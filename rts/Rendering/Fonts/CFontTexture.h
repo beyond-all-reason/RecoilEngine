@@ -139,6 +139,7 @@ public:
 	const GlyphInfo& GetGlyph(char32_t ch); //< Get a glyph
 public:
 	void ReallocAtlases(bool pre);
+	bool HasColor() const { return needsColor; }
 protected:
 	void LoadWantedGlyphs(char32_t begin, char32_t end);
 	void LoadWantedGlyphs(const std::vector<char32_t>& wanted);
@@ -150,6 +151,7 @@ protected:
 private:
 	void ClearAtlases(const int width, const int height);
 	void CreateTexture(const int width, const int height);
+	void CreateTexture(const int width, const int height, const bool init);
 	void LoadGlyph(std::shared_ptr<FontFace>& f, char32_t ch, unsigned index);
 	bool ClearGlyphs();
 	void PreloadGlyphs();
@@ -176,6 +178,8 @@ protected:
 	int texHeight;
 	int wantedTexWidth;
 	int wantedTexHeight;
+	bool needsColor;
+	bool isColor;
 
 	unsigned int glyphAtlasTextureID = 0;
 

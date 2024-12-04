@@ -645,7 +645,7 @@ void CglFont::End() {
 	fontRenderer->HandleTextureUpdate(*this, false);
 	fontRenderer->PushGLState(*this);
 	fontRenderer->DrawTraingleElements();
-	fontRenderer->PopGLState();
+	fontRenderer->PopGLState(*this);
 
 	fontRenderer->SetUserDefinedBlending(false);
 
@@ -666,7 +666,7 @@ void CglFont::DrawBuffered(bool userDefinedBlending)
 
 	fontRenderer->PushGLState(*this);
 	fontRenderer->DrawTraingleElements();
-	fontRenderer->PopGLState();
+	fontRenderer->PopGLState(*this);
 
 	fontRenderer->SetUserDefinedBlending(false);
 }
