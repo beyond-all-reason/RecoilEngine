@@ -596,11 +596,12 @@ void CUnitDrawerData::RenderUnitCreated(const CUnit* unit, int cloaked)
 	UpdateUnitIcon(unit, false, false);
 }
 
-void CUnitDrawerData::UpdateGhosts(const CUnit* unit, const bool addNewGhost)
+bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost)
 {
 	if (!gameSetup->ghostedBuildings)
-		return;
+		return false;
 
+	bool addedOwnAllyTeam = false;
 	CUnit* u = const_cast<CUnit*>(unit);
 
 	const UnitDef* unitDef = unit->unitDef;
@@ -647,10 +648,14 @@ void CUnitDrawerData::UpdateGhosts(const CUnit* unit, const bool addNewGhost)
 			// remove prevlos for unit
 			if (u->losStatus[allyTeam] & LOS_PREVLOS)
 				u->losStatus[allyTeam] ^= LOS_PREVLOS;
+			if (allyTeam == gu->myAllyTeam)
+				addedOwnAllyTeam = true;
+
 		}
 
 		spring::VectorErase(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(u)], u);
 	}
+	return addedOwnAllyTeam;
 }
 
 void CUnitDrawerData::RenderUnitDestroyed(const CUnit* unit)
@@ -658,7 +663,7 @@ void CUnitDrawerData::RenderUnitDestroyed(const CUnit* unit)
 	RECOIL_DETAILED_TRACY_ZONE;
 	CUnit* u = const_cast<CUnit*>(unit);
 
-	UpdateGhosts(unit, unit->staticRadarGhost);
+	UpdateUnitGhosts(unit, unit->staticRadarGhost);
 
 	DelObject(unit, true);
 	UpdateUnitIcon(unit, false, true);
@@ -708,9 +713,8 @@ void CUnitDrawerData::SetUnitStaticRadarGhost(const CUnit* unit)
 	if (unit->staticRadarGhost)
 		return;
 
-	const bool addNewGhost = gameSetup->ghostedBuildings;
-
-	UpdateGhosts(unit, true);
+	if (UpdateUnitGhosts(unit, true))
+		UpdateUnitIcon(unit, false, true);
 }
 
 void CUnitDrawerData::PlayerChanged(int playerNum)
