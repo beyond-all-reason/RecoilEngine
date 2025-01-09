@@ -2869,7 +2869,6 @@ int LuaSyncedCtrl::SetUnitSeismicSignature(lua_State* L)
  * @function Spring.SetUnitLeavesGhost
  *
  * Set the radar ghost for the unit to have no drift.
- * Only for units where unitDef has leavesGhost enabled.
  *
  * @number unitID
  * @bool leavesGhost
