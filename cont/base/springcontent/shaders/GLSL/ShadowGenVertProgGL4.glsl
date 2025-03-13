@@ -266,7 +266,6 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 	);
 
 	//tx = transforms[instData.x + 2u + 2u * bID0 + 1u];
-
 	weights[0] *= float(tx.trSc.w > 0.0);
 	msPosition = ApplyTransform(tx, piecePos);
 	msNormal = ApplyTransform(tx, normal4).xyz;
