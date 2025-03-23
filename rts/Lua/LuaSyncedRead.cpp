@@ -74,6 +74,7 @@
 #include "Sim/Weapons/PlasmaRepulser.h"
 #include "Sim/Weapons/Weapon.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
+#include "System/AABB.hpp"
 #include "System/MainDefines.h"
 #include "System/SpringMath.h"
 #include "System/FileSystem/FileHandler.h"
@@ -81,6 +82,7 @@
 #include "System/StringUtil.h"
 
 #include <cctype>
+#include <functional>
 #include <type_traits>
 
 
@@ -2932,7 +2934,7 @@ void ApplyPlanarTeamError(lua_State* L, int allegiance, float3& mins, float3& ma
  * @param inRegion A lambda checking if the unit position is in the region
  */
 template<typename InRegion>
-static void getFilteredUnits(lua_State *L, int allegiance, const std::vector<CUnit *> &units, InRegion inRegion, bool fullRead) {
+static void GetFilteredUnits(lua_State *L, int allegiance, const std::vector<CUnit *> &units, InRegion inRegion, bool fullRead) {
     unsigned int count = 0;
 
     const int readTeam = CLuaHandle::GetHandleReadTeam(L);
@@ -2994,7 +2996,7 @@ int LuaSyncedRead::GetUnitsInRectangle(lua_State* L)
 
     lua_createtable(L, units.size(), 0);
 
-    getFilteredUnits(L, allegiance, units, rectangeCheck, fullRead);
+    GetFilteredUnits(L, allegiance, units, rectangeCheck, fullRead);
 
 	return 1;
 }
@@ -3026,16 +3028,8 @@ int LuaSyncedRead::GetUnitsInBox(lua_State* L)
 
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 7);
 
-    const auto boxCheck = [&](const float3 &pos) {
-        if((pos.x < xmin) || (pos.x > xmax))
-            return false;
-        if((pos.z < zmin) || (pos.z > zmax))
-            return false;
-        if((pos.y < ymin) || (pos.y > ymax)) {
-            return false;
-        }
-        return true;
-    };
+    const auto boxCheck = std::bind_front(&AABB::Contains,
+                                          AABB(float3(xmin, ymin, zmin), float3(xmax, ymax, zmax)));
 
     const bool fullRead = CLuaHandle::GetHandleFullRead(L);
 	if (!fullRead)
@@ -3047,7 +3041,7 @@ int LuaSyncedRead::GetUnitsInBox(lua_State* L)
 
     lua_createtable(L, units.size(), 0);
 
-    getFilteredUnits(L, allegiance, units, boxCheck, fullRead);
+    GetFilteredUnits(L, allegiance, units, boxCheck, fullRead);
 
     return 1;
 }
@@ -3072,11 +3066,8 @@ int LuaSyncedRead::GetUnitsInCylinder(lua_State* L)
 
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 4);
 
-	const auto cylinderCheck = [&](const float3 &pos) {
-		const float dx = (pos.x - x);
-		const float dz = (pos.z - z);
-		const float dist = ((dx * dx) + (dz * dz));
-		return dist <= radSqr;
+	const auto cylinderCheck = [&](const float3 &p) {
+		return p.SqDistance2D(float3{x, 0.0, z}) <= radSqr;
 	};
 
     const bool fullRead = CLuaHandle::GetHandleFullRead(L);
@@ -3089,7 +3080,7 @@ int LuaSyncedRead::GetUnitsInCylinder(lua_State* L)
 
     lua_createtable(L, units.size(), 0);
 
-	getFilteredUnits(L, allegiance, units, cylinderCheck, fullRead);
+	GetFilteredUnits(L, allegiance, units, cylinderCheck, fullRead);
 
 	return 1;
 }
@@ -3112,18 +3103,13 @@ int LuaSyncedRead::GetUnitsInSphere(lua_State* L)
 	const float radius = luaL_checkfloat(L, 4);
 	const float radSqr = (radius * radius);
 
-	const float3 pos(x, y, z);
 	float3 mins(x - radius, 0.0f, z - radius);
 	float3 maxs(x + radius, 0.0f, z + radius);
 
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 5);
 
-	const auto sphereCheck = [&](const float3 &pos) {
-		const float dx = (pos.x - x);
-		const float dy = (pos.y - y);
-		const float dz = (pos.z - z);
-		const float dist = ((dx * dx) + (dy * dy) + (dz * dz));
-		return dist <= radSqr;
+	const auto sphereCheck = [&](const float3 &p) {
+		return p.SqDistance(float3(x, y, z)) <= radSqr;
 	};
 
     const bool fullRead = CLuaHandle::GetHandleFullRead(L);
@@ -3136,7 +3122,7 @@ int LuaSyncedRead::GetUnitsInSphere(lua_State* L)
 
     lua_createtable(L, units.size(), 0);
 
-	getFilteredUnits(L, allegiance, units, sphereCheck, fullRead);
+	GetFilteredUnits(L, allegiance, units, sphereCheck, fullRead);
 
 	return 1;
 }
@@ -3228,7 +3214,7 @@ int LuaSyncedRead::GetUnitsInPlanes(lua_State *L) {
     for(int team = startTeam; team <= endTeam; team++) {
         const std::vector<CUnit *> &units = unitHandler.GetUnitsByTeam(team);
 
-        getFilteredUnits(L, allegiance, units, planesTest, fullRead);
+        GetFilteredUnits(L, allegiance, units, planesTest, fullRead);
     }
 
     return 1;
