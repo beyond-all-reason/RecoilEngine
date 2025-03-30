@@ -1599,11 +1599,13 @@ int LuaSyncedRead::GetMapStartPositions(lua_State* L)
 		if (!mapParser.GetStartPos(teamNum, pos))
 			return false;
 
+		// clang-format off
 		lua_createtable(L, 3, 0);
 		lua_pushnumber(L, pos.x); lua_rawseti(L, -2, 1);
 		lua_pushnumber(L, pos.y); lua_rawseti(L, -2, 2);
 		lua_pushnumber(L, pos.z); lua_rawseti(L, -2, 3);
 		lua_rawseti(L, -2, 1 + teamNum); // [i] = {x,y,z}
+		                             // clang-format on
 		return true;
 	});
 
@@ -4470,11 +4472,13 @@ int LuaSyncedRead::GetUnitVectors(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
+	// clang-format off
 #define PACK_VECTOR(n) \
 	lua_createtable(L, 3, 0);            \
 	lua_pushnumber(L, unit-> n .x); lua_rawseti(L, -2, 1); \
 	lua_pushnumber(L, unit-> n .y); lua_rawseti(L, -2, 2); \
 	lua_pushnumber(L, unit-> n .z); lua_rawseti(L, -2, 3)
+	// clang-format on
 
 	PACK_VECTOR(frontdir);
 	PACK_VECTOR(updir);
@@ -4844,12 +4848,12 @@ int LuaSyncedRead::GetUnitBuildParams(lua_State* L)
 	case hashString("buildDistance"): {
 		lua_pushnumber(L, builder->buildDistance);
 		return 1;
-	} break;
+	}
 	case hashString("buildRange3D"): {
 		lua_pushboolean(L, builder->range3D);
 		return 1;
-	} break;
-	default: {} break;
+	}
+	default: break;
 	};
 
 	return 0;
@@ -5216,10 +5220,12 @@ int LuaSyncedRead::GetUnitWeaponState(lua_State* L)
 		case hashString("salvoError"): {
 			const float3 salvoError =  weapon->SalvoErrorExperience();
 
-			lua_createtable(L, 3, 0);
+		// clang-format off
+		lua_createtable(L, 3, 0);
 			lua_pushnumber(L, salvoError.x); lua_rawseti(L, -2, 1);
 			lua_pushnumber(L, salvoError.y); lua_rawseti(L, -2, 2);
 			lua_pushnumber(L, salvoError.z); lua_rawseti(L, -2, 3);
+		// clang-format on
 		} break;
 
 		case hashString("salvoLeft"): {
@@ -5336,9 +5342,9 @@ int LuaSyncedRead::GetUnitWeaponDamages(lua_State* L)
 		const char* key = lua_tostring(L, 2);
 
 		switch (hashString(key)) {
-			case hashString("explode"     ): { damages = unit->deathExpDamages; } break;
-			case hashString("selfDestruct"): { damages = unit->selfdExpDamages; } break;
-			default                        : {                        return 0; } break;
+		case hashString("explode"): damages = unit->deathExpDamages; break;
+		case hashString("selfDestruct"): damages = unit->selfdExpDamages; break;
+		default: return 0;
 		}
 	} else {
 		const size_t weaponNum = luaL_checkint(L, 2) - LUA_WEAPON_BASE_INDEX;
@@ -5380,10 +5386,10 @@ int LuaSyncedRead::GetUnitWeaponVectors(lua_State* L)
 	const float3* dir = &weapon->wantedDir;
 
 	switch (weapon->weaponDef->projectileType) {
-		case WEAPON_MISSILE_PROJECTILE  : { dir = &weapon->weaponDir; } break;
-		case WEAPON_TORPEDO_PROJECTILE  : { dir = &weapon->weaponDir; } break;
-		case WEAPON_STARBURST_PROJECTILE: { dir = &weapon->weaponDir; } break;
-		default                         : {                           } break;
+	case WEAPON_MISSILE_PROJECTILE: dir = &weapon->weaponDir; break;
+	case WEAPON_TORPEDO_PROJECTILE: dir = &weapon->weaponDir; break;
+	case WEAPON_STARBURST_PROJECTILE: dir = &weapon->weaponDir; break;
+	default: break;
 	}
 
 	lua_pushnumber(L, pos.x);
@@ -5687,27 +5693,27 @@ int LuaSyncedRead::GetUnitWeaponTarget(lua_State* L)
 	lua_pushnumber(L, curTarget.type);
 
 	switch (curTarget.type) {
-		case Target_None:
-			return 1;
-			break;
-		case Target_Unit: {
-			lua_pushboolean(L, curTarget.isUserTarget);
-			lua_pushnumber(L, curTarget.unit->id);
-			break;
-		}
-		case Target_Pos: {
-			lua_pushboolean(L, curTarget.isUserTarget);
-			lua_createtable(L, 3, 0);
+	case Target_None: return 1;
+	case Target_Unit: {
+		lua_pushboolean(L, curTarget.isUserTarget);
+		lua_pushnumber(L, curTarget.unit->id);
+		break;
+	}
+	case Target_Pos: {
+		lua_pushboolean(L, curTarget.isUserTarget);
+		// clang-format off
+		lua_createtable(L, 3, 0);
 			lua_pushnumber(L, curTarget.groundPos.x); lua_rawseti(L, -2, 1);
 			lua_pushnumber(L, curTarget.groundPos.y); lua_rawseti(L, -2, 2);
 			lua_pushnumber(L, curTarget.groundPos.z); lua_rawseti(L, -2, 3);
-			break;
-		}
-		case Target_Intercept: {
-			lua_pushboolean(L, curTarget.isUserTarget);
-			lua_pushnumber(L, curTarget.intercept->id);
-			break;
-		}
+		// clang-format on
+		break;
+	}
+	case Target_Intercept: {
+		lua_pushboolean(L, curTarget.isUserTarget);
+		lua_pushnumber(L, curTarget.intercept->id);
+		break;
+	}
 	}
 
 	return 3;
@@ -7200,10 +7206,12 @@ int LuaSyncedRead::GetProjectileTarget(lua_State* L)
 
 	if (wtgt == nullptr) {
 		lua_pushnumber(L, int('g')); // ground
+		// clang-format off
 		lua_createtable(L, 3, 0);
 		lua_pushnumber(L, (wpro->GetTargetPos()).x); lua_rawseti(L, -2, 1);
 		lua_pushnumber(L, (wpro->GetTargetPos()).y); lua_rawseti(L, -2, 2);
 		lua_pushnumber(L, (wpro->GetTargetPos()).z); lua_rawseti(L, -2, 3);
+		// clang-format on
 		return 2;
 	}
 
@@ -8412,6 +8420,7 @@ static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 	lua_pushboolean(L, !op.HasGeometryData());
 	lua_rawset(L, -3);
 
+	// clang-format off
 	HSTR_PUSH(L, "min");
 	lua_createtable(L, 3, 0); {
 		lua_pushnumber(L, op.mins.x); lua_rawseti(L, -2, 1);
@@ -8435,6 +8444,7 @@ static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 		lua_pushnumber(L, op.offset.z); lua_rawseti(L, -2, 3);
 	}
 	lua_rawset(L, -3);
+	// clang-format on
 	return 1;
 }
 

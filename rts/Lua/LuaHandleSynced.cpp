@@ -449,6 +449,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	origNextRef = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	// delete/replace some dangerous functions
+	// clang-format off
 	lua_pushnil(L); lua_setglobal(L, "dofile");
 	lua_pushnil(L); lua_setglobal(L, "loadfile");
 	lua_pushnil(L); lua_setglobal(L, "loadlib");
@@ -521,7 +522,8 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 		if (!AddEntriesToTable(L, "COB",              LuaConstCOB::PushEntries      )) KILL
 		if (!AddEntriesToTable(L, "SFX",              LuaConstSFX::PushEntries      )) KILL
 		if (!AddEntriesToTable(L, "LOG",                 LuaUtils::PushLogEntries   )) KILL
-		#undef KILL
+#undef KILL
+		// clang-format on
 	}
 
 	// add code from the sub-class
@@ -1288,9 +1290,10 @@ bool CSyncedLuaHandle::AllowBuilderHoldFire(const CUnit* unit, int action)
  *
  *     0 - player picked a position,
  *     1 - player clicked ready,
- *     2 - player pressed ready OR the game was force-started (player did not click ready, but is now forcibly readied) or
+ *     2 - player pressed ready OR the game was force-started (player did not click ready, but is now forcibly readied),
  *     3 - the player failed to load.
- *     The default 'failed to choose' start-position is the north-west point of their startbox, or (0,0,0) if they do not have a startbox.
+ * The default 'failed to choose' start-position is the north-west point of their startbox, or (0,0,0) if they do not
+ * have a startbox.
  *
  * @param playerID integer
  * @param teamID integer
@@ -2120,6 +2123,7 @@ int CSyncedLuaHandle::GetWatchWeaponDef(lua_State* L) {
 	return 1;
 }
 
+// clang-format off
 GetWatchDef(Unit)
 GetWatchDef(Feature)
 GetWatchDef(Explosion)
@@ -2131,6 +2135,7 @@ SetWatchDef(Feature)
 SetWatchDef(Explosion)
 SetWatchDef(Projectile)
 SetWatchDef(AllowTarget)
+// clang-format on
 
 #undef GetWatchDef
 #undef SetWatchDef

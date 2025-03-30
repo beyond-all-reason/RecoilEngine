@@ -90,12 +90,14 @@ int LuaPathFinder::PushPathNodes(lua_State* L, const int pathID)
 		lua_createtable(L, pointCount, 0);
 
 		for (int i = 0; i < pointCount; i++) {
+			// clang-format off
 			lua_createtable(L, 3, 0); {
 				const float3& p = points[i];
 				lua_pushnumber(L, p.x); lua_rawseti(L, -2, 1);
 				lua_pushnumber(L, p.y); lua_rawseti(L, -2, 2);
 				lua_pushnumber(L, p.z); lua_rawseti(L, -2, 3);
 			}
+			// clang-format on
 			lua_rawseti(L, -2, i + 1);
 		}
 	}

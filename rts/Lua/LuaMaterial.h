@@ -81,10 +81,10 @@ class LuaMatShader {
 		// only accepts engine programs
 		void SetEngineTypeFromKey(const char* key) {
 			switch (hashStringLower(key)) {
-				case hashStringLower("3DO"): { type = LUASHADER_3DO ; } break;
-				case hashStringLower("S3O"): { type = LUASHADER_S3O ; } break;
-				case hashStringLower("ASS"): { type = LUASHADER_ASS ; } break;
-				default                    : { type = LUASHADER_NONE; } break;
+			case hashStringLower("3DO"): type = LUASHADER_3DO; break;
+			case hashStringLower("S3O"): type = LUASHADER_S3O; break;
+			case hashStringLower("ASS"): type = LUASHADER_ASS; break;
+			default: type = LUASHADER_NONE; break;
 			}
 		}
 
@@ -246,9 +246,9 @@ private:
 		bool Execute(const Type val) const { return (CanExec() && RawExec(val)); }
 		bool RawExec(const Type val) const {
 			switch (Size) {
-				case 3: { glUniform3fv(loc, 1, &val.x); return true; } break;
-				case 4: { glUniform4fv(loc, 1, &val.x); return true; } break;
-				default: { return false; } break;
+			case 3: glUniform3fv(loc, 1, &val.x); return true;
+			case 4: glUniform4fv(loc, 1, &val.x); return true;
+			default: return false;
 			}
 		}
 
@@ -372,9 +372,9 @@ class LuaMatBin : public LuaMaterial {
 			static const std::vector<CSolidObject*> dummy;
 
 			switch (objType) {
-				case LUAOBJ_UNIT   : { return (GetUnits   ()); } break;
-				case LUAOBJ_FEATURE: { return (GetFeatures()); } break;
-				default            : {          assert(false); } break;
+			case LUAOBJ_UNIT: return (GetUnits()); break;
+			case LUAOBJ_FEATURE: return (GetFeatures()); break;
+			default: assert(false); break;
 			}
 
 			return dummy;
@@ -387,9 +387,9 @@ class LuaMatBin : public LuaMaterial {
 		void AddFeature(CSolidObject* o) { features.push_back(o); }
 		void AddObject(CSolidObject* o, LuaObjType objType) {
 			switch (objType) {
-				case LUAOBJ_UNIT   : { AddUnit   (o); } break;
-				case LUAOBJ_FEATURE: { AddFeature(o); } break;
-				default            : { assert(false); } break;
+			case LUAOBJ_UNIT: AddUnit(o); break;
+			case LUAOBJ_FEATURE: AddFeature(o); break;
+			default: assert(false); break;
 			}
 		}
 

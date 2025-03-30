@@ -648,8 +648,10 @@ int LuaFBOs::ActiveFBO(lua_State* L)
 	glPushAttrib(GL_VIEWPORT_BIT);
 	glViewport(0, 0, fbo->xsize, fbo->ysize);
 	if (identities) {
+		// clang-format off
 		glMatrixMode(GL_PROJECTION); glPushMatrix(); glLoadIdentity();
 		glMatrixMode(GL_MODELVIEW);  glPushMatrix(); glLoadIdentity();
+		// clang-format on
 	}
 
 	GLint currentFBO = 0;
@@ -660,8 +662,10 @@ int LuaFBOs::ActiveFBO(lua_State* L)
 
 	glBindFramebufferEXT(target, currentFBO);
 	if (identities) {
+		// clang-format off
 		glMatrixMode(GL_PROJECTION); glPopMatrix();
 		glMatrixMode(GL_MODELVIEW);  glPopMatrix();
+		// clang-format on
 	}
 	glPopAttrib();
 
@@ -868,6 +872,7 @@ int LuaFBOs::ClearAttachmentFBO(lua_State* L)
 	GLenum attachment = 0;
 	GLenum drawBuffer = 0;
 
+	// clang-format off
 	if (lua_isstring(L, nextArg)) {
 		const char* attachmentStr = luaL_checkstring(L, nextArg++);
 		switch (hashString(attachmentStr)) {
@@ -917,6 +922,7 @@ int LuaFBOs::ClearAttachmentFBO(lua_State* L)
 				return ReportErrorAndReturn(fmt::format("invalid attachment type ({})", attachment).c_str());
 		}
 	}
+	// clang-format on
 
 	GLint attachmentType = GL_NONE;
 	glGetFramebufferAttachmentParameteriv(target, attachment, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &attachmentType);

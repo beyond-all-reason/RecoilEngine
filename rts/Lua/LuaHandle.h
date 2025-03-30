@@ -58,14 +58,14 @@ class CLuaHandle : public CEventClient
 		static void SetHandle ## Name(const lua_State* L, type _ ## val) {        GetLuaContextData(L)->val = _ ## val; } \
 		static type GetHandle ## Name(const lua_State* L               ) { return GetLuaContextData(L)->val           ; }
 
-		PERMISSIONS_FUNCS(FullRead,     bool, fullRead, override); // virtual function in CEventClient
-		PERMISSIONS_FUNCS(FullCtrl,     bool, fullCtrl, );
-		PERMISSIONS_FUNCS(CtrlTeam,     int,  ctrlTeam, );
-		PERMISSIONS_FUNCS(ReadTeam,     int,  readTeam, );
-		PERMISSIONS_FUNCS(ReadAllyTeam, int,  readAllyTeam, override); // virtual function in CEventClient
-		PERMISSIONS_FUNCS(SelectTeam,   int,  selectTeam, );
-
-	#undef PERMISSIONS_FUNCS
+	// clang-format off
+	PERMISSIONS_FUNCS(FullRead,     bool, fullRead, override); // virtual function in CEventClient
+	PERMISSIONS_FUNCS(FullCtrl,     bool, fullCtrl, );
+	PERMISSIONS_FUNCS(CtrlTeam,     int,  ctrlTeam, );
+	PERMISSIONS_FUNCS(ReadTeam,     int,  readTeam, );
+	PERMISSIONS_FUNCS(ReadAllyTeam, int,  readAllyTeam, override); // virtual function in CEventClient
+	PERMISSIONS_FUNCS(SelectTeam,   int,  selectTeam, );
+	// clang-format on
 
 		static bool GetHandleSynced(const lua_State* L) { return GetLuaContextData(L)->synced; }
 

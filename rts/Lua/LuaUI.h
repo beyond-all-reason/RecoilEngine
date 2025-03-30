@@ -40,9 +40,9 @@ public:
 	void QueueAction(const QueuedAction action) { queuedAction = action; }
 	void CheckAction() {
 		switch (queuedAction) {
-			case ACTION_RELOAD:  { ReloadHandler(); } break;
-			case ACTION_DISABLE: {   FreeHandler(); } break;
-			default:             {                  } break;
+		case ACTION_RELOAD: ReloadHandler(); break;
+		case ACTION_DISABLE: FreeHandler(); break;
+		default: break;
 		}
 	}
 

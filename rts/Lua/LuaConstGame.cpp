@@ -117,6 +117,7 @@
 
 bool LuaConstGame::PushEntries(lua_State* L)
 {
+	// clang-format off
 	{
 		// game, should perhaps be moved over to ConstEngine
 		LuaPushNamedNumber(L, "maxTeams"  , MAX_TEAMS  );
@@ -334,5 +335,6 @@ bool LuaConstGame::PushEntries(lua_State* L)
 	}
 
 	return true;
+	// clang-format on
 }
 
