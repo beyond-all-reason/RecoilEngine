@@ -45,7 +45,7 @@ jobs:
           emmylua_doc_cli \
             -i rts/Lua/library \
             -o doc/site/lua-api \
-            --override-template doc/emmlua-doc-cli-template
+            --override-template doc/emmylua-doc-cli-template
           git add -f doc/site/lua-api
       - name: Commit changes
         run: |
