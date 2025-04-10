@@ -2,38 +2,46 @@
 
 
 #include "LuaPathFinder.h"
-#include "LuaInclude.h"
+
 #include "LuaHandle.h"
+#include "LuaInclude.h"
 #include "LuaUtils.h"
-#include "Sim/Path/IPathManager.h"
+
 #include "Sim/MoveTypes/MoveDefHandler.h"
+#include "Sim/Path/IPathManager.h"
 
 #include <algorithm>
 #include <vector>
 
-
 struct NodeCostOverlay {
 public:
 	NodeCostOverlay() { Clear(); }
+
 	NodeCostOverlay(const NodeCostOverlay& o) = delete;
-	NodeCostOverlay(NodeCostOverlay&& o) noexcept {
+
+	NodeCostOverlay(NodeCostOverlay&& o) noexcept
+	{
 		costs = std::move(o.costs);
 		sizex = o.sizex;
 		sizez = o.sizez;
 	}
 
-	void Init(unsigned int sx, unsigned int sz) {
+	void Init(unsigned int sx, unsigned int sz)
+	{
 		costs.resize(sx * sz, 0.0f);
 		sizex = sx;
 		sizez = sz;
 	}
-	void Clear() {
+
+	void Clear()
+	{
 		costs.clear();
 		sizex = 0;
 		sizez = 0;
 	}
 
 	bool Empty() const { return costs.empty(); }
+
 	unsigned int Size() const { return costs.size(); }
 
 public:
@@ -48,16 +56,15 @@ static std::vector<NodeCostOverlay> costOverlays[2];
 
 static void CreatePathMetatable(lua_State* L);
 
-
 /******************************************************************************/
 /******************************************************************************/
 
 bool LuaPathFinder::PushEntries(lua_State* L)
 {
 	// safety in case of reload
-	costOverlays[ true].clear();
+	costOverlays[true].clear();
 	costOverlays[false].clear();
-	costOverlays[ true].resize(4);
+	costOverlays[true].resize(4);
 	costOverlays[false].resize(4);
 
 	CreatePathMetatable(L);
@@ -79,7 +86,7 @@ int LuaPathFinder::PushPathNodes(lua_State* L, const int pathID)
 		return 0;
 
 	vector<float3> points;
-	vector<int>    starts;
+	vector<int> starts;
 
 	pathManager->GetPathWayPoints(pathID, points, starts);
 
@@ -114,7 +121,6 @@ int LuaPathFinder::PushPathNodes(lua_State* L, const int pathID)
 	return 2;
 }
 
-
 /******************************************************************************/
 
 static int path_next(lua_State* L)
@@ -139,9 +145,7 @@ static int path_next(lua_State* L)
 	const bool synced = CLuaHandle::GetHandleSynced(L);
 	const float3 point = pathManager->NextWayPoint(nullptr, pathID, 0, callerPos, minDist, synced);
 
-	if ((point.x == -1.0f) &&
-	    (point.y == -1.0f) &&
-	    (point.z == -1.0f)) {
+	if ((point.x == -1.0f) && (point.y == -1.0f) && (point.z == -1.0f)) {
 		return 0;
 	}
 
@@ -151,7 +155,6 @@ static int path_next(lua_State* L)
 
 	return 3;
 }
-
 
 static int path_nodes(lua_State* L)
 {
@@ -181,10 +184,7 @@ static int path_index(lua_State* L)
 	return 0;
 }
 
-static int path_newindex(lua_State* L)
-{
-	return 0;
-}
+static int path_newindex(lua_State* L) { return 0; }
 
 static int path_gc(lua_State* L)
 {
@@ -199,16 +199,14 @@ static int path_gc(lua_State* L)
 	return 0;
 }
 
-
 static void CreatePathMetatable(lua_State* L)
 {
 	luaL_newmetatable(L, "Path");
-	HSTR_PUSH_CFUNC(L, "__gc",       path_gc);
-	HSTR_PUSH_CFUNC(L, "__index",    path_index);
+	HSTR_PUSH_CFUNC(L, "__gc", path_gc);
+	HSTR_PUSH_CFUNC(L, "__index", path_index);
 	HSTR_PUSH_CFUNC(L, "__newindex", path_newindex);
 	lua_pop(L, 1);
 }
-
 
 /******************************************************************************/
 /******************************************************************************/
@@ -219,7 +217,8 @@ int LuaPathFinder::RequestPath(lua_State* L)
 
 	if (lua_israwstring(L, 1)) {
 		moveDef = moveDefHandler.GetMoveDefByName(lua_tostring(L, 1));
-	} else {
+	}
+	else {
 		const unsigned int pathType = luaL_checkint(L, 1);
 
 		if (pathType >= moveDefHandler.GetNumMoveDefs())
@@ -232,7 +231,7 @@ int LuaPathFinder::RequestPath(lua_State* L)
 		return 0;
 
 	const float3 start(luaL_checkfloat(L, 2), luaL_checkfloat(L, 3), luaL_checkfloat(L, 4));
-	const float3   end(luaL_checkfloat(L, 5), luaL_checkfloat(L, 6), luaL_checkfloat(L, 7));
+	const float3 end(luaL_checkfloat(L, 5), luaL_checkfloat(L, 6), luaL_checkfloat(L, 7));
 
 	const float radius = luaL_optfloat(L, 8, 8.0f);
 
@@ -250,8 +249,6 @@ int LuaPathFinder::RequestPath(lua_State* L)
 	*idPtr = pathID;
 	return 1;
 }
-
-
 
 int LuaPathFinder::InitPathNodeCostsArray(lua_State* L)
 {
@@ -316,8 +313,6 @@ int LuaPathFinder::FreePathNodeCostsArray(lua_State* L)
 	return 1;
 }
 
-
-
 int LuaPathFinder::SetPathNodeCosts(lua_State* L)
 {
 	const unsigned int overlayIndex = luaL_checkint(L, 1);
@@ -370,8 +365,6 @@ int LuaPathFinder::GetPathNodeCosts(lua_State* L)
 
 	return 1;
 }
-
-
 
 int LuaPathFinder::SetPathNodeCost(lua_State* L)
 {

@@ -1,11 +1,11 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef S_SKIRMISH_AI_CALLBACK_H
-#define	S_SKIRMISH_AI_CALLBACK_H
+#define S_SKIRMISH_AI_CALLBACK_H
 
 #include "aidefines.h"
 
-#if	defined(__cplusplus)
+#if defined(__cplusplus)
 extern "C" {
 #endif
 

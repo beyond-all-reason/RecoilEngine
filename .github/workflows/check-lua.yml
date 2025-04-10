@@ -40,6 +40,6 @@ jobs:
           mkdir lls
           tar -xvzf lls.tar.gz -C lls
 
-      - name: Check 
+      - name: Check
         run: |
           ./lls/bin/lua-language-server --check rts/Lua/library

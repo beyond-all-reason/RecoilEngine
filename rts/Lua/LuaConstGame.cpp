@@ -2,9 +2,10 @@
 
 #include "LuaConstGame.h"
 
-#include "LuaInclude.h"
 #include "LuaHandle.h"
+#include "LuaInclude.h"
 #include "LuaUtils.h"
+
 #include "Game/GameSetup.h"
 #include "Game/TraceRay.h"
 #include "Map/MapDamage.h"
@@ -12,9 +13,9 @@
 #include "Map/MetalMap.h"
 #include "Map/ReadMap.h"
 #include "Rendering/Fonts/glFont.h"
-#include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/CategoryHandler.h"
 #include "Sim/Misc/DamageArrayHandler.h"
+#include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/Wind.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/MoveTypes/ScriptMoveType.h"
@@ -26,7 +27,7 @@
 /******************************************************************************
  * Game constants
  * @see rts/Lua/LuaConstGame.cpp
-******************************************************************************/
+ ******************************************************************************/
 
 /*** Game specific information
  *
@@ -34,7 +35,8 @@
  * @field maxUnits number
  * @field maxTeams number
  * @field maxPlayers number
- * @field squareSize number Divide Game.mapSizeX or Game.mapSizeZ by this to get engine's "mapDims" coordinates. The resolution of height, yard and type maps.
+ * @field squareSize number Divide Game.mapSizeX or Game.mapSizeZ by this to get engine's "mapDims" coordinates. The
+ * resolution of height, yard and type maps.
  * @field metalMapSquareSize number The resolution of metalmap (for use in API such as Spring.GetMetalAmount etc.)
  * @field gameSpeed number Number of simulation gameframes per second
  * @field startPosType number
@@ -112,7 +114,8 @@
  *       ["crawlingbombs"]= 10, ...
  *     }
  * ```
- * @field textColorCodes TextColorCode Table containing keys that represent the color code operations during font rendering
+ * @field textColorCodes TextColorCode Table containing keys that represent the color code operations during font
+ * rendering
  */
 
 bool LuaConstGame::PushEntries(lua_State* L)
@@ -337,4 +340,3 @@ bool LuaConstGame::PushEntries(lua_State* L)
 	return true;
 	// clang-format on
 }
-

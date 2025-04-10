@@ -3,18 +3,17 @@
 
 #include "LuaRBOs.h"
 
-#include "LuaInclude.h"
-
 #include "LuaHandle.h"
 #include "LuaHashString.h"
+#include "LuaInclude.h"
 #include "LuaUtils.h"
-#include "Rendering/GlobalRendering.h"
 
+#include "Rendering/GlobalRendering.h"
 
 /******************************************************************************
  * RBO
  * @see rts/Lua/LuaRBOs.cpp
-******************************************************************************/
+ ******************************************************************************/
 
 LuaRBOs::~LuaRBOs()
 {
@@ -22,7 +21,6 @@ LuaRBOs::~LuaRBOs()
 		glDeleteRenderbuffersEXT(1, &rbo->id);
 	}
 }
-
 
 /******************************************************************************/
 /******************************************************************************/
@@ -37,17 +35,15 @@ bool LuaRBOs::PushEntries(lua_State* L)
 	return true;
 }
 
-
 bool LuaRBOs::CreateMetatable(lua_State* L)
 {
 	luaL_newmetatable(L, "RBO");
-	HSTR_PUSH_CFUNC(L, "__gc",        meta_gc);
-	HSTR_PUSH_CFUNC(L, "__index",     meta_index);
-	HSTR_PUSH_CFUNC(L, "__newindex",  meta_newindex);
+	HSTR_PUSH_CFUNC(L, "__gc", meta_gc);
+	HSTR_PUSH_CFUNC(L, "__index", meta_index);
+	HSTR_PUSH_CFUNC(L, "__newindex", meta_newindex);
 	lua_pop(L, 1);
 	return true;
 }
-
 
 /******************************************************************************/
 /******************************************************************************/
@@ -57,23 +53,21 @@ const LuaRBOs::RBO* LuaRBOs::GetLuaRBO(lua_State* L, int index)
 	return static_cast<RBO*>(LuaUtils::GetUserData(L, index, "RBO"));
 }
 
-
 /******************************************************************************/
 /******************************************************************************/
 
 void LuaRBOs::RBO::Init()
 {
-	index   = -1u;
-	id      = 0;
+	index = -1u;
+	id = 0;
 
-	target  = GL_RENDERBUFFER_EXT;
-	format  = GL_RGBA;
+	target = GL_RENDERBUFFER_EXT;
+	format = GL_RGBA;
 
-	xsize   = 0;
-	ysize   = 0;
+	xsize = 0;
+	ysize = 0;
 	samples = 0;
 }
-
 
 void LuaRBOs::RBO::Free(lua_State* L)
 {
@@ -97,7 +91,6 @@ void LuaRBOs::RBO::Free(lua_State* L)
 	}
 }
 
-
 /******************************************************************************/
 /******************************************************************************/
 
@@ -107,7 +100,6 @@ int LuaRBOs::meta_gc(lua_State* L)
 	rbo->Free(L);
 	return 0;
 }
-
 
 int LuaRBOs::meta_index(lua_State* L)
 {
@@ -124,12 +116,7 @@ int LuaRBOs::meta_index(lua_State* L)
 	}
 }
 
-
-int LuaRBOs::meta_newindex(lua_State* L)
-{
-	return 0;
-}
-
+int LuaRBOs::meta_newindex(lua_State* L) { return 0; }
 
 /******************************************************************************/
 /******************************************************************************/
@@ -227,7 +214,6 @@ int LuaRBOs::CreateRBO(lua_State* L)
 	return 1;
 }
 
-
 /***
  * @function gl.DeleteRBO
  * @param rbo RBO
@@ -241,7 +227,6 @@ int LuaRBOs::DeleteRBO(lua_State* L)
 	rbo->Free(L);
 	return 0;
 }
-
 
 /******************************************************************************/
 /******************************************************************************/
