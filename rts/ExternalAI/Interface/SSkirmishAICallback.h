@@ -9,6 +9,8 @@
 extern "C" {
 #endif
 
+// clang-format off: The awk processing of this file doesn't understand
+// multi-line functions so we turn off clang formatting for the entire file
 
 /**
  * @brief Skirmish AI Callback function pointers.
@@ -2261,5 +2263,7 @@ struct SSkirmishAICallback {
 #if	defined(__cplusplus)
 } // extern "C"
 #endif
+
+// clang-format on
 
 #endif // S_SKIRMISH_AI_CALLBACK_H

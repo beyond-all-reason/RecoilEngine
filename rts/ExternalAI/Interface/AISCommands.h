@@ -494,7 +494,7 @@ struct SRestartPathDrawerCommand {
 	bool sameColor;
 }; //$ COMMAND_DRAWER_PATH_RESTART Map_Drawer_PathDrawer_restart
 
-
+// clang-format off
 /**
  * @brief Creates a cubic Bezier spline figure
  * Creates a cubic Bezier spline figure from pos1 to pos4,
@@ -548,6 +548,7 @@ struct SCreateLineFigureDrawerCommand {
 	/// the new group
 	int ret_newFigureGroupId;
 }; //$ COMMAND_DRAWER_FIGURE_CREATE_LINE Map_Drawer_Figure_drawLine REF:figureGroupId->FigureGroup REF:ret_newFigureGroupId->FigureGroup
+// clang-format on
 
 /**
  * Sets the color used to draw all lines of figures in a figure group.
