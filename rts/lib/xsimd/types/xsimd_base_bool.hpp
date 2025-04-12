@@ -13,6 +13,8 @@
 
 #include <ostream>
 
+#include "xsimd_utils.hpp"
+
 namespace xsimd
 {
 

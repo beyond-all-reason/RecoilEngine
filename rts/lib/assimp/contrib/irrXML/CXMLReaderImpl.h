@@ -9,7 +9,7 @@
 #include "irrString.h"
 #include "irrArray.h"
 
-using namespace Assimp;
+#include "./../../code/fast_atof.h"
 
 #ifdef _DEBUG
 #define IRR_DEBUGPRINT(x) printf((x));
@@ -160,7 +160,7 @@ public:
 			return 0;
 
 		core::stringc c = attr->Value.c_str();
-		return fast_atof(c.c_str());
+		return Assimp::fast_atof(c.c_str());
 	}
 
 
@@ -172,7 +172,7 @@ public:
 			return 0;
 
 		core::stringc c = attrvalue;
-		return fast_atof(c.c_str());
+		return Assimp::fast_atof(c.c_str());
 	}
 
 

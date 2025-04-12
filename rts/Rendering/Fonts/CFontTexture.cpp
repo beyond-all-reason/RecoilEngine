@@ -10,12 +10,14 @@
 #include <sstream>
 
 #ifndef HEADLESS
-	#include <ft2build.h>
-	#include FT_FREETYPE_H
-	#ifdef USE_FONTCONFIG
-		#include <fontconfig/fontconfig.h>
-		#include <fontconfig/fcfreetype.h>
-	#endif
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#ifdef USE_FONTCONFIG
+// clang-format off
+#include <fontconfig/fontconfig.h>
+#include <fontconfig/fcfreetype.h>
+// clang-format on
+#endif
 #endif // HEADLESS
 
 #include "Rendering/GL/myGL.h"

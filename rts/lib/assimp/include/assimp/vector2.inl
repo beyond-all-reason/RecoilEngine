@@ -52,6 +52,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "lib/streflop/streflop_cond.h"
 
+#include <cmath>
+
 // ------------------------------------------------------------------------------------------------
 template <typename TReal>
 template <typename TOther>

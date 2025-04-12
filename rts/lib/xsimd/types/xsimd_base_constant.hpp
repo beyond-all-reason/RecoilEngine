@@ -10,6 +10,8 @@
 #ifndef XSIMD_BASE_CONSTANT_HPP
 #define XSIMD_BASE_CONSTANT_HPP
 
+#include "xsimd_utils.hpp"
+
 namespace xsimd
 {
     template <class X>

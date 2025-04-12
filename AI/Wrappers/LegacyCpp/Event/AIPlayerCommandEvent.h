@@ -4,8 +4,11 @@
 #define _AI_PLAYER_COMMAND_EVENT_H
 
 #include "AIEvent.h"
-#include "ExternalAI/Interface/AISCommands.h"
+#include "AISEvents.h"
+
 #include "../CommandQueue.h"
+#include "../IAICallback.h"
+#include "ExternalAI/Interface/AISCommands.h"
 
 
 namespace springLegacyAI {

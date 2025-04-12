@@ -3,6 +3,11 @@
 #ifndef QTPFS_PATHDRAWER_HDR
 #define QTPFS_PATHDRAWER_HDR
 
+#include "IPathDrawer.h"
+
+#include "Rendering/GL/RenderBuffersFwd.h"
+#include "Sim/Path/QTPFS/Node.h"
+
 #include <vector>
 
 #include "IPathDrawer.h"
@@ -13,7 +18,6 @@ struct MoveDef;
 namespace QTPFS {
 	class PathManager;
 
-	struct QTNode;
 	struct IPath;
 	struct NodeLayer;
 	struct PathSearch;

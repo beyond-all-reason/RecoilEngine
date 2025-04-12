@@ -507,6 +507,7 @@ struct aiMemoryInfo
 }
 #endif //!  __cplusplus
 
+// clang-format off
 // Include implementation files
 #include "vector2.inl"
 #include "vector3.inl"
@@ -514,5 +515,6 @@ struct aiMemoryInfo
 #include "quaternion.inl"
 #include "matrix3x3.inl"
 #include "matrix4x4.inl"
+// clang-format on
 
 #endif // AI_TYPES_H_INC
