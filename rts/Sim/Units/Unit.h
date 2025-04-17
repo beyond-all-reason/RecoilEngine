@@ -551,6 +551,8 @@ public:
 	icon::CIconData* myIcon = nullptr;
 
 	bool drawIcon = true;
+	bool moved = true;
+	bool slowMoved = true;
 private:
 	// if we are stunned by a weapon or for other reason, access via IsStunned/SetStunned(bool)
 	bool stunned = false;

@@ -653,9 +653,13 @@ void CUnit::Update()
 	RECOIL_DETAILED_TRACY_ZONE;
 	ASSERT_SYNCED(pos);
 
-	UpdatePhysicalState(0.1f);
+	// buildings update physical state less frequently in SlowUpdate
+	if (moved || transporter != nullptr) {
+		UpdatePhysicalState(0.1f);
+	}
 	UpdatePosErrorParams(true, false);
-	UpdateTransportees(); // none if already dead
+	if (moved)
+		UpdateTransportees(); // none if already dead
 
 	if (beingBuilt)
 		return;
@@ -737,6 +741,7 @@ void CUnit::UpdateTransportees()
 		transportee->Move(absPiecePos, false);
 		transportee->UpdateMidAndAimPos();
 		transportee->SetHeadingFromDirection();
+		transportee->moved = true;
 
 		// see ::AttachUnit
 		if (transportee->IsStunned()) {
@@ -950,6 +955,9 @@ void CUnit::SetStunned(bool stun) {
 void CUnit::SlowUpdate()
 {
 	ZoneScoped;
+	/*if (unitDef->IsImmobileUnit()) {
+		UpdatePhysicalState(0.1f);
+	}*/
 	UpdatePosErrorParams(false, true);
 
 	DoWaterDamage();
@@ -1078,8 +1086,10 @@ void CUnit::SlowUpdate()
 	if (moveType->progressState == AMoveType::Active)
 		DoSeismicPing(seismicSignature);
 
-	CalculateTerrainType();
-	UpdateTerrainType();
+	if (slowMoved || GetTransporter() != nullptr) {
+		CalculateTerrainType();
+		UpdateTerrainType();
+	}
 }
 
 
