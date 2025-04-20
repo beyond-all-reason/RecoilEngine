@@ -122,9 +122,11 @@ uint GetUnpackedValue(uint packedValue, uint byteNum) {
 	return (packedValue >> (8u * byteNum)) & 0xFFu;
 }
 
+// BEGIN TRS LIB
+
 vec4 MultiplyQuat(vec4 a, vec4 b)
 {
-    return vec4(a.w * b.w - dot(a.w, b.w), a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz));
+    return vec4(a.w * b.xyz + b.w * a.xyz + cross(a.xyz, b.xyz), a.w * b.w - dot(a.xyz, b.xyz));
 }
 
 vec3 RotateByQuaternion(vec4 q, vec3 v) {
@@ -144,7 +146,7 @@ vec3 ApplyTransform(Transform tra, vec3 v) {
 }
 
 vec4 ApplyTransform(Transform tra, vec4 v) {
-	return vec4(ApplyTransform(tra, v.xyz), v.w);
+	return vec4(RotateByQuaternion(tra.quat, v.xyz * tra.trSc.w) + tra.trSc.xyz * v.w, v.w);
 }
 
 Transform ApplyTransform(Transform parentTra, Transform childTra) {
@@ -240,9 +242,12 @@ Transform Lerp(Transform t0, Transform t1, float a) {
 	);
 }
 
+// END TRS LIB
+
 void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 {
 	vec4 piecePos = vec4(pos, 1.0);
+	vec4 normal4 = vec4(normal, 0.0);
 
 	vec4 weights = vec4(
 		float(GetUnpackedValue(bonesInfo.y, 0u)) / 255.0,
@@ -264,8 +269,7 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 
 	weights[0] *= float(tx.trSc.w > 0.0);
 	msPosition = ApplyTransform(tx, piecePos);
-	tx.trSc = vec4(0, 0, 0, 1); //nullify the transform part
-	msNormal = ApplyTransform(tx, normal);
+	msNormal = ApplyTransform(tx, normal4).xyz;
 
 	if (weights[0] == 1.0)
 		return;
@@ -297,10 +301,8 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 		// emulate boneTx * bposeInvTra * bposeTra * piecePos
 		vec4 txPiecePos = ApplyTransform(ApplyTransform(boneTx, ApplyTransform(bposeInvTra, bposeTra)), piecePos);
 
-		tx.trSc = vec4(0, 0, 0, 1); //nullify the transform part
-
 		// emulate boneTx * bposeInvTra * bposeTra * normal
-		vec3 txPieceNormal = ApplyTransform(ApplyTransform(boneTx, ApplyTransform(bposeInvTra, bposeTra)), normal);
+		vec3 txPieceNormal = ApplyTransform(ApplyTransform(boneTx, ApplyTransform(bposeInvTra, bposeTra)), normal4).xyz;
 
 		msPosition += txPiecePos    * weights[bi];
 		msNormal   += txPieceNormal * weights[bi];
