@@ -972,9 +972,8 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 						//eoh->UnitSelfDestructCancelled(*owner);
 						eventHandler.UnitSelfDestructCancelled(owner); // Fire cancel event
 					} else if (owner->unitDef->canSelfD) { // Not counting down -> start it
-						// Read countdown duration in seconds from UnitDef, convert to frames
-						const int countdownSeconds = std::max(0, owner->unitDef->selfDCountdown); 
-						const int countdownFrames = countdownSeconds * GAME_SPEED;
+						// Read countdown duration in frames from UnitDef
+						const int countdownFrames = std::max(0, owner->unitDef->selfDCountdown);
 
 						owner->selfDTargetFrame = gs->frameNum + countdownFrames;
 
