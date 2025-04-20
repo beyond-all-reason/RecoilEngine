@@ -70,10 +70,6 @@ class CEventHandler
 		void UnitTaken(const CUnit* unit, int oldTeam, int newTeam);
 		void UnitGiven(const CUnit* unit, int oldTeam, int newTeam);
 
-		void UnitSelfDestructStarted(const CUnit* unit);
-		void UnitSelfDestructCancelled(const CUnit* unit);
-		void UnitSelfDestructProgress(const CUnit* unit, int remainingSeconds);
-
 		//FIXME no events
 		void RenderUnitPreCreated(const CUnit* unit);
 		void RenderUnitCreated(const CUnit* unit, int cloaked);
@@ -96,6 +92,10 @@ class CEventHandler
 			bool paralyzer);
 		void UnitStunned(const CUnit* unit, bool stunned);
 		void UnitExperience(const CUnit* unit, float oldExperience);
+		void UnitSelfDestructStarted(const CUnit* unit);
+		void UnitSelfDestructCancelled(const CUnit* unit);
+		void UnitSelfDestructProgress(const CUnit* unit, int remainingSeconds);
+
 		void UnitHarvestStorageFull(const CUnit* unit);
 
 		void UnitSeismicPing(const CUnit* unit, int allyTeam,

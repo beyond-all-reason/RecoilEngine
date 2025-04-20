@@ -663,10 +663,14 @@ void CUnit::Update()
 		return;
 
 	 // --- NEW Self-Destruct Check ---
-	if (selfDTargetFrame > 0 && gs->frameNum >= selfDTargetFrame) {
-		// avoid unfinished buildings making an explosion
-		KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
+	if (selfDTargetFrame > 0) {
+		if (gs->frameNum >= selfDTargetFrame) {
+			// avoid unfinished buildings making an explosion
+			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
 		return; // Skip rest of update if killed
+		} else {
+			this->selfDCountdown = std::ceil(std::max(0.0f, (static_cast<float>(selfDTargetFrame) - gs->frameNum) / GAME_SPEED));
+		}
 	}
     // --- END NEW Self-Destruct Check ---
 
@@ -1011,7 +1015,8 @@ void CUnit::SlowUpdate()
 	*/
 	// --- NEW Self-Destruct Progress Event ---
 	if (selfDTargetFrame > 0 && gs->frameNum < selfDTargetFrame) {
-		selfDCountdown = std::max(0, (selfDTargetFrame - gs->frameNum) / GAME_SPEED);
+		//selfDCountdown = std::max(0, (selfDTargetFrame - gs->frameNum) / GAME_SPEED);
+		//eoh->UnitSelfDestructProgress(*this, selfDCountdown);
 		eventHandler.UnitSelfDestructProgress(this, selfDCountdown);
 	}
 

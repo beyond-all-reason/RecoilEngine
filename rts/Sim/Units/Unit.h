@@ -491,7 +491,7 @@ public:
 	// Used for calling setSFXoccupy which TA scripts want
 	int curTerrainType = 0;
 
-	// Frame number when self-destruct occurs, -1 means inactive
+	// Frame number when self-destruct occurs, 0 means inactive
 	int selfDTargetFrame = 0;
 	int selfDCountdown = 0;
 
