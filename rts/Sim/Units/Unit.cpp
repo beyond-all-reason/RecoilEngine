@@ -662,6 +662,14 @@ void CUnit::Update()
 	if (isDead)
 		return;
 
+	 // --- NEW Self-Destruct Check ---
+	if (selfDTargetFrame > 0 && gs->frameNum >= selfDTargetFrame) {
+		// avoid unfinished buildings making an explosion
+		KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
+		return; // Skip rest of update if killed
+	}
+    // --- END NEW Self-Destruct Check ---
+
 	recentDamage *= 0.9f;
 	flankingBonusMobility += flankingBonusMobilityAdd;
 
@@ -989,6 +997,7 @@ void CUnit::SlowUpdate()
 		return;
 	}
 
+	/*
 	if (selfDCountdown > 0) {
 		if ((selfDCountdown -= 1) == 0) {
 			// avoid unfinished buildings making an explosion
@@ -998,6 +1007,12 @@ void CUnit::SlowUpdate()
 
 		if ((selfDCountdown & 1) && (team == gu->myTeam) && !gu->spectating)
 			LOG("%s: self-destruct in %is", unitDef->humanName.c_str(), (selfDCountdown >> 1) + 1);
+	}
+	*/
+	// --- NEW Self-Destruct Progress Event ---
+	if (selfDTargetFrame > 0 && gs->frameNum < selfDTargetFrame) {
+		selfDCountdown = std::max(0, (selfDTargetFrame - gs->frameNum) / GAME_SPEED);
+		eventHandler.UnitSelfDestructProgress(this, selfDCountdown);
 	}
 
 	if (beingBuilt) {
@@ -3014,7 +3029,7 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(lastTerrainType),
 	CR_MEMBER(curTerrainType),
 
-	CR_MEMBER(selfDCountdown),
+	CR_MEMBER(selfDTargetFrame),
 
 	CR_MEMBER_UN(myIcon),
 	CR_MEMBER_UN(drawIcon),

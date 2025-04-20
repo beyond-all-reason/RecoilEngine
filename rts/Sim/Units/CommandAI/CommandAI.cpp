@@ -965,10 +965,18 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 		case CMD_SELFD: {
 			if (owner->unitDef->canSelfD) {
 				if (!(c.GetOpts() & SHIFT_KEY) || commandQue.empty()) {
-					if (owner->selfDCountdown != 0) {
-						owner->selfDCountdown = 0;
-					} else {
-						owner->selfDCountdown = owner->unitDef->selfDCountdown*2+1;
+					if (owner->selfDTargetFrame > 0) { // Currently counting down -> cancel it
+						owner->selfDTargetFrame = 0;
+						
+						eventHandler.UnitSelfDestructCancelled(owner); // Fire cancel event
+					} else if (owner->unitDef->canSelfD) { // Not counting down -> start it
+						// Read countdown duration in seconds from UnitDef, convert to frames
+						const int countdownSeconds = std::max(0, owner->unitDef->selfDCountdown);
+						const int countdownFrames = countdownSeconds * GAME_SPEED;
+
+						owner->selfDTargetFrame = gs->frameNum + countdownFrames;
+
+						eventHandler.UnitSelfDestructStarted(owner); // Fire start event
 					}
 				}
 				else if (commandQue.back().GetID() == CMD_SELFD) {
@@ -1557,14 +1565,10 @@ void CCommandAI::SlowUpdate()
 			return;
 		}
 		case CMD_SELFD: {
-			if ((owner->selfDCountdown != 0) || !owner->unitDef->canSelfD) {
-				owner->selfDCountdown = 0;
-			} else {
-				owner->selfDCountdown = (owner->unitDef->selfDCountdown * 2) + 1;
-			}
+			if (owner->selfDTargetFrame > 0 && gs->frameNum >= owner->selfDTargetFrame)
 			FinishCommand();
 			return;
-		}
+			}
 		case CMD_STOP: {
 			ExecuteStop(c);
 			return;
@@ -1589,7 +1593,7 @@ void CCommandAI::SlowUpdate()
 		return;
 
 	FinishCommand();
-}
+	}
 
 
 int CCommandAI::GetDefaultCmd(const CUnit* pointed, const CFeature* feature)

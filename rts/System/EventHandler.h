@@ -40,7 +40,6 @@ class CEventHandler
 		bool IsUnsynced(const std::string& ciName) const;
 		bool IsController(const std::string& ciName) const;
 
-
 	public:
 		/**
 		 * @name Synced_events
@@ -71,6 +70,9 @@ class CEventHandler
 		void UnitTaken(const CUnit* unit, int oldTeam, int newTeam);
 		void UnitGiven(const CUnit* unit, int oldTeam, int newTeam);
 
+		void UnitSelfDestructStarted(const CUnit* unit);
+		void UnitSelfDestructCancelled(const CUnit* unit);
+		void UnitSelfDestructProgress(const CUnit* unit, int remainingSeconds);
 
 		//FIXME no events
 		void RenderUnitPreCreated(const CUnit* unit);
@@ -419,6 +421,11 @@ inline void CEventHandler::UnitDestroyed(const CUnit* unit, const CUnit* attacke
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitDestroyed, unit, attacker, weaponDefID)
 }
 
+inline void CEventHandler::UnitSelfDestructProgress(const CUnit* unit, int remainingSeconds)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitSelfDestructProgress, unit, remainingSeconds)
+}
+
 #define UNIT_CALLIN_NO_PARAM(name)                                 \
 	inline void CEventHandler:: name (const CUnit* unit)           \
 	{                                                              \
@@ -445,6 +452,8 @@ UNIT_CALLIN_NO_PARAM(UnitLeftUnderwater)
 UNIT_CALLIN_NO_PARAM(UnitLeftWater)
 UNIT_CALLIN_NO_PARAM(UnitLeftAir)
 UNIT_CALLIN_NO_PARAM(UnitMoved)
+UNIT_CALLIN_NO_PARAM(UnitSelfDestructStarted)
+UNIT_CALLIN_NO_PARAM(UnitSelfDestructCancelled)
 
 #define UNIT_CALLIN_INT_PARAMS(name)                                              \
 	inline void CEventHandler:: Unit ## name (const CUnit* unit, int p1, int p2)  \
@@ -481,7 +490,6 @@ inline void CEventHandler::UnitFromFactory(const CUnit* unit,
 {
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitFromFactory, unit, factory, userOrders)
 }
-
 
 UNIT_CALLIN_NO_PARAM(UnitCloaked)
 UNIT_CALLIN_NO_PARAM(UnitDecloaked)

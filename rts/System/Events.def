@@ -78,6 +78,10 @@
 	SETUP_EVENT(UnitMoveFailed,       MANAGED_BIT)
 	SETUP_EVENT(UnitArrivedAtGoal,    MANAGED_BIT)
 
+	SETUP_EVENT(UnitSelfDestructStarted,            MANAGED_BIT)
+	SETUP_EVENT(UnitSelfDestructCancelled,       MANAGED_BIT)
+	SETUP_EVENT(UnitSelfDestructProgress,    MANAGED_BIT)
+
 	SETUP_EVENT(FeatureCreated,   MANAGED_BIT)
 	SETUP_EVENT(FeatureDestroyed, MANAGED_BIT)
 	SETUP_EVENT(FeatureDamaged,   MANAGED_BIT)
