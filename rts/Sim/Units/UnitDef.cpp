@@ -418,7 +418,7 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	groundFrictionCoefficient = udTable.GetFloat("groundFrictionCoefficient", 0.01f);
 	atmosphericDragCoefficient = udTable.GetFloat("atmosphericDragCoefficient", 1.0f);
 	pushResistant = udTable.GetBool("pushResistant", false);
-	selfDCountdown = udTable.GetInt("selfDestructCountdown", 5) * GAME_SPEED;
+	selfDCountdown = udTable.GetFloat("selfDestructCountdown", 5.0f) * GAME_SPEED;
 
 	/* Note that the legacy unit is elmo/frame
 	 * whereas the modern one is elmo/second */
