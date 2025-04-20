@@ -669,7 +669,7 @@ void CUnit::Update()
 			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
 		return; // Skip rest of update if killed
 		} else {
-			const float remainingSeconds = std::max(0.0f, (static_cast<float>(selfDTargetFrame) - gs->frameNum) / GAME_SPEED);
+			const float remainingSeconds = (selfDTargetFrame - gs->frameNum) * INV_GAME_SPEED;
 			selfDRemainingSeconds = remainingSeconds;
 
 			//Backwards compatability with existing widgets (depreciated?)

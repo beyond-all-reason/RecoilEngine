@@ -1474,6 +1474,7 @@ void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit)
  * @function Callins:UnitSelfDestructProgress
  * @param unitID integer
  * @param unitDefID integer
+ * @param unitTeam integer
  * @param remainingSeconds float
  */
 void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds) 
@@ -1489,7 +1490,8 @@ void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit, float remainingSeco
 		return;
 
 	lua_pushnumber(L, unit->id);// unitID
-	lua_pushnumber(L, unit->unitDef->id); // UnitDefID
+	lua_pushnumber(L, unit->unitDef->id); // unitDefID
+	lua_pushnumber(L, unit->team); // unitTeam
 	lua_pushnumber(L, remainingSeconds); // updatePeriodSeconds
 
 	RunCallInTraceback(L, cmdStr, 2, 0, traceBack.GetErrFuncIdx(), false);
