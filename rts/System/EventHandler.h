@@ -92,11 +92,10 @@ class CEventHandler
 			bool paralyzer);
 		void UnitStunned(const CUnit* unit, bool stunned);
 		void UnitExperience(const CUnit* unit, float oldExperience);
+		void UnitHarvestStorageFull(const CUnit* unit);
 		void UnitSelfDestructStarted(const CUnit* unit);
 		void UnitSelfDestructCancelled(const CUnit* unit);
-		void UnitSelfDestructProgress(const CUnit* unit, int remainingSeconds);
-
-		void UnitHarvestStorageFull(const CUnit* unit);
+		void UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds);
 
 		void UnitSeismicPing(const CUnit* unit, int allyTeam,
 		                     const float3& pos, float strength);
@@ -421,7 +420,7 @@ inline void CEventHandler::UnitDestroyed(const CUnit* unit, const CUnit* attacke
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitDestroyed, unit, attacker, weaponDefID)
 }
 
-inline void CEventHandler::UnitSelfDestructProgress(const CUnit* unit, int remainingSeconds)
+inline void CEventHandler::UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds)
 {
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitSelfDestructProgress, unit, remainingSeconds)
 }

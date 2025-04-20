@@ -135,7 +135,7 @@ class CEventClient
 
 		virtual void UnitSelfDestructStarted(const CUnit* unit) {}
 		virtual void UnitSelfDestructCancelled(const CUnit* unit) {}
-		virtual void UnitSelfDestructProgress(const CUnit* unit, int remainingSeconds) {}
+		virtual void UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds) {}
 
 		virtual void UnitIdle(const CUnit* unit) {}
 		virtual void UnitCommand(const CUnit* unit, const Command& command, int playerNum, bool fromSynced, bool fromLua) {}

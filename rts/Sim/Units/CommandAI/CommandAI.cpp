@@ -1571,7 +1571,7 @@ void CCommandAI::SlowUpdate()
 			if (owner->selfDTargetFrame > 0 && gs->frameNum >= owner->selfDTargetFrame)
 			FinishCommand();
 			return;
-			}
+		}
 		case CMD_STOP: {
 			ExecuteStop(c);
 			return;
@@ -1596,7 +1596,7 @@ void CCommandAI::SlowUpdate()
 		return;
 
 	FinishCommand();
-	}
+}
 
 
 int CCommandAI::GetDefaultCmd(const CUnit* pointed, const CFeature* feature)

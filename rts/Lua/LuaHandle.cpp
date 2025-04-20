@@ -1474,9 +1474,9 @@ void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit)
  * @function Callins:UnitSelfDestructProgress
  * @param unitID integer
  * @param unitDefID integer
- * @param remainingSeconds integer
+ * @param remainingSeconds float
  */
-void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit, int remainingSeconds) 
+void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds) 
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
