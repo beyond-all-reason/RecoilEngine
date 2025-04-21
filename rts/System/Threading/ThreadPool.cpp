@@ -634,7 +634,10 @@ void SetDefaultThreadCount()
 		if (mainAffinity == 0)
 			mainAffinity = systemCores;
 
-		Threading::SetAffinityHelper("Main", mainAffinity & mainCoreAffinity);
+		if (cpu_topology::GetThreadPinPolicy() == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
+			mainAffinity &= mainCoreAffinity;
+
+		Threading::SetAffinityHelper("Main", mainAffinity);
 	}
 }
 
