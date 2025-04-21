@@ -67,7 +67,7 @@ CUnitHandler unitHandler;
 
 CUnit* CUnitHandler::NewUnit(const UnitDef* ud)
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	// special static builder structures that can always be given
 	// move orders (which are passed on to all mobile buildees)
 	if (ud->IsFactoryUnit())
@@ -94,7 +94,7 @@ CUnit* CUnitHandler::NewUnit(const UnitDef* ud)
 
 
 void CUnitHandler::Init() {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	GroundMoveSystem::Init();
 	GeneralMoveSystem::Init();
 	UnitTrapCheckSystem::Init();
@@ -134,7 +134,7 @@ void CUnitHandler::Init() {
 
 void CUnitHandler::Kill()
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	for (CUnit* u: activeUnits) {
 		// ~CUnit dereferences featureHandler which is destroyed already
 		u->KilledScriptFinished(-1);
@@ -170,7 +170,7 @@ void CUnitHandler::Kill()
 
 void CUnitHandler::DeleteScripts()
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	// predelete scripts since they sometimes reference (pieces
 	// of) models, which are already gone before KillSimulation
 	for (CUnit* u: activeUnits) {
@@ -181,7 +181,7 @@ void CUnitHandler::DeleteScripts()
 
 void CUnitHandler::InsertActiveUnit(CUnit* unit)
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	idPool.AssignID(unit);
 
 	assert(unit->id < units.size());
@@ -216,7 +216,7 @@ void CUnitHandler::InsertActiveUnit(CUnit* unit)
 
 bool CUnitHandler::AddUnit(CUnit* unit)
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	// LoadUnit should make sure this is true
 	assert(CanAddUnit(unit->id));
 
@@ -236,7 +236,7 @@ bool CUnitHandler::AddUnit(CUnit* unit)
 
 bool CUnitHandler::GarbageCollectUnit(unsigned int id)
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	if (inUpdateCall)
 		return false;
 
@@ -263,7 +263,7 @@ void CUnitHandler::QueueDeleteUnits()
 
 bool CUnitHandler::QueueDeleteUnit(CUnit* unit)
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	if (!unit->deathScriptFinished)
 		return false;
 
@@ -287,7 +287,7 @@ void CUnitHandler::DeleteUnits()
 
 void CUnitHandler::DeleteUnit(CUnit* delUnit)
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	assert(delUnit->isDead);
 	// we want to call RenderUnitDestroyed while the unit is still valid
 	eventHandler.RenderUnitDestroyed(delUnit);
@@ -337,104 +337,97 @@ void CUnitHandler::UpdateUnitMoveTypes()
 
 void CUnitHandler::UpdateUnitLosStates()
 {
-    SCOPED_TIMER("Sim::Unit::LosUpdate"); // I don't know why it's wasn't profiled earlier
+    SCOPED_TIMER("Sim::Unit::UpdateLosStatus"); 
 
-    // Structure to hold data for deferred event processing
     struct LosUpdateData {
         CUnit* unit;
         int allyTeam;
-        unsigned short diffBits; // Store the changed bits
+        unsigned short diffBits;
+
+        bool operator<(const LosUpdateData& other) const {
+            if (unit == nullptr || other.unit == nullptr) {
+                 if (unit != other.unit)
+                    return (unit < other.unit);
+                 return (allyTeam < other.allyTeam);
+            }
+            if (unit->id != other.unit->id)
+                return (unit->id < other.unit->id);
+            return (allyTeam < other.allyTeam);
+        }
     };
 
-    // Use a temporary vector of vectors (one per thread) to store deferred updates.
-    // This avoids locking during the parallel phase.
-    std::vector<std::vector<LosUpdateData>> deferredLosUpdates(ThreadPool::GetMaxThreads());
-    // Ensure inner vectors are cleared (important if reusing across frames, though here it's stack-local effectively)
-for (auto& innerVec : deferredLosUpdates) {
+    std::vector<std::vector<LosUpdateData>> deferredLosUpdatesPerThread(ThreadPool::GetMaxThreads());
+    for (auto& innerVec : deferredLosUpdatesPerThread) {
         innerVec.clear();
     }
 
+    constexpr size_t losUpdateChunkSize = 32;
 
-    // Parallel loop over active units
     {
-        ZoneScopedN("Parallel LOS Calculation"); // Tracy zone for the parallel part
-        for_mt(0, activeUnits.size(), [&](const int i) {
+        ZoneScopedN("Parallel LOS Calculation (Chunked)");
+        for_mt_chunk(0, activeUnits.size(), [&](const int i) {
             CUnit* unit = activeUnits[i];
-            const int tid = ThreadPool::GetThreadNum(); // Get thread ID for thread-local storage
-            auto& threadDeferredUpdates = deferredLosUpdates[tid];
-
-            // Optional: Reserve space if many ally teams are expected, reduces reallocations
-            // threadDeferredUpdates.reserve(teamHandler.ActiveAllyTeams());
+            const int tid = ThreadPool::GetThreadNum();
+            auto& threadDeferredUpdates = deferredLosUpdatesPerThread[tid];
 
             for (int at = 0; at < teamHandler.ActiveAllyTeams(); ++at) {
                 const unsigned short currStatus = unit->losStatus[at];
 
-                // Optimization: Skip if all changes are masked by Lua or cheats
                 if ((currStatus & LOS_ALL_MASK_BITS) == LOS_ALL_MASK_BITS) {
                     continue;
                 }
 
-                // Calculate the new LOS status based on current game state
                 const unsigned short newStatus = unit->CalcLosStatus(at);
-                // Determine which bits actually changed
                 const unsigned short diffBits = (currStatus ^ newStatus);
 
-                // Update the unit's LOS status directly.
-                // This *should* be safe because for_mt partitions the work based on unit index,
-                // meaning no two threads write to the same unit *instance* concurrently.
-                // Reads from shared losHandler maps are safe.
                 unit->losStatus[at] = newStatus;
 
                 if (diffBits != 0) {
-                    // Store data needed for deferred event handling in the thread's vector
                     threadDeferredUpdates.push_back({unit, at, diffBits});
                 }
             }
-        });
-    } // End of parallel section
+        }, losUpdateChunkSize);
+    }
 
-
-    // Serial processing of deferred events (outside the parallel loop, in the main sim thread)
     {
-        ZoneScopedN("Deferred Event Processing"); // Tracy zone for the serial part
-        for (const auto& threadUpdates : deferredLosUpdates) {
-            for (const auto& updateData : threadUpdates) {
+       ZoneScopedN("Deferred Event Processing (Gather, Sort, Fire)");
+
+       std::vector<LosUpdateData> allDeferredUpdates;
+       size_t totalUpdates = 0;
+       for (const auto& threadUpdates : deferredLosUpdatesPerThread) {
+           totalUpdates += threadUpdates.size();
+       }
+       allDeferredUpdates.reserve(totalUpdates);
+
+       for (const auto& threadUpdates : deferredLosUpdatesPerThread) {
+           allDeferredUpdates.insert(allDeferredUpdates.end(), threadUpdates.begin(), threadUpdates.end());
+       }
+
+       std::sort(allDeferredUpdates.begin(), allDeferredUpdates.end());
+
+       for (const auto& updateData : allDeferredUpdates) {
                 CUnit* unit = updateData.unit;
                 const int at = updateData.allyTeam;
                 const unsigned short diffBits = updateData.diffBits;
-                // Read the final state written by the worker thread
                 const unsigned short newStatus = unit->losStatus[at];
 
-                // Check specific bits and fire corresponding events
-                // These calls happen serially, avoiding Lua state conflicts.
                 if (diffBits & LOS_INLOS) {
                     if (newStatus & LOS_INLOS) {
                         eventHandler.UnitEnteredLos(unit, at);
-                        // eoh->UnitEnteredLos(*unit, at); // If eoh needs events, defer/handle similarly
                     } else {
                         eventHandler.UnitLeftLos(unit, at);
-                        // eoh->UnitLeftLos(*unit, at);
                     }
                 }
 
                 if (diffBits & LOS_INRADAR) {
                     if (newStatus & LOS_INRADAR) {
                         eventHandler.UnitEnteredRadar(unit, at);
-                        // eoh->UnitEnteredRadar(*unit, at);
                     } else {
                         eventHandler.UnitLeftRadar(unit, at);
-                        // eoh->UnitLeftRadar(*unit, at);
                     }
                 }
-
-                // Note: PREVLOS and CONTRADAR bits are implicitly updated by CalcLosStatus
-                // based on the changes in INLOS and INRADAR. The original SetLosStatus
-                // logic handled this update implicitly after the event calls. Since we
-                // update losStatus[at] directly in the parallel section now, these bits
-                // are already correct when we process events here.
             }
         }
-    } // End of serial event processing
 }
 
 
@@ -540,14 +533,14 @@ void CUnitHandler::Update()
 
 void CUnitHandler::AddBuilderCAI(CBuilderCAI* b)
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	// called from CBuilderCAI --> owner is already valid
 	builderCAIs[b->owner->id] = b;
 }
 
 void CUnitHandler::RemoveBuilderCAI(CBuilderCAI* b)
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	// called from ~CUnit --> owner is still valid
 	assert(b->owner != nullptr);
 	builderCAIs.erase(b->owner->id);
@@ -556,7 +549,7 @@ void CUnitHandler::RemoveBuilderCAI(CBuilderCAI* b)
 
 void CUnitHandler::ChangeUnitTeam(CUnit* unit, int oldTeamNum, int newTeamNum)
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	spring::VectorErase       (GetUnitsByTeamAndDef(oldTeamNum,                 0), unit       );
 	spring::VectorErase       (GetUnitsByTeamAndDef(oldTeamNum, unit->unitDef->id), unit       );
 	spring::VectorInsertUnique(GetUnitsByTeamAndDef(newTeamNum,                 0), unit, false);
@@ -566,7 +559,7 @@ void CUnitHandler::ChangeUnitTeam(CUnit* unit, int oldTeamNum, int newTeamNum)
 
 bool CUnitHandler::CanBuildUnit(const UnitDef* unitdef, int team) const
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	if (teamHandler.Team(team)->AtUnitLimit())
 		return false;
 
@@ -575,7 +568,7 @@ bool CUnitHandler::CanBuildUnit(const UnitDef* unitdef, int team) const
 
 unsigned int CUnitHandler::CalcMaxUnits() const
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 	unsigned int n = 0;
 
 	for (unsigned int i = 0; i < teamHandler.ActiveTeams(); i++) {
