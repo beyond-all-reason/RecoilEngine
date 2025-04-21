@@ -16,8 +16,8 @@ int CSyncChecker::inSyncedCode;
 
 unsigned CSyncChecker::nextHistoryIndex = 0;
 unsigned CSyncChecker::nextFrameIndex = 0;
-unsigned CSyncChecker::logs[MAX_SYNC_HISTORY];
-unsigned CSyncChecker::logFrames[MAX_SYNC_HISTORY_FRAMES];
+std::array<unsigned, MAX_SYNC_HISTORY> CSyncChecker::logs;
+std::array<unsigned, MAX_SYNC_HISTORY_FRAMES> CSyncChecker::logFrames;
 
 void CSyncChecker::NewGameFrame()
 {
@@ -43,7 +43,7 @@ std::tuple<unsigned, unsigned, unsigned*> CSyncChecker::GetFrameHistory(unsigned
 	if (startFrameIndex < 0)
 		startFrameIndex = MAX_SYNC_HISTORY_FRAMES + startFrameIndex;
 
-	return std::make_tuple(logFrames[startFrameIndex], logFrames[endFrameIndex], logs);
+	return std::make_tuple(logFrames[startFrameIndex], logFrames[endFrameIndex], logs.data());
 }
 
 #endif // SYNC_HISTORY

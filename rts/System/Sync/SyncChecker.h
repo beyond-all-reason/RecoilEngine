@@ -8,6 +8,7 @@
 #include "System/SpringHash.h"
 
 #include <assert.h>
+#include <array>
 
 static constexpr size_t MAX_SYNC_HISTORY = 2500000; // 10MB, ~= 10 seconds of typical midgame
 static constexpr size_t MAX_SYNC_HISTORY_FRAMES = 1000;
@@ -55,7 +56,7 @@ class CSyncChecker {
 		}
 		#ifdef SYNC_HISTORY
 		static std::tuple<unsigned, unsigned, unsigned*> GetFrameHistory(unsigned rewindFrames);
-		static std::pair<unsigned, unsigned*> GetHistory() { return std::make_pair(nextHistoryIndex, logs); };
+		static std::pair<unsigned, unsigned*> GetHistory() { return std::make_pair(nextHistoryIndex, logs.data()); };
 		static void NewGameFrame();
 		#endif // SYNC_HISTORY
 
@@ -81,8 +82,8 @@ class CSyncChecker {
 
 		static unsigned nextHistoryIndex;
 		static unsigned nextFrameIndex;
-		static unsigned logs[MAX_SYNC_HISTORY];
-		static unsigned logFrames[MAX_SYNC_HISTORY_FRAMES];
+		static std::array<unsigned, MAX_SYNC_HISTORY> logs;
+		static std::array<unsigned, MAX_SYNC_HISTORY_FRAMES> logFrames;
 #endif // SYNC_HISTORY
 };
 
