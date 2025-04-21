@@ -5,6 +5,14 @@
 
 namespace cpu_topology {
 
+enum ThreadPinPolicy {
+	THREAD_PIN_POLICY_NONE,
+	THREAD_PIN_POLICY_PER_PERF_CORE,
+	THREAD_PIN_POLICY_ANY_PERF_CORE
+};
+
+ThreadPinPolicy GetThreadPinPolicy();
+
 static constexpr uint32_t MAX_CACHE_LEVELS = 3;
 
 struct ProcessorMasks {
