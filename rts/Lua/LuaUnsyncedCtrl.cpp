@@ -606,7 +606,7 @@ int LuaUnsyncedCtrl::SendAllyChat(lua_State* L) {
 
 /*** Sends a chat message to spectators.
  *
- * @function Spring.SendSpectatorsChat
+ * @function Spring.SendSpectatorChat
  * @param message string
  * @return nil
  */
