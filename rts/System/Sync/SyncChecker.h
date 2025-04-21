@@ -9,8 +9,8 @@
 
 #include <assert.h>
 
-#define MAX_SYNC_HISTORY 2500000 // 10MB, ~= 10 seconds of typical midgame
-#define MAX_SYNC_HISTORY_FRAMES 1000
+static constexpr size_t MAX_SYNC_HISTORY = 2500000; // 10MB, ~= 10 seconds of typical midgame
+static constexpr size_t MAX_SYNC_HISTORY_FRAMES = 1000;
 
 /**
  * @brief sync checker class
