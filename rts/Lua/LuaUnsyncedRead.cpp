@@ -2110,6 +2110,8 @@ namespace {
 /***
  *
  * @function Spring.GetRenderUnits
+ * @return integer[] unitIDs
+ * @return integer[] unitDrawFlags
  */
 int LuaUnsyncedRead::GetRenderUnits(lua_State* L)
 {
@@ -2119,6 +2121,9 @@ int LuaUnsyncedRead::GetRenderUnits(lua_State* L)
 /***
  *
  * @function Spring.GetRenderUnitsDrawFlagChanged
+ * Gets a list of IDs of units that have had their draw flags changed, and the corresponding flags.
+ * @return integer[] unitIDs
+ * @return integer[] newDrawFlags
  */
 int LuaUnsyncedRead::GetRenderUnitsDrawFlagChanged(lua_State* L)
 {
@@ -2128,6 +2133,8 @@ int LuaUnsyncedRead::GetRenderUnitsDrawFlagChanged(lua_State* L)
 /***
  *
  * @function Spring.GetRenderFeatures
+ * @return integer[] featureIDs
+ * @return integer[] drawFlags
  */
 int LuaUnsyncedRead::GetRenderFeatures(lua_State* L)
 {
@@ -2137,6 +2144,8 @@ int LuaUnsyncedRead::GetRenderFeatures(lua_State* L)
 /***
  *
  * @function Spring.GetRenderFeaturesDrawFlagChanged
+ * @return integer[] featureIDs
+ * @return integer[] newDrawFlags
  */
 int LuaUnsyncedRead::GetRenderFeaturesDrawFlagChanged(lua_State* L)
 {
