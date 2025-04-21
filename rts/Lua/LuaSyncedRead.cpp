@@ -4445,12 +4445,12 @@ int LuaSyncedRead::GetUnitPosition(lua_State* L)
 /***
  *
  * @function Spring.GetUnitBasePosition
- * The same as Spring.GetUnitPosition, but without the optional midpoint calculations.
+ * The same as `Spring.GetUnitPosition`, but without the optional midpoint calculations.
  * @see Spring.GetUnitPosition 
  * @param unitID integer
  * @return number? posX
- * @return number posY
- * @return number posZ
+ * @return number? posY
+ * @return number? posZ
  */
 int LuaSyncedRead::GetUnitBasePosition(lua_State* L)
 {
@@ -6815,9 +6815,9 @@ int LuaSyncedRead::GetFeatureMass(lua_State* L)
  *
  * @function Spring.GetFeaturePosition
  * @param featureID integer
- * @return number|nil x
- * @return number y
- * @return number z
+ * @return number? x
+ * @return number? y
+ * @return number? z
  */
 int LuaSyncedRead::GetFeaturePosition(lua_State* L)
 {
@@ -6862,9 +6862,9 @@ int LuaSyncedRead::GetFeatureSeparation(lua_State* L)
  * @function Spring.GetFeatureRotation
  * Note: PYR order
  * @param featureID integer
- * @return number|nil pitch Rotation in X axis
- * @return number yaw Rotation in Y axis
- * @return number roll Rotation in Z axis
+ * @return number? pitch Rotation in X axis
+ * @return number? yaw Rotation in Y axis
+ * @return number? roll Rotation in Z axis
  */
 int LuaSyncedRead::GetFeatureRotation(lua_State* L)
 {
@@ -6879,15 +6879,15 @@ int LuaSyncedRead::GetFeatureRotation(lua_State* L)
  *
  * @function Spring.GetFeatureDirection
  * @param featureID integer
- * @return number|nil frontDirX
- * @return number frontDirY
- * @return number frontDirZ
- * @return number rightDirX
- * @return number rightDirY
- * @return number rightDirZ
- * @return number upDirX
- * @return number upDirY
- * @return number upDirZ
+ * @return number? frontDirX
+ * @return number? frontDirY
+ * @return number? frontDirZ
+ * @return number? rightDirX
+ * @return number? rightDirY
+ * @return number? rightDirZ
+ * @return number? upDirX
+ * @return number? upDirY
+ * @return number? upDirZ
  */
 int LuaSyncedRead::GetFeatureDirection(lua_State* L)
 {
@@ -6921,10 +6921,10 @@ int LuaSyncedRead::GetFeatureDirection(lua_State* L)
  * @function Spring.GetFeatureVelocity
  * Returns nil if no feature found with ID.
  * @param featureID integer
- * @return number|nil x 
- * @return number y
- * @return number z
- * @return number w
+ * @return number? x 
+ * @return number? y
+ * @return number? z
+ * @return number? w
  */
 int LuaSyncedRead::GetFeatureVelocity(lua_State* L)
 {
@@ -6979,13 +6979,13 @@ int LuaSyncedRead::GetFeatureResources(lua_State* L)
  *
  * @function Spring.GetFeatureBlocking
  * @param featureID integer
- * @return nil|boolean isBlocking
- * @return boolean isSolidObjectCollidable
- * @return boolean isProjectileCollidable
- * @return boolean isRaySegmentCollidable
- * @return boolean crushable
- * @return boolean blockEnemyPushing
- * @return boolean blockHeightChanges
+ * @return boolean? isBlocking
+ * @return boolean? isSolidObjectCollidable
+ * @return boolean? isProjectileCollidable
+ * @return boolean? isRaySegmentCollidable
+ * @return boolean? crushable
+ * @return boolean? blockEnemyPushing
+ * @return boolean? blockHeightChanges
  */
 int LuaSyncedRead::GetFeatureBlocking(lua_State* L)
 {
@@ -6997,7 +6997,7 @@ int LuaSyncedRead::GetFeatureBlocking(lua_State* L)
  *
  * @function Spring.GetFeatureNoSelect
  * @param featureID integer
- * @return boolean|nil
+ * @return boolean?
  */
 int LuaSyncedRead::GetFeatureNoSelect(lua_State* L)
 {
@@ -7050,23 +7050,27 @@ int LuaSyncedRead::GetFeatureLastAttackedPiece(lua_State* L)
 	return (GetSolidObjectLastHitPiece(L, ParseFeature(L, __func__, 1)));
 }
 
+/*
+ * @class CollisionVolumeData
+ * A collection of information relating to a collision volume.
+ * @field type "ellipsoid"|"cylinder"|"box"|"sphere" type
+ * @field scaleX number
+ * @field scaleY number
+ * @field scaleZ number
+ * @field offsetX number
+ * @field offsetY number
+ * @field offsetZ number
+ * @field boundingRadius number
+ * @field defaultToSphere boolean
+ * @field defaultToFootPrint boolean
+ * @field defaultToPieceTree boolean
+*/
+
 /***
  *
  * @function Spring.GetFeatureCollisionVolumeData
  * @param featureID integer
- * @return {
- * type "ellipsoid"|"cylinder"|"box"|"sphere" type,
- * scaleX number,
- * scaleY number,
- * scaleZ number,
- * offsetX number,
- * offsetY number,
- * offsetZ number,
- * boundingRadius number,
- * defaultToSphere boolean,
- * defaultToFootPrint boolean,
- * defaultToPieceTree boolean,
- * } | nil
+ * @return CollisionVolumeData?
  */
 int LuaSyncedRead::GetFeatureCollisionVolumeData(lua_State* L)
 {
@@ -7082,19 +7086,7 @@ int LuaSyncedRead::GetFeatureCollisionVolumeData(lua_State* L)
  *
  * @function Spring.GetFeaturePieceCollisionVolumeData
  * @param featureID integer
- * @return {
- * type "ellipsoid"|"cylinder"|"box"|"sphere" type,
- * scaleX number,
- * scaleY number,
- * scaleZ number,
- * offsetX number,
- * offsetY number,
- * offsetZ number,
- * boundingRadius number,
- * defaultToSphere boolean,
- * defaultToFootPrint boolean,
- * defaultToPieceTree boolean,
- * } | nil
+ * @return CollisionVolumeData?
  */
 int LuaSyncedRead::GetFeaturePieceCollisionVolumeData(lua_State* L)
 {
@@ -7113,9 +7105,9 @@ int LuaSyncedRead::GetFeaturePieceCollisionVolumeData(lua_State* L)
  *
  * @function Spring.GetProjectilePosition
  * @param projectileID integer
- * @return number|nil posX
- * @return number posY
- * @return number posZ
+ * @return number? posX
+ * @return number? posY
+ * @return number? posZ
  */
 int LuaSyncedRead::GetProjectilePosition(lua_State* L)
 {
@@ -7135,8 +7127,8 @@ int LuaSyncedRead::GetProjectilePosition(lua_State* L)
  * @function Spring.GetProjectileDirection
  * @param projectileID integer
  * @return number? dirX
- * @return number dirY
- * @return number dirZ
+ * @return number? dirY
+ * @return number? dirZ
  */
 int LuaSyncedRead::GetProjectileDirection(lua_State* L)
 {
@@ -7156,9 +7148,9 @@ int LuaSyncedRead::GetProjectileDirection(lua_State* L)
  * @function Spring.GetProjectileVelocity
  * @param projectileID integer
  * @return number? velX
- * @return number velY
- * @return number velZ
- * @return number velW
+ * @return number? velY
+ * @return number? velZ
+ * @return number? velW
  */
 int LuaSyncedRead::GetProjectileVelocity(lua_State* L)
 {
