@@ -6210,7 +6210,7 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
 		// - 1 to convert from lua index to C index
 		cmdIndex -= 1;
 	} else {
-		cmdIndex = queue->size()-cmdIndex;
+		cmdIndex = queue->size() + cmdIndex;
 	}
 
 	if (cmdIndex >= queue->size() || cmdIndex < 0)
