@@ -2169,7 +2169,7 @@ int LuaUnsyncedRead::GetRenderFeatures(lua_State* L)
 /***
  *
  * @function Spring.GetRenderFeaturesDrawFlagChanged
- * @param sendMask boolean
+ * @param sendMask boolean (Default: `false`) Whether to send objects draw flags as second return
  * @return integer[] featureIDs
  * @return DrawFlag[]? newDrawFlags
  */
