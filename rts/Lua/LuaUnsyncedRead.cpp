@@ -2144,7 +2144,7 @@ int LuaUnsyncedRead::GetRenderUnits(lua_State* L)
  *
  * @function Spring.GetRenderUnitsDrawFlagChanged
  * Gets a list of IDs of units that have had their draw flags changed, and the corresponding flags.
- * @param sendMask boolean
+ * @param sendMask boolean (Default: `false`) Whether to send objects draw flags as second return
  * @return integer[] unitIDs
  * @return DrawFlag[]? newDrawFlags
  */
