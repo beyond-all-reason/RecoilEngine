@@ -9,6 +9,7 @@
 #include "fmt/printf.h"
 
 #include "DumpState.h"
+#include "DumpHistory.h"
 
 #include "Game/Game.h"
 #include "Game/GameSetup.h"
@@ -110,7 +111,7 @@ namespace {
 }
 
 
-int DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::optional<bool> outputFloats, bool serverRequest)
+int DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::optional<bool> outputFloats, std::optional<int> historyFrame, bool serverRequest)
 {
 	if (outputFloats.has_value())
 		onlyHash = !outputFloats.value();
@@ -119,6 +120,7 @@ int DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::o
 	static int gMinFrameNum = -1;
 	static int gMaxFrameNum = -1;
 	static int gFramePeriod =  1;
+	static int gHistoryFrame = -1;
 
 	const int oldMinFrameNum = gMinFrameNum;
 	const int oldMaxFrameNum = gMaxFrameNum;
@@ -142,6 +144,8 @@ int DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::o
 			file.flush();
 			file.close();
 		}
+
+		gHistoryFrame = historyFrame.value_or(-1);
 
 		dumpId = guRNG.NextInt();
 
@@ -653,8 +657,11 @@ int DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::o
 	#endif
 
 	file.flush();
-	if (gs->frameNum == gMaxFrameNum)
+	if (gs->frameNum == gMaxFrameNum) {
+		if (gHistoryFrame > -1)
+			DumpHistory(file, gHistoryFrame, serverRequest);
 		file.close();
+	}
 
 	gMinFrameNum = -1;
 	gMaxFrameNum = -1;
