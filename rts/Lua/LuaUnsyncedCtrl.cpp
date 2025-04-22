@@ -630,13 +630,12 @@ int LuaUnsyncedCtrl::SendPrivateChat(lua_State* L) {
 	if (lua_gettop(L) != 2 || !lua_isstring(L, 1))
 		return luaL_error(L, "Incorrect arguments to Spring.SendPrivateChat(message string, playerID integer)");
 
-	const LUA_INTEGER rawPlayerID = luaL_checkinteger(L, 2);
-	if (rawPlayerID < 0 || rawPlayerID > MAX_PLAYERS)
-		return luaL_error(L, "Error in function '%s': Player ID %lld out of range (0-%lld)", __func__, rawPlayerID, MAX_PLAYERS);
+	const int playerID = luaL_checkinteger(L, 2);
+	if (playerID < 0 || playerID > MAX_PLAYERS)
+		return luaL_error(L, "Error in function '%s': Player ID %d out of range (0-%d)", __func__, playerID, MAX_PLAYERS);
 
-	const uint8_t playerID = static_cast<uint8_t>(rawPlayerID);
 	if (!playerHandler.IsValidPlayer(playerID))
-		return luaL_error(L, "Error in function '%s': Invalid Player ID %lld", __func__, playerID);
+		return luaL_error(L, "Error in function '%s': Invalid Player ID %d", __func__, playerID);
 
 	game->SendNetChat(luaL_checksstring(L, 1), playerID);
 	return 0;

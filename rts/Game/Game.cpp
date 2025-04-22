@@ -1970,6 +1970,7 @@ void CGame::SendNetChat(std::string message, int destination)
 	clientNet->Send(buf.Pack());
 }
 
+
 void CGame::HandleChatMsg(const ChatMessage& msg)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
