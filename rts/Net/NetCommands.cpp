@@ -1574,7 +1574,7 @@ void CGame::ClientReadNet()
 				LOG("Collecting current game state information.");
 				// TODO? maybe check for old DUMP version (dataLength >= 5) or create DUMP2 packet
 				uint32_t* desyncFrame = (uint32_t*)&inbuf[1];
-				DumpState(gs->frameNum, gs->frameNum, 1, true, static_cast<unsigned>(*desyncFrame), true);
+				DumpState(gs->frameNum, gs->frameNum, 1, true, *desyncFrame, true);
 				break;
 			}
 
