@@ -3,7 +3,6 @@
 #ifndef DUMPHISTORY_H
 #define DUMPHISTORY_H
 
-extern void DumpHistoryBinary(int dumpId, int frameNum, bool serverRequest);
 extern void DumpHistory(std::fstream& file, int frameNum, bool serverRequest);
 
 #endif /* DUMPHISTORY_H */

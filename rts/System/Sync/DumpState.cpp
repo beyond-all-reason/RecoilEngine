@@ -111,7 +111,7 @@ namespace {
 }
 
 
-int DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::optional<bool> outputFloats, std::optional<int> historyFrame, bool serverRequest)
+void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::optional<bool> outputFloats, std::optional<int> historyFrame, bool serverRequest)
 {
 	if (outputFloats.has_value())
 		onlyHash = !outputFloats.value();
@@ -124,13 +124,12 @@ int DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::o
 
 	const int oldMinFrameNum = gMinFrameNum;
 	const int oldMaxFrameNum = gMaxFrameNum;
-	int dumpId = 0;
 
 	if (!gs->cheatEnabled && !serverRequest)
-		return dumpId;
+		return;
 	// check if the range is valid
 	if (newMaxFrameNum < newMinFrameNum)
-		return dumpId;
+		return;
 
 	// adjust the bounds if the new values are valid
 	if (newMinFrameNum >= 0) gMinFrameNum = newMinFrameNum;
@@ -147,11 +146,9 @@ int DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::o
 
 		gHistoryFrame = historyFrame.value_or(-1);
 
-		dumpId = guRNG.NextInt();
-
 		std::string name = (gameServer != nullptr)? "Server": "Client";
 		name += "GameState-";
-		name += IntToString(dumpId);
+		name += IntToString(guRNG.NextInt());
 		name += "-[";
 		name += IntToString(gMinFrameNum);
 		name += "-";
@@ -175,14 +172,14 @@ int DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::o
 	}
 
 	if (file.bad() || !file.is_open())
-		return dumpId;
+		return;
 	// check if the CURRENT frame lies within the bounds
 	if (gs->frameNum < gMinFrameNum)
-		return dumpId;
+		return;
 	if (gs->frameNum > gMaxFrameNum)
-		return dumpId;
+		return;
 	if ((gs->frameNum % gFramePeriod) != 0)
-		return dumpId;
+		return;
 
 	// we only care about the synced projectile data here
 	const std::vector<CUnit*>& activeUnits = unitHandler.GetActiveUnits();
@@ -666,7 +663,7 @@ int DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::o
 	gMinFrameNum = -1;
 	gMaxFrameNum = -1;
 	gFramePeriod =  1;
-	return dumpId;
+	return;
 }
 
 void DumpRNG(int newMinFrameNum, int newMaxFrameNum)
