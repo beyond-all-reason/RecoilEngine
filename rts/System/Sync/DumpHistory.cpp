@@ -41,10 +41,8 @@ void DumpHistory(std::fstream& file, int frameNum, bool serverRequest)
 	for (int i = startIndex; i < startIndex + firstRangeSize; ++i) {
 		file << std::format("\t{:08x}\n", data[i]);
 	}
-	if (secondRangeSize > 0) {
-		for (int i = 0; i < secondRangeSize; ++i) {
-			file << std::format("\t{:08x}\n", data[i]);
-		}
+	for (int i = 0; i < secondRangeSize; ++i) {
+		file << std::format("\t{:08x}\n", data[i]);
 	}
 #endif // SYNC_HISTORY
 }
