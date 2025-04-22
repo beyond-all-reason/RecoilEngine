@@ -573,7 +573,7 @@ static string ParseMessage(lua_State* L, const string& msg)
  * @section chatmessages
 ******************************************************************************/
 
-/*** Sends a chat message to everyone (players).
+/*** Sends a chat message to everyone (players and spectators).
  *
  * @function Spring.SendPublicChat
  * @param message string
@@ -589,7 +589,7 @@ int LuaUnsyncedCtrl::SendPublicChat(lua_State* L) {
 	return 0;
 }
 
-/*** Sends a chat message to the sender's ally team.
+/*** Sends a chat message to the sender's ally team (if a spectator, to other spectators).
  *
  * @function Spring.SendAllyChat
  * @param message string
@@ -604,7 +604,7 @@ int LuaUnsyncedCtrl::SendAllyChat(lua_State* L) {
 	return 0;
 }
 
-/*** Sends a chat message to spectators.
+/*** Sends a chat message to spectators. Works even if you're a player.
  *
  * @function Spring.SendSpectatorChat
  * @param message string
