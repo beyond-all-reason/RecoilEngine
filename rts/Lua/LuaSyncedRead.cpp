@@ -855,7 +855,7 @@ int LuaSyncedRead::AreHelperAIsEnabled(lua_State* L)
  *
  * @function Spring.FixedAllies
  *
- * @return boolean|nil enabled
+ * @return boolean? enabled
  */
 int LuaSyncedRead::FixedAllies(lua_State* L)
 {
@@ -1152,7 +1152,7 @@ int LuaSyncedRead::GetGameRulesParam(lua_State* L)
  * @param teamID integer
  * @param ruleRef number|string the rule index or name
  *
- * @return nil|number|string value
+ * @return number|string|nil value
  */
 int LuaSyncedRead::GetTeamRulesParam(lua_State* L)
 {
@@ -1180,7 +1180,7 @@ int LuaSyncedRead::GetTeamRulesParam(lua_State* L)
  * @param playerID integer
  * @param ruleRef number|string the rule index or name
  *
- * @return nil|number|string value
+ * @return number|string|nil value
  */
 int LuaSyncedRead::GetPlayerRulesParam(lua_State* L)
 {
@@ -1211,7 +1211,7 @@ int LuaSyncedRead::GetPlayerRulesParam(lua_State* L)
  * @param unitID integer
  * @param ruleRef number|string the rule index or name
  *
- * @return nil|number|string value
+ * @return number|string|nil value
  */
 int LuaSyncedRead::GetUnitRulesParam(lua_State* L)
 {
@@ -1230,7 +1230,7 @@ int LuaSyncedRead::GetUnitRulesParam(lua_State* L)
  * @param featureID integer
  * @param ruleRef number|string the rule index or name
  *
- * @return nil|number|string value
+ * @return number|string|nil value
  */
 int LuaSyncedRead::GetFeatureRulesParam(lua_State* L)
 {
@@ -1442,7 +1442,7 @@ int LuaSyncedRead::GetHeadingFromFacing(lua_State* L)
  *
  * @param sideName string
  *
- * @return nil|string startUnit
+ * @return string? startUnit
  * @return string caseSensitiveSideName
  */
 
@@ -1452,7 +1452,7 @@ int LuaSyncedRead::GetHeadingFromFacing(lua_State* L)
  *
  * @param sideID integer
  *
- * @return nil|string sideName
+ * @return string? sideName
  * @return string startUnit
  * @return string caseSensitiveSideName
  */
@@ -2326,7 +2326,7 @@ int LuaSyncedRead::GetAIInfo(lua_State* L)
  *
  * @function Spring.GetAllyTeamInfo
  * @param allyTeamID integer
- * @return nil|table<string,string>
+ * @return table<string,string>?
  */
 int LuaSyncedRead::GetAllyTeamInfo(lua_State* L)
 {
@@ -2353,7 +2353,7 @@ int LuaSyncedRead::GetAllyTeamInfo(lua_State* L)
  * @function Spring.AreTeamsAllied
  * @param teamID1 number
  * @param teamID2 number
- * @return nil|boolean
+ * @return boolean?
  */
 int LuaSyncedRead::AreTeamsAllied(lua_State* L)
 {
@@ -2373,7 +2373,7 @@ int LuaSyncedRead::AreTeamsAllied(lua_State* L)
  * @function Spring.ArePlayersAllied
  * @param playerID1 number
  * @param playerID2 number
- * @return nil|boolean
+ * @return boolean?
  */
 int LuaSyncedRead::ArePlayersAllied(lua_State* L)
 {
@@ -3826,7 +3826,7 @@ int LuaSyncedRead::GetUnitStates(lua_State* L)
  *
  * @function Spring.GetUnitArmored
  * @param unitID integer
- * @return nil|boolean armored
+ * @return boolean? armored
  * @return number armorMultiple
  */
 int LuaSyncedRead::GetUnitArmored(lua_State* L)
@@ -4016,7 +4016,7 @@ int LuaSyncedRead::GetUnitPosErrorParams(lua_State* L)
  *
  * @function Spring.GetUnitTooltip
  * @param unitID integer
- * @return nil|string
+ * @return string?
  */
 int LuaSyncedRead::GetUnitTooltip(lua_State* L)
 {
@@ -4119,7 +4119,7 @@ int LuaSyncedRead::GetUnitAllyTeam(lua_State* L)
  * To check if a unit is Gaia, check its owner team.
  *
  * @param unitID integer
- * @return nil|boolean
+ * @return boolean?
  */
 int LuaSyncedRead::GetUnitNeutral(lua_State* L)
 {
@@ -4175,7 +4175,7 @@ int LuaSyncedRead::GetUnitHealth(lua_State* L)
  *
  * @function Spring.GetUnitIsDead
  * @param unitID integer
- * @return nil|boolean
+ * @return boolean?
  */
 int LuaSyncedRead::GetUnitIsDead(lua_State* L)
 {
@@ -4198,7 +4198,7 @@ int LuaSyncedRead::GetUnitIsDead(lua_State* L)
  *
  * @function Spring.GetUnitIsStunned
  * @param unitID integer
- * @return nil|boolean stunnedOrBuilt unit is disabled
+ * @return boolean? stunnedOrBuilt unit is disabled
  * @return boolean stunned unit is either stunned via EMP or being transported by a non-fireplatform
  * @return boolean beingBuilt unit is under construction
  */
@@ -4946,7 +4946,7 @@ int LuaSyncedRead::GetUnitNanoPieces(lua_State* L)
  * Returns nil if the unit is not being transported.
  *
  * @param unitID integer
- * @return integer|nil transportUnitID
+ * @return integer? transportUnitID
  */
 int LuaSyncedRead::GetUnitTransporter(lua_State* L)
 {
@@ -5939,7 +5939,7 @@ int LuaSyncedRead::GetCEGID(lua_State* L)
  *
  * @function Spring.GetUnitBlocking
  * @param unitID integer
- * @return nil|boolean isBlocking
+ * @return boolean? isBlocking
  * @return boolean isSolidObjectCollidable
  * @return boolean isProjectileCollidable
  * @return boolean isRaySegmentCollidable
@@ -6561,7 +6561,7 @@ static int PackBuildQueue(lua_State* L, bool canBuild, const char* caller)
  *
  * @function Spring.GetFullBuildQueue
  * @param unitID integer
- * @return nil|table<number,number> buildqueue indexed by unitDefID with count values
+ * @return table<number,number>? buildqueue indexed by unitDefID with count values
  */
 int LuaSyncedRead::GetFullBuildQueue(lua_State* L)
 {
@@ -6573,7 +6573,7 @@ int LuaSyncedRead::GetFullBuildQueue(lua_State* L)
  *
  * @function Spring.GetRealBuildQueue
  * @param unitID integer
- * @return nil|table<number,number> buildqueue indexed by unitDefID with count values
+ * @return table<number,number>? buildqueue indexed by unitDefID with count values
  */
 int LuaSyncedRead::GetRealBuildQueue(lua_State* L)
 {
@@ -7263,7 +7263,7 @@ int LuaSyncedRead::GetProjectileTarget(lua_State* L)
  *
  * @function Spring.GetProjectileIsIntercepted
  * @param projectileID integer
- * @return nil|boolean
+ * @return boolean?
  */
 int LuaSyncedRead::GetProjectileIsIntercepted(lua_State* L)
 {
@@ -7367,7 +7367,7 @@ int LuaSyncedRead::GetProjectileAllyTeamID(lua_State* L)
  *
  * @function Spring.GetProjectileType
  * @param projectileID integer
- * @return nil|boolean weapon
+ * @return boolean? weapon
  * @return boolean piece
  */
 int LuaSyncedRead::GetProjectileType(lua_State* L)
@@ -8577,7 +8577,7 @@ int LuaSyncedRead::GetModelRootPiece(lua_State* L) {
  *
  * @function Spring.GetModelPieceMap
  * @param modelName string
- * @return nil|table<string,number> pieceInfos where keys are piece names and values are indices
+ * @return table<string,number>? pieceInfos where keys are piece names and values are indices
  */
 int LuaSyncedRead::GetModelPieceMap(lua_State* L) {
 	return ::GetModelPieceMap(L, luaL_optsstring(L, 1, ""));
@@ -8588,7 +8588,7 @@ int LuaSyncedRead::GetModelPieceMap(lua_State* L) {
  *
  * @function Spring.GetModelPieceList
  * @param modelName string
- * @return nil|string[] pieceNames
+ * @return string[]? pieceNames
  */
 int LuaSyncedRead::GetModelPieceList(lua_State* L) {
 	return ::GetModelPieceList(L, luaL_optsstring(L, 1, ""));
@@ -8609,7 +8609,7 @@ int LuaSyncedRead::GetUnitRootPiece(lua_State* L) {
  *
  * @function Spring.GetUnitPieceMap
  * @param unitID integer
- * @return nil|table<string,number> pieceInfos where keys are piece names and values are indices
+ * @return table<string,number>? pieceInfos where keys are piece names and values are indices
  */
 int LuaSyncedRead::GetUnitPieceMap(lua_State* L) {
 	return (GetSolidObjectPieceMap(L, ParseTypedUnit(L, __func__, 1)));
@@ -8644,7 +8644,7 @@ int LuaSyncedRead::GetUnitPieceInfo(lua_State* L) {
  * @function Spring.GetUnitPiecePosDir
  * @param unitID integer
  * @param pieceIndex integer
- * @return number|nil posX
+ * @return number? posX
  * @return number     posY
  * @return number     posZ
  * @return number     dirX
@@ -8661,7 +8661,7 @@ int LuaSyncedRead::GetUnitPiecePosDir(lua_State* L) {
  * @function Spring.GetUnitPiecePosition
  * @param unitID integer
  * @param pieceIndex integer
- * @return number|nil posX
+ * @return number? posX
  * @return number     posY
  * @return number     posZ
  */
@@ -8675,7 +8675,7 @@ int LuaSyncedRead::GetUnitPiecePosition(lua_State* L) {
  * @function Spring.GetUnitPieceDirection
  * @param unitID integer
  * @param pieceIndex integer
- * @return number|nil dirX
+ * @return number? dirX
  * @return number     dirY
  * @return number     dirZ
  */
@@ -8688,7 +8688,7 @@ int LuaSyncedRead::GetUnitPieceDirection(lua_State* L) {
  *
  * @function Spring.GetUnitPieceMatrix
  * @param unitID integer
- * @return number|nil m11
+ * @return number? m11
  * @return number m12
  * @return number m13
  * @return number m14
@@ -8758,7 +8758,7 @@ int LuaSyncedRead::GetFeaturePieceInfo(lua_State* L) {
  * @function Spring.GetFeaturePiecePosDir
  * @param featureID integer
  * @param pieceIndex integer
- * @return number|nil posX
+ * @return number? posX
  * @return number     posY
  * @return number     posZ
  * @return number     dirX
@@ -8775,7 +8775,7 @@ int LuaSyncedRead::GetFeaturePiecePosDir(lua_State* L) {
  * @function Spring.GetFeaturePiecePosition
  * @param featureID integer
  * @param pieceIndex integer
- * @return number|nil posX
+ * @return number? posX
  * @return number     posY
  * @return number     posZ
  */
@@ -8789,7 +8789,7 @@ int LuaSyncedRead::GetFeaturePiecePosition(lua_State* L) {
  * @function Spring.GetFeaturePieceDirection
  * @param featureID integer
  * @param pieceIndex integer
- * @return number|nil dirX
+ * @return number? dirX
  * @return number     dirY
  * @return number     dirZ
  */
@@ -8802,7 +8802,7 @@ int LuaSyncedRead::GetFeaturePieceDirection(lua_State* L) {
  *
  * @function Spring.GetFeaturePieceMatrix
  * @param featureID integer
- * @return number|nil m11
+ * @return number? m11
  * @return number m12
  * @return number m13
  * @return number m14

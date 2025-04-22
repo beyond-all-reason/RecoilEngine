@@ -1780,7 +1780,7 @@ public:
  * @param teamID integer? (Default: `-1`)
  * @param radius number? (Default: `30`)
  * @param icons boolean? (Default: `true`)
- * @return nil|number[] unitIDs
+ * @return number[]? unitIDs
  */
 int LuaUnsyncedRead::GetVisibleUnits(lua_State* L)
 {
@@ -1879,7 +1879,7 @@ int LuaUnsyncedRead::GetVisibleUnits(lua_State* L)
  * @param radius number? (Default: `30`)
  * @param icons boolean? (Default: `true`)
  * @param geos boolean? (Default: `true`)
- * @return nil|number[] featureIDs
+ * @return number[]? featureIDs
  */
 int LuaUnsyncedRead::GetVisibleFeatures(lua_State* L)
 {
@@ -1960,7 +1960,7 @@ int LuaUnsyncedRead::GetVisibleFeatures(lua_State* L)
  * @param addSyncedProjectiles boolean? (Default: `true`)
  * @param addWeaponProjectiles boolean? (Default: `true`)
  * @param addPieceProjectiles boolean? (Default: `true`)
- * @return nil|number[] projectileIDs
+ * @return number[]? projectileIDs
  */
 int LuaUnsyncedRead::GetVisibleProjectiles(lua_State* L)
 {
@@ -2142,7 +2142,6 @@ namespace {
  * @param drawMask DrawMask (Default: `0`) Filter objects by their draw flags.
  * @param sendMask false? Whether to send objects draw flags as second return
  * @return integer[] featureIDs
- * @return nil
  */
 int LuaUnsyncedRead::GetRenderUnits(lua_State* L)
 {
@@ -2162,7 +2161,6 @@ int LuaUnsyncedRead::GetRenderUnits(lua_State* L)
  * Gets a list of IDs of units that have had their draw flags changed, and the corresponding flags.
  * @param sendMask false? Whether to send objects draw flags as second return.
  * @return integer[] ids
- * @return nil
  */
 int LuaUnsyncedRead::GetRenderUnitsDrawFlagChanged(lua_State* L)
 {
@@ -2184,7 +2182,6 @@ int LuaUnsyncedRead::GetRenderUnitsDrawFlagChanged(lua_State* L)
  * @param drawMask DrawMask (Default: `0`) Filter objects by their draw flags.
  * @param sendMask false? Whether to send objects draw flags as second return
  * @return integer[] featureIDs
- * @return nil
  */
 int LuaUnsyncedRead::GetRenderFeatures(lua_State* L)
 {
@@ -2204,7 +2201,6 @@ int LuaUnsyncedRead::GetRenderFeatures(lua_State* L)
  * Gets a list of IDs of features that have had their draw flags changed, and the corresponding flags.
  * @param sendMask false? Whether to send objects draw flags as second return.
  * @return integer[] ids
- * @return nil
  */
 int LuaUnsyncedRead::GetRenderFeaturesDrawFlagChanged(lua_State* L)
 {
@@ -2214,7 +2210,6 @@ int LuaUnsyncedRead::GetRenderFeaturesDrawFlagChanged(lua_State* L)
 /***
  *
  * @function Spring.ClearUnitsPreviousDrawFlag
- * @return nil
  */
 int LuaUnsyncedRead::ClearUnitsPreviousDrawFlag(lua_State* L)
 {
@@ -2225,7 +2220,6 @@ int LuaUnsyncedRead::ClearUnitsPreviousDrawFlag(lua_State* L)
 /***
  *
  * @function Spring.ClearFeaturesPreviousDrawFlag
- * @return nil
  */
 int LuaUnsyncedRead::ClearFeaturesPreviousDrawFlag(lua_State* L)
 {
@@ -2241,7 +2235,7 @@ int LuaUnsyncedRead::ClearFeaturesPreviousDrawFlag(lua_State* L)
  * @param right number
  * @param bottom number
  * @param allegiance number? (Default: `-1`) teamID when > 0, when < 0 one of AllUnits = -1, MyUnits = -2, AllyUnits = -3, EnemyUnits = -4
- * @return nil|number[] unitIDs
+ * @return number[]? unitIDs
  */
 int LuaUnsyncedRead::GetUnitsInScreenRectangle(lua_State* L)
 {
@@ -2339,7 +2333,7 @@ int LuaUnsyncedRead::GetUnitsInScreenRectangle(lua_State* L)
 	* @param top number
 	* @param right number
 	* @param bottom number
-	* @return nil|number[] featureIDs
+	* @return number[]? featureIDs
 	*/
 int LuaUnsyncedRead::GetFeaturesInScreenRectangle(lua_State* L)
 {
@@ -2939,10 +2933,10 @@ int LuaUnsyncedRead::WorldToScreenCoords(lua_State* L)
  * @param includeSky boolean? (Default: `false`)
  * @param ignoreWater boolean? (Default: `false`)
  * @param heightOffset number? (Default: `0`)
- * @return nil|string description of traced position
- * @return nil|number|string|xyz unitID or feature, position triple when onlyCoords=true
- * @return nil|number|string featureID or ground
- * @return nil|xyz coords
+ * @return string? description of traced position
+ * @return number|string|xyz|nil unitID or feature, position triple when onlyCoords=true
+ * @return number|string|nil featureID or ground
+ * @return xyz? coords
  */
 int LuaUnsyncedRead::TraceScreenRay(lua_State* L)
 {
@@ -3367,7 +3361,7 @@ int LuaUnsyncedRead::GetGameState(lua_State* L)
  * @return number? cmdIndex
  * @return integer? cmdID
  * @return number? cmdType
- * @return nil|string cmdName
+ * @return string? cmdName
  */
 int LuaUnsyncedRead::GetActiveCommand(lua_State* L)
 {
@@ -4059,7 +4053,7 @@ int LuaUnsyncedRead::GetActionHotKeys(lua_State* L)
 /***
  *
  * @function Spring.GetGroupList
- * @return nil|table<number,number> where keys are groupIDs and values are counts
+ * @return table<number,number>? where keys are groupIDs and values are counts
  */
 int LuaUnsyncedRead::GetGroupList(lua_State* L)
 {
@@ -4135,7 +4129,7 @@ static inline const CGroup* GetGroupFromArg(lua_State* L, int arg)
  *
  * @function Spring.GetGroupUnits
  * @param groupID integer
- * @return nil|number[] unitIDs
+ * @return number[]? unitIDs
  */
 int LuaUnsyncedRead::GetGroupUnits(lua_State* L)
 {
@@ -4152,7 +4146,7 @@ int LuaUnsyncedRead::GetGroupUnits(lua_State* L)
  *
  * @function Spring.GetGroupUnitsSorted
  * @param groupID integer
- * @return nil|table<number,number[]> where keys are unitDefIDs and values are unitIDs
+ * @return table<number,number[]>? where keys are unitDefIDs and values are unitIDs
  */
 int LuaUnsyncedRead::GetGroupUnitsSorted(lua_State* L)
 {
@@ -4169,7 +4163,7 @@ int LuaUnsyncedRead::GetGroupUnitsSorted(lua_State* L)
  *
  * @function Spring.GetGroupUnitsCounts
  * @param groupID integer
- * @return nil|table<number,number> where keys are unitDefIDs and values are counts
+ * @return table<number,number>? where keys are unitDefIDs and values are counts
  */
 int LuaUnsyncedRead::GetGroupUnitsCounts(lua_State* L)
 {
@@ -4665,7 +4659,7 @@ int LuaUnsyncedRead::GetGroundDecalRotation(lua_State* L)
  * @function Spring.GetGroundDecalTexture
  * @param decalID integer
  * @param isMainTex boolean? (Default: `true`) If `false`, return the normal/glow map.
- * @return nil|string texture
+ * @return string? texture
  */
 int LuaUnsyncedRead::GetGroundDecalTexture(lua_State* L)
 {
@@ -4859,7 +4853,7 @@ int LuaUnsyncedRead::GetGroundDecalOwner(lua_State* L)
  *
  * @function Spring.GetGroundDecalType
  * @param decalID integer
- * @return nil|string type "explosion"|"plate"|"lua"|"track"|"unknown"
+ * @return "explosion"|"plate"|"lua"|"track"|"unknown"|nil type
  */
 int LuaUnsyncedRead::GetGroundDecalType(lua_State* L)
 {
