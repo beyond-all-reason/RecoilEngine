@@ -2130,10 +2130,19 @@ namespace {
 /***
  *
  * @function Spring.GetRenderUnits
- * @param drawMask DrawMask (Default: `0`) Filter objects by their draw flags
- * @param sendMask boolean (Default: `false`) Whether to send objects draw flags as second return
- * @return integer[] unitIDs
- * @return DrawFlag[]? unitDrawFlags
+ * @param drawMask DrawMask (Default: `0`) Filter objects by their draw flags.
+ * @param sendMask true Whether to send objects draw flags as second return
+ * @return integer[] featureIDs
+ * @return DrawFlag[] drawFlags
+ */
+
+/***
+ *
+ * @function Spring.GetRenderUnits
+ * @param drawMask DrawMask (Default: `0`) Filter objects by their draw flags.
+ * @param sendMask false? Whether to send objects draw flags as second return
+ * @return integer[] featureIDs
+ * @return nil
  */
 int LuaUnsyncedRead::GetRenderUnits(lua_State* L)
 {
@@ -2141,12 +2150,19 @@ int LuaUnsyncedRead::GetRenderUnits(lua_State* L)
 }
 
 /***
- *
  * @function Spring.GetRenderUnitsDrawFlagChanged
  * Gets a list of IDs of units that have had their draw flags changed, and the corresponding flags.
- * @param sendMask boolean (Default: `false`) Whether to send objects draw flags as second return
- * @return integer[] unitIDs
- * @return DrawFlag[]? newDrawFlags
+ * @param sendMask true Whether to send objects draw flags as second return.
+ * @return integer[] ids
+ * @return DrawFlag[] unitDrawFlags
+ */
+
+/***
+ * @function Spring.GetRenderUnitsDrawFlagChanged
+ * Gets a list of IDs of units that have had their draw flags changed, and the corresponding flags.
+ * @param sendMask false? Whether to send objects draw flags as second return.
+ * @return integer[] ids
+ * @return nil
  */
 int LuaUnsyncedRead::GetRenderUnitsDrawFlagChanged(lua_State* L)
 {
@@ -2156,10 +2172,19 @@ int LuaUnsyncedRead::GetRenderUnitsDrawFlagChanged(lua_State* L)
 /***
  *
  * @function Spring.GetRenderFeatures
- * @param drawMask DrawMask (Default: `0`) Filter objects by their draw flags
- * @param sendMask boolean (Default: `false`) Whether to send objects draw flags as second return
+ * @param drawMask DrawMask (Default: `0`) Filter objects by their draw flags.
+ * @param sendMask true Whether to send objects draw flags as second return
  * @return integer[] featureIDs
- * @return DrawFlag[]? drawFlags
+ * @return DrawFlag[] drawFlags
+ */
+
+/***
+ *
+ * @function Spring.GetRenderFeatures
+ * @param drawMask DrawMask (Default: `0`) Filter objects by their draw flags.
+ * @param sendMask false? Whether to send objects draw flags as second return
+ * @return integer[] featureIDs
+ * @return nil
  */
 int LuaUnsyncedRead::GetRenderFeatures(lua_State* L)
 {
@@ -2167,11 +2192,19 @@ int LuaUnsyncedRead::GetRenderFeatures(lua_State* L)
 }
 
 /***
- *
  * @function Spring.GetRenderFeaturesDrawFlagChanged
- * @param sendMask boolean (Default: `false`) Whether to send objects draw flags as second return
- * @return integer[] featureIDs
- * @return DrawFlag[]? newDrawFlags
+ * Gets a list of IDs of units that have had their draw flags changed, and the corresponding flags.
+ * @param sendMask true Whether to send objects draw flags as second return.
+ * @return integer[] ids
+ * @return DrawFlag[] unitDrawFlags
+ */
+
+/***
+ * @function Spring.GetRenderFeaturesDrawFlagChanged
+ * Gets a list of IDs of units that have had their draw flags changed, and the corresponding flags.
+ * @param sendMask false? Whether to send objects draw flags as second return.
+ * @return integer[] ids
+ * @return nil
  */
 int LuaUnsyncedRead::GetRenderFeaturesDrawFlagChanged(lua_State* L)
 {

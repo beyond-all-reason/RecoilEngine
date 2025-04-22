@@ -7017,7 +7017,7 @@ int LuaSyncedRead::GetFeatureNoSelect(lua_State* L)
  * Returns nil if no feature found with ID.
  * @param featureID integer
  * @return string|""|nil featureDefName
- * @return integer buildFacing facing of footprint, 0 - 3
+ * @return FacingInteger buildFacing facing of footprint, 0 - 3
  */
 int LuaSyncedRead::GetFeatureResurrect(lua_State* L)
 {
@@ -7050,7 +7050,7 @@ int LuaSyncedRead::GetFeatureLastAttackedPiece(lua_State* L)
 	return (GetSolidObjectLastHitPiece(L, ParseFeature(L, __func__, 1)));
 }
 
-/*
+/***
  * @class CollisionVolumeData
  * A collection of information relating to a collision volume.
  * @field type "ellipsoid"|"cylinder"|"box"|"sphere" type
