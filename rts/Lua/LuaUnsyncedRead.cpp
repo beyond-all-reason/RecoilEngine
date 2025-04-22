@@ -2107,17 +2107,17 @@ namespace {
 }
 
 /***
-  * Drawing Flag
+  * Drawing Flags
   *
   * @alias DrawFlag
-  * | 0 # No draw
-  * | 1 # Opaque
-  * | 2 # Alpha F
-  * | 4 # Reflection
-  * | 8 # Refraction
-  * | 16 # Sh Opaque
-  * | 32 # Sh Transparent
-  * | 128 # Icon
+  * | 0 # No Draw
+  * | 1 # Opaque Pass
+  * | 2 # Alpha Pass
+  * | 4 # Reflection Pass
+  * | 8 # Refraction Pass
+  * | 16 # Shadow pass - Opaque Objects
+  * | 32 # Shadow pass - Transparent Objects
+  * | 128 # Icon - Possibly Radar Icons
   */
 
 /***
