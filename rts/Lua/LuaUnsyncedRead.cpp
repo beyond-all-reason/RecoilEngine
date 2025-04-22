@@ -2193,7 +2193,7 @@ int LuaUnsyncedRead::GetRenderFeatures(lua_State* L)
 
 /***
  * @function Spring.GetRenderFeaturesDrawFlagChanged
- * Gets a list of IDs of units that have had their draw flags changed, and the corresponding flags.
+ * Gets a list of IDs of features that have had their draw flags changed, and the corresponding flags.
  * @param sendMask true Whether to send objects draw flags as second return.
  * @return integer[] ids
  * @return DrawFlag[] unitDrawFlags
@@ -2201,7 +2201,7 @@ int LuaUnsyncedRead::GetRenderFeatures(lua_State* L)
 
 /***
  * @function Spring.GetRenderFeaturesDrawFlagChanged
- * Gets a list of IDs of units that have had their draw flags changed, and the corresponding flags.
+ * Gets a list of IDs of features that have had their draw flags changed, and the corresponding flags.
  * @param sendMask false? Whether to send objects draw flags as second return.
  * @return integer[] ids
  * @return nil
