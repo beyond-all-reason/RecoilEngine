@@ -1570,10 +1570,11 @@ void CCommandAI::SlowUpdate()
 		case CMD_SELFD: {
 			if ((owner->selfDTargetFrame != 0) || !owner->unitDef->canSelfD) {
 				owner->selfDTargetFrame = 0;
+				owner->selfDRemainingSeconds = 0;
 				owner->selfDCountdown = 0;
 			} else {
 				const int countdownFrames = std::max(0, owner->unitDef->selfDCountdown);
-
+				
 				owner->selfDTargetFrame = (gs->frameNum + countdownFrames);
 				owner->selfDRemainingSeconds = countdownFrames * INV_GAME_SPEED;
 				owner->selfDCountdown = owner->selfDRemainingSeconds * 2 + 1;
