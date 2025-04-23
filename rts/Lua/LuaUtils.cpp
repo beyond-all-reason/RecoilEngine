@@ -1108,7 +1108,7 @@ static bool ParseCommandTimeOut(
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer?
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
  */
 Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
 {

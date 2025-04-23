@@ -3284,7 +3284,7 @@ static bool CanGiveOrders(const lua_State* L)
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer? The frame after which the command will be ignored if unstarted.
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
  * @return boolean
  */
 int LuaUnsyncedCtrl::GiveOrder(lua_State* L)
@@ -3309,7 +3309,7 @@ int LuaUnsyncedCtrl::GiveOrder(lua_State* L)
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer? The frame after which the command will be ignored if unstarted.
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
  * @return boolean
  */
 int LuaUnsyncedCtrl::GiveOrderToUnit(lua_State* L)
@@ -3343,7 +3343,7 @@ int LuaUnsyncedCtrl::GiveOrderToUnit(lua_State* L)
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer? The frame after which the command will be ignored if unstarted.
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
  * @return boolean orderGiven
  */
 int LuaUnsyncedCtrl::GiveOrderToUnitMap(lua_State* L)
@@ -3377,7 +3377,7 @@ int LuaUnsyncedCtrl::GiveOrderToUnitMap(lua_State* L)
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer? The frame after which the command will be ignored if unstarted.
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
  * @return boolean ordersGiven `true` if any orders were sent, otherwise `false`.
  */
 int LuaUnsyncedCtrl::GiveOrderToUnitArray(lua_State* L)
