@@ -1423,44 +1423,37 @@ int LuaSyncedRead::GetHeadingFromFacing(lua_State* L)
 ******************************************************************************/
 
 
-/*** Side spec
+/***
+ * Side spec
  *
  * @class SideSpec
  *
- * Used when returning arrays of side specifications, is itself an array with
- * positional values as below:
+ * Returned when getting arrays of side specifications.
  *
- * @field sideName string
- * @field caseName string
+ * @field sideName string Lowercase side name.
+ * @field caseName string Original case side name.
  * @field startUnit string
+ * @see Spring.GetSideData
  */
 
-
 /***
- *
  * @function Spring.GetSideData
  *
- * @param sideName string
- *
+ * @param sideName string Case-insensitive side name.
  * @return string? startUnit
- * @return string caseSensitiveSideName
+ * @return string? caseName Original case side name.
  */
 
 /***
- *
  * @function Spring.GetSideData
- *
  * @param sideID integer
- *
- * @return string? sideName
- * @return string startUnit
- * @return string caseSensitiveSideName
+ * @return string? sideName Lowercase side name.
+ * @return string? startUnit
+ * @return string? caseName Original case side name.
  */
 
 /***
- *
  * @function Spring.GetSideData
- *
  * @return SideSpec[] sideArray
  */
 int LuaSyncedRead::GetSideData(lua_State* L)
@@ -6212,7 +6205,7 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
 		// - 1 to convert from lua index to C index
 		cmdIndex -= 1;
 	} else {
-		cmdIndex = queue->size()-cmdIndex;
+		cmdIndex = queue->size() + cmdIndex;
 	}
 
 	if (cmdIndex >= queue->size() || cmdIndex < 0)

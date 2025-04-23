@@ -21,7 +21,8 @@ void GLX::Load(SDL_Window* window)
 		supported = static_cast<bool>(gladLoadGLX(display, DefaultScreen(display)));
 	} break;
 	case SDL_SYSWM_WAYLAND: {
-		supported = static_cast<bool>(gladLoadGLX(nullptr, 0));
+		// unsafe in case XWayland is not available
+		//supported = static_cast<bool>(gladLoadGLX(nullptr, 0));
 	} break;
 	default:
 		break;

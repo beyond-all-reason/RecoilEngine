@@ -5,6 +5,18 @@
 
 namespace cpu_topology {
 
+// Identifies policy for how threads are pinned to logical processors. Windows/Linux work better with different
+// policies.
+enum ThreadPinPolicy {
+	THREAD_PIN_POLICY_NONE,          // No pinning
+	THREAD_PIN_POLICY_PER_PERF_CORE, // Pin each thread to one unique performance core (don't use HT/SMT)
+	THREAD_PIN_POLICY_ANY_PERF_CORE  // Pin threads so that they share a group of performance cores (don't use HT/SMT)
+	                                 // The same cores will be used as per THREAD_PIN_POLICY_PER_PERF_CORE, but the
+	                                 // threads are allowed to move between cores.
+};
+
+ThreadPinPolicy GetThreadPinPolicy();
+
 static constexpr uint32_t MAX_CACHE_LEVELS = 3;
 
 struct ProcessorMasks {
