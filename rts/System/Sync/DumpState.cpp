@@ -663,7 +663,6 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 	gMinFrameNum = -1;
 	gMaxFrameNum = -1;
 	gFramePeriod =  1;
-	return;
 }
 
 void DumpRNG(int newMinFrameNum, int newMaxFrameNum)
