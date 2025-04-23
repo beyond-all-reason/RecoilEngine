@@ -133,7 +133,7 @@ class CEventClient
 		virtual void UnitTaken(const CUnit* unit, int oldTeam, int newTeam) {}
 		virtual void UnitGiven(const CUnit* unit, int oldTeam, int newTeam) {}
 
-		virtual void UnitSelfDestructStarted(const CUnit* unit) {}
+		virtual void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) {}
 		virtual void UnitSelfDestructCancelled(const CUnit* unit) {}
 		virtual void UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds) {}
 

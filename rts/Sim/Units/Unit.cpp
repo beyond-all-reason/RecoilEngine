@@ -672,7 +672,7 @@ void CUnit::Update()
 			selfDRemainingSeconds = (selfDTargetFrame - gs->frameNum) * INV_GAME_SPEED;
 
 			//Backwards compatability with existing widgets (depreciated?)
-			selfDCountdown = remainingSeconds * 2 + 1;
+			selfDCountdown = selfDRemainingSeconds * 2 + 1;
 		}
 	}
     // --- END NEW Self-Destruct Check ---

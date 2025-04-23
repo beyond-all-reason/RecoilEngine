@@ -93,7 +93,8 @@ class CEventHandler
 		void UnitStunned(const CUnit* unit, bool stunned);
 		void UnitExperience(const CUnit* unit, float oldExperience);
 		void UnitHarvestStorageFull(const CUnit* unit);
-		void UnitSelfDestructStarted(const CUnit* unit);
+		
+		void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds);
 		void UnitSelfDestructCancelled(const CUnit* unit);
 		void UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds);
 
@@ -420,6 +421,11 @@ inline void CEventHandler::UnitDestroyed(const CUnit* unit, const CUnit* attacke
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitDestroyed, unit, attacker, weaponDefID)
 }
 
+inline void CEventHandler::UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitSelfDestructStarted, unit, remainingSeconds)
+}
+
 inline void CEventHandler::UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds)
 {
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitSelfDestructProgress, unit, remainingSeconds)
@@ -451,7 +457,6 @@ UNIT_CALLIN_NO_PARAM(UnitLeftUnderwater)
 UNIT_CALLIN_NO_PARAM(UnitLeftWater)
 UNIT_CALLIN_NO_PARAM(UnitLeftAir)
 UNIT_CALLIN_NO_PARAM(UnitMoved)
-UNIT_CALLIN_NO_PARAM(UnitSelfDestructStarted)
 UNIT_CALLIN_NO_PARAM(UnitSelfDestructCancelled)
 
 #define UNIT_CALLIN_INT_PARAMS(name)                                              \

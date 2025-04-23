@@ -1449,11 +1449,26 @@ void CLuaHandle::UnitHarvestStorageFull(const CUnit* unit)
  * @param unitID integer
  * @param unitDefID integer
  * @param unitTeam integer
+ * @param remainingSeconds float
  */
-void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit) 
+void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) 
 {
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 6, __func__);
+
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+
 	static const LuaHashString cmdStr(__func__);
-	UnitCallIn(cmdStr, unit);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	lua_pushnumber(L, unit->id);// unitID
+	lua_pushnumber(L, unit->unitDef->id); // unitDefID
+	lua_pushnumber(L, unit->team); // unitTeam
+	lua_pushnumber(L, remainingSeconds); // updatePeriodSeconds
+
+	RunCallInTraceback(L, cmdStr, 4, 0, traceBack.GetErrFuncIdx(), false);
 }
 
 /*** Called when a unit cancel's it's self destruct command.

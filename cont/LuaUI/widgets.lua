@@ -2101,23 +2101,23 @@ function widgetHandler:UnitHarvestStorageFull(unitID, unitDefID, unitTeam)
   return
 end
 
-function widgetHandler:UnitSelfDestructStarted(unitID, unitDefID, unitTeam)
+function widgetHandler:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
   for _,w in ipairs(self.UnitSelfDestructStartedList) do
-    w:UnitSelfDestructStarted(unitID, unitDefID, unitTeam)
+    w:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
   end
   return
 end
 
 function widgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam)
   for _,w in ipairs(self.UnitSelfDestructCancelledList) do
-    w:UnitSelfDestructStarted(unitID, unitDefID, unitTeam)
+    w:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam)
   end
   return
 end
 
-function widgetHandler:UnitSelfDestructProgress(unitID, unitDefID, remainingSeconds)
+function widgetHandler:UnitSelfDestructProgress(unitID, unitDefID, unitTeam, remainingSeconds)
   for _,w in ipairs(self.UnitSelfDestructProgressList) do
-    w:UnitSelfDestructStarted(unitID, unitDefID, remainingSeconds)
+    w:UnitSelfDestructProgress(unitID, unitDefID, unitTeam, remainingSeconds)
   end
   return
 end
