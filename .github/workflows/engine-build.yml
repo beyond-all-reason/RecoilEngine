@@ -53,7 +53,7 @@ on:
       - 'doc/**'
 jobs:
   build-engine:
-    if: github.repository == 'beyond-all-reason/spring' || github.event_name == 'workflow_dispatch'
+    if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
     strategy:
       matrix:
         system:
