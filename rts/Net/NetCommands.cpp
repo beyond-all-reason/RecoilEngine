@@ -1572,9 +1572,8 @@ void CGame::ClientReadNet()
 			case NETMSG_GAMESTATE_DUMP: {
 				ZoneScopedN("Net::GamestateDump");
 				LOG("Collecting current game state information.");
-				// TODO? maybe check for old DUMP version (dataLength >= 5) or create DUMP2 packet
-				uint32_t* desyncFrame = (uint32_t*)&inbuf[1];
-				DumpState(gs->frameNum, gs->frameNum, 1, true, *desyncFrame, true);
+				const uint32_t desyncFrameNum = *reinterpret_cast<const uint32_t*>(inbuf + 1);
+				DumpState(gs->frameNum, gs->frameNum, 1, true, desyncFrameNum, true);
 				break;
 			}
 
