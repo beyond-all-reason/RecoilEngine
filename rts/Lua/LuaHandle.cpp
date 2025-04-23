@@ -1481,7 +1481,7 @@ void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit, float remainingSeco
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
-	luaL_checkstack(L, 8, __func__);
+	luaL_checkstack(L, 6, __func__);
 
 	const LuaUtils::ScopedDebugTraceBack traceBack(L);
 
@@ -1494,7 +1494,7 @@ void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit, float remainingSeco
 	lua_pushnumber(L, unit->team); // unitTeam
 	lua_pushnumber(L, remainingSeconds); // updatePeriodSeconds
 
-	RunCallInTraceback(L, cmdStr, 2, 0, traceBack.GetErrFuncIdx(), false);
+	RunCallInTraceback(L, cmdStr, 4, 0, traceBack.GetErrFuncIdx(), false);
 }
 
 

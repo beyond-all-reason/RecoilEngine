@@ -669,8 +669,7 @@ void CUnit::Update()
 			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
 		return; // Skip rest of update if killed
 		} else {
-			const float remainingSeconds = (selfDTargetFrame - gs->frameNum) * INV_GAME_SPEED;
-			selfDRemainingSeconds = remainingSeconds;
+			selfDRemainingSeconds = (selfDTargetFrame - gs->frameNum) * INV_GAME_SPEED;
 
 			//Backwards compatability with existing widgets (depreciated?)
 			selfDCountdown = remainingSeconds * 2 + 1;
