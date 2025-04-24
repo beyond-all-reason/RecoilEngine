@@ -148,6 +148,7 @@ jobs:
           ghcr_image=ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}:latest
           nsc_image=${{ env.NSC_CONTAINER_REGISTRY }}/recoil-build-${{ matrix.system }}:latest
 
+          docker version
           docker pull $nsc_image || true
           docker pull $ghcr_image
           docker image tag $ghcr_image $nsc_image
