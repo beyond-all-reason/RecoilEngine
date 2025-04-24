@@ -497,6 +497,7 @@ inline void CEventHandler::UnitFromFactory(const CUnit* unit,
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitFromFactory, unit, factory, userOrders)
 }
 
+
 UNIT_CALLIN_NO_PARAM(UnitCloaked)
 UNIT_CALLIN_NO_PARAM(UnitDecloaked)
 
