@@ -93,6 +93,10 @@ void CEventHandler::RemoveClient(CEventClient* ec)
 	}
 }
 
+
+/******************************************************************************/
+/******************************************************************************/
+
 void CEventHandler::GetEventList(std::vector<std::string>& list) const
 {
 	list.clear();
