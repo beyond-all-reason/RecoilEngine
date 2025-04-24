@@ -109,12 +109,9 @@ void Skinning::ReparentMeshesTrianglesToBones(S3DModel* model, const std::vector
 		if (!piece->HasGeometryData())
 			continue;
 
-		const auto invTra = piece->bposeTransform.InvertAffine();
+		const auto invTra = piece->bposeTransform.InvertAffineNormalized();
 		for (auto& vert : piece->GetVerticesVec()) {
-			vert.pos      = (invTra * float4{ vert.pos     , 1.0f }).xyz;
-			vert.normal   = (invTra * float4{ vert.normal  , 0.0f }).xyz;
-			vert.sTangent = (invTra * float4{ vert.sTangent, 0.0f }).xyz;
-			vert.tTangent = (invTra * float4{ vert.tTangent, 0.0f }).xyz;
+			vert.TransformBy(invTra);
 		}
 	}
 }
@@ -197,12 +194,9 @@ void Skinning::ReparentCompleteMeshesToBones(S3DModel* model, const std::vector<
 		if (!piece->HasGeometryData())
 			continue;
 
-		const auto invTra = piece->bposeTransform.InvertAffine();
+		const auto invTra = piece->bposeTransform.InvertAffineNormalized();
 		for (auto& vert : piece->GetVerticesVec()) {
-			vert.pos      = (invTra * float4{ vert.pos     , 1.0f }).xyz;
-			vert.normal   = (invTra * float4{ vert.normal  , 0.0f }).xyz;
-			vert.sTangent = (invTra * float4{ vert.sTangent, 0.0f }).xyz;
-			vert.tTangent = (invTra * float4{ vert.tTangent, 0.0f }).xyz;
+			vert.TransformBy(invTra);
 		}
 	}
 }

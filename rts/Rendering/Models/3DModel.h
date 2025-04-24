@@ -43,6 +43,7 @@ struct S3DModel;
 struct S3DModelPiece;
 struct LocalModel;
 struct LocalModelPiece;
+struct Transform;
 
 
 struct SVertexData {
@@ -115,6 +116,8 @@ struct SVertexData {
 			static_cast<uint8_t>((bi[3].first >> 8) & 0xFF)
 		};
 	}
+
+	void TransformBy(const Transform& transform);
 };
 
 struct S3DModelPiecePart {

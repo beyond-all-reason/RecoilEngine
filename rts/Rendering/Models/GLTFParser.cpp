@@ -39,6 +39,17 @@ namespace Impl {
 		return Transform{ r, t, s.x };
 	}
 
+	Transform GetNodeTransform(const fastgltf::Node& node) {
+		return fastgltf::visit_exhaustive(fastgltf::visitor{
+			[](const fastgltf::math::fmat4x4& matrix) {
+				return Impl::MatrixToTransform(matrix);
+			},
+			[](const fastgltf::TRS& trs) {
+				return Impl::TRStoTransform(trs);
+			}
+		}, node.transform);
+	}
+
 	template<typename PrimContainer>
 	void ReadGeometryData(const fastgltf::Asset& asset, const PrimContainer& primitives, std::vector<SVertexData>& verts, std::vector<uint32_t>& indcs, const fastgltf::Skin* skinPtr = nullptr) {
 			for (const auto& prim : primitives) {
@@ -155,6 +166,7 @@ namespace Impl {
 			});
 		}
 	}
+
 	void ReplaceNodeIndexWithPieceIndex(std::vector<SVertexData>& verts, const spring::unordered_map<size_t, size_t>& nodeIdxToPieceIdx) {
 		for (auto& vert : verts) {
 			for (size_t wi = 0; wi < vert.boneIDsLow.size(); ++wi) {
@@ -169,6 +181,23 @@ namespace Impl {
 			}
 		}
 	}
+
+	void CondTransformSkinsToModelSpace(std::vector<SVertexData>& verts, size_t nodeIdx, const spring::unordered_map<size_t, Transform>& transforms) {
+		auto it = transforms.find(nodeIdx);
+		assert(it != transforms.end());
+
+		// Skins are expected to be in the model space anyway,
+		// So this whole function is mostly a precaution
+		if likely(it->second.IsIdentity())
+			return;
+
+		auto invTransform = it->second.InvertAffineNormalized();
+
+		for (auto& vert : verts) {
+			vert.TransformBy(invTransform);
+		}
+	}
+
 	void ParseSceneExtra(simdjson::dom::object* extras, std::size_t objectIndex, fastgltf::Category objectType, void* userPointer) {
 		if (objectType != fastgltf::Category::Scenes)
 			return;
@@ -232,6 +261,32 @@ namespace Impl {
 
 		// TODO parse asset?
 		// TODO guess the texture?
+	}
+
+	auto GetModelTransforms(const fastgltf::Asset& asset, std::size_t sceneIndex, const Transform& sceneTransform = Transform{}) {
+		auto& scene = asset.scenes[sceneIndex];
+
+		spring::unordered_map<size_t, Transform> transforms(asset.nodes.size());
+
+		auto function = [&](auto& self, size_t nodeIdx, const Transform& parentTransform) -> void {
+			const auto& node = asset.nodes[nodeIdx];
+
+			const auto& [it, noDup] = transforms.emplace(
+				nodeIdx,
+				parentTransform * GetNodeTransform(node)
+			);
+			assert(noDup);
+
+			for (auto& child : node.children) {
+				self(self, child, it->second);
+			}
+		};
+
+		for (auto& node : scene.nodeIndices) {
+			function(function, node, sceneTransform);
+		}
+
+		return transforms;
 	}
 }
 
@@ -308,8 +363,11 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 	model.mins = DEF_MIN_SIZE;
 	model.maxs = DEF_MAX_SIZE;
 
+	const auto initTransform = Transform{};
+
 	const auto defaultSceneIdx = asset.defaultScene.value_or(0);
-	auto* rootPiece = AllocRootEmptyPiece(&model, Transform{}, asset, defaultSceneIdx);
+
+	auto* rootPiece = AllocRootEmptyPiece(&model, initTransform, asset, defaultSceneIdx);
 	model.FlattenPieceTree(rootPiece);
 	model.SetPieceMatrices();
 
@@ -321,6 +379,10 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 
 		nodeIdxToPieceIdx[piece->nodeIndex] = pi;
 	}
+
+	// conceptually almost the same as AllocRootEmptyPiece + SetPieceMatrices
+	// except this one doesn't ignore nodes with skinned meshes
+	const auto modelTransforms = Impl::GetModelTransforms(asset, defaultSceneIdx, initTransform);
 
 	std::vector<Skinning::SkinnedMesh> allSkinnedMeshes;
 
@@ -337,6 +399,7 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 		auto& skinnedMesh = allSkinnedMeshes.emplace_back();
 
 		Impl::ReadGeometryData(asset, mesh.primitives, skinnedMesh.verts, skinnedMesh.indcs, &skin);
+		Impl::CondTransformSkinsToModelSpace(skinnedMesh.verts, ni, modelTransforms);
 		Impl::ReplaceNodeIndexWithPieceIndex(skinnedMesh.verts, nodeIdxToPieceIdx);
 	}
 
@@ -427,14 +490,7 @@ GLTFPiece* CGLTFParser::LoadPiece(S3DModel* model, GLTFPiece* parentPiece, const
 	piece->children.reserve(node.children.size());
 	piece->nodeIndex = nodeIndex;
 
-	Transform pieceTransform = fastgltf::visit_exhaustive(fastgltf::visitor{
-		[&](const fastgltf::math::fmat4x4& matrix) {
-			return Impl::MatrixToTransform(matrix);
-		},
-		[&](const fastgltf::TRS& trs) {
-			return Impl::TRStoTransform(trs);
-		}
-	}, node.transform);
+	Transform pieceTransform = Impl::GetNodeTransform(node);
 	
 	auto bakedTransform = pieceTransform;
 	// by idiotic Spring convention bakedTransform should only contain rotation

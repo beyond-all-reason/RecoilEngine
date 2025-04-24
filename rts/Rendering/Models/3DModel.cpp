@@ -752,3 +752,11 @@ void S3DModel::UpdatePiecesMinMaxExtents()
 		}
 	}
 }
+
+void SVertexData::TransformBy(const Transform& transform)
+{
+	pos      = (transform * float4{ pos     , 1.0f }).xyz;
+	normal   = (transform * float4{ normal  , 0.0f }).xyz;
+	sTangent = (transform * float4{ sTangent, 0.0f }).xyz;
+	tTangent = (transform * float4{ tTangent, 0.0f }).xyz;
+}
