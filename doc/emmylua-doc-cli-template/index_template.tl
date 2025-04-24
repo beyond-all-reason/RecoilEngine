@@ -1,3 +1,15 @@
+---
+layout: default
+title: Lua API
+nav_order: 5
+has_children: true
+has_toc: false
+permalink: lua-api
+render_with_liquid: false
+---
+{# Use `render_with_liquid: false` when we upgrade to Jekyl >=4.0 #}
+{{ "{% raw %}" }}
+
 # index
 
 {% if types %}
@@ -19,3 +31,5 @@
 - [{{ item.name }}]({{ item.file }})
 {% endfor %}
 {% endif %}
+
+{{ "{% endraw %}" }}
