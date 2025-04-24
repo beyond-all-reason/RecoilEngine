@@ -1,32 +1,35 @@
+# enum {{ doc.name }}
 ---
-layout: default
-title: {{ type_name }}
-parent: Lua API
-permalink: lua-api/types/{{ type_name }}
----
-{# Use `render_with_liquid: false` when we upgrade to Jekyl >=4.0 #}
-{{ "{% raw %}" }}
-
-# enum {{ type_name }}
----
-{% if namespace %}
-- namespace: {{ namespace }}
+{% if doc.namespace %}
+- namespace: {{ doc.namespace }}
 {% endif %}
 
-{% if description %}
-{{ description }}
+{% if doc.description %}
+{{ doc.description }}
 {% endif %}
-
-{% for field in fields -%}
+{% if doc.fields %}
+{% for field in doc.fields -%}
 
 ### {{ field.name }}
 
 ```lua
-{{ type_name }}.{{ field.name }} = {{ field.value }}
+{{ doc.name }}.{{ field.name }} = {{ field.display }}
 ```
+{% if field.property.description %}
+{{ field.property.description }}
+{% endif %}
 
-{{ field.description }}
+{% if field.property.deprecated %}
+@deprecated {{ field.property.deprecated }}
+{% endif %}
+
+{% if field.property.see %}
+@see {{ field.property.see }}
+{% endif %}
+
+{% if field.property.other %}
+{{ field.property.other }}
+{% endif %}
 
 {% endfor %}
-
-{{ "{% endraw %}" }}
+{% endif %}

@@ -1,24 +1,14 @@
+# alias {{ doc.name }}
 ---
-layout: default
-title: {{ type_name }}
-parent: Lua API
-permalink: lua-api/types/{{ type_name }}
----
-{# Use `render_with_liquid: false` when we upgrade to Jekyl >=4.0 #}
-{{ "{% raw %}" }}
-
-# alias {{ type_name }}
----
-{% if namespace %}
-- namespace: {{ namespace }}
+{% if doc.namespace %}
+- namespace: {{ doc.namespace }}
 {% endif %}
 
-{% if origin_type %}
-{{ origin_type }}
+{% if doc.display %}
+{{ doc.display }}
 {% endif %}
 
-{% if description %}
-{{ description }}
+{% if doc.property.description %}
+{{ doc.property.description }}
 {% endif %}
 
-{{ "{% endraw %}" }}
