@@ -109,7 +109,11 @@ void Skinning::ReparentMeshesTrianglesToBones(S3DModel* model, const std::vector
 		if (!piece->HasGeometryData())
 			continue;
 
+		if (piece->bposeTransform.IsIdentity())
+			continue;
+
 		const auto invTra = piece->bposeTransform.InvertAffineNormalized();
+
 		for (auto& vert : piece->GetVerticesVec()) {
 			vert.TransformBy(invTra);
 		}
@@ -194,7 +198,11 @@ void Skinning::ReparentCompleteMeshesToBones(S3DModel* model, const std::vector<
 		if (!piece->HasGeometryData())
 			continue;
 
+		if (piece->bposeTransform.IsIdentity())
+			continue;
+
 		const auto invTra = piece->bposeTransform.InvertAffineNormalized();
+
 		for (auto& vert : piece->GetVerticesVec()) {
 			vert.TransformBy(invTra);
 		}
