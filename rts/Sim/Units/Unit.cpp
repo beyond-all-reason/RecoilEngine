@@ -1004,21 +1004,7 @@ void CUnit::SlowUpdate()
 		return;
 	}
 
-	/*
-	if (selfDCountdown > 0) {
-		if ((selfDCountdown -= 1) == 0) {
-			// avoid unfinished buildings making an explosion
-			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
-			return;
-		}
-
-		if ((selfDCountdown & 1) && (team == gu->myTeam) && !gu->spectating)
-			LOG("%s: self-destruct in %is", unitDef->humanName.c_str(), (selfDCountdown >> 1) + 1);
-	}
-	*/
-	// --- NEW Self-Destruct Progress Event ---
 	if (selfDTargetFrame > 0 && gs->frameNum < selfDTargetFrame) {
-		//selfDCountdown = std::max(0, (selfDTargetFrame - gs->frameNum) / GAME_SPEED);
 		//eoh->UnitSelfDestructProgress(*this, selfDCountdown);
 		eventHandler.UnitSelfDestructProgress(this, selfDRemainingSeconds);
 	}

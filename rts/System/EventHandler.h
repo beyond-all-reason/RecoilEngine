@@ -40,6 +40,7 @@ class CEventHandler
 		bool IsUnsynced(const std::string& ciName) const;
 		bool IsController(const std::string& ciName) const;
 
+		
 	public:
 		/**
 		 * @name Synced_events
@@ -70,6 +71,7 @@ class CEventHandler
 		void UnitTaken(const CUnit* unit, int oldTeam, int newTeam);
 		void UnitGiven(const CUnit* unit, int oldTeam, int newTeam);
 
+
 		//FIXME no events
 		void RenderUnitPreCreated(const CUnit* unit);
 		void RenderUnitCreated(const CUnit* unit, int cloaked);
@@ -93,7 +95,7 @@ class CEventHandler
 		void UnitStunned(const CUnit* unit, bool stunned);
 		void UnitExperience(const CUnit* unit, float oldExperience);
 		void UnitHarvestStorageFull(const CUnit* unit);
-		
+
 		void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds);
 		void UnitSelfDestructCancelled(const CUnit* unit);
 		void UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds);
