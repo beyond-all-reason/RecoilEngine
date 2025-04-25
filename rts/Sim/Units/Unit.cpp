@@ -1006,7 +1006,7 @@ void CUnit::SlowUpdate()
 
 	if (selfDTargetFrame > 0 && gs->frameNum < selfDTargetFrame) {
 		//eoh->UnitSelfDestructProgress(*this, selfDCountdown);
-		eventHandler.UnitSelfDestructProgress(this, selfDRemainingSeconds);
+		eventHandler.UnitSelfDestructProgress(this);
 	}
 
 	if (beingBuilt) {

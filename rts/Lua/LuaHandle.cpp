@@ -1013,6 +1013,24 @@ inline void CLuaHandle::UnitCallIn(const LuaHashString& hs, const CUnit* unit)
 	RunCallInTraceback(L, hs, 3, 0, traceBack.GetErrFuncIdx(), false);
 }
 
+inline void CLuaHandle::UnitSelfDestructCallin(const LuaHashString& hs, const CUnit* unit)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 6, __func__);
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+
+	if (!hs.GetGlobalFunc(L))
+		return;
+
+	lua_pushnumber(L, unit->id);// unitID
+	lua_pushnumber(L, unit->unitDef->id); // unitDefID
+	lua_pushnumber(L, unit->team); // unitTeam
+	lua_pushnumber(L, unit->selfDRemainingSeconds); // updatePeriodSeconds
+
+	RunCallInTraceback(L, hs, 4, 0, traceBack.GetErrFuncIdx(), false);
+}
+
 
 /*** Called at the moment the unit is created.
  *
@@ -1449,26 +1467,12 @@ void CLuaHandle::UnitHarvestStorageFull(const CUnit* unit)
  * @param unitID integer
  * @param unitDefID integer
  * @param unitTeam integer
- * @param remainingSeconds float
+ * @param remainingSeconds number
  */
-void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) 
+void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit) 
 {
-	RECOIL_DETAILED_TRACY_ZONE;
-	LUA_CALL_IN_CHECK(L);
-	luaL_checkstack(L, 6, __func__);
-
-	const LuaUtils::ScopedDebugTraceBack traceBack(L);
-
 	static const LuaHashString cmdStr(__func__);
-	if (!cmdStr.GetGlobalFunc(L))
-		return;
-
-	lua_pushnumber(L, unit->id);// unitID
-	lua_pushnumber(L, unit->unitDef->id); // unitDefID
-	lua_pushnumber(L, unit->team); // unitTeam
-	lua_pushnumber(L, remainingSeconds); // updatePeriodSeconds
-
-	RunCallInTraceback(L, cmdStr, 4, 0, traceBack.GetErrFuncIdx(), false);
+	UnitSelfDestructCallin(cmdStr, unit);
 }
 
 /*** Called when a unit cancel's it's self destruct command.
@@ -1477,11 +1481,12 @@ void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit, float remainingSecon
  * @param unitID integer
  * @param unitDefID integer
  * @param unitTeam integer
+ * @param remainingSeconds number
  */
 void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit) 
 {
 	static const LuaHashString cmdStr(__func__);
-	UnitCallIn(cmdStr, unit);
+	UnitSelfDestructCallin(cmdStr, unit);
 }
 
 /*** Called every second while a unit has a self destruct command active.
@@ -1490,26 +1495,12 @@ void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit)
  * @param unitID integer
  * @param unitDefID integer
  * @param unitTeam integer
- * @param remainingSeconds float
+ * @param remainingSeconds number
  */
-void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds) 
+void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit) 
 {
-	RECOIL_DETAILED_TRACY_ZONE;
-	LUA_CALL_IN_CHECK(L);
-	luaL_checkstack(L, 6, __func__);
-
-	const LuaUtils::ScopedDebugTraceBack traceBack(L);
-
 	static const LuaHashString cmdStr(__func__);
-	if (!cmdStr.GetGlobalFunc(L))
-		return;
-
-	lua_pushnumber(L, unit->id);// unitID
-	lua_pushnumber(L, unit->unitDef->id); // unitDefID
-	lua_pushnumber(L, unit->team); // unitTeam
-	lua_pushnumber(L, remainingSeconds); // updatePeriodSeconds
-
-	RunCallInTraceback(L, cmdStr, 4, 0, traceBack.GetErrFuncIdx(), false);
+	UnitSelfDestructCallin(cmdStr, unit);
 }
 
 

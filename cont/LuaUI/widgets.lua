@@ -2108,9 +2108,9 @@ function widgetHandler:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, rema
   return
 end
 
-function widgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam)
+function widgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
   for _,w in ipairs(self.UnitSelfDestructCancelledList) do
-    w:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam)
+    w:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
   end
   return
 end

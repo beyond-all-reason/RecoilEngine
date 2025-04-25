@@ -979,7 +979,7 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 						owner->selfDRemainingSeconds = countdownFrames * INV_GAME_SPEED;
 
 						//eoh->UnitSelfDestructStarted(*owner);
-						eventHandler.UnitSelfDestructStarted(owner, owner->selfDRemainingSeconds); // Fire start event
+						eventHandler.UnitSelfDestructStarted(owner); // Fire start event
 					}
 				}
 				else if (commandQue.back().GetID() == CMD_SELFD) {
@@ -1574,7 +1574,7 @@ void CCommandAI::SlowUpdate()
 				owner->selfDCountdown = 0;
 			} else {
 				const int countdownFrames = std::max(0, owner->unitDef->selfDCountdown);
-				
+
 				owner->selfDTargetFrame = (gs->frameNum + countdownFrames);
 				owner->selfDRemainingSeconds = countdownFrames * INV_GAME_SPEED;
 				owner->selfDCountdown = owner->selfDRemainingSeconds * 2 + 1;

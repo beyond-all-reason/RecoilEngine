@@ -1698,9 +1698,9 @@ function gadgetHandler:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, rema
   return
 end
 
-function gadgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam)
+function gadgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
   for _,g in r_ipairs(self.UnitSelfDestructCancelledList) do
-    g:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam)
+    g:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
   end
   return
 end
