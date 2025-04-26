@@ -40,6 +40,11 @@
 #include "fmt/format.h"
 #include "fmt/printf.h"
 
+#ifdef _WIN32
+	#include <nowide/convert.hpp>
+#endif // _WIN32
+
+
 #include "System/Misc/TracyDefs.h"
 
 #define SUPPORT_AMD_HACKS_HERE
@@ -176,13 +181,16 @@ public:
 			// and system fonts included. also linux actually has system config files that can be used by fontconfig.
 
 			#ifdef _WIN32
-			static constexpr auto winFontPath = "%WINDIR%\\fonts";
+			static constexpr auto winFontPath = L"%WINDIR%\\fonts";
 			const int neededSize = ExpandEnvironmentStrings(winFontPath, nullptr, 0);
-			std::vector <char> osFontsDir (neededSize);
+			std::vector <TCHAR> osFontsDir(neededSize);
 			ExpandEnvironmentStrings(winFontPath, osFontsDir.data(), osFontsDir.size());
 
-			static constexpr const char* configFmt = R"(<fontconfig><dir>%s</dir><cachedir>fontcache</cachedir></fontconfig>)";
-			const std::string configFmtVar = fmt::sprintf(configFmt, osFontsDir.data());
+			std::wostringstream ss;
+			ss << "<fontconfig><dir>" << std::wstring(osFontsDir.data()) << "</dir><cachedir>fontcache</cachedir></fontconfig>";
+
+			// pass utf8 to fontconfig and hope for the best
+			const std::string configFmtVar = nowide::narrow(ss.str());
 			#else
 			const std::string configFmtVar = R"(<fontconfig><cachedir>fontcache</cachedir></fontconfig>)";
 			#endif
