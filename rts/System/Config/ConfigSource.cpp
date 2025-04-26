@@ -10,6 +10,7 @@
 #else
 	#include <unistd.h>
 #endif
+#include <cstdint>
 #include <cstring>
 #include <stdexcept>
 #include <functional>
