@@ -211,12 +211,12 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * Spring.GiveOrderToUnit(unitID, CMD.ATTACK, targetID)
 	 * ```
 	 *
-	 * Area attack:
+	 * Area attack of radius 50 at map position 1000,1000 with height 100:
 	 * ```lua
-	 * Spring.GiveOrderToUnit(unitID, CMD.ATTACK, {100, 1000,100,1000})
+	 * Spring.GiveOrderToUnit(unitID, CMD.ATTACK, {1000,100,1000,50})
 	 * ```
 	 *
-	 * Ground attack:
+	 * Ground attack at map position 1000,1000 with height 100:
 	 * ```lua
 	 * Spring.GiveOrderToUnit(unitID, CMD.ATTACK, {1000,100,1000})
 	 * ```
