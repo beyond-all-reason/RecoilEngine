@@ -25,10 +25,10 @@
 #include "System/TimeUtil.h"
 #include "System/Platform/Misc.h"
 
+#include <nowide/fstream.hpp>
 #ifdef _WIN32
 	#include <windows.h>
 	#include <winioctl.h> //needed for IsPathOnSpinningDisk()
-	#include <nowide/fstream.hpp>
 	#include <nowide/convert.hpp>
 	#ifdef DeleteFile
 		#undef DeleteFile
@@ -281,7 +281,7 @@ bool FileSystemAbstraction::IsPathOnSpinningDisk(const std::string& path)
 	devName = devName.substr(ss + 1);
 	std::string rotFileName = fmt::format("/sys/block/{}/queue/rotational", devName);
 
-	std::ifstream rotf(rotFileName, std::ios::in);
+	nowide::ifstream rotf(rotFileName, std::ios::in);
 	if (rotf.bad() || !rotf.is_open()) {
 		LOG_L(L_WARNING, "[%s] Error '%s' opening file '%s'", __func__, Platform::GetLastErrorAsString().c_str(), rotFileName.c_str());
 		return true;
