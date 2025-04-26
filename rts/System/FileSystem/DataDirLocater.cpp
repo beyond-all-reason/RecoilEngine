@@ -2,10 +2,10 @@
 
 #include "DataDirLocater.h"
 
-#include <cstdlib>
 #include <cassert>
 #include <cstring>
 #include <sstream>
+#include <nowide/cstdlib.hpp>
 
 #ifdef _WIN32
 	#include <io.h>
@@ -106,7 +106,7 @@ void DataDirLocater::UpdateIsolationModeByEnvVar()
 	isolationMode = false;
 	isolationModeDir = "";
 
-	const char* const envIsolation = getenv("SPRING_ISOLATED");
+	const char* const envIsolation = nowide::getenv("SPRING_ISOLATED");
 	if (envIsolation != nullptr) {
 		SetIsolationMode(true);
 		SetIsolationModeDir(envIsolation);
@@ -398,7 +398,7 @@ void DataDirLocater::LocateDataDirs()
 		if (!forcedWriteDir.empty())
 			AddDirs(forcedWriteDir);
 
-		const char* env = getenv("SPRING_WRITEDIR");
+		const char* env = nowide::getenv("SPRING_WRITEDIR");
 
 		if (env != nullptr && *env != 0)
 			AddDirs(env); // ENV{SPRING_WRITEDIR}
@@ -425,7 +425,7 @@ void DataDirLocater::LocateDataDirs()
 
 	// LEVEL 3: additional custom data sources
 	{
-		const char* env = getenv("SPRING_DATADIR");
+		const char* env = nowide::getenv("SPRING_DATADIR");
 
 		if (env != nullptr && *env != 0)
 			AddDirs(env); // ENV{SPRING_DATADIR}
