@@ -9,8 +9,8 @@
 #include "System/Log/Level.h"
 
 #include <cassert>
-#include <cstdio>
 #include <string>
+#include <nowide/cstdio.hpp>
 
 #include <algorithm>
 #include <vector>
@@ -211,7 +211,7 @@ void log_file_addLogFile(
 	if (iter != logFiles.end() && iter->first == filePathStr)
 		return;
 
-	FILE* tmpStream = fopen(filePath, "w");
+	FILE* tmpStream = nowide::fopen(filePath, "w");
 
 	if (tmpStream == nullptr) {
 		LOG_L(L_ERROR, "[%s] failed to open log file \"%s\" for writing", __func__, filePath);
