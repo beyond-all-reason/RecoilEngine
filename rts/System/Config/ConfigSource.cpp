@@ -13,6 +13,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <functional>
+#include <nowide/cstdio.hpp>
 
 /******************************************************************************/
 
@@ -51,16 +52,17 @@ void ReadWriteConfigSource::Delete(const string& key)
 
 /******************************************************************************/
 
-FileConfigSource::FileConfigSource(const string& filename) : filename(filename)
+FileConfigSource::FileConfigSource(const string& filename)
+	: filename(filename)
 {
 	FILE* file;
 
-	if ((file = fopen(filename.c_str(), "r"))) {
+	if ((file = nowide::fopen(filename.c_str(), "r"))) {
 		ScopedFileLock scoped_lock(fileno(file), false);
 		Read(file);
 		fclose(file);
 	}
-	else if ((file = fopen(filename.c_str(), "a"))) {
+	else if ((file = nowide::fopen(filename.c_str(), "a"))) {
 		// TODO: write some initial contents into the config file?
 		fclose(file);
 	}
@@ -92,7 +94,7 @@ void FileConfigSource::Delete(const string& key)
 }
 
 void FileConfigSource::ReadModifyWrite(std::function<void ()> modify) {
-	FILE* file = fopen(filename.c_str(), "r+");
+	FILE* file = nowide::fopen(filename.c_str(), "r+");
 
 	if (file) {
 		ScopedFileLock scoped_lock(fileno(file), true);
