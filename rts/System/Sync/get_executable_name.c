@@ -34,7 +34,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
  */
 void get_executable_name(char *output, int size)
 {
-	if (!GetModuleFileName(GetModuleHandle(NULL), output, size))
+	if (!GetModuleFileNameA(GetModuleHandle(NULL), output, size))
 		*output = 0;
 }
 
