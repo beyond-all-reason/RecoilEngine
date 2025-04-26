@@ -24,7 +24,7 @@
 #include "System/SpringRegex.h"
 #include "System/TimeUtil.h"
 #include "System/Platform/Misc.h"
-#include "System/Cpp20Compat.hpp"
+#include "System/Cpp17Compat.hpp"
 
 #include <nowide/fstream.hpp>
 #ifdef _WIN32
