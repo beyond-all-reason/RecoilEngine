@@ -662,10 +662,11 @@ void CUnit::Update()
 	if (isDead)
 		return;
 
-	 // --- NEW Self-Destruct Check ---
 	if (selfDTargetFrame > 0) {
 		if (gs->frameNum >= selfDTargetFrame) {
-			// avoid unfinished buildings making an explosion
+			selfDRemainingSeconds = 0.0f;
+			eventHandler.UnitSelfDestructProgress(this);
+			
 			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
 		return; // Skip rest of update if killed
 		} else {
@@ -675,7 +676,6 @@ void CUnit::Update()
 			selfDCountdown = selfDRemainingSeconds * 2 + 1;
 		}
 	}
-    // --- END NEW Self-Destruct Check ---
 
 	recentDamage *= 0.9f;
 	flankingBonusMobility += flankingBonusMobilityAdd;

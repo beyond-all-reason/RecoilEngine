@@ -1489,7 +1489,7 @@ void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit)
 	UnitSelfDestructCallin(cmdStr, unit);
 }
 
-/*** Called every second while a unit has a self destruct command active.
+/*** Called every second while a unit has a self destruct command active and driectly before the unit is killed.
  *
  * @function Callins:UnitSelfDestructProgress
  * @param unitID integer
