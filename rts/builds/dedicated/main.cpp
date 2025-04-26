@@ -4,6 +4,8 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <fcntl.h>
+#include <io.h>
 #endif
 
 #include "Game/GameSetup.h"
@@ -121,6 +123,11 @@ int main(int argc, char* argv[])
 		gflags::SetUsageMessage("Usage: " + binaryName + " [options] path_to_script.txt");
 		gflags::SetVersionString(SpringVersion::GetFull());
 		gflags::ParseCommandLineFlags(&argc, &argv, true);
+#ifdef _WIN32
+		_setmode(_fileno(stdout), _O_U8TEXT);
+		_setmode(_fileno(stderr), _O_U8TEXT);
+#endif // _WIN32
+
 		ParseCmdLine(argc, argv, scriptName);
 
 		CLogOutput::LogSectionInfo();

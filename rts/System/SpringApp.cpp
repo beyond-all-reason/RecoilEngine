@@ -8,6 +8,8 @@
 #include <System/GflagsExt.h>
 
 #ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
 //windows workarrounds
 #undef KeyPress
 #undef KeyRelease
@@ -197,6 +199,10 @@ SpringApp::SpringApp(int argc, char** argv)
 	gflags::SetUsageMessage("Usage: " + std::string(argv[0]) + " [options] [path_to_script.txt or demo.sdfz]");
 	gflags::SetVersionString(SpringVersion::GetFull());
 	gflags::ParseCommandLineFlags(&argc, &argv, true);
+#ifdef _WIN32
+	_setmode(_fileno(stdout), _O_U8TEXT);
+	_setmode(_fileno(stderr), _O_U8TEXT);
+#endif // _WIN32
 
 	// also initializes configHandler and logOutput
 	ParseCmdLine(argc, argv);
