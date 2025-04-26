@@ -121,8 +121,8 @@ void FileConfigSource::ReadModifyWrite(std::function<void ()> modify) {
  * i.e. the one before the terminating '\0'.
  */
 char* FileConfigSource::Strip(char* begin, char* end) {
-	while (end >= begin && isspace(*end)) --end;
-	while (begin <= end && isspace(*begin)) ++begin;
+	while (end >= begin && isspace(static_cast<uint8_t>(*end  ))) --end;
+	while (begin <= end && isspace(static_cast<uint8_t>(*begin))) ++begin;
 	*(end + 1) = '\0';
 	return begin;
 }
