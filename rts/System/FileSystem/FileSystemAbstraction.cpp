@@ -27,12 +27,15 @@
 
 #ifdef _WIN32
 	#include <windows.h>
-	#include <winioctl.h>
+	#include <winioctl.h> //needed for IsPathOnSpinningDisk()
 	#include <nowide/fstream.hpp>
 	#include <nowide/convert.hpp>
 	#ifdef DeleteFile
 		#undef DeleteFile
 	#endif
+#else
+	#include <sys/types.h>
+	#include <dirent.h>
 #endif // _WIN32
 
 
@@ -499,80 +502,84 @@ void FileSystemAbstraction::ChDir(const std::string& dirStr)
 	std::filesystem::current_path(dir); //setting path
 }
 
-static void FindFiles(std::vector<std::string>& matches, const std::string& datadir, const std::string& dir, const spring::regex& regexPattern, int flags)
-{
-#ifdef _WIN32
-	WIN32_FIND_DATA wfd;
-	HANDLE hFind = FindFirstFile(nowide::widen(datadir + dir + "\\*").c_str(), &wfd);
+namespace Impl {
+	void FindFiles(std::vector<std::string>& matches, const std::string& datadir, const std::string& dir, const spring::regex& regexPattern, int flags)
+	{
+	#ifdef _WIN32
+		WIN32_FIND_DATA wfd;
+		HANDLE hFind = FindFirstFile(nowide::widen(datadir + dir + "\\*").c_str(), &wfd);
 
-	if (hFind != INVALID_HANDLE_VALUE) {
-		do {
-			const auto cFileName = nowide::narrow(wfd.cFileName);
-			if (cFileName != "." && cFileName != "..") {
-				if (!(wfd.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)) {
-					if ((flags & FileQueryFlags::ONLY_DIRS) == 0) {
-						if (spring::regex_match(cFileName, regexPattern)) {
-							matches.push_back(dir + cFileName);
+		if (hFind != INVALID_HANDLE_VALUE) {
+			do {
+				const auto cFileName = nowide::narrow(wfd.cFileName);
+				if (cFileName != "." && cFileName != "..") {
+					if (!(wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) {
+						if ((flags & FileQueryFlags::ONLY_DIRS) == 0) {
+							if (spring::regex_match(cFileName, regexPattern)) {
+								matches.push_back(dir + cFileName);
+							}
 						}
 					}
-				} else {
-					if (flags & FileQueryFlags::INCLUDE_DIRS) {
-						if (spring::regex_match(cFileName, regexPattern)) {
-							matches.push_back(dir + cFileName + "\\");
+					else {
+						if (flags & FileQueryFlags::INCLUDE_DIRS) {
+							if (spring::regex_match(cFileName, regexPattern)) {
+								matches.push_back(dir + cFileName + "\\");
+							}
+						}
+						if (flags & FileQueryFlags::RECURSE) {
+							FindFiles(matches, datadir, dir + cFileName + "\\", regexPattern, flags);
 						}
 					}
-					if (flags & FileQueryFlags::RECURSE) {
-						FindFiles(matches, datadir, dir + cFileName + "\\", regexPattern, flags);
+				}
+			} while (FindNextFile(hFind, &wfd));
+			FindClose(hFind);
+		}
+	#else
+		DIR* dp;
+		struct dirent* ep;
+
+		if ((dp = opendir((datadir + dir).c_str())) == nullptr)
+			return;
+
+		while ((ep = readdir(dp))) {
+			// exclude hidden files
+			if (ep->d_name[0] == '.')
+				continue;
+
+			// is it a file? (we just treat sockets / pipes / fifos / character&block devices as files...)
+			// (need to stat because d_type is DT_UNKNOWN on linux :-/)
+			struct stat info;
+			if (stat((datadir + dir + ep->d_name).c_str(), &info) != 0)
+				continue;
+
+			if (!S_ISDIR(info.st_mode)) {
+				if ((flags & FileQueryFlags::ONLY_DIRS) == 0) {
+					if (spring::regex_match(ep->d_name, regexPattern)) {
+						matches.push_back(dir + ep->d_name);
 					}
 				}
 			}
-		} while (FindNextFile(hFind, &wfd));
-		FindClose(hFind);
-	}
-#else
-	DIR* dp;
-	struct dirent* ep;
-
-	if ((dp = opendir((datadir + dir).c_str())) == nullptr)
-		return;
-
-	while ((ep = readdir(dp))) {
-		// exclude hidden files
-		if (ep->d_name[0] == '.')
-			continue;
-
-		// is it a file? (we just treat sockets / pipes / fifos / character&block devices as files...)
-		// (need to stat because d_type is DT_UNKNOWN on linux :-/)
-		struct stat info;
-		if (stat((datadir + dir + ep->d_name).c_str(), &info) != 0)
-			continue;
-
-		if (!S_ISDIR(info.st_mode)) {
-			if ((flags & FileQueryFlags::ONLY_DIRS) == 0) {
-				if (spring::regex_match(ep->d_name, regexPattern)) {
-					matches.push_back(dir + ep->d_name);
+			else {
+				// or a directory?
+				if (flags & FileQueryFlags::INCLUDE_DIRS) {
+					if (spring::regex_match(ep->d_name, regexPattern)) {
+						matches.push_back(dir + ep->d_name + "/");
+					}
 				}
-			}
-		} else {
-			// or a directory?
-			if (flags & FileQueryFlags::INCLUDE_DIRS) {
-				if (spring::regex_match(ep->d_name, regexPattern)) {
-					matches.push_back(dir + ep->d_name + "/");
+				if (flags & FileQueryFlags::RECURSE) {
+					FindFiles(matches, datadir, dir + ep->d_name + "/", regexPattern, flags);
 				}
-			}
-			if (flags & FileQueryFlags::RECURSE) {
-				FindFiles(matches, datadir, dir + ep->d_name + "/", regexPattern, flags);
 			}
 		}
-	}
 
-	closedir(dp);
-#endif
+		closedir(dp);
+	#endif
+	}
 }
 
 void FileSystemAbstraction::FindFiles(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dir, const std::string& regex, int flags)
 {
 	const spring::regex regexPattern(regex);
-	::FindFiles(matches, dataDir, dir, regexPattern, flags);
+	Impl::FindFiles(matches, dataDir, dir, regexPattern, flags);
 }
 
