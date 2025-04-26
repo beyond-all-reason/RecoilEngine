@@ -8,7 +8,6 @@
 #include "System/VersionGenerated.h"
 
 #include <cstring>
-#include <cstdio>
 
 /**
  * @brief Defines the current version string.

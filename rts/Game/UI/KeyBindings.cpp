@@ -1,7 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include <cstdio>
 #include <algorithm>
+#include <nowide/cstdio.hpp>
 
 #include "KeyBindings.h"
 #include "KeyCodes.h"
@@ -1012,7 +1012,7 @@ void CKeyBindings::Print() const
 bool CKeyBindings::Save(const std::string& filename) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	FILE* out = fopen(filename.c_str(), "wt");
+	FILE* out = nowide::fopen(filename.c_str(), "wt");
 	if (out == nullptr)
 		return false;
 
