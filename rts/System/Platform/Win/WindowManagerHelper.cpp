@@ -11,10 +11,10 @@ void BlockCompositing(SDL_Window* window)
 {
 #ifndef HEADLESS
 	// only available in WinVista+
-	HMODULE dwmapiDllHandle = LoadLibrary("dwmapi.dll");
+	HMODULE dwmapiDllHandle = LoadLibrary(L"dwmapi.dll");
 
 	if (dwmapiDllHandle != nullptr) {
-		typedef HRESULT (*DwmEnableCompositionFunction)(UINT uCompositionAction);
+		using DwmEnableCompositionFunction = HRESULT(*)(UINT uCompositionAction);
 		auto DwmEnableComposition = (DwmEnableCompositionFunction) ::GetProcAddress(dwmapiDllHandle, "DwmEnableComposition");
 		if (DwmEnableComposition != nullptr) {
 			static const unsigned int DWM_EC_DISABLECOMPOSITION = 0U;
