@@ -1,5 +1,5 @@
 #include <string>
-#include <cstdio>
+#include <nowide/cstdio.hpp>
 #include <sys/stat.h>
 #include "System/Log/ILog.h"
 
@@ -34,7 +34,7 @@ namespace {
 			}
 		}
 		static void WriteFile(const std::string& filePath, const std::string& content) {
-			FILE* testFile = fopen(filePath.c_str(), "w");
+			FILE* testFile = nowide::fopen(filePath.c_str(), "w");
 			if (testFile != NULL) {
 				fprintf(testFile, "%s", content.c_str());
 				fclose(testFile);
