@@ -6,6 +6,7 @@
 #include <cstring>
 #include <sstream>
 #include <nowide/cstdlib.hpp>
+#include <nowide/convert.hpp>
 
 #ifdef _WIN32
 	#include <io.h>
@@ -132,9 +133,9 @@ std::string DataDirLocater::SubstEnvVars(const std::string& in) const
 
 #ifdef _WIN32
 	constexpr size_t maxSize = 32 * 1024;
-	char out_c[maxSize];
-	ExpandEnvironmentStrings(in.c_str(), out_c, maxSize); // expands %HOME% etc.
-	out = out_c;
+	std::wstring out_ws; out_ws.reserve(maxSize);
+	ExpandEnvironmentStrings(nowide::widen(in).c_str(), out_ws.data(), maxSize); // expands %HOME% etc.
+	out = nowide::narrow(out_ws);
 #else
 	std::string previous = in;
 
@@ -293,8 +294,8 @@ void DataDirLocater::AddHomeDirs()
 	TCHAR pathAppDataC[MAX_PATH];
 	SHGetFolderPath(nullptr, CSIDL_PERSONAL, nullptr, SHGFP_TYPE_CURRENT, pathMyDocsC);
 	SHGetFolderPath(nullptr, CSIDL_COMMON_APPDATA, nullptr, SHGFP_TYPE_CURRENT, pathAppDataC);
-	const std::string pathMyDocs = pathMyDocsC;
-	const std::string pathAppData = pathAppDataC;
+	const std::string pathMyDocs  = nowide::narrow(pathMyDocsC );
+	const std::string pathAppData = nowide::narrow(pathAppDataC);
 
 	// e.g. F:\Dokumente und Einstellungen\Karl-Robert\Eigene Dateien\Spring
 	const std::string dd_myDocs = pathMyDocs + "\\Spring";
