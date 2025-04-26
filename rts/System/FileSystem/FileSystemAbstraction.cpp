@@ -162,7 +162,7 @@ bool FileSystemAbstraction::IsReadableFile(const std::string& file)
 uint32_t FileSystemAbstraction::GetFileModificationTime(const std::string& file)
 {
 #ifdef _WIN32
-	auto h = CreateFile(file.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+	auto h = CreateFile(nowide::widen(file).c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
 	if (h == INVALID_HANDLE_VALUE) {
 		LOG_L(L_WARNING, "[FSA::%s] error '%s' getting last modification time of file '%s'", __func__, Platform::GetLastErrorAsString().c_str(), file.c_str());
 		return 0;
@@ -490,7 +490,7 @@ std::string FileSystemAbstraction::GetEngineExecutableDir()
 std::string FileSystemAbstraction::GetCwd()
 {
 	// meh
-	return std::string(reinterpret_cast<const char*>(std::filesystem::current_path().u8string().c_str());
+	return std::string(reinterpret_cast<const char*>(std::filesystem::current_path().u8string().c_str()));
 }
 
 void FileSystemAbstraction::ChDir(const std::string& dirStr)

@@ -2,6 +2,7 @@
 
 #include "System/Platform/MessageBox.h"
 #include <windows.h>
+#include <nowide/convert.hpp>
 
 
 namespace Platform {
@@ -17,7 +18,7 @@ void MsgBox(const char* message, const char* caption, unsigned int flags)
 	if (flags & MBF_INFO)  winFlags |= MB_ICONINFORMATION;
 	if (flags & MBF_CRASH) winFlags |= MB_ICONERROR;
 
-	::MessageBox(GetActiveWindow(), message, caption, winFlags);
+	::MessageBox(GetActiveWindow(), nowide::widen(message).c_str(), nowide::widen(caption).c_str(), winFlags);
 }
 
 }; //namespace Platform
