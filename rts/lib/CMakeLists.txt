@@ -23,7 +23,14 @@ SET(GFLAGS_INSTALL_HEADERS            FALSE)
 SET(GFLAGS_INSTALL_SHARED_LIBS        FALSE)
 SET(GFLAGS_INSTALL_STATIC_LIBS        FALSE)
 
+#Meh-meh
+if (WIN32)
+	remove_definitions(-DUNICODE -D_UNICODE)
+endif()
 ADD_SUBDIRECTORY(gflags)
+if (WIN32)
+	add_definitions(-DUNICODE -D_UNICODE)
+endif()
 
 
 # to change assimp for springs need, see fix_assimp.sh
