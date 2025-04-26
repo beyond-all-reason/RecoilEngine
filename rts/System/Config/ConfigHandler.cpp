@@ -10,9 +10,6 @@
 #include "System/UnorderedMap.hpp"
 #include "System/Threading/SpringThreading.h"
 
-#include <cstdio>
-#include <cstring>
-
 #include <stdexcept>
 
 CONFIG(bool, StoreDefaultSettings).defaultValue(false).description("springsettings.cfg will save the settings values, if they match the implicit defaults and were set by a user explicitly");
