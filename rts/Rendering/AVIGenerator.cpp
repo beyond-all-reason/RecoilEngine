@@ -11,10 +11,12 @@
 #include "System/SpringApp.h"
 #include "System/SafeUtil.h"
 
-#include <windows.h>
-
 #include <functional>
 #include <cassert>
+
+#ifdef _WIN32
+	#include <windows.h>
+#endif
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #pragma message("Adding library: vfw32.lib")
@@ -215,8 +217,7 @@ HRESULT CAVIGenerator::InitAVICompressionEngine()
 	strHdr.dwRate                 = videoFPS;			// fps
 	strHdr.dwSuggestedBufferSize  = bitmapInfo.biSizeImage;	// Recommended buffer size, in bytes, for the stream.
 	SetRect(&strHdr.rcFrame, 0, 0, bitmapInfo.biWidth, bitmapInfo.biHeight);
-	strcpy(strHdr.szName, "Spring video.");
-
+	wcscpy(strHdr.szName, L"Spring video.");
 
 	memset(&opts, 0, sizeof(AVICOMPRESSOPTIONS));
 	opts.fccType = streamtypeVIDEO;
