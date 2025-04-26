@@ -37,6 +37,7 @@
 	#include <direct.h>
 	#include <fstream>
 	#include <winioctl.h>
+	#include <nowide/convert.hpp>
 	// Win-API redefines these, which breaks things
 	#if defined(CreateDirectory)
 		#undef CreateDirectory
@@ -560,25 +561,26 @@ static void FindFiles(std::vector<std::string>& matches, const std::string& data
 {
 #ifdef _WIN32
 	WIN32_FIND_DATA wfd;
-	HANDLE hFind = FindFirstFile((datadir + dir + "\\*").c_str(), &wfd);
+	HANDLE hFind = FindFirstFile(nowide::widen(datadir + dir + "\\*").c_str(), &wfd);
 
 	if (hFind != INVALID_HANDLE_VALUE) {
 		do {
-			if (strcmp(wfd.cFileName,".") && strcmp(wfd.cFileName ,"..")) {
+			const auto cFileName = nowide::narrow(wfd.cFileName);
+			if (cFileName != "." && cFileName != "..") {
 				if (!(wfd.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)) {
 					if ((flags & FileQueryFlags::ONLY_DIRS) == 0) {
-						if (spring::regex_match(wfd.cFileName, regexPattern)) {
-							matches.push_back(dir + wfd.cFileName);
+						if (spring::regex_match(cFileName, regexPattern)) {
+							matches.push_back(dir + cFileName);
 						}
 					}
 				} else {
 					if (flags & FileQueryFlags::INCLUDE_DIRS) {
-						if (spring::regex_match(wfd.cFileName, regexPattern)) {
-							matches.push_back(dir + wfd.cFileName + "\\");
+						if (spring::regex_match(cFileName, regexPattern)) {
+							matches.push_back(dir + cFileName + "\\");
 						}
 					}
 					if (flags & FileQueryFlags::RECURSE) {
-						FindFiles(matches, datadir, dir + wfd.cFileName + "\\", regexPattern, flags);
+						FindFiles(matches, datadir, dir + cFileName + "\\", regexPattern, flags);
 					}
 				}
 			}
