@@ -297,7 +297,7 @@ bool CDDSImage::load(string filename, bool flipImage)
 
 	// open file
 #if 0
-	FILE *fp = fopen(filename.c_str(), "rb");
+	FILE *fp = nowide::fopen(filename.c_str(), "rb");
 #else
 	CFileHandler file(filename);
 
