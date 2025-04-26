@@ -10,7 +10,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 find_package_static(ZLIB 1.2.7 REQUIRED)
 
 list(APPEND unitsync_libs ${CMAKE_DL_LIBS})
-list(APPEND unitsync_libs 7zip prd::jsoncpp lua headlessStubs archives_nothreadpool)
+list(APPEND unitsync_libs 7zip prd::jsoncpp lua headlessStubs archives_nothreadpool nowide::nowide)
 list(APPEND unitsync_libs ZLIB::ZLIB)
 list(APPEND unitsync_libs ${SPRING_MINIZIP_LIBRARY})
 
@@ -50,6 +50,7 @@ include_directories(${SPRING_MINIZIP_INCLUDE_DIR})
 include_directories(${ENGINE_SRC_ROOT}/lib)
 include_directories(${ENGINE_SRC_ROOT}/lib/lua/include)
 include_directories(${ENGINE_SRC_ROOT}/lib/7zip)
+include_directories(${ENGINE_SRC_ROOT}/lib/nowide/include)
 include_directories(${ENGINE_SRC_ROOT})
 include_directories(${CMAKE_BINARY_DIR}/src-generated/engine)
 
