@@ -133,9 +133,12 @@ std::string DataDirLocater::SubstEnvVars(const std::string& in) const
 
 #ifdef _WIN32
 	constexpr size_t maxSize = 32 * 1024;
-	std::wstring out_ws; out_ws.reserve(maxSize);
-	ExpandEnvironmentStrings(nowide::widen(in).c_str(), out_ws.data(), maxSize); // expands %HOME% etc.
-	out = nowide::narrow(out_ws);
+	std::wstring out_ws; out_ws.resize(maxSize);
+	auto strLen = ExpandEnvironmentStrings(nowide::widen(in).c_str(), out_ws.data(), maxSize); // expands %HOME% etc.
+	if (strLen == 0)
+		return "";
+
+	out = nowide::narrow(out_ws.c_str());
 #else
 	std::string previous = in;
 
