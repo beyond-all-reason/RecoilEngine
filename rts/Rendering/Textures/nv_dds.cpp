@@ -160,9 +160,10 @@
 //         GL_UNSIGNED_BYTE, image[0].get_mipmap(i));
 // }
 
-#include <cstdio>
 #include <cstring>
 #include <cassert>
+
+#include <nowide/cstdio.hpp>
 
 // spring related
 #include "Rendering/GL/myGL.h"
@@ -654,7 +655,7 @@ bool CDDSImage::save(std::string filename, bool flipImage) const
         ddsh.dwCaps1 |= DDSF_COMPLEX | DDSF_MIPMAP;
 
     // open file
-    FILE *fp = fopen(filename.c_str(), "wb");
+    FILE *fp = nowide::fopen(filename.c_str(), "wb");
     if (fp == nullptr) {
         LOG_L(L_ERROR, "couldn't create texture %s", filename.c_str());
         return false;
