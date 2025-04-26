@@ -43,5 +43,5 @@ DllLib::~DllLib()
  */
 void* DllLib::FindAddress(const char* symbol)
 {
-	return static_cast<void*>(GetProcAddress(dll,symbol));
+	return reinterpret_cast<void*>(GetProcAddress(dll,symbol));
 }

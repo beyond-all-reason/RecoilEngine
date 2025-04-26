@@ -335,7 +335,7 @@ bool SpringApp::InitPlatformLibs()
 		// suppress dialog box if gdb helpers aren't found
 		const UINT oldErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
 
-		if (LoadLibrary("gdbmacros.dll"))
+		if (LoadLibrary(L"gdbmacros.dll"))
 			LOG_L(L_DEBUG, "[SpringApp::%s] QTCreator's gdbmacros.dll loaded", __func__);
 
 		SetErrorMode(oldErrorMode);

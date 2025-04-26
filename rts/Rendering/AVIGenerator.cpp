@@ -31,8 +31,8 @@ bool CAVIGenerator::initVFW()
 {
 #if defined(_WIN32) && defined(__MINGW32__)
 
-	msvfw32 = LoadLibrary("msvfw32.dll");
-	avifil32 = LoadLibrary("avifil32.dll");
+	msvfw32 = LoadLibrary(L"msvfw32.dll");
+	avifil32 = LoadLibrary(L"avifil32.dll");
 
 	VideoForWindowsVersion_ptr = (VideoForWindowsVersion_type)GetProcAddress(msvfw32, "VideoForWindowsVersion");
 	ICCompressorChoose_ptr = (ICCompressorChoose_type)GetProcAddress(msvfw32, "ICCompressorChoose");
@@ -64,7 +64,7 @@ bool CAVIGenerator::initVFW()
 		return false;
 	}
 
-	if (!AVIFileInit_ptr || !AVIFileOpenA_ptr || !AVIFileCreateStreamA_ptr ||
+	if (!AVIFileInit_ptr || !AVIFileOpenA_ptr || !AVIFileCreateStream_ptr ||
 		!AVIMakeCompressedStream_ptr || !AVIStreamSetFormat_ptr || !AVIStreamRelease_ptr ||
 		!AVIFileRelease_ptr || !AVIFileExit_ptr || !AVIStreamWrite_ptr) {
 			errorMsg = "initVFW Error.";
