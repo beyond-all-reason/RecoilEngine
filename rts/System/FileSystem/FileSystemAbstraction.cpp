@@ -342,8 +342,12 @@ bool FileSystemAbstraction::MkDir(const std::string& dirStr)
 	auto dir = std::filesystem::u8path(dirStr);
 	std::error_code ec;
 	std::filesystem::create_directory(dir, ec);
-	if (ec)
+	if (ec) {
 		LOG_L(L_WARNING, "[FSA::%s] error '%s' creating directory '%s'", __func__, ec.message().c_str(), dirStr.c_str());
+		return false;
+	}
+
+	return true;
 }
 
 
