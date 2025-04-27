@@ -657,16 +657,15 @@ void CUnit::Update()
 	UpdatePosErrorParams(true, false);
 	UpdateTransportees(); // none if already dead
 
-	if (beingBuilt)
-		return;
 	if (isDead)
 		return;
 
 	if (selfDTargetFrame > 0) {
 		if (gs->frameNum >= selfDTargetFrame) {
 			selfDRemainingSeconds = 0.0f;
-			eventHandler.UnitSelfDestructProgress(this);
-			
+
+			//Run event to signal self destruct is complete
+			eventHandler.UnitSelfDestructProgress(this); 
 			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
 		return; // Skip rest of update if killed
 		} else {
@@ -676,6 +675,9 @@ void CUnit::Update()
 			selfDCountdown = selfDRemainingSeconds * 2 + 1;
 		}
 	}
+
+	if (beingBuilt)
+		return;
 
 	recentDamage *= 0.9f;
 	flankingBonusMobility += flankingBonusMobilityAdd;
@@ -688,7 +690,7 @@ void CUnit::Update()
 
 		return;
 	}
-
+	
 	restTime += 1;
 }
 
