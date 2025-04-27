@@ -129,7 +129,7 @@ std::string FileSystemAbstraction::StripTrailingSlashes(const std::string& path)
 
 std::string FileSystemAbstraction::GetParent(const std::string& pathStr)
 {
-	auto path = Recoil::Utf8stringToPath(pathStr);
+	auto path = Recoil::filesystem::u8path(pathStr);
 	if (!path.has_parent_path())
 		return "";
 
@@ -139,7 +139,7 @@ std::string FileSystemAbstraction::GetParent(const std::string& pathStr)
 
 size_t FileSystemAbstraction::GetFileSize(const std::string& fileStr)
 {
-	auto file = Recoil::Utf8stringToPath(fileStr);
+	auto file = Recoil::filesystem::u8path(fileStr);
 	std::error_code ec;
 	auto size = static_cast<int32_t>(std::filesystem::file_size(file, ec));
 	if (ec) {
@@ -340,7 +340,7 @@ bool FileSystemAbstraction::MkDir(const std::string& dirStr)
 	if (DirExists(dirStr))
 		return true;
 
-	auto dir = Recoil::Utf8stringToPath(dirStr);
+	auto dir = Recoil::filesystem::u8path(dirStr);
 	std::error_code ec;
 	std::filesystem::create_directory(dir, ec);
 	if (ec) {
@@ -354,7 +354,7 @@ bool FileSystemAbstraction::MkDir(const std::string& dirStr)
 
 bool FileSystemAbstraction::DeleteFile(const std::string& fileStr)
 {
-	auto file = Recoil::Utf8stringToPath(fileStr);
+	auto file = Recoil::filesystem::u8path(fileStr);
 
 	std::error_code ec;
 	return std::filesystem::remove(file, ec);
@@ -363,13 +363,13 @@ bool FileSystemAbstraction::DeleteFile(const std::string& fileStr)
 
 bool FileSystemAbstraction::FileExists(const std::string& fileStr)
 {
-	auto file = Recoil::Utf8stringToPath(fileStr);
+	auto file = Recoil::filesystem::u8path(fileStr);
 	return std::filesystem::exists(file) && !std::filesystem::is_directory(file);
 }
 
 bool FileSystemAbstraction::DirExists(const std::string& dirStr)
 {
-	auto dir = Recoil::Utf8stringToPath(dirStr);
+	auto dir = Recoil::filesystem::u8path(dirStr);
 	return std::filesystem::exists(dir) && std::filesystem::is_directory(dir);
 }
 
@@ -503,7 +503,7 @@ std::string FileSystemAbstraction::GetCwd()
 
 void FileSystemAbstraction::ChDir(const std::string& dirStr)
 {
-	auto dir = Recoil::Utf8stringToPath(dirStr);
+	auto dir = Recoil::filesystem::u8path(dirStr);
 	std::filesystem::current_path(dir); //setting path
 }
 
