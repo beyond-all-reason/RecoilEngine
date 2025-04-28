@@ -525,12 +525,20 @@ namespace Platform
 
 	int SetEnvironment(const char* name, const char* value, int overwrite)
 	{
+#ifdef _WIN32
 		return nowide::setenv(name, value, overwrite);
+#else
+		return setenv(name, value, overwrite);
+#endif // _WIN32
 	}
 
 	std::string GetEnvironment(const char* name)
 	{
+#ifdef _WIN32
 		const char* val = nowide::getenv(name);
+#else
+		const char* val = getenv(name);
+#endif // _WIN32
 		return val ? std::string(val) : "";
 	}
 
