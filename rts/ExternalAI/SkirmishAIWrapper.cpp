@@ -28,7 +28,7 @@
 #include <string>
 #include <sstream>
 #include <iostream>
-#include <fstream>
+#include <nowide/fstream.hpp>
 
 #undef DeleteFile
 
@@ -267,7 +267,7 @@ void CSkirmishAIWrapper::Load(std::istream* loadStream)
 	const SLoadEvent evtData = {tmpFile.c_str()};
 
 	{
-		std::ofstream tmpFileStream;
+		nowide::ofstream tmpFileStream;
 
 		tmpFileStream.open(tmpFile.c_str(), std::ios::binary);
 		streamCopy(loadStream, &tmpFileStream);
@@ -292,7 +292,7 @@ void CSkirmishAIWrapper::Save(std::ostream* saveStream)
 		return;
 
 	{
-		std::ifstream tmpFileStream;
+		nowide::ifstream tmpFileStream;
 
 		tmpFileStream.open(tmpFile.c_str(), std::ios::binary);
 		streamCopy(&tmpFileStream, saveStream);

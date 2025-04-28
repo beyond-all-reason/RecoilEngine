@@ -18,6 +18,7 @@
 	#include <shlwapi.h>
 	#include <iphlpapi.h>
 	#include <nowide/convert.hpp>
+	#include <nowide/cstdlib.hpp>
 
 	#ifndef SHGFP_TYPE_CURRENT
 		#define SHGFP_TYPE_CURRENT 0
@@ -99,7 +100,7 @@ static HMODULE GetCurrentModule()
 static std::string GetUserDirFromEnvVar()
 {
 	#ifdef _WIN32
-	const char* home = getenv("LOCALAPPDATA");
+	const char* home = nowide::getenv("LOCALAPPDATA");
 	#else
 	const char* home = getenv("HOME");
 	#endif
@@ -524,33 +525,12 @@ namespace Platform
 
 	int SetEnvironment(const char* name, const char* value, int overwrite)
 	{
-#ifdef _WIN32
-		int errcode = 0;
-		if (!overwrite) {
-			size_t envsize = 0;
-	#ifdef _MSC_VER
-			errcode = getenv_s(&envsize, NULL, 0, name);
-			if (errcode || envsize) return errcode;
-	#else
-			const char* val = getenv(name);
-			if (!val || strlen(val)) return -1;
-	#endif
-		}
-	#ifdef _MSC_VER
-		return _putenv_s(name, value);
-	#else
-		std::array<char, 1024> buffer = {0};
-		sprintf(buffer.data(), "%s = %s", name, value);
-		return putenv(buffer.data());
-	#endif
-#else
-		return setenv(name, value, overwrite);
-#endif // _WIN32
+		return nowide::setenv(name, value, overwrite);
 	}
 
 	std::string GetEnvironment(const char* name)
 	{
-		const char* val = getenv(name);
+		const char* val = nowide::getenv(name);
 		return val ? std::string(val) : "";
 	}
 

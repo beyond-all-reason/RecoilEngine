@@ -32,18 +32,21 @@ remove_definitions(-DTHREADPOOL)
 # - Both of those static libraries are *not* self contained, but require the
 #   targets it will be linked against to export compatible symbols.
 
+# Need nowide include
+set(NOWIDE_INCLUDE_DIR ${SOURCE_ROOT}/lib/nowide/include)
+
 add_library(archives STATIC ${archives_sources})
 if (THREADPOOL)
 	target_compile_definitions(archives PRIVATE -DTHREADPOOL)
 endif()
 target_include_directories(archives
-	PRIVATE ${SOURCE_ROOT} ${SPRING_MINIZIP_INCLUDE_DIR})
+	PRIVATE ${SOURCE_ROOT} ${SPRING_MINIZIP_INCLUDE_DIR} ${NOWIDE_INCLUDE_DIR})
 target_link_libraries(archives
-	PRIVATE 7zip ${SPRING_MINIZIP_LIBRARY} Tracy::TracyClient)
+	PRIVATE 7zip ${SPRING_MINIZIP_LIBRARY} Tracy::TracyClient nowide::nowide)
 
 add_library(archives_nothreadpool STATIC ${archives_sources})
 target_compile_options(archives_nothreadpool PRIVATE ${PIC_FLAG})
 target_include_directories(archives_nothreadpool
-	PRIVATE ${SOURCE_ROOT} ${SPRING_MINIZIP_INCLUDE_DIR})
+	PRIVATE ${SOURCE_ROOT} ${SPRING_MINIZIP_INCLUDE_DIR} ${NOWIDE_INCLUDE_DIR})
 target_link_libraries(archives_nothreadpool
-	PRIVATE 7zip ${SPRING_MINIZIP_LIBRARY})
+	PRIVATE 7zip ${SPRING_MINIZIP_LIBRARY} nowide::nowide)

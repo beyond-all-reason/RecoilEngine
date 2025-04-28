@@ -5,11 +5,10 @@
 
 #include <array>
 #include <cinttypes>
-#include <fstream>
 #include <limits>
 #include <variant>
 #include <vector>
-
+#include <nowide/fstream.hpp>
 
 #include "PathEnums.h"
 #include "PathDefines.h"
@@ -83,7 +82,7 @@ namespace QTPFS {
 
 		void PreTesselate(NodeLayer& nl, const SRectangle& r, SRectangle& ur, unsigned int depth, const UpdateThreadData* threadData);
 		void Tesselate(NodeLayer& nl, const SRectangle& r, unsigned int depth, const UpdateThreadData* threadData);
-		void Serialize(std::fstream& fStream, NodeLayer& nodeLayer, unsigned int* streamSize, unsigned int depth, bool readMode);
+		void Serialize(nowide::fstream& fStream, NodeLayer& nodeLayer, unsigned int* streamSize, unsigned int depth, bool readMode);
 
 		bool IsLeaf() const { return (childBaseIndex == -1u); }
 		bool CanSplit(unsigned int depth, bool forced) const;

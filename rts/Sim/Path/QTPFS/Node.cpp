@@ -670,7 +670,7 @@ unsigned int QTPFS::QTNode::GetMaxNumNeighbors() const {
 
 // THIS FUNCTION IS NOT USED
 // Loading the cache seems to be slower than regenerating the data live at the moment.
-void QTPFS::QTNode::Serialize(std::fstream& fStream, NodeLayer& nodeLayer, unsigned int* streamSize, unsigned int depth, bool readMode) {
+void QTPFS::QTNode::Serialize(nowide::fstream& fStream, NodeLayer& nodeLayer, unsigned int* streamSize, unsigned int depth, bool readMode) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// overwritten when de-serializing
 	unsigned int numChildren = QTNODE_CHILD_COUNT * (1 - int(IsLeaf()));

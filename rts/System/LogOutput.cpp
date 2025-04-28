@@ -19,6 +19,7 @@
 #include <iostream>
 #include <sstream>
 #include <ranges>
+#include <nowide/cstdio.hpp>
 
 #include <cassert>
 #include <cstring>
@@ -151,7 +152,7 @@ void CLogOutput::RotateLogFile() const
 		FileSystem::CreateDirectory(logArchiveDir);
 
 	// move the old log to the archive dir
-	if (rename(filePath.c_str(), archivedLogFile.c_str()) != 0) {
+	if (nowide::rename(filePath.c_str(), archivedLogFile.c_str()) != 0) {
 		// no log here yet
 		std::cerr << "Failed rotating the log file" << std::endl;
 	}

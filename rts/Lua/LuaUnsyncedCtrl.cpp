@@ -101,7 +101,7 @@
 #include <cfloat>
 #include <cinttypes>
 
-#include <fstream>
+#include <nowide/fstream.hpp>
 
 #include <SDL_keyboard.h>
 #include <SDL_clipboard.h>
@@ -2710,7 +2710,7 @@ int LuaUnsyncedCtrl::ExtractModArchiveFile(lua_State* L)
 
 
 	std::vector<uint8_t> buffer;
-	std::fstream fstr(path.c_str(), std::ios::out | std::ios::binary);
+	nowide::fstream fstr(path.c_str(), std::ios::out | std::ios::binary);
 
 	if (!vfsFile.IsBuffered()) {
 		buffer.resize(vfsFile.FileSize(), 0);
@@ -3269,7 +3269,7 @@ static int ReloadOrRestart(const std::string& springArgs, const std::string& scr
 
 	if (!scriptText.empty()) {
 		// create file 'script.txt' with contents given by Lua code
-		std::ofstream scriptFile(scriptFullName.c_str());
+		nowide::ofstream scriptFile(scriptFullName.c_str());
 
 		scriptFile.write(scriptText.c_str(), scriptText.size());
 		scriptFile.close();

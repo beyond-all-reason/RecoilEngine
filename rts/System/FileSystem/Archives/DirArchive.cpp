@@ -3,7 +3,7 @@
 #include "DirArchive.h"
 
 #include <assert.h>
-#include <fstream>
+#include <nowide/fstream.hpp>
 
 #include "System/FileSystem/DataDirsAccess.h"
 #include "System/FileSystem/FileSystem.h"
@@ -57,7 +57,7 @@ bool CDirArchive::GetFile(uint32_t fid, std::vector<std::uint8_t>& buffer)
 
 	auto scopedSemAcq = AcquireSemaphoreScoped();
 
-	std::ifstream ifs(files[fid].rawFileName.c_str(), std::ios::in | std::ios::binary);
+	nowide::ifstream ifs(files[fid].rawFileName.c_str(), std::ios::in | std::ios::binary);
 
 	if (ifs.bad() || !ifs.is_open())
 		return false;
