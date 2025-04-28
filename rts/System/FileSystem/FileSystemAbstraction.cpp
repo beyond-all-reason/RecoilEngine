@@ -12,6 +12,7 @@
 #include <cerrno>
 #include <cstring>
 #include <filesystem>
+#include <variant>
 
 #include <fmt/printf.h>
 #include <fmt/format.h>
@@ -39,6 +40,19 @@
 	#include <dirent.h>
 #endif // _WIN32
 
+namespace fs = std::filesystem;
+
+namespace Impl {
+	inline std::string StoreUTF8AsString(const std::u8string& utf8) {
+		return std::string(reinterpret_cast<const char*>(utf8.c_str()));
+	}
+	inline std::string StoreUTF8AsString(const std::u8string_view& utf8) {
+		return std::string(reinterpret_cast<const char*>(utf8.data()));
+	}
+	inline std::string StorePathAsString(const fs::path& path) {
+		return StoreUTF8AsString(path.u8string());
+	}
+}
 
 std::string FileSystemAbstraction::RemoveLocalPathPrefix(const std::string& path)
 {
@@ -133,15 +147,14 @@ std::string FileSystemAbstraction::GetParent(const std::string& pathStr)
 	if (!path.has_parent_path())
 		return "";
 
-	// meh
-	return std::string(reinterpret_cast<const char*>(path.parent_path().u8string().c_str()));
+	return Impl::StorePathAsString(path);
 }
 
 size_t FileSystemAbstraction::GetFileSize(const std::string& fileStr)
 {
 	auto file = Recoil::filesystem::u8path(fileStr);
 	std::error_code ec;
-	auto size = static_cast<int32_t>(std::filesystem::file_size(file, ec));
+	auto size = static_cast<int32_t>(fs::file_size(file, ec));
 	if (ec) {
 		LOG_L(L_WARNING, "[FSA::%s] error '%s' reading file size '%s'", __func__, ec.message().c_str(), fileStr.c_str());
 		return 0;
@@ -150,17 +163,24 @@ size_t FileSystemAbstraction::GetFileSize(const std::string& fileStr)
 	return size;
 }
 
-bool FileSystemAbstraction::IsReadableFile(const std::string& file)
+bool FileSystemAbstraction::IsReadableFile(const std::string& fileStr)
 {
+	auto file = Recoil::filesystem::u8path(fileStr);
+
 	// Exclude directories!
 	if (!FileExists(file))
 		return false;
 
-#ifdef _WIN32
-	return (_access(StripTrailingSlashes(file).c_str(), 4) == 0);
-#else
-	return (access(file.c_str(), R_OK | F_OK) == 0);
-#endif
+	std::error_code ec;
+	auto perms = fs::status(file, ec).permissions();
+
+	if (ec)
+		return false;
+
+	return
+		(perms & fs::perms::owner_read ) != fs::perms::none ||
+		(perms & fs::perms::group_read ) != fs::perms::none ||
+		(perms & fs::perms::others_read) != fs::perms::none;
 }
 
 uint32_t FileSystemAbstraction::GetFileModificationTime(const std::string& file)
@@ -306,16 +326,17 @@ char FileSystemAbstraction::GetNativePathSeparator()
 	#endif
 }
 
-bool FileSystemAbstraction::IsAbsolutePath(const std::string& path)
+bool FileSystemAbstraction::IsAbsolutePath(const std::string& pathStr)
 {
-	//TODO uncomment this and test if there are conflicts in the code when this returns true but other custom code doesn't (e.g. with IsFSRoot)
-	//const boost::filesystem::path f(file);
-	//return f.is_absolute();
-
-#ifdef _WIN32
-	return ((path.length() > 1) && (path[1] == ':'));
+#if 1
+	auto path = Recoil::filesystem::u8path(pathStr);
+	return path.is_absolute();
 #else
-	return ((path.length() > 0) && (path[0] == '/'));
+	#ifdef _WIN32
+		return ((pathStr.length() > 1) && (pathStr[1] == ':'));
+	#else
+		return ((pathStr.length() > 0) && (pathStr[0] == '/'));
+	#endif
 #endif
 }
 
@@ -336,82 +357,118 @@ bool FileSystemAbstraction::IsAbsolutePath(const std::string& path)
  */
 bool FileSystemAbstraction::MkDir(const std::string& dirStr)
 {
+	auto dir = Recoil::filesystem::u8path(dirStr);
+
 	// First check if directory exists. We'll return success if it does.
-	if (DirExists(dirStr))
+	if (DirExists(dir))
 		return true;
 
-	auto dir = Recoil::filesystem::u8path(dirStr);
 	std::error_code ec;
-	std::filesystem::create_directory(dir, ec);
+	fs::create_directory(dir, ec);
 	if (ec) {
 		LOG_L(L_WARNING, "[FSA::%s] error '%s' creating directory '%s'", __func__, ec.message().c_str(), dirStr.c_str());
 		return false;
 	}
 
+	// Set permissions to rwxr-xr-x
+	fs::permissions(
+		dir,
+		fs::perms::owner_all  |   // rwx for owner
+		fs::perms::group_read |   // r-- for group
+		fs::perms::group_exec |   // --x for group (combined makes r-x)
+		fs::perms::others_read |  // r-- for others
+		fs::perms::others_exec,   // --x for others (combined makes r-x)
+		fs::perm_options::replace
+	);
+
 	return true;
 }
-
 
 bool FileSystemAbstraction::DeleteFile(const std::string& fileStr)
 {
 	auto file = Recoil::filesystem::u8path(fileStr);
 
 	std::error_code ec;
-	return std::filesystem::remove(file, ec);
+	return fs::remove(file, ec);
 }
 
+bool FileSystemAbstraction::FileExists(const fs::path& file)
+{
+	return fs::exists(file) && !fs::is_directory(file);
+}
 
 bool FileSystemAbstraction::FileExists(const std::string& fileStr)
 {
 	auto file = Recoil::filesystem::u8path(fileStr);
-	return std::filesystem::exists(file) && !std::filesystem::is_directory(file);
+	return FileExists(file);
+}
+
+bool FileSystemAbstraction::DirExists(const fs::path& dir)
+{
+	return fs::exists(dir) && fs::is_directory(dir);
 }
 
 bool FileSystemAbstraction::DirExists(const std::string& dirStr)
 {
 	auto dir = Recoil::filesystem::u8path(dirStr);
-	return std::filesystem::exists(dir) && std::filesystem::is_directory(dir);
+	return DirExists(dir);
 }
 
 
-bool FileSystemAbstraction::DirIsWritable(const std::string& dir)
+bool FileSystemAbstraction::DirIsWritable(const std::string& dirStr)
 {
-#ifdef _WIN32
-	// this exists because _access does not do the right thing
-	// see http://msdn.microsoft.com/en-us/library/1w06ktdy(VS.71).aspx
-	// for now, try to create a temporary file in a directory and open it
-	// to rule out the possibility of it being created in the virtual store
-	// TODO perhaps use SECURITY_DESCRIPTOR winapi calls here
-
-	std::string testfile = dir + "\\__$testfile42$.test";
-	nowide::ofstream os(testfile.c_str());
-
-	if (os.fail())
+#if 1
+	auto dir = Recoil::filesystem::u8path(dirStr);
+	if (!DirExists(dir))
 		return false;
 
-	const char* testdata = "THIS IS A TEST";
-	os << testdata;
-	os.close();
-
-	// this part should only be needed when there is no manifest embedded
-	nowide::ifstream is(testfile.c_str());
-
-	if (is.fail())
-		return false; // the file most likely exists in the virtual store
-
-	std::string input;
-	getline(is, input);
-
-	if (input != testdata) {
-		unlink(testfile.c_str());
+	std::error_code ec;
+	auto perms = fs::status(dir, ec).permissions();
+	if (ec)
 		return false;
-	}
 
-	is.close();
-	unlink(testfile.c_str());
-	return true;
+	return
+		(perms & fs::perms::owner_write ) != fs::perms::none ||
+		(perms & fs::perms::group_write ) != fs::perms::none ||
+		(perms & fs::perms::others_write) != fs::perms::none;
 #else
-	return (access(dir.c_str(), W_OK) == 0);
+	#ifdef _WIN32
+		// this exists because _access does not do the right thing
+		// see http://msdn.microsoft.com/en-us/library/1w06ktdy(VS.71).aspx
+		// for now, try to create a temporary file in a directory and open it
+		// to rule out the possibility of it being created in the virtual store
+		// TODO perhaps use SECURITY_DESCRIPTOR winapi calls here
+
+		std::string testfile = dirStr + "\\__$testfile42$.test";
+		nowide::ofstream os(testfile.c_str());
+
+		if (os.fail())
+			return false;
+
+		const char* testdata = "THIS IS A TEST";
+		os << testdata;
+		os.close();
+
+		// this part should only be needed when there is no manifest embedded
+		nowide::ifstream is(testfile.c_str());
+
+		if (is.fail())
+			return false; // the file most likely exists in the virtual store
+
+		std::string input;
+		getline(is, input);
+
+		if (input != testdata) {
+			unlink(testfile.c_str());
+			return false;
+		}
+
+		is.close();
+		unlink(testfile.c_str());
+		return true;
+	#else
+		return (access(dir.c_str(), W_OK) == 0);
+	#endif
 #endif
 }
 
@@ -472,15 +529,13 @@ bool FileSystemAbstraction::ComparePaths(const std::string& path1, const std::st
 	CloseHandle(h2);
 
 	return
-		info1.dwVolumeSerialNumber == info2.dwVolumeSerialNumber
-		&& info1.nFileIndexHigh == info2.nFileIndexHigh
-		&& info1.nFileIndexLow == info2.nFileIndexLow
-		&& info1.nFileSizeHigh == info2.nFileSizeHigh
-		&& info1.nFileSizeLow == info2.nFileSizeLow
-		&& info1.ftLastWriteTime.dwLowDateTime
-		== info2.ftLastWriteTime.dwLowDateTime
-		&& info1.ftLastWriteTime.dwHighDateTime
-		== info2.ftLastWriteTime.dwHighDateTime;
+		info1.dwVolumeSerialNumber == info2.dwVolumeSerialNumber &&
+		info1.nFileIndexHigh == info2.nFileIndexHigh &&
+		info1.nFileIndexLow == info2.nFileIndexLow &&
+		info1.nFileSizeHigh == info2.nFileSizeHigh &&
+		info1.nFileSizeLow == info2.nFileSizeLow &&
+		info1.ftLastWriteTime.dwLowDateTime == info2.ftLastWriteTime.dwLowDateTime &&
+		info1.ftLastWriteTime.dwHighDateTime == info2.ftLastWriteTime.dwHighDateTime;
 #endif
 }
 
@@ -497,14 +552,13 @@ std::string FileSystemAbstraction::GetEngineExecutableDir()
 
 std::string FileSystemAbstraction::GetCwd()
 {
-	// meh
-	return std::string(reinterpret_cast<const char*>(std::filesystem::current_path().u8string().c_str()));
+	return Impl::StorePathAsString(fs::current_path());
 }
 
 void FileSystemAbstraction::ChDir(const std::string& dirStr)
 {
 	auto dir = Recoil::filesystem::u8path(dirStr);
-	std::filesystem::current_path(dir); //setting path
+	fs::current_path(dir); //setting path
 }
 
 namespace Impl {
@@ -580,11 +634,43 @@ namespace Impl {
 		closedir(dp);
 	#endif
 	}
+
+	void FindFilesStd(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dirStr, const spring::regex& regexPattern, int flags)
+	{
+		auto dir = Recoil::filesystem::u8path(dataDir + dirStr).lexically_normal(); //we want it lexically_normal() so regex won't trip up
+		if (!fs::exists(dir))
+			return;
+
+		std::variant<fs::directory_iterator, fs::recursive_directory_iterator> dirIterator;
+		if ((flags & FileQueryFlags::RECURSE) != 0)
+			dirIterator = fs::recursive_directory_iterator(dir);
+		else
+			dirIterator = fs::directory_iterator(dir);
+
+		std::visit([&](const auto& dirIterator) {
+			for (const fs::directory_entry& entry : dirIterator) {
+				const bool isDir = fs::is_directory(entry);
+
+				// need directory, but it's not a directory
+				if ((flags & FileQueryFlags::ONLY_DIRS   ) != 0 && !isDir)
+					continue;
+
+				// don't need directories, but it's a directory
+				if ((flags & FileQueryFlags::INCLUDE_DIRS) == 0 &&  isDir)
+					continue;
+
+				// hope std::regex_match will not trip up on UTF-8, if it does, will need to convert to std::wregex
+				auto utf8String = StorePathAsString(entry.path());
+				if (spring::regex_match(utf8String, regexPattern)) {
+					matches.emplace_back(std::move(utf8String));
+				}
+			}
+		}, dirIterator);
+	}
 }
 
 void FileSystemAbstraction::FindFiles(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dir, const std::string& regex, int flags)
 {
 	const spring::regex regexPattern(regex);
-	Impl::FindFiles(matches, dataDir, dir, regexPattern, flags);
+	Impl::FindFilesStd(matches, dataDir, dir, regexPattern, flags);
 }
-
