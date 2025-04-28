@@ -200,8 +200,9 @@ SpringApp::SpringApp(int argc, char** argv)
 	gflags::SetVersionString(SpringVersion::GetFull());
 	gflags::ParseCommandLineFlags(&argc, &argv, true);
 #ifdef _WIN32
-	_setmode(_fileno(stdout), _O_U8TEXT);
-	_setmode(_fileno(stderr), _O_U8TEXT);
+	SetConsoleOutputCP(CP_UTF8);
+	setvbuf(stdout, nullptr, _IOFBF, 8192);
+	setvbuf(stderr, nullptr, _IONBF,    0);
 #endif // _WIN32
 
 	// also initializes configHandler and logOutput
