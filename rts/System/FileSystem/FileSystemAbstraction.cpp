@@ -648,7 +648,7 @@ namespace Impl {
 		else
 			dirIterator = fs::directory_iterator(dir);
 
-		std::visit([&](const auto& dirIterator) {
+		std::visit([&](auto&& dirIterator) {
 			for (const fs::directory_entry& entry : dirIterator) {
 				const bool isDir = fs::is_directory(entry);
 
@@ -672,7 +672,7 @@ namespace Impl {
 					matches.emplace_back(std::move(utf8Str));
 				}
 			}
-		}, dirIterator);
+		}, std::move(dirIterator));
 	}
 }
 
