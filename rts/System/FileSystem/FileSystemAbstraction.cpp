@@ -637,7 +637,8 @@ namespace Impl {
 
 	void FindFilesStd(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dirStr, const spring::regex& regexPattern, int flags)
 	{
-		auto dir = Recoil::filesystem::u8path(dataDir + dirStr).lexically_normal(); //we want it lexically_normal() so regex won't trip up
+		const auto dirFullStr = dataDir + dirStr;
+		auto dir = Recoil::filesystem::u8path(dirFullStr);
 		if (!fs::exists(dir))
 			return;
 
@@ -660,9 +661,15 @@ namespace Impl {
 					continue;
 
 				// hope std::regex_match will not trip up on UTF-8, if it does, will need to convert to std::wregex
-				auto utf8String = StorePathAsString(entry.path());
-				if (spring::regex_match(utf8String, regexPattern)) {
-					matches.emplace_back(std::move(utf8String));
+				// the previous implementation relied on checking the filename only
+				if (spring::regex_match(StorePathAsString(entry.path().filename()), regexPattern)) {
+					auto utf8Str = StorePathAsString(entry.path().lexically_normal());
+
+					// previous convention to add trailing slashes
+					if (isDir && !utf8Str.empty() && utf8Str.back() != FileSystemAbstraction::GetNativePathSeparator()) {
+						utf8Str += FileSystemAbstraction::GetNativePathSeparator();
+					}
+					matches.emplace_back(std::move(utf8Str));
 				}
 			}
 		}, dirIterator);
