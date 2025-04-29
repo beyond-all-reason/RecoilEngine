@@ -102,14 +102,14 @@ float3 CFactory::CalcBuildPos(int buildPiece)
 
 
 
-void CFactory::Update(bool moved)
+void CFactory::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	nanoPieceCache.Update();
 
 	if (beingBuilt) {
 		// factory is under construction, cannot build anything yet
-		CUnit::Update(moved);
+		CUnit::Update();
 
 		// this can happen if we started being reclaimed *while* building a
 		// unit, in which case our buildee can either be allowed to finish
@@ -165,7 +165,7 @@ void CFactory::Update(bool moved)
 		script->Deactivate();
 	}
 
-	CBuilding::Update(moved);
+	CBuilding::Update();
 }
 
 

@@ -93,6 +93,7 @@ void AMoveType::UpdateCollisionMap(bool force)
 	if (!force || owner->pos != oldCollisionUpdatePos){
 		oldCollisionUpdatePos = owner->pos;
 		quadField.MovedUnit(owner);
+		owner->moved = false;
 	}
 }
 

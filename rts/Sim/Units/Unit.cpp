@@ -650,7 +650,7 @@ void CUnit::DisableScriptMoveType()
 }
 
 
-void CUnit::Update(bool moved)
+void CUnit::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	ASSERT_SYNCED(pos);

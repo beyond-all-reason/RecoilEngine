@@ -81,7 +81,7 @@ public:
 	virtual void PreInit(const UnitLoadParams& params);
 	virtual void PostInit(const CUnit* builder);
 
-	virtual void Update(bool moved = false);
+	virtual void Update();
 	virtual void SlowUpdate();
 
 	const SolidObjectDef* GetDef() const { return ((const SolidObjectDef*) unitDef); }
@@ -552,6 +552,13 @@ public:
 
 	bool drawIcon = true;
 	bool slowMoved = true;
+	bool moved = true;
+	void Move(const float3& v, bool relative) {
+		moved = true;
+		slowMoved = true;
+		CSolidObject::Move(v, relative);
+	}
+
 private:
 	// if we are stunned by a weapon or for other reason, access via IsStunned/SetStunned(bool)
 	bool stunned = false;

@@ -373,8 +373,6 @@ void CUnitHandler::SlowUpdateUnits()
 			CUnit* unit = activeUnits[i];
 
 			unit->SanityCheck();
-			if (unit->pos != unit->moveType->oldCollisionUpdatePos)
-				unit->slowMoved = true;
 			unit->SlowUpdate();
 			unit->slowMoved = false;
 			unit->SlowUpdateWeapons();
@@ -404,10 +402,8 @@ void CUnitHandler::UpdateUnits()
 		CUnit* unit = activeUnits[i];
 
 		unit->SanityCheck();
-		bool moved = unit->pos != unit->moveType->oldCollisionUpdatePos;
-		unit->Update(moved);
-		if (moved) {
-			unit->slowMoved = true;
+		unit->Update();
+		if (unit->moved) {
 			unit->moveType->UpdateCollisionMap();
 		}
 		// unsynced; done on-demand when drawing unit
