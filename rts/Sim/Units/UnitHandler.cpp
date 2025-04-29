@@ -376,8 +376,7 @@ void CUnitHandler::SlowUpdateUnits()
 			if (unit->pos != unit->moveType->oldCollisionUpdatePos)
 				unit->slowMoved = true;
 			unit->SlowUpdate();
-			if (unit->slowMoved)
-				unit->slowMoved = false;
+			unit->slowMoved = false;
 			unit->SlowUpdateWeapons();
 			unit->SanityCheck();
 

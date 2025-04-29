@@ -656,12 +656,11 @@ void CUnit::Update(bool moved)
 	ASSERT_SYNCED(pos);
 
 	// buildings update physical state less frequently in SlowUpdate
-	if (moved || transporter != nullptr) {
+	if unlikely(moved) {
 		UpdatePhysicalState(0.1f);
+		UpdateTransportees(); // none if already dead
 	}
 	UpdatePosErrorParams(true, false);
-	if (moved)
-		UpdateTransportees(); // none if already dead
 
 	if (beingBuilt)
 		return;
@@ -1086,7 +1085,7 @@ void CUnit::SlowUpdate()
 	if (moveType->progressState == AMoveType::Active)
 		DoSeismicPing(seismicSignature);
 
-	if (slowMoved || GetTransporter() != nullptr) {
+	if unlikely(slowMoved) {
 		CalculateTerrainType();
 		UpdateTerrainType();
 	}
