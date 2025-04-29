@@ -51,11 +51,14 @@ void CStaticMoveType::FitToGround()
 	// NOTE:
 	//   static buildings don't have any MoveDef instance, hence we need
 	//   to get the ground height instead of calling CMoveMath::yLevel()
+	float change;
 	if (owner->FloatOnWater() && owner->IsInWater()) {
-		owner->Move(UpVector * (-waterline - owner->pos.y), true);
+		change = -waterline - owner->pos.y;
 	} else {
-		owner->Move(UpVector * (CGround::GetHeightReal(owner->pos.x, owner->pos.z) - owner->pos.y), true);
+		change = CGround::GetHeightReal(owner->pos.x, owner->pos.z) - owner->pos.y;
 	}
+	if (std::abs(change) > 1e-04f)
+		owner->Move(UpVector * change, true);
 }
 
 void CStaticMoveType::TerrainChanged(int x1, int y1, int x2, int y2)
