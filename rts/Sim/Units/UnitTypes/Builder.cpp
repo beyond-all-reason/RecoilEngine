@@ -530,7 +530,7 @@ bool CBuilder::UpdateCapture(const Command& fCommand)
 
 
 
-void CBuilder::Update()
+void CBuilder::Update(bool moved)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const CBuilderCAI* cai = static_cast<CBuilderCAI*>(commandAI);
@@ -551,7 +551,7 @@ void CBuilder::Update()
 		updated = updated || UpdateCapture(fCommand);
 	}
 
-	CUnit::Update();
+	CUnit::Update(moved);
 }
 
 

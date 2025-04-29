@@ -411,13 +411,10 @@ void CUnitHandler::UpdateUnits()
 		CUnit* unit = activeUnits[i];
 
 		unit->SanityCheck();
-		if (unit->pos != unit->moveType->oldCollisionUpdatePos)
-			unit->moved = true;
-		unit->Update();
-		if (unit->moved) {
+		bool moved = unit->pos != unit->moveType->oldCollisionUpdatePos;
+		unit->Update(moved);
+		if (moved)
 			unit->moveType->UpdateCollisionMap();
-			unit->moved = false;
-		}
 		// unsynced; done on-demand when drawing unit
 		// unit->UpdateLocalModel();
 		unit->SanityCheck();

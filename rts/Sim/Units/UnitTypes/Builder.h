@@ -31,7 +31,7 @@ public:
 
 	CBuilder();
 
-	void Update();
+	void Update(bool moved = false);
 	void SlowUpdate();
 	void DependentDied(CObject* o);
 

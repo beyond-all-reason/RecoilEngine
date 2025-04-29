@@ -249,7 +249,6 @@ void CUnit::PreInit(const UnitLoadParams& params)
 
 	unitHandler.AddUnit(this);
 	quadField.MovedUnit(this);
-	moved = true;
 	slowMoved = true;
 
 	losStatus[allyteam] = LOS_ALL_MASK_BITS | LOS_INLOS | LOS_INRADAR | LOS_PREVLOS | LOS_CONTRADAR;
@@ -535,7 +534,6 @@ void CUnit::ForcedMove(const float3& newPos)
 
 	eventHandler.UnitMoved(this);
 	quadField.MovedUnit(this);
-	moved = true;
 	slowMoved = true;
 }
 
@@ -652,7 +650,7 @@ void CUnit::DisableScriptMoveType()
 }
 
 
-void CUnit::Update()
+void CUnit::Update(bool moved)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	ASSERT_SYNCED(pos);
@@ -745,7 +743,6 @@ void CUnit::UpdateTransportees()
 		transportee->Move(absPiecePos, false);
 		transportee->UpdateMidAndAimPos();
 		transportee->SetHeadingFromDirection();
-		transportee->moved = true;
 		transportee->slowMoved = true;
 
 		// see ::AttachUnit
@@ -778,7 +775,6 @@ void CUnit::ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaim
 		} else {
 			// NOTE: game's responsibility to deal with edge-cases now
 			transportee->Move(transportee->pos.cClampInBounds(), false);
-			transportee->moved = true;
 			transportee->slowMoved = true;
 
 			// if this transporter uses the piece-underneath-ground
@@ -1568,7 +1564,6 @@ bool CUnit::ChangeTeam(int newteam, ChangeType type)
 
 	// insert for new allyteam
 	quadField.MovedUnit(this);
-	moved = true;
 	slowMoved = true;
 
 	eventHandler.UnitGiven(this, oldteam, newteam);

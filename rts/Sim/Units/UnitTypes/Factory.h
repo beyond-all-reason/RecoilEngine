@@ -26,7 +26,7 @@ public:
 	/// @return whether the to-be-built unit is enqueued
 	unsigned int QueueBuild(const UnitDef* buildeeDef, const Command& buildCmd);
 
-	void Update();
+	void Update(bool moved = false);
 
 	void DependentDied(CObject* o);
 	void CreateNanoParticle(bool highPriority = false);
