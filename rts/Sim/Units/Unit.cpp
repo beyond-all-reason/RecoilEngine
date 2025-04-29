@@ -742,7 +742,6 @@ void CUnit::UpdateTransportees()
 		transportee->Move(absPiecePos, false);
 		transportee->UpdateMidAndAimPos();
 		transportee->SetHeadingFromDirection();
-		transportee->slowMoved = true;
 
 		// see ::AttachUnit
 		if (transportee->IsStunned()) {
@@ -774,7 +773,6 @@ void CUnit::ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaim
 		} else {
 			// NOTE: game's responsibility to deal with edge-cases now
 			transportee->Move(transportee->pos.cClampInBounds(), false);
-			transportee->slowMoved = true;
 
 			// if this transporter uses the piece-underneath-ground
 			// method to "hide" transportees, place transportee near
