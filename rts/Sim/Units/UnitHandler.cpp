@@ -373,17 +373,11 @@ void CUnitHandler::SlowUpdateUnits()
 			CUnit* unit = activeUnits[i];
 
 			unit->SanityCheck();
-			/*if (unit->unitDef->IsImmobileUnit()) {
-				unit->moveType->UpdateCollisionMap();
-			}*/
 			if (unit->pos != unit->moveType->oldCollisionUpdatePos)
 				unit->slowMoved = true;
 			unit->SlowUpdate();
-			//if (unit->unitDef->IsImmobileUnit() && unit->slowMoved)
 			if (unit->slowMoved)
-			{
 				unit->slowMoved = false;
-			}
 			unit->SlowUpdateWeapons();
 			unit->SanityCheck();
 

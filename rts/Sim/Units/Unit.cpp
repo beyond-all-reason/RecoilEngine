@@ -958,9 +958,6 @@ void CUnit::SetStunned(bool stun) {
 void CUnit::SlowUpdate()
 {
 	ZoneScoped;
-	/*if (unitDef->IsImmobileUnit()) {
-		UpdatePhysicalState(0.1f);
-	}*/
 	UpdatePosErrorParams(false, true);
 
 	DoWaterDamage();
