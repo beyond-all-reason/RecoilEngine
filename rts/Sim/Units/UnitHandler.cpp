@@ -399,6 +399,7 @@ void CUnitHandler::SlowUpdateUnits()
 	}
 }
 
+
 void CUnitHandler::UpdateUnits()
 {
 	SCOPED_TIMER("Sim::Unit::Update");
@@ -408,8 +409,10 @@ void CUnitHandler::UpdateUnits()
 		CUnit* unit = activeUnits[i];
 
 		unit->SanityCheck();
+		if (!unit->moved && unit->pos != unit->moveType->oldCollisionUpdatePos)
+			unit->moved = true;
 		unit->Update();
-		if (unit->moved || unit->transporter != nullptr) {
+		if (unit->moved) {
 			unit->moveType->UpdateCollisionMap();
 			if (unit->unitDef->IsImmobileUnit())
 				unit->moved = false;
