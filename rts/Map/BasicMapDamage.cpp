@@ -14,6 +14,7 @@
 #include "Sim/Path/IPathManager.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "System/TimeProfiler.h"
+#include "Sim/MoveTypes/StaticMoveType.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -241,6 +242,7 @@ void CBasicMapDamage::RecalcArea(int x1, int x2, int y1, int y2)
 
 	readMap->UpdateHeightMapSynced(updRect);
 	featureHandler.TerrainChanged(x1, y1, x2, y2);
+	CStaticMoveType::TerrainChanged(x1, y1, x2, y2);
 	smoothGround.MapChanged(x1, y1, x2, y2);
 	{
 		SCOPED_TIMER("Sim::BasicMapDamage::Los");

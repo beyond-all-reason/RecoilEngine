@@ -23,6 +23,10 @@ public:
 
 	bool Update() override { return false; }
 	void SlowUpdate() override;
+	static void TerrainChanged(int x1, int y1, int x2, int y2);
+private:
+	void FitToGround();
+	bool firstUpdate;
 };
 
 #endif // STATICMOVETYPE_H

@@ -7,6 +7,8 @@
 #include "Sim/Ecs/Registry.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
+#include "System/Rectangle.h"
+#include "Sim/Misc/QuadField.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -21,6 +23,7 @@ CStaticMoveType::CStaticMoveType(CUnit* unit) : AMoveType(unit) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	useWantedSpeed[false] = false;
 	useWantedSpeed[ true] = false;
+	firstUpdate = true;
 
 	// creg
 	if (unit == nullptr)
@@ -32,17 +35,41 @@ CStaticMoveType::CStaticMoveType(CUnit* unit) : AMoveType(unit) {
 void CStaticMoveType::SlowUpdate()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// buildings and pseudo-static units can be transported
+	if (firstUpdate) {
+		FitToGround();
+		firstUpdate = false;
+	}
+}
+
+void CStaticMoveType::FitToGround()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// buildings and pseudo-static units can be moved and ground can change.
 	if (owner->GetTransporter() != nullptr)
 		return;
 
 	// NOTE:
 	//   static buildings don't have any MoveDef instance, hence we need
 	//   to get the ground height instead of calling CMoveMath::yLevel()
-	// FIXME: intercept heightmapUpdate events and update buildings y-pos only on-demand!
 	if (owner->FloatOnWater() && owner->IsInWater()) {
 		owner->Move(UpVector * (-waterline - owner->pos.y), true);
 	} else {
 		owner->Move(UpVector * (CGround::GetHeightReal(owner->pos.x, owner->pos.z) - owner->pos.y), true);
 	}
+}
+
+void CStaticMoveType::TerrainChanged(int x1, int y1, int x2, int y2)
+{
+	QuadFieldQuery qfQuery;
+	const float3 mins(x1 * SQUARE_SIZE, 0, y1 * SQUARE_SIZE);
+	const float3 maxs(x2 * SQUARE_SIZE, 0, y2 * SQUARE_SIZE);
+
+	quadField.GetUnitsExact(qfQuery, mins, maxs);
+	const auto& units = (*qfQuery.units);
+	for (auto unit: units) {
+		auto staticMoveType = dynamic_cast<CStaticMoveType*>(unit->moveType);
+		if (staticMoveType)
+			staticMoveType->FitToGround();
+	}
+
 }
