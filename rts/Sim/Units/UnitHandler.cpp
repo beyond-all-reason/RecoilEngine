@@ -404,6 +404,7 @@ void CUnitHandler::UpdateUnits()
 		unit->SanityCheck();
 		unit->Update();
 		if (unit->moved) {
+			// resets the moved flag unless skipped by modrule
 			unit->moveType->UpdateCollisionMap();
 		}
 		// unsynced; done on-demand when drawing unit
