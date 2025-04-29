@@ -376,6 +376,8 @@ void CUnitHandler::SlowUpdateUnits()
 			/*if (unit->unitDef->IsImmobileUnit()) {
 				unit->moveType->UpdateCollisionMap();
 			}*/
+			if (unit->pos != unit->moveType->oldCollisionUpdatePos)
+				unit->slowMoved = true;
 			unit->SlowUpdate();
 			//if (unit->unitDef->IsImmobileUnit() && unit->slowMoved)
 			if (unit->slowMoved)

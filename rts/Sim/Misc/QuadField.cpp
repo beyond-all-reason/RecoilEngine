@@ -483,8 +483,6 @@ void CQuadField::MovedUnit(CUnit* unit)
 	RECOIL_DETAILED_TRACY_ZONE;
 	QuadFieldQuery qfQuery;
 	GetQuads(qfQuery, unit->pos, unit->radius);
-	unit->moved = true;
-	unit->slowMoved = true;
 
 	// compare if the quads have changed, if not stop here
 	if (qfQuery.quads->size() == unit->quads.size()) {
