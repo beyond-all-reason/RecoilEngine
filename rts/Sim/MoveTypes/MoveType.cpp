@@ -90,9 +90,9 @@ void AMoveType::UpdateCollisionMap(bool force)
 	if (!force && ((gs->frameNum + owner->id) % modInfo.unitQuadPositionUpdateRate))
 		return;
 
-	if (owner->pos != oldCollisionUpdatePos) {
-		quadField.MovedUnit(owner);
+	if (owner->pos != oldCollisionUpdatePos){
 		oldCollisionUpdatePos = owner->pos;
+		quadField.MovedUnit(owner);
 	}
 	owner->moved = false;
 }
