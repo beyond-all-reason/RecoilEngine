@@ -249,7 +249,6 @@ void CUnit::PreInit(const UnitLoadParams& params)
 
 	unitHandler.AddUnit(this);
 	quadField.MovedUnit(this);
-	slowMoved = true;
 
 	losStatus[allyteam] = LOS_ALL_MASK_BITS | LOS_INLOS | LOS_INRADAR | LOS_PREVLOS | LOS_CONTRADAR;
 
