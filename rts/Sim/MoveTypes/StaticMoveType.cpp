@@ -56,7 +56,7 @@ bool CStaticMoveType::FitToGround()
 		 * needsUpdate above to be set to the result of FitToGround. */
 		change = CGround::GetApproximateHeight(owner->pos.x, owner->pos.z) - owner->pos.y;
 	}
-	if (std::abs(change) > 1e-04f) {
+	if (std::abs(change) > float3::cmp_eps()) {
 		owner->Move(UpVector * change, true);
 		return true;
 	}
