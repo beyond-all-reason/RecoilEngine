@@ -325,8 +325,6 @@ void CBasicMapDamage::Update()
 
 	}
 
-	ProcessRecalcs();
-
 
 	// pop explosions that are no longer being processed
 	while (explUpdateQueueIdx < explosionUpdateQueue.size()) {
