@@ -561,7 +561,7 @@ public:
 		 */
 		bool didMove;
 		if (relative) {
-			didMove = (v.SqLength() > (1e-08f));
+			didMove = (v.SqLength() > float3::cmp_eps()*float3::cmp_eps());
 		} else {
 			didMove = (v != pos);
 		}
