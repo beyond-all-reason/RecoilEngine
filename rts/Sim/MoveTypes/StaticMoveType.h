@@ -22,11 +22,12 @@ public:
 	void KeepPointingTo(float3 pos, float distance, bool aggressive) override {}
 
 	bool Update() override { return false; }
-	void SlowUpdate() override;
+	void UpdateGroundFit();
 	static void TerrainChanged(int x1, int y1, int x2, int y2);
+
+	bool needsUpdate;
 private:
-	void FitToGround();
-	bool firstUpdate;
+	bool FitToGround();
 };
 
 #endif // STATICMOVETYPE_H

@@ -23,7 +23,7 @@ CStaticMoveType::CStaticMoveType(CUnit* unit) : AMoveType(unit) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	useWantedSpeed[false] = false;
 	useWantedSpeed[ true] = false;
-	firstUpdate = true;
+	needsUpdate = true;
 
 	// creg
 	if (unit == nullptr)
@@ -32,21 +32,18 @@ CStaticMoveType::CStaticMoveType(CUnit* unit) : AMoveType(unit) {
 	Sim::registry.emplace_or_replace<GeneralMoveType>(unit->entityReference, unit->id);
 }
 
-void CStaticMoveType::SlowUpdate()
+void CStaticMoveType::UpdateGroundFit()
 {
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (firstUpdate) {
-		FitToGround();
-		firstUpdate = false;
-	}
+	FitToGround();
+	needsUpdate = false;
 }
 
-void CStaticMoveType::FitToGround()
+bool CStaticMoveType::FitToGround()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// buildings and pseudo-static units can be moved and ground can change.
 	if (owner->GetTransporter() != nullptr)
-		return;
+		return false;
 
 	// NOTE:
 	//   static buildings don't have any MoveDef instance, hence we need
@@ -55,10 +52,15 @@ void CStaticMoveType::FitToGround()
 	if (owner->FloatOnWater() && owner->IsInWater()) {
 		change = -waterline - owner->pos.y;
 	} else {
-		change = CGround::GetHeightReal(owner->pos.x, owner->pos.z) - owner->pos.y;
+		/* Using GetHeightReal gives smoother result, but desyncs with ground drawing and also needs
+		 * needsUpdate above to be set to the result of FitToGround. */
+		change = CGround::GetApproximateHeight(owner->pos.x, owner->pos.z) - owner->pos.y;
 	}
-	if (std::abs(change) > 1e-04f)
+	if (std::abs(change) > 1e-04f) {
 		owner->Move(UpVector * change, true);
+		return true;
+	}
+	return false;
 }
 
 void CStaticMoveType::TerrainChanged(int x1, int y1, int x2, int y2)
@@ -71,8 +73,9 @@ void CStaticMoveType::TerrainChanged(int x1, int y1, int x2, int y2)
 	const auto& units = (*qfQuery.units);
 	for (auto unit: units) {
 		auto staticMoveType = dynamic_cast<CStaticMoveType*>(unit->moveType);
-		if (staticMoveType)
-			staticMoveType->FitToGround();
+		if (staticMoveType) {
+			staticMoveType->needsUpdate = true;
+		}
 	}
 
 }
