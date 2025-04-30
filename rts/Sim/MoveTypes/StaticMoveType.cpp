@@ -52,7 +52,7 @@ bool CStaticMoveType::FitToGround()
 	if (owner->FloatOnWater() && owner->IsInWater()) {
 		change = -waterline - owner->pos.y;
 	} else {
-		/* Using GetHeightReal gives smoother result, but desyncs with ground drawing and also needs
+		/* Using GetHeightReal gives smoother result, but makes it draw off the ground and also needs
 		 * needsUpdate above to be set to the result of FitToGround. */
 		change = CGround::GetApproximateHeight(owner->pos.x, owner->pos.z) - owner->pos.y;
 	}
