@@ -256,6 +256,7 @@ void CBasicMapDamage::RecalcArea(int x1, int x2, int y1, int y2)
 void CBasicMapDamage::Update()
 {
 	SCOPED_TIMER("Sim::BasicMapDamage");
+	damageRects.clear();
 
 	for (unsigned int i = explUpdateQueueIdx, n = explosionUpdateQueue.size(); i < n; i++) {
 		Explo& e = explosionUpdateQueue[i];
@@ -292,9 +293,29 @@ void CBasicMapDamage::Update()
 		if (e.ttl != 0)
 			continue;
 
-		RecalcArea(e.x1 - 1, e.x2 + 1, e.y1 - 1, e.y2 + 1);
+		//const auto& pred = [this](int id) { return (this->TryFreeFeatureID(id)); };
+		SRectangle rect{e.x1 - 1, e.y1 - 1, e.x2 + 1, e.y2 + 1};
+		const auto& pred = [&rect](auto& next){ return rect.OverlapArea(next) > 0.0; };
+		const auto iter = std::find_if(damageRects.begin(), damageRects.end(), pred);
+		if (iter == damageRects.end() )
+			damageRects.emplace_back(e.x1 - 1, e.y1 - 1, e.x2 + 1, e.y2 + 1);
+		else {
+			LOG_L(L_WARNING, "merge");
+			auto prevRect = *iter;
+			prevRect.x1 = std::min(rect.x1, prevRect.x1);
+			prevRect.x2 = std::max(rect.x2, prevRect.x2);
+			prevRect.y1 = std::min(rect.y1, prevRect.y1);
+			prevRect.y2 = std::max(rect.y2, prevRect.y2);
+		}
+
 	}
 
+	if (damageRects.size())
+		LOG_L(L_WARNING, "map damage %ld", damageRects.size());
+	for(auto rect: damageRects) {
+		//LOG_L(L_WARNING, "height change  %d %d %d %d %d", gs->frameNum, rect.x1, rect.x2, rect.y1, rect.y2);
+		RecalcArea(rect.x1, rect.x2, rect.y1, rect.y2);
+	}
 
 	// pop explosions that are no longer being processed
 	while (explUpdateQueueIdx < explosionUpdateQueue.size()) {

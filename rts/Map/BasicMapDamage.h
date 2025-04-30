@@ -6,6 +6,7 @@
 #include "MapDamage.h"
 
 #include <vector>
+#include "System/Rectangle.h"
 
 class CBasicMapDamage : public IMapDamage
 {
@@ -60,6 +61,7 @@ private:
 
 	std::vector<float> explosionSquaresPool;
 	std::vector<Explo> explosionUpdateQueue;
+	std::vector<SRectangle> damageRects;
 
 	static constexpr unsigned int CRATER_TABLE_SIZE = 200;
 	static constexpr unsigned int EXPLOSION_LIFETIME = 10;
