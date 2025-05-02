@@ -1013,7 +1013,7 @@ inline void CLuaHandle::UnitCallIn(const LuaHashString& hs, const CUnit* unit)
 	RunCallInTraceback(L, hs, 3, 0, traceBack.GetErrFuncIdx(), false);
 }
 
-inline void CLuaHandle::UnitSelfDestructCallin(const LuaHashString& hs, const CUnit* unit)
+inline void CLuaHandle::UnitSelfDestructCallin(const LuaHashString& hs, const CUnit* unit, float remainingSeconds)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
@@ -1026,7 +1026,7 @@ inline void CLuaHandle::UnitSelfDestructCallin(const LuaHashString& hs, const CU
 	lua_pushnumber(L, unit->id);// unitID
 	lua_pushnumber(L, unit->unitDef->id); // unitDefID
 	lua_pushnumber(L, unit->team); // unitTeam
-	lua_pushnumber(L, unit->selfDRemainingSeconds); // updatePeriodSeconds
+	lua_pushnumber(L, remainingSeconds); // updatePeriodSeconds
 
 	RunCallInTraceback(L, hs, 4, 0, traceBack.GetErrFuncIdx(), false);
 }
@@ -1469,10 +1469,10 @@ void CLuaHandle::UnitHarvestStorageFull(const CUnit* unit)
  * @param unitTeam integer
  * @param remainingSeconds number
  */
-void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit) 
+void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) 
 {
 	static const LuaHashString cmdStr(__func__);
-	UnitSelfDestructCallin(cmdStr, unit);
+	UnitSelfDestructCallin(cmdStr, unit, remainingSeconds);
 }
 
 /*** Called when a unit cancel's it's self destruct command.
@@ -1483,10 +1483,10 @@ void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit)
  * @param unitTeam integer
  * @param remainingSeconds number
  */
-void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit) 
+void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds) 
 {
 	static const LuaHashString cmdStr(__func__);
-	UnitSelfDestructCallin(cmdStr, unit);
+	UnitSelfDestructCallin(cmdStr, unit, remainingSeconds);
 }
 
 /*** Called every second while a unit has a self destruct command active and driectly before the unit is killed.
@@ -1497,10 +1497,10 @@ void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit)
  * @param unitTeam integer
  * @param remainingSeconds number
  */
-void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit) 
+void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds) 
 {
 	static const LuaHashString cmdStr(__func__);
-	UnitSelfDestructCallin(cmdStr, unit);
+	UnitSelfDestructCallin(cmdStr, unit, remainingSeconds);
 }
 
 

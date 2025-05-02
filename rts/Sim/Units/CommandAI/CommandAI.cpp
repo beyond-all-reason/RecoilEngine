@@ -964,22 +964,24 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 	switch (c.GetID()) {
 		case CMD_SELFD: {
 			if (owner->unitDef->canSelfD) {
+				const int currentFrameNum = gs->frameNum;
+				 float remainingSeconds;
 				if (!(c.GetOpts() & SHIFT_KEY) || commandQue.empty()) {
 					if (owner->selfDTargetFrame > 0) { // Currently counting down -> cancel it
+						remainingSeconds = (owner->selfDTargetFrame - currentFrameNum) * INV_GAME_SPEED;
+						eventHandler.UnitSelfDestructCancelled(owner, remainingSeconds); // Fire cancel event
+
 						owner->selfDTargetFrame = 0;
 						owner->selfDCountdown = 0;
-						
-						//eoh->UnitSelfDestructCancelled(*owner);
-						eventHandler.UnitSelfDestructCancelled(owner); // Fire cancel event
 					} else { // Not counting down -> start it
 						// Read countdown duration in frames from UnitDef
 						const int countdownFrames = std::max(0, owner->unitDef->selfDCountdown);
 
-						owner->selfDTargetFrame = gs->frameNum + countdownFrames;
-						owner->selfDRemainingSeconds = countdownFrames * INV_GAME_SPEED;
+						owner->selfDTargetFrame = currentFrameNum + countdownFrames;
+						remainingSeconds = countdownFrames * INV_GAME_SPEED;
 
 						//eoh->UnitSelfDestructStarted(*owner);
-						eventHandler.UnitSelfDestructStarted(owner); // Fire start event
+						eventHandler.UnitSelfDestructStarted(owner, remainingSeconds); // Fire start event
 					}
 				}
 				else if (commandQue.back().GetID() == CMD_SELFD) {
@@ -1570,14 +1572,12 @@ void CCommandAI::SlowUpdate()
 		case CMD_SELFD: {
 			if ((owner->selfDTargetFrame != 0) || !owner->unitDef->canSelfD) {
 				owner->selfDTargetFrame = 0;
-				owner->selfDRemainingSeconds = 0;
 				owner->selfDCountdown = 0;
 			} else {
 				const int countdownFrames = std::max(0, owner->unitDef->selfDCountdown);
 
 				owner->selfDTargetFrame = (gs->frameNum + countdownFrames);
-				owner->selfDRemainingSeconds = countdownFrames * INV_GAME_SPEED;
-				owner->selfDCountdown = owner->selfDRemainingSeconds * 2 + 1;
+				owner->selfDCountdown = countdownFrames * INV_GAME_SPEED * 2 + 1;
 			}
 			FinishCommand();
 			return;

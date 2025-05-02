@@ -495,8 +495,6 @@ public:
 	int selfDTargetFrame = 0;
 	// Seconds remaining until self-destruct (depreciated?)
 	int selfDCountdown = 0;
-	// Seconds remaining until self-destruct
-	float selfDRemainingSeconds = 0.0f;
 
 	// the damage value passed to CEGs spawned by this unit's script
 	int cegDamage = 0;
