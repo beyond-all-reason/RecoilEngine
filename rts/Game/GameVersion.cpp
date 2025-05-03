@@ -9,7 +9,6 @@
 
 #include <ciso646> // _LIBCPP*
 #include <cstring>
-#include <cstdio>
 
 /**
  * @brief Defines the current version string.

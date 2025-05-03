@@ -14,6 +14,11 @@ set(CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_MODULES_SPRING}/OverrideFlags.cmake"
 
 project(Spring)
 
+# Force Unicode WinAPI
+if (WIN32)
+	add_definitions(-DUNICODE -D_UNICODE)
+endif()
+
 add_definitions(-DFMT_HEADER_ONLY) #for fmt lib
 
 option(INSTALL_PORTABLE "Make a portable installation (instead of regular system installation)" TRUE)

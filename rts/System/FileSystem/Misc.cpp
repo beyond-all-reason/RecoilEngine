@@ -12,7 +12,7 @@ std::vector<std::string> FileSystemMisc::GetSplashScreenFiles()
 	std::vector<std::string> splashScreenFiles = dataDirsAccess.FindFiles(FileSystem::IsAbsolutePath(ssd) ? ssd : cwd + ssd, "*.{png,jpg}", 0);
 
 	if (splashScreenFiles.empty()) {
-		auto logoPath = FileSystem::EnsurePathSepAtEnd(FileSystem::GetNormalizedPath(FileSystem::EnsurePathSepAtEnd(FileSystemAbstraction::GetSpringExecutableDir()) + "base"));
+		auto logoPath = FileSystem::EnsurePathSepAtEnd(FileSystem::GetNormalizedPath(FileSystem::EnsurePathSepAtEnd(FileSystemAbstraction::GetEngineExecutableDir()) + "base"));
 		splashScreenFiles = dataDirsAccess.FindFiles(logoPath, "*.{png,jpg}", 0);
 	}
 

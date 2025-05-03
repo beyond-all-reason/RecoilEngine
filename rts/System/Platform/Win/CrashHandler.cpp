@@ -288,7 +288,7 @@ inline static void StacktraceInline(const char* threadName, LPEXCEPTION_POINTERS
 
 
 		if ((dwModBase = SymGetModuleBase64(process, frame.AddrPC.Offset)) != 0) {
-			GetModuleFileName((HINSTANCE) dwModBase, modName, MAX_PATH);
+			GetModuleFileNameA((HINSTANCE) dwModBase, modName, MAX_PATH);
 		} else {
 			strcpy(modName, "Unknown");
 		}

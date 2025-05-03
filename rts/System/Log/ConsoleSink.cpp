@@ -11,7 +11,7 @@
 #include "Level.h" // for LOG_LEVEL_*
 #include "System/MainDefines.h"
 
-#include <cstdio>
+#include <cstdio> // for stderr, stdout
 
 
 #ifdef __cplusplus

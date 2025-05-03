@@ -2,10 +2,11 @@
 
 #include <algorithm>
 #include <array>
-#include <cstdio>
 #include <memory>
 #include <random>
 #include <chrono>
+
+#include <nowide/cstdio.hpp>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1319,7 +1320,7 @@ void CArchiveScanner::WriteCacheData(const std::string& filename)
 		}
 	}
 
-	FILE* out = fopen(filename.c_str(), "wt");
+	FILE* out = nowide::fopen(filename.c_str(), "wt");
 	if (out == nullptr) {
 		LOG_L(L_ERROR, "[AS::%s] failed to write to \"%s\"!", __func__, filename.c_str());
 		return;
