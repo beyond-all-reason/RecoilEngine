@@ -1,19 +1,17 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _PBO_INFO_TEXTURE_H
-#define _PBO_INFO_TEXTURE_H
+#pragma once
 
 #include "Rendering/Map/InfoTexture/InfoTexture.h"
 #include "Rendering/GL/PBO.h"
+#include "Rendering/GL/FBO.h"
 
-
-
-class CPboInfoTexture : public CInfoTexture
+class CModernInfoTexture : public CInfoTexture
 {
 public:
-	CPboInfoTexture(const std::string& name);
-	virtual ~CPboInfoTexture();
-	CPboInfoTexture(const CPboInfoTexture&) = delete; // no-copy
+	CModernInfoTexture(const std::string& name);
+	~CModernInfoTexture() override;
+	CModernInfoTexture(const CModernInfoTexture&) = delete; // no-copy
 
 public:
 	virtual void Update() = 0;
@@ -23,4 +21,20 @@ protected:
 	PBO infoTexPBO;
 };
 
-#endif // _PBO_INFO_TEXTURE_H
+namespace Shader {
+	struct IProgramObject;
+}
+
+class CModernFBOInfoTexture : public CModernInfoTexture
+{
+public:
+	CModernFBOInfoTexture(const std::string& name);
+	~CModernFBOInfoTexture() override;
+	CModernFBOInfoTexture(const CModernFBOInfoTexture&) = delete; // no-copy
+protected:
+	//virtual void CreateShader() = 0;
+	//virtual void ReleaseShader() = 0;
+protected:
+	FBO fbo;
+	Shader::IProgramObject* shader;
+};

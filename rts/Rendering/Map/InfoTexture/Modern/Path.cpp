@@ -24,7 +24,7 @@
 
 
 CPathTexture::CPathTexture()
-: CPboInfoTexture("path")
+: CModernFBOInfoTexture("path")
 , isCleared(false)
 //, updateFrame(0)
 , updateProcess(0)

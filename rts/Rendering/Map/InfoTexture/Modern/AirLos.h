@@ -12,7 +12,7 @@ namespace Shader {
 }
 
 
-class CAirLosTexture : public CPboInfoTexture
+class CAirLosTexture : public CModernFBOInfoTexture
 {
 public:
 	CAirLosTexture();

@@ -113,6 +113,7 @@ set(sources_engine_Rendering
 		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/NamedTextures.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/S3OTextureHandler.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/TAPalette.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/Texture.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/TextureFormat.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/TextureCollection.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/TextureAtlas.cpp"

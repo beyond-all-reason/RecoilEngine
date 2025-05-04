@@ -20,7 +20,7 @@
 
 
 CHeightTexture::CHeightTexture()
-: CPboInfoTexture("height")
+: CModernInfoTexture("height")
 , CEventClient("[CHeightTexture]", 271990, false)
 , needUpdate(true)
 {

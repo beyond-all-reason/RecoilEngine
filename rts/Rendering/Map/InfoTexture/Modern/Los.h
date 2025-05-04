@@ -12,7 +12,7 @@ namespace Shader {
 }
 
 
-class CLosTexture : public CPboInfoTexture
+class CLosTexture : public CModernInfoTexture
 {
 public:
 	CLosTexture();

@@ -14,7 +14,7 @@ namespace Shader {
 
 
 
-class CHeightTexture : public CPboInfoTexture, public CEventClient
+class CHeightTexture : public CModernInfoTexture, public CEventClient
 {
 public:
 	CHeightTexture();

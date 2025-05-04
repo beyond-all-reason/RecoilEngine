@@ -515,7 +515,7 @@ void CUnitDrawerData::SetUnitDefImage(const UnitDef* unitDef, const std::string&
 		}
 	}
 
-	unitImage->textureID = bitmap.CreateTexture(TextureCreationParams{
+	unitImage->textureID = bitmap.CreateTexture(GL::TextureCreationParams{
 		.aniso = 0.0f,
 		.lodBias = 0.0f,
 		.texID = 0,

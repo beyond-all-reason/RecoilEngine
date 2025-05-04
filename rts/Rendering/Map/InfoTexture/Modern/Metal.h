@@ -7,7 +7,7 @@
 #include "System/EventHandler.h"
 
 
-class CMetalTexture : public CPboInfoTexture, public CEventClient
+class CMetalTexture : public CModernInfoTexture, public CEventClient
 {
 public:
 	CMetalTexture();

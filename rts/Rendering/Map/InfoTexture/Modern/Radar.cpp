@@ -16,7 +16,7 @@
 
 
 CRadarTexture::CRadarTexture()
-: CPboInfoTexture("radar")
+: CModernFBOInfoTexture("radar")
 , uploadTexRadar(0)
 , uploadTexJammer(0)
 {

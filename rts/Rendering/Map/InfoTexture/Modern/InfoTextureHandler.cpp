@@ -46,7 +46,7 @@ CInfoTextureHandler::~CInfoTextureHandler()
 }
 
 
-void CInfoTextureHandler::AddInfoTexture(CPboInfoTexture* itex)
+void CInfoTextureHandler::AddInfoTexture(CModernInfoTexture* itex)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	infoTextures[itex->GetName()] = itex;
@@ -140,7 +140,7 @@ void CInfoTextureHandler::Update()
 	glEnable(GL_TEXTURE_2D);
 
 	for (auto& p: infoTextures) {
-		CPboInfoTexture* tex = p.second;
+		auto* tex = p.second;
 
 		// force first update except for combiner; hides visible uninitialized texmem
 		if ((firstUpdate && tex != infoTex) || tex->IsUpdateNeeded())

@@ -4,6 +4,7 @@
 #define _INFO_TEXTURE_H
 
 #include "Rendering/GL/myGL.h"
+#include "Rendering/Textures/Texture.hpp"
 #include "System/type2.h"
 #include <string>
 
