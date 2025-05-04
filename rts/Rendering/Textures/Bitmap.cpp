@@ -1131,22 +1131,7 @@ int32_t CBitmap::GetReqNumLevels() const
 uint32_t CBitmap::GetDataTypeSize(uint32_t glType)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	switch (glType) {
-	case GL_FLOAT:
-		return sizeof(float);
-	case GL_INT: [[fallthrough]];
-	case GL_UNSIGNED_INT:
-		return sizeof(uint32_t);
-	case GL_SHORT: [[fallthrough]];
-	case GL_UNSIGNED_SHORT:
-		return sizeof(uint16_t);
-	case GL_BYTE: [[fallthrough]];
-	case GL_UNSIGNED_BYTE:
-		return sizeof(uint8_t);
-	default:
-		assert(false);
-		return 0;
-	}
+	return GL::GetDataTypeSize(glType);
 }
 
 int32_t CBitmap::GetExtFmt(uint32_t ch)

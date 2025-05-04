@@ -1,17 +1,14 @@
 /* This file is part of the Recoil engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef TEXTURE_FORMAT_H
-#define TEXTURE_FORMAT_H
+#pragma once
 
+#include <cstdint>
 #include "Rendering/GL/myGL.h"
 
 namespace GL
 {
-	GLenum GetInternalFormatDataFormat(GLenum internalFormat);
-
-	GLenum GetInternalFormatDataType(GLenum internalFormat);
-
-	GLenum GetBindingQueryFromTarget(GLenum target);
+	uint32_t GetInternalFormatDataFormat(uint32_t internalFormat);
+	uint32_t GetInternalFormatDataType(uint32_t internalFormat);
+	uint32_t GetDataTypeSize(uint32_t glDataType);
+	uint32_t GetBindingQueryFromTarget(GLenum target);
 }
-
-#endif // TEXTURE_FORMAT_H
