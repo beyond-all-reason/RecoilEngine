@@ -1,7 +1,8 @@
 #include "TextureFormat.h"
+#include "Rendering/GL/myGL.h"
 
-GLenum GL::GetInternalFormatDataFormat(GLenum internalFormat) {
-	GLenum dataFormat;
+uint32_t GL::GetInternalFormatDataFormat(uint32_t internalFormat) {
+	uint32_t dataFormat;
 	switch (internalFormat) {
 		case GL_R8UI:
 		case GL_R16UI:
@@ -55,8 +56,8 @@ GLenum GL::GetInternalFormatDataFormat(GLenum internalFormat) {
 	return dataFormat;
 }
 
-GLenum GL::GetInternalFormatDataType(GLenum internalFormat) {
-	GLenum dataType;
+uint32_t GL::GetInternalFormatDataType(uint32_t internalFormat) {
+	uint32_t dataType;
 	switch (internalFormat) {
 		case GL_RGBA16F:
 		case GL_RG16F:
@@ -108,7 +109,27 @@ GLenum GL::GetInternalFormatDataType(GLenum internalFormat) {
 	return dataType;
 }
 
-GLenum GL::GetBindingQueryFromTarget(GLenum target) {
+uint32_t GL::GetDataTypeSize(uint32_t glDataType)
+{
+	switch (glDataType) {
+	case GL_FLOAT:
+		return sizeof(float);
+	case GL_INT: [[fallthrough]];
+	case GL_UNSIGNED_INT:
+		return sizeof(uint32_t);
+	case GL_SHORT: [[fallthrough]];
+	case GL_UNSIGNED_SHORT:
+		return sizeof(uint16_t);
+	case GL_BYTE: [[fallthrough]];
+	case GL_UNSIGNED_BYTE:
+		return sizeof(uint8_t);
+	default:
+		assert(false);
+		return 0;
+	}
+}
+
+uint32_t GL::GetBindingQueryFromTarget(uint32_t target) {
 	switch (target) {
 		case GL_TEXTURE_1D:                   return GL_TEXTURE_BINDING_1D;
 		case GL_TEXTURE_2D:                   return GL_TEXTURE_BINDING_2D;

@@ -88,6 +88,10 @@ private:
 	ValueType value;
 };
 
+namespace myGL {
+	void PixelStoreUnpackAlignment(GLint alignment);
+}
+
 template<class AttributeT> struct UniqueStateAttributeValueType {
 public:
 	using AttributeType = AttributeT;
@@ -111,6 +115,9 @@ private:
 #define ATTRIBUTE(name) name##Attribute
 #define ATTRIBUTE_TYPE_DEFS(name, ...) \
 	using ATTRIBUTE(name) = StateAttribute<&(gl##name), __VA_ARGS__>; \
+	using name = UniqueStateAttributeValueType<ATTRIBUTE(name)>;
+#define CUSTOM_ATTRIBUTE_TYPE_DEFS(name, ...) \
+	using ATTRIBUTE(name) = StateAttribute<&(myGL::name), __VA_ARGS__>; \
 	using name = UniqueStateAttributeValueType<ATTRIBUTE(name)>;
 #define CAPABILITY_ATTRIBUTE_TYPE_DEFS(name, glParamName) \
 	using ATTRIBUTE(name) = StateAttribute<nullptr, glParamName>; \
@@ -177,6 +184,8 @@ namespace State {
 
 	CAPABILITY_ATTRIBUTE_TYPE_DEFS (FrameBufferSRBG, GL_FRAMEBUFFER_SRGB);
 
+	CUSTOM_ATTRIBUTE_TYPE_DEFS     (PixelStoreUnpackAlignment, GL_UNPACK_ALIGNMENT);
+
 	extern std::tuple<
 		ATTRIBUTE(PolygonMode),
 		ATTRIBUTE(PolygonOffsetFill),
@@ -225,7 +234,8 @@ namespace State {
 		ATTRIBUTE(AlphaToOne),
 		ATTRIBUTE(CubemapSeamless),
 		ATTRIBUTE(PointSize),
-		ATTRIBUTE(FrameBufferSRBG)
+		ATTRIBUTE(FrameBufferSRBG),
+		ATTRIBUTE(PixelStoreUnpackAlignment)
 	> Attributes;
 };
 
