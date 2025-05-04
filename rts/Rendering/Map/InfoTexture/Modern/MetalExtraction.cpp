@@ -17,7 +17,7 @@
 
 
 CMetalExtractionTexture::CMetalExtractionTexture()
-: CPboInfoTexture("metalextraction")
+: CModernInfoTexture("metalextraction")
 , updateN(0)
 {
 	texSize = int2(mapDims.hmapx, mapDims.hmapy);

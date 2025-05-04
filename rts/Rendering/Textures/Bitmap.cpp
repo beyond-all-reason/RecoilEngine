@@ -15,7 +15,6 @@
 #endif
 
 #include "Bitmap.h"
-#include "Rendering/GL/myGL.h"
 #include "Rendering/GL/TexBind.h"
 #include "System/ScopedFPUSettings.h"
 #include "System/ContainerUtil.h"
@@ -1686,7 +1685,7 @@ bool CBitmap::SaveFloat(std::string const& filename) const
 
 
 #ifndef HEADLESS
-uint32_t CBitmap::CreateTexture(const TextureCreationParams& tcp) const
+uint32_t CBitmap::CreateTexture(const GL::TextureCreationParams& tcp) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (compressed)
@@ -1731,7 +1730,7 @@ static void HandleDDSMipmap(GLenum target, int32_t numEmbeddedLevels, uint32_t m
 		glGenerateMipmap(target);
 }
 
-uint32_t CBitmap::CreateDDSTexture(const TextureCreationParams& tcp) const
+uint32_t CBitmap::CreateDDSTexture(const GL::TextureCreationParams& tcp) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	glPushAttrib(GL_TEXTURE_BIT);
@@ -1809,12 +1808,12 @@ uint32_t CBitmap::CreateDDSTexture(const TextureCreationParams& tcp) const
 }
 #else  // !HEADLESS
 
-uint32_t CBitmap::CreateTexture(const TextureCreationParams& tcp) const {
+uint32_t CBitmap::CreateTexture(const GL::TextureCreationParams& tcp) const {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return 0;
 }
 
-uint32_t CBitmap::CreateDDSTexture(const TextureCreationParams& tcp) const {
+uint32_t CBitmap::CreateDDSTexture(const GL::TextureCreationParams& tcp) const {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return 0;
 }
@@ -1823,7 +1822,7 @@ uint32_t CBitmap::CreateDDSTexture(const TextureCreationParams& tcp) const {
 
 uint32_t CBitmap::CreateMipMapTexture(float aniso, float lodBias, int32_t reqNumLevels, uint32_t texID) const
 {
-	TextureCreationParams tcp;
+	GL::TextureCreationParams tcp;
 	tcp.texID = texID;
 	tcp.aniso = aniso;
 	tcp.lodBias = lodBias;
@@ -2085,24 +2084,4 @@ void CBitmap::ReverseYAxis()
 
 	ITexMemPool::texMemPool->Free(tmp, memSize);
 #endif
-}
-
-uint32_t TextureCreationParams::GetMinFilter(int32_t numLevels) const
-{
-	if (numLevels == 1) {
-		return linearTextureFilter ? GL_LINEAR : GL_NEAREST;
-	}
-	else {
-		if (linearMipMapFilter) {
-			return linearTextureFilter ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST;
-		}
-		else {
-			return linearTextureFilter ? GL_LINEAR_MIPMAP_NEAREST : GL_NEAREST_MIPMAP_NEAREST;
-		}
-	}
-}
-
-uint32_t TextureCreationParams::GetMagFilter() const
-{
-	return linearTextureFilter ? GL_LINEAR : GL_NEAREST;
 }

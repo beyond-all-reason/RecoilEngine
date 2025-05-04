@@ -3,7 +3,7 @@
 #include "PboInfoTexture.h"
 
 
-CPboInfoTexture::CPboInfoTexture(const std::string& _name)
+CModernInfoTexture::CModernInfoTexture(const std::string& _name)
 {
 	name        = _name;
 	texChannels = 0;
@@ -11,7 +11,17 @@ CPboInfoTexture::CPboInfoTexture(const std::string& _name)
 }
 
 
-CPboInfoTexture::~CPboInfoTexture()
+CModernInfoTexture::~CModernInfoTexture()
 {
 	glDeleteTextures(1, &texture);
+}
+
+CModernFBOInfoTexture::CModernFBOInfoTexture(const std::string& name)
+	: CModernInfoTexture(name)
+	, shader(nullptr)
+{
+}
+
+CModernFBOInfoTexture::~CModernFBOInfoTexture()
+{
 }

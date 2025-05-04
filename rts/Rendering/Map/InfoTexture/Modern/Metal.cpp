@@ -9,7 +9,7 @@
 
 
 CMetalTexture::CMetalTexture()
-: CPboInfoTexture("metal")
+: CModernInfoTexture("metal")
 , CEventClient("[CMetalTexture]", 271990, false)
 , metalMapChanged(true)
 {

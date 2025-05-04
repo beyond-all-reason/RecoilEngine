@@ -14,7 +14,7 @@
 
 
 CLosTexture::CLosTexture()
-: CPboInfoTexture("los")
+: CModernInfoTexture("los")
 , uploadTex(0)
 {
 	texSize = losHandler->los.size;

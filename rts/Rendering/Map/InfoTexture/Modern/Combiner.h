@@ -14,7 +14,7 @@ namespace Shader {
 }
 
 
-class CInfoTextureCombiner : public CPboInfoTexture
+class CInfoTextureCombiner : public CModernInfoTexture
 {
 public:
 	CInfoTextureCombiner();

@@ -57,8 +57,8 @@ std::string LuaTextures::Create(const Texture& tex)
 
 	glClearErrors("LuaTex", __func__, globalRendering->glDebugErrors);
 
-	GLenum dataFormat = GL::GetInternalFormatDataFormat(tex.format);
-	GLenum dataType   = GL::GetInternalFormatDataType(tex.format);
+	GLenum dataFormat = GL::GetDataFormatFromInternalFormat(tex.format);
+	GLenum dataType   = GL::GetDataTypeFromInternalFormat(tex.format);
 
 	switch (tex.target) {
 		case GL_TEXTURE_1D: {

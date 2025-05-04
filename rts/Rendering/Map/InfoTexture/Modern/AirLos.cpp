@@ -13,7 +13,7 @@
 
 
 CAirLosTexture::CAirLosTexture()
-: CPboInfoTexture("airlos")
+: CModernFBOInfoTexture("airlos")
 , uploadTex(0)
 {
 	texSize = losHandler->airLos.size;

@@ -17,7 +17,7 @@ CONFIG(bool, HighResInfoTexture).defaultValue(true).description("Use full height
 
 
 CInfoTextureCombiner::CInfoTextureCombiner()
-: CPboInfoTexture("info")
+: CModernInfoTexture("info")
 , disabled(true)
 {
 	texSize = (configHandler->GetBool("HighResInfoTexture")) ? int2(mapDims.pwr2mapx, mapDims.pwr2mapy) : int2(mapDims.pwr2mapx >> 1, mapDims.pwr2mapy >> 1);

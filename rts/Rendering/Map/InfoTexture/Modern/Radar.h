@@ -13,7 +13,7 @@ namespace Shader {
 }
 
 
-class CRadarTexture : public CPboInfoTexture
+class CRadarTexture : public CModernFBOInfoTexture
 {
 public:
 	CRadarTexture();

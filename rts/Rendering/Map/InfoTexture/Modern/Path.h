@@ -12,7 +12,7 @@ struct MoveDef;
 struct UnitDef;
 
 
-class CPathTexture : public CPboInfoTexture
+class CPathTexture : public CModernFBOInfoTexture
 {
 public:
 	CPathTexture();

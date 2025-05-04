@@ -12,7 +12,7 @@ namespace Shader {
 }
 
 
-class CMetalExtractionTexture : public CPboInfoTexture
+class CMetalExtractionTexture : public CModernInfoTexture
 {
 public:
 	CMetalExtractionTexture();

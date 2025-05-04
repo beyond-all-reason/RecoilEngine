@@ -7,8 +7,12 @@
 
 namespace GL
 {
-	uint32_t GetInternalFormatDataFormat(uint32_t internalFormat);
-	uint32_t GetInternalFormatDataType(uint32_t internalFormat);
+	uint32_t GetDataFormatFromInternalFormat(uint32_t internalFormat);
+	uint32_t GetDataTypeFromInternalFormat(uint32_t internalFormat);
+	uint32_t GetNumChannelsFromInternalFormat(uint32_t internalFormat);
+	uint32_t GetExternalFormatFromInternalFormat(uint32_t internalFormat);
+	uint32_t GetExternalFormatFromNumChannels(uint32_t numChannels);
 	uint32_t GetDataTypeSize(uint32_t glDataType);
 	uint32_t GetBindingQueryFromTarget(GLenum target);
+	uint32_t GetCompressedInterFormat(uint32_t internalFormat);
 }
