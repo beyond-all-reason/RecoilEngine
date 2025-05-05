@@ -12,7 +12,7 @@ namespace Shader {
 }
 
 
-class CMetalExtractionTexture : public CModernInfoTexture
+class CMetalExtractionTexture : public CModernFBOInfoTexture
 {
 public:
 	CMetalExtractionTexture();
@@ -23,8 +23,6 @@ public:
 
 private:
 	int updateN;
-	FBO fbo;
-	Shader::IProgramObject* shader;
 };
 
 #endif // _METAL_EXTRACTION_TEXTURE_H

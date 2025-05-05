@@ -26,9 +26,7 @@ private:
 	void UpdateCPU();
 
 private:
-	FBO fbo;
 	GLuint uploadTex;
-	Shader::IProgramObject* shader;
 };
 
 #endif // _AIRLOS_TEXTURE_H

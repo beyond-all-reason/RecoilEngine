@@ -20,7 +20,7 @@
 
 
 CHeightTexture::CHeightTexture()
-: CModernInfoTexture("height")
+: CModernFBOInfoTexture("height")
 , CEventClient("[CHeightTexture]", 271990, false)
 , needUpdate(true)
 {
@@ -47,35 +47,22 @@ CHeightTexture::CHeightTexture()
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, &CHeightLinePalette::paletteColored[0].r);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 1, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, &CHeightLinePalette::paletteBlackAndWhite[0].r);
 
-	if (FBO::IsSupported()) {
-		fbo.Bind();
-		fbo.AttachTexture(texture);
-		/*bool status =*/ fbo.CheckStatus("CHeightTexture");
-		FBO::Unbind();
-	}
-
-	const std::string vertexCode = R"(
-		#version 120
-		varying vec2 texCoord;
-
-		void main() {
-			gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
-			gl_Position.xy = gl_Vertex.xy * 2.0 - 1.0;
-			texCoord = gl_Vertex.st;
-		}
-	)";
+	CreateFBO("CHeightTexture");
 
 	const std::string fragmentCode = R"(
-		#version 120
+		#version 130
+
 		uniform sampler2D texHeight;
 		uniform sampler2D texPalette;
 		uniform float paletteOffset;
-		varying vec2 texCoord;
+
+		in vec2 uv;
+		out vec4 fragData;
 
 		void main() {
-			float h = texture2D(texHeight, texCoord).r;
+			float h = texture(texHeight, uv).r;
 			vec2 tc = vec2(h * (8. / 256.), paletteOffset);
-			gl_FragColor = texture2D(texPalette, tc);
+			fragData = texture(texPalette, tc);
 		}
 	)";
 
@@ -150,28 +137,16 @@ void CHeightTexture::Update()
 	if (!fbo.IsValid() || !shader->IsValid() || (hmTexID == 0))
 		return UpdateCPU();
 
-	fbo.Bind();
-	glViewport(0,0, texSize.x, texSize.y);
-	shader->Enable();
 	glDisable(GL_BLEND);
 	glActiveTexture(GL_TEXTURE1);
-	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, paletteTex);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, hmTexID);
-	glBegin(GL_QUADS);
-		glVertex2f(0.f, 0.f);
-		glVertex2f(0.f, 1.f);
-		glVertex2f(1.f, 1.f);
-		glVertex2f(1.f, 0.f);
-	glEnd();
-	shader->Disable();
-	globalRendering->LoadViewport();
-	FBO::Unbind();
+	RunFullScreenPass();
 
 	// cleanup
 	glActiveTexture(GL_TEXTURE1);
-	glDisable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0); // ?
 	glActiveTexture(GL_TEXTURE0);
 }
 

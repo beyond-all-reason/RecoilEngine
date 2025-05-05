@@ -17,7 +17,7 @@
 
 
 CMetalExtractionTexture::CMetalExtractionTexture()
-: CModernInfoTexture("metalextraction")
+: CModernFBOInfoTexture("metalextraction")
 , updateN(0)
 {
 	texSize = int2(mapDims.hmapx, mapDims.hmapy);
@@ -36,28 +36,18 @@ CMetalExtractionTexture::CMetalExtractionTexture()
 	//  then on the gpu instead.
 	RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, texSize.x, texSize.y);
 
-	if (FBO::IsSupported()) {
-		fbo.Bind();
-		fbo.AttachTexture(texture);
-		/*bool status =*/ fbo.CheckStatus("CMetalExtractionTexture");
-		FBO::Unbind();
-	}
-
-	const std::string vertexCode = R"(
-		varying vec2 texCoord;
-
-		void main() {
-			texCoord = gl_Vertex.xy * 0.5 + 0.5;
-			gl_Position = vec4(gl_Vertex.xyz, 1.0);
-		}
-	)";
+	CreateFBO("CLosTexture");
 
 	const std::string fragmentCode = R"(
+		#version 130
+
 		uniform sampler2D tex0;
-		varying vec2 texCoord;
+
+		in vec2 uv;
+		out vec4 fragData;
 
 		void main() {
-			gl_FragColor = texture2D(tex0, texCoord) * 800.0;
+			fragData = texture(tex0, uv) * 800.0;
 		}
 	)";
 
@@ -115,21 +105,10 @@ void CMetalExtractionTexture::Update()
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_FLOAT, metalMap.GetExtractionMap());
 
 	// do post-processing on the gpu (los-checking & scaling)
-	fbo.Bind();
-	shader->Enable();
-	glViewport(0, 0, texSize.x, texSize.y);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_ZERO, GL_SRC_COLOR);
 	glBindTexture(GL_TEXTURE_2D, infoTex->GetTexture());
-	glBegin(GL_QUADS);
-		glVertex2f(-1.f, -1.f);
-		glVertex2f(-1.f, +1.f);
-		glVertex2f(+1.f, +1.f);
-		glVertex2f(+1.f, -1.f);
-	glEnd();
+	RunFullScreenPass();
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	//glDisable(GL_BLEND);
-	globalRendering->LoadViewport();
-	shader->Disable();
-	FBO::Unbind();
 }

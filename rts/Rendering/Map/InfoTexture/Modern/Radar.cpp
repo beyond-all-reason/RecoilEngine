@@ -35,38 +35,28 @@ CRadarTexture::CRadarTexture()
 	infoTexPBO.New(texSize.x * texSize.y * texChannels * sizeof(unsigned short), GL_STREAM_DRAW);
 	infoTexPBO.Unbind();
 
-	if (FBO::IsSupported()) {
-		fbo.Bind();
-		fbo.AttachTexture(texture);
-		/*bool status =*/ fbo.CheckStatus("CRadarTexture");
-		FBO::Unbind();
-	}
-
-	const std::string vertexCode = R"(
-		#version 120
-		varying vec2 texCoord;
-
-		void main() {
-			texCoord = gl_Vertex.xy * 0.5 + 0.5;
-			gl_Position = vec4(gl_Vertex.xyz, 1.0);
-		}
-	)";
+	CreateFBO("CRadarTexture");
 
 	const std::string fragmentCode = R"(
-		#version 120
+		#version 130
+
 		uniform sampler2D texLoS;
 		uniform sampler2D texRadar;
 		uniform sampler2D texJammer;
-		varying vec2 texCoord;
+
+		in vec2 uv;
+		out vec2 fragData;
 
 		void main() {
-			float los = texture2D(texLoS, texCoord).r;
+			float los = texture(texLoS, uv).r;
 
-			vec2 fr = texture2D(texRadar,  texCoord).rg;
-			vec2 fj = texture2D(texJammer, texCoord).rg;
-			float cr = (fr.r + fr.g) * 200000.0;
-			float cj = (fj.r + fj.g) * 200000.0;
-			gl_FragColor = vec4(cr, los * cj, 0.0f, 0.0f);
+			float fr = texture(texRadar,  uv).r;
+			float fj = texture(texJammer, uv).r;
+
+			fragData = vec2(
+				float(fr > 0.0),
+				float(fj > 0.0)
+			);
 		}
 	)";
 
@@ -97,7 +87,7 @@ CRadarTexture::CRadarTexture()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RG8, texSize.x, texSize.y);
+		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_R16, texSize.x, texSize.y);
 
 		glGenTextures(1, &uploadTexJammer);
 		glBindTexture(GL_TEXTURE_2D, uploadTexJammer);
@@ -105,7 +95,7 @@ CRadarTexture::CRadarTexture()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RG8, texSize.x, texSize.y);
+		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_R16, texSize.x, texSize.y);
 	}
 
 	if (!fbo.IsValid() || !shader->IsValid()) {
@@ -198,30 +188,19 @@ void CRadarTexture::Update()
 	glActiveTexture(GL_TEXTURE1);
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, uploadTexRadar);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RG, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_UNSIGNED_SHORT, infoTexPBO.GetPtr());
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, uploadTexJammer);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RG, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr(arraySize));
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_UNSIGNED_SHORT, infoTexPBO.GetPtr(arraySize));
 	infoTexPBO.Invalidate();
 	infoTexPBO.Unbind();
 
 	// do post-processing on the gpu (los-checking & scaling)
-	fbo.Bind();
-	glViewport(0, 0, texSize.x, texSize.y);
-	shader->Enable();
 	glDisable(GL_BLEND);
 	glActiveTexture(GL_TEXTURE2);
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, infoTextureHandler->GetInfoTexture("los")->GetTexture());
-	glBegin(GL_QUADS);
-		glVertex2f(-1.f, -1.f);
-		glVertex2f(-1.f, +1.f);
-		glVertex2f(+1.f, +1.f);
-		glVertex2f(+1.f, -1.f);
-	glEnd();
-	shader->Disable();
-	globalRendering->LoadViewport();
-	FBO::Unbind();
+	RunFullScreenPass();
 
 	// cleanup
 	glDisable(GL_TEXTURE_2D);
