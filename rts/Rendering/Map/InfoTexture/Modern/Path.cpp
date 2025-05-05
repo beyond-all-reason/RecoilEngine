@@ -64,7 +64,7 @@ enum BuildSquareStatus {
 };
 
 
-static const SColor buildColors[] = {
+static constexpr SColor buildColors[] = {
 	SColor(  0,   0,   0), // nolos
 	SColor(  0, 255,   0), // free
 	SColor(  0,   0, 255), // objblocked
