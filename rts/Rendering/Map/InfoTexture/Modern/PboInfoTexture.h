@@ -5,6 +5,7 @@
 #include "Rendering/Map/InfoTexture/InfoTexture.h"
 #include "Rendering/GL/PBO.h"
 #include "Rendering/GL/FBO.h"
+#include "Rendering/GL/VAO.h"
 
 class CModernInfoTexture : public CInfoTexture
 {
@@ -18,6 +19,7 @@ public:
 	virtual bool IsUpdateNeeded() = 0;
 
 protected:
+	static constexpr const char* vertexCode = "GLSL/FullscreenTriangleVS.glsl";
 	PBO infoTexPBO;
 };
 
@@ -32,9 +34,10 @@ public:
 	~CModernFBOInfoTexture() override;
 	CModernFBOInfoTexture(const CModernFBOInfoTexture&) = delete; // no-copy
 protected:
-	//virtual void CreateShader() = 0;
-	//virtual void ReleaseShader() = 0;
+	bool CreateFBO(const char* fboName);
+	void RunFullScreenPass();
 protected:
 	FBO fbo;
+	VAO vao;
 	Shader::IProgramObject* shader;
 };

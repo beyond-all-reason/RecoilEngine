@@ -12,7 +12,7 @@ namespace Shader {
 }
 
 
-class CLosTexture : public CModernInfoTexture
+class CLosTexture : public CModernFBOInfoTexture
 {
 public:
 	CLosTexture();
@@ -26,9 +26,7 @@ private:
 	void UpdateCPU();
 
 private:
-	FBO fbo;
 	GLuint uploadTex;
-	Shader::IProgramObject* shader;
 };
 
 #endif // _LOS_TEXTURE_H

@@ -31,30 +31,20 @@ CAirLosTexture::CAirLosTexture()
 	infoTexPBO.New(texSize.x * texSize.y * texChannels * 2, GL_STREAM_DRAW);
 	infoTexPBO.Unbind();
 
-	if (FBO::IsSupported()) {
-		fbo.Bind();
-		fbo.AttachTexture(texture);
-		/*bool status =*/ fbo.CheckStatus("CAirLosTexture");
-		FBO::Unbind();
-	}
-
-	const std::string vertexCode = R"(
-		varying vec2 texCoord;
-
-		void main() {
-			texCoord = gl_Vertex.xy * 0.5 + 0.5;
-			gl_Position = vec4(gl_Vertex.xyz, 1.0);
-		}
-	)";
+	CreateFBO("CAirLosTexture");
 
 	const std::string fragmentCode = R"(
+		#version 130
+
 		uniform sampler2D tex0;
-		varying vec2 texCoord;
+
+		in vec2 uv;
+		out float fragData;
 
 		void main() {
-			vec2 f = texture2D(tex0, texCoord).rg;
-			float c = (f.r + f.g) * 200000.0;
-			gl_FragColor = vec4(c);
+			float f = texture(tex0, uv).r;
+
+			fragData = float(f > 0.0);
 		}
 	)";
 
@@ -83,7 +73,7 @@ CAirLosTexture::CAirLosTexture()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RG8, texSize.x, texSize.y);
+		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_R16, texSize.x, texSize.y);
 	} else {
 		throw opengl_error("");
 	}
@@ -153,24 +143,13 @@ void CAirLosTexture::Update()
 	// Faster than doing it on the CPU! And uploading it as shorts would be slow, cause the GPU
 	// has no native support for them and so the transformation would happen on the CPU, too.
 	glBindTexture(GL_TEXTURE_2D, uploadTex);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RG, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_UNSIGNED_SHORT, infoTexPBO.GetPtr());
 	infoTexPBO.Invalidate();
 	infoTexPBO.Unbind();
 
 	// do post-processing on the gpu (los-checking & scaling)
-	fbo.Bind();
-	glViewport(0, 0, texSize.x, texSize.y);
-	shader->Enable();
 	glDisable(GL_BLEND);
-	glBegin(GL_QUADS);
-		glVertex2f(-1.f, -1.f);
-		glVertex2f(-1.f, +1.f);
-		glVertex2f(+1.f, +1.f);
-		glVertex2f(+1.f, -1.f);
-	glEnd();
-	shader->Disable();
-	globalRendering->LoadViewport();
-	FBO::Unbind();
+	RunFullScreenPass();
 
 	// generate mipmaps
 	glBindTexture(GL_TEXTURE_2D, texture);
