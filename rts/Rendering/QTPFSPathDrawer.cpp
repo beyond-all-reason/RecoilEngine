@@ -29,7 +29,7 @@
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/RenderBuffers.h"
-#include "Rendering/Map/InfoTexture/Legacy/LegacyInfoTextureHandler.h"
+#include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "System/StringUtil.h"
 
 static std::vector<const QTPFS::QTNode*> visibleNodes;
@@ -386,7 +386,7 @@ void QTPFSPathDrawer::DrawNodeLink(const QTPFS::QTNode* pushedNode, const QTPFS:
 // part of LegacyInfoTexHandler, no longer called
 void QTPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int offset, unsigned char* texMem) const {
 	switch (extraTex) {
-		case CLegacyInfoTextureHandler::drawPathTrav: {
+		case IInfoTextureHandler::drawPathTrav: {
 			const MoveDef* md = GetSelectedMoveDef();
 
 			if (md != nullptr) {
@@ -423,10 +423,10 @@ void QTPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int
 						const SColor& smc = GetSpeedModColor(sm * scale);
 						#endif
 
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_R] = smc.r;
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_G] = smc.g;
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_B] = smc.b;
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_A] = smc.a;
+						texMem[texIdx + IInfoTextureHandler::COLOR_R] = smc.r;
+						texMem[texIdx + IInfoTextureHandler::COLOR_G] = smc.g;
+						texMem[texIdx + IInfoTextureHandler::COLOR_B] = smc.b;
+						texMem[texIdx + IInfoTextureHandler::COLOR_A] = smc.a;
 					}
 				}
 			} else {
@@ -435,16 +435,16 @@ void QTPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int
 					for (int tx = 0; tx < mapDims.hmapx; ++tx) {
 						const int texIdx = ((ty * (mapDims.pwr2mapx >> 1)) + tx) * 4 - offset;
 
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_R] = 100;
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_G] = 0;
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_B] = 0;
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_A] = 255;
+						texMem[texIdx + IInfoTextureHandler::COLOR_R] = 100;
+						texMem[texIdx + IInfoTextureHandler::COLOR_G] = 0;
+						texMem[texIdx + IInfoTextureHandler::COLOR_B] = 0;
+						texMem[texIdx + IInfoTextureHandler::COLOR_A] = 255;
 					}
 				}
 			}
 		} break;
 
-		case CLegacyInfoTextureHandler::drawPathCost: {
+		case IInfoTextureHandler::drawPathCost: {
 		} break;
 	}
 }

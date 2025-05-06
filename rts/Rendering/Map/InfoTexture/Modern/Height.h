@@ -40,9 +40,7 @@ private:
 
 private:
 	bool needUpdate;
-	FBO fbo;
 	GLuint paletteTex;
-	Shader::IProgramObject* shader;
 };
 
 #endif // _HEIGHT_TEXTURE_H
