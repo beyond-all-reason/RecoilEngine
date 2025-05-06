@@ -491,6 +491,9 @@ public:
 	// Used for calling setSFXoccupy which TA scripts want
 	int curTerrainType = 0;
 
+	// Frame number when self-destruct occurs, 0 means inactive
+	int selfDTargetFrame = 0;
+	// Seconds remaining until self-destruct (depreciated?)
 	int selfDCountdown = 0;
 
 	// the damage value passed to CEGs spawned by this unit's script
