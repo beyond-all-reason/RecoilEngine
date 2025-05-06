@@ -12,6 +12,24 @@ class CInfoTexture;
 
 
 class IInfoTextureHandler {
+// carryovers from the old LegacyInfoTextureHandler
+public:
+	enum {
+		COLOR_R = 2,
+		COLOR_G = 1,
+		COLOR_B = 0,
+		COLOR_A = 3,
+	};
+	enum BaseGroundDrawMode {
+		drawNormal   = 0,
+		drawLos      = 1, // L
+		drawMetal    = 2, // F4
+		drawHeight   = 3, // F1
+		drawPathTrav = 4, // F2
+		drawPathHeat = 5, // not hotkeyed, command-only
+		drawPathFlow = 6, // not hotkeyed, command-only
+		drawPathCost = 7, // not hotkeyed, command-only
+	};
 public:
 	static void Create();
 

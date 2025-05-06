@@ -27,10 +27,8 @@ private:
 	void UpdateCPU();
 
 private:
-	FBO fbo;
 	GLuint uploadTexRadar;
 	GLuint uploadTexJammer;
-	Shader::IProgramObject* shader;
 };
 
 #endif // _RADAR_TEXTURE_H
