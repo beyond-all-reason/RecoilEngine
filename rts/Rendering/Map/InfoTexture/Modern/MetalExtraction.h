@@ -3,7 +3,7 @@
 #ifndef _METAL_EXTRACTION_TEXTURE_H
 #define _METAL_EXTRACTION_TEXTURE_H
 
-#include "PboInfoTexture.h"
+#include "ModernInfoTexture.h"
 #include "Rendering/GL/FBO.h"
 
 
@@ -12,7 +12,7 @@ namespace Shader {
 }
 
 
-class CMetalExtractionTexture : public CModernFBOInfoTexture
+class CMetalExtractionTexture : public CModernInfoTexture
 {
 public:
 	CMetalExtractionTexture();

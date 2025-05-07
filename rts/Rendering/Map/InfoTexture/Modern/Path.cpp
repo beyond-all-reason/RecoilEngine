@@ -24,7 +24,7 @@
 
 
 CPathTexture::CPathTexture()
-: CModernFBOInfoTexture("path")
+: CModernInfoTexture("path")
 , isCleared(false)
 //, updateFrame(0)
 , updateProcess(0)
@@ -34,7 +34,6 @@ CPathTexture::CPathTexture()
 , lastUsage(spring_gettime())
 {
 	texSize = int2(mapDims.hmapx, mapDims.hmapy);
-	texChannels = 4;
 
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
@@ -45,7 +44,7 @@ CPathTexture::CPathTexture()
 	RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, texSize.x, texSize.y);
 
 	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * texChannels, GL_STREAM_DRAW);
+	infoTexPBO.New(texSize.x * texSize.y * 4, GL_STREAM_DRAW);
 	infoTexPBO.Unbind();
 
 	CreateFBO("CPathTexture");

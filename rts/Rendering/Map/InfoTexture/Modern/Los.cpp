@@ -12,11 +12,10 @@
 #include "System/Misc/TracyDefs.h"
 
 CLosTexture::CLosTexture()
-: CModernFBOInfoTexture("los")
+: CModernInfoTexture("los")
 , uploadTex(0)
 {
 	texSize = losHandler->los.size;
-	texChannels = 1;
 
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
@@ -27,7 +26,7 @@ CLosTexture::CLosTexture()
 	RecoilTexStorage2D(GL_TEXTURE_2D, -1, GL_R8, texSize.x, texSize.y);
 
 	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * texChannels * 2, GL_STREAM_DRAW);
+	infoTexPBO.New(texSize.x * texSize.y * 2, GL_STREAM_DRAW);
 	infoTexPBO.Unbind();
 
 	CreateFBO("CLosTexture");
@@ -137,7 +136,7 @@ void CLosTexture::Update()
 	infoTexPBO.Bind();
 	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
 	const unsigned short* myLos = &losHandler->los.losMaps[gu->myAllyTeam].front();
-	memcpy(infoTexMem, myLos, texSize.x * texSize.y * texChannels * sizeof(short));
+	memcpy(infoTexMem, myLos, texSize.x * texSize.y * 1 * sizeof(short));
 	infoTexPBO.UnmapBuffer();
 
 	//Trick: Upload the ushort as 2 ubytes, and then check both for `!=0` in the shader.

@@ -3,7 +3,7 @@
 #ifndef _METAL_TEXTURE_H
 #define _METAL_TEXTURE_H
 
-#include "PboInfoTexture.h"
+#include "ModernInfoTexture.h"
 #include "System/EventHandler.h"
 
 

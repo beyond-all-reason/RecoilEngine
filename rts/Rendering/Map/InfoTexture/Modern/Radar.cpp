@@ -16,12 +16,11 @@
 
 
 CRadarTexture::CRadarTexture()
-: CModernFBOInfoTexture("radar")
+: CModernInfoTexture("radar")
 , uploadTexRadar(0)
 , uploadTexJammer(0)
 {
 	texSize = losHandler->radar.size;
-	texChannels = 2;
 
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
@@ -32,7 +31,7 @@ CRadarTexture::CRadarTexture()
 	RecoilTexStorage2D(GL_TEXTURE_2D, -1, GL_RG8, texSize.x, texSize.y);
 
 	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * texChannels * sizeof(unsigned short), GL_STREAM_DRAW);
+	infoTexPBO.New(texSize.x * texSize.y * 2 * sizeof(unsigned short), GL_STREAM_DRAW);
 	infoTexPBO.Unbind();
 
 	CreateFBO("CRadarTexture");

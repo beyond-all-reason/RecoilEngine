@@ -20,14 +20,13 @@
 
 
 CHeightTexture::CHeightTexture()
-: CModernFBOInfoTexture("height")
+: CModernInfoTexture("height")
 , CEventClient("[CHeightTexture]", 271990, false)
 , needUpdate(true)
 {
 	eventHandler.AddClient(this);
 
 	texSize = int2(mapDims.mapxp1, mapDims.mapyp1);
-	texChannels = 4;
 
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
@@ -99,7 +98,7 @@ void CHeightTexture::UpdateCPU()
 	const float* heightMap = readMap->GetCornerHeightMapUnsynced();
 
 	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * texChannels, GL_STREAM_DRAW);
+	infoTexPBO.New(texSize.x * texSize.y * 4, GL_STREAM_DRAW);
 	auto infoTexMem = reinterpret_cast<SColor*>(infoTexPBO.MapBuffer());
 
 	for (int y = 0; y < texSize.y; ++y) {

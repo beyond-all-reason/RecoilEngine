@@ -4,7 +4,7 @@
 #define _RADAR_TEXTURE_H
 
 
-#include "PboInfoTexture.h"
+#include "ModernInfoTexture.h"
 #include "Rendering/GL/FBO.h"
 
 
@@ -13,7 +13,7 @@ namespace Shader {
 }
 
 
-class CRadarTexture : public CModernFBOInfoTexture
+class CRadarTexture : public CModernInfoTexture
 {
 public:
 	CRadarTexture();

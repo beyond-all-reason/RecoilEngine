@@ -1,11 +1,11 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _INTERFACE_INFO_TEXTURE_HANDLER_H
-#define _INTERFACE_INFO_TEXTURE_HANDLER_H
+#pragma once
 
 #include "Rendering/GL/myGL.h"
 #include "System/type2.h"
 #include <string>
+#include <memory>
 
 
 class CInfoTexture;
@@ -57,6 +57,4 @@ public:
 	virtual       CInfoTexture* GetInfoTexture     (const std::string& name)       = 0;
 };
 
-extern IInfoTextureHandler* infoTextureHandler;
-
-#endif // _INTERFACE_INFO_TEXTURE_HANDLER_H
+extern std::unique_ptr<IInfoTextureHandler> infoTextureHandler;
