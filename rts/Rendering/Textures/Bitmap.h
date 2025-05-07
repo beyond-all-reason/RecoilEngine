@@ -11,7 +11,7 @@
 #endif // !HEADLESS
 #include "System/float3.h"
 #include "System/Color.h"
-#include "Rendering/Textures/Texture.hpp"
+#include "Rendering/Textures/TextureCreationParams.hpp"
 
 
 struct SDL_Surface;

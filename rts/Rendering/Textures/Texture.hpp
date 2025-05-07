@@ -2,36 +2,23 @@
 
 #include <cstdint>
 #include <array>
-#include <optional>
 #include "Rendering/GL/TexBind.h"
-#include "System/float4.h"
+#include "Rendering/Textures/TextureCreationParams.hpp"
 
 namespace GL {
-	struct TextureCreationParams {
-		float aniso = 0.0f;
-		float lodBias = 0.0f;
-		uint32_t texID = 0;
-		int32_t reqNumLevels = 0;
-		bool linearMipMapFilter = true;
-		bool linearTextureFilter = true;
-		bool wrapMirror = true;
-		bool repeatMirror = false;
-		std::optional<float4> clampBorder = std::nullopt;
-		uint32_t GetMinFilter(int32_t numLevels) const;
-		uint32_t GetMagFilter() const;
-		uint32_t GetWrapMode() const;
-	};
-
 	class Texture {
 	public:
 		virtual ~Texture();
+		const auto GetId() const { return texID; }
+		const auto DisOwn() { ownTexID = false; return texID; }
 	protected:
 		uint32_t texID = 0;
 		uint32_t texTarget = 0;
 		uint32_t intFormat = 0;
 		int32_t numLevels = -1;
 		bool ownTexID = true;
-		virtual void UploadImageAndCreateMipmaps(const void* data) const = 0;
+		virtual void UploadImage(const void* data, int level = 0) const = 0;
+		virtual void ProduceMipmaps() const = 0;
 	};
 
 	class Texture2D : public Texture {
@@ -40,16 +27,20 @@ namespace GL {
 		Texture2D(int xsize_, int ysize_, uint32_t intFormat_, const TextureCreationParams& tcp_, bool wantCompress = true);
 
 		template <typename ContainerLike>
-		void UploadImageAndCreateMipmaps(const ContainerLike& containerLike) {
+		void UploadImage(const ContainerLike& containerLike) const {
 		#ifdef DEBUG
 			const auto dataType = GetDataTypeFromInternalFormat(intFormat);
 			const auto dataSize = GetDataTypeSize(dataType);
 			const auto numChannels = GetNumChannelsFromInternalFormat(intFormat);
 			assert(containerLike.size() >= xsize * ysize * numChannels * dataSize);
 		#endif // DEBUG
-			UploadImageAndCreateMipmaps(containerLike.data());
+			UploadImage(containerLike.data());
 		}
-		void UploadImageAndCreateMipmaps(const void* data) const override;
+		void UploadImage(const void* data, int level = 0) const override {
+			UploadSubImage(data, 0, 0, xsize, ysize, level);
+		}
+		void UploadSubImage(const void* data, int xOffset, int yOffset, int width, int height, int level = 0) const;
+		void ProduceMipmaps() const override;
 	protected:
 		int xsize;
 		int ysize;
