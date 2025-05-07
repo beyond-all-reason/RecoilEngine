@@ -13,19 +13,16 @@
 CONFIG(bool, HighResLos).deprecated(true);
 CONFIG(int, ExtraTextureUpdateRate).deprecated(true);
 
-
-IInfoTextureHandler* infoTextureHandler = nullptr;
+decltype(infoTextureHandler) infoTextureHandler = nullptr;
 
 void IInfoTextureHandler::Create()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (FBO::IsSupported()) {
-		try {
-			infoTextureHandler = new CInfoTextureHandler();
-		} catch (const opengl_error& glerr) {
-			infoTextureHandler = nullptr;
-			throw glerr;
-		}
+	try {
+		infoTextureHandler = std::make_unique<CInfoTextureHandler>();
+	} catch (const opengl_error& glerr) {
+		infoTextureHandler = nullptr;
+		throw glerr;
 	}
 
 	LOG("InfoTexture: shaders");

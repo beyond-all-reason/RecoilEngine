@@ -3,7 +3,7 @@
 #ifndef _INFO_TEXTURE_COMBINER_H
 #define _INFO_TEXTURE_COMBINER_H
 
-#include "PboInfoTexture.h"
+#include "ModernInfoTexture.h"
 #include "Rendering/GL/FBO.h"
 #include "System/float4.h"
 #include <string>

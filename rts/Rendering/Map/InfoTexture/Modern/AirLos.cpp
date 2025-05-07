@@ -13,11 +13,10 @@
 
 
 CAirLosTexture::CAirLosTexture()
-: CModernFBOInfoTexture("airlos")
+: CModernInfoTexture("airlos")
 , uploadTex(0)
 {
 	texSize = losHandler->airLos.size;
-	texChannels = 1;
 
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
@@ -28,7 +27,7 @@ CAirLosTexture::CAirLosTexture()
 	RecoilTexStorage2D(GL_TEXTURE_2D, -1, GL_R8, texSize.x, texSize.y);
 
 	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * texChannels * 2, GL_STREAM_DRAW);
+	infoTexPBO.New(texSize.x * texSize.y * 2, GL_STREAM_DRAW);
 	infoTexPBO.Unbind();
 
 	CreateFBO("CAirLosTexture");
@@ -136,7 +135,7 @@ void CAirLosTexture::Update()
 	infoTexPBO.Bind();
 	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
 	const unsigned short* myAirLos = &losHandler->airLos.losMaps[gu->myAllyTeam].front();
-	memcpy(infoTexMem, myAirLos, texSize.x * texSize.y * texChannels * sizeof(short));
+	memcpy(infoTexMem, myAirLos, texSize.x * texSize.y * 1 * sizeof(short));
 	infoTexPBO.UnmapBuffer();
 
 	//Trick: Upload the ushort as 2 ubytes, and then check both for `!=0` in the shader.

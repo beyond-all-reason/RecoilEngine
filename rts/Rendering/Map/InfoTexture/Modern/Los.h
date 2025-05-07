@@ -3,7 +3,7 @@
 #ifndef _LOS_TEXTURE_H
 #define _LOS_TEXTURE_H
 
-#include "PboInfoTexture.h"
+#include "ModernInfoTexture.h"
 #include "Rendering/GL/FBO.h"
 
 
@@ -12,7 +12,7 @@ namespace Shader {
 }
 
 
-class CLosTexture : public CModernFBOInfoTexture
+class CLosTexture : public CModernInfoTexture
 {
 public:
 	CLosTexture();

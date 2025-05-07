@@ -7,6 +7,10 @@
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/VAO.h"
 
+namespace Shader {
+	struct IProgramObject;
+}
+
 class CModernInfoTexture : public CInfoTexture
 {
 public:
@@ -17,22 +21,6 @@ public:
 public:
 	virtual void Update() = 0;
 	virtual bool IsUpdateNeeded() = 0;
-
-protected:
-	static constexpr const char* vertexCode = "GLSL/FullscreenTriangleVS.glsl";
-	PBO infoTexPBO;
-};
-
-namespace Shader {
-	struct IProgramObject;
-}
-
-class CModernFBOInfoTexture : public CModernInfoTexture
-{
-public:
-	CModernFBOInfoTexture(const std::string& name);
-	~CModernFBOInfoTexture() override;
-	CModernFBOInfoTexture(const CModernFBOInfoTexture&) = delete; // no-copy
 protected:
 	bool CreateFBO(const char* fboName);
 	void RunFullScreenPass();
@@ -40,4 +28,7 @@ protected:
 	FBO fbo;
 	VAO vao;
 	Shader::IProgramObject* shader;
+protected:
+	static constexpr const char* vertexCode = "GLSL/FullscreenTriangleVS.glsl";
+	PBO infoTexPBO;
 };

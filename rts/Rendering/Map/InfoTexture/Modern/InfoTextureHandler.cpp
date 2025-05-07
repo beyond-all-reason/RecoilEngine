@@ -17,9 +17,6 @@
 
 CInfoTextureHandler::CInfoTextureHandler()
 {
-	if (infoTextureHandler == nullptr)
-		infoTextureHandler = this;
-
 	AddInfoTexture(infoTex = new CInfoTextureCombiner());
 	AddInfoTexture(new CLosTexture());
 	AddInfoTexture(new CAirLosTexture());

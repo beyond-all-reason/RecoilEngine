@@ -1,16 +1,14 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "PboInfoTexture.h"
+#include "ModernInfoTexture.h"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/GlobalRendering.h"
 
 
 CModernInfoTexture::CModernInfoTexture(const std::string& _name)
-{
-	name        = _name;
-	texChannels = 0;
-	texture     = 0;
-}
+	: CInfoTexture(name, 0, int2(0, 0))
+	, shader(nullptr)
+{}
 
 
 CModernInfoTexture::~CModernInfoTexture()
@@ -18,17 +16,7 @@ CModernInfoTexture::~CModernInfoTexture()
 	glDeleteTextures(1, &texture);
 }
 
-CModernFBOInfoTexture::CModernFBOInfoTexture(const std::string& name)
-	: CModernInfoTexture(name)
-	, shader(nullptr)
-{
-}
-
-CModernFBOInfoTexture::~CModernFBOInfoTexture()
-{
-}
-
-bool CModernFBOInfoTexture::CreateFBO(const char* fboName)
+bool CModernInfoTexture::CreateFBO(const char* fboName)
 {
 	if (!FBO::IsSupported())
 		return false;
@@ -41,7 +29,7 @@ bool CModernFBOInfoTexture::CreateFBO(const char* fboName)
 	return status;
 }
 
-void CModernFBOInfoTexture::RunFullScreenPass()
+void CModernInfoTexture::RunFullScreenPass()
 {
 	fbo.Bind();
 	glViewport(0, 0, texSize.x, texSize.y);

@@ -15,7 +15,6 @@ CMetalTexture::CMetalTexture()
 {
 	eventHandler.AddClient(this);
 	texSize = int2(mapDims.hmapx, mapDims.hmapy);
-	texChannels = 1;
 
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
