@@ -39,45 +39,6 @@ namespace GL {
 
 			return std::make_pair(texID, std::move(binding));
 		}
-
-		void CreateMipmaps(uint32_t texTarget) {
-			if (globalRendering->amdHacks) {
-				glEnable(texTarget);
-				glGenerateMipmap(texTarget);
-				glDisable(texTarget);
-			}
-			else {
-				glGenerateMipmap(texTarget);
-			}
-		}
-	}
-
-	uint32_t TextureCreationParams::GetMinFilter(int32_t numLevels) const
-	{
-		if (numLevels == 1) {
-			return linearTextureFilter ? GL_LINEAR : GL_NEAREST;
-		}
-		else {
-			if (linearMipMapFilter) {
-				return linearTextureFilter ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST;
-			}
-			else {
-				return linearTextureFilter ? GL_LINEAR_MIPMAP_NEAREST : GL_NEAREST_MIPMAP_NEAREST;
-			}
-		}
-	}
-
-	uint32_t TextureCreationParams::GetMagFilter() const
-	{
-		return linearTextureFilter ? GL_LINEAR : GL_NEAREST;
-	}
-
-	uint32_t TextureCreationParams::GetWrapMode() const
-	{
-		if (wrapMirror)
-			return repeatMirror ? GL_MIRRORED_REPEAT : GL_REPEAT;
-
-		return clampBorder.has_value() ? GL_CLAMP_TO_BORDER: GL_CLAMP_TO_EDGE;
 	}
 
 	Texture::~Texture() {
@@ -122,13 +83,24 @@ namespace GL {
 		glTexParameteri(texTarget, GL_TEXTURE_MAX_LEVEL , numLevels - 1);
 	}
 
-	void Texture2D::UploadImageAndCreateMipmaps(const void* data) const
+	void Texture2D::UploadSubImage(const void* data, int xOffset, int yOffset, int width, int height, int level) const
 	{
 		const auto extFormat = GetExternalFormatFromInternalFormat(intFormat);
 		const auto dataType = GetDataTypeFromInternalFormat(intFormat);
 
 		auto binding = GL::TexBind(texTarget, texID);
-		glTexSubImage2D(texTarget, 0, 0, 0, xsize, ysize, extFormat, dataType, data);
-		Impl::CreateMipmaps(texTarget);
+		glTexSubImage2D(texTarget, level, xOffset, yOffset, width, height, extFormat, dataType, data);
+	}
+
+	void Texture2D::ProduceMipmaps() const
+	{
+		if (globalRendering->amdHacks) {
+			glEnable(texTarget);
+			glGenerateMipmap(texTarget);
+			glDisable(texTarget);
+		}
+		else {
+			glGenerateMipmap(texTarget);
+		}
 	}
 }
