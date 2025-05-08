@@ -198,9 +198,18 @@ namespace Rml::SolLua
 		/***
 		 * Event listener interface
 		 * @class RmlUi.EventListener
-		 * @field ProcessEvent fun(event: RmlEvent)
-		 * @field OnAttach fun(element: RmlUi.Element) 
-		 * @field OnDetach fun(element: RmlUi.Element)
+		 */
+		/***
+		 * @function RmlUi.EventListener.ProcessEvent
+		 * @param event RmlEvent
+		 */
+		/***
+		 * @function RmlUi.EventListener.OnAttach
+		 * @param element RmlUi.Element
+		 */
+		/***
+		 * @function RmlUi.EventListener.OnDetach
+		 * @param element RmlUi.Element
 		 */ 
 		namespace_table.new_usertype<Rml::EventListener>("EventListener", sol::no_constructor,
 			// M

@@ -78,7 +78,7 @@ namespace Rml::SolLua
 		);
 
 		/***
-		 * --- @alias RmlUi.EventParametersProxy.MouseButton
+		 * @alias RmlUi.EventParametersProxy.MouseButton
 		 * | 0 # Left
 		 * | 1 # Right
 		 * | 2 # Middle

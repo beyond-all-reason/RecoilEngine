@@ -42,7 +42,7 @@ namespace Rml::SolLua
 	void bind_element_derived(sol::table& namespace_table)
 	{
 		/***
-		 * @class RmlUi.ElementText:RmlUi.Element
+		 * @class RmlUi.ElementText : RmlUi.Element
 		 * @field text string
 		 */
 		namespace_table.new_usertype<Rml::ElementText>("ElementText", sol::no_constructor,
@@ -55,8 +55,8 @@ namespace Rml::SolLua
 
 		///////////////////////////
 		/***
-		 * @class RmlUi.ElementTabSet:RmlUi.Element
-		 * @field active_tab integer 
+		 * @class RmlUi.ElementTabSet : RmlUi.Element
+		 * @field active_tab integer
 		 * @field num_tabs integer
 		 */
 
@@ -99,7 +99,7 @@ namespace Rml::SolLua
 
 		//--
 		/***
-		 * @class RmlUi.ElementProgress:RmlUi.Element
+		 * @class RmlUi.ElementProgress : RmlUi.Element
 		 * @field value number
 		 * @field max number
 		 */

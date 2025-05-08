@@ -51,7 +51,7 @@ namespace Rml::SolLua
 		 */
 
 		 /***
-		 * @functions RmlUi.Vector2i.new
+		 * @function RmlUi.Vector2i.new
 		 * @param x integer
 		 * @param y integer
 		 * @return RmlUi.Vector2i
@@ -81,7 +81,7 @@ namespace Rml::SolLua
 		/***
 		 * Two-dimensional float vector
 		 * @see float2
-		 * @class RmlUi.Vector2f.
+		 * @class RmlUi.Vector2f
 		 * @field magnitude number
 		 * @field x number
 		 * @field y number
@@ -93,7 +93,7 @@ namespace Rml::SolLua
 		 */
 		
 		/***
-		 * @functions RmlUi.Vector2f.new
+		 * @function RmlUi.Vector2f.new
 		 * @param x number
 		 * @param y number
 		 * @return RmlUi.Vector2f

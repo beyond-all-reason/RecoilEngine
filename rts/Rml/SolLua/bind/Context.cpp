@@ -286,13 +286,13 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 	 * Holds documents and a data model.
 	 * The Context class has no constructor; it must be instantiated through the CreateContext() function. It has the following functions and properties:
 	 * @class RmlUi.Context
-	 * @field dimensions Vector2i
+	 * @field dimensions RmlUi.Vector2i
 	 * @field documents RmlContextDocumentsProxy
 	 * @field focus_element RmlUi.Element
 	 * @field hover_element RmlUi.Element
 	 * @field name string
 	 * @field root_element RmlUi.Element
-	 * @field dp_ratio float
+	 * @field dp_ratio number
 	 */
 
 	/***
@@ -365,7 +365,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 	/***
 	 * Processes a mouse move event.
 	 * @function RmlUi.Context:ProcessMouseMove
-	 * @param position Vector2f
+	 * @param position RmlUi.Vector2f
 	 * @return boolean
 	 */
 
@@ -388,7 +388,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 	/***
 	 * Processes a mouse wheel event.
 	 * @function RmlUi.Context:ProcessMouseWheel
-	 * @param delta Vector2f | float
+	 * @param delta RmlUi.Vector2f | number
 	 * @param key_modifier_state integer
 	 * @return boolean
 	 */
@@ -451,7 +451,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 	/***
 	 * Returns the element at the point specified by point.
 	 * @function RmlUi.Context:GetElementAtPoint
-	 * @param point Vector2f
+	 * @param point RmlUi.Vector2f
 	 * @param ignore RmlUi.Element?
 	 * @return RmlUi.Element
 	 */

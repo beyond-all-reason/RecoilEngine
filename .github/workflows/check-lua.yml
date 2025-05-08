@@ -3,14 +3,14 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'rts/Lua/**'
-      - 'rts/Rml/SolLua/*.cpp'
+      - rts/Lua/**
+      - rts/Rml/SolLua/**/*.cpp
   push:
     branches:
       - master
     paths:
-      - 'rts/Lua/**'
-      - 'rts/Rml/SolLua/*.cpp'
+      - rts/Lua/**
+      - rts/Rml/SolLua/**/*.cpp
 jobs:
   check-library:
     name: Check library
@@ -19,12 +19,14 @@ jobs:
       - name: Checkout Lua CPP files
         uses: actions/checkout@v4
         with:
-          sparse-checkout: rts/Lua
+          sparse-checkout: |
+            rts/Lua
+            rts/Rml/SolLua
 
       - name: Generate Lua library
         run: |
           npm install -g lua-doc-extractor@3
-          lua-doc-extractor rts/Lua/*.cpp rts/Rml/SolLua/bind/*.cpp \
+          lua-doc-extractor "rts/Lua/**/*.cpp" "rts/Rml/SolLua/**/*.cpp" \
             --dest rts/Lua/library/generated \
             --repo https://github.com/${{ github.repository }}/blob/${{ github.sha }} \
             --error

@@ -137,7 +137,7 @@ namespace Rml::SolLua
 	void bind_element_form(sol::table& namespace_table)
 	{
 		/***
-		 * @class RmlUi.ElementForm:RmlUi.Element
+		 * @class RmlUi.ElementForm : RmlUi.Element
 		 */
 
 		/***
@@ -155,10 +155,10 @@ namespace Rml::SolLua
 
 		///////////////////////////
 		/***
-		 * @class RmlUi.ElementFormControl:RmlUi.Element
+		 * @class RmlUi.ElementFormControl : RmlUi.Element
 		 * @field disabled boolean
-		 * @field name string 
-		 * @field value string 
+		 * @field name string
+		 * @field value string
 		 * @field submitted boolean
 		 */
 		namespace_table.new_usertype<Rml::ElementFormControl>("ElementFormControl", sol::no_constructor,
@@ -177,13 +177,13 @@ namespace Rml::SolLua
 
 		///////////////////////////
 		/***
-		 * @class RmlUi.ElementFormControlInput: RmlUi.Element, RmlUi.ElementFormControl
-		 * @field checked boolean 
-		 * @field maxlength integer 
-		 * @field size int 
-		 * @field max int
-		 * @field min int
-		 * @field step int
+		 * @class RmlUi.ElementFormControlInput : RmlUi.Element, RmlUi.ElementFormControl
+		 * @field checked boolean
+		 * @field maxlength integer
+		 * @field size integer
+		 * @field max integer
+		 * @field min integer
+		 * @field step integer
 		 */
 		namespace_table.new_usertype<Rml::ElementFormControlInput>("ElementFormControlInput", sol::no_constructor,
 			// G+S
@@ -215,7 +215,7 @@ namespace Rml::SolLua
 			"value", &options::SelectOptionsProxyNode::Value
 		);
 		/***
-		 * @class RmlUi.ElementFormControlSelect: RmlUi.Element, RmlUi.ElementFormControl
+		 * @class RmlUi.ElementFormControlSelect : RmlUi.Element, RmlUi.ElementFormControl
 		 * @field options RmlUi.OptionsProxy
 		 */
 
@@ -255,7 +255,7 @@ namespace Rml::SolLua
 
 		///////////////////////////
 		/***
-		 * @class RmlUi.ElementFormControlTextArea: RmlUi.Element, RmlUi.ElementFormControl
+		 * @class RmlUi.ElementFormControlTextArea : RmlUi.Element, RmlUi.ElementFormControl
 		 * @field cols integer
 		 * @field maxlength integer
 		 * @field rows integer
