@@ -287,7 +287,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 	 * The Context class has no constructor; it must be instantiated through the CreateContext() function. It has the following functions and properties:
 	 * @class RmlUi.Context
 	 * @field dimensions RmlUi.Vector2i
-	 * @field documents Documents[]
+	 * @field documents RmlUi.Documents[]
 	 * @field focus_element RmlUi.Element
 	 * @field hover_element RmlUi.Element
 	 * @field name string
