@@ -201,7 +201,7 @@ namespace Rml::SolLua
 		 */
 		/***
 		 * @function RmlUi.EventListener.ProcessEvent
-		 * @param event RmlEvent
+		 * @param event RmlUi.Event
 		 */
 		/***
 		 * @function RmlUi.EventListener.OnAttach

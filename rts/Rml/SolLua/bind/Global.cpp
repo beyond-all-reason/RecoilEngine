@@ -126,11 +126,6 @@
 		 */
 
 		/***
-		 * This one has no documentation.
-		 * @alias RmlUi.SelectOptionsProxy {element: RmlElement, value: string}[]
-		 */
-
-		/***
 		 * Gets the rcss styles associated with an element. As far as I can tell, the values will always be a string.
 		 * @alias RmlUi.ElementStyleProxy { [string]: string }
 		 */

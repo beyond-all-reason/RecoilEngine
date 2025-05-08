@@ -216,7 +216,7 @@ namespace Rml::SolLua
 		);
 		/***
 		 * @class RmlUi.ElementFormControlSelect : RmlUi.Element, RmlUi.ElementFormControl
-		 * @field options RmlUi.OptionsProxy
+		 * @field options RmlUi.SelectOptionsProxy
 		 */
 
 		/***
