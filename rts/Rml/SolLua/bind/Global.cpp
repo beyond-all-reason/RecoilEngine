@@ -102,6 +102,39 @@
 	 
 	 void bind_global(sol::table& namespace_table, SolLuaPlugin* slp)
 	 {
+		/***
+		 * Represents an owned element. This type is mainly used to modify the DOM tree by passing the object into other elements. For example `RmlUi.Element:AppendChild()`.
+		 * A current limitation in the Lua plugin is that Element member properties and functions cannot be used directly on this type.
+		 * @class RmlUi.ElementPtr
+		 */
+
+		/***
+		 * @alias RmlUi.MouseButton
+		 * | 0 # Left button
+		 * | 1 # Right button
+		 * | 2 # Middle button
+		 */
+
+		/***
+		 * Contains a list of all child elements.
+		 * @alias RmlUi.ElementChildNodesProxy RmlUi.Element[]
+		 */
+
+		/***
+		 * Contains all the attributes of an element: The stuff in the opening tag i.e. `<span class="my-class">`
+		 * @alias RmlUi.ElementAttributesProxy {[string]: string|number|boolean}
+		 */
+
+		/***
+		 * This one has no documentation.
+		 * @alias RmlUi.SelectOptionsProxy {element: RmlElement, value: string}[]
+		 */
+
+		/***
+		 * Gets the rcss styles associated with an element. As far as I can tell, the values will always be a string.
+		 * @alias RmlUi.ElementStyleProxy { [string]: string }
+		 */
+
 		 auto translationTable = &slp->translationTable;
 		 namespace_table.set(
 			 /***
@@ -110,7 +143,7 @@
 			  * @function RmlUi.CreateContext
 			  * 
 			  * @param name string
-			  * @return RmlContext? nil if failed.
+			  * @return RmlUi.Context? nil if failed.
 			  */
 			 "CreateContext", [slp](const Rml::String& name) {
 				 // context will be resized right away by other code
@@ -126,7 +159,7 @@
 			  * 
 			  * @function RmlUi.RemoveContext
 			  * 
-			  * @param context string|RmlContext
+			  * @param context string|RmlUi.Context
 			  */
 			 "RemoveContext", sol::overload(
 				 &functions::removeContext,
@@ -154,7 +187,7 @@
 			  * @function RmlUi.GetContext 
 			  * 
 			  * @param name string
-			  * @return RmlContext? nil if failed.
+			  * @return RmlUi.Context? nil if failed.
 			  */
 			 "GetContext", sol::resolve<Rml::Context* (const Rml::String&)>(&RmlGui::GetContext),
  
@@ -244,7 +277,7 @@
 			  * 
 			  * @function RmlUi.SetDebugContext
 			  * 
-			  * @param context string | RmlContext
+			  * @param context string | RmlUi.Context
 			  */
 			 "SetDebugContext", sol::overload(&functions::setDebugContext, &functions::setDebugContextByName),
  

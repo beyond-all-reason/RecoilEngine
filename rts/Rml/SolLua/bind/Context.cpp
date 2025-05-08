@@ -280,6 +280,8 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 {
 	// clang-format off
 
+
+
 	/***
 	 * Holds documents and a data model.
 	 * The Context class has no constructor; it must be instantiated through the CreateContext() function. It has the following functions and properties:
@@ -297,7 +299,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 	 * Adds the inline Lua script, script, as an event listener to the context. element_context is an optional Element; if it is not None, then the script will be executed as if it was bound to that element.
 	 * @function RmlUi.Context:AddEventListener
 	 * @param event string
-	 * @param script RmlElement
+	 * @param script RmlUi.Element
 	 * @param element_context boolean
 	 * @param in_capture_phase boolean
 	 */
@@ -370,7 +372,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 	/***
 	 * Processes a mouse button down event.
 	 * @function RmlUi.Context:ProcessMouseButtonDown
-	 * @param button RmlMouseButton
+	 * @param button RmlUi.MouseButton
 	 * @param key_modifier_state integer
 	 * @return boolean
 	 */
@@ -378,7 +380,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 	/***
 	 * Processes a mouse button up event.
 	 * @function RmlUi.Context:ProcessMouseButtonUp
-	 * @param button RmlMouseButton
+	 * @param button RmlUi.MouseButton
 	 * @param key_modifier_state integer
 	 * @return boolean
 	 */
@@ -406,7 +408,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 	/***
 	 * Processes a key down event.
 	 * @function RmlUi.Context:ProcessKeyDown
-	 * @param key RmlUi.key)identifier
+	 * @param key RmlUi.key_identifier
 	 * @param key_modifier_state integer
 	 * @return boolean
 	 */

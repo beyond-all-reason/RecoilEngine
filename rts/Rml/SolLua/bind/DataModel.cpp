@@ -62,7 +62,7 @@ namespace Rml::SolLua
 		 * You can access fields by using normal indexing, but for the moment, the only keys that work are strings. Any index done this way will automatically trigger a rerender.
 		 * If you need to index any tables or subtables by anything not a string, you will need to use the underlying table, gotten with `__GetTable`. This will not trigger a rerender.
 		 * To trigger a rerender manually, use `_SetDirty`, passing in the name of the top-level entry in your model table that you edited.
-		 * @class SolLuaDataModel<T> : {__GetTable:fun():T}
+		 * @class RmlUi.SolLuaDataModel<T> : {__GetTable:fun():T}
 		 */
 
 		 /***

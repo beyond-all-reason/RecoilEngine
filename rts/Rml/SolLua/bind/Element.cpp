@@ -239,7 +239,7 @@ namespace Rml::SolLua
 		 * @field offset_parent RmlUi.Element Read-only. The closest positioned ancestor element.
 		 * @field offset_top integer Read-only. The distance from the inner top edge of the offset parent, in pixels.
 		 * @field offset_width integer Read-only. The width of the element including horizontal padding and borders, in pixels.
-		 * @field owner_document RmlDocument Read-only. The document that owns this element.
+		 * @field owner_document RmlUi.Document Read-only. The document that owns this element.
 		 * @field parent_node RmlUi.Element? Read-only. The parent node of this element, or nil if there is none.
 		 * @field previous_sibling RmlUi.Element? Read-only. The previous sibling element, or nil if there is none.
 		 * @field scroll_height integer Read-only. The total height of the element's content, including content not visible on the screen due to overflow.

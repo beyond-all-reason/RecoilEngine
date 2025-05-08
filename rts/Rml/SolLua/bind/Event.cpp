@@ -106,7 +106,7 @@ namespace Rml::SolLua
 
 		/***
 		 * @class RmlUi.Event
-		 * @field current_element Rml.Element
+		 * @field current_element RmlUi.Element
 		 * @field type string
 		 * @field parameters RmlUi.EventParametersProxy
 		 * @field event_phase RmlUi.RmlEventPhase
