@@ -278,7 +278,7 @@
  
 			 /***
 			  * Global functions for Recoil's RmlUi implementation. 
-			  * @class RmlUi
+			  * @table RmlUi
 			  * @field contexts RmlUi.Context[]
 			  * @field version string RmlUi version
 			  */
