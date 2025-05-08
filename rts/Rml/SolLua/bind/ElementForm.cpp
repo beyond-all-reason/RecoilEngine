@@ -180,10 +180,10 @@ namespace Rml::SolLua
 		 * @class RmlUi.ElementFormControlInput : RmlUi.Element, RmlUi.ElementFormControl
 		 * @field checked boolean
 		 * @field maxlength integer
-		 * @field size int
-		 * @field max int
-		 * @field min int
-		 * @field step int
+		 * @field size integer
+		 * @field max integer
+		 * @field min integer
+		 * @field step integer
 		 */
 		namespace_table.new_usertype<Rml::ElementFormControlInput>("ElementFormControlInput", sol::no_constructor,
 			// G+S

@@ -66,6 +66,9 @@ namespace Rml::SolLua
 
 	void RegisterLua(sol::state_view* state, SolLuaPlugin* slp)
 	{
+		/***
+		 * @table RmlUi
+		 */
 		sol::table namespace_table = state->create_named_table("RmlUi");
 
 		bind_color(namespace_table);
