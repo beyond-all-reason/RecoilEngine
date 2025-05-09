@@ -21,9 +21,9 @@ jobs:
         uses: actions/checkout@v2
       - name: Generate Dynamic Content
         run: |
-          bash doc/site/_scripts/get_release_data.sh
-          bash doc/site/_scripts/get_engine_data.sh
-          git add -f doc/site/_data
+          bash doc/site/scripts/get_release_data.sh
+          bash doc/site/scripts/get_engine_data.sh
+          git add -f doc/site/data
       # NOTE: This step is duplicated in `generate-lua-library.yml`
       - name: Generate Lua library
         run: |
@@ -44,9 +44,18 @@ jobs:
         run: |
           emmylua_doc_cli \
             -i rts/Lua/library \
+<<<<<<< HEAD
             -o doc/site/lua-api \
             --override-template doc/emmylua-doc-cli-template
           git add -f doc/site/lua-api
+=======
+            -o ${META_PATH} \
+            --override-template doc/emmlua-doc-cli-template
+      - name: Run generator glue code
+        run: |
+          python doc/site/generate_from_meta.py ${META_PATH} ${TEMP_PATH} ${LUA_API_DOCS_PATH}
+          git add -f ${LUA_API_DOCS_PATH}
+>>>>>>> 9338b0b8cf (added site)
       - name: Commit changes
         run: |
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
