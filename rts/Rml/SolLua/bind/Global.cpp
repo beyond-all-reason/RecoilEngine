@@ -687,11 +687,11 @@
 		 namespace_table.set("default_action_phase", sol::readonly_property([](sol::this_state l) {
 			 sol::state_view lua(l);
 			 return lua.create_table_with(
-				/*** @field default_action_phase.Auto integer */
+				/*** @field RmlUi.default_action_phase.Auto integer */
 				"None", Rml::DefaultActionPhase::None,
-				/*** @field default_action_phase.Target integer */
+				/*** @field RmlUi.default_action_phase.Target integer */
 				"Target", Rml::DefaultActionPhase::Target,
-				/*** @field default_action_phase.TargetAndBubble integer */
+				/*** @field RmlUi.default_action_phase.TargetAndBubble integer */
 				"TargetAndBubble", Rml::DefaultActionPhase::TargetAndBubble
 			 );
 		 }));
