@@ -21,4 +21,4 @@ permalink: lua-api/types/{{ doc.name }}
 {{ doc.property.description }}
 {% endif %}
 
-{{ "{% endraw %}" }}
+

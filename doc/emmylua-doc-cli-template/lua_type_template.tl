@@ -1,4 +1,5 @@
 ---
+<<<<<<< HEAD
 layout: default
 title: {{ doc.name }}
 parent: Lua API
@@ -11,6 +12,16 @@ permalink: lua-api/types/{{ doc.name }}
 
 {% if doc.supers %}
 - supers: {{ doc.supers }}
+=======
+title: "{{ doc.name }}"
+permalink: "docs/lua-api/{{ doc.name }}"
+---
+# class {{ doc.name }}
+
+{% if doc.supers %}
+- inherits:
+{{ doc.supers }}
+>>>>>>> 9338b0b8cf (added site)
 {% endif %}
 {% if doc.namespace %}
 - namespace: {{ doc.namespace }}
@@ -83,5 +94,8 @@ permalink: lua-api/types/{{ doc.name }}
 {% endif %}
 {% endfor %}
 {% endif %}
+<<<<<<< HEAD
 
 {{ "{% endraw %}" }}
+=======
+>>>>>>> 9338b0b8cf (added site)

@@ -1,4 +1,5 @@
 ---
+<<<<<<< HEAD
 layout: default
 title: {{ doc.name }}
 parent: Lua API
@@ -6,6 +7,11 @@ permalink: lua-api/types/{{ doc.name }}
 ---
 {# Use `render_with_liquid: false` when we upgrade to Jekyl >=4.0 #}
 {{ "{% raw %}" }}
+=======
+title: "{{ doc.name }}"
+permalink: "docs/lua-api/{{ doc.name }}"
+---
+>>>>>>> 9338b0b8cf (added site)
 
 # enum {{ doc.name }}
 ---
@@ -42,5 +48,8 @@ permalink: lua-api/types/{{ doc.name }}
 
 {% endfor %}
 {% endif %}
+<<<<<<< HEAD
 
 {{ "{% endraw %}" }}
+=======
+>>>>>>> 9338b0b8cf (added site)

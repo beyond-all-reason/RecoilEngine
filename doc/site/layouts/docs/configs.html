@@ -1,0 +1,53 @@
+{{ define "main" }}
+	<div class='hx-mx-auto hx-flex {{ partial "utils/page-width" . }}'>
+    {{ partial "sidebar.html" (dict "context" .) }}
+    {{ partial "toc.html" . }}
+    <article class="hx-w-full hx-break-words hx-flex hx-min-h-[calc(100vh-var(--navbar-height))] hx-min-w-0 hx-justify-center hx-pb-8 hx-pr-[calc(env(safe-area-inset-right)-1.5rem)]">
+    	<main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
+	        <div class="content">
+	            {{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
+				{{ .Content }}
+				{{ $repo := .Site.Params.repo }}
+
+	            {{ $data := index .Site.Data .Params.context }}
+	            {{ range $config_name, $info := $data }}
+					<h2>
+						{{ $config_name }}: {{ index $info "type" }} {{ if index $info "deprecated" }} (DEPRECATED) {{ end }}<span class="hx-absolute -hx-mt-20" id="{{ $config_name }}"></span>
+
+						<a href="#{{ $config_name }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
+					</h2>
+                    <p>{{ index $info "description" }}</p>
+    				<a href="{{ $repo }}blob/master{{ index $info "declarationFile"}}#L{{ index $info "declarationLine" }}">source</a>
+                    <br>
+    				<table>
+    				    {{ range $title, $data := dict "Mimimum Value" "minimumValue" "Maximum Value" "maximumValue" "Default Value" "defaultValue" "Headless Value" "headlessValue" "Safe Mode Value" "safemodeValue" }}
+    						{{ if index $info $data }}
+    				            <tr>
+    								<td>{{ $data }}</td>
+    								<td>{{ index $info $data }}</td>
+    						    </tr>
+    						{{ end }}
+    					{{ end }}
+    				</table>
+
+    	            {{ if .arguments }}
+    	                <h3>Arguments</h3>
+    	                <ul>
+    	                {{ range $argname, $argdesc := .arguments }}
+    						{{ if $argname }}
+    	                        <li><code>{{ $argname }}</code>: {{ $argdesc }}</li>
+    						{{ else }}
+                                <li>No arguments provided: {{ $argdesc }}</li>
+    						{{ end }}
+    	                {{ end }}
+    	                </ul>
+    	            {{ end }}
+	            {{ end }}
+	        </div>
+		{{ partial "components/last-updated.html" . }}
+        {{ partial "components/pager.html" . }}
+        {{ partial "components/comments.html" . }}
+        </main>
+    </article>
+  </div>
+{{ end }}

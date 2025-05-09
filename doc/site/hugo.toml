@@ -1,0 +1,105 @@
+baseURL = 'https://beyond-all-reason.github.io/RecoilEngine/'
+languageCode = 'en-us'
+title = 'Recoil Engine'
+
+minify.minifyOutput = true
+
+[markup.goldmark.renderer]
+unsafe = true
+
+theme = "github.com/imfing/hextra"
+
+[module]
+[[module.imports]]
+path = "github.com/imfing/hextra"
+
+[params]
+repo = "https://github.com/beyond-all-reason/RecoilEngine/"
+
+[params.page]
+width = "full"
+
+[params.footer]
+enable = true
+displayCopyright = true
+displayuPoweredBy = true
+
+[params.search.flexsearch]
+index = "heading"
+
+[params.editUrl]
+enable = true
+base = "https://github.com/beyond-all-reason/RecoilEngine/edit/master/doc/site/content/"
+
+[params.navbar]
+displayTitle = false
+displayLogo = true
+[params.navbar.logo]
+path = "RecoilEngine_Logo_Light.svg"
+dark = "RecoilEngine_Logo_Dark.svg"
+width = 112
+
+[[menu.main]]
+identifier = "documentation"
+name = "Documentation"
+pageRef = "/docs"
+weight = 1
+
+[[menu.main]]
+identifier = "api"
+name = "API Reference"
+pageRef = "/docs/lua-api"
+weight = 2
+
+[[menu.main]]
+identifier = "articles"
+name = "Articles"
+pageRef = "/articles"
+weight = 3
+
+[[menu.main]]
+identifier = "development"
+name = "Development"
+pageRef = "/development"
+weight = 4
+
+[[menu.main]]
+identifier = "changelogs"
+name = "Changelogs"
+pageRef = "/changelogs"
+weight = 5
+
+[[menu.main]]
+identifier = "search"
+name = "Search"
+params.type = "search"
+weight = 6
+
+[[menu.main]]
+identifier = "github"
+name = "Github"
+params.icon = "github"
+url = "https://github.com/beyond-all-reason/RecoilEngine/"
+weight = 7
+
+[[menu.main]]
+identifier = "discord"
+name = "Discord"
+params.icon = "discord"
+url = "https://discord.gg/GUpRg6Wz3e"
+weight = 8
+
+[[menu.sidebar]]
+name = "More"
+weight = 1
+params.type = "separator"
+
+[[menu.sidebar]]
+name = "Github ↗"
+url = "https://github.com/beyond-all-reason/RecoilEngine/"
+weight = 2
+
+[[menu.sidebar]]
+name = "Discord ↗"
+url = "https://discord.gg/GUpRg6Wz3e"
+weight = 3

@@ -1,0 +1,52 @@
+{{ $owner := "beyond-all-reason" }}
+{{ $repo := "RecoilEngine" }}
+{{ $count := 100 }}
+{{ $max_pages := 5 }}
+
+{{ $data := slice }}
+
+{{ range $max_pages }}
+	{{- $url := printf "https://api.github.com/repos/%s/%s/contributors?per_page=%d&page=%d"
+	    $owner
+	    $repo
+	    $count
+		.
+	  }}
+	{{ with try (resources.GetRemote $url) }}
+		{{ with .Err }}
+			{{ errorf "uh oh sisters! unable to get remote resource %s: %s" $url .}}
+		{{ else }}
+			{{ $deserialized := .Value | transform.Unmarshal }}
+
+			{{ if not $deserialized }}
+				{{ break }}
+			{{ end }}
+
+			{{$data = append $data $deserialized }}
+		{{ end }}
+	{{ else }}
+		{{ errorf "uh oh sisters! unable to get remote resource %s: %s" $url .}}
+	{{ end }}
+{{ end }}
+
+{{ $gh_contributors := slice }}
+{{ with $data }}
+	{{ range $data }}
+		{{ $gh_contributors = $gh_contributors | append (dict "html_url" .html_url "avatar_url" .avatar_url "login" .login)}}
+	{{ end }}
+{{ end }}
+
+{{ $nonCoders := site.Data.non_coder_contributors }}
+{{ $allContributors := append $nonCoders ($gh_contributors | uniq) }}
+{{ $shuffled := shuffle $allContributors }}
+
+{{ $img_size := 48 }}
+<ul style="list-style-type: none; ">
+    {{ range $shuffled }}
+    <li style="display: inline-block;">
+        <a href="{{ .html_url }}">
+            <img src="{{ .avatar_url }}" width="{{ $img_size }}" height="{{ $img_size }}" alt="{{ .login }}">
+        </a>
+    </li>
+    {{ end }}
+</ul>

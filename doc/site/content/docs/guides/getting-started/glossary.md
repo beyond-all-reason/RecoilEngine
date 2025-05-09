@@ -1,0 +1,24 @@
+---
+title: "Glossary"
+draft: false
+---
+
+Like anything, there's jargon involved in Recoil. Here's the definition of some.
+
+| Term        | Remarks                                                                                                                                                                    | See More                                                              |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Allyteam    | What most people would naturally call a team is called an “allyteam” in Recoil terminology.                                                                                | [More]({{% ref "/articles/team-terminology/#allyteam-vs-team" %}})                  |
+| Team        | A team is generally controlled by a player or AI.                                                                                                                          | [More]({{% ref "/articles/team-terminology/#team-vs-player" %}})                    |
+| Spectator   | Spectators are players not controlling any teams.                                                                                                                          | [More]({{% ref "/articles/team-terminology/#regular-player-vs-spectator" %}})       |
+| AI          | A simulated player.                                                                                                                                                        | [More]({{% ref "articles/team-terminology/#player-vs-ai" %}})                       |
+| Lua AI      | A Lua AI generally has two components: a piece of game mechanics, and the AI instance itself which is just handle to tell game mechanics which teams are legal to control. | [More]({{% ref "/articles/team-terminology/#lua-ai-vs-skirmish-ai" %}})             |
+| Skirmish AI | A "skirmish" AI is hosted by one of the players and generally acts similar to a player.                                                                                    | [More]({{% ref "/articles/team-terminology/#lua-ai-vs-skirmish-ai" %}})             |
+| Gaia        | "Gaia" is a special team that is always present, uncontrolled, and is always its own Allyteam. Generally used for neutral units and features.                              | [More]({{% ref "/articles/team-terminology/#gaia" %}})                              |
+| Callin      | A callback that the engine executes on Lua scripts; it "calls in" to the Lua environment.                                                                                  | [Docs]({{% ref "/docs/lua-api/callins" %}})                                         |
+| Callout     | Any function in the Lua API that comes from the engine. It "calls out" from Lua.                                                                                           | [Spring API]({{% ref "/docs/lua-api/spring" %}}) [Script API]({{% ref "/docs/lua-api/script" %}}) |
+| Unit        | Any controllable or commandable entity; usually a soldier or a building.                                                                                                   |                                                                       |
+| Feature     | Any non-commandable, but interactible, prop or item; usually trees, rocks, set dressing, etc.                                                                              |                                                                       |
+| Map         | A game arena.                                                                                                                                                              |                                                                       |
+| Scenario    | A version of a map with scripted events, zones, and mechanics.                                                                                                             |                                                                       |
+| Widget      | A Lua script that can control UI.                                                                                                                                          |                                                                       |
+| Gadget      | A Lua script that can control game mechanics.                                                                                                                              |                                                                       |
