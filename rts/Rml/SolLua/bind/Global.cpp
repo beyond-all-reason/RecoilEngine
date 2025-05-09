@@ -285,6 +285,16 @@
 		 );
 		/***
 		 * @enum RmlUi.key_identifier
+		 * @field ["0"] integer
+		 * @field ["1"] integer
+		 * @field ["2"] integer
+		 * @field ["3"] integer
+		 * @field ["4"] integer
+		 * @field ["5"] integer
+		 * @field ["6"] integer
+		 * @field ["7"] integer
+		 * @field ["8"] integer
+		 * @field ["9"] integer
 		 */
 		 namespace_table.set("key_identifier", sol::readonly_property([](sol::this_state l) {
 			sol::state_view lua(l);
@@ -295,25 +305,15 @@
 			KEY_ENUM(UNKNOWN);
 			/*** @field RmlUi.key_identifier.SPACE integer */
 			KEY_ENUM(SPACE);
-			/*** @field RmlUi.key_identifier.0 integer */
 			KEY_ENUM(0);
-			/*** @field RmlUi.key_identifier.1 integer */
 			KEY_ENUM(1);
-			/*** @field RmlUi.key_identifier.2 integer */
 			KEY_ENUM(2);
-			/*** @field RmlUi.key_identifier.3 integer */
 			KEY_ENUM(3);
-			/*** @field RmlUi.key_identifier.4 integer */
 			KEY_ENUM(4);
-			/*** @field RmlUi.key_identifier.5 integer */
 			KEY_ENUM(5);
-			/*** @field RmlUi.key_identifier.6 integer */
 			KEY_ENUM(6);
-			/*** @field RmlUi.key_identifier.7 integer */
 			KEY_ENUM(7);
-			/*** @field RmlUi.key_identifier.8 integer */
 			KEY_ENUM(8);
-			/*** @field RmlUi.key_identifier.9 integer */
 			KEY_ENUM(9);
 			/*** @field RmlUi.key_identifier.A integer */
 			KEY_ENUM(A);
