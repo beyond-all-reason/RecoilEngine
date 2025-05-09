@@ -276,16 +276,11 @@
 			  */
 			 "SetDebugContext", sol::overload(&functions::setDebugContext, &functions::setDebugContextByName),
  
-			 /***
-			  * Global functions for Recoil's RmlUi implementation. 
-			  * @table RmlUi
-			  * @field contexts RmlUi.Context[]
-			  * @field version string RmlUi version
-			  */
- 
 			 // G
+			 /*** @field RmlUi.contexts RmlUi.Context[] */
 			 "contexts", sol::readonly_property(&getIndexedTable<Rml::Context, &functions::getContext, &functions::getMaxContexts>),
 			 //--
+			 /*** @field RmlUi.version string RmlUi version */
 			 "version", sol::readonly_property(&Rml::GetVersion)
 		 );
 		 /***
