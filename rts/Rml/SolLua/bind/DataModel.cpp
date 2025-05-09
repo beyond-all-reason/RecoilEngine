@@ -65,13 +65,6 @@ namespace Rml::SolLua
 		 * @class RmlUi.SolLuaDataModel<T>
 		 */
 
-		/***
-		 * Get the underlying table. Note: Implemented in next release as of May 9 2025. See [PR](https://github.com/beyond-all-reason/RecoilEngine/pull/2241)
-		 * @generic T
-		 * @function RmlUi.SolLuaDataModel<T>:__GetTable
-		 * @return T
-		 */
-		
 		namespace_table.new_usertype<SolLuaDataModel>("SolLuaDataModel", sol::no_constructor,
 			sol::meta_function::index, &functions::dataModelGet,
 			sol::meta_function::new_index, &functions::dataModelSet,
