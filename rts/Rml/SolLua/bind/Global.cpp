@@ -284,7 +284,7 @@
 			 "version", sol::readonly_property(&Rml::GetVersion)
 		 );
 		 /***
-		  * @alias RmlUi.key_identifier
+		  * @enum RmlUi.key_identifier
 		  * | "UNKNOWN"
 		  * | "SPACE"
 		  * | "0"
@@ -646,7 +646,14 @@
 			 return t;
 		 }));
 		 /***
-		  * @alias RmlUi.key_modifier "CTRL" | "SHIFT" | "ALT" | "META" | "CAPSLOCK" | "NUMLOCK" | "SCROLLOCK"
+		  * @enum RmlUi.key_modifier 
+		  * | "CTRL" 
+		  * | "SHIFT" 
+		  * | "ALT" 
+		  * | "META" 
+		  * | "CAPSLOCK" 
+		  * | "NUMLOCK" 
+		  * | "SCROLLOCK"
 		  */
 		 namespace_table.set("key_modifier", sol::readonly_property([](sol::this_state l) {
 			 sol::state_view lua(l);
@@ -661,7 +668,10 @@
 			 );
 		 }));
 		 /***
-		  * @alias RmlUi.font_weight "Auto" | "Normal" | "Bold"
+		  * @enum RmlUi.font_weight 
+		  * | "Auto" 
+		  * | "Normal" 
+		  * | "Bold"
 		  */
 		 namespace_table.set("font_weight", sol::readonly_property([](sol::this_state l) {
 			 sol::state_view lua(l);
@@ -672,7 +682,10 @@
 			 );
 		 }));
 		 /***
-		  * @alias RmlUi.default_action_phase "None" | "Target" | "TargetAndBubble"
+		  * @enum RmlUi.default_action_phase 
+		  * | "None" 
+		  * | "Target" 
+		  * | "TargetAndBubble"
 		  */
 		 namespace_table.set("default_action_phase", sol::readonly_property([](sol::this_state l) {
 			 sol::state_view lua(l);

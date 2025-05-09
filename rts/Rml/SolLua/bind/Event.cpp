@@ -64,7 +64,7 @@ namespace Rml::SolLua
 	{
 		//--
 		/***
-		 * @alias RmlUi.RmlEventPhase
+		 * @enum RmlUi.RmlEventPhase
 		 * | "None"
 		 * | "Capture"
 		 * | "Target"
@@ -105,40 +105,40 @@ namespace Rml::SolLua
 		 */
 
 		/***
+		 * An event that happens to an element.
 		 * @class RmlUi.Event
-		 * @field current_element RmlUi.Element
-		 * @field type string
-		 * @field parameters RmlUi.EventParametersProxy
-		 * @field event_phase RmlUi.RmlEventPhase
-		 * @field interruptible boolean
-		 * @field propogating boolean
-		 * @field immediate_propogating boolean
 		 */
-
-		/***
-		 * function RmlUi.Event:StopPropogation
-		 */
-
-		/***
-		 * function RmlUi.Event:StopImmediatePropogation
-		 */
+		
 		namespace_table.new_usertype<Rml::Event>("Event", sol::no_constructor,
 			// M
+			/***
+			 * function RmlUi.Event:StopPropogation
+			 */
 			"StopPropagation", &Rml::Event::StopPropagation,
 			//--
+			/***
+			 * function RmlUi.Event:StopImmediatePropogation
+			 */
 			"StopImmediatePropagation", &Rml::Event::StopImmediatePropagation,
 
 			// G+S
 
 			// G
+			/*** @field RmlUi.Event.current_element RmlUi.Element */
 			"current_element", sol::readonly_property(&Rml::Event::GetCurrentElement),
+			/*** @field RmlUi.Event.type string */
 			"type", sol::readonly_property(&Rml::Event::GetType),
 			"target_element", sol::readonly_property(&Rml::Event::GetTargetElement),
+			/*** @field RmlUi.Event.parameters RmlUi.EventParametersProxy */
 			"parameters", sol::readonly_property(&functions::getParameters),
 			//--
+			/*** @field RmlUi.Event.event_phase RmlUi.RmlEventPhase */
 			"event_phase", sol::readonly_property(&Rml::Event::GetPhase),
+			/*** @field RmlUi.Event.interruptible boolean */
 			"interruptible", sol::readonly_property(&Rml::Event::IsInterruptible),
+			/*** @field RmlUi.Event.propagating boolean */
 			"propagating", sol::readonly_property(&Rml::Event::IsPropagating),
+			/*** @field RmlUi.Event.immediate_propagating boolean */
 			"immediate_propagating", sol::readonly_property(&Rml::Event::IsImmediatePropagating)
 		);
 	}

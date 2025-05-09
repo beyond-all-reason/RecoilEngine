@@ -62,17 +62,24 @@ namespace Rml::SolLua
 		 * You can access fields by using normal indexing, but for the moment, the only keys that work are strings. Any index done this way will automatically trigger a rerender.
 		 * If you need to index any tables or subtables by anything not a string, you will need to use the underlying table, gotten with `__GetTable`. This will not trigger a rerender.
 		 * To trigger a rerender manually, use `_SetDirty`, passing in the name of the top-level entry in your model table that you edited.
-		 * @class RmlUi.SolLuaDataModel<T> : {__GetTable:fun():T}
+		 * @class RmlUi.SolLuaDataModel<T>
 		 */
 
-		 /***
-		  * Set a table property dirty to trigger a rerender
-		  * @function RmlUi.SolLuaDataModel:__SetDirty
-		  * @param property string
-		  */
+		/***
+		 * Get the underlying table. Note: Implemented in next release as of May 9 2025. See [PR](https://github.com/beyond-all-reason/RecoilEngine/pull/2241)
+		 * @generic T
+		 * @function RmlUi.SolLuaDataModel<T>:__GetTable
+		 * @return T
+		 */
+		
 		namespace_table.new_usertype<SolLuaDataModel>("SolLuaDataModel", sol::no_constructor,
 			sol::meta_function::index, &functions::dataModelGet,
 			sol::meta_function::new_index, &functions::dataModelSet,
+			/***
+			 * Set a table property dirty to trigger a rerender
+			 * @function RmlUi.SolLuaDataModel:__SetDirty
+			 * @param property string
+			 */
 			"__SetDirty", &functions::dataModelSetDirty
 		);
 	}
