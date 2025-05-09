@@ -663,7 +663,7 @@
 				"CAPSLOCK", Rml::Input::KM_CAPSLOCK,
 				/*** @field RmlUi.key_modifier.NUMLOCK integer */
 				"NUMLOCK", Rml::Input::KM_NUMLOCK,
-				/*** @field RmlUi.key_modifier.SCROLLOCK integer */
+				/*** @field RmlUi.key_modifier.SCROLLLOCK integer */
 				"SCROLLLOCK", Rml::Input::KM_SCROLLLOCK
 			 );
 		 }));

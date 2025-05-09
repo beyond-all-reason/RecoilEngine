@@ -65,15 +65,15 @@ namespace Rml::SolLua
 		//--
 		/***
 		 * @enum RmlUi.RmlEventPhase
-		 * | "None"
-		 * | "Capture"
-		 * | "Target"
-		 * | "Bubble"
 		 */
 		namespace_table.new_enum("RmlEventPhase",
+			/*** @field RmlUi.RmlEventPhase.None integer */
 			"None", Rml::EventPhase::None,
+			/*** @field RmlUi.RmlEventPhase.Capture integer */
 			"Capture", Rml::EventPhase::Capture,
+			/*** @field RmlUi.RmlEventPhase.Target integer */
 			"Target", Rml::EventPhase::Target,
+			/*** @field RmlUi.RmlEventPhase.Bubble integer */
 			"Bubble", Rml::EventPhase::Bubble
 		);
 

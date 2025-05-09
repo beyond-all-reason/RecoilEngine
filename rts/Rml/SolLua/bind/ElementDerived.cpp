@@ -43,10 +43,10 @@ namespace Rml::SolLua
 	{
 		/***
 		 * @class RmlUi.ElementText : RmlUi.Element
-		 * @field text string
 		 */
 		namespace_table.new_usertype<Rml::ElementText>("ElementText", sol::no_constructor,
 			// G
+			/*** @field RmlUi.ElementText.text string */
 			"text", sol::property(&Rml::ElementText::GetText, &Rml::ElementText::SetText),
 
 			// B
@@ -56,39 +56,37 @@ namespace Rml::SolLua
 		///////////////////////////
 		/***
 		 * @class RmlUi.ElementTabSet : RmlUi.Element
-		 * @field active_tab integer
-		 * @field num_tabs integer
 		 */
-
-		/***
-		 * Sets the contents of a panel to the RML content rml. If index is out-of-bounds, a new panel will be added at the end.
-		 * @function RmlUi.ElementTabSet:SetPanel
-		 * @param index integer
-		 * @param rml string
-		 */
-
-		/***
-		 * Sets the contents of a tab to the RML content rml. If index is out-of-bounds, a new tab will be added at the end.
-		 * @function RmlUi.ElementTabSet:SetTab
-		 * @param index integer
-		 * @param rml string
-		 */
-
-		 /***
-		  * @function RmlUi.ElementTabSet:RemoveTab
-		  * @param index integer
-		  */
+		 
 		namespace_table.new_usertype<Rml::ElementTabSet>("ElementTabSet", sol::no_constructor,
 			// M
+			/***
+			 * Sets the contents of a panel to the RML content rml. If index is out-of-bounds, a new panel will be added at the end.
+			 * @function RmlUi.ElementTabSet:SetPanel
+			 * @param index integer
+			 * @param rml string
+			 */
 			"SetPanel", sol::resolve<void(int, const Rml::String&)>(&Rml::ElementTabSet::SetPanel),
+			/***
+			 * Sets the contents of a tab to the RML content rml. If index is out-of-bounds, a new tab will be added at the end.
+			 * @function RmlUi.ElementTabSet:SetTab
+			 * @param index integer
+			 * @param rml string
+			 */
 			"SetTab", sol::resolve<void(int, const Rml::String&)>(&Rml::ElementTabSet::SetTab),
 			//--
+			/***
+			 * @function RmlUi.ElementTabSet:RemoveTab
+			 * @param index integer
+			 */
 			"RemoveTab", &Rml::ElementTabSet::RemoveTab,
 
 			// G+S
+			/*** @field RmlUi.ElementTabSet.active_tab integer */
 			"active_tab", sol::property(&Rml::ElementTabSet::GetActiveTab, &Rml::ElementTabSet::SetActiveTab),
 
 			// G
+			/*** @field RmlUi.ElementTabSet.num_tabs integer */
 			"num_tabs", &Rml::ElementTabSet::GetNumTabs,
 
 			// B
@@ -100,13 +98,13 @@ namespace Rml::SolLua
 		//--
 		/***
 		 * @class RmlUi.ElementProgress : RmlUi.Element
-		 * @field value number
-		 * @field max number
 		 */
 		namespace_table.new_usertype<Rml::ElementProgress>("ElementProgress", sol::no_constructor,
 			// G+S
 			//--
+			/*** @field RmlUi.ElementProgress.value number */
 			"value", sol::property(&Rml::ElementProgress::GetValue, &Rml::ElementProgress::SetValue),
+			/*** @field RmlUi.ElementProgress.max number */
 			"max", sol::property(&Rml::ElementProgress::GetMax, &Rml::ElementProgress::SetMax),
 
 			// B
