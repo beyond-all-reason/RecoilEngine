@@ -61,13 +61,17 @@ namespace Rml::SolLua
 			sol::meta_function::equal_to, &Rml::Colourb::operator==,
 
 			// G+S
+			/*** @field RmlUi.Colourb.red integer */
 			"red",   sol::property([](Rml::Colourb& self) { return self.red;   }, [](Rml::Colourb& self, Rml::byte value) { self.red   = value; }),
+			/*** @field RmlUi.Colourb.green integer */
 			"green", sol::property([](Rml::Colourb& self) { return self.green; }, [](Rml::Colourb& self, Rml::byte value) { self.green = value; }),
+			/*** @field RmlUi.Colourb.blue integer */
 			"blue",  sol::property([](Rml::Colourb& self) { return self.blue;  }, [](Rml::Colourb& self, Rml::byte value) { self.blue  = value; }),
+			/*** @field RmlUi.Colourb.alpha integer */
 			"alpha", sol::property([](Rml::Colourb& self) { return self.alpha; }, [](Rml::Colourb& self, Rml::byte value) { self.alpha = value; }),
+			/*** @field RmlUi.Colourb.rgba [integer, integer, integer, integer] */
 			"rgba", sol::property(static_cast<ColourbTuple(*)(Rml::Colourb&)>(&getRGBA), static_cast<void(*)(Rml::Colourb&, ColourbTuple)>(&setRGBA))
 		);
-
 		bindings.new_usertype<Rml::Colourf>("Colourf", sol::constructors<Rml::Colourf(), Rml::Colourf(float, float, float), Rml::Colourf(float, float, float, float)>(),
 			// O
 			sol::meta_function::addition, &Rml::Colourf::operator+,
@@ -77,10 +81,15 @@ namespace Rml::SolLua
 			sol::meta_function::equal_to, &Rml::Colourf::operator==,
 
 			// G+S
+			/*** @field RmlUi.Colourf.red number */
 			"red",   sol::property([](Rml::Colourf& self) { return self.red;   }, [](Rml::Colourf& self, float value) { self.red   = value; }),
+			/*** @field RmlUi.Colourf.green number */
 			"green", sol::property([](Rml::Colourf& self) { return self.green; }, [](Rml::Colourf& self, float value) { self.green = value; }),
+			/*** @field RmlUi.Colourf.blue number */
 			"blue",  sol::property([](Rml::Colourf& self) { return self.blue;  }, [](Rml::Colourf& self, float value) { self.blue  = value; }),
+			/*** @field RmlUi.Colourf.alpha number */
 			"alpha", sol::property([](Rml::Colourf& self) { return self.alpha; }, [](Rml::Colourf& self, float value) { self.alpha = value; }),
+			/*** @field RmlUi.Colourf.rgba [number, number, number, number] */
 			"rgba", sol::property(static_cast<ColourfTuple(*)(Rml::Colourf&)>(&getRGBA), static_cast<void(*)(Rml::Colourf&, ColourfTuple)>(&setRGBA))
 		);
 	}

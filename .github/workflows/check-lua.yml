@@ -3,26 +3,30 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'rts/Lua/**'
+      - rts/Lua/**
+      - rts/Rml/SolLua/**/*.cpp
   push:
     branches:
       - master
     paths:
-      - 'rts/Lua/**'
+      - rts/Lua/**
+      - rts/Rml/SolLua/**/*.cpp
 jobs:
-  cehck-library:
+  check-library:
     name: Check library
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Lua CPP files
         uses: actions/checkout@v4
         with:
-          sparse-checkout: rts/Lua
+          sparse-checkout: |
+            rts/Lua
+            rts/Rml/SolLua
 
       - name: Generate Lua library
         run: |
           npm install -g lua-doc-extractor@3
-          lua-doc-extractor rts/Lua/*.cpp \
+          lua-doc-extractor "rts/Lua/**/*.cpp" "rts/Rml/SolLua/**/*.cpp" \
             --dest rts/Lua/library/generated \
             --repo https://github.com/${{ github.repository }}/blob/${{ github.sha }} \
             --error
@@ -43,3 +47,9 @@ jobs:
       - name: Check 
         run: |
           ./lls/bin/lua-language-server --check rts/Lua/library
+      
+      - name: Upload Lua Library artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{github.run_id}}-library
+          path: rts/Lua/library/

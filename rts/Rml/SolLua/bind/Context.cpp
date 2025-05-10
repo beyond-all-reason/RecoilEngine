@@ -279,15 +279,42 @@ auto getElementAtPoint2(Rml::Context& self, Rml::Vector2f point, Rml::Element& i
 void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 {
 	// clang-format off
+
+	/***
+	 * Holds documents and a data model.
+	 * The Context class has no constructor; it must be instantiated through the CreateContext() function. It has the following functions and properties:
+	 * @class RmlUi.Context
+	 */
+
 	namespace_table.new_usertype<Rml::Context>(
 		"Context", sol::no_constructor,
 		// M
+		/***
+		 * Adds the inline Lua script, script, as an event listener to the context. element_context is an optional Element; if it is not None, then the script will be executed as if it was bound to that element.
+		 * @function RmlUi.Context:AddEventListener
+		 * @param event string
+		 * @param script RmlUi.Element
+		 * @param element_context boolean
+		 * @param in_capture_phase boolean
+		 */
 		"AddEventListener", &Rml::Context::AddEventListener,
+		/***
+		 * Creates a new document with the tag name of tag.
+		 * @function RmlUi.Context:CreateDocument
+		 * @param tag string
+		 * @return RmlUi.Document
+		 */
 		"CreateDocument", [slp](Rml::Context& self) {
 			auto doc = self.CreateDocument();
 			slp->AddDocumentTracking(doc);
 			return doc;
 		},
+		/***
+		 * Attempts to load a document from the RML file found at document_path. If successful, the document will be returned with a reference count of one.
+		 * @function RmlUi.Context:LoadDocument
+		 * @param document_path string
+		 * @return RmlUi.Document
+		 */
 		"LoadDocument", [slp](Rml::Context& self, const Rml::String& document, const sol::object& widget) {
 			auto doc = self.LoadDocument(document);
 			if (doc == nullptr) {
@@ -298,40 +325,176 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 			env["widget"] = widget;
 			return dynamic_cast<SolLuaDocument*>(doc);
 		},
+		/***
+		 * @function RmlUi.Context:GetDocument
+		 * @param name string
+		 */
 		"GetDocument", &document::getDocumentBypassString,
+		/***
+		 * Renders the context.
+		 * @function RmlUi.Context:Render
+		 * @return boolean
+		 */
 		"Render", &Rml::Context::Render,
+		/***
+		 * Closes all documents currently loaded with the context.
+		 * @function RmlUi.Context:UnloadAllDocuments
+		 */
 		"UnloadAllDocuments", &Rml::Context::UnloadAllDocuments,
+		/***
+		 * Unloads a specific document within the context.
+		 * @function RmlUi.Context:UnloadDocument
+		 * @param document RmlUi.Document
+		 */
 		"UnloadDocument", &Rml::Context::UnloadDocument,
+		/***
+		 * Updates the context.
+		 * @function RmlUi.Context:Update
+		 * @return boolean
+		 */
 		"Update", &Rml::Context::Update,
+		/***
+		 * Create a new data model from a base table `model` and register to the context. The model table is copied. 
+		 * Note that `widget` does not actually have to be a widget; it can be any table. This table can be accessed in widgets like `<button class="mode-button" onclick="widget:SetCamMode()">Set Dolly Mode</button>`. Also note that your data model is inaccessible in `onx` properties.
+		 * @function RmlUi.Context:OpenDataModel
+		 * @generic T
+		 * @param name string
+		 * @param model T
+		 * @param widget table
+		 * @return RmlUi.SolLuaDataModel<T>
+		 */
 		"OpenDataModel", &datamodel::openDataModel,
+		/***
+		 * Removes a data model from the context.
+		 * @function RmlUi.Context:RemoveDataModel
+		 * @param name string
+		 */
 		"RemoveDataModel", &Rml::Context::RemoveDataModel,
+		/***
+		 * Processes a mouse move event.
+		 * @function RmlUi.Context:ProcessMouseMove
+		 * @param position RmlUi.Vector2f
+		 * @return boolean
+		 */
 		"ProcessMouseMove", &Rml::Context::ProcessMouseMove,
+		/***
+		 * Processes a mouse button down event.
+		 * @function RmlUi.Context:ProcessMouseButtonDown
+		 * @param button RmlUi.MouseButton
+		 * @param key_modifier_state integer
+		 * @return boolean
+		 */
 		"ProcessMouseButtonDown", &Rml::Context::ProcessMouseButtonDown,
+		/***
+		 * Processes a mouse button up event.
+		 * @function RmlUi.Context:ProcessMouseButtonUp
+		 * @param button RmlUi.MouseButton
+		 * @param key_modifier_state integer
+		 * @return boolean
+		 */
 		"ProcessMouseButtonUp", &Rml::Context::ProcessMouseButtonUp,
+		/***
+		 * Processes a mouse wheel event.
+		 * @function RmlUi.Context:ProcessMouseWheel
+		 * @param delta RmlUi.Vector2f | number
+		 * @param key_modifier_state integer
+		 * @return boolean
+		 */
 		"ProcessMouseWheel", sol::overload(
 			static_cast<bool (Rml::Context::*)(float, int)>(&Rml::Context::ProcessMouseWheel),
 			static_cast<bool (Rml::Context::*)(Vector2f, int)>(&Rml::Context::ProcessMouseWheel)),
+		/***
+		 * Processes a mouse leave event.
+		 * @function RmlUi.Context:ProcessMouseLeave
+		 * @return boolean
+		 */
 		"ProcessMouseLeave", &Rml::Context::ProcessMouseLeave,
+		/***
+		 * Returns true if the mouse is currently interacting with the context, false if not.
+		 * @function RmlUi.Context:IsMouseInteracting
+		 * @return boolean
+		 */
 		"IsMouseInteracting", &Rml::Context::IsMouseInteracting,
+		/***
+		 * Processes a key down event.
+		 * @function RmlUi.Context:ProcessKeyDown
+		 * @param key RmlUi.key_identifier
+		 * @param key_modifier_state integer
+		 * @return boolean
+		 */
 		"ProcessKeyDown", &Rml::Context::ProcessKeyDown,
+		/***
+		 * Processes a key up event.
+		 * @function RmlUi.Context:ProcessKeyUp
+		 * @param key RmlUi.key_identifier
+		 * @param key_modifier_state integer
+		 * @return boolean
+		 */
 		"ProcessKeyUp", &Rml::Context::ProcessKeyUp,
+		/***
+		 * Processes a text input event.
+		 * @function RmlUi.Context:ProcessTextInput
+		 * @param text string
+		 * @return boolean
+		 */
 		"ProcessTextInput", sol::resolve<bool(const Rml::String&)>(&Rml::Context::ProcessTextInput),
 		//--
+		/***
+		 * Enables or disables the mouse cursor for the context.
+		 * @function RmlUi.Context:EnableMouseCursor
+		 * @param enable boolean
+		 */
 		"EnableMouseCursor", &Rml::Context::EnableMouseCursor,
+		/***
+		 * Activates a theme for the context.
+		 * @function RmlUi.Context:ActivateTheme
+		 * @param theme_name string
+		 * @param activate boolean
+		 */
 		"ActivateTheme",&Rml::Context::ActivateTheme,
+		/***
+		 * Returns true if the theme is active, false if not.
+		 * @function RmlUi.Context:IsThemeActive
+		 * @param theme_name string
+		 * @return boolean
+		 */
 		"IsThemeActive", &Rml::Context::IsThemeActive,
+		/***
+		 * Returns the element at the point specified by point.
+		 * @function RmlUi.Context:GetElementAtPoint
+		 * @param point RmlUi.Vector2f
+		 * @param ignore RmlUi.Element?
+		 * @return RmlUi.Element
+		 */
 		"GetElementAtPoint", sol::overload(&element::getElementAtPoint1, &element::getElementAtPoint2),
+		/***
+		 * Pulls the document to the front of the context.
+		 * @function RmlUi.Context:PullDocumentToFront
+		 * @param document RmlUi.Document
+		 */
 		"PullDocumentToFront", &Rml::Context::PullDocumentToFront,
+		/***
+		 * Pushes the document to the back of the context.
+		 * @function RmlUi.Context:PushDocumentToBack
+		 * @param document RmlUi.Document
+		 */
 		"PushDocumentToBack",&Rml::Context::PushDocumentToBack, "UnfocusDocument", &Rml::Context::UnfocusDocument,
 
 		// G+S
+		/*** @field RmlUi.Context.dimensions RmlUi.Vector2i */
 		"dimensions", sol::property(&Rml::Context::GetDimensions, &Rml::Context::SetDimensions),
+		/*** @field RmlUi.Context.dp_ratio number */
 		"dp_ratio", sol::property(&Rml::Context::GetDensityIndependentPixelRatio, &Rml::Context::SetDensityIndependentPixelRatio),
 		// G
+		/*** @field RmlUi.Context.documents RmlUi.Document[] */
 		"documents", sol::readonly_property(&getIndexedTable<SolLuaDocument, Rml::Context, &document::getDocument, &Rml::Context::GetNumDocuments>),
+		/*** @field RmlUi.Context.focus_element RmlUi.Element */
 		"focus_element", sol::readonly_property(&Rml::Context::GetFocusElement),
+		/*** @field RmlUi.Context.hover_element RmlUi.Element */
 		"hover_element", sol::readonly_property(&Rml::Context::GetHoverElement),
+		/*** @field RmlUi.Context.name string */
 		"name", sol::readonly_property(&Rml::Context::GetName),
+		/*** @field RmlUi.Context.root_element RmlUi.Element */
 		"root_element", sol::readonly_property(&Rml::Context::GetRootElement));
 	// clang-format on
 }

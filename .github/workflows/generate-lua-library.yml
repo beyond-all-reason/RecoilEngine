@@ -5,7 +5,8 @@ on:
     branches:
       - master
     paths:
-      - 'rts/Lua/**'
+      - rts/Lua/**
+      - rts/Rml/SolLua/**/*.cpp
 jobs:
   generate-library:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
@@ -20,7 +21,9 @@ jobs:
       - name: Checkout Lua CPP files
         uses: actions/checkout@v4
         with:
-          sparse-checkout: rts/Lua
+          sparse-checkout: |
+            rts/Lua
+            rts/Rml/SolLua
           path: recoil
 
       # NOTE: This step is duplicated in `publish-site.yml`
@@ -28,7 +31,7 @@ jobs:
         working-directory: recoil
         run: |
           npm install -g lua-doc-extractor@3
-          lua-doc-extractor rts/Lua/*.cpp \
+          lua-doc-extractor "rts/Lua/**/*.cpp" "rts/Rml/SolLua/**/*.cpp" \
             --dest rts/Lua/library/generated \
             --repo https://github.com/${{ github.repository }}/blob/${{ github.sha }}
 
