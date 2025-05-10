@@ -120,5 +120,28 @@ namespace springproc {
 
 		smtDetected = !!( processorMasks.hyperThreadLowMask | processorMasks.hyperThreadHighMask );
 	}
+	std::string CPUID::GetCPUBrandString() {
+        // Check if the CPU supports the extended CPUID leaves for the brand string
+        unsigned int eax = 0x80000000, ebx, ecx, edx;
+        ExecCPUID(&eax, &ebx, &ecx, &edx);
+        if (eax < 0x80000004) {
+            return "Unknown CPU";
+        }
+
+        // Buffer to hold the 48-byte brand string
+        char brand[49] = {0};
+        unsigned int regs[REG_CNT];
+
+        // Query leaves 0x80000002, 0x80000003, and 0x80000004
+        for (int i = 0; i < 3; ++i) {
+            regs[REG_EAX] = 0x80000002 + i;
+            regs[REG_ECX] = 0; // Subleaf is 0
+            ExecCPUID(&regs[REG_EAX], &regs[REG_EBX], &regs[REG_ECX], &regs[REG_EDX]);
+            std::memcpy(&brand[i * 16], regs, 16);
+        }
+
+        // Return the brand string as a std::string
+        return std::string(brand);
+    }
 
 }

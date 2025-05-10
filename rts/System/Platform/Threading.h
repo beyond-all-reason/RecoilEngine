@@ -124,6 +124,7 @@ namespace Threading {
 	int GetLogicalCpuCores();  /// physical + hyperthreading
 	int GetPerformanceCpuCores(); /// performance physical cores only (excluding hyperthreading or efficiency cores)
 	bool HasHyperThreading();
+	std::string GetCPUBrand();
 
 	uint32_t GetSystemAffinityMask();
 	uint32_t GetPreferredMainThreadMask();
