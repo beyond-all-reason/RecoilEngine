@@ -21,14 +21,14 @@ public:
 		if (stateTexUnit != texUnit)
 			glActiveTexture(texUnit);
 
-		restoredTextureID = GL::FetchCurrentSlotTextureID(target);
+		restoredTextureID = GL::FetchCurrentSlotBoundTextureID(target);
 		glBindTexture(target, textureID);
 	}
 	inline TexBind(GLenum target, GLuint textureID)
 	: stateTexUnit(GL::FetchEffectualStateAttribValue<GLenum>(GL_ACTIVE_TEXTURE))
 	, texUnit(stateTexUnit)
 	, target(target)
-	, restoredTextureID(GL::FetchCurrentSlotTextureID(target))
+	, restoredTextureID(GL::FetchCurrentSlotBoundTextureID(target))
 	{
 		glBindTexture(target, textureID);
 	}
