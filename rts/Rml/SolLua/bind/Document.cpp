@@ -100,31 +100,31 @@ namespace Rml::SolLua
 	void bind_document(sol::table& namespace_table)
 	{
 		/***
-		 * @enum RmlModalFlag 
-		 * | "None" 
-		 * | "Modal" 
-		 * | "Keep"
+		 * @enum RmlUi.RmlModalFlag 
 		 */
 		namespace_table.new_enum<Rml::ModalFlag>("RmlModalFlag",
 			{
+				/*** @field RmlUi.RmlModalFlag.None integer */
 				{ "None", Rml::ModalFlag::None },
+				/*** @field RmlUi.RmlModalFlag.Modal integer */
 				{ "Modal", Rml::ModalFlag::Modal },
+				/*** @field RmlUi.RmlModalFlag.Keep integer */
 				{ "Keep", Rml::ModalFlag::Keep }
 			}
 		);
 
 		/***
-		 * @enum RmlFocusFlag 
-		 * | "None" 
-		 * | "Document" 
-		 * | "Keep" 
-		 * | "Auto"
+		 * @enum RmlUi.RmlFocusFlag 
 		 */
 		namespace_table.new_enum<Rml::FocusFlag>("RmlFocusFlag",
 			{
+				/*** @field RmlUi.RmlFocusFlag.None integer */
 				{ "None", Rml::FocusFlag::None },
+				/*** @field RmlUi.RmlFocusFlag.Document integer */
 				{ "Document", Rml::FocusFlag::Document },
+				/*** @field RmlUi.RmlFocusFlag.Keep integer */
 				{ "Keep", Rml::FocusFlag::Keep },
+				/*** @field RmlUi.RmlFocusFlag.Auto integer */
 				{ "Auto", Rml::FocusFlag::Auto }
 			}
 		);
@@ -149,8 +149,8 @@ namespace Rml::SolLua
 			/***
 			 * Shows the document.
 			 * @function RmlUi.Document:Show
-			 * @param modal RmlModalFlag? Defaults to Focus
-			 * @param focus RmlFocusFlag?
+			 * @param modal RmlUi.RmlModalFlag? Defaults to Focus
+			 * @param focus RmlUi.RmlFocusFlag?
 			 */
 			"Show", sol::overload(&document::show, &document::showModal, &document::showModalFocus),
 			/***
@@ -220,7 +220,7 @@ namespace Rml::SolLua
 			//--
 			/*** @field RmlUi.Document.url string */
 			"url", sol::readonly_property(&SolLuaDocument::GetSourceURL),
-			/*** @field RmlUi.Document.modal boolean is it modal? */
+			/*** @field RmlUi.Document.modal boolean Is it modal? */
 			"modal", sol::readonly_property(&SolLuaDocument::IsModal),
 			/*** @field RmlUi.Document.widget table A table of data that can be accessed in onevent attributes. It doesn't have to be a widget. */
 			"widget", sol::readonly_property(&document::getWidget),

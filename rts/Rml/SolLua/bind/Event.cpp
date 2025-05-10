@@ -128,6 +128,7 @@ namespace Rml::SolLua
 			"current_element", sol::readonly_property(&Rml::Event::GetCurrentElement),
 			/*** @field RmlUi.Event.type string */
 			"type", sol::readonly_property(&Rml::Event::GetType),
+			/*** @field RmlUi.Event.target_element RmlUi.Element What element it happened to */
 			"target_element", sol::readonly_property(&Rml::Event::GetTargetElement),
 			/*** @field RmlUi.Event.parameters RmlUi.EventParametersProxy */
 			"parameters", sol::readonly_property(&functions::getParameters),
