@@ -85,30 +85,31 @@ namespace Rml::SolLua
 		 */
 
 		/***
+		 * RmlUi uses 0 and 1 to represent boolean values here.
 		 * @alias RmlUi.EventParametersProxy.TrueFalse
 		 * | 0 # False
 		 * | 1 # True
 		 */
 
 		/***
-		 * @alias RmlUi.EventParametersProxy {
-		 * button: RmlUi.EventParametersProxy.MouseButton,
-		 * mouse_x: integer,
-		 * mouse_y: integer,
-		 * scroll_lock_key: RmlUi.EventParametersProxy.TrueFalse,
-		 * meta_key: RmlUi.EventParametersProxy.TrueFalse,
-		 * ctrl_key: RmlUi.EventParametersProxy.TrueFalse,
-		 * shift_key: RmlUi.EventParametersProxy.TrueFalse,
-		 * caps_lock_key: RmlUi.EventParametersProxy.TrueFalse,
-		 * alt_key: RmlUi.EventParametersProxy.TrueFalse,
-		 * }
+		 * Keyboard and mouse input data associated with an event.
+		 * @class RmlUi.EventParametersProxy
+		 * @field button RmlUi.EventParametersProxy.MouseButton
+		 * @field mouse_x integer
+		 * @field mouse_y integer
+		 * @field scroll_lock_key RmlUi.EventParametersProxy.TrueFalse
+		 * @field meta_key RmlUi.EventParametersProxy.TrueFalse
+		 * @field ctrl_key RmlUi.EventParametersProxy.TrueFalse
+		 * @field shift_key RmlUi.EventParametersProxy.TrueFalse
+		 * @field caps_lock_key RmlUi.EventParametersProxy.TrueFalse
+		 * @field alt_key RmlUi.EventParametersProxy.TrueFalse
 		 */
 
 		/***
 		 * An event that happens to an element.
 		 * @class RmlUi.Event
 		 */
-		
+
 		namespace_table.new_usertype<Rml::Event>("Event", sol::no_constructor,
 			// M
 			/***
