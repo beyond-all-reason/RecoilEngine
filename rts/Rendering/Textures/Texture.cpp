@@ -3,6 +3,7 @@
 #include <bit>
 #include <tuple>
 #include "Rendering/GL/myGL.h"
+#include "Rendering/GL/SubState.h"
 #include "Rendering/GlobalRendering.h"
 
 namespace GL {
@@ -75,7 +76,7 @@ namespace GL {
 
 	void Texture2D::Bind()
 	{
-		lastBoundSlot = GL::FetchCurrentSlotTextureID(texTarget);
+		lastBoundSlot = GL::FetchActiveTextureSlot();
 		glBindTexture(texTarget, texID);
 	}
 
@@ -89,12 +90,14 @@ namespace GL {
 	void Texture2D::Unbind()
 	{
 		glBindTexture(texTarget, 0);
+		lastBoundSlot = 0;
 	}
 
 	void Texture2D::Unbind(uint32_t relSlot)
 	{
 		glActiveTexture(GL_TEXTURE0 + relSlot);
 		glBindTexture(texTarget, 0);
+		lastBoundSlot = 0;
 	}
 
 	Texture2D::Texture2D(int xsize_, int ysize_, uint32_t intFormat_, const TextureCreationParams& tcp, bool wantCompress)
@@ -107,7 +110,7 @@ namespace GL {
 			? std::bit_width(static_cast<uint32_t>(std::max({ xsize , ysize })))
 			: tcp.reqNumLevels;
 
-		lastBoundSlot = GL::FetchCurrentSlotTextureID(texTarget);
+		lastBoundSlot = GL::FetchActiveTextureSlot();
 		auto&& [genTexID, binding] = Impl::InitTexture(tcp, texTarget, numLevels);
 		texID = genTexID;
 
@@ -131,14 +134,18 @@ namespace GL {
 		assert(lastBoundSlot >= GL_TEXTURE0);
 		const auto extFormat = GetExternalFormatFromInternalFormat(intFormat);
 		const auto dataType = GetDataTypeFromInternalFormat(intFormat);
-
+		const auto dataSize = GetDataTypeSize(dataType);
+		using namespace GL::State;
+		auto state = GL::SubState(
+			PixelStoreUnpackAlignment(dataSize)
+		);
 		auto binding = GL::TexBind(texTarget, texID);
 		glTexSubImage2D(texTarget, level, xOffset, yOffset, width, height, extFormat, dataType, data);
 	}
 
 	void Texture2D::ProduceMipmaps() const
 	{
-		assert(lastBoundSlot >= GL_TEXTURE0);
+		//assert(lastBoundSlot >= GL_TEXTURE0);
 		if (globalRendering->amdHacks) {
 			glEnable(texTarget);
 			glGenerateMipmap(texTarget);

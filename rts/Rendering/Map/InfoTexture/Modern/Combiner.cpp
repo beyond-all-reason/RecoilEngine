@@ -13,8 +13,8 @@
 #include "System/Misc/TracyDefs.h"
 
 
-CONFIG(bool, HighResInfoTexture).deprecated(true);
-
+// set HighResInfoTexture, because games read that value
+CONFIG(bool, HighResInfoTexture).defaultValue(true).deprecated(true);
 
 CInfoTextureCombiner::CInfoTextureCombiner()
 : CModernInfoTexture("info")
@@ -30,6 +30,7 @@ CInfoTextureCombiner::CInfoTextureCombiner()
 	};
 
 	texture = GL::Texture2D(texSize.x, texSize.y, GL_RGB10_A2, tcp, false);
+	glBindTexture(GL_TEXTURE_2D, texture.GetId());
 
 	if (FBO::IsSupported()) {
 		fbo.Bind();
@@ -112,12 +113,13 @@ bool CInfoTextureCombiner::CreateShader(const std::string& filename, const bool 
 void CInfoTextureCombiner::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	shader->Enable();
+
 	fbo.Bind();
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
 	glViewport(0,0, texSize.x, texSize.y);
 	glEnable(GL_BLEND);
 
+	shader->Enable();
 	shader->BindTextures();
 	shader->SetUniform("time", gu->gameTime);
 
@@ -132,10 +134,12 @@ void CInfoTextureCombiner::Update()
 		glTexCoord2f(1.f, 0.f); glVertex2f(+isx, -1.f);
 	glEnd();
 
+	shader->Disable();
+
 	globalRendering->LoadViewport();
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	FBO::Unbind();
-	shader->Disable();
+
 
 	// create mipmaps
 	auto binding = texture.ScopedBind();
