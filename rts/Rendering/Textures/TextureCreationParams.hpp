@@ -15,6 +15,8 @@ namespace GL {
 		bool wrapMirror = true;
 		bool repeatMirror = false;
 		std::optional<float4> clampBorder = std::nullopt;
+		std::optional<uint32_t> minFilter = std::nullopt;
+		std::optional<uint32_t> magFilter = std::nullopt;
 		uint32_t GetMinFilter(int32_t numLevels) const;
 		uint32_t GetMagFilter() const;
 		uint32_t GetWrapMode() const;

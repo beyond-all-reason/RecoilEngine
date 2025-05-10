@@ -5,6 +5,9 @@
 namespace GL {
 	uint32_t TextureCreationParams::GetMinFilter(int32_t numLevels) const
 	{
+		if (minFilter.has_value())
+			return minFilter.value();
+
 		if (numLevels == 1) {
 			return linearTextureFilter ? GL_LINEAR : GL_NEAREST;
 		}
@@ -20,6 +23,9 @@ namespace GL {
 
 	uint32_t TextureCreationParams::GetMagFilter() const
 	{
+		if (magFilter.has_value())
+			return magFilter.value();
+
 		return linearTextureFilter ? GL_LINEAR : GL_NEAREST;
 	}
 

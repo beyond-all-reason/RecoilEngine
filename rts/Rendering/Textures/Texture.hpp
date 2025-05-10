@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <array>
+#include "System/type2.h"
 #include "Rendering/GL/TexBind.h"
 #include "Rendering/Textures/TextureCreationParams.hpp"
 
@@ -42,18 +43,17 @@ namespace GL {
 			const auto dataType = GetDataTypeFromInternalFormat(intFormat);
 			const auto dataSize = GetDataTypeSize(dataType);
 			const auto numChannels = GetNumChannelsFromInternalFormat(intFormat);
-			assert(c.size() >= xsize * ysize * numChannels * dataSize);
+			assert(c.size() >= size.x * size.y * numChannels * dataSize);
 		#endif // DEBUG
 			UploadImage(c.data());
 		}
 		void UploadImage(const void* data, int level = 0) const {
-			UploadSubImage(data, 0, 0, xsize, ysize, level);
+			UploadSubImage(data, 0, 0, size.x, size.y, level);
 		}
 		void UploadSubImage(const void* data, int xOffset, int yOffset, int width, int height, int level = 0) const;
 		void ProduceMipmaps() const;
-	private:
-		int xsize = 0;
-		int ysize = 0;
+	public:
+		int2 size;
 		uint32_t texID = 0;
 		uint32_t intFormat = 0;
 		int32_t numLevels = -1;

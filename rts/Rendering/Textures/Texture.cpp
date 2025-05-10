@@ -52,8 +52,7 @@ namespace GL {
 	Texture2D& Texture2D::operator=(Texture2D&& other) noexcept
 	{
 		std::swap(texID, other.texID);
-		std::swap(xsize, other.xsize);
-		std::swap(ysize, other.ysize);
+		std::swap(size, other.size);
 		std::swap(intFormat, other.intFormat);
 		std::swap(numLevels, other.numLevels);
 		std::swap(lastBoundSlot, other.lastBoundSlot);
@@ -102,12 +101,11 @@ namespace GL {
 
 	Texture2D::Texture2D(int xsize_, int ysize_, uint32_t intFormat_, const TextureCreationParams& tcp, bool wantCompress)
 	{
-		xsize = xsize_;
-		ysize = ysize_;
+		size = int2(xsize_, ysize_);
 		intFormat = intFormat_;
 
 		numLevels = tcp.reqNumLevels <= 0
-			? std::bit_width(static_cast<uint32_t>(std::max({ xsize , ysize })))
+			? std::bit_width(static_cast<uint32_t>(std::max({ size.x , size.y })))
 			: tcp.reqNumLevels;
 
 		lastBoundSlot = GL::FetchActiveTextureSlot();
@@ -115,7 +113,7 @@ namespace GL {
 		texID = genTexID;
 
 		if (GLAD_GL_ARB_texture_storage && !wantCompress) {
-			glTexStorage2D(texTarget, numLevels, intFormat, xsize, ysize);
+			glTexStorage2D(texTarget, numLevels, intFormat, size.x, size.y);
 		}
 		else {
 			const auto compressedIntFormat = GetCompressedInternalFormat(intFormat);
@@ -123,7 +121,7 @@ namespace GL {
 			const auto dataType = GetDataTypeFromInternalFormat(intFormat);
 
 			for (int level = 0; level < numLevels; ++level)
-				glTexImage2D(texTarget, level, compressedIntFormat, std::max(xsize >> level, 1), std::max(ysize >> level, 1), 0, extFormat, dataType, nullptr);
+				glTexImage2D(texTarget, level, compressedIntFormat, std::max(size.x >> level, 1), std::max(size.y >> level, 1), 0, extFormat, dataType, nullptr);
 		}
 		glTexParameteri(texTarget, GL_TEXTURE_BASE_LEVEL,             0);
 		glTexParameteri(texTarget, GL_TEXTURE_MAX_LEVEL , numLevels - 1);
