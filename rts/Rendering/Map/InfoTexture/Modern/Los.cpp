@@ -11,51 +11,39 @@
 
 #include "System/Misc/TracyDefs.h"
 
-
-
 CLosTexture::CLosTexture()
-: CPboInfoTexture("los")
+: CModernInfoTexture("los")
 , uploadTex(0)
 {
 	texSize = losHandler->los.size;
-	texChannels = 1;
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	RecoilTexStorage2D(GL_TEXTURE_2D, -1, GL_R8, texSize.x, texSize.y);
+	GL::TextureCreationParams tcp{
+		.reqNumLevels = -1,
+		.linearMipMapFilter = false,
+		.linearTextureFilter = true,
+		.wrapMirror = false
+	};
+
+	texture = GL::Texture2D(texSize.x, texSize.y, GL_R8, tcp, false);
 
 	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * texChannels * 2, GL_STREAM_DRAW);
+	infoTexPBO.New(texSize.x * texSize.y * 2, GL_STREAM_DRAW);
 	infoTexPBO.Unbind();
 
-	if (FBO::IsSupported()) {
-		fbo.Bind();
-		fbo.AttachTexture(texture);
-		/*bool status =*/ fbo.CheckStatus("CLosTexture");
-		FBO::Unbind();
-	}
-
-	const std::string vertexCode = R"(
-		varying vec2 texCoord;
-
-		void main() {
-			texCoord = gl_Vertex.xy * 0.5 + 0.5;
-			gl_Position = vec4(gl_Vertex.xyz, 1.0);
-		}
-	)";
+	CreateFBO("CLosTexture");
 
 	const std::string fragmentCode = R"(
+		#version 130
+
 		uniform sampler2D tex0;
-		varying vec2 texCoord;
+
+		in vec2 uv;
+		out float fragData;
 
 		void main() {
-			vec2 f = texture2D(tex0, texCoord).rg;
-			float c = (f.r + f.g) * 200000.0;
-			gl_FragColor = vec4(c);
+			float f = texture(tex0, uv).r;
+
+			fragData = float(f > 0.0);
 		}
 	)";
 
@@ -84,7 +72,7 @@ CLosTexture::CLosTexture()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RG8, texSize.x, texSize.y);
+		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_R16, texSize.x, texSize.y);
 	}
 
 	if (!fbo.IsValid() || !shader->IsValid()) {
@@ -119,13 +107,12 @@ void CLosTexture::UpdateCPU()
 	}
 
 	infoTexPBO.UnmapBuffer();
-	glBindTexture(GL_TEXTURE_2D, texture);
+	auto binding = texture.ScopedBind();
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
-	glGenerateMipmap(GL_TEXTURE_2D);
+	texture.ProduceMipmaps();
 	infoTexPBO.Invalidate();
 	infoTexPBO.Unbind();
 }
-
 
 void CLosTexture::Update()
 {
@@ -141,41 +128,30 @@ void CLosTexture::Update()
 		globalRendering->LoadViewport();
 		FBO::Unbind();
 
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glGenerateMipmap(GL_TEXTURE_2D);
+		auto binding = texture.ScopedBind();
+		texture.ProduceMipmaps();
 		return;
 	}
 
 	infoTexPBO.Bind();
 	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
 	const unsigned short* myLos = &losHandler->los.losMaps[gu->myAllyTeam].front();
-	memcpy(infoTexMem, myLos, texSize.x * texSize.y * texChannels * sizeof(short));
+	memcpy(infoTexMem, myLos, texSize.x * texSize.y * 1 * sizeof(short));
 	infoTexPBO.UnmapBuffer();
 
 	//Trick: Upload the ushort as 2 ubytes, and then check both for `!=0` in the shader.
 	// Faster than doing it on the CPU! And uploading it as shorts would be slow, cause the GPU
 	// has no native support for them and so the transformation would happen on the CPU, too.
 	glBindTexture(GL_TEXTURE_2D, uploadTex);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RG, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_UNSIGNED_SHORT, infoTexPBO.GetPtr());
 	infoTexPBO.Invalidate();
 	infoTexPBO.Unbind();
 
 	// do post-processing on the gpu (los-checking & scaling)
-	fbo.Bind();
-	glViewport(0, 0, texSize.x, texSize.y);
-	shader->Enable();
 	glDisable(GL_BLEND);
-	glBegin(GL_QUADS);
-		glVertex2f(-1.f, -1.f);
-		glVertex2f(-1.f, +1.f);
-		glVertex2f(+1.f, +1.f);
-		glVertex2f(+1.f, -1.f);
-	glEnd();
-	shader->Disable();
-	globalRendering->LoadViewport();
-	FBO::Unbind();
+	RunFullScreenPass();
 
 	// generate mipmaps
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	auto binding = texture.ScopedBind();
+	texture.ProduceMipmaps();
 }
