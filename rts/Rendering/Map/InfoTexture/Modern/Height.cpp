@@ -28,13 +28,14 @@ CHeightTexture::CHeightTexture()
 
 	texSize = int2(mapDims.mapxp1, mapDims.mapyp1);
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, texSize.x, texSize.y);
+	GL::TextureCreationParams tcp{
+		.reqNumLevels = 1,
+		.linearMipMapFilter = false,
+		.linearTextureFilter = true,
+		.wrapMirror = false
+	};
+
+	texture = GL::Texture2D(texSize.x, texSize.y, GL_RGBA8, tcp, false);
 
 	glGenTextures(1, &paletteTex);
 	glBindTexture(GL_TEXTURE_2D, paletteTex);
@@ -111,8 +112,8 @@ void CHeightTexture::UpdateCPU()
 	}
 
 	infoTexPBO.UnmapBuffer();
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RGBA, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
+	auto binding = texture.ScopedBind();
+	texture.UploadImage(infoTexPBO.GetPtr());
 	infoTexPBO.Invalidate();
 	infoTexPBO.Unbind();
 }

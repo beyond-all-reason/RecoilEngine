@@ -56,6 +56,7 @@ public:
 		if (stateTexUnit != texUnit) glActiveTexture(stateTexUnit);
 	}
 
+	inline auto GetLastActiveTextureSlot() const { return stateTexUnit; }
 private:
 	GLenum stateTexUnit = 0;
 	GLenum texUnit = 0;

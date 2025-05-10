@@ -247,7 +247,7 @@ uint32_t GL::GetDataTypeSize(uint32_t glDataType)
 	}
 }
 
-uint32_t GL::GetCompressedInterFormat(uint32_t internalFormat)
+uint32_t GL::GetCompressedInternalFormat(uint32_t internalFormat)
 {
 	if (!globalRendering->compressTextures)
 		return internalFormat;

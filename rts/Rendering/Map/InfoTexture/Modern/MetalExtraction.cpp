@@ -22,18 +22,18 @@ CMetalExtractionTexture::CMetalExtractionTexture()
 {
 	texSize = int2(mapDims.hmapx, mapDims.hmapy);
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	GL::TextureCreationParams tcp{
+		.reqNumLevels = 1,
+		.linearMipMapFilter = false,
+		.linearTextureFilter = true,
+		.wrapMirror = false
+	};
 
 	//Info: 32F isn't really needed for the final result, but it allows us
 	//  to upload the CPU array directly to the GPU w/o any (slow) cpu-side
 	//  transformation. The transformation (0..1 range rescaling) happens
 	//  then on the gpu instead.
-	RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, texSize.x, texSize.y);
+	texture = GL::Texture2D(texSize.x, texSize.y, GL_R32F, tcp, false);
 
 	CreateFBO("CLosTexture");
 
@@ -100,8 +100,8 @@ void CMetalExtractionTexture::Update()
 	assert(metalMap.GetSizeX() == texSize.x && metalMap.GetSizeZ() == texSize.y);
 
 	// upload raw data to gpu
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_FLOAT, metalMap.GetExtractionMap());
+	auto binding = texture.ScopedBind();
+	texture.UploadImage(metalMap.GetExtractionMap());
 
 	// do post-processing on the gpu (los-checking & scaling)
 	glEnable(GL_BLEND);

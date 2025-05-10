@@ -11,22 +11,22 @@ class CInfoTexture
 {
 public:
 	CInfoTexture();
-	CInfoTexture(const std::string& name, GLuint texture, int2 texSize);
+	CInfoTexture(const std::string& name, GL::Texture2D&& texture, int2 texSize);
 	virtual ~CInfoTexture() {}
 
 public:
-	virtual GLuint GetTexture() { return texture; }
+	virtual GLuint GetTexture() { return texture.GetId(); }
 	int2 GetTexSize()     const { return texSize; }
 	const std::string& GetName() const { return name; }
 protected:
 	friend class IInfoTextureHandler;
 
-	GLuint texture;
+	GL::Texture2D texture;
 	std::string name;
 	int2 texSize;
 };
 
 class CDummyInfoTexture: public CInfoTexture {
 public:
-	CDummyInfoTexture(): CInfoTexture("dummy", 0, int2(0, 0)) {}
+	CDummyInfoTexture() : CInfoTexture("dummy", {}, int2(0, 0)) {}
 };

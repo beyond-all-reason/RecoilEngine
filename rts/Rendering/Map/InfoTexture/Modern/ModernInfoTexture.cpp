@@ -6,15 +6,9 @@
 
 
 CModernInfoTexture::CModernInfoTexture(const std::string& _name)
-	: CInfoTexture(name, 0, int2(0, 0))
+	: CInfoTexture(_name, {}, int2(0, 0))
 	, shader(nullptr)
 {}
-
-
-CModernInfoTexture::~CModernInfoTexture()
-{
-	glDeleteTextures(1, &texture);
-}
 
 bool CModernInfoTexture::CreateFBO(const char* fboName)
 {
@@ -22,7 +16,7 @@ bool CModernInfoTexture::CreateFBO(const char* fboName)
 		return false;
 
 	fbo.Bind();
-	fbo.AttachTexture(texture);
+	fbo.AttachTexture(texture.GetId());
 	bool status = fbo.CheckStatus(fboName);
 	FBO::Unbind();
 

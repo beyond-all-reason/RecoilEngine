@@ -15,7 +15,6 @@ class CModernInfoTexture : public CInfoTexture
 {
 public:
 	CModernInfoTexture(const std::string& name);
-	~CModernInfoTexture() override;
 	CModernInfoTexture(const CModernInfoTexture&) = delete; // no-copy
 
 public:

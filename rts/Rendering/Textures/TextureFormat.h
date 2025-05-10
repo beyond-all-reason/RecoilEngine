@@ -14,5 +14,5 @@ namespace GL
 	uint32_t GetExternalFormatFromNumChannels(uint32_t numChannels);
 	uint32_t GetDataTypeSize(uint32_t glDataType);
 	uint32_t GetBindingQueryFromTarget(GLenum target);
-	uint32_t GetCompressedInterFormat(uint32_t internalFormat);
+	uint32_t GetCompressedInternalFormat(uint32_t internalFormat);
 }

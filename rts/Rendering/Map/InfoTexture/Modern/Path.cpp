@@ -35,13 +35,14 @@ CPathTexture::CPathTexture()
 {
 	texSize = int2(mapDims.hmapx, mapDims.hmapy);
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, texSize.x, texSize.y);
+	GL::TextureCreationParams tcp{
+		.reqNumLevels = 1,
+		.linearMipMapFilter = false,
+		.linearTextureFilter = true,
+		.wrapMirror = false
+	};
+
+	texture = GL::Texture2D(texSize.x, texSize.y, GL_RGBA8, tcp, false);
 
 	infoTexPBO.Bind();
 	infoTexPBO.New(texSize.x * texSize.y * 4, GL_STREAM_DRAW);
@@ -129,7 +130,7 @@ GLuint CPathTexture::GetTexture()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	lastUsage = spring_gettime();
-	return texture;
+	return texture.GetId();
 }
 
 
@@ -279,8 +280,8 @@ void CPathTexture::Update()
 	}
 
 	infoTexPBO.UnmapBuffer();
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, start, texSize.x, updateProcess - start, GL_RGBA, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr(offset * sizeof(SColor)));
+	auto binding = texture.ScopedBind();
+	texture.UploadSubImage(infoTexPBO.GetPtr(offset * sizeof(SColor)), 0, start, texSize.x, updateProcess - start);
 	infoTexPBO.Unbind();
 
 	isCleared = false;
