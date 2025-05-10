@@ -71,6 +71,7 @@ CONFIG(int, MinimizeOnFocusLoss).defaultValue(0).minimumValue(0).maximumValue(1)
 CONFIG(bool, Fullscreen).defaultValue(true).headlessValue(false).description("Sets whether the game will run in fullscreen, as opposed to a window. For Windowed Fullscreen of Borderless Window, set this to 0, WindowBorderless to 1, and WindowPosX and WindowPosY to 0.");
 CONFIG(bool, WindowBorderless).defaultValue(false).description("When set and Fullscreen is 0, will put the game in Borderless Window mode, also known as Windowed Fullscreen. When using this, it is generally best to also set WindowPosX and WindowPosY to 0");
 CONFIG(bool, BlockCompositing).defaultValue(false).safemodeValue(true).description("Disables kwin compositing to fix tearing, possible fixes low FPS in windowed mode, too.");
+CONFIG(int, DWMFlush).defaultValue(0).description("Force Windows Desktop Compositors DWMFlush before each SDL_GL_SwapWindow, preventing dropped frames (use nVidias FrameView to validate dropped frames, or BARs Jitter Timer widget). Value of 1 does DWMFlush before SwapBuffers, value of 2 does DWMFlush after swapbuffers.");
 
 CONFIG(int, XResolution).defaultValue(0).headlessValue(8).minimumValue(0).description("Sets the width of the game screen. If set to 0 Spring will autodetect the current resolution of your desktop.");
 CONFIG(int, YResolution).defaultValue(0).headlessValue(8).minimumValue(0).description("Sets the height of the game screen. If set to 0 Spring will autodetect the current resolution of your desktop.");
@@ -207,6 +208,7 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(borderless),
 
 	CR_IGNORED(underExternalDebug),
+	CR_IGNORED(forceDWMFlush),
 
 	CR_IGNORED(sdlWindow),
 	CR_IGNORED(glContext),
@@ -336,6 +338,7 @@ CGlobalRendering::CGlobalRendering()
 	, fullScreen(configHandler->GetBool("Fullscreen"))
 	, borderless(configHandler->GetBool("WindowBorderless"))
 	, underExternalDebug(false)
+	, forceDWMFlush(configHandler->GetInt("DWMFlush"))
 	, sdlWindow{nullptr}
 	, glContext{nullptr}
 	, glExtensions{}
@@ -347,6 +350,7 @@ CGlobalRendering::CGlobalRendering()
 		"DualScreenMiniMapOnLeft",
 		"Fullscreen",
 		"WindowBorderless",
+		"DWMFlush",
 		"XResolution",
 		"YResolution",
 		"XResolutionWindowed",
@@ -676,8 +680,23 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 
 		//https://stackoverflow.com/questions/68480028/supporting-opengl-screen-capture-by-third-party-applications
 		glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, 0);
-
+		
+		#ifdef _WIN32
+			if (forceDWMFlush == 1){ 
+				ZoneScopedN("CGlobalRendering::SwapBuffers::DWMFlushPre");
+				HRESULT result = dwmLoader.DwmFlush();
+			}
+		#endif
+		
 		SDL_GL_SwapWindow(sdlWindow);
+
+		#ifdef _WIN32
+			if (forceDWMFlush == 2){ 
+				ZoneScopedN("CGlobalRendering::SwapBuffers::DWMFlushPost");
+				HRESULT result = dwmLoader.DwmFlush();
+			}
+		#endif
+
 		FrameMark;
 	}
 	// exclude debug from SCOPED_TIMER("Misc::SwapBuffers");
@@ -1247,6 +1266,7 @@ void CGlobalRendering::ConfigNotify(const std::string& key, const std::string& v
 		return;
 	}
 	winChgFrame = drawFrame + 1; //need to do on next frame since config mutex is locked inside ConfigNotify
+	forceDWMFlush = configHandler->GetInt("DWMFlush");
 }
 
 void CGlobalRendering::UpdateWindow()
