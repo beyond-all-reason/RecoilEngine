@@ -22,13 +22,14 @@ CRadarTexture::CRadarTexture()
 {
 	texSize = losHandler->radar.size;
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	RecoilTexStorage2D(GL_TEXTURE_2D, -1, GL_RG8, texSize.x, texSize.y);
+	GL::TextureCreationParams tcp{
+		.reqNumLevels = -1,
+		.linearMipMapFilter = false,
+		.linearTextureFilter = true,
+		.wrapMirror = false
+	};
+
+	texture = GL::Texture2D(texSize.x, texSize.y, GL_RG8, tcp, false);
 
 	infoTexPBO.Bind();
 	infoTexPBO.New(texSize.x * texSize.y * 2 * sizeof(unsigned short), GL_STREAM_DRAW);
@@ -143,8 +144,8 @@ void CRadarTexture::UpdateCPU()
 	}
 
 	infoTexPBO.UnmapBuffer();
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RG, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
+	auto binding = texture.ScopedBind();
+	texture.UploadImage(infoTexPBO.GetPtr());
 	infoTexPBO.Invalidate();
 	infoTexPBO.Unbind();
 }
@@ -164,8 +165,8 @@ void CRadarTexture::Update()
 		globalRendering->LoadViewport();
 		FBO::Unbind();
 
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glGenerateMipmap(GL_TEXTURE_2D);
+		auto binding = texture.ScopedBind();
+		texture.ProduceMipmaps();
 		return;
 	}
 
@@ -208,6 +209,6 @@ void CRadarTexture::Update()
 
 	// generate mipmaps
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	auto binding = texture.ScopedBind();
+	texture.ProduceMipmaps();
 }

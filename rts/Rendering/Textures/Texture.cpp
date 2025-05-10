@@ -7,7 +7,7 @@
 
 namespace GL {
 	namespace Impl {
-		std::pair<uint32_t, GL::TexBind> CreateTexture(const GL::TextureCreationParams& tcp, uint32_t texTarget, int32_t numLevels) {
+		std::pair<uint32_t, GL::TexBind> InitTexture(const GL::TextureCreationParams& tcp, uint32_t texTarget, int32_t numLevels) {
 			uint32_t texID = tcp.texID;
 
 			if (texID == 0)
@@ -41,22 +41,63 @@ namespace GL {
 		}
 	}
 
-	Texture::~Texture() {
-		if (!ownTexID)
+	Texture2D::~Texture2D() {
+		if (!ownTexID || !texID)
 			return;
 
 		glDeleteTextures(1, &texID);
 	}
 
-	Texture2D::Texture2D()
-		: xsize(0)
-		, ysize(0)
+	Texture2D& Texture2D::operator=(Texture2D&& other) noexcept
 	{
-		texTarget = GL_TEXTURE_2D;
+		std::swap(texID, other.texID);
+		std::swap(xsize, other.xsize);
+		std::swap(ysize, other.ysize);
+		std::swap(intFormat, other.intFormat);
+		std::swap(numLevels, other.numLevels);
+		std::swap(lastBoundSlot, other.lastBoundSlot);
+		std::swap(ownTexID, other.ownTexID);
+
+		return *this;
+	}
+
+	GL::TexBind Texture2D::ScopedBind()
+	{
+		auto scopedBinding = GL::TexBind(texTarget, texID);
+		lastBoundSlot = scopedBinding.GetLastActiveTextureSlot();
+		return scopedBinding; // NRTO should optimize it
+	}
+	GL::TexBind Texture2D::ScopedBind(uint32_t relSlot)
+	{
+		lastBoundSlot = GL_TEXTURE0 + relSlot;
+		return GL::TexBind(relSlot, texTarget, texID);
+	}
+
+	void Texture2D::Bind()
+	{
+		lastBoundSlot = GL::FetchCurrentSlotTextureID(texTarget);
+		glBindTexture(texTarget, texID);
+	}
+
+	void Texture2D::Bind(uint32_t relSlot)
+	{
+		lastBoundSlot = GL_TEXTURE0 + relSlot;
+		glActiveTexture(GL_TEXTURE0 + relSlot);
+		glBindTexture(texTarget, texID);
+	}
+
+	void Texture2D::Unbind()
+	{
+		glBindTexture(texTarget, 0);
+	}
+
+	void Texture2D::Unbind(uint32_t relSlot)
+	{
+		glActiveTexture(GL_TEXTURE0 + relSlot);
+		glBindTexture(texTarget, 0);
 	}
 
 	Texture2D::Texture2D(int xsize_, int ysize_, uint32_t intFormat_, const TextureCreationParams& tcp, bool wantCompress)
-		: Texture2D()
 	{
 		xsize = xsize_;
 		ysize = ysize_;
@@ -66,13 +107,15 @@ namespace GL {
 			? std::bit_width(static_cast<uint32_t>(std::max({ xsize , ysize })))
 			: tcp.reqNumLevels;
 
-		auto&& [texID, binding] = Impl::CreateTexture(tcp, texTarget, numLevels);
+		lastBoundSlot = GL::FetchCurrentSlotTextureID(texTarget);
+		auto&& [genTexID, binding] = Impl::InitTexture(tcp, texTarget, numLevels);
+		texID = genTexID;
 
 		if (GLAD_GL_ARB_texture_storage && !wantCompress) {
 			glTexStorage2D(texTarget, numLevels, intFormat, xsize, ysize);
 		}
 		else {
-			const auto compressedIntFormat = GetCompressedInterFormat(intFormat);
+			const auto compressedIntFormat = GetCompressedInternalFormat(intFormat);
 			const auto extFormat = GetExternalFormatFromInternalFormat(intFormat);
 			const auto dataType = GetDataTypeFromInternalFormat(intFormat);
 
@@ -85,6 +128,7 @@ namespace GL {
 
 	void Texture2D::UploadSubImage(const void* data, int xOffset, int yOffset, int width, int height, int level) const
 	{
+		assert(lastBoundSlot >= GL_TEXTURE0);
 		const auto extFormat = GetExternalFormatFromInternalFormat(intFormat);
 		const auto dataType = GetDataTypeFromInternalFormat(intFormat);
 
@@ -94,6 +138,7 @@ namespace GL {
 
 	void Texture2D::ProduceMipmaps() const
 	{
+		assert(lastBoundSlot >= GL_TEXTURE0);
 		if (globalRendering->amdHacks) {
 			glEnable(texTarget);
 			glGenerateMipmap(texTarget);

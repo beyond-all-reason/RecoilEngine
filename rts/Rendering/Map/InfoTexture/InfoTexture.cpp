@@ -4,12 +4,12 @@
 
 
 CInfoTexture::CInfoTexture()
-	: texture(0)
+	: texture{}
 	, texSize(0, 0)
 {}
 
-CInfoTexture::CInfoTexture(const std::string& _name, GLuint _texture, int2 _texSize)
-	: texture(_texture)
+CInfoTexture::CInfoTexture(const std::string& _name, GL::Texture2D&& _texture, int2 _texSize)
+	: texture(std::move(_texture))
 	, name(_name)
 	, texSize(_texSize)
 {}

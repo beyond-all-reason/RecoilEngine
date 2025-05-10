@@ -359,7 +359,7 @@ void RecoilBuildMipmaps(const GLenum target, GLint internalFormat, const GLsizei
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
-	internalFormat = GL::GetCompressedInterFormat(internalFormat);
+	internalFormat = GL::GetCompressedInternalFormat(internalFormat);
 
 	// the number of required levels was not specified, assume the request for
 	// mipmapped texture, determine the number of levels
