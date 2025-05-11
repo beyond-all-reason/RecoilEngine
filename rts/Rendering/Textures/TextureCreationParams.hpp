@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <cstdint>
+#include <initializer_list>
 #include "System/float4.h"
 
 namespace GL {
@@ -17,6 +18,7 @@ namespace GL {
 		std::optional<float4> clampBorder = std::nullopt;
 		std::optional<uint32_t> minFilter = std::nullopt;
 		std::optional<uint32_t> magFilter = std::nullopt;
+		std::optional<std::initializer_list<uint32_t>> wrapModes = std::nullopt;
 		uint32_t GetMinFilter(int32_t numLevels) const;
 		uint32_t GetMagFilter() const;
 		uint32_t GetWrapMode() const;

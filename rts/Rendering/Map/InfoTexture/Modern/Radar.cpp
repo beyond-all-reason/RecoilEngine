@@ -23,10 +23,10 @@ CRadarTexture::CRadarTexture()
 	texSize = losHandler->radar.size;
 
 	GL::TextureCreationParams tcp{
-		.reqNumLevels = 1,
-		.linearMipMapFilter = false,
-		.linearTextureFilter = true,
-		.wrapMirror = false
+		.reqNumLevels = -1,
+		.wrapMirror = false,
+		.minFilter = GL_NEAREST,
+		.magFilter = GL_LINEAR
 	};
 
 	texture = GL::Texture2D(texSize.x, texSize.y, GL_RG8, tcp, false);
@@ -211,5 +211,4 @@ void CRadarTexture::Update()
 	glActiveTexture(GL_TEXTURE0);
 	auto binding = texture.ScopedBind();
 	//texture.ProduceMipmaps();
-	glSaveTexture(texture.texID, "radar.bmp", 0);
 }
