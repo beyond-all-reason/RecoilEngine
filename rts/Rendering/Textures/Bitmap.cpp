@@ -1552,7 +1552,7 @@ bool CBitmap::Save(const std::string& filename, bool dontSaveAlpha, bool logged,
 	ilTexImage(xsize, ysize, 1, channels, Channels2Formats[channels], dataType, flippedCopy.GetRawMem());
 	assert(ilGetError() == IL_NO_ERROR);
 
-	if (dontSaveAlpha && (channels == 2 || channels == 4)) {
+	if (dontSaveAlpha && channels == 4) {
 		ilConvertImage(Channels2Formats[channels - 1], dataType);
 		assert(ilGetError() == IL_NO_ERROR);
 	}
