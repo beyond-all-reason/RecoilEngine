@@ -5,7 +5,6 @@
 #include <utility>
 #include <cstring>
 #include <memory>
-#include <span>
 
 #include <IL/il.h>
 #include <SDL_video.h>
@@ -74,6 +73,7 @@ public:
 
 	virtual const uint8_t* GetRawMem(size_t memIdx) const = 0;
 	virtual       uint8_t* GetRawMem(size_t memIdx)       = 0;
+	virtual std::span<const uint8_t> GetSpan(size_t memIdx) const = 0;
 
 	spring::mutex& GetMutex() { return bmpMutex; }
 public:
@@ -252,6 +252,11 @@ public:
 
 	const uint8_t* GetRawMem(size_t memIdx) const override { return ((memIdx == size_t(-1))? nullptr: (Base() + memIdx)); }
 	      uint8_t* GetRawMem(size_t memIdx)       override { return ((memIdx == size_t(-1))? nullptr: (Base() + memIdx)); }
+	std::span<const uint8_t> GetSpan(size_t memIdx) const override {
+		return (memIdx == size_t(-1))
+			? std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(0), size_t(0))
+			: std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(Base() + memIdx), Size());
+	}
 
 private:
 	bool DefragRaw() {
@@ -339,6 +344,11 @@ public:
 	bool Defrag() override { return true; }
 	const uint8_t* GetRawMem(size_t memIdx) const override { return (memIdx == size_t(-1)) ? nullptr : reinterpret_cast<uint8_t*>(memIdx); }
 		  uint8_t* GetRawMem(size_t memIdx)       override { return (memIdx == size_t(-1)) ? nullptr : reinterpret_cast<uint8_t*>(memIdx); }
+	std::span<const uint8_t> GetSpan(size_t memIdx) const override {
+		return (memIdx == size_t(-1))
+			? std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(0), size_t(0))
+			: std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(memIdx), Size());
+	}
 };
 
 void ITexMemPool::Init(size_t size)
@@ -1089,6 +1099,7 @@ void CBitmap::KillPool()
 
 const uint8_t* CBitmap::GetRawMem() const { return ITexMemPool::texMemPool->GetRawMem(memIdx); }
       uint8_t* CBitmap::GetRawMem()       { return ITexMemPool::texMemPool->GetRawMem(memIdx); }
+std::span<const uint8_t> CBitmap::GetSpan() const { return ITexMemPool::texMemPool->GetSpan(memIdx); }
 
 void CBitmap::Alloc(int w, int h, int c, uint32_t glType)
 {

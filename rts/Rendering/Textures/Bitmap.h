@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <span>
 #include <vector>
 #ifndef HEADLESS
 	#include "nv_dds.h"
@@ -101,6 +102,7 @@ public:
 
 	const uint8_t* GetRawMem() const;
 	      uint8_t* GetRawMem()      ;
+	std::span<const uint8_t> GetSpan() const;
 
 	size_t GetMemSize() const { return (xsize * ysize * channels * GetDataTypeSize()); }
 
