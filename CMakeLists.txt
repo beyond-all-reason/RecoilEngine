@@ -137,8 +137,6 @@ else  (UNIX AND NOT MINGW)
 	set(LIBDIR  "." CACHE STRING "Where to install libraries")
 	set(DOCDIR  "doc" CACHE STRING "Where to install basic project documentation (README, LICENSE, etc.)")
 	set(DATADIR "." CACHE STRING "Where to install game content")
-	if(BUILD_BITS EQUAL 32)
-		
 
 	if    (NOT MINGWLIBS)
 		if (DEFINED ENV{MINGWLIBS})
