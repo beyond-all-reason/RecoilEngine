@@ -417,11 +417,11 @@ void CPathManager::DeletePath(unsigned int pathID, bool /* force ignored*/) {
 
 		PathSearch* existingSearch = nullptr;
 		auto searchView = registry.view<PathSearch>();
-		searchView.each([&searchView, pathID](entt::entity entity){
+		for(auto entity: searchView) {
 			auto& search = searchView.get<PathSearch>(entity);
 			if (search.pathId == pathID)
 				registry.destroy(entity);
-		});
+		};
 	}
 }
 
@@ -848,7 +848,8 @@ void CPathManager::Update()
 		});
 
 		// Clear out the search entities.
-		pathSearchView.each([](entt::entity ent){ registry.destroy(ent); });
+		for(auto entity: pathSearchView)
+			registry.destroy(entity);
 	}
 }
 
