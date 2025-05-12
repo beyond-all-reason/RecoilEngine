@@ -44,18 +44,12 @@ jobs:
         run: |
           emmylua_doc_cli \
             -i rts/Lua/library \
-<<<<<<< HEAD
-            -o doc/site/lua-api \
-            --override-template doc/emmylua-doc-cli-template
-          git add -f doc/site/lua-api
-=======
             -o ${META_PATH} \
             --override-template doc/emmlua-doc-cli-template
       - name: Run generator glue code
         run: |
           python doc/site/generate_from_meta.py ${META_PATH} ${TEMP_PATH} ${LUA_API_DOCS_PATH}
           git add -f ${LUA_API_DOCS_PATH}
->>>>>>> 9338b0b8cf (added site)
       - name: Commit changes
         run: |
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"

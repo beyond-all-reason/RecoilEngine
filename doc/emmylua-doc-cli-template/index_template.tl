@@ -2,7 +2,7 @@
 title: "Lua API"
 ---
 
-# index
+## index
 
 {% if types %}
 ## Types

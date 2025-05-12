@@ -7,9 +7,9 @@
 
 {{ range $max_pages }}
 	{{- $url := printf "https://api.github.com/repos/%s/%s/contributors?per_page=%d&page=%d"
-	    $owner
-	    $repo
-	    $count
+		$owner
+		$repo
+		$count
 		.
 	  }}
 	{{ with try (resources.GetRemote $url) }}
@@ -42,11 +42,11 @@
 
 {{ $img_size := 48 }}
 <ul style="list-style-type: none; ">
-    {{ range $shuffled }}
-    <li style="display: inline-block;">
-        <a href="{{ .html_url }}">
-            <img src="{{ .avatar_url }}" width="{{ $img_size }}" height="{{ $img_size }}" alt="{{ .login }}">
-        </a>
-    </li>
-    {{ end }}
+	{{ range $shuffled }}
+	<li style="display: inline-block;">
+		<a href="{{ .html_url }}">
+			<img src="{{ .avatar_url }}" width="{{ $img_size }}" height="{{ $img_size }}" alt="{{ .login }}">
+		</a>
+	</li>
+	{{ end }}
 </ul>

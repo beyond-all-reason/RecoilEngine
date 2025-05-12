@@ -3,11 +3,11 @@
 <p>The latest stable release is <code>{{ $data.name }}</code> available at:</p>
 
 <ul>
-  {{ range $asset := $data.assets }}
-    {{ if in $asset.browser_download_url "minimal-portable" }}
-      <li>[<a href="{{ $asset.browser_download_url }}">{{ $asset.name }}</a>]</li>
-    {{ end }}
-  {{ end }}
+	{{ range $asset := $data.assets }}
+		{{ if in $asset.browser_download_url "minimal-portable" }}
+			<li>[<a href="{{ $asset.browser_download_url }}">{{ $asset.name }}</a>]</li>
+		{{ end }}
+	{{ end }}
 </ul>
 
 <p>See the <a href="{{ $data.html_url }}">release page</a> for more options.</p>
