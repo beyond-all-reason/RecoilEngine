@@ -199,11 +199,12 @@ A table of constants can also be expressed using `@field`:
 ```cpp
 /***
  * @table CoolNumbers
- * @field number Pi
- * @field integer SixyNine
- * @field integer FourTwenty
+ * @field Pi number
+ * @field SixtyNine integer
+ * @field FourTwenty integer
  */
 ```
 
-{: .note }
-> A table is a global that can be accessed in Lua and not a type like `@class`.
+{{< callout type="warning" >}}
+A table is a global that can be accessed in Lua and not a type like `@class`.
+{{< /callout >}}

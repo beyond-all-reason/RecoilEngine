@@ -24,21 +24,23 @@ And the following programs:
 2. Emmylua_doc_cli, 0.7.2 or greater, installed with cargo
 3. lua-doc-extractor by resident rhys_vdw
 
+Install [HUGO](https://gohugo.io/installation/)
+
 Windows:
-``` bash
-scoop install hugo-extended
+```bash
 cargo install emmylua_doc_cli
 npm install -g lua-doc-extractor
 ```
 
 Linux:
-``` bash
-sudo apt-get install hugo-extended
+```bash
 cargo install emmylua_doc_cli
 npm install -g lua-doc-extractor
 ```
 
 To compile the site, `cd` into the `doc` directory and run `./build_site.sh`. Then, `cd` into `site` and run `hugo server`.
+
+See [Documenting Lua development guide](content/development/documenting-lua.markdown) for more info.
 
 # File Structure
 
@@ -75,11 +77,9 @@ This site is built using [HUGO]. Pretty much everything you need is on their web
 - If you're making a new folder, it's best to make an `_index.md` for the folder.
 - If you're writing a link within the site, use `{{% ref "path/to/page/" %}}` for it to render correctly in relation to the site root (`beyond-all-reason.github.io/RecoilEngine`), otherwise they will be in relation to `beyond-all-reason.github.io/`.
 
-### Will my code be templated?
+### Templating and Shortcodes
 
-With the former Jekyll site, lua code would often be misinterpreted as templating code and cause issues, due to the `{{}}` syntax for nested tables. HUGO has a similar syntax with the curly braces. Does HUGO have the same problem?
-
-Short answer: no. HUGO content files (the markdown) cannot have templates executed within them. They *do* have a limited form of templating called [shortcodes](https://gohugo.io/content-management/shortcodes/), and shortcodes have template code that is executed. These are executed when the markdown page is rendered into HTML. These have the syntax of:
+HUGO content files (the markdown) cannot have templates executed within them. They *do* have a limited form of templating called [shortcodes](https://gohugo.io/content-management/shortcodes/), and shortcodes have template code that is executed. These are executed when the markdown page is rendered into HTML. These have the syntax of:
 Notation|Example
 :--|:--
 Markdown|`{{%/* foo */%}} ## Section 1 {{%/* /foo */%}}`
@@ -119,7 +119,7 @@ Along with the default shortcodes, you also have access to some more added by th
 A few shortcodes and layouts have been written for the website specifically. They won't really be useful in most circumstances, but they are worth writing down.
 - Shortcode `contributors` will render a list of contributors from Github. This is used for the site's homepage.
 - Shortcode `latest_release` will render links for the latest release of Recoil, as well as download links and the releases page. This is also used for the site's homepage.
-- Layout `commands` will render out a list of chat commands from a provided data file in the `data` directory of the site. This is used for the [Unsynced](docs/unsynced-commands) and [Synced](docs/synced-commands) pages. It expects a JSON file with the following schema:
+- Layout `commands` will render out a list of chat commands from a provided data file in the `data` directory of the site. This is used for the [Unsynced](content\docs\unsynced-commands.md) and [Synced](content\docs\synced-commands.md) pages. It expects a JSON file with the following schema:
 ```json
 {
   "command-name": {
