@@ -173,3 +173,12 @@ build-*
 
 # lua-doc-extractor generated library
 /rts/Lua/library/generated
+
+# lua site generation
+
+doc/site/public
+doc/site/temp
+doc/site/meta
+doc/site/resources/_gen
+doc/site/content/docs/lua-api/*
+!doc/site/content/docs/lua-api/_index.md

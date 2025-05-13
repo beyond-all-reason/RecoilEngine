@@ -1,12 +1,7 @@
 ---
-layout: post
 title: Building without Docker
-parent: Development
-permalink: development/build-without-docker
 author: p2004a
 ---
-
-# Building without Docker
 
 The [https://github.com/beyond-all-reason/RecoilEngine/tree/BAR105/docker-build/scripts](scripts) folder is the source of truth and best reference to figure out how to invoke and configure things.
 
