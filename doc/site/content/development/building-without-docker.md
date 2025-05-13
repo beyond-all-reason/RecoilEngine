@@ -1,8 +1,5 @@
 ---
-layout: post
 title: Building without Docker
-parent: Development
-permalink: development/build-without-docker
 author: p2004a
 ---
 
