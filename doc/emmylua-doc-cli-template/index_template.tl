@@ -2,8 +2,6 @@
 title: "Lua API"
 ---
 
-## index
-
 {% if types %}
 ## Types
 {% for item in types %}

@@ -114,6 +114,8 @@ Along with the default shortcodes, you also have access to some more added by th
   - LaTeX
   - Diagrams/flow charts
 
+Note that we prefer to use Github's note markdown syntax as opposed to callouts.
+
 ### Recoil Website
 
 A few shortcodes and layouts have been written for the website specifically. They won't really be useful in most circumstances, but they are worth writing down.
