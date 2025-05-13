@@ -9,9 +9,8 @@ author: lhog
 
 Read excellent intro here: [Hello-Triangle](https://learnopengl.com/Getting-started/Hello-Triangle)
 
-{{< callout type="info" >}}
-It's a modern and most performant way of loading geometry attributes like position, color, normal vector, texture coordinates and generally any attribute you need to GPU for rendering.
-{{< /callout >}}
+> [!NOTE]
+> It's a modern and most performant way of loading geometry attributes like position, color, normal vector, texture coordinates and generally any attribute you need to GPU for rendering.
 
 ### What is VBO?
 

@@ -2,7 +2,6 @@
 title: "Documenting Lua"
 ---
 
-
 This article covers working with Lua for **engine developers**. For adding the library to your Recoil game, refer to the [Lua Language Server guide](/docs/guides/getting-started/lua-language-server).
 
 The Lua library is a collection of type definitions that can be included in Recoil games to provide intellisense and type checking. It is found in the [recoil-lua-library](https://github.com/beyond-all-reason/recoil-lua-library) repo.
@@ -205,6 +204,5 @@ A table of constants can also be expressed using `@field`:
  */
 ```
 
-{{< callout type="warning" >}}
-A table is a global that can be accessed in Lua and not a type like `@class`.
-{{< /callout >}}
+> [!WARNING]
+> A table is a global that can be accessed in Lua and not a type like `@class`.

@@ -22,13 +22,13 @@ draft = false
 
 ---
 
-{{< callout type="info" >}}
-Recoil is a recent hard fork of [Spring](https://github.com/spring/spring) from the [105 tree](https://github.com/spring/spring/releases/tag/105.0.1), many references to it might and will be present. Overall most documented Spring API and tutorials are compatible with Recoil since they are based on the 105 tree.
-{{< /callout >}}
+> [!NOTE]
+> Recoil is a recent hard fork of [Spring](https://github.com/spring/spring) from the [105 tree](https://github.com/spring/spring/releases/tag/105.0.1), many references to it might and will be present. Overall most documented Spring API and tutorials are compatible with Recoil since they are based on the 105 tree.
 
 ## Getting started
 
-{{< callout type="warning" >}} This site is an early work-in-progress so content will mostly be references to Spring documentation until its own guides are written. {{< /callout >}}
+> [!WARNING]
+> This site is an early work-in-progress so content will mostly be references to Spring documentation until its own guides are written.
 
 Want to know if recoil is right for your project? [Find out here](articles/choose-recoil/)!
 
