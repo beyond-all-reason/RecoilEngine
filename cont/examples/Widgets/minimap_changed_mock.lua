@@ -11,14 +11,14 @@ function widget:GetInfo()
 end
 
 function widget:MiniMapRotationChanged(newRot, oldRot)
-	Spring.Echo("MMRC: from " .. oldRot .. " to " .. newRot)
+	Spring.Echo("<MiniMap Callins Test> Minimap Rotation Changed from " .. oldRot .. " to " .. newRot)
 end
 
 
 function widget:MiniMapGeometryChanged(newPosX, newPosY, newDimX, newDimY, oldPosX, oldPosY, oldDimX, oldDimY)
-	Spring.Echo("MMGC: from " .. oldPosX, oldPosY, oldDimX, oldDimY .. " to " .. newPosX, newPosY, newDimX, newDimY)
+	Spring.Echo("<MiniMap Callins Test> Minimap Geometry Changed from " .. oldPosX, oldPosY, oldDimX, oldDimY .. " to " .. newPosX, newPosY, newDimX, newDimY)
 end
 
 function widget:MiniMapStateChanged(isMini, isMax)
-	Spring.Echo("MMSC: Minimized - " .. tostring(isMini) .. " Maximized - " .. tostring(isMax))
+	Spring.Echo("<MiniMap Callins Test> Minimap State Changed: Minimized - " .. tostring(isMini) .. ", Maximized - " .. tostring(isMax))
 end
