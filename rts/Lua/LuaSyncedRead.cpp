@@ -6271,7 +6271,7 @@ int LuaSyncedRead::GetUnitCommands(lua_State* L)
 		// *get wants the actual commands
 		PackCommandQueue(L, *queue, numCmds);
 	} else {
-		LOG_DEPRECATED("This game is issuing `Spring.GetUnitCommands(unitId, 0)`, `Spring.GetCommandQueue(unitId, 0)` or passing a third argument to these functions. This usage is deprecated, please use `Spring.GetUnitCommandCount` instead or fix some underlying bug.");
+		LOG_DEPRECATED("This game is issuing `Spring.GetUnitCommands(unitId, 0)`, `Spring.GetCommandQueue(unitId, 0)` or passing a third argument to these functions. This usage is deprecated, please use `Spring.GetUnitCommandCount(unitId)` instead or fix some underlying bug.");
 		// *get just wants the queue's size
 		lua_pushnumber(L, queue->size());
 	}
