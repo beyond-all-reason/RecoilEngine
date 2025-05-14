@@ -6235,8 +6235,6 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
  *
  * @function Spring.GetUnitCommands
  *
- * Same as `Spring.GetCommandQueue`
- *
  * @param unitID integer
  * @param count integer Maximum amount of commands to return, `-1` returns all commands.
  * @return Command[] commands
@@ -6244,9 +6242,8 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
 /***
  * Get the count of commands for a unit.
  *
+ * @deprecated
  * @function Spring.GetUnitCommands
- *
- * Same as `Spring.GetCommandQueue`
  *
  * @param unitID integer
  * @param count 0 Returns the number of commands in the units queue.
@@ -6454,7 +6451,7 @@ int LuaSyncedRead::GetFactoryCounts(lua_State* L)
 }
 
 
-// FIXME: Issue a deprecation warning
+// FIXME: Consider issuing a deprecation warning and adding @deprecated to either of `GetCommandQueue` or `GetUnitCommands`.
 /***
  * Get the commands for a unit.
  *
