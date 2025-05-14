@@ -6238,7 +6238,7 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
  * Same as `Spring.GetCommandQueue`
  *
  * @param unitID integer
- * @param count integer Maximum amount of commands to return, `-1` returns all commands, `0` returns command count.
+ * @param count integer Maximum amount of commands to return, `-1` returns all commands.
  * @return Command[] commands
  */
 /***
