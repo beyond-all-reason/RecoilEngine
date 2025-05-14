@@ -2,9 +2,8 @@ import shutil
 import os
 import sys
 
-meta_files_path = sys.argv[1]
-temp_md_path = sys.argv[2]
-output_path = sys.argv[3]
+temp_md_path = sys.argv[1]
+output_path = sys.argv[2]
 
 index_text = "" # This is a really dumb way to retain the index from getting deleted
 
@@ -45,7 +44,7 @@ def hugoify(dir: str):
 
 def execute():
     index_path = os.path.join(output_path, "_index.md")
-    print("temp: {0}, meta: {1}, output: {2}, index: {3}".format(temp_md_path, meta_files_path, output_path, index_path))
+    print("temp: {0}, output: {1}, index: {1}".format(temp_md_path, output_path, index_path))
     with open(index_path, "r") as idx:
         index_text = idx.read()
 

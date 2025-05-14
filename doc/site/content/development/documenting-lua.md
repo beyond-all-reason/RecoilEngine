@@ -20,18 +20,22 @@ To test library generation, you can run [lua-doc-extractor](https://github.com/r
 
 Install lua-doc-extractor:
 
+If you have [Task](https://taskfile.dev/installation/), you can run `task install-tools` at root.
+Otherwise, you can run
+
 ```bash
-npm install -g lua-doc-extractor
+npm install -g lua-doc-extractor@3
 ```
 
-At root, run:
+At root, you have 2 options:
 
+With task, you can run `task extract-lua` at root, or if not, run
 ```bash
 # First delete any previously generated output.
 rm -rf rts/Lua/library/generated
 
 # Regenerate the library.
-lua-doc-extractor rts/Lua/*.cpp --dest rts/Lua/library/generated
+lua-doc-extractor rts/Lua/**/*.cpp rts/Rml/SolLua/**/*.cpp --dest rts/Lua/library/generated
 ```
 
 ## Doc comments

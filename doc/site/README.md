@@ -1,10 +1,8 @@
 # Setting Up Local Site Development
 
-This version of the site was designed to be as simple to edit as possible. In the majority of cases, all you need is HUGO itself.
+For local development, all that is required is Hugo. See the [Hugo installation guide](https://gohugo.io/installation/).
 
-## Writing articles for the site
-
-All you need is `hugo-extended`, available now at your local package manager.
+## Testing Locally
 
 `cd` into `doc/site` and run `hugo server`. It will take 2-5 seconds to generate the site, but then any changes you make will be compiled quickly. The site will be hosted on [Localhost](http://localhost:1313/RecoilEngine).
 
@@ -17,34 +15,26 @@ if you are editing the Lua docs, the process can be a little longwinded. They ne
 Doing this locally requires:
 1. Rust, for cargo
 2. Node, for NPM (or equivalent software repo)
-3. Python 3, latest version, for glue code
+3. Python 3 for glue code
+
+There is also a somewhat overengineered document for a command runner called [Task](https://taskfile.dev/installation/), you can use optionally.
 
 And the following programs:
-1. Hugo extended, latest version, installed from your favorite package manager
-2. Emmylua_doc_cli, 0.7.2 or greater, installed with cargo
-3. lua-doc-extractor by resident rhys_vdw
+1. [Hugo](https://gohugo.io/installation/)
+2. [emmylua_doc_cli](https://github.com/CppCXY/emmylua-analyzer-rust/tree/main/crates/emmylua_doc_cli)
+3. [lua-doc-extractor](https://github.com/rhys-vdw/lua-doc-extractor) version 3
 
-Install [HUGO](https://gohugo.io/installation/)
+You can use task to install all the programs except Hugo: `task install-site-tools`.
+These tasks are also available:
+- `task generate-docs` will extract lua meta files, generate markdown, and format it into the Hugo website. Can only be called in `doc`.
+- `task extract-lua` will generate meta files from the lua docs. Can be called in `doc` and root.
 
-Windows:
-```bash
-cargo install emmylua_doc_cli
-npm install -g lua-doc-extractor
-```
-
-Linux:
-```bash
-cargo install emmylua_doc_cli
-npm install -g lua-doc-extractor
-```
-
-To compile the site, `cd` into the `doc` directory and run `./build_site.sh`. Then, `cd` into `site` and run `hugo server`.
 
 See [Documenting Lua development guide](content/development/documenting-lua.markdown) for more info.
 
 # File Structure
 
-The file structure of the site is almost entirely the same as a generic HUGO site. Here's what you need to be interested in:
+The file structure of the site is almost entirely the same as a generic Hugo site. Here's what you need to be interested in:
 
 - `.github`: Contains the workflow for publishing the site onto github pages.
 - `content`: This is all of the markdown files that the site visitor will see.
@@ -56,7 +46,7 @@ The file structure of the site is almost entirely the same as a generic HUGO sit
   - `changelogs`: Changelogs.
 - `data`: A variety of config files used for rendering different parts of the website.
 - `i18n`: Translations.
-- `layouts`: Custom HUGO templates used for the site.
+- `layouts`: Custom Hugo templates used for the site.
 - `scripts`: Shell scripts used in the build process for github workflows.
 - `generate_from_meta.py`: Glue code for generating lua docs from LLS meta files.
 - `README.md`: You are here!
@@ -65,7 +55,7 @@ The file structure of the site is almost entirely the same as a generic HUGO sit
 
 ## Quickstart
 
-This site is built using [HUGO]. Pretty much everything you need is on their website for how to make an article, but here's a brief overview:
+This site is built using [Hugo]. Pretty much everything you need is on their website for how to make an article, but here's a brief overview:
 1. `cd doc/site` if you're in the root directory of the Recoil repo.
 2. `hugo new <filepath>/<filename>.md` will create a new page. For example, `hugo new content/docs/guides/writing-widgets.md`. For filenames and folder names especially, it tends to struggle with spaces, so avoid those. You can make the file manually, but the tool generates the head matter (page info section) for you.
 3. Write your article.
@@ -79,7 +69,7 @@ This site is built using [HUGO]. Pretty much everything you need is on their web
 
 ### Templating and Shortcodes
 
-HUGO content files (the markdown) cannot have templates executed within them. They *do* have a limited form of templating called [shortcodes](https://gohugo.io/content-management/shortcodes/), and shortcodes have template code that is executed. These are executed when the markdown page is rendered into HTML. These have the syntax of:
+Hugo content files (the markdown) cannot have templates executed within them. They *do* have a limited form of templating called [shortcodes](https://gohugo.io/content-management/shortcodes/), and shortcodes have template code that is executed. These are executed when the markdown page is rendered into HTML. These have the syntax of:
 Notation|Example
 :--|:--
 Markdown|`{{%/* foo */%}} ## Section 1 {{%/* /foo */%}}`
@@ -140,4 +130,4 @@ A few shortcodes and layouts have been written for the website specifically. The
   - `layout = "commands"`
   - `type = "docs"`
 
-[HUGO]: https://gohugo.io/
+[Hugo]: https://gohugo.io/
