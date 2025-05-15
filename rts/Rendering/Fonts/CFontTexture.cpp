@@ -1133,8 +1133,8 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& wanted)
 				blurRectangles.emplace_back(
 					texpos2.x + outlineSize/2,
 					texpos2.y + outlineSize/2,
-					std::min<int>(wantedTexWidth, texpos2.x + outlineSize + atlasGlyphs[glyphIdx].xsize),
-					std::min<int>(wantedTexHeight, texpos2.y + outlineSize + atlasGlyphs[glyphIdx].ysize)
+					std::min<int>(atlasUpdateShadow.xsize, texpos2.x + outlineSize + atlasGlyphs[glyphIdx].xsize),
+					std::min<int>(atlasUpdateShadow.ysize, texpos2.y + outlineSize + atlasGlyphs[glyphIdx].ysize)
 				);
 				atlasUpdateShadow.CopySubImage(atlasGlyphs[glyphIdx], texpos2.x + outlineSize, texpos2.y + outlineSize);
 			}
@@ -1319,6 +1319,7 @@ void CFontTexture::ReallocAtlases(bool pre)
 		atlasShadowMem = {};
 		atlasDim = {};
 		atlasUDim = {};
+		blurRectangles.clear();
 		return;
 	}
 
@@ -1330,6 +1331,7 @@ void CFontTexture::ReallocAtlases(bool pre)
 	}
 
 	atlasGlyphs.clear();
+	blurRectangles.clear();
 
 	atlasMem = {};
 	atlasShadowMem = {};
@@ -1357,6 +1359,7 @@ void CFontTexture::ClearAtlases(const int width, const int height)
 		LOG_L(L_WARNING, "[FontTexture::%s] discarding %u glyph bitmaps", __func__, uint32_t(atlasGlyphs.size()));
 
 	atlasGlyphs.clear();
+	blurRectangles.clear();
 #endif
 }
 
