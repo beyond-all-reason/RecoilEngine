@@ -1,7 +1,7 @@
----
-title: Release 105-2590
-author: sprunk
----
++++
+title = "Release 105-2590"
+author = "sprunk"
++++
 
 This is the changelog since version 2511 **until release 2590**, which happened on 2024-09-30.
 

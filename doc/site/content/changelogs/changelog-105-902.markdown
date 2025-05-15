@@ -1,7 +1,7 @@
----
-title: Release 105-902
-author: sprunk
----
++++
+title = "Release 105-902"
+author = "sprunk"
++++
 
 The changelog since release 105-861 **until minor release 105-902**, which happened in April 2022.
 

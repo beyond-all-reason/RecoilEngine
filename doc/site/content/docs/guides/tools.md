@@ -12,8 +12,10 @@ Useful tools for developing a game on Recoil.
 
 [Skeletor S3O](https://github.com/Beherith/Skeletor_S3O) - For animating .s3o format models in Blender and exporting code to include within a [unitscript](https://springrts.com/wiki/Animation-LuaScripting)
 
+[Upspring](https://github.com/techannihilation/upspring) - For editing and previewing .s3o format models
+
 ### Mapmaking
 
 [PyMapConv](https://github.com/Beherith/springrts_smf_compiler) - Map compiler
 
-TODO Add upspring, springboard, etc
+[SpringBoard](https://github.com/Spring-SpringBoard/SpringBoard-Core) - Map and scenario editor

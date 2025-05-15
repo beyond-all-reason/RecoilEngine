@@ -1,6 +1,6 @@
----
-title: "Netcode overview"
----
++++
+title = "Netcode overview"
++++
 
 Here's an overview of some aspects of Recoil's so-called netcode. The **tl;dr is that it uses lockstep simulation which is essentially the same as basically every classic RTS from the 90s and 00s**. Read on for a bit more detailed explanation.
 

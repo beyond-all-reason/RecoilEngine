@@ -1,6 +1,6 @@
----
-title: "CEG operators"
----
++++
+title = "CEG operators"
++++
 
 ## Basics
 

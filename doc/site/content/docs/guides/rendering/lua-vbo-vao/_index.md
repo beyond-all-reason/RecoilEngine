@@ -1,7 +1,7 @@
----
-title: Lua VBO and VAO
-author: lhog
----
++++
+title = "Lua VBO and VAO"
+author = "lhog"
++++
 
 ## Crash course
 

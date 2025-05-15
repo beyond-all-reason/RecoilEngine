@@ -1,5 +1,6 @@
----
-title: "Pathfinding"
----
++++
+title = "Pathfinding"
+draft = true
++++
 
 TODO

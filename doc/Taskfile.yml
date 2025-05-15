@@ -8,8 +8,9 @@ includes:
     flatten: true
 
 vars:
-  TEMP_PATH: temp
-  PATH_TO_ROOT: ../
+  TEMP_PATH: site/temp
+  LUA_EXTRACT_PATHS: ["rts/Lua/**/*.cpp", "rts/Rml/SolLua/**/*.cpp"]
+  EXTRACTOR_VERSION: 3
 
 tasks:
   generate-docs:
@@ -18,8 +19,13 @@ tasks:
     cmds:
       - emmylua_doc_cli -i rts/Lua/library -o {{.TEMP_PATH}} --override-template emmylua-doc-cli-template
       - python3 site/generate_from_meta.py {{.TEMP_PATH}} site/content/docs/lua-api
+  extract-lua:
+    summary: "Extracts lua meta files from the cpp files."
+    cmds:
+      - lua-doc-extractor {{.LUA_EXTRACT_PATHS | join " "}} --dest rts/Lua/library/generated
   install-site-tools:
     deps: [install-tools]
     summary: "Installs needed tools for Lua docs site generation."
     cmds:
+      - npm install -g lua-doc-extractor@{{.EXTRACTOR_VERSION}}
       - cargo install emmylua_doc_cli

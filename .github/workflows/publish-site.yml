@@ -45,7 +45,7 @@ jobs:
           emmylua_doc_cli \
             -i rts/Lua/library \
             -o ${META_PATH} \
-            --override-template doc/emmlua-doc-cli-template
+            --override-template doc/emmylua-doc-cli-template
       - name: Run generator glue code
         run: |
           python doc/site/generate_from_meta.py ${META_PATH} ${TEMP_PATH} ${LUA_API_DOCS_PATH}

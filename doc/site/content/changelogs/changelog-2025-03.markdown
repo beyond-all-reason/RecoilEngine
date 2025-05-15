@@ -1,6 +1,6 @@
----
-title: "Release 2025.03"
----
++++
+title = "Release 2025.03"
++++
 
 This is the changelog since version 2025.01 until **version 2025.03**, which is still in pre-release phase.
 

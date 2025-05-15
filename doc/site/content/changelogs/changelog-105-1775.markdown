@@ -1,7 +1,7 @@
----
-title: Release 105-1775
-author: sprunk
----
++++
+title = "Release 105-1775"
+author = "sprunk"
++++
 
 The changelog since release 105-1544 **until release 105-1775**, which happened in June 2023.
 

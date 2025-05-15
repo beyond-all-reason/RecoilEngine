@@ -1,7 +1,7 @@
----
-title: Wupget communication and best practices
-author: sprunk
----
++++
+title = "Wupget communication and best practices"
+author = "sprunk"
++++
 
 There are multiple Lua environments (see [old wiki](https://springrts.com/wiki/Lua:Environments)), and within an environment each wupget is also separated to some degree. How do these communicate?
 
