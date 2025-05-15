@@ -1385,7 +1385,14 @@ void CFontTexture::UpdateGlyphAtlasTexture()
 
 	// merge shadow and regular atlas bitmaps, dispose shadow
 	if (atlasUpdateShadow.xsize == atlasUpdate.xsize && atlasUpdateShadow.ysize == atlasUpdate.ysize) {
+		spring_time t1 = spring_gettime();
 		atlasUpdateShadow.Blur(outlineSize, outlineWeight);
+		spring_time t2 = spring_gettime();
+		spring_time tt = t2-t1;
+		if (tt.toMilliSecsf() > 10) {
+		       LOG_L(L_WARNING, "Slow Blur %f", tt.toMilliSecsf());
+		}
+
 		assert((atlasUpdate.xsize * atlasUpdate.ysize) % sizeof(int) == 0);
 
 		const int* src = reinterpret_cast<const int*>(atlasUpdateShadow.GetRawMem());
