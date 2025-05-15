@@ -576,6 +576,7 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 
 		FcChar8* cFilename = nullptr;
 		FcResult r = FcPatternGetString(font, FC_FILE, 0, &cFilename);
+		LOG_L(L_WARNING, "LOAD1 %s", cFilename);
 		if (r != FcResultMatch || cFilename == nullptr)
 			continue;
 
@@ -728,9 +729,6 @@ void CFontTexture::PreloadGlyphs()
 {
 #ifndef HEADLESS
 	FT_Face face = *shFace;
-	// don't preload for non alphanumeric
-	if (!FT_Get_Char_Index(face, 65))
-		return;
 	//preload Glyphs
 	// if given face doesn't contain alphanumerics, don't preload it
 	if (!FT_Get_Char_Index(face, 'a'))
@@ -1211,8 +1209,9 @@ void CFontTexture::LoadGlyph(std::shared_ptr<FontFace>& f, char32_t ch, unsigned
 	glyph.letter = ch;
 
 	// load glyph
-	auto flags = FT_LOAD_DEFAULT;
+	auto flags = FT_LOAD_RENDER;
 	if (FT_HAS_COLOR(f->face)) {
+		LOG_L(L_WARNING, "LOAD WITH COLOR");
 		flags |= FT_LOAD_COLOR;
 	} else {
 		flags |= FT_LOAD_RENDER;
