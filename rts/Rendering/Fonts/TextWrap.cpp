@@ -315,6 +315,7 @@ void CTextWrap::WrapTextConsole(std::list<word>& words, float maxWidth, float ma
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (words.empty() || (GetLineHeight()<=0.0f))
 		return;
+	const spring_time t1 = spring_gettime();
 	const bool splitAllWords = false;
 	const unsigned int maxLines = (unsigned int)std::floor(std::max(0.0f, maxHeight / GetLineHeight()));
 
@@ -420,12 +421,18 @@ void CTextWrap::WrapTextConsole(std::list<word>& words, float maxWidth, float ma
 	wi = currLine->end;
 	++wi;
 	wi = words.erase(wi, words.end());
+	const spring_time t2 = spring_gettime();
+	const spring_time tt = t2-t1;
+	if (tt.toMilliSecsf() > 10) {
+		LOG_L(L_WARNING, "Slow TextWrap %f", tt.toMilliSecsf());
+	}
 }
 
 
 void CTextWrap::SplitTextInWords(const spring::u8string& text, std::list<word>* words, std::list<colorcode>* colorcodes)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	const spring_time t1 = spring_gettime();
 	const unsigned int length = (unsigned int)text.length();
 	const float spaceAdvance = GetGlyph(spaceUTF16).advance;
 
@@ -517,6 +524,11 @@ void CTextWrap::SplitTextInWords(const spring::u8string& text, std::list<word>* 
 		w->width = spaceAdvance * w->numSpaces;
 	} else if (!w->isLineBreak) {
 		w->width = GetTextWidth(w->text);
+	}
+	const spring_time t2 = spring_gettime();
+	const spring_time tt = t2-t1;
+	if (tt.toMilliSecsf() > 10) {
+		LOG_L(L_WARNING, "Slow SplitTextInWords %f", tt.toMilliSecsf());
 	}
 }
 
