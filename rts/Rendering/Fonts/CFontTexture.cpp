@@ -871,12 +871,10 @@ bool CFontTexture::ClearGlyphs() {
 		// clear atlases
 		ClearAtlases(32, 32);
 
-		// signal need to update texture
-		blurRectangles.clear();
-
 		// preload standard glyphs
 		PreloadGlyphs();
 
+		// signal need to update texture
 		++curTextureUpdate;
 	}
 #endif
