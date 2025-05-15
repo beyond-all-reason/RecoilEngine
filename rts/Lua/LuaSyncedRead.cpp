@@ -6244,7 +6244,7 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
 /***
  * Get the count of commands for a unit.
  *
- * @deprecated This overload is deprecated, prefer to use `Spring.GetUnitCommandCount(unitId)`.
+ * @deprecated This overload is deprecated, use `Spring.GetUnitCommandCount(unitId)` instead.
  * @function Spring.GetUnitCommands
  *
  * @param unitID integer
