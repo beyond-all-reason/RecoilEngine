@@ -678,45 +678,45 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 	};
 	static constexpr int BLUR_KERNEL_HS = BLUR_KERNEL.size() >> 1;
 
+	if (w == 0)
+		w = bmp->xsize;
+	if (h == 0)
+		h = bmp->ysize;
+
 	// note ysize and xsize are swapped
-	CBitmap tmp(nullptr, bmp->ysize, bmp->xsize, ch, bmp->dataType);
+	CBitmap tmp(nullptr, h, w, ch, bmp->dataType);
 	auto tempAction = BitmapAction::GetBitmapAction(&tmp); // lifetime thing, not used furher
 
 	auto* tempTypedAction = static_cast<TBitmapAction<T, ch>*>(tempAction.get());
 	auto* currTypedAction = this;
 
 	const std::array blurPassTuples {
-		std::tuple( bmp, currTypedAction, tempTypedAction), // horizontal pass
-		std::tuple(&tmp, tempTypedAction, currTypedAction)  // vertical   pass
+		std::tuple( bmp, currTypedAction, tempTypedAction, startx, starty, 0, 0), // horizontal pass
+		std::tuple(&tmp, tempTypedAction, currTypedAction, 0, 0, startx, starty)  // vertical   pass
 	};
 
 	const auto w0 = BLUR_KERNEL[BLUR_KERNEL_HS] * BLUR_KERNEL[BLUR_KERNEL_HS] * (weight - 1.0f);
 
 	#define MT_EXECUTION 0
 
-	if (w == 0)
-		w = bmp->xsize;
-	if (h == 0)
-		h = bmp->ysize;
-
 	for (int iter = 0; iter < iterations; ++iter) {
 		for (size_t bpi = 0; bpi < blurPassTuples.size(); ++bpi) {
 			// everything is a pointer here, can assign with just auto
-			auto [src, srcAction, dstAction] = blurPassTuples[bpi];
+			auto [src, srcAction, dstAction, sx, sy, dx, dy] = blurPassTuples[bpi];
 		#if MT_EXECUTION == 1
-			for_mt_chunk(starty, starty+h, [this, src, srcAction, dstAction, bpi, w0](int y) {
+			for_mt_chunk(starty, starty+h, [this, src, srcAction, dstAction, bpi, w0, sx, sy, dx, dy](int y) {
 		#else
-			for (int y = starty; y < starty+h; y++) {
+			for (int y = 0; y < h; y++) {
 		#endif
-				int yBaseOffset = (y * src->xsize);
-				for (int x = startx; x < startx+w; x++) {
+				int yBaseOffset = ((sy + y) * src->xsize);
+				for (int x = 0; x < w; x++) {
 
 					// don't use AccumChanType for additional precision
 					std::array<float, ch> val{ 0.0f };
 					float wSum = 0.0f;
 
 					for (int off = -BLUR_KERNEL_HS; off <= BLUR_KERNEL_HS; ++off) {
-						const int xo = x + off;
+						const int xo = (sx + x) + off;
 						// check bounds
 						if ((xo < 0) || (xo > src->xsize - 1))
 							continue;
@@ -730,7 +730,7 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 						}
 					}
 
-					auto& dstRef = dstAction->GetRef(x * src->ysize + y);
+					auto& dstRef = dstAction->GetRef((dx + x) * src->ysize + (dy + y));
 					for (int a = 0; a < ch; a++) {
 						auto rawDstVal = val[a] / wSum;
 
