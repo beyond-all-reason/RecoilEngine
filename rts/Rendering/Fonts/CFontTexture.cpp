@@ -871,11 +871,12 @@ bool CFontTexture::ClearGlyphs() {
 		// clear atlases
 		ClearAtlases(32, 32);
 
+		// signal need to update texture
+		blurRectangles.clear();
+
 		// preload standard glyphs
 		PreloadGlyphs();
 
-		// signal need to update texture
-		blurX1 = blurY1 = blurX2 = blurY2 = 0;
 		++curTextureUpdate;
 	}
 #endif
@@ -1091,7 +1092,6 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& wanted)
 
 	// read atlasAlloc glyph data back into atlasUpdate{Shadow}
 	{
-		blurX1 = blurY1 = blurX2 = blurY2 = 0;
 		if (!atlasAlloc.Allocate())
 			LOG_L(L_WARNING, "[CFontTexture::%s] Texture limit reached! (try to reduce the font size and/or outlinewidth)", __func__);
 
@@ -1130,10 +1130,12 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& wanted)
 			if (texpos[2] != 0)
 				atlasUpdate.CopySubImage(atlasGlyphs[glyphIdx], texpos.x, texpos.y);
 			if (texpos2[2] != 0) {
-				blurX1 = std::min<int>(blurX1, texpos2.x + outlineSize);
-				blurX2 = std::max<int>(blurX2, texpos2.x + outlineSize + atlasGlyphs[glyphIdx].xsize + outlineSize);
-				blurY1 = std::min<int>(blurY1, texpos2.y + outlineSize);
-				blurY2 = std::max<int>(blurY2, texpos2.y + outlineSize + atlasGlyphs[glyphIdx].ysize + outlineSize);
+				blurRectangles.emplace_back(
+					texpos2.x + outlineSize/2,
+					texpos2.y + outlineSize/2,
+					std::min<int>(wantedTexWidth, texpos2.x + outlineSize + atlasGlyphs[glyphIdx].xsize),
+					std::min<int>(wantedTexHeight, texpos2.y + outlineSize + atlasGlyphs[glyphIdx].ysize)
+				);
 				atlasUpdateShadow.CopySubImage(atlasGlyphs[glyphIdx], texpos2.x + outlineSize, texpos2.y + outlineSize);
 			}
 		}
@@ -1141,10 +1143,6 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& wanted)
 		atlasAlloc.clear();
 		atlasGlyphs.clear();
 	}
-	blurX1 = std::max(blurX1, 0);
-	blurY1 = std::max(blurY1, 0);
-	blurX2 = std::min(blurX2, wantedTexWidth);
-	blurY2 = std::min(blurY2, wantedTexHeight);
 
 	const spring_time t2 = spring_gettime();
 	const spring_time tt = t2-t1;
@@ -1397,7 +1395,11 @@ void CFontTexture::UpdateGlyphAtlasTexture()
 	// merge shadow and regular atlas bitmaps, dispose shadow
 	if (atlasUpdateShadow.xsize == atlasUpdate.xsize && atlasUpdateShadow.ysize == atlasUpdate.ysize) {
 		spring_time t1 = spring_gettime();
-		atlasUpdateShadow.Blur(outlineSize, outlineWeight, blurX1, blurY1, blurX2-blurX1, blurY2-blurY1);
+		for_mt(0, blurRectangles.size(), [&](int i) {
+			SRectangle& rect = blurRectangles[i];
+			atlasUpdateShadow.Blur(outlineSize, outlineWeight, rect.x1, rect.y1, rect.x2-rect.x1, rect.y2-rect.y1);
+		});
+		blurRectangles.clear();
 		spring_time t2 = spring_gettime();
 		spring_time tt = t2-t1;
 		if (tt.toMilliSecsf() > 10) {
