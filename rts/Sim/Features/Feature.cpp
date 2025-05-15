@@ -341,6 +341,7 @@ bool CFeature::AddBuildPower(CUnit* builder, float amount)
 	order.overflow   = builder->harvestStorage.empty();
 	order.separate   = true;
 	order.use.energy = energyUseScaled;
+	order.useIncomeMultiplier = (team == teamHandler.GaiaTeamID()); // Apply income bonus to map generated reclaim but not to player generated reclaim
 
 	if (reclaimLeftTemp == 0.0f) {
 		// always give remaining resources at the end
