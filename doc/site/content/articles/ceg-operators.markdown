@@ -1,5 +1,6 @@
 +++
 title = "CEG operators"
+author = "sprunk"
 +++
 
 ## Basics

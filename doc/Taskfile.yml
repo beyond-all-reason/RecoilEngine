@@ -18,7 +18,7 @@ tasks:
     summary: "Generates documentation for the website based on lua meta files."
     cmds:
       - emmylua_doc_cli -i rts/Lua/library -o {{.TEMP_PATH}} --override-template emmylua-doc-cli-template
-      - python3 site/generate_from_meta.py {{.TEMP_PATH}} site/content/docs/lua-api
+      - python3 site/scripts/generate_from_meta.py {{.TEMP_PATH}} site/content/docs/lua-api
   extract-lua:
     summary: "Extracts lua meta files from the cpp files."
     cmds:
