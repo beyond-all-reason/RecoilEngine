@@ -1129,10 +1129,10 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& wanted)
 				atlasUpdate.CopySubImage(atlasGlyphs[glyphIdx], texpos.x, texpos.y);
 			if (texpos2[2] != 0) {
 				blurRectangles.emplace_back(
-					texpos2.x + outlineSize/2,
-					texpos2.y + outlineSize/2,
-					std::min<int>(wantedTexWidth, texpos2.x + outlineSize + atlasGlyphs[glyphIdx].xsize),
-					std::min<int>(wantedTexHeight, texpos2.y + outlineSize + atlasGlyphs[glyphIdx].ysize)
+					std::max<int>(0, texpos2.x + outlineSize - (outlineSize/2)),
+					std::max<int>(0, texpos2.y + outlineSize - (outlineSize/2)),
+					std::min<int>(wantedTexWidth, texpos2.x + outlineSize/2 + atlasGlyphs[glyphIdx].xsize),
+					std::min<int>(wantedTexHeight, texpos2.y + outlineSize/2 + atlasGlyphs[glyphIdx].ysize)
 				);
 				atlasUpdateShadow.CopySubImage(atlasGlyphs[glyphIdx], texpos2.x + outlineSize, texpos2.y + outlineSize);
 			}
