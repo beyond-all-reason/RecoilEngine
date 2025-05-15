@@ -1,7 +1,7 @@
----
-title: Release 105-2314
-author: sprunk
----
++++
+title = "Release 105-2314"
+author = "sprunk"
++++
 
 This is the changelog since release 1775 **until release 2314**, which happened on 2024-02-13.
 

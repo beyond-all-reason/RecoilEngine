@@ -1,6 +1,6 @@
----
-title: The select command
----
++++
+title = 'The select command'
++++
 
 You can bind the command `select` to a key, in order to define custom selection commands. After select, you can specify a **selector**, that defines *which* units will be selected.
 

@@ -1,7 +1,7 @@
----
-title: Units of measurement
-author: sprunk
----
++++
+title = "Units of measurement"
+author = "sprunk"
++++
 
 In addition to standard units of measurement such as seconds or radians, Recoil uses some in-house units that warrant a bit of explanation.
 

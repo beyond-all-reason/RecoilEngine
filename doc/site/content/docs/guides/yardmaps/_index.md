@@ -1,7 +1,7 @@
----
-title: Yardmaps and map squares
-author: sprunk
----
++++
+title = "Yardmaps and map squares"
+author = "sprunk"
++++
 
 ### Squares
 

@@ -1,7 +1,7 @@
----
-title: Team terminology
-author: sprunk
----
++++
+title = "Team terminology"
+author = "sprunk"
++++
 
 ## Overview
 

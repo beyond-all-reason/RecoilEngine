@@ -1,6 +1,6 @@
----
-title: "Running changelog"
----
++++
+title = "Running changelog"
++++
 
 This is the bleeding-edge changelog **since version 2025.03**, which is still in the pre-release phase.
 See [the 2025.03 page]({{ site.baseurl }}{% link changelogs/changelog-2025-03.markdown %}) for the upcoming release.

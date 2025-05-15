@@ -1,7 +1,7 @@
----
-title: Profiling with Tracy
-author: beherith
----
++++
+title = 'Profiling with Tracy'
+author = 'beherith'
++++
 
 ## Using a prebuilt binary:
 
@@ -26,11 +26,11 @@ author: beherith
 The following options are available:
 
 - `TRACY_ENABLE`: Enable tracy profiling
-- `TRACY_ON_DEMAND`: On demand profiling is *slightly* more expensive, but it
-allows to run the build with tracing like regular build and attach late in game,
-where regular trace would just run out of memory because of size.
+- `TRACY_ON_DEMAND`: On demand profiling is _slightly_ more expensive, but it
+  allows to run the build with tracing like regular build and attach late in game,
+  where regular trace would just run out of memory because of size.
 - `TRACY_PROFILE_MEMORY`: Profile memory allocations. It's pretty expensive and
-some places that use raw malloc have to be used with care.
+  some places that use raw malloc have to be used with care.
 - `RECOIL_DETAILED_TRACY_ZONING`: Enable additional detailed tracy zones (only enable this for testing/debugging)
 
 For example, building with docker and tracy support enabled:

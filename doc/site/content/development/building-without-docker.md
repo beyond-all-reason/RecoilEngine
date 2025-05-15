@@ -1,13 +1,14 @@
----
-title: Building without Docker
-author: p2004a
----
++++
+title = 'Building without Docker'
+author = 'p2004a'
++++
 
 The [https://github.com/beyond-all-reason/RecoilEngine/tree/BAR105/docker-build/scripts](scripts) folder is the source of truth and best reference to figure out how to invoke and configure things.
 
 ## Compilation
 
 It's arguable that compilation of spring for both Linux and Windows is just easier from Linux. So, we will only describe compilation on Linux.
+
 - Windows: There is [WSL](https://docs.microsoft.com/en-us/windows/wsl/) and it works great.
 - Linux: To not have to install all the dev dependencies, compilers etc directly in the base system, and for compatibility, you can use [distrobox](https://github.com/89luca89/distrobox) and develop there. It's fine to do it without that, but it's just very convenient.
 
@@ -74,6 +75,7 @@ This part is the most annoying: configuring build is done using cmake, and the c
 First, you should have a few toolchains configured. Toolchains select the compiler and target operating system. You can store them in the `toolchain` directory in the spring repo. Linux toolchains use `lld` linker as it's much faster.
 
 `toolchain/clang_x86_64-pc-linux-gnu.cmake`:
+
 ```cmake
 SET(CMAKE_SYSTEM_NAME Linux)
 SET(CMAKE_C_COMPILER "clang")
@@ -84,6 +86,7 @@ SET(CMAKE_SHARED_LINKER_FLAGS_INIT "-fuse-ld=lld")
 ```
 
 `toolchain/gcc_x86_64-pc-linux-gnu.cmake`:
+
 ```cmake
 SET(CMAKE_SYSTEM_NAME Linux)
 SET(CMAKE_C_COMPILER "gcc")
@@ -94,6 +97,7 @@ SET(CMAKE_SHARED_LINKER_FLAGS_INIT "-fuse-ld=lld")
 ```
 
 `toolchain/gcc_x86_64-pc-windows-gnu.cmake`:
+
 ```cmake
 SET(CMAKE_SYSTEM_NAME Windows)
 SET(CMAKE_C_COMPILER "x86_64-w64-mingw32-gcc-posix")
@@ -109,11 +113,13 @@ SET(DLLTOOL "x86_64-w64-mingw32-dlltool")
 With cmake we are building outside of the source, so create directory like `builddir-win`, or `builddir-dbg` and inside them we can run cmake invocations. There are plenty of possible configuration so we will just list a bunch that can be used as a starting point.
 
 In all of them:
+
 - We use Ninja generator, as Ninja is the quickest to actually execute the build process, scan for changes etc.
 - Using ccache to make next compilation quicker
 - Install dir is simply `install`, so that after configuing build with cmake, you can just run `ninja && ninja install` and get all the files ready for usage in the `install` directory in builddir.
 
-----
+---
+
 Basic release with debug info, shared libraries Linux build with GCC:
 
 ```bash
@@ -135,6 +141,7 @@ cmake \
 ```
 
 Fast unoptimized debug Linux shared libraries build with Clang and generation of [`compile_commands.json`](https://clang.llvm.org/docs/JSONCompilationDatabase.html) file.
+
 ```bash
 cmake \
 	-DCMAKE_TOOLCHAIN_FILE="../toolchain/clang_x86_64-pc-linux-gnu.cmake" \
@@ -156,6 +163,7 @@ cmake \
 ```
 
 Windows release with minimal line debug info static cross compilation with mingw64:
+
 ```bash
 cmake \
 	-DCMAKE_TOOLCHAIN_FILE="../toolchain/gcc_x86_64-pc-windows-gnu.cmake" \
@@ -169,7 +177,7 @@ cmake \
 	-GNinja ..
 ```
 
-----
+---
 
 ### Source code completion
 
@@ -183,14 +191,13 @@ Clangd will then just pick it up.
 
 If running in distrobox, and with clangd in distrobox, you might need to override clangd invocation in the LSP supporting editor to something like: `distrobox enter --no-tty {container_name} spring -- socat tcp-listen:{port},reuseaddr exec:clangd`
 
-When developing on Windows, with clangd on Linux, and WSL container mapped to `L:` drive, the invocation might looks like this:  `wsl.exe socat tcp-listen:${port},reuseaddr exec:'clangd --path-mappings=L:/home=/home,L:/usr=/usr'`. Only drawback is that ofc `#ifdef _WIN32` blocks won't have completion in such setup.
+When developing on Windows, with clangd on Linux, and WSL container mapped to `L:` drive, the invocation might looks like this: `wsl.exe socat tcp-listen:${port},reuseaddr exec:'clangd --path-mappings=L:/home=/home,L:/usr=/usr'`. Only drawback is that ofc `#ifdef _WIN32` blocks won't have completion in such setup.
 
 Example `spring.sublime-project` for Sublime Text on Linux with [LSP](https://lsp.sublimetext.io/) server pckages:
 
 ```json
 {
-	"folders":
-	[
+	"folders": [
 		{
 			"path": "."
 		}
@@ -214,9 +221,9 @@ Example `spring.sublime-project` for Sublime Text on Linux with [LSP](https://ls
 				"scopes": ["source.c", "source.c++"],
 				"syntaxes": [
 					"Packages/C++/C.sublime-syntax",
-					"Packages/C++/C++.sublime-syntax",
+					"Packages/C++/C++.sublime-syntax"
 				],
-				"languageId": "cpp",
+				"languageId": "cpp"
 			}
 		}
 	}

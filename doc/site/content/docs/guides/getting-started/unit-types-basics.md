@@ -1,7 +1,7 @@
----
-title: Unit Types Basics
-author: sprunk
----
++++
+title = "Unit Types Basics"
+author = "sprunk"
++++
 
 **Each unit in Spring/Recoil belongs to a single type**.
 By default, all units of a type are the same as far as most traits (for example health) go.

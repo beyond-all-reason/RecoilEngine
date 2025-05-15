@@ -1,6 +1,6 @@
----
-title: "Documenting Lua"
----
++++
+title = "Documenting Lua"
++++
 
 This article covers working with Lua for **engine developers**. For adding the library to your Recoil game, refer to the [Lua Language Server guide](/docs/guides/getting-started/lua-language-server).
 
@@ -20,7 +20,6 @@ To test library generation, you can run [lua-doc-extractor](https://github.com/r
 
 Install lua-doc-extractor:
 
-If you have [Task](https://taskfile.dev/installation/), you can run `task install-tools` at root.
 Otherwise, you can run
 
 ```bash
@@ -29,7 +28,6 @@ npm install -g lua-doc-extractor@3
 
 At root, you have 2 options:
 
-With task, you can run `task extract-lua` at root, or if not, run
 ```bash
 # First delete any previously generated output.
 rm -rf rts/Lua/library/generated
@@ -101,9 +99,10 @@ All files under `/rts/Lua/Library/` are directly copied into the library when th
 - `integer`
 - `table<,>`
 
-
 {: .note }
+
 > Literals (e.g. `true`, `false`, `5`) are also available as types. `true` is useful in the case where a table is being used as a set, e.g.
+>
 > ```
 > table<string, true>
 > ```
@@ -138,9 +137,10 @@ An array type is expressed as `type[]`.
 - For multiple returns use one per line.
 
 {: .warning }
+
 > `@return` must specify the type _before_ the name, whereas `@param` takes the name before the type.
 
-```cpp
+````cpp
 /***
  * @function Math.Add
  *
@@ -156,7 +156,7 @@ An array type is expressed as `type[]`.
  * @param b integer The second number.
  * @returns integer result The sum of `a` and `b`.
  */
-```
+````
 
 ### Class
 

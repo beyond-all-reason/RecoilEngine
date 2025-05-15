@@ -1,7 +1,7 @@
----
-title: Release 2025.01
-author: sprunk
----
++++
+title = "Release 2025.01"
+author = "sprunk"
++++
 
 This is the changelog since version 105-2590 until **version 2025.01**, which was released on 2025-01-08.
 

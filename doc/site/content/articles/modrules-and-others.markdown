@@ -1,7 +1,7 @@
----
-title: Modrules and (un)related concepts
-author: sprunk
----
++++
+title = "Modrules and (un)related concepts"
+author = "sprunk"
++++
 
 ### Mod options, mod info, mod rules, rules params
 These concepts have similar names (which stems from how Recoil games used to be called "mods", even original/standalone ones)

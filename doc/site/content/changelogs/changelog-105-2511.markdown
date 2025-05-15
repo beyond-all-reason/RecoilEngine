@@ -1,6 +1,6 @@
----
-title: "Release 105-2511"
----
++++
+title = "Release 105-2511"
++++
 
 This is the changelog since version 2314 **until release 2511**, which happened on 2024-06-07.
 

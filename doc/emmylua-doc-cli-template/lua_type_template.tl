@@ -1,8 +1,7 @@
 ---
 title: "{{ doc.name }}"
-permalink: "docs/lua-api/{{ doc.name }}"
 ---
-# class {{ doc.name }}
+## class {{ doc.name }}
 
 {% if doc.supers %}
 - inherits:
@@ -29,10 +28,10 @@ permalink: "docs/lua-api/{{ doc.name }}"
 {% endif %}
 ---
 {% if doc.methods %}
-## methods
+### methods
 ---
 {% for method in doc.methods %}
-### {{ method.name }}
+#### {{ method.name }}
 ---
 {{ method.display }}
 
@@ -55,10 +54,10 @@ permalink: "docs/lua-api/{{ doc.name }}"
 {% endif %}
 
 {% if doc.fields %}
-## fields
+### fields
 ---
 {% for field in doc.fields %}
-### {{ field.name }}
+#### {{ field.name }}
 ---
 {{ field.display }}
 

@@ -1,7 +1,7 @@
----
-title: "Widgets and Gadgets"
-weight: 1
----
++++
+title = "Widgets and Gadgets"
+weight = 1
++++
 
 Strictly speaking, Recoil does not have a concept of UI and game rules. It simply has a `draw` command, and a number of so-called "callins" that lua scripts can respond to. Most games, however, have abstractions on top of this to make these much simpler. By far the most pervasive of these are the "Widgets" and "Gadgets", collectively known as "Addons". Pretty much everything you will be doing during the course of developing your game will concern addons, unit defs, and feature defs. Let's take a look at some of the concepts here.
 
