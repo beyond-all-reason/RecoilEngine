@@ -692,7 +692,7 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight)
 
 	const auto w0 = BLUR_KERNEL[BLUR_KERNEL_HS] * BLUR_KERNEL[BLUR_KERNEL_HS] * (weight - 1.0f);
 
-	#define MT_EXECUTION 1
+	#define MT_EXECUTION 0
 
 	for (int iter = 0; iter < iterations; ++iter) {
 		for (size_t bpi = 0; bpi < blurPassTuples.size(); ++bpi) {
