@@ -131,10 +131,10 @@ private:
 		int& numLines
 	);
 private:
-	void ScanForWantedGlyphs(const spring::u8string& str);
 	float GetTextWidth_(const spring::u8string& text);
 	float GetTextHeight_(const spring::u8string& text, float* descender = nullptr, int* numLines = nullptr);
 public:
+	void ScanForWantedGlyphs(const spring::u8string& str) override;
 	static auto GetLoadedFonts() -> const decltype(allFonts)& {
 		return allFonts;
 	}

@@ -27,6 +27,7 @@ protected:
 	virtual ~CTextWrap() {}
 public:
 	virtual float GetTextWidth(const std::string& text) = 0;
+	virtual void ScanForWantedGlyphs(const spring::u8string& str) = 0;
 private:
 	struct colorcode {
 		colorcode() : resetColor(false),color(1.f,1.f,1.f,1.f),pos(0) {};

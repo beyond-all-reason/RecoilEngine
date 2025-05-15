@@ -429,6 +429,9 @@ void CTextWrap::SplitTextInWords(const spring::u8string& text, std::list<word>* 
 	const unsigned int length = (unsigned int)text.length();
 	const float spaceAdvance = GetGlyph(spaceUTF16).advance;
 
+	// Scan in advance so we avoid calls on every step of splitting.
+	ScanForWantedGlyphs(text);
+
 	words->push_back(word());
 	word* w = &(words->back());
 
