@@ -175,6 +175,10 @@ protected:
 	int texHeight;
 	int wantedTexWidth;
 	int wantedTexHeight;
+	int blurX1 = 0;
+	int blurY1 = 0;
+	int blurX2 = 0;
+	int blurY2 = 0;
 
 	unsigned int glyphAtlasTextureID = 0;
 
