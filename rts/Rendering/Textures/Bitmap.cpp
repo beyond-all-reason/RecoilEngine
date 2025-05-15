@@ -424,9 +424,10 @@ protected:
 template<typename T, uint32_t ch>
 class TBitmapAction : public BitmapAction {
 public:
+	static constexpr size_t PixelTypeSize = sizeof(T) * ch;
+
 	using ChanType  = T;
-	using PixelType = std::array<T, ch>;
-	static constexpr size_t PixelTypeSize = sizeof(PixelType);
+	using PixelType = T[ch];
 
 	using AccumChanType = typename std::conditional<std::is_same_v<T, float>, float, uint32_t>::type;
 
@@ -666,97 +667,89 @@ template<typename T, uint32_t ch>
 void TBitmapAction<T, ch>::Blur(int iterations, float weight)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// We use an axis-separated blur algorithm. Applies BLUR_KERNEL in both the x
+	// We use an axis-separated blur algorithm. Applies blurkernel in both the x
 	// and y dimensions. This 3x1 blur kernel is equivalent to a 3x3 kernel in
 	// both the x and y dimensions.
 	// See more info
 	// https://www.rastergrid.com/blog/2010/09/efficient-gaussian-blur-with-linear-sampling/
-	static constexpr std::array BLUR_KERNEL {
+	static constexpr float blurkernel[3] = {
 		1.0f / 4.0f, 2.0f / 4.0f, 1.0f / 4.0f
 	};
-	static constexpr int BLUR_KERNEL_HS = BLUR_KERNEL.size() >> 1;
 
-	// note ysize and xsize are swapped
-	CBitmap tmp(nullptr, bmp->ysize, bmp->xsize, ch, bmp->dataType);
-	auto tempAction = BitmapAction::GetBitmapAction(&tmp); // lifetime thing, not used furher
+	// Two temporaries are required in order to perform axis separated gaussian
+	// blur with an additional weight from the source pixel specified by `weight`.
+	// The first blur pass, when dimension == 0, applies blur in the x
+	// dimension on bitmaps[0] and saves the result to bitmaps[1]. The second blur
+	// pass, when dimension == 1, applies blur in the y dimension on bitmaps[1]
+	// and saves the result in bitmaps[2]. Additionally, the second blur pass adds
+	// an additional `weight` from bitmaps[0] to the final result in bitmaps[2].
+	CBitmap tmp(nullptr, bmp->xsize, bmp->ysize, bmp->channels, bmp->dataType);
+	CBitmap tmp2(nullptr, bmp->xsize, bmp->ysize, bmp->channels, bmp->dataType);
 
-	auto* tempTypedAction = static_cast<TBitmapAction<T, ch>*>(tempAction.get());
-	auto* currTypedAction = this;
-
-	const std::array blurPassTuples {
-		std::tuple( bmp, currTypedAction, tempTypedAction), // horizontal pass
-		std::tuple(&tmp, tempTypedAction, currTypedAction)  // vertical   pass
+	std::array<CBitmap*, 3> bitmaps = {bmp, &tmp, &tmp2};
+	std::array<std::unique_ptr<BitmapAction>, 3> actions = {
+		BitmapAction::GetBitmapAction(bitmaps[0]),
+		BitmapAction::GetBitmapAction(bitmaps[1]),
+		BitmapAction::GetBitmapAction(bitmaps[2])
 	};
 
-	#define MT_EXECUTION 1
+	using ThisType = decltype(this);
 
 	for (int iter = 0; iter < iterations; ++iter) {
-		for (auto [src, srcAction, dstAction] : blurPassTuples) {
-		#if MT_EXECUTION == 1
-			for_mt_chunk(0, src->ysize, [this, src, srcAction, dstAction](int y) {
-		#else
-			for (int y = 0; y < src->ysize; y++) {
-		#endif
-				int yBaseOffset = (y * src->xsize);
+		for(int dimension = 0; dimension < 2; ++dimension) {
+
+			CBitmap* src = bitmaps[dimension];
+			CBitmap* dst = bitmaps[dimension + 1];
+
+			auto& srcAction = actions[dimension];
+			auto& dstAction = actions[dimension + 1];
+
+			for_mt(0, src->ysize, [&](const int y) {
 				for (int x = 0; x < src->xsize; x++) {
+					int yBaseOffset = (y * src->xsize);
+					for (int a = 0; a < src->channels; a++) {
+						float fragment = 0.0f;
 
-					// don't use AccumChanType for additional precision
-					std::array<float, ch> val{ 0.0f };
-					float wgt = 0.0f;
+						for (int i = 0; i < 3; ++i) {
+							int yoffset = dimension == 1 ? (i - 1) : 0;
+							int xoffset = dimension == 0 ? (i - 1) : 0;
 
-					for (int off = -BLUR_KERNEL_HS; off <= BLUR_KERNEL_HS; ++off) {
-						const int xo = x + off;
-						// check bounds
-						if ((xo < 0) || (xo > src->xsize - 1))
-							continue;
+							const int tx = x + xoffset;
+							const int ty = y + yoffset;
 
-						const auto w = BLUR_KERNEL[off + BLUR_KERNEL_HS];
+							xoffset *= ((tx >= 0) && (tx < src->xsize));
+							yoffset *= ((ty >= 0) && (ty < src->ysize));
 
-						wgt += w;
-						const auto& srcRef = srcAction->GetRef(yBaseOffset + xo);
-						for (int a = 0; a < ch; a++) {
-							val[a] += w * srcRef[a];
+							const int offset = (yoffset * src->xsize + xoffset);
+
+							auto& srcChannel = static_cast<ThisType>(srcAction.get())->GetRef(yBaseOffset + x + offset, a);
+
+							fragment += (blurkernel[i] * srcChannel);
 						}
-					}
 
-					auto& dstRef = dstAction->GetRef(x * src->ysize + y);
-					for (int a = 0; a < ch; a++) {
-						const auto rawDstVal = val[a] / wgt;
+						if (dimension == 1) {
+							auto& srcChannel = static_cast<ThisType>(actions[0].get())->GetRef(yBaseOffset + x, a);
+
+							fragment += (blurkernel[1] * blurkernel[1]) * (weight - 1.0f) * srcChannel;
+						}
+
+						auto& dstChannel = static_cast<ThisType>(dstAction.get())->GetRef(yBaseOffset + x, a);
 
 						if constexpr (std::is_same_v<ChanType, float>) {
-							dstRef[a] = static_cast<ChanType>(std::max(rawDstVal, 0.0f));
+							dstChannel = static_cast<ChanType>(std::max(fragment, 0.0f));
 						}
 						else {
-							dstRef[a] = static_cast<ChanType>(std::clamp(rawDstVal + 0.5f, 0.0f, static_cast<float>(GetMaxNormValue())));
+							dstChannel = static_cast<ChanType>(std::clamp(fragment, 0.0f, static_cast<float>(GetMaxNormValue())));
 						}
 					}
 				}
-		#if MT_EXECUTION == 1
 			});
-		#else
-			}
-		#endif
 		}
+
+		std::swap(actions[0], actions[2]);
+		std::swap(bitmaps[0], bitmaps[2]);
 	}
 
-	#undef MT_EXECUTION
-
-	if (weight == 1.0f)
-		return;
-
-	// apply weight
-	auto* chanRefBeg = reinterpret_cast<ChanType*>(bmp->GetRawMem());
-	auto* chanRefEnd = reinterpret_cast<ChanType*>(chanRefBeg + bmp->xsize * bmp->ysize);
-	for (auto* chanRef = chanRefBeg; chanRef != chanRefEnd; ++chanRef) {
-		const auto rawDstVal = static_cast<float>(*chanRef) * weight;
-
-		if constexpr (std::is_same_v<ChanType, float>) {
-			*chanRef = static_cast<ChanType>(std::max(rawDstVal, 0.0f));
-		}
-		else {
-			*chanRef = static_cast<ChanType>(std::clamp(rawDstVal + 0.5f, 0.0f, static_cast<float>(GetMaxNormValue())));
-		}
-	}
 }
 
 template<typename T, uint32_t ch>
@@ -1568,13 +1561,6 @@ bool CBitmap::Save(const std::string& filename, bool dontSaveAlpha, bool logged,
 	const std::string& fsImageExt = FileSystem::GetExtension(filename);
 	const std::string& fsFullPath = dataDirsAccess.LocateFile(filename, FileQueryFlags::WRITE);
 	const std::wstring& ilFullPath = std::wstring(fsFullPath.begin(), fsFullPath.end());
-
-	if (FileSystem::FileExists(fsFullPath)) {
-		if (logged)
-			LOG("[CBitmap::%s] deleting \"%s\" in \"%s\"", __func__, filename.c_str(), fsFullPath.c_str());
-
-		FileSystem::DeleteFile(fsFullPath);
-	}
 
 	if (logged)
 		LOG("[CBitmap::%s] saving \"%s\" to \"%s\" (IL_VERSION=%d IL_UNICODE=%d)", __func__, filename.c_str(), fsFullPath.c_str(), IL_VERSION, sizeof(ILchar) != 1);
