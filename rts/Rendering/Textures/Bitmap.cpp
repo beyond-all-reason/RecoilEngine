@@ -704,7 +704,7 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 			// everything is a pointer here, can assign with just auto
 			auto [src, srcAction, dstAction] = blurPassTuples[bpi];
 		#if MT_EXECUTION == 1
-			for_mt_chunk(0, src->ysize, [this, src, srcAction, dstAction, bpi, w0](int y) {
+			for_mt_chunk(starty, starty+h, [this, src, srcAction, dstAction, bpi, w0](int y) {
 		#else
 			for (int y = starty; y < starty+h; y++) {
 		#endif
