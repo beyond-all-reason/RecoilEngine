@@ -710,7 +710,7 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 			auto& srcAction = actions[dimension];
 			auto& dstAction = actions[dimension + 1];
 
-			for_mt(starty, starty+h, [&](const int y) {
+			for(int y = starty; y < starty+h; ++y) {
 				for (int x = startx; x < startx+w; x++) {
 					int yBaseOffset = (y * src->xsize);
 					for (int a = 0; a < src->channels; a++) {
@@ -749,7 +749,7 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 						}
 					}
 				}
-			});
+			}
 		}
 
 		std::swap(actions[0], actions[2]);
