@@ -871,12 +871,10 @@ bool CFontTexture::ClearGlyphs() {
 		// clear atlases
 		ClearAtlases(32, 32);
 
-		// signal need to update texture
-		blurRectangles.clear();
-
 		// preload standard glyphs
 		PreloadGlyphs();
 
+		// signal need to update texture
 		++curTextureUpdate;
 	}
 #endif
@@ -1319,7 +1317,6 @@ void CFontTexture::ReallocAtlases(bool pre)
 		atlasShadowMem = {};
 		atlasDim = {};
 		atlasUDim = {};
-		blurRectangles.clear();
 		return;
 	}
 
@@ -1331,7 +1328,6 @@ void CFontTexture::ReallocAtlases(bool pre)
 	}
 
 	atlasGlyphs.clear();
-	blurRectangles.clear();
 
 	atlasMem = {};
 	atlasShadowMem = {};
