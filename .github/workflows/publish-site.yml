@@ -48,7 +48,7 @@ jobs:
             --override-template doc/emmylua-doc-cli-template
       - name: Run generator glue code
         run: |
-          python doc/site/generate_from_meta.py ${META_PATH} ${TEMP_PATH} ${LUA_API_DOCS_PATH}
+          python3 doc/site/scripts/generate_from_meta.py ${META_PATH} ${TEMP_PATH} ${LUA_API_DOCS_PATH}
           git add -f ${LUA_API_DOCS_PATH}
       - name: Commit changes
         run: |

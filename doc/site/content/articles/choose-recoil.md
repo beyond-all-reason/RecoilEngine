@@ -2,6 +2,7 @@
 title = 'Choose Recoil!'
 date = 2025-05-10T01:32:25-07:00
 draft = false
+author = "sprunk"
 +++
 
 Picking the engine for your game is a very important decision to make.

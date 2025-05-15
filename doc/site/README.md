@@ -1,4 +1,6 @@
-# Setting Up Local Site Development
+# Recoil Site Readme
+
+## Setting Up Local Site Development
 
 For basic local site development, all that is required is [Hugo](https://gohugo.io/installation/).
 
@@ -16,8 +18,11 @@ By default, `doc/site/content/docs/lua-api` is not tracked in the repo, since th
 To generate, install the following:
 
 1. [Hugo](https://gohugo.io/installation/)
-2. [emmylua_doc_cli](https://github.com/CppCXY/emmylua-analyzer-rust/tree/main/crates/emmylua_doc_cli)
-3. [lua-doc-extractor](https://github.com/rhys-vdw/lua-doc-extractor) version 3
+2. [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) (for installing doc tool)
+3. [Node](https://nodejs.org/en/download)
+4. [Python 3](https://www.python.org/downloads/)
+5. [emmylua_doc_cli](https://github.com/CppCXY/emmylua-analyzer-rust/tree/main/crates/emmylua_doc_cli)
+6. [lua-doc-extractor](https://github.com/rhys-vdw/lua-doc-extractor) version 3
 
 You can run commands manually or use [Task](https://taskfile.dev/installation/).
 
@@ -27,14 +32,15 @@ Otherwise, do this manually:
 ```bash
 lua-doc-extractor rts/Lua/**/*.cpp rts/Rml/SolLua/**/*.cpp --dest rts/Lua/library/generated
 emmylua_doc_cli -i rts/Lua/library -o doc/temp  --override-template doc/emmylua-doc-cli-template
-python3 doc/site/generate_from_meta.py doc/temp soc/site/content/docs/lua-api
+cd doc
+python3 site/scrpts/generate_from_meta.py temp site/content/docs/lua-api
 ```
 
 Once done, running `hugo server` in `doc/site` will show you the site.
 
 See [Documenting Lua development guide](content/development/documenting-lua.md) for info on writing documentation.
 
-# File Structure
+## File Structure
 
 These are the important directories:
 
