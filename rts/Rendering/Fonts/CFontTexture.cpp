@@ -69,6 +69,7 @@
 
 
 
+static constexpr int FT_INTERNAL_DPI = 64;
 
 #ifdef HEADLESS
 typedef unsigned char FT_Byte;
@@ -432,7 +433,7 @@ static std::shared_ptr<FontFace> GetRenderFontFace(const std::string& fontfile, 
 
 	// set render size
 	if (!FT_IS_SCALABLE(facePtr->face) && facePtr->face->num_fixed_sizes >= 1)
-		size = static_cast<unsigned int>(facePtr->face->available_sizes[0].y_ppem / 64.0);
+		size = static_cast<unsigned int>(facePtr->face->available_sizes[0].y_ppem / FT_INTERNAL_DPI);
 
 	if ((error = FT_Set_Pixel_Sizes(facePtr->face, 0, size)) != 0) {
 		throw content_error(fmt::format("FT_Set_Pixel_Sizes failed: {}", GetFTError(error)));
@@ -675,7 +676,6 @@ CFontTexture::CFontTexture(const std::string& fontfile, int size, int _outlinesi
 
 	FT_Face face = *shFace;
 
-	static constexpr int FT_INTERNAL_DPI = 64;
 	normScale = 1.0f / (fontSize * FT_INTERNAL_DPI);
 	float pixScale = 1.0;
 	bool canScale = false;
