@@ -637,6 +637,8 @@ void CglFont::End() {
 		LOG_L(L_ERROR, "called End() without Begin()");
 		return;
 	}
+	const spring_time t1 = spring_gettime();
+
 	inBeginEndBlock = false;
 
 	//without this, fonts textures are empty in display lists (probably GL commands in UploadGlyphAtlasTexture are get recorded as part of the list)
@@ -647,6 +649,11 @@ void CglFont::End() {
 
 	inBeginEndBlock = false;
 	sync.Unlock();
+        const spring_time t2 = spring_gettime();
+        const spring_time tt = t2-t1;
+        if (tt.toMilliSecsf() > 10) {
+               LOG_L(L_WARNING, "Slow END %f", tt.toMilliSecsf());
+        }
 }
 
 
@@ -678,6 +685,7 @@ template<int shiftXC, int shiftYC, bool outline>
 void CglFont::RenderStringImpl(float x, float y, float scaleX, float scaleY, const std::string& str)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	const spring_time t1 = spring_gettime();
 	const spring::u8string& ustr = toustring(str);
 
 	ScanForWantedGlyphs(ustr);
@@ -762,6 +770,11 @@ void CglFont::RenderStringImpl(float x, float y, float scaleX, float scaleY, con
 			{ {dx1, dy1, textDepth.x},  tx1, ty1,  (&textColor.x) },
 			{ {dx0, dy1, textDepth.x},  tx0, ty1,  (&textColor.x) }
 		);
+	}
+	const spring_time t2 = spring_gettime();
+	const spring_time tt = t2-t1;
+	if (tt.toMilliSecsf() > 10) {
+		LOG_L(L_WARNING, "Slow text %f", tt.toMilliSecsf());
 	}
 }
 

@@ -259,6 +259,7 @@ int LuaFonts::Print(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 
+	const spring_time t1 = spring_gettime();
 	const int args = lua_gettop(L); // number of arguments
 
 	auto f = tofont(L, 1);
@@ -299,6 +300,12 @@ int LuaFonts::Print(lua_State* L)
 	}
 
 	f->glPrint(x, y, size, options, text);
+	const spring_time t2 = spring_gettime();
+	const spring_time tt = t2-t1;
+	if (tt.toMilliSecsf() > 10) {
+		LOG_L(L_WARNING, "Slow glPrint %f", tt.toMilliSecsf());
+	}
+
 	return 0;
 }
 
@@ -307,6 +314,7 @@ int LuaFonts::PrintWorld(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 
+	const spring_time t1 = spring_gettime();
 	const int args = lua_gettop(L); // number of arguments
 
 	auto f = tofont(L, 1);
@@ -350,6 +358,12 @@ int LuaFonts::PrintWorld(lua_State* L)
 	}
 
 	f->glWorldPrint(pos, size, text, options);
+	const spring_time t2 = spring_gettime();
+	const spring_time tt = t2-t1;
+	if (tt.toMilliSecsf() > 10) {
+		LOG_L(L_WARNING, "Slow glPrintWorld %f", tt.toMilliSecsf());
+	}
+
 	return 0;
 }
 
@@ -377,6 +391,7 @@ int LuaFonts::End(lua_State* L)
 int LuaFonts::SubmitBuffered(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	const spring_time t1 = spring_gettime();
 	CheckDrawingEnabled(L, __func__);
 	auto f = tofont(L, 1);
 
@@ -384,6 +399,12 @@ int LuaFonts::SubmitBuffered(lua_State* L)
 		f->DrawBuffered();
 	else
 		f->DrawWorldBuffered();
+	const spring_time t2 = spring_gettime();
+	const spring_time tt = t2-t1;
+	if (tt.toMilliSecsf() > 10) {
+		LOG_L(L_WARNING, "Slow SubmitBuffered %f", tt.toMilliSecsf());
+	}
+
 
 	return 0;
 }

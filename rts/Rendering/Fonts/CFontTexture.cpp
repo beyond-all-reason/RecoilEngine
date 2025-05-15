@@ -466,7 +466,6 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 
 	if (!FtLibraryHandler::CanUseFontConfig())
 		return nullptr;
-	LOG_L(L_WARNING, "GetFontForCharacters0");
 
 	// create list of wanted characters
 	auto cset = spring::ScopedResource(
@@ -483,7 +482,6 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 		FcPatternDuplicate(FtLibraryHandler::GetBasePattern()),
 		[](FcPattern* p) { if (p) FcPatternDestroy(p); }
 	);
-	LOG_L(L_WARNING, "GetFontForCharacters1");
 
 	{
 		{
@@ -511,7 +509,6 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 			[](FcBlanks* b) { if (b) FcBlanksDestroy(b); }
 		);
 
-		LOG_L(L_WARNING, "GetFontForCharacters2");
 		if (FtLibraryHandler::GetSearchFontAttributes()) {
 			auto origPattern = spring::ScopedResource(
 				FcFreeTypeQueryFace(origFace, ftname, 0, blanks),
@@ -540,9 +537,7 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 			FcPatternAddDouble(pattern, FC_PIXEL_SIZE, pixelSize);
 	}
 
-	LOG_L(L_WARNING, "GetFontForCharacters3");
 	FcDefaultSubstitute(pattern);
-	LOG_L(L_WARNING, "GetFontForCharacters4");
 	if (FtLibraryHandler::GetSearchApplySubstitutions() && !FcConfigSubstitute(FtLibraryHandler::GetFCConfig(), pattern, FcMatchPattern))
 	{
 		return nullptr;
@@ -557,7 +552,6 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 
 	// first search game fonts
 	FcFontSet *sets[] = { FtLibraryHandler::GetGameFontSet() };
-	LOG_L(L_WARNING, "GetFontForCharacters5");
 	ScopedFcFontSet fs(FcFontSetSort(FtLibraryHandler::GetFCConfig(), sets, 1, pattern, FcFalse, nullptr, &res), &FcFontSetDestroy);
 
 	if (fs != nullptr && res == FcResultMatch)
@@ -568,7 +562,6 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 	while (i < nFonts || loadMore) {
 		if (i == nFonts) {
 			// now search system fonts
-			LOG_L(L_WARNING, "GetFontForCharacters6");
 			fs = ScopedFcFontSet(FcFontSort(FtLibraryHandler::GetFCConfig(), pattern, FcFalse, nullptr, &res), &FcFontSetDestroy);
 			if (fs == nullptr || res != FcResultMatch)
 				return nullptr;
@@ -584,7 +577,6 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 			continue;
 
 		FcCharSet *patternCharSet;
-		LOG_L(L_WARNING, "GetFontForCharacters7 %s", cFilename);
 		r = FcPatternGetCharSet(font, FC_CHARSET, 0, &patternCharSet);
 		if (r != FcResultMatch || FcCharSetIntersectCount(cset, patternCharSet) == 0)
 			continue;
@@ -595,12 +587,10 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 			continue;
 
 		try {
-			LOG_L(L_WARNING, "GetFontForCharacters8 %s", cFilename);
 			auto face = GetRenderFontFace(filename, origSize);
 
 			if (blackList.find(GetFaceKey(*face)) != blackList.cend())
 				continue;
-			LOG_L(L_WARNING, "GetFontForCharacters9 %s", cFilename);
 
 			CFontTexture::PinFont(face, filename, origSize);
 
@@ -1057,22 +1047,16 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& wanted)
 	if (map.empty())
 		return;
 
+	const spring_time t1 = spring_gettime();
 	// load glyphs from different fonts (using fontconfig)
 	std::shared_ptr<FontFace> f = shFace;
 
-	LOG_L(L_WARNING, "LOAD WANTED GLYPHS %s %ld", shFace->face->family_name, map.size());
-
 	static spring::unordered_set<std::string> alreadyCheckedFonts;
 	alreadyCheckedFonts.clear();
-	int i = 0;
-	int j = 0;
 	do {
 		alreadyCheckedFonts.insert(GetFaceKey(*f));
-		LOG_L(L_WARNING, "LoadWantedGlyphs loop %d %d", i, j);
-		i++;
 
 		for (std::size_t idx = 0; idx < map.size(); /*nop*/) {
-			j++;
 			if (auto it = failedAttemptsToReplace.find(map[idx]); (it != failedAttemptsToReplace.end() && it->second == maxFontTries)) {
 				// handle maxFontTries attempts case
 				LoadGlyph(shFace, map[idx], 0);
@@ -1150,7 +1134,12 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& wanted)
 		atlasAlloc.clear();
 		atlasGlyphs.clear();
 	}
-	LOG_L(L_WARNING, "LOAD WANTED GLYPHS END %s", shFace->face->family_name);
+
+	const spring_time t2 = spring_gettime();
+	const spring_time tt = t2-t1;
+	if (tt.toMilliSecsf() > 10) {
+		LOG_L(L_WARNING, "Slow LoadWantedGlyphs %f", tt.toMilliSecsf());
+	}
 
 	// schedule a texture update
 	++curTextureUpdate;

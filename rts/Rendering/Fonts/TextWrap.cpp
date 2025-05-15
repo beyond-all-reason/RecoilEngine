@@ -573,6 +573,7 @@ int CTextWrap::WrapInPlace(spring::u8string& text, float _fontSize, float maxWid
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// TODO make an option to insert '-' for word wrappings (and perhaps try to syllabificate)
+	const spring_time t1 = spring_gettime();
 
 	if (_fontSize <= 0.0f)
 		_fontSize = GetSize();
@@ -616,6 +617,11 @@ int CTextWrap::WrapInPlace(spring::u8string& text, float _fontSize, float maxWid
 		} else {
 			text.append(w.text);
 		}
+	}
+	const spring_time t2 = spring_gettime();
+	const spring_time tt = t2-t1;
+	if (tt.toMilliSecsf() > 10) {
+		LOG_L(L_WARNING, "Slow TextWrap %f", tt.toMilliSecsf());
 	}
 
 	return numlines;
