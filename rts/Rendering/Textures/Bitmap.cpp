@@ -406,7 +406,7 @@ public:
 	virtual void SetTransparent(const SColor& c, const SColor trans = SColor(0, 0, 0, 0)) = 0;
 
 	virtual void Renormalize(const float3& newCol) = 0;
-	virtual void Blur(int iterations = 1, float weight = 1.0f) = 0;
+	virtual void Blur(int iterations = 1, float weight = 1.0f, int x=0, int y=0, int w=0, int h=0) = 0;
 	virtual void Fill(const SColor& c) = 0;
 
 	virtual void InvertColors() = 0;
@@ -465,7 +465,7 @@ public:
 	void SetTransparent(const SColor& c, const SColor trans) override;
 
 	void Renormalize(const float3& newCol) override;
-	void Blur(int iterations = 1, float weight = 1.0f) override;
+	void Blur(int iterations = 1, float weight = 1.0f, int x=0, int y=0, int w=0, int h=0) override;
 	void Fill(const SColor& c) override;
 
 	void InvertColors() override;
@@ -664,7 +664,7 @@ void TBitmapAction<T, ch>::Renormalize(const float3& newCol)
 }
 
 template<typename T, uint32_t ch>
-void TBitmapAction<T, ch>::Blur(int iterations, float weight)
+void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int starty, int w, int h)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// We use an axis-separated blur algorithm. Applies blurkernel in both the x
@@ -675,6 +675,12 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight)
 	static constexpr float blurkernel[3] = {
 		1.0f / 4.0f, 2.0f / 4.0f, 1.0f / 4.0f
 	};
+
+	if (w == 0)
+		w = bmp->xsize;
+	if (h == 0)
+		h = bmp->ysize;
+
 
 	// Two temporaries are required in order to perform axis separated gaussian
 	// blur with an additional weight from the source pixel specified by `weight`.
@@ -704,8 +710,8 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight)
 			auto& srcAction = actions[dimension];
 			auto& dstAction = actions[dimension + 1];
 
-			for_mt(0, src->ysize, [&](const int y) {
-				for (int x = 0; x < src->xsize; x++) {
+			for_mt(starty, starty+h, [&](const int y) {
+				for (int x = startx; x < startx+w; x++) {
 					int yBaseOffset = (y * src->xsize);
 					for (int a = 0; a < src->channels; a++) {
 						float fragment = 0.0f;
@@ -1868,7 +1874,7 @@ void CBitmap::Renormalize(const float3& newCol)
 #endif
 }
 
-void CBitmap::Blur(int iterations, float weight)
+void CBitmap::Blur(int iterations, float weight, int x, int y, int w, int h)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 #ifndef HEADLESS
@@ -1877,7 +1883,7 @@ void CBitmap::Blur(int iterations, float weight)
 
 
 	auto action = BitmapAction::GetBitmapAction(this);
-	action->Blur(iterations, weight);
+	action->Blur(iterations, weight, x, y, w, h);
 #endif
 }
 
