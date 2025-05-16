@@ -715,7 +715,7 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 
 			for(int y = 0; y < h; ++y) {
 				for (int x = 0; x < w; x++) {
-					int yBaseOffset = ((y+sy) * sxsize);
+					const int yBaseOffset = ((y + sy) * sxsize);
 					for (int a = 0; a < channels; a++) {
 						float fragment = 0.0f;
 
@@ -731,7 +731,7 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 
 							const int offset = (yoffset * sxsize + xoffset);
 
-							auto& srcChannel = static_cast<ThisType>(srcAction)->GetRef(yBaseOffset + (x + sx) + offset, a);
+							auto& srcChannel = srcAction->GetRef(yBaseOffset + (x + sx) + offset, a);
 
 							fragment += (blurkernel[i] * srcChannel);
 						}
@@ -739,13 +739,13 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 						if (dimension == 1) {
 							auto [fAction, fx, fy, fxsize, fysize] = actions[0];
 							const int fyBaseOffset = ((y+fy) * fxsize);
-							auto& srcChannel = static_cast<ThisType>(fAction)->GetRef(fyBaseOffset + (x + fx), a);
+							auto& srcChannel = fAction->GetRef(fyBaseOffset + (x + fx), a);
 
 							fragment += (blurkernel[1] * blurkernel[1]) * (weight - 1.0f) * srcChannel;
 						}
 
-						const int dyBaseOffset = ((y+dy) * dxsize);
-						auto& dstChannel = static_cast<ThisType>(dstAction)->GetRef(dyBaseOffset + (x + dx), a);
+						const int dyBaseOffset = ((y + dy) * dxsize);
+						auto& dstChannel = dstAction->GetRef(dyBaseOffset + (x + dx), a);
 
 						if constexpr (std::is_same_v<ChanType, float>) {
 							dstChannel = static_cast<ChanType>(std::max(fragment, 0.0f));
