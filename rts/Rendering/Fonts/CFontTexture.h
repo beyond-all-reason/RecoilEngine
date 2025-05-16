@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 
+#include "System/Rectangle.h"
 #include "Rendering/Textures/Bitmap.h"
 #include "Rendering/Textures/IAtlasAllocator.h"
 #include "Rendering/Textures/RowAtlasAlloc.h"
@@ -196,6 +197,7 @@ private:
 	spring::unordered_map<uint64_t, float> kerningDynamic; // contains unicode kerning
 
 	std::vector<CBitmap> atlasGlyphs;
+	std::vector<SRectangle> blurRectangles;
 
 	CRowAtlasAlloc atlasAlloc;
 

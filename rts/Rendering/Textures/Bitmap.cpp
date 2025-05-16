@@ -401,14 +401,12 @@ public:
 	BitmapAction& operator=(const BitmapAction& ba) = delete;
 	BitmapAction& operator=(BitmapAction&& ba) noexcept = delete;
 
-	const CBitmap* GetBitmap() const { return bmp; }
-
 	virtual void CreateAlpha(uint8_t red, uint8_t green, uint8_t blue) = 0;
 	virtual void ReplaceAlpha(float a) = 0;
 	virtual void SetTransparent(const SColor& c, const SColor trans = SColor(0, 0, 0, 0)) = 0;
 
 	virtual void Renormalize(const float3& newCol) = 0;
-	virtual void Blur(int iterations = 1, float weight = 1.0f) = 0;
+	virtual void Blur(int iterations = 1, float weight = 1.0f, int x=0, int y=0, int w=0, int h=0) = 0;
 	virtual void Fill(const SColor& c) = 0;
 
 	virtual void InvertColors() = 0;
@@ -426,9 +424,10 @@ protected:
 template<typename T, uint32_t ch>
 class TBitmapAction : public BitmapAction {
 public:
+	static constexpr size_t PixelTypeSize = sizeof(T) * ch;
+
 	using ChanType  = T;
-	using PixelType = std::array<T, ch>;
-	static constexpr size_t PixelTypeSize = sizeof(PixelType);
+	using PixelType = T[ch];
 
 	using AccumChanType = typename std::conditional<std::is_same_v<T, float>, float, uint32_t>::type;
 
@@ -466,7 +465,7 @@ public:
 	void SetTransparent(const SColor& c, const SColor trans) override;
 
 	void Renormalize(const float3& newCol) override;
-	void Blur(int iterations = 1, float weight = 1.0f) override;
+	void Blur(int iterations = 1, float weight = 1.0f, int x=0, int y=0, int w=0, int h=0) override;
 	void Fill(const SColor& c) override;
 
 	void InvertColors() override;
@@ -665,90 +664,103 @@ void TBitmapAction<T, ch>::Renormalize(const float3& newCol)
 }
 
 template<typename T, uint32_t ch>
-void TBitmapAction<T, ch>::Blur(int iterations, float weight)
+void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int starty, int w, int h)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// We use an axis-separated blur algorithm. Applies BLUR_KERNEL in both the x
+	// We use an axis-separated blur algorithm. Applies blurkernel in both the x
 	// and y dimensions. This 3x1 blur kernel is equivalent to a 3x3 kernel in
 	// both the x and y dimensions.
 	// See more info
 	// https://www.rastergrid.com/blog/2010/09/efficient-gaussian-blur-with-linear-sampling/
-	static constexpr std::array BLUR_KERNEL {
+	static constexpr float blurkernel[3] = {
 		1.0f / 4.0f, 2.0f / 4.0f, 1.0f / 4.0f
 	};
-	static constexpr int BLUR_KERNEL_HS = BLUR_KERNEL.size() >> 1;
 
-	// note ysize and xsize are swapped
-	CBitmap tmp(nullptr, bmp->ysize, bmp->xsize, ch, bmp->dataType);
-	auto tempAction = BitmapAction::GetBitmapAction(&tmp); // lifetime thing, not used furher
+	if (w == 0)
+		w = bmp->xsize;
+	if (h == 0)
+		h = bmp->ysize;
 
-	auto* tempTypedAction = static_cast<TBitmapAction<T, ch>*>(tempAction.get());
-	auto* currTypedAction = this;
 
-	const std::array blurPassTuples {
-		std::tuple( bmp, currTypedAction, tempTypedAction), // horizontal pass
-		std::tuple(&tmp, tempTypedAction, currTypedAction)  // vertical   pass
+	// Two temporaries are required in order to perform axis separated gaussian
+	// blur with an additional weight from the source pixel specified by `weight`.
+	// The first blur pass, when dimension == 0, applies blur in the x
+	// dimension on bitmaps[0] and saves the result to bitmaps[1]. The second blur
+	// pass, when dimension == 1, applies blur in the y dimension on bitmaps[1]
+	// and saves the result in bitmaps[2]. Additionally, the second blur pass adds
+	// an additional `weight` from bitmaps[0] to the final result in bitmaps[2].
+	CBitmap tmp(nullptr, w, h, bmp->channels, bmp->dataType);
+	CBitmap tmp2(nullptr, w, h, bmp->channels, bmp->dataType);
+
+	auto action = BitmapAction::GetBitmapAction(&tmp);
+	auto action2 = BitmapAction::GetBitmapAction(&tmp2);
+	auto* typedAction = static_cast<TBitmapAction<T, ch>*>(action.get());
+	auto* typedAction2 = static_cast<TBitmapAction<T, ch>*>(action2.get());
+
+	std::array actions {
+		std::tuple(this, startx, starty, bmp->xsize, bmp->ysize),
+		std::tuple(typedAction, 0, 0, w, h),
+		std::tuple(typedAction2, 0, 0, w, h)
 	};
 
-	const auto w0 = BLUR_KERNEL[BLUR_KERNEL_HS] * BLUR_KERNEL[BLUR_KERNEL_HS] * (weight - 1.0f);
+	const bool channels = bmp->channels;
 
-	#define MT_EXECUTION 1
+	using ThisType = decltype(this);
 
 	for (int iter = 0; iter < iterations; ++iter) {
-		for (size_t bpi = 0; bpi < blurPassTuples.size(); ++bpi) {
-			// everything is a pointer here, can assign with just auto
-			auto [src, srcAction, dstAction] = blurPassTuples[bpi];
-		#if MT_EXECUTION == 1
-			for_mt_chunk(0, src->ysize, [this, src, srcAction, dstAction, bpi, w0](int y) {
-		#else
-			for (int y = 0; y < src->ysize; y++) {
-		#endif
-				int yBaseOffset = (y * src->xsize);
-				for (int x = 0; x < src->xsize; x++) {
+		for(int dimension = 0; dimension < 2; ++dimension) {
 
-					// don't use AccumChanType for additional precision
-					std::array<float, ch> val{ 0.0f };
-					float wSum = 0.0f;
+			auto [srcAction, sx, sy, sxsize, sysize] = actions[dimension];
+			auto [dstAction, dx, dy, dxsize, dysize] = actions[dimension + 1];
 
-					for (int off = -BLUR_KERNEL_HS; off <= BLUR_KERNEL_HS; ++off) {
-						const int xo = x + off;
-						// check bounds
-						if ((xo < 0) || (xo > src->xsize - 1))
-							continue;
+			for(int y = 0; y < h; ++y) {
+				for (int x = 0; x < w; x++) {
+					const int yBaseOffset = ((y + sy) * sxsize);
+					for (int a = 0; a < channels; a++) {
+						float fragment = 0.0f;
 
-						const auto& w = BLUR_KERNEL[off + BLUR_KERNEL_HS];
-						wSum += w;
+						for (int i = 0; i < 3; ++i) {
+							int yoffset = dimension == 1 ? (i - 1) : 0;
+							int xoffset = dimension == 0 ? (i - 1) : 0;
 
-						const auto& srcRef = srcAction->GetRef(yBaseOffset + xo);
-						for (int a = 0; a < ch; a++) {
-							val[a] += w * srcRef[a];
+							const int tx = (x + sx) + xoffset;
+							const int ty = (y + sy) + yoffset;
+
+							xoffset *= ((tx >= 0) && (tx < sxsize));
+							yoffset *= ((ty >= 0) && (ty < sysize));
+
+							const int offset = (yoffset * sxsize + xoffset);
+
+							auto& srcChannel = srcAction->GetRef(yBaseOffset + (x + sx) + offset, a);
+
+							fragment += (blurkernel[i] * srcChannel);
 						}
-					}
 
-					auto& dstRef = dstAction->GetRef(x * src->ysize + y);
-					for (int a = 0; a < ch; a++) {
-						auto rawDstVal = val[a] / wSum;
+						if (dimension == 1) {
+							auto [fAction, fx, fy, fxsize, fysize] = actions[0];
+							const int fyBaseOffset = ((y+fy) * fxsize);
+							auto& srcChannel = fAction->GetRef(fyBaseOffset + (x + fx), a);
 
-						// apply extra (> 1.0f) weight
-						rawDstVal += w0 * dstRef[a] * (bpi == 1 && w0 > 0.0f);
+							fragment += (blurkernel[1] * blurkernel[1]) * (weight - 1.0f) * srcChannel;
+						}
+
+						const int dyBaseOffset = ((y + dy) * dxsize);
+						auto& dstChannel = dstAction->GetRef(dyBaseOffset + (x + dx), a);
 
 						if constexpr (std::is_same_v<ChanType, float>) {
-							dstRef[a] = static_cast<ChanType>(std::max(rawDstVal, 0.0f));
+							dstChannel = static_cast<ChanType>(std::max(fragment, 0.0f));
 						}
 						else {
-							dstRef[a] = static_cast<ChanType>(std::clamp(rawDstVal, 0.0f, static_cast<float>(GetMaxNormValue())));
+							dstChannel = static_cast<ChanType>(std::clamp(fragment, 0.0f, static_cast<float>(GetMaxNormValue())));
 						}
 					}
 				}
-		#if MT_EXECUTION == 1
-			});
-		#else
 			}
-		#endif
 		}
+
+		std::swap(actions[0], actions[2]);
 	}
 
-	#undef MT_EXECUTION
 }
 
 template<typename T, uint32_t ch>
@@ -1561,13 +1573,6 @@ bool CBitmap::Save(const std::string& filename, bool dontSaveAlpha, bool logged,
 	const std::string& fsFullPath = dataDirsAccess.LocateFile(filename, FileQueryFlags::WRITE);
 	const std::wstring& ilFullPath = std::wstring(fsFullPath.begin(), fsFullPath.end());
 
-	if (FileSystem::FileExists(fsFullPath)) {
-		if (logged)
-			LOG("[CBitmap::%s] deleting \"%s\" in \"%s\"", __func__, filename.c_str(), fsFullPath.c_str());
-
-		FileSystem::DeleteFile(fsFullPath);
-	}
-
 	if (logged)
 		LOG("[CBitmap::%s] saving \"%s\" to \"%s\" (IL_VERSION=%d IL_UNICODE=%d)", __func__, filename.c_str(), fsFullPath.c_str(), IL_VERSION, sizeof(ILchar) != 1);
 
@@ -1874,7 +1879,7 @@ void CBitmap::Renormalize(const float3& newCol)
 #endif
 }
 
-void CBitmap::Blur(int iterations, float weight)
+void CBitmap::Blur(int iterations, float weight, int x, int y, int w, int h)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 #ifndef HEADLESS
@@ -1883,7 +1888,7 @@ void CBitmap::Blur(int iterations, float weight)
 
 
 	auto action = BitmapAction::GetBitmapAction(this);
-	action->Blur(iterations, weight);
+	action->Blur(iterations, weight, x, y, w, h);
 #endif
 }
 

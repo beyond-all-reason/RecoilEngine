@@ -80,7 +80,7 @@ public:
 	void SetTransparent(const SColor& c, const SColor trans = SColor(0, 0, 0, 0));
 
 	void Renormalize(const float3& newCol);
-	void Blur(int iterations = 1, float weight = 1.0f);
+	void Blur(int iterations = 1, float weight = 1.0f, int x=0, int y=0, int w=0, int h=0);
 	void Fill(const SColor& c);
 
 	void CopySubImage(const CBitmap& src, int x, int y);
