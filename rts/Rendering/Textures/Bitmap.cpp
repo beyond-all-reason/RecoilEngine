@@ -689,57 +689,63 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 	// pass, when dimension == 1, applies blur in the y dimension on bitmaps[1]
 	// and saves the result in bitmaps[2]. Additionally, the second blur pass adds
 	// an additional `weight` from bitmaps[0] to the final result in bitmaps[2].
-	CBitmap tmp(nullptr, bmp->xsize, bmp->ysize, bmp->channels, bmp->dataType);
-	CBitmap tmp2(nullptr, bmp->xsize, bmp->ysize, bmp->channels, bmp->dataType);
+	CBitmap tmp(nullptr, w, h, bmp->channels, bmp->dataType);
+	CBitmap tmp2(nullptr, w, h, bmp->channels, bmp->dataType);
 
-	std::array<CBitmap*, 3> bitmaps = {bmp, &tmp, &tmp2};
-	std::array<std::unique_ptr<BitmapAction>, 3> actions = {
-		BitmapAction::GetBitmapAction(bitmaps[0]),
-		BitmapAction::GetBitmapAction(bitmaps[1]),
-		BitmapAction::GetBitmapAction(bitmaps[2])
+	auto action = BitmapAction::GetBitmapAction(&tmp);
+	auto action2 = BitmapAction::GetBitmapAction(&tmp2);
+	auto* typedAction = static_cast<TBitmapAction<T, ch>*>(action.get());
+	auto* typedAction2 = static_cast<TBitmapAction<T, ch>*>(action2.get());
+
+	std::array actions {
+		std::tuple(this, startx, starty, bmp->xsize, bmp->ysize),
+		std::tuple(typedAction, 0, 0, w, h),
+		std::tuple(typedAction2, 0, 0, w, h)
 	};
+
+	const bool channels = bmp->channels;
 
 	using ThisType = decltype(this);
 
 	for (int iter = 0; iter < iterations; ++iter) {
 		for(int dimension = 0; dimension < 2; ++dimension) {
 
-			CBitmap* src = bitmaps[dimension];
-			CBitmap* dst = bitmaps[dimension + 1];
+			auto [srcAction, sx, sy, sxsize, sysize] = actions[dimension];
+			auto [dstAction, dx, dy, dxsize, dysize] = actions[dimension + 1];
 
-			auto& srcAction = actions[dimension];
-			auto& dstAction = actions[dimension + 1];
-
-			for(int y = starty; y < starty+h; ++y) {
-				for (int x = startx; x < startx+w; x++) {
-					int yBaseOffset = (y * src->xsize);
-					for (int a = 0; a < src->channels; a++) {
+			for(int y = 0; y < h; ++y) {
+				for (int x = 0; x < w; x++) {
+					int yBaseOffset = ((y+sy) * sxsize);
+					for (int a = 0; a < channels; a++) {
 						float fragment = 0.0f;
 
 						for (int i = 0; i < 3; ++i) {
 							int yoffset = dimension == 1 ? (i - 1) : 0;
 							int xoffset = dimension == 0 ? (i - 1) : 0;
 
-							const int tx = x + xoffset;
-							const int ty = y + yoffset;
+							const int tx = (x + sx) + xoffset;
+							const int ty = (y + sy) + yoffset;
 
-							xoffset *= ((tx >= 0) && (tx < src->xsize));
-							yoffset *= ((ty >= 0) && (ty < src->ysize));
+							xoffset *= ((tx >= 0) && (tx < sxsize));
+							yoffset *= ((ty >= 0) && (ty < sysize));
 
-							const int offset = (yoffset * src->xsize + xoffset);
+							const int offset = (yoffset * sxsize + xoffset);
 
-							auto& srcChannel = static_cast<ThisType>(srcAction.get())->GetRef(yBaseOffset + x + offset, a);
+							auto& srcChannel = static_cast<ThisType>(srcAction)->GetRef(yBaseOffset + (x + sx) + offset, a);
 
 							fragment += (blurkernel[i] * srcChannel);
 						}
 
 						if (dimension == 1) {
-							auto& srcChannel = static_cast<ThisType>(actions[0].get())->GetRef(yBaseOffset + x, a);
+							auto [fAction, fx, fy, fxsize, fysize] = actions[0];
+							const int fyBaseOffset = ((y+fy) * fxsize);
+							auto& srcChannel = static_cast<ThisType>(fAction)->GetRef(fyBaseOffset + (x + fx), a);
 
 							fragment += (blurkernel[1] * blurkernel[1]) * (weight - 1.0f) * srcChannel;
 						}
 
-						auto& dstChannel = static_cast<ThisType>(dstAction.get())->GetRef(yBaseOffset + x, a);
+						const int dyBaseOffset = ((y+dy) * dxsize);
+						auto& dstChannel = static_cast<ThisType>(dstAction)->GetRef(dyBaseOffset + (x + dx), a);
 
 						if constexpr (std::is_same_v<ChanType, float>) {
 							dstChannel = static_cast<ChanType>(std::max(fragment, 0.0f));
@@ -753,7 +759,6 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 		}
 
 		std::swap(actions[0], actions[2]);
-		std::swap(bitmaps[0], bitmaps[2]);
 	}
 
 }
