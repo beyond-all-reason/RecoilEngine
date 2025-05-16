@@ -81,7 +81,11 @@ private:
 	typedef DWORD (__stdcall *VideoForWindowsVersion_type)(void);
 	typedef void (__stdcall *AVIFileInit_type)(void);
 	typedef HRESULT (__stdcall *AVIFileOpenA_type)(PAVIFILE FAR *, LPCSTR, UINT, LPCLSID);
+#ifdef UNICODE
+	typedef HRESULT (__stdcall *AVIFileCreateStreamW_type)(PAVIFILE, PAVISTREAM FAR *, AVISTREAMINFOW FAR *);
+#else
 	typedef HRESULT (__stdcall *AVIFileCreateStreamA_type)(PAVIFILE, PAVISTREAM FAR *, AVISTREAMINFOA FAR *);
+#endif
 	typedef HRESULT (__stdcall *AVIMakeCompressedStream_type)(PAVISTREAM FAR *, PAVISTREAM, AVICOMPRESSOPTIONS FAR *, CLSID FAR *);
 	typedef HRESULT (__stdcall *AVIStreamSetFormat_type)(PAVISTREAM, LONG, LPVOID, LONG);
 	typedef ULONG (__stdcall *AVIStreamRelease_type)(PAVISTREAM);
@@ -96,7 +100,11 @@ private:
 	VideoForWindowsVersion_type VideoForWindowsVersion_ptr;
 	AVIFileInit_type AVIFileInit_ptr;
 	AVIFileOpenA_type AVIFileOpenA_ptr;
-	AVIFileCreateStreamA_type AVIFileCreateStreamA_ptr;
+#ifdef UNICODE
+	AVIFileCreateStreamW_type AVIFileCreateStream_ptr;
+#else
+	AVIFileCreateStreamA_type AVIFileCreateStream_ptr;
+#endif
 	AVIMakeCompressedStream_type AVIMakeCompressedStream_ptr;
 	AVIStreamSetFormat_type AVIStreamSetFormat_ptr;
 	AVIStreamRelease_type AVIStreamRelease_ptr;

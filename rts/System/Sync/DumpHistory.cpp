@@ -1,7 +1,5 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include <fstream>
-
 #include "DumpHistory.h"
 #include "SyncChecker.h"
 
@@ -13,7 +11,7 @@
 #include "System/Log/ILog.h"
 
 
-void DumpHistory(std::fstream& file, int frameNum, bool serverRequest)
+void DumpHistory(nowide::fstream& file, int frameNum, bool serverRequest)
 {
 #ifdef SYNC_HISTORY
 	if (!gs->cheatEnabled && !serverRequest)

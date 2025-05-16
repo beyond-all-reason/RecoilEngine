@@ -30,3 +30,7 @@
 [submodule "rts/lib/lunasvg"]
 	path = rts/lib/lunasvg
 	url = https://github.com/sammycage/lunasvg.git
+[submodule "rts/lib/nowide"]
+	path = rts/lib/nowide
+	url = https://github.com/boostorg/nowide
+	branch = standalone

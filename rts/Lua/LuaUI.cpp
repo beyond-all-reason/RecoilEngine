@@ -41,7 +41,6 @@
 #include "System/Threading/SpringThreading.h"
 #include "lib/luasocket/src/luasocket.h"
 
-#include <cstdio>
 #include <cctype>
 
 CONFIG(bool, LuaSocketEnabled)

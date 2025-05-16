@@ -12,7 +12,7 @@
 #include "FramePrefixer.h"
 
 #include <windows.h>
-
+#include <nowide/convert.hpp>
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,9 +30,9 @@ static void log_sink_record_outputDebugString(int level, const char* section, co
 	char framePrefix[128] = {'\0'};
 	log_framePrefixer_createPrefix(framePrefix, sizeof(framePrefix));
 
-	OutputDebugString(framePrefix);
-	OutputDebugString(record);
-	OutputDebugString("\n");
+	OutputDebugString(nowide::widen(framePrefix).c_str());
+	OutputDebugString(nowide::widen(record).c_str());
+	OutputDebugString(L"\n");
 }
 
 ///@}
