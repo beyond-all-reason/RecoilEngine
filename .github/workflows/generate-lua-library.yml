@@ -24,16 +24,16 @@ jobs:
           sparse-checkout: |
             rts/Lua
             rts/Rml/SolLua
+            doc
           path: recoil
-
+      
+      - name: Install Task
+        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
+      
       # NOTE: This step is duplicated in `publish-site.yml`
       - name: Generate Lua library
-        working-directory: recoil
-        run: |
-          npm install -g lua-doc-extractor@3
-          lua-doc-extractor "rts/Lua/**/*.cpp" "rts/Rml/SolLua/**/*.cpp" \
-            --dest rts/Lua/library/generated \
-            --repo https://github.com/${{ github.repository }}/blob/${{ github.sha }}
+        working-directory: doc
+        run: task extract-lua REPO_PATH=https://github.com/${{ github.repository }}/blob/${{ github.sha }}
 
       - name: Check out library repo
         uses: actions/checkout@v4
