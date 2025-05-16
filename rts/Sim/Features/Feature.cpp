@@ -341,6 +341,7 @@ bool CFeature::AddBuildPower(CUnit* builder, float amount)
 	order.overflow   = builder->harvestStorage.empty();
 	order.separate   = true;
 	order.use.energy = energyUseScaled;
+	order.useIncomeMultiplier = false; // Dont apply income multiplier to reclaim
 
 	if (reclaimLeftTemp == 0.0f) {
 		// always give remaining resources at the end
