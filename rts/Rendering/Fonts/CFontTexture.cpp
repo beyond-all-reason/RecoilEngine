@@ -1402,7 +1402,7 @@ void CFontTexture::UpdateGlyphAtlasTexture()
 		spring_time t2 = spring_gettime();
 		spring_time tt = t2-t1;
 		if (tt.toMilliSecsf() > 10) {
-		       LOG_L(L_WARNING, "Slow Blur %f", tt.toMilliSecsf());
+		       LOG_L(L_WARNING, "Slow Blur %f %d %d", tt.toMilliSecsf(), atlasUpdateShadow.xsize, atlasUpdateShadow.ysize);
 		}
 
 		assert((atlasUpdate.xsize * atlasUpdate.ysize) % sizeof(int) == 0);
