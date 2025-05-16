@@ -2,30 +2,97 @@
 
 version: "3"
 
-includes:
-  base:
-    taskfile: ../Taskfile.yml
-    flatten: true
-
 vars:
   TEMP_PATH: site/temp
   LUA_EXTRACT_PATHS: ["rts/Lua/**/*.cpp", "rts/Rml/SolLua/**/*.cpp"]
   EXTRACTOR_VERSION: 3
+  DEFAULT_PM: '{{if (OS) | eq "windows"}}scoop{{else}}brew{{end}}' # if windows, default pm is scoop, else, homebrew
+  PM: '{{.PM | default .DEFAULT_PM}}'
 
 tasks:
+  #* Internal commands
+
+  # Install Platforms
+
+  install_hugo:
+    internal: true
+    status:
+      - command -v hugo
+    cmds:
+      - "{{.PM}} install hugo"
+  
+  install_cargo:
+    internal: true
+    status:
+      - command -v cargo
+    cmds:
+      - "{{.PM}} install cargo"
+  
+  install_node:
+    internal: true
+    status:
+      - command -v node
+    cmds:
+      - "{{.PM}} install node"
+  
+  install_python:
+    internal: true
+    status:
+      - command -v python3
+    cmds:
+      - "{{.PM}} install python"
+
+  
+  install_platforms:
+    internal: true
+    cmds:
+      - task: install_hugo
+      - task: install_cargo
+      - task: install_node
+      - task: install_python
+  
+  # Install Tools
+  
+  install_extractor:
+    internal: true
+    deps: [install_node]
+    status:
+      - command -v lua-doc-extractor
+    cmds:
+      - npm install -g lua-doc-extractor@{{.EXTRACTOR_VERSION}}
+  
+  install_emmylua:
+    internal: true
+    deps: [install_cargo]
+    status:
+      - command -v emmylua_doc_cli
+    cmds:
+      - cargo install emmylua_doc_cli
+  
+  install_tools:
+    internal: true
+    cmds:
+      - task: install_extractor
+      - task: install_emmylua
+  
+  #* Public commands
+
+  install-all:
+    summary: Installs programs and tools to allow for lua extraction.
+    cmds:
+      - task: install_hugo
+      - task: install_python
+      - task: install_tools # cargo and NPM are covered by these
+  
   generate-docs:
-    deps: [extract-lua]
+    deps: [extract-lua, install_emmylua, install_python]
     summary: "Generates documentation for the website based on lua meta files."
     cmds:
       - emmylua_doc_cli -i rts/Lua/library -o {{.TEMP_PATH}} --override-template emmylua-doc-cli-template
       - python3 site/scripts/generate_from_meta.py {{.TEMP_PATH}} site/content/docs/lua-api
+  
   extract-lua:
+    deps: [install_extractor]
     summary: "Extracts lua meta files from the cpp files."
     cmds:
-      - lua-doc-extractor {{.LUA_EXTRACT_PATHS | join " "}} --dest rts/Lua/library/generated
-  install-site-tools:
-    deps: [install-tools]
-    summary: "Installs needed tools for Lua docs site generation."
-    cmds:
-      - npm install -g lua-doc-extractor@{{.EXTRACTOR_VERSION}}
-      - cargo install emmylua_doc_cli
+      - lua-doc-extractor "{{.LUA_EXTRACT_PATHS | join "\" \""}}" --dest rts/Lua/library/generated # Uses join to wrap paths in quotes
