@@ -95,4 +95,4 @@ tasks:
     deps: [install_extractor]
     summary: "Extracts lua meta files from the cpp files."
     cmds:
-      - lua-doc-extractor "{{.LUA_EXTRACT_PATHS | join "\" \""}}" --dest rts/Lua/library/generated # Uses join to wrap paths in quotes
+      - lua-doc-extractor "{{.LUA_EXTRACT_PATHS | join "\" \""}}" --dest rts/Lua/library/generated {{if .REPO_PATH}}--repo {{.REPO_PATH}}{{end}} {{if .DO_ERROR}}--error{{end}} # Uses join to wrap paths in quotes

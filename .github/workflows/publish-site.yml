@@ -24,32 +24,18 @@ jobs:
           bash doc/site/scripts/get_release_data.sh
           bash doc/site/scripts/get_engine_data.sh
           git add -f doc/site/data
+      - name: Install Task
+        run: sh -c "$(curl --location https://taskfile.dev/install.sh)" -- -d -b ~/.local/bin
       # NOTE: This step is duplicated in `generate-lua-library.yml`
       - name: Generate Lua library
-        run: |
-          npm install -g lua-doc-extractor@3
-          lua-doc-extractor "rts/Lua/**/*.cpp" "rts/Rml/SolLua/**/*.cpp" \
-            --dest rts/Lua/library/generated \
-            --repo https://github.com/${{ github.repository }}/blob/${{ github.sha }}
+        working-directory: doc
+        run: task generate-docs REPO_PATH=https://github.com/${{ github.repository }}/blob/${{ github.sha }}
       # Upload the Lua library artifact for debugging.
       - name: Upload Lua Library artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{github.run_id}}-library
           path: rts/Lua/library/
-      - name: Install emmylua_doc_cli
-        run: |
-          cargo install emmylua_doc_cli --version "${EMMYLUA_CLI_VERSION}"
-      - name: Generate docs using emmylua_doc_cli
-        run: |
-          emmylua_doc_cli \
-            -i rts/Lua/library \
-            -o ${META_PATH} \
-            --override-template doc/emmylua-doc-cli-template
-      - name: Run generator glue code
-        run: |
-          python3 doc/site/scripts/generate_from_meta.py ${META_PATH} ${TEMP_PATH} ${LUA_API_DOCS_PATH}
-          git add -f ${LUA_API_DOCS_PATH}
       - name: Commit changes
         run: |
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
