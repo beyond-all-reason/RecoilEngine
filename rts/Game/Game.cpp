@@ -1450,18 +1450,11 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 	if (inMapDrawer->IsWantLabel() && gameTextInput.SendLabelInput())
 		gameTextInput.ClearInput();
 
-	const spring_time t1 = spring_gettime();
 	infoConsole->PushNewLinesToEventHandler();
 	infoConsole->Update();
 
 	//infoConsole->Update() can in theory cause the need to update fonts, so update here
 	CFontTexture::Update();
-
-	const spring_time t2 = spring_gettime();
-	const spring_time tt = t2-t1;
-	if (tt.toMilliSecsf() > 10) {
-		LOG_L(L_WARNING, "Slow update %f", tt.toMilliSecsf());
-	}
 
 	mouse->Update();
 	mouse->UpdateCursors();
