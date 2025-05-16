@@ -1765,7 +1765,7 @@ struct SSkirmishAICallback {
 	 */
 	void              (CALLING_CONV *Map_findClosestBuildSite)(int skirmishAIId, int unitDefId, float* pos_posF3, float searchRadius, int minDist, int facing, float* return_posF3_out); //$ REF:unitDefId->UnitDef
 
-// BEGIN OBJECT Map
+// END OBJECT Map
 
 
 
