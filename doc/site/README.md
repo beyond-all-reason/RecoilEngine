@@ -30,7 +30,7 @@ You can run commands manually or use [Task](https://taskfile.dev/installation/).
 Otherwise, do this manually:
 
 ```bash
-lua-doc-extractor rts/Lua/**/*.cpp rts/Rml/SolLua/**/*.cpp --dest rts/Lua/library/generated
+lua-doc-extractor "rts/Lua/**/*.cpp" "rts/Rml/SolLua/**/*.cpp" --dest rts/Lua/library/generated
 emmylua_doc_cli -i rts/Lua/library -o doc/temp  --override-template doc/emmylua-doc-cli-template
 cd doc
 python3 site/scrpts/generate_from_meta.py temp site/content/docs/lua-api
