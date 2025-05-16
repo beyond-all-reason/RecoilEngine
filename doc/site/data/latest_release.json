@@ -1,0 +1,10 @@
+{
+  "name": "test",
+  "html_url": "https://github.com/beyond-all-reason/RecoilEngine/releases",
+  "assets": [
+    {
+      "name": "minimal-portable-linux.tar.gz",
+      "browser_download_url": "https://example.com/minimal-portable-linux.tar.gz"
+    }
+  ]
+}

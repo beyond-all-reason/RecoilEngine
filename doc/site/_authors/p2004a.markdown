@@ -1,4 +1,0 @@
----
-short_name: p2004a
-github: p2004a
----

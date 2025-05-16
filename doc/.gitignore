@@ -1,0 +1,6 @@
+# lua site generation
+site/public
+temp
+site/resources/_gen
+site/content/docs/lua-api/*
+!site/content/docs/lua-api/_index
