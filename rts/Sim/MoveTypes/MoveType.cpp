@@ -94,6 +94,7 @@ void AMoveType::UpdateCollisionMap(bool force)
 		oldCollisionUpdatePos = owner->pos;
 		quadField.MovedUnit(owner);
 	}
+	owner->moved = false;
 }
 
 void AMoveType::UpdateGroundBlockMap() {
