@@ -38,7 +38,6 @@ private:
 	int forcedPathType;
 	int forcedUnitDef;
 	spring_time lastUsage;
-	FBO fbo;
 };
 
 #endif // _PATH_TEXTURE_H

@@ -124,8 +124,8 @@ void CInfoTextureCombiner::Update()
 	fbo.Bind();
 	glViewport(0,0, texSize.x, texSize.y);
 
-	shader->Enable();
 	shader->BindTextures();
+	shader->Enable();
 	shader->SetUniform("time", gu->gameTime);
 
 	const float isx = 2.0f * (mapDims.mapx / float(mapDims.pwr2mapx)) - 1.0f;
@@ -140,6 +140,7 @@ void CInfoTextureCombiner::Update()
 	glEnd();
 
 	shader->Disable();
+	shader->UnbindTextures();
 
 	globalRendering->LoadViewport();
 	FBO::Unbind();
