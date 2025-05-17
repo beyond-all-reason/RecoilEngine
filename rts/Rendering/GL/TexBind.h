@@ -12,11 +12,12 @@ namespace GL
 // When constructed without exact slot, will also restore the previously bound texture to the contemporary slot
 class TexBind {
 public:
+	inline TexBind() {} // can be used to pop the binding
 	inline TexBind(unsigned slot, GLenum target, GLuint textureID)
-	: stateTexUnit(GL::FetchEffectualStateAttribValue<GLenum>(GL_ACTIVE_TEXTURE))
-	, texUnit(GL_TEXTURE0+slot)
-	, target(target)
-	, restoredTextureID(0)
+		: stateTexUnit(GL::FetchEffectualStateAttribValue<GLenum>(GL_ACTIVE_TEXTURE))
+		, texUnit(GL_TEXTURE0+slot)
+		, target(target)
+		, restoredTextureID(0)
 	{
 		if (stateTexUnit != texUnit)
 			glActiveTexture(texUnit);
@@ -25,10 +26,10 @@ public:
 		glBindTexture(target, textureID);
 	}
 	inline TexBind(GLenum target, GLuint textureID)
-	: stateTexUnit(GL::FetchEffectualStateAttribValue<GLenum>(GL_ACTIVE_TEXTURE))
-	, texUnit(stateTexUnit)
-	, target(target)
-	, restoredTextureID(GL::FetchCurrentSlotBoundTextureID(target))
+		: stateTexUnit(GL::FetchEffectualStateAttribValue<GLenum>(GL_ACTIVE_TEXTURE))
+		, texUnit(stateTexUnit)
+		, target(target)
+		, restoredTextureID(GL::FetchCurrentSlotBoundTextureID(target))
 	{
 		glBindTexture(target, textureID);
 	}

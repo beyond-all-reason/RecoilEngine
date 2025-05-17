@@ -33,8 +33,6 @@ private:
 
 private:
 	bool disabled;
-	FBO fbo;
-	Shader::IProgramObject* shader;
 	std::string curMode;
 };
 

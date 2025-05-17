@@ -26,7 +26,7 @@ private:
 	void UpdateCPU();
 
 private:
-	GLuint uploadTex;
+	GL::Texture2D uploadTex;
 };
 
 #endif // _LOS_TEXTURE_H

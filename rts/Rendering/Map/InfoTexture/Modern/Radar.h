@@ -27,8 +27,8 @@ private:
 	void UpdateCPU();
 
 private:
-	GLuint uploadTexRadar;
-	GLuint uploadTexJammer;
+	GL::Texture2D uploadTexRadar;
+	GL::Texture2D uploadTexJammer;
 };
 
 #endif // _RADAR_TEXTURE_H

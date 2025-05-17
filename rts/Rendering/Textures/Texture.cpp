@@ -23,14 +23,7 @@ namespace GL {
 			glTexParameteri(texTarget, GL_TEXTURE_MIN_FILTER, minFilter);
 
 			if (tcp.wrapModes.has_value()) {
-				const auto texWrapMode = tcp.GetWrapMode();
-
-				glTexParameteri(texTarget, GL_TEXTURE_WRAP_S, texWrapMode);
-				glTexParameteri(texTarget, GL_TEXTURE_WRAP_T, texWrapMode);
-				glTexParameteri(texTarget, GL_TEXTURE_WRAP_R, texWrapMode);
-			}
-			else {
-				static constexpr std::array<uint32_t, 3> texWrapModes {
+				static constexpr std::array<uint32_t, 3> texWrapModes{
 					GL_TEXTURE_WRAP_S,
 					GL_TEXTURE_WRAP_T,
 					GL_TEXTURE_WRAP_R
@@ -40,6 +33,13 @@ namespace GL {
 				for (size_t i = 0; auto wrapMode : wrapModes) {
 					glTexParameteri(texTarget, texWrapModes[i++], wrapMode);
 				}
+			}
+			else {
+				const auto texWrapMode = tcp.GetWrapMode();
+
+				glTexParameteri(texTarget, GL_TEXTURE_WRAP_S, texWrapMode);
+				glTexParameteri(texTarget, GL_TEXTURE_WRAP_T, texWrapMode);
+				glTexParameteri(texTarget, GL_TEXTURE_WRAP_R, texWrapMode);
 			}
 
 			if (tcp.clampBorder.has_value()) {
@@ -85,6 +85,12 @@ namespace GL {
 	{
 		lastBoundSlot = GL_TEXTURE0 + relSlot;
 		return GL::TexBind(relSlot, texTarget, texID);
+	}
+
+	void Texture2D::ScopedBind(const GL::TexBind& existingScopedBinding)
+	{
+		glActiveTexture(existingScopedBinding.GetLastActiveTextureSlot());
+		glBindTexture(texTarget, texID);
 	}
 
 	void Texture2D::Bind()

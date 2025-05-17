@@ -8,6 +8,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/GL/SubState.h"
 #include "Sim/Misc/LosHandler.h"
 #include "System/Exceptions.h"
 #include "System/Log/ILog.h"
@@ -33,7 +34,7 @@ CMetalExtractionTexture::CMetalExtractionTexture()
 	//  to upload the CPU array directly to the GPU w/o any (slow) cpu-side
 	//  transformation. The transformation (0..1 range rescaling) happens
 	//  then on the gpu instead.
-	texture = GL::Texture2D(texSize.x, texSize.y, GL_R32F, tcp, false);
+	texture = GL::Texture2D(texSize, GL_R32F, tcp, false);
 
 	CreateFBO("CLosTexture");
 
@@ -100,14 +101,19 @@ void CMetalExtractionTexture::Update()
 	assert(metalMap.GetSizeX() == texSize.x && metalMap.GetSizeZ() == texSize.y);
 
 	// upload raw data to gpu
-	auto binding = texture.ScopedBind();
-	texture.UploadImage(metalMap.GetExtractionMap());
+	{
+		auto binding = texture.ScopedBind();
+		texture.UploadImage(metalMap.GetExtractionMap());
+	}
+
+	using namespace GL::State;
+	auto state = GL::SubState(
+		Blending(GL_TRUE),
+		BlendFunc(GL_ZERO, GL_SRC_COLOR)
+	);
 
 	// do post-processing on the gpu (los-checking & scaling)
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ZERO, GL_SRC_COLOR);
 	glBindTexture(GL_TEXTURE_2D, infoTex->GetTexture());
 	RunFullScreenPass();
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//glDisable(GL_BLEND);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }

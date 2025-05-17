@@ -6,6 +6,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/GL/SubState.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "System/Exceptions.h"
@@ -17,8 +18,6 @@
 
 CRadarTexture::CRadarTexture()
 : CModernInfoTexture("radar")
-, uploadTexRadar(0)
-, uploadTexJammer(0)
 {
 	texSize = losHandler->radar.size;
 
@@ -29,7 +28,7 @@ CRadarTexture::CRadarTexture()
 		.magFilter = GL_LINEAR
 	};
 
-	texture = GL::Texture2D(texSize.x, texSize.y, GL_RG8, tcp, false);
+	texture = GL::Texture2D(texSize, GL_RG8, tcp, false);
 
 	infoTexPBO.Bind();
 	infoTexPBO.New(texSize.x * texSize.y * 2 * sizeof(unsigned short), GL_STREAM_DRAW);
@@ -81,21 +80,14 @@ CRadarTexture::CRadarTexture()
 	}
 
 	if (fbo.IsValid() && shader->IsValid()) {
-		glGenTextures(1, &uploadTexRadar);
-		glBindTexture(GL_TEXTURE_2D, uploadTexRadar);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_R16, texSize.x, texSize.y);
+		GL::TextureCreationParams tcp{
+			.reqNumLevels = 1,
+			.linearTextureFilter = false,
+			.wrapMirror = false			
+		};
 
-		glGenTextures(1, &uploadTexJammer);
-		glBindTexture(GL_TEXTURE_2D, uploadTexJammer);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_R16, texSize.x, texSize.y);
+		uploadTexRadar  = GL::Texture2D(texSize, GL_R16, tcp, false);
+		uploadTexJammer = GL::Texture2D(texSize, GL_R16, tcp, false);
 	}
 
 	if (!fbo.IsValid() || !shader->IsValid()) {
@@ -107,8 +99,6 @@ CRadarTexture::CRadarTexture()
 CRadarTexture::~CRadarTexture()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glDeleteTextures(1, &uploadTexRadar);
-	glDeleteTextures(1, &uploadTexJammer);
 	shaderHandler->ReleaseProgramObject("[CRadarTexture]", "CRadarTexture");
 }
 
@@ -154,7 +144,7 @@ void CRadarTexture::UpdateCPU()
 void CRadarTexture::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!fbo.IsValid() || !shader->IsValid() || uploadTexRadar == 0 || uploadTexJammer == 0)
+	if (!fbo.IsValid() || !shader->IsValid() || !uploadTexRadar.IsValid() || uploadTexJammer.IsValid())
 		return UpdateCPU();
 
 	if (losHandler->GetGlobalLOS(gu->myAllyTeam)) {
@@ -166,7 +156,7 @@ void CRadarTexture::Update()
 		FBO::Unbind();
 
 		auto binding = texture.ScopedBind();
-		//texture.ProduceMipmaps();
+		texture.ProduceMipmaps();
 		return;
 	}
 
@@ -182,33 +172,31 @@ void CRadarTexture::Update()
 	memcpy(infoTexMem, myJammer, arraySize);
 	infoTexPBO.UnmapBuffer();
 
-	//Trick: Upload the ushort as 2 ubytes, and then check both for `!=0` in the shader.
-	// Faster than doing it on the CPU! And uploading it as shorts would be slow, cause the GPU
-	// has no native support for them and so the transformation would happen on the CPU, too.
-	glActiveTexture(GL_TEXTURE1);
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, uploadTexRadar);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_UNSIGNED_SHORT, infoTexPBO.GetPtr());
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, uploadTexJammer);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_UNSIGNED_SHORT, infoTexPBO.GetPtr(arraySize));
+	auto binding1 = uploadTexRadar.ScopedBind(1);
+	uploadTexRadar.UploadImage(infoTexPBO.GetPtr());
+	auto binding0 = uploadTexRadar.ScopedBind(0);
+	uploadTexRadar.UploadImage(infoTexPBO.GetPtr(arraySize));
+
 	infoTexPBO.Invalidate();
 	infoTexPBO.Unbind();
 
 	// do post-processing on the gpu (los-checking & scaling)
-	glDisable(GL_BLEND);
+	using namespace GL::State;
+	auto state = GL::SubState(
+		Blending(GL_FALSE)
+	);
 	glActiveTexture(GL_TEXTURE2);
 	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, infoTextureHandler->GetInfoTexture("los")->GetTexture());
 	RunFullScreenPass();
 
 	// cleanup
-	glDisable(GL_TEXTURE_2D);
-	glActiveTexture(GL_TEXTURE1);
-	glDisable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	binding1 = {};
+	binding0 = {};
 
 	// generate mipmaps
 	glActiveTexture(GL_TEXTURE0);
 	auto binding = texture.ScopedBind();
-	//texture.ProduceMipmaps();
+	texture.ProduceMipmaps();
 }

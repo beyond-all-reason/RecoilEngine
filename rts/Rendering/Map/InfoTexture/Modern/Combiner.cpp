@@ -5,6 +5,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/GL/SubState.h"
 #include "Map/ReadMap.h"
 #include "System/Exceptions.h"
 #include "System/Config/ConfigHandler.h"
@@ -29,7 +30,7 @@ CInfoTextureCombiner::CInfoTextureCombiner()
 		.wrapMirror = false
 	};
 
-	texture = GL::Texture2D(texSize.x, texSize.y, GL_RGB10_A2, tcp, false);
+	texture = GL::Texture2D(texSize, GL_RGB10_A2, tcp, false);
 	glBindTexture(GL_TEXTURE_2D, texture.GetId());
 
 	if (FBO::IsSupported()) {
@@ -114,10 +115,14 @@ void CInfoTextureCombiner::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
+	using namespace GL::State;
+	auto state = GL::SubState(
+		Blending(GL_TRUE),
+		ColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE)
+	);
+
 	fbo.Bind();
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_FALSE);
 	glViewport(0,0, texSize.x, texSize.y);
-	glEnable(GL_BLEND);
 
 	shader->Enable();
 	shader->BindTextures();
@@ -137,10 +142,9 @@ void CInfoTextureCombiner::Update()
 	shader->Disable();
 
 	globalRendering->LoadViewport();
-	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	FBO::Unbind();
 
-
+	state.pop();
 	// create mipmaps
 	auto binding = texture.ScopedBind();
 	texture.ProduceMipmaps();

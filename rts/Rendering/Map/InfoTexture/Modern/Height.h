@@ -40,7 +40,7 @@ private:
 
 private:
 	bool needUpdate;
-	GLuint paletteTex;
+	GL::Texture2D paletteTex;
 };
 
 #endif // _HEIGHT_TEXTURE_H

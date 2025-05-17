@@ -28,24 +28,28 @@ CHeightTexture::CHeightTexture()
 
 	texSize = int2(mapDims.mapxp1, mapDims.mapyp1);
 
-	GL::TextureCreationParams tcp{
-		.reqNumLevels = 1,
-		.linearMipMapFilter = false,
-		.linearTextureFilter = true,
-		.wrapMirror = false
-	};
+	{
+		GL::TextureCreationParams tcp{
+			.reqNumLevels = 1,
+			.linearMipMapFilter = false,
+			.linearTextureFilter = true,
+			.wrapMirror = false
+		};
 
-	texture = GL::Texture2D(texSize.x, texSize.y, GL_RGBA8, tcp, false);
-
-	glGenTextures(1, &paletteTex);
-	glBindTexture(GL_TEXTURE_2D, paletteTex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 256, 2);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, &CHeightLinePalette::paletteColored[0].r);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 1, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, &CHeightLinePalette::paletteBlackAndWhite[0].r);
+		texture = GL::Texture2D(texSize, GL_RGBA8, tcp, false);
+	}
+	{
+		GL::TextureCreationParams tcp{
+			.reqNumLevels = 1,
+			.minFilter = GL_NEAREST,
+			.magFilter = GL_LINEAR,
+			.wrapModes = std::initializer_list{ GL_REPEAT, GL_CLAMP_TO_EDGE }
+		};
+		paletteTex = GL::Texture2D(256, 2, GL_RGBA8, tcp, false);
+		auto binding = paletteTex.ScopedBind();
+		paletteTex.UploadSubImage(CHeightLinePalette::paletteColored      , 0, 0, 256, 1);
+		paletteTex.UploadSubImage(CHeightLinePalette::paletteBlackAndWhite, 0, 1, 256, 1);
+	}
 
 	CreateFBO("CHeightTexture");
 
@@ -122,7 +126,6 @@ void CHeightTexture::UpdateCPU()
 CHeightTexture::~CHeightTexture()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glDeleteTextures(1, &paletteTex);
 	shaderHandler->ReleaseProgramObject("[CHeightTexture]", "CHeightTexture");
 }
 
@@ -138,16 +141,10 @@ void CHeightTexture::Update()
 		return UpdateCPU();
 
 	glDisable(GL_BLEND);
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, paletteTex);
+	auto binding = paletteTex.ScopedBind(1);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, hmTexID);
 	RunFullScreenPass();
-
-	// cleanup
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, 0); // ?
-	glActiveTexture(GL_TEXTURE0);
 }
 
 

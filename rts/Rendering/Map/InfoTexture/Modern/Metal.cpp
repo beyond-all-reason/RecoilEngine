@@ -23,7 +23,7 @@ CMetalTexture::CMetalTexture()
 		.wrapMirror = false
 	};
 
-	texture = GL::Texture2D(texSize.x, texSize.y, GL_R8, tcp, false);
+	texture = GL::Texture2D(texSize, GL_R8, tcp, false);
 }
 
 void CMetalTexture::Update()

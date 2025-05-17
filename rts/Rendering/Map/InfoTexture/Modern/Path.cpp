@@ -42,7 +42,7 @@ CPathTexture::CPathTexture()
 		.wrapMirror = false
 	};
 
-	texture = GL::Texture2D(texSize.x, texSize.y, GL_RGBA8, tcp, false);
+	texture = GL::Texture2D(texSize, GL_RGBA8, tcp, false);
 
 	infoTexPBO.Bind();
 	infoTexPBO.New(texSize.x * texSize.y * 4, GL_STREAM_DRAW);

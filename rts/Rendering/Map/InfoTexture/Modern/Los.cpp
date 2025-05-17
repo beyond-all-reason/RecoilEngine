@@ -5,6 +5,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/GL/SubState.h"
 #include "Sim/Misc/LosHandler.h"
 #include "System/Exceptions.h"
 #include "System/Log/ILog.h"
@@ -13,7 +14,6 @@
 
 CLosTexture::CLosTexture()
 : CModernInfoTexture("los")
-, uploadTex(0)
 {
 	texSize = losHandler->los.size;
 
@@ -24,7 +24,7 @@ CLosTexture::CLosTexture()
 		.wrapMirror = false
 	};
 
-	texture = GL::Texture2D(texSize.x, texSize.y, GL_R8, tcp, false);
+	texture = GL::Texture2D(texSize, GL_R8, tcp, false);
 
 	infoTexPBO.Bind();
 	infoTexPBO.New(texSize.x * texSize.y * 2, GL_STREAM_DRAW);
@@ -66,13 +66,14 @@ CLosTexture::CLosTexture()
 	}
 
 	if (fbo.IsValid() && shader->IsValid()) {
-		glGenTextures(1, &uploadTex);
-		glBindTexture(GL_TEXTURE_2D, uploadTex);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_R16, texSize.x, texSize.y);
+		GL::TextureCreationParams tcp{
+			.reqNumLevels = 1,
+			.linearMipMapFilter = false,
+			.linearTextureFilter = false,
+			.wrapMirror = false
+		};
+
+		uploadTex = GL::Texture2D(texSize, GL_R16, tcp, false);
 	}
 
 	if (!fbo.IsValid() || !shader->IsValid()) {
@@ -84,7 +85,6 @@ CLosTexture::CLosTexture()
 CLosTexture::~CLosTexture()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glDeleteTextures(1, &uploadTex);
 	shaderHandler->ReleaseProgramObject("[CLosTexture]", "CLosTexture");
 }
 
@@ -108,7 +108,7 @@ void CLosTexture::UpdateCPU()
 
 	infoTexPBO.UnmapBuffer();
 	auto binding = texture.ScopedBind();
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
+	texture.UploadImage(infoTexPBO.GetPtr());
 	texture.ProduceMipmaps();
 	infoTexPBO.Invalidate();
 	infoTexPBO.Unbind();
@@ -117,7 +117,7 @@ void CLosTexture::UpdateCPU()
 void CLosTexture::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!fbo.IsValid() || !shader->IsValid() || uploadTex == 0)
+	if (!fbo.IsValid() || !shader->IsValid() || !uploadTex.IsValid())
 		return UpdateCPU();
 
 	if (losHandler->GetGlobalLOS(gu->myAllyTeam)) {
@@ -139,19 +139,21 @@ void CLosTexture::Update()
 	memcpy(infoTexMem, myLos, texSize.x * texSize.y * 1 * sizeof(short));
 	infoTexPBO.UnmapBuffer();
 
-	//Trick: Upload the ushort as 2 ubytes, and then check both for `!=0` in the shader.
-	// Faster than doing it on the CPU! And uploading it as shorts would be slow, cause the GPU
-	// has no native support for them and so the transformation would happen on the CPU, too.
-	glBindTexture(GL_TEXTURE_2D, uploadTex);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_UNSIGNED_SHORT, infoTexPBO.GetPtr());
+	auto binding = uploadTex.ScopedBind();
+	uploadTex.UploadImage(infoTexPBO.GetPtr());
 	infoTexPBO.Invalidate();
 	infoTexPBO.Unbind();
 
 	// do post-processing on the gpu (los-checking & scaling)
-	glDisable(GL_BLEND);
-	RunFullScreenPass();
+	{
+		using namespace GL::State;
+		auto state = GL::SubState(
+			Blending(GL_FALSE)
+		);
+		RunFullScreenPass();
+	}
 
 	// generate mipmaps
-	auto binding = texture.ScopedBind();
+	texture.ScopedBind(binding);
 	texture.ProduceMipmaps();
 }
