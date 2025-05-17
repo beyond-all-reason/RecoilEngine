@@ -408,7 +408,7 @@ public:
 	virtual void SetTransparent(const SColor& c, const SColor trans = SColor(0, 0, 0, 0)) = 0;
 
 	virtual void Renormalize(const float3& newCol) = 0;
-	virtual void Blur(int iterations = 1, float weight = 1.0f) = 0;
+	virtual void Blur(int iterations = 1, float weight = 1.0f, int x=0, int y=0, int w=0, int h=0) = 0;
 	virtual void Fill(const SColor& c) = 0;
 
 	virtual void InvertColors() = 0;
@@ -466,7 +466,7 @@ public:
 	void SetTransparent(const SColor& c, const SColor trans) override;
 
 	void Renormalize(const float3& newCol) override;
-	void Blur(int iterations = 1, float weight = 1.0f) override;
+	void Blur(int iterations = 1, float weight = 1.0f, int x=0, int y=0, int w=0, int h=0) override;
 	void Fill(const SColor& c) override;
 
 	void InvertColors() override;
@@ -665,7 +665,7 @@ void TBitmapAction<T, ch>::Renormalize(const float3& newCol)
 }
 
 template<typename T, uint32_t ch>
-void TBitmapAction<T, ch>::Blur(int iterations, float weight)
+void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int starty, int w, int h)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// We use an axis-separated blur algorithm. Applies BLUR_KERNEL in both the x
@@ -678,40 +678,45 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight)
 	};
 	static constexpr int BLUR_KERNEL_HS = BLUR_KERNEL.size() >> 1;
 
+	if (w == 0)
+		w = bmp->xsize;
+	if (h == 0)
+		h = bmp->ysize;
+
 	// note ysize and xsize are swapped
-	CBitmap tmp(nullptr, bmp->ysize, bmp->xsize, ch, bmp->dataType);
+	CBitmap tmp(nullptr, h, w, ch, bmp->dataType);
 	auto tempAction = BitmapAction::GetBitmapAction(&tmp); // lifetime thing, not used furher
 
 	auto* tempTypedAction = static_cast<TBitmapAction<T, ch>*>(tempAction.get());
 	auto* currTypedAction = this;
 
 	const std::array blurPassTuples {
-		std::tuple( bmp, currTypedAction, tempTypedAction), // horizontal pass
-		std::tuple(&tmp, tempTypedAction, currTypedAction)  // vertical   pass
+		std::tuple( bmp, &tmp, currTypedAction, tempTypedAction, startx, starty, 0, 0, w, h), // horizontal pass
+		std::tuple(&tmp, bmp, tempTypedAction, currTypedAction, 0, 0, startx, starty, h, w)  // vertical   pass
 	};
 
 	const auto w0 = BLUR_KERNEL[BLUR_KERNEL_HS] * BLUR_KERNEL[BLUR_KERNEL_HS] * (weight - 1.0f);
 
-	#define MT_EXECUTION 1
+	#define MT_EXECUTION 0
 
 	for (int iter = 0; iter < iterations; ++iter) {
 		for (size_t bpi = 0; bpi < blurPassTuples.size(); ++bpi) {
 			// everything is a pointer here, can assign with just auto
-			auto [src, srcAction, dstAction] = blurPassTuples[bpi];
+			auto [src, dst, srcAction, dstAction, sx, sy, dx, dy, rw, rh] = blurPassTuples[bpi];
 		#if MT_EXECUTION == 1
-			for_mt_chunk(0, src->ysize, [this, src, srcAction, dstAction, bpi, w0](int y) {
+			for_mt_chunk(0, rh, [this, src, dst, srcAction, dstAction, bpi, w0, sx, sy, dx, dy, rw](int y) {
 		#else
-			for (int y = 0; y < src->ysize; y++) {
+			for (int y = 0; y < rh; y++) {
 		#endif
-				int yBaseOffset = (y * src->xsize);
-				for (int x = 0; x < src->xsize; x++) {
+				int yBaseOffset = ((sy + y) * src->xsize);
+				for (int x = 0; x < rw; x++) {
 
 					// don't use AccumChanType for additional precision
 					std::array<float, ch> val{ 0.0f };
 					float wSum = 0.0f;
 
 					for (int off = -BLUR_KERNEL_HS; off <= BLUR_KERNEL_HS; ++off) {
-						const int xo = x + off;
+						const int xo = (sx + x) + off;
 						// check bounds
 						if ((xo < 0) || (xo > src->xsize - 1))
 							continue;
@@ -725,7 +730,7 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight)
 						}
 					}
 
-					auto& dstRef = dstAction->GetRef(x * src->ysize + y);
+					auto& dstRef = dstAction->GetRef((dy + x) * dst->xsize + (dx + y));
 					for (int a = 0; a < ch; a++) {
 						auto rawDstVal = val[a] / wSum;
 
@@ -1874,7 +1879,7 @@ void CBitmap::Renormalize(const float3& newCol)
 #endif
 }
 
-void CBitmap::Blur(int iterations, float weight)
+void CBitmap::Blur(int iterations, float weight, int x, int y, int w, int h)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 #ifndef HEADLESS
@@ -1883,7 +1888,7 @@ void CBitmap::Blur(int iterations, float weight)
 
 
 	auto action = BitmapAction::GetBitmapAction(this);
-	action->Blur(iterations, weight);
+	action->Blur(iterations, weight, x, y, w, h);
 #endif
 }
 
