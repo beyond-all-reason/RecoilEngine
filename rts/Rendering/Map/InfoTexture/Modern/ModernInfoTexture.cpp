@@ -7,7 +7,6 @@
 
 CModernInfoTexture::CModernInfoTexture(const std::string& _name)
 	: CInfoTexture(_name, {}, int2(0, 0))
-	, shader(nullptr)
 {}
 
 bool CModernInfoTexture::CreateFBO(const char* fboName)

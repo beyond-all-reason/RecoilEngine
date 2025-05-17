@@ -27,7 +27,7 @@ protected:
 protected:
 	FBO fbo;
 	VAO vao;
-	Shader::IProgramObject* shader;
+	Shader::IProgramObject* shader = nullptr;
 protected:
 	static constexpr const char* vertexCode = "GLSL/FullscreenTriangleVS.glsl";
 };
