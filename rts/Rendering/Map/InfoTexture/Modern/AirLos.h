@@ -3,7 +3,7 @@
 #ifndef _AIRLOS_TEXTURE_H
 #define _AIRLOS_TEXTURE_H
 
-#include "PboInfoTexture.h"
+#include "ModernInfoTexture.h"
 #include "Rendering/GL/FBO.h"
 
 
@@ -12,7 +12,7 @@ namespace Shader {
 }
 
 
-class CAirLosTexture : public CPboInfoTexture
+class CAirLosTexture : public CModernInfoTexture
 {
 public:
 	CAirLosTexture();
@@ -26,9 +26,7 @@ private:
 	void UpdateCPU();
 
 private:
-	FBO fbo;
-	GLuint uploadTex;
-	Shader::IProgramObject* shader;
+	GL::Texture2D uploadTex;
 };
 
 #endif // _AIRLOS_TEXTURE_H

@@ -11,7 +11,7 @@
 #include "System/UnorderedMap.hpp"
 
 
-class CPboInfoTexture;
+class CModernInfoTexture;
 class CInfoTextureCombiner;
 
 
@@ -40,15 +40,15 @@ public:
 	      CInfoTexture* GetInfoTexture     (const std::string& name)       override;
 
 protected:
-	friend class CPboInfoTexture;
-	void AddInfoTexture(CPboInfoTexture*);
+	friend class CModernInfoTexture;
+	void AddInfoTexture(CModernInfoTexture*);
 
 protected:
 	bool returnToLOS = false;
 	bool inMetalMode = false;
 	bool firstUpdate =  true;
 
-	spring::unordered_map<std::string, CPboInfoTexture*> infoTextures;
+	spring::unordered_map<std::string, CModernInfoTexture*> infoTextures;
 
 	// special; always non-NULL at runtime
 	CInfoTextureCombiner* infoTex = nullptr;

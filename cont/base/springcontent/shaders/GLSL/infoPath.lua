@@ -58,24 +58,22 @@ return {
 			vec4 c = vec4(0.0);
 
 			off = (vec2(rand(p.st + off),rand(p.ts + off)) * 2.0 - 1.0) / texSize;
-			c += texture2D(tex, p + off * 0.25);
+			c += texture(tex, p + off * 0.25);
 			off = (vec2(rand(p.st + off),rand(p.ts + off)) * 2.0 - 1.0) / texSize;
-			c += texture2D(tex, p + off * 0.25);
+			c += texture(tex, p + off * 0.25);
 			off = (vec2(rand(p.st + off),rand(p.ts + off)) * 2.0 - 1.0) / texSize;
-			c += texture2D(tex, p + off * 0.25);
+			c += texture(tex, p + off * 0.25);
 			off = (vec2(rand(p.st + off),rand(p.ts + off)) * 2.0 - 1.0) / texSize;
-			c += texture2D(tex, p + off * 0.25);
+			c += texture(tex, p + off * 0.25);
 
 			return c * 0.25;
 		}
 	#else
-		#define getTexel texture2D
+		#define getTexel texture
 	#endif
 
 	void main() {
-		vec4 null = vec4(0.5,0.5,0.5,1.0);
-
-		vec4 pathData = texture2D(tex0, texCoord);
+		vec4 pathData = texture(tex0, texCoord);
 		gl_FragColor = COLORMATRIX0 * pathData;
 
 		gl_FragColor.r -= smoothstep(0.75, 1.0, pathData.r) * 0.3;

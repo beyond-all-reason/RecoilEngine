@@ -250,6 +250,7 @@ namespace Shader {
 		/// interface to auto-bind textures with the shader
 		void AddTextureBinding(const int texUnit, const std::string& luaTexName);
 		void BindTextures() const;
+		void UnbindTextures() const;
 
 	protected:
 		/// internal
