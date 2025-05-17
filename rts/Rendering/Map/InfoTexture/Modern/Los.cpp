@@ -26,10 +26,6 @@ CLosTexture::CLosTexture()
 
 	texture = GL::Texture2D(texSize, GL_R8, tcp, false);
 
-	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * 2, GL_STREAM_DRAW);
-	infoTexPBO.Unbind();
-
 	CreateFBO("CLosTexture");
 
 	const std::string fragmentCode = R"(
@@ -92,26 +88,23 @@ CLosTexture::~CLosTexture()
 void CLosTexture::UpdateCPU()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	infoTexPBO.Bind();
-	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
+	static std::vector<uint8_t> infoTexMem;
+	infoTexMem.resize(texSize.x * texSize.y);
 
 	if (!losHandler->GetGlobalLOS(gu->myAllyTeam)) {
 		const unsigned short* myLos = &losHandler->los.losMaps[gu->myAllyTeam].front();
 		for (int y = 0; y < texSize.y; ++y) {
 			for (int x = 0; x < texSize.x; ++x) {
-				infoTexMem[y * texSize.x + x] = (myLos[y * texSize.x + x] != 0) ? 255 : 0;
+				infoTexMem[y * texSize.x + x] = (myLos[y * texSize.x + x] != 0) ? 0xFF : 0x00;
 			}
 		}
 	} else {
-		memset(infoTexMem, 255, texSize.x * texSize.y);
+		std::ranges::fill(infoTexMem, 0xFF);
 	}
 
-	infoTexPBO.UnmapBuffer();
 	auto binding = texture.ScopedBind();
-	texture.UploadImage(infoTexPBO.GetPtr());
+	texture.UploadImage(infoTexMem.data());
 	texture.ProduceMipmaps();
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
 }
 
 void CLosTexture::Update()
@@ -133,16 +126,14 @@ void CLosTexture::Update()
 		return;
 	}
 
-	infoTexPBO.Bind();
-	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
-	const unsigned short* myLos = &losHandler->los.losMaps[gu->myAllyTeam].front();
-	memcpy(infoTexMem, myLos, texSize.x * texSize.y * 1 * sizeof(short));
-	infoTexPBO.UnmapBuffer();
+	static std::vector<uint8_t> infoTexMem;
+	infoTexMem.resize(texSize.x * texSize.y);
+
+	const auto& myLos = static_cast<const std::vector<uint16_t>&>(losHandler->los.losMaps[gu->myAllyTeam]);
+	assert(myLos.size() == texSize.x * texSize.y);
 
 	auto binding = uploadTex.ScopedBind();
-	uploadTex.UploadImage(infoTexPBO.GetPtr());
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
+	uploadTex.UploadImage(myLos.data());
 
 	// do post-processing on the gpu (los-checking & scaling)
 	{

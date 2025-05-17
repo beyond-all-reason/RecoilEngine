@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <ranges>
 #include "Rendering/Map/InfoTexture/InfoTexture.h"
 #include "Rendering/GL/PBO.h"
 #include "Rendering/GL/FBO.h"
@@ -29,5 +30,4 @@ protected:
 	Shader::IProgramObject* shader;
 protected:
 	static constexpr const char* vertexCode = "GLSL/FullscreenTriangleVS.glsl";
-	PBO infoTexPBO;
 };

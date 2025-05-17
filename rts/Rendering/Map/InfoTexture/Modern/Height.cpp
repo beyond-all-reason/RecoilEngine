@@ -6,6 +6,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/GL/SubState.h"
 #include "System/Color.h"
 #include "System/Exceptions.h"
 #include "System/Config/ConfigHandler.h"
@@ -99,27 +100,24 @@ CHeightTexture::CHeightTexture()
 void CHeightTexture::UpdateCPU()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	static std::vector<SColor> infoTexMem;
+	infoTexMem.resize(texSize.x * texSize.y);
+
 	const SColor* extraTexPal = CHeightLinePalette::GetData();
 	const float* heightMap = readMap->GetCornerHeightMapUnsynced();
-
-	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * 4, GL_STREAM_DRAW);
-	auto infoTexMem = reinterpret_cast<SColor*>(infoTexPBO.MapBuffer());
 
 	for (int y = 0; y < texSize.y; ++y) {
 		for (int x = 0; x < texSize.x; ++x) {
 			const int idx = y * texSize.x + x;
 			const float height = heightMap[idx];
-			const unsigned int value = ((unsigned int)(height * 8.0f)) % 255;
+			const auto value = static_cast<unsigned int>(height * 8.0f) % 255;
 			infoTexMem[idx] = extraTexPal[value];
 		}
 	}
 
-	infoTexPBO.UnmapBuffer();
 	auto binding = texture.ScopedBind();
-	texture.UploadImage(infoTexPBO.GetPtr());
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
+	texture.UploadImage(infoTexMem.data());
 }
 
 
@@ -140,10 +138,15 @@ void CHeightTexture::Update()
 	if (!fbo.IsValid() || !shader->IsValid() || (hmTexID == 0))
 		return UpdateCPU();
 
-	glDisable(GL_BLEND);
+	using namespace GL::State;
+	auto state = GL::SubState(
+		Blending(GL_FALSE)
+	);
 	auto binding = paletteTex.ScopedBind(1);
+
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, hmTexID);
+
 	RunFullScreenPass();
 }
 

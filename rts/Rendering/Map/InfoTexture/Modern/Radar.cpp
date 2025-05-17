@@ -30,10 +30,6 @@ CRadarTexture::CRadarTexture()
 
 	texture = GL::Texture2D(texSize, GL_RG8, tcp, false);
 
-	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * 2 * sizeof(unsigned short), GL_STREAM_DRAW);
-	infoTexPBO.Unbind();
-
 	CreateFBO("CRadarTexture");
 
 	const std::string fragmentCode = R"(
@@ -106,8 +102,8 @@ CRadarTexture::~CRadarTexture()
 void CRadarTexture::UpdateCPU()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	infoTexPBO.Bind();
-	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
+	static std::vector<uint8_t> infoTexMem;
+	infoTexMem.resize(texSize.x * texSize.y * 2);
 
 	if (!losHandler->GetGlobalLOS(gu->myAllyTeam)) {
 		const int jammerAllyTeam = modInfo.separateJammers ? gu->myAllyTeam : 0;
@@ -119,25 +115,22 @@ void CRadarTexture::UpdateCPU()
 		for (int y = 0; y < texSize.y; ++y) {
 			for (int x = 0; x < texSize.x; ++x) {
 				const int idx = y * texSize.x + x;
-				infoTexMem[idx * 2 + 0] = ( myRadar[idx] != 0) ? 255 : 0;
-				infoTexMem[idx * 2 + 1] = (myJammer[idx] != 0 && myLos[idx] != 0) ? 255 : 0;
+				infoTexMem[idx * 2 + 0] = ( myRadar[idx] != 0) ? 0xFF : 0x00;
+				infoTexMem[idx * 2 + 1] = (myJammer[idx] != 0 && myLos[idx] != 0) ? 0xFF : 0x00;
 			}
 		}
 	} else {
 		for (int y = 0; y < texSize.y; ++y) {
 			for (int x = 0; x < texSize.x; ++x) {
 				const int idx = y * texSize.x + x;
-				infoTexMem[idx * 2 + 0] = 255;
-				infoTexMem[idx * 2 + 1] = 0;
+				infoTexMem[idx * 2 + 0] = 0xFF;
+				infoTexMem[idx * 2 + 1] = 0x00;
 			}
 		}
 	}
 
-	infoTexPBO.UnmapBuffer();
 	auto binding = texture.ScopedBind();
-	texture.UploadImage(infoTexPBO.GetPtr());
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
+	texture.UploadImage(infoTexMem.data());
 }
 
 
@@ -162,23 +155,14 @@ void CRadarTexture::Update()
 
 	const int jammerAllyTeam = modInfo.separateJammers ? gu->myAllyTeam : 0;
 
-	infoTexPBO.Bind();
-	const size_t arraySize = texSize.x * texSize.y * sizeof(unsigned short);
-	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
-	const unsigned short* myRadar  = &losHandler->radar.losMaps[gu->myAllyTeam].front();
-	const unsigned short* myJammer = &losHandler->jammer.losMaps[jammerAllyTeam].front();
-	memcpy(infoTexMem,  myRadar, arraySize);
-	infoTexMem += arraySize;
-	memcpy(infoTexMem, myJammer, arraySize);
-	infoTexPBO.UnmapBuffer();
+	const auto& myRadar  = static_cast<const std::vector<uint16_t>>(losHandler->radar.losMaps[gu->myAllyTeam]);
+	const auto& myJammer = static_cast<const std::vector<uint16_t>>(losHandler->jammer.losMaps[jammerAllyTeam]);
 
 	auto binding1 = uploadTexRadar.ScopedBind(1);
-	uploadTexRadar.UploadImage(infoTexPBO.GetPtr());
-	auto binding0 = uploadTexRadar.ScopedBind(0);
-	uploadTexRadar.UploadImage(infoTexPBO.GetPtr(arraySize));
+	uploadTexRadar.UploadImage(myRadar.data());
 
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
+	auto binding0 = uploadTexJammer.ScopedBind(0);
+	uploadTexJammer.UploadImage(myJammer.data());
 
 	// do post-processing on the gpu (los-checking & scaling)
 	using namespace GL::State;
@@ -186,7 +170,6 @@ void CRadarTexture::Update()
 		Blending(GL_FALSE)
 	);
 	glActiveTexture(GL_TEXTURE2);
-	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, infoTextureHandler->GetInfoTexture("los")->GetTexture());
 	RunFullScreenPass();
 

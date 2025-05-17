@@ -5,6 +5,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/GL/SubState.h"
 #include "Sim/Misc/LosHandler.h"
 #include "System/Exceptions.h"
 #include "System/Log/ILog.h"
@@ -25,10 +26,6 @@ CAirLosTexture::CAirLosTexture()
 	};
 
 	texture = GL::Texture2D(texSize, GL_R8, tcp, false);
-
-	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * 2, GL_STREAM_DRAW);
-	infoTexPBO.Unbind();
 
 	CreateFBO("CAirLosTexture");
 
@@ -90,26 +87,23 @@ CAirLosTexture::~CAirLosTexture()
 void CAirLosTexture::UpdateCPU()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	infoTexPBO.Bind();
-	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
+	static std::vector<uint8_t> infoTexMem;
+	infoTexMem.resize(texSize.x * texSize.y);
 
 	if (!losHandler->GetGlobalLOS(gu->myAllyTeam)) {
 		const unsigned short* myAirLos = &losHandler->airLos.losMaps[gu->myAllyTeam].front();
 		for (int y = 0; y < texSize.y; ++y) {
 			for (int x = 0; x < texSize.x; ++x) {
-				infoTexMem[y * texSize.x + x] = (myAirLos[y * texSize.x + x] != 0) ? 255 : 0;
+				infoTexMem[y * texSize.x + x] = (myAirLos[y * texSize.x + x] != 0) ? 0xFF : 0x00;
 			}
 		}
 	} else {
-		memset(infoTexMem, 255, texSize.x * texSize.y);
+		std::ranges::fill(infoTexMem, 0xFF);
 	}
 
-	infoTexPBO.UnmapBuffer();
 	auto binding = texture.ScopedBind();
-	texture.UploadImage(infoTexPBO.GetPtr());
+	texture.UploadImage(infoTexMem.data());
 	texture.ProduceMipmaps();
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
 }
 
 
@@ -132,21 +126,17 @@ void CAirLosTexture::Update()
 		return;
 	}
 
-	infoTexPBO.Bind();
-	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
-	const unsigned short* myAirLos = &losHandler->airLos.losMaps[gu->myAllyTeam].front();
-	memcpy(infoTexMem, myAirLos, texSize.x * texSize.y * 1 * sizeof(short));
-	infoTexPBO.UnmapBuffer();
-
+	const auto& myAirLos = static_cast<const std::vector<uint16_t>>(losHandler->airLos.losMaps[gu->myAllyTeam]);
 	{
 		auto binding = uploadTex.ScopedBind();
-		uploadTex.UploadImage(infoTexPBO.GetPtr());
+		uploadTex.UploadImage(myAirLos.data());
 	}
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
 
 	// do post-processing on the gpu (los-checking & scaling)
-	glDisable(GL_BLEND);
+	using namespace GL::State;
+	auto state = GL::SubState(
+		Blending(GL_FALSE)
+	);
 	RunFullScreenPass();
 
 	// generate mipmaps
