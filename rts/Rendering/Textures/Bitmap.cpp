@@ -691,8 +691,8 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 	auto* currTypedAction = this;
 
 	const std::array blurPassTuples {
-		std::tuple( bmp, &tmp, currTypedAction, tempTypedAction, startx, starty, 0, 0), // horizontal pass
-		std::tuple(&tmp, bmp, tempTypedAction, currTypedAction, 0, 0, startx, starty)  // vertical   pass
+		std::tuple( bmp, &tmp, currTypedAction, tempTypedAction, startx, starty, 0, 0, w, h), // horizontal pass
+		std::tuple(&tmp, bmp, tempTypedAction, currTypedAction, 0, 0, startx, starty, h, w)  // vertical   pass
 	};
 
 	const auto w0 = BLUR_KERNEL[BLUR_KERNEL_HS] * BLUR_KERNEL[BLUR_KERNEL_HS] * (weight - 1.0f);
@@ -702,14 +702,14 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 	for (int iter = 0; iter < iterations; ++iter) {
 		for (size_t bpi = 0; bpi < blurPassTuples.size(); ++bpi) {
 			// everything is a pointer here, can assign with just auto
-			auto [src, dst, srcAction, dstAction, sx, sy, dx, dy] = blurPassTuples[bpi];
+			auto [src, dst, srcAction, dstAction, sx, sy, dx, dy, rw, rh] = blurPassTuples[bpi];
 		#if MT_EXECUTION == 1
-			for_mt_chunk(0, h, [this, src, dst, srcAction, dstAction, bpi, w0, sx, sy, dx, dy](int y) {
+			for_mt_chunk(0, rh, [this, src, dst, srcAction, dstAction, bpi, w0, sx, sy, dx, dy, rw](int y) {
 		#else
-			for (int y = 0; y < h; y++) {
+			for (int y = 0; y < rh; y++) {
 		#endif
 				int yBaseOffset = ((sy + y) * src->xsize);
-				for (int x = 0; x < w; x++) {
+				for (int x = 0; x < rw; x++) {
 
 					// don't use AccumChanType for additional precision
 					std::array<float, ch> val{ 0.0f };
