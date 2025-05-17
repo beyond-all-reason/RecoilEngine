@@ -1385,17 +1385,11 @@ void CFontTexture::UpdateGlyphAtlasTexture()
 
 	// merge shadow and regular atlas bitmaps, dispose shadow
 	if (atlasUpdateShadow.xsize == atlasUpdate.xsize && atlasUpdateShadow.ysize == atlasUpdate.ysize) {
-		spring_time t1 = spring_gettime();
 		for_mt(0, blurRectangles.size(), [&](int i) {
 			SRectangle& rect = blurRectangles[i];
 			atlasUpdateShadow.Blur(outlineSize, outlineWeight, rect.x1, rect.y1, rect.x2-rect.x1, rect.y2-rect.y1);
 		});
 		blurRectangles.clear();
-		spring_time t2 = spring_gettime();
-		spring_time tt = t2-t1;
-		if (tt.toMilliSecsf() > 10) {
-		       LOG_L(L_WARNING, "Slow Blur %f", tt.toMilliSecsf());
-		}
 
 		assert((atlasUpdate.xsize * atlasUpdate.ysize) % sizeof(int) == 0);
 
