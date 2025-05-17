@@ -730,7 +730,7 @@ void TBitmapAction<T, ch>::Blur(int iterations, float weight, int startx, int st
 						}
 					}
 
-					auto& dstRef = dstAction->GetRef((dx + x) * dst->ysize + (dy + y));
+					auto& dstRef = dstAction->GetRef((dy + x) * dst->xsize + (dx + y));
 					for (int a = 0; a < ch; a++) {
 						auto rawDstVal = val[a] / wSum;
 
