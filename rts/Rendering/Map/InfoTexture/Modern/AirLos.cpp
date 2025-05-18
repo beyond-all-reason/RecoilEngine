@@ -65,9 +65,9 @@ CAirLosTexture::CAirLosTexture()
 	if (fbo.IsValid() && shader->IsValid()) {
 		GL::TextureCreationParams tcp{
 			.reqNumLevels = 1,
-			.linearMipMapFilter = false,
-			.linearTextureFilter = false,
-			.wrapMirror = false
+			.wrapMirror = false,
+			.minFilter = GL_NEAREST,
+			.magFilter = GL_NEAREST
 		};
 
 		uploadTex = GL::Texture2D(texSize, GL_R16, tcp, false);

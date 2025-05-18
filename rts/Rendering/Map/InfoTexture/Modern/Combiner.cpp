@@ -31,7 +31,6 @@ CInfoTextureCombiner::CInfoTextureCombiner()
 	};
 
 	texture = GL::Texture2D(texSize, GL_RGB10_A2, tcp, false);
-	glBindTexture(GL_TEXTURE_2D, texture.GetId());
 
 	if (FBO::IsSupported()) {
 		fbo.Bind();

@@ -37,9 +37,9 @@ CPathTexture::CPathTexture()
 
 	GL::TextureCreationParams tcp{
 		.reqNumLevels = 1,
-		.linearMipMapFilter = false,
-		.linearTextureFilter = true,
-		.wrapMirror = false
+		.wrapMirror = false,
+		.minFilter = GL_NEAREST,
+		.magFilter = GL_LINEAR
 	};
 
 	texture = GL::Texture2D(texSize, GL_RGBA8, tcp, false);

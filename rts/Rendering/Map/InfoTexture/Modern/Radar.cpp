@@ -78,8 +78,9 @@ CRadarTexture::CRadarTexture()
 	if (fbo.IsValid() && shader->IsValid()) {
 		GL::TextureCreationParams tcp{
 			.reqNumLevels = 1,
-			.linearTextureFilter = false,
-			.wrapMirror = false			
+			.wrapMirror = false,
+			.minFilter = GL_NEAREST,
+			.magFilter = GL_NEAREST
 		};
 
 		uploadTexRadar  = GL::Texture2D(texSize, GL_R16, tcp, false);

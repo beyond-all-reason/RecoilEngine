@@ -163,7 +163,7 @@ namespace GL {
 
 	void Texture2D::ProduceMipmaps() const
 	{
-		//assert(lastBoundSlot >= GL_TEXTURE0);
+		assert(lastBoundSlot >= GL_TEXTURE0);
 		if (globalRendering->amdHacks) {
 			glEnable(texTarget);
 			glGenerateMipmap(texTarget);
