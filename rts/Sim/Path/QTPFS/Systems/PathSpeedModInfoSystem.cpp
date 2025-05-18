@@ -46,7 +46,7 @@ void ScanForPathSpeedModInfo(int frameModulus) {
 
     // Initialization
     if (frameModulus <= 0) {
-        layersView.each([&layersView, pm](entt::entity entity){
+        for(auto entity: layersView) {
                 auto& layer = layersView.get<NodeLayerSpeedInfoSweep>(entity);
                 auto& nodeLayer = pm->GetNodeLayer(layer.layerNum);
                 layer.updateCurMaxSpeed = (-std::numeric_limits<float>::infinity());
@@ -54,13 +54,13 @@ void ScanForPathSpeedModInfo(int frameModulus) {
                 layer.updateInProgress = true;
                 layer.updateCurSumSpeed = 0.f;
                 layer.updateNumLeafNodes = 0.f;
-            });
+        }
         dataChunk = 0;
     }
     
     // One thread per layer: get maximum speed mod from the nodes walked thus far.
     for_mt(0, layersView.size(), [&layersView, &comp, dataChunk, pm](int idx){
-        entt::entity entity = layersView.storage<NodeLayerSpeedInfoSweep>()[idx];
+        entt::entity entity = layersView.begin()[idx];
         auto& layer = layersView.get<NodeLayerSpeedInfoSweep>(entity);
 
         const int idxBeg = ((dataChunk + 0) * layer.updateMaxNodes) / comp.refreshTimeInFrames;
@@ -89,7 +89,7 @@ void ScanForPathSpeedModInfo(int frameModulus) {
 
     // Finished search
     if (dataChunk == comp.refreshTimeInFrames + (-1))
-        layersView.each([&comp, &layersView](entt::entity entity){
+        for(auto entity: layersView) {
             auto& layer = layersView.get<NodeLayerSpeedInfoSweep>(entity);
             comp.relSpeedModinfos[layer.layerNum].max = layer.updateCurMaxSpeed;
             comp.relSpeedModinfos[layer.layerNum].mean = layer.updateCurSumSpeed / layer.updateNumLeafNodes;
@@ -98,7 +98,7 @@ void ScanForPathSpeedModInfo(int frameModulus) {
             // if (layer.layerNum == 2) {
             //     LOG("Finished Search - result is %f", comp.relSpeedModinfos[layer.layerNum]);
             // }
-            });
+        };
 }
 
 // #ifdef __GNUC__
@@ -168,6 +168,6 @@ void PathSpeedModInfoSystem::Shutdown() {
     RECOIL_DETAILED_TRACY_ZONE;
     systemUtils.OnUpdate().disconnect<&PathSpeedModInfoSystem::Update>();
 
-    registry.view<NodeLayerSpeedInfoSweep>()
-            .each([](entt::entity entity){ registry.destroy(entity); });
+    for (auto entity: registry.view<NodeLayerSpeedInfoSweep>())
+        registry.destroy(entity);
 }

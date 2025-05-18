@@ -154,7 +154,7 @@ QTPFS::PathManager::~PathManager() {
 	RemoveDeadPathsSystem::Shutdown();
 
 	// print out anything still left in the registry - there should be nothing
-	registry.each([this](auto entity) {
+	for(auto [entity]: registry.storage<entt::entity>().each()) {
 		bool isPath = registry.all_of<IPath>(entity);
 		bool isSearch = registry.all_of<PathSearch>(entity);
 		if (isPath) {
@@ -165,7 +165,7 @@ QTPFS::PathManager::~PathManager() {
 			const PathSearch& search = registry.get<PathSearch>(entity);
 			registry.destroy(entity);
 		}
-	});
+	};
 
 	nodeLayerUpdatePriorityOrder.clear();
 	for (unsigned int layerNum = 0; layerNum < nodeLayers.size(); layerNum++) {
@@ -201,7 +201,7 @@ QTPFS::PathManager::~PathManager() {
 	// make this is destroyed last to ensure entity 0 will be first picked up next time.
 	registry.destroy(systemEntity);
 
-	LOG("%s: %d entities still active!", __func__, int(registry.alive()));
+	LOG("%s: %d entities still active!", __func__, int(registry.storage<entt::entity>().size()));
 
 	assert(registry.alive() == 0);
 
