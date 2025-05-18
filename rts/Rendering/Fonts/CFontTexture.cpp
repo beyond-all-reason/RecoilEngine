@@ -1348,6 +1348,7 @@ void CFontTexture::ClearAtlases(const int width, const int height)
 		LOG_L(L_WARNING, "[FontTexture::%s] discarding %u glyph bitmaps", __func__, uint32_t(atlasGlyphs.size()));
 
 	atlasGlyphs.clear();
+	blurRectangles.clear();
 #endif
 }
 
