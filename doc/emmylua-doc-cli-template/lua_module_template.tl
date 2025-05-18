@@ -1,12 +1,6 @@
 ---
-layout: default
 title: {{ doc.name }}
-parent: Lua API
-permalink: lua-api/modules/{{ doc.name }}
 ---
-{# Use `render_with_liquid: false` when we upgrade to Jekyl >=4.0 #}
-{{ "{% raw %}" }}
-
 # global {{ doc.name }}
 
 {% if doc.property.description %}
@@ -76,5 +70,3 @@ permalink: lua-api/modules/{{ doc.name }}
 {% endif %}
 {% endfor %}
 {% endif %}
-
-{{ "{% endraw %}" }}

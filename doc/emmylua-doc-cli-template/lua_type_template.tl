@@ -1,16 +1,11 @@
 ---
-layout: default
-title: {{ doc.name }}
-parent: Lua API
-permalink: lua-api/types/{{ doc.name }}
+title: "{{ doc.name }}"
 ---
-{# Use `render_with_liquid: false` when we upgrade to Jekyl >=4.0 #}
-{{ "{% raw %}" }}
-
-# class {{ doc.name }}
+## class {{ doc.name }}
 
 {% if doc.supers %}
-- supers: {{ doc.supers }}
+- inherits:
+{{ doc.supers }}
 {% endif %}
 {% if doc.namespace %}
 - namespace: {{ doc.namespace }}
@@ -33,10 +28,10 @@ permalink: lua-api/types/{{ doc.name }}
 {% endif %}
 ---
 {% if doc.methods %}
-## methods
+### methods
 ---
 {% for method in doc.methods %}
-### {{ method.name }}
+#### {{ method.name }}
 ---
 {{ method.display }}
 
@@ -59,10 +54,10 @@ permalink: lua-api/types/{{ doc.name }}
 {% endif %}
 
 {% if doc.fields %}
-## fields
+### fields
 ---
 {% for field in doc.fields %}
-### {{ field.name }}
+#### {{ field.name }}
 ---
 {{ field.display }}
 
@@ -83,5 +78,3 @@ permalink: lua-api/types/{{ doc.name }}
 {% endif %}
 {% endfor %}
 {% endif %}
-
-{{ "{% endraw %}" }}
