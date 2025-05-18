@@ -408,7 +408,7 @@ public:
 	virtual void SetTransparent(const SColor& c, const SColor trans = SColor(0, 0, 0, 0)) = 0;
 
 	virtual void Renormalize(const float3& newCol) = 0;
-	virtual void Blur(int iterations = 1, float weight = 1.0f, int x=0, int y=0, int w=0, int h=0) = 0;
+	virtual void Blur(int iterations = 1, float weight = 1.0f, int x = 0, int y = 0, int w = 0, int h = 0) = 0;
 	virtual void Fill(const SColor& c) = 0;
 
 	virtual void InvertColors() = 0;
@@ -466,7 +466,7 @@ public:
 	void SetTransparent(const SColor& c, const SColor trans) override;
 
 	void Renormalize(const float3& newCol) override;
-	void Blur(int iterations = 1, float weight = 1.0f, int x=0, int y=0, int w=0, int h=0) override;
+	void Blur(int iterations = 1, float weight = 1.0f, int x = 0, int y = 0, int w = 0, int h = 0) override;
 	void Fill(const SColor& c) override;
 
 	void InvertColors() override;
