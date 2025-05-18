@@ -1129,7 +1129,7 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& wanted)
 			if (texpos2[2] != 0) {
 				const int x = texpos2.x + outlineSize;
 				const int y = texpos2.y + outlineSize;
-				const int outlineHalf = outlineSize/2;
+				const int outlineHalf = std::ceil(outlineSize/2.0f);
 				blurRectangles.emplace_back(
 					std::max<int>(0, x - outlineHalf),
 					std::max<int>(0, y - outlineHalf),
