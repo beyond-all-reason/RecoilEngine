@@ -91,7 +91,7 @@ void CAirLosTexture::UpdateCPU()
 	infoTexMem.resize(texSize.x * texSize.y);
 
 	if (!losHandler->GetGlobalLOS(gu->myAllyTeam)) {
-		const unsigned short* myAirLos = &losHandler->airLos.losMaps[gu->myAllyTeam].front();
+		const auto& myAirLos = losHandler->airLos.losMaps[gu->myAllyTeam].GetLosMap();
 		for (int y = 0; y < texSize.y; ++y) {
 			for (int x = 0; x < texSize.x; ++x) {
 				infoTexMem[y * texSize.x + x] = (myAirLos[y * texSize.x + x] != 0) ? 0xFF : 0x00;
@@ -126,7 +126,7 @@ void CAirLosTexture::Update()
 		return;
 	}
 
-	const auto& myAirLos = static_cast<const std::vector<uint16_t>>(losHandler->airLos.losMaps[gu->myAllyTeam]);
+	const auto& myAirLos = losHandler->airLos.losMaps[gu->myAllyTeam].GetLosMap();
 	{
 		auto binding = uploadTex.ScopedBind();
 		uploadTex.UploadImage(myAirLos.data());

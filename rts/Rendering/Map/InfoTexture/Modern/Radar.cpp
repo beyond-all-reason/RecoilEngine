@@ -108,10 +108,10 @@ void CRadarTexture::UpdateCPU()
 	if (!losHandler->GetGlobalLOS(gu->myAllyTeam)) {
 		const int jammerAllyTeam = modInfo.separateJammers ? gu->myAllyTeam : 0;
 
-		const unsigned short* myLos = &losHandler->los.losMaps[gu->myAllyTeam].front();
+		const auto& myLos = losHandler->los.losMaps[gu->myAllyTeam].GetLosMap();
 
-		const unsigned short* myRadar  = &losHandler->radar.losMaps[gu->myAllyTeam].front();
-		const unsigned short* myJammer = &losHandler->jammer.losMaps[jammerAllyTeam].front();
+		const auto& myRadar  = losHandler->radar.losMaps[gu->myAllyTeam].GetLosMap();
+		const auto& myJammer = losHandler->jammer.losMaps[jammerAllyTeam].GetLosMap();
 		for (int y = 0; y < texSize.y; ++y) {
 			for (int x = 0; x < texSize.x; ++x) {
 				const int idx = y * texSize.x + x;
@@ -155,8 +155,8 @@ void CRadarTexture::Update()
 
 	const int jammerAllyTeam = modInfo.separateJammers ? gu->myAllyTeam : 0;
 
-	const auto& myRadar  = static_cast<const std::vector<uint16_t>>(losHandler->radar.losMaps[gu->myAllyTeam]);
-	const auto& myJammer = static_cast<const std::vector<uint16_t>>(losHandler->jammer.losMaps[jammerAllyTeam]);
+	const auto& myRadar  = losHandler->radar.losMaps[gu->myAllyTeam].GetLosMap();
+	const auto& myJammer = losHandler->jammer.losMaps[jammerAllyTeam].GetLosMap();
 
 	auto binding1 = uploadTexRadar.ScopedBind(1);
 	uploadTexRadar.UploadImage(myRadar.data());

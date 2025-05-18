@@ -92,7 +92,7 @@ void CLosTexture::UpdateCPU()
 	infoTexMem.resize(texSize.x * texSize.y);
 
 	if (!losHandler->GetGlobalLOS(gu->myAllyTeam)) {
-		const unsigned short* myLos = &losHandler->los.losMaps[gu->myAllyTeam].front();
+		const auto& myLos = losHandler->los.losMaps[gu->myAllyTeam].GetLosMap();
 		for (int y = 0; y < texSize.y; ++y) {
 			for (int x = 0; x < texSize.x; ++x) {
 				infoTexMem[y * texSize.x + x] = (myLos[y * texSize.x + x] != 0) ? 0xFF : 0x00;
@@ -129,7 +129,7 @@ void CLosTexture::Update()
 	static std::vector<uint8_t> infoTexMem;
 	infoTexMem.resize(texSize.x * texSize.y);
 
-	const auto& myLos = static_cast<const std::vector<uint16_t>&>(losHandler->los.losMaps[gu->myAllyTeam]);
+	const auto& myLos = losHandler->los.losMaps[gu->myAllyTeam].GetLosMap();
 	assert(myLos.size() == texSize.x * texSize.y);
 
 	auto binding = uploadTex.ScopedBind();
