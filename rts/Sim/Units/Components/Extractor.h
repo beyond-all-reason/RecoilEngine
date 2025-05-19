@@ -11,6 +11,8 @@
 class CUnit;
 struct UnitLoadParams;
 
+namespace UnitComponents {
+
 struct MetalSquareOfControl {
 	int x;
 	int z;
@@ -65,5 +67,7 @@ public:
 		ar(extractionRange, extractionDepth, metalAreaOfControl);
 	};
 };
+
+} // namespace UnitComponents
 
 #endif

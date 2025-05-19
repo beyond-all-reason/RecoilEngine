@@ -15,6 +15,7 @@
 
 #include "System/Misc/TracyDefs.h"
 
+using namespace UnitComponents;
 
 Extractor::Extractor(CUnit* unit, float extractionRange, float extractionDepth)
 		: unit(unit), extractionRange(extractionRange), extractionDepth(extractionDepth) {}

@@ -12,6 +12,8 @@
 
 #include "System/Misc/TracyDefs.h"
 
+using UnitComponents::Extractor;
+
 CR_BIND(ExtractorHandler, )
 
 CR_REG_METADATA(ExtractorHandler, (

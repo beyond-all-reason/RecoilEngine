@@ -8,8 +8,10 @@
 #include <vector>
 
 class CUnit;
-class Extractor;
 struct UnitLoadParams;
+
+namespace UnitComponents { class Extractor; }
+using UnitComponents::Extractor;
 
 class ExtractorHandler
 {
