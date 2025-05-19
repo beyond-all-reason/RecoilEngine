@@ -2,10 +2,11 @@
 
 #include "DataDirLocater.h"
 
-#include <cstdlib>
 #include <cassert>
 #include <cstring>
 #include <sstream>
+#include <nowide/cstdlib.hpp>
+#include <nowide/convert.hpp>
 
 #ifdef _WIN32
 	#include <io.h>
@@ -106,7 +107,7 @@ void DataDirLocater::UpdateIsolationModeByEnvVar()
 	isolationMode = false;
 	isolationModeDir = "";
 
-	const char* const envIsolation = getenv("SPRING_ISOLATED");
+	const char* const envIsolation = nowide::getenv("SPRING_ISOLATED");
 	if (envIsolation != nullptr) {
 		SetIsolationMode(true);
 		SetIsolationModeDir(envIsolation);
@@ -132,9 +133,12 @@ std::string DataDirLocater::SubstEnvVars(const std::string& in) const
 
 #ifdef _WIN32
 	constexpr size_t maxSize = 32 * 1024;
-	char out_c[maxSize];
-	ExpandEnvironmentStrings(in.c_str(), out_c, maxSize); // expands %HOME% etc.
-	out = out_c;
+	std::wstring out_ws; out_ws.resize(maxSize);
+	auto strLen = ExpandEnvironmentStrings(nowide::widen(in).c_str(), out_ws.data(), maxSize); // expands %HOME% etc.
+	if (strLen == 0)
+		return "";
+
+	out = nowide::narrow(out_ws.c_str());
 #else
 	std::string previous = in;
 
@@ -293,8 +297,8 @@ void DataDirLocater::AddHomeDirs()
 	TCHAR pathAppDataC[MAX_PATH];
 	SHGetFolderPath(nullptr, CSIDL_PERSONAL, nullptr, SHGFP_TYPE_CURRENT, pathMyDocsC);
 	SHGetFolderPath(nullptr, CSIDL_COMMON_APPDATA, nullptr, SHGFP_TYPE_CURRENT, pathAppDataC);
-	const std::string pathMyDocs = pathMyDocsC;
-	const std::string pathAppData = pathAppDataC;
+	const std::string pathMyDocs  = nowide::narrow(pathMyDocsC );
+	const std::string pathAppData = nowide::narrow(pathAppDataC);
 
 	// e.g. F:\Dokumente und Einstellungen\Karl-Robert\Eigene Dateien\Spring
 	const std::string dd_myDocs = pathMyDocs + "\\Spring";
@@ -398,7 +402,7 @@ void DataDirLocater::LocateDataDirs()
 		if (!forcedWriteDir.empty())
 			AddDirs(forcedWriteDir);
 
-		const char* env = getenv("SPRING_WRITEDIR");
+		const char* env = nowide::getenv("SPRING_WRITEDIR");
 
 		if (env != nullptr && *env != 0)
 			AddDirs(env); // ENV{SPRING_WRITEDIR}
@@ -425,7 +429,7 @@ void DataDirLocater::LocateDataDirs()
 
 	// LEVEL 3: additional custom data sources
 	{
-		const char* env = getenv("SPRING_DATADIR");
+		const char* env = nowide::getenv("SPRING_DATADIR");
 
 		if (env != nullptr && *env != 0)
 			AddDirs(env); // ENV{SPRING_DATADIR}

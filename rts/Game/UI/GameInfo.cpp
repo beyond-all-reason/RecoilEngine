@@ -18,7 +18,7 @@
 #include "System/StringUtil.h"
 
 #include <SDL_keycode.h>
-#include <cstdio>
+#include <fmt/printf.h>
 
 #include "System/Misc/TracyDefs.h"
 
@@ -27,18 +27,16 @@ using std::vector;
 
 
 
-static const char* boolString(bool value)
+static std::string boolString(bool value)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return (value)? "True": "False";
 }
 
-static const char* floatString(float value)
+static std::string floatString(float value)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	static char buf[16];
-	sprintf(buf, "%8.3f", value);
-	return buf;
+	return fmt::sprintf("%8.3f", value);
 }
 
 static void StringListStats(
@@ -93,8 +91,6 @@ CGameInfo::CGameInfo()
 	labels.reserve(16);
 	values.reserve(16);
 
-	char buf[1024];
-
 	if (gameSetup->hostDemo) {
 		labels.emplace_back("Playback:");
 		values.emplace_back(FileSystem::GetBasename(gameSetup->demoName));
@@ -107,23 +103,19 @@ CGameInfo::CGameInfo()
 	values.emplace_back(gs->speedFactor);
 
 	labels.emplace_back("Map Gravity:");
-	sprintf(buf, "%.2f (%.2f e/f^2)", -(mapInfo->map.gravity * GAME_SPEED * GAME_SPEED), -mapInfo->map.gravity);
-	values.emplace_back(buf);
+	values.emplace_back(fmt::sprintf("%.2f (%.2f e/f^2)", -(mapInfo->map.gravity * GAME_SPEED * GAME_SPEED), -mapInfo->map.gravity));
 
 	labels.emplace_back("Map Hardness:");
-	sprintf(buf, "%.2f", mapInfo->map.hardness);
-	values.emplace_back(buf);
+	values.emplace_back(fmt::sprintf("%.2f", mapInfo->map.hardness));
 
 	labels.emplace_back("Map Tidal:");
 	values.emplace_back(envResHandler.GetCurrentTidalStrength());
 
 	labels.emplace_back("Map Wind:");
-	sprintf(buf, "%.2f - %.2f (%.2f)", envResHandler.GetMinWindStrength(), envResHandler.GetMaxWindStrength(), envResHandler.GetAverageWindStrength());
-	values.emplace_back(buf);
+	values.emplace_back(fmt::sprintf("%.2f - %.2f (%.2f)", envResHandler.GetMinWindStrength(), envResHandler.GetMaxWindStrength(), envResHandler.GetAverageWindStrength()));
 
 	labels.emplace_back("Map Size:");
-	sprintf(buf, "%ix%i", mapDims.mapx / 64, mapDims.mapy / 64);
-	values.emplace_back(buf);
+	values.emplace_back(fmt::sprintf("%ix%i", mapDims.mapx / 64, mapDims.mapy / 64));
 
 	labels.emplace_back("Map Name:");
 	values.emplace_back(gameSetup->mapName);

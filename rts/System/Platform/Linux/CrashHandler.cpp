@@ -5,7 +5,7 @@
 #include <cinttypes> // uintptr_t
 #include <cstring> // strnlen
 #include <cstdlib>
-#include <cstdio>
+#include <cstdio> // utf8 safe on Linux
 #include <string>
 
 #include <array>

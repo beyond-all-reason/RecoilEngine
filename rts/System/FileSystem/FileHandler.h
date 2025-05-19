@@ -5,8 +5,8 @@
 
 #include <vector>
 #include <string>
-#include <fstream>
 #include <cinttypes>
+#include <nowide/fstream.hpp>
 
 #include "VFSModes.h"
 
@@ -76,7 +76,7 @@ protected:
 	static bool InsertVFSDirs(std::vector<std::string>& dirSet, const std::string& path, const std::string& pattern, bool recursive, int section);
 
 	std::string fileName;
-	std::ifstream ifs;
+	nowide::ifstream ifs;
 	std::vector<std::uint8_t> fileBuffer;
 
 	int filePos = 0;
