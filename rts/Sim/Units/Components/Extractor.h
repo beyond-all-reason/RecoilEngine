@@ -54,12 +54,6 @@ private:
 
 public:
 	// Serialization
-
-	template<class Archive, class Snapshot>
-	static void SerializeComponents(Archive &archive, Snapshot &snapshot) {
-	    snapshot.template component<Extractor>(archive);
-	};
-
 	template<class Archive>
 	void serialize(Archive &ar) {
 		ar(extractionRange, extractionDepth, metalAreaOfControl);

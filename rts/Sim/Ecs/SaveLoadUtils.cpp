@@ -12,7 +12,7 @@
 #include "System/Log/ILog.h"
 #include "Sim/Misc/Resource.h"
 #include "Sim/MoveTypes/Components/MoveTypesComponents.h"
-#include "Sim/Units/Components/Extractor.h"
+#include "Sim/Units/Components/SaveLoad.h"
 
 
 
@@ -48,7 +48,7 @@ void ProcessComponents(T&& archive, S&& snapshot) {
     snapshot.entities(archive);
 
     MoveTypes::serializeComponents(archive, snapshot);
-    UnitComponents::Extractor::SerializeComponents(archive, snapshot);
+    UnitComponents::SerializeComponents(archive, snapshot);
 }
 
 using namespace Sim;
