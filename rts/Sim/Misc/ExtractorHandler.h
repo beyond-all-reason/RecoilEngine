@@ -1,7 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef ENV_METAL_HANDLER_H
-#define ENV_METAL_HANDLER_H
+#ifndef EXTRACTOR_HANDLER_H
+#define EXTRACTOR_HANDLER_H
 
 #include "System/creg/creg.h"
 
@@ -24,7 +24,7 @@ public:
 	Extractor* GetExtractor(const CUnit* unit) const;
 	Extractor* TryGetExtractor(const CUnit* unit) const;
 
-	void UnitActivated(const CUnit* unit, bool activated);
+	void UnitActivated(const CUnit* unit, bool activated) const;
 	void UnitPreInit(CUnit* unit, const UnitLoadParams& params) const;
 	void UnitPostLoad(CUnit* unit) const;
 	void UnitReverseBuilt(const CUnit* unit) const;

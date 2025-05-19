@@ -86,7 +86,7 @@ void ExtractorHandler::PostFinalizeRefresh() const
 }
 
 
-void ExtractorHandler::UnitActivated(const CUnit* unit, bool activated)
+void ExtractorHandler::UnitActivated(const CUnit* unit, bool activated) const
 {
 	auto* extractor = TryGetExtractor(unit);
 	if (extractor == nullptr)
