@@ -374,6 +374,7 @@ void CUnitHandler::SlowUpdateUnits()
 
 			unit->SanityCheck();
 			unit->SlowUpdate();
+			unit->slowMoved = false;
 			unit->SlowUpdateWeapons();
 			unit->SanityCheck();
 
@@ -391,6 +392,7 @@ void CUnitHandler::SlowUpdateUnits()
 	}
 }
 
+
 void CUnitHandler::UpdateUnits()
 {
 	SCOPED_TIMER("Sim::Unit::Update");
@@ -401,7 +403,10 @@ void CUnitHandler::UpdateUnits()
 
 		unit->SanityCheck();
 		unit->Update();
-		unit->moveType->UpdateCollisionMap();
+		if (unit->moved) {
+			// resets the moved flag unless skipped by modrule
+			unit->moveType->UpdateCollisionMap();
+		}
 		// unsynced; done on-demand when drawing unit
 		// unit->UpdateLocalModel();
 		unit->SanityCheck();

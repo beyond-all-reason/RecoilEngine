@@ -551,6 +551,27 @@ public:
 	icon::CIconData* myIcon = nullptr;
 
 	bool drawIcon = true;
+	bool slowMoved = true;
+	bool moved = true;
+	void Move(const float3& v, bool relative) {
+		/*
+		 * Move() users a bit careless atm about calling it with
+		 * small epsilon or null moves, so filter out a bit here
+		 * to avoid triggering useless Update and SlowUpdate machinery.
+		 */
+		bool didMove;
+		if (relative) {
+			didMove = (v.SqLength() > float3::cmp_eps()*float3::cmp_eps());
+		} else {
+			didMove = (v != pos);
+		}
+		if (didMove) {
+			moved = true;
+			slowMoved = true;
+		}
+		CSolidObject::Move(v, relative);
+	}
+
 private:
 	// if we are stunned by a weapon or for other reason, access via IsStunned/SetStunned(bool)
 	bool stunned = false;

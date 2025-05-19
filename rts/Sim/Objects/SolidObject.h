@@ -143,7 +143,7 @@ public:
 
 	virtual void UpdatePhysicalState(float eps);
 
-	void Move(const float3& v, bool relative) {
+	virtual void Move(const float3& v, bool relative) {
 		const float3& dv = relative? v: (v - pos);
 
 		pos += dv;

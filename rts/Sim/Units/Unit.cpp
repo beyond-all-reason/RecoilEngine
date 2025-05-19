@@ -653,9 +653,12 @@ void CUnit::Update()
 	RECOIL_DETAILED_TRACY_ZONE;
 	ASSERT_SYNCED(pos);
 
-	UpdatePhysicalState(0.1f);
+	// buildings update physical state less frequently in SlowUpdate
+	if unlikely(moved) {
+		UpdatePhysicalState(0.1f);
+		UpdateTransportees(); // none if already dead
+	}
 	UpdatePosErrorParams(true, false);
-	UpdateTransportees(); // none if already dead
 
 	if (beingBuilt)
 		return;
@@ -1078,8 +1081,10 @@ void CUnit::SlowUpdate()
 	if (moveType->progressState == AMoveType::Active)
 		DoSeismicPing(seismicSignature);
 
-	CalculateTerrainType();
-	UpdateTerrainType();
+	if unlikely(slowMoved) {
+		CalculateTerrainType();
+		UpdateTerrainType();
+	}
 }
 
 
@@ -1551,6 +1556,7 @@ bool CUnit::ChangeTeam(int newteam, ChangeType type)
 
 	// insert for new allyteam
 	quadField.MovedUnit(this);
+	slowMoved = true;
 
 	eventHandler.UnitGiven(this, oldteam, newteam);
 	eoh->UnitGiven(*this, oldteam, newteam);
