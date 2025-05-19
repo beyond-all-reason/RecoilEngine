@@ -20,15 +20,15 @@ struct MetalSquareOfControl {
 
 class ExtractorBuilding {
 public:
-	ExtractorBuilding(int unitID, float newExtractionRange, float newExtractionDepth);
+	ExtractorBuilding() {};
+	ExtractorBuilding(int unitID, float extractionRange, float extractionDepth);
 
-	int unitID;
+	CUnit *unit;
+
 	float extractionRange, extractionDepth;
 
 	std::vector<MetalSquareOfControl> metalAreaOfControl;
 	std::vector<ExtractorBuilding*> neighbours;
-
-	CUnit *unit;
 
 	void PreInit(const UnitLoadParams& params);
 

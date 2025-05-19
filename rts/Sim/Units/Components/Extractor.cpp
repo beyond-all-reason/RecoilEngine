@@ -72,7 +72,7 @@ void ExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
 	RECOIL_DETAILED_TRACY_ZONE;
 	extractionRange = std::max(range, 0.001f);
 	extractionDepth = std::max(depth, 0.0f);
-	extractorHandler.maxExtractionRange = std::max(extractionRange, extractorHandler.maxExtractionRange);
+	extractorHandler.UpdateMaxExtractionRange(extractionRange);
 
 	// find any neighbouring extractors
 	QuadFieldQuery qfQuery;
@@ -82,15 +82,14 @@ void ExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
 		if (u == unit)
 			continue;
 
-		entt::entity unitEntity = entt::entity(unit->entityReference);
-		auto* eb = Sim::registry.try_get<ExtractorBuilding>(unitEntity);
+		auto *eb = extractorHandler.GetExtractor(u);
 		if (eb == nullptr)
 			continue;
 
 		if (!IsNeighbour(eb))
 			continue;
 
-		this->AddNeighbour(eb);
+		AddNeighbour(eb);
 		eb->AddNeighbour(this);
 	}
 
@@ -184,19 +183,4 @@ void ExtractorBuilding::Deactivate()
 {
 	ResetExtraction();
 }
-
-
-/*VOID_COMPONENT(PathIsTemp);
-VOID_COMPONENT(PathIsDirty);
-VOID_COMPONENT(PathIsToBeUpdated);
-VOID_COMPONENT(PathUpdatedCounterIncrease);
-VOID_COMPONENT(ProcessPath);
-
-ALIAS_COMPONENT(PathSearchRef, entt::entity);
-ALIAS_COMPONENT(PathRequeueSearch, bool);*/
-/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
-
-// Used for all metal-extractors.
-// Handles the metal-make-process.
-
 

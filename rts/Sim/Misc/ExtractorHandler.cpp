@@ -17,57 +17,53 @@ CR_BIND(ExtractorHandler, )
 CR_REG_METADATA(ExtractorHandler, (
 	CR_MEMBER(maxExtractionRange)
 ))
-	
+
 ExtractorHandler extractorHandler;
 
-void ExtractorHandler::UnitActivated(const CUnit* unit, bool activated) {
-
-	if (!unit->unitDef->extractsMetal)
-		return;
-	entt::entity unitEntity = entt::entity(unit->entityReference);
-	auto* extractor = Sim::registry.try_get<ExtractorBuilding>(unitEntity);
-	if (!extractor)
-		return;
-	if (activated) {
-		extractor->Activate();
-	}
-	else{
-		extractor->Deactivate();
-	}
+void ExtractorHandler::ResetState() {
+	maxExtractionRange = 0.0f;
 }
 
-ExtractorBuilding* ExtractorHandler::GetExtractor(const CUnit* unit) {
+void ExtractorHandler::UpdateMaxExtractionRange(float newExtractorRange) {
+	maxExtractionRange = std::max(newExtractorRange, maxExtractionRange);
+}
+
+bool ExtractorHandler::IsExtractor(const CUnit* unit) const
+{
+	return unit->unitDef->extractsMetal > 0.0f;
+}
+
+ExtractorBuilding* ExtractorHandler::GetExtractor(const CUnit* unit) const
+{
+	if (!IsExtractor(unit))
+		return nullptr;
+
 	entt::entity unitEntity = entt::entity(unit->entityReference);
 	return Sim::registry.try_get<ExtractorBuilding>(unitEntity);
 }
 
-void ExtractorHandler::UnitReverseBuilt(const CUnit* unit) {
-	if (!unit->unitDef->extractsMetal)
-		return;
-	entt::entity unitEntity = entt::entity(unit->entityReference);
-	auto* extractor = Sim::registry.try_get<ExtractorBuilding>(unitEntity);
-	if (extractor != nullptr)
-		extractor->ResetExtraction();
-}
-
-void ExtractorHandler::UnitPreInit(const CUnit* unit, const UnitLoadParams& params)
+void ExtractorHandler::UnitPreInit(const CUnit* unit, const UnitLoadParams& params) const
 {
-	if (unit->unitDef->extractsMetal) {
-		Sim::registry.emplace<ExtractorBuilding>(unit->entityReference, unit->id, unit->unitDef->extractRange, unit->unitDef->extractsMetal); //TODO VALUEs
+	if (IsExtractor(unit)) {
+		Sim::registry.emplace<ExtractorBuilding>(unit->entityReference, unit->id, unit->unitDef->extractRange, unit->unitDef->extractsMetal);
 	}
 }
 
-
-bool ExtractorHandler::AddExtractor(const CUnit* u) {
-	RECOIL_DETAILED_TRACY_ZONE;
-	Sim::registry.emplace<ExtractorBuildingActive>(u->entityReference);
-	return true;
+void ExtractorHandler::UnitActivated(const CUnit* unit, bool activated)
+{
+	auto* extractor = GetExtractor(unit);
+	if (extractor == nullptr)
+		return;
+	if (activated)
+		extractor->Activate();
+	else
+		extractor->Deactivate();
 }
 
-bool ExtractorHandler::DelExtractor(const CUnit* u) {
-	RECOIL_DETAILED_TRACY_ZONE;
-	Sim::registry.remove<ExtractorBuildingActive>(u->entityReference);
-	return true;
+void ExtractorHandler::UnitReverseBuilt(const CUnit* unit) const
+{
+	auto* extractor = GetExtractor(unit);
+	if (extractor != nullptr)
+		extractor->ResetExtraction();
 }
-
 
