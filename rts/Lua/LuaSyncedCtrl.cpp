@@ -2903,7 +2903,7 @@ int LuaSyncedCtrl::SetUnitMetalExtraction(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
-	auto mex = extractorHandler.GetExtractor(unit);
+	auto mex = extractorHandler.TryGetExtractor(unit);
 
 	if (mex == nullptr)
 		return 0;
