@@ -726,6 +726,7 @@ void CGame::PostLoadSimulation(LuaParser* defsParser)
 	envResHandler.LoadTidal(mapInfo->map.tidalStrength);
 	envResHandler.LoadWind(mapInfo->atmosphere.minWind, mapInfo->atmosphere.maxWind);
 
+
 	inMapDrawerModel = new CInMapDrawModel();
 	inMapDrawer = new CInMapDraw();
 
