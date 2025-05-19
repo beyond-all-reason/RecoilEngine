@@ -68,7 +68,6 @@ void ExtractorHandler::UnitPostLoad(CUnit* unit) const
 	// Called after loading a unit from savegame.
 	auto* extractor = TryGetExtractor(unit);
 	if (extractor != nullptr) {
-		auto* extractor = GetExtractor(unit);
 		extractor->PostLoad(unit);
 	}
 }
