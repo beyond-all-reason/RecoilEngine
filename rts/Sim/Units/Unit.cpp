@@ -398,6 +398,8 @@ void CUnit::PostLoad()
 	RECOIL_DETAILED_TRACY_ZONE;
 	eventHandler.RenderUnitPreCreated(this);
 	eventHandler.RenderUnitCreated(this, isCloaked);
+
+	extractorHandler.UnitPostLoad(this);
 }
 
 //////////////////////////////////////////////////////////////////////

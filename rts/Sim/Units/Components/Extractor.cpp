@@ -1,38 +1,36 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include <vector>
-
 #include "Extractor.h"
-#include "System/float3.h"
-#include "System/Ecs/Components/BaseComponents.h"
 
-#include <typeinfo>
-#include "Sim/Units/Unit.h"
-#include "Sim/Units/UnitLoader.h"
-#include "Sim/Units/Scripts/UnitScript.h"
-#include "Sim/Units/UnitHandler.h"
-#include "Map/ReadMap.h"
-#include "Sim/Units/UnitDef.h"
 #include "Map/MetalMap.h"
-#include "Sim/Misc/QuadField.h"
-#include "System/ContainerUtil.h"
+#include "Map/ReadMap.h"
 #include "Sim/Ecs/Registry.h"
 #include "Sim/Misc/ExtractorHandler.h"
+#include "Sim/Misc/QuadField.h"
+#include "Sim/Units/Unit.h"
+#include "Sim/Units/Scripts/UnitScript.h"
+#include "Sim/Units/UnitHandler.h"
+#include "Sim/Units/UnitDef.h"
+#include "System/ContainerUtil.h"
 
 #include "System/Misc/TracyDefs.h"
 
-ExtractorBuilding::ExtractorBuilding(int unitID, float newExtractionRange, float newExtractionDepth)
-		: extractionRange(newExtractionRange), extractionDepth(newExtractionDepth)
-{
-	unit = unitHandler.GetUnit(unitID);
-}
+
+ExtractorBuilding::ExtractorBuilding(CUnit* unit, float extractionRange, float extractionDepth)
+		: unit(unit), extractionRange(extractionRange), extractionDepth(extractionDepth) {}
+
 
 void ExtractorBuilding::PreInit(const UnitLoadParams& params)
 {
-	RECOIL_DETAILED_TRACY_ZONE;
 	extractionRange = unit->unitDef->extractRange;
 	extractionDepth = unit->unitDef->extractsMetal;
 }
+
+void ExtractorBuilding::PostLoad(CUnit* myUnit)
+{
+	unit = myUnit;
+}
+
 
 /* resets the metalMap and notifies the neighbours */
 void ExtractorBuilding::ResetExtraction()
@@ -57,7 +55,6 @@ void ExtractorBuilding::ResetExtraction()
 }
 
 
-
 /* determine if two extraction areas overlap */
 bool ExtractorBuilding::IsNeighbour(ExtractorBuilding* other)
 {
@@ -65,6 +62,29 @@ bool ExtractorBuilding::IsNeighbour(ExtractorBuilding* other)
 	// circle vs. circle
 	return (unit->pos.SqDistance2D(other->unit->pos) < Square(extractionRange + other->extractionRange));
 }
+
+
+void ExtractorBuilding::FindNeighbours()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	QuadFieldQuery qfQuery;
+	quadField.GetUnits(qfQuery, unit->pos, extractionRange + extractorHandler.maxExtractionRange);
+
+	for (CUnit* u: *qfQuery.units) {
+		if (u == unit)
+			continue;
+
+		auto *eb = extractorHandler.TryGetExtractor(u);
+		if (eb == nullptr)
+			continue;
+
+		if (!IsNeighbour(eb))
+			continue;
+
+		AddNeighbour(eb);
+	}
+}
+
 
 /* sets the range of extraction for this extractor, also finds overlapping neighbours. */
 void ExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
@@ -82,7 +102,7 @@ void ExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
 		if (u == unit)
 			continue;
 
-		auto *eb = extractorHandler.GetExtractor(u);
+		auto *eb = extractorHandler.TryGetExtractor(u);
 		if (eb == nullptr)
 			continue;
 
@@ -141,6 +161,7 @@ void ExtractorBuilding::AddNeighbour(ExtractorBuilding* neighbour)
 	assert(neighbour != this);
 	spring::VectorInsertUnique(neighbours, neighbour, true);
 }
+
 
 /* removes a neighbour for this extractor */
 void ExtractorBuilding::RemoveNeighbour(ExtractorBuilding* neighbour)

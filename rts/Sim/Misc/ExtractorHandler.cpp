@@ -20,38 +20,73 @@ CR_REG_METADATA(ExtractorHandler, (
 
 ExtractorHandler extractorHandler;
 
+
 void ExtractorHandler::ResetState() {
 	maxExtractionRange = 0.0f;
 }
 
+
 void ExtractorHandler::UpdateMaxExtractionRange(float newExtractorRange) {
 	maxExtractionRange = std::max(newExtractorRange, maxExtractionRange);
 }
+
 
 bool ExtractorHandler::IsExtractor(const CUnit* unit) const
 {
 	return unit->unitDef->extractsMetal > 0.0f;
 }
 
-ExtractorBuilding* ExtractorHandler::GetExtractor(const CUnit* unit) const
+
+ExtractorBuilding* ExtractorHandler::TryGetExtractor(const CUnit* unit) const
 {
 	if (!IsExtractor(unit))
 		return nullptr;
 
+	return GetExtractor(unit);
+}
+
+ExtractorBuilding* ExtractorHandler::GetExtractor(const CUnit* unit) const
+{
 	entt::entity unitEntity = entt::entity(unit->entityReference);
 	return Sim::registry.try_get<ExtractorBuilding>(unitEntity);
 }
 
-void ExtractorHandler::UnitPreInit(const CUnit* unit, const UnitLoadParams& params) const
+
+void ExtractorHandler::UnitPreInit(CUnit* unit, const UnitLoadParams& params) const
 {
+	// Called when creating the unit during the game.
 	if (IsExtractor(unit)) {
-		Sim::registry.emplace<ExtractorBuilding>(unit->entityReference, unit->id, unit->unitDef->extractRange, unit->unitDef->extractsMetal);
+		Sim::registry.emplace<ExtractorBuilding>(unit->entityReference, unit, unit->unitDef->extractRange, unit->unitDef->extractsMetal);
 	}
 }
 
+
+void ExtractorHandler::UnitPostLoad(CUnit* unit) const
+{
+	// Called after loading a unit from savegame.
+	auto* extractor = TryGetExtractor(unit);
+	if (extractor != nullptr) {
+		auto* extractor = GetExtractor(unit);
+		extractor->PostLoad(unit);
+	}
+}
+
+
+void ExtractorHandler::PostFinalizeRefresh() const
+{
+	// Called after all units are loaded.
+	auto& activeUnits = unitHandler.GetActiveUnits();
+	auto view = Sim::registry.view<ExtractorBuilding>();
+	for(auto entity: view) {
+		auto* extractor = Sim::registry.try_get<ExtractorBuilding>(entity);
+		extractor->FindNeighbours();
+	}
+}
+
+
 void ExtractorHandler::UnitActivated(const CUnit* unit, bool activated)
 {
-	auto* extractor = GetExtractor(unit);
+	auto* extractor = TryGetExtractor(unit);
 	if (extractor == nullptr)
 		return;
 	if (activated)
@@ -60,9 +95,10 @@ void ExtractorHandler::UnitActivated(const CUnit* unit, bool activated)
 		extractor->Deactivate();
 }
 
+
 void ExtractorHandler::UnitReverseBuilt(const CUnit* unit) const
 {
-	auto* extractor = GetExtractor(unit);
+	auto* extractor = TryGetExtractor(unit);
 	if (extractor != nullptr)
 		extractor->ResetExtraction();
 }

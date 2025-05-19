@@ -483,6 +483,7 @@ void CGame::Load(const std::string& mapFileName)
 		// Update height bounds and pathing after pregame or a saved game load.
 		{
 			ENTER_SYNCED_CODE();
+			extractorHandler.PostFinalizeRefresh();
 			//needed in case pre-game terraform changed the map
 			readMap->UpdateHeightBounds();
 			Watchdog::ClearTimer(WDT_LOAD);
@@ -724,7 +725,6 @@ void CGame::PostLoadSimulation(LuaParser* defsParser)
 
 	envResHandler.LoadTidal(mapInfo->map.tidalStrength);
 	envResHandler.LoadWind(mapInfo->atmosphere.minWind, mapInfo->atmosphere.maxWind);
-
 
 	inMapDrawerModel = new CInMapDrawModel();
 	inMapDrawer = new CInMapDraw();

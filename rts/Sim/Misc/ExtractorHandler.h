@@ -22,10 +22,14 @@ public:
 
 	bool IsExtractor(const CUnit* unit) const;
 	ExtractorBuilding* GetExtractor(const CUnit* unit) const;
+	ExtractorBuilding* TryGetExtractor(const CUnit* unit) const;
 
 	void UnitActivated(const CUnit* unit, bool activated);
-	void UnitPreInit(const CUnit* unit, const UnitLoadParams& params) const;
+	void UnitPreInit(CUnit* unit, const UnitLoadParams& params) const;
+	void UnitPostLoad(CUnit* unit) const;
 	void UnitReverseBuilt(const CUnit* unit) const;
+
+	void PostFinalizeRefresh() const;
 
 	void UpdateMaxExtractionRange(float newExtractorRange);
 	void ResetState();
