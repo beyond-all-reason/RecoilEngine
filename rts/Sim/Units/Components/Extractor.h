@@ -4,8 +4,6 @@
 #define UNIT_COMPONENTS_EXTRACTOR_H__
 
 #include <vector>
-
-#include "Sim/Units/Unit.h"
 #include <cereal/types/vector.hpp>
 
 class CUnit;

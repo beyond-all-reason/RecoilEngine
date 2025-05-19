@@ -3,9 +3,7 @@
 #ifndef ENV_METAL_HANDLER_H
 #define ENV_METAL_HANDLER_H
 
-#include "Sim/Misc/GlobalConstants.h"
-#include "System/float3.h"
-#include <vector>
+#include "System/creg/creg.h"
 
 class CUnit;
 struct UnitLoadParams;
