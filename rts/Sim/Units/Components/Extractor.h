@@ -20,17 +20,10 @@ struct MetalSquareOfControl {
 };
 
 
-class ExtractorBuilding {
+class Extractor {
 public:
-	ExtractorBuilding() {};
-	ExtractorBuilding(CUnit* unit, float extractionRange, float extractionDepth);
-
-	CUnit *unit;
-
-	float extractionRange, extractionDepth;
-
-	std::vector<MetalSquareOfControl> metalAreaOfControl;
-	std::vector<ExtractorBuilding*> neighbours;
+	Extractor() {};
+	Extractor(CUnit* unit, float extractionRange, float extractionDepth);
 
 	void PreInit(const UnitLoadParams& params);
 	void PostLoad(CUnit* myUnit);
@@ -38,10 +31,8 @@ public:
 	void ResetExtraction();
 	void FindNeighbours();
 	void SetExtractionRangeAndDepth(float range, float depth);
-	void ReCalculateMetalExtraction();
-	bool IsNeighbour(ExtractorBuilding* neighbour);
-	void AddNeighbour(ExtractorBuilding* neighbour);
-	void RemoveNeighbour(ExtractorBuilding* neighbour);
+	void AddNeighbour(Extractor* neighbour);
+	void RemoveNeighbour(Extractor* neighbour);
 
 	float GetExtractionRange() const { return extractionRange; }
 	float GetExtractionDepth() const { return extractionDepth; }
@@ -49,11 +40,24 @@ public:
 	void Activate();
 	void Deactivate();
 
+private:
+	void ReCalculateMetalExtraction();
+	bool IsNeighbour(Extractor* neighbour);
+
+private:
+	CUnit *unit;
+
+	float extractionRange, extractionDepth;
+
+	std::vector<MetalSquareOfControl> metalAreaOfControl;
+	std::vector<Extractor*> neighbours;
+
+public:
 	// Serialization
 
 	template<class Archive, class Snapshot>
 	static void SerializeComponents(Archive &archive, Snapshot &snapshot) {
-	    snapshot.template component<ExtractorBuilding>(archive);
+	    snapshot.template component<Extractor>(archive);
 	};
 
 	template<class Archive>

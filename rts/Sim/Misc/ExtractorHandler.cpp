@@ -37,7 +37,7 @@ bool ExtractorHandler::IsExtractor(const CUnit* unit) const
 }
 
 
-ExtractorBuilding* ExtractorHandler::TryGetExtractor(const CUnit* unit) const
+Extractor* ExtractorHandler::TryGetExtractor(const CUnit* unit) const
 {
 	if (!IsExtractor(unit))
 		return nullptr;
@@ -45,10 +45,10 @@ ExtractorBuilding* ExtractorHandler::TryGetExtractor(const CUnit* unit) const
 	return GetExtractor(unit);
 }
 
-ExtractorBuilding* ExtractorHandler::GetExtractor(const CUnit* unit) const
+Extractor* ExtractorHandler::GetExtractor(const CUnit* unit) const
 {
 	entt::entity unitEntity = entt::entity(unit->entityReference);
-	return Sim::registry.try_get<ExtractorBuilding>(unitEntity);
+	return Sim::registry.try_get<Extractor>(unitEntity);
 }
 
 
@@ -56,7 +56,7 @@ void ExtractorHandler::UnitPreInit(CUnit* unit, const UnitLoadParams& params) co
 {
 	// Called when creating the unit during the game.
 	if (IsExtractor(unit)) {
-		Sim::registry.emplace<ExtractorBuilding>(unit->entityReference, unit, unit->unitDef->extractRange, unit->unitDef->extractsMetal);
+		Sim::registry.emplace<Extractor>(unit->entityReference, unit, unit->unitDef->extractRange, unit->unitDef->extractsMetal);
 	}
 }
 
@@ -76,9 +76,9 @@ void ExtractorHandler::PostFinalizeRefresh() const
 {
 	// Called after all units are loaded.
 	auto& activeUnits = unitHandler.GetActiveUnits();
-	auto view = Sim::registry.view<ExtractorBuilding>();
+	auto view = Sim::registry.view<Extractor>();
 	for(auto entity: view) {
-		auto* extractor = Sim::registry.try_get<ExtractorBuilding>(entity);
+		auto* extractor = Sim::registry.try_get<Extractor>(entity);
 		extractor->FindNeighbours();
 	}
 }

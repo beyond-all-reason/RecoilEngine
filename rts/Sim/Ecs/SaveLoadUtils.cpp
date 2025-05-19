@@ -48,7 +48,7 @@ void ProcessComponents(T&& archive, S&& snapshot) {
     snapshot.entities(archive);
 
     MoveTypes::serializeComponents(archive, snapshot);
-    ExtractorBuilding::SerializeComponents(archive, snapshot);
+    Extractor::SerializeComponents(archive, snapshot);
 }
 
 using namespace Sim;

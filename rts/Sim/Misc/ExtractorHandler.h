@@ -8,7 +8,7 @@
 #include <vector>
 
 class CUnit;
-class ExtractorBuilding;
+class Extractor;
 struct UnitLoadParams;
 
 class ExtractorHandler
@@ -21,8 +21,8 @@ public:
 	ExtractorHandler& operator = (const ExtractorHandler&) = delete;
 
 	bool IsExtractor(const CUnit* unit) const;
-	ExtractorBuilding* GetExtractor(const CUnit* unit) const;
-	ExtractorBuilding* TryGetExtractor(const CUnit* unit) const;
+	Extractor* GetExtractor(const CUnit* unit) const;
+	Extractor* TryGetExtractor(const CUnit* unit) const;
 
 	void UnitActivated(const CUnit* unit, bool activated);
 	void UnitPreInit(CUnit* unit, const UnitLoadParams& params) const;

@@ -16,24 +16,24 @@
 #include "System/Misc/TracyDefs.h"
 
 
-ExtractorBuilding::ExtractorBuilding(CUnit* unit, float extractionRange, float extractionDepth)
+Extractor::Extractor(CUnit* unit, float extractionRange, float extractionDepth)
 		: unit(unit), extractionRange(extractionRange), extractionDepth(extractionDepth) {}
 
 
-void ExtractorBuilding::PreInit(const UnitLoadParams& params)
+void Extractor::PreInit(const UnitLoadParams& params)
 {
 	extractionRange = unit->unitDef->extractRange;
 	extractionDepth = unit->unitDef->extractsMetal;
 }
 
-void ExtractorBuilding::PostLoad(CUnit* myUnit)
+void Extractor::PostLoad(CUnit* myUnit)
 {
 	unit = myUnit;
 }
 
 
 /* resets the metalMap and notifies the neighbours */
-void ExtractorBuilding::ResetExtraction()
+void Extractor::ResetExtraction()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	unit->metalExtract = 0;
@@ -47,7 +47,7 @@ void ExtractorBuilding::ResetExtraction()
 	metalAreaOfControl.clear();
 
 	// tell the neighbours (if any) to take it over
-	for (ExtractorBuilding* ngb: neighbours) {
+	for (Extractor* ngb: neighbours) {
 		ngb->RemoveNeighbour(this);
 		ngb->ReCalculateMetalExtraction();
 	}
@@ -56,7 +56,7 @@ void ExtractorBuilding::ResetExtraction()
 
 
 /* determine if two extraction areas overlap */
-bool ExtractorBuilding::IsNeighbour(ExtractorBuilding* other)
+bool Extractor::IsNeighbour(Extractor* other)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// circle vs. circle
@@ -64,7 +64,7 @@ bool ExtractorBuilding::IsNeighbour(ExtractorBuilding* other)
 }
 
 
-void ExtractorBuilding::FindNeighbours()
+void Extractor::FindNeighbours()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	QuadFieldQuery qfQuery;
@@ -87,7 +87,7 @@ void ExtractorBuilding::FindNeighbours()
 
 
 /* sets the range of extraction for this extractor, also finds overlapping neighbours. */
-void ExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
+void Extractor::SetExtractionRangeAndDepth(float range, float depth)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	extractionRange = std::max(range, 0.001f);
@@ -155,7 +155,7 @@ void ExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
 
 
 /* adds a neighbour for this extractor */
-void ExtractorBuilding::AddNeighbour(ExtractorBuilding* neighbour)
+void Extractor::AddNeighbour(Extractor* neighbour)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(neighbour != this);
@@ -164,7 +164,7 @@ void ExtractorBuilding::AddNeighbour(ExtractorBuilding* neighbour)
 
 
 /* removes a neighbour for this extractor */
-void ExtractorBuilding::RemoveNeighbour(ExtractorBuilding* neighbour)
+void Extractor::RemoveNeighbour(Extractor* neighbour)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(neighbour != this);
@@ -173,7 +173,7 @@ void ExtractorBuilding::RemoveNeighbour(ExtractorBuilding* neighbour)
 
 
 /* recalculate metalExtract for this extractor (eg. when a neighbour dies) */
-void ExtractorBuilding::ReCalculateMetalExtraction()
+void Extractor::ReCalculateMetalExtraction()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	unit->metalExtract = 0;
@@ -193,14 +193,14 @@ void ExtractorBuilding::ReCalculateMetalExtraction()
 }
 
 
-void ExtractorBuilding::Activate()
+void Extractor::Activate()
 {
 	/* Finds the amount of metal to extract and sets the rotationspeed when the extractor is built. */
 	SetExtractionRangeAndDepth(extractionRange, extractionDepth);
 }
 
 
-void ExtractorBuilding::Deactivate()
+void Extractor::Deactivate()
 {
 	ResetExtraction();
 }
