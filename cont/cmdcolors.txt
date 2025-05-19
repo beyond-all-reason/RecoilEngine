@@ -84,6 +84,9 @@ deathWatch  0.5  0.5  0.5  0.4
 //
 //  Selected Range Rendering
 //
+// This section controls the colors assigned to ground circles that are drawn for selected units
+// The numbers below are RGBA values
+// If the alpha of any circle color is 0.0, that circle type will be completely skipped. 
 
 selectedLineWidth  2.0
 selectedBlendSrc   src_alpha

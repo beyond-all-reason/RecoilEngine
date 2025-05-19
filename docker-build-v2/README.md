@@ -64,7 +64,7 @@ docker build -t recoil-build-amd64-windows docker-build-v2/amd64-windows
 
 and `build.sh` will use it.
 
-For details on private testing, check the wiki [here](https://github.com/beyond-all-reason/spring/wiki/Pre-release-testing-Checklist,-and-release-engine-checklist#private-testing)
+For details on private testing, check the wiki [here](https://github.com/beyond-all-reason/RecoilEngine/wiki/Pre-release-testing-Checklist,-and-release-engine-checklist#private-testing)
 
 
 ## Overview

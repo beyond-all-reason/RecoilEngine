@@ -9,10 +9,10 @@
 
 namespace SystemGlobals {
 
-
+template<class RegType = entt::registry>
 class SystemGlobal {
 public:
-    SystemGlobal(entt::registry& registryReference)
+    SystemGlobal(RegType& registryReference)
         : registry(registryReference)
     {}
 
@@ -21,14 +21,14 @@ public:
         if (! registry.valid(systemGlobalsEntity))
             systemGlobalsEntity = registry.create();
 
-        return registry.emplace_or_replace<T>(systemGlobalsEntity);
+        return registry.template emplace_or_replace<T>(systemGlobalsEntity);
     };
 
     template<class T>
-    T& GetSystemComponent() { return registry.get<T>(systemGlobalsEntity); }
+    T& GetSystemComponent() { return registry.template get<T>(systemGlobalsEntity); }
 
     template<class T>
-    bool IsSystemActive() { return (nullptr != registry.try_get<T>(systemGlobalsEntity)); }
+    bool IsSystemActive() { return (nullptr != registry.template try_get<T>(systemGlobalsEntity)); }
 
     void ClearComponents() {
         if (registry.valid(systemGlobalsEntity))
@@ -41,8 +41,8 @@ public:
     void serialize(Archive &ar) { ar(systemGlobalsEntity); }
 
 private:
-    entt::entity systemGlobalsEntity = entt::null;
-    entt::registry& registry;
+    RegType::entity_type systemGlobalsEntity = entt::null;
+    RegType& registry;
 };
 
 }

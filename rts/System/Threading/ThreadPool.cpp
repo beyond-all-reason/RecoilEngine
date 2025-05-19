@@ -14,6 +14,7 @@
 	#include "System/Config/ConfigHandler.h"
 #endif
 #include "System/Log/ILog.h"
+#include "System/Platform/CpuTopology.h"
 #include "System/Platform/Threading.h"
 #include "System/Threading/SpringThreading.h"
 
@@ -593,7 +594,10 @@ void SetDefaultThreadCount()
 
 	#ifndef UNIT_TEST
 	std::uint32_t configAffinity = configHandler->GetUnsigned("SetCoreAffinity");
-	mainAffinity &= (configAffinity != 0) ? configAffinity : Threading::GetPreferredMainThreadMask();
+	mainAffinity &= (configAffinity != 0) ? configAffinity
+		: (cpu_topology::GetThreadPinPolicy() == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
+			? Threading::GetPreferredMainThreadMask()
+			: 0;
 	LOG("[ThreadPool] Main thread affinity requested as 0x%08x", mainAffinity);
 	#endif
 
@@ -612,8 +616,10 @@ void SetDefaultThreadCount()
 			if (i == 0)
 				return 0;
 
-			const std::uint32_t workerCore = FindWorkerThreadCore(i - 1, workerAvailCores, mainAffinity);
-			// const std::uint32_t workerCore = workerAvailCores;
+			const std::uint32_t workerCore =
+				 (cpu_topology::GetThreadPinPolicy() == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
+				 ? FindWorkerThreadCore(i - 1, workerAvailCores, mainAffinity)
+				 : workerAvailCores;
 
 			char threadName[20];
 			std::snprintf(threadName, sizeof(threadName), "Worker %d", i);
@@ -628,7 +634,10 @@ void SetDefaultThreadCount()
 		if (mainAffinity == 0)
 			mainAffinity = systemCores;
 
-		Threading::SetAffinityHelper("Main", mainAffinity & mainCoreAffinity);
+		if (cpu_topology::GetThreadPinPolicy() == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
+			mainAffinity &= mainCoreAffinity;
+
+		Threading::SetAffinityHelper("Main", mainAffinity);
 	}
 }
 

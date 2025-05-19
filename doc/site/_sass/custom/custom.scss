@@ -199,19 +199,19 @@ html[data-theme="dark"] button.theme-toggle, button.theme-toggle {
 }
 
 html:not(data-theme) .aux-nav-matrix img, html[data-theme="light"] .aux-nav-matrix img {
-  background-image: url("/spring/assets/matrix-logo.svg");
+  background-image: url("/RecoilEngine/assets/matrix-logo.svg");
 }
 
 html[data-theme="dark"] .aux-nav-matrix img {
-  background-image: url("/spring/assets/matrix-logo-white.svg");
+  background-image: url("/RecoilEngine/assets/matrix-logo-white.svg");
 }
 
 html:not(data-theme) .aux-nav-github img, html[data-theme="light"] .aux-nav-github img {
-  background-image: url("/spring/assets/github-mark.svg");
+  background-image: url("/RecoilEngine/assets/github-mark.svg");
 }
 
 html[data-theme="dark"] .aux-nav-github img {
-  background-image: url("/spring/assets/github-mark-white.svg");
+  background-image: url("/RecoilEngine/assets/github-mark-white.svg");
 }
 
 html .aux-nav-img img {

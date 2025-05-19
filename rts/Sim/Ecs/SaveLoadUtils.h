@@ -18,7 +18,7 @@ public:
     SaveLoadUtils
         ( entt::registry& registryReference
         , SystemUtils::SystemUtils& systemUtilsReference
-        , SystemGlobals::SystemGlobal& systemGlobalsReference
+        , SystemGlobals::SystemGlobal<>& systemGlobalsReference
         )
         : registry(registryReference)
         , systemUtils(systemUtilsReference)
@@ -31,7 +31,7 @@ public:
 private:
     entt::registry& registry;
     SystemUtils::SystemUtils& systemUtils;
-    SystemGlobals::SystemGlobal& systemGlobals;
+    SystemGlobals::SystemGlobal<>& systemGlobals;
 };
 
 }

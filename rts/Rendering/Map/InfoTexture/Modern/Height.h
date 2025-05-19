@@ -3,7 +3,7 @@
 #ifndef _HEIGHT_TEXTURE_H
 #define _HEIGHT_TEXTURE_H
 
-#include "PboInfoTexture.h"
+#include "ModernInfoTexture.h"
 #include "Rendering/GL/FBO.h"
 #include "System/EventHandler.h"
 
@@ -14,7 +14,7 @@ namespace Shader {
 
 
 
-class CHeightTexture : public CPboInfoTexture, public CEventClient
+class CHeightTexture : public CModernInfoTexture, public CEventClient
 {
 public:
 	CHeightTexture();
@@ -40,9 +40,7 @@ private:
 
 private:
 	bool needUpdate;
-	FBO fbo;
-	GLuint paletteTex;
-	Shader::IProgramObject* shader;
+	GL::Texture2D paletteTex;
 };
 
 #endif // _HEIGHT_TEXTURE_H

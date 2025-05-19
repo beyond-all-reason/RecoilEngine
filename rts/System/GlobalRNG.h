@@ -122,6 +122,7 @@ public:
 		// use address of this object as sequence-id for unsynced RNG, modern systems have ASLR
 		if (init) {
 			gen.seed(initSeed = seed, static_cast<rng_val_type>(size_t(this)) * (1 - synced) + RNG::def_seq * synced);
+			lastSeed = seed;
 		} else {
 			gen.seed(lastSeed = seed, static_cast<rng_val_type>(size_t(this)) * (1 - synced) + RNG::def_seq * synced);
 		}

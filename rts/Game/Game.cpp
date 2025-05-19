@@ -1814,6 +1814,9 @@ void CGame::SimFrame() {
 
 	// note: starts at -1, first actual frame is 0
 	gs->frameNum += 1;
+#ifdef SYNC_HISTORY
+	CSyncChecker::NewGameFrame();
+#endif
 	lastFrameTime = spring_gettime();
 	// This is not very ideal, as the timeoffset of each new draw frame is also calculated from this
 	// with a strange side effect: if the timeOffset was a high number, like 0.9, then this will force the next draw frame to have an offset of 0.0x
@@ -2300,13 +2303,8 @@ void CGame::ActionReceived(const Action& action, int playerID)
 bool CGame::ActionPressed(const Action& action, bool isRepeat)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const IUnsyncedActionExecutor* executor = unsyncedGameCommands->GetActionExecutor(action.command);
-
-	if (executor != nullptr) {
-		// an executor for that action was found
-		if (executor->ExecuteAction(UnsyncedAction(action, isRepeat)))
-			return true;
-	}
+	if (unsyncedGameCommands->ActionPressed(action, isRepeat))
+		return true;
 
 	if (CGameServer::IsServerCommand(action.command)) {
 		CommandMessage pckt(action, gu->myPlayerNum);
@@ -2315,4 +2313,9 @@ bool CGame::ActionPressed(const Action& action, bool isRepeat)
 	}
 
 	return (gameCommandConsole.ExecuteAction(action));
+}
+
+bool CGame::ActionReleased(const Action& action)
+{
+	return unsyncedGameCommands->ActionReleased(action);
 }

@@ -3,7 +3,7 @@
 #ifndef _PATH_TEXTURE_H
 #define _PATH_TEXTURE_H
 
-#include "PboInfoTexture.h"
+#include "ModernInfoTexture.h"
 #include "Rendering/GL/FBO.h"
 #include "System/Misc/SpringTime.h"
 
@@ -12,7 +12,7 @@ struct MoveDef;
 struct UnitDef;
 
 
-class CPathTexture : public CPboInfoTexture
+class CPathTexture : public CModernInfoTexture
 {
 public:
 	CPathTexture();
@@ -38,7 +38,6 @@ private:
 	int forcedPathType;
 	int forcedUnitDef;
 	spring_time lastUsage;
-	FBO fbo;
 };
 
 #endif // _PATH_TEXTURE_H

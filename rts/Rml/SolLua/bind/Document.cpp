@@ -99,47 +99,130 @@ namespace Rml::SolLua
 
 	void bind_document(sol::table& namespace_table)
 	{
+		/***
+		 * @enum RmlUi.RmlModalFlag 
+		 */
 		namespace_table.new_enum<Rml::ModalFlag>("RmlModalFlag",
 			{
+				/*** @field RmlUi.RmlModalFlag.None integer */
 				{ "None", Rml::ModalFlag::None },
+				/*** @field RmlUi.RmlModalFlag.Modal integer */
 				{ "Modal", Rml::ModalFlag::Modal },
+				/*** @field RmlUi.RmlModalFlag.Keep integer */
 				{ "Keep", Rml::ModalFlag::Keep }
 			}
 		);
 
+		/***
+		 * @enum RmlUi.RmlFocusFlag 
+		 */
 		namespace_table.new_enum<Rml::FocusFlag>("RmlFocusFlag",
 			{
+				/*** @field RmlUi.RmlFocusFlag.None integer */
 				{ "None", Rml::FocusFlag::None },
+				/*** @field RmlUi.RmlFocusFlag.Document integer */
 				{ "Document", Rml::FocusFlag::Document },
+				/*** @field RmlUi.RmlFocusFlag.Keep integer */
 				{ "Keep", Rml::FocusFlag::Keep },
+				/*** @field RmlUi.RmlFocusFlag.Auto integer */
 				{ "Auto", Rml::FocusFlag::Auto }
 			}
 		);
 
+		/***
+		 * Document derives from Element. Document has no constructor; it must be instantiated through a Context object instead, either by loading an external RML file or creating an empty document. It has the following functions and properties:
+		 * @class RmlUi.Document : RmlUi.Element
+		 */
+		
 		namespace_table.new_usertype<SolLuaDocument>("Document", sol::no_constructor,
 			// M
+			/***
+			 * Pulls the document in front of other documents within its context with a similar z-index.
+			 * @function RmlUi.Document:PullToFront
+			 */
 			"PullToFront", &SolLuaDocument::PullToFront,
+			/***
+			 * Pushes the document behind other documents within its context with a similar z-index.
+			 * @function RmlUi.Document:PushToBack
+			 */
 			"PushToBack", &SolLuaDocument::PushToBack,
+			/***
+			 * Shows the document.
+			 * @function RmlUi.Document:Show
+			 * @param modal RmlUi.RmlModalFlag? Defaults to Focus
+			 * @param focus RmlUi.RmlFocusFlag?
+			 */
 			"Show", sol::overload(&document::show, &document::showModal, &document::showModalFocus),
+			/***
+			 * Hides the document.
+			 * @function RmlUi.Document:Hide
+			 */
 			"Hide", &SolLuaDocument::Hide,
+			/***
+			 * Hides and closes the document, destroying its contents.
+			 * @function RmlUi.Document:Close
+			 */
 			"Close", &SolLuaDocument::Close,
+			/***
+			 * Instances an element with a tag of tag_name.
+			 * @function RmlUi.Document:CreateElement
+			 * @param tag_name string
+			 * @return RmlUi.ElementPtr
+			 */
 			"CreateElement", &SolLuaDocument::CreateElement,
+			/***
+			 * Instances a text element containing the string text.
+			 * @function RmlUi.Document:CreateTextNode
+			 * @param text string
+			 * @return RmlUi.ElementPtr
+			 */
 			"CreateTextNode", &SolLuaDocument::CreateTextNode,
 			//--
+			/***
+			 * Reload the active style sheet.
+			 * @function RmlUi.Document:ReloadStyleSheet
+			 * @param load boolean?
+			 */
 			"ReloadStyleSheet", sol::overload(&document::reloadStyleSheet, &document::reloadStyleSheetAndLoad),
+			/***
+			 * Load scripts as if it were in the script tag.
+			 * @function RmlUi.Document:LoadInlineScript
+			 * @param content string
+			 * @param source string?
+			 * @param source_line integer?
+			 */
 			"LoadInlineScript", sol::overload(&document::loadInlineScript1, &document::loadInlineScript2, &document::loadInlineScript3),
+			/***
+			 * Load an external script.
+			 * @function RmlUi.Document:LoadExternalScript
+			 * @param source_path string
+			 */
 			"LoadExternalScript", &SolLuaDocument::LoadExternalScript,
+			/***
+			 * Update the Document.
+			 * @function RmlUi.Document:UpdateDocument
+			 */
 			"UpdateDocument", &SolLuaDocument::UpdateDocument,
+			/***
+			 * Append text to style sheet.
+			 * @function RmlUi.Document:AppendToStyleSheet
+			 * @param content string
+			 */
 			"AppendToStyleSheet", &document::appendToStyleSheet,
 
 			// G+S
+			/*** @field RmlUi.Document.title string */
 			"title", sol::property(&SolLuaDocument::GetTitle, &SolLuaDocument::SetTitle),
 
 			// G
+			/*** @field RmlUi.Document.context RmlUi.Context */
 			"context", sol::readonly_property(&SolLuaDocument::GetContext),
 			//--
+			/*** @field RmlUi.Document.url string */
 			"url", sol::readonly_property(&SolLuaDocument::GetSourceURL),
+			/*** @field RmlUi.Document.modal boolean Is it modal? */
 			"modal", sol::readonly_property(&SolLuaDocument::IsModal),
+			/*** @field RmlUi.Document.widget table A table of data that can be accessed in onevent attributes. It doesn't have to be a widget. */
 			"widget", sol::readonly_property(&document::getWidget),
 
 			// B

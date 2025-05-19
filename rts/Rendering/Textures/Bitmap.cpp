@@ -5,7 +5,6 @@
 #include <utility>
 #include <cstring>
 #include <memory>
-#include <span>
 
 #include <IL/il.h>
 #include <SDL_video.h>
@@ -16,7 +15,6 @@
 #endif
 
 #include "Bitmap.h"
-#include "Rendering/GL/myGL.h"
 #include "Rendering/GL/TexBind.h"
 #include "System/ScopedFPUSettings.h"
 #include "System/ContainerUtil.h"
@@ -74,6 +72,7 @@ public:
 
 	virtual const uint8_t* GetRawMem(size_t memIdx) const = 0;
 	virtual       uint8_t* GetRawMem(size_t memIdx)       = 0;
+	virtual std::span<const uint8_t> GetSpan(size_t memIdx) const = 0;
 
 	spring::mutex& GetMutex() { return bmpMutex; }
 public:
@@ -252,6 +251,11 @@ public:
 
 	const uint8_t* GetRawMem(size_t memIdx) const override { return ((memIdx == size_t(-1))? nullptr: (Base() + memIdx)); }
 	      uint8_t* GetRawMem(size_t memIdx)       override { return ((memIdx == size_t(-1))? nullptr: (Base() + memIdx)); }
+	std::span<const uint8_t> GetSpan(size_t memIdx) const override {
+		return (memIdx == size_t(-1))
+			? std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(0), size_t(0))
+			: std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(Base() + memIdx), Size());
+	}
 
 private:
 	bool DefragRaw() {
@@ -339,6 +343,11 @@ public:
 	bool Defrag() override { return true; }
 	const uint8_t* GetRawMem(size_t memIdx) const override { return (memIdx == size_t(-1)) ? nullptr : reinterpret_cast<uint8_t*>(memIdx); }
 		  uint8_t* GetRawMem(size_t memIdx)       override { return (memIdx == size_t(-1)) ? nullptr : reinterpret_cast<uint8_t*>(memIdx); }
+	std::span<const uint8_t> GetSpan(size_t memIdx) const override {
+		return (memIdx == size_t(-1))
+			? std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(0), size_t(0))
+			: std::span<const uint8_t>(reinterpret_cast<const uint8_t*>(memIdx), Size());
+	}
 };
 
 void ITexMemPool::Init(size_t size)
@@ -1089,6 +1098,7 @@ void CBitmap::KillPool()
 
 const uint8_t* CBitmap::GetRawMem() const { return ITexMemPool::texMemPool->GetRawMem(memIdx); }
       uint8_t* CBitmap::GetRawMem()       { return ITexMemPool::texMemPool->GetRawMem(memIdx); }
+std::span<const uint8_t> CBitmap::GetSpan() const { return ITexMemPool::texMemPool->GetSpan(memIdx); }
 
 void CBitmap::Alloc(int w, int h, int c, uint32_t glType)
 {
@@ -1120,22 +1130,7 @@ int32_t CBitmap::GetReqNumLevels() const
 uint32_t CBitmap::GetDataTypeSize(uint32_t glType)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	switch (glType) {
-	case GL_FLOAT:
-		return sizeof(float);
-	case GL_INT: [[fallthrough]];
-	case GL_UNSIGNED_INT:
-		return sizeof(uint32_t);
-	case GL_SHORT: [[fallthrough]];
-	case GL_UNSIGNED_SHORT:
-		return sizeof(uint16_t);
-	case GL_BYTE: [[fallthrough]];
-	case GL_UNSIGNED_BYTE:
-		return sizeof(uint8_t);
-	default:
-		assert(false);
-		return 0;
-	}
+	return GL::GetDataTypeSize(glType);
 }
 
 int32_t CBitmap::GetExtFmt(uint32_t ch)
@@ -1552,7 +1547,7 @@ bool CBitmap::Save(const std::string& filename, bool dontSaveAlpha, bool logged,
 	ilTexImage(xsize, ysize, 1, channels, Channels2Formats[channels], dataType, flippedCopy.GetRawMem());
 	assert(ilGetError() == IL_NO_ERROR);
 
-	if (dontSaveAlpha && (channels == 2 || channels == 4)) {
+	if (dontSaveAlpha && channels == 4) {
 		ilConvertImage(Channels2Formats[channels - 1], dataType);
 		assert(ilGetError() == IL_NO_ERROR);
 	}
@@ -1690,7 +1685,7 @@ bool CBitmap::SaveFloat(std::string const& filename) const
 
 
 #ifndef HEADLESS
-uint32_t CBitmap::CreateTexture(const TextureCreationParams& tcp) const
+uint32_t CBitmap::CreateTexture(const GL::TextureCreationParams& tcp) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (compressed)
@@ -1735,7 +1730,7 @@ static void HandleDDSMipmap(GLenum target, int32_t numEmbeddedLevels, uint32_t m
 		glGenerateMipmap(target);
 }
 
-uint32_t CBitmap::CreateDDSTexture(const TextureCreationParams& tcp) const
+uint32_t CBitmap::CreateDDSTexture(const GL::TextureCreationParams& tcp) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	glPushAttrib(GL_TEXTURE_BIT);
@@ -1813,12 +1808,12 @@ uint32_t CBitmap::CreateDDSTexture(const TextureCreationParams& tcp) const
 }
 #else  // !HEADLESS
 
-uint32_t CBitmap::CreateTexture(const TextureCreationParams& tcp) const {
+uint32_t CBitmap::CreateTexture(const GL::TextureCreationParams& tcp) const {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return 0;
 }
 
-uint32_t CBitmap::CreateDDSTexture(const TextureCreationParams& tcp) const {
+uint32_t CBitmap::CreateDDSTexture(const GL::TextureCreationParams& tcp) const {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return 0;
 }
@@ -1827,7 +1822,7 @@ uint32_t CBitmap::CreateDDSTexture(const TextureCreationParams& tcp) const {
 
 uint32_t CBitmap::CreateMipMapTexture(float aniso, float lodBias, int32_t reqNumLevels, uint32_t texID) const
 {
-	TextureCreationParams tcp;
+	GL::TextureCreationParams tcp;
 	tcp.texID = texID;
 	tcp.aniso = aniso;
 	tcp.lodBias = lodBias;
@@ -2089,24 +2084,4 @@ void CBitmap::ReverseYAxis()
 
 	ITexMemPool::texMemPool->Free(tmp, memSize);
 #endif
-}
-
-uint32_t TextureCreationParams::GetMinFilter(int32_t numLevels) const
-{
-	if (numLevels == 1) {
-		return linearTextureFilter ? GL_LINEAR : GL_NEAREST;
-	}
-	else {
-		if (linearMipMapFilter) {
-			return linearTextureFilter ? GL_LINEAR_MIPMAP_LINEAR : GL_NEAREST_MIPMAP_NEAREST;
-		}
-		else {
-			return linearTextureFilter ? GL_LINEAR_MIPMAP_NEAREST : GL_NEAREST_MIPMAP_NEAREST;
-		}
-	}
-}
-
-uint32_t TextureCreationParams::GetMagFilter() const
-{
-	return linearTextureFilter ? GL_LINEAR : GL_NEAREST;
 }

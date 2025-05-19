@@ -4,10 +4,10 @@ on:
     - cron: "0 0 * * *"
   workflow_dispatch:
 env:
-  EMMYLUA_CLI_VERSION: "0.6.0"
+  EMMYLUA_CLI_VERSION: "0.7.2"
 jobs:
   publish:
-    if: github.repository == 'beyond-all-reason/spring' || github.event_name == 'workflow_dispatch'
+    if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
     name: Publish Site
     runs-on: ubuntu-latest
     permissions:
@@ -28,7 +28,7 @@ jobs:
       - name: Generate Lua library
         run: |
           npm install -g lua-doc-extractor@3
-          lua-doc-extractor rts/Lua/*.cpp \
+          lua-doc-extractor "rts/Lua/**/*.cpp" "rts/Rml/SolLua/**/*.cpp" \
             --dest rts/Lua/library/generated \
             --repo https://github.com/${{ github.repository }}/blob/${{ github.sha }}
       # Upload the Lua library artifact for debugging.
@@ -45,7 +45,7 @@ jobs:
           emmylua_doc_cli \
             -i rts/Lua/library \
             -o doc/site/lua-api \
-            --override-template doc/emmlua-doc-cli-template
+            --override-template doc/emmylua-doc-cli-template
           git add -f doc/site/lua-api
       - name: Commit changes
         run: |

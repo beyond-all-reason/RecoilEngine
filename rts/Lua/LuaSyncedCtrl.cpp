@@ -5489,7 +5489,7 @@ int LuaSyncedCtrl::UnitFinishCommand(lua_State* L)
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer?
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
 
  * @return boolean unitOrdered
  */
@@ -5525,12 +5525,12 @@ int LuaSyncedCtrl::GiveOrderToUnit(lua_State* L)
  * Give order to multiple units, specified by table keys.
  * 
  * @function Spring.GiveOrderToUnitMap
- * @param unitMap table<number,table> A table with unit IDs as keys.
+ * @param unitMap table<integer, any> A table with unit IDs as keys.
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer?
- * @return number unitsOrdered
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
+ * @return integer unitsOrdered The number of units ordered.
  */
 int LuaSyncedCtrl::GiveOrderToUnitMap(lua_State* L)
 {
@@ -5569,12 +5569,12 @@ int LuaSyncedCtrl::GiveOrderToUnitMap(lua_State* L)
 /***
  *
  * @function Spring.GiveOrderToUnitArray
- * @param unitIDs number[]
+ * @param unitIDs integer[] An array of unit IDs.
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer?
- * @return number unitsOrdered
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
+ * @return integer unitsOrdered The number of units ordered.
  */
 int LuaSyncedCtrl::GiveOrderToUnitArray(lua_State* L)
 {
@@ -5657,7 +5657,7 @@ int LuaSyncedCtrl::GiveOrderArrayToUnit(lua_State* L)
  * @function Spring.GiveOrderArrayToUnitMap
  * @param unitMap table<integer, any> A table with unit IDs as keys.
  * @param commands CreateCommand[]
- * @return number unitsOrdered
+ * @return integer unitsOrdered The number of units ordered.
  */
 int LuaSyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 {
@@ -5697,9 +5697,16 @@ int LuaSyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 
 /***
  * @function Spring.GiveOrderArrayToUnitArray
- * @param unitArray number[] containing unitIDs
- * @param commands Command[]
- * @return nil
+ * @param unitIDs integer[] Array of unit IDs.
+ * @param commands CreateCommand[]
+ * @param pairwise boolean? (Default: `false`) When `false`, assign all commands to each unit.
+ *
+ * When `true`, assign commands according to index between units and cmds arrays.
+ *
+ * If `len(unitArray) < len(cmdArray)` only the first `len(unitArray)` commands
+ * will be assigned, and vice-versa.
+ *
+ * @return integer unitsOrdered The number of units ordered.
  */
 int LuaSyncedCtrl::GiveOrderArrayToUnitArray(lua_State* L)
 {
@@ -5753,6 +5760,19 @@ int LuaSyncedCtrl::GiveOrderArrayToUnitArray(lua_State* L)
 /******************************************************************************/
 /******************************************************************************/
 
+/* - no doc
+ * @param x number
+ * @param z number
+ * @param height number
+ */
+/* - no doc
+ * @param x1 number
+ * @param z1 number
+ * @param x2 number
+ * @param z2 number
+ * @param height number
+ * @param factor number
+ */
 static void ParseParams(lua_State* L, const char* caller, float& factor,
 		int& x1, int& z1, int& x2, int& z2, int resolution, int maxX, int maxZ)
 {
@@ -5804,13 +5824,23 @@ static inline void ParseMapParams(lua_State* L, const char* caller,
  * Note that x & z coords are in worldspace (Game.mapSizeX/Z), still the heightmap resolution is Game.squareSize.
 ******************************************************************************/
 
-/*** Set a certain height to a point or rectangle area on the world
- *
+
+/*** 
+ * Set the height of a point in the world.
+ * 
+ * @function Spring.LevelHeightMap
+ * @param x number
+ * @param z number
+ * @param height number
+ */
+/***
+ * Set the height of a rectangle area in the world.
+ * 
  * @function Spring.LevelHeightMap
  * @param x1 number
  * @param z1 number
- * @param x2_height number if y2 and height are nil then this parameter is the height
- * @param z2 number?
+ * @param x2 number
+ * @param z2 number
  * @param height number?
  * @return nil
  */
@@ -5834,13 +5864,23 @@ int LuaSyncedCtrl::LevelHeightMap(lua_State* L)
 }
 
 
-/*** Add a certain height to a point or rectangle area on the world
+/*** 
+ * Add height to a point in the world.
  *
  * @function Spring.AdjustHeightMap
+ * @param x number
+ * @param z number
+ * @param height number
+ */
+
+/***
+ * Add height to a rectangle in the world.
+ * 
+ * @function Spring.AdjustHeightMap
  * @param x1 number
- * @param y1 number
- * @param x2_height number if y2 and height are nil then this parameter is the height
- * @param y2 number?
+ * @param z1 number
+ * @param x2 number
+ * @param z2 number
  * @param height number?
  * @return nil
  */
@@ -5865,15 +5905,23 @@ int LuaSyncedCtrl::AdjustHeightMap(lua_State* L)
 	return 0;
 }
 
-
-/*** Restore original map height to a point or rectangle area on the world
+/*** 
+ * Restore map height at a point in the world.
  *
  * @function Spring.RevertHeightMap
+ * @param x number
+ * @param z number
+ * @param height number
+ */
+/***
+ * Restore map height of a rectangle area in the world.
+ * 
+ * @function Spring.RevertHeightMap
  * @param x1 number
- * @param y1 number
- * @param x2_factor number if y2 and factor are nil then this parameter is the factor
- * @param y2 number?
- * @param factor number?
+ * @param z1 number
+ * @param x2 number
+ * @param z2 number
+ * @param height number?
  * @return nil
  */
 int LuaSyncedCtrl::RevertHeightMap(lua_State* L)
@@ -5963,7 +6011,7 @@ int LuaSyncedCtrl::AddHeightMap(lua_State* L)
  *
  * @function Spring.SetHeightMap
  *
- * Can only be called in `Spring.SetHeightMapFunc`. The terraform argument is
+ * Can only be called in `Spring.SetHeightMapFunc`.
  *
  * @param x number
  * @param z number
@@ -6083,15 +6131,23 @@ int LuaSyncedCtrl::SetHeightMapFunc(lua_State* L)
  * @section heightmap
 ******************************************************************************/
 
-/*** Set a height to a point or rectangle area to the original map height cache
+/***
+ * Set the height of a point in the original map height cache.
+ *
+ * @function Spring.LevelOriginalHeightMap
+ * @param x number
+ * @param z number
+ * @param height number
+ */
+/***
+ * Set the height of a rectangle area in the original map height cache.
  *
  * @function Spring.LevelOriginalHeightMap
  * @param x1 number
- * @param y1 number
- * @param x2_height number if y2 and height are nil then this parameter is the height
- * @param y2 number?
- * @param height number?
- * @return nil
+ * @param z1 number
+ * @param x2 number
+ * @param z2 number
+ * @param height number
  */
 int LuaSyncedCtrl::LevelOriginalHeightMap(lua_State* L)
 {
@@ -6111,16 +6167,23 @@ int LuaSyncedCtrl::LevelOriginalHeightMap(lua_State* L)
 	return 0;
 }
 
-
-/*** Add height to a point or rectangle area to the original map height cache
+/***
+ * Add height to a point in the original map height cache.
+ *
+ * @function Spring.AdjustOriginalHeightMap
+ * @param x number
+ * @param z number
+ * @param height number
+ */
+/***
+ * Add height to a rectangle area in the original map height cache.
  *
  * @function Spring.AdjustOriginalHeightMap
  * @param x1 number
- * @param y1 number
- * @param x2_height number if y2 and height are nil then this parameter is the height
- * @param y2 number?
- * @param height number?
- * @return nil
+ * @param z1 number
+ * @param x2 number
+ * @param z2 number
+ * @param height number
  */
 int LuaSyncedCtrl::AdjustOriginalHeightMap(lua_State* L)
 {
@@ -6143,14 +6206,23 @@ int LuaSyncedCtrl::AdjustOriginalHeightMap(lua_State* L)
 }
 
 
-/*** Restore original map height cache to a point or rectangle area on the world
+/*** 
+ * Restore original map height at a point in the world.
  *
  * @function Spring.RevertOriginalHeightMap
+ * @param x number
+ * @param z number
+ * @param height number
+ */
+/***
+ * Restore original map height over a rectangle in the world.
+ * 
+ * @function Spring.RevertOriginalHeightMap
  * @param x1 number
- * @param y1 number
- * @param x2_factor number if y2 and factor are nil then this parameter is the factor
- * @param y2 number?
- * @param factor number?
+ * @param z1 number
+ * @param x2 number
+ * @param z2 number
+ * @param height number?
  * @return nil
  */
 int LuaSyncedCtrl::RevertOriginalHeightMap(lua_State* L)
@@ -6353,13 +6425,19 @@ int LuaSyncedCtrl::RebuildSmoothMesh(lua_State* L)
 
 /***
  * @function Spring.LevelSmoothMesh
+ * @param x number
+ * @param z number
+ * @param height number
+ */
+/***
+ * @function Spring.LevelSmoothMesh
  * @param x1 number
  * @param z1 number
- * @param x2 number?
- * @param z2 number?
+ * @param x2 number
+ * @param z2 number
  * @param height number
- * @return nil
  */
+
 int LuaSyncedCtrl::LevelSmoothMesh(lua_State* L)
 {
 	float height;
@@ -6379,12 +6457,17 @@ int LuaSyncedCtrl::LevelSmoothMesh(lua_State* L)
 
 /***
  * @function Spring.AdjustSmoothMesh
+ * @param x number
+ * @param z number
+ * @param height number
+ */
+/***
+ * @function Spring.AdjustSmoothMesh
  * @param x1 number
  * @param z1 number
- * @param x2 number?
- * @param z2 number?
+ * @param x2 number
+ * @param z2 number
  * @param height number
- * @return nil
  */
 int LuaSyncedCtrl::AdjustSmoothMesh(lua_State* L)
 {
@@ -6403,14 +6486,18 @@ int LuaSyncedCtrl::AdjustSmoothMesh(lua_State* L)
 }
 
 /***
- *
+ * @function Spring.RevertSmoothMesh
+ * @param x number
+ * @param z number
+ * @param origFactor number
+ */
+/***
  * @function Spring.RevertSmoothMesh
  * @param x1 number
  * @param z1 number
- * @param x2 number?
- * @param z2 number?
+ * @param x2 number
+ * @param z2 number
  * @param origFactor number
- * @return nil
  */
 int LuaSyncedCtrl::RevertSmoothMesh(lua_State* L)
 {

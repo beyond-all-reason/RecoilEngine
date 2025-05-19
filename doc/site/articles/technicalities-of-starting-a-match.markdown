@@ -40,4 +40,4 @@ The lobbyserver is only responsible for transmitting metadata from the host to t
 
 ### Startscript format
 
-See [here](https://github.com/beyond-all-reason/spring/blob/BAR105/doc/StartScriptFormat.txt).
+See [here](https://github.com/beyond-all-reason/RecoilEngine/blob/BAR105/doc/StartScriptFormat.txt).

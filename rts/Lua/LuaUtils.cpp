@@ -1108,7 +1108,7 @@ static bool ParseCommandTimeOut(
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer?
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
  */
 Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
 {
@@ -1469,7 +1469,7 @@ int LuaUtils::ParseLogLevel(lua_State* L, int index)
  * Logs a message to the logfile/console.
  * 
  * @function Spring.Log
- * @param section string
+ * @param section string Sets an arbitrary section. Level filtering can be applied per-section
  * @param logLevel (LogLevel|LOG)? (Default: `"notice"`)
  * @param ... string messages
  */

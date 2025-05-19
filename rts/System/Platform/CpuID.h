@@ -12,6 +12,8 @@
 #endif
 
 #include <cstdint>
+#include <cstring>
+#include <string> 
 
 namespace springproc {
 	_noinline void ExecCPUID(unsigned int* a, unsigned int* b, unsigned int* c, unsigned int* d);
@@ -49,6 +51,8 @@ namespace springproc {
 		int GetNumLogicalCores() const { return numLogicalCores; }
 
 		bool HasHyperThreading() const { return smtDetected; };
+
+		std::string GetCPUBrandString();
 
 		cpu_topology::ProcessorMasks GetAvailableProcessorAffinityMask() const { return processorMasks; };
 

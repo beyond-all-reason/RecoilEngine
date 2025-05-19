@@ -31,7 +31,7 @@ The caveat here is that this can have a large performance cost in `/debugGL` mod
 ### Deprecation notice
 * the metal view automatically toggling when building a metal extractor is now deprecated.
 Disable it via `Spring.SetAutoShowMetal` (see below) and reimplement manually. A replacement
-example has been provided at [`(basecontent)/examples/Widgets/gui_autoshowmetal.lua`](https://github.com/beyond-all-reason/spring/blob/master/cont/examples/Widgets/gui_autoshowmetal.lua).
+example has been provided at [`(basecontent)/examples/Widgets/gui_autoshowmetal.lua`](https://github.com/beyond-all-reason/RecoilEngine/blob/master/cont/examples/Widgets/gui_autoshowmetal.lua).
 
 # Features
 

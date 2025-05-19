@@ -211,4 +211,8 @@ ProcessorCaches GetProcessorCache() {
 	return processorCaches;
 }
 
+ThreadPinPolicy GetThreadPinPolicy() {
+	return THREAD_PIN_POLICY_ANY_PERF_CORE;
+}
+
 } //namespace cpu_topology

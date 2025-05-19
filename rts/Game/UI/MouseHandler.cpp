@@ -512,6 +512,10 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 		return;
 	}
 
+	if (button >= ACTION_BUTTON_MIN && activeController != nullptr && activeController->MouseRelease(x, y, button)) {
+		return;
+	}
+
 	// Switch camera mode on a middle click that wasn't a middle mouse drag scroll.
 	// the latter is determined by the time the mouse was held down:
 	// switch (dragScrollThreshold)

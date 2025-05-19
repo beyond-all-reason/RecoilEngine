@@ -290,6 +290,10 @@ namespace Threading {
 		return springproc::CPUID::GetInstance().HasHyperThreading();
 	}
 
+	std::string GetCPUBrand() {
+		return springproc::CPUID::GetInstance().GetCPUBrandString();
+	}
+
 
 	void SetThreadScheduler()
 	{

@@ -1248,7 +1248,7 @@ int LuaOpenGL::GetViewRange(lua_State* L)
 
 
 /***
- * @function gl.SetSlaveMode
+ * @function gl.SlaveMiniMap
  * @param newMode boolean
  */
 int LuaOpenGL::SlaveMiniMap(lua_State* L)

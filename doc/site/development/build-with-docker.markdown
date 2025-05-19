@@ -35,7 +35,7 @@ When building the image the following arguments are available:
 
 ### Building
 
-To build branch `BAR105` from `https://github.com/beyond-all-reason/spring` (default values) run this command:
+To build branch `BAR105` from `https://github.com/beyond-all-reason/RecoilEngine` (default values) run this command:
 ```bash
 docker run -it springrts-build build
 ```
@@ -52,10 +52,10 @@ You will get a bash shell with the spring source code checked out ready to make 
 ```
 ----------------------------------------------
 SpringRTS development environment has been set up successfully
-Source code directory: /spring
-Build directory: /spring/build
+Source code directory: /RecoilEngine
+Build directory: /RecoilEngine/build
 ----------------------------------------------
-<springdev> root@e0d3fbe4fffd:/spring/build$ _
+<springdev> root@e0d3fbe4fffd:/RecoilEngine/build$ _
 ```
 
 ## General
@@ -85,7 +85,7 @@ Both commands can be configured with these arguments:
 | Parameter|      Default |  Description |
 |:----------:|:-------------:|:------|
 | -b |  BAR105 | The branch to build from the spring project |
-| -u |  https://github.com/beyond-all-reason/spring     | URL to a Spring Git repository |
+| -u |  https://github.com/beyond-all-reason/RecoilEngine     | URL to a Spring Git repository |
 | -a | https://github.com/beyond-all-reason |  Prefix for the URLs used to clone auxiliary repos.  The following URL will e.g. be cloned: https://github.com/beyond-all-reason/BARbarIAn |
 | -d | 0 | Dummy mode: to not actually clone or compile but just produce zero-size artifacts
 | -e | 1 | Enable ccache
@@ -112,8 +112,8 @@ docker run -v D:\myspringbuild:/publish -it springrts-build
 ### Building from another GitHub Repository
 
 ```bash
-Build branch `gl4` from repository at `https://github.com/beyond-all-reason/spring`:
-docker run -it springrts-build build -u https://github.com/beyond-all-reason/spring -b gl4 -p linux-64
+Build branch `gl4` from repository at `https://github.com/beyond-all-reason/RecoilEngine`:
+docker run -it springrts-build build -u https://github.com/beyond-all-reason/RecoilEngine -b gl4 -p linux-64
 ```
 
 ## Development
@@ -126,7 +126,7 @@ The image can also be used as a development environment. When starting the devel
 So the source code will be cloned into the container and the build will be configured using CMake. You will find yourself inside the development shell ready to start the compilation process.
 In you started the container with a raw `/bin/bash` shell (didn't use `build` or `dev` command) you can start the dev shell manually by running `dev.sh` with the usual arguments.
 
-When working in the development shell you can always start the step scripts manually if needed. But be aware that running e.g. `01_clone.sh` will wipe the `/spring` directory completely and create a clean checkout. So make sure to not lose your changes!
+When working in the development shell you can always start the step scripts manually if needed. But be aware that running e.g. `01_clone.sh` will wipe the `/RecoilEngine` directory completely and create a clean checkout. So make sure to not lose your changes!
 As some of the steps will modify shell variables all scripts should be sourced (instead of started regularly), e.g. `. /scripts/01.clone.sh`.
 
 ### Reconfiguring

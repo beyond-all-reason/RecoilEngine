@@ -15,9 +15,11 @@
 
 #include "ExternalAI/EngineOutHandler.h"
 #include "ExternalAI/SkirmishAIHandler.h"
+#include "Game/Game.h"
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
 #include "Game/Camera/CameraController.h"
+#include "Game/ChatMessage.h"
 #include "Game/GameSetup.h"
 #include "Game/GlobalUnsynced.h"
 #include "Game/IVideoCapturing.h"
@@ -130,6 +132,11 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SendMessageToTeam);
 	REGISTER_LUA_CFUNC(SendMessageToAllyTeam);
 	REGISTER_LUA_CFUNC(SendMessageToSpectators);
+
+	REGISTER_LUA_CFUNC(SendPublicChat);
+	REGISTER_LUA_CFUNC(SendAllyChat);
+	REGISTER_LUA_CFUNC(SendSpectatorChat);
+	REGISTER_LUA_CFUNC(SendPrivateChat);
 
 	REGISTER_LUA_CFUNC(LoadSoundDef);
 	REGISTER_LUA_CFUNC(PlaySoundFile);
@@ -561,11 +568,80 @@ static string ParseMessage(lua_State* L, const string& msg)
 }
 
 
+/******************************************************************************
+ * Chat Messages
+ * @section chatmessages
+******************************************************************************/
+
+/*** Sends a chat message to everyone (players and spectators).
+ *
+ * @function Spring.SendPublicChat
+ * @param message string
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SendPublicChat(lua_State* L) {
+	// Check arguments: Expects 1 string argument
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		return luaL_error(L, "Incorrect arguments to Spring.SendPublicChat(message string)");
+	}
+
+	game->SendNetChat(luaL_checksstring(L, 1), ChatMessage::TO_EVERYONE);
+	return 0;
+}
+
+/*** Sends a chat message to the sender's ally team (if a spectator, to other spectators).
+ *
+ * @function Spring.SendAllyChat
+ * @param message string
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SendAllyChat(lua_State* L) {
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		return luaL_error(L, "Incorrect arguments to Spring.SendAllyChat(message string)");
+	}
+
+	game->SendNetChat(luaL_checksstring(L, 1), ChatMessage::TO_ALLIES);
+	return 0;
+}
+
+/*** Sends a chat message to spectators. Works even if you're a player.
+ *
+ * @function Spring.SendSpectatorChat
+ * @param message string
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SendSpectatorChat(lua_State* L) {
+	if (lua_gettop(L) != 1 || !lua_isstring(L, 1)) {
+		return luaL_error(L, "Incorrect arguments to Spring.SendSpectatorChat(message string)");
+	}
+
+	game->SendNetChat(luaL_checksstring(L, 1), ChatMessage::TO_SPECTATORS);
+	return 0;
+}
+
+/*** Sends a private chat message to a specific player ID.
+ *
+ * @function Spring.SendPrivateChat
+ * @param message string
+ * @param playerID integer
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SendPrivateChat(lua_State* L) {
+	if (lua_gettop(L) != 2 || !lua_isstring(L, 1))
+		return luaL_error(L, "Incorrect arguments to Spring.SendPrivateChat(message string, playerID integer)");
+
+	const int playerID = luaL_checkint(L, 2);
+	if (!playerHandler.IsValidPlayer(playerID))
+		return luaL_error(L, "Error in function '%s': Invalid Player ID %d", __func__, playerID);
+
+	game->SendNetChat(luaL_checksstring(L, 1), playerID);
+	return 0;
+}
+
 static void PrintMessage(lua_State* L, const string& msg)
 {
 	LOG("%s", ParseMessage(L, msg).c_str());
 }
-
 
 /******************************************************************************
  * Messages
@@ -2429,11 +2505,7 @@ int LuaUnsyncedCtrl::FreeUnitIcon(lua_State* L)
  */
 int LuaUnsyncedCtrl::UnitIconSetDraw(lua_State* L)
 {
-	static bool deprecatedMsgDone = false;
-	if (!deprecatedMsgDone) {
-		LOG_L(L_DEPRECATED, "Spring.UnitIconSetDraw is deprecated. Please use Spring.SetUnitIconDraw instead.");
-		deprecatedMsgDone = true;
-	}
+	LOG_DEPRECATED("Spring.UnitIconSetDraw is deprecated. Please use Spring.SetUnitIconDraw instead.");
 	return LuaUnsyncedCtrl::SetUnitIconDraw(L);
 }
 
@@ -3288,13 +3360,15 @@ static bool CanGiveOrders(const lua_State* L)
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer?
- * @return nil|true
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
+ * @return boolean
  */
 int LuaUnsyncedCtrl::GiveOrder(lua_State* L)
 {
-	if (!CanGiveOrders(L))
+	if (!CanGiveOrders(L)) {
+		lua_pushboolean(L, false);
 		return 1;
+	}
 
 	selectedUnitsHandler.GiveCommand(LuaUtils::ParseCommand(L, __func__, 1));
 
@@ -3311,8 +3385,8 @@ int LuaUnsyncedCtrl::GiveOrder(lua_State* L)
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer?
- * @return nil|true
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
+ * @return boolean
  */
 int LuaUnsyncedCtrl::GiveOrderToUnit(lua_State* L)
 {
@@ -3345,8 +3419,8 @@ int LuaUnsyncedCtrl::GiveOrderToUnit(lua_State* L)
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer?
- * @return nil|true
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
+ * @return boolean orderGiven
  */
 int LuaUnsyncedCtrl::GiveOrderToUnitMap(lua_State* L)
 {
@@ -3379,8 +3453,8 @@ int LuaUnsyncedCtrl::GiveOrderToUnitMap(lua_State* L)
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer?
- * @return nil|true
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
+ * @return boolean ordersGiven `true` if any orders were sent, otherwise `false`.
  */
 int LuaUnsyncedCtrl::GiveOrderToUnitArray(lua_State* L)
 {
@@ -3409,7 +3483,7 @@ int LuaUnsyncedCtrl::GiveOrderToUnitArray(lua_State* L)
  * @function Spring.GiveOrderArrayToUnit
  * @param unitID integer Unit ID.
  * @param commands CreateCommand[]
- * @return boolean ordersGiven
+ * @return boolean ordersGiven `true` if any orders were sent, otherwise `false`.
  */
 int LuaUnsyncedCtrl::GiveOrderArrayToUnit(lua_State* L)
 {
@@ -3443,7 +3517,7 @@ int LuaUnsyncedCtrl::GiveOrderArrayToUnit(lua_State* L)
  * @function Spring.GiveOrderArrayToUnitMap
  * @param unitMap table<integer, any> A table with unit IDs as keys.
  * @param commands CreateCommand[]
- * @return boolean ordersGiven
+ * @return boolean ordersGiven `true` if any orders were sent, otherwise `false`.
  */
 int LuaUnsyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 {
@@ -3473,9 +3547,8 @@ int LuaUnsyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 
 
 /***
- *
  * @function Spring.GiveOrderArrayToUnitArray
- * @param unitArray number[] array of unit ids
+ * @param unitIDs integer[] Array of unit IDs.
  * @param commands CreateCommand[]
  * @param pairwise boolean? (Default: `false`) When `false`, assign all commands to each unit.
  *
@@ -3484,7 +3557,7 @@ int LuaUnsyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
  * If `len(unitArray) < len(cmdArray)` only the first `len(unitArray)` commands
  * will be assigned, and vice-versa.
  *
- * @return nil|boolean
+ * @return boolean ordersGiven `true` if any orders were sent, otherwise `false`.
  */
 int LuaUnsyncedCtrl::GiveOrderArrayToUnitArray(lua_State* L)
 {

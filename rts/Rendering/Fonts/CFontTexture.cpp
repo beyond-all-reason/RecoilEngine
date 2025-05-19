@@ -74,16 +74,18 @@
 typedef unsigned char FT_Byte;
 #endif
 
-static spring::unordered_map<std::string, std::weak_ptr<FontFace>> fontFaceCache;
+using SizedFontKey = std::pair<std::string, int>;
+
+static spring::unordered_map<SizedFontKey, std::weak_ptr<FontFace>> fontFaceCache;
 static spring::unordered_map<std::string, std::weak_ptr<FontFileBytes>> fontMemCache;
-static spring::unordered_set<std::pair<std::string, int>, spring::synced_hash<std::pair<std::string, int>>> invalidFonts;
+static spring::unordered_set<SizedFontKey> invalidFonts;
 static auto cacheMutexes = spring::WrappedSyncRecursiveMutex{};
 
 struct TimestampedFont { std::shared_ptr<FontFace> fontFace; float timestamp; };
 
 /* pinnedRecentFonts maintains shared_ptrs to the weak_ptrs from fontFaceCache. This prevents the weak_ptr from expiring
  * when no other part of the code holds a shared_ptr, as is the case when searching game and system fallback fonts. */
-static spring::unordered_map<std::pair<std::string, int>, TimestampedFont> pinnedRecentFonts;
+static spring::unordered_map<SizedFontKey, TimestampedFont> pinnedRecentFonts;
 
 #include "NonPrintableSymbols.inl"
 
@@ -420,7 +422,7 @@ static std::shared_ptr<FontFace> GetRenderFontFace(const std::string& fontfile, 
 
 	FT_Error error;
 
-	const auto fontKey = fontfile + IntToString(size);
+	const auto fontKey = make_pair(fontfile, size);
 	const auto fontIt = fontFaceCache.find(fontKey);
 
 	if (fontIt != fontFaceCache.end() && !fontIt->second.expired())
@@ -521,6 +523,10 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 
 				FcPatternGetString( origPattern, FC_FAMILY , 0, &family );
 			}
+
+			if (family != nullptr)
+				FcPatternAddString(pattern, FC_FAMILY, family);
+
 		}
 
 		FcPatternAddInteger(pattern, FC_WEIGHT, weight);
@@ -529,9 +535,6 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 
 		if (pixelSize > 0.0)
 			FcPatternAddDouble(pattern, FC_PIXEL_SIZE, pixelSize);
-
-		if (family)
-			FcPatternAddString(pattern, FC_FAMILY, family);
 	}
 
 	FcDefaultSubstitute(pattern);
@@ -891,7 +894,7 @@ void CFontTexture::PinFont(std::shared_ptr<FontFace>& face, const std::string& f
 		cached->second.timestamp = time;
 	} else {
 		if (pinnedRecentFonts.size() >= maxPinnedFonts) {
-			std::pair<string, int>* oldest;
+			SizedFontKey* oldest;
 			float oldestTime = time;
 			for(auto &[key, timestampedFont]: pinnedRecentFonts) {
 				if (timestampedFont.timestamp <= oldestTime) {

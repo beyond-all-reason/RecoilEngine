@@ -22,12 +22,12 @@ title: Recoil
 email: amadeusfolego@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
   Recoil RTS Engine
-baseurl: "/spring" # the subpath of your site, e.g. /blog
+baseurl: "/RecoilEngine" # the subpath of your site, e.g. /blog
 url: "https://beyond-all-reason.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 #twitter_username: jekyllrb
 github_username: beyond-all-reason
 permalink: pretty
-repository: beyond-all-reason/spring # for github-metadata
+repository: beyond-all-reason/RecoilEngine # for github-metadata
 
 # Build settings
 #theme: minima
@@ -94,7 +94,7 @@ last_edit_time_format: "%b %e %Y at %I:%M %p" # uses ruby's time format: https:/
 # Footer "Edit this page on GitHub" link text
 gh_edit_link: true # show or hide edit this page link
 gh_edit_link_text: "Edit this page on GitHub"
-gh_edit_repository: "https://github.com/beyond-all-reason/spring" # the github URL for your repo
+gh_edit_repository: "https://github.com/beyond-all-reason/RecoilEngine" # the github URL for your repo
 gh_edit_branch: "BAR105" # the branch that your docs is served from
 gh_edit_source: doc/site # the source that your files originate from
 gh_edit_view_mode: "tree" # "tree" or "edit" if you want the user to jump into the editor immediately

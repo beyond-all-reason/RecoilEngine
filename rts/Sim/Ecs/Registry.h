@@ -10,7 +10,7 @@
 
 namespace Sim {
     extern entt::registry registry;
-    extern SystemGlobals::SystemGlobal systemGlobals;
+    extern SystemGlobals::SystemGlobal<> systemGlobals;
     extern SystemUtils::SystemUtils systemUtils;
     extern SaveLoadUtils saveLoadUtils;
 }

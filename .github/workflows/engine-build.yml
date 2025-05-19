@@ -53,7 +53,7 @@ on:
       - 'doc/**'
 jobs:
   build-engine:
-    if: github.repository == 'beyond-all-reason/spring' || github.event_name == 'workflow_dispatch'
+    if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
     strategy:
       matrix:
         system:
@@ -74,7 +74,7 @@ jobs:
       - nscloud-exp-container-image-cache
     steps:
       - name: Checkout code
-        uses: namespacelabs/nscloud-checkout-action@v5
+        uses: namespacelabs/nscloud-checkout-action@v7
         with:
           # We fetch full history because engine automatic version naming uses
           # that.
@@ -148,6 +148,7 @@ jobs:
           ghcr_image=ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}:latest
           nsc_image=${{ env.NSC_CONTAINER_REGISTRY }}/recoil-build-${{ matrix.system }}:latest
 
+          docker version
           docker pull $nsc_image || true
           docker pull $ghcr_image
           docker image tag $ghcr_image $nsc_image
