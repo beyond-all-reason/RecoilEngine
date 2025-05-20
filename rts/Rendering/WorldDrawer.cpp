@@ -172,7 +172,7 @@ void CWorldDrawer::InitPost() const
 
 void CWorldDrawer::Kill()
 {
-	spring::SafeDelete(infoTextureHandler);
+	infoTextureHandler = nullptr;
 
 	IWater::KillWater();
 	ISky::KillSky();

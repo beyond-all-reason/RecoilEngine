@@ -129,6 +129,15 @@ namespace QTPFS {
 
 	unsigned int PathManager::LAYERS_PER_UPDATE;
 	unsigned int PathManager::MAX_TEAM_SEARCHES;
+
+	IPath* GetPath(QTPFS::entity entityId) {
+		if (!registry.valid(entityId)) return nullptr;
+
+		IPath* path = registry.try_get<IPath>(entityId);
+		if (path != nullptr) return path;
+
+		return registry.try_get<UnsyncedIPath>(entityId);
+	};
 }
 
 QTPFS::PathManager::PathManager() {
@@ -156,9 +165,14 @@ QTPFS::PathManager::~PathManager() {
 	// print out anything still left in the registry - there should be nothing
 	registry.each([this](auto entity) {
 		bool isPath = registry.all_of<IPath>(entity);
+		bool isUnsyncedPath = registry.all_of<UnsyncedIPath>(entity);
 		bool isSearch = registry.all_of<PathSearch>(entity);
 		if (isPath) {
 			const IPath& path = registry.get<IPath>(entity);
+			registry.destroy(entity);
+		}
+		if (isUnsyncedPath) {
+			const IPath& path = registry.get<UnsyncedIPath>(entity);
 			registry.destroy(entity);
 		}
 		if (isSearch) {
@@ -238,6 +252,9 @@ void QTPFS::PathManager::InitStatic() {
 	}
 	{ auto view = registry.view<IPath>();
 	  if (view.size() > 0) { LOG("%s: IPath is unexpectedly greater than 0.", __func__); }
+	}
+	{ auto view = registry.view<UnsyncedIPath>();
+	  if (view.size() > 0) { LOG("%s: UnsyncedIPath is unexpectedly greater than 0.", __func__); }
 	}
 	// Views are created in multi-threaded sections, but they are referenced and I haven't determined
 	// yet whether that is safe in EnTT so creating views here to ensure everything is initialized
@@ -725,7 +742,7 @@ void QTPFS::PathManager::Update() {
 		for (auto& layerDirtyPaths : pathCache.dirtyPaths) {
 			// LOG("%s: start: %d", __func__, (int)layerDirtyPaths.size());
 			for (auto dirtyPathDetail : layerDirtyPaths) {
-				entt::entity pathEntity = dirtyPathDetail.pathEntity;
+				QTPFS::entity pathEntity = dirtyPathDetail.pathEntity;
 
 				// May have already been deleted.
 				if (!registry.valid(pathEntity)) { continue; }
@@ -756,6 +773,8 @@ void QTPFS::PathManager::Update() {
 
 					// The path may still be fine for owner, even if it can't be shared any more.
 					auto& path = registry.get<IPath>(pathEntity);
+					assert(path.GetOwner() != nullptr);
+					assert(path.IsSynced());
 
 					if (dirtyPathDetail.autoRepathTrigger > 0) {
 						// Rather than repath immediately we can defer the repath until the unit
@@ -792,7 +811,7 @@ void QTPFS::PathManager::ThreadUpdate() {
 }
 
 
-bool QTPFS::PathManager::InitializeSearch(entt::entity searchEntity) {
+bool QTPFS::PathManager::InitializeSearch(QTPFS::entity searchEntity) {
 	ZoneScoped;
 	assert(registry.all_of<PathSearch>(searchEntity));
 	PathSearch* search = &registry.get<PathSearch>(searchEntity);
@@ -808,10 +827,10 @@ bool QTPFS::PathManager::InitializeSearch(entt::entity searchEntity) {
 	assert(pathType < nodeLayers.size());
 	NodeLayer& nodeLayer = nodeLayers[pathType];
 
-	entt::entity pathEntity = (entt::entity)search->GetID();
+	QTPFS::entity pathEntity = (QTPFS::entity)search->GetID();
 	if (registry.valid(pathEntity)) {
-		assert(registry.all_of<IPath>(pathEntity));
-		IPath* path = &registry.get<IPath>(pathEntity);
+		assert((registry.any_of<IPath, UnsyncedIPath>(pathEntity)));
+		IPath* path = GetPath(pathEntity);
 		assert(path->GetPathType() == pathType);
 		search->Initialize(&nodeLayer, path->GetSourcePoint(), path->GetGoalPosition(), path->GetOwner());
 		path->SetHash(search->GetHash());
@@ -858,7 +877,7 @@ void QTPFS::PathManager::ReadyQueuedSearches() {
 		auto pathView = registry.view<PathSearch>();
 
 		// Go through in reverse order to minimize reshuffling EnTT will do with the grouping.
-		std::for_each(pathView.rbegin(), pathView.rend(), [this](entt::entity entity){
+		std::for_each(pathView.rbegin(), pathView.rend(), [this](QTPFS::entity entity){
 			if (InitializeSearch(entity))
 				registry.emplace_or_replace<ProcessPath>(entity);
 		});
@@ -868,7 +887,7 @@ void QTPFS::PathManager::ReadyQueuedSearches() {
 
 		// Any requests that cannot be processed should be removed. We can't do that with the r*
 		// iterators because that will break them.
-		std::for_each(pathView.begin(), pathView.end(), [this](entt::entity entity){
+		std::for_each(pathView.begin(), pathView.end(), [this](QTPFS::entity entity){
 			if (!registry.all_of<ProcessPath>(entity))
 				registry.destroy(entity);
 		});
@@ -885,8 +904,8 @@ void QTPFS::PathManager::ExecuteQueuedSearches() {
 	// execute pending searches collected via
 	// RequestPath and QueueDeadPathSearches
 	for_mt(0, pathView.size(), [this, &pathView](int i){
-		entt::entity pathSearchEntity = pathView.begin()[i];
-        // entt::entity pathSearchEntity = pathView.storage<PathSearch>()[i];
+		QTPFS::entity pathSearchEntity = pathView.begin()[i];
+        // QTPFS::entity pathSearchEntity = pathView.storage<PathSearch>()[i];
 
 		assert(registry.valid(pathSearchEntity));
 		assert(registry.all_of<PathSearch>(pathSearchEntity));
@@ -897,7 +916,7 @@ void QTPFS::PathManager::ExecuteQueuedSearches() {
 		ExecuteSearch(search, nodeLayer, pathType);
 	});
 
-	auto completePath = [this](entt::entity pathEntity, IPath* path){
+	auto completePath = [this](QTPFS::entity pathEntity, IPath* path){
 		// inform the movement system that the path has been changed.
 		if (registry.all_of<PathUpdatedCounterIncrease>(pathEntity)) {
 			path->SetNumPathUpdates(path->GetNumPathUpdates() + 1);
@@ -921,8 +940,9 @@ void QTPFS::PathManager::ExecuteQueuedSearches() {
 		assert(registry.all_of<PathSearch>(pathSearchEntity));
 
 		PathSearch* search = &pathView.get<PathSearch>(pathSearchEntity);
-		entt::entity pathEntity = (entt::entity)search->GetID();
+		QTPFS::entity pathEntity = (QTPFS::entity)search->GetID();
 		if (registry.valid(pathEntity)) {
+			// Only synced paths should be actioned in this function.
 			IPath* path = registry.try_get<IPath>(pathEntity);
 			if (path != nullptr) {
 				if (search->PathWasFound()) {
@@ -977,11 +997,11 @@ bool QTPFS::PathManager::ExecuteSearch(
 
 	BasicTimer searchTimer(0);
 
-	entt::entity pathEntity = (entt::entity)search->GetID();
+	QTPFS::entity pathEntity = (QTPFS::entity)search->GetID();
 	if (!registry.valid(pathEntity))
 		return false;
 
-	IPath* path = registry.try_get<IPath>(pathEntity);
+	IPath* path = GetPath(pathEntity);
 
 	int currentThread = ThreadPool::GetThreadNum();
 
@@ -1005,8 +1025,8 @@ bool QTPFS::PathManager::ExecuteSearch(
 	bool synced = path->IsSynced();
 	bool forceFullPath = false;
 
-	entt::entity chainHeadEntity = entt::null;
-	entt::entity partialChainHeadEntity = entt::null;
+	QTPFS::entity chainHeadEntity = entt::null;
+	QTPFS::entity partialChainHeadEntity = entt::null;
 
 	// TODO: make a function?
 	if (synced)
@@ -1127,6 +1147,9 @@ bool QTPFS::PathManager::ExecuteSearch(
 
 void QTPFS::PathManager::QueueDeadPathSearches() {
 	ZoneScoped;
+
+	// Only synced can be marked as dead.
+
 	auto pathUpdatesView = registry.view<IPath, PathIsToBeUpdated>();
 	if (pathUpdatesView.size_hint() == 0 && gs->frameNum >= refreshDirtyPathRateFrame) {
 		// LOG("%s: pathUpdatesView=%d,frame=%d>%d", __func__
@@ -1193,14 +1216,22 @@ unsigned int QTPFS::PathManager::QueueSearch(
 	//     calls DeletePath, which ensures any path is removed
 	//     from its cache before we get to ExecuteSearch
 
-	entt::entity pathEntity = registry.create();
-	assert(!registry.all_of<IPath>(pathEntity));
-	IPath* newPath = &(registry.emplace<IPath>(pathEntity));
+	QTPFS::entity pathEntity = registry.create();
+	assert((!registry.any_of<IPath, UnsyncedIPath>(pathEntity)));
+
+	auto createNewPath = [](QTPFS::entity entityId, bool synced) -> IPath* {
+		if (synced)
+			return &(registry.emplace<IPath>(entityId));
+		else
+			return &(registry.emplace<UnsyncedIPath>(entityId));
+	};
+
+	IPath* newPath = createNewPath(pathEntity, synced);
 
 	// Every path gets one. It gets changed in a multi-threaded section, so we can't add them on demand.
 	registry.emplace<PathRequeueSearch>(pathEntity, false);
 
-	entt::entity searchEntity = registry.create();
+	QTPFS::entity searchEntity = registry.create();
 	PathSearch* newSearch = &registry.emplace<PathSearch>(searchEntity, PATH_SEARCH_ASTAR);
 
 	if (synced) {
@@ -1216,7 +1247,7 @@ unsigned int QTPFS::PathManager::QueueSearch(
 	assert(newSearch != nullptr);
 
 	// 0 is considered a null path. Entity id 0 should have been taken by the pathing system itself.
-	assert(pathEntity != (entt::entity)0);
+	assert(pathEntity != (QTPFS::entity)0);
 
 	// NOTE:
 	//     the unclamped end-points are temporary
@@ -1264,7 +1295,7 @@ unsigned int QTPFS::PathManager::RequeueSearch(
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(!ThreadPool::inMultiThreadedSection);
-	entt::entity pathEntity = entt::entity(oldPath->GetID());
+	QTPFS::entity pathEntity = QTPFS::entity(oldPath->GetID());
 
 	// assert(!registry.all_of<PathDelayedDelete>(pathEntity));
 
@@ -1279,7 +1310,7 @@ unsigned int QTPFS::PathManager::RequeueSearch(
 
 	// Always create the search object first to ensure pathEntity can never be 0 (which is
 	// considered a non-path)
-	entt::entity searchEntity = registry.create();
+	QTPFS::entity searchEntity = registry.create();
 	PathSearch* newSearch = &registry.emplace<PathSearch>(searchEntity, PATH_SEARCH_ASTAR);
 	assert(oldPath != nullptr);
 	assert(newSearch != nullptr);
@@ -1334,7 +1365,7 @@ void QTPFS::PathManager::DeletePath(unsigned int pathID, bool force) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(!ThreadPool::inMultiThreadedSection);
 
-	entt::entity pathEntity = entt::entity(pathID);
+	QTPFS::entity pathEntity = QTPFS::entity(pathID);
 
 	if (!registry.valid(pathEntity)) return;
 
@@ -1351,7 +1382,7 @@ void QTPFS::PathManager::DeletePath(unsigned int pathID, bool force) {
 	}
 }
 
-void QTPFS::PathManager::DeletePathEntity(entt::entity pathEntity) {
+void QTPFS::PathManager::DeletePathEntity(QTPFS::entity pathEntity) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const PathTraceMapIt pathTraceIt = pathTraces.find(entt::to_integral(pathEntity));
 
@@ -1369,7 +1400,7 @@ void QTPFS::PathManager::DeletePathEntity(entt::entity pathEntity) {
 	}
 }
 
-void QTPFS::PathManager::RemovePathFromShared(entt::entity entity) {
+void QTPFS::PathManager::RemovePathFromShared(QTPFS::entity entity) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// if (!registry.valid(entity)) return;
 	if (!registry.all_of<SharedPathChain>(entity)) return;
@@ -1390,7 +1421,7 @@ void QTPFS::PathManager::RemovePathFromShared(entt::entity entity) {
 	linkedListHelper.RemoveChain<SharedPathChain>(entity);
 }
 
-void QTPFS::PathManager::RemovePathFromPartialShared(entt::entity entity) {
+void QTPFS::PathManager::RemovePathFromPartialShared(QTPFS::entity entity) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// if (!registry.valid(entity)) return;
 	if (!registry.all_of<PartialSharedPathChain>(entity)) return;
@@ -1412,17 +1443,17 @@ void QTPFS::PathManager::RemovePathFromPartialShared(entt::entity entity) {
 	linkedListHelper.RemoveChain<PartialSharedPathChain>(entity);
 }
 
-void QTPFS::PathManager::RemovePathSearch(entt::entity pathEntity) {
+void QTPFS::PathManager::RemovePathSearch(QTPFS::entity pathEntity) {
 	RECOIL_DETAILED_TRACY_ZONE;
 
 	auto search = registry.try_get<PathSearchRef>(pathEntity);
 
-	// if (pathEntity == entt::entity(257949903))
+	// if (pathEntity == QTPFS::entity(257949903))
 	// 		LOG("%s: id: %d search %p", __func__
 	// 			, entt::to_integral(pathEntity), search);
 
 	if (search != nullptr) {
-		entt::entity searchId = search->value;
+		QTPFS::entity searchId = search->value;
 		if (registry.valid(searchId))
 			registry.destroy(searchId);
 	}
@@ -1434,7 +1465,8 @@ unsigned int QTPFS::PathManager::RequestPath(
 	float3 sourcePoint,
 	float3 targetPoint,
 	float radius,
-	bool synced
+	bool synced,
+	bool immediateResult
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	unsigned int returnPathId = 0;
@@ -1449,19 +1481,17 @@ unsigned int QTPFS::PathManager::RequestPath(
 	// if (object != nullptr && 30809 == object->id)
 	// 	LOG("%s: RequestPath (%d).", __func__, returnPathId);
 
-	if (!synced && returnPathId != 0) {
-		// Unsynced calls are expected to resolve immediately.
-		returnPathId = ExecuteUnsyncedSearch(returnPathId);
-	}
+	if (immediateResult && returnPathId != 0)
+		returnPathId = ExecuteImmediateSearch(returnPathId);
 
 	return returnPathId;
 }
 
-unsigned int QTPFS::PathManager::ExecuteUnsyncedSearch(unsigned int pathId){
+unsigned int QTPFS::PathManager::ExecuteImmediateSearch(unsigned int pathId){
 	RECOIL_DETAILED_TRACY_ZONE;
-	entt::entity pathEntity = entt::entity(pathId);
+	QTPFS::entity pathEntity = QTPFS::entity(pathId);
 	assert(registry.valid(pathEntity));
-	entt::entity pathSearchEntity = registry.get<PathSearchRef>(pathEntity).value;
+	QTPFS::entity pathSearchEntity = registry.get<PathSearchRef>(pathEntity).value;
 	assert(registry.valid(pathSearchEntity));
 	InitializeSearch(pathSearchEntity);
 
@@ -1471,7 +1501,7 @@ unsigned int QTPFS::PathManager::ExecuteUnsyncedSearch(unsigned int pathId){
 	ExecuteSearch(&pathSearch, nodeLayer, pathType);
 
 	if (registry.valid(pathEntity)) {
-		IPath* path = registry.try_get<IPath>(pathEntity);
+		IPath* path = GetPath(pathEntity);
 		if (path != nullptr) {
 			if (pathSearch.PathWasFound()) {
 				registry.remove<PathIsTemp>(pathEntity);
@@ -1492,7 +1522,7 @@ unsigned int QTPFS::PathManager::ExecuteUnsyncedSearch(unsigned int pathId){
 
 bool QTPFS::PathManager::PathUpdated(unsigned int pathID) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	entt::entity pathEntity = (entt::entity)pathID;
+	QTPFS::entity pathEntity = (QTPFS::entity)pathID;
 	if (!registry.valid(pathEntity)) { return false; }
 	IPath* livePath = registry.try_get<IPath>(pathEntity);
 
@@ -1504,7 +1534,7 @@ bool QTPFS::PathManager::PathUpdated(unsigned int pathID) {
 
 void QTPFS::PathManager::ClearPathUpdated(unsigned int pathID) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	entt::entity pathEntity = (entt::entity)pathID;
+	QTPFS::entity pathEntity = (QTPFS::entity)pathID;
 	if (!registry.valid(pathEntity)) { return; }
 	IPath* livePath = registry.try_get<IPath>(pathEntity);
 
@@ -1529,11 +1559,11 @@ float3 QTPFS::PathManager::NextWayPoint(
 	if (!IsFinalized())
 		return noPathPoint;
 
-	entt::entity pathEntity = entt::entity(pathID);
+	QTPFS::entity pathEntity = QTPFS::entity(pathID);
 	if (!registry.valid(pathEntity))
 		return noPathPoint;
 
-	IPath* livePath = registry.try_get<IPath>(pathEntity);
+	IPath* livePath = GetPath(pathEntity);
 	if (livePath == nullptr)
 		return noPathPoint;
 
@@ -1612,7 +1642,7 @@ float3 QTPFS::PathManager::NextWayPoint(
 
 bool QTPFS::PathManager::CurrentWaypointIsUnreachable(unsigned int pathID) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	entt::entity pathEntity = entt::entity(pathID);
+	QTPFS::entity pathEntity = QTPFS::entity(pathID);
 	if (!registry.valid(pathEntity))
 		return true;
 
@@ -1630,7 +1660,7 @@ bool QTPFS::PathManager::CurrentWaypointIsUnreachable(unsigned int pathID) {
 
 bool QTPFS::PathManager::NextWayPointIsUnreachable(unsigned int pathID) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	entt::entity pathEntity = entt::entity(pathID);
+	QTPFS::entity pathEntity = QTPFS::entity(pathID);
 	if (!registry.valid(pathEntity))
 		return true;
 
@@ -1654,11 +1684,11 @@ void QTPFS::PathManager::GetPathWayPoints(
 	if (!IsFinalized())
 		return;
 
-	entt::entity pathEntity = (entt::entity)pathID;
+	QTPFS::entity pathEntity = (QTPFS::entity)pathID;
 	if (!registry.valid(pathEntity))
 		return;
 
-	const IPath* path = registry.try_get<IPath>(pathEntity);
+	const IPath* path = GetPath(pathEntity);
 	if (path == nullptr)
 		return;
 

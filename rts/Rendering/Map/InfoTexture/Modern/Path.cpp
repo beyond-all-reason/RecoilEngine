@@ -24,7 +24,7 @@
 
 
 CPathTexture::CPathTexture()
-: CPboInfoTexture("path")
+: CModernInfoTexture("path")
 , isCleared(false)
 //, updateFrame(0)
 , updateProcess(0)
@@ -34,26 +34,17 @@ CPathTexture::CPathTexture()
 , lastUsage(spring_gettime())
 {
 	texSize = int2(mapDims.hmapx, mapDims.hmapy);
-	texChannels = 4;
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, texSize.x, texSize.y);
+	GL::TextureCreationParams tcp{
+		.reqNumLevels = 1,
+		.wrapMirror = false,
+		.minFilter = GL_NEAREST,
+		.magFilter = GL_LINEAR
+	};
 
-	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * texChannels, GL_STREAM_DRAW);
-	infoTexPBO.Unbind();
+	texture = GL::Texture2D(texSize, GL_RGBA8, tcp, false);
 
-	if (FBO::IsSupported()) {
-		fbo.Bind();
-		fbo.AttachTexture(texture);
-		/*bool status =*/ fbo.CheckStatus("CPathTexture");
-		FBO::Unbind();
-	}
+	CreateFBO("CPathTexture");
 
 	if (!fbo.IsValid()) {
 		throw opengl_error("");
@@ -69,7 +60,7 @@ enum BuildSquareStatus {
 };
 
 
-static const SColor buildColors[] = {
+static constexpr SColor buildColors[] = {
 	SColor(  0,   0,   0), // nolos
 	SColor(  0, 255,   0), // free
 	SColor(  0,   0, 255), // objblocked
@@ -135,7 +126,7 @@ GLuint CPathTexture::GetTexture()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	lastUsage = spring_gettime();
-	return texture;
+	return texture.GetId();
 }
 
 
@@ -213,24 +204,26 @@ void CPathTexture::Update()
 		glViewport(0, 0, texSize.x, texSize.y);
 		glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
-		globalRendering->LoadViewport();
 		FBO::Unbind();
+		globalRendering->LoadViewport();
 		return;
 	}
 
+	static std::vector<SColor> infoTexMem;
+	infoTexMem.resize(texSize.x * texSize.y, SColor(1.0f, 0.0f, 0.0f, 1.0f));
+
 	// spread update across time
 	constexpr int TEX_SIZE_TO_UPDATE_EACH_FRAME = 128*128;
-	if (updateProcess >= texSize.y) updateProcess = 0;
+	if (updateProcess >= texSize.y)
+		updateProcess = 0;
 
 	int start = updateProcess;
 	const int updateLines = std::max(TEX_SIZE_TO_UPDATE_EACH_FRAME / texSize.x, ThreadPool::GetNumThreads());
 	updateProcess += updateLines;
 	updateProcess = std::min(updateProcess, texSize.y);
+	assert(updateProcess - start >= 0);
 
-	// map PBO
-	infoTexPBO.Bind();
-	const size_t offset = start * texSize.x;
-	SColor* infoTexMem = reinterpret_cast<SColor*>(infoTexPBO.MapBuffer(offset * sizeof(SColor), (updateProcess - start) * texSize.x * sizeof(SColor)));
+	const size_t elemOfft = start * texSize.x;
 
 	//FIXME make global func
 	const bool losFullView = ((gu->spectating && gu->spectatingFullView) || losHandler->GetGlobalLOS(gu->myAllyTeam));
@@ -258,7 +251,7 @@ void CPathTexture::Update()
 					status = TERRAINBLOCKED;
 				}
 
-				infoTexMem[idx - offset] = GetBuildColor(status);
+				infoTexMem[idx] = GetBuildColor(status);
 			}
 		});
 	} else if (md != nullptr) {
@@ -279,15 +272,13 @@ void CPathTexture::Update()
 
 				// NOTE: raw speedmods are not necessarily clamped to [0, 1]
 				const float sm = CMoveMath::GetPosSpeedMod(*md, sq.x, sq.y);
-				infoTexMem[idx - offset] = GetSpeedModColor(sm * scale);
+				infoTexMem[idx] = GetSpeedModColor(sm * scale);
 			}
 		});
 	}
 
-	infoTexPBO.UnmapBuffer();
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, start, texSize.x, updateProcess - start, GL_RGBA, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr(offset * sizeof(SColor)));
-	infoTexPBO.Unbind();
+	auto binding = texture.ScopedBind();
+	texture.UploadSubImage(infoTexMem.data() + elemOfft, 0, start, texSize.x, updateProcess - start);
 
 	isCleared = false;
 }

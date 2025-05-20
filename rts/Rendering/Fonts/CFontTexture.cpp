@@ -1126,8 +1126,17 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& wanted)
 
 			if (texpos[2] != 0)
 				atlasUpdate.CopySubImage(atlasGlyphs[glyphIdx], texpos.x, texpos.y);
-			if (texpos2[2] != 0)
-				atlasUpdateShadow.CopySubImage(atlasGlyphs[glyphIdx], texpos2.x + outlineSize, texpos2.y + outlineSize);
+			if (texpos2[2] != 0) {
+				const int x = texpos2.x + outlineSize;
+				const int y = texpos2.y + outlineSize;
+				blurRectangles.emplace_back(
+					std::max<int>(0, x),
+					std::max<int>(0, y),
+					std::min<int>(wantedTexWidth,  x + 2*outlineSize + atlasGlyphs[glyphIdx].xsize),
+					std::min<int>(wantedTexHeight, y + 2*outlineSize + atlasGlyphs[glyphIdx].ysize)
+				);
+				atlasUpdateShadow.CopySubImage(atlasGlyphs[glyphIdx], x, y);
+			}
 		}
 
 		atlasAlloc.clear();
@@ -1341,6 +1350,7 @@ void CFontTexture::ClearAtlases(const int width, const int height)
 		LOG_L(L_WARNING, "[FontTexture::%s] discarding %u glyph bitmaps", __func__, uint32_t(atlasGlyphs.size()));
 
 	atlasGlyphs.clear();
+	blurRectangles.clear();
 #endif
 }
 
@@ -1378,7 +1388,12 @@ void CFontTexture::UpdateGlyphAtlasTexture()
 
 	// merge shadow and regular atlas bitmaps, dispose shadow
 	if (atlasUpdateShadow.xsize == atlasUpdate.xsize && atlasUpdateShadow.ysize == atlasUpdate.ysize) {
-		atlasUpdateShadow.Blur(outlineSize, outlineWeight);
+		for_mt(0, blurRectangles.size(), [&](int i) {
+			SRectangle& rect = blurRectangles[i];
+			atlasUpdateShadow.Blur(outlineSize, outlineWeight, rect.x1, rect.y1, rect.x2-rect.x1, rect.y2-rect.y1);
+		});
+		blurRectangles.clear();
+
 		assert((atlasUpdate.xsize * atlasUpdate.ysize) % sizeof(int) == 0);
 
 		const int* src = reinterpret_cast<const int*>(atlasUpdateShadow.GetRawMem());

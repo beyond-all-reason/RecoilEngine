@@ -173,8 +173,8 @@ void QTPFS::PathSearch::InitializeThread(SearchThreadData* threadData) {
 		return false;
 	};
 
-	auto *pathToRepair = ( tryPathRepair && registry.valid(entt::entity(searchID)) )
-			? registry.try_get<IPath>(entt::entity(searchID)) : nullptr;
+	auto *pathToRepair = ( tryPathRepair && registry.valid(QTPFS::entity(searchID)) )
+			? registry.try_get<IPath>(QTPFS::entity(searchID)) : nullptr;
 
 	// Path repairs need only search to the point of finding the beginning of the renaming clean part of the old path.
 	// Such searches are also restricted in the area they can search to avoid creating poor paths that would be better
@@ -432,7 +432,7 @@ void QTPFS::PathSearch::LoadPartialPath(IPath* path) {
 }
 
 void QTPFS::PathSearch::LoadRepairPath() {
-	const auto *pathToRepair = registry.try_get<IPath>(entt::entity(searchID));
+	const auto *pathToRepair = registry.try_get<IPath>(QTPFS::entity(searchID));
 
 	const uint32_t firstCleanNodeId = pathToRepair->GetFirstNodeIdOfCleanPath();
 	const uint32_t nodeCount = pathToRepair->GetGoodNodeCount();

@@ -24,7 +24,7 @@ namespace QTPFS {
 	struct PathCache {
 
 		struct DirtyPathDetail {
-			entt::entity pathEntity;
+			QTPFS::entity pathEntity;
 			int autoRepathTrigger;
 			int nodesAreCleanFromNodeId;
 			bool clearSharing;

@@ -46,7 +46,7 @@ void ScanForPathSpeedModInfo(int frameModulus) {
 
     // Initialization
     if (frameModulus <= 0) {
-        layersView.each([&layersView, pm](entt::entity entity){
+        layersView.each([&layersView, pm](QTPFS::entity entity){
                 auto& layer = layersView.get<NodeLayerSpeedInfoSweep>(entity);
                 auto& nodeLayer = pm->GetNodeLayer(layer.layerNum);
                 layer.updateCurMaxSpeed = (-std::numeric_limits<float>::infinity());
@@ -60,7 +60,7 @@ void ScanForPathSpeedModInfo(int frameModulus) {
     
     // One thread per layer: get maximum speed mod from the nodes walked thus far.
     for_mt(0, layersView.size(), [&layersView, &comp, dataChunk, pm](int idx){
-        entt::entity entity = layersView.storage<NodeLayerSpeedInfoSweep>()[idx];
+        QTPFS::entity entity = layersView.storage<NodeLayerSpeedInfoSweep>()[idx];
         auto& layer = layersView.get<NodeLayerSpeedInfoSweep>(entity);
 
         const int idxBeg = ((dataChunk + 0) * layer.updateMaxNodes) / comp.refreshTimeInFrames;
@@ -89,7 +89,7 @@ void ScanForPathSpeedModInfo(int frameModulus) {
 
     // Finished search
     if (dataChunk == comp.refreshTimeInFrames + (-1))
-        layersView.each([&comp, &layersView](entt::entity entity){
+        layersView.each([&comp, &layersView](QTPFS::entity entity){
             auto& layer = layersView.get<NodeLayerSpeedInfoSweep>(entity);
             comp.relSpeedModinfos[layer.layerNum].max = layer.updateCurMaxSpeed;
             comp.relSpeedModinfos[layer.layerNum].mean = layer.updateCurSumSpeed / layer.updateNumLeafNodes;
@@ -107,11 +107,11 @@ void ScanForPathSpeedModInfo(int frameModulus) {
 
 void InitLayers() {
     RECOIL_DETAILED_TRACY_ZONE;
-    std::vector<entt::entity> layers((size_t)moveDefHandler.GetNumMoveDefs());
+    std::vector<QTPFS::entity> layers((size_t)moveDefHandler.GetNumMoveDefs());
     QTPFS::registry.create<decltype(layers)::iterator>(layers.begin(), layers.end());
 
     int counter = 0;
-    std::for_each(layers.begin(), layers.end(), [&counter](entt::entity entity){
+    std::for_each(layers.begin(), layers.end(), [&counter](QTPFS::entity entity){
         auto& layer = QTPFS::registry.emplace<NodeLayerSpeedInfoSweep>(entity);
         layer.layerNum = counter++;
         layer.updateCurMaxSpeed = 0.f;
@@ -169,5 +169,5 @@ void PathSpeedModInfoSystem::Shutdown() {
     systemUtils.OnUpdate().disconnect<&PathSpeedModInfoSystem::Update>();
 
     registry.view<NodeLayerSpeedInfoSweep>()
-            .each([](entt::entity entity){ registry.destroy(entity); });
+            .each([](QTPFS::entity entity){ registry.destroy(entity); });
 }

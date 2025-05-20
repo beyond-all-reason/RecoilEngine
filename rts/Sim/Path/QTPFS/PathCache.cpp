@@ -124,6 +124,7 @@ bool QTPFS::PathCache::MarkDeadPaths(const SRectangle& r, const NodeLayer& nodeL
 		IPath* path = &pathView.get<IPath>(entity);
 
 		if (path->IsSynced() == false) { continue; }
+		assert(path->GetOwner() != nullptr);
 		if (path->GetPathType() != pathType) { continue; }
 
 		// LOG("%s: %x is processing", __func__, (int)entity);

@@ -358,9 +358,19 @@ namespace Shader {
 	void IProgramObject::BindTextures() const
 	{
 		RECOIL_DETAILED_TRACY_ZONE;
-		for (const auto& p: luaTextures) {
-			glActiveTexture(GL_TEXTURE0 + p.first);
-			(p.second).Bind();
+		for (const auto& [relSlot, lmt] : luaTextures) {
+			glActiveTexture(GL_TEXTURE0 + relSlot);
+			lmt.Bind();
+		}
+		glActiveTexture(GL_TEXTURE0);
+	}
+
+	void IProgramObject::UnbindTextures() const
+	{
+		RECOIL_DETAILED_TRACY_ZONE;
+		for (const auto& [relSlot, lmt] : luaTextures) {
+			glActiveTexture(GL_TEXTURE0 + relSlot);
+			lmt.Unbind();
 		}
 		glActiveTexture(GL_TEXTURE0);
 	}

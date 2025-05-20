@@ -5,12 +5,14 @@
 
 #include <stdint.h>
 #include <string>
+#include <span>
 #include <vector>
 #ifndef HEADLESS
 	#include "nv_dds.h"
 #endif // !HEADLESS
 #include "System/float3.h"
 #include "System/Color.h"
+#include "Rendering/Textures/TextureCreationParams.hpp"
 
 
 struct SDL_Surface;
@@ -71,16 +73,16 @@ public:
 
 	bool Empty() const { return (memIdx == size_t(-1)); } // implies size=0
 
-	uint32_t CreateTexture(const TextureCreationParams& tcp = TextureCreationParams{}) const;
+	uint32_t CreateTexture(const GL::TextureCreationParams& tcp = GL::TextureCreationParams{}) const;
 	uint32_t CreateMipMapTexture(float aniso = 0.0f, float lodBias = 0.0f, int32_t reqNumLevels = 0, uint32_t texID = 0) const;
-	uint32_t CreateDDSTexture(const TextureCreationParams& tcp = TextureCreationParams{}) const;
+	uint32_t CreateDDSTexture(const GL::TextureCreationParams& tcp = GL::TextureCreationParams{}) const;
 
 	void CreateAlpha(uint8_t red, uint8_t green, uint8_t blue);
 	void ReplaceAlpha(float a = 1.0f);
 	void SetTransparent(const SColor& c, const SColor trans = SColor(0, 0, 0, 0));
 
 	void Renormalize(const float3& newCol);
-	void Blur(int iterations = 1, float weight = 1.0f);
+	void Blur(int iterations = 1, float weight = 1.0f, int x = 0, int y = 0, int width = 0, int height = 0);
 	void Fill(const SColor& c);
 
 	void CopySubImage(const CBitmap& src, int x, int y);
@@ -101,6 +103,7 @@ public:
 
 	const uint8_t* GetRawMem() const;
 	      uint8_t* GetRawMem()      ;
+	std::span<const uint8_t> GetSpan() const;
 
 	size_t GetMemSize() const { return (xsize * ysize * channels * GetDataTypeSize()); }
 

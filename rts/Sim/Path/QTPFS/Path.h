@@ -385,6 +385,12 @@ namespace QTPFS {
 
 		spring_time searchTime;
 	};
+
+	struct UnsyncedIPath : public IPath {
+		UnsyncedIPath() {
+			SetSynced(false); // Mark this path as unsynced explicitly
+		}
+	};
 }
 
 #endif
