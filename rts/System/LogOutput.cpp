@@ -41,8 +41,8 @@ CONFIG(int, LogFlushLevel)
 	.description("Flush the logfile when a message's level exceeds this value. ERROR is flushed by default, WARNING is not.");
 
 CONFIG(int, LogRepeatLimit)
-	.defaultValue(10)
-	.description("Allow at most this many consecutive identical messages to be logged.");
+	.defaultValue(0)
+	.description("Allow at most this many consecutive identical messages to be logged. Set to 0 to disable the limit.");
 
 /******************************************************************************/
 /******************************************************************************/
