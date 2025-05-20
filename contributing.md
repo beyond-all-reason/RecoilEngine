@@ -23,12 +23,12 @@
 ## Responsibilities
 * lead: **ivand** aka @lhog
 * vice-lead: **Tarnished Knight** aka @lostsquirrel1, specialises in pathfinding and optimisation
-* **badosu** - gamedev UX (documentation etc.) and UI input
 * **Marek** aka @p2004a - infrastructure (tools, external protocols etc)
 * **rhys-vdw** aka duke_of_gloat - documentation tooling
 * **saurtron** - fonts, perf, misc
 * **sprunk** - gamedev capabilities (incl. API), misc
 
 ### Less active but knowledgeable people you could try reach if nobody above can deal with it
+* **badosu** - gamedev UX (documentation etc.) and UI input
 * **ChrisFloofyKitsune** - rmlUI
 * **loveridge** - rmlUI, misc
