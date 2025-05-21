@@ -2184,7 +2184,7 @@ GetWatchDef(Feature)
 GetWatchDef(Explosion)
 
 
-/*** Query Projectile watch status for a weaponDefID.
+/*** Query whether projectile callins are registered for a weaponDefID.
  *
  * @function Spring.GetWatchProjectile
  *
