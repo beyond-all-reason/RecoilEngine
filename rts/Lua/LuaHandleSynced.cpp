@@ -167,16 +167,7 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 
 void CUnsyncedLuaHandle::EnactDevMode() const
 {
-	if (devMode) {
-		LUA_OPEN_LIB(L, luaopen_debug);
-		lua_getglobal(L, LUA_DBLIBNAME); {
-			//LuaPushNamedNil(L, "setupvalue"); //example
-		}
-		lua_pop(L, 1); // debug
-	}
-	else {
-		LUA_UNLOAD_LIB(L, LUA_DBLIBNAME);
-	}
+	SwapEnableModule(L, devMode, LUA_DBLIBNAME, luaopen_debug);
 }
 
 
@@ -564,16 +555,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 
 void CSyncedLuaHandle::EnactDevMode() const
 {
-	if (devMode) {
-		SPRING_LUA_OPEN_LIB(L, luaopen_debug);
-		lua_getglobal(L, LUA_DBLIBNAME); {
-			//LuaPushNamedNil(L, "setupvalue"); //example
-		}
-		lua_pop(L, 1); // debug
-	}
-	else {
-		LUA_UNLOAD_LIB(L, LUA_DBLIBNAME);
-	}
+	SwapEnableModule(L, devMode, LUA_DBLIBNAME, luaopen_debug);
 }
 
 

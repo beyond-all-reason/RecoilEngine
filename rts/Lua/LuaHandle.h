@@ -10,6 +10,7 @@
 #include "LuaHashString.h"
 #include "lib/lua/include/LuaInclude.h" //FIXME needed for GetLuaContextData
 
+
 #include <map>
 #include <string>
 #include <tuple>
@@ -343,6 +344,7 @@ class CLuaHandle : public CEventClient
 		void RunDelayedFunctions(int frameNum);
 
 		virtual void EnactDevMode() const {};
+		void SwapEnableModule(lua_State* L, bool enabled, const char* moduleName, lua_CFunction func) const;
 
 		std::vector<bool> watchUnitDefs;        // callin masks for Unit*Collision, UnitMoveFailed
 		std::vector<bool> watchFeatureDefs;     // callin masks for UnitFeatureCollision

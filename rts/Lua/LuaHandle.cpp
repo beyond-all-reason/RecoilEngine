@@ -2312,6 +2312,44 @@ void CLuaHandle::SetDevMode(bool value)
 	}
 }
 
+
+/* Toggles between empty table and filling it with lua module functions. 
+ */
+void CLuaHandle::SwapEnableModule(lua_State* L, bool enabled, const char* moduleName, lua_CFunction func) const
+{
+	// check if module table already exists
+	lua_getglobal(L, moduleName);
+	const bool missing = lua_isnil(L, -1);
+	lua_pop(L, 1);
+
+	// create an empty module table
+	lua_pushvalue(L, LUA_GLOBALSINDEX);
+	if (missing) {
+		lua_createtable(L, 0, 0);
+		lua_setglobal(L, moduleName);
+	}
+
+	if (enabled) {
+		// relink methods
+		LUA_OPEN_LIB(L, func);
+	}
+	else {
+		// unlink all methods
+		lua_getglobal(L, moduleName);
+		lua_pushnil(L);
+		while (lua_next(L, -2))
+		{
+			lua_pop(L, 1);		// pop value
+			lua_pushnil(L);
+			lua_rawset(L, -3);	// pop new value and key
+			lua_pushnil(L);		// restart iteration
+		}
+		lua_pop(L, 1);
+	}
+	lua_pop(L, 1);
+}
+
+
 void CLuaHandle::HandleLuaMsg(int playerID, int script, int mode, const std::vector<std::uint8_t>& data)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
