@@ -2082,6 +2082,8 @@ void CLuaHandle::FeatureDamaged(
  * @param proOwnerID integer
  * @param weaponDefID integer
  *
+ * @see Spring.SetWatchProjectile
+ * @see Spring.SetWatchWeapon
  */
 void CLuaHandle::ProjectileCreated(const CProjectile* p)
 {
@@ -2128,6 +2130,9 @@ void CLuaHandle::ProjectileCreated(const CProjectile* p)
  * @param proID integer
  * @param ownerID integer
  * @param proWeaponDefID integer
+ *
+ * @see Spring.SetWatchProjectile
+ * @see Spring.SetWatchWeapon
  */
 void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
 {
@@ -2189,6 +2194,9 @@ void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
  * Only called for weaponDefIDs registered via Script.SetWatchExplosion or Script.SetWatchWeapon.
  *
  * @return boolean noGfx if then no graphical effects are drawn by the engine for this explosion.
+ *
+ * @see Script.SetWatchExplosion
+ * @see Script.SetWatchWeapon
  */
 bool CLuaHandle::Explosion(int weaponDefID, int projectileID, const float3& pos, const CUnit* owner)
 {
