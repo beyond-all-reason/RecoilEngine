@@ -2171,7 +2171,7 @@ GetWatchDef(Feature)
  * @see Spring.SetWatchWeapon
  */
 
-/*** Query Explosion watch status for a weaponDefID.
+/*** Query whether explosion callins are registered for a weaponDefID.
  *
  * @function Spring.GetWatchExplosion
  *
