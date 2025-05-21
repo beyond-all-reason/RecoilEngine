@@ -11,6 +11,7 @@ set(sources_engine_Lua
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaConstGame.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaConstPlatform.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaVFSDownload.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/LuaEncoding.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaFBOs.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaFeatureDefs.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaFonts.cpp"
