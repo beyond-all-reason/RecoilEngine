@@ -20,8 +20,8 @@ bool LuaEncoding::PushEntries(lua_State* L)
  *
  * @function Spring.DecodeBase64
  *
- * @param string Text to decode
- * @return string Decoded text
+ * @param text string Text to decode
+ * @return string decoded Decoded text
  */
 int LuaEncoding::DecodeBase64(lua_State* L)
 {
@@ -37,8 +37,8 @@ int LuaEncoding::DecodeBase64(lua_State* L)
  *
  * @function Spring.EncodeBase64
  *
- * @param string Text to encode
- * @return string Encoded text
+ * @param text string Text to encode
+ * @return string encoded Encoded text
  */
 int LuaEncoding::EncodeBase64(lua_State* L)
 {
