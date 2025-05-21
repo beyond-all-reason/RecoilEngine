@@ -2777,6 +2777,9 @@ void CLuaHandle::DrawScreenEffects()
 /*** Similar to DrawScreenEffects, this can be used to alter the contents of a frame after it has been completely rendered (i.e. World, MiniMap, Menu, UI).
  *
  * @function Callins:DrawScreenPost
+ *
+ * Note: This callin is invoked after the software rendered cursor (configuration variable HardwareCursor=0) is drawn.
+ *
  * @param viewSizeX number
  * @param viewSizeY number
  */
