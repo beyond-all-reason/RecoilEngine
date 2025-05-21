@@ -2273,7 +2273,7 @@ SetWatchDef(Feature)
 SetWatchDef(Explosion)
 
 
-/*** Register or deregister weaponDefID for expensive Projectile callins.
+/*** Register or deregister weaponDefID for expensive projectile callins.
  *
  * @function Spring.SetWatchProjectile
  *
