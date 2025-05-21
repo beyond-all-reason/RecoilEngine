@@ -21,7 +21,6 @@ CR_BIND_DERIVED(CBitmapMuzzleFlame, CProjectile, )
 CR_REG_METADATA(CBitmapMuzzleFlame,
 (
 	CR_MEMBER(invttl),
-	CR_MEMBER(speedVec),
 	CR_MEMBER_BEGINFLAG(CM_Config),
 		CR_IGNORED(sideTexture),
 		CR_IGNORED(frontTexture),
@@ -31,8 +30,8 @@ CR_REG_METADATA(CBitmapMuzzleFlame,
 		CR_MEMBER(sizeGrowth),
 		CR_MEMBER(ttl),
 		CR_MEMBER(frontOffset),
-		CR_MEMBER(speed),
-		CR_MEMBER(speedSpread),
+		CR_MEMBER(particleSpeed),
+		CR_MEMBER(particleSpeedSpread),
 		CR_MEMBER(airdrag),
 		CR_MEMBER(gravity),
 	CR_MEMBER_ENDFLAG(CM_Config),
@@ -47,13 +46,12 @@ CBitmapMuzzleFlame::CBitmapMuzzleFlame()
 	, length(0.0f)
 	, sizeGrowth(0.0f)
 	, frontOffset(0.0f)
-	, speed(0.0f)
-	, speedSpread(0.0f)
+	, particleSpeed(0.0f)
+	, particleSpeedSpread(0.0f)
 	, airdrag(0.0f)
 	, gravity(0.0f, 0.0f, 0.0f)
 	, ttl(0)
 	, invttl(0.0f)
-	, speedVec(0.0f, 0.0f, 0.0f)
 {
 	// set fields from super-classes
 	useAirLos = true;
@@ -83,7 +81,7 @@ void CBitmapMuzzleFlame::Draw()
 	UpdateRotation();
 	UpdateAnimParams();
 
-	const float3 drawPos = pos + speedVec * globalRendering->timeOffset;
+	const float3 drawPos = pos + speed * globalRendering->timeOffset;
 	const float life = (gs->frameNum - createFrame + globalRendering->timeOffset) * invttl;
 	const float igrowth = sizeGrowth * (1.0f - Square(1.0f - life));
 
@@ -152,18 +150,18 @@ void CBitmapMuzzleFlame::Update()
 	RECOIL_DETAILED_TRACY_ZONE;
 	deleteMe |= ((ttl--) == 0);
 
-	pos += speedVec;
-	speedVec += gravity;
-	speedVec *= airdrag;
+	pos += speed;
+	speed += gravity;
+	speed *= airdrag;
 }
 
 void CBitmapMuzzleFlame::Init(const CUnit* owner, const float3& offset)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	speed = (particleSpeed + guRNG.NextFloat() * particleSpeedSpread) * dir;
 	CProjectile::Init(owner, offset);
 
 	invttl = 1.0f / ttl;
-	speedVec = (speed + guRNG.NextFloat() * speedSpread) * dir;
 
 	SetDrawRadius(std::max(size, length));
 }
@@ -188,8 +186,8 @@ bool CBitmapMuzzleFlame::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, length     )
 	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, sizeGrowth )
 	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, frontOffset)
-	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, speed      )
-	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, speedSpread)
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, particleSpeed      )
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, particleSpeedSpread)
 	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, airdrag    )
 	CHECK_MEMBER_INFO_FLOAT3(CBitmapMuzzleFlame, gravity    )
 	CHECK_MEMBER_INFO_INT   (CBitmapMuzzleFlame, ttl        )
