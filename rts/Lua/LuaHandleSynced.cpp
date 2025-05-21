@@ -2189,7 +2189,7 @@ GetWatchDef(Explosion)
  * @function Spring.GetWatchProjectile
  *
  * @param weaponDefID integer
- * @return boolean watched Watch status.
+ * @return boolean watched `true` if callins are registered, otherwise `false`.
  *
  * @see Spring.SetWatchProjectile
  */
