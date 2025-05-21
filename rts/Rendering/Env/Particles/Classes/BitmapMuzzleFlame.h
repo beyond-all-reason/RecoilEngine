@@ -36,8 +36,13 @@ private:
 	float length;
 	float sizeGrowth;
 	float frontOffset;
+	float speed;
+	float speedSpread;
+	float airdrag;
+	float3 gravity;
 	int ttl;
 
+	float3 speedVec;
 	float invttl;
 };
 
