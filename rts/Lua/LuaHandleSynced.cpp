@@ -2259,7 +2259,7 @@ SetWatchDef(Feature)
  * @return nil
  */
 
-/*** Register or deregister weaponDefID for expensive Explosion callins.
+/*** Register or deregister weaponDefID for explosion callins.
  *
  * @function Spring.SetWatchExplosion
  *
