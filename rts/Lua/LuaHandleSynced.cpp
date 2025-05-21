@@ -2120,16 +2120,187 @@ int CSyncedLuaHandle::GetWatchWeaponDef(lua_State* L) {
 	return 1;
 }
 
+/*** Register/deregister callins working per defID.
+ *
+ * Some of the engine callins can result in so many callins the engine doesn't forward them until registered
+ * through the following SetWatch* methods.
+ *
+ * The GetWatch* methods can be used to query the currently registered defIDs.
+ *
+ * @section watch_methods
+ */
+
+/*** Query watch status for a unitDefID.
+ *
+ * @function Spring.GetWatchUnit
+ *
+ * @param unitDefID integer
+ * @return boolean watched Watch status.
+ *
+ * @see Spring.SetWatchUnit
+ */
+
 GetWatchDef(Unit)
+
+
+/*** Query watch status for a featureDefID.
+ *
+ * @function Spring.GetWatchFeature
+ *
+ * @param featureDefID integer
+ * @return boolean watched Watch status.
+ *
+ * @see Spring.SetWatchFeature
+ */
+
 GetWatchDef(Feature)
+
+
+/*** Query general watch status for a weaponDefID.
+ *
+ * @function Spring.GetWatchWeapon
+ *
+ * Same as calling:
+ * ```lua
+ * Spring.GetWatchExplosion(weaponDefID) or Spring.GetWatchProjectile(weaponDefID) or Spring.GetWatchAllowTarget(weaponDefID)
+ * ```
+ *
+ * @param weaponDefID integer
+ * @return boolean watched True if watch is enabled for any weaponDefID callins.
+ *
+ * @see Spring.SetWatchWeapon
+ */
+
+/*** Query Explosion watch status for a weaponDefID.
+ *
+ * @function Spring.GetWatchExplosion
+ *
+ * @param weaponDefID integer
+ * @return boolean watched Watch status.
+ *
+ * @see Spring.SetWatchExplosion
+ */
+
 GetWatchDef(Explosion)
+
+
+/*** Query Projectile watch status for a weaponDefID.
+ *
+ * @function Spring.GetWatchProjectile
+ *
+ * @param weaponDefID integer
+ * @return boolean watched Watch status.
+ *
+ * @see Spring.SetWatchProjectile
+ */
+
 GetWatchDef(Projectile)
+
+
+/*** Query AllowTarget watch status for a weaponDefID.
+ *
+ * @function Spring.GetWatchAllowTarget
+ *
+ * @param weaponDefID integer
+ * @return boolean watched Watch status.
+ *
+ * @see Spring.SetWatchAllowTarget
+ */
+
 GetWatchDef(AllowTarget)
 
+
+/*** Register or deregister unitDefID for expensive callins.
+ *
+ * @function Spring.SetWatchUnit
+ *
+ * @param unitDefID integer
+ * @param watch boolean Whether to register or deregister.
+ * @return nil
+ *
+ * @see Callins:UnitFeatureCollision
+ * @see Callins:UnitUnitCollision
+ * @see Callins:UnitMoveFailed
+ */
+
 SetWatchDef(Unit)
+
+
+/*** Register or deregister featureDefID for expensive callins.
+ *
+ * @function Spring.SetWatchFeature
+ *
+ * @param featureDefID integer
+ * @param watch boolean Whether to register or deregister.
+ * @return nil
+ *
+ * @see Callins:UnitFeatureCollision
+ */
+
 SetWatchDef(Feature)
+
+
+/*** Register or deregister weaponDefID for all expensive callins.
+ *
+ * @function Spring.SetWatchWeapon
+ *
+ * Equivalent to calling:
+ *
+ * ```lua
+ * Spring.SetWatchExplosion(weaponDefID)
+ * Spring.SetWatchProjectile(weaponDefID)
+ * Spring.SetWatchAllowTarget(weaponDefID)
+ * ```
+ *
+ * Generally it's better to use those methods to avoid registering uneeded callins.
+ *
+ * @param weaponDefID integer
+ * @param watch boolean Whether to register or deregister.
+ * @return nil
+ */
+
+/*** Register or deregister weaponDefID for expensive Explosion callins.
+ *
+ * @function Spring.SetWatchExplosion
+ *
+ * @param weaponDefID integer
+ * @param watch boolean Whether to register or deregister.
+ * @return nil
+ *
+ * @see SyncedCallins:Explosion
+ */
+
 SetWatchDef(Explosion)
+
+
+/*** Register or deregister weaponDefID for expensive Projectile callins.
+ *
+ * @function Spring.SetWatchProjectile
+ *
+ * @param weaponDefID integer weaponDefID for weapons or -1 to watch for debris.
+ * @param watch boolean Whether to register or deregister.
+ * @return nil
+ *
+ * @see SyncedCallins:ProjectileCreated
+ * @see SyncedCallins:ProjectileDestroyed
+ */
+
 SetWatchDef(Projectile)
+
+
+/*** Register or deregister weaponDefID for expensive AllowWeaponTarget callins.
+ *
+ * @function Spring.SetWatchAllowTarget
+ *
+ * @param weaponDefID integer
+ * @param watch boolean Whether to register or deregister.
+ * @return nil
+ *
+ * @see SyncedCallins:AllowWeaponTargetCheck
+ * @see SyncedCallins:AllowWeaponTarget
+ * @see SyncedCallins:AllowWeaponInterceptTarget
+ */
+
 SetWatchDef(AllowTarget)
 
 #undef GetWatchDef
