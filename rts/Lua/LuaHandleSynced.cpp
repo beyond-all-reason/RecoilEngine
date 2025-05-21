@@ -1696,11 +1696,12 @@ bool CSyncedLuaHandle::ShieldPreDamaged(
 /*** Determines if this weapon can automatically generate targets itself. See also commandFire weaponDef tag.
  *
  * @function SyncedCallins:AllowWeaponTargetCheck
+ *
+ * Only called for weaponDefIDs registered via Script.SetWatchAllowTarget or Script.SetWatchWeapon.
+ *
  * @param attackerID integer
  * @param attackerWeaponNum integer
  * @param attackerWeaponDefID integer
- *
- * Only called for weaponDefIDs registered via Script.SetWatchAllowTarget or Script.SetWatchWeapon.
  *
  * @return boolean allowCheck
  * @return boolean ignoreCheck
@@ -1742,13 +1743,14 @@ int CSyncedLuaHandle::AllowWeaponTargetCheck(unsigned int attackerID, unsigned i
 /*** Controls blocking of a specific target from being considered during a weapon's periodic auto-targeting sweep.
  *
  * @function SyncedCallins:AllowWeaponTarget
+ *
+ * Only called for weaponDefIDs registered via Script.SetWatchAllowTarget or Script.SetWatchWeapon.
+ *
  * @param attackerID integer
  * @param targetID integer
  * @param attackerWeaponNum integer
  * @param attackerWeaponDefID integer
  * @param defPriority number
- *
- * Only called for weaponDefIDs registered via Script.SetWatchAllowTarget or Script.SetWatchWeapon.
  *
  * @return boolean allowed
  * @return number the new priority for this target (if you don't want to change it, return defPriority). Lower priority targets are targeted first.

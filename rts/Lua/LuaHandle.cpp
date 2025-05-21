@@ -2184,15 +2184,15 @@ void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
  *
  * @function Callins:Explosion
  *
+ * Only called for weaponDefIDs registered via Script.SetWatchExplosion or Script.SetWatchWeapon.
+ *
  * @param weaponDefID integer
  * @param px number
  * @param py number
  * @param pz number
  * @param attackerID integer
  * @param projectileID integer
- *
- * Only called for weaponDefIDs registered via Script.SetWatchExplosion or Script.SetWatchWeapon.
- *
+  *
  * @return boolean noGfx if then no graphical effects are drawn by the engine for this explosion.
  *
  * @see Script.SetWatchExplosion
