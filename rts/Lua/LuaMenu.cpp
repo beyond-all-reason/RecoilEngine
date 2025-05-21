@@ -109,6 +109,7 @@ CLuaMenu::CLuaMenu()
 
 	// load the spring libraries
 	if (
+		!AddCommonModules(L)						   ||
 		!AddEntriesToTable(L, "Spring",    LoadUnsyncedCtrlFunctions)      ||
 		!AddEntriesToTable(L, "Spring",    LoadUnsyncedReadFunctions)      ||
 		!AddEntriesToTable(L, "Spring",    LoadLuaMenuFunctions)           ||

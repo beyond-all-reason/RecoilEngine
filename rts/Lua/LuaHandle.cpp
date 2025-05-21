@@ -10,6 +10,7 @@
 #include "LuaConfig.h"
 #include "LuaHashString.h"
 #include "LuaOpenGL.h"
+#include "LuaEncoding.h"
 #include "LuaMathExtra.h"
 #include "LuaTableExtra.h"
 #include "LuaTracyExtra.h"
@@ -3994,6 +3995,12 @@ bool CLuaHandle::AddBasicCalls(lua_State* L)
 	return true;
 }
 
+bool CLuaHandle::AddCommonModules(lua_State* L)
+{
+	if (!AddEntriesToTable(L, "Spring",           LuaEncoding::PushEntries        ))
+		return false;
+	return true;
+}
 
 /***
  * @function Script.GetName

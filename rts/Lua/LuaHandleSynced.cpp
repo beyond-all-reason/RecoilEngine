@@ -120,6 +120,7 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 		#define KILL { KillLua(); return false; }
 		if (!LuaSyncedTable::PushEntries(L)) KILL
 
+		if (!AddCommonModules(L)						       ) KILL
 		if (!AddEntriesToTable(L, "VFS",                   LuaVFS::PushUnsynced       )) KILL
 		if (!AddEntriesToTable(L, "VFS",         LuaZipFileReader::PushUnsynced       )) KILL
 		if (!AddEntriesToTable(L, "VFS",         LuaZipFileWriter::PushUnsynced       )) KILL
@@ -503,6 +504,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	// load our libraries  (LuaSyncedCtrl overrides some LuaUnsyncedCtrl entries)
 	{
 		#define KILL { KillLua(); return false; }
+		if (!AddCommonModules(L)						     ) KILL
 		if (!AddEntriesToTable(L, "VFS",                   LuaVFS::PushSynced       )) KILL
 		if (!AddEntriesToTable(L, "VFS",         LuaZipFileReader::PushSynced       )) KILL
 		if (!AddEntriesToTable(L, "VFS",         LuaZipFileWriter::PushSynced       )) KILL

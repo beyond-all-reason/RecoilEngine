@@ -142,6 +142,7 @@ CLuaUI::CLuaUI()
 
 	// load the spring libraries
 	if (!LoadCFunctions(L)                                                   ||
+	    !AddCommonModules(L)						 ||
 	    !AddEntriesToTable(L, "VFS",         LuaVFS::PushUnsynced)           ||
 	    !AddEntriesToTable(L, "VFS",         LuaZipFileReader::PushUnsynced) ||
 	    !AddEntriesToTable(L, "VFS",         LuaZipFileWriter::PushUnsynced) ||
