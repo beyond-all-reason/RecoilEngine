@@ -2156,7 +2156,7 @@ GetWatchDef(Unit)
 GetWatchDef(Feature)
 
 
-/*** Query general watch status for a weaponDefID.
+/*** Query whether any callins are registered for a weaponDefID.
  *
  * @function Spring.GetWatchWeapon
  *
