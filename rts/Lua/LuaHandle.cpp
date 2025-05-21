@@ -2323,7 +2323,6 @@ void CLuaHandle::SwapEnableModule(lua_State* L, bool enabled, const char* module
 	lua_pop(L, 1);
 
 	// create an empty module table
-	lua_pushvalue(L, LUA_GLOBALSINDEX);
 	if (missing) {
 		lua_createtable(L, 0, 0);
 		lua_setglobal(L, moduleName);
@@ -2331,7 +2330,9 @@ void CLuaHandle::SwapEnableModule(lua_State* L, bool enabled, const char* module
 
 	if (enabled) {
 		// relink methods
+		lua_pushvalue(L, LUA_GLOBALSINDEX);
 		LUA_OPEN_LIB(L, func);
+		lua_pop(L, 1);
 	}
 	else {
 		// unlink all methods
@@ -2346,7 +2347,6 @@ void CLuaHandle::SwapEnableModule(lua_State* L, bool enabled, const char* module
 		}
 		lua_pop(L, 1);
 	}
-	lua_pop(L, 1);
 }
 
 
