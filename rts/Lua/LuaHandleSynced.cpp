@@ -1699,6 +1699,9 @@ bool CSyncedLuaHandle::ShieldPreDamaged(
  * @param attackerID integer
  * @param attackerWeaponNum integer
  * @param attackerWeaponDefID integer
+ *
+ * Only called for weaponDefIDs registered via Script.SetWatchAllowTarget or Script.SetWatchWeapon.
+ *
  * @return boolean allowCheck
  * @return boolean ignoreCheck
  */
@@ -1741,6 +1744,9 @@ int CSyncedLuaHandle::AllowWeaponTargetCheck(unsigned int attackerID, unsigned i
  * @param attackerWeaponNum integer
  * @param attackerWeaponDefID integer
  * @param defPriority number
+ *
+ * Only called for weaponDefIDs registered via Script.SetWatchAllowTarget or Script.SetWatchWeapon.
+ *
  * @return boolean allowed
  * @return number the new priority for this target (if you don't want to change it, return defPriority). Lower priority targets are targeted first.
  */
@@ -1800,7 +1806,7 @@ bool CSyncedLuaHandle::AllowWeaponTarget(
  *
  * @function SyncedCallins:AllowWeaponInterceptTarget
  *
- * Only called for weaponDefIDs registered via Script.SetWatchWeapon.
+ * Only called for weaponDefIDs registered via Script.SetWatchAllowTarget or Script.SetWatchWeapon.
  *
  * @param interceptorUnitID integer
  * @param interceptorWeaponID integer
