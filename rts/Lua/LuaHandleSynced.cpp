@@ -2288,7 +2288,7 @@ SetWatchDef(Explosion)
 SetWatchDef(Projectile)
 
 
-/*** Register or deregister weaponDefID for expensive AllowWeaponTarget callins.
+/*** Register or deregister weaponDefID for weapon targeting callins.
  *
  * @function Spring.SetWatchAllowTarget
  *
