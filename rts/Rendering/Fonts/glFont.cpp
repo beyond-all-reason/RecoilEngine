@@ -643,7 +643,7 @@ void CglFont::End() {
 	fontRenderer->HandleTextureUpdate(*this, false);
 	fontRenderer->PushGLState(*this);
 	fontRenderer->DrawTraingleElements();
-	fontRenderer->PopGLState();
+	fontRenderer->PopGLState(*this);
 
 	inBeginEndBlock = false;
 	sync.Unlock();
@@ -660,7 +660,7 @@ void CglFont::DrawBuffered()
 
 	fontRenderer->PushGLState(*this);
 	fontRenderer->DrawTraingleElements();
-	fontRenderer->PopGLState();
+	fontRenderer->PopGLState(*this);
 }
 
 void CglFont::DrawWorldBuffered()
