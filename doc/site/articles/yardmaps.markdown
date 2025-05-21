@@ -54,10 +54,9 @@ Basic characters:
 
 Remarks:
 
- * Needs geo means the unit can only be built on top of terrain marked as geothermal.
+ * Active/Inactive means whether `YARD_OPEN` is true or false (controlled by animation, default false)
+ * Needs geo means whether the unit can only be built on top of terrain marked as geothermal.
  * `h`: special character that when passed as (and **only valid** when) the first letter on a yardmap (e.g. `hyyy..`) marks it as high resolution: requires 4x more characters and each will correspond to a "regular" 8x8 elmo game square instead of the larger 16x16 elmo footprint square. Does not count as a square.
- * `c`: Open and unblocking only while constructing (controlled by animation via `COB.YARD_OPEN`)
- * `i`: Closed and blocking only while constructing (controlled by animation via `COB.YARD_OPEN`)
  * `w`, `x`, `f`:  deprecated, same as `o`.
  * **whitespace is ignored**, which you can use to neatly **arrange the rectangle visually**.
  * anything else is ignored as well but may be used in the future.
