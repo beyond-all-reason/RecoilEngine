@@ -1691,6 +1691,27 @@ function gadgetHandler:UnitHarvestStorageFull(unitID, unitDefID, unitTeam)
   end
 end
 
+function gadgetHandler:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
+  for _,g in r_ipairs(self.UnitSelfDestructStartedList) do
+    g:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
+  end
+  return
+end
+
+function gadgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
+  for _,g in r_ipairs(self.UnitSelfDestructCancelledList) do
+    g:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
+  end
+  return
+end
+
+function gadgetHandler:UnitSelfDestructProgress(unitID, unitDefID, unitTeam, remainingSeconds)
+  for _,g in r_ipairs(self.UnitSelfDestructProgressList) do
+    g:UnitSelfDestructProgress(unitID, unitDefID, unitTeam, remainingSeconds)
+  end
+  return
+end
+
 --------------------------------------------------------------------------------
 --
 --  Feature call-ins
