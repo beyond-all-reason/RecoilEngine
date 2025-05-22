@@ -148,6 +148,7 @@ set(engineDedicatedSources
 	${ENGINE_SRC_ROOT_DIR}/Sim/Misc/AllyTeam.cpp
 	${ENGINE_SRC_ROOT_DIR}/Sim/Units/CommandAI/Command.cpp ## LuaUtils::ParseCommand*
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaConstEngine.cpp
+	${ENGINE_SRC_ROOT_DIR}/Lua/LuaEncoding.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaIO.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMemPool.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaParser.cpp
