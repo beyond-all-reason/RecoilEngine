@@ -5,6 +5,7 @@
 #include <cstring> // memcpy
 
 #include "xsimd/xsimd.hpp"
+#include <array>
 #include "ReadMap.h"
 #include "MapDamage.h"
 #include "MapInfo.h"
@@ -679,18 +680,71 @@ void CReadMap::UpdateFaceNormals(const SRectangle& rect, bool initialize)
 	const int z2 = std::min(mapDims.mapym1, rect.z2 + 1);
 	const int x2 = std::min(mapDims.mapxm1, rect.x2 + 1);
 
-	for_mt_chunk(z1, z2 + 1, [&](const int y) {
-		float3 fnTL;
-		float3 fnBR;
+       for_mt_chunk(z1, z2 + 1, [&](const int y) {
+#ifdef USE_XSIMD
+               using batch = xsimd::batch<float, 8>;
+               const batch sqsize = batch(float(SQUARE_SIZE));
 
-		for (int x = x1; x <= x2; x++) {
-			const int idxTL = (y    ) * mapDims.mapxp1 + x; // TL
-			const int idxBL = (y + 1) * mapDims.mapxp1 + x; // BL
+               int x = x1;
+               const int simdEnd = x2 - int(batch::size) + 1;
 
-			const float& hTL = heightmapSynced[idxTL    ];
-			const float& hTR = heightmapSynced[idxTL + 1];
-			const float& hBL = heightmapSynced[idxBL    ];
-			const float& hBR = heightmapSynced[idxBL + 1];
+               for (; x <= simdEnd; x += batch::size) {
+                       const int idxTL = (y    ) * mapDims.mapxp1 + x;
+                       const int idxBL = (y + 1) * mapDims.mapxp1 + x;
+
+                       batch hTL = batch::load_unaligned(heightmapSynced + idxTL    );
+                       batch hTR = batch::load_unaligned(heightmapSynced + idxTL + 1);
+                       batch hBL = batch::load_unaligned(heightmapSynced + idxBL    );
+                       batch hBR = batch::load_unaligned(heightmapSynced + idxBL + 1);
+
+                       batch fnTLx = -(hTR - hTL);
+                       batch fnTLy = sqsize;
+                       batch fnTLz = -(hBL - hTL);
+                       batch lenTL = xsimd::sqrt(fnTLx * fnTLx + fnTLy * fnTLy + fnTLz * fnTLz);
+                       fnTLx /= lenTL; fnTLy /= lenTL; fnTLz /= lenTL;
+
+                       batch fnBRx =  (hBL - hBR);
+                       batch fnBRy =  sqsize;
+                       batch fnBRz =  (hTR - hBR);
+                       batch lenBR = xsimd::sqrt(fnBRx * fnBRx + fnBRy * fnBRy + fnBRz * fnBRz);
+                       fnBRx /= lenBR; fnBRy /= lenBR; fnBRz /= lenBR;
+
+                       batch cnx = fnTLx + fnBRx;
+                       batch cny = fnTLy + fnBRy;
+                       batch cnz = fnTLz + fnBRz;
+                       batch lenCN = xsimd::sqrt(cnx * cnx + cny * cny + cnz * cnz);
+                       cnx /= lenCN; cny /= lenCN; cnz /= lenCN;
+
+                       batch cn2dx = cnx;
+                       batch cn2dz = cnz;
+                       batch lenCN2D = xsimd::sqrt(cn2dx * cn2dx + cn2dz * cn2dz);
+                       cn2dx /= lenCN2D; cn2dz /= lenCN2D;
+
+                       for (size_t i = 0; i < batch::size; ++i) {
+                               const int xi = x + i;
+                               faceNormalsSynced[(y * mapDims.mapx + xi) * 2    ] = float3{fnTLx[i], fnTLy[i], fnTLz[i]};
+                               faceNormalsSynced[(y * mapDims.mapx + xi) * 2 + 1] = float3{fnBRx[i], fnBRy[i], fnBRz[i]};
+                               centerNormalsSynced[y * mapDims.mapx + xi] = float3{cnx[i], cny[i], cnz[i]};
+                               centerNormals2D[y * mapDims.mapx + xi] = float3{cn2dx[i], 0.0f, cn2dz[i]};
+                               if (initialize) {
+                                       faceNormalsUnsynced[(y * mapDims.mapx + xi) * 2    ] = faceNormalsSynced[(y * mapDims.mapx + xi) * 2    ];
+                                       faceNormalsUnsynced[(y * mapDims.mapx + xi) * 2 + 1] = faceNormalsSynced[(y * mapDims.mapx + xi) * 2 + 1];
+                                       centerNormalsUnsynced[y * mapDims.mapx + xi] = centerNormalsSynced[y * mapDims.mapx + xi];
+                               }
+                       }
+               }
+
+               for (; x <= x2; ++x) {
+#else
+               for (int x = x1; x <= x2; x++) {
+#endif
+                       const int idxTL = (y    ) * mapDims.mapxp1 + x; // TL
+                       const int idxBL = (y + 1) * mapDims.mapxp1 + x; // BL
+
+                       const float& hTL = heightmapSynced[idxTL    ];
+                       const float& hTR = heightmapSynced[idxTL + 1];
+                       const float& hBL = heightmapSynced[idxBL    ];
+                       const float& hBR = heightmapSynced[idxBL + 1];
 
 			// normal of top-left triangle (face) in square
 			//
@@ -728,13 +782,16 @@ void CReadMap::UpdateFaceNormals(const SRectangle& rect, bool initialize)
 			centerNormalsSynced[y * mapDims.mapx + x] = (fnTL + fnBR).Normalize();
 			centerNormals2D[y * mapDims.mapx + x] = (fnTL + fnBR).Normalize2D();
 
-			if (initialize) {
-				faceNormalsUnsynced[(y * mapDims.mapx + x) * 2    ] = faceNormalsSynced[(y * mapDims.mapx + x) * 2    ];
-				faceNormalsUnsynced[(y * mapDims.mapx + x) * 2 + 1] = faceNormalsSynced[(y * mapDims.mapx + x) * 2 + 1];
-				centerNormalsUnsynced[y * mapDims.mapx + x] = centerNormalsSynced[y * mapDims.mapx + x];
-			}
-		}
-	}, 64);
+                       if (initialize) {
+                               faceNormalsUnsynced[(y * mapDims.mapx + x) * 2    ] = faceNormalsSynced[(y * mapDims.mapx + x) * 2    ];
+                               faceNormalsUnsynced[(y * mapDims.mapx + x) * 2 + 1] = faceNormalsSynced[(y * mapDims.mapx + x) * 2 + 1];
+                               centerNormalsUnsynced[y * mapDims.mapx + x] = centerNormalsSynced[y * mapDims.mapx + x];
+                       }
+#ifdef USE_XSIMD
+               }
+#endif
+               }
+       }, 64);
 }
 
 
@@ -746,38 +803,54 @@ void CReadMap::UpdateSlopemap(const SRectangle& rect, bool initialize)
 	const int sy = std::max(0,                 (rect.z1 / 2) - 1);
 	const int ey = std::min(mapDims.hmapy - 1, (rect.z2 / 2) + 1);
 
-	for_mt_chunk(sy, ey + 1, [sx, ex](const int y) {
-		for (int x = sx; x <= ex; x++) {
-			const int idx0 = (y*2    ) * (mapDims.mapx) + x*2;
-			const int idx1 = (y*2 + 1) * (mapDims.mapx) + x*2;
+       for_mt_chunk(sy, ey + 1, [sx, ex](const int y) {
+               for (int x = sx; x <= ex; x++) {
+                       const int idx0 = (y*2    ) * (mapDims.mapx) + x*2;
+                       const int idx1 = (y*2 + 1) * (mapDims.mapx) + x*2;
 
-			float avgslope = 0.0f;
-			avgslope += faceNormalsSynced[(idx0    ) * 2    ].y;
-			avgslope += faceNormalsSynced[(idx0    ) * 2 + 1].y;
-			avgslope += faceNormalsSynced[(idx0 + 1) * 2    ].y;
-			avgslope += faceNormalsSynced[(idx0 + 1) * 2 + 1].y;
-			avgslope += faceNormalsSynced[(idx1    ) * 2    ].y;
-			avgslope += faceNormalsSynced[(idx1    ) * 2 + 1].y;
-			avgslope += faceNormalsSynced[(idx1 + 1) * 2    ].y;
-			avgslope += faceNormalsSynced[(idx1 + 1) * 2 + 1].y;
-			avgslope *= 0.125f;
+#ifdef USE_XSIMD
+                       const std::array<float, 8> slopes = {
+                               faceNormalsSynced[(idx0    ) * 2    ].y,
+                               faceNormalsSynced[(idx0    ) * 2 + 1].y,
+                               faceNormalsSynced[(idx0 + 1) * 2    ].y,
+                               faceNormalsSynced[(idx0 + 1) * 2 + 1].y,
+                               faceNormalsSynced[(idx1    ) * 2    ].y,
+                               faceNormalsSynced[(idx1    ) * 2 + 1].y,
+                               faceNormalsSynced[(idx1 + 1) * 2    ].y,
+                               faceNormalsSynced[(idx1 + 1) * 2 + 1].y,
+                       };
 
-			float maxslope =              faceNormalsSynced[(idx0    ) * 2    ].y;
-			maxslope = std::min(maxslope, faceNormalsSynced[(idx0    ) * 2 + 1].y);
-			maxslope = std::min(maxslope, faceNormalsSynced[(idx0 + 1) * 2    ].y);
-			maxslope = std::min(maxslope, faceNormalsSynced[(idx0 + 1) * 2 + 1].y);
-			maxslope = std::min(maxslope, faceNormalsSynced[(idx1    ) * 2    ].y);
-			maxslope = std::min(maxslope, faceNormalsSynced[(idx1    ) * 2 + 1].y);
-			maxslope = std::min(maxslope, faceNormalsSynced[(idx1 + 1) * 2    ].y);
-			maxslope = std::min(maxslope, faceNormalsSynced[(idx1 + 1) * 2 + 1].y);
+                       const float avgslope = xsimd::hadd(xsimd::load_unaligned(slopes.data())) * 0.125f;
+                       float maxslope = xsimd::reduce(slopes.begin(), slopes.end(), slopes[0], MinOp{});
+#else
+                       float avgslope = 0.0f;
+                       avgslope += faceNormalsSynced[(idx0    ) * 2    ].y;
+                       avgslope += faceNormalsSynced[(idx0    ) * 2 + 1].y;
+                       avgslope += faceNormalsSynced[(idx0 + 1) * 2    ].y;
+                       avgslope += faceNormalsSynced[(idx0 + 1) * 2 + 1].y;
+                       avgslope += faceNormalsSynced[(idx1    ) * 2    ].y;
+                       avgslope += faceNormalsSynced[(idx1    ) * 2 + 1].y;
+                       avgslope += faceNormalsSynced[(idx1 + 1) * 2    ].y;
+                       avgslope += faceNormalsSynced[(idx1 + 1) * 2 + 1].y;
+                       avgslope *= 0.125f;
 
-			// smooth it a bit, so small holes don't block huge tanks
-			const float lerp = maxslope / avgslope;
-			const float slope = mix(maxslope, avgslope, lerp);
+                       float maxslope =              faceNormalsSynced[(idx0    ) * 2    ].y;
+                       maxslope = std::min(maxslope, faceNormalsSynced[(idx0    ) * 2 + 1].y);
+                       maxslope = std::min(maxslope, faceNormalsSynced[(idx0 + 1) * 2    ].y);
+                       maxslope = std::min(maxslope, faceNormalsSynced[(idx0 + 1) * 2 + 1].y);
+                       maxslope = std::min(maxslope, faceNormalsSynced[(idx1    ) * 2    ].y);
+                       maxslope = std::min(maxslope, faceNormalsSynced[(idx1    ) * 2 + 1].y);
+                       maxslope = std::min(maxslope, faceNormalsSynced[(idx1 + 1) * 2    ].y);
+                       maxslope = std::min(maxslope, faceNormalsSynced[(idx1 + 1) * 2 + 1].y);
+#endif
 
-			slopeMap[y * mapDims.hmapx + x] = 1.0f - slope;
-		}
-	}, 128);
+                       // smooth it a bit, so small holes don't block huge tanks
+                       const float lerp = maxslope / avgslope;
+                       const float slope = mix(maxslope, avgslope, lerp);
+
+                       slopeMap[y * mapDims.hmapx + x] = 1.0f - slope;
+               }
+       }, 128);
 }
 
 
