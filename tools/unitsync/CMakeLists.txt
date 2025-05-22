@@ -14,6 +14,9 @@ list(APPEND unitsync_libs 7zip prd::jsoncpp lua headlessStubs archives_nothreadp
 list(APPEND unitsync_libs ZLIB::ZLIB)
 list(APPEND unitsync_libs ${SPRING_MINIZIP_LIBRARY})
 
+### base64 from pr-downloader
+list(APPEND unitsync_libs "prd::base64")
+
 ### smmalloc
 list(APPEND unitsync_libs "smmalloc")
 
