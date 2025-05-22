@@ -6481,7 +6481,7 @@ int LuaSyncedRead::GetFactoryCounts(lua_State* L)
 
 int LuaSyncedRead::GetCommandQueue(lua_State* L)
 {
-	LOG_DEPRECATED("Spring.GetCommandQueue is deprecated, please use Spring.GetUnitCommands instead.");
+	LOG_DEPRECATED("Spring.GetCommandQueue is deprecated, please use Spring.GetUnitCommands/Spring.GetUnitCommandCount instead.");
 	return (GetUnitCommands(L));
 }
 
