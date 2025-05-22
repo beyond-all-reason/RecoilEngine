@@ -315,44 +315,6 @@ end
 --------------------------------------------------------------------------------
 
 
-local function GetWidgetInfo(name, mode)
-
-  do return end -- FIXME
-
-  local lines = VFS.LoadFile(name, mode)
-
-  local infoLines = {}
-
-  for line in lines:gmatch('([^\n]*)\n') do
-    if (not line:find('^%s*%-%-')) then
-      if (line:find('[^\r]')) then
-        break -- not commented, not a blank line
-      end
-    end
-    local s, e, source = line:find('^%s*%-%-%>%>(.*)')
-    if (source) then
-      table.insert(infoLines, source)
-    end
-  end
-
-  local info = {}
-  local chunk, err = loadstring(table.concat(infoLines, '\n'))
-  if (not chunk) then
-    Spring.Log(section, LOG.INFO, 'not loading ' .. name .. ': ' .. err)
-  else
-    setfenv(chunk, info)
-    local success, err = pcall(chunk)
-    if (not success) then
-      Spring.Log(section, LOG.INFO, 'not loading ' .. name .. ': ' .. tostring(err))
-    end
-  end
-
-  for k,v in pairs(info) do
-    Spring.Log(section, LOG.INFO, name, k, 'type: ' .. type(v), '<'..tostring(v)..'>')
-  end
-end
-
-
 function widgetHandler:Initialize()
   self:LoadConfigData()
 
@@ -367,7 +329,6 @@ function widgetHandler:Initialize()
   -- stuff the raw widgets into unsortedWidgets
   local widgetFiles = VFS.DirList(WIDGET_DIRNAME, "*.lua", VFS.RAW_ONLY)
   for k,wf in ipairs(widgetFiles) do
-    GetWidgetInfo(wf, VFS.RAW_ONLY)
     local widget = self:LoadWidget(wf, false)
     if (widget) then
       table.insert(unsortedWidgets, widget)
@@ -377,7 +338,6 @@ function widgetHandler:Initialize()
   -- stuff the zip widgets into unsortedWidgets
   local widgetFiles = VFS.DirList(WIDGET_DIRNAME, "*.lua", VFS.ZIP_ONLY)
   for k,wf in ipairs(widgetFiles) do
-    GetWidgetInfo(wf, VFS.ZIP_ONLY)
     local widget = self:LoadWidget(wf, true)
     if (widget) then
       table.insert(unsortedWidgets, widget)
