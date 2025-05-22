@@ -26,6 +26,7 @@
 #include <utility>
 #include <functional>
 #include <cinttypes>
+#include <thread>
 
 #define USE_TASK_STATS_TRACKING
 
@@ -108,19 +109,26 @@ static int GetConfigNumWorkers() {
 }
 
 static int GetDefaultNumWorkers() {
-	const int maxNumThreads = GetMaxThreads(); // min(MAX_THREADS, logicalCpus)
-	const int cfgNumWorkers = GetConfigNumWorkers();
+        const int maxNumThreads = GetMaxThreads(); // min(MAX_THREADS, logicalCpus)
+        const int cfgNumWorkers = GetConfigNumWorkers();
 
-	if (cfgNumWorkers < 0) {
-		return Threading::GetPerformanceCpuCores();
-	}
+        if (cfgNumWorkers >= 0) {
+                if (cfgNumWorkers > maxNumThreads) {
+                        LOG_L(L_WARNING, "[ThreadPool::%s] workers set to %i, but there are just %i hardware threads!", __func__, cfgNumWorkers, maxNumThreads);
+                        return maxNumThreads;
+                }
 
-	if (cfgNumWorkers > maxNumThreads) {
-		LOG_L(L_WARNING, "[ThreadPool::%s] workers set to %i, but there are just %i hardware threads!", __func__, cfgNumWorkers, maxNumThreads);
-		return maxNumThreads;
-	}
+                return cfgNumWorkers;
+        }
 
-	return cfgNumWorkers;
+        // automatic worker count
+        const unsigned int hwCores = std::thread::hardware_concurrency();
+        const int perfCores = Threading::GetPerformanceCpuCores();
+
+        if (cfgNumWorkers == -1 && perfCores > 0 && hwCores > static_cast<unsigned int>(perfCores))
+                return std::min(perfCores, maxNumThreads);
+
+        return std::min(perfCores, maxNumThreads);
 }
 
 
