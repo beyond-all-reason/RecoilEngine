@@ -57,6 +57,7 @@ set(main_files
 	"${ENGINE_SRC_ROOT}/ExternalAI/LuaAIImplHandler.cpp"
 	"${ENGINE_SRC_ROOT}/Game/GameVersion.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaConstEngine.cpp"
+	"${ENGINE_SRC_ROOT}/Lua/LuaEncoding.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaMemPool.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaParser.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaUtils.cpp"
