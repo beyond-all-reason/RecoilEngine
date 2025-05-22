@@ -2130,7 +2130,7 @@ int CSyncedLuaHandle::GetWatchWeaponDef(lua_State* L) {
  * @section watch_methods
  */
 
-/*** Query watch status for a unitDefID.
+/*** Query whether any callins are registered for a unitDefID.
  *
  * @function Script.GetWatchUnit
  *
@@ -2143,7 +2143,7 @@ int CSyncedLuaHandle::GetWatchWeaponDef(lua_State* L) {
 GetWatchDef(Unit)
 
 
-/*** Query watch status for a featureDefID.
+/*** Query whether any callins are registered for a featureDefID.
  *
  * @function Script.GetWatchFeature
  *
