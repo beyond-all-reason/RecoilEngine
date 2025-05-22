@@ -11,6 +11,11 @@ if    (UNIX AND (NOT APPLE) AND (NOT MINGW))
 	if    (PREFER_STATIC_LIBS AND NOT EXISTS "${REALTIME_LIBRARY}")
 		message(FATAL_ERROR "librt.[so|a] not found! Needed by std::chrono when statically linked!")
 	endif (PREFER_STATIC_LIBS AND NOT EXISTS "${REALTIME_LIBRARY}")
+	# Prevent `CMake Error: The following variables are used in this project, but they are set to NOTFOUND.`
+	# for `test_SpringTime` and `test_UDPListener`:
+	if (NOT REALTIME_LIBRARY)
+		set(REALTIME_LIBRARY "")
+	endif ()
 else  (UNIX AND (NOT APPLE) AND (NOT MINGW))
 	set(REALTIME_LIBRARY "")
 endif (UNIX AND (NOT APPLE) AND (NOT MINGW))
