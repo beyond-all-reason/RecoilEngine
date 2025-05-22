@@ -6468,7 +6468,7 @@ int LuaSyncedRead::GetFactoryCounts(lua_State* L)
 /***
  * Get the count of commands for a unit.
  *
- * @deprecated Use Spring.GetUnitCommands instead.
+ * @deprecated Use Spring.GetUnitCommandCount instead.
  * @function Spring.GetCommandQueue
  *
  * Same as `Spring.GetUnitCommands`
