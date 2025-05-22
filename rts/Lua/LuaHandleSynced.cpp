@@ -2267,7 +2267,7 @@ SetWatchDef(Feature)
  * @param watch boolean Whether to register or deregister.
  * @return nil
  *
- * @see SyncedCallins:Explosion
+ * @see Callins:Explosion
  */
 
 SetWatchDef(Explosion)
@@ -2281,8 +2281,8 @@ SetWatchDef(Explosion)
  * @param watch boolean Whether to register or deregister.
  * @return nil
  *
- * @see SyncedCallins:ProjectileCreated
- * @see SyncedCallins:ProjectileDestroyed
+ * @see Callins:ProjectileCreated
+ * @see Callins:ProjectileDestroyed
  */
 
 SetWatchDef(Projectile)
