@@ -1706,8 +1706,8 @@ bool CSyncedLuaHandle::ShieldPreDamaged(
  * @return boolean allowCheck
  * @return boolean ignoreCheck
  *
- * @see Spring.SetWatchAllowTarget
- * @see Spring.SetWatchWeapon
+ * @see Script.SetWatchAllowTarget
+ * @see Script.SetWatchWeapon
  */
 int CSyncedLuaHandle::AllowWeaponTargetCheck(unsigned int attackerID, unsigned int attackerWeaponNum, unsigned int attackerWeaponDefID)
 {
@@ -1755,8 +1755,8 @@ int CSyncedLuaHandle::AllowWeaponTargetCheck(unsigned int attackerID, unsigned i
  * @return boolean allowed
  * @return number the new priority for this target (if you don't want to change it, return defPriority). Lower priority targets are targeted first.
  *
- * @see Spring.SetWatchAllowTarget
- * @see Spring.SetWatchWeapon
+ * @see Script.SetWatchAllowTarget
+ * @see Script.SetWatchWeapon
  */
 bool CSyncedLuaHandle::AllowWeaponTarget(
 	unsigned int attackerID,
@@ -1822,8 +1822,8 @@ bool CSyncedLuaHandle::AllowWeaponTarget(
  *
  * @return boolean allowed
  *
- * @see Spring.SetWatchAllowTarget
- * @see Spring.SetWatchWeapon
+ * @see Script.SetWatchAllowTarget
+ * @see Script.SetWatchWeapon
  */
 bool CSyncedLuaHandle::AllowWeaponInterceptTarget(
 	const CUnit* interceptorUnit,

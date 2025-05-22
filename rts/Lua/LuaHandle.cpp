@@ -2131,8 +2131,8 @@ void CLuaHandle::ProjectileCreated(const CProjectile* p)
  * @param ownerID integer
  * @param proWeaponDefID integer
  *
- * @see Spring.SetWatchProjectile
- * @see Spring.SetWatchWeapon
+ * @see Script.SetWatchProjectile
+ * @see Script.SetWatchWeapon
  */
 void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
 {
