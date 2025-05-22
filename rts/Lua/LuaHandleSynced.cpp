@@ -2216,7 +2216,6 @@ GetWatchDef(AllowTarget)
  *
  * @param unitDefID integer
  * @param watch boolean Whether to register or deregister.
- * @return nil
  *
  * @see Callins:UnitFeatureCollision
  * @see Callins:UnitUnitCollision
@@ -2232,7 +2231,6 @@ SetWatchDef(Unit)
  *
  * @param featureDefID integer
  * @param watch boolean Whether to register or deregister.
- * @return nil
  *
  * @see Callins:UnitFeatureCollision
  */
@@ -2256,7 +2254,6 @@ SetWatchDef(Feature)
  *
  * @param weaponDefID integer
  * @param watch boolean Whether to register or deregister.
- * @return nil
  */
 
 /*** Register or deregister weaponDefID for explosion callins.
@@ -2265,7 +2262,6 @@ SetWatchDef(Feature)
  *
  * @param weaponDefID integer
  * @param watch boolean Whether to register or deregister.
- * @return nil
  *
  * @see Callins:Explosion
  */
@@ -2279,7 +2275,6 @@ SetWatchDef(Explosion)
  *
  * @param weaponDefID integer weaponDefID for weapons or -1 to watch for debris.
  * @param watch boolean Whether to register or deregister.
- * @return nil
  *
  * @see Callins:ProjectileCreated
  * @see Callins:ProjectileDestroyed
@@ -2294,7 +2289,6 @@ SetWatchDef(Projectile)
  *
  * @param weaponDefID integer
  * @param watch boolean Whether to register or deregister.
- * @return nil
  *
  * @see SyncedCallins:AllowWeaponTargetCheck
  * @see SyncedCallins:AllowWeaponTarget
