@@ -2217,6 +2217,7 @@ GetWatchDef(AllowTarget)
  * @param unitDefID integer
  * @param watch boolean Whether to register or deregister.
  *
+ * @see Script.GetWatchUnit
  * @see Callins:UnitFeatureCollision
  * @see Callins:UnitUnitCollision
  * @see Callins:UnitMoveFailed
@@ -2232,6 +2233,7 @@ SetWatchDef(Unit)
  * @param featureDefID integer
  * @param watch boolean Whether to register or deregister.
  *
+ * @see Script.GetWatchFeature
  * @see Callins:UnitFeatureCollision
  */
 
@@ -2254,6 +2256,11 @@ SetWatchDef(Feature)
  *
  * @param weaponDefID integer
  * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchWeapon
+ * @see Script.SetWatchExplosion
+ * @see Script.SetWatchProjectile
+ * @see Script.SetWatchAllowTarget
  */
 
 /*** Register or deregister weaponDefID for explosion callins.
@@ -2263,6 +2270,7 @@ SetWatchDef(Feature)
  * @param weaponDefID integer
  * @param watch boolean Whether to register or deregister.
  *
+ * @see Script.GetWatchExplosion
  * @see Callins:Explosion
  */
 
@@ -2276,6 +2284,7 @@ SetWatchDef(Explosion)
  * @param weaponDefID integer weaponDefID for weapons or -1 to watch for debris.
  * @param watch boolean Whether to register or deregister.
  *
+ * @see Script.GetWatchProjectile
  * @see Callins:ProjectileCreated
  * @see Callins:ProjectileDestroyed
  */
@@ -2290,6 +2299,7 @@ SetWatchDef(Projectile)
  * @param weaponDefID integer
  * @param watch boolean Whether to register or deregister.
  *
+ * @see Script.GetWatchAllowTarget
  * @see SyncedCallins:AllowWeaponTargetCheck
  * @see SyncedCallins:AllowWeaponTarget
  * @see SyncedCallins:AllowWeaponInterceptTarget
