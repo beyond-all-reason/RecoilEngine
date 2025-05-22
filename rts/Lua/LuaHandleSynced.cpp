@@ -2132,12 +2132,12 @@ int CSyncedLuaHandle::GetWatchWeaponDef(lua_State* L) {
 
 /*** Query watch status for a unitDefID.
  *
- * @function Spring.GetWatchUnit
+ * @function Script.GetWatchUnit
  *
  * @param unitDefID integer
  * @return boolean watched Watch status.
  *
- * @see Spring.SetWatchUnit
+ * @see Script.SetWatchUnit
  */
 
 GetWatchDef(Unit)
@@ -2145,12 +2145,12 @@ GetWatchDef(Unit)
 
 /*** Query watch status for a featureDefID.
  *
- * @function Spring.GetWatchFeature
+ * @function Script.GetWatchFeature
  *
  * @param featureDefID integer
  * @return boolean watched `true` if callins are registered, otherwise `false`.
  *
- * @see Spring.SetWatchFeature
+ * @see Script.SetWatchFeature
  */
 
 GetWatchDef(Feature)
@@ -2158,27 +2158,27 @@ GetWatchDef(Feature)
 
 /*** Query whether any callins are registered for a weaponDefID.
  *
- * @function Spring.GetWatchWeapon
+ * @function Script.GetWatchWeapon
  *
  * Same as calling:
  * ```lua
- * Spring.GetWatchExplosion(weaponDefID) or Spring.GetWatchProjectile(weaponDefID) or Spring.GetWatchAllowTarget(weaponDefID)
+ * Script.GetWatchExplosion(weaponDefID) or Script.GetWatchProjectile(weaponDefID) or Script.GetWatchAllowTarget(weaponDefID)
  * ```
  *
  * @param weaponDefID integer
  * @return boolean watched True if watch is enabled for any weaponDefID callins.
  *
- * @see Spring.SetWatchWeapon
+ * @see Script.SetWatchWeapon
  */
 
 /*** Query whether explosion callins are registered for a weaponDefID.
  *
- * @function Spring.GetWatchExplosion
+ * @function Script.GetWatchExplosion
  *
  * @param weaponDefID integer
  * @return boolean watched `true` if callins are registered, otherwise `false`.
  *
- * @see Spring.SetWatchExplosion
+ * @see Script.SetWatchExplosion
  */
 
 GetWatchDef(Explosion)
@@ -2186,12 +2186,12 @@ GetWatchDef(Explosion)
 
 /*** Query whether projectile callins are registered for a weaponDefID.
  *
- * @function Spring.GetWatchProjectile
+ * @function Script.GetWatchProjectile
  *
  * @param weaponDefID integer
  * @return boolean watched `true` if callins are registered, otherwise `false`.
  *
- * @see Spring.SetWatchProjectile
+ * @see Script.SetWatchProjectile
  */
 
 GetWatchDef(Projectile)
@@ -2199,12 +2199,12 @@ GetWatchDef(Projectile)
 
 /*** Query whether weapon targeting callins are registered for a weaponDefID.
  *
- * @function Spring.GetWatchAllowTarget
+ * @function Script.GetWatchAllowTarget
  *
  * @param weaponDefID integer
  * @return boolean watched `true` if callins are registered, otherwise `false`.
  *
- * @see Spring.SetWatchAllowTarget
+ * @see Script.SetWatchAllowTarget
  */
 
 GetWatchDef(AllowTarget)
@@ -2212,7 +2212,7 @@ GetWatchDef(AllowTarget)
 
 /*** Register or deregister unitDefID for expensive callins.
  *
- * @function Spring.SetWatchUnit
+ * @function Script.SetWatchUnit
  *
  * @param unitDefID integer
  * @param watch boolean Whether to register or deregister.
@@ -2228,7 +2228,7 @@ SetWatchDef(Unit)
 
 /*** Register or deregister featureDefID for expensive callins.
  *
- * @function Spring.SetWatchFeature
+ * @function Script.SetWatchFeature
  *
  * @param featureDefID integer
  * @param watch boolean Whether to register or deregister.
@@ -2242,14 +2242,14 @@ SetWatchDef(Feature)
 
 /*** Register or deregister weaponDefID for all expensive callins.
  *
- * @function Spring.SetWatchWeapon
+ * @function Script.SetWatchWeapon
  *
  * Equivalent to calling:
  *
  * ```lua
- * Spring.SetWatchExplosion(weaponDefID)
- * Spring.SetWatchProjectile(weaponDefID)
- * Spring.SetWatchAllowTarget(weaponDefID)
+ * Script.SetWatchExplosion(weaponDefID)
+ * Script.SetWatchProjectile(weaponDefID)
+ * Script.SetWatchAllowTarget(weaponDefID)
  * ```
  *
  * Generally it's better to use those methods to avoid registering uneeded callins.
@@ -2261,7 +2261,7 @@ SetWatchDef(Feature)
 
 /*** Register or deregister weaponDefID for explosion callins.
  *
- * @function Spring.SetWatchExplosion
+ * @function Script.SetWatchExplosion
  *
  * @param weaponDefID integer
  * @param watch boolean Whether to register or deregister.
@@ -2275,7 +2275,7 @@ SetWatchDef(Explosion)
 
 /*** Register or deregister weaponDefID for expensive projectile callins.
  *
- * @function Spring.SetWatchProjectile
+ * @function Script.SetWatchProjectile
  *
  * @param weaponDefID integer weaponDefID for weapons or -1 to watch for debris.
  * @param watch boolean Whether to register or deregister.
@@ -2290,7 +2290,7 @@ SetWatchDef(Projectile)
 
 /*** Register or deregister weaponDefID for weapon targeting callins.
  *
- * @function Spring.SetWatchAllowTarget
+ * @function Script.SetWatchAllowTarget
  *
  * @param weaponDefID integer
  * @param watch boolean Whether to register or deregister.
