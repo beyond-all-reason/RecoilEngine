@@ -214,24 +214,10 @@ static void WorkerLoop(int tid, bool async)
 	Threading::SetThreadName(IntToString(tid, "worker%i"));
 	#endif
 
-	// make first worker spin a while before sleeping/waiting on the thread signal
-	// this increases the chance that at least one worker is awake when a new task
-	// is inserted, which can then take over the job of waking up sleeping workers
-	// (see NotifyWorkerThreads)
-	// NOTE: the spin-time has to be *short* to avoid biasing thread 1's workload
-	const auto ourSpinTime = spring_time::fromMicroSecs(30 * (tid == 1));
-	const auto maxSleepTime = spring_time::fromMilliSecs(30);
-
-	while (!exitFlags[tid]) {
-		const auto spinlockEnd = spring_now() + ourSpinTime;
-		      auto sleepTime   = spring_time::fromMicroSecs(1);
-
-		while (!DoTask(tid, async) && !exitFlags[tid]) {
-			if (spring_now() < spinlockEnd)
-				continue;
-
-			newTasksSignal[async].wait_for(sleepTime = std::min(sleepTime * 1.25f, maxSleepTime));
-		}
+	// try to execute a queued job; if none are available
+	// then block until new work is enqueued or shutdown
+	if (!DoTask(tid, async))
+		newTasksSignal[async].wait();
 	}
 }
 
