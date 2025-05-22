@@ -223,6 +223,8 @@ bool CUnsyncedLuaHandle::DrawUnit(const CUnit* unit)
 	if (!cmdStr.GetGlobalFunc(L))
 		return false;
 
+	LOG_DEPRECATED("DrawUnit is deprecated.");
+
 	const bool oldDrawState = LuaOpenGL::IsDrawingEnabled(L);
 	LuaOpenGL::SetDrawingEnabled(L, true);
 
@@ -259,6 +261,8 @@ bool CUnsyncedLuaHandle::DrawFeature(const CFeature* feature)
 	static const LuaHashString cmdStr(__func__);
 	if (!cmdStr.GetGlobalFunc(L))
 		return false;
+
+	LOG_DEPRECATED("DrawFeature is deprecated.");
 
 	const bool oldDrawState = LuaOpenGL::IsDrawingEnabled(L);
 	LuaOpenGL::SetDrawingEnabled(L, true);
@@ -297,6 +301,8 @@ bool CUnsyncedLuaHandle::DrawShield(const CUnit* unit, const CWeapon* weapon)
 
 	if (!cmdStr.GetGlobalFunc(L))
 		return false;
+
+	LOG_DEPRECATED("DrawShield is deprecated.");
 
 	const bool oldDrawState = LuaOpenGL::IsDrawingEnabled(L);
 	LuaOpenGL::SetDrawingEnabled(L, true);
@@ -337,6 +343,8 @@ bool CUnsyncedLuaHandle::DrawProjectile(const CProjectile* projectile)
 	if (!cmdStr.GetGlobalFunc(L))
 		return false;
 
+	LOG_DEPRECATED("DrawProjectile is deprecated.");
+
 	const bool oldDrawState = LuaOpenGL::IsDrawingEnabled(L);
 	LuaOpenGL::SetDrawingEnabled(L, true);
 
@@ -372,6 +380,8 @@ bool CUnsyncedLuaHandle::DrawMaterial(const LuaMaterial* material)
 	static const LuaHashString cmdStr(__func__);
 	if (!cmdStr.GetGlobalFunc(L))
 		return false;
+
+	LOG_DEPRECATED("DrawMaterial is deprecated.");
 
 	const bool oldDrawState = LuaOpenGL::IsDrawingEnabled(L);
 	LuaOpenGL::SetDrawingEnabled(L, true);
