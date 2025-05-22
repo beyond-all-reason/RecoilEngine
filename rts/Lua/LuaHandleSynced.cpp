@@ -1697,7 +1697,7 @@ bool CSyncedLuaHandle::ShieldPreDamaged(
  *
  * @function SyncedCallins:AllowWeaponTargetCheck
  *
- * Only called for weaponDefIDs registered via Script.SetWatchAllowTarget or Script.SetWatchWeapon.
+ * Only called for weaponDefIDs registered via `Script.SetWatchAllowTarget` or `Script.SetWatchWeapon`.
  *
  * @param attackerID integer
  * @param attackerWeaponNum integer
@@ -1744,7 +1744,7 @@ int CSyncedLuaHandle::AllowWeaponTargetCheck(unsigned int attackerID, unsigned i
  *
  * @function SyncedCallins:AllowWeaponTarget
  *
- * Only called for weaponDefIDs registered via Script.SetWatchAllowTarget or Script.SetWatchWeapon.
+ * Only called for weaponDefIDs registered via `Script.SetWatchAllowTarget` or `Script.SetWatchWeapon`.
  *
  * @param attackerID integer
  * @param targetID integer
@@ -1814,7 +1814,7 @@ bool CSyncedLuaHandle::AllowWeaponTarget(
  *
  * @function SyncedCallins:AllowWeaponInterceptTarget
  *
- * Only called for weaponDefIDs registered via Script.SetWatchAllowTarget or Script.SetWatchWeapon.
+ * Only called for weaponDefIDs registered via `Script.SetWatchAllowTarget` or `Script.SetWatchWeapon`.
  *
  * @param interceptorUnitID integer
  * @param interceptorWeaponID integer
