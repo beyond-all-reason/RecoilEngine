@@ -2082,8 +2082,8 @@ void CLuaHandle::FeatureDamaged(
  * @param proOwnerID integer
  * @param weaponDefID integer
  *
- * @see Spring.SetWatchProjectile
- * @see Spring.SetWatchWeapon
+ * @see Script.SetWatchProjectile
+ * @see Script.SetWatchWeapon
  */
 void CLuaHandle::ProjectileCreated(const CProjectile* p)
 {
