@@ -4,6 +4,8 @@
 #define _SMF_GROUND_TEXTURES_H_
 
 #include <vector>
+#include <deque>
+#include <future>
 
 #include "Map/BaseGroundTextures.h"
 #include "Rendering/GL/PBO.h"
@@ -75,12 +77,18 @@ private:
 	static std::vector<float> stretchFactors;
 
 	// use Pixel Buffer Objects for async. uploading (DMA)
-	PBO pbo;
+       PBO pbo;
 
-	unsigned int tileTexFormat = 0;
-	// unsigned int pboUnsyncedBit = 0;
-	bool smfTextureStreaming = false;
-	float smfTextureLodBias = 0.0f;
+       unsigned int tileTexFormat = 0;
+       // unsigned int pboUnsyncedBit = 0;
+       bool smfTextureStreaming = false;
+       float smfTextureLodBias = 0.0f;
+       int smfStreamingPreloadTiles = 0;
+       float3 lastCamPos;
+       std::deque<std::shared_future<void>> preloadFuts;
+
+       void AsyncLoadSquare(int x, int y, int level);
+       void PredictivePreload();
 };
 
 #endif // _BF_GROUND_TEXTURES_H_
