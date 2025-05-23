@@ -57,14 +57,13 @@ void CWreckProjectile::Draw()
 	col[2] = (unsigned char) (0.05f * 200);
 	col[3] = 200;
 
-	#define wt projectileDrawer->wrecktex
-	AddEffectsQuad(
+	const auto* wt = projectileDrawer->wrecktex;
+	AddEffectsQuad<0>(
 		{ drawPos - camera->GetRight() * drawRadius - camera->GetUp() * drawRadius, wt->xstart, wt->ystart, col },
 		{ drawPos + camera->GetRight() * drawRadius - camera->GetUp() * drawRadius, wt->xend,   wt->ystart, col },
 		{ drawPos + camera->GetRight() * drawRadius + camera->GetUp() * drawRadius, wt->xend,   wt->yend,   col },
 		{ drawPos - camera->GetRight() * drawRadius + camera->GetUp() * drawRadius, wt->xstart, wt->yend,   col }
 	);
-	#undef wt
 }
 
 void CWreckProjectile::DrawOnMinimap() const
