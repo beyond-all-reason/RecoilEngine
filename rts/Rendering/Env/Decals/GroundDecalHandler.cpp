@@ -60,16 +60,16 @@
 CONFIG(int, GroundScarAlphaFade).deprecated(true);
 CONFIG(bool, HighQualityDecals).defaultValue(false).description("Forces MSAA processing of decals. Improves decals quality, but may ruin the performance.");
 
-
-CR_BIND(CGroundDecalHandler::UnitMinMaxHeight, )
-CR_REG_METADATA_SUB(CGroundDecalHandler, UnitMinMaxHeight,
+CR_BIND(CGroundDecalHandlerData::UnitMinMaxHeight, )
+CR_REG_METADATA_SUB(CGroundDecalHandlerData, UnitMinMaxHeight,
 (
 	CR_MEMBER(min),
 	CR_MEMBER(max)
 ))
 
-CR_BIND_DERIVED(CGroundDecalHandler, IGroundDecalDrawer, )
-CR_REG_METADATA(CGroundDecalHandler, (
+CR_BIND_DERIVED(CGroundDecalHandlerData, IGroundDecalDrawer, )
+
+CR_REG_METADATA(CGroundDecalHandlerData, (
 	CR_MEMBER_UN(maxUniqueScars),
 	CR_MEMBER_UN(atlasMain),
 	CR_MEMBER_UN(atlasNorm),
@@ -95,16 +95,27 @@ CR_REG_METADATA(CGroundDecalHandler, (
 	CR_POSTLOAD(PostLoad)
 ))
 
-CGroundDecalHandler::CGroundDecalHandler()
-	: CEventClient("[CGroundDecalHandler]", 314159, false)
+CGroundDecalHandlerData::CGroundDecalHandlerData()
+	: IGroundDecalDrawer()
 	, maxUniqueScars{ 0 }
 	, atlasMain{ nullptr }
 	, atlasNorm{ nullptr }
 	, decalShader{ nullptr }
 	, decalsUpdateList{ }
-	, smfDrawer { nullptr }
+	, smfDrawer{ nullptr }
 	, highQuality{ configHandler->GetBool("HighQualityDecals") && (globalRendering->msaaLevel > 0) }
 	, sdbc{ highQuality }
+{
+}
+
+void CGroundDecalHandlerData::PostLoad()
+{
+	decalsUpdateList.SetNeedUpdateAll();
+}
+
+CGroundDecalHandler::CGroundDecalHandler()
+	: CEventClient("[CGroundDecalHandler]", 314159, false)
+	, CGroundDecalHandlerData()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!GetDrawDecals())
@@ -126,11 +137,6 @@ CGroundDecalHandler::CGroundDecalHandler()
 	decalsUpdateList.Reserve(decals.capacity());
 
 	nextId = 0;
-}
-
-void CGroundDecalHandler::PostLoad()
-{
-	decalsUpdateList.SetNeedUpdateAll();
 }
 
 CGroundDecalHandler::~CGroundDecalHandler()

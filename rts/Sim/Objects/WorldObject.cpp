@@ -13,6 +13,7 @@ CR_REG_METADATA(CWorldObject, (
 	CR_MEMBER(tempNum),
 	CR_MEMBER(mtTempNum),
 	CR_MEMBER(radius),
+	CR_MEMBER(buildeeRadius),
 	CR_MEMBER(height),
 	CR_MEMBER(sqRadius),
 	CR_MEMBER(drawRadius),
