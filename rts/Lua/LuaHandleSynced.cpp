@@ -1967,7 +1967,7 @@ int CSyncedLuaHandle::SyncedPairs(lua_State* L)
  * Invoke `UnsyncedCallins:RecvFromSynced` callin with the given arguments.
  * 
  * @function SendToUnsynced
- * @param ... nil|boolean|number|string Arguments. Typically the first argument is the name of a function to call.
+ * @param ... nil|boolean|number|string|table Arguments. Typically the first argument is the name of a function to call.
  * @see UnsyncedCallins:RecvFromSynced
  */
 int CSyncedLuaHandle::SendToUnsynced(lua_State* L)
