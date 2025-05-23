@@ -260,7 +260,7 @@ bool CSimpleParticleSystem::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo
 	CHECK_MEMBER_INFO_INT   (CSimpleParticleSystem, numParticles       );
 	CHECK_MEMBER_INFO_BOOL  (CSimpleParticleSystem, directional        );
 	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, texture, projectileDrawer->textureAtlas->GetTexturePtr);
-	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, colorMap, CColorMap::LoadFromDefString                 );
+	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, colorMap, CColorMap::LoadFromDefString                );
 
 	return false;
 }
