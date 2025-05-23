@@ -93,7 +93,7 @@ bool CTracerProjectile::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT (CTracerProjectile, length)
+	CHECK_MEMBER_INFO_FLOAT(CTracerProjectile, length);
 
 	return false;
 }

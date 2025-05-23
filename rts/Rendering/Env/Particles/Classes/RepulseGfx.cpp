@@ -110,7 +110,7 @@ void CRepulseGfx::Draw()
 		for (int x = 0; x < loopCountX; ++x) {
 			const float dx = x - 2.00f;
 			const float rx = x * 0.25f;
-			AddEffectsQuad(
+			AddEffectsQuad<0>(
 				{ pos + xdirDS * (dx + 0) + ydirDS * (dy + 0) + zdir * vertexDists[(y    ) * 5 + x    ],  txo + (ry        ) * txs, tyo + (rx        ) * tys,  col },
 				{ pos + xdirDS * (dx + 0) + ydirDS * (dy + 1) + zdir * vertexDists[(y + 1) * 5 + x    ],  txo + (ry + 0.25f) * txs, tyo + (rx        ) * tys,  col },
 				{ pos + xdirDS * (dx + 1) + ydirDS * (dy + 1) + zdir * vertexDists[(y + 1) * 5 + x + 1],  txo + (ry + 0.25f) * txs, tyo + (rx + 0.25f) * tys,  col },
@@ -134,28 +134,28 @@ void CRepulseGfx::Draw()
 	xdirDS = xdir * drawsize;
 	ydirDS = ydir * drawsize;
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
 		{ owner->pos + (-xdir + ydir) * drawsize * 0.2f,  tx, ty, col2 },
 		{ owner->pos + ( xdir + ydir) * drawsize * 0.2f,  tx, ty, col2 },
 		{ pos + xdirDS + ydirDS + zdir * vertexDists[6],  tx, ty, col },
 		{ pos - xdirDS + ydirDS + zdir * vertexDists[6],  tx, ty, col }
 	);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
 		{ owner->pos + (-xdir - ydir) * drawsize * 0.2f,  tx, ty, col2 },
 		{ owner->pos + ( xdir - ydir) * drawsize * 0.2f,  tx, ty, col2 },
 		{ pos + xdirDS - ydirDS + zdir * vertexDists[6],  tx, ty, col },
 		{ pos - xdirDS - ydirDS + zdir * vertexDists[6],  tx, ty, col }
 	);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
 		{ owner->pos + ( xdir - ydir) * drawsize * 0.2f,   tx, ty, col2 },
 		{ owner->pos + ( xdir + ydir) * drawsize * 0.2f,   tx, ty, col2 },
 		{ pos + xdirDS + ydirDS + zdir * vertexDists[6],  tx, ty, col },
 		{ pos + xdirDS - ydirDS + zdir * vertexDists[6],  tx, ty, col }
 	);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
 		{ owner->pos + (-xdir - ydir) * drawsize * 0.2f,  tx, ty, col2 },
 		{ owner->pos + (-xdir + ydir) * drawsize * 0.2f,  tx, ty, col2 },
 		{ pos - xdirDS + ydirDS + zdir * vertexDists[6],  tx, ty, col },

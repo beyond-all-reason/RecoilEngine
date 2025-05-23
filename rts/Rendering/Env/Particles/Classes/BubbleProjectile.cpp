@@ -89,14 +89,13 @@ void CBubbleProjectile::Draw()
 
 	const float interSize = size + sizeExpansion * globalRendering->timeOffset;
 
-	#define bt projectileDrawer->bubbletex
-	AddEffectsQuad(
+	const auto* bt = projectileDrawer->bubbletex;
+	AddEffectsQuad<0>(
 		{ drawPos - camera->GetRight() * interSize - camera->GetUp() * interSize, bt->xstart, bt->ystart, col },
 		{ drawPos + camera->GetRight() * interSize - camera->GetUp() * interSize, bt->xend,   bt->ystart, col },
 		{ drawPos + camera->GetRight() * interSize + camera->GetUp() * interSize, bt->xend,   bt->yend,   col },
 		{ drawPos - camera->GetRight() * interSize + camera->GetUp() * interSize, bt->xstart, bt->yend,   col }
 	);
-	#undef bt
 }
 
 int CBubbleProjectile::GetProjectilesCount() const
@@ -112,10 +111,10 @@ bool CBubbleProjectile::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT(CBubbleProjectile, alpha        )
-	CHECK_MEMBER_INFO_FLOAT(CBubbleProjectile, startSize    )
-	CHECK_MEMBER_INFO_FLOAT(CBubbleProjectile, sizeExpansion)
-	CHECK_MEMBER_INFO_INT  (CBubbleProjectile, ttl          )
+	CHECK_MEMBER_INFO_FLOAT(CBubbleProjectile, alpha        );
+	CHECK_MEMBER_INFO_FLOAT(CBubbleProjectile, startSize    );
+	CHECK_MEMBER_INFO_FLOAT(CBubbleProjectile, sizeExpansion);
+	CHECK_MEMBER_INFO_INT  (CBubbleProjectile, ttl          );
 
 	return false;
 }

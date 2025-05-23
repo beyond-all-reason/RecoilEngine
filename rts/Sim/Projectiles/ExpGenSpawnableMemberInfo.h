@@ -37,34 +37,45 @@ struct SExpGenSpawnableMemberInfo
 
 
 #define SET_MEMBER_INFO(memberInfo, memberHash, Offset, Size, Length, Type, Ptr)  \
-	if (memberInfo.phash == memberHash) {                                         \
-		memberInfo.offset      = (Offset);                                        \
-		memberInfo.size        = (Size);                                          \
-		memberInfo.length      = (Length);                                        \
-		memberInfo.type        = (Type);                                          \
-		memberInfo.ptrCallback = (Ptr);                                           \
-		return true;                                                              \
-	}
+	do {                                                                          \
+		if (memberInfo.phash == memberHash) {                                     \
+			memberInfo.offset      = (Offset);                                    \
+			memberInfo.size        = (Size);                                      \
+			memberInfo.length      = (Length);                                    \
+			memberInfo.type        = (Type);                                      \
+			memberInfo.ptrCallback = (Ptr);                                       \
+			return true;                                                          \
+		}                                                                         \
+	} while(0)
 
 #define CHECK_MEMBER_INFO_INT(type, member) \
 	static_assert(std::is_integral<decltype(member)>::value, "Member type mismatch"); \
-	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member)  , 1, SExpGenSpawnableMemberInfo::TYPE_INT  , nullptr );
+	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member)  , 1, SExpGenSpawnableMemberInfo::TYPE_INT  , nullptr )
 
 #define CHECK_MEMBER_INFO_FLOAT(type, member) \
 	static_assert(std::is_same<decltype(member), float>::value, "Member type mismatch"); \
-	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member)  , 1, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr );
+	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member)  , 1, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr )
 
 #define CHECK_MEMBER_INFO_FLOAT3(type, member) \
 	static_assert(std::is_same<decltype(member), float3>::value, "Member type mismatch"); \
-	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member.x), 3, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr );
+	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member.x), 3, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr )
+
+#define CHECK_MEMBER_INFO_FLOAT3_NAME(type, member, memberName) \
+	static_assert(std::is_same<decltype(member), float3>::value, "Member type mismatch"); \
+	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(memberName), offsetof_expgen(type, member), sizeof_expgen(type, member.x), 3, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr )
 
 #define CHECK_MEMBER_INFO_FLOAT4(type, member) \
 	static_assert(std::is_same<decltype(member), float4>::value, "Member type mismatch"); \
-	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member.x), 4, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr );
+	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member.x), 4, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr )
 
 #define CHECK_MEMBER_INFO_PTR(t, member, callback) \
 	static_assert(std::is_same<decltype(callback("")), decltype(member)>::value, "Member and callback type mismatch"); \
-	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(t, member), sizeof_expgen(t, member), 1, SExpGenSpawnableMemberInfo::TYPE_PTR, [](const std::string& s) { return (void *) callback(s.c_str()); } );
+	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(t, member), sizeof_expgen(t, member), 1, SExpGenSpawnableMemberInfo::TYPE_PTR, [](const std::string& s) { return (void *) callback(s.c_str()); } )
+
+#define CHECK_MEMBER_INFO_PTR_NAME(t, member, memberName, callback) \
+	static_assert(std::is_same<decltype(callback("")), decltype(member)>::value, "Member and callback type mismatch"); \
+	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(memberName), offsetof_expgen(t, member), sizeof_expgen(t, member), 1, SExpGenSpawnableMemberInfo::TYPE_PTR, [](const std::string& s) { return (void *) callback(s.c_str()); } )
+
 
 #define CHECK_MEMBER_INFO_BOOL(type, member) CHECK_MEMBER_INFO_INT(type, member)
 #define CHECK_MEMBER_INFO_SCOLOR(type, member) CHECK_MEMBER_INFO_INT(type, member.i)
@@ -73,23 +84,23 @@ struct SExpGenSpawnableMemberInfo
 
 #define CHECK_MEMBER_INFO_INT_HASH(type, member, memberHash) \
 	static_assert(std::is_integral<decltype(member)>::value, "Member type mismatch"); \
-	SET_MEMBER_INFO(memberInfo, memberHash, offsetof_expgen(type, member), sizeof_expgen(type, member)  , 1, SExpGenSpawnableMemberInfo::TYPE_INT  , nullptr );
+	SET_MEMBER_INFO(memberInfo, memberHash, offsetof_expgen(type, member), sizeof_expgen(type, member)  , 1, SExpGenSpawnableMemberInfo::TYPE_INT  , nullptr )
 
 #define CHECK_MEMBER_INFO_FLOAT_HASH(type, member, memberHash) \
 	static_assert(std::is_same<decltype(member), float>::value, "Member type mismatch"); \
-	SET_MEMBER_INFO(memberInfo, memberHash, offsetof_expgen(type, member), sizeof_expgen(type, member)  , 1, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr );
+	SET_MEMBER_INFO(memberInfo, memberHash, offsetof_expgen(type, member), sizeof_expgen(type, member)  , 1, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr )
 
 #define CHECK_MEMBER_INFO_FLOAT3_HASH(type, member, memberHash) \
 	static_assert(std::is_same<decltype(member), float3>::value, "Member type mismatch"); \
-	SET_MEMBER_INFO(memberInfo, memberHash, offsetof_expgen(type, member), sizeof_expgen(type, member.x), 3, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr );
+	SET_MEMBER_INFO(memberInfo, memberHash, offsetof_expgen(type, member), sizeof_expgen(type, member.x), 3, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr )
 
 #define CHECK_MEMBER_INFO_FLOAT4_HASH(type, member, memberHash) \
 	static_assert(std::is_same<decltype(member), float4>::value, "Member type mismatch"); \
-	SET_MEMBER_INFO(memberInfo, memberHash, offsetof_expgen(type, member), sizeof_expgen(type, member.x), 4, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr );
+	SET_MEMBER_INFO(memberInfo, memberHash, offsetof_expgen(type, member), sizeof_expgen(type, member.x), 4, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr )
 
 #define CHECK_MEMBER_INFO_PTR_HASH(t, member, callback, memberHash) \
 	static_assert(std::is_same<decltype(callback("")), decltype(member)>::value, "Member and callback type mismatch"); \
-	SET_MEMBER_INFO(memberInfo, memberHash, offsetof_expgen(t, member), sizeof_expgen(t, member), 1, SExpGenSpawnableMemberInfo::TYPE_PTR, [](const std::string& s) { return (void *) callback(s); } );
+	SET_MEMBER_INFO(memberInfo, memberHash, offsetof_expgen(t, member), sizeof_expgen(t, member), 1, SExpGenSpawnableMemberInfo::TYPE_PTR, [](const std::string& s) { return (void *) callback(s); } )
 
 #define CHECK_MEMBER_INFO_BOOL_HASH(type, member, memberHash) CHECK_MEMBER_INFO_INT_HASH(type, member, memberHash)
 #define CHECK_MEMBER_INFO_SCOLOR_HASH(type, member, memberHash) CHECK_MEMBER_INFO_INT_HASH(type, member.i, memberHash)

@@ -105,7 +105,7 @@ void CSpherePartProjectile::Draw()
 			col1[2] = (unsigned char)(color.z * 255.0f * alpha);
 			col1[3] = ((unsigned char)(40 * alpha)) + 1;
 
-			AddEffectsQuad(
+			AddEffectsQuad<0>(
 				{ centerPos + vectors[y*5 + x    ]     * interSize, texx, texy, col0 },
 				{ centerPos + vectors[y*5 + x + 1]     * interSize, texx, texy, col0 },
 				{ centerPos+vectors[(y + 1)*5 + x + 1] * interSize, texx, texy, col1 },
@@ -175,10 +175,10 @@ bool CSpherePartSpawner::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT (CSpherePartSpawner, alpha         )
-	CHECK_MEMBER_INFO_FLOAT (CSpherePartSpawner, expansionSpeed)
-	CHECK_MEMBER_INFO_INT   (CSpherePartSpawner, ttl           )
-	CHECK_MEMBER_INFO_FLOAT3(CSpherePartSpawner, color         )
+	CHECK_MEMBER_INFO_FLOAT (CSpherePartSpawner, alpha         );
+	CHECK_MEMBER_INFO_FLOAT (CSpherePartSpawner, expansionSpeed);
+	CHECK_MEMBER_INFO_INT   (CSpherePartSpawner, ttl           );
+	CHECK_MEMBER_INFO_FLOAT3(CSpherePartSpawner, color         );
 
 	return false;
 }
