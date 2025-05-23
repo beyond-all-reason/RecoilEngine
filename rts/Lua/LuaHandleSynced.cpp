@@ -1983,6 +1983,7 @@ int CSyncedLuaHandle::SendToUnsynced(lua_State* L)
 		| (1 << LUA_TBOOLEAN)
 		| (1 << LUA_TNUMBER)
 		| (1 << LUA_TSTRING)
+		| (1 << LUA_TTABLE)
 	;
 
 	for (int i = 1; i <= args; i++) {
