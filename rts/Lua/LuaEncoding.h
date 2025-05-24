@@ -11,6 +11,8 @@ class LuaEncoding {
 	private:
 		static int EncodeBase64(lua_State* L);
 		static int DecodeBase64(lua_State* L);
+		static int EncodeBase64Url(lua_State* L);
+		static int DecodeBase64Url(lua_State* L);
 };
 
 

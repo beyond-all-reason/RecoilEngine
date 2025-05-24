@@ -12,6 +12,9 @@ bool LuaEncoding::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(EncodeBase64);
 	REGISTER_LUA_CFUNC(DecodeBase64);
 
+	REGISTER_LUA_CFUNC(EncodeBase64Url);
+	REGISTER_LUA_CFUNC(DecodeBase64Url);
+
 	return true;
 }
 
@@ -38,12 +41,69 @@ int LuaEncoding::DecodeBase64(lua_State* L)
  * @function Spring.EncodeBase64
  *
  * @param text string Text to encode
+ * @param stripPadding? boolean Remove padding (`=` characters) at the end when 'true'. Defaults to `false`.
  * @return string encoded Encoded text
  */
 int LuaEncoding::EncodeBase64(lua_State* L)
 {
 	const std::string text = luaL_checkstring(L, 1);
-	const std::string res = base64_encode(reinterpret_cast<const uint8_t*>(text.c_str()), text.size());
+	std::string res = base64_encode(reinterpret_cast<const uint8_t*>(text.c_str()), text.size());
+
+	if (luaL_optboolean(L, 2, false)) {
+		res.erase(res.find_last_not_of("=") + 1);
+	}
+
+	lua_pushsstring(L, res);
+	return 1;
+}
+
+
+/*** Decodes a base64url string
+ *
+ * @function Spring.DecodeBase64Url
+ *
+ * @param text string Text to decode
+ * @return string decoded Decoded text
+ */
+int LuaEncoding::DecodeBase64Url(lua_State* L)
+{
+	std::string text = luaL_checkstring(L, 1);
+	for (char& c: text) {
+		switch (c)
+		{
+			case '-': c = '+'; break;
+			case '_': c = '/'; break;
+		}
+	}
+	const std::string res = base64_decode(text);
+
+	lua_pushsstring(L, res);
+	return 1;
+}
+
+
+/*** Encodes a base64url string
+ *
+ * @function Spring.EncodeBase64Url
+ *
+ * @param text string Text to encode
+ * @return string encoded Encoded text
+ */
+int LuaEncoding::EncodeBase64Url(lua_State* L)
+{
+	const std::string text = luaL_checkstring(L, 1);
+	std::string res = base64_encode(reinterpret_cast<const uint8_t*>(text.c_str()), text.size());
+
+	res.erase(res.find_last_not_of("=") + 1);
+
+	for (char& c: res) {
+		switch (c)
+		{
+			case '+': c = '-'; break;
+			case '/': c = '_'; break;
+		}
+	}
+
 	lua_pushsstring(L, res);
 	return 1;
 }
