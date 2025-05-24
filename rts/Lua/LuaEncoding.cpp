@@ -6,6 +6,19 @@
 #include "base64.h"
 #include "Lua/LuaUtils.h"
 
+
+// For validation
+static const std::string base64Chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789+/=";
+
+static const std::string base64UrlChars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "abcdefghijklmnopqrstuvwxyz"
+    "0123456789-_";
+
+
 /***
  * Lua Encoding API
  * @table Encoding
@@ -15,9 +28,11 @@ bool LuaEncoding::PushEntries(lua_State* L)
 {
 	REGISTER_LUA_CFUNC(EncodeBase64);
 	REGISTER_LUA_CFUNC(DecodeBase64);
+	REGISTER_LUA_CFUNC(IsValidBase64);
 
 	REGISTER_LUA_CFUNC(EncodeBase64Url);
 	REGISTER_LUA_CFUNC(DecodeBase64Url);
+	REGISTER_LUA_CFUNC(IsValidBase64Url);
 
 	return true;
 }
@@ -58,6 +73,30 @@ int LuaEncoding::EncodeBase64(lua_State* L)
 	}
 
 	lua_pushsstring(L, encoded);
+	return 1;
+}
+
+
+/*** Validates a base64 string
+ *
+ * @function Encoding.IsValidBase64
+ *
+ * @param text string Text to validate
+ * @return boolean valid Whether the text is valid base64
+ */
+int LuaEncoding::IsValidBase64(lua_State* L)
+{
+	const std::string text = luaL_checkstring(L, 1);
+
+	bool valid = text.find_first_not_of(base64Chars) == std::string::npos;
+
+	if (valid) {
+		size_t firstPadding = text.find_first_of("=");
+		if (firstPadding != std::string::npos)
+			valid = firstPadding == (text.find_last_not_of("=") + 1);
+	}
+
+	lua_pushboolean(L, valid);
 	return 1;
 }
 
@@ -109,6 +148,24 @@ int LuaEncoding::EncodeBase64Url(lua_State* L)
 	}
 
 	lua_pushsstring(L, encoded);
+	return 1;
+}
+
+
+/*** Validates a base64url string
+ *
+ * @function Encoding.IsValidBase64Url
+ *
+ * @param text string Text to validate
+ * @return boolean valid Whether the text is valid base64url
+ */
+int LuaEncoding::IsValidBase64Url(lua_State* L)
+{
+	const std::string text = luaL_checkstring(L, 1);
+
+	bool valid = text.find_first_not_of(base64UrlChars) == std::string::npos;
+
+	lua_pushboolean(L, valid);
 	return 1;
 }
 
