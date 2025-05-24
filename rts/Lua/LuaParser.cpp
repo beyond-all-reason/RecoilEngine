@@ -158,6 +158,9 @@ void LuaParser::SetupEnv(bool isSyncedCtxt, bool isDefsParser)
 	AddFunc("Echo", LuaUtils::Echo);
 	AddFunc("Log", LuaUtils::Log);
 	AddFunc("TimeCheck", TimeCheck);
+	EndTable();
+
+	GetTable("Encoding");
 	LuaEncoding::PushEntries(L);
 	EndTable();
 

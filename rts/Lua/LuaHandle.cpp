@@ -3997,7 +3997,7 @@ bool CLuaHandle::AddBasicCalls(lua_State* L)
 
 bool CLuaHandle::AddCommonModules(lua_State* L)
 {
-	if (!AddEntriesToTable(L, "Spring",           LuaEncoding::PushEntries        ))
+	if (!AddEntriesToTable(L, "Encoding",           LuaEncoding::PushEntries        ))
 		return false;
 	return true;
 }

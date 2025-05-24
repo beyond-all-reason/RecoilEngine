@@ -21,7 +21,7 @@ bool LuaEncoding::PushEntries(lua_State* L)
 
 /*** Decodes a base64 string
  *
- * @function Spring.DecodeBase64
+ * @function Encoding.DecodeBase64
  *
  * @param text string Text to decode
  * @return string decoded Decoded text
@@ -38,7 +38,7 @@ int LuaEncoding::DecodeBase64(lua_State* L)
 
 /*** Encodes a base64 string
  *
- * @function Spring.EncodeBase64
+ * @function Encoding.EncodeBase64
  *
  * @param text string Text to encode
  * @param stripPadding? boolean Remove padding (`=` characters) at the end when 'true'. Defaults to `false`.
@@ -60,7 +60,7 @@ int LuaEncoding::EncodeBase64(lua_State* L)
 
 /*** Decodes a base64url string
  *
- * @function Spring.DecodeBase64Url
+ * @function Encoding.DecodeBase64Url
  *
  * @param text string Text to decode
  * @return string decoded Decoded text
@@ -84,7 +84,7 @@ int LuaEncoding::DecodeBase64Url(lua_State* L)
 
 /*** Encodes a base64url string
  *
- * @function Spring.EncodeBase64Url
+ * @function Encoding.EncodeBase64Url
  *
  * @param text string Text to encode
  * @return string encoded Encoded text
