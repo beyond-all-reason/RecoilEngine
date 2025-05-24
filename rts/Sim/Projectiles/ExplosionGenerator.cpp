@@ -911,13 +911,38 @@ bool CCustomExplosionGenerator::Load(CExplosionGeneratorHandler* handler, const 
 
 		spawnTable.SubTable("properties").GetMap(props);
 
-		for (const auto& propIt: props) {
-			SExpGenSpawnableMemberInfo memberInfo = {0, 0, 0, STRING_HASH(std::move(StringToLower(propIt.first))), SExpGenSpawnableMemberInfo::TYPE_INT, nullptr};
+		// handle special cases first
+
+		/// animparams (lowercased) is used to set up defaults for
+		/// animParams1, animParams2, animParams3, animParams4 in case their values are not defined
+		if (auto it = props.find("animparams"); it != props.end()) {
+			// it->second will change on props.emplace(), need a copy
+			const auto animParams = it->second;
+			props.erase(it);
+
+			if (auto apit = props.find("animparams1"); apit == props.end()) {
+				props.emplace("animparams1", animParams);
+			}
+			if (auto apit = props.find("animparams2"); apit == props.end()) {
+				props.emplace("animparams2", animParams);
+			}
+			if (auto apit = props.find("animparams3"); apit == props.end()) {
+				props.emplace("animparams3", animParams);
+			}
+			if (auto apit = props.find("animparams4"); apit == props.end()) {
+				props.emplace("animparams4", animParams);
+			}
+
+		}
+
+		for (const auto& [key, val] : props) {
+			SExpGenSpawnableMemberInfo memberInfo = { 0, 0, 0, STRING_HASH(std::move(StringToLower(key))), SExpGenSpawnableMemberInfo::TYPE_INT, nullptr };
 
 			if (CExpGenSpawnable::GetSpawnableMemberInfo(className, memberInfo)) {
-				ParseExplosionCode(&psi, propIt.second, memberInfo, code);
-			} else {
-				LOG_L(L_WARNING, "[CCEG::%s] unknown field %s::%s in spawn-table \"%s\" for CEG \"%s\"", __func__, tag, propIt.first.c_str(), spawnName.c_str(), className.c_str());
+				ParseExplosionCode(&psi, val, memberInfo, code);
+			}
+			else {
+				LOG_L(L_WARNING, "[CCEG::%s] unknown field %s::%s in spawn-table \"%s\" for CEG \"%s\"", __func__, tag, key.c_str(), spawnName.c_str(), className.c_str());
 			}
 		}
 

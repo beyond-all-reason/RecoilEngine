@@ -156,6 +156,25 @@ void CProjectile::DrawOnMinimap() const
 	AddMiniMapVertices({ pos        , color4::whiteA }, { pos + speed, color4::whiteA });
 }
 
+bool CProjectile::UpdateAnimParams()
+{
+	if (!validTextures[0])
+		return false;
+
+	if (validTextures[1])
+		UpdateAnimParamsImpl(animParams1, animProgress1);
+
+	if (validTextures[2])
+		UpdateAnimParamsImpl(animParams2, animProgress2);
+
+	if (validTextures[3])
+		UpdateAnimParamsImpl(animParams3, animProgress3);
+
+	if (validTextures[4])
+		UpdateAnimParamsImpl(animParams4, animProgress4);
+
+	return true;
+}
 
 CUnit* CProjectile::owner() const {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -189,9 +208,9 @@ bool CProjectile::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CExpGenSpawnable::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_BOOL(CProjectile, castShadow)
-	CHECK_MEMBER_INFO_FLOAT3(CProjectile, dir)
-	CHECK_MEMBER_INFO_INT(CProjectile, drawOrder)
+	CHECK_MEMBER_INFO_BOOL  (CProjectile, castShadow);
+	CHECK_MEMBER_INFO_FLOAT3(CProjectile, dir       );
+	CHECK_MEMBER_INFO_INT   (CProjectile, drawOrder );
 
 	return false;
 }

@@ -99,7 +99,8 @@ void CSimpleParticleSystem::Serialize(creg::ISerializer* s)
 void CSimpleParticleSystem::Draw()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	UpdateAnimParams();
+	if (!UpdateAnimParams())
+		return;
 
 	float3 zdir;
 	float3 ydir;
@@ -122,7 +123,7 @@ void CSimpleParticleSystem::Draw()
 		if (math::fabs(p->rotVal) > 0.01f) {
 			float3::rotate<false>(p->rotVal, zdir, bounds);
 		}
-		AddEffectsQuad(
+		AddEffectsQuad<1>(
 			{ pDrawPos + bounds[0], texture->xstart, texture->ystart, color },
 			{ pDrawPos + bounds[1], texture->xend,   texture->ystart, color },
 			{ pDrawPos + bounds[2], texture->xend,   texture->yend,   color },
@@ -220,10 +221,13 @@ void CSimpleParticleSystem::Init(const CUnit* owner, const float3& offset)
 		p.rotVel = rotParams.x; //initial rotation velocity
 		p.life = 0.0f;
 		p.decayrate = 1.0f / (particleLife + (guRNG.NextFloat() * particleLifeSpread));
-		p.size = particleSize + guRNG.NextFloat()*particleSizeSpread;
+		p.size = particleSize + guRNG.NextFloat() * particleSizeSpread;
 	}
 
 	drawRadius = (particleSpeed + particleSpeedSpread) * (particleLife + particleLifeSpread);
+
+	validTextures[1] = IsValidTexture(texture);
+	validTextures[0] = validTextures[1];
 }
 
 int CSimpleParticleSystem::GetProjectilesCount() const
@@ -239,24 +243,24 @@ bool CSimpleParticleSystem::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, emitVector         )
-	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, emitMul            )
-	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, gravity            )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSpeed      )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSpeedSpread)
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, emitRot            )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, emitRotSpread      )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleLife       )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleLifeSpread )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSize       )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSizeSpread )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, airdrag            )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, sizeGrowth         )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, sizeMod            )
-	CHECK_MEMBER_INFO_INT   (CSimpleParticleSystem, numParticles       )
-	CHECK_MEMBER_INFO_BOOL  (CSimpleParticleSystem, directional        )
-	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, texture , projectileDrawer->textureAtlas->GetTexturePtr)
-	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, colorMap, CColorMap::LoadFromDefString                 )
+	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, emitVector         );
+	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, emitMul            );
+	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, gravity            );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSpeed      );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSpeedSpread);
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, emitRot            );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, emitRotSpread      );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleLife       );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleLifeSpread );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSize       );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSizeSpread );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, airdrag            );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, sizeGrowth         );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, sizeMod            );
+	CHECK_MEMBER_INFO_INT   (CSimpleParticleSystem, numParticles       );
+	CHECK_MEMBER_INFO_BOOL  (CSimpleParticleSystem, directional        );
+	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, texture, projectileDrawer->textureAtlas->GetTexturePtr);
+	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, colorMap, CColorMap::LoadFromDefString                );
 
 	return false;
 }

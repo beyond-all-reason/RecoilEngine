@@ -78,8 +78,10 @@ void CBitmapMuzzleFlame::Serialize(creg::ISerializer* s)
 void CBitmapMuzzleFlame::Draw()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (!UpdateAnimParams())
+		return;
+
 	UpdateRotation();
-	UpdateAnimParams();
 
 	const float3 drawPos = pos + speed * globalRendering->timeOffset;
 	const float life = (gs->frameNum - createFrame + globalRendering->timeOffset) * invttl;
@@ -121,13 +123,13 @@ void CBitmapMuzzleFlame::Draw()
 	}
 
 	if (IsValidTexture(sideTexture)) {
-		AddEffectsQuad(
+		AddEffectsQuad<2>(
 			{ drawPos + bounds[0], sideTexture->xstart, sideTexture->ystart, col },
 			{ drawPos + bounds[1], sideTexture->xend  , sideTexture->ystart, col },
 			{ drawPos + bounds[2], sideTexture->xend  , sideTexture->yend  , col },
 			{ drawPos + bounds[3], sideTexture->xstart, sideTexture->yend  , col }
 		);
-		AddEffectsQuad(
+		AddEffectsQuad<2>(
 			{ drawPos + bounds[4], sideTexture->xstart, sideTexture->ystart, col },
 			{ drawPos + bounds[5], sideTexture->xend  , sideTexture->ystart, col },
 			{ drawPos + bounds[6], sideTexture->xend  , sideTexture->yend  , col },
@@ -136,7 +138,7 @@ void CBitmapMuzzleFlame::Draw()
 	}
 
 	if (IsValidTexture(frontTexture)) {
-		AddEffectsQuad(
+		AddEffectsQuad<1>(
 			{ fpos + bounds[8 ], frontTexture->xstart, frontTexture->ystart, col },
 			{ fpos + bounds[9 ], frontTexture->xend  , frontTexture->ystart, col },
 			{ fpos + bounds[10], frontTexture->xend  , frontTexture->yend , col },
@@ -164,6 +166,10 @@ void CBitmapMuzzleFlame::Init(const CUnit* owner, const float3& offset)
 	invttl = 1.0f / ttl;
 
 	SetDrawRadius(std::max(size, length));
+
+	validTextures[1] = IsValidTexture(frontTexture);
+	validTextures[2] = IsValidTexture(sideTexture);
+	validTextures[0] = validTextures[1] || validTextures[2];
 }
 
 int CBitmapMuzzleFlame::GetProjectilesCount() const
@@ -179,18 +185,18 @@ bool CBitmapMuzzleFlame::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_PTR   (CBitmapMuzzleFlame, sideTexture,  projectileDrawer->textureAtlas->GetTexturePtr)
-	CHECK_MEMBER_INFO_PTR   (CBitmapMuzzleFlame, frontTexture, projectileDrawer->textureAtlas->GetTexturePtr)
-	CHECK_MEMBER_INFO_PTR   (CBitmapMuzzleFlame, colorMap, CColorMap::LoadFromDefString)
-	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, size       )
-	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, length     )
-	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, sizeGrowth )
-	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, frontOffset)
-	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, particleSpeed      )
-	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, particleSpeedSpread)
-	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, airdrag    )
-	CHECK_MEMBER_INFO_FLOAT3(CBitmapMuzzleFlame, gravity    )
-	CHECK_MEMBER_INFO_INT   (CBitmapMuzzleFlame, ttl        )
+	CHECK_MEMBER_INFO_PTR   (CBitmapMuzzleFlame, sideTexture,  projectileDrawer->textureAtlas->GetTexturePtr);
+	CHECK_MEMBER_INFO_PTR   (CBitmapMuzzleFlame, frontTexture, projectileDrawer->textureAtlas->GetTexturePtr);
+	CHECK_MEMBER_INFO_PTR   (CBitmapMuzzleFlame, colorMap, CColorMap::LoadFromDefString                     );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, size               );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, length             );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, sizeGrowth         );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, frontOffset        );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, particleSpeed      );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, particleSpeedSpread);
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, airdrag            );
+	CHECK_MEMBER_INFO_FLOAT3(CBitmapMuzzleFlame, gravity            );
+	CHECK_MEMBER_INFO_INT   (CBitmapMuzzleFlame, ttl                );
 
 	return false;
 }

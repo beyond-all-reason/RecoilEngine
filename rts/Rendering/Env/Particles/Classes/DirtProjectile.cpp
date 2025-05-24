@@ -112,7 +112,7 @@ void CDirtProjectile::Draw()
 	const float interSize = size + globalRendering->timeOffset * sizeExpansion;
 	const float texx = texture->xstart + (texture->xend - texture->xstart) * ((1.0f - partAbove) * 0.5f);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
 		{ drawPos - camera->GetRight() * interSize - camera->GetUp() * interSize * partAbove, texx,          texture->ystart, col },
 		{ drawPos - camera->GetRight() * interSize + camera->GetUp() * interSize,             texture->xend, texture->ystart, col },
 		{ drawPos + camera->GetRight() * interSize + camera->GetUp() * interSize,             texture->xend, texture->yend,   col },
@@ -133,13 +133,13 @@ bool CDirtProjectile::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, alpha        )
-	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, alphaFalloff )
-	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, size         )
-	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, sizeExpansion)
-	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, slowdown     )
-	CHECK_MEMBER_INFO_FLOAT3(CDirtProjectile, color        )
-	CHECK_MEMBER_INFO_PTR   (CDirtProjectile, texture, projectileDrawer->textureAtlas->GetTexturePtr)
+	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, alpha        );
+	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, alphaFalloff );
+	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, size         );
+	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, sizeExpansion);
+	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, slowdown     );
+	CHECK_MEMBER_INFO_FLOAT3(CDirtProjectile, color        );
+	CHECK_MEMBER_INFO_PTR   (CDirtProjectile, texture, projectileDrawer->textureAtlas->GetTexturePtr);
 
 	return false;
 }
