@@ -29,9 +29,9 @@ bool LuaEncoding::PushEntries(lua_State* L)
 int LuaEncoding::DecodeBase64(lua_State* L)
 {
 	const char* text = luaL_checkstring(L, 1);
-	const std::string res = base64_decode(text);
+	const std::string decoded = base64_decode(text);
 
-	lua_pushsstring(L, res);
+	lua_pushsstring(L, decoded);
 	return 1;
 }
 
@@ -47,13 +47,13 @@ int LuaEncoding::DecodeBase64(lua_State* L)
 int LuaEncoding::EncodeBase64(lua_State* L)
 {
 	const std::string text = luaL_checkstring(L, 1);
-	std::string res = base64_encode(reinterpret_cast<const uint8_t*>(text.c_str()), text.size());
+	std::string encoded = base64_encode(reinterpret_cast<const uint8_t*>(text.c_str()), text.size());
 
 	if (luaL_optboolean(L, 2, false)) {
-		res.erase(res.find_last_not_of("=") + 1);
+		encoded.erase(encoded.find_last_not_of("=") + 1);
 	}
 
-	lua_pushsstring(L, res);
+	lua_pushsstring(L, encoded);
 	return 1;
 }
 
@@ -75,9 +75,9 @@ int LuaEncoding::DecodeBase64Url(lua_State* L)
 			case '_': c = '/'; break;
 		}
 	}
-	const std::string res = base64_decode(text);
+	const std::string decoded = base64_decode(text);
 
-	lua_pushsstring(L, res);
+	lua_pushsstring(L, decoded);
 	return 1;
 }
 
@@ -92,11 +92,11 @@ int LuaEncoding::DecodeBase64Url(lua_State* L)
 int LuaEncoding::EncodeBase64Url(lua_State* L)
 {
 	const std::string text = luaL_checkstring(L, 1);
-	std::string res = base64_encode(reinterpret_cast<const uint8_t*>(text.c_str()), text.size());
+	std::string encoded = base64_encode(reinterpret_cast<const uint8_t*>(text.c_str()), text.size());
 
-	res.erase(res.find_last_not_of("=") + 1);
+	encoded.erase(encoded.find_last_not_of("=") + 1);
 
-	for (char& c: res) {
+	for (char& c: encoded) {
 		switch (c)
 		{
 			case '+': c = '-'; break;
@@ -104,7 +104,7 @@ int LuaEncoding::EncodeBase64Url(lua_State* L)
 		}
 	}
 
-	lua_pushsstring(L, res);
+	lua_pushsstring(L, encoded);
 	return 1;
 }
 
