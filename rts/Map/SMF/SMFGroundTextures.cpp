@@ -4,6 +4,8 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstdio>
+#include <algorithm>
+#include <chrono>
 
 #if !defined(HEADLESS)
 	#include "lib/squish/squish.h"
@@ -48,6 +50,7 @@ LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_SMF_GROUND_TEXTURES)
 
 CONFIG(bool , SMFTextureStreaming).defaultValue(false).safemodeValue(true).description("Dynamically load and unload SMF Diffuse textures. Saves VRAM, worse performance and image quality.");
 CONFIG(float, SMFTextureLodBias).defaultValue(0.0f).safemodeValue(0.0f).description("In case SMFTextureStreaming = false, this parameter controls the sampling lod bias applied to diffuse texture");
+CONFIG(int, SMFStreamingPreloadTiles).defaultValue(2).minimumValue(0).description("Number of tiles streamed ahead of the camera");
 
 std::vector<CSMFGroundTextures::GroundSquare> CSMFGroundTextures::squares;
 
@@ -74,8 +77,10 @@ CSMFGroundTextures::GroundSquare::~GroundSquare()
 CSMFGroundTextures::CSMFGroundTextures(CSMFReadMap* rm): smfMap(rm)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	smfTextureStreaming = configHandler->GetBool("SMFTextureStreaming");
-	smfTextureLodBias = configHandler->GetFloat("SMFTextureLodBias");
+       smfTextureStreaming = configHandler->GetBool("SMFTextureStreaming");
+       smfTextureLodBias = configHandler->GetFloat("SMFTextureLodBias");
+       smfStreamingPreloadTiles = configHandler->GetInt("SMFStreamingPreloadTiles");
+       lastCamPos = CCameraHandler::GetActiveCamera()->GetPos();
 
 	LoadTiles(smfMap->GetMapFile());
 	if (smfTextureStreaming) {
@@ -339,9 +344,11 @@ inline bool CSMFGroundTextures::TexSquareInView(int btx, int bty) const
 
 void CSMFGroundTextures::DrawUpdate()
 {
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (!smfTextureStreaming)
-		return;
+       RECOIL_DETAILED_TRACY_ZONE;
+       if (!smfTextureStreaming)
+               return;
+
+       PredictivePreload();
 
 	const CCamera* cam = CCameraHandler::GetActiveCamera();
 
@@ -636,7 +643,51 @@ void CSMFGroundTextures::BindSquareTexture(int texSquareX, int texSquareY)
 	GroundSquare* square = &squares[texSquareY * smfMap->numBigTexX + texSquareX];
 	glBindTexture(GL_TEXTURE_2D, square->GetTextureID());
 
-	if (game->GetDrawMode() == CGame::gameNormalDraw) {
-		square->SetDrawFrame(globalRendering->drawFrame);
-	}
+        if (game->GetDrawMode() == CGame::gameNormalDraw) {
+                square->SetDrawFrame(globalRendering->drawFrame);
+        }
+}
+
+
+void CSMFGroundTextures::AsyncLoadSquare(int x, int y, int level)
+{
+       preloadFuts.emplace_back(ThreadPool::Enqueue([this, x, y, level]() {
+               auto lock = CLoadLock::GetUniqueLock();
+               LoadSquareTexture(x, y, level);
+       }));
+}
+
+void CSMFGroundTextures::PredictivePreload()
+{
+       if (!smfTextureStreaming || smfStreamingPreloadTiles <= 0)
+               return;
+
+       const CCamera* cam = CCameraHandler::GetActiveCamera();
+       const float3 camPos = cam->GetPos();
+       float3 mv = camPos - lastCamPos;
+       lastCamPos = camPos;
+
+       if (mv.SqLength() <= 0.001f)
+               return;
+
+       mv.ANormalize();
+
+       const float tileSize = smfMap->bigSquareSize * SQUARE_SIZE;
+
+       for (int i = 1; i <= smfStreamingPreloadTiles; ++i) {
+               const float3 p = camPos + mv * (i * tileSize);
+               int tx = std::clamp(int(p.x / tileSize), 0, smfMap->numBigTexX - 1);
+               int ty = std::clamp(int(p.z / tileSize), 0, smfMap->numBigTexY - 1);
+
+               GroundSquare* square = &squares[ty * smfMap->numBigTexX + tx];
+
+               if (square->HasLuaTexture())
+                       continue;
+
+               if (square->GetMipLevel() != 0)
+                       AsyncLoadSquare(tx, ty, 0);
+       }
+
+       while (!preloadFuts.empty() && preloadFuts.front().wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+               preloadFuts.pop_front();
 }
