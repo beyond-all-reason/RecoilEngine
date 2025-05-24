@@ -6,6 +6,10 @@
 #include "base64.h"
 #include "Lua/LuaUtils.h"
 
+/***
+ * Lua Encoding API
+ * @table Encoding
+ */
 
 bool LuaEncoding::PushEntries(lua_State* L)
 {
