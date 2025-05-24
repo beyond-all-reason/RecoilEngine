@@ -122,8 +122,11 @@ struct SResourceOrder {
 	//! handle resources separate, i.e. when metal storage is full still allow energy one to be filled?
 	bool separate;
 
+	//! should the income multiplier be applied
+	bool useIncomeMultiplier;
+
 public:
-	SResourceOrder() : quantum(false), overflow(false), separate(false) {}
+	SResourceOrder() : quantum(false), overflow(false), separate(false), useIncomeMultiplier(true) {}
 	CR_DECLARE_STRUCT(SResourceOrder)
 };
 
