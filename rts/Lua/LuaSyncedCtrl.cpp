@@ -1833,7 +1833,7 @@ int LuaSyncedCtrl::DestroyUnit(lua_State* L)
  * @param newTeamID integer
  * @param given boolean? (Default: `true`) if false, the unit is captured.
  * @param adjustUnitLimit boolean? (Default: `false`) if true, also transfer the limit slot
- * @return bool successfulTransfer
+ * @return boolean successfulTransfer
  */
 int LuaSyncedCtrl::TransferUnit(lua_State* L)
 {
@@ -1892,7 +1892,7 @@ int LuaSyncedCtrl::TransferUnit(lua_State* L)
  * @param fromTeamID number
  * @param newTeamID number
  * @param transferAmnt number
- * @return bool successfulTransfer Whether max units was successfully transferred. Returns false when the source team does not have enough available maxunits to transfer
+ * @return boolean successfulTransfer Whether max units was successfully transferred. Returns false when the source team does not have enough available maxunits to transfer
  */
 int LuaSyncedCtrl::TransferTeamMaxUnits(lua_State* L)
 {
