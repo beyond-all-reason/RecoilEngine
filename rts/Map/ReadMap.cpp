@@ -682,7 +682,7 @@ void CReadMap::UpdateFaceNormals(const SRectangle& rect, bool initialize)
 
        for_mt_chunk(z1, z2 + 1, [&](const int y) {
 #ifdef USE_XSIMD
-               using batch = xsimd::batch<float, 8>;
+               using batch = xsimd::batch<float>;      // auto-select lane width for SSE2/AVX builds: 4-lane on SSE2, 8-lane on AVX
                const batch sqsize = batch(float(SQUARE_SIZE));
 
                int x = x1;
