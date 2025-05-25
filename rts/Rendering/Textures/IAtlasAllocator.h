@@ -50,10 +50,26 @@ public:
 		entries[name] = SAtlasEntry(size, name, data);
 	}
 
-	const auto& GetEntry(const std::string& name)
+	auto FindEntry(const std::string& name) const
 	{
-		return entries[name].texCoords;
+		return entries.find(name);
 	}
+
+	const auto& GetEntry(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it) const {
+		if (it == entries.end())
+			return AtlasedTexture::DefaultAtlasTexture;
+
+		return it->second.texCoords;
+	}
+	const auto& GetEntry(const std::string& name) const { return GetEntry(FindEntry(name));	}
+
+	auto GetEntryPage(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it) const {
+		if (it == entries.end())
+			return uint32_t(-1);
+
+		return it->second.pageIdx;
+	}
+	auto GetEntryPage(const std::string& name) const { return GetEntryPage(FindEntry(name)); }
 
 	void*& GetEntryData(const std::string& name)
 	{
@@ -62,9 +78,12 @@ public:
 
 	const auto& GetEntries() const { return entries; }
 
-	AtlasedTexture GetTexCoords(const std::string& name)
+	AtlasedTextureLayered GetTexCoords(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it)
 	{
-		AtlasedTexture uv(entries[name].texCoords);
+		if (it == entries.end())
+			return AtlasedTextureLayered::DefaultAtlasTextureLayered;
+
+		AtlasedTextureLayered uv(it->second.texCoords);
 		uv.x1 /= atlasSize.x;
 		uv.y1 /= atlasSize.y;
 		uv.x2 /= atlasSize.x;
@@ -77,6 +96,10 @@ public:
 		uv.y2 += 0.5f / atlasSize.y;
 
 		return uv;
+	}
+	AtlasedTexture GetTexCoords(const std::string& name)
+	{
+		return GetTexCoords(FindEntry(name));
 	}
 
 	bool contains(const std::string& name) const
