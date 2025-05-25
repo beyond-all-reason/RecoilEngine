@@ -316,6 +316,8 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetFeatureRulesParam);
 	REGISTER_LUA_CFUNC(GetFeatureRulesParams);
 
+	REGISTER_LUA_CFUNC(IsFeatureVisible);
+
 	REGISTER_LUA_CFUNC(GetProjectilePosition);
 	REGISTER_LUA_CFUNC(GetProjectileDirection);
 	REGISTER_LUA_CFUNC(GetProjectileVelocity);
@@ -1127,6 +1129,19 @@ int LuaSyncedRead::GetFeatureRulesParams(lua_State* L)
 	const LuaRulesParams::Params&  params = feature->modParams;
 
 	return PushRulesParams(L, __func__, params, losMask);
+}
+
+/***
+ *
+ * @function Spring.IsFeatureVisible
+ * @param featureID integer
+ * @return boolean visible
+ */
+int LuaSyncedRead::IsFeatureVisible(lua_State* L)
+{
+	const CFeature* feature = ParseFeature(L, __func__, 1);
+	lua_pushboolean(L, feature != nullptr && LuaUtils::IsFeatureVisible(L, feature));
+	return 1;
 }
 
 
@@ -9006,7 +9021,6 @@ int LuaSyncedRead::GetRadarErrorParams(lua_State* L)
 	lua_pushnumber(L, losHandler->GetBaseRadarErrorMult());
 	return 3;
 }
-
 
 /******************************************************************************/
 /******************************************************************************/
