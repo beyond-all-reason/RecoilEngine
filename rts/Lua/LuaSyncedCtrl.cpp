@@ -1887,7 +1887,7 @@ int LuaSyncedCtrl::TransferUnit(lua_State* L)
 	return 1;
 }
 
-/***
+/*** Transfer capacity of units from one team to another
  * @function Spring.TransferTeamMaxUnits
  * @param fromTeamID number
  * @param newTeamID number
