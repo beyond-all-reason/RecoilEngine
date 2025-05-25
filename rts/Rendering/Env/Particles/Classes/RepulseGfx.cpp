@@ -94,7 +94,7 @@ void CRepulseGfx::Draw()
 	xdirDS = xdir * drawsize;
 	ydirDS = ydir * drawsize;
 
-	const AtlasedTexture* et = projectileDrawer->repulsetex;
+	const auto* et = projectileDrawer->repulsetex;
 	const float txo = et->xstart;
 	const float tyo = et->ystart;
 	const float txs = et->xend - et->xstart;
@@ -127,7 +127,7 @@ void CRepulseGfx::Draw()
 	col[2] = (unsigned char) (color.z * alpha       );
 	col[3] = (unsigned char) (color.w * alpha * 0.4f);
 
-	const AtlasedTexture* ct = projectileDrawer->repulsegfxtex;
+	const auto* ct = projectileDrawer->repulsegfxtex;
 	const float tx = (ct->xend + ct->xstart) * 0.5f;
 	const float ty = (ct->yend + ct->ystart) * 0.5f;
 

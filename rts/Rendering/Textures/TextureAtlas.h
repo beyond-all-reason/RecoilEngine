@@ -185,7 +185,7 @@ protected:
 	std::vector<MemTex> memTextures;
 
 	spring::unordered_map<std::string, size_t> files;
-	spring::unordered_map<std::string, AtlasedTextureLayered> textures;
+	spring::unordered_map<std::string, AtlasedTexture> textures;
 	spring::unordered_map<AtlasedTexture*, std::string> texToName;  // non-creg serialization
 
 	std::unique_ptr<GL::TextureBase> atlasTex;

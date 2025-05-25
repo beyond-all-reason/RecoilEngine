@@ -78,12 +78,12 @@ public:
 
 	const auto& GetEntries() const { return entries; }
 
-	AtlasedTextureLayered GetTexCoords(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it)
+	AtlasedTexture GetTexCoords(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it)
 	{
 		if (it == entries.end())
-			return AtlasedTextureLayered::DefaultAtlasTextureLayered;
+			return AtlasedTexture::DefaultAtlasTexture;
 
-		AtlasedTextureLayered uv(it->second.texCoords);
+		AtlasedTexture uv(it->second.texCoords);
 		uv.x1 /= atlasSize.x;
 		uv.y1 /= atlasSize.y;
 		uv.x2 /= atlasSize.x;
