@@ -117,4 +117,10 @@ struct float4 : public float3
 	operator       float* ()       { return reinterpret_cast<      float*>(&x); }
 };
 
+struct float4Hash {
+	uint32_t operator()(const float4& v) const {
+		return spring::LiteHash(&v, sizeof(v));
+	}
+};
+
 #endif /* FLOAT4_H */

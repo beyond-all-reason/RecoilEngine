@@ -680,7 +680,7 @@ void CBumpWater::UploadCoastline(const bool forceFull)
 	// save the area positions in the texture atlas
 	for (size_t i = 0; i < coastmapAtlasRects.size(); i++) {
 		CoastAtlasRect& r = coastmapAtlasRects[i];
-		const AtlasedTexture& tex = atlas.GetTexture(IntToString(i));
+		const auto& tex = atlas.GetTexture(IntToString(i));
 		r.tx1 = tex.xstart;
 		r.tx2 = tex.xend;
 		r.ty1 = tex.ystart;

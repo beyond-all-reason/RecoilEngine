@@ -4968,7 +4968,7 @@ int LuaOpenGL::GetAtlasTexture(lua_State* L)
 
 	const std::string subAtlasTexName = luaL_checksstring(L, 2);
 
-	AtlasedTexture atlTex = atlas->GetTexture(subAtlasTexName);
+	auto atlTex = atlas->GetTexture(subAtlasTexName);
 	if (atlTex == AtlasedTexture::DefaultAtlasTexture)
 		luaL_error(L, "gl.%s() Invalid atlas named texture specified %s", __func__, subAtlasTexName.c_str());
 
@@ -4976,7 +4976,8 @@ int LuaOpenGL::GetAtlasTexture(lua_State* L)
 	lua_pushnumber(L, atlTex.x2);
 	lua_pushnumber(L, atlTex.y1);
 	lua_pushnumber(L, atlTex.y2);
-	return 4;
+	lua_pushnumber(L, atlTex.pageNum);
+	return 5;
 }
 
 /***

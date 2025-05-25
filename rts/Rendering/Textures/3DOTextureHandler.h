@@ -17,7 +17,7 @@ struct TexFile;
 class C3DOTextureHandler
 {
 public:
-	using UnitTexture = AtlasedTexture;
+	using UnitTexture = float4;
 
 	void Init();
 	void Kill();

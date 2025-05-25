@@ -855,7 +855,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			glBindTexture(GL_TEXTURE_2D, 0); //15th slot
 			glActiveTexture(GL_TEXTURE0);
 		}
-		glBindTexture(GL_TEXTURE_2D, 0);
+		textureAtlas->UnbindTexture();
 	}
 }
 
@@ -1083,7 +1083,8 @@ void CProjectileDrawer::DrawGroundFlashes()
 		glBindTexture(GL_TEXTURE_2D, 0); //15th slot
 		glActiveTexture(GL_TEXTURE0);
 	}
-	glBindTexture(GL_TEXTURE_2D, 0);
+
+	groundFXAtlas->UnbindTexture();
 
 //	glFogfv(GL_FOG_COLOR, sky->fogColor);
 	glDisable(GL_POLYGON_OFFSET_FILL);
