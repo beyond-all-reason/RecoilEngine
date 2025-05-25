@@ -18,7 +18,7 @@ public:
 
 	bool Allocate() override;
 	int GetNumTexLevels() const override;
-
+	uint32_t GetNumPages() const override { return 1; }
 private:
 	struct Row {
 		Row(int _ypos,int _height):
