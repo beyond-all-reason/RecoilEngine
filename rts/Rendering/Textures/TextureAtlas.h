@@ -4,9 +4,11 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 #include "IAtlasAllocator.h"
 #include "AtlasedTexture.hpp"
+#include "Texture.hpp"
 #include "System/float4.h"
 #include "System/type2.h"
 #include "System/UnorderedMap.hpp"
@@ -46,9 +48,8 @@ public:
 			files = std::move(ta.files);
 			textures = std::move(ta.textures);
 			texToName = std::move(ta.texToName);
-			atlasTexID = ta.atlasTexID;
+			atlasTex = std::move(ta.atlasTex);
 			initialized = ta.initialized;
-			freeTexture = ta.freeTexture;
 
 			allocType = ta.allocType;
 			atlasSizeX = ta.atlasSizeX;
@@ -58,7 +59,6 @@ public:
 
 			// Trick to not call destructor on atlasAllocator multiple times
 			ta.atlasAllocator = nullptr;
-			ta.atlasTexID = 0u;
 		}
 		return *this;
 	};
@@ -119,14 +119,15 @@ public:
 	int2 GetSize() const;
 	std::string GetName() const { return name; }
 
-	uint32_t GetTexID() const { return atlasTexID; }
+	uint32_t GetTexID() const { return atlasTex->GetId(); }
 	const uint32_t GetTexTarget() const;
 
 	int GetNumTexLevels() const;
 	void SetMaxTexLevel(int maxLevels);
 
 	void BindTexture();
-	void SetFreeTexture(bool b) { freeTexture = b; }
+	void UnbindTexture();
+	void DisOwnTexture() { atlasTex->DisOwn(); }
 	void SetName(const std::string& s) { name = s; }
 
 	static void SetDebug(bool b) { debug = b; }
@@ -154,16 +155,17 @@ protected:
 	public:
 		MemTex(): xsize(0), ysize(0), texType(RGBA32) {}
 		MemTex(const MemTex&) = delete;
-		MemTex(MemTex&& t) { *this = std::move(t); }
+		MemTex(MemTex&& t) noexcept { *this = std::move(t); }
 
-		MemTex& operator = (const MemTex&) = delete;
-		MemTex& operator = (MemTex&& t) {
+		MemTex& operator=(const MemTex&) = delete;
+		MemTex& operator=(MemTex&& t) noexcept {
 			xsize = t.xsize;
 			ysize = t.ysize;
 			texType = t.texType;
 
 			names = std::move(t.names);
 			mem = std::move(t.mem);
+
 			return *this;
 		}
 
@@ -183,13 +185,12 @@ protected:
 	std::vector<MemTex> memTextures;
 
 	spring::unordered_map<std::string, size_t> files;
-	spring::unordered_map<std::string, AtlasedTexture> textures;
+	spring::unordered_map<std::string, AtlasedTextureLayered> textures;
 	spring::unordered_map<AtlasedTexture*, std::string> texToName;  // non-creg serialization
 
-	uint32_t atlasTexID = 0;
+	std::unique_ptr<GL::TextureBase> atlasTex;
 
 	bool initialized = false;
-	bool freeTexture = true; // free texture on atlas destruction?
 
 	// set to true to write finalized texture atlas to disk
 	static inline bool debug = false;

@@ -44,7 +44,11 @@ public:
 		}
 
 		std::stable_sort(memtextures.begin(), memtextures.end(), [](const auto* lhs, const auto* rhs) {
+		#if 0
 			return std::forward_as_tuple(lhs->size.y, lhs->size.x, lhs->name) > std::forward_as_tuple(rhs->size.y, rhs->size.x, rhs->name);
+		#else
+			return std::forward_as_tuple(lhs->size.y * lhs->size.x, lhs->name) > std::forward_as_tuple(rhs->size.y * rhs->size.x, rhs->name);
+		#endif
 		});
 
 		// guestimate the initial number of pages
@@ -73,6 +77,7 @@ public:
 			for (const auto* memtexture : memtextures) {
 				auto minAreaIdx = std::distance(areaSums.begin(), std::min_element(areaSums.begin(), areaSums.end()));
 				allocators[minAreaIdx]->AddEntry(*memtexture);
+				areaSums[minAreaIdx] += (memtexture->size.x * memtexture->size.y);
 			}
 
 			done = true;

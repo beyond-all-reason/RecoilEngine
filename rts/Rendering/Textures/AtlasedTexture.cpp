@@ -7,5 +7,10 @@ CR_REG_METADATA(AtlasedTexture, (
 	CR_MEMBER(z),
 	CR_MEMBER(w)
 ))
-
 const AtlasedTexture& AtlasedTexture::DefaultAtlasTexture = AtlasedTexture{};
+
+CR_BIND(AtlasedTextureLayered, )
+CR_REG_METADATA(AtlasedTextureLayered, (
+	CR_MEMBER(pageNum)
+))
+const AtlasedTextureLayered& AtlasedTextureLayered::DefaultAtlasTextureLayered = AtlasedTextureLayered{};

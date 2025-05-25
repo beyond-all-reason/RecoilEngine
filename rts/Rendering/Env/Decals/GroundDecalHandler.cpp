@@ -693,11 +693,6 @@ void CGroundDecalHandler::AddExplosion(AddExplosionInfo&& ei)
 void CGroundDecalHandler::ReloadTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	struct AtlasedTextureHash {
-		uint32_t operator()(const AtlasedTexture& at) const {
-			return spring::LiteHash(&at, sizeof(at));
-		}
-	};
 
 	spring::unordered_map<AtlasedTexture, std::string, AtlasedTextureHash> subTexToNameMain;
 	spring::unordered_map<AtlasedTexture, std::string, AtlasedTextureHash> subTexToNameNorm;
