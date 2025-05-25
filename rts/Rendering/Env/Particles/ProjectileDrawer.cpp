@@ -86,8 +86,8 @@ void CProjectileDrawer::Init() {
 
 	loadscreen->SetLoadMessage("Creating Projectile Textures");
 
-	textureAtlas = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_LEGACY, 0, 0, "ProjectileTextureAtlas", true);
-	groundFXAtlas = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_LEGACY, 0, 0, "ProjectileEffectsAtlas", true);
+	textureAtlas  = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_MP_LEGACY, 0, 0, "ExplosFXAtlas", true);
+	groundFXAtlas = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_MP_LEGACY, 0, 0, "GroundFXAtlas", true);
 
 	LuaParser resourcesParser("gamedata/resources.lua", SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
 	LuaParser mapResParser("gamedata/resources_map.lua", SPRING_VFS_MAP_BASE, SPRING_VFS_ZIP);

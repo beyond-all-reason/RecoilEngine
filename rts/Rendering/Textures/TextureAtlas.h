@@ -1,59 +1,15 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef TEXTURE_ATLAS_H
-#define TEXTURE_ATLAS_H
+#pragma once
 
 #include <string>
 #include <vector>
 
-#include "System/creg/creg_cond.h"
+#include "IAtlasAllocator.h"
+#include "AtlasedTexture.hpp"
 #include "System/float4.h"
 #include "System/type2.h"
 #include "System/UnorderedMap.hpp"
-#include "Rendering/Textures/IAtlasAllocator.h"
-
-/** @brief texture coordinates of an atlas subimage. */
-//typedef float4 AtlasedTexture;
-
-struct AtlasedTexture
-{
-	CR_DECLARE_STRUCT(AtlasedTexture)
-
-	explicit AtlasedTexture() = default;
-	explicit AtlasedTexture(const float4& f)
-		: x(f.x)
-		, y(f.y)
-		, z(f.z)
-		, w(f.w)
-	{};
-/*
-	AtlasedTexture(AtlasedTexture&& f) noexcept { *this = std::move(f); }
-	AtlasedTexture& operator= (AtlasedTexture&& f) = default;
-
-	AtlasedTexture(const AtlasedTexture& f) { *this = f; }
-	AtlasedTexture& operator= (const AtlasedTexture& f) = default;
-*/
-	bool operator==(const AtlasedTexture& rhs) const {
-		if (this == &rhs)
-			return true;
-
-		float4 f0(x    , y    , z    , w    );
-		float4 f1(rhs.x, rhs.y, rhs.z, rhs.w);
-		return f0 == f1;
-	}
-	bool operator!=(const AtlasedTexture& rhs) const { return !(*this == rhs); }
-
-	union {
-		struct { float x, y, z, w; };
-		struct { float x1, y1, x2, y2; };
-		struct { float s, t, p, q; };
-		struct { float xstart, ystart, xend, yend; };
-	};
-
-	static const AtlasedTexture& DefaultAtlasTexture;
-};
-
-
 
 /** @brief Class for combining multiple bitmaps into one large single bitmap. */
 class CTextureAtlas
@@ -63,9 +19,12 @@ public:
 		RGBA32
 	};
 	enum AllocatorType {
-		ATLAS_ALLOC_LEGACY   = 0,
-		ATLAS_ALLOC_QUADTREE = 1,
-		ATLAS_ALLOC_ROW      = 2,
+		ATLAS_ALLOC_LEGACY      = 0,
+		ATLAS_ALLOC_QUADTREE    = 1,
+		ATLAS_ALLOC_ROW         = 2,
+		ATLAS_ALLOC_MP_LEGACY   = 3,
+		ATLAS_ALLOC_MP_QUADTREE = 4,
+		ATLAS_ALLOC_MP_ROW      = 5
 	};
 
 public:
@@ -235,5 +194,3 @@ protected:
 	// set to true to write finalized texture atlas to disk
 	static inline bool debug = false;
 };
-
-#endif // TEXTURE_ATLAS_H

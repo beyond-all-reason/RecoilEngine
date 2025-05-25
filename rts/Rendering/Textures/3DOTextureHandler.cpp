@@ -101,7 +101,7 @@ void C3DOTextureHandler::Init()
 
 		const size_t foundx = atlasAlloc->GetEntry(texFile.name).x;
 		const size_t foundy = atlasAlloc->GetEntry(texFile.name).y;
-		const float4 texCoords = atlasAlloc->GetTexCoords(texFile.name);
+		const auto texCoords = atlasAlloc->GetTexCoords(texFile.name);
 
 		const uint8_t* rmem1 = curtex1.GetRawMem();
 		const uint8_t* rmem2 = curtex2.GetRawMem();
