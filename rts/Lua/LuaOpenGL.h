@@ -221,7 +221,6 @@ class LuaOpenGL {
 
 		static int LineWidth(lua_State* L);
 		static int PointSize(lua_State* L);
-		static int PointSmooth(lua_State* L);
 		static int PointSprite(lua_State* L);
 		static int PointParameter(lua_State* L);
 
