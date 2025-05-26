@@ -1170,6 +1170,8 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 				rightdir = frontdir.cross(updir.Normalize());
 				frontdir = updir.cross(rightdir.Normalize());
 			}
+			if (aircraftState == AIRCRAFT_CRASHING)
+				owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
 		}
 	}
 
