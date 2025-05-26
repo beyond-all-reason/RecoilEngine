@@ -2130,31 +2130,48 @@ public:
 	}
 };
 
-class ShowElevationActionExecutor : public IUnsyncedActionExecutor {
+class IShowInfoTexActionExecutor : public IUnsyncedActionExecutor {
 public:
-	ShowElevationActionExecutor() : IUnsyncedActionExecutor("ShowElevation", "Enable rendering of the auxiliary height-map overlay") {
+	IShowInfoTexActionExecutor(const std::string& command, const std::string& description, bool cheatRequired = false) : IUnsyncedActionExecutor(command, description, cheatRequired) {
 	}
+	bool SetMode(const UnsyncedAction& action, const std::string mode, const std::string value) const {
+		const bool wasEnabled = infoTextureHandler->GetMode() == mode;
+		bool enabled = wasEnabled;
 
-	bool Execute(const UnsyncedAction& action) const final {
-		infoTextureHandler->ToggleMode("height");
+		InverseOrSetBool(enabled, value);
+
+		if (enabled && !wasEnabled)
+			infoTextureHandler->SetMode(mode);
+		else if (!enabled && wasEnabled) {
+			infoTextureHandler->DisableCurrentMode();
+		}
 		return true;
 	}
 };
 
-class ShowMetalMapActionExecutor : public IUnsyncedActionExecutor {
+class ShowElevationActionExecutor : public IShowInfoTexActionExecutor {
 public:
-	ShowMetalMapActionExecutor() : IUnsyncedActionExecutor("ShowMetalMap", "Enable rendering of the auxiliary metal-map overlay") {
+	ShowElevationActionExecutor() : IShowInfoTexActionExecutor("ShowElevation", "Enable rendering of the auxiliary height-map overlay") {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		infoTextureHandler->ToggleMode("metal");
-		return true;
+		return SetMode(action, "height", action.GetArgs());
 	}
 };
 
-class ShowPathTravActionExecutor : public IUnsyncedActionExecutor {
+class ShowMetalMapActionExecutor : public IShowInfoTexActionExecutor {
 public:
-	ShowPathTravActionExecutor() : IUnsyncedActionExecutor("ShowPathTraversability", "Enable rendering of the path traversability-map overlay") {
+	ShowMetalMapActionExecutor() : IShowInfoTexActionExecutor("ShowMetalMap", "Enable rendering of the auxiliary metal-map overlay") {
+	}
+
+	bool Execute(const UnsyncedAction& action) const final {
+		return SetMode(action, "metal", action.GetArgs());
+	}
+};
+
+class ShowPathTravActionExecutor : public IShowInfoTexActionExecutor {
+public:
+	ShowPathTravActionExecutor() : IShowInfoTexActionExecutor("ShowPathTraversability", "Enable rendering of the path traversability-map overlay") {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
@@ -2163,47 +2180,66 @@ public:
 		if (pathTexInfo != nullptr)
 			pathTexInfo->ShowMoveDef(-1);
 
-		infoTextureHandler->ToggleMode("path");
-		return true;
+		return SetMode(action, "path", action.GetArgs());
 	}
 };
 
-class ShowPathHeatActionExecutor : public IUnsyncedActionExecutor {
+class ShowPathHeatActionExecutor : public IShowInfoTexActionExecutor {
 public:
-	ShowPathHeatActionExecutor() : IUnsyncedActionExecutor("ShowPathHeat", "Enable/Disable rendering of the path heat-map overlay", true) {
+	ShowPathHeatActionExecutor() : IShowInfoTexActionExecutor("ShowPathHeat", "Enable/Disable rendering of the path heat-map overlay", true) {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		infoTextureHandler->ToggleMode("heat");
-		return true;
+		return SetMode(action, "heat", action.GetArgs());
 	}
 };
 
-class ShowPathFlowActionExecutor : public IUnsyncedActionExecutor {
+class ShowPathFlowActionExecutor : public IShowInfoTexActionExecutor {
 public:
-	ShowPathFlowActionExecutor() : IUnsyncedActionExecutor("ShowPathFlow", "Enable/Disable rendering of the path flow-map overlay", true) {
+	ShowPathFlowActionExecutor() : IShowInfoTexActionExecutor("ShowPathFlow", "Enable/Disable rendering of the path flow-map overlay", true) {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		infoTextureHandler->ToggleMode("flow");
-		return true;
+		return SetMode(action, "flow", action.GetArgs());
 	}
 };
 
-class ShowPathCostActionExecutor : public IUnsyncedActionExecutor {
+class ShowPathCostActionExecutor : public IShowInfoTexActionExecutor {
 public:
-	ShowPathCostActionExecutor() : IUnsyncedActionExecutor("ShowPathCost", "Enable rendering of the path cost-map overlay", true) {
+	ShowPathCostActionExecutor() : IShowInfoTexActionExecutor("ShowPathCost", "Enable rendering of the path cost-map overlay", true) {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		infoTextureHandler->ToggleMode("pathcost");
-		return true;
+		return SetMode(action, "pathcost", action.GetArgs());
 	}
 };
 
-class ToggleLOSActionExecutor : public IUnsyncedActionExecutor {
+class ShowLOSActionExecutor : public IShowInfoTexActionExecutor {
 public:
-	ToggleLOSActionExecutor() : IUnsyncedActionExecutor("ToggleLOS", "Enable rendering of the auxiliary LOS-map overlay") {
+	ShowLOSActionExecutor() : IShowInfoTexActionExecutor("ShowLOS", "Enable rendering of the auxiliary LOS-map overlay") {
+	}
+
+	bool Execute(const UnsyncedAction& action) const final {
+		return SetMode(action, "los", action.GetArgs());
+	}
+};
+
+class ShowInfoTexActionExecutor : public IShowInfoTexActionExecutor {
+public:
+	ShowInfoTexActionExecutor() : IShowInfoTexActionExecutor("ShowInfoTex", "Enable rendering of an arbitrary info texture view", true) {
+	}
+
+	bool Execute(const UnsyncedAction& action) const final {
+		auto args = CSimpleParser::Tokenize(action.GetArgs());
+		auto mode = args.size() > 0 ? args[0] : "";
+		auto value = args.size() > 1 ? args[1] : "";
+		return SetMode(action, mode, value);
+	}
+};
+
+class ToggleLOSActionExecutor : public IShowInfoTexActionExecutor {
+public:
+	ToggleLOSActionExecutor() : IShowInfoTexActionExecutor("ToggleLOS", "Toggle rendering of the auxiliary LOS-map overlay") {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
@@ -2212,9 +2248,9 @@ public:
 	}
 };
 
-class ToggleInfoActionExecutor : public IUnsyncedActionExecutor {
+class ToggleInfoActionExecutor : public IShowInfoTexActionExecutor {
 public:
-	ToggleInfoActionExecutor() : IUnsyncedActionExecutor("ToggleInfo", "Toggles current info texture view") {
+	ToggleInfoActionExecutor() : IShowInfoTexActionExecutor("ToggleInfo", "Toggles current info texture view") {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
