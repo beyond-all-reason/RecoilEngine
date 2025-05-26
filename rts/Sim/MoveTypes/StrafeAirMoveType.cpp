@@ -1150,7 +1150,9 @@ bool CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 
 			const float impactSpeed = -spd.dot(groundNormal) * int(1 - owner->IsStunned());
 
-			owner->Move(groundOffset, true);
+			if (aircraftState != AIRCRAFT_CRASHING)
+				// skip when crashing to explode a bit into the ground
+				owner->Move(groundOffset, true);
 
 			if (impactSpeed > 0.0f) {
 				// fix for mantis #1355
