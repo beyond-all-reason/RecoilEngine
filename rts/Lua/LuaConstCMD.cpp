@@ -182,14 +182,22 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	/***
 	 * @field CMD.SQUADWAIT 8
 	 *
-	 * Makes selected units not multiple of the squadSize wait.
+	 * Makes selected units, or units coming out of a factory wait until squadSize peers
+	 * are found to go with them.
 	 *
-	 * If the squadSize is smaller than the selected number of units the command will
-	 * have no effect.
+	 * If given to non factory units and the squadSize is smaller than the selected number
+	 * of units the command will have no effect.
 	 *
 	 * Each unit will find squadSize other units and resume wait, those remaining
 	 * without peers will wait. For example if there are 30 selected units and a
 	 * squadSize of 12 is sent, 6 units will stay waiting, as `30 - 12*2 = 6`.
+	 *
+	 * If given at a waypoint for a factory queue for new units, units coming out of the
+	 * factory will wait at the waypoint until squadSize units are available, and then
+	 * they will proceed together.
+	 *
+	 * Can also be given to a group of factories, and units from those factories
+	 * will gather together.
 	 *
 	 * - `params` squadSize: Squad size.
 	 */
