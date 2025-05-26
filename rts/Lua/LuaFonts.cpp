@@ -375,7 +375,7 @@ int LuaFonts::PrintWorld(lua_State* L)
  * Also allows disabling automatic setting of the blend mode. Otherwise the font will always print
  * with `BlendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)`.
 
- * @param autoBlendMode boolean? When `false` doesn't set the gl.BlendFunc automatically. Defaults to `true`.
+ * @param userDefinedBlending boolean? When `true` doesn't set the gl.BlendFunc automatically. Defaults to `false`.
  *
  * @see gl.BlendFunc
  * @see gl.BlendFuncSeparate
@@ -385,8 +385,8 @@ int LuaFonts::Begin(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 	auto f = tofont(L, 1);
-	auto autoBlendMode = luaL_optboolean(L, 2, true);
-	f->Begin(autoBlendMode);
+	auto userDefinedBlending = luaL_optboolean(L, 2, false);
+	f->Begin(userDefinedBlending);
 	return 0;
 }
 
@@ -404,7 +404,7 @@ int LuaFonts::End(lua_State* L)
  * @function LuaFont:SubmitBuffered
  *
  * @param noBillboarding boolean? When `false` sets 3d billboard mode. Defaults to `true`.
- * @param autoBlendMode boolean? When `false` doesn't set the gl.BlendFunc automatically. Defaults to `true`.
+ * @param userDefinedBlending boolean? When `true` doesn't set the gl.BlendFunc automatically. Defaults to `false`.
  *
  * @see gl.BlendFunc
  * @see gl.BlendFuncSeparate
@@ -414,12 +414,12 @@ int LuaFonts::SubmitBuffered(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 	auto f = tofont(L, 1);
-	auto autoBlendMode = luaL_optboolean(L, 3, true);
+	auto userDefinedBlending = luaL_optboolean(L, 3, false);
 
 	if (luaL_optboolean(L, 2, true)) // world or not
-		f->DrawBuffered(autoBlendMode);
+		f->DrawBuffered(userDefinedBlending);
 	else
-		f->DrawWorldBuffered(autoBlendMode);
+		f->DrawWorldBuffered(userDefinedBlending);
 
 	return 0;
 }
