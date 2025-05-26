@@ -3903,6 +3903,23 @@ int LuaOpenGL::PointSize(lua_State* L)
 
 
 /***
+ * @function gl.PointSmooth
+ * @param flag boolean
+ */
+int LuaOpenGL::PointSmooth(lua_State* L)
+{
+	CheckDrawingEnabled(L, __func__);
+	CondWarnDeprecatedGL(L, __func__);
+
+	if (luaL_checkboolean(L, 1))
+		glEnable(GL_POINT_SMOOTH);
+	else
+		glDisable(GL_POINT_SMOOTH);
+	return 0;
+}
+
+
+/***
  * @function gl.PointSprite
  * @param enable boolean
  * @param enableCoordReplace boolean?
