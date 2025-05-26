@@ -6052,6 +6052,8 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 		} break;
 		case hashString("pointSmooth"):
 		case hashString("pointsmooth"): {
+			CondWarnDeprecatedGL(L, __func__);
+
 			GLboolean pointSmoothFlag;
 
 			glGetBooleanv(GL_POINT_SMOOTH, &pointSmoothFlag);
