@@ -1144,6 +1144,11 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 		const bool groundContact = (groundHeight > (owner->midPos.y - owner->radius));
 		const bool handleContact = (aircraftState != AIRCRAFT_LANDED && aircraftState != AIRCRAFT_TAKEOFF);
 
+		if (aircraftState == AIRCRAFT_CRASHING) {
+			owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
+			return;
+		}
+
 		if (groundContact && handleContact) {
 			const float3  groundOffset = UpVector * (groundHeight - (owner->midPos.y - owner->radius) + 0.01f);
 			const float3& groundNormal = CGround::GetNormal(pos.x, pos.z);
@@ -1170,8 +1175,6 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 				rightdir = frontdir.cross(updir.Normalize());
 				frontdir = updir.cross(rightdir.Normalize());
 			}
-			if (aircraftState == AIRCRAFT_CRASHING)
-				owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
 		}
 	}
 
