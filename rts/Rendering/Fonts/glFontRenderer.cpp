@@ -192,8 +192,6 @@ void CglShaderFontRenderer::PopGLState()
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	glPopAttrib();
-
-	userDefinedBlending = false;
 }
 
 void CglShaderFontRenderer::GetStats(std::array<size_t, 8>& stats) const
@@ -341,8 +339,6 @@ void CglNoShaderFontRenderer::PopGLState()
 
 	glDisable(GL_TEXTURE_2D);
 	glPopAttrib();
-
-	userDefinedBlending = false;
 }
 
 void CglNoShaderFontRenderer::GetStats(std::array<size_t, 8>& stats) const

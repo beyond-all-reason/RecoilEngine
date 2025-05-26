@@ -647,6 +647,8 @@ void CglFont::End() {
 	fontRenderer->DrawTraingleElements();
 	fontRenderer->PopGLState();
 
+	fontRenderer->SetUserDefinedBlending(false);
+
 	inBeginEndBlock = false;
 	sync.Unlock();
 }
@@ -665,6 +667,8 @@ void CglFont::DrawBuffered(bool userDefinedBlending)
 	fontRenderer->PushGLState(*this);
 	fontRenderer->DrawTraingleElements();
 	fontRenderer->PopGLState();
+
+	fontRenderer->SetUserDefinedBlending(false);
 }
 
 void CglFont::DrawWorldBuffered(bool userDefinedBlending)
