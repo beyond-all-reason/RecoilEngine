@@ -22,7 +22,7 @@ public:
 	virtual bool IsValid() const = 0;
 	virtual void GetStats(std::array<size_t, 8>& stats) const = 0;
 
-	void SetUserDefinedBlending(bool newAutoBlendMode) { userDefinedBlending = userDefinedBlending; };
+	void SetUserDefinedBlending(bool enableUserDefinedBlending) { userDefinedBlending = enableUserDefinedBlending; };
 
 	static std::unique_ptr<CglFontRenderer> CreateInstance();
 	static void DeleteInstance(std::unique_ptr<CglFontRenderer>& instance);
