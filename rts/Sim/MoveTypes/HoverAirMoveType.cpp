@@ -832,6 +832,11 @@ void CHoverAirMoveType::UpdateAirPhysics()
 		const bool bpGroundContact = (bpGroundHeight > ownerMinHeight);
 		const bool   handleContact = (aircraftState != AIRCRAFT_LANDED && aircraftState != AIRCRAFT_TAKEOFF);
 
+		if (cpGroundContact && aircraftState == AIRCRAFT_CRASHING) {
+			owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
+			return;
+		}
+
 		// hard avoidance in case soft constraint fails
 		if (cpGroundContact && handleContact)
 			owner->Move(UpVector * (cpGroundHeight - ownerMinHeight + 0.01f), true);
