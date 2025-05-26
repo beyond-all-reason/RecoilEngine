@@ -142,15 +142,70 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * @see Spring.GiveOrderToUnit
 	 */
 	PUSH_CMD(REMOVE);
-	/*** @field CMD.WAIT 5 */
+
+	/***
+	 * @field CMD.WAIT 5
+	 *
+	 * Makes the unit suspend processing its command queue until wait is removed.
+	 *
+	 * Accepts no parameters.
+	 */
 	PUSH_CMD(WAIT);
-	/*** @field CMD.TIMEWAIT 6 */
+
+	/***
+	 * @field CMD.TIMEWAIT 6
+	 *
+	 * Makes the unit suspend processing its command queue for a given duration.
+	 *
+	 * - `params` duration Time to wait in seconds.
+	 */
 	PUSH_CMD(TIMEWAIT);
-	/*** @field CMD.DEATHWAIT 7 */
+
+	/***
+	 * @field CMD.DEATHWAIT 7
+	 *
+	 * Makes the unit suspend processing its commmand queue until the death of a
+	 * given unitID.
+	 *
+	 * ## Modes of operation
+	 *
+	 * ### Wait for death of specific unit
+	 *
+	 * - `params` unitID: unitID of the unit to wait for.
+	 *
+	 * ### Wait for death of units in an area
+	 *
+	 * - `params` {x1, y1, z1, x2, y2, z2}: Wait for death of units in square {x1, z1, x2, z2}
+	 */
 	PUSH_CMD(DEATHWAIT);
-	/*** @field CMD.SQUADWAIT 8 */
+
+	/***
+	 * @field CMD.SQUADWAIT 8
+	 *
+	 * Makes units not multiple of the squadSize wait.
+	 *
+	 * If the squadSize is smaller than the selected number of units the command will
+	 * have no effect.
+	 *
+	 * Each unit will find squadSize other units and resume wait, those remaining
+	 * without peers will wait. For example if there are 30 selected units and a
+	 * squadSize of 12 is sent, 6 units will stay waiting, as `30 - 12*2 = 6`.
+	 *
+	 * - `params` squadSize: Squad size.
+	 */
 	PUSH_CMD(SQUADWAIT);
-	/*** @field CMD.GATHERWAIT 9 */
+
+	/***
+	 * @field CMD.GATHERWAIT 9
+	 *
+	 * Makes the unit wait for all other selected units to reach the command.
+	 *
+	 * Useful to make units wait until all other units have reached a waypoint.
+	 *
+	 * Will only be given to movable (`unitDef.canMove == true`) non-factory units.
+	 *
+	 * Accepts no parameters.
+	 */
 	PUSH_CMD(GATHERWAIT);
 	/*** @field CMD.MOVE 10 */
 	PUSH_CMD(MOVE);
