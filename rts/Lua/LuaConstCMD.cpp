@@ -165,7 +165,7 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * @field CMD.DEATHWAIT 7
 	 *
 	 * Makes the unit suspend processing its commmand queue until the death of a
-	 * given unitID.
+	 * given unit or units in an area.
 	 *
 	 * ## Modes of operation
 	 *
@@ -175,7 +175,7 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 *
 	 * ### Wait for death of units in an area
 	 *
-	 * - `params` {x1, y1, z1, x2, y2, z2}: Wait for death of units in square {x1, z1, x2, z2}
+	 * - `params` {x1, y1, z1, x2, y2, z2}: Wait for death of units in square {x1, z1, x2, z2}.
 	 */
 	PUSH_CMD(DEATHWAIT);
 
