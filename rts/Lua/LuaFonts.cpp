@@ -18,6 +18,15 @@
 #include "System/Misc/TracyDefs.h"
 
 
+/***
+ * Lua opengl font object.
+ *
+ * @class LuaFont
+ * @table LuaFont
+ * @see gl.LoadFont
+ */
+
+
 bool LuaFonts::PushEntries(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -358,7 +367,7 @@ int LuaFonts::PrintWorld(lua_State* L)
 
 /*** Begin a block of font commands.
  *
- * @function gl.BeginText
+ * @function LuaFont:Begin
  *
  * Fonts can be printed without using Start/End, but when doing several operations it's more optimal
  * if done inside a block.
@@ -392,7 +401,7 @@ int LuaFonts::End(lua_State* L)
 
 /*** Draws text printed with the `buffered` option.
  *
- * @function gl.SubmitBuffered
+ * @function LuaFont:SubmitBuffered
  *
  * @param noBillboarding boolean? When `false` sets 3d billboard mode. Defaults to `true`.
  * @param autoBlendMode boolean? When `false` doesn't set the gl.BlendFunc automatically. Defaults to `true`.
