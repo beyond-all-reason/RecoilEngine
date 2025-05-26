@@ -171,7 +171,7 @@ void CglShaderFontRenderer::PushGLState(const CglFont& fnt)
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_ALPHA_TEST); //just in case
 	glEnable(GL_BLEND);
-	if (autoBlendMode)
+	if (!userDefinedBlending)
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glBindTexture(GL_TEXTURE_2D, fnt.GetTexture());
@@ -193,7 +193,7 @@ void CglShaderFontRenderer::PopGLState()
 
 	glPopAttrib();
 
-	autoBlendMode = true;
+	userDefinedBlending = false;
 }
 
 void CglShaderFontRenderer::GetStats(std::array<size_t, 8>& stats) const
@@ -312,7 +312,7 @@ void CglNoShaderFontRenderer::PushGLState(const CglFont& fnt)
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_ALPHA_TEST);
 	glEnable(GL_BLEND);
-	if (autoBlendMode)
+	if (!userDefinedBlending)
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_TEXTURE_2D);
 
@@ -342,7 +342,7 @@ void CglNoShaderFontRenderer::PopGLState()
 	glDisable(GL_TEXTURE_2D);
 	glPopAttrib();
 
-	autoBlendMode = true;
+	userDefinedBlending = false;
 }
 
 void CglNoShaderFontRenderer::GetStats(std::array<size_t, 8>& stats) const
