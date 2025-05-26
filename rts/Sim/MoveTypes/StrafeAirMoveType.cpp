@@ -1144,7 +1144,7 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 		const bool groundContact = (groundHeight > (owner->midPos.y - owner->radius));
 		const bool handleContact = (aircraftState != AIRCRAFT_LANDED && aircraftState != AIRCRAFT_TAKEOFF);
 
-		if (aircraftState == AIRCRAFT_CRASHING) {
+		if (groundContact && aircraftState == AIRCRAFT_CRASHING) {
 			owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
 			return;
 		}
