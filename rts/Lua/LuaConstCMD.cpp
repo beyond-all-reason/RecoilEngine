@@ -182,7 +182,7 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	/***
 	 * @field CMD.SQUADWAIT 8
 	 *
-	 * Makes units not multiple of the squadSize wait.
+	 * Makes selected units not multiple of the squadSize wait.
 	 *
 	 * If the squadSize is smaller than the selected number of units the command will
 	 * have no effect.
