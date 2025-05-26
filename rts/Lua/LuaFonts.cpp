@@ -356,12 +356,28 @@ int LuaFonts::PrintWorld(lua_State* L)
 /******************************************************************************/
 /******************************************************************************/
 
+/*** Begin a block of font commands.
+ *
+ * @function gl.BeginText
+ *
+ * Fonts can be printed without using Start/End, but when doing several operations it's more optimal
+ * if done inside a block.
+ *
+ * Also allows disabling automatic setting of the blend mode. Otherwise the font will always print
+ * with `BlendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)`.
+
+ * @param autoBlendMode boolean? When `false` doesn't set the gl.BlendFunc automatically. Defaults to `true`.
+ *
+ * @see gl.BlendFunc
+ * @see gl.BlendFuncSeparate
+ */
 int LuaFonts::Begin(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 	auto f = tofont(L, 1);
-	f->Begin();
+	auto autoBlendMode = luaL_optboolean(L, 2, true);
+	f->Begin(autoBlendMode);
 	return 0;
 }
 
@@ -374,16 +390,27 @@ int LuaFonts::End(lua_State* L)
 	return 0;
 }
 
+/*** Draws text printed with the `buffered` option.
+ *
+ * @function gl.SubmitBuffered
+ *
+ * @param noBillboarding boolean? When `false` sets 3d billboard mode. Defaults to `true`.
+ * @param autoBlendMode boolean? When `false` doesn't set the gl.BlendFunc automatically. Defaults to `true`.
+ *
+ * @see gl.BlendFunc
+ * @see gl.BlendFuncSeparate
+ */
 int LuaFonts::SubmitBuffered(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 	auto f = tofont(L, 1);
+	auto autoBlendMode = luaL_optboolean(L, 3, true);
 
 	if (luaL_optboolean(L, 2, true)) // world or not
-		f->DrawBuffered();
+		f->DrawBuffered(autoBlendMode);
 	else
-		f->DrawWorldBuffered();
+		f->DrawWorldBuffered(autoBlendMode);
 
 	return 0;
 }

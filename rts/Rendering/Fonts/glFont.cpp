@@ -191,10 +191,10 @@ CglFont::CglFont(const std::string& fontFile, int size, int _outlineWidth, float
 }
 
 #ifdef HEADLESS
-void CglFont::Begin() {}
+void CglFont::Begin(bool autoBlendMode) {}
 void CglFont::End() {}
-void CglFont::DrawBuffered() {}
-void CglFont::DrawWorldBuffered() {}
+void CglFont::DrawBuffered(bool autoBlendMode) {}
+void CglFont::DrawWorldBuffered(bool autoBlendMode) {}
 
 void CglFont::glWorldPrint(const float3& p, const float size, const std::string& str, int options) {}
 
@@ -619,9 +619,11 @@ const float4* CglFont::ChooseOutlineColor(const float4& textColor)
 	return &lightOutline;
 }
 
-void CglFont::Begin() {
+void CglFont::Begin(bool autoBlendMode) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	sync.Lock();
+
+	fontRenderer->SetAutoBlendMode(autoBlendMode);
 
 	if (inBeginEndBlock) {
 		sync.Unlock();
@@ -650,7 +652,7 @@ void CglFont::End() {
 }
 
 
-void CglFont::DrawBuffered()
+void CglFont::DrawBuffered(bool autoBlendMode)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto lock = sync.GetScopedLock();
@@ -658,18 +660,20 @@ void CglFont::DrawBuffered()
 	UpdateGlyphAtlasTexture();
 	UploadGlyphAtlasTexture();
 
+	fontRenderer->SetAutoBlendMode(autoBlendMode);
+
 	fontRenderer->PushGLState(*this);
 	fontRenderer->DrawTraingleElements();
 	fontRenderer->PopGLState();
 }
 
-void CglFont::DrawWorldBuffered()
+void CglFont::DrawWorldBuffered(bool autoBlendMode)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	glPushMatrix();
 	glMultMatrixf(camera->GetBillBoardMatrix());
 
-	DrawBuffered();
+	DrawBuffered(autoBlendMode);
 
 	glPopMatrix();
 }
