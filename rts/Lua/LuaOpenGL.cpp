@@ -1277,10 +1277,26 @@ int LuaOpenGL::DrawMiniMap(lua_State* L)
 ******************************************************************************/
 
 
+/*** Begin a block of text commands.
+ *
+ * @function gl.BeginText
+ *
+ * Text can be drawn without Start/End, but when doing several operations it's more optimal
+ * if done inside a block.
+ *
+ * Also allows disabling automatic setting of the blend mode. Otherwise the font will always print
+ * with `BlendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)`.
+ *
+ * @param autoBlendMode boolean? When `false` doesn't set the gl.BlendFunc automatically. Defaults to `true`.
+ *
+ * @see gl.BlendFunc
+ * @see gl.BlendFuncSeparate
+ */
 int LuaOpenGL::BeginText(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
-	font->Begin();
+	auto autoBlendMode = luaL_optboolean(L, 2, true);
+	font->Begin(autoBlendMode);
 	return 0;
 }
 

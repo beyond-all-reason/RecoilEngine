@@ -55,12 +55,12 @@ public:
 
 	CglFont(const std::string& fontFile, int size, int outlinewidth, float outlineweight);
 
-	void Begin();
+	void Begin(bool autoBlendMode = true);
 	void End();
 
-	void DrawBuffered();
+	void DrawBuffered(bool autoBlendMode = true);
 
-	void DrawWorldBuffered();
+	void DrawWorldBuffered(bool autoBlendMode = true);
 
 	void glWorldPrint(const float3& p, const float size, const std::string& str, int options = FONT_DESCENDER | FONT_CENTER | FONT_OUTLINE | FONT_BUFFERED);
 
@@ -138,6 +138,7 @@ public:
 	static auto GetLoadedFonts() -> const decltype(allFonts)& {
 		return allFonts;
 	}
+	bool autoBlendMode = true;
 private:
 	std::string fontPath;
 
