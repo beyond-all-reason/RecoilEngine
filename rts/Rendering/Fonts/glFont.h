@@ -138,7 +138,6 @@ public:
 	static auto GetLoadedFonts() -> const decltype(allFonts)& {
 		return allFonts;
 	}
-	bool autoBlendMode = true;
 private:
 	std::string fontPath;
 
