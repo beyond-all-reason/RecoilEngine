@@ -133,7 +133,7 @@ int CLuaRules::UnpackCobArg(lua_State* L)
 
 
 void CLuaRules::Cob2Lua(const LuaHashString& name, const CUnit* unit,
-                        int& argsCount, int args[MAX_LUA_COB_ARGS])
+                        int& argsCount, int args[MAX_LUA_COB_ARGS], bool synced)
 {
 	static int callDepth = 0;
 	if (callDepth >= 16) {
@@ -142,7 +142,10 @@ void CLuaRules::Cob2Lua(const LuaHashString& name, const CUnit* unit,
 		return;
 	}
 
-	auto L = syncedLuaHandle.L;
+	auto L = synced ? syncedLuaHandle.L : unsyncedLuaHandle.L;
+
+	if (!synced && !LuaUtils::IsUnitInLos(L, unit))
+		return;
 
 	LUA_CALL_IN_CHECK(L);
 

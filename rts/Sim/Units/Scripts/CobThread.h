@@ -105,7 +105,7 @@ protected:
 		int stackTop = -1;
 	};
 
-	void LuaCall();
+	void LuaCall(bool synced);
 
 	void PushCallStack(CallInfo v) { callStack.push_back(v); }
 	void PushDataStack(int v) { dataStack.push_back(v); }
