@@ -32,6 +32,7 @@
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Units/CommandAI/CommandDescription.h"
+#include "Sim/Weapons/WeaponDefHandler.h"
 #include "System/EventHandler.h"
 #include "System/Log/ILog.h"
 #include "System/FileSystem/FileHandler.h"
@@ -168,7 +169,15 @@ CLuaUI::CLuaUI()
 		KillLua();
 		return;
 	}
+
+	lua_getglobal(L, "Script");
+		LuaPushNamedCFunc(L, "GetWatchExplosion",    GetWatchExplosionDef);
+		LuaPushNamedCFunc(L, "SetWatchExplosion",    SetWatchExplosionDef);
+	lua_pop(L, 1); // os
+
 	InitializeRmlUi();
+
+	watchExplosionDefs.resize(weaponDefHandler->NumWeaponDefs(), false);
 
 	lua_settop(L, 0);
 	if (!LoadCode(L, std::move(code), file)) {
@@ -190,6 +199,43 @@ CLuaUI::CLuaUI()
 CLuaUI::~CLuaUI()
 {
 	luaUI = nullptr;
+}
+
+#define GetWatchDef(DefType)                                                \
+	int CLuaUI::GetWatch ## DefType ## Def(lua_State* L) {        \
+		CLuaHandle* lhs = GetHandle(L);                         \
+		const auto& vec = lhs->watch ## DefType ## Defs;                    \
+                                                                            \
+		const uint32_t defIdx = luaL_checkint(L, 1);                        \
+                                                                            \
+                                                                           \
+		if (defIdx >= vec.size())                                           \
+			return 0;                                                       \
+                                                                            \
+		lua_pushboolean(L, vec[defIdx]);                                    \
+		return 1;                                                           \
+	}
+
+#define SetWatchDef(DefType)                                                \
+	int CLuaUI::SetWatch ## DefType ## Def(lua_State* L) {        \
+		CLuaHandle* lhs = GetHandle(L);                         \
+		auto& vec = lhs->watch ## DefType ## Defs;                          \
+                                                                            \
+		const uint32_t defIdx = luaL_checkint(L, 1);                        \
+                                                                            \
+		if (defIdx >= vec.size())                                           \
+			return 0;                                                       \
+                                                                            \
+		vec[defIdx] = luaL_checkboolean(L, 2);                              \
+		return 0;                                                           \
+	}
+
+GetWatchDef(Explosion)
+SetWatchDef(Explosion)
+
+bool CLuaUI::Explosion(int weaponDefID, int projectileID, const float3& pos, const CUnit* owner)
+{
+	return CLuaHandle::Explosion(weaponDefID, projectileID, pos, owner);
 }
 
 void CLuaUI::InitLuaSocket(lua_State* L) {
@@ -226,7 +272,7 @@ string CLuaUI::LoadFile(const string& name, const std::string& mode) const
 static bool IsDisallowedCallIn(const string& name)
 {
 	switch (hashString(name.c_str())) {
-		case hashString("Explosion"     ): { return true; } break;
+		//case hashString("Explosion"     ): { return true; } break; // so dangerous??
 		case hashString("DrawUnit"      ): { return true; } break;
 		case hashString("DrawFeature"   ): { return true; } break;
 		case hashString("DrawShield"    ): { return true; } break;

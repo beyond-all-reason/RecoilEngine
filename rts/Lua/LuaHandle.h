@@ -43,6 +43,7 @@ class LuaTextures;
 class LuaShaders;
 class CLuaDisplayLists;
 class CLuaRules;
+class CLuaUI;
 
 
 class CLuaHandle : public CEventClient
@@ -393,6 +394,7 @@ class CLuaHandle : public CEventClient
 
 		// FIXME needs access to L & RunCallIn
 		friend class CLuaRules;
+		friend class CLuaUI;
 
 		friend class CLuaStateCollector;
 };

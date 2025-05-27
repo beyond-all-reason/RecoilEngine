@@ -74,6 +74,9 @@ public: // call-ins
 
 	void ShockFront(const float3& pos, float power, float areaOfEffect, const float* distMod = NULL);
 
+	static int GetWatchExplosionDef(lua_State* L);
+	static int SetWatchExplosionDef(lua_State* L);
+	bool Explosion(int weaponID, int projectileID, const float3& pos, const CUnit* owner) override;
 protected:
 	CLuaUI();
 	virtual ~CLuaUI();
