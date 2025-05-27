@@ -10,7 +10,6 @@
 #include "LuaConfig.h"
 #include "LuaHashString.h"
 #include "LuaOpenGL.h"
-#include "LuaBitOps.h"
 #include "LuaMathExtra.h"
 #include "LuaTableExtra.h"
 #include "LuaTracyExtra.h"
@@ -2068,7 +2067,8 @@ void CLuaHandle::FeatureDamaged(
  * Projectiles
  * @section projectiles
  *
- * The following Callins are only called for weaponDefIDs registered via Script.SetWatchWeapon.
+ * The following Callins are only called for weaponDefIDs registered
+ * via Script.SetWatchWeapon or Script.SetWatchProjectile.
 ******************************************************************************/
 
 /*** Called when the projectile is created.
@@ -2081,6 +2081,8 @@ void CLuaHandle::FeatureDamaged(
  * @param proOwnerID integer
  * @param weaponDefID integer
  *
+ * @see Script.SetWatchProjectile
+ * @see Script.SetWatchWeapon
  */
 void CLuaHandle::ProjectileCreated(const CProjectile* p)
 {
@@ -2127,6 +2129,9 @@ void CLuaHandle::ProjectileCreated(const CProjectile* p)
  * @param proID integer
  * @param ownerID integer
  * @param proWeaponDefID integer
+ *
+ * @see Script.SetWatchProjectile
+ * @see Script.SetWatchWeapon
  */
 void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
 {
@@ -2178,13 +2183,19 @@ void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
  *
  * @function Callins:Explosion
  *
+ * Only called for weaponDefIDs registered via Script.SetWatchExplosion or Script.SetWatchWeapon.
+ *
  * @param weaponDefID integer
  * @param px number
  * @param py number
  * @param pz number
  * @param attackerID integer
  * @param projectileID integer
+  *
  * @return boolean noGfx if then no graphical effects are drawn by the engine for this explosion.
+ *
+ * @see Script.SetWatchExplosion
+ * @see Script.SetWatchWeapon
  */
 bool CLuaHandle::Explosion(int weaponDefID, int projectileID, const float3& pos, const CUnit* owner)
 {
@@ -2294,6 +2305,61 @@ bool CLuaHandle::RecvLuaMsg(const string& msg, int playerID)
 
 
 /******************************************************************************/
+
+void CLuaHandle::SetDevMode(bool value)
+{
+	if (value == devMode)
+		return;
+
+	devMode = value;
+
+	for (const auto* lcd : LUAHANDLE_CONTEXTS) {
+		for (const auto* lc : *lcd) {
+			if (!lc || !lc->owner)
+				continue;
+
+			lc->owner->EnactDevMode();
+		}
+	}
+}
+
+
+/* Toggles between empty table and filling it with lua module functions. 
+ */
+void CLuaHandle::SwapEnableModule(lua_State* L, bool enabled, const char* moduleName, lua_CFunction func) const
+{
+	// check if module table already exists
+	lua_getglobal(L, moduleName);
+	const bool missing = lua_isnil(L, -1);
+	lua_pop(L, 1);
+
+	// create an empty module table
+	if (missing) {
+		lua_createtable(L, 0, 0);
+		lua_setglobal(L, moduleName);
+	}
+
+	if (enabled) {
+		// relink methods
+		lua_pushvalue(L, LUA_GLOBALSINDEX);
+		LUA_OPEN_LIB(L, func);
+		lua_pop(L, 1);
+	}
+	else {
+		// unlink all methods
+		lua_getglobal(L, moduleName);
+		lua_pushnil(L);
+		while (lua_next(L, -2))
+		{
+			lua_pop(L, 1);		// pop value
+			lua_pushnil(L);
+			lua_rawset(L, -3);	// pop new value and key
+			lua_pushnil(L);		// restart iteration
+		}
+		lua_pop(L, 1);
+	}
+}
+
 
 void CLuaHandle::HandleLuaMsg(int playerID, int script, int mode, const std::vector<std::uint8_t>& data)
 {
@@ -2777,6 +2843,9 @@ void CLuaHandle::DrawScreenEffects()
 /*** Similar to DrawScreenEffects, this can be used to alter the contents of a frame after it has been completely rendered (i.e. World, MiniMap, Menu, UI).
  *
  * @function Callins:DrawScreenPost
+ *
+ * Note: This callin is invoked after the software rendered cursor (configuration variable HardwareCursor=0) is drawn.
+ *
  * @param viewSizeX number
  * @param viewSizeY number
  */
@@ -3985,7 +4054,6 @@ bool CLuaHandle::AddBasicCalls(lua_State* L)
 
 	// extra math utilities
 	lua_getglobal(L, "math");
-	LuaBitOps::PushEntries(L);
 	LuaMathExtra::PushEntries(L);
 	lua_pop(L, 1);
 

@@ -6,6 +6,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/GL/SubState.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "System/Exceptions.h"
@@ -16,57 +17,41 @@
 
 
 CRadarTexture::CRadarTexture()
-: CPboInfoTexture("radar")
-, uploadTexRadar(0)
-, uploadTexJammer(0)
+: CModernInfoTexture("radar")
 {
 	texSize = losHandler->radar.size;
-	texChannels = 2;
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	RecoilTexStorage2D(GL_TEXTURE_2D, -1, GL_RG8, texSize.x, texSize.y);
+	GL::TextureCreationParams tcp{
+		.reqNumLevels = -1,
+		.wrapMirror = false,
+		.minFilter = GL_NEAREST,
+		.magFilter = GL_LINEAR
+	};
 
-	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * texChannels * sizeof(unsigned short), GL_STREAM_DRAW);
-	infoTexPBO.Unbind();
+	texture = GL::Texture2D(texSize, GL_RG8, tcp, false);
 
-	if (FBO::IsSupported()) {
-		fbo.Bind();
-		fbo.AttachTexture(texture);
-		/*bool status =*/ fbo.CheckStatus("CRadarTexture");
-		FBO::Unbind();
-	}
-
-	const std::string vertexCode = R"(
-		#version 120
-		varying vec2 texCoord;
-
-		void main() {
-			texCoord = gl_Vertex.xy * 0.5 + 0.5;
-			gl_Position = vec4(gl_Vertex.xyz, 1.0);
-		}
-	)";
+	CreateFBO("CRadarTexture");
 
 	const std::string fragmentCode = R"(
-		#version 120
+		#version 130
+
 		uniform sampler2D texLoS;
 		uniform sampler2D texRadar;
 		uniform sampler2D texJammer;
-		varying vec2 texCoord;
+
+		in vec2 uv;
+		out vec2 fragData;
 
 		void main() {
-			float los = texture2D(texLoS, texCoord).r;
+			float los = texture(texLoS, uv).r;
 
-			vec2 fr = texture2D(texRadar,  texCoord).rg;
-			vec2 fj = texture2D(texJammer, texCoord).rg;
-			float cr = (fr.r + fr.g) * 200000.0;
-			float cj = (fj.r + fj.g) * 200000.0;
-			gl_FragColor = vec4(cr, los * cj, 0.0f, 0.0f);
+			float fr = texture(texRadar,  uv).r;
+			float fj = texture(texJammer, uv).r;
+
+			fragData = vec2(
+				float(fr > 0.0),
+				los * float(fj > 0.0)
+			);
 		}
 	)";
 
@@ -91,21 +76,15 @@ CRadarTexture::CRadarTexture()
 	}
 
 	if (fbo.IsValid() && shader->IsValid()) {
-		glGenTextures(1, &uploadTexRadar);
-		glBindTexture(GL_TEXTURE_2D, uploadTexRadar);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RG8, texSize.x, texSize.y);
+		GL::TextureCreationParams tcp{
+			.reqNumLevels = 1,
+			.wrapMirror = false,
+			.minFilter = GL_NEAREST,
+			.magFilter = GL_NEAREST
+		};
 
-		glGenTextures(1, &uploadTexJammer);
-		glBindTexture(GL_TEXTURE_2D, uploadTexJammer);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RG8, texSize.x, texSize.y);
+		uploadTexRadar  = GL::Texture2D(texSize, GL_R16, tcp, false);
+		uploadTexJammer = GL::Texture2D(texSize, GL_R16, tcp, false);
 	}
 
 	if (!fbo.IsValid() || !shader->IsValid()) {
@@ -117,8 +96,6 @@ CRadarTexture::CRadarTexture()
 CRadarTexture::~CRadarTexture()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glDeleteTextures(1, &uploadTexRadar);
-	glDeleteTextures(1, &uploadTexJammer);
 	shaderHandler->ReleaseProgramObject("[CRadarTexture]", "CRadarTexture");
 }
 
@@ -126,45 +103,42 @@ CRadarTexture::~CRadarTexture()
 void CRadarTexture::UpdateCPU()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	infoTexPBO.Bind();
-	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
+	static std::vector<uint8_t> infoTexMem;
+	infoTexMem.resize(texSize.x * texSize.y * 2);
 
 	if (!losHandler->GetGlobalLOS(gu->myAllyTeam)) {
 		const int jammerAllyTeam = modInfo.separateJammers ? gu->myAllyTeam : 0;
 
-		const unsigned short* myLos = &losHandler->los.losMaps[gu->myAllyTeam].front();
+		const auto& myLos = losHandler->los.losMaps[gu->myAllyTeam].GetLosMap();
 
-		const unsigned short* myRadar  = &losHandler->radar.losMaps[gu->myAllyTeam].front();
-		const unsigned short* myJammer = &losHandler->jammer.losMaps[jammerAllyTeam].front();
+		const auto& myRadar  = losHandler->radar.losMaps[gu->myAllyTeam].GetLosMap();
+		const auto& myJammer = losHandler->jammer.losMaps[jammerAllyTeam].GetLosMap();
 		for (int y = 0; y < texSize.y; ++y) {
 			for (int x = 0; x < texSize.x; ++x) {
 				const int idx = y * texSize.x + x;
-				infoTexMem[idx * 2 + 0] = ( myRadar[idx] != 0) ? 255 : 0;
-				infoTexMem[idx * 2 + 1] = (myJammer[idx] != 0 && myLos[idx] != 0) ? 255 : 0;
+				infoTexMem[idx * 2 + 0] = ( myRadar[idx] != 0) ? 0xFF : 0x00;
+				infoTexMem[idx * 2 + 1] = (myJammer[idx] != 0 && myLos[idx] != 0) ? 0xFF : 0x00;
 			}
 		}
 	} else {
 		for (int y = 0; y < texSize.y; ++y) {
 			for (int x = 0; x < texSize.x; ++x) {
 				const int idx = y * texSize.x + x;
-				infoTexMem[idx * 2 + 0] = 255;
-				infoTexMem[idx * 2 + 1] = 0;
+				infoTexMem[idx * 2 + 0] = 0xFF;
+				infoTexMem[idx * 2 + 1] = 0x00;
 			}
 		}
 	}
 
-	infoTexPBO.UnmapBuffer();
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RG, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
+	auto binding = texture.ScopedBind();
+	texture.UploadImage(infoTexMem.data());
 }
 
 
 void CRadarTexture::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!fbo.IsValid() || !shader->IsValid() || uploadTexRadar == 0 || uploadTexJammer == 0)
+	if (!fbo.IsValid() || !shader->IsValid() || !uploadTexRadar.IsValid() || uploadTexJammer.IsValid())
 		return UpdateCPU();
 
 	if (losHandler->GetGlobalLOS(gu->myAllyTeam)) {
@@ -175,61 +149,38 @@ void CRadarTexture::Update()
 		globalRendering->LoadViewport();
 		FBO::Unbind();
 
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glGenerateMipmap(GL_TEXTURE_2D);
+		auto binding = texture.ScopedBind();
+		texture.ProduceMipmaps();
 		return;
 	}
 
 	const int jammerAllyTeam = modInfo.separateJammers ? gu->myAllyTeam : 0;
 
-	infoTexPBO.Bind();
-	const size_t arraySize = texSize.x * texSize.y * sizeof(unsigned short);
-	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
-	const unsigned short* myRadar  = &losHandler->radar.losMaps[gu->myAllyTeam].front();
-	const unsigned short* myJammer = &losHandler->jammer.losMaps[jammerAllyTeam].front();
-	memcpy(infoTexMem,  myRadar, arraySize);
-	infoTexMem += arraySize;
-	memcpy(infoTexMem, myJammer, arraySize);
-	infoTexPBO.UnmapBuffer();
+	const auto& myRadar  = losHandler->radar.losMaps[gu->myAllyTeam].GetLosMap();
+	const auto& myJammer = losHandler->jammer.losMaps[jammerAllyTeam].GetLosMap();
 
-	//Trick: Upload the ushort as 2 ubytes, and then check both for `!=0` in the shader.
-	// Faster than doing it on the CPU! And uploading it as shorts would be slow, cause the GPU
-	// has no native support for them and so the transformation would happen on the CPU, too.
-	glActiveTexture(GL_TEXTURE1);
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, uploadTexRadar);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RG, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, uploadTexJammer);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RG, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr(arraySize));
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
+	auto binding1 = uploadTexRadar.ScopedBind(1);
+	uploadTexRadar.UploadImage(myRadar.data());
+
+	auto binding0 = uploadTexJammer.ScopedBind(0);
+	uploadTexJammer.UploadImage(myJammer.data());
 
 	// do post-processing on the gpu (los-checking & scaling)
-	fbo.Bind();
-	glViewport(0, 0, texSize.x, texSize.y);
-	shader->Enable();
-	glDisable(GL_BLEND);
+	using namespace GL::State;
+	auto state = GL::SubState(
+		Blending(GL_FALSE)
+	);
 	glActiveTexture(GL_TEXTURE2);
-	glEnable(GL_TEXTURE_2D);
 	glBindTexture(GL_TEXTURE_2D, infoTextureHandler->GetInfoTexture("los")->GetTexture());
-	glBegin(GL_QUADS);
-		glVertex2f(-1.f, -1.f);
-		glVertex2f(-1.f, +1.f);
-		glVertex2f(+1.f, +1.f);
-		glVertex2f(+1.f, -1.f);
-	glEnd();
-	shader->Disable();
-	globalRendering->LoadViewport();
-	FBO::Unbind();
+	RunFullScreenPass();
 
 	// cleanup
-	glDisable(GL_TEXTURE_2D);
-	glActiveTexture(GL_TEXTURE1);
-	glDisable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	binding1 = {};
+	binding0 = {};
 
 	// generate mipmaps
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	auto binding = texture.ScopedBind();
+	texture.ProduceMipmaps();
 }

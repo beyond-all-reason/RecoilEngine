@@ -93,6 +93,7 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 	//LUA_OPEN_LIB(L, luaopen_os);
 	//LUA_OPEN_LIB(L, luaopen_package);
 	//LUA_OPEN_LIB(L, luaopen_debug);
+	EnactDevMode();
 
 	// delete some dangerous functions
 	lua_pushnil(L); lua_setglobal(L, "dofile");
@@ -162,6 +163,13 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 	eventHandler.AddClient(this);
 	return true;
 }
+
+
+void CUnsyncedLuaHandle::EnactDevMode() const
+{
+	SwapEnableModule(L, devMode, LUA_DBLIBNAME, luaopen_debug);
+}
+
 
 /***
  * @class UnsyncedCallins
@@ -444,6 +452,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	//SPRING_LUA_OPEN_LIB(L, luaopen_os);
 	//SPRING_LUA_OPEN_LIB(L, luaopen_package);
 	//SPRING_LUA_OPEN_LIB(L, luaopen_debug);
+	EnactDevMode();
 
 	lua_getglobal(L, "next");
 	origNextRef = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -541,6 +550,12 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	lua_settop(L, 0);
 	eventHandler.AddClient(this);
 	return true;
+}
+
+
+void CSyncedLuaHandle::EnactDevMode() const
+{
+	SwapEnableModule(L, devMode, LUA_DBLIBNAME, luaopen_debug);
 }
 
 
@@ -1696,11 +1711,18 @@ bool CSyncedLuaHandle::ShieldPreDamaged(
 /*** Determines if this weapon can automatically generate targets itself. See also commandFire weaponDef tag.
  *
  * @function SyncedCallins:AllowWeaponTargetCheck
+ *
+ * Only called for weaponDefIDs registered via `Script.SetWatchAllowTarget` or `Script.SetWatchWeapon`.
+ *
  * @param attackerID integer
  * @param attackerWeaponNum integer
  * @param attackerWeaponDefID integer
+ *
  * @return boolean allowCheck
  * @return boolean ignoreCheck
+ *
+ * @see Script.SetWatchAllowTarget
+ * @see Script.SetWatchWeapon
  */
 int CSyncedLuaHandle::AllowWeaponTargetCheck(unsigned int attackerID, unsigned int attackerWeaponNum, unsigned int attackerWeaponDefID)
 {
@@ -1736,13 +1758,20 @@ int CSyncedLuaHandle::AllowWeaponTargetCheck(unsigned int attackerID, unsigned i
 /*** Controls blocking of a specific target from being considered during a weapon's periodic auto-targeting sweep.
  *
  * @function SyncedCallins:AllowWeaponTarget
+ *
+ * Only called for weaponDefIDs registered via `Script.SetWatchAllowTarget` or `Script.SetWatchWeapon`.
+ *
  * @param attackerID integer
  * @param targetID integer
  * @param attackerWeaponNum integer
  * @param attackerWeaponDefID integer
  * @param defPriority number
+ *
  * @return boolean allowed
  * @return number the new priority for this target (if you don't want to change it, return defPriority). Lower priority targets are targeted first.
+ *
+ * @see Script.SetWatchAllowTarget
+ * @see Script.SetWatchWeapon
  */
 bool CSyncedLuaHandle::AllowWeaponTarget(
 	unsigned int attackerID,
@@ -1800,13 +1829,16 @@ bool CSyncedLuaHandle::AllowWeaponTarget(
  *
  * @function SyncedCallins:AllowWeaponInterceptTarget
  *
- * Only called for weaponDefIDs registered via Script.SetWatchWeapon.
+ * Only called for weaponDefIDs registered via `Script.SetWatchAllowTarget` or `Script.SetWatchWeapon`.
  *
  * @param interceptorUnitID integer
  * @param interceptorWeaponID integer
  * @param targetProjectileID integer
  *
  * @return boolean allowed
+ *
+ * @see Script.SetWatchAllowTarget
+ * @see Script.SetWatchWeapon
  */
 bool CSyncedLuaHandle::AllowWeaponInterceptTarget(
 	const CUnit* interceptorUnit,
@@ -1967,7 +1999,11 @@ int CSyncedLuaHandle::SyncedPairs(lua_State* L)
  * Invoke `UnsyncedCallins:RecvFromSynced` callin with the given arguments.
  * 
  * @function SendToUnsynced
- * @param ... nil|boolean|number|string Arguments. Typically the first argument is the name of a function to call.
+ *
+ * @param ... nil|boolean|number|string|table Arguments. Typically the first argument is the name of a function to call.
+ *
+ * Argument tables will be recursively copied and stripped of unsupported types and metatables.
+ *
  * @see UnsyncedCallins:RecvFromSynced
  */
 int CSyncedLuaHandle::SendToUnsynced(lua_State* L)
@@ -1983,6 +2019,7 @@ int CSyncedLuaHandle::SendToUnsynced(lua_State* L)
 		| (1 << LUA_TBOOLEAN)
 		| (1 << LUA_TNUMBER)
 		| (1 << LUA_TSTRING)
+		| (1 << LUA_TTABLE)
 	;
 
 	for (int i = 1; i <= args; i++) {
@@ -2120,16 +2157,191 @@ int CSyncedLuaHandle::GetWatchWeaponDef(lua_State* L) {
 	return 1;
 }
 
+/*** Register/deregister callins working per defID.
+ *
+ * Some of the engine callins can result in so many callins the engine doesn't forward them until registered
+ * through the following SetWatch* methods.
+ *
+ * The GetWatch* methods can be used to query the currently registered defIDs.
+ *
+ * @section watch_methods
+ */
+
+/*** Query whether any callins are registered for a unitDefID.
+ *
+ * @function Script.GetWatchUnit
+ *
+ * @param unitDefID integer
+ * @return boolean watched Watch status.
+ *
+ * @see Script.SetWatchUnit
+ */
+
 GetWatchDef(Unit)
+
+
+/*** Query whether any callins are registered for a featureDefID.
+ *
+ * @function Script.GetWatchFeature
+ *
+ * @param featureDefID integer
+ * @return boolean watched `true` if callins are registered, otherwise `false`.
+ *
+ * @see Script.SetWatchFeature
+ */
+
 GetWatchDef(Feature)
+
+
+/*** Query whether any callins are registered for a weaponDefID.
+ *
+ * @function Script.GetWatchWeapon
+ *
+ * Same as calling:
+ * ```lua
+ * Script.GetWatchExplosion(weaponDefID) or Script.GetWatchProjectile(weaponDefID) or Script.GetWatchAllowTarget(weaponDefID)
+ * ```
+ *
+ * @param weaponDefID integer
+ * @return boolean watched True if watch is enabled for any weaponDefID callins.
+ *
+ * @see Script.SetWatchWeapon
+ */
+
+/*** Query whether explosion callins are registered for a weaponDefID.
+ *
+ * @function Script.GetWatchExplosion
+ *
+ * @param weaponDefID integer
+ * @return boolean watched `true` if callins are registered, otherwise `false`.
+ *
+ * @see Script.SetWatchExplosion
+ */
+
 GetWatchDef(Explosion)
+
+
+/*** Query whether projectile callins are registered for a weaponDefID.
+ *
+ * @function Script.GetWatchProjectile
+ *
+ * @param weaponDefID integer
+ * @return boolean watched `true` if callins are registered, otherwise `false`.
+ *
+ * @see Script.SetWatchProjectile
+ */
+
 GetWatchDef(Projectile)
+
+
+/*** Query whether weapon targeting callins are registered for a weaponDefID.
+ *
+ * @function Script.GetWatchAllowTarget
+ *
+ * @param weaponDefID integer
+ * @return boolean watched `true` if callins are registered, otherwise `false`.
+ *
+ * @see Script.SetWatchAllowTarget
+ */
+
 GetWatchDef(AllowTarget)
 
+
+/*** Register or deregister unitDefID for expensive callins.
+ *
+ * @function Script.SetWatchUnit
+ *
+ * @param unitDefID integer
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchUnit
+ * @see Callins:UnitFeatureCollision
+ * @see Callins:UnitUnitCollision
+ * @see Callins:UnitMoveFailed
+ */
+
 SetWatchDef(Unit)
+
+
+/*** Register or deregister featureDefID for expensive callins.
+ *
+ * @function Script.SetWatchFeature
+ *
+ * @param featureDefID integer
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchFeature
+ * @see Callins:UnitFeatureCollision
+ */
+
 SetWatchDef(Feature)
+
+
+/*** Register or deregister weaponDefID for all expensive callins.
+ *
+ * @function Script.SetWatchWeapon
+ *
+ * Equivalent to calling:
+ *
+ * ```lua
+ * Script.SetWatchExplosion(weaponDefID)
+ * Script.SetWatchProjectile(weaponDefID)
+ * Script.SetWatchAllowTarget(weaponDefID)
+ * ```
+ *
+ * Generally it's better to use those methods to avoid registering uneeded callins.
+ *
+ * @param weaponDefID integer
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchWeapon
+ * @see Script.SetWatchExplosion
+ * @see Script.SetWatchProjectile
+ * @see Script.SetWatchAllowTarget
+ */
+
+/*** Register or deregister weaponDefID for explosion callins.
+ *
+ * @function Script.SetWatchExplosion
+ *
+ * @param weaponDefID integer
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchExplosion
+ * @see Callins:Explosion
+ */
+
 SetWatchDef(Explosion)
+
+
+/*** Register or deregister weaponDefID for expensive projectile callins.
+ *
+ * @function Script.SetWatchProjectile
+ *
+ * @param weaponDefID integer weaponDefID for weapons or -1 to watch for debris.
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchProjectile
+ * @see Callins:ProjectileCreated
+ * @see Callins:ProjectileDestroyed
+ */
+
 SetWatchDef(Projectile)
+
+
+/*** Register or deregister weaponDefID for weapon targeting callins.
+ *
+ * @function Script.SetWatchAllowTarget
+ *
+ * @param weaponDefID integer
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchAllowTarget
+ * @see SyncedCallins:AllowWeaponTargetCheck
+ * @see SyncedCallins:AllowWeaponTarget
+ * @see SyncedCallins:AllowWeaponInterceptTarget
+ */
+
 SetWatchDef(AllowTarget)
 
 #undef GetWatchDef

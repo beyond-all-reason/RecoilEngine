@@ -906,7 +906,10 @@ int LuaVFS::ZlibDecompress(lua_State* L)
  */
 
 /***
- * Calculates hash (in base64 form) of a given string.
+ * Calculates hash of a given string.
+ *
+ * - MD5 gets base64 encoded.
+ * - SHA512 gets hex encoded.
  * 
  * @function VFS.CalculateHash
  * @param input string

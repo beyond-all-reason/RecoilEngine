@@ -237,7 +237,7 @@ namespace CNamedTextures {
 
 		const bool needMipMaps = (!(nearest || linear)) || mipnear;
 
-		TextureCreationParams tcp;
+		GL::TextureCreationParams tcp;
 		tcp.texID = texID;
 		tcp.linearMipMapFilter = !mipnear;
 		tcp.linearTextureFilter = !nearest;

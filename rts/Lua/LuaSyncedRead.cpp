@@ -6228,6 +6228,8 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
 	return 3 + numParams;
 }
 
+
+// FIXME: Document the third argument usage or remove it: `boolean (Default: true) When true returns a list of commands, otherwise returns the count`
 /***
  * Get the commands for a unit.
  *
@@ -6236,20 +6238,18 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
  * Same as `Spring.GetCommandQueue`
  *
  * @param unitID integer
- * @param count integer Number of commands to return, `-1` returns all commands, `0` returns command count.
+ * @param count integer Maximum amount of commands to return, `-1` returns all commands.
  * @return Command[] commands
  */
 /***
  * Get the count of commands for a unit.
  *
+ * @deprecated This overload is deprecated, use `Spring.GetUnitCommandCount(unitId)` instead.
  * @function Spring.GetUnitCommands
- *
- * Same as `Spring.GetCommandQueue`
  *
  * @param unitID integer
  * @param count 0 Returns the number of commands in the units queue.
  * @return integer The number of commands in the unit queue.
- *
  */
 int LuaSyncedRead::GetUnitCommands(lua_State* L)
 {
@@ -6270,7 +6270,7 @@ int LuaSyncedRead::GetUnitCommands(lua_State* L)
 		// *get wants the actual commands
 		PackCommandQueue(L, *queue, numCmds);
 	} else {
-		LOG_DEPRECATED("Getting the command count using GetUnitCommands/GetCommandQueue is deprecated. Please use Spring.GetUnitCommandCount instead.");
+		LOG_DEPRECATED("This game is issuing `Spring.GetUnitCommands(unitId, 0)`, `Spring.GetCommandQueue(unitId, 0)` or passing a third argument to these functions. This usage is deprecated, please use `Spring.GetUnitCommandCount(unitId)` instead or fix some underlying bug.");
 		// *get just wants the queue's size
 		lua_pushnumber(L, queue->size());
 	}
@@ -6456,6 +6456,7 @@ int LuaSyncedRead::GetFactoryCounts(lua_State* L)
 /***
  * Get the commands for a unit.
  *
+ * @deprecated Use Spring.GetUnitCommands instead.
  * @function Spring.GetCommandQueue
  *
  * Same as `Spring.GetUnitCommands`
@@ -6467,6 +6468,7 @@ int LuaSyncedRead::GetFactoryCounts(lua_State* L)
 /***
  * Get the count of commands for a unit.
  *
+ * @deprecated Use Spring.GetUnitCommandCount instead.
  * @function Spring.GetCommandQueue
  *
  * Same as `Spring.GetUnitCommands`
@@ -6479,6 +6481,7 @@ int LuaSyncedRead::GetFactoryCounts(lua_State* L)
 
 int LuaSyncedRead::GetCommandQueue(lua_State* L)
 {
+	LOG_DEPRECATED("Spring.GetCommandQueue is deprecated, please use Spring.GetUnitCommands/Spring.GetUnitCommandCount instead.");
 	return (GetUnitCommands(L));
 }
 

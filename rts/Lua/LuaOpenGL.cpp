@@ -134,6 +134,8 @@ std::unordered_map<GLenum, std::string> LuaOpenGL::fixedStateEnumToString = {
 		FillFixedStateEnumToString(GL_FLAT),
 		FillFixedStateEnumToString(GL_SMOOTH),
 
+		FillFixedStateEnumToString(GL_POINT_SMOOTH),
+
 		FillFixedStateEnumToString(GL_FRONT),
 		FillFixedStateEnumToString(GL_BACK),
 		FillFixedStateEnumToString(GL_FRONT_AND_BACK),
@@ -6047,6 +6049,17 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 			lua_pushnumber(L, pointSize);
 
 			return 2;
+		} break;
+		case hashString("pointSmooth"):
+		case hashString("pointsmooth"): {
+			CondWarnDeprecatedGL(L, __func__);
+
+			GLboolean pointSmoothFlag;
+
+			glGetBooleanv(GL_POINT_SMOOTH, &pointSmoothFlag);
+			lua_pushnumber(L, pointSmoothFlag);
+
+			return 1;
 		} break;
 		default: {
 			luaL_error(L, "Incorrect first argument (%s) to gl.GetFixedState", param);

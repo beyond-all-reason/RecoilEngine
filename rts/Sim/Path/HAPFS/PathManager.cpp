@@ -434,14 +434,15 @@ unsigned int CPathManager::RequestPath(
 	float3 startPos,
 	float3 goalPos,
 	float goalRadius,
-	bool synced
+	bool synced,
+	bool immediateResult
 ) {
 	unsigned int pathId = 0;
 
 	if (!IsFinalized())
 		return 0;
 
-	if (synced) {
+	if (!immediateResult) {
 		assert(!ThreadPool::inMultiThreadedSection);
 
 		PathSearch* existingSearch = nullptr;

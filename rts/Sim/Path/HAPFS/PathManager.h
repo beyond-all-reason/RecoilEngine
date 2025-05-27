@@ -144,7 +144,8 @@ public:
 		float3 startPos,
 		float3 goalPos,
 		float goalRadius,
-		bool synced
+		bool synced,
+		bool immediateResult = false
 	) override;
 
 	/**

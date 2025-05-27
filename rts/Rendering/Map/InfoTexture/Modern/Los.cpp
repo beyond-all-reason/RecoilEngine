@@ -5,57 +5,41 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/GL/SubState.h"
 #include "Sim/Misc/LosHandler.h"
 #include "System/Exceptions.h"
 #include "System/Log/ILog.h"
 
 #include "System/Misc/TracyDefs.h"
 
-
-
 CLosTexture::CLosTexture()
-: CPboInfoTexture("los")
-, uploadTex(0)
+: CModernInfoTexture("los")
 {
 	texSize = losHandler->los.size;
-	texChannels = 1;
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	RecoilTexStorage2D(GL_TEXTURE_2D, -1, GL_R8, texSize.x, texSize.y);
+	GL::TextureCreationParams tcp{
+		.reqNumLevels = -1,
+		.linearMipMapFilter = false,
+		.linearTextureFilter = true,
+		.wrapMirror = false
+	};
 
-	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * texChannels * 2, GL_STREAM_DRAW);
-	infoTexPBO.Unbind();
+	texture = GL::Texture2D(texSize, GL_R8, tcp, false);
 
-	if (FBO::IsSupported()) {
-		fbo.Bind();
-		fbo.AttachTexture(texture);
-		/*bool status =*/ fbo.CheckStatus("CLosTexture");
-		FBO::Unbind();
-	}
-
-	const std::string vertexCode = R"(
-		varying vec2 texCoord;
-
-		void main() {
-			texCoord = gl_Vertex.xy * 0.5 + 0.5;
-			gl_Position = vec4(gl_Vertex.xyz, 1.0);
-		}
-	)";
+	CreateFBO("CLosTexture");
 
 	const std::string fragmentCode = R"(
+		#version 130
+
 		uniform sampler2D tex0;
-		varying vec2 texCoord;
+
+		in vec2 uv;
+		out float fragData;
 
 		void main() {
-			vec2 f = texture2D(tex0, texCoord).rg;
-			float c = (f.r + f.g) * 200000.0;
-			gl_FragColor = vec4(c);
+			float f = texture(tex0, uv).r;
+
+			fragData = float(f > 0.0);
 		}
 	)";
 
@@ -78,13 +62,14 @@ CLosTexture::CLosTexture()
 	}
 
 	if (fbo.IsValid() && shader->IsValid()) {
-		glGenTextures(1, &uploadTex);
-		glBindTexture(GL_TEXTURE_2D, uploadTex);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_RG8, texSize.x, texSize.y);
+		GL::TextureCreationParams tcp{
+			.reqNumLevels = 1,
+			.wrapMirror = false,
+			.minFilter = GL_NEAREST,
+			.magFilter = GL_NEAREST
+		};
+
+		uploadTex = GL::Texture2D(texSize, GL_R16, tcp, false);
 	}
 
 	if (!fbo.IsValid() || !shader->IsValid()) {
@@ -96,7 +81,6 @@ CLosTexture::CLosTexture()
 CLosTexture::~CLosTexture()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glDeleteTextures(1, &uploadTex);
 	shaderHandler->ReleaseProgramObject("[CLosTexture]", "CLosTexture");
 }
 
@@ -104,33 +88,29 @@ CLosTexture::~CLosTexture()
 void CLosTexture::UpdateCPU()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	infoTexPBO.Bind();
-	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
+	static std::vector<uint8_t> infoTexMem;
+	infoTexMem.resize(texSize.x * texSize.y);
 
 	if (!losHandler->GetGlobalLOS(gu->myAllyTeam)) {
-		const unsigned short* myLos = &losHandler->los.losMaps[gu->myAllyTeam].front();
+		const auto& myLos = losHandler->los.losMaps[gu->myAllyTeam].GetLosMap();
 		for (int y = 0; y < texSize.y; ++y) {
 			for (int x = 0; x < texSize.x; ++x) {
-				infoTexMem[y * texSize.x + x] = (myLos[y * texSize.x + x] != 0) ? 255 : 0;
+				infoTexMem[y * texSize.x + x] = (myLos[y * texSize.x + x] != 0) ? 0xFF : 0x00;
 			}
 		}
 	} else {
-		memset(infoTexMem, 255, texSize.x * texSize.y);
+		std::ranges::fill(infoTexMem, 0xFF);
 	}
 
-	infoTexPBO.UnmapBuffer();
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
-	glGenerateMipmap(GL_TEXTURE_2D);
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
+	auto binding = texture.ScopedBind();
+	texture.UploadImage(infoTexMem.data());
+	texture.ProduceMipmaps();
 }
-
 
 void CLosTexture::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!fbo.IsValid() || !shader->IsValid() || uploadTex == 0)
+	if (!fbo.IsValid() || !shader->IsValid() || !uploadTex.IsValid())
 		return UpdateCPU();
 
 	if (losHandler->GetGlobalLOS(gu->myAllyTeam)) {
@@ -141,41 +121,30 @@ void CLosTexture::Update()
 		globalRendering->LoadViewport();
 		FBO::Unbind();
 
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glGenerateMipmap(GL_TEXTURE_2D);
+		auto binding = texture.ScopedBind();
+		texture.ProduceMipmaps();
 		return;
 	}
 
-	infoTexPBO.Bind();
-	auto infoTexMem = reinterpret_cast<unsigned char*>(infoTexPBO.MapBuffer());
-	const unsigned short* myLos = &losHandler->los.losMaps[gu->myAllyTeam].front();
-	memcpy(infoTexMem, myLos, texSize.x * texSize.y * texChannels * sizeof(short));
-	infoTexPBO.UnmapBuffer();
+	static std::vector<uint8_t> infoTexMem;
+	infoTexMem.resize(texSize.x * texSize.y);
 
-	//Trick: Upload the ushort as 2 ubytes, and then check both for `!=0` in the shader.
-	// Faster than doing it on the CPU! And uploading it as shorts would be slow, cause the GPU
-	// has no native support for them and so the transformation would happen on the CPU, too.
-	glBindTexture(GL_TEXTURE_2D, uploadTex);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RG, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
+	const auto& myLos = losHandler->los.losMaps[gu->myAllyTeam].GetLosMap();
+	assert(myLos.size() == texSize.x * texSize.y);
+
+	auto binding = uploadTex.ScopedBind();
+	uploadTex.UploadImage(myLos.data());
 
 	// do post-processing on the gpu (los-checking & scaling)
-	fbo.Bind();
-	glViewport(0, 0, texSize.x, texSize.y);
-	shader->Enable();
-	glDisable(GL_BLEND);
-	glBegin(GL_QUADS);
-		glVertex2f(-1.f, -1.f);
-		glVertex2f(-1.f, +1.f);
-		glVertex2f(+1.f, +1.f);
-		glVertex2f(+1.f, -1.f);
-	glEnd();
-	shader->Disable();
-	globalRendering->LoadViewport();
-	FBO::Unbind();
+	{
+		using namespace GL::State;
+		auto state = GL::SubState(
+			Blending(GL_FALSE)
+		);
+		RunFullScreenPass();
+	}
 
 	// generate mipmaps
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	texture.ScopedBind(binding);
+	texture.ProduceMipmaps();
 }

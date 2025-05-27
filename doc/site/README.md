@@ -13,7 +13,7 @@ bundle
 bundle exec jekyll build && bundle exec jekyll serve
 ```
 
-Navigate to http://localhost:4000/spring
+Navigate to http://localhost:4000/RecoilEngine
 
 ## Generating Lua API
 

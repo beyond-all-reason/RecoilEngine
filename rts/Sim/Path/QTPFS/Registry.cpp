@@ -1,6 +1,6 @@
 #include "Registry.h"
 
-entt::registry QTPFS::registry;
-SystemGlobals::SystemGlobal QTPFS::systemGlobals(QTPFS::registry);
+entt::basic_registry<QTPFS::entity> QTPFS::registry;
+SystemGlobals::SystemGlobal<decltype(QTPFS::registry)> QTPFS::systemGlobals(QTPFS::registry);
 SystemUtils::SystemUtils QTPFS::systemUtils;
-ecs_dll::DoubleLinkList QTPFS::linkedListHelper(QTPFS::registry);
+ecs_dll::DoubleLinkList<decltype(QTPFS::registry)> QTPFS::linkedListHelper(QTPFS::registry);

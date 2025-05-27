@@ -8,6 +8,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/GL/SubState.h"
 #include "Sim/Misc/LosHandler.h"
 #include "System/Exceptions.h"
 #include "System/Log/ILog.h"
@@ -17,47 +18,36 @@
 
 
 CMetalExtractionTexture::CMetalExtractionTexture()
-: CPboInfoTexture("metalextraction")
+: CModernInfoTexture("metalextraction")
 , updateN(0)
 {
 	texSize = int2(mapDims.hmapx, mapDims.hmapy);
-	texChannels = 1;
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	GL::TextureCreationParams tcp{
+		.reqNumLevels = 1,
+		.wrapMirror = false,
+		.minFilter = GL_NEAREST,
+		.magFilter = GL_LINEAR
+	};
 
 	//Info: 32F isn't really needed for the final result, but it allows us
 	//  to upload the CPU array directly to the GPU w/o any (slow) cpu-side
 	//  transformation. The transformation (0..1 range rescaling) happens
 	//  then on the gpu instead.
-	RecoilTexStorage2D(GL_TEXTURE_2D, 1, GL_R32F, texSize.x, texSize.y);
+	texture = GL::Texture2D(texSize, GL_R32F, tcp, false);
 
-	if (FBO::IsSupported()) {
-		fbo.Bind();
-		fbo.AttachTexture(texture);
-		/*bool status =*/ fbo.CheckStatus("CMetalExtractionTexture");
-		FBO::Unbind();
-	}
-
-	const std::string vertexCode = R"(
-		varying vec2 texCoord;
-
-		void main() {
-			texCoord = gl_Vertex.xy * 0.5 + 0.5;
-			gl_Position = vec4(gl_Vertex.xyz, 1.0);
-		}
-	)";
+	CreateFBO("CLosTexture");
 
 	const std::string fragmentCode = R"(
+		#version 130
+
 		uniform sampler2D tex0;
-		varying vec2 texCoord;
+
+		in vec2 uv;
+		out vec4 fragData;
 
 		void main() {
-			gl_FragColor = texture2D(tex0, texCoord) * 800.0;
+			fragData = texture(tex0, uv) * 800.0;
 		}
 	)";
 
@@ -111,25 +101,19 @@ void CMetalExtractionTexture::Update()
 	assert(metalMap.GetSizeX() == texSize.x && metalMap.GetSizeZ() == texSize.y);
 
 	// upload raw data to gpu
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RED, GL_FLOAT, metalMap.GetExtractionMap());
+	{
+		auto binding = texture.ScopedBind();
+		texture.UploadImage(metalMap.GetExtractionMap());
+	}
+
+	using namespace GL::State;
+	auto state = GL::SubState(
+		Blending(GL_TRUE),
+		BlendFunc(GL_ZERO, GL_SRC_COLOR)
+	);
 
 	// do post-processing on the gpu (los-checking & scaling)
-	fbo.Bind();
-	shader->Enable();
-	glViewport(0, 0, texSize.x, texSize.y);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ZERO, GL_SRC_COLOR);
 	glBindTexture(GL_TEXTURE_2D, infoTex->GetTexture());
-	glBegin(GL_QUADS);
-		glVertex2f(-1.f, -1.f);
-		glVertex2f(-1.f, +1.f);
-		glVertex2f(+1.f, +1.f);
-		glVertex2f(+1.f, -1.f);
-	glEnd();
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//glDisable(GL_BLEND);
-	globalRendering->LoadViewport();
-	shader->Disable();
-	FBO::Unbind();
+	RunFullScreenPass();
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
