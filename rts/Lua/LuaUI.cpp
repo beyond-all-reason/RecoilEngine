@@ -173,7 +173,7 @@ CLuaUI::CLuaUI()
 	lua_getglobal(L, "Script");
 		LuaPushNamedCFunc(L, "GetWatchExplosion",    GetWatchExplosionDef);
 		LuaPushNamedCFunc(L, "SetWatchExplosion",    SetWatchExplosionDef);
-	lua_pop(L, 1); // os
+	lua_pop(L, 1); // Script
 
 	InitializeRmlUi();
 
