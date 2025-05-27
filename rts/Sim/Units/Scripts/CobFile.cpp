@@ -129,7 +129,9 @@ CCobFile::CCobFile(CFileHandler& in, const std::string& scriptName)
 		swabDWordInPlace(ofs);
 		scriptNames.emplace_back(reinterpret_cast<const char*>(&cobFileData[ofs]));
 
-		if (scriptNames[scriptNames.size() - 1].find("lua_") == 0) {
+		if (scriptNames[scriptNames.size() - 1].find("lua_unsynced_") == 0) {
+			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str() + sizeof("lua_unsynced_") - 1);
+		} else if (scriptNames[scriptNames.size() - 1].find("lua_") == 0) {
 			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str() + sizeof("lua_") - 1);
 		} else {
 			luaScripts.emplace_back("");
