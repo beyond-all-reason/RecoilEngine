@@ -207,7 +207,6 @@ CLuaUI::~CLuaUI()
 		const auto& vec = lhs->watch ## DefType ## Defs;                    \
                                                                             \
 		const uint32_t defIdx = luaL_checkint(L, 1);                        \
-                                                                            \
                                                                            \
 		if (defIdx >= vec.size())                                           \
 			return 0;                                                       \
