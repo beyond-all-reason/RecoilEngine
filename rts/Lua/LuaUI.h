@@ -76,7 +76,6 @@ public: // call-ins
 
 	static int GetWatchExplosionDef(lua_State* L);
 	static int SetWatchExplosionDef(lua_State* L);
-	bool Explosion(int weaponID, int projectileID, const float3& pos, const CUnit* owner) override;
 protected:
 	CLuaUI();
 	virtual ~CLuaUI();

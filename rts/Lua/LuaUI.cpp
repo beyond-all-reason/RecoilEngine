@@ -232,10 +232,6 @@ CLuaUI::~CLuaUI()
 GetWatchDef(Explosion)
 SetWatchDef(Explosion)
 
-bool CLuaUI::Explosion(int weaponDefID, int projectileID, const float3& pos, const CUnit* owner)
-{
-	return CLuaHandle::Explosion(weaponDefID, projectileID, pos, owner);
-}
 
 void CLuaUI::InitLuaSocket(lua_State* L) {
 	std::string code;
