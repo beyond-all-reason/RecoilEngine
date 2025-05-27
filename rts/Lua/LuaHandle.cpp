@@ -20,6 +20,7 @@
 #include "Game/GlobalUnsynced.h"
 #include "Game/Players/Player.h"
 #include "Game/Players/PlayerHandler.h"
+#include "Sim/Misc/LosHandler.h"
 #include "Net/Protocol/NetProtocol.h"
 #include "Game/UI/KeySet.h"
 #include "Game/UI/MiniMap.h"
@@ -2210,6 +2211,17 @@ bool CLuaHandle::Explosion(int weaponDefID, int projectileID, const float3& pos,
 		return false;
 	if (!watchExplosionDefs[weaponDefID])
 		return false;
+
+	bool synced = GetHandleSynced(L);
+
+	if (!synced) {
+		const int allyTeamID = CLuaHandle::GetHandleReadAllyTeam(L);
+
+		if (allyTeamID < 0 && allyTeamID != CEventClient::AllAccessTeam)
+			return false;
+		if (allyTeamID >= 0 && !losHandler->InLos(pos, allyTeamID))
+			return false;
+	}
 
 	LUA_CALL_IN_CHECK(L, false);
 	luaL_checkstack(L, 7, __func__);

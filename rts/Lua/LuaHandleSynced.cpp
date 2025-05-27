@@ -84,6 +84,9 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 	if (!IsValid())
 		return false;
 
+	// other watch defs not initialized here since unsupported on unsynced
+	watchExplosionDefs.resize(weaponDefHandler->NumWeaponDefs(), false);
+
 	// load the standard libraries
 	LUA_OPEN_LIB(L, luaopen_base);
 	LUA_OPEN_LIB(L, luaopen_math);
@@ -2094,9 +2097,9 @@ int CSyncedLuaHandle::RemoveSyncedActionFallback(lua_State* L)
 
 
 
-#define GetWatchDef(DefType)                                                \
-	int CSyncedLuaHandle::GetWatch ## DefType ## Def(lua_State* L) {        \
-		const CSyncedLuaHandle* lhs = GetSyncedHandle(L);                   \
+#define GetWatchDef(HandleType, DefType)                                                \
+	int C ## HandleType ## LuaHandle::GetWatch ## DefType ## Def(lua_State* L) {        \
+		const C ## HandleType ## LuaHandle* lhs = Get ## HandleType ## Handle(L);                   \
 		const auto& vec = lhs->watch ## DefType ## Defs;                    \
                                                                             \
 		const uint32_t defIdx = luaL_checkint(L, 1);                        \
@@ -2113,9 +2116,9 @@ int CSyncedLuaHandle::RemoveSyncedActionFallback(lua_State* L)
 		return 1;                                                           \
 	}
 
-#define SetWatchDef(DefType)                                                \
-	int CSyncedLuaHandle::SetWatch ## DefType ## Def(lua_State* L) {        \
-		CSyncedLuaHandle* lhs = GetSyncedHandle(L);                         \
+#define SetWatchDef(HandleType, DefType)                                                \
+	int C ## HandleType ## LuaHandle::SetWatch ## DefType ## Def(lua_State* L) {        \
+		C ## HandleType ## LuaHandle* lhs = Get ## HandleType ## Handle(L);                         \
 		auto& vec = lhs->watch ## DefType ## Defs;                          \
                                                                             \
 		const uint32_t defIdx = luaL_checkint(L, 1);                        \
@@ -2177,7 +2180,7 @@ int CSyncedLuaHandle::GetWatchWeaponDef(lua_State* L) {
  * @see Script.SetWatchUnit
  */
 
-GetWatchDef(Unit)
+GetWatchDef(Synced, Unit)
 
 
 /*** Query whether any callins are registered for a featureDefID.
@@ -2190,7 +2193,7 @@ GetWatchDef(Unit)
  * @see Script.SetWatchFeature
  */
 
-GetWatchDef(Feature)
+GetWatchDef(Synced, Feature)
 
 
 /*** Query whether any callins are registered for a weaponDefID.
@@ -2218,7 +2221,8 @@ GetWatchDef(Feature)
  * @see Script.SetWatchExplosion
  */
 
-GetWatchDef(Explosion)
+GetWatchDef(Synced, Explosion)
+GetWatchDef(Unsynced, Explosion)
 
 
 /*** Query whether projectile callins are registered for a weaponDefID.
@@ -2231,7 +2235,7 @@ GetWatchDef(Explosion)
  * @see Script.SetWatchProjectile
  */
 
-GetWatchDef(Projectile)
+GetWatchDef(Synced, Projectile)
 
 
 /*** Query whether weapon targeting callins are registered for a weaponDefID.
@@ -2244,7 +2248,7 @@ GetWatchDef(Projectile)
  * @see Script.SetWatchAllowTarget
  */
 
-GetWatchDef(AllowTarget)
+GetWatchDef(Synced, AllowTarget)
 
 
 /*** Register or deregister unitDefID for expensive callins.
@@ -2260,7 +2264,7 @@ GetWatchDef(AllowTarget)
  * @see Callins:UnitMoveFailed
  */
 
-SetWatchDef(Unit)
+SetWatchDef(Synced, Unit)
 
 
 /*** Register or deregister featureDefID for expensive callins.
@@ -2274,7 +2278,7 @@ SetWatchDef(Unit)
  * @see Callins:UnitFeatureCollision
  */
 
-SetWatchDef(Feature)
+SetWatchDef(Synced, Feature)
 
 
 /*** Register or deregister weaponDefID for all expensive callins.
@@ -2311,7 +2315,8 @@ SetWatchDef(Feature)
  * @see Callins:Explosion
  */
 
-SetWatchDef(Explosion)
+SetWatchDef(Synced, Explosion)
+SetWatchDef(Unsynced, Explosion)
 
 
 /*** Register or deregister weaponDefID for expensive projectile callins.
@@ -2326,7 +2331,7 @@ SetWatchDef(Explosion)
  * @see Callins:ProjectileDestroyed
  */
 
-SetWatchDef(Projectile)
+SetWatchDef(Synced, Projectile)
 
 
 /*** Register or deregister weaponDefID for weapon targeting callins.
@@ -2342,7 +2347,7 @@ SetWatchDef(Projectile)
  * @see SyncedCallins:AllowWeaponInterceptTarget
  */
 
-SetWatchDef(AllowTarget)
+SetWatchDef(Synced, AllowTarget)
 
 #undef GetWatchDef
 #undef SetWatchDef
