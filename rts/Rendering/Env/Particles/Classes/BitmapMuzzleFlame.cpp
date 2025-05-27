@@ -24,8 +24,6 @@ CR_REG_METADATA(CBitmapMuzzleFlame,
 	CR_MEMBER_BEGINFLAG(CM_Config),
 		CR_IGNORED(sideTexture),
 		CR_IGNORED(frontTexture),
-		CR_FAKE(frontTextureAnimParams, float3),
-		CR_FAKE(sideTextureAnimParams , float3),
 		CR_MEMBER(colorMap),
 		CR_MEMBER(size),
 		CR_MEMBER(length),
@@ -187,20 +185,18 @@ bool CBitmapMuzzleFlame::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_PTR        (CBitmapMuzzleFlame, sideTexture,  projectileDrawer->textureAtlas->GetTexturePtr);
-	CHECK_MEMBER_INFO_PTR        (CBitmapMuzzleFlame, frontTexture, projectileDrawer->textureAtlas->GetTexturePtr);
-	CHECK_MEMBER_INFO_FLOAT3_NAME(CBitmapMuzzleFlame, animParams1, frontTextureAnimParams                        );
-	CHECK_MEMBER_INFO_FLOAT3_NAME(CBitmapMuzzleFlame, animParams2,  sideTextureAnimParams                        );
-	CHECK_MEMBER_INFO_PTR        (CBitmapMuzzleFlame, colorMap, CColorMap::LoadFromDefString                     );
-	CHECK_MEMBER_INFO_FLOAT      (CBitmapMuzzleFlame, size               );
-	CHECK_MEMBER_INFO_FLOAT      (CBitmapMuzzleFlame, length             );
-	CHECK_MEMBER_INFO_FLOAT      (CBitmapMuzzleFlame, sizeGrowth         );
-	CHECK_MEMBER_INFO_FLOAT      (CBitmapMuzzleFlame, frontOffset        );
-	CHECK_MEMBER_INFO_FLOAT      (CBitmapMuzzleFlame, particleSpeed      );
-	CHECK_MEMBER_INFO_FLOAT      (CBitmapMuzzleFlame, particleSpeedSpread);
-	CHECK_MEMBER_INFO_FLOAT      (CBitmapMuzzleFlame, airdrag            );
-	CHECK_MEMBER_INFO_FLOAT3     (CBitmapMuzzleFlame, gravity            );
-	CHECK_MEMBER_INFO_INT        (CBitmapMuzzleFlame, ttl                );
+	CHECK_MEMBER_INFO_PTR   (CBitmapMuzzleFlame, sideTexture,  projectileDrawer->textureAtlas->GetTexturePtr);
+	CHECK_MEMBER_INFO_PTR   (CBitmapMuzzleFlame, frontTexture, projectileDrawer->textureAtlas->GetTexturePtr);
+	CHECK_MEMBER_INFO_PTR   (CBitmapMuzzleFlame, colorMap, CColorMap::LoadFromDefString                     );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, size               );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, length             );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, sizeGrowth         );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, frontOffset        );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, particleSpeed      );
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, particleSpeedSpread);
+	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, airdrag            );
+	CHECK_MEMBER_INFO_FLOAT3(CBitmapMuzzleFlame, gravity            );
+	CHECK_MEMBER_INFO_INT   (CBitmapMuzzleFlame, ttl                );
 
 	return false;
 }
