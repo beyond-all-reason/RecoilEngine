@@ -1918,9 +1918,9 @@ int LuaSyncedCtrl::TransferTeamMaxUnits(lua_State* L)
 
 	// Make sure transferAmnt is in range
 	if ((transferAmnt < 0)					 ||
-		(transferAmnt > fromTeam->maxUnits)  ||
 		(transferAmnt > (fromTeam->maxUnits - fromTeam->numUnits))) {
-		return 0;
+		lua_pushboolean(L, false);
+		return 1;
 	}
 
 	bool success = teamHandler.TransferTeamMaxUnits(fromTeam, toTeam, transferAmnt);
