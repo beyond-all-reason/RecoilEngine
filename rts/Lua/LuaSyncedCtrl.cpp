@@ -1892,7 +1892,7 @@ int LuaSyncedCtrl::TransferUnit(lua_State* L)
  * @param fromTeamID number
  * @param newTeamID number
  * @param transferAmnt number
- * @return boolean successfulTransfer Whether max units was successfully transferred. Returns false when the source team does not have enough available maxunits to transfer
+ * @return boolean successfulTransfer Whether the max unit limit was successfully transferred.
  */
 int LuaSyncedCtrl::TransferTeamMaxUnits(lua_State* L)
 {
