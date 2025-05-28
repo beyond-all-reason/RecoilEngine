@@ -4,6 +4,7 @@
 #define FLOAT4_H
 
 #include "System/float3.h"
+#include "System/SpringHash.h"
 #include "System/creg/creg_cond.h"
 
 /** Float3 with a fourth data member, which is basically unused but required
