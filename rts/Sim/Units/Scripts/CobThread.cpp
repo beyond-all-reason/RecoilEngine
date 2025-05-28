@@ -515,7 +515,6 @@ bool CCobThread::Tick()
 
 				// fall-through
 			}
-
 			case REAL_CALL: {
 				r1 = GET_LONG_PC();
 				r2 = GET_LONG_PC();
@@ -537,6 +536,7 @@ bool CCobThread::Tick()
 			case LUA_CALL: {
 				LuaCall();
 			} break;
+
 
 			case POP_STATIC: {
 				r1 = GET_LONG_PC();
