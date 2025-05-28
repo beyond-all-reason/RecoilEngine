@@ -1888,6 +1888,12 @@ int LuaSyncedCtrl::TransferUnit(lua_State* L)
 }
 
 /*** Transfer capacity of units from one team to another
+ *
+ * @function Spring.TransferTeamMaxUnits
+ *
+ * There are two conditions that need to be satisfied for the operation to be successful:
+ * - `transferAmnt` must be lower or equal than the origin team current maxunits (can't transfer limit team does not have available)
+ * - `transferAmnt` must be lower than origin team maxunits - currentunitscount (can't transfer limit if origin team would be already over the limit after transfer)
  * @function Spring.TransferTeamMaxUnits
  * @param fromTeamID number
  * @param newTeamID number
