@@ -104,7 +104,7 @@ public:
 	const auto  GetThreadCounter() const { return threadCounter; }
 	const auto  GetCurrCounter() const { return threadCounter; }
 
-	void AddDeferredCallin(CCobDeferredCallin& deferredCallin);
+	void AddDeferredCallin(CCobDeferredCallin& deferredCallin, int threadNum);
 	void RunDeferredCallins();
 private:
 	void TickThread(CCobThread* thread);

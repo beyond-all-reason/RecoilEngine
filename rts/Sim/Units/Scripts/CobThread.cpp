@@ -949,7 +949,7 @@ void CCobThread::DeferredCall(bool synced)
 	d.funcName = cobFile->luaScripts[r1].GetString();
 	d.funcHash = cobFile->luaScripts[r1].GetHash();
 
-	cobEngine->AddDeferredCallin(d);
+	cobEngine->AddDeferredCallin(d, ThreadPool::GetThreadNum());
 
 	// always succeeds
 	retCode = 1;
