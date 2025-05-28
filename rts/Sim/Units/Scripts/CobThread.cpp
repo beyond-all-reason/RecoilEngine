@@ -939,6 +939,18 @@ void CCobThread::DeferredCall(bool synced)
 	const int r1 = GET_LONG_PC(); // script id
 	const int r2 = GET_LONG_PC(); // arg count
 
+	// sanity checks
+	if (!luaRules) {
+		retCode = 0;
+		return;
+	}
+
+	// check script index validity
+	if (static_cast<size_t>(r1) >= cobFile->luaScripts.size()) {
+		retCode = 0;
+		return;
+	}
+
 	// setup the parameter array
 	const int size = static_cast<int>(dataStack.size());
 	const int argCount = std::min(r2, MAX_LUA_COB_ARGS);
