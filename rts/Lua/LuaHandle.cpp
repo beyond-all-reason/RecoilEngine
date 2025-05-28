@@ -28,6 +28,7 @@
 #include "Rml/Backends/RmlUi_Backend.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/TeamHandler.h"
+#include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Projectiles/Projectile.h"
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectile.h"
 #include "Sim/Features/FeatureDef.h"
@@ -2180,6 +2181,16 @@ void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
 
 /******************************************************************************/
 
+/***
+ * Helper to get Explosion visibility.
+ */
+
+bool CLuaHandle::IsExplosionVisible(const WeaponDef* weaponDef, const float3& pos)
+{
+	const int allyTeamID = CLuaHandle::GetHandleReadAllyTeam(L);
+	return explGenHandler.PredictExplosionVisible(weaponDef, pos, allyTeamID);
+}
+
 /*** Called when an explosion occurs.
  *
  * @function Callins:Explosion
@@ -2198,7 +2209,7 @@ void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
  * @see Script.SetWatchExplosion
  * @see Script.SetWatchWeapon
  */
-bool CLuaHandle::Explosion(int weaponDefID, int projectileID, const float3& pos, const CUnit* owner)
+bool CLuaHandle::Explosion(int weaponDefID, const WeaponDef* weaponDef, int projectileID, const float3& pos, const CUnit* owner)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// piece-projectile collision (*ALL* other
@@ -2214,14 +2225,8 @@ bool CLuaHandle::Explosion(int weaponDefID, int projectileID, const float3& pos,
 
 	bool synced = GetHandleSynced(L);
 
-	if (!synced) {
-		const int allyTeamID = CLuaHandle::GetHandleReadAllyTeam(L);
-
-		if (allyTeamID < 0 && allyTeamID != CEventClient::AllAccessTeam)
-			return false;
-		if (allyTeamID >= 0 && !losHandler->InLos(pos, allyTeamID))
-			return false;
-	}
+	if (!synced && !IsExplosionVisible(weaponDef, pos))
+		return false;
 
 	LUA_CALL_IN_CHECK(L, false);
 	luaL_checkstack(L, 7, __func__);

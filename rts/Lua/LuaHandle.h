@@ -44,6 +44,7 @@ class LuaShaders;
 class CLuaDisplayLists;
 class CLuaRules;
 class CLuaUI;
+class WeaponDef;
 
 
 class CLuaHandle : public CEventClient
@@ -188,7 +189,8 @@ class CLuaHandle : public CEventClient
 		void ProjectileCreated(const CProjectile* p) override;
 		void ProjectileDestroyed(const CProjectile* p) override;
 
-		bool Explosion(int weaponID, int projectileID, const float3& pos, const CUnit* owner) override;
+		bool IsExplosionVisible(const WeaponDef* weaponDef, const float3& pos);
+		bool Explosion(int weaponID, const WeaponDef* weaponDef, int projectileID, const float3& pos, const CUnit* owner) override;
 
 		void StockpileChanged(const CUnit* owner,
 		                      const CWeapon* weapon, int oldCount) override;
