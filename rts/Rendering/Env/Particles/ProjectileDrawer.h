@@ -170,7 +170,7 @@ private:
 	bool drawSorted = true;
 
 	std::array<Shader::IProgramObject*, 2> fxShaders = { nullptr };
-	Shader::IProgramObject* fsShadowShader = nullptr;
+	std::array<Shader::IProgramObject*, 2> fsShadowShaders = { nullptr };
 
 	constexpr static int WANT_SOFTEN_COUNT = 2;
 	int wantSoften = 0;

@@ -148,11 +148,16 @@ bool CTextureAtlas::Finalize()
 	return success;
 }
 
-const uint32_t CTextureAtlas::GetTexTarget() const
+uint32_t CTextureAtlas::GetTexTarget() const
 {
 	return (atlasAllocator->GetNumPages() > 1) ?
 		GL_TEXTURE_2D_ARRAY :
 		GL_TEXTURE_2D;
+}
+
+uint32_t CTextureAtlas::GetNumPages() const
+{
+	return atlasAllocator->GetNumPages();
 }
 
 int CTextureAtlas::GetNumTexLevels() const

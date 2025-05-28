@@ -12,10 +12,8 @@ centroid out vec4 vUV;
 out float vLayer;
 out float vBF;
 out float fogFactor;
-#ifdef SMOOTH_PARTICLES
-	out vec4 vsPos;
-	noperspective out vec2 screenUV;
-#endif
+out vec4 vsPos;
+noperspective out vec2 screenUV;
 
 out float gl_ClipDistance[1];
 
@@ -60,12 +58,8 @@ void main() {
 
 	gl_ClipDistance[0] = dot(vec4(pos, 1.0), clipPlane); //water clip plane
 
-	#ifdef SMOOTH_PARTICLES
-		// viewport relative UV [0.0, 1.0]
-		vsPos = gl_ModelViewMatrix * vec4(pos, 1.0);
-		gl_Position = gl_ProjectionMatrix * vsPos;
-		screenUV = SNORM2NORM(gl_Position.xy / gl_Position.w);
-	#else
-		gl_Position = gl_ModelViewProjectionMatrix * vec4(pos, 1.0);
-	#endif
+	// viewport relative UV [0.0, 1.0]
+	vsPos = gl_ModelViewMatrix * vec4(pos, 1.0);
+	gl_Position = gl_ProjectionMatrix * vsPos;
+	screenUV = SNORM2NORM(gl_Position.xy / gl_Position.w);
 }
