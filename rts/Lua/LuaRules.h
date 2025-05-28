@@ -9,8 +9,6 @@
 #include "LuaHandleSynced.h"
 #include "System/UnorderedMap.hpp"
 
-#define MAX_LUA_COB_ARGS 10
-
 
 class CUnit;
 class CFeature;
@@ -21,7 +19,6 @@ struct FeatureDef;
 struct Command;
 struct BuildInfo;
 struct lua_State;
-class CCobDeferredCallin;
 
 
 class CLuaRules : public CSplitLuaHandle
@@ -35,11 +32,6 @@ public:
 	static bool FreeHandler();
 
 public: // call-ins
-	void Cob2Lua(const LuaHashString& funcName, const CUnit* unit,
-	             int& argsCount, int args[MAX_LUA_COB_ARGS], bool synced);
-
-	void Cob2LuaBatch(const LuaHashString& name, std::vector<CCobDeferredCallin>& callins, bool synced);
-
 	const char* RecvSkirmishAIMessage(int aiID, const char* data, int inSize, size_t* outSize) {
 		return syncedLuaHandle.RecvSkirmishAIMessage(aiID, data, inSize, outSize);
 	}
@@ -58,13 +50,8 @@ protected:
 	std::string GetInitFileModes() const;
 	int GetInitSelectTeam() const;
 
-	int UnpackCobArg(lua_State* L);
-
 protected: // call-outs
 	static int PermitHelperAIs(lua_State* L);
-
-private:
-	static const int* currentCobArgs;
 };
 
 

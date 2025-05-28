@@ -6,6 +6,9 @@
 #include "CobEngine.h"
 
 #include "Lua/LuaHashString.h"
+#include "Sim/Misc/GlobalConstants.h"
+#include "Sim/Misc/GlobalSynced.h"
+#include "Lua/LuaUI.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -47,5 +50,7 @@ CCobDeferredCallin& CCobDeferredCallin::operator = (const CCobDeferredCallin& t)
 void CCobDeferredCallin::Call()
 {
 	// unused since batching it atm
-	luaRules->Cob2Lua(LuaHashString(funcName.c_str()), unit, argCount, luaArgs, false);
+	luaRules->unsyncedLuaHandle.Cob2Lua(LuaHashString(funcName.c_str()), unit, argCount, luaArgs);
+	if (luaUI)
+		luaUI->Cob2Lua(LuaHashString(funcName.c_str()), unit, argCount, luaArgs);
 }

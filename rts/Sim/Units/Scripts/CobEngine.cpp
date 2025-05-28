@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include "System/Misc/TracyDefs.h"
+#include "Lua/LuaUI.h"
 
 CR_BIND(CCobEngine, )
 
@@ -231,6 +232,8 @@ void CCobEngine::RunDeferredCallins()
 		auto& callins = pair.mapped();
 
 		const LuaHashString cmdStr = LuaHashString(callins[0].funcName.c_str());
-		luaRules->Cob2LuaBatch(cmdStr, callins, false);
+		luaRules->unsyncedLuaHandle.Cob2LuaBatch(cmdStr, callins);
+		if (luaUI)
+			luaUI->Cob2LuaBatch(cmdStr, callins);
 	}
 }

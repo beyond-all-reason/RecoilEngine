@@ -993,7 +993,7 @@ void CCobThread::LuaCall()
 	}
 
 	int argsCount = argCount;
-	luaRules->Cob2Lua(cobFile->luaScripts[r1], cobInst->GetUnit(), argsCount, luaArgs, true);
+	luaRules->syncedLuaHandle.Cob2Lua(cobFile->luaScripts[r1], cobInst->GetUnit(), argsCount, luaArgs);
 	retCode = luaArgs[0];
 }
 
