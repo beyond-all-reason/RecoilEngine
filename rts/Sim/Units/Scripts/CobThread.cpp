@@ -310,7 +310,7 @@ static constexpr int ATTACH = 0x10083000;
 static constexpr int DROP   = 0x10084000;
 
 // Recoil custom function signatures, should be the only opcode for the function
-// and signals a reference not to be actually executed.
+// and signals a reference, not an opcode to be actually executed.
 static constexpr int SIGNATURE_LUA = 0x10090000;
 
 // Indices for SET, GET, and GET_UNIT_VALUE for LUA return values
