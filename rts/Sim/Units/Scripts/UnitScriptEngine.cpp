@@ -153,4 +153,5 @@ void CUnitScriptEngine::Tick(int deltaTime)
 	}
 
 	currentScript = nullptr;
+	cobEngine->RunDeferredCallins();
 }

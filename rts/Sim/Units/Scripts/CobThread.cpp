@@ -2,6 +2,8 @@
 
 
 #include "CobThread.h"
+
+#include "CobDeferredCallin.h"
 #include "CobFile.h"
 #include "CobInstance.h"
 #include "CobEngine.h"
@@ -490,7 +492,7 @@ bool CCobThread::Tick()
 
 				if (cobFile->scriptNames[r1].find("lua_unsynced_") == 0) {
 					cobFile->code[pc - 1] = LUA_CALL_UNSYNCED;
-					LuaCall(false);
+					DeferredCall(false);
 					break;
 				}
 
@@ -527,7 +529,7 @@ bool CCobThread::Tick()
 				LuaCall(true);
 			} break;
 			case LUA_CALL_UNSYNCED: {
-				LuaCall(false);
+				DeferredCall(false);
 			} break;
 
 
@@ -922,6 +924,35 @@ void CCobThread::ShowError(const char* msg)
 	const char* func = cobFile->scriptNames[LocalFunctionID()].c_str();
 
 	LOG_L(L_ERROR, "[COBThread::%s] %s (in %s:%s at %x)", __func__, msg, name, func, pc - 1);
+}
+
+
+void CCobThread::DeferredCall(bool synced)
+{
+	auto d = CCobDeferredCallin();
+
+	const int r1 = GET_LONG_PC(); // script id
+	const int r2 = GET_LONG_PC(); // arg count
+
+	// setup the parameter array
+	const int size = static_cast<int>(dataStack.size());
+	const int argCount = std::min(r2, MAX_LUA_COB_ARGS);
+	const int start = std::max(0, size - r2);
+	const int end = std::min(size, start + argCount);
+
+	for (int a = 0, i = start; i < end; i++) {
+		d.luaArgs[a++] = dataStack[i];
+	}
+
+	d.argCount = argCount;
+	d.unit = cobInst->GetUnit();
+	d.funcName = cobFile->luaScripts[r1].GetString();
+	d.funcHash = cobFile->luaScripts[r1].GetHash();
+
+	cobEngine->AddDeferredCallin(d);
+
+	// always succeeds
+	retCode = 1;
 }
 
 
