@@ -380,6 +380,7 @@ void CStarburstProjectile::Draw()
 			col.a = 1;
 
 			AddEffectsQuad<3>(
+				wt3->pageNum,
 				{ interPos - camera->GetRight() * drawsize - camera->GetUp() * drawsize, wt3->xstart, wt3->ystart, col },
 				{ interPos + camera->GetRight() * drawsize - camera->GetUp() * drawsize, wt3->xend,   wt3->ystart, col },
 				{ interPos + camera->GetRight() * drawsize + camera->GetUp() * drawsize, wt3->xend,   wt3->yend,   col },
@@ -396,6 +397,7 @@ void CStarburstProjectile::Draw()
 
 	if (validTextures[1]) {
 		AddEffectsQuad<1>(
+			wt1->pageNum,
 			{ drawPos - camera->GetRight() * fsize - camera->GetUp() * fsize, wt1->xstart, wt1->ystart, lightRed },
 			{ drawPos + camera->GetRight() * fsize - camera->GetUp() * fsize, wt1->xend,   wt1->ystart, lightRed },
 			{ drawPos + camera->GetRight() * fsize + camera->GetUp() * fsize, wt1->xend,   wt1->yend,   lightRed },

@@ -82,6 +82,7 @@ void CEmgProjectile::Draw()
 	const auto* tex = weaponDef->visuals.texture1;
 
 	AddEffectsQuad<1>(
+		tex->pageNum,
 		{ drawPos - camera->GetRight() * drawRadius - camera->GetUp() * drawRadius, tex->xstart, tex->ystart, col },
 		{ drawPos + camera->GetRight() * drawRadius - camera->GetUp() * drawRadius, tex->xend,   tex->ystart, col },
 		{ drawPos + camera->GetRight() * drawRadius + camera->GetUp() * drawRadius, tex->xend,   tex->yend,   col },

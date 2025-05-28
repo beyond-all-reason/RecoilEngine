@@ -119,6 +119,7 @@ void CExplosiveProjectile::Draw()
 		col[3] = stageDecay * col[3];
 
 		AddEffectsQuad<1>(
+			tex->pageNum,
 			{ stagePos - xdirCam - ydirCam, tex->xstart, tex->ystart, col },
 			{ stagePos + xdirCam - ydirCam, tex->xend,   tex->ystart, col },
 			{ stagePos + xdirCam + ydirCam, tex->xend,   tex->yend,   col },

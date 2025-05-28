@@ -88,6 +88,7 @@ void CLightningProjectile::Draw()
 
 			const auto& WDV = weaponDef->visuals;
 			AddEffectsQuad<1>(
+				WDV.texture1->pageNum,
 				{ tempPosO + (dir1 * (displacement[d    ] + WDV.thickness)), WDV.texture1->xstart, WDV.texture1->ystart, col },
 				{ tempPos  + (dir1 * (displacement[d + 1] + WDV.thickness)), WDV.texture1->xend,   WDV.texture1->ystart, col },
 				{ tempPos  + (dir1 * (displacement[d + 1] - WDV.thickness)), WDV.texture1->xend,   WDV.texture1->yend,   col },

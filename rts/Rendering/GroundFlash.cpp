@@ -231,6 +231,7 @@ void CStandardGroundFlash::Draw()
 
 		color.a = (unsigned char)(iAlpha * 255);
 		AddEffectsQuad<0>(
+			projectileDrawer->groundringtex->pageNum,
 			{ p1, projectileDrawer->groundringtex->xstart, projectileDrawer->groundringtex->ystart, color },
 			{ p2, projectileDrawer->groundringtex->xend,   projectileDrawer->groundringtex->ystart, color },
 			{ p3, projectileDrawer->groundringtex->xend,   projectileDrawer->groundringtex->yend,   color },
@@ -253,6 +254,7 @@ void CStandardGroundFlash::Draw()
 		const float3 p4 = pos + (-side1 - side2) * size;
 
 		AddEffectsQuad<0>(
+			projectileDrawer->groundflashtex->pageNum,
 			{ p1, projectileDrawer->groundflashtex->xstart, projectileDrawer->groundflashtex->ystart, color },
 			{ p2, projectileDrawer->groundflashtex->xend  , projectileDrawer->groundflashtex->ystart, color },
 			{ p3, projectileDrawer->groundflashtex->xend  , projectileDrawer->groundflashtex->yend  , color },
@@ -335,6 +337,7 @@ void CSimpleGroundFlash::Draw()
 	}
 
 	AddEffectsQuad<1>(
+		texture->pageNum,
 		{ pos + bounds[0], texture->xstart, texture->ystart, color },
 		{ pos + bounds[1], texture->xend  , texture->ystart, color },
 		{ pos + bounds[2], texture->xend  , texture->yend  , color },
@@ -415,6 +418,7 @@ void CSeismicGroundFlash::Draw()
 	const float3 p4 = pos + (-side1 + side2) * size;
 
 	AddEffectsQuad<0>(
+		texture->pageNum,
 		{ p1, texture->xstart, texture->ystart, color },
 		{ p2, texture->xend,   texture->ystart, color },
 		{ p3, texture->xend,   texture->yend,   color },

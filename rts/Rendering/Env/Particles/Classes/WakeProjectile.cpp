@@ -100,6 +100,7 @@ void CWakeProjectile::Draw()
 
 	const auto* wt = projectileDrawer->waketex;
 	AddEffectsQuad<0>(
+		wt->pageNum,
 		{ drawPos + dir1 + dir2, wt->xstart, wt->ystart, col },
 		{ drawPos - dir1 + dir2, wt->xend,   wt->ystart, col },
 		{ drawPos - dir1 - dir2, wt->xend,   wt->yend,   col },

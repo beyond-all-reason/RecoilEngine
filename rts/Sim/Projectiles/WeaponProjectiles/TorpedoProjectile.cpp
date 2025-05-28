@@ -185,7 +185,10 @@ void CTorpedoProjectile::Draw()
 	const float w = 2;
 	const SColor col(60, 60, 100, 255);
 
+	const auto& pageNum = projectileDrawer->torpedotex->pageNum;
+
 	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos + (r * w),             texx, texy, col },
 		{ drawPos + (u * w),             texx, texy, col },
 		{ drawPos + (u * w) + (dir * h), texx, texy, col },
@@ -193,6 +196,7 @@ void CTorpedoProjectile::Draw()
 	);
 
 	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos + (u * w),             texx, texy, col },
 		{ drawPos - (r * w),             texx, texy, col },
 		{ drawPos - (r * w) + (dir * h), texx, texy, col },
@@ -200,6 +204,7 @@ void CTorpedoProjectile::Draw()
 	);
 
 	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos - (r * w),             texx, texy, col },
 		{ drawPos - (u * w),             texx, texy, col },
 		{ drawPos - (u * w) + (dir * h), texx, texy, col },
@@ -207,6 +212,7 @@ void CTorpedoProjectile::Draw()
 	);
 
 	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos - (u * w),             texx, texy, col },
 		{ drawPos + (r * w),             texx, texy, col },
 		{ drawPos + (r * w) + (dir * h), texx, texy, col },
@@ -214,6 +220,7 @@ void CTorpedoProjectile::Draw()
 	);
 
 	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos + (r * w) + (dir * h), texx, texy, col },
 		{ drawPos + (u * w) + (dir * h), texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col },
@@ -221,6 +228,7 @@ void CTorpedoProjectile::Draw()
 	);
 
 	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos + (u * w) + (dir * h), texx, texy, col },
 		{ drawPos - (r * w) + (dir * h), texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col },
@@ -228,6 +236,7 @@ void CTorpedoProjectile::Draw()
 	);
 
 	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos - (r * w) + (dir * h), texx, texy, col },
 		{ drawPos - (u * w) + (dir * h), texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col },
@@ -235,6 +244,7 @@ void CTorpedoProjectile::Draw()
 	);
 
 	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos - (u * w) + (dir * h), texx, texy, col },
 		{ drawPos + (r * w) + (dir * h), texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col },
