@@ -157,7 +157,7 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 *
 	 * Makes the unit suspend processing its command queue for a given duration.
 	 *
-	 * - `params` duration Time to wait in seconds.
+	 * - `params` {duration} Time to wait in seconds.
 	 */
 	PUSH_CMD(TIMEWAIT);
 
@@ -171,7 +171,7 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 *
 	 * ### Wait for death of specific unit
 	 *
-	 * - `params` unitID: unitID of the unit to wait for.
+	 * - `params` {unitID} unitID of the unit to wait for.
 	 *
 	 * ### Wait for death of units in an area
 	 *
@@ -199,7 +199,7 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * Can also be given to a group of factories, and units from those factories
 	 * will gather together.
 	 *
-	 * - `params` squadSize: Squad size.
+	 * - `params` {squadSize} Squad size.
 	 */
 	PUSH_CMD(SQUADWAIT);
 
