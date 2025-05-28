@@ -405,6 +405,8 @@ static const char* GetOpcodeName(int opcode)
 		case SET: return "set";
 		case ATTACH: return "attach";
 		case DROP: return "drop";
+
+		case SIGNATURE_LUA: return "signature_lua";
 	}
 
 	return "unknown";
