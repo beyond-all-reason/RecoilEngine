@@ -219,9 +219,16 @@ void CCobEngine::AddDeferredCallin(CCobDeferredCallin& deferredCallin, int threa
 
 void CCobEngine::RunDeferredCallins()
 {
-	for(auto& [funcHash, callins]: deferredCallins) {
+	std::vector<int> funcHashes;
+	funcHashes.reserve(deferredCallins.size());
+	for(auto& it: deferredCallins)
+		funcHashes.push_back(it.first);
+
+	for(auto funcHash: funcHashes) {
+		auto pair = deferredCallins.extract(funcHash);
+		auto& callins = pair.mapped();
+
 		const LuaHashString cmdStr = LuaHashString(callins[0].funcName.c_str());
 		luaRules->Cob2LuaBatch(cmdStr, callins, false);
 	}
-	deferredCallins.clear();
 }
