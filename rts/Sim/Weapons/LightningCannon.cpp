@@ -67,6 +67,12 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 	if (hitUnit != nullptr)
 		hitUnit->SetLastHitPiece(hitColQuery.GetHitPiece(), gs->frameNum);
 
+	ProjectileParams pparams = GetProjectileParams();
+	pparams.pos = curPos;
+	pparams.end = curPos + curDir * (boltLength + 10.0f);
+	pparams.ttl = weaponDef->beamLaserTTL;
+
+	auto projID = WeaponProjectileFactory::LoadProjectile(pparams);
 
 	const DamageArray& damageArray = damages->GetDynamicDamages(weaponMuzzlePos, currentTargetPos);
 	const CExplosionParams params = {
@@ -86,16 +92,11 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 		.impactOnly           = weaponDef->impactOnly,
 		.ignoreOwner          = weaponDef->noExplode || weaponDef->noSelfDamage,
 		.damageGround         = false,
-		.projectileID         = static_cast<uint32_t>(-1u)
+		.projectileID         = projID
 	};
 
 	helper->Explosion(params);
 
-	ProjectileParams pparams = GetProjectileParams();
-	pparams.pos = curPos;
-	pparams.end = curPos + curDir * (boltLength + 10.0f);
-	pparams.ttl = weaponDef->beamLaserTTL;
 
-	WeaponProjectileFactory::LoadProjectile(pparams);
 }
 
