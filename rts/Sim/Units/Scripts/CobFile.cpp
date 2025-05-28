@@ -135,9 +135,7 @@ CCobFile::CCobFile(CFileHandler& in, const std::string& scriptName)
 		ofs = *(int *) &cobFileData[ch.OffsetToScriptCodeIndexArray + i * 4];
 		swabDWordInPlace(ofs);
 
-		if (scriptNames[scriptNames.size() - 1].find("lua_unsynced_") == 0) {
-			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str() + sizeof("lua_unsynced_") - 1);
-		} else if (scriptNames[scriptNames.size() - 1].find("lua_") == 0) {
+		if (scriptNames[scriptNames.size() - 1].find("lua_") == 0) {
 			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str() + sizeof("lua_") - 1);
 		} else if (swabDWord(*(preCode + ofs)) == 0x10090000 /* SIGNATURE_LUA */) {
 			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str());
