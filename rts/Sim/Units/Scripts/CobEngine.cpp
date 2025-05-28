@@ -2,6 +2,8 @@
 
 
 #include "CobEngine.h"
+
+#include "CobDeferredCallin.h"
 #include "CobThread.h"
 #include "CobFile.h"
 
@@ -208,3 +210,18 @@ void CCobEngine::ShowScriptError(const std::string& msg)
 	LOG_L(L_ERROR, "[COBEngine::%s] \"%s\" outside script execution", __func__, msg.c_str());
 }
 
+
+void CCobEngine::AddDeferredCallin(CCobDeferredCallin& deferredCallin)
+{
+	// TODO thread safety
+	deferredCallins[deferredCallin.funcHash].push_back(deferredCallin);
+}
+
+void CCobEngine::RunDeferredCallins()
+{
+	for(auto& [funcHash, callins]: deferredCallins) {
+		const LuaHashString cmdStr = LuaHashString(callins[0].funcName.c_str());
+		luaRules->Cob2LuaBatch(cmdStr, callins, false);
+	}
+	deferredCallins.clear();
+}
