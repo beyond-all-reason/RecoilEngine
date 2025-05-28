@@ -507,7 +507,7 @@ bool CCobThread::Tick()
 
 				if (cobFile->scriptNames[r1].find("lua_") == 0) {
 					cobFile->code[pc - 1] = LUA_CALL;
-					LuaCall(true);
+					LuaCall();
 					break;
 				}
 
@@ -535,7 +535,7 @@ bool CCobThread::Tick()
 				pc = cobFile->scriptOffsets[r1];
 			} break;
 			case LUA_CALL: {
-				LuaCall(true);
+				LuaCall();
 			} break;
 
 			case POP_STATIC: {
@@ -973,7 +973,7 @@ void CCobThread::DeferredCall(bool synced)
 }
 
 
-void CCobThread::LuaCall(bool synced)
+void CCobThread::LuaCall()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int r1 = GET_LONG_PC(); // script id
@@ -1007,7 +1007,7 @@ void CCobThread::LuaCall(bool synced)
 	}
 
 	int argsCount = argCount;
-	luaRules->Cob2Lua(cobFile->luaScripts[r1], cobInst->GetUnit(), argsCount, luaArgs, synced);
+	luaRules->Cob2Lua(cobFile->luaScripts[r1], cobInst->GetUnit(), argsCount, luaArgs, true);
 	retCode = luaArgs[0];
 }
 
