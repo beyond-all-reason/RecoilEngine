@@ -293,7 +293,6 @@ static constexpr int START           = 0x10061000;
 static constexpr int CALL            = 0x10062000; ///< converted when executed
 static constexpr int REAL_CALL       = 0x10062001; ///< spring custom
 static constexpr int LUA_CALL        = 0x10062002; ///< spring custom
-static constexpr int LUA_CALL_UNSYNCED = 0x10062003; ///< spring custom
 static constexpr int DEFER           = 0x10062004; ///< spring custom
 static constexpr int JUMP            = 0x10064000;
 static constexpr int RETURN          = 0x10065000;
@@ -394,7 +393,6 @@ static const char* GetOpcodeName(int opcode)
 		case CALL: return "call";
 		case REAL_CALL: return "call";
 		case LUA_CALL: return "lua_call";
-		case LUA_CALL_UNSYNCED: return "lua_call_unsynced";
 		case JUMP: return "jmp";
 		case RETURN: return "return";
 		case JUMP_NOT_EQUAL: return "jne";
@@ -505,12 +503,6 @@ bool CCobThread::Tick()
 				r1 = GET_LONG_PC();
 				pc--;
 
-				if (cobFile->scriptNames[r1].find("lua_unsynced_") == 0) {
-					cobFile->code[pc - 1] = LUA_CALL_UNSYNCED;
-					DeferredCall(false);
-					break;
-				}
-
 				if (cobFile->scriptNames[r1].find("lua_") == 0) {
 					cobFile->code[pc - 1] = LUA_CALL;
 					LuaCall(true);
@@ -543,10 +535,6 @@ bool CCobThread::Tick()
 			case LUA_CALL: {
 				LuaCall(true);
 			} break;
-			case LUA_CALL_UNSYNCED: {
-				DeferredCall(false);
-			} break;
-
 
 			case POP_STATIC: {
 				r1 = GET_LONG_PC();
