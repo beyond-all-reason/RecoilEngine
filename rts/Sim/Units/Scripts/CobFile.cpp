@@ -3,6 +3,7 @@
 
 #include "Sim/Misc/GlobalConstants.h"
 #include "CobFile.h"
+#include "CobOpCodes.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Sound/ISound.h"
@@ -137,7 +138,7 @@ CCobFile::CCobFile(CFileHandler& in, const std::string& scriptName)
 
 		if (scriptNames[scriptNames.size() - 1].find("lua_") == 0) {
 			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str() + sizeof("lua_") - 1);
-		} else if (swabDWord(*(preCode + ofs)) == 0x10090000 /* SIGNATURE_LUA */) {
+		} else if (swabDWord(*(preCode + ofs)) == SIGNATURE_LUA) {
 			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str());
 		} else {
 			luaScripts.emplace_back("");
