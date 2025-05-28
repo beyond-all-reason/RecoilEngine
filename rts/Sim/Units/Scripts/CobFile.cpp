@@ -134,7 +134,7 @@ CCobFile::CCobFile(CFileHandler& in, const std::string& scriptName)
 		} else if (scriptNames[scriptNames.size() - 1].find("lua_") == 0) {
 			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str() + sizeof("lua_") - 1);
 		} else {
-			luaScripts.emplace_back("");
+			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str());
 		}
 
 		ofs = *(int *) &cobFileData[ch.OffsetToScriptCodeIndexArray + i * 4];
