@@ -60,7 +60,7 @@ int LuaEncoding::DecodeBase64(lua_State* L)
  * @function Encoding.EncodeBase64
  *
  * @param text string Text to encode
- * @param stripPadding? boolean Remove padding (`=` characters) at the end when 'true'. Defaults to `false`.
+ * @param stripPadding? boolean Remove padding (`=` characters) at the end when 'true'. Defaults to `true`.
  * @return string encoded Encoded text
  */
 int LuaEncoding::EncodeBase64(lua_State* L)
@@ -68,7 +68,7 @@ int LuaEncoding::EncodeBase64(lua_State* L)
 	const std::string text = luaL_checkstring(L, 1);
 	std::string encoded = base64_encode(reinterpret_cast<const uint8_t*>(text.c_str()), text.size());
 
-	if (luaL_optboolean(L, 2, false)) {
+	if (luaL_optboolean(L, 2, true)) {
 		encoded.erase(encoded.find_last_not_of("=") + 1);
 	}
 
