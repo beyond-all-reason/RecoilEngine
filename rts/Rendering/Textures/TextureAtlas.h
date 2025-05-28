@@ -120,7 +120,8 @@ public:
 	std::string GetName() const { return name; }
 
 	uint32_t GetTexID() const { return atlasTex->GetId(); }
-	const uint32_t GetTexTarget() const;
+	uint32_t GetTexTarget() const;
+	uint32_t GetNumPages() const;
 
 	int GetNumTexLevels() const;
 	void SetMaxTexLevel(int maxLevels);
