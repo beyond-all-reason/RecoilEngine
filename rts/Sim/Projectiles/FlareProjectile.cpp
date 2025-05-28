@@ -128,14 +128,14 @@ void CFlareProjectile::Draw()
 	for (int a = 0; a < numSubProjs; ++a) {
 		const float3 interPos = subProjPos[a] + subProjVel[a] * globalRendering->timeOffset;
 
-		#define fpt projectileDrawer->flareprojectiletex
+		const auto* fpt = projectileDrawer->flareprojectiletex;
 		AddEffectsQuad<0>(
+			fpt->pageNum,
 			{ interPos - camera->GetRight() * rad - camera->GetUp() * rad, fpt->xstart, fpt->ystart, col },
 			{ interPos + camera->GetRight() * rad - camera->GetUp() * rad, fpt->xend,   fpt->ystart, col },
 			{ interPos + camera->GetRight() * rad + camera->GetUp() * rad, fpt->xend,   fpt->yend,   col },
 			{ interPos - camera->GetRight() * rad + camera->GetUp() * rad, fpt->xstart, fpt->yend,   col }
 		);
-		#undef fpt
 	}
 }
 

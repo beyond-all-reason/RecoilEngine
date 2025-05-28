@@ -169,6 +169,7 @@ void CFireProjectile::Draw()
 		col[2] = (uint8_t) ((1 - age) * 255);
 
 		AddEffectsQuad<0>(
+			et->pageNum,
 			{ interPos - dir1 - dir2, et->xstart, et->ystart, col },
 			{ interPos + dir1 - dir2, et->xend,   et->ystart, col },
 			{ interPos + dir1 + dir2, et->xend,   et->yend,   col },
@@ -198,6 +199,7 @@ void CFireProjectile::Draw()
 			col[3] = 1;
 
 			AddEffectsQuad<0>(
+				et->pageNum,
 				{ interPos - dir1 - dir2, et->xstart, et->ystart, col },
 				{ interPos + dir1 - dir2, et->xend,   et->ystart, col },
 				{ interPos + dir1 + dir2, et->xend,   et->yend,   col },
@@ -217,6 +219,7 @@ void CFireProjectile::Draw()
 		col2[3] = c;
 
 		AddEffectsQuad<0>(
+			at->pageNum,
 			{ interPos - dir1 - dir2, at->xstart, at->ystart, col2 },
 			{ interPos + dir1 - dir2, at->xend,   at->ystart, col2 },
 			{ interPos + dir1 + dir2, at->xend,   at->yend,   col2 },

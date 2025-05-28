@@ -289,6 +289,7 @@ void CPieceProjectile::Draw()
 
 		const auto eft = projectileDrawer->explofadetex;
 		AddEffectsQuad<0>(
+			eft->pageNum,
 			{ interPos - camera->GetRight() * drawsize - camera->GetUp() * drawsize, eft->xstart, eft->ystart, col },
 			{ interPos + camera->GetRight() * drawsize - camera->GetUp() * drawsize, eft->xend,   eft->ystart, col },
 			{ interPos + camera->GetRight() * drawsize + camera->GetUp() * drawsize, eft->xend,   eft->yend,   col },
