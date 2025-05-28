@@ -310,6 +310,10 @@ static constexpr int SET    = 0x10082000;
 static constexpr int ATTACH = 0x10083000;
 static constexpr int DROP   = 0x10084000;
 
+// Recoil custom function signatures, should be the only opcode for the function
+// and signals a reference not to be actually executed.
+static constexpr int SIGNATURE_LUA = 0x10090000;
+
 // Indices for SET, GET, and GET_UNIT_VALUE for LUA return values
 static constexpr int LUA0 = 110; // (LUA0 returns the lua call status, 0 or 1)
 static constexpr int LUA1 = 111;
@@ -485,6 +489,12 @@ bool CCobThread::Tick()
 			} break;
 			case DONT_CACHE: {
 				r1 = GET_LONG_PC();
+			} break;
+
+			case SIGNATURE_LUA: {
+				LOG_L(L_ERROR, "BAD ACCESS: Entered a lua method reference.");
+				state = Dead;
+				return false;
 			} break;
 
 			case DEFER: {
