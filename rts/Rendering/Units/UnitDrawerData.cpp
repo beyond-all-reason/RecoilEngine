@@ -743,10 +743,7 @@ void CUnitDrawerData::RemoveDeadGhosts(const CUnit* unit)
 
 	CUnit* u = const_cast<CUnit*>(unit);
 
-	// TODO - make ghosted buildings per allyTeam - so they are correctly dealt with
-	// when spectating
 	GhostSolidObject* gso = nullptr;
-	// FIXME -- adjust decals for decoys? gets weird?
 	S3DModel* gsoModel = (decoyDef == nullptr) ? u->model : decoyDef->LoadModel();
 
 	for (int allyTeam = 0; allyTeam < savedData.deadGhostBuildings.size(); ++allyTeam) {
