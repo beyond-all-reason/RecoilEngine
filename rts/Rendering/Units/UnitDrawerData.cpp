@@ -589,6 +589,16 @@ void CUnitDrawerData::RenderUnitCreated(const CUnit* unit, int cloaked)
 	UpdateUnitIcon(unit, false, false);
 }
 
+S3DModel* CUnitDrawerData::GetUnitModel(const CUnit* unit) const
+{
+	const UnitDef* unitDef = unit->unitDef;
+	const UnitDef* decoyDef = unitDef->decoyDef;
+
+	// FIXME -- adjust decals for decoys? gets weird?
+	S3DModel* gsoModel = (decoyDef == nullptr) ? unit->model : decoyDef->LoadModel();
+	return gsoModel;
+}
+
 bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost)
 {
 	if (!gameSetup->ghostedBuildings)
@@ -597,14 +607,10 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 	bool addedOwnAllyTeam = false;
 	CUnit* u = const_cast<CUnit*>(unit);
 
-	const UnitDef* unitDef = unit->unitDef;
-	const UnitDef* decoyDef = unitDef->decoyDef;
-
 	// TODO - make ghosted buildings per allyTeam - so they are correctly dealt with
 	// when spectating
 	GhostSolidObject* gso = nullptr;
-	// FIXME -- adjust decals for decoys? gets weird?
-	S3DModel* gsoModel = (decoyDef == nullptr) ? u->model : decoyDef->LoadModel();
+	S3DModel* gsoModel = GetUnitModel(unit);
 
 	for (int allyTeam = 0; allyTeam < savedData.deadGhostBuildings.size(); ++allyTeam) {
 		const bool canSeeGhost = !(u->losStatus[allyTeam] & (LOS_INLOS | LOS_CONTRADAR | LOS_INRADAR)) && (u->losStatus[allyTeam] & (LOS_PREVLOS));
@@ -731,13 +737,10 @@ void CUnitDrawerData::RemoveDeadGhosts(const CUnit* unit)
 {
 	const float3 pos = unit->pos;
 
-	const UnitDef* unitDef = unit->unitDef;
-	const UnitDef* decoyDef = unitDef->decoyDef;
-
 	CUnit* u = const_cast<CUnit*>(unit);
 
 	GhostSolidObject* gso = nullptr;
-	S3DModel* gsoModel = (decoyDef == nullptr) ? u->model : decoyDef->LoadModel();
+	S3DModel* gsoModel = GetUnitModel(unit);
 
 	for (int allyTeam = 0; allyTeam < savedData.deadGhostBuildings.size(); ++allyTeam) {
 		auto& dgb = savedData.deadGhostBuildings[allyTeam][gsoModel->type];

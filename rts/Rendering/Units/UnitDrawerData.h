@@ -189,6 +189,7 @@ private:
 
 	std::vector<UnitDefImage> unitDefImages;
 
+	S3DModel* GetUnitModel(const CUnit* unit) const;
 	void RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSolidObject*>& dgb, int index);
 
 
