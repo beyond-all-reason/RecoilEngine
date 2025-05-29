@@ -708,11 +708,26 @@ void CUnitDrawerData::UnitLeftLos(const CUnit* unit, int allyTeam)
 
 void CUnitDrawerData::UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost)
 {
-	if (unit->leavesGhost)
+	if (unit->leavesGhost) {
+		ReviewPrevLos(unit);
 		return;
+	}
 
 	if (UpdateUnitGhosts(unit, leaveDeadGhost))
 		UpdateUnitIcon(unit, false, true);
+}
+
+void CUnitDrawerData::ReviewPrevLos(const CUnit* unit)
+{
+	// When reinstating leavesGhost, we need to check whether the unit is still in los or
+	// contradar, and disable PREVLOS, otherwise specs will see it after going in and
+	// out of player mode.
+	for (int allyTeam = 0; allyTeam < savedData.liveGhostBuildings.size(); ++allyTeam) {
+		if (!(unit->losStatus[allyTeam] & (LOS_INLOS | LOS_CONTRADAR))) {
+			CUnit* u = const_cast<CUnit*>(unit);
+			u->losStatus[allyTeam] &= ~LOS_PREVLOS;
+		}
+	}
 }
 
 void CUnitDrawerData::PlayerChanged(int playerNum)
