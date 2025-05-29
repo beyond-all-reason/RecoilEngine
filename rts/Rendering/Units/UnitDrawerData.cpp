@@ -241,14 +241,7 @@ void CUnitDrawerData::UpdateGhostedBuildings()
 				}
 
 				// obtained LOS on the ghost of a dead building
-				if (!gso->DecRef()) {
-					spring::VectorErase(unitsByIcon[gso->myIcon].second, const_cast<const GhostSolidObject*>(gso));
-					groundDecals->GhostDestroyed(gso);
-					ghostMemPool.free(gso);
-				}
-
-				dgb[i] = dgb.back();
-				dgb.pop_back();
+				RemoveDeadGhost(gso, dgb, i); // swaps element with last so counter shouldn't be increased.
 			}
 		}
 	}
@@ -751,18 +744,23 @@ void CUnitDrawerData::RemoveDeadGhosts(const CUnit* unit)
 		for (int i = 0; i < dgb.size(); /*no-op*/) {
 			GhostSolidObject* gso = dgb[i];
 			if (gso->pos == pos) {
-				if (!gso->DecRef()) {
-					spring::VectorErase(unitsByIcon[gso->myIcon].second, const_cast<const GhostSolidObject*>(gso));
-					groundDecals->GhostDestroyed(gso);
-					ghostMemPool.free(gso);
-				}
-				dgb[i] = dgb.back();
-				dgb.pop_back();
+				RemoveDeadGhost(gso, dgb, i); // swaps element with last so counter shouldn't be increased.
 			} else {
 				++i;
 			}
 		}
 	}
+}
+
+void CUnitDrawerData::RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSolidObject*>& dgb, int index)
+{
+	if (!gso->DecRef()) {
+		spring::VectorErase(unitsByIcon[gso->myIcon].second, const_cast<const GhostSolidObject*>(gso));
+		groundDecals->GhostDestroyed(gso);
+		ghostMemPool.free(gso);
+	}
+	dgb[index] = dgb.back();
+	dgb.pop_back();
 }
 
 void CUnitDrawerData::PlayerChanged(int playerNum)

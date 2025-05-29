@@ -189,6 +189,7 @@ private:
 
 	std::vector<UnitDefImage> unitDefImages;
 
+	void RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSolidObject*>& dgb, int index);
 
 
 	// icons
