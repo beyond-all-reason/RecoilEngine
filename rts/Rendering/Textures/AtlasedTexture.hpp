@@ -17,14 +17,14 @@ struct AtlasedTexture
 		, w(0.0f)
 		, pageNum(0)
 	{}
-	explicit AtlasedTexture(float x_, float y_, float z_, float w_, uint32_t pageNum_ = 0)
+	AtlasedTexture(float x_, float y_, float z_, float w_, uint32_t pageNum_)
 		: x(x_)
 		, y(y_)
 		, z(z_)
 		, w(w_)
 		, pageNum(pageNum_)
 	{}
-	explicit AtlasedTexture(const float4& f, uint32_t pageNum_ = 0)
+	AtlasedTexture(const float4& f, uint32_t pageNum_)
 		: x(f.x)
 		, y(f.y)
 		, z(f.z)
