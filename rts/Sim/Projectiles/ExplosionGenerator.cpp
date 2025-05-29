@@ -24,6 +24,7 @@
 #include "Rendering/Env/Particles/Classes/WakeProjectile.h"
 #include "Rendering/Env/Particles/Classes/WreckProjectile.h"
 
+#include "Sim/Misc/LosHandler.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Projectiles/ProjectileMemPool.h"
 
@@ -65,6 +66,7 @@ unsigned int CCustomExplosionGenerator::GetFlagsFromTable(const LuaTable& table)
 	flags |= (CEG_SPWF_UNDERWATER * table.GetBool("underwater", false));
 	flags |= (CEG_SPWF_UNIT       * table.GetBool(      "unit", false));
 	flags |= (CEG_SPWF_NO_UNIT    * table.GetBool(    "nounit", false));
+	flags |= (CEG_SPWF_ALWAYS_VISIBLE * table.SubTable("properties").GetBool("alwaysvisible", false));
 
 	return flags;
 }
@@ -373,6 +375,46 @@ bool CExplosionGeneratorHandler::GenExplosion(
 	return (expGen->Explosion(pos, dir, damage, radius, gfxMod, owner, hit, withMutex));
 }
 
+
+bool CExplosionGeneratorHandler::PredictExplosionVisible(const WeaponDef* weaponDef, const float3& pos, int allyTeamID)
+{
+	if (gu->spectatingFullView)
+		return true;
+
+	if (allyTeamID == CEventClient::AllAccessTeam)
+		return true;
+
+	bool losAir = true;
+	bool losGround = true;
+	if (weaponDef != nullptr) {
+		if (weaponDef != nullptr && weaponDef->visuals.alwaysVisible)
+			return true;
+
+		const int explosionID = (weaponDef != nullptr)? weaponDef->impactExplosionGeneratorID: CExplosionGeneratorHandler::EXPGEN_ID_STANDARD;
+
+		IExplosionGenerator* gen = explGenHandler.GetGenerator(explosionID);
+		CCustomExplosionGenerator* cGen;
+		if (gen && (cGen = dynamic_cast<CCustomExplosionGenerator*>(gen)) != nullptr) {
+			const float realHeight = CGround::GetHeightReal(pos);
+			const unsigned int heightFlags = CCustomExplosionGenerator::GetFlagsFromHeight(pos.y, realHeight);
+			const unsigned int commonFlags = cGen->CommonVisibleFlags(heightFlags); // TODO: should also pass bit about hitting unit or not unit to filter.
+
+			if (commonFlags & CCustomExplosionGenerator::CEG_SPWF_ALWAYS_VISIBLE) {
+				return true;
+			}
+
+			const bool    airExplosion = ((heightFlags & CCustomExplosionGenerator::CEG_SPWF_AIR       ) != 0);
+			const bool groundExplosion = ((heightFlags & CCustomExplosionGenerator::CEG_SPWF_GROUND    ) != 0);
+			const bool  waterExplosion = ((heightFlags & CCustomExplosionGenerator::CEG_SPWF_WATER     ) != 0);
+			const bool     uwExplosion = ((heightFlags & CCustomExplosionGenerator::CEG_SPWF_UNDERWATER) != 0);
+			losAir = airExplosion;
+			losGround = groundExplosion || waterExplosion || uwExplosion;
+		}
+	}
+	if (allyTeamID >= 0 && ((losGround && losHandler->InLos(pos, allyTeamID)) || (losAir && losHandler->InAirLos(pos, allyTeamID))))
+		return true;
+	return false;
+}
 
 
 bool CStdExplosionGenerator::Explosion(
@@ -862,6 +904,17 @@ void CCustomExplosionGenerator::ParseExplosionCode(
 	code.append((char*)&ofs, (char*)&ofs + sizeof(ofs));
 }
 
+
+unsigned int CCustomExplosionGenerator::CommonVisibleFlags(unsigned int visibilityFlags) const
+{
+	int resFlags = 0;
+	visibilityFlags |= CEG_SPWF_ALWAYS_VISIBLE;
+	for (auto& psi: expGenParams.projectiles) {
+		if (psi.flags & visibilityFlags)
+			resFlags |= psi.flags;
+	}
+	return resFlags;
+}
 
 
 bool CCustomExplosionGenerator::Load(CExplosionGeneratorHandler* handler, const char* tag)
