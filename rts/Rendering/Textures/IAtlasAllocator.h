@@ -83,7 +83,7 @@ public:
 		if (it == entries.end())
 			return AtlasedTexture::DefaultAtlasTexture;
 
-		AtlasedTexture uv(it->second.texCoords);
+		AtlasedTexture uv(static_cast<float4>(it->second.texCoords), it->second.pageIdx);
 		uv.x1 /= atlasSize.x;
 		uv.y1 /= atlasSize.y;
 		uv.x2 /= atlasSize.x;

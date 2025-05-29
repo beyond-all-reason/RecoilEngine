@@ -86,7 +86,7 @@ void CProjectileDrawer::Init() {
 
 	loadscreen->SetLoadMessage("Creating Projectile Textures");
 
-	textureAtlas  = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_MP_LEGACY, 512, 512, "ExplosFXAtlas", true);
+	textureAtlas  = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_MP_LEGACY, 0, 0, "ExplosFXAtlas", true);
 	groundFXAtlas = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_MP_LEGACY, 0, 0, "GroundFXAtlas", true);
 
 	LuaParser resourcesParser("gamedata/resources.lua", SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
@@ -1008,7 +1008,7 @@ void CProjectileDrawer::DrawGroundFlashes()
 	const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
 	const auto& sky = ISky::GetSky();
 
-	auto* fxShader = fxShaders[textureAtlas->GetNumPages() > 1];
+	auto* fxShader = fxShaders[groundFXAtlas->GetNumPages() > 1];
 	fxShader->Enable();
 	fxShader->SetUniform("alphaCtrl", 0.01f, 1.0f, 0.0f, 0.0f);
 	fxShader->SetUniform("softenThreshold", -CProjectileDrawer::softenThreshold[1]);

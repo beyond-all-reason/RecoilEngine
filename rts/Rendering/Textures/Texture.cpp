@@ -166,7 +166,6 @@ namespace GL {
 		auto state = GL::SubState(
 			PixelStoreUnpackAlignment(dataSize)
 		);
-		auto binding = GL::TexBind(texTarget, texID);
 		glTexSubImage2D(texTarget, level, xOffset, yOffset, width, height, extFormat, dataType, data);
 	}
 
@@ -188,7 +187,7 @@ namespace GL {
 		: Texture2DArray()
 	{
 		size = int2(xsize_, ysize_);
-		numPages = numPages;
+		numPages = numPages_;
 		intFormat = intFormat_;
 
 		numLevels = tcp.reqNumLevels <= 0
@@ -233,7 +232,6 @@ namespace GL {
 		auto state = GL::SubState(
 			PixelStoreUnpackAlignment(dataSize)
 		);
-		auto binding = GL::TexBind(texTarget, texID);
 		glTexSubImage3D(texTarget, level, xOffset, yOffset, layer, width, height, 1, extFormat, dataType, data);
 	}
 
