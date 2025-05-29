@@ -52,6 +52,7 @@
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/MoveTypes/MoveType.h"
 #include "Sim/MoveTypes/MoveTypeFactory.h"
+#include "Sim/MoveTypes/StaticMoveType.h"
 #include "Sim/MoveTypes/ScriptMoveType.h"
 #include "Sim/Projectiles/FlareProjectile.h"
 #include "Sim/Projectiles/ProjectileMemPool.h"
@@ -653,6 +654,10 @@ void CUnit::Update()
 	RECOIL_DETAILED_TRACY_ZONE;
 	ASSERT_SYNCED(pos);
 
+
+	auto staticMoveType = dynamic_cast<CStaticMoveType*>(moveType);
+	if unlikely(staticMoveType && staticMoveType->needsUpdate)
+		staticMoveType->UpdateGroundFit();
 	UpdatePhysicalState(0.1f);
 	UpdatePosErrorParams(true, false);
 	UpdateTransportees(); // none if already dead
