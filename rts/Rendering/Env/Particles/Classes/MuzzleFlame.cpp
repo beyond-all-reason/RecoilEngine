@@ -75,6 +75,7 @@ void CMuzzleFlame::Draw()
 
 		const auto* st = projectileDrawer->GetSmokeTexture(tex);
 		AddEffectsQuad<0>(
+			st->pageNum,
 			{ interPos - camera->GetRight() * drawsize - camera->GetUp() * drawsize, st->xstart, st->ystart, col },
 			{ interPos + camera->GetRight() * drawsize - camera->GetUp() * drawsize, st->xend,   st->ystart, col },
 			{ interPos + camera->GetRight() * drawsize + camera->GetUp() * drawsize, st->xend,   st->yend,   col },
@@ -90,6 +91,7 @@ void CMuzzleFlame::Draw()
 
 			const auto* mft = projectileDrawer->muzzleflametex;
 			AddEffectsQuad<0>(
+				mft->pageNum,
 				{ interPos - camera->GetRight() * drawsize - camera->GetUp() * drawsize, mft->xstart, mft->ystart, col },
 				{ interPos + camera->GetRight() * drawsize - camera->GetUp() * drawsize, mft->xend,   mft->ystart, col },
 				{ interPos + camera->GetRight() * drawsize + camera->GetUp() * drawsize, mft->xend,   mft->yend,   col },

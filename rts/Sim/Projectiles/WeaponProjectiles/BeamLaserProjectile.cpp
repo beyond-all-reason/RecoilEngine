@@ -130,12 +130,14 @@ void CBeamLaserProjectile::Draw()
 	if (playerCamDistSq < Square(1000.0f)) {
 		if (validTextures[2]) {
 			AddEffectsQuad<2>(
+				WT2->pageNum,
 				{ pos1 - xdir * beamEdgeSize,                       midtexx  , WT2->ystart, edgeColStart },
 				{ pos1 - xdir * beamEdgeSize - ydir * beamEdgeSize, WT2->xend, WT2->ystart, edgeColStart },
 				{ pos1 + xdir * beamEdgeSize - ydir * beamEdgeSize, WT2->xend, WT2->yend  , edgeColStart },
 				{ pos1 + xdir * beamEdgeSize,                       midtexx  , WT2->yend  , edgeColStart }
 			);
 			AddEffectsQuad<2>(
+				WT2->pageNum,
 				{ pos1 - xdir * beamCoreSize,                       midtexx  , WT2->ystart, coreColStart },
 				{ pos1 - xdir * beamCoreSize - ydir * beamCoreSize, WT2->xend, WT2->ystart, coreColStart },
 				{ pos1 + xdir * beamCoreSize - ydir * beamCoreSize, WT2->xend, WT2->yend  , coreColStart },
@@ -145,6 +147,7 @@ void CBeamLaserProjectile::Draw()
 		}
 		if (validTextures[1]) {
 			AddEffectsQuad<1>(
+				WT1->pageNum,
 				{ pos1 - xdir * beamEdgeSize,                       WT1->xstart, WT1->ystart, edgeColStart },
 				{ pos2 - xdir * beamEdgeSize,                       WT1->xend  , WT1->ystart, edgeColEnd   },
 				{ pos2 + xdir * beamEdgeSize,                       WT1->xend  , WT1->yend  , edgeColEnd   },
@@ -152,6 +155,7 @@ void CBeamLaserProjectile::Draw()
 			);
 
 			AddEffectsQuad<1>(
+				WT1->pageNum,
 				{ pos1 - xdir * beamCoreSize,                       WT1->xstart, WT1->ystart, coreColStart },
 				{ pos2 - xdir * beamCoreSize,                       WT1->xend  , WT1->ystart, coreColEnd   },
 				{ pos2 + xdir * beamCoreSize,                       WT1->xend  , WT1->yend  , coreColEnd   },
@@ -160,6 +164,7 @@ void CBeamLaserProjectile::Draw()
 		}
 		if (validTextures[2]) {
 			AddEffectsQuad<2>(
+				WT2->pageNum,
 				{ pos2 - xdir * beamEdgeSize,                       midtexx  , WT2->ystart, edgeColStart },
 				{ pos2 - xdir * beamEdgeSize + ydir * beamEdgeSize, WT2->xend, WT2->ystart, edgeColStart },
 				{ pos2 + xdir * beamEdgeSize + ydir * beamEdgeSize, WT2->xend, WT2->yend  , edgeColStart },
@@ -167,6 +172,7 @@ void CBeamLaserProjectile::Draw()
 			);
 
 			AddEffectsQuad<2>(
+				WT2->pageNum,
 				{ pos2 - xdir * beamCoreSize,                       midtexx  , WT2->ystart, coreColStart },
 				{ pos2 - xdir * beamCoreSize + ydir * beamCoreSize, WT2->xend, WT2->ystart, coreColStart },
 				{ pos2 + xdir * beamCoreSize + ydir * beamCoreSize, WT2->xend, WT2->yend  , coreColStart },
@@ -176,6 +182,7 @@ void CBeamLaserProjectile::Draw()
 	} else {
 		if (validTextures[1]) {
 			AddEffectsQuad<1>(
+				WT1->pageNum,
 				{ pos1 - xdir * beamEdgeSize,                       WT1->xstart, WT1->ystart, edgeColStart },
 				{ pos2 - xdir * beamEdgeSize,                       WT1->xend  , WT1->ystart, edgeColEnd   },
 				{ pos2 + xdir * beamEdgeSize,                       WT1->xend  , WT1->yend  , edgeColEnd   },
@@ -183,6 +190,7 @@ void CBeamLaserProjectile::Draw()
 			);
 
 			AddEffectsQuad<1>(
+				WT1->pageNum,
 				{ pos1 - xdir * beamCoreSize,                       WT1->xstart, WT1->ystart, coreColStart },
 				{ pos2 - xdir * beamCoreSize,                       WT1->xend  , WT1->ystart, coreColEnd   },
 				{ pos2 + xdir * beamCoreSize,                       WT1->xend  , WT1->yend  , coreColEnd   },
@@ -194,6 +202,7 @@ void CBeamLaserProjectile::Draw()
 	// draw flare
 	if (validTextures[3]) {
 		AddEffectsQuad<3>(
+			WT3->pageNum,
 			{ pos1 - camera->GetRight() * flareEdgeSize - camera->GetUp() * flareEdgeSize, WT3->xstart, WT3->ystart, edgeColStart },
 			{ pos1 + camera->GetRight() * flareEdgeSize - camera->GetUp() * flareEdgeSize, WT3->xend,   WT3->ystart, edgeColStart },
 			{ pos1 + camera->GetRight() * flareEdgeSize + camera->GetUp() * flareEdgeSize, WT3->xend,   WT3->yend,   edgeColStart },
@@ -201,6 +210,7 @@ void CBeamLaserProjectile::Draw()
 		);
 
 		AddEffectsQuad<3>(
+			WT3->pageNum,
 			{ pos1 - camera->GetRight() * flareCoreSize - camera->GetUp() * flareCoreSize, WT3->xstart, WT3->ystart, coreColStart },
 			{ pos1 + camera->GetRight() * flareCoreSize - camera->GetUp() * flareCoreSize, WT3->xend,   WT3->ystart, coreColStart },
 			{ pos1 + camera->GetRight() * flareCoreSize + camera->GetUp() * flareCoreSize, WT3->xend,   WT3->yend,   coreColStart },

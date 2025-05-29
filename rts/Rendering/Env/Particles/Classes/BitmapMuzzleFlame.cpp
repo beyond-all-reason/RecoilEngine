@@ -124,12 +124,14 @@ void CBitmapMuzzleFlame::Draw()
 
 	if (IsValidTexture(sideTexture)) {
 		AddEffectsQuad<2>(
+			sideTexture->pageNum,
 			{ drawPos + bounds[0], sideTexture->xstart, sideTexture->ystart, col },
 			{ drawPos + bounds[1], sideTexture->xend  , sideTexture->ystart, col },
 			{ drawPos + bounds[2], sideTexture->xend  , sideTexture->yend  , col },
 			{ drawPos + bounds[3], sideTexture->xstart, sideTexture->yend  , col }
 		);
 		AddEffectsQuad<2>(
+			sideTexture->pageNum,
 			{ drawPos + bounds[4], sideTexture->xstart, sideTexture->ystart, col },
 			{ drawPos + bounds[5], sideTexture->xend  , sideTexture->ystart, col },
 			{ drawPos + bounds[6], sideTexture->xend  , sideTexture->yend  , col },
@@ -139,6 +141,7 @@ void CBitmapMuzzleFlame::Draw()
 
 	if (IsValidTexture(frontTexture)) {
 		AddEffectsQuad<1>(
+			frontTexture->pageNum,
 			{ fpos + bounds[8 ], frontTexture->xstart, frontTexture->ystart, col },
 			{ fpos + bounds[9 ], frontTexture->xend  , frontTexture->ystart, col },
 			{ fpos + bounds[10], frontTexture->xend  , frontTexture->yend , col },

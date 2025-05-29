@@ -101,6 +101,7 @@ void CNanoProjectile::Draw()
 
 	const auto* gfxt = projectileDrawer->gfxtex;
 	AddEffectsQuad<0>(
+		gfxt->pageNum,
 		{ drawPos + bounds[0], gfxt->xstart, gfxt->ystart, color },
 		{ drawPos + bounds[1], gfxt->xend  , gfxt->ystart, color },
 		{ drawPos + bounds[2], gfxt->xend  , gfxt->yend  , color },

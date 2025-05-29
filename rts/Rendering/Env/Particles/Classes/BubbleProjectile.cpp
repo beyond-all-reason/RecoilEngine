@@ -91,6 +91,7 @@ void CBubbleProjectile::Draw()
 
 	const auto* bt = projectileDrawer->bubbletex;
 	AddEffectsQuad<0>(
+		bt->pageNum,
 		{ drawPos - camera->GetRight() * interSize - camera->GetUp() * interSize, bt->xstart, bt->ystart, col },
 		{ drawPos + camera->GetRight() * interSize - camera->GetUp() * interSize, bt->xend,   bt->ystart, col },
 		{ drawPos + camera->GetRight() * interSize + camera->GetUp() * interSize, bt->xend,   bt->yend,   col },
