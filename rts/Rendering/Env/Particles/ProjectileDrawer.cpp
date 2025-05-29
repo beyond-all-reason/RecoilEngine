@@ -282,61 +282,49 @@ void CProjectileDrawer::Init() {
 
 	LoadWeaponTextures();
 
-	fsShadowShaders[0] = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader shadow(tex2d)");
-	fsShadowShaders[1] = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader shadow(tex2dArray)");
-	for (auto*& fsShadowShader : fsShadowShaders)
-	{
-		fsShadowShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXVertShadowProg.glsl", "", GL_VERTEX_SHADER));
-		fsShadowShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXFragShadowProg.glsl", "", GL_FRAGMENT_SHADER));
-		fsShadowShader->SetFlag("USE_TEXTURE_ARRAY", fsShadowShader == fsShadowShaders[1]);
+	fxShadowShader = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader shadow");
+	fxShadowShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXVertShadowProg.glsl", "", GL_VERTEX_SHADER));
+	fxShadowShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXFragShadowProg.glsl", "", GL_FRAGMENT_SHADER));
+	fxShadowShader->SetFlag("USE_TEXTURE_ARRAY", false);
 
-		{
-			using VAT = std::decay_t<decltype(CProjectile::GetPrimaryRenderBuffer())>::VertType;
-			fsShadowShader->BindAttribLocations<VAT>();
-		}
+	using VAT = std::decay_t<decltype(CProjectile::GetPrimaryRenderBuffer())>::VertType;
+	fxShadowShader->BindAttribLocations<VAT>();
 
-		fsShadowShader->Link();
-		fsShadowShader->Enable();
+	fxShadowShader->Link();
+	fxShadowShader->Enable();
 
-		fsShadowShader->SetUniform("atlasTex", 0);
-		fsShadowShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
-		fsShadowShader->SetUniform("shadowColorMode", shadowHandler.shadowColorMode > 0 ? 1.0f : 0.0f);
+	fxShadowShader->SetUniform("atlasTex", 0);
+	fxShadowShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
+	fxShadowShader->SetUniform("shadowColorMode", shadowHandler.shadowColorMode > 0 ? 1.0f : 0.0f);
 
-		fsShadowShader->Disable();
-		fsShadowShader->Validate();
-	}
+	fxShadowShader->Disable();
+	fxShadowShader->Validate();
 
-	fxShaders[0] = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader(tex2d)");
-	fxShaders[1] = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader(tex2dArray)");
 
-	for (auto*& fxShader : fxShaders)
-	{
-		fxShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXVertProg.glsl", "", GL_VERTEX_SHADER));
-		fxShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXFragProg.glsl", "", GL_FRAGMENT_SHADER));
-		fxShader->SetFlag("USE_TEXTURE_ARRAY", fxShader == fxShaders[1]);
-		fxShader->SetFlag("SMOOTH_PARTICLES", CheckSoftenExt());
-		fxShader->SetFlag("DEPTH_CLIP01", globalRendering->supportClipSpaceControl);
+	fxShader = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader");
+	fxShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXVertProg.glsl", "", GL_VERTEX_SHADER));
+	fxShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXFragProg.glsl", "", GL_FRAGMENT_SHADER));
+	fxShader->SetFlag("SMOOTH_PARTICLES", CheckSoftenExt());
+	fxShader->SetFlag("DEPTH_CLIP01", globalRendering->supportClipSpaceControl);
+	fxShader->SetFlag("USE_TEXTURE_ARRAY", false);
 
-		{
-			using VAT = std::decay_t<decltype(CProjectile::GetPrimaryRenderBuffer())>::VertType;
-			fxShader->BindAttribLocations<VAT>();
-		}
+	using VAT = std::decay_t<decltype(CProjectile::GetPrimaryRenderBuffer())>::VertType;
+	fxShader->BindAttribLocations<VAT>();
 
-		fxShader->Link();
-		fxShader->Enable();
-		fxShader->SetUniform("atlasTex", 0);
-		fxShader->SetUniform("depthTex", 15);
-		fxShader->SetUniform("softenExponent", softenExponent[0], softenExponent[1]);
-		fxShader->SetUniform("softenThreshold", softenThreshold[0]);
+	fxShader->Link();
+	fxShader->Enable();
+	fxShader->SetUniform("atlasTex", 0);
+	fxShader->SetUniform("depthTex", 15);
+	fxShader->SetUniform("softenExponent", softenExponent[0], softenExponent[1]);
+	fxShader->SetUniform("softenThreshold", softenThreshold[0]);
 
-		fxShader->SetUniform("camPos", 0.0f, 0.0f, 0.0f);
-		fxShader->SetUniform("fogColor", 0.0f, 0.0f, 0.0f);
-		fxShader->SetUniform("fogParams", 0.0f, 0.0f);
+	fxShader->SetUniform("camPos", 0.0f, 0.0f, 0.0f);
+	fxShader->SetUniform("fogColor", 0.0f, 0.0f, 0.0f);
+	fxShader->SetUniform("fogParams", 0.0f, 0.0f);
 
-		fxShader->Disable();
+	fxShader->Disable();
 
-		fxShader->Validate();
-	}
+	fxShader->Validate();
 
 	sdbc = std::make_unique<ScopedDepthBufferCopy>(false);
 
@@ -368,8 +356,8 @@ void CProjectileDrawer::Kill() {
 	drawSorted = true;
 
 	shaderHandler->ReleaseProgramObjects("[ProjectileDrawer::VFS]");
-	fxShaders = { nullptr };
-	fsShadowShaders = { nullptr };
+	fxShader = nullptr;
+	fxShadowShader = nullptr;
 	sdbc = nullptr;
 
 	configHandler->Set("SoftParticles", wantSoften);
@@ -795,13 +783,12 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			glActiveTexture(GL_TEXTURE15); glBindTexture(GL_TEXTURE_2D, depthBufferCopy->GetDepthBufferTexture(false));
 		}
 
-		auto* fxShader = fxShaders[textureAtlas->GetNumPages() > 1];
-
 		const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
 		const auto& sky = ISky::GetSky();
 
 		fxShader->Enable();
 		fxShader->SetFlag("SMOOTH_PARTICLES", needSoften);
+		fxShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
 		fxShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
 		fxShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
 		fxShader->SetUniform("softenThreshold", CProjectileDrawer::softenThreshold[0]);
@@ -902,13 +889,14 @@ void CProjectileDrawer::DrawShadowTransparent()
 
 	// 6) Render transparents in arbitrary order
 	textureAtlas->BindTexture();
-	auto* fsShadowShader = fsShadowShaders[textureAtlas->GetNumPages() > 1];
-	fsShadowShader->Enable();
-	fsShadowShader->SetUniform("shadowColorMode", shadowHandler.shadowColorMode > 0 ? 1.0f : 0.0f);
+
+	fxShadowShader->Enable();
+	fxShadowShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
+	fxShadowShader->SetUniform("shadowColorMode", shadowHandler.shadowColorMode > 0 ? 1.0f : 0.0f);
 
 	rb.DrawElements(GL_TRIANGLES);
 
-	fsShadowShader->Disable();
+	fxShadowShader->Disable();
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	//shadowHandler.EnableColorOutput(false);
@@ -1008,8 +996,8 @@ void CProjectileDrawer::DrawGroundFlashes()
 	const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
 	const auto& sky = ISky::GetSky();
 
-	auto* fxShader = fxShaders[groundFXAtlas->GetNumPages() > 1];
 	fxShader->Enable();
+	fxShader->SetFlag("USE_TEXTURE_ARRAY", (groundFXAtlas->GetNumPages() > 1));
 	fxShader->SetUniform("alphaCtrl", 0.01f, 1.0f, 0.0f, 0.0f);
 	fxShader->SetUniform("softenThreshold", -CProjectileDrawer::softenThreshold[1]);
 	fxShader->SetUniform("camPos", camPlayer->pos.x, camPlayer->pos.y, camPlayer->pos.z);
