@@ -714,7 +714,11 @@ void CUnitDrawerData::UnitLeavesGhostChanged(const CUnit* unit, const bool leave
 	}
 
 	if (UpdateUnitGhosts(unit, leaveDeadGhost))
+		// left ghost
 		UpdateUnitIcon(unit, false, true);
+	else {
+		RemoveDeadGhosts(unit);
+	}
 }
 
 void CUnitDrawerData::ReviewPrevLos(const CUnit* unit)
@@ -726,6 +730,40 @@ void CUnitDrawerData::ReviewPrevLos(const CUnit* unit)
 		if (!(unit->losStatus[allyTeam] & (LOS_INLOS | LOS_CONTRADAR))) {
 			CUnit* u = const_cast<CUnit*>(unit);
 			u->losStatus[allyTeam] &= ~LOS_PREVLOS;
+		}
+	}
+}
+
+void CUnitDrawerData::RemoveDeadGhosts(const CUnit* unit)
+{
+	const float3 pos = unit->pos;
+
+	const UnitDef* unitDef = unit->unitDef;
+	const UnitDef* decoyDef = unitDef->decoyDef;
+
+	CUnit* u = const_cast<CUnit*>(unit);
+
+	// TODO - make ghosted buildings per allyTeam - so they are correctly dealt with
+	// when spectating
+	GhostSolidObject* gso = nullptr;
+	// FIXME -- adjust decals for decoys? gets weird?
+	S3DModel* gsoModel = (decoyDef == nullptr) ? u->model : decoyDef->LoadModel();
+
+	for (int allyTeam = 0; allyTeam < savedData.deadGhostBuildings.size(); ++allyTeam) {
+		auto& dgb = savedData.deadGhostBuildings[allyTeam][gsoModel->type];
+		for (int i = 0; i < dgb.size(); /*no-op*/) {
+			GhostSolidObject* gso = dgb[i];
+			if (gso->pos == pos) {
+				if (!gso->DecRef()) {
+					spring::VectorErase(unitsByIcon[gso->myIcon].second, const_cast<const GhostSolidObject*>(gso));
+					groundDecals->GhostDestroyed(gso);
+					ghostMemPool.free(gso);
+				}
+				dgb[i] = dgb.back();
+				dgb.pop_back();
+			} else {
+				++i;
+			}
 		}
 	}
 }
