@@ -21,7 +21,7 @@
  * @class Image
  * @field width integer
  * @field height interger
- * @field size integer[2]
+ * @field size integer[]
  * @field format string
  * @field channels integer
  * @field dataType string
