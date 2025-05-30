@@ -496,7 +496,7 @@ static void f_parser (lua_State *L, void *ud) {
   int c = luaZ_lookahead(p->z);
   luaC_checkGC(L);
   if (c == LUA_SIGNATURE[0]) {
-    luaG_runerror(L, "bytecode not allowed");
+    luaG_runerror(L, "bytecode unsupported");
     return;
   }
   tf = luaY_parser(L, p->z, &p->buff, p->name);
