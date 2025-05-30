@@ -20,14 +20,14 @@ LuaImage luaImage;
  * LuaImageData
  ******************************************************************************/
 
-LuaImageData::LuaImageData(std::string filename, bool grayscale) : filename(filename)
+LuaImageData::LuaImageData(std::string filename, bool grayscale, int reqChannels, int reqDataType) : filename(filename)
 {
 	id     = 0;
 	bitmap = std::make_shared<CBitmap>();
 	if (grayscale)
 		valid = bitmap->LoadGrayscale(filename);
 	else
-		valid = bitmap->Load(filename);
+		valid = bitmap->Load(filename, 1.0f, reqChannels, dataType);
 	if (bitmap->dataType != GL_UNSIGNED_BYTE && bitmap->dataType != GL_UNSIGNED_SHORT && bitmap->dataType != GL_FLOAT)
 		valid = false;
 	if (valid) {
@@ -151,7 +151,9 @@ int LuaImage::LoadImage(lua_State* L)
 {
 	std::string filename = luaL_checkstring(L, 1);
 	bool grayscale = luaL_optboolean(L, 2, false);
-	LuaImageData image = LuaImageData(filename, grayscale);
+	int channels = luaL_optinteger(L, 3, 0);
+	int dataType = luaL_optinteger(L, 4, 0);
+	LuaImageData image = LuaImageData(filename, grayscale, channels, dataType);
 	if (image.valid) {
 		image.id = ++luaImage.lastIndex;
 		luaImage.images.emplace_back(std::move(image));
