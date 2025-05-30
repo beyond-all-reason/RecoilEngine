@@ -151,8 +151,8 @@ std::shared_ptr<LuaImageData> LoadImageObject(lua_State* L)
 {
 	std::string filename = luaL_checkstring(L, 1);
 	bool grayscale = luaL_optboolean(L, 2, false);
-	int channels = luaL_optinteger(L, 3, 0);
-	int dataType = luaL_optinteger(L, 4, 0);
+	int channels = LuaImage::ParseFormat(L, 3);
+	int dataType = LuaImage::ParseDataType(L, 4);
 	auto image = make_shared<LuaImageData>(filename, grayscale, channels, dataType);
 	if (image->valid) {
 		return image;
@@ -208,6 +208,7 @@ int LuaImage::meta_index(lua_State* L)
 				lua_pushinteger(L, image->width);
 				return 1;
 			} break;
+
 			case hashString("height"): {
 				lua_pushinteger(L, image->height);
 				return 1;
@@ -219,7 +220,12 @@ int LuaImage::meta_index(lua_State* L)
 			} break;
 
 			case hashString("format"): {
-				lua_pushinteger(L, image->bitmap->dataType);
+				lua_pushstring(L, ChannelsToFormat(image->channels));
+				return 1;
+			} break;
+
+			case hashString("dataType"): {
+				lua_pushstring(L, DataTypeToString(image->bitmap->dataType));
 				return 1;
 			} break;
 
@@ -298,5 +304,92 @@ int LuaImage::ReadMapPixel(lua_State* L)
 	const float y = (mapY * image->height) / mapSizeY;
 
 	return PushImagePixel(L, image, x, y);
+}
+
+
+/******************************************************************************
+ *  Formatting
+ */
+
+const char* LuaImage::DataTypeToString(int dataType)
+{
+	switch(dataType) {
+		case GL_UNSIGNED_BYTE:
+			return "byte";
+		case GL_UNSIGNED_SHORT:
+			return "short";
+		case GL_FLOAT:
+			return "float";
+		default:
+			return "unknown";
+	}
+}
+
+
+int LuaImage::StringToDataType(const char* str)
+{
+	switch (hashString(str)) {
+		case hashString("byte"):
+			return GL_UNSIGNED_BYTE;
+		case hashString("short"):
+			return GL_UNSIGNED_SHORT;
+		case hashString("float"):
+			return GL_FLOAT;
+		case hashString("default"):
+			return 0;
+		default:
+			return -1;
+	}
+}
+
+
+
+const char* LuaImage::ChannelsToFormat(int channels)
+{
+	switch(channels) {
+		case 1:
+			return "grayscale";
+		case 3:
+			return "rgb";
+		case 4:
+			return "rgba";
+		default:
+			return "unknown";
+	}
+}
+
+
+int LuaImage::FormatToChannels(const char* format)
+{
+	switch (hashString(format)) {
+		case hashString("grayscale"):
+			return 1;
+		case hashString("rgb"):
+			return 3;
+		case hashString("rgba"):
+			return 4;
+		case hashString("default"):
+			return 0;
+		default:
+			return -1;
+	}
+}
+
+
+int LuaImage::ParseFormat(lua_State* L, int index)
+{
+	int channels = FormatToChannels(luaL_optstring(L, index, "default"));
+	if (channels == -1)
+		luaL_error(L, "Invalid format for image");
+	return channels;
+}
+
+
+int LuaImage::ParseDataType(lua_State* L, int index)
+{
+	int dataType = StringToDataType(luaL_optstring(L, index, "default"));
+	if (dataType == -1)
+		luaL_error(L, "Invalid data type for image");
+	return dataType;
 }
 

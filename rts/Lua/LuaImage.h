@@ -54,6 +54,13 @@ private: // call-outs
 	static int ReadPixel(lua_State* L);
 	static int ReadMapPixel(lua_State* L);
 	static int GetFormat(lua_State* L);
+public:
+	static const char* DataTypeToString(int dataType);
+	static int StringToDataType(const char* str);
+	static const char* ChannelsToFormat(int channels);
+	static int FormatToChannels(const char* format);
+	static int ParseFormat(lua_State* L, int index);
+	static int ParseDataType(lua_State* L, int index);
 };
 
 extern LuaImage luaImage;
