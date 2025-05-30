@@ -1,0 +1,53 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
+#ifndef LUA_IMAGE_H
+#define LUA_IMAGE_H
+
+#include <vector>
+#include <string>
+
+#include "Rendering/GL/myGL.h"
+
+
+struct lua_State;
+class CBitmap;
+
+class LuaImageData {
+public:
+	LuaImageData(std::string filename);
+	~LuaImageData();
+
+	std::string filename;
+	bool valid;
+	unsigned int id;
+	std::shared_ptr<CBitmap> bitmap;
+	unsigned int width;
+	unsigned int height;
+	unsigned int channels;
+};
+
+class LuaImage {
+public:
+	LuaImage() { images.reserve(8); }
+	~LuaImage();
+
+	void Clear() { images.clear(); }
+
+	const LuaImageData* GetImage(unsigned int index);
+
+public:
+	static bool PushEntries(lua_State* L);
+private:
+	int lastIndex = 0;
+	std::vector<LuaImageData> images;
+
+private: // call-outs
+	static int LoadImage(lua_State* L);
+	static int DeleteImage(lua_State* L);
+	static int ReadPixel(lua_State* L);
+	static int GetSize(lua_State* L);
+};
+
+extern LuaImage luaImage;
+
+#endif /* LUA_IMAGE_H */
