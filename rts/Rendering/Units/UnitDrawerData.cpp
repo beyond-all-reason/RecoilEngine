@@ -713,7 +713,7 @@ void CUnitDrawerData::UnitLeavesGhostChanged(const CUnit* unit, const bool leave
 	}
 
 	if (UpdateUnitGhosts(unit, leaveDeadGhost)) {
-		// left ghost
+		// left decoy dead ghost for own team
 		UpdateUnitIcon(unit, false, true);
 	}
 }
