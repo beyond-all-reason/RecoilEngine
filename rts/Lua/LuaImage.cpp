@@ -17,6 +17,16 @@
  * LuaImageData
  ******************************************************************************/
 
+/***
+ * @class Image
+ * @field width
+ * @field height
+ * @field size
+ * @field format
+ * @field channels
+ * @field dataType
+ */
+
 LuaImageData::LuaImageData(std::string filename, int reqChannels, int reqDataType, bool luminance) : filename(filename)
 {
 	bitmap = std::make_shared<CBitmap>();
@@ -215,6 +225,17 @@ int LuaImage::meta_index(lua_State* L)
  *  Api
  */
 
+/*** Loads an image
+ *
+ * @function Image.LoadImage
+ *
+ * @param filePath string VFS path to the file, for example "map/windfield.png".
+ * @param format string Force resulting Image format. Leave as "default" or nil for default.
+ * @param dataType string Force resulting Image dataType. Leave as "default" or nil for default.
+ *
+ * @return Image userdata object to operate on the image
+ */
+
 int LuaImage::LoadImage(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -233,12 +254,32 @@ int LuaImage::LoadImage(lua_State* L)
 }
 
 
+/*** Deletes an image
+ *
+ * @function Image.DeleteImage
+ * @param image Image Image object to delete.
+ */
+
 int LuaImage::DeleteImage(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return meta_gc(L);
 }
 
+
+/*** Reads a pixel from the image
+ *
+ * @function Image:ReadPixel
+ *
+ * Return values depend on the image channels and type.
+ *
+ * @param x integer x coordinate in pixels.
+ * @param y integer y coordinate in pixels.
+ * @return r number
+ * @return g number?
+ * @return b number?
+ * @return a number?
+ */
 
 int LuaImage::ReadPixel(lua_State* L)
 {
@@ -249,6 +290,21 @@ int LuaImage::ReadPixel(lua_State* L)
 
 	return PushImagePixel(L, image, x, y);
 }
+
+
+/*** Reads a pixel from the image in map coordinates
+ *
+ * @function Image:ReadMapPixel
+ *
+ * Return values depend on the image channels and type.
+ *
+ * @param x number x coordinate in elmos.
+ * @param y number y coordinate in elmos.
+ * @return r number
+ * @return g number?
+ * @return b number?
+ * @return a number?
+ */
 
 
 int LuaImage::ReadMapPixel(lua_State* L)
