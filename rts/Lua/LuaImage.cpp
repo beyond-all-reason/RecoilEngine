@@ -27,7 +27,7 @@ LuaImageData::LuaImageData(std::string filename, bool grayscale, int reqChannels
 	if (grayscale)
 		valid = bitmap->LoadGrayscale(filename);
 	else
-		valid = bitmap->Load(filename, 1.0f, reqChannels, dataType);
+		valid = bitmap->Load(filename, 1.0f, reqChannels, reqDataType);
 	if (bitmap->dataType != GL_UNSIGNED_BYTE && bitmap->dataType != GL_UNSIGNED_SHORT && bitmap->dataType != GL_FLOAT)
 		valid = false;
 	if (valid) {
