@@ -34,9 +34,13 @@ public:
 	bool Init(lua_State* L);
 	void Shutdown(lua_State* L);
 
-	void Clear() { images.clear(); }
+private: // helpers
+	static bool CreateMetatable(lua_State* L);
 
-	const LuaImageData* GetImage(unsigned int index);
+private: // metatable methods
+	static int meta_gc(lua_State* L);
+	static int meta_index(lua_State* L);
+	static int meta_tostring(lua_State* L);
 
 public:
 	static bool PushEntries(lua_State* L);

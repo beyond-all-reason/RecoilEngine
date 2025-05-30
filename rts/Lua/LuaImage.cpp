@@ -72,27 +72,32 @@ void LuaImage::Shutdown(lua_State* L)
 
 bool LuaImage::PushEntries(lua_State* L)
 {
+	CreateMetatable(L);
+
 	REGISTER_LUA_CFUNC(LoadImage);
 	REGISTER_LUA_CFUNC(DeleteImage);
-	REGISTER_LUA_CFUNC(ReadPixel);
-	REGISTER_LUA_CFUNC(ReadMapPixel);
-	REGISTER_LUA_CFUNC(GetFormat);
 
 	return true;
 }
 
-
-/******************************************************************************/
-/******************************************************************************/
-
-const LuaImageData* LuaImage::GetImage(unsigned int id)
+bool LuaImage::CreateMetatable(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	for(auto& image: luaImage.images) {
-		if (image.id == id)
-			return &image;
-	}
-	return nullptr;
+	luaL_newmetatable(L, "Image");
+
+	HSTR_PUSH_CFUNC(L, "__gc",        meta_gc);
+	HSTR_PUSH_CFUNC(L, "__index",     meta_index);
+	HSTR_PUSH_CFUNC(L, "__tostring",  meta_tostring);
+	LuaPushNamedString(L, "__metatable", "protected metatable");
+
+		// push userdata callouts
+		REGISTER_LUA_CFUNC(ReadPixel);
+		REGISTER_LUA_CFUNC(ReadMapPixel);
+
+		REGISTER_LUA_CFUNC(GetFormat);
+
+	lua_pop(L, 1);
+	return true;
 }
 
 
@@ -100,15 +105,14 @@ const LuaImageData* LuaImage::GetImage(unsigned int id)
  *  Helpers
  */
 
-const LuaImageData* GetLuaImageData(lua_State* L)
+inline LuaImageData* toimage(lua_State* L, int idx)
 {
-	const unsigned int id = luaL_checkinteger(L, 1);
-	const LuaImageData* image = luaImage.GetImage(id);
-	if (image == nullptr) {
-		luaL_error(L, "bad image!");
-	}
-	return image;
-		
+	auto image = static_cast<std::shared_ptr<LuaImageData>*>(luaL_checkudata(L, idx, "Image"));
+
+	if (*image == nullptr)
+		luaL_error(L, "attempt to use a deleted image");
+
+	return image->get();
 }
 
 
@@ -143,44 +147,123 @@ int PushImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
 }
 
 
+std::shared_ptr<LuaImageData> LoadImageObject(lua_State* L)
+{
+	std::string filename = luaL_checkstring(L, 1);
+	bool grayscale = luaL_optboolean(L, 2, false);
+	int channels = luaL_optinteger(L, 3, 0);
+	int dataType = luaL_optinteger(L, 4, 0);
+	auto image = make_shared<LuaImageData>(filename, grayscale, channels, dataType);
+	if (image->valid) {
+		return image;
+	}
+	return nullptr;
+}
+
+
+/******************************************************************************/
+/******************************************************************************/
+
+int LuaImage::meta_gc(lua_State* L)
+{
+	if (lua_isnil(L, 1))
+		return 0;
+
+	auto image = std::move(*static_cast<std::shared_ptr<LuaImageData>*>(luaL_checkudata(L, 1, "Image")));
+	image = {};
+
+	return 0;
+}
+
+
+int LuaImage::meta_tostring(lua_State* L)
+{
+	if (lua_isnil(L, 1))
+		return 0;
+
+	auto image = toimage(L, 1);
+	lua_pushstring(L, std::format("Image(\"{}\", 0x{:x})", image->filename, reinterpret_cast<intptr_t>(image)).c_str());
+
+	return 1;
+}
+
+
+int LuaImage::meta_index(lua_State* L)
+{
+	// first check if there is a function
+	luaL_getmetatable(L, "Image");
+	lua_pushvalue(L, 2);
+	lua_rawget(L, -2);
+	if (!lua_isnil(L, -1))
+		return 1;
+
+	lua_pop(L, 1);
+
+	// couldn't find a function, so check properties
+	auto image = toimage(L, 1);
+
+	if (lua_israwstring(L, 2)) {
+		switch (hashString(lua_tostring(L, 2))) {
+			case hashString("width"): {
+				lua_pushinteger(L, image->width);
+				return 1;
+			} break;
+			case hashString("height"): {
+				lua_pushinteger(L, image->height);
+				return 1;
+			} break;
+
+			case hashString("channels"): {
+				lua_pushinteger(L, image->channels);
+				return 1;
+			} break;
+
+			case hashString("format"): {
+				lua_pushinteger(L, image->bitmap->dataType);
+				return 1;
+			} break;
+
+			default: {
+			} break;
+		}
+	}
+
+	return 0;
+}
+
+
 /******************************************************************************
  *  Api
  */
 
 int LuaImage::LoadImage(lua_State* L)
 {
-	std::string filename = luaL_checkstring(L, 1);
-	bool grayscale = luaL_optboolean(L, 2, false);
-	int channels = luaL_optinteger(L, 3, 0);
-	int dataType = luaL_optinteger(L, 4, 0);
-	LuaImageData image = LuaImageData(filename, grayscale, channels, dataType);
-	if (image.valid) {
-		image.id = ++luaImage.lastIndex;
-		luaImage.images.emplace_back(std::move(image));
-		lua_pushinteger(L, image.id);
-		return 1;
-	}
-	return 0;
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto image = LoadImageObject(L);
+	if (image == nullptr)
+		return 0;
+
+	auto shPtrImagePtr = static_cast<decltype(image)*>(lua_newuserdata(L, sizeof(decltype(image))));
+	memset(shPtrImagePtr, 0, sizeof(decltype(image)));
+
+	*shPtrImagePtr = std::move(image);
+
+	luaL_getmetatable(L, "Image");
+	lua_setmetatable(L, -2);
+	return 1;
 }
 
 
 int LuaImage::DeleteImage(lua_State* L)
 {
-	const unsigned int id = luaL_checkinteger(L, 1);
-
-	const auto it = std::find_if(luaImage.images.begin(), luaImage.images.end(),
-			[&id](const LuaImageData& x) { return x.id == id;});
-
-	if (it != luaImage.images.end())
-		luaImage.images.erase(it);
-
-	return 0;
+	RECOIL_DETAILED_TRACY_ZONE;
+	return meta_gc(L);
 }
 
 
 int LuaImage::GetFormat(lua_State* L)
 {
-	const LuaImageData* image = GetLuaImageData(L);
+	const LuaImageData* image = toimage(L, 1);
 
 	lua_pushinteger(L, image->width);
 	lua_pushinteger(L, image->height);
@@ -192,7 +275,7 @@ int LuaImage::GetFormat(lua_State* L)
 
 int LuaImage::ReadPixel(lua_State* L)
 {
-	const LuaImageData* image = GetLuaImageData(L);
+	const LuaImageData* image = toimage(L, 1);
 
 	const unsigned int x = luaL_checkinteger(L, 2) - 1;
 	const unsigned int y = luaL_checkinteger(L, 3) - 1;
@@ -203,7 +286,7 @@ int LuaImage::ReadPixel(lua_State* L)
 
 int LuaImage::ReadMapPixel(lua_State* L)
 {
-	const LuaImageData* image = GetLuaImageData(L);
+	const LuaImageData* image = toimage(L, 1);
 
 	const float mapX = luaL_checknumber(L, 2);
 	const float mapY = luaL_checknumber(L, 3);
