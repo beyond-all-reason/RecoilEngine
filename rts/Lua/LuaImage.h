@@ -15,11 +15,9 @@ class CBitmap;
 class LuaImageData {
 public:
 	LuaImageData(std::string filename, int channels, int dataType, bool luminance);
-	~LuaImageData();
 
 	std::string filename;
 	bool valid;
-	unsigned int id;
 	std::shared_ptr<CBitmap> bitmap;
 	unsigned int width;
 	unsigned int height;
@@ -28,11 +26,7 @@ public:
 
 class LuaImage {
 public:
-	LuaImage() { images.reserve(8); }
-	~LuaImage();
-
-	bool Init(lua_State* L);
-	void Shutdown(lua_State* L);
+	LuaImage() { }
 
 private: // helpers
 	static bool CreateMetatable(lua_State* L);
@@ -44,9 +38,6 @@ private: // metatable methods
 
 public:
 	static bool PushEntries(lua_State* L);
-private:
-	int lastIndex = 0;
-	std::vector<LuaImageData> images;
 
 private: // call-outs
 	static int LoadImage(lua_State* L);

@@ -22,7 +22,6 @@ LuaImage luaImage;
 
 LuaImageData::LuaImageData(std::string filename, int reqChannels, int reqDataType, bool luminance) : filename(filename)
 {
-	id     = 0;
 	bitmap = std::make_shared<CBitmap>();
 	if (luminance)
 		valid = bitmap->LoadGrayscale(filename);
@@ -38,36 +37,9 @@ LuaImageData::LuaImageData(std::string filename, int reqChannels, int reqDataTyp
 }
 
 
-LuaImageData::~LuaImageData()
-{
-	// delete bitmap from array
-	id = 0;
-}
-
-
 /******************************************************************************
  * LuaImage
  ******************************************************************************/
-
-LuaImage::~LuaImage()
-{
-	// TODO clean up
-}
-
-
-bool LuaImage::Init(lua_State* L)
-{
-	lastIndex = 0;
-	images.clear();
-	return true;
-}
-
-
-void LuaImage::Shutdown(lua_State* L)
-{
-	lastIndex = 0;
-	images.clear();
-}
 
 
 bool LuaImage::PushEntries(lua_State* L)
