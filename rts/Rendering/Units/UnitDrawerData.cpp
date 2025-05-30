@@ -712,12 +712,9 @@ void CUnitDrawerData::UnitLeavesGhostChanged(const CUnit* unit, const bool leave
 		return;
 	}
 
-	if (UpdateUnitGhosts(unit, leaveDeadGhost))
+	if (UpdateUnitGhosts(unit, leaveDeadGhost)) {
 		// left ghost
 		UpdateUnitIcon(unit, false, true);
-	else {
-		// no ghost was created so ensure no dead ghost remains below the unit
-		RemoveDeadGhosts(unit);
 	}
 }
 
@@ -730,28 +727,6 @@ void CUnitDrawerData::ReviewPrevLos(const CUnit* unit)
 		if (!(unit->losStatus[allyTeam] & (LOS_INLOS | LOS_CONTRADAR))) {
 			CUnit* u = const_cast<CUnit*>(unit);
 			u->losStatus[allyTeam] &= ~LOS_PREVLOS;
-		}
-	}
-}
-
-void CUnitDrawerData::RemoveDeadGhosts(const CUnit* unit)
-{
-	const float3 pos = unit->pos;
-
-	CUnit* u = const_cast<CUnit*>(unit);
-
-	GhostSolidObject* gso = nullptr;
-	S3DModel* gsoModel = GetUnitModel(unit);
-
-	for (int allyTeam = 0; allyTeam < savedData.deadGhostBuildings.size(); ++allyTeam) {
-		auto& dgb = savedData.deadGhostBuildings[allyTeam][gsoModel->type];
-		for (int i = 0; i < dgb.size(); /*no-op*/) {
-			GhostSolidObject* gso = dgb[i];
-			if (gso->pos == pos) {
-				RemoveDeadGhost(gso, dgb, i); // swaps element with last so counter shouldn't be increased.
-			} else {
-				++i;
-			}
 		}
 	}
 }
