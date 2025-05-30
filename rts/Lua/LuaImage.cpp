@@ -63,8 +63,6 @@ bool LuaImage::CreateMetatable(lua_State* L)
 		REGISTER_LUA_CFUNC(ReadPixel);
 		REGISTER_LUA_CFUNC(ReadMapPixel);
 
-		REGISTER_LUA_CFUNC(GetFormat);
-
 	lua_pop(L, 1);
 	return true;
 }
@@ -116,7 +114,7 @@ int PushImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
 }
 
 
-std::shared_ptr<LuaImageData> LoadImageObject(lua_State* L)
+std::shared_ptr<LuaImageData> LuaImage::LoadImageObject(lua_State* L)
 {
 	std::string filename = luaL_checkstring(L, 1);
 	int channels = LuaImage::ParseFormat(L, 2);
@@ -239,18 +237,6 @@ int LuaImage::DeleteImage(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return meta_gc(L);
-}
-
-
-int LuaImage::GetFormat(lua_State* L)
-{
-	const LuaImageData* image = toimage(L, 1);
-
-	lua_pushinteger(L, image->width);
-	lua_pushinteger(L, image->height);
-	lua_pushinteger(L, image->channels);
-	lua_pushinteger(L, image->bitmap->dataType);
-	return 4;
 }
 
 

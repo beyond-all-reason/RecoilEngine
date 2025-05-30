@@ -28,6 +28,8 @@ class LuaImage {
 	public:
 		LuaImage() { }
 
+		static bool PushEntries(lua_State* L);
+
 	private: // helpers
 		static bool CreateMetatable(lua_State* L);
 
@@ -36,20 +38,20 @@ class LuaImage {
 		static int meta_index(lua_State* L);
 		static int meta_tostring(lua_State* L);
 
-	public:
-		static bool PushEntries(lua_State* L);
-
 	private: // call-outs
 		static int LoadImage(lua_State* L);
 		static int DeleteImage(lua_State* L);
+
 		static int ReadPixel(lua_State* L);
 		static int ReadMapPixel(lua_State* L);
-		static int GetFormat(lua_State* L);
-	public:
+	private:
+		static std::shared_ptr<LuaImageData> LoadImageObject(lua_State* L);
+
 		static const char* DataTypeToString(int dataType);
 		static int StringToDataType(const char* str);
 		static const char* ChannelsToFormat(int channels);
 		static int FormatToChannels(const char* format);
+
 		static int ParseFormat(lua_State* L, int index);
 		static int ParseDataType(lua_State* L, int index);
 };
