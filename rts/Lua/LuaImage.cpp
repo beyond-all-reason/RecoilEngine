@@ -20,7 +20,7 @@
 /***
  * @class Image
  * @field width integer
- * @field height interger
+ * @field height integer
  * @field size integer[]
  * @field format string
  * @field channels integer
@@ -275,10 +275,10 @@ int LuaImage::DeleteImage(lua_State* L)
  *
  * @param x integer x coordinate in pixels.
  * @param y integer y coordinate in pixels.
- * @return r number
- * @return g number?
- * @return b number?
- * @return a number?
+ * @return number r
+ * @return number? g
+ * @return number? b
+ * @return number? a
  */
 
 int LuaImage::ReadPixel(lua_State* L)
@@ -300,10 +300,10 @@ int LuaImage::ReadPixel(lua_State* L)
  *
  * @param x number x coordinate in elmos.
  * @param y number y coordinate in elmos.
- * @return r number
- * @return g number?
- * @return b number?
- * @return a number?
+ * @return number r
+ * @return number? g
+ * @return number? b
+ * @return number? a
  */
 
 
