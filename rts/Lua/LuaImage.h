@@ -14,7 +14,7 @@ class CBitmap;
 
 class LuaImageData {
 public:
-	LuaImageData(std::string filename);
+	LuaImageData(std::string filename, bool grayscale);
 	~LuaImageData();
 
 	std::string filename;
@@ -31,6 +31,9 @@ public:
 	LuaImage() { images.reserve(8); }
 	~LuaImage();
 
+	bool Init(lua_State* L);
+	void Shutdown(lua_State* L);
+
 	void Clear() { images.clear(); }
 
 	const LuaImageData* GetImage(unsigned int index);
@@ -45,7 +48,7 @@ private: // call-outs
 	static int LoadImage(lua_State* L);
 	static int DeleteImage(lua_State* L);
 	static int ReadPixel(lua_State* L);
-	static int GetSize(lua_State* L);
+	static int GetFormat(lua_State* L);
 };
 
 extern LuaImage luaImage;

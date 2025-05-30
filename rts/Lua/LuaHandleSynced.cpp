@@ -541,6 +541,8 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 		return false;
 	}
 
+	luaImage.Init(L);
+
 	lua_settop(L, 0);
 	creg::AutoRegisterCFunctions(GetName(), L);
 
