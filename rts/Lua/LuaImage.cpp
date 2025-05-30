@@ -19,12 +19,12 @@
 
 /***
  * @class Image
- * @field width
- * @field height
- * @field size
- * @field format
- * @field channels
- * @field dataType
+ * @field width integer
+ * @field height interger
+ * @field size integer[2]
+ * @field format string
+ * @field channels integer
+ * @field dataType string
  */
 
 LuaImageData::LuaImageData(std::string filename, int reqChannels, int reqDataType, bool luminance) : filename(filename)
