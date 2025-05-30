@@ -111,7 +111,7 @@ const LuaImageData* GetLuaImageData(lua_State* L)
 }
 
 
-int ReadLuaImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
+int PushImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
 {
 	if (x > image->width || y > image->height || x < 0 || y < 0)
 		return 0;
@@ -194,7 +194,7 @@ int LuaImage::ReadPixel(lua_State* L)
 	const unsigned int x = luaL_checkinteger(L, 2) - 1;
 	const unsigned int y = luaL_checkinteger(L, 3) - 1;
 
-	return ReadLuaImagePixel(L, image, x, y);
+	return PushImagePixel(L, image, x, y);
 }
 
 
@@ -211,6 +211,6 @@ int LuaImage::ReadMapPixel(lua_State* L)
 	const float x = (mapX * image->width) / mapSizeX;
 	const float y = (mapY * image->height) / mapSizeY;
 
-	return ReadLuaImagePixel(L, image, x, y);
+	return PushImagePixel(L, image, x, y);
 }
 
