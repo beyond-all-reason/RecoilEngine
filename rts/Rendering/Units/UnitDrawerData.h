@@ -64,6 +64,9 @@ public:
 	void UnitLeftLos(const CUnit* unit, int allyTeam) override;
 
 	void PlayerChanged(int playerNum) override;
+	bool UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost);
+	void UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost);
+	void ReviewPrevLos(const CUnit* unit);
 public:
 	class TempDrawUnit {
 		CR_DECLARE_STRUCT(TempDrawUnit)
@@ -185,6 +188,8 @@ private:
 
 	std::vector<UnitDefImage> unitDefImages;
 
+	S3DModel* GetUnitModel(const CUnit* unit) const;
+	void RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSolidObject*>& dgb, int index);
 
 
 	// icons
