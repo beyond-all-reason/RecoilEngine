@@ -2,6 +2,8 @@
 
 
 #include "CobThread.h"
+
+#include "CobDeferredCallin.h"
 #include "CobFile.h"
 #include "CobInstance.h"
 #include "CobEngine.h"
@@ -291,6 +293,7 @@ static constexpr int START           = 0x10061000;
 static constexpr int CALL            = 0x10062000; ///< converted when executed
 static constexpr int REAL_CALL       = 0x10062001; ///< spring custom
 static constexpr int LUA_CALL        = 0x10062002; ///< spring custom
+static constexpr int DEFER           = 0x10062004; ///< recoil custom
 static constexpr int JUMP            = 0x10064000;
 static constexpr int RETURN          = 0x10065000;
 static constexpr int JUMP_NOT_EQUAL  = 0x10066000;
@@ -305,6 +308,10 @@ static constexpr int PLAY_SOUND = 0x10072000;
 static constexpr int SET    = 0x10082000;
 static constexpr int ATTACH = 0x10083000;
 static constexpr int DROP   = 0x10084000;
+
+// Recoil custom function signatures, should be the only opcode for the function
+// and signals a reference, not an opcode to be actually executed.
+static constexpr int SIGNATURE_LUA = 0x10090000;
 
 // Indices for SET, GET, and GET_UNIT_VALUE for LUA return values
 static constexpr int LUA0 = 110; // (LUA0 returns the lua call status, 0 or 1)
@@ -332,6 +339,7 @@ static const char* GetOpcodeName(int opcode)
 	switch (opcode) {
 		case MOVE: return "move";
 		case TURN: return "turn";
+		case DEFER: return "defer";
 		case SPIN: return "spin";
 		case STOP_SPIN: return "stop-spin";
 		case SHOW: return "show";
@@ -397,6 +405,8 @@ static const char* GetOpcodeName(int opcode)
 		case SET: return "set";
 		case ATTACH: return "attach";
 		case DROP: return "drop";
+
+		case SIGNATURE_LUA: return "signature_lua";
 	}
 
 	return "unknown";
@@ -481,6 +491,15 @@ bool CCobThread::Tick()
 				r1 = GET_LONG_PC();
 			} break;
 
+			case SIGNATURE_LUA: {
+				LOG_L(L_ERROR, "BAD ACCESS: Entered a lua method reference.");
+				state = Dead;
+				return false;
+			} break;
+
+			case DEFER: {
+				DeferredCall(false);
+			} break;
 
 			case CALL: {
 				r1 = GET_LONG_PC();
@@ -913,6 +932,47 @@ void CCobThread::ShowError(const char* msg)
 }
 
 
+void CCobThread::DeferredCall(bool synced)
+{
+	auto d = CCobDeferredCallin();
+
+	const int r1 = GET_LONG_PC(); // script id
+	const int r2 = GET_LONG_PC(); // arg count
+
+	// sanity checks
+	if (!luaRules) {
+		retCode = 0;
+		return;
+	}
+
+	// check script index validity
+	if (static_cast<size_t>(r1) >= cobFile->luaScripts.size()) {
+		retCode = 0;
+		return;
+	}
+
+	// setup the parameter array
+	const int size = static_cast<int>(dataStack.size());
+	const int argCount = std::min(r2, MAX_LUA_COB_ARGS);
+	const int start = std::max(0, size - r2);
+	const int end = std::min(size, start + argCount);
+
+	for (int a = 0, i = start; i < end; i++) {
+		d.luaArgs[a++] = dataStack[i];
+	}
+
+	d.argCount = argCount;
+	d.unit = cobInst->GetUnit();
+	d.funcName = cobFile->luaScripts[r1].GetString();
+	d.funcHash = cobFile->luaScripts[r1].GetHash();
+
+	cobEngine->AddDeferredCallin(d, ThreadPool::GetThreadNum());
+
+	// always succeeds
+	retCode = 1;
+}
+
+
 void CCobThread::LuaCall()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -947,10 +1007,9 @@ void CCobThread::LuaCall()
 	}
 
 	int argsCount = argCount;
-	luaRules->Cob2Lua(cobFile->luaScripts[r1], cobInst->GetUnit(), argsCount, luaArgs);
+	luaRules->Cob2Lua(cobFile->luaScripts[r1], cobInst->GetUnit(), argsCount, luaArgs, true);
 	retCode = luaArgs[0];
 }
-
 
 void CCobThread::AnimFinished(CUnitScript::AnimType type, int piece, int axis)
 {

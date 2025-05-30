@@ -106,6 +106,7 @@ protected:
 	};
 
 	void LuaCall();
+	void DeferredCall(bool synced);
 
 	void PushCallStack(CallInfo v) { callStack.push_back(v); }
 	void PushDataStack(int v) { dataStack.push_back(v); }
