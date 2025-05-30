@@ -20,7 +20,7 @@ LuaImage luaImage;
  * LuaImageData
  ******************************************************************************/
 
-LuaImageData::LuaImageData(std::string filename, bool grayscale) : filename(filename)
+LuaImageData::LuaImageData(std::string filename) : filename(filename)
 {
 	id     = 0;
 	bitmap = std::make_shared<CBitmap>();
@@ -28,8 +28,6 @@ LuaImageData::LuaImageData(std::string filename, bool grayscale) : filename(file
 	if (bitmap->dataType != GL_UNSIGNED_BYTE && bitmap->dataType != GL_UNSIGNED_SHORT && bitmap->dataType != GL_FLOAT)
 		valid = false;
 	if (valid) {
-		if (grayscale && bitmap->channels > 1)
-			bitmap->MakeGrayScale();
 		width = bitmap->xsize;
 		height = bitmap->ysize;
 		channels = bitmap->channels;
