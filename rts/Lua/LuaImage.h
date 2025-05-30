@@ -14,7 +14,7 @@ class CBitmap;
 
 class LuaImageData {
 public:
-	LuaImageData(std::string filename);
+	LuaImageData(std::string filename, bool grayscale);
 	~LuaImageData();
 
 	std::string filename;
