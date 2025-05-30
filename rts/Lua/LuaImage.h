@@ -48,6 +48,7 @@ private: // call-outs
 	static int LoadImage(lua_State* L);
 	static int DeleteImage(lua_State* L);
 	static int ReadPixel(lua_State* L);
+	static int ReadMapPixel(lua_State* L);
 	static int GetFormat(lua_State* L);
 };
 

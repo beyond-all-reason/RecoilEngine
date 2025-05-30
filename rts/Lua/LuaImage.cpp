@@ -8,14 +8,16 @@
 
 #include "Rendering/Textures/Bitmap.h"
 #include "System/Log/ILog.h"
+#include "Map/ReadMap.h"
 
 #include "System/Misc/TracyDefs.h"
 
 
 LuaImage luaImage;
 
+
 /******************************************************************************
- * ImageData
+ * LuaImageData
  ******************************************************************************/
 
 LuaImageData::LuaImageData(std::string filename, bool grayscale) : filename(filename)
@@ -41,10 +43,10 @@ LuaImageData::~LuaImageData()
 	id = 0;
 }
 
+
 /******************************************************************************
- * Image
- * @see rts/Lua/LuaImage.cpp
-******************************************************************************/
+ * LuaImage
+ ******************************************************************************/
 
 LuaImage::~LuaImage()
 {
@@ -52,8 +54,6 @@ LuaImage::~LuaImage()
 }
 
 
-/******************************************************************************/
-/******************************************************************************/
 bool LuaImage::Init(lua_State* L)
 {
 	lastIndex = 0;
@@ -74,6 +74,7 @@ bool LuaImage::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(LoadImage);
 	REGISTER_LUA_CFUNC(DeleteImage);
 	REGISTER_LUA_CFUNC(ReadPixel);
+	REGISTER_LUA_CFUNC(ReadMapPixel);
 	REGISTER_LUA_CFUNC(GetFormat);
 
 	return true;
@@ -94,8 +95,9 @@ const LuaImageData* LuaImage::GetImage(unsigned int id)
 }
 
 
-/******************************************************************************/
-/******************************************************************************/
+/******************************************************************************
+ *  Helpers
+ */
 
 const LuaImageData* GetLuaImageData(lua_State* L)
 {
@@ -108,51 +110,9 @@ const LuaImageData* GetLuaImageData(lua_State* L)
 		
 }
 
-int LuaImage::LoadImage(lua_State* L)
+
+int ReadLuaImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
 {
-	std::string filename = luaL_checkstring(L, 1);
-	bool grayscale = luaL_optboolean(L, 2, false);
-	LuaImageData image = LuaImageData(filename, grayscale);
-	if (image.valid) {
-		image.id = ++luaImage.lastIndex;
-		luaImage.images.emplace_back(std::move(image));
-		lua_pushinteger(L, image.id);
-		return 1;
-	}
-	return 0;
-}
-
-int LuaImage::DeleteImage(lua_State* L)
-{
-	const unsigned int id = luaL_checkinteger(L, 1);
-
-	const auto it = std::find_if(luaImage.images.begin(), luaImage.images.end(),
-			[&id](const LuaImageData& x) { return x.id == id;});
-
-	if (it != luaImage.images.end())
-		luaImage.images.erase(it);
-
-	return 0;
-}
-
-int LuaImage::GetFormat(lua_State* L)
-{
-	const LuaImageData* image = GetLuaImageData(L);
-
-	lua_pushinteger(L, image->width);
-	lua_pushinteger(L, image->height);
-	lua_pushinteger(L, image->channels);
-	lua_pushinteger(L, image->bitmap->dataType);
-	return 4;
-}
-
-int LuaImage::ReadPixel(lua_State* L)
-{
-	const LuaImageData* image = GetLuaImageData(L);
-
-	const unsigned int x = luaL_checkinteger(L, 2) - 1;
-	const unsigned int y = luaL_checkinteger(L, 3) - 1;
-
 	if (x > image->width || y > image->height || x < 0 || y < 0)
 		return 0;
 
@@ -179,5 +139,78 @@ int LuaImage::ReadPixel(lua_State* L)
 		} break;
 	}
 	return image->channels;
+}
+
+
+/******************************************************************************
+ *  Api
+ */
+
+int LuaImage::LoadImage(lua_State* L)
+{
+	std::string filename = luaL_checkstring(L, 1);
+	bool grayscale = luaL_optboolean(L, 2, false);
+	LuaImageData image = LuaImageData(filename, grayscale);
+	if (image.valid) {
+		image.id = ++luaImage.lastIndex;
+		luaImage.images.emplace_back(std::move(image));
+		lua_pushinteger(L, image.id);
+		return 1;
+	}
+	return 0;
+}
+
+
+int LuaImage::DeleteImage(lua_State* L)
+{
+	const unsigned int id = luaL_checkinteger(L, 1);
+
+	const auto it = std::find_if(luaImage.images.begin(), luaImage.images.end(),
+			[&id](const LuaImageData& x) { return x.id == id;});
+
+	if (it != luaImage.images.end())
+		luaImage.images.erase(it);
+
+	return 0;
+}
+
+
+int LuaImage::GetFormat(lua_State* L)
+{
+	const LuaImageData* image = GetLuaImageData(L);
+
+	lua_pushinteger(L, image->width);
+	lua_pushinteger(L, image->height);
+	lua_pushinteger(L, image->channels);
+	lua_pushinteger(L, image->bitmap->dataType);
+	return 4;
+}
+
+
+int LuaImage::ReadPixel(lua_State* L)
+{
+	const LuaImageData* image = GetLuaImageData(L);
+
+	const unsigned int x = luaL_checkinteger(L, 2) - 1;
+	const unsigned int y = luaL_checkinteger(L, 3) - 1;
+
+	return ReadLuaImagePixel(L, image, x, y);
+}
+
+
+int LuaImage::ReadMapPixel(lua_State* L)
+{
+	const LuaImageData* image = GetLuaImageData(L);
+
+	const float mapX = luaL_checknumber(L, 2);
+	const float mapY = luaL_checknumber(L, 3);
+
+	const float mapSizeX = mapDims.mapx * SQUARE_SIZE;
+	const float mapSizeY = mapDims.mapy * SQUARE_SIZE;
+
+	const float x = (mapX * image->width) / mapSizeX;
+	const float y = (mapY * image->height) / mapSizeY;
+
+	return ReadLuaImagePixel(L, image, x, y);
 }
 
