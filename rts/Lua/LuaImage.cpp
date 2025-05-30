@@ -20,11 +20,11 @@ LuaImage luaImage;
  * LuaImageData
  ******************************************************************************/
 
-LuaImageData::LuaImageData(std::string filename, bool grayscale, int reqChannels, int reqDataType) : filename(filename)
+LuaImageData::LuaImageData(std::string filename, int reqChannels, int reqDataType, bool luminance) : filename(filename)
 {
 	id     = 0;
 	bitmap = std::make_shared<CBitmap>();
-	if (grayscale)
+	if (luminance)
 		valid = bitmap->LoadGrayscale(filename);
 	else
 		valid = bitmap->Load(filename, 1.0f, reqChannels, reqDataType);
@@ -150,10 +150,10 @@ int PushImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
 std::shared_ptr<LuaImageData> LoadImageObject(lua_State* L)
 {
 	std::string filename = luaL_checkstring(L, 1);
-	bool grayscale = luaL_optboolean(L, 2, false);
-	int channels = LuaImage::ParseFormat(L, 3);
-	int dataType = LuaImage::ParseDataType(L, 4);
-	auto image = make_shared<LuaImageData>(filename, grayscale, channels, dataType);
+	int channels = LuaImage::ParseFormat(L, 2);
+	int dataType = LuaImage::ParseDataType(L, 3);
+	bool luminance = luaL_optboolean(L, 4, false);
+	auto image = make_shared<LuaImageData>(filename, channels, dataType, luminance);
 	if (image->valid) {
 		return image;
 	}
@@ -212,6 +212,12 @@ int LuaImage::meta_index(lua_State* L)
 			case hashString("height"): {
 				lua_pushinteger(L, image->height);
 				return 1;
+			} break;
+
+			case hashString("size"): {
+				lua_pushinteger(L, image->width);
+				lua_pushinteger(L, image->height);
+				return 2;
 			} break;
 
 			case hashString("channels"): {
