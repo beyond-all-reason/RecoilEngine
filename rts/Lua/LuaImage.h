@@ -54,6 +54,4 @@ class LuaImage {
 		static int ParseDataType(lua_State* L, int index);
 };
 
-extern LuaImage luaImage;
-
 #endif /* LUA_IMAGE_H */
