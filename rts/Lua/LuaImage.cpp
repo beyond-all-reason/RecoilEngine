@@ -4,24 +4,13 @@
 #include "LuaImage.h"
 
 #include "LuaInclude.h"
-
-#include "LuaHandle.h"
-#include "LuaHashString.h"
 #include "LuaUtils.h"
 
-#include "LuaOpenGL.h"
-#include "LuaRBOs.h"
-#include "LuaTextures.h"
-
+#include "Rendering/Textures/Bitmap.h"
 #include "System/Log/ILog.h"
-#include "System/Exceptions.h"
-#include "fmt/format.h"
 
 #include "System/Misc/TracyDefs.h"
-#include "Rendering/GL/FBO.h"
-#include "Rendering/GlobalRendering.h"
 
-#include "Rendering/Textures/Bitmap.h"
 
 LuaImage luaImage;
 
