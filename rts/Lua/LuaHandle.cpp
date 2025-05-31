@@ -30,6 +30,8 @@
 #include "Sim/Projectiles/Projectile.h"
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectile.h"
 #include "Sim/Features/FeatureDef.h"
+#include "Sim/Units/Scripts/CobDeferredCallin.h"
+#include "Sim/Units/Scripts/CobInstance.h" // for UNPACK{X,Z}
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Weapons/Weapon.h"
@@ -69,6 +71,8 @@ static spring::unsynced_set<const luaContextData*>  UNSYNCED_LUAHANDLE_CONTEXTS;
 const  spring::unsynced_set<const luaContextData*>*          LUAHANDLE_CONTEXTS[2] = {&UNSYNCED_LUAHANDLE_CONTEXTS, &SYNCED_LUAHANDLE_CONTEXTS};
 
 bool CLuaHandle::devMode = false;
+
+const int* CLuaHandle::currentCobArgs = nullptr;
 
 /***
  * @class Callins
@@ -146,6 +150,8 @@ CLuaHandle::CLuaHandle(const string& _name, int _order, bool _userMode, bool _sy
 	D.gcCtrl.baseMemLoadMult = configHandler->GetFloat("LuaGarbageCollectionMemLoadMult");
 	D.gcCtrl.baseRunTimeMult = configHandler->GetFloat("LuaGarbageCollectionRunTimeMult");
 
+	currentCobArgs = nullptr;
+
 	L = LUA_OPEN(&D);
 	L_GC = lua_newthread(L);
 
@@ -172,6 +178,9 @@ CLuaHandle::CLuaHandle(const string& _name, int _order, bool _userMode, bool _sy
 CLuaHandle::~CLuaHandle()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	currentCobArgs = nullptr;
+
 	// KillLua() must be called before us!
 	assert(!IsValid());
 	assert(!eventHandler.HasClient(this));
@@ -4249,6 +4258,171 @@ int CLuaHandle::CallOutUpdateCallIn(lua_State* L)
 void CLuaHandle::InitializeRmlUi()
 {
 	rmlui = RmlGui::InitializeLua(L);
+}
+
+
+/******************************************************************************/
+/******************************************************************************/
+
+int CLuaHandle::UnpackCobArg(lua_State* L)
+{
+	if (currentCobArgs == nullptr) {
+		luaL_error(L, "Error in UnpackCobArg(), no current args");
+	}
+	const int arg = luaL_checkint(L, 1) - 1;
+	if ((arg < 0) || (arg >= MAX_LUA_COB_ARGS)) {
+		luaL_error(L, "Error in UnpackCobArg(), bad index");
+	}
+	const int value = currentCobArgs[arg];
+	lua_pushnumber(L, UNPACKX(value));
+	lua_pushnumber(L, UNPACKZ(value));
+	return 2;
+}
+
+
+void CLuaHandle::Cob2Lua(const LuaHashString& name, const CUnit* unit,
+                        int& argsCount, int args[MAX_LUA_COB_ARGS])
+{
+	const bool synced = GetHandleSynced(L);
+	static int callDepth = 0;
+	if (callDepth >= 16) {
+		LOG_L(L_WARNING, "[%s::%s] call overflow: %s", GetName().c_str(), __func__, name.GetString());
+		args[0] = 0; // failure
+		return;
+	}
+
+	if (!synced && !LuaUtils::IsUnitInLos(L, unit))
+		return;
+
+	LUA_CALL_IN_CHECK(L);
+
+	const int top = lua_gettop(L);
+
+	if (!lua_checkstack(L, 1 + 3 + argsCount)) {
+		if (synced)
+			LOG_L(L_WARNING, "[%s::%s] lua_checkstack() error: %s", GetName().c_str(),  __func__, name.GetString());
+		args[0] = 0; // failure
+		lua_settop(L, top);
+		return;
+	}
+
+	if (!name.GetGlobalFunc(L)) {
+		if (synced)
+			LOG_L(L_WARNING, "[%s::%s] missing function: %s", GetName().c_str(), __func__, name.GetString());
+		args[0] = 0; // failure
+		lua_settop(L, top);
+		return;
+	}
+
+	lua_pushnumber(L, unit->id);
+	lua_pushnumber(L, unit->unitDef->id);
+	lua_pushnumber(L, unit->team);
+	for (int a = 0; a < argsCount; a++) {
+		lua_pushnumber(L, args[a]);
+	}
+
+	// call the routine
+	callDepth++;
+	const int* oldArgs = currentCobArgs;
+	currentCobArgs = args;
+
+	const bool error = !RunCallIn(L, name, 3 + argsCount, LUA_MULTRET);
+
+	currentCobArgs = oldArgs;
+	callDepth--;
+
+	// bail on error
+	if (error) {
+		args[0] = 0; // failure
+		lua_settop(L, top);
+		return;
+	}
+
+	// get the results
+	const int retArgs = std::min(lua_gettop(L) - top, (MAX_LUA_COB_ARGS - 1));
+	for (int a = 1; a <= retArgs; a++) {
+		const int index = (a + top);
+		if (lua_isnumber(L, index)) {
+			args[a] = lua_toint(L, index);
+		}
+		else if (lua_isboolean(L, index)) {
+			args[a] = lua_toboolean(L, index) ? 1 : 0;
+		}
+		else if (lua_istable(L, index)) {
+			lua_rawgeti(L, index, 1);
+			lua_rawgeti(L, index, 2);
+			if (lua_isnumber(L, -2) && lua_isnumber(L, -1)) {
+				const int x = lua_toint(L, -2);
+				const int z = lua_toint(L, -1);
+				args[a] = PACKXZ(x, z);
+			} else {
+				args[a] = 0;
+			}
+			lua_pop(L, 2);
+		}
+		else {
+			args[a] = 0;
+		}
+	}
+
+	args[0] = 1; // success
+	lua_settop(L, top);
+}
+
+
+void CLuaHandle::Cob2LuaBatch(const LuaHashString& name, std::vector<CCobDeferredCallin>& callins)
+{
+	const bool synced = GetHandleSynced(L);
+	static int callDepth = 0;
+	if (callDepth >= 16) {
+		LOG_L(L_WARNING, "[%s::%s] call overflow: %s", GetName().c_str(), __func__, name.GetString());
+		return;
+	}
+
+	LUA_CALL_IN_CHECK(L);
+
+	const int top = lua_gettop(L);
+	int argsCount = 0;
+
+	if (!lua_checkstack(L, 1 + 3 + argsCount)) {
+		LOG_L(L_WARNING, "[%s::%s] lua_checkstack() error: %s", GetName().c_str(), __func__, name.GetString());
+		lua_settop(L, top);
+		return;
+	}
+
+	if (!name.GetGlobalFunc(L)) {
+		LOG_L(L_WARNING, "[%s::%s] missing function: %s", GetName().c_str(), __func__, name.GetString());
+		lua_settop(L, top);
+		return;
+	}
+
+	// count can be smaller because of LOS when unsynced
+	lua_createtable(L, callins.size(), 0);
+
+	int i = 0;
+	for(auto& callin: callins) {
+		// TODO check if unit still alive
+		if (!synced && !LuaUtils::IsUnitInLos(L, callin.unit))
+			continue;
+
+		lua_createtable(L, callin.argCount+1, 0);
+
+		for (int a = 0; a < callin.argCount; a++) {
+			lua_pushnumber(L, callin.luaArgs[a]);
+			lua_rawseti(L, -2, a + 1);
+		}
+
+		lua_rawseti(L, -2, ++i);
+	}
+
+	// call the routine
+	callDepth++;
+
+	const bool error = !RunCallIn(L, name, 1 + argsCount, LUA_MULTRET);
+
+	callDepth--;
+
+	lua_settop(L, top);
 }
 
 /******************************************************************************/

@@ -26,6 +26,7 @@
 #define LUA_HANDLE_ORDER_INTRO           3000
 #define LUA_HANDLE_ORDER_MENU            4000
 
+#define MAX_LUA_COB_ARGS 10
 
 class CUnit;
 class CWeapon;
@@ -43,6 +44,7 @@ class LuaTextures;
 class LuaShaders;
 class CLuaDisplayLists;
 class CLuaRules;
+class CCobDeferredCallin;
 
 
 class CLuaHandle : public CEventClient
@@ -295,9 +297,19 @@ class CLuaHandle : public CEventClient
 		bool GotChatMsg(const std::string& msg, int playerID);
 		bool RecvLuaMsg(const std::string& msg, int playerID);
 
-	public: // custom call-in  (inter-script calls)
+	public:
+		// custom call-in  (inter-script calls)
 		bool HasXCall(const std::string& funcName) const { return HasCallIn(L, funcName); }
 		int XCall(lua_State* srcState, const char* funcName);
+
+		// cob callins
+		void Cob2Lua(const LuaHashString& funcName, const CUnit* unit,
+			     int& argsCount, int args[MAX_LUA_COB_ARGS]);
+
+		void Cob2LuaBatch(const LuaHashString& name, std::vector<CCobDeferredCallin>& callins);
+
+	private:
+		static const int* currentCobArgs;
 
 	protected:
 		CLuaHandle(const std::string& name, int order, bool userMode, bool synced);
@@ -327,6 +339,8 @@ class CLuaHandle : public CEventClient
 
 		void DrawObjectsLua(std::initializer_list<bool> bools, const char* func);
 		void InitializeRmlUi();
+
+		int UnpackCobArg(lua_State* L);
 	protected:
 		bool rmlui = false;
 		bool userMode = false;
