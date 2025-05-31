@@ -243,8 +243,8 @@ int LuaImage::LoadImage(lua_State* L)
 	if (image == nullptr)
 		return 0;
 
-	auto shPtrImagePtr = static_cast<decltype(image)*>(lua_newuserdata(L, sizeof(decltype(image))));
-	memset(shPtrImagePtr, 0, sizeof(decltype(image)));
+	auto shPtrImagePtr = static_cast<decltype(image)*>(lua_newuserdata(L, sizeof(image)));
+	memset(shPtrImagePtr, 0, sizeof(image));
 
 	*shPtrImagePtr = std::move(image);
 
