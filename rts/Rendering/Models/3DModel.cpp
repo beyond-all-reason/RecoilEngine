@@ -18,7 +18,7 @@
 
 #include "System/Misc/TracyDefs.h"
 
-CR_BIND(LocalModelPiece, (nullptr))
+CR_BIND(LocalModelPiece, )
 CR_REG_METADATA(LocalModelPiece, (
 	CR_MEMBER(pos),
 	CR_MEMBER(rot),
@@ -449,7 +449,7 @@ LocalModelPiece::LocalModelPiece(const S3DModelPiece* piece)
 	assert(piece != nullptr);
 
 	pos = piece->offset;
-	dir = piece->GetEmitDir(); // warning investigated, seems fake
+	dir = piece->GetEmitDir();
 
 	pieceSpaceMat = CalcPieceSpaceMatrix(pos, rot, original->scales);
 
