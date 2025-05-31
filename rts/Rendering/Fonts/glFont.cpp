@@ -30,6 +30,7 @@ CONFIG(int,      FontOutlineWidth).defaultValue(2).description("Sets the width o
 CONFIG(int, SmallFontOutlineWidth).defaultValue(2).description("see FontOutlineWidth");
 CONFIG(float,      FontOutlineWeight).defaultValue(25.0f).description("Sets the opacity of Spring engine text, such as the title screen version number, clock, and basic UI. Does not affect LuaUI elements.");
 CONFIG(float, SmallFontOutlineWeight).defaultValue(10.0f).description("see FontOutlineWeight");
+CONFIG(bool, TextUseNewColorIndicators).defaultValue(false).description("Old color indicators don't allow writing some characters.");
 
 std::shared_ptr<CglFont> font = nullptr;
 std::shared_ptr<CglFont> smallFont = nullptr;
@@ -233,9 +234,17 @@ static inline int SkipColorCodes(const spring::u8string& text, int idx)
 	while (idx < text.size()) {
 		switch (text[idx])
 		{
+		case CglFont::OldColorCodeIndicator:
+			if (FtLibraryHandlerProxy::UseNewColorIndicators())
+				break;
+			[[fallthrough]];
 		case CglFont::ColorCodeIndicator: {
 			idx += 3 + 1; // RGB
 		} continue;
+		case CglFont::OldColorCodeIndicatorEx:
+			if (FtLibraryHandlerProxy::UseNewColorIndicators())
+				break;
+			[[fallthrough]];
 		case CglFont::ColorCodeIndicatorEx: {
 			idx += 2 * 4 + 1; // RGBA,RGBA
 		} continue;
@@ -258,6 +267,14 @@ bool CglFont::SkipColorCodesAndNewLines(const spring::u8string& text, int& curIn
 	char32_t nextChar = 0;
 	for (int end = static_cast<int>(text.length()); idx < end; ) {
 		switch (nextChar = utf8::GetNextChar(text, idx, false/*do not advance*/)) {
+			case CglFont::OldColorCodeIndicator:
+				if (FtLibraryHandlerProxy::UseNewColorIndicators()) {
+					// same as default case
+					curIndex = idx;
+					numLines = nls;
+					return false;
+				}
+				[[fallthrough]];
 			case CglFont::ColorCodeIndicator: {
 				if ((idx += 3 + 1) < end) {
 					const float4 newTextColor = { text[idx - 3] / 255.0f, text[idx - 2] / 255.0f, text[idx - 1] / 255.0f, 1.0f };
@@ -267,6 +284,14 @@ bool CglFont::SkipColorCodesAndNewLines(const spring::u8string& text, int& curIn
 						SetTextColor(&newTextColor);
 				}
 			} break;
+			case CglFont::OldColorCodeIndicatorEx:
+				if (FtLibraryHandlerProxy::UseNewColorIndicators()) {
+					// same as default case
+					curIndex = idx;
+					numLines = nls;
+					return false;
+				}
+				[[fallthrough]];
 			case CglFont::ColorCodeIndicatorEx: {
 				if ((idx += 4 * 2 + 1) < end) {
 					const float4 newTextColor = { text[idx - 8] / 255.0f, text[idx - 7] / 255.0f, text[idx - 6] / 255.0f, text[idx - 5] / 255.0f };
@@ -364,6 +389,15 @@ float CglFont::GetTextWidth_(const spring::u8string& text)
 				prvGlyphPtr = nullptr;
 			} break;
 
+			case OldColorCodeIndicatorEx: [[fallthrough]];
+			case OldColorCodeIndicator: {
+				if (!FtLibraryHandlerProxy::UseNewColorIndicators()) {
+					idx = SkipColorCodes(text, idx - 1);
+					break;
+				}
+				[[fallthrough]];
+			}
+
 			// printable char
 			default: {
 				curGlyphPtr = &GetGlyph(curGlyphIdx);
@@ -430,6 +464,15 @@ float CglFont::GetTextHeight_(const spring::u8string& text, float* descender, in
 				d = GetLineHeight() + GetDescender();
 			} break;
 
+			case OldColorCodeIndicatorEx: [[fallthrough]];
+			case OldColorCodeIndicator: {
+				if (!FtLibraryHandlerProxy::UseNewColorIndicators()) {
+					idx = SkipColorCodes(text, idx - 1);
+					break;
+				}
+				[[fallthrough]];
+			}
+
 			// printable char
 			default: {
 				const GlyphInfo& g = GetGlyph(u);
@@ -477,6 +520,15 @@ void CglFont::ScanForWantedGlyphs(const spring::u8string& ustr)
 			// LF
 		} break;
 
+		case OldColorCodeIndicatorEx: [[fallthrough]];
+		case OldColorCodeIndicator: {
+			if (!FtLibraryHandlerProxy::UseNewColorIndicators()) {
+				idx = SkipColorCodes(ustr, idx - 1);
+				break;
+			}
+			[[fallthrough]];
+		}
+
 			// printable char
 		default: {
 			const GlyphInfo& curGlyph = GetGlyph(nextChar);
@@ -506,6 +558,14 @@ std::deque<std::string> CglFont::SplitIntoLines(const spring::u8string& text)
 
 		switch (c) {
 			// inlined colorcode; push to stack if [I,R,G,B] is followed by more text
+			case OldColorCodeIndicator: {
+				if (FtLibraryHandlerProxy::UseNewColorIndicators()) {
+					// same as 'default' case
+					lines.back() += c;
+					break;
+				}
+				[[fallthrough]];
+			}
 			case ColorCodeIndicator: {
 				if ((idx + 3 + 1) < end) {
 					colorCodeStack.emplace_back(text.substr(idx, 4));
@@ -516,6 +576,14 @@ std::deque<std::string> CglFont::SplitIntoLines(const spring::u8string& text)
 					idx += 4;
 				}
 			} break;
+			case OldColorCodeIndicatorEx: {
+				if (FtLibraryHandlerProxy::UseNewColorIndicators()) {
+					// same as 'default' case
+					lines.back() += c;
+					break;
+				}
+				[[fallthrough]];
+			}
 			// inlined colorcodeEx; push to stack if [I,R,G,B,A,R,G,B,A] is followed by more text
 			case ColorCodeIndicatorEx: {
 				if ((idx + 4 * 2 + 1) < end) {
@@ -921,6 +989,14 @@ void CglFont::glPrintTable(float x, float y, float s, const int options, const s
 		const unsigned char& c = text[pos];
 
 		switch (c) {
+			case OldColorCodeIndicator: {
+				if (FtLibraryHandlerProxy::UseNewColorIndicators()) {
+					// same as 'default' case
+					colLines[col] += c;
+					break;
+				}
+				[[fallthrough]];
+			}
 			// inline colorcodes
 			case ColorCodeIndicator: {
 				for (int i = 0; i < 4 && pos < text.length(); ++i, ++pos) {
@@ -930,6 +1006,14 @@ void CglFont::glPrintTable(float x, float y, float s, const int options, const s
 				colColor[col] = curColor;
 				pos -= 1;
 			} break;
+			case OldColorCodeIndicatorEx: {
+				if (FtLibraryHandlerProxy::UseNewColorIndicators()) {
+					// same as 'default' case
+					colLines[col] += c;
+					break;
+				}
+				[[fallthrough]];
+			}
 			case ColorCodeIndicatorEx: {
 				assert(false); //not implemented
 			} break;
