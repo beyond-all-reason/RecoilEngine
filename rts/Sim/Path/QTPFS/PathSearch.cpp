@@ -1135,7 +1135,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 				if (!bwdPathConnected && !expectIncompletePartialSearch) {
 					haveFullPath = havePartPath = false;
 					rejectPartialSearch = true;
-					// LOG("%s: rejecting partial path 2 (search %x)", __func__, this->GetID());
+					// LOG("%s: rejecting partial path 2 (search %x) bwdNodesSearched=%d", __func__, this->GetID(), int(bwdNodesSearched));
 					return false;
 				}
 
@@ -1443,11 +1443,6 @@ void QTPFS::PathSearch::IterateNodeNeighbors(const INode* curNode, unsigned int 
 		// Don't process the node we just came from. We can't improve on the route by doubling back on ourselves.
 		if (curSearchNode->GetPrevNode() == nextSearchNode)
 			continue;
-
-		// Forbid the reverse search from trampling on it's preloaded nodes.
-		if ( (searchDir == SearchThreadData::SEARCH_BACKWARD) && (nextSearchNode->GetStepIndex() > 0) ) {
-			continue;
-		}
 
 		// if (disallowNodeRevisit) {
 		// 	bool alreadyVisited = (nextSearchNode->GetPathCost(NODE_PATH_COST_G) != QTPFS_POSITIVE_INFINITY);
