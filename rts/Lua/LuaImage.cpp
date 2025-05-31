@@ -129,7 +129,7 @@ int PushImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
 }
 
 
-int ReadPixelsRaw(lua_State* L, const LuaImageData* image, int startX, int startY, int endX, int endY, int index)
+int ReadPixelsRaw(lua_State* L, const LuaImageData* image, int startX, int startY, int endX, int endY, int index, bool mapCoord)
 {
 	if (startX > image->width || startY > image->height || startX < 0 || startY < 0)
 		return 0;
@@ -140,18 +140,30 @@ int ReadPixelsRaw(lua_State* L, const LuaImageData* image, int startX, int start
 	if (!lua_isfunction(L, index))
 		return 0;
 
+	const float mapFactorX = (mapDims.mapx * SQUARE_SIZE) / image->width;
+	const float mapFactorY = (mapDims.mapy * SQUARE_SIZE) / image->height;
+
+	const int nArgs = image->channels + 2;
 	for (int y=startY; y < endY; ++y) {
 		int linepos = y * image->width;
 		for (int x=startX; x < endX; ++x) {
 			int pixelCoords = (x + linepos) * image->channels;
 			lua_pushvalue(L, index);
+			if (mapCoord) {
+				// TODO probably send the pixel center instead
+				lua_pushnumber(L, x*mapFactorX);
+				lua_pushnumber(L, y*mapFactorY);
+			} else {
+				lua_pushinteger(L, x);
+				lua_pushinteger(L, y);
+			}
 			switch (image->bitmap->dataType) {
 				case GL_UNSIGNED_BYTE: {
 					const uint8_t* data = image->bitmap->GetRawMem() + pixelCoords;
 					for (int i=0; i < image->channels; ++i) {
 						lua_pushinteger(L, data[i]);
 					}
-					if (lua_pcall(L, image->channels, 0, 0)) {
+					if (lua_pcall(L, nArgs, 0, 0)) {
 						luaL_error(L, "ReadPixelsRaw failed");
 					}
 				} break;
@@ -160,7 +172,7 @@ int ReadPixelsRaw(lua_State* L, const LuaImageData* image, int startX, int start
 					for (int i=0; i < image->channels; ++i) {
 						lua_pushinteger(L, data[i]);
 					}
-					if (lua_pcall(L, image->channels, 0, 0)) {
+					if (lua_pcall(L, nArgs, 0, 0)) {
 						luaL_error(L, "ReadPixelsRaw failed");
 					}
 				} break;
@@ -169,7 +181,7 @@ int ReadPixelsRaw(lua_State* L, const LuaImageData* image, int startX, int start
 					for (int i=0; i < image->channels; ++i) {
 						lua_pushnumber(L, data[i]);
 					}
-					if (lua_pcall(L, image->channels, 0, 0)) {
+					if (lua_pcall(L, nArgs, 0, 0)) {
 						luaL_error(L, "ReadPixelsRaw failed");
 					}
 				} break;
@@ -411,7 +423,7 @@ int LuaImage::ReadPixels(lua_State* L)
 	const unsigned int width = luaL_checkinteger(L, 4);
 	const unsigned int height = luaL_checkinteger(L, 5);
 
-	return ReadPixelsRaw(L, image, x, y, x + width, y + height, 6);
+	return ReadPixelsRaw(L, image, x, y, x + width, y + height, 6, false);
 }
 
 /*** Reads pixels from a map rect
@@ -449,7 +461,7 @@ int LuaImage::ReadMapPixels(lua_State* L)
 	const float width = (mapX * image->width) / mapSizeX;
 	const float height = (mapY * image->height) / mapSizeY;
 
-	return ReadPixelsRaw(L, image, x, y, x + width, y + height, 6);
+	return ReadPixelsRaw(L, image, x, y, x + width, y + height, 6, true);
 }
 
 
