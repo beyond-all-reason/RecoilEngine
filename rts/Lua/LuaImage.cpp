@@ -12,6 +12,9 @@
 
 #include "System/Misc/TracyDefs.h"
 
+#ifdef LoadImage // windows defines this and messes up our LoadImage.
+#undef LoadImage
+#endif
 
 /******************************************************************************
  * LuaImageData
