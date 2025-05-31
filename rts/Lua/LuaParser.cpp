@@ -14,6 +14,7 @@
 
 #include "LuaConstGame.h"
 #include "LuaConstEngine.h"
+#include "LuaEncoding.h"
 #include "LuaIO.h"
 #include "LuaVFS.h"
 #include "LuaUtils.h"
@@ -157,6 +158,10 @@ void LuaParser::SetupEnv(bool isSyncedCtxt, bool isDefsParser)
 	AddFunc("Echo", LuaUtils::Echo);
 	AddFunc("Log", LuaUtils::Log);
 	AddFunc("TimeCheck", TimeCheck);
+	EndTable();
+
+	GetTable("Encoding");
+	LuaEncoding::PushEntries(L);
 	EndTable();
 
 	GetTable("Script");

@@ -308,6 +308,7 @@ class CLuaHandle : public CEventClient
 		static void PushTracebackFuncToRegistry(lua_State* L);
 
 		bool AddBasicCalls(lua_State* L);
+		bool AddCommonModules(lua_State* L);
 		bool LoadCode(lua_State* L, std::string code, const std::string& debug);
 		static bool AddEntriesToTable(lua_State* L, const char* name, bool (*entriesFunc)(lua_State*));
 
