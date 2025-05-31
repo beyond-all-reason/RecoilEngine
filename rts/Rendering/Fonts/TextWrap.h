@@ -10,7 +10,6 @@
 #include "ustring.h"
 #include "System/Color.h"
 
-
 class CTextWrap : public CFontTexture
 {
 public:
@@ -20,8 +19,12 @@ public:
 
 	static constexpr float MAX_HEIGHT_DEFAULT = 1e3;
 
-	static constexpr const char8_t ColorCodeIndicator = 0xFF;
-	static constexpr const char8_t ColorResetIndicator = 0x08; //! =: '\\b'
+	static constexpr char8_t OldColorCodeIndicator   = 0xFF; // ÿ
+	static constexpr char8_t OldColorCodeIndicatorEx = 0xFE; // þ
+	static constexpr char8_t ColorCodeIndicator   = 0x11; // dc1
+	static constexpr char8_t ColorCodeIndicatorEx = 0x12; // dc2
+	static constexpr char8_t ColorResetIndicator  = 0x08; // =: '\\b'
+
 protected:
 	CTextWrap(const std::string& fontfile, int size, int outlinesize, float  outlineweight);
 	virtual ~CTextWrap() {}
@@ -41,7 +44,7 @@ private:
 			if (resetColor) {
 				out = ColorResetIndicator;
 			} else {
-				out = ColorCodeIndicator;
+				out = FtLibraryHandlerProxy::UseNewColorIndicators() ? ColorCodeIndicator : OldColorCodeIndicator;
 				out += color.r;
 				out += color.g;
 				out += color.b;

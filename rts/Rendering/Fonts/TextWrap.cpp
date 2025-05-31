@@ -39,7 +39,8 @@ static inline int SkipColorCodes(const spring::u8string& text, T* pos, SColor* c
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	int colorFound = 0;
-	while (text[(*pos)] == CTextWrap::ColorCodeIndicator) {
+	const char8_t colorIndicator = FtLibraryHandlerProxy::UseNewColorIndicators() ? CTextWrap::ColorCodeIndicator : CTextWrap::OldColorCodeIndicator;
+	while (text[(*pos)] == colorIndicator) {
 		(*pos) += 4;
 		if ((*pos) >= text.size()) {
 			return -(1 + colorFound);

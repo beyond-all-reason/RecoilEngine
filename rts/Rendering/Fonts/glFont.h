@@ -106,10 +106,6 @@ public:
 	const std::string& GetFilePath() const { return fontPath; }
 
 	void GetStats(std::array<size_t, 8>& stats) const;
-
-	static constexpr char8_t ColorCodeIndicator   = 0xFF;
-	static constexpr char8_t ColorCodeIndicatorEx = 0xFE;
-	static constexpr char8_t ColorResetIndicator  = 0x08; // =: '\\b'
 private:
 	static const float4* ChooseOutlineColor(const float4& textColor);
 
