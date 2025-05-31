@@ -38,8 +38,10 @@ class LuaImage {
 		static int meta_index(lua_State* L);
 		static int meta_tostring(lua_State* L);
 
-	private: // call-outs
+	public:
 		static int LoadImage(lua_State* L);
+
+	private: // call-outs
 		static int DeleteImage(lua_State* L);
 
 		static int ReadPixel(lua_State* L);
