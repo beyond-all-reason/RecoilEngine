@@ -329,9 +329,9 @@ bool LuaConstGame::PushEntries(lua_State* L)
 
 		lua_pushliteral(L, "textColorCodes");
 		lua_createtable(L, 0, 3);
-				LuaPushNamedChar(L, "Color"          , static_cast<char>(newIndicators ? CglFont::ColorCodeIndicator : CglFont::OldColorCodeIndicator)  );
-				LuaPushNamedChar(L, "ColorAndOutline", static_cast<char>(newIndicators ? CglFont::ColorCodeIndicatorEx : CglFont::OldColorCodeIndicatorEx));
-				LuaPushNamedChar(L, "Reset"          , static_cast<char>(CglFont::ColorResetIndicator) );
+			LuaPushNamedChar(L, "Color"          , static_cast<char>(newIndicators ? CglFont::ColorCodeIndicator : CglFont::OldColorCodeIndicator)  );
+			LuaPushNamedChar(L, "ColorAndOutline", static_cast<char>(newIndicators ? CglFont::ColorCodeIndicatorEx : CglFont::OldColorCodeIndicatorEx));
+			LuaPushNamedChar(L, "Reset"          , static_cast<char>(CglFont::ColorResetIndicator) );
 		lua_rawset(L, -3);
 	}
 
