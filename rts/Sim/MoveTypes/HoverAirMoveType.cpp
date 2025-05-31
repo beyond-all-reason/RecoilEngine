@@ -793,7 +793,7 @@ void CHoverAirMoveType::UpdateVerticalSpeed(const float4& spd, float curRelHeigh
 }
 
 
-void CHoverAirMoveType::UpdateAirPhysics()
+bool CHoverAirMoveType::UpdateAirPhysics()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const float3& pos = owner->pos;
@@ -827,13 +827,17 @@ void CHoverAirMoveType::UpdateAirPhysics()
 	// between model and ground)
 	// note: unlike StrafeAirMoveType, UpdateTakeoff and UpdateLanding call
 	// UpdateAirPhysics() so we ignore terrain while we are in those states
+	bool crashed = false;
 	if (modInfo.allowAircraftToHitGround) {
 		const bool cpGroundContact = (cpGroundHeight > ownerMinHeight);
 		const bool bpGroundContact = (bpGroundHeight > ownerMinHeight);
 		const bool   handleContact = (aircraftState != AIRCRAFT_LANDED && aircraftState != AIRCRAFT_TAKEOFF);
 
-		// hard avoidance in case soft constraint fails
-		if (cpGroundContact && handleContact)
+		if (cpGroundContact && aircraftState == AIRCRAFT_CRASHING)
+			// avoid moving up since explosion would look a bit off
+			crashed = true;
+		else if (cpGroundContact && handleContact)
+			// hard avoidance in case soft constraint fails
 			owner->Move(UpVector * (cpGroundHeight - ownerMinHeight + 0.01f), true);
 
 		// soft avoidance
@@ -872,6 +876,8 @@ void CHoverAirMoveType::UpdateAirPhysics()
 
 	if (modInfo.allowAircraftToLeaveMap || (pos + spd).IsInBounds())
 		owner->Move(spd, true);
+
+	return crashed;
 }
 
 
@@ -958,9 +964,7 @@ bool CHoverAirMoveType::Update()
 			UpdateHovering();
 			break;
 		case AIRCRAFT_CRASHING: {
-			UpdateAirPhysics();
-
-			if ((CGround::GetHeightAboveWater(owner->pos.x, owner->pos.z) + 5.0f + owner->radius) > owner->pos.y) {
+			if (UpdateAirPhysics()) {
 				owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
 			} else {
 				#define SPIN_DIR(o) ((o->id & 1) * 2 - 1)

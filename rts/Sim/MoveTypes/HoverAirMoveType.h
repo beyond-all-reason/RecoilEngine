@@ -52,7 +52,7 @@ private:
 	// Helpers for (multiple) state handlers
 	void UpdateHeading();
 	void UpdateBanking(bool noBanking);
-	void UpdateAirPhysics();
+	bool UpdateAirPhysics();
 	void UpdateMoveRate();
 
 	void UpdateVerticalSpeed(const float4& spd, float curRelHeight, float curVertSpeed) const;

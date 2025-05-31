@@ -520,9 +520,7 @@ bool CStrafeAirMoveType::Update()
 			break;
 		case AIRCRAFT_CRASHING: {
 			// NOTE: the crashing-state can only be set (and unset) by scripts
-			UpdateAirPhysics({crashRudder, crashElevator, crashAileron, 0.0f}, owner->frontdir);
-
-			if ((CGround::GetHeightAboveWater(owner->pos.x, owner->pos.z) + 5.0f + owner->radius) > owner->pos.y)
+			if (UpdateAirPhysics({crashRudder, crashElevator, crashAileron, 0.0f}, owner->frontdir))
 				owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
 
 			amtEmitCrashTrailFuncs[crashExpGenID != -1u](owner, crashExpGenID);
@@ -1043,7 +1041,7 @@ void CStrafeAirMoveType::UpdateLanding()
 
 
 
-void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const float3& thrustVector)
+bool CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const float3& thrustVector)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const float3& pos = owner->pos;
@@ -1140,9 +1138,11 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 	//   impulse from weapon impacts can add speed and cause us
 	//   to start bouncing with ever-increasing amplitude while
 	//   stunned, so the same applies there
+	bool crashed = false;
 	if (modInfo.allowAircraftToHitGround) {
 		const bool groundContact = (groundHeight > (owner->midPos.y - owner->radius));
 		const bool handleContact = (aircraftState != AIRCRAFT_LANDED && aircraftState != AIRCRAFT_TAKEOFF);
+
 
 		if (groundContact && handleContact) {
 			const float3  groundOffset = UpVector * (groundHeight - (owner->midPos.y - owner->radius) + 0.01f);
@@ -1150,7 +1150,9 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 
 			const float impactSpeed = -spd.dot(groundNormal) * int(1 - owner->IsStunned());
 
-			owner->Move(groundOffset, true);
+			if (aircraftState != AIRCRAFT_CRASHING)
+				// skip when crashing to explode a bit into the ground
+				owner->Move(groundOffset, true);
 
 			if (impactSpeed > 0.0f) {
 				// fix for mantis #1355
@@ -1170,6 +1172,7 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 				rightdir = frontdir.cross(updir.Normalize());
 				frontdir = updir.cross(rightdir.Normalize());
 			}
+			crashed = true;
 		}
 	}
 
@@ -1182,6 +1185,7 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 	owner->SetSpeed(spd);
 	owner->UpdateMidAndAimPos();
 	owner->SetHeadingFromDirection();
+	return crashed;
 }
 
 
