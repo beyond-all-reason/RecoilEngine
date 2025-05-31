@@ -46,6 +46,8 @@ class LuaImage {
 
 		static int ReadPixel(lua_State* L);
 		static int ReadMapPixel(lua_State* L);
+		static int ReadPixels(lua_State* L);
+		static int ReadMapPixels(lua_State* L);
 	private:
 		static std::shared_ptr<LuaImageData> LoadImageObject(lua_State* L);
 

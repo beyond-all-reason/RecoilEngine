@@ -72,6 +72,8 @@ bool LuaImage::CreateMetatable(lua_State* L)
 		// push userdata callouts
 		REGISTER_LUA_CFUNC(ReadPixel);
 		REGISTER_LUA_CFUNC(ReadMapPixel);
+		REGISTER_LUA_CFUNC(ReadPixels);
+		REGISTER_LUA_CFUNC(ReadMapPixels);
 
 	lua_pop(L, 1);
 	return true;
@@ -119,6 +121,57 @@ int PushImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
 				lua_pushnumber(L, data[i]);
 			}
 		} break;
+	}
+	return image->channels;
+}
+
+
+int ReadPixelsRaw(lua_State* L, const LuaImageData* image, int startX, int startY, int endX, int endY, int index)
+{
+	if (startX > image->width || startY > image->height || startX < 0 || startY < 0)
+		return 0;
+
+	if (endX > image->width || endY > image->height || endX < 0 || endY < 0 || endX <= startX || endY <= startY)
+		return 0;
+
+	if (!lua_isfunction(L, index))
+		return 0;
+
+	for (int y=startY; y < endY; ++y) {
+		int linepos = y * image->width;
+		for (int x=startX; x < endX; ++x) {
+			int pixelCoords = (x + linepos) * image->channels;
+			lua_pushvalue(L, index);
+			switch (image->bitmap->dataType) {
+				case GL_UNSIGNED_BYTE: {
+					const uint8_t* data = image->bitmap->GetRawMem() + pixelCoords;
+					for (int i=0; i < image->channels; ++i) {
+						lua_pushinteger(L, data[i]);
+					}
+					if (lua_pcall(L, image->channels, 0, 0)) {
+						luaL_error(L, "ReadPixelsRaw failed");
+					}
+				} break;
+				case GL_UNSIGNED_SHORT: {
+					const uint16_t* data = reinterpret_cast<uint16_t*>(image->bitmap->GetRawMem()) + pixelCoords;
+					for (int i=0; i < image->channels; ++i) {
+						lua_pushinteger(L, data[i]);
+					}
+					if (lua_pcall(L, image->channels, 0, 0)) {
+						luaL_error(L, "ReadPixelsRaw failed");
+					}
+				} break;
+				case GL_FLOAT: {
+					const float* data = reinterpret_cast<float*>(image->bitmap->GetRawMem()) + pixelCoords;
+					for (int i=0; i < image->channels; ++i) {
+						lua_pushnumber(L, data[i]);
+					}
+					if (lua_pcall(L, image->channels, 0, 0)) {
+						luaL_error(L, "ReadPixelsRaw failed");
+					}
+				} break;
+			}
+		}
 	}
 	return image->channels;
 }
@@ -321,6 +374,79 @@ int LuaImage::ReadMapPixel(lua_State* L)
 	const float y = (mapY * image->height) / mapSizeY;
 
 	return PushImagePixel(L, image, x, y);
+}
+
+
+/*** Reads pixels from an image rect
+ *
+ * @function Image:ReadPixels
+ *
+ * This method will iterate over the area pixels and call the
+ * provided callback function, with each pixel channels as arguments.
+ *
+ * example:
+ *
+ *  image:ReadPixels(20, 20, 100, 100, function(r, g, b, a)
+ *    Spring.Echo("got pixel", r, g, b, a)
+ *  end)
+
+ * Callback function arguments will depend on the image channels.
+ *
+ * @param x integer x coordinate in pixels.
+ * @param y integer y coordinate in pixels.
+ * @param width integer width in pixels.
+ * @param height integer height in pixels.
+ * @param callbackFn function Function to call for each pixel
+ */
+
+int LuaImage::ReadPixels(lua_State* L)
+{
+	const LuaImageData* image = toimage(L, 1);
+
+	const unsigned int x = luaL_checkinteger(L, 2) - 1;
+	const unsigned int y = luaL_checkinteger(L, 3) - 1;
+	const unsigned int width = luaL_checkinteger(L, 4);
+	const unsigned int height = luaL_checkinteger(L, 5);
+
+	return ReadPixelsRaw(L, image, x, y, x + width, y + height, 6);
+}
+
+/*** Reads pixels from a map rect
+ *
+ * @function Image:ReadMapPixels
+ *
+ * This method will map the provided map coordinates to pixels,
+ * and then iterate over them calling the provided function for
+ * each pixel, like Image:ReadPixel.
+ *
+ * @param x integer x coordinate in elmos.
+ * @param y integer y coordinate in elmos.
+ * @param width integer width in elmos.
+ * @param height integer height in elmos.
+ * @param callbackFn function Function to call for each pixel
+ *
+ * @see Image:ReadPixels
+ */
+
+
+int LuaImage::ReadMapPixels(lua_State* L)
+{
+	const LuaImageData* image = toimage(L, 1);
+
+	const float mapX = luaL_checkinteger(L, 2) - 1;
+	const float mapY = luaL_checkinteger(L, 3) - 1;
+	const float mapWidth = luaL_checkinteger(L, 4);
+	const float mapHeight = luaL_checkinteger(L, 5);
+
+	const float mapSizeX = mapDims.mapx * SQUARE_SIZE;
+	const float mapSizeY = mapDims.mapy * SQUARE_SIZE;
+
+	const float x = (mapX * image->width) / mapSizeX;
+	const float y = (mapY * image->height) / mapSizeY;
+	const float width = (mapX * image->width) / mapSizeX;
+	const float height = (mapY * image->height) / mapSizeY;
+
+	return ReadPixelsRaw(L, image, x, y, x + width, y + height, 6);
 }
 
 
