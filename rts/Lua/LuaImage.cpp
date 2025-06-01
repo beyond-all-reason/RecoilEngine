@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <stdexcept>
 
 #include "LuaImage.h"
 
@@ -15,6 +16,12 @@
 #ifdef LoadImage // windows defines this and messes up our LoadImage.
 #undef LoadImage
 #endif
+
+class LuaImageException : public std::runtime_error
+{
+	using std::runtime_error::runtime_error;
+};
+
 
 /******************************************************************************
  * LuaImageData
@@ -33,12 +40,16 @@
 LuaImageData::LuaImageData(std::string filename, int reqChannels, int reqDataType, bool luminance) : filename(filename)
 {
 	bitmap = std::make_shared<CBitmap>();
-	if (luminance)
-		valid = bitmap->LoadGrayscale(filename);
-	else
-		valid = bitmap->Load(filename, 1.0f, reqChannels, reqDataType);
+	if (luminance) {
+		if (!bitmap->LoadGrayscale(filename))
+			throw LuaImageException{"failure loading image"};
+	}
+	else {
+		if (!bitmap->Load(filename, 1.0f, reqChannels, reqDataType))
+			throw LuaImageException{"failure loading image"};
+	}
 	if (bitmap->dataType != GL_UNSIGNED_BYTE && bitmap->dataType != GL_UNSIGNED_SHORT && bitmap->dataType != GL_FLOAT)
-		valid = false;
+		throw LuaImageException{"bad resulting dataType"};
 	if (valid) {
 		width = bitmap->xsize;
 		height = bitmap->ysize;
@@ -144,7 +155,7 @@ int ReadPixelsRaw(lua_State* L, const LuaImageData* image, int startX, int start
 	}
 
 	if (!lua_isfunction(L, index)) {
-		luaL_error(L, std::format("{}th parameter has to be a function", index));
+		luaL_error(L, std::format("{}th parameter has to be a function", index).c_str());
 		return 0;
 	}
 
@@ -206,11 +217,14 @@ std::shared_ptr<LuaImageData> LuaImage::LoadImageObject(lua_State* L)
 	int channels = LuaImage::ParseFormat(L, 2);
 	int dataType = LuaImage::ParseDataType(L, 3);
 	bool luminance = luaL_optboolean(L, 4, false);
-	auto image = make_shared<LuaImageData>(filename, channels, dataType, luminance);
-	if (image->valid) {
+	try {
+		auto image = make_shared<LuaImageData>(filename, channels, dataType, luminance);
 		return image;
 	}
-	return nullptr;
+	catch (LuaImageException &e) {
+		luaL_error(L, std::format("error loading image: {}", e.what()).c_str());
+		return nullptr;
+	}
 }
 
 
@@ -506,7 +520,7 @@ int LuaImage::StringToDataType(const char* str)
 		case hashString("default"):
 			return 0;
 		default:
-			return -1;
+			throw LuaImageException(std::format("invalid image dataType '{}'", str));
 	}
 }
 
@@ -539,25 +553,31 @@ int LuaImage::FormatToChannels(const char* format)
 		case hashString("default"):
 			return 0;
 		default:
-			return -1;
+			throw LuaImageException(std::format("invalid image format '{}'", format));
 	}
 }
 
 
 int LuaImage::ParseFormat(lua_State* L, int index)
 {
-	int channels = FormatToChannels(luaL_optstring(L, index, "default"));
-	if (channels == -1)
-		luaL_error(L, "Invalid format for image");
-	return channels;
+	try {
+		int channels = FormatToChannels(luaL_optstring(L, index, "default"));
+		return channels;
+	}
+	catch (LuaImageException& e) {
+		return luaL_error(L, e.what());
+	}
 }
 
 
 int LuaImage::ParseDataType(lua_State* L, int index)
 {
-	int dataType = StringToDataType(luaL_optstring(L, index, "default"));
-	if (dataType == -1)
-		luaL_error(L, "Invalid data type for image");
-	return dataType;
+	try {
+		int dataType = StringToDataType(luaL_optstring(L, index, "default"));
+		return dataType;
+	}
+	catch (LuaImageException& e) {
+		return luaL_error(L, e.what());
+	}
 }
 
