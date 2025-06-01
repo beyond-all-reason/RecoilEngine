@@ -318,11 +318,24 @@ int LuaImage::meta_index(lua_State* L)
  *
  * @function Image.LoadImage
  *
+ * Will load any image from the provided VFS `filePath`. The image will be converted into
+ * the provided `format` and `dataType`.
+ *
  * @param filePath string VFS path to the file, for example "map/windfield.png".
  * @param format string Force resulting Image format. Leave as "default" or nil for default.
+ * Accepts the following options:
+ * - grayscale: 1 channel.
+ * - rgb: 3 channels.
+ * - rgba: 4 channels.
+ * - luminance: 1 channel with special luminance conversion if origin image is rgb or rgba. Also forces 'byte' `dataType`.
+ * - default: same amount of channels as the source image.
+ *
  * @param dataType string Force resulting Image dataType. Leave as "default" or nil for default.
- * @param luminance boolean Load image as luminance data instead. Will force 'grayscale' and 'byte',
- * 			    and perform luminance calculations if rgb+.
+ * Accepts the following options:
+ * - byte: unsigned 8 bit integer.
+ * - short: unsigned 16 bit integer.
+ * - float: float values.
+ * - default: same dataType as the source image.
  *
  * @return Image userdata object to operate on the image
  */
@@ -434,7 +447,7 @@ int LuaImage::ReadMapPixel(lua_State* L)
  * @param y integer y coordinate in pixels.
  * @param width integer width in pixels.
  * @param height integer height in pixels.
- * @param callbackFn function Function to call for each pixel
+ * @param callbackFn fun(...) Function to call for each pixel
  */
 
 int LuaImage::ReadPixels(lua_State* L)
@@ -461,7 +474,7 @@ int LuaImage::ReadPixels(lua_State* L)
  * @param y integer y coordinate in elmos.
  * @param width integer width in elmos.
  * @param height integer height in elmos.
- * @param callbackFn function Function to call for each pixel
+ * @param callbackFn fun(...) Function to call for each pixel
  *
  * @see Image:ReadPixels
  */
