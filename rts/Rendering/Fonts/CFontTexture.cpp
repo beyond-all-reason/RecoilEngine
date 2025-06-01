@@ -1210,7 +1210,7 @@ void CFontTexture::LoadGlyph(std::shared_ptr<FontFace>& f, char32_t ch, unsigned
 	glyph.letter = ch;
 
 	// load glyph
-	auto flags = FT_LOAD_RENDER;
+	auto flags = FT_LOAD_DEFAULT;
 	if (FT_HAS_COLOR(f->face) && allowColorFonts) {
 		LOG_L(L_WARNING, "LOAD WITH COLOR");
 		flags |= FT_LOAD_COLOR;
