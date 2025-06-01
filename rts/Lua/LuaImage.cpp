@@ -144,9 +144,8 @@ int PushPixel(lua_State* L, const LuaImageData* image, int x, int y)
 			return PushPixelInternal<float>(L, image, x, y);
 		default:
 			// shouldn't happen
-			luaL_error(L, "corrupted image");
+			return luaL_error(L, "corrupted image");
 	}
-	return 0;
 }
 
 
@@ -215,9 +214,8 @@ int CallbackPixels(lua_State* L, const LuaImageData* image, int startX, int star
 			return CallbackPixelsInternal<float, isMap>(L, image, startX, startY, endX, endY, index);
 		default:
 			// shouldn't happen
-			luaL_error(L, "corrupted image");
+			return luaL_error(L, "corrupted image");
 	}
-	return 0;
 }
 
 
