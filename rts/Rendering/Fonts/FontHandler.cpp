@@ -16,9 +16,11 @@ CFontHandler::CFontHandler()
 
 bool CFontHandler::Init()
 {
-	configHandler->NotifyOnChange(this, {"TextUseNewColorIndicators"});
+	if (configHandler != nullptr) {
+		configHandler->NotifyOnChange(this, {"TextUseNewColorIndicators"});
 
-	useNewColorIndicators = configHandler->GetBool("TextUseNewColorIndicators");
+		useNewColorIndicators = configHandler->GetBool("TextUseNewColorIndicators");
+	}
 	return true;
 }
 
