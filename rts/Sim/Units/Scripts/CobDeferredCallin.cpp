@@ -29,7 +29,7 @@ CCobDeferredCallin& CCobDeferredCallin::operator = (CCobDeferredCallin&& t) {
 	argCount = t.argCount;
 	funcName = t.funcName;
 	funcHash = t.funcHash;
-	std::memcpy(luaArgs, t.luaArgs, sizeof(luaArgs));
+	std::memcpy(luaArgs, t.luaArgs, sizeof(int)*argCount);
 	return *this;
 }
 
@@ -39,7 +39,7 @@ CCobDeferredCallin& CCobDeferredCallin::operator = (const CCobDeferredCallin& t)
 	argCount = t.argCount;
 	funcName = t.funcName;
 	funcHash = t.funcHash;
-	std::memcpy(luaArgs, t.luaArgs, sizeof(luaArgs));
+	std::memcpy(luaArgs, t.luaArgs, sizeof(int)*argCount);
 	return *this;
 }
 
