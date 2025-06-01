@@ -23,7 +23,6 @@ class FtLibraryHandlerProxy {
 public:
 	static void InitFtLibrary();
 	static bool InitFontconfig(bool console);
-	static bool UseNewColorIndicators();
 };
 
 

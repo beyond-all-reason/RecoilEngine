@@ -6,6 +6,7 @@
 #include "Game/GameVersion.h"
 #include "System/Platform/Misc.h"
 #include "Rendering/Fonts/glFont.h"
+#include "Rendering/Fonts/FontHandler.h"
 
 /******************************************************************************
  * Engine constants
@@ -78,7 +79,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");
-	bool newIndicators = FtLibraryHandlerProxy::UseNewColorIndicators();
+	bool newIndicators = fontHandler.useNewColorIndicators;
 	lua_createtable(L, 0, 3);
 		LuaPushNamedChar(L, "Color"          , static_cast<char>(newIndicators ? CglFont::ColorCodeIndicator : CglFont::OldColorCodeIndicator)  );
 		LuaPushNamedChar(L, "ColorAndOutline", static_cast<char>(newIndicators ? CglFont::ColorCodeIndicatorEx : CglFont::OldColorCodeIndicatorEx));

@@ -161,7 +161,6 @@ public:
 			searchSystemFonts = configHandler->GetBool("UseFontConfigSystemFonts");
 			searchFontAttributes = configHandler->GetBool("FontConfigSearchAttributes");
 			searchApplySubstitutions = configHandler->GetBool("FontConfigApplySubstitutions");
-			useNewColorIndicators = configHandler->GetBool("TextUseNewColorIndicators");
 
 			FcBool res;
 			std::string errprefix = fmt::sprintf("[%s] Fontconfig(version %d.%d.%d) failed to initialize", __func__, FC_MAJOR, FC_MINOR, FC_REVISION);
@@ -308,9 +307,6 @@ public:
 	static bool GetSearchApplySubstitutions() {
 		return singleton->searchApplySubstitutions;
 	}
-	static bool GetUseNewColorIndicators() {
-		return singleton ? singleton->useNewColorIndicators : false;
-	}
 	#endif
 private:
 	FcConfig* config;
@@ -322,7 +318,6 @@ private:
 	bool searchSystemFonts;
 	bool searchFontAttributes;
 	bool searchApplySubstitutions;
-	bool useNewColorIndicators;
 
 	static inline std::unique_ptr<FtLibraryHandler> singleton = nullptr;
 };
@@ -343,17 +338,6 @@ bool FtLibraryHandlerProxy::InitFontconfig(bool console)
 	RECOIL_DETAILED_TRACY_ZONE;
 #ifndef HEADLESS
 	return FtLibraryHandler::InitSingletonFontconfig(console);
-#else
-	return false;
-#endif
-}
-
-
-bool FtLibraryHandlerProxy::UseNewColorIndicators()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-#ifndef HEADLESS
-	return FtLibraryHandler::GetUseNewColorIndicators();
 #else
 	return false;
 #endif

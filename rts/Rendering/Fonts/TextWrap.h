@@ -6,6 +6,7 @@
 #include <string>
 #include <list>
 
+#include "FontHandler.h"
 #include "CFontTexture.h"
 #include "ustring.h"
 #include "System/Color.h"
@@ -44,7 +45,7 @@ private:
 			if (resetColor) {
 				out = ColorResetIndicator;
 			} else {
-				out = FtLibraryHandlerProxy::UseNewColorIndicators() ? ColorCodeIndicator : OldColorCodeIndicator;
+				out = fontHandler.useNewColorIndicators ? ColorCodeIndicator : OldColorCodeIndicator;
 				out += color.r;
 				out += color.g;
 				out += color.b;

@@ -22,6 +22,7 @@
 #include "System/FileSystem/ArchiveScanner.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/StringUtil.h"
+#include "Rendering/Fonts/FontHandler.h"
 
 /******************************************************************************
  * Game constants
@@ -325,7 +326,7 @@ bool LuaConstGame::PushEntries(lua_State* L)
 	}
 	{
 		// inline color-codes for text fonts
-		bool newIndicators = FtLibraryHandlerProxy::UseNewColorIndicators();
+		bool newIndicators = fontHandler.useNewColorIndicators;
 
 		lua_pushliteral(L, "textColorCodes");
 		lua_createtable(L, 0, 3);
