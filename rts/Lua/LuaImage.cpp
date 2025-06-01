@@ -308,6 +308,8 @@ int LuaImage::meta_index(lua_State* L)
  * @param filePath string VFS path to the file, for example "map/windfield.png".
  * @param format string Force resulting Image format. Leave as "default" or nil for default.
  * @param dataType string Force resulting Image dataType. Leave as "default" or nil for default.
+ * @param luminance boolean Load image as luminance data instead. Will force 'grayscale' 1 channel,
+ * 			    and perform luminance calculations if rgb+.
  *
  * @return Image userdata object to operate on the image
  */
