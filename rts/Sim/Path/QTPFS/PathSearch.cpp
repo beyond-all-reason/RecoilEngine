@@ -1444,6 +1444,13 @@ void QTPFS::PathSearch::IterateNodeNeighbors(const INode* curNode, unsigned int 
 		if (curSearchNode->GetPrevNode() == nextSearchNode)
 			continue;
 
+		// Forbid the reverse search from trampling on it's preloaded nodes for path repair, because even though the
+		// search resticted is to an AABB, the remaining existing path can flow in and out of this region. If we
+		// connect the reverse in this particular scenario, it will create an infinite loop.
+		if ( (searchDir == SearchThreadData::SEARCH_BACKWARD) && (nextSearchNode->GetStepIndex() > 0) && doPathRepair ) {
+			continue;
+		}
+
 		// if (disallowNodeRevisit) {
 		// 	bool alreadyVisited = (nextSearchNode->GetPathCost(NODE_PATH_COST_G) != QTPFS_POSITIVE_INFINITY);
 		// 	constexpr bool improvingStart = false;
