@@ -48,7 +48,7 @@ LuaImageData::LuaImageData(std::string filename, int reqChannels, int reqDataTyp
 		if (!bitmap->Load(filename, 1.0f, reqChannels, reqDataType))
 			throw LuaImageException{"failure loading image"};
 	}
-	if (bitmap->dataType != GL_UNSIGNED_BYTE && bitmap->dataType != GL_UNSIGNED_SHORT && bitmap->dataType != GL_FLOAT)
+	if (bitmap->dataType != GL_UNSIGNED_BYTE && bitmap->dataType != GL_UNSIGNED_SHORT && bitmap->dataType != GL_UNSIGNED_INT && bitmap->dataType != GL_FLOAT)
 		throw LuaImageException{"bad resulting dataType"};
 	if (valid) {
 		width = bitmap->xsize;
@@ -131,6 +131,12 @@ int PushImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
 				lua_pushinteger(L, data[i]);
 			}
 		} break;
+		case GL_UNSIGNED_INT: {
+			const uint32_t* data = image->bitmap->GetRawMem() + pixelCoords;
+			for (int i=0; i < image->channels; ++i) {
+				lua_pushinteger(L, data[i]);
+			}
+		} break;
 		case GL_FLOAT: {
 			const float* data = reinterpret_cast<float*>(image->bitmap->GetRawMem()) + pixelCoords;
 			for (int i=0; i < image->channels; ++i) {
@@ -188,6 +194,15 @@ int ReadPixelsRaw(lua_State* L, const LuaImageData* image, int startX, int start
 				} break;
 				case GL_UNSIGNED_SHORT: {
 					const uint16_t* data = reinterpret_cast<uint16_t*>(image->bitmap->GetRawMem()) + pixelCoords;
+					for (int i=0; i < image->channels; ++i) {
+						lua_pushinteger(L, data[i]);
+					}
+					if (lua_pcall(L, nArgs, 0, 0)) {
+						luaL_error(L, "ReadPixelsRaw failed");
+					}
+				} break;
+				case GL_UNSIGNED_INT: {
+					const uint32_t* data = reinterpret_cast<uint32_t*>(image->bitmap->GetRawMem()) + pixelCoords;
 					for (int i=0; i < image->channels; ++i) {
 						lua_pushinteger(L, data[i]);
 					}
@@ -334,6 +349,7 @@ int LuaImage::meta_index(lua_State* L)
  * Accepts the following options:
  * - byte: unsigned 8 bit integer.
  * - short: unsigned 16 bit integer.
+ * - integer: unsigned 32 bit integer.
  * - float: float values.
  * - default: same dataType as the source image.
  *
@@ -512,6 +528,8 @@ const char* LuaImage::DataTypeToString(int dataType)
 			return "byte";
 		case GL_UNSIGNED_SHORT:
 			return "short";
+		case GL_UNSIGNED_INT:
+			return "integer";
 		case GL_FLOAT:
 			return "float";
 		default:
@@ -527,6 +545,8 @@ int LuaImage::StringToDataType(const char* str)
 			return GL_UNSIGNED_BYTE;
 		case hashString("short"):
 			return GL_UNSIGNED_SHORT;
+		case hashString("integer"):
+			return GL_UNSIGNED_INT;
 		case hashString("float"):
 			return GL_FLOAT;
 		case hashString("default"):
