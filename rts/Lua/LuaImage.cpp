@@ -37,10 +37,10 @@ class LuaImageException : public std::runtime_error
  * @field dataType string
  */
 
-LuaImageData::LuaImageData(std::string filename, int reqChannels, int reqDataType, bool luminance) : filename(filename)
+LuaImageData::LuaImageData(std::string filename, int reqChannels, int reqDataType) : filename(filename)
 {
 	bitmap = std::make_shared<CBitmap>();
-	if (luminance) {
+	if (reqChannels == -1) {
 		if (!bitmap->LoadGrayscale(filename))
 			throw LuaImageException{"failure loading image"};
 	}
@@ -216,9 +216,8 @@ std::shared_ptr<LuaImageData> LuaImage::LoadImageObject(lua_State* L)
 	std::string filename = luaL_checkstring(L, 1);
 	int channels = LuaImage::ParseFormat(L, 2);
 	int dataType = LuaImage::ParseDataType(L, 3);
-	bool luminance = luaL_optboolean(L, 4, false);
 	try {
-		auto image = make_shared<LuaImageData>(filename, channels, dataType, luminance);
+		auto image = make_shared<LuaImageData>(filename, channels, dataType);
 		return image;
 	}
 	catch (LuaImageException &e) {
@@ -544,6 +543,8 @@ const char* LuaImage::ChannelsToFormat(int channels)
 int LuaImage::FormatToChannels(const char* format)
 {
 	switch (hashString(format)) {
+		case hashString("luminance"):
+			return -1; // special value
 		case hashString("grayscale"):
 			return 1;
 		case hashString("rgb"):

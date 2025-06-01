@@ -14,7 +14,7 @@ class CBitmap;
 
 class LuaImageData {
 	public:
-		LuaImageData(std::string filename, int channels, int dataType, bool luminance);
+		LuaImageData(std::string filename, int channels, int dataType);
 
 		std::string filename;
 		bool valid;
