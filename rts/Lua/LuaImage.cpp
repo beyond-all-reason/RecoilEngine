@@ -100,8 +100,10 @@ inline LuaImageData* toimage(lua_State* L, int idx)
 
 int PushImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
 {
-	if (x > image->width || y > image->height || x < 0 || y < 0)
+	if (x > image->width || y > image->height || x < 0 || y < 0) {
+		luaL_error(L, "x or y coordinates out of bounds");
 		return 0;
+	}
 
 	int pixelCoords = (x + y * image->width) * image->channels;
 
@@ -131,14 +133,20 @@ int PushImagePixel(lua_State* L, const LuaImageData* image, int x, int y)
 
 int ReadPixelsRaw(lua_State* L, const LuaImageData* image, int startX, int startY, int endX, int endY, int index, bool mapCoord)
 {
-	if (startX > image->width || startY > image->height || startX < 0 || startY < 0)
+	if (startX > image->width || startY > image->height || startX < 0 || startY < 0) {
+		luaL_error(L, "start coordinates out of bounds");
 		return 0;
+	}
 
-	if (endX > image->width || endY > image->height || endX < 0 || endY < 0 || endX <= startX || endY <= startY)
+	if (endX > image->width || endY > image->height || endX < 0 || endY < 0 || endX <= startX || endY <= startY) {
+		luaL_error(L, "end coordinates out of bounds");
 		return 0;
+	}
 
-	if (!lua_isfunction(L, index))
+	if (!lua_isfunction(L, index)) {
+		luaL_error(L, std::format("{}th parameter has to be a function", index));
 		return 0;
+	}
 
 	const float mapFactorX = (mapDims.mapx * SQUARE_SIZE) / image->width;
 	const float mapFactorY = (mapDims.mapy * SQUARE_SIZE) / image->height;
