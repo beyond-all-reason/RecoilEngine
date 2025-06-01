@@ -938,6 +938,7 @@ void CFontTexture::InitFonts()
 #ifndef HEADLESS
 	maxFontTries = configHandler ? configHandler->GetInt("MaxFontTries") : 5;
 	maxPinnedFonts = configHandler ? configHandler->GetInt("MaxPinnedFonts") : 10;
+	allowColorFonts = configHandler ? configHandler->GetBool("AllowColorFonts") : false;
 #endif
 }
 
@@ -1210,7 +1211,7 @@ void CFontTexture::LoadGlyph(std::shared_ptr<FontFace>& f, char32_t ch, unsigned
 
 	// load glyph
 	auto flags = FT_LOAD_RENDER;
-	if (FT_HAS_COLOR(f->face)) {
+	if (FT_HAS_COLOR(f->face) && allowColorFonts) {
 		LOG_L(L_WARNING, "LOAD WITH COLOR");
 		flags |= FT_LOAD_COLOR;
 	} else {

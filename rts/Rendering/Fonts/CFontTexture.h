@@ -193,6 +193,7 @@ private:
 	bool needsTextureUpload = true;
 	inline static int maxFontTries = 0;
 	inline static int maxPinnedFonts = 0;
+	inline static int allowColorFonts = 0;
 #endif
 	std::shared_ptr<FontFace> shFace;
 
