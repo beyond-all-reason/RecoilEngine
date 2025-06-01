@@ -4,6 +4,7 @@
 #include "LuaHandle.h"
 #include "LuaUtils.h"
 #include "Game/GameVersion.h"
+#include "System/Config/ConfigHandler.h"
 #include "System/Platform/Misc.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/Fonts/FontHandler.h"
@@ -79,7 +80,11 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");
+#ifndef HEADLESS
 	bool newIndicators = fontHandler.useNewColorIndicators;
+#else
+	bool newIndicators = configHandler->GetBool("TextUseNewColorIndicators");
+#endif
 	lua_createtable(L, 0, 3);
 		LuaPushNamedChar(L, "Color"          , static_cast<char>(newIndicators ? CglFont::ColorCodeIndicator : CglFont::OldColorCodeIndicator)  );
 		LuaPushNamedChar(L, "ColorAndOutline", static_cast<char>(newIndicators ? CglFont::ColorCodeIndicatorEx : CglFont::OldColorCodeIndicatorEx));
