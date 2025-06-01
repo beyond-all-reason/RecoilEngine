@@ -4,15 +4,6 @@
 #define _FONT_HANDLER_H
 
 #include "System/Misc/NonCopyable.h"
-/*
-#include <vector>
-
-#include "System/float3.h"
-#include "System/creg/creg_cond.h"
-#include "System/UnorderedSet.hpp"
-#include "Sim/Misc/GlobalConstants.h"
-#include "Sim/Misc/SimObjectIDPool.h"
-*/
 
 class CFontHandler : public spring::noncopyable
 {
