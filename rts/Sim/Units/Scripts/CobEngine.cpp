@@ -22,6 +22,7 @@ CR_REG_METADATA(CCobEngine, (
 	CR_IGNORED(waitingThreadIDs),
 
 	CR_IGNORED(curThread),
+	CR_IGNORED(deferredCallins),
 
 	CR_MEMBER(currentTime),
 	CR_MEMBER(threadCounter)
