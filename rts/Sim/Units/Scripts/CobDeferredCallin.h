@@ -24,12 +24,11 @@ public:
 	CCobDeferredCallin& operator = (const CCobDeferredCallin& t);
 
 	void Call();
-public: // protected:
+public:
 	CUnit* unit;
 	int luaArgs[MAX_LUA_COB_ARGS] = {0};
 	int argCount;
-	int scriptIndex;
-	CCobFile* cobFile = nullptr;
+
 	std::string funcName;
 	uint32_t funcHash;
 };
