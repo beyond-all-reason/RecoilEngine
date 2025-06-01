@@ -109,8 +109,8 @@ inline LuaImageData* toimage(lua_State* L, int idx)
 }
 
 
-template<typename DataType, typename Func>
-int PushPixelInternal(lua_State* L, const LuaImageData* image, int x, int y, Func pushFunc)
+template<typename DataType>
+int PushPixelInternal(lua_State* L, const LuaImageData* image, int x, int y)
 {
 	if (x > image->width || y > image->height || x < 0 || y < 0) {
 		luaL_error(L, "x or y coordinates out of bounds");
@@ -121,7 +121,10 @@ int PushPixelInternal(lua_State* L, const LuaImageData* image, int x, int y, Fun
 
 	const DataType* data = reinterpret_cast<DataType*>(image->bitmap->GetRawMem()) + pixelCoords;
 	for (int i=0; i < image->channels; ++i) {
-		pushFunc(L, data[i]);
+		if constexpr(std::is_floating_point_v<DataType>)
+			lua_pushnumber(L, data[i]);
+		else
+			lua_pushinteger(L, data[i]);
 	}
 
 	return image->channels;
@@ -132,13 +135,13 @@ int PushPixel(lua_State* L, const LuaImageData* image, int x, int y)
 {
 	switch (image->bitmap->dataType) {
 		case GL_UNSIGNED_BYTE:
-			return PushPixelInternal<uint8_t>(L, image, x, y, lua_pushinteger);
+			return PushPixelInternal<uint8_t>(L, image, x, y);
 		case GL_UNSIGNED_SHORT:
-			return PushPixelInternal<uint16_t>(L, image, x, y, lua_pushinteger);
+			return PushPixelInternal<uint16_t>(L, image, x, y);
 		case GL_UNSIGNED_INT:
-			return PushPixelInternal<uint32_t>(L, image, x, y, lua_pushinteger);
+			return PushPixelInternal<uint32_t>(L, image, x, y);
 		case GL_FLOAT:
-			return PushPixelInternal<float>(L, image, x, y, lua_pushnumber);
+			return PushPixelInternal<float>(L, image, x, y);
 		default:
 			// shouldn't happen
 			luaL_error(L, "corrupted image");
@@ -147,8 +150,8 @@ int PushPixel(lua_State* L, const LuaImageData* image, int x, int y)
 }
 
 
-template<typename DataType, bool isMap, typename Func>
-int CallbackPixelsInternal(lua_State* L, const LuaImageData* image, int startX, int startY, int endX, int endY, int index, Func pushFunc)
+template<typename DataType, bool isMap>
+int CallbackPixelsInternal(lua_State* L, const LuaImageData* image, int startX, int startY, int endX, int endY, int index)
 {
 	if (startX > image->width || startY > image->height || startX < 0 || startY < 0) {
 		luaL_error(L, "start coordinates out of bounds");
@@ -184,7 +187,10 @@ int CallbackPixelsInternal(lua_State* L, const LuaImageData* image, int startX, 
 			}
 			const DataType* data = reinterpret_cast<DataType*>(image->bitmap->GetRawMem()) + pixelCoords;
 			for (int i=0; i < image->channels; ++i) {
-				pushFunc(L, data[i]);
+				if constexpr(std::is_floating_point_v<DataType>)
+					lua_pushnumber(L, data[i]);
+				else
+					lua_pushinteger(L, data[i]);
 			}
 			if (lua_pcall(L, nArgs, 0, 0)) {
 				luaL_error(L, "ReadPixelsRaw failed");
@@ -200,13 +206,13 @@ int CallbackPixels(lua_State* L, const LuaImageData* image, int startX, int star
 {
 	switch (image->bitmap->dataType) {
 		case GL_UNSIGNED_BYTE:
-			return CallbackPixelsInternal<uint8_t, isMap>(L, image, startX, startY, endX, endY, index, lua_pushinteger);
+			return CallbackPixelsInternal<uint8_t, isMap>(L, image, startX, startY, endX, endY, index);
 		case GL_UNSIGNED_SHORT:
-			return CallbackPixelsInternal<uint16_t, isMap>(L, image, startX, startY, endX, endY, index, lua_pushinteger);
+			return CallbackPixelsInternal<uint16_t, isMap>(L, image, startX, startY, endX, endY, index);
 		case GL_UNSIGNED_INT:
-			return CallbackPixelsInternal<uint32_t, isMap>(L, image, startX, startY, endX, endY, index, lua_pushinteger);
+			return CallbackPixelsInternal<uint32_t, isMap>(L, image, startX, startY, endX, endY, index);
 		case GL_FLOAT:
-			return CallbackPixelsInternal<float, isMap>(L, image, startX, startY, endX, endY, index, lua_pushnumber);
+			return CallbackPixelsInternal<float, isMap>(L, image, startX, startY, endX, endY, index);
 		default:
 			// shouldn't happen
 			luaL_error(L, "corrupted image");
