@@ -5,21 +5,9 @@
 #include "CobFile.h"
 #include "CobInstance.h"
 #include "CobEngine.h"
-#include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/GlobalSynced.h"
 
 #include "System/Misc/TracyDefs.h"
-
-CR_BIND(CCobDeferredCallin, )
-
-CR_REG_METADATA(CCobDeferredCallin, (
-	CR_MEMBER(unit),
-	CR_MEMBER(luaArgs),
-	CR_MEMBER(argCount),
-	CR_MEMBER(funcName),
-	CR_MEMBER(funcHash),
-	CR_IGNORED(cobFile) // how to restore? no need?
-))
 
 CCobDeferredCallin::CCobDeferredCallin() : funcName("")
 {

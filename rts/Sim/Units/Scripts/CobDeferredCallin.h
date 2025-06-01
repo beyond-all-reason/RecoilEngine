@@ -15,11 +15,7 @@ class CUnit;
 
 class CCobDeferredCallin
 {
-	CR_DECLARE_STRUCT(CCobDeferredCallin)
 public:
-	// default and copy-ctor are creg only
-	//CCobDeferredCallin() {}
-
 	CCobDeferredCallin();
 	CCobDeferredCallin(CCobDeferredCallin&& t) { *this = std::move(t); }
 	CCobDeferredCallin(const CCobDeferredCallin& t) { *this = t; }
