@@ -143,13 +143,7 @@ public:
 
 	virtual void UpdatePhysicalState(float eps);
 
-	void Move(const float3& v, bool relative) {
-		const float3& dv = relative? v: (v - pos);
-
-		pos += dv;
-		midPos += dv;
-		aimPos += dv;
-	}
+	void Move(const float3& v, bool relative);
 
 	// this should be called whenever the direction
 	// vectors are changed (ie. after a rotation) in
@@ -189,6 +183,8 @@ public:
 	// NOTE: movetypes call this directly
 	void UpdateDirVectors(bool useGroundNormal, bool useObjectNormal, float dirSmoothing);
 	void UpdateDirVectors(const float3& uDir);
+
+	virtual void UpdatePrevFrameTransform() = 0;
 
 	CMatrix44f ComposeMatrix(const float3& p) const { return (CMatrix44f(p, -rightdir, updir, frontdir)); }
 	virtual CMatrix44f GetTransformMatrix(bool synced = false, bool fullread = false) const = 0;
@@ -395,6 +391,9 @@ public:
 	int team = 0;
 	///< allyteam that this->team is part of
 	int allyteam = 0;
+
+	// the object could be spawned before the frame start (via cheats) or during the normal sim frame
+	bool prevFrameNeedsUpdate = true;
 
 	///< [i] := frame on which hitModelPieces[i] was last hit
 	int pieceHitFrames[2] = {-1, -1};

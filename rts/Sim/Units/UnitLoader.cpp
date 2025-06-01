@@ -19,6 +19,7 @@
 #include "Map/ReadMap.h"
 
 #include "Sim/Ecs/Registry.h"
+#include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Features/FeatureDefHandler.h"
 #include "Sim/Features/FeatureHandler.h"
@@ -221,7 +222,10 @@ void CUnitLoader::GiveUnits(const std::string& objectName, float3 pos, int amoun
 				true,
 			};
 
-			LoadUnit(unitParams);
+			auto* unit = LoadUnit(unitParams);
+
+			// special treatment because units spawned with cheats appear before the gameframe
+			unit->UpdatePrevFrameTransform();
 		}
 	} else {
 		unsigned int numRequestedUnits = amount;
@@ -281,7 +285,10 @@ void CUnitLoader::GiveUnits(const std::string& objectName, float3 pos, int amoun
 						true,
 					};
 
-					LoadUnit(unitParams);
+					auto* unit = LoadUnit(unitParams);
+
+					// special treatment because units spawned with cheats appear before the gameframe
+					unit->UpdatePrevFrameTransform();
 				}
 			}
 
@@ -329,7 +336,10 @@ void CUnitLoader::GiveUnits(const std::string& objectName, float3 pos, int amoun
 						0, // smokeTime
 					};
 
-					featureHandler.LoadFeature(params);
+					auto* feature = featureHandler.LoadFeature(params);
+
+					// special treatment because features spawned with cheats appear before the gameframe
+					feature->UpdatePrevFrameTransform();
 
 					--total;
 				}

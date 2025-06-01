@@ -45,6 +45,7 @@ CR_REG_METADATA(CUnitHandler, (
 	CR_MEMBER(unitsByDefs),
 	CR_MEMBER(activeUnits),
 	CR_MEMBER(unitsToBeRemoved),
+	CR_MEMBER(unitsJustAdded),
 
 	CR_MEMBER(builderCAIs),
 
@@ -220,8 +221,8 @@ bool CUnitHandler::AddUnit(CUnit* unit)
 	assert(CanAddUnit(unit->id));
 
 	InsertActiveUnit(unit);
-
 	teamHandler.Team(unit->team)->AddUnit(unit, CTeam::AddBuilt);
+	unitsJustAdded.emplace_back(unit);
 
 	// 0 is not a valid UnitDef id, so just use unitsByDefs[team][0]
 	// as an unsorted bin to store all units belonging to unit->team
@@ -427,18 +428,30 @@ void CUnitHandler::UpdateUnitWeapons()
 	}
 }
 
-void CUnitHandler::UpdatePreframe()
+void CUnitHandler::UpdatePreFrame()
 {
-	SCOPED_TIMER("Sim::Unit::UpdatePreframe");
+	SCOPED_TIMER("Sim::Unit::UpdatePreFrame");
 	inUpdateCall = true;
 
 	for (CUnit* unit : activeUnits) {
-		unit->PreUpdate();
+		unit->UpdatePrevFrameTransform();
 	}
 
 	inUpdateCall = false;
 }
 
+void CUnitHandler::UpdatePostFrame()
+{
+	SCOPED_TIMER("Sim::Unit::UpdatePostFrame");
+	inUpdateCall = true;
+
+	for (CUnit* unit : unitsJustAdded) {
+		unit->UpdatePrevFrameTransform();
+	}
+	unitsJustAdded.clear();
+
+	inUpdateCall = false;
+}
 
 void CUnitHandler::Update()
 {

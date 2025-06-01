@@ -74,7 +74,7 @@ CExpGenSpawnable::~CExpGenSpawnable()
 void CExpGenSpawnable::Init(const CUnit* owner, const float3& offset)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	createFrame = gs->frameNum;
+	createFrame = std::max(gs->frameNum, 0);
 	rotParams *= float3(math::DEG_TO_RAD / GAME_SPEED, math::DEG_TO_RAD / (GAME_SPEED * GAME_SPEED), math::DEG_TO_RAD);
 
 	UpdateRotation();

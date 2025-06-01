@@ -52,6 +52,8 @@ CR_REG_METADATA(CSolidObject,
 	CR_MEMBER(team),
 	CR_MEMBER(allyteam),
 
+	CR_MEMBER(prevFrameNeedsUpdate),
+
 	CR_MEMBER(pieceHitFrames),
 
 	CR_MEMBER(moveDef),
@@ -139,6 +141,17 @@ void CSolidObject::UpdatePhysicalState(float eps)
 	assert((IsInAir() != IsInWater()) || IsOnGround());
 	assert((IsInAir() != IsUnderWater()) || (IsOnGround() || IsInWater()));
 	#endif
+}
+
+void CSolidObject::Move(const float3& v, bool relative)
+{
+	const float3& dv = relative ? v : (v - pos);
+
+	pos += dv;
+	midPos += dv;
+	aimPos += dv;
+
+	prevFrameNeedsUpdate = true;
 }
 
 

@@ -53,7 +53,8 @@ public:
 	CFeature* CreateWreckage(const FeatureLoadParams& params);
 	CFeature* GetFeature(unsigned int id) { return ((id < features.size())? features[id]: nullptr); }
 
-	void UpdatePreframe();
+	void UpdatePreFrame();
+	void UpdatePostFrame();
 	void Update();
 
 	bool UpdateFeature(CFeature* feature);
@@ -89,6 +90,7 @@ private:
 	std::vector<int> deletedFeatureIDs;
 	std::vector<CFeature*> features;
 	std::vector<CFeature*> updateFeatures;
+	std::vector<CFeature*> featuresJustAdded;
 };
 
 extern CFeatureHandler featureHandler;

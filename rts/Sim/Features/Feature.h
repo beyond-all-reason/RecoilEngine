@@ -77,8 +77,8 @@ public:
 	void ForcedMove(const float3& newPos);
 	void ForcedSpin(const float3& newDir) override;
 	void ForcedSpin(const float3& newFrontDir, const float3& newRightDir) override; 
+	void UpdatePrevFrameTransform() override;
 
-	void PreUpdate();
 	bool Update();
 	bool UpdatePosition();
 	bool UpdateVelocity(const float3& dragAccel, const float3& gravAccel, const float3& movMask, const float3& velMask);
@@ -144,7 +144,6 @@ public:
 private:
 	// [0] := unsynced, [1] := synced
 	CMatrix44f transMatrix[2];
-	bool wasForceFullyMoved = true;
 };
 
 #endif // _FEATURE_H

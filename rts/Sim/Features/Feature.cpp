@@ -58,6 +58,7 @@ CR_REG_METADATA(CFeature, (
 
 	CR_MEMBER(solidOnTop),
 	CR_MEMBER(transMatrix),
+
 	CR_POSTLOAD(PostLoad)
 ))
 
@@ -153,6 +154,8 @@ void CFeature::Initialize(const FeatureLoadParams& params)
 	RECOIL_DETAILED_TRACY_ZONE;
 	const CSolidObject* po = params.parentObj;
 
+	prevFrameNeedsUpdate = true;
+
 	def = params.featureDef;
 	udef = params.unitDef;
 
@@ -227,7 +230,6 @@ void CFeature::Initialize(const FeatureLoadParams& params)
 
 	UpdateMidAndAimPos();
 	UpdateTransformAndPhysState();
-	preFrameTra = Transform::FromMatrix(GetTransformMatrix(true));
 
 	collisionVolume = def->collisionVolume;
 	selectionVolume = def->selectionVolume;
@@ -471,7 +473,7 @@ void CFeature::ForcedMove(const float3& newPos)
 	// remove from managers
 	quadField.RemoveFeature(this);
 
-	wasForceFullyMoved = true;
+	prevFrameNeedsUpdate = true;
 
 	UnBlock();
 	Move(newPos - pos, true);
@@ -495,7 +497,7 @@ void CFeature::ForcedSpin(const float3& newDir)
 	CSolidObject::ForcedSpin(newDir);
 	UpdateTransform(pos, true);
 
-	wasForceFullyMoved = true;
+	prevFrameNeedsUpdate = true;
 }
 
 void CFeature::ForcedSpin(const float3& newFrontDir, const float3& newRightDir)
@@ -505,7 +507,7 @@ void CFeature::ForcedSpin(const float3& newFrontDir, const float3& newRightDir)
 	CSolidObject::ForcedSpin(newFrontDir, newRightDir);
 	UpdateTransform(pos, true);
 
-	wasForceFullyMoved = true;
+	prevFrameNeedsUpdate = true;
 }
 
 
@@ -515,7 +517,7 @@ void CFeature::UpdateTransformAndPhysState()
 	UpdateDirVectors(!def->upright && IsOnGround(), true, 0.0f);
 	UpdateTransform(pos, true);
 
-	wasForceFullyMoved = true;
+	prevFrameNeedsUpdate = true;
 
 	UpdatePhysicalStateBit(CSolidObject::PSTATE_BIT_MOVING, (SetSpeed(speed) != 0.0f));
 	UpdatePhysicalState(0.1f);
@@ -575,7 +577,7 @@ bool CFeature::UpdateVelocity(
 bool CFeature::UpdatePosition()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	wasForceFullyMoved = true;
+	prevFrameNeedsUpdate = true;
 	// const float4 oldSpd = speed;
 
 	if (moveCtrl.enabled) {
@@ -622,13 +624,13 @@ bool CFeature::UpdatePosition()
 	return (moveCtrl.enabled);
 }
 
-void CFeature::PreUpdate()
+void CFeature::UpdatePrevFrameTransform()
 {
-	if (!wasForceFullyMoved)
+	if (!prevFrameNeedsUpdate)
 		return;
 
 	preFrameTra = Transform{ CQuaternion::MakeFrom(GetTransformMatrix(true)), pos };
-	wasForceFullyMoved = false;
+	prevFrameNeedsUpdate = false;
 }
 
 bool CFeature::Update()

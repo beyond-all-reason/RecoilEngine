@@ -26,7 +26,8 @@ public:
 
 	void DeleteScripts();
 
-	void UpdatePreframe();
+	void UpdatePreFrame();
+	void UpdatePostFrame();
 	void Update();
 	void UpdatePostAnimation();
 	bool AddUnit(CUnit* unit);
@@ -101,6 +102,7 @@ private:
 
 	std::vector<CUnit*> activeUnits;                                     ///< used to get all active units
 	std::vector<CUnit*> unitsToBeRemoved;                                ///< units that will be removed at start of next update
+	std::vector<CUnit*> unitsJustAdded;                                  ///< units created this frame
 
 	spring::unordered_map<unsigned int, CBuilderCAI*> builderCAIs;
 

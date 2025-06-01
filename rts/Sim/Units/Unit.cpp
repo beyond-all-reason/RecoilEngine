@@ -183,18 +183,24 @@ void CUnit::SanityCheck() const
 	}
 }
 
-void CUnit::PreUpdate()
+void CUnit::UpdatePrevFrameTransform()
 {
-	preFrameTra = Transform{ CQuaternion::MakeFrom(GetTransformMatrix(true)), pos };
 	for (auto& lmp : localModel.pieces) {
 		lmp.SavePrevModelSpaceTransform();
 	}
+
+	if (!prevFrameNeedsUpdate)
+		return;
+
+	preFrameTra = Transform{ CQuaternion::MakeFrom(GetTransformMatrix(true)), pos };
+	prevFrameNeedsUpdate = false;
 }
 
 
 void CUnit::PreInit(const UnitLoadParams& params)
 {
 	ZoneScoped;
+
 	// if this is < 0, UnitHandler will give us a random ID
 	id = params.unitID;
 	featureDefID = -1;
@@ -244,12 +250,9 @@ void CUnit::PreInit(const UnitLoadParams& params)
 	upright  = unitDef->upright;
 
 	SetVelocity(params.speed);
-	preFrameTra.t = params.pos.cClampInMap();
-	preFrameTra.s = 1.0f;
-	Move(preFrameTra.t, false);
+	Move(params.pos.cClampInMap(), false);
 
 	UpdateDirVectors(!upright && IsOnGround(), false, 0.0f);
-	preFrameTra.r = CQuaternion::MakeFrom(GetTransformMatrix(true));
 	SetMidAndAimPos(model->relMidPos, model->relMidPos, true);
 	SetRadiusAndHeight(model);
 	UpdateMidAndAimPos();
@@ -537,8 +540,7 @@ void CUnit::ForcedMove(const float3& newPos)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	UnBlock();
-	preFrameTra = Transform(CQuaternion::MakeFrom(GetTransformMatrix(true)), newPos, 1.0f);
-	Move(preFrameTra.t - pos, true);
+	Move(newPos - pos, true);
 	Block();
 
 	eventHandler.UnitMoved(this);
