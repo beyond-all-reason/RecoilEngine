@@ -4,9 +4,7 @@
 #define COB_DEFERRED_CALLIN_H
 
 #include <string>
-#include <array>
 
-#include "CobInstance.h"
 #include "Lua/LuaRules.h"
 
 class CCobFile;
