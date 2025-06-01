@@ -577,7 +577,6 @@ static std::shared_ptr<FontFace> GetFontForCharacters(const std::vector<char32_t
 
 		FcChar8* cFilename = nullptr;
 		FcResult r = FcPatternGetString(font, FC_FILE, 0, &cFilename);
-		LOG_L(L_WARNING, "LOAD1 %s", cFilename);
 		if (r != FcResultMatch || cFilename == nullptr)
 			continue;
 
@@ -1212,7 +1211,6 @@ void CFontTexture::LoadGlyph(std::shared_ptr<FontFace>& f, char32_t ch, unsigned
 	// load glyph
 	auto flags = FT_LOAD_DEFAULT;
 	if (FT_HAS_COLOR(f->face) && allowColorFonts) {
-		LOG_L(L_WARNING, "LOAD WITH COLOR");
 		flags |= FT_LOAD_COLOR;
 	} else {
 		flags |= FT_LOAD_RENDER;
