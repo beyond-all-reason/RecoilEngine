@@ -112,10 +112,8 @@ inline LuaImageData* toimage(lua_State* L, int idx)
 template<typename DataType>
 int PushPixelInternal(lua_State* L, const LuaImageData* image, int x, int y)
 {
-	if (x > image->width || y > image->height || x < 0 || y < 0) {
-		luaL_error(L, "x or y coordinates out of bounds");
-		return 0;
-	}
+	if (x > image->width || y > image->height || x < 0 || y < 0)
+		return luaL_error(L, "x or y coordinates out of bounds");
 
 	int pixelCoords = (x + y * image->width) * image->channels;
 
@@ -152,20 +150,14 @@ int PushPixel(lua_State* L, const LuaImageData* image, int x, int y)
 template<typename DataType, bool isMap>
 int CallbackPixelsInternal(lua_State* L, const LuaImageData* image, int startX, int startY, int endX, int endY, int index)
 {
-	if (startX > image->width || startY > image->height || startX < 0 || startY < 0) {
-		luaL_error(L, "start coordinates out of bounds");
-		return 0;
-	}
+	if (startX > image->width || startY > image->height || startX < 0 || startY < 0)
+		return luaL_error(L, "start coordinates out of bounds");
 
-	if (endX > image->width || endY > image->height || endX < 0 || endY < 0 || endX <= startX || endY <= startY) {
-		luaL_error(L, "end coordinates out of bounds");
-		return 0;
-	}
+	if (endX > image->width || endY > image->height || endX < 0 || endY < 0 || endX <= startX || endY <= startY)
+		return luaL_error(L, "end coordinates out of bounds");
 
-	if (!lua_isfunction(L, index)) {
-		luaL_error(L, std::format("{}th parameter has to be a function", index).c_str());
-		return 0;
-	}
+	if (!lua_isfunction(L, index))
+		return luaL_error(L, std::format("{}th parameter has to be a function", index).c_str());
 
 	const float mapFactorX = (mapDims.mapx * SQUARE_SIZE) / image->width;
 	const float mapFactorY = (mapDims.mapy * SQUARE_SIZE) / image->height;
