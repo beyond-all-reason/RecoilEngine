@@ -913,7 +913,7 @@ CBitmap TBitmapAction<T, ch>::CreateRescaled(int newx, int newy)
 	RECOIL_DETAILED_TRACY_ZONE;
 	CBitmap dst;
 
-	if (ch != 4) {
+	if (ch > 4) {
 		assert(false);
 		dst.AllocDummy();
 		return dst;
@@ -2011,8 +2011,8 @@ CBitmap CBitmap::CreateRescaled(int newx, int newy) const
 		return bm;
 	}
 
-	if (channels != 4) {
-		LOG_L(L_WARNING, "CBitmap::CreateRescaled only works with RGBA data!");
+	if (channels > 4) {
+		LOG_L(L_WARNING, "CBitmap::CreateRescaled only works with up to four channels!");
 		CBitmap bm;
 		bm.AllocDummy();
 		return bm;
