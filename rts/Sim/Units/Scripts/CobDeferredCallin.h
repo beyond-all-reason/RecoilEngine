@@ -7,26 +7,25 @@
 
 #include "Lua/LuaRules.h"
 
-class CCobFile;
-class CCobInstance;
 class CUnit;
 
 class CCobDeferredCallin
 {
 public:
-	CCobDeferredCallin();
 	CCobDeferredCallin(CCobDeferredCallin&& t) { *this = std::move(t); }
 	CCobDeferredCallin(const CCobDeferredCallin& t) { *this = t; }
 
-	~CCobDeferredCallin();
+	CCobDeferredCallin(const CUnit* unit, const LuaHashString& hs, const std::vector<int>& dataStack, const int stackStart);
+
+	~CCobDeferredCallin() {};
 
 	CCobDeferredCallin& operator = (CCobDeferredCallin&& t);
 	CCobDeferredCallin& operator = (const CCobDeferredCallin& t);
 
 	void Call();
 public:
-	CUnit* unit;
-	int luaArgs[MAX_LUA_COB_ARGS] = {0};
+	const CUnit* unit;
+	int luaArgs[MAX_LUA_COB_ARGS];
 	int argCount;
 
 	std::string funcName;

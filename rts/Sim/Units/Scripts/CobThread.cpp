@@ -934,8 +934,6 @@ void CCobThread::ShowError(const char* msg)
 
 void CCobThread::DeferredCall(bool synced)
 {
-	auto d = CCobDeferredCallin();
-
 	const int r1 = GET_LONG_PC(); // script id
 	const int r2 = GET_LONG_PC(); // arg count
 
@@ -952,21 +950,9 @@ void CCobThread::DeferredCall(bool synced)
 	}
 
 	// setup the parameter array
-	const int size = static_cast<int>(dataStack.size());
-	const int argCount = std::min(r2, MAX_LUA_COB_ARGS);
-	const int start = std::max(0, size - r2);
-	const int end = std::min(size, start + argCount);
+	auto d = CCobDeferredCallin(cobInst->GetUnit(), cobFile->luaScripts[r1], dataStack, r2);
 
-	for (int a = 0, i = start; i < end; i++) {
-		d.luaArgs[a++] = dataStack[i];
-	}
-
-	d.argCount = argCount;
-	d.unit = cobInst->GetUnit();
-	d.funcName = cobFile->luaScripts[r1].GetString();
-	d.funcHash = cobFile->luaScripts[r1].GetHash();
-
-	cobEngine->AddDeferredCallin(d, ThreadPool::GetThreadNum());
+	cobEngine->AddDeferredCallin(std::move(d), ThreadPool::GetThreadNum());
 
 	// always succeeds
 	retCode = 1;
