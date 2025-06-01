@@ -293,7 +293,7 @@ static constexpr int START           = 0x10061000;
 static constexpr int CALL            = 0x10062000; ///< converted when executed
 static constexpr int REAL_CALL       = 0x10062001; ///< spring custom
 static constexpr int LUA_CALL        = 0x10062002; ///< spring custom
-static constexpr int DEFER           = 0x10062004; ///< recoil custom
+static constexpr int BATCH_LUA       = 0x10062004; ///< recoil custom
 static constexpr int JUMP            = 0x10064000;
 static constexpr int RETURN          = 0x10065000;
 static constexpr int JUMP_NOT_EQUAL  = 0x10066000;
@@ -339,7 +339,7 @@ static const char* GetOpcodeName(int opcode)
 	switch (opcode) {
 		case MOVE: return "move";
 		case TURN: return "turn";
-		case DEFER: return "defer";
+		case BATCH_LUA: return "batch-lua";
 		case SPIN: return "spin";
 		case STOP_SPIN: return "stop-spin";
 		case SHOW: return "show";
@@ -497,7 +497,7 @@ bool CCobThread::Tick()
 				return false;
 			} break;
 
-			case DEFER: {
+			case BATCH_LUA: {
 				DeferredCall(false);
 			} break;
 
