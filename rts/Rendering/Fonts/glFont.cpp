@@ -30,7 +30,7 @@ CONFIG(int,      FontOutlineWidth).defaultValue(2).description("Sets the width o
 CONFIG(int, SmallFontOutlineWidth).defaultValue(2).description("see FontOutlineWidth");
 CONFIG(float,      FontOutlineWeight).defaultValue(25.0f).description("Sets the opacity of Spring engine text, such as the title screen version number, clock, and basic UI. Does not affect LuaUI elements.");
 CONFIG(float, SmallFontOutlineWeight).defaultValue(10.0f).description("see FontOutlineWeight");
-CONFIG(bool, AllowColorFonts).defaultValue(false).description("Allow working with colored fonts.");
+CONFIG(bool, AllowColorFonts).defaultValue(false).description("Allow working with colored fonts (experimental).");
 
 std::shared_ptr<CglFont> font = nullptr;
 std::shared_ptr<CglFont> smallFont = nullptr;
