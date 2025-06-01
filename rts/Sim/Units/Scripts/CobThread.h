@@ -12,6 +12,28 @@
 class CCobFile;
 class CCobInstance;
 
+class CCobStackGuard
+{
+public:
+	CCobStackGuard(std::vector<int>* dataStack, int  nArgs) : data(dataStack), nArgs(nArgs)
+	{ }
+
+	~CCobStackGuard() {
+		const int size = GetSize();
+		if (nArgs >= size) {
+			data->clear();
+		} else {
+			data->resize(size - nArgs);
+		}
+	}
+
+	int GetSize() {
+		return static_cast<int>(data->size());
+	}
+
+	std::vector<int>* data;
+	int nArgs;
+};
 
 class CCobThread
 {

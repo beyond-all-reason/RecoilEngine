@@ -937,6 +937,9 @@ void CCobThread::DeferredCall(bool synced)
 	const int r1 = GET_LONG_PC(); // script id
 	const int r2 = GET_LONG_PC(); // arg count
 
+	// Make sure to clean args from stack on exit
+	CCobStackGuard guard{&dataStack, r2};
+
 	// sanity checks
 	if (!luaRules) {
 		retCode = 0;
@@ -965,6 +968,9 @@ void CCobThread::LuaCall()
 	const int r1 = GET_LONG_PC(); // script id
 	const int r2 = GET_LONG_PC(); // arg count
 
+	// Make sure to clean args from stack on exit
+	CCobStackGuard guard{&dataStack, r2};
+
 	// setup the parameter array
 	const int size = static_cast<int>(dataStack.size());
 	const int argCount = std::min(r2, MAX_LUA_COB_ARGS);
@@ -973,12 +979,6 @@ void CCobThread::LuaCall()
 
 	for (int a = 0, i = start; i < end; i++) {
 		luaArgs[a++] = dataStack[i];
-	}
-
-	if (r2 >= size) {
-		dataStack.clear();
-	} else {
-		dataStack.resize(size - r2);
 	}
 
 	if (!luaRules) {
