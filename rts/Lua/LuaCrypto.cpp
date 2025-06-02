@@ -14,8 +14,8 @@
 
 // random generator access
 #if defined(_WIN32)
- * The defined WIN32_NO_STATUS macro disables return code definitions in
- * windows.h, which avoids "macro redefinition" MSVC warnings in ntstatus.h.
+// * The defined WIN32_NO_STATUS macro disables return code definitions in
+// * windows.h, which avoids "macro redefinition" MSVC warnings in ntstatus.h.
 
 #define WIN32_NO_STATUS
 #include <windows.h>
