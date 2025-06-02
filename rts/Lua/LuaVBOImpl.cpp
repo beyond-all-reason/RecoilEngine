@@ -1474,6 +1474,9 @@ void LuaVBOImpl::DumpDefinition()
 /***
  *
  * @function VBO:CopyTo
+ *
+ * Copies the current content of the buffer to another buffer. That another buffer is expected to have sufficient allocation.
+ *
  * @param VBO destVBO
  * @param integer copySizeInBytes
  * @return boolean success

@@ -1348,7 +1348,7 @@ int LuaShaders::GetEngineModelUniformDataDef(lua_State* L)
  *
  * @function gl.GetEngineModelUniformDataSize
  *
- * Return the current parameters of ModelUniformData structure (per Unit/Feature buffer available on GPU)
+ * Return the current size values of ModelUniformData structure (per Unit/Feature buffer available on GPU)
  *
  * @param number index
  * @return number sizeInElements
