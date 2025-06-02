@@ -1310,7 +1310,7 @@ int LuaShaders::UniformSubroutine(lua_State* L)
  *
  * Return the GLSL compliant definition of UniformMatricesBuffer(idx=0) or UniformParamsBuffer(idx=1) structure.
  *
- * @param number index
+ * @param index number
  * @return string glslDefinition
  */
 int LuaShaders::GetEngineUniformBufferDef(lua_State* L)
@@ -1332,7 +1332,7 @@ int LuaShaders::GetEngineUniformBufferDef(lua_State* L)
  *
  * Return the GLSL compliant definition of ModelUniformData structure (per Unit/Feature buffer available on GPU)
  *
- * @param number index
+ * @param index number
  * @return string glslDefinition
  */
 int LuaShaders::GetEngineModelUniformDataDef(lua_State* L)
@@ -1350,7 +1350,7 @@ int LuaShaders::GetEngineModelUniformDataDef(lua_State* L)
  *
  * Return the current size values of ModelUniformData structure (per Unit/Feature buffer available on GPU)
  *
- * @param number index
+ * @param index number
  * @return number sizeInElements
  * @return number sizeInBytesOnCPU
 

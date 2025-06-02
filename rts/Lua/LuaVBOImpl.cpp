@@ -1477,8 +1477,8 @@ void LuaVBOImpl::DumpDefinition()
  *
  * Copies the current content of the buffer to another buffer. That another buffer is expected to have sufficient allocation.
  *
- * @param VBO destVBO
- * @param integer copySizeInBytes
+ * @param destVBO VBO
+ * @param copySizeInBytes integer
  * @return boolean success
  */
 bool LuaVBOImpl::CopyTo(const std::shared_ptr<LuaVBOImpl>& destVBO, int copySizeInBytes)
