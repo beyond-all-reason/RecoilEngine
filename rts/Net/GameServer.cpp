@@ -547,7 +547,7 @@ bool CGameServer::SendDemoData(int targetFrameNum)
 	return ret;
 }
 
-void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet)
+void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet, bool isPrivate)
 {
 	for (GameParticipant& p: players) {
 		p.SendData(packet);
@@ -556,7 +556,7 @@ void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet)
 	if (canReconnect || allowSpecJoin || !gameHasStarted)
 		packetCache.push_back(packet);
 
-	if (demoRecorder != nullptr)
+	if (demoRecorder != nullptr && !isPrivate)
 		demoRecorder->SaveToDemo(packet->data, packet->length, GetDemoTime());
 }
 
@@ -3060,7 +3060,7 @@ void CGameServer::GotChatMessage(const ChatMessage& msg)
 	if (msg.msg.empty())
 		return;
 
-	Broadcast(std::shared_ptr<const RawPacket>(msg.Pack()));
+	Broadcast(std::shared_ptr<const RawPacket>(msg.Pack()), msg.isPrivate);
 
 	if (hostif == nullptr)
 		return;
