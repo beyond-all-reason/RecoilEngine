@@ -566,9 +566,9 @@ public:
 
 
 
-class SaySecureByPlayerIDActionExecutor : public IUnsyncedActionExecutor {
+class SaySecretByPlayerIDActionExecutor : public IUnsyncedActionExecutor {
 public:
-	SaySecureByPlayerIDActionExecutor() : IUnsyncedActionExecutor("SByNum", "Say something in private to a specific player, by player-ID") {
+	SaySecretByPlayerIDActionExecutor() : IUnsyncedActionExecutor("SByNum", "Say a secret to a specific player, by player-ID") {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
@@ -3978,7 +3978,7 @@ void UnsyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<SayActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<SayPrivateActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<SayPrivateByPlayerIDActionExecutor>());
-	AddActionExecutor(AllocActionExecutor<SaySecureByPlayerIDActionExecutor>());
+	AddActionExecutor(AllocActionExecutor<SaySecretByPlayerIDActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<EchoActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<SetActionExecutor>(true));
 	AddActionExecutor(AllocActionExecutor<SetActionExecutor>(false));
