@@ -13,10 +13,7 @@
 
 #include "System/Misc/TracyDefs.h"
 
-#ifdef LoadImage // windows defines this and messes up our LoadImage.
-#undef LoadImage
-#endif
-
+#undef LoadImage // windows defines this and messes up our LoadImage
 class LuaImageException : public std::runtime_error
 {
 	using std::runtime_error::runtime_error;
