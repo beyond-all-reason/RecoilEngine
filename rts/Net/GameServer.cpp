@@ -3066,7 +3066,7 @@ void CGameServer::GotChatMessage(const ChatMessage& msg)
 	if (msg.msg.empty())
 		return;
 	if (msg.isSecret)
-		SendDirect(std::shared_ptr<const RawPacket>(msg.Pack()), msg.destination);
+		SendSecret(std::shared_ptr<const RawPacket>(msg.Pack()), msg.destination);
 	else
 		Broadcast(std::shared_ptr<const RawPacket>(msg.Pack()));
 
