@@ -566,7 +566,7 @@ void CGameServer::SendSecret(const ChatMessage& msg)
 {
 	int destPlayer = msg.destination;
 
-	if (allowInterplayerSecrets && destPlayer >= 0 && destPlayer < players.size() && !players[msg.fromPlayer].IsSpectator()) {
+	if (allowInterplayerSecrets && destPlayer >= 0 && destPlayer < players.size() && !players[msg.fromPlayer].IsSpectator() && !players[destination].IsSpectator()) {
 		players[destPlayer].SendData(std::shared_ptr<const RawPacket>(msg.Pack()));
 	}
 }
