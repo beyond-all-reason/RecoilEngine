@@ -15,6 +15,7 @@
 #include "LuaConstEngine.h"
 #include "LuaConstGame.h"
 #include "LuaConstPlatform.h"
+#include "LuaCrypto.h"
 #include "LuaInterCall.h"
 #include "LuaSyncedCtrl.h"
 #include "LuaSyncedRead.h"
@@ -515,6 +516,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 		if (!AddEntriesToTable(L, "VFS",                   LuaVFS::PushSynced       )) KILL
 		if (!AddEntriesToTable(L, "VFS",         LuaZipFileReader::PushSynced       )) KILL
 		if (!AddEntriesToTable(L, "VFS",         LuaZipFileWriter::PushSynced       )) KILL
+		if (!AddEntriesToTable(L, "Crypto",             LuaCrypto::PushEntries      )) KILL
 		if (!AddEntriesToTable(L, "UnitDefs",         LuaUnitDefs::PushEntries      )) KILL
 		if (!AddEntriesToTable(L, "WeaponDefs",     LuaWeaponDefs::PushEntries      )) KILL
 		if (!AddEntriesToTable(L, "FeatureDefs",   LuaFeatureDefs::PushEntries      )) KILL
