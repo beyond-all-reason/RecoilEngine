@@ -1471,11 +1471,11 @@ void LuaVBOImpl::DumpDefinition()
 	LOG("%s", ss.str().c_str());
 }
 
-/***
+/*** Copy the contents of the VBO to another VBO.
  *
  * @function VBO:CopyTo
  *
- * Copies the current content of the buffer to another buffer. That another buffer is expected to have sufficient allocation.
+ * Destination VBO is expected to have sufficient allocation size, otherwise the copying will gracefully fail.
  *
  * @param destVBO VBO
  * @param copySizeInBytes integer
