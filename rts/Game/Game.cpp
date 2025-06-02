@@ -1899,7 +1899,7 @@ void CGame::SendNetChat(std::string message, int destination, bool isSecret)
 	}
 
 	if (isSecret && destination >= ChatMessage::TO_ALLIES && destination <= ChatMessage::TO_SPECTATORS) {
-		LOG_L(L_WARNING, "Secure message with broadcast destination");
+		LOG_L(L_WARNING, "Secret message with broadcast destination");
 		return;
 	}
 
@@ -1980,7 +1980,10 @@ void CGame::HandleChatMsg(const ChatMessage& msg)
 			if (player->isFromDemo) {
 				LOG("%s whispered %s: %s", label.c_str(), playerHandler.Player(msg.destination)->name.c_str(), s.c_str());
 			} else if (msg.destination == gu->myPlayerNum && player->spectator == gu->spectating) {
-				LOG("%sPrivate: %s", label.c_str(), s.c_str());
+				if (msg.isSecret)
+					LOG("%sSecret: %s", label.c_str(), s.c_str());
+				else
+					LOG("%sPrivate: %s", label.c_str(), s.c_str());
 				Channels::UserInterface->PlaySample(chatSound, 5);
 			}
 			else if (player->playerNum == gu->myPlayerNum)
