@@ -547,7 +547,7 @@ bool CGameServer::SendDemoData(int targetFrameNum)
 	return ret;
 }
 
-void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet, bool isSecure)
+void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet)
 {
 	for (GameParticipant& p: players) {
 		p.SendData(packet);
@@ -556,7 +556,7 @@ void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet, bo
 	if (canReconnect || allowSpecJoin || !gameHasStarted)
 		packetCache.push_back(packet);
 
-	if (demoRecorder != nullptr && !isSecure)
+	if (demoRecorder != nullptr)
 		demoRecorder->SaveToDemo(packet->data, packet->length, GetDemoTime());
 }
 
@@ -1150,7 +1150,7 @@ void CGameServer::ProcessPacket(const unsigned playerNum, std::shared_ptr<const 
 			Broadcast(CBaseNetProtocol::Get().SendPathCheckSum(playerNum, playerCheckSum));
 		} break;
 
-		case NETMSG_SECURE_CHAT:
+		case NETMSG_SECRET_CHAT:
 		case NETMSG_CHAT: {
 			try {
 				ChatMessage msg(packet);
@@ -3065,8 +3065,8 @@ void CGameServer::GotChatMessage(const ChatMessage& msg)
 	// silently drop empty chat messages
 	if (msg.msg.empty())
 		return;
-	if (msg.isSecure)
-		SendTo(std::shared_ptr<const RawPacket>(msg.Pack()), msg.destination)
+	if (msg.isSecret)
+		SendDirect(std::shared_ptr<const RawPacket>(msg.Pack()), msg.destination);
 	else
 		Broadcast(std::shared_ptr<const RawPacket>(msg.Pack()));
 

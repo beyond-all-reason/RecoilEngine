@@ -1872,7 +1872,7 @@ void CGame::GameEnd(const std::vector<unsigned char>& winningAllyTeams, bool tim
 	}
 }
 
-void CGame::SendNetChat(std::string message, int destination, bool isSecure)
+void CGame::SendNetChat(std::string message, int destination, bool isSecret)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (message.empty())
@@ -1898,12 +1898,12 @@ void CGame::SendNetChat(std::string message, int destination, bool isSecure)
 		}
 	}
 
-	if (isSecure && destination >= TO_ALLIES && destination <= TO_SPECTATORS) {
+	if (isSecret && destination >= ChatMessage::TO_ALLIES && destination <= ChatMessage::TO_SPECTATORS) {
 		LOG_L(L_WARNING, "Secure message with broadcast destination");
 		return;
 	}
 
-	ChatMessage buf(gu->myPlayerNum, destination, message, isSecure);
+	ChatMessage buf(gu->myPlayerNum, destination, message, isSecret);
 	clientNet->Send(buf.Pack());
 }
 
