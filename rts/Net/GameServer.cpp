@@ -556,8 +556,14 @@ void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet, bo
 	if (canReconnect || allowSpecJoin || !gameHasStarted)
 		packetCache.push_back(packet);
 
-	if (demoRecorder != nullptr && !isPrivate)
+	if (demoRecorder != nullptr && !isSecure)
 		demoRecorder->SaveToDemo(packet->data, packet->length, GetDemoTime());
+}
+
+void CGameServer::SendDirect(std::shared_ptr<const netcode::RawPacket> packet, int destination)
+{
+	if (destination < ChatMessage::TO_ALLIES)
+		players[destination].SendData(packet);
 }
 
 void CGameServer::Message(const std::string& message, bool broadcast, bool internal)
@@ -3059,8 +3065,10 @@ void CGameServer::GotChatMessage(const ChatMessage& msg)
 	// silently drop empty chat messages
 	if (msg.msg.empty())
 		return;
-
-	Broadcast(std::shared_ptr<const RawPacket>(msg.Pack()), msg.isPrivate);
+	if (msg.isSecure)
+		SendTo(std::shared_ptr<const RawPacket>(msg.Pack()), msg.destination)
+	else
+		Broadcast(std::shared_ptr<const RawPacket>(msg.Pack()));
 
 	if (hostif == nullptr)
 		return;

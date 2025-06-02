@@ -173,7 +173,8 @@ private:
 	/// read data from demo and send it to clients
 	bool SendDemoData(int targetFrameNum);
 
-	void Broadcast(std::shared_ptr<const netcode::RawPacket> packet, bool isPrivate = false);
+	void Broadcast(std::shared_ptr<const netcode::RawPacket> packet);
+	void SendDirect(std::shared_ptr<const netcode::RawPacket> packet, int destination);
 
 	/**
 	 * @brief skip frames

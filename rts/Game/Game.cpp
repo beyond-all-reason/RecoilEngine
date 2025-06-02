@@ -1898,7 +1898,12 @@ void CGame::SendNetChat(std::string message, int destination, bool isSecure)
 		}
 	}
 
-	ChatMessage buf(gu->myPlayerNum, destination, message, isPrivate);
+	if (isSecure && destination >= TO_ALLIES && destination <= TO_SPECTATORS) {
+		LOG_L(L_WARNING, "Secure message with broadcast destination");
+		return;
+	}
+
+	ChatMessage buf(gu->myPlayerNum, destination, message, isSecure);
 	clientNet->Send(buf.Pack());
 }
 
