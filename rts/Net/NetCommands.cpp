@@ -472,6 +472,7 @@ void CGame::ClientReadNet()
 				}
 			} break;
 
+			case NETMSG_PRIVATE_CHAT:
 			case NETMSG_CHAT: {
 				ZoneScopedN("Net::Chat");
 				try {

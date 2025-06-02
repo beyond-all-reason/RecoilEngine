@@ -1872,7 +1872,7 @@ void CGame::GameEnd(const std::vector<unsigned char>& winningAllyTeams, bool tim
 	}
 }
 
-void CGame::SendNetChat(std::string message, int destination)
+void CGame::SendNetChat(std::string message, int destination, bool isPrivate)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (message.empty())
@@ -1898,7 +1898,7 @@ void CGame::SendNetChat(std::string message, int destination)
 		}
 	}
 
-	ChatMessage buf(gu->myPlayerNum, destination, message);
+	ChatMessage buf(gu->myPlayerNum, destination, message, isPrivate);
 	clientNet->Send(buf.Pack());
 }
 

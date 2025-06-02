@@ -94,6 +94,7 @@ enum NETMSG {
 	NETMSG_GAME_FRAME_PROGRESS= 77, // int32_t frameNum # this special packet skips queue & cache entirely, indicates current game progress for clients fast-forwarding to current point the game #
 
 	NETMSG_PING = 78, // uint8_t playerNum, uint8_t pingTag, float localTime
+	NETMSG_PRIVATE_CHAT     = 79,  // uint8_t from, dest; std::string message; (same as NETMSG_CHAT, but private)
 
 	NETMSG_LAST //max types of netmessages, internal only
 };

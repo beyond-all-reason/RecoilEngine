@@ -849,10 +849,10 @@ void CGameServer::Update()
 
 		if (!msg.empty()) {
 			if (msg.at(0) != '/') { // normal chat message
-				GotChatMessage(ChatMessage(SERVER_PLAYER, ChatMessage::TO_EVERYONE, msg));
+				GotChatMessage(ChatMessage(SERVER_PLAYER, ChatMessage::TO_EVERYONE, msg, false));
 			}
 			else if (msg.at(0) == '/' && msg.size() > 1 && msg.at(1) == '/') { // chatmessage with prefixed '/'
-				GotChatMessage(ChatMessage(SERVER_PLAYER, ChatMessage::TO_EVERYONE, msg.substr(1)));
+				GotChatMessage(ChatMessage(SERVER_PLAYER, ChatMessage::TO_EVERYONE, msg.substr(1), false));
 			}
 			else if (msg.size() > 1) { // command
 				PushAction(Action(msg.substr(1)), true);
@@ -1144,6 +1144,7 @@ void CGameServer::ProcessPacket(const unsigned playerNum, std::shared_ptr<const 
 			Broadcast(CBaseNetProtocol::Get().SendPathCheckSum(playerNum, playerCheckSum));
 		} break;
 
+		case NETMSG_PRIVATE_CHAT:
 		case NETMSG_CHAT: {
 			try {
 				ChatMessage msg(packet);
