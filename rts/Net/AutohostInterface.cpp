@@ -142,7 +142,10 @@ enum EVENT
 	 *
 	 *   (uint8 playernumber, uint8 destination, char[] text)
 	 *
-	 * Message should not be logged into public destinations, and shouldn't be forwarded to all players.
+	 * Message should not be:
+	 *  * Logged into public destinations
+	 *  * Forwarded to all players.
+	 *  * Sent to spectators.
 	 *
 	 * destination works like PLAYER_CHAT but will only be sent to TO_SERVER and specific playerIds for now.
 	 */
