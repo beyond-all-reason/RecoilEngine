@@ -281,6 +281,7 @@ private:
 
 	bool logInfoMessages = false;
 	bool logDebugMessages = false;
+	bool allowInterplayerSecrets = false;
 
 
 	/// If the server receives a command, it will forward it to clients if it is not in this set

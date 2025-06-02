@@ -75,6 +75,7 @@ CONFIG(bool, WhiteListAdditionalPlayers).defaultValue(true);
 CONFIG(bool, ServerRecordDemos).defaultValue(false).dedicatedValue(true);
 CONFIG(bool, ServerLogInfoMessages).defaultValue(false);
 CONFIG(bool, ServerLogDebugMessages).defaultValue(false);
+CONFIG(bool, AllowInterplayerSecrets).defaultValue(false);
 CONFIG(std::string, AutohostIP).defaultValue("127.0.0.1");
 
 
@@ -163,6 +164,7 @@ void CGameServer::Initialize()
 	whiteListAdditionalPlayers = configHandler->GetBool("WhiteListAdditionalPlayers");
 	logInfoMessages = configHandler->GetBool("ServerLogInfoMessages");
 	logDebugMessages = configHandler->GetBool("ServerLogDebugMessages");
+	allowInterplayerSecrets = configHandler->GetBool("AllowInterplayerSecrets");
 
 	rng.Seed((myGameData->GetSetupText()).length());
 
