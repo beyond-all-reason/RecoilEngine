@@ -12,10 +12,7 @@
 #undef UNUSED
 #endif
 
-/*
-
- not really needed?
-// sec256k1 helpers
+// random generator access
 #if defined(_WIN32)
  * The defined WIN32_NO_STATUS macro disables return code definitions in
  * windows.h, which avoids "macro redefinition" MSVC warnings in ntstatus.h.
@@ -31,12 +28,11 @@
 #include <unistd.h>
 #else
 #error "Couldn't identify the OS"
-#endif*/
+#endif
 
 
 // secp256k1
 
-#include "sys/random.h"
 #include "secp256k1.h"
 #include "secp256k1_ecdh.h"
 
