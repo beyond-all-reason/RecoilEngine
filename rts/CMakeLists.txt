@@ -60,6 +60,10 @@ list(APPEND engineCommonLibraries "tiny-aes")
 list(APPEND engineCommonLibraries "secp256k1")
 list(APPEND engineCommonLibraries "cryptopp")
 
+if (WIN32)
+list(APPEND engineCommonLibraries "bcrypt")
+endif (WIN32)
+
 ### Assemble common libraries
 add_subdirectory(System/Sound)
 if    (NO_SOUND)
