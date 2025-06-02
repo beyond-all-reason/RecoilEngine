@@ -114,14 +114,13 @@ void CSmokeProjectile::Draw()
 	const float3 pos1 ((camera->GetRight() - camera->GetUp()) * interSize);
 	const float3 pos2 ((camera->GetRight() + camera->GetUp()) * interSize);
 
-	#define st projectileDrawer->GetSmokeTexture(textureNum)
-	AddEffectsQuad(
+	const auto* st = projectileDrawer->GetSmokeTexture(textureNum);
+	AddEffectsQuad<0>(
 		{ drawPos - pos2, st->xstart, st->ystart, col },
 		{ drawPos + pos1, st->xend,   st->ystart, col },
 		{ drawPos + pos2, st->xend,   st->yend,   col },
 		{ drawPos - pos1, st->xstart, st->yend,   col }
 	);
-	#undef st
 }
 
 int CSmokeProjectile::GetProjectilesCount() const
@@ -136,11 +135,11 @@ bool CSmokeProjectile::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, color        )
-	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, size         )
-	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, startSize    )
-	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, sizeExpansion)
-	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, ageSpeed     )
+	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, color        );
+	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, size         );
+	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, startSize    );
+	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, sizeExpansion);
+	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, ageSpeed     );
 
 	return false;
 }

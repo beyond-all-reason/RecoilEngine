@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _INFO_TEXTURE_HANDLER_H
-#define _INFO_TEXTURE_HANDLER_H
+#pragma once
 
 #include <string>
 
@@ -54,4 +53,26 @@ protected:
 	CInfoTextureCombiner* infoTex = nullptr;
 };
 
-#endif // _INFO_TEXTURE_HANDLER_H
+class CNullInfoTextureHandler : public IInfoTextureHandler
+{
+public:
+	virtual ~CNullInfoTextureHandler() {};
+
+	void Update() override {};
+
+public:
+	bool IsEnabled() const override { return false; }
+	bool InMetalMode() const override { return false; }
+
+	void DisableCurrentMode() override {}
+	void SetMode(const std::string& name) override {}
+	void ToggleMode(const std::string& name) override {}
+	const std::string& GetMode() const override { static const std::string modeMock = ""; return modeMock; }
+
+	GLuint GetCurrentInfoTexture() const override { return 0; }
+	int2 GetCurrentInfoTextureSize() const override { return int2{ 1, 1 }; }
+
+public:
+	const CInfoTexture* GetInfoTextureConst(const std::string& name) const override { return nullptr; }
+	      CInfoTexture* GetInfoTexture(const std::string& name)            override { return nullptr; }
+};

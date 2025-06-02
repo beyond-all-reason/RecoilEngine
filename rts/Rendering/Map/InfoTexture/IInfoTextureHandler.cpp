@@ -19,7 +19,11 @@ void IInfoTextureHandler::Create()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	try {
+#ifdef HEADLESS
+		infoTextureHandler = std::make_unique<CNullInfoTextureHandler>();
+#else
 		infoTextureHandler = std::make_unique<CInfoTextureHandler>();
+#endif
 	} catch (const opengl_error& glerr) {
 		infoTextureHandler = nullptr;
 		throw glerr;

@@ -79,7 +79,7 @@ void CExplosiveProjectile::Draw()
 	if (!validTextures[0])
 		return;
 
-	UpdateWeaponAnimParams();
+	UpdateAnimParams();
 
 	uint8_t col[4] = {0};
 
@@ -118,7 +118,7 @@ void CExplosiveProjectile::Draw()
 		col[2] = stageDecay * col[2];
 		col[3] = stageDecay * col[3];
 
-		AddWeaponEffectsQuad<1>(
+		AddEffectsQuad<1>(
 			{ stagePos - xdirCam - ydirCam, tex->xstart, tex->ystart, col },
 			{ stagePos + xdirCam - ydirCam, tex->xend,   tex->ystart, col },
 			{ stagePos + xdirCam + ydirCam, tex->xend,   tex->yend,   col },

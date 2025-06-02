@@ -61,7 +61,7 @@ CONFIG(float, UnitIconFadeVanish).defaultValue(1000.0f).minimumValue(1.0f).maxim
 CONFIG(float, UnitTransparency).defaultValue(0.7f);
 CONFIG(bool, UnitIconsAsUI).defaultValue(false).description("Draw unit icons like it is an UI element and not like unit's LOD.");
 CONFIG(bool, UnitIconsHideWithUI).defaultValue(false).description("Hide unit icons when UI is hidden.");
-CONFIG(float, UnitGhostIconsDimming).defaultValue(0.5).minimumValue(0.0f).maximumValue(1.0f).description("Dimming multiplier for out of radar ghost icons. Setting to 0 disables them.");
+CONFIG(float, UnitGhostIconsDimming).defaultValue(0.8).minimumValue(0.0f).maximumValue(1.0f).description("Dimming multiplier for out of radar ghost icons. Setting to 0 disables them.");
 
 CONFIG(int, MaxDynamicModelLights)
 	.defaultValue(1)

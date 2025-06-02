@@ -2039,10 +2039,13 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		restTime = 0;
 
 		bool killMe = false;
+
 		SResourceOrder order;
 		order.quantum    = false;
 		order.overflow   = true;
 		order.use.energy = -energyRefundStepScaled;
+		order.useIncomeMultiplier = false; // Dont apply income bonus to reclaimed units
+		
 		if (modInfo.reclaimUnitMethod == 0) {
 			// gradual reclamation of invested metal
 			order.add.metal = -metalRefundStepScaled;
@@ -2323,7 +2326,7 @@ bool CUnit::IssueResourceOrder(SResourceOrder* order)
 	// add
 	if (!order->add.empty()) {
 		if (harvestStorage.empty()) {
-			AddResources(order->add);
+			AddResources(order->add, order->useIncomeMultiplier);
 		} else {
 			bool isFull = false;
 			for (int i = 0; i < SResourcePack::MAX_RESOURCES; ++i) {

@@ -22,10 +22,13 @@ public:
 	virtual bool IsValid() const = 0;
 	virtual void GetStats(std::array<size_t, 8>& stats) const = 0;
 
+	void SetUserDefinedBlending(bool enableUserDefinedBlending) { userDefinedBlending = enableUserDefinedBlending; };
+
 	static std::unique_ptr<CglFontRenderer> CreateInstance();
 	static void DeleteInstance(std::unique_ptr<CglFontRenderer>& instance);
 protected:
 	GLint currProgID = 0;
+	bool userDefinedBlending = false;
 
 	// should be enough to hold all data for a given frame
 	static constexpr size_t NUM_BUFFER_ELEMS = (1 << 14);

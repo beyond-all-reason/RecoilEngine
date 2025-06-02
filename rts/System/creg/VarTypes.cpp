@@ -84,3 +84,8 @@ std::unique_ptr<IType> IType::CreateIgnoredType(size_t size)
 {
 	return std::unique_ptr<IType>(new IgnoredType(size));
 }
+
+std::unique_ptr<IType> creg::IType::CreateFakeType(const IType* orig)
+{
+	return std::unique_ptr<IType>(new FakeType(orig));
+}

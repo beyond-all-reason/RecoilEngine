@@ -29,14 +29,21 @@ CR_REG_METADATA(CExpGenSpawnable, (
 	CR_MEMBER(rotVal),
 	CR_MEMBER(rotVel),
 	CR_MEMBER(createFrame),
+	CR_MEMBER(animProgress1),
+	CR_MEMBER(animProgress2),
+	CR_MEMBER(animProgress3),
+	CR_MEMBER(animProgress4),
 	CR_MEMBER_BEGINFLAG(CM_Config),
 		CR_MEMBER(rotParams),
-		CR_MEMBER(animParams),
-	CR_MEMBER_ENDFLAG(CM_Config),
-	CR_IGNORED(animProgress)
+		CR_FAKE(animParams, float3),
+		CR_MEMBER(animParams1),
+		CR_MEMBER(animParams2),
+		CR_MEMBER(animParams3),
+		CR_MEMBER(animParams4),
+	CR_MEMBER_ENDFLAG(CM_Config)
 ))
 
-std::array<CExpGenSpawnable::SpawnableTuple, 14> CExpGenSpawnable::spawnables = {};
+decltype(CExpGenSpawnable::spawnables) CExpGenSpawnable::spawnables = {};
 
 CExpGenSpawnable::CExpGenSpawnable(const float3& pos, const float3& spd)
 	: CWorldObject(pos, spd)
@@ -82,12 +89,7 @@ void CExpGenSpawnable::UpdateRotation()
 	rotVal = rotParams.z + rotVel      * t;
 }
 
-void CExpGenSpawnable::UpdateAnimParams()
-{
-	UpdateAnimParamsImpl(animParams, animProgress);
-}
-
-void CExpGenSpawnable::UpdateAnimParamsImpl(const float3& ap, float& p)
+void CExpGenSpawnable::UpdateAnimParamsImpl(const float3& ap, float& p) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (static_cast<int>(ap.x) <= 1 && static_cast<int>(ap.y) <= 1) {
@@ -121,13 +123,17 @@ bool CExpGenSpawnable::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 		spring::LiteHash("alwaysvisible",  sizeof("alwaysvisible") - 1, 0),
 	};
 
-	CHECK_MEMBER_INFO_FLOAT3_HASH(CExpGenSpawnable, pos          , memberHashes[0])
-	CHECK_MEMBER_INFO_FLOAT4_HASH(CExpGenSpawnable, speed        , memberHashes[1])
-	CHECK_MEMBER_INFO_BOOL_HASH  (CExpGenSpawnable, useAirLos    , memberHashes[2])
-	CHECK_MEMBER_INFO_BOOL_HASH  (CExpGenSpawnable, alwaysVisible, memberHashes[3])
+	CHECK_MEMBER_INFO_FLOAT3_HASH(CExpGenSpawnable, pos          , memberHashes[0]);
+	CHECK_MEMBER_INFO_FLOAT4_HASH(CExpGenSpawnable, speed        , memberHashes[1]);
+	CHECK_MEMBER_INFO_BOOL_HASH  (CExpGenSpawnable, useAirLos    , memberHashes[2]);
+	CHECK_MEMBER_INFO_BOOL_HASH  (CExpGenSpawnable, alwaysVisible, memberHashes[3]);
 
-	CHECK_MEMBER_INFO_FLOAT3(CExpGenSpawnable, rotParams)
-	CHECK_MEMBER_INFO_FLOAT3(CExpGenSpawnable, animParams)
+	CHECK_MEMBER_INFO_FLOAT3(CExpGenSpawnable, rotParams);
+
+	CHECK_MEMBER_INFO_FLOAT3(CExpGenSpawnable, animParams1);
+	CHECK_MEMBER_INFO_FLOAT3(CExpGenSpawnable, animParams2);
+	CHECK_MEMBER_INFO_FLOAT3(CExpGenSpawnable, animParams3);
+	CHECK_MEMBER_INFO_FLOAT3(CExpGenSpawnable, animParams4);
 
 	return false;
 }
@@ -218,11 +224,6 @@ CExpGenSpawnable* CExpGenSpawnable::CreateSpawnable(int spawnableID)
 		return nullptr;
 
 	return std::get<2>(spawnables[spawnableID])();
-}
-
-void CExpGenSpawnable::AddEffectsQuad(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const
-{
-	AddEffectsQuadImpl(tl, tr, br, bl, animParams, animProgress);
 }
 
 void CExpGenSpawnable::AddEffectsQuadImpl(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl, const float3& ap, const float& p)

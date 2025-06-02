@@ -55,12 +55,12 @@ public:
 
 	CglFont(const std::string& fontFile, int size, int outlinewidth, float outlineweight);
 
-	void Begin();
+	void Begin(bool userDefinedBlending = false);
 	void End();
 
-	void DrawBuffered();
+	void DrawBuffered(bool userDefinedBlending = false);
 
-	void DrawWorldBuffered();
+	void DrawWorldBuffered(bool userDefinedBlending = false);
 
 	void glWorldPrint(const float3& p, const float size, const std::string& str, int options = FONT_DESCENDER | FONT_CENTER | FONT_OUTLINE | FONT_BUFFERED);
 

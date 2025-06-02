@@ -10,8 +10,6 @@
 #include "GameController.h"
 #include "GameJobDispatcher.h"
 #include "GameInputReceiver.h"
-#include "Game/UI/KeySet.h"
-#include "Game/Action.h"
 #include "Rendering/WorldDrawer.h"
 #include "System/UnorderedMap.hpp"
 #include "System/creg/creg_cond.h"
@@ -107,6 +105,10 @@ public:
 	void SetDrawMode(GameDrawMode mode) { gameDrawMode = mode; }
 	GameDrawMode GetDrawMode() const { return gameDrawMode; }
 
+	bool ActionPressed(const Action& action, bool isRepeat);
+	bool ActionReleased(const Action& action);
+
+	const ActionList& GetLastActionList();
 private:
 	bool Draw() override;
 	bool Update() override;
@@ -121,12 +123,10 @@ private:
 	void HandleChatMsg(const ChatMessage& msg);
 
 	/// Called when a key is released by the user
-	int KeyReleased(int keyCode, int scanCode) override;
-	/// Called when the key is pressed by the user (can be called several times due to key repeat)
 	int KeyPressed(int keyCode, int scanCode, bool isRepeat) override;
+	/// Called when the key is pressed by the user (can be called several times due to key repeat)
+	int KeyReleased(int keyCode, int scanCode) override;
 
-	bool MousePress(int x, int y, int button) override;
-	bool MouseRelease(int x, int y, int button) override;
 	CInputReceiver* GetInputReceiver() override;
 
 	/// Called when the keymap changes (language or keyboard switch)
@@ -135,8 +135,6 @@ private:
 	int TextInput(const std::string& utf8Text) override;
 	int TextEditing(const std::string& utf8Text, unsigned int start, unsigned int length) override;
 
-	bool ActionPressed(const Action& action, bool isRepeat);
-	bool ActionReleased(const Action& action);
 	/// synced actions (received from server) go in here
 	void ActionReceived(const Action& action, int playerID);
 
@@ -171,8 +169,6 @@ public:
 	spring_time lastSimFrameNetPacketTime;
 	spring_time lastUnsyncedUpdateTime;
 	spring_time skipLastDrawTime;
-
-	ActionList lastActionList;
 
 	float updateDeltaSeconds = 0.0f;
 	/// Time in seconds, stops at game end
@@ -218,9 +214,6 @@ public:
 
 private:
 	JobDispatcher jobDispatcher;
-
-	CTimedKeyChain curKeyCodeChain;
-	CTimedKeyChain curScanCodeChain;
 
 	CWorldDrawer worldDrawer;
 

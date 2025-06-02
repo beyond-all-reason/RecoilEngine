@@ -59,10 +59,10 @@ bool CExpGenSpawner::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_INT  (CExpGenSpawner, delay )
-	CHECK_MEMBER_INFO_FLOAT(CExpGenSpawner, damage)
+	CHECK_MEMBER_INFO_INT  (CExpGenSpawner, delay );
+	CHECK_MEMBER_INFO_FLOAT(CExpGenSpawner, damage);
 	// TODO: much nicer to load cegID directly via LoadGeneratorID callback
-	CHECK_MEMBER_INFO_PTR  (CExpGenSpawner, explosionGenerator, explGenHandler.LoadGenerator)
+	CHECK_MEMBER_INFO_PTR  (CExpGenSpawner, explosionGenerator, explGenHandler.LoadGenerator);
 
 	return false;
 }

@@ -381,7 +381,7 @@ void CMissileProjectile::Draw()
 	if (!validTextures[1])
 		return;
 
-	UpdateWeaponAnimParams();
+	UpdateAnimParams();
 
 	// rocket flare
 	const SColor lightYellow(255, 210, 180, 1);
@@ -389,7 +389,7 @@ void CMissileProjectile::Draw()
 
 	const auto* WT1 = weaponDef->visuals.texture1;
 
-	AddWeaponEffectsQuad<1>(
+	AddEffectsQuad<1>(
 		{ drawPos - camera->GetRight() * fsize - camera->GetUp() * fsize, WT1->xstart, WT1->ystart, lightYellow },
 		{ drawPos + camera->GetRight() * fsize - camera->GetUp() * fsize, WT1->xend,   WT1->ystart, lightYellow },
 		{ drawPos + camera->GetRight() * fsize + camera->GetUp() * fsize, WT1->xend,   WT1->yend,   lightYellow },
