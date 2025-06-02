@@ -1872,7 +1872,7 @@ void CGame::GameEnd(const std::vector<unsigned char>& winningAllyTeams, bool tim
 	}
 }
 
-void CGame::SendNetChat(std::string message, int destination, bool isPrivate)
+void CGame::SendNetChat(std::string message, int destination, bool isSecure)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (message.empty())

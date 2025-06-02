@@ -4310,7 +4310,7 @@ int LuaUnsyncedRead::GetPlayerTraffic(lua_State* L)
 		(playerID != gu->myPlayerNum) && // all  self  counts can be read
 		(packetID != -1) &&
 		(packetID != NETMSG_CHAT)     &&
-		(packetID != NETMSG_PRIVATE_CHAT) &&
+		(packetID != NETMSG_SECURE_CHAT) &&
 		(packetID != NETMSG_PAUSE)    &&
 		(packetID != NETMSG_LUAMSG)   &&
 		(packetID != NETMSG_STARTPOS) &&

@@ -547,7 +547,7 @@ bool CGameServer::SendDemoData(int targetFrameNum)
 	return ret;
 }
 
-void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet, bool isPrivate)
+void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet, bool isSecure)
 {
 	for (GameParticipant& p: players) {
 		p.SendData(packet);
@@ -1144,7 +1144,7 @@ void CGameServer::ProcessPacket(const unsigned playerNum, std::shared_ptr<const 
 			Broadcast(CBaseNetProtocol::Get().SendPathCheckSum(playerNum, playerCheckSum));
 		} break;
 
-		case NETMSG_PRIVATE_CHAT:
+		case NETMSG_SECURE_CHAT:
 		case NETMSG_CHAT: {
 			try {
 				ChatMessage msg(packet);

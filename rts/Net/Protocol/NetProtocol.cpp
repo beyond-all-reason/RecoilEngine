@@ -136,7 +136,7 @@ std::shared_ptr<const netcode::RawPacket> CNetProtocol::GetData(int frameNum)
 	if (ret->data[0] == NETMSG_GAMEDATA)
 		return ret;
 
-	if (ret->data[0] == NETMSG_PRIVATE_CHAT)
+	if (ret->data[0] == NETMSG_SECURE_CHAT)
 		return ret;
 
 	if (demoRecordPtr->IsValid())
