@@ -174,7 +174,7 @@ private:
 	bool SendDemoData(int targetFrameNum);
 
 	void Broadcast(std::shared_ptr<const netcode::RawPacket> packet);
-	void SendDirect(std::shared_ptr<const netcode::RawPacket> packet, int destination);
+	void SendSecret(std::shared_ptr<const netcode::RawPacket> packet, int destination);
 
 	/**
 	 * @brief skip frames

@@ -560,9 +560,9 @@ void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet)
 		demoRecorder->SaveToDemo(packet->data, packet->length, GetDemoTime());
 }
 
-void CGameServer::SendDirect(std::shared_ptr<const netcode::RawPacket> packet, int destination)
+void CGameServer::SendSecret(std::shared_ptr<const netcode::RawPacket> packet, int destination)
 {
-	if (destination < ChatMessage::TO_ALLIES)
+	if (destination >= 0 && destination < players.size())
 		players[destination].SendData(packet);
 }
 
