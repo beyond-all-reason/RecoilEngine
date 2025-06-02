@@ -562,10 +562,13 @@ void CGameServer::Broadcast(std::shared_ptr<const netcode::RawPacket> packet)
 		demoRecorder->SaveToDemo(packet->data, packet->length, GetDemoTime());
 }
 
-void CGameServer::SendSecret(std::shared_ptr<const netcode::RawPacket> packet, int destination)
+void CGameServer::SendSecret(const ChatMessage& msg)
 {
-	if (destination >= 0 && destination < players.size())
-		players[destination].SendData(packet);
+	int destPlayer = msg.destination;
+
+	if (allowInterplayerSecrets && destPlayer >= 0 && destPlayer < players.size() && !players[msg.fromPlayer].IsSpectator()) {
+		players[destPlayer].SendData(std::shared_ptr<const RawPacket>(msg.Pack()));
+	}
 }
 
 void CGameServer::Message(const std::string& message, bool broadcast, bool internal)
@@ -3068,7 +3071,7 @@ void CGameServer::GotChatMessage(const ChatMessage& msg)
 	if (msg.msg.empty())
 		return;
 	if (msg.isSecret)
-		SendSecret(std::shared_ptr<const RawPacket>(msg.Pack()), msg.destination);
+		SendSecret(msg);
 	else
 		Broadcast(std::shared_ptr<const RawPacket>(msg.Pack()));
 
