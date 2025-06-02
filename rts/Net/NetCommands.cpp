@@ -479,8 +479,7 @@ void CGame::ClientReadNet()
 					const ChatMessage msg(packet);
 
 					HandleChatMsg(msg);
-					if (packetCode != NETMSG_PRIVATE_CHAT)
-						AddTraffic(msg.fromPlayer, packetCode, dataLength);
+					AddTraffic(msg.fromPlayer, packetCode, dataLength);
 				} catch (const netcode::UnpackPacketException& ex) {
 					LOG_L(L_ERROR, "[Game::%s][NETMSG_CHAT] exception \"%s\"", __func__, ex.what());
 				}
