@@ -42,6 +42,9 @@ class CUnsyncedLuaHandle : public CLuaHandle
 			return static_cast<CUnsyncedLuaHandle*>(CLuaHandle::GetHandle(L));
 		}
 
+		static int GetWatchExplosionDef(lua_State* L);
+		static int SetWatchExplosionDef(lua_State* L);
+
 	protected:
 		CSplitLuaHandle& base;
 };
