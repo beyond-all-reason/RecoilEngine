@@ -567,7 +567,13 @@ void CGameServer::SendSecret(const ChatMessage& msg)
 	const int fromPlayer = msg.fromPlayer;
 	const int toPlayer   = msg.destination;
 
-	if (allowInterplayerSecrets && toPlayer >= 0 && toPlayer < players.size() && !players[fromPlayer].IsSpectator() && !players[toPlayer].IsSpectator()) {
+	if (toPlayer < 0 || toPlayer >= players.size())
+		return;
+
+	// Allows the server to send.
+	// Usually it would use PrivateMessage -> SendSystemMessage instead, but may be needed
+	// in some situations like if autohost wants to send secret messages to players.
+	if (fromPlayer == SERVER_PLAYER || ( allowInterplayerSecrets && !players[fromPlayer].IsSpectator() && !players[toPlayer].IsSpectator() )) {
 		players[toPlayer].SendData(std::shared_ptr<const RawPacket>(msg.Pack()));
 	}
 }
