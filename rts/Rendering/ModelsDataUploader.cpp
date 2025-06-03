@@ -236,7 +236,7 @@ size_t TransformsUploader::GetElemOffset(const S3DModel* model) const
 		return TransformsMemStorage::INVALID_INDEX;
 	}
 
-	return model->GetMatAlloc().GetOffset(false);
+	return model->GetTransformAlloc().GetOffset(false);
 }
 
 size_t TransformsUploader::GetUnitDefElemOffset(int32_t unitDefID) const

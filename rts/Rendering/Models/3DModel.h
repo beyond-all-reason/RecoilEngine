@@ -379,7 +379,7 @@ struct S3DModel
 	float3 CalcDrawMidPos() const { return ((maxs + mins) * 0.5f); }
 	float3 GetDrawMidPos() const { return relMidPos; }
 
-	const ScopedTransformMemAlloc& GetMatAlloc() const { return traAlloc; }
+	const ScopedTransformMemAlloc& GetTransformAlloc() const { return traAlloc; }
 public:
 	std::string name;
 	std::array<std::string, NUM_MODEL_TEXTURES> texs;

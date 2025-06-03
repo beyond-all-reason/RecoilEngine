@@ -287,8 +287,8 @@ template<typename TObj>
 bool S3DModelVAO::AddToSubmissionImpl(const TObj* obj, uint32_t indexStart, uint32_t indexCount, uint8_t teamID, uint8_t drawFlags)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const auto matIndex = transformsUploader.GetElemOffset(obj);
-	if (matIndex == TransformsMemStorage::INVALID_INDEX)
+	const auto traIndex = transformsUploader.GetElemOffset(obj);
+	if (traIndex == TransformsMemStorage::INVALID_INDEX)
 		return false;
 
 	const auto uniIndex = modelUniformsStorage.GetObjOffset(obj); //doesn't need to exist for defs and models. Don't check for validity
@@ -309,7 +309,7 @@ bool S3DModelVAO::AddToSubmissionImpl(const TObj* obj, uint32_t indexStart, uint
 
 	auto& modelInstanceData = modelDataToInstance[SIndexAndCount{ indexStart, indexCount }];
 	modelInstanceData.emplace_back(SInstanceData(
-		static_cast<uint32_t>(matIndex),
+		static_cast<uint32_t>(traIndex),
 		teamID,
 		drawFlags,
 		numPieces,
@@ -414,8 +414,8 @@ template<typename TObj>
 bool S3DModelVAO::SubmitImmediatelyImpl(const TObj* obj, uint32_t indexStart, uint32_t indexCount, uint8_t teamID, uint8_t drawFlags, GLenum mode, bool bindUnbind)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	std::size_t matIndex = transformsUploader.GetElemOffset(obj);
-	if (matIndex == TransformsMemStorage::INVALID_INDEX)
+	std::size_t traIndex = transformsUploader.GetElemOffset(obj);
+	if (traIndex == TransformsMemStorage::INVALID_INDEX)
 		return false;
 
 	const auto uniIndex = modelUniformsStorage.GetObjOffset(obj); //doesn't need to exist for defs. Don't check for validity
@@ -431,7 +431,7 @@ bool S3DModelVAO::SubmitImmediatelyImpl(const TObj* obj, uint32_t indexStart, ui
 		bposeIndex = transformsUploader.GetElemOffset(obj->model);
 	}
 
-	SInstanceData instanceData(static_cast<uint32_t>(matIndex), teamID, drawFlags, numPieces, uniIndex, bposeIndex);
+	SInstanceData instanceData(static_cast<uint32_t>(traIndex), teamID, drawFlags, numPieces, uniIndex, bposeIndex);
 	const uint32_t immediateBaseInstanceAbs = INSTANCE_BUFFER_NUM_BATCHED + immediateBaseInstance;
 
 	static SDrawElementsIndirectCommand scmd;
