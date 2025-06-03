@@ -51,6 +51,8 @@ public:
 	virtual void Draw() {}
 	virtual void DrawOnMinimap() const;
 
+	bool UpdateAnimParams() override;
+
 	virtual int GetProjectilesCount() const = 0;
 
 	// override WorldObject::SetVelocityAndSpeed so

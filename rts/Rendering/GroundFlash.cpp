@@ -88,6 +88,11 @@ CGroundFlash::CGroundFlash(const float3& _pos) : CGroundFlash()
 	pos = _pos;
 }
 
+bool CGroundFlash::UpdateAnimParams() {
+	UpdateAnimParamsImpl(animParams1, animProgress1);
+	return true;
+}
+
 float3 CGroundFlash::CalcNormal(const float3 midPos, const float3 camDir, float quadSize) const
 {
 	// no degenerate quads, otherwise ANormalize() fails
@@ -116,9 +121,9 @@ bool CGroundFlash::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CExpGenSpawnable::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT(CGroundFlash, size)
-	CHECK_MEMBER_INFO_BOOL (CGroundFlash, depthTest)
-	CHECK_MEMBER_INFO_BOOL (CGroundFlash, depthMask)
+	CHECK_MEMBER_INFO_FLOAT(CGroundFlash, size     );
+	CHECK_MEMBER_INFO_BOOL (CGroundFlash, depthTest);
+	CHECK_MEMBER_INFO_BOOL (CGroundFlash, depthMask);
 
 	return false;
 }
@@ -225,7 +230,7 @@ void CStandardGroundFlash::Draw()
 		const float3 p4 = pos + (-side1 + side2) * iSize;
 
 		color.a = (unsigned char)(iAlpha * 255);
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
 			{ p1, projectileDrawer->groundringtex->xstart, projectileDrawer->groundringtex->ystart, color },
 			{ p2, projectileDrawer->groundringtex->xend,   projectileDrawer->groundringtex->ystart, color },
 			{ p3, projectileDrawer->groundringtex->xend,   projectileDrawer->groundringtex->yend,   color },
@@ -247,7 +252,7 @@ void CStandardGroundFlash::Draw()
 		const float3 p3 = pos + ( side1 - side2) * size;
 		const float3 p4 = pos + (-side1 - side2) * size;
 
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
 			{ p1, projectileDrawer->groundflashtex->xstart, projectileDrawer->groundflashtex->ystart, color },
 			{ p2, projectileDrawer->groundflashtex->xend  , projectileDrawer->groundflashtex->ystart, color },
 			{ p3, projectileDrawer->groundflashtex->xend  , projectileDrawer->groundflashtex->yend  , color },
@@ -262,11 +267,11 @@ bool CStandardGroundFlash::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CGroundFlash::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT(CStandardGroundFlash, flashSize   )
-	CHECK_MEMBER_INFO_FLOAT(CStandardGroundFlash, flashAlpha  )
-	CHECK_MEMBER_INFO_FLOAT(CStandardGroundFlash, circleGrowth)
-	CHECK_MEMBER_INFO_FLOAT(CStandardGroundFlash, circleAlpha )
-	CHECK_MEMBER_INFO_SCOLOR(CStandardGroundFlash, color      )
+	CHECK_MEMBER_INFO_FLOAT(CStandardGroundFlash, flashSize   );
+	CHECK_MEMBER_INFO_FLOAT(CStandardGroundFlash, flashAlpha  );
+	CHECK_MEMBER_INFO_FLOAT(CStandardGroundFlash, circleGrowth);
+	CHECK_MEMBER_INFO_FLOAT(CStandardGroundFlash, circleAlpha );
+	CHECK_MEMBER_INFO_SCOLOR(CStandardGroundFlash, color      );
 
 	return false;
 }
@@ -329,7 +334,7 @@ void CSimpleGroundFlash::Draw()
 		float3::rotate<false>(rotVal, normal, bounds);
 	}
 
-	AddEffectsQuad(
+	AddEffectsQuad<1>(
 		{ pos + bounds[0], texture->xstart, texture->ystart, color },
 		{ pos + bounds[1], texture->xend  , texture->ystart, color },
 		{ pos + bounds[2], texture->xend  , texture->yend  , color },
@@ -351,10 +356,10 @@ bool CSimpleGroundFlash::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	if (CGroundFlash::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT(CSimpleGroundFlash, sizeGrowth)
-	CHECK_MEMBER_INFO_INT  (CSimpleGroundFlash, ttl       )
-	CHECK_MEMBER_INFO_PTR  (CSimpleGroundFlash, colorMap, CColorMap::LoadFromDefString)
-	CHECK_MEMBER_INFO_PTR  (CSimpleGroundFlash, texture , projectileDrawer->groundFXAtlas->GetTexturePtr)
+	CHECK_MEMBER_INFO_FLOAT(CSimpleGroundFlash, sizeGrowth);
+	CHECK_MEMBER_INFO_INT  (CSimpleGroundFlash, ttl       );
+	CHECK_MEMBER_INFO_PTR  (CSimpleGroundFlash, colorMap, CColorMap::LoadFromDefString                  );
+	CHECK_MEMBER_INFO_PTR  (CSimpleGroundFlash, texture , projectileDrawer->groundFXAtlas->GetTexturePtr);
 
 	return false;
 }
@@ -409,7 +414,7 @@ void CSeismicGroundFlash::Draw()
 	const float3 p3 = pos + ( side1 + side2) * size;
 	const float3 p4 = pos + (-side1 + side2) * size;
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
 		{ p1, texture->xstart, texture->ystart, color },
 		{ p2, texture->xend,   texture->ystart, color },
 		{ p3, texture->xend,   texture->yend,   color },

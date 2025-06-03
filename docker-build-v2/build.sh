@@ -15,8 +15,8 @@ export CONFIGURE=true
 export COMPILE=true
 export CMAKE_BUILD_PARALLEL_LEVEL=
 OS=
-for arg in "$@"; do
-  case $arg in
+while (( $# > 0 )); do
+  case $1 in
     --configure)
       CONFIGURE=true
       COMPILE=false
@@ -47,8 +47,9 @@ for arg in "$@"; do
       shift
       ;;
     windows|linux)
-      OS="$arg"
+      OS="$1"
       shift
+      break
       ;;
     *)
       break

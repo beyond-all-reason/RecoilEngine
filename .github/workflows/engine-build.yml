@@ -100,6 +100,7 @@ jobs:
         id: mount-overlay
         if: github.event_name == 'pull_request'
         run: |
+          sudo apt-get update
           sudo apt-get install --yes fuse-overlayfs
           sudo tar --acls --xattrs --xattrs-include='*' -xf bazel-remote-data-overlay.tar || mkdir bazel-remote-data-overlay
           mkdir -p overlay-workdir bazel-remote-data-merged

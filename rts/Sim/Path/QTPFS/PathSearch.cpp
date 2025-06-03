@@ -1135,7 +1135,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 				if (!bwdPathConnected && !expectIncompletePartialSearch) {
 					haveFullPath = havePartPath = false;
 					rejectPartialSearch = true;
-					// LOG("%s: rejecting partial path 2 (search %x)", __func__, this->GetID());
+					// LOG("%s: rejecting partial path 2 (search %x) bwdNodesSearched=%d", __func__, this->GetID(), int(bwdNodesSearched));
 					return false;
 				}
 
@@ -1444,8 +1444,10 @@ void QTPFS::PathSearch::IterateNodeNeighbors(const INode* curNode, unsigned int 
 		if (curSearchNode->GetPrevNode() == nextSearchNode)
 			continue;
 
-		// Forbid the reverse search from trampling on it's preloaded nodes.
-		if ( (searchDir == SearchThreadData::SEARCH_BACKWARD) && (nextSearchNode->GetStepIndex() > 0) ) {
+		// Forbid the reverse search from trampling on it's preloaded nodes for path repair, because even though the
+		// search resticted is to an AABB, the remaining existing path can flow in and out of this region. If we
+		// connect the reverse in this particular scenario, it will create an infinite loop.
+		if ( (searchDir == SearchThreadData::SEARCH_BACKWARD) && (nextSearchNode->GetStepIndex() > 0) && doPathRepair ) {
 			continue;
 		}
 

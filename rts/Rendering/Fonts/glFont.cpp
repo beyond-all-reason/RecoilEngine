@@ -191,10 +191,10 @@ CglFont::CglFont(const std::string& fontFile, int size, int _outlineWidth, float
 }
 
 #ifdef HEADLESS
-void CglFont::Begin() {}
+void CglFont::Begin(bool userDefinedBlending) {}
 void CglFont::End() {}
-void CglFont::DrawBuffered() {}
-void CglFont::DrawWorldBuffered() {}
+void CglFont::DrawBuffered(bool userDefinedBlending) {}
+void CglFont::DrawWorldBuffered(bool userDefinedBlending) {}
 
 void CglFont::glWorldPrint(const float3& p, const float size, const std::string& str, int options) {}
 
@@ -619,9 +619,11 @@ const float4* CglFont::ChooseOutlineColor(const float4& textColor)
 	return &lightOutline;
 }
 
-void CglFont::Begin() {
+void CglFont::Begin(bool userDefinedBlending) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	sync.Lock();
+
+	fontRenderer->SetUserDefinedBlending(userDefinedBlending);
 
 	if (inBeginEndBlock) {
 		sync.Unlock();
@@ -645,12 +647,14 @@ void CglFont::End() {
 	fontRenderer->DrawTraingleElements();
 	fontRenderer->PopGLState();
 
+	fontRenderer->SetUserDefinedBlending(false);
+
 	inBeginEndBlock = false;
 	sync.Unlock();
 }
 
 
-void CglFont::DrawBuffered()
+void CglFont::DrawBuffered(bool userDefinedBlending)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto lock = sync.GetScopedLock();
@@ -658,18 +662,22 @@ void CglFont::DrawBuffered()
 	UpdateGlyphAtlasTexture();
 	UploadGlyphAtlasTexture();
 
+	fontRenderer->SetUserDefinedBlending(userDefinedBlending);
+
 	fontRenderer->PushGLState(*this);
 	fontRenderer->DrawTraingleElements();
 	fontRenderer->PopGLState();
+
+	fontRenderer->SetUserDefinedBlending(false);
 }
 
-void CglFont::DrawWorldBuffered()
+void CglFont::DrawWorldBuffered(bool userDefinedBlending)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	glPushMatrix();
 	glMultMatrixf(camera->GetBillBoardMatrix());
 
-	DrawBuffered();
+	DrawBuffered(userDefinedBlending);
 
 	glPopMatrix();
 }

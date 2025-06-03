@@ -129,7 +129,7 @@ void CFlareProjectile::Draw()
 		const float3 interPos = subProjPos[a] + subProjVel[a] * globalRendering->timeOffset;
 
 		#define fpt projectileDrawer->flareprojectiletex
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
 			{ interPos - camera->GetRight() * rad - camera->GetUp() * rad, fpt->xstart, fpt->ystart, col },
 			{ interPos + camera->GetRight() * rad - camera->GetUp() * rad, fpt->xend,   fpt->ystart, col },
 			{ interPos + camera->GetRight() * rad + camera->GetUp() * rad, fpt->xend,   fpt->yend,   col },

@@ -67,14 +67,14 @@ void CGeoSquareProjectile::Draw()
 	const float v1 = projectileDrawer->geosquaretex->yend;
 
 	if (w2 != 0) {
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
 			{ p1 - dir1 * w1, u, v1, col },
 			{ p1 + dir1 * w1, u, v0, col },
 			{ p2 + dir2 * w2, u, v0, col },
 			{ p2 - dir2 * w2, u, v1, col }
 		);
 	} else {
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
 			{ p1 - dir1 * w1, u, v1,                    col },
 			{ p1 + dir1 * w1, u, v0,                    col },
 			{ p2,             u, v0 + (v1 - v0) * 0.5f, col },

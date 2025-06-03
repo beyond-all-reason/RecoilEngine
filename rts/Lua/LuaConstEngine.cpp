@@ -23,6 +23,7 @@
  * @field noRefundForConstructionDecay boolean Whether there is no refund for construction decay (100% metal back if false)
  * @field noRefundForFactoryCancel boolean Whether there is no refund for factory cancel (100% metal back if false)
  * @field noOffsetForFeatureID boolean Whether featureID from various interfaces (targetID for Reclaim commands, ownerID from SpringGetGroundDecalOwner, etc) needs to be offset by `Game.maxUnits`
+ * @field noHandicapForReclaim boolean Whether handicap is applied to income from reclaim
  */
 
 /***
@@ -73,6 +74,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "noRefundForConstructionDecay", false);
 		LuaPushNamedBool(L, "noRefundForFactoryCancel", false);
 		LuaPushNamedBool(L, "noOffsetForFeatureID", false);
+		LuaPushNamedBool(L, "noHandicapForReclaim", true);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");

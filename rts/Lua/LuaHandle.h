@@ -10,6 +10,7 @@
 #include "LuaHashString.h"
 #include "lib/lua/include/LuaInclude.h" //FIXME needed for GetLuaContextData
 
+
 #include <map>
 #include <string>
 #include <tuple>
@@ -342,6 +343,9 @@ class CLuaHandle : public CEventClient
 		std::map <int, std::vector <std::pair <int, std::vector <int>>>> delayedCallsByFrame;
 		void RunDelayedFunctions(int frameNum);
 
+		virtual void EnactDevMode() const {};
+		void SwapEnableModule(lua_State* L, bool enabled, const char* moduleName, lua_CFunction func) const;
+
 		std::vector<bool> watchUnitDefs;        // callin masks for Unit*Collision, UnitMoveFailed
 		std::vector<bool> watchFeatureDefs;     // callin masks for UnitFeatureCollision
 		std::vector<bool> watchProjectileDefs;  // callin masks for Projectile*
@@ -376,8 +380,7 @@ class CLuaHandle : public CEventClient
 		static inline LuaVAOs& GetActiveVAOs(lua_State* L) { return GetLuaContextData(L)->vaos; }
 		static inline CLuaDisplayLists& GetActiveDisplayLists(lua_State* L) { return GetLuaContextData(L)->displayLists; }
 #endif
-
-		static void SetDevMode(bool value) { devMode = value; }
+		static void SetDevMode(bool value);
 		static bool GetDevMode() { return devMode; }
 
 		static void HandleLuaMsg(int playerID, int script, int mode, const std::vector<std::uint8_t>& msg);

@@ -148,21 +148,21 @@ void CSmokeTrailProjectile::Draw()
 
 		const SColor colm = colBase * std::clamp(lerpm, 0.0f, 1.0f);
 
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
 			{ pos1   - (odir1 * size1), texture->xstart, texture->ystart, col1  },
 			{ midpos - (odirm * sizem), midtexx        , texture->ystart, colm },
 			{ midpos + (odirm * sizem), midtexx        , texture->yend  , colm },
 			{ pos1   + (odir1 * size1), texture->xstart, texture->yend  , col1  }
 		);
 
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
 			{ midpos - (odirm * sizem), midtexx      ,   texture->ystart, colm },
 			{ pos2   - (odir2 * size2), texture->xend,   texture->ystart, col2 },
 			{ pos2   + (odir2 * size2), texture->xend,   texture->yend  , col2 },
 			{ midpos + (odirm * sizem), midtexx      ,   texture->yend  , colm }
 		);
 	} else {
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
 			{ pos1 - (odir1 * size1), texture->xstart, texture->ystart, col1 },
 			{ pos2 - (odir2 * size2), texture->xend  , texture->ystart, col2 },
 			{ pos2 + (odir2 * size2), texture->xend  , texture->yend  , col2 },

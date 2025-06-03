@@ -49,7 +49,7 @@ namespace GL {
 			const auto dataType = GetDataTypeFromInternalFormat(intFormat);
 			const auto dataSize = GetDataTypeSize(dataType);
 			const auto numChannels = GetNumChannelsFromInternalFormat(intFormat);
-			assert(c.size() * sizeof(C::value_type) >= size.x * size.y * numChannels * dataSize);
+			assert(c.size() * sizeof(typename C::value_type) >= size.x * size.y * numChannels * dataSize);
 		#endif // DEBUG
 			UploadImage(c.data());
 		}
@@ -61,7 +61,7 @@ namespace GL {
 			const auto dataType = GetDataTypeFromInternalFormat(intFormat);
 			const auto dataSize = GetDataTypeSize(dataType);
 			const auto numChannels = GetNumChannelsFromInternalFormat(intFormat);
-			assert(c.size() * sizeof(C::value_type) >= width * height * numChannels * dataSize);
+			assert(c.size() * sizeof(typename C::value_type) >= width * height * numChannels * dataSize);
 		#endif // DEBUG
 			UploadSubImage(c.data(), xOffset, yOffset, width, height, 0);
 		}
