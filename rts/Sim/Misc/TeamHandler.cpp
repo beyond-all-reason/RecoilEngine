@@ -237,6 +237,7 @@ void CTeamHandler::UpdateTeamUnitLimitsPreDeath(int deadTeamNum)
 
 bool CTeamHandler::TransferTeamMaxUnits(CTeam* fromTeam, CTeam* toTeam, int transferAmnt)
 {
+	if (transferAmnt < 0) {return false; }
 	if (transferAmnt > fromTeam->maxUnits) { return false; }
 	if (fromTeam->maxUnits - transferAmnt < fromTeam->numUnits) { return false; }
 
