@@ -2233,7 +2233,11 @@ public:
 		auto args = CSimpleParser::Tokenize(action.GetArgs());
 		auto mode = args.size() > 0 ? args[0] : "";
 		auto value = args.size() > 1 ? args[1] : "";
-		return SetMode(action, mode, value);
+		if (infoTextureHandler->HasMode(mode))
+			return SetMode(action, mode, value);
+		else
+			LOG_L(L_WARNING, std::format("/{}: infotex mode does not exist {}", GetCommand().c_str(), mode).c_str());
+		return true;
 	}
 };
 

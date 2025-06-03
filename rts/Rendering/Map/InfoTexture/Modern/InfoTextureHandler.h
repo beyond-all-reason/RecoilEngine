@@ -28,6 +28,7 @@ public:
 
 	void DisableCurrentMode() override;
 	void SetMode(const std::string& name) override;
+	bool HasMode(const std::string& name) const override;
 	void ToggleMode(const std::string& name) override;
 	const std::string& GetMode() const override;
 
@@ -66,6 +67,7 @@ public:
 
 	void DisableCurrentMode() override {}
 	void SetMode(const std::string& name) override {}
+	bool HasMode(const std::string& name) const override { return false; }
 	void ToggleMode(const std::string& name) override {}
 	const std::string& GetMode() const override { static const std::string modeMock = ""; return modeMock; }
 

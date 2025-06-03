@@ -116,6 +116,13 @@ const std::string& CInfoTextureHandler::GetMode() const
 	return (infoTex->GetMode());
 }
 
+bool CInfoTextureHandler::HasMode(const std::string& name) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	return infoTextures.contains(name);
+}
+
+
 GLuint CInfoTextureHandler::GetCurrentInfoTexture() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
