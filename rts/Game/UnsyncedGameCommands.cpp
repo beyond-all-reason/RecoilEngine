@@ -2236,7 +2236,7 @@ public:
 		if (infoTextureHandler->HasMode(mode))
 			return SetMode(action, mode, value);
 		else
-			LOG_L(L_WARNING, std::format("/{}: infotex mode does not exist {}", GetCommand().c_str(), mode).c_str());
+			LOG_L(L_WARNING, "/%s: infotex mode does not exist '%s'", GetCommand().c_str(), mode.c_str());
 		return true;
 	}
 };
