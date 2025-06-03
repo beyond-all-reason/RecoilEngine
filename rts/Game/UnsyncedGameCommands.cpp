@@ -4074,6 +4074,8 @@ void UnsyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<ControlUnitActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<ShowStandardActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<ShowElevationActionExecutor>());
+	AddActionExecutor(AllocActionExecutor<ShowInfoTexActionExecutor>());
+	AddActionExecutor(AllocActionExecutor<ShowLOSActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<ShowMetalMapActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<ShowPathTravActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<ShowPathHeatActionExecutor>());
