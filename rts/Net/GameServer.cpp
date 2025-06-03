@@ -3083,7 +3083,7 @@ void CGameServer::GotChatMessage(const ChatMessage& msg)
 	if (msg.fromPlayer < 0 || msg.fromPlayer == SERVER_PLAYER)
 		return;
 
-	hostif->SendPlayerChat(msg.fromPlayer, msg.destination, msg.msg);
+	hostif->SendPlayerChat(msg.fromPlayer, msg.destination, msg.msg, msg.isSecret);
 }
 
 
