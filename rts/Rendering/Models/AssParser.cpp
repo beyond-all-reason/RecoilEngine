@@ -503,8 +503,8 @@ void CAssParser::Load(S3DModel& model, const std::string& modelFilePath)
 	RECOIL_DETAILED_TRACY_ZONE;
 	LOG_SL(LOG_SECTION_MODEL, L_INFO, "Loading model: %s", modelFilePath.c_str());
 
-	const std::string& modelPath = FileSystem::GetDirectory(modelFilePath);
-	const std::string& modelName = FileSystem::GetBasename(modelFilePath);
+	const std::string modelPath = FileSystem::GetDirectory(modelFilePath);
+	const std::string modelName = FileSystem::GetBasename(modelFilePath);
 
 	CFileHandler file(modelFilePath, SPRING_VFS_ZIP);
 

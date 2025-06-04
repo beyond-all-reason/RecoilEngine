@@ -232,8 +232,8 @@ void ModelUtils::CalculateModelDimensions(S3DModel* model, S3DModelPiece* piece)
 void ModelUtils::CalculateModelProperties(S3DModel* model, const LuaTable& modelTable)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	model->UpdatePiecesMinMaxExtents();
 
+	model->UpdatePiecesMinMaxExtents();
 	CalculateModelDimensions(model, model->GetRootPiece());
 
 	model->mins = modelTable.GetFloat3("mins", model->mins);
@@ -245,20 +245,44 @@ void ModelUtils::CalculateModelProperties(S3DModel* model, const LuaTable& model
 	model->relMidPos = modelTable.GetFloat3("midpos", model->CalcDrawMidPos());
 }
 
-void ModelUtils::CalculateModelProperties(S3DModel* model, const ModelParams& modelParams)
+void ModelUtils::GetModelParams(const LuaTable& modelTable, ModelParams& modelParams)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	model->UpdatePiecesMinMaxExtents();
 
+	auto CondGetLuaValue = [&modelTable]<typename T>(std::optional<T>& value, const std::string& key) {
+		if (!modelTable.KeyExists(key))
+			return;
+
+		value = modelTable.Get(key, T{});
+	};
+
+	CondGetLuaValue(modelParams.mins, "mins");
+	CondGetLuaValue(modelParams.maxs, "maxs");
+
+	CondGetLuaValue(modelParams.relMidPos, "midpos");
+
+	CondGetLuaValue(modelParams.radius, "radius");
+	CondGetLuaValue(modelParams.height, "height");
+
+	CondGetLuaValue(modelParams.flipTextures, "fliptextures");
+	CondGetLuaValue(modelParams.invertTeamColor, "invertteamcolor");
+}
+
+void ModelUtils::ApplyModelProperties(S3DModel* model, const ModelParams& modelParams)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	model->UpdatePiecesMinMaxExtents();
 	CalculateModelDimensions(model, model->GetRootPiece());
 
 	model->mins = modelParams.mins.value_or(model->mins);
 	model->maxs = modelParams.maxs.value_or(model->maxs);
 
+	// must come after mins / maxs assignment
+	model->relMidPos = modelParams.relMidPos.value_or(model->CalcDrawMidPos());
+
 	model->radius = modelParams.radius.value_or(model->CalcDrawRadius());
 	model->height = modelParams.height.value_or(model->CalcDrawHeight());
-
-	model->relMidPos = modelParams.relMidPos.value_or(model->CalcDrawMidPos());
 }
 
 void ModelLog::LogModelProperties(const S3DModel& model)

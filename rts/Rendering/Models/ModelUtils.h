@@ -30,14 +30,21 @@ namespace ModelUtils {
 		std::optional<float3> maxs;
 		std::optional<float> radius;
 		std::optional<float> height;
+		std::optional<bool> flipTextures;
+		std::optional<bool> invertTeamColor;
 	};
 
 	// Iterate over the model and calculate its overall dimensions
 	void CalculateModelDimensions(S3DModel* model, S3DModelPiece* piece);
+
 	// Calculate model radius from the min/max extents
 	void CalculateModelProperties(S3DModel* model, const LuaTable& modelTable);
-	// Calculate model radius from the min/max extents
-	void CalculateModelProperties(S3DModel* model, const ModelParams& modelParams);
+
+	// Get ModelParams from the modelTable
+	void GetModelParams(const LuaTable& modelTable, ModelParams& modelParams);
+
+	// Apply model properties from modelParams
+	void ApplyModelProperties(S3DModel* model, const ModelParams& modelParams);
 }
 
 namespace ModelLog {

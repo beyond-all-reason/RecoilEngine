@@ -9,6 +9,7 @@
 #include "3DModelLog.h"
 #include "ModelUtils.h"
 
+#include "Lua/LuaParser.h"
 #include "Rendering/Textures/S3OTextureHandler.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/FileSystem/FileSystem.h"
@@ -243,9 +244,18 @@ namespace Impl {
 			case hashString("radius"): {
 				optionalModelParams.radius = static_cast<float>(value.get_double());
 			} break;
+			case hashString("fliptextures"): {
+				if (value.is_bool())
+					optionalModelParams.flipTextures = value;
+			} break;
+			case hashString("invertteamcolor"): {
+				if (value.is_bool())
+					optionalModelParams.invertTeamColor = value;
+			} break;
 			}
 		}
 	}
+
 	void FindTextures(S3DModel* model, const fastgltf::Asset& asset, const std::string& modelBaseName, const ModelUtils::ModelParams& optionalModelParams)
 	{
 		std::string fullPath;
@@ -351,11 +361,43 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 		throw content_error("Error loading GLTF file " + modelFilePath);
 	}
 
+	//////// Lua metafile
+	// load the lua metafile containing properties unique to Spring models (must return a table)
+	std::string metaFileName = modelFilePath + ".lua";
+
+	// try again without the model file extension
+	if (!CFileHandler::FileExists(metaFileName, SPRING_VFS_ZIP))
+		metaFileName = modelPath + modelName + ".lua";
+
+	if (!CFileHandler::FileExists(metaFileName, SPRING_VFS_ZIP)) {
+		LOG_SL(LOG_SECTION_MODEL, L_INFO, "No meta-file found for the GLTF model '%s'.", metaFileName.c_str());
+	}
+
+	LuaParser metaFileParser(metaFileName, SPRING_VFS_ZIP, SPRING_VFS_ZIP);
+
+	if (!metaFileParser.Execute()) {
+		LOG_SL(LOG_SECTION_MODEL, L_INFO, "Error parsing the meta-file '%s': %s.", metaFileName.c_str(), metaFileParser.GetErrorLog().c_str());
+	}
+
+	// get the (root-level) model table
+	const LuaTable& modelTable = metaFileParser.GetRoot();
+
+	if (!modelTable.IsValid()) {
+		LOG_SL(LOG_SECTION_MODEL, L_INFO, "No valid model metadata in '%s' or no meta-file", metaFileName.c_str());
+	}
+
+	// optionalModelParams will contain all non-empty data from the modelTable
+	ModelUtils::GetModelParams(modelTable, optionalModelParams);
+
 	// Load textures
 	Impl::FindTextures(&model, asset, modelName, optionalModelParams);
 	LOG_SL(LOG_SECTION_MODEL, L_INFO, "Loading textures. Tex1: '%s' Tex2: '%s'", model.texs[0].c_str(), model.texs[1].c_str());
 
-	textureHandlerS3O.PreloadTexture(&model);
+	textureHandlerS3O.PreloadTexture(
+		&model,
+		optionalModelParams.flipTextures.value_or(false),
+		optionalModelParams.invertTeamColor.value_or(false)
+	);
 
 	model.name = modelFilePath;
 	model.type = MODELTYPE_ASS; // Revise?
@@ -417,7 +459,8 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 	else
 		Skinning::ReparentMeshesTrianglesToBones(&model, allSkinnedMeshes);
 
-	ModelUtils::CalculateModelProperties(&model, optionalModelParams);
+	// will also calculate pieces / model bounding box
+	ModelUtils::ApplyModelProperties(&model, optionalModelParams);
 
 	ModelLog::LogModelProperties(model);
 }
