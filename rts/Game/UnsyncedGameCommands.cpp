@@ -2229,17 +2229,27 @@ public:
 	ShowInfoTexActionExecutor() : IShowInfoTexActionExecutor("ShowInfoTex", "Enable rendering of an arbitrary info texture view", true) {
 	}
 
-	bool CommandError(const std::string description, bool showHint) const {
+	bool CommandError(const std::string description, bool showHint, bool showModes) const {
 		LOG_L(L_WARNING, "/%s error: %s", GetCommand().c_str(), description.c_str());
+
 		if (showHint)
 			LOG("usage:   /%s <mode> [on/off/1/0]", GetCommand().c_str());
+
+		if (showModes) {
+			std::stringstream ss;
+			const auto allModes = infoTextureHandler->GetModes();
+			for (auto it = allModes.begin(); it != allModes.end(); it++)
+				ss << *it << (it + 1 == allModes.end() ? "" : ", ");
+			LOG("modes:   %s", ss.str().c_str());
+		}
+
 		return true;
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
 		const auto args = CSimpleParser::Tokenize(action.GetArgs());
 		if (args.size() < 1) {
-			return CommandError("missing mandatory argument \"mode\"", true);
+			return CommandError("missing mandatory argument \"mode\"", true, false);
 		}
 		const auto& mode = args[0];
 		if (infoTextureHandler->HasMode(mode)) {
@@ -2247,7 +2257,7 @@ public:
 			return SetMode(action, mode, value);
 		}
 		else {
-			return CommandError(std::format("infotex mode does not exist '{}'", mode), false);
+			return CommandError(std::format("infotex mode does not exist '{}'", mode), false, true);
 		}
 	}
 };

@@ -49,6 +49,7 @@ public:
 	virtual bool HasMode(const std::string& name) const = 0;
 	virtual void ToggleMode(const std::string& name) = 0;
 	virtual const std::string& GetMode() const = 0;
+	virtual const std::vector<std::string> GetModes() const = 0;
 
 	virtual GLuint GetCurrentInfoTexture() const = 0;
 	virtual int2   GetCurrentInfoTextureSize() const = 0;
