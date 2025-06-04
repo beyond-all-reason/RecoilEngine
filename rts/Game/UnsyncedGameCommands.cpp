@@ -2249,7 +2249,7 @@ public:
 	bool Execute(const UnsyncedAction& action) const final {
 		const auto args = CSimpleParser::Tokenize(action.GetArgs());
 		if (args.size() < 1) {
-			return CommandError("missing mandatory argument \"mode\"", true, false);
+			return CommandError("missing mandatory argument \"mode\"", true, true);
 		}
 		const auto& mode = args[0];
 		if (infoTextureHandler->HasMode(mode)) {
