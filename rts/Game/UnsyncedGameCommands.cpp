@@ -2229,7 +2229,7 @@ public:
 	ShowInfoTexActionExecutor() : IShowInfoTexActionExecutor("ShowInfoTex", "Enable rendering of an arbitrary info texture view", true) {
 	}
 
-	bool CommandError(std::string description, bool showHint) const {
+	bool CommandError(const std::string description, bool showHint) const {
 		LOG_L(L_WARNING, "/%s error: %s", GetCommand().c_str(), description.c_str());
 		if (showHint)
 			LOG("usage:   /%s <mode> [on/off/1/0]", GetCommand().c_str());
@@ -2237,13 +2237,13 @@ public:
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		auto args = CSimpleParser::Tokenize(action.GetArgs());
+		const auto args = CSimpleParser::Tokenize(action.GetArgs());
 		if (args.size() < 1) {
 			return CommandError("missing mandatory argument \"mode\"", true);
 		}
-		auto mode = args[0];
+		const auto& mode = args[0];
 		if (infoTextureHandler->HasMode(mode)) {
-			auto value = args.size() > 1 ? args[1] : "";
+			const auto value = args.size() > 1 ? args[1] : "";
 			return SetMode(action, mode, value);
 		}
 		else {
