@@ -2142,9 +2142,9 @@ public:
 
 		if (enabled && !wasEnabled)
 			infoTextureHandler->SetMode(mode);
-		else if (!enabled && wasEnabled) {
+		else if (!enabled && wasEnabled)
 			infoTextureHandler->DisableCurrentMode();
-		}
+
 		return true;
 	}
 };
@@ -2248,17 +2248,14 @@ public:
 
 	bool Execute(const UnsyncedAction& action) const final {
 		const auto args = CSimpleParser::Tokenize(action.GetArgs());
-		if (args.size() < 1) {
+		if (args.size() < 1)
 			return CommandError("missing mandatory argument \"mode\"", true, true);
-		}
+
 		const auto& mode = args[0];
-		if (infoTextureHandler->HasMode(mode)) {
-			const auto value = args.size() > 1 ? args[1] : "";
-			return SetMode(action, mode, value);
-		}
-		else {
+		if (infoTextureHandler->HasMode(mode))
+			return SetMode(action, mode, args.size() > 1 ? args[1] : "");
+		else
 			return CommandError(std::format("infotex mode does not exist '{}'", mode), false, true);
-		}
 	}
 };
 
