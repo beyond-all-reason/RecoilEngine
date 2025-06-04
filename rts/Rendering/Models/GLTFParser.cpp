@@ -362,7 +362,7 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 	}
 
 	//////// Lua metafile
-	// load the lua metafile containing properties unique to Spring models (must return a table)
+	// load the lua metafile containing properties unique to Recoil models (must return a table)
 	std::string metaFileName = modelFilePath + ".lua";
 
 	// try again without the model file extension

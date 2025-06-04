@@ -275,6 +275,8 @@ void ModelUtils::ApplyModelProperties(S3DModel* model, const ModelParams& modelP
 	model->UpdatePiecesMinMaxExtents();
 	CalculateModelDimensions(model, model->GetRootPiece());
 
+	// Note the content from Lua table will overwrite whatever has already been defined in modelParams
+
 	model->mins = modelParams.mins.value_or(model->mins);
 	model->maxs = modelParams.maxs.value_or(model->maxs);
 
