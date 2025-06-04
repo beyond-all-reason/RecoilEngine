@@ -21,6 +21,7 @@ struct FeatureDef;
 struct Command;
 struct BuildInfo;
 struct lua_State;
+class CCobDeferredCallin;
 
 
 class CLuaRules : public CSplitLuaHandle
@@ -35,7 +36,9 @@ public:
 
 public: // call-ins
 	void Cob2Lua(const LuaHashString& funcName, const CUnit* unit,
-	             int& argsCount, int args[MAX_LUA_COB_ARGS]);
+	             int& argsCount, int args[MAX_LUA_COB_ARGS], bool synced);
+
+	void Cob2LuaBatch(const LuaHashString& name, std::vector<CCobDeferredCallin>& callins, bool synced);
 
 	const char* RecvSkirmishAIMessage(int aiID, const char* data, int inSize, size_t* outSize) {
 		return syncedLuaHandle.RecvSkirmishAIMessage(aiID, data, inSize, outSize);
