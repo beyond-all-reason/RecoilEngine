@@ -1,12 +1,12 @@
 ---
 layout: post
-title: Release 2025.03
+title: Release 2025.04
 parent: Changelogs
 permalink: changelogs/changelog-2025-03
 author: sprunk
 ---
 
-This is the changelog since version 2025.01 until **version 2025.03**, which is still in pre-release phase.
+This is the changelog since version 2025.01 until **version 2025.04**, which is still in pre-release phase.
 
 # Caveats
 These are the entries which may require special attention when migrating:
@@ -18,15 +18,18 @@ Existing shaders should generally keep working.
 * `math.clamp` now errors if the lower bound is higher than the upper bound.
 * added minimap rotation API which can screw up the minimap (see below), set it to nil at LuaUI entry point if you don't want to handle it.
 * added `UnitGhostIconsDimming` numerical springsetting, multiplier for ghost icon color (both on main view and minimap).
-This defaults to 0.5 so icons will be dimmed, set to 1.0 to get the previous behaviour.
+This defaults to 0.8 so icons will be dimmed, set to 1.0 to get the previous behaviour.
 * server no longer automatically forcestarts the game if there is nobody connected after 30s.
 * units no longer drop Guard commands if the target was out of map for more than 5s. For a replacement look for `control_guard.lua` in basecontent.
 * fixed the `SPRING_LOG_SECTIONS` environment var, it no longer requires a comma in front.
 * `gl.GetAtmosphere("skyDir")` now returns nil. The skyDir was never actually used for anything.
+* FIXME some info shader changes at commit be96560770b95cfe18a6c5ff3cbd9c0c47b1bb3a, do they change anything? different values passed to shaders, different formats of things?
 * updated Tracy to v0.11.1, see the changelog at https://github.com/wolfpld/tracy/releases
 * archive cache was reworked. Should be much faster to process, but will take up more disk space and it's not yet known how stable it is.
 * added GL debug annotations to main engine GL draw calls, this is similar to tracy scopes for regular code.
 The caveat here is that this can have a large performance cost in `/debugGL` mode. The next release is planned to feature improvements in this area.
+* the default value for `FontOutlineWidth` springsetting changed from 3 to 2. This is because of a width fix so doesn't actually change the looks.
+* Lua `loadstring` no longer accepts bytecode, for safety and maintainability reasons.
 
 ### Deprecation notice
 * the metal view automatically toggling when building a metal extractor is now deprecated.
@@ -80,6 +83,8 @@ Attachment can be either string ("color0" .. "color15", "depth", or "stencil") o
 * minimap is sharper with super-sampling anti-aliasing enabled
 * added 3D noise to basecontent bitmaps archive, under `bitmaps/noise/recoil_noise_2025_p5_p3_w6_w4_64x64x64_RGBA.dds` and `bitmaps/noise/recoil_noise_2025_p5_p3_w6_w4_128x128x128_RGBA.dds`.
 This allows for reliable generation of cheaper 3D noise in shaders.
+* added (immediately deprecated) `GL.POINT_SMOOTH` and `gl.GetFixedState("pointSmooth") → number pointSmooth` interfaces.
+Don't use them, they are just a bandage for patching up legacy code that broke along the way. New code should use a shader instead.
 
 ### Praise the sun!
 * the shading texture (used by minimap, water, and grass) now tracks sun position changes immediately.
@@ -137,6 +142,10 @@ Disabling substitutions can make fonts randomly break but you can take the gambl
 Reduces perf spikes if many fonts are used (keep in mind players can send mixed chat with multiple exotic characters mxied),
 though if many fonts are loaded it can increase peak memory usage.
 * extra optimisations to baseline fonts perf even if you don't touch any of the above.
+* Lua `font:Begin(bool? userDefinedBlending)` now takes an optional boolean param that makes it use whatever blending mode you set via `gl.BlendFunc`.
+The default, if set to `false`, is the current behaviour where it always uses `GL.SRC_ALPHA,  GL.ONE_MINUS_SRC_ALPHA`.
+* fixed font outline widths. Previously values 2N+1 looked the same as 2N.
+As a consequence, the default value for `FontOutlineWidth` springsetting changed from 3 to 2 to maintain the same look.
 
 ### rmlUI
 * add deep reactivity to rmlUI data models.
@@ -145,10 +154,12 @@ though if many fonts are loaded it can increase peak memory usage.
 
 ### Building ghosts
 * added `UnitGhostIconsDimming` numerical springsetting, multiplier for ghost icon color (both on main view and minimap).
-This defaults to 0.5 so icons will be dimmed, set to 1.0 to get the previous behaviour.
+This defaults to 0.8 so icons will be dimmed, set to 1.0 to get the previous behaviour.
 * fix minimap icons revealing whether a building ghost was dead or not.
 
 ### Misc
+* `SendToUnsynced` can now send (and `gadget:RecvFromSynced` can receive) tables. Unsynced receives a copy which is
+recursively stripped of anything that isn't a supported type and has no metatable.
 * add `Spring.GetSoundDevices() → { { name = "...", }, { name = "...", }, ... }`.
 May be extended with more info than just name in the future.
 * add `wupget:ActiveCommandChanged(cmdID?, cmdType?) → nil`.
@@ -157,8 +168,10 @@ May be extended with more info than just name in the future.
 * add `Spring.GetUnitStorage(unitID) → numbers metal, energy`.
 * add `Spring.GetProjectilesInSphere(x, y, z, radius, bool excludeWeaponProjectiles = false, bool excludePieceProjectiles = false) → {projID, projID, ...}`.
 * add "ttl" field to `Spring.Set/GetUnitWeaponState`, projectile lifetime in seconds.
-* added `Game.buildGridResolution`, number which is currently 2. This means that buildings created via native build orders
+* add `Game.buildGridResolution`, number which is currently 2. This means that buildings created via native build orders
 are aligned to 2 squares.
+* add `Spring.GetMouseButtonsPressed(indexA, indexB, ..., indexN) → bool pressedA, pressedB, ..., pressedN`.
+For example, `Get(4, 1)` will return the states for mouse4 and LMB (mouse1). Has to provide at least 1 index.
 * add `Platform.totalRAM`, in megabytes.
 * add `Spring.SetProjectileTimeToLive(projID, framesTLL) → nil`.
 * add `Spring.GetUnitSeismicSignature(unitID) → number`. The Set was already added earlier.
@@ -171,6 +184,8 @@ The practical effect is that the Engine table is available in some LuaParser env
 * add `experience.experienceGrade` number modrule, same as calling Spring.SetExperienceGrade.
 * the `allowHoverUnitStrafing` modrule now defaults to `false`. Previously it defaulted to `false` for HAPFS and `true` for QTPFS.
 * bumpmapped water (aka `/water 4`) now has a different default texture.
+* add more data to desync dumps. The extra data will be dumped to files named `ClientGameState-<random number>-[<desync frame>-<desync frame>].txt`, i.e. same as before.
+* Lua `loadstring` no longer accepts bytecode, for safety and maintainability reasons.
 
 ### Fixes
 * fix `Spring.SetUnitHealth(build < 1)` not reverting the unit into a nanoframe.
@@ -186,6 +201,14 @@ hyperthreads on the same physical core, performance cores on a dedicated server)
 * fix units being stuck if an overlapping push-resistant unit stops.
 * fix the "modern" sky renderer not adjusting to changes via `Spring.SetAtmosphere`.
 * fix (or at least mostly reduce) a freeze when you remove multiple thousands of units from a factory queue.
+* fix a crash when loading a 7z archive without the 'mod time' field set for its files.
+* fix a crash when loading some WAV sounds.
+* fix some crashes related to fonts.
+* fix a minor stack corruption when calling `Spring.GiveOrder` as a spectator.
+* fix some graphics crashes on Linux with Wayland.
+* fix `Spring.GetUnitCurrentCommand` not actually accepting negative indices.
+* fix desyncs via unsynced Lua path requests.
+* fix performance spikes when high unit counts get a move order.
 
 ### GL object type constants
 For use with the new `gl.ObjectLabel` (see above):
