@@ -2273,9 +2273,9 @@ public:
 	}
 };
 
-class ToggleInfoActionExecutor : public IShowInfoTexActionExecutor {
+class ToggleInfoActionExecutor : public IUnsyncedActionExecutor {
 public:
-	ToggleInfoActionExecutor() : IShowInfoTexActionExecutor("ToggleInfo", "Toggles current info texture view") {
+	ToggleInfoActionExecutor() : IUnsyncedActionExecutor("ToggleInfo", "Toggles current info texture view") {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
