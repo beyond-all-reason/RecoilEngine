@@ -1,3 +1,5 @@
+/* This file is part of the Recoil engine (GPL v2 or later), see LICENSE.html */
+
 #include <cstring>
 
 #include "lua.h"
