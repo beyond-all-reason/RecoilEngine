@@ -66,7 +66,7 @@ int LuaEncoding::DecodeBase64(lua_State* L)
 int LuaEncoding::EncodeBase64(lua_State* L)
 {
 	size_t textLen;
-	// querying with checklstring this since there could be embedded '\0' characters.
+	// querying with checklstring since there could be embedded '\0' characters.
 	const char* text = luaL_checklstring(L, 1, &textLen);
 	std::string encoded = base64_encode(reinterpret_cast<const uint8_t*>(text), textLen);
 
