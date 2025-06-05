@@ -137,6 +137,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SendAllyChat);
 	REGISTER_LUA_CFUNC(SendSpectatorChat);
 	REGISTER_LUA_CFUNC(SendPrivateChat);
+	REGISTER_LUA_CFUNC(SendSecretChat);
 
 	REGISTER_LUA_CFUNC(LoadSoundDef);
 	REGISTER_LUA_CFUNC(PlaySoundFile);
@@ -619,6 +620,21 @@ int LuaUnsyncedCtrl::SendSpectatorChat(lua_State* L) {
 	return 0;
 }
 
+
+/* Helper for direct sending to player */
+int SendDirectChat(lua_State* L, bool isSecret, const char* funcName) {
+	if (lua_gettop(L) != 2 || !lua_isstring(L, 1))
+		return luaL_error(L, std::format("Incorrect arguments to Spring.%s(message string, playerID integer)", funcName).c_str());
+
+	const int playerID = luaL_checkint(L, 2);
+	if (!playerHandler.IsValidPlayer(playerID))
+		return luaL_error(L, "Error in function '%s': Invalid Player ID %d", __func__, playerID);
+
+	game->SendNetChat(luaL_checksstring(L, 1), playerID, isSecret);
+	return 0;
+}
+
+
 /*** Sends a private chat message to a specific player ID.
  *
  * @function Spring.SendPrivateChat
@@ -627,16 +643,28 @@ int LuaUnsyncedCtrl::SendSpectatorChat(lua_State* L) {
  * @return nil
  */
 int LuaUnsyncedCtrl::SendPrivateChat(lua_State* L) {
-	if (lua_gettop(L) != 2 || !lua_isstring(L, 1))
-		return luaL_error(L, "Incorrect arguments to Spring.SendPrivateChat(message string, playerID integer)");
-
-	const int playerID = luaL_checkint(L, 2);
-	if (!playerHandler.IsValidPlayer(playerID))
-		return luaL_error(L, "Error in function '%s': Invalid Player ID %d", __func__, playerID);
-
-	game->SendNetChat(luaL_checksstring(L, 1), playerID);
-	return 0;
+	SendDirectChat(L, false, __func__);
 }
+
+
+/*** Sends a secret chat message to a specific player ID.
+ *
+ * Goes direct to receiver and doesn't get stored in replays
+ * and doesn't broadcast to everyone.
+ *
+ * Sending to players usually disallowed by the server, unless
+ * 'AllowInterplayerSecrets' is set on the server.
+ *
+ * It can always be sent to the server player (with id: 255).
+ *
+ * @function Spring.SendSecretChat
+ * @param message string
+ * @param playerID integer
+ */
+int LuaUnsyncedCtrl::SendSecretChat(lua_State* L) {
+	SendDirectChat(L, true, __func__);
+}
+
 
 static void PrintMessage(lua_State* L, const string& msg)
 {
