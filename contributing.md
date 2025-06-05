@@ -2,7 +2,7 @@
 
 ### Before you start
 * To report a bug or make a suggestion/request, [create a github ticket](https://github.com/beyond-all-reason/RecoilEngine/issues/new/choose).
-* If you want to contribute code not covered by an existing ticket, make one or at least talk to responsible devs listed below to make sure your work won't get rejected.
+* If you want to contribute something **not covered by an existing ticket, make one or at least talk to responsible devs listed below** to make sure your work won't get rejected.
 * Be aware that we're volunteers working in our free time, every interaction may take a while.
 * Consider getting familiar with [the build process](https://beyond-all-reason.github.io/RecoilEngine/development) and [guides](https://beyond-all-reason.github.io/RecoilEngine/guides)/[articles](https://beyond-all-reason.github.io/RecoilEngine/articles) relating to your contribution area.
 * If an existing ticket provides a bill of materials it is strongly recommended to follow it.
@@ -11,7 +11,7 @@
 ### Work in progress
 * Don't be afraid to ask for feedback/help. This can be on a ticket, your PR, or e.g. on discord.
 * If you have pure refactor commits that don't change logic, put them in front if possible. This makes things much easier to review and they can get merged immediately to get them out of the way. The smaller the better.
-* There aren't really any proper tests. Come up with some manual tests and let us know what you did. Of course if you write proper automated tests that's even better, but often difficult so don't worry about it too much.
+* There aren't really any proper tests. If making a change related to Lua you can write a test wupget, otherwise come up with some manual procedure and let us know what you did. Of course if you write proper automated tests that's even better, but often very difficult so don't worry about it too much.
 
 [comment]: # (* Follow Recoil development philosophy. // FIXME would need an article and not everybody even agrees on details there)
 
@@ -24,7 +24,7 @@
 * lead: **ivand** aka @lhog
 * vice-lead: **Tarnished Knight** aka @lostsquirrel1, specialises in pathfinding and optimisation
 * **Marek** aka @p2004a - infrastructure (tools, external protocols etc)
-* **rhys-vdw** aka duke_of_gloat - documentation tooling
+* **rhys-vdw** aka duke_of_gloat - documentation, tooling
 * **saurtron** - fonts, perf, misc
 * **sprunk** - gamedev capabilities (incl. API), misc
 
