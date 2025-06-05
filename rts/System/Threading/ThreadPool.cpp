@@ -584,6 +584,10 @@ void SetMaximumThreadCount()
 	SetThreadCount(GetMaxThreads());
 }
 
+/**
+ * ThreadPolicyObject
+ */
+
 void SetDefaultThreadCount()
 {
 	#if !defined(THREADPOOL)
@@ -602,7 +606,6 @@ void SetDefaultThreadCount()
 	#endif
 
 	std::uint32_t workerAvailCores = systemCores & ~mainAffinity;
-
 	SetThreadCount(GetDefaultNumWorkers());
 
 	{
@@ -628,7 +631,7 @@ void SetDefaultThreadCount()
 			return workerCore;
 		};
 
-		const std::uint32_t poolCoreAffinity = parallel_reduce(AffinityFunc, ReduceFunc);
+		const std::uint32_t poolCoreAffinity = parallel_reduce<SyncTask<decltype(AffinityFunc)>>(AffinityFunc, ReduceFunc);
 		const std::uint32_t mainCoreAffinity = ~poolCoreAffinity & systemCores;
 
 		if (mainAffinity == 0)
