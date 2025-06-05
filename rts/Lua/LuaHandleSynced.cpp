@@ -3,6 +3,7 @@
 #include "LuaHandleSynced.h"
 
 #include "LuaInclude.h"
+#include "lua_privileges.h"
 
 #include "LuaUtils.h"
 #include "LuaArchive.h"

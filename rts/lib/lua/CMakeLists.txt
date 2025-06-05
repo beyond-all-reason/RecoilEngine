@@ -36,6 +36,7 @@ SET(luaSources
 		"src/lvm.cpp"
 		"src/lzio.cpp"
 		"src/print.cpp"
+		"src/lua_privileges.cpp"
 		"include/LuaUser.cpp"
 	)
 
