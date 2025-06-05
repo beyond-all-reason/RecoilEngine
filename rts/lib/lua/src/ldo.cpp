@@ -515,7 +515,7 @@ int luaD_protectedparser (lua_State *L, ZIO *z, const char *name, bool privilege
   struct SParser p;
   int status;
   p.z = z; p.name = name;
-  p.privileged = privileged;
+  p.privileged = privileged; // recoil
   luaZ_initbuffer(L, &p.buff);
   status = luaD_pcall(L, f_parser, &p, savestack(L, L->top), L->errfunc);
   luaZ_freebuffer(L, &p.buff);
