@@ -621,20 +621,6 @@ int LuaUnsyncedCtrl::SendSpectatorChat(lua_State* L) {
 }
 
 
-/* Helper for direct sending to player */
-int SendDirectChat(lua_State* L, bool isSecret, const char* funcName) {
-	if (lua_gettop(L) != 2 || !lua_isstring(L, 1))
-		return luaL_error(L, std::format("Incorrect arguments to Spring.%s(message string, playerID integer)", funcName).c_str());
-
-	const int playerID = luaL_checkint(L, 2);
-	if (!playerHandler.IsValidPlayer(playerID))
-		return luaL_error(L, "Error in function '%s': Invalid Player ID %d", __func__, playerID);
-
-	game->SendNetChat(luaL_checksstring(L, 1), playerID, isSecret);
-	return 0;
-}
-
-
 /*** Sends a private chat message to a specific player ID.
  *
  * @function Spring.SendPrivateChat
@@ -643,7 +629,15 @@ int SendDirectChat(lua_State* L, bool isSecret, const char* funcName) {
  * @return nil
  */
 int LuaUnsyncedCtrl::SendPrivateChat(lua_State* L) {
-	SendDirectChat(L, false, __func__);
+	if (lua_gettop(L) != 2 || !lua_isstring(L, 1))
+		return luaL_error(L, std::format("Incorrect arguments to Spring.%s(message string, playerID integer)", __func__).c_str());
+
+	const int playerID = luaL_checkint(L, 2);
+	if (!playerHandler.IsValidPlayer(playerID))
+		return luaL_error(L, "Error in function '%s': Invalid Player ID %d", __func__);
+
+	game->SendNetChat(luaL_checksstring(L, 1), playerID, false);
+	return 0;
 }
 
 
@@ -659,10 +653,21 @@ int LuaUnsyncedCtrl::SendPrivateChat(lua_State* L) {
  *
  * @function Spring.SendSecretChat
  * @param message string
- * @param playerID integer
+ * @param playerID integer Player id or SERVER_PLAYER
  */
 int LuaUnsyncedCtrl::SendSecretChat(lua_State* L) {
-	SendDirectChat(L, true, __func__);
+	if (lua_gettop(L) != 2 || !lua_isstring(L, 1))
+		return luaL_error(L, std::format("Incorrect arguments to Spring.%s(message string, playerID integer)", __func__).c_str());
+
+	const int playerID = luaL_checkint(L, 2);
+	if (playerID != SERVER_PLAYER && !playerHandler.IsValidPlayer(playerID))
+		return luaL_error(L, "Error in function '%s': Invalid Player ID %d", __func__);
+
+	if (playerID != SERVER_PLAYER && !gameSetup->interplayerSecrets)
+		return luaL_error(L, "Error in function '%s': Game configuration disallows sending secrets to players", __func__);
+
+	game->SendNetChat(luaL_checksstring(L, 1), playerID, true);
+	return 0;
 }
 
 
