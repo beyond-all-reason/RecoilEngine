@@ -2521,7 +2521,6 @@ int CSplitLuaHandle::LoadStringData(lua_State* L)
 
 	auto handle = CLuaHandle::GetHandle(L);
 
-	// BLOCK HERE
 	if (luaL_loadbuffer_privileged(L, str, len, chunkname, handle->GetDevMode()) != 0) {
 		lua_pushnil(L);
 		lua_insert(L, -2);
