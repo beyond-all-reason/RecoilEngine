@@ -20,8 +20,3 @@ LUA_API int lua_load_privileged (lua_State *L, lua_Reader reader, void *data,
 }
 
 
-LUALIB_API int (luaL_loadstring_privileged) (lua_State *L, const char *s) {
-
-  return luaL_loadbuffer_privileged(L, s, strlen(s), s, true);
-}
-
