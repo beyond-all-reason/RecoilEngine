@@ -486,7 +486,7 @@ struct SParser {  /* data to `f_parser' */
   ZIO *z;
   Mbuffer buff;  /* buffer to be used by the scanner */
   const char *name;
-  bool privileged;
+  bool privileged; // recoil
 };
 
 static void f_parser (lua_State *L, void *ud) {
