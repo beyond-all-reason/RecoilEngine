@@ -65,8 +65,9 @@ int LuaEncoding::DecodeBase64(lua_State* L)
  */
 int LuaEncoding::EncodeBase64(lua_State* L)
 {
-	const std::string text = luaL_checkstring(L, 1);
-	std::string encoded = base64_encode(reinterpret_cast<const uint8_t*>(text.c_str()), text.size());
+	size_t textLen;
+	const char* text = luaL_checklstring(L, 1, &textLen);
+	std::string encoded = base64_encode(reinterpret_cast<const uint8_t*>(text), textLen);
 
 	if (luaL_optboolean(L, 2, true)) {
 		encoded.erase(encoded.find_last_not_of("=") + 1);
@@ -134,8 +135,9 @@ int LuaEncoding::DecodeBase64Url(lua_State* L)
  */
 int LuaEncoding::EncodeBase64Url(lua_State* L)
 {
-	const std::string text = luaL_checkstring(L, 1);
-	std::string encoded = base64_encode(reinterpret_cast<const uint8_t*>(text.c_str()), text.size());
+	size_t textLen;
+	const char* text = luaL_checklstring(L, 1, &textLen);
+	std::string encoded = base64_encode(reinterpret_cast<const uint8_t*>(text), textLen);
 
 	encoded.erase(encoded.find_last_not_of("=") + 1);
 
