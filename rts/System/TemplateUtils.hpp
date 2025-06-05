@@ -202,3 +202,13 @@ namespace spring {
 	template<auto FuncPtr, typename... FallbackSignature>
 	using func_ptr_signature_t = typename func_ptr_signature<FuncPtr, FallbackSignature...>::type;
 };
+
+namespace Concepts {
+	template <typename T>
+	concept HasSizeAndData = requires(const T & t) {
+		// Validate .size() returns std::size_t
+		{ t.size() } -> std::same_as<std::size_t>;
+		// Validate .data() returns a pointer to element type
+		{ t.data() } -> std::convertible_to<const typename T::value_type*>;
+	};
+}

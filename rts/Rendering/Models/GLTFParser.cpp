@@ -52,94 +52,94 @@ namespace Impl {
 	}
 
 	template<typename PrimContainer>
-	void ReadGeometryData(const fastgltf::Asset& asset, const PrimContainer& primitives, std::vector<SVertexData>& verts, std::vector<uint32_t>& indcs, const fastgltf::Skin* skinPtr = nullptr) {
+	void ReadGeometryData(const fastgltf::Asset& asset, const PrimContainer& primitives, std::vector<SVertexData>& verts, std::vector<uint32_t>& indcs, size_t nodeIdx, const fastgltf::Skin* skinPtr = nullptr) {
 			for (const auto& prim : primitives) {
-			const size_t prevVertSize = verts.size();
-			const size_t prevIndcSize = indcs.size();
+				const size_t prevVertSize = verts.size();
+				const size_t prevIndcSize = indcs.size();
 
-			std::vector<std::vector<std::pair<uint16_t, float>>> vertexWeights;
+				std::vector<std::array<std::pair<uint16_t, float>, 8>> vertexWeights;
 
-			assert(prim.type == fastgltf::PrimitiveType::Triangles);
-			for (const auto* primAttIt = prim.attributes.cbegin(); primAttIt != prim.attributes.cend(); ++primAttIt) {
-				auto& accessor = asset.accessors[primAttIt->accessorIndex];
+				assert(prim.type == fastgltf::PrimitiveType::Triangles);
+				for (const auto* primAttIt = prim.attributes.cbegin(); primAttIt != prim.attributes.cend(); ++primAttIt) {
+					auto& accessor = asset.accessors[primAttIt->accessorIndex];
 
-				if (primAttIt == prim.attributes.cbegin()) {
-					verts.resize(prevVertSize + accessor.count);
-					vertexWeights.resize(accessor.count, std::vector<std::pair<uint16_t, float>>(8, std::make_pair(SVertexData::INVALID_BONEID, 0.0f)));
-				}
+					if (primAttIt == prim.attributes.cbegin()) {
+						verts.resize(prevVertSize + accessor.count);
+						vertexWeights.resize(accessor.count, { std::make_pair(SVertexData::INVALID_BONEID, 0.0f) } );
+					}
 
-				if (!accessor.bufferViewIndex.has_value())
-					continue;
+					if (!accessor.bufferViewIndex.has_value())
+						continue;
 
-				switch (hashString(primAttIt->name.c_str(), primAttIt->name.length()))
-				{
-				case hashString("POSITION"): {
-					fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, accessor, [&](const auto& val, std::size_t idx) {
-						verts[prevVertSize + idx].pos = float3{ val.x(), val.y(), val.z() };
-					});
-				} break;
-				case hashString("NORMAL"): {
-					fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, accessor, [&](const auto& val, std::size_t idx) {
-						verts[prevVertSize + idx].normal = float3{ val.x(), val.y(), val.z() }.ANormalize();
-					});
-				} break;
-				case hashString("TEXCOORD_0"): {
-					fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset, accessor, [&](const auto& val, std::size_t idx) {
-						verts[prevVertSize + idx].texCoords[0] = float2(val.x(), val.y());
-					});
-				} break;
-				case hashString("TEXCOORD_1"): {
-					fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset, accessor, [&](const auto& val, std::size_t idx) {
-						verts[prevVertSize + idx].texCoords[1] = float2(val.x(), val.y());
-					});
-				} break;
-				case hashString("TANGENT"): {
-					fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
-						verts[prevVertSize + idx].sTangent = (val.w() * float3{ val.x(), val.y(), val.z() }).ANormalize();
-						verts[prevVertSize + idx].tTangent = verts[prevVertSize + idx].normal.cross(verts[prevVertSize + idx].sTangent).ANormalize();
-					});
-				} break;
-				case hashString("JOINTS_0"): {
-					assert(skinPtr);
-					fastgltf::iterateAccessorWithIndex<fastgltf::math::uvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
-						auto& vertexWeight = vertexWeights[idx];
-						vertexWeight[0].first = static_cast<uint16_t>(skinPtr->joints[val.x()]);
-						vertexWeight[1].first = static_cast<uint16_t>(skinPtr->joints[val.y()]);
-						vertexWeight[2].first = static_cast<uint16_t>(skinPtr->joints[val.z()]);
-						vertexWeight[3].first = static_cast<uint16_t>(skinPtr->joints[val.w()]);
-					});
-				} break;
-				case hashString("JOINTS_1"): {
-					assert(skinPtr);
-					fastgltf::iterateAccessorWithIndex<fastgltf::math::uvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
-						auto& vertexWeight = vertexWeights[idx];
-						vertexWeight[4].first = static_cast<uint16_t>(skinPtr->joints[val.x()]);
-						vertexWeight[5].first = static_cast<uint16_t>(skinPtr->joints[val.y()]);
-						vertexWeight[6].first = static_cast<uint16_t>(skinPtr->joints[val.z()]);
-						vertexWeight[7].first = static_cast<uint16_t>(skinPtr->joints[val.w()]);
-					});
-				} break;
-				case hashString("WEIGHTS_0"): {
-					fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
-						auto& vertexWeight = vertexWeights[idx];
-						vertexWeight[0].second = val.x();
-						vertexWeight[1].second = val.y();
-						vertexWeight[2].second = val.z();
-						vertexWeight[3].second = val.w();
-					});
-				} break;
-				case hashString("WEIGHTS_1"): {
-					fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
-						auto& vertexWeight = vertexWeights[idx];
-						vertexWeight[4].second = val.x();
-						vertexWeight[5].second = val.y();
-						vertexWeight[6].second = val.z();
-						vertexWeight[7].second = val.w();
-					});
-				} break;
-				default:
-					break;
-				}
+					switch (hashString(primAttIt->name.c_str(), primAttIt->name.length()))
+					{
+					case hashString("POSITION"): {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, accessor, [&](const auto& val, std::size_t idx) {
+							verts[prevVertSize + idx].pos = float3{ val.x(), val.y(), val.z() };
+						});
+					} break;
+					case hashString("NORMAL"): {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, accessor, [&](const auto& val, std::size_t idx) {
+							verts[prevVertSize + idx].normal = float3{ val.x(), val.y(), val.z() }.ANormalize();
+						});
+					} break;
+					case hashString("TEXCOORD_0"): {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset, accessor, [&](const auto& val, std::size_t idx) {
+							verts[prevVertSize + idx].texCoords[0] = float2(val.x(), val.y());
+						});
+					} break;
+					case hashString("TEXCOORD_1"): {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset, accessor, [&](const auto& val, std::size_t idx) {
+							verts[prevVertSize + idx].texCoords[1] = float2(val.x(), val.y());
+						});
+					} break;
+					case hashString("TANGENT"): {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+							verts[prevVertSize + idx].sTangent = (val.w() * float3{ val.x(), val.y(), val.z() }).ANormalize();
+							verts[prevVertSize + idx].tTangent = verts[prevVertSize + idx].normal.cross(verts[prevVertSize + idx].sTangent).ANormalize();
+						});
+					} break;
+					case hashString("JOINTS_0"): {
+						assert(skinPtr);
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::uvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+							auto& vertexWeight = vertexWeights[idx];
+							vertexWeight[0].first = static_cast<uint16_t>(skinPtr->joints[val.x()]);
+							vertexWeight[1].first = static_cast<uint16_t>(skinPtr->joints[val.y()]);
+							vertexWeight[2].first = static_cast<uint16_t>(skinPtr->joints[val.z()]);
+							vertexWeight[3].first = static_cast<uint16_t>(skinPtr->joints[val.w()]);
+						});
+					} break;
+					case hashString("JOINTS_1"): {
+						assert(skinPtr);
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::uvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+							auto& vertexWeight = vertexWeights[idx];
+							vertexWeight[4].first = static_cast<uint16_t>(skinPtr->joints[val.x()]);
+							vertexWeight[5].first = static_cast<uint16_t>(skinPtr->joints[val.y()]);
+							vertexWeight[6].first = static_cast<uint16_t>(skinPtr->joints[val.z()]);
+							vertexWeight[7].first = static_cast<uint16_t>(skinPtr->joints[val.w()]);
+						});
+					} break;
+					case hashString("WEIGHTS_0"): {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+							auto& vertexWeight = vertexWeights[idx];
+							vertexWeight[0].second = val.x();
+							vertexWeight[1].second = val.y();
+							vertexWeight[2].second = val.z();
+							vertexWeight[3].second = val.w();
+						});
+					} break;
+					case hashString("WEIGHTS_1"): {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+							auto& vertexWeight = vertexWeights[idx];
+							vertexWeight[4].second = val.x();
+							vertexWeight[5].second = val.y();
+							vertexWeight[6].second = val.z();
+							vertexWeight[7].second = val.w();
+						});
+					} break;
+					default:
+						break;
+					}
 			}
 
 			for (auto& vertexWeight : vertexWeights) {
@@ -147,10 +147,27 @@ namespace Impl {
 					if (w.second == 0.0f)
 						w.first = SVertexData::INVALID_BONEID;
 				}
+
 				std::stable_sort(vertexWeight.begin(), vertexWeight.end(), [](const auto& lhs, const auto& rhs) {
 					return std::forward_as_tuple(lhs.second, lhs.first) > std::forward_as_tuple(rhs.second, rhs.first);
 				});
-				vertexWeight.resize(4, std::make_pair(255, 0.0f));
+
+				float sumWeight = 0.0f;
+				for (size_t i = 0; i < 4; ++i) {
+					sumWeight += vertexWeight[i].second;
+				}
+
+				// normalize weights on the 4 only supported bones
+				sumWeight = (sumWeight > 0.0f) ? sumWeight : 1.0f;
+				for (size_t i = 0; i < 4; ++i) {
+					vertexWeight[i].second /= sumWeight;
+				}
+
+				// non-skinning case
+				if (auto& [boneId, boneWeight] = vertexWeight.front(); boneId == SVertexData::INVALID_BONEID) {
+					boneId = nodeIdx;
+					boneWeight = 1.0f;
+				}
 			}
 
 			for (size_t i = prevVertSize; i < verts.size(); ++i) {
@@ -440,9 +457,23 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 		const auto& mesh = asset.meshes[*node.meshIndex];
 		auto& skinnedMesh = allSkinnedMeshes.emplace_back();
 
-		Impl::ReadGeometryData(asset, mesh.primitives, skinnedMesh.verts, skinnedMesh.indcs, &skin);
+		Impl::ReadGeometryData(asset, mesh.primitives, skinnedMesh.verts, skinnedMesh.indcs, ni, &skin);
 		Impl::CondTransformSkinsToModelSpace(skinnedMesh.verts, ni, modelTransforms);
 		Impl::ReplaceNodeIndexWithPieceIndex(skinnedMesh.verts, nodeIdxToPieceIdx);
+	}
+
+	// non-skinning case
+	if (allSkinnedMeshes.empty()) {
+		for (size_t pi = 0; pi < model.pieceObjects.size(); ++pi) {
+			auto* piece = static_cast<GLTFPiece*>(model.pieceObjects[pi]);
+			if (piece->nodeIndex == GLTFPiece::INVALID_NODE_INDEX)
+				continue;
+
+			if (piece->GetVerticesVec().empty())
+				continue;
+
+			Impl::ReplaceNodeIndexWithPieceIndex(piece->GetVerticesVec(), nodeIdxToPieceIdx);
+		}
 	}
 
 	spring::unordered_set<size_t> allBones;
@@ -452,12 +483,14 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 		}
 	}
 
-	// if numMeshes >= numBones reparent the whole meshes
-	// else reparent meshes per-triangle
-	if (allSkinnedMeshes.size() >= allBones.size())
-		Skinning::ReparentCompleteMeshesToBones(&model, allSkinnedMeshes);
-	else
-		Skinning::ReparentMeshesTrianglesToBones(&model, allSkinnedMeshes);
+	if (!allSkinnedMeshes.empty()) {
+		// if numMeshes >= numBones reparent the whole meshes
+		// else reparent meshes per-triangle
+		if (allSkinnedMeshes.size() >= allBones.size())
+			Skinning::ReparentCompleteMeshesToBones(&model, allSkinnedMeshes);
+		else
+			Skinning::ReparentMeshesTrianglesToBones(&model, allSkinnedMeshes);
+	}
 
 	// will also calculate pieces / model bounding box
 	ModelUtils::ApplyModelProperties(&model, optionalModelParams);
@@ -497,7 +530,7 @@ GLTFPiece* CGLTFParser::AllocRootEmptyPiece(S3DModel* model, const Transform& pa
 	// only rotation is allowed because of Spring-isms
 	bakedTransform.t = float3{};
 	bakedTransform.s = 1.0f;
-	piece->SetBakedTransform(bakedTransform);
+	piece->SetBakedTransform(bakedTransform); // bakedRotAngles are not read or supported for GLTF
 	piece->offset = parentTransform.t;
 	piece->scale = parentTransform.s;
 
@@ -540,7 +573,7 @@ GLTFPiece* CGLTFParser::LoadPiece(S3DModel* model, GLTFPiece* parentPiece, const
 	bakedTransform.t = float3{};
 	bakedTransform.s = 1.0f;
 
-	piece->SetBakedTransform(bakedTransform);
+	piece->SetBakedTransform(bakedTransform); // bakedRotAngles are not read or supported for GLTF
 	piece->offset = pieceTransform.t;
 	piece->scale = pieceTransform.s;
 	piece->goffset = piece->offset + ((parentPiece != nullptr) ? parentPiece->goffset : ZeroVector);
@@ -557,7 +590,7 @@ GLTFPiece* CGLTFParser::LoadPiece(S3DModel* model, GLTFPiece* parentPiece, const
 	auto& verts = piece->GetVerticesVec();
 	auto& indcs = piece->GetIndicesVec();
 	const auto& mesh = asset.meshes[*node.meshIndex];
-	Impl::ReadGeometryData(asset, mesh.primitives, verts, indcs);
+	Impl::ReadGeometryData(asset, mesh.primitives, verts, indcs, nodeIndex, nullptr);
 
 	return piece;
 }

@@ -182,11 +182,6 @@ namespace Impl {
 		// process transforms
 		pieceNode->mTransformation.Decompose(aiScaleVec, aiRotateQuat, aiTransVec);
 
-		// TODO remove bakedMatrix and do everything with basic transformations
-		const aiMatrix3x3t<float> aiBakedRotMatrix = aiRotateQuat.GetMatrix();
-		const aiMatrix4x4t<float> aiBakedMatrix = aiMatrix4x4t<float>(aiBakedRotMatrix);
-		CMatrix44f bakedMatrix = aiMatrixToMatrix(aiBakedMatrix);
-
 		// metadata-scaling
 		float3 scales{ 1.0f, 1.0f, 1.0f };
 		scales = pieceTable.GetFloat3("scale", aiVectorToFloat3(aiScaleVec));

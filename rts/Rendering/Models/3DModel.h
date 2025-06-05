@@ -8,6 +8,7 @@
 #include <vector>
 #include <string>
 #include <limits>
+#include <type_traits>
 
 #include "ModelsMemStorage.h"
 #include "Lua/LuaObjectMaterial.h"
@@ -19,6 +20,7 @@
 #include "System/float4.h"
 #include "System/SafeUtil.h"
 #include "System/SpringMath.h"
+#include "System/TemplateUtils.hpp"
 #include "System/creg/creg_cond.h"
 
 static constexpr int MAX_MODEL_OBJECTS  = 3840;
@@ -93,8 +95,10 @@ struct SVertexData {
 	static constexpr std::array<uint8_t, 4> DEFAULT_BONEWEIGHTS  = { 255, 0  ,   0,   0 };
 	static constexpr uint16_t INVALID_BONEID = 0xFFFF;
 
-	void SetBones(const std::vector<std::pair<uint16_t, float>>& bi) {
-		assert(bi.size() == 4);
+	template <Concepts::HasSizeAndData C>
+	void SetBones(const C& bi) {
+		static_assert(std::is_same_v<typename C::value_type, std::pair<uint16_t, float>>);
+		assert(bi.size() >= 4);
 		boneIDsLow = {
 			static_cast<uint8_t>((bi[0].first     ) & 0xFF),
 			static_cast<uint8_t>((bi[1].first     ) & 0xFF),
