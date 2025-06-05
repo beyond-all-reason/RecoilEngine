@@ -3088,7 +3088,9 @@ void CGameServer::GotChatMessage(const ChatMessage& msg)
 	if (msg.fromPlayer < 0 || msg.fromPlayer == SERVER_PLAYER)
 		return;
 
-	hostif->SendPlayerChat(msg.fromPlayer, msg.destination, msg.msg, msg.isSecret);
+	// do not forward interplayer secrets to autohost if they're not allowed.
+	if (!msg.isSecret || allowInterplayerSecrets || msg.destination == SERVER_PLAYER)
+		hostif->SendPlayerChat(msg.fromPlayer, msg.destination, msg.msg, msg.isSecret);
 }
 
 
