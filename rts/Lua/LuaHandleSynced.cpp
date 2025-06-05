@@ -2518,7 +2518,10 @@ int CSplitLuaHandle::LoadStringData(lua_State* L)
 	const char *str    = luaL_checklstring(L, 1, &len);
 	const char *chunkname = luaL_optstring(L, 2, str);
 
-	if (luaL_loadbuffer(L, str, len, chunkname) != 0) {
+	auto handle = CLuaHandle::GetHandle(L);
+
+	// BLOCK HERE
+	if (luaL_loadbuffer_privileged(L, str, len, chunkname, handle->GetDevMode()) != 0) {
 		lua_pushnil(L);
 		lua_insert(L, -2);
 		return 2; // nil, then the error message

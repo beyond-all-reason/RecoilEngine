@@ -878,7 +878,20 @@ LUA_API int lua_load (lua_State *L, lua_Reader reader, void *data,
   lua_lock(L);
   if (!chunkname) chunkname = "?";
   luaZ_init(L, &z, reader, data);
-  status = luaD_protectedparser(L, &z, chunkname);
+  status = luaD_protectedparser(L, &z, chunkname, false);
+  lua_unlock(L);
+  return status;
+}
+
+
+LUA_API int lua_load_privileged (lua_State *L, lua_Reader reader, void *data,
+                      const char *chunkname) {
+  ZIO z;
+  int status;
+  lua_lock(L);
+  if (!chunkname) chunkname = "?";
+  luaZ_init(L, &z, reader, data);
+  status = luaD_protectedparser(L, &z, chunkname, true);
   lua_unlock(L);
   return status;
 }
