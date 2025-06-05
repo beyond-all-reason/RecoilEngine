@@ -113,8 +113,8 @@ function MiniMapRotationChanged(newRot, oldRot)
   return widgetHandler:MiniMapRotationChanged(newRot, oldRot)
 end
 
-function MiniMapStateChanged(isMinimized, isMaximized)
-  return widgetHandler:MiniMapStateChanged(isMinimized, isMaximized)
+function MiniMapStateChanged(isMinimized, isMaximized, isSlaved)
+  return widgetHandler:MiniMapStateChanged(isMinimized, isMaximized, isSlaved)
 end
 
 function MiniMapGeometryChanged(newPosX, newPosY, newDimX, newDimY, oldPosX, oldPosY, oldDimX, oldDimY)

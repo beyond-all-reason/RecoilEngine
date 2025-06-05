@@ -1212,9 +1212,9 @@ function widgetHandler:MiniMapRotationChanged(newRot, oldRot)
   end
 end
 
-function widgetHandler:MiniMapStateChanged(isMinimized, isMaximized)
+function widgetHandler:MiniMapStateChanged(isMinimized, isMaximized, isSlaved)
   for _,w in ipairs(self.MiniMapStateChangedList) do
-    w:MiniMapStateChanged(isMinimized, isMaximized)
+    w:MiniMapStateChanged(isMinimized, isMaximized, isSlaved)
   end
 end
 

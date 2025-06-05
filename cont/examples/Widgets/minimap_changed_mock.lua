@@ -19,6 +19,6 @@ function widget:MiniMapGeometryChanged(newPosX, newPosY, newDimX, newDimY, oldPo
 	Spring.Echo("<MiniMap Callins Test> Minimap Geometry Changed from " .. oldPosX, oldPosY, oldDimX, oldDimY .. " to " .. newPosX, newPosY, newDimX, newDimY)
 end
 
-function widget:MiniMapStateChanged(isMini, isMax)
-	Spring.Echo("<MiniMap Callins Test> Minimap State Changed: Minimized - " .. tostring(isMini) .. ", Maximized - " .. tostring(isMax))
+function widget:MiniMapStateChanged(isMini, isMax, isSlave)
+	Spring.Echo("<MiniMap Callins Test> Minimap State Changed: Minimized - " .. tostring(isMini) .. ", Maximized - " .. tostring(isMax) .. ", Slave - " .. tostring(isSlave))
 end

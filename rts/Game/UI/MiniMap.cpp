@@ -252,7 +252,7 @@ void CMiniMap::ToggleMaximized(bool _maxspect)
 		curDim = oldDim;
 	}
 
-	eventHandler.MiniMapStateChanged(minimized,maximized);
+	eventHandler.MiniMapStateChanged(minimized,maximized, slaveDrawMode);
 
 	// needed for SetMaximizedGeometry
 	UpdateGeometry();
@@ -278,7 +278,7 @@ void CMiniMap::SetMinimized(bool state)
 		return;
 
 	minimized = state;
-	eventHandler.MiniMapStateChanged(minimized, maximized);
+	eventHandler.MiniMapStateChanged(minimized, maximized, slaveDrawMode);
 }
 
 void CMiniMap::SetAspectRatioGeometry(const float& viewSizeX, const float& viewSizeY,
@@ -372,6 +372,7 @@ void CMiniMap::SetSlaveMode(bool newMode)
 	}
 
 	slaveDrawMode = newMode;
+	eventHandler.MiniMapStateChanged(minimized, maximized, slaveDrawMode);
 	UpdateGeometry();
 }
 

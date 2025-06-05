@@ -786,10 +786,10 @@ void CEventHandler::MiniMapRotationChanged(const float newRot, const float oldRo
 	ITERATE_EVENTCLIENTLIST(MiniMapRotationChanged, newRot, oldRot);
 }
 
-void CEventHandler::MiniMapStateChanged(const bool isMinimized, const bool isMaximized)
+void CEventHandler::MiniMapStateChanged(const bool isMinimized, const bool isMaximized, const bool isSlaved)
 {
 	ZoneScoped;
-	ITERATE_EVENTCLIENTLIST(MiniMapStateChanged, isMinimized, isMaximized);
+	ITERATE_EVENTCLIENTLIST(MiniMapStateChanged, isMinimized, isMaximized, isSlaved);
 }
 
 void CEventHandler::MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim)

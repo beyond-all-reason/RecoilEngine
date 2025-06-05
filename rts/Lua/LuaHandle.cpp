@@ -3451,7 +3451,8 @@ void CLuaHandle::MiniMapRotationChanged(const float newRot, const float oldRot)
  * @param isMaximized boolean
  */
 void CLuaHandle::MiniMapStateChanged(const bool isMinimized,
-									const bool isMaximized)
+									const bool isMaximized,
+									const bool isSlaved)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, false);
@@ -3463,8 +3464,10 @@ void CLuaHandle::MiniMapStateChanged(const bool isMinimized,
 
 	lua_pushboolean(L, isMinimized);
 	lua_pushboolean(L, isMaximized);
+	lua_pushboolean(L, isSlaved);
 
-	RunCallIn(L, cmdStr, 2, 0);
+
+	RunCallIn(L, cmdStr, 3, 0);
 }
 
 /*** Called when the MiniMap Geometry changes
