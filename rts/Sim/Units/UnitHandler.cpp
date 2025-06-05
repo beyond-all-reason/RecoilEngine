@@ -11,6 +11,7 @@
 #include "UnitTypes/Factory.h"
 
 #include "CommandAI/BuilderCAI.h"
+#include "Map/MapDamage.h"
 #include "Sim/Ecs/Registry.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/ModInfo.h"
@@ -462,6 +463,7 @@ void CUnitHandler::Update()
 	QueueDeleteUnits();
 	UpdateUnitLosStates();
 	SlowUpdateUnits();
+	mapDamage->ProcessRecalcs();
 	UpdateUnits();
 	UpdateUnitWeapons();
 

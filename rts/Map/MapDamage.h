@@ -18,6 +18,8 @@ public:
 	virtual void RecalcArea(int x1, int x2, int y1, int y2) = 0;
 	virtual void TerrainTypeHardnessChanged(int ttIndex) {}
 	virtual void TerrainTypeSpeedModChanged(int ttIndex) {}
+	virtual void PushRecalcArea(int x1, int x2, int y1, int y2) {}
+	virtual void ProcessRecalcs() {}
 
 	virtual void Init() = 0;
 	virtual void Update() = 0;
