@@ -73,7 +73,7 @@ public:
 	bool CanDrawSoften() {
 		return
 			CheckSoftenExt() &&
-			fxShaders[1] && fxShaders[1]->IsValid() &&
+			fxShader && fxShader->IsValid() &&
 			depthBufferCopy->IsValid(false);
 	};
 
@@ -169,8 +169,8 @@ private:
 
 	bool drawSorted = true;
 
-	std::array<Shader::IProgramObject*, 2> fxShaders = { nullptr };
-	Shader::IProgramObject* fsShadowShader = nullptr;
+	Shader::IProgramObject* fxShader = nullptr;
+	Shader::IProgramObject* fxShadowShader = nullptr;
 
 	constexpr static int WANT_SOFTEN_COUNT = 2;
 	int wantSoften = 0;

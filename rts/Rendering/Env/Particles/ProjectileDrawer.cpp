@@ -86,8 +86,8 @@ void CProjectileDrawer::Init() {
 
 	loadscreen->SetLoadMessage("Creating Projectile Textures");
 
-	textureAtlas = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_LEGACY, 0, 0, "ProjectileTextureAtlas", true);
-	groundFXAtlas = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_LEGACY, 0, 0, "ProjectileEffectsAtlas", true);
+	textureAtlas  = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_MP_LEGACY, 0, 0, "ExplosFXAtlas", true);
+	groundFXAtlas = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_MP_LEGACY, 0, 0, "GroundFXAtlas", true);
 
 	LuaParser resourcesParser("gamedata/resources.lua", SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
 	LuaParser mapResParser("gamedata/resources_map.lua", SPRING_VFS_MAP_BASE, SPRING_VFS_ZIP);
@@ -282,61 +282,49 @@ void CProjectileDrawer::Init() {
 
 	LoadWeaponTextures();
 
-	{
-		fsShadowShader = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader shadow");
+	fxShadowShader = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader shadow");
+	fxShadowShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXVertShadowProg.glsl", "", GL_VERTEX_SHADER));
+	fxShadowShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXFragShadowProg.glsl", "", GL_FRAGMENT_SHADER));
+	fxShadowShader->SetFlag("USE_TEXTURE_ARRAY", false);
 
-		fsShadowShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXVertShadowProg.glsl", "", GL_VERTEX_SHADER));
-		fsShadowShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXFragShadowProg.glsl", "", GL_FRAGMENT_SHADER));
+	using VAT = std::decay_t<decltype(CProjectile::GetPrimaryRenderBuffer())>::VertType;
+	fxShadowShader->BindAttribLocations<VAT>();
 
-		{
-			using VAT = std::decay_t<decltype(CProjectile::GetPrimaryRenderBuffer())>::VertType;
-			fsShadowShader->BindAttribLocations<VAT>();
-		}
+	fxShadowShader->Link();
+	fxShadowShader->Enable();
 
-		fsShadowShader->Link();
-		fsShadowShader->Enable();
+	fxShadowShader->SetUniform("atlasTex", 0);
+	fxShadowShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
+	fxShadowShader->SetUniform("shadowColorMode", shadowHandler.shadowColorMode > 0 ? 1.0f : 0.0f);
 
-		fsShadowShader->SetUniform("atlasTex", 0);
-		fsShadowShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
-		fsShadowShader->SetUniform("shadowColorMode", shadowHandler.shadowColorMode > 0 ? 1.0f : 0.0f);
+	fxShadowShader->Disable();
+	fxShadowShader->Validate();
 
-		fsShadowShader->Disable();
-		fsShadowShader->Validate();
-	}
 
-	fxShaders[0] = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader hard");
-	fxShaders[1] = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader soft");
+	fxShader = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Shader");
+	fxShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXVertProg.glsl", "", GL_VERTEX_SHADER));
+	fxShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXFragProg.glsl", "", GL_FRAGMENT_SHADER));
+	fxShader->SetFlag("SMOOTH_PARTICLES", CheckSoftenExt());
+	fxShader->SetFlag("DEPTH_CLIP01", globalRendering->supportClipSpaceControl);
+	fxShader->SetFlag("USE_TEXTURE_ARRAY", false);
 
-	for (auto*& fxShader : fxShaders)
-	{
-		fxShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXVertProg.glsl", "", GL_VERTEX_SHADER));
-		fxShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXFragProg.glsl", "", GL_FRAGMENT_SHADER));
+	using VAT = std::decay_t<decltype(CProjectile::GetPrimaryRenderBuffer())>::VertType;
+	fxShader->BindAttribLocations<VAT>();
 
-		{
-			using VAT = std::decay_t<decltype(CProjectile::GetPrimaryRenderBuffer())>::VertType;
-			fxShader->BindAttribLocations<VAT>();
-		}
+	fxShader->Link();
+	fxShader->Enable();
+	fxShader->SetUniform("atlasTex", 0);
+	fxShader->SetUniform("depthTex", 15);
+	fxShader->SetUniform("softenExponent", softenExponent[0], softenExponent[1]);
+	fxShader->SetUniform("softenThreshold", softenThreshold[0]);
 
-		fxShader->SetFlag("DEPTH_CLIP01", globalRendering->supportClipSpaceControl);
-		if (fxShader == fxShaders[1])
-			fxShader->SetFlag("SMOOTH_PARTICLES", CheckSoftenExt());
+	fxShader->SetUniform("camPos", 0.0f, 0.0f, 0.0f);
+	fxShader->SetUniform("fogColor", 0.0f, 0.0f, 0.0f);
+	fxShader->SetUniform("fogParams", 0.0f, 0.0f);
 
-		fxShader->Link();
-		fxShader->Enable();
-		fxShader->SetUniform("atlasTex", 0);
-		if (fxShader == fxShaders[1]) {
-			fxShader->SetUniform("depthTex", 15);
-			fxShader->SetUniform("softenExponent", softenExponent[0], softenExponent[1]);
-		}
+	fxShader->Disable();
 
-		fxShader->SetUniform("camPos", 0.0f, 0.0f, 0.0f);
-		fxShader->SetUniform("fogColor", 0.0f, 0.0f, 0.0f);
-		fxShader->SetUniform("fogParams", 0.0f, 0.0f);
-
-		fxShader->Disable();
-
-		fxShader->Validate();
-	}
+	fxShader->Validate();
 
 	sdbc = std::make_unique<ScopedDepthBufferCopy>(false);
 
@@ -368,8 +356,8 @@ void CProjectileDrawer::Kill() {
 	drawSorted = true;
 
 	shaderHandler->ReleaseProgramObjects("[ProjectileDrawer::VFS]");
-	fxShaders = { nullptr };
-	fsShadowShader = nullptr;
+	fxShader = nullptr;
+	fxShadowShader = nullptr;
 	sdbc = nullptr;
 
 	configHandler->Set("SoftParticles", wantSoften);
@@ -598,40 +586,6 @@ bool CProjectileDrawer::ShouldDrawProjectile(const CProjectile* p, uint8_t thisP
 	return p->HasDrawFlag(static_cast<DrawFlags>(thisPassMask));
 }
 
-/*
-void CProjectileDrawer::DrawProjectileNow(CProjectile* pro, bool drawReflection, bool drawRefraction)
-{
-	pro->drawPos = pro->GetDrawPos(globalRendering->timeOffset);
-
-	if (!CanDrawProjectile(pro, pro->GetAllyteamID()))
-		return;
-
-	if (drawRefraction && (pro->drawPos.y > pro->GetDrawRadius()))
-		return;
-	// removed this to fix AMD particle drawing
-	//if (drawReflection && !CModelDrawerHelper::ObjectVisibleReflection(pro->drawPos, camera->GetPos(), pro->GetDrawRadius()))
-	//	return;
-
-	const CCamera* cam = CCameraHandler::GetActiveCamera();
-	if (!cam->InView(pro->drawPos, pro->GetDrawRadius()))
-		return;
-
-	// no-op if no model
-	if (DrawProjectileModel(pro))
-		return;
-
-	pro->SetSortDist(cam->ProjectedDistance(pro->pos));
-
-	auto lock = mutex.GetScopedLock();
-	if (drawSorted && pro->drawSorted) {
-		sortedProjectiles.emplace_back(pro);
-	} else {
-		unsortedProjectiles.emplace_back(pro);
-	}
-
-}
-*/
-
 void CProjectileDrawer::DrawProjectilesMiniMap()
 {
 	ZoneScopedN("ProjectileDrawer::DrawMiniMap");
@@ -823,25 +777,21 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 
 		const bool needSoften = (wantSoften > 0) && !drawReflection && !drawRefraction;
 
-
 		glActiveTexture(GL_TEXTURE0); textureAtlas->BindTexture();
 
 		if (needSoften) {
 			glActiveTexture(GL_TEXTURE15); glBindTexture(GL_TEXTURE_2D, depthBufferCopy->GetDepthBufferTexture(false));
 		}
 
-		auto* fxShader = fxShaders[needSoften];
-
 		const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
 		const auto& sky = ISky::GetSky();
 
 		fxShader->Enable();
-
+		fxShader->SetFlag("SMOOTH_PARTICLES", needSoften);
+		fxShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
 		fxShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
 		fxShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
-		if (needSoften) {
-			fxShader->SetUniform("softenThreshold", CProjectileDrawer::softenThreshold[0]);
-		}
+		fxShader->SetUniform("softenThreshold", CProjectileDrawer::softenThreshold[0]);
 
 		fxShader->SetUniform("camPos", camPlayer->pos.x, camPlayer->pos.y, camPlayer->pos.z);
 		fxShader->SetUniform("fogColor", sky->fogColor.x, sky->fogColor.y, sky->fogColor.z);
@@ -855,7 +805,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			glBindTexture(GL_TEXTURE_2D, 0); //15th slot
 			glActiveTexture(GL_TEXTURE0);
 		}
-		glBindTexture(GL_TEXTURE_2D, 0);
+		textureAtlas->UnbindTexture();
 	}
 }
 
@@ -939,12 +889,14 @@ void CProjectileDrawer::DrawShadowTransparent()
 
 	// 6) Render transparents in arbitrary order
 	textureAtlas->BindTexture();
-	fsShadowShader->Enable();
-	fsShadowShader->SetUniform("shadowColorMode", shadowHandler.shadowColorMode > 0 ? 1.0f : 0.0f);
+
+	fxShadowShader->Enable();
+	fxShadowShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
+	fxShadowShader->SetUniform("shadowColorMode", shadowHandler.shadowColorMode > 0 ? 1.0f : 0.0f);
 
 	rb.DrawElements(GL_TRIANGLES);
 
-	fsShadowShader->Disable();
+	fxShadowShader->Disable();
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	//shadowHandler.EnableColorOutput(false);
@@ -1018,6 +970,7 @@ void CProjectileDrawer::DrawGroundFlashes()
 	glDepthMask(GL_FALSE);
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
 	glActiveTexture(GL_TEXTURE0);
 	groundFXAtlas->BindTexture();
 /*
@@ -1040,11 +993,16 @@ void CProjectileDrawer::DrawGroundFlashes()
 		glActiveTexture(GL_TEXTURE15); glBindTexture(GL_TEXTURE_2D, depthBufferCopy->GetDepthBufferTexture(false));
 	}
 
-	fxShaders[needSoften]->Enable();
-	fxShaders[needSoften]->SetUniform("alphaCtrl", 0.01f, 1.0f, 0.0f, 0.0f);
-	if (needSoften) {
-		fxShaders[needSoften]->SetUniform("softenThreshold", -CProjectileDrawer::softenThreshold[1]);
-	}
+	const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
+	const auto& sky = ISky::GetSky();
+
+	fxShader->Enable();
+	fxShader->SetFlag("USE_TEXTURE_ARRAY", (groundFXAtlas->GetNumPages() > 1));
+	fxShader->SetUniform("alphaCtrl", 0.01f, 1.0f, 0.0f, 0.0f);
+	fxShader->SetUniform("softenThreshold", -CProjectileDrawer::softenThreshold[1]);
+	fxShader->SetUniform("camPos", camPlayer->pos.x, camPlayer->pos.y, camPlayer->pos.z);
+	fxShader->SetUniform("fogColor", sky->fogColor.x, sky->fogColor.y, sky->fogColor.z);
+	fxShader->SetUniform("fogParams", sky->fogStart * camPlayer->GetFarPlaneDist(), sky->fogEnd * camPlayer->GetFarPlaneDist());
 
 	for (CGroundFlash* gf: gfc) {
 		const bool inLos = gf->alwaysVisible || gu->spectatingFullView || losHandler->InAirLos(gf, gu->myAllyTeam);
@@ -1077,13 +1035,14 @@ void CProjectileDrawer::DrawGroundFlashes()
 
 	rb.DrawElements(GL_TRIANGLES);
 
-	fxShaders[needSoften]->Disable();
+	fxShader->Disable();
 
 	if (needSoften) {
 		glBindTexture(GL_TEXTURE_2D, 0); //15th slot
 		glActiveTexture(GL_TEXTURE0);
 	}
-	glBindTexture(GL_TEXTURE_2D, 0);
+
+	groundFXAtlas->UnbindTexture();
 
 //	glFogfv(GL_FOG_COLOR, sky->fogColor);
 	glDisable(GL_POLYGON_OFFSET_FILL);

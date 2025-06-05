@@ -660,8 +660,8 @@ void CGroundDecalHandler::AddExplosion(AddExplosionInfo&& ei)
 		.posTR = posTR,
 		.posBR = posBR,
 		.posBL = posBL,
-		.texMainOffsets = atlasMain->GetTexture(mainName, "%FB_MAIN%"),
-		.texNormOffsets = atlasNorm->GetTexture(normName, "%FB_NORM%"),
+		.texMainOffsets = static_cast<float4>(atlasMain->GetTexture(mainName, "%FB_MAIN%")),
+		.texNormOffsets = static_cast<float4>(atlasNorm->GetTexture(normName, "%FB_NORM%")),
 		.alpha = alpha,
 		.alphaFalloff = alphaDecay,
 		.glow = glow,
@@ -693,20 +693,15 @@ void CGroundDecalHandler::AddExplosion(AddExplosionInfo&& ei)
 void CGroundDecalHandler::ReloadTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	struct AtlasedTextureHash {
-		uint32_t operator()(const AtlasedTexture& at) const {
-			return spring::LiteHash(&at, sizeof(at));
-		}
-	};
 
-	spring::unordered_map<AtlasedTexture, std::string, AtlasedTextureHash> subTexToNameMain;
-	spring::unordered_map<AtlasedTexture, std::string, AtlasedTextureHash> subTexToNameNorm;
+	spring::unordered_map<float4, std::string, float4Hash> subTexToNameMain;
+	spring::unordered_map<float4, std::string, float4Hash> subTexToNameNorm;
 
 	for (const auto& [name, ae] : atlasMain->GetAllocator()->GetEntries()) {
-		subTexToNameMain.emplace(atlasMain->GetTexture(name), name);
+		subTexToNameMain.emplace(static_cast<float4>(atlasMain->GetTexture(name)), name);
 	}
 	for (const auto& [name, ae] : atlasNorm->GetAllocator()->GetEntries()) {
-		subTexToNameNorm.emplace(atlasNorm->GetTexture(name), name);
+		subTexToNameNorm.emplace(static_cast<float4>(atlasNorm->GetTexture(name)), name);
 	}
 
 	// can't use {atlas}->ReloadTextures() here as all textures come from memory
@@ -736,10 +731,10 @@ void CGroundDecalHandler::ReloadTextures()
 
 	for (auto& decal : decals) {
 		if (auto it = subTexToNameMain.find(decal.texMainOffsets); it != subTexToNameMain.end()) {
-			decal.texMainOffsets = atlasMain->GetTexture(it->second, "%FB_MAIN%");
+			decal.texMainOffsets = static_cast<float4>(atlasMain->GetTexture(it->second, "%FB_MAIN%"));
 		}
 		if (auto it = subTexToNameNorm.find(decal.texNormOffsets); it != subTexToNameNorm.end()) {
-			decal.texNormOffsets = atlasNorm->GetTexture(it->second, "%FB_NORM%");
+			decal.texNormOffsets = static_cast<float4>(atlasNorm->GetTexture(it->second, "%FB_NORM%"));
 		}
 	}
 	decalsUpdateList.SetNeedUpdateAll();
@@ -892,8 +887,8 @@ void CGroundDecalHandler::MoveSolidObject(const CSolidObject* object, const floa
 		.posTR = posTR,
 		.posBR = posBR,
 		.posBL = posBL,
-		.texMainOffsets = atlasMain->GetTexture(                   (decalDef.groundDecalTypeName), "%FB_MAIN%"),
-		.texNormOffsets = atlasNorm->GetTexture(GetExtraTextureName(decalDef.groundDecalTypeName), "%FB_NORM%"),
+		.texMainOffsets = static_cast<float4>(atlasMain->GetTexture(                   (decalDef.groundDecalTypeName), "%FB_MAIN%")),
+		.texNormOffsets = static_cast<float4>(atlasNorm->GetTexture(GetExtraTextureName(decalDef.groundDecalTypeName), "%FB_NORM%")),
 		.alpha = 1.0f,
 		.alphaFalloff = 0.0f,
 		.glow = 0.0f,
@@ -993,8 +988,8 @@ uint32_t CGroundDecalHandler::CreateLuaDecal()
 		.posTR = float2{},
 		.posBR = float2{},
 		.posBL = float2{},
-		.texMainOffsets = atlasMain->GetTexture("%FB_MAIN%"),
-		.texNormOffsets = atlasNorm->GetTexture("%FB_NORM%"),
+		.texMainOffsets = static_cast<float4>(atlasMain->GetTexture("%FB_MAIN%")),
+		.texNormOffsets = static_cast<float4>(atlasNorm->GetTexture("%FB_NORM%")),
 		.alpha = 1.0f,
 		.alphaFalloff = 0.0f,
 		.glow = 0.0f,
@@ -1086,7 +1081,7 @@ bool CGroundDecalHandler::SetDecalTexture(uint32_t id, const std::string& texNam
 	if (newOffset == AtlasedTexture::DefaultAtlasTexture)
 		return false;
 
-	offset = newOffset;
+	offset = static_cast<float4>(newOffset);
 	decalsUpdateList.SetUpdate(it->second);
 	return true;
 }
@@ -1106,7 +1101,7 @@ std::string CGroundDecalHandler::GetDecalTexture(uint32_t id, bool mainTex) cons
 	const auto& atlas = mainTex ? atlasMain : atlasNorm;
 
 	for (auto& [name, _] : atlas->GetAllocator()->GetEntries()) {
-		const auto at = atlas->GetTexture(name);
+		const auto at = static_cast<float4>(atlas->GetTexture(name));
 		if (at == offset)
 			return name;
 	}
@@ -1238,8 +1233,8 @@ void CGroundDecalHandler::AddTrack(const CUnit* unit, const float3& newPos, bool
 			.posTR = decalPos2 - wc,
 			.posBR = decalPos2 + wc,
 			.posBL = decalPos2 + wc,
-			.texMainOffsets = atlasMain->GetTexture(mainName, "%FB_MAIN%"),
-			.texNormOffsets = atlasNorm->GetTexture(normName, "%FB_NORM%"),
+			.texMainOffsets = static_cast<float4>(atlasMain->GetTexture(mainName, "%FB_MAIN%")),
+			.texNormOffsets = static_cast<float4>(atlasNorm->GetTexture(normName, "%FB_NORM%")),
 			.alpha = 1.0f,
 			.alphaFalloff = alphaDecay,
 			.glow = 0.0f,
