@@ -214,9 +214,6 @@ void CInfoConsole::RecordLogMessage(int level, const std::string& section, const
 	RECOIL_DETAILED_TRACY_ZONE;
 	std::lock_guard<decltype(infoConsoleMutex)> scoped_lock(infoConsoleMutex);
 
-	if (section == prvSection && message == prvMessage)
-		return;
-
 	newLines += (newLines < maxRawLines);
 
 	if (rawLines.size() > maxRawLines)
