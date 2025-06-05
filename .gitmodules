@@ -30,3 +30,15 @@
 [submodule "rts/lib/lunasvg"]
 	path = rts/lib/lunasvg
 	url = https://github.com/sammycage/lunasvg.git
+[submodule "rts/lib/cryptopp"]
+	path = rts/lib/cryptopp
+	url = https://github.com/weidai11/cryptopp
+[submodule "rts/lib/cryptopp-cmake"]
+	path = rts/lib/cryptopp-cmake
+	url = https://github.com/saurtron/cryptopp-cmake
+[submodule "rts/lib/secp256k1"]
+	path = rts/lib/secp256k1
+	url = https://github.com/bitcoin-core/secp256k1
+[submodule "rts/lib/tiny-AES-c"]
+	path = rts/lib/tiny-AES-c
+	url = https://github.com/kokke/tiny-AES-c.git
