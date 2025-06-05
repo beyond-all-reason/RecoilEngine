@@ -6,6 +6,7 @@
 #include "lua_privileges.h"
 #include "ldo.h"
 
+/* A copy of lua_lua passing privileged to luaD_protectedparser */
 LUA_API int lua_load_privileged (lua_State *L, lua_Reader reader, void *data,
                       const char *chunkname) {
   ZIO z;
