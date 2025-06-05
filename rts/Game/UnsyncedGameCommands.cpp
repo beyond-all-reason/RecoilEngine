@@ -587,7 +587,10 @@ public:
 			return true;
 		}
 
-		if (playerID >= 0) {
+		if (!gameSetup->interplayerSecrets && playerID != SERVER_PLAYER) {
+			LOG_L(L_WARNING, "Sending secrets to other players disallowed by game configuration");
+		}
+		else if (playerID >= 0) {
 			std::string message = (args.size() == 2) ? std::move(args[1]) : "";
 			game->SendNetChat(std::move(message), playerID, true);
 		} else {
