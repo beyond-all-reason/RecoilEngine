@@ -110,6 +110,9 @@ int LuaEncoding::IsValidBase64(lua_State* L)
  *
  * @function Encoding.DecodeBase64Url
  *
+ * Decodes a base64url encoded string. If it encounters
+ * invalid data, it stops and returns whatever it parsed so far.
+ *
  * @param text string Text to decode
  * @return string decoded Decoded text
  */
