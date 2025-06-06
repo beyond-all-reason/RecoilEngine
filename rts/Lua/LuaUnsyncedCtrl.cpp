@@ -620,7 +620,6 @@ int LuaUnsyncedCtrl::SendSpectatorChat(lua_State* L) {
 	return 0;
 }
 
-
 /*** Sends a private chat message to a specific player ID.
  *
  * @function Spring.SendPrivateChat
@@ -639,7 +638,6 @@ int LuaUnsyncedCtrl::SendPrivateChat(lua_State* L) {
 	game->SendNetChat(luaL_checksstring(L, 1), playerID, false);
 	return 0;
 }
-
 
 /*** Sends a secret chat message to a specific player ID.
  *
@@ -669,7 +667,6 @@ int LuaUnsyncedCtrl::SendSecretChat(lua_State* L) {
 	game->SendNetChat(luaL_checksstring(L, 1), playerID, true);
 	return 0;
 }
-
 
 static void PrintMessage(lua_State* L, const string& msg)
 {
