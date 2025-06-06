@@ -3,14 +3,12 @@
 #ifndef LUA_IMAGE_H
 #define LUA_IMAGE_H
 
-#include <vector>
+#include <memory>
 #include <string>
-
-#include "Rendering/GL/myGL.h"
-
 
 struct lua_State;
 class CBitmap;
+
 
 class LuaImageData {
 	public:
