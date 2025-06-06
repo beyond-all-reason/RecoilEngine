@@ -657,11 +657,11 @@ int LuaUnsyncedCtrl::SendPrivateChat(lua_State* L) {
  */
 int LuaUnsyncedCtrl::SendSecretChat(lua_State* L) {
 	if (lua_gettop(L) != 2 || !lua_isstring(L, 1))
-		return luaL_error(L, std::format("Incorrect arguments to Spring.%s(message string, playerID integer)", __func__).c_str());
+		return luaL_error(L, "Incorrect arguments to Spring.%s(message string, playerID integer)", __func__);
 
 	const int playerID = luaL_checkint(L, 2);
 	if (playerID != SERVER_PLAYER && !playerHandler.IsValidPlayer(playerID))
-		return luaL_error(L, "Error in function '%s': Invalid Player ID %d", __func__);
+		return luaL_error(L, "Error in function '%s': Invalid Player ID %d", __func__, playerID);
 
 	if (playerID != SERVER_PLAYER && !gameSetup->interplayerSecrets)
 		return luaL_error(L, "Error in function '%s': Game configuration disallows sending secrets to players", __func__);
