@@ -680,7 +680,7 @@ LUALIB_API int luaL_loadbuffer_privileged (lua_State *L, const char *buff, size_
   LoadS ls;
   ls.s = buff;
   ls.size = size;
-  if (privileged)
+  if unlikely(privileged)
          return lua_load_privileged(L, getS, &ls, name);
   else
          return lua_load(L, getS, &ls, name);
