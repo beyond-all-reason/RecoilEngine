@@ -27,7 +27,6 @@
 #include "ExternalAI/AILibraryManager.h"
 #include "ExternalAI/SkirmishAIHandler.h"
 
-#include "Game/ChatMessage.h"
 #include "Game/Players/Player.h"
 #include "Game/Players/PlayerHandler.h"
 #include "Game/UI/CommandColors.h"
