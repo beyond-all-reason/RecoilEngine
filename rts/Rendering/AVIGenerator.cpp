@@ -11,10 +11,13 @@
 #include "System/SpringApp.h"
 #include "System/SafeUtil.h"
 
-#include <windows.h>
-
 #include <functional>
 #include <cassert>
+
+#ifdef _WIN32
+	#include <windows.h>
+	#include <SDL_syswm.h>
+#endif
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #pragma message("Adding library: vfw32.lib")
@@ -28,8 +31,8 @@ bool CAVIGenerator::initVFW()
 {
 #if defined(_WIN32) && defined(__MINGW32__)
 
-	msvfw32 = LoadLibrary("msvfw32.dll");
-	avifil32 = LoadLibrary("avifil32.dll");
+	msvfw32 = LoadLibrary(L"msvfw32.dll");
+	avifil32 = LoadLibrary(L"avifil32.dll");
 
 	VideoForWindowsVersion_ptr = (VideoForWindowsVersion_type)GetProcAddress(msvfw32, "VideoForWindowsVersion");
 	ICCompressorChoose_ptr = (ICCompressorChoose_type)GetProcAddress(msvfw32, "ICCompressorChoose");
@@ -38,7 +41,11 @@ bool CAVIGenerator::initVFW()
 
 	AVIFileInit_ptr = (AVIFileInit_type)GetProcAddress(avifil32, "AVIFileInit");
 	AVIFileOpenA_ptr = (AVIFileOpenA_type)GetProcAddress(avifil32, "AVIFileOpenA");
-	AVIFileCreateStreamA_ptr = (AVIFileCreateStreamA_type)GetProcAddress(avifil32, "AVIFileCreateStreamA");
+#ifdef UNICODE
+	AVIFileCreateStream_ptr = (AVIFileCreateStreamW_type)GetProcAddress(avifil32, "AVIFileCreateStreamW");
+#else
+	AVIFileCreateStream_ptr = (AVIFileCreateStreamA_type)GetProcAddress(avifil32, "AVIFileCreateStreamA");
+#endif
 	AVIMakeCompressedStream_ptr = (AVIMakeCompressedStream_type)GetProcAddress(avifil32, "AVIMakeCompressedStream");
 	AVIStreamSetFormat_ptr = (AVIStreamSetFormat_type)GetProcAddress(avifil32, "AVIStreamSetFormat");
 	AVIStreamRelease_ptr = (AVIStreamRelease_type)GetProcAddress(avifil32, "AVIStreamRelease");
@@ -57,7 +64,7 @@ bool CAVIGenerator::initVFW()
 		return false;
 	}
 
-	if (!AVIFileInit_ptr || !AVIFileOpenA_ptr || !AVIFileCreateStreamA_ptr ||
+	if (!AVIFileInit_ptr || !AVIFileOpenA_ptr || !AVIFileCreateStream_ptr ||
 		!AVIMakeCompressedStream_ptr || !AVIStreamSetFormat_ptr || !AVIStreamRelease_ptr ||
 		!AVIFileRelease_ptr || !AVIFileExit_ptr || !AVIStreamWrite_ptr) {
 			errorMsg = "initVFW Error.";
@@ -68,7 +75,11 @@ bool CAVIGenerator::initVFW()
 	VideoForWindowsVersion_ptr = &VideoForWindowsVersion;
 	AVIFileInit_ptr = &AVIFileInit;
 	AVIFileOpenA_ptr = &AVIFileOpenA;
-	AVIFileCreateStreamA_ptr = &AVIFileCreateStreamA;
+#ifdef UNICODE
+	AVIFileCreateStream_ptr = &AVIFileCreateStreamW;
+#else
+	AVIFileCreateStream_ptr = &AVIFileCreateStreamA;
+#endif
 	AVIMakeCompressedStream_ptr = &AVIMakeCompressedStream;
 	AVIStreamSetFormat_ptr = &AVIStreamSetFormat;
 	AVIStreamRelease_ptr = &AVIStreamRelease;
@@ -215,8 +226,7 @@ HRESULT CAVIGenerator::InitAVICompressionEngine()
 	strHdr.dwRate                 = videoFPS;			// fps
 	strHdr.dwSuggestedBufferSize  = bitmapInfo.biSizeImage;	// Recommended buffer size, in bytes, for the stream.
 	SetRect(&strHdr.rcFrame, 0, 0, bitmapInfo.biWidth, bitmapInfo.biHeight);
-	strcpy(strHdr.szName, "Spring video.");
-
+	wcscpy(strHdr.szName, L"Spring video.");
 
 	memset(&opts, 0, sizeof(AVICOMPRESSOPTIONS));
 	opts.fccType = streamtypeVIDEO;
@@ -267,7 +277,7 @@ HRESULT CAVIGenerator::InitAVICompressionEngine()
 
 
 	// Create the stream
-	hr = AVIFileCreateStreamA_ptr(m_pAVIFile,		    // file pointer
+	hr = AVIFileCreateStream_ptr(m_pAVIFile,		    // file pointer
 		&m_pStream,		    // returned stream pointer
 		&strHdr);	    // stream header
 
@@ -328,7 +338,10 @@ bool CAVIGenerator::InitEngine()
 		freeImageBuffers.push_back(new unsigned char[bitmapInfo.biSizeImage]);
 	}
 
-	HWND mainWindow = FindWindow(nullptr, ("Spring " + SpringVersion::GetFull()).c_str());
+	SDL_SysWMinfo wmInfo;
+	SDL_VERSION(&wmInfo.version);
+	SDL_GetWindowWMInfo(globalRendering->GetWindow(), &wmInfo);
+	HWND& mainWindow = wmInfo.info.win.window;
 
 	if (globalRendering->fullScreen)
 		ShowWindow(mainWindow, SW_SHOWMINNOACTIVE);

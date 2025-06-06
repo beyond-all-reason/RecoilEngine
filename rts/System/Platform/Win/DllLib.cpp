@@ -6,13 +6,15 @@
  */
 
 #include "DllLib.h"
+#include <nowide/convert.hpp>
 
 /**
  * Attempts to LoadLibrary on the given DLL
  */
-DllLib::DllLib(const char* fileName) : dll(NULL)
+DllLib::DllLib(const char* fileName)
+	: dll(nullptr)
 {
-	dll = LoadLibrary(fileName);
+	dll = LoadLibrary(nowide::widen(fileName).c_str());
 }
 
 /**
@@ -21,11 +23,11 @@ DllLib::DllLib(const char* fileName) : dll(NULL)
 void DllLib::Unload() {
 
 	FreeLibrary(dll);
-	dll = NULL;
+	dll = nullptr;
 }
 
 bool DllLib::LoadFailed() {
-	return dll == NULL;
+	return dll == nullptr;
 }
 
 /**
@@ -41,5 +43,5 @@ DllLib::~DllLib()
  */
 void* DllLib::FindAddress(const char* symbol)
 {
-	return (void*) GetProcAddress(dll,symbol);
+	return reinterpret_cast<void*>(GetProcAddress(dll,symbol));
 }

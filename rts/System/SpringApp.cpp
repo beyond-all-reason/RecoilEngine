@@ -8,6 +8,8 @@
 #include <System/GflagsExt.h>
 
 #ifdef _WIN32
+#include <fcntl.h>
+#include <io.h>
 //windows workarrounds
 #undef KeyPress
 #undef KeyRelease
@@ -197,6 +199,11 @@ SpringApp::SpringApp(int argc, char** argv)
 	gflags::SetUsageMessage("Usage: " + std::string(argv[0]) + " [options] [path_to_script.txt or demo.sdfz]");
 	gflags::SetVersionString(SpringVersion::GetFull());
 	gflags::ParseCommandLineFlags(&argc, &argv, true);
+#ifdef _WIN32
+	SetConsoleOutputCP(CP_UTF8);
+	setvbuf(stdout, nullptr, _IOFBF, 8192);
+	setvbuf(stderr, nullptr, _IONBF,    0);
+#endif // _WIN32
 
 	// also initializes configHandler and logOutput
 	ParseCmdLine(argc, argv);
@@ -328,7 +335,7 @@ bool SpringApp::InitPlatformLibs()
 		// suppress dialog box if gdb helpers aren't found
 		const UINT oldErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
 
-		if (LoadLibrary("gdbmacros.dll"))
+		if (LoadLibrary(L"gdbmacros.dll"))
 			LOG_L(L_DEBUG, "[SpringApp::%s] QTCreator's gdbmacros.dll loaded", __func__);
 
 		SetErrorMode(oldErrorMode);

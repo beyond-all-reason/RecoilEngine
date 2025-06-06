@@ -14,6 +14,7 @@
 
 #include "System/SpringRegex.h"
 
+#include <nowide/cstdio.hpp>
 #include <unistd.h>
 #ifdef _WIN32
 #include <io.h>
@@ -153,7 +154,7 @@ bool FileSystem::TouchFile(std::string filePath)
 	if (access(filePath.c_str(), R_OK) == 0)
 		return true;
 
-	FILE* f = fopen(filePath.c_str(), "a+b");
+	FILE* f = nowide::fopen(filePath.c_str(), "a+b");
 	if (f == nullptr)
 		return false;
 	fclose(f);

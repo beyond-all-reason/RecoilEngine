@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 
-#include <cstdio>
 #include <cerrno>
 
 #ifndef _MSC_VER	// this header file does not exist for the microsoft compiler
@@ -10,6 +9,7 @@
 
 #include <string>
 #include <array>
+#include <nowide/cstdio.hpp>
 
 #include "LuaIO.h"
 
@@ -104,7 +104,7 @@ FILE* LuaIO::fopen(lua_State* L, const char* path, const char* mode)
 		errno = EPERM; //EACCESS?
 		return nullptr;
 	}
-	return ::fopen(path, mode);
+	return nowide::fopen(path, mode);
 }
 
 
@@ -146,7 +146,7 @@ int LuaIO::remove(lua_State* L, const char* pathname)
 		errno = EPERM; //EACCESS?
 		return -1;
 	}
-	return ::remove(pathname);
+	return nowide::remove(pathname);
 }
 
 
@@ -158,7 +158,7 @@ int LuaIO::rename(lua_State* L, const char* oldpath, const char* newpath)
 		errno = EPERM; //EACCESS?
 		return -1;
 	}
-	return ::rename(oldpath, newpath);
+	return nowide::rename(oldpath, newpath);
 }
 
 

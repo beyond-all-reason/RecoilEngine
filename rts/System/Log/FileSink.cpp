@@ -9,8 +9,8 @@
 #include "System/Log/Level.h"
 
 #include <cassert>
-#include <cstdio>
 #include <string>
+#include <nowide/cstdio.hpp>
 
 #include <algorithm>
 #include <vector>
@@ -211,13 +211,14 @@ void log_file_addLogFile(
 	if (iter != logFiles.end() && iter->first == filePathStr)
 		return;
 
-	FILE* tmpStream = fopen(filePath, "w");
+	FILE* tmpStream = nowide::fopen(filePath, "wb");
 
 	if (tmpStream == nullptr) {
 		LOG_L(L_ERROR, "[%s] failed to open log file \"%s\" for writing", __func__, filePath);
 		return;
 	}
 
+	fwrite("\xEF\xBB\xBF", 1, 3, tmpStream); // Write the 3-byte UTF-8 byte order mark
 	setvbuf(tmpStream, nullptr, _IOFBF, std::min(BUFSIZ, 8192)); // limit buffer to 8kB
 
 	logFiles.emplace_back(filePathStr, log_file::LogFileDetails(tmpStream, sectionsStr, minLevel, flushLevel));
