@@ -42,6 +42,9 @@ bool LuaEncoding::PushEntries(lua_State* L)
  *
  * @function Encoding.DecodeBase64
  *
+ * Decodes a base64 encoded string. If it encounters
+ * invalid data, it stops and returns whatever it parsed so far.
+ *
  * @param text string Text to decode
  * @return string decoded Decoded text
  */
