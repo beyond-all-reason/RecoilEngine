@@ -47,11 +47,10 @@ LuaImageData::LuaImageData(std::string filename, int reqChannels, int reqDataTyp
 	}
 	if (bitmap->dataType != GL_UNSIGNED_BYTE && bitmap->dataType != GL_UNSIGNED_SHORT && bitmap->dataType != GL_UNSIGNED_INT && bitmap->dataType != GL_FLOAT)
 		throw LuaImageException{"bad resulting dataType"};
-	if (valid) {
-		width = bitmap->xsize;
-		height = bitmap->ysize;
-		channels = bitmap->channels;
-	}
+
+	width = bitmap->xsize;
+	height = bitmap->ysize;
+	channels = bitmap->channels;
 }
 
 
