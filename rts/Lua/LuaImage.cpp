@@ -159,7 +159,9 @@ int CallbackPixelsInternal(lua_State* L, const LuaImageData* image, int startX, 
 	const float mapFactorX = (mapDims.mapx * SQUARE_SIZE) / image->width;
 	const float mapFactorY = (mapDims.mapy * SQUARE_SIZE) / image->height;
 
+	const DataType* memPtr = reinterpret_cast<DataType*>(image->bitmap->GetRawMem());
 	const int nArgs = image->channels + 2;
+
 	for (int y=startY; y < endY; ++y) {
 		int linepos = y * image->width;
 		for (int x=startX; x < endX; ++x) {
@@ -173,7 +175,7 @@ int CallbackPixelsInternal(lua_State* L, const LuaImageData* image, int startX, 
 				lua_pushinteger(L, x);
 				lua_pushinteger(L, y);
 			}
-			const DataType* data = reinterpret_cast<DataType*>(image->bitmap->GetRawMem()) + pixelCoords;
+			const DataType* data = memPtr + pixelCoords;
 			for (int i=0; i < image->channels; ++i) {
 				if constexpr(std::is_floating_point_v<DataType>)
 					lua_pushnumber(L, data[i]);
