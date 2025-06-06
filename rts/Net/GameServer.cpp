@@ -75,6 +75,7 @@ CONFIG(bool, WhiteListAdditionalPlayers).defaultValue(true);
 CONFIG(bool, ServerRecordDemos).defaultValue(false).dedicatedValue(true);
 CONFIG(bool, ServerLogInfoMessages).defaultValue(false);
 CONFIG(bool, ServerLogDebugMessages).defaultValue(false);
+CONFIG(bool, InterplayerSecretsForbidden).defaultValue(true);
 CONFIG(std::string, AutohostIP).defaultValue("127.0.0.1");
 
 
@@ -163,7 +164,7 @@ void CGameServer::Initialize()
 	whiteListAdditionalPlayers = configHandler->GetBool("WhiteListAdditionalPlayers");
 	logInfoMessages = configHandler->GetBool("ServerLogInfoMessages");
 	logDebugMessages = configHandler->GetBool("ServerLogDebugMessages");
-	allowInterplayerSecrets = myGameSetup->interplayerSecrets;
+	allowInterplayerSecrets = myGameSetup->interplayerSecrets && !configHandler->GetBool("InterplayerSecretsForbidden");
 
 	rng.Seed((myGameData->GetSetupText()).length());
 
@@ -346,11 +347,16 @@ void CGameServer::StripGameSetupText(GameData* gameData)
 	TdfParser::TdfSection* gameSec = rootSec->sections["game"];
 
 	for (const auto& sectionPair: gameSec->sections) {
-		if (!StringStartsWith(StringToLower(sectionPair.first), "player"))
-			continue;
+		const auto sectionNameLower = StringToLower(sectionPair.first);
+		if (StringStartsWith(sectionNameLower, "player")) {
+			TdfParser::TdfSection* playerSec = sectionPair.second;
+			playerSec->remove("password", false);
+		}
+		else if (!allowInterplayerSecrets && StringStartsWith(sectionNameLower, "modoptions")) {
+			TdfParser::TdfSection* modconfigSec = sectionPair.second;
+			modconfigSec->remove("interplayersecrets", false);
+		}
 
-		TdfParser::TdfSection* playerSec = sectionPair.second;
-		playerSec->remove("password", false);
 	}
 
 	std::ostringstream strbuf;
