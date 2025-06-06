@@ -27,6 +27,7 @@
 #include "ExternalAI/AILibraryManager.h"
 #include "ExternalAI/SkirmishAIHandler.h"
 
+#include "Game/ChatMessage.h"
 #include "Game/Players/Player.h"
 #include "Game/Players/PlayerHandler.h"
 #include "Game/UI/CommandColors.h"
@@ -590,7 +591,7 @@ public:
 		if (!gameSetup->interplayerSecrets && playerID != SERVER_PLAYER) {
 			LOG_L(L_WARNING, "Sending secrets to other players disallowed by game configuration");
 		}
-		else if (playerID >= 0) {
+		else if (playerID == SERVER_PLAYER || playerHandler.IsValidPlayer(playerID)) {
 			std::string message = (args.size() == 2) ? std::move(args[1]) : "";
 			game->SendNetChat(std::move(message), playerID, true);
 		} else {
