@@ -246,11 +246,7 @@ void S3DModelPiece::Shatter(float pieceChance, int modelType, int texType, int t
 
 void S3DModelPiece::SetPieceTransform(const Transform& parentTra)
 {
-	bposeTransform = parentTra * Transform{
-		CQuaternion(),
-		offset,
-		scale
-	};
+	bposeTransform = parentTra * ComposeTransform(offset, ZeroVector, scale);
 
 	for (S3DModelPiece* c : children) {
 		c->SetPieceTransform(bposeTransform);
@@ -710,11 +706,57 @@ size_t S3DModel::FindPieceOffset(const std::string& name) const
 
 void S3DModel::SetPieceMatrices()
 {
-	pieceObjects[0]->SetPieceTransform(Transform());
+	auto* rootPiece = GetRootPiece();
+	rootPiece->SetPieceTransform(Transform());
 
 	// use this occasion and copy bpose matrices
 	for (size_t i = 0; i < pieceObjects.size(); ++i) {
 		const auto* po = pieceObjects[i];
 		traAlloc.UpdateForced(i, po->bposeTransform);
 	}
+}
+
+void S3DModel::FlattenPieceTree(S3DModelPiece* root)
+{
+	assert(root != nullptr);
+
+	pieceObjects.clear();
+	pieceObjects.reserve(numPieces);
+
+	// force mutex just in case this is called from modelLoader.ProcessVertices()
+	// TODO: pass to S3DModel if it is created from LoadModel(ST) or from ProcessVertices(MT)
+	traAlloc = ScopedTransformMemAlloc(numPieces);
+
+	std::vector<S3DModelPiece*> stack = { root };
+
+	while (!stack.empty()) {
+		S3DModelPiece* p = stack.back();
+
+		stack.pop_back();
+		pieceObjects.push_back(p);
+
+		// add children in reverse for the correct DF traversal order
+		for (size_t n = 0; n < p->children.size(); n++) {
+			stack.push_back(p->children[p->children.size() - n - 1]);
+		}
+	}
+}
+
+void S3DModel::UpdatePiecesMinMaxExtents()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	for (auto* piece : pieceObjects) {
+		for (const auto& vertex : piece->GetVerticesVec()) {
+			piece->mins = float3::min(piece->mins, vertex.pos);
+			piece->maxs = float3::max(piece->maxs, vertex.pos);
+		}
+	}
+}
+
+void SVertexData::TransformBy(const Transform& transform)
+{
+	pos      = (transform * float4{ pos     , 1.0f }).xyz;
+	normal   = (transform * float4{ normal  , 0.0f }).xyz;
+	sTangent = (transform * float4{ sTangent, 0.0f }).xyz;
+	tTangent = (transform * float4{ tTangent, 0.0f }).xyz;
 }

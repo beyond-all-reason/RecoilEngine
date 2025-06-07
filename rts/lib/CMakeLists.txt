@@ -1,4 +1,3 @@
-
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/rts)
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/rts/lib)
 
@@ -48,22 +47,45 @@ foreach(var
 		ASSIMP_BUILD_NONFREE_C4D_IMPORTER
 		ASSIMP_DOUBLE_PRECISION
 	)
-	set("${var}" OFF CACHE STRING "forced off by spring build env" FORCE)
+	set("${var}" OFF CACHE STRING "forced by Recoil build env" FORCE)
 endforeach()
 
 foreach(var
 		${ENABLED_ASSIMP_FORMATS}
 	)
-	set("${var}" ON CACHE STRING "forced on by spring build env" FORCE)
+	set("${var}" ON CACHE STRING "forced by Recoil build env" FORCE)
 endforeach()
 
 foreach(var ASSIMP_BUILD_STATIC_LIB ASSIMP_NO_EXPORT)
 	message(STATUS "Forcing assimp option ${var} to on")
-	set("${var}" ON CACHE STRING "forced on by spring build env" FORCE)
+	set("${var}" ON CACHE STRING "forced by Recoil build env" FORCE)
 endforeach()
 
 ADD_SUBDIRECTORY(assimp)
 target_compile_definitions(assimp PRIVATE -DASSIMP_BUILD_NO_OWN_ZLIB)
+
+# simdjson, a fastgltf dependency (manually added to submodules to work around the build system limitations)
+set(SIMDJSON_AVX512_ALLOWED OFF CACHE BOOL "forced by Recoil build env" FORCE)
+set(SIMDJSON_BASH OFF CACHE BOOL "forced by Recoil build env" FORCE)
+set(SIMDJSON_IMPLEMENTATION_FALLBACK ON CACHE BOOL "forced by Recoil build env" FORCE)
+set(SIMDJSON_IMPLEMENTATION fallback CACHE STRING "forced by Recoil build env" FORCE)
+set(SIMDJSON_IMPLEMENTATION_ARM64    OFF CACHE BOOL "forced by Recoil build env" FORCE)
+set(SIMDJSON_IMPLEMENTATION_HASWELL  OFF CACHE BOOL "forced by Recoil build env" FORCE)
+set(SIMDJSON_IMPLEMENTATION_ICELAKE  OFF CACHE BOOL "forced by Recoil build env" FORCE)
+set(SIMDJSON_IMPLEMENTATION_PPC64    OFF CACHE BOOL "forced by Recoil build env" FORCE)
+set(SIMDJSON_IMPLEMENTATION_WESTMERE OFF CACHE BOOL "forced by Recoil build env" FORCE)
+set(SIMDJSON_IMPLEMENTATION_LSX      OFF CACHE BOOL "forced by Recoil build env" FORCE)
+set(SIMDJSON_IMPLEMENTATION_LASX     OFF CACHE BOOL "forced by Recoil build env" FORCE)
+
+set(SIMDJSON_ENABLE_THREADS     OFF CACHE BOOL "forced by Recoil build env" FORCE)
+set(SIMDJSON_EXCEPTIONS     ON CACHE BOOL "forced by Recoil build env" FORCE)
+ADD_SUBDIRECTORY(simdjson)
+
+# fastgltf
+set(FASTGLTF_COMPILE_AS_CPP20 ON CACHE BOOL "forced by Recoil build env" FORCE)
+set(FASTGLTF_USE_64BIT_FLOAT OFF CACHE BOOL "forced by Recoil build env" FORCE)
+set(FASTGLTF_USE_CUSTOM_SMALLVECTOR OFF CACHE BOOL "forced by Recoil build env" FORCE)
+ADD_SUBDIRECTORY(fastgltf)
 
 ADD_SUBDIRECTORY(squish)
 ADD_SUBDIRECTORY(rg-etc1)

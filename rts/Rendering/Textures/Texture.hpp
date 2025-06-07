@@ -3,17 +3,12 @@
 #include <cstdint>
 #include <array>
 #include "System/type2.h"
+#include "System/TemplateUtils.hpp"
 #include "Rendering/GL/TexBind.h"
 #include "Rendering/Textures/TextureCreationParams.hpp"
 
 namespace GL {
-	template <typename T>
-	concept HasSizeAndData = requires(const T & t) {
-		// Validate .size() returns std::size_t
-		{ t.size() } -> std::same_as<std::size_t>;
-		// Validate .data() returns a pointer to element type
-		{ t.data() } -> std::convertible_to<const typename T::value_type*>;
-	};
+
 
 	class Texture2D {
 	public:
@@ -43,7 +38,7 @@ namespace GL {
 		void Unbind();
 		void Unbind(uint32_t relSlot);
 
-		template <HasSizeAndData C>
+		template <Concepts::HasSizeAndData C>
 		void UploadImage(const C& c) const {
 		#ifdef DEBUG
 			const auto dataType = GetDataTypeFromInternalFormat(intFormat);
@@ -54,7 +49,7 @@ namespace GL {
 			UploadImage(c.data());
 		}
 
-		template <HasSizeAndData C>
+		template <Concepts::HasSizeAndData C>
 		void UploadSubImage(const C& c, int xOffset, int yOffset, int width, int height) const {
 		#ifdef DEBUG
 			assert(xOffset + width <= size.x && yOffset + height <= size.y);

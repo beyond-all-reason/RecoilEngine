@@ -38,14 +38,7 @@ struct SAssPiece: public S3DModelPiece
 
 		vertices.clear();
 		indices.clear();
-
-		numTexCoorChannels = 0;
 	}
-
-	unsigned int GetNumTexCoorChannels() const { return numTexCoorChannels; }
-	void SetNumTexCoorChannels(unsigned int n) { numTexCoorChannels = n; }
-public:
-	unsigned int numTexCoorChannels = 0;
 };
 
 
@@ -54,7 +47,6 @@ class CAssParser: public IModelParser
 public:
 	using ModelPieceMap = spring::unordered_map<std::string, S3DModelPiece*>;
 	using ParentNameMap = spring::unordered_map<std::string, std::string>;
-	using MeshData = std::tuple<std::vector<SVertexData>, std::vector<uint32_t>, uint32_t>;
 
 	void Init() override;
 	void Kill() override;
@@ -63,7 +55,6 @@ public:
 private:
 	static void PreProcessFileBuffer(std::vector<unsigned char>& fileBuffer);
 
-	static void UpdatePiecesMinMaxExtents(S3DModel* model);
 	static void SetPieceName(
 		SAssPiece* piece,
 		const S3DModel* model,
@@ -96,16 +87,6 @@ private:
 		const aiScene* scene
 	);
 
-	static void ReparentMeshesTrianglesToBones(
-		S3DModel* model,
-		const std::vector<MeshData>& meshes
-	);
-
-	static void ReparentCompleteMeshesToBones(
-		S3DModel* model,
-		const std::vector<MeshData>& meshes
-	);
-
 	SAssPiece* AllocPiece();
 	SAssPiece* LoadPiece(
 		S3DModel* model,
@@ -118,8 +99,6 @@ private:
 	);
 
 	static void BuildPieceHierarchy(S3DModel* model, ModelPieceMap& pieceMap, const ParentNameMap& parentMap);
-	static void CalculateModelDimensions(S3DModel* model, S3DModelPiece* piece);
-	static void CalculateModelProperties(S3DModel* model, const LuaTable& pieceTable);
 	static void FindTextures(
 		S3DModel* model,
 		const aiScene* scene,
