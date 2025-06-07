@@ -6,7 +6,7 @@
 
 #include "3DModelLog.h"
 #include "System/Misc/TracyDefs.h"
-#include "lua/LuaParser.h"
+#include "Lua/LuaParser.h"
 
 using namespace Skinning;
 
