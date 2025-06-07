@@ -20,7 +20,7 @@
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/math.hpp>
-#include <fastgltf/deps/simdjson/simdjson.h>
+#include <simdjson.h>
 
 
 namespace Impl {
