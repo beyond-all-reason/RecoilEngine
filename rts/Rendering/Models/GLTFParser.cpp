@@ -152,17 +152,6 @@ namespace Impl {
 					return std::forward_as_tuple(lhs.second, lhs.first) > std::forward_as_tuple(rhs.second, rhs.first);
 				});
 
-				float sumWeight = 0.0f;
-				for (size_t i = 0; i < 4; ++i) {
-					sumWeight += vertexWeight[i].second;
-				}
-
-				// normalize weights on the 4 only supported bones
-				sumWeight = (sumWeight > 0.0f) ? sumWeight : 1.0f;
-				for (size_t i = 0; i < 4; ++i) {
-					vertexWeight[i].second /= sumWeight;
-				}
-
 				// non-skinning case
 				if (auto& [boneId, boneWeight] = vertexWeight.front(); boneId == SVertexData::INVALID_BONEID) {
 					boneId = nodeIdx;
