@@ -53,6 +53,7 @@ public:
 	 * @see http://www.opengl.org/sdk/docs/man/xhtml/glBufferData.xml
 	 */
 	void Resize(GLsizeiptr newSize, GLenum newUsage = GL_STREAM_DRAW);
+	bool CopyTo(VBO& dest, GLsizeiptr copySize);
 
 	template<typename TData>
 	void New(const std::vector<TData>& data, GLenum newUsage = GL_STATIC_DRAW) { New(sizeof(TData) * data.size(), newUsage, data.data()); };

@@ -52,6 +52,9 @@ public:
 	int UnbindBufferRange(const GLuint index, const sol::optional<int> elemOffsetOpt, const sol::optional<int> elemCountOpt, const sol::optional<GLenum> targetOpt);
 
 	void DumpDefinition();
+
+	bool CopyTo(const std::shared_ptr<LuaVBOImpl>& destVBO, int copySizeInBytes);
+
 	uint32_t GetID() const;
 public:
 	static bool Supported(GLenum target);
