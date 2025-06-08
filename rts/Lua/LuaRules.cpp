@@ -11,6 +11,7 @@
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
+#include "Sim/Units/Scripts/CobDeferredCallin.h"
 #include "Sim/Units/Scripts/CobInstance.h" // for UNPACK{X,Z}
 #include "System/Log/ILog.h"
 #include "System/FileSystem/VFSModes.h" // for SPRING_VFS_*
@@ -133,7 +134,7 @@ int CLuaRules::UnpackCobArg(lua_State* L)
 
 
 void CLuaRules::Cob2Lua(const LuaHashString& name, const CUnit* unit,
-                        int& argsCount, int args[MAX_LUA_COB_ARGS])
+                        int& argsCount, int args[MAX_LUA_COB_ARGS], bool synced)
 {
 	static int callDepth = 0;
 	if (callDepth >= 16) {
@@ -142,7 +143,10 @@ void CLuaRules::Cob2Lua(const LuaHashString& name, const CUnit* unit,
 		return;
 	}
 
-	auto L = syncedLuaHandle.L;
+	auto L = synced ? syncedLuaHandle.L : unsyncedLuaHandle.L;
+
+	if (!synced && !LuaUtils::IsUnitInLos(L, unit))
+		return;
 
 	LUA_CALL_IN_CHECK(L);
 
@@ -217,6 +221,61 @@ void CLuaRules::Cob2Lua(const LuaHashString& name, const CUnit* unit,
 	lua_settop(L, top);
 }
 
+void CLuaRules::Cob2LuaBatch(const LuaHashString& name, std::vector<CCobDeferredCallin>& callins, bool synced)
+{
+	static int callDepth = 0;
+	if (callDepth >= 16) {
+		LOG_L(L_WARNING, "[LuaRules::%s] call overflow: %s", __func__, name.GetString());
+		return;
+	}
+
+	auto L = synced ? syncedLuaHandle.L : unsyncedLuaHandle.L;
+
+	LUA_CALL_IN_CHECK(L);
+
+	const int top = lua_gettop(L);
+	int argsCount = 0;
+
+	if (!lua_checkstack(L, 1 + 3 + argsCount)) {
+		LOG_L(L_WARNING, "[LuaRules::%s] lua_checkstack() error: %s", __func__, name.GetString());
+		lua_settop(L, top);
+		return;
+	}
+
+	if (!name.GetGlobalFunc(L)) {
+		LOG_L(L_WARNING, "[LuaRules::%s] missing function: %s", __func__, name.GetString());
+		lua_settop(L, top);
+		return;
+	}
+
+	// count can be smaller because of LOS when unsynced
+	lua_createtable(L, callins.size(), 0);
+
+	int i = 0;
+	for(auto& callin: callins) {
+		// TODO check if unit still alive
+		if (!synced && !LuaUtils::IsUnitInLos(L, callin.unit))
+			continue;
+
+		lua_createtable(L, callin.argCount+1, 0);
+
+		for (int a = 0; a < callin.argCount; a++) {
+			lua_pushnumber(L, callin.luaArgs[a]);
+			lua_rawseti(L, -2, a + 1);
+		}
+
+		lua_rawseti(L, -2, ++i);
+	}
+
+	// call the routine
+	callDepth++;
+
+	const bool error = !syncedLuaHandle.RunCallIn(L, name, 1 + argsCount, LUA_MULTRET);
+
+	callDepth--;
+
+	lua_settop(L, top);
+}
 
 /******************************************************************************/
 /******************************************************************************/

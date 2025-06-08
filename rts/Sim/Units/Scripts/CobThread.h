@@ -12,6 +12,28 @@
 class CCobFile;
 class CCobInstance;
 
+class CCobStackGuard
+{
+public:
+	CCobStackGuard(std::vector<int>* dataStack, int  nArgs) : data(dataStack), nArgs(nArgs)
+	{ }
+
+	~CCobStackGuard() {
+		const int size = GetSize();
+		if (nArgs >= size) {
+			data->clear();
+		} else {
+			data->resize(size - nArgs);
+		}
+	}
+
+	int GetSize() {
+		return static_cast<int>(data->size());
+	}
+
+	std::vector<int>* data;
+	int nArgs;
+};
 
 class CCobThread
 {
@@ -106,6 +128,7 @@ protected:
 	};
 
 	void LuaCall();
+	void DeferredCall(bool synced);
 
 	void PushCallStack(CallInfo v) { callStack.push_back(v); }
 	void PushDataStack(int v) { dataStack.push_back(v); }
