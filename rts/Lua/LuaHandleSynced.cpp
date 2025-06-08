@@ -3,7 +3,6 @@
 #include "LuaHandleSynced.h"
 
 #include "LuaInclude.h"
-#include "lua_privileges.h"
 
 #include "LuaUtils.h"
 #include "LuaArchive.h"
@@ -112,7 +111,7 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 		LuaPushNamedNil(L, "Kill");
 	lua_pop(L, 1);
 
-	LuaPushNamedCFunc(L, "loadstring", CSplitLuaHandle::LoadStringData);
+	LuaPushNamedCFunc(L, "loadstring", CLuaHandle::LoadStringData);
 	LuaPushNamedCFunc(L, "CallAsTeam", CSplitLuaHandle::CallAsTeam);
 	/*** @global COBSCALE integer */ 
 	LuaPushNamedNumber(L, "COBSCALE",  COBSCALE);
@@ -474,7 +473,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	lua_pushnil(L); lua_setglobal(L, "collectgarbage");
 
 	lua_pushvalue(L, LUA_GLOBALSINDEX);
-	LuaPushNamedCFunc(L, "loadstring", CSplitLuaHandle::LoadStringData);
+	LuaPushNamedCFunc(L, "loadstring", CLuaHandle::LoadStringData);
 	LuaPushNamedCFunc(L, "pairs", SyncedPairs);
 	LuaPushNamedCFunc(L, "next",  SyncedNext);
 	lua_pop(L, 1);
@@ -2511,34 +2510,6 @@ string CSplitLuaHandle::LoadFile(const std::string& filename, const std::string&
 //
 // Call-Outs
 //
-
-int CSplitLuaHandle::LoadStringData(lua_State* L)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	size_t len;
-	const char *str    = luaL_checklstring(L, 1, &len);
-	const char *chunkname = luaL_optstring(L, 2, str);
-
-	auto handle = CLuaHandle::GetHandle(L);
-
-	if (luaL_loadbuffer_privileged(L, str, len, chunkname, handle->GetDevMode()) != 0) {
-		lua_pushnil(L);
-		lua_insert(L, -2);
-		return 2; // nil, then the error message
-	}
-
-	// set the chunk's fenv to the current fenv
-	if (lua_istable(L, 3)) {
-		lua_pushvalue(L, 3);
-	} else {
-		LuaUtils::PushCurrentFuncEnv(L, __func__);
-	}
-
-	if (lua_setfenv(L, -2) == 0)
-		luaL_error(L, "[%s] error with setfenv", __func__);
-
-	return 1;
-}
 
 /***
  * @class CallAsTeamOptions

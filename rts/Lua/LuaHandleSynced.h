@@ -264,7 +264,6 @@ class CSplitLuaHandle
 		virtual int GetInitSelectTeam() const = 0;
 
 		// call-outs
-		static int LoadStringData(lua_State* L);
 		static int CallAsTeam(lua_State* L);
 
 	public:

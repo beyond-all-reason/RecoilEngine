@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "LuaHandle.h"
+#include "lua_privileges.h"
 
 #include "LuaGaia.h"
 #include "LuaRules.h"
@@ -533,6 +534,35 @@ bool CLuaHandle::LoadCode(lua_State* L, std::string code, const string& debug)
 
 	// call Initialize immediately after load
 	return (RunCallInTraceback(L, cmdStr, 0, 0, traceBack.GetErrFuncIdx(), false));
+}
+
+
+int CLuaHandle::LoadStringData(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	size_t len;
+	const char *str    = luaL_checklstring(L, 1, &len);
+	const char *chunkname = luaL_optstring(L, 2, str);
+
+	auto handle = GetHandle(L);
+
+	if (luaL_loadbuffer_privileged(L, str, len, chunkname, handle->GetDevMode()) != 0) {
+		lua_pushnil(L);
+		lua_insert(L, -2);
+		return 2; // nil, then the error message
+	}
+
+	// set the chunk's fenv to the current fenv
+	if (lua_istable(L, 3)) {
+		lua_pushvalue(L, 3);
+	} else {
+		LuaUtils::PushCurrentFuncEnv(L, __func__);
+	}
+
+	if (lua_setfenv(L, -2) == 0)
+		luaL_error(L, "[%s] error with setfenv", __func__);
+
+	return 1;
 }
 
 
