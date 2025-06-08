@@ -1138,6 +1138,10 @@ void CGame::ClientReadNet()
 
 			} break;
 
+			case NETMSG_MAPDRAW_OLD: {
+				LOG_L(L_WARNING, "[Game::%s] Invalid network opcode NETMSG_MAPDRAW_OLD(%d). Are you watching an old replay?", __func__, NETMSG_MAPDRAW_OLD);
+			} break;
+
 			case NETMSG_TEAM: {
 				ZoneScopedN("Net::Team");
 				const uint8_t playerNum = inbuf[1];

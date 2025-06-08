@@ -49,7 +49,7 @@ enum NETMSG {
 
 	NETMSG_PLAYERSTAT       = 29, // uint8_t playerNum; CPlayer::Statistics currentStats;
 	NETMSG_GAMEOVER         = 30, // uint8_t playerNum; std::vector<uint8_t> winningAllyTeams
-	//NETMSG_MAPDRAW_OLD	= 31, // old MAPDRAW with int16 coords
+	NETMSG_MAPDRAW_OLD	= 31, // old MAPDRAW with int16 coords
 	NETMSG_MAPDRAW          = 32, // uint8_t messageSize =  12, playerNum, command = MapDrawAction::NET_ERASE; int32_t x, z;
 	                              // uint8_t messageSize = 21, playerNum, command = MapDrawAction::NET_LINE; int32_t x1, z1, x2, z2, uint8_t fromLua;
 	                              // /*messageSize*/   uint8_t playerNum, command = MapDrawAction::NET_POINT; int32_t x, z; uint8_t fromLua, std::string label;
