@@ -555,7 +555,7 @@ void QTPFS::PathSearch::InitStartingSearchNodes() {
 	bwdPathConnected = false;
 
 	// max nodes is split between forward and reverse search.
-	if (synced){
+	if (pathOwner != nullptr){
 		float relativeModifier = std::max(MAP_RELATIVE_MAX_NODES_SEARCHED, modInfo.qtMaxNodesSearchedRelativeToMapOpenNodes);
 		int relativeLimit = nodeLayer->GetNumOpenNodes() * relativeModifier;
 		int absoluteLimit = std::max(MAP_MAX_NODES_SEARCHED, modInfo.qtMaxNodesSearched);
@@ -655,6 +655,8 @@ static float CircularEaseOut(float t) {
 
 void QTPFS::PathSearch::SetForwardSearchLimit() {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (pathOwner == nullptr) return;
+
 	auto& fwd = directionalSearchData[SearchThreadData::SEARCH_FORWARD];
 	auto& bwd = directionalSearchData[SearchThreadData::SEARCH_BACKWARD];
 
@@ -1207,6 +1209,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 
 bool QTPFS::PathSearch::ExecuteRawSearch() {
 	ZoneScoped;
+	assert(pathOwner != nullptr);
 	auto& fwd = directionalSearchData[SearchThreadData::SEARCH_FORWARD];
 
 	int2 nearestSquare;
@@ -2090,7 +2093,8 @@ void QTPFS::PathSearch::TracePath(IPath* path) {
 	//assert(path->NumPoints() - path->GetNodeList().size() == 1 + (-nodesWithoutPoints));
 	
 	uint32_t repathIndex = 0;
-	if (!haveFullPath) {
+	// Unowned paths do not allow repaths - they always perform a full path search.
+	if (!haveFullPath && pathOwner != nullptr) {
 		const float minRepathLength = modInfo.qtRefreshPathMinDist;
 		bool pathIsBigEnoughForRepath = (pathDist >= minRepathLength);
 

@@ -840,7 +840,7 @@ bool QTPFS::PathManager::InitializeSearch(QTPFS::entity searchEntity) {
 		// LOG("%s: path vhash %x%x", __func__, int(path->GetVirtualHash() >> 32), int(path->GetVirtualHash() & 32));
 		// assert(search->GetPartialSearchHash() == path->GetVirtualHash());
 
-		if (path->IsSynced()) {
+		if (path->GetOwner() != nullptr) {
 			if (search->GetHash() != QTPFS::BAD_HASH) {
 				assert(!registry.all_of<SharedPathChain>(pathEntity));
 				SharedPathMap::iterator sharedPathsIt = sharedPaths.find(path->GetHash());
@@ -942,7 +942,7 @@ void QTPFS::PathManager::ExecuteQueuedSearches() {
 		PathSearch* search = &pathView.get<PathSearch>(pathSearchEntity);
 		QTPFS::entity pathEntity = (QTPFS::entity)search->GetID();
 		if (registry.valid(pathEntity)) {
-			// Only synced paths should be actioned in this function.
+			// Only owned paths should be actioned in this function.
 			IPath* path = registry.try_get<IPath>(pathEntity);
 			if (path != nullptr) {
 				if (search->PathWasFound()) {
@@ -1022,14 +1022,12 @@ bool QTPFS::PathManager::ExecuteSearch(
 
 	assert(path->GetID() == search->GetID());
 
-	bool synced = path->IsSynced();
 	bool forceFullPath = false;
-
 	QTPFS::entity chainHeadEntity = entt::null;
 	QTPFS::entity partialChainHeadEntity = entt::null;
 
 	// TODO: make a function?
-	if (synced)
+	if (path->GetOwner() != nullptr)
 	{
 		// Always clear incase the situation has changed since the last frame, if a partial search
 		// was intended, but not carried out. For example, a full-path share wait.
@@ -1148,8 +1146,7 @@ bool QTPFS::PathManager::ExecuteSearch(
 void QTPFS::PathManager::QueueDeadPathSearches() {
 	ZoneScoped;
 
-	// Only synced can be marked as dead.
-
+	// Only owned can be marked as dead.
 	auto pathUpdatesView = registry.view<IPath, PathIsToBeUpdated>();
 	if (pathUpdatesView.size_hint() == 0 && gs->frameNum >= refreshDirtyPathRateFrame) {
 		// LOG("%s: pathUpdatesView=%d,frame=%d>%d", __func__
@@ -1228,16 +1225,16 @@ unsigned int QTPFS::PathManager::QueueSearch(
 
 	IPath* newPath = createNewPath(pathEntity, synced);
 
-	// Every path gets one. It gets changed in a multi-threaded section, so we can't add them on demand.
-	registry.emplace<PathRequeueSearch>(pathEntity, false);
+	// Every synced path gets one. It gets changed in a multi-threaded section, so we can't add them on demand.
+	// Unsynced paths don't requeue their searches (also, unsynced paths cannot have owning units.)
+	if (synced)
+		registry.emplace<PathRequeueSearch>(pathEntity, false);
+	else
+		object = nullptr;
 
 	QTPFS::entity searchEntity = registry.create();
 	PathSearch* newSearch = &registry.emplace<PathSearch>(searchEntity, PATH_SEARCH_ASTAR);
 
-	if (synced) {
-		assert(object->pos.x == sourcePoint.x);
-		assert(object->pos.z == sourcePoint.z);
-	}
 	assert(targetPoint.x >= 0.f);
 	assert(targetPoint.z >= 0.f);
 	assert(targetPoint.x / SQUARE_SIZE <= mapDims.mapx);
@@ -1303,7 +1300,8 @@ unsigned int QTPFS::PathManager::RequeueSearch(
 	if (registry.any_of<PathSearchRef, PathDelayedDelete>(pathEntity))
 		return (oldPath->GetID());
 
-	if (oldPath->GetOwner()->objectUsable == false) {
+	const CSolidObject* object = oldPath->GetOwner();
+	if (object != nullptr && object->objectUsable == false) {
 		DeletePathEntity(pathEntity);
 		return 0;
 	}
@@ -1317,8 +1315,7 @@ unsigned int QTPFS::PathManager::RequeueSearch(
 	assert(oldPath->GetID() != 0);
 	assert(pathEntity != entt::null);
 
-	const CSolidObject* obj = oldPath->GetOwner();
-	const float3& pos = (obj != nullptr)? obj->pos: oldPath->GetSourcePoint();
+	const float3& pos = (object != nullptr)? object->pos: oldPath->GetSourcePoint();
 
 	RemovePathFromShared(pathEntity);
 	RemovePathFromPartialShared(pathEntity);
@@ -1334,8 +1331,6 @@ unsigned int QTPFS::PathManager::RequeueSearch(
 	oldPath->SetSourcePoint(pos);
 
 	newSearch->SetID(oldPath->GetID());
-
-	auto object = oldPath->GetOwner();
 	newSearch->SetTeam((object != nullptr)? object->team: teamHandler.ActiveTeams());
 	newSearch->SetPathType(oldPath->GetPathType());
 	newSearch->SetGoalDistance(oldPath->GetRadius());
@@ -1476,7 +1471,7 @@ unsigned int QTPFS::PathManager::RequestPath(
 
 	assert(	sourcePoint.x != 0.f || sourcePoint.z != 0.f );
 
-	returnPathId = QueueSearch(object, moveDef, sourcePoint, targetPoint, radius, synced, synced);
+	returnPathId = QueueSearch(object, moveDef, sourcePoint, targetPoint, radius, synced, (synced && object != nullptr));
 
 	// if (object != nullptr && 30809 == object->id)
 	// 	LOG("%s: RequestPath (%d).", __func__, returnPathId);
@@ -1560,11 +1555,12 @@ float3 QTPFS::PathManager::NextWayPoint(
 		return noPathPoint;
 
 	QTPFS::entity pathEntity = QTPFS::entity(pathID);
-	if (!registry.valid(pathEntity))
-		return noPathPoint;
-
 	IPath* livePath = GetPath(pathEntity);
 	if (livePath == nullptr)
+		return noPathPoint;
+
+	// Do not permit unsynced code/data to potentially impact synced code/data.
+	if (livePath->IsSynced() != synced)
 		return noPathPoint;
 
 	if (registry.all_of<PathIsTemp>(pathEntity)) {
@@ -1631,6 +1627,7 @@ float3 QTPFS::PathManager::NextWayPoint(
 
 	if (livePath->GetRepathTriggerIndex() > 0 && nextPointIndex >= livePath->GetRepathTriggerIndex()) {
 		// Request an update to the path.
+		assert(livePath->GetOwner() != nullptr);
 		assert(registry.all_of<PathRequeueSearch>(pathEntity));
 		registry.get<PathRequeueSearch>(pathEntity).value = true;
 		livePath->ClearGetRepathTriggerIndex();
