@@ -115,7 +115,7 @@ public:
 	static void Update();
 	static bool AddFallbackFont(const std::string& fontfile);
 	static void ClearFallbackFonts();
-	static void ClearAllGlyphs();
+	static bool ClearAllGlyphs();
 
 	static void PinFont(std::shared_ptr<FontFace>& face, const std::string& filename, const int size);
 

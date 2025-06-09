@@ -846,20 +846,19 @@ void CFontTexture::ClearFallbackFonts()
  *
  * Clears all glyphs for all fonts
  */
-void CFontTexture::ClearAllGlyphs() {
+bool CFontTexture::ClearAllGlyphs() {
+	bool changed = false;
 #ifndef HEADLESS
 	RECOIL_DETAILED_TRACY_ZONE;
 
-	bool changed = false;
 	for (const auto& ft : allFonts) {
 		auto lf = ft.lock();
 		changed |= lf->ClearGlyphs();
 	}
-	if (changed)
-		eventHandler.FontsChanged();
 
 	needsClearGlyphs = false;
 #endif
+	return changed;
 }
 
 /***
@@ -960,8 +959,9 @@ void CFontTexture::Update() {
 
 	static std::vector<std::shared_ptr<CFontTexture>> fontsToUpdate;
 
+	bool needsNotify = false;
 	if (needsClearGlyphs)
-		ClearAllGlyphs();
+		needsNotify = ClearAllGlyphs();
 
 	for (const auto& font : allFonts) {
 		auto lf = font.lock();
@@ -977,9 +977,14 @@ void CFontTexture::Update() {
 
 	for (const auto& font : allFonts) {
 		auto lf = font.lock();
+		if (lf->needsColor && !lf->isColor)
+			needsNotify = true;
 		if (lf->GlyphAtlasTextureNeedsUpload())
 			lf->UploadGlyphAtlasTexture();
 	}
+
+	if (needsNotify)
+		eventHandler.FontsChanged();
 }
 
 const GlyphInfo& CFontTexture::GetGlyph(char32_t ch)
