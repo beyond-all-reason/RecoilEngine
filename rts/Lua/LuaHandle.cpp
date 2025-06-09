@@ -4053,11 +4053,6 @@ bool CLuaHandle::AddBasicCalls(lua_State* L)
 	}
 	lua_rawset(L, -3);
 
-	// extra math utilities
-	lua_getglobal(L, "math");
-	LuaMathExtra::PushEntries(L);
-	lua_pop(L, 1);
-
 	lua_getglobal(L, "table");
 	LuaTableExtra::PushEntries(L);
 	lua_pop(L, 1);
@@ -4068,6 +4063,8 @@ bool CLuaHandle::AddBasicCalls(lua_State* L)
 bool CLuaHandle::AddCommonModules(lua_State* L)
 {
 	if (!AddEntriesToTable(L, "Encoding",           LuaEncoding::PushEntries        ))
+		return false;
+	if (!AddEntriesToTable(L, "math",               LuaMathExtra::PushEntries       ))
 		return false;
 	return true;
 }
