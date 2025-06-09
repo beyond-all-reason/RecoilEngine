@@ -310,6 +310,63 @@ void VBO::Resize(GLsizeiptr newSize, GLenum newUsage)
 	}
 }
 
+#ifdef HEADLESS
+bool VBO::CopyTo(VBO& dest, GLsizeiptr copySize) { return false; }
+#else
+bool VBO::CopyTo(VBO& dest, GLsizeiptr copySize)
+{
+	assert(bound);
+	assert(!mapped);
+
+	if (!bound || mapped || copySize <= 0)
+		return false;
+
+	GLint sizeInBytes = 0;
+	glGetBufferParameteriv(curBoundTarget, GL_BUFFER_SIZE, &sizeInBytes);
+	if (copySize > sizeInBytes) {
+		return false;
+	}
+
+	if (GLAD_GL_ARB_copy_buffer) {
+		auto origDestBoundTarget = dest.GetCurrTarget();
+		dest.Bind(GL_COPY_WRITE_BUFFER);
+		sizeInBytes = 0;
+		glGetBufferParameteriv(GL_COPY_WRITE_BUFFER, GL_BUFFER_SIZE, &sizeInBytes);
+		if (copySize > sizeInBytes) {
+			dest.Unbind();
+			dest.curBoundTarget = origDestBoundTarget;
+			return false;
+		}
+
+		glCopyBufferSubData(curBoundTarget, GL_COPY_WRITE_BUFFER, 0, 0, copySize);
+
+		dest.Unbind();
+		dest.curBoundTarget = origDestBoundTarget;
+		Unbind();
+		Bind();
+	}
+	else {
+		void* memsrc = MapBuffer(GL_READ_ONLY);
+		Unbind();
+
+		dest.Bind();
+		sizeInBytes = 0;
+		glGetBufferParameteriv(dest.GetCurrTarget(), GL_BUFFER_SIZE, &sizeInBytes);
+
+		void* memdst = dest.MapBuffer(GL_WRITE_ONLY);
+
+		if (!memsrc || !memdst)
+			return false;
+
+		// cpu download & copy (slow)
+		memcpy(memdst, memsrc, copySize);
+		dest.UnmapBuffer(); dest.Unbind();
+		Bind(); UnmapBuffer(); Unbind();
+	}
+
+	return true;
+}
+#endif // HEADLESS
 
 void VBO::New(GLsizeiptr newSize, GLenum newUsage, const void* newData)
 {
