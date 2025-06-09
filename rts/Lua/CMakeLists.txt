@@ -18,6 +18,7 @@ set(sources_engine_Lua
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaGaia.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaHandle.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaHandleSynced.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/LuaImage.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaIO.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaInputReceiver.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaInterCall.cpp"
