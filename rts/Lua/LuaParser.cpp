@@ -18,6 +18,7 @@
 #include "LuaIO.h"
 #include "LuaVFS.h"
 #include "LuaUtils.h"
+#include "LuaMathExtra.h"
 
 #include "Sim/Misc/GlobalSynced.h" // gsRNG
 #include "System/Log/ILog.h"
@@ -142,6 +143,7 @@ void LuaParser::SetupEnv(bool isSyncedCtxt, bool isDefsParser)
 
 	{
 		lua_getglobal(L, "math");
+		LuaMathExtra::PushEntries(L);
 		if (isSyncedCtxt) {
 			LuaPushNamedCFunc(L, "random", Random);
 			LuaPushNamedCFunc(L, "randomseed", RandomSeed);
