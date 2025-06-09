@@ -704,10 +704,9 @@ CFontTexture::CFontTexture(const std::string& fontfile, int size, int _outlinesi
 	if (lineHeight <= 0)
 		lineHeight = 1.25 * (face->bbox.yMax - face->bbox.yMin);
 
-	// TODO: untested
 	if (canScale) {
+		// NOTE: may need tweaking
 		fontDescender = fontDescender*(pixScale/normScale);
-		//fontDescender = fontDescender*pixScale ??
 		lineHeight = lineHeight*pixScale;
 	}
 
@@ -743,7 +742,7 @@ void CFontTexture::PreloadGlyphs()
 			if (FT_HAS_KERNING(face))
 				FT_Get_Kerning(face, lgl.index, rgl.index, FT_KERNING_DEFAULT, &kerning);
 
-			// TODO: likely need rescaling for not rescalable fonts
+			// NOTE: may need rescaling for not rescalable fonts
 			kerningPrecached[hash] = advance + normScale * kerning.x;
 		}
 	}
@@ -1019,7 +1018,7 @@ float CFontTexture::GetKerning(const GlyphInfo& lgl, const GlyphInfo& rgl)
 	// load & cache
 	FT_Vector kerning;
 	FT_Get_Kerning(*lgl.face, lgl.index, rgl.index, FT_KERNING_DEFAULT, &kerning);
-	// TODO: likely need rescaling for not rescalable fonts
+	// NOTE: may need rescaling for not rescalable fonts
 	return (kerningDynamic[hash] = lgl.advance + normScale * kerning.x);
 #else
 	return 0;
