@@ -246,7 +246,6 @@ namespace QTPFS {
 		bool haveFullPath;
 		bool havePartPath;
 		bool badGoal;
-		bool disallowNodeRevisit = false;
 
 public:
 		bool rawPathCheck = false;

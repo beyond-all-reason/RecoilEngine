@@ -527,8 +527,8 @@ bool QTPFS::PathSearch::Execute(unsigned int searchStateOffset) {
 	haveFullPath = (fwd.srcSearchNode == fwd.tgtSearchNode);
 	havePartPath = false;
 
-	// early-out
-	if (haveFullPath) {
+	// early-out, but not for a repair path because it needs to build out the remaining path.
+	if (haveFullPath && !doPathRepair) {
 		// Ensure the node data is pulled
 		if ( !rawPathCheck ) {
 			{
@@ -708,8 +708,6 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 
 	bool isFullSearch = !doPartialSearch;
 	int dirThatFinishedTheSearch = 0;
-
-	disallowNodeRevisit = modInfo.qtLowerQualityPaths;
 
 	auto nodeIsTemp = [](const SearchNode& curSearchNode) {
 		return (curSearchNode.GetPathCost(NODE_PATH_COST_H) == std::numeric_limits<float>::infinity());
@@ -1453,21 +1451,6 @@ void QTPFS::PathSearch::IterateNodeNeighbors(const INode* curNode, unsigned int 
 		if ( doPathRepair && (searchDir == SearchThreadData::SEARCH_BACKWARD) && (nextSearchNode->GetStepIndex() > 0) ) {
 			continue;
 		}
-
-		// if (disallowNodeRevisit) {
-		// 	bool alreadyVisited = (nextSearchNode->GetPathCost(NODE_PATH_COST_G) != QTPFS_POSITIVE_INFINITY);
-		// 	constexpr bool improvingStart = false;
-
-		// // 	// The start of a path should look good, a unit that starts off by moving in the wrong
-		// // 	// direction will look weird and will break commands like guard, which regaularly ask
-		// // 	// for path updates. This also cleans up the last bit around the goal due to the
-		// // 	// reverse search, which is an added bonus.
-		// // 	bool improvingStart = (nextSearchNode == searchData.srcSearchNode)
-		// // 						|| (nextSearchNode->GetPrevNode() == searchData.srcSearchNode);
-		// 	if (alreadyVisited && !improvingStart) {
-		// 		continue;
-		// 	}
-		// }
 
 		const bool isTarget = (nextSearchNode == searchData.tgtSearchNode);
 		QTPFS::INode *nxtNode = nullptr;

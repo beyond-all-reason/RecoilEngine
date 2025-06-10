@@ -118,7 +118,6 @@ void CModInfo::ResetState()
 		qtMaxNodesSearched = 8192;
 		qtRefreshPathMinDist = 512.f;
 		qtMaxNodesSearchedRelativeToMapOpenNodes = 0.25;
-		qtLowerQualityPaths = false;
 
 		enableSmoothMesh = true;
 		smoothMeshResDivider = 2;
@@ -177,7 +176,6 @@ void CModInfo::Init(const std::string& modFileName)
 		qtMaxNodesSearched = system.GetInt("qtMaxNodesSearched", qtMaxNodesSearched);
 		qtRefreshPathMinDist = system.GetFloat("qtRefreshPathMinDist", qtRefreshPathMinDist);
 		qtMaxNodesSearchedRelativeToMapOpenNodes = system.GetFloat("qtMaxNodesSearchedRelativeToMapOpenNodes", qtMaxNodesSearchedRelativeToMapOpenNodes);
-		qtLowerQualityPaths = system.GetBool("qtLowerQualityPaths", qtLowerQualityPaths);
 
 		enableSmoothMesh = system.GetBool("enableSmoothMesh", enableSmoothMesh);
 		smoothMeshResDivider = system.GetInt("smoothMeshResDivider", smoothMeshResDivider);
