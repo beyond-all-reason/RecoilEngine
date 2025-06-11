@@ -115,8 +115,11 @@ set(system_files
 	${ENGINE_SRC_ROOT_DIR}/System/TimeUtil.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/SafeCStrings.c
 	${ENGINE_SRC_ROOT_DIR}/System/SafeVector.cpp
+	${ENGINE_SRC_ROOT_DIR}/System/SpringMath.cpp
+	${ENGINE_SRC_ROOT_DIR}/System/Sync/FPUCheck.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/UriParser.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/StringUtil.cpp
+	${ENGINE_SRC_ROOT_DIR}/System/float3.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/float4.cpp
 	)
 if    (WIN32)
@@ -150,6 +153,7 @@ set(engineDedicatedSources
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaConstEngine.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaEncoding.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaIO.cpp
+	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMathExtra.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMemPool.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaParser.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaUtils.cpp
