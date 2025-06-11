@@ -4,6 +4,7 @@
 
 #include "System/Log/ILog.h"
 #include "System/Platform/CpuID.h"
+#include "System/Config/ConfigHandler.h"
 
 #ifndef DEDICATED
 	#include "System/Sync/FPUCheck.h"
@@ -31,6 +32,42 @@
 #include "System/Misc/TracyDefs.h"
 
 namespace Threading {
+
+enum ConfigPinPolicy {
+	None,
+	SystemDefault,
+	ExclusivePerformanceCore,
+	SharedPerformanceCores,
+
+	MinimumValue = None,
+	MaximumValue = SharedPerformanceCores,
+};
+
+CONFIG(int, ThreadPinPolicy)
+	.defaultValue(ConfigPinPolicy::SystemDefault)
+	.safemodeValue(ConfigPinPolicy::None)
+	.minimumValue(ConfigPinPolicy::MinimumValue)
+	.maximumValue(ConfigPinPolicy::MaximumValue)
+	.description("Thread to CPU Pinning Policy (0) = Off; (1) = System Default; (2) = Exclusive Performance Core; (3) = Share Performance Cores");
+
+
+	cpu_topology::ThreadPinPolicy GetChosenThreadPinPolicy() {
+		int configPinPolicy = configHandler->GetInt("ThreadPinPolicy");
+		switch (configPinPolicy) {
+			case ConfigPinPolicy::None:
+				return cpu_topology::THREAD_PIN_POLICY_NONE;
+			case ConfigPinPolicy::ExclusivePerformanceCore:
+				return cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE;
+			case ConfigPinPolicy::SharedPerformanceCores:
+				return cpu_topology::THREAD_PIN_POLICY_ANY_PERF_CORE;
+			
+			// ConfigPinPolicy::SystemDefault jumps here as well.
+			default:
+				return cpu_topology::GetThreadPinPolicy(); 
+		};
+	};
+
+
 #ifndef _WIN32
 	thread_local std::shared_ptr<ThreadControls> localThreadControls;
 #endif
@@ -121,6 +158,8 @@ namespace Threading {
 			LOG("-- Hyper Thread/SMT High Mask: 0x%08x", pm.hyperThreadHighMask);
 		});
 
+		const cpu_topology::ThreadPinPolicy chosenPinPolicy = GetChosenThreadPinPolicy();
+
 		// Engine worker thread pool are primarily for mutli-threading activies of simulation; though, they are
 		// available to be used by other system while simulation is not running. As such the policy for pinning worker
 		// threads are to maximise performance of the multi-threaded tasks of simulation, which are a poor fit for
@@ -133,7 +172,13 @@ namespace Threading {
 		// This doesn't preclude systems from using separate unpinned threads, which the OS should logically try to
 		// move to under used resources, such as low-power cores for example.
 		#if defined(THREADPOOL)
-		const uint32_t policy = pm.performanceCoreMask & (~pm.hyperThreadHighMask);
+		const uint32_t smt_mask =
+			( chosenPinPolicy == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE )
+				? (~pm.hyperThreadHighMask) : (~0);
+		const uint32_t vcpu_mask =
+			( chosenPinPolicy != cpu_topology::THREAD_PIN_POLICY_NONE )
+				? (pm.performanceCoreMask) : (pm.performanceCoreMask | pm.efficiencyCoreMask);
+		const uint32_t policy = vcpu_mask & smt_mask;
 		#else
 
 		/* Allow any core; keep it a "proper" mask though

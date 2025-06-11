@@ -12,7 +12,7 @@
 #ifdef __APPLE__
 #include <libkern/OSAtomic.h> // OSAtomicIncrement64
 #endif
-
+#include "CpuTopology.h"
 #include "System/Platform/Win/win32.h"
 #include "System/Threading/SpringThreading.h"
 
@@ -103,6 +103,7 @@ namespace Threading {
 
 	inline bool NativeThreadIdsEqual(const NativeThreadId thID1, const NativeThreadId thID2);
 
+	cpu_topology::ThreadPinPolicy GetChosenThreadPinPolicy();
 
 	/**
 	 * Sets the affinity of the current thread
