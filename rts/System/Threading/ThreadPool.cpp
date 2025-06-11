@@ -112,7 +112,7 @@ static int GetDefaultNumWorkers() {
 	const int cfgNumWorkers = GetConfigNumWorkers();
 
 	if (cfgNumWorkers < 0) {
-		return Threading::GetPerformanceCpuCores();
+		return Threading::GetOptimalThreadCount();
 	}
 
 	if (cfgNumWorkers > maxNumThreads) {
@@ -593,7 +593,11 @@ void SetDefaultThreadCount()
 	#if !defined(THREADPOOL)
 	return;
 	#endif
-	std::uint32_t systemCores = Threading::GetSystemAffinityMask();
+
+	const int threadCount = GetDefaultNumWorkers();
+	SetThreadCount(threadCount);
+
+	std::uint32_t systemCores = Threading::GetSystemAffinityMask(threadCount);
 	std::uint32_t mainAffinity = systemCores;
 
 	const cpu_topology::ThreadPinPolicy threadPinPolicy = Threading::GetChosenThreadPinPolicy();
@@ -608,7 +612,6 @@ void SetDefaultThreadCount()
 	#endif
 
 	std::uint32_t workerAvailCores = systemCores & ~mainAffinity;
-	SetThreadCount(GetDefaultNumWorkers());
 
 	{
 		// parallel_reduce now folds over shared_ptrs to futures

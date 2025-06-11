@@ -127,8 +127,9 @@ namespace Threading {
 	bool HasHyperThreading();
 	std::string GetCPUBrand();
 
-	uint32_t GetSystemAffinityMask();
+	uint32_t GetSystemAffinityMask(int forThreadCount = std::numeric_limits<int>::max());
 	uint32_t GetPreferredMainThreadMask();
+	uint32_t GetOptimalThreadCount();
 
 	/**
 	 * Inform the OS kernel that we are a cpu-intensive task
