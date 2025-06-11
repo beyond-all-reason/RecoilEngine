@@ -138,6 +138,9 @@ CLuaUI::CLuaUI()
 
 	lua_pushvalue(L, LUA_GLOBALSINDEX);
 
+	// version of loadstring allowing bytecode in some situations
+	LuaPushNamedCFunc(L, "loadstring", CLuaHandle::LoadStringData);
+
 	AddBasicCalls(L); // into Global
 
 	// load the spring libraries

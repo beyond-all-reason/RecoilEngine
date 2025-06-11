@@ -486,6 +486,7 @@ struct SParser {  /* data to `f_parser' */
   ZIO *z;
   Mbuffer buff;  /* buffer to be used by the scanner */
   const char *name;
+  bool privileged; // recoil
 };
 
 static void f_parser (lua_State *L, void *ud) {
@@ -495,11 +496,12 @@ static void f_parser (lua_State *L, void *ud) {
   struct SParser *p = lua_cast(struct SParser *, ud);
   int c = luaZ_lookahead(p->z);
   luaC_checkGC(L);
-  if (c == LUA_SIGNATURE[0]) {
+  if (c == LUA_SIGNATURE[0] && !p->privileged) {
     luaG_runerror(L, "bytecode unsupported");
     return;
   }
-  tf = luaY_parser(L, p->z, &p->buff, p->name);
+  tf = ((c == LUA_SIGNATURE[0]) ? luaU_undump : luaY_parser)(L, p->z,
+                                                             &p->buff, p->name);
   cl = luaF_newLclosure(L, tf->nups, hvalue(gt(L)));
   cl->l.p = tf;
   for (i = 0; i < tf->nups; i++)  /* initialize eventual upvalues */
@@ -509,10 +511,11 @@ static void f_parser (lua_State *L, void *ud) {
 }
 
 
-int luaD_protectedparser (lua_State *L, ZIO *z, const char *name) {
+int luaD_protectedparser (lua_State *L, ZIO *z, const char *name, bool privileged) {
   struct SParser p;
   int status;
   p.z = z; p.name = name;
+  p.privileged = privileged; // recoil
   luaZ_initbuffer(L, &p.buff);
   status = luaD_pcall(L, f_parser, &p, savestack(L, L->top), L->errfunc);
   luaZ_freebuffer(L, &p.buff);

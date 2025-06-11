@@ -22,6 +22,7 @@
 
 #include "lua.h"
 #include "lauxlib.h"
+#include "lua_privileges.h"
 
 #include "streflop_cond.h" // SPRING
 #include "System/BranchPrediction.h" // Recoil
@@ -669,5 +670,19 @@ LUALIB_API lua_State *luaL_newstate (void) {
   lua_State *L = lua_newstate(l_alloc, NULL);
   if (L) lua_atpanic(L, &panic);
   return L;
+}
+
+
+/* Recoil Privileged LoadBuffer */
+
+LUALIB_API int luaL_loadbuffer_privileged (lua_State *L, const char *buff, size_t size,
+                                const char *name, bool privileged) {
+  LoadS ls;
+  ls.s = buff;
+  ls.size = size;
+  if unlikely(privileged)
+         return lua_load_privileged(L, getS, &ls, name);
+  else
+         return lua_load(L, getS, &ls, name);
 }
 
