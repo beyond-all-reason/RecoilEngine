@@ -32,8 +32,6 @@
 
 #include "System/Misc/TracyDefs.h"
 
-namespace Threading {
-
 enum ConfigPinPolicy {
 	None,
 	SystemDefault,
@@ -51,6 +49,7 @@ CONFIG(int, ThreadPinPolicy)
 	.maximumValue(ConfigPinPolicy::MaximumValue)
 	.description("Thread to CPU Pinning Policy (0) = Off; (1) = System Default; (2) = Exclusive Performance Core; (3) = Share Performance Cores");
 
+namespace Threading {
 
 	cpu_topology::ThreadPinPolicy GetChosenThreadPinPolicy() {
 		int configPinPolicy = configHandler->GetInt("ThreadPinPolicy");
@@ -61,8 +60,7 @@ CONFIG(int, ThreadPinPolicy)
 				return cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE;
 			case ConfigPinPolicy::SharedPerformanceCores:
 				return cpu_topology::THREAD_PIN_POLICY_ANY_PERF_CORE;
-			
-			// ConfigPinPolicy::SystemDefault jumps here as well.
+			case ConfigPinPolicy::SystemDefault:
 			default:
 				return cpu_topology::GetThreadPinPolicy(); 
 		};
@@ -220,7 +218,10 @@ CONFIG(int, ThreadPinPolicy)
 		cpu_topology::ProcessorCaches pc = springproc::CPUID::GetInstance().GetProcessorCaches();
 		cpu_topology::ProcessorMasks pm = springproc::CPUID::GetInstance().GetAvailableProcessorAffinityMask();
 
-		// Excessive threads will overload the memory bus. We need to assing an optimal number based on cache groups.
+		// Excessive threads will overload the memory bus. We need to chose an optimal number based on cache groups.
+		// Try to get at least threadCountThreshold threads, but can be more. AMD Ryzen CCDs are grouped into either 6
+		// or 8 cores - so we should try to avoid spreading the game accross multiple CCDs, which is especially
+		// important for the X3D processors.
 		constexpr uint32_t threadCountThreshold = 6;
 
 		// The cache groups from GetProcessorCaches() are sorted in order of largest first.
