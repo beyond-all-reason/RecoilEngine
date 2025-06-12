@@ -112,7 +112,7 @@ void CGameStateCollector::Serialize(creg::ISerializer* s)
 	mapType->Serialize(s, &CSplitLuaHandle::gameParams);
 
 	s->SerializeObjectInstance(CUnitDrawer::modelDrawerData->GetSavedData(), CUnitDrawer::modelDrawerData->GetSavedData()->GetClass());
-	//s->SerializeObjectInstance(groundDecals, groundDecals->GetClass());
+	s->SerializeObjectInstance(groundDecals, groundDecals->GetClass());
 }
 
 

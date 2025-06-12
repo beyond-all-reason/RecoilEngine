@@ -102,6 +102,8 @@ CR_BIND_DERIVED(CGroundMoveType, AMoveType, (nullptr))
 CR_REG_METADATA(CGroundMoveType, (
 	CR_IGNORED(pathController),
 
+	CR_IGNORED(jobId),
+
 	CR_MEMBER(currWayPoint),
 	CR_MEMBER(nextWayPoint),
 
@@ -144,6 +146,8 @@ CR_REG_METADATA(CGroundMoveType, (
 	CR_MEMBER(forceFromStaticCollidees),
 
 	CR_MEMBER(pathID),
+	CR_MEMBER(nextPathId),
+	CR_MEMBER(deletePathId),
 
 	CR_MEMBER(numIdlingUpdates),
 	CR_MEMBER(numIdlingSlowUpdates),
@@ -151,13 +155,26 @@ CR_REG_METADATA(CGroundMoveType, (
 	CR_MEMBER(wantedHeading),
 	CR_MEMBER(minScriptChangeHeading),
 
+	CR_MEMBER(wantRepathFrame),
+	CR_MEMBER(lastRepathFrame),
+	CR_MEMBER(bestLastWaypointDist),
+	CR_MEMBER(bestReattemptedLastWaypointDist),
+	CR_MEMBER(setHeading),
+	CR_MEMBER(setHeadingDir),
+	CR_MEMBER(limitSpeedForTurning),
+
+	CR_MEMBER(oldSpeed),
+	CR_MEMBER(newSpeed),
+
 	CR_MEMBER(atGoal),
 	CR_MEMBER(atEndOfPath),
 	CR_MEMBER(wantRepath),
+	CR_MEMBER(lastWaypoint),
 
 	CR_MEMBER(reversing),
 	CR_MEMBER(idling),
 	CR_MEMBER(pushResistant),
+	CR_MEMBER(pushResistanceBlockActive),
 	CR_MEMBER(canReverse),
 	CR_MEMBER(useMainHeading),
 	CR_MEMBER(useRawMovement),
@@ -166,8 +183,6 @@ CR_REG_METADATA(CGroundMoveType, (
 	CR_MEMBER(positionStuck),
 	CR_MEMBER(forceStaticObjectCheck),
 	CR_MEMBER(avoidingUnits),
-	CR_MEMBER(setHeading),
-	CR_MEMBER(setHeadingDir),
 
 	CR_POSTLOAD(PostLoad),
 	CR_PREALLOC(GetPreallocContainer)

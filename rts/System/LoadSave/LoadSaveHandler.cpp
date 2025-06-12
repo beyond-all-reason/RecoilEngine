@@ -32,7 +32,7 @@ bool ILoadSaveHandler::CreateSave(
 		return false;
 
 	if (saveArgs != "-y" && FileSystem::FileExists(saveFile)) {
-		LOG_L(L_WARNING, "[ILoadSaveHandler::%s] file \"%s\" already exists (use /save -y to override)", __func__, saveFile.c_str());
+		LOG_L(L_WARNING, "[ILoadSaveHandler::%s] file \"%s\" already exists (use /save <filename> -y to override)", __func__, saveFile.c_str());
 		return false;
 	}
 

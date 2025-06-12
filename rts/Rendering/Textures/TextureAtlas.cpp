@@ -25,7 +25,12 @@ CONFIG(int, MaxTextureAtlasSizeX).defaultValue(4096).minimumValue(512).maximumVa
 CONFIG(int, MaxTextureAtlasSizeY).defaultValue(4096).minimumValue(512).maximumValue(32768).description("The max Y size of the projectile and Lua texture atlasses");
 
 CR_BIND(AtlasedTexture, )
-CR_REG_METADATA(AtlasedTexture, (CR_IGNORED(x), CR_IGNORED(y), CR_IGNORED(z), CR_IGNORED(w)))
+CR_REG_METADATA(AtlasedTexture, (
+	CR_MEMBER(x),
+	CR_MEMBER(y),
+	CR_MEMBER(z),
+	CR_MEMBER(w)
+))
 
 
 const AtlasedTexture& AtlasedTexture::DefaultAtlasTexture = AtlasedTexture{};

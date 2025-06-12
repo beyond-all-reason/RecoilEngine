@@ -41,6 +41,7 @@ CR_REG_METADATA(CWeaponProjectile,(
 	CR_MEMBER(ttl),
 	CR_MEMBER(bounces),
 	CR_MEMBER(weaponNum),
+	CR_MEMBER(extraAnimProgress),
 
 	CR_POSTLOAD(PostLoad)
 ))
