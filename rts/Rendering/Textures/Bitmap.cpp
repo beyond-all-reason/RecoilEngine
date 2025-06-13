@@ -913,7 +913,7 @@ CBitmap TBitmapAction<T, ch>::CreateRescaled(int newx, int newy)
 	RECOIL_DETAILED_TRACY_ZONE;
 	CBitmap dst;
 
-	if (ch != 4) {
+	if (ch > 4) {
 		assert(false);
 		dst.AllocDummy();
 		return dst;
@@ -1928,14 +1928,29 @@ void CBitmap::CopySubImage(const CBitmap& src, int xpos, int ypos)
 
 	const uint8_t* srcMem = src.GetRawMem();
 	      uint8_t* dstMem =     GetRawMem();
-
 	const auto dts = GetDataTypeSize();
-	for (int y = 0; y < src.ysize; ++y) {
-		const int pixelDst = (((ypos + y) *     xsize) + xpos) * channels * dts;
-		const int pixelSrc = ((        y  * src.xsize) +    0) * channels * dts;
 
-		// copy the whole line
-		std::copy(&srcMem[pixelSrc], &srcMem[pixelSrc] + src.xsize * channels * dts, &dstMem[pixelDst]);
+	if (src.channels == channels) {
+		for (int y = 0; y < src.ysize; ++y) {
+			const int pixelDst = (((ypos + y) *     xsize) + xpos) * channels * dts;
+			const int pixelSrc = ((        y  * src.xsize) +    0) * channels * dts;
+
+			// copy the whole line
+			std::copy(&srcMem[pixelSrc], &srcMem[pixelSrc] + src.xsize * channels * dts, &dstMem[pixelDst]);
+		}
+	} else if (src.channels == 1 && channels == 4 && dts == 1 && src.GetDataTypeSize() == 1) {
+		// set rgb to 255 and alpha to src tex value
+		constexpr uint32_t baseColor = ((255<<16)|(255<<8)|(255));
+		uint32_t* dst32 = reinterpret_cast<uint32_t*>(dstMem);
+		for (int y = 0; y < src.ysize; ++y) {
+			const int pixelDst = (((ypos + y) *     xsize) + xpos) * dts;
+			const int pixelSrc = ((        y  * src.xsize) +    0) * src.channels * dts;
+			for (int x = 0; x < src.xsize; ++x) {
+				dst32[pixelDst+x] =  baseColor | (srcMem[pixelSrc+x]<<24);
+			}
+		}
+	} else {
+		LOG_L(L_WARNING, "CBitmap::CopySubImage channels/datasize mismatch!");
 	}
 }
 
@@ -1996,8 +2011,8 @@ CBitmap CBitmap::CreateRescaled(int newx, int newy) const
 		return bm;
 	}
 
-	if (channels != 4) {
-		LOG_L(L_WARNING, "CBitmap::CreateRescaled only works with RGBA data!");
+	if (channels > 4) {
+		LOG_L(L_WARNING, "CBitmap::CreateRescaled only works with up to four channels!");
 		CBitmap bm;
 		bm.AllocDummy();
 		return bm;
