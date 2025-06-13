@@ -4,6 +4,7 @@
 #define FLOAT4_H
 
 #include "System/float3.h"
+#include "System/SpringHash.h"
 #include "System/creg/creg_cond.h"
 
 /** Float3 with a fourth data member, which is basically unused but required
@@ -115,6 +116,12 @@ struct float4 : public float3
 	/// Allows implicit conversion to float* (for passing to gl functions)
 	operator const float* () const { return reinterpret_cast<const float*>(&x); }
 	operator       float* ()       { return reinterpret_cast<      float*>(&x); }
+};
+
+struct float4Hash {
+	uint32_t operator()(const float4& v) const {
+		return spring::LiteHash(&v, sizeof(v));
+	}
 };
 
 #endif /* FLOAT4_H */

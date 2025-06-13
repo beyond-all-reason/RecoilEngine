@@ -226,7 +226,7 @@ CExpGenSpawnable* CExpGenSpawnable::CreateSpawnable(int spawnableID)
 	return std::get<2>(spawnables[spawnableID])();
 }
 
-void CExpGenSpawnable::AddEffectsQuadImpl(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl, const float3& ap, const float& p)
+void CExpGenSpawnable::AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl, const float3& ap, const float& p)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	float minS = std::numeric_limits<float>::max()   ; float minT = std::numeric_limits<float>::max()   ;
@@ -242,18 +242,18 @@ void CExpGenSpawnable::AddEffectsQuadImpl(const VA_TYPE_TC& tl, const VA_TYPE_TC
 
 	const auto uvInfo = float4{ minS, minT, maxS - minS, maxT - minT };
 	const auto animInfo = float3{ ap.x, ap.y, p };
-	constexpr float layer = 0.0f; //for future texture arrays
+	const auto pn = static_cast<float>(pageNum);
 
 	//pos, uvw, uvmm, col
 	rb.AddQuadTriangles(
-		{ tl.pos, float3{ tl.s, tl.t, layer }, uvInfo, animInfo, tl.c },
-		{ tr.pos, float3{ tr.s, tr.t, layer }, uvInfo, animInfo, tr.c },
-		{ br.pos, float3{ br.s, br.t, layer }, uvInfo, animInfo, br.c },
-		{ bl.pos, float3{ bl.s, bl.t, layer }, uvInfo, animInfo, bl.c }
+		{ tl.pos, float3{ tl.s, tl.t, pn }, uvInfo, animInfo, tl.c },
+		{ tr.pos, float3{ tr.s, tr.t, pn }, uvInfo, animInfo, tr.c },
+		{ br.pos, float3{ br.s, br.t, pn }, uvInfo, animInfo, br.c },
+		{ bl.pos, float3{ bl.s, bl.t, pn }, uvInfo, animInfo, bl.c }
 	);
 }
 
-void CExpGenSpawnable::AddEffectsQuadImpl(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl)
+void CExpGenSpawnable::AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	float minS = std::numeric_limits<float>::max()   ; float minT = std::numeric_limits<float>::max()   ;
@@ -269,13 +269,13 @@ void CExpGenSpawnable::AddEffectsQuadImpl(const VA_TYPE_TC& tl, const VA_TYPE_TC
 
 	const auto uvInfo = float4{ minS, minT, maxS - minS, maxT - minT };
 	static constexpr auto animInfo = float3{ 1.0f, 1.0f , 0.0f };
-	constexpr float layer = 0.0f; //for future texture arrays
+	const auto pn = static_cast<float>(pageNum);
 
 	//pos, uvw, uvmm, col
 	rb.AddQuadTriangles(
-		{ tl.pos, float3{ tl.s, tl.t, layer }, uvInfo, animInfo, tl.c },
-		{ tr.pos, float3{ tr.s, tr.t, layer }, uvInfo, animInfo, tr.c },
-		{ br.pos, float3{ br.s, br.t, layer }, uvInfo, animInfo, br.c },
-		{ bl.pos, float3{ bl.s, bl.t, layer }, uvInfo, animInfo, bl.c }
+		{ tl.pos, float3{ tl.s, tl.t, pn }, uvInfo, animInfo, tl.c },
+		{ tr.pos, float3{ tr.s, tr.t, pn }, uvInfo, animInfo, tr.c },
+		{ br.pos, float3{ br.s, br.t, pn }, uvInfo, animInfo, br.c },
+		{ bl.pos, float3{ bl.s, bl.t, pn }, uvInfo, animInfo, bl.c }
 	);
 }
