@@ -6296,7 +6296,7 @@ int LuaSyncedRead::GetUnitCommands(lua_State* L)
  * @function Spring.GetFactoryCommands
  *
  * @param unitID integer
- * @param count 0 Returns the number of commands in the units queue.
+ * @param count 0 Returns the number of commands in the factory queue.
  * @return integer The number of commands in the factory queue.
  *
  * @see Spring.GetFactoryCommandCount
