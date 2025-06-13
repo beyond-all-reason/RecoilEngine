@@ -6287,7 +6287,8 @@ int LuaSyncedRead::GetUnitCommands(lua_State* L)
  * @param count integer Maximum amount of commands to return, `-1` returns all commands.
  * @return Command[] commands
  *
- * @see Spring.GetFactoryCommandCount
+ * @see Spring.GetFactoryCommandCount to get the count of commands.
+ * @see Spring.GetFactoryCounts to get command counts grouped by cmdID.
  */
 /***
  * Get the count of commands for a factory.
@@ -6299,7 +6300,7 @@ int LuaSyncedRead::GetUnitCommands(lua_State* L)
  * @param count 0 Returns the number of commands in the factory queue.
  * @return integer The number of commands in the factory queue.
  *
- * @see Spring.GetFactoryCommandCount
+ * @see Spring.GetFactoryCommandCount for replacement function.
  */
 int LuaSyncedRead::GetFactoryCommands(lua_State* L)
 {
@@ -6359,7 +6360,8 @@ int LuaSyncedRead::GetUnitCommandCount(lua_State* L)
  * @param unitID integer
  * @return integer The number of commands in the factory queue.
  *
- * @see Spring.GetFactoryCommands
+ * @see Spring.GetFactoryCommands to get the factory commands.
+ * @see Spring.GetFactoryCounts to get command counts grouped by cmdID.
  */
 int LuaSyncedRead::GetFactoryCommandCount(lua_State* L)
 {
