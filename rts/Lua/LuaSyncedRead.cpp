@@ -274,6 +274,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitCommands);
 	REGISTER_LUA_CFUNC(GetUnitCurrentCommand);
 	REGISTER_LUA_CFUNC(GetFactoryCounts);
+	REGISTER_LUA_CFUNC(GetFactoryCommandCount);
 	REGISTER_LUA_CFUNC(GetFactoryCommands);
 
 	REGISTER_LUA_CFUNC(GetFactoryBuggerOff);
@@ -6229,7 +6230,7 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
 }
 
 
-// FIXME: Document the third argument usage or remove it: `boolean (Default: true) When true returns a list of commands, otherwise returns the count`
+// FIXME: Remove the undocumented third argument when deprecations expire: `boolean (Default: true) When true returns a list of commands, otherwise returns the count`
 /***
  * Get the commands for a unit.
  *
@@ -6283,8 +6284,23 @@ int LuaSyncedRead::GetUnitCommands(lua_State* L)
  * @function Spring.GetFactoryCommands
  *
  * @param unitID integer
- * @param count number when 0 returns the number of commands in the units queue, when -1 returns all commands, number of commands to return otherwise
- * @return number|Command[] commands
+ * @param count integer Maximum amount of commands to return, `-1` returns all commands.
+ * @return Command[] commands
+ *
+ * @see Spring.GetFactoryCommandCount to get the count of commands.
+ * @see Spring.GetFactoryCounts to get command counts grouped by cmdID.
+ */
+/***
+ * Get the count of commands for a factory.
+ *
+ * @deprecated This overload is deprecated, use `Spring.GetFactoryCommandCount(unitId)` instead.
+ * @function Spring.GetFactoryCommands
+ *
+ * @param unitID integer
+ * @param count 0 Returns the number of commands in the factory queue.
+ * @return integer The number of commands in the factory queue.
+ *
+ * @see Spring.GetFactoryCommandCount for replacement function.
  */
 int LuaSyncedRead::GetFactoryCommands(lua_State* L)
 {
@@ -6308,6 +6324,7 @@ int LuaSyncedRead::GetFactoryCommands(lua_State* L)
 	if (cmdsTable && (numCmds != 0)) {
 		PackCommandQueue(L, commandQue, numCmds);
 	} else {
+		LOG_DEPRECATED("This game is issuing `Spring.GetFactoryCommands(unitId, 0)`, or passing a third argument. This usage is deprecated, please use `Spring.GetFactoryCommandCount(unitId)` instead or fix some underlying bug.");
 		lua_pushnumber(L, commandQue.size());
 	}
 
@@ -6333,6 +6350,36 @@ int LuaSyncedRead::GetUnitCommandCount(lua_State* L)
 	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->commandQue : &factoryCAI->newUnitCommands;
 
 	lua_pushnumber(L, queue->size());
+
+	return 1;
+}
+
+/*** Get the number of commands in a factory queue.
+ *
+ * @function Spring.GetFactoryCommandCount
+ * @param unitID integer
+ * @return integer The number of commands in the factory queue.
+ *
+ * @see Spring.GetFactoryCommands to get the factory commands.
+ * @see Spring.GetFactoryCounts to get command counts grouped by cmdID.
+ */
+int LuaSyncedRead::GetFactoryCommandCount(lua_State* L)
+{
+	const CUnit* unit = ParseAllyUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	const CCommandAI* commandAI = unit->commandAI;
+	const CFactoryCAI* factoryCAI = dynamic_cast<const CFactoryCAI*>(commandAI);
+
+	// bail if not a factory
+	if (factoryCAI == nullptr)
+		return 0;
+
+	const CCommandQueue& queue = commandAI->commandQue;
+
+	lua_pushnumber(L, queue.size());
 
 	return 1;
 }

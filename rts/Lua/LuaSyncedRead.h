@@ -175,6 +175,7 @@ class LuaSyncedRead {
 		static int GetUnitCommands(lua_State* L);
 		static int GetUnitCurrentCommand(lua_State* L);
 		static int GetFactoryCounts(lua_State* L);
+		static int GetFactoryCommandCount(lua_State* L);
 		static int GetFactoryCommands(lua_State* L);
 
 		static int GetFactoryBuggerOff(lua_State* L);
