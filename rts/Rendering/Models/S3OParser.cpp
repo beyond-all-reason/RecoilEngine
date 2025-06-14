@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "S3OParser.h"
+#include "ModelUtils.h"
 #include "s3o.h"
 #include "Game/GlobalUnsynced.h"
 #include "Rendering/GlobalRendering.h"
@@ -247,92 +248,7 @@ void SS3OPiece::Trianglize()
 	}
 }
 
-
 void SS3OPiece::SetVertexTangents()
 {
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (!HasGeometryData())
-		return;
-
-	unsigned int stride = 0;
-
-	switch (primType) {
-		case S3O_PRIMTYPE_TRIANGLES     : { stride = 3; } break;
-		case S3O_PRIMTYPE_TRIANGLE_STRIP: { stride = 1; } break;
-		case S3O_PRIMTYPE_QUADS         : {     return; } break;
-	}
-
-	// set the triangle-level S- and T-tangents
-	// for triangle strips, the piece vertex _indices_ are defined
-	// by the draw order of the vertices numbered <v, v + 1, v + 2>
-	// for v in [0, n - 2]
-	for (unsigned int i = 0, n = indices.size() - 2 * (stride == 1); i < n; i += stride) {
-		const bool flipWinding = ((primType == S3O_PRIMTYPE_TRIANGLE_STRIP) && ((i & 1) == 1));
-
-		const int v0idx = indices[i                      ];
-		const int v1idx = indices[i + (flipWinding? 2: 1)];
-		const int v2idx = indices[i + (flipWinding? 1: 2)];
-
-		if (v1idx == -1 || v2idx == -1) {
-			// not a valid triangle, skip
-			// to start of next tri-strip
-			i += 3; continue;
-		}
-
-		SVertexData& v0 = vertices[v0idx];
-		SVertexData& v1 = vertices[v1idx];
-		SVertexData& v2 = vertices[v2idx];
-
-		const float3& p0 = v0.pos;
-		const float3& p1 = v1.pos;
-		const float3& p2 = v2.pos;
-
-		const float2& tc0 = v0.texCoords[0];
-		const float2& tc1 = v1.texCoords[0];
-		const float2& tc2 = v2.texCoords[0];
-
-		const float3 p10 = p1 - p0;
-		const float3 p20 = p2 - p0;
-
-		const float2 tc10 = tc1 - tc0;
-		const float2 tc20 = tc2 - tc0;
-
-		// if d is 0, texcoors are degenerate
-		const float d = (tc10.x * tc20.y - tc20.x * tc10.y);
-		const float r = (abs(d) < 1e-9f) ? 1.0f : 1.0f / d;
-
-		// note: not necessarily orthogonal to each other
-		// or to vertex normal, only to the triangle plane
-		const float3 sdir = ( p10 * tc20.y - p20 * tc10.y) * r;
-		const float3 tdir = (-p10 * tc20.x + p20 * tc10.x) * r;
-
-		v0.sTangent += sdir;
-		v1.sTangent += sdir;
-		v2.sTangent += sdir;
-
-		v0.tTangent += tdir;
-		v1.tTangent += tdir;
-		v2.tTangent += tdir;
-	}
-
-	// set the smoothed per-vertex tangents
-	for (unsigned int i = 0, n = vertices.size(); i < n; i++) {
-		float3& N = vertices[i].normal;
-		float3& T = vertices[i].sTangent;
-		float3& B = vertices[i].tTangent; // bi
-
-		N.AssertNaNs(); N.SafeANormalize();
-		T.AssertNaNs();
-		B.AssertNaNs();
-
-		//const float bitangentAngle = B.dot(N.cross(T)); // dot(B,B')
-		//const float handednessSign = Sign(bitangentAngle);
-
-		T = (T - N * N.dot(T));// *handednessSign;
-		T.SafeANormalize();
-
-		B = (B - N * N.dot(B) - T * T.dot(N));
-		//B = N.cross(T); //probably better
-		B.SafeANormalize();
-	}
+	ModelUtils::CalculateTangents(vertices, indices);
 }

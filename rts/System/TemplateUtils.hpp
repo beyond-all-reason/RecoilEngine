@@ -3,8 +3,10 @@
 #include <memory>
 #include <functional>
 #include <tuple>
+#include <variant>
 #include <type_traits>
 
+// TODO Move to namespace Recoil
 namespace spring {
 	template<bool...> struct bool_pack;
 	template<bool... bs>
@@ -202,3 +204,34 @@ namespace spring {
 	template<auto FuncPtr, typename... FallbackSignature>
 	using func_ptr_signature_t = typename func_ptr_signature<FuncPtr, FallbackSignature...>::type;
 };
+
+namespace Recoil {
+	// taken from https://github.com/spnda/fastgltf/blob/main/include/fastgltf/util.hpp
+	// The MIT License
+	// Copyright (C) 2022 - 2025 Sean Apeler
+	template <typename Visitor, typename Variant, std::size_t... i>
+	constexpr bool is_exhaustive_visitor(std::integer_sequence<std::size_t, i...>) noexcept {
+		return std::conjunction_v<std::is_invocable<Visitor, std::variant_alternative_t<i, std::remove_cvref_t<Variant>>>...>;
+	}
+
+	/**
+	 * Simple wrapper around std::visit for a single variant that checks at compile-time if the given visitor contains
+	 * overloads for *all* required alternatives.
+	 */
+	template<typename Visitor, typename Variant>
+		constexpr decltype(auto) visit_exhaustive(Visitor&& visitor, Variant&& variant) {
+		static_assert(is_exhaustive_visitor<Visitor, Variant>(std::make_index_sequence<std::variant_size_v<std::remove_cvref_t<Variant>>>()),
+			"The visitor does not include all necessary overloads for the given variant");
+		return std::visit(std::forward<Visitor>(visitor), std::forward<Variant>(variant));
+	}
+}
+
+namespace Concepts {
+	template <typename T>
+	concept HasSizeAndData = requires(const T & t) {
+		// Validate .size() returns std::size_t
+		{ t.size() } -> std::same_as<std::size_t>;
+		// Validate .data() returns a pointer to element type
+		{ t.data() } -> std::convertible_to<const typename T::value_type*>;
+	};
+}
