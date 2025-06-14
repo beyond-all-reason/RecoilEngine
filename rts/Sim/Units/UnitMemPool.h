@@ -5,7 +5,6 @@
 
 #include "UnitTypes/Builder.h"
 #include "UnitTypes/Building.h"
-#include "UnitTypes/ExtractorBuilding.h"
 #include "UnitTypes/Factory.h"
 
 #include "Sim/Misc/GlobalConstants.h"
@@ -17,7 +16,6 @@ union LargestDerivedFromCUnit {
 	CBuilder builder;
 	CFactory factory;
 	CBuilding building;
-	CExtractorBuilding extractorBuilding;
 };
 
 #if (defined(__x86_64) || defined(__x86_64__) || defined(_M_X64))

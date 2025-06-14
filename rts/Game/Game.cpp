@@ -76,6 +76,7 @@
 #include "Sim/Misc/GeometricObjects.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/BuildingMaskMap.h"
+#include "Sim/Misc/ExtractorHandler.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/InterceptHandler.h"
@@ -257,6 +258,7 @@ CGame::CGame(const std::string& mapFileName, const std::string& modFileName, ILo
 	// clear left-over receivers in case we reloaded
 	gameCommandConsole.ResetState();
 
+	extractorHandler.ResetState();
 	envResHandler.ResetState();
 
 	modInfo.Init(modFileName);
@@ -478,6 +480,7 @@ void CGame::Load(const std::string& mapFileName)
 		// Update height bounds and pathing after pregame or a saved game load.
 		{
 			ENTER_SYNCED_CODE();
+			extractorHandler.PostFinalizeRefresh();
 			//needed in case pre-game terraform changed the map
 			readMap->UpdateHeightBounds();
 			Watchdog::ClearTimer(WDT_LOAD);
