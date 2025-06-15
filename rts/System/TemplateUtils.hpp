@@ -6,6 +6,9 @@
 #include <variant>
 #include <type_traits>
 
+#include "Matrix44f.h"
+#include "Transform.hpp"
+
 // TODO Move to namespace Recoil
 namespace spring {
 	template<bool...> struct bool_pack;
@@ -228,10 +231,15 @@ namespace Recoil {
 
 namespace Concepts {
 	template <typename T>
-	concept HasSizeAndData = requires(const T & t) {
-		// Validate .size() returns std::size_t
+	concept HasSizeAndData = requires(T t) {
 		{ t.size() } -> std::same_as<std::size_t>;
-		// Validate .data() returns a pointer to element type
 		{ t.data() } -> std::convertible_to<const typename T::value_type*>;
 	};
+	template<typename T>
+	concept HasMemberBeginEnd = requires(T t) {
+		{ t.begin() } -> std::input_or_output_iterator;
+		{ t.end() } -> std::sentinel_for<decltype(t.begin())>;
+	};
+	template <typename T>
+	concept CanTransform = std::same_as<T, CMatrix44f> || std::same_as<T, Transform>;
 }
