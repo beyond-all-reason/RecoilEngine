@@ -50,16 +50,11 @@ public:
 	float3 ClampInto(const float3& pnt) const;
 
 	void CalcCorners(std::array<float3, 8>& verts) const;
-	void CalcCorners(float3 verts[8]) const;
-
-	template<Concepts::CanTransform T>
-	void CalcCorners(const T& t, float3 verts[8]) const {
-		std::for_each(std::begin(verts), std::end(verts), [&t](auto& vert) { vert = t * vert; });
-	}
 
 	template<Concepts::CanTransform T>
 	void CalcCorners(const T& t, std::array<float3, 8>& verts) const {
-		std::for_each(std::begin(verts), std::end(verts), [&t](auto& vert) { vert = t * vert; });
+		CalcCorners(verts);
+		std::for_each(verts.begin(), verts.end(), [&t](auto& vert) { vert = t * vert; });
 	}
 
 	template<Concepts::CanTransform T>
