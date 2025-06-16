@@ -19,7 +19,7 @@ float3 AABB::ClampInto(const float3& pnt) const
 {
     return float3{
         std::clamp(pnt.x, mins.x, maxs.x),
-        std::clamp(pnt.y, mins.y, maxs.x),
+        std::clamp(pnt.y, mins.y, maxs.y),
         std::clamp(pnt.z, mins.z, maxs.z)
     };
 }
