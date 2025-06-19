@@ -3,8 +3,6 @@
 #ifndef SYNCCHECKER_H
 #define SYNCCHECKER_H
 
-#ifdef SYNCCHECK
-
 #include "System/SpringHash.h"
 
 #include <cassert>
@@ -69,7 +67,5 @@ class CSyncChecker {
 		static std::array<unsigned, MAX_SYNC_HISTORY_FRAMES> logFrames;
 #endif // SYNC_HISTORY
 };
-
-#endif // SYNCDEBUG
 
 #endif // SYNCDEBUGGER_H
