@@ -12,7 +12,12 @@ The engine has recently instroduced the support to [GLTF 2.0](https://registry.k
 ## Why use GLTF in Recoil?
 
 ## GLTF support in Recoil
-The engine versions after [this commit](https://github.com/beyond-all-reason/RecoilEngine/commit/d20e7f15024db58ade60dff3dbcb9590c94a316a) should have working experimental GLTF support (could still be bugged).
+- The engine versions after [this commit](https://github.com/beyond-all-reason/RecoilEngine/commit/d20e7f15024db58ade60dff3dbcb9590c94a316a) should have working experimental GLTF support (could still be bugged).
+- The only supported primitive type is `Triangles`. `Points`, `Lines`, `LineLoops`, `LineStrips`, `TriangleStrips` and `TriangleFans` are not supported. The last two might be added on demand (and for good reason). The unsupported primitives will cause runtime fatal error
+- Skinning is supposed to be supported, but was never tested after initial implementation
+- Embedded animation is not supported, but maybe will be supported in the future versions of the engine
+- Recoil ignores textures and materials, mostly because they're expected to follow the PBR workflow
+- Other vertex attributes, e.g. vertex colors, are not loaded, but can be considered for addition in the future versions of the engine
 
 ## Side notes
 - [S3O Kit](https://github.com/ChrisFloofyKitsune/s3o-blender-tools) provides a great Blender plugin to import existing s3o models from Blender. The s3o Kit imports many s3o attributes as separate nodes, you might want to remove them from the model, before exporting it to GLTF2, because they cause creation of extra meaningless pieces. Make sure the model hierarchy is clean of s3o attributes leftovers.
@@ -62,6 +67,8 @@ If both the custom Scene attributes in the GLTF file and the Lua file are presen
 ![image]({{ site.baseurl }}/assets/guides/blender-gltf-7.png)
 6. Finally choose the folder and filename and press `Export glTF 2.0` button
 ![image]({{ site.baseurl }}/assets/guides/blender-gltf-8.png)
+
+*You can export additional attributes not listed on the screenshots, there's no harm in that*
 
 # Load the GLTF model in Recoil
 Out of all custom attributes defined in the Scene's GLTF or in the Lua file the two you should probably define in any case are `tex1` and `tex2`. The rest are defined per use case.
