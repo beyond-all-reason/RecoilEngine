@@ -1,7 +1,7 @@
 ---
 layout: post
 title: How to import a GLTF file from Blender
-parent: Articles
+parent: Guides
 permalink: guides/blender-gltf-import
 author: lhog
 ---
