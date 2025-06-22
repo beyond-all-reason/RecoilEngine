@@ -128,7 +128,7 @@ namespace Threading {
 	std::string GetCPUBrand();
 
 	uint32_t GetSystemAffinityMask(int forThreadCount = std::numeric_limits<int>::max());
-	uint32_t GetPreferredMainThreadMask();
+	uint32_t GetPreferredMainThreadMask(uint32_t affinityMask);
 	uint32_t GetOptimalThreadCount();
 
 	/**

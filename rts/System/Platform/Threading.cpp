@@ -152,7 +152,7 @@ namespace Threading {
 
 		// The cache groups from GetProcessorCaches() are sorted in order of largest first.
 		const uint32_t optimal_mask = std::accumulate(pc.groupCaches.begin(), pc.groupCaches.end(), 0, [&](uint32_t mask, const cpu_topology::ProcessorGroupCaches& gc){
-			return mask | ( std::popcount(mask) < forThreadCount ) ? gc.groupMask : 0;
+			return mask | ( std::popcount(mask & ~pm.hyperThreadHighMask) < forThreadCount ? gc.groupMask : 0 );
 		});
 
 		std::call_once(affinityMaskDetailsLogFlag, [&](){
@@ -188,10 +188,8 @@ namespace Threading {
 
 	std::once_flag preferredMaskDetailsLogFlag;
 
-	uint32_t GetPreferredMainThreadMask() {
+	uint32_t GetPreferredMainThreadMask(uint32_t affinityMask) {
 		cpu_topology::ProcessorCaches pc = springproc::CPUID::GetInstance().GetProcessorCaches();
-
-		const uint32_t affinityMask = GetSystemAffinityMask();
 
 		// The cache groups from GetProcessorCaches() are sorted in order of largest first. Find the first group that
 		// has a logical processor that will be used to pin the main/worker threads.
@@ -226,7 +224,7 @@ namespace Threading {
 
 		// The cache groups from GetProcessorCaches() are sorted in order of largest first.
 		const uint32_t optimalThreadCount = std::accumulate(pc.groupCaches.begin(), pc.groupCaches.end(), 0, [&](uint32_t threadCount, const cpu_topology::ProcessorGroupCaches& gc){
-			return threadCount + ( threadCount < threadCountThreshold ) ? std::popcount(gc.groupMask & (pm.performanceCoreMask) & (~pm.hyperThreadHighMask)) : 0;
+			return threadCount + ( threadCount < threadCountThreshold  ? std::popcount(gc.groupMask & (pm.performanceCoreMask) & (~pm.hyperThreadHighMask)) : 0 );
 		});
 		const uint32_t fallbackThreadCount = GetPerformanceCpuCores();
 		

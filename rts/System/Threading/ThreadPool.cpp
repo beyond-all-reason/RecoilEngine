@@ -606,7 +606,7 @@ void SetDefaultThreadCount()
 	std::uint32_t configAffinity = configHandler->GetUnsigned("SetCoreAffinity");
 	mainAffinity &= (configAffinity != 0) ? configAffinity
 		: (threadPinPolicy == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
-			? Threading::GetPreferredMainThreadMask()
+			? Threading::GetPreferredMainThreadMask(systemCores)
 			: 0;
 	LOG("[ThreadPool] Main thread affinity requested as 0x%08x", mainAffinity);
 	#endif
