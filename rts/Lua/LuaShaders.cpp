@@ -1212,7 +1212,7 @@ int LuaShaders::UniformArray(lua_State* L)
  *
  * @function gl.UniformMatrix
  * @param locationID integer|string uniformName
- * @param matrix "shadows"|"camera"|"caminv"|"camprj" Name of common matrix.
+ * @param matrix MatrixName Name of common matrix.
  */
 
 /***
