@@ -4725,7 +4725,7 @@ int LuaOpenGL::MultiTexGen(lua_State* L)
  * @function gl.BindImageTexture
  * @param unit integer
  * @param texID nil | string (nil breaks any existing binding to the image unit)
- * @param level nil | integer (Default(nil): 0)
+ * @param level nil | integer (Default: 0)
  * @param layer nil | integer (nil binds the entire texture(array/cube), an integer binds a specific layer, ignored if the texture does not support layered bindings)
  * @param access nil | integer (Default(nil): GL.READ_WRITE, can be any of GL.READ_ONLY | GL.WRITE_ONLY | GL.READ_WRITE)
  * @param format integer (Example: GL.RGBA16F)
