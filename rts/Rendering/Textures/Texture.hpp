@@ -119,7 +119,7 @@ namespace GL {
 		Texture2DArray& operator=(Texture2DArray&& other) noexcept;
 		Texture2DArray& operator=(const Texture2DArray&) = delete;
 
-		template <HasSizeAndData C>
+		template <Concepts::HasSizeAndData C>
 		void UploadImage(const C& c, int layer) const {
 		#ifdef DEBUG
 			const auto dataType = GetDataTypeFromInternalFormat(intFormat);
@@ -130,7 +130,7 @@ namespace GL {
 			UploadImage(c.data());
 		}
 
-		template <HasSizeAndData C>
+		template <Concepts::HasSizeAndData C>
 		void UploadSubImage(const C& c, int layer, int xOffset, int yOffset, int width, int height) const {
 		#ifdef DEBUG
 			assert(xOffset + width <= size.x && yOffset + height <= size.y);

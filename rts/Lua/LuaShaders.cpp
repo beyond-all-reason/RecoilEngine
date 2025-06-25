@@ -1360,7 +1360,7 @@ int LuaShaders::GetEngineModelUniformDataSize(lua_State* L)
 	if (!globalRendering->haveGL4)
 		return 0;
 
-	const auto sizeInElems = modelsUniformsStorage.Size();
+	const auto sizeInElems = modelUniformsStorage.GetSize();
 	lua_pushinteger(L, static_cast<lua_Integer>(sizeInElems                           ));
 	lua_pushinteger(L, static_cast<lua_Integer>(sizeInElems * sizeof(ModelUniformData)));
 
