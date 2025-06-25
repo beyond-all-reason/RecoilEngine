@@ -72,6 +72,7 @@ void CFireBallProjectile::Draw()
 
 		const auto* ept = projectileDrawer->explotex;
 		AddEffectsQuad<1>(
+			ept->pageNum,
 			{ sparks[i].pos - camera->GetRight() * sparks[i].size - camera->GetUp() * sparks[i].size, ept->xstart, ept->ystart, col },
 			{ sparks[i].pos + camera->GetRight() * sparks[i].size - camera->GetUp() * sparks[i].size, ept->xend  , ept->ystart, col },
 			{ sparks[i].pos + camera->GetRight() * sparks[i].size + camera->GetUp() * sparks[i].size, ept->xend  , ept->yend  , col },
@@ -86,6 +87,7 @@ void CFireBallProjectile::Draw()
 		col[2] = (maxCol - i) * 10;
 		const auto* dgt = projectileDrawer->dguntex;
 		AddEffectsQuad<2>(
+			dgt->pageNum,
 			{ interPos - (speed * 0.5f * i) - camera->GetRight() * size - camera->GetUp() * size, dgt->xstart, dgt->ystart, col },
 			{ interPos - (speed * 0.5f * i) + camera->GetRight() * size - camera->GetUp() * size, dgt->xend ,  dgt->ystart, col },
 			{ interPos - (speed * 0.5f * i) + camera->GetRight() * size + camera->GetUp() * size, dgt->xend ,  dgt->yend  , col },

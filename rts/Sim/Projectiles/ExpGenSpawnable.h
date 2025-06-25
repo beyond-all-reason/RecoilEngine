@@ -45,10 +45,10 @@ protected:
 	void UpdateAnimParamsImpl(const float3& ap, float& p) const;
 
 	template <uint32_t texIdx>
-	void AddEffectsQuad(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const;
+	void AddEffectsQuad(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const;
 
-	static void AddEffectsQuadImpl(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl, const float3& ap, const float& p);
-	static void AddEffectsQuadImpl(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl);
+	static void AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl, const float3& ap, const float& p);
+	static void AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl);
 
 	static bool GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo);
 
@@ -73,29 +73,29 @@ protected:
 };
 
 template <>
-inline void CExpGenSpawnable::AddEffectsQuad<0>(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
+inline void CExpGenSpawnable::AddEffectsQuad<0>(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
 	// no animation
-	AddEffectsQuadImpl(tl, tr, br, bl);
+	AddEffectsQuadImpl(pageNum, tl, tr, br, bl);
 }
 
 template <>
-inline void CExpGenSpawnable::AddEffectsQuad<1>(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
-	AddEffectsQuadImpl(tl, tr, br, bl, animParams1, animProgress1);
+inline void CExpGenSpawnable::AddEffectsQuad<1>(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
+	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, animParams1, animProgress1);
 }
 
 template <>
-inline void CExpGenSpawnable::AddEffectsQuad<2>(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
-	AddEffectsQuadImpl(tl, tr, br, bl, animParams2, animProgress2);
+inline void CExpGenSpawnable::AddEffectsQuad<2>(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
+	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, animParams2, animProgress2);
 }
 
 template <>
-inline void CExpGenSpawnable::AddEffectsQuad<3>(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
-	AddEffectsQuadImpl(tl, tr, br, bl, animParams3, animProgress3);
+inline void CExpGenSpawnable::AddEffectsQuad<3>(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
+	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, animParams3, animProgress3);
 }
 
 template <>
-inline void CExpGenSpawnable::AddEffectsQuad<4>(const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
-	AddEffectsQuadImpl(tl, tr, br, bl, animParams4, animProgress4);
+inline void CExpGenSpawnable::AddEffectsQuad<4>(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
+	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, animParams4, animProgress4);
 }
 
 #endif //EXP_GEN_SPAWNABLE_H

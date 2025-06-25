@@ -107,6 +107,7 @@ set(sources_engine_Rendering
 		"${CMAKE_CURRENT_SOURCE_DIR}/Shaders/ShaderStates.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/ShadowHandler.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/TeamHighlight.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/AtlasedTexture.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/3DOTextureHandler.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/Bitmap.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Textures/ColorMap.cpp"

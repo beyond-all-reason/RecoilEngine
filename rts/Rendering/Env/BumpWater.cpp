@@ -635,7 +635,6 @@ void CBumpWater::UploadCoastline(const bool forceFull)
 
 	// create a texture atlas for the to-be-updated areas
 	CTextureAtlas atlas;
-	atlas.SetFreeTexture(false);
 
 	const float* heightMap = (!gs->PreSimFrame()) ? readMap->GetCornerHeightMapUnsynced() : readMap->GetCornerHeightMapSynced();
 
@@ -671,6 +670,9 @@ void CBumpWater::UploadCoastline(const bool forceFull)
 		return;
 	}
 
+	// must happen after atlas.Finalize()
+	atlas.DisOwnTexture();
+
 	coastUpdateTexture = atlas.GetTexID();
 	atlasX = (atlas.GetSize()).x;
 	atlasY = (atlas.GetSize()).y;
@@ -678,7 +680,7 @@ void CBumpWater::UploadCoastline(const bool forceFull)
 	// save the area positions in the texture atlas
 	for (size_t i = 0; i < coastmapAtlasRects.size(); i++) {
 		CoastAtlasRect& r = coastmapAtlasRects[i];
-		const AtlasedTexture& tex = atlas.GetTexture(IntToString(i));
+		const auto& tex = atlas.GetTexture(IntToString(i));
 		r.tx1 = tex.xstart;
 		r.tx2 = tex.xend;
 		r.ty1 = tex.ystart;

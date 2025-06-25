@@ -150,7 +150,7 @@ bool CLegacyAtlasAlloc::Allocate()
 		if (recalc) {
 			// reset all existing texcoords
 			for (auto it = memtextures.begin(); it != memtextures.end(); ++it) {
-				(*it)->texCoords = float4();
+				(*it)->texCoords = AtlasedTexture();
 			}
 			recalc = false;
 			a = -1;

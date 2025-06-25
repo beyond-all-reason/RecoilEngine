@@ -1150,22 +1150,22 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& wanted)
 			if (!atlasAlloc.contains(glyphName))
 				continue;
 
-			const auto texpos  = atlasAlloc.GetEntry(glyphName);
+			const auto texpos1 = atlasAlloc.GetEntry(glyphName );
 			const auto texpos2 = atlasAlloc.GetEntry(glyphName2);
 
 			//glyphs is a map
 			auto& thisGlyph = glyphs[i];
 
-			thisGlyph.texCord       = IGlyphRect(texpos [0], texpos [1], texpos [2] - texpos [0], texpos [3] - texpos [1]);
-			thisGlyph.shadowTexCord = IGlyphRect(texpos2[0], texpos2[1], texpos2[2] - texpos2[0], texpos2[3] - texpos2[1]);
+			thisGlyph.texCord       = IGlyphRect(texpos1.x1, texpos1.y1, texpos1.x2 - texpos1.x1, texpos1.y2 - texpos1.y1);
+			thisGlyph.shadowTexCord = IGlyphRect(texpos2.x1, texpos2.y1, texpos2.x2 - texpos2.x1, texpos2.y2 - texpos2.y1);
 
 			const size_t glyphIdx = reinterpret_cast<size_t>(atlasAlloc.GetEntryData(glyphName));
 
 			assert(glyphIdx < atlasGlyphs.size());
 
-			if (texpos[2] != 0)
-				atlasUpdate.CopySubImage(atlasGlyphs[glyphIdx], texpos.x, texpos.y);
-			if (texpos2[2] != 0) {
+			if (texpos1.x2 != 0)
+				atlasUpdate.CopySubImage(atlasGlyphs[glyphIdx], texpos1.x, texpos1.y);
+			if (texpos2.x2 != 0) {
 				const int x = texpos2.x;
 				const int y = texpos2.y;
 				blurRectangles.emplace_back(

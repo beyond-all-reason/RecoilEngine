@@ -86,6 +86,8 @@ void CSpherePartProjectile::Draw()
 
 	const float interSize = sphereSize + expansionSpeed * globalRendering->timeOffset;
 
+	const auto& pageNum = projectileDrawer->sphereparttex->pageNum;
+
 	for (int y = 0; y < 4; ++y) {
 		for (int x = 0; x < 4; ++x) {
 			float alpha =
@@ -106,6 +108,7 @@ void CSpherePartProjectile::Draw()
 			col1[3] = ((unsigned char)(40 * alpha)) + 1;
 
 			AddEffectsQuad<0>(
+				pageNum,
 				{ centerPos + vectors[y*5 + x    ]     * interSize, texx, texy, col0 },
 				{ centerPos + vectors[y*5 + x + 1]     * interSize, texx, texy, col0 },
 				{ centerPos+vectors[(y + 1)*5 + x + 1] * interSize, texx, texy, col1 },

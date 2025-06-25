@@ -38,8 +38,8 @@ public:
 	float2 posBR;
 	float2 posBL;
 
-	AtlasedTexture texMainOffsets;
-	AtlasedTexture texNormOffsets;
+	float4 texMainOffsets;
+	float4 texNormOffsets;
 
 	float alpha;
 	float alphaFalloff;

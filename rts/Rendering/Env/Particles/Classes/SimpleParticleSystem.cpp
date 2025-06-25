@@ -123,7 +123,9 @@ void CSimpleParticleSystem::Draw()
 		if (math::fabs(p->rotVal) > 0.01f) {
 			float3::rotate<false>(p->rotVal, zdir, bounds);
 		}
+
 		AddEffectsQuad<1>(
+			texture->pageNum,
 			{ pDrawPos + bounds[0], texture->xstart, texture->ystart, color },
 			{ pDrawPos + bounds[1], texture->xend,   texture->ystart, color },
 			{ pDrawPos + bounds[2], texture->xend,   texture->yend,   color },

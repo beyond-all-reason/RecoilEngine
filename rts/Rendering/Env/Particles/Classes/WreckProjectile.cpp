@@ -59,6 +59,7 @@ void CWreckProjectile::Draw()
 
 	const auto* wt = projectileDrawer->wrecktex;
 	AddEffectsQuad<0>(
+		wt->pageNum,
 		{ drawPos - camera->GetRight() * drawRadius - camera->GetUp() * drawRadius, wt->xstart, wt->ystart, col },
 		{ drawPos + camera->GetRight() * drawRadius - camera->GetUp() * drawRadius, wt->xend,   wt->ystart, col },
 		{ drawPos + camera->GetRight() * drawRadius + camera->GetUp() * drawRadius, wt->xend,   wt->yend,   col },

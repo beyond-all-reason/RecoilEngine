@@ -131,6 +131,7 @@ void CSmokeProjectile2::Draw()
 
 	const auto* st = projectileDrawer->GetSmokeTexture(textureNum);
 	AddEffectsQuad<0>(
+		st->pageNum,
 		{ interPos - pos2, st->xstart, st->ystart, col },
 		{ interPos + pos1, st->xend,   st->ystart, col },
 		{ interPos + pos2, st->xend,   st->yend,   col },

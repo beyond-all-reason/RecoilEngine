@@ -100,6 +100,7 @@ void CExploSpikeProjectile::Draw()
 
 	const auto* let = projectileDrawer->laserendtex;
 	AddEffectsQuad<0>(
+		let->pageNum,
 		{ drawPos - l - w, let->xstart, let->ystart, col },
 		{ drawPos + l - w, let->xend,   let->ystart, col },
 		{ drawPos + l + w, let->xend,   let->yend,   col },
