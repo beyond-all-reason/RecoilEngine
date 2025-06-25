@@ -2009,7 +2009,7 @@ int LuaOpenGL::DrawListAtUnit(lua_State* L)
  * @function gl.DrawFuncAtUnit
  * @param unitID integer
  * @param useMidPos boolean? (Default: `true`)
- * @param fun(...) func Function to call.
+ * @param func function Function to call.
  * @param ... any Arguments passed to function.
  */
 int LuaOpenGL::DrawFuncAtUnit(lua_State* L)
@@ -2365,7 +2365,7 @@ int LuaOpenGL::Shape(lua_State* L)
 /***
  * @function gl.BeginEnd
  * @param primMode GL
- * @param fun(...) func Function to call.
+ * @param callback function Function to call.
  * @param ... any Arguments passed to function.
  */
 int LuaOpenGL::BeginEnd(lua_State* L)
@@ -4597,19 +4597,19 @@ static void SetTexGenState(GLenum target, bool state)
 
 /***
  * @function gl.TexGen
- * @param target GL
+ * @param target number
  * @param state boolean
  */
 /***
  * @function gl.TexGen
- * @param target GL
- * @param pname GL
+ * @param target number
+ * @param pname number
  * @param value number
  */
 /***
  * @function gl.TexGen
- * @param target GL
- * @param pname GL
+ * @param target number
+ * @param pname number
  * @param r number? (Default: `0.0`)
  * @param g number? (Default: `0.0`)
  * @param b number? (Default: `0.0`)
@@ -4656,21 +4656,21 @@ int LuaOpenGL::TexGen(lua_State* L)
 /***
  * @function gl.MultiTexGen
  * @param texNum integer
- * @param target GL
+ * @param target number
  * @param state boolean
  */
 /***
  * @function gl.MultiTexGen
  * @param texNum integer
- * @param target GL
- * @param pname GL
+ * @param target number
+ * @param pname number
  * @param value number
  */
 /***
  * @function gl.MultiTexGen
  * @param texNum integer
- * @param target GL
- * @param pname GL
+ * @param target number
+ * @param pname number
  * @param r number? (Default: `0.0`)
  * @param g number? (Default: `0.0`)
  * @param b number? (Default: `0.0`)
@@ -5237,19 +5237,22 @@ int LuaOpenGL::Billboard(lua_State* L)
 
 /***
  * @function gl.Light
- * @param light integer
+ * @see https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/glLight.xml
+ * @param light integer index for `GL_LIGHT<index>`
  * @param enable boolean
  */
 /***
  * @function gl.Light
- * @param light integer
- * @param pname GL
- * @param param GL
+ * @see https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/glLight.xml
+ * @param light integer index for `GL_LIGHT<index>`
+ * @param pname integer
+ * @param param integer
  */
 /***
  * @function gl.Light
- * @param light integer
- * @param pname GL
+ * @see https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/glLight.xml
+ * @param light integer index for `GL_LIGHT<index>`
+ * @param pname integer
  * @param r number
  * @param g number
  * @param b number
@@ -5380,9 +5383,10 @@ int LuaOpenGL::ClipDistance(lua_State* L) {
 
 /******************************************************************************/
 
-/***
+/*** Set the current matrix mode
+ *
  * @function gl.MatrixMode
- * @param mode GL
+ * @param mode GL.MatrixMode
  */
 int LuaOpenGL::MatrixMode(lua_State* L)
 {
@@ -5396,7 +5400,8 @@ int LuaOpenGL::MatrixMode(lua_State* L)
 }
 
 
-/***
+/*** Replace the current matrix with the identity matrix
+ *
  * @function gl.LoadIdentity
  */
 int LuaOpenGL::LoadIdentity(lua_State* L)
@@ -5413,52 +5418,37 @@ int LuaOpenGL::LoadIdentity(lua_State* L)
 }
 
 
-/***
- * @class Matrix4x4
- * @field [1] number Element at [1,1]
- * @field [2] number Element at [1,2]
- * @field [3] number Element at [1,3]
- * @field [4] number Element at [1,4]
- * @field [5] number Element at [2,1]
- * @field [6] number Element at [2,2]
- * @field [7] number Element at [2,3]
- * @field [8] number Element at [2,4]
- * @field [9] number Element at [3,1]
- * @field [10] number Element at [3,2]
- * @field [11] number Element at [3,3]
- * @field [12] number Element at [3,4]
- * @field [13] number Element at [4,1]
- * @field [14] number Element at [4,2]
- * @field [15] number Element at [4,3]
- * @field [16] number Element at [4,4]
+/*** Load a matrix by name
+ *
+ * @function gl.LoadMatrix
+ * @param matrix MatrixName
  */
 
-/***
- * @function gl.LoadMatrix
- * @param matrix string
- */
-/***
+/*** Load a matrix by value (array)
+ *
  * @function gl.LoadMatrix
  * @param matrix Matrix4x4
  */
-/***
+
+/*** Load a matrix by value (args)
+ *
  * @function gl.LoadMatrix
- * @return number m11
- * @return number m12
- * @return number m13
- * @return number m14
- * @return number m21
- * @return number m22
- * @return number m23
- * @return number m24
- * @return number m31
- * @return number m32
- * @return number m33
- * @return number m34
- * @return number m41
- * @return number m42
- * @return number m43
- * @return number m44
+ * @param m11 number
+ * @param m12 number
+ * @param m13 number
+ * @param m14 number
+ * @param m21 number
+ * @param m22 number
+ * @param m23 number
+ * @param m24 number
+ * @param m31 number
+ * @param m32 number
+ * @param m33 number
+ * @param m34 number
+ * @param m41 number
+ * @param m42 number
+ * @param m43 number
+ * @param m44 number
  */
 int LuaOpenGL::LoadMatrix(lua_State* L)
 {
@@ -5492,15 +5482,20 @@ int LuaOpenGL::LoadMatrix(lua_State* L)
 }
 
 
-/***
+/*** Multiply a matrix by name
+ *
  * @function gl.MultMatrix
- * @param matrixName string
+ * @param matrixName MatrixName
  */
-/***
+
+/*** Multiply a matrix by value (array)
+ *
  * @function gl.MultMatrix
  * @param matrix Matrix4x4
  */
-/***
+
+/*** Multiply a matrix by value (args)
+ *
  * @function gl.MultMatrix
  * @param m11 number
  * @param m12 number
@@ -5551,7 +5546,8 @@ int LuaOpenGL::MultMatrix(lua_State* L)
 }
 
 
-/***
+/*** Push and pop the current matrix stack
+ *
  * @function gl.PushMatrix
  */
 int LuaOpenGL::PushMatrix(lua_State* L)
@@ -5572,7 +5568,8 @@ int LuaOpenGL::PushMatrix(lua_State* L)
 }
 
 
-/***
+/*** Pop the current matrix stack
+ *
  * @function gl.PopMatrix
  */
 int LuaOpenGL::PopMatrix(lua_State* L)
@@ -5592,16 +5589,23 @@ int LuaOpenGL::PopMatrix(lua_State* L)
 	return 0;
 }
 
-/***
+/*** Push, execute a callback then pop the matrix stack
+ *
  * @function gl.PushPopMatrix
- * @param matMode1 GL
- * @param func fun()
- * @param ... any Arguments to the function.
+ * @param matrixMode GL.MatrixMode matrix mode to be applied.
+ *
+ * Note this is a variable argument entry, allowing as many modes as possible
+ * until the first `function` type argument is passed.
+ *
+ * @param func function callback to be executed after push and before pop
+ * @param ... any arguments to the function.
  */
-/***
+
+/*** Push, execute a callback then pop the matrix stack
+ *
  * @function gl.PushPopMatrix
- * @param func fun()
- * @param ... any Arguments to the function.
+ * @param func function callback to be executed after push and before pop
+ * @param ... any arguments to the function.
  */
 int LuaOpenGL::PushPopMatrix(lua_State* L)
 {
@@ -5735,9 +5739,16 @@ int LuaOpenGL::GetMatrixData(lua_State* L)
 
 /******************************************************************************/
 
-/***
+/*** Push and pop the server attribute stack
+ *
+ * @see gl.PopAttrib
  * @function gl.PushAttrib
- * @param mask GL? (Default: `GL.ALL_ATTRIB_BITS`)
+ * @see https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/glPushAttrib.xml
+ * @param mask number? (Default: `GL.ALL_ATTRIB_BITS`)
+ *
+ * A bitmask of `GL.AttrBit`.
+ *
+ * When negative, the mask is applied a bitwise or with `GL.ALL_ATTRIB_BITS`.
  */
 int LuaOpenGL::PushAttrib(lua_State* L)
 {
@@ -5752,7 +5763,17 @@ int LuaOpenGL::PushAttrib(lua_State* L)
 }
 
 
-/***
+/*** Restores the values saved with the last `gl.PushAttrib` command.
+ *
+ * It is an error to push attributes onto a full stack or to pop attributes off
+ * an empty stack.
+ *
+ * In either case, the error flag is set and no other change is made to GL
+ * state.
+ *
+ * Initially the attribute stack is empty.
+ *
+ * @see gl.PushAttrib
  * @function gl.PopAttrib
  */
 int LuaOpenGL::PopAttrib(lua_State* L)
@@ -5765,15 +5786,16 @@ int LuaOpenGL::PopAttrib(lua_State* L)
 
 /***
  * @function gl.UnsafeState
- * @param state GL
- * @param func fun()
+ * @param state GL.Capability|integer
+ * @param func function
  * @param ... any Arguments to the function.
  */
+
 /***
  * @function gl.UnsafeState
- * @param state GL
+ * @param state GL.Capability|integer
  * @param reverse boolean
- * @param func fun()
+ * @param func function
  * @param ... any Arguments to the function.
  */
 int LuaOpenGL::UnsafeState(lua_State* L)
@@ -6090,10 +6112,12 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 
 /******************************************************************************/
 
-/***
+/*** Create or replace a display list
+ *
  * @function gl.CreateList
- * @param func fun()
+ * @param func function
  * @param ... any Arguments to the function.
+ * @return integer displayListId
  */
 int LuaOpenGL::CreateList(lua_State* L)
 {
@@ -6142,9 +6166,10 @@ int LuaOpenGL::CreateList(lua_State* L)
 }
 
 
-/***
+/*** Execute a display list
+ *
  * @function gl.CallList
- * @param listIndex integer
+ * @param displayListId integer
  */
 int LuaOpenGL::CallList(lua_State* L)
 {
@@ -6166,9 +6191,10 @@ int LuaOpenGL::CallList(lua_State* L)
 }
 
 
-/***
+/*** Delete a display list
+ *
  * @function gl.DeleteList
- * @param listIndex integer
+ * @param displayListId integer
  */
 int LuaOpenGL::DeleteList(lua_State* L)
 {
@@ -6189,7 +6215,8 @@ int LuaOpenGL::DeleteList(lua_State* L)
 
 /******************************************************************************/
 
-/***
+/*** Force execution of GL commands in finite time
+ *
  * @function gl.Flush
  */
 int LuaOpenGL::Flush(lua_State* L)
@@ -6200,7 +6227,8 @@ int LuaOpenGL::Flush(lua_State* L)
 }
 
 
-/***
+/*** Block until all GL execution is complete
+ *
  * @function gl.Finish
  */
 int LuaOpenGL::Finish(lua_State* L)
@@ -6258,44 +6286,61 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
 }
 
 
-/***
- * Get single pixel.
+/*** Get single pixel.
+ *
  * @function gl.ReadPixels
  * @param x integer
  * @param y integer
  * @param w 1
  * @param h 1
- * @param format GL? (Default: `GL.RGBA`)
+ *
+ * @param format integer? (Default: `0x1908`)
+ *
+ * See reference for accepted values, default is `GL_RGBA`.
  * @return number ... Color values (color size based on format).
  */
-/***
- * Get column of pixels.
+
+/*** Get column of pixels.
+ *
  * @function gl.ReadPixels
  * @param x integer
  * @param y integer
  * @param w 1
  * @param h integer
- * @param format GL? (Default: `GL.RGBA`)
+ *
+ * @param format integer? (Default: `0x1908`)
+ *
+ * See reference for accepted values, default is `GL_RGBA`.
  * @return number[][] Column of color values (color size based on format).
  */
-/***
- * Get row of pixels.
+
+/*** Get row of pixels.
+ *
  * @function gl.ReadPixels
  * @param x integer
  * @param y integer
  * @param w integer
  * @param h 1
- * @param format GL? (Default: `GL.RGBA`)
+ *
+ * @param format integer? (Default: `0x1908`)
+ *
+ * See reference for accepted values, default is `GL_RGBA`.
  * @return number[][] Row of color values (color size based on format).
  */
-/***
- * Get row of pixels.
+
+/*** Get row of pixels.
+ *
  * @function gl.ReadPixels
+ * @see https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/glReadPixels.xml
  * @param x integer
  * @param y integer
  * @param w integer
  * @param h integer
- * @param format GL? (Default: `GL.RGBA`)
+ *
+ * @param format integer? (Default: `0x1908`)
+ *
+ * See reference for accepted values, default is `GL_RGBA`.
+ *
  * @return number[][][] Array of columns of color values (color size based on format).
  */
 int LuaOpenGL::ReadPixels(lua_State* L)
@@ -6370,21 +6415,25 @@ int LuaOpenGL::ReadPixels(lua_State* L)
 
 
 /***
- * @class SaveImageOptions
+ *
+ * @class gl.SaveImageOptions
  * @field alpha boolean (Default: `false`)
  * @field yflip boolean (Default: `true`)
  * @field grayscale16bit boolean (Default: `false`)
- * @field readbuffer GL (Default: current read buffer)
+ * @field readbuffer integer (Default: `current_read_buffer`)
+ *
+ * see [reference](https://registry.khronos.org/OpenGL-Refpages/gl2.1/xhtml/glReadBuffer.xml) for possible values
  */
 
-/***
+/*** Save the image of a buffer to a file
+ *
  * @function gl.SaveImage
  * @param x integer
  * @param y integer
  * @param width integer
  * @param height integer
  * @param filename string
- * @param options SaveImageOptions?
+ * @param options gl.SaveImageOptions?
  * @return boolean? success
  */
 int LuaOpenGL::SaveImage(lua_State* L)
@@ -6460,7 +6509,8 @@ int LuaOpenGL::SaveImage(lua_State* L)
 
 /******************************************************************************/
 
-/***
+/*** Create a query
+ *
  * @function gl.CreateQuery
  * @return any query
  */
@@ -6484,7 +6534,8 @@ int LuaOpenGL::CreateQuery(lua_State* L)
 	return 1;
 }
 
-/***
+/*** Delete a query
+ *
  * @function gl.DeleteQuery
  * @param query any
  */
@@ -6511,9 +6562,12 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
 	return 0;
 }
 
-/***
+/*** Begin query, execute a callback and end query
+ *
  * @function gl.RunQuery
  * @param query any
+ * @param callback function
+ * @param ... any arguments to callback
  */
 int LuaOpenGL::RunQuery(lua_State* L)
 {
@@ -6551,10 +6605,11 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	return 0;
 }
 
-/***
+/*** Get the result of a query
+ *
  * @function gl.GetQuery
  * @param query any
- * @return integer count
+ * @return integer? count
  */
 int LuaOpenGL::GetQuery(lua_State* L)
 {
@@ -6578,7 +6633,8 @@ int LuaOpenGL::GetQuery(lua_State* L)
 
 /******************************************************************************/
 
-/***
+/*** Get 3DO texture names
+ *
  * @function gl.GetGlobalTexNames
  * @return string[] List of texture names.
  */
@@ -6597,8 +6653,10 @@ int LuaOpenGL::GetGlobalTexNames(lua_State* L)
 }
 
 
-/***
+/*** Get 3DO texture coordinates
+ *
  * @function gl.GetGlobalTexCoords
+ * @param textureName string
  * @return number xstart
  * @return number ystart
  * @return number xend

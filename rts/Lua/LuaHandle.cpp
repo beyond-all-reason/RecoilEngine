@@ -4242,7 +4242,7 @@ int CLuaHandle::CallOutIsEngineMinVersion(lua_State* L)
 /***
  * @function Script.DelayByFrames
  * @param frameDelay integer
- * @param fun(...) func
+ * @param callback function
  */
 int CLuaHandle::CallOutDelayByFrames(lua_State* L)
 {

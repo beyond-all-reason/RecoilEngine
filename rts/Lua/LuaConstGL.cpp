@@ -197,10 +197,14 @@ bool LuaConstGL::PushEntries(lua_State* L)
 	/*** @field GL.SMOOTH integer */
 	PUSH_GL(SMOOTH);
 
-	/***
-	 * MatrixMode
-	 * @section matrixmode
+	/* NOTE: GL.MatrixMode supported but not exposed?
+	 * | GL.COLOR
 	 */
+	/*** @alias GL.MatrixMode
+	  * | GL.MODELVIEW
+	  * | GL.PROJECTION
+	  * | GL.TEXTURE
+	  */
 
 	/*** @field GL.MODELVIEW integer */
 	PUSH_GL(MODELVIEW);
@@ -298,10 +302,29 @@ bool LuaConstGL::PushEntries(lua_State* L)
 	/*** @field GL.Q integer */
 	PUSH_GL(Q);
 
-	/***
-	 * glPushAttrib() bits
-	 * @section glpushattribbits
-	 */
+	/*** @alias GL.AttrBit
+	 * | GL.CURRENT_BIT
+	 * | GL.POINT_BIT
+	 * | GL.LINE_BIT
+	 * | GL.POLYGON_BIT
+	 * | GL.POLYGON_STIPPLE_BIT
+	 * | GL.PIXEL_MODE_BIT
+	 * | GL.LIGHTING_BIT
+	 * | GL.FOG_BIT
+	 * | GL.DEPTH_BUFFER_BIT
+	 * | GL.ACCUM_BUFFER_BIT
+	 * | GL.STENCIL_BUFFER_BIT
+	 * | GL.VIEWPORT_BIT
+	 * | GL.TRANSFORM_BIT
+	 * | GL.ENABLE_BIT
+	 * | GL.COLOR_BUFFER_BIT
+	 * | GL.HINT_BIT
+	 * | GL.EVAL_BIT
+	 * | GL.LIST_BIT
+	 * | GL.TEXTURE_BIT
+	 * | GL.SCISSOR_BIT
+	 * | GL.ALL_ATTRIB_BITS
+	  */
 
 	/*** @field GL.CURRENT_BIT integer */
 	PUSH_GL(CURRENT_BIT);
@@ -395,10 +418,13 @@ bool LuaConstGL::PushEntries(lua_State* L)
 	/*** @field GL.QUADRATIC_ATTENUATION integer */
 	PUSH_GL(QUADRATIC_ATTENUATION);
 
-	/***
-	 * Shader Types
-	 * @section shadertypes
-	 */
+	/*** @alias GL.ShaderType
+	  * | GL.VERTEX_SHADER
+	  * | GL.TESS_CONTROL_SHADER
+	  * | GL.TESS_EVALUATION_SHADER
+	  * | GL.GEOMETRY_SHADER
+	  * | GL.FRAGMENT_SHADER
+	  */
 
 	/*** @field GL.VERTEX_SHADER integer */
 	PUSH_GL(VERTEX_SHADER);
@@ -406,8 +432,8 @@ bool LuaConstGL::PushEntries(lua_State* L)
 	PUSH_GL(TESS_CONTROL_SHADER);
 	/*** @field GL.TESS_EVALUATION_SHADER integer */
 	PUSH_GL(TESS_EVALUATION_SHADER);
-	/*** @field GL.GEOMETRY_SHADER_EXT integer */
-	PUSH_GL(GEOMETRY_SHADER_EXT);
+	/*** @field GL.GEOMETRY_SHADER integer */
+	PUSH_GL(GEOMETRY_SHADER);
 	/*** @field GL.FRAGMENT_SHADER integer */
 	PUSH_GL(FRAGMENT_SHADER);
 
@@ -730,6 +756,76 @@ bool LuaConstGL::PushEntries(lua_State* L)
 #undef PUSH_GL
 }
 
+
+
+/* NOTE: GL.Capability supported but not exposed
+ * | GL.CLIP_DISTANCE
+ * | GL.COLOR_LOGIC_OP
+ * | GL.CULL_FACE
+ * | GL.DEBUG_OUTPUT
+ * | GL.DEBUG_OUTPUT_SYNCHRONOUS
+ * | GL.DEPTH_CLAMP
+ * | GL.DEPTH_TEST
+ * | GL.DITHER
+ * | GL.FRAMEBUFFER_SRGB
+ * | GL.LINE_SMOOTH
+ * | GL.MULTISAMPLE
+ * | GL.POLYGON_OFFSET_FILL
+ * | GL.POLYGON_OFFSET_LINE
+ * | GL.POLYGON_OFFSET_POINT
+ * | GL.POLYGON_SMOOTH
+ * | GL.PRIMITIVE_RESTART
+ * | GL.PRIMITIVE_RESTART_FIXED_INDEX
+ * | GL.RASTERIZER_DISCARD
+ * | GL.SAMPLE_ALPHA_TO_COVERAGE
+ * | GL.SAMPLE_ALPHA_TO_ONE
+ * | GL.SAMPLE_COVERAGE
+ * | GL.SAMPLE_SHADING
+ * | GL.SAMPLE_MASK
+ * | GL.SCISSOR_TEST
+ * | GL.STENCIL_TEST
+ * | GL.TEXTURE_CUBE_MAP_SEAMLESS
+ * | GL.PROGRAM_POINT_SIZE
+ */
+
+/*** @alias GL.Capability
+ * | GL.BLEND
+ */
+
+/* NOTE: GL.GeometryInputTypePrimitives supported but not exposed:
+ * | GL.LINES_ADJACENCY_EXT
+ * | GL.TRIANGLES_ADJACENCY_EXT
+ */
+// See section 2.16.1 of https://registry.khronos.org/OpenGL/extensions/EXT/EXT_geometry_shader4.txt.
+/*** @alias GL.GeometryInputTypePrimitives
+ * | GL.POINTS
+ * | GL.LINES
+ * | GL.TRIANGLES
+ */
+
+// See section 2.16.2 of https://registry.khronos.org/OpenGL/extensions/EXT/EXT_geometry_shader4.txt.
+/*** @alias GL.GeometryOutputTypePrimitives
+ * | GL.POINTS
+ * | GL.LINE_STRIP
+ * | GL.TRIANGLE_STRIP
+ */
+
+/* NOTE: No primitives accepted for glReadPixels are exposed:
+ * @alias GL.ReadPixelsFormat
+ * | GL.COLOR_INDEX
+ * | GL.STENCIL_INDEX
+ * | GL.DEPTH_COMPONENT
+ * | GL.RED
+ * | GL.GREEN
+ * | GL.BLUE
+ * | GL.ALPHA
+ * | GL.RGB
+ * | GL.BGR
+ * | GL.RGBA
+ * | GL.BGRA
+ * | GL.LUMINANCE
+ * | GL.LUMINANCE_ALPHA
+ */
 
 
 

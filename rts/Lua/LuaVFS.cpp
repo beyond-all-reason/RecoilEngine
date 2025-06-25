@@ -690,7 +690,7 @@ int LuaVFS::GetArchiveContainingFile(lua_State* L)
  * 
  * @function VFS.UseArchive
  * @param archiveName string
- * @param fun(...) func
+ * @param callback function
  * @return any ... Results of of the given function
  */
 int LuaVFS::UseArchive(lua_State* L)

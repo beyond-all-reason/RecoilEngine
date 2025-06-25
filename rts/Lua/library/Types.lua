@@ -1,7 +1,7 @@
 ---@meta
 
 --------------------------------------------------------------------------------
--- Vectors
+-- Vectors and Matrices
 --------------------------------------------------------------------------------
 
 ---Cartesian double (XY)
@@ -10,16 +10,12 @@
 ---@field [1] number x
 ---@field [2] number y
 
----@alias float2 xy
-
 ---Cartesian triple (XYZ)
 ---
 ---@class xyz
 ---@field [1] number x
 ---@field [2] number y
 ---@field [3] number z
-
----@alias float3 xyz
 
 ---Cartesian quadruple (XYZW)
 ---
@@ -29,7 +25,42 @@
 ---@field [3] number z
 ---@field [4] number w
 
----@alias float4 xyzw
+---@alias float2 [number, number]
+---@alias float3 [number, number, number]
+---@alias float4 [number, number, number, number]
+
+---@class Matrix2x2
+---@field [1] number Element at [1,1]
+---@field [2] number Element at [1,2]
+---@field [3] number Element at [2,1]
+---@field [4] number Element at [2,2]
+---@class Matrix3x3
+---@field [1] number Element at [1,1]
+---@field [2] number Element at [1,2]
+---@field [3] number Element at [1,3]
+---@field [4] number Element at [2,1]
+---@field [5] number Element at [2,2]
+---@field [6] number Element at [2,3]
+---@field [7] number Element at [3,1]
+---@field [8] number Element at [3,2]
+---@field [9] number Element at [3,3]
+---@class Matrix4x4
+---@field [1] number Element at [1,1]
+---@field [2] number Element at [1,2]
+---@field [3] number Element at [1,3]
+---@field [4] number Element at [1,4]
+---@field [5] number Element at [2,1]
+---@field [6] number Element at [2,2]
+---@field [7] number Element at [2,3]
+---@field [8] number Element at [2,4]
+---@field [9] number Element at [3,1]
+---@field [10] number Element at [3,2]
+---@field [11] number Element at [3,3]
+---@field [12] number Element at [3,4]
+---@field [13] number Element at [4,1]
+---@field [14] number Element at [4,2]
+---@field [15] number Element at [4,3]
+---@field [16] number Element at [4,4]
 
 --------------------------------------------------------------------------------
 -- Color
