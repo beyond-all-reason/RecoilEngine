@@ -1471,6 +1471,34 @@ void LuaVBOImpl::DumpDefinition()
 	LOG("%s", ss.str().c_str());
 }
 
+/*** Copy the contents of the VBO to another VBO.
+ *
+ * @function VBO:CopyTo
+ *
+ * Destination VBO is expected to have sufficient allocation size, otherwise the copying will gracefully fail.
+ *
+ * @param destVBO VBO
+ * @param copySizeInBytes integer
+ * @return boolean success
+ */
+bool LuaVBOImpl::CopyTo(const std::shared_ptr<LuaVBOImpl>& destVBO, int copySizeInBytes)
+{
+	VBOExistenceCheck(vbo         , __func__);
+	VBOExistenceCheck(destVBO->vbo, __func__);
+
+	const auto wasBound = vbo->bound;
+	if (!wasBound)
+		vbo->Bind();
+
+	auto result = vbo->CopyTo(*destVBO->vbo, static_cast<GLsizeiptr>(copySizeInBytes));
+
+	if (!wasBound)
+		vbo->Unbind();
+
+	return result;
+}
+
+
 /*** Gets the OpenGL Buffer ID
  *
  * @function VBO:GetID
