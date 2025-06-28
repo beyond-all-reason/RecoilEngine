@@ -72,7 +72,7 @@ local instVBO = gl.GetVBO(GL.ARRAY_BUFFER, true) --empty VBO, "GL.ARRAY_BUFFER" 
 
 local indxVBO = gl.GetVBO(GL.ELEMENT_ARRAY_BUFFER, false) -- empty index buffer, not going to be frequently updated ("false").
 
-vertVBO:Define(1000, { --someVBO is created to hold 1000 "elements", see pics above what element is. If suddenly the number of elements exceeds 1000, the buffer will not accept new data, "someVBO" will need to be remand and rebound to VAO
+vertVBO:Define(1000, { --someVBO is created to hold 1000 "elements", see pics above what element is. If suddenly the number of elements exceeds 1000, the buffer will not accept new data, "someVBO" will need to be remade and rebound to VAO
     {id = 0, name = "pos", size = 4}, -- "pos" attribute will hold 4 floats (float is the default type, if "type" is not specified). "id" in the shader must be 0
     {id = 1, name = "color", type=GL.UNSIGNED_BYTE, normalized = true, size = 3}, -- "color" is represented by 3 unsigned bytes (values from 0 to 255), values are normalized (in this case divided by 255 to get float inside shader). "id" in the shader must be 1. This can be useful to hold RGB data.
 })
@@ -145,7 +145,7 @@ https://gist.github.com/Beherith/c965cff2a81253e37aed25f4db0c0fce
 ### Drawing with VAOs
 
 ```lua
----somewhere in widget:Draw...()
+--somewhere in widget:Draw...()
 
 -- draw WITHOUT index buffer (index buffer is not needed and won't be used if attached)
 gl.UseShader(someShader) --yes, you need a shader. No, without shader you won't see a pixel
