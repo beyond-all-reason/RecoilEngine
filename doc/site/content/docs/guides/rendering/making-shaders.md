@@ -18,16 +18,17 @@ layout(std140, binding = 0) uniform UniformMatrixBuffer {
 };
 
 in vec4 instancePosition;
-in vec4 vtxPosition; // Note: To project properly, it should be a vec4 with the w value being 1.0
-in vec4 vtxUV;
+in vec4 pos; // Note: To project properly, it should be a vec4 with the w value being 1.0
+in uvec3 color;
+in vec2 uv;
 
 out DataVS { // Interpolated for each vertex
     vec4 texCoord;
 };
 
 void main() {
-    gl_Position = cameraViewProj * (instancePosition + vtxPosition);
-    texCoord = vtxUV;
+    gl_Position = cameraViewProj * (instancePosition + pos);
+    texCoord = uv;
 }
 ```
 
@@ -258,15 +259,16 @@ Next, we need to define the shapes of some of these buffers.
 vert_vbo:Define(8, {
     {id = 0, name = "pos", size = 4}, -- vec4. The default type is a float. Size is the number of dimensions in the vector; in this case, 4.
     {id = 1, name = "color", type=GL.UNSIGNED_BYTE, normalized = true, size = 3}, -- a uvec3 of bytes. Unused in our shader, but for demonstration purposes.
+    {id = 2, name = "uv", size = 2},
 })
 
 --[[
     Here, we define the instance buffer; Custom data for each instance of an object we want to draw.
     We want to draw 2 objects.
-    Each instance gets a vec4 position.
+    Each instance gets a vec4 instancePosition.
 ]]
 instance_vbo:Define(2, {
-    {id = 0, name = "position", size = 4},
+    {id = 0, name = "instancePosition", size = 4},
 })
 
 -- The index buffer is just a buffer of indices, which are u32s. the 6 * 6 comes from the indices we will use to draw a cube.
@@ -287,9 +289,11 @@ vert_vbo:Upload({
     -- element 1
     0.0, 0.0, 0.0, 1.0, -- goes into "pos". Remember the w being 1.0
     255, 255, 255, -- goes into "color"
+    0.0, 0.0, -- "uv"
     -- element 2
     1.0, 0.0, 0.0, 1.0, -- goes into "pos"
     255, 255, 255, -- goes into "color"
+    1.0, 0.0, -- "uv"
     -- ... etc
 })
 
