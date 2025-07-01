@@ -1318,7 +1318,7 @@ unsigned int QTPFS::PathManager::QueueSearch(
 	const bool allowRawSearch
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	assert(!ThreadPool::inMultiThreadedSection);
+	assert(!ThreadPool::IsInMultiThreadedSection());
 
 	// NOTE:
 	//     all paths get deleted by the cache they are in;
@@ -1423,7 +1423,7 @@ unsigned int QTPFS::PathManager::RequeueSearch(
 	IPath* oldPath, const bool allowRawSearch, const bool allowPartialSearch, const bool allowRepair
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	assert(!ThreadPool::inMultiThreadedSection);
+	assert(!ThreadPool::IsInMultiThreadedSection());
 	QTPFS::entity pathEntity = QTPFS::entity(oldPath->GetID());
 
 	// assert(!registry.all_of<PathDelayedDelete>(pathEntity));
@@ -1505,7 +1505,7 @@ void QTPFS::PathManager::UpdatePath(const CSolidObject* owner, unsigned int path
 
 void QTPFS::PathManager::DeletePath(unsigned int pathID, bool force) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	assert(!ThreadPool::inMultiThreadedSection);
+	assert(!ThreadPool::IsInMultiThreadedSection());
 
 	QTPFS::entity pathEntity = QTPFS::entity(pathID);
 

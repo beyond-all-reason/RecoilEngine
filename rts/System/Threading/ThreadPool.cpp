@@ -62,7 +62,7 @@ struct ThreadStats {
 static std::vector< spring::thread > extThreads;
 static std::vector< std::future<void> > extFutures;
 
-bool ThreadPool::inMultiThreadedSection;
+static _threadlocal bool inMultiThreadedSection(false);
 
 // global [idx = 0] and smaller per-thread [idx > 0] queues; the latter are
 // for tasks that want to execute on specific threads, e.g. parallel_reduce
@@ -99,6 +99,10 @@ namespace ThreadPool {
 
 int GetThreadNum() { return threadnum; }
 static void SetThreadNum(const int idx) { threadnum = idx; }
+
+
+int IsInMultiThreadedSection() { return inMultiThreadedSection; }
+void SetInMultiThreadedSection(const bool value) { inMultiThreadedSection = value; }
 
 static int GetConfigNumWorkers() {
 	#ifndef UNIT_TEST
@@ -232,6 +236,7 @@ static void WorkerLoop(int tid, bool async)
 {
 	assert(tid != 0);
 	SetThreadNum(tid);
+	SetInMultiThreadedSection(true);
 	#ifndef UNIT_TEST
 	Threading::SetThreadName(IntToString(tid, "worker%i"));
 	#endif

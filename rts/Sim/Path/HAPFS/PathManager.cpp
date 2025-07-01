@@ -311,7 +311,7 @@ IPath::SearchResult CPathManager::ArrangePath(
 
 	unsigned int bestSearch = -1u; // index
 
-	pfDef->useVerifiedStartBlock = true; // ((caller != nullptr) && ThreadPool::inMultiThreadedSection);
+	pfDef->useVerifiedStartBlock = true; // ((caller != nullptr) && ThreadPool::IsInMultiThreadedSection());
 
 	{
 		RECOIL_DETAILED_TRACY_ZONE;
@@ -639,7 +639,7 @@ float3 CPathManager::NextWayPoint(
 	// recursive refinement of its lower-resolution segments
 	// if so, check if the med-res path also needs extending
 	if (extendMaxResPath && (!synced)) {
-		assert(!ThreadPool::inMultiThreadedSection);
+		assert(!ThreadPool::IsInMultiThreadedSection());
 		LowRes2MaxRes(*multiPath, callerPos, owner, synced);
 		FinalizePath(multiPath, callerPos, multiPath->finalGoal, multiPath->searchResult == IPath::CantGetCloser);
 	}

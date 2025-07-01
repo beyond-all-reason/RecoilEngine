@@ -24,6 +24,8 @@ namespace ThreadPool {
 	static inline void SetDefaultThreadCount() {}
 	static inline void SetThreadCount(int num) {}
 	static inline int GetThreadNum() { return 0; }
+	static inline int IsInMultiThreadedSection() { return false; }
+	static inline void SetInMultiThreadedSection(const bool ignored) {}
 	static inline int GetMaxThreads() { return 1; }
 	static inline int GetNumThreads() { return 1; }
 	static inline void NotifyWorkerThreads(bool force, bool async) {}
@@ -47,11 +49,31 @@ static inline void for_mt(int start, int end, F&& f)
 }
 
 template <typename F>
+static inline void for_mt_background(int start, int end, int step, F&& f)
+{
+	for (int i = start; i < end; i += step) {
+		f(i);
+	}
+}
+
+template <typename F>
+static inline void for_mt_background(int start, int end, F&& f)
+{
+	for_mt(start, end, 1, std::move(f));
+}
+
+template <typename F>
+static inline void wait_for_mt_background(F taskGroup)
+{
+	return;
+}
+
+
+template <typename F>
 static inline void for_mt_chunk(int b, int e, F&& f, int chunkSize = 0)
 {
 	for_mt(b, e, f);
 }
-
 
 static inline void parallel(const std::function<void()>&& f)
 {
@@ -107,17 +129,26 @@ namespace ThreadPool {
 	void SetDefaultThreadCount();
 	void SetThreadCount(int num);
 	int GetThreadNum();
+	int IsInMultiThreadedSection();
+	void SetInMultiThreadedSection(const bool value);
 	bool HasThreads();
 	int GetMaxThreads();
 	int GetNumThreads();
 	void NotifyWorkerThreads(bool force, bool async);
 
-	extern bool inMultiThreadedSection;
-
 	static constexpr int MAX_THREADS = 32;
 }
 
 
+struct MultithreadedSection {
+	MultithreadedSection() {
+		ThreadPool::SetInMultiThreadedSection(true);
+	}
+
+	~MultithreadedSection() {
+		ThreadPool::SetInMultiThreadedSection(false);
+	}
+};
 
 
 class ITaskGroup
@@ -735,7 +766,7 @@ struct TaskPool {
 template <typename F>
 static inline void for_mt(int start, int end, int step, F&& f)
 {
-	ThreadPool::inMultiThreadedSection = true;
+	MultithreadedSection mtSection;
 
 	if (!ThreadPool::HasThreads() || ((end - start) < step)) {
 		for (int i = start; i < end; i += step) {
@@ -767,8 +798,6 @@ static inline void for_mt(int start, int end, int step, F&& f)
 		// make calling thread also run ExecuteLoop
 		ThreadPool::WaitForFinished(taskGroup);
 	}
-
-	ThreadPool::inMultiThreadedSection = false;
 }
 
 // Schedule Synced, background task. This is a task that will break between each execution step to let other sync tasks
@@ -781,6 +810,8 @@ static inline void for_mt(int start, int end, int step, F&& f)
 template <typename F>
 static inline auto for_mt_background(int start, int end, int step, F&& f)
 {
+	// mt section delcaration is not needed here because the main thread won't be working on the mt tasks here.
+
 	if (!ThreadPool::HasThreads() || ((end - start) < step)) {
 		for (int i = start; i < end; i += step) {
 			f(i);
@@ -828,6 +859,8 @@ static inline auto for_mt_background(int start, int end, F&& f)
 template <typename F>
 static inline void wait_for_mt_background(F taskGroup)
 {
+	MultithreadedSection mtSection;
+
 	if (!ThreadPool::HasThreads())
 		return;
 
@@ -841,6 +874,8 @@ static inline void wait_for_mt_background(F taskGroup)
 template <typename F>
 static inline void for_mt_chunk(int b, int e, F&& f, int minChunkSize = 1, int maxChunkSize = std::numeric_limits<int>::max())
 {
+	MultithreadedSection mtSection;
+
 	const int numElems = e - b;
 	if (numElems <= 0)
 		return;
@@ -870,6 +905,8 @@ static inline void for_mt_chunk(int b, int e, F&& f, int minChunkSize = 1, int m
 template <typename F>
 static inline void parallel(F&& f)
 {
+	MultithreadedSection mtSection;
+
 	if (!ThreadPool::HasThreads())
 		return f();
 
@@ -893,6 +930,8 @@ static inline void parallel(F&& f)
 template<typename TaskType, class F, class G>
 static inline auto parallel_reduce(F&& f, G&& g) -> std::invoke_result_t<F>
 {
+	MultithreadedSection mtSection;
+
 	if (!ThreadPool::HasThreads())
 		return f();
 
