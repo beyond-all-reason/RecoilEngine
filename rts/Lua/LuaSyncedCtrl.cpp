@@ -4496,7 +4496,7 @@ int LuaSyncedCtrl::CreateFeature(lua_State* L)
 
 /***
  * @function Spring.DestroyFeature
- * @param featureDefID integer
+ * @param featureID integer
  * @return nil
  */
 int LuaSyncedCtrl::DestroyFeature(lua_State* L)
@@ -4520,7 +4520,7 @@ int LuaSyncedCtrl::DestroyFeature(lua_State* L)
 /*** Feature Control
  *
  * @function Spring.TransferFeature
- * @param featureDefID integer
+ * @param featureID integer
  * @param teamID integer
  * @return nil
  */
