@@ -5,7 +5,7 @@ draft = false
 author = "Slashscreen"
 +++
 
-RmlUi is a UI framework that is defined using a HTML/CSS style workflow (using Lua instead of JS). It is designed for interactive applications, and so is reactive by default. You can learn more about it on the [RmlUI website]. It's a natural way to do things for web devs.
+RmlUi is a UI framework that is defined using a HTML/CSS style workflow (using Lua instead of JS). It is designed for interactive applications, and so is reactive by default. You can learn more about it on the [RmlUI website] and [differences in the Recoil version here](#differences-between-upstream-rmlui-and-rmlui-in-recoil). It's a natural way to do things for web devs.
 
 ## How does RmlUI Work?
 
@@ -122,7 +122,9 @@ What this does is create a unified context for all your documents and data model
 
 Now, create an RML file somewhere under `luaui/widgets/`, like `luaui/widgets/getting_started.rml`. This is the UI document.
 
-Writing it is much like HTML by design. There are some differences, which you can find out on the [RmlUI website], which mostly have to do with tag attributes, but for the time being, we don't need to worry about them. Here's a basic widget written by Mupersega.
+Writing it is much like HTML by design. There are some differences, which you can find out on the [RmlUI website], which mostly have to do with tag attributes, but for the time being, we don't need to worry about them.
+
+Here's a basic widget written by Mupersega.
 
 ```html
 <rml>
@@ -391,4 +393,10 @@ document = widget.rmlContext:LoadDocument("document.rml", document_table)
 - The Beyond All Reason devs prefer to use one shared context for all rmlui widgets.
 - Make the body the size of the entire screen, and make inputs pass through it with the `pointer-events: none;` style. Bind to a data model in a widget underneath, and then make *that* your widget and size it how you will (and reenable events with `pointer-events: auto;`).
 
+
+### Differences between upstream RmlUI and RmlUI in Recoil
+
+- The SVG element allows either a filepath or raw SVG data in the src attribute, allowing for inline svg to be used (this may change to svg being supported between the opening and closing tag when implemented upstream)
+- An additional element ```<texture>``` is available which allows for textures loaded in Recoil to be used, this behaves the same as an ```<img>``` element except the src attribute takes a [texture reference](/RecoilEngine/articles/texture-reference-strings)
+  
 [RmlUI website]: https://github.com/mikke89/RmlUi
