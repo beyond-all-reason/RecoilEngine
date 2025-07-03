@@ -18,6 +18,7 @@ Many related to units or features and in these cases the UnitDefId is used, this
 Textures in recoil are generally referenced by a string in one of the formats listed below.
 
 `#<UnitDefId#int>` -- Build picture / the image that would be shown in a list of things a constructor could build e.g. `#101`
+
 `^<UnitDefId#int>` -- Radar icon for unit e.g. `^101`
 
 `%<UnitDefId#int>:<texNum#int[0-1]>` -- The unit texture for UnitDefId, each unit has two textures referenced here as 0 & 1 e.g. `%35:1`
@@ -25,6 +26,7 @@ Textures in recoil are generally referenced by a string in one of the formats li
 The above reference for unit textures can also be used for features (e.g trees). Feature textures are effectively the same as units but always have negative UnitDefId e.g. `%-12:0`
 
 `!<luaTextureId#int>` -- Lua created textures referenced by id provided at time of texture creation
+
 `*<atlasId#int>` -- Atlas/sprite (added by LUA CreateTextureAtlas)
 
 `$<textureName>` -- There are also named textures, with ssmf_splat_normals, extra and info also have subtextures beneath, below is a table of many named textures available.
@@ -71,7 +73,7 @@ The above reference for unit textures can also be used for features (e.g trees).
 | $info:los              | LOS-map overlay                                                                                          |                                                                                      |
 | $info:airlos           |                                                                                                          |                                                                                      |
 | $info:height           | height-map overlay                                                                                       |                                                                                      |
-| $info:metal            | metal-map overlay                                                                                        |                                                                                      || $info                  |                                                                                                       |                                                                                      |
+| $info:metal            | metal-map overlay                                                                                        |                                                                                      |
 | $info:metalextraction  |                                                                                                          |                                                                                      |
 | $info:path             | path traversability-map overlay                                                                          |                                                                                      |
 | $info:radar            |                                                                                                          |                                                                                      |
