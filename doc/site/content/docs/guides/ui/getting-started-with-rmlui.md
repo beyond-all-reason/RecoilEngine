@@ -397,6 +397,6 @@ document = widget.rmlContext:LoadDocument("document.rml", document_table)
 ### Differences between upstream RmlUI and RmlUI in Recoil
 
 - The SVG element allows either a filepath or raw SVG data in the src attribute, allowing for inline svg to be used (this may change to svg being supported between the opening and closing tag when implemented upstream)
-- An additional element ```<texture>``` is available which allows for textures loaded in Recoil to be used, this behaves the same as an ```<img>``` element except the src attribute takes a [texture reference](/RecoilEngine/articles/texture-reference-strings)
+- An additional element ```<texture>``` is available which allows for textures loaded in Recoil to be used, this behaves the same as an ```<img>``` element except the src attribute takes a [texture reference]({{% ref "articles/texture-reference-strings" %}})
   
 [RmlUI website]: https://github.com/mikke89/RmlUi
