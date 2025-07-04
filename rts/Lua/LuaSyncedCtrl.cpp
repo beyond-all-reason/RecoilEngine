@@ -4034,13 +4034,14 @@ int LuaSyncedCtrl::SetUnitHeadingAndUpDir(lua_State* L)
 	return SetSolidObjectHeadingAndUpDir(L, ParseUnit(L, __func__, 1));
 }
 
-/***
+/*** Set the velocity of a Unit
+ *
+ * @see Spring.SetUnitMoveCtrl for disabling/enabling this control
  * @function Spring.SetUnitVelocity
  * @param unitID integer
- * @param velX number
- * @param velY number
- * @param velZ number
- * @return nil
+ * @param velX number in elmos/frame
+ * @param velY number in elmos/frame
+ * @param velZ number in elmos/frame
  */
 int LuaSyncedCtrl::SetUnitVelocity(lua_State* L)
 {
@@ -4888,13 +4889,14 @@ int LuaSyncedCtrl::SetFeatureHeadingAndUpDir(lua_State* L)
 	return SetSolidObjectHeadingAndUpDir(L, ParseFeature(L, __func__, 1));
 }
 
-/***
+/*** Set the velocity of a Feature
+ *
+ * @see Spring.SetFeatureMoveCtrl for disabling/enabling this control
  * @function Spring.SetFeatureVelocity
  * @param featureID integer
- * @param velX number
- * @param velY number
- * @param velZ number
- * @return nil
+ * @param velX number in elmos/frame
+ * @param velY number in elmos/frame
+ * @param velZ number in elmos/frame
  */
 int LuaSyncedCtrl::SetFeatureVelocity(lua_State* L)
 {
@@ -5153,14 +5155,14 @@ int LuaSyncedCtrl::SetProjectilePosition(lua_State* L)
 	return 0;
 }
 
-/***
+/*** Set the velocity of a Projectile
+ *
+ * @see Spring.SetProjectileMoveCtrl for disabling/enabling this control
  * @function Spring.SetProjectileVelocity
  * @param projectileID integer
- * @param velX number? (Default: `0`)
- * @param velY number? (Default: `0`)
- * @param velZ number? (Default: `0`)
- * @return nil
- *
+ * @param velX number in elmos/frame
+ * @param velY number in elmos/frame
+ * @param velZ number in elmos/frame
  */
 int LuaSyncedCtrl::SetProjectileVelocity(lua_State* L)
 {
