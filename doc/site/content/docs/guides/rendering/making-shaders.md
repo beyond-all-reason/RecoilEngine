@@ -141,7 +141,7 @@ layout(std140, binding = 1) uniform UniformParamsBuffer {
 };
 ```
 
-To include this in your shader, it's better to append this to the beginning of your shader on the lua side with [`gl.GetEngineUniformBuffer()`](docs/lua-api/gl/#glgetengineuniformbufferdef), like `fragment = gl.GetEngineUniformBuffer() .. VFS.LoadFile("path/to/shader.frag.glsl")`. This way, if something changes, you won't have to update all of your scripts, but we will still have to update this article.
+To include this in your shader, it's better to append this to the beginning of your shader on the lua side with [`gl.GetEngineUniformBuffer()`]({{% ref "docs/lua-api/gl/#glgetengineuniformbufferdef" %}}), like `fragment = gl.GetEngineUniformBuffer() .. VFS.LoadFile("path/to/shader.frag.glsl")`. This way, if something changes, you won't have to update all of your scripts, but we will still have to update this article.
 
 ### Custom Uniforms
 
