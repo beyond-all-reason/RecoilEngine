@@ -338,31 +338,36 @@ float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float wate
 		IsOnGround()                * dragScales.z * (frictionCoeff * mass)  // ground
 	);
 
+	float4 normVelocity = speed * GAME_SPEED;
+
 	float3 dragAccelVec;
 
-	dragAccelVec.x += (speed.x * speed.x * dragScaleVec.x * -speedSignVec.x);
-	dragAccelVec.y += (speed.y * speed.y * dragScaleVec.x * -speedSignVec.y);
-	dragAccelVec.z += (speed.z * speed.z * dragScaleVec.x * -speedSignVec.z);
+	dragAccelVec.x += (normVelocity.x * normVelocity.x * dragScaleVec.x * -speedSignVec.x);
+	dragAccelVec.y += (normVelocity.y * normVelocity.y * dragScaleVec.x * -speedSignVec.y);
+	dragAccelVec.z += (normVelocity.z * normVelocity.z * dragScaleVec.x * -speedSignVec.z);
 
-	dragAccelVec.x += (speed.x * speed.x * dragScaleVec.y * -speedSignVec.x);
-	dragAccelVec.y += (speed.y * speed.y * dragScaleVec.y * -speedSignVec.y);
-	dragAccelVec.z += (speed.z * speed.z * dragScaleVec.y * -speedSignVec.z);
+	dragAccelVec.x += (normVelocity.x * normVelocity.x * dragScaleVec.y * -speedSignVec.x);
+	dragAccelVec.y += (normVelocity.y * normVelocity.y * dragScaleVec.y * -speedSignVec.y);
+	dragAccelVec.z += (normVelocity.z * normVelocity.z * dragScaleVec.y * -speedSignVec.z);
 
 	// FIXME?
 	//   magnitude of dynamic friction may or may not depend on speed
 	//   coefficient must be multiplied by mass or it will be useless
 	//   (due to division by mass since the coefficient is normalized)
-	dragAccelVec.x += (math::fabs(speed.x) * dragScaleVec.z * -speedSignVec.x);
-	dragAccelVec.y += (math::fabs(speed.y) * dragScaleVec.z * -speedSignVec.y);
-	dragAccelVec.z += (math::fabs(speed.z) * dragScaleVec.z * -speedSignVec.z);
+	dragAccelVec.x += (math::fabs(normVelocity.x) * dragScaleVec.z * -speedSignVec.x);
+	dragAccelVec.y += (math::fabs(normVelocity.y) * dragScaleVec.z * -speedSignVec.y);
+	dragAccelVec.z += (math::fabs(normVelocity.z) * dragScaleVec.z * -speedSignVec.z);
 
 	// convert from force
 	dragAccelVec /= mass;
 
 	// limit the acceleration
-	dragAccelVec.x = std::clamp(dragAccelVec.x, -math::fabs(speed.x), math::fabs(speed.x));
-	dragAccelVec.y = std::clamp(dragAccelVec.y, -math::fabs(speed.y), math::fabs(speed.y));
-	dragAccelVec.z = std::clamp(dragAccelVec.z, -math::fabs(speed.z), math::fabs(speed.z));
+	dragAccelVec.x = std::clamp(dragAccelVec.x, -math::fabs(normVelocity.x), math::fabs(normVelocity.x));
+	dragAccelVec.y = std::clamp(dragAccelVec.y, -math::fabs(normVelocity.y), math::fabs(normVelocity.y));
+	dragAccelVec.z = std::clamp(dragAccelVec.z, -math::fabs(normVelocity.z), math::fabs(normVelocity.z));
+
+	// convert back to per-frame acceleration from m/s^2
+	dragAccelVec *= INV_GAME_SPEED * INV_GAME_SPEED;
 
 	return dragAccelVec;
 }
