@@ -175,8 +175,11 @@ bool CGuiHandler::EnableLuaUI(bool enableCommand)
 		}
 	}
 
-	RmlGui::Reload();
-	CLuaUI::ReloadHandler();
+	LOG_L(L_NOTICE, "[GUIHandler] Reloading LuaUI/RmlGui", __func__);
+	CLuaUI::FreeHandler();
+	RmlGui::Shutdown();
+	//CLuaUI load also initialises RmlGui
+	CLuaUI::LoadFreeHandler();
 
 	if (luaUI != nullptr) {
 		LayoutIcons(false);
