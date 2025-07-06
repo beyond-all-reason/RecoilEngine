@@ -339,9 +339,9 @@ float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float wate
 		return float3(-speed.x, -speed.y, -speed.z);
 	}
 
-	// Typical radiuses in Elmo make no sense given the mass and the fact the robots are made from metal (some light alloy)
+	// Typical radiuses in Elmo make no sense given the mass and the fact the robots are made from metal (some heavy alloy)
 	// kg / m3
-	static constexpr float MATERIAL_DENSITY = 2000.0f;
+	static constexpr float MATERIAL_DENSITY = 8000.0f;
 	const float assumedRadius = math::cbrtf((3.0f * mass) / (4.0f * math::PI * MATERIAL_DENSITY));
 
 	myGravity = math::fabs(myGravity) * GAME_SPEED * GAME_SPEED;
@@ -363,13 +363,13 @@ float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float wate
 	// convert from force
 	dragAccelVec /= mass;
 
-	// limit the acceleration
-	dragAccelVec.x = std::clamp(dragAccelVec.x, -math::fabs(perSecVelocity.x), math::fabs(perSecVelocity.x));
-	dragAccelVec.y = std::clamp(dragAccelVec.y, -math::fabs(perSecVelocity.y), math::fabs(perSecVelocity.y));
-	dragAccelVec.z = std::clamp(dragAccelVec.z, -math::fabs(perSecVelocity.z), math::fabs(perSecVelocity.z));
-
 	// convert back to per-frame acceleration from m/s^2
 	dragAccelVec *= INV_GAME_SPEED * INV_GAME_SPEED;
+
+	// limit the acceleration
+	dragAccelVec.x = std::clamp(dragAccelVec.x, -math::fabs(speed.x), math::fabs(speed.x));
+	dragAccelVec.y = std::clamp(dragAccelVec.y, -math::fabs(speed.y), math::fabs(speed.y));
+	dragAccelVec.z = std::clamp(dragAccelVec.z, -math::fabs(speed.z), math::fabs(speed.z));
 
 	return dragAccelVec;
 }
