@@ -598,7 +598,7 @@ bool CFeature::UpdatePosition()
 			mapInfo->atmosphere.fluidDensity,
 			mapInfo->water.fluidDensity,
 			1.0f,
-			0.1f,
+			0.5f,
 			mapInfo->map.gravity
 		);
 		const float3 gravAccel = UpVector * mapInfo->map.gravity;

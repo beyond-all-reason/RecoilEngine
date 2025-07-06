@@ -331,24 +331,34 @@ float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float wate
 	//
 	// params.xyzw map: {{atmosphere, water}Density, {drag, friction}Coefficient}
 
+	// in elmo/s
+	static constexpr auto STOPPING_SPEED = 0.5f;
+
+	// prevent eternal crawling, also exit early for static objects
+	if (const float perSecSpeed = speed.w * GAME_SPEED; perSecSpeed < STOPPING_SPEED) {
+		return float3(-speed.x, -speed.y, -speed.z);
+	}
+
 	// Typical radiuses in Elmo make no sense given the mass and the fact the robots are made from metal (some light alloy)
 	// kg / m3
 	static constexpr float MATERIAL_DENSITY = 2000.0f;
-	const float assumedSqRadius = math::powf((3.0f * mass) / (4.0f * math::PI * MATERIAL_DENSITY), 2.0f / 3.0f);
+	const float assumedRadius = math::cbrtf((3.0f * mass) / (4.0f * math::PI * MATERIAL_DENSITY));
 
-	myGravity *= -GAME_SPEED * GAME_SPEED;
+	myGravity = math::fabs(myGravity) * GAME_SPEED * GAME_SPEED;
 
 	const float3 speedSignVec = float3(Sign(speed.x), Sign(speed.y), Sign(speed.z));
+	const float3 speedDir = float3(speed.x, speed.y, speed.z).ANormalize();
+
 	const auto perSecVelocity = static_cast<float3>(speed) * GAME_SPEED;
 
-	const float dragScalar = 0.5f * dragCoeff * (math::PI * assumedSqRadius) * (
+	const float dragScalar = 0.5f * dragCoeff * (math::PI * assumedRadius * assumedRadius) * (
 		(IsInAir() || IsOnGround()) * dragScales.x * atmosphericDensity +
 		(IsInWater()              ) * dragScales.y * waterDensity
 	);
 
-	const float friction = IsOnGround() * dragScales.z * (frictionCoeff * mass * myGravity * updir.y); // ground: fc * mass * g * cos(inclination)
+	const float normalForce = IsOnGround() * dragScales.z * (frictionCoeff * mass * myGravity * updir.y); // ground: fc * mass * g * cos(inclination)
 
-	float3 dragAccelVec  = -(perSecVelocity * perSecVelocity * dragScalar + friction) * speedSignVec;
+	float3 dragAccelVec  = -(perSecVelocity * perSecVelocity * dragScalar * speedSignVec + normalForce * speedDir);
 
 	// convert from force
 	dragAccelVec /= mass;
