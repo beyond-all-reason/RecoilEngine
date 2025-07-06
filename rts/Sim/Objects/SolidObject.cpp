@@ -322,7 +322,7 @@ int2 CSolidObject::GetMapPosStatic(const float3& position, int xsize, int zsize)
 	return mp;
 }
 
-float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float waterDensity, float dragCoeff, float frictionCoeff) const
+float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float waterDensity, float dragCoeff, float frictionCoeff, float myGravity) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// KISS: use the cross-sectional area of a sphere, object shapes are complex
@@ -330,41 +330,33 @@ float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float wate
 	// other units as normal: mass in kg, speed in elmos/frame, density in kg/m^3
 	//
 	// params.xyzw map: {{atmosphere, water}Density, {drag, friction}Coefficient}
-	//
+
+	// Typical radiuses in Elmo make no sense given the mass and the fact the robots are made from metal (some light alloy)
+	// kg / m3
+	static constexpr float MATERIAL_DENSITY = 2000.0f;
+	const float assumedSqRadius = math::powf((3.0f * mass) / (4.0f * math::PI * MATERIAL_DENSITY), 2.0f / 3.0f);
+
+	myGravity *= -GAME_SPEED * GAME_SPEED;
+
 	const float3 speedSignVec = float3(Sign(speed.x), Sign(speed.y), Sign(speed.z));
-	const float3 dragScaleVec = float3(
-		(IsInAir() || IsOnGround()) * dragScales.x * (0.5f * atmosphericDensity * dragCoeff * (math::PI * sqRadius * 0.01f * 0.01f)), // air
-		IsInWater()                 * dragScales.y * (0.5f * waterDensity * dragCoeff * (math::PI * sqRadius * 0.01f * 0.01f)), // water
-		IsOnGround()                * dragScales.z * (frictionCoeff * mass)  // ground
+	const auto perSecVelocity = static_cast<float3>(speed) * GAME_SPEED;
+
+	const float dragScalar = 0.5f * dragCoeff * (math::PI * assumedSqRadius) * (
+		(IsInAir() || IsOnGround()) * dragScales.x * atmosphericDensity +
+		(IsInWater()              ) * dragScales.y * waterDensity
 	);
 
-	float4 normVelocity = speed * GAME_SPEED;
+	const float friction = IsOnGround() * dragScales.z * (frictionCoeff * mass * myGravity * updir.y); // ground: fc * mass * g * cos(inclination)
 
-	float3 dragAccelVec;
-
-	dragAccelVec.x += (normVelocity.x * normVelocity.x * dragScaleVec.x * -speedSignVec.x);
-	dragAccelVec.y += (normVelocity.y * normVelocity.y * dragScaleVec.x * -speedSignVec.y);
-	dragAccelVec.z += (normVelocity.z * normVelocity.z * dragScaleVec.x * -speedSignVec.z);
-
-	dragAccelVec.x += (normVelocity.x * normVelocity.x * dragScaleVec.y * -speedSignVec.x);
-	dragAccelVec.y += (normVelocity.y * normVelocity.y * dragScaleVec.y * -speedSignVec.y);
-	dragAccelVec.z += (normVelocity.z * normVelocity.z * dragScaleVec.y * -speedSignVec.z);
-
-	// FIXME?
-	//   magnitude of dynamic friction may or may not depend on speed
-	//   coefficient must be multiplied by mass or it will be useless
-	//   (due to division by mass since the coefficient is normalized)
-	dragAccelVec.x += (math::fabs(normVelocity.x) * dragScaleVec.z * -speedSignVec.x);
-	dragAccelVec.y += (math::fabs(normVelocity.y) * dragScaleVec.z * -speedSignVec.y);
-	dragAccelVec.z += (math::fabs(normVelocity.z) * dragScaleVec.z * -speedSignVec.z);
+	float3 dragAccelVec  = -(perSecVelocity * perSecVelocity * dragScalar + friction) * speedSignVec;
 
 	// convert from force
 	dragAccelVec /= mass;
 
 	// limit the acceleration
-	dragAccelVec.x = std::clamp(dragAccelVec.x, -math::fabs(normVelocity.x), math::fabs(normVelocity.x));
-	dragAccelVec.y = std::clamp(dragAccelVec.y, -math::fabs(normVelocity.y), math::fabs(normVelocity.y));
-	dragAccelVec.z = std::clamp(dragAccelVec.z, -math::fabs(normVelocity.z), math::fabs(normVelocity.z));
+	dragAccelVec.x = std::clamp(dragAccelVec.x, -math::fabs(perSecVelocity.x), math::fabs(perSecVelocity.x));
+	dragAccelVec.y = std::clamp(dragAccelVec.y, -math::fabs(perSecVelocity.y), math::fabs(perSecVelocity.y));
+	dragAccelVec.z = std::clamp(dragAccelVec.z, -math::fabs(perSecVelocity.z), math::fabs(perSecVelocity.z));
 
 	// convert back to per-frame acceleration from m/s^2
 	dragAccelVec *= INV_GAME_SPEED * INV_GAME_SPEED;
