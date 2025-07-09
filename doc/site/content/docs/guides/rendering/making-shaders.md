@@ -190,7 +190,7 @@ gl.Texture(filepath, MY_TEXTURE_INDEX)
 
 And you should be good to go.
 
-There's some built-in path values and formats:
+There are some built-in path values and format examples below, for further information see the [referencing textures article]({{% ref "articles/texture-reference-strings" %}})
 
 | Name | Role |
 | --- | --- |
