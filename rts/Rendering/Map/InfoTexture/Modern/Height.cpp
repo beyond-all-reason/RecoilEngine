@@ -96,31 +96,6 @@ CHeightTexture::CHeightTexture()
 	}
 }
 
-
-void CHeightTexture::UpdateCPU()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-
-	static std::vector<SColor> infoTexMem;
-	infoTexMem.resize(texSize.x * texSize.y);
-
-	const SColor* extraTexPal = CHeightLinePalette::GetData();
-	const float* heightMap = readMap->GetCornerHeightMapUnsynced();
-
-	for (int y = 0; y < texSize.y; ++y) {
-		for (int x = 0; x < texSize.x; ++x) {
-			const int idx = y * texSize.x + x;
-			const float height = heightMap[idx];
-			const auto value = static_cast<unsigned int>(height * 8.0f) % 255;
-			infoTexMem[idx] = extraTexPal[value];
-		}
-	}
-
-	auto binding = texture.ScopedBind();
-	texture.UploadImage(infoTexMem.data());
-}
-
-
 CHeightTexture::~CHeightTexture()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -134,9 +109,6 @@ void CHeightTexture::Update()
 	needUpdate = false;
 
 	const auto hmTexID = readMap->GetHeightMapTexture();
-
-	if (!fbo.IsValid() || !shader->IsValid() || (hmTexID == 0))
-		return UpdateCPU();
 
 	using namespace GL::State;
 	auto state = GL::SubState(

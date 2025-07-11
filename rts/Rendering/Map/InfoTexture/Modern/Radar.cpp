@@ -74,8 +74,7 @@ CRadarTexture::CRadarTexture()
 			LOG_L(L_ERROR, fmt, shader->GetName().c_str(), shader->GetLog().c_str());
 		}
 	}
-
-	if (fbo.IsValid() && shader->IsValid()) {
+	{
 		GL::TextureCreationParams tcp{
 			.reqNumLevels = 1,
 			.wrapMirror = false,
@@ -87,7 +86,7 @@ CRadarTexture::CRadarTexture()
 		uploadTexJammer = GL::Texture2D(texSize, GL_R16, tcp, false);
 	}
 
-	if (!fbo.IsValid() || !shader->IsValid()) {
+	if (!fbo.IsValid() || !shader->IsValid() || !uploadTexRadar.IsValid() || !uploadTexJammer.IsValid()) {
 		throw opengl_error("");
 	}
 }
@@ -99,48 +98,9 @@ CRadarTexture::~CRadarTexture()
 	shaderHandler->ReleaseProgramObject("[CRadarTexture]", "CRadarTexture");
 }
 
-
-void CRadarTexture::UpdateCPU()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	static std::vector<uint8_t> infoTexMem;
-	infoTexMem.resize(texSize.x * texSize.y * 2);
-
-	if (!losHandler->GetGlobalLOS(gu->myAllyTeam)) {
-		const int jammerAllyTeam = modInfo.separateJammers ? gu->myAllyTeam : 0;
-
-		const auto& myLos = losHandler->los.losMaps[gu->myAllyTeam].GetLosMap();
-
-		const auto& myRadar  = losHandler->radar.losMaps[gu->myAllyTeam].GetLosMap();
-		const auto& myJammer = losHandler->jammer.losMaps[jammerAllyTeam].GetLosMap();
-		for (int y = 0; y < texSize.y; ++y) {
-			for (int x = 0; x < texSize.x; ++x) {
-				const int idx = y * texSize.x + x;
-				infoTexMem[idx * 2 + 0] = ( myRadar[idx] != 0) ? 0xFF : 0x00;
-				infoTexMem[idx * 2 + 1] = (myJammer[idx] != 0 && myLos[idx] != 0) ? 0xFF : 0x00;
-			}
-		}
-	} else {
-		for (int y = 0; y < texSize.y; ++y) {
-			for (int x = 0; x < texSize.x; ++x) {
-				const int idx = y * texSize.x + x;
-				infoTexMem[idx * 2 + 0] = 0xFF;
-				infoTexMem[idx * 2 + 1] = 0x00;
-			}
-		}
-	}
-
-	auto binding = texture.ScopedBind();
-	texture.UploadImage(infoTexMem.data());
-}
-
-
 void CRadarTexture::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!fbo.IsValid() || !shader->IsValid() || !uploadTexRadar.IsValid() || uploadTexJammer.IsValid())
-		return UpdateCPU();
-
 	if (losHandler->GetGlobalLOS(gu->myAllyTeam)) {
 		fbo.Bind();
 		glViewport(0, 0, texSize.x, texSize.y);

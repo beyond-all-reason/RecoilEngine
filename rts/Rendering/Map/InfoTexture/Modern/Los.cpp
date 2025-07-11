@@ -60,8 +60,7 @@ CLosTexture::CLosTexture()
 			LOG_L(L_ERROR, fmt, shader->GetName().c_str(), shader->GetLog().c_str());
 		}
 	}
-
-	if (fbo.IsValid() && shader->IsValid()) {
+	{
 		GL::TextureCreationParams tcp{
 			.reqNumLevels = 1,
 			.wrapMirror = false,
@@ -72,7 +71,7 @@ CLosTexture::CLosTexture()
 		uploadTex = GL::Texture2D(texSize, GL_R16, tcp, false);
 	}
 
-	if (!fbo.IsValid() || !shader->IsValid()) {
+	if (!fbo.IsValid() || !shader->IsValid() || !uploadTex.IsValid()) {
 		throw opengl_error("");
 	}
 }
@@ -84,35 +83,9 @@ CLosTexture::~CLosTexture()
 	shaderHandler->ReleaseProgramObject("[CLosTexture]", "CLosTexture");
 }
 
-
-void CLosTexture::UpdateCPU()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	static std::vector<uint8_t> infoTexMem;
-	infoTexMem.resize(texSize.x * texSize.y);
-
-	if (!losHandler->GetGlobalLOS(gu->myAllyTeam)) {
-		const auto& myLos = losHandler->los.losMaps[gu->myAllyTeam].GetLosMap();
-		for (int y = 0; y < texSize.y; ++y) {
-			for (int x = 0; x < texSize.x; ++x) {
-				infoTexMem[y * texSize.x + x] = (myLos[y * texSize.x + x] != 0) ? 0xFF : 0x00;
-			}
-		}
-	} else {
-		std::ranges::fill(infoTexMem, 0xFF);
-	}
-
-	auto binding = texture.ScopedBind();
-	texture.UploadImage(infoTexMem.data());
-	texture.ProduceMipmaps();
-}
-
 void CLosTexture::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!fbo.IsValid() || !shader->IsValid() || !uploadTex.IsValid())
-		return UpdateCPU();
-
 	if (losHandler->GetGlobalLOS(gu->myAllyTeam)) {
 		fbo.Bind();
 		glViewport(0, 0, texSize.x, texSize.y);

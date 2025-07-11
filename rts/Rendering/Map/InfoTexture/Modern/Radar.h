@@ -22,10 +22,6 @@ public:
 public:
 	void Update() override;
 	bool IsUpdateNeeded() override { return true; }
-
-private:
-	void UpdateCPU();
-
 private:
 	GL::Texture2D uploadTexRadar;
 	GL::Texture2D uploadTexJammer;

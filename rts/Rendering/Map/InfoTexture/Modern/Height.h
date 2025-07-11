@@ -34,10 +34,6 @@ public:
 	// IInfoTexture interface
 	void Update() override;
 	bool IsUpdateNeeded() override;
-
-private:
-	void UpdateCPU();
-
 private:
 	bool needUpdate;
 	GL::Texture2D paletteTex;
