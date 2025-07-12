@@ -15,11 +15,11 @@
 
 /***
  * @class PlatformVideoModes
- * @field display number
- * @field displayName number
+ * @field display integer
+ * @field displayName string
  * @field w number
  * @field h number
- * @field bpp number
+ * @field bpp integer
  * @field hz number
  */
 
@@ -92,7 +92,7 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	lua_rawset(L, -3);
 
 
-	/*** @field Platform.numDisplays number */
+	/*** @field Platform.numDisplays integer */
 	LuaPushNamedNumber(L, "numDisplays", globalRendering->numDisplays);
 
 	/*** @field Platform.glSupportNonPowerOfTwoTex boolean */
