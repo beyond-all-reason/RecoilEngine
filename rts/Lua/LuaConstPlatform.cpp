@@ -12,17 +12,6 @@
  * @see rts/Lua/LuaConstPlatform.cpp
 ******************************************************************************/
 
-
-/***
- * @class PlatformVideoModes
- * @field display integer
- * @field displayName string
- * @field w number
- * @field h number
- * @field bpp integer
- * @field hz number
- */
-
 /*** Platform specific information
  *
  * @table Platform
@@ -71,29 +60,29 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	/*** @field Platform.sdlVersionLinkedPatch number */
 	LuaPushNamedNumber(L, "sdlVersionLinkedPatch", globalRenderingInfo.sdlVersionLinked.patch);
 
-	/*** @field Platform.availableVideoModes PlatformVideoModes[] */
-	lua_pushstring(L, "availableVideoModes");
-	lua_createtable(L, 0, globalRenderingInfo.availableVideoModes.size());
-	for (int i = 0; i < globalRenderingInfo.availableVideoModes.size(); ++i) {
+	/*** @field Platform.availableVideoMode PlatformVideoMode[] */
+	lua_pushstring(L, "availableVideoMode");
+	lua_createtable(L, 0, globalRenderingInfo.availableVideoMode.size());
+	for (int i = 0; i < globalRenderingInfo.availableVideoMode.size(); ++i) {
 		lua_pushnumber(L, i + 1);
 		lua_createtable(L, 0, 6);
 
-		const auto& avm = globalRenderingInfo.availableVideoModes[i];
+		const auto& avm = globalRenderingInfo.availableVideoMode[i];
 		/***
-		* @class PlatformVideoModes
+		* @class PlatformVideoMode
 		*/
 
-		/*** @field PlatformVideoModes.display integer */
+		/*** @field PlatformVideoMode.display integer */
 		LuaPushNamedNumber(L, "display", avm.displayIndex);
-		/*** @field PlatformVideoModes.displayName string */
+		/*** @field PlatformVideoMode.displayName string */
 		LuaPushNamedString(L, "displayName", avm.displayName);
-		/*** @field PlatformVideoModes.w number */
+		/*** @field PlatformVideoMode.w number */
 		LuaPushNamedNumber(L, "w", avm.width);
-		/*** @field PlatformVideoModes.h number */
+		/*** @field PlatformVideoMode.h number */
 		LuaPushNamedNumber(L, "h", avm.height);
-		/*** @field PlatformVideoModes.bpp integer */
+		/*** @field PlatformVideoMode.bpp integer */
 		LuaPushNamedNumber(L, "bpp", avm.bpp);
-		/*** @field PlatformVideoModes.hz number */
+		/*** @field PlatformVideoMode.hz number */
 		LuaPushNamedNumber(L, "hz", avm.refreshRate);
 
 		lua_rawset(L, -3);
