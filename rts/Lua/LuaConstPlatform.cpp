@@ -12,61 +12,65 @@
  * @see rts/Lua/LuaConstPlatform.cpp
 ******************************************************************************/
 
+
+/***
+ * @class PlatformVideoModes
+ * @field display number
+ * @field displayName number
+ * @field w number
+ * @field h number
+ * @field bpp number
+ * @field hz number
+ */
+
 /*** Platform specific information
  *
  * @table Platform
- * @field gpu string Full GPU device name
- * @field gpuVendor "Nvidia"|"Intel"|"ATI"|"Mesa"|"Unknown"
- * @field glVersionShort string `major.minor.buildNumber`
- * @field glslVersionShort string `major.minor`
- * @field glVersion string Full version
- * @field glVendor string
- * @field glRenderer string
- * @field glslVersion string Full version
- * @field gladVersion string
- * @field osName string full name of the OS
- * @field osFamily "Windows"|"Linux"|"MacOSX"|"FreeBSD"|"Unknown"
- * @field numDisplays number
- * @field gpuMemorySize number Size of total GPU memory in MBs; only available for "Nvidia", (rest are 0)
- * @field sdlVersionCompiledMajor number
- * @field sdlVersionCompiledMinor number
- * @field sdlVersionCompiledPatch number
- * @field sdlVersionLinkedMajor number
- * @field sdlVersionLinkedMinor number
- * @field sdlVersionLinkedPatch number
- * @field totalRAM number Total physical system RAM in MBs.
- * @field glSupportNonPowerOfTwoTex boolean
- * @field glSupportTextureQueryLOD boolean
- * @field glSupport24bitDepthBuffer boolean
- * @field glSupportRestartPrimitive boolean
- * @field glSupportClipSpaceControl boolean
- * @field glSupportFragDepthLayout boolean
  */
 
 bool LuaConstPlatform::PushEntries(lua_State* L)
 {
+  /*** @field Platform.gpu string Full GPU device name */
 	LuaPushNamedString(L, "gpu", globalRenderingInfo.gpuName);
+  /*** @field Platform.gpuVendor "Nvidia"|"Intel"|"ATI"|"Mesa"|"Unknown" */
 	LuaPushNamedString(L, "gpuVendor", globalRenderingInfo.gpuVendor);
+  /*** @field Platform.gpuMemorySize number Size of total GPU memory in MBs; only available for "Nvidia", (rest are 0) */
 	LuaPushNamedNumber(L, "gpuMemorySize", globalRenderingInfo.gpuMemorySize.x);
+  /*** @field Platform.glVersionShort string `major.minor.buildNumber` */
 	LuaPushNamedString(L, "glVersionShort", globalRenderingInfo.glVersionShort.data());
 	LuaPushNamedNumber(L, "glVersionNum", globalRenderingInfo.glVersionNum);
+  /*** @field Platform.glslVersionShort string `major.minor` */
 	LuaPushNamedString(L, "glslVersionShort", globalRenderingInfo.glslVersionShort.data());
+  /*** @field Platform.glslVersionNum string */
 	LuaPushNamedNumber(L, "glslVersionNum", globalRenderingInfo.glslVersionNum);
 
+  /*** @field Platform.glVersion string Full version */
 	LuaPushNamedString(L, "glVersion", globalRenderingInfo.glVersion);
+  /*** @field Platform.glVendor string */
 	LuaPushNamedString(L, "glVendor", globalRenderingInfo.glVendor);
+  /*** @field Platform.glRenderer string */
 	LuaPushNamedString(L, "glRenderer", globalRenderingInfo.glRenderer);
+  /*** @field Platform.glslVersion string Full version */
 	LuaPushNamedString(L, "glslVersion", globalRenderingInfo.glslVersion);
+  /*** @field Platform.gladVersion string */
 	LuaPushNamedString(L, "gladVersion", globalRenderingInfo.gladVersion);
+  /*** @field Platform.glewVersion string */
 	LuaPushNamedString(L, "glewVersion", globalRenderingInfo.gladVersion);
 
+  /*** @field Platform.sdlVersionCompiledMajor number */
 	LuaPushNamedNumber(L, "sdlVersionCompiledMajor", globalRenderingInfo.sdlVersionCompiled.major);
+  /*** @field Platform.sdlVersionCompiledMinor number */
 	LuaPushNamedNumber(L, "sdlVersionCompiledMinor", globalRenderingInfo.sdlVersionCompiled.minor);
+  /*** @field Platform.sdlVersionCompiledPatch number */
 	LuaPushNamedNumber(L, "sdlVersionCompiledPatch", globalRenderingInfo.sdlVersionCompiled.patch);
+  /*** @field Platform.sdlVersionLinkedMajor number */
 	LuaPushNamedNumber(L, "sdlVersionLinkedMajor", globalRenderingInfo.sdlVersionLinked.major);
+  /*** @field Platform.sdlVersionLinkedMinor number */
 	LuaPushNamedNumber(L, "sdlVersionLinkedMinor", globalRenderingInfo.sdlVersionLinked.minor);
+  /*** @field Platform.sdlVersionLinkedPatch number */
 	LuaPushNamedNumber(L, "sdlVersionLinkedPatch", globalRenderingInfo.sdlVersionLinked.patch);
 
+  /*** @field Platform.availableVideoModes PlatformVideoModes[] */
 	lua_pushstring(L, "availableVideoModes");
 	lua_createtable(L, 0, globalRenderingInfo.availableVideoModes.size());
 	for (int i = 0; i < globalRenderingInfo.availableVideoModes.size(); ++i) {
@@ -86,36 +90,61 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	}
 	lua_rawset(L, -3);
 
+
+  /*** @field Platform.numDisplays number */
 	LuaPushNamedNumber(L, "numDisplays", globalRendering->numDisplays);
 
+  /*** @field Platform.glSupportNonPowerOfTwoTex boolean */
 	LuaPushNamedBool(L, "glSupportNonPowerOfTwoTex", true);
+  /*** @field Platform.glSupportTextureQueryLOD boolean */
 	LuaPushNamedBool(L, "glSupportTextureQueryLOD" , globalRendering->supportTextureQueryLOD);
+  /*** @field Platform.glSupportMSAAFrameBuffer boolean */
 	LuaPushNamedBool(L, "glSupportMSAAFrameBuffer" , globalRendering->supportMSAAFrameBuffer);
 
+  /*** @field Platform.glHaveAMD boolean */
 	LuaPushNamedBool(L, "glHaveAMD", globalRendering->haveAMD);
+  /*** @field Platform.glHaveNVidia boolean */
 	LuaPushNamedBool(L, "glHaveNVidia", globalRendering->haveNvidia);
+  /*** @field Platform.glHaveIntel boolean */
 	LuaPushNamedBool(L, "glHaveIntel", globalRendering->haveIntel);
 
+  /*** @field Platform.glHaveGLSL boolean */
 	LuaPushNamedBool(L, "glHaveGLSL", true);
+  /*** @field Platform.glHaveGL4 boolean */
 	LuaPushNamedBool(L, "glHaveGL4", globalRendering->haveGL4);
 
+  /*** @field Platform.glSupportDepthBufferBitDepth number */
 	LuaPushNamedNumber(L, "glSupportDepthBufferBitDepth", globalRendering->supportDepthBufferBitDepth);
 
+  /*** @field Platform.glSupportRestartPrimitive boolean */
 	LuaPushNamedBool(L, "glSupportRestartPrimitive", globalRendering->supportRestartPrimitive);
+  /*** @field Platform.glSupportClipSpaceControl boolean */
 	LuaPushNamedBool(L, "glSupportClipSpaceControl", globalRendering->supportClipSpaceControl);
+  /*** @field Platform.glSupportFragDepthLayout boolean */
 	LuaPushNamedBool(L, "glSupportFragDepthLayout" , globalRendering->supportFragDepthLayout);
+  /*** @field Platform.glSupportSeamlessCubeMaps boolean */
 	LuaPushNamedBool(L, "glSupportSeamlessCubeMaps", globalRendering->supportSeamlessCubeMaps);
 
+  /*** @field Platform.osName string full name of the OS */
 	LuaPushNamedString(L, "osName", Platform::GetOSNameStr());
+  /*** @field Platform.osVersion string */
 	LuaPushNamedString(L, "osVersion", Platform::GetOSVersionStr());
+  /*** @field Platform.osFamily "Windows"|"Linux"|"MacOSX"|"FreeBSD"|"Unknown" */
 	LuaPushNamedString(L, "osFamily", Platform::GetOSFamilyStr());
+  /*** @field Platform.hwConfig string */
 	LuaPushNamedString(L, "hwConfig", Platform::GetHardwareStr());
+  /*** @field Platform.cpuLogicalCores integer */
 	LuaPushNamedNumber(L, "cpuLogicalCores", Threading::GetLogicalCpuCores());
+  /*** @field Platform.cpuPhysicalCores integer */
 	LuaPushNamedNumber(L, "cpuPhysicalCores", Threading::GetPhysicalCpuCores());
+  /*** @field Platform.cpuBrand string */
 	LuaPushNamedString(L, "cpuBrand", Threading::GetCPUBrand());
+  /*** @field Platform.totalRAM number Total physical system RAM in MBs. */
 	LuaPushNamedNumber(L, "totalRAM", Platform::TotalRAM()/1e6);
 
+  /*** @field Platform.sysInfoHash string */
 	LuaPushNamedString(L, "sysInfoHash", Platform::GetSysInfoHash());
+  /*** @field Platform.macAddrHash string */
 	LuaPushNamedString(L, "macAddrHash", Platform::GetMacAddrHash());
 
 	return true;
