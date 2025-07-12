@@ -60,14 +60,14 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	/*** @field Platform.sdlVersionLinkedPatch number */
 	LuaPushNamedNumber(L, "sdlVersionLinkedPatch", globalRenderingInfo.sdlVersionLinked.patch);
 
-	/*** @field Platform.availableVideoMode PlatformVideoMode[] */
-	lua_pushstring(L, "availableVideoMode");
-	lua_createtable(L, 0, globalRenderingInfo.availableVideoMode.size());
-	for (int i = 0; i < globalRenderingInfo.availableVideoMode.size(); ++i) {
+	/*** @field Platform.availableVideoModes PlatformVideoMode[] */
+	lua_pushstring(L, "availableVideoModes");
+	lua_createtable(L, 0, globalRenderingInfo.availableVideoModes.size());
+	for (int i = 0; i < globalRenderingInfo.availableVideoModes.size(); ++i) {
 		lua_pushnumber(L, i + 1);
 		lua_createtable(L, 0, 6);
 
-		const auto& avm = globalRenderingInfo.availableVideoMode[i];
+		const auto& avm = globalRenderingInfo.availableVideoModes[i];
 		/***
 		* @class PlatformVideoMode
 		*/
