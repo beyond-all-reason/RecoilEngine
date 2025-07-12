@@ -100,7 +100,6 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	}
 	lua_rawset(L, -3);
 
-
 	/*** @field Platform.numDisplays integer */
 	LuaPushNamedNumber(L, "numDisplays", globalRendering->numDisplays);
 
