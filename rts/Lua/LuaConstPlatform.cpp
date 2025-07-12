@@ -38,6 +38,7 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	LuaPushNamedNumber(L, "gpuMemorySize", globalRenderingInfo.gpuMemorySize.x);
 	/*** @field Platform.glVersionShort string `major.minor.buildNumber` */
 	LuaPushNamedString(L, "glVersionShort", globalRenderingInfo.glVersionShort.data());
+	/*** @field Platform.glVersionNum integer */
 	LuaPushNamedNumber(L, "glVersionNum", globalRenderingInfo.glVersionNum);
 	/*** @field Platform.glslVersionShort string `major.minor` */
 	LuaPushNamedString(L, "glslVersionShort", globalRenderingInfo.glslVersionShort.data());
