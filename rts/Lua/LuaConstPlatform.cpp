@@ -79,12 +79,21 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 		lua_createtable(L, 0, 6);
 
 		const auto& avm = globalRenderingInfo.availableVideoModes[i];
+		/***
+		* @class PlatformVideoModes
+		*/
 
+		/*** @field PlatformVideoModes.display integer */
 		LuaPushNamedNumber(L, "display", avm.displayIndex);
+		/*** @field PlatformVideoModes.displayName string */
 		LuaPushNamedString(L, "displayName", avm.displayName);
+		/*** @field PlatformVideoModes.w number */
 		LuaPushNamedNumber(L, "w", avm.width);
+		/*** @field PlatformVideoModes.h number */
 		LuaPushNamedNumber(L, "h", avm.height);
+		/*** @field PlatformVideoModes.bpp integer */
 		LuaPushNamedNumber(L, "bpp", avm.bpp);
+		/*** @field PlatformVideoModes.hz number */
 		LuaPushNamedNumber(L, "hz", avm.refreshRate);
 
 		lua_rawset(L, -3);
