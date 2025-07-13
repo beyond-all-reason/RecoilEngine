@@ -1,5 +1,5 @@
 {{- $context := .context -}}
-{{- $topEntries := .context.Params.entries -}}
+{{- $topEntries := .context.Params.entries | default slice -}}
 
 {{- $disableSidebar := .disableSidebar | default false -}}
 {{- $displayPlaceholder := .displayPlaceholder | default false -}}
@@ -24,7 +24,7 @@
   <div class="hextra-scrollbar hx-overflow-y-auto hx-overflow-x-hidden hx-p-4 hx-grow md:hx-h-[calc(100vh-var(--navbar-height)-var(--menu-height))]">
     <ul class="hx-flex hx-flex-col hx-gap-1 md:hx-hidden">
       <!-- Nav -->
-      {{ template "sidebar-main" (dict "entries" $topEntries) -}}
+      {{ template "api-sidebar-main" (dict "entries" $topEntries) -}}
     </ul>
 
     <!-- Sidebar on large screen -->
@@ -33,7 +33,7 @@
       {{ .context.Scratch.Set "enableFooterSwitches" true }}
     {{- else -}}
       <ul class="hx-flex hx-flex-col hx-gap-1 max-md:hx-hidden">
-        {{ template "sidebar-main" (dict "entries" $topEntries) -}}
+        {{ template "api-sidebar-main" (dict "entries" $topEntries) -}}
       </ul>
     {{ end -}}
   </div>
@@ -55,11 +55,11 @@
   {{- end -}}
 </aside>
 
-{{- define "sidebar-main" -}}
-  {{ template "sidebar-tree" (dict "entries" .entries "level" 0) }}
+{{- define "api-sidebar-main" -}}
+  {{ template "api-sidebar-tree" (dict "entries" .entries "level" 0) }}
 {{- end -}}
 
-{{- define "sidebar-tree" -}}
+{{- define "api-sidebar-tree" -}}
   {{- if ge .level 4 -}}
     {{- return -}}
   {{- end -}}
@@ -74,8 +74,8 @@
 				{{- $active := false -}}
 				{{- $shouldOpen := false }}
 				<li class="{{ if $shouldOpen }}open{{ end }}">
-					{{- template "sidebar-item-link" . -}}
-					{{- template "sidebar-tree" . -}}
+					{{- template "api-sidebar-item-link" . -}}
+					{{- template "api-sidebar-tree" . -}}
 				</li>
       {{- end -}}
     {{- else -}}
@@ -85,8 +85,8 @@
             {{- $active := false -}}
             {{- $shouldOpen := false }}
             <li class="hx-flex hx-flex-col {{ if $shouldOpen }}open{{ end }}">
-              {{- template "sidebar-item-link" . -}}
-              {{ template "sidebar-tree" . }}
+              {{- template "api-sidebar-item-link" . -}}
+              {{ template "api-sidebar-tree" . }}
             </li>
           {{- end -}}
         </ul>
@@ -95,7 +95,7 @@
   {{- end }}
 {{- end -}}
 
-{{- define "sidebar-item-link" -}}
+{{- define "api-sidebar-item-link" -}}
   {{- $external := strings.HasPrefix .ref "http" -}}
   {{- $open := .open | default false -}}
   <a
@@ -111,12 +111,12 @@
     {{- .name -}}
 		{{- with .entries }}
 			<span class="hextra-sidebar-collapsible-button">
-				{{- template "sidebar-collapsible-button" -}}
+				{{- template "api-sidebar-collapsible-button" -}}
 			</span>
 		{{- end }}
   </a>
 {{- end -}}
 
-{{- define "sidebar-collapsible-button" -}}
+{{- define "api-sidebar-collapsible-button" -}}
   <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="hx-h-[18px] hx-min-w-[18px] hx-rounded-sm hx-p-0.5 hover:hx-bg-gray-800/5 dark:hover:hx-bg-gray-100/5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" class="hx-origin-center hx-transition-transform rtl:-hx-rotate-180"></path></svg>
 {{- end -}}
