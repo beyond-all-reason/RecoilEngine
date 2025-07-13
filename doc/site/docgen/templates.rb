@@ -96,7 +96,7 @@ class Member < OpenStruct
     <% end %>
 
     <% if not fields.empty? %>
-    <%= h(dom_level + 1, "Fields", "#{ref}_returns") %>
+    <%= h(dom_level + 1, "Fields", "#{ref}_fields") %>
 
     <dl class="pl-1"><%= generate_fields() %></dl>
     <% end %>
@@ -127,7 +127,7 @@ class Member < OpenStruct
     <% end %>
 
     <% if not fields.empty? %>
-    <%= h(dom_level + 1, "Fields", "#{ref}_returns") %>
+    <%= h(dom_level + 1, "Fields", "#{ref}_fields") %>
 
     <dl class="pl-1"><%= generate_fields() %></dl>
     <% end %>
@@ -153,7 +153,7 @@ class Member < OpenStruct
     <% end %>
 
     <% if not fields.empty? %>
-    <%= h(dom_level + 1, "Fields", "#{ref}_returns") %>
+    <%= h(dom_level + 1, "Fields", "#{ref}_fields") %>
 
     <dl class="pl-1"><%= generate_fields() %></dl>
     <% end %>

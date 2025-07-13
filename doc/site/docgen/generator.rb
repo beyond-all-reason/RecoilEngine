@@ -17,12 +17,24 @@ class Member
 
   @@known_templates = Set.new(@@templates.keys)
 
-  @@top_level = Set.new(["Spring", "Callins", "UnsyncedCallins", "gl", "GL", "RmlUi"])
+  @@top_level = Set.new(["Spring", "Callins", "SyncedCallins", "UnsyncedCallins", "gl", "GL", "RmlUi"])
 
   def initialize(attributes, parent = nil)
     super(attributes)
 
     initialize_attributes(parent)
+  end
+
+  def generate_sidebar_entry()
+    entries = if fields.empty? or children.empty?
+      ""
+    else
+      "{name = 'Fields', link = '##{ref}_fields', ref = '#{ref}_fields'}, "
+    end
+
+    entries += children.map(&:generate_sidebar_entry).join(', ')
+
+    "{name = '#{name}', link = '##{ref}', ref = '#{ref}', entries = [#{entries}]}"
   end
 
   def generate_children(member_type = nil)
@@ -265,7 +277,7 @@ class Generator
     data = JSON.load_file(data_file)
 
     aliases, non_aliases = (data["globals"] + data["types"])
-      .map {|g| Member.new (g) }
+      .map {|g| Member.new(g) }
       .partition{|g| g.type == :alias }
 
     @aliases = aliases
@@ -279,7 +291,7 @@ class Generator
     # ## Table of Contents
     #
     # #{@globals.map { |el| el.generate(:definition) }.join("\n")}
-    entries = @globals.map {|g| "{name = '#{g.name}', ref = '#{g.ref}'}"}.join(',')
+    entries = @globals.map(&:generate_sidebar_entry).join(',')
 
     <<~EOF
       +++
