@@ -149,7 +149,7 @@ int LuaRBOs::meta_newindex(lua_State* L)
 
 /***
  * @class CreateRBOData
- * @helper
+ * @x_helper
  * @field target GL
  * @field format GL
  * @field samples number? any number here will result in creation of multisampled RBO

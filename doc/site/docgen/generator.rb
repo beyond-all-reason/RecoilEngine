@@ -60,24 +60,16 @@ class Member
     @@refs.add(self.ref)
   end
 
-  @@deep_type_ref_matcher = Regexp.new("[\\w\.]+")
+  @@deep_type_ref_matcher = Regexp.new('[^\s\(\)\[\]\|\?&;]+')
 
   def self.replace_deep_type_refs(value)
     return value if not value&.is_a?(String)
 
-    matches = value.scan(@@deep_type_ref_matcher)
-
-    return value if matches.empty?
-
-    value = value.dup
-
-    value.gsub!("<", "&lt;")
-    value.gsub!(">", "&gt;")
-
-    matches.select {|m| @@refs.include?(m) }.uniq
-           .each {|m| value.gsub!(m, a(m))}
-
     value
+      .gsub("<", "&lt;").gsub(">", "&gt;") # escape < > to html
+      .gsub(@@deep_type_ref_matcher) do |match|
+        @@refs.include?(match) ? a(match) : match
+      end
   end
 
   @@ref_matcher = Regexp.new("`([^`]*)`")
@@ -94,8 +86,10 @@ class Member
     matches.map(&:first)
            .select {|m| @@refs.include?(m) }.uniq
            .each {|m| value.gsub!("`#{m}`", a(m)) }
-
     value
+      .gsub(@@ref_matcher) do |match|
+        "<code>#{self.replace_deep_type_refs($1)}</code>"
+      end
   end
 
   def process_refs()
@@ -105,11 +99,13 @@ class Member
 
     params&.each do |p|
       p["typeref"] = Member.replace_deep_type_refs(p["typ"])
+      p["ref"] = "#{full_name}-params.#{p["name"]}"
       p["desc"] = Member.replace_refs(p["desc"])
     end
 
     returns&.each do |p|
       p["typeref"] = Member.replace_deep_type_refs(p["typ"])
+      p["ref"] = "#{full_name}-returns.#{p["name"]}"
       p["desc"] = Member.replace_refs(p["desc"])
     end
 
@@ -143,8 +139,8 @@ class Member
   end
 
   def self.compare(m1, m2)
-    helper1 = m1.custom["helper"]
-    helper2 = m2.custom["helper"]
+    helper1 = m1.custom["x_helper"]
+    helper2 = m2.custom["x_helper"]
 
     # Tagged helpers should be at the utmost bottom
     if helper1 && helper1 == helper2
@@ -237,8 +233,8 @@ class Generator
 
   def self.compare_members(m1, m2)
     # helpers to the bottom
-    helper1 = m1.custom["helper"]
-    helper2 = m2.custom["helper"]
+    helper1 = m1.custom["x_helper"]
+    helper2 = m2.custom["x_helper"]
 
     if helper1 && (helper1 == helper2)
       return 0
@@ -280,20 +276,33 @@ class Generator
   end
 
   def generate
-    alias_content = "## Aliases\n\n<dl>#{@aliases.map(&:generate).join("\n")}</dl>" if not @aliases.empty?
+    # ## Table of Contents
+    #
+    # #{@globals.map { |el| el.generate(:definition) }.join("\n")}
+    entries = @globals.map {|g| "{name = '#{g.name}', ref = '#{g.ref}'}"}.join(',')
 
     <<~EOF
       +++
       title = "Lua API"
+      type = "docs"
+      layout = "lua_api"
+      [params]
+      entries = [#{entries}]
       +++
 
-      ## Table of Contents
+      ## Overview
 
-      #{@globals.map { |el| el.generate(:definition) }.join("\n")}
+      We list here all globals available among all different lua environments
+      within Recoil. Some types listed here exist only as helpers for aliasing
+      parameters and returns.
+
+      The documentation pages are still a work in progress.
 
       #{@globals.map(&:generate).join("\n")}
 
-      #{alias_content}
+      #{"## Aliases\n\n" + \
+        "<dl>#{@aliases.map(&:generate).join("\n")}</dl>" \
+        if not @aliases.empty?}
     EOF
   end
 end

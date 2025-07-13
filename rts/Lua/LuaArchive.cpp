@@ -155,7 +155,7 @@ int LuaArchive::GetArchivePath(lua_State* L)
 
 /***
  * @class ArchiveInfo
- * @helper
+ * @x_helper
  * @field name string
  * @field shortname string
  * @field version string
@@ -299,7 +299,7 @@ int LuaArchive::GetNameFromRapidTag(lua_State* L)
 
 /***
  * @class AIInfo
- * @helper
+ * @x_helper
  * @field shortName string
  * @field version string
  */

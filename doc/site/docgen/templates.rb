@@ -5,14 +5,14 @@ def md(string)
 end
 
 H_TEMPLATE = ERB.new <<~'EOF'
-  <h<%= dom_level %> <%= "class=#{klass}" if klass %>>
+  <h<%= dom_level %>>
   <%= name %>
   <span id="<%= ref %>" class="hx-absolute -hx-mt-20"></span>
   <a href="#<%= ref %>" class="subheading-anchor" aria-label="Permalink for this section"></a>
   </h<%= dom_level %>>
 EOF
 
-def h(dom_level, name, ref, klass=nil)
+def h(dom_level, name, ref)
   dom_level = dom_level + 2
 
   H_TEMPLATE.result(binding)
@@ -33,9 +33,7 @@ class Member < OpenStruct
     See <%= see %>
     <% end %>
 
-    <dl class="inline">
-    <%= generate_children() %>
-    </dl>
+    <dl><%= generate_fields() %></dl>
   EOF
 
   @@function_template = ERB.new <<~'EOF'
@@ -51,16 +49,16 @@ class Member < OpenStruct
     <% end %>
 
     ```lua
-    <%= full_name %>(<%= params.map {|p| p["typ"] }.join(", ") unless params.empty?
-  %>) -> <% if returns.empty? %>nil<% else %><%= returns.map {|p| p["typ"] }.join(", ")  %><% end %>
+  <%= full_name %>(<%= params.map {|p| p["name"] == "..." ? "[#{p["typ"]}, ]*" : p["typ"] }.join(", ") unless params.empty?
+  %>) -> <% if returns.empty? %>nil<% else %><%= returns.map {|p| p["name"] == "..." ? "[#{p["typ"]}, ]*" : p["typ"] }.join(", ")  %><% end %>
     ```
 
     <% if not params.empty? %>
     <%= h(dom_level + 1, "Parameters", "#{ref}_arguments") %>
 
-    <dl>
+    <dl class="pl-1">
     <% params.each do |param| %>
-    <dt><code><%= param["typeref"] %></code> <%= param["name"] %></dt>
+    <dt><code><%= param["typeref"] %></code><a class="pl-025" href="#<%= param["ref"] %>"><%= param["name"] %></a><span id="<%= param["ref"] %>" class="hx-absolute -hx-mt-20"></span></dt>
     <dd><%= md(param["desc"]) %></dd>
     <% end %>
     </dl>
@@ -69,9 +67,9 @@ class Member < OpenStruct
     <% if not returns.empty? %>
     <%= h(dom_level + 1, "Returns", "#{ref}_returns") %>
 
-    <dl>
+    <dl class="pl-1">
     <% returns.each do |return_value| %>
-    <dt><code><%= return_value["typeref"] %></code> <%= return_value["name"] %></dt>
+    <dt><code><%= return_value["typeref"] %></code><a class="pl-025" href="#<%= return_value["ref"] %>"><%= return_value["name"] %></a><span id="<%= return_value["ref"] %>" class="hx-absolute -hx-mt-20"></span></dt>
     <dd><%= md(return_value["desc"]) %></dd>
     <% end %>
     </dl>
@@ -100,7 +98,7 @@ class Member < OpenStruct
     <% if not fields.empty? %>
     <%= h(dom_level + 1, "Fields", "#{ref}_returns") %>
 
-    <dl><%= generate_fields() %></dl>
+    <dl class="pl-1"><%= generate_fields() %></dl>
     <% end %>
   EOF
 
@@ -131,7 +129,7 @@ class Member < OpenStruct
     <% if not fields.empty? %>
     <%= h(dom_level + 1, "Fields", "#{ref}_returns") %>
 
-    <dl><%= generate_fields() %></dl>
+    <dl class="pl-1"><%= generate_fields() %></dl>
     <% end %>
   EOF
 
@@ -157,12 +155,12 @@ class Member < OpenStruct
     <% if not fields.empty? %>
     <%= h(dom_level + 1, "Fields", "#{ref}_returns") %>
 
-    <dl><%= generate_fields() %></dl>
+    <dl class="pl-1"><%= generate_fields() %></dl>
     <% end %>
   EOF
 
   @@alias_template = ERB.new <<~'EOF'
-    <dt id="<%= ref %>"><a href="#<%= ref %>"><%= full_name %></a></dt>
+    <dt><a href="#<%= ref %>"><%= full_name %></a><span id="<%= ref %>" class="hx-absolute -hx-mt-20"></span></dt>
     <dd><code><%= literal || typeref %></code></dd>
   EOF
 
@@ -203,7 +201,7 @@ class Member < OpenStruct
   EOF
 
   @@field_template = ERB.new <<~'EOF'
-    <dt id="<%= ref %>"><code><%= literal || typeref %></code> <a href="#<%= ref %>"><%= name %></a></dt>
+    <dt><code><%= literal || typeref %></code> <a href="#<%= ref %>"><%= name %></a><span id="<%= ref %>" class="hx-absolute -hx-mt-20"></span></dt>
     <dd><%= md(description) %></dd>
   EOF
 

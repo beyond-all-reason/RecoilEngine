@@ -1435,7 +1435,7 @@ int LuaSyncedRead::GetHeadingFromFacing(lua_State* L)
  * Side spec
  *
  * @class SideSpec
- * @helper
+ * @x_helper
  *
  * Returned when getting arrays of side specifications.
  *
@@ -1985,7 +1985,7 @@ int LuaSyncedRead::GetTeamDamageStats(lua_State* L)
 
 /***
  * @class TeamStats
- * @helper
+ * @x_helper
  * @field time number
  * @field frame number
  * @field metalUsed number
@@ -3257,7 +3257,7 @@ static inline bool UnitInPlanes(const float3& pos, const float radius, const vec
 
 /***
  * @class Plane
- * @helper
+ * @x_helper
  * @field normalVecX number
  * @field normalVecY number
  * @field normalVecZ number
@@ -3723,7 +3723,7 @@ int LuaSyncedRead::ValidUnitID(lua_State* L)
 
 /***
  * @class UnitState
- * @helper
+ * @x_helper
  * @field firestate number
  * @field movestate number
  * @field repeat boolean
@@ -4317,7 +4317,7 @@ int LuaSyncedRead::GetUnitCosts(lua_State* L)
 
 /***
  * @class ResourceCost
- * @helper
+ * @x_helper
  * @field metal number
  * @field energy number
  */
@@ -5900,7 +5900,7 @@ int LuaSyncedRead::GetUnitFeatureSeparation(lua_State* L)
 
 /***
  * @class UnitDefDimensions
- * @helper
+ * @x_helper
  * @field height number
  * @field radius number
  * @field midx number
@@ -6169,7 +6169,7 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 
 /***
  * @class Command
- * @helper
+ * @x_helper
  * @field id integer
  * @field params number[]?
  * @field options CommandOptions?
@@ -7132,7 +7132,7 @@ int LuaSyncedRead::GetFeatureLastAttackedPiece(lua_State* L)
 /*** Parameters related to a collision volume.
  *
  * @class CollisionVolumeData
- * @helper
+ * @x_helper
  *
  * @field type "ellipsoid"|"cylinder"|"box"|"sphere" type
  * @field scaleX number
@@ -8495,7 +8495,7 @@ static int GetSolidObjectPieceList(lua_State* L, const CSolidObject* o)
 
 /***
  * @class PieceInfo
- * @helper
+ * @x_helper
  * @field name string
  * @field parent string
  * @field children string[] names

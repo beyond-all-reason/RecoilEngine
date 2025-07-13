@@ -1375,7 +1375,7 @@ int LuaSyncedCtrl::ShareTeamResource(lua_State* L)
  * You can read RulesParams from any Lua environments! With those losAccess policies you can limit their access.
  *
  * @class losAccess
- * @helper
+ * @x_helper
  *
  * @field public private boolean? only readable by the ally (default)
  * @field public allied boolean? readable by ally + ingame allied
@@ -2116,7 +2116,7 @@ int LuaSyncedCtrl::SetUnitTooltip(lua_State* L)
 
 /***
  * @class SetUnitHealthAmounts
- * @helper
+ * @x_helper
  * @field health number? Set the unit's health.
  * @field capture number? Set the unit's capture progress.
  * @field paralyze number? Set the unit's paralyze damage.
@@ -2241,7 +2241,7 @@ int LuaSyncedCtrl::SetUnitStockpile(lua_State* L)
 /*** Parameter for weapon states
  *
  * @class WeaponState
- * @helper
+ * @x_helper
  * @field reloadState integer?
  * @field reloadFrame integer? Alias for `reloadState`.
  * @field reloadTime number?
@@ -2418,7 +2418,7 @@ int LuaSyncedCtrl::SetUnitWeaponState(lua_State* L)
 /*** Parameters for damage
  *
  * @class WeaponDamages
- * @helper
+ * @x_helper
  * @field paralyzeDamageTime integer
  * @field impulseFactor number
  * @field impulseBoost number
@@ -6980,7 +6980,7 @@ int LuaSyncedCtrl::SetUnitLoadingTransport(lua_State* L)
 
 /***
  * @class ProjectileParams
- * @helper
+ * @x_helper
  * @field pos xyz
  * @field speed xyz
  * @field spread xyz
@@ -7152,7 +7152,7 @@ static int SetExplosionParam(lua_State* L, CExplosionParams& params, DamageArray
  * The weapondefID is only used for visuals and for passing into callins like UnitDamaged.
  *
  * @class ExplosionParams
- * @helper
+ * @x_helper
  * @field weaponDef number
  * @field owner number
  * @field hitUnit number

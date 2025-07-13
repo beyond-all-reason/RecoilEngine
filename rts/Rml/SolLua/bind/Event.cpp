@@ -94,7 +94,7 @@ namespace Rml::SolLua
 		/***
 		 * Keyboard and mouse input data associated with an event.
 		 * @class RmlUi.EventParametersProxy
-		 * @helper
+		 * @x_helper
 		 * @field button RmlUi.EventParametersProxy.MouseButton
 		 * @field mouse_x integer
 		 * @field mouse_y integer

@@ -26,6 +26,10 @@
 	margin-bottom: 0 !important;
 }
 
+.mt-05 {
+	margin-top: .5rem !important;
+}
+
 .mt-1 {
 	margin-top: 1rem;
 }
@@ -38,10 +42,56 @@
 	padding-inline-start: 0 !important;
 }
 
+.pl-025 {
+	padding-left: .25rem;
+}
+
 .pl-1 {
 	padding-left: 1rem;
 }
 
 .pl-2 {
 	padding-left: 2rem;
+}
+
+.content.lua-api {
+	h2, h3, h4 {
+		margin-top: 1rem !important;
+		margin-bottom: .5rem !important;
+	}
+
+	h5, h6, p, ul, .hextra-code-block {
+		margin-top: .5rem !important;
+	}
+
+	p {
+		line-height: 1.3rem !important;
+	}
+
+	h5 {
+		font-size: 1.05rem !important;
+	}
+
+	dl {
+	}
+
+	dt, dd, li {
+		margin-top: .25rem !important;
+	}
+
+	dd, li {
+		margin-bottom: .25rem !important;
+	}
+
+	dt, dd {
+		margin-bottom: 0 !important;
+	}
+
+	.hextra-code-block {
+		pre {
+			margin-bottom: .5rem !important;
+			padding: .5rem !important;
+			border-radius: .4rem !important;
+		}
+	}
 }

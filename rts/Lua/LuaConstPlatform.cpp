@@ -15,7 +15,6 @@
 /*** Platform specific information
  *
  * @table Platform
- * @no_toc_contents
  * @field gpu string Full GPU device name
  * @field gpuVendor "Nvidia"|"Intel"|"ATI"|"Mesa"|"Unknown"
  * @field glVersionShort string `major.minor.buildNumber`

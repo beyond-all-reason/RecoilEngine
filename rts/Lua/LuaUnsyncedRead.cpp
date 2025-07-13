@@ -2856,7 +2856,7 @@ int LuaUnsyncedRead::GetCameraFOV(lua_State* L)
 
 /***
  * @class CameraVectors
- * @helper
+ * @x_helper
  * @field forward xyz
  * @field up xyz
  * @field right xyz
@@ -3170,7 +3170,7 @@ int LuaUnsyncedRead::GetDrawSeconds(lua_State* L)
 
 /*** Contains data about a sound device.
  * @class SoundDeviceSpec
- * @helper
+ * @x_helper
  *
  * @field name string
  */
@@ -3996,7 +3996,7 @@ int LuaUnsyncedRead::GetScanSymbol(lua_State* L)
 /*** Contains data about a keybinding
  *
  * @class KeyBinding
- * @helper
+ * @x_helper
  * @field command string
  * @field extra string
  * @field boundWith string
@@ -4234,7 +4234,7 @@ int LuaUnsyncedRead::GetGroupUnitsCount(lua_State* L)
 /*** Contains data about a player
  *
  * @class Roster
- * @helper
+ * @x_helper
  * @field name string
  * @field playerID integer
  * @field teamID integer
@@ -4374,7 +4374,7 @@ int LuaUnsyncedRead::GetPlayerStatistics(lua_State* L)
 /*** Contains data about a configuration, only name and type are guaranteed
  *
  * @class Configuration
- * @helper
+ * @x_helper
  * @field name string
  * @field type string
  * @field description string

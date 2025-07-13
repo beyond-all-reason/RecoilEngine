@@ -458,7 +458,7 @@ bool LuaVBOImpl::DefineElementArray(const sol::optional<sol::object> attribDefAr
 
 /***
  * @class VBOAttributeDef
- * @helper
+ * @x_helper
  * 
  * @field id integer?
  * 

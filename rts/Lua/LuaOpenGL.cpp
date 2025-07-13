@@ -2233,7 +2233,7 @@ int LuaOpenGL::DrawGroundQuad(lua_State* L)
 
 /***
  * @class VertexData
- * @helper
+ * @x_helper
  * @field vert xyz?
  * @field v xyz? Short for `vert`.
  * @field norm float3?
@@ -3012,7 +3012,7 @@ int LuaOpenGL::Color(lua_State* L)
 
 /***
  * @class Material
- * @helper
+ * @x_helper
  * @field shininess number
  * @field ambidiff rgb|rgba
  * @field ambient rgb|rgba
@@ -4089,7 +4089,7 @@ int LuaOpenGL::Texture(lua_State* L)
 
 /***
  * @class Texture
- * @helper
+ * @x_helper
  * @field target GL?
  * @field format integer?
  * @field min_filter GL?
@@ -4293,7 +4293,7 @@ int LuaOpenGL::DeleteTextureFBO(lua_State* L)
 
 /***
  * @class TextureInfo
- * @helper
+ * @x_helper
  * @field xsize integer
  * @field ysize integer
  * @field zsize integer
@@ -5438,7 +5438,7 @@ int LuaOpenGL::LoadIdentity(lua_State* L)
 
 /***
  * @class Matrix4x4
- * @helper
+ * @x_helper
  * @field [1] number Element at [1,1]
  * @field [2] number Element at [1,2]
  * @field [3] number Element at [1,3]
@@ -6395,7 +6395,7 @@ int LuaOpenGL::ReadPixels(lua_State* L)
 
 /***
  * @class SaveImageOptions
- * @helper
+ * @x_helper
  * @field alpha boolean (Default: `false`)
  * @field yflip boolean (Default: `true`)
  * @field grayscale16bit boolean (Default: `false`)

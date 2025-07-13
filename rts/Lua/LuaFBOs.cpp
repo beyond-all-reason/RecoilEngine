@@ -442,7 +442,7 @@ bool LuaFBOs::ApplyDrawBuffers(lua_State* L, int index)
 
 /***
  * @class FBODescription
- * @helper
+ * @x_helper
  * @field depth string?
  * @field stencil string?
  * @field color0 string?

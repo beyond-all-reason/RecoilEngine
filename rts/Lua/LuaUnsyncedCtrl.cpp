@@ -1339,7 +1339,7 @@ int LuaUnsyncedCtrl::SetDollyCameraPosition(lua_State* L)
 /*** NURBS control point.
  *
  * @class ControlPoint
- * @helper
+ * @x_helper
  * 
  * @field [1] number x
  * @field [2] number y
@@ -1590,7 +1590,7 @@ int LuaUnsyncedCtrl::SelectUnitMap(lua_State* L)
 /*** Parameters for lighting
  *
  * @class LightParams
- * @helper
+ * @x_helper
  * @field position { px: number, py: number, pz: number }
  * @field direction { dx: number, dy: number, dz: number }
  * @field ambientColor { red: number, green: number, blue: number }
@@ -3149,7 +3149,7 @@ int LuaUnsyncedCtrl::SetConfigInt(lua_State* L)
  * @function Spring.SetConfigFloat
  * @param name string
  * @param value number
- * @param useOverla boolean? (Default: `false`) If `true`, the value will only be set in memory, and not be restored for the next game.y
+ * @param useOverlay boolean? (Default: `false`) If `true`, the value will only be set in memory, and not be restored for the next game.
  * @return nil
  */
 int LuaUnsyncedCtrl::SetConfigFloat(lua_State* L)
@@ -3941,7 +3941,7 @@ int LuaUnsyncedCtrl::MarkerErasePosition(lua_State* L)
 
 /***
  * @class AtmosphereParams
- * @helper
+ * @x_helper
  * @field fogStart number
  * @field fogEnd number
  * @field sunColor rgba
@@ -4086,7 +4086,7 @@ int LuaUnsyncedCtrl::SetSunLighting(lua_State* L)
 /*** Map rendering params
  *
  * @class MapRenderingParams
- * @helper
+ * @x_helper
  * @field splatTexMults rgba
  * @field splatTexScales rgba
  * @field voidWater boolean
@@ -4393,7 +4393,7 @@ int LuaUnsyncedCtrl::SetVideoCapturingTimeOffset(lua_State* L)
  * Water params
  *
  * @class WaterParams
- * @helper
+ * @x_helper
  * @field absorb rgb
  * @field baseColor rgb
  * @field minColor rgb
@@ -4817,7 +4817,7 @@ int LuaUnsyncedCtrl::SetGroundDecalPosAndDims(lua_State* L)
 
 /***
  * @class xz
- * @helper
+ * @x_helper
  * @field x number
  * @field y number
  */

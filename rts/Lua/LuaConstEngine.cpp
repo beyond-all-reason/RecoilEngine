@@ -16,7 +16,7 @@
 
 /***
  * @class FeatureSupport
- * @helper
+ * @x_helper
  * @field NegativeGetUnitCurrentCommand boolean Whether Spring.GetUnitCurrentCommand allows negative indices to look from the end
  * @field hasExitOnlyYardmaps boolean Whether yardmaps accept 'e' (exit only) and 'u' (unbuildable, walkable)
  * @field rmlUiApiVersion integer Version of Recoil's rmlUI API

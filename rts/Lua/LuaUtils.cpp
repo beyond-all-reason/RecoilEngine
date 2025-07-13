@@ -935,7 +935,7 @@ void LuaUtils::PushCommandParamsTable(lua_State* L, const Command& cmd, bool sub
  * when creating a command from Lua.
  * 
  * @class CommandOptions
- * @helper
+ * @x_helper
  * @field coded CommandOptionBit|integer Bitmask of command options.
  * @field alt boolean Alt key pressed.
  * @field ctrl boolean Ctrl key pressed.
@@ -1153,7 +1153,7 @@ Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
  * Used when assigning multiple commands at once.
  * 
  * @class CreateCommand
- * @helper
+ * @x_helper
  * @field [1] CMD|integer Command ID.
  * @field [2] CreateCommandParams? Parameters for the given command.
  * @field [3] CreateCommandOptions? Command options.
@@ -1572,7 +1572,7 @@ void LuaUtils::PushStringVector(lua_State* L, const vector<string>& vec)
 /*** Contains data about a command.
  * 
  * @class CommandDescription
- * @helper
+ * @x_helper
  * @field id (CMD|integer)?
  * @field type CMDTYPE?
  * @field name string?
