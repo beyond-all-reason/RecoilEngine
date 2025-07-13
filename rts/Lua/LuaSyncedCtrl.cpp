@@ -5198,7 +5198,7 @@ int LuaSyncedCtrl::SetProjectileCollision(lua_State* L)
 
 /***
  * @enum ProjectileTargetType
- * @helper
+ * @x_helper
  * @field feature 102 ASCII number for the character `f`
  * @field projectile 112 ASCII number for the character `p`
  * @field unit 117 ASCII number for the character `u`
