@@ -5115,12 +5115,17 @@ int LuaSyncedCtrl::SetProjectileUseAirLos(lua_State* L)
 }
 
 
-/***
- * Disables engine movecontrol, so lua can fully control the physics.
+/*** Set whether engine should process position and speed for a projectile
+ *
+ * Contrary to `Spring.SetFeatureMoveCtrl`, speed and position for projectiles
+ * can be set regardless of whether this method has been called or not.
+ *
+ * Passing true merely skips engine updating velocity and position.
+ *
  * @function Spring.SetProjectileMoveControl
+ *
  * @param projectileID integer
  * @param enable boolean
- * @return nil
  */
 int LuaSyncedCtrl::SetProjectileMoveControl(lua_State* L)
 {
@@ -5135,13 +5140,13 @@ int LuaSyncedCtrl::SetProjectileMoveControl(lua_State* L)
 	return 0;
 }
 
-/***
+/*** Set the position of a projectile
+ *
  * @function Spring.SetProjectilePosition
  * @param projectileID integer
  * @param posX number? (Default: `0`)
  * @param posY number? (Default: `0`)
  * @param posZ number? (Default: `0`)
- * @return nil
  */
 int LuaSyncedCtrl::SetProjectilePosition(lua_State* L)
 {
@@ -5157,9 +5162,14 @@ int LuaSyncedCtrl::SetProjectilePosition(lua_State* L)
 	return 0;
 }
 
-/*** Set the velocity of a Projectile
+/*** Set the velocity of a projectile
  *
- * @see Spring.SetProjectileMoveCtrl for disabling/enabling this control
+ * > [!NOTE]
+ * > Differently from features, `Spring.SetProjectileMoveControl` is not
+ * > required to have been called to make use of this method, but often used in
+ * > conjunction.
+ *
+ * @see Spring.SetProjectileMoveControl
  * @function Spring.SetProjectileVelocity
  * @param projectileID integer
  * @param velX number in elmos/frame
@@ -5174,7 +5184,6 @@ int LuaSyncedCtrl::SetProjectileVelocity(lua_State* L)
 /***
  * @function Spring.SetProjectileCollision
  * @param projectileID integer
- * @return nil
  */
 int LuaSyncedCtrl::SetProjectileCollision(lua_State* L)
 {
@@ -5188,22 +5197,30 @@ int LuaSyncedCtrl::SetProjectileCollision(lua_State* L)
 }
 
 /***
+ * @enum ProjectileTargetType
+ * @helper
+ * @field feature 102 ASCII number for the character `f`
+ * @field projectile 112 ASCII number for the character `p`
+ * @field unit 117 ASCII number for the character `u`
+ */
+
+/*** Set projectile target (object)
+ *
+ * @function Spring.SetProjectileTarget
+ * @param projectileID integer
+ * @param targetID number
+ * @param targetType ProjectileTargetType
+ * @return boolean? validTarget
+ */
+
+/*** Set projectile target (position)
+ *
  * @function Spring.SetProjectileTarget
  *
- * targetTypeStr can be one of:
- *     'u' - unit
- *     'f' - feature
- *     'p' - projectile
- *  while targetTypeInt is one of:
- *     string.byte('g') := GROUND
- *     string.byte('u') := UNIT
- *     string.byte('f') := FEATURE
- *     string.byte('p') := PROJECTILE
- *
  * @param projectileID integer
- * @param arg1 number? (Default: `0`) targetID or posX
- * @param arg2 number? (Default: `0`) targetType or posY
- * @param posZ number? (Default: `0`)
+ * @param posX number (Default: `0`)
+ * @param posY number (Default: `0`)
+ * @param posZ number (Default: `0`)
  * @return boolean? validTarget
  */
 int LuaSyncedCtrl::SetProjectileTarget(lua_State* L)
@@ -5276,11 +5293,11 @@ int LuaSyncedCtrl::SetProjectileTarget(lua_State* L)
 }
 
 
-/***
+/*** Set TTL for a projectile
+ *
  * @function Spring.SetProjectileTimeToLive
  * @param projectileID integer
  * @param ttl number Remaining time to live in frames
- * @return nil
  */
 int LuaSyncedCtrl::SetProjectileTimeToLive(lua_State* L)
 {
@@ -5301,7 +5318,6 @@ int LuaSyncedCtrl::SetProjectileTimeToLive(lua_State* L)
 /***
  * @function Spring.SetProjectileIsIntercepted
  * @param projectileID integer
- * @return nil
  */
 int LuaSyncedCtrl::SetProjectileIsIntercepted(lua_State* L)
 {
@@ -5321,10 +5337,9 @@ int LuaSyncedCtrl::SetProjectileIsIntercepted(lua_State* L)
 /***
  * @function Spring.SetProjectileDamages
  * @param unitID integer
- * @param weaponNum number
+ * @param weaponNum integer
  * @param key string
  * @param value number
- * @return nil
  */
 int LuaSyncedCtrl::SetProjectileDamages(lua_State* L)
 {
@@ -5359,7 +5374,6 @@ int LuaSyncedCtrl::SetProjectileDamages(lua_State* L)
  * @function Spring.SetProjectileIgnoreTrackingError
  * @param projectileID integer
  * @param ignore boolean
- * @return nil
  */
 int LuaSyncedCtrl::SetProjectileIgnoreTrackingError(lua_State* L)
 {
