@@ -54,8 +54,8 @@ Creating a basic shader in Lua is simple.
 ```lua
 local ubo_defs = gl.GetEngineUniformBuffer()
 shader = gl.CreateShader({
-    fragment = VFS.LoadFile("path/to/shader.frag.glsl"):gsub("//##UBO##"), -- again we will address this later
-    vertex = VFS.LoadFile("path/to/shader.vert.glsl"):gsub("//##UBO##"),
+    fragment = VFS.LoadFile("path/to/shader.frag.glsl"):gsub("//##UBO##", ubo_defs), -- again we will address this later
+    vertex = VFS.LoadFile("path/to/shader.vert.glsl"):gsub("//##UBO##", ubo_defs),
 })
 ```
 
@@ -143,7 +143,7 @@ layout(std140, binding = 1) uniform UniformParamsBuffer {
 };
 ```
 
-To include this in your shader, it's better to append this to the beginning of your shader on the lua side with [`gl.GetEngineUniformBuffer()`]({{% ref "docs/lua-api/gl/#glgetengineuniformbufferdef" %}}), like `fragment = VFS.LoadFile("path/to/shader.frag.glsl"):gsub("//##UBO##")`. We use the gsub here to make sure it's after the `#version` stuff glsl expects to be at the beginning. If you plan to use them in your shader, make sure to add `//##UBU##` as a comment up near the beginning. This way, if something changes, you won't have to update all of your scripts (but we will still have to update this article).
+To include this in your shader, it's better to append this to the beginning of your shader on the lua side with [`gl.GetEngineUniformBuffer()`]({{% ref "docs/lua-api/gl/#glgetengineuniformbufferdef" %}}), like `fragment = VFS.LoadFile("path/to/shader.frag.glsl"):gsub("//##UBO##", gl.GetEngineUniformBuffer())`. We use the gsub here to make sure it's after the `#version` stuff glsl expects to be at the beginning. If you plan to use them in your shader, make sure to add `//##UBO##` as a comment up near the beginning. This way, if something changes, you won't have to update all of your scripts (but we will still have to update this article).
 
 ### Custom Uniforms
 
