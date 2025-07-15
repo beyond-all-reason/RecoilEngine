@@ -5218,9 +5218,9 @@ int LuaSyncedCtrl::SetProjectileCollision(lua_State* L)
  * @function Spring.SetProjectileTarget
  *
  * @param projectileID integer
- * @param posX number (Default: `0`)
- * @param posY number (Default: `0`)
- * @param posZ number (Default: `0`)
+ * @param posX number
+ * @param posY number
+ * @param posZ number
  * @return boolean? validTarget
  */
 int LuaSyncedCtrl::SetProjectileTarget(lua_State* L)
@@ -5293,7 +5293,7 @@ int LuaSyncedCtrl::SetProjectileTarget(lua_State* L)
 }
 
 
-/*** Set TTL for a projectile
+/*** Set Time To Live for a projectile
  *
  * @function Spring.SetProjectileTimeToLive
  * @param projectileID integer
