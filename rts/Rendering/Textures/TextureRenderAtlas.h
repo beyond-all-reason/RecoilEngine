@@ -37,7 +37,7 @@ public:
 	AtlasedTexture GetTexture(const std::string& texName, const std::string& texBackupName);
 
 	uint32_t GetTexTarget() const;
-	uint32_t GetTexID() const { return texID; }
+	uint32_t GetTexID() const;
 	int GetMinDim() const;
 	int GetNumTexLevels() const;
 	void SetMaxTexLevel(int maxLevels);
@@ -46,7 +46,7 @@ public:
 	const std::string& GetAtlasName() const { return atlasName; }
 
 	bool Finalize();
-	bool IsValid() const { return finalized && texID != 0; }
+	bool IsValid() const;
 
 	bool DumpTexture() const;
 private:
@@ -57,7 +57,7 @@ private:
 	int atlasSizeY;
 	CTextureAtlas::AllocatorType allocType;
 	uint32_t glInternalType;
-	uint32_t texID;
+	std::unique_ptr<GL::TextureBase> atlasTex;
 	std::unique_ptr<IAtlasAllocator> atlasAllocator;
 	std::string atlasName;
 	static inline size_t shaderRef = 0;

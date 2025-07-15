@@ -228,7 +228,7 @@ bool CTextureAtlas::CreateTexture()
 		//make function re-entrant
 		.texID = atlasTex ? atlasTex->GetId() : 0,
 		.reqNumLevels = numLevels,
-		.linearMipMapFilter = false,
+		.linearMipMapFilter = true,
 		.linearTextureFilter = true,
 		.wrapMirror = false
 	};
