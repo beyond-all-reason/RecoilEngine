@@ -1023,10 +1023,10 @@ inline void CLuaHandle::UnitSelfDestructCallin(const LuaHashString& hs, const CU
 	if (!hs.GetGlobalFunc(L))
 		return;
 
-	lua_pushnumber(L, unit->id);// unitID
-	lua_pushnumber(L, unit->unitDef->id); // unitDefID
-	lua_pushnumber(L, unit->team); // unitTeam
-	lua_pushnumber(L, remainingSeconds); // updatePeriodSeconds
+	lua_pushnumber(L, unit->id);
+	lua_pushnumber(L, unit->unitDef->id);
+	lua_pushnumber(L, unit->team);
+	lua_pushnumber(L, remainingSeconds);
 
 	RunCallInTraceback(L, hs, 4, 0, traceBack.GetErrFuncIdx(), false);
 }

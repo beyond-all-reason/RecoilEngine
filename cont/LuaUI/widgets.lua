@@ -2105,21 +2105,18 @@ function widgetHandler:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, rema
   for _,w in ipairs(self.UnitSelfDestructStartedList) do
     w:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
   end
-  return
 end
 
 function widgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
   for _,w in ipairs(self.UnitSelfDestructCancelledList) do
     w:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
   end
-  return
 end
 
 function widgetHandler:UnitSelfDestructProgress(unitID, unitDefID, unitTeam, remainingSeconds)
   for _,w in ipairs(self.UnitSelfDestructProgressList) do
     w:UnitSelfDestructProgress(unitID, unitDefID, unitTeam, remainingSeconds)
   end
-  return
 end
 
 function widgetHandler:RecvLuaMsg(msg, playerID)
