@@ -2699,30 +2699,16 @@ static unsigned char ParseLosBits(lua_State* L, int index, unsigned char bits)
 	return 0;
 }
 
+/***
+ * @alias LosTable table<"los"|"radar"|"prevLos"|"contRadar",boolean>
+ */
 
 /***
  * @function Spring.SetUnitLosMask
  *
- * The 3rd argument is either the bit-and combination of the following numbers:
- *
- *     LOS_INLOS = 1
- *     LOS_INRADAR = 2
- *     LOS_PREVLOS = 4
- *     LOS_CONTRADAR = 8
- *
- * or a table of the following form:
- *
- *     losTypes = {
- *     [los = boolean,]
- *     [radar = boolean,]
- *     [prevLos = boolean,]
- *     [contRadar = boolean]
- *     }
- *
  * @param unitID integer
  * @param allyTeam number
- * @param losTypes number|table
- * @return nil
+ * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` or a table with los type strings as keys and booleans as values
  */
 int LuaSyncedCtrl::SetUnitLosMask(lua_State* L)
 {
@@ -2752,8 +2738,7 @@ int LuaSyncedCtrl::SetUnitLosMask(lua_State* L)
  * @function Spring.SetUnitLosState
  * @param unitID integer
  * @param allyTeam number
- * @param los number|table
- * @return nil
+ * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` or a table with los type strings as keys and booleans as values
  */
 int LuaSyncedCtrl::SetUnitLosState(lua_State* L)
 {
