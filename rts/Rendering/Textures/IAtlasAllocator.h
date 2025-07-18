@@ -29,7 +29,6 @@ public:
 		int2 size;
 		std::string name;
 		AtlasedTexture texCoords;
-		uint32_t pageIdx = 0;
 		void* data = nullptr;
 	};
 public:
@@ -63,14 +62,6 @@ public:
 	}
 	const auto& GetEntry(const std::string& name) const { return GetEntry(FindEntry(name));	}
 
-	auto GetEntryPage(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it) const {
-		if (it == entries.end())
-			return uint32_t(-1);
-
-		return it->second.pageIdx;
-	}
-	auto GetEntryPage(const std::string& name) const { return GetEntryPage(FindEntry(name)); }
-
 	void*& GetEntryData(const std::string& name)
 	{
 		return entries[name].data;
@@ -83,7 +74,8 @@ public:
 		if (it == entries.end())
 			return AtlasedTexture::DefaultAtlasTexture;
 
-		AtlasedTexture uv(static_cast<float4>(it->second.texCoords), it->second.pageIdx);
+		AtlasedTexture uv = it->second.texCoords;
+
 		uv.x1 /= atlasSize.x;
 		uv.y1 /= atlasSize.y;
 		uv.x2 /= atlasSize.x;

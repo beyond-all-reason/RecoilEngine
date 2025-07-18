@@ -4,8 +4,11 @@
 	uniform sampler2D   depthTex;
 #endif
 
-uniform sampler2D decalMainTex;
-uniform sampler2D decalNormTex;
+#ifdef USE_TEXTURE_ARRAY
+	uniform sampler2DArray atlasTex;
+#else
+	uniform sampler2D      atlasTex;
+#endif
 
 uniform sampler2D groundNormalTex;
 uniform sampler2D miniMapTex;
@@ -310,14 +313,29 @@ bool ProjectOntoPlane(vec3 worldPos, vec3 BL, vec3 TL, vec3 TR, vec3 BR, vec3 pr
 	return false;
 }
 
-vec4 GetColorByRelUV(sampler2D tex, vec2 uvTL, vec2 uvBL, vec2 uvTR, vec2 uvBR, vec4 relUV) {
+#ifdef USE_TEXTURE_ARRAY
+vec4 GetColorByRelUV(vec2 uvTL, vec2 uvBL, vec2 uvTR, vec2 uvBR, vec4 relUV) {
+	float layer = floor(uvTL.x);
+	uvTL.x = fract(uvTL.x);
+	uvBL.x = fract(uvBL.x);
+
 	vec2 uv = mix(
 		mix(uvTL, uvBL, relUV.x),
 		mix(uvTR, uvBR, relUV.x),
 	relUV.y);
 
-	return texture(tex, uv);
+	return texture(atlasTex, vec3(uv, layer));
 }
+#else
+vec4 GetColorByRelUV(vec2 uvTL, vec2 uvBL, vec2 uvTR, vec2 uvBR, vec4 relUV) {
+	vec2 uv = mix(
+		mix(uvTL, uvBL, relUV.x),
+		mix(uvTR, uvBR, relUV.x),
+	relUV.y);
+
+	return texture(atlasTex, uv);
+}
+#endif
 
 
 bool IsInEllipsoid(vec3 xyz, vec3 abc) {
@@ -372,8 +390,8 @@ void main() {
 	float alpha = clamp(vAlpha, 0.0, 1.0);
 	float glow  = clamp(vGlow , 0.0, 1.0);
 
-	vec4 mainCol = GetColorByRelUV(decalMainTex, uvTL.xy, uvBL.xy, uvTR.xy, uvBR.xy, relUV);
-	vec4 normVal = GetColorByRelUV(decalNormTex, uvTL.zw, uvBL.zw, uvTR.zw, uvBR.zw, relUV);
+	vec4 mainCol = GetColorByRelUV(uvTL.xy, uvBL.xy, uvTR.xy, uvBR.xy, relUV);
+	vec4 normVal = GetColorByRelUV(uvTL.zw, uvBL.zw, uvTR.zw, uvBR.zw, relUV);
 
 	mainCol *= 2.0 * vTintColor;
 

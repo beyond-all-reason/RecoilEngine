@@ -326,16 +326,19 @@ bool CTextureRenderAtlas::Finalize()
 				shader->SetUniform("lod", static_cast<float>(level));
 				// draw
 				for (auto& [name, entry] : atlasAllocator->GetEntries()) {
+					if (entry.texCoords.pageNum != page)
+						continue;
+
+					const auto texID = nameToTexID[name];
+					if (texID == 0)
+						continue;
+
 					const auto tc = atlasAllocator->GetTexCoords(name);
 
 					VA_TYPE_2DT posTL = { .x = Norm2SNorm(tc.x1), .y = Norm2SNorm(tc.y1), .s = 0.0f, .t = 0.0f };
 					VA_TYPE_2DT posTR = { .x = Norm2SNorm(tc.x2), .y = Norm2SNorm(tc.y1), .s = 1.0f, .t = 0.0f };
 					VA_TYPE_2DT posBL = { .x = Norm2SNorm(tc.x1), .y = Norm2SNorm(tc.y2), .s = 0.0f, .t = 1.0f };
 					VA_TYPE_2DT posBR = { .x = Norm2SNorm(tc.x2), .y = Norm2SNorm(tc.y2), .s = 1.0f, .t = 1.0f };
-
-					const auto texID = nameToTexID[name];
-					if (texID == 0)
-						continue;
 
 					auto texBind = GL::TexBind(GL_TEXTURE_2D, texID);
 
@@ -388,10 +391,20 @@ bool CTextureRenderAtlas::DumpTexture() const
 	if (!IsValid())
 		return false;
 
-	int levels = atlasAllocator->GetNumTexLevels();
+	const auto numLevels = atlasAllocator->GetNumTexLevels();
+	const auto numPages = atlasAllocator->GetNumPages();
 
-	for (uint32_t level = 0; level < levels; ++level) {
-		glSaveTexture(atlasTex->GetId(), fmt::format("{}_{}.png", atlasName, level).c_str(), level);
+	if (numPages > 1) {
+		for (uint32_t page = 0; page < numPages; ++page) {
+			for (uint32_t level = 0; level < numLevels; ++level) {
+				glSaveTextureArray(atlasTex->GetId(), fmt::format("{}_{}_{}.png", atlasName, page, level).c_str(), level, page);
+			}
+		}
+	}
+	else {
+		for (uint32_t level = 0; level < numLevels; ++level) {
+			glSaveTexture(atlasTex->GetId(), fmt::format("{}_{}.png", atlasName, level).c_str(), level);
+		}
 	}
 
 	return true;

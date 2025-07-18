@@ -100,7 +100,7 @@ public:
 				assert(entries.contains(name));
 				auto& myEntry = entries[name];
 				myEntry.texCoords = ae.texCoords;
-				myEntry.pageIdx = static_cast<uint32_t>(i);
+				myEntry.texCoords.pageNum = static_cast<uint32_t>(i);
 			}
 
 			const auto& as = allocator->GetAtlasSize();

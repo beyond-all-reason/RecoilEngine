@@ -4702,13 +4702,12 @@ int LuaUnsyncedRead::GetGroundDecalTexture(lua_State* L)
 /***
  *
  * @function Spring.GetGroundDecalTextures
- * @param isMainTex boolean? (Default: `true`) If `false`, return the texture for normal/glow maps.
  * @return string[] textureNames All textures on the atlas and available for use in `SetGroundDecalTexture`.
  * @see Spring.GetGroundDecalTexture
  */
 int LuaUnsyncedRead::GetGroundDecalTextures(lua_State* L)
 {
-	const auto& texNames = groundDecals->GetDecalTextures(luaL_optboolean(L, 1, true));
+	const auto& texNames = groundDecals->GetDecalTextures();
 	LuaUtils::PushStringVector(L, texNames);
 
 	return 1;

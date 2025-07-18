@@ -517,6 +517,7 @@ decltype(glad_glObjectLabel) glad_glObjectLabel = nullptr;
 decltype(glad_glClearBufferuiv) glad_glClearBufferuiv = nullptr;
 decltype(glad_glClearBufferiv) glad_glClearBufferiv = nullptr;
 decltype(glad_glClearBufferfv) glad_glClearBufferfv = nullptr;
+decltype(glad_glGetTextureSubImage) glad_glGetTextureSubImage = nullptr;
 
 namespace Impl {
     template<typename R, typename... Args>
@@ -955,6 +956,7 @@ int gladLoadGL(void) {
     glad_glClearBufferuiv = MakeStubImpl(glad_glClearBufferuiv);
     glad_glClearBufferiv = MakeStubImpl(glad_glClearBufferiv);
     glad_glClearBufferfv = MakeStubImpl(glad_glClearBufferfv);
+    glad_glGetTextureSubImage = MakeStubImpl(glad_glGetTextureSubImage);
 
     return 0;
 }
