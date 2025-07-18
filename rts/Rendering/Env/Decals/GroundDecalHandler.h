@@ -110,7 +110,8 @@ public:
 	const GroundDecal* GetDecalById(uint32_t id) const override;
 	bool SetDecalTexture(uint32_t id, const std::string& texName, bool mainTex) override;
 	std::string GetDecalTexture(uint32_t id, bool mainTex) const override;
-	const std::vector<std::string> GetDecalTextures() const override;
+	const std::vector<std::string> GetDecalTextures(const std::optional<bool>& mainTex) const override;
+	const std::vector<std::string> GetDecalTextureFileNames(const std::vector<std::string>& texList) const override;
 	const CSolidObject* GetDecalSolidObjectOwner(uint32_t id) const override;
 
 	void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) override;
@@ -162,6 +163,7 @@ private:
 	spring::unordered_map<int, UnitMinMaxHeight> unitMinMaxHeights; // for tracks
 	spring::unordered_map<uint32_t, size_t> idToPos;
 	spring::unordered_map<uint32_t, std::tuple<const CColorMap*, std::pair<size_t, size_t>>> idToCmInfo;
+	spring::unordered_map<std::string, std::string> texFileNames;
 
 	UpdateList decalsUpdateList;
 

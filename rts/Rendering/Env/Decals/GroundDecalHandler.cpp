@@ -197,7 +197,9 @@ void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::stri
 	RECOIL_DETAILED_TRACY_ZONE;
 	try {
 		const auto& [bm, fn] = LoadTexture(filename, convertOldBMP);
-		atlasTex->AddTexFromBitmap(name, bm);
+		if (atlasTex->AddTexFromBitmap(name, bm)) {
+			texFileNames.emplace(name, fn);
+		}
 	}
 	catch (const content_error& err) {
 		LOG_L(L_WARNING, "%s", err.what());
@@ -1078,14 +1080,49 @@ std::string CGroundDecalHandler::GetDecalTexture(uint32_t id, bool mainTex) cons
 	return "";
 }
 
-const std::vector<std::string> CGroundDecalHandler::GetDecalTextures() const
+const std::vector<std::string> CGroundDecalHandler::GetDecalTextures(const std::optional<bool>& mainTex) const
 {
-	//ZoneScoped;
+	auto IsNormalTexture = [](const std::string& texName) {
+		if (texName == "%FB_NORM%")
+			return true;
+
+		if (texName.find("_normal") != std::string::npos)
+			return true;
+
+		return false;
+	};
+
 	std::vector<std::string> ret;
 	for (auto& [name, _] : atlasTex->GetAllocator()->GetEntries()) {
-		ret.emplace_back(name);
+		if (!mainTex.has_value()) {
+			ret.emplace_back(name);
+			continue;
+		}
+
+		const auto isNorm = IsNormalTexture(name);
+
+		if ((mainTex.value() && !isNorm) || (!mainTex.value() && isNorm))
+			ret.emplace_back(name);
 	}
+
 	std::sort(ret.begin(), ret.end());
+	return ret;
+}
+
+const std::vector<std::string> CGroundDecalHandler::GetDecalTextureFileNames(const std::vector<std::string>& texList) const
+{
+	std::vector<std::string> ret;
+	ret.reserve(texList.size());
+
+	for (const auto& tex : texList) {
+		if (auto it = texFileNames.find(tex); it != texFileNames.end()) {
+			ret.emplace_back(it->second);
+		}
+		else {
+			ret.emplace_back("");
+		}
+	}
+
 	return ret;
 }
 
