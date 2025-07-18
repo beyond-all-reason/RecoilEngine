@@ -14,6 +14,14 @@ int GLAD_GL_VERSION_2_1 = 0;
 int GLAD_GL_VERSION_3_0 = 0;
 int GLAD_GL_VERSION_3_1 = 0;
 int GLAD_GL_VERSION_3_2 = 0;
+int GLAD_GL_VERSION_3_3 = 0;
+int GLAD_GL_VERSION_4_0 = 0;
+int GLAD_GL_VERSION_4_1 = 0;
+int GLAD_GL_VERSION_4_2 = 0;
+int GLAD_GL_VERSION_4_3 = 0;
+int GLAD_GL_VERSION_4_4 = 0;
+int GLAD_GL_VERSION_4_5 = 0;
+int GLAD_GL_VERSION_4_6 = 0;
 
 int GLAD_GL_NV_primitive_restart = 0;
 int GLAD_GL_EXT_texture_filter_anisotropic = 0;
