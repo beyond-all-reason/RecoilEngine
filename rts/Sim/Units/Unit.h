@@ -105,6 +105,9 @@ public:
 
 	// negative amount=reclaim, return= true -> build power was successfully applied
 	bool AddBuildPower(CUnit* builder, float amount);
+	
+	// FindRepairTarget/FindRepairTargetAndRepair functions will ignore units that return false here
+	bool AllowUnitAutoRepair();
 
 	virtual void Activate();
 	virtual void Deactivate();
@@ -370,6 +373,8 @@ public:
 
 	// if we arent built on for a while start decaying
 	int lastNanoAdd = 0;
+	int lastOwnerReclaim = 0;
+	int lastOwnerBuildRepair = 0;
 	int lastFlareDrop = 0;
 
 	// id of transport that the unit is about to be {un}loaded by
