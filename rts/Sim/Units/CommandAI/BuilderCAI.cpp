@@ -1639,8 +1639,13 @@ bool CBuilderCAI::FindRepairTargetAndRepair(
 	bool stationary = false;
 
 	for (const CUnit* unit: *qfQuery.units) {
+
 		if (teamHandler.Ally(owner->allyteam, unit->allyteam)) {
 			if (!haveEnemy && (unit->health < unit->maxHealth)) {
+				// Don't auto pick for repair or build if within 900 frames of last reclaim
+				if (unit->AllowUnitAutoRepair())
+					continue;
+				
 				// don't help allies build unless set on roam
 				if (unit->beingBuilt && owner->team != unit->team && (owner->moveState != MOVESTATE_ROAM))
 					continue;
