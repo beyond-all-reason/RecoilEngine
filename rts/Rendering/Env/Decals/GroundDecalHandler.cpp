@@ -332,7 +332,7 @@ void CGroundDecalHandler::AddFallbackTextures()
 	RECOIL_DETAILED_TRACY_ZONE;
 	const auto minDim = std::max(atlasTex->GetMinDim(), 32);
 	atlasTex->AddTex("%FB_MAIN%", minDim, minDim, SColor(255,   0,   0, 255));
-	atlasTex->AddTex("%FB_NORM%", minDim, minDim, SColor(128, 128, 255, 0));
+	atlasTex->AddTex("%FB_NORM%", minDim, minDim, SColor(128, 128, 255,   0));
 }
 
 uint32_t CGroundDecalHandler::GetNextId()
@@ -681,7 +681,6 @@ void CGroundDecalHandler::ReloadTextures()
 	}
 
 	// can't use {atlas}->ReloadTextures() here as all textures come from memory
-	atlasTex = nullptr;
 	atlasTex = nullptr;
 	GenerateAtlasTexture();
 
