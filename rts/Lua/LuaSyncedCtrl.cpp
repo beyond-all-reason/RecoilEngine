@@ -2703,6 +2703,15 @@ static unsigned char ParseLosBits(lua_State* L, int index, unsigned char bits)
  * @alias LosTable table<"los"|"radar"|"prevLos"|"contRadar",boolean>
  */
 
+/***
+ * @enum LosMask
+ * @x_helper
+ * @field INLOS 1 the unit is currently in the los of the allyteam
+ * @field INRADAR 2 the unit is currently in radar from the allyteam
+ * @field PREVLOS 4 the unit has previously been in los from the allyteam
+ * @field CONTRADAR 8 the unit has continuously been in radar since it was last inlos by the allyteam
+ */
+
 /*** Set visibility status mask for a unit and team
  *
  * Use this to allow or disallow a unit from having its visibility status
@@ -2746,6 +2755,15 @@ int LuaSyncedCtrl::SetUnitLosMask(lua_State* L)
  *
  * Use it to change visibility state, once you set the unit to not receive
  * engine visibility updates.
+ *
+ * A few notes on certain bits:
+ *
+ * - `contradar`: True when the unit entered los at some point, remains set
+ *   until radar is lost. Useful for tracking the unit type in radar, if you
+ *   lost los you still know what unit type that radar dot refers to.
+ * - `prevlos`: True when the unit has entered los at least once, useful for
+ *   tracking building locations (controls whether a ghost appears or not in
+ *   the location)
  *
  * @see Spring.SetUnitLosMask
  * @function Spring.SetUnitLosState

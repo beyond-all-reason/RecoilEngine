@@ -8208,15 +8208,6 @@ int LuaSyncedRead::IsPosInAirLos(lua_State* L)
 	return 1;
 }
 
-/***
- * @enum LosMask
- * @x_helper
- * @field INLOS 1 the unit is currently in the los of the allyteam
- * @field INRADAR 2 the unit is currently in radar from the allyteam
- * @field PREVLOS 4 the unit has previously been in los from the allyteam
- * @field CONTRADAR 8 the unit has continuously been in radar since it was last inlos by the allyteam
- */
-
 /*** Get unit los state (bitmask)
  *
  * @function Spring.GetUnitLosState
