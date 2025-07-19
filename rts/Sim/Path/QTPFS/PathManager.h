@@ -44,6 +44,7 @@ namespace QTPFS {
 		std::uint32_t GetPathCheckSum() const override { return pfsCheckSum; }
 
 		std::int64_t Finalize() override;
+		std::int64_t PostFinalizeRefresh() override;
 
 		bool PathUpdated(unsigned int pathID) override;
 		void ClearPathUpdated(unsigned int pathID) override;

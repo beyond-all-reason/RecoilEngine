@@ -236,6 +236,32 @@ std::int64_t QTPFS::PathManager::Finalize() {
 	return (dt.toMilliSecsi());
 }
 
+std::int64_t QTPFS::PathManager::PostFinalizeRefresh() {
+	RECOIL_DETAILED_TRACY_ZONE;
+	const spring_time t0 = spring_gettime();
+	
+	bool updateNeeded = nodeLayersMapDamageTrack.mapChangeTrackers.end() !=
+		std::ranges::find_if(nodeLayersMapDamageTrack.mapChangeTrackers,
+			[](const QTPFS::PathManager::MapChangeTrack &ct) -> bool { return ct.damageQueue.size() > 0; });
+
+	if (updateNeeded) {
+		// Rescan the map otherwise random maps won't work correctly.
+
+		SRectangle rect(0,0,0,0);
+		for_mt(0, nodeLayers.size(), [this, &rect](const int index) {
+			int curThread = ThreadPool::GetThreadNum();
+			int layerNum = nodeLayerUpdatePriorityOrder[index];
+			int blocksToUpdate = nodeLayersMapDamageTrack.mapChangeTrackers[layerNum].damageQueue.size();
+			for (int i = 0; i < blocksToUpdate; ++i) { UpdateNodeLayer(layerNum, rect, curThread); }
+		});
+
+		PathSpeedModInfoSystem::Init();
+	}
+
+	const spring_time dt = spring_gettime() - t0;
+	return (dt.toMilliSecsi());
+}
+
 void QTPFS::PathManager::InitStatic() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LAYERS_PER_UPDATE = std::max(1u, mapInfo->pfs.qtpfs_constants.layersPerUpdate);
