@@ -29,13 +29,13 @@ struct BuildInfo;
 
 class ExplosionHitObject {
 private:
-	using VariantType = std::variant<void*, CUnit*, CFeature*, CWeapon*>;
+	using VariantType = std::variant<std::monostate, CUnit*, CFeature*, CWeapon*>;
 public:
 	ExplosionHitObject()
-		: hitObject(static_cast<void*>(nullptr))
+		: hitObject({})
 	{}
 	ExplosionHitObject(std::nullptr_t)
-		: hitObject(static_cast<void*>(nullptr))
+		: hitObject({})
 	{}
 
 	template<typename... PT>
@@ -60,8 +60,8 @@ public:
 		hitObject = p;
 	}
 
-	void operator=(void* p) {
-		hitObject = p;
+	void operator=(std::nullptr_t) {
+		hitObject = {};
 	}
 
 	template<typename T>
@@ -72,11 +72,15 @@ public:
 		return std::get<T*>(hitObject);
 	}
 
-	template<typename T, typename E = std::enable_if_t<std::is_constructible_v<VariantType, T*>>>
-	bool HasStored() const { return std::holds_alternative<T*>(hitObject); }
-
-	template<typename T, std::false_type>
-	bool HasStored() const;
+	template <typename T>
+	bool HasStored() const {
+		if constexpr (std::is_constructible_v<VariantType, T*>) {
+			return std::holds_alternative<T*>(hitObject);
+		}
+		else {
+			return false;
+		}
+	}
 private:
 	VariantType hitObject;
 };
@@ -103,7 +107,7 @@ struct CExplosionParams {
 	bool ignoreOwner;
 	bool damageGround;
 
-	unsigned int projectileID;
+	uint32_t projectileID;
 };
 
 class CGameHelper
