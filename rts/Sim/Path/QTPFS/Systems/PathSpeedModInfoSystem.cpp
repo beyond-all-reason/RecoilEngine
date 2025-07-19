@@ -124,7 +124,7 @@ void ScanWholeMap()
 {
     auto& comp = systemGlobals.GetSystemComponent<PathSpeedModInfoSystemComponent>();
 
-    // Scan whole map for initial max speed for hCost 
+    // Scan whole map for initial max speed for hCost
     comp.refreshTimeInFrames = 1;
     ScanForPathSpeedModInfo(-1);
     comp.refreshTimeInFrames = GAME_SPEED * 30;
