@@ -2703,12 +2703,18 @@ static unsigned char ParseLosBits(lua_State* L, int index, unsigned char bits)
  * @alias LosTable table<"los"|"radar"|"prevLos"|"contRadar",boolean>
  */
 
-/***
+/*** Set visibility status mask for a unit and team
+ *
+ * Use this to allow or disallow a unit from having its visibility status
+ * against a certain team updated by the engine.
+ *
+ * @see Spring.SetUnitLosState
  * @function Spring.SetUnitLosMask
  *
  * @param unitID integer
  * @param allyTeam number
- * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` or a table with los type strings as keys and booleans as values
+ * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` bits or a
+ * table. True bits disable engine updates to visibility.
  */
 int LuaSyncedCtrl::SetUnitLosMask(lua_State* L)
 {
@@ -2734,11 +2740,19 @@ int LuaSyncedCtrl::SetUnitLosMask(lua_State* L)
 }
 
 
-/***
+/*** Set current visibility status for a unit and team
+ *
+ * Note this state will not be persisted if the visibility state is not masked.
+ *
+ * Use it to change visibility state, once you set the unit to not receive
+ * engine visibility updates.
+ *
+ * @see Spring.SetUnitLosMask
  * @function Spring.SetUnitLosState
  * @param unitID integer
  * @param allyTeam number
- * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` or a table with los type strings as keys and booleans as values
+ * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` bits or a
+ * table
  */
 int LuaSyncedCtrl::SetUnitLosState(lua_State* L)
 {
