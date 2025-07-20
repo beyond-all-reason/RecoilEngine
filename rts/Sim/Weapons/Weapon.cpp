@@ -957,7 +957,7 @@ bool CWeapon::TryTarget(const float3 tgtPos, const SWeaponTarget& trg, bool preF
 }
 
 
-bool CWeapon::TestTarget(const float3 tgtPos, const SWeaponTarget& trg) const
+bool CWeapon::TestTarget(const float3& tgtPos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if ((trg.isManualFire != weaponDef->manualfire) && owner->unitDef->canManualFire)
@@ -1024,7 +1024,7 @@ bool CWeapon::TestTarget(const float3 tgtPos, const SWeaponTarget& trg) const
 	return true;
 }
 
-bool CWeapon::TestRange(const float3 tgtPos, const SWeaponTarget& trg) const
+bool CWeapon::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const float heightDiff = tgtPos.y - aimFromPos.y;
@@ -1049,7 +1049,7 @@ bool CWeapon::TestRange(const float3 tgtPos, const SWeaponTarget& trg) const
 }
 
 
-bool CWeapon::HaveFreeLineOfFire(const float3 srcPos, const float3 tgtPos, const SWeaponTarget& trg) const
+bool CWeapon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	float3 tgtDir = tgtPos - srcPos;

@@ -16,10 +16,10 @@ public:
 private:
 	bool CanFire(bool ignoreAngleGood, bool ignoreTargetType, bool ignoreRequestedDir) const override final;
 
-	bool TestTarget(const float3 pos, const SWeaponTarget& trg) const override final;
-	bool TestRange(const float3 pos, const SWeaponTarget& trg) const override final;
+	bool TestTarget(const float3& pos, const SWeaponTarget& trg) const override final;
+	bool TestRange(const float3& tgtPos, const SWeaponTarget& trg) const override final;
 	// TODO: requires sampling parabola from aimFromPos down to dropPos
-	bool HaveFreeLineOfFire(const float3 srcPos, const float3 tgtPos, const SWeaponTarget& trg) const override final { return true; }
+	bool HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const override final { return true; }
 	void FireImpl(const bool scriptCall) override final;
 
 private:

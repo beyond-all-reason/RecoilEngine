@@ -271,7 +271,7 @@ void CBeamLaser::FireImpl(const bool scriptCall)
 	FireInternal(GetFireDir(false, scriptCall));
 }
 
-bool CBeamLaser::TestRange(const float3 tgtPos, const SWeaponTarget& trg) const
+bool CBeamLaser::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
 {
 	const float targetDistSq = aimFromPos.SqDistance(tgtPos);
 	const float3 aimDir = (tgtPos - aimFromPos).SafeNormalize();

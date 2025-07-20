@@ -25,7 +25,7 @@ CTorpedoLauncher::CTorpedoLauncher(CUnit* owner, const WeaponDef* def): CWeapon(
 }
 
 
-bool CTorpedoLauncher::TestTarget(const float3 pos, const SWeaponTarget& trg) const
+bool CTorpedoLauncher::TestTarget(const float3& pos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// by default we are a waterweapon, therefore:

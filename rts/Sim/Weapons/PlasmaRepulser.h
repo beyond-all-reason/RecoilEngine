@@ -18,7 +18,7 @@ public:
 
 	void Init() override final;
 	void DependentDied(CObject* o) override final;
-	bool HaveFreeLineOfFire(const float3 srcPos, const float3 tgtPos, const SWeaponTarget& trg) const override final { return true; }
+	bool HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const override final { return true; }
 
 	void Update() override final;
 	void SlowUpdate() override final;
