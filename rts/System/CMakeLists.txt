@@ -41,6 +41,7 @@ make_global_var(sources_engine_System_common
 		"${CMAKE_CURRENT_SOURCE_DIR}/GameLoadThread.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/Clipboard.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/ConsoleInit.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/errorhandler.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/Misc.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/ScopedFileLock.cpp"

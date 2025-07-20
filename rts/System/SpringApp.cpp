@@ -92,6 +92,7 @@
 #include "System/Log/DefaultFilter.h"
 #include "System/LogOutput.h"
 #include "System/Platform/errorhandler.h"
+#include "System/Platform/ConsoleInit.hpp"
 #include "System/Platform/CrashHandler.h"
 #include "System/Platform/Threading.h"
 #include "System/Platform/Watchdog.h"
@@ -200,11 +201,7 @@ SpringApp::SpringApp(int argc, char** argv)
 	gflags::SetUsageMessage("Usage: " + std::string(argv[0]) + " [options] [path_to_script.txt or demo.sdfz]");
 	gflags::SetVersionString(SpringVersion::GetFull());
 	gflags::ParseCommandLineFlags(&argc, &argv, true);
-#ifdef _WIN32
-	SetConsoleOutputCP(CP_UTF8);
-	setvbuf(stdout, nullptr, _IOFBF, 8192);
-	setvbuf(stderr, nullptr, _IONBF,    0);
-#endif // _WIN32
+	Recoil::InitConsole();
 
 	// also initializes configHandler and logOutput
 	ParseCmdLine(argc, argv);

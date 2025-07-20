@@ -105,6 +105,7 @@ set(system_files
 	${ENGINE_SRC_ROOT_DIR}/System/Log/ConsoleSink.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Log/TracySink.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Misc/SpringTime.cpp
+	${ENGINE_SRC_ROOT_DIR}/System/Platform/ConsoleInit.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Platform/errorhandler.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Platform/CpuID.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Platform/Misc.cpp
