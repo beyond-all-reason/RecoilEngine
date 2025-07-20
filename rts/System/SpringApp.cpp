@@ -107,12 +107,6 @@ CONFIG(unsigned, SetCoreAffinity).defaultValue(0).safemodeValue(1).description("
 CONFIG(unsigned, TextureMemPoolSize).defaultValue(512).minimumValue(0).description("Set to 0 to disable, otherwise specify a predefined memory to serve Bitmap allocation requests");
 CONFIG(bool, UseLuaMemPools).defaultValue(true).description("Whether Lua VM memory allocations are made from pools.");
 CONFIG(bool, UseHighResTimer).defaultValue(false).description("On Windows, sets whether Spring will use low- or high-resolution timer functions for tasks like graphical interpolation between game frames.");
-CONFIG(bool, UseFontConfigLib).defaultValue(true).description("Whether the system fontconfig library (if present and enabled at compile-time) should be used for handling fonts.");
-CONFIG(bool, UseFontConfigSystemFonts).defaultValue(true).description("Whether the system fonts will be searched by fontconfig.");
-CONFIG(bool, FontConfigSearchAttributes).defaultValue(true).description("Whether the font characteristics will used to refine the search by fontconfig. Results in better glyph matches in some cases, but has a nontrivial performance cost.");
-CONFIG(bool, FontConfigApplySubstitutions).defaultValue(true).description("[EXPERIMENTAL] In case it's disabled FcConfigSubstitute is not getting called, this might break non-ASCII font rendering.");
-CONFIG(int, MaxFontTries).defaultValue(5).description("Represents the maximum number of attempts to search for a glyph replacement using the FontConfig library (lower = foreign glyphs may fail to render, higher = searching for foreign glyphs can lag the game).");
-CONFIG(int, MaxPinnedFonts).defaultValue(10).description("Maximum number of fonts to pin to cache. Increasing this will eventually use more memory, but can alleviate processing spikes when rendering new glyphs.");
 
 CONFIG(std::string, name).defaultValue(UnnamedPlayerName).description("Sets your name in the game. Since this is overridden by lobbies with your lobby username when playing, it usually only comes up when viewing replays or starting the engine directly for testing purposes.");
 CONFIG(std::string, DefaultStartScript).defaultValue("").description("filename of script.txt to use when no command line parameters are specified.");
@@ -341,11 +335,7 @@ bool SpringApp::InitPlatformLibs()
 
 bool SpringApp::InitFonts()
 {
-	fontHandler.Init();
-	FtLibraryHandlerProxy::InitFtLibrary();
-	FtLibraryHandlerProxy::InitFontconfig(false);
-	CFontTexture::InitFonts();
-	return CglFont::LoadConfigFonts();
+	return fontHandler.FullInit();
 /*
 	using namespace std::chrono_literals;
 	auto future = std::async(std::launch::async, []() {
@@ -371,12 +361,9 @@ bool SpringApp::InitFonts()
 
 void SpringApp::CleanFonts()
 {
-	font      = {};
-	smallFont = {};
-
 	// Can't leave it to default program destructor as the order of object destruction is not guaranteed.
 	// E.g.: Bitmap memory pool can be destroyed before fonts causing null ptr exception
-	CFontTexture::KillFonts();
+	fontHandler.Kill();
 }
 
 bool SpringApp::InitFileSystem()
@@ -491,8 +478,7 @@ void SpringApp::ParseCmdLine(int argc, char* argv[])
 			spring_clock::PushTickRate();
 			spring_time::setstarttime(spring_time::gettime(true));
 		}
-		FtLibraryHandlerProxy::InitFtLibrary();
-		if (FtLibraryHandlerProxy::InitFontconfig(true)) {
+		if (fontHandler.Init(true)) {
 			printf("[FtLibraryHandler::GenFontConfig] is succesfull\n");
 			exit(spring::EXIT_CODE_SUCCESS);
 		}

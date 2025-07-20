@@ -13,18 +13,10 @@
 #include "System/UnorderedMap.hpp"
 #include "System/UnorderedSet.hpp"
 #include "System/Threading/WrappedSync.h"
+#include "FtLibraryHandler.h"
 
 
-struct FT_FaceRec_;
-typedef struct FT_FaceRec_* FT_Face;
 class CBitmap;
-
-class FtLibraryHandlerProxy {
-public:
-	static void InitFtLibrary();
-	static bool InitFontconfig(bool console);
-};
-
 
 struct IGlyphRect { //FIXME use SRect or float4
 	IGlyphRect():
@@ -191,9 +183,6 @@ private:
 	int curTextureUpdate = 0;
 	int lastTextureUpdate = 0;
 	bool needsTextureUpload = true;
-	inline static int maxFontTries = 0;
-	inline static int maxPinnedFonts = 0;
-	inline static int allowColorFonts = 0;
 #endif
 	std::shared_ptr<FontFace> shFace;
 
