@@ -115,13 +115,30 @@ void InitLayers() {
         auto& layer = QTPFS::registry.emplace<NodeLayerSpeedInfoSweep>(entity);
         layer.layerNum = counter++;
         layer.updateCurMaxSpeed = 0.f;
-        // LOG("%s: added %x:%x entity", __func__, entt::to_integral(entity), entt::to_version(entity));
+        // LOG("%s: added %x:%x entity for layer %d '%s'", __func__, entt::to_integral(entity), entt::to_version(entity)
+        //     , layer.layerNum, moveDefHandler.GetMoveDefByPathType(layer.layerNum)->name.c_str());
     });
+}
+
+void ScanWholeMap()
+{
+    auto& comp = systemGlobals.GetSystemComponent<PathSpeedModInfoSystemComponent>();
+
+    // Scan whole map for initial max speed for hCost
+    comp.refreshTimeInFrames = 1;
+    ScanForPathSpeedModInfo(-1);
+    comp.refreshTimeInFrames = GAME_SPEED * 30;
 }
 
 void PathSpeedModInfoSystem::Init()
 {
     RECOIL_DETAILED_TRACY_ZONE;
+
+    if (systemGlobals.IsSystemActive<PathSpeedModInfoSystemComponent>()) {
+        ScanWholeMap();
+        return;
+    }
+
     auto& comp = systemGlobals.CreateSystemComponent<PathSpeedModInfoSystemComponent>();
     auto pm = dynamic_cast<QTPFS::PathManager*>(IPathManager::GetInstance(QTPFS_TYPE));
 
@@ -129,11 +146,8 @@ void PathSpeedModInfoSystem::Init()
 
     systemUtils.OnUpdate().connect<&PathSpeedModInfoSystem::Update>();
 
-    // Scan whole map for initial max speed for hCost 
-    comp.refreshTimeInFrames = 1;
-    ScanForPathSpeedModInfo(-1);
+    ScanWholeMap();
 
-    comp.refreshTimeInFrames = GAME_SPEED * 30;
     comp.startRefreshOnFrame = NEXT_FRAME_NEVER;
     comp.refeshDelayInFrames = GAME_SPEED;
 

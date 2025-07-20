@@ -445,6 +445,16 @@ void FBO::AttachTexture(const GLuint texId, const GLenum texTarget, const GLenum
 	}
 }
 
+void FBO::AttachTextureLayer(const GLuint texId, const GLenum attachment, const int mipLevel, const int layer)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+#ifndef HEADLESS
+	assert(GetCurrentBoundFBO() == fboId);
+#endif
+
+	glFramebufferTextureLayerEXT(GL_FRAMEBUFFER_EXT, attachment, texId, mipLevel, layer);
+}
+
 
 /**
  * Attaches a GL RenderBuffer to the framebuffer

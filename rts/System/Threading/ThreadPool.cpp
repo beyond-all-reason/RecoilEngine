@@ -112,7 +112,7 @@ static int GetDefaultNumWorkers() {
 	const int cfgNumWorkers = GetConfigNumWorkers();
 
 	if (cfgNumWorkers < 0) {
-		return Threading::GetPerformanceCpuCores();
+		return Threading::GetOptimalThreadCount();
 	}
 
 	if (cfgNumWorkers > maxNumThreads) {
@@ -584,26 +584,34 @@ void SetMaximumThreadCount()
 	SetThreadCount(GetMaxThreads());
 }
 
+/**
+ * ThreadPolicyObject
+ */
+
 void SetDefaultThreadCount()
 {
 	#if !defined(THREADPOOL)
 	return;
 	#endif
-	std::uint32_t systemCores = Threading::GetSystemAffinityMask();
+
+	const int threadCount = GetDefaultNumWorkers();
+	SetThreadCount(threadCount);
+
+	std::uint32_t systemCores = Threading::GetSystemAffinityMask(threadCount);
 	std::uint32_t mainAffinity = systemCores;
+
+	const cpu_topology::ThreadPinPolicy threadPinPolicy = Threading::GetChosenThreadPinPolicy();
 
 	#ifndef UNIT_TEST
 	std::uint32_t configAffinity = configHandler->GetUnsigned("SetCoreAffinity");
 	mainAffinity &= (configAffinity != 0) ? configAffinity
-		: (cpu_topology::GetThreadPinPolicy() == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
-			? Threading::GetPreferredMainThreadMask()
+		: (threadPinPolicy == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
+			? Threading::GetPreferredMainThreadMask(systemCores)
 			: 0;
 	LOG("[ThreadPool] Main thread affinity requested as 0x%08x", mainAffinity);
 	#endif
 
 	std::uint32_t workerAvailCores = systemCores & ~mainAffinity;
-
-	SetThreadCount(GetDefaultNumWorkers());
 
 	{
 		// parallel_reduce now folds over shared_ptrs to futures
@@ -617,7 +625,7 @@ void SetDefaultThreadCount()
 				return 0;
 
 			const std::uint32_t workerCore =
-				 (cpu_topology::GetThreadPinPolicy() == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
+				 (threadPinPolicy == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
 				 ? FindWorkerThreadCore(i - 1, workerAvailCores, mainAffinity)
 				 : workerAvailCores;
 
@@ -628,13 +636,13 @@ void SetDefaultThreadCount()
 			return workerCore;
 		};
 
-		const std::uint32_t poolCoreAffinity = parallel_reduce(AffinityFunc, ReduceFunc);
+		const std::uint32_t poolCoreAffinity = parallel_reduce<SyncTask<decltype(AffinityFunc)>>(AffinityFunc, ReduceFunc);
 		const std::uint32_t mainCoreAffinity = ~poolCoreAffinity & systemCores;
 
 		if (mainAffinity == 0)
 			mainAffinity = systemCores;
 
-		if (cpu_topology::GetThreadPinPolicy() == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
+		if (threadPinPolicy == cpu_topology::THREAD_PIN_POLICY_PER_PERF_CORE)
 			mainAffinity &= mainCoreAffinity;
 
 		Threading::SetAffinityHelper("Main", mainAffinity);

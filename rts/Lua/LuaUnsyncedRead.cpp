@@ -4702,16 +4702,26 @@ int LuaUnsyncedRead::GetGroundDecalTexture(lua_State* L)
 /***
  *
  * @function Spring.GetGroundDecalTextures
- * @param isMainTex boolean? (Default: `true`) If `false`, return the texture for normal/glow maps.
  * @return string[] textureNames All textures on the atlas and available for use in `SetGroundDecalTexture`.
+ * @param isMainTex boolean|nil (Default: `nil`). If `nil` - no filtering is done, if `false` - return normal/glow textures, if `true` - return main color textures.
+ * @param addFilenames boolean? (Default: `false`). If `true` add the texture filenames in the second table
  * @see Spring.GetGroundDecalTexture
  */
 int LuaUnsyncedRead::GetGroundDecalTextures(lua_State* L)
 {
-	const auto& texNames = groundDecals->GetDecalTextures(luaL_optboolean(L, 1, true));
+	std::optional<bool> isMainTex;
+	if (!lua_isnoneornil(L, 1))
+		isMainTex = luaL_checkboolean(L, 1);
+
+	const auto& texNames = groundDecals->GetDecalTextures(isMainTex);
 	LuaUtils::PushStringVector(L, texNames);
 
-	return 1;
+	if (!luaL_optboolean(L, 2, false))
+		return 1;
+
+	const auto& texFileNames = groundDecals->GetDecalTextureFileNames(texNames);
+	LuaUtils::PushStringVector(L, texFileNames);
+	return 2;
 }
 
 

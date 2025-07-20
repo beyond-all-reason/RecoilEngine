@@ -33,7 +33,7 @@ struct AtlasedTexture
 	{}
 
 	explicit operator float4() const {
-		return float4(x, y, z, w);
+		return float4(x + pageNum, y, z, w);
 	}
 
 	bool operator==(const AtlasedTexture& rhs) const {

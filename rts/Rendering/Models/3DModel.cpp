@@ -36,11 +36,12 @@ CR_REG_METADATA(LocalModelPiece, (
 	// reload
 	CR_IGNORED(original),
 
-	CR_IGNORED(dirty),
-	CR_IGNORED(wasUpdated),
-	CR_IGNORED(noInterpolation),
-	CR_IGNORED(modelSpaceTra),
-	CR_IGNORED(pieceSpaceTra),
+	CR_MEMBER(dirty),
+	CR_MEMBER(wasUpdated),
+	CR_MEMBER(noInterpolation),
+	CR_MEMBER(modelSpaceTra),
+	CR_MEMBER(pieceSpaceTra),
+	CR_MEMBER(modelSpaceMat),
 
 	CR_IGNORED(lodDispLists) //FIXME GL idx!
 ))

@@ -28,7 +28,12 @@ public:
     T& GetSystemComponent() { return registry.template get<T>(systemGlobalsEntity); }
 
     template<class T>
-    bool IsSystemActive() { return (nullptr != registry.template try_get<T>(systemGlobalsEntity)); }
+    bool IsSystemActive() {
+        if (! registry.valid(systemGlobalsEntity))
+            systemGlobalsEntity = registry.create();
+
+        return (nullptr != registry.template try_get<T>(systemGlobalsEntity));
+    }
 
     void ClearComponents() {
         if (registry.valid(systemGlobalsEntity))

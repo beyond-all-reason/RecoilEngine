@@ -33,10 +33,79 @@ namespace Shader {
 	struct IProgramObject;
 }
 
-class CGroundDecalHandler: public IGroundDecalDrawer, public CEventClient, public IExplosionListener
-{
-	CR_DECLARE_DERIVED(CGroundDecalHandler)
+class CGroundDecalHandlerData : public IGroundDecalDrawer {
+public:
+	CR_DECLARE_DERIVED(CGroundDecalHandlerData)
 	CR_DECLARE_SUB(UnitMinMaxHeight)
+	CGroundDecalHandlerData();
+	void PostLoad();
+public:
+	void ReloadTextures() override {}
+	void DumpAtlasTextures() override {}
+
+	void Draw() override {}
+
+	void AddSolidObject(const CSolidObject* object) override {}
+	void ForceRemoveSolidObject(const CSolidObject* object) override {}
+
+	void GhostCreated(const CSolidObject* object, const GhostSolidObject* gb) override {}
+	void GhostDestroyed(const GhostSolidObject* gb) override {}
+
+	uint32_t CreateLuaDecal() override { return 0; }
+	bool DeleteLuaDecal(uint32_t id) override { return false; }
+	      GroundDecal* GetDecalById(uint32_t id)       override { return nullptr; }
+	const GroundDecal* GetDecalById(uint32_t id) const override { return nullptr; }
+	bool SetDecalTexture(uint32_t id, const std::string& texName, bool mainTex) override { return false; }
+	std::string GetDecalTexture(uint32_t id, bool mainTex) const override { return ""; }
+	const std::vector<std::string> GetDecalTextures(const std::optional<bool>& mainTex) const override {
+		return std::vector<std::string>();
+	}
+	const std::vector<std::string> GetDecalTextureFileNames(const std::vector<std::string>& texList) const override {
+		return std::vector<std::string>();
+	}
+	const CSolidObject* GetDecalSolidObjectOwner(uint32_t id) const override { return nullptr; }
+
+	void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) override {}
+protected:
+	struct UnitMinMaxHeight {
+		CR_DECLARE_STRUCT(UnitMinMaxHeight)
+			UnitMinMaxHeight()
+			: min(std::numeric_limits<float>::max())
+			, max(std::numeric_limits<float>::lowest())
+		{
+		}
+		float min;
+		float max;
+	};
+	int maxUniqueScars;
+
+	std::unique_ptr<CTextureRenderAtlas> atlasTex;
+
+	Shader::IProgramObject* decalShader;
+
+	using DecalOwner = std::variant<const CSolidObject*, const GhostSolidObject*>;
+	spring::unordered_map<DecalOwner, size_t, std::hash<DecalOwner>> decalOwners; // for tracks, plates and ghosts
+	spring::unordered_map<int, UnitMinMaxHeight> unitMinMaxHeights; // for tracks
+	spring::unordered_map<uint32_t, size_t> idToPos;
+	spring::unordered_map<uint32_t, std::tuple<const CColorMap*, std::pair<size_t, size_t>>> idToCmInfo;
+	spring::unordered_map<std::string, std::string> texFileNames;
+
+	UpdateList decalsUpdateList;
+
+	uint32_t nextId;
+	std::vector<uint32_t> freeIds;
+
+	VBO instVBO;
+	VAO vao;
+
+	CSMFGroundDrawer* smfDrawer;
+
+	bool highQuality = false;
+	ScopedDepthBufferCopy sdbc;
+};
+
+class CGroundDecalHandler: public CGroundDecalHandlerData, public CEventClient, public IExplosionListener
+{
 public:
 	CGroundDecalHandler();
 	~CGroundDecalHandler() override;
@@ -50,8 +119,7 @@ private:
 		const WeaponDef* wd;
 	};
 private:
-	void BindAtlasTextures();
-	void BindCommonTextures();
+	void BindTextures();
 	void UnbindTextures();
 	void AddExplosion(AddExplosionInfo&& explInfo);
 	void MoveSolidObject(const CSolidObject* object, const float3& pos);
@@ -111,22 +179,21 @@ public:
 	const GroundDecal* GetDecalById(uint32_t id) const override;
 	bool SetDecalTexture(uint32_t id, const std::string& texName, bool mainTex) override;
 	std::string GetDecalTexture(uint32_t id, bool mainTex) const override;
-	const std::vector<std::string> GetDecalTextures(bool mainTex) const override;
+	const std::vector<std::string> GetDecalTextures(const std::optional<bool>& mainTex) const override;
+	const std::vector<std::string> GetDecalTextureFileNames(const std::vector<std::string>& texList) const override;
 	const CSolidObject* GetDecalSolidObjectOwner(uint32_t id) const override;
 
 	void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) override;
-
-	void PostLoad();
 private:
 	static void BindVertexAtrribs();
 	static void UnbindVertexAtrribs();
 
 	uint32_t GetDepthBufferTextureTarget() const;
 
-	void GenerateAtlasTextures();
+	void GenerateAtlasTexture();
 	void ReloadDecalShaders();
 
-	void AddTexToAtlas(const std::string& name, const std::string& filename, bool mainTex, bool convertOldBMP);
+	void AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP);
 
 	void AddTrack(const CUnit* unit, const float3& newPos, bool forceEval = false);
 
@@ -142,41 +209,6 @@ private:
 	void AddFallbackTextures();
 
 	uint32_t GetNextId();
-private:
-	struct UnitMinMaxHeight {
-		CR_DECLARE_STRUCT(UnitMinMaxHeight)
-		UnitMinMaxHeight()
-			: min(std::numeric_limits<float>::max()   )
-			, max(std::numeric_limits<float>::lowest())
-		{}
-		float min;
-		float max;
-	};
-	int maxUniqueScars;
-
-	std::unique_ptr<CTextureRenderAtlas> atlasMain;
-	std::unique_ptr<CTextureRenderAtlas> atlasNorm;
-
-	Shader::IProgramObject* decalShader;
-
-	using DecalOwner = std::variant<const CSolidObject*, const GhostSolidObject*>;
-	spring::unordered_map<DecalOwner, size_t, std::hash<DecalOwner>> decalOwners; // for tracks, plates and ghosts
-	spring::unordered_map<int, UnitMinMaxHeight> unitMinMaxHeights; // for tracks
-	spring::unordered_map<uint32_t, size_t> idToPos;
-	spring::unordered_map<uint32_t, std::tuple<const CColorMap*, std::pair<size_t, size_t>>> idToCmInfo;
-
-	UpdateList decalsUpdateList;
-
-	uint32_t nextId;
-	std::vector<uint32_t> freeIds;
-
-	VBO instVBO;
-	VAO vao;
-
-	CSMFGroundDrawer* smfDrawer;
-
-	bool highQuality = false;
-	ScopedDepthBufferCopy sdbc;
 
 	static constexpr uint32_t TRACKS_UPDATE_RATE = 4u;
 };

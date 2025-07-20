@@ -1,11 +1,13 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef AABB_H
-#define AABB_H
+#pragma once
 
+#include <algorithm>
+#include <functional>
 #include "System/float3.h"
 #include "System/type2.h"
 #include "System/Matrix44f.h"
+#include "System/TemplateUtils.hpp"
 
 struct AABB {
 public:
@@ -18,6 +20,11 @@ public:
 		n += (a.y >= b.x && a.y <= b.y);
 
 		return (n > 0);
+	}
+
+	void Combine(const AABB& other) {
+		mins = float3::min(mins, other.mins);
+		maxs = float3::max(maxs, other.maxs);
 	}
 
 	bool Intersects(const AABB& b) const {
@@ -40,31 +47,34 @@ public:
 		return (n == 3);
 	};
 
-	void CalcCorners(std::array<float3, 8>& verts) const { CalcCorners(CMatrix44f::Identity(), verts); }
-	void CalcCorners(float3 verts[8]) const { CalcCorners(CMatrix44f::Identity(), verts); }
-	void CalcCorners(const CMatrix44f& mat, float3 verts[8]) const {
-		// bottom
-		verts[0] = mat * float3{mins.x, mins.y, mins.z};
-		verts[1] = mat * float3{mins.x, mins.y, maxs.z};
-		verts[2] = mat * float3{maxs.x, mins.y, mins.z};
-		verts[3] = mat * float3{maxs.x, mins.y, maxs.z};
-		// top
-		verts[4] = mat * float3{mins.x, maxs.y, mins.z};
-		verts[5] = mat * float3{mins.x, maxs.y, maxs.z};
-		verts[6] = mat * float3{maxs.x, maxs.y, mins.z};
-		verts[7] = mat * float3{maxs.x, maxs.y, maxs.z};
+	float3 ClampInto(const float3& pnt) const;
+
+	void CalcCorners(std::array<float3, 8>& verts) const;
+
+	template<Concepts::CanTransform T>
+	void CalcCorners(const T& t, std::array<float3, 8>& verts) const {
+		CalcCorners(verts);
+		std::for_each(verts.begin(), verts.end(), [&t](auto& vert) { vert = t * vert; });
 	}
-	void CalcCorners(const CMatrix44f& mat, std::array<float3, 8>& verts) const {
-		// bottom
-		verts[0] = mat * float3{ mins.x, mins.y, mins.z };
-		verts[1] = mat * float3{ mins.x, mins.y, maxs.z };
-		verts[2] = mat * float3{ maxs.x, mins.y, mins.z };
-		verts[3] = mat * float3{ maxs.x, mins.y, maxs.z };
-		// top
-		verts[4] = mat * float3{ mins.x, maxs.y, mins.z };
-		verts[5] = mat * float3{ mins.x, maxs.y, maxs.z };
-		verts[6] = mat * float3{ maxs.x, maxs.y, mins.z };
-		verts[7] = mat * float3{ maxs.x, maxs.y, maxs.z };
+
+	template<Concepts::CanTransform T>
+	AABB CalcTransformed(const T& t) const {
+		AABB ret;
+		ret.AddPoints(GetCorners(t));
+		return ret;
+	}
+
+	template<Concepts::CanTransform T>
+	std::array<float3, 8> GetCorners(const T& t) const {
+		std::array<float3, 8> corners;
+		CalcCorners(t, corners);
+		return corners;
+	}
+
+	std::array<float3, 8> GetCorners() const {
+		std::array<float3, 8> corners;
+		CalcCorners(corners);
+		return corners;
 	}
 
 	float3 CalcCenter(const CMatrix44f& mat) const { return (mat * CalcCenter()); }
@@ -82,14 +92,22 @@ public:
 		maxs = float3::max(maxs, p);
 	}
 
+	template<Concepts::HasMemberBeginEnd T>
+	void AddPoints(const T& t) {
+		std::for_each(t.begin(), t.end(), std::bind_front(&AABB::AddPoint, this));
+	}
+
 	void Reset() {
-		mins = float3{ std::numeric_limits<float>::max()    };
-		maxs = float3{ std::numeric_limits<float>::lowest() };
+		mins = DEF_MINS;
+		maxs = DEF_MAXS;
+	}
+
+	bool IsReset() const {
+		return (mins == DEF_MINS) && (maxs == DEF_MAXS);
 	}
 public:
-	float3 mins = float3{ std::numeric_limits<float>::max()    };
-	float3 maxs = float3{ std::numeric_limits<float>::lowest() };
+	float3 mins = DEF_MINS;
+	float3 maxs = DEF_MAXS;
+	static constexpr auto DEF_MINS = float3{ std::numeric_limits<float>::max()    };
+	static constexpr auto DEF_MAXS = float3{ std::numeric_limits<float>::lowest() };
 };
-
-#endif
-

@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <optional>
+
 #include "Decals/GroundDecal.h"
 #include "System/creg/creg.h"
 
@@ -31,7 +33,8 @@ public:
 	virtual const GroundDecal* GetDecalById(uint32_t id) const = 0;
 	virtual bool SetDecalTexture(uint32_t id, const std::string& texName, bool mainTex) = 0;
 	virtual std::string GetDecalTexture(uint32_t id, bool mainTex) const = 0;
-	virtual const std::vector<std::string> GetDecalTextures(bool mainTex) const = 0;
+	virtual const std::vector<std::string> GetDecalTextures(const std::optional<bool>& mainTex = std::nullopt) const = 0;
+	virtual const std::vector<std::string> GetDecalTextureFileNames(const std::vector<std::string>& texList) const = 0;
 	virtual const CSolidObject* GetDecalSolidObjectOwner(uint32_t id) const = 0;
 
 	virtual void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) = 0;
@@ -76,7 +79,8 @@ public:
 	const GroundDecal* GetDecalById(uint32_t id) const override { return nullptr; }
 	bool SetDecalTexture(uint32_t id, const std::string& texName, bool mainTex) override { return false; }
 	std::string GetDecalTexture(uint32_t id, bool mainTex) const override { return ""; }
-	const std::vector<std::string> GetDecalTextures(bool mainTex) const override { return {}; }
+	const std::vector<std::string> GetDecalTextures(const std::optional<bool>& mainTex) const override { return {}; }
+	const std::vector<std::string> GetDecalTextureFileNames(const std::vector<std::string>& texList) const override { return {}; }
 	const CSolidObject* GetDecalSolidObjectOwner(uint32_t id) const override { return nullptr; }
 
 	void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) override;

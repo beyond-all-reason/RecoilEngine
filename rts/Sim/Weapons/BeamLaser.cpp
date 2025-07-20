@@ -329,6 +329,7 @@ void CBeamLaser::FireInternal(float3 curDir)
 		maxLength = std::min(maxLength, sweepFireState.GetTargetDist3D() * 1.125f);
 	}
 
+	uint32_t lastProjID = -1;
 	for (int tries = 0; tries < 5 && tryAgain; ++tries) {
 		float beamLength = TraceRay::TraceRay(curPos, curDir, maxLength - curLength, collisionFlags, owner, hitUnit, hitFeature, &hitColQuery);
 
@@ -376,6 +377,7 @@ void CBeamLaser::FireInternal(float3 curDir)
 
 			newDir = curDir - prjDir;
 			tryAgain = true;
+			hitShield = nullptr;
 		} else {
 			tryAgain = false;
 		}
@@ -392,7 +394,7 @@ void CBeamLaser::FireInternal(float3 curDir)
 			pparams.startAlpha = std::clamp(startAlpha * baseAlpha, 0.0f, 255.0f);
 			pparams.endAlpha = std::clamp(endAlpha * baseAlpha, 0.0f, 255.0f);
 
-			WeaponProjectileFactory::LoadProjectile(pparams);
+			lastProjID = WeaponProjectileFactory::LoadProjectile(pparams);
 		}
 
 		curPos = hitPos;
@@ -422,8 +424,7 @@ void CBeamLaser::FireInternal(float3 curDir)
 			.damages              = da,
 			.weaponDef            = weaponDef,
 			.owner                = owner,
-			.hitUnit              = hitUnit,
-			.hitFeature           = hitFeature,
+			.hitObject            = ExplosionHitObject(hitUnit, hitFeature, hitShield),
 			.craterAreaOfEffect   = damages->craterAreaOfEffect,
 			.damageAreaOfEffect   = damages->damageAreaOfEffect,
 			.edgeEffectiveness    = damages->edgeEffectiveness,
@@ -433,7 +434,7 @@ void CBeamLaser::FireInternal(float3 curDir)
 			.impactOnly           = weaponDef->impactOnly,
 			.ignoreOwner          = weaponDef->noExplode || weaponDef->noSelfDamage,
 			.damageGround         = true,
-			.projectileID         = static_cast<uint32_t>(-1u)
+			.projectileID         = lastProjID
 		};
 
 		helper->Explosion(params);

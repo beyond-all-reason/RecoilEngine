@@ -39,6 +39,7 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 
 	CUnit* hitUnit = nullptr;
 	CFeature* hitFeature = nullptr;
+	CPlasmaRepulser* hitShield = nullptr;
 	CollisionQuery hitColQuery;
 
 	float boltLength = TraceRay::TraceRay(curPos, curDir, range, collisionFlags, owner, hitUnit, hitFeature, &hitColQuery);
@@ -60,6 +61,7 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 			boltLength = sd.dist;
 			hitUnit = nullptr;
 			hitFeature = nullptr;
+			hitShield = sd.rep;
 			break;
 		}
 	}
@@ -67,6 +69,14 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 	if (hitUnit != nullptr)
 		hitUnit->SetLastHitPiece(hitColQuery.GetHitPiece(), gs->frameNum);
 
+	assert(1 * (!!hitUnit) + 1 * (!!hitFeature) + 1 * (!!hitShield) <= 1);
+
+	ProjectileParams pparams = GetProjectileParams();
+	pparams.pos = curPos;
+	pparams.end = curPos + curDir * (boltLength + 10.0f);
+	pparams.ttl = weaponDef->beamLaserTTL;
+
+	auto projID = WeaponProjectileFactory::LoadProjectile(pparams);
 
 	const DamageArray& damageArray = damages->GetDynamicDamages(weaponMuzzlePos, currentTargetPos);
 	const CExplosionParams params = {
@@ -75,8 +85,7 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 		.damages              = damageArray,
 		.weaponDef            = weaponDef,
 		.owner                = owner,
-		.hitUnit              = hitUnit,
-		.hitFeature           = hitFeature,
+		.hitObject            = ExplosionHitObject(hitUnit, hitFeature, hitShield),
 		.craterAreaOfEffect   = damages->craterAreaOfEffect,
 		.damageAreaOfEffect   = damages->damageAreaOfEffect,
 		.edgeEffectiveness    = damages->edgeEffectiveness,
@@ -86,16 +95,9 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 		.impactOnly           = weaponDef->impactOnly,
 		.ignoreOwner          = weaponDef->noExplode || weaponDef->noSelfDamage,
 		.damageGround         = false,
-		.projectileID         = static_cast<uint32_t>(-1u)
+		.projectileID         = projID
 	};
 
 	helper->Explosion(params);
-
-	ProjectileParams pparams = GetProjectileParams();
-	pparams.pos = curPos;
-	pparams.end = curPos + curDir * (boltLength + 10.0f);
-	pparams.ttl = weaponDef->beamLaserTTL;
-
-	WeaponProjectileFactory::LoadProjectile(pparams);
 }
 

@@ -12,7 +12,7 @@
 #ifdef __APPLE__
 #include <libkern/OSAtomic.h> // OSAtomicIncrement64
 #endif
-
+#include "CpuTopology.h"
 #include "System/Platform/Win/win32.h"
 #include "System/Threading/SpringThreading.h"
 
@@ -103,6 +103,7 @@ namespace Threading {
 
 	inline bool NativeThreadIdsEqual(const NativeThreadId thID1, const NativeThreadId thID2);
 
+	cpu_topology::ThreadPinPolicy GetChosenThreadPinPolicy();
 
 	/**
 	 * Sets the affinity of the current thread
@@ -126,8 +127,9 @@ namespace Threading {
 	bool HasHyperThreading();
 	std::string GetCPUBrand();
 
-	uint32_t GetSystemAffinityMask();
-	uint32_t GetPreferredMainThreadMask();
+	uint32_t GetSystemAffinityMask(int forThreadCount = std::numeric_limits<int>::max());
+	uint32_t GetPreferredMainThreadMask(uint32_t affinityMask);
+	uint32_t GetOptimalThreadCount();
 
 	/**
 	 * Inform the OS kernel that we are a cpu-intensive task

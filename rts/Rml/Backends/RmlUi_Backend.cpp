@@ -356,7 +356,7 @@ void RmlGui::Update()
 	if (!RmlInitialized()) {
 		return;
 	}
-#ifndef HEADLESS
+
 	for (const auto& context : state->contexts) {
 		context->Update();
 	}
@@ -378,7 +378,6 @@ void RmlGui::Update()
 		}
 		state->contexts_to_remove.clear();
 	}
-#endif
 }
 
 void RmlGui::RenderFrame()

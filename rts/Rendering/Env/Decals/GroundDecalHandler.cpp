@@ -60,25 +60,25 @@
 CONFIG(int, GroundScarAlphaFade).deprecated(true);
 CONFIG(bool, HighQualityDecals).defaultValue(false).description("Forces MSAA processing of decals. Improves decals quality, but may ruin the performance.");
 
-
-CR_BIND(CGroundDecalHandler::UnitMinMaxHeight, )
-CR_REG_METADATA_SUB(CGroundDecalHandler, UnitMinMaxHeight,
+CR_BIND(CGroundDecalHandlerData::UnitMinMaxHeight, )
+CR_REG_METADATA_SUB(CGroundDecalHandlerData, UnitMinMaxHeight,
 (
 	CR_MEMBER(min),
 	CR_MEMBER(max)
 ))
 
-CR_BIND_DERIVED(CGroundDecalHandler, IGroundDecalDrawer, )
-CR_REG_METADATA(CGroundDecalHandler, (
+CR_BIND_DERIVED(CGroundDecalHandlerData, IGroundDecalDrawer, )
+
+CR_REG_METADATA(CGroundDecalHandlerData, (
 	CR_MEMBER_UN(maxUniqueScars),
-	CR_MEMBER_UN(atlasMain),
-	CR_MEMBER_UN(atlasNorm),
+	CR_MEMBER_UN(atlasTex),
 	CR_MEMBER_UN(decalShader),
 
 	CR_MEMBER(decalOwners),
 	CR_MEMBER(unitMinMaxHeights),
 	CR_MEMBER(idToPos),
 	CR_MEMBER(idToCmInfo),
+	CR_MEMBER_UN(texFileNames),
 
 	CR_MEMBER(decalsUpdateList),
 
@@ -95,16 +95,26 @@ CR_REG_METADATA(CGroundDecalHandler, (
 	CR_POSTLOAD(PostLoad)
 ))
 
-CGroundDecalHandler::CGroundDecalHandler()
-	: CEventClient("[CGroundDecalHandler]", 314159, false)
+CGroundDecalHandlerData::CGroundDecalHandlerData()
+	: IGroundDecalDrawer()
 	, maxUniqueScars{ 0 }
-	, atlasMain{ nullptr }
-	, atlasNorm{ nullptr }
+	, atlasTex{ nullptr }
 	, decalShader{ nullptr }
 	, decalsUpdateList{ }
-	, smfDrawer { nullptr }
+	, smfDrawer{ nullptr }
 	, highQuality{ configHandler->GetBool("HighQualityDecals") && (globalRendering->msaaLevel > 0) }
 	, sdbc{ highQuality }
+{
+}
+
+void CGroundDecalHandlerData::PostLoad()
+{
+	decalsUpdateList.SetNeedUpdateAll();
+}
+
+CGroundDecalHandler::CGroundDecalHandler()
+	: CEventClient("[CGroundDecalHandler]", 314159, false)
+	, CGroundDecalHandlerData()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!GetDrawDecals())
@@ -117,7 +127,7 @@ CGroundDecalHandler::CGroundDecalHandler()
 
 	smfDrawer = dynamic_cast<CSMFGroundDrawer*>(readMap->GetGroundDrawer());
 
-	GenerateAtlasTextures();
+	GenerateAtlasTexture();
 	ReloadDecalShaders();
 
 	instVBO = VBO(GL_ARRAY_BUFFER, false, false);
@@ -126,11 +136,6 @@ CGroundDecalHandler::CGroundDecalHandler()
 	decalsUpdateList.Reserve(decals.capacity());
 
 	nextId = 0;
-}
-
-void CGroundDecalHandler::PostLoad()
-{
-	decalsUpdateList.SetNeedUpdateAll();
 }
 
 CGroundDecalHandler::~CGroundDecalHandler()
@@ -142,8 +147,7 @@ CGroundDecalHandler::~CGroundDecalHandler()
 
 	shaderHandler->ReleaseProgramObjects("[GroundDecalHandler]");
 	decalShader = nullptr;
-	atlasMain = nullptr;
-	atlasNorm = nullptr;
+	atlasTex = nullptr;
 }
 
 static auto LoadTexture(const std::string& name, bool convertDecalBitmap)
@@ -196,12 +200,13 @@ static inline std::string GetExtraTextureName(const std::string& mainTex) {
 	return mainTex.substr(0, dotPos) + "_normal" + (dotPos == string::npos ? "" : mainTex.substr(dotPos));
 }
 
-void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::string& filename, bool mainTex, bool convertOldBMP) {
+void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	try {
 		const auto& [bm, fn] = LoadTexture(filename, convertOldBMP);
-		const auto& decalAtlas = (mainTex ? atlasMain : atlasNorm);
-		decalAtlas->AddTexFromBitmap(name, bm);
+		if (atlasTex->AddTexFromBitmap(name, bm)) {
+			texFileNames.emplace(name, fn);
+		}
 	}
 	catch (const content_error& err) {
 		LOG_L(L_WARNING, "%s", err.what());
@@ -231,8 +236,8 @@ void CGroundDecalHandler::AddBuildingDecalTextures()
 			const std::string mainTex =                    (decalDef.groundDecalTypeName);
 			const std::string normTex = GetExtraTextureName(decalDef.groundDecalTypeName);
 
-			AddTexToAtlas(mainTex, mainTex, true , false);
-			AddTexToAtlas(normTex, normTex, false, false);
+			AddTexToAtlas(mainTex, mainTex, false);
+			AddTexToAtlas(normTex, normTex, false);
 		}
 	};
 	ProcessDefs(featureDefHandler->GetFeatureDefsVec());
@@ -263,12 +268,12 @@ void CGroundDecalHandler::AddTexturesFromTable()
 		const auto mainName = IntToString(i, "mainscar_%i");
 		const auto normName = IntToString(i, "normscar_%i");
 
-		AddTexToAtlas(mainName, mainTexFileName,  true,  true);
-		AddTexToAtlas(normName, normTexFileName, false, false);
+		AddTexToAtlas(mainName, mainTexFileName,  true);
+		AddTexToAtlas(normName, normTexFileName, false);
 
 		// check if loaded for real
 		// can't use atlas->TextureExists() as it's only populated after Finalize()
-		maxUniqueScars += atlasMain->GetAllocator()->contains(mainName);
+		maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
 	}
 
 	if (maxUniqueScars == scarTblSize)
@@ -281,7 +286,7 @@ void CGroundDecalHandler::AddTexturesFromTable()
 	if (scarsExtraNum > 0) {
 		for (int extraTexNum = 0, i = 1; scarTblSize - maxUniqueScars > 0 && i <= scarTblSize; ++i) {
 			const auto mainName = IntToString(i, "mainscar_%i");
-			if (atlasMain->GetAllocator()->contains(mainName))
+			if (atlasTex->GetAllocator()->contains(mainName))
 				continue;
 
 			const auto normName = IntToString(i, "normscar_%i");
@@ -289,10 +294,10 @@ void CGroundDecalHandler::AddTexturesFromTable()
 			const std::string mainTexFileName = scarMainTextures[extraTexNum++ % scarsExtraNum];
 			const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
 
-			AddTexToAtlas(mainName, mainTexFileName,  true,  true);
-			AddTexToAtlas(normName, normTexFileName, false, false);
+			AddTexToAtlas(mainName, mainTexFileName,  true);
+			AddTexToAtlas(normName, normTexFileName, false);
 
-			maxUniqueScars += atlasMain->GetAllocator()->contains(mainName);
+			maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
 		}
 	}
 
@@ -308,8 +313,8 @@ void CGroundDecalHandler::AddTexturesFromTable()
 		const auto mainName = IntToString(i, "maindecal_%i");
 		const auto normName = IntToString(i, "normdecal_%i");
 
-		AddTexToAtlas(mainName, mainTexFileName,  true,  true);
-		AddTexToAtlas(normName, normTexFileName, false, false);
+		AddTexToAtlas(mainName, mainTexFileName,  true);
+		AddTexToAtlas(normName, normTexFileName, false);
 	}
 }
 
@@ -322,8 +327,8 @@ void CGroundDecalHandler::AddGroundTrackTextures()
 		const auto normName = mainName + "_norm";
 		const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
 
-		AddTexToAtlas(mainName, mainTexFileName,  true,  true);
-		AddTexToAtlas(normName, normTexFileName, false, false);
+		AddTexToAtlas(mainName, mainTexFileName,  true);
+		AddTexToAtlas(normName, normTexFileName, false);
 	}
 }
 
@@ -331,14 +336,9 @@ void CGroundDecalHandler::AddGroundTrackTextures()
 void CGroundDecalHandler::AddFallbackTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	{
-		const auto minDim = std::max(atlasMain->GetMinDim(), 32);
-		atlasMain->AddTex("%FB_MAIN%", minDim, minDim, SColor(255,   0,   0, 255));
-	}
-	{
-		const auto minDim = std::max(atlasNorm->GetMinDim(), 32);
-		atlasNorm->AddTex("%FB_NORM%", minDim, minDim, SColor(128, 128, 255,   0));
-	}
+	const auto minDim = std::max(atlasTex->GetMinDim(), 32);
+	atlasTex->AddTex("%FB_MAIN%", minDim, minDim, SColor(255,   0,   0, 255));
+	atlasTex->AddTex("%FB_NORM%", minDim, minDim, SColor(128, 128, 255,   0));
 }
 
 uint32_t CGroundDecalHandler::GetNextId()
@@ -385,14 +385,12 @@ uint32_t CGroundDecalHandler::GetDepthBufferTextureTarget() const
 	return highQuality ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
 }
 
-static constexpr CTextureAtlas::AllocatorType defAllocType = CTextureAtlas::ATLAS_ALLOC_LEGACY;
+static constexpr CTextureAtlas::AllocatorType defAllocType = CTextureAtlas::ATLAS_ALLOC_MP_LEGACY;
 static constexpr int defNumLevels = 4;
-void CGroundDecalHandler::GenerateAtlasTextures() {
-	atlasMain = std::make_unique<CTextureRenderAtlas>(defAllocType, 0, 0, GL_RGBA8, "DecalsMain");
-	atlasNorm = std::make_unique<CTextureRenderAtlas>(defAllocType, 0, 0, GL_RGBA8, "DecalsNorm");
+void CGroundDecalHandler::GenerateAtlasTexture() {
+	atlasTex = std::make_unique<CTextureRenderAtlas>(defAllocType, 0, 0, GL_RGBA8, "Decals");
 
-	atlasMain->SetMaxTexLevel(defNumLevels);
-	atlasNorm->SetMaxTexLevel(defNumLevels);
+	atlasTex->SetMaxTexLevel(defNumLevels);
 
 	// often represented by compressed textures, cannot be added to the regular atlas
 	AddBuildingDecalTextures();
@@ -401,12 +399,8 @@ void CGroundDecalHandler::GenerateAtlasTextures() {
 	AddGroundTrackTextures();
 	AddFallbackTextures();
 
-	if (!atlasMain->Finalize()) {
-		LOG_L(L_ERROR, "Could not finalize %s texture atlas. Use fewer/smaller textures.", atlasMain->GetAtlasName().c_str());
-	}
-
-	if (!atlasNorm->Finalize()) {
-		LOG_L(L_ERROR, "Could not finalize %s texture atlas. Use fewer/smaller textures.", atlasNorm->GetAtlasName().c_str());
+	if (!atlasTex->Finalize()) {
+		LOG_L(L_ERROR, "Could not finalize %s texture atlas. Use fewer/smaller textures.", atlasTex->GetAtlasName().c_str());
 	}
 }
 
@@ -426,6 +420,7 @@ void CGroundDecalHandler::ReloadDecalShaders() {
 	decalShader->SetFlag("HIGH_QUALITY", highQuality);
 	decalShader->SetFlag("HAVE_INFOTEX", true);
 	decalShader->SetFlag("SMF_WATER_ABSORPTION", true);
+	decalShader->SetFlag("USE_TEXTURE_ARRAY", atlasTex->GetTexTarget() == GL_TEXTURE_2D_ARRAY);
 
 	decalShader->BindAttribLocations<GroundDecal>();
 
@@ -445,8 +440,7 @@ void CGroundDecalHandler::ReloadDecalShaders() {
 		1.0f / (mapDims.pwr2mapy * SQUARE_SIZE)
 	);
 
-	decalShader->SetUniform("decalMainTex"   , 0);
-	decalShader->SetUniform("decalNormTex"   , 1);
+	decalShader->SetUniform("atlasTex"       , 0);
 	decalShader->SetUniform("miniMapTex"     , 2);
 	decalShader->SetUniform("heightTex"      , 3);
 	decalShader->SetUniform("depthTex"       , 4);
@@ -473,19 +467,13 @@ void CGroundDecalHandler::ReloadDecalShaders() {
 	decalShader->Validate();
 }
 
-void CGroundDecalHandler::BindAtlasTextures()
+void CGroundDecalHandler::BindTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(atlasMain->GetTexTarget(), atlasMain->GetTexID());
+	glBindTexture(atlasTex->GetTexTarget(), atlasTex->GetTexID());
 
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(atlasNorm->GetTexTarget(), atlasNorm->GetTexID());
-}
-
-void CGroundDecalHandler::BindCommonTextures()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
 	const CSMFReadMap* smfMap = smfDrawer->GetReadMap();
 
 	glActiveTexture(GL_TEXTURE2);
@@ -517,10 +505,7 @@ void CGroundDecalHandler::UnbindTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(atlasMain->GetTexTarget(), 0);
-
-	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(atlasNorm->GetTexTarget(), 0);
+	glBindTexture(atlasTex->GetTexTarget(), 0);
 
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -660,8 +645,8 @@ void CGroundDecalHandler::AddExplosion(AddExplosionInfo&& ei)
 		.posTR = posTR,
 		.posBR = posBR,
 		.posBL = posBL,
-		.texMainOffsets = static_cast<float4>(atlasMain->GetTexture(mainName, "%FB_MAIN%")),
-		.texNormOffsets = static_cast<float4>(atlasNorm->GetTexture(normName, "%FB_NORM%")),
+		.texMainOffsets = static_cast<float4>(atlasTex->GetTexture(mainName, "%FB_MAIN%")),
+		.texNormOffsets = static_cast<float4>(atlasTex->GetTexture(normName, "%FB_NORM%")),
 		.alpha = alpha,
 		.alphaFalloff = alphaDecay,
 		.glow = glow,
@@ -697,17 +682,13 @@ void CGroundDecalHandler::ReloadTextures()
 	spring::unordered_map<float4, std::string, float4Hash> subTexToNameMain;
 	spring::unordered_map<float4, std::string, float4Hash> subTexToNameNorm;
 
-	for (const auto& [name, ae] : atlasMain->GetAllocator()->GetEntries()) {
-		subTexToNameMain.emplace(static_cast<float4>(atlasMain->GetTexture(name)), name);
-	}
-	for (const auto& [name, ae] : atlasNorm->GetAllocator()->GetEntries()) {
-		subTexToNameNorm.emplace(static_cast<float4>(atlasNorm->GetTexture(name)), name);
+	for (const auto& [name, ae] : atlasTex->GetAllocator()->GetEntries()) {
+		subTexToNameMain.emplace(static_cast<float4>(atlasTex->GetTexture(name)), name);
 	}
 
 	// can't use {atlas}->ReloadTextures() here as all textures come from memory
-	atlasMain = nullptr;
-	atlasNorm = nullptr;
-	GenerateAtlasTextures();
+	atlasTex = nullptr;
+	GenerateAtlasTexture();
 
 	// update scar subtexture names to match possibly a new number of maxUniqueScars
 	for (auto& [at, name] : subTexToNameMain) {
@@ -731,10 +712,10 @@ void CGroundDecalHandler::ReloadTextures()
 
 	for (auto& decal : decals) {
 		if (auto it = subTexToNameMain.find(decal.texMainOffsets); it != subTexToNameMain.end()) {
-			decal.texMainOffsets = static_cast<float4>(atlasMain->GetTexture(it->second, "%FB_MAIN%"));
+			decal.texMainOffsets = static_cast<float4>(atlasTex->GetTexture(it->second, "%FB_MAIN%"));
 		}
 		if (auto it = subTexToNameNorm.find(decal.texNormOffsets); it != subTexToNameNorm.end()) {
-			decal.texNormOffsets = static_cast<float4>(atlasNorm->GetTexture(it->second, "%FB_NORM%"));
+			decal.texNormOffsets = static_cast<float4>(atlasTex->GetTexture(it->second, "%FB_NORM%"));
 		}
 	}
 	decalsUpdateList.SetNeedUpdateAll();
@@ -743,8 +724,7 @@ void CGroundDecalHandler::ReloadTextures()
 void CGroundDecalHandler::DumpAtlasTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	atlasMain->DumpTexture();
-	atlasNorm->DumpTexture();
+	atlasTex->DumpTexture();
 }
 
 void CGroundDecalHandler::Draw()
@@ -759,7 +739,7 @@ void CGroundDecalHandler::Draw()
 	if (decals.empty())
 		return;
 
-	if (!atlasMain->IsValid() || !atlasNorm->IsValid())
+	if (!atlasTex->IsValid())
 		return;
 
 	UpdateDecalsVisibility();
@@ -805,8 +785,7 @@ void CGroundDecalHandler::Draw()
 		CullFace(GL_BACK)
 	);
 
-	BindCommonTextures();
-	BindAtlasTextures();
+	BindTextures();
 
 	const bool visWater = smfDrawer->GetReadMap()->HasVisibleWater();
 
@@ -887,8 +866,8 @@ void CGroundDecalHandler::MoveSolidObject(const CSolidObject* object, const floa
 		.posTR = posTR,
 		.posBR = posBR,
 		.posBL = posBL,
-		.texMainOffsets = static_cast<float4>(atlasMain->GetTexture(                   (decalDef.groundDecalTypeName), "%FB_MAIN%")),
-		.texNormOffsets = static_cast<float4>(atlasNorm->GetTexture(GetExtraTextureName(decalDef.groundDecalTypeName), "%FB_NORM%")),
+		.texMainOffsets = static_cast<float4>(atlasTex->GetTexture(                   (decalDef.groundDecalTypeName), "%FB_MAIN%")),
+		.texNormOffsets = static_cast<float4>(atlasTex->GetTexture(GetExtraTextureName(decalDef.groundDecalTypeName), "%FB_NORM%")),
 		.alpha = 1.0f,
 		.alphaFalloff = 0.0f,
 		.glow = 0.0f,
@@ -988,8 +967,8 @@ uint32_t CGroundDecalHandler::CreateLuaDecal()
 		.posTR = float2{},
 		.posBR = float2{},
 		.posBL = float2{},
-		.texMainOffsets = static_cast<float4>(atlasMain->GetTexture("%FB_MAIN%")),
-		.texNormOffsets = static_cast<float4>(atlasNorm->GetTexture("%FB_NORM%")),
+		.texMainOffsets = static_cast<float4>(atlasTex->GetTexture("%FB_MAIN%")),
+		.texNormOffsets = static_cast<float4>(atlasTex->GetTexture("%FB_NORM%")),
 		.alpha = 1.0f,
 		.alphaFalloff = 0.0f,
 		.glow = 0.0f,
@@ -1074,10 +1053,9 @@ bool CGroundDecalHandler::SetDecalTexture(uint32_t id, const std::string& texNam
 	if (!decal.IsValid())
 		return false;
 
-	const auto& atlas  = mainTex ? atlasMain : atlasNorm;
-	      auto& offset = mainTex ? decal.texMainOffsets : decal.texNormOffsets;
+	auto& offset = mainTex ? decal.texMainOffsets : decal.texNormOffsets;
 
-	const AtlasedTexture newOffset = atlas->GetTexture(texName);
+	const auto newOffset = atlasTex->GetTexture(texName);
 	if (newOffset == AtlasedTexture::DefaultAtlasTexture)
 		return false;
 
@@ -1098,10 +1076,9 @@ std::string CGroundDecalHandler::GetDecalTexture(uint32_t id, bool mainTex) cons
 		return "";
 
 	const auto& offset = mainTex ? decal.texMainOffsets : decal.texNormOffsets;
-	const auto& atlas = mainTex ? atlasMain : atlasNorm;
 
-	for (auto& [name, _] : atlas->GetAllocator()->GetEntries()) {
-		const auto at = static_cast<float4>(atlas->GetTexture(name));
+	for (auto& [name, _] : atlasTex->GetAllocator()->GetEntries()) {
+		const auto at = static_cast<float4>(atlasTex->GetTexture(name));
 		if (at == offset)
 			return name;
 	}
@@ -1109,15 +1086,49 @@ std::string CGroundDecalHandler::GetDecalTexture(uint32_t id, bool mainTex) cons
 	return "";
 }
 
-const std::vector<std::string> CGroundDecalHandler::GetDecalTextures(bool mainTex) const
+const std::vector<std::string> CGroundDecalHandler::GetDecalTextures(const std::optional<bool>& mainTex) const
 {
-	//ZoneScoped;
-	const auto& atlas = mainTex ? atlasMain : atlasNorm;
+	auto IsNormalTexture = [](const std::string& texName) {
+		if (texName == "%FB_NORM%")
+			return true;
+
+		if (texName.find("_normal") != std::string::npos)
+			return true;
+
+		return false;
+	};
+
 	std::vector<std::string> ret;
-	for (auto& [name, _] : atlas->GetAllocator()->GetEntries()) {
-		ret.emplace_back(name);
+	for (auto& [name, _] : atlasTex->GetAllocator()->GetEntries()) {
+		if (!mainTex.has_value()) {
+			ret.emplace_back(name);
+			continue;
+		}
+
+		const auto isNorm = IsNormalTexture(name);
+
+		if ((mainTex.value() && !isNorm) || (!mainTex.value() && isNorm))
+			ret.emplace_back(name);
 	}
+
 	std::sort(ret.begin(), ret.end());
+	return ret;
+}
+
+const std::vector<std::string> CGroundDecalHandler::GetDecalTextureFileNames(const std::vector<std::string>& texList) const
+{
+	std::vector<std::string> ret;
+	ret.reserve(texList.size());
+
+	for (const auto& tex : texList) {
+		if (auto it = texFileNames.find(tex); it != texFileNames.end()) {
+			ret.emplace_back(it->second);
+		}
+		else {
+			ret.emplace_back("");
+		}
+	}
+
 	return ret;
 }
 
@@ -1233,8 +1244,8 @@ void CGroundDecalHandler::AddTrack(const CUnit* unit, const float3& newPos, bool
 			.posTR = decalPos2 - wc,
 			.posBR = decalPos2 + wc,
 			.posBL = decalPos2 + wc,
-			.texMainOffsets = static_cast<float4>(atlasMain->GetTexture(mainName, "%FB_MAIN%")),
-			.texNormOffsets = static_cast<float4>(atlasNorm->GetTexture(normName, "%FB_NORM%")),
+			.texMainOffsets = static_cast<float4>(atlasTex->GetTexture(mainName, "%FB_MAIN%")),
+			.texNormOffsets = static_cast<float4>(atlasTex->GetTexture(normName, "%FB_NORM%")),
 			.alpha = 1.0f,
 			.alphaFalloff = alphaDecay,
 			.glow = 0.0f,

@@ -115,6 +115,15 @@ bool Transform::equals(const Transform& tra) const
 		epscmp(s, tra.s, float3::cmp_eps());
 }
 
+Transform Transform::operator+(const Transform& origTra) const
+{
+	return Transform{
+		r * origTra.r,
+		t + origTra.t,
+		s * origTra.s
+	};
+}
+
 Transform Transform::operator*(const Transform& childTra) const
 {
 	return Transform{

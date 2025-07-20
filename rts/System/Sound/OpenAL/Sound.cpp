@@ -126,6 +126,17 @@ void CSound::Kill()
 
 
 void CSound::Cleanup() {
+#ifdef ALC_SOFT_loopback
+	if (hasAlcSoftLoopBack && sdlDeviceID != 0) {
+		LOG("[Sound::%s][SDL_CloseAudioDevice(%d)]", __func__, sdlDeviceID);
+		SDL_CloseAudioDevice(sdlDeviceID);
+		SDL_CloseAudio();
+		SDL_QuitSubSystem(SDL_INIT_AUDIO);
+
+		sdlDeviceID = -1;
+	}
+#endif
+
 	if (curContext != nullptr) {
 		LOG("[Sound::%s][alcDestroyContext(%p)]", __func__, curContext);
 		alcMakeContextCurrent(nullptr);
@@ -138,17 +149,6 @@ void CSound::Cleanup() {
 		alcCloseDevice(curDevice);
 		curDevice = nullptr;
 	}
-
-#ifdef ALC_SOFT_loopback
-	if (hasAlcSoftLoopBack && sdlDeviceID != 0) {
-		LOG("[Sound::%s][SDL_CloseAudioDevice(%d)]", __func__, sdlDeviceID);
-		SDL_CloseAudioDevice(sdlDeviceID);
-		SDL_CloseAudio();
-		SDL_QuitSubSystem(SDL_INIT_AUDIO);
-
-		sdlDeviceID = -1;
-	}
-#endif
 }
 
 
@@ -416,9 +416,7 @@ static void SDLCALL RenderSDLSamples(void* userdata, Uint8* stream, int len)
 	ALCdevice* dev = snd->GetCurrentDevice();
 
 	assert(snd->GetFrameSize() > 0);
-	// Prevent sigsegv when openal has been closed before sdl
-	if (dev != nullptr) // FIXME: Perhaps can be fixed by reordering ::Cleanup properly?
-		alcRenderSamplesSOFT(dev, stream, len / snd->GetFrameSize());
+	alcRenderSamplesSOFT(dev, stream, len / snd->GetFrameSize());
 }
 
 static const char* ChannelsName(ALCenum chans)

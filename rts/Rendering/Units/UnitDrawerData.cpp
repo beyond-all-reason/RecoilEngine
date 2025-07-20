@@ -39,11 +39,15 @@ CR_REG_METADATA(GhostSolidObject, (
 	CR_MEMBER(modelName),
 
 	CR_MEMBER(pos),
+	CR_MEMBER(midPos),
 	CR_MEMBER(dir),
+	CR_MEMBER(radius),
+	CR_MEMBER(iconRadius),
 
 	CR_MEMBER(facing),
 	CR_MEMBER(team),
 	CR_MEMBER(refCount),
+	CR_IGNORED(myIcon),
 
 	CR_IGNORED(model),
 

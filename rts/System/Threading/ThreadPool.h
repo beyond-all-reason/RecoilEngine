@@ -255,6 +255,38 @@ public:
 };
 
 
+template<class F, class... Args>
+class SyncTask: public ITaskGroup
+{
+public:
+	using return_type = std::invoke_result_t<F, Args...>;
+
+	SyncTask(F f, Args... args) : selfDelete(true) {
+		task = std::make_shared<std::packaged_task<return_type()>>(std::bind(f, std::forward<Args>(args)...));
+		result = std::move(task->get_future());
+
+		remainingTasks += 1;
+	}
+
+	bool SelfDelete() const override { return (selfDelete.load()); }
+	bool ExecuteStep() override {
+		// note: *never* called from WaitForFinished
+		(*task)();
+		remainingTasks -= 1;
+		return false;
+	}
+
+	// FIXME: rethrow exceptions some time
+	std::shared_future<return_type> GetFuture() { assert(result.valid()); return std::move(result); }
+
+public:
+	// if true, we are not managed by a shared_ptr
+	std::atomic<bool> selfDelete;
+
+	std::shared_ptr<std::packaged_task<return_type()>> task;
+	std::shared_future<return_type> result;
+};
+
 
 template<class F, typename R = int, class... Args>
 class TTaskGroup: public ITaskGroup
@@ -770,7 +802,7 @@ static inline void parallel(F&& f)
 }
 
 
-template<class F, class G>
+template<typename TaskType, class F, class G>
 static inline auto parallel_reduce(F&& f, G&& g) -> std::invoke_result_t<F>
 {
 	if (!ThreadPool::HasThreads())
@@ -781,18 +813,16 @@ static inline auto parallel_reduce(F&& f, G&& g) -> std::invoke_result_t<F>
 	using RetType = std::invoke_result_t<F>;
 	using FoldType = std::shared_future<RetType>;
 
-	// std::array<TaskType, ThreadPool::MAX_THREADS> tasks;
-	std::array<AsyncTask<F>*, ThreadPool::MAX_THREADS> tasks;
+	std::array<TaskType*, ThreadPool::MAX_THREADS> tasks;
 	std::array<FoldType, ThreadPool::MAX_THREADS> results;
 
 	// NOTE:
-	//   results become available in AsyncTask::ExecuteStep, and can allow
+	//   results become available in TaskType::ExecuteStep, and can allow
 	//   accumulate to return (followed by tasks going out of scope) before
 	//   ExecuteStep's themselves have returned --> premature task deletion
 	//   if shared_ptr were used (all tasks *must* have exited ExecuteLoop)
 	//
-	// tasks[0] = std::move(std::make_shared<AsyncTask<F>>(std::forward<F>(f)));
-	tasks[0] = new AsyncTask<F>(std::forward<F>(f));
+	tasks[0] = new TaskType(std::forward<F>(f));
 	results[0] = std::move(tasks[0]->GetFuture());
 
 	// first job in a reduction usually wants to run on the main thread
@@ -800,8 +830,7 @@ static inline auto parallel_reduce(F&& f, G&& g) -> std::invoke_result_t<F>
 
 	// need to push N individual tasks; see NOTE in TParallelTaskGroup
 	for (size_t i = 1, n = ThreadPool::GetNumThreads(); i < n; ++i) {
-		// tasks[i] = std::move(std::make_shared<AsyncTask<F>>(std::forward<F>(f)));
-		tasks[i] = new AsyncTask<F>(std::forward<F>(f));
+		tasks[i] = new TaskType(std::forward<F>(f));
 		results[i] = std::move(tasks[i]->GetFuture());
 
 		// tasks[i]->selfDelete.store(false);

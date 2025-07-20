@@ -14,6 +14,14 @@ int GLAD_GL_VERSION_2_1 = 0;
 int GLAD_GL_VERSION_3_0 = 0;
 int GLAD_GL_VERSION_3_1 = 0;
 int GLAD_GL_VERSION_3_2 = 0;
+int GLAD_GL_VERSION_3_3 = 0;
+int GLAD_GL_VERSION_4_0 = 0;
+int GLAD_GL_VERSION_4_1 = 0;
+int GLAD_GL_VERSION_4_2 = 0;
+int GLAD_GL_VERSION_4_3 = 0;
+int GLAD_GL_VERSION_4_4 = 0;
+int GLAD_GL_VERSION_4_5 = 0;
+int GLAD_GL_VERSION_4_6 = 0;
 
 int GLAD_GL_NV_primitive_restart = 0;
 int GLAD_GL_EXT_texture_filter_anisotropic = 0;
@@ -517,6 +525,7 @@ decltype(glad_glObjectLabel) glad_glObjectLabel = nullptr;
 decltype(glad_glClearBufferuiv) glad_glClearBufferuiv = nullptr;
 decltype(glad_glClearBufferiv) glad_glClearBufferiv = nullptr;
 decltype(glad_glClearBufferfv) glad_glClearBufferfv = nullptr;
+decltype(glad_glGetTextureSubImage) glad_glGetTextureSubImage = nullptr;
 
 namespace Impl {
     template<typename R, typename... Args>
@@ -955,6 +964,7 @@ int gladLoadGL(void) {
     glad_glClearBufferuiv = MakeStubImpl(glad_glClearBufferuiv);
     glad_glClearBufferiv = MakeStubImpl(glad_glClearBufferiv);
     glad_glClearBufferfv = MakeStubImpl(glad_glClearBufferfv);
+    glad_glGetTextureSubImage = MakeStubImpl(glad_glGetTextureSubImage);
 
     return 0;
 }

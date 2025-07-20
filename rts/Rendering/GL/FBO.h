@@ -88,6 +88,8 @@ public:
 	 */
 	void AttachTexture(const GLuint texId, const GLenum texTarget = GL_TEXTURE_2D, const GLenum attachment = GL_COLOR_ATTACHMENT0_EXT, const int mipLevel = 0, const int zSlice = 0);
 
+	void AttachTextureLayer(const GLuint texId, const GLenum attachment = GL_COLOR_ATTACHMENT0_EXT, const int mipLevel = 0, const int layer = 0);
+
 	/**
 	 * @brief AttachRenderBuffer
 	 * @param rboId RenderBuffer to attach

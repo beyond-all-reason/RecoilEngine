@@ -295,7 +295,7 @@ void RecoilGetTexParams(GLenum target, GLuint textureID, GLint level, TexturePar
 void glSaveTexture(const GLuint textureID, const char* filename, int level)
 {
 	TextureParameters params;
-	RecoilGetTexParams(GL_TEXTURE_2D, textureID, 0, params);
+	RecoilGetTexParams(GL_TEXTURE_2D, textureID, level, params);
 
 	CBitmap bmp;
 	GLenum extFormat = params.isNormalizedDepth ? GL_DEPTH_COMPONENT : CBitmap::GetExtFmt(params.chNum);
@@ -305,6 +305,48 @@ void glSaveTexture(const GLuint textureID, const char* filename, int level)
 	{
 		auto texBind = GL::TexBind(GL_TEXTURE_2D, textureID);
 		glGetTexImage(GL_TEXTURE_2D, level, extFormat, params.prefDataType, bmp.GetRawMem());
+	}
+
+	if (params.isNormalizedDepth) {
+		//doesn't work, TODO: fix
+		bmp.SaveFloat(filename);
+	}
+	else {
+		bmp.Save(filename, params.bpp < 32);
+	}
+}
+
+
+void glSaveTextureArray(const GLuint textureID, const char* filename, int level, int page)
+{
+	TextureParameters params;
+	RecoilGetTexParams(GL_TEXTURE_2D_ARRAY, textureID, level, params);
+
+	GLenum extFormat = params.isNormalizedDepth ? GL_DEPTH_COMPONENT : CBitmap::GetExtFmt(params.chNum);
+
+	CBitmap bmp;
+	bmp.Alloc(params.sizeX, params.sizeY, params.chNum, params.prefDataType);
+
+	if (GLAD_GL_VERSION_4_5) {
+		//DSA, needs no binding
+		glGetTextureSubImage(textureID, level, 0, 0, page, params.sizeX, params.sizeY, 1, extFormat, params.prefDataType, bmp.GetMemSize(), bmp.GetRawMem());
+	}
+	else {
+		const size_t pageSize = params.sizeX * params.sizeY * params.chNum * CBitmap::GetDataTypeSize(params.prefDataType);
+		const size_t allPagesSize = pageSize * params.sizeZ;
+		assert(params.imageSize == allPagesSize);
+
+		static std::vector<uint8_t> dataBytes;
+		dataBytes.resize(allPagesSize);
+
+		auto texBind = GL::TexBind(GL_TEXTURE_2D_ARRAY, textureID);
+		glGetTexImage(GL_TEXTURE_2D_ARRAY, level, extFormat, params.prefDataType, dataBytes.data());
+
+		std::copy(
+			dataBytes.data() + (page + 0) * pageSize,
+			dataBytes.data() + (page + 1) * pageSize,
+			bmp.GetRawMem()
+		);
 	}
 
 	if (params.isNormalizedDepth) {

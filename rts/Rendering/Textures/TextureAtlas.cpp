@@ -193,13 +193,12 @@ bool CTextureAtlas::CreateTexture()
 
 	for (const MemTex& memTex: memTextures) {
 		auto it = atlasAllocator->FindEntry(memTex.names.front());
-		auto pageNum = atlasAllocator->GetEntryPage(it);
-		if (pageNum > numPages)
+		const auto& pixCoords = atlasAllocator->GetEntry(it);
+
+		if (pixCoords.pageNum > numPages)
 			continue;
 
 		auto texCoords = atlasAllocator->GetTexCoords(it);
-		const auto& pixCoords = atlasAllocator->GetEntry(it);
-
 		const int xpos = static_cast<int>(pixCoords.x);
 		const int ypos = static_cast<int>(pixCoords.y);
 
@@ -207,7 +206,7 @@ bool CTextureAtlas::CreateTexture()
 			textures[name] = texCoords;
 		}
 
-		auto& atlasPage = atlasPages[pageNum];
+		auto& atlasPage = atlasPages[pixCoords.pageNum];
 
 		for (int y = 0; y < memTex.ysize; ++y) {
 			int* dst = ((int*) atlasPage.data()) + xpos + (ypos + y) * atlasSize.x;
@@ -228,7 +227,7 @@ bool CTextureAtlas::CreateTexture()
 		//make function re-entrant
 		.texID = atlasTex ? atlasTex->GetId() : 0,
 		.reqNumLevels = numLevels,
-		.linearMipMapFilter = false,
+		.linearMipMapFilter = true,
 		.linearTextureFilter = true,
 		.wrapMirror = false
 	};
@@ -337,9 +336,18 @@ void CTextureAtlas::DumpTexture(const char* newFileName) const
 		return;
 
 	std::string filename = newFileName ? newFileName : name.c_str();
-	filename += ".png";
 
-	glSaveTexture(atlasTex->GetId(), filename.c_str());
+	const auto numPages = atlasAllocator->GetNumPages();
+
+	if (numPages > 1) {
+		for (uint32_t page = 0; page < numPages; ++page) {
+			glSaveTextureArray(atlasTex->GetId(), fmt::format("{}_{}.png", filename, page).c_str(), page);
+		}
+	}
+	else {
+		filename += ".png";
+		glSaveTexture(atlasTex->GetId(), filename.c_str());
+	}
 }
 
 

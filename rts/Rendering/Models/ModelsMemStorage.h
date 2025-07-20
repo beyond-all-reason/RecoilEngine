@@ -65,7 +65,7 @@ public:
 	      auto& GetUpdateList()       { return updateList; }
 private:
 	StablePosAllocator<MyType> storage;
-	UpdateListMT updateList;
+	UpdateList updateList;
 private:
 	static constexpr int INIT_NUM_ELEMS = 1 << 16u;
 public:

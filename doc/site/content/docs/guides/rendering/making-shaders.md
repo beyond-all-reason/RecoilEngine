@@ -7,15 +7,14 @@ Recoil comes with some premade shaders that cover the majority of use cases, but
 
 ## Step 1: The Shader
 
-First thing's first, let's make a basic shader.
+First thing's first, let's make a basic shader (For GL4).
 
 **Vertex Shader (`shader.vert.glsl`):**
 ```glsl
 #version 460
 
-layout(std140, binding = 0) uniform UniformMatrixBuffer {
-    mat4 cameraViewProj;
-};
+//##UBO##
+// We'll talk about this later
 
 in vec4 instancePosition;
 in vec4 pos; // Note: To project properly, it should be a vec4 with the w value being 1.0
@@ -23,7 +22,7 @@ in uvec3 color;
 in vec2 uv;
 
 out DataVS { // Interpolated for each vertex
-    vec4 texCoord;
+    vec2 texCoord;
 };
 
 void main() {
@@ -39,13 +38,13 @@ void main() {
 uniform sampler2D inputTexture;
 
 in DataVS {
-    vec4 texCoord;
+    vec2 texCoord;
 };
 
 out vec4 colorOut; // This is the final fragment color
 
 void main() {
-    colorOut = texture(inputTexture, texCoord.xy);
+    colorOut = texture(inputTexture, texCoord);
 }
 ```
 
@@ -53,9 +52,10 @@ void main() {
 Creating a basic shader in Lua is simple.
 
 ```lua
+local ubo_defs = gl.GetEngineUniformBuffer()
 shader = gl.CreateShader({
-    fragment = VFS.LoadFile("path/to/shader.frag.glsl"),
-    vertex = VFS.LoadFile("path/to/shader.vert.glsl"),
+    fragment = VFS.LoadFile("path/to/shader.frag.glsl"):gsub("//##UBO##", ubo_defs), -- again we will address this later
+    vertex = VFS.LoadFile("path/to/shader.vert.glsl"):gsub("//##UBO##", ubo_defs),
 })
 ```
 
@@ -65,11 +65,11 @@ But we aren't at a working place yet.
 
 ## Step 2: The Uniforms
 
-There are some uniforms in these shaders. Some data is provided by the engine, but others have to be provided by you. 
+There are some uniforms in these shaders. Some data is provided by the engine in a Uniform Buffer Object, but others have to be provided by you. 
 
 ### Engine Uniforms
 
-Putting this in your shader will allow you access to a number of matrices and other important engine-related data.
+All shaders have access to a Uniform Buffer Object containing information about the game world. The shape is as follows:
 
 ```glsl
 layout(std140, binding = 0) uniform UniformMatrixBuffer {
@@ -143,6 +143,8 @@ layout(std140, binding = 1) uniform UniformParamsBuffer {
 };
 ```
 
+To include this in your shader, it's better to append this to the beginning of your shader on the lua side with [`gl.GetEngineUniformBuffer()`]({{% ref "docs/lua-api/gl/#glgetengineuniformbufferdef" %}}), like `fragment = VFS.LoadFile("path/to/shader.frag.glsl"):gsub("//##UBO##", gl.GetEngineUniformBuffer())`. We use the gsub here to put UBO in the middle of the code, rather than just prepend engine UBO in front of the shader, to make sure it's after the `#version` stuff glsl expects to be at the beginning. If you plan to use them in your shader, make sure to add `//##UBO##` as a comment up near the beginning. This way, if something changes, you won't have to update all of your scripts (but we will still have to update this article).
+
 ### Custom Uniforms
 
 Often times, you want to pass in your own uniform data. To do that, we have to define uniform bindings when creating our shader. Our fragment shader has an input texture, so let's put that in:
@@ -206,16 +208,16 @@ There are some built-in path values and format examples below, for further infor
 
 ### Editing Uniforms During Runtime
 
-To change uniforms during runtime, you will have to grab a handle to the uniform. Luckily, it's easy to do that.
+To change uniforms during runtime, you will have to grab a uniform location. Luckily, it's easy to do that.
 
 ```lua
-local uniform_handle = gl.GetUniformLocation(shader, "myUniformName")
+local uniform_location = gl.GetUniformLocation(shader, "myUniformName")
 ```
 
-Then, to change the uniform, you use the handle:
+Then, to change the uniform, you use the location:
 
 ```lua
-gl.Uniform(uniform_handle, 1.0, 0.0, 1.0, 0.0)
+gl.Uniform(uniform_location, 1.0, 0.0, 1.0, 0.0)
 ```
 
 There are a couple of these `gl.UniformX` functions for floats, integers, etc, but they all have in common that you can put in up to 4 values, representing the maximum vector dimensions of 4.  
@@ -233,7 +235,7 @@ A Vertex *Array* Object (VAO) bundles all your buffers together.
 
 ### Creation
 
-Let's create some: 
+Let's create some. Note that any of these can be skipped apart from the VAO if you don't need them.
 
 ```lua
 local my_vao = gl.GetVAO() -- first, create a VAO

@@ -93,6 +93,7 @@ static constexpr  glFrustumFuncPtr  glFrustumFuncs[2] = {__spring_glFrustum_noCC
 
 void WorkaroundATIPointSizeBug();
 
+void glSaveTextureArray(const GLuint textureID, const char* filename, int level = 0, int page = 0);
 void glSaveTexture(const GLuint textureID, const char* filename, int level = 0);
 
 void RecoilGetTexParams(GLenum target, GLuint textureID, GLint level, TextureParameters& textureParameters);

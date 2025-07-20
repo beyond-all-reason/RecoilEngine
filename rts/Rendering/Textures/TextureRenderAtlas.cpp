@@ -5,6 +5,7 @@
 #include "LegacyAtlasAlloc.h"
 #include "QuadtreeAtlasAlloc.h"
 #include "RowAtlasAlloc.h"
+#include "MultiPageAtlasAlloc.hpp"
 
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/myGL.h"
@@ -62,16 +63,25 @@ CTextureRenderAtlas::CTextureRenderAtlas(
 	, atlasSizeY(atlasSizeY_)
 	, allocType(allocType_)
 	, glInternalType(glInternalType_)
-	, texID(0)
 	, atlasName(atlasName_)
 	, finalized(false)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	using MPLegacyAtlasAlloc = MultiPageAtlasAlloc<CLegacyAtlasAlloc>;
+	using MPQuadtreeAtlasAlloc = MultiPageAtlasAlloc<CQuadtreeAtlasAlloc>;
+	using MPRowAtlasAlloc = MultiPageAtlasAlloc<CRowAtlasAlloc>;
+
+	static constexpr uint32_t MAX_TEXTURE_PAGES = 16;
+
 	switch (allocType) {
-		case CTextureAtlas::ATLAS_ALLOC_LEGACY:   { atlasAllocator = std::make_unique<  CLegacyAtlasAlloc>(); } break;
-		case CTextureAtlas::ATLAS_ALLOC_QUADTREE: { atlasAllocator = std::make_unique<CQuadtreeAtlasAlloc>(); } break;
-		case CTextureAtlas::ATLAS_ALLOC_ROW:      { atlasAllocator = std::make_unique<     CRowAtlasAlloc>(); } break;
-		default:                                  {                                            assert(false); } break;
+		case CTextureAtlas::ATLAS_ALLOC_LEGACY:      { atlasAllocator = std::make_unique<   CLegacyAtlasAlloc>(                 ); } break;
+		case CTextureAtlas::ATLAS_ALLOC_QUADTREE:    { atlasAllocator = std::make_unique< CQuadtreeAtlasAlloc>(                 ); } break;
+		case CTextureAtlas::ATLAS_ALLOC_ROW:         { atlasAllocator = std::make_unique<      CRowAtlasAlloc>(                 ); } break;
+		case CTextureAtlas::ATLAS_ALLOC_MP_LEGACY:   { atlasAllocator = std::make_unique<  MPLegacyAtlasAlloc>(MAX_TEXTURE_PAGES); } break;
+		case CTextureAtlas::ATLAS_ALLOC_MP_QUADTREE: { atlasAllocator = std::make_unique<MPQuadtreeAtlasAlloc>(MAX_TEXTURE_PAGES); } break;
+		case CTextureAtlas::ATLAS_ALLOC_MP_ROW:      { atlasAllocator = std::make_unique<     MPRowAtlasAlloc>(MAX_TEXTURE_PAGES); } break;
+		default:                                     {                                                              assert(false); } break;
 	}
 
 	atlasSizeX = std::min(globalRendering->maxTextureSize, (atlasSizeX > 0) ? atlasSizeX : configHandler->GetInt("MaxTextureAtlasSizeX"));
@@ -112,10 +122,7 @@ CTextureRenderAtlas::~CTextureRenderAtlas()
 		}
 	}
 
-	if (texID) {
-		glDeleteTextures(1, &texID);
-		texID = 0;
-	}
+	atlasTex = nullptr;
 }
 
 bool CTextureRenderAtlas::TextureExists(const std::string& texName)
@@ -217,8 +224,17 @@ AtlasedTexture CTextureRenderAtlas::GetTexture(const std::string& texName, const
 
 uint32_t CTextureRenderAtlas::GetTexTarget() const
 {
-	RECOIL_DETAILED_TRACY_ZONE;
-	return GL_TEXTURE_2D;
+	return (atlasAllocator->GetNumPages() > 1) ?
+		GL_TEXTURE_2D_ARRAY :
+		GL_TEXTURE_2D;
+}
+
+uint32_t CTextureRenderAtlas::GetTexID() const
+{
+	if (!finalized)
+		return 0;
+
+	return atlasTex->GetId();
 }
 
 int CTextureRenderAtlas::GetMinDim() const
@@ -251,19 +267,26 @@ bool CTextureRenderAtlas::Finalize()
 	if (!atlasAllocator->Allocate())
 		return false;
 
-	int levels = atlasAllocator->GetNumTexLevels();
+	const auto numLevels = atlasAllocator->GetNumTexLevels();
+	const auto numPages = atlasAllocator->GetNumPages();
 
-	const auto as = atlasAllocator->GetAtlasSize();
+	const auto atlasSize = atlasAllocator->GetAtlasSize();
 	{
-		glGenTextures(1, &texID);
-		auto texBind = GL::TexBind(GL_TEXTURE_2D, texID);
+		GL::TextureCreationParams tcp{
+			//make function re-entrant
+			.texID = atlasTex ? atlasTex->GetId() : 0,
+			.reqNumLevels = numLevels,
+			.linearMipMapFilter = true,
+			.linearTextureFilter = true,
+			.wrapMirror = false
+		};
 
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, (levels > 1) ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-		RecoilTexStorage2D(GL_TEXTURE_2D, levels, glInternalType, as.x, as.y);
+		if (numPages > 1) {
+			atlasTex = std::make_unique<GL::Texture2DArray>(atlasSize, numPages, glInternalType, tcp, true);
+		}
+		else {
+			atlasTex = std::make_unique<GL::Texture2D     >(atlasSize, glInternalType, tcp, true);
+		}
 	}
 	{
 		using namespace GL::State;
@@ -278,49 +301,61 @@ bool CTextureRenderAtlas::Finalize()
 		FBO fbo;
 		fbo.Init(false);
 		fbo.Bind();
-		fbo.AttachTexture(texID, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0, 0);
+		if (numPages > 1)
+			fbo.AttachTextureLayer(atlasTex->GetId(), GL_COLOR_ATTACHMENT0, 0, 0);
+		else
+			fbo.AttachTexture(atlasTex->GetId(), GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0, 0);
 		fbo.CheckStatus("TEXTURE-RENDER-ATLAS");
 		finalized = fbo.IsValid();
 
 		const auto Norm2SNorm = [](float value) { return (value * 2.0f - 1.0f); };
 
-		for (uint32_t level = 0; finalized && (level < levels); ++level) {
-			glViewport(0, 0, std::max(as.x >> level, 1), std::max(as.y >> level, 1));
+		for (uint32_t page = 0; page < numPages; ++page) {
+			for (uint32_t level = 0; finalized && (level < numLevels); ++level) {
+				glViewport(0, 0, std::max(atlasSize.x >> level, 1), std::max(atlasSize.y >> level, 1));
 
-			fbo.AttachTexture(texID, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0, level);
-			glDrawBuffer(GL_COLOR_ATTACHMENT0);
-			glReadBuffer(GL_COLOR_ATTACHMENT0);
+				if (numPages > 1)
+					fbo.AttachTextureLayer(atlasTex->GetId(), GL_COLOR_ATTACHMENT0, level, page);
+				else
+					fbo.AttachTexture(atlasTex->GetId(), GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0, level);
 
-			auto shEnToken = shader->EnableScoped();
-			shader->SetUniform("lod", static_cast<float>(level));
-			// draw
-			for (auto& [name, entry] : atlasAllocator->GetEntries()) {
-				const auto tc = atlasAllocator->GetTexCoords(name);
+				glDrawBuffer(GL_COLOR_ATTACHMENT0);
+				glReadBuffer(GL_COLOR_ATTACHMENT0);
 
-				VA_TYPE_2DT posTL = { .x = Norm2SNorm(tc.x1), .y = Norm2SNorm(tc.y1), .s = 0.0f, .t = 0.0f };
-				VA_TYPE_2DT posTR = { .x = Norm2SNorm(tc.x2), .y = Norm2SNorm(tc.y1), .s = 1.0f, .t = 0.0f };
-				VA_TYPE_2DT posBL = { .x = Norm2SNorm(tc.x1), .y = Norm2SNorm(tc.y2), .s = 0.0f, .t = 1.0f };
-				VA_TYPE_2DT posBR = { .x = Norm2SNorm(tc.x2), .y = Norm2SNorm(tc.y2), .s = 1.0f, .t = 1.0f };
+				auto shEnToken = shader->EnableScoped();
+				shader->SetUniform("lod", static_cast<float>(level));
+				// draw
+				for (auto& [name, entry] : atlasAllocator->GetEntries()) {
+					if (entry.texCoords.pageNum != page)
+						continue;
 
-				const auto texID = nameToTexID[name];
-				if (texID == 0)
-					continue;
+					const auto texID = nameToTexID[name];
+					if (texID == 0)
+						continue;
 
-				auto texBind = GL::TexBind(GL_TEXTURE_2D, texID);
+					const auto tc = atlasAllocator->GetTexCoords(name);
 
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+					VA_TYPE_2DT posTL = { .x = Norm2SNorm(tc.x1), .y = Norm2SNorm(tc.y1), .s = 0.0f, .t = 0.0f };
+					VA_TYPE_2DT posTR = { .x = Norm2SNorm(tc.x2), .y = Norm2SNorm(tc.y1), .s = 1.0f, .t = 0.0f };
+					VA_TYPE_2DT posBL = { .x = Norm2SNorm(tc.x1), .y = Norm2SNorm(tc.y2), .s = 0.0f, .t = 1.0f };
+					VA_TYPE_2DT posBR = { .x = Norm2SNorm(tc.x2), .y = Norm2SNorm(tc.y2), .s = 1.0f, .t = 1.0f };
 
-				rb.AddQuadTriangles(
-					std::move(posTL),
-					std::move(posTR),
-					std::move(posBR),
-					std::move(posBL)
-				);
+					auto texBind = GL::TexBind(GL_TEXTURE_2D, texID);
 
-				rb.DrawElements(GL_TRIANGLES);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+					glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+					rb.AddQuadTriangles(
+						std::move(posTL),
+						std::move(posTR),
+						std::move(posBR),
+						std::move(posBL)
+					);
+
+					rb.DrawElements(GL_TRIANGLES);
+				}
 			}
 		}
 
@@ -344,19 +379,32 @@ bool CTextureRenderAtlas::Finalize()
 	return true;
 }
 
+bool CTextureRenderAtlas::IsValid() const
+{
+	return finalized && (atlasTex->GetId() > 0);
+}
+
 bool CTextureRenderAtlas::DumpTexture() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!finalized)
+
+	if (!IsValid())
 		return false;
 
-	if (texID == 0)
-		return false;
+	const auto numLevels = atlasAllocator->GetNumTexLevels();
+	const auto numPages = atlasAllocator->GetNumPages();
 
-	int levels = atlasAllocator->GetNumTexLevels();
-
-	for (uint32_t level = 0; level < levels; ++level) {
-		glSaveTexture(texID, fmt::format("{}_{}.png", atlasName, level).c_str(), level);
+	if (numPages > 1) {
+		for (uint32_t page = 0; page < numPages; ++page) {
+			for (uint32_t level = 0; level < numLevels; ++level) {
+				glSaveTextureArray(atlasTex->GetId(), fmt::format("{}_{}_{}.png", atlasName, page, level).c_str(), level, page);
+			}
+		}
+	}
+	else {
+		for (uint32_t level = 0; level < numLevels; ++level) {
+			glSaveTexture(atlasTex->GetId(), fmt::format("{}_{}.png", atlasName, level).c_str(), level);
+		}
 	}
 
 	return true;
