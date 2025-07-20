@@ -1974,8 +1974,10 @@ void CUnit::TurnIntoNanoframe()
 }
 
 bool CUnit::AllowUnitAutoRepair()
-{
-	if ((this->lastOwnerReclaim) >= (gs->frameNum + 900))
+const {
+	if (this->lastOwnerReclaim == 0) return true;
+	
+	if ((gs->frameNum) >= (this->lastOwnerReclaim + 900))
 	{
 		return true;
 	}
@@ -2003,7 +2005,7 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 
 	if (amount >= 0.0f) {
 		// Register attempt to build/repair by owner
-		if (builder->team)==(this->team)
+		if ((builder->team)==(this->team))
 			lastOwnerBuildRepair = gs->frameNum;
 		
 		// build or repair
@@ -2062,8 +2064,8 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		}
 	} else {
 		// reclaim
-		if (builder->team)==(this->team)
-			lastOwnerBuildReclaim = gs->frameNum;
+		if ((builder->team)==(this->team))
+			lastOwnerReclaim = gs->frameNum;
 		if (!AllowedReclaim(builder)) {
 			builder->DependentDied(this);
 			return false;

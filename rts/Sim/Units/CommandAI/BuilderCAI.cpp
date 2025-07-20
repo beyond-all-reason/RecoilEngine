@@ -1643,7 +1643,7 @@ bool CBuilderCAI::FindRepairTargetAndRepair(
 		if (teamHandler.Ally(owner->allyteam, unit->allyteam)) {
 			if (!haveEnemy && (unit->health < unit->maxHealth)) {
 				// Don't auto pick for repair or build if within 900 frames of last reclaim
-				if (unit->AllowUnitAutoRepair())
+				if (!unit->AllowUnitAutoRepair())
 					continue;
 				
 				// don't help allies build unless set on roam

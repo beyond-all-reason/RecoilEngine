@@ -107,7 +107,7 @@ public:
 	bool AddBuildPower(CUnit* builder, float amount);
 	
 	// FindRepairTarget/FindRepairTargetAndRepair functions will ignore units that return false here
-	bool AllowUnitAutoRepair();
+	bool AllowUnitAutoRepair() const;
 
 	virtual void Activate();
 	virtual void Deactivate();
