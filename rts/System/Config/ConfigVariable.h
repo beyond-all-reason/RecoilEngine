@@ -154,8 +154,8 @@ public:
 			return *this;
 		}
 
-		svFile.remove_prefix(off);
-		data->declarationFile = std::format("{}{}", ".", svFile);
+		svFile.remove_prefix(off + 1);
+		data->declarationFile = std::string(svFile);
 		return *this;
 	}
 
