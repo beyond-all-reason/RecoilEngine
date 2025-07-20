@@ -1974,7 +1974,7 @@ void CUnit::TurnIntoNanoframe()
 	eventHandler.UnitReverseBuilt(this);
 }
 
-bool Cunit::AllowUnitAutoRepair()
+bool CUnit::AllowUnitAutoRepair()
 {
 	if ((this->lastOwnerReclaim) >= (gs->frameNum + 900))
 	{
