@@ -271,6 +271,34 @@ void CBeamLaser::FireImpl(const bool scriptCall)
 	FireInternal(GetFireDir(false, scriptCall));
 }
 
+bool CBeamLaser::TestRange(const float3 tgtPos, const SWeaponTarget& trg) const
+{
+	const float targetDistSq = aimFromPos.SqDistance(tgtPos);
+	const float3 aimDir = (tgtPos - aimFromPos).SafeNormalize();
+
+	float reqRange = range;
+	if (weaponDef->cylinderTargeting > 0.01f) {
+		const float invSinA = math::isqrt(1.0f - aimDir.y * aimDir.y);
+		reqRange = std::min(math::fabs(range * invSinA), math::fabs(range * weaponDef->cylinderTargeting / aimDir.y));
+	}
+	// Ellipsoid firing
+	else if (weaponDef->heightmod != 1.0f) {
+		const float maxVertLen = range / std::max(weaponDef->heightmod, 1e-6f);
+		reqRange = math::isqrt(Square(aimDir.x / range) + Square(aimDir.z / range) + Square(aimDir.y / maxVertLen));
+	}
+
+	// adjust range if targeting edge of hitsphere
+	if (currentTarget.type == Target_Unit && weaponDef->targetBorder != 0.0f) {
+		reqRange += (currentTarget.unit->radius * weaponDef->targetBorder);
+	}
+
+	if (targetDistSq > (reqRange * reqRange))
+		return false;
+
+	// NOTE: mainDir is in unit-space
+	return (CheckTargetAngleConstraint(aimDir, owner->GetObjectSpaceVec(mainDir)));
+}
+
 void CBeamLaser::FireInternal(float3 curDir)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -312,22 +340,28 @@ void CBeamLaser::FireInternal(float3 curDir)
 		curDir += (gsRNG.NextVector() * SprayAngleExperience());
 		curDir.SafeNormalize();
 
-		// increase range if targets are searched for in a cylinder
+		maxLength = std::max(maxLength, 1e-6f); // prevent possible NaNs
+		// Cylinder firing
 		if (weaponDef->cylinderTargeting > 0.01f) {
-			const float verticalDist = owner->radius * weaponDef->cylinderTargeting * curDir.y;
-			const float maxLengthModSq = maxLength * maxLength + verticalDist * verticalDist;
-
-			maxLength = math::sqrt(maxLengthModSq);
+			const float invSinA = math::isqrt(1.0f - curDir.y * curDir.y);
+			maxLength = std::min(math::fabs(maxLength * invSinA), math::fabs(maxLength * weaponDef->cylinderTargeting / curDir.y));
+		}
+		// Ellipsoid firing
+		else if (weaponDef->heightmod != 1.0f) {
+			const float maxVertLen = maxLength / std::max(weaponDef->heightmod, 1e-6f);
+			maxLength = math::isqrt(Square(curDir.x / maxLength) + Square(curDir.z / maxLength) + Square(curDir.y / maxVertLen));
 		}
 
 		// adjust range if targeting edge of hitsphere
 		if (currentTarget.type == Target_Unit && weaponDef->targetBorder != 0.0f) {
 			maxLength += (currentTarget.unit->radius * weaponDef->targetBorder);
 		}
-	} else {
+	}
+	else {
 		// restrict the range when sweeping
 		maxLength = std::min(maxLength, sweepFireState.GetTargetDist3D() * 1.125f);
 	}
+
 
 	uint32_t lastProjID = -1;
 	for (int tries = 0; tries < 5 && tryAgain; ++tries) {
