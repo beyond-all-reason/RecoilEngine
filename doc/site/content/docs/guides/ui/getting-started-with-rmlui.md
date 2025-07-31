@@ -1,26 +1,32 @@
 +++
-title = 'Getting Started With Rmlui'
+title = 'RmlUi'
 date = 2025-05-11T13:17:05-07:00
 draft = false
 author = "Slashscreen"
 +++
 
-RmlUi is a UI framework that is defined using a HTML/CSS style workflow (using Lua instead of JS). It is designed for interactive applications, and so is reactive by default. You can learn more about it on the [RmlUI website] and [differences in the Recoil version here](#differences-between-upstream-rmlui-and-rmlui-in-recoil). It's a natural way to do things for web devs.
+RmlUi is a UI framework that is defined using a HTML/CSS style workflow (using Lua instead of JS) intended to simplify UI development especially for those already familiar with web development. It is designed for interactive applications, and so is reactive by default. You can learn more about it on the [RmlUI website] and [differences in the Recoil version here](#differences-between-upstream-rmlui-and-rmlui-in-recoil).
 
 ## How does RmlUI Work?
 
 To get started, it's important to learn a few key concepts.
-- Data Model: This holds information (a Lua table) that is used in the UI code.
-- Document: This is a document tree/DOM holding the actual UI.
 - Context: This is a bundle of documents and data models.
+- Document: This is a document tree/DOM (document object model) holding the actual UI.
+- RML: This is the markup language used to define the document, it is very similar to XHTML (HTML but must be well-formed XML).
+- RCSS: This is the styling language used to style the document, it is very similar to CSS2 but does differ in some places.
+- Data Model: This holds information (a Lua table) that is used in the UI code in data bindings.
 
-On the Lua side, you are creating 1 or more contexts and providing them with data models and documents.
+On the Lua side, you are creating 1 or more contexts and adding data models and documents to them.
 
-On the Rml side, you are creating documents to be loaded by the Lua.
+On the Rml side, you are creating documents to be loaded by the Lua which will likely include data bindings to show information from the data model, and references to lua functions for event handlers.
+
+As each widget/component you create will likely comprise of several files (.lua, .rml & .rcss) you may find having a folder for each widget/component a useful way to organise your files.
 
 ## Getting Started
-
-RmlUi is built into the engine, so it is already there for you tu use. However, to get going with it, you need a few things. Like widgets and gadgets, you should use some kind of "handler", although this handler is much simpler than the others.
+ 
+RmlUi is available in LuaUI (the game UI) with future availability in LuaIntro & LuaMenu planned, so it is already there for you to use. 
+However, to get going with it there is some setup code that should be considered for loading fonts, cursors and configuring ui scaling, an example script is provided below.
+If you are working on a widget for an existing game, it is likely that the game already has some form of this setup code in, so you may be able to skip this section.
 
 ### Setup script
 
@@ -110,19 +116,23 @@ RmlUi.SetMouseCursorAlias("ew-resize", 'uiresizeh')
 RmlUi.CreateContext("shared")
 ```
 
-Also, add this line to your `luaui/main.lua`:
+This setup script can then be included from your `luaui/main.lua` (main.lua is the entry point for the LuaUI environment)
 
 ```lua
 VFS.Include(LUAUI_DIRNAME .. "rml_setup.lua",  nil, VFS.ZIP) -- Runs the script
 ```
 
-What this does is create a unified context for all your documents and data models, which is currently the reccommended way to architect documents. If you have any custom font files, list them in `font_files`, otherwise leave it empty.
+What this does is create a unified context 'shared' for all your documents and data models, which is currently the recommended way to architect documents. If you have any custom font files, list them in `font_files`, otherwise leave it empty.
 
 ### Writing Your First Document
 
+You will be creating files with .rml and .rcss extensions, as these closely resemble HTML and CSS it is worth configuring your editor to treat these file extensions as HTML and CSS respectively, see the [IDE Setup](#ide-setup) section for more information.
+
 Now, create an RML file somewhere under `luaui/widgets/`, like `luaui/widgets/getting_started.rml`. This is the UI document.
 
-Writing it is much like HTML by design. There are some differences, which you can find out on the [RmlUI website], which mostly have to do with tag attributes, but for the time being, we don't need to worry about them.
+Writing it is much like HTML by design. There are some differences, the most immediate being the root tag is called rml instead of html, most other RML/HTML differences relate to attributes for databindings and events, but for the time being, we don't need to worry about them.
+
+By default RmlUi has *NO* styles, this includes setting default element behaviour like block/inline and styles web developers would expect like input elements default appearances, as a starting point you can use [RmlUi documentation](https://mikke89.github.io/RmlUiDoc/pages/rml/html4_style_sheet.html) though these do not include styles for form elements. 
 
 Here's a basic widget written by Mupersega.
 
@@ -185,15 +195,6 @@ Here's a basic widget written by Mupersega.
         <div id="main-content">
             <h1 class="text-primary">Welcome to an Rml Starter Widget</h1>
             <p>This is a simple example of an RMLUI widget.</p>
-            <p>Each rml widget must reside in a folder of the same name in the <span>luaui/RmlWidgets/</span> directory
-                and contain at least a <span>widget.lua</span> file and a
-                <span>widget.rml</span>file.
-            </p>
-            <p>
-                The widget.lua file is the main entry point for the widget and is responsible for loading the rml file and creating the widget.
-                The widget.rml file is the main layout file for the widget and contains the structure and styling of the widget.
-                The widget.lua file can also contain any additional logic or functionality that you want to add to your widget.
-            </p>
             <div>
                 <button onclick="widget:Reload()">reload widget</button>
             </div>
@@ -213,21 +214,26 @@ Here's a basic widget written by Mupersega.
 Let's take a look at different areas that are important to look at.
 
 `<div id="rml-starter-widget" class="relative" data-model="starter_model">`
-1. Here, we bind to the data model using `data-model`. This is what we will need to name the data model in our Lua script later. Everything inside the model will be in scope i nand beneath the div.
-2. Typically, it is reccommended to bind your data model inside of a div beneath `body` rather than `body` itself.
+1. Here, we bind to the data model using `data-model`. This is what we will need to name the data model in our Lua script later. Everything inside the model will be in scope and beneath the div.
+2. Typically, it is recommended to bind your data model inside of a div beneath `body` rather than `body` itself.
 
 ```html
 <div id="expanding-content" data-class-expanded="expanded">
     <input type="checkbox" value="expanded" data-checked="expanded"/>
 ```
-anything with `data-x` is a "data event". Talking about these is redundant, as they are documented [on the RmlUi docs site](https://mikke89.github.io/RmlUiDoc/pages/data_bindings/views_and_controllers.html). You can, however, piece together what's happening here:
-1. `data-class-expanded="expanded"` applies the `expanded` class to the div if the value `expanded` in the data model is `true`.
-2. `<input type="checkbox" value="expanded" data-checked="expanded"/>` This checkbox will set the data model value in `data-checked` to true.
-3. When the data model is changed, the document is rerendered automatically. So, the expanding div will have the `expanded` class applied to it or removed whenever the check box is toggled.
+any attribute starting with `data-` is a "data event". We will go through a couple below, but you can find out more here [on the RmlUi docs site](https://mikke89.github.io/RmlUiDoc/pages/data_bindings/views_and_controllers.html).
+1. Double curly braces are used to show values from the data model within the document text. e.g. `{{message}}` shows the value of `message` in the data model.
+2. `data-class-expanded="expanded"` applies the `expanded` class to the div if the value `expanded` in the data model is `true`.
+3. `<input type="checkbox" value="expanded" data-checked="expanded"/>` This checkbox will set the data model value in `data-checked` to true.
+4. When the data model is changed, the document is rerendered automatically. So, the expanding div will have the `expanded` class applied to it or removed whenever the check box is toggled.
+
+There are data bindings to allow you to loop through arrays (data-for) have conditional sections of the document (data-if) and many others. 
 
 ### The Lua
 
-Here is a
+Hint: For information on setting up your editor to provide intellisense behaviour see the [Lua Language Server guide]({{% ref "lua-language-server" %}}).
+
+To load your document into the shared context we created earlier and to define and add the data model you will need to have a lua script something like the one below.
 
 ```lua
 -- luaui/widgets/getting_started.lua
@@ -305,7 +311,7 @@ end
 
 ### The Data Model Handle
 
-In the script, we are given a data model handle. This is a proxy for the Lua table used as the data model; the RmlUi system uses Sol as its Lua runtime, which is different than Recoil, and so data cannot be accessed directly.
+In the script, we are given a data model handle. This is a proxy for the Lua table used as the data model; as Recoil uses Lua 5.1 the standard RmlUi Lua bindings couldn't be used and RmlSolLua was used instead which uses Sol2 as a wrapper, and so data cannot be accessed directly.
 
 In most cases, you can simply do `dm_handle.expanded = true`, but this only works for table entries with string keys. What if you have an array, like `testArray` above? To loop through on the Lua side, you will need to get the underlying table:
 
@@ -354,9 +360,23 @@ Some of the rough edges you are likely to run into have already been discussed, 
 
 ---
 
-There are two kinds of events: data events, like `data-mousehover`, and normal events, like `onmousehover`. These have different data in their scopes.
+Unlike a web browser a default set of styles is not included, as a starting point you can look at the [RmlUi documentation](https://mikke89.github.io/RmlUiDoc/pages/rml/html4_style_sheet.html) though this doesn't provide styles for form elements.
+
+When using Context:OpenDataModel in Lua you must assign the return value to a variable, not doing so will cause the engine to crash when the model is reference in RML.
+
+Input elements of type submit & button behave differently to HTML and more like Button elements in that their text is not set by the value attribute. [This may get fixed if this PR is merged](https://github.com/mikke89/RmlUi/pull/798)
+
+The alpha/transparency value of an RGBA colour is different to CSS (0-1) and instead uses 0-255. The css opacity does still use 0-1.
+
+List styling is unavailable (list-style-type etc.), you can still use UL/OL/LI elements but there is no special meaning to them, whilst you could use background images to replicate bullets there isn't a practical way to achieve numbered list items with RML/RCSS.
+
+Only solid borders are supported, so the border-style property is unavailable and the shorthand border property doesn't include a style part (```border: 1dp solid black;``` won't work, instead use ```border: 1dp black;```).
+
+background-color behaves as expected, all other background styles are different and use decorators instead see the [RmlUi documentation for more information on decorators.](https://mikke89.github.io/RmlUiDoc/pages/rcss/decorators.html) 
+
+There are two kinds of events: data events, like `data-mouseover`, and normal events, like `onmouseover`. These have different data in their scopes.
 - Data events have the data model in their scope.
-- Normal events doon't have the data model, but they *do* have whatever is passed into `widget` on `widget.rmlContext:LoadDocument`. `widget` doesn't have to be a widget, just any table with data in it.
+- Normal events don't have the data model, but they *do* have whatever is passed into `widget` on `widget.rmlContext:LoadDocument`. `widget` doesn't have to be a widget, just any table with data in it.
 
 For example, take this:
 
@@ -388,15 +408,23 @@ document = widget.rmlContext:LoadDocument("document.rml", document_table)
 
 ### Best Practices
 
+- To create a scalable interface the use of the dp unit over px is recommended as the scale can be set per context with SetDensityIndependentPixelRatio.
 - For styles unique to a document, put them in a `style` tag. For shared styles, put them in an `rcss` file.
 - Rely on Recoil's RmlUi Lua bindings doc for what you can and can't do. The Recoil implementation has some extra stuff the RmlUi docs don't.
 - The Beyond All Reason devs prefer to use one shared context for all rmlui widgets.
-- Make the body the size of the entire screen, and make inputs pass through it with the `pointer-events: none;` style. Bind to a data model in a widget underneath, and then make *that* your widget and size it how you will (and reenable events with `pointer-events: auto;`).
+- You may want to consider making the body the size of the entire screen, and make inputs pass through it with the `pointer-events: none;` style. This will allow you to use layouts like flex to position your widget rather than absolutely positioning it. Remember to re-enable events on your widget element with `pointer-events: auto;`.
 
 
 ### Differences between upstream RmlUI and RmlUI in Recoil
 
 - The SVG element allows either a filepath or raw SVG data in the src attribute, allowing for inline svg to be used (this may change to svg being supported between the opening and closing tag when implemented upstream)
 - An additional element ```<texture>``` is available which allows for textures loaded in Recoil to be used, this behaves the same as an ```<img>``` element except the src attribute takes a [texture reference]({{% ref "articles/texture-reference-strings" %}})
-  
-[RmlUI website]: https://github.com/mikke89/RmlUi
+
+
+### IDE Setup
+
+To get the best experience with RmlUi, you should set up your editor to use HTML syntax highlighting for .rml file extensions and CSS syntax highlighting for .rcss file extensions.
+
+In VS Code, this can be done by opening a file with the extension you want to setup, then clicking on the language mode  in the bottom right corner of the window (probably shows as Plain Text). From there, you can select "Configure File Association for '.rml'" from the top menu that appears and choose "HTML" from the list. Do the same for .rcss files, but select "CSS".
+
+[RmlUI website]: https://mikke89.github.io/RmlUiDoc/

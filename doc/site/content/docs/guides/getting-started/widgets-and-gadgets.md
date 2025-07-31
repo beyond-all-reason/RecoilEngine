@@ -68,12 +68,11 @@ end
 
 ## Widgets - UI
 
-Widgets are addons that specialize in adding UI to your game. Synced code for these are buttons that affect the world, such as issuing commands. These lie in the "LuaUI/Widgets" folder. There are a few UI frameworks available to you if you'd rather not make your own. The major ones are:
-- Chili: A legacy UI framework using a retained-mode model. It's largely unmaintained and should be considered EOL, but it still functions.
-- RmlUi: A brand-new HTML/CSS style UI framework. If you have experience with web dev, you will feel at home here. It's very new, so the documentation and implementation has some rough edges. See the [article on it](docs/guides/ui/getting started with rmlui.md).
+Widgets are addons that specialize in adding UI to your game. Synced code for these are buttons that affect the world, such as issuing commands. These lie in the "LuaUI/Widgets" folder. 
+Recoil has the [RmlUi framework](https://mikke89.github.io/RmlUiDoc/) integrated but you can also use other Lua based frameworks, for example Beyond All Reason uses [FlowUi](https://github.com/beyond-all-reason/Beyond-All-Reason/blob/master/luaui/Widgets/flowui_gl4.lua) and Chobby uses [Chili](https://springrts.com/wiki/Chili)
 
-TODO: Example
-TODO: Link to docs
+RmlUi: A brand-new HTML/CSS style UI framework there is a recoil specific article on it here [article on it]({{% ref "rmlui" %}}).
+
 
 ## Gadgets - Game logic
 
