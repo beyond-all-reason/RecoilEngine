@@ -63,11 +63,9 @@ namespace Rml::SolLua
 	void SolLuaDocument::LoadInlineScript(const Rml::String& content, const Rml::String& source_path, int source_line)
 	{
 		auto* context = GetContext();
-		if (context == nullptr)
-		{
-			// A context isn't present in the case of reloading stylesheets which reprocesses the whole head section.
-			return;
-		}
+
+		// A context isn't present in the case of reloading stylesheets which reprocesses the whole head section.
+		if (context == nullptr) return;
 
 		Rml::String buffer{ "--" };
 		buffer.append("[");
