@@ -63,7 +63,7 @@ int LuaEncoding::DecodeBase64(lua_State* L)
  * @function Encoding.EncodeBase64
  *
  * @param text string Text to encode
- * @param stripPadding? boolean Remove padding (`=` characters) at the end when 'true'. Defaults to `true`.
+ * @param stripPadding? boolean (Default: `true`) Remove padding (`=` characters) at the end when 'true'.
  * @return string encoded Encoded text
  */
 int LuaEncoding::EncodeBase64(lua_State* L)

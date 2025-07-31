@@ -2,6 +2,10 @@
   grid-column: span 1 / span 1;
 }
 
+.col-span-2 {
+  grid-column: span 2 / span 2;
+}
+
 .grid-cols-2 {
 	grid-template-columns: max-content minmax(0, 1fr);
 }
@@ -28,6 +32,14 @@
 
 .mt-05 {
 	margin-top: .5rem !important;
+}
+
+.ml-05 {
+	margin-top: .5rem !important;
+}
+
+.right {
+	float: right;
 }
 
 .mt-1 {
@@ -60,7 +72,7 @@
 		margin-bottom: .5rem !important;
 	}
 
-	h5, h6, p, ul, .hextra-code-block {
+	h5, h6, p, ul, ol, .hextra-code-block {
 		margin-top: .5rem !important;
 	}
 

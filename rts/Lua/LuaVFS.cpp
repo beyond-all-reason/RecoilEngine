@@ -817,11 +817,9 @@ int LuaVFS::UnmapArchive(lua_State* L)
  * Compresses the specified folder.
  * @function VFS.CompressFolder
  * @param folderPath string
- * @param archiveType string? (Default: `"zip"`)The compression type (can
- * currently be only `"zip"`).
+ * @param archiveType string? (Default: `"zip"`) The compression type (can currently be only `"zip"`).
  * @param compressedFilePath string? (Default: `folderPath .. ".sdz"`)
- * @param includeFolder boolean? (Default: `false`) Whether the archive should
- * have the specified folder as root.
+ * @param includeFolder boolean? (Default: `false`) Whether the archive should have the specified folder as root.
  * @param mode string?
  */
 int LuaVFS::CompressFolder(lua_State* L)

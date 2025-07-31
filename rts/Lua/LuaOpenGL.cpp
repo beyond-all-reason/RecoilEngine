@@ -1339,7 +1339,7 @@ int LuaOpenGL::DrawMiniMap(lua_State* L)
  * Also allows disabling automatic setting of the blend mode. Otherwise the font will always print
  * with `BlendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)`.
  *
- * @param userDefinedBlending boolean? When `true` doesn't set the gl.BlendFunc automatically. Defaults to `false`.
+ * @param userDefinedBlending boolean? (Default: `false`) When `true` doesn't set the gl.BlendFunc automatically.
  *
  * @see gl.BlendFunc
  * @see gl.BlendFuncSeparate

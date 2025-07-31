@@ -10,7 +10,6 @@ def a(name)
 end
 
 class Member
-  @@other_matcher = Regexp.compile('\@\*(\w+)\*( (.*))?')
   @@refs = Set.new
 
   def self.refs; @@refs; end
@@ -26,13 +25,15 @@ class Member
   end
 
   def generate_sidebar_entry()
+    return if helper or type == :alias
+
     entries = if fields.empty? or children.empty?
       ""
     else
       "{name = 'Fields', link = '##{ref}_fields', ref = '#{ref}_fields'}, "
     end
 
-    entries += children.map(&:generate_sidebar_entry).join(', ')
+    entries += children.map(&:generate_sidebar_entry).compact.join(', ')
 
     "{name = '#{name}', link = '##{ref}', ref = '#{ref}', entries = [#{entries}]}"
   end
@@ -47,6 +48,16 @@ class Member
 
   def generate_fields(member_type = nil)
     self.fields.map(&:generate).join("\n")
+  end
+
+  def generate_see()
+    return if see.empty?
+
+    <<~EOF
+      See:
+
+      #{see.map {|s| "- #{s}"}.join("\n")}
+    EOF
   end
 
   def generate(internal_type = nil)
@@ -72,7 +83,7 @@ class Member
     @@refs.add(self.ref)
   end
 
-  @@deep_type_ref_matcher = Regexp.new('[^\s\(\)\[\]\|\?&;]+')
+  @@deep_type_ref_matcher = Regexp.new('[\w\.]+')
 
   def self.replace_deep_type_refs(value)
     return value if not value&.is_a?(String)
@@ -84,7 +95,7 @@ class Member
       end
   end
 
-  @@ref_matcher = Regexp.new("`([^`]*)`")
+  @@ref_matcher = Regexp.new(%q((\A|[^`])`([^`]+)`))
 
   def self.replace_refs(value)
     return value if not value&.is_a?(String)
@@ -100,12 +111,12 @@ class Member
            .each {|m| value.gsub!("`#{m}`", a(m)) }
     value
       .gsub(@@ref_matcher) do |match|
-        "<code>#{self.replace_deep_type_refs($1)}</code>"
+        "#{$1}<code>#{self.replace_deep_type_refs($2)}</code>"
       end
   end
 
   def process_refs()
-    self.see = a(see) if @@refs.include?(see)
+    self.see = see.map {|s| @@refs.include?(s) ? a(s)  : s }
 
     self.description = Member.replace_refs(self.description)
 
@@ -113,12 +124,20 @@ class Member
       p["typeref"] = Member.replace_deep_type_refs(p["typ"])
       p["ref"] = "#{full_name}-params.#{p["name"]}"
       p["desc"] = Member.replace_refs(p["desc"])
+
+      segments = (p["desc"] || "").strip.split("\n")
+      p["summary"] = segments.slice!(0)&.strip
+      p["short_desc"] = segments.empty? ? nil : segments.join("\n")
     end
 
     returns&.each do |p|
       p["typeref"] = Member.replace_deep_type_refs(p["typ"])
       p["ref"] = "#{full_name}-returns.#{p["name"]}"
       p["desc"] = Member.replace_refs(p["desc"])
+
+      segments = (p["desc"] || "").strip.split("\n")
+      p["summary"] = segments.slice!(0)&.strip
+      p["short_desc"] = segments.empty? ? nil : segments.join("\n")
     end
 
     self.typeref = Member.replace_deep_type_refs(self.typ)
@@ -128,7 +147,7 @@ class Member
       segments = self.description.strip.split("\n")
 
       self.summary = segments.slice!(0)&.strip
-      self.short_description = segments.join("\n")
+      self.short_description = segments.join("\n") if not segments.empty?
     end
 
     children.each(&:process_refs)
@@ -151,15 +170,12 @@ class Member
   end
 
   def self.compare(m1, m2)
-    helper1 = m1.custom["x_helper"]
-    helper2 = m2.custom["x_helper"]
-
     # Tagged helpers should be at the utmost bottom
-    if helper1 && helper1 == helper2
+    if m1.helper && m1.helper == m2.helper
       0
-    elsif helper1
+    elsif m1.helper
       1
-    elsif helper2
+    elsif m2.helper
       -1
     elsif m1.type == m2.type
       m1.full_name <=> m2.full_name
@@ -214,27 +230,17 @@ class Member
   end
 
   def extract_custom_tags()
-    other = self.other
-
-    if !other
-      self.custom = {}
-      self.section = nil
-
-      return
-    end
-
-    custom = other.split("\n\n").reduce({}) do |acc, el|
-      name, _, value = el.match(@@other_matcher).captures
-
-      if name
-        acc[name] = value || true
-      end
+    self.tags = (self.tag_content || {}).reduce({}) do |acc, el|
+      acc[el["tag_name"]] ||= []
+      acc[el["tag_name"]].push(el["content"])
 
       acc
     end
 
-    self.custom = custom
-    self.section = custom["section"]
+
+    self.section = tags["x_section"]
+    self.helper = tags["x_helper"]
+    self.see = tags["see"] || []
   end
 end
 
@@ -245,14 +251,11 @@ class Generator
 
   def self.compare_members(m1, m2)
     # helpers to the bottom
-    helper1 = m1.custom["x_helper"]
-    helper2 = m2.custom["x_helper"]
-
-    if helper1 && (helper1 == helper2)
+    if m1.helper && (m1.helper == m2.helper)
       return 0
-    elsif helper1
+    elsif m1.helper
       return 1
-    elsif helper2
+    elsif m2.helper
       return -1
     end
 

@@ -109,7 +109,6 @@ inline void LuaVBOImpl::InstanceBufferCheckAndFormatCheck(int attrID, const char
 /***
  *
  * @function VBO:Delete
- * @return nil
  */
 void LuaVBOImpl::Delete()
 {
@@ -459,25 +458,23 @@ bool LuaVBOImpl::DefineElementArray(const sol::optional<sol::object> attribDefAr
 /***
  * @class VBOAttributeDef
  * @x_helper
- * 
- * @field id integer?
- * 
+ *
  * The location in the vertex shader layout e.g.: layout (location = 0) in vec2
  * aPos. optional attrib, specifies location in the vertex shader. If not
  * specified the implementation will increment the counter starting from 0.
  * There can be maximum 16 attributes (so id of 15 is max).
- * 
- * @field name string? (Default: `attr#` where `#` is `id`)
- * 
+ *
+ * @field id integer?
+ *
  * The name for this VBO, only used for debugging.
- * 
- * @field size integer?
- * 
- * Defaults to to 4 for VBO. The number of floats that constitute 1 element in
+ *
+ * @field name string? (Default: `attr#` where `#` is `id`)
+ *
+ * Defaults to 4 for VBO. The number of floats that constitute 1 element in
  * this buffer. e.g. for the previous layout (location = 0) in vec2 aPos, it
  * would be size = 2.
- * 
- * @field type GL? (Default: `GL.FLOAT`) The datatype of this element.
+ *
+ * @field size integer?
  *
  * Accepts the following:
  * - `GL.BYTE`
@@ -487,11 +484,13 @@ bool LuaVBOImpl::DefineElementArray(const sol::optional<sol::object> attribDefAr
  * - `GL.INT`
  * - `GL.UNSIGNED_INT`
  * - `GL.FLOAT`
- * 
- * @field normalized boolean? (Defaults: `false`)
- * 
+ *
+ * @field type GL? (Default: `GL.FLOAT`) The datatype of this element.
+ *
  * It's possible to submit normals without normalizing them first, normalized
  * will make sure data is normalized.
+ *
+ * @field normalized boolean? (Defaults: `false`)
  */
 
 /***
@@ -523,13 +522,8 @@ bool LuaVBOImpl::DefineElementArray(const sol::optional<sol::object> attribDefAr
  *
  * @function VBO:Define
  * @param size number The maximum number of elements this VBO can have.
- * @param attribs number|VBOAttributeDef[]
- *
- * When number, the maximum number of elements this VBO can have.
- *
+ * @param attribs number|VBOAttributeDef[] When number, the maximum number of elements this VBO can have.
  * Otherwise, an array of arrays specifying the layout.
- *
- * @return nil
  * @see GL.OpenGL_Data_Types
  * @see VBO:Upload
  */
@@ -1172,11 +1166,10 @@ size_t LuaVBOImpl::UploadImpl(const std::vector<TIn>& dataVec, uint32_t elemOffs
 
 /*** Binds engine side vertex or index VBO containing models (units, features) data.
  *
- * @function VBO:ModelsVBO
- *
  * Also fills in VBO definition data as they're set for engine models (no need to do VBO:Define()).
  *
- * @return nil|number buffer size in bytes
+ * @function VBO:ModelsVBO
+ * @return number? buffer size in bytes
  */
 size_t LuaVBOImpl::ModelsVBO()
 {
@@ -1454,7 +1447,6 @@ int LuaVBOImpl::UnbindBufferRange(const GLuint index, const sol::optional<int> e
 /*** Logs the definition of the VBO to the console
  *
  * @function VBO:DumpDefinition
- * @return nil
  */
 void LuaVBOImpl::DumpDefinition()
 {

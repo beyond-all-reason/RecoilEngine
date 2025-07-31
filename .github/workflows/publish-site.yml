@@ -13,7 +13,7 @@ env:
   LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
   HUGO_VERSION: "0.147.9"
   LUA_DOC_EXTRACTOR_VERSION: "3"
-  EMMYLUA_DOC_CLI_VERSION: "0.8.2"
+  EMMYLUA_DOC_CLI_VERSION: "0.9.0"
   JQ_VERSION: "1.8.0"
   7Z_VERSION: "24.09"
   RUBY_VERSION: "3.3"

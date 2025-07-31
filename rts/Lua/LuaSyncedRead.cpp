@@ -3406,10 +3406,10 @@ static int GetUnitTableCentroid(lua_State *const L, const int indexWithinTable, 
  * Returns nil for an empty array
  *
  * @function Spring.GetUnitArrayCentroid
- * @param units table { unitID, unitID, ... }
- * @return number centerX
- * @return number centerY
- * @return number centerZ
+ * @param units integer[]
+ * @return number? centerX
+ * @return number? centerY
+ * @return number? centerZ
  */
 int LuaSyncedRead::GetUnitArrayCentroid(lua_State* L)
 {
@@ -3421,10 +3421,10 @@ int LuaSyncedRead::GetUnitArrayCentroid(lua_State* L)
  * Returns nil for an empty map
  *
  * @function Spring.GetUnitMapCentroid
- * @param units table { [unitID] = true, [unitID] = true, ... }
- * @return number centerX
- * @return number centerY
- * @return number centerZ
+ * @param units table<integer,true> { [unitID] = true, [unitID] = true, ... }
+ * @return number? centerX
+ * @return number? centerY
+ * @return number? centerZ
  */
 int LuaSyncedRead::GetUnitMapCentroid(lua_State* L)
 {

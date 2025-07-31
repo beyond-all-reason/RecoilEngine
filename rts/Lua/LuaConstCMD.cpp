@@ -21,7 +21,7 @@
  * @see Spring.GiveOrderToUnit
  * @see Spring.GiveOrderArrayToUnitArray
  * @see Spring.GetUnitCurrentCommand
- * @see Callins:AllowCommand
+ * @see SyncedCallins:AllowCommand
  * @enum CMD
  */
 

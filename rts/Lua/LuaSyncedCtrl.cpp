@@ -1109,24 +1109,21 @@ int LuaSyncedCtrl::AddTeamResource(lua_State* L)
 	return 0;
 }
 
-/***
- * Consumes metal or energy resources of the specified team.
+/*** Consumes resource of the specified team (single)
  *
  * @function Spring.UseTeamResource
  * @param teamID integer
- * @param type ResourceName Resource type.
+ * @param type "m"|"e" Resource type.
  * @param amount number Amount of resource to use.
- * @return boolean hadEnough
- * True if enough of the resource type was available and was consumed, otherwise false.
+ * @return boolean hadEnough True if enough of the resource type was available and was consumed, otherwise false.
  */
-/***
- * Consumes metal and/or energy resources of the specified team.
+
+/*** Consumes resource of the specified team (table)
  *
  * @function Spring.UseTeamResource
  * @param teamID integer
- * @param amount ResourceUsage
- * @return boolean hadEnough
- * True if enough of the resource type(s) were available and was consumed, otherwise false.
+ * @param amount table<"m"|"e",number> keys are: "[m|e]" metal | energy. Values are amounts
+ * @return boolean hadEnough True if enough of the resource type(s) were available and was consumed, otherwise false.
  */
 int LuaSyncedCtrl::UseTeamResource(lua_State* L)
 {
@@ -2068,7 +2065,7 @@ int LuaSyncedCtrl::SetUnitResourcing(lua_State* L)
 /***
  * @function Spring.SetUnitStorage
  * @param unitID integer
- * @param res ResourceUsage keys are: "[m|e]" metal | energy. Values are amounts
+ * @param res table<string,number> keys are: "[m|e]" metal | energy. Values are amounts
  */
 int LuaSyncedCtrl::SetUnitStorage(lua_State* L)
 {
@@ -3266,7 +3263,7 @@ int LuaSyncedCtrl::SetUnitShieldRechargeDelay(lua_State* L)
 /***
  * @function Spring.SetUnitFlanking
  * @param unitID integer
- * @param type string "dir"|"minDamage"|"maxDamage"|"moveFactor"|"mode"
+ * @param type "dir"|"minDamage"|"maxDamage"|"moveFactor"|"mode"
  * @param arg1 number x|minDamage|maxDamage|moveFactor|mode
  * @param y number? only when type is "dir"
  * @param z number? only when type is "dir"
@@ -3313,8 +3310,7 @@ int LuaSyncedCtrl::SetUnitFlanking(lua_State* L)
 /***
  * @function Spring.SetUnitPhysicalStateBit
  * @param unitID integer
- * @param Physical number[bit] state bit
- * @return nil
+ * @param bit integer Physical state bit
  */
 int LuaSyncedCtrl::SetUnitPhysicalStateBit(lua_State* L)
 {
@@ -3332,7 +3328,7 @@ int LuaSyncedCtrl::SetUnitPhysicalStateBit(lua_State* L)
 /***
  * @function Spring.GetUnitPhysicalState
  * @param unitID integer
- * @return number Unit's PhysicalState bitmask
+ * @return number bitmask Unit's PhysicalState bitmask
  */
 int LuaSyncedCtrl::GetUnitPhysicalState(lua_State* L)
 {
@@ -3358,7 +3354,7 @@ int LuaSyncedCtrl::SetUnitFuel(lua_State* L) { return 0; } // FIXME: DELETE ME
  *
  * @param unitID integer
  * @param neutral boolean
- * @return nil|boolean setNeutral
+ * @return boolean? setNeutral
  */
 int LuaSyncedCtrl::SetUnitNeutral(lua_State* L)
 {
@@ -4347,7 +4343,7 @@ int LuaSyncedCtrl::AddUnitResource(lua_State* L)
 /***
  * @function Spring.UseUnitResource
  * @param unitID integer
- * @param resources ResourceUsage
+ * @param resources table<"m"|"e",number> keys are: "[m|e]" metal | energy. Values are amounts
  * @return boolean? okay
  */
 int LuaSyncedCtrl::UseUnitResource(lua_State* L)
