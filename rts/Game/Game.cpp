@@ -135,6 +135,8 @@
 
 #include "System/Misc/TracyDefs.h"
 
+#include "fmt/ranges.h"
+
 
 #undef CreateDirectory
 
