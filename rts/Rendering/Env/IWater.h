@@ -52,7 +52,7 @@ protected:
 	void DrawRefractions(const double* clipPlaneEqs, bool drawGround, bool drawSky);
 
 protected:
-	static inline std::unique_ptr<IWater> water = nullptr;
+	static std::unique_ptr<IWater> water;
 
 	bool drawReflection;
 	bool drawRefraction;

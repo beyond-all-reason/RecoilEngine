@@ -78,7 +78,7 @@ public:
 public:
 	static void Init(size_t size);
 	static void Kill();
-	static inline std::unique_ptr<ITexMemPool> texMemPool = {};
+	static std::unique_ptr<ITexMemPool> texMemPool;
 protected:
 	size_t numAllocs = 0;
 	size_t allocSize = 0;
@@ -88,6 +88,8 @@ protected:
 	// libIL is not thread-safe, neither are {Alloc,Free}
 	spring::mutex bmpMutex;
 };
+
+std::unique_ptr<ITexMemPool> ITexMemPool::texMemPool = {};
 
 class TexMemPool : public ITexMemPool {
 private:

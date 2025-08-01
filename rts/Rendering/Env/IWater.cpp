@@ -39,6 +39,8 @@ IWater::IWater()
 	CExplosionCreator::AddExplosionListener(this);
 }
 
+std::unique_ptr<IWater> IWater::water = nullptr;
+
 void IWater::ExplosionOccurred(const CExplosionParams& event) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	AddExplosion(event.pos, event.damages.GetDefault(), event.craterAreaOfEffect);

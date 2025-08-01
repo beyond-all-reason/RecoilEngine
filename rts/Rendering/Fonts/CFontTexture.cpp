@@ -322,8 +322,10 @@ private:
 	bool searchFontAttributes;
 	bool searchApplySubstitutions;
 
-	static inline std::unique_ptr<FtLibraryHandler> singleton = nullptr;
+	static std::unique_ptr<FtLibraryHandler> singleton;
 };
+
+std::unique_ptr<FtLibraryHandler> FtLibraryHandler::singleton = nullptr;
 #endif
 
 

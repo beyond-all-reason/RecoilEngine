@@ -67,6 +67,8 @@ S3DModelVAO::S3DModelVAO()
 	instVBO.Unbind();
 }
 
+std::unique_ptr<S3DModelVAO> S3DModelVAO::instance = nullptr;
+
 void S3DModelVAO::ProcessVertices(const S3DModel* model)
 {
 	RECOIL_DETAILED_TRACY_ZONE;

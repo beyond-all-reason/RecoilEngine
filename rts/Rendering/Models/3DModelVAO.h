@@ -107,7 +107,7 @@ private:
 	void EnableAttribs(bool inst) const;
 	void DisableAttribs() const;
 private:
-	inline static std::unique_ptr<S3DModelVAO> instance = nullptr;
+	static std::unique_ptr<S3DModelVAO> instance;
 private:
 	bool safeToDeleteVectors = false;
 
