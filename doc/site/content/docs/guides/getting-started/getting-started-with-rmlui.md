@@ -412,7 +412,6 @@ document = widget.rmlContext:LoadDocument("document.rml", document_table)
 - For styles unique to a document, put them in a `style` tag. For shared styles, put them in an `rcss` file.
 - Rely on Recoil's RmlUi Lua bindings doc for what you can and can't do. The Recoil implementation has some extra stuff the RmlUi docs don't.
 - The Beyond All Reason devs prefer to use one shared context for all rmlui widgets.
-- You may want to consider making the body the size of the entire screen, and make inputs pass through it with the `pointer-events: none;` style. This will allow you to use layouts like flex to position your widget rather than absolutely positioning it. Remember to re-enable events on your widget element with `pointer-events: auto;`.
 
 
 ### Differences between upstream RmlUI and RmlUI in Recoil
