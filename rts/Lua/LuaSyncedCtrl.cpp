@@ -4498,9 +4498,9 @@ int LuaSyncedCtrl::RemoveGrass(lua_State* L)
  * @param y number
  * @param z number
  * @param heading Heading?
- * @param AllyTeamID integer?
+ * @param teamID integer?
  * @param featureID integer?
- * @return integer featureID
+ * @return integer? featureID returns nil if creation was unsuccessful
  */
 int LuaSyncedCtrl::CreateFeature(lua_State* L)
 {
