@@ -63,9 +63,9 @@ UnitDefWeapon::UnitDefWeapon(const WeaponDef* weaponDef, const LuaTable& weaponT
 	burstControlWhenOutOfArc = weaponTable.GetInt("burstControlWhenOutOfArc", burstControlWhenOutOfArc);
 
 	// Perform more math to accurately lead moving targets. 
-	// 0 = undershoot approaching or retreating targets (default), 
-	// 1 = exact solution for non-parabolic shots and 1 accuracy iteration for parabolic shots, 
-	// 2 = one frame accuracy for almost all shots, 2+ = more iterations for more accuracy if needed.
+	// 0 = undershoot approaching or retreating targets (default)
+	// 1 = exact solution for non-parabolic shots and 1 accuracy iteration for parabolic shots
+	// 2+ = extra iterations for parabolic shots. Iterations terminate early once 1-frame accuracy is achieved. 
 	accurateLeading = weaponTable.GetInt("accurateLeading", accurateLeading);
 }
 
