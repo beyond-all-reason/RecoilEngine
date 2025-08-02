@@ -1703,12 +1703,6 @@ function gadgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, re
   end
 end
 
-function gadgetHandler:UnitSelfDestructProgress(unitID, unitDefID, unitTeam, remainingSeconds)
-  for _,g in r_ipairs(self.UnitSelfDestructProgressList) do
-    g:UnitSelfDestructProgress(unitID, unitDefID, unitTeam, remainingSeconds)
-  end
-end
-
 --------------------------------------------------------------------------------
 --
 --  Feature call-ins

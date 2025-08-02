@@ -64,7 +64,6 @@ CallInsList = {
 	"UnitHarvestStorageFull",
 	"UnitSelfDestructStarted",
 	"UnitSelfDestructCancelled",
-	"UnitSelfDestructProgress",
 
 	"UnitEnteredUnderwater",
 	"UnitEnteredWater",

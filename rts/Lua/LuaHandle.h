@@ -173,7 +173,6 @@ class CLuaHandle : public CEventClient
 		
 		void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) override;
 		void UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds) override;
-		void UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds) override;
 
 		void RenderUnitDestroyed(const CUnit* unit) override;
 

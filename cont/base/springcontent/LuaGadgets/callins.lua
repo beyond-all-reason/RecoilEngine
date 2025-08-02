@@ -83,7 +83,6 @@ CALLIN_LIST = {
 	"UnitHarvestStorageFull",
 	"UnitSelfDestructStarted",
 	"UnitSelfDestructCancelled",
-	"UnitSelfDestructProgress",
 
 	-- weapon callins
 	"StockpileChanged",

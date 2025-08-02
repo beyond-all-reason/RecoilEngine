@@ -66,7 +66,6 @@ CR_REG_METADATA(CCommandAI, (
 	CR_MEMBER(nonQueingCommands),
 	CR_MEMBER(commandQue),
 	CR_MEMBER(lastUserCommand),
-	CR_MEMBER(selfDCountdown),
 	CR_MEMBER(lastFinishCommand),
 
 	CR_MEMBER(owner),
@@ -85,7 +84,6 @@ CR_REG_METADATA(CCommandAI, (
 CCommandAI::CCommandAI():
 	stockpileWeapon(0),
 	lastUserCommand(-1000),
-	selfDCountdown(0),
 	lastFinishCommand(0),
 	owner(NULL),
 	orderTarget(0),
@@ -99,7 +97,6 @@ CCommandAI::CCommandAI():
 CCommandAI::CCommandAI(CUnit* owner):
 	stockpileWeapon(0),
 	lastUserCommand(-1000),
-	selfDCountdown(0),
 	lastFinishCommand(0),
 	owner(owner),
 	orderTarget(0),
@@ -965,14 +962,13 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 		case CMD_SELFD: {
 			if (owner->unitDef->canSelfD) {
 				const int currentFrameNum = gs->frameNum;
-				 float remainingSeconds;
+				float remainingSeconds;
 				if (!(c.GetOpts() & SHIFT_KEY) || commandQue.empty()) {
 					if (owner->selfDTargetFrame > 0) { // Currently counting down -> cancel it
 						remainingSeconds = (owner->selfDTargetFrame - currentFrameNum) * INV_GAME_SPEED;
-						eventHandler.UnitSelfDestructCancelled(owner, remainingSeconds); // Fire cancel event
+						eventHandler.UnitSelfDestructCancelled(owner, remainingSeconds);
 
 						owner->selfDTargetFrame = 0;
-						owner->selfDCountdown = 0;
 					} else { // Not counting down -> start it
 						// Read countdown duration in frames from UnitDef
 						const int countdownFrames = std::max(0, owner->unitDef->selfDCountdown);
@@ -980,8 +976,7 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 						owner->selfDTargetFrame = currentFrameNum + countdownFrames;
 						remainingSeconds = countdownFrames * INV_GAME_SPEED;
 
-						//eoh->UnitSelfDestructStarted(*owner);
-						eventHandler.UnitSelfDestructStarted(owner, remainingSeconds); // Fire start event
+						eventHandler.UnitSelfDestructStarted(owner, remainingSeconds);
 					}
 				}
 				else if (commandQue.back().GetID() == CMD_SELFD) {
@@ -1572,12 +1567,10 @@ void CCommandAI::SlowUpdate()
 		case CMD_SELFD: {
 			if ((owner->selfDTargetFrame != 0) || !owner->unitDef->canSelfD) {
 				owner->selfDTargetFrame = 0;
-				owner->selfDCountdown = 0;
 			} else {
 				const int countdownFrames = std::max(0, owner->unitDef->selfDCountdown);
 
 				owner->selfDTargetFrame = (gs->frameNum + countdownFrames);
-				owner->selfDCountdown = countdownFrames * INV_GAME_SPEED * 2 + 1;
 			}
 			FinishCommand();
 			return;

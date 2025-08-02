@@ -152,7 +152,6 @@ local flexCallIns = {
   'UnitHarvestStorageFull',
   "UnitSelfDestructStarted",
   "UnitSelfDestructCancelled",
-  "UnitSelfDestructProgress",
   'RecvLuaMsg',
   'StockpileChanged',
   'DrawGenesis',
@@ -2113,11 +2112,6 @@ function widgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, re
   end
 end
 
-function widgetHandler:UnitSelfDestructProgress(unitID, unitDefID, unitTeam, remainingSeconds)
-  for _,w in ipairs(self.UnitSelfDestructProgressList) do
-    w:UnitSelfDestructProgress(unitID, unitDefID, unitTeam, remainingSeconds)
-  end
-end
 
 function widgetHandler:RecvLuaMsg(msg, playerID)
   local retval = false

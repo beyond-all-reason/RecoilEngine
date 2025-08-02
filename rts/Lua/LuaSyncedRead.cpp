@@ -3903,7 +3903,9 @@ int LuaSyncedRead::GetUnitSelfDTime(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
-	lua_pushnumber(L, unit->selfDCountdown);
+	const float remainingSeconds = (unit->selfDTargetFrame - gs->frameNum) * INV_GAME_SPEED;
+	
+	lua_pushnumber(L, remainingSeconds);
 	return 1;
 }
 

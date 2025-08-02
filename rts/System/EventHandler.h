@@ -98,7 +98,6 @@ class CEventHandler
 
 		void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds);
 		void UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds);
-		void UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds);
 
 		void UnitSeismicPing(const CUnit* unit, int allyTeam,
 		                     const float3& pos, float strength);
@@ -431,11 +430,6 @@ inline void CEventHandler::UnitSelfDestructStarted(const CUnit* unit, float rema
 inline void CEventHandler::UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds)
 {
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitSelfDestructCancelled, unit, remainingSeconds)
-}
-
-inline void CEventHandler::UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds)
-{
-	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitSelfDestructProgress, unit, remainingSeconds)
 }
 
 #define UNIT_CALLIN_NO_PARAM(name)                                 \

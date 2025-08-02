@@ -663,14 +663,8 @@ void CUnit::Update()
 	if unlikely(selfDTargetFrame > 0) {
 		const int currentFrameNum = gs->frameNum;
 		if (currentFrameNum >= selfDTargetFrame) {
-			//Run event to signal self destruct is complete
-			eventHandler.UnitSelfDestructProgress(this, 0.0f);
-
 			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
 			return; // Skip rest of update if killed
-		} else {
-			//Backwards compatability with existing widgets (depreciated?)
-			selfDCountdown = (selfDTargetFrame - currentFrameNum) * INV_GAME_SPEED * 2 + 1;
 		}
 	}
 
@@ -1002,11 +996,6 @@ void CUnit::SlowUpdate()
 
 		SlowUpdateCloak(true);
 		return;
-	}
-
-	if (selfDTargetFrame > 0 && gs->frameNum < selfDTargetFrame) {
-		const float remainingSeconds = (selfDTargetFrame - gs->frameNum) * INV_GAME_SPEED;
-		eventHandler.UnitSelfDestructProgress(this, remainingSeconds);
 	}
 
 	if (beingBuilt) {
@@ -3024,7 +3013,6 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(curTerrainType),
 
 	CR_MEMBER(selfDTargetFrame),
-	CR_MEMBER(selfDCountdown),
 
 	CR_MEMBER_UN(myIcon),
 	CR_MEMBER_UN(drawIcon),

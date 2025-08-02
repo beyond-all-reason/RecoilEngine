@@ -1475,7 +1475,7 @@ void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit, float remainingSecon
 	UnitSelfDestructCallin(cmdStr, unit, remainingSeconds);
 }
 
-/*** Called when a unit cancel's it's self destruct command.
+/*** Called when a unit cancels it's self destruct command.
  *
  * @function Callins:UnitSelfDestructCancelled
  * @param unitID integer
@@ -1484,20 +1484,6 @@ void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit, float remainingSecon
  * @param remainingSeconds number
  */
 void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds) 
-{
-	static const LuaHashString cmdStr(__func__);
-	UnitSelfDestructCallin(cmdStr, unit, remainingSeconds);
-}
-
-/*** Called every second while a unit has a self destruct command active and driectly before the unit is killed.
- *
- * @function Callins:UnitSelfDestructProgress
- * @param unitID integer
- * @param unitDefID integer
- * @param unitTeam integer
- * @param remainingSeconds number
- */
-void CLuaHandle::UnitSelfDestructProgress(const CUnit* unit, float remainingSeconds) 
 {
 	static const LuaHashString cmdStr(__func__);
 	UnitSelfDestructCallin(cmdStr, unit, remainingSeconds);
