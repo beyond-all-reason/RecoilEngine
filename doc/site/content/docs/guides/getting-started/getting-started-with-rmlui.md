@@ -116,13 +116,15 @@ RmlUi.SetMouseCursorAlias("ew-resize", 'uiresizeh')
 RmlUi.CreateContext("shared")
 ```
 
-This setup script can then be included from your `luaui/main.lua` (main.lua is the entry point for the LuaUI environment)
+What this does is create a unified context 'shared' for all your documents and data models, which is currently the recommended way to architect documents. If you have any custom font files, list them in `font_files`, otherwise leave it empty.
+
+The setup script above can then be included from your `luaui/main.lua` (main.lua is the entry point for the LuaUI environment).
 
 ```lua
 VFS.Include(LUAUI_DIRNAME .. "rml_setup.lua",  nil, VFS.ZIP) -- Runs the script
 ```
+> [!NOTE] The rml_setup.lua script included in base content only imports a font and cursor and doesn't create a context or set scaling
 
-What this does is create a unified context 'shared' for all your documents and data models, which is currently the recommended way to architect documents. If you have any custom font files, list them in `font_files`, otherwise leave it empty.
 
 ### Writing Your First Document
 
@@ -231,7 +233,7 @@ There are data bindings to allow you to loop through arrays (data-for) have cond
 
 ### The Lua
 
-Hint: For information on setting up your editor to provide intellisense behaviour see the [Lua Language Server guide]({{% ref "lua-language-server" %}}).
+> [!NOTE] For information on setting up your editor to provide intellisense behaviour see the [Lua Language Server guide]({{% ref "lua-language-server" %}}).
 
 To load your document into the shared context we created earlier and to define and add the data model you will need to have a lua script something like the one below.
 
@@ -311,7 +313,7 @@ end
 
 ### The Data Model Handle
 
-In the script, we are given a data model handle. This is a proxy for the Lua table used as the data model; as the Recoil RmlUi integration uses Sol2 as a wrapper, and so data cannot be accessed directly.
+In the script, we are given a data model handle. This is a proxy for the Lua table used as the data model; as the Recoil RmlUi integration uses Sol2 as a wrapper data cannot be accessed directly.
 
 In most cases, you can simply do `dm_handle.expanded = true`, but this only works for table entries with string keys. What if you have an array, like `testArray` above? To loop through on the Lua side, you will need to get the underlying table:
 
