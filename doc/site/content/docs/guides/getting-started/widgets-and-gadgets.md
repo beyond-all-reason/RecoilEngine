@@ -135,7 +135,7 @@ GadgetHandler:add_gadget("luarules/gadgets/testwidget.lua")
 This isn't how it's implemented exactly, but it illustrates the concept. The gadgets are loaded from a file and added to the handler's list of gadgets. When a callin is triggered, such as `Update` here, it calls `Update()` on all gadgets that have it overridden (be aware that the available callins vary by endpoint (Intro/Menu/Ui/Rules/Gaia) you can use Script.GetCallInList() to check what is available).
 
 ## Widget/Gadget Communication
-For information how widgets and gadgets can communicate between themselves and to other environments see [Wupget communication and best practices]({{% ref "../wupget" %}})
+For information on how widgets and gadgets can communicate between themselves and to other environments see [Wupget communication and best practices]({{% ref "../wupget" %}})
 
 ## Creating User Interfaces
 
