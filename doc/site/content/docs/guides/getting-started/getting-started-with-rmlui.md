@@ -311,7 +311,7 @@ end
 
 ### The Data Model Handle
 
-In the script, we are given a data model handle. This is a proxy for the Lua table used as the data model; as Recoil uses Lua 5.1 the standard RmlUi Lua bindings couldn't be used and RmlSolLua was used instead which uses Sol2 as a wrapper, and so data cannot be accessed directly.
+In the script, we are given a data model handle. This is a proxy for the Lua table used as the data model; as the Recoil RmlUi integration uses Sol2 as a wrapper, and so data cannot be accessed directly.
 
 In most cases, you can simply do `dm_handle.expanded = true`, but this only works for table entries with string keys. What if you have an array, like `testArray` above? To loop through on the Lua side, you will need to get the underlying table:
 
