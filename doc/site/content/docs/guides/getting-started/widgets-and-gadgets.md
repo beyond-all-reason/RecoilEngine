@@ -20,7 +20,7 @@ When in Unsynced mode LuaIntro, LuaUi, LuaRules and LuaGaia provide read access 
 - LuaUI - The handler for the in-game UI.
 
 ### Entrypoint into Lua code
-Each of these handlers will provide a Lua environment with some predefined globals and start by executing a main.lua file within their respective folders in the game. (LuaGaia and LuaRules have two entry points main.lua for Synced and draw.lua for Unsynced)<!--Useful but doesn't mention the global variable names in Lua [more information on the environments and what is available is here](https://springrts.com/wiki/Lua:Environments)--> 
+Each of these handlers will provide a Lua environment with some predefined globals and start by executing a main.lua file within their respective folders in the game. (LuaGaia and LuaRules have two entry points main.lua for Synced and draw.lua for Unsynced) [more information on the environments and what is available is here](https://springrts.com/wiki/Lua:Environments) 
 
 To allow you to control and extend the game/engine behavior predefined functions in your lua code will be called (if they are present) by the engine at certain hook points or on events in the engine. These are commonly referred to as call-ins (but could also be known as event handlers, callbacks). The list of available call-ins is extensive and can be retrieved in Lua using Script.GetCallInList()
 
