@@ -366,7 +366,7 @@ Unlike a web browser a default set of styles is not included, as a starting poin
 
 When using Context:OpenDataModel in Lua you must assign the return value to a variable, not doing so will cause the engine to crash when the model is reference in RML.
 
-Input elements of type submit & button behave differently to HTML and more like Button elements in that their text is not set by the value attribute. [This may get fixed if this PR is merged](https://github.com/mikke89/RmlUi/pull/798)
+Input elements of type submit & button behave differently to HTML and more like Button elements in that their text is not set by the value attribute. (This is likely to be corrected in a future version)
 
 The alpha/transparency value of an RGBA colour is different to CSS (0-1) and instead uses 0-255. The css opacity does still use 0-1.
 
