@@ -206,6 +206,7 @@ public:
 	bool fastAutoRetargeting;
 	bool fastQueryPointUpdate;
 	unsigned int burstControlWhenOutOfArc;
+	float rangefrombase;
 
 protected:
 	SWeaponTarget currentTarget;

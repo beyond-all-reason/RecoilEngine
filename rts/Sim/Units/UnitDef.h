@@ -47,7 +47,7 @@ struct UnitDefWeapon {
 	bool fastQueryPointUpdate = false;	///< check in with unitscript to get most current query piece before every friendly fire check, don't wait for slow update
 	unsigned int burstControlWhenOutOfArc = 0; ///< Determines how to handle burst fire, when target is out of arc. 0 = no restrictions (default), 1 = don't fire, 2 = fire in current direction of weapon 
 	float weaponAimAdjustPriority = 1.f;		///< relative importance of picking enemy targets that are in front
-
+	float rangefrombase = 0.0f; ///< This weapon checks range from base of unit plus this value, instead of from aimFromPos
 
 	static constexpr unsigned int BURST_CONTROL_OUT_OF_ARC_OFF = 0;
 	static constexpr unsigned int BURST_CONTROL_OUT_OF_ARC_HOLD = 1;
