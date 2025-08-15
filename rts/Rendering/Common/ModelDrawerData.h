@@ -128,7 +128,7 @@ inline void CModelDrawerDataBase<T>::AddObject(const T* co, bool add)
 
 	const uint32_t numMatrices = ((o->model ? o->model->numPieces : 0) + 1u) * 2;
 	scTransMemAllocMap.emplace(o, ScopedTransformMemAlloc(numMatrices));
-	static constexpr auto INITIAL_FRAME_NUM = std::numeric_limits<decltype(lastSyncedFrameUpload)::mapped_type>::lowest();
+	static constexpr auto INITIAL_FRAME_NUM = std::numeric_limits<typename decltype(lastSyncedFrameUpload)::mapped_type>::lowest();
 	lastSyncedFrameUpload.emplace(o, INITIAL_FRAME_NUM); //set to INITIAL_FRAME_NUM to update at least once before the sim starts
 
 	modelUniformsStorage.AddObject(co);
