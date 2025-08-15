@@ -126,6 +126,7 @@ void CModInfo::ResetState()
 
 		SLuaAllocLimit::MAX_ALLOC_BYTES = SLuaAllocLimit::MAX_ALLOC_BYTES_DEFAULT;
 
+		nativeExcessSharing = true;
 		allowTake = true;
 
 		allowEnginePlayerlist = true;
@@ -186,6 +187,7 @@ void CModInfo::Init(const std::string& modFileName)
 		// Specify in megabytes: 1 << 20 = (1024 * 1024)
 		SLuaAllocLimit::MAX_ALLOC_BYTES = static_cast<decltype(SLuaAllocLimit::MAX_ALLOC_BYTES)>(system.GetInt("LuaAllocLimit", SLuaAllocLimit::MAX_ALLOC_BYTES >> 20u)) << 20u;
 
+		nativeExcessSharing = system.GetBool("nativeExcessSharing", nativeExcessSharing);
 		allowTake = system.GetBool("allowTake", allowTake);
 		allowEnginePlayerlist = system.GetBool("allowEnginePlayerlist", allowEnginePlayerlist);
 	}

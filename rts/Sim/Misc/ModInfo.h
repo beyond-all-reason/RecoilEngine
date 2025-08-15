@@ -230,6 +230,7 @@ public:
 
 	int quadFieldQuadSizeInElmos;
 
+	bool nativeExcessSharing;
 	bool allowTake;
 	bool allowEnginePlayerlist;
 
