@@ -55,6 +55,7 @@
 
 #include "System/Misc/TracyDefs.h"
 
+#include <ranges>
 
 LuaRulesParams::Params  CSplitLuaHandle::gameParams;
 
@@ -1196,6 +1197,42 @@ bool CSyncedLuaHandle::AllowResourceTransfer(int oldTeam, int newTeam, const cha
 	const bool allow = luaL_optboolean(L, -1, true);
 	lua_pop(L, 1);
 	return allow;
+}
+
+/*** Called when excess resources are added.
+ * Accumulates all excesses within a single gameframe.
+ *
+ * @function SyncedCallins:ResourceExcess
+ * @param excesses table
+ * @return boolean whether or not Lua handled the event
+ */
+bool CSyncedLuaHandle::ResourceExcess(const std::map <int, SResourcePack>& excesses)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L, true);
+	luaL_checkstack(L, 3, __func__);
+
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return false;
+
+	lua_createtable(L, excesses.size(), 1);
+
+	for (const auto &[teamID, excess] : excesses) {
+		lua_createtable(L, excess.MAX_RESOURCES, 0);
+		for (const auto &[resourceID, resource] : std::views::enumerate(excess)) {
+			lua_pushnumber(L, resource);
+			lua_rawseti(L, -2, resourceID + 1);
+		}
+		lua_rawseti(L, -2, teamID);
+	}
+
+	if (!RunCallIn(L, cmdStr, 1, 1))
+		return false;
+
+	const bool handled = luaL_optboolean(L, -1, false);
+	lua_pop(L, 1);
+	return handled;
 }
 
 
