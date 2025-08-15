@@ -477,10 +477,16 @@ void CGame::Load(const std::string& mapFileName)
 			}
 			LEAVE_SYNCED_CODE();
 		}
-		// Update height bounds and pathing after pregame or a saved game load.
+		// Update height bounds, pathing and added/features units after pregame or a saved game load.
 		{
 			ENTER_SYNCED_CODE();
 			extractorHandler.PostFinalizeRefresh();
+
+			// update features / units in case they need to be rendered before the sim starts
+			// (e.g. during start position selection)
+			featureHandler.UpdatePostFrame();
+			unitHandler.UpdatePostFrame();
+
 			//needed in case pre-game terraform changed the map
 			readMap->UpdateHeightBounds();
 			Watchdog::ClearTimer(WDT_LOAD);
