@@ -28,6 +28,18 @@ CLightningCannon::CLightningCannon(CUnit* owner, const WeaponDef* def): CWeapon(
 }
 
 
+bool CLightningCannon::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
+{
+	const float targetDistSq = aimFromPos.SqDistance(tgtPos);
+	const float3 aimDir = (tgtPos - aimFromPos).SafeNormalize();
+
+	if (const auto shapedRange = GetShapedWeaponRange(aimDir, range); targetDistSq > Square(shapedRange))
+		return false;
+
+	// NOTE: mainDir is in unit-space
+	return (CheckTargetAngleConstraint(aimDir, owner->GetObjectSpaceVec(mainDir)));
+}
+
 void CLightningCannon::FireImpl(const bool scriptCall)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -42,7 +54,9 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 	CPlasmaRepulser* hitShield = nullptr;
 	CollisionQuery hitColQuery;
 
-	float boltLength = TraceRay::TraceRay(curPos, curDir, range, collisionFlags, owner, hitUnit, hitFeature, &hitColQuery);
+	const auto shapedRange = GetShapedWeaponRange(curDir, range);
+
+	float boltLength = TraceRay::TraceRay(curPos, curDir, shapedRange, collisionFlags, owner, hitUnit, hitFeature, &hitColQuery);
 
 	if (!weaponDef->waterweapon) {
 		// terminate bolt at water surface if necessary
@@ -55,7 +69,7 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 
 	static std::vector<TraceRay::SShieldDist> hitShields;
 	hitShields.clear();
-	TraceRay::TraceRayShields(this, curPos, curDir, range, hitShields);
+	TraceRay::TraceRayShields(this, curPos, curDir, shapedRange, hitShields);
 	for (const TraceRay::SShieldDist& sd: hitShields) {
 		if (sd.dist < boltLength && sd.rep->IncomingBeam(this, curPos, curPos + (curDir * sd.dist), 1.0f)) {
 			boltLength = sd.dist;

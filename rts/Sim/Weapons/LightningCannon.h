@@ -12,6 +12,7 @@ public:
 	CLightningCannon(CUnit* owner = nullptr, const WeaponDef* def = nullptr);
 
 private:
+	bool TestRange(const float3& tgtPos, const SWeaponTarget& trg) const override final;
 	void FireImpl(const bool scriptCall) override final;
 	float GetPredictedImpactTime(float3 p) const override final { return 0.0f; }
 

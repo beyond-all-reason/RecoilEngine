@@ -111,6 +111,7 @@ protected:
 	void UpdateWeaponPieces(const bool updateAimFrom = true);
 	float3 GetLeadVec(const CUnit* unit) const;
 
+	float GetShapedWeaponRange(const float3& dir, float maxLength) const;
 private:
 	void UpdateAim();
 	void UpdateFire();
@@ -126,7 +127,6 @@ private:
 	void HoldIfTargetInvalid();
 
 	bool TryTarget(const float3 tgtPos, const SWeaponTarget& trg, bool preFire = false) const;
-
 public:
 	CUnit* owner;
 	CWeapon* slavedTo;                      // use this weapon to choose target

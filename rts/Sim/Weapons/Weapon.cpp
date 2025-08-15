@@ -956,6 +956,27 @@ bool CWeapon::TryTarget(const float3 tgtPos, const SWeaponTarget& trg, bool preF
 	return (HaveFreeLineOfFire(GetAimFromPos(preFire), tgtPos, trg));
 }
 
+float CWeapon::GetShapedWeaponRange(const float3& dir, float maxLength) const
+{
+	maxLength = std::max(maxLength, 1e-6f); // prevent possible NaNs
+	// Cylinder firing
+	if (weaponDef->cylinderTargeting > 0.01f) {
+		const float invSinA = math::isqrt(1.0f - dir.y * dir.y);
+		maxLength = std::min(math::fabs(maxLength * invSinA), math::fabs(maxLength * weaponDef->cylinderTargeting / dir.y));
+	}
+	// Ellipsoid firing
+	else if (weaponDef->heightmod != 1.0f) {
+		const float maxVertLen = maxLength / std::max(weaponDef->heightmod, 1e-6f);
+		maxLength = math::isqrt(Square(dir.x / maxLength) + Square(dir.z / maxLength) + Square(dir.y / maxVertLen));
+	}
+
+	// adjust range if targeting edge of hitsphere
+	if (currentTarget.type == Target_Unit && weaponDef->targetBorder != 0.0f) {
+		maxLength += (currentTarget.unit->radius * weaponDef->targetBorder);
+	}
+
+	return maxLength;
+}
 
 bool CWeapon::TestTarget(const float3& tgtPos, const SWeaponTarget& trg) const
 {
