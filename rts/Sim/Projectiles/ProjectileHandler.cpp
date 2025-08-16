@@ -624,7 +624,7 @@ void CProjectileHandler::CheckGroundCollisions(bool synced)
 
 		if (belowGround && p->speed.w > 0.0f) {
 			const auto prevPos = p->pos - static_cast<float3>(p->speed);
-			const auto groundDistance = std::clamp(CGround::LineGroundCol(prevPos, p->pos, true), 0.0f, p->speed.w);
+			const auto groundDistance = std::clamp(CGround::LineGroundCol(prevPos, p->pos, synced), 0.0f, p->speed.w);
 			p->SetPosition(prevPos + static_cast<float3>(p->speed) * groundDistance / p->speed.w);
 		}
 		p->Collision();
