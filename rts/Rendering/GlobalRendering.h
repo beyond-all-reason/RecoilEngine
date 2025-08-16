@@ -377,12 +377,8 @@ public:
 
 	#ifdef _WIN32
 		std::unique_ptr<SharedLib> dwmApiLib;
-
-		using DwmGetWindowAttributeT = HRESULT (WINAPI *)(HWND, DWORD, PVOID, DWORD);
-		DwmGetWindowAttributeT DwmGetWindowAttribute = nullptr;
-
-		using DwmFlushT = HRESULT (WINAPI *)();
-		DwmFlushT DwmFlush = nullptr;
+		void* DwmGetWindowAttribute = nullptr;
+		void* DwmFlush = nullptr;
 	#endif
 public:
 	SDL_Window* sdlWindow;

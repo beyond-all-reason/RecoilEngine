@@ -349,8 +349,8 @@ CGlobalRendering::CGlobalRendering()
 #ifdef _WIN32
 	dwmApiLib = std::unique_ptr<SharedLib>(SharedLib::Instantiate("dwmapi"));
 	if (dwmApiLib) {
-		DwmGetWindowAttribute = dwmApiLib->FindAddressTyped<DwmGetWindowAttributeT>("DwmGetWindowAttribute");
-		DwmFlush = dwmApiLib->FindAddressTyped<DwmFlushT>("DwmFlush");
+		DwmGetWindowAttribute = dwmApiLib->FindAddress("DwmGetWindowAttribute");
+		DwmFlush = dwmApiLib->FindAddress("DwmFlush");
 	}
 #endif
 	verticalSync->WrapNotifyOnChange();
@@ -691,10 +691,11 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 		glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, 0);
 		
 		#ifdef _WIN32
+			using DwmFlushT = HRESULT(WINAPI*)();
 			if (forceDWMFlush == 1){ 
 				ZoneScopedN("CGlobalRendering::SwapBuffers::DWMFlushPre");
 				if (DwmFlush)
-					DwmFlush();
+					reinterpret_cast<DwmFlushT>(DwmFlush)();
 			}
 		#endif
 		
@@ -704,7 +705,7 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 			if (forceDWMFlush == 2){ 
 				ZoneScopedN("CGlobalRendering::SwapBuffers::DWMFlushPost");
 				if (DwmFlush)
-					DwmFlush();
+					reinterpret_cast<DwmFlushT>(DwmFlush)();
 			}
 		#endif
 
@@ -1661,8 +1662,10 @@ void CGlobalRendering::UpdateWindowBorders(SDL_Window* window) const
 
 		RECT rect, frame;
 
+		using DwmGetWindowAttributeT = HRESULT(WINAPI*)(HWND, DWORD, PVOID, DWORD);
+
 		static constexpr DWORD DWMWA_EXTENDED_FRAME_BOUNDS = 9; // https://docs.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute
-		DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(RECT));
+		reinterpret_cast<DwmGetWindowAttributeT>(DwmGetWindowAttribute)(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(RECT));
 		GetWindowRect(hwnd, &rect);
 
 		winBorder[0] -= std::max(0l, frame.top   - rect.top    );
