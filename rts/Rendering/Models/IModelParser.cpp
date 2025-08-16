@@ -265,7 +265,7 @@ void CModelLoader::LogErrors()
 	}
 
 	errors.clear();
-	//throw content_error("[CModelLoader] couldn't load one or many models");
+	throw content_error("[CModelLoader] couldn't load one or many models");
 }
 
 
