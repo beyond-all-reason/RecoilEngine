@@ -29,6 +29,7 @@
 #include "System/Platform/CrashHandler.h"
 #include "System/Platform/MessageBox.h"
 #include "System/Platform/Threading.h"
+#include "System/Platform/SharedLib.h"
 #include "System/Platform/WindowManagerHelper.h"
 #include "System/Platform/errorhandler.h"
 #include "System/ScopedResource.h"
@@ -345,6 +346,13 @@ CGlobalRendering::CGlobalRendering()
 	, glExtensions{}
 	, glTimerQueries{0}
 {
+#ifdef _WIN32
+	dwmApiLib = std::unique_ptr<SharedLib>(SharedLib::Instantiate("dwmapi"));
+	if (dwmApiLib) {
+		DwmGetWindowAttribute = dwmApiLib->FindAddressTyped<DwmGetWindowAttributeT>("DwmGetWindowAttribute");
+		DwmFlush = dwmApiLib->FindAddressTyped<DwmFlushT>("DwmFlush");
+	}
+#endif
 	verticalSync->WrapNotifyOnChange();
 	configHandler->NotifyOnChange(this, {
 		"DualScreenMode",
@@ -685,7 +693,8 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 		#ifdef _WIN32
 			if (forceDWMFlush == 1){ 
 				ZoneScopedN("CGlobalRendering::SwapBuffers::DWMFlushPre");
-				HRESULT result = dwmLoader.DwmFlush();
+				if (DwmFlush)
+					DwmFlush();
 			}
 		#endif
 		
@@ -694,7 +703,8 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 		#ifdef _WIN32
 			if (forceDWMFlush == 2){ 
 				ZoneScopedN("CGlobalRendering::SwapBuffers::DWMFlushPost");
-				HRESULT result = dwmLoader.DwmFlush();
+				if (DwmFlush)
+					DwmFlush();
 			}
 		#endif
 
@@ -1643,27 +1653,7 @@ void CGlobalRendering::UpdateWindowBorders(SDL_Window* window) const
 
 	#if defined(_WIN32) && (WINDOWS_NO_INVISIBLE_GRIPS == 1)
 	// W/A for 8 px Aero invisible borders https://github.com/libsdl-org/SDL/commit/7c60bec493404905f512c835f502f1ace4eff003
-	{
-		auto scopedLib = spring::ScopedResource(
-			LoadLibrary("dwmapi.dll"),
-			[](HMODULE lib) { if (lib) FreeLibrary(lib); }
-		);
-
-		if (scopedLib == nullptr)
-			return;
-
-		using DwmGetWindowAttributeT = HRESULT WINAPI(
-			HWND,
-			DWORD,
-			PVOID,
-			DWORD
-		);
-
-		static auto* DwmGetWindowAttribute = reinterpret_cast<DwmGetWindowAttributeT*>(GetProcAddress(scopedLib, "DwmGetWindowAttribute"));
-
-		if (!DwmGetWindowAttribute)
-			return;
-
+	if (DwmGetWindowAttribute) {
 		SDL_SysWMinfo wmInfo;
 		SDL_VERSION(&wmInfo.version);
 		SDL_GetWindowWMInfo(window, &wmInfo);
