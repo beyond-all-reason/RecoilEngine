@@ -622,11 +622,11 @@ void CProjectileHandler::CheckGroundCollisions(bool synced)
 		if (!belowGround && (!insideWater || p->ignoreWater))
 			continue;
 
-		// if position has dropped below terrain or into water
-		// where we can not live, adjust it and explode us now
-		// (if the projectile does not set deleteMe = true, it
-		// will keep hugging the terrain)
-		p->SetPosition((p->pos * XZVector) + (UpVector * mix(py, gy, belowGround)));
+		if (belowGround && p->speed.w > 0.0f) {
+			const auto prevPos = p->pos - static_cast<float3>(p->speed);
+			const auto groundDistance = std::clamp(CGround::LineGroundCol(prevPos, p->pos, true), 0.0f, p->speed.w);
+			p->SetPosition(prevPos + static_cast<float3>(p->speed) * groundDistance / p->speed.w);
+		}
 		p->Collision();
 	}
 }
