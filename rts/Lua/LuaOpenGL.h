@@ -247,6 +247,8 @@ class LuaOpenGL {
 
 		static int GetEngineAtlasTextures(lua_State* L);
 
+		static int DrawWaterReflections(lua_State* L);
+
 		static int Shape(lua_State* L);
 		static int BeginEnd(lua_State* L);
 		static int Vertex(lua_State* L);
