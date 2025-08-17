@@ -410,14 +410,31 @@ endif()
 option(ENABLE_STREFLOP "build Spring with streflop support (REQUIRED FOR MULTIPLAYER)" TRUE)
 
 if (ENABLE_STREFLOP)
-## note: is removed in ./AI/CMakeLists.txt since it would break AI compilation
-add_definitions(-DSTREFLOP_SSE)
+	## note: is removed in ./AI/CMakeLists.txt since it would break AI compilation
+	if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+		add_definitions(-DSTREFLOP_NEON)
+	else ()
+		add_definitions(-DSTREFLOP_SSE)
+	endif ()
 else ()
-add_definitions(-DNOT_USING_STREFLOP)
+	add_definitions(-DNOT_USING_STREFLOP)
 endif ()
 
 ### Asio
 add_definitions(-DASIO_STANDALONE)
+
+### sse2neon
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+	add_definitions(-DSSE2NEON)
+	add_definitions(-DSSE2NEON_SUPPRESS_WARNINGS)
+
+#   These are mentioned by sse2neon docs, do *not* use them. They will cause desyncs!
+#	add_definitions(-DSSE2NEON_PRECISE_MINMAX)
+#	add_definitions(-DSSE2NEON_PRECISE_DIV)
+#	add_definitions(-DSSE2NEON_PRECISE_SQRT)
+#	add_definitions(-DSSE2NEON_PRECISE_DP)
+endif()
+
 
 ### compiler specific flags
 set(CXX_FLAGS_DEBUG_ADDITIONAL "")
@@ -436,6 +453,8 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 
 	if (NOT MARCH_FLAG STREQUAL "generic")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${MARCH_FLAG} -mtune=${MARCH_FLAG}") #march/mtune define SSE flags
+	elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a+simd -ffp-contract=off")
 	else (NOT MARCH_FLAG STREQUAL "generic")
 		set(FALLBACK_SSE_FLAGS "-msse")
 		#set(FALLBACK_SSE_FLAGS "${FALLBACK_SSE_FLAGS} -mmmx")
@@ -458,7 +477,9 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${FALLBACK_MARCH} -mtune=generic ${FALLBACK_SSE_FLAGS}")
 	endif (NOT MARCH_FLAG STREQUAL "generic")
 
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -mfpmath=sse") #SSE_FLAGS are now user input only
+	if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -mfpmath=sse") #SSE_FLAGS are now user input only
+	endif ()
 elseif (MSVC)
 	set(MSVC_CXX_FLAGS "/arch:SSE2") #default, but still set explicitly
 	# silence warnings

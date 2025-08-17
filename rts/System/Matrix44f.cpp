@@ -11,8 +11,12 @@
 #include <algorithm>
 #include <cstring>
 
-#include <xmmintrin.h>
-#include <emmintrin.h>
+#ifdef SSE2NEON
+	#include "lib/sse2neon/sse2neon.h"
+#else
+	#include <xmmintrin.h>
+	#include <emmintrin.h>
+#endif
 
 CR_BIND(CMatrix44f, )
 

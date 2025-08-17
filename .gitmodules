@@ -36,3 +36,6 @@
 [submodule "rts/lib/simdjson"]
 	path = rts/lib/simdjson
 	url = https://github.com/simdjson/simdjson
+[submodule "rts/lib/sse2neon"]
+	path = rts/lib/sse2neon
+	url = https://github.com/DLTcollab/sse2neon.git

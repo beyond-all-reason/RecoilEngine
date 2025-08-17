@@ -9,7 +9,7 @@
 #ifndef STREFLOP_COND_H
 #define STREFLOP_COND_H
 
-#if (!defined(NOT_USING_STREFLOP) && (defined(STREFLOP_SSE) || defined(STREFLOP_X87) || defined(STREFLOP_SOFT)))
+#if (!defined(NOT_USING_STREFLOP) && (defined(STREFLOP_SSE) || defined(STREFLOP_NEON) || defined(STREFLOP_X87) || defined(STREFLOP_SOFT)))
 #define STREFLOP_ENABLED 1
 #endif
 

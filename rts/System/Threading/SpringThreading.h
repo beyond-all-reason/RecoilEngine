@@ -9,7 +9,11 @@
 #include <atomic>
 #include <thread>
 #include <condition_variable>
-#include <immintrin.h>
+#ifdef SSE2NEON
+	#include "lib/sse2neon/sse2neon.h"
+#else
+	#include <immintrin.h>
+#endif
 
 
 #if   defined(_WIN32)

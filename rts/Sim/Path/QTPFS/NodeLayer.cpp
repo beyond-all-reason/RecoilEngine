@@ -14,7 +14,11 @@ inline int __bsfd (int mask)
 	return index;
 }
 #elif defined(__GNUC__)
-#include <x86intrin.h>
+	#ifdef SSE2NEON
+		#include "lib/sse2neon/sse2neon.h"
+	#else
+		#include <x86intrin.h>
+	#endif
 #else
 #error no bsfd intrinsic currently set
 #endif

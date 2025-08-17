@@ -1,6 +1,10 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#ifdef SSE2NEON
+#include "lib/sse2neon/sse2neon.h"
+#else
 #include <xmmintrin.h> //SSE1
+#endif
 
 #include "System/Matrix44f.h"
 #include "System/float4.h"
