@@ -5077,11 +5077,11 @@ int LuaOpenGL::GetEngineAtlasTextures(lua_State* L) {
 
 /***
  * @function gl.DrawWaterReflections
- * @param drawSky bool?
- * @param drawGround bool?
- * @param drawUnits bool?
- * @param drawFeatures bool?
- * @param drawProjectiles bool?
+ * @param drawSky boolean?
+ * @param drawGround boolean?
+ * @param drawUnits boolean?
+ * @param drawFeatures boolean?
+ * @param drawProjectiles boolean?
  * @param viewportX number?
  * @param viewportY number?
  */
