@@ -3,6 +3,7 @@
 #include "System/Log/ILog.h"
 #include "System/Platform/ThreadAffinityGuard.h"
 
+
 #include <algorithm>
 #include <bitset>
 #if !defined(__aarch64__) && !defined(__arm__)
@@ -14,13 +15,10 @@
 #include <vector>
 #include <sstream>
 #include <sched.h>
-#include <filesystem>
 
 namespace cpu_topology {
 
 #define MAX_CPUS 32  // Maximum logical CPUs
-	
-enum Vendor { VENDOR_INTEL, VENDOR_AMD, VENDOR_ARM, VENDOR_UNKNOWN };
 
 enum CoreType { CORE_PERFORMANCE, CORE_EFFICIENCY, CORE_UNKNOWN };
 
@@ -41,7 +39,7 @@ void set_cpu_affinity(uint32_t cpu) {
 	}
 }
 
-// Get thread siblings for a CPU (works for all Linux architectures)
+// Get thread siblings for a CPU
 std::vector<int> get_thread_siblings(int cpu) {
 	std::ifstream file("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/topology/thread_siblings_list");
 	std::vector<int> siblings;
@@ -73,158 +71,22 @@ void collect_smt_affinity_masks(int cpu,
 	}
 }
 
-ProcessorGroupCaches& get_group_cache(ProcessorCaches& processorCaches, uint32_t cacheSize) {
-	auto foundCache = std::ranges::find_if
-		( processorCaches.groupCaches
-		, [cacheSize](const auto& gc) -> bool { return (gc.cacheSizes[2] == cacheSize); });
-
-	if (foundCache == processorCaches.groupCaches.end()) {
-		processorCaches.groupCaches.push_back({});
-		auto& newCacheGroup = processorCaches.groupCaches[processorCaches.groupCaches.size()-1];
-		newCacheGroup.cacheSizes[2] = cacheSize;
-		return newCacheGroup;
-	}
-
-	return (*foundCache);
+ThreadPinPolicy GetThreadPinPolicy() {
+	return THREAD_PIN_POLICY_ANY_PERF_CORE;
 }
 
-#if defined(__aarch64__) || defined(__arm__)
+#if !defined(__aarch64__) && !defined(__arm__)
 
-// Read a numeric value from a sysfs file
-template<typename T>
-T read_sysfs_value(const std::string& path, T default_value) {
-	std::ifstream file(path);
-	if (file) {
-		T value;
-		file >> value;
-		return value;
-	}
-	return default_value;
+enum Vendor { VENDOR_INTEL, VENDOR_AMD, VENDOR_UNKNOWN };
+
+// Detect CPU vendor (Intel or VENDOR_AMD)
+Vendor detect_cpu_vendor() {
+	unsigned int eax, ebx, ecx, edx;
+	__get_cpuid(0, &eax, &ebx, &ecx, &edx);
+	if (ebx == 0x756E6547) return VENDOR_INTEL; // "GenuineIntel"
+	if (ebx == 0x68747541) return VENDOR_AMD;   // "AuthenticAMD"
+	return VENDOR_UNKNOWN;
 }
-
-// Detect ARM core type using cpu_capacity
-// On ARM big.LITTLE systems, bigger capacity indicates performance cores
-CoreType get_arm_core_type(int cpu) {
-	std::string capacity_path = "/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/cpu_capacity";
-	
-	// Not all ARM systems have cpu_capacity (older kernels or non-big.LITTLE)
-	if (!std::filesystem::exists(capacity_path)) {
-		return CORE_PERFORMANCE; // Default to performance if capacity not available
-	}
-	
-	uint32_t capacity = read_sysfs_value<uint32_t>(capacity_path, 0);
-	
-	// Find the maximum capacity across all CPUs to determine what's a performance core
-	static uint32_t max_capacity = 0;
-	static bool capacity_initialized = false;
-	
-	if (!capacity_initialized) {
-		int num_cpus = get_cpu_count();
-		for (int i = 0; i < num_cpus; ++i) {
-			std::string path = "/sys/devices/system/cpu/cpu" + std::to_string(i) + "/cpu_capacity";
-			uint32_t cap = read_sysfs_value<uint32_t>(path, 0);
-			if (cap > max_capacity) {
-				max_capacity = cap;
-			}
-		}
-		capacity_initialized = true;
-	}
-	
-	// If capacity is less than 75% of max, consider it an efficiency core
-	// This threshold works for most big.LITTLE systems
-	if (capacity > 0 && max_capacity > 0) {
-		if (capacity < (max_capacity * 3 / 4)) {
-			return CORE_EFFICIENCY;
-		} else {
-			return CORE_PERFORMANCE;
-		}
-	}
-	
-	return CORE_PERFORMANCE; // Default to performance
-}
-
-// Collect CPU affinity masks for ARM
-void collect_arm_affinity_masks(std::bitset<MAX_CPUS> &eff_mask,
-								std::bitset<MAX_CPUS> &perf_mask,
-								std::bitset<MAX_CPUS> &low_smt_mask,
-								std::bitset<MAX_CPUS> &high_smt_mask) {
-	int num_cpus = get_cpu_count();
-	
-	for (int cpu = 0; cpu < num_cpus; ++cpu) {
-		if (cpu >= MAX_CPUS) {
-			LOG_L(L_WARNING, "CPU index %d exceeds bitset limit.", cpu);
-			continue;
-		}
-		
-		CoreType core_type = get_arm_core_type(cpu);
-		
-		if (core_type == CORE_EFFICIENCY) {
-			eff_mask.set(cpu);   // Efficiency Core (LITTLE core)
-		} else {
-			perf_mask.set(cpu);  // Performance Core (big core)
-		}
-		
-		collect_smt_affinity_masks(cpu, low_smt_mask, high_smt_mask);
-	}
-}
-
-uint32_t get_thread_cache(int cpu) {
-	uint32_t sizeInBytes = 0;
-	
-	// First try L3 cache (index3)
-	std::string l3_path = "/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/cache/index3/size";
-	if (std::filesystem::exists(l3_path)) {
-		std::ifstream file(l3_path);
-		if (file) {
-			std::string line;
-			std::getline(file, line);
-			// Parse size - format is like "4096K" or "12288K"
-			if (!line.empty()) {
-				std::istringstream ss(line);
-				uint32_t size;
-				char unit;
-				ss >> size >> unit;
-				if (unit == 'K' || unit == 'k') {
-					sizeInBytes = size * 1024;
-				} else if (unit == 'M' || unit == 'm') {
-					sizeInBytes = size * 1024 * 1024;
-				} else {
-					sizeInBytes = size;
-				}
-			}
-		}
-	}
-	
-	// If no L3, fall back to L2 cache (index2) on ARM
-	if (sizeInBytes == 0) {
-		std::string l2_path = "/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/cache/index2/size";
-		if (std::filesystem::exists(l2_path)) {
-			std::ifstream file(l2_path);
-			if (file) {
-				std::string line;
-				std::getline(file, line);
-				// Parse size - format is like "4096K" or "12288K"
-				if (!line.empty()) {
-					std::istringstream ss(line);
-					uint32_t size;
-					char unit;
-					ss >> size >> unit;
-					if (unit == 'K' || unit == 'k') {
-						sizeInBytes = size * 1024;
-					} else if (unit == 'M' || unit == 'm') {
-						sizeInBytes = size * 1024 * 1024;
-					} else {
-						sizeInBytes = size;
-					}
-				}
-			}
-		}
-	}
-	
-	return sizeInBytes;
-}
-
-#else  // x86
 
 // Detect Intel core type using CPUID 0x1A
 CoreType get_intel_core_type(int cpu) {
@@ -263,21 +125,7 @@ void collect_intel_affinity_masks(std::bitset<MAX_CPUS> &eff_mask,
 	}
 }
 
-uint32_t get_thread_cache(int cpu) {
-	std::ifstream file("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/cache/index3/size");
-	uint32_t sizeInBytes = 0;
-	if (file) {
-		std::string line;
-		std::getline(file, line);
-		std::istringstream ss(line);
-		ss >> sizeInBytes;
-	}
-	return sizeInBytes;
-}
-
-#endif // Architecture-specific implementations
-
-// Collect CPU affinity masks for AMD (same for all architectures)
+// Collect CPU affinity masks for AMD
 void collect_amd_affinity_masks(std::bitset<MAX_CPUS> &eff_mask,
 								std::bitset<MAX_CPUS> &perf_mask,
 								std::bitset<MAX_CPUS> &low_smt_mask,
@@ -296,17 +144,31 @@ void collect_amd_affinity_masks(std::bitset<MAX_CPUS> &eff_mask,
 	}
 }
 
-// Detect CPU vendor
-Vendor detect_cpu_vendor() {
-#if defined(__aarch64__) || defined(__arm__)
-	return VENDOR_ARM;
-#else
-	unsigned int eax, ebx, ecx, edx;
-	__get_cpuid(0, &eax, &ebx, &ecx, &edx);
-	if (ebx == 0x756E6547) return VENDOR_INTEL; // "GenuineIntel"
-	if (ebx == 0x68747541) return VENDOR_AMD;   // "AuthenticAMD"
-	return VENDOR_UNKNOWN;
-#endif
+uint32_t get_thread_cache(int cpu) {
+	std::ifstream file("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/cache/index3/size");
+	uint32_t sizeInBytes = 0;
+	if (file) {
+		std::string line;
+		std::getline(file, line);
+		std::istringstream ss(line);
+		ss >> sizeInBytes;
+	}
+	return sizeInBytes;
+}
+
+ProcessorGroupCaches& get_group_cache(ProcessorCaches& processorCaches, uint32_t cacheSize) {
+	auto foundCache = std::ranges::find_if
+		( processorCaches.groupCaches
+		, [cacheSize](const auto& gc) -> bool { return (gc.cacheSizes[2] == cacheSize); });
+
+	if (foundCache == processorCaches.groupCaches.end()) {
+		processorCaches.groupCaches.push_back({});
+		auto& newCacheGroup = processorCaches.groupCaches[processorCaches.groupCaches.size()-1];
+		newCacheGroup.cacheSizes[2] = cacheSize;
+		return newCacheGroup;
+	}
+
+	return (*foundCache);
 }
 
 ProcessorMasks GetProcessorMasks() {
@@ -318,17 +180,10 @@ ProcessorMasks GetProcessorMasks() {
 
 	if (cpu_vendor == VENDOR_INTEL) {
 		LOG("Detected Intel CPU.");
-#if !defined(__aarch64__) && !defined(__arm__)
 		collect_intel_affinity_masks(eff_mask, perf_mask, low_ht_mask, high_ht_mask);
-#endif
 	} else if (cpu_vendor == VENDOR_AMD) {
 		LOG("Detected AMD CPU.");
 		collect_amd_affinity_masks(eff_mask, perf_mask, low_ht_mask, high_ht_mask);
-	} else if (cpu_vendor == VENDOR_ARM) {
-		LOG("Detected ARM CPU.");
-#if defined(__aarch64__) || defined(__arm__)
-		collect_arm_affinity_masks(eff_mask, perf_mask, low_ht_mask, high_ht_mask);
-#endif
 	} else {
 		LOG_L(L_WARNING, "Unknown or unsupported CPU vendor.");
 	}
@@ -364,8 +219,270 @@ ProcessorCaches GetProcessorCache() {
 	return processorCaches;
 }
 
-ThreadPinPolicy GetThreadPinPolicy() {
-	return THREAD_PIN_POLICY_ANY_PERF_CORE;
+#endif // x86 specific code
+
+#if defined(__aarch64__) || defined(__arm__)
+
+// Get the highest cache index available for a CPU (2 for L2, 3 for L3)
+int get_arm_highest_cache_index(int cpu) {
+	// Check if L3 exists (index3)
+	std::ifstream l3_file("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/cache/index3/size");
+	if (l3_file.good()) {
+		return 3; // L3 cache exists
+	}
+	
+	// Check if L2 exists (index2)
+	std::ifstream l2_file("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/cache/index2/size");
+	if (l2_file.good()) {
+		return 2; // L2 cache exists (highest level)
+	}
+	
+	return -1; // No L2 or L3 cache found
 }
+
+// Get cache size for a specific CPU and cache index
+uint32_t get_arm_cache_size(int cpu, int index) {
+	std::ifstream file("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/cache/index" + std::to_string(index) + "/size");
+	uint32_t sizeInKB = 0;
+	if (file) {
+		std::string line;
+		std::getline(file, line);
+		// Parse the size (e.g., "128K" -> 128)
+		std::istringstream ss(line);
+		ss >> sizeInKB;
+		// Convert KB to bytes
+		sizeInKB *= 1024;
+	}
+	return sizeInKB;
+}
+
+// Get shared CPU list for a cache index
+std::vector<int> get_arm_cache_shared_cpus(int cpu, int index) {
+	std::ifstream file("/sys/devices/system/cpu/cpu" + std::to_string(cpu) + "/cache/index" + std::to_string(index) + "/shared_cpu_list");
+	std::vector<int> shared_cpus;
+	if (file) {
+		std::string line;
+		std::getline(file, line);
+		std::istringstream ss(line);
+		
+		// Parse CPU ranges like "0-1" or "2-5" or single CPUs
+		while (!ss.eof()) {
+			int start_cpu, end_cpu;
+			char dash;
+			ss >> start_cpu;
+			if (ss.peek() == '-') {
+				ss >> dash >> end_cpu;
+				for (int i = start_cpu; i <= end_cpu; ++i) {
+					shared_cpus.push_back(i);
+				}
+			} else {
+				shared_cpus.push_back(start_cpu);
+			}
+			// Skip comma if present
+			if (ss.peek() == ',') {
+				ss.ignore();
+			}
+		}
+	}
+	return shared_cpus;
+}
+
+// Detect ARM core types based on cache sizes
+void detect_arm_core_types(std::bitset<MAX_CPUS> &eff_mask, std::bitset<MAX_CPUS> &perf_mask) {
+	int num_cpus = get_cpu_count();
+	std::vector<std::pair<int, uint32_t>> cpu_cache_sizes;
+	
+	// First, determine the highest cache level and collect sizes
+	int highest_cache_index = -1;
+	for (int cpu = 0; cpu < num_cpus && cpu < MAX_CPUS; ++cpu) {
+		int cache_index = get_arm_highest_cache_index(cpu);
+		if (cache_index > highest_cache_index) {
+			highest_cache_index = cache_index;
+		}
+	}
+	
+	if (highest_cache_index == -1) {
+		// No L2 or L3 cache found, all cores are performance cores
+		for (int cpu = 0; cpu < num_cpus && cpu < MAX_CPUS; ++cpu) {
+			perf_mask.set(cpu);
+		}
+		return;
+	}
+	
+	// Collect cache sizes for the highest cache level
+	uint32_t min_cache_size = UINT32_MAX;
+	for (int cpu = 0; cpu < num_cpus && cpu < MAX_CPUS; ++cpu) {
+		uint32_t cache_size = get_arm_cache_size(cpu, highest_cache_index);
+		cpu_cache_sizes.push_back({cpu, cache_size});
+		if (cache_size > 0 && cache_size < min_cache_size) {
+			min_cache_size = cache_size;
+		}
+	}
+	
+	// Classify cores based on cache size
+	if (min_cache_size == UINT32_MAX) {
+		// No valid cache sizes found, all cores are performance cores
+		for (int cpu = 0; cpu < num_cpus && cpu < MAX_CPUS; ++cpu) {
+			perf_mask.set(cpu);
+		}
+		return;
+	}
+	
+	// Cores with the smallest cache are efficiency cores, others are performance cores
+	bool has_different_sizes = false;
+	for (const auto& [cpu, cache_size] : cpu_cache_sizes) {
+		if (cache_size != min_cache_size && cache_size > 0) {
+			has_different_sizes = true;
+			break;
+		}
+	}
+	
+	if (!has_different_sizes) {
+		// All cores have the same cache size, all are performance cores
+		for (int cpu = 0; cpu < num_cpus && cpu < MAX_CPUS; ++cpu) {
+			perf_mask.set(cpu);
+		}
+	} else {
+		// Cores with minimum cache are efficiency, others are performance
+		for (const auto& [cpu, cache_size] : cpu_cache_sizes) {
+			if (cache_size == min_cache_size) {
+				eff_mask.set(cpu);
+			} else {
+				perf_mask.set(cpu);
+			}
+		}
+	}
+}
+
+// Collect CPU affinity masks for ARM
+void collect_arm_affinity_masks(std::bitset<MAX_CPUS> &eff_mask,
+								std::bitset<MAX_CPUS> &perf_mask,
+								std::bitset<MAX_CPUS> &low_smt_mask,
+								std::bitset<MAX_CPUS> &high_smt_mask) {
+	int num_cpus = get_cpu_count();
+	
+	// Detect core types based on cache sizes
+	detect_arm_core_types(eff_mask, perf_mask);
+	
+	// Detect SMT
+	for (int cpu = 0; cpu < num_cpus && cpu < MAX_CPUS; ++cpu) {
+		collect_smt_affinity_masks(cpu, low_smt_mask, high_smt_mask);
+	}
+}
+
+ProcessorMasks GetProcessorMasks() {
+	ThreadAffinityGuard guard;
+	ProcessorMasks processorMasks;
+
+	std::bitset<MAX_CPUS> eff_mask, perf_mask, low_ht_mask, high_ht_mask;
+
+	LOG("Detected ARM CPU.");
+	collect_arm_affinity_masks(eff_mask, perf_mask, low_ht_mask, high_ht_mask);
+
+	processorMasks.efficiencyCoreMask = eff_mask.to_ulong();
+	processorMasks.performanceCoreMask = perf_mask.to_ulong();
+	processorMasks.hyperThreadLowMask = low_ht_mask.to_ulong();
+	processorMasks.hyperThreadHighMask = high_ht_mask.to_ulong();
+
+	return processorMasks;
+}
+
+// Helper to find or create a cache group for ARM
+ProcessorGroupCaches& get_arm_group_cache(ProcessorCaches& processorCaches, uint32_t cacheSize, int cacheLevel, bool useExistingGroup) {
+	// Store in the appropriate index based on cache level
+	// L2 cache (index2) goes into cacheSizes[1]
+	// L3 cache (index3) goes into cacheSizes[2]
+	int cacheSizeIndex = (cacheLevel == 3) ? 2 : 1;
+	
+	// If we should use an existing group (fallback mode when shared_cpu_list is not available)
+	if (useExistingGroup) {
+		auto foundCache = std::ranges::find_if
+			( processorCaches.groupCaches
+			, [cacheSize, cacheSizeIndex](const auto& gc) -> bool { 
+				return (gc.cacheSizes[cacheSizeIndex] == cacheSize); 
+			});
+
+		if (foundCache != processorCaches.groupCaches.end()) {
+			return (*foundCache);
+		}
+	}
+	
+	// Create a new group
+	processorCaches.groupCaches.push_back({});
+	auto& newCacheGroup = processorCaches.groupCaches[processorCaches.groupCaches.size()-1];
+	newCacheGroup.cacheSizes[cacheSizeIndex] = cacheSize;
+	return newCacheGroup;
+}
+
+ProcessorCaches GetProcessorCache() {
+	ProcessorCaches processorCaches;
+	int num_cpus = get_cpu_count();
+	
+	// First determine the highest cache level available
+	int highest_cache_index = -1;
+	for (int cpu = 0; cpu < num_cpus && cpu < MAX_CPUS; ++cpu) {
+		int cache_index = get_arm_highest_cache_index(cpu);
+		if (cache_index > highest_cache_index) {
+			highest_cache_index = cache_index;
+		}
+	}
+	
+	if (highest_cache_index == -1) {
+		LOG_L(L_WARNING, "No L2 or L3 cache found on ARM system");
+		return processorCaches;
+	}
+	
+	// Track which CPUs we've already processed (to handle shared caches)
+	std::bitset<MAX_CPUS> processed;
+	
+	// Process each CPU and group by shared cache
+	for (int cpu = 0; cpu < num_cpus && cpu < MAX_CPUS; ++cpu) {
+		if (processed.test(cpu)) {
+			continue; // Already part of a cache group
+		}
+		
+		uint32_t cacheSize = get_arm_cache_size(cpu, highest_cache_index);
+		if (cacheSize == 0) {
+			continue; // No cache at this level
+		}
+		
+		// Get all CPUs that share this cache
+		std::vector<int> shared_cpus = get_arm_cache_shared_cpus(cpu, highest_cache_index);
+		
+		// Determine whether to use existing group based on cache size
+		// If shared_cpu_list was not available or only contains the current CPU, fall back to grouping by size
+		bool useExistingGroup = (shared_cpus.empty() || (shared_cpus.size() == 1 && shared_cpus[0] == cpu));
+		
+		// Create or find the cache group
+		ProcessorGroupCaches& groupCache = get_arm_group_cache(processorCaches, cacheSize, highest_cache_index, useExistingGroup);
+		
+		// Add CPUs to this group
+		if (shared_cpus.empty()) {
+			// No shared CPU info available, just add this CPU
+			groupCache.groupMask |= (0x1 << cpu);
+			processed.set(cpu);
+		} else {
+			// Add all shared CPUs to this group
+			for (int shared_cpu : shared_cpus) {
+				if (shared_cpu < MAX_CPUS) {
+					groupCache.groupMask |= (0x1 << shared_cpu);
+					processed.set(shared_cpu);
+				}
+			}
+		}
+	}
+	
+	// Sort cache groups: larger caches (performance cores) first
+	int cacheSizeIndex = (highest_cache_index == 3) ? 2 : 1;
+	std::ranges::stable_sort
+		( processorCaches.groupCaches
+		, [cacheSizeIndex](const auto &lh, const auto &rh) -> bool { 
+			return lh.cacheSizes[cacheSizeIndex] > rh.cacheSizes[cacheSizeIndex]; 
+		});
+	
+	return processorCaches;
+}
+
+#endif // ARM specific code
 
 } //namespace cpu_topology

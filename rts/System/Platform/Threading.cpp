@@ -166,7 +166,7 @@ namespace Threading {
 
 		const cpu_topology::ThreadPinPolicy chosenPinPolicy = GetChosenThreadPinPolicy();
 
-		// Engine worker thread pool are primarily for mutli-threading activies of simulation; though, they are
+		// Engine worker thread pool are primarily for multi-threading activies of simulation; though, they are
 		// available to be used by other system while simulation is not running. As such the policy for pinning worker
 		// threads are to maximise performance of the multi-threaded tasks of simulation, which are a poor fit for
 		// cpu hardware threads (SMT/Hyper-Threading) and low-power cores.
@@ -217,10 +217,16 @@ namespace Threading {
 		cpu_topology::ProcessorMasks pm = springproc::CPUID::GetInstance().GetAvailableProcessorAffinityMask();
 
 		// Excessive threads will overload the memory bus. We need to chose an optimal number based on cache groups.
-		// Try to get at least threadCountThreshold threads, but can be more. AMD Ryzen CCDs are grouped into either 6
-		// or 8 cores - so we should try to avoid spreading the game accross multiple CCDs, which is especially
-		// important for the X3D processors.
+		// Try to get at least threadCountThreshold threads, but can be more.
+#if !defined(__aarch64__) && !defined(__arm__)
+		// AMD Ryzen CCDs are grouped into either 6 or 8 cores - so we should try to avoid spreading the game
+		// across multiple CCDs, which is especially important for the X3D processors.
 		constexpr uint32_t threadCountThreshold = 6;
+#else
+		// Apple Silicon CCDs are grouped into a minimum of 4 cores with atrocious cross-CCD latency, so avoid
+		// multiple CCDs there as well.
+		constexpr uint32_t threadCountThreshold = 4;
+#endif
 
 		// The cache groups from GetProcessorCaches() are sorted in order of largest first.
 		const uint32_t optimalThreadCount = std::accumulate(pc.groupCaches.begin(), pc.groupCaches.end(), 0, [&](uint32_t threadCount, const cpu_topology::ProcessorGroupCaches& gc){
