@@ -11,12 +11,7 @@
 #include <algorithm>
 #include <cstring>
 
-#ifdef SSE2NEON
-	#include "lib/sse2neon/sse2neon.h"
-#else
-	#include <xmmintrin.h>
-	#include <emmintrin.h>
-#endif
+#include "System/simd_compat.h"
 
 CR_BIND(CMatrix44f, )
 
