@@ -62,7 +62,7 @@ UnitDefWeapon::UnitDefWeapon(const WeaponDef* weaponDef, const LuaTable& weaponT
 	// Determines how to handle burst fire, when target is out of arc. 0 = no restrictions (default), 1 = don't fire, 2 = fire in current direction of weapon 
 	burstControlWhenOutOfArc = weaponTable.GetInt("burstControlWhenOutOfArc", burstControlWhenOutOfArc);
 
-	// This weapon checks range from base of unit plus this value, instead of from aimFromPos
+	// Determines where to calculate weapon range from. 0 = from weapon->aimFromPos (default), 1 = from owner->pos + aimFromPos.y, 2 = from owner->aimPos
 	rangefrombase = weaponTable.GetInt("rangefrombase", rangefrombase);
 
 }
