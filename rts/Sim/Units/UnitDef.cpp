@@ -63,7 +63,7 @@ UnitDefWeapon::UnitDefWeapon(const WeaponDef* weaponDef, const LuaTable& weaponT
 	burstControlWhenOutOfArc = weaponTable.GetInt("burstControlWhenOutOfArc", burstControlWhenOutOfArc);
 
 	// This weapon checks range from base of unit plus this value, instead of from aimFromPos
-	rangefrombase = weaponTable.GetFloat("rangefrombase", rangefrombase);
+	rangefrombase = weaponTable.GetInt("rangefrombase", rangefrombase);
 
 }
 

@@ -195,7 +195,7 @@ CWeapon::CWeapon(CUnit* owner, const WeaponDef* def):
 	fastAutoRetargeting(false),
 	fastQueryPointUpdate(false),
 	burstControlWhenOutOfArc(0),
-	rangefrombase(0.0f)
+	rangefrombase(0)
 {
 	assert(weaponMemPool.alloced(this));
 }
@@ -1026,18 +1026,25 @@ bool CWeapon::TestTarget(const float3 tgtPos, const SWeaponTarget& trg) const
 	return true;
 }
 
+float CWeapon::TargetDistCases(const float3 tgtPos, const float heightDiff, int rangefrombase) const
+{
+	if (rangefrombase == 1) {
+		return tgtPos.SqDistance2D(owner->pos + heightDiff);
+	}
+	else if (rangefrombase == 2) {
+		return tgtPos.SqDistance2D(owner->aimPos);
+	}
+	else {
+		return tgtPos.SqDistance2D(aimFromPos);
+	}
+}
+
 bool CWeapon::TestRange(const float3 tgtPos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
-	const float heightDiff = (rangefrombase > 0) 
-		? tgtPos.y - owner->pos.y * rangefrombase
-		: tgtPos.y - aimFromPos.y;
-	;
-	const float targetDist = (rangefrombase > 0)
-		? tgtPos.SqDistance2D(owner->pos + (UpVector * rangefrombase))
-		: tgtPos.SqDistance2D(aimFromPos);
-	;
+	const float heightDiff = tgtPos.y - aimFromPos.y;
+	const float targetDist = TargetDistCases(tgtPos, heightDiff, rangefrombase);
 
 	float weaponRange = 0.0f; // range modified by heightDiff and cylinderTargeting
 
