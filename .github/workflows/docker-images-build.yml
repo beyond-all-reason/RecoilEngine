@@ -11,40 +11,37 @@ on:
     branches:
       - master
     paths:
-      - 'docker-build-v2/amd64-linux/**'
-      - 'docker-build-v2/amd64-windows/**'
+      - "docker-build-v2/images/**"
   pull_request:
     paths:
-      - 'docker-build-v2/amd64-linux/**'
-      - 'docker-build-v2/amd64-windows/**'
+      - "docker-build-v2/images/**"
 jobs:
   build-images:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
-    name: Build ${{ matrix.system }} docker image
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.system.target }} docker image
+    runs-on: ${{ matrix.system.runs-on }}
     strategy:
       matrix:
         system:
-          - amd64-linux
-          - amd64-windows
+          - target: amd64-linux
+            runs-on: ubuntu-24.04
+          - target: arm64-linux
+            runs-on: ubuntu-24.04-arm
+          - target: amd64-windows
+            runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Build
-        uses: docker/build-push-action@v6
-        with:
+        run: |
           # Disabling cache to make sure that operations like git clone are
           # not cached and we always pull freshest libs. New images are build
           # quite rarely so it's not an issue performance wise.
-          no-cache: true
-          context: docker-build-v2/${{ matrix.system }}
-          tags: recoil-build-${{ matrix.system }}:latest
-          outputs: type=docker,dest=${{ runner.temp }}/image.tar
+          docker-build-v2/images/${{ matrix.system.target }}/build.sh --no-cache
+          docker image save recoil-build-${{ matrix.system.target }}:latest --output ${{ runner.temp }}/image.tar
       - name: Upload image artifact
         uses: actions/upload-artifact@v7
         with:
-          name: build-image-${{ matrix.system }}
+          name: build-image-${{ matrix.system.target }}
           path: ${{ runner.temp }}/image.tar
   test-build:
     needs: build-images
@@ -75,7 +72,7 @@ jobs:
           path: ${{ runner.temp }}/images
       - name: Push images and update digests
         run: |
-          for system in amd64-linux amd64-windows; do
+          for system in amd64-linux arm64-linux amd64-windows; do
             docker load --input ${{ runner.temp }}/images/build-image-$system/image.tar
             docker tag recoil-build-$system:latest ghcr.io/${{ github.repository_owner }}/recoil-build-$system:latest
             docker push ghcr.io/${{ github.repository_owner }}/recoil-build-$system:latest | tee ${{ runner.temp }}/push_output.txt
