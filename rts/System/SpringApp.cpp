@@ -1210,6 +1210,10 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 			LOG("[SpringApp::%s][SDL_AUDIODEVICEREMOVED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.iscapture));
 			sound->DeviceChanged(event.adevice.which);
 		} break;
+		case SDL_AUDIODEVICEADDED: {
+			LOG("[SpringApp::%s][SDL_AUDIODEVICEADDED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.iscapture));
+			sound->DeviceChanged(event.adevice.which);
+		} break;
 		case SDL_QUIT: {
 			gu->globalQuit = true;
 		} break;
