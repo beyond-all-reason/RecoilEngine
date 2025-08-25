@@ -370,7 +370,7 @@ void CSound::DeviceChanged(uint32_t sdlDeviceIndex)
 	SDL_CloseAudioDevice(sdlDeviceID);
 	sdlDeviceID = 0;
 
-	LOG("[Sound::%s] Attempt to reopen default device", __func__);
+	LOG("[Sound::%s] Attempt to reopen device", __func__);
 	std::string configDeviceName;
 	// call IsSet; we do not want to create a default for snd_device
 	if (configHandler->IsSet("snd_device"))
