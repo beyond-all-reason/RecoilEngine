@@ -381,10 +381,6 @@ void CSound::DeviceChanged(uint32_t sdlDeviceIndex)
 		LOG("[Sound::%s] Reopening device failed", __func__);
 		// Continue using our loopback device.
 		// It may later be reused by a subsequent SDL_AUDIODEVICEADDED event.
-
-		// Kill();
-		// Init(); // Destroys curContext and all sounds currently loaded by the game
-
 	}
 
 	// The OpenAL loopback device remains unchanged.
