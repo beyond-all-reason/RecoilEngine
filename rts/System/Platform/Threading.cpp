@@ -118,10 +118,7 @@ namespace Threading {
 	static std::uint32_t CalcCoreAffinityMask(const cpu_set_t* cpuSet) {
 		std::uint32_t coreMask = 0;
 
-		// without the min(..., 32), `(1 << n)` could overflow
-		const int numCPUs = std::min(CPU_COUNT(&cpusSystem), 32);
-
-		for (int n = numCPUs - 1; n >= 0; --n) {
+		for (int n = 31; n >= 0; --n) {
 			if (CPU_ISSET(n, cpuSet))
 				coreMask |= (1 << n);
 		}
@@ -132,10 +129,8 @@ namespace Threading {
 	static void SetWantedCoreAffinityMask(cpu_set_t* cpuDstSet, std::uint32_t coreMask) {
 		CPU_ZERO(cpuDstSet);
 
-		const int numCPUs = std::min(CPU_COUNT(&cpusSystem), 32);
-
-		for (int n = numCPUs - 1; n >= 0; --n) {
-			if ((coreMask & (1 << n)) != 0)
+		for (int n = 31; n >= 0; --n) {
+			if (((coreMask & (1 << n)) != 0) && CPU_ISSET(n, &cpusSystem))
 				CPU_SET(n, cpuDstSet);
 		}
 
