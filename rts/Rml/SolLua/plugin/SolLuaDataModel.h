@@ -48,7 +48,7 @@ namespace Rml::SolLua
 
 	struct SolLuaDataModel
 	{
-		SolLuaDataModel(sol::state_view s) : Lua{ s } {}
+		SolLuaDataModel(sol::state_view s);
 
 		Rml::DataModelConstructor Constructor;
 		Rml::DataModelHandle Handle;

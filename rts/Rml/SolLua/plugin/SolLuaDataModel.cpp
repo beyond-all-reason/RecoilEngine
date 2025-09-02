@@ -36,6 +36,7 @@
 
 namespace Rml::SolLua
 {
+	SolLuaDataModel::SolLuaDataModel(sol::state_view s) : Lua{ s } {}
 
 	SolLuaObjectDef::SolLuaObjectDef(SolLuaDataModel* model)
 		: VariableDefinition(DataVariableType::Scalar), m_model(model)
@@ -77,7 +78,7 @@ namespace Rml::SolLua
 	int SolLuaObjectDef::Size(void* ptr)
 	{
 		auto object = static_cast<sol::object*>(ptr);
-		
+
 		// Non-table types have no children to iterate over.
 		if (object->get_type() != sol::type::table)
 			return 0;
