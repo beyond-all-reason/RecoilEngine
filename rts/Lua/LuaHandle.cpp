@@ -3784,15 +3784,23 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 	return retval;
 }
 
+/*** @alias PLAYER_STATE
+ *| "missing" when the player hasn't joined yet (NETMSG_PLAYERNAME wasn't received)
+ *| "ready"
+ *| "notready"
+ */
 
-/***
+/*** Fired when the pregame stage is reached
+ *
+ * Pregame is the stage where player readiness is managed before a game starts.
+ * Game only starts once all players are ready.
  *
  * @function Callins:GameSetup
  * @param state string
  * @param ready boolean
- * @param playerStates table
- * @return boolean success
- * @return boolean newReady
+ * @param playerStates table<number,PLAYER_STATE> indexed by playerID
+ * @return boolean? gameHandled whether the game manages the UI for readying players
+ * @return boolean? newReady whether the player is ready (ignored when gameHandled is not true)
  */
 bool CLuaHandle::GameSetup(const string& state, bool& ready,
                            const std::vector< std::pair<int, std::string> >& playerStates)
