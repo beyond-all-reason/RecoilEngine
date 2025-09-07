@@ -3784,10 +3784,11 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 	return retval;
 }
 
-/*** @alias PLAYER_STATE
- *| "missing" when the player hasn't joined yet (NETMSG_PLAYERNAME wasn't received)
- *| "ready"
- *| "notready"
+/***
+ * @enum PLAYER_STATE
+ * @field MISSING "missing" when the player hasn't joined yet (NETMSG_PLAYERNAME wasn't received)
+ * @field READY "ready"
+ * @field NOT_READY "notready"
  */
 
 /*** Fired when the pregame stage is reached
