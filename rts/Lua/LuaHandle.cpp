@@ -3784,8 +3784,17 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 	return retval;
 }
 
+
 /***
- * @enum PLAYER_STATE
+ * @enum READY_MESSAGE
+ * @field WAITING "Waiting for players"
+ * @field HOST_WAITING "Waiting for players, press key to force start" when waiting and currently the host, key is the first key bound to the action forcestart
+ * @field CHOOSE_POS "Choose start pos" when current player is not ready and is not a spectator
+ * @field STARTING "Starting in n" where n is the number of seconds
+ */
+
+/***
+ * @enum READY_STATE
  * @field MISSING "missing" when the player hasn't joined yet (NETMSG_PLAYERNAME wasn't received)
  * @field READY "ready"
  * @field NOT_READY "notready"
@@ -3797,11 +3806,11 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
  * Game only starts once all players are ready.
  *
  * @function Callins:GameSetup
- * @param state string
- * @param ready boolean
- * @param playerStates table<number,PLAYER_STATE> indexed by playerID
- * @return boolean? gameHandled whether the game manages the UI for readying players
- * @return boolean? newReady whether the player is ready (ignored when gameHandled is not true)
+ * @param state READY_MESSAGE the current message the engine would display to the player
+ * @param ready boolean whether the player is currently ready or not
+ * @param playerStates table<number,READY_STATE> indexed by playerID
+ * @return boolean? gameHandled disables the engine ui when true
+ * @return boolean? newReady whether the player is ready (ignored unless gameHandled is provided)
  */
 bool CLuaHandle::GameSetup(const string& state, bool& ready,
                            const std::vector< std::pair<int, std::string> >& playerStates)
