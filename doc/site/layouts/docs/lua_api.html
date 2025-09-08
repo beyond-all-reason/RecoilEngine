@@ -1,11 +1,24 @@
 {{ define "main" }}
 	<div class='hx-mx-auto hx-flex {{ partial "utils/page-width" . }}'>
-	{{ partial "entries_sidebar.html" (dict "context" .) }}
+	{{ partial "sidebar.html" (dict "context" .) }}
+
+	{{ $data := .Site.Data.doc }}
+	{{ partial "toc.html" . }}
+
 	<article class="hx-w-full hx-break-words hx-flex hx-min-h-[calc(100vh-var(--navbar-height))] hx-min-w-0 hx-justify-center hx-pb-8 hx-pr-[calc(env(safe-area-inset-right)-1.5rem)]">
 		<main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
 			<div class="content lua-api">
 				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
-				{{ .Content }}
+				
+				<h1>Globals</h1>
+				{{ range index $data "globals" }}
+					{{ partial "api_card.html" .}}
+				{{ end }}
+
+				<h1>Types</h1>
+				{{ range index $data "types" }}
+					{{ partial "api_card.html" .}}
+				{{ end }}
 			</div>
 			{{ partial "components/last-updated.html" . }}
 			{{ partial "components/pager.html" . }}
