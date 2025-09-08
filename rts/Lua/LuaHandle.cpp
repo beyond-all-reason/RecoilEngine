@@ -3810,7 +3810,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
  * @param ready boolean whether the player is currently ready or not
  * @param playerStates table<number,READY_STATE> indexed by playerID
  * @return boolean? gameHandled disables the engine ui when true
- * @return boolean? newReady whether the player is ready (ignored unless gameHandled is provided)
+ * @return boolean? newReady whether the player is ready (ignored unless `gameHandled = true`)
  */
 bool CLuaHandle::GameSetup(const string& state, bool& ready,
                            const std::vector< std::pair<int, std::string> >& playerStates)
