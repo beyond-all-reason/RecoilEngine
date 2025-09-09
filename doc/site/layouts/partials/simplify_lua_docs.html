@@ -1,17 +1,21 @@
+{{/* Extracts TOC structure from json */}}
+
 {{- $result := slice -}}
 
 {{- range $k, $v := . }}
-    {{- $entry := dict "title" $k -}}
+    {{- $entry := dict "title" $k "name_path" $k -}}
+    {{- $name_path_slice := slice -}}
 
     {{- $children := slice -}}
     {{- range $v }}
         {{ $child_titles := slice }}
+        {{- $l1_path := append (slice .name) $name_path_slice -}}
 
         {{- range .members -}}
-            {{ $child_titles = append $child_titles (slice (dict "title" .name )) }}
+            {{ $child_titles = append $child_titles (slice (dict "title" .name "name_path" (delimit (append (slice .name) $l1_path ) "-") )) }}
         {{- end -}}
-        
-        {{- $children = $children | append (dict "title" .name "children" $child_titles) -}}
+
+        {{- $children = $children | append (dict "title" .name "name_path" (delimit $l1_path "-") "children" $child_titles) -}}
     {{- end }}
     {{- $entry = merge $entry (dict "children" $children) -}}
 
