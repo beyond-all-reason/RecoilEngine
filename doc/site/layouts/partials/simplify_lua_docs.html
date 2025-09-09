@@ -1,0 +1,21 @@
+{{- $result := slice -}}
+
+{{- range $k, $v := . }}
+    {{- $entry := dict "title" $k -}}
+
+    {{- $children := slice -}}
+    {{- range $v }}
+        {{ $child_titles := slice }}
+
+        {{- range .members -}}
+            {{ $child_titles = append $child_titles (slice (dict "title" .name )) }}
+        {{- end -}}
+        
+        {{- $children = $children | append (dict "title" .name "children" $child_titles) -}}
+    {{- end }}
+    {{- $entry = merge $entry (dict "children" $children) -}}
+
+    {{- $result = append $result (slice $entry) -}}
+{{- end }}
+
+{{- return $result -}}

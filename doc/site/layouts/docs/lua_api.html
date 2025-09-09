@@ -1,3 +1,7 @@
+{{/*
+	I will be real with you, this is completely unreadable.
+*/}}
+
 {{ define "main" }}
 	<div class='hx-mx-auto hx-flex {{ partial "utils/page-width" . }}'>
 	{{ partial "sidebar.html" (dict "context" .) }}
@@ -7,15 +11,19 @@
 		<main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
 			<div class="content lua-api">
 				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
+
+				{{/*{{ template "api_toc" partial "simplify_lua_docs.html" $data.types }}*/}}
+				{{ $test := (partial "simplify_lua_docs.html" $data) }}
+				{{ partial "generated_toc.html" $test }}
 				
 				<h1>Globals</h1>
 				{{ range $data.globals }}
-					{{ template "render_member" (dict "data" . "level" 0 "name_path" slice) }}
+					{{ template "render_member" (dict "data" . "level" 0 "name_path" (slice)) }}
 				{{ end }}
 
 				<h1>Types</h1>
 				{{ range $data.types }}
-					{{ template "render_member" (dict "data" . "level" 0 "name_path" slice) }}
+					{{ template "render_member" (dict "data" . "level" 0 "name_path" (slice)) }}
 				{{ end }}
 			</div>
 			{{ partial "components/last-updated.html" . }}
@@ -26,6 +34,35 @@
 
   </div>
 {{ end }}
+
+{{/* UTILS */}}
+
+{{ define "render_common" }}
+	{{ if .deprecated }} <b>DEPRECATED:</b> {{ .deprecation_reason }} {{ end }}
+    {{ if .description }} <p>{{ .description | markdownify }}</p> {{ end }}
+{{ end }}
+
+{{ define "leveled_tag" }} 
+	{{ if eq . 0 }}
+		<h2 style="display:inline;">
+	{{ else }}
+		<h3 style="display:inline;">
+	{{ end }}
+{{ end }}
+
+{{ define "leveled_tag_closer" }} 
+	{{ if eq . 0 }}
+		</h2>
+	{{ else }}
+		</h3>
+	{{ end }}
+{{ end }}
+
+{{ define "permalink" }}
+		<a href="#{{ . }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
+{{ end }}
+
+{{/* RENDERING CARDS */}}
 
 {{ define "render_member" }}
 	{{ if eq .data.type "field" }}
@@ -165,27 +202,15 @@
 	{{ end }}
 {{ end }}
 
-{{ define "render_common" }}
-	{{ if .deprecated }} <b>DEPRECATED:</b> {{ .deprecation_reason }} {{ end }}
-    {{ if .description }} <p>{{ .description | markdownify }}</p> {{ end }}
-{{ end }}
+{{/* TOC functions */}}
 
-{{ define "leveled_tag" }} 
-	{{ if eq . 0 }}
-		<h2 style="display:inline;">
-	{{ else }}
-		<h3 style="display:inline;">
-	{{ end }}
-{{ end }}
-
-{{ define "leveled_tag_closer" }} 
-	{{ if eq . 0 }}
-		</h2>
-	{{ else }}
-		</h3>
-	{{ end }}
-{{ end }}
-
-{{ define "permalink" }}
-		<a href="#{{ . }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
+{{ define "api_toc" }}
+	<li>
+		{{ .title }}
+		<ul>
+			{{ range .children }}
+				{{ template "api_toc" . }}
+			{{ end }}
+		</ul>
+	</li>
 {{ end }}
