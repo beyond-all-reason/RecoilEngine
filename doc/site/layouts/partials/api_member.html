@@ -1,9 +1,0 @@
-<div style="margin: 1%;">
-    {{ if eq .type "fn" }}
-        {{ partial "api_function.html" . }}
-    {{ else }}
-        <div class="api-card">
-            <p><i>@{{ .type }}</i> <code>{{.name}}{{ if .typ }} {{ .typ }}{{ end }}{{ if .literal }}: {{ .literal }}{{ end }}</code> </p>{{ if .description }}{{ .description | markdownify }} {{ end }}
-        </div>
-    {{ end }}
-</div>
