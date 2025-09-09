@@ -3,21 +3,19 @@
 	{{ partial "sidebar.html" (dict "context" .) }}
 
 	{{ $data := .Site.Data.doc }}
-	{{ partial "toc.html" . }}
-
 	<article class="hx-w-full hx-break-words hx-flex hx-min-h-[calc(100vh-var(--navbar-height))] hx-min-w-0 hx-justify-center hx-pb-8 hx-pr-[calc(env(safe-area-inset-right)-1.5rem)]">
 		<main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
 			<div class="content lua-api">
 				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
 				
 				<h1>Globals</h1>
-				{{ range index $data "globals" }}
-					{{ partial "api_card.html" .}}
+				{{ range $data.globals }}
+					{{ template "render_member" (dict "data" . "level" 0) }}
 				{{ end }}
 
 				<h1>Types</h1>
-				{{ range index $data "types" }}
-					{{ partial "api_card.html" .}}
+				{{ range $data.types }}
+					{{ template "render_member" (dict "data" . "level" 0) }}
 				{{ end }}
 			</div>
 			{{ partial "components/last-updated.html" . }}
@@ -25,5 +23,127 @@
 			{{ partial "components/comments.html" . }}
 		</main>
 	</article>
+
   </div>
+{{ end }}
+
+{{ define "render_member" }}
+	{{ if eq .data.type "field" }}
+  		{{ template "render_field" . }}
+  	{{ else if eq .data.type "class" }}
+  		{{ template "render_class" . }}
+	{{ else if eq .data.type "enum" }}
+  		{{ template "render_enum" . }}
+	{{ else if eq .data.type "table" }}
+  		{{ template "render_table" . }}
+	{{ else if eq .data.type "fn" }}
+  		{{ template "render_function" . }}
+	{{ end }}
+{{ end }}
+
+{{ define "render_class" }}
+	{{ $level := .level }}
+	{{ with .data }}
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+			<details>
+				<summary>
+					<h2>
+						<i>class</i> 
+						<code>{{ .name }}
+						{{ if .bases }}
+							</code> <i>inherits from</i> <code>
+							{{ range .bases }}
+									{{.}}
+							{{ end }}
+						{{ end }}</code>
+					</h2> {{ template "render_common" . }}
+				</summary>
+				{{ range .members }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1)) }}
+				{{ end }}
+			</details>
+		</div>
+	{{end}}
+{{ end }}
+
+{{ define "render_enum" }}
+	{{ $level := .level }}
+	{{ with .data }}
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+			<h2>
+				<i>enum</i> 
+				<code>{{ .name }}{{ if .typ }}</code> <i>is</i> <code>{{ .typ }}{{ end }}</code>
+			</h2> {{ template "render_common" . }}
+
+			{{ range .members }}
+				{{ template "render_member" (dict "data" . "level" (add $level 1)) }}
+			{{ end }}
+		</div>
+	{{ end }}
+{{ end }}
+
+{{ define "render_table" }}
+	{{ $level := .level }}
+	{{ with .data }}
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+			<details>
+				<summary>
+					<h2>
+						<i>table</i>
+						<code>{{ .name }}</code>
+					</h2> {{ template "render_common" . }}
+				</summary>
+				{{ range .members }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1)) }}
+				{{ end }}
+			</details>
+		</div>
+	{{ end }}
+{{ end }}
+
+{{ define "render_function" }}
+	{{ $level := .level }}
+	{{ with .data }}
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+			<details>
+				<summary>
+					{{ $paramNames := slice }}
+					{{ range .params}}
+						{{ $paramNames = $paramNames | append .name }}
+					{{ end }}
+					<h3>function <code>{{ .name }}({{ delimit $paramNames ", " }})</code><a href="#{{ .name }}" class="subheading-anchor" aria-label="Permalink for this section"></a></h3>
+				</summary>
+
+				{{ if .params }}
+				<div id="hextra-code-block highlight">
+					<h4>Parameters</h4>
+					{{ range .params }}<code> {{ .name }} : {{ .typ }}{{ if .desc }} - {{ .desc }}{{ end }} </code><br>{{ end }}
+				</div>
+			{{ end }}
+
+			{{ if .returns }}
+				<h4>Returns</h4>
+				{{ range .returns }}<code> {{ .name }} : {{.typ }}{{ if .desc }} - {{ .desc }}{{ end }}</code><br>{{ end }}<br>
+			{{ end }}
+
+			{{ template "render_common" . }}
+			</details>
+		</div>
+	{{ end }}
+{{ end }}
+
+{{ define "render_field" }}
+	{{ $level := .level }}
+	{{ with .data }}
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+			<i>field</i>
+			<code>{{.name}}{{ if .typ }} {{ .typ }}{{ end }}{{ if .literal }}: {{ .literal }}{{ end }}</code> 
+			{{ template "render_common" . }}
+		</div>
+	{{ end }}
+{{ end }}
+
+{{ define "render_common" }}
+	{{ if .deprecated }} <b>DEPRECATED:</b> {{ .deprecation_reason }} {{ end }}
+    {{ if .description }} <p>{{ .description | markdownify }}</p> {{ end }}
 {{ end }}
