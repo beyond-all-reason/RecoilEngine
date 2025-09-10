@@ -148,15 +148,18 @@
 
 	{{ with .data }}
 		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
-			{{ template "leveled_tag" $level }}
-				<i>enum</i> 
-				<code>{{ .name }}{{ if .typ }}</code> <i>is</i> <code>{{ template "process_type" .typ }}{{ end }}</code>
-				{{ template "permalink" $name_path_string}}
-			{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
-
-			{{ range .members }}
-				{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path) }}
-			{{ end }}
+			<details>
+				<summary>
+					{{ template "leveled_tag" $level }}
+						<i>enum</i> 
+						<code>{{ .name }}{{ if .typ }}</code> <i>is</i> <code>{{ template "process_type" .typ }}{{ end }}</code>
+						{{ template "permalink" $name_path_string}}
+					{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
+				</summary>
+				{{ range .members }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path) }}
+				{{ end }}
+			</details>
 		</div>
 	{{ end }}
 {{ end }}
@@ -240,7 +243,7 @@
 	{{ with .data }}
 		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{ template "leveled_tag" $level }}
-				<i>property</i>
+				<i style="margin-left:.8rem">property</i>
 				<code>{{ .name }}{{ if .typ }} {{ template "process_type" .typ }}{{ end }}{{ if .literal }}: {{ .literal }}{{ end }}</code> 
 				{{ template "permalink" $name_path_string}}
 			{{ template "leveled_tag_closer" $level }}
