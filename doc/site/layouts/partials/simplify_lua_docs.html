@@ -1,4 +1,20 @@
-{{/* Extracts TOC structure from json */}}
+{{/* 
+    Extracts TOC structure from json. COmpletely illegible.
+    Generates trees of shape:
+
+    toc_entry : { 
+        title : string, 
+        name_path : string, 
+        children: []toc_entry 
+    }
+
+    Note that the doc.json category like `globals` and `types` are the roots of the tree and are also entires.
+
+    TODO: make this more recursive
+
+    params: data : doc.json
+    returns: tree : []toc_entry
+*/}}
 
 {{- $result := slice -}}
 

@@ -39,11 +39,21 @@
 
 {{/* UTILS */}}
 
+{{/*
+  Renders things common to all members, like descriptions.
+  params: member : Member
+*/}}
 {{ define "render_common" }}
 	{{ if .deprecated }} <b>DEPRECATED:</b> {{ .deprecation_reason }} {{ end }}
     {{ if .description }} <p>{{ .description | markdownify }}</p> {{ end }}
+	{{ if .see }} (See: {{ template "process_type" .typ }}) {{ end }}
 {{ end }}
 
+{{/*
+  Generates an opening tag for the member name headings.
+  h2 for top level, h3 for everything else.
+  params: level : integer
+*/}}
 {{ define "leveled_tag" }} 
 	{{ if eq . 0 }}
 		<h2 style="display:inline;">
@@ -52,6 +62,11 @@
 	{{ end }}
 {{ end }}
 
+{{/*
+  Generates an opening tag for the member name headings.
+  h2 for top level, h3 for everything else.
+  params: level : integer
+*/}}
 {{ define "leveled_tag_closer" }} 
 	{{ if eq . 0 }}
 		</h2>
@@ -60,12 +75,20 @@
 	{{ end }}
 {{ end }}
 
+{{/*
+  Renders a link tag anchor for the click hash sign thing.
+  params: link_path : string
+*/}}
 {{ define "permalink" }}
 		<a href="#{{ . }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
 {{ end }}
 
 {{/* RENDERING CARDS */}}
 
+{{/*
+  Render member. Will break out into specialized functions depending on the type.
+  params: {data : member, level : integer, name_path : []string}
+*/}}
 {{ define "render_member" }}
 	{{ if eq .data.type "field" }}
   		{{ template "render_field" . }}
@@ -80,6 +103,10 @@
 	{{ end }}
 {{ end }}
 
+{{/*
+  Render a class.
+  params: {data : member, level : integer, name_path : []string}
+*/}}
 {{ define "render_class" }}
 	{{ $level := .level }}
 	{{ $name_path := append (slice .data.name) .name_path }}
@@ -109,6 +136,10 @@
 	{{end}}
 {{ end }}
 
+{{/*
+  Render an enum.
+  params: {data : member, level : integer, name_path : []string}
+*/}}
 {{ define "render_enum" }}
 	{{ $level := .level }}
 	{{ $name_path := append (slice .data.name) .name_path }}
@@ -118,7 +149,7 @@
 		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{ template "leveled_tag" $level }}
 				<i>enum</i> 
-				<code>{{ .name }}{{ if .typ }}</code> <i>is</i> <code>{{ .typ }}{{ end }}</code>
+				<code>{{ .name }}{{ if .typ }}</code> <i>is</i> <code>{{ template "process_type" .typ }}{{ end }}</code>
 				{{ template "permalink" $name_path_string}}
 			{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
 
@@ -129,6 +160,10 @@
 	{{ end }}
 {{ end }}
 
+{{/*
+  Render a table. I mean everything is a table, but you know what I mean.
+  params: {data : member, level : integer, name_path : []string}
+*/}}
 {{ define "render_table" }}
 	{{ $level := .level }}
 	{{ $name_path := append (slice .data.name) .name_path }}
@@ -152,6 +187,10 @@
 	{{ end }}
 {{ end }}
 
+{{/*
+  Render a function.
+  params: {data : member, level : integer, name_path : []string}
+*/}}
 {{ define "render_function" }}
 	{{ $level := .level }}
 	{{ $name_path := append (slice .data.name) .name_path }}
@@ -172,13 +211,13 @@
 				{{ if .params }}
 				<div id="hextra-code-block highlight">
 					<h4>Parameters</h4>
-					{{ range .params }}<code> {{ .name }} : {{ .typ }}{{ if .desc }} - {{ .desc }}{{ end }} </code><br>{{ end }}
+					{{ range .params }}<code> {{ .name }} : {{ template "process_type" .typ }}{{ if .desc }} - {{ .desc }}{{ end }} </code><br>{{ end }}
 				</div>
 			{{ end }}
 
 			{{ if .returns }}
 				<h4>Returns</h4>
-				{{ range .returns }}<code> {{ .name }} : {{.typ }}{{ if .desc }} - {{ .desc }}{{ end }}</code><br>{{ end }}<br>
+				{{ range .returns }}<code> {{ .name }} : {{ template "process_type" .typ }}{{ if .desc }} - {{ .desc }}{{ end }}</code><br>{{ end }}<br>
 			{{ end }}
 
 			{{ template "render_common" . }}
@@ -187,6 +226,10 @@
 	{{ end }}
 {{ end }}
 
+{{/*
+  Render a property (anything that isn't the other categories).
+  params: {data : member, level : integer, name_path : []string}
+*/}}
 {{ define "render_field" }}
 	{{ $level := .level }}
 	{{ $name_path := append (slice .data.name) .name_path }}
@@ -196,7 +239,7 @@
 		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{ template "leveled_tag" $level }}
 				<i>property</i>
-				<code>{{ .name }}{{ if .typ }} {{ .typ }}{{ end }}{{ if .literal }}: {{ .literal }}{{ end }}</code> 
+				<code>{{ .name }}{{ if .typ }} {{ template "process_type" .typ }}{{ end }}{{ if .literal }}: {{ .literal }}{{ end }}</code> 
 				{{ template "permalink" $name_path_string}}
 			{{ template "leveled_tag_closer" $level }}
 			{{ template "render_common" . }}
@@ -204,15 +247,25 @@
 	{{ end }}
 {{ end }}
 
-{{/* TOC functions */}}
+{{/* TYPES */}}
 
-{{ define "api_toc" }}
-	<li>
-		{{ .title }}
-		<ul>
-			{{ range .children }}
-				{{ template "api_toc" . }}
-			{{ end }}
-		</ul>
-	</li>
+{{/* 
+  Renders out a parsed type providing backlinks
+  params: raw_type : string
+*/}}
+{{ define "process_type" }}
+	{{/* Can I make these consts?... */}}
+	{{ $lua_keywords := slice "integer" "number" "string" "boolean" "nil" "func" "table" "any" }}
+	{{ $typedef := . }}
+	{{ $words := strings.FindRE `[\w.]+` . }}
+
+	{{ range $words }}
+		{{ if not ( collections.In $lua_keywords . ) }}
+			{{ $permalink := strings.Replace . "." "-" }}
+			{{ $type_link := printf `[%s](#%s)` $permalink .}}
+			{{ $typedef = strings.Replace $typedef . $type_link }}
+		{{ end }}
+	{{ end }}
+
+	{{ $typedef | markdownify }} {{/* seems weird but the html got sanitized and I could not be bothered to figure out where that happened */}}
 {{ end }}
