@@ -17,9 +17,9 @@ migrating from Spring.
 Rendering fonts now obeys GL color state. This means that sometimes text will
 not be the same color as previously. To get back previous behaviour, you might
 need to add
-[`gl.Color`]()
+[`gl.Color`]({{% ref "docs/lua-api/#gl.Color" %}})
 in front of
-[`gl.Text`]()
+[`gl.Text`]({{% ref "docs/lua-api/#gl.Text" %}})
 calls. Alternatively, you can add inline colour codes (`\255\rrr\ggg\bbb`).
 
 ### Spring.Marker usage

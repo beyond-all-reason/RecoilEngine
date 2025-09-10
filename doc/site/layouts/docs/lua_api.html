@@ -3,6 +3,7 @@
 	This is in several parts:
 	1. Analyze and generate a table of contents
 	2. Generate API cards
+	3. Type backlinks
 
 	The API generator is recursive, and generates the style and heading based on the level.
 */}}
@@ -171,6 +172,7 @@
 
 	{{ with .data }}
 		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+			{{/* The ones with children get the details folddown. The ones without don't. */}}
 			<details>
 				<summary>
 					{{ template "leveled_tag" $level }}

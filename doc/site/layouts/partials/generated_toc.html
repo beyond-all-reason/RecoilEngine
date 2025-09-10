@@ -4,10 +4,20 @@
 {{- $editThisPage := (T "editThisPage") | default "Edit this page"}}
 {{- $backToTop := (T "backToTop") | default "Scroll to top" -}}
 
-{{/* Render out the table element. */}}
+{{/* 
+  Render out the table element.
+
+  For toc_entry : { 
+        title : string, 
+        name_path : string, 
+        children: []toc_entry 
+    }
+  This expects []toc_entry
+*/}}
 <nav style="width:25vw;" class="hextra-toc hx:order-last hx:hidden hx:w-64 hx:shrink-0 hx:xl:block hx:print:hidden hx:px-4" aria-label="table of contents">
-    <div style="position: sticky; top:5vh; overflow-y:scroll; height:85vh;" class="hextra-scrollbar hx:sticky hx:top-16 hx:overflow-y-auto hx:pr-4 hx:pt-6 hx:text-sm [hyphens:auto] hx:max-h-[calc(100vh-var(--navbar-height)-env(safe-area-inset-bottom))] hx:ltr:-mr-4 hx:rtl:-ml-4">
-        <p class="hx:mb-4 hx:font-semibold hx:tracking-tight">{{ $onThisPage }}</p>
+  <h4 class="hx:mb-4 hx:font-semibold hx:tracking-tight">{{ $onThisPage }}</h4>  
+  <hr>
+  <div style="position: sticky; top:5vh; overflow-y:scroll; height:85vh;" class="hextra-scrollbar hx:sticky hx:top-16 hx:overflow-y-auto hx:pr-4 hx:pt-6 hx:text-sm [hyphens:auto] hx:max-h-[calc(100vh-var(--navbar-height)-env(safe-area-inset-bottom))] hx:ltr:-mr-4 hx:rtl:-ml-4">  
           <ul style="list-style-type: none;">
             {{ range .}}
               {{ template "toc-subheading" (dict "info" . "level" 0) }}
