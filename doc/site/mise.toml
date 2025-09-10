@@ -5,11 +5,10 @@
 [env]
 	HUGO_VERSION = "0.147.9"
 	LUA_DOC_EXTRACTOR_VERSION = "3" # lua_library lua_check
-	EMMYLUA_DOC_CLI_VERSION = "0.8.2" # lua_pages lua_library lua_check
+	EMMYLUA_DOC_CLI_VERSION = "0.8.2" # lua_library lua_check
 	LUA_LANGUAGE_SERVER_VERSION = "3.15.0" # lua_check
 	JQ_VERSION = "1.8.0" # binary_pages
 	7Z_VERSION = "24.09" # binary_pages
-	RUBY_VERSION = "3.3" # lua_pages
 	LUA_DOC_EXTRACTOR_SOURCE_REF = "https://github.com/beyond-all-reason/RecoilEngine/blob/master"
 	RECOIL_LUA_LIBRARY_DIR = "rts/Lua/library"
 
@@ -18,7 +17,6 @@
 	site_dir = 'doc/site'
 	site_temp_dir = "{{vars.site_dir}}/temp"
 	lua_doc_paths = 'rts/{Lua,Rml/SolLua}/**/*.cpp'
-	lua_pages_dir = "{{vars.site_dir}}/content/docs/lua-api"
 	emmylua_cli_template = "{{vars.site_dir}}/emmylua-doc-cli-template"
 	latest_release_data = 'data/latest_release.json'
 
@@ -29,16 +27,10 @@
 	run = "hugo server --navigateToChanged"
 
 	[tasks.server_full]
-	depends = ["lua_pages", "binary_pages"]
+	depends = ["lua_json", "binary_pages"]
 	description = "Run the site server locally, with all possible content"
 	tools.hugo = "{{env.HUGO_VERSION}}"
 	run = "hugo server --navigateToChanged"
-
-	[tasks.lua_pages]
-	description = "Generate Lua API Pages"
-	depends = ["lua_json"]
-	tools.ruby = "{{env.RUBY_VERSION}}"
-	run = "ruby docgen/generator.rb --out=content/docs/lua-api/_index.md --doc=data/doc.json"
 
 	[tasks.lua_json]
 	description = "Generate Lua JSON export"

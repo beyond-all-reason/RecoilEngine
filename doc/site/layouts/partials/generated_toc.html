@@ -15,16 +15,20 @@
   This expects []toc_entry
 */}}
 <nav style="width:25vw;" class="hextra-toc hx:order-last hx:hidden hx:w-64 hx:shrink-0 hx:xl:block hx:print:hidden hx:px-4" aria-label="table of contents">
-  <h4 class="hx:mb-4 hx:font-semibold hx:tracking-tight">{{ $onThisPage }}</h4>  
-  <hr>
-  <div style="position: sticky; top:5vh; overflow-y:scroll; height:85vh;" class="hextra-scrollbar hx:sticky hx:top-16 hx:overflow-y-auto hx:pr-4 hx:pt-6 hx:text-sm [hyphens:auto] hx:max-h-[calc(100vh-var(--navbar-height)-env(safe-area-inset-bottom))] hx:ltr:-mr-4 hx:rtl:-ml-4">  
-          <ul style="list-style-type: none;">
-            {{ range .}}
-              {{ template "toc-subheading" (dict "info" . "level" 0) }}
-            {{ end }}
-          </ul>
-      {{- $borderClass := "hx:mt-8 hx:border-t hx:bg-white hx:pt-8 hx:shadow-[0_-12px_16px_white] hx:dark:bg-dark hx:dark:shadow-[0_-12px_16px_#111]" -}}
+  <div style="position: sticky; top:7vh; height:85vh;" class="hextra-scrollbar hx:sticky hx:top-16 hx:overflow-y-auto hx:pr-4 hx:pt-6 hx:text-sm [hyphens:auto] hx:max-h-[calc(100vh-var(--navbar-height)-env(safe-area-inset-bottom))] hx:ltr:-mr-4 hx:rtl:-ml-4">  
+    <p class="hx:mb-4 hx:font-semibold hx:tracking-tight">{{ $onThisPage }}</p>
+    <div style="margin-top: .5rem;"></div>
+    <hr>
+    <div style="margin-top: .5rem;"></div>   
+    <div style="overflow-y:scroll; height: 100%;">
+      <ul style="list-style-type: none;">
+        {{ range .}}
+          {{ template "toc-subheading" (dict "info" . "level" 0) }}
+        {{ end }}
+      </ul>
     </div>
+    {{/* TODO: Scroll to top? DO we care, since it's not an article? */}}
+  </div>
 </nav>
 
 {{/* TOC subheadings component. This is a recursive component that renders a list of headings. */}}
