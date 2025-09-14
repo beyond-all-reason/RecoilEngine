@@ -19,12 +19,12 @@
 				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
 				
 				<h1>Globals</h1>
-				{{ range $data.globals }}
+				{{ range sort $data.globals "name" }}
 					{{ template "render_member" (dict "data" . "level" 0 "name_path" (slice)) }}
 				{{ end }}
 
 				<h1>Types</h1>
-				{{ range $data.types }}
+				{{ range sort $data.types "name" }}
 					{{ template "render_member" (dict "data" . "level" 0 "name_path" (slice)) }}
 				{{ end }}
 			</div>
@@ -47,7 +47,7 @@
 {{ define "render_common" }}
 	{{ if .deprecated }} <b>DEPRECATED:</b> {{ .deprecation_reason }} {{ end }}
     {{ if .description }} <p>{{ .description | markdownify }}</p> {{ end }}
-	{{ if .see }} (See: {{ template "process_type" .typ }}) {{ end }}
+	{{ if .see }} (See: {{ template "process_type" (dict "def" .typ "generics" .generics) }}) {{ end }}
 {{ end }}
 
 {{/*
@@ -95,6 +95,8 @@
   		{{ template "render_field" . }}
   	{{ else if eq .data.type "class" }}
   		{{ template "render_class" . }}
+	{{ else if eq .data.type "alias"}}
+		{{ template "render_alias" . }}
 	{{ else if eq .data.type "enum" }}
   		{{ template "render_enum" . }}
 	{{ else if eq .data.type "table" }}
@@ -102,6 +104,27 @@
 	{{ else if eq .data.type "fn" }}
   		{{ template "render_function" . }}
 	{{ end }}
+{{ end }}
+
+{{/*
+  Render an alias.
+  params: {data : member, level : integer, name_path : []string}
+*/}}
+{{ define "render_alias"}}
+	{{ $level := .level }}
+	{{ $name_path := append (slice .data.name) .name_path }}
+	{{ $name_path_string := delimit $name_path "-" }}
+
+	{{ with .data }}
+		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+			{{ template "leveled_tag" $level }}
+				<i>alias</i> 
+				<code>{{ template "format_title" . }}</code> is
+				<code>{{ template "process_type" (dict "def" .typ "generics" .generics) }}</code>
+				{{ template "permalink" $name_path_string}}
+			{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
+		</div>
+	{{end}}
 {{ end }}
 
 {{/*
@@ -114,6 +137,7 @@
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
+		{{ $generics := .generics }}
 		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			<details>
 				<summary>
@@ -123,13 +147,13 @@
 						{{ if .bases }}
 							</code> <i>inherits from</i> <code>
 							{{ range .bases }}
-									{{.}}
+									{{ template "process_type" (dict "def" . "generics" $generics) }}
 							{{ end }}
 						{{ end }}</code>
 						{{ template "permalink" $name_path_string}}
 					{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
 				</summary>
-				{{ range .members }}
+				{{ range sort .members "name" }}
 					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path) }}
 				{{ end }}
 			</details>
@@ -152,11 +176,11 @@
 				<summary>
 					{{ template "leveled_tag" $level }}
 						<i>enum</i> 
-						<code>{{ .name }}{{ if .typ }}</code> <i>is</i> <code>{{ template "process_type" .typ }}{{ end }}</code>
+						<code>{{ template "format_title" . }}{{ if .typ }}</code> <i>is</i> <code>{{ template "process_type" (dict "def" .typ "generics" .generics) }}{{ end }}</code>
 						{{ template "permalink" $name_path_string}}
 					{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
 				</summary>
-				{{ range .members }}
+				{{ range sort .members "name" }}
 					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path) }}
 				{{ end }}
 			</details>
@@ -180,11 +204,11 @@
 				<summary>
 					{{ template "leveled_tag" $level }}
 						<i>table</i>
-						<code>{{ .name }}</code>
+						<code>{{ template "format_title" . }}</code>
 						{{ template "permalink" $name_path_string}}
 					{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
 				</summary>
-				{{ range .members }}
+				{{ range sort .members "name" }}
 					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path) }}
 				{{ end }}
 			</details>
@@ -202,6 +226,7 @@
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
+		{{ $generics := .generics }}
 		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			<details>
 				<summary>
@@ -209,20 +234,20 @@
 					{{ range .params}}
 						{{ $paramNames = $paramNames | append .name }}
 					{{ end }}
-					{{ template "leveled_tag" $level }}function <code>{{ .name }}({{ delimit $paramNames ", " }})</code>{{ template "permalink" $name_path_string}}{{ template "leveled_tag_closer" $level }}
+					{{ template "leveled_tag" $level }}function <code>{{ template "format_title" . }}({{ delimit $paramNames ", " }})</code>{{ template "permalink" $name_path_string}}{{ template "leveled_tag_closer" $level }}
 					
 				</summary>
 
 				{{ if .params }}
 				<div id="hextra-code-block highlight">
 					<h4>Parameters</h4>
-					{{ range .params }}<code> {{ .name }} : {{ template "process_type" .typ }}{{ if .desc }} - {{ .desc }}{{ end }} </code><br>{{ end }}
+					{{ range .params }}<code> {{ .name }} : {{ template "process_type" (dict "def" .typ "generics" $generics) }}{{ if .desc }} - {{ .desc }}{{ end }} </code><br>{{ end }}
 				</div>
 			{{ end }}
 
 			{{ if .returns }}
 				<h4>Returns</h4>
-				{{ range .returns }}<code> {{ .name }} : {{ template "process_type" .typ }}{{ if .desc }} - {{ .desc }}{{ end }}</code><br>{{ end }}<br>
+				{{ range .returns }}<code> {{ .name }} : {{ template "process_type" (dict "def" .typ "generics" $generics) }}{{ if .desc }} - {{ .desc }}{{ end }}</code><br>{{ end }}<br>
 			{{ end }}
 
 			{{ template "render_common" . }}
@@ -244,7 +269,10 @@
 		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{ template "leveled_tag" $level }}
 				<i style="margin-left:.8rem">property</i>
-				<code>{{ .name }}{{ if .typ }} {{ template "process_type" .typ }}{{ end }}{{ if .literal }}: {{ .literal }}{{ end }}</code> 
+				<code>
+					{{ template "format_title" . }}
+					{{ if .typ }} {{ template "process_type" (dict "def" .typ "generics" .generics) }}{{ end }}
+					{{ if .literal }}: {{ .literal }}{{ end }}</code> 
 				{{ template "permalink" $name_path_string}}
 			{{ template "leveled_tag_closer" $level }}
 			{{ template "render_common" . }}
@@ -252,25 +280,47 @@
 	{{ end }}
 {{ end }}
 
-{{/* TYPES */}}
+{{/* FORMATTING */}}
 
 {{/* 
   Renders out a parsed type providing backlinks
-  params: raw_type : string
+  params: { def : string, generics : []{ name : string, "base" : string? } }
 */}}
 {{ define "process_type" }}
 	{{/* Can I make these consts?... */}}
-	{{ $lua_keywords := slice "integer" "number" "string" "boolean" "nil" "func" "table" "any" }}
-	{{ $typedef := . }}
-	{{ $words := strings.FindRE `[\w.]+` . }}
+	{{ $generics := slice }}
+	{{ range .generics }}
+		{{ $generics = append .name $generics }}
+	{{ end }}
+
+	{{ $kw := append (slice "integer" "number" "string" "boolean" "nil" "func" "table" "any") $generics }}
+	{{ $typedef := .def }}
+	{{ $words := strings.FindRE `[a-zA-Z\."]+` .def }}
 
 	{{ range $words }}
-		{{ if not ( collections.In $lua_keywords . ) }}
-			{{ $permalink := strings.Replace . "." "-" }}
-			{{ $type_link := printf `[%s](#%s)` $permalink .}}
-			{{ $typedef = strings.Replace $typedef . $type_link }}
+		{{ if not ( collections.In $kw . ) }}
+			{{ if not ( hasPrefix . `"`) }}
+				{{ $permalink := strings.Replace . "." "-" }}
+				{{ $type_link := printf "[%s](#%s)" $permalink .}}
+				{{ $typedef = strings.Replace $typedef . $type_link }}
+			{{ end }}
 		{{ end }}
 	{{ end }}
 
 	{{ $typedef | markdownify }} {{/* seems weird but the html got sanitized and I could not be bothered to figure out where that happened */}}
+{{ end }}
+
+{{/* 
+  Renders out a parsed type providing backlinks
+  params: member
+*/}}
+{{ define "format_title" }}
+	{{.name}}
+	{{- $g_names := slice -}}
+	{{- range .generics -}}
+		{{ $g_names = append .name $g_names }}
+	{{- end -}}
+	{{- if .generics -}}
+		&lt;{{ delimit $g_names ", " }}&gt;
+	{{- end -}}
 {{ end }}

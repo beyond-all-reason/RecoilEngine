@@ -47,7 +47,7 @@
         <details>
           <summary><a href="#{{ .name_path }}">{{ .title }}</a></summary>
           <ul style="list-style-type: none;">
-            {{ range .children }}
+            {{ range sort .children "title" }}
               {{ template "toc-subheading" (dict "info" . "level" (add $level 1)) }}
             {{ end }}
           </ul>
