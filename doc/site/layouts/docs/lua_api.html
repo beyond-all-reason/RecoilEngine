@@ -143,9 +143,9 @@
 				<summary>
 					{{ template "leveled_tag" $level }}
 						<i>class</i> 
-						<code>{{ .name }}
+						<code>{{ .name }}</code>
 						{{ if .bases }}
-							</code> <i>inherits from</i> <code>
+							 <i>inherits from</i> <code>
 							{{ range .bases }}
 									{{ template "process_type" (dict "def" . "generics" $generics) }}
 							{{ end }}
@@ -176,7 +176,7 @@
 				<summary>
 					{{ template "leveled_tag" $level }}
 						<i>enum</i> 
-						<code>{{ template "format_title" . }}{{ if .typ }}</code> <i>is</i> <code>{{ template "process_type" (dict "def" .typ "generics" .generics) }}{{ end }}</code>
+						<code>{{ template "format_title" . }}</code>{{ if .typ }} <i>is</i> <code>{{ template "process_type" (dict "def" .typ "generics" .generics) }}</code>{{ end }}
 						{{ template "permalink" $name_path_string}}
 					{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
 				</summary>
@@ -297,12 +297,12 @@
 	{{ $typedef := .def }}
 	{{ $words := strings.FindRE `[a-zA-Z\."]+` .def }}
 
-	{{ range $words }}
+	{{ range uniq $words }}
 		{{ if not ( collections.In $kw . ) }}
 			{{ if not ( hasPrefix . `"`) }}
 				{{ $permalink := strings.Replace . "." "-" }}
-				{{ $type_link := printf "[%s](#%s)" $permalink .}}
-				{{ $typedef = strings.Replace $typedef . $type_link }}
+				{{ $type_link := printf "[%s](#%s)" . $permalink }}
+				{{ $typedef = replace $typedef . $type_link }}
 			{{ end }}
 		{{ end }}
 	{{ end }}
@@ -318,7 +318,7 @@
 	{{.name}}
 	{{- $g_names := slice -}}
 	{{- range .generics -}}
-		{{ $g_names = append .name $g_names }}
+		{{ $g_names = append .name $g_names }} {{/* TODO: Support type restrictions */}}
 	{{- end -}}
 	{{- if .generics -}}
 		&lt;{{ delimit $g_names ", " }}&gt;
