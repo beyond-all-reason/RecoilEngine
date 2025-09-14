@@ -146,9 +146,9 @@
 						<code>{{ .name }}</code>
 						{{ if .bases }}
 							 <i>inherits from</i> <code>
-							{{ range .bases }}
-									{{ template "process_type" (dict "def" . "generics" $generics) }}
-							{{ end }}
+							{{- range .bases -}}
+									{{- template "process_type" (dict "def" . "generics" $generics) -}}
+							{{- end -}}
 						{{ end }}</code>
 						{{ template "permalink" $name_path_string}}
 					{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
@@ -269,10 +269,9 @@
 		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{ template "leveled_tag" $level }}
 				<i style="margin-left:.8rem">property</i>
-				<code>
-					{{ template "format_title" . }}
-					{{ if .typ }} {{ template "process_type" (dict "def" .typ "generics" .generics) }}{{ end }}
-					{{ if .literal }}: {{ .literal }}{{ end }}</code> 
+				<code>{{ template "format_title" . }}</code> 
+				<code>{{- if .typ -}} {{- template "process_type" (dict "def" .typ "generics" .generics) -}}{{- end -}}</code>
+				{{- if .literal -}}: <code>{{- .literal -}}</code>{{- end -}}
 				{{ template "permalink" $name_path_string}}
 			{{ template "leveled_tag_closer" $level }}
 			{{ template "render_common" . }}
@@ -286,35 +285,35 @@
   Renders out a parsed type providing backlinks
   params: { def : string, generics : []{ name : string, "base" : string? } }
 */}}
-{{ define "process_type" }}
+{{- define "process_type" -}}
 	{{/* Can I make these consts?... */}}
-	{{ $generics := slice }}
-	{{ range .generics }}
-		{{ $generics = append .name $generics }}
-	{{ end }}
+	{{- $generics := slice -}}
+	{{- range .generics -}}
+		{{- $generics = append .name $generics -}}
+	{{- end -}}
 
-	{{ $kw := append (slice "integer" "number" "string" "boolean" "nil" "func" "table" "any") $generics }}
-	{{ $typedef := .def }}
-	{{ $words := strings.FindRE `[a-zA-Z\."]+` .def }}
+	{{- $kw := append (slice "integer" "number" "string" "boolean" "nil" "func" "table" "any") $generics -}}
+	{{- $typedef := .def -}}
+	{{- $words := strings.FindRE `[a-zA-Z\."]+` .def -}}
 
-	{{ range uniq $words }}
-		{{ if not ( collections.In $kw . ) }}
-			{{ if not ( hasPrefix . `"`) }}
-				{{ $permalink := strings.Replace . "." "-" }}
-				{{ $type_link := printf "[%s](#%s)" . $permalink }}
-				{{ $typedef = replace $typedef . $type_link }}
-			{{ end }}
-		{{ end }}
-	{{ end }}
+	{{- range uniq $words -}}
+		{{- if not ( collections.In $kw . ) -}}
+			{{- if not ( hasPrefix . `"`) -}}
+				{{- $permalink := strings.Replace . "." "-" -}}
+				{{- $type_link := printf "[%s](#%s)" . $permalink -}}
+				{{- $typedef = replace $typedef . $type_link -}}
+			{{- end -}}
+		{{- end -}}
+	{{- end -}}
 
-	{{ $typedef | markdownify }} {{/* seems weird but the html got sanitized and I could not be bothered to figure out where that happened */}}
-{{ end }}
+	{{- $typedef | markdownify -}} {{/* seems weird but the html got sanitized and I could not be bothered to figure out where that happened */}}
+{{- end -}}
 
 {{/* 
   Renders out a parsed type providing backlinks
   params: member
 */}}
-{{ define "format_title" }}
+{{- define "format_title" -}}
 	{{.name}}
 	{{- $g_names := slice -}}
 	{{- range .generics -}}
@@ -323,4 +322,4 @@
 	{{- if .generics -}}
 		&lt;{{ delimit $g_names ", " }}&gt;
 	{{- end -}}
-{{ end }}
+{{- end -}}
