@@ -121,3 +121,38 @@
   border-radius: 1rem;
   background-color: #222222;
 }
+
+.display-inline {
+  display: inline;
+}
+
+.margin-left-1rem {
+  margin-left: 1rem;
+}
+
+.list-style-type-none {
+  list-style-type: none;
+}
+
+.margin-top-half-rem {
+  margin-top: 0.5rem;
+}
+
+.generated-toc-scroll-box {
+  overflow-y: scroll;
+  height: 100%;
+}
+
+.generated-toc-sticky {
+  position: sticky;
+  top: 7vh;
+  height: 85vh;
+}
+
+.width-25vw {
+  width:25vw;
+}
+
+.margin-left-dot8rem {
+  margin-left:.8rem;
+}

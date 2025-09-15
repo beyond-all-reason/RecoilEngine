@@ -8,4 +8,3 @@
 	"aqua:jqlang/jq" = "{{env.JQ_VERSION}}"
 	"aqua:ip7z/7zip" = "{{env.7Z_VERSION}}"
 	"npm:lua-doc-extractor" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
-	"ruby" = "{{env.RUBY_VERSION}}"
