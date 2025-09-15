@@ -57,9 +57,9 @@
 */}}
 {{ define "leveled_tag" }} 
 	{{ if eq . 0 }}
-		<h2 style="display:inline;">
+		<h2 class="display-inline">
 	{{ else }}
-		<h3 style="display:inline;">
+		<h3 class="display-inline">
 	{{ end }}
 {{ end }}
 
@@ -268,7 +268,7 @@
 	{{ with .data }}
 		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{ template "leveled_tag" $level }}
-				<i style="margin-left:.8rem">property</i>
+				<i class="margin-left-dot8rem">property</i>
 				<code>{{ template "format_title" . }}</code> 
 				<code>{{- if .typ -}} {{- template "process_type" (dict "def" .typ "generics" .generics) -}}{{- end -}}</code>
 				{{- if .literal -}}: <code>{{- .literal -}}</code>{{- end -}}
