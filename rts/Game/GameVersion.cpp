@@ -7,7 +7,6 @@
 
 #include "System/VersionGenerated.h"
 
-#include <ciso646> // _LIBCPP*
 #include <cstring>
 #include <cstdio>
 

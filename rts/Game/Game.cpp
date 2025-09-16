@@ -76,7 +76,6 @@
 #include "Sim/Misc/GeometricObjects.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/BuildingMaskMap.h"
-#include "Sim/Misc/ExtractorHandler.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/InterceptHandler.h"
@@ -260,7 +259,6 @@ CGame::CGame(const std::string& mapFileName, const std::string& modFileName, ILo
 	// clear left-over receivers in case we reloaded
 	gameCommandConsole.ResetState();
 
-	extractorHandler.ResetState();
 	envResHandler.ResetState();
 
 	modInfo.Init(modFileName);
@@ -479,11 +477,9 @@ void CGame::Load(const std::string& mapFileName)
 			}
 			LEAVE_SYNCED_CODE();
 		}
-		// Update height bounds, pathing and added/features units after pregame or a saved game load.
+		// Update height bounds and pathing after pregame or a saved game load.
 		{
 			ENTER_SYNCED_CODE();
-			extractorHandler.PostFinalizeRefresh();
-
 			// update features / units in case they need to be rendered before the sim starts
 			// (e.g. during start position selection)
 			featureHandler.UpdatePostFrame();

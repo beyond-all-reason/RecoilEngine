@@ -186,6 +186,7 @@ else  (UNIX AND NOT MINGW)
 		add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
 		add_compile_options(/bigobj)
 		add_compile_options(/utf-8) ## new FMT refuses to compile w/o it
+		add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>) ## define __cplusplus value properly / https://learn.microsoft.com/en-us/cpp/build/reference/zc-cplusplus?view=msvc-170
 		add_definitions(-D_ITERATOR_DEBUG_LEVEL=0) ## attempt to make debug MSVC builds faster
 		#set(EXE_FLAGS WIN32)
 	endif()
