@@ -45,6 +45,7 @@ struct UnitDefWeapon {
 
 	bool fastAutoRetargeting = false; ///< pick new targets as soon as possible, don't wait for slow update
 	bool fastQueryPointUpdate = false;	///< check in with unitscript to get most current query piece before every friendly fire check, don't wait for slow update
+	unsigned int accurateLeading = 0;	///< Accurately lead moving targets. The number controls how many calculation iterations are done. 0 = undershoot approaching or retreating targets (default), 1 = sufficient for exact solution for non-parabolic shots and improves parabolic shots, 2+ = extra iterations for parabolic shots
 	unsigned int burstControlWhenOutOfArc = 0; ///< Determines how to handle burst fire, when target is out of arc. 0 = no restrictions (default), 1 = don't fire, 2 = fire in current direction of weapon 
 	float weaponAimAdjustPriority = 1.f;		///< relative importance of picking enemy targets that are in front
 

@@ -62,6 +62,11 @@ namespace spring {
 			nextId = 0;
 		}
 
+		void shrink_to_fit() {
+			values.shrink_to_fit();
+			freeIDs.shrink_to_fit();
+		}
+
 		template<typename ShuffleFunc>
 		void ShuffleFreeIDs(ShuffleFunc&& shuffleFunc) {
 			spring::random_shuffle(freeIDs.begin(), freeIDs.end(), shuffleFunc);
@@ -137,9 +142,9 @@ namespace spring {
 		template<typename ShuffleFunc>
 		TKey Add(const TVal& val, ShuffleFunc&& shuffleFunc) {
 			TKey key = GetKey(shuffleFunc);
-			const auto pos = vault.size();
-			kpMap[key] = pos;
-			pkMap[pos] = key;
+
+			kpMap[key] = vault.size();
+			pkVec.emplace_back(key);
 			vault.emplace_back(val);
 
 			return key;
@@ -147,43 +152,33 @@ namespace spring {
 
 		TKey Add(const TVal& val) {
 			TKey key = GetKey();
-			const auto pos = vault.size();
-			kpMap[key] = pos;
-			pkMap[pos] = key;
+
+			kpMap[key] = vault.size();
+			pkVec.emplace_back(key);
 			vault.emplace_back(val);
 
 			return key;
 		}
 
 		void Del(const TKey& key) {
-			const auto it = kpMap.find(key);
+			const auto kpIt = kpMap.find(key);
+			assert(kpIt != kpMap.end());
 
-			assert(it != kpMap.end());
+			const size_t posToDel = kpIt->second;
+			const size_t lastPos  = vault.size() - 1;
 
-			//last elem in vault
-			if (it->second == vault.size() - 1) {
-				vault.pop_back();
-				freeKeys.emplace_back(key);
-				pkMap.erase(it->second);
-				kpMap.erase(it);
-				return;
+			kpMap.erase(kpIt);
+
+			if (posToDel != lastPos) {
+				const TKey& lastKey = pkVec.back();
+				vault[posToDel] = std::move(vault.back());
+				pkVec[posToDel] = lastKey;
+				kpMap[lastKey] = posToDel;
 			}
 
-			const auto it2 = pkMap.find(vault.size() - 1); //find the key that corresponds to the last position in vault
-			assert(it2 != pkMap.end());
-
-			//iterators might become invalid, use values
-			const auto kp = *it;
-			const auto pk = *it2;
-
-			kpMap.erase(it);
-			pkMap.erase(it2);
-
-			vault[kp.second] = vault.back();
-			kpMap[pk.second] = kp.second;
-			pkMap[kp.second] = pk.second;
-
 			vault.pop_back();
+			pkVec.pop_back();
+
 			freeKeys.emplace_back(key);
 		}
 
@@ -196,12 +191,21 @@ namespace spring {
 		}
 
 		bool empty() const { return vault.empty(); }
-		void reserve(std::size_t sz) { vault.reserve(sz); }
+		void reserve(std::size_t sz) {
+			vault.reserve(sz); 
+			pkVec.reserve(sz);
+		}
 		void clear() {
 			vault.clear();
 			kpMap.clear();
-			pkMap.clear();
+			pkVec.clear();
 			freeKeys.clear();
+		}
+
+		void shrink_to_fit() {
+			vault.shrink_to_fit();
+			pkVec.shrink_to_fit();
+			freeKeys.shrink_to_fit();
 		}
 
 		constexpr auto begin()        { return vault.begin(); }
@@ -234,9 +238,9 @@ namespace spring {
 			return key;
 		}
 
-		std::size_t GetKey() {
+		TKey GetKey() {
 			if (freeKeys.empty())
-				return kpMap.size();
+				return kpMap.size() + freeKeys.size();
 
 			const TKey key = freeKeys.back();
 			freeKeys.pop_back();
@@ -246,8 +250,8 @@ namespace spring {
 	private:
 		std::vector<TVal> vault;
 		std::vector<TKey> freeKeys;
+		std::vector<TKey> pkVec; // pos --> key
 		spring::unordered_map<TKey, size_t> kpMap; // key --> pos
-		spring::unordered_map<size_t, TKey> pkMap; // pos --> key
 	};
 }
 
@@ -264,5 +268,5 @@ CR_REG_METADATA_TEMPLATE_2TYPED(spring::FreeListMapCompact, TVal, TKey, (
 	CR_MEMBER(vault),
 	CR_MEMBER(freeKeys),
 	CR_MEMBER(kpMap),
-	CR_MEMBER(pkMap)
+	CR_MEMBER(pkVec)
 ))

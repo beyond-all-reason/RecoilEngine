@@ -30,7 +30,6 @@
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/CategoryHandler.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
-#include "Sim/Misc/ExtractorHandler.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/Wind.h"
 #include "Sim/Misc/YardmapStatusEffectsMap.h"
@@ -100,7 +99,6 @@ void CGameStateCollector::Serialize(creg::ISerializer* s)
 	CPlasmaRepulser::SerializeShieldSegmentCollectionPool(s);
 	CColorMap::SerializeColorMaps(s);
 	s->SerializeObjectInstance(&waitCommandsAI, waitCommandsAI.GetClass());
-	s->SerializeObjectInstance(&extractorHandler, extractorHandler.GetClass());
 	s->SerializeObjectInstance(&envResHandler, envResHandler.GetClass());
 	s->SerializeObjectInstance(&moveDefHandler, moveDefHandler.GetClass());
 	s->SerializeObjectInstance(&teamHandler, teamHandler.GetClass());
