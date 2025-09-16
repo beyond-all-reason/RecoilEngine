@@ -112,7 +112,7 @@
 */}}
 {{ define "render_alias"}}
 	{{ $level := .level }}
-	{{ $name_path := append (slice .data.name) .name_path }}
+	{{ $name_path := append (slice "type" .data.name) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
@@ -133,7 +133,7 @@
 */}}
 {{ define "render_class" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice .data.name) .name_path }}
+	{{ $name_path := append (slice "type" .data.name) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
@@ -167,7 +167,7 @@
 */}}
 {{ define "render_enum" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice .data.name) .name_path }}
+	{{ $name_path := append (slice "type" .data.name) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
@@ -194,7 +194,7 @@
 */}}
 {{ define "render_table" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice .data.name) .name_path }}
+	{{ $name_path := append (slice "property" .data.name) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
@@ -222,7 +222,7 @@
 */}}
 {{ define "render_function" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice .data.name) .name_path }}
+	{{ $name_path := append (slice "property" .data.name) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
@@ -262,7 +262,7 @@
 */}}
 {{ define "render_field" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice .data.name) .name_path }}
+	{{ $name_path := append (slice "property" .data.name) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
@@ -299,7 +299,7 @@
 	{{- range uniq $words -}}
 		{{- if not ( collections.In $kw . ) -}}
 			{{- if not ( hasPrefix . `"`) -}}
-				{{- $permalink := strings.Replace . "." "-" -}}
+				{{- $permalink := printf "type-%s" (strings.Replace . "." "-") -}}
 				{{- $type_link := printf "[%s](#%s)" . $permalink -}}
 				{{- $typedef = replace $typedef . $type_link -}}
 			{{- end -}}

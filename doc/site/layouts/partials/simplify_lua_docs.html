@@ -28,10 +28,10 @@
         {{- $l1_path := append (slice .name) $name_path_slice -}}
 
         {{- range .members -}}
-            {{ $child_titles = append $child_titles (slice (dict "title" .name "name_path" (delimit (append (slice .name) $l1_path ) "-") )) }}
+            {{ $child_titles = append $child_titles (slice (dict "title" .name "name_path" ( printf "%s-%s" ( cond (collections.In .type (slice "field" "fn" "table") ) "property" "type" ) (delimit (append (slice .name) $l1_path ) "-")) )) }}
         {{- end -}}
 
-        {{- $children = $children | append (dict "title" .name "name_path" (delimit $l1_path "-") "children" $child_titles) -}}
+        {{- $children = $children | append (dict "title" .name "name_path" ( printf "%s-%s" ( cond (collections.In .type (slice "field" "fn" "table") ) "property" "type" ) (delimit $l1_path "-") ) "children" $child_titles) -}}
     {{- end }}
     {{- $entry = merge $entry (dict "children" $children) -}}
 
