@@ -20,7 +20,9 @@
 				
 				<h1>Globals</h1>
 				{{ range sort $data.globals "name" }}
-					{{ template "render_member" (dict "data" . "level" 0 "name_path" (slice)) }}
+					{{ if not ( and .typ ( eq .name .typ ) ) }}
+						{{ template "render_member" (dict "data" . "level" 0 "name_path" (slice)) }}
+					{{ end }}
 				{{ end }}
 
 				<h1>Types</h1>
