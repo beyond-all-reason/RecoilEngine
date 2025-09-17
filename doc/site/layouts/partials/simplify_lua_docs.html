@@ -26,11 +26,11 @@
     {{- range $v }}
         {{ if not ( and .typ ( eq .name .typ ) ) }}
             {{ $child_titles := slice }}
-            {{- $l1_path := append (slice .name) $name_path_slice -}}
+            {{- $l1_path := append (slice ( replace .name "." "-" )) $name_path_slice -}}
 
             {{- range .members -}}
                 {{ if not ( and .typ ( eq .name .typ ) ) }}
-                    {{ $child_titles = append $child_titles (slice (dict "title" .name "name_path" ( printf "%s-%s" ( cond (collections.In .type (slice "field" "fn" "table") ) "property" "type" ) (delimit (append (slice .name) $l1_path ) "-")) )) }}
+                    {{ $child_titles = append $child_titles (slice (dict "title" .name "name_path" ( printf "%s-%s" ( cond (collections.In .type (slice "field" "fn" "table") ) "property" "type" ) (delimit (append (slice ( replace .name "." "-" )) $l1_path ) "-")) )) }}
                 {{ end }}
             {{- end -}}
 

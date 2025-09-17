@@ -114,11 +114,12 @@
 */}}
 {{ define "render_alias"}}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "type" .data.name) .name_path }}
+	{{ $name_path := append (slice "type" ( replace .data.name "." "-" )) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
-		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+		<span id="{{ $name_path_string }}" class="hx-absolute -hx-mt-20"></span>
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{ template "leveled_tag" $level }}
 				<i>alias</i> 
 				<code>{{ template "format_title" . }}</code> is
@@ -135,12 +136,13 @@
 */}}
 {{ define "render_class" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "type" .data.name) .name_path }}
+	{{ $name_path := append (slice "type" ( replace .data.name "." "-" )) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
 		{{ $generics := .generics }}
-		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+		<span id="{{ $name_path_string }}" class="hx-absolute -hx-mt-20"></span>
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			<details>
 				<summary>
 					{{ template "leveled_tag" $level }}
@@ -169,11 +171,12 @@
 */}}
 {{ define "render_enum" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "type" .data.name) .name_path }}
+	{{ $name_path := append (slice "type" ( replace .data.name "." "-" )) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
-		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+		<span id="{{ $name_path_string }}" class="hx-absolute -hx-mt-20"></span>
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			<details>
 				<summary>
 					{{ template "leveled_tag" $level }}
@@ -196,11 +199,12 @@
 */}}
 {{ define "render_table" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "property" .data.name) .name_path }}
+	{{ $name_path := append (slice "property" ( replace .data.name "." "-" )) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
-		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+		<span id="{{ $name_path_string }}" class="hx-absolute -hx-mt-20"></span>
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{/* The ones with children get the details folddown. The ones without don't. */}}
 			<details>
 				<summary>
@@ -224,12 +228,13 @@
 */}}
 {{ define "render_function" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "property" .data.name) .name_path }}
+	{{ $name_path := append (slice "property" ( replace .data.name "." "-" )) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
 		{{ $generics := .generics }}
-		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+		<span id="{{ $name_path_string }}" class="hx-absolute -hx-mt-20"></span>
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			<details>
 				<summary>
 					{{ $paramNames := slice }}
@@ -268,7 +273,8 @@
 	{{ $name_path_string := delimit $name_path "-" }}
 
 	{{ with .data }}
-		<div id="{{ $name_path_string }}" class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
+		<span id="{{ $name_path_string }}" class="hx-absolute -hx-mt-20"></span>
+		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{ template "leveled_tag" $level }}
 				<i class="margin-left-dot8rem">property</i>
 				<code>{{ template "format_title" . }}</code> 
