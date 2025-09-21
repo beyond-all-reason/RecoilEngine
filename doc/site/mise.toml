@@ -5,12 +5,12 @@
 [env]
 	HUGO_VERSION = "0.147.9"
 	LUA_DOC_EXTRACTOR_VERSION = "3" # lua_library lua_check
-	EMMYLUA_DOC_CLI_VERSION = "0.8.2" # lua_library lua_check
+	EMMYLUA_DOC_CLI_VERSION = "rev:9924098" # lua_library lua_check
 	LUA_LANGUAGE_SERVER_VERSION = "3.15.0" # lua_check
 	JQ_VERSION = "1.8.0" # binary_pages
 	7Z_VERSION = "24.09" # binary_pages
 	LUA_DOC_EXTRACTOR_SOURCE_REF = "https://github.com/beyond-all-reason/RecoilEngine/blob/master"
-	RECOIL_LUA_LIBRARY_DIR = "rts/Lua/library"
+	RECOIL_LUA_LIBRARY_DIR = "./rts/Lua/library"
 
 [vars]
 	lua_doc_gen_dest = "$RECOIL_LUA_LIBRARY_DIR/generated"

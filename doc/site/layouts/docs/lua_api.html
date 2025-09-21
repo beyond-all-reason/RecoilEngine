@@ -12,6 +12,7 @@
 	<div class='hx-mx-auto hx-flex {{ partial "utils/page-width" . }}'>
 	{{ partial "sidebar.html" (dict "context" .) }}
 	{{ $data := .Site.Data.doc }}
+	{{ $type_info := (partial "analyze_types.html" $data.types) }}
 
 	<article class="hx-w-full hx-break-words hx-flex hx-min-h-[calc(100vh-var(--navbar-height))] hx-min-w-0 hx-justify-center hx-pb-8 hx-pr-[calc(env(safe-area-inset-right)-1.5rem)]">
 		<main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
@@ -20,14 +21,14 @@
 				
 				<h1>Globals</h1>
 				{{ range sort $data.globals "name" }}
-					{{ if not ( and .typ ( eq .name .typ ) ) }}
-						{{ template "render_member" (dict "data" . "level" 0 "name_path" (slice)) }}
+					{{ if not ( and .typ ( strings.Contains .typ .name ) ) }} {{/* This dumb hack is to try to avoid the duplicate property CMD and type CMD */}}
+						{{ template "render_member" (dict "data" . "level" 0 "name_path" (slice) "type_info" $type_info)}}
 					{{ end }}
 				{{ end }}
 
 				<h1>Types</h1>
 				{{ range sort $data.types "name" }}
-					{{ template "render_member" (dict "data" . "level" 0 "name_path" (slice)) }}
+					{{ template "render_member" (dict "data" . "level" 0 "name_path" (slice) "type_info" $type_info) }}
 				{{ end }}
 			</div>
 			{{ partial "components/last-updated.html" . }}
@@ -46,10 +47,13 @@
   Renders things common to all members, like descriptions.
   params: member : Member
 */}}
-{{ define "render_common" }}
+{{ define "render_common" }} {{/* TODO: THIS needs type info */}}
+  {{ $type_info := .type_info}}
+  {{ with .data }}
 	{{ if .deprecated }} <b>DEPRECATED:</b> {{ .deprecation_reason }} {{ end }}
     {{ if .description }} <p>{{ .description | markdownify }}</p> {{ end }}
-	{{ if .see }} (See: {{ template "process_type" (dict "def" .typ "generics" .generics) }}) {{ end }}
+	{{ if .see }} (See: {{ template "process_type" (dict "def" .typ "generics" .generics "type_info" $type_info) }}) {{ end }}
+  {{ end }}
 {{ end }}
 
 {{/*
@@ -116,6 +120,7 @@
 	{{ $level := .level }}
 	{{ $name_path := append (slice "type" ( replace .data.name "." "-" )) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $type_info := .type_info }}
 
 	{{ with .data }}
 		<span id="{{ $name_path_string }}" class="hx-absolute -hx-mt-20"></span>
@@ -123,9 +128,9 @@
 			{{ template "leveled_tag" $level }}
 				<i>alias</i> 
 				<code>{{ template "format_title" . }}</code> is
-				<code>{{ template "process_type" (dict "def" .typ "generics" .generics) }}</code>
+				<code>{{ template "process_type" (dict "def" .typ "generics" .generics "type_info" $type_info) }}</code>
 				{{ template "permalink" $name_path_string}}
-			{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
+			{{ template "leveled_tag_closer" $level }} {{ template "render_common" (dict "data" . "type_info" $type_info) }}
 		</div>
 	{{end}}
 {{ end }}
@@ -138,6 +143,7 @@
 	{{ $level := .level }}
 	{{ $name_path := append (slice "type" ( replace .data.name "." "-" )) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $type_info := .type_info }}
 
 	{{ with .data }}
 		{{ $generics := .generics }}
@@ -151,14 +157,14 @@
 						{{ if .bases }}
 							 <i>inherits from</i> <code>
 							{{- range .bases -}}
-									{{- template "process_type" (dict "def" . "generics" $generics) -}}
+									{{- template "process_type" (dict "def" . "generics" $generics "type_info" $type_info) -}}
 							{{- end -}}
 						{{ end }}</code>
 						{{ template "permalink" $name_path_string}}
-					{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
+					{{ template "leveled_tag_closer" $level }} {{ template "render_common" (dict "data" . "type_info" $type_info) }}
 				</summary>
 				{{ range sort .members "name" }}
-					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path) }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path "type_info" $type_info) }}
 				{{ end }}
 			</details>
 		</div>
@@ -173,6 +179,7 @@
 	{{ $level := .level }}
 	{{ $name_path := append (slice "type" ( replace .data.name "." "-" )) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $type_info := .type_info }}
 
 	{{ with .data }}
 		<span id="{{ $name_path_string }}" class="hx-absolute -hx-mt-20"></span>
@@ -181,12 +188,12 @@
 				<summary>
 					{{ template "leveled_tag" $level }}
 						<i>enum</i> 
-						<code>{{ template "format_title" . }}</code>{{ if .typ }} <i>is</i> <code>{{ template "process_type" (dict "def" .typ "generics" .generics) }}</code>{{ end }}
+						<code>{{ template "format_title" . }}</code>{{ if .typ }} <i>is</i> <code>{{ template "process_type" (dict "def" .typ "generics" .generics "type_info" $type_info) }}</code>{{ end }}
 						{{ template "permalink" $name_path_string}}
-					{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
+					{{ template "leveled_tag_closer" $level }} {{ template "render_common" (dict "data" . "type_info" $type_info) }}
 				</summary>
 				{{ range sort .members "name" }}
-					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path) }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path "type_info" $type_info) }}
 				{{ end }}
 			</details>
 		</div>
@@ -201,6 +208,7 @@
 	{{ $level := .level }}
 	{{ $name_path := append (slice "property" ( replace .data.name "." "-" )) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $type_info := .type_info }}
 
 	{{ with .data }}
 		<span id="{{ $name_path_string }}" class="hx-absolute -hx-mt-20"></span>
@@ -212,10 +220,10 @@
 						<i>table</i>
 						<code>{{ template "format_title" . }}</code>
 						{{ template "permalink" $name_path_string}}
-					{{ template "leveled_tag_closer" $level }} {{ template "render_common" . }}
+					{{ template "leveled_tag_closer" $level }} {{ template "render_common" (dict "data" . "type_info" $type_info) }}
 				</summary>
 				{{ range sort .members "name" }}
-					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path) }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path "type_info" $type_info) }}
 				{{ end }}
 			</details>
 		</div>
@@ -230,6 +238,7 @@
 	{{ $level := .level }}
 	{{ $name_path := append (slice "property" ( replace .data.name "." "-" )) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $type_info := .type_info }}
 
 	{{ with .data }}
 		{{ $generics := .generics }}
@@ -248,16 +257,16 @@
 				{{ if .params }}
 				<div id="hextra-code-block highlight">
 					<h4>Parameters</h4>
-					{{ range .params }}<code> {{ .name }} : {{ template "process_type" (dict "def" .typ "generics" $generics) }}{{ if .desc }} - {{ .desc }}{{ end }} </code><br>{{ end }}
+					{{ range .params }}<code> {{ .name }} : {{ template "process_type" (dict "def" .typ "generics" $generics "type_info" $type_info) }}{{ if .desc }} - {{ .desc }}{{ end }} </code><br>{{ end }}
 				</div>
 			{{ end }}
 
 			{{ if .returns }}
 				<h4>Returns</h4>
-				{{ range .returns }}<code> {{ .name }} : {{ template "process_type" (dict "def" .typ "generics" $generics) }}{{ if .desc }} - {{ .desc }}{{ end }}</code><br>{{ end }}<br>
+				{{ range .returns }}<code> {{ .name }} : {{ template "process_type" (dict "def" .typ "generics" $generics "type_info" $type_info) }}{{ if .desc }} - {{ .desc }}{{ end }}</code><br>{{ end }}<br>
 			{{ end }}
 
-			{{ template "render_common" . }}
+			{{ template "render_common" (dict "data" . "type_info" $type_info) }}
 			</details>
 		</div>
 	{{ end }}
@@ -271,6 +280,7 @@
 	{{ $level := .level }}
 	{{ $name_path := append (slice "property" .data.name) .name_path }}
 	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $type_info := .type_info }}
 
 	{{ with .data }}
 		<span id="{{ $name_path_string }}" class="hx-absolute -hx-mt-20"></span>
@@ -278,11 +288,11 @@
 			{{ template "leveled_tag" $level }}
 				<i class="margin-left-dot8rem">property</i>
 				<code>{{ template "format_title" . }}</code> 
-				<code>{{- if .typ -}} {{- template "process_type" (dict "def" .typ "generics" .generics) -}}{{- end -}}</code>
+				<code>{{- if .typ -}} {{- template "process_type" (dict "def" .typ "generics" .generics "type_info" $type_info) -}}{{- end -}}</code>
 				{{- if .literal -}}: <code>{{- .literal -}}</code>{{- end -}}
 				{{ template "permalink" $name_path_string}}
 			{{ template "leveled_tag_closer" $level }}
-			{{ template "render_common" . }}
+			{{ template "render_common" (dict "data" . "type_info" $type_info) }}
 		</div>
 	{{ end }}
 {{ end }}
@@ -301,15 +311,17 @@
 	{{- end -}}
 
 	{{- $kw := append (slice "integer" "number" "string" "boolean" "nil" "func" "table" "any") $generics -}}
-	{{- $typedef := .def -}}
-	{{- $words := strings.FindRE `[a-zA-Z\."]+` .def -}}
+	{{- $typedef := (partial "extract_type_name.html" .def) -}}
+	{{- $words := strings.FindRE `[a-zA-Z\."]+` $typedef -}}
+	{{- $type_info := .type_info -}}
 
 	{{- range uniq $words -}}
 		{{- if not ( collections.In $kw . ) -}}
-			{{- if not ( hasPrefix . `"`) -}}
-				{{- $permalink := printf "type-%s" (strings.Replace . "." "-") -}}
-				{{- $type_link := printf "[%s](#%s)" . $permalink -}}
-				{{- $typedef = replace $typedef . $type_link -}}
+			{{- if not ( hasPrefix . `"`) -}} {{/* Hack to filter out strings in unions */}}
+				{{ with $link := (index $type_info .) }}
+					{{- $type_link := printf "[%s](#%s)" . $link -}}
+					{{- $typedef = replace $typedef . $type_link -}}
+				{{ end }}
 			{{- end -}}
 		{{- end -}}
 	{{- end -}}
