@@ -37,8 +37,9 @@ Want to know if recoil is right for your project? [Find out here](articles/choos
 
 The best place to get started is our [getting started](docs/guides/getting-started/) section. There are other sources, though:
 
+- [Forum] Got a question? ask us here!
 - [Spring Wiki] (For information not yet ported to the docs)
-- [Recoil Github Wiki]
+- [Recoil Github Wiki] (for engine dev-related information not yet ported to the docs)
 - [Discord server]
 
 ### Download
@@ -53,7 +54,7 @@ See [Development](development) for guides on how to build and
 develop Recoil.
 
 When contributing to this repository, please first discuss the change you wish
-to make via [GitHub issues], our [Discord server] or any other method with the
+to make via [GitHub issues], our [Forum], our [Discord server], or any other method with the
 owners of this repository before making a change.
 
 ### Thank you to the contributors of Recoil!
@@ -65,3 +66,4 @@ owners of this repository before making a change.
 [Discord server]: https://discord.gg/GUpRg6Wz3e
 [Spring Wiki]: https://springrts.com/wiki/Main_Page
 [Recoil Github Wiki]: {{% param "repo" %}}wiki
+[Forum]: https://github.com/beyond-all-reason/RecoilEngine/discussions/categories/general
