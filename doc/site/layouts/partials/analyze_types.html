@@ -6,10 +6,10 @@ expects data.types
 {{ $result := dict }} {{/* map[name]permalink */}}
 
 {{ range . }}
-    {{ $type := (partial "extract_type_name.html" .type) }}
-    {{ $name := replace .name "." "-" }}
+    {{ $type := .type }}
+    {{ $name := replace (partial "extract_type_name.html" .name) "." "-" }}
     {{ $permalink := printf "%s-%s" $type $name }}
-    {{ $result = merge $result (dict $type $permalink) }}
+    {{ $result = merge $result (dict $name $permalink) }}
 {{ end }}
 
 {{ return $result }}

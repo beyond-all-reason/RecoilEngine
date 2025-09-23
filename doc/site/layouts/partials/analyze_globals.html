@@ -1,0 +1,13 @@
+{{ $result := dict }}
+
+{{ $root_name := .root_name }}
+
+{{ range .data }}
+    {{ $type := .type }}
+    {{ $name := (delimit (slice $root_name "." .name)) "." "-" }}
+    {{ $permalink := printf "%s-%s" $type $name }}
+    {{ $result = merge $result (dict $name $permalink) }}
+    {{ $result = merge $result (partial "analyze_globals.html" (dict "data" .members "root_name" $name))}}
+{{ end }}
+
+{{ return $result }}

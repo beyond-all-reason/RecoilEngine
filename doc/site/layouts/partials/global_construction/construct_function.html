@@ -1,0 +1,34 @@
+{{ $data := .data }}
+{{ $path := .path }} {{/* path appended in construct_member */}}
+
+{{ $fn := (dict 
+    "type" "fn"
+    "name" $data.name
+    "description" $data.description
+    "deprecation_reason" $data.deprecation_reason
+    "loc" $data.loc
+    "method" $data.is_meth
+    "permalink" (printf "fn-%s" (replace (delimit $path "-") "." "-"))
+    )}}
+
+{{ $params := slice }}
+{{ range $data.params }}
+    {{ $params = append $params (dict
+        "name" $data.name
+        "type" (partial "extract_type_name.html" .typ)
+        "desc" $data.desc
+        ) }}
+{{ end }}
+{{ $fn = merge $fn (dict "params" $params) }}
+
+{{ $returns := slice }}
+{{ range $data.returns }}
+    {{ $returns = append $returns (dict
+        "name" $data.name
+        "type" (partial "extract_type_name.html" .typ)
+        "desc" $data.desc
+        ) }}
+{{ end }}
+{{ $fn = merge $fn (dict "returns" $returns) }}
+
+{{ return $fn }}

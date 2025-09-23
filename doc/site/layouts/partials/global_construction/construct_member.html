@@ -1,0 +1,14 @@
+{{ $data := .data }}
+{{ $path := append .data.name .path }}
+
+{{ $res := dict }}
+
+{{ if eq .type "table" }}
+    {{ $res = (partial "global_construction/construct_table.html" (dict "data" $data "path" (append $data.name $path))) }}
+{{ else if eq .type "fn" }}
+    {{ $res = (partial "global_construction/construct_function.html" (dict "data" $data "path" (append $data.name $path))) }}
+{{ else if eq .type "field" }}
+    {{ $res = (partial "global_construction/construct_field.html" (dict "data" $data "path" (append $data.name $path))) }}
+{{ end }}
+
+{{ return $res }}

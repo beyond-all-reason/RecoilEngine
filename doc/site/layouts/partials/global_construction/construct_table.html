@@ -1,0 +1,20 @@
+{{ $data := .data }}
+{{ $path := .path }} {{/* path appended in construct_member */}}
+
+{{ $table := (dict
+    "type" "table"
+    "name" $data.name
+    "description" $data.description
+    "deprecation_reason" $data.deprecation_reason
+    "loc" $data.loc
+    "permalink" (printf "table-%s" (replace (delimit $path "-") "." "-"))
+    ) }}
+
+{{ $members := slice }}
+{{ range .members }}
+    {{ $members := append (partial "global_construction/construct_member.html" (dict "data" . "path" (append $data.name $path)) ) }}
+{{ end }}
+
+{{ $table = merge $table (dict "members" $members) }}
+
+{{ return $table }}

@@ -1,0 +1,15 @@
+{{ $data := .data }}
+{{ $path := .path }} {{/* path appended in construct_member */}}
+
+{{ $field := (dict 
+    "type" "field"
+    "name" $data.name
+    "description" $data.description
+    "deprecation_reason" $data.deprecation_reason
+    "loc" $data.loc
+    "method" $data.is_meth
+    "permalink" (printf "field-%s" (replace (delimit $path "-") "." "-"))
+    "type" (partial "extract_type_name.html" .typ)
+    )}}
+
+{{ return $field }}

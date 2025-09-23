@@ -118,8 +118,7 @@
 */}}
 {{ define "render_alias"}}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "type" ( replace .data.name "." "-" )) .name_path }}
-	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $name_path_string := index .type_info .data.name }}
 	{{ $type_info := .type_info }}
 
 	{{ with .data }}
@@ -141,8 +140,7 @@
 */}}
 {{ define "render_class" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "type" ( replace .data.name "." "-" )) .name_path }}
-	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $name_path_string := index .type_info .data.name }}
 	{{ $type_info := .type_info }}
 
 	{{ with .data }}
@@ -164,7 +162,7 @@
 					{{ template "leveled_tag_closer" $level }} {{ template "render_common" (dict "data" . "type_info" $type_info) }}
 				</summary>
 				{{ range sort .members "name" }}
-					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path "type_info" $type_info) }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1) "type_info" $type_info) }}
 				{{ end }}
 			</details>
 		</div>
@@ -177,8 +175,7 @@
 */}}
 {{ define "render_enum" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "type" ( replace .data.name "." "-" )) .name_path }}
-	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $name_path_string := index .type_info .data.name }}
 	{{ $type_info := .type_info }}
 
 	{{ with .data }}
@@ -193,7 +190,7 @@
 					{{ template "leveled_tag_closer" $level }} {{ template "render_common" (dict "data" . "type_info" $type_info) }}
 				</summary>
 				{{ range sort .members "name" }}
-					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path "type_info" $type_info) }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1) "type_info" $type_info) }}
 				{{ end }}
 			</details>
 		</div>
@@ -206,8 +203,7 @@
 */}}
 {{ define "render_table" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "property" ( replace .data.name "." "-" )) .name_path }}
-	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $name_path_string := index .type_info .data.name }}
 	{{ $type_info := .type_info }}
 
 	{{ with .data }}
@@ -223,7 +219,7 @@
 					{{ template "leveled_tag_closer" $level }} {{ template "render_common" (dict "data" . "type_info" $type_info) }}
 				</summary>
 				{{ range sort .members "name" }}
-					{{ template "render_member" (dict "data" . "level" (add $level 1) "name_path" $name_path "type_info" $type_info) }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1) "type_info" $type_info) }}
 				{{ end }}
 			</details>
 		</div>
@@ -236,8 +232,7 @@
 */}}
 {{ define "render_function" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "property" ( replace .data.name "." "-" )) .name_path }}
-	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $name_path_string := index .type_info .data.name }}
 	{{ $type_info := .type_info }}
 
 	{{ with .data }}
@@ -278,8 +273,7 @@
 */}}
 {{ define "render_field" }}
 	{{ $level := .level }}
-	{{ $name_path := append (slice "property" .data.name) .name_path }}
-	{{ $name_path_string := delimit $name_path "-" }}
+	{{ $name_path_string := index .type_info .data.name }}
 	{{ $type_info := .type_info }}
 
 	{{ with .data }}
@@ -318,7 +312,8 @@
 	{{- range uniq $words -}}
 		{{- if not ( collections.In $kw . ) -}}
 			{{- if not ( hasPrefix . `"`) -}} {{/* Hack to filter out strings in unions */}}
-				{{ with $link := (index $type_info .) }}
+				{{ $link := (index $type_info .) }}
+				{{ if $link }}
 					{{- $type_link := printf "[%s](#%s)" . $link -}}
 					{{- $typedef = replace $typedef . $type_link -}}
 				{{ end }}
