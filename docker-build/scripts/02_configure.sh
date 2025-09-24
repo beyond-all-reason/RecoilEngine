@@ -36,6 +36,7 @@ fi
 
 cd "${BUILD_DIR}"
 cmake \
+    -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="/scripts/${PLATFORM}.cmake" \
     -DMARCH_FLAG="${MYARCHTUNE}" \
     -DCMAKE_CXX_FLAGS="${MYCFLAGS}" \
