@@ -5516,6 +5516,10 @@ int LuaSyncedCtrl::SetProjectileTarget(lua_State* L)
 			lua_pushboolean(L, wpro->GetTargetObject() == nullptr);
 			return 1;
 		} break;
+
+		default: {
+			luaL_error(L, "Incorrect arguments to SetProjectileTarget");
+		} break;
 	}
 
 	return 0;
