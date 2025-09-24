@@ -5,6 +5,7 @@
 #include <tuple>
 #include <variant>
 #include <type_traits>
+#include <memory>
 
 #include "Matrix44f.h"
 #include "Transform.hpp"
@@ -104,41 +105,23 @@ namespace spring {
 	template<typename R, typename... Ts>
 	struct return_type<R& (*)(Ts...)> { using type = R; };
 
-	template<typename R, typename T>
-	struct return_type<R(T::*)() const> { using type = R; };
+	template<typename R, typename T, typename... Ts>
+	struct return_type<R(T::*)(Ts...) const> { using type = R; };
 
-	template<typename R, typename T>
-	struct return_type<R& (T::*)() const> { using type = R; };
+	template<typename R, typename T, typename... Ts>
+	struct return_type<R& (T::*)(Ts...) const> { using type = R; };
 
-	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>(T::*)() const> { using type = R; };
+	template<typename R, typename T, typename... Ts>
+	struct return_type<R(T::* const)(Ts...) const> { using type = R; };
 
-	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>& (T::*)() const> { using type = R; };
+	template<typename R, typename T, typename... Ts>
+	struct return_type<R& (T::* const)(Ts...) const> { using type = R; };
 
-	template<typename R, typename T>
-	struct return_type<R(T::* const)() const> { using type = R; };
+	template<typename R, typename T, typename... Ts>
+	struct return_type<R(T::* const&)(Ts...) const> { using type = R; };
 
-	template<typename R, typename T>
-	struct return_type<R& (T::* const)() const> { using type = R; };
-
-	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>(T::* const)() const> { using type = R; };
-
-	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>& (T::* const)() const> { using type = R; };
-
-	template<typename R, typename T>
-	struct return_type<R(T::* const&)() const> { using type = R; };
-
-	template<typename R, typename T>
-	struct return_type<R& (T::* const&)() const> { using type = R; };
-
-	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>(T::* const&)() const> { using type = R; };
-
-	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>& (T::* const&)() const> { using type = R; };
+	template<typename R, typename T, typename... Ts>
+	struct return_type<R& (T::* const&)(Ts...) const> { using type = R; };
 
 	template<typename T>
 	using return_type_t = typename return_type<T>::type;
