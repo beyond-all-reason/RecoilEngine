@@ -1,14 +1,14 @@
 {{ $data := .data }}
-{{ $path := .path }} {{/* path appended in construct_member */}}
+{{ $path := .path }} {{/* path appended in construct_type */}}
 {{ $type_info := .type_info }}
 
 {{ $t := (partial "extract_type_name.html" .typ)}}
-{{ $field := merge 
-    (partial "construct_common.html" (dict "data" .data "type" "field")) 
+{{ $alias := merge 
+    (partial "construct_common.html" (dict "data" .data "type" "alias")) 
     (dict
         "typ" $t
         "type_permalink" (index $type_info $t)
     )
 }}
 
-{{ return $field }}
+{{ return $alias }}

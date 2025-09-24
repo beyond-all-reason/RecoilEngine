@@ -1,21 +1,16 @@
 {{ $data := .data }}
 {{ $path := .path }} {{/* path appended in construct_member */}}
+{{ $type_info := .type_info }}
 
-{{ $fn := (dict 
-    "type" "fn"
-    "name" $data.name
-    "description" $data.description
-    "deprecation_reason" $data.deprecation_reason
-    "loc" $data.loc
-    "method" $data.is_meth
-    "permalink" (printf "fn-%s" (replace (delimit $path "-") "." "-"))
-    )}}
+{{ $fn := (partial "construct_common.html" (dict "data" .data "type" "fn"))}}
 
 {{ $params := slice }}
 {{ range $data.params }}
+    {{ $t := (partial "extract_type_name.html" .typ)}}
     {{ $params = append $params (dict
         "name" $data.name
-        "type" (partial "extract_type_name.html" .typ)
+        "type" $t
+        "type_permalink" (index $type_info $t)
         "desc" $data.desc
         ) }}
 {{ end }}
@@ -23,9 +18,11 @@
 
 {{ $returns := slice }}
 {{ range $data.returns }}
+    {{ $t := (partial "extract_type_name.html" .typ)}}
     {{ $returns = append $returns (dict
         "name" $data.name
-        "type" (partial "extract_type_name.html" .typ)
+        "type" $t
+        "type_permalink" (index $type_info $t)
         "desc" $data.desc
         ) }}
 {{ end }}

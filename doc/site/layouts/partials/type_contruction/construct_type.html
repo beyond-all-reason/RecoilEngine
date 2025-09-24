@@ -1,0 +1,44 @@
+{{/*
+type: {
+    name: string
+    permalink: string
+    description: string
+    deprecation_reason: string?
+    generics: []string
+    loc: {
+        file: string
+        line: integer
+    }
+    literal: string?
+    path: []string
+    see: string
+}
+enum: type {
+    members: []field
+}
+class: type {
+    inherits: []{
+        name: string
+        type_permalink: string
+    }
+    members: []member
+}
+alias: type {
+    typ: string
+}
+*/}}
+
+{{ $data := .data }}
+{{ $path := append .data.name .path }}
+
+{{ $res := dict }}
+
+{{ if eq $data.type "enum" }}
+    {{ $res = (partial "type_construction/construct_enum.html" (dict "data" $data "path" (append $data.name $path) "type_info" .type_info)) }}
+{{ else if eq $data.type "class" }}
+    {{ $res = (partial "type_construction/construct_class.html" (dict "data" $data "path" (append $data.name $path) "type_info" .type_info)) }}
+{{ else if eq $data.type "alias" }}
+    {{ $res = (partial "type_construction/construct_alias.html" (dict "data" $data "path" (append $data.name $path) "type_info" .type_info)) }}
+{{ end }}
+
+{{ return $res }}

@@ -1,0 +1,8 @@
+{{ return (dict
+    "type" .type
+    "name" .data.name
+    "description" .data.description
+    "deprecation_reason" .data.deprecation_reason
+    "loc" .data.loc
+    "permalink" (printf "%s-%s" .type (replace (delimit $path "-") "." "-"))
+    ) }}

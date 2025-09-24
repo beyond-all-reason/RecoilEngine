@@ -1,0 +1,20 @@
+{{ $data := .data }}
+{{ $path := .path }} {{/* path appended in construct_type */}}
+{{ $type_info := .type_info }}
+
+{{ $class := (partial "construct_common.html" (dict "data" .data "type" "class")) }}
+
+{{ $members := slice }}
+{{ range .members }}
+    {{ $members = append (partial "global_construction/construct_member.html" (dict "data" . "path" (append $data.name $path) "type_info" .type_info) ) }}
+{{ end }}
+
+{{ $t := (partial "extract_type_name.html" .typ)}}
+{{ $bases := slice }}
+{{ range .bases }}
+    {{ $bases = append $bases (dict "name" $t "permalink" (index $type_info $t) ) }}
+{{ end }}
+
+{{ $class = merge $class (dict "members" $members "bases" $bases) }}
+
+{{ return $class }}

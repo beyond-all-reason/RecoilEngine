@@ -1,14 +1,54 @@
+{{/*
+member: {
+    name: string
+    permalink: string
+    description: string
+    deprecation_reason: string?
+    generics: []string
+    loc: {
+        file: string
+        line: integer
+    }
+    literal: string?
+    path: []string
+    see: string
+}
+table: member {
+    type: "table"
+    members: []member
+}
+field: member {
+    type: "field"
+    typ: string
+    type_permalink: string
+}
+func: member {
+    params: []{
+        name: string
+        type: string
+        type_permalink: string
+        desc: string?
+    }
+    returns: []{
+        name: string
+        type: string
+        type_permalink: string
+        desc: string?
+    }
+}
+*/}}
+
 {{ $data := .data }}
 {{ $path := append .data.name .path }}
 
 {{ $res := dict }}
 
-{{ if eq .type "table" }}
-    {{ $res = (partial "global_construction/construct_table.html" (dict "data" $data "path" (append $data.name $path))) }}
-{{ else if eq .type "fn" }}
-    {{ $res = (partial "global_construction/construct_function.html" (dict "data" $data "path" (append $data.name $path))) }}
-{{ else if eq .type "field" }}
-    {{ $res = (partial "global_construction/construct_field.html" (dict "data" $data "path" (append $data.name $path))) }}
+{{ if eq $data.type "table" }}
+    {{ $res = (partial "global_construction/construct_table.html" (dict "data" $data "path" (append $data.name $path) "type_info" .type_info)) }}
+{{ else if eq $data.type "fn" }}
+    {{ $res = (partial "global_construction/construct_function.html" (dict "data" $data "path" (append $data.name $path) "type_info" .type_info)) }}
+{{ else if eq $data.type "field" }}
+    {{ $res = (partial "global_construction/construct_field.html" (dict "data" $data "path" (append $data.name $path) "type_info" .type_info)) }}
 {{ end }}
 
 {{ return $res }}

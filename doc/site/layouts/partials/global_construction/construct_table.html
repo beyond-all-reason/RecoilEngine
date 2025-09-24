@@ -1,18 +1,12 @@
 {{ $data := .data }}
 {{ $path := .path }} {{/* path appended in construct_member */}}
+{{ $type_info := .type_info }}
 
-{{ $table := (dict
-    "type" "table"
-    "name" $data.name
-    "description" $data.description
-    "deprecation_reason" $data.deprecation_reason
-    "loc" $data.loc
-    "permalink" (printf "table-%s" (replace (delimit $path "-") "." "-"))
-    ) }}
+{{ $table := (partial "construct_common.html" (dict "data" .data "type" "table")) }}
 
 {{ $members := slice }}
 {{ range .members }}
-    {{ $members := append (partial "global_construction/construct_member.html" (dict "data" . "path" (append $data.name $path)) ) }}
+    {{ $members = append (partial "global_construction/construct_member.html" (dict "data" . "path" (append $data.name $path) "type_info" .type_info) ) }}
 {{ end }}
 
 {{ $table = merge $table (dict "members" $members) }}
