@@ -2,11 +2,11 @@
 {{ $path := .path }} {{/* path appended in construct_member */}}
 {{ $type_info := .type_info }}
 
-{{ $table := (partial "construct_common.html" (dict "data" .data "type" "table")) }}
+{{ $table := (partial "construct_common.html" (dict "data" .data .path $path "type" "table")) }}
 
 {{ $members := slice }}
-{{ range .members }}
-    {{ $members = append (partial "global_construction/construct_member.html" (dict "data" . "path" (append $data.name $path) "type_info" .type_info) ) }}
+{{ range .data.members }}
+    {{ $members = $members | append (partial "global_construction/construct_member.html" (dict "data" . "path" (append $data.name $path) "type_info" .type_info) ) }}
 {{ end }}
 
 {{ $table = merge $table (dict "members" $members) }}

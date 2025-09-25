@@ -93,7 +93,7 @@ refLinksErrorLevel = "WARNING"
 	[[menu.main]]
 		identifier = "forum"
 		name = "Forum"
-		params.icon = "forum"
+		params.icon = "github"
 		url = "https://github.com/beyond-all-reason/RecoilEngine/discussions/categories/general"
 		weight = 8
 	

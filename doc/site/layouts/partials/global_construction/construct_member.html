@@ -39,16 +39,16 @@ func: member {
 */}}
 
 {{ $data := .data }}
-{{ $path := append .data.name .path }}
+{{ $path := .path | append .data.name }}
 
 {{ $res := dict }}
 
 {{ if eq $data.type "table" }}
-    {{ $res = (partial "global_construction/construct_table.html" (dict "data" $data "path" (append $data.name $path) "type_info" .type_info)) }}
+    {{ $res = (partial "global_construction/construct_table.html" (dict "data" $data "path" $path "type_info" .type_info)) }}
 {{ else if eq $data.type "fn" }}
-    {{ $res = (partial "global_construction/construct_function.html" (dict "data" $data "path" (append $data.name $path) "type_info" .type_info)) }}
+    {{ $res = (partial "global_construction/construct_function.html" (dict "data" $data "path" $path "type_info" .type_info)) }}
 {{ else if eq $data.type "field" }}
-    {{ $res = (partial "global_construction/construct_field.html" (dict "data" $data "path" (append $data.name $path) "type_info" .type_info)) }}
+    {{ $res = (partial "global_construction/construct_field.html" (dict "data" $data "path" $path "type_info" .type_info)) }}
 {{ end }}
 
 {{ return $res }}

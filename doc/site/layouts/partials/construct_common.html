@@ -1,8 +1,15 @@
-{{ return (dict
-    "type" .type
+{{ $res := (dict
+    "type" .data.type
     "name" .data.name
     "description" .data.description
     "deprecation_reason" .data.deprecation_reason
     "loc" .data.loc
-    "permalink" (printf "%s-%s" .type (replace (delimit $path "-") "." "-"))
-    ) }}
+) }}
+
+{{ if .path }}
+    {{ $res = merge $res (dict "permalink" (printf "%s-%s" .data.type (replace (delimit .path "-") "." "-"))) }}
+{{ else }}
+    {{ $res = merge $res (dict "permalink" "") }}
+{{ end }}
+
+{{ return $res }}

@@ -4,7 +4,7 @@
 
 {{ $t := (partial "extract_type_name.html" .typ)}}
 {{ $alias := merge 
-    (partial "construct_common.html" (dict "data" .data "type" "alias")) 
+    (partial "construct_common.html" (dict "data" .data .path $path "type" "alias")) 
     (dict
         "typ" $t
         "type_permalink" (index $type_info $t)

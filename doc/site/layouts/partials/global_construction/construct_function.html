@@ -2,16 +2,16 @@
 {{ $path := .path }} {{/* path appended in construct_member */}}
 {{ $type_info := .type_info }}
 
-{{ $fn := (partial "construct_common.html" (dict "data" .data "type" "fn"))}}
+{{ $fn := (partial "construct_common.html" (dict "data" .data "path" $path "type" "fn"))}}
 
 {{ $params := slice }}
 {{ range $data.params }}
     {{ $t := (partial "extract_type_name.html" .typ)}}
-    {{ $params = append $params (dict
-        "name" $data.name
+    {{ $params = $params | append (dict
+        "name" .name
         "type" $t
         "type_permalink" (index $type_info $t)
-        "desc" $data.desc
+        "desc" .desc
         ) }}
 {{ end }}
 {{ $fn = merge $fn (dict "params" $params) }}
@@ -19,11 +19,11 @@
 {{ $returns := slice }}
 {{ range $data.returns }}
     {{ $t := (partial "extract_type_name.html" .typ)}}
-    {{ $returns = append $returns (dict
-        "name" $data.name
+    {{ $returns = $returns | append (dict
+        "name" .name
         "type" $t
         "type_permalink" (index $type_info $t)
-        "desc" $data.desc
+        "desc" .desc
         ) }}
 {{ end }}
 {{ $fn = merge $fn (dict "returns" $returns) }}
