@@ -22,7 +22,7 @@ CONFIG(int, NetworkTimeout)
 
 CONFIG(int, ReconnectTimeout)
 	.defaultValue(15)
-	.minimumValue(0);
+	.minimumValue(0).description("Time to wait before reconnecting to the server. Required only if client network address changed. Needs to be smaller than 'InitialNetworkTimeout' and 'NetworkTimeout' to trigger. '0' disables the feature.");
 
 CONFIG(int, MaximumTransmissionUnit)
 	.defaultValue(1400)
