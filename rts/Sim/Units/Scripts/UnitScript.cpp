@@ -182,7 +182,7 @@ void CUnitScript::TickAllAnims(int deltaTime)
 
 	// optimize the memory access patterns of the procedure below
 	std::sort(anims.begin(), anims.end(), [](const auto& lhs, const auto& rhs) {
-		return std::tie(lhs.piece, lhs.axis, lhs.animType) < std::tie(rhs.piece, rhs.axis, lhs.animType);
+		return std::tie(lhs.piece, lhs.axis, lhs.animType) < std::tie(rhs.piece, rhs.axis, rhs.animType);
 	});
 
 	// tick-functions; these never change address
@@ -211,6 +211,8 @@ void CUnitScript::TickAllAnims(int deltaTime)
 
 		lmp->UpdatePieceSpaceTransform();
 		lmp->UpdateModelSpaceTransform(lmp->parent);
+		lmp->SetDirtyRaw(false);
+		lmp->SetWasUpdatedRaw(true);
 
 		for (auto* p : lmp->children)
 			bfsQueue.emplace_back(p);

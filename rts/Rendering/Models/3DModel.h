@@ -461,7 +461,7 @@ struct LocalModelPiece
 
 	bool GetEmitDirPos(float3& emitPos, float3& emitDir) const;
 
-
+	void SetDirtyRaw(bool state) { dirty = state; }
 	void SetDirty();
 	bool GetDirty() const { return dirty; }
 	void SetPosOrRot(const float3& src, float3& dst); // anim-script only
@@ -472,6 +472,7 @@ struct LocalModelPiece
 	void SetPositionNoInterpolation(bool noInterpolate) { noInterpolation[1] = noInterpolate; }
 	void SetScalingNoInterpolation (bool noInterpolate) { noInterpolation[2] = noInterpolate; }
 
+	void SetWasUpdatedRaw(bool state = true) { wasUpdated[0] = state; }
 	auto GetWasUpdated() const { return wasUpdated[0] || wasUpdated[1]; }
 	void ResetWasUpdated() const; /*fake*/
 
