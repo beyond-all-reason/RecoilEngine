@@ -68,6 +68,7 @@ CR_REG_METADATA(CUnitScript, (
 CR_BIND(CUnitScript::AnimInfo,)
 
 CR_REG_METADATA_SUB(CUnitScript, AnimInfo,(
+	CR_MEMBER(animType),
 	CR_MEMBER(axis),
 	CR_MEMBER(piece),
 	CR_MEMBER(speed),
@@ -179,31 +180,40 @@ void CUnitScript::TickAllAnims(int deltaTime)
 {
 	ZoneScoped;
 
+	// optimize the memory access patterns of the procedure below
+	std::sort(anims.begin(), anims.end(), [](const auto& lhs, const auto& rhs) {
+		return std::tie(lhs.piece, lhs.axis, lhs.animType) < std::tie(rhs.piece, rhs.axis, lhs.animType);
+	});
+
 	// tick-functions; these never change address
 	static constexpr std::array<TickAnimFunc, ACount> TICK_ANIM_FUNCS = { &CUnitScript::TickTurnAnim, &CUnitScript::TickSpinAnim, &CUnitScript::TickMoveAnim };
 
 	const int tickRate = 1000 / deltaTime;
 
-	for (int animType = ATurn; animType < ACount; animType++) {
-		auto& currAnims = anims[animType];
-		const auto& currFunc = TICK_ANIM_FUNCS[animType];
-		auto& currDoneAnims = doneAnims[animType];
-
-		for (size_t i = 0; i < currAnims.size(); ) {
-			AnimInfo& ai = currAnims[i];
-			LocalModelPiece& lmp = *pieces[ai.piece];
-
-			if ((ai.done |= std::invoke(currFunc, this, tickRate, lmp, ai))) {
-				if (ai.hasWaiting)
-					currDoneAnims.emplace_back(ai);
-
-				ai = std::move(currAnims.back());
-				currAnims.pop_back();
-				continue;
-			}
-
-			++i;
+	for (auto& ai : anims) {
+		LocalModelPiece& lmp = *pieces[ai.piece];
+		const auto& currFunc = TICK_ANIM_FUNCS[ai.animType];
+		if ((ai.done |= std::invoke(currFunc, this, tickRate, lmp, ai))) {
+			if (ai.hasWaiting)
+				doneAnims.emplace_back(ai);
 		}
+	}
+	spring::VectorEraseIf(anims, [](const auto& ai) { return ai.done; });
+
+	std::deque bfsQueue { pieces.front() };
+
+	while (!bfsQueue.empty()) {
+		auto* lmp = bfsQueue.front();
+		bfsQueue.pop_front();
+
+		if (!lmp->GetDirty())
+			continue;
+
+		lmp->UpdatePieceSpaceTransform();
+		lmp->UpdateModelSpaceTransform(lmp->parent);
+
+		for (auto* p : lmp->children)
+			bfsQueue.emplace_back(p);
 	}
 }
 
@@ -221,13 +231,10 @@ bool CUnitScript::TickAnimFinished(int deltaTime)
 	ZoneScoped;
 
 	// Tell listeners to unblock, and remove finished animations from the unit/script.
-	for (int animType = ATurn; animType <= AMove; animType++) {
-		auto& currDoneAnims = doneAnims[animType];
-		for (const auto& ai : currDoneAnims)
-			AnimFinished(static_cast<AnimType>(animType), ai.piece, ai.axis);
+	for (const auto& ai : doneAnims)
+		AnimFinished(ai.animType, ai.piece, ai.axis);
 
-		currDoneAnims.clear();
-	}
+	doneAnims.clear();
 
 	return (HaveAnimations());
 }
@@ -267,15 +274,15 @@ bool CUnitScript::TickSpinAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai)
 CUnitScript::AnimContainerTypeIt CUnitScript::FindAnim(AnimType type, int piece, int axis)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const auto& pred = [&](const AnimInfo& ai) { return (ai.piece == piece && ai.axis == axis); };
-	const auto& iter = std::find_if(anims[type].begin(), anims[type].end(), pred);
+	const auto& pred = [&](const AnimInfo& ai) { return ai.animType == type && ai.piece == piece && ai.axis == axis; };
+	const auto& iter = std::find_if(anims.begin(), anims.end(), pred);
 	return iter;
 }
 
 void CUnitScript::RemoveAnim(AnimType type, const AnimContainerTypeIt& animInfoIt)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (animInfoIt == anims[type].end())
+	if (animInfoIt == anims.end())
 		return;
 
 	AnimInfo& ai = *animInfoIt;
@@ -285,8 +292,8 @@ void CUnitScript::RemoveAnim(AnimType type, const AnimContainerTypeIt& animInfoI
 	if (ai.hasWaiting)
 		AnimFinished(type, ai.piece, ai.axis);
 
-	ai = anims[type].back();
-	anims[type].pop_back();
+	ai = anims.back();
+	anims.pop_back();
 
 	// If this was the last animation, remove from currently animating list
 	// FIXME: this could be done in a cleaner way
@@ -337,29 +344,29 @@ void CUnitScript::AddAnim(AnimType type, int piece, int axis, float speed, float
 		case AMove: {
 			// ensure we never remove an animation of this type
 			overrideType = AMove;
-			animInfoIt = anims[overrideType].end();
+			animInfoIt = anims.end();
 		} break;
 		default: {
 		} break;
 	}
 	assert(overrideType >= 0);
 
-	if (animInfoIt != anims[overrideType].end())
+	if (animInfoIt != anims.end())
 		RemoveAnim(overrideType, animInfoIt);
 
 	// now find an animation of our own type
 	animInfoIt = FindAnim(type, piece, axis);
 
-	if (animInfoIt == anims[type].end()) {
+	if (animInfoIt == anims.end()) {
 		// If we were not animating before, inform the engine of this so it can schedule us
 		// FIXME: this could be done in a cleaner way
 		if (!HaveAnimations())
 			unitScriptEngine->AddInstance(this);
 
-		anims[type].emplace_back();
-		ai = &anims[type].back();
-		ai->piece = piece;
+		ai = &anims.emplace_back();
+		ai->animType = type;
 		ai->axis = axis;
+		ai->piece = piece;
 	} else {
 		ai = &(*animInfoIt);
 	}
@@ -377,7 +384,7 @@ void CUnitScript::Spin(int piece, int axis, float speed, float accel)
 	auto animInfoIt = FindAnim(ASpin, piece, axis);
 
 	// if we are already spinning, we may have to decelerate to the new speed
-	if (animInfoIt != anims[ASpin].end()) {
+	if (animInfoIt != anims.end()) {
 		AnimInfo* ai = &(*animInfoIt);
 		ai->dest = speed;
 
@@ -409,7 +416,7 @@ void CUnitScript::StopSpin(int piece, int axis, float decel)
 	if (decel <= 0.0f) {
 		RemoveAnim(ASpin, animInfoIt);
 	} else {
-		if (animInfoIt == anims[ASpin].end())
+		if (animInfoIt == anims.end())
 			return;
 
 		AnimInfo* ai = &(*animInfoIt);
@@ -754,7 +761,7 @@ bool CUnitScript::NeedsWait(AnimType type, int piece, int axis)
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto animInfoIt = FindAnim(type, piece, axis);
 
-	if (animInfoIt == anims[type].end())
+	if (animInfoIt == anims.end())
 		return false;
 
 	AnimInfo& ai = *animInfoIt;

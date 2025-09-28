@@ -443,6 +443,8 @@ struct LocalModelPiece
 
 
 	// on-demand functions
+	void UpdatePieceSpaceTransform();
+	void UpdateModelSpaceTransform(const LocalModelPiece* parent);
 	void UpdateChildTransformRec(bool updateChildMatrices) const;
 	void UpdateParentMatricesRec() const;
 
@@ -461,6 +463,7 @@ struct LocalModelPiece
 
 
 	void SetDirty();
+	bool GetDirty() const { return dirty; }
 	void SetPosOrRot(const float3& src, float3& dst); // anim-script only
 	void SetPosition(const float3& p) { SetPosOrRot(p, pos); } // anim-script only
 	void SetRotation(const float3& r) { SetPosOrRot(r, rot); } // anim-script only
@@ -492,6 +495,7 @@ struct LocalModelPiece
 
 	const float3& GetDirection() const { return dir; }
 
+	const Transform& GetModelSpaceTransformRaw() const { return modelSpaceTra; }
 	const Transform&  GetModelSpaceTransform() const;
 	const CMatrix44f& GetModelSpaceMatrix()    const;
 

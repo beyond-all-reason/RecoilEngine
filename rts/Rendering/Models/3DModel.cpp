@@ -571,6 +571,21 @@ Transform LocalModelPiece::GetEffectivePrevModelSpaceTransform() const
 	};
 }
 
+void LocalModelPiece::UpdatePieceSpaceTransform()
+{
+	pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, original->scale);
+}
+
+void LocalModelPiece::UpdateModelSpaceTransform(const LocalModelPiece* parent)
+{
+	if (parent)
+		modelSpaceTra = parent->modelSpaceTra * pieceSpaceTra;
+	else
+		modelSpaceTra = pieceSpaceTra;
+
+	modelSpaceMat = modelSpaceTra.ToMatrix();
+}
+
 void LocalModelPiece::UpdateChildTransformRec(bool updateChildTransform) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;

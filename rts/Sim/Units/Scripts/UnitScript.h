@@ -34,6 +34,7 @@ protected:
 
 	struct AnimInfo {
 		CR_DECLARE_STRUCT(AnimInfo)
+		AnimType animType;
 		int axis;
 		int piece;
 		float speed;
@@ -48,8 +49,8 @@ protected:
 
 	typedef bool(CUnitScript::*TickAnimFunc)(int, LocalModelPiece&, AnimInfo&);
 
-	std::array<AnimContainerType, ACount> anims;
-	std::array<AnimContainerType, ACount> doneAnims;
+	AnimContainerType anims;
+	AnimContainerType doneAnims;
 
 	bool hasSetSFXOccupy;
 	bool hasRockUnit;
@@ -146,10 +147,10 @@ public:
 	void SetUnitVal(int val, int param);
 
 	bool IsInAnimation(AnimType type, int piece, int axis) {
-		return (FindAnim(type, piece, axis) != anims[type].end());
+		return (FindAnim(type, piece, axis) != anims.end());
 	}
 	bool HaveAnimations() const {
-		return (!anims[ATurn].empty() || !anims[ASpin].empty() || !anims[AMove].empty());
+		return (!anims.empty());
 	}
 
 	// checks for callin existence
