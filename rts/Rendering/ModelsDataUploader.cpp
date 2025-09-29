@@ -21,7 +21,6 @@
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitDefHandler.h"
 #include "Rendering/GL/VBO.h"
-#include "Rendering/Models/3DModel.h"
 #include "Rendering/Models/ModelsMemStorage.h"
 #include "Rendering/Models/ModelsLock.h"
 #include "Rendering/Units/UnitDrawer.h"

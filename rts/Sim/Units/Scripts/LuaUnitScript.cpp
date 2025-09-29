@@ -24,6 +24,7 @@
 #include "System/ContainerUtil.h"
 #include "System/SafeUtil.h"
 #include "System/StringUtil.h"
+#include "Rendering/Models/3DModelPiece.hpp"
 
 #include "System/Misc/TracyDefs.h"
 

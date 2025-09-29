@@ -27,6 +27,8 @@
 #include "Map/ReadMap.h"
 #include "Rendering/Env/GrassDrawer.h"
 #include "Rendering/Models/IModelParser.h"
+#include "Rendering/Models/3DModel.hpp"
+#include "Rendering/Models/3DModelPiece.hpp"
 #include "Sim/Misc/DamageArrayHandler.h"
 #include "Sim/Misc/SideParser.h"
 #include "Sim/Features/Feature.h"

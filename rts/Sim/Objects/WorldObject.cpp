@@ -1,7 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "WorldObject.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "System/Threading/ThreadPool.h"
 
 #include "System/Misc/TracyDefs.h"

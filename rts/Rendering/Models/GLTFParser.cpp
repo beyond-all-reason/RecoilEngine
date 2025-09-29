@@ -7,7 +7,7 @@
 #include <unordered_map>
 
 #include "GLTFParser.h"
-#include "3DModel.h"
+#include "3DModel.hpp"
 #include "3DModelLog.h"
 #include "ModelUtils.h"
 

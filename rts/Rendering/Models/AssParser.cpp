@@ -1,7 +1,14 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "AssParser.h"
-#include "3DModel.h"
+
+#include <regex>
+#include <algorithm>
+#include <numeric>
+#include <optional>
+
+#include "3DModel.hpp"
+#include "3DModelDefs.hpp"
 #include "3DModelLog.h"
 #include "ModelUtils.h"
 #include "AssIO.h"
@@ -25,10 +32,6 @@
 #include "lib/assimp/include/assimp/postprocess.h"
 #include "lib/assimp/include/assimp/Importer.hpp"
 #include "lib/assimp/include/assimp/DefaultLogger.hpp"
-
-#include <regex>
-#include <algorithm>
-#include <numeric>
 
 #include "System/Misc/TracyDefs.h"
 
@@ -144,17 +147,17 @@ struct SPseudoAssPiece {
 	S3DModelPiece* parent;
 
 	Transform bposeTransform;    /// bind-pose transform, including baked rots
-	Transform bakedTransform;    /// baked local-space rotations
+	std::optional<Transform> bakedTransform;    /// baked local-space rotations
 
 	float3 offset;     /// local (piece-space) offset wrt. parent piece
 	float scale{1.0f}; /// baked uniform scaling factor (assimp-only)
 
-	bool hasBakedTra;
-
 	// copy of S3DModelPiece::SetBakedTransform()
 	void SetBakedTransform(const Transform& tra) {
-		bakedTransform = tra;
-		hasBakedTra = !tra.IsIdentity();
+		if (tra.IsIdentity())
+			bakedTransform = std::nullopt;
+		else
+			bakedTransform = tra;
 	}
 
 	// copy of S3DModelPiece::ComposeTransform(), unused?
@@ -420,7 +423,7 @@ namespace Impl {
 				}
 
 				// vertex tex-coords per channel
-				for (uint32_t uvChanIndex = 0; uvChanIndex < NUM_MODEL_UVCHANNS; uvChanIndex++) {
+				for (uint32_t uvChanIndex = 0; uvChanIndex < SVertexData::NUM_MODEL_UVCHANNS; uvChanIndex++) {
 					if (!mesh->HasTextureCoords(uvChanIndex))
 						break;
 
@@ -892,7 +895,7 @@ void CAssParser::LoadPieceGeometry(SAssPiece* piece, const S3DModel* model, cons
 			}
 
 			// vertex tex-coords per channel
-			for (unsigned int uvChanIndex = 0; uvChanIndex < NUM_MODEL_UVCHANNS; uvChanIndex++) {
+			for (unsigned int uvChanIndex = 0; uvChanIndex < SVertexData::NUM_MODEL_UVCHANNS; uvChanIndex++) {
 				if (!mesh->HasTextureCoords(uvChanIndex))
 					break;
 
@@ -1176,8 +1179,8 @@ Transform SPseudoAssPiece::ComposeTransform(const float3& t, const float3& r, fl
 	Transform tra;
 	tra.t = t;
 
-	if (hasBakedTra)
-		tra *= bakedTransform;
+	if (bakedTransform.has_value())
+		tra *= bakedTransform.value();
 
 	tra *= Transform(CQuaternion::FromEulerYPRNeg(-r), ZeroVector, s);
 	return tra;

@@ -1,12 +1,13 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "3DModelVAO.h"
+#include "3DModelVAO.hpp"
 
 #include <algorithm>
 #include <iterator>
 
-#include "Rendering/Models/3DModel.h"
-#include "Rendering/Models/IModelParser.h"
+#include "3DModel.hpp"
+#include "3DModelPiece.hpp"
+#include "IModelParser.h"
 #include "Rendering/ModelsDataUploader.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"

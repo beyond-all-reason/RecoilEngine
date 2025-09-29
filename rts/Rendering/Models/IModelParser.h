@@ -7,10 +7,11 @@
 #include <string>
 #include <mutex>
 #include <condition_variable>
+#include <future>
 
-#include "3DModel.h"
 #include "System/UnorderedMap.hpp"
 
+struct S3DModel;
 
 class IModelParser
 {

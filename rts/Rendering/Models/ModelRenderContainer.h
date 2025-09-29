@@ -8,7 +8,7 @@
 #include <array>
 #include <vector>
 
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModelDefs.hpp"
 #include "System/ContainerUtil.h"
 
 template<typename TObject>

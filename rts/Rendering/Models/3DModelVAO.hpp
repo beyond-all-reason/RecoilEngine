@@ -3,7 +3,7 @@
 
 #include <memory>
 
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/VertexData.hpp"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/VBO.h"
 #include "Rendering/GL/VAO.h"

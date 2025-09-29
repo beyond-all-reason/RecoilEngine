@@ -8,6 +8,7 @@
 #include "Game/GlobalUnsynced.h"
 #include "Map/Ground.h"
 #include "Map/MapInfo.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Rendering/Env/Particles/Classes/BubbleProjectile.h"
 #include "Rendering/Env/Particles/Classes/GeoThermSmokeProjectile.h"
 #include "Rendering/Env/Particles/Classes/SmokeProjectile.h"

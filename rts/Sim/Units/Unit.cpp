@@ -32,6 +32,7 @@
 
 #include "Rendering/GroundFlash.h"
 #include "Rendering/Units/UnitDrawer.h"
+#include "Rendering/Models/3DModel.hpp"
 
 #include "Game/UI/Groups/Group.h"
 #include "Game/UI/Groups/GroupHandler.h"

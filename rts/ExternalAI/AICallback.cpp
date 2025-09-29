@@ -21,7 +21,6 @@
 #include "Map/ReadMap.h"
 #include "Rendering/DebugDrawerAI.h"
 #include "Rendering/LineDrawer.h"
-#include "Rendering/Models/3DModel.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/Units/UnitDrawerData.h"
 #include "Sim/Features/Feature.h"

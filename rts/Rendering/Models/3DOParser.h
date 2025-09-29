@@ -6,13 +6,13 @@
 #include <vector>
 #include <string>
 
-#include "3DModel.h"
+#include "3DModelPiece.hpp"
 #include "IModelParser.h"
 
 #include "Rendering/Textures/3DOTextureHandler.h"
 #include "System/float3.h"
 #include "System/UnorderedSet.hpp"
-
+#include "System/Threading/SpringThreading.h"
 
 namespace TA3DO {
 	typedef struct _3DObject

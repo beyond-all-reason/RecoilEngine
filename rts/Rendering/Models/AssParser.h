@@ -5,11 +5,12 @@
 
 #include <vector>
 
-#include "3DModel.h"
+#include "3DModelPiece.hpp"
 #include "IModelParser.h"
 #include "System/float3.h"
 #include "System/type2.h"
 #include "System/UnorderedMap.hpp"
+#include "System/Threading/SpringThreading.h"
 
 
 struct aiNode;

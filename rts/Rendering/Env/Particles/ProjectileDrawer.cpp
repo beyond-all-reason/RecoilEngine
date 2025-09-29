@@ -19,6 +19,7 @@
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/SubState.h"
 #include "Rendering/GL/RenderBuffers.h"
+#include "Rendering/Models/3DModelPiece.hpp"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Textures/ColorMap.h"
 #include "Rendering/Textures/TextureAtlas.h"

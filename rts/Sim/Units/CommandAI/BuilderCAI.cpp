@@ -30,6 +30,7 @@
 #include "System/Exceptions.h"
 #include "System/Log/ILog.h"
 #include "System/creg/STL_Map.h"
+#include "Rendering/Models/3DModel.hpp"
 
 #include "System/Misc/TracyDefs.h"
 

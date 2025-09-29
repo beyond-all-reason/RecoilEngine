@@ -3,6 +3,7 @@
 #include "SolidObjectDef.h"
 #include "Lua/LuaParser.h"
 #include "Rendering/Models/IModelParser.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Sim/Misc/CollisionVolume.h"
 #include "System/EventHandler.h"
 #include "System/Log/ILog.h"

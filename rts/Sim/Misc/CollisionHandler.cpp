@@ -3,7 +3,6 @@
 #include "CollisionHandler.h"
 #include "CollisionVolume.h"
 #include "Map/ReadMap.h" // mapDims
-#include "Rendering/Models/3DModel.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Objects/SolidObject.h"

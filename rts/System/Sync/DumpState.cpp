@@ -16,7 +16,8 @@
 #include "Game/GlobalUnsynced.h"
 #include "Game/GameVersion.h"
 #include "Net/GameServer.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModel.hpp"
+#include "Rendering/Models/3DModelPiece.hpp"
 #include "Rendering/Models/IModelParser.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureDef.h"
@@ -296,9 +297,12 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 				file << "\t\t\tbposeTransform(t): " << TapFloats(p->bposeTransform.t);
 				file << "\t\t\tbposeTransform(r): " << TapFloats(float4{ p->bposeTransform.r.x, p->bposeTransform.r.y, p->bposeTransform.r.z, p->bposeTransform.r.r });
 				file << "\t\t\tbposeTransform(s): " << TapFloats(p->bposeTransform.s);
-				file << "\t\t\tbakedTransform(t): " << TapFloats(p->bakedTransform.t);
-				file << "\t\t\tbakedTransform(r): " << TapFloats(float4{ p->bakedTransform.r.x, p->bakedTransform.r.y, p->bakedTransform.r.z, p->bakedTransform.r.r });
-				file << "\t\t\tbakedTransform(s): " << TapFloats(p->bakedTransform.s);
+				if (p->HasBackedTra()) {
+					const auto bakedTransform = p->bakedTransform.value();
+					file << "\t\t\tbakedTransform(t): " << TapFloats(bakedTransform.t);
+					file << "\t\t\tbakedTransform(r): " << TapFloats(float4{ bakedTransform.r.x, bakedTransform.r.y, bakedTransform.r.z, bakedTransform.r.r });
+					file << "\t\t\tbakedTransform(s): " << TapFloats(bakedTransform.s);
+				}
 				file << "\t\t\toffset: " << TapFloats(p->offset);
 				file << "\t\t\tgoffset: " << TapFloats(p->goffset);
 				file << "\t\t\tscales: " << TapFloats(p->scale);

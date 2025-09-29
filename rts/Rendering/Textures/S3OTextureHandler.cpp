@@ -8,7 +8,7 @@
 #include "System/FileSystem/SimpleParser.h"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Units/UnitDrawer.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Rendering/Models/ModelsLock.h"
 #include "Rendering/Textures/Bitmap.h"
 #include "System/StringUtil.h"

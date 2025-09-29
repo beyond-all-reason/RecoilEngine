@@ -22,6 +22,7 @@
 #include "Sim/Units/Scripts/UnitScript.h"
 #include "Sim/Weapons/Weapon.h"
 #include "Sim/Weapons/WeaponDef.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "System/Log/ILog.h"
 #include "System/EventHandler.h"
 #include "System/SpringMath.h"

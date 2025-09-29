@@ -11,6 +11,7 @@
 #include "System/SafeUtil.h"
 #include "Rendering/GL/VBO.h"
 #include "Rendering/GL/VAO.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "LuaVBOImpl.h"
 
 #include "LuaUtils.h"

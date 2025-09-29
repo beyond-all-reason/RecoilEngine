@@ -56,7 +56,6 @@
 #include "Rendering/GL/myGL.h"
 #include "Rendering/CommandDrawer.h"
 #include "Rendering/IconHandler.h"
-#include "Rendering/Models/3DModel.h"
 #include "Rendering/Models/IModelParser.h"
 #include "Rendering/Features/FeatureDrawer.h"
 #include "Rendering/Units/UnitDrawer.h"

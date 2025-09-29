@@ -17,6 +17,7 @@
 #include "Rendering/GL/glxHandler.h"
 #include "Rendering/UniformConstants.h"
 #include "Rendering/Fonts/glFont.h"
+#include "Rendering/Models/ModelsMemStorage.h"
 #include "System/EventHandler.h"
 #include "System/type2.h"
 #include "System/TimeProfiler.h"

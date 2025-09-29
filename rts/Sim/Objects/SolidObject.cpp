@@ -1,3 +1,13 @@
+#include "SolidObject.h"
+#include "SolidObject.h"
+#include "SolidObject.h"
+#include "SolidObject.h"
+#include "SolidObject.h"
+#include "SolidObject.h"
+#include "SolidObject.h"
+#include "SolidObject.h"
+#include "SolidObject.h"
+#include "SolidObject.h"
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 
@@ -305,6 +315,11 @@ YardMapStatus CSolidObject::GetGroundBlockingMaskAtPos(float3 gpos) const
 	return blockMap[bx + by*footprint.x];
 }
 
+
+// unsynced mid-{position,vector}s
+float3 CSolidObject::GetMdlDrawMidPos() const { return (GetObjectSpaceDrawPos(WORLD_TO_OBJECT_SPACE * localModel.GetRelMidPos())); }
+float3 CSolidObject::GetObjDrawMidPos() const { return (GetObjectSpaceDrawPos(WORLD_TO_OBJECT_SPACE * relMidPos                )); }
+
 int2 CSolidObject::GetMapPosStatic(const float3& position, int xsize, int zsize)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -474,7 +489,20 @@ void CSolidObject::Kill(CUnit* killer, const float3& impulse, bool crushed)
 	DoDamage(DamageArray(health + 1.0f), impulse, killer, crushed? -DAMAGE_EXTSOURCE_CRUSHED: -DAMAGE_EXTSOURCE_KILLED, -1);
 }
 
+const CollisionVolume* CSolidObject::GetCollisionVolume(const LocalModelPiece* lmp) const {
+	if (lmp == nullptr)
+		return &collisionVolume;
+	if (!collisionVolume.DefaultToPieceTree())
+		return &collisionVolume;
 
+	return (lmp->GetCollisionVolume());
+}
+
+      LuaObjectMaterialData* CSolidObject::GetLuaMaterialData()       { return (localModel.GetLuaMaterialData()); }
+const LuaObjectMaterialData* CSolidObject::GetLuaMaterialData() const { return (localModel.GetLuaMaterialData()); }
+
+
+float CSolidObject::GetDrawRadius() const { return localModel.GetDrawRadius(); }
 
 float CSolidObject::CalcFootPrintMinExteriorRadius(float scale) const { return ((math::sqrt((xsize * xsize + zsize * zsize)) * 0.5f * SQUARE_SIZE) * scale); }
 float CSolidObject::CalcFootPrintMaxInteriorRadius(float scale) const { return ((std::max(xsize, zsize) * 0.5f * SQUARE_SIZE) * scale); }

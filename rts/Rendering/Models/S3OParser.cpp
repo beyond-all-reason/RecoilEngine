@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "S3OParser.h"
+#include "3DModel.hpp"
 #include "ModelUtils.h"
 #include "s3o.h"
 #include "Game/GlobalUnsynced.h"

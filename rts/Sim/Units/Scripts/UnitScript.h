@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/LocalModelPiece.hpp"
 #include "System/creg/creg_cond.h"
 
 

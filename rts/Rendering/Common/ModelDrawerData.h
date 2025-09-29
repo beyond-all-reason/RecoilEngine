@@ -15,7 +15,7 @@
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Models/ModelsMemStorage.h"
 #include "Rendering/Models/ModelRenderContainer.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Rendering/Env/IWater.h"
 #include "Map/ReadMap.h"
 #include "Game/Camera.h"

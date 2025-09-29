@@ -6,6 +6,7 @@
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/Team.h"
 #include "Sim/Objects/SolidObject.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Textures/3DOTextureHandler.h"
 #include "Rendering/Env/CubeMapHandler.h"

@@ -9,7 +9,6 @@
 #include "Map/Ground.h"
 #include "Map/MapDamage.h"
 #include "Map/ReadMap.h"
-#include "Rendering/Models/3DModel.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Misc/BuildingMaskMap.h"

@@ -10,7 +10,6 @@
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/SubState.h"
-#include "Rendering/Models/3DModel.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/QuadField.h"

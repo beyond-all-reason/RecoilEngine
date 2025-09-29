@@ -4,9 +4,11 @@
 #include <optional>
 #include <string>
 
-#include "3DModel.h"
+#include "VertexData.hpp"
 
 class LuaTable;
+struct S3DModel;
+struct S3DModelPiece;
 
 namespace Skinning {
 	struct SkinnedMesh {
