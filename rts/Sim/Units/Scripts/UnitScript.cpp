@@ -202,8 +202,7 @@ void CUnitScript::TickAllAnims(int deltaTime)
 	}
 	spring::VectorEraseIf(anims, [](const auto& ai) { return ai.done; });
 
-	std::deque<LocalModelPiece*> bfsQueue;
-	bfsQueue.emplace_back(pieces.front());
+	std::deque bfsQueue { pieces.front() };
 
 	while (!bfsQueue.empty()) {
 		auto* lmp = bfsQueue.front();
@@ -228,9 +227,10 @@ void CUnitScript::TickAllAnims(int deltaTime)
 		This is not multi threaded as it guarantees that AnimFinished will be called in consistent order for
 		all anims for all participants of the simulation, and guarantees that the order of the animating
 		vector in CUnitScriptEngine::Tick is preserved.
+* @param deltaTime int delta time to update
 * @return true if there are still active animations
 */
-bool CUnitScript::TickAnimFinished()
+bool CUnitScript::TickAnimFinished(int deltaTime)
 {
 	ZoneScoped;
 
@@ -240,7 +240,7 @@ bool CUnitScript::TickAnimFinished()
 
 	doneAnims.clear();
 
-	return HaveAnimations();
+	return (HaveAnimations());
 }
 
 bool CUnitScript::TickMoveAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai)

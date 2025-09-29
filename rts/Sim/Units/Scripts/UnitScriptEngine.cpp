@@ -140,20 +140,18 @@ void CUnitScriptEngine::Tick(int deltaTime)
 	}
 	{
 		ZoneScopedN("CUnitScriptEngine::Tick(ST)");
-
-		for (size_t i = 0; i < animating.size(); /*NO-OP*/) {
+		for (size_t i = 0; i < animating.size(); ) {
 			currentScript = animating[i];
 
-			if (!currentScript->TickAnimFinished()) {
+			if (!currentScript->TickAnimFinished(deltaTime)) {
 				animating[i] = animating.back();
 				animating.pop_back();
 				continue;
 			}
 			i++;
 		}
-
-		currentScript = nullptr;
 	}
 
+	currentScript = nullptr;
 	cobEngine->RunDeferredCallins();
 }
