@@ -84,10 +84,11 @@ static inline LocalModelPiece* ParseLocalModelPiece(lua_State* L, CUnitScript* s
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int piece = luaL_checkint(L, 1) - 1;
 
-	if (!script->PieceExists(piece))
+	auto* p = script->SafeGetPiece(piece);
+	if (!p)
 		luaL_error(L, "%s(): Invalid piecenumber", caller);
 
-	return (script->GetScriptLocalModelPiece(piece));
+	return p;
 }
 
 static inline int ToLua(lua_State* L, const float3& v)
@@ -1468,6 +1469,28 @@ int CLuaUnitScript::Move(lua_State* L)
 		activeScript->MoveNow(piece, axis, dest);
 	} else {
 		activeScript->Move(piece, axis, speed, dest);
+	}
+
+	return 0;
+}
+
+int CLuaUnitScript::Scale(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// void Scale(int piece, int speed, int destination);
+	// void ScaleNow(int piece, int destination);
+	if (activeScript == nullptr)
+		return 0;
+
+	const int piece = luaL_checkint(L, 1) - 1;
+	const float dest = luaL_checkfloat(L, 2);
+	const float speed = luaL_optfloat(L, 3, 0.0f); // speed == 0 -> MoveNow
+
+	if (speed == 0.0f) {
+		activeScript->ScaleNow(piece, dest);
+	}
+	else {
+		activeScript->Scale(piece, speed, dest);
 	}
 
 	return 0;

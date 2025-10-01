@@ -7,8 +7,22 @@
 
 CR_BIND(LocalModelPiece, )
 CR_REG_METADATA(LocalModelPiece, (
+	CR_MEMBER(pos),
+	CR_MEMBER(rot),
+	CR_MEMBER(scale),
 	CR_MEMBER(dir),
+
+	CR_MEMBER(prevModelSpaceTra),
+	CR_MEMBER(pieceSpaceTra),
+	CR_MEMBER(modelSpaceTra),
+	CR_MEMBER(modelSpaceMat),
+
 	CR_MEMBER(colvol),
+
+	CR_MEMBER(wasUpdated),
+	CR_MEMBER(noInterpolation),
+	CR_MEMBER(dirty),
+
 	CR_MEMBER(scriptSetVisible),
 	CR_MEMBER(lmodelPieceIndex),
 	CR_MEMBER(scriptPieceIndex),
@@ -18,9 +32,6 @@ CR_REG_METADATA(LocalModelPiece, (
 
 	// reload
 	CR_IGNORED(original),
-
-	CR_MEMBER(modelSpaceMat),
-
 	CR_IGNORED(lodDispLists) //FIXME GL idx!
 ))
 
@@ -47,8 +58,9 @@ LocalModelPiece::LocalModelPiece(const S3DModelPiece* piece)
 
 	pos = piece->offset;
 	dir = piece->GetEmitDir();
+	scale = original->scale;
 
-	pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, original->scale);
+	pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, scale);
 	prevModelSpaceTra = Transform{ };
 
 	children.reserve(piece->children.size());
@@ -65,11 +77,27 @@ void LocalModelPiece::SetDirty() {
 	}
 }
 
-void LocalModelPiece::SetPosOrRot(const float3& src, float3& dst) {
+void LocalModelPiece::SetFloat3(const float3& src, float3& dst) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (blockScriptAnims)
 		return;
+
 	if (!dirty && !dst.same(src)) {
+		SetDirty();
+		assert(localModel);
+		localModel->SetBoundariesNeedsRecalc();
+	}
+
+	dst = src;
+}
+
+void LocalModelPiece::SetFloat(const float& src, float& dst)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (blockScriptAnims)
+		return;
+
+	if (!dirty && !(dst == src)) {
 		SetDirty();
 		assert(localModel);
 		localModel->SetBoundariesNeedsRecalc();
@@ -141,7 +169,7 @@ Transform LocalModelPiece::GetEffectivePrevModelSpaceTransform() const
 
 void LocalModelPiece::UpdatePieceSpaceTransform()
 {
-	pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, original->scale);
+	pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, scale);
 }
 
 void LocalModelPiece::UpdateModelSpaceTransform(const LocalModelPiece* parent)
@@ -163,7 +191,7 @@ void LocalModelPiece::UpdateChildTransformRec(bool updateChildTransform) const
 		wasUpdated[0] = true;  //update for current frame
 		updateChildTransform = true;
 
-		pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, original->scale);
+		pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, scale);
 	}
 
 	if (updateChildTransform) {
@@ -189,7 +217,7 @@ void LocalModelPiece::UpdateParentMatricesRec() const
 	dirty = false;
 	wasUpdated[0] = true;  //update for current frame
 
-	pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, original->scale);
+	pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, scale);
 
 	if (parent != nullptr)
 		modelSpaceTra = parent->modelSpaceTra * pieceSpaceTra;

@@ -18,10 +18,13 @@ static constexpr int TURN_NOW   = 0x1000C000;
 static constexpr int SHADE      = 0x1000D000;
 static constexpr int DONT_SHADE = 0x1000E000;
 static constexpr int EMIT_SFX   = 0x1000F000;
+static constexpr int SCALE     = 0x100A0000; // Added in Recoil
+static constexpr int SCALE_NOW = 0x100A1000; // Added in Recoil
 
 // Blocking operations
 static constexpr int WAIT_TURN  = 0x10011000;
 static constexpr int WAIT_MOVE  = 0x10012000;
+static constexpr int WAIT_SCALE = 0x100A2000; // Added in Recoil
 static constexpr int SLEEP      = 0x10013000;
 
 // Stack manipulation

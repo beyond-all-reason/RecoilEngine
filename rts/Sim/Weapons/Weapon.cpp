@@ -244,8 +244,8 @@ void CWeapon::UpdateWeaponPieces(const bool updateAimFrom)
 		aimFromPiece = owner->script->AimFromWeapon(weaponNum);
 
 	// some scripts only implement one of these
-	const bool aimExists = owner->script->PieceExists(aimFromPiece);
-	const bool muzExists = owner->script->PieceExists(muzzlePiece);
+	const bool aimExists = owner->script->SafeGetPiece(aimFromPiece) != nullptr;
+	const bool muzExists = owner->script->SafeGetPiece(muzzlePiece)  != nullptr;
 
 	if (aimExists && muzExists)
 		return; // everything fine

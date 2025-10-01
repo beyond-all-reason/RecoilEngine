@@ -59,9 +59,11 @@ struct LocalModelPiece
 	void SetDirtyRaw(bool state) { dirty = state; }
 	void SetDirty();
 	bool GetDirty() const { return dirty; }
-	void SetPosOrRot(const float3& src, float3& dst); // anim-script only
-	void SetPosition(const float3& p) { SetPosOrRot(p, pos); } // anim-script only
-	void SetRotation(const float3& r) { SetPosOrRot(r, rot); } // anim-script only
+	void SetFloat3(const float3& src, float3& dst); // anim-script only
+	void SetFloat(const float& src, float& dst); // anim-script only
+	void SetPosition(const float3& p) { SetFloat3(p, pos); } // anim-script only
+	void SetRotation(const float3& r) { SetFloat3(r, rot); } // anim-script only
+	void SetScaling(const float& s) { SetFloat(s, scale); }    // anim-script only
 
 	void SetRotationNoInterpolation(bool noInterpolate) { noInterpolation[0] = noInterpolate; }
 	void SetPositionNoInterpolation(bool noInterpolate) { noInterpolation[1] = noInterpolate; }
@@ -75,6 +77,7 @@ struct LocalModelPiece
 
 	const float3& GetPosition() const { return pos; }
 	const float3& GetRotation() const { return rot; }
+	const float&  GetScaling() const { return scale; }
 
 	const float3& GetDirection() const { return dir; }
 
@@ -91,12 +94,12 @@ struct LocalModelPiece
 	void SavePrevModelSpaceTransform();
 	Transform GetEffectivePrevModelSpaceTransform() const;
 private:
-	Transform prevModelSpaceTra;
-
 	float3 pos;      // translation relative to parent LMP, *INITIALLY* equal to original->offset
 	float3 rot;      // orientation relative to parent LMP, in radians (updated by scripts)
+	float scale;     // uniform scaling
 	float3 dir;      // cached copy of original->GetEmitDir()
 
+	Transform prevModelSpaceTra;
 	mutable Transform pieceSpaceTra;  // transform relative to parent LMP (SYNCED), combines <pos> and <rot>
 	mutable Transform modelSpaceTra;  // transform relative to root LMP (SYNCED), chained pieceSpaceMat's
 	mutable CMatrix44f modelSpaceMat; // same as above, except matrix

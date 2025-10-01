@@ -53,7 +53,7 @@ public:
 	CCobThread& operator = (CCobThread&& t);
 	CCobThread& operator = (const CCobThread& t);
 
-	enum State {Init, Sleep, Run, Dead, WaitTurn, WaitMove};
+	enum State {Init, Sleep, Run, Dead, WaitTurn, WaitMove, WaitScale};
 
 	/**
 	 * Returns false if this thread is dead and needs to be killed.

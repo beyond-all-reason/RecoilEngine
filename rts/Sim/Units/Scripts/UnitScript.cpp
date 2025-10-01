@@ -147,6 +147,20 @@ bool CUnitScript::TurnToward(float& cur, float dest, float speed)
 	return false;
 }
 
+// copy of MoveToward for now
+bool CUnitScript::ScaleToward(float& cur, float dest, float speed)
+{
+	const float delta = dest - cur;
+
+	if (math::fabsf(delta) <= speed) {
+		cur = dest;
+		return true;
+	}
+
+	cur += (speed * Sign(delta));
+	return false;
+}
+
 
 /**
  * @brief Updates spin animations
@@ -188,14 +202,14 @@ void CUnitScript::TickAllAnims(int deltaTime)
 	});
 
 	// tick-functions; these never change address
-	static constexpr std::array<TickAnimFunc, ACount> TICK_ANIM_FUNCS = { &CUnitScript::TickTurnAnim, &CUnitScript::TickSpinAnim, &CUnitScript::TickMoveAnim };
+	static constexpr std::array<TickAnimFunc, ACount> TICK_ANIM_FUNCS = { &CUnitScript::TickTurnAnim, &CUnitScript::TickSpinAnim, &CUnitScript::TickMoveAnim, &CUnitScript::TickScaleAnim };
 
 	const int tickRate = 1000 / deltaTime;
 
 	for (auto& ai : anims) {
 		LocalModelPiece& lmp = *pieces[ai.piece];
 		const auto& currFunc = TICK_ANIM_FUNCS[ai.animType];
-		if ((ai.done |= std::invoke(currFunc, this, tickRate, lmp, ai))) {
+		if (ai.done |= std::invoke(currFunc, this, tickRate, lmp, ai)) {
 			if (ai.hasWaiting)
 				doneAnims.emplace_back(ai);
 		}
@@ -275,6 +289,16 @@ bool CUnitScript::TickSpinAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai)
 	return ret;
 }
 
+bool CUnitScript::TickScaleAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai)
+{
+	auto scale = lmp.GetScaling();
+	const bool ret = ScaleToward(scale, ai.dest, ai.speed / tickRate);
+	lmp.SetScaling(scale);
+	lmp.SetScalingNoInterpolation(false);
+
+	return ret;
+}
+
 CUnitScript::AnimContainerTypeIt CUnitScript::FindAnim(AnimType type, int piece, int axis)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -314,7 +338,8 @@ void CUnitScript::RemoveAnim(AnimType type, const AnimContainerTypeIt& animInfoI
 void CUnitScript::AddAnim(AnimType type, int piece, int axis, float speed, float dest, float accel)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
 		ShowUnitScriptError("[US::AddAnim] invalid script piece index");
 		return;
 	}
@@ -322,7 +347,7 @@ void CUnitScript::AddAnim(AnimType type, int piece, int axis, float speed, float
 	float destf = 0.0f;
 
 	if (type == AMove) {
-		destf = pieces[piece]->original->offset[axis] + dest;
+		destf = p->original->offset[axis] + dest;
 	} else {
 		// clamp destination (angle) for turn-anims
 		destf = mix(dest, ClampRad(dest), type == ATurn);
@@ -348,6 +373,11 @@ void CUnitScript::AddAnim(AnimType type, int piece, int axis, float speed, float
 		case AMove: {
 			// ensure we never remove an animation of this type
 			overrideType = AMove;
+			animInfoIt = anims.end();
+		} break;
+		case AScale: {
+			// ensure we never remove an animation of this type
+			overrideType = AScale;
 			animInfoIt = anims.end();
 		} break;
 		default: {
@@ -443,21 +473,29 @@ void CUnitScript::Move(int piece, int axis, float speed, float destination)
 	AddAnim(AMove, piece, axis, math::fabs(speed), destination, 0);
 }
 
+void CUnitScript::Scale(int piece, float speed, float destination)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	AddAnim(AScale, piece, -1, math::fabs(speed), destination, 0);
+}
 
 void CUnitScript::MoveNow(int piece, int axis, float destination)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
 		ShowUnitScriptError("[US::MoveNow] invalid script piece index");
 		return;
 	}
 
-	LocalModelPiece* p = pieces[piece];
-
 	float3 pos = p->GetPosition();
 	float3 ofs = p->original->offset;
 
-	pos[axis] = ofs[axis] + destination;
+	const float newValue = ofs[axis] + destination;
+	if (pos[axis] == newValue)
+		return;
+
+	pos[axis] = newValue;
 
 	p->SetPosition(pos);
 	p->SetPositionNoInterpolation(true);
@@ -467,31 +505,51 @@ void CUnitScript::MoveNow(int piece, int axis, float destination)
 void CUnitScript::TurnNow(int piece, int axis, float destination)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
 		ShowUnitScriptError("[US::TurnNow] invalid script piece index");
 		return;
 	}
 	destination = ClampRad(destination);
 
-	LocalModelPiece* p = pieces[piece];
-
 	float3 rot = p->GetRotation();
+
+	if (rot[axis] == destination)
+		return;
+
 	rot[axis] = destination;
 
 	p->SetRotation(rot);
 	p->SetRotationNoInterpolation(true);
 }
 
+void CUnitScript::ScaleNow(int piece, float destination)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
+		ShowUnitScriptError("[US::TurnNow] invalid script piece index");
+		return;
+	}
+
+	if (p->GetScaling() == destination)
+		return;
+
+	p->SetScaling(destination);
+	p->SetScalingNoInterpolation(true);
+}
+
 
 void CUnitScript::SetVisibility(int piece, bool visible)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
 		ShowUnitScriptError("[US::SetVisibility] invalid script piece index");
 		return;
 	}
 
-	pieces[piece]->SetScriptVisible(visible);
+	p->SetScriptVisible(visible);
 }
 
 
@@ -499,7 +557,8 @@ bool CUnitScript::EmitSfx(int sfxType, int sfxPiece)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 #ifndef _CONSOLE
-	if (!PieceExists(sfxPiece)) {
+	auto* p = SafeGetPiece(sfxPiece);
+	if (!p) {
 		ShowUnitScriptError("[US::EmitSFX] invalid script piece index");
 		return false;
 	}
@@ -729,7 +788,7 @@ void CUnitScript::AttachUnit(int piece, int u)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// -1 is valid, indicates that the unit should be hidden
-	if ((piece >= 0) && (!PieceExists(piece))) {
+	if ((piece >= 0) && (!SafeGetPiece(piece))) {
 		ShowUnitScriptError("[US::AttachUnit] invalid script piece index");
 		return;
 	}
@@ -792,7 +851,8 @@ bool CUnitScript::NeedsWait(AnimType type, int piece, int axis)
 void CUnitScript::Explode(int piece, int flags)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
 		ShowUnitScriptError("[US::Explode] invalid script piece index");
 		return;
 	}
@@ -809,7 +869,7 @@ void CUnitScript::Explode(int piece, int flags)
 	if (flags & PF_NONE)
 		return;
 
-	if (pieces[piece]->original == nullptr)
+	if (p->original == nullptr)
 		return;
 
 	if (flags & PF_Shatter) {
@@ -867,7 +927,7 @@ void CUnitScript::Shatter(int piece, const float3& pos, const float3& speed)
 void CUnitScript::ShowFlare(int piece)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	if (!SafeGetPiece(piece)) {
 		ShowUnitScriptError("[US::ShowFlare] invalid script piece index");
 		return;
 	}
@@ -921,7 +981,7 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 	} break;
 
 	case PIECE_XZ: {
-		if (!PieceExists(p1)) {
+		if (!SafeGetPiece(p1)) {
 			ShowUnitScriptError("[US::GetUnitVal::PIECE_XZ] invalid script piece index");
 			break;
 		}
@@ -930,7 +990,7 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		return PACKXZ(absPos.x, absPos.z);
 	} break;
 	case PIECE_Y: {
-		if (!PieceExists(p1)) {
+		if (!SafeGetPiece(p1)) {
 			ShowUnitScriptError("[US::GetUnitVal::PIECE_Y] invalid script piece index");
 			break;
 		}
@@ -1647,12 +1707,12 @@ void CUnitScript::SetUnitVal(int val, int param)
 
 int CUnitScript::ScriptToModel(int scriptPieceNum) const {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(scriptPieceNum))
+	const LocalModelPiece* smp = SafeGetPiece(scriptPieceNum);
+
+	if (!smp)
 		return -1;
 
-	const LocalModelPiece* smp = GetScriptLocalModelPiece(scriptPieceNum);
-
-	return (smp->GetLModelPieceIndex());
+	return smp->GetLModelPieceIndex();
 }
 
 int CUnitScript::ModelToScript(int lmodelPieceNum) const {
