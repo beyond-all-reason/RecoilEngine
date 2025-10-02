@@ -1,9 +1,16 @@
+{{ $loc := dict }}
+{{ if reflect.IsSlice .data.loc }}
+    {{ $loc = index .data.loc 0 }}
+{{ else }}
+    {{ $loc = .data.loc }}
+{{ end }}
+
 {{ $res := (dict
     "type" .data.type
     "name" .data.name
     "description" .data.description
     "deprecation_reason" .data.deprecation_reason
-    "loc" .data.loc
+    "loc" $loc
 ) }}
 
 {{ if .path }}

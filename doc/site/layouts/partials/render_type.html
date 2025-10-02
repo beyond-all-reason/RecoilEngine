@@ -1,0 +1,26 @@
+{{/*
+    params:
+    type: string
+    type_info: TypeInfo
+    generics: []string
+*/}}
+
+{{ $builtins := (slice "integer" "number" "string" "boolean" "nil" "func" "table" "any") | append .generics }}
+{{ $type := .type }}
+{{ $type_info := .type_info }}
+
+{{ $words := uniq (strings.FindRE `[a-zA-Z\."]+` $type) }}
+
+{{ range $words }}
+    {{ if not (hasPrefix . `"`) }}
+        {{ if not (collections.In $builtins .) }}
+            {{ $link := (index $type_info .) }}
+            {{ if $link }}
+                {{- $type_link := printf "[%s](#%s)" . $link -}}
+                {{- $type = replace $type . $type_link -}}
+            {{ end }}
+        {{ end }}
+    {{ end }}
+{{ end }}
+
+{{ return $type | markdownify }}

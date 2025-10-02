@@ -8,17 +8,17 @@ returns: type_name string
 
 {{ $res := . }}
 
-{{/* Case 1: Type + alias `xyz {x: number, y: number, z:number}1 */}}
+{{/* Case 1: Type + alias `xyz {x: number, y: number, z:number}` */}}
 {{ $case1 := strings.FindRESubmatch `(\S+)\s+{` . 1 }}
 {{ if $case1 }}
-    {{ $res = index (index $case1 0) 1 }}
+    {{ $res = printf "%s" $case1 }}
 {{ else }}
     {{/* Case 2: A tuple in the form of `{x: number, y: number, z:number}` */}}
     {{ $case2 := strings.FindRESubmatch `^({.*})` . 1 }}
     {{ if $case2 }}
-        {{ $res := index (index $case2 0) 1 }}
+        {{ $res := printf "%s" $case2 }}
     {{ end }}
 {{ end }}
 
-{{/* Fallthrough: type is fine as is, e.g. `xyz`.*/}}
+{{/* Fallthrough: type is fine as is, e.g. `xyz`. */}}
 {{ return $res }}

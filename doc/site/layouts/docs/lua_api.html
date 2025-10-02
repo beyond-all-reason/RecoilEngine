@@ -34,7 +34,7 @@
 	{{/* Generate Types Info and TOC */}}
 	{{ $types_info := slice }}
 	{{ $t_list := slice }}
-	{{ range $data.globals }}
+	{{ range $data.types }}
 		{{ $info := (partial "type_construction/construct_type.html" (dict "data" . "path" slice)) }}
 		{{ $types_info = $types_info | append $info }}
 		{{ $t_list = $t_list | append (dict "title" $info.name "permalink" $info.permalink) }}
@@ -106,6 +106,10 @@
 	{{ else }}
 		</h3>
 	{{ end }}
+{{ end }}
+
+{{ define "debug" }}
+	<pre>{{ . | debug.Dump }}</pre>
 {{ end }}
 
 {{/*
@@ -197,7 +201,7 @@
 		<span id="{{ .permalink }}" class="hx-absolute -hx-mt-20"></span>
 		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{ template "leveled_tag" $level }}
-				<code>{{ .name }}: <a href="#{{ .type_permalink }}">{{ .typ }}</a>{{ if .literal }} = {{ .literal }}{{ end }}</code> {{ template "permalink" .permalink }}
+				<code>{{ .name }}: {{ if .type_permalink }}<a href="#{{ .type_permalink }}">{{ .typ }}</a>{{ else }}{{ .typ }}{{ end }}{{ if .literal }} = {{ .literal }}{{ end }}</code> {{ template "permalink" .permalink }}
 			{{ template "leveled_tag_closer" $level }}
 			{{ template "render_common" . }}
 		</div>
@@ -226,7 +230,7 @@
 		<span id="{{ .permalink }}" class="hx-absolute -hx-mt-20"></span>
 		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
 			{{ template "leveled_tag" $level }}
-				<i>alias</i> <code>{{ .name }}: <a href="#{{ .type_permalink }}">{{ .typ }}</a>{{ if .description }} --{{ .description }}{{ end }}</code> {{ template "permalink" .permalink }}
+				<i>alias</i> <code>{{ .name }}: {{ if .type_permalink }}<a href="#{{ .type_permalink }}">{{ .typ }}</a>{{ else }}{{ .typ }}{{ end }}{{ if .description }} --{{ .description }}{{ end }}</code> {{ template "permalink" .permalink }}
 			{{ template "leveled_tag_closer" $level }}
 			{{ template "render_common" . }}
 		</div>
