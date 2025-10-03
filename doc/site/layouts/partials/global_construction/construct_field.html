@@ -2,7 +2,7 @@
 {{ $path := .path }} {{/* path appended in construct_member */}}
 {{ $type_info := .type_info }}
 
-{{ $t := (partial "extract_type_name.html" .data.typ)}}
+{{ $t := partial "render_type.html" (dict "type" (partial "extract_type_name.html" .data.typ) "type_info" $type_info) }}
 {{ $field := merge 
     (partial "construct_common.html" (dict "data" .data "path" $path "type" "field")) 
     (dict
