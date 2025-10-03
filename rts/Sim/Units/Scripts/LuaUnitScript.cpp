@@ -1030,6 +1030,7 @@ bool CLuaUnitScript::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(StopSpin);
 	REGISTER_LUA_CFUNC(Turn);
 	REGISTER_LUA_CFUNC(Move);
+	REGISTER_LUA_CFUNC(Scale);
 	REGISTER_LUA_CFUNC(MultiSetPieceVisibility);
 	REGISTER_LUA_CFUNC(MultiSpin);
 	REGISTER_LUA_CFUNC(MultiStopSpin);
@@ -1477,8 +1478,8 @@ int CLuaUnitScript::Move(lua_State* L)
 int CLuaUnitScript::Scale(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// void Scale(int piece, int speed, int destination);
-	// void ScaleNow(int piece, int destination);
+	// void Scale(int speed, int destination);
+	// void ScaleNow(int destination);
 	if (activeScript == nullptr)
 		return 0;
 
