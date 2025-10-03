@@ -51,6 +51,8 @@ void CLuaUnitScript::PostLoad()
 
 	for (auto& p: unit->localModel.pieces) {
 		pieces.push_back(&p);
+		if (!p.parent)
+			rootPiece = &p;
 	}
 
 	L = handle->GetLuaState();

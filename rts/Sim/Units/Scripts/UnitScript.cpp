@@ -61,6 +61,7 @@ CR_REG_METADATA(CUnitScript, (
 	CR_MEMBER(doneAnims),
 
 	//Populated by children
+	CR_IGNORED(rootPiece),
 	CR_IGNORED(pieces),
 	CR_IGNORED(hasSetSFXOccupy),
 	CR_IGNORED(hasRockUnit),
@@ -220,7 +221,7 @@ void CUnitScript::TickAllAnims(int deltaTime)
 	/*
 	// BFS pass
 	std::deque<LocalModelPiece*> bfsQueue;
-	bfsQueue.emplace_back(pieces.front());
+	bfsQueue.emplace_back(rootPiece);
 
 	while (!bfsQueue.empty()) {
 		auto* lmp = bfsQueue.front();
@@ -238,31 +239,27 @@ void CUnitScript::TickAllAnims(int deltaTime)
 	}
 	*/
 	// BFS pass
-	auto WalkBFS = [](LocalModelPiece* root, const Transform& rootTra) -> void {
-		std::deque<std::pair<LocalModelPiece*, Transform>> q;
-		q.push_front({ root, rootTra });
+	std::deque<std::pair<LocalModelPiece*, Transform>> q;
+	q.push_front({ rootPiece, Transform{} });
 
-		while (!q.empty()) {
-			auto& [lmp, pTra] = q.front();
+	while (!q.empty()) {
+		// copy
+		auto [lmp, pTra] = q.front();
+		q.pop_front();
 
-			if (lmp->GetDirty()) {
-				lmp->SetDirtyRaw(false);
-				lmp->SetWasUpdatedRaw(true);
-				lmp->UpdatePieceSpaceTransform();
-				lmp->UpdateModelSpaceTransform(pTra);
-			}
-
-			const Transform& modelTra = lmp->GetModelSpaceTransformRaw();
-
-			for (auto* child : lmp->children) {
-				q.push_back({ child, modelTra });
-			}
-
-			q.pop_front();
+		if (lmp->GetDirty()) {
+			lmp->SetDirtyRaw(false);
+			lmp->SetWasUpdatedRaw(true);
+			lmp->UpdatePieceSpaceTransform();
+			lmp->UpdateModelSpaceTransform(pTra);
 		}
-	};
 
-	WalkBFS(pieces.front(), Transform{});
+		const Transform& modelTra = lmp->GetModelSpaceTransformRaw();
+
+		for (auto* child : lmp->children) {
+			q.push_back({ child, modelTra });
+		}
+	}
 #else
 	// DFS pass
 	auto WalkDFS = [](this auto&& self, LocalModelPiece* lmp, const Transform& pTra) -> void {
@@ -279,7 +276,7 @@ void CUnitScript::TickAllAnims(int deltaTime)
 			self(p, modelTra);
 		};
 
-	WalkDFS(pieces.front(), Transform{});
+	WalkDFS(rootPiece, Transform{});
 #endif
 }
 
