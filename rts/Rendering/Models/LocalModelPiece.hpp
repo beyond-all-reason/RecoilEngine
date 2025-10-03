@@ -44,6 +44,7 @@ struct LocalModelPiece
 
 	// on-demand functions
 	void UpdatePieceSpaceTransform();
+	void UpdateModelSpaceTransform(const Transform& pTra);
 	void UpdateModelSpaceTransform(const LocalModelPiece* parent);
 	void UpdateChildTransformRec(bool updateChildMatrices) const;
 	void UpdateParentMatricesRec() const;

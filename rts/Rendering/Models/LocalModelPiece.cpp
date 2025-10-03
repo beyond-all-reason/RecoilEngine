@@ -172,6 +172,12 @@ void LocalModelPiece::UpdatePieceSpaceTransform()
 	pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, scale);
 }
 
+void LocalModelPiece::UpdateModelSpaceTransform(const Transform& pTra)
+{
+	modelSpaceTra = pTra * pieceSpaceTra;
+	modelSpaceMat = modelSpaceTra.ToMatrix();
+}
+
 void LocalModelPiece::UpdateModelSpaceTransform(const LocalModelPiece* parent)
 {
 	if (parent)

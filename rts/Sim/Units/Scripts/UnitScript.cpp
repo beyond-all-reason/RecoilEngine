@@ -216,6 +216,8 @@ void CUnitScript::TickAllAnims(int deltaTime)
 	}
 	spring::VectorEraseIf(anims, [](const auto& ai) { return ai.done; });
 
+#if 0
+	// BFS pass
 	std::deque<LocalModelPiece*> bfsQueue;
 	bfsQueue.emplace_back(pieces.front());
 
@@ -223,17 +225,34 @@ void CUnitScript::TickAllAnims(int deltaTime)
 		auto* lmp = bfsQueue.front();
 		bfsQueue.pop_front();
 
-		if (!lmp->GetDirty())
-			continue;
-
-		lmp->UpdatePieceSpaceTransform();
-		lmp->UpdateModelSpaceTransform(lmp->parent);
-		lmp->SetDirtyRaw(false);
-		lmp->SetWasUpdatedRaw(true);
+		if (lmp->GetDirty()) {
+			lmp->SetDirtyRaw(false);
+			lmp->SetWasUpdatedRaw(true);
+			lmp->UpdatePieceSpaceTransform();
+			lmp->UpdateModelSpaceTransform(lmp->parent);
+		}
 
 		for (auto* p : lmp->children)
 			bfsQueue.emplace_back(p);
 	}
+#else
+	// DFS pass
+	auto WalkDFS = [](this auto&& self, LocalModelPiece* lmp, const Transform& pTra) -> void {
+		if (lmp->GetDirty()) {
+			lmp->SetDirtyRaw(false);
+			lmp->SetWasUpdatedRaw(true);
+			lmp->UpdatePieceSpaceTransform();
+			lmp->UpdateModelSpaceTransform(pTra);
+		}
+
+		const Transform& modelTra = lmp->GetModelSpaceTransformRaw();
+
+		for (auto* p : lmp->children)
+			self(p, modelTra);
+		};
+
+	WalkDFS(pieces.front(), Transform{});
+#endif
 }
 
 /**
