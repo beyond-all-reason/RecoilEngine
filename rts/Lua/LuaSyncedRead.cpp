@@ -1817,15 +1817,15 @@ int LuaSyncedRead::GetTeamAllyTeamID(lua_State* L)
  * @function Spring.GetTeamResources
  * @param teamID integer
  * @param resource ResourceName
- * @return number? currentLevel
- * @return number storage
- * @return number pull
- * @return number income
- * @return number expense
- * @return number share
- * @return number sent
- * @return number received
- * @return number excess
+ * @return number? currentLevel The current amount of the resource that the team has in storage at this moment
+ * @return number storage       The maximum storage capacity for the resource.
+ * @return number pull          The total amount of the resource that is being requested/used by all units and buildings per second, regardless of whether the resource is actually available.
+ * @return number income        The total amount of the resource being generated per second from all sources (e.g., mines, generators, reclaiming, etc.).
+ * @return number expense       The total amount of the resource actually being spent per second. This is the real consumption, which may be less than pull if there isn’t enough resource available.
+ * @return number share         The fraction (0.0 to 1.0) of the storage that the team is sharing with allied teams. A value of 0.0 means 100% of storage is shared, while 1.0 means only any excess is shared.
+ * @return number sent          The total amount of the resource that has actually been sent to allies (via sharing or manual transfer).
+ * @return number received      The total amount of the resource that has actually been received from allies (via sharing or manual transfer).
+ * @return number excess        The amount of the resource that was lost due to storage overflow (wasted).
  */
 int LuaSyncedRead::GetTeamResources(lua_State* L)
 {
