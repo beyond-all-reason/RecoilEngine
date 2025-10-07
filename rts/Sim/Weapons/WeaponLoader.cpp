@@ -37,6 +37,7 @@ static_assert((sizeof(UnitDef::weapons) / sizeof(UnitDef::weapons[0])) == MAX_WE
 static_assert(MAX_WEAPONS_PER_UNIT < std::numeric_limits<decltype(udWeaponCounts)::value_type>::max(), "");
 
 void CWeaponLoader::InitStatic(const CUnitDefHandler *udh) {
+	udWeaponCounts.clear();
 	udWeaponCounts.resize(udh->NumUnitDefs(), MAX_WEAPONS_PER_UNIT + 1);
 	weaponMemPool.reserve(128);
 }
