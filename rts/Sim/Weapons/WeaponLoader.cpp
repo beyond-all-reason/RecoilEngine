@@ -24,19 +24,23 @@
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
+#include "Sim/Units/UnitDefHandler.h"
 #include "System/Log/ILog.h"
 
 #include "System/Misc/TracyDefs.h"
 
-static std::array<uint8_t, 2048> udWeaponCounts;
+static std::vector<uint8_t> udWeaponCounts;
 
 WeaponMemPool weaponMemPool;
 
 static_assert((sizeof(UnitDef::weapons) / sizeof(UnitDef::weapons[0])) == MAX_WEAPONS_PER_UNIT, "");
 static_assert(MAX_WEAPONS_PER_UNIT < std::numeric_limits<decltype(udWeaponCounts)::value_type>::max(), "");
 
-void CWeaponLoader::InitStatic() { udWeaponCounts.fill(MAX_WEAPONS_PER_UNIT + 1); weaponMemPool.reserve(128); }
-void CWeaponLoader::KillStatic() { udWeaponCounts.fill(MAX_WEAPONS_PER_UNIT + 1); weaponMemPool.clear(); }
+void CWeaponLoader::InitStatic(const CUnitDefHandler *udh) {
+	udWeaponCounts.resize(udh->NumUnitDefs(), MAX_WEAPONS_PER_UNIT + 1);
+	weaponMemPool.reserve(128);
+}
+void CWeaponLoader::KillStatic() { udWeaponCounts.clear(); udWeaponCounts.shrink_to_fit(); weaponMemPool.clear(); }
 
 
 
