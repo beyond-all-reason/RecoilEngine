@@ -87,7 +87,7 @@
 			<details>
 				<summary>
 					<h{{ add 2 $level }} class="display-inline">
-						{{ .type }} <code>{{ .name }}{{ if .signature }} {{ .signature }}{{ end }}</code>
+						{{ if .method }}method{{ else }}{{ .type }}{{ end }} <code>{{ .name }}{{ if .signature }} {{ .signature }}{{ end }}</code>
 					</h{{ add 2 $level }}>
 					<a href="#{{ .permalink }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
 				</summary>
@@ -95,10 +95,10 @@
 				<hr>
 
 				{{ if .bases }}
-					inherits from <code>{{ delimit .bases "," }}</code>
+					inherits from <code>{{ delimit .bases "," }}</code><br>
 				{{ end }}
 				{{ if .typ }}
-					is <code>{{ .typ }}</code>
+					is <code>{{ .typ }}</code><br>
 				{{ end }}
 
 				{{ if .description }}
@@ -110,6 +110,7 @@
 					{{ range .see }}
 						<a href="#{{ .link }}">{{ .name }}</a>
 					{{ end }}
+					<br>
 				{{ end }}
 
 				{{ if .params }}
