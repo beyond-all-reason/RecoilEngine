@@ -5,8 +5,24 @@
     generics: []string
 */}}
 
-{{ $builtins := (slice "integer" "number" "string" "boolean" "nil" "func" "table" "any") | append .generics }}
 {{ $type := .type }}
+{{ $context := .context}}
+
+{{/* Case 1: Type + alias `xyz {x: number, y: number, z:number}` */}}
+{{ $case1 := strings.FindRESubmatch `(\S+)\s+{` $type 1 }}
+{{ if $case1 }}
+    {{ $type = printf "%s" (index (index $case1 0 ) 0) }}
+{{ else }}
+    {{/* Case 2: A tuple in the form of `{x: number, y: number, z:number}` */}}
+    {{ $case2 := strings.FindRESubmatch `^({.*})` $type 1 }}
+    {{ if $case2 }}
+        {{ $type := printf "%s" (index (index $case2 0 ) 0) }}
+    {{ end }}
+{{ end }}
+
+{{/* Fallthrough: type is fine as is, e.g. `xyz`. */}}
+
+{{ $builtins := (slice "integer" "number" "string" "boolean" "nil" "func" "table" "any") | append .generics }}
 {{ $type_info := .type_info }}
 
 {{ $words := uniq (strings.FindRE `[a-zA-Z\."]+` $type) }}
@@ -23,4 +39,4 @@
     {{ end }}
 {{ end }}
 
-{{ return $type | markdownify }}
+{{ return $context.Page.RenderString $type }}

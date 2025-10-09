@@ -12,6 +12,7 @@
 	<div class='hx-mx-auto hx-flex {{ partial "utils/page-width" . }}'>
 	{{ partial "sidebar.html" (dict "context" .) }}
 	{{ $data := .Site.Data.doc }}
+	{{ $context := . }}
 	{{/*
 	1. Generate type info
 	2. Generate globals info
@@ -26,7 +27,7 @@
 	{{ $global_info := slice }}
 	{{ $g_list := slice }}
 	{{ range $data.globals }}
-		{{ $info := (partial "global_construction/construct_member.html" (dict "data" . "path" slice)) }}
+		{{ $info := (partial "construct_member.html" (dict "context" $context "data" . "path" slice)) }}
 		{{ $global_info = $global_info | append $info }}
 		{{ $g_list = $g_list | append (dict "title" $info.name "permalink" $info.permalink) }}
 	{{ end }}
@@ -35,7 +36,7 @@
 	{{ $types_info := slice }}
 	{{ $t_list := slice }}
 	{{ range $data.types }}
-		{{ $info := (partial "type_construction/construct_type.html" (dict "data" . "path" slice)) }}
+		{{ $info := (partial "construct_member.html" (dict "context" $context "data" . "path" slice)) }}
 		{{ $types_info = $types_info | append $info }}
 		{{ $t_list = $t_list | append (dict "title" $info.name "permalink" $info.permalink) }}
 	{{ end }}
@@ -51,13 +52,13 @@
 				<h1>Globals</h1>
 				{{ range sort $global_info "name" }}
 					{{ if not ( and .typ ( strings.Contains .typ .name ) ) }} {{/* This dumb hack is to try to avoid the duplicate property CMD and type CMD */}}
-						{{ template "render_global_member" (dict "data" . "level" 0)}}
+						{{ template "render_member" (dict "data" . "level" 0)}}
 					{{ end }}
 				{{ end }}
 
 				<h1>Types</h1>
 				{{ range sort $types_info "name" }}
-					{{ template "render_type" (dict "data" . "level" 0) }}
+					{{ template "render_member" (dict "data" . "level" 0) }}
 				{{ end }}
 			</div>
 			{{ partial "components/last-updated.html" . }}
@@ -72,222 +73,70 @@
 
 {{/* UTILS */}}
 
-{{/*
-  Renders things common to all members, like descriptions.
-  params: member : Member
-*/}}
-{{ define "render_common" }}
-	{{ if .deprecated }} <b>DEPRECATED:</b> {{ .deprecation_reason }} {{ end }}
-    {{ if .description }} <pre>{{ .description | markdownify }}</pre> {{ end }}
-	{{ if .see }} (See: ) {{ end }}
-{{ end }}
-
-{{/*
-  Generates an opening tag for the member name headings.
-  h2 for top level, h3 for everything else.
-  params: level : integer
-*/}}
-{{ define "leveled_tag" }} 
-	{{ if eq . 0 }}
-		<h2 class="display-inline">
-	{{ else }}
-		<h3 class="display-inline">
-	{{ end }}
-{{ end }}
-
-{{/*
-  Generates an opening tag for the member name headings.
-  h2 for top level, h3 for everything else.
-  params: level : integer
-*/}}
-{{ define "leveled_tag_closer" }} 
-	{{ if eq . 0 }}
-		</h2>
-	{{ else }}
-		</h3>
-	{{ end }}
-{{ end }}
-
 {{ define "debug" }}
 	<pre>{{ . | debug.Dump }}</pre>
 {{ end }}
 
-{{/*
-  Renders a link tag anchor for the click hash sign thing.
-  params: link_path : string
-*/}}
-{{ define "permalink" }}
-	<a href="#{{ . }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
-{{ end }}
-
-{{ define "render_loc" }}
-	<a href="{{ .file }}#L{{ .line }}">source</a>
-{{ end }}
-
-{{/* RENDERING GLOBALS */}}
-
-{{ define "render_global_member" }}
-	{{ if eq .data.type "table" }}
-		{{ template "render_table" . }}
-	{{ else if eq .data.type "fn" }}
-		{{ template "render_function" . }}
-	{{ else if eq .data.type "field" }}
-		{{ template "render_field" . }}
-	{{ end }}
-{{ end }}
-
-{{ define "render_table" }}
+{{ define "render_member" }}
+	{{ $data := .data }}
 	{{ $level := .level }}
-	{{ with .data }}
-		<span id="{{ .permalink }}" class="hx-absolute -hx-mt-20"></span>
-		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
-			{{ template "leveled_tag" $level }}
-				<i>table</i> <code>{{ .name }}</code> {{ template "permalink" .permalink }}
-			{{ template "leveled_tag_closer" $level }}
-			<details>
-				{{ template "render_common" . }}
-				{{ range .members }}
-					{{ template "render_global_member" (dict "data" . "level" (add $level 1)) }}
-				{{ end }}
-			</details>
-			{{ template "render_loc" .loc }}
-		</div>
-	{{ end }}
-{{ end }}
 
-{{ define "render_function" }}
-	{{ $level := .level }}
-	{{ with .data }}
+	{{ with $data }}
 		<span id="{{ .permalink }}" class="hx-absolute -hx-mt-20"></span>
-		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
-			{{ template "leveled_tag" $level }}
-				<i>function</i> <code>{{ .name }}</code> {{ template "permalink" .permalink }}
-			{{ template "leveled_tag_closer" $level }}
+		<div class="api-card-toplevel">
 			<details>
 				<summary>
-					{{ $params_l := slice }}
-					{{ range .params }}
-						{{ $params_l = $params_l | append .name }}
-					{{ end }}
-					
-					{{ $ret_l := slice }}
-					{{ range .returns }}
-						{{ $ret_l = $ret_l | append .name }}
-					{{ end }}
-
-					<code>({{ delimit $params_l ", " }}): {{ delimit $ret_l ", " }}</code>
+					<h{{ add 2 $level }} class="display-inline">
+						{{ .type }} <code>{{ .name }}{{ if .signature }} {{ .signature }}{{ end }}</code>
+					</h{{ add 2 $level }}>
+					<a href="#{{ .permalink }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
 				</summary>
-				{{ template "render_common" . }}
-				{{ if .params }}<h4>Parameters</h4>{{ end }}
-				{{ range .params }}
-					<span id="{{ .permalink }}" class="hx-absolute -hx-mt-20"></span>
-					<code>{{ .name }}: <a href="#{{ .type_permalink }}">{{ .type }}</a>{{ if .desc }} --{{ .desc }}{{ end }}</code> {{ template "permalink" .permalink }}
-					<br>
-				{{ end }}
-				{{ if .returns }}<h4>Returns</h4>{{ end }}
-				{{ range .returns }}
-					<span id="{{ .permalink }}" class="hx-absolute -hx-mt-20"></span>
-					<code>{{ .name }}: <a href="#{{ .type_permalink }}">{{ .type }}</a>{{ if .desc }} --{{ .desc }}{{ end }}</code> {{ template "permalink" .permalink }}
-					<br>
-				{{ end }}
-			</details>
-		</div>
-	{{ end }}
-{{ end }}
-
-{{ define "render_field" }}
-	{{ $level := .level }}
-	{{ with .data }}
-		<span id="{{ .permalink }}" class="hx-absolute -hx-mt-20"></span>
-		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
-			{{ template "leveled_tag" $level }}
-				<code>{{ .name }}: {{ if .type_permalink }}<a href="#{{ .type_permalink }}">{{ .typ }}</a>{{ else }}{{ .typ }}{{ end }}{{ if .literal }} = {{ .literal }}{{ end }}</code> {{ template "permalink" .permalink }}
-			{{ template "leveled_tag_closer" $level }}
-			{{ template "render_common" . }}
-		</div>
-	{{ end }}
-{{ end }}
-
-{{/* RENDERING TYPES */}}
-
-{{ define "render_type" }}
-	{{ if eq .data.type "alias" }}
-		{{ template "render_alias" . }}
-	{{ else if eq .data.type "class" }}
-		{{ template "render_class" . }}
-	{{ else if eq .data.type "enum" }}
-		{{ template "render_enum" . }}
-	{{ else if eq .data.type "fn" }}
-		{{ template "render_function" . }}
-	{{ else if eq .data.type "field" }}
-		{{ template "render_field" . }}
-	{{ end }}
-{{ end }}
-
-{{ define "render_alias" }}
-	{{ $level := .level }}
-	{{ with .data }}
-		<span id="{{ .permalink }}" class="hx-absolute -hx-mt-20"></span>
-		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
-			{{ template "leveled_tag" $level }}
-				<i>alias</i> <code>{{ .name }}: {{ if .type_permalink }}<a href="#{{ .type_permalink }}">{{ .typ }}</a>{{ else }}{{ .typ }}{{ end }}{{ if .description }} --{{ .description }}{{ end }}</code> {{ template "permalink" .permalink }}
-			{{ template "leveled_tag_closer" $level }}
-			{{ template "render_common" . }}
-		</div>
-	{{ end }}
-{{ end }}
-
-{{ define "render_class" }}
-	{{ $level := .level }}
-	{{ with .data }}
-		<span id="{{ .permalink }}" class="hx-absolute -hx-mt-20"></span>
-		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
-			{{ template "leveled_tag" $level }}
-				<i>class</i> <code>{{ .name }}</code> {{ template "permalink" .permalink }}
-			{{ template "leveled_tag_closer" $level }}
-			<details>
-				<summary>
-					{{ template "render_common" . }}
-				</summary>
-				{{ template "render_common" . }}
+				<br>
+				<hr>
 
 				{{ if .bases }}
-					Inherits: 
-					{{ $links := slice }}
-					{{ range .bases }}
-						{{ $links = $links | append (printf "<a href='#%s'>%s</a>" .permalink .name) }}
+					inherits from <code>{{ delimit .bases "," }}</code>
+				{{ end }}
+				{{ if .typ }}
+					is <code>{{ .typ }}</code>
+				{{ end }}
+
+				{{ if .description }}
+					{{ .description | markdownify }}<br>
+				{{ end }}
+
+				{{ if .see }}
+					See:
+					{{ range .see }}
+						<a href="#{{ .link }}">{{ .name }}</a>
 					{{ end }}
-					{{ delimit $links ", " }}
+				{{ end }}
+
+				{{ if .params }}
+					<h4>Params</h4>
+					<code>
+						{{ range .params }}
+							{{ .name }}: {{ .type }}{{ if .desc }} --{{ .desc }}{{ end }}<br>
+						{{ end }}
+					</code>
+				{{ end }}
+				{{ if .returns }}
+					<h4>Returns</h4>
+					<code>
+						{{ range .returns }}
+							{{ .name }}: {{ .type }}{{ if .desc }} --{{ .desc }}{{ end }}<br>
+						{{ end }}
+					</code>
 				{{ end }}
 
 				{{ range .members }}
-					{{ template "render_global_member" (dict "data" . "level" (add $level 1)) }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1)) }}
+				{{ end }}
+
+				{{ with .loc }}
+					<a href="{{ .file }}#L{{ .line }}">source</a>
 				{{ end }}
 			</details>
-			{{ template "render_loc" .loc }}
-		</div>
-	{{ end }}
-{{ end }}
-
-{{ define "render_enum"}}
-	{{ $level := .level }}
-	{{ with .data }}
-		<span id="{{ .permalink }}" class="hx-absolute -hx-mt-20"></span>
-		<div class="api-card{{ if eq $level 0 }}-toplevel{{ end }}">
-			{{ template "leveled_tag" $level }}
-				<i>enum</i> <code>{{ .name }}</code> {{ template "permalink" .permalink }}
-			{{ template "leveled_tag_closer" $level }}
-			<details>
-				<summary>
-					{{ template "render_common" . }}
-				</summary>
-				{{ template "render_common" . }}
-
-				{{ range .members }}
-					{{ template "render_global_member" (dict "data" . "level" (add $level 1)) }}
-				{{ end }}
-			</details>
-			{{ template "render_loc" .loc }}
 		</div>
 	{{ end }}
 {{ end }}
