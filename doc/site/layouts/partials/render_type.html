@@ -24,6 +24,7 @@
 
 {{ $builtins := (slice "integer" "number" "string" "boolean" "nil" "func" "table" "any") | append .generics }}
 {{ $type_info := .type_info }}
+{{ $type := .type }}
 
 {{ $words := uniq (strings.FindRE `[a-zA-Z\."]+` $type) }}
 
@@ -39,4 +40,4 @@
     {{ end }}
 {{ end }}
 
-{{ return $context.Page.RenderString $type }}
+{{ return markdownify $type }}

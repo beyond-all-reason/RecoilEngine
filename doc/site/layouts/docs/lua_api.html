@@ -23,11 +23,12 @@
 
 	{{/* Analyze Types */}}
 	{{ $type_info := (partial "analyze_types.html" $data.types) }}
+
 	{{/* Generate Globals Info and TOC */}}
 	{{ $global_info := slice }}
 	{{ $g_list := slice }}
 	{{ range $data.globals }}
-		{{ $info := (partial "construct_member.html" (dict "context" $context "data" . "path" slice)) }}
+		{{ $info := (partial "construct_member.html" (dict "type_info" $type_info "context" $context "data" . "path" slice)) }}
 		{{ $global_info = $global_info | append $info }}
 		{{ $g_list = $g_list | append (dict "title" $info.name "permalink" $info.permalink) }}
 	{{ end }}
@@ -36,7 +37,7 @@
 	{{ $types_info := slice }}
 	{{ $t_list := slice }}
 	{{ range $data.types }}
-		{{ $info := (partial "construct_member.html" (dict "context" $context "data" . "path" slice)) }}
+		{{ $info := (partial "construct_member.html" (dict "type_info" $type_info "context" $context "data" . "path" slice)) }}
 		{{ $types_info = $types_info | append $info }}
 		{{ $t_list = $t_list | append (dict "title" $info.name "permalink" $info.permalink) }}
 	{{ end }}
@@ -93,6 +94,7 @@
 				</summary>
 				<br>
 				<hr>
+				<br>
 
 				{{ if .bases }}
 					inherits from <code>{{ delimit .bases "," }}</code><br>
@@ -115,19 +117,15 @@
 
 				{{ if .params }}
 					<h4>Params</h4>
-					<code>
-						{{ range .params }}
-							{{ .name }}: {{ .type }}{{ if .desc }} --{{ .desc }}{{ end }}<br>
-						{{ end }}
-					</code>
+					{{ range .params }}
+						<code>{{ .name }}: {{ .type }}{{ if .desc }} --{{ .desc }}{{ end }}</code><br>
+					{{ end }}
 				{{ end }}
 				{{ if .returns }}
 					<h4>Returns</h4>
-					<code>
-						{{ range .returns }}
-							{{ .name }}: {{ .type }}{{ if .desc }} --{{ .desc }}{{ end }}<br>
-						{{ end }}
-					</code>
+					{{ range .returns }}
+						<code>{{ .name }}: {{ .type }}{{ if .desc }} --{{ .desc }}{{ end }}</code><br>
+					{{ end }}
 				{{ end }}
 
 				{{ range .members }}
