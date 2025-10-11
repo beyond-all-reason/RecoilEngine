@@ -21,8 +21,9 @@
 	5. Generate globals section
 	*/}}
 
-	{{/* Analyze Types */}}
+	{{/* Analyze Types and Globals for linking */}}
 	{{ $type_info := (partial "analyze_types.html" $data.types) }}
+	{{ $type_info = $type_info | merge (partial "analyze_types.html" $data.globals) }}
 
 	{{/* Generate Globals Info and TOC */}}
 	{{ $global_info := slice }}
@@ -97,7 +98,7 @@
 				<br>
 
 				{{ if .bases }}
-					inherits from <code>{{ delimit .bases "," }}</code><br>
+					inherits from {{ range .bases }} <code>{{ . }}</code> {{ end }}<br>
 				{{ end }}
 				{{ if .typ }}
 					is <code>{{ .typ }}</code><br>
@@ -110,7 +111,7 @@
 				{{ if .see }}
 					See:
 					{{ range .see }}
-						<a href="#{{ .link }}">{{ .name }}</a>
+						{{ .link }}
 					{{ end }}
 					<br>
 				{{ end }}
