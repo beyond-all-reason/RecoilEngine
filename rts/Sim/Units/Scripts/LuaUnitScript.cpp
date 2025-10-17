@@ -54,6 +54,7 @@ void CLuaUnitScript::PostLoad()
 		if (!p.parent)
 			rootPiece = &p;
 	}
+	assert(rootPiece);
 
 	L = handle->GetLuaState();
 
@@ -264,7 +265,10 @@ CLuaUnitScript::CLuaUnitScript(lua_State* L, CUnit* unit)
 	}
 	for (auto& p: unit->localModel.pieces) {
 		pieces.push_back(&p);
+		if (!p.parent)
+			rootPiece = &p;
 	}
+	assert(rootPiece);
 }
 
 
