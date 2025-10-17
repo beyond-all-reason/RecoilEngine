@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <cstdint>
+#include <algorithm>
 
 #include "System/creg/creg_cond.h"
 #include "System/Transform.hpp"
