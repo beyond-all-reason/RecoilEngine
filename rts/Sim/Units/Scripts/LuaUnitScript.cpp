@@ -1491,7 +1491,7 @@ int CLuaUnitScript::Scale(lua_State* L)
 
 	const int piece = luaL_checkint(L, 1) - 1;
 	const float dest = luaL_checkfloat(L, 2);
-	const float speed = luaL_optfloat(L, 3, 0.0f); // speed == 0 -> MoveNow
+	const float speed = luaL_optfloat(L, 3, 0.0f); // speed == 0 -> ScaleNow
 
 	if (speed == 0.0f) {
 		activeScript->ScaleNow(piece, dest);

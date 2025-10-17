@@ -254,7 +254,7 @@ void CUnitScript::TickAllAnims(int deltaTime)
 
 		for (auto* p : lmp->children)
 			self(p, modelTra);
-		};
+	};
 
 	WalkDFS(rootPiece, Transform{});
 #endif
