@@ -199,7 +199,7 @@ void CUnitScript::TickAllAnims(int deltaTime)
 
 	// optimize the memory access patterns of the procedure below
 	std::sort(anims.begin(), anims.end(), [](const auto& lhs, const auto& rhs) {
-		return std::tie(lhs.piece, lhs.axis, lhs.animType) < std::tie(rhs.piece, rhs.axis, rhs.animType);
+		return std::tie(lhs.piece, lhs.animType, lhs.axis) < std::tie(rhs.piece, rhs.animType, rhs.axis);
 	});
 
 	// tick-functions; these never change address

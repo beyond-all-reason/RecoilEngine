@@ -621,7 +621,7 @@ bool CCobThread::Tick()
 				r1 = GET_LONG_PC();
 				r3 = PopDataStack();
 				r2 = PopDataStack();
-				cobInst->Scale(r1, r2, r1);
+				cobInst->Scale(r1, r2, r3);
 			} break;
 			case SCALE_NOW: {
 				r1 = GET_LONG_PC();
