@@ -676,6 +676,7 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 	RECOIL_DETAILED_TRACY_ZONE;
 	bool tryTargetRotate  = false;
 	bool tryTargetHeading = false;
+	bool tryOwnerRotation = false;
 
 	float edgeFactor = 0.0f; // percent offset to target center
 
@@ -715,8 +716,10 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 
 		edgeFactor = math::fabs(w->weaponDef->targetBorder);
 
-		if (tryTargetRotate || tryTargetHeading)
+		if (tryTargetRotate)
 			break;
+
+		tryOwnerRotation |= w->WantOwnerRotation();
 	}
 
 	// if w->AttackUnit() returned true then we are already
@@ -752,7 +755,7 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 
 	// target is probably close enough
 	if (targetMidPosDist2D < (owner->maxRange * 0.9f)) {
-		if (owner->unitDef->IsHoveringAirUnit() || (targetMidPosVec.SqLength2D() < 1024)) {
+		if (owner->unitDef->IsHoveringAirUnit() || (targetMidPosVec.SqLength2D() < 1024) || tryOwnerRotation) {
 			StopMove();
 			owner->moveType->KeepPointingTo(orderTarget->midPos, minPointingDist, true);
 			return;

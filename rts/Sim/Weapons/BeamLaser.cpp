@@ -141,7 +141,7 @@ void CBeamLaser::UpdatePosAndMuzzlePos()
 	}
 }
 
-float CBeamLaser::GetPredictedImpactTime(float3 p) const
+float CBeamLaser::GetPredictedImpactTime(const float3& p) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// beamburst tracks the target during the burst so there's no need to lead

@@ -336,14 +336,22 @@ public:
 
 
 	/**
-	 * @brief binary float3 equality
+	 * @brief float3 equality
 	 * @param f float3 to compare to
-	 * @return const whether the two float3 are binary same
+	 * @return const whether the two float3 are same
 	 *
 	 */
 	bool same(const float3& f) const {
 		return x == f.x && y == f.y && z == f.z;
 	}
+
+	/**
+	 * @brief binary float3 equality
+	 * @param f float3 to compare to
+	 * @return const whether the two float3 are binary same
+	 *
+	 */
+	bool binarySame(const float3& f) const;
 
 	/**
 	 * @brief dot product

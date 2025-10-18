@@ -11,7 +11,7 @@ class CBombDropper: public CWeapon
 public:
 	CBombDropper(CUnit* owner = nullptr, const WeaponDef* def = nullptr, bool useTorps = false);
 
-	float GetPredictedImpactTime(float3 p) const override final;
+	float GetPredictedImpactTime(const float3& p) const override final;
 
 private:
 	bool CanFire(bool ignoreAngleGood, bool ignoreTargetType, bool ignoreRequestedDir) const override final;

@@ -308,7 +308,7 @@ void CWeapon::UpdateWantedDir()
 }
 
 
-float CWeapon::GetPredictedImpactTime(float3 p) const
+float CWeapon::GetPredictedImpactTime(const float3& p) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	//TODO take target's speed into account? (not just its position)
@@ -831,7 +831,7 @@ void CWeapon::DependentDied(CObject* o)
 }
 
 
-bool CWeapon::TargetUnderWater(const float3 tgtPos, const SWeaponTarget& target)
+bool CWeapon::TargetUnderWater(const float3& tgtPos, const SWeaponTarget& target)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	switch (target.type) {
@@ -844,7 +844,7 @@ bool CWeapon::TargetUnderWater(const float3 tgtPos, const SWeaponTarget& target)
 }
 
 
-bool CWeapon::TargetInWater(const float3 tgtPos, const SWeaponTarget& target)
+bool CWeapon::TargetInWater(const float3& tgtPos, const SWeaponTarget& target)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	switch (target.type) {
@@ -857,9 +857,13 @@ bool CWeapon::TargetInWater(const float3 tgtPos, const SWeaponTarget& target)
 }
 
 
-bool CWeapon::CheckTargetAngleConstraint(const float3 worldTargetDir, const float3 worldWeaponDir) const
+bool CWeapon::CheckTargetAngleConstraint(const float3& worldTargetDir, const float3& worldWeaponDir) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// check makes no sense for a degenerate worldTargetDir
+	if (worldTargetDir.same(ZeroVector))
+		return true;
+
 	if (onlyForward) {
 		if (maxForwardAngleDif > -1.0f) {
 			// if we are not a turret, we care about our owner's direction
@@ -879,8 +883,8 @@ bool CWeapon::CheckTargetAngleConstraint(const float3 worldTargetDir, const floa
 
 float3 CWeapon::GetTargetBorderPos(
 	const CUnit* targetUnit,
-	const float3 rawTargetPos,
-	const float3 rawTargetDir
+	const float3& rawTargetPos,
+	const float3& rawTargetDir
 ) const {
 	RECOIL_DETAILED_TRACY_ZONE;
 	float3 targetBorderPos = rawTargetPos;
@@ -940,7 +944,7 @@ float3 CWeapon::GetTargetBorderPos(
 }
 
 
-bool CWeapon::TryTarget(const float3 tgtPos, const SWeaponTarget& trg, bool preFire) const
+bool CWeapon::TryTarget(const float3& tgtPos, const SWeaponTarget& trg, bool preFire) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(GetLeadTargetPos(trg).SqDistance(tgtPos) < Square(250.0f));
@@ -981,6 +985,26 @@ float CWeapon::GetShapedWeaponRange(const float3& dir, float maxLength) const
 	}
 
 	return maxLength;
+}
+
+WeaponVectorsState CWeapon::SaveWeaponVectors() const
+{
+	return WeaponVectorsState{
+		.relAimFromPos = relAimFromPos,
+		.relWeaponMuzzlePos = relWeaponMuzzlePos,
+		.aimFromPos = aimFromPos,
+		.weaponMuzzlePos = weaponMuzzlePos,
+		.weaponDir = weaponDir
+	};
+}
+
+void CWeapon::LoadWeaponVectors(const WeaponVectorsState& wvs)
+{
+	relAimFromPos = wvs.relAimFromPos;
+	relWeaponMuzzlePos = wvs.relWeaponMuzzlePos;
+	aimFromPos = wvs.aimFromPos;
+	weaponMuzzlePos = wvs.weaponMuzzlePos;
+	weaponDir = wvs.weaponDir;
 }
 
 bool CWeapon::TestTarget(const float3& tgtPos, const SWeaponTarget& trg) const
@@ -1127,11 +1151,21 @@ bool CWeapon::TryTargetRotate(const CUnit* unit, bool userTarget, bool manualFir
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 tempTargetPos = GetUnitLeadTargetPos(unit);
-	const short weaponHeading = GetHeadingFromVector(mainDir.x, mainDir.z);
-	const short enemyHeading = GetHeadingFromVector(tempTargetPos.x - aimFromPos.x, tempTargetPos.z - aimFromPos.z);
 	SWeaponTarget trg(unit, userTarget);
 	trg.isManualFire = manualFire;
 
+	const short weaponHeading = GetHeadingFromVector(mainDir.x, mainDir.z);
+	const auto aimToTgt = float3{
+		tempTargetPos.x - aimFromPos.x,
+		0.0f,
+		tempTargetPos.z - aimFromPos.z
+	};
+
+	if unlikely(aimToTgt.SqLength2D() < 1.0f) {
+		return TryTargetHeading(owner->heading - weaponHeading, trg);
+	}
+
+	const short enemyHeading = GetHeadingFromVector(aimToTgt.x, aimToTgt.z);
 	return TryTargetHeading(enemyHeading - weaponHeading, trg);
 }
 
@@ -1159,6 +1193,7 @@ bool CWeapon::TryTargetHeading(short heading, const SWeaponTarget& trg)
 	owner->heading = heading;
 	owner->frontdir = GetVectorFromHeading(owner->heading);
 	owner->rightdir = owner->frontdir.cross(owner->updir);
+	auto wvs = SaveWeaponVectors();
 	UpdateWeaponVectors();
 
 	const bool val = TryTarget(trg);
@@ -1166,7 +1201,8 @@ bool CWeapon::TryTargetHeading(short heading, const SWeaponTarget& trg)
 	owner->frontdir = tempfrontdir;
 	owner->rightdir = temprightdir;
 	owner->heading = tempHeading;
-	UpdateWeaponVectors();
+	//UpdateWeaponVectors();
+	LoadWeaponVectors(wvs);
 
 	return val;
 }

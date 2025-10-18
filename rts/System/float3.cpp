@@ -85,6 +85,11 @@ bool float3::equals(const float3& f, const float3& eps) const
 	return (epscmp(x, f.x, eps.x) && epscmp(y, f.y, eps.y) && epscmp(z, f.z, eps.z));
 }
 
+bool float3::binarySame(const float3& f) const
+{
+	return !std::memcmp(&x, &f.x, sizeof(float3));
+}
+
 float3 float3::snapToAxis() const {
 	// https://gamedev.stackexchange.com/questions/83601/from-3d-rotation-snap-to-nearest-90-directions/183342#183342
 	float nx = std::abs(x);

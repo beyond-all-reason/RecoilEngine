@@ -44,7 +44,7 @@ CBombDropper::CBombDropper(CUnit* owner, const WeaponDef* def, bool useTorps)
 }
 
 
-float CBombDropper::GetPredictedImpactTime(float3 impactPos) const
+float CBombDropper::GetPredictedImpactTime(const float3& impactPos) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (weaponMuzzlePos.y <= impactPos.y)

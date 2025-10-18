@@ -21,7 +21,7 @@ private:
 
 	void UpdatePosAndMuzzlePos();
 	bool TestRange(const float3& tgtPos, const SWeaponTarget& trg) const override final;
-	float GetPredictedImpactTime(float3 p) const override final;
+	float GetPredictedImpactTime(const float3& p) const override final;
 	void UpdateSweep();
 
 	void FireInternal(float3 curDir);
