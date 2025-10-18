@@ -676,7 +676,7 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 	RECOIL_DETAILED_TRACY_ZONE;
 	bool tryTargetRotate  = false;
 	bool tryTargetHeading = false;
-	bool tryOwnerRotation = false;
+	bool tryOwnerRotation = false; // if a weapon doesn't swivel to aim we've got to know about it to rotate the owner instead
 
 	float edgeFactor = 0.0f; // percent offset to target center
 

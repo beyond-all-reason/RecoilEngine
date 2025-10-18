@@ -1161,6 +1161,8 @@ bool CWeapon::TryTargetRotate(const CUnit* unit, bool userTarget, bool manualFir
 		tempTargetPos.z - aimFromPos.z
 	};
 
+	// if the aimToTgt is (close to) degenerate then enemyHeading value makes no sense,
+	// use the owner's heading instead
 	if unlikely(aimToTgt.SqLength2D() < 1.0f) {
 		return TryTargetHeading(owner->heading - weaponHeading, trg);
 	}
