@@ -3,6 +3,7 @@
 #include "System/float3.h"
 
 #include <algorithm>
+#include <cstring>
 
 #include "System/creg/creg_cond.h"
 #include "System/SpringMath.h"
