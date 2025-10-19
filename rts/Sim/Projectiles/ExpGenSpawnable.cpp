@@ -204,7 +204,7 @@ bool CExpGenSpawnable::GetSpawnableMemberInfo(const std::string& spawnableName, 
 	return std::get<1>(*it)(memberInfo);
 }
 
-int CExpGenSpawnable::GetSpawnableID(const std::string& spawnableName)
+uint32_t CExpGenSpawnable::GetSpawnableID(const std::string& spawnableName)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto it = std::find_if(spawnables.begin(), spawnables.end(), [&spawnableName](const auto& entry) {
@@ -212,12 +212,12 @@ int CExpGenSpawnable::GetSpawnableID(const std::string& spawnableName)
 	});
 
 	if (it == spawnables.end())
-		return -1;
+		return -1u;
 
-	return static_cast<int>(std::distance(spawnables.begin(), it));
+	return static_cast<uint32_t>(std::distance(spawnables.begin(), it));
 }
 
-CExpGenSpawnable* CExpGenSpawnable::CreateSpawnable(int spawnableID)
+CExpGenSpawnable* CExpGenSpawnable::CreateSpawnable(uint32_t spawnableID)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (spawnableID < 0 || spawnableID > spawnables.size() - 1)

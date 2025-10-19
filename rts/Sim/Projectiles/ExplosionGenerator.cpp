@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <cassert>
 #include <cinttypes>
+#include <fmt/format.h>
 
 #include "ExplosionGenerator.h"
 #include "ExpGenSpawner.h" //!!
@@ -48,18 +49,86 @@
 static DynMemPoolT<CCustomExplosionGenerator, CStdExplosionGenerator, IExplosionGenerator> egMemPool;
 
 alignas(LuaParser) static std::byte exploParserMem[sizeof(LuaParser)];
-alignas(LuaParser) static std::byte aliasParserMem[sizeof(LuaParser)];
 alignas(LuaTable) static std::byte explTblRootMem[sizeof(LuaTable )];
 
 static constexpr size_t CEG_PREFIX_STRLEN = sizeof(CEG_PREFIX_STRING) - 1;
 
 CExplosionGeneratorHandler explGenHandler;
 
-
-
-unsigned int CCustomExplosionGenerator::GetFlagsFromTable(const LuaTable& table)
+std::string CCustomExplosionGenerator::GetClassNameAlias(const std::string& alias)
 {
-	unsigned int flags = 0;
+	switch (hashString(alias))
+	{
+	case hashString("beamlaser"             ): return "CBeamLaserProjectile"  ;
+	case hashString("bitmapmuzzleflame"     ): return "CBitmapMuzzleFlame"    ;
+	case hashString("bubble"                ): return "CBubbleProjectile"     ;
+	case hashString("delayspawner"          ): return "CExpGenSpawner"        ;
+	case hashString("dirt"                  ): return "CDirtProjectile"       ;
+	case hashString("emg"                   ): return "CEmgProjectile"        ;
+	case hashString("expl"                  ): return "CExplosiveProjectile"  ;
+	case hashString("explsphere"            ): return "CSpherePartSpawner"    ;
+	case hashString("explspike"             ): return "CExploSpikeProjectile" ;
+	case hashString("fireball"              ): return "CFireBallProjectile"   ;
+	case hashString("fire"                  ): return "CFireProjectile"       ;
+	case hashString("flame"                 ): return "CFlameProjectile"      ;
+	case hashString("flare"                 ): return "CFlareProjectile"      ;
+	case hashString("geosquare"             ): return "CGeoSquareProjectile"  ;
+	case hashString("heatcloud"             ): return "CHeatCloudProjectile"  ;
+	case hashString("lighting"              ): return "CLightingProjectile"   ;
+	case hashString("missile"               ): return "CMissileProjectile"    ;
+	case hashString("muzzleflame"           ): return "CMuzzleFlame"          ;
+	case hashString("piece"                 ): return "CPieceProjectile"      ;
+	case hashString("shieldpart"            ): return "CShieldPartProjectile" ;
+	case hashString("simplegroundflash"     ): return "CSimpleGroundFlash"    ;
+	case hashString("groundflash"           ): return "CStandardGroundFlash"  ;
+	case hashString("simpleparticlespawner" ): return "CSphereParticleSpawner";
+	case hashString("simpleparticlesystem"  ): return "CSimpleParticleSystem" ;
+	case hashString("smoke"                 ): return "CSmokeProjectile"      ;
+	case hashString("smoke2"                ): return "CSmokeProjectile2"     ;
+	case hashString("smoketrail"            ): return "CSmokeTrailProjectile" ;
+	case hashString("spherepart"            ): return "CSpherePartProjectile" ;
+	case hashString("starburst"             ): return "CStarburstProjectile"  ;
+	case hashString("torpedo"               ): return "CTorpedoProjectile"    ;
+	case hashString("tracer"                ): return "CTracerProjectile"     ;
+	case hashString("wake"                  ): return "CWakeProjectile"       ;
+	case hashString("CBeamLaserProjectile"  ): return "CBeamLaserProjectile"  ;
+	case hashString("CBitmapMuzzleFlame"	): return "CBitmapMuzzleFlame"    ;
+	case hashString("CBubbleProjectile"	    ): return "CBubbleProjectile"     ;
+	case hashString("CExpGenSpawner"        ): return "CExpGenSpawner"        ;
+	case hashString("CDirtProjectile"       ): return "CDirtProjectile"       ;
+	case hashString("CEmgProjectile"        ): return "CEmgProjectile"        ;
+	case hashString("CExplosiveProjectile"  ): return "CExplosiveProjectile"  ;
+	case hashString("CSpherePartSpawner"	): return "CSpherePartSpawner"    ;
+	case hashString("CExploSpikeProjectile" ): return "CExploSpikeProjectile" ;
+	case hashString("CFireBallProjectile"	): return "CFireBallProjectile"   ;
+	case hashString("CFireProjectile"       ): return "CFireProjectile"       ;
+	case hashString("CFlameProjectile"	    ): return "CFlameProjectile"      ;
+	case hashString("CFlareProjectile"	    ): return "CFlareProjectile"      ;
+	case hashString("CGeoSquareProjectile"  ): return "CGeoSquareProjectile"  ;
+	case hashString("CHeatCloudProjectile"  ): return "CHeatCloudProjectile"  ;
+	case hashString("CLightingProjectile"	): return "CLightingProjectile"   ;
+	case hashString("CMissileProjectile"	): return "CMissileProjectile"    ;
+	case hashString("CMuzzleFlame"          ): return "CMuzzleFlame"          ;
+	case hashString("CPieceProjectile"	    ): return "CPieceProjectile"      ;
+	case hashString("CShieldPartProjectile" ): return "CShieldPartProjectile" ;
+	case hashString("CSimpleGroundFlash"	): return "CSimpleGroundFlash"    ;
+	case hashString("CSphereParticleSpawner"): return "CSphereParticleSpawner";
+	case hashString("CSimpleParticleSystem" ): return "CSimpleParticleSystem" ;
+	case hashString("CSmokeProjectile"	    ): return "CSmokeProjectile"      ;
+	case hashString("CSmokeProjectile2"	    ): return "CSmokeProjectile2"     ;
+	case hashString("CSmokeTrailProjectile" ): return "CSmokeTrailProjectile" ;
+	case hashString("CSpherePartProjectile" ): return "CSpherePartProjectile" ;
+	case hashString("CStarburstProjectile"  ): return "CStarburstProjectile"  ;
+	case hashString("CTorpedoProjectile"	): return "CTorpedoProjectile"    ;
+	case hashString("CTracerProjectile"	    ): return "CTracerProjectile"     ;
+	case hashString("CWakeProjectile"       ): return "CWakeProjectile"       ;
+	default                                  : return "Unresolved"            ;
+	}
+}
+
+uint32_t CCustomExplosionGenerator::GetFlagsFromTable(const LuaTable& table)
+{
+	uint32_t flags = 0;
 
 	flags |= (CEG_SPWF_GROUND      * table.GetBool(     "ground", false));
 	flags |= (CEG_SPWF_WATER       * table.GetBool(     "water" , false));
@@ -76,12 +145,12 @@ unsigned int CCustomExplosionGenerator::GetFlagsFromTable(const LuaTable& table)
 	return flags;
 }
 
-unsigned int CCustomExplosionGenerator::GetFlagsFromHeight(float height, float groundHeight)
+uint32_t CCustomExplosionGenerator::GetFlagsFromHeight(float height, float groundHeight)
 {
-	unsigned int flags = 0;
+	uint32_t flags = 0;
 
-	const unsigned int voidGroundMask = 1 - mapRendering->voidGround;
-	const unsigned int voidWaterMask  = 1 - mapRendering->voidWater ;
+	const uint32_t voidGroundMask = 1 - mapRendering->voidGround;
+	const uint32_t voidWaterMask  = 1 - mapRendering->voidWater ;
 
 	const float waterDistance = math::fabsf(height);
 	const float exploAltitude = height - groundHeight;
@@ -119,50 +188,6 @@ unsigned int CCustomExplosionGenerator::GetFlagsFromHeight(float height, float g
 }
 
 
-
-void ClassAliasList::Load(const LuaTable& aliasTable)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	decltype(aliases) aliasList;
-	aliasTable.GetMap(aliasList);
-	aliases.insert(aliasList.begin(), aliasList.end());
-}
-
-
-std::string ClassAliasList::ResolveAlias(const std::string& name) const
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	std::string n = name;
-
-	for (;;) {
-		const auto i = aliases.find(n);
-
-		if (i == aliases.end())
-			break;
-
-		n = i->second;
-	}
-
-	return n;
-}
-
-
-std::string ClassAliasList::FindAlias(const std::string& className) const
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	for (const auto& p: aliases) {
-		if (p.second == className)
-			return p.first;
-	}
-
-	return className;
-}
-
-
-
-
-
-
 void CExplosionGeneratorHandler::Init()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -178,7 +203,6 @@ void CExplosionGeneratorHandler::Init()
 
 
 	exploParser = nullptr;
-	aliasParser = nullptr;
 	explTblRoot = nullptr;
 
 	ParseExplosionTables();
@@ -188,11 +212,9 @@ void CExplosionGeneratorHandler::Kill()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	spring::SafeDestruct(exploParser);
-	spring::SafeDestruct(aliasParser);
 	spring::SafeDestruct(explTblRoot);
 
 	std::memset(exploParserMem, 0, sizeof(exploParserMem));
-	std::memset(aliasParserMem, 0, sizeof(aliasParserMem));
 	std::memset(explTblRootMem, 0, sizeof(explTblRootMem));
 
 	for (IExplosionGenerator*& eg: explosionGenerators) {
@@ -212,21 +234,10 @@ void CExplosionGeneratorHandler::ParseExplosionTables()
 	static_assert(sizeof(LuaTable ) <= sizeof(explTblRootMem), "");
 
 	spring::SafeDestruct(exploParser);
-	spring::SafeDestruct(aliasParser);
 	spring::SafeDestruct(explTblRoot);
 
 	exploParser = new (exploParserMem) LuaParser("gamedata/explosions.lua", SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
-	aliasParser = new (aliasParserMem) LuaParser("gamedata/explosion_alias.lua", SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
 	explTblRoot = nullptr;
-
-	if (!aliasParser->Execute()) {
-		LOG_L(L_ERROR, "[%s] failed to parse explosion aliases: %s", __func__, (aliasParser->GetErrorLog()).c_str());
-	} else {
-		const LuaTable& aliasRoot = aliasParser->GetRoot();
-
-		projectileClasses.Clear();
-		projectileClasses.Load(aliasRoot.SubTable("projectiles"));
-	}
 
 	if (!exploParser->Execute()) {
 		LOG_L(L_ERROR, "[%s] failed to parse explosions: %s", __func__, (exploParser->GetErrorLog()).c_str());
@@ -264,7 +275,7 @@ void CExplosionGeneratorHandler::ReloadGenerators(const std::string& tag) {
 		return;
 	}
 
-	for (unsigned int n = 1; n < explosionGenerators.size(); n++) {
+	for (uint32_t n = 1; n < explosionGenerators.size(); n++) {
 		IExplosionGenerator* eg = explosionGenerators[n];
 
 		// standard EG's (empty postfix) do not need to be reloaded
@@ -283,7 +294,7 @@ void CExplosionGeneratorHandler::ReloadGenerators(const std::string& tag) {
 
 
 
-unsigned int CExplosionGeneratorHandler::LoadGeneratorID(const char* tag, const char* pre)
+uint32_t CExplosionGeneratorHandler::LoadGeneratorID(const char* tag, const char* pre)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	IExplosionGenerator* eg = LoadGenerator(tag, pre);
@@ -348,7 +359,7 @@ IExplosionGenerator* CExplosionGeneratorHandler::LoadGenerator(const char* tag, 
 	return explGen;
 }
 
-IExplosionGenerator* CExplosionGeneratorHandler::GetGenerator(unsigned int expGenID)
+IExplosionGenerator* CExplosionGeneratorHandler::GetGenerator(uint32_t expGenID)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (expGenID == EXPGEN_ID_INVALID)
@@ -361,7 +372,7 @@ IExplosionGenerator* CExplosionGeneratorHandler::GetGenerator(unsigned int expGe
 }
 
 bool CExplosionGeneratorHandler::GenExplosion(
-	unsigned int expGenID,
+	uint32_t expGenID,
 	const float3& pos,
 	const float3& dir,
 	float damage,
@@ -452,7 +463,7 @@ bool CStdExplosionGenerator::Explosion(
 
 	float3 camVect = camera->GetPos() - pos;
 
-	const unsigned int flags = CCustomExplosionGenerator::GetFlagsFromHeight(pos.y, groundHeight);
+	const uint32_t flags = CCustomExplosionGenerator::GetFlagsFromHeight(pos.y, groundHeight);
 	const bool    airExplosion = ((flags & CCustomExplosionGenerator::CEG_SPWF_AIR       ) != 0);
 	const bool groundExplosion = ((flags & CCustomExplosionGenerator::CEG_SPWF_GROUND    ) != 0);
 	const bool  waterExplosion = ((flags & CCustomExplosionGenerator::CEG_SPWF_WATER     ) != 0);
@@ -789,8 +800,6 @@ void CCustomExplosionGenerator::ExecuteExplosionCode(const char* code, float dam
 	}
 }
 
-
-
 void CCustomExplosionGenerator::ParseExplosionCode(
 	CCustomExplosionGenerator::ProjectileSpawnInfo* psi,
 	const string& script,
@@ -821,7 +830,7 @@ void CCustomExplosionGenerator::ParseExplosionCode(
 		SExpGenSpawnableMemberInfo subInfo = memberInfo;
 		subInfo.length = 1;
 
-		for (unsigned int i = 0; i < memberInfo.length && start < script.length(); ++i) {
+		for (uint32_t i = 0; i < memberInfo.length && start < script.length(); ++i) {
 			const string::size_type subEnd = script.find(',', start + 1);
 
 			ParseExplosionCode(psi, script.substr(start, subEnd - start), subInfo, code);
@@ -948,15 +957,13 @@ bool CCustomExplosionGenerator::Load(CExplosionGeneratorHandler* handler, const 
 	}
 
 	expGenParams.projectiles.clear();
-	expGenParams.groundFlash = GroundFlashInfo();
 
-	vector<string> spawns;
-	expTable.GetKeys(spawns);
+	vector<string> spawnNames;
+	expTable.GetKeys(spawnNames);
 
-	for (unsigned int n = 0; n < spawns.size(); n++) {
+	for (auto& spawnName : spawnNames) {
 		ProjectileSpawnInfo psi;
 
-		const std::string& spawnName = spawns[n];
 		const LuaTable& spawnTable = expTable.SubTable(spawnName);
 
 		// NOTE:
@@ -964,25 +971,53 @@ bool CCustomExplosionGenerator::Load(CExplosionGeneratorHandler* handler, const 
 		//   see springcontent/gamedata/explosions.lua::LoadTDFs
 		if (!spawnTable.IsValid())
 			continue;
-		if (spawnName == "groundflash" || spawnName == "filename")
+		if (spawnName == "filename")
 			continue;
 
-		const string& className = handler->GetProjectileClasses().ResolveAlias(spawnTable.GetString("class", spawnName));
+		uint32_t classNameFlags = 0;
+		bool hasPropertiesTbl = spawnTable.KeyExists("properties");
 
-		if ((psi.spawnableID = CExpGenSpawnable::GetSpawnableID(className)) == -1u) {
-			LOG_L(L_WARNING, "[CCEG::%s] %s: unknown class \"%s\"", __func__, tag, className.c_str());
+		const auto className = spawnTable.GetString("class", spawnName);
+		const auto resolvedClassName = GetClassNameAlias(className);
+
+		if (resolvedClassName == "CStandardGroundFlash" || resolvedClassName == "CSimpleGroundFlash") {
+			classNameFlags = CEG_SPWF_GROUND;
+		}
+
+		if ((psi.spawnableID = CExpGenSpawnable::GetSpawnableID(resolvedClassName)) == -1u) {
+			LOG_L(L_WARNING, "[CCEG::%s] %s: unknown class \"%s\"(\"%s\")", __func__, tag, className.c_str(), resolvedClassName.c_str());
 			continue;
 		}
 
-		psi.flags = GetFlagsFromTable(spawnTable);
+		psi.flags = classNameFlags | GetFlagsFromTable(spawnTable);
 		psi.count = std::max(0, spawnTable.GetInt("count", 1));
 
 		std::string code;
 		spring::unordered_map<string, string> props;
 
-		spawnTable.SubTable("properties").GetMap(props);
+		if (!hasPropertiesTbl) {
+			spawnTable.GetMap(props);
+			// remove elements normally belonging to the spawnable table
+			// so the loop below won't complain about unknown fields
+			props.erase(    "ground");
+			props.erase(     "water");
+			props.erase("voidground");
+			props.erase( "voidwater");
+			props.erase(       "air");
+			props.erase("underwater");
+			props.erase(      "unit");
+			props.erase(    "nounit");
 
-		// handle special cases first
+			// spawnTable.GetMap(props); will skip CStandardGroundFlash.color because it's a table, revert it to string manually
+			if (spawnTable.KeyExists("color")) {
+				const auto color = spawnTable.GetFloat3("color", float3{});
+				props.emplace("color", fmt::format("{},{},{}", color.r, color.g, color.b));
+			}
+		} else {
+			spawnTable.SubTable("properties").GetMap(props);
+		}
+
+		// handle special cases below
 
 		/// animparams (lowercased) is used to set up defaults for
 		/// animParams1, animParams2, animParams3, animParams4 in case their values are not defined
@@ -1006,14 +1041,13 @@ bool CCustomExplosionGenerator::Load(CExplosionGeneratorHandler* handler, const 
 
 		}
 
-		for (const auto& [key, val] : props) {
-			SExpGenSpawnableMemberInfo memberInfo = { 0, 0, 0, STRING_HASH(std::move(StringToLower(key))), SExpGenSpawnableMemberInfo::TYPE_INT, nullptr };
+		for (const auto& [propName, propValue]: props) {
+			SExpGenSpawnableMemberInfo memberInfo = {0, 0, 0, STRING_HASH(StringToLower(propName)), SExpGenSpawnableMemberInfo::TYPE_INT, nullptr};
 
-			if (CExpGenSpawnable::GetSpawnableMemberInfo(className, memberInfo)) {
-				ParseExplosionCode(&psi, val, memberInfo, code);
-			}
-			else {
-				LOG_L(L_WARNING, "[CCEG::%s] unknown field %s::%s in spawn-table \"%s\" for CEG \"%s\"", __func__, tag, key.c_str(), spawnName.c_str(), className.c_str());
+			if (CExpGenSpawnable::GetSpawnableMemberInfo(resolvedClassName, memberInfo)) {
+				ParseExplosionCode(&psi, propValue, memberInfo, code);
+			} else {
+				LOG_L(L_WARNING, "[CCEG::%s] unknown field %s::%s in spawn-table \"%s\" for CEG \"%s\"(\"%s\")", __func__, tag, propName.c_str(), spawnName.c_str(), className.c_str(), resolvedClassName.c_str());
 			}
 		}
 
@@ -1022,20 +1056,6 @@ bool CCustomExplosionGenerator::Load(CExplosionGeneratorHandler* handler, const 
 		copy(code.begin(), code.end(), psi.code.begin());
 
 		expGenParams.projectiles.push_back(psi);
-	}
-
-	const LuaTable gndTable = expTable.SubTable("groundflash");
-	const int ttl = gndTable.GetInt("ttl", 0);
-
-	if (ttl > 0) {
-		expGenParams.groundFlash.circleAlpha  = gndTable.GetFloat("circleAlpha",  0.0f);
-		expGenParams.groundFlash.flashSize    = gndTable.GetFloat("flashSize",    0.0f);
-		expGenParams.groundFlash.flashAlpha   = gndTable.GetFloat("flashAlpha",   0.0f);
-		expGenParams.groundFlash.circleGrowth = gndTable.GetFloat("circleGrowth", 0.0f);
-		expGenParams.groundFlash.color        = gndTable.GetFloat3("color", float3(1.0f, 1.0f, 0.8f));
-
-		expGenParams.groundFlash.flags = CEG_SPWF_GROUND | GetFlagsFromTable(gndTable);
-		expGenParams.groundFlash.ttl = ttl;
 	}
 
 	expGenParams.useDefaultExplosions = expTable.GetBool("useDefaultExplosions", false);
@@ -1065,7 +1085,7 @@ bool CCustomExplosionGenerator::Explosion(
 	bool withMutex
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	unsigned int flags = GetFlagsFromHeight(pos.y, CGround::GetHeightReal(pos.x, pos.z));
+	uint32_t flags = GetFlagsFromHeight(pos.y, CGround::GetHeightReal(pos.x, pos.z));
 
 	auto* hitWeapon = hitObject.GetTyped<CWeapon>();
 
@@ -1080,7 +1100,6 @@ bool CCustomExplosionGenerator::Explosion(
 	flags |= CEG_SPWF_INTERCEPTED * (hitWeapon && !shieldCollision);
 
 	const std::vector<ProjectileSpawnInfo>& spawnInfo = expGenParams.projectiles;
-	const GroundFlashInfo& groundFlash = expGenParams.groundFlash;
 
 	std::unique_lock<spring::mutex> lock(CProjectile::mut, std::defer_lock);
 	if (withMutex) {
@@ -1101,15 +1120,12 @@ bool CCustomExplosionGenerator::Explosion(
 		if (projectileHandler.GetParticleSaturation() > 1.0f)
 			break;
 
-		for (unsigned int c = 0; c < psi.count; c++) {
+		for (uint32_t c = 0; c < psi.count; c++) {
 			CExpGenSpawnable* projectile = CExpGenSpawnable::CreateSpawnable(psi.spawnableID);
 			ExecuteExplosionCode(&psi.code[0], damage, (char*) projectile, c, dir);
 			projectile->Init(owner, pos);
 		}
 	}
-
-	if (groundExplosion && (groundFlash.ttl > 0) && (groundFlash.flashSize > 1))
-		projMemPool.alloc<CStandardGroundFlash>(pos, groundFlash);
 
 	if (expGenParams.useDefaultExplosions) {
 		return (explGenHandler.GenExplosion(
@@ -1154,7 +1170,6 @@ bool CCustomExplosionGenerator::OutputProjectileClassInfo()
 			std::cout << "," << std::endl;
 
 		std::cout << "  \"" << c->name << "\": {" << std::endl;
-		std::cout << "    \"alias\": \"" << (egh.GetProjectileClasses()).FindAlias(c->name) << "\"";
 		for (creg::Class* cb = c; cb; cb = cb->base()) {
 			for (creg::Class::Member& m: cb->members) {
 				if (m.flags & creg::CM_Config) {
@@ -1175,4 +1190,3 @@ bool CCustomExplosionGenerator::OutputProjectileClassInfo()
 	return false;
 #endif
 }
-

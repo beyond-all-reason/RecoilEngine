@@ -28,12 +28,12 @@ public:
 	virtual void Init(const CUnit* owner, const float3& offset);
 
 	static bool GetSpawnableMemberInfo(const std::string& spawnableName, SExpGenSpawnableMemberInfo& memberInfo);
-	static int GetSpawnableID(const std::string& spawnableName);
+	static uint32_t GetSpawnableID(const std::string& spawnableName);
 
 	static void InitSpawnables();
 
 	//Memory handled in projectileHandler
-	static CExpGenSpawnable* CreateSpawnable(int spawnableID);
+	static CExpGenSpawnable* CreateSpawnable(uint32_t spawnableID);
 	static TypedRenderBuffer<VA_TYPE_PROJ>& GetPrimaryRenderBuffer();
 protected:
 	CExpGenSpawnable();

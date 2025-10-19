@@ -16,7 +16,7 @@
 // slow, use the CHECK_MEMBER_INFO_*_HASH macros instead
 #define STRING_HASH(memberName) spring::LiteHash(memberName.c_str(), memberName.size(), 0)
 #define MEMBER_NAME(member)     StringToLower(#member)
-#define MEMBER_HASH(member)     STRING_HASH(std::move(MEMBER_NAME(member)))
+#define MEMBER_HASH(member)     STRING_HASH(MEMBER_NAME(member))
 
 
 struct SExpGenSpawnableMemberInfo
