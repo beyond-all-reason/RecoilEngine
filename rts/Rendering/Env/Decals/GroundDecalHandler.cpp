@@ -204,7 +204,7 @@ void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::stri
 	RECOIL_DETAILED_TRACY_ZONE;
 	try {
 		const auto& [bm, fn] = LoadTexture(filename, convertOldBMP);
-		if (atlasTex->AddTexFromBitmap(name, bm)) {
+		if (atlasTex->AddTexFromBitmap(name, bm, filename)) {
 			texFileNames.emplace(name, fn);
 		}
 	}
@@ -337,8 +337,8 @@ void CGroundDecalHandler::AddFallbackTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const auto minDim = std::max(atlasTex->GetMinDim(), 32);
-	atlasTex->AddTex("%FB_MAIN%", minDim, minDim, SColor(255,   0,   0, 255));
-	atlasTex->AddTex("%FB_NORM%", minDim, minDim, SColor(128, 128, 255,   0));
+	atlasTex->AddTex("%FB_MAIN%", minDim, minDim, SColor(255,   0,   0, 255), "%FB_MAIN%");
+	atlasTex->AddTex("%FB_NORM%", minDim, minDim, SColor(128, 128, 255,   0), "%FB_NORM%");
 }
 
 uint32_t CGroundDecalHandler::GetNextId()
