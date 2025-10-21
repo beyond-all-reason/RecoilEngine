@@ -205,6 +205,7 @@ private:
 	std::vector<SRectangle> blurRectangles;
 
 	CRowAtlasAlloc atlasAlloc;
+	spring::unordered_map<std::string, size_t> glyphNameToIdx;
 
 	CBitmap atlasUpdate;
 	CBitmap atlasUpdateShadow;
