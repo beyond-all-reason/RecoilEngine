@@ -221,7 +221,8 @@ bool LuaConstGame::PushEntries(lua_State* L)
 
 		LuaPushNamedBool  (L, "allowEnginePlayerlist", modInfo.allowEnginePlayerlist);
 		/*** @field Game.nativeExcessSharing boolean whether the engine handles excess resources overflow */
-		LuaPushNamedBool  (L, "nativeExcessSharing", modInfo.nativeExcessSharing);	}
+		LuaPushNamedBool  (L, "nativeExcessSharing", modInfo.nativeExcessSharing);
+	}
 
 	if (archiveScanner != nullptr && mapInfo != nullptr) {
 		// archive checksums
