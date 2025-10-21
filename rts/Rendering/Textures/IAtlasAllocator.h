@@ -37,11 +37,12 @@ public:
 public:
 	virtual bool Allocate() = 0;
 	virtual int GetNumTexLevels() const = 0;
+	virtual int GetReqNumTexLevels() const = 0;
 	virtual uint32_t GetNumPages() const = 0;
 	void SetMaxTexLevel(int maxLevels) { numLevels = maxLevels; };
 public:
 	void AddEntry(const SAtlasEntry& ae) { AddEntry(ae.name, ae.size); }
-	void AddEntry(const std::string& name, int2 size)
+	void AddEntry(const std::string& name, const int2& size)
 	{
 		minDim = argmin(minDim, size.x, size.y);
 		entries[name] = SAtlasEntry(size, name);

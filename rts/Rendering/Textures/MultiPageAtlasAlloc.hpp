@@ -120,6 +120,16 @@ public:
 
 		return (minLevels == std::numeric_limits<int>::max()) ? 0 : minLevels;
 	}
+
+	int GetReqNumTexLevels() const override
+	{
+		int reqLevels = std::numeric_limits<int>::max();
+		for (auto& allocator : allocators) {
+			reqLevels = std::min(reqLevels, allocator->GetNumTexLevels());
+		}
+
+		return (reqLevels == std::numeric_limits<int>::max()) ? 0 : reqLevels;
+	}
 	uint32_t GetNumPages() const override { return allocators.size(); }
 private:
 	uint32_t maxPages;

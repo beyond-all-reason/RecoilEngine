@@ -17,6 +17,7 @@ public:
 
 	bool Allocate() override;
 	int GetNumTexLevels() const override;
+	int GetReqNumTexLevels() const override;
 	uint32_t GetNumPages() const override { return 1; }
 private:
 	static bool CompareTex(const SAtlasEntry* tex1, const SAtlasEntry* tex2);

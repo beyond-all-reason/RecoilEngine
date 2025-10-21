@@ -138,9 +138,14 @@ int CRowAtlasAlloc::GetNumTexLevels() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return std::min(
-		std::bit_width(static_cast<uint32_t>(GetMinDim())),
+		GetReqNumTexLevels(),
 		numLevels
 	);
+}
+
+int CRowAtlasAlloc::GetReqNumTexLevels() const
+{
+	return std::bit_width(static_cast<uint32_t>(GetMinDim()));
 }
 
 
