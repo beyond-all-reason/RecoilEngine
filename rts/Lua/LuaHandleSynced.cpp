@@ -1635,8 +1635,8 @@ bool CSyncedLuaHandle::FeaturePreDamaged(
  *
  * @function SyncedCallins:ShieldPreDamaged
  *
- * @param projectileID integer? `nil` when the weapon type is `BeamLaser` or `LightningCannon`
- * @param projectileOwnerID integer
+ * @param projectileID integer `-1` when the weapon type is `BeamLaser` or `LightningCannon`
+ * @param projectileOwnerID integer `-1` when the weapon type is `BeamLaser` or `LightningCannon`
  * @param shieldWeaponNum integer
  * @param shieldCarrierID integer
  * @param bounceProjectile boolean
