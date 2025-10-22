@@ -13,7 +13,7 @@ namespace GL
 class TexBind {
 public:
 	inline TexBind() {} // can be used to pop the binding
-	inline TexBind(unsigned slot, GLenum target, GLuint textureID)
+	inline TexBind(uint32_t slot, GLenum target, GLuint textureID)
 		: stateTexUnit(GL::FetchEffectualStateAttribValue<GLenum>(GL_ACTIVE_TEXTURE))
 		, texUnit(GL_TEXTURE0+slot)
 		, target(target)
