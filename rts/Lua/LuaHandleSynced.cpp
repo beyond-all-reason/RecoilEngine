@@ -1640,7 +1640,7 @@ bool CSyncedLuaHandle::FeaturePreDamaged(
  * @param projectileID integer
  * @param projectileOwnerID integer
  * @param shieldWeaponNum integer
- * @param shieldCarrierID integer
+ * @param shieldCarrierID integer?
  * @param bounceProjectile boolean
  * @param beamEmitterWeaponNum integer
  * @param beamEmitterUnitID integer
