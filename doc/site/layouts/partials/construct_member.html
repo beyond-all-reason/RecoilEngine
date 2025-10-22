@@ -1,0 +1,118 @@
+{{/*
+    Constructs a member data structure
+*/}}
+
+{{/* TODO:
+    - Generics
+*/}}
+
+{{ $data := .data }}
+{{ $path := slice }}
+{{ if .path }}
+	{{ $path = append .data.name .path }}
+{{ else }}
+	{{ $path = slice .data.name }}
+{{ end }}
+{{ $context := .context }}
+{{ $type_info := .type_info }}
+
+{{ $loc := dict }}
+{{ if reflect.IsSlice .data.loc }}
+    {{ $loc = index .data.loc 0 }}
+{{ else }}
+    {{ $loc = .data.loc }}
+{{ end }}
+
+{{ $res := (dict
+    "type" .data.type
+    "name" .data.name
+    "description" .data.description
+    "deprecation_reason" .data.deprecation_reason
+    "loc" $loc
+) }}
+
+{{ $res = merge $res (dict "permalink" (printf "%s-%s" .data.type (replace (delimit $path ".") "." "-"))) }}
+
+{{/* Things that have underlying types */}}
+
+{{ $has_types := slice "alias" "field" }}
+{{ if $data.type | collections.In $has_types }}
+    {{/* render types and insert*/}}
+    {{ $rendered_type := (partial "render_type.html" (dict "type" $data.typ "type_info" $type_info) ) }}
+    {{ $res = $res | merge (dict "typ" $rendered_type) }}
+{{ end }}
+
+{{/* Things that have members */}}
+
+{{ $has_members := slice "class" "enum" "table" }}
+{{ if $data.type | collections.In $has_members }}
+    {{ $members := slice }}
+
+    {{ range .data.members }}
+        {{ $members = $members | append (partial "construct_member.html" (dict "data" . "path" $path "type_info" $type_info) ) }}
+    {{ end }}
+
+    {{ $res = merge $res (dict "members" $members) }}
+{{ end }}
+
+{{/* Get @see tags */}}
+
+{{ $see := slice }}
+{{ range $data.tag_content }}
+    {{ if eq .tag_name "see" }}
+        {{ $see = $see | append (dict "name" .content "link" (partial "render_type.html" (dict "type" .content "type_info" $type_info))) }} {{/* Shit */}}
+    {{ end }}
+{{ end }}
+{{ $res = $res | merge (dict "see" $see) }}
+
+{{/* Function */}}
+
+{{ if eq $data.type "fn" }}
+    {{/* Params */}}
+    {{ $p_names := slice }}
+    {{ $params := slice }}
+    {{ range $data.params }}
+        {{ $params = $params | append (dict
+            "name" .name
+            "type" (partial "render_type.html" (dict "type" .typ "type_info" $type_info) )
+            "desc" .desc
+            ) }}
+        {{ $p_names = $p_names | append .name }}
+    {{ end }}
+    {{ $res = merge $res (dict "params" $params) }}
+
+    {{/* Returns */}}
+    {{ $r_names := slice }}
+    {{ $returns := slice }}
+    {{ range $data.returns }}
+        {{ $returns = $returns | append (dict
+            "name" .name
+            "type" (partial "render_type.html" (dict "type" .typ "type_info" $type_info) )
+            "desc" .desc
+            ) }}
+        {{ $r_names = $r_names | append .name }}
+    {{ end }}
+
+    {{/* Signature */}}
+    {{ $signature := "" }}
+    {{ if $r_names }}
+        {{ $signature = printf "(%s) -> %s" (delimit $p_names ", ") (delimit $r_names ", ") }}
+    {{ else }}
+        {{ $signature = printf "(%s)" (delimit $p_names ", ") }}
+    {{ end }}
+
+    {{ $res = merge $res (dict "params" $params "returns" $returns "signature" $signature "method" $data.is_meth) }}
+{{ end }}
+
+{{/* Class */}}
+
+{{ if eq $data.type "class" }}
+    {{ $bases := slice }}
+    {{ range .data.bases }}
+        {{ $bases = $bases | append (partial "render_type.html" (dict "type" . "type_info" $type_info) ) }}
+    {{ end }}
+
+    {{ $res = merge $res (dict "bases" $bases) }}
+{{ end }}
+
+{{ return $res }}
