@@ -2236,7 +2236,7 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 
 			const BuildInfo bi(unitdef, cameraPos + mouseDir * dist, buildFacing);
 
-			if (GetQueueKeystate() && (button == SDL_BUTTON_LEFT)) {
+			if ((GetQueueKeystate() && (button == SDL_BUTTON_LEFT)) || boxBuildMode) {
 				const float3 camTracePos = mouse->buttons[SDL_BUTTON_LEFT].camPos;
 				const float3 camTraceDir = mouse->buttons[SDL_BUTTON_LEFT].dir;
 
@@ -2260,16 +2260,34 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 
 			}
 
-			if (!preview) {
-				// only issue if more than one entry, i.e. user created some
-				// kind of line/area queue (caller handles the last command)
-				for (auto beg = buildInfos.cbegin(), end = --buildInfos.cend(); beg != end; ++beg) {
-					GiveCommand(beg->CreateCommand(CreateOptions(button)));
-				}
+			if (preview) {
+				unsigned char previewOpts = CreateOptions(button);
+				buildCommands.clear();
+				return CheckCommand(buildInfos.back().CreateCommand(previewOpts));
 			}
 
+			// multi-command + batching: issue all commands but last; last is returned
+			bool shiftHeld = GetQueueKeystate();
+			unsigned char baseOpts = CreateOptions(button);
+
+			for (auto it = buildInfos.cbegin(), end = --buildInfos.cend(); it != end; ++it) {
+				unsigned char opts = baseOpts;
+
+				// First command clears previous commands if shift isn't held; otherwise append with shift
+				if (it == buildInfos.cbegin() && !shiftHeld) {
+					opts &= ~SHIFT_KEY;      // clear once
+				} else {
+					opts |= SHIFT_KEY;       // append
+				}
+
+				GiveCommand(it->CreateCommand(opts));
+			}
+
+			// last command option = append
+			unsigned char lastOpts = baseOpts;
+			lastOpts |= SHIFT_KEY;
 			buildCommands.clear();
-			return CheckCommand((buildInfos.back()).CreateCommand(CreateOptions(button)));
+			return CheckCommand(buildInfos.back().CreateCommand(lastOpts));
 		}
 
 		case CMDTYPE_ICON_UNIT: {
@@ -2564,7 +2582,7 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 		float xstep = (int)((0 < delta.x) ? xsize : -xsize);
 		float zstep = (int)((0 < delta.z) ? zsize : -zsize);
 
-		if (KeyInput::GetKeyModState(KMOD_ALT)) {
+		if (KeyInput::GetKeyModState(KMOD_ALT) || boxBuildMode){
 			// build a (filled or hollow) rectangle
 			if (KeyInput::GetKeyModState(KMOD_CTRL)) {
 				if ((1 < xnum) && (1 < znum)) {
@@ -2611,6 +2629,27 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 
 	return (buildInfos.size());
 }
+
+void CGuiHandler::BoxBuildPress() {
+
+	boxBuildMode = true;
+    // Only simulate mouse press if not already pressed
+    if (!mouse->buttons[SDL_BUTTON_LEFT].pressed) {
+        mouse->MousePress(mouse->lastx, mouse->lasty, SDL_BUTTON_LEFT);
+		boxBuildPressed = true;
+    }
+}
+
+void CGuiHandler::BoxBuildRelease() {
+    // Only simulate release if BoxBuild owns the press
+    if (boxBuildPressed) {
+        mouse->MouseRelease(mouse->lastx, mouse->lasty, SDL_BUTTON_LEFT);
+		boxBuildPressed = false;
+    }
+
+    boxBuildMode = false;
+}
+
 
 
 void CGuiHandler::ProcessFrontPositions(float3& pos0, const float3& pos1)
@@ -3807,7 +3846,7 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 				const float3 cPos = tracePos + traceDir * rayTraceDist;
 
 				const CMouseHandler::ButtonPressEvt& bp = mouse->buttons[SDL_BUTTON_LEFT];
-				if (GetQueueKeystate() && bp.pressed) {
+				if ((GetQueueKeystate() && bp.pressed) || boxBuildMode) {
 					const float bpDist = CGround::LineGroundWaterCol(bp.camPos, bp.dir, maxTraceDist, buildeeDef->floatOnWater, false);
 					const float3 bPos = bp.camPos + bp.dir * bpDist;
 					const BuildInfo cInfo = BuildInfo(buildeeDef, cPos, buildFacing);

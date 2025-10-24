@@ -46,6 +46,10 @@ public:
 		MouseRelease(x, y, button, camera->GetPos(), mouse->dir);
 	}
 	void MouseRelease(int x, int y, int button, const float3& cameraPos, const float3& mouseDir);
+
+	void BoxBuildPress();
+    void BoxBuildRelease();
+	
 	bool IsAbove(int x, int y);
 	std::string GetTooltip(int x, int y);
 	std::string GetBuildTooltip() const;
@@ -251,6 +255,8 @@ private:
 		Box visual;
 		Box selection;
 	};
+    bool boxBuildMode = false;
+    bool boxBuildPressed = false;
 
 	std::string menuName;
 

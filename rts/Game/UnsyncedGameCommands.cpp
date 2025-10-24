@@ -768,6 +768,27 @@ private:
 };
 
 
+class BoxBuildActionExecutor : public IUnsyncedActionExecutor {
+public:
+    BoxBuildActionExecutor()
+      : IUnsyncedActionExecutor("boxbuild", "Enables box build placement mode") {}
+
+	bool Execute(const UnsyncedAction& action) const final {
+		if (!action.IsRepeat() && guihandler != nullptr)
+			guihandler->BoxBuildPress();
+		return false;
+	}
+
+	bool ExecuteRelease(const UnsyncedAction& action) const final {
+		if (guihandler != nullptr)
+			guihandler->BoxBuildRelease();
+		return false;
+	}
+};
+
+
+
+
 
 class AIKillReloadActionExecutor : public IUnsyncedActionExecutor {
 public:
@@ -4219,6 +4240,7 @@ void UnsyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<RedirectToSyncedActionExecutor>("LuaGaia"));
 	AddActionExecutor(AllocActionExecutor<CommandListActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<CommandHelpActionExecutor>());
+	AddActionExecutor(AllocActionExecutor<BoxBuildActionExecutor>());
 }
 
 

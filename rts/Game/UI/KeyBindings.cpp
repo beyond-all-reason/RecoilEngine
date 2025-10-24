@@ -152,6 +152,7 @@ static const DefaultBinding defaultBindings[] = {
 	{ "Shift+]", "buildfacing dec"  },
 	{   "Any+z", "buildspacing inc" },
 	{   "Any+x", "buildspacing dec" },
+	{   "Any+F14", "boxbuild" },
 
 	{            "a", "attack"       },
 	{      "Shift+a", "attack"       },
