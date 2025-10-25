@@ -5,7 +5,6 @@
 
 #include <vector>
 
-#include "Rendering/Icon.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/GuiSoundSet.h"
 #include "Sim/Objects/SolidObject.h"
@@ -13,7 +12,7 @@
 #include "System/float3.h"
 #include "System/UnorderedMap.hpp"
 
-#define MAX_UNITDEF_EXPGEN_IDS 32
+static constexpr uint32_t MAX_UNITDEF_EXPGEN_IDS = 32;
 
 
 struct Command;
@@ -264,7 +263,7 @@ public:
 	const WeaponDef* selfdExpWeaponDef;
 
 	mutable UnitDefImage* buildPic;
-	mutable icon::CIcon iconType;
+	mutable std::string iconName;
 
 	int selfDCountdown;
 

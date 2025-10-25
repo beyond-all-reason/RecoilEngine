@@ -18,8 +18,8 @@ namespace GL {
 		virtual ~TextureBase();
 
 		bool IsValid() const { return texID != 0; }
-		const auto GetId() const { return texID; }
-		const auto DisOwn() { ownTexID = false; return texID; }
+		auto GetId() const { return texID; }
+		auto DisOwn() { ownTexID = false; return texID; }
 
 		[[nodiscard]] GL::TexBind ScopedBind();
 		[[nodiscard]] GL::TexBind ScopedBind(uint32_t relSlot);

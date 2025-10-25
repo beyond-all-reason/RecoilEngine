@@ -2775,7 +2775,7 @@ static inline bool BindUnitTexByString(const std::string& str)
 	return true;
 }
 
-
+/*
 static inline bool BindIconTexByString(const std::string& str)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -2793,6 +2793,13 @@ static inline bool BindIconTexByString(const std::string& str)
 
 	ud->iconType->BindTexture();
 	return true;
+}
+*/
+
+static inline bool BindIconTexByString(const std::string& str)
+{
+	assert(false);
+	return false;
 }
 
 

@@ -415,6 +415,11 @@ bool CTextureRenderAtlas::IsValid() const
 	return finalized && (atlasTex->GetId() > 0);
 }
 
+uint32_t CTextureRenderAtlas::DisownTexture()
+{
+	return atlasTex->DisOwn();
+}
+
 bool CTextureRenderAtlas::DumpTexture() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;

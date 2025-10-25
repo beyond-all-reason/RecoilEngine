@@ -20,8 +20,6 @@ namespace GL {
 class GhostSolidObject {
 	CR_DECLARE_STRUCT(GhostSolidObject)
 public:
-	void IncRef() { (refCount++); }
-	bool DecRef() { return ((refCount--) > 1); }
 	const S3DModel* GetModel() const;
 	void PostLoad();
 public:
@@ -35,8 +33,7 @@ public:
 
 	int facing; //FIXME replaced with dir-vector just legacy decal drawer uses this
 	uint8_t team;
-	int refCount;
-	icon::CIconData* myIcon;
+	size_t currentIconIndex;
 private:
 	mutable const S3DModel* model;
 };
@@ -49,8 +46,7 @@ public:
 			eventName == "RenderUnitPreCreated" ||
 			eventName == "RenderUnitCreated" || eventName == "RenderUnitDestroyed" ||
 			eventName == "UnitEnteredRadar"  || eventName == "UnitEnteredLos"      ||
-			eventName == "UnitLeftRadar"     || eventName == "UnitLeftLos"         ||
-			eventName == "PlayerChanged";
+			eventName == "UnitLeftRadar"     || eventName == "UnitLeftLos"         ;
 	}
 
 	void RenderUnitPreCreated(const CUnit* unit) override;
@@ -63,7 +59,6 @@ public:
 	void UnitEnteredLos(const CUnit* unit, int allyTeam) override;
 	void UnitLeftLos(const CUnit* unit, int allyTeam) override;
 
-	void PlayerChanged(int playerNum) override;
 	bool UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost);
 	void UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost);
 	void ReviewPrevLos(const CUnit* unit);
@@ -127,35 +122,32 @@ public:
 	void AddTempDrawUnit(const TempDrawUnit& tempDrawUnit);
 
 	void UpdateGhostedBuildings();
-	void UpdateUnitDefMiniMapIcons(const UnitDef* ud);
+	void UpdateUnitIconsByUnitDef(const UnitDef* ud);
 public:
-	const std::vector<UnitDefImage>& GetUnitDefImages() const { return unitDefImages; }
-	      std::vector<UnitDefImage>& GetUnitDefImages() { return unitDefImages; }
+	const auto& GetUnitDefImages() const { return unitDefImages; }
+	      auto& GetUnitDefImages() { return unitDefImages; }
 
-	const std::vector<TempDrawUnit>& GetTempOpaqueDrawUnits(int modelType) const { return savedData.tempOpaqueUnits[modelType]; }
-	const std::vector<TempDrawUnit>& GetTempAlphaDrawUnits(int modelType) const { return  savedData.tempAlphaUnits[modelType]; }
+	const auto& GetTempOpaqueDrawUnits(int modelType) const { return savedData.tempOpaqueUnits[modelType]; }
+	const auto& GetTempAlphaDrawUnits(int modelType) const { return  savedData.tempAlphaUnits[modelType]; }
 
-	const std::vector<GhostSolidObject*>& GetDeadGhostBuildings(int allyTeam, int modelType) const {
+	const std::vector<GhostSolidObject*> GetDeadGhostBuildings() const;
+	const auto& GetDeadGhostBuildings(int allyTeam, int modelType) const {
 		assert((unsigned)gu->myAllyTeam < savedData.deadGhostBuildings.size());
 		return savedData.deadGhostBuildings[allyTeam][modelType];
 	}
-	const std::vector<CUnit*           >& GetLiveGhostBuildings(int allyTeam, int modelType) const {
+	const auto& GetLiveGhostBuildings(int allyTeam, int modelType) const {
 		assert((unsigned)gu->myAllyTeam < savedData.liveGhostBuildings.size());
 		return savedData.liveGhostBuildings[allyTeam][modelType];
 	}
 
 	auto*       GetSavedData()       { return &savedData; }
 	const auto* GetSavedData() const { return &savedData; }
-
-	const spring::unsynced_map<icon::CIconData*, std::pair<std::vector<const CUnit*>, std::vector<const GhostSolidObject*> > >& GetUnitsByIcon() const { return unitsByIcon; }
 protected:
 	void UpdateObjectDrawFlags(CSolidObject* o) const override;
 private:
-	const icon::CIconData* GetUnitIcon(const CUnit* unit);
-
 	void UpdateTempDrawUnits(std::vector<TempDrawUnit>& tempDrawUnits);
 
-	void UpdateUnitIcon(const CUnit* unit, bool forced, bool killed);
+	void UpdateCurrentUnitIcon(const CUnit* unit);
 	void UpdateUnitIconState(CUnit* unit);
 	void UpdateUnitIconStateScreen(CUnit* unit);
 	static void UpdateDrawPos(CUnit* unit);
@@ -184,19 +176,14 @@ public:
 private:
 	SavedData savedData;
 
-	spring::unsynced_map<icon::CIconData*, std::pair<std::vector<const CUnit*>, std::vector<const GhostSolidObject*> > > unitsByIcon;
-
 	std::vector<UnitDefImage> unitDefImages;
 
 	S3DModel* GetUnitModel(const CUnit* unit) const;
 	void RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSolidObject*>& dgb, int index);
 
-
 	// icons
 	bool useDistToGroundForIcons;
 	float sqCamDistToGroundForIcons;
-
-
 
 	// IconsAsUI
 	static constexpr float iconSizeMult = 0.005f; // 1/200
