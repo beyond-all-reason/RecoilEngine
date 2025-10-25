@@ -240,6 +240,7 @@ class LuaSyncedRead {
 		static int GetProjectileAllyTeamID(lua_State* L);
 		static int GetProjectileType(lua_State* L);
 		static int GetProjectileDefID(lua_State* L);
+		static int GetProjectileName(lua_State* L);
 		static int GetProjectileDamages(lua_State* L);
 
 		static int IsPosInMap(lua_State* L);

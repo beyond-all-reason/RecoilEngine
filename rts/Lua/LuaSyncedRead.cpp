@@ -336,6 +336,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetProjectileAllyTeamID);
 	REGISTER_LUA_CFUNC(GetProjectileType);
 	REGISTER_LUA_CFUNC(GetProjectileDefID);
+	REGISTER_LUA_CFUNC(GetProjectileName);
 	REGISTER_LUA_CFUNC(GetProjectileDamages);
 
 	REGISTER_LUA_CFUNC(IsPosInMap);
@@ -7533,6 +7534,45 @@ int LuaSyncedRead::GetProjectileDefID(lua_State* L)
 
 	lua_pushnumber(L, wdef->id);
 	return 1;
+}
+
+/***
+ *
+ * @function Spring.GetProjectileName
+ *
+ * Returns the name of projectile in case in it's a weapon or piece projectile, nil otherwise
+ *
+ * @param projectileID integer
+ * @return string? projectileName
+ */
+int LuaSyncedRead::GetProjectileName(lua_State* L)
+{
+	const auto* pro = ParseProjectile(L, __func__, 1);
+
+	if (pro == nullptr)
+		return 0;
+
+	if (pro->weapon) {
+		const auto* wpro = static_cast<const CWeaponProjectile*>(pro);
+
+		if (wpro != nullptr && wpro->GetWeaponDef() != nullptr) {
+			// maybe CWeaponProjectile derivatives
+			// should have actual names themselves?
+			lua_pushsstring(L, wpro->GetWeaponDef()->name);
+			return 1;
+		}
+	}
+
+	if (pro->piece) {
+		const auto* ppro = static_cast<const CPieceProjectile*>(pro);
+		if (ppro != nullptr && ppro->omp != nullptr) {
+			lua_pushsstring(L, ppro->omp->name);
+			return 1;
+		}
+	}
+
+	// neither weapon nor piece likely means the projectile is CExpGenSpawner, should we return any name in this case?
+	return 0;
 }
 
 
