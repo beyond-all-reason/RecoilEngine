@@ -169,10 +169,10 @@ void CIconHandler::Update()
 			}
 		}
 
-		if (invalidIcons.contains("default")) {
+		if (auto it = invalidIcons.find("default"); it != invalidIcons.end()) {
 			bool res = atlas.AddTexFromFile("default", "bitmaps/defaultradardot.png");
 			assert(res);
-			invalidIcons.erase("default");
+			invalidIcons.erase(it);
 		}
 
 		// everything above was loaded from a single image atlas, no need to run CTextureRenderAtlas machinery
@@ -210,10 +210,10 @@ void CIconHandler::Update()
 			item.SetTexCoords(atlas.GetTexture(iconName));
 		}
 
-		const auto& def = iconsData[defaultIconIdx];
+		const auto& defTC = iconsData[defaultIconIdx].GetTexCoords();
 		for (const auto& iconName : invalidIcons) {
 			auto& item = iconsData[*iconsMap.try_get(iconName)];
-			item.SetTexCoords(def.GetTexCoords());
+			item.SetTexCoords(defTC);
 		}
 
 		//atlas.DumpTexture();

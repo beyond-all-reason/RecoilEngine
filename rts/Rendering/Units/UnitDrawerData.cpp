@@ -271,17 +271,24 @@ void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
-	const unsigned short prevMask = (LOS_PREVLOS | LOS_CONTRADAR);
-
-	const auto* unitDef = unit->unitDef;
+	constexpr unsigned short inLosOrRad = (LOS_INLOS | LOS_INRADAR);
+	constexpr unsigned short prevMask = (LOS_PREVLOS | LOS_CONTRADAR);
 
 	// use the unit's custom icon if we can currently see it,
 	// or have seen it before and did not lose contact since
-	bool unitVisible = ((losStatus & (LOS_INLOS | LOS_INRADAR)) && ((losStatus & prevMask) == prevMask));
-	unitVisible |= gameSetup->ghostedBuildings && unit->unitDef->IsBuildingUnit() && (losStatus & LOS_PREVLOS);
+	bool unitVisible =
+		(losStatus & inLosOrRad) != 0 &&
+		(losStatus & prevMask) == prevMask ||
+		gameSetup->ghostedBuildings && unit->unitDef->IsBuildingUnit() && (losStatus & LOS_PREVLOS) != 0;
+
 	const bool customIcon = (unitVisible || gu->spectatingFullView);
 
-	unit->currentIconIndex = customIcon ? icon::iconHandler.GetIconIdx(unit->definedIconName) : icon::iconHandler.GetDefaultIconIdx();
+	if (customIcon)
+		unit->currentIconIndex = icon::iconHandler.GetIconIdx(unit->definedIconName);
+	else if ((losStatus & LOS_INRADAR) != 0)
+		unit->currentIconIndex = icon::iconHandler.GetDefaultIconIdx();
+	else
+		unit->currentIconIndex = icon::INVALID_ICON_INDEX;
 }
 
 void CUnitDrawerData::UpdateUnitIconState(CUnit* unit)

@@ -146,10 +146,8 @@ bool CTextureRenderAtlas::AddTexFromFile(const std::string& name, const std::str
 	if (finalized)
 		return false;
 
-	if (!filenameToTexID.contains(fileName))
-		return false;
-
-	if (!CFileHandler::FileExists(fileName, SPRING_VFS_ALL))
+	// doesn't contain the texture already and can't find the file
+	if (!filenameToTexID.contains(fileName) && !CFileHandler::FileExists(fileName, SPRING_VFS_ALL))
 		return false;
 
 	CBitmap bm;

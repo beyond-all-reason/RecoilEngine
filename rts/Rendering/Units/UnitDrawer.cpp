@@ -398,7 +398,7 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 	const float ghostIconDimming = modelDrawerData->ghostIconDimming;
 
 	for (auto* unit : modelDrawerData->GetUnsortedObjects()) {
-		const size_t iconIndex = minimap->UseUnitIcons() ? icon::iconHandler.GetDefaultIconIdx() : unit->currentIconIndex;
+		const size_t iconIndex = minimap->UseUnitIcons() ? unit->currentIconIndex : icon::iconHandler.GetDefaultIconIdx();
 
 		if (iconIndex == icon::INVALID_ICON_INDEX)
 			continue;
