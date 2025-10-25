@@ -216,6 +216,8 @@ void CIconHandler::Update()
 			item.SetTexCoords(defTC);
 		}
 
+		atlasTextureSizes[i] = atlas.GetAtlasSize();
+
 		//atlas.DumpTexture();
 		glDeleteTextures(1, &atlasTextureIDs[i]);
 		atlasTextureIDs[i] = atlas.DisownTexture();
@@ -226,6 +228,16 @@ void CIconHandler::Update()
 
 }
 
+std::string CIconHandler::GetIconName(size_t tgtIconIdx) const
+{
+	for (const auto& [iconName, iconIdx] : iconsMap) {
+		if (iconIdx == tgtIconIdx)
+			return iconName;
+	}
+
+	return "";
+}
+
 std::pair<bool, spring::unordered_map<std::string, size_t>::const_iterator> CIconHandler::FindIconIdx(const std::string& iconName) const
 {
 	const auto it = iconsMap.find(iconName);
@@ -233,6 +245,14 @@ std::pair<bool, spring::unordered_map<std::string, size_t>::const_iterator> CIco
 }
 
 size_t CIconHandler::GetIconIdx(const std::string& iconName) const
+{
+	if (const auto& [found, it] = FindIconIdx(iconName); found)
+		return it->second;
+	else
+		return INVALID_ICON_INDEX;
+}
+
+size_t CIconHandler::GetIconIdxOrDefault(const std::string& iconName) const
 {
 	if (const auto& [found, it] = FindIconIdx(iconName); found)
 		return it->second;

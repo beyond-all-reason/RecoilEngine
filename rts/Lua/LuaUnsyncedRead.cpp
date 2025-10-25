@@ -45,6 +45,7 @@
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/Features/FeatureDrawer.h"
+#include "Rendering/IconHandler.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Features/FeatureHandler.h"
@@ -301,6 +302,9 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetGroundDecalType);
 
 	REGISTER_LUA_CFUNC(UnitIconGetDraw);
+	REGISTER_LUA_CFUNC(GetUnitIconData);
+	REGISTER_LUA_CFUNC(GetIconData);
+	REGISTER_LUA_CFUNC(GetAllIconData);
 
 	REGISTER_LUA_CFUNC(GetSyncedGCInfo);
 	REGISTER_LUA_CFUNC(SolveNURBSCurve);
@@ -1354,6 +1358,113 @@ int LuaUnsyncedRead::UnitIconGetDraw(lua_State* L) {
 	return 1;
 }
 
+namespace Impl {
+	template<bool full>
+	void PushIconData(lua_State* L, const std::string& iconName, const icon::IconData& iconData) {
+		lua_createtable(L, 0, 2 + 5 * !full);
+
+		LuaPushNamedString(L, "name", iconName);
+		if constexpr (full) {
+			LuaPushNamedString(L, "fileName", iconData.GetFileName());
+			LuaPushNamedNumber(L, "size", iconData.GetSize());
+			LuaPushNamedNumber(L, "distance", iconData.GetDistance());
+			LuaPushNamedBool(L, "radiusAdjust", iconData.GetRadiusAdjust());
+			{
+				const auto& stc = iconData.GetSrcTexCoords();
+				lua_pushliteral(L, "srcTexCoords");
+				lua_createtable(L, 0, 4);
+
+				LuaPushNamedNumber(L, "x0", stc.x1);
+				LuaPushNamedNumber(L, "y0", stc.y1);
+				LuaPushNamedNumber(L, "x1", stc.x2);
+				LuaPushNamedNumber(L, "y1", stc.y2);
+
+				lua_rawset(L, -3);
+			}
+		}
+		const auto& atc = iconData.GetTexCoords();
+		{
+			lua_pushliteral(L, "atlasTexCoords");
+			lua_createtable(L, 0, 5);
+
+			LuaPushNamedNumber(L, "x0", atc.x1);
+			LuaPushNamedNumber(L, "y0", atc.y1);
+			LuaPushNamedNumber(L, "x1", atc.x2);
+			LuaPushNamedNumber(L, "y1", atc.y2);
+			LuaPushNamedNumber(L, "atlasIndex", atc.pageNum);
+
+			lua_rawset(L, -3);
+		}
+	}
+
+	template<bool full>
+	int GetIconDataImpl(lua_State* L, size_t iconIdx) {
+		if (iconIdx == icon::INVALID_ICON_INDEX)
+			return 0;
+
+		const auto& iconData = icon::iconHandler.GetIconData(iconIdx);
+		const auto  iconName = icon::iconHandler.GetIconName(iconIdx);
+
+		PushIconData<full>(L, iconName, iconData);
+		return 1;
+	}
+}
+
+int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+	const auto fullData = luaL_optboolean(L, 2, false);
+
+	if (unit == nullptr)
+		return 0;
+
+	if (fullData)
+		return Impl::GetIconDataImpl<true >(L, unit->currentIconIndex);
+	else
+		return Impl::GetIconDataImpl<false>(L, unit->currentIconIndex);
+}
+
+int LuaUnsyncedRead::GetIconData(lua_State* L)
+{
+	const auto iconName = luaL_checkstring(L, 1);
+	const auto fullData = luaL_optboolean(L, 2, false);
+
+	const auto iconIdx = icon::iconHandler.GetIconIdx(iconName);
+
+	if (fullData)
+		return Impl::GetIconDataImpl<true >(L, iconIdx);
+	else
+		return Impl::GetIconDataImpl<false>(L, iconIdx);
+}
+
+int LuaUnsyncedRead::GetAllIconData(lua_State* L)
+{
+	const auto fullData = luaL_optboolean(L, 1, false);
+
+	const auto& iconsData = icon::iconHandler.GetIconsData();
+	const auto& iconsMap = icon::iconHandler.GetIconsMap();
+
+	spring::unordered_map<size_t, std::string> iconsInvMap; iconsInvMap.reserve(iconsMap.size());
+
+	for (const auto& [iconName, iconIdx] : iconsMap) {
+		iconsInvMap[iconIdx] = iconName;
+	}
+
+	lua_createtable(L, iconsData.size(), 0);
+	for (size_t i = 0; i < iconsData.size() && i < 10; ++i) {
+		const auto& iconData = iconsData[i];
+		const auto it = iconsInvMap.find(i);
+		const std::string iconName = (it != iconsInvMap.end()) ? it->second : "";
+		if (fullData)
+			Impl::PushIconData<true >(L, iconName, iconData);
+		else
+			Impl::PushIconData<false>(L, iconName, iconData);
+
+		lua_rawseti(L, -2, i + 1);
+	}
+
+	return 1;
+}
 
 /***
  *

@@ -284,7 +284,7 @@ void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 	const bool customIcon = (unitVisible || gu->spectatingFullView);
 
 	if (customIcon)
-		unit->currentIconIndex = icon::iconHandler.GetIconIdx(unit->definedIconName);
+		unit->currentIconIndex = icon::iconHandler.GetIconIdxOrDefault(unit->definedIconName);
 	else if ((losStatus & LOS_INRADAR) != 0)
 		unit->currentIconIndex = icon::iconHandler.GetDefaultIconIdx();
 	else

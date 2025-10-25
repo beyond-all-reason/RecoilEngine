@@ -90,13 +90,19 @@ namespace icon {
 
 			void Update();
 
+			std::string GetIconName(size_t iconIdx) const;
+			const auto& GetIconsMap() const { return iconsMap; }
+			const auto& GetIconsData() const { return iconsData; }
 			const auto& GetIconData(const std::string& iconName) const { return iconsData[*iconsMap.try_get(iconName)]; }
 			const auto& GetIconData(size_t iconIdx) const { return iconsData[iconIdx]; }
 			size_t GetIconIdx(const std::string& iconName) const;
+			size_t GetIconIdxOrDefault(const std::string& iconName) const;
 			std::pair<bool, spring::unordered_map<std::string, size_t>::const_iterator> FindIconIdx(const std::string& iconName) const;
 			size_t GetDefaultIconIdx() const { return defaultIconIdx; }
 
 			const auto& GetAtlasTextureIDs() const { return atlasTextureIDs; }
+			auto GetAtlasTextureID(size_t i) const { return atlasTextureIDs[i]; }
+			const auto& GetAtlasSize(size_t i) const { return atlasTextureSizes[i]; }
 		private:
 			void LoadIcons(const std::string& filename);
 		private:
@@ -108,6 +114,7 @@ namespace icon {
 			size_t defaultIconIdx = INVALID_ICON_INDEX;
 
 			std::array<uint32_t, 2> atlasTextureIDs = {};
+			std::array<int2, 2> atlasTextureSizes = {};
 			std::bitset<2> atlasNeedsUpdate = { false };
 	};
 

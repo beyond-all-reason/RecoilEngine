@@ -10,9 +10,6 @@ struct S3DModel;
 class CUnitDrawer;
 struct UnitDef;
 
-namespace icon {
-	class CIconData;
-}
 namespace GL {
 	struct GeometryBuffer;
 }

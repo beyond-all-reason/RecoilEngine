@@ -272,6 +272,12 @@ int CTextureRenderAtlas::GetMinDim() const
 	return atlasAllocator->GetMinDim();
 }
 
+const int2& CTextureRenderAtlas::GetAtlasSize() const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	return atlasAllocator->GetAtlasSize();
+}
+
 int CTextureRenderAtlas::GetNumTexLevels() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;

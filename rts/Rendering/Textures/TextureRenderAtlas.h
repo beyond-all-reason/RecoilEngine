@@ -51,6 +51,7 @@ public:
 
 	uint32_t GetTexTarget() const;
 	uint32_t GetTexID() const;
+	const int2& GetAtlasSize() const;
 	int GetMinDim() const;
 	int GetNumTexLevels() const;
 	void SetMaxTexLevel(int maxLevels);

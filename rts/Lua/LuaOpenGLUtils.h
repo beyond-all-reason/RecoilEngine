@@ -87,6 +87,9 @@ class LuaMatTexture {
 
 			LUATEX_EXPLOSIONS_ATLAS,
 			LUATEX_GROUNDFX_ATLAS,
+
+			LUATEX_ICONS_ATLAS0,
+			LUATEX_ICONS_ATLAS1,
 		};
 
 	public:
