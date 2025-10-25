@@ -98,6 +98,8 @@ class LuaSyncedRead {
 		static int GetFeaturesInRectangle(lua_State* L);
 		static int GetFeaturesInSphere(lua_State* L);
 		static int GetFeaturesInCylinder(lua_State* L);
+
+		static int GetAllProjectiles(lua_State* L);
 		static int GetProjectilesInRectangle(lua_State* L);
 		static int GetProjectilesInSphere(lua_State* L);
 

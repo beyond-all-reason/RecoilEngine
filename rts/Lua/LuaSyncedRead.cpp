@@ -193,6 +193,8 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetFeaturesInRectangle);
 	REGISTER_LUA_CFUNC(GetFeaturesInSphere);
 	REGISTER_LUA_CFUNC(GetFeaturesInCylinder);
+
+	REGISTER_LUA_CFUNC(GetAllProjectiles);
 	REGISTER_LUA_CFUNC(GetProjectilesInRectangle);
 	REGISTER_LUA_CFUNC(GetProjectilesInSphere);
 
@@ -3647,6 +3649,22 @@ static void GetProjectilesLuaTable(lua_State* L, const std::vector<CProjectile*>
 			lua_rawseti(L, -2, arrayIndex++);
 		}
 	}
+}
+
+/***
+ *
+ * @function Spring.GetAllProjectiles
+ * @param excludeWeaponProjectiles boolean? (Default: `false`)
+ * @param excludePieceProjectiles boolean? (Default: `false`)
+ * @return number[] projectileIDs
+ */
+int LuaSyncedRead::GetAllProjectiles(lua_State* L)
+{
+	const bool excludeWeaponProjectiles = luaL_optboolean(L, 1, false);
+	const bool excludePieceProjectiles  = luaL_optboolean(L, 2, false);
+	const auto& projVec = projectileHandler.GetActiveProjectiles(true).GetData();
+	GetProjectilesLuaTable(L, projVec, excludeWeaponProjectiles, excludePieceProjectiles);
+	return 1;
 }
 
 /***
