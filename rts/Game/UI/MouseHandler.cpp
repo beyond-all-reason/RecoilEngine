@@ -334,6 +334,24 @@ void CMouseHandler::MousePress(int x, int y, int button)
 
 	pressedBitMask |= 1 << button;
 
+	const bool isXButton = (button == SDL_BUTTON_X1 || button == SDL_BUTTON_X2);
+	if (isXButton) {
+
+		// 1. Lua first
+		if (luaInputReceiver->MousePress(x, y, button)) {
+			return;
+		}
+
+		// 2. GameInputReceiver via the same path as mouse buttons
+		auto activeControllerReceiver = (activeController == nullptr) ? nullptr : activeController->GetInputReceiver();
+		if (activeControllerReceiver && activeControllerReceiver->MousePress(x, y, button)) {
+			// NOTE: X‑buttons bypass ownership so they can be pressed/released without stealing or confusing activeReceiver
+			return;
+		}
+		return;
+	}
+
+
 	if (activeReceiver != nullptr && activeReceiver->MousePress(x, y, button))
 		return;
 
@@ -500,6 +518,22 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 	}
 
 	if (RmlGui::ProcessMouseRelease(x, y, button)) {
+		return;
+	}
+
+	const bool isXButton = (button == SDL_BUTTON_X1 || button == SDL_BUTTON_X2);
+	if (isXButton) {
+
+		// 1. Lua first
+		luaInputReceiver->MouseRelease(x, y, button);
+
+		// 2. GameInputReceiver via the same path as mouse buttons
+		auto activeControllerReceiver = (activeController == nullptr) ? nullptr : activeController->GetInputReceiver();
+		if (activeControllerReceiver) {
+			activeControllerReceiver->MouseRelease(x, y, button);
+		}
+
+		// 3. Skip ownership funnel
 		return;
 	}
 

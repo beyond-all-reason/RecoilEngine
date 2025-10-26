@@ -257,7 +257,6 @@ private:
 	};
     bool boxBuildMode = false;
     bool boxBuildClicking = false;
-	CInputReceiver* boxBuildOwner = nullptr;
 
 	std::string menuName;
 

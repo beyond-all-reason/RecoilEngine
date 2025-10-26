@@ -2257,35 +2257,30 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 				// TODO: maybe also check out-of-range for immobile builder?
 				if (!CGameHelper::TestUnitBuildSquare(buildInfos[0], feature, gu->myAllyTeam, false))
 					return defaultRet;
-
-			}
-
-			if (preview || buildInfos.size() == 1) {
 				buildCommands.clear();
 				return CheckCommand(buildInfos.back().CreateCommand(CreateOptions(button)));
 			}
-			else {
-				// multi-command + batching: issue all commands but last; last is returned
-				bool shiftHeld = GetQueueKeystate();
-				unsigned char baseOpts = CreateOptions(button);
 
+			// handle multi-command batching if not preview
+			unsigned char baseOpts = CreateOptions(button);
+			if (!preview) {
+				bool shiftHeld = GetQueueKeystate();
 				for (auto it = buildInfos.cbegin(), end = --buildInfos.cend(); it != end; ++it) {
 					unsigned char opts = baseOpts;
 					// First command clears previous commands if shift isn't held; otherwise append with shift
 					if (it == buildInfos.cbegin() && !shiftHeld) {
-						opts &= ~SHIFT_KEY;      // clear once
+						opts &= ~SHIFT_KEY;   // clear once
 					} else {
-						opts |= SHIFT_KEY;       // append
+						opts |= SHIFT_KEY;    // append
 					}
 					GiveCommand(it->CreateCommand(opts));
 				}
-
-				// last command option = append
-				unsigned char lastOpts = baseOpts;
-				lastOpts |= SHIFT_KEY;
-				buildCommands.clear();
-				return CheckCommand(buildInfos.back().CreateCommand(lastOpts));
 			}
+			// finalize: last command always acts as append in multibuild
+			unsigned char lastOpts = baseOpts;
+			lastOpts |= SHIFT_KEY;  // batching branch also appends last
+			buildCommands.clear();
+			return CheckCommand(buildInfos.back().CreateCommand(lastOpts));
 		}
 
 		case CMDTYPE_ICON_UNIT: {
@@ -2634,19 +2629,14 @@ void CGuiHandler::BoxBuildPress() {
     if (!mouse->buttons[SDL_BUTTON_LEFT].pressed) {
         mouse->MousePress(mouse->lastx, mouse->lasty, SDL_BUTTON_LEFT);
         boxBuildClicking = true;
-        // GUI or minimap claims the press
-        boxBuildOwner = CInputReceiver::GetActiveReceiverRef();
     }
 }
 
 void CGuiHandler::BoxBuildRelease() {
 	// Only simulate release if mouse press was simulated
     if (boxBuildClicking) {
-		// Fix Mouse4/Mouse5 bind release misrouting from cross‑receiver multipress by adjusting ownership (keybinds like F14 unaffected)
-        CInputReceiver::GetActiveReceiverRef() = boxBuildOwner;
         mouse->MouseRelease(mouse->lastx, mouse->lasty, SDL_BUTTON_LEFT);
         boxBuildClicking = false;
-        boxBuildOwner = nullptr;
     }
     boxBuildMode = false;
 }
