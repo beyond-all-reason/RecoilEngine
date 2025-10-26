@@ -1365,11 +1365,11 @@ int LuaUnsyncedRead::UnitIconGetDraw(lua_State* L) {
 
 /***
  * @class TexCoords
- * @field x0 number
- * @field x1 number
- * @field y0 number
- * @field y1 number
- * @field atlasIndex integer?
+ * @field x0 number left coordinate in the normalized range
+ * @field x1 number right coordinate in the normalized range
+ * @field y0 number top coordinate in the normalized range
+ * @field y1 number bottom coordinate in the normalized range
+ * @field atlasIndex integer? Means the atlas page number in case the texture is arrayed or points to another sequential texture in other rare cases
  */
 
 namespace Impl {
@@ -1382,11 +1382,11 @@ namespace Impl {
 		if constexpr (full) {
 			/*** @field IconData.fileName string? */
 			LuaPushNamedString(L, "fileName", iconData.GetFileName());
-			/*** @field IconData.size number? */
+			/*** @field IconData.size number? Relative size of the icon */
 			LuaPushNamedNumber(L, "size", iconData.GetSize());
-			/*** @field IconData.distance number? */
+			/*** @field IconData.distance number? When squared used as a icon length multiplier */
 			LuaPushNamedNumber(L, "distance", iconData.GetDistance());
-			/*** @field IconData.radiusAdjust boolean? */
+			/*** @field IconData.radiusAdjust boolean? Controls whether the unit radius affects the icon size */
 			LuaPushNamedBool(L, "radiusAdjust", iconData.GetRadiusAdjust());
 
 			/*** @field IconData.srcTexCoords TexCoords? */
@@ -1404,7 +1404,7 @@ namespace Impl {
 			}
 		}
 
-		/*** @field IconData.atlasTexCoords TexCoords */
+		/*** @field IconData.atlasTexCoords TexCoords atlasIndex points to $icons0 or $icons1 texture */
 		const auto& atc = iconData.GetTexCoords();
 		{
 			lua_pushliteral(L, "atlasTexCoords");
@@ -1436,7 +1436,7 @@ namespace Impl {
  *
  * @function Spring.GetUnitIconData
  * @param unitID number
- * @param fullData boolean? (Default: false) Whether additional information about the icon is returned
+ * @param fullData boolean? (Default: false) Whether additional information about the icon is returned, otherwise only `name` and `atlasTexCoords` are returned
  * @return IconData iconData
  * @see Spring.GetIconData
  */
@@ -1458,7 +1458,7 @@ int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
  *
  * @function Spring.GetIconData
  * @param iconName string
- * @param fullData boolean? (Default: false) Whether additional information about the icon is returned
+ * @param fullData boolean? (Default: false) Whether additional information about the icon is returned, otherwise only `name` and `atlasTexCoords` are returned
  * @return IconData iconData
  * @see Spring.GetUnitIconData
  */
@@ -1478,7 +1478,7 @@ int LuaUnsyncedRead::GetIconData(lua_State* L)
 /*** Get icon data
  *
  * @function Spring.GetAllIconDataArray
- * @param fullData boolean? (Default: false) Whether additional information about each icon is returned
+ * @param fullData boolean? (Default: false) Whether additional information about each icon is returned, otherwise only `name` and `atlasTexCoords` are returned
  * @return IconData[] iconDataList
  * @see Spring.GetUnitIconData
  * @see Spring.GetIconData
