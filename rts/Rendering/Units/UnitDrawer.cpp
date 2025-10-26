@@ -388,7 +388,8 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, 
 
 void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
+
 	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_2DTC3>();
 	rb.AssertSubmission();
 
@@ -536,7 +537,7 @@ float CUnitDrawerGLSL::DrawUnitIcon(TypedRenderBuffer<VA_TYPE_TC3>& rb, size_t i
 
 void CUnitDrawerGLSL::DrawUnitIcons() const
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
 #if 0
 	if (game->hideInterface && modelDrawerData->iconHideWithUI)
 		return;
@@ -638,7 +639,8 @@ void CUnitDrawerGLSL::DrawUnitIconScreen(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, s
 
 void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 {
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScoped;
+
 	if (game->hideInterface && modelDrawerData->iconHideWithUI)
 		return;
 
