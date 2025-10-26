@@ -1404,7 +1404,7 @@ namespace Impl {
 			}
 		}
 
-		/*** @field IconData.atlasTexCoords TexCoords? */
+		/*** @field IconData.atlasTexCoords TexCoords */
 		const auto& atc = iconData.GetTexCoords();
 		{
 			lua_pushliteral(L, "atlasTexCoords");
@@ -1436,8 +1436,9 @@ namespace Impl {
  *
  * @function Spring.GetUnitIconData
  * @param unitID number
- * @param fullData boolean? (Default: false)
+ * @param fullData boolean? (Default: false) Whether additional information about the icon is returned
  * @return IconData iconData
+ * @see Spring.GetIconData
  */
 int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
 {
@@ -1457,8 +1458,9 @@ int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
  *
  * @function Spring.GetIconData
  * @param iconName string
- * @param fullData boolean? (Default: false)
+ * @param fullData boolean? (Default: false) Whether additional information about the icon is returned
  * @return IconData iconData
+ * @see Spring.GetUnitIconData
  */
 int LuaUnsyncedRead::GetIconData(lua_State* L)
 {
@@ -1476,8 +1478,10 @@ int LuaUnsyncedRead::GetIconData(lua_State* L)
 /*** Get icon data
  *
  * @function Spring.GetAllIconDataArray
- * @param fullData boolean? (Default: false)
+ * @param fullData boolean? (Default: false) Whether additional information about each icon is returned
  * @return IconData[] iconDataList
+ * @see Spring.GetUnitIconData
+ * @see Spring.GetIconData
  */
 int LuaUnsyncedRead::GetAllIconDataArray(lua_State* L)
 {
