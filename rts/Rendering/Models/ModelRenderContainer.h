@@ -10,7 +10,7 @@
 #include "System/ForceInline.hpp"
 
 template<typename T>
-RECOIL_FORCE_INLINE auto MDL_TYPE(T* o) { return o->model->type; }
+RECOIL_FORCE_INLINE const auto& MDL_TYPE(T* o) { return o->model->type; }
 
 template<typename TObject>
 class ModelRenderContainerSelector {
