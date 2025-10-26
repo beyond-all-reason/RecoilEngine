@@ -1358,17 +1358,38 @@ int LuaUnsyncedRead::UnitIconGetDraw(lua_State* L) {
 	return 1;
 }
 
+/*** Icon Data
+ *
+ * @class IconData
+ */
+
+/***
+ * @class TexCoords
+ * @field x0 number
+ * @field x1 number
+ * @field y0 number
+ * @field y1 number
+ * @field atlasIndex integer?
+ */
+
 namespace Impl {
 	template<bool full>
 	void PushIconData(lua_State* L, const icon::IconData& iconData) {
 		lua_createtable(L, 0, 2 + 5 * !full);
 
+		/*** @field IconData.name string */
 		LuaPushNamedString(L, "name", iconData.GetName());
 		if constexpr (full) {
+			/*** @field IconData.fileName string? */
 			LuaPushNamedString(L, "fileName", iconData.GetFileName());
+			/*** @field IconData.size number? */
 			LuaPushNamedNumber(L, "size", iconData.GetSize());
+			/*** @field IconData.distance number? */
 			LuaPushNamedNumber(L, "distance", iconData.GetDistance());
+			/*** @field IconData.radiusAdjust boolean? */
 			LuaPushNamedBool(L, "radiusAdjust", iconData.GetRadiusAdjust());
+
+			/*** @field IconData.srcTexCoords TexCoords? */
 			{
 				const auto& stc = iconData.GetSrcTexCoords();
 				lua_pushliteral(L, "srcTexCoords");
@@ -1382,6 +1403,8 @@ namespace Impl {
 				lua_rawset(L, -3);
 			}
 		}
+
+		/*** @field IconData.atlasTexCoords TexCoords? */
 		const auto& atc = iconData.GetTexCoords();
 		{
 			lua_pushliteral(L, "atlasTexCoords");
@@ -1409,6 +1432,13 @@ namespace Impl {
 	}
 }
 
+/*** Get unit icon data
+ *
+ * @function Spring.GetUnitIconData
+ * @param unitID number
+ * @param fullData boolean? (Default: false)
+ * @return IconData iconData
+ */
 int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
 {
 	CUnit* unit = ParseUnit(L, __func__, 1);
@@ -1423,6 +1453,13 @@ int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
 		return Impl::GetIconDataImpl<false>(L, unit->currentIconIndex);
 }
 
+/*** Get icon data
+ *
+ * @function Spring.GetIconData
+ * @param iconName string
+ * @param fullData boolean? (Default: false)
+ * @return IconData iconData
+ */
 int LuaUnsyncedRead::GetIconData(lua_State* L)
 {
 	const auto iconName = luaL_checkstring(L, 1);
@@ -1436,6 +1473,12 @@ int LuaUnsyncedRead::GetIconData(lua_State* L)
 		return Impl::GetIconDataImpl<false>(L, iconIdx);
 }
 
+/*** Get icon data
+ *
+ * @function Spring.GetAllIconDataArray
+ * @param fullData boolean? (Default: false)
+ * @return IconData[] iconDataList
+ */
 int LuaUnsyncedRead::GetAllIconDataArray(lua_State* L)
 {
 	const auto fullData = luaL_optboolean(L, 1, false);
