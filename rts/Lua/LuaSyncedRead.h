@@ -231,7 +231,6 @@ class LuaSyncedRead {
 		static int GetProjectileDirection(lua_State* L);
 		static int GetProjectileVelocity(lua_State* L);
 		static int GetProjectileGravity(lua_State* L);
-		static int GetPieceProjectileParams(lua_State* L);
 		static int GetProjectileTarget(lua_State* L);
 		static int GetProjectileIsIntercepted(lua_State* L);
 		static int GetProjectileTimeToLive(lua_State* L);
@@ -240,8 +239,9 @@ class LuaSyncedRead {
 		static int GetProjectileAllyTeamID(lua_State* L);
 		static int GetProjectileType(lua_State* L);
 		static int GetProjectileDefID(lua_State* L);
-		static int GetProjectileName(lua_State* L);
 		static int GetProjectileDamages(lua_State* L);
+		static int GetPieceProjectileParams(lua_State* L);
+		static int GetPieceProjectileName(lua_State* L);
 
 		static int IsPosInMap(lua_State* L);
 		static int GetWaterPlaneLevel(lua_State* L);
