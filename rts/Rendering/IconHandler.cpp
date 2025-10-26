@@ -88,6 +88,7 @@ bool CIconHandler::AddIcon(
 	}
 
 	iconsData[it->second] = IconData{
+		iconName,
 		texFileName,
 		size,
 		distance,
@@ -131,6 +132,7 @@ void CIconHandler::Update()
 		if (defIt == iconsMap.end()) {
 			defIt = iconsMap.emplace("default", iconsData.size()).first;
 			iconsData.emplace_back(
+				"default",
 				"bitmaps/defaultradardot.png",
 				1.0f,
 				1.0f,
@@ -226,16 +228,6 @@ void CIconHandler::Update()
 	}
 
 
-}
-
-std::string CIconHandler::GetIconName(size_t tgtIconIdx) const
-{
-	for (const auto& [iconName, iconIdx] : iconsMap) {
-		if (iconIdx == tgtIconIdx)
-			return iconName;
-	}
-
-	return "";
 }
 
 std::pair<bool, spring::unordered_map<std::string, size_t>::const_iterator> CIconHandler::FindIconIdx(const std::string& iconName) const

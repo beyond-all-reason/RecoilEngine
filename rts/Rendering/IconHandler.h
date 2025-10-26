@@ -21,7 +21,8 @@ namespace icon {
 	class IconData {
 	public:
 		explicit IconData()
-			: fileName{}
+			: name {}
+			, fileName{}
 			, size{ 0.0f }
 			, distance{ 1.0f }
 			, distSqr{ 1.0f }
@@ -29,8 +30,9 @@ namespace icon {
 			, srcTexCoords{}
 			, texCoords{}
 		{}
-		explicit IconData(const std::string& fileName_, float size_, float distance_, uint32_t atlasIndex_, bool radiusAdjust_, const float4& srcTexCoords_)
-			: fileName{ fileName_ }
+		explicit IconData(const std::string& name_, const std::string& fileName_, float size_, float distance_, uint32_t atlasIndex_, bool radiusAdjust_, const float4& srcTexCoords_)
+			: name{ name_ }
+			, fileName{ fileName_ }
 			, size{ size_ }
 			, distance{ distance_ }
 			, distSqr{ distance_ * distance_ }
@@ -39,6 +41,7 @@ namespace icon {
 			, texCoords{ 0.0f, 0.0f, 1.0f, 1.0f, atlasIndex_ }
 		{}
 
+		const auto& GetName() const { return name; }
 		const auto& GetSize() const { return size; }
 		const auto& GetDistance() const { return distance; }
 		const auto& GetDistanceSq() const { return distSqr; }
@@ -53,6 +56,7 @@ namespace icon {
 		void SetTexCoords(AtlasedTexture&& tc) { texCoords = std::move(tc); }
 		void SetTexCoords(const AtlasedTexture& tc) { texCoords = tc; }
 	private:
+		std::string name;
 		std::string fileName;
 		float size;
 		float distance;
@@ -90,7 +94,6 @@ namespace icon {
 
 			void Update();
 
-			std::string GetIconName(size_t iconIdx) const;
 			const auto& GetIconsMap() const { return iconsMap; }
 			const auto& GetIconsData() const { return iconsData; }
 			const auto& GetIconData(const std::string& iconName) const { return iconsData[*iconsMap.try_get(iconName)]; }

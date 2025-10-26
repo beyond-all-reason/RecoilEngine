@@ -304,7 +304,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(UnitIconGetDraw);
 	REGISTER_LUA_CFUNC(GetUnitIconData);
 	REGISTER_LUA_CFUNC(GetIconData);
-	REGISTER_LUA_CFUNC(GetAllIconData);
+	REGISTER_LUA_CFUNC(GetAllIconDataArray);
 
 	REGISTER_LUA_CFUNC(GetSyncedGCInfo);
 	REGISTER_LUA_CFUNC(SolveNURBSCurve);
@@ -1360,10 +1360,10 @@ int LuaUnsyncedRead::UnitIconGetDraw(lua_State* L) {
 
 namespace Impl {
 	template<bool full>
-	void PushIconData(lua_State* L, const std::string& iconName, const icon::IconData& iconData) {
+	void PushIconData(lua_State* L, const icon::IconData& iconData) {
 		lua_createtable(L, 0, 2 + 5 * !full);
 
-		LuaPushNamedString(L, "name", iconName);
+		LuaPushNamedString(L, "name", iconData.GetName());
 		if constexpr (full) {
 			LuaPushNamedString(L, "fileName", iconData.GetFileName());
 			LuaPushNamedNumber(L, "size", iconData.GetSize());
@@ -1403,9 +1403,8 @@ namespace Impl {
 			return 0;
 
 		const auto& iconData = icon::iconHandler.GetIconData(iconIdx);
-		const auto  iconName = icon::iconHandler.GetIconName(iconIdx);
 
-		PushIconData<full>(L, iconName, iconData);
+		PushIconData<full>(L, iconData);
 		return 1;
 	}
 }
@@ -1437,28 +1436,19 @@ int LuaUnsyncedRead::GetIconData(lua_State* L)
 		return Impl::GetIconDataImpl<false>(L, iconIdx);
 }
 
-int LuaUnsyncedRead::GetAllIconData(lua_State* L)
+int LuaUnsyncedRead::GetAllIconDataArray(lua_State* L)
 {
 	const auto fullData = luaL_optboolean(L, 1, false);
 
 	const auto& iconsData = icon::iconHandler.GetIconsData();
-	const auto& iconsMap = icon::iconHandler.GetIconsMap();
-
-	spring::unordered_map<size_t, std::string> iconsInvMap; iconsInvMap.reserve(iconsMap.size());
-
-	for (const auto& [iconName, iconIdx] : iconsMap) {
-		iconsInvMap[iconIdx] = iconName;
-	}
 
 	lua_createtable(L, iconsData.size(), 0);
 	for (size_t i = 0; i < iconsData.size() && i < 10; ++i) {
 		const auto& iconData = iconsData[i];
-		const auto it = iconsInvMap.find(i);
-		const std::string iconName = (it != iconsInvMap.end()) ? it->second : "";
 		if (fullData)
-			Impl::PushIconData<true >(L, iconName, iconData);
+			Impl::PushIconData<true >(L, iconData);
 		else
-			Impl::PushIconData<false>(L, iconName, iconData);
+			Impl::PushIconData<false>(L, iconData);
 
 		lua_rawseti(L, -2, i + 1);
 	}
