@@ -124,9 +124,9 @@ LuaMatTexture::Type LuaOpenGLUtils::GetLuaMatTextureType(const std::string& name
 		case hashString("$explosions"): { return LuaMatTexture::LUATEX_EXPLOSIONS_ATLAS; } break;
 		case hashString("$groundfx"):   { return LuaMatTexture::LUATEX_GROUNDFX_ATLAS; } break;
 
-		case hashString("icons"): [[fallthrough]];
-		case hashString("icons0"): { return LuaMatTexture::LUATEX_ICONS_ATLAS0; } break;
-		case hashString("icons1"): { return LuaMatTexture::LUATEX_ICONS_ATLAS1; } break;
+		case hashString("$icons"): [[fallthrough]];
+		case hashString("$icons0"): { return LuaMatTexture::LUATEX_ICONS_ATLAS0; } break;
+		case hashString("$icons1"): { return LuaMatTexture::LUATEX_ICONS_ATLAS1; } break;
 
 		default: {} break;
 	}
