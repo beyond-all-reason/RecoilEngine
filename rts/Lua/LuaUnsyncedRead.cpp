@@ -1443,7 +1443,7 @@ int LuaUnsyncedRead::GetAllIconDataArray(lua_State* L)
 	const auto& iconsData = icon::iconHandler.GetIconsData();
 
 	lua_createtable(L, iconsData.size(), 0);
-	for (size_t i = 0; i < iconsData.size() && i < 10; ++i) {
+	for (size_t i = 0; i < iconsData.size(); ++i) {
 		const auto& iconData = iconsData[i];
 		if (fullData)
 			Impl::PushIconData<true >(L, iconData);
