@@ -327,7 +327,6 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetProjectileDirection);
 	REGISTER_LUA_CFUNC(GetProjectileVelocity);
 	REGISTER_LUA_CFUNC(GetProjectileGravity);
-	REGISTER_LUA_CFUNC(GetPieceProjectileParams);
 	REGISTER_LUA_CFUNC(GetProjectileTarget);
 	REGISTER_LUA_CFUNC(GetProjectileIsIntercepted);
 	REGISTER_LUA_CFUNC(GetProjectileTimeToLive);
@@ -336,8 +335,9 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetProjectileAllyTeamID);
 	REGISTER_LUA_CFUNC(GetProjectileType);
 	REGISTER_LUA_CFUNC(GetProjectileDefID);
-	REGISTER_LUA_CFUNC(GetProjectileName);
 	REGISTER_LUA_CFUNC(GetProjectileDamages);
+	REGISTER_LUA_CFUNC(GetPieceProjectileParams);
+	REGISTER_LUA_CFUNC(GetPieceProjectileName);
 
 	REGISTER_LUA_CFUNC(IsPosInMap);
 	REGISTER_LUA_CFUNC(GetWaterPlaneLevel);
@@ -7512,8 +7512,6 @@ int LuaSyncedRead::GetProjectileType(lua_State* L)
  *
  * @function Spring.GetProjectileDefID
  *
- * Using this to get a weaponDefID is HIGHLY preferred to indexing WeaponDefNames via GetProjectileName
- *
  * @param projectileID integer
  * @return number?
  */
@@ -7536,43 +7534,28 @@ int LuaSyncedRead::GetProjectileDefID(lua_State* L)
 	return 1;
 }
 
-/***
+/*** Returns the name of the model piece from which a piece projectile was spawned. Returns nil for other projectiles including weapons
  *
- * @function Spring.GetProjectileName
- *
- * Returns the name of projectile in case in it's a weapon or piece projectile, nil otherwise
- *
+ * @function Spring.GetPieceProjectileName
  * @param projectileID integer
- * @return string? projectileName
+ * @return string? pieceName
  */
-int LuaSyncedRead::GetProjectileName(lua_State* L)
+int LuaSyncedRead::GetPieceProjectileName(lua_State* L)
 {
 	const auto* pro = ParseProjectile(L, __func__, 1);
 
 	if (pro == nullptr)
 		return 0;
 
-	if (pro->weapon) {
-		const auto* wpro = static_cast<const CWeaponProjectile*>(pro);
+	if (!pro->piece)
+		return 0;
 
-		if (wpro != nullptr && wpro->GetWeaponDef() != nullptr) {
-			// maybe CWeaponProjectile derivatives
-			// should have actual names themselves?
-			lua_pushsstring(L, wpro->GetWeaponDef()->name);
-			return 1;
-		}
-	}
+	const auto* ppro = static_cast <const CPieceProjectile*> (pro);
+	if (ppro == nullptr || ppro->omp == nullptr) // FIXME: assert? neither should happen if pro->piece was true
+		return 0;
 
-	if (pro->piece) {
-		const auto* ppro = static_cast<const CPieceProjectile*>(pro);
-		if (ppro != nullptr && ppro->omp != nullptr) {
-			lua_pushsstring(L, ppro->omp->name);
-			return 1;
-		}
-	}
-
-	// neither weapon nor piece likely means the projectile is CExpGenSpawner, should we return any name in this case?
-	return 0;
+	lua_pushsstring(L, ppro->omp->name);
+	return 1;
 }
 
 
