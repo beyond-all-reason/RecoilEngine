@@ -146,7 +146,9 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetTeamStartPosition);
 
 	REGISTER_LUA_CFUNC(AddTeamResource);
+	REGISTER_LUA_CFUNC(AddResourceRaw);
 	REGISTER_LUA_CFUNC(UseTeamResource);
+	REGISTER_LUA_CFUNC(UseResourceRaw);
 	REGISTER_LUA_CFUNC(SetTeamResource);
 	REGISTER_LUA_CFUNC(SetTeamShareLevel);
 	REGISTER_LUA_CFUNC(ShareTeamResource);
@@ -1142,6 +1144,62 @@ int LuaSyncedCtrl::SetWind(lua_State* L)
  * @param amount number
  * @return nil
  */
+int LuaSyncedCtrl::AddResourceRaw(lua_State* L)
+{
+	const int teamID = luaL_checkint(L, 1);
+
+	if (!teamHandler.IsValidTeam(teamID))
+		return 0;
+
+	if (!CanControlTeam(L, teamID))
+		return 0;
+
+	CTeam* team = teamHandler.Team(teamID);
+
+	if (team == nullptr)
+		return 0;
+
+	const char* type = luaL_checkstring(L, 2);
+
+	const float value = max(0.0f, luaL_checkfloat(L, 3));
+
+	switch (type[0]) {
+		case 'm': { team->res.metal += value; } break;
+		case 'e': { team->res.energy += value; } break;
+		default : {                         } break;
+	}
+
+	return 0;
+}
+
+int LuaSyncedCtrl::UseResourceRaw(lua_State* L)
+{
+	const int teamID = luaL_checkint(L, 1);
+
+	if (!teamHandler.IsValidTeam(teamID))
+		return 0;
+
+	if (!CanControlTeam(L, teamID))
+		return 0;
+
+	CTeam* team = teamHandler.Team(teamID);
+
+	if (team == nullptr)
+		return 0;
+
+	const char* type = luaL_checkstring(L, 2);
+
+	const float value = max(0.0f, luaL_checkfloat(L, 3));
+
+	switch (type[0]) {
+		case 'm': { team->res.metal -= value; } break;
+		case 'e': { team->res.energy -= value; } break;
+		default : {                         } break;
+	}
+
+	return 0;
+}
+
 int LuaSyncedCtrl::AddTeamResource(lua_State* L)
 {
 	const int teamID = luaL_checkint(L, 1);
