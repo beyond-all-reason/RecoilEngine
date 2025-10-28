@@ -4,9 +4,9 @@ author = "sprunk"
 +++
 
 ### Resource excess
-When a player generates more resources in a GameFrame than they can store, the leftovers are called **excess** (also often called overflow -- either as a noun *("I received overflow.")* or as a verb *("I overflow to my team.")*. 
+When a player generates more resources in a GameFrame than they can store, the leftovers are called **excess**. (sometimes called overflow)
 
-In some games, the overflow level can be set to something lower than 100% storage. In the example below, the "red slider" (overflow level) is set to 75% of player-storage.
+In some games, the level-that-is-considered-excess can be set to something lower than 100% of storage capacity. In the example below, the "red slider" (excess level) is set to 75% of player-storage.
 
 ### Scenario Context
 
