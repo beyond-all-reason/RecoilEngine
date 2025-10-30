@@ -4,6 +4,7 @@
 #define GUI_HANDLER_H
 
 #include <vector>
+#include <set>
 
 #include "KeySet.h"
 #include "InputReceiver.h"
@@ -28,6 +29,12 @@ class CGuiHandler : public CInputReceiver {
 public:
 	CGuiHandler();
 
+	enum class BuildState {
+        Default,
+        Box,
+		Line
+        // add more later
+    };
 	void Update();
 
 	void Draw();
@@ -46,9 +53,6 @@ public:
 		MouseRelease(x, y, button, camera->GetPos(), mouse->dir);
 	}
 	void MouseRelease(int x, int y, int button, const float3& cameraPos, const float3& mouseDir);
-
-	void BoxBuildPress();
-    void BoxBuildRelease();
 	
 	bool IsAbove(int x, int y);
 	std::string GetTooltip(int x, int y);
@@ -88,6 +92,11 @@ public:
 
 	bool GetGatherMode() const { return gatherMode; }
 	void SetGatherMode(bool value) { gatherMode = value; }
+
+	BuildState GetBuildState() const { return buildState; }
+	static BuildState ParseBuildState(const std::string& arg);
+    void EnableBuildModifier(BuildState s);
+    void DisableBuildModifier(BuildState s);
 
 	bool GetOutlineFonts() const { return outlineFonts; }
 
@@ -174,6 +183,8 @@ private:
 	int  GetIconPosCommand(int slot) const;
 	int  ParseIconSlot(const std::string& text) const;
 
+	BuildState ResolveBuildState() const;
+
 
 public:
 	int inCommand = -1;
@@ -187,6 +198,9 @@ private:
 	int defaultCmdMemory = -1;
 	int explicitCommand = -1;
 	int curIconCommand = -1;
+
+	BuildState buildState = BuildState::Default;   // current effective state
+    std::set<BuildState> activeBuildStates;        // disjoint flags
 
 	int actionOffset = 0;
 
@@ -255,8 +269,6 @@ private:
 		Box visual;
 		Box selection;
 	};
-    bool boxBuildMode = false;
-    bool boxBuildClicking = false;
 
 	std::string menuName;
 

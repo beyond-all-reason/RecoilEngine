@@ -1316,6 +1316,27 @@ void CGuiHandler::MouseRelease(int x, int y, int button, const float3& cameraPos
 	FinishCommand(button);
 }
 
+CGuiHandler::BuildState CGuiHandler::ParseBuildState(const std::string& arg) {
+    if (arg == "box")  return BuildState::Box;
+    if (arg == "line") return BuildState::Line;
+    return BuildState::Default;
+}
+
+void CGuiHandler::EnableBuildModifier(BuildState s) {
+    activeBuildStates.insert(s);
+    buildState = ResolveBuildState();
+}
+
+void CGuiHandler::DisableBuildModifier(BuildState s) {
+    activeBuildStates.erase(s);
+    buildState = ResolveBuildState();
+}
+
+CGuiHandler::BuildState CGuiHandler::ResolveBuildState() const {
+    if (activeBuildStates.count(BuildState::Box))  return BuildState::Box;
+    if (activeBuildStates.count(BuildState::Line)) return BuildState::Line;
+    return BuildState::Default;
+}
 
 bool CGuiHandler::SetActiveCommand(int cmdIndex, bool rightMouseButton)
 {
@@ -2236,7 +2257,7 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 
 			const BuildInfo bi(unitdef, cameraPos + mouseDir * dist, buildFacing);
 
-			if ((GetQueueKeystate() && (button == SDL_BUTTON_LEFT)) || boxBuildMode) {
+			if ((GetQueueKeystate() && (button == SDL_BUTTON_LEFT)) || guihandler->GetBuildState() == CGuiHandler::BuildState::Box) {
 				const float3 camTracePos = mouse->buttons[SDL_BUTTON_LEFT].camPos;
 				const float3 camTraceDir = mouse->buttons[SDL_BUTTON_LEFT].dir;
 
@@ -2575,7 +2596,7 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 		float xstep = (int)((0 < delta.x) ? xsize : -xsize);
 		float zstep = (int)((0 < delta.z) ? zsize : -zsize);
 
-		if (KeyInput::GetKeyModState(KMOD_ALT) || boxBuildMode){
+		if (KeyInput::GetKeyModState(KMOD_ALT) || guihandler->GetBuildState() == CGuiHandler::BuildState::Box){
 			// build a (filled or hollow) rectangle
 			if (KeyInput::GetKeyModState(KMOD_CTRL)) {
 				if ((1 < xnum) && (1 < znum)) {
@@ -2621,24 +2642,6 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 	}
 
 	return (buildInfos.size());
-}
-
-void CGuiHandler::BoxBuildPress() {
-    boxBuildMode = true;
-	// Only simulate mouse press if mouse not pressed
-    if (!mouse->buttons[SDL_BUTTON_LEFT].pressed) {
-        mouse->MousePress(mouse->lastx, mouse->lasty, SDL_BUTTON_LEFT);
-        boxBuildClicking = true;
-    }
-}
-
-void CGuiHandler::BoxBuildRelease() {
-	// Only simulate release if mouse press was simulated
-    if (boxBuildClicking) {
-        mouse->MouseRelease(mouse->lastx, mouse->lasty, SDL_BUTTON_LEFT);
-        boxBuildClicking = false;
-    }
-    boxBuildMode = false;
 }
 
 void CGuiHandler::ProcessFrontPositions(float3& pos0, const float3& pos1)
@@ -3835,7 +3838,7 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 				const float3 cPos = tracePos + traceDir * rayTraceDist;
 
 				const CMouseHandler::ButtonPressEvt& bp = mouse->buttons[SDL_BUTTON_LEFT];
-				if ((GetQueueKeystate() && bp.pressed) || boxBuildMode) {
+				if ((GetQueueKeystate() && bp.pressed) || guihandler->GetBuildState() == CGuiHandler::BuildState::Box) {
 					const float bpDist = CGround::LineGroundWaterCol(bp.camPos, bp.dir, maxTraceDist, buildeeDef->floatOnWater, false);
 					const float3 bPos = bp.camPos + bp.dir * bpDist;
 					const BuildInfo cInfo = BuildInfo(buildeeDef, cPos, buildFacing);
