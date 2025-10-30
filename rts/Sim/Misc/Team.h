@@ -91,6 +91,7 @@ public:
 	SResourcePack resDelayedShare; //< excess that might be shared next SlowUpdate
 	SResourcePack resSent,     resPrevSent;
 	SResourcePack resReceived, resPrevReceived;
+	SResourcePack resExcess;
 	SResourcePack resPrevExcess;
 
 	int nextHistoryEntry;

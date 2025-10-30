@@ -49,6 +49,7 @@ CR_REG_METADATA(CTeam, (
 	CR_MEMBER(resPrevSent),
 	CR_MEMBER(resReceived),
 	CR_MEMBER(resPrevReceived),
+	CR_MEMBER(resExcess),
 	CR_MEMBER(resPrevExcess),
 	CR_MEMBER(nextHistoryEntry),
 	CR_MEMBER(statHistory),
@@ -325,6 +326,11 @@ void CTeam::ResetResourceState()
 	resPrevReceived.metal = resReceived.metal; resReceived.metal = 0.0f;
 	resPrevSent.energy = resSent.energy; resSent.energy = 0.0f;
 	resPrevReceived.energy = resReceived.energy; resReceived.energy = 0.0f;
+
+	// reset the excess accumulators after logging into previous stats
+	resPrevExcess.energy = resExcess.energy; resExcess.energy = 0.0f;
+	resPrevExcess.metal = resExcess.metal; resExcess.metal = 0.0f;
+
 }
 
 void CTeam::SlowUpdate()
@@ -354,6 +360,8 @@ void CTeam::SlowUpdate()
 	currentStats.energyProduced += resPrevIncome.energy;
 	currentStats.metalUsed  += resPrevExpense.metal;
 	currentStats.energyUsed += resPrevExpense.energy;
+	currentStats.metalExcess += resPrevExcess.metal; // Log previous excess into currentStats
+	currentStats.energyExcess += resPrevExcess.energy; // Log previous excess into currentStats
 
 	res.metal  += resDelayedShare.metal;  resDelayedShare.metal  = 0.0f;
 	res.energy += resDelayedShare.energy; resDelayedShare.energy = 0.0f;
@@ -395,19 +403,15 @@ void CTeam::SlowUpdate()
 	}
 
 	// clamp resource levels to storage capacity
+	// we did not need to accumulate excess as excess was only handled here up until now
+	// But if we want to be able to add excess value to the logs, we need to register resExcess accumulator and process that excess just like we would any other stat
 	if (res.metal > resStorage.metal) {
-		resPrevExcess.metal = (res.metal - resStorage.metal);
-		currentStats.metalExcess += resPrevExcess.metal;
+		resExcess.metal += (res.metal - resStorage.metal); // Accumulate excess into the accumulator
 		res.metal = resStorage.metal;
-	} else {
-		resPrevExcess.metal = 0;
 	}
 	if (res.energy > resStorage.energy) {
-		resPrevExcess.energy = (res.energy - resStorage.energy);
-		currentStats.energyExcess += resPrevExcess.energy;
+		resExcess.energy += (res.energy - resStorage.energy); // Accumulate excess into the accumulator
 		res.energy = resStorage.energy;
-	} else {
-		resPrevExcess.energy = 0;
 	}
 
 	// make sure the stats update is always in a SlowUpdate
