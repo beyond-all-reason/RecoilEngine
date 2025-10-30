@@ -192,6 +192,8 @@ public:
 	bool avoidGround;       // if true, try to avoid ground while aiming
 	bool avoidCloaked;      // if true, try to avoid cloaked units while aiming
 
+	bool traceGroundCollision; // if true, the implementation will trace exact point of ground collision, otherwise a fast approximation is used
+
 	/**
 	 * If nonzero, targeting units will TryTarget at the edge of collision sphere
 	 * (radius*tag value, [-1;1]) instead of its centre.

@@ -611,9 +611,10 @@ void CProjectileHandler::CheckGroundCollisions(bool synced)
 		//   don't add p->radius to groundHeight, or most (esp. modelled)
 		//   projectiles will collide with the ground one or more frames
 		//   too early
-		const float px = p->pos.x;
-		const float py = p->pos.y;
-		const float pz = p->pos.z;
+		const float& px = p->pos.x;
+		const float& py = p->pos.y;
+		const float& pz = p->pos.z;
+
 		const float gy = CGround::GetHeightReal(px, pz);
 
 		const bool belowGround = (py < gy);
@@ -622,11 +623,18 @@ void CProjectileHandler::CheckGroundCollisions(bool synced)
 		if (!belowGround && (!insideWater || p->ignoreWater))
 			continue;
 
-		if (belowGround && p->speed.w > 0.0f) {
-			const auto prevPos = p->pos - static_cast<float3>(p->speed);
-			const auto groundDistance = std::clamp(CGround::LineGroundCol(prevPos, p->pos, synced), 0.0f, p->speed.w);
-			p->SetPosition(prevPos + static_cast<float3>(p->speed) * groundDistance / p->speed.w);
+
+		if (belowGround) {
+			if (p->traceGroundCollision && p->speed.w > 0) {
+				const auto& prePos = p->preFrameTra.t;
+				const auto groundDistance = std::clamp(CGround::LineGroundCol(prePos, p->pos, synced), 0.0f, p->speed.w);
+				p->SetPosition(prePos + static_cast<float3>(p->speed) * groundDistance / p->speed.w);
+			}
+			else {
+				p->pos.y = gy;
+			}
 		}
+
 		p->Collision();
 	}
 }

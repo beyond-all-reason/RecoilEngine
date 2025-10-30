@@ -28,6 +28,7 @@ CR_REG_METADATA(CProjectile,
 	CR_MEMBER(luaMoveCtrl),
 	CR_MEMBER(checkCol),
 	CR_MEMBER(ignoreWater),
+	CR_MEMBER(traceGroundCollision),
 
 	CR_IGNORED(createMe),
 	CR_MEMBER(deleteMe),
