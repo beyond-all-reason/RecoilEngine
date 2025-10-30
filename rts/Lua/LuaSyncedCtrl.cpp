@@ -146,9 +146,9 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetTeamStartPosition);
 
 	REGISTER_LUA_CFUNC(AddTeamResource);
-	REGISTER_LUA_CFUNC(AddResourceRaw);
 	REGISTER_LUA_CFUNC(UseTeamResource);
-	REGISTER_LUA_CFUNC(UseResourceRaw);
+	REGISTER_LUA_CFUNC(AdjustTeamResourceStats);
+	REGISTER_LUA_CFUNC(AdjustUnitResourceStats);
 	REGISTER_LUA_CFUNC(SetTeamResource);
 	REGISTER_LUA_CFUNC(SetTeamShareLevel);
 	REGISTER_LUA_CFUNC(ShareTeamResource);
@@ -1135,8 +1135,7 @@ int LuaSyncedCtrl::SetWind(lua_State* L)
 	return 0;
 }
 
-/*** Adds metal or energy resources to the specified team.
- * Counts as production in post-game graph statistics.
+/*** Silently adds metal or energy resources to the specified team.
  *
  * @function Spring.AddTeamResource
  * @param teamID integer
@@ -1144,7 +1143,7 @@ int LuaSyncedCtrl::SetWind(lua_State* L)
  * @param amount number
  * @return nil
  */
-int LuaSyncedCtrl::AddResourceRaw(lua_State* L)
+int LuaSyncedCtrl::AddTeamResource(lua_State* L)
 {
 	const int teamID = luaL_checkint(L, 1);
 
@@ -1171,8 +1170,15 @@ int LuaSyncedCtrl::AddResourceRaw(lua_State* L)
 
 	return 0;
 }
-
-int LuaSyncedCtrl::UseResourceRaw(lua_State* L)
+/*** Silently removes metal or energy resources to the specified team.
+ *
+ * @function Spring.UseTeamResource
+ * @param teamID integer
+ * @param type ResourceName
+ * @param amount number
+ * @return nil
+ */
+int LuaSyncedCtrl::UseTeamResource(lua_State* L)
 {
 	const int teamID = luaL_checkint(L, 1);
 
@@ -1200,7 +1206,17 @@ int LuaSyncedCtrl::UseResourceRaw(lua_State* L)
 	return 0;
 }
 
-int LuaSyncedCtrl::AddTeamResource(lua_State* L)
+/*** Adds (or removes in case of value < 0) value to the team's resource stats
+*
+@function Spring.AdjustTeamResourceStats
+@param teamID integer
+@param type resourceName
+@param stat resourceStatName
+@param amount number
+@return nil
+*/
+
+int LuaSyncedCtrl::AdjustTeamResourceStats(lua_State* L)
 {
 	const int teamID = luaL_checkint(L, 1);
 
@@ -1209,120 +1225,81 @@ int LuaSyncedCtrl::AddTeamResource(lua_State* L)
 
 	if (!CanControlTeam(L, teamID))
 		return 0;
-
+		
 	CTeam* team = teamHandler.Team(teamID);
-
+	
 	if (team == nullptr)
 		return 0;
 
 	const char* type = luaL_checkstring(L, 2);
-
-	const float value = max(0.0f, luaL_checkfloat(L, 3));
+	const char* stat = luaL_checkstring(L, 3);
+	const float value = luaL_checkfloat(L, 4);
 
 	switch (type[0]) {
-		case 'm': { team->AddMetal (value); } break;
-		case 'e': { team->AddEnergy(value); } break;
-		default : {                         } break;
+		case 'm': { // metal
+			switch (stat[0]) {
+				case 'o': team->resExcess.metal    += value; break;
+				case 'r': team->resReceived.metal  += value; break;
+				case 's': team->resSent.metal      += value; break;
+				case 'e': team->resExpense.metal      += value; break;
+				case 'i': team->resIncome.metal  += value; break;
+				case 'p': team->resPull.metal  += value; break;
+				default: break;
+			}
+			break;
+		}
+
+		case 'e': { // energy
+			switch (stat[0]) {
+				case 'o': team->resExcess.energy    += value; break;
+				case 'r': team->resReceived.energy  += value; break;
+				case 's': team->resSent.energy      += value; break;
+				case 'e': team->resExpense.energy      += value; break;
+				case 'i': team->resIncome.energy  += value; break;
+				case 'p': team->resPull.energy  += value; break;
+				default: break;
+			}
+			break;
+		}
+		default: break;
 	}
 
-	return 0;
+    return 0;
 }
 
-/***
- * Consumes metal or energy resources of the specified team.
- * Counts as usage in post-game graph statistics.
- *
- * @function Spring.UseTeamResource
- * @param teamID integer
- * @param type ResourceName Resource type.
- * @param amount number Amount of resource to use.
- * @return boolean hadEnough
- * True if enough of the resource type was available and was consumed, otherwise false.
- */
-/***
- * Consumes metal and/or energy resources of the specified team.
- * Counts as usage in post-game graph statistics.
- *
- * @function Spring.UseTeamResource
- * @param teamID integer
- * @param amount ResourceUsage
- * @return boolean hadEnough
- * True if enough of the resource type(s) were available and was consumed, otherwise false.
- */
-int LuaSyncedCtrl::UseTeamResource(lua_State* L)
+int LuaSyncedCtrl::AdjustUnitResourceStats(lua_State* L)
 {
-	const int teamID = luaL_checkint(L, 1);
+	CUnit* unit = ParseUnit(L, __func__, 1);
 
-	if (!teamHandler.IsValidTeam(teamID))
+	if (unit == nullptr)
 		return 0;
 
-	if (!CanControlTeam(L, teamID))
-		return 0;
+	const char* type = luaL_checkstring(L, 2);
+	const char* stat = luaL_checkstring(L, 3);
+	const float value = luaL_checkfloat(L, 4);
 
-	CTeam* team = teamHandler.Team(teamID);
-
-	if (team == nullptr)
-		return 0;
-
-	if (lua_isstring(L, 2)) {
-		const char* type = lua_tostring(L, 2);
-
-		const float value = std::max(0.0f, luaL_checkfloat(L, 3));
-
-		switch (type[0]) {
-			case 'm': {
-				team->resPull.metal += value;
-				lua_pushboolean(L, team->UseMetal(value));
-				return 1;
-			} break;
-			case 'e': {
-				team->resPull.energy += value;
-				lua_pushboolean(L, team->UseEnergy(value));
-				return 1;
-			} break;
-			default: {
-			} break;
-		}
-
-		return 0;
-	}
-
-	if (lua_istable(L, 2)) {
-		float metal  = 0.0f;
-		float energy = 0.0f;
-
-		constexpr int tableIdx = 2;
-
-		for (lua_pushnil(L); lua_next(L, tableIdx) != 0; lua_pop(L, 1)) {
-			if (!lua_israwstring(L, LUA_TABLE_KEY_INDEX) || !lua_isnumber(L, LUA_TABLE_VALUE_INDEX))
-				continue;
-
-			const char* key = lua_tostring(L, LUA_TABLE_KEY_INDEX);
-			const float value = lua_tofloat(L, LUA_TABLE_VALUE_INDEX);
-
-			switch (key[0]) {
-				case 'm': { metal  = std::max(0.0f, value); } break;
-				case 'e': { energy = std::max(0.0f, value); } break;
-				default : {                                 } break;
+	switch (type[0]) {
+		case 'm': { // metal
+			switch (stat[0]) {
+				case 'u': unit->resourcesUseI.metal    += value; break;
+				case 'm': unit->resourcesMakeI.metal  += value; break;
+				default: break;
 			}
+			break;
 		}
 
-		team->resPull.metal  += metal;
-		team->resPull.energy += energy;
-
-		if ((team->res.metal >= metal) && (team->res.energy >= energy)) {
-			team->UseMetal(metal);
-			team->UseEnergy(energy);
-			lua_pushboolean(L, true);
-		} else {
-			lua_pushboolean(L, false);
+		case 'e': { // energy
+			switch (stat[0]) {
+				case 'u': unit->resourcesUseI.energy    += value; break;
+				case 'm': unit->resourcesMakeI.energy  += value; break;
+				default: break;
+			}
+			break;
 		}
-
-		return 1;
+		default: break;
 	}
 
-	luaL_error(L, "bad arguments");
-	return 0;
+    return 0;
 }
 
 
