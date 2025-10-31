@@ -273,9 +273,9 @@ void CTeam::Died(bool normalDeath)
 		}
 	}
 
-	// increase per-team unit-limit for each remaining team in _our_ allyteam
-	teamHandler.UpdateTeamUnitLimitsPreDeath(teamNum);
 	eventHandler.TeamDied(teamNum);
+	// increase per-team unit-limit for each remaining team in _our_ allyteam
+	teamHandler.UpdateTeamUnitLimitsOnDeath(teamNum);
 
 	isDead = true;
 }
