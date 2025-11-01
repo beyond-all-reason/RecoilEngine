@@ -2427,8 +2427,8 @@ EXPORT(float) skirmishAiCallback_UnitDef_getResourceExtractorRange(int skirmishA
 EXPORT(float) skirmishAiCallback_UnitDef_getWindResourceGenerator(int skirmishAIId, int unitDefId, int resourceId) {
 	const UnitDef* ud = getUnitDefById(skirmishAIId, unitDefId);
 
-	if (resourceId == resourceHandler->GetEnergyId())
-		return ud->windGenerator;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return ud->windGenerator[resourceId];
 
 	return 0.0f;
 }
@@ -2436,8 +2436,8 @@ EXPORT(float) skirmishAiCallback_UnitDef_getWindResourceGenerator(int skirmishAI
 EXPORT(float) skirmishAiCallback_UnitDef_getTidalResourceGenerator(int skirmishAIId, int unitDefId, int resourceId) {
 	const UnitDef* ud = getUnitDefById(skirmishAIId, unitDefId);
 
-	if (resourceId == resourceHandler->GetEnergyId())
-		return ud->tidalGenerator;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return ud->tidalGenerator[resourceId];
 
 	return 0.0f;
 }

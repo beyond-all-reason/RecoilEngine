@@ -700,8 +700,8 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FLOAT("buildeeBuildRadius", ud.buildeeBuildRadius);
 	ADD_FLOAT("extractsMetal",  ud.extractsMetal);
 	ADD_FLOAT("extractRange",   ud.extractRange);
-	ADD_FLOAT("windGenerator",  ud.windGenerator);
-	ADD_FLOAT("tidalGenerator", ud.tidalGenerator);
+	ADD_FLOAT("windGenerator",  ud.windGenerator.energy);
+	ADD_FLOAT("tidalGenerator", ud.tidalGenerator.energy);
 	ADD_FLOAT("metalStorage",   ud.storage.metal);
 	ADD_FLOAT("energyStorage",  ud.storage.energy);
 

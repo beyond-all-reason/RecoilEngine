@@ -128,8 +128,8 @@ public:
 	float buildeeBuildRadius; ///< if >= 0.f, override default radius to use for the buildee in build distance calculations.
 	float extractsMetal;
 	float extractRange;
-	float windGenerator;
-	float tidalGenerator;
+	SResourcePack windGenerator;
+	SResourcePack tidalGenerator;
 	SResourcePack storage;
 	SResourcePack harvestStorage;
 

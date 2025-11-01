@@ -303,8 +303,15 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	};
 
 	extractsMetal  = udTable.GetFloat("extractsMetal",  0.0f);
-	windGenerator  = udTable.GetFloat("windGenerator",  0.0f);
-	tidalGenerator = udTable.GetFloat("tidalGenerator", 0.0f);
+
+	windGenerator =
+		{ 0.0f
+		, udTable.GetFloat("windGenerator", 0.0f)
+	};
+	tidalGenerator =
+		{ 0.0f
+		, udTable.GetFloat("tidalGenerator", 0.0f)
+	};
 
 	upkeep =
 		{ udTable.GetFloat( "metalUpkeep", udTable.GetFloat( "metalUse", 0.0f))

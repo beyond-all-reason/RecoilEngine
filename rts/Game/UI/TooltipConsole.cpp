@@ -129,7 +129,7 @@ static void GetDecoyResources(const CUnit* unit,
 		return;
 
 	make += ud->resourceMake;
-	make.energy += (ud->tidalGenerator * envResHandler.GetCurrentTidalStrength() * (ud->tidalGenerator > 0.0f));
+	make += ud->tidalGenerator * envResHandler.GetCurrentTidalStrength();
 
 	bool active = ud->activateWhenBuilt;
 	if (rd->onoffable && ud->onoffable) {
@@ -144,14 +144,7 @@ static void GetDecoyResources(const CUnit* unit,
 			}
 		}
 		use += ud->upkeep;
-
-		if (ud->windGenerator > 0.0f) {
-			if (envResHandler.GetCurrentWindStrength() > ud->windGenerator) {
-				make.energy += ud->windGenerator;
-			} else {
-				make.energy += envResHandler.GetCurrentWindStrength();
-			}
-		}
+		make += SResourcePack(envResHandler.GetCurrentWindStrength()).cap_at(ud->windGenerator);
 	}
 }
 
