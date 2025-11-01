@@ -28,6 +28,7 @@
  * @field noOffsetForFeatureID boolean Whether featureID from various interfaces (targetID for Reclaim commands, ownerID from SpringGetGroundDecalOwner, etc) needs to be offset by `Game.maxUnits`
  * @field noHandicapForReclaim boolean Whether handicap is applied to income from reclaim
  * @field groupAddDoesntSelect boolean Whether 'group add' also selects the group (does both if false)
+ * @field deadTeamsKeepUnitLimit boolean Whether engine redistributes dead team unitlimit to allies (false) or keeps it as-is (true)
  */
 
 /***
@@ -68,7 +69,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	 *
 	 * will be compatible even on engines that don't yet know about the entry at all. */
 	lua_pushliteral(L, "FeatureSupport");
-	lua_createtable(L, 0, 10);
+	lua_createtable(L, 0, 11);
 		LuaPushNamedBool(L, "NegativeGetUnitCurrentCommand", true);
 		LuaPushNamedBool(L, "hasExitOnlyYardmaps", true);
 		LuaPushNamedNumber(L, "rmlUiApiVersion", 1);
@@ -81,6 +82,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "noOffsetForFeatureID", false);
 		LuaPushNamedBool(L, "noHandicapForReclaim", true);
 		LuaPushNamedBool(L, "groupAddDoesntSelect", true);
+		LuaPushNamedBool(L, "deadTeamsKeepUnitLimit", false);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");
