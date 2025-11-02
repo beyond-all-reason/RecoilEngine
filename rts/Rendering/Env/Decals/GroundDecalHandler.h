@@ -213,9 +213,13 @@ private:
 	void UpdateDecalsVisibility();
 
 	void AddBuildingDecalTextures();
-	void AddTexturesFromTable();
-	void AddGroundTrackTextures();
+	void AddScarTextures(const LuaTable& table);
+	void AddGroundTrackTextures(const LuaTable& table);
 	void AddFallbackTextures();
+	void AddTexturesFromResources();
+
+	const std::optional<std::tuple<int, int>> AddTexturesFromTable(const LuaTable& parent, const std::string key, const std::string suffix);
+	const int AddTexturesFromFiles(const std::vector<std::string>& fileNames, const std::string key, const std::string suffix);
 
 	uint32_t GetNextId();
 

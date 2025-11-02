@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <optional>
 
 #include "GroundDecal.h"
 #include "GroundDecalHandler.h"
@@ -209,129 +210,169 @@ void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::stri
 		}
 	}
 	catch (const content_error& err) {
-		LOG_L(L_WARNING, "%s", err.what());
+		LOG_L(L_WARNING, "[GroundDecalHandler::%s] %s", __func__, err.what());
 	}
 }
 
 void CGroundDecalHandler::AddBuildingDecalTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	auto CreateFallBackTexture = [](const SColor& color) {
-		CBitmap bm;
-		bm.AllocDummy(color);
-		bm = bm.CreateRescaled(32, 32);
-		return bm.CreateTexture();
-	};
+	auto ProcessDefs = [this](const auto& defsVector, const std::string key) {
+		auto defIt = defsVector.begin();
 
-	auto ProcessDefs = [this](const auto& defsVector) {
-		for (const SolidObjectDef& soDef : defsVector) {
-			const SolidObjectDecalDef& decalDef = soDef.decalDef;
-
-			if (!decalDef.useGroundDecal)
+		for (; defIt != defsVector.end(); ++defIt) {
+			const SolidObjectDecalDef& decalDef = *defIt.decalDef;
+			const bool hasDecal = decalDef.useGroundDecal && !decalDef.groundDecalTypeName.empty();
+			if (!hasDecal)
 				continue;
 
-			if (decalDef.groundDecalTypeName.empty())
+			const std::string mainTex = decalDef.groundDecalTypeName;
+			if (atlasTex->GetAllocator()->contains(mainTex))
 				continue;
 
-			const std::string mainTex =                    (decalDef.groundDecalTypeName);
 			const std::string normTex = GetExtraTextureName(decalDef.groundDecalTypeName);
 
 			AddTexToAtlas(mainTex, mainTex, false);
 			AddTexToAtlas(normTex, normTex, false);
+
+			if (!atlasTex->GetAllocator()->contains(mainTex)) {
+				LOG_L(L_ERROR, "[GroundDecalHandler::%s] Failed to load building decal for %s: %s", __func__, key.c_str(), mainTexFileName.c_str(), mainTex.c_str());
+			}
 		}
 	};
-	ProcessDefs(featureDefHandler->GetFeatureDefsVec());
-	ProcessDefs(unitDefHandler->GetUnitDefsVec());
+
+	ProcessDefs(featureDefHandler->GetFeatureDefsVec(), "feature");
+	ProcessDefs(unitDefHandler->GetUnitDefsVec(), "unit");
 }
 
-
-void CGroundDecalHandler::AddTexturesFromTable()
+void CGroundDecalHandler::AddTexturesFromResources()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LuaParser resourcesParser("gamedata/resources.lua", SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
 	if (!resourcesParser.Execute()) {
-		LOG_L(L_ERROR, "Failed to load resources: %s", resourcesParser.GetErrorLog().c_str());
+		LOG_L(L_ERROR, "[GroundDecalHandler::%s] Failed to load resources: %s", __func__, resourcesParser.GetErrorLog().c_str());
 	}
 
-	const auto GraphicsTbl = resourcesParser.GetRoot().SubTable("graphics");
-	const LuaTable scarsTable = GraphicsTbl.SubTable("scars");
-	const int scarTblSize = scarsTable.GetLength();
+	const auto &GraphicsTbl = resourcesParser.GetRoot().SubTable("graphics");
 
-	maxUniqueScars = 0;
-	for (int i = 1; i <= scarTblSize; ++i) {
-		const std::string mainTexFileName = scarsTable.GetString(i, "");
-
-		if (mainTexFileName.find("_normal") != std::string::npos)
-			continue;
-
-		const std::string normTexFileName = mainTexFileName.empty() ? "" : GetExtraTextureName(mainTexFileName);
-		const auto mainName = IntToString(i, "mainscar_%i");
-		const auto normName = IntToString(i, "normscar_%i");
-
-		AddTexToAtlas(mainName, mainTexFileName,  true);
-		AddTexToAtlas(normName, normTexFileName, false);
-
-		// check if loaded for real
-		// can't use atlas->TextureExists() as it's only populated after Finalize()
-		maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
-	}
-
-	if (maxUniqueScars == scarTblSize)
-		return;
-
-	// fill the gaps in case the loop above failed to load some of the scar textures
-	const std::vector<std::string> scarMainTextures = CFileHandler::FindFiles("bitmaps/scars/", "scar?.*");
-	const size_t scarsExtraNum = scarMainTextures.size();
-
-	if (scarsExtraNum > 0) {
-		for (int extraTexNum = 0, i = 1; scarTblSize - maxUniqueScars > 0 && i <= scarTblSize; ++i) {
-			const auto mainName = IntToString(i, "mainscar_%i");
-			if (atlasTex->GetAllocator()->contains(mainName))
-				continue;
-
-			const auto normName = IntToString(i, "normscar_%i");
-
-			const std::string mainTexFileName = scarMainTextures[extraTexNum++ % scarsExtraNum];
-			const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
-
-			AddTexToAtlas(mainName, mainTexFileName,  true);
-			AddTexToAtlas(normName, normTexFileName, false);
-
-			maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
-		}
-	}
-
-	const LuaTable decalsTable = GraphicsTbl.SubTable("decals");
-	const int decalsTblSize = decalsTable.GetLength();
-	for (int i = 1; i <= decalsTblSize; ++i) {
-		const std::string mainTexFileName = decalsTable.GetString(i, "");
-
-		if (mainTexFileName.find("_normal") != std::string::npos)
-			continue;
-
-		const std::string normTexFileName = mainTexFileName.empty() ? "" : GetExtraTextureName(mainTexFileName);
-		const auto mainName = IntToString(i, "maindecal_%i");
-		const auto normName = IntToString(i, "normdecal_%i");
-
-		AddTexToAtlas(mainName, mainTexFileName,  true);
-		AddTexToAtlas(normName, normTexFileName, false);
-	}
+	AddScarTextures(GraphicsTbl);
+	AddTexturesFromTable(GraphicsTbl, "decals", "decal")
+	AddGroundTrackTextures(GraphicsTbl);
 }
 
-void CGroundDecalHandler::AddGroundTrackTextures()
-{
+// NOTE: When entries in graphics.scars in the table fail to load, we backfill
+// with basecontent named ones until the tablesize is filled or we exhaust.
+// When the table is not present, we don't do anything.
+void AddScarTextures(LuaTable& table) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const auto fileNames = CFileHandler::FindFiles("bitmaps/tracks/", "");
-	for (const auto& mainTexFileName : fileNames) {
-		const auto mainName = FileSystem::GetBasename(StringToLower(mainTexFileName));
-		const auto normName = mainName + "_norm";
+	maxUniqueScars = 0;
+
+	const auto result = AddTexturesFromTable(table, "scars", "scar");
+	if (result == std::nullopt)
+		return;
+
+	const auto [tableSize, addedEntries] = result;
+
+	maxUniqueScars += addedEntries;
+	if (tableSize == addedEntries)
+		return;
+
+	const std::vector<std::string> scarMainTextures = CFileHandler::FindFiles("bitmaps/scars/", "scar?.*");
+	const size_t scarsExtraNum = scarMainTextures.size();
+	if (scarsExtraNum == 0)
+		return;
+
+	// We proceed with the same naming logic as previous table scars:
+	// we increment the registered scar name until we fill all remaining unique
+	// scars or exhaust the available base textures attempting to reach
+	// maxUniqueScars == scarTblSize even if we register mainscar_%i when i
+	// ranges from scarTblSize + 1 to scarTblSize + scarsExtraNum
+	int remainingEntries = scarTblSize - maxUniqueScars;
+	for (int extraTexNum = 0, i = scarTblSize + 1; remainingEntries > 0 && extraTexNum < scarsExtraNum; ++i) {
+		const auto mainName = IntToString(i, "mainscar_%i");
+		if (atlasTex->GetAllocator()->contains(mainName))
+			continue;
+
+		const auto normName = IntToString(i, "normscar_%i");
+
+		const std::string mainTexFileName = scarMainTextures[extraTexNum++ % scarsExtraNum];
 		const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
 
 		AddTexToAtlas(mainName, mainTexFileName,  true);
 		AddTexToAtlas(normName, normTexFileName, false);
+
+		if (atlasTex->GetAllocator()->contains(mainName)) {
+			maxUniqueScars++;
+			remainingEntries--;
+		} else {
+			LOG_L(L_ERROR, "[GroundDecalHandler::%s] Failed to load basecontent scar decal %s: %s", __func__, mainTexFileName.c_str(), mainName.c_str());
+		}
 	}
 }
 
+int CGroundDecalHandler::AddTexturesFromFiles(std::vector<std::string>& fileNames, std::string key, std::string suffix) {
+	int addedTexturesCount = 0;
+
+	for (int i = 1; i <= fileNames.size(); ++i) {
+		const std::string mainTexFileName = fileNames[i];
+
+		if (mainTexFileName.find("_normal") != std::string::npos)
+			continue;
+
+		const auto mainName = spring::format("main%s_%i", suffix, i);
+		if (atlasTex->GetAllocator()->contains(mainName))
+			continue;
+
+		const std::string normTexFileName = mainTexFileName.empty() ? "" : GetExtraTextureName(mainTexFileName);
+		const auto normName = spring::format("norm%s_%i", suffix, i);
+
+		AddTexToAtlas(mainName, mainTexFileName,  true);
+		AddTexToAtlas(normName, normTexFileName, false);
+
+		// check if we loaded the texture successfully into atlas
+		// can't use atlas->TextureExists() as it's only populated after Finalize()
+		if (atlasTex->GetAllocator()->contains(mainName)) {
+			addedTexturesCount++;
+		} else {
+			LOG_L(L_WARNING, "[GroundDecalHandler::%s] Failed to load graphics.%s decal %s: %s", __func__, key.c_str(), suffix.c_str(), mainTexFileName.c_str(), mainName.c_str());
+		}
+	}
+
+	return addedTexturesCount;
+}
+
+std::optional<std::tuple<int, int>> CGroundDecalHandler::AddTexturesFromTable(LuaTable& parent, std::string key, std::string suffix) {
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!parent.KeyExists(key))
+		return std::nullopt;
+
+	const auto table = parent.SubTable(key);
+
+	std::vector<std::string> fileNames;
+	if (!table.GetValues(&fileNames))
+		return std::nullopt;
+
+	const size_t tableSize = fileNames.size():
+	if (tableSize == 0)
+		return std::make_tuple(0, 0)
+
+	const int addedEntries = AddTexturesFromFiles(&fileNames, key, suffix);
+
+	return std::make_tuple(tableSize, addedEntries);
+}
+
+void CGroundDecalHandler::AddGroundTrackTextures(LuaTable& table)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// WARN: graphics.tracks opts out of bitmaps/tracks/* fallback
+	//       **if and only if the table exists with size > 0**
+	const auto result = AddTexturesFromTable(table, "tracks", "track");
+	if (result != std::nullopt && std::get<0>(result) == 0)
+		return;
+
+	const auto fileNames = CFileHandler::FindFiles("bitmaps/tracks/", "");
+	AddTexturesFromFiles(&fileNames, "tracks", "track");
+}
 
 void CGroundDecalHandler::AddFallbackTextures()
 {
@@ -394,13 +435,13 @@ void CGroundDecalHandler::GenerateAtlasTexture() {
 
 	// often represented by compressed textures, cannot be added to the regular atlas
 	AddBuildingDecalTextures();
-
-	AddTexturesFromTable();
-	AddGroundTrackTextures();
+	// loads decals, scars and tracks from resources.graphics.<key>
+	// and (sometimes) falls back to VFS and or basecontent
+	AddTexturesFromResources();
 	AddFallbackTextures();
 
 	if (!atlasTex->Finalize()) {
-		LOG_L(L_ERROR, "Could not finalize %s texture atlas. Use fewer/smaller textures.", atlasTex->GetAtlasName().c_str());
+		LOG_L(L_ERROR, "[GroundDecalHandler::%s] Could not finalize %s texture atlas. Use fewer/smaller textures.", __func__, atlasNorm->GetAtlasName().c_str());
 	}
 }
 

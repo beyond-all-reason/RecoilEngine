@@ -1223,7 +1223,22 @@ bool LuaTable::GetKeys(std::vector<std::string>& data) const
 	return true;
 }
 
+bool LuaTable::GetValues(std::vector<std::string>& data) const
+{
+	std::vector<std::pair<int, std::string>> pairs;
 
+	if (!GetPairs(&pairs))
+		return false;
+
+	using T = std::remove_reference<decltype(pairs)>::type;
+	using P = T::value_type;
+
+	std::transform(pairs.begin(), pairs.end(),
+		std::back_inserter(data),
+		[](P& v) { return v.second; });
+
+	return true
+}
 
 bool LuaTable::GetPairs(std::vector<std::pair<int, std::string>>& data) const
 {
