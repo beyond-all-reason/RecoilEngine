@@ -71,8 +71,6 @@ public:
 	const CSolidObject* GetDecalSolidObjectOwner(uint32_t id) const override { return nullptr; }
 
 	void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) override {}
-
-	bool SetDecalsShader(const std::string& luaShader) override { return false; }
 protected:
 	struct UnitMinMaxHeight {
 		CR_DECLARE_STRUCT(UnitMinMaxHeight)
@@ -88,8 +86,7 @@ protected:
 
 	std::unique_ptr<CTextureRenderAtlas> atlasTex;
 
-	Shader::IProgramObject* engineDecalShader;
-	Shader::IProgramObject* customDecalShader;
+	Shader::IProgramObject* decalShader;
 
 	using DecalOwner = std::variant<const CSolidObject*, const GhostSolidObject*>;
 	spring::unordered_map<DecalOwner, size_t, std::hash<DecalOwner>> decalOwners; // for tracks, plates and ghosts
@@ -196,8 +193,6 @@ public:
 	const CSolidObject* GetDecalSolidObjectOwner(uint32_t id) const override;
 
 	void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) override;
-
-	bool SetDecalsShader(const std::string& luaShader) override;
 private:
 	static void BindVertexAtrribs();
 	static void UnbindVertexAtrribs();

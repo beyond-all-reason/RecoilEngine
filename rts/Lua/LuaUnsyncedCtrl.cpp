@@ -325,7 +325,6 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetGroundDecalCreationFrame);
 	REGISTER_LUA_CFUNC(SetGroundDecalGlowParams);
 	REGISTER_LUA_CFUNC(SetGroundDecalUserData);
-	REGISTER_LUA_CFUNC(SetGroundDecalShader);
 
 	REGISTER_LUA_CFUNC(SDLSetTextInputRect);
 	REGISTER_LUA_CFUNC(SDLStartTextInput);
@@ -5171,22 +5170,6 @@ int LuaUnsyncedCtrl::SetGroundDecalUserData(lua_State* L)
 	lua_pushboolean(L, true);
 	return 1;
 }
-
-/***
- *
- * @function Spring.SetGroundDecalShader
- *
- * Tries to load a custom decal shader or resets it to the engine's one.
- *
- * @param pathToShader string? Path to Lua shader or nil to restore the engine's shader
- * @return boolean success
- */
-int LuaUnsyncedCtrl::SetGroundDecalShader(lua_State* L)
-{
-	lua_pushboolean(L, groundDecals->SetDecalsShader(luaL_optsstring(L, 1, "")));
-	return 1;
-}
-
 
 /******************************************************************************
  * SDL Text

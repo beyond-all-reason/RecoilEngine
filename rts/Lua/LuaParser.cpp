@@ -436,6 +436,12 @@ void LuaParser::AddString(const std::string& key, const std::string& value)
 	PushParam();
 }
 
+void LuaParser::PushFunc(bool(*func)(lua_State*))
+{
+	assert(initDepth > 0);
+	func(L);
+}
+
 
 /******************************************************************************/
 
