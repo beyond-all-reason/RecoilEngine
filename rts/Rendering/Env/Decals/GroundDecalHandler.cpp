@@ -73,7 +73,8 @@ CR_BIND_DERIVED(CGroundDecalHandlerData, IGroundDecalDrawer, )
 CR_REG_METADATA(CGroundDecalHandlerData, (
 	CR_MEMBER_UN(maxUniqueScars),
 	CR_MEMBER_UN(atlasTex),
-	CR_MEMBER_UN(decalShader),
+	CR_MEMBER_UN(engineDecalShader),
+	CR_MEMBER_UN(customDecalShader),
 
 	CR_MEMBER(decalOwners),
 	CR_MEMBER(unitMinMaxHeights),
@@ -100,7 +101,8 @@ CGroundDecalHandlerData::CGroundDecalHandlerData()
 	: IGroundDecalDrawer()
 	, maxUniqueScars{ 0 }
 	, atlasTex{ nullptr }
-	, decalShader{ nullptr }
+	, engineDecalShader{ nullptr }
+	, customDecalShader{ nullptr }
 	, decalsUpdateList{ }
 	, smfDrawer{ nullptr }
 	, highQuality{ configHandler->GetBool("HighQualityDecals") && (globalRendering->msaaLevel > 0) }
@@ -147,7 +149,8 @@ CGroundDecalHandler::~CGroundDecalHandler()
 	configHandler->RemoveObserver(this);
 
 	shaderHandler->ReleaseProgramObjects("[GroundDecalHandler]");
-	decalShader = nullptr;
+	engineDecalShader = nullptr;
+	customDecalShader = nullptr;
 	atlasTex = nullptr;
 }
 
@@ -418,67 +421,76 @@ void CGroundDecalHandler::GenerateAtlasTexture() {
 	}
 }
 
-void CGroundDecalHandler::ReloadDecalShaders() {
-	if (shaderHandler->ReleaseProgramObjects("[GroundDecalHandler]"))
-		decalShader = nullptr;
+bool CGroundDecalHandler::ReloadDecalShaders() {
+	if (shaderHandler->ReleaseProgramObject("[GroundDecalHandler]", "EngineDecalShaderGLSL"))
+		engineDecalShader = nullptr;
 
 	const std::string ver = highQuality ? "#version 400 compatibility\n" : "#version 130\n";
 
-	decalShader = shaderHandler->CreateProgramObject("[GroundDecalHandler]", "DecalShaderGLSL");
+	engineDecalShader = shaderHandler->CreateProgramObject("[GroundDecalHandler]", "EngineDecalShaderGLSL");
+	engineDecalShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/GroundDecalsVertProg.glsl", "" , GL_VERTEX_SHADER));
+	engineDecalShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/GroundDecalsFragProg.glsl", ver, GL_FRAGMENT_SHADER));
 
-	decalShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/GroundDecalsVertProg.glsl",  "", GL_VERTEX_SHADER));
-	decalShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/GroundDecalsFragProg.glsl", ver, GL_FRAGMENT_SHADER));
+	// side effect: if the engine shader is bad customDecalShader is going to be deleted as well
+	bool failed = false;
 
-	decalShader->SetFlag("DEPTH_CLIP01", globalRendering->supportClipSpaceControl);
-	decalShader->SetFlag("HAVE_SHADOWS", true);
-	decalShader->SetFlag("HIGH_QUALITY", highQuality);
-	decalShader->SetFlag("HAVE_INFOTEX", true);
-	decalShader->SetFlag("SMF_WATER_ABSORPTION", true);
-	decalShader->SetFlag("USE_TEXTURE_ARRAY", atlasTex->GetTexTarget() == GL_TEXTURE_2D_ARRAY);
+	for (auto* decalShader : { engineDecalShader, customDecalShader }) {
+		if (!decalShader)
+			continue;
 
-	decalShader->BindAttribLocations<GroundDecal>();
+		decalShader->SetFlag("DEPTH_CLIP01", globalRendering->supportClipSpaceControl);
+		decalShader->SetFlag("HAVE_SHADOWS", true);
+		decalShader->SetFlag("HIGH_QUALITY", highQuality);
+		decalShader->SetFlag("HAVE_INFOTEX", true);
+		decalShader->SetFlag("SMF_WATER_ABSORPTION", true);
+		decalShader->SetFlag("USE_TEXTURE_ARRAY", atlasTex->GetTexTarget() == GL_TEXTURE_2D_ARRAY);
 
-	decalShader->Link();
+		decalShader->BindAttribLocations<GroundDecal>();
 
-	decalShader->Enable();
-	decalShader->SetUniform("mapDims",
-		static_cast<float>(mapDims.mapx * SQUARE_SIZE),
-		static_cast<float>(mapDims.mapy * SQUARE_SIZE),
-		1.0f / (mapDims.mapx * SQUARE_SIZE),
-		1.0f / (mapDims.mapy * SQUARE_SIZE)
-	);
-	decalShader->SetUniform("mapDimsPO2",
-		static_cast<float>(mapDims.pwr2mapx * SQUARE_SIZE),
-		static_cast<float>(mapDims.pwr2mapy * SQUARE_SIZE),
-		1.0f / (mapDims.pwr2mapx * SQUARE_SIZE),
-		1.0f / (mapDims.pwr2mapy * SQUARE_SIZE)
-	);
+		decalShader->Link();
 
-	decalShader->SetUniform("atlasTex"       , 0);
-	decalShader->SetUniform("miniMapTex"     , 2);
-	decalShader->SetUniform("heightTex"      , 3);
-	decalShader->SetUniform("depthTex"       , 4);
-	decalShader->SetUniform("groundNormalTex", 5);
-	decalShader->SetUniform("shadowTex"      , 6);
-	decalShader->SetUniform("shadowColorTex" , 7);
-	decalShader->SetUniform("infoTex"        , 8);
+		decalShader->Enable();
+		decalShader->SetUniform("mapDims",
+			static_cast<float>(mapDims.mapx * SQUARE_SIZE),
+			static_cast<float>(mapDims.mapy * SQUARE_SIZE),
+			1.0f / (mapDims.mapx * SQUARE_SIZE),
+			1.0f / (mapDims.mapy * SQUARE_SIZE)
+		);
+		decalShader->SetUniform("mapDimsPO2",
+			static_cast<float>(mapDims.pwr2mapx * SQUARE_SIZE),
+			static_cast<float>(mapDims.pwr2mapy * SQUARE_SIZE),
+			1.0f / (mapDims.pwr2mapx * SQUARE_SIZE),
+			1.0f / (mapDims.pwr2mapy * SQUARE_SIZE)
+		);
 
-	decalShader->SetUniform("waterMinColor", 0.0f, 0.0f, 0.0f);
-	decalShader->SetUniform("waterBaseColor", 0.0f, 0.0f, 0.0f);
-	decalShader->SetUniform("waterAbsorbColor", 0.0f, 0.0f, 0.0f);
+		decalShader->SetUniform("atlasTex", 0);
+		decalShader->SetUniform("miniMapTex", 2);
+		decalShader->SetUniform("heightTex", 3);
+		decalShader->SetUniform("depthTex", 4);
+		decalShader->SetUniform("groundNormalTex", 5);
+		decalShader->SetUniform("shadowTex", 6);
+		decalShader->SetUniform("shadowColorTex", 7);
+		decalShader->SetUniform("infoTex", 8);
 
-	decalShader->SetUniform("curAdjustedFrame", std::max(gs->frameNum, 0) + globalRendering->timeOffset);
-	decalShader->SetUniform("screenSizeInverse",
-		1.0f / globalRendering->viewSizeX,
-		1.0f / globalRendering->viewSizeY
-	);
-	const auto& identityMat = CMatrix44f::Identity();
-	decalShader->SetUniformMatrix4x4("shadowMatrix", false, &identityMat.m[0]);
+		decalShader->SetUniform("waterMinColor", 0.0f, 0.0f, 0.0f);
+		decalShader->SetUniform("waterBaseColor", 0.0f, 0.0f, 0.0f);
+		decalShader->SetUniform("waterAbsorbColor", 0.0f, 0.0f, 0.0f);
 
-	decalShader->Disable();
-	SunChanged();
+		decalShader->SetUniform("curAdjustedFrame", std::max(gs->frameNum, 0) + globalRendering->timeOffset);
+		decalShader->SetUniform("screenSizeInverse",
+			1.0f / globalRendering->viewSizeX,
+			1.0f / globalRendering->viewSizeY
+		);
+		const auto& identityMat = CMatrix44f::Identity();
+		decalShader->SetUniformMatrix4x4("shadowMatrix", false, &identityMat.m[0]);
 
-	decalShader->Validate();
+		decalShader->Disable();
+		SunChanged();
+
+		failed |= decalShader->Validate();
+	}
+
+	return !failed;
 }
 
 void CGroundDecalHandler::BindTextures()
@@ -802,6 +814,8 @@ void CGroundDecalHandler::Draw()
 	BindTextures();
 
 	const bool visWater = smfDrawer->GetReadMap()->HasVisibleWater();
+
+	auto* decalShader = customDecalShader ? customDecalShader : engineDecalShader;
 
 	decalShader->SetFlag("HAVE_SHADOWS", shadowHandler.ShadowsLoaded());
 	decalShader->SetFlag("HAVE_INFOTEX", infoTextureHandler->IsEnabled());
@@ -1224,6 +1238,24 @@ void CGroundDecalHandler::SetUnitLeaveTracks(CUnit* unit, bool leaveTracks)
 	else {
 		AddTrack(unit, unit->pos, false);
 	}
+}
+
+bool CGroundDecalHandler::SetDecalsShader(const std::string& luaShader)
+{
+	if (shaderHandler->ReleaseProgramObject("[GroundDecalHandler]", "CustomDecalShaderGLSL"))
+		customDecalShader = nullptr;
+
+	if (luaShader.empty())
+		return true;
+
+	customDecalShader = shaderHandler->CreateProgramObject("[GroundDecalHandler]", "CustomDecalShaderGLSL");
+	if (customDecalShader->LoadFromLua(luaShader) && ReloadDecalShaders())
+		return true;
+
+	// failure
+	shaderHandler->ReleaseProgramObject("[GroundDecalHandler]", "CustomDecalShaderGLSL");
+	customDecalShader = nullptr;
+	return false;
 }
 
 static inline bool CanReceiveTracks(const float3& pos)
@@ -1666,6 +1698,9 @@ void CGroundDecalHandler::GameFramePost(int frameNum)
 void CGroundDecalHandler::SunChanged()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	auto* decalShader = customDecalShader ? customDecalShader : engineDecalShader;
+
 	auto enToken = decalShader->EnableScoped();
 	decalShader->SetUniform("groundAmbientColor", sunLighting->groundAmbientColor.x, sunLighting->groundAmbientColor.y, sunLighting->groundAmbientColor.z, sunLighting->groundShadowDensity);
 	decalShader->SetUniform("groundDiffuseColor", sunLighting->groundDiffuseColor.x, sunLighting->groundDiffuseColor.y, sunLighting->groundDiffuseColor.z);
@@ -1675,6 +1710,9 @@ void CGroundDecalHandler::SunChanged()
 void CGroundDecalHandler::ViewResize()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	auto* decalShader = customDecalShader ? customDecalShader : engineDecalShader;
+
 	auto enToken = decalShader->EnableScoped();
 	decalShader->SetUniform("screenSizeInverse",
 		1.0f / globalRendering->viewSizeX,

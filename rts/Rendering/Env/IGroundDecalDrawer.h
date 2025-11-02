@@ -52,6 +52,8 @@ public:
 	virtual void GhostCreated(const CSolidObject* object, const GhostSolidObject* gb) = 0;
 
 	const auto& GetAllDecals() const { return decals; }
+
+	virtual bool SetDecalsShader(const std::string& luaShader) = 0;
 public:
 	virtual ~IGroundDecalDrawer() {}
 
@@ -93,6 +95,8 @@ public:
 	const CSolidObject* GetDecalSolidObjectOwner(uint32_t id) const override { return nullptr; }
 
 	void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) override;
+
+	bool SetDecalsShader(const std::string& luaShader) override { return false; }
 };
 
 

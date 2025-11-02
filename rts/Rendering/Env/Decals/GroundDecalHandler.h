@@ -71,6 +71,8 @@ public:
 	const CSolidObject* GetDecalSolidObjectOwner(uint32_t id) const override { return nullptr; }
 
 	void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) override {}
+
+	bool SetDecalsShader(const std::string& luaShader) override { return false; }
 protected:
 	struct UnitMinMaxHeight {
 		CR_DECLARE_STRUCT(UnitMinMaxHeight)
@@ -86,7 +88,8 @@ protected:
 
 	std::unique_ptr<CTextureRenderAtlas> atlasTex;
 
-	Shader::IProgramObject* decalShader;
+	Shader::IProgramObject* engineDecalShader;
+	Shader::IProgramObject* customDecalShader;
 
 	using DecalOwner = std::variant<const CSolidObject*, const GhostSolidObject*>;
 	spring::unordered_map<DecalOwner, size_t, std::hash<DecalOwner>> decalOwners; // for tracks, plates and ghosts
@@ -193,6 +196,8 @@ public:
 	const CSolidObject* GetDecalSolidObjectOwner(uint32_t id) const override;
 
 	void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) override;
+
+	bool SetDecalsShader(const std::string& luaShader) override;
 private:
 	static void BindVertexAtrribs();
 	static void UnbindVertexAtrribs();
@@ -200,7 +205,7 @@ private:
 	uint32_t GetDepthBufferTextureTarget() const;
 
 	void GenerateAtlasTexture();
-	void ReloadDecalShaders();
+	bool ReloadDecalShaders();
 
 	void AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP, const std::string& errMsg);
 

@@ -136,7 +136,7 @@ public:
 	union {
 		/// individual color channel values in the range [0, 255]
 		struct { std::uint8_t r, g, b, a; };
-		std::uint8_t rgba[4];
+		std::array<std::uint8_t, 4> rgba;
 		/// The color as a single 32bit value
 		std::uint32_t i;
 	};

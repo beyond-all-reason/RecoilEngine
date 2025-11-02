@@ -323,6 +323,9 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetGroundDecalTint);
 	REGISTER_LUA_CFUNC(SetGroundDecalMisc);
 	REGISTER_LUA_CFUNC(SetGroundDecalCreationFrame);
+	REGISTER_LUA_CFUNC(SetGroundDecalGlowParams);
+	REGISTER_LUA_CFUNC(SetGroundDecalUserData);
+	REGISTER_LUA_CFUNC(SetGroundDecalShader);
 
 	REGISTER_LUA_CFUNC(SDLSetTextInputRect);
 	REGISTER_LUA_CFUNC(SDLStartTextInput);
@@ -5104,6 +5107,83 @@ int LuaUnsyncedCtrl::SetGroundDecalCreationFrame(lua_State* L)
 	decal->createFrameMax = luaL_optfloat(L, 3, decal->createFrameMax);
 
 	lua_pushboolean(L, true);
+	return 1;
+}
+
+/***
+ *
+ * @function Spring.SetGroundDecalGlowParams
+ *
+ * Set decal glow parameters
+ *
+ * @param decalID integer
+ * @param glow number? Between 0 and 1 (Default: currGlow)
+ * @param glowFalloff number? Between 0 and 1, per second (Default: currGlowFallOff)
+ * @return boolean decalSet
+ */
+int LuaUnsyncedCtrl::SetGroundDecalGlowParams(lua_State* L)
+{
+	auto* decal = groundDecals->GetDecalById(luaL_checkint(L, 1));
+	if (!decal) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	decal->glow = luaL_optfloat(L, 2, decal->glow);
+	decal->glowFalloff = luaL_optfloat(L, 3, decal->glowFalloff * GAME_SPEED) / GAME_SPEED;
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+/***
+ *
+ * @function Spring.SetGroundDecalUserData
+ *
+ * Set decal user data. Useful in conjunction with custom decal shaders
+ *
+ * @param decalID integer
+ * @param vec4 index integer? Must be within [0;1] for now
+ * @param x number? Between 0 and 1, per second (Default: current data)
+ * @param y number? Between 0 and 1, per second (Default: current data)
+ * @param z number? Between 0 and 1, per second (Default: current data)
+ * @param w number? Between 0 and 1, per second (Default: current data)
+ * @return boolean decalSet
+ */
+int LuaUnsyncedCtrl::SetGroundDecalUserData(lua_State* L)
+{
+	auto* decal = groundDecals->GetDecalById(luaL_checkint(L, 1));
+	if (!decal) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	const auto quad = static_cast<uint32_t>(luaL_checknumber(L, 2));
+	if (quad >= GroundDecal::NUM_USERDATA) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	float4& userData = decal->userDefined[quad];
+	for (size_t i = 0; i < 4; ++i)
+		userData[i] = luaL_optfloat(L, 3 + i, userData[i]);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+/***
+ *
+ * @function Spring.SetGroundDecalShader
+ *
+ * Tries to load a custom decal shader or resets it to the engine's one.
+ *
+ * @param pathToShader string? Path to Lua shader or nil to restore the engine's shader
+ * @return boolean success
+ */
+int LuaUnsyncedCtrl::SetGroundDecalShader(lua_State* L)
+{
+	lua_pushboolean(L, groundDecals->SetDecalsShader(luaL_optsstring(L, 1, "")));
 	return 1;
 }
 
