@@ -54,6 +54,7 @@
 #include "System/FileSystem/FileSystem.h"
 #include "System/creg/STL_Variant.h"
 #include "System/creg/STL_Tuple.h"
+#include "fmt/format.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -150,48 +151,50 @@ CGroundDecalHandler::~CGroundDecalHandler()
 	atlasTex = nullptr;
 }
 
-static auto LoadTexture(const std::string& name, bool convertDecalBitmap)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	std::string fileName = StringToLower(name);
+namespace Impl {
+	auto LoadTexture(const std::string& name, bool convertDecalBitmap, const std::string& errMsg)
+	{
+		RECOIL_DETAILED_TRACY_ZONE;
+		std::string fileName = StringToLower(name);
 
-	if (FileSystem::GetExtension(fileName).empty())
-		fileName += ".bmp";
+		if (FileSystem::GetExtension(fileName).empty())
+			fileName += ".bmp";
 
-	std::string fullName = fileName;
+		std::string fullName = fileName;
 
-	if (!CFileHandler::FileExists(fullName, SPRING_VFS_ALL))
-		fullName = std::string("bitmaps/") + fileName;
+		if (!CFileHandler::FileExists(fullName, SPRING_VFS_ALL))
+			fullName = std::string("bitmaps/") + fileName;
 
-	if (!CFileHandler::FileExists(fullName, SPRING_VFS_ALL))
-		fullName = std::string("unittextures/") + fileName;
+		if (!CFileHandler::FileExists(fullName, SPRING_VFS_ALL))
+			fullName = std::string("unittextures/") + fileName;
 
-	CBitmap bm;
-	if (!bm.Load(fullName))
-		throw content_error("Could not load ground decal \"" + fileName + "\"");
+		CBitmap bm;
+		if (!bm.Load(fullName))
+			throw content_error(fmt::format(", {} file: \"{}\"", errMsg, fileName));
 
-	if (convertDecalBitmap && FileSystem::GetExtension(fullName) == "bmp") {
-		// bitmaps don't have an alpha channel
-		// so use: red := brightness & green := alpha
-		auto* rmem = bm.GetRawMem();
+		if (convertDecalBitmap && FileSystem::GetExtension(fullName) == "bmp") {
+			// bitmaps don't have an alpha channel
+			// so use: red := brightness & green := alpha
+			auto* rmem = bm.GetRawMem();
 
-		for (int y = 0; y < bm.ysize; ++y) {
-			for (int x = 0; x < bm.xsize; ++x) {
-				const int index = ((y * bm.xsize) + x) * 4;
+			for (int y = 0; y < bm.ysize; ++y) {
+				for (int x = 0; x < bm.xsize; ++x) {
+					const int index = ((y * bm.xsize) + x) * 4;
 
-				const auto brightness = rmem[index + 0];
-				const auto alpha      = rmem[index + 1];
+					const auto brightness = rmem[index + 0];
+					const auto alpha = rmem[index + 1];
 
-				rmem[index + 0] = (brightness * 90) / 255;
-				rmem[index + 1] = (brightness * 60) / 255;
-				rmem[index + 2] = (brightness * 30) / 255;
-				rmem[index + 3] = alpha;
+					rmem[index + 0] = (brightness * 90) / 255;
+					rmem[index + 1] = (brightness * 60) / 255;
+					rmem[index + 2] = (brightness * 30) / 255;
+					rmem[index + 3] = alpha;
+				}
 			}
 		}
-	}
-	// non BMP scar textures doesn't follow the above historic convention, so keep them as is
+		// non BMP scar textures doesn't follow the above historic convention, so keep them as is
 
-	return std::make_tuple(bm, fullName);
+		return std::make_tuple(bm, fullName);
+	}
 }
 
 static inline std::string GetExtraTextureName(const std::string& mainTex) {
@@ -200,10 +203,10 @@ static inline std::string GetExtraTextureName(const std::string& mainTex) {
 	return mainTex.substr(0, dotPos) + "_normal" + (dotPos == string::npos ? "" : mainTex.substr(dotPos));
 }
 
-void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP) {
+void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP, const std::string& errMsg) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	try {
-		const auto& [bm, fn] = LoadTexture(filename, convertOldBMP);
+		const auto& [bm, fn] = Impl::LoadTexture(filename, convertOldBMP, errMsg);
 		if (atlasTex->AddTexFromBitmap(name, bm, filename)) {
 			texFileNames.emplace(name, fn);
 		}
@@ -223,7 +226,7 @@ void CGroundDecalHandler::AddBuildingDecalTextures()
 		return bm.CreateTexture();
 	};
 
-	auto ProcessDefs = [this](const auto& defsVector) {
+	auto ProcessDefs = [this](const auto& defsVector, const std::string& defName) {
 		for (const SolidObjectDef& soDef : defsVector) {
 			const SolidObjectDecalDef& decalDef = soDef.decalDef;
 
@@ -236,12 +239,15 @@ void CGroundDecalHandler::AddBuildingDecalTextures()
 			const std::string mainTex =                    (decalDef.groundDecalTypeName);
 			const std::string normTex = GetExtraTextureName(decalDef.groundDecalTypeName);
 
-			AddTexToAtlas(mainTex, mainTex, false);
-			AddTexToAtlas(normTex, normTex, false);
+			const std::string ERR_MSG = fmt::format("Error loading a ground decal texture from {}Defs, def.name = {}", defName, soDef.name);
+
+			AddTexToAtlas(mainTex, mainTex, false, ERR_MSG);
+			AddTexToAtlas(normTex, normTex, false, ERR_MSG);
 		}
 	};
-	ProcessDefs(featureDefHandler->GetFeatureDefsVec());
-	ProcessDefs(unitDefHandler->GetUnitDefsVec());
+
+	ProcessDefs(featureDefHandler->GetFeatureDefsVec(), "Feature");
+	ProcessDefs(unitDefHandler->GetUnitDefsVec(), "Unit");
 }
 
 
@@ -252,6 +258,8 @@ void CGroundDecalHandler::AddTexturesFromTable()
 	if (!resourcesParser.Execute()) {
 		LOG_L(L_ERROR, "Failed to load resources: %s", resourcesParser.GetErrorLog().c_str());
 	}
+
+	const std::string ERR_MSG_SCAR1 = "Error loading a ground scar texture";
 
 	const auto GraphicsTbl = resourcesParser.GetRoot().SubTable("graphics");
 	const LuaTable scarsTable = GraphicsTbl.SubTable("scars");
@@ -268,38 +276,41 @@ void CGroundDecalHandler::AddTexturesFromTable()
 		const auto mainName = IntToString(i, "mainscar_%i");
 		const auto normName = IntToString(i, "normscar_%i");
 
-		AddTexToAtlas(mainName, mainTexFileName,  true);
-		AddTexToAtlas(normName, normTexFileName, false);
+		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_SCAR1);
+		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_SCAR1);
 
 		// check if loaded for real
 		// can't use atlas->TextureExists() as it's only populated after Finalize()
 		maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
 	}
 
-	if (maxUniqueScars == scarTblSize)
-		return;
-
 	// fill the gaps in case the loop above failed to load some of the scar textures
-	const std::vector<std::string> scarMainTextures = CFileHandler::FindFiles("bitmaps/scars/", "scar?.*");
-	const size_t scarsExtraNum = scarMainTextures.size();
+	if (maxUniqueScars != scarTblSize) {
+		const std::string ERR_MSG_SCAR2 = "Error loading a replacement ground scar texture";
 
-	if (scarsExtraNum > 0) {
-		for (int extraTexNum = 0, i = 1; scarTblSize - maxUniqueScars > 0 && i <= scarTblSize; ++i) {
-			const auto mainName = IntToString(i, "mainscar_%i");
-			if (atlasTex->GetAllocator()->contains(mainName))
-				continue;
+		const std::vector<std::string> scarMainTextures = CFileHandler::FindFiles("bitmaps/scars/", "scar?.*");
+		const size_t scarsExtraNum = scarMainTextures.size();
 
-			const auto normName = IntToString(i, "normscar_%i");
+		if (scarsExtraNum > 0) {
+			for (int extraTexNum = 0, i = 1; scarTblSize - maxUniqueScars > 0 && i <= scarTblSize; ++i) {
+				const auto mainName = IntToString(i, "mainscar_%i");
+				if (atlasTex->GetAllocator()->contains(mainName))
+					continue;
 
-			const std::string mainTexFileName = scarMainTextures[extraTexNum++ % scarsExtraNum];
-			const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
+				const auto normName = IntToString(i, "normscar_%i");
 
-			AddTexToAtlas(mainName, mainTexFileName,  true);
-			AddTexToAtlas(normName, normTexFileName, false);
+				const std::string mainTexFileName = scarMainTextures[extraTexNum++ % scarsExtraNum];
+				const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
 
-			maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
+				AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_SCAR2);
+				AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_SCAR2);
+
+				maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
+			}
 		}
 	}
+
+	const std::string ERR_MSG_DECAL = "Error loading a user provided decal texture";
 
 	const LuaTable decalsTable = GraphicsTbl.SubTable("decals");
 	const int decalsTblSize = decalsTable.GetLength();
@@ -313,22 +324,25 @@ void CGroundDecalHandler::AddTexturesFromTable()
 		const auto mainName = IntToString(i, "maindecal_%i");
 		const auto normName = IntToString(i, "normdecal_%i");
 
-		AddTexToAtlas(mainName, mainTexFileName,  true);
-		AddTexToAtlas(normName, normTexFileName, false);
+		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_DECAL);
+		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_DECAL);
 	}
 }
 
 void CGroundDecalHandler::AddGroundTrackTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	const std::string ERR_MSG = "Error loading a ground track/footprint decal texture";
+
 	const auto fileNames = CFileHandler::FindFiles("bitmaps/tracks/", "");
 	for (const auto& mainTexFileName : fileNames) {
 		const auto mainName = FileSystem::GetBasename(StringToLower(mainTexFileName));
 		const auto normName = mainName + "_norm";
 		const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
 
-		AddTexToAtlas(mainName, mainTexFileName,  true);
-		AddTexToAtlas(normName, normTexFileName, false);
+		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG);
+		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG);
 	}
 }
 
