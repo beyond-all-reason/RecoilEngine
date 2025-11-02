@@ -5143,7 +5143,7 @@ int LuaUnsyncedCtrl::SetGroundDecalGlowParams(lua_State* L)
  * Set decal user data. Useful in conjunction with custom decal shaders
  *
  * @param decalID integer
- * @param vec4 index integer? Must be within [0;1] for now
+ * @param udQuad integer vec4 index, must be within [0;1] for now
  * @param x number? Between 0 and 1, per second (Default: current data)
  * @param y number? Between 0 and 1, per second (Default: current data)
  * @param z number? Between 0 and 1, per second (Default: current data)

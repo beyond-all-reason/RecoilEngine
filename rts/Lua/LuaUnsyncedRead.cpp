@@ -5069,7 +5069,7 @@ int LuaUnsyncedRead::GetGroundDecalGlowParams(lua_State* L)
  * @function Spring.GetGroundDecalUserData
  * Gets the user defined decal data.
  * @param decalID integer
- * @param udQuad integer vec4 index
+ * @param udQuad integer vec4 index, must be within [0;1] for now
  * @return number? x
  * @return number y
  * @return number z
