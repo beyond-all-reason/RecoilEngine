@@ -450,17 +450,17 @@ bool CGroundDecalHandler::ReloadDecalShaders() {
 		1.0f / (mapDims.pwr2mapy * SQUARE_SIZE)
 	);
 
-	decalShader->SetUniform("atlasTex", 0);
-	decalShader->SetUniform("miniMapTex", 2);
-	decalShader->SetUniform("heightTex", 3);
-	decalShader->SetUniform("depthTex", 4);
+	decalShader->SetUniform("atlasTex"       , 0);
+	decalShader->SetUniform("miniMapTex"     , 2);
+	decalShader->SetUniform("heightTex"      , 3);
+	decalShader->SetUniform("depthTex"       , 4);
 	decalShader->SetUniform("groundNormalTex", 5);
-	decalShader->SetUniform("shadowTex", 6);
-	decalShader->SetUniform("shadowColorTex", 7);
-	decalShader->SetUniform("infoTex", 8);
+	decalShader->SetUniform("shadowTex"      , 6);
+	decalShader->SetUniform("shadowColorTex" , 7);
+	decalShader->SetUniform("infoTex"        , 8);
 
-	decalShader->SetUniform("waterMinColor", 0.0f, 0.0f, 0.0f);
-	decalShader->SetUniform("waterBaseColor", 0.0f, 0.0f, 0.0f);
+	decalShader->SetUniform("waterMinColor"   , 0.0f, 0.0f, 0.0f);
+	decalShader->SetUniform("waterBaseColor"  , 0.0f, 0.0f, 0.0f);
 	decalShader->SetUniform("waterAbsorbColor", 0.0f, 0.0f, 0.0f);
 
 	decalShader->SetUniform("curAdjustedFrame", std::max(gs->frameNum, 0) + globalRendering->timeOffset);
