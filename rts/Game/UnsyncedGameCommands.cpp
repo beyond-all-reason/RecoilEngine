@@ -767,65 +767,46 @@ private:
 	bool halt;
 };
 
-
 class BuildStateActionExecutor : public IUnsyncedActionExecutor {
 public:
     BuildStateActionExecutor()
       : IUnsyncedActionExecutor(
             "build_state",
-            "Toggles build placement modifiers (e.g. 'box', 'line')"
+            "Toggles build placement modifiers (e.g. 'box', 'line', 'circle'. Lua commands: call 'box r' for release)"
         ) {}
     bool Execute(const UnsyncedAction& action) const final {
-        if (!guihandler) return false;
-        guihandler->EnableBuildModifier(
-            CGuiHandler::ParseBuildState(action.GetArgs())
-        );
-        return true;
-    }
-    bool ExecuteRelease(const UnsyncedAction& action) const final {
-        if (!guihandler) return false;
-        guihandler->DisableBuildModifier(
-            CGuiHandler::ParseBuildState(action.GetArgs())
-        );
-        return true;
-    }
+		if (!guihandler) return false;
+		const std::string& args = action.GetArgs();
+		const size_t spacePos = args.find(' ');
+		if (spacePos == std::string::npos) {
+			guihandler->EnableBuildModifier(CGuiHandler::ParseBuildModifier(args));
+		} else {
+			const std::string modStr = args.substr(0, spacePos);
+			guihandler->DisableBuildModifier(CGuiHandler::ParseBuildModifier(modStr));
+		}
+		return false;
+	}
+	bool ExecuteRelease(const UnsyncedAction& action) const final {
+		if (!guihandler) return false;
+		guihandler->DisableBuildModifier(CGuiHandler::ParseBuildModifier(action.GetArgs()));
+		return false;
+	}
 };
 
-class BoxBuildActionExecutor : public IUnsyncedActionExecutor {
+class GuiHandlerConfigCommandExecutor : public IUnsyncedActionExecutor {
 public:
-    BoxBuildActionExecutor()
-      : IUnsyncedActionExecutor("boxbuild", "Shortcut for 'build_state box' + mouse click") {}
-
-    mutable bool boxBuildClicking = false;
+    GuiHandlerConfigCommandExecutor()
+      : IUnsyncedActionExecutor("guihandler",
+            "Subcommands to control GUI handler config", false, {
+                {"legacybuildui [0|1]", "Enable (1) or disable (0) legacy build UI. No argument toggles."},
+            }) {}
 
     bool Execute(const UnsyncedAction& action) const final {
-        if (!action.IsRepeat() && guihandler != nullptr) {
-            // Enable 'build_state box'
-            guihandler->EnableBuildModifier(CGuiHandler::ParseBuildState("box"));
-
-            // Simulate mouse press if not already pressed
-            if (!mouse->buttons[SDL_BUTTON_LEFT].pressed) {
-                mouse->MousePress(mouse->lastx, mouse->lasty, SDL_BUTTON_LEFT);
-                boxBuildClicking = true;
-            }
-        }
-        return false;
-    }
-
-    bool ExecuteRelease(const UnsyncedAction& action) const final {
-        if (guihandler != nullptr) {
-            if (boxBuildClicking) {
-                mouse->MouseRelease(mouse->lastx, mouse->lasty, SDL_BUTTON_LEFT);
-                boxBuildClicking = false;
-            }
-			guihandler->DisableBuildModifier(CGuiHandler::ParseBuildState("box"));
-        }
-        return false;
+        if (!guihandler) return false;
+        guihandler->ConfigCommand(action.GetArgs());
+        return true;
     }
 };
-
-
-
 
 class AIKillReloadActionExecutor : public IUnsyncedActionExecutor {
 public:
@@ -4278,7 +4259,7 @@ void UnsyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<CommandListActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<CommandHelpActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<BuildStateActionExecutor>());
-	AddActionExecutor(AllocActionExecutor<BoxBuildActionExecutor>());
+	AddActionExecutor(AllocActionExecutor<GuiHandlerConfigCommandExecutor>());
 }
 
 

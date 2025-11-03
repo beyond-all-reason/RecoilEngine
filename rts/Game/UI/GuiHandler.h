@@ -4,7 +4,6 @@
 #define GUI_HANDLER_H
 
 #include <vector>
-#include <set>
 
 #include "KeySet.h"
 #include "InputReceiver.h"
@@ -29,12 +28,14 @@ class CGuiHandler : public CInputReceiver {
 public:
 	CGuiHandler();
 
-	enum class BuildState {
-        Default,
-        Box,
-		Line
-        // add more later
-    };
+	enum BuildModifier : uint32_t {
+		MOD_NONE       = 0,
+		MOD_LINE       = 1 << 0,
+		MOD_BOX        = 1 << 1,
+		MOD_CIRCLE     = 1 << 2,
+		MOD_HOLLOW_BOX = 1 << 3,
+		MOD_AXIS_LOCK  = 1 << 5,
+	};
 	void Update();
 
 	void Draw();
@@ -75,6 +76,7 @@ public:
 
 	bool LoadConfig(const std::string& cfg);
 	bool LoadDefaultConfig() { return (LoadConfig(DEFAULT_GUI_CONFIG)); }
+	void ConfigCommand(const std::string& line);
 	bool ReloadConfigFromFile(const std::string& fileName);
 	bool ReloadConfigFromString(const std::string& cfg);
 
@@ -93,10 +95,9 @@ public:
 	bool GetGatherMode() const { return gatherMode; }
 	void SetGatherMode(bool value) { gatherMode = value; }
 
-	BuildState GetBuildState() const { return buildState; }
-	static BuildState ParseBuildState(const std::string& arg);
-    void EnableBuildModifier(BuildState s);
-    void DisableBuildModifier(BuildState s);
+    void EnableBuildModifier(BuildModifier m) {activeBuildModifiers |= m;}
+	void DisableBuildModifier(BuildModifier m) {activeBuildModifiers &= ~m;}
+	static BuildModifier ParseBuildModifier(const std::string& arg);
 
 	bool GetOutlineFonts() const { return outlineFonts; }
 
@@ -183,7 +184,7 @@ private:
 	int  GetIconPosCommand(int slot) const;
 	int  ParseIconSlot(const std::string& text) const;
 
-	BuildState ResolveBuildState() const;
+	
 
 
 public:
@@ -199,8 +200,8 @@ private:
 	int explicitCommand = -1;
 	int curIconCommand = -1;
 
-	BuildState buildState = BuildState::Default;   // current effective state
-    std::set<BuildState> activeBuildStates;        // disjoint flags
+	uint32_t activeBuildModifiers = MOD_NONE; // bitmask of active modifiers
+	bool useLegacyBuildUI = true;
 
 	int actionOffset = 0;
 
