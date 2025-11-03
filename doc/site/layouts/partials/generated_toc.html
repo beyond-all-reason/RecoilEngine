@@ -4,26 +4,26 @@
 {{- $editThisPage := (T "editThisPage") | default "Edit this page"}}
 {{- $backToTop := (T "backToTop") | default "Scroll to top" -}}
 
-{{/* 
+{{/*
   Render out the table element.
 
-  For toc_entry : { 
-        title : string, 
-        name_path : string, 
-        children: []toc_entry 
+  For toc_entry : {
+        title : string,
+        name_path : string,
+        children: []toc_entry
     }
   This expects []toc_entry
 */}}
 <nav class="width-25vw hextra-toc hx:order-last hx:hidden hx:w-64 hx:shrink-0 hx:xl:block hx:print:hidden hx:px-4" aria-label="table of contents">
-  <div class="generated-toc-sticky hextra-scrollbar hx:sticky hx:top-16 hx:overflow-y-auto hx:pr-4 hx:pt-6 hx:text-sm [hyphens:auto] hx:max-h-[calc(100vh-var(--navbar-height)-env(safe-area-inset-bottom))] hx:ltr:-mr-4 hx:rtl:-ml-4">  
+  <div class="generated-toc-sticky hextra-scrollbar hx:sticky hx:top-16 hx:overflow-y-auto hx:pr-4 hx:pt-6 hx:text-sm [hyphens:auto] hx:max-h-[calc(100vh-var(--navbar-height)-env(safe-area-inset-bottom))] hx:ltr:-mr-4 hx:rtl:-ml-4">
     <p class="hx:mb-4 hx:font-semibold hx:tracking-tight">{{ $onThisPage }}</p>
     <div class="margin-top-half-rem"></div>
     <hr>
-    <div class="margin-top-half-rem"></div>   
+    <div class="margin-top-half-rem"></div>
       <div class="generated-toc-scroll-box">
         <ul class="list-style-type-none">
-          {{ range .}}
-            {{ template "toc-subheading" (dict "info" . "level" 0) }}
+          {{ range $k, $v := . }}
+            {{ template "toc-subheading" (dict "info" $v "level" 0 "title" $k) }}
           {{ end }}
         </ul>
       </div>
@@ -35,6 +35,7 @@
 {{- define "toc-subheading" -}}
   {{- $info := .info -}}
   {{- $level := .level -}}
+  {{- $title := .title -}}
   {{- if ge $level 6 -}}
     {{ return }}
   {{- end -}}
@@ -43,7 +44,17 @@
   {{/* render each item in the list */}}
   <li class="hx:my-2 hx:scroll-my-6 hx:scroll-py-6" style="padding-left: {{ $padding }}%">
     {{ with $info }}
-        {{ if .children }}
+    	<details>
+	     	<summary>{{ $title }}</summary>
+	      	<ul>
+		   		{{ range sort . "title" }}
+		     		<li><a href="#{{ .permalink }}"> {{ .title }}</a></li>
+		     	{{ end }}
+	      	</ul>
+     	</details>
+
+
+        {{/* {{ if .children }}
         <details>
           <summary><a href="#{{ .name_path }}">{{ .title }}</a></summary>
           <ul class="list-style-type-none">
@@ -55,6 +66,7 @@
         {{ else }}
           <a class="margin-left-1rem" href="#{{ .name_path }}">{{ .title }}</a>
         {{ end }}
+        */}}
     {{ end }}
   </li>
 {{- end -}}
