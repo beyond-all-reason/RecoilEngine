@@ -107,20 +107,12 @@
 }
 
 .api-card-toplevel {
-	background-color: #303030;
+	background-color: light-dark(#efefef, #303030);
 	padding: 1rem;
 	margin-bottom: 1rem;
 	margin-top: 1rem;
 	border-radius: 1rem;
 	box-shadow: 0 0 1rem rgb(17, 17, 17);
-}
-
-.api-card {
-	padding: 1rem;
-	margin-bottom: 1rem;
-	margin-top: 1rem;
-	border-radius: 1rem;
-	background-color: #222222;
 }
 
 .display-inline {

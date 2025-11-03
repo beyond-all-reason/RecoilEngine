@@ -48,7 +48,7 @@
 	     	<summary>{{ $title }}</summary>
 	      	<ul>
 		   		{{ range sort . "title" }}
-		     		<li><a href="#{{ .permalink }}"> {{ .title }}</a></li>
+		     		<li><a class="margin-left-1rem" href="#{{ .permalink }}"> {{ .title }}</a></li>
 		     	{{ end }}
 	      	</ul>
      	</details>
