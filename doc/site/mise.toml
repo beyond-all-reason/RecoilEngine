@@ -23,13 +23,13 @@
 [tasks]
 	[tasks.server]
 	description = "Run the site server locally"
-	tools."aqua:gohugoio/hugo-extended" = "{{env.HUGO_VERSION}}"
+	tools.hugo-extended = "{{env.HUGO_VERSION}}"
 	run = "hugo server --navigateToChanged"
 
 	[tasks.server_full]
 	depends = ["lua_json", "binary_pages"]
 	description = "Run the site server locally, with all possible content"
-	tools."aqua:gohugoio/hugo-extended" = "{{env.HUGO_VERSION}}"
+	tools.hugo-extended = "{{env.HUGO_VERSION}}"
 	run = "hugo server --navigateToChanged"
 
 	[tasks.lua_json]
