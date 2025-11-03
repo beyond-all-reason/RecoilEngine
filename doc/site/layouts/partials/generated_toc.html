@@ -26,6 +26,7 @@
             {{ template "toc-subheading" (dict "info" $v "level" 0 "title" $k) }}
           {{ end }}
         </ul>
+        <pre>{{ . | debug.Dump }}</pre>
       </div>
       {{/* TODO: Scroll to top? Do we care, since it's not an article? */}}
   </div>

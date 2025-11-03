@@ -93,10 +93,10 @@ refLinksErrorLevel = "WARNING"
 	[[menu.main]]
 		identifier = "forum"
 		name = "Forum"
-		params.icon = "github"
+		params.icon = "chat-alt-2"
 		url = "https://github.com/beyond-all-reason/RecoilEngine/discussions/categories/general"
 		weight = 8
-	
+
 	[[menu.main]]
 		identifier = "discord"
 		name = "Discord"
