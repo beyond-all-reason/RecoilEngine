@@ -153,7 +153,12 @@ void CDemoRecorder::SetName(const std::string& mapName, const std::string& modNa
 	std::ostringstream buf;
 
 	oss << demoDir << curTime << "_";
-	oss << FileSystem::GetBasename(mapName);
+	// check to see if the standard map extension is here, remove it if so
+	if (FileSystem::GetExtension(mapName) == "sd7") {
+		oss << FileSystem::GetBasename(mapName);
+	} else {
+		oss << mapName;
+	}
 	oss << "_";
 	// FIXME: why is this not included?
 	// oss << FileSystem::GetBasename(modName);
