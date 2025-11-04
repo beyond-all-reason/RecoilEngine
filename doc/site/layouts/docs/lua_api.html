@@ -133,9 +133,9 @@
 					{{ template "render_member" (dict "data" . "level" (add $level 1)) }}
 				{{ end }}
 
-				{{ with .loc }}
+				{{/*{{ with .loc }}
 					<a href="{{ .file }}#L{{ .line }}">source</a>
-				{{ end }}
+				{{ end }} /*}}
 			</details>
 		</div>
 	{{ end }}

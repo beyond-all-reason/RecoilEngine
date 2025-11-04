@@ -53,21 +53,6 @@
 		     	{{ end }}
 	      	</ul>
      	</details>
-
-
-        {{/* {{ if .children }}
-        <details>
-          <summary><a href="#{{ .name_path }}">{{ .title }}</a></summary>
-          <ul class="list-style-type-none">
-            {{ range sort .children "title" }}
-              {{ template "toc-subheading" (dict "info" . "level" (add $level 1)) }}
-            {{ end }}
-          </ul>
-        </details>
-        {{ else }}
-          <a class="margin-left-1rem" href="#{{ .name_path }}">{{ .title }}</a>
-        {{ end }}
-        */}}
     {{ end }}
   </li>
 {{- end -}}
