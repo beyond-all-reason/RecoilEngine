@@ -153,12 +153,9 @@ void CDemoRecorder::SetName(const std::string& mapName, const std::string& modNa
 	std::ostringstream buf;
 
 	oss << demoDir << curTime << "_";
-	// check to see if the standard map extension is here, remove it if so
-	if (FileSystem::GetExtension(mapName) == "sd7") {
-		oss << FileSystem::GetBasename(mapName);
-	} else {
-		oss << mapName;
-	}
+	// mapName has not been passed with an extension since commit 28c3b5e, 
+	// which changes map loading to use an archive scanner
+	oss << mapName;
 	oss << "_";
 	// FIXME: why is this not included?
 	// oss << FileSystem::GetBasename(modName);
