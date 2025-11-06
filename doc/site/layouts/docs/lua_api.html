@@ -9,7 +9,7 @@
 */}}
 
 {{ define "main" }}
-	<div class='hx-mx-auto hx-flex {{ partial "utils/page-width" . }}'>
+	<div class='hx-mx-auto hx-flex hextra-max-page-width'>
 	{{ partial "sidebar.html" (dict "context" .) }}
 	{{ $data := .Site.Data.doc }}
 	{{ $context := . }}

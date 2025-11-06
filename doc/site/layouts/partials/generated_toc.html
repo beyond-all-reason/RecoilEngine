@@ -23,36 +23,10 @@
       <div class="generated-toc-scroll-box">
         <ul class="list-style-type-none">
           {{ range $k, $v := . }}
-            {{ template "toc-subheading" (dict "info" $v "level" 0 "title" $k) }}
+            {{ partial "toc_subheading.html" (dict "info" $v "level" 0 "title" $k) }}
           {{ end }}
         </ul>
-        <pre>{{ . | debug.Dump }}</pre>
       </div>
       {{/* TODO: Scroll to top? Do we care, since it's not an article? */}}
   </div>
 </nav>
-
-{{/* TOC subheadings component. This is a recursive component that renders a list of headings. */}}
-{{- define "toc-subheading" -}}
-  {{- $info := .info -}}
-  {{- $level := .level -}}
-  {{- $title := .title -}}
-  {{- if ge $level 6 -}}
-    {{ return }}
-  {{- end -}}
-
-  {{- $padding := (mul $level 4) -}}
-  {{/* render each item in the list */}}
-  <li class="hx:my-2 hx:scroll-my-6 hx:scroll-py-6" style="padding-left: {{ $padding }}%">
-    {{ with $info }}
-    	<details>
-	     	<summary>{{ $title }}</summary>
-	      	<ul>
-		   		{{ range sort . "title" }}
-		     		<li><a class="margin-left-1rem" href="#{{ .permalink }}"> {{ .title }}</a></li>
-		     	{{ end }}
-	      	</ul>
-     	</details>
-    {{ end }}
-  </li>
-{{- end -}}
