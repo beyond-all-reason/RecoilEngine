@@ -5143,10 +5143,10 @@ int LuaUnsyncedCtrl::SetGroundDecalGlowParams(lua_State* L)
  *
  * @param decalID integer
  * @param udQuad integer vec4 index, must be within [0;1] for now
- * @param x number? Between 0 and 1, per second (Default: current data)
- * @param y number? Between 0 and 1, per second (Default: current data)
- * @param z number? Between 0 and 1, per second (Default: current data)
- * @param w number? Between 0 and 1, per second (Default: current data)
+ * @param x number? Any valid Lua float number (Default: current data)
+ * @param y number? Any valid Lua float number (Default: current data)
+ * @param z number? Any valid Lua float number (Default: current data)
+ * @param w number? Any valid Lua float number (Default: current data)
  * @return boolean decalSet
  */
 int LuaUnsyncedCtrl::SetGroundDecalUserData(lua_State* L)
