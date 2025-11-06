@@ -21,9 +21,15 @@
     <hr>
     <div class="margin-top-half-rem"></div>
       <div class="generated-toc-scroll-box">
-        <ul class="list-style-type-none">
+        <ul class="">
           {{ range $k, $v := . }}
-            {{ partial "toc_subheading.html" (dict "info" $v "level" 0 "title" $k) }}
+          	<li>{{ $k }}
+          	<ul>
+	           {{ range $v }}
+					<li><pre>{{ . | debug.Dump }}</pre></li>
+	           {{ end }}
+				</ul></li>
+            {{/* partial "toc_subheading.html" (dict "info" $v "level" 0 "title" $k) */}}
           {{ end }}
         </ul>
       </div>
