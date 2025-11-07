@@ -31,7 +31,7 @@
 	{{ range $data.globals }}
 		{{ $info := (partial "construct_member.html" (dict "type_info" $type_info "context" $context "data" . "path" slice)) }}
 		{{ $global_info = $global_info | append $info }}
-		{{ $g_list = $g_list | append (dict "title" $info.name "permalink" $info.permalink) }}
+		{{ $g_list = $g_list | append (dict "Title" $info.name "ID" $info.permalink "Level" 1 "Headings" slice) }}
 	{{ end }}
 
 	{{/* Generate Types Info and TOC */}}
@@ -40,13 +40,14 @@
 	{{ range $data.types }}
 		{{ $info := (partial "construct_member.html" (dict "type_info" $type_info "context" $context "data" . "path" slice)) }}
 		{{ $types_info = $types_info | append $info }}
-		{{ $t_list = $t_list | append (dict "title" $info.name "permalink" $info.permalink) }}
+		{{ $t_list = $t_list | append (dict "Title" $info.name "ID" $info.permalink "Level" 1 "Headings" slice) }}
 	{{ end }}
 
 	{{/* Generate TOC */}}
-	{{ $toc := dict "types" $t_list "globals" $g_list }}
-
-	{{ $custom_data := ( dict "Fragments" ( dict "Headings" (slice ( dict "ID" "sdfsf" "Level" 0 "Title" "babbaba" "Headings" slice ) )) ) }}
+	{{ $custom_data := ( dict "Fragments" ( dict "Headings" (slice
+		( dict "ID" "globals" "Level" 0 "Title" "Globals" "Headings" $g_list )
+		( dict "ID" "types" "Level" 0 "Title" "Types" "Headings" $t_list )
+	)) ) }}
 	{{ partial "generated_toc.html" $custom_data }}
 
 	<article class="hx:w-full hx:break-words hx:flex hx:min-h-[calc(100vh-var(--navbar-height))] hx:min-w-0 hx:justify-center hx:pb-8 hx:pr-[calc(env(safe-area-inset-right)-1.5rem)]">
