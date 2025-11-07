@@ -1,8 +1,9 @@
 {{ define "main" }}
-	<div class='hx-mx-auto hx-flex hextra-max-page-width'>
+	<div class='hx:mx-auto hx:flex hextra-max-page-width'>
 	{{ partial "sidebar.html" (dict "context" .) }}
+	{{ $toc_content := slice }}
 
-	<article class="hx-w-full hx-break-words hx-flex hx-min-h-[calc(100vh-var(--navbar-height))] hx-min-w-0 hx-justify-center hx-pb-8 hx-pr-[calc(env(safe-area-inset-right)-1.5rem)]">
+	<article class="hx:w-full hx:break-words hx:flex hx:min-h-[calc(100vh-var(--navbar-height))] hx:min-w-0 hx:justify-center hx:pb-8 hx:pr-[calc(env(safe-area-inset-right)-1.5rem)]">
 		<main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
 			<div class="content">
 				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
@@ -10,8 +11,7 @@
 				{{ $data := index .Site.Data .Params.context }}
 				{{ range $data }}
 					<h2>
-						{{ .command }}<span class="hx-absolute -hx-mt-20" id="{{ .command }}"></span>
-
+						{{ .command }}<span id="{{ .command }}" class="hx:absolute hx:-mt-20"></span>
 							<a href="#{{ .command }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
 					</h2>
 					<p>{{ .description }}</p>
@@ -36,6 +36,8 @@
 						{{ end }}
 						</dl>
 					{{ end }}
+
+					{{ $toc_content = $toc_content | append (dict "ID" .command "Title" .command "Level" 0 "Headings" slice ) }}
 				{{ end }}
 			</div>
 		{{ partial "components/last-updated.html" . }}
@@ -43,9 +45,6 @@
 		{{ partial "components/comments.html" . }}
 		</main>
 	</article>
-	{{ $toc_data := slice }}
-	{{ range $name, $info := (index .Site.Data .Params.context)  }}
-		{{ $toc_data = append $toc_data (slice (dict "title" $info.command "name_path" $info.command "children" slice)) }}
-	{{ end }}
+	{{ partial "generated_toc.html" ( dict "Fragments" ( dict "Headings" $toc_content) ) }}
 	</div>
 {{ end }}
