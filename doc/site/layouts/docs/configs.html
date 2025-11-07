@@ -1,7 +1,9 @@
 {{ define "main" }}
-	<div class='hx-mx-auto hx-flex hextra-max-page-width'>
+	<div class='hx:mx-auto hx:flex hextra-max-page-width'>
 	{{ partial "sidebar.html" (dict "context" .) }}
-	<article class="hx-w-full hx-break-words hx-flex hx-min-h-[calc(100vh-var(--navbar-height))] hx-min-w-0 hx-justify-center hx-pb-8 hx-pr-[calc(env(safe-area-inset-right)-1.5rem)]">
+	{{ $toc_content := slice }}
+
+	<article class="hx:w-full hx:break-words hx:flex hx:min-h-[calc(100vh-var(--navbar-height))] hx:min-w-0 hx:justify-center hx:pb-8 hx:pr-[calc(env(safe-area-inset-right)-1.5rem)]">
 		<main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
 			<div class="content">
 				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
@@ -17,10 +19,12 @@
 					</tr>
 					{{ range $config_name, $info := $data }}
 						<tr>
-							<td id="{{ $config_name }}">
+							<td>
+								<span id="{{ $config_name }}" class="hx:absolute hx:-mt-20"></span>
+								{{ $config_name }}
 								{{ if $info.deprecated }}<i>(Deprecated)</i>{{ end }}
 								<code>{{ if strings.Contains $info.type "string" }}string{{ else }}{{ $info.type }}{{ end }}</code>
-								<a href="#{{ $config_name }}">{{ $config_name }}</a>
+								<a href="#{{ $config_name }}" class="subheading-anchor" aria-label="Permalink for {{ $config_name }}"></a>
 							</td>
 							<td>
 								{{ $info.description }}
@@ -51,6 +55,7 @@
 								</dl>
 							</td>
 						</tr>
+						{{ $toc_content = $toc_content | append (dict "ID" $config_name "Title" $config_name "Level" 0 "Headings" slice ) }}
 					{{ end }}
 				</table>
 			</div>
@@ -59,9 +64,7 @@
 		{{ partial "components/comments.html" . }}
 		</main>
 	</article>
-	{{ $toc_data := slice }}
-	{{ range $name, $info := (index .Site.Data .Params.context)  }}
-		{{ $toc_data = append $toc_data (slice (dict "title" $name "name_path" $name "children" slice)) }}
-	{{ end }}
+
+	{{ partial "generated_toc.html" ( dict "Fragments" ( dict "Headings" $toc_content) ) }}
   </div>
 {{ end }}

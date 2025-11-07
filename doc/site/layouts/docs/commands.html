@@ -9,7 +9,7 @@
 				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
 
 				{{ $data := index .Site.Data .Params.context }}
-				{{ range $data }}
+				{{ range sort $data "command" }}
 					<h2>
 						{{ .command }}<span id="{{ .command }}" class="hx:absolute hx:-mt-20"></span>
 							<a href="#{{ .command }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
@@ -45,6 +45,7 @@
 		{{ partial "components/comments.html" . }}
 		</main>
 	</article>
+
 	{{ partial "generated_toc.html" ( dict "Fragments" ( dict "Headings" $toc_content) ) }}
 	</div>
 {{ end }}
