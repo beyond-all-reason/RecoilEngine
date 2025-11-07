@@ -153,8 +153,6 @@ void CDemoRecorder::SetName(const std::string& mapName, const std::string& modNa
 	std::ostringstream buf;
 
 	oss << demoDir << curTime << "_";
-	// mapName has not been passed with an extension since commit 28c3b5e, 
-	// which changes map loading to use an archive scanner
 	oss << mapName;
 	oss << "_";
 	// FIXME: why is this not included?
