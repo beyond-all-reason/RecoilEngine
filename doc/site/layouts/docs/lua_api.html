@@ -9,7 +9,7 @@
 */}}
 
 {{ define "main" }}
-	<div class='hx-mx-auto hx-flex'>
+	<div class='hx:mx-auto hx:flex hextra-max-page-width'>
 	{{ partial "sidebar.html" (dict "context" .) }}
 	{{ $data := .Site.Data.doc }}
 	{{ $context := . }}
@@ -47,7 +47,7 @@
 	{{ $custom_data := ( dict "Fragments" ( dict "Headings" (slice
 		( dict "ID" "globals" "Level" 0 "Title" "Globals" "Headings" $g_list )
 		( dict "ID" "types" "Level" 0 "Title" "Types" "Headings" $t_list )
-	)) ) }}
+	)) ) }} {{/* Still need to do the filter thing */}}
 	{{ partial "generated_toc.html" $custom_data }}
 
 	<article class="hx:w-full hx:break-words hx:flex hx:min-h-[calc(100vh-var(--navbar-height))] hx:min-w-0 hx:justify-center hx:pb-8 hx:pr-[calc(env(safe-area-inset-right)-1.5rem)]">
@@ -55,14 +55,16 @@
 			<div class="content lua-api">
 				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
 
-				<h1>Globals</h1>
+				<span id="globals" class="hx:absolute -hx:mt-20"></span>
+				<h2>Globals <a href="#globals" class="subheading-anchor" aria-label="Permalink for globals"></a></h2>
 				{{ range sort $global_info "name" }}
 					{{ if not ( and .typ ( strings.Contains .typ .name ) ) }} {{/* This dumb hack is to try to avoid the duplicate property CMD and type CMD */}}
 						{{ template "render_member" (dict "data" . "level" 0)}}
 					{{ end }}
 				{{ end }}
 
-				<h1>Types</h1>
+				<span id="types" class="hx:absolute -hx:mt-20"></span>
+				<h2>Types <a href="#types" class="subheading-anchor" aria-label="Permalink for types"></a></h2>
 				{{ range sort $types_info "name" }}
 					{{ template "render_member" (dict "data" . "level" 0) }}
 				{{ end }}
@@ -94,7 +96,7 @@
 					<h{{ add 2 $level }} class="display-inline">
 						{{ if .method }}method{{ else }}{{ .type }}{{ end }} <code>{{ .name }}{{ if .signature }} {{ .signature }}{{ end }}</code>
 					</h{{ add 2 $level }}>
-					<a href="#{{ .permalink }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
+					<a href="#{{ .permalink }}" class="subheading-anchor" aria-label="Permalink for {{ .name }}"></a>
 				</summary>
 				<br>
 				<hr>
