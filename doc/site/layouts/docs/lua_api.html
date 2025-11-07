@@ -46,6 +46,9 @@
 	{{/* Generate TOC */}}
 	{{ $toc := dict "types" $t_list "globals" $g_list }}
 
+	{{ $custom_data := ( dict "Fragments" ( dict "Headings" (slice ( dict "ID" "sdfsf" "Level" 0 "Title" "babbaba" "Headings" slice ) )) ) }}
+	{{ partial "generated_toc.html" $custom_data }}
+
 	<article class="hx:w-full hx:break-words hx:flex hx:min-h-[calc(100vh-var(--navbar-height))] hx:min-w-0 hx:justify-center hx:pb-8 hx:pr-[calc(env(safe-area-inset-right)-1.5rem)]">
 		<main class="hx:w-full hx:min-w-0 hx:max-w-6xl hx:px-6 hx:pt-4 hx:md:px-12">
 			<div class="content lua-api">
@@ -69,7 +72,6 @@
 		</main>
 	</article>
 
-	{{ partial "generated_toc.html" $toc }}
   </div>
 {{ end }}
 

@@ -63,6 +63,5 @@
 	{{ range $name, $info := (index .Site.Data .Params.context)  }}
 		{{ $toc_data = append $toc_data (slice (dict "title" $name "name_path" $name "children" slice)) }}
 	{{ end }}
-	{{ partial "generated_toc.html" (collections.Reverse $toc_data) }}
   </div>
 {{ end }}
