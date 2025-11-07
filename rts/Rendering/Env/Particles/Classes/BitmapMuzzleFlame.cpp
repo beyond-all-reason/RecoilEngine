@@ -4,6 +4,7 @@
 
 #include "Sim/Misc/GlobalSynced.h"
 #include "Game/GlobalUnsynced.h"
+#include "Game/Camera.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Env/Particles/ProjectileDrawer.h"
 #include "Rendering/GL/RenderBuffers.h"
@@ -34,8 +35,6 @@ CR_REG_METADATA(CBitmapMuzzleFlame,
 		CR_MEMBER(particleSpeedSpread),
 		CR_MEMBER(airdrag),
 		CR_MEMBER(gravity),
-		CR_MEMBER(drawSideX),
-		CR_MEMBER(drawSideY),
 	CR_MEMBER_ENDFLAG(CM_Config),
 	CR_SERIALIZER(Serialize)
 ))
@@ -54,8 +53,6 @@ CBitmapMuzzleFlame::CBitmapMuzzleFlame()
 	, gravity(0.0f, 0.0f, 0.0f)
 	, ttl(0)
 	, invttl(0.0f)
-	, drawSideX(true)
-	, drawSideY(true)
 {
 	// set fields from super-classes
 	useAirLos = true;
@@ -101,20 +98,22 @@ void CBitmapMuzzleFlame::Draw()
 
 	float3 fpos = drawPos + dir * frontOffset * ilength;
 
-	const float3 zdir = (std::fabs(dir.dot(UpVector)) >= 0.99f)? FwdVector: UpVector;
-	const float3 xdir = (dir.cross(zdir)).SafeANormalize();
-	const float3 ydir = (dir.cross(xdir)).SafeANormalize();
+	float3 nDir = dir; nDir.SafeANormalize();
+	// make zdir look at drawPos, but then rotate around "nDir" by 45 degree to create cross planes
+	const float3 zdir = (drawPos - camera->GetPos()).rotate<false>(math::QUARTERPI, nDir);
+	const float3 xdir = (nDir.cross(zdir)).SafeANormalize();
+	const float3 ydir = (nDir.cross(xdir)).SafeANormalize();
 
 	std::array<float3, 12> bounds = {
-		  ydir * isize                ,
-		  ydir * isize + dir * ilength,
-		 -ydir * isize + dir * ilength,
-		 -ydir * isize                ,
-
 		  xdir * isize                ,
 		  xdir * isize + dir * ilength,
 		 -xdir * isize + dir * ilength,
 		 -xdir * isize                ,
+
+		  ydir * isize                ,
+		  ydir * isize + dir * ilength,
+		 -ydir * isize + dir * ilength,
+		 -ydir * isize                ,
 
 		 -xdir * isize + ydir * isize,
 		  xdir * isize + ydir * isize,
@@ -127,23 +126,20 @@ void CBitmapMuzzleFlame::Draw()
 	}
 
 	if (IsValidTexture(sideTexture)) {
-		if (drawSideY)
-			AddEffectsQuad<2>(
-				sideTexture->pageNum,
-				{ drawPos + bounds[0], sideTexture->xstart, sideTexture->ystart, col },
-				{ drawPos + bounds[1], sideTexture->xend  , sideTexture->ystart, col },
-				{ drawPos + bounds[2], sideTexture->xend  , sideTexture->yend  , col },
-				{ drawPos + bounds[3], sideTexture->xstart, sideTexture->yend  , col }
-			);
-
-		if (drawSideX)
-			AddEffectsQuad<2>(
-				sideTexture->pageNum,
-				{ drawPos + bounds[4], sideTexture->xstart, sideTexture->ystart, col },
-				{ drawPos + bounds[5], sideTexture->xend  , sideTexture->ystart, col },
-				{ drawPos + bounds[6], sideTexture->xend  , sideTexture->yend  , col },
-				{ drawPos + bounds[7], sideTexture->xstart, sideTexture->yend  , col }
-			);
+		AddEffectsQuad<2>(
+			sideTexture->pageNum,
+			{ drawPos + bounds[0], sideTexture->xstart, sideTexture->ystart, col },
+			{ drawPos + bounds[1], sideTexture->xend  , sideTexture->ystart, col },
+			{ drawPos + bounds[2], sideTexture->xend  , sideTexture->yend  , col },
+			{ drawPos + bounds[3], sideTexture->xstart, sideTexture->yend  , col }
+		);
+		AddEffectsQuad<2>(
+			sideTexture->pageNum,
+			{ drawPos + bounds[4], sideTexture->xstart, sideTexture->ystart, col },
+			{ drawPos + bounds[5], sideTexture->xend  , sideTexture->ystart, col },
+			{ drawPos + bounds[6], sideTexture->xend  , sideTexture->yend  , col },
+			{ drawPos + bounds[7], sideTexture->xstart, sideTexture->yend  , col }
+		);
 	}
 
 	if (IsValidTexture(frontTexture)) {
@@ -151,8 +147,8 @@ void CBitmapMuzzleFlame::Draw()
 			frontTexture->pageNum,
 			{ fpos + bounds[8 ], frontTexture->xstart, frontTexture->ystart, col },
 			{ fpos + bounds[9 ], frontTexture->xend  , frontTexture->ystart, col },
-			{ fpos + bounds[10], frontTexture->xend  , frontTexture->yend , col },
-			{ fpos + bounds[11], frontTexture->xstart, frontTexture->yend , col }
+			{ fpos + bounds[10], frontTexture->xend  , frontTexture->yend  , col },
+			{ fpos + bounds[11], frontTexture->xstart, frontTexture->yend  , col }
 		);
 	}
 }
@@ -207,8 +203,6 @@ bool CBitmapMuzzleFlame::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	CHECK_MEMBER_INFO_FLOAT (CBitmapMuzzleFlame, airdrag            );
 	CHECK_MEMBER_INFO_FLOAT3(CBitmapMuzzleFlame, gravity            );
 	CHECK_MEMBER_INFO_INT   (CBitmapMuzzleFlame, ttl                );
-	CHECK_MEMBER_INFO_BOOL  (CBitmapMuzzleFlame, drawSideX          );
-	CHECK_MEMBER_INFO_BOOL  (CBitmapMuzzleFlame, drawSideY          );
 
 	return false;
 }

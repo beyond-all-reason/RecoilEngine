@@ -418,6 +418,7 @@ public:
 
 	template<bool synced>
 	float3 rotate(float angle, const float3& axis) const {
+		assert(axis.Normalized());
 		float ca;
 		float sa;
 		if constexpr (synced) {

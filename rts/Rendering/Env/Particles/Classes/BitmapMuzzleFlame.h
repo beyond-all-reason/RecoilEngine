@@ -41,8 +41,6 @@ private:
 	float airdrag;
 	float3 gravity;
 	int ttl;
-	bool drawSideX;
-	bool drawSideY;
 
 	float invttl;
 };

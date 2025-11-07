@@ -165,7 +165,7 @@ template<typename T, typename ...Ts>
 inline T argmax(const T v1, const Ts... vs) { return argmax(v1, argmax(vs...)); }
 
 // template<class T> T mix(const T v1, const T v2, const float a) { return (v1 * (1.0f - a) + v2 * a); }
-template<class T, typename T2> constexpr T mix(const T v1, const T v2, const T2 a) { return (v1 + (v2 - v1) * a); }
+template<class T, typename T2> constexpr T mix(const T& v1, const T& v2, const T2& a) { return (v1 + (v2 - v1) * a); }
 
 template <class T, class T2> constexpr T mixRotation(T v1, T v2, T2 a) {
     v1=ClampRad(v1);
