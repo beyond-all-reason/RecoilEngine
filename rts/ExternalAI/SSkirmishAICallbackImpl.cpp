@@ -4583,8 +4583,8 @@ EXPORT(int) skirmishAiCallback_WeaponDef_getVisibleShieldHitFrames(int skirmishA
 EXPORT(float) skirmishAiCallback_WeaponDef_Shield_getResourceUse(int skirmishAIId, int weaponDefId, int resourceId) {
 	const WeaponDef* wd = getWeaponDefById(skirmishAIId, weaponDefId);
 
-	if (resourceId == resourceHandler->GetEnergyId())
-		return wd->shieldEnergyUse;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return wd->shieldResourceUse[resourceId];
 
 	return 0.0f;
 }
@@ -4612,8 +4612,8 @@ EXPORT(float) skirmishAiCallback_WeaponDef_Shield_getPowerRegen(int skirmishAIId
 EXPORT(float) skirmishAiCallback_WeaponDef_Shield_getPowerRegenResource(int skirmishAIId, int weaponDefId, int resourceId) {
 	const WeaponDef* wd = getWeaponDefById(skirmishAIId, weaponDefId);
 
-	if (resourceId == resourceHandler->GetEnergyId())
-		return wd->shieldPowerRegenEnergy;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return wd->shieldPowerRegenCost[resourceId];
 
 	return 0.0f;
 }

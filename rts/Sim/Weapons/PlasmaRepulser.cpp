@@ -158,10 +158,10 @@ void CPlasmaRepulser::Update()
 	hitFrameCount -= (hitFrameCount > 0);
 
 	if (IsActive() && (curPower < weaponDef->shieldPower) && rechargeDelay <= 0) {
-		const float energyCost = weaponDef->shieldPowerRegenEnergy * INV_GAME_SPEED;
-		const float powerRegen = weaponDef->shieldPowerRegen       * INV_GAME_SPEED;
+		const auto  regenCost  = weaponDef->shieldPowerRegenCost * INV_GAME_SPEED;
+		const float powerRegen = weaponDef->shieldPowerRegen     * INV_GAME_SPEED;
 
-		curPower += (powerRegen * owner->UseEnergy(energyCost));
+		curPower += (powerRegen * owner->UseResources(regenCost));
 	}
 
 	UpdateWeaponVectors();
@@ -205,8 +205,8 @@ bool CPlasmaRepulser::IncomingProjectile(CWeaponProjectile* p, const float3& hit
 	if (curPower < shieldDamage)
 		return false;
 
-		// team does not have enough energy, don't touch the projectile
-	if (teamHandler.Team(owner->team)->res.energy < weaponDef->shieldEnergyUse)
+	// team does not have enough resources, don't touch the projectile
+	if (!teamHandler.Team(owner->team)->HaveResources(weaponDef->shieldResourceUse))
 		return false;
 
 	SetRechargeDelay(weaponDef->shieldRechargeDelay, false);
@@ -216,7 +216,7 @@ bool CPlasmaRepulser::IncomingProjectile(CWeaponProjectile* p, const float3& hit
 		switch (p->ShieldRepulse(weaponMuzzlePos, weaponDef->shieldForce, weaponDef->shieldMaxSpeed)) {
 			case 0: { return false; } break;
 			case 1: {
-				owner->UseEnergy(weaponDef->shieldEnergyUse);
+				owner->UseResources(weaponDef->shieldResourceUse);
 
 				curPower -= (shieldDamage * (weaponDef->shieldPower != 0.0f));
 			} break;
@@ -225,7 +225,7 @@ bool CPlasmaRepulser::IncomingProjectile(CWeaponProjectile* p, const float3& hit
 				//   all weapons except Lasers do only (1 / GAME_SPEED) damage
 				//   (Lasers are insta-bounced, others spend time "inside" the
 				//   shield dealing damage every frame)
-				owner->UseEnergy(weaponDef->shieldEnergyUse / GAME_SPEED);
+				owner->UseResources(weaponDef->shieldResourceUse / GAME_SPEED);
 
 				curPower -= ((shieldDamage / GAME_SPEED) * (weaponDef->shieldPower != 0.0f));
 			} break;
@@ -250,7 +250,7 @@ bool CPlasmaRepulser::IncomingProjectile(CWeaponProjectile* p, const float3& hit
 	}
 
 	// kill the projectile
-	if (owner->UseEnergy(weaponDef->shieldEnergyUse)) {
+	if (owner->UseResources(weaponDef->shieldResourceUse)) {
 		if (weaponDef->shieldPower != 0.0f) {
 			curPower -= shieldDamage;
 			curPower = std::min(weaponDef->shieldPower, curPower); // damage can be negative
@@ -292,8 +292,8 @@ bool CPlasmaRepulser::IncomingBeam(const CWeapon* emitter, const float3& startPo
 	if (curPower < shieldDamage)
 		return false;
 
-	// team does not have enough energy, don't touch the projectile
-	if (teamHandler.Team(owner->team)->res.energy < weaponDef->shieldEnergyUse)
+	// team does not have enough resources, don't touch the projectile
+	if (!teamHandler.Team(owner->team)->HaveResources(weaponDef->shieldResourceUse))
 		return false;
 
 	curPower -= (shieldDamage * damageMultiplier * (weaponDef->shieldPower > 0.0f));

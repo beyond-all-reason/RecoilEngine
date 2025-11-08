@@ -195,9 +195,9 @@ WEAPONTAG(float, shieldStartingPower).externalName("shield.startingPower").fallb
 	.defaultValue(0.0f).description("How many hit-points the shield starts with - otherwise the shield must regenerate from 0 until it reaches maximum power.");
 WEAPONTAG(float, shieldPowerRegen).externalName("shield.powerRegen").fallbackName("shieldPowerRegen")
 	.defaultValue(0.0f).description("How many hit-points the shield regenerates each second.");
-WEAPONTAG(float, shieldPowerRegenEnergy).externalName("shield.powerRegenEnergy").fallbackName("shieldPowerRegenEnergy")
+WEAPONDUMMYTAG(float, shieldPowerRegenEnergy).externalName("shield.powerRegenEnergy").fallbackName("shieldPowerRegenEnergy")
 	.defaultValue(0.0f).description("How much energy resource is consumed to regenerate each hit-point.");
-WEAPONTAG(float, shieldEnergyUse).externalName("shield.energyUse").fallbackName("shieldEnergyUse")
+WEAPONDUMMYTAG(float, shieldEnergyUse).externalName("shield.energyUse").fallbackName("shieldEnergyUse")
 	.defaultValue(0.0f).description("The amount of the energy resource consumed by the shield to absorb or repulse weapons, continually drained by a repulsor as long as the projectile is in range.");
 WEAPONDUMMYTAG(float, shieldRechargeDelay).externalName("rechargeDelay").fallbackName("shieldRechargeDelay").defaultValue(0)
 	.scaleValue(GAME_SPEED).description("The delay in seconds before a shield begins to regenerate after it is hit."); // must be read as float
@@ -359,6 +359,15 @@ WeaponDef::WeaponDef(const LuaTable& wdTable, const std::string& name_, int id_)
 	cost =
 		{ wdTable.GetFloat( "metalPerShot", 0.0f)
 		, wdTable.GetFloat("energyPerShot", 0.0f)
+	};
+
+	shieldResourceUse =
+		{ 0.0f
+		, wdTable.GetFloat("shield.energyUse", wdTable.GetFloat("shieldEnergyUse", 0.0f))
+	};
+	shieldPowerRegenCost =
+		{ 0.0f
+		, wdTable.GetFloat("shield.powerRegenEnergy", wdTable.GetFloat("shieldPowerRegenEnergy", 0.0f))
 	};
 
 	//FIXME defaults depend on other tags
