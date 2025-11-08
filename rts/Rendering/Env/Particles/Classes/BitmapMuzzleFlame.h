@@ -43,6 +43,8 @@ private:
 	int ttl;
 
 	float invttl;
+
+	bool fixedSideDir;
 };
 
 #endif // BITMAP_MUZZLE_FLAME_H
