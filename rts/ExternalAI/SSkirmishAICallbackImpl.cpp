@@ -1677,15 +1677,15 @@ EXPORT(int) skirmishAiCallback_Mod_getReclaimUnitMethod(int skirmishAIId) {
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getReclaimUnitEnergyCostFactor(int skirmishAIId) {
-	return modInfo.reclaimUnitEnergyCostFactor;
+	return modInfo.reclaimUnitCostFactor.energy;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getReclaimUnitEfficiency(int skirmishAIId) {
-	return modInfo.reclaimUnitEfficiency;
+	return modInfo.reclaimUnitEfficiency.metal;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getReclaimFeatureEnergyCostFactor(int skirmishAIId) {
-	return modInfo.reclaimFeatureEnergyCostFactor;
+	return modInfo.reclaimFeatureCostFactor.energy;
 }
 
 EXPORT(bool) skirmishAiCallback_Mod_getReclaimUnitDrainHealth(int skirmishAIId) {
@@ -1701,15 +1701,15 @@ EXPORT(bool) skirmishAiCallback_Mod_getReclaimAllowAllies(int skirmishAIId) {
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getRepairEnergyCostFactor(int skirmishAIId) {
-	return modInfo.repairEnergyCostFactor;
+	return modInfo.repairCostFactor.energy;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getResurrectEnergyCostFactor(int skirmishAIId) {
-	return modInfo.resurrectEnergyCostFactor;
+	return modInfo.resurrectCostFactor.energy;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getCaptureEnergyCostFactor(int skirmishAIId) {
-	return modInfo.captureEnergyCostFactor;
+	return modInfo.captureCostFactor.energy;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getTransportGround(int skirmishAIId) {

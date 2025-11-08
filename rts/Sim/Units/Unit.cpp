@@ -2011,19 +2011,17 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		else if (health < maxHealth) {
 			// repair
 			const float step = std::min(amount / buildTime, 1.0f - (health / maxHealth));
-			const float energyUse = (cost.energy * step);
-			const float energyUseScaled = energyUse * modInfo.repairEnergyCostFactor;
+			const auto resourceUse = cost * step * modInfo.repairCostFactor;
 
-			if ((builderTeam->res.energy < energyUseScaled)) {
-				// update the energy and metal required counts
-				builderTeam->resPull.energy += energyUseScaled;
+			if (!builderTeam->HaveResources(resourceUse)) {
+				builderTeam->resPull += resourceUse;
 				return false;
 			}
 
 			if (!eventHandler.AllowUnitBuildStep(builder, this, step))
 				return false;
 
-	  		if (!builder->UseEnergy(energyUseScaled)) {
+			if (!builder->UseResources(resourceUse)) {
 				return false;
 			}
 
@@ -2041,10 +2039,9 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		}
 
 		const float step = std::max(amount / buildTime, -buildProgress);
-		const float energyRefundStep = cost.energy * step;
-		const float metalRefundStep  =  cost.metal * step;
-		const float metalRefundStepScaled  =  metalRefundStep * modInfo.reclaimUnitEfficiency;
-		const float energyRefundStepScaled = energyRefundStep * modInfo.reclaimUnitEnergyCostFactor;
+		const auto costFraction = cost * -step;
+		const auto refund  = costFraction * modInfo.reclaimUnitEfficiency;
+		const auto useCost = costFraction * modInfo.reclaimUnitCostFactor;
 		const float healthStep        = modInfo.reclaimUnitDrainHealth ? maxHealth * step : 0;
 		const float buildProgressStep = int(modInfo.reclaimUnitMethod == 0) * step;
 		const float postHealth        = health + healthStep;
@@ -2060,16 +2057,16 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		SResourceOrder order;
 		order.quantum    = false;
 		order.overflow   = true;
-		order.use.energy = -energyRefundStepScaled;
+		order.use = useCost;
 		order.useIncomeMultiplier = false; // Dont apply income bonus to reclaimed units
 		
 		if (modInfo.reclaimUnitMethod == 0) {
-			// gradual reclamation of invested metal
-			order.add.metal = -metalRefundStepScaled;
+			// gradual reclamation of invested resources
+			order.add = refund;
 		} else {
-			// lump reclamation of invested metal
+			// lump reclamation of invested resources
 			if (postHealth <= 0.0f || postBuildProgress <= 0.0f) {
-				order.add.metal = (cost.metal * buildProgress) * modInfo.reclaimUnitEfficiency;
+				order.add = cost * buildProgress * modInfo.reclaimUnitEfficiency;
 				killMe = true; // to make 100% sure the unit gets killed, and so no resources are reclaimed twice!
 			}
 		}

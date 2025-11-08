@@ -417,7 +417,7 @@ bool CBuilder::UpdateResurrect(const Command& fCommand)
 	const float step = resurrectSpeed / resurrecteeDef->buildTime;
 
 	const bool resurrectAllowed = eventHandler.AllowFeatureBuildStep(this, curResurrectee, step);
-	const bool canExecResurrect = (resurrectAllowed && UseEnergy(resurrecteeDef->cost.energy * step * modInfo.resurrectEnergyCostFactor));
+	const bool canExecResurrect = (resurrectAllowed && UseResources(resurrecteeDef->cost * step * modInfo.resurrectCostFactor));
 
 	if (canExecResurrect) {
 		curResurrectee->resurrectProgress += step;
@@ -504,11 +504,11 @@ bool CBuilder::UpdateCapture(const Command& fCommand)
 	const float captureProgressTemp = std::min(curCapturee->captureProgress + captureProgressStep, 1.0f);
 
 	const float captureFraction = captureProgressTemp - curCapturee->captureProgress;
-	const float energyUseScaled = curCapturee->cost.energy * captureFraction * modInfo.captureEnergyCostFactor;
+	const auto resourceUseScaled = curCapturee->cost * captureFraction * modInfo.captureCostFactor;
 
 	const bool buildStepAllowed = (eventHandler.AllowUnitBuildStep(this, curCapturee, captureProgressStep));
 	const bool captureStepAllowed = (eventHandler.AllowUnitCaptureStep(this, curCapturee, captureProgressStep));
-	const bool canExecCapture = (buildStepAllowed && captureStepAllowed && UseEnergy(energyUseScaled));
+	const bool canExecCapture = (buildStepAllowed && captureStepAllowed && UseResources(resourceUseScaled));
 
 	if (!canExecCapture)
 		return true;
