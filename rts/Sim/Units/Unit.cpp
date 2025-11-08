@@ -1023,7 +1023,7 @@ void CUnit::SlowUpdate()
 			health         = std::max(0.0f, health - maxHealth * buildDecay);
 			buildProgress -= buildDecay;
 
-			AddMetal(cost.metal * buildDecay, false);
+			AddResources({cost.metal * buildDecay, 0.0f}, false);
 
 			eventHandler.UnitConstructionDecayed(this
 				, INV_GAME_SPEED * framesSinceLastNanoAdd
