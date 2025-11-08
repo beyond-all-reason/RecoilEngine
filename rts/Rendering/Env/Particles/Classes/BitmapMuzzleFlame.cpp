@@ -2,6 +2,8 @@
 
 #include "BitmapMuzzleFlame.h"
 
+#include <ranges>
+
 #include "Sim/Misc/GlobalSynced.h"
 #include "Game/GlobalUnsynced.h"
 #include "Game/Camera.h"
@@ -121,7 +123,8 @@ void CBitmapMuzzleFlame::Draw()
 	};
 
 	if (math::fabs(rotVal) > 0.01f) {
-		float3::rotate<false>(rotVal, dir, bounds);
+		auto slice = bounds | std::views::drop(8) | std::views::take(4);
+		float3::rotate<false>(rotVal, dir, slice);
 	}
 
 	if (IsValidTexture(sideTexture)) {
