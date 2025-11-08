@@ -98,11 +98,10 @@ void CBitmapMuzzleFlame::Draw()
 
 	float3 fpos = drawPos + dir * frontOffset * ilength;
 
-	float3 nDir = dir; nDir.SafeANormalize();
-	// make zdir look at drawPos, but then rotate around "nDir" by 45 degree to create cross planes
-	const float3 zdir = (drawPos - camera->GetPos()).rotate<false>(math::QUARTERPI, nDir);
-	const float3 xdir = (nDir.cross(zdir)).SafeANormalize();
-	const float3 ydir = (nDir.cross(xdir)).SafeANormalize();
+	// make zdir look at drawPos, but then rotate around "dir" by 45 degree to create cross planes
+	const float3 zdir = (drawPos - camera->GetPos()).rotate<false>(math::QUARTERPI, dir);
+	const float3 xdir = (dir.cross(zdir)).SafeANormalize();
+	const float3 ydir = (dir.cross(xdir)).SafeANormalize();
 
 	std::array<float3, 12> bounds = {
 		  xdir * isize                ,
@@ -166,7 +165,13 @@ void CBitmapMuzzleFlame::Update()
 void CBitmapMuzzleFlame::Init(const CUnit* owner, const float3& offset)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// grab the dir length to stay compatible with the old behavior, where dir was unnormalized
+	const float dirLen = dir.Length();
+	length *= dirLen;
+
 	speed = (particleSpeed + guRNG.NextFloat() * particleSpeedSpread) * dir;
+	dir /= dirLen;
+
 	CProjectile::Init(owner, offset);
 
 	invttl = 1.0f / ttl;
