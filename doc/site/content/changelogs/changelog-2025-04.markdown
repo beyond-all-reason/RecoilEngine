@@ -37,8 +37,8 @@ example has been provided at [`(basecontent)/examples/Widgets/gui_autoshowmetal.
 ### Lua language server support
 LDoc has been replaced by [Lua Language Server](https://luals.github.io/) compatible annotations. This allows for language server support when editing Lua code (namely autocompletion and type checking).
 Type definitions can be found in the [Lua library repo](https://github.com/beyond-all-reason/recoil-lua-library). This is intended to be included as a submodule in projects that use the engine.
-[Lua API docs]({{ site.baseurl }}{% link lua-api/docs/index.md %}) are now generated from LLS definitions instead of LDoc. This has caused a regression in docs quality, with all docs on a single page and some docs missing information. Improvements to the docs are being considered.
-For more information see the [Lua Language Server guide]({{ site.baseurl }}{% link guides/lua-language-server.markdown %}).
+[Lua API docs]({{< base_url >}}/docs/lua-api/) are now generated from LLS definitions instead of LDoc. This has caused a regression in docs quality, with all docs on a single page and some docs missing information. Improvements to the docs are being considered.
+For more information see the [Lua Language Server guide]({{< base_url >}}/docs/guides/getting-started/lua-language-server/).
 
 ### Unit groups
 * units no longer removed from groups at the start of their death animation.

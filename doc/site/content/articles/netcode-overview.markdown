@@ -42,7 +42,7 @@ The **benefits** of this setup are:
 * extremely small bandwidth use (remember Recoil has its roots in Total Annihilation back from 1997)
 * small replay size
 * you cannot easily cheat by modifying your own gamestate (cheat engine style), since there are no inputs that will replicate that on the server.
-* the server doesn't need to simulate a game, since clients already do. This makes hosting much easier. See [the dedicated server article]({{ site.baseurl }}{% link guides/headless-and-dedi.markdown %}).
+* the server doesn't need to simulate a game, since clients already do. This makes hosting much easier. See [the dedicated server article]({{< base_url >}}/docs/guides/getting-started/headless-and-dedicated/).
 * for development: easy to reproduce bugs - running the same inputs will result in the same simulation, containing the bug.
 
 But there are also **drawbacks**:
