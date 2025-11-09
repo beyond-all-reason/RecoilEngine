@@ -811,7 +811,7 @@ void CArchiveScanner::ScanArchive(const std::string& fullName, bool doChecksum)
 	// Store modinfo.lua/mapinfo.lua modified timestamp for directory archives, as only they can change.
 	if (ar->GetType() == ARCHIVE_TYPE_SDD && !luaInfoFile.empty()) {
 		ai.archiveDataPath = ar->GetArchiveFile() + "/" + static_cast<const CDirArchive*>(ar.get())->FileName(ar->FindFile(luaInfoFile));
-		ai.modifiedArchiveData = FileSystemAbstraction::GetFileModificationTime(ai.archiveDataPath);
+		ai.modifiedArchiveData = FileSystem::GetFileModificationTime(ai.archiveDataPath);
 	}
 
 	ai.origName = fname;
@@ -835,7 +835,7 @@ bool CArchiveScanner::CheckCachedData(const std::string& fullName, uint32_t& mod
 	// if stat fails, assume the archive is not broken nor cached
 	// it would also fail in the case of virtual archives and cause
 	// warning-spam which is suppressed by the extension-test above
-	if ((modified = FileSystemAbstraction::GetFileModificationTime(fullName)) == 0)
+	if ((modified = FileSystem::GetFileModificationTime(fullName)) == 0)
 		return false;
 
 	const std::string& fileName      = FileSystem::GetFilename(fullName);
@@ -870,7 +870,7 @@ bool CArchiveScanner::CheckCachedData(const std::string& fullName, uint32_t& mod
 
 	const bool haveValidCacheData = (modified == ai.modified && filePath == ai.path);
 	// check if the archive data file (modinfo.lua/mapinfo.lua) has changed
-	const bool archiveDataChanged = (!ai.archiveDataPath.empty() && FileSystemAbstraction::GetFileModificationTime(ai.archiveDataPath) != ai.modifiedArchiveData);
+	const bool archiveDataChanged = (!ai.archiveDataPath.empty() && FileSystem::GetFileModificationTime(ai.archiveDataPath) != ai.modifiedArchiveData);
 
 	if (haveValidCacheData && !archiveDataChanged) {
 		// archive found in cache, update checksum if wanted

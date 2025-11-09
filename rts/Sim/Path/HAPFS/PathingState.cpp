@@ -48,7 +48,7 @@ PCMemPool pcMemPool;
 
 static const std::string GetPathCacheDir() {
 	RECOIL_DETAILED_TRACY_ZONE;
-	return (FileSystem::GetCacheDir() + FileSystemAbstraction::GetNativePathSeparator() + "paths" + FileSystemAbstraction::GetNativePathSeparator());
+	return (FileSystem::GetCacheDir() + FileSystem::GetNativePathSeparator() + "paths" + FileSystem::GetNativePathSeparator());
 }
 
 static const std::string GetCacheFileName(const std::string& fileHashCode, const std::string& peFileName, const std::string& mapFileName) {

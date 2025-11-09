@@ -105,7 +105,7 @@ IArchive::SFileInfo CDirArchive::FileInfo(uint32_t fid) const
 			file.size = FileSystem::GetFileSize(file.rawFileName);
 
 		if (ifm)
-			file.modTime = FileSystemAbstraction::GetFileModificationTime(file.rawFileName);
+			file.modTime = FileSystem::GetFileModificationTime(file.rawFileName);
 	}
 
 	fi.specialFileName = file.rawFileName;

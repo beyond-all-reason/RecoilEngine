@@ -276,7 +276,6 @@ endif()
 	set(test_name FileSystem)
 	set(test_src
 			"${ENGINE_SOURCE_DIR}/System/FileSystem/FileSystem.cpp"
-			"${ENGINE_SOURCE_DIR}/System/FileSystem/FileSystemAbstraction.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Platform/Misc.cpp"
 			"${ENGINE_SOURCE_DIR}/System/CRC.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Sync/SHA512.cpp"

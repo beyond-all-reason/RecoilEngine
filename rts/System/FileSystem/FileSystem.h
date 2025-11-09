@@ -1,29 +1,134 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef FILE_SYSTEM_H
-#define FILE_SYSTEM_H
+#pragma once
 
-#include "FileSystemAbstraction.h"
-
+#include <vector>
 #include <string>
-
-// Win-API redifines these, which breaks things
-#if defined(CreateDirectory)
-	#undef CreateDirectory
-#endif
-#if defined(DeleteFile)
-	#undef DeleteFile
-#endif
+#include <cstdint>
+#include <filesystem>
 
 /**
- * @brief filesystem interface
- *
- * Abstracts locating of content on different platforms.
- * Use this from the rest of the spring code, not FileSystemHandler!
+ * Native file-system handling abstraction.
+ * This contains only functions that have to implemented differently on
+ * different OSs.
+ * @note do not use this directly, but use FileSystem instead
+ * @see FileSystem
  */
-class FileSystem : public FileSystemAbstraction
+class FileSystem
 {
 public:
+	static bool MkDir(const std::string& dir);
+	static bool DeleteFile(const std::string& file);
+
+	/// Returns true if the file exists, and is not a directory
+	static bool FileExists(const std::filesystem::path& file);
+
+	/// Returns true if the file exists, and is not a directory
+	static bool FileExists(const std::string& file);
+
+	static bool DirExists(const std::filesystem::path& dir);
+	static bool DirExists(const std::string& dir);
+
+	/// oddly, this is non-trivial on Windows
+	static bool DirIsWritable(const std::string& dir);
+
+	static bool ComparePaths(const std::string& path1, const std::string& path2);
+
+	static std::string GetEngineExecutableDir();
+	static std::string GetCwd();
+	static void ChDir(const std::string& dir);
+
+	/**
+	 * Removes "./" or ".\" from the start of a path string.
+	 */
+	static std::string RemoveLocalPathPrefix(const std::string& path);
+
+	/**
+	 * Returns true if path matches regex ...
+	 * on windows:          ^[a-zA-Z]\:[\\/]?$
+	 * on all other systems: ^/$
+	 */
+	static bool IsFSRoot(const std::string& path);
+
+	/**
+	 * Returns true if the supplied char is a path separator,
+	 * that is either '\' or '/'.
+	 */
+	static bool IsPathSeparator(char aChar);
+
+	/**
+	 * Returns true if the supplied char is a platform native path separator,
+	 * that is '\' on windows and '/' on POSIX.
+	 */
+	static bool IsNativePathSeparator(char aChar);
+
+	/**
+	 * Returns true if the path ends with the platform native path separator.
+	 * That is '\' on windows and '/' on POSIX.
+	 */
+	static bool HasPathSepAtEnd(const std::string& path);
+
+	/**
+	 * Ensures the path ends with the platform native path separator.
+	 * Converts the empty string to ".\" or "./" respectively.
+	 * @see #HasPathSepAtEnd()
+	 */
+	static std::string& EnsurePathSepAtEnd(std::string& path);
+	/// @see #EnsurePathSepAtEnd(std::string&)
+	static std::string EnsurePathSepAtEnd(const std::string& path);
+
+	/**
+	 * Ensures the path does not end with the platform native path separator.
+	 * @see #HasPathSepAtEnd()
+	 */
+	static void EnsureNoPathSepAtEnd(std::string& path);
+	/// @see #EnsureNoPathSepAtEnd(std::string&)
+	static std::string EnsureNoPathSepAtEnd(const std::string& path);
+
+	/**
+	 * Ensures the path does not end with a path separator.
+	 */
+	static std::string StripTrailingSlashes(const std::string& path);
+
+	/**
+	 * Returns the path to the parent of the given path element.
+	 * @return the paths parent, including the trailing path separator,
+	 *         or "" on error
+	 */
+	static std::string GetParent(const std::string& path);
+
+	/**
+	 * @brief get filesize
+	 *
+	 * @return the files size or 0, if the file does not exist. Returns
+	 *          also 0 if the file is a directory.
+	 */
+	static size_t GetFileSize(const std::string& file);
+
+	// custom functions
+	static bool IsReadableFile(const std::string& file);
+
+	static uint32_t GetFileModificationTime(const std::string& file);
+	/**
+	 * Returns the last file modification time formatted in a sort friendly
+	 * way, with second resolution.
+	 * 23:58:59 30 January 1999 -> "19990130235859"
+	 *
+	 * @return  the last file modification time as described above,
+	 *          or "" on error
+	 */
+	static std::string GetFileModificationDate(const std::string& file);
+
+	/**
+	 * Returns if the file or directory reside on spinning disk
+	 * @return true if on a spinning disk
+	 */
+	static bool IsPathOnSpinningDisk(const std::string& path);
+
+	static char GetNativePathSeparator();
+	static bool IsAbsolutePath(const std::string& path);
+
+	static void FindFiles(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dir, const std::string& regex, int flags);
 
 	/**
 	 * @brief remove a file
@@ -32,26 +137,6 @@ public:
 	 */
 	static bool Remove(std::string file);
 
-	/**
-	 * @brief Compares if 2 paths point to the same file/directory
-	 *
-	 */
-	static bool ComparePaths(std::string path1, std::string path2);
-
-	/// @name meta-data
-	///@{
-	/// Returns true if the file exists, and is not a directory
-	static bool FileExists(std::string path);
-	/**
-	 * @brief get filesize
-	 *
-	 * @return the filesize or 0 if the file doesn't exist.
-	 */
-	static size_t GetFileSize(const std::string& path);
-	///@}
-
-	/// @name directory
-	///@{
 	/**
 	 * @brief creates a directory recursively
 	 *
@@ -123,10 +208,8 @@ public:
 	 * @brief does a little checking of a filename
 	 */
 	static bool CheckFile(const std::string& file);
-//	static bool CheckDir(const std::string& dir) const;
+	//	static bool CheckDir(const std::string& dir) const;
 
 	static const std::string& GetCacheBaseDir();
 	static const std::string& GetCacheDir();
 };
-
-#endif // !FILE_SYSTEM_H

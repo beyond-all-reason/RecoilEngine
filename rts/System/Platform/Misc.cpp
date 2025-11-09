@@ -132,8 +132,8 @@ namespace Platform
 		if (!origCWD.empty())
 			return origCWD;
 
-		origCWD = FileSystemAbstraction::GetCwd();
-		FileSystemAbstraction::EnsurePathSepAtEnd(origCWD);
+		origCWD = FileSystem::GetCwd();
+		FileSystem::EnsurePathSepAtEnd(origCWD);
 		return origCWD;
 	}
 
