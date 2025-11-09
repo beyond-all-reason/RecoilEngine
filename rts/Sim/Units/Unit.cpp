@@ -1056,14 +1056,12 @@ void CUnit::SlowUpdate()
 	AddResources(unitDef->resourceMake * 0.5f);
 
 	if (activated) {
-		if (UseEnergy(unitDef->upkeep.energy * 0.5f)) {
+		if (UseResources(unitDef->upkeep * 0.5f)) {
 			AddResources(unitDef->makesResources * 0.5f);
 
 			if (unitDef->extractsMetal > 0.0f)
-				AddMetal(metalExtract * 0.5f);
+				AddResources({metalExtract * 0.5f, 0.0f});
 		}
-
-		UseMetal(unitDef->upkeep.metal * 0.5f);
 
 		AddResources(SResourcePack(envResHandler.GetCurrentWindStrength()).cap_at(unitDef->windGenerator) * 0.5f);
 	}
