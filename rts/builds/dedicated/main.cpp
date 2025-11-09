@@ -8,6 +8,8 @@
 #include <io.h>
 #endif
 
+#include <nowide/args.hpp>
+
 #include "Game/GameSetup.h"
 #include "Game/ClientSetup.h"
 #include "Game/GameData.h"
@@ -110,6 +112,8 @@ void ParseCmdLine(int argc, char* argv[], std::string& scriptName)
 
 int main(int argc, char* argv[])
 {
+	nowide::args a(argc, argv); // Fix arguments - make them UTF-8
+
 	Threading::SetMainThread();
 	try {
 		spring_clock::PushTickRate();
