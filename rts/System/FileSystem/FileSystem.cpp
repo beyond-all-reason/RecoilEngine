@@ -30,6 +30,8 @@
 #include "System/Cpp17Compat.hpp"
 
 #include <nowide/fstream.hpp>
+#include <nowide/cstdio.hpp>
+
 #ifdef _WIN32
 	#include <windows.h>
 	#include <winioctl.h> //needed for IsPathOnSpinningDisk()
