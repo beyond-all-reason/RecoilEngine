@@ -87,15 +87,16 @@
 {{ define "render_member" }}
 	{{ $data := .data }}
 	{{ $level := .level }}
+	{{ $level_offset := 3 }}
 
 	{{ with $data }}
 		<span id="{{ .permalink | anchorize }}" class="hx:absolute hx:-mt-20"></span>
 		<div class="api-card-toplevel">
 			<details>
 				<summary>
-					<h{{ add 2 $level }} class="display-inline">
+					<h{{ add $level_offset $level }} class="display-inline">
 						{{ if .method }}method{{ else }}{{ .type }}{{ end }} <code>{{ .name }}{{ if .signature }} {{ .signature }}{{ end }}</code>
-					</h{{ add 2 $level }}>
+					</h{{ add $level_offset $level }}>
 					<a href="#{{ .permalink | anchorize }}" class="subheading-anchor" aria-label="Permalink for {{ .name }}"></a>
 				</summary>
 
