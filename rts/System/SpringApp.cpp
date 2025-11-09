@@ -8,8 +8,6 @@
 #include <System/GflagsExt.h>
 
 #ifdef _WIN32
-#include <fcntl.h>
-#include <io.h>
 //windows workarrounds
 #undef KeyPress
 #undef KeyRelease

@@ -4,8 +4,6 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#include <fcntl.h>
-#include <io.h>
 #endif
 
 #include <nowide/args.hpp>
