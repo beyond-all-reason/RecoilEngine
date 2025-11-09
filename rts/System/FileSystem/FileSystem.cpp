@@ -1,5 +1,9 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+ /**
+  * Glob conversion by Chris Han (based on work by Nathaniel Smith).
+  */
+
 #if defined(_MSC_VER) && !defined(S_ISDIR)
 #	define S_ISDIR(m) (((m) & 0170000) == 0040000)
 #endif
@@ -39,14 +43,11 @@
 	#include <io.h>
 
 	// Win-API redifines these, which breaks things
-	#ifdef DeleteFile
+	#if defined(DeleteFile)
 		#undef DeleteFile
 	#endif
 	#if defined(CreateDirectory)
 		#undef CreateDirectory
-	#endif
-	#if defined(DeleteFile)
-		#undef DeleteFile
 	#endif
 #else
 	#include <sys/types.h>
