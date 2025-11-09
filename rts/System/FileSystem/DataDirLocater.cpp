@@ -27,6 +27,7 @@
 #include "FileSystem.h"
 #include "System/Exceptions.h"
 #include "System/MainDefines.h" // for sPS, cPS, cPD
+#include "System/UnorderedSet.hpp"
 #include "System/Config/ConfigHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Platform/Misc.h"
@@ -194,40 +195,39 @@ void DataDirLocater::AddDir(const std::string& dir)
 	dataDirs.push_back(newDataDir);
 }
 
-bool DataDirLocater::DeterminePermissions(DataDir* dataDir)
+bool DataDirLocater::DeterminePermissions(const DataDir& dataDir)
 {
 #ifndef _WIN32
-	if ((dataDir->path.c_str()[0] != '/') || (dataDir->path.find("..") != std::string::npos))
+	if ((dataDir.path.c_str()[0] != '/') || (dataDir.path.find("..") != std::string::npos))
 #else
-	if (dataDir->path.find("..") != std::string::npos)
+	if (dataDir.path.find("..") != std::string::npos)
 #endif
 	{
-		throw content_error(std::string("a datadir may not be specified with a relative path: \"") + dataDir->path + "\"");
+		throw content_error(std::string("a datadir may not be specified with a relative path: \"") + dataDir.path + "\"");
 	}
 
-	return FileSystem::DirExists(dataDir->path);
+	return FileSystem::DirExists(dataDir.path);
 }
 
 void DataDirLocater::FilterUsableDataDirs()
 {
 	std::vector<DataDir> newDatadirs;
-	std::string previous; // used to filter out consecutive duplicates
-	// (I did not bother filtering out non-consecutive duplicates because then
-	//  there is the question which of the multiple instances to purge.)
+	spring::unordered_set<std::string> dataDirsSet;
 
-	for (auto& dd : dataDirs) {
-		if (dd.path != previous) {
-			if (DeterminePermissions(&dd)) {
-				newDatadirs.push_back(dd);
-				previous = dd.path;
-				if (dd.writable) {
-					LOG("[DataDirLocater::%s] using read-write data directory: %s", __func__, dd.path.c_str());
-				} else {
-					LOG("[DataDirLocater::%s] using read-only data directory: %s", __func__, dd.path.c_str());
-				}
+	for (const auto& dd : dataDirs) {
+		if (dataDirsSet.contains(dd.path))
+			continue;
+
+		if (DeterminePermissions(dd)) {
+			dataDirsSet.emplace(dd.path);
+			newDatadirs.push_back(dd);
+			if (dd.writable) {
+				LOG("[DataDirLocater::%s] using read-write data directory: %s", __func__, dd.path.c_str());
 			} else {
-				LOG_L(L_DEBUG, "[DataDirLocater::%s] potentional data directory: %s", __func__, dd.path.c_str());
+				LOG("[DataDirLocater::%s] using read-only data directory: %s", __func__, dd.path.c_str());
 			}
+		} else {
+			LOG_L(L_DEBUG, "[DataDirLocater::%s] potentional data directory: %s", __func__, dd.path.c_str());
 		}
 	}
 

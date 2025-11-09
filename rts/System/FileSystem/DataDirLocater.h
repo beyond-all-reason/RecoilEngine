@@ -153,7 +153,7 @@ private:
 	 * @brief Figure out permissions we have for a single data directory.
 	 * @returns whether we have permissions to read the data directory.
 	 */
-	bool DeterminePermissions(DataDir* dataDir);
+	bool DeterminePermissions(const DataDir& dataDir);
 	/**
 	 * @brief Figure out permissions we have for the data directories.
 	 */
