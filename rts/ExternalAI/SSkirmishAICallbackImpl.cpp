@@ -2390,11 +2390,10 @@ EXPORT(float) skirmishAiCallback_UnitDef_getMakesResource(int skirmishAIId,
 		int unitDefId, int resourceId) {
 
 	const UnitDef* ud = getUnitDefById(skirmishAIId, unitDefId);
-	if (resourceId == resourceHandler->GetMetalId()) {
-		return ud->makesMetal;
-	} else {
-		return 0.0f;
-	}
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return ud->makesResources[resourceId];
+
+	return 0.0f;
 }
 
 EXPORT(float) skirmishAiCallback_UnitDef_getCost(int skirmishAIId, int unitDefId, int resourceId) {

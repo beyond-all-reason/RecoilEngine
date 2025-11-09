@@ -123,7 +123,7 @@ public:
 
 	SResourcePack upkeep;
 	SResourcePack resourceMake; ///< will always be created
-	float makesMetal;		///< metal will be created when unit is on and enough energy can be drained
+	SResourcePack makesResources; ///< resources will be created when unit is on and upkeep can be paid
 	float buildTime;
 	float buildeeBuildRadius; ///< if >= 0.f, override default radius to use for the buildee in build distance calculations.
 	float extractsMetal;

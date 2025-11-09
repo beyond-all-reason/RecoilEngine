@@ -1057,7 +1057,7 @@ void CUnit::SlowUpdate()
 
 	if (activated) {
 		if (UseEnergy(unitDef->upkeep.energy * 0.5f)) {
-			AddMetal(unitDef->makesMetal * 0.5f);
+			AddResources(unitDef->makesResources * 0.5f);
 
 			if (unitDef->extractsMetal > 0.0f)
 				AddMetal(metalExtract * 0.5f);

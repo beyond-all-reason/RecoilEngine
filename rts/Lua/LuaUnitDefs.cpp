@@ -693,7 +693,7 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FLOAT("energyUpkeep",   ud.upkeep.energy);
 	ADD_FLOAT("metalMake",      ud.resourceMake.metal);
 	ADD_FLOAT("energyMake",     ud.resourceMake.energy);
-	ADD_FLOAT("makesMetal",     ud.makesMetal);
+	ADD_FLOAT("makesMetal",     ud.makesResources.metal);
 	ADD_FLOAT("metalCost",      ud.cost.metal);
 	ADD_FLOAT("energyCost",     ud.cost.energy);
 	ADD_FLOAT("buildTime",      ud.buildTime);

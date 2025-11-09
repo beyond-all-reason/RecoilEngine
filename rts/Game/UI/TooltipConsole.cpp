@@ -137,7 +137,7 @@ static void GetDecoyResources(const CUnit* unit,
 	}
 
 	if (active) {
-		make.metal += ud->makesMetal;
+		make += ud->makesResources;
 		if (ud->extractsMetal > 0.0f) {
 			if (rd->extractsMetal > 0.0f) {
 				make.metal += unit->metalExtract * (ud->extractsMetal / rd->extractsMetal);
