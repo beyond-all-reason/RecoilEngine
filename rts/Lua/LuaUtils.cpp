@@ -697,25 +697,62 @@ int LuaUtils::ParseFloat4Vector(lua_State* L, int index, vector<float4>& vec)
 	}
 }
 
+enum class LuaResourceTableType {
+	INVALID,
+	ARRAY,
+	NAMES,
+};
 
-bool LuaUtils::ParseResourcePack(lua_State* L, int index, SResourcePack& pack)
+static LuaResourceTableType GetResourcePackType(lua_State* L, int index)
 {
-	if (!lua_istable(L, index))
-		return false;
+	assert(lua_istable(L, index));
 
-	for (auto [i, resource] : std::views::enumerate(pack)) {
-		// Parse by resource index, like `{ 1.23, 45.6, 789 }`
-		lua_rawgeti(L, index, i+1);
-		resource = luaL_optnumber(L, -1, resource);
-		lua_pop(L, 1);
+	LuaResourceTableType ret = LuaResourceTableType::INVALID;
 
+	/* Note, we iterate rather than using e.g. '#' operator
+	 * aka `lua_objlen` because:
+	 * 1) this doesn't tell us about mixed tables, which we
+	 *    want to reject,
+	 * 2) a table like {nil, nil, 123} is still a valid array,
+	 *    good for passing into various Set functions to keep
+	 *    the others untouched (rather than e.g. set 0), but
+	 *    a naive objlen check doesn't see it as an array. */
+
+	const int adjustedIndex = index < 0 ? index - 1 : index;
+	for (lua_pushnil(L); lua_next(L, adjustedIndex) != 0; lua_pop(L, 1)) {
+		switch (lua_type(L, LUA_TABLE_KEY_INDEX)) {
+		case LUA_TNUMBER:
+			if (ret == LuaResourceTableType::NAMES) {
+				lua_pop(L, 2);
+				return LuaResourceTableType::INVALID;
+			}
+			ret = LuaResourceTableType::ARRAY;
+			break;
+		case LUA_TSTRING:
+			if (ret == LuaResourceTableType::ARRAY) {
+				lua_pop(L, 2);
+				return LuaResourceTableType::INVALID;
+			}
+			ret = LuaResourceTableType::NAMES;
+			break;
+		default:
+			lua_pop(L, 2);
+			return LuaResourceTableType::INVALID;
+		}
+	}
+
+	return ret;
+}
+
+static void ParseResourcePackFromNames(lua_State* L, int index, SResourcePack& pack)
+{
 /* TODO: unitsync could also have a resource handler instance, and
  * read modrules when trying to read stuff that could be defined as
  * resource packs. Dedi is out of luck though. No idea about AI. */
 #if !defined UNITSYNC && !defined DEDICATED && !defined BUILDING_AI
 
-		/* Parse by name, like `{ energy = 45.6, blood_mana = 789, metal = 1.23 }`.
-		 * This takes precedence over index-based since it's more explicit. */
+	// e.g. `{ energy = 45.6, blood_mana = 789, metal = 1.23 }`
+	for (auto [i, resource] : std::views::enumerate(pack)) {
 		const auto resourceDef = CResourceHandler::GetInstance()->GetResource(i);
 		if (!resourceDef)
 			continue;
@@ -730,7 +767,34 @@ bool LuaUtils::ParseResourcePack(lua_State* L, int index, SResourcePack& pack)
 		lua_getfield(L, index, resourceNameLower.c_str());
 		resource = luaL_optnumber(L, -1, resource);
 		lua_pop(L, 1);
+	}
 #endif
+}
+
+static void ParseResourcePackFromArray(lua_State* L, int index, SResourcePack& pack)
+{
+	// e.g. `{ 1.23, 45.6, 789 }`
+	for (auto [i, resource] : std::views::enumerate(pack)) {
+		lua_rawgeti(L, index, i+1);
+		resource = luaL_optnumber(L, -1, resource);
+		lua_pop(L, 1);
+	}
+}
+
+bool LuaUtils::ParseResourcePack(lua_State* L, int index, SResourcePack& pack)
+{
+	if (!lua_istable(L, index))
+		return false;
+
+	switch (GetResourcePackType(L, index)) {
+	case LuaResourceTableType::INVALID:
+		return false;
+	case LuaResourceTableType::ARRAY:
+		ParseResourcePackFromArray(L, index, pack);
+		break;
+	case LuaResourceTableType::NAMES:
+		ParseResourcePackFromNames(L, index, pack);
+		break;
 	}
 
 	return true;
