@@ -4,10 +4,6 @@
   * Glob conversion by Chris Han (based on work by Nathaniel Smith).
   */
 
-#if defined(_MSC_VER) && !defined(S_ISDIR)
-#	define S_ISDIR(m) (((m) & 0170000) == 0040000)
-#endif
-
 #include "FileSystem.h"
 
 #include <cassert>
