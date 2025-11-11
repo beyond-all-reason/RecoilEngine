@@ -32,6 +32,7 @@
 #include "System/TimeUtil.h"
 #include "System/Platform/Misc.h"
 #include "System/Cpp17Compat.hpp"
+#include "System/ForceInline.hpp"
 
 #include <nowide/fstream.hpp>
 #include <nowide/cstdio.hpp>
@@ -57,13 +58,13 @@
 namespace fs = std::filesystem;
 
 namespace Impl {
-	inline std::string StoreUTF8AsString(const std::u8string& utf8) {
+	RECOIL_FORCE_INLINE std::string StoreUTF8AsString(const std::u8string& utf8) {
 		return std::string(reinterpret_cast<const char*>(utf8.c_str()));
 	}
-	inline std::string StoreUTF8AsString(const std::u8string_view& utf8) {
+	RECOIL_FORCE_INLINE std::string StoreUTF8AsString(const std::u8string_view& utf8) {
 		return std::string(reinterpret_cast<const char*>(utf8.data()));
 	}
-	inline std::string StorePathAsString(const fs::path& path) {
+	RECOIL_FORCE_INLINE std::string StorePathAsString(const fs::path& path) {
 		return StoreUTF8AsString(path.u8string());
 	}
 }
