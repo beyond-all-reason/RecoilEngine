@@ -110,7 +110,6 @@ public:
 	bool luaMoveCtrl = false;
 	bool checkCol = true;
 	bool ignoreWater = false;
-	bool traceGroundCollision = false;
 
 	bool createMe =  true;
 	bool deleteMe = false;

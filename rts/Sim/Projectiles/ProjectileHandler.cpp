@@ -623,9 +623,9 @@ void CProjectileHandler::CheckGroundCollisions(bool synced)
 		if (!belowGround && (!insideWater || p->ignoreWater))
 			continue;
 
-
-		if (belowGround) {
-			if (p->traceGroundCollision && p->speed.w > 0) {
+		if likely(belowGround) {
+			//ZoneScopedN("CheckGroundCollisions::BG");
+			if likely(p->speed.w > 0) {
 				const auto& prePos = p->preFrameTra.t;
 				const auto groundDistance = std::clamp(CGround::LineGroundCol(prePos, p->pos, synced), 0.0f, p->speed.w);
 				p->SetPosition(prePos + static_cast<float3>(p->speed) * groundDistance / p->speed.w);

@@ -60,8 +60,6 @@ WEAPONDUMMYTAG(bool, collideNonTarget).defaultValue(true).description("Does the 
 WEAPONDUMMYTAG(bool, collideGround).defaultValue(true).description("Does the projectile collide with terrain? See remarks at `collideFriendly`");
 WEAPONDUMMYTAG(bool, collideCloaked).defaultValue(true).description("Does the projectile collide with cloaked (includes revealed but not decloaked) units? See remarks at `collideFriendly`");
 
-WEAPONTAG(bool, traceGroundCollision).defaultValue(false).description("if true, the implementation will trace exact point of ground collision, otherwise a fast approximation is used");
-
 // Damaging
 WEAPONDUMMYTAG(table, damage).description("Damage table, indexed by armor class name");
 WEAPONDUMMYTAG(float, damage.default).defaultValue(1.0f).description("The default damage used in absence of explicit per-armorclass value");

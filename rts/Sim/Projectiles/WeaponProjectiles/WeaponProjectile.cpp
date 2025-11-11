@@ -107,8 +107,6 @@ CWeaponProjectile::CWeaponProjectile(const ProjectileParams& params)
 		alwaysVisible = weaponDef->visuals.alwaysVisible;
 		ignoreWater = weaponDef->waterweapon;
 
-		traceGroundCollision = weaponDef->traceGroundCollision;
-
 		validTextures = {
 			false,
 			IsValidTexture(weaponDef->visuals.texture1),
