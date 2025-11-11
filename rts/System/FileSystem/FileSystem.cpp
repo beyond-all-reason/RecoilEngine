@@ -243,23 +243,23 @@ std::string FileSystem::GetFileModificationDate(const std::string& file)
 bool FileSystem::IsPathOnSpinningDisk(const std::string& path)
 {
 #ifdef _WIN32
-	std::string volumePath; volumePath.resize(64);
-	if (!::GetVolumePathNameA(path.c_str(), volumePath.data(), volumePath.size())) {
+	std::wstring volumePath; volumePath.resize(64);
+	if (!::GetVolumePathName(nowide::widen(path).c_str(), volumePath.data(), volumePath.size())) {
 		LOG_L(L_WARNING, "[%s] GetVolumePathNameA error: '%s'", __func__, Platform::GetLastErrorAsString().c_str());
 		return true;
 	}
 
-	std::string volumeName; volumeName.resize(1024);
-	if (!::GetVolumeNameForVolumeMountPointA(volumePath.data(), volumeName.data(), volumeName.size())) {
+	std::wstring volumeName; volumeName.resize(1024);
+	if (!::GetVolumeNameForVolumeMountPoint(volumePath.data(), volumeName.data(), volumeName.size())) {
 		LOG_L(L_WARNING, "[%s] GetVolumeNameForVolumeMountPointA error: '%s'", __func__, Platform::GetLastErrorAsString().c_str());
 		return true;
 	}
 
-	auto length = strlen(volumeName.c_str());
+	auto length = ::wcslen(volumeName.c_str());
 	if (length && volumeName[length - 1] == L'\\')
 		volumeName[length - 1] = L'\0';
 
-	HANDLE volHandle = ::CreateFileA(volumeName.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+	HANDLE volHandle = ::CreateFile(volumeName.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
 	if (volHandle == INVALID_HANDLE_VALUE) {
 		LOG_L(L_WARNING, "[%s] CreateFileA error: '%s'", __func__, Platform::GetLastErrorAsString().c_str());
 		return true;
