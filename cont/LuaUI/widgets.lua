@@ -1094,9 +1094,7 @@ function widgetHandler:Shutdown()
 end
 
 function widgetHandler:Update(dt)
-  if dt == nil then
-      dt = Spring.GetLastUpdateSeconds()
-  end
+  dt = dt or Spring.GetLastUpdateSeconds()
   -- update the hour timer
   hourTimer = (hourTimer + dt) % 3600.0
   for _,w in ipairs(self.UpdateList) do
