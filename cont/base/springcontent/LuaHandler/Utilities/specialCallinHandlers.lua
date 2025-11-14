@@ -73,11 +73,9 @@ function hHookFuncs.ConfigureLayout(command)
 end
 
 
-function hHookFuncs.Update()
-	local deltaTime = (LUA_NAME == "LuaUI") and Spring.GetLastUpdateSeconds() or nil
-
+function hHookFuncs.Update(dt)
 	for _,f in hCallInLists.Update:iter() do
-		f(deltaTime)
+		f(dt)
 	end
 end
 
