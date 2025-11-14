@@ -2536,8 +2536,9 @@ void CLuaHandle::Update()
 	if (!cmdStr.GetGlobalFunc(L))
 		return;
 
-	// call the routine
-	RunCallIn(L, cmdStr, 0, 0);
+	// call the routine and pass dt
+	lua_pushnumber(L, game->updateDeltaSeconds);
+	RunCallIn(L, cmdStr, 1, 0);
 }
 
 
