@@ -76,20 +76,11 @@ std::string FileSystem::RemoveLocalPathPrefix(const std::string& path)
 	return p;
 }
 
-bool FileSystem::IsFSRoot(const std::string& p)
+bool FileSystem::IsFSRoot(const std::string& pStr)
 {
-
-#ifdef _WIN32
-	// examples: "C:\", "C:/", "C:", "c:", "D:"
-	bool isFsRoot = (p.length() >= 2 && p[1] == ':' &&
-			((p[0] >= 'a' && p[0] <= 'z') || (p[0] >= 'A' && p[0] <= 'Z')) &&
-			(p.length() == 2 || (p.length() == 3 && IsPathSeparator(p[2]))));
-#else
-	// examples: "/"
-	bool isFsRoot = (p.length() == 1 && IsNativePathSeparator(p[0]));
-#endif
-
-	return isFsRoot;
+	auto p = Recoil::filesystem::u8path(pStr);
+	const auto rp = p.root_path();
+	return !rp.empty() && p == rp;
 }
 
 bool FileSystem::IsPathSeparator(char aChar) { return ((aChar == cPS_WIN32) || (aChar == cPS_POSIX)); }
@@ -776,21 +767,36 @@ std::string FileSystem::ConvertGlobToRegex(const std::string& glob)
 	return regex;
 }
 
-bool FileSystem::CreateDirectory(std::string dir)
+bool FileSystem::CreateDirectory(const std::string& dirStr)
 {
+	auto dir = Recoil::filesystem::u8path(dirStr);
 	if (!CheckFile(dir))
 		return false;
 
-	ForwardSlashes(dir);
-	size_t prev_slash = 0, slash;
-	while ((slash = dir.find('/', prev_slash + 1)) != std::string::npos) {
-		std::string pathPart = dir.substr(0, slash);
-		if (!FileSystem::IsFSRoot(pathPart) && !FileSystem::MkDir(pathPart)) {
-			return false;
-		}
-		prev_slash = slash;
+	std::error_code ec;
+	fs::create_directories(dir, ec);
+	if (ec) {
+		LOG_L(L_WARNING, "[FS::%s] error '%s' creating directory '%s'", __func__, ec.message().c_str(), dirStr.c_str());
+		return false;
 	}
-	return FileSystem::MkDir(dir);
+
+	// Set permissions to rwxr-xr-x
+	fs::permissions(
+		dir,
+		fs::perms::owner_all |   // rwx for owner
+		fs::perms::group_read |   // r-- for group
+		fs::perms::group_exec |   // --x for group (combined makes r-x)
+		fs::perms::others_read |  // r-- for others
+		fs::perms::others_exec,   // --x for others (combined makes r-x)
+		fs::perm_options::replace,
+		ec
+	);
+	if (ec) {
+		LOG_L(L_WARNING, "[FS::%s] error '%s' creating directory '%s'", __func__, ec.message().c_str(), dirStr.c_str());
+		return false;
+	}
+
+	return true;
 }
 
 
@@ -891,12 +897,18 @@ std::string& FileSystem::ForwardSlashes(std::string& path)
 
 bool FileSystem::CheckFile(const std::string& file)
 {
+	auto p = Recoil::filesystem::u8path(file);
+	return CheckFile(p);
+}
+
+bool FileSystem::CheckFile(const std::filesystem::path& p)
+{
 	// Don't allow code to escape from the data directories.
 	// Note: this does NOT mean this is a SAFE fopen function:
 	// symlink-, hardlink-, you name it-attacks are all very well possible.
 	// The check is just meant to "enforce" certain coding behaviour.
 	//
-	return (file.find("..") == std::string::npos);
+	return p.generic_u8string().find(u8"..") == std::string::npos;
 }
 
 bool FileSystem::Remove(std::string file)

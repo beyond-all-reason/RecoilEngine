@@ -145,7 +145,7 @@ public:
 	 * @return true if the postcondition of this function is that dir exists
 	 *   in the write directory.
 	 */
-	static bool CreateDirectory(std::string dir);
+	static bool CreateDirectory(const std::string& dir);
 	///@}
 
 
@@ -208,6 +208,7 @@ public:
 	 * @brief does a little checking of a filename
 	 */
 	static bool CheckFile(const std::string& file);
+	static bool CheckFile(const std::filesystem::path& file);
 	//	static bool CheckDir(const std::string& dir) const;
 
 	static const std::string& GetCacheBaseDir();
