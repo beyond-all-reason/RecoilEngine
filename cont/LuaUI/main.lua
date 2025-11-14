@@ -75,7 +75,7 @@ function Update(dt)
   end
   activePage = currentPage
 
-  fontHandler.Update()
+  fontHandler.Update(dt)
 
   widgetHandler:Update(dt)
 

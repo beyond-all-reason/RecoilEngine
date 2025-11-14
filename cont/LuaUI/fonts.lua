@@ -36,7 +36,6 @@ local glPushMatrix           = gl.PushMatrix
 local glTexRect              = gl.TexRect
 local glTexture              = gl.Texture
 local glTranslate            = gl.Translate
-local spGetLastUpdateSeconds = Spring.GetLastUpdateSeconds
 
 
 --------------------------------------------------------------------------------
@@ -493,8 +492,8 @@ local function FreeFonts()
 end
 
 
-local function Update()
-  timeStamp = timeStamp + spGetLastUpdateSeconds()
+local function Update(dt)
+  timeStamp = timeStamp + dt
   if (timeStamp < (lastUpdate + 1.0)) then
     return  -- only update every 1.0 seconds
   end
