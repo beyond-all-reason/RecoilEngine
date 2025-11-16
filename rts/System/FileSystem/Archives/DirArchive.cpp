@@ -37,12 +37,10 @@ CDirArchive::CDirArchive(const std::string& archiveName)
 	const std::vector<std::string>& found = dataDirsAccess.FindFiles(dirName, "*", FileQueryFlags::RECURSE);
 
 	for (const std::string& f: found) {
-		// strip our own name off.. & convert to forward slashes
+		// effectively stores the filename of f
 		std::string origName(f, dirName.length());
-		FileSystem::ForwardSlashes(origName);
 
 		std::string rawFileName = dataDirsAccess.LocateFile(dirName + origName);
-		FileSystem::FixSlashes(rawFileName);
 		files.emplace_back(origName, std::move(rawFileName), -1, 0);
 
 		// convert to lowercase and store

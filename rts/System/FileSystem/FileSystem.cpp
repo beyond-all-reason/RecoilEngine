@@ -54,6 +54,9 @@
 namespace fs = std::filesystem;
 
 namespace Impl {
+	RECOIL_FORCE_INLINE std::u8string StoreStringAsUTF8(const std::string& s) {
+		return std::u8string(reinterpret_cast<const char8_t*>(s.c_str()), s.size());
+	}
 	RECOIL_FORCE_INLINE std::string StoreUTF8AsString(const std::u8string& utf8) {
 		return std::string(reinterpret_cast<const char*>(utf8.c_str()));
 	}
@@ -65,71 +68,69 @@ namespace Impl {
 	}
 }
 
-std::string FileSystem::RemoveLocalPathPrefix(const std::string& path)
+std::string FileSystem::RemoveLocalPathPrefix(const std::string& pStr)
 {
-	std::string p(path);
+	auto u8str = Recoil::filesystem::u8path(pStr).generic_u8string();
 
-	if ((p.length() >= 2) && (p[0] == '.') && IsPathSeparator(p[1])) {
-	    p.erase(0, 2);
+	if ((u8str.length() >= 2) && (u8str[0] == '.') && IsPathSeparator(u8str[1])) {
+		u8str.erase(0, 2);
 	}
 
-	return p;
+	return Impl::StoreUTF8AsString(u8str);
 }
 
 bool FileSystem::IsFSRoot(const std::string& pStr)
 {
-	auto p = Recoil::filesystem::u8path(pStr);
+	const auto p = Recoil::filesystem::u8path(pStr);
 	const auto rp = p.root_path();
 	return !rp.empty() && p == rp;
 }
 
 bool FileSystem::IsPathSeparator(char aChar) { return ((aChar == cPS_WIN32) || (aChar == cPS_POSIX)); }
-bool FileSystem::IsNativePathSeparator(char aChar) { return (aChar == cPS); }
+bool FileSystem::IsPathSeparator(char8_t wChar) { return ((wChar == cPS_WIN32) || (wChar == cPS_POSIX)); }
+bool FileSystem::IsPathSeparator(wchar_t aChar) { return ((aChar == cPS_WIN32) || (aChar == cPS_POSIX)); }
 
-bool FileSystem::HasPathSepAtEnd(const std::string& path)
+bool FileSystem::HasPathSepAtEnd(const std::u8string& path)
 {
-	bool pathSepAtEnd = false;
-
-	if (!path.empty()) {
-		pathSepAtEnd = IsNativePathSeparator(path.at(path.size() - 1));
-	}
-
-	return pathSepAtEnd;
+	return !path.empty() && IsPathSeparator(path.at(path.size() - 1));
 }
 
-std::string& FileSystem::EnsurePathSepAtEnd(std::string& path)
+bool FileSystem::HasPathSepAtEnd(const std::string& pStr)
 {
-	if (path.empty()) {
-		path += "." sPS;
-	} else if (!HasPathSepAtEnd(path)) {
-		path += cPS;
-	}
-
-	return path;
-}
-std::string FileSystem::EnsurePathSepAtEnd(const std::string& path)
-{
-	std::string pathCopy(path);
-	EnsurePathSepAtEnd(pathCopy);
-	return pathCopy;
+	const auto path = Recoil::filesystem::u8path(pStr).generic_u8string();
+	return HasPathSepAtEnd(path);
 }
 
-void FileSystem::EnsureNoPathSepAtEnd(std::string& path)
+std::string FileSystem::EnsurePathSepAtEnd(const std::string& pStr)
 {
+	auto path = Recoil::filesystem::u8path(pStr);
+	path /= "";
+
+	return Impl::StoreUTF8AsString(path.lexically_normal().generic_u8string());
+}
+
+std::string FileSystem::EnsurePathSepAtEnd(const std::u8string& pStr)
+{
+	auto path = std::filesystem::path(pStr);
+	path /= "";
+
+	return Impl::StorePathAsString(path.lexically_normal().generic_u8string());
+}
+
+std::string FileSystem::EnsureNoPathSepAtEnd(const std::string& pStr)
+{
+	auto path = Recoil::filesystem::u8path(pStr).generic_u8string();
+
 	if (HasPathSepAtEnd(path)) {
 		path.resize(path.size() - 1);
 	}
+
+	return Impl::StoreUTF8AsString(path);
 }
 
-std::string FileSystem::EnsureNoPathSepAtEnd(const std::string& path)
+std::string FileSystem::StripTrailingSlashes(const std::string& pStr)
 {
-	std::string pathCopy(path);
-	EnsureNoPathSepAtEnd(pathCopy);
-	return pathCopy;
-}
-
-std::string FileSystem::StripTrailingSlashes(const std::string& path)
-{
+	auto path = Recoil::filesystem::u8path(pStr).generic_u8string();
 	size_t len = path.length();
 
 	while (len > 0) {
@@ -140,26 +141,28 @@ std::string FileSystem::StripTrailingSlashes(const std::string& path)
 		}
 	}
 
-	return path.substr(0, len);
+	return Impl::StoreUTF8AsString(path.substr(0, len));
 }
 
 std::string FileSystem::GetParent(const std::string& pathStr)
 {
-	auto path = Recoil::filesystem::u8path(pathStr);
+	const auto path = Recoil::filesystem::u8path(EnsureNoPathSepAtEnd(pathStr));
 	if (!path.has_parent_path())
 		return "";
 
-	return Impl::StorePathAsString(path);
+	const auto ppath = path.parent_path();
+
+	return EnsurePathSepAtEnd(ppath.generic_u8string());
 }
 
-size_t FileSystem::GetFileSize(const std::string& fileStr)
+int32_t FileSystem::GetFileSize(const std::string& fileStr)
 {
-	auto file = Recoil::filesystem::u8path(GetNormalizedPath(fileStr));
+	const auto file = Recoil::filesystem::u8path(fileStr);
 	std::error_code ec;
 	auto size = static_cast<int32_t>(fs::file_size(file, ec));
 	if (ec) {
 		LOG_L(L_WARNING, "[FSA::%s] error '%s' reading file size '%s'", __func__, ec.message().c_str(), fileStr.c_str());
-		return 0;
+		return -1;
 	}
 
 	return size;
@@ -167,7 +170,7 @@ size_t FileSystem::GetFileSize(const std::string& fileStr)
 
 bool FileSystem::IsReadableFile(const std::string& fileStr)
 {
-	auto file = Recoil::filesystem::u8path(fileStr);
+	const auto file = Recoil::filesystem::u8path(fileStr);
 
 	// Exclude directories!
 	if (!FileExists(file))
@@ -391,7 +394,8 @@ bool FileSystem::DeleteFile(const std::string& fileStr)
 	auto file = Recoil::filesystem::u8path(fileStr);
 
 	std::error_code ec;
-	return fs::remove(file, ec);
+	return (fs::remove(file, ec) && !ec);
+
 }
 
 bool FileSystem::FileExists(const fs::path& path)
@@ -640,8 +644,9 @@ namespace Impl {
 
 	void FindFilesStd(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dirStr, const spring::regex& regexPattern, int flags)
 	{
-		const auto dirFullStr = dataDir + dirStr;
-		auto dir = Recoil::filesystem::u8path(dirFullStr).lexically_normal();
+		const auto dirFullStr = FileSystem::ForwardSlashes(dataDir + dirStr);
+
+		auto dir = Recoil::filesystem::u8path(dirFullStr);
 		if (!fs::exists(dir))
 			return;
 
@@ -665,14 +670,16 @@ namespace Impl {
 
 				// hope std::regex_match will not trip up on UTF-8, if it does, will need to convert to std::wregex
 				// the previous implementation relied on checking the filename only
-				if (spring::regex_match(StorePathAsString(entry.path().filename()), regexPattern)) {
-					auto utf8Str = StorePathAsString(entry.path());
+				const auto entryPathFnStr = entry.path().filename().generic_u8string();
+
+				if (spring::regex_match(StoreUTF8AsString(entryPathFnStr), regexPattern)) {
+					auto entryPathStr = entry.path().generic_u8string();
 
 					// the previous convention to add a trailing slash
-					if (isDir && !utf8Str.empty() && utf8Str.back() != FileSystem::GetNativePathSeparator()) {
-						utf8Str += FileSystem::GetNativePathSeparator();
+					if (isDir && !entryPathStr.empty() && entryPathStr.back() != u8'/') {
+						entryPathStr += u8'/';
 					}
-					matches.emplace_back(std::move(utf8Str));
+					matches.emplace_back(Impl::StoreUTF8AsString(entryPathStr));
 				}
 			}
 		}, std::move(dirIterator));
@@ -767,6 +774,32 @@ std::string FileSystem::ConvertGlobToRegex(const std::string& glob)
 	return regex;
 }
 
+std::string FileSystem::Concatenate(const std::initializer_list<const char*>& list)
+{
+	std::filesystem::path p;
+	for (const auto* li : list) {
+		p /= Recoil::filesystem::u8path(li);
+	}
+
+	return Impl::StorePathAsString(p);
+}
+
+
+std::filesystem::path FileSystem::ForwardSlashes(const std::filesystem::path& path)
+{
+	auto u8path = path.generic_u8string();
+	std::replace_if(u8path.begin(), u8path.end(), [](auto ch) { return ch == u8'\\'; }, '/');
+	return std::filesystem::path(u8path);
+}
+
+std::string FileSystem::ForwardSlashes(const std::string& path)
+{
+	auto u8path = Recoil::filesystem::u8path(path).generic_u8string();
+	std::replace_if(u8path.begin(), u8path.end(), [](auto ch) { return ch == u8'\\'; }, '/');
+
+	return Impl::StoreUTF8AsString(u8path);
+}
+
 bool FileSystem::CreateDirectory(const std::string& dirStr)
 {
 	auto dir = Recoil::filesystem::u8path(dirStr);
@@ -800,104 +833,71 @@ bool FileSystem::CreateDirectory(const std::string& dirStr)
 }
 
 
-bool FileSystem::TouchFile(std::string filePath)
+bool FileSystem::TouchFile(const std::string& filePathStr)
 {
+	const auto filePath = Recoil::filesystem::u8path(filePathStr);
 	if (!CheckFile(filePath))
 		return false;
 
-	// check for read access
-	if (access(filePath.c_str(), R_OK) == 0)
-		return true;
-
-	FILE* f = nowide::fopen(filePath.c_str(), "a+b");
-	if (f == nullptr)
+	// Try to create/open the file
+	nowide::fstream file(filePath, std::ios::in | std::ios::out | std::ios::app | std::ios::binary);
+	if (!file.is_open())
 		return false;
-	fclose(f);
-	return (access(filePath.c_str(), R_OK) == 0); // check for read access
+
+	file.close();
+
+	// Check for read access again
+	if (fs::exists(filePath)) {
+		auto perms = fs::status(filePath).permissions();
+		return (perms & fs::perms::owner_read) != fs::perms::none;
+	}
+
+	return false;
 }
 
 
-
-
-std::string FileSystem::GetDirectory(const std::string& path)
+std::string FileSystem::GetDirectory(const std::string& pStr)
 {
-	const size_t s = path.find_last_of("\\/");
+	auto u8str = Recoil::filesystem::u8path(pStr).generic_u8string();
+
+	const size_t s = u8str.find_last_of(u8"\\/");
 
 	if (s != std::string::npos)
-		return path.substr(0, s + 1);
+		return Impl::StoreUTF8AsString(u8str.substr(0, s + 1));
 
 	return ""; // XXX return "./"? (a short test caused a crash because CFileHandler used in Lua couldn't find a file in the base-dir)
 }
 
-std::string FileSystem::GetFilename(const std::string& path)
+std::string FileSystem::GetFilename(const std::string& pathStr)
 {
-	const size_t s = path.find_last_of("\\/");
-
-	if (s != std::string::npos)
-		return path.substr(s + 1);
-
-	return path;
+	const auto p = Recoil::filesystem::u8path(pathStr);
+	return Impl::StorePathAsString(p.filename());
 }
 
-std::string FileSystem::GetBasename(const std::string& path)
+std::string FileSystem::GetBasename(const std::string& pathStr)
 {
-	std::string fn = GetFilename(path);
-	const size_t dot = fn.find_last_of('.');
-
-	if (dot != std::string::npos)
-		return fn.substr(0, dot);
-
-	return fn;
+	const auto p = Recoil::filesystem::u8path(pathStr);
+	return Impl::StorePathAsString(p.stem());
 }
 
-std::string FileSystem::GetExtension(const std::string& path)
+std::string FileSystem::GetExtension(const std::string& pathStr)
 {
-	const std::string fileName = GetFilename(path);
-	size_t l = fileName.length();
-//#ifdef _WIN32
-	//! windows eats dots and spaces at the end of filenames
-	while (l > 0) {
-		const char prevChar = fileName[l-1];
-		if ((prevChar == '.') || (prevChar == ' ')) {
-			l--;
-		} else {
-			break;
-		}
-	}
-//#endif
-	const size_t dot = fileName.rfind('.', l);
+	const auto p = Recoil::filesystem::u8path(pathStr);
+	auto ext = p.extension().generic_u8string();
+	if (ext.empty())
+		return "";
 
-	if (dot != std::string::npos)
-		return StringToLower(fileName.substr(dot + 1));
-
-	return "";
+	assert(ext[0] == u8'.');
+	return Impl::StorePathAsString(ext.substr(1, ext.length() - 1));
 }
 
 std::string FileSystem::GetNormalizedPath(const std::string& path) {
-	return std::filesystem::path(path).lexically_normal().generic_string();
+	return Impl::StoreUTF8AsString(std::filesystem::path(path).lexically_normal().generic_u8string());
 }
-
-std::string& FileSystem::FixSlashes(std::string& path)
-{
-	const char sep = GetNativePathSeparator();
-	const auto P = [](const char c) { return (c == '/' || c == '\\'); };
-
-	std::replace_if(std::begin(path), std::end(path), P, sep);
-
-	return path;
-}
-
-std::string& FileSystem::ForwardSlashes(std::string& path)
-{
-	std::replace(std::begin(path), std::end(path), '\\', '/');
-
-	return path;
-}
-
 
 bool FileSystem::CheckFile(const std::string& file)
 {
-	auto p = Recoil::filesystem::u8path(file);
+	const auto p = Recoil::filesystem::u8path(file);
 	return CheckFile(p);
 }
 

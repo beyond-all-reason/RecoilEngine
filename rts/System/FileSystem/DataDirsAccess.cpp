@@ -20,8 +20,7 @@ std::vector<std::string> DataDirsAccess::FindFiles(std::string dir, const std::s
 		return std::vector<std::string>();
 	}
 
-	FileSystem::FixSlashes(dir);
-	FileSystem::EnsurePathSepAtEnd(dir);
+	dir = FileSystem::EnsurePathSepAtEnd(dir);
 
 	if (flags & FileQueryFlags::ONLY_DIRS) {
 		flags |= FileQueryFlags::INCLUDE_DIRS;
@@ -73,7 +72,7 @@ std::string DataDirsAccess::LocateFileInternal(const std::string& file) const
 
 void DataDirsAccess::FindFilesSingleDir(std::vector<std::string>& matches, const std::string& datadir, const std::string& dir, const std::string& pattern, int flags) const
 {
-	assert(datadir.empty() || datadir[datadir.length() - 1] == FileSystem::GetNativePathSeparator());
+	assert(datadir.empty() || FileSystem::HasPathSepAtEnd(datadir));
 
 	const std::string regexPattern = FileSystem::ConvertGlobToRegex(pattern);
 
@@ -82,7 +81,7 @@ void DataDirsAccess::FindFilesSingleDir(std::vector<std::string>& matches, const
 
 
 
-std::string DataDirsAccess::LocateFile(std::string file, int flags) const
+std::string DataDirsAccess::LocateFile(const std::string& file, int flags) const
 {
 	if (!FileSystem::CheckFile(file)) {
 		return "";
@@ -93,11 +92,8 @@ std::string DataDirsAccess::LocateFile(std::string file, int flags) const
 		return file;
 	}
 
-	FileSystem::FixSlashes(file);
-
 	if (flags & FileQueryFlags::WRITE) {
 		std::string writeableFile = dataDirLocater.GetWriteDirPath() + file;
-		FileSystem::FixSlashes(writeableFile);
 		if (flags & FileQueryFlags::CREATE_DIRS) {
 			FileSystem::CreateDirectory(FileSystem::GetDirectory(writeableFile));
 		}
@@ -107,7 +103,7 @@ std::string DataDirsAccess::LocateFile(std::string file, int flags) const
 	return LocateFileInternal(file);
 }
 
-std::string DataDirsAccess::LocateDir(std::string dir, int flags) const
+std::string DataDirsAccess::LocateDir(const std::string& dir, int flags) const
 {
 	if (!FileSystem::CheckFile(dir)) {
 		return "";
@@ -117,11 +113,8 @@ std::string DataDirsAccess::LocateDir(std::string dir, int flags) const
 		return dir;
 	}
 
-	FileSystem::FixSlashes(dir);
-
 	if (flags & FileQueryFlags::WRITE) {
 		std::string writeableDir = dataDirLocater.GetWriteDirPath() + dir;
-		FileSystem::FixSlashes(writeableDir);
 		if (flags & FileQueryFlags::CREATE_DIRS) {
 			FileSystem::CreateDirectory(writeableDir);
 		}
@@ -137,15 +130,13 @@ std::string DataDirsAccess::LocateDir(std::string dir, int flags) const
 		return dir;
 	}
 }
-std::vector<std::string> DataDirsAccess::LocateDirs(std::string dir) const
+std::vector<std::string> DataDirsAccess::LocateDirs(const std::string& dir) const
 {
 	std::vector<std::string> found;
 
 	if (!FileSystem::CheckFile(dir) || FileSystem::IsAbsolutePath(dir)) {
 		return found;
 	}
-
-	FileSystem::FixSlashes(dir);
 
 	const std::vector<std::string>& datadirs = dataDirLocater.GetDataDirPaths();
 	for (const std::string& dd: datadirs) {

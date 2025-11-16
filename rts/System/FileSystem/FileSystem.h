@@ -6,6 +6,7 @@
 #include <string>
 #include <cstdint>
 #include <filesystem>
+#include <initializer_list>
 
 /**
  * Native file-system handling abstraction.
@@ -55,17 +56,14 @@ public:
 	 * that is either '\' or '/'.
 	 */
 	static bool IsPathSeparator(char aChar);
-
-	/**
-	 * Returns true if the supplied char is a platform native path separator,
-	 * that is '\' on windows and '/' on POSIX.
-	 */
-	static bool IsNativePathSeparator(char aChar);
+	static bool IsPathSeparator(char8_t wChar);
+	static bool IsPathSeparator(wchar_t wChar);
 
 	/**
 	 * Returns true if the path ends with the platform native path separator.
 	 * That is '\' on windows and '/' on POSIX.
 	 */
+	static bool HasPathSepAtEnd(const std::u8string& path);
 	static bool HasPathSepAtEnd(const std::string& path);
 
 	/**
@@ -73,16 +71,13 @@ public:
 	 * Converts the empty string to ".\" or "./" respectively.
 	 * @see #HasPathSepAtEnd()
 	 */
-	static std::string& EnsurePathSepAtEnd(std::string& path);
-	/// @see #EnsurePathSepAtEnd(std::string&)
 	static std::string EnsurePathSepAtEnd(const std::string& path);
+	static std::string EnsurePathSepAtEnd(const std::u8string& path);
 
 	/**
 	 * Ensures the path does not end with the platform native path separator.
 	 * @see #HasPathSepAtEnd()
 	 */
-	static void EnsureNoPathSepAtEnd(std::string& path);
-	/// @see #EnsureNoPathSepAtEnd(std::string&)
 	static std::string EnsureNoPathSepAtEnd(const std::string& path);
 
 	/**
@@ -100,10 +95,10 @@ public:
 	/**
 	 * @brief get filesize
 	 *
-	 * @return the files size or 0, if the file does not exist. Returns
+	 * @return the files size or -1, if the file does not exist. Returns
 	 *          also 0 if the file is a directory.
 	 */
-	static size_t GetFileSize(const std::string& file);
+	static int32_t GetFileSize(const std::string& file);
 
 	// custom functions
 	static bool IsReadableFile(const std::string& file);
@@ -149,7 +144,7 @@ public:
 	///@}
 
 
-	static bool TouchFile(std::string filePath);
+	static bool TouchFile(const std::string& filePath);
 
 	/// @name convenience
 	///@{
@@ -193,15 +188,11 @@ public:
 	 * @return string containing regex
 	 */
 	static std::string ConvertGlobToRegex(const std::string& glob);
-	/**
-	 * Converts all slashes and backslashes in path to the
-	 * native_path_separator.
-	 */
-	static std::string& FixSlashes(std::string& path);
-	/**
-	 * @brief converts backslashes in path to forward slashes
-	 */
-	static std::string& ForwardSlashes(std::string& path);
+
+	static std::string Concatenate(const std::initializer_list<const char*>& list);
+
+	static std::filesystem::path ForwardSlashes(const std::filesystem::path& path);
+	static std::string ForwardSlashes(const std::string& path);
 	///@}
 
 	/**

@@ -91,8 +91,7 @@ bool CacheDir::WriteCacheTagFile(const std::string& filePath, const std::string&
 }
 
 std::string CacheDir::GetCacheTagFilePath(const std::string& dir) {
-	std::string cacheFile = dir;
-	FileSystem::EnsurePathSepAtEnd(cacheFile);
+	std::string cacheFile = FileSystem::EnsurePathSepAtEnd(dir);
 	cacheFile = cacheFile + CacheDir::tagFile_name;
 
 	return cacheFile;

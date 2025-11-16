@@ -49,10 +49,10 @@ public:
 	 * @return  an absolute path to file on success, or the argument
 	 *          (relative path) on failure
 	 */
-	std::string LocateFile(std::string file, int flags = 0) const;
+	std::string LocateFile(const std::string& file, int flags = 0) const;
 
-	std::string LocateDir(std::string dir, int flags = 0) const;
-	std::vector<std::string> LocateDirs(std::string dir) const;
+	std::string LocateDir(const std::string& dir, int flags = 0) const;
+	std::vector<std::string> LocateDirs(const std::string& dir) const;
 
 	std::vector<std::string> FindDirsInDirectSubDirs(const std::string& relPath) const;
 	/**

@@ -93,7 +93,7 @@ static inline void SplitColonString(const std::string& str, const std::function<
 
 DataDir::DataDir(const std::string& path): path(path)
 {
-	FileSystem::EnsurePathSepAtEnd(this->path);
+	this->path = FileSystem::GetNormalizedPath(FileSystem::EnsurePathSepAtEnd(this->path));
 }
 
 
