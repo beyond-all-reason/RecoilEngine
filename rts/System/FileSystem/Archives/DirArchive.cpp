@@ -40,11 +40,12 @@ CDirArchive::CDirArchive(const std::string& archiveName)
 		// effectively stores the filename of f
 		std::string origName(f, dirName.length());
 
+		// all variables here will use forward slashes, no need for conversion
 		std::string rawFileName = dataDirsAccess.LocateFile(dirName + origName);
 		files.emplace_back(origName, std::move(rawFileName), -1, 0);
 
 		// convert to lowercase and store
-		lcNameIndex[StringToLower(origName)] = files.size() - 1;
+		lcNameIndex[StringToLower(std::move(origName))] = static_cast<decltype(lcNameIndex)::value_type::second_type>(files.size() - 1);
 	}
 }
 
@@ -55,7 +56,7 @@ bool CDirArchive::GetFile(uint32_t fid, std::vector<std::uint8_t>& buffer)
 
 	auto scopedSemAcq = AcquireSemaphoreScoped();
 
-	nowide::ifstream ifs(files[fid].rawFileName.c_str(), std::ios::in | std::ios::binary);
+	nowide::ifstream ifs(files[fid].rawFileName, std::ios::in | std::ios::binary);
 
 	if (ifs.bad() || !ifs.is_open())
 		return false;

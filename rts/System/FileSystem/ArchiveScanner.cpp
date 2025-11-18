@@ -1149,7 +1149,7 @@ bool CArchiveScanner::ReadCacheData(const std::string& filename, bool loadOldVer
 	static const auto ReadFileInfoMap = [](const LuaTable& filesInfoTbl, spring::unordered_map<std::string, FileInfo>& filesInfoMap) {
 		for (int j = 1; filesInfoTbl.KeyExists(j); ++j) {
 			const LuaTable fileInfoTbl = filesInfoTbl.SubTable(j);
-			const auto fn = fileInfoTbl.GetString("fileName", "");
+			const auto fn = FileSystem::ForwardSlashes(fileInfoTbl.GetString("fileName", ""));
 			if (fn.empty())
 				continue;
 
@@ -1174,8 +1174,8 @@ bool CArchiveScanner::ReadCacheData(const std::string& filename, bool loadOldVer
 		ArchiveInfo& ai = GetAddArchiveInfo(curArchiveNameLC);
 
 		ai.origName 	   = curArchiveName;
-		ai.path     	   = curArchiveTbl.GetString("path", "");
-		ai.archiveDataPath = curArchiveTbl.GetString("archiveDataPath", "");
+		ai.path     	   = FileSystem::ForwardSlashes(curArchiveTbl.GetString("path", ""));
+		ai.archiveDataPath = FileSystem::ForwardSlashes(curArchiveTbl.GetString("archiveDataPath", ""));
 
 		// do not use LuaTable.GetInt() for integers: the engine's lua
 		// library uses 32-bit floats to represent numbers, which can only

@@ -86,7 +86,7 @@ bool FileSystem::IsFSRoot(const std::string& pStr)
 	return !rp.empty() && p == rp;
 }
 
-bool FileSystem::IsPathSeparator(char aChar) { return ((aChar == cPS_WIN32) || (aChar == cPS_POSIX)); }
+bool FileSystem::IsPathSeparator(char    aChar) { return ((aChar == cPS_WIN32) || (aChar == cPS_POSIX)); }
 bool FileSystem::IsPathSeparator(char8_t wChar) { return ((wChar == cPS_WIN32) || (wChar == cPS_POSIX)); }
 bool FileSystem::IsPathSeparator(wchar_t aChar) { return ((aChar == cPS_WIN32) || (aChar == cPS_POSIX)); }
 
@@ -788,14 +788,14 @@ std::string FileSystem::Concatenate(const std::initializer_list<const char*>& li
 std::filesystem::path FileSystem::ForwardSlashes(const std::filesystem::path& path)
 {
 	auto u8path = path.generic_u8string();
-	std::replace_if(u8path.begin(), u8path.end(), [](auto ch) { return ch == u8'\\'; }, '/');
+	std::replace_if(u8path.begin(), u8path.end(), [](auto ch) { return ch == u8'\\'; }, u8'/');
 	return std::filesystem::path(u8path);
 }
 
 std::string FileSystem::ForwardSlashes(const std::string& path)
 {
 	auto u8path = Recoil::filesystem::u8path(path).generic_u8string();
-	std::replace_if(u8path.begin(), u8path.end(), [](auto ch) { return ch == u8'\\'; }, '/');
+	std::replace_if(u8path.begin(), u8path.end(), [](auto ch) { return ch == u8'\\'; }, u8'/');
 
 	return Impl::StoreUTF8AsString(u8path);
 }
