@@ -1348,7 +1348,7 @@ void CArchiveScanner::WriteCacheData(const std::string& filename)
 
 		fprintf(out, "\t\t{\n");
 		SafeStr(out, "\t\t\tname = ",              arcInfo.origName);
-		SafeStr(out, "\t\t\tpath = ",              arcInfo.path);
+		SafeStr(out, "\t\t\tpath = ",              arcInfo.path    );
 		fprintf(out, "\t\t\tmodified = \"%u\",\n", arcInfo.modified);
 		fprintf(out, "\t\t\tchecksum = \"%s\",\n", hexDigest.data());
 		SafeStr(out, "\t\t\treplaced = ",          arcInfo.replaced);

@@ -193,6 +193,8 @@ public:
 
 	static std::filesystem::path ForwardSlashes(const std::filesystem::path& path);
 	static std::string ForwardSlashes(const std::string& path);
+
+	static std::string NativeSlashes(const std::string& path);
 	///@}
 
 	/**

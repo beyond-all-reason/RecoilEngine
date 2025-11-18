@@ -800,6 +800,14 @@ std::string FileSystem::ForwardSlashes(const std::string& path)
 	return Impl::StoreUTF8AsString(u8path);
 }
 
+std::string FileSystem::NativeSlashes(const std::string& path)
+{
+	auto u8path = Recoil::filesystem::u8path(path).generic_u8string();
+	std::replace_if(u8path.begin(), u8path.end(), [](auto ch) { return IsPathSeparator(ch); }, cPS);
+
+	return Impl::StoreUTF8AsString(u8path);
+}
+
 bool FileSystem::CreateDirectory(const std::string& dirStr)
 {
 	auto dir = Recoil::filesystem::u8path(dirStr);
