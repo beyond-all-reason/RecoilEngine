@@ -130,7 +130,7 @@ public:
 	 *
 	 * Operates on the current working directory.
 	 */
-	static bool Remove(std::string file);
+	static bool Remove(const std::string& file);
 
 	/**
 	 * @brief creates a directory recursively
@@ -204,6 +204,5 @@ public:
 	static bool CheckFile(const std::filesystem::path& file);
 	//	static bool CheckDir(const std::string& dir) const;
 
-	static const std::string& GetCacheBaseDir();
 	static const std::string& GetCacheDir();
 };

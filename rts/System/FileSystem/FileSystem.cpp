@@ -363,6 +363,8 @@ bool FileSystem::IsAbsolutePath(const std::string& pathStr)
 bool FileSystem::MkDir(const std::string& dirStr)
 {
 	auto dir = Recoil::filesystem::u8path(dirStr);
+	if (!CheckFile(dir))
+		return false;
 
 	// First check if directory exists. We'll return success if it does.
 	if (DirExists(dir))
@@ -549,12 +551,7 @@ bool FileSystem::ComparePaths(const std::string& path1, const std::string& path2
 
 std::string FileSystem::GetEngineExecutableDir()
 {
-	std::string engineFullName = Platform::GetProcessExecutableFile();
-	std::size_t pos = engineFullName.find_last_of("/\\");
-	if (pos != std::string::npos)
-		return EnsurePathSepAtEnd(engineFullName.substr(0, pos));
-	else
-		return "";
+	return GetDirectory(Platform::GetProcessExecutableFile());
 }
 
 std::string FileSystem::GetCwd()
@@ -774,6 +771,8 @@ std::string FileSystem::ConvertGlobToRegex(const std::string& glob)
 	return regex;
 }
 
+#undef QUOTE
+
 std::string FileSystem::Concatenate(const std::initializer_list<const char*>& list)
 {
 	std::filesystem::path p;
@@ -813,6 +812,10 @@ bool FileSystem::CreateDirectory(const std::string& dirStr)
 	auto dir = Recoil::filesystem::u8path(dirStr);
 	if (!CheckFile(dir))
 		return false;
+
+	// First check if directory exists. We'll return success if it does.
+	if (DirExists(dir))
+		return true;
 
 	std::error_code ec;
 	fs::create_directories(dir, ec);
@@ -919,7 +922,7 @@ bool FileSystem::CheckFile(const std::filesystem::path& p)
 	return p.generic_u8string().find(u8"..") == std::string::npos;
 }
 
-bool FileSystem::Remove(std::string file)
+bool FileSystem::Remove(const std::string& file)
 {
 	if (!CheckFile(file))
 		return false;
@@ -927,16 +930,8 @@ bool FileSystem::Remove(std::string file)
 	return FileSystem::DeleteFile(FileSystem::GetNormalizedPath(file));
 }
 
-const std::string& FileSystem::GetCacheBaseDir()
+const std::string& FileSystem::GetCacheDir()
 {
 	static const std::string cacheBaseDir = "cache";
 	return cacheBaseDir;
 }
-
-const std::string& FileSystem::GetCacheDir()
-{
-	static const std::string cacheDir = EnsureNoPathSepAtEnd(GetCacheBaseDir());
-	return cacheDir;
-}
-
-#undef QUOTE
