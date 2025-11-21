@@ -143,8 +143,9 @@ void CLogOutput::RotateLogFile() const
 	if (!FileSystem::FileExists(filePath))
 		return;
 
+	const auto baseDir = FileSystem::GetDirectory(filePath);
 	// logArchiveDir: /absolute/writeable/data/dir/log/
-	const std::string logArchiveDir = filePath.substr(0, filePath.find_last_of("/\\") + 1) + "log" + FileSystem::GetNativePathSeparator();
+	const std::string logArchiveDir = FileSystem::Concatenate({ baseDir, "log/"});
 	const std::string archivedLogFile = logArchiveDir + FileSystem::GetFileModificationDate(filePath) + "_" + fileName;
 
 	// create the log archive dir if it does not exist yet

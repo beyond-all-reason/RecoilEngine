@@ -544,8 +544,8 @@ void CArchiveScanner::ScanDir(const std::string& curPath, std::deque<std::string
 		subDirs.pop_front();
 
 		for (const std::string& fileName: foundFiles) {
-			const std::string& fileNameNoSep = FileSystem::EnsureNoPathSepAtEnd(fileName);
-			const std::string& lcFilePath = StringToLower(FileSystem::GetDirectory(fileNameNoSep));
+			const std::string fileNameNoSep = FileSystem::EnsureNoPathSepAtEnd(fileName);
+			const std::string lcFilePath = StringToLower(FileSystem::GetDirectory(fileNameNoSep));
 
 			// Exclude archive files found inside directory archives (.sdd)
 			if (lcFilePath.find(".sdd") != std::string::npos)

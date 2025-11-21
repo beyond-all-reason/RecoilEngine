@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <string>
+#include <string_view>
 #include <cstdint>
 #include <filesystem>
 #include <initializer_list>
@@ -189,7 +190,7 @@ public:
 	 */
 	static std::string ConvertGlobToRegex(const std::string& glob);
 
-	static std::string Concatenate(const std::initializer_list<const char*>& list);
+	static std::string Concatenate(const std::initializer_list<std::string_view>& list);
 
 	static std::filesystem::path ForwardSlashes(const std::filesystem::path& path);
 	static std::string ForwardSlashes(const std::string& path);

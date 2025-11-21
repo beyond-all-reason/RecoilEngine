@@ -72,7 +72,7 @@ std::string FileSystem::RemoveLocalPathPrefix(const std::string& pStr)
 {
 	auto u8str = Recoil::filesystem::u8path(pStr).generic_u8string();
 
-	if ((u8str.length() >= 2) && (u8str[0] == '.') && IsPathSeparator(u8str[1])) {
+	if ((u8str.length() >= 2) && (u8str[0] == u8'.') && IsPathSeparator(u8str[1])) {
 		u8str.erase(0, 2);
 	}
 
@@ -119,7 +119,7 @@ std::string FileSystem::EnsurePathSepAtEnd(const std::u8string& pStr)
 
 std::string FileSystem::EnsureNoPathSepAtEnd(const std::string& pStr)
 {
-	auto path = Recoil::filesystem::u8path(pStr).generic_u8string();
+	auto path = Recoil::filesystem::u8path(pStr).lexically_normal().generic_u8string();
 
 	if (HasPathSepAtEnd(path)) {
 		path.resize(path.size() - 1);
@@ -686,7 +686,11 @@ namespace Impl {
 void FileSystem::FindFiles(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dir, const std::string& regex, int flags)
 {
 	const spring::regex regexPattern(regex);
+#if 1
 	Impl::FindFilesStd(matches, dataDir, dir, regexPattern, flags);
+#else
+	Impl::FindFiles   (matches, dataDir, dir, regexPattern, flags);
+#endif
 }
 
 /**
@@ -773,10 +777,10 @@ std::string FileSystem::ConvertGlobToRegex(const std::string& glob)
 
 #undef QUOTE
 
-std::string FileSystem::Concatenate(const std::initializer_list<const char*>& list)
+std::string FileSystem::Concatenate(const std::initializer_list<std::string_view>& list)
 {
 	std::filesystem::path p;
-	for (const auto* li : list) {
+	for (const auto& li : list) {
 		p /= Recoil::filesystem::u8path(li);
 	}
 

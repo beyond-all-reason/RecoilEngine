@@ -2,21 +2,17 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 namespace Recoil {
-	template<class T>
-	concept StringLike = std::is_same_v<T, std::string_view> || std::is_same_v<T, std::string>;
-
-	template<class T>
-	concept CStringLike = std::is_same_v<std::decay_t<T>, const char*>;
-
 	namespace filesystem {
-		template<StringLike Source>
-		std::filesystem::path u8path(const Source& pathStr) {
+		std::filesystem::path u8path(const std::string& pathStr) {
 			return std::filesystem::path(reinterpret_cast<const char8_t*>(pathStr.c_str()));
 		}
-		template<CStringLike Source>
-		std::filesystem::path u8path(const Source& pathStr) {
+		std::filesystem::path u8path(const std::string_view& pathStr) {
+			return std::filesystem::path(reinterpret_cast<const char8_t*>(pathStr.data()));
+		}
+		std::filesystem::path u8path(const char* pathStr) {
 			return std::filesystem::path(reinterpret_cast<const char8_t*>(pathStr));
 		}
 	}
