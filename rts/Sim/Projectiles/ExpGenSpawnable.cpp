@@ -35,7 +35,8 @@ CR_REG_METADATA(CExpGenSpawnable, (
 	CR_MEMBER(animProgress4),
 	CR_MEMBER_BEGINFLAG(CM_Config),
 		CR_MEMBER(rotParams),
-		CR_FAKE(animParams, float3),
+		// CR_FAKE(animParams, float3), // Caused a serialization crash (creg::FakeType::GetName) // this is 90% vibe coded
+		// I had an annoying crash on save — and went hey AI tech me how to use gdb ... and in the end it sugested this chage.
 		CR_MEMBER(animParams1),
 		CR_MEMBER(animParams2),
 		CR_MEMBER(animParams3),
