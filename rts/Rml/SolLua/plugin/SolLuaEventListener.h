@@ -56,6 +56,7 @@ namespace Rml::SolLua
 	private:
 		sol::protected_function m_func;
 		Rml::Element *m_element;
+		bool m_detached = false;
 	};
 
 } // namespace Rml::SolLua
