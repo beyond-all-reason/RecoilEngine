@@ -279,14 +279,19 @@ if    (WIN32)
 	endif(NOT MSVC)
 endif (WIN32)
 
-option(USE_ASAN "Build/link with address sanitizer enabled (for DEBUG builds only)" FALSE)
+option(USE_ASAN "Build/link with address sanitizer enabled" FALSE)
 if    (USE_ASAN)
 	if (UNIX AND NOT MINGW)
-		add_compile_options("$<$<CONFIG:DEBUG>:-fsanitize=address>")
-		add_link_options("$<$<CONFIG:DEBUG>:-fsanitize=address>")
+		# -fsanitize=address: Enable AddressSanitizer for detecting memory errors
+		# -fPIC: Position Independent Code required for shared libraries with ASAN
+		# -fno-omit-frame-pointer: Keep frame pointers for better stack traces in error reports
+		# -fno-optimize-sibling-calls: Prevent tail call optimization to preserve full call chains
+		# -O2: Use moderate optimization for better ASAN error detection and reasonable performance
+		add_compile_options("-fsanitize=address" "-fPIC" "-fno-omit-frame-pointer" "-fno-optimize-sibling-calls" "-O2")
+		add_link_options("-fsanitize=address")
 	endif (UNIX AND NOT MINGW)
 	if (MSVC)
-		add_compile_options("$<$<CONFIG:DEBUG>:/fsanitize=address>")
+		add_compile_options("/fsanitize=address")
 	endif (MSVC)
 endif (USE_ASAN)
 
