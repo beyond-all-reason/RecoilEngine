@@ -44,7 +44,7 @@ CHeightTexture::CHeightTexture()
 			.reqNumLevels = 1,
 			.minFilter = GL_NEAREST,
 			.magFilter = GL_LINEAR,
-			.wrapModes = std::initializer_list{ GL_REPEAT, GL_CLAMP_TO_EDGE }
+			.wrapModes = std::array<int32_t, 3>{ GL_REPEAT, GL_CLAMP_TO_EDGE, GL_REPEAT } // R wrap unused for 2D textures
 		};
 		paletteTex = GL::Texture2D(256, 2, GL_RGBA8, tcp, false);
 		auto binding = paletteTex.ScopedBind();
