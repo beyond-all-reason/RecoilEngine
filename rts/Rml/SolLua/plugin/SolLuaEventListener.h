@@ -35,7 +35,6 @@
 #include <RmlUi/Core/EventListener.h>
 #include <sol2/sol.hpp>
 
-
 namespace Rml
 {
 	class Element;
