@@ -1063,6 +1063,7 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 {
 	switch (event.type) {
 		case SDL_WINDOWEVENT: {
+			LOG("[SpringApp::%s] event.window.event = %d", __func__, event.window.event);
 			switch (event.window.event) {
 				case SDL_WINDOWEVENT_MOVED: {
 					LOG("[SpringApp::%s][SDL_WINDOWEVENT_MOVED][1] di=%d, ssx=%d, ssy=%d, wsx=%d, wsy=%d, wpx=%d, wpy=%d"

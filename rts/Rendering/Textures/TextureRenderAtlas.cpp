@@ -293,6 +293,9 @@ void CTextureRenderAtlas::SetMaxTexLevel(int maxLevels)
 bool CTextureRenderAtlas::Finalize()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	LOG("CTextureRenderAtlas::Finalize");
+
 	if (finalized)
 		return false;
 
