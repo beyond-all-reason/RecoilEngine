@@ -57,11 +57,20 @@
 #include "System/Platform/Threading.h"
 #include "System/Threading/SpringThreading.h"
 
+#include "System/Misc/TracyDefs.h"
+#include "System/TimeProfiler.h"
+
 #ifndef DEDICATED
 #include "lib/luasocket/src/restrictions.h"
 #endif
 
 #define ALLOW_DEMO_GODMODE
+
+//#define DEBUG_SERVERSYNCGAMETIMING // uncomment to enable debug output for serverSyncGameTiming
+#ifdef DEBUG_SERVERSYNCGAMETIMING
+	const char* const tracyFrameTimeLeft = "FrameTimeLeft";
+	const char* const tracyDrawSimRatio = "DrawSimRatio2";
+#endif
 
 using netcode::RawPacket;
 
@@ -70,6 +79,7 @@ CONFIG(int, AutohostPort).defaultValue(0).description("Which port should the eng
 CONFIG(int, ServerSleepTime).defaultValue(5).description("Number of milliseconds to sleep per tick for the server thread. Lower values have marginally higher CPU load, while high values can introduce additional latency.");
 CONFIG(int, SpeedControl).defaultValue(1).minimumValue(1).maximumValue(2)
 	.description("Sets how server adjusts speed according to player's load (CPU), 1: use average, 2: use highest");
+CONFIG(int, ServerSyncGameTiming).defaultValue(0).minimumValue(1).maximumValue(1000 / GAME_SPEED).description("When non-zero makes the server thread attempt to sync up simframe generation timing in local and demo games with the game's simframe consumption timing. Issues frames ~[ServerSyncGameTiming]ms before consumption, 3ms recommended (determined empirically at 30 FPS)");
 CONFIG(bool, AllowSpectatorJoin).defaultValue(true).dedicatedValue(false).description("allow any unauthenticated clients to join as spectator with any name, name will be prefixed with ~");
 CONFIG(bool, WhiteListAdditionalPlayers).defaultValue(true);
 CONFIG(bool, ServerRecordDemos).defaultValue(false).dedicatedValue(true);
@@ -255,6 +265,14 @@ void CGameServer::Initialize()
 	}
 
 	loopSleepTime = configHandler->GetInt("ServerSleepTime");
+	serverSyncGameTiming = configHandler->GetInt("ServerSyncGameTiming");
+	vSync = configHandler->GetInt("VSync"); // See verticalSync->WrapNotifyOnChange
+	configHandler->NotifyOnChange(this, {
+		"ServerSleepTime",
+		"ServerSyncGameTiming",
+		"VSync"
+	});
+
 	linkMinPacketSize = globalConfig.linkIncomingMaxPacketRate > 0 ? (globalConfig.linkIncomingSustainedBandwidth / globalConfig.linkIncomingMaxPacketRate) : 1;
 
 	lastNewFrameTick = spring_gettime();
@@ -278,6 +296,13 @@ void CGameServer::Initialize()
 			Broadcast(CBaseNetProtocol::Get().SendRandSeed(myGameSetup->fixedRNGSeed));
 		}
 	}
+}
+
+void CGameServer::ConfigNotify(const std::string& key, const std::string& value)
+{
+	vSync = configHandler->GetInt("VSync");
+	loopSleepTime = configHandler->GetInt("ServerSleepTime");
+	serverSyncGameTiming= configHandler->GetInt("ServerSyncGameTiming");
 }
 
 void CGameServer::PostLoad(int newServerFrameNum)
@@ -795,7 +820,9 @@ float CGameServer::GetDemoTime() const {
 
 void CGameServer::Update()
 {
-	const float tdif = spring_tomsecs(spring_gettime() - lastUpdate) * 0.001f;
+	ZoneScopedN("CGameServer::Update");
+	// Previously this had an error resulting in underflowing milliseconds, fixed by:
+	const float tdif = (spring_gettime() - lastUpdate).toMilliSecsf() * 0.001f; 
 
 	gameTime += tdif;
 	lastUpdate = spring_gettime();
@@ -1942,6 +1969,7 @@ void CGameServer::HandleConnectionAttempts()
 
 void CGameServer::ServerReadNet()
 {
+	ZoneScopedN("CGameServer::ServerReadNet");
 	// handle new connections
 	HandleConnectionAttempts();
 
@@ -2574,9 +2602,9 @@ bool CGameServer::HasFinished() const
 {
 	return quitServer;
 }
-
 void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 {
+	ZoneScopedN("CGameServer::CreateNewFrame");
 	if (demoReader != nullptr) {
 		CheckSync();
 		SendDemoData(-1);
@@ -2608,16 +2636,94 @@ void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 	}
 
 	if (!fixedFrameTime) {
-		spring_time currentTick = spring_gettime();
-		spring_time timeElapsed = currentTick - lastNewFrameTick;
+		spring_time currentTick = spring_gettime();  // Right now, in spring-ticks
+		spring_time timeElapsed = currentTick - lastNewFrameTick; // how long has elapsed since we previously called CreateNewFrame
+		
+		spring_time lastSimFrameStartTime = gu->lastSimFrameStartTime; // When the last sim frame was actually started by game thread
 
+		// Cap the max time we are behind to 200ms
 		if (timeElapsed > spring_msecs(200))
 			timeElapsed = spring_msecs(200);
 
+		// frameTimeLeft is mostly negative, and each time we add how much time has passed since last CreateNewFrame
 		frameTimeLeft += ((GAME_SPEED * 0.001f) * internalSpeed * timeElapsed.toMilliSecsf());
 		lastNewFrameTick = currentTick;
+		// If frameTimeLeft goes positive, we are overdue for ciel(frameTimeLeft) frames
 		numNewFrames = (frameTimeLeft > 0.0f)? int(math::ceil(frameTimeLeft)): 0;
 		frameTimeLeft -= numNewFrames;
+
+		#ifndef HEADLESS
+
+			/* When VSync is enabled, we want to ensure that we issue new sim frames just before the next VBLANK, as that is when main game thread checks for new sim frames to execute.  
+			 * So that we can ensure an even and consistent game frame cadence. E.g. ensure for 60 fps, make sure there are 2 draw frames per sim frame. 
+			 * This code below synchronizes the netcode thread with the game thread, so that we can ensure that the netcode thread is ready to send out the next sim frame at the right time.   
+			 * Checking if our game speed is close to the default 1.0 internal speed, because we then assume we want a regular gameframe cadence.
+			 * If the game speed is not close to 1.0, then we are lagging out or catching up, and dont really care about cadence. 
+			 * Specific min/max values chosen empirically. */
+
+			static constexpr float SPEED_CLAMP_MIN = 0.80f;
+			static constexpr float SPEED_CLAMP_MAX = 1.25f;
+			float internalSpeedClamped = std::clamp(internalSpeed, SPEED_CLAMP_MIN, SPEED_CLAMP_MAX);
+
+
+			float timeFromNextExpectedSimMs = (currentTick - lastSimFrameStartTime).toMilliSecsf();
+
+			timeFromNextExpectedSimMs = timeFromNextExpectedSimMs - (1000.0f / GAME_SPEED) / internalSpeedClamped;
+
+			// If we have a new sim frame and vsync is on, then we want to check if how far we are from the last VBLANK time, and we are running a 
+			// speed that is within 25% of 1.0, then we want to hurry up or slow down the game server, by adding or subtracting a small amount of time from frameTimeLeft.
+			if ((numNewFrames == 1) && (serverSyncGameTiming > 0) && (vSync != 0) && 
+				(internalSpeed == internalSpeedClamped)) {
+
+				// we just inserted a single frame. if we happened to insert it in the expected window +-2ms, then hurry up by 1ms
+				timeFromNextExpectedSimMs = (currentTick - lastSimFrameStartTime).toMilliSecsf();
+
+				float simFramePeriodms =  (1000.0f / GAME_SPEED) / internalSpeedClamped; // Usually 33.3 ms
+				// ok very good. Now if our internalSpeed is near 1, then try your absolute best to converge the net messages to the target of  (lastSimFrameStartTime + (1000/GAME_SPEED * internalSpeed) ) = serverSyncGameTiming milliseconds
+				// this number is positive if we are issuing the sim frame too late
+				// ideally this number is about -3 ms
+				float desiredSimFrameArrival = float(serverSyncGameTiming) * -1.0f;
+				timeFromNextExpectedSimMs = timeFromNextExpectedSimMs - simFramePeriodms;
+				#ifdef DEBUG_SERVERSYNCGAMETIMING
+					TracyPlot("timeFromNextExpectedSimMs", timeFromNextExpectedSimMs);
+				#endif
+		
+				// We are more than 1 millisecond behind from the desired frame time arrival
+				if (timeFromNextExpectedSimMs > (desiredSimFrameArrival + 1.0f) ) {
+					// Add one millisecond to frameTimeLeft, so that we hurry up the game server
+					frameTimeLeft += (simFramePeriodms/1000.0f);
+					#ifdef DEBUG_SERVERSYNCGAMETIMING
+						TracyMessageL("Hurrying up Gameserver");
+					#endif
+				}
+				// We are more than 1 millisecond ahead of the desired frame time arrival
+				if (timeFromNextExpectedSimMs < (desiredSimFrameArrival - 1.0f)) {
+					// Subtract half a millisecond from frameTimeLeft, so that we slow down the game server
+					frameTimeLeft -= (simFramePeriodms/1000.0f)  * 0.5f;
+					#ifdef DEBUG_SERVERSYNCGAMETIMING
+						TracyMessageL("Slowing down Gameserver");
+					#endif
+				}
+
+			}
+
+			#ifdef DEBUG_SERVERSYNCGAMETIMING
+				char msgBuf[512];
+
+				SNPRINTF(msgBuf, sizeof(msgBuf), "timeElapsed=%fms frameTimeLeft=%f internalSpeed=%f numNewFrames=%u timeFromNextExpectedSimMs=%fms, lastsim=%f, ct = %f",
+					timeElapsed.toMilliSecsf(), frameTimeLeft, internalSpeed, numNewFrames,timeFromNextExpectedSimMs, 
+					(lastSimFrameStartTime).toMilliSecsf(), currentTick.toMilliSecsf());
+
+				TracyMessage(msgBuf, sizeof(msgBuf));
+				TracyPlot(tracyFrameTimeLeft,frameTimeLeft);
+				TracyPlot("timeFromNextExpectedSimMs",timeFromNextExpectedSimMs);
+				TracyPlot("tracyTimeElapsed",timeElapsed.toMilliSecsf());
+
+
+			#endif
+
+		#endif
+
 
 		if (logDebugMessages) {
 			LOG_L(
@@ -2664,6 +2770,8 @@ void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 		for (unsigned int i = 0; i < numNewFrames; ++i) {
 			++serverFrameNum;
 
+			ZoneScopedN("CGameServer::CreateNewFrame::NewFrameCreated");
+			
 			// Send out new frame messages.
 			if ((serverFrameNum % serverKeyframeInterval) == 0) {
 				Broadcast(CBaseNetProtocol::Get().SendKeyFrame(serverFrameNum));
@@ -2687,7 +2795,6 @@ void CGameServer::CreateNewFrame(bool fromServerThread, bool fixedFrameTime)
 		}
 	}
 }
-
 
 void CGameServer::UpdateSpeedControl(int speedCtrl)
 {
