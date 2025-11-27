@@ -191,20 +191,6 @@ void CUnit::SanityCheck() const
 	}
 }
 
-void CUnit::UpdatePrevFrameTransform()
-{
-	for (auto& lmp : localModel.pieces) {
-		lmp.SavePrevModelSpaceTransform();
-	}
-
-	if (!prevFrameNeedsUpdate)
-		return;
-
-	preFrameTra = Transform{ CQuaternion::MakeFrom(GetTransformMatrix(true)), pos };
-	prevFrameNeedsUpdate = false;
-}
-
-
 void CUnit::PreInit(const UnitLoadParams& params)
 {
 	ZoneScoped;

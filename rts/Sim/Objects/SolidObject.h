@@ -124,6 +124,7 @@ public:
 		DAMAGE_KILLED_LUA = 21
 	};
 
+	CSolidObject();
 	virtual ~CSolidObject() {}
 
 	void PostLoad();
@@ -185,7 +186,8 @@ public:
 	void UpdateDirVectors(bool useGroundNormal, bool useObjectNormal, float dirSmoothing);
 	void UpdateDirVectors(const float3& uDir);
 
-	virtual void UpdatePrevFrameTransform() = 0;
+	void CondUpdateTransformPart();
+	void UpdatePrevFrameTransform();
 
 	CMatrix44f ComposeMatrix(const float3& p) const { return (CMatrix44f(p, -rightdir, updir, frontdir)); }
 	virtual CMatrix44f GetTransformMatrix(bool synced = false, bool fullread = false) const = 0;
@@ -386,8 +388,8 @@ public:
 	///< allyteam that this->team is part of
 	int allyteam = 0;
 
-	// the object could be spawned before the frame start (via cheats) or during the normal sim frame
-	bool prevFrameNeedsUpdate = true;
+	// useful to track the objects that just got created
+	int creationFrame = -1;
 
 	///< [i] := frame on which hitModelPieces[i] was last hit
 	int pieceHitFrames[2] = {-1, -1};
