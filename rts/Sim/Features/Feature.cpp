@@ -516,7 +516,7 @@ void CFeature::UpdateTransform(const float3& p, bool synced)
 	transMatrix[synced] = std::move(ComposeMatrix(p));
 
 	if (synced)
-		CondUpdateTransformPart();
+		CondUpdatePrevTransform();
 }
 
 void CFeature::UpdateTransformAndPhysState()

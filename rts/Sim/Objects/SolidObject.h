@@ -186,7 +186,7 @@ public:
 	void UpdateDirVectors(bool useGroundNormal, bool useObjectNormal, float dirSmoothing);
 	void UpdateDirVectors(const float3& uDir);
 
-	void CondUpdateTransformPart();
+	void CondUpdatePrevTransform();
 	void UpdatePrevFrameTransform();
 
 	CMatrix44f ComposeMatrix(const float3& p) const { return (CMatrix44f(p, -rightdir, updir, frontdir)); }

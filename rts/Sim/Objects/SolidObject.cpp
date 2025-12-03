@@ -157,7 +157,7 @@ void CSolidObject::Move(const float3& v, bool relative)
 	midPos += dv;
 	aimPos += dv;
 
-	CondUpdateTransformPart();
+	CondUpdatePrevTransform();
 }
 
 
@@ -447,8 +447,11 @@ void CSolidObject::UpdateDirVectors(const float3& uDir)
 	updir = uDir;
 }
 
-void CSolidObject::CondUpdateTransformPart()
+void CSolidObject::CondUpdatePrevTransform()
 {
+	// copy every transformation happening on the creation frame
+	// into PrevFrameTransform state
+	// skip otherwise
 	if likely(creationFrame != gs->frameNum)
 		return;
 
