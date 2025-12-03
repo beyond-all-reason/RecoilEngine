@@ -342,7 +342,7 @@ public:
 	 *
 	 */
 	bool same(const float3& f) const {
-		return y == f.y && x == f.x && z == f.z;
+		return x == f.x && y == f.y && z == f.z;
 	}
 
 	/**
