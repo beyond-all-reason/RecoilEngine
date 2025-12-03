@@ -39,7 +39,7 @@ spring_bar_{BAR105}105.1.1-1050-g5075cc0
 If you aren't seeeing these (often, when you've cloned your fork of the repository and not the upstream version), try the following:
 
 ```bash
-git remote add upstream git@github.com:beyond-all-reason/RecoilEngine.git
+git remote add upstream https://github.com/beyond-all-reason/RecoilEngine
 git fetch --all --tags
 ```
 
