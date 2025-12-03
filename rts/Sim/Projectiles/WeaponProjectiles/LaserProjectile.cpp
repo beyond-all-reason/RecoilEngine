@@ -220,15 +220,23 @@ void CLaserProjectile::Draw()
 	const float size = weaponDef->visuals.thickness;
 	const float coresize = size * weaponDef->visuals.corethickness;
 
+	float3 clampedPrevDrawPos = drawPos - dir * curLength;
+	clampedPrevDrawPos = startPos + std::max(0.0f, dir.dot(clampedPrevDrawPos - startPos)) * dir;
+
+	const float curDrawLen = dir.dot(drawPos - clampedPrevDrawPos);
+
+	if unlikely(curDrawLen <= 0)
+		return;
+
 	if (camDist < weaponDef->visuals.lodDistance) {
-		const float3 pos2 = drawPos - (dir * curLength);
+		const float3 pos2 = drawPos - (dir * curDrawLen);
 		float texStartOffset;
 		float texEndOffset;
 		if (checkCol) { // expanding or contracting?
 			texStartOffset = 0.0f;
-			texEndOffset   = (1.0f - (curLength / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
+			texEndOffset   = (1.0f - (curDrawLen / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 		} else {
-			texStartOffset = (-1.0f + (curLength / maxLength) + ((float)stayTime * (speedf / maxLength))) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
+			texStartOffset = (-1.0f + (curDrawLen / maxLength) + ((float)stayTime * (speedf / maxLength))) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 			texEndOffset   = ((float)stayTime * (speedf / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 		}
 
@@ -288,15 +296,15 @@ void CLaserProjectile::Draw()
 		}
 	} else {
 		const float3 pos1 = drawPos + (dir * (size * 0.5f));
-		const float3 pos2 = pos1 - (dir * (curLength + size));
+		const float3 pos2 = pos1 - (dir * (curDrawLen + size));
 		float texStartOffset;
 		float texEndOffset;
 
 		if (checkCol) { // expanding or contracting?
 			texStartOffset = 0;
-			texEndOffset   = (1.0f - (curLength / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
+			texEndOffset   = (1.0f - (curDrawLen / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 		} else {
-			texStartOffset = (-1.0f + (curLength / maxLength) + ((float)stayTime * (speedf / maxLength))) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
+			texStartOffset = (-1.0f + (curDrawLen / maxLength) + ((float)stayTime * (speedf / maxLength))) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 			texEndOffset   = ((float)stayTime * (speedf / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 		}
 		if (validTextures[1]) {
