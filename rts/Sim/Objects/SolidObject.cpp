@@ -150,9 +150,6 @@ void CSolidObject::Move(const float3& v, bool relative)
 {
 	const float3& dv = relative ? v : (v - pos);
 
-	if likely(dv.same(ZeroVector))
-		return;
-
 	pos    += dv;
 	midPos += dv;
 	aimPos += dv;
