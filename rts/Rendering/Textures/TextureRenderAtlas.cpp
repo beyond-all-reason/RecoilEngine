@@ -291,11 +291,6 @@ void CTextureRenderAtlas::SetMaxTexLevel(int maxLevels)
 	atlasAllocator->SetMaxTexLevel(maxLevels);
 }
 
-bool CTextureRenderAtlas::Finalize()
-{
-	return FinalizeAtlas() && RenderAtlas();
-}
-
 bool CTextureRenderAtlas::IsValid() const
 {
 	return atlasFinalized && atlasRendered;
@@ -335,7 +330,7 @@ bool CTextureRenderAtlas::DumpTexture() const
 	return true;
 }
 
-bool CTextureRenderAtlas::FinalizeAtlas()
+bool CTextureRenderAtlas::CalculateAtlas()
 {
 	if (atlasFinalized)
 		return true;
@@ -343,7 +338,7 @@ bool CTextureRenderAtlas::FinalizeAtlas()
 	return (atlasFinalized = atlasAllocator->Allocate());
 }
 
-bool CTextureRenderAtlas::RenderAtlas()
+bool CTextureRenderAtlas::CreateAtlasTexture()
 {
 	if (atlasRendered)
 		return true;
