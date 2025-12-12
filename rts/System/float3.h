@@ -548,11 +548,11 @@ public:
 	}
 
 	/**
-	 * @brief SqDistance2D between float3 and float2 (only x and z)
-	 * @param f float2 to compare against
+	 * @brief SqDistance2D between float3s (only x and z)
+	 * @param f float3 to compare against
 	 * @return 2D squared distance between float3s
 	 *
-	 * Returns the squared distance of a float3 and another float2
+	 * Returns the squared 2d-distance of 2 float3s
 	 */
 	float SqDistance2D(const float3& f) const {
 		const float dx = x - f.x;
