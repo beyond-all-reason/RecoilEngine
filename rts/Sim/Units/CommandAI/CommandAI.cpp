@@ -858,13 +858,7 @@ bool CCommandAI::ExecuteStateCommand(const Command& c)
 	switch (c.GetID()) {
 		case CMD_FIRE_STATE: {
 			owner->fireState = (int)c.GetParam(0);
-			if (owner->fireState < FIRESTATE_FIREATWILL)
-			{
-				owner->DropCurrentAttackTarget();
-				for (CWeapon* w: owner->weapons) { /* Force unload weapons targets */
-					w->DropCurrentTarget();
-				}
-			}
+
 			SetCommandDescParam0(c);
 			selectedUnitsHandler.PossibleCommandChange(owner);
 			return true;

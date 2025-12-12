@@ -212,6 +212,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(ClearUnitGoal);
 	REGISTER_LUA_CFUNC(SetUnitNeutral);
 	REGISTER_LUA_CFUNC(SetUnitTarget);
+	REGISTER_LUA_CFUNC(DropCurrentUnitAutoTargets);
 	REGISTER_LUA_CFUNC(SetUnitMidAndAimPos);
 	REGISTER_LUA_CFUNC(SetUnitRadiusAndHeight);
 	REGISTER_LUA_CFUNC(SetUnitBuildeeRadius);
@@ -3572,6 +3573,23 @@ int LuaSyncedCtrl::SetUnitTarget(lua_State* L)
 		return 1;
 	}
 	return 0;
+}
+
+/***
+ * @function Spring.DropCurrentUnitAutoTargets
+ * @param unitID integer
+ * @ return nil
+ */
+ 
+void LuaSyncedCtrl::DropCurrentUnitAutoTargets(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
+	
+	unit->DropCurrentAutoTarget();
+	
+	return 0,
 }
 
 
