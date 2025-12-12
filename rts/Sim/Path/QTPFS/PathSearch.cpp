@@ -927,20 +927,24 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 						lastNode = lastNode->prevNode;
 					}
 
-					// Find the nearest point on that node to the goal.
-					const auto* curNode = nodeLayer->GetPoolNode(lastNode->GetIndex());
-					const INode::NeighbourPoints& nearestPoint =
-						*std::ranges::min_element(curNode->GetNeighbours(), {}, [&](const INode::NeighbourPoints& np){
-								return fwd.tgtPoint.SqDistance2D(np.netpoints[0]);
-							});
+					// If we trace back to the bwd source node, then we have a full path already.
+					// No need to worry about goal distance.
+					if (lastNode != bwd.srcSearchNode) {
+						// Find the nearest point on that node to the goal.
+						const auto* curNode = nodeLayer->GetPoolNode(lastNode->GetIndex());
+						const INode::NeighbourPoints& nearestPoint =
+							*std::ranges::min_element(curNode->GetNeighbours(), {}, [&](const INode::NeighbourPoints& np){
+									return fwd.tgtPoint.SqDistance2D(np.netpoints[0]);
+								});
 
-					// Configure the search result params if the path ends within the goal distance.
-					const float distToGoalSq = fwd.tgtPoint.SqDistance2D(nearestPoint.netpoints[0]);
-					if ( distToGoalSq <= goalDistance*goalDistance ){
-						useFwdPathOnly = true;
-						expectIncompletePartialSearch = true;
-						badGoal = false;
-						searchThreadData->ResetQueue(SearchThreadData::SEARCH_BACKWARD);
+						// Configure the search result params if the path ends within the goal distance.
+						const float distToGoalSq = fwd.tgtPoint.SqDistance2D(nearestPoint.netpoints[0]);
+						if ( distToGoalSq <= goalDistance*goalDistance ){
+							useFwdPathOnly = true;
+							expectIncompletePartialSearch = true;
+							badGoal = false;
+							searchThreadData->ResetQueue(SearchThreadData::SEARCH_BACKWARD);
+						}
 					}
 				}
 
