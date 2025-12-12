@@ -1271,7 +1271,7 @@ void QTPFS::PathSearch::ResetState(SearchNode* node, struct DirectionalSearchDat
 	netPoints[0] = {srcPoint.x, srcPoint.z};
 
 	gDists[0] = 0.0f;
-	hDists[0] = srcPoint.distance(searchData.tgtPoint);
+	hDists[0] = srcPoint.distance2D(searchData.tgtPoint);
 	gCosts[0] = 0.0f;
 	hCosts[0] = hDists[0] * hCostMult;
 
