@@ -931,7 +931,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 					const auto* curNode = nodeLayer->GetPoolNode(lastNode->GetIndex());
 					const INode::NeighbourPoints& nearestPoint =
 						*std::ranges::min_element(curNode->GetNeighbours(), {}, [&](const INode::NeighbourPoints& np){
-								return goalPos.SqDistance2D(np.netpoints[0]);
+								return fwd.tgtPoint.SqDistance2D(np.netpoints[0]);
 							});
 
 					// Configure the search result params if the path ends within the goal distance.
