@@ -1413,23 +1413,28 @@ void QTPFS::PathSearch::IterateNodes(unsigned int searchDir) {
 	if (curSearchNode->GetPathCost(NODE_PATH_COST_H) < searchData.minSearchNode->GetPathCost(NODE_PATH_COST_H))
 		searchData.minSearchNode = curSearchNode;
 
-	// if ((searchID == 7340095 || searchID == 10485810) /*&& pathOwner != nullptr && pathOwner->id == 30809 */ /*&& searchDir == SearchThreadData::SEARCH_BACKWARD*/){
-	// 	LOG("%s: MinNode2  [%d] %d [%x] g=%d (%d,%d)-(%d,%d)", __func__, searchDir
+	// if ((searchID == 0x30001b) && pathOwner != nullptr && pathOwner->id == 25278 && searchDir == SearchThreadData::SEARCH_BACKWARD){
+	// 	LOG("%s: MinNode2  [%d] %d [%x] g=%d (%d,%d)-(%d,%d) cost=%f <= adjust %f> ", __func__, searchDir
 	// 		, searchData.minSearchNode->index, searchData.minSearchNode->nodeNumber
 	// 		, int(!searchData.minSearchNode->isNodeBad())
 	// 		, searchData.minSearchNode->xmin, searchData.minSearchNode->zmin, searchData.minSearchNode->xmax,searchData.minSearchNode->zmax
-	// 		);
+	// 		, curSearchNode->GetPathCost(NODE_PATH_COST_H), adjustedGoalDistance
+	// 	);
 	// }
 
 	#endif
 
-	if (curSearchNode->GetPathCost(NODE_PATH_COST_H) <= adjustedGoalDistance)
-		return;
+	// Early drop out for forward searches that have reached close enough to the goal. The main search loop
+	// will check and handle this.
+	if (searchDir == SearchThreadData::SEARCH_FORWARD) {
+		if (curSearchNode->GetPathCost(NODE_PATH_COST_H) <= adjustedGoalDistance)
+			return;
+	}
 
 	assert(curSearchNode->GetIndex() == curOpenNode.nodeIndex);
 	auto* curNode = nodeLayer->GetPoolNode(curOpenNode.nodeIndex);
 
-	// if ((searchID == 7340095 || searchID == 10485810) /*&& pathOwner != nullptr && pathOwner->id == 30809 */ /*&& searchDir == SearchThreadData::SEARCH_BACKWARD*/){
+	// if ((searchID == 0x30001b) && pathOwner != nullptr && pathOwner->id == 25278 && searchDir == SearchThreadData::SEARCH_BACKWARD){
 	// 	LOG("%s: MinNode2. [%d] %d [%x] g=%d (%d,%d)-(%d,%d)", __func__, searchDir
 	// 		, searchData.minSearchNode->index, searchData.minSearchNode->nodeNumber
 	// 		, int(!searchData.minSearchNode->isNodeBad())
