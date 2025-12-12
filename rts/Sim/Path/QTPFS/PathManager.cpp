@@ -1321,15 +1321,17 @@ unsigned int QTPFS::PathManager::QueueSearch(
 	newSearch->initialized = false;
 	newSearch->synced = synced;
 
-	// LOG("%s: %s (%x) %d -> %d ", __func__
-	// 		, unit != nullptr ? unit->unitDef->name.c_str() : "non-unit"
-	// 		, newPath->GetID()
-	// 		, (oldPath != nullptr) ? oldPath->GetPathType() : -1
-	// 		, moveDef->pathType
-	// 		);
+	// if (object != nullptr && object->id == 25278) {
+	// 	CUnit *unit = object != nullptr ? dynamic_cast<CUnit*>(const_cast<CSolidObject*>(object)) : nullptr;
+	// 	LOG("%s: NEW %s (%x) %d ", __func__
+	// 			, unit != nullptr ? unit->unitDef->name.c_str() : "non-unit"
+	// 			, newPath->GetID()
+	// 			, moveDef->pathType
+	// 			);
 
-	// LOG("%s: [%d] (%f,%f) -> (%f,%f)", __func__, newPath->GetPathType()
-	// 		, sourcePoint.x, sourcePoint.z, targetPoint.x, targetPoint.z);
+	// 	LOG("%s: NEW [%d] (%f,%f) -> (%f,%f)", __func__, newPath->GetPathType()
+	// 			, sourcePoint.x, sourcePoint.z, targetPoint.x, targetPoint.z);
+	// }
 
 	return (newPath->GetID());
 }
@@ -1398,6 +1400,19 @@ unsigned int QTPFS::PathManager::RequeueSearch(
 
 	// LOG("%s: [p%x:s%x] (%f,%f) -> (%f,%f)", __func__, oldPath->GetID(), entt::to_integral(searchEntity)
 	// 		, pos.x, pos.z, targetPoint.x, targetPoint.z);
+
+	// if (object != nullptr && object->id == 25278) {
+	// 	CUnit *unit = object != nullptr ? dynamic_cast<CUnit*>(const_cast<CSolidObject*>(object)) : nullptr;
+	// 	LOG("%s: REQUEUE %s (%x) %d -> %d ", __func__
+	// 			, unit != nullptr ? unit->unitDef->name.c_str() : "non-unit"
+	// 			, oldPath->GetID()
+	// 			, (oldPath != nullptr) ? oldPath->GetPathType() : -1
+	// 			, oldPath->GetPathType()
+	// 			);
+
+	// 	LOG("%s: REQUEUE [%d] (%f,%f) -> x,z", __func__, oldPath->GetPathType()
+	// 			, pos.x, pos.z);
+	// }
 
 	return (oldPath->GetID());
 }
