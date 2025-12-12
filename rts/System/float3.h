@@ -518,7 +518,7 @@ public:
 	/**
 	 * @brief distance2D between float3 and float2 (only x and z)
 	 * @param f float2 to compare against
-	 * @return 2D distance between float3s
+	 * @return 2D distance between a float3 and a float2
 	 *
 	 * Calculates the distance between this float3
 	 * and another float2 2-dimensionally (that is,
@@ -564,7 +564,7 @@ public:
 	/**
 	 * @brief distance2D between float3 and float2 (only x and z)
 	 * @param f float2 to compare against
-	 * @return 2D distance between float3s
+	 * @return 2D squared distance between a float3 and a float2
 	 *
 	 * Calculates the distance between this float3
 	 * and another float2 2-dimensionally (that is,
