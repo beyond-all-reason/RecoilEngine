@@ -548,11 +548,11 @@ public:
 	}
 
 	/**
-	 * @brief SqDistance2D between float3s (only x and z)
-	 * @param f float3 to compare against
+	 * @brief SqDistance2D between float3 and float2 (only x and z)
+	 * @param f float2 to compare against
 	 * @return 2D squared distance between float3s
 	 *
-	 * Returns the squared 2d-distance of 2 float3s
+	 * Returns the squared distance of a float3 and another float2
 	 */
 	float SqDistance2D(const float3& f) const {
 		const float dx = x - f.x;
@@ -560,6 +560,23 @@ public:
 		return (dx*dx + dz*dz);
 	}
 
+
+	/**
+	 * @brief distance2D between float3 and float2 (only x and z)
+	 * @param f float2 to compare against
+	 * @return 2D distance between float3s
+	 *
+	 * Calculates the distance between this float3
+	 * and another float2 2-dimensionally (that is,
+	 * only using the x and z components).  Sums the
+	 * differences in the x and z components, square
+	 * root for pythagorean theorem
+	 */
+	float SqDistance2D(const float2& f) const {
+		const float dx = x - f.x;
+		const float dz = z - f.y;
+		return (dx*dx + dz*dz);
+	}
 
 	/**
 	 * @brief Length of this vector
