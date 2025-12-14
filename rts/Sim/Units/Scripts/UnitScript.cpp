@@ -215,7 +215,7 @@ void CUnitScript::TickAllAnims(int deltaTime)
 				doneAnims.emplace_back(ai);
 		}
 	}
-	spring::VectorEraseIf(anims, [](const auto& ai) { return ai.done; });
+	spring::VectorEraseIfAll(anims, [](const auto& ai) { return ai.done; });
 
 #if 1
 	// BFS pass

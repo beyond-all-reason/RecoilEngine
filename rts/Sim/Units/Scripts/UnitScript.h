@@ -36,14 +36,14 @@ protected:
 
 	struct AnimInfo {
 		CR_DECLARE_STRUCT(AnimInfo)
-		AnimType animType;
-		int axis;
-		int piece;
-		float speed;
-		float dest;     // means final position when turning or moving, final speed when spinning
-		float accel;    // used for spinning, can be negative
-		bool done;
-		bool hasWaiting;
+		AnimType animType = ANone;
+		int axis  = -1;
+		int piece = -1;
+		float speed = 0.0f;
+		float dest  = 0.0f;    // means final position when turning or moving, final speed when spinning
+		float accel = 0.0f;    // used for spinning, can be negative
+		bool done = false;
+		bool hasWaiting = false;
 	};
 
 	using AnimContainerType = std::vector<AnimInfo>;

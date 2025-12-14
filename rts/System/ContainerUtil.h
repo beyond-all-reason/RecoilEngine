@@ -23,9 +23,9 @@ namespace spring {
 	}
 
 	template<typename T, typename UnaryPredicate>
-	static bool VectorEraseIf(std::vector<T>& v, UnaryPredicate p)
+	static bool VectorEraseIf(std::vector<T>& v, UnaryPredicate&& p)
 	{
-		auto it = std::find_if(v.begin(), v.end(), p);
+		auto it = std::find_if(v.begin(), v.end(), std::forward<UnaryPredicate>(p));
 
 		if (it == v.end())
 			return false;
@@ -46,6 +46,50 @@ namespace spring {
 		*it = std::move(v.back());
 		v.pop_back();
 		return true;
+	}
+
+	template<typename T, typename UnaryPredicate>
+	static bool VectorEraseIfAll(std::vector<T>& v, UnaryPredicate&& p)
+	{
+		size_t removed = 0;
+		auto it = v.begin();
+
+		while (it != v.end()) {
+			if (p(*it)) {
+				*it = std::move(v.back());
+				v.pop_back();
+				removed++;
+
+				if (it == v.end())
+					break;
+			} else {
+				++it;
+			}
+		}
+
+		return removed > 0;
+	}
+
+	template<typename T>
+	static bool VectorEraseAll(std::vector<T>& v, const T& e)
+	{
+		size_t removed = 0;
+		auto it = v.begin();
+
+		while (it != v.end()) {
+			if (*it == e) {
+				*it = std::move(v.back());
+				v.pop_back();
+				removed++;
+
+				if (it == v.end())
+					break;
+			} else {
+				++it;
+			}
+		}
+
+		return removed > 0;
 	}
 
 	template<typename T, typename C>
