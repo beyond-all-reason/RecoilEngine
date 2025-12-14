@@ -605,10 +605,10 @@ void WeaponDef::LoadSound(
 
     LuaTable tbl = wdTable.SubTable(soundKey);
 
-    if (tbl.GetCount() < 1 && useHitFallback)
+    if (tbl.IsValid() && useHitFallback)
         tbl = wdTable.SubTable(hitFallbackKey);
 
-    if (tbl.GetCount() > 0) {
+    if (tbl.IsValid()) {
         for (int i = 1; true; i++) {
             fileName = tbl.GetString(i, "");
 
