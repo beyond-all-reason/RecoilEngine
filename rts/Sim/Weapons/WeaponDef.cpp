@@ -589,21 +589,25 @@ void WeaponDef::LoadSound(
 	GuiSoundSet& soundData
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	switch (hashString(soundKey.c_str())) {
-		case hashString("soundStart"): {
-			CommonDefHandler::AddSoundSetData(soundData, wdTable.GetString(soundKey, ""), wdTable.GetFloat(soundKey + "Volume", 1.0f));
-		} break;
 
-		case hashString("soundHitDry"): {
-			CommonDefHandler::AddSoundSetData(soundData, wdTable.GetString(soundKey, wdTable.GetString("soundHit", "")), wdTable.GetFloat(soundKey + "Volume", wdTable.GetFloat("soundHitVolume", 1.0f)));
-		} break;
-		case hashString("soundHitWet"): {
-			CommonDefHandler::AddSoundSetData(soundData, wdTable.GetString(soundKey, wdTable.GetString("soundHit", "")), wdTable.GetFloat(soundKey + "Volume", wdTable.GetFloat("soundHitVolume", 1.0f)));
-		} break;
+    float volume = wdTable.GetFloat(soundKey + "Volume", wdTable.GetFloat("soundHitVolume", 1.0f));
+    string fileName = wdTable.GetString(soundKey, wdTable.GetString("soundHit", ""));
 
-		default: {
-		} break;
-	}
+    if (!fileName.empty()) {
+        CommonDefHandler::AddSoundSetData(soundData, fileName, volume);
+        return;
+    }
+
+    LuaTable sndTable = wdTable.SubTable(soundKey);
+
+    for (int i = 1; true; i++) {
+        fileName = sndTable.GetString(i, "");
+
+        if (fileName.empty())
+            break;
+
+        CommonDefHandler::AddSoundSetData(soundData, fileName, volume);
+    }
 }
 
 
