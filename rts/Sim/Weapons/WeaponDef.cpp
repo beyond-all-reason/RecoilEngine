@@ -590,23 +590,41 @@ void WeaponDef::LoadSound(
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 
-    float volume = wdTable.GetFloat(soundKey + "Volume", wdTable.GetFloat("soundHitVolume", 1.0f));
-    string fileName = wdTable.GetString(soundKey, wdTable.GetString("soundHit", ""));
+    string hitFallbackKey = "soundHit";
 
+    uint32_t hash = hashString(soundKey.c_str());
+    bool useHitFallback = hash == hashString("soundHitWet") || hash == hashString("soundHitDry");
+
+    float volume = wdTable.GetFloat(soundKey + "Volume", wdTable.GetFloat("soundHitVolume", 1.0f));
+
+    string fileName = wdTable.GetString(soundKey, "");
     if (!fileName.empty()) {
         CommonDefHandler::AddSoundSetData(soundData, fileName, volume);
         return;
     }
 
-    LuaTable sndTable = wdTable.SubTable(soundKey);
+    LuaTable tbl = wdTable.SubTable(soundKey);
 
-    for (int i = 1; true; i++) {
-        fileName = sndTable.GetString(i, "");
+    if (tbl.GetCount() < 1 && useHitFallback)
+        tbl = wdTable.SubTable(hitFallbackKey);
 
-        if (fileName.empty())
-            break;
+    if (tbl.GetCount() > 0) {
+        for (int i = 1; true; i++) {
+            fileName = tbl.GetString(i, "");
 
-        CommonDefHandler::AddSoundSetData(soundData, fileName, volume);
+            if (fileName.empty())
+                break;
+
+            CommonDefHandler::AddSoundSetData(soundData, fileName, volume);
+        }
+        return;
+    }
+
+    if (useHitFallback) {
+        fileName = wdTable.GetString(hitFallbackKey, "");
+        if (!fileName.empty()) {
+            CommonDefHandler::AddSoundSetData(soundData, fileName, volume);
+        }
     }
 }
 
