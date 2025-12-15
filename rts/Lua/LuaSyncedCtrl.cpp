@@ -3581,7 +3581,7 @@ int LuaSyncedCtrl::SetUnitTarget(lua_State* L)
  * @ return nil
  */
  
-void LuaSyncedCtrl::DropCurrentUnitAutoTargets(lua_State* L)
+int LuaSyncedCtrl::DropCurrentUnitAutoTargets(lua_State* L)
 {
 	CUnit* unit = ParseUnit(L, __func__, 1);
 	if (unit == nullptr)
