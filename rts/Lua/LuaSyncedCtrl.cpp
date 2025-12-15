@@ -3589,7 +3589,7 @@ int LuaSyncedCtrl::DropCurrentUnitAutoTargets(lua_State* L)
 	
 	unit->DropCurrentAutoTarget();
 	
-	return 0,
+	return 0;
 }
 
 
