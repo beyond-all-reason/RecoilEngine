@@ -102,6 +102,19 @@ static float TurnRadius(const float rawRadius, const float rawSpeed) {
 	return (std::min(1000.0f, rawRadius * rawSpeed));
 }
 
+static bool ShouldRunLookahead(int frameNum, int unitId, int frameMask)
+{
+	// stagger work across units; frameMask is (interval - 1)
+	return (((frameNum + unitId) & frameMask) == 0);
+}
+
+static float GetLookaheadRadius(const CStrafeAirMoveType* moveType, float speedNorm)
+{
+	// keep radius tightly bounded to avoid expensive quad queries in big swarms
+	const float tunedSpeed = std::max(speedNorm, 0.5f);
+	return std::max(80.0f, std::min(160.0f, moveType->turnRadius * tunedSpeed));
+}
+
 
 static float GetRudderDeflection(
 	const CUnit* owner,
@@ -756,8 +769,9 @@ void CStrafeAirMoveType::UpdateAttack()
 		return;
 	}
 
-	if (((gs->frameNum + owner->id) & 3) == 0)
-		CheckForCollision();
+	if (collide && ShouldRunLookahead(gs->frameNum, owner->id, 7)) {
+		CheckForCollision(GetLookaheadRadius(this, spd.w));
+	}
 
 	      float3 rightDir2D = rightdir;
 	const float3 difGoalPos = (goalPos - oldGoalPos) * SQUARE_SIZE;
@@ -829,8 +843,9 @@ bool CStrafeAirMoveType::UpdateFlying(float wantedHeight, float wantedThrottle)
 
 	const float3 rightDir2D = (rightdir * XZVector).Normalize2D();
 
-	if (((gs->frameNum + owner->id) & 3) == 0)
-		CheckForCollision();
+	if (collide && ShouldRunLookahead(gs->frameNum, owner->id, 7)) {
+		CheckForCollision(GetLookaheadRadius(this, spd.w));
+	}
 
 
 	// RHS is needed for moving targets (when called by UpdateAttack)
@@ -1445,4 +1460,3 @@ bool CStrafeAirMoveType::SetMemberValue(unsigned int memberHash, void* memberVal
 
 	return false;
 }
-

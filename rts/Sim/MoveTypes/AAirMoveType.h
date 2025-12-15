@@ -61,7 +61,7 @@ public:
 	void DependentDied(CObject* o);
 
 protected:
-	void CheckForCollision();
+	void CheckForCollision(float dist = 200.0f);
 
 public:
 	AircraftState aircraftState = AIRCRAFT_LANDED;
