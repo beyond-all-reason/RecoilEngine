@@ -1,0 +1,15 @@
+{{/* 
+Does simple type analysis for more accurate backlinking
+expects data.types
+*/}}
+
+{{ $result := dict }} {{/* map[name]permalink */}}
+
+{{ range . }}
+    {{ $type := .type }}
+    {{ $name := replace (partial "extract_type_name.html" .name) "." "-" }}
+    {{ $permalink := printf "%s-%s" $type $name }}
+    {{ $result = merge $result (dict $name $permalink) }}
+{{ end }}
+
+{{ return $result }}

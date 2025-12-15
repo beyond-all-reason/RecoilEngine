@@ -11,12 +11,11 @@ permissions:
 env:
   RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
   LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
-  HUGO_VERSION: "0.147.9"
+  HUGO_VERSION: "0.152.2"
   LUA_DOC_EXTRACTOR_VERSION: "3"
-  EMMYLUA_DOC_CLI_VERSION: "0.8.2"
+  EMMYLUA_DOC_CLI_VERSION: "0.15.0"
   JQ_VERSION: "1.8.0"
   7Z_VERSION: "24.09"
-  RUBY_VERSION: "3.3"
   MISE_ENV: "ci"
 jobs:
   build:
@@ -48,8 +47,7 @@ jobs:
           path: |
             ${{ runner.temp }}/hugo_cache
           key: hugo-${{ github.run_id }}
-          restore-keys:
-            hugo-
+          restore-keys: hugo-
       - name: Configure Git
         run: git config core.quotepath false
       - name: Setup Pages
@@ -66,7 +64,7 @@ jobs:
           HUGO_ENVIRONMENT: production
         working-directory: ./doc/site
         run: |
-          mise run lua_pages
+          mise run lua_json
           mise run binary_pages
           mise exec hugo -- \
             hugo \

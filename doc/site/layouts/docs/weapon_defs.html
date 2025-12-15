@@ -1,8 +1,9 @@
 {{ define "main" }}
-	<div class='hx-mx-auto hx-flex {{ partial "utils/page-width" . }}'>
+	<div class='hx:mx-auto hx:flex hextra-max-page-width'>
 	{{ partial "sidebar.html" (dict "context" .) }}
-	{{ partial "toc.html" . }}
-	<article class="hx-w-full hx-break-words hx-flex hx-min-h-[calc(100vh-var(--navbar-height))] hx-min-w-0 hx-justify-center hx-pb-8 hx-pr-[calc(env(safe-area-inset-right)-1.5rem)]">
+	{{ $toc_content := slice }}
+
+	<article class="hx:w-full hx:break-words hx:flex hx:min-h-[calc(100vh-var(--navbar-height))] hx:min-w-0 hx:justify-center hx:pb-8 hx:pr-[calc(env(safe-area-inset-right)-1.5rem)]">
 		<main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
 			<div class="content">
 				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
@@ -15,17 +16,19 @@
 						<th>Values</th>
 					</tr>
 					{{ $data := index .Site.Data.weapondefs.WeaponDefs }}
-					{{ range $name, $info :=  $data }}
+					{{ range $name, $info := $data }}
 						<tr>
-							<td id="{{ $name }}">
+							<td>
+								<span id="{{ $name }}" class="hx:absolute hx:-mt-20"></span>
+								{{ $name }}
 								<code>{{ if strings.Contains $info.type "string" }}string{{ else }}{{ $info.type }}{{ end }}</code>
-								<a href="#{{ $name }}">{{ $name }}</a>
+								<a href="#{{ $name }}" class="subheading-anchor" aria-label="Permalink for {{ $name }}"></a>
 							</td>
 							<td>
 								{{ $info.description }}
 							</td>
 							<td>
-								<dl class="hx-text-xs">
+								<dl class="hx:text-xs">
 									{{ if $info.fallbackName }}
 										<dt>Fallback to:</dt>
 										<dd><code>{{ $info.fallbackName }}</code></dd>
@@ -53,6 +56,7 @@
 								</dl>
 							</td>
 						</tr>
+						{{ $toc_content = $toc_content | append (dict "ID" $name "Title" $name "Level" 0 "Headings" slice ) }}
 					{{ end }}
 				</table>
 			</div>
@@ -61,5 +65,7 @@
 		{{ partial "components/comments.html" . }}
 		</main>
 	</article>
+
+	{{ partial "generated_toc.html" ( dict "Fragments" ( dict "Headings" $toc_content) ) }}
   </div>
 {{ end }}

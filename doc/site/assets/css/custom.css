@@ -1,5 +1,5 @@
 .col-span-1 {
-  grid-column: span 1 / span 1;
+	grid-column: span 1 / span 1;
 }
 
 .grid-cols-2 {
@@ -27,7 +27,7 @@
 }
 
 .mt-05 {
-	margin-top: .5rem !important;
+	margin-top: 0.5rem !important;
 }
 
 .mt-1 {
@@ -43,7 +43,7 @@
 }
 
 .pl-025 {
-	padding-left: .25rem;
+	padding-left: 0.25rem;
 }
 
 .pl-1 {
@@ -55,13 +55,19 @@
 }
 
 .content.lua-api {
-	h2, h3, h4 {
+	h2,
+	h3,
+	h4 {
 		margin-top: 1rem !important;
-		margin-bottom: .5rem !important;
+		margin-bottom: 0.5rem !important;
 	}
 
-	h5, h6, p, ul, .hextra-code-block {
-		margin-top: .5rem !important;
+	h5,
+	h6,
+	p,
+	ul,
+	.hextra-code-block {
+		margin-top: 0.5rem !important;
 	}
 
 	p {
@@ -75,23 +81,71 @@
 	dl {
 	}
 
-	dt, dd, li {
-		margin-top: .25rem !important;
+	dt,
+	dd,
+	li {
+		margin-top: 0.25rem !important;
 	}
 
-	dd, li {
-		margin-bottom: .25rem !important;
+	dd,
+	li {
+		margin-bottom: 0.25rem !important;
 	}
 
-	dt, dd {
+	dt,
+	dd {
 		margin-bottom: 0 !important;
 	}
 
 	.hextra-code-block {
 		pre {
-			margin-bottom: .5rem !important;
-			padding: .5rem !important;
-			border-radius: .4rem !important;
+			margin-bottom: 0.5rem !important;
+			padding: 0.5rem !important;
+			border-radius: 0.4rem !important;
 		}
 	}
+}
+
+.api-card-toplevel {
+	background-color: light-dark(#efefef, #303030);
+	padding: 1rem;
+	margin-bottom: 1rem;
+	margin-top: 1rem;
+	border-radius: 1rem;
+	box-shadow: 0 0 1rem rgb(17, 17, 17);
+}
+
+.display-inline {
+	display: inline;
+}
+
+.margin-left-1rem {
+	margin-left: 1rem;
+}
+
+.list-style-type-none {
+	list-style-type: none;
+}
+
+.margin-top-half-rem {
+	margin-top: 0.5rem;
+}
+
+.generated-toc-scroll-box {
+	overflow-y: scroll;
+	height: 100%;
+}
+
+.generated-toc-sticky {
+	position: sticky;
+	top: 7vh;
+	height: 85vh;
+}
+
+.width-25vw {
+	width: 25vw;
+}
+
+.margin-left-dot8rem {
+	margin-left: 0.8rem;
 }

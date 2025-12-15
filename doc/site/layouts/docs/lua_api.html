@@ -1,16 +1,149 @@
+{{/*
+	I will be real with you, this is completely unreadable.
+	This is in several parts:
+	1. Analyze and generate a table of contents
+	2. Generate API cards
+	3. Type backlinks
+
+	The API generator is recursive, and generates the style and heading based on the level.
+*/}}
+
 {{ define "main" }}
-	<div class='hx-mx-auto hx-flex {{ partial "utils/page-width" . }}'>
-	{{ partial "entries_sidebar.html" (dict "context" .) }}
-	<article class="hx-w-full hx-break-words hx-flex hx-min-h-[calc(100vh-var(--navbar-height))] hx-min-w-0 hx-justify-center hx-pb-8 hx-pr-[calc(env(safe-area-inset-right)-1.5rem)]">
-		<main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
+	<div class='hx:mx-auto hx:flex hextra-max-page-width'>
+	{{ partial "sidebar.html" (dict "context" .) }}
+	{{ $data := .Site.Data.doc }}
+	{{ $context := . }}
+	{{/*
+	1. Generate type info
+	2. Generate globals info
+	3. Merge into a TOC table
+	4. Generate types section
+	5. Generate globals section
+	*/}}
+
+	{{/* Analyze Types and Globals for linking */}}
+	{{ $type_info := (partial "analyze_types.html" $data.types) }}
+	{{ $type_info = $type_info | merge (partial "analyze_types.html" $data.globals) }}
+
+	{{/* Generate Globals Info and TOC */}}
+	{{ $global_info := slice }}
+	{{ $g_list := slice }}
+	{{ range $data.globals }}
+		{{ $info := (partial "construct_member.html" (dict "type_info" $type_info "context" $context "data" . "path" slice)) }}
+		{{ if not ( and $info.typ ( strings.Contains $info.typ $info.name ) ) }}
+			{{ $global_info = $global_info | append $info }}
+			{{ $g_list = $g_list | append (dict "Title" $info.name "ID" $info.permalink "Level" 1 "Headings" slice) }}
+		{{ end }}
+	{{ end }}
+
+	{{/* Generate Types Info and TOC */}}
+	{{ $types_info := slice }}
+	{{ $t_list := slice }}
+	{{ range $data.types }}
+		{{ $info := (partial "construct_member.html" (dict "type_info" $type_info "context" $context "data" . "path" slice)) }}
+		{{ $types_info = $types_info | append $info }}
+		{{ $t_list = $t_list | append (dict "Title" $info.name "ID" $info.permalink "Level" 1 "Headings" slice) }}
+	{{ end }}
+
+	{{/* Generate TOC */}}
+	{{ $custom_data := ( dict "Fragments" ( dict "Headings" (slice
+		( dict "ID" "globals" "Level" 0 "Title" "Globals" "Headings" (sort $g_list "Title") )
+		( dict "ID" "types" "Level" 0 "Title" "Types" "Headings" (sort $t_list "Title") )
+	)) ) }}
+	{{ partial "generated_toc.html" $custom_data }}
+
+	<article class="hx:w-full hx:break-words hx:flex hx:min-h-[calc(100vh-var(--navbar-height))] hx:min-w-0 hx:justify-center hx:pb-8 hx:pr-[calc(env(safe-area-inset-right)-1.5rem)]">
+		<main class="hx:w-full hx:min-w-0 hx:max-w-6xl hx:px-6 hx:pt-4 hx:md:px-12">
 			<div class="content lua-api">
 				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
-				{{ .Content }}
+
+				<span id="globals" class="hx:absolute hx:-mt-20"></span>
+				<h2>Globals <a href="#globals" class="subheading-anchor" aria-label="Permalink for globals"></a></h2>
+				{{ range sort $global_info "name" }}
+					{{ template "render_member" (dict "data" . "level" 0)}}
+				{{ end }}
+
+				<span id="types" class="hx:absolute hx:-mt-20"></span>
+				<h2>Types <a href="#types" class="subheading-anchor" aria-label="Permalink for types"></a></h2>
+				{{ range sort $types_info "name" }}
+					{{ template "render_member" (dict "data" . "level" 0) }}
+				{{ end }}
 			</div>
 			{{ partial "components/last-updated.html" . }}
 			{{ partial "components/pager.html" . }}
 			{{ partial "components/comments.html" . }}
 		</main>
 	</article>
+
   </div>
+{{ end }}
+
+{{/* UTILS */}}
+
+{{ define "debug" }}
+	<pre>{{ . | debug.Dump }}</pre>
+{{ end }}
+
+{{ define "render_member" }}
+	{{ $data := .data }}
+	{{ $level := .level }}
+	{{ $level_offset := 3 }}
+
+	{{ with $data }}
+		<span id="{{ .permalink | anchorize }}" class="hx:absolute hx:-mt-20"></span>
+		<div class="api-card-toplevel">
+			<details>
+				<summary>
+					<h{{ add $level_offset $level }} class="display-inline">
+						{{ if .method }}method{{ else }}{{ .type }}{{ end }} <code>{{ .name }}{{ if .signature }} {{ .signature }}{{ end }}</code>
+					</h{{ add $level_offset $level }}>
+					<a href="#{{ .permalink | anchorize }}" class="subheading-anchor" aria-label="Permalink for {{ .name }}"></a>
+				</summary>
+
+				<br>
+
+				{{ if .bases }}
+					<h4>inherits from {{ range .bases }} <code>{{ . }}</code> {{ end }}</h4><br>
+				{{ end }}
+				{{ if .typ }}
+					is <code>{{ .typ }}</code><br>
+				{{ end }}
+
+				{{ if .description }}
+					{{ .description | markdownify }}<br>
+				{{ end }}
+
+				{{ if .see }}
+					See:
+					{{ range .see }}
+						{{ .link }}
+					{{ end }}
+					<br>
+				{{ end }}
+
+				{{ if .params }}
+					<h4>Params</h4>
+					{{ range .params }}
+						<code>{{ .name }}: {{ .type }}{{ if .desc }} --{{ .desc }}{{ end }}</code><br>
+					{{ end }}
+				{{ end }}
+				{{ if .returns }}
+					<h4>Returns</h4>
+					{{ range .returns }}
+						<code>{{ .name }}: {{ .type }}{{ if .desc }} --{{ .desc }}{{ end }}</code><br>
+					{{ end }}
+				{{ end }}
+
+				{{ range .members }}
+					{{ template "render_member" (dict "data" . "level" (add $level 1)) }}
+				{{ end }}
+
+				{{/*
+					{{ with .loc }}
+						<a href="{{ .file }}#L{{ .line }}">source</a>
+					{{ end }}
+				*/}}
+			</details>
+		</div>
+	{{ end }}
 {{ end }}

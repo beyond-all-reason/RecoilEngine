@@ -91,11 +91,18 @@ refLinksErrorLevel = "WARNING"
 		weight = 7
 
 	[[menu.main]]
+		identifier = "forum"
+		name = "Forum"
+		params.icon = "chat-alt-2"
+		url = "https://github.com/beyond-all-reason/RecoilEngine/discussions/categories/general"
+		weight = 8
+
+	[[menu.main]]
 		identifier = "discord"
 		name = "Discord"
 		params.icon = "discord"
 		url = "https://discord.gg/GUpRg6Wz3e"
-		weight = 8
+		weight = 9
 
 	[[menu.sidebar]]
 		name = "More"
@@ -108,6 +115,11 @@ refLinksErrorLevel = "WARNING"
 		weight = 2
 
 	[[menu.sidebar]]
+		name = "Forum ↗"
+		url = "https://github.com/beyond-all-reason/RecoilEngine/discussions/categories/general"
+		weight = 3
+
+	[[menu.sidebar]]
 		name = "Discord ↗"
 		url = "https://discord.gg/GUpRg6Wz3e"
-		weight = 3
+		weight = 4
