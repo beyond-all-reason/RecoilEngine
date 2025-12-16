@@ -12,6 +12,7 @@
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
 #include "System/ContainerUtil.h"
+#include "System/HashSpec.h"
 #include "System/SafeUtil.h"
 #include "System/Config/ConfigHandler.h"
 
@@ -142,10 +143,9 @@ void CUnitScriptEngine::Tick(int deltaTime)
 	{
 		uint32_t cs = 0;
 		for (const auto& a : animating) {
-			// simple XOR should be resilient enough
-			cs = a->GetAnimArrayChecksum() ^ cs;
+			cs = spring::hash_combine(a->GetAnimArrayChecksum(), cs);
 		}
-		Sync::Assert(&cs, sizeof(cs), "animating");
+		Sync::Assert(cs, "animating");
 	}
 	{
 		ZoneScopedN("CUnitScriptEngine::Tick(ST)");

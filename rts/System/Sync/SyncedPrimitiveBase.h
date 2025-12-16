@@ -53,6 +53,18 @@ namespace Sync {
 #endif
 	}
 
+	static inline void Assert(uint32_t val, const char* msg) {
+		AssertDebugger(val, msg);
+#ifdef SYNCCHECK
+		assert(CSyncChecker::InSyncedCode());
+		CSyncChecker::Sync(val);
+	#ifdef TRACE_SYNC
+		unsigned int crc = CSyncChecker::GetChecksum();
+		fprintf(stderr, "[Sync::%s] msg=%s chksum=%u\n", __func__, msg, crc);
+	#endif
+#endif
+	}
+
 	/**
 	 * @brief Check sync of the argument x.
 	 */

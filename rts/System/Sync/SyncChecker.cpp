@@ -7,6 +7,7 @@
 
 // This cannot be included in the header file (SyncChecker.h) because include conflicts will occur.
 #include "System/Threading/ThreadPool.h"
+#include "System/HashSpec.h"
 
 
 unsigned CSyncChecker::g_checksum;
@@ -23,6 +24,20 @@ void CSyncChecker::NewFrame()
 void CSyncChecker::debugSyncCheckThreading()
 {
 	assert(ThreadPool::GetThreadNum() == 0);
+}
+
+void CSyncChecker::Sync(uint32_t val)
+{
+#ifdef DEBUG_SYNC_MT_CHECK
+	// Sync calls should not be occurring in multi-threaded sections
+	debugSyncCheckThreading();
+#endif
+	g_checksum = spring::hash_combine(val, g_checksum);
+	//LOG("[Sync::Checker] chksum=%u\n", g_checksum);
+
+#ifdef SYNC_HISTORY
+	LogHistory();
+#endif // SYNC_HISTORY
 }
 
 void CSyncChecker::Sync(const void* p, unsigned size)

@@ -35,6 +35,7 @@ class CSyncChecker {
 		static unsigned GetChecksum() { return g_checksum; }
 		static void NewFrame();
 		static void debugSyncCheckThreading();
+		static void Sync(uint32_t val);
 		static void Sync(const void* p, unsigned size);
 		#ifdef SYNC_HISTORY
 		static std::tuple<unsigned, unsigned, unsigned*> GetFrameHistory(unsigned rewindFrames);
