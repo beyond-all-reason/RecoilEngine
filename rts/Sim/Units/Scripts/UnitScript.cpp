@@ -216,11 +216,9 @@ void CUnitScript::TickAllAnims(int deltaTime)
 			if (ai.hasWaiting)
 				doneAnims.emplace_back(ai);
 		}
-	}
 
-	// checksum all anims (live + done)
-	for (const auto& anim : anims) {
-		checksum = spring::LiteHash(anim, checksum);
+		// checksum all anims (live + done)
+		checksum = spring::LiteHash(ai, checksum);
 	}
 
 	spring::VectorEraseIfAll(anims, [](const auto& ai) { return ai.done; });
