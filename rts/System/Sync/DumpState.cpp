@@ -136,11 +136,12 @@ namespace {
 	template<typename T>
 	concept Numeric = std::integral<T> || std::floating_point<T>;
 
-	//template<typename T>
-	//inline uint32_t CheckSum(T&& r, uint32_t cs = 0u)
-	//{
-	//	static_assert(false, "Not Implemented");
-	//}
+	template <typename T>
+	struct is_tuple : std::false_type {};
+	template <typename... Args>
+	struct is_tuple<std::tuple<Args...>> : std::true_type {};
+	template <typename T>
+	concept IsTuple = is_tuple<T>::value;
 
 	template<StringLike S>
 	inline uint32_t CheckSum(S&& str, uint32_t cs = 0u) {
@@ -178,12 +179,18 @@ namespace {
 		return cs;
 	}
 
-	template<typename ... Ts>
-	inline uint32_t CheckSum(const std::tuple<Ts...>& t, uint32_t cs = 0u) {
+	template<IsTuple Tpl>
+	inline uint32_t CheckSum(Tpl&& t, uint32_t cs = 0u) {
 		std::apply([&cs](auto&&... args) {
 			((cs = CheckSum(args, cs)), ...);
 		}, t);
 		return cs;
+	}
+
+	template<typename T>
+	inline uint32_t CheckSum(T&&, uint32_t cs = 0u)
+	{
+		static_assert(false, "Not implemented <T>");
 	}
 }
 
