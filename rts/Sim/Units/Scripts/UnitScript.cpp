@@ -207,6 +207,9 @@ void CUnitScript::TickAllAnims(int deltaTime)
 
 	const int tickRate = 1000 / deltaTime;
 
+	// clear doneAnims here to preserve them for DumpState
+	doneAnims.clear();
+
 	for (auto& ai : anims) {
 		LocalModelPiece& lmp = *pieces[ai.piece];
 		const auto& currFunc = TICK_ANIM_FUNCS[ai.animType];
@@ -283,7 +286,8 @@ bool CUnitScript::TickAnimFinished()
 	for (const auto& ai : doneAnims)
 		AnimFinished(ai.animType, ai.piece, ai.axis);
 
-	doneAnims.clear();
+	// don't clear doneAnims for the purpose of capturing them in DumpState
+	//doneAnims.clear();
 
 	return HaveAnimations();
 }
