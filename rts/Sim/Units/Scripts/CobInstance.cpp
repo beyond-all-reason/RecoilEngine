@@ -451,7 +451,7 @@ void CCobInstance::AimShieldWeapon(CPlasmaRepulser* weapon)
 	ZoneScoped;
 	std::array<int, 1 + MAX_COB_ARGS> callinArgs;
 
-	callinArgs[0] = 2;
+	callinArgs[0] = 1;
 	callinArgs[1] = 0; // compat with AimWeapon (same script is called)
 
 	Call(COBFN_AimPrimary + COBFN_Weapon_Funcs * weapon->weaponNum, callinArgs, CBAimShield, weapon->weaponNum, nullptr);
