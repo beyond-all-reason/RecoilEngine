@@ -32,7 +32,7 @@ public:
 
 protected:
 	CUnit* unit;
-	bool busy;
+	uint32_t checksum;
 
 	struct AnimInfo {
 		CR_DECLARE_STRUCT(AnimInfo)
@@ -54,6 +54,7 @@ protected:
 	AnimContainerType anims;
 	AnimContainerType doneAnims;
 
+	bool busy;
 	bool hasSetSFXOccupy;
 	bool hasRockUnit;
 	bool hasStartBuilding;
@@ -115,6 +116,7 @@ public:
 	      CUnit* GetUnit()       { return unit; }
 	const CUnit* GetUnit() const { return unit; }
 
+	auto GetAnimArrayChecksum() const { return checksum; }
 	void TickAllAnims(int tickRate);
 	bool TickAnimFinished();
 	// note: must copy-and-set here (LMP dirty flag, etc)

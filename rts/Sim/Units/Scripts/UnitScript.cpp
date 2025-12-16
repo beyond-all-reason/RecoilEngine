@@ -56,6 +56,7 @@ CR_BIND_INTERFACE(CUnitScript)
 
 CR_REG_METADATA(CUnitScript, (
 	CR_MEMBER(unit),
+	CR_MEMBER(checksum),
 	CR_MEMBER(busy),
 	CR_MEMBER(anims),
 	CR_MEMBER(doneAnims),
@@ -84,6 +85,7 @@ CR_REG_METADATA_SUB(CUnitScript, AnimInfo,(
 
 CUnitScript::CUnitScript(CUnit* unit)
 	: unit(unit)
+	, checksum(0)
 	, busy(false)
 	, hasSetSFXOccupy(false)
 	, hasRockUnit(false)
@@ -215,8 +217,13 @@ void CUnitScript::TickAllAnims(int deltaTime)
 				doneAnims.emplace_back(ai);
 		}
 	}
-	spring::VectorEraseIfAll(anims, [](const auto& ai) { return ai.done; });
 
+	// checksum all anims (live + done)
+	for (const auto& anim : anims) {
+		checksum = spring::LiteHash(anim, checksum);
+	}
+
+	spring::VectorEraseIfAll(anims, [](const auto& ai) { return ai.done; });
 #if 1
 	// BFS pass
 	std::deque<std::pair<LocalModelPiece*, Transform>> q;

@@ -138,6 +138,15 @@ void CUnitScriptEngine::Tick(int deltaTime)
 			animating[i]->TickAllAnims(deltaTime);
 		});
 	}
+	// deal with synced checksum here, before animating is possibly popped below
+	{
+		uint32_t cs = 0;
+		for (const auto& a : animating) {
+			// simple XOR should be resilient enough
+			cs = a->GetAnimArrayChecksum() ^ cs;
+		}
+		Sync::Assert(&cs, sizeof(cs), "animating");
+	}
 	{
 		ZoneScopedN("CUnitScriptEngine::Tick(ST)");
 
