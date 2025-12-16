@@ -569,7 +569,7 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 				<< " scriptMap cs " << CheckSum(thread.cobFile->scriptIndex)
 				<< " t.state " << +thread.GetState() << " t.sigmask " << thread.GetSignalMask()
 				<< " t.retc " << thread.GetRetCode()
-				<< " dead|gargage|waiting " << thread.IsDead() << "|" << thread.IsGarbage() << "|" << thread.IsWaiting() << "\n";
+				<< " dead|garbage|waiting " << thread.IsDead() << "|" << thread.IsGarbage() << "|" << thread.IsWaiting() << "\n";
 		}
 		file << "\t\tWaitingThreads: " << cobEngine->GetWaitingThreadIDs().size();
 		file << "\t\t\tids:";
