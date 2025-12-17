@@ -15,6 +15,7 @@
 #include "System/Log/ILog.h"
 #include "System/StringHash.h"
 #include "System/StringUtil.h"
+#include "Audio/AudioStatics.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -593,7 +594,7 @@ void WeaponDef::LoadSound(
     std::string hitFallbackKey = "soundHit";
 
     uint32_t hash = hashString(soundKey.c_str());
-    bool useHitFallback = hash == hashString("soundHitWet") || hash == hashString("soundHitDry");
+    bool useHitFallback = AudioStatics::ShouldUseHitFallback(hash);
 
     float volume = wdTable.GetFloat(soundKey + "Volume", wdTable.GetFloat("soundHitVolume", 1.0f));
 
