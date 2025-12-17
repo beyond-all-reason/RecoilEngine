@@ -1,5 +1,6 @@
 #include "AudioStatics.h"
 #include "System/StringHash.h"
+#include <unordered_set>
 #include <cstdint>
 
 static const std::unordered_set<uint32_t> hitFallbackSoundHashes = {
