@@ -414,8 +414,8 @@ void CGroundDecalHandler::GenerateAtlasTexture() {
 	AddGroundTrackTextures();
 	AddFallbackTextures();
 
-	if (!atlasTex->Finalize()) {
-		LOG_L(L_ERROR, "Could not finalize %s texture atlas. Use fewer/smaller textures.", atlasTex->GetAtlasName().c_str());
+	if (!atlasTex->CalculateAtlas()) {
+		LOG_L(L_ERROR, "Could not calculate %s texture atlas. Use fewer/smaller textures.", atlasTex->GetAtlasName().c_str());
 	}
 }
 
@@ -750,7 +750,7 @@ void CGroundDecalHandler::Draw()
 	if (decals.empty())
 		return;
 
-	if (!atlasTex->IsValid())
+	if (!atlasTex->CreateAtlasTexture())
 		return;
 
 	UpdateDecalsVisibility();

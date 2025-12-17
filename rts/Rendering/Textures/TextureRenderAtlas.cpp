@@ -309,9 +309,10 @@ bool CTextureRenderAtlas::DumpTexture() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
-	if (!IsValid())
+	if (!IsValid()) {
+		LOG_L(L_ERROR, "[CTextureRenderAtlas::%s] Can't dump invalid %s atlas", __func__, atlasName.c_str());
 		return false;
-
+	}
 	const auto numLevels = atlasAllocator->GetNumTexLevels();
 	const auto numPages = atlasAllocator->GetNumPages();
 
@@ -343,6 +344,9 @@ bool CTextureRenderAtlas::CalculateAtlas()
 
 bool CTextureRenderAtlas::CreateAtlasTexture()
 {
+	if (!atlasFinalized)
+		return true;
+
 	if (atlasRendered)
 		return true;
 
