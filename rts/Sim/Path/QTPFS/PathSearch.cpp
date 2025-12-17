@@ -879,7 +879,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 	// 		);
 	// }
 
-	// if ((searchID == 0x30001b) && pathOwner != nullptr && pathOwner->id == 25278){
+	// if (/*(searchID == 0x30001b) &&*/ pathOwner != nullptr ){//&& pathOwner->id == 25278){
 	// 	LOG("%s: starting target point %f,%f", __func__
 	// 			, bwd.tgtPoint.x, bwd.tgtPoint.z
 	// 			);
@@ -1372,7 +1372,7 @@ void QTPFS::PathSearch::IterateNodes(unsigned int searchDir) {
 	}
 	#endif
 
-	// if ((searchID == 0x30001b) && pathOwner != nullptr && pathOwner->id == 25278 && searchDir == SearchThreadData::SEARCH_BACKWARD){
+	// if ((searchID == 0x30001d) && pathOwner != nullptr && pathOwner->id == 25278 && searchDir == SearchThreadData::SEARCH_BACKWARD){
 	// 	auto* curNode = nodeLayer->GetPoolNode(curOpenNode.nodeIndex);
 	// 	auto* tgtNode = nodeLayer->GetPoolNode(searchData.tgtSearchNode->GetIndex());
 	// 	LOG("%s: (searchDir: %d) continuing search from %d (0x%x) to %d (0x%x)", __func__

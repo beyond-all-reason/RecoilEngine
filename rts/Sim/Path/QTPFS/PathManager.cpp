@@ -136,6 +136,9 @@ namespace QTPFS {
 		IPath* path = registry.try_get<IPath>(entityId);
 		if (path != nullptr) return path;
 
+		path = registry.try_get<ExternalyManagedSyncedIPath>(entityId);
+		if (path != nullptr) return path;
+
 		return registry.try_get<UnsyncedIPath>(entityId);
 	};
 
@@ -143,6 +146,9 @@ namespace QTPFS {
 		if (!registry.valid(entityId)) return nullptr;
 
 		PathSearch* path = registry.try_get<PathSearch>(entityId);
+		if (path != nullptr) return path;
+
+		path = registry.try_get<ExternalyManagedPathSearch>(entityId);
 		if (path != nullptr) return path;
 
 		return registry.try_get<UnsyncedPathSearch>(entityId);
@@ -156,6 +162,7 @@ QTPFS::PathManager::PathManager() {
 	PathManager::InitStatic();
 	PathSearch::InitStatic();
 	UnsyncedPathSearch::InitStatic();
+	ExternalyManagedPathSearch::InitStatic();
 
 	assert(registry.alive() == 0);
 
@@ -176,8 +183,12 @@ QTPFS::PathManager::~PathManager() {
 	registry.each([this](auto entity) {
 		bool isPath = registry.all_of<IPath>(entity);
 		bool isUnsyncedPath = registry.all_of<UnsyncedIPath>(entity);
+		bool isExternallyManagedSyncedPath = registry.all_of<ExternalyManagedSyncedIPath>(entity);
+
 		bool isSearch = registry.all_of<PathSearch>(entity);
 		bool isUnsyncedSearch = registry.all_of<UnsyncedPathSearch>(entity);
+		bool isExternallyManagedSearch = registry.all_of<ExternalyManagedPathSearch>(entity);
+
 		if (isPath) {
 			LOG("%s: IPath %x still active!", __func__, entt::to_integral(entity));
 			registry.destroy(entity);
@@ -186,12 +197,20 @@ QTPFS::PathManager::~PathManager() {
 			LOG("%s: UnsyncedIPath %x still active!", __func__, entt::to_integral(entity));
 			registry.destroy(entity);
 		}
+		if (isExternallyManagedSyncedPath) {
+			LOG("%s: ExternalyManagedSyncedIPath %x still active!", __func__, entt::to_integral(entity));
+			registry.destroy(entity);
+		}
 		if (isSearch) {
 			LOG("%s: PathSearch %x still active!", __func__, entt::to_integral(entity));
 			registry.destroy(entity);
 		}
 		if (isUnsyncedSearch) {
 			LOG("%s: UnsyncedPathSearch %x still active!", __func__, entt::to_integral(entity));
+			registry.destroy(entity);
+		}
+		if (isExternallyManagedSearch) {
+			LOG("%s: ExternalyManagedPathSearch %x still active!", __func__, entt::to_integral(entity));
 			registry.destroy(entity);
 		}
 	});
@@ -296,6 +315,18 @@ void QTPFS::PathManager::InitStatic() {
 	}
 	{ auto view = registry.view<UnsyncedIPath>();
 	  if (view.size() > 0) { LOG("%s: UnsyncedIPath is unexpectedly greater than 0.", __func__); }
+	}
+	{ auto view = registry.view<ExternalyManagedSyncedIPath>();
+	  if (view.size() > 0) { LOG("%s: ExternalyManagedSyncedIPath is unexpectedly greater than 0.", __func__); }
+	}
+	{ auto view = registry.view<PathSearch>();
+	  if (view.size() > 0) { LOG("%s: PathSearch is unexpectedly greater than 0.", __func__); }
+	}
+	{ auto view = registry.view<UnsyncedPathSearch>();
+	  if (view.size() > 0) { LOG("%s: UnsyncedPathSearch is unexpectedly greater than 0.", __func__); }
+	}
+	{ auto view = registry.view<ExternalyManagedPathSearch>();
+	  if (view.size() > 0) { LOG("%s: ExternalyManagedPathSearch is unexpectedly greater than 0.", __func__); }
 	}
 	// Views are created in multi-threaded sections, but they are referenced and I haven't determined
 	// yet whether that is safe in EnTT so creating views here to ensure everything is initialized
@@ -869,7 +900,7 @@ bool QTPFS::PathManager::InitializeSearch(QTPFS::entity searchEntity) {
 
 	QTPFS::entity pathEntity = (QTPFS::entity)search->GetID();
 	if (registry.valid(pathEntity)) {
-		assert((registry.any_of<IPath, UnsyncedIPath>(pathEntity)));
+		assert((registry.any_of<IPath, UnsyncedIPath, ExternalyManagedSyncedIPath>(pathEntity)));
 		IPath* path = GetPath(pathEntity);
 		assert(path->GetPathType() == pathType);
 		search->Initialize(&nodeLayer, path->GetSourcePoint(), path->GetGoalPosition(), path->GetOwner());
@@ -987,6 +1018,11 @@ void QTPFS::PathManager::ExecuteQueuedSearches() {
 			// Only owned paths should be actioned in this function.
 			IPath* path = registry.try_get<IPath>(pathEntity);
 			if (path != nullptr) {
+				// LOG("%s: owner %d pathHash %x"
+				// 	, __func__
+				// 	, path->GetOwner() != nullptr ? path->GetOwner()->id : -1
+				// 	, path->CalculateHash()
+				// );
 				if (search->PathWasFound()) {
 					completePath(pathEntity, path);
 					// LOG("%s: %x - path found", __func__, entt::to_integral(pathEntity));
@@ -1241,6 +1277,7 @@ unsigned int QTPFS::PathManager::QueueSearch(
 	const float3& targetPoint,
 	const float radius,
 	const bool synced,
+	const bool externalRequest,
 	const bool allowRawSearch
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -1256,23 +1293,29 @@ unsigned int QTPFS::PathManager::QueueSearch(
 	//     from its cache before we get to ExecuteSearch
 
 	QTPFS::entity pathEntity = registry.create();
-	assert((!registry.any_of<IPath, UnsyncedIPath>(pathEntity)));
+	assert((!registry.any_of<IPath, UnsyncedIPath, ExternalyManagedSyncedIPath>(pathEntity)));
 
-	auto createNewPath = [](QTPFS::entity entityId, bool synced) -> IPath* {
-		if (synced)
-			return &(registry.emplace<IPath>(entityId));
-		else
+	auto createNewPath = [](QTPFS::entity entityId, bool synced, bool externalRequest) -> IPath* {
+		if (synced) {
+			if (externalRequest)
+				return &(registry.emplace<ExternalyManagedSyncedIPath>(entityId));
+			else
+				return &(registry.emplace<IPath>(entityId));
+		} else
 			return &(registry.emplace<UnsyncedIPath>(entityId));
 	};
 
-	auto createNewSearch = [](QTPFS::entity entityId, bool synced) -> PathSearch* {
-		if (synced)
-			return &(registry.emplace<PathSearch>(entityId, PATH_SEARCH_ASTAR));
-		else
+	auto createNewSearch = [](QTPFS::entity entityId, bool synced, bool externalRequest) -> PathSearch* {
+		if (synced) {
+			if (externalRequest)
+				return &(registry.emplace<ExternalyManagedPathSearch>(entityId, PATH_SEARCH_ASTAR));
+			else
+				return &(registry.emplace<PathSearch>(entityId, PATH_SEARCH_ASTAR));
+		}else
 			return &(registry.emplace<UnsyncedPathSearch>(entityId, PATH_SEARCH_ASTAR));
 	};
 
-	IPath* newPath = createNewPath(pathEntity, synced);
+	IPath* newPath = createNewPath(pathEntity, synced, externalRequest);
 
 	// Every synced path gets one. It gets changed in a multi-threaded section, so we can't add them on demand.
 	// Unsynced paths don't requeue their searches (also, unsynced paths cannot have owning units.)
@@ -1282,7 +1325,7 @@ unsigned int QTPFS::PathManager::QueueSearch(
 		object = nullptr;
 
 	QTPFS::entity searchEntity = registry.create();
-	PathSearch* newSearch = createNewSearch(searchEntity, synced);
+	PathSearch* newSearch = createNewSearch(searchEntity, synced, externalRequest);
 
 	assert(targetPoint.x >= 0.f);
 	assert(targetPoint.z >= 0.f);
@@ -1537,13 +1580,36 @@ unsigned int QTPFS::PathManager::RequestPath(
 
 	assert(	sourcePoint.x != 0.f || sourcePoint.z != 0.f );
 
-	returnPathId = QueueSearch(object, moveDef, sourcePoint, targetPoint, radius, synced, (synced && object != nullptr));
+	returnPathId = QueueSearch(object, moveDef, sourcePoint, targetPoint, radius, synced, immediateResult, (synced && object != nullptr));
 
 	// if (object != nullptr && 30809 == object->id)
 	// 	LOG("%s: RequestPath (%d).", __func__, returnPathId);
 
-	if (immediateResult && returnPathId != 0)
+	if (immediateResult && returnPathId != 0) {
 		returnPathId = ExecuteImmediateSearch(returnPathId);
+	// 	auto path = GetPath(QTPFS::entity(returnPathId));
+	// 	LOG("%s: IMMEDIATE non-owner (synced=%d) pathType=%d (srcPoint=%f,%f) (dstPoint=%f,%f) radius=%f hash=%x"
+	// 			, __func__
+	// 			// , returnPathId	
+	// 			, int(synced)
+	// 			, moveDef->pathType
+	// 			, sourcePoint.x, sourcePoint.z
+	// 			, targetPoint.x, targetPoint.z
+	// 			, radius
+	// 			, path != nullptr ? path->CalculateHash() : -1
+	// 			);
+	// } else {
+	// 	LOG("%s: QUEUED owner id %d (synced=%d) pathType=%d (srcPoint=%f,%f) (dstPoint=%f,%f) radius=%f"
+	// 			, __func__
+	// 			, object != nullptr ? object->id : -1
+	// 			// , returnPathId
+	// 			, int(synced)
+	// 			, moveDef->pathType
+	// 			, sourcePoint.x, sourcePoint.z
+	// 			, targetPoint.x, targetPoint.z
+	// 			, radius
+	// 			);
+	}
 
 	return returnPathId;
 }

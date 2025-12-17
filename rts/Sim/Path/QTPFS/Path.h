@@ -309,6 +309,14 @@ namespace QTPFS {
 			}
 		}
 
+		int CalculateHash() const {
+			int hash = 0;
+			for (const float3& p: points) {
+				hash += (int(p.x) * 73856093) ^ (int(p.z) * 19349663);
+			}
+			return hash;
+		}
+
 		void SetPathType(int newPathType) { assert(pathType < moveDefHandler.GetNumMoveDefs()); pathType = newPathType; }
 		int GetPathType() const { return pathType; }
 
@@ -389,6 +397,12 @@ namespace QTPFS {
 	struct UnsyncedIPath : public IPath {
 		UnsyncedIPath() {
 			SetSynced(false); // Mark this path as unsynced explicitly
+		}
+	};
+
+	struct ExternalyManagedSyncedIPath : public IPath {
+		ExternalyManagedSyncedIPath() {
+			SetSynced(true); // Mark this path as synced explicitly
 		}
 	};
 }
