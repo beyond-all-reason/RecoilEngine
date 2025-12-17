@@ -596,7 +596,7 @@ void WeaponDef::LoadSound(
     uint32_t hash = hashString(soundKey.c_str());
     bool useHitFallback = AudioStatics::ShouldUseHitFallback(hash);
 
-    float volume = wdTable.GetFloat(soundKey + "Volume", wdTable.GetFloat("soundHitVolume", 1.0f));
+    float volume = wdTable.GetFloat(soundKey + "Volume", useHitFallback ? wdTable.GetFloat("soundHitVolume", 1.0f) : 1.0f);
 
     std::string fileName = wdTable.GetString(soundKey, "");
     if (!fileName.empty()) {
