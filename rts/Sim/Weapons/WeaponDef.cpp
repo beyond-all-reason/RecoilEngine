@@ -590,14 +590,14 @@ void WeaponDef::LoadSound(
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 
-    string hitFallbackKey = "soundHit";
+    std::string hitFallbackKey = "soundHit";
 
     uint32_t hash = hashString(soundKey.c_str());
     bool useHitFallback = hash == hashString("soundHitWet") || hash == hashString("soundHitDry");
 
     float volume = wdTable.GetFloat(soundKey + "Volume", wdTable.GetFloat("soundHitVolume", 1.0f));
 
-    string fileName = wdTable.GetString(soundKey, "");
+    std::string fileName = wdTable.GetString(soundKey, "");
     if (!fileName.empty()) {
         CommonDefHandler::AddSoundSetData(soundData, fileName, volume);
         return;
@@ -605,7 +605,7 @@ void WeaponDef::LoadSound(
 
     LuaTable tbl = wdTable.SubTable(soundKey);
 
-    if (tbl.IsValid() && useHitFallback)
+    if (!tbl.IsValid() && useHitFallback)
         tbl = wdTable.SubTable(hitFallbackKey);
 
     if (tbl.IsValid()) {
