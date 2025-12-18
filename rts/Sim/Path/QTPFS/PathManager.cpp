@@ -136,7 +136,7 @@ namespace QTPFS {
 		IPath* path = registry.try_get<IPath>(entityId);
 		if (path != nullptr) return path;
 
-		path = registry.try_get<ExternalyManagedSyncedIPath>(entityId);
+		path = registry.try_get<ExternallyManagedSyncedIPath>(entityId);
 		if (path != nullptr) return path;
 
 		return registry.try_get<UnsyncedIPath>(entityId);
@@ -183,7 +183,7 @@ QTPFS::PathManager::~PathManager() {
 	registry.each([this](auto entity) {
 		bool isPath = registry.all_of<IPath>(entity);
 		bool isUnsyncedPath = registry.all_of<UnsyncedIPath>(entity);
-		bool isExternallyManagedSyncedPath = registry.all_of<ExternalyManagedSyncedIPath>(entity);
+		bool isExternallyManagedSyncedPath = registry.all_of<ExternallyManagedSyncedIPath>(entity);
 
 		bool isSearch = registry.all_of<PathSearch>(entity);
 		bool isUnsyncedSearch = registry.all_of<UnsyncedPathSearch>(entity);
@@ -198,7 +198,7 @@ QTPFS::PathManager::~PathManager() {
 			registry.destroy(entity);
 		}
 		if (isExternallyManagedSyncedPath) {
-			LOG("%s: ExternalyManagedSyncedIPath %x still active!", __func__, entt::to_integral(entity));
+			LOG("%s: ExternallyManagedSyncedIPath %x still active!", __func__, entt::to_integral(entity));
 			registry.destroy(entity);
 		}
 		if (isSearch) {
@@ -316,8 +316,8 @@ void QTPFS::PathManager::InitStatic() {
 	{ auto view = registry.view<UnsyncedIPath>();
 	  if (view.size() > 0) { LOG("%s: UnsyncedIPath is unexpectedly greater than 0.", __func__); }
 	}
-	{ auto view = registry.view<ExternalyManagedSyncedIPath>();
-	  if (view.size() > 0) { LOG("%s: ExternalyManagedSyncedIPath is unexpectedly greater than 0.", __func__); }
+	{ auto view = registry.view<ExternallyManagedSyncedIPath>();
+	  if (view.size() > 0) { LOG("%s: ExternallyManagedSyncedIPath is unexpectedly greater than 0.", __func__); }
 	}
 	{ auto view = registry.view<PathSearch>();
 	  if (view.size() > 0) { LOG("%s: PathSearch is unexpectedly greater than 0.", __func__); }
@@ -900,7 +900,7 @@ bool QTPFS::PathManager::InitializeSearch(QTPFS::entity searchEntity) {
 
 	QTPFS::entity pathEntity = (QTPFS::entity)search->GetID();
 	if (registry.valid(pathEntity)) {
-		assert((registry.any_of<IPath, UnsyncedIPath, ExternalyManagedSyncedIPath>(pathEntity)));
+		assert((registry.any_of<IPath, UnsyncedIPath, ExternallyManagedSyncedIPath>(pathEntity)));
 		IPath* path = GetPath(pathEntity);
 		assert(path->GetPathType() == pathType);
 		search->Initialize(&nodeLayer, path->GetSourcePoint(), path->GetGoalPosition(), path->GetOwner());
@@ -1293,13 +1293,13 @@ unsigned int QTPFS::PathManager::QueueSearch(
 	//     from its cache before we get to ExecuteSearch
 
 	QTPFS::entity pathEntity = registry.create();
-	assert((!registry.any_of<IPath, UnsyncedIPath, ExternalyManagedSyncedIPath>(pathEntity)));
+	assert((!registry.any_of<IPath, UnsyncedIPath, ExternallyManagedSyncedIPath>(pathEntity)));
 
 	auto createNewPath = [](QTPFS::entity entityId, bool synced, bool externalRequest) -> IPath* {
 		if (!synced)
 			return &(registry.emplace<UnsyncedIPath>(entityId));
 		else if (externalRequest)
-			return &(registry.emplace<ExternalyManagedSyncedIPath>(entityId));
+			return &(registry.emplace<ExternallyManagedSyncedIPath>(entityId));
 		else
 			return &(registry.emplace<IPath>(entityId));
 

@@ -414,8 +414,8 @@ namespace QTPFS {
 		}
 	};
 
-	struct ExternalyManagedSyncedIPath : public IPath {
-		ExternalyManagedSyncedIPath() {
+	struct ExternallyManagedSyncedIPath : public IPath {
+		ExternallyManagedSyncedIPath() {
 			SetSynced(true); // Mark this path as synced explicitly
 		}
 	};
