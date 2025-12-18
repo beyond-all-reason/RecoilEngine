@@ -573,62 +573,12 @@ WeaponDef::WeaponDef(const LuaTable& wdTable, const std::string& name_, int id_)
 	onlyForward = !turret && (projectileType != WEAPON_STARBURST_PROJECTILE);
 }
 
-
-
 void WeaponDef::ParseWeaponSounds(const LuaTable& wdTable) {
-	RECOIL_DETAILED_TRACY_ZONE;
-	LoadSound(wdTable, "soundStart" , fireSound);
-	LoadSound(wdTable, "soundHitDry",  hitSound);
-	LoadSound(wdTable, "soundHitWet",  hitSound);
+    RECOIL_DETAILED_TRACY_ZONE;
+    AudioStatics::LoadSound(wdTable, "soundStart" , fireSound);
+    AudioStatics::LoadSound(wdTable, "soundHitDry",  hitSound);
+    AudioStatics::LoadSound(wdTable, "soundHitWet",  hitSound);
 }
-
-
-
-void WeaponDef::LoadSound(
-	const LuaTable& wdTable,
-	const std::string& soundKey,
-	GuiSoundSet& soundData
-) {
-	RECOIL_DETAILED_TRACY_ZONE;
-
-    std::string hitFallbackKey = "soundHit";
-
-    uint32_t hash = hashString(soundKey.c_str());
-    bool useHitFallback = AudioStatics::ShouldUseHitFallback(hash);
-
-    float volume = wdTable.GetFloat(soundKey + "Volume", useHitFallback ? wdTable.GetFloat("soundHitVolume", 1.0f) : 1.0f);
-
-    std::string fileName = wdTable.GetString(soundKey, "");
-    if (!fileName.empty()) {
-        CommonDefHandler::AddSoundSetData(soundData, fileName, volume);
-        return;
-    }
-
-    LuaTable tbl = wdTable.SubTable(soundKey);
-
-    if (!tbl.IsValid() && useHitFallback)
-        tbl = wdTable.SubTable(hitFallbackKey);
-
-    if (tbl.IsValid()) {
-        for (int i = 1; true; i++) {
-            fileName = tbl.GetString(i, "");
-
-            if (fileName.empty())
-                break;
-
-            CommonDefHandler::AddSoundSetData(soundData, fileName, volume);
-        }
-        return;
-    }
-
-    if (useHitFallback) {
-        fileName = wdTable.GetString(hitFallbackKey, "");
-        if (!fileName.empty()) {
-            CommonDefHandler::AddSoundSetData(soundData, fileName, volume);
-        }
-    }
-}
-
 
 S3DModel* WeaponDef::LoadModel()
 {
@@ -666,3 +616,4 @@ void WeaponDef::PreloadModel() const
 	//not very sweet, but still better than replacing "const WeaponDef" _everywhere_
 	const_cast<WeaponDef*>(this)->PreloadModel();
 }
+
