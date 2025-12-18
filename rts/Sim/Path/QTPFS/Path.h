@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <bit>
 
 #include "PathDefines.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
@@ -309,12 +310,25 @@ namespace QTPFS {
 			}
 		}
 
-		int CalculateHash() const {
-			int hash = 0;
+		// Function is for debugging and logging purposes only
+		uint32_t CalculateHash() const {
+			// Use FNV-1a style mixing over the raw float bit-patterns so
+			// we don't lose any information when converting floats to ints.
+			// We copy the float bytes into a uint32_t to avoid strict-aliasing
+			// UB instead of reinterpreting pointers directly.
+
+			uint32_t h = 2166136261u; // FNV-1a 32-bit offset basis
+			constexpr uint32_t FNV_PRIME = 16777619u;
+
 			for (const float3& p: points) {
-				hash += (int(p.x) * 73856093) ^ (int(p.z) * 19349663);
+				const uint32_t bx = std::bit_cast<uint32_t>(p.x);
+				const uint32_t bz = std::bit_cast<uint32_t>(p.z);
+
+				h ^= bx; h *= FNV_PRIME;
+				h ^= bz; h *= FNV_PRIME;
 			}
-			return hash;
+
+			return h;
 		}
 
 		void SetPathType(int newPathType) { assert(pathType < moveDefHandler.GetNumMoveDefs()); pathType = newPathType; }

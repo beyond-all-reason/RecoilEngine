@@ -148,7 +148,7 @@ namespace QTPFS {
 		PathSearch* path = registry.try_get<PathSearch>(entityId);
 		if (path != nullptr) return path;
 
-		path = registry.try_get<ExternalyManagedPathSearch>(entityId);
+		path = registry.try_get<ExternallyManagedPathSearch>(entityId);
 		if (path != nullptr) return path;
 
 		return registry.try_get<UnsyncedPathSearch>(entityId);
@@ -162,7 +162,7 @@ QTPFS::PathManager::PathManager() {
 	PathManager::InitStatic();
 	PathSearch::InitStatic();
 	UnsyncedPathSearch::InitStatic();
-	ExternalyManagedPathSearch::InitStatic();
+	ExternallyManagedPathSearch::InitStatic();
 
 	assert(registry.alive() == 0);
 
@@ -187,7 +187,7 @@ QTPFS::PathManager::~PathManager() {
 
 		bool isSearch = registry.all_of<PathSearch>(entity);
 		bool isUnsyncedSearch = registry.all_of<UnsyncedPathSearch>(entity);
-		bool isExternallyManagedSearch = registry.all_of<ExternalyManagedPathSearch>(entity);
+		bool isExternallyManagedSearch = registry.all_of<ExternallyManagedPathSearch>(entity);
 
 		if (isPath) {
 			LOG("%s: IPath %x still active!", __func__, entt::to_integral(entity));
@@ -210,7 +210,7 @@ QTPFS::PathManager::~PathManager() {
 			registry.destroy(entity);
 		}
 		if (isExternallyManagedSearch) {
-			LOG("%s: ExternalyManagedPathSearch %x still active!", __func__, entt::to_integral(entity));
+			LOG("%s: ExternallyManagedPathSearch %x still active!", __func__, entt::to_integral(entity));
 			registry.destroy(entity);
 		}
 	});
@@ -325,8 +325,8 @@ void QTPFS::PathManager::InitStatic() {
 	{ auto view = registry.view<UnsyncedPathSearch>();
 	  if (view.size() > 0) { LOG("%s: UnsyncedPathSearch is unexpectedly greater than 0.", __func__); }
 	}
-	{ auto view = registry.view<ExternalyManagedPathSearch>();
-	  if (view.size() > 0) { LOG("%s: ExternalyManagedPathSearch is unexpectedly greater than 0.", __func__); }
+	{ auto view = registry.view<ExternallyManagedPathSearch>();
+	  if (view.size() > 0) { LOG("%s: ExternallyManagedPathSearch is unexpectedly greater than 0.", __func__); }
 	}
 	// Views are created in multi-threaded sections, but they are referenced and I haven't determined
 	// yet whether that is safe in EnTT so creating views here to ensure everything is initialized
@@ -1296,23 +1296,22 @@ unsigned int QTPFS::PathManager::QueueSearch(
 	assert((!registry.any_of<IPath, UnsyncedIPath, ExternalyManagedSyncedIPath>(pathEntity)));
 
 	auto createNewPath = [](QTPFS::entity entityId, bool synced, bool externalRequest) -> IPath* {
-		if (synced) {
-			if (externalRequest)
-				return &(registry.emplace<ExternalyManagedSyncedIPath>(entityId));
-			else
-				return &(registry.emplace<IPath>(entityId));
-		} else
+		if (!synced)
 			return &(registry.emplace<UnsyncedIPath>(entityId));
+		else if (externalRequest)
+			return &(registry.emplace<ExternalyManagedSyncedIPath>(entityId));
+		else
+			return &(registry.emplace<IPath>(entityId));
+
 	};
 
 	auto createNewSearch = [](QTPFS::entity entityId, bool synced, bool externalRequest) -> PathSearch* {
-		if (synced) {
-			if (externalRequest)
-				return &(registry.emplace<ExternalyManagedPathSearch>(entityId, PATH_SEARCH_ASTAR));
-			else
-				return &(registry.emplace<PathSearch>(entityId, PATH_SEARCH_ASTAR));
-		}else
+		if (!synced)
 			return &(registry.emplace<UnsyncedPathSearch>(entityId, PATH_SEARCH_ASTAR));
+		else if (externalRequest)
+			return &(registry.emplace<ExternallyManagedPathSearch>(entityId, PATH_SEARCH_ASTAR));
+		else
+			return &(registry.emplace<PathSearch>(entityId, PATH_SEARCH_ASTAR));
 	};
 
 	IPath* newPath = createNewPath(pathEntity, synced, externalRequest);

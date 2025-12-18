@@ -291,11 +291,11 @@ public:
 	// These paths are also not safe to have their data modified during path rebuilding after map changes because
 	// the rebuilding is order-sensitive and externally-managed paths could be destroyed at any time, which can
 	// change the order of path processing.
-	struct ExternalyManagedPathSearch : public PathSearch {
-		ExternalyManagedPathSearch() {
+	struct ExternallyManagedPathSearch : public PathSearch {
+		ExternallyManagedPathSearch() {
 			synced = true; // Mark this path as synced explicitly
 		}
-		ExternalyManagedPathSearch(unsigned int pathSearchType)
+		ExternallyManagedPathSearch(unsigned int pathSearchType)
 			: PathSearch(pathSearchType)
 			{ synced = true; }
 	};
