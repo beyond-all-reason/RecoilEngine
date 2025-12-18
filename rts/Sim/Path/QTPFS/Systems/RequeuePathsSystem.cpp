@@ -42,7 +42,6 @@ void RequeuePathsSystem::Update()
 
             pm->RequeueSearch(&registry.get<IPath>(pathEntity), true, false, true);
             registry.emplace_or_replace<PathUpdatedCounterIncrease>(pathEntity);
-            
         }
     }
 }

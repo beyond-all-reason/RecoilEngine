@@ -1316,9 +1316,10 @@ unsigned int QTPFS::PathManager::QueueSearch(
 
 	IPath* newPath = createNewPath(pathEntity, synced, externalRequest);
 
-	// Every synced path gets one. It gets changed in a multi-threaded section, so we can't add them on demand.
+	// Requeue demands gets changed in a multi-threaded section, so we can't add them on demand.
 	// Unsynced paths don't requeue their searches (also, unsynced paths cannot have owning units.)
-	if (synced)
+	// Also, externally managed synced paths don't requeue their searches.
+	if (synced && !externalRequest)
 		registry.emplace<PathRequeueSearch>(pathEntity, false);
 	else
 		object = nullptr;
