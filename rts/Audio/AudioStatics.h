@@ -14,7 +14,8 @@ class AudioStatics {
         static bool LoadSound(
             const LuaTable& table,
             const std::string& key,
-            GuiSoundSet& soundSet
+            GuiSoundSet& soundSet,
+            std::uint8_t depth = 3
         );
 };
 

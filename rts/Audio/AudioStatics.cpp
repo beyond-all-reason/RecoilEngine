@@ -14,12 +14,12 @@
 
 static const int MAX_SOUND_FILES = 8;
 
-const std::unordered_map<uint32_t, std::string> soundFallbackMap = {
+const std::unordered_map<uint32_t, std::string> AudioStatics::soundFallbackMap = {
     {hashString("soundHitWet"), "soundHit"},
     {hashString("soundHitDry"), "soundHit"}
 };
 
-std::string GetSoundFallbackKey(const std::string& soundKey) {
+std::string AudioStatics::GetSoundFallbackKey(const std::string& soundKey) {
     uint32_t keyHash = hashString(soundKey.c_str());
     auto it = soundFallbackMap.find(keyHash);
     if (it != soundFallbackMap.end()) {
@@ -31,11 +31,12 @@ std::string GetSoundFallbackKey(const std::string& soundKey) {
 bool AudioStatics::LoadSound(
     const LuaTable& table,
     const std::string& key,
-    GuiSoundSet& soundSet
+    GuiSoundSet& soundSet,
+    std::uint8_t depth
 ) {
     RECOIL_DETAILED_TRACY_ZONE;
 
-    std::string fallbackKey= AudioStatics::GetSoundFallbackKey(key);
+    std::string fallbackKey= GetSoundFallbackKey(key);
 
     float volume = table.GetFloat(key + "Volume", 1.0f);
 
@@ -71,6 +72,13 @@ bool AudioStatics::LoadSound(
         LOG_L(L_WARNING, "[AudioStatics::%s] Sound file not found: %s, there is no fallback to try, not adding sound-set", __func__, key.c_str());
         return false;
     }
+
+    depth--;
+
+    if (depth < 0)
+        LOG_L(L_WARNING, "[AudioStatics::%s] Sound file not found: %s, reached max depth while searching for fallbacks", __func__, key.c_str());
+        return false;
+
 
     LOG_L(L_WARNING, "[AudioStatics::%s] Sound file not found: %s, trying fallback: %s", __func__, key.c_str(), fallbackKey.c_str());
     return AudioStatics::LoadSound(table, fallbackKey, soundSet);
