@@ -43,7 +43,7 @@ bool AudioStatics::LoadSound(
     std::string soundFile = table.GetString(key, "");
     if (!soundFile.empty()) {
         CommonDefHandler::AddSoundSetData(soundSet, soundFile, volume);
-        LOG_L(L_DEBUG, "[AudioStatics::%s] Successfully loaded sound file: %s with volume: %f", __func__, soundFile.c_str(), volume);
+        LOG_L(L_INFO, "[AudioStatics::%s] Successfully loaded sound file: %s with volume: %f", __func__, soundFile.c_str(), volume);
         return true;
     }
 
@@ -58,7 +58,7 @@ bool AudioStatics::LoadSound(
             if (soundFile.empty())
                 break;
 
-            LOG_L(L_DEBUG, "[AudioStatics::%s] Successfully loaded sound file: %s with volume: %f", __func__, soundFile.c_str(), volume);
+            LOG_L(L_INFO, "[AudioStatics::%s] Successfully loaded sound file: %s with volume: %f", __func__, soundFile.c_str(), volume);
             CommonDefHandler::AddSoundSetData(soundSet, soundFile, volume);
             success = true;
         }
@@ -69,18 +69,19 @@ bool AudioStatics::LoadSound(
     }
 
     if (fallbackKey.empty()) {
-        LOG_L(L_WARNING, "[AudioStatics::%s] Sound file not found: %s, there is no fallback to try, not adding sound-set", __func__, key.c_str());
+        LOG_L(L_INFO, "[AudioStatics::%s] Sound file not found: %s, there is no fallback to try, not adding sound-set", __func__, key.c_str());
         return false;
     }
 
     depth--;
 
-    if (depth < 0)
-        LOG_L(L_WARNING, "[AudioStatics::%s] Sound file not found: %s, reached max depth while searching for fallbacks", __func__, key.c_str());
+    if (depth < 0) {
+        LOG_L(L_INFO, "[AudioStatics::%s] Sound file not found: %s, reached max depth while searching for fallbacks", __func__, key.c_str());
         return false;
+    }
 
 
-    LOG_L(L_WARNING, "[AudioStatics::%s] Sound file not found: %s, trying fallback: %s", __func__, key.c_str(), fallbackKey.c_str());
+    LOG_L(L_INFO, "[AudioStatics::%s] Sound file not found: %s, trying fallback: %s", __func__, key.c_str(), fallbackKey.c_str());
     return AudioStatics::LoadSound(table, fallbackKey, soundSet);
 }
 
