@@ -5,14 +5,11 @@
 #include "Sim/Misc/CommonDefHandler.h"
 #include "Sim/Misc/GuiSoundSet.h"
 #include "System/Log/ILog.h"
-#include <unordered_set>
 #include <string>
 #include <cstdint>
 
 #undef LOG_SECTION_CURRENT
 #define LOG_SECTION_CURRENT "Audio"
-
-static const int MAX_SOUND_FILES = 8;
 
 const std::unordered_map<uint32_t, std::string> AudioStatics::soundFallbackMap = {
     {hashString("soundHitWet"), "soundHit"},
@@ -36,7 +33,7 @@ bool AudioStatics::LoadSound(
 ) {
     RECOIL_DETAILED_TRACY_ZONE;
 
-    std::string fallbackKey= GetSoundFallbackKey(key);
+    std::string fallbackKey = GetSoundFallbackKey(key);
 
     float volume = table.GetFloat(key + "Volume", 1.0f);
 
@@ -58,8 +55,8 @@ bool AudioStatics::LoadSound(
             if (soundFile.empty())
                 break;
 
-            LOG_L(L_INFO, "[AudioStatics::%s] Successfully loaded sound file: %s with volume: %f", __func__, soundFile.c_str(), volume);
             CommonDefHandler::AddSoundSetData(soundSet, soundFile, volume);
+            LOG_L(L_INFO, "[AudioStatics::%s] Successfully loaded sound file: %s with volume: %f", __func__, soundFile.c_str(), volume);
             success = true;
         }
 
