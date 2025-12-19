@@ -73,15 +73,14 @@ bool AudioStatics::LoadSound(
         return false;
     }
 
-    depth--;
-
-    if (depth < 0) {
+    if (depth == 0) {
         LOG_L(L_INFO, "[AudioStatics::%s] Sound file not found: %s, reached max depth while searching for fallbacks", __func__, key.c_str());
         return false;
     }
 
+    depth--;
 
     LOG_L(L_INFO, "[AudioStatics::%s] Sound file not found: %s, trying fallback: %s", __func__, key.c_str(), fallbackKey.c_str());
-    return AudioStatics::LoadSound(table, fallbackKey, soundSet);
+    return AudioStatics::LoadSound(table, fallbackKey, soundSet, depth);
 }
 
