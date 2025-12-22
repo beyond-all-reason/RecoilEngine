@@ -7,7 +7,7 @@
 #include "Lua/LuaParser.h"
 #include "Sim/Misc/GuiSoundSet.h"
 
-class AudioStatics {
+class SoundStatics {
     private:
         static const std::unordered_map<uint32_t, std::string> soundFallbackMap;
         static constexpr int MAX_SOUND_FILES = 8;

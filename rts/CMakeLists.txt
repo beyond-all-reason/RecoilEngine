@@ -118,7 +118,6 @@ endif()
 
 ### Assemble engine sources
 add_subdirectory(Game)
-add_subdirectory(Audio)
 add_subdirectory(Lua)
 add_subdirectory(ExternalAI)
 add_subdirectory(Rendering)
