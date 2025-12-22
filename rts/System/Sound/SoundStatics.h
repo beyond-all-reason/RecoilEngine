@@ -1,5 +1,5 @@
-#ifndef AUDIOSTATICS_H
-#define AUDIOSTATICS_H
+#ifndef SOUNDSTATICS_H
+#define SOUNDSTATICS_H
 
 #include <cstdint>
 #include <string>

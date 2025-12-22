@@ -5,11 +5,10 @@
 #include "Sim/Misc/CommonDefHandler.h"
 #include "Sim/Misc/GuiSoundSet.h"
 #include "System/Log/ILog.h"
-#include <string>
 #include <cstdint>
 
 #undef LOG_SECTION_CURRENT
-#define LOG_SECTION_CURRENT "Audio"
+#define LOG_SECTION_CURRENT "Sound"
 
 const std::unordered_map<uint32_t, std::string> SoundStatics::soundFallbackMap = {
     {hashString("soundHitWet"), "soundHit"},
