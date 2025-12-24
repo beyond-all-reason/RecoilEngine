@@ -56,6 +56,10 @@ struct SExpGenSpawnableMemberInfo
 	static_assert(std::is_same<decltype(member), float>::value, "Member type mismatch"); \
 	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member)  , 1, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr )
 
+#define CHECK_MEMBER_INFO_FLOAT2(type, member) \
+	static_assert(std::is_same<decltype(member), float2>::value, "Member type mismatch"); \
+	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member.x), 2, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr )
+
 #define CHECK_MEMBER_INFO_FLOAT3(type, member) \
 	static_assert(std::is_same<decltype(member), float3>::value, "Member type mismatch"); \
 	SET_MEMBER_INFO(memberInfo, MEMBER_HASH(member), offsetof_expgen(type, member), sizeof_expgen(type, member.x), 3, SExpGenSpawnableMemberInfo::TYPE_FLOAT, nullptr )

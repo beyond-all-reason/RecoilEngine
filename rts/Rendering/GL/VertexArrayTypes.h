@@ -277,6 +277,7 @@ struct VA_TYPE_PROJ {
 	float4 uvInfo;
 	float3 aparams;
 	SColor c;
+	uint2 dparams;
 
 	auto operator+(MY_VA_TYPE const& o) const {
 		auto v = *this;
@@ -285,6 +286,7 @@ struct VA_TYPE_PROJ {
 		v.uvInfo += o.uvInfo;
 		v.aparams += o.aparams;
 		v.c += o.c;
+		v.dparams += o.dparams;
 		return v;
 	}
 	auto operator-(MY_VA_TYPE const& o) const {
@@ -294,6 +296,7 @@ struct VA_TYPE_PROJ {
 		v.uvInfo -= o.uvInfo;
 		v.aparams -= o.aparams;
 		v.c -= o.c;
+		v.dparams -= o.dparams;
 		return v;
 	}
 	auto operator* (float t) const {
@@ -303,10 +306,11 @@ struct VA_TYPE_PROJ {
 		v.uvInfo *= t;
 		v.aparams *= t;
 		v.c *= t;
+		v.dparams *= t;
 		return v;
 	}
 
-	static std::array<AttributeDef, 5> attributeDefs;
+	static std::array<AttributeDef, 6> attributeDefs;
 };
 struct VA_TYPE_TNT {
 	using MY_VA_TYPE = VA_TYPE_TNT;

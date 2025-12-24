@@ -312,24 +312,42 @@ void CProjectileDrawer::Init() {
 	using VAT = std::decay_t<decltype(CProjectile::GetPrimaryRenderBuffer())>::VertType;
 	fxShader->BindAttribLocations<VAT>();
 
+	fxShader->BindOutputLocation("fragColor", 0);
+	fxShader->BindOutputLocation("distVec"  , 1);
+
 	fxShader->Link();
 	fxShader->Enable();
 	fxShader->SetUniform("atlasTex", 0);
 	fxShader->SetUniform("depthTex", 15);
 	fxShader->SetUniform("softenExponent", softenExponent[0], softenExponent[1]);
 	fxShader->SetUniform("softenThreshold", softenThreshold[0]);
+	fxShader->SetUniform("distUni", 0.0f, 0.0f);
 
 	fxShader->SetUniform("camPos", 0.0f, 0.0f, 0.0f);
 	fxShader->SetUniform("fogColor", 0.0f, 0.0f, 0.0f);
 	fxShader->SetUniform("fogParams", 0.0f, 0.0f);
 
 	fxShader->Disable();
-
 	fxShader->Validate();
+
+
+	fxCombShader = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "FX Combination Shader");
+	fxCombShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/FullscreenTriangleVS.glsl", "", GL_VERTEX_SHADER));
+	fxCombShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/ProjFXFragProgComb.glsl", "", GL_FRAGMENT_SHADER));
+	fxCombShader->Link();
+
+	fxCombShader->Enable();
+	fxCombShader->SetUniform("screenCopyTex", 0);
+	fxCombShader->SetUniform("distortionTex", 1);
+	fxCombShader->SetUniform("params", 0.0f, 0.0f, 0.0f);
+	fxCombShader->Disable();
+	fxCombShader->Validate();
 
 	sdbc = std::make_unique<ScopedDepthBufferCopy>(false);
 
 	EnableSoften(configHandler->GetInt("SoftParticles"));
+
+	ViewResize();
 }
 
 void CProjectileDrawer::Kill() {
@@ -355,9 +373,15 @@ void CProjectileDrawer::Kill() {
 
 	drawSorted = true;
 
+	particlesFBO.Kill();
+	screenCopyFBO.Kill();
+	distortionTex = {};
+	screenCopyTex = {};
+
 	shaderHandler->ReleaseProgramObjects("[ProjectileDrawer::VFS]");
 	fxShader = nullptr;
 	fxShadowShader = nullptr;
+	fxCombShader = nullptr;
 	sdbc = nullptr;
 
 	configHandler->Set("SoftParticles", wantSoften);
@@ -732,38 +756,47 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 	};
 	const auto& clipPlane = clipPlanes[1U * drawBelowWater + 2U * drawAboveWater];
 
+	static uint32_t prevDrawFrame = uint32_t(-1);
+	static uint8_t prevPassMask = 0U;
 	const uint8_t thisPassMask =
 		(1 - (drawReflection || drawRefraction)) * DrawFlags::SO_ALPHAF_FLAG +
 		(drawReflection * DrawFlags::SO_REFLEC_FLAG) +
 		(drawRefraction * DrawFlags::SO_REFRAC_FLAG);
 
-	for (auto& dp : drawParticles)
-		dp.clear();
 
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
-		for (CProjectile* p : renderProjectiles) {
-			if (!ShouldDrawProjectile(p, thisPassMask))
-				continue;
+	// spare some compute on drawAboveWater, drawBelowWater passes (the result is the same)
+	if (globalRendering->drawFrame != prevDrawFrame || thisPassMask != prevPassMask) {
+		prevDrawFrame = globalRendering->drawFrame;
+		prevPassMask = thisPassMask;
 
-			drawParticles[drawSorted && p->drawSorted].emplace_back(p);
+		for (auto& dp : drawParticles)
+			dp.clear();
+
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
+			for (CProjectile* p : renderProjectiles) {
+				if (!ShouldDrawProjectile(p, thisPassMask))
+					continue;
+
+				drawParticles[drawSorted && p->drawSorted].emplace_back(p);
+			}
 		}
-	}
 
-	// set static variable to facilite sorting
-	sortCamType = camera->GetCamType();
+		// set static variable to facilite sorting
+		sortCamType = camera->GetCamType();
 
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
-		if (wantDrawOrder)
-			std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileDrawOrderSortingPredicate);
-		else
-			std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileSortingPredicate);
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
+			if (wantDrawOrder)
+				std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileDrawOrderSortingPredicate);
+			else
+				std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileSortingPredicate);
+		}
 	}
 
 	{
 		ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
-		for (auto p : drawParticles[ true]) {
+		for (auto p : drawParticles[true ]) {
 			p->Draw();
 		}
 	}
@@ -776,54 +809,190 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 
 	{
 		ZoneScopedN("ProjectileDrawer::DrawAlpha(RR)");
+		{
+			using namespace GL::State;
+			auto state = GL::SubState(
+				Blending(GL_TRUE),
+				BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA),
+				DepthTest(GL_TRUE),
+				DepthMask(GL_FALSE),
+				ClipDistance<0>(GL_TRUE)
+			);
 
-		using namespace GL::State;
-		auto state = GL::SubState(
-			Blending(GL_TRUE),
-			BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA),
-			DepthTest(GL_TRUE),
-			DepthMask(GL_FALSE),
-			ClipDistance<0>(GL_TRUE)
-		);
+			// by established convention DrawWorldPreParticles() don't expect yet to draw into a non-default FBO.
+			eventHandler.DrawWorldPreParticles(drawAboveWater, drawBelowWater, drawReflection, drawRefraction);
 
-		eventHandler.DrawWorldPreParticles(drawAboveWater, drawBelowWater, drawReflection, drawRefraction);
+			auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
+			if (!rb.ShouldSubmit())
+				return;
 
+			const std::array rect = { 0, 0, globalRendering->viewSizeX, globalRendering->viewSizeY };
+			FBO::Blit(0, screenCopyFBO.GetId(), rect, rect, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+			particlesFBO.Bind();
+
+			static constexpr float CV[] = { 0.0f, 0.0f, 0.0f, 1.0f };
+			glClearBufferfv(GL_COLOR, 1, CV);
+
+			glActiveTexture(GL_TEXTURE0); textureAtlas->BindTexture();
+			const bool needSoften = (wantSoften > 0) && !drawReflection && !drawRefraction;
+			if (needSoften) {
+				glActiveTexture(GL_TEXTURE15); glBindTexture(GL_TEXTURE_2D, depthBufferCopy->GetDepthBufferTexture(false));
+			}
+
+			const auto* camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
+			const auto& sky = ISky::GetSky();
+
+			fxShader->Enable();
+
+			fxShader->SetFlag("SMOOTH_PARTICLES", needSoften);
+			fxShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
+			fxShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
+			fxShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
+			fxShader->SetUniform("softenThreshold", CProjectileDrawer::softenThreshold[0]);
+			fxShader->SetUniform("distUni", gu->gameTime, 0.01f);
+
+			fxShader->SetUniform("camPos", camPlayer->pos.x, camPlayer->pos.y, camPlayer->pos.z);
+			fxShader->SetUniform("fogColor", sky->fogColor.x, sky->fogColor.y, sky->fogColor.z);
+			fxShader->SetUniform("fogParams", sky->fogStart * camPlayer->GetFarPlaneDist(), sky->fogEnd * camPlayer->GetFarPlaneDist());
+
+			rb.DrawElements(GL_TRIANGLES);
+
+			fxShader->Disable();
+
+			if (needSoften) {
+				glBindTexture(GL_TEXTURE_2D, 0); //15th slot
+				glActiveTexture(GL_TEXTURE0);
+			}
+			textureAtlas->UnbindTexture();
+
+			FBO::Unbind();
+
+			auto b = screenCopyTex.ScopedBind();
+			screenCopyTex.ProduceMipmaps();
+		}
+		{
+			using namespace GL::State;
+			auto state = GL::SubState(
+				Blending(GL_FALSE),
+				DepthTest(GL_FALSE),
+				DepthMask(GL_FALSE)
+			);
+
+			auto b0 = screenCopyTex.ScopedBind(0);
+			auto b1 = distortionTex.ScopedBind(1);
+
+			fxCombShader->Enable();
+			fxCombShader->SetUniform("params",
+				0.003f,
+				static_cast<float>(screenCopyTex.GetNumLevels()),
+				0.8f
+			);
+
+			distortionVAO.Bind();
+			glDrawArrays(GL_TRIANGLES, 0, 3); // full screen triangle
+			distortionVAO.Unbind();
+
+			fxCombShader->Disable();
+		}
+	}
+	/*
+	{
+		ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
+		for (auto p : drawParticles[2]) {
+			p->Draw();
+		}
+	}
+	{
 		auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
 		if (!rb.ShouldSubmit())
 			return;
 
-		const bool needSoften = (wantSoften > 0) && !drawReflection && !drawRefraction;
-
-		glActiveTexture(GL_TEXTURE0); textureAtlas->BindTexture();
-
-		if (needSoften) {
-			glActiveTexture(GL_TEXTURE15); glBindTexture(GL_TEXTURE_2D, depthBufferCopy->GetDepthBufferTexture(false));
+		const std::array rect = { 0, 0, globalRendering->viewSizeX, globalRendering->viewSizeY};
+		FBO::Blit(0, screenCopyFBO.GetId(), rect, rect, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		{
+			auto b = screenCopyTex.ScopedBind();
+			screenCopyTex.ProduceMipmaps();
 		}
 
-		const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
-		const auto& sky = ISky::GetSky();
+		ZoneScopedN("ProjectileDrawer::DrawAlpha(RP)");
+		{
+			using namespace GL::State;
+			auto state = GL::SubState(
+				Blending(GL_TRUE),
+				BlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_COLOR),
+				DepthTest(GL_FALSE),
+				DepthMask(GL_FALSE),
+				ColorMask(GL_TRUE, GL_FALSE, GL_FALSE, GL_FALSE)
+			);
 
-		fxShader->Enable();
-		fxShader->SetFlag("SMOOTH_PARTICLES", needSoften);
-		fxShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
-		fxShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
-		fxShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
-		fxShader->SetUniform("softenThreshold", CProjectileDrawer::softenThreshold[0]);
+			distortionFBO.Bind();
 
-		fxShader->SetUniform("camPos", camPlayer->pos.x, camPlayer->pos.y, camPlayer->pos.z);
-		fxShader->SetUniform("fogColor", sky->fogColor.x, sky->fogColor.y, sky->fogColor.z);
-		fxShader->SetUniform("fogParams", sky->fogStart * camPlayer->GetFarPlaneDist(), sky->fogEnd * camPlayer->GetFarPlaneDist());
+			// Blending is
+			// R = (S * 0) + (D * (1 - S)), so D must be initialized to 1
+			glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
 
-		rb.DrawElements(GL_TRIANGLES);
+			glActiveTexture(GL_TEXTURE0); textureAtlas->BindTexture();
 
-		fxShader->Disable();
+			if (needSoften) {
+				glActiveTexture(GL_TEXTURE15); glBindTexture(GL_TEXTURE_2D, depthBufferCopy->GetDepthBufferTexture(false));
+			}
 
-		if (needSoften) {
-			glBindTexture(GL_TEXTURE_2D, 0); //15th slot
-			glActiveTexture(GL_TEXTURE0);
+			const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
+
+			fxShader->Enable();
+			fxShader->SetFlag("SMOOTH_PARTICLES", needSoften);
+			fxShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
+			fxShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
+			fxShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
+			fxShader->SetUniform("softenThreshold", CProjectileDrawer::softenThreshold[0]);
+
+			fxShader->SetUniform("camPos", camPlayer->pos.x, camPlayer->pos.y, camPlayer->pos.z);
+			fxShader->SetUniform("fogParams", std::numeric_limits<float>::max(), std::numeric_limits<float>::max()); // effectively disable fog
+
+			rb.DrawElements(GL_TRIANGLES);
+
+			fxShader->Disable();
+
+			if (needSoften) {
+				glBindTexture(GL_TEXTURE_2D, 0); //15th slot
+				glActiveTexture(GL_TEXTURE0);
+			}
+			textureAtlas->UnbindTexture();
+
+			distortionFBO.Unbind();
+
+			//glSaveTexture(distortionTex.GetId(), "distortion.png");
 		}
-		textureAtlas->UnbindTexture();
+		{
+			using namespace GL::State;
+			auto state = GL::SubState(
+				Blending(GL_FALSE),
+				DepthTest(GL_FALSE),
+				DepthMask(GL_FALSE)
+			);
+
+			auto b0 = screenCopyTex.ScopedBind(0);
+			auto b1 = distortionTex.ScopedBind(1);
+
+			fxPostShader->Enable();
+			fxPostShader->SetUniform("params",
+				gu->gameTime,
+				0.003f,
+				static_cast<float>(screenCopyTex.GetNumLevels()),
+				0.8f
+			);
+
+			distortionVAO.Bind();
+			glDrawArrays(GL_TRIANGLES, 0, 3); // full screen triangle
+			distortionVAO.Unbind();
+
+			fxPostShader->Disable();
+			fxPostShader->Validate();
+		}
 	}
+	*/
 }
 
 void CProjectileDrawer::DrawShadowOpaque()
@@ -1194,7 +1363,60 @@ void CProjectileDrawer::GenerateNoiseTex(uint32_t tex)
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, perlinBlendTexSize, perlinBlendTexSize, GL_RGBA, GL_UNSIGNED_BYTE, &mem[0]);
 }
 
+void CProjectileDrawer::ViewResize()
+{
+	{
+		GL::TextureCreationParams tcp {
+			//make function re-entrant
+			.texID = distortionTex.GetId(),
+			.reqNumLevels = 1,
+			.linearMipMapFilter = false,
+			.linearTextureFilter = false,
+			.wrapMirror = false
+		};
 
+		distortionTex = GL::Texture2D(globalRendering->viewSizeX, globalRendering->viewSizeY, GL_RG16F/*GL_RG16_SNORM*/, tcp, false);
+	}
+	{
+		static constexpr int32_t NUM_MIPS = 4;
+		GL::TextureCreationParams tcp{
+			//make function re-entrant
+			.texID = screenCopyTex.GetId(),
+			.reqNumLevels = NUM_MIPS,
+			.linearMipMapFilter = true,
+			.linearTextureFilter = true,
+			.wrapMirror = false
+		};
+
+		screenCopyTex = GL::Texture2D(globalRendering->viewSizeX, globalRendering->viewSizeY, GL_RGBA8, tcp, false);
+	}
+	{
+		//recreate just in case
+		particlesFBO = FBO(false);
+
+		particlesFBO.Bind();
+		particlesFBO.AttachTexture(depthBufferCopy->GetDepthBufferTexture(false), GL_TEXTURE_2D, GL_DEPTH_ATTACHMENT);
+		particlesFBO.AttachTexture(screenCopyTex.GetId(), GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0);
+		particlesFBO.AttachTexture(distortionTex.GetId(), GL_TEXTURE_2D, GL_COLOR_ATTACHMENT1);
+		particlesFBO.CheckStatus("PROJECTILE-DRAWER-PARTICLES");
+
+		constexpr GLenum DRAW_BUFFERS[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+		glDrawBuffers(2, DRAW_BUFFERS);
+	}
+	{
+		//recreate just in case
+		screenCopyFBO = FBO(false);
+
+		screenCopyFBO.Bind();
+		screenCopyFBO.AttachTexture(screenCopyTex.GetId(), GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0);
+		screenCopyFBO.CheckStatus("PROJECTILE-DRAWER-SCREENCOPY");
+
+		constexpr GLenum DRAW_BUFFERS[] = { GL_COLOR_ATTACHMENT0 };
+		glDrawBuffers(1, DRAW_BUFFERS);
+
+		FBO::Unbind();
+	}
+}
 
 void CProjectileDrawer::RenderProjectileCreated(const CProjectile* p)
 {

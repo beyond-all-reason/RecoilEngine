@@ -245,7 +245,7 @@ void RecoilGetTexParams(GLenum target, GLuint textureID, GLint level, TexturePar
 	glGetTexLevelParameteriv(target, level, GL_TEXTURE_DEPTH, &tp.sizeZ);
 
 	tp.isNormalizedDepth = false;
-	tp.prefDataType = GL_UNSIGNED_BYTE;
+	tp.prefDataType = 0;
 	tp.bpp = 0;
 	tp.chNum = 0;
 
@@ -257,6 +257,46 @@ void RecoilGetTexParams(GLenum target, GLuint textureID, GLint level, TexturePar
 		tp.chNum = 1;
 		tp.prefDataType = GL_FLOAT;
 	} break;
+	case GL_R8_SNORM: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_RG8_SNORM: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_RGB8_SNORM: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_RGBA8_SNORM: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_R16F: [[fallthrough]];
+	case GL_R16_SNORM: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_RG16F: [[fallthrough]];
+	case GL_RG16_SNORM: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_RGB16F: [[fallthrough]];
+	case GL_RGB16_SNORM: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_RGBA16F: [[fallthrough]];
+	case GL_RGBA16_SNORM: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_R32F: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_RG32F: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_RGB32F: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
+	case GL_RGBA32F: {
+		tp.prefDataType = GL_FLOAT;
+	} break;
 	default: {
 		GLint _cbits;
 		glGetTexLevelParameteriv(target, level, GL_TEXTURE_RED_SIZE  , &_cbits); tp.bpp += _cbits; if (_cbits > 0) tp.chNum++;
@@ -265,11 +305,13 @@ void RecoilGetTexParams(GLenum target, GLuint textureID, GLint level, TexturePar
 		glGetTexLevelParameteriv(target, level, GL_TEXTURE_ALPHA_SIZE, &_cbits); tp.bpp += _cbits; if (_cbits > 0) tp.chNum++;
 		glGetTexLevelParameteriv(target, level, GL_TEXTURE_DEPTH_SIZE, &_cbits); tp.bpp += _cbits; if (_cbits > 0) { tp.chNum++; tp.isNormalizedDepth = true; tp.prefDataType = GL_FLOAT; }
 
-		if (tp.chNum > 0) {
-			if (auto bytesPerChannel = tp.bpp / tp.chNum; bytesPerChannel == 4)
+		if (tp.chNum > 0 && !tp.prefDataType) {
+			if (auto bytesPerChannel = tp.bpp / tp.chNum / 8; bytesPerChannel == 4)
 				tp.prefDataType = GL_UNSIGNED_INT;
 			else if (bytesPerChannel == 2)
 				tp.prefDataType = GL_UNSIGNED_SHORT;
+			else if (bytesPerChannel == 1)
+				tp.prefDataType = GL_UNSIGNED_BYTE;
 		}
 	} break;
 	}

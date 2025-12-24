@@ -98,6 +98,10 @@ template<typename t> struct itype2 : public type2<t> {
 	type2<int> operator / (const int& i) const        { return (type2<int>(type2<t>::x / i  , type2<t>::y / i  )); }
 	type2<int> operator * (const type2<int>& v) const { return (type2<int>(type2<t>::x * v.x, type2<t>::y * v.y)); }
 	type2<int> operator * (const int& i) const        { return (type2<int>(type2<t>::x * i  , type2<t>::y * i  )); }
+	type2<int> operator += (const type2<int>& v) { return (type2<int>(type2<t>::x += v.x, type2<t>::y += v.y)); }
+	type2<int> operator -= (const type2<int>& v) { return (type2<int>(type2<t>::x -= v.x, type2<t>::y -= v.y)); }
+	type2<int> operator *= (const type2<int>& v) { return (type2<int>(type2<t>::x *= v.x, type2<t>::y *= v.y)); }
+	type2<int> operator /= (const type2<int>& v) { return (type2<int>(type2<t>::x /= v.x, type2<t>::y /= v.y)); }
 
 	operator type2<int> () const { return (type2<int>(type2<t>::x, type2<t>::y)); }
 };

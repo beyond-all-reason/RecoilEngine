@@ -36,6 +36,13 @@ public:
 	static CExpGenSpawnable* CreateSpawnable(int spawnableID);
 	static TypedRenderBuffer<VA_TYPE_PROJ>& GetPrimaryRenderBuffer();
 protected:
+	struct EffectAuxParams {
+		const float3* ap = nullptr;
+		float p = 0.0f;
+		const float2* distMag = nullptr;
+		const float4* distPar = nullptr;
+	};
+
 	CExpGenSpawnable();
 
 	//update in Draw() of CGroundFlash or CProjectile
@@ -47,8 +54,7 @@ protected:
 	template <uint32_t texIdx>
 	void AddEffectsQuad(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const;
 
-	static void AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl, const float3& ap, const float& p);
-	static void AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl);
+	static void AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl, const EffectAuxParams& aux);
 
 	static bool GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo);
 
@@ -69,33 +75,36 @@ protected:
 
 	int createFrame;
 
-	static std::array<SpawnableTuple, 14> spawnables;
+	float2 distMag = { 0.0f, 0.0f };
+	float4 distPar = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+	static std::array<SpawnableTuple, 15> spawnables;
 };
 
 template <>
 inline void CExpGenSpawnable::AddEffectsQuad<0>(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
 	// no animation
-	AddEffectsQuadImpl(pageNum, tl, tr, br, bl);
+	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, EffectAuxParams{ .ap = nullptr, .p = 0.0f, .distMag = &distMag, .distPar = &distPar });
 }
 
 template <>
 inline void CExpGenSpawnable::AddEffectsQuad<1>(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
-	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, animParams1, animProgress1);
+	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, EffectAuxParams{ .ap = &animParams1, .p = animProgress1, .distMag = &distMag, .distPar = &distPar });
 }
 
 template <>
 inline void CExpGenSpawnable::AddEffectsQuad<2>(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
-	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, animParams2, animProgress2);
+	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, EffectAuxParams{ .ap = &animParams2, .p = animProgress2, .distMag = &distMag, .distPar = &distPar });
 }
 
 template <>
 inline void CExpGenSpawnable::AddEffectsQuad<3>(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
-	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, animParams3, animProgress3);
+	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, EffectAuxParams{ .ap = &animParams3, .p = animProgress3, .distMag = &distMag, .distPar = &distPar });
 }
 
 template <>
 inline void CExpGenSpawnable::AddEffectsQuad<4>(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl) const {
-	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, animParams4, animProgress4);
+	AddEffectsQuadImpl(pageNum, tl, tr, br, bl, EffectAuxParams{ .ap = &animParams4, .p = animProgress4, .distMag = &distMag, .distPar = &distPar });
 }
 
 #endif //EXP_GEN_SPAWNABLE_H

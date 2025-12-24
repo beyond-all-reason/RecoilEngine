@@ -34,6 +34,7 @@ set(sources_engine_Rendering
 		"${CMAKE_CURRENT_SOURCE_DIR}/Env/Particles/Classes/BitmapMuzzleFlame.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Env/Particles/Classes/BubbleProjectile.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Env/Particles/Classes/DirtProjectile.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Env/Particles/Classes/DistortionEffect.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Env/Particles/Classes/ExploSpikeProjectile.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Env/Particles/Classes/FlyingPiece.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Env/Particles/Classes/GeoSquareProjectile.cpp"

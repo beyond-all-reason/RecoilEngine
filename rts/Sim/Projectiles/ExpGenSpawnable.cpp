@@ -16,6 +16,7 @@
 #include "Rendering/Env/Particles/Classes/SmokeProjectile2.h"
 #include "Rendering/Env/Particles/Classes/SpherePartProjectile.h"
 #include "Rendering/Env/Particles/Classes/TracerProjectile.h"
+#include "Rendering/Env/Particles/Classes/DistortionEffect.hpp"
 #include "Rendering/GL/RenderBuffers.h"
 #include "System/SpringHash.h"
 #include "System/TemplateUtils.hpp"
@@ -135,6 +136,9 @@ bool CExpGenSpawnable::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 	CHECK_MEMBER_INFO_FLOAT3(CExpGenSpawnable, animParams3);
 	CHECK_MEMBER_INFO_FLOAT3(CExpGenSpawnable, animParams4);
 
+	CHECK_MEMBER_INFO_FLOAT2(CExpGenSpawnable, distMag);
+	CHECK_MEMBER_INFO_FLOAT4(CExpGenSpawnable, distPar);
+
 	return false;
 }
 
@@ -157,28 +161,27 @@ CExpGenSpawnable::SpawnableTuple GetSpawnableEntryImpl()
 	);
 }
 
-#define MAKE_FUNCTIONS_TUPLE(Func) \
-std::make_tuple( \
-	Func<CExpGenSpawner        >, \
-	Func<CStandardGroundFlash  >, \
-	Func<CSimpleGroundFlash    >, \
-	Func<CBitmapMuzzleFlame    >, \
-	Func<CDirtProjectile       >, \
-	Func<CExploSpikeProjectile >, \
-	Func<CHeatCloudProjectile  >, \
-	Func<CNanoProjectile       >, \
-	Func<CSimpleParticleSystem >, \
-	Func<CSphereParticleSpawner>, \
-	Func<CSmokeProjectile      >, \
-	Func<CSmokeProjectile2     >, \
-	Func<CSpherePartSpawner    >, \
-	Func<CTracerProjectile     >  \
-)
 
 void CExpGenSpawnable::InitSpawnables()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	auto funcTuple = MAKE_FUNCTIONS_TUPLE(GetSpawnableEntryImpl);
+	auto funcTuple = std::make_tuple(
+		GetSpawnableEntryImpl<CExpGenSpawner        >,
+		GetSpawnableEntryImpl<CStandardGroundFlash  >,
+		GetSpawnableEntryImpl<CSimpleGroundFlash    >,
+		GetSpawnableEntryImpl<CBitmapMuzzleFlame    >,
+		GetSpawnableEntryImpl<CDirtProjectile       >,
+		GetSpawnableEntryImpl<CExploSpikeProjectile >,
+		GetSpawnableEntryImpl<CHeatCloudProjectile  >,
+		GetSpawnableEntryImpl<CNanoProjectile       >,
+		GetSpawnableEntryImpl<CSimpleParticleSystem >,
+		GetSpawnableEntryImpl<CSphereParticleSpawner>,
+		GetSpawnableEntryImpl<CSmokeProjectile      >,
+		GetSpawnableEntryImpl<CSmokeProjectile2     >,
+		GetSpawnableEntryImpl<CSpherePartSpawner    >,
+		GetSpawnableEntryImpl<CTracerProjectile     >,
+		GetSpawnableEntryImpl<CDistortionEffect     >
+	);
 	static_assert(std::tuple_size<decltype(funcTuple)>::value == spawnables.size());
 
 	for (size_t i = 0; i < spawnables.size(); ++i) {
@@ -188,8 +191,6 @@ void CExpGenSpawnable::InitSpawnables()
 		spawnables[i] = entry;
 	}
 }
-
-#undef MAKE_FUNCTIONS_TUPLE
 
 bool CExpGenSpawnable::GetSpawnableMemberInfo(const std::string& spawnableName, SExpGenSpawnableMemberInfo& memberInfo)
 {
@@ -226,34 +227,18 @@ CExpGenSpawnable* CExpGenSpawnable::CreateSpawnable(int spawnableID)
 	return std::get<2>(spawnables[spawnableID])();
 }
 
-void CExpGenSpawnable::AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl, const float3& ap, const float& p)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	float minS = std::numeric_limits<float>::max()   ; float minT = std::numeric_limits<float>::max()   ;
-	float maxS = std::numeric_limits<float>::lowest(); float maxT = std::numeric_limits<float>::lowest();
-	std::invoke([&](auto&&... arg) {
-		((minS = std::min(minS, arg.s)), ...);
-		((minT = std::min(minT, arg.t)), ...);
-		((maxS = std::max(maxS, arg.s)), ...);
-		((maxT = std::max(maxT, arg.t)), ...);
-	}, tl, tr, br, bl);
-
-	auto& rb = GetPrimaryRenderBuffer();
-
-	const auto uvInfo = float4{ minS, minT, maxS - minS, maxT - minT };
-	const auto animInfo = float3{ ap.x, ap.y, p };
-	const auto pn = static_cast<float>(pageNum);
-
-	//pos, uvw, uvmm, col
-	rb.AddQuadTriangles(
-		{ tl.pos, float3{ tl.s, tl.t, pn }, uvInfo, animInfo, tl.c },
-		{ tr.pos, float3{ tr.s, tr.t, pn }, uvInfo, animInfo, tr.c },
-		{ br.pos, float3{ br.s, br.t, pn }, uvInfo, animInfo, br.c },
-		{ bl.pos, float3{ bl.s, bl.t, pn }, uvInfo, animInfo, bl.c }
-	);
+namespace Impl {
+	inline uint32_t GetNormalizedFloatAsUint(float f, uint32_t bn) {
+		f = std::clamp(f, 0.0f, 1.0f);
+		return uint32_t(f * 0xFFU) << (8U * bn);
+	}
+	inline uint32_t GetSNormalizedFloatAsUint(float f, uint32_t bn) {
+		f = f * 0.5f + 0.5f;
+		return GetNormalizedFloatAsUint(f, bn);
+	}
 }
 
-void CExpGenSpawnable::AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl)
+void CExpGenSpawnable::AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl, const VA_TYPE_TC& tr, const VA_TYPE_TC& br, const VA_TYPE_TC& bl, const EffectAuxParams& aux)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	float minS = std::numeric_limits<float>::max()   ; float minT = std::numeric_limits<float>::max()   ;
@@ -268,14 +253,32 @@ void CExpGenSpawnable::AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl
 	auto& rb = GetPrimaryRenderBuffer();
 
 	const auto uvInfo = float4{ minS, minT, maxS - minS, maxT - minT };
-	static constexpr auto animInfo = float3{ 1.0f, 1.0f , 0.0f };
+	const auto animInfo = aux.ap ?
+		float3{ aux.ap->x, aux.ap->y, aux.p } :
+		float3{ 1.0f, 1.0f, 0.0f };
+
 	const auto pn = static_cast<float>(pageNum);
+
+	assert(aux.distMag);
+	assert(aux.distPar);
+
+	decltype(VA_TYPE_PROJ::dparams) dparams = {
+		// 1st uint32_t
+		Impl::GetNormalizedFloatAsUint(aux.distMag->x, 0U) |
+		Impl::GetNormalizedFloatAsUint(aux.distMag->y, 1U),
+
+		// 2nd uint32_t
+		Impl::GetSNormalizedFloatAsUint(aux.distPar->x, 0U) |
+		Impl::GetSNormalizedFloatAsUint(aux.distPar->y, 1U) |
+		Impl::GetSNormalizedFloatAsUint(aux.distPar->z, 2U) |
+		Impl::GetSNormalizedFloatAsUint(aux.distPar->w, 3U)
+	};
 
 	//pos, uvw, uvmm, col
 	rb.AddQuadTriangles(
-		{ tl.pos, float3{ tl.s, tl.t, pn }, uvInfo, animInfo, tl.c },
-		{ tr.pos, float3{ tr.s, tr.t, pn }, uvInfo, animInfo, tr.c },
-		{ br.pos, float3{ br.s, br.t, pn }, uvInfo, animInfo, br.c },
-		{ bl.pos, float3{ bl.s, bl.t, pn }, uvInfo, animInfo, bl.c }
+		{ tl.pos, float3{ tl.s, tl.t, pn }, uvInfo, animInfo, tl.c, dparams },
+		{ tr.pos, float3{ tr.s, tr.t, pn }, uvInfo, animInfo, tr.c, dparams },
+		{ br.pos, float3{ br.s, br.t, pn }, uvInfo, animInfo, br.c, dparams },
+		{ bl.pos, float3{ bl.s, bl.t, pn }, uvInfo, animInfo, bl.c, dparams }
 	);
 }

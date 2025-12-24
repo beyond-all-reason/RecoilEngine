@@ -42,6 +42,7 @@ public:
 	bool AddTexFromBitmap(const std::string& name, const CBitmap& bm, const std::string& refFileName, const float4& subTexCoords = float4(0.0f, 0.0f, 1.0f, 1.0f));
 	bool AddTex(const std::string& name, int xsize, int ysize, const SColor& color, const std::string& refFileName);
 
+	bool ContainsTexture(const std::string& texName);
 	AtlasedTexture GetTexture(const std::string& texName);
 	AtlasedTexture GetTexture(const std::string& texName, const std::string& texBackupName);
 

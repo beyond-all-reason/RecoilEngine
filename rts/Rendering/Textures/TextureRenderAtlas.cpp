@@ -213,6 +213,16 @@ bool CTextureRenderAtlas::AddTex(const std::string& name, int xsize, int ysize, 
 	return AddTexFromBitmapRaw(name, bm, float4(0.0f, 0.0f, 1.0f, 1.0f), refFileName);
 }
 
+bool CTextureRenderAtlas::ContainsTexture(const std::string& texName)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto it = nameToUniqueSubTexStr.find(texName);
+	if (it == nameToUniqueSubTexStr.end())
+		return false;
+
+	return atlasAllocator->contains(it->second);
+}
+
 AtlasedTexture CTextureRenderAtlas::GetTexture(const std::string& texName)
 {
 	RECOIL_DETAILED_TRACY_ZONE;

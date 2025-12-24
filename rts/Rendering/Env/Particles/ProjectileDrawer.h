@@ -8,9 +8,11 @@
 #include "Sim/Projectiles/Projectile.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/FBO.h"
+#include "Rendering/GL/VAO.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Models/ModelRenderContainer.h"
+#include "Rendering/Textures/Texture.hpp"
 #include "Rendering/DepthBufferCopy.h"
 #include "System/EventClient.h"
 #include "System/UnorderedSet.hpp"
@@ -25,7 +27,12 @@ class LuaTable;
 
 class CProjectileDrawer: public CEventClient {
 public:
-	CProjectileDrawer(): CEventClient("[CProjectileDrawer]", 123456, false), perlinFB(true) {}
+	CProjectileDrawer()
+		: CEventClient("[CProjectileDrawer]", 123456, false)
+		, perlinFB(true)
+		, particlesFBO(true)
+		, screenCopyFBO(true)
+	{}
 
 	static void InitStatic();
 	static void KillStatic(bool reload);
@@ -52,13 +59,16 @@ public:
 	bool WantsEvent(const std::string& eventName) {
 		return
 			(eventName == "RenderProjectileCreated") ||
-			(eventName == "RenderProjectileDestroyed");
+			(eventName == "RenderProjectileDestroyed") ||
+			(eventName == "ViewResize")
+		;
 	}
 	bool GetFullRead() const { return true; }
 	int GetReadAllyTeam() const { return AllAccessTeam; }
 
-	void RenderProjectileCreated(const CProjectile* projectile);
-	void RenderProjectileDestroyed(const CProjectile* projectile);
+	void ViewResize() override;
+	void RenderProjectileCreated(const CProjectile* projectile) override;
+	void RenderProjectileDestroyed(const CProjectile* projectile) override;
 
 	unsigned int NumSmokeTextures() const { return (smokeTextures.size()); }
 
@@ -169,6 +179,7 @@ private:
 	bool drawSorted = true;
 
 	Shader::IProgramObject* fxShader = nullptr;
+	Shader::IProgramObject* fxCombShader = nullptr;
 	Shader::IProgramObject* fxShadowShader = nullptr;
 
 	constexpr static int WANT_SOFTEN_COUNT = 2;
@@ -176,6 +187,11 @@ private:
 
 	bool wantDrawOrder = true;
 
+	FBO particlesFBO;
+	FBO screenCopyFBO;
+	GL::Texture2D distortionTex;
+	GL::Texture2D screenCopyTex;
+	VAO distortionVAO;
 	std::unique_ptr<ScopedDepthBufferCopy> sdbc;
 };
 

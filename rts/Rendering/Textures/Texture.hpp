@@ -29,6 +29,7 @@ namespace GL {
 		void Bind(uint32_t relSlot);
 		void Unbind();
 		void Unbind(uint32_t relSlot);
+		auto GetNumLevels() const { return numLevels; }
 	public:
 		TextureBase(TextureBase&& other) noexcept{ *this = std::move(other); }
 		TextureBase(const TextureBase&) = delete;
@@ -94,6 +95,7 @@ namespace GL {
 		}
 		void UploadSubImage(const void* data, int xOffset, int yOffset, int width, int height, int level = 0) const;
 		void ProduceMipmaps() const override;
+		const auto& GetSize() const { return size; }
 	private:
 		int2 size;
 	};
@@ -147,6 +149,7 @@ namespace GL {
 		}
 		void UploadSubImage(const void* data, int layer, int xOffset, int yOffset, int width, int height, int level = 0) const;
 		void ProduceMipmaps() const override;
+		const auto& GetSize() const { return size; }
 	private:
 		int2 size;
 		int numPages;
