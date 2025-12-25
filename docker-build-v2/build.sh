@@ -14,6 +14,8 @@ USAGE="Usage: $0 [--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] {
 export CONFIGURE=true
 export COMPILE=true
 export CMAKE_BUILD_PARALLEL_LEVEL=
+
+ARCH=amd64
 OS=
 while (( $# > 0 )); do
   case $1 in
@@ -60,14 +62,16 @@ if [[ -z $OS ]]; then
   exit 1
 fi
 
+PLATFORM="$ARCH-$OS"
+
 cd "$(dirname "$(readlink -f "$0")")/.."
+source docker-build-v2/images_versions.sh
 mkdir -p build-$OS .cache/ccache-$OS
 
 # Use locally build image if available, and pull from upstream if not
-image=recoil-build-amd64-$OS:latest
+image=recoil-build-$PLATFORM:latest
 if [[ -z "$(docker images -q $image 2> /dev/null)" ]]; then
-  image=ghcr.io/beyond-all-reason/recoil-build-amd64-$OS:latest
-  docker pull $image
+  image=ghcr.io/beyond-all-reason/recoil-build-$PLATFORM@${image_version[$PLATFORM]}
 fi
 
 docker run -it --rm \
