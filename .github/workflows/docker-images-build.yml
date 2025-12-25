@@ -2,6 +2,11 @@
 name: Docker Images Build
 on:
   workflow_dispatch:
+    inputs:
+      update-digests:
+        description: "Commit new image versions to branch"
+        type: boolean
+        default: true
   push:
     branches:
       - master
@@ -26,7 +31,7 @@ jobs:
       packages: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
@@ -36,6 +41,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
           # Disabling cache to make sure that operations like git clone are
@@ -45,3 +51,35 @@ jobs:
           context: docker-build-v2/${{ matrix.system }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}:latest
+      - name: Write new image digest to file
+        run: echo "${{ steps.build.outputs.digest }}" > ${{ matrix.system }}.txt
+      - name: Save digest in artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: image-digest-${{ matrix.system }}
+          path: ${{ matrix.system }}.txt
+  publish:
+    name: Update digest branch
+    needs: build-images
+    if: github.event_name == 'workflow_dispatch' && inputs.update-digests == true || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Fetch digests
+        uses: actions/download-artifact@v7
+        with:
+          path: .digests
+          pattern: image-digest-*
+          merge-multiple: true
+      - name: Update digests
+        run: |
+          for digest in $(ls .digests); do
+            sed -i -r "s/(image_version\[${digest%.*}\]=)(.*)/\1$(cat .digests/$digest)/" docker-build-v2/images_versions.sh
+          done
+          rm -r .digests
+      - name: Commit and push
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: Automatic docker build image update from ${{ github.sha }}
