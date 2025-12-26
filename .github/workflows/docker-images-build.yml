@@ -58,27 +58,49 @@ jobs:
         with:
           name: image-digest-${{ matrix.system }}
           path: ${{ matrix.system }}.txt
-  publish:
-    name: Update digest branch
-    needs: build-images
-    if: github.event_name == 'workflow_dispatch' && inputs.update-digests == true || github.event_name == 'push'
+  gather-digests:
+    name: Gather digests
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    needs: build-images
+    outputs:
+      images_versions: ${{ steps.merge.outputs.images_versions }}
     steps:
-      - uses: actions/checkout@v6
       - name: Fetch digests
         uses: actions/download-artifact@v7
         with:
           path: .digests
           pattern: image-digest-*
           merge-multiple: true
-      - name: Update digests
+      - name: Merge digests
+        id: merge
         run: |
-          for digest in $(ls .digests); do
-            sed -i -r "s/(image_version\[${digest%.*}\]=)(.*)/\1$(cat .digests/$digest)/" docker-build-v2/images_versions.sh
+          echo "images_versions=$(
+            for digest in $(ls .digests); do
+              echo "${digest%.*}=$(cat .digests/$digest)"
+            done | jq -Rnc '[inputs] | map(. | split("=") | {key: .[0], value: .[1]}) | from_entries'
+          )" >> "$GITHUB_OUTPUT"
+  test-build:
+    needs: gather-digests
+    uses: ./.github/workflows/engine-build.yml
+    with:
+      image-versions: ${{ needs.gather-digests.outputs.images_versions }}
+    secrets: inherit
+  publish:
+    name: Update digest branch
+    needs: [test-build, gather-digests]
+    if: github.event_name == 'workflow_dispatch' && inputs.update-digests == true || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Update digests
+        env:
+          images_versions: ${{ needs.gather-digests.outputs.images_versions }}
+        run: |
+          echo "$images_versions" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read -r platform digest; do
+            sed -i -r "s/(image_version\[$platform\]=)(.*)/\1$digest/" docker-build-v2/images_versions.sh
           done
-          rm -r .digests
       - name: Commit and push
         uses: stefanzweifel/git-auto-commit-action@v7
         with:

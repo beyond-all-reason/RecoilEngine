@@ -42,6 +42,10 @@ on:
       package-suffix:
         description: 'Custom suffix for the package name'
         type: string
+      image-versions:
+        description: 'Allows override image-versions for this run'
+        type: string
+        default: '{}'
   pull_request:
     paths-ignore:
       - 'doc/**'
@@ -143,12 +147,13 @@ jobs:
             http-get://127.0.0.1:8085/cas/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
           wait-for: 3m
       - name: Pull builder image
+        id: resolve-image
         # Fetching image from GitHub can be *incredibly* slow, so cache layers also in the
         # namespace.so container registry.
         run: |
           source src/docker-build-v2/images_versions.sh
 
-          digest=${image_version[${{ matrix.system }}]}
+          digest=${{ fromJson(inputs.image-versions || '{}')[matrix.system] || format('${{image_version[{0}]}}', matrix.system) }}
           ghcr_image=ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}
           nsc_image=${{ env.NSC_CONTAINER_REGISTRY }}/recoil-build-${{ matrix.system }}
 
@@ -157,6 +162,8 @@ jobs:
           docker pull $ghcr_image@$digest
           docker image tag $ghcr_image@$digest $nsc_image
           docker push $nsc_image
+
+          echo "image=$ghcr_image@$digest" >> "$GITHUB_OUTPUT"
       - name: Build
         # Instead of manually running docker, it would be cool to just run whole GitHub actions
         # in container, but unfortunately ubuntu 18.04 is just too old to be able to do it ;(.
@@ -172,7 +179,7 @@ jobs:
             -v $(pwd)/artifacts:/build/artifacts:rw \
             -e CCACHE_${{ inputs.recache && 'RECACHE' || 'NORECACHE' }}=1 \
             --network host \
-            ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}@${image_version[${{ matrix.system }}]} \
+            ${{ steps.resolve-image.outputs.image }} \
             bash <<EOF
           set -e
           cd /build/src/docker-build-v2/scripts
