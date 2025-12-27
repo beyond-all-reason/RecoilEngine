@@ -191,6 +191,7 @@ namespace {
 	inline uint32_t CheckSum(T&&, uint32_t cs = 0u)
 	{
 		static_assert(false, "Not implemented <T>");
+		return cs;
 	}
 }
 
