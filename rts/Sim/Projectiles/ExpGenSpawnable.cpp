@@ -168,7 +168,6 @@ std::make_tuple( \
 	Func<CHeatCloudProjectile  >, \
 	Func<CNanoProjectile       >, \
 	Func<CSimpleParticleSystem >, \
-	Func<CSphereParticleSpawner>, \
 	Func<CSmokeProjectile      >, \
 	Func<CSmokeProjectile2     >, \
 	Func<CSpherePartSpawner    >, \

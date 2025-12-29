@@ -69,7 +69,7 @@ protected:
 
 	int createFrame;
 
-	static std::array<SpawnableTuple, 14> spawnables;
+	static std::array<SpawnableTuple, 13> spawnables;
 };
 
 template <>
