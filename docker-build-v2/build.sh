@@ -68,19 +68,38 @@ cd "$(dirname "$(readlink -f "$0")")/.."
 source docker-build-v2/images_versions.sh
 mkdir -p build-$OS .cache/ccache-$OS
 
+RUNTIME=${CONTAINER_RUNTIME:-docker}
+
 # Use locally build image if available, and pull from upstream if not
 image=recoil-build-$PLATFORM:latest
-if [[ -z "$(docker images -q $image 2> /dev/null)" ]]; then
+if [[ -z "$($RUNTIME images -q $image 2> /dev/null)" ]]; then
   image=ghcr.io/beyond-all-reason/recoil-build-$PLATFORM@${image_version[$PLATFORM]}
 fi
 
-docker run -it --rm \
-    -v /etc/passwd:/etc/passwd:ro \
-    -v /etc/group:/etc/group:ro \
-    --user=$(id -u):$(id -g) \
+# With the most common rootful docker as runtime, the users inside of the
+# container maps directly to users on the host and because user in container
+# is root, all files created in mounted volumes are owned by root outside of
+# container. To avoid this, we mount /etc/passwd and /etc/group and use --user
+# flag to run the container as current host user.
+#
+# This is not the case when using rootless podman or docker, because the root
+# inside of container is mapped via user namespaces to the calling user on
+# the host. Another option we handle is Docker Desktop, which runs containers
+# in a separate VM and does special remapping for mounted volumes.
+UID_FLAGS=""
+if [[ -n "${FORCE_UID_FLAGS:-}" ]] || (
+       [[ -z "${FORCE_NO_UID_FLAGS:-}" && "$RUNTIME" == "docker" ]] &&
+       [[ "$(docker info -f '{{.OperatingSystem}}')" != "Docker Desktop" ]] &&
+       ! docker info -f '{{.SecurityOptions}}' | grep -q rootless
+   ); then
+    UID_FLAGS="-v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro --user=$(id -u):$(id -g)"
+fi
+
+$RUNTIME run -it --rm \
     -v $(pwd):/build/src:ro \
     -v $(pwd)/.cache/ccache-$OS:/build/cache:rw \
     -v $(pwd)/build-$OS:/build/out:rw \
+    $UID_FLAGS \
     -e CONFIGURE \
     -e COMPILE \
     -e CMAKE_BUILD_PARALLEL_LEVEL \
