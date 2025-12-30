@@ -129,9 +129,9 @@ else
 fi
 
 $RUNTIME run -it --rm \
-    -v "$CWD${P}":/build/src:ro \
-    -v "$CWD${P}.cache${P}ccache-$OS":/build/cache:rw \
-    -v "$CWD${P}build-$OS":/build/out:rw \
+    -v "$CWD${P}":/build/src:z,ro \
+    -v "$CWD${P}.cache${P}ccache-$OS":/build/cache:z,rw \
+    -v "$CWD${P}build-$OS":/build/out:z,rw \
     $UID_FLAGS \
     -e CONFIGURE \
     -e COMPILE \
