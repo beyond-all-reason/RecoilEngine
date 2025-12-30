@@ -272,7 +272,7 @@ void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 	bool unitVisible =
 		(losStatus & inLosOrRad) != 0 &&
 		(losStatus & prevMask) == prevMask ||
-		gameSetup->ghostedBuildings && unit->unitDef->IsBuildingUnit() && (losStatus & LOS_PREVLOS) != 0;
+		gameSetup->ghostedBuildings && unit->leavesGhost && (losStatus & LOS_PREVLOS) != 0;
 
 	const bool customIcon = (unitVisible || gu->spectatingFullView);
 
