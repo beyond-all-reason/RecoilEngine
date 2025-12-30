@@ -112,6 +112,12 @@ if [[ -n "${FORCE_UID_FLAGS:-}" ]] || (
     UID_FLAGS="-v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro --user=$(id -u):$(id -g)"
 fi
 
+# Allow passing extra arguments to runtime for example to mount additional volumes
+EXTRA_ARGS=()
+if [[ -n "${CONTAINER_RUNTIME_EXTRA_ARGS:-}" ]]; then
+  eval "EXTRA_ARGS=($CONTAINER_RUNTIME_EXTRA_ARGS)"
+fi
+
 $RUNTIME run -it --rm \
     -v $(pwd):/build/src:ro \
     -v $(pwd)/.cache/ccache-$OS:/build/cache:rw \
@@ -120,6 +126,7 @@ $RUNTIME run -it --rm \
     -e CONFIGURE \
     -e COMPILE \
     -e CMAKE_BUILD_PARALLEL_LEVEL \
+    "${EXTRA_ARGS[@]}" \
     $IMAGE \
     bash -c '
 set -e
