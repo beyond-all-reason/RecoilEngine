@@ -53,13 +53,16 @@ docker-build-v2/build.sh --configure linux -LH
 
 ### Custom Docker image
 
-Before downloading official Docker build environment image, `build.sh` will
-first lookup if there exists locally a Docker image with tag
-`recoil-build-amd64-windows` (and `-linux` for Linux). If you want to adjust
-the Docker build image, test local changes, build it with that tag:
+If you want to adjust the Docker build image, test local changes, build it:
 
 ```shell
 docker build -t recoil-build-amd64-windows docker-build-v2/amd64-windows
+```
+
+and then pass the custom image to build script via the environment variable `CONTAINER_IMAGE`:
+
+```shell
+CONTAINER_IMAGE=recoil-build-amd64-windows docker-build-v2/build.sh windows
 ```
 
 and `build.sh` will use it.

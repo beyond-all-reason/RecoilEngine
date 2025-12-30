@@ -36,6 +36,8 @@ while (( $# > 0 )); do
       echo "  --configure  only configure, don't compile"
       echo "  --compile    only compile, don't configure"
       echo "  -j, --jobs   number of concurrent processes to use when building"
+      echo ""
+      echo "Some behaviors can be changed by setting environment variables. Consult the script source for those more advanced use cases."
       exit 0
       ;;
     -j|--jobs)
@@ -65,8 +67,15 @@ fi
 PLATFORM="$ARCH-$OS"
 
 cd "$(dirname "$(readlink -f "$0")")/.."
-source docker-build-v2/images_versions.sh
 mkdir -p build-$OS .cache/ccache-$OS
+
+# Build container image selection, allow overriding.
+if [[ -n "${CONTAINER_IMAGE:-}" ]]; then
+  IMAGE="$CONTAINER_IMAGE"
+else
+  source docker-build-v2/images_versions.sh
+  IMAGE=ghcr.io/beyond-all-reason/recoil-build-$PLATFORM@${image_version[$PLATFORM]}
+fi
 
 # Detect and select container runtime. Support explicit override, docker and
 # podman, with docker being the default as that's likely more expected behavior.
@@ -82,12 +91,6 @@ elif command -v podman &> /dev/null; then
 else
     echo "Neither docker nor podman is installed. Please install one of them."
     exit 1
-fi
-
-# Use locally build image if available, and pull from upstream if not
-image=recoil-build-$PLATFORM:latest
-if [[ -z "$($RUNTIME images -q $image 2> /dev/null)" ]]; then
-  image=ghcr.io/beyond-all-reason/recoil-build-$PLATFORM@${image_version[$PLATFORM]}
 fi
 
 # With the most common rootful docker as runtime, the users inside of the
@@ -117,7 +120,7 @@ $RUNTIME run -it --rm \
     -e CONFIGURE \
     -e COMPILE \
     -e CMAKE_BUILD_PARALLEL_LEVEL \
-    $image \
+    $IMAGE \
     bash -c '
 set -e
 echo "$@"
