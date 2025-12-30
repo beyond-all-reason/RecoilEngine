@@ -118,10 +118,20 @@ if [[ -n "${CONTAINER_RUNTIME_EXTRA_ARGS:-}" ]]; then
   eval "EXTRA_ARGS=($CONTAINER_RUNTIME_EXTRA_ARGS)"
 fi
 
+# Support running directly from Windows without WSL layer: we need to pass real
+# native Windows path to docker.
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+  CWD="$(cygpath -w -a .)"
+  P="\\"
+else
+  CWD="$(pwd)"
+  P="/"
+fi
+
 $RUNTIME run -it --rm \
-    -v $(pwd):/build/src:ro \
-    -v $(pwd)/.cache/ccache-$OS:/build/cache:rw \
-    -v $(pwd)/build-$OS:/build/out:rw \
+    -v "$CWD${P}":/build/src:ro \
+    -v "$CWD${P}.cache${P}ccache-$OS":/build/cache:rw \
+    -v "$CWD${P}build-$OS":/build/out:rw \
     $UID_FLAGS \
     -e CONFIGURE \
     -e COMPILE \
