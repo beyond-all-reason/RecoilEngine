@@ -76,8 +76,6 @@ class CLuaHandle : public CEventClient
 
 		bool GetUserMode() const { return userMode; }
 
-		static int GetHandleAllowChanges(const lua_State* L) { return GetLuaContextData(L)->allowChanges; }
-
 		static CLuaHandle* GetHandle(lua_State* L) { return (GetLuaContextData(L)->owner); }
 
 		static void SetHandleRunning(lua_State* L, const bool _running) {
