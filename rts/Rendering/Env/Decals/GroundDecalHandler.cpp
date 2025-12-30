@@ -91,6 +91,7 @@ CR_REG_METADATA(CGroundDecalHandlerData, (
 	CR_MEMBER_UN(smfDrawer),
 
 	CR_MEMBER_UN(highQuality),
+	CR_MEMBER_UN(ghostDimming),
 	CR_MEMBER_UN(sdbc),
 
 	CR_POSTLOAD(PostLoad)
