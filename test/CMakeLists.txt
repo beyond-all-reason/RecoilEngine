@@ -55,6 +55,7 @@ set(test_Log_sources
 set(test_common_libraries
 	Tracy::TracyClient
 	Catch2
+	nowide::nowide
 )
 
 add_custom_target(tests)
