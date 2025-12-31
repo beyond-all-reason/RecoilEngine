@@ -179,6 +179,7 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testMatrix44f.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Matrix44f.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Quaternion.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
 			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
@@ -199,6 +200,7 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testRotationMatrix44f.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Matrix44f.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Quaternion.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
 			${test_Log_sources}
