@@ -44,7 +44,6 @@ include_directories(${CMAKE_SOURCE_DIR}/include/AL)
 include_directories(${SPRING_MINIZIP_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/cereal/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/nowide/include)
 
 
 #nowide for Windows utf-8 abstraction layer
