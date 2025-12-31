@@ -4,7 +4,10 @@
 
 #include "System/Log/ILog.h"
 #include "System/Platform/CpuID.h"
-#include "System/Config/ConfigHandler.h"
+
+#ifndef UNIT_TEST
+	#include "System/Config/ConfigHandler.h"
+#endif
 
 #ifndef DEDICATED
 	#include "System/Sync/FPUCheck.h"
@@ -42,16 +45,19 @@ enum ConfigPinPolicy {
 	MaximumValue = SharedPerformanceCores,
 };
 
+#ifndef UNIT_TEST
 CONFIG(int, ThreadPinPolicy)
 	.defaultValue(ConfigPinPolicy::SystemDefault)
 	.safemodeValue(ConfigPinPolicy::None)
 	.minimumValue(ConfigPinPolicy::MinimumValue)
 	.maximumValue(ConfigPinPolicy::MaximumValue)
 	.description("Thread to CPU Pinning Policy (0) = Off; (1) = System Default; (2) = Exclusive Performance Core; (3) = Share Performance Cores");
+#endif
 
 namespace Threading {
 
 	cpu_topology::ThreadPinPolicy GetChosenThreadPinPolicy() {
+#ifndef UNIT_TEST
 		int configPinPolicy = configHandler->GetInt("ThreadPinPolicy");
 		switch (configPinPolicy) {
 			case ConfigPinPolicy::None:
@@ -62,8 +68,11 @@ namespace Threading {
 				return cpu_topology::THREAD_PIN_POLICY_ANY_PERF_CORE;
 			case ConfigPinPolicy::SystemDefault:
 			default:
-				return cpu_topology::GetThreadPinPolicy(); 
+				return cpu_topology::GetThreadPinPolicy();
 		};
+#else
+				return cpu_topology::THREAD_PIN_POLICY_NONE;
+#endif
 	};
 
 
