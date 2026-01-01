@@ -56,6 +56,7 @@ set(test_common_libraries
 	Tracy::TracyClient
 	Catch2
 	nowide::nowide
+	${LZMA_LIBRARY}
 )
 
 add_custom_target(tests)
