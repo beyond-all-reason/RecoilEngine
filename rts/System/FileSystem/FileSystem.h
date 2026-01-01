@@ -23,12 +23,8 @@ public:
 	static bool DeleteFile(const std::string& file);
 
 	/// Returns true if the file exists, and is not a directory
-	static bool FileExists(const std::filesystem::path& file);
-
-	/// Returns true if the file exists, and is not a directory
 	static bool FileExists(const std::string& file);
 
-	static bool DirExists(const std::filesystem::path& dir);
 	static bool DirExists(const std::string& dir);
 
 	/// oddly, this is non-trivial on Windows

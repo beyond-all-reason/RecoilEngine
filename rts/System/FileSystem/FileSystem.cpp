@@ -395,26 +395,16 @@ bool FileSystem::DeleteFile(const std::string& fileStr)
 
 }
 
-bool FileSystem::FileExists(const fs::path& path)
-{
-	return fs::exists(path) && !fs::is_directory(path);
-}
-
 bool FileSystem::FileExists(const std::string& fileStr)
 {
 	auto file = Recoil::filesystem::u8path(FileSystem::GetNormalizedPath(fileStr));
-	return FileExists(file);
-}
-
-bool FileSystem::DirExists(const fs::path& dir)
-{
-	return fs::exists(dir) && fs::is_directory(dir);
+	return fs::exists(file) && !fs::is_directory(file);
 }
 
 bool FileSystem::DirExists(const std::string& dirStr)
 {
 	auto dir = Recoil::filesystem::u8path(dirStr);
-	return DirExists(dir);
+	return fs::exists(dir) && fs::is_directory(dir);
 }
 
 
