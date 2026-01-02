@@ -6728,6 +6728,8 @@ int LuaSyncedRead::GetUnitCmdDescs(lua_State* L)
  *
  * @function Spring.FindUnitCmdDesc
  * @param unitID integer
+ * @param cmdID integer
+ * @return integer?
  */
 int LuaSyncedRead::FindUnitCmdDesc(lua_State* L)
 {
