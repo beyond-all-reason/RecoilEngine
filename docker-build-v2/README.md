@@ -82,7 +82,7 @@ will:
    - `build-windows/install`: ready to use installation
 
 > [!CAUTION]
-> The build output like in archives fetched from the [releases page](https://github.com/beyond-all-reason/RecoilEngine/releases) is inside of `build-windows/install` directory, **not** `build-windows`.
+> The build output like in archives fetched from the [releases page](https://github.com/beyond-all-reason/RecoilEngine/releases) is inside of `build-windows/install` directory, **not** `build-windows`. The improvement is tracked in [#2742](https://github.com/beyond-all-reason/RecoilEngine/issues/2747).
 
 > **TODO:** Link to documentation article about how to start engine, load game in it etc once it exists. Some current references of not best quality specifically for BAR:
 >   - https://github.com/beyond-all-reason/Beyond-All-Reason/wiki/Testing-New-Engine-Releases-in-BAR
