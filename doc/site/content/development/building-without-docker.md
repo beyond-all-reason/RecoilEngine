@@ -3,24 +3,24 @@ title = 'Building without Docker'
 author = 'p2004a'
 +++
 
-This article describes how to compile Engine directly on host without using Docker. [The Docker method](/development/building-with-docker/) is recommended if you are just starting out to get up and running quickly.
+This article describes how to compile the engine directly on the host without using Docker. [The Docker method](/development/building-with-docker/) is recommended if you are just starting out to get up and running quickly.
 
 The [docker-build-v2](https://github.com/beyond-all-reason/RecoilEngine/tree/master/docker-build-v2) folder is the source of truth and best reference to figure out how to invoke and configure things.
 
 ## Compilation
 
-It's arguable that compilation of Recoil for both Linux and Windows is just easier from Linux. In this article we will only describe compilation on Linux (via WSL on Windows). Alternatively see ["Building on MSVC"](https://github.com/beyond-all-reason/RecoilEngine/wiki/Building-on-MSVC) wiki page for how to setup Visual Studio environment which is excellent for C++ development on Windows.
+It's arguable that compilation of Recoil for both Linux and Windows is just easier from Linux. In this article, we will only describe compilation on Linux (via WSL on Windows). Alternatively, see the ["Building on MSVC"](https://github.com/beyond-all-reason/RecoilEngine/wiki/Building-on-MSVC) wiki page for how to set up a Visual Studio environment which is excellent for C++ development on Windows.
 
 - Windows: There is [WSL](https://docs.microsoft.com/en-us/windows/wsl/) and it works great.
-- Linux: To not have to install all the dev dependencies, compilers etc directly in the base system, and for compatibility, you can use [distrobox](https://github.com/89luca89/distrobox) and develop there. It's fine to do it without that, but it's just very convenient.
+- Linux: To not have to install all the dev dependencies, compilers, etc., directly in the base system, and for compatibility, you can use [distrobox](https://github.com/89luca89/distrobox) and develop there. It's fine to do it without that, but it's just very convenient.
 
-This instruction was tested on Debian based system and Arch, but it should also work on all other Linux distributions once you figure out the list of packages to install.
+This instruction was tested on a Debian-based system and Arch, but it should also work on all other Linux distributions once you figure out the list of packages to install.
 
 ### Install system dependencies
 
-#### Debian based systems
+#### Debian-based systems
 
-Compilers, basic utilities, and helpful for developing:
+Compilers, basic utilities, and tools helpful for development:
 
 ```bash
 sudo apt-get install -y cmake g++ ccache ninja-build clang mold git clangd socat \
@@ -38,7 +38,7 @@ sudo apt-get install -y libsdl2-dev libdevil-dev libcurl4-openssl-dev \
 
 #### Arch
 
-Compilers, basic utilities, and helpful for developing (except for mingw cross compiler that is instelled for Debian based distros):
+Compilers, basic utilities, and tools helpful for development (except for the mingw cross compiler that is installed for Debian-based distros):
 
 ```bash
 sudo pacman -S base-devel cmake ccache git openssh ninja mold socat clang python-pip
@@ -69,11 +69,11 @@ git clone https://github.com/beyond-all-reason/mingwlibs64.git mingwlibs64
 
 ### Compilation
 
-This part is the most annoying: configuring build is done using cmake, and the command lines are quite large.
+This part is the most annoying: configuring the build is done using cmake, and the command lines are quite large.
 
 #### Toolchains
 
-First, you should have a few toolchains configured. Toolchains select the compiler and target operating system. You can store them in the `toolchain` directory in the Recoil repo. Linux toolchains use `mold` linker as it's much faster.
+First, you should have a few toolchains configured. Toolchains select the compiler and target operating system. You can store them in the `toolchain` directory in the Recoil repo. Linux toolchains use the `mold` linker as it's much faster.
 
 `toolchain/clang_x86_64-pc-linux-gnu.cmake`:
 
@@ -111,13 +111,13 @@ SET(DLLTOOL "x86_64-w64-mingw32-dlltool")
 
 #### CMake command lines
 
-With cmake we are building outside of the source, so create directory like `builddir-win`, or `builddir-dbg` and inside them we can run cmake invocations. There are plenty of possible configuration so we will just list a bunch that can be used as a starting point.
+With cmake we are building outside of the source, so create a directory like `builddir-win`, or `builddir-dbg` and inside them we can run cmake invocations. There are plenty of possible configurations so we will just list a bunch that can be used as a starting point.
 
 In all of them:
 
-- We use Ninja generator, as Ninja is the quickest to actually execute the build process, scan for changes etc.
-- Using ccache to make next compilation quicker
-- Install dir is simply `install`, so that after configuing build with cmake, you can just run `ninja && ninja install` and get all the files ready for usage in the `install` directory in builddir.
+- We use the Ninja generator, as Ninja is the quickest to actually execute the build process, scan for changes etc.
+- Using ccache to make the next compilation quicker
+- Install dir is simply `install`, so that after configuring the build with cmake, you can just run `ninja && ninja install` and get all the files ready for usage in the `install` directory in the builddir.
 
 ---
 
@@ -138,7 +138,7 @@ cmake --fresh \
 	..
 ```
 
-Fast unoptimized debug Linux shared libraries build with Clang and generation of [`compile_commands.json`](https://clang.llvm.org/docs/JSONCompilationDatabase.html) file.
+Fast unoptimized debug Linux shared libraries build with Clang and generation of a [`compile_commands.json`](https://clang.llvm.org/docs/JSONCompilationDatabase.html) file.
 
 ```bash
 cmake --fresh \
@@ -177,7 +177,7 @@ cmake --fresh \
 
 ### Source code completion
 
-In the clang debug above, we also enabled creation of `compile_commands.json` file that can be then used by IMHO the best C++ language server [clangd](https://clangd.llvm.org/). The main problem with cmake generated compilation databases is that it doesn't contain entries for header files. That can be fixed with [compdb](https://github.com/Sarcasm/compdb) utility installed in the beginning. Running from top repo directory:
+In the clang debug above, we also enabled the creation of a `compile_commands.json` file that can then be used by IMHO the best C++ language server [clangd](https://clangd.llvm.org/). The main problem with cmake-generated compilation databases is that they don't contain entries for header files. That can be fixed with the [compdb](https://github.com/Sarcasm/compdb) utility that we installed earlier. Running from the top repo directory:
 
 ```bash
 compdb -p builddir-clang/ list > compile_commands.json
@@ -187,15 +187,15 @@ Clangd will then just pick it up.
 
 #### Visual Studio Code
 
-We recommend [clangd](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd) extension. If you are developling inside of distrobox, there are multiple options documented in https://distrobox.it/posts/integrate_vscode_distrobox/.
+We recommend the [clangd](https://marketplace.visualstudio.com/items?itemName=llvm-vs-code-extensions.vscode-clangd) extension. If you are developing inside of distrobox, there are multiple options documented in https://distrobox.it/posts/integrate_vscode_distrobox/.
 
 #### Other IDEs with Distrobox
 
-If running in distrobox, with clangd in distrobox and IDE directly on host you might need to override clangd invocation in the LSP supporting editor to something like: `distrobox enter --no-tty {container_name} -- socat tcp-listen:{port},reuseaddr exec:clangd`
+If running in distrobox, with clangd in distrobox and an IDE directly on the host, you might need to override the clangd invocation in the LSP supporting editor to something like: `distrobox enter --no-tty {container_name} -- socat tcp-listen:{port},reuseaddr exec:clangd`
 
-When developing on Windows, with clangd on Linux, and WSL container mapped to `L:` drive, the invocation might looks like this: `wsl.exe socat tcp-listen:${port},reuseaddr exec:'clangd --path-mappings=L:/home=/home,L:/usr=/usr'`. Only drawback is that ofc `#ifdef _WIN32` blocks won't have completion in such setup.
+When developing on Windows, with clangd on Linux, and a WSL container mapped to the `L:` drive, the invocation might look like this: `wsl.exe socat tcp-listen:${port},reuseaddr exec:'clangd --path-mappings=L:/home=/home,L:/usr=/usr'`. The only drawback is that, of course, `#ifdef _WIN32` blocks won't have completion in such a setup.
 
-Example `recoil.sublime-project` for Sublime Text on Linux with [LSP](https://lsp.sublimetext.io/) server pckages:
+Example `recoil.sublime-project` for Sublime Text on Linux with the [LSP](https://lsp.sublimetext.io/) server package:
 
 ```json
 {

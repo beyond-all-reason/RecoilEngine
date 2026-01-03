@@ -36,7 +36,7 @@ spring_bar_{BAR105}105.1.1-1050-g5075cc0
 ...
 ```
 
-If you aren't seeeing these (often, when you've cloned your fork of the repository and not the upstream version), try the following:
+If you aren't seeing these (often, when you've cloned your fork of the repository and not the upstream version), try the following:
 
 ```bash
 git remote add upstream https://github.com/beyond-all-reason/RecoilEngine
@@ -50,11 +50,11 @@ git checkout master
 git branch -u upstream/master
 ```
 
-## Triggering build
+## Triggering a build
 
-If you are just starting out and want to get a engine binary, we recommend you start with using our Docker scripts documented in [docker-build-v2/](docker-build-v2/README.md).
+If you are just starting out and want to get an engine binary, we recommend using our Docker scripts documented in [docker-build-v2/](docker-build-v2/README.md).
 
-If you want to compile engine without docker to use a different compiler, have better setup with code completion in IDE etc, you might want to follow [building without docker article](https://recoilengine.org/development/building-without-docker/).
+If you want to compile the engine without Docker to use a different compiler, to have a better setup with code completion in an IDE, etc., you might want to follow the [building without Docker article](https://recoilengine.org/development/building-without-docker/).
 
 ### License
 
