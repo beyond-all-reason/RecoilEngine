@@ -55,8 +55,6 @@ set(test_Log_sources
 set(test_common_libraries
 	Tracy::TracyClient
 	Catch2
-	nowide::nowide
-	${LZMA_LIBRARY}
 )
 
 add_custom_target(tests)
@@ -122,7 +120,7 @@ endif()
 		)
 
 	set(test_libs
-			""
+			nowide::nowide
 		)
 
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
@@ -290,6 +288,7 @@ endif()
 		)
 	set(test_libs
 			7zip
+			nowide::nowide
 		)
 	if (WIN32)
 		list(APPEND test_src "${ENGINE_SOURCE_DIR}/System/Platform/Win/WinVersion.cpp")
@@ -357,6 +356,7 @@ endif()
 	set(test_libs
 			${CMAKE_DL_LIBS}
 			unitsync
+			${LZMA_LIBRARY}
 		)
 
 	set(test_flags "-DUNITSYNC")
