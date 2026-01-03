@@ -19,9 +19,9 @@ You can use a pre-compiled binary, usually, you want to use an installer or a pa
 
 ### Compiling
 
-Detailed instructions for how to compile Recoil can be found in the docker-build-v2 README (recommended, or [here](https://github.com/beyond-all-reason/RecoilEngine/wiki/Building-and-developing-engine-without-docker) or [here](https://github.com/beyond-all-reason/RecoilEngine/wiki/SpringRTS-Build-Environment-(Docker)) for legacy docker builds).
+## Preparation
 
-Use `master` as the primary branch.
+Start with `master` as the primary branch.
 
 Verify you're seeing tags:
 
@@ -50,12 +50,11 @@ git checkout master
 git branch -u upstream/master
 ```
 
-The most simple set of commands will be:
+## Triggering build
 
-```bash
-cmake .
-ninja
-```
+If you are just starting out and want to get a engine binary, we recommend you start with using our Docker scripts documented in [docker-build-v2/](docker-build-v2/README.md).
+
+If you want to compile engine without docker to use a different compiler, have better setup with code completion in IDE etc, you might want to follow [building without docker article](https://recoilengine.org/development/building-without-docker/).
 
 ### License
 
