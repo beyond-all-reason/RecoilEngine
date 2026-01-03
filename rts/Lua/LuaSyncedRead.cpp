@@ -8847,6 +8847,7 @@ int LuaSyncedRead::GetUnitPieceDirection(lua_State* L) {
  *
  * @function Spring.GetUnitPieceMatrix
  * @param unitID integer
+ * @param pieceIndex integer
  * @return number? m11
  * @return number m12
  * @return number m13
@@ -8961,6 +8962,7 @@ int LuaSyncedRead::GetFeaturePieceDirection(lua_State* L) {
  *
  * @function Spring.GetFeaturePieceMatrix
  * @param featureID integer
+ * @param pieceIndex integer
  * @return number? m11
  * @return number m12
  * @return number m13
