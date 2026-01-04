@@ -4130,6 +4130,7 @@ int LuaSyncedRead::GetUnitDefID(lua_State* L)
 * @param unitID integer
 *
 * @return integer? MoveDefID nil for structures, aircraft
+* @return boolean? hasMoveDef whether given unitID contains MoveDef
 * @return string? MoveDefName
 */
 
@@ -4137,19 +4138,22 @@ int LuaSyncedRead::GetUnitMoveDefID(lua_State* L)
 {
 	const CUnit* unit = ParseInLosUnit(L, __func__, 1); // not mutating only read
 
-	if (unit == nullptr) {
-		luaL_error(L, "Invalid unitID for GetUnitMoveDefID passed: %s", lua_tostring(L, 1));
+	if (unit == nullptr) { // no unit/unit not accessible, nil/nil/nil
+		return 0; 
 	}
 
-	if (unit->moveDef == nullptr) {
-		return 0; // aircraft or structure unsupported, return nil.
+	if (unit->moveDef == nullptr) { // structure/aircraft, nil/false/nil
+		lua_pushnil(L);
+		lua_pushboolean(L, false);
+		return 3;
 	}
 
-	const MoveDef* moveDef = unit->moveDef;
+	const MoveDef* moveDef = unit->moveDef; // unit, int/true/str
 	lua_pushnumber(L, moveDef->pathType);
-	lua_pushstring(L, (moveDef -> name).c_str());
+	lua_pushboolean(L, true);
+	lua_pushsstring(L, moveDef -> name);
 
-	return 2;
+	return 3;
 }
 
 
