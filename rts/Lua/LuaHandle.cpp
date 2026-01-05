@@ -1063,14 +1063,12 @@ inline void CLuaHandle::UnitCallIn(const LuaHashString& hs, const CUnit* unit)
  * @param unitDefID integer
  * @param unitTeam integer
  * @param builderID integer?
- * @param builderDefID integer?
- * @param builderTeam integer?
  */
 void CLuaHandle::UnitCreated(const CUnit* unit, const CUnit* builder)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
-	luaL_checkstack(L, 9, __func__);
+	luaL_checkstack(L, 7, __func__);
 
 	const LuaUtils::ScopedDebugTraceBack traceBack(L);
 
@@ -1081,14 +1079,11 @@ void CLuaHandle::UnitCreated(const CUnit* unit, const CUnit* builder)
 	lua_pushnumber(L, unit->id);
 	lua_pushnumber(L, unit->unitDef->id);
 	lua_pushnumber(L, unit->team);
-	if (builder != nullptr) {
+	if (builder != nullptr)
 		lua_pushnumber(L, builder->id);
-		lua_pushnumber(L, builder->unitDef->id);
-		lua_pushnumber(L, builder->team);
-	}
 
 	// call the routine
-	RunCallInTraceback(L, cmdStr, (builder != nullptr)? 6: 3, 0, traceBack.GetErrFuncIdx(), false);
+	RunCallInTraceback(L, cmdStr, (builder != nullptr)? 4: 3, 0, traceBack.GetErrFuncIdx(), false);
 }
 
 
