@@ -3578,7 +3578,7 @@ int LuaSyncedCtrl::SetUnitTarget(lua_State* L)
 /***
  * @function Spring.DropCurrentUnitAutoTargets
  * @param unitID integer
- * @ return nil
+ * @return nil
  */
  
 int LuaSyncedCtrl::DropCurrentUnitAutoTargets(lua_State* L)
