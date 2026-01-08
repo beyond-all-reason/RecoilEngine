@@ -907,7 +907,7 @@ std::string FileSystem::GetExtension(const std::string& pathStr)
 }
 
 std::string FileSystem::GetNormalizedPath(const std::string& path) {
-	return Impl::StoreUTF8AsString(std::filesystem::path(path).lexically_normal().generic_u8string());
+	return Impl::StoreUTF8AsString(std::filesystem::path(ForwardSlashes(path)).lexically_normal().generic_u8string());
 }
 
 bool FileSystem::CheckFile(const std::string& file)
