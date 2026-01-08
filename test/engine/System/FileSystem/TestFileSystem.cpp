@@ -139,7 +139,8 @@ TEST_CASE("GetNormalizedPath")
 		CHECK(FileSystem::GetNormalizedPath(path) == normPath)
 
 	CHECK_NORM_PATH("/home/userX/.spring/foo/bar///./../test.log", "/home/userX/.spring/foo/test.log");
-	CHECK_NORM_PATH("./symLinkToHome/foo/bar///./../test.log", "./symLinkToHome/foo/test.log");
+	CHECK_NORM_PATH("./symLinkToHome/foo/bar///./../test.log", "symLinkToHome/foo/test.log");
+	CHECK_NORM_PATH(".\\symLinkToHome\\foo\\bar\\\\\\.\\..\\test.log", "symLinkToHome/foo/test.log");
 	CHECK_NORM_PATH("C:\\foo\\bar\\\\\\.\\..\\test.log", "C:/foo/test.log");
 
 #undef CHECK_NORM_PATH
