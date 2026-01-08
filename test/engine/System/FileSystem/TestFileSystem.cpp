@@ -35,19 +35,19 @@ namespace {
 		}
 		static void WriteFile(const std::string& filePath, const std::string& content) {
 			FILE* testFile = nowide::fopen(filePath.c_str(), "w");
-			if (testFile != NULL) {
+			if (testFile != nullptr) {
 				fprintf(testFile, "%s", content.c_str());
 				fclose(testFile);
-				testFile = NULL;
+				testFile = nullptr;
 			} else {
 				FAIL("Failed to create test-file " + filePath);
 			}
 		}
 		std::string GetTempDir() {
 			if (testCwd.empty()) {
-				char* tmpDir = tmpnam(NULL);
-				if (tmpDir != NULL) {
-					testCwd = oldDir + tmpDir;
+				char* tmpDir = std::tmpnam(nullptr);
+				if (tmpDir != nullptr) {
+					testCwd = tmpDir;
 					FileSystem::CreateDirectory(testCwd);
 					if (!FileSystem::DirIsWritable(testCwd)) {
 						FAIL("Failed to create temporary test dir");
