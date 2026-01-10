@@ -187,7 +187,24 @@ jobs:
           ./compile.sh
           ${{ ((github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.split-debug-info == false) && 'echo "Not splitting debug info."' || './split-debug-info.sh' }}
           ./package.sh ${{ inputs.package-suffix }}
-
+          EOF
+      - name: Test
+        run: |
+          source src/docker-build-v2/images_versions.sh
+          docker run -i --rm \
+            -v /etc/passwd:/etc/passwd:ro \
+            -v /etc/group:/etc/group:ro \
+            --user="$(id -u):$(id -g)" \
+            -v $(pwd)/src:/build/src:ro \
+            -v $(pwd)/remote_ccache.conf:/build/ccache.conf:ro \
+            -e CCACHE_${{ inputs.recache && 'RECACHE' || 'NORECACHE' }}=1 \
+            --network host \
+            ${{ steps.resolve-image.outputs.image }} \
+            bash <<EOF
+          set -e
+          cd /build/src/docker-build-v2/scripts
+          ./configure.sh ${{ inputs.cmake-options || '' }}
+          ./compile.sh -t tests
           EOF
       - name: Save
         #if: github.event_name != 'pull_request'
