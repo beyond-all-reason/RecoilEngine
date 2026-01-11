@@ -147,7 +147,7 @@ class CEventHandler
 
 		std::pair <bool, bool> AllowUnitCreation(const UnitDef* unitDef, const CUnit* builder, const BuildInfo* buildInfo);
 		bool AllowUnitTransfer(const CUnit* unit, int newTeam, bool capture);
-		bool AllowUnitBuildStep(const CUnit* builder, const CUnit* unit, float part);
+		std::pair <float, float>  AllowUnitBuildStep(const CUnit* builder, const CUnit* unit, float part);
 		bool AllowUnitCaptureStep(const CUnit* builder, const CUnit* unit, float part);
 		bool AllowUnitTransport(const CUnit* transporter, const CUnit* transportee);
 		bool AllowUnitTransportLoad(const CUnit* transporter, const CUnit* transportee, const float3& loadPos, bool allowed);

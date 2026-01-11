@@ -2012,19 +2012,26 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 
 		if (beingBuilt) {
 			// build
-			const float step = std::min(amount / buildTime, 1.0f - buildProgress);
-			const auto resourceUse = cost * step;
-
+			float step = amount / buildTime; // we clamp later, is that a bad thing ?
+			/* Note: do we want that check failing to bypass AllowUnitBuildStep()?
+			* It seems like we'd want to know when a buildstep fails because of resourcing aswell
+			
+			
 			if (!builderTeam->HaveResources(resourceUse)) {
 				builderTeam->resPull += resourceUse;
 				return false;
 			}
-
-			if (!eventHandler.AllowUnitBuildStep(builder, this, step))
+			*/
+			
+			auto [mult, resMult] = eventHandler.AllowUnitBuildStep(builder, this, step);
+			if (mult == 0.0f)
 				return false;
 
 			/* Note, eventHandler.AllowUnitBuildStep() may have
 			 * changed stored resources. That is fine though. */
+			step = std::min(step * mult, 1.0f - buildProgress);
+			const auto resourceUse = cost * step * resMult;
+
 			if (builder->UseResources(resourceUse)) {
 				health += (maxHealth * step);
 				health = std::min(health, maxHealth);
@@ -2038,24 +2045,29 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		}
 		else if (health < maxHealth) {
 			// repair
-			const float step = std::min(amount / buildTime, 1.0f - (health / maxHealth));
-			const float energyUse = (cost.energy * step);
-			const float energyUseScaled = energyUse * modInfo.repairEnergyCostFactor;
+			float step = amount / buildTime;
 
-			if ((builderTeam->res.energy < energyUseScaled)) {
+			// skip this part just the same
+			/*if ((builderTeam->res.energy < energyUseScaled)) {
 				// update the energy and metal required counts
 				builderTeam->resPull.energy += energyUseScaled;
 				return false;
-			}
+			}*/
 
-			if (!eventHandler.AllowUnitBuildStep(builder, this, step))
+			auto [mult, resMult] = eventHandler.AllowUnitBuildStep(builder, this, step);
+			
+			if (mult == 0.0f)
 				return false;
+			
+			step = std::min(step * mult; 1.0f - (health/maxhealth));
+			const float energyUse = (cost.energy * step) * resMult;
+			const float energyUseScaled = energyUse * modInfo.repairEnergyCostFactor * resMult;
 
 	  		if (!builder->UseEnergy(energyUseScaled)) {
 				return false;
 			}
 
-			repairAmount += amount;
+			repairAmount += step;
 			health += (maxHealth * step);
 			health = std::min(health, maxHealth);
 
@@ -2068,19 +2080,22 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 			return false;
 		}
 
-		const float step = std::max(amount / buildTime, -buildProgress);
-		const float energyRefundStep = cost.energy * step;
-		const float metalRefundStep  =  cost.metal * step;
-		const float metalRefundStepScaled  =  metalRefundStep * modInfo.reclaimUnitEfficiency;
-		const float energyRefundStepScaled = energyRefundStep * modInfo.reclaimUnitEnergyCostFactor;
+		float step = amount / buildTime;
+
+		
+		auto [mult, resMult] = eventHandler.AllowUnitBuildStep(builder, this, step);
+
+		if (mult == 0.0f)
+			return false;
+		step = std::max(-buildProgress, step * mult);
+		const float energyRefundStep = cost.energy * step * resMult;
+		const float metalRefundStep  =  cost.metal * step * resMult;
+		const float metalRefundStepScaled  =  energyRefundStep * modInfo.reclaimUnitEfficiency;
+		const float energyRefundStepScaled = metalRefundStep * modInfo.reclaimUnitEnergyCostFactor;
 		const float healthStep        = modInfo.reclaimUnitDrainHealth ? maxHealth * step : 0;
 		const float buildProgressStep = int(modInfo.reclaimUnitMethod == 0) * step;
 		const float postHealth        = health + healthStep;
 		const float postBuildProgress = buildProgress + buildProgressStep;
-
-		if (!eventHandler.AllowUnitBuildStep(builder, this, step))
-			return false;
-
 		restTime = 0;
 
 		bool killMe = false;

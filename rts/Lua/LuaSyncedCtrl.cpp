@@ -196,6 +196,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitHarvestStorage);
 	REGISTER_LUA_CFUNC(SetUnitBuildSpeed);
 	REGISTER_LUA_CFUNC(SetUnitBuildParams);
+	REGISTER_LUA_CFUNC(SetUnitBuildStepData);
 	REGISTER_LUA_CFUNC(SetUnitNanoPieces);
 
 	REGISTER_LUA_CFUNC(SetUnitBlocking);

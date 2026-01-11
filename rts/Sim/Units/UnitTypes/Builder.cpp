@@ -499,8 +499,9 @@ bool CBuilder::UpdateCapture(const Command& fCommand)
 
 	const float captureFraction = captureProgressTemp - curCapturee->captureProgress;
 	const float energyUseScaled = curCapturee->cost.energy * captureFraction * modInfo.captureEnergyCostFactor;
-
-	const bool buildStepAllowed = (eventHandler.AllowUnitBuildStep(this, curCapturee, captureProgressStep));
+	
+	const auto [mult,resMult] = eventHandler.AllowUnitBuildStep(this, curCapturee, captureProgressStep);
+	const bool buildStepAllowed = (mult > 0.0f);
 	const bool captureStepAllowed = (eventHandler.AllowUnitCaptureStep(this, curCapturee, captureProgressStep));
 	const bool canExecCapture = (buildStepAllowed && captureStepAllowed && UseEnergy(energyUseScaled));
 
