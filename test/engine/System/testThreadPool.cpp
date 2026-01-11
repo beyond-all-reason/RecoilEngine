@@ -127,7 +127,7 @@ TEST_CASE("test_parallel_reduce")
 		return threadnum;
 	};
 
-	const int result = parallel_reduce(TestFunc, ReduceFunc);
+	const int result = parallel_reduce<SyncTask<decltype(TestFunc)>>(TestFunc, ReduceFunc);
 	CHECK(result == ((NUM_THREADS - 1) * ((NUM_THREADS - 1) + 1)) / 2);
 }
 

@@ -56,7 +56,6 @@ if (aliases == nil) then
       piece                 = 'CPieceProjectile',
       shieldpart            = 'CShieldPartProjectile',
       simplegroundflash     = 'CSimpleGroundFlash',
-      simpleparticlespawner = 'CSphereParticleSpawner',
       simpleparticlesystem  = 'CSimpleParticleSystem',
       smoke                 = 'CSmokeProjectile',
       smoke2                = 'CSmokeProjectile2',

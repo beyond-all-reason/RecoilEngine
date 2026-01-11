@@ -33,8 +33,11 @@
 
 #include "../plugin/SolLuaDataModel.h"
 #include "../plugin/SolLuaDocument.h"
+#include "sol2/sol.hpp"
 
 #include <memory>
+#include <string>
+#include <variant>
 
 namespace Rml::SolLua
 {
@@ -88,36 +91,91 @@ void bindTable(SolLuaDataModel* data, sol::table& table)
 		} else {
 			skey = key.as<std::string>();
 		}
-		auto it = data->ObjectMap.insert_or_assign(skey, value);
 
 		if (value.get_type() == sol::type::function) {
-			data->Constructor.BindEventCallback(skey, [skey, cb = sol::protected_function{value},
-			                                           state = sol::state_view{table.lua_state()}](
-														  Rml::DataModelHandle, Rml::Event& event,
-														  const Rml::VariantList& varlist) {
+			data->Constructor.BindEventCallback(skey,
+				[skey, cb = sol::protected_function{value}, state = sol::state_view{table.lua_state()}]
+				(Rml::DataModelHandle, Rml::Event& event, const Rml::VariantList& varlist)
+			{
 				if (cb.valid()) {
 					std::vector<sol::object> args;
 					for (const auto& variant : varlist) {
 						args.push_back(makeObjectFromVariant(&variant, state));
 					}
 					auto pfr = cb(event, sol::as_args(args));
-					if (!pfr.valid())
+					if (!pfr.valid()) {
 						ErrorHandler(cb.lua_state(), std::move(pfr));
+					}
 				}
 			});
 			data->BindingMap[skey] = SolLuaDataModel::BindingType::Function;
 		} else {
-			data->Constructor.BindCustomDataVariable(
-				skey, Rml::DataVariable(data->ObjectDef.get(), &(it.first->second)));
+			auto it = data->ObjectMap.insert_or_assign(skey, DataVariableReference(table, skey, ""));
+			data->Constructor.BindCustomDataVariable(skey, Rml::DataVariable(data->ObjectDef.get(), &(it.first->second)));
 			data->BindingMap[skey] = SolLuaDataModel::BindingType::Variable;
 		}
 	}
 }
 
-sol::object getFromTable(const sol::table& t, const std::vector<std::string>& keychain, int depth) {
+struct lua_iterator_state
+{
+	std::vector<sol::object> keys;
+	std::vector<sol::object>::iterator it;
+	std::vector<sol::object>::iterator last;
+	sol::table valuetable;
+
+	lua_iterator_state(sol::table keytable, sol::table valuetable, sol::this_state s, bool ipairs = false)
+		: valuetable(valuetable)
+	{
+		if (ipairs) {
+			sol::state_view l{s};
+			int index = 0;
+			int count = keytable.size();
+			while (keytable.get<sol::object>(++index).get_type() != sol::type::nil && index <= count) {
+				this->keys.emplace_back(sol::object(l, sol::in_place, index));
+			}
+		} else {
+			keytable.for_each([this](sol::object key, sol::object value) {
+				this->keys.emplace_back(key);
+			});
+		}
+		it = keys.begin();
+		last = keys.end();
+	}
+};
+
+auto nextPair(sol::user<lua_iterator_state&> user_it_state, sol::this_state l)
+{
+	lua_iterator_state& it_state = user_it_state;
+	auto& it = it_state.it;
+	if (it == it_state.last) {
+		return std::make_tuple(sol::object(sol::lua_nil), sol::object(sol::lua_nil));
+	}
+	auto& key = *it;
+	auto r = std::make_tuple(key, it_state.valuetable.get<sol::object>(key));
+	std::advance(it, 1);
+	return r;
+}
+
+constexpr auto createPairsFunction(bool ipairs = false)
+{
+	return ([ipairs] (sol::object self, sol::this_state s) {
+			auto metatable = self.as<sol::table>();
+			auto rawtable = metatable.get<sol::function>("__raw").call<sol::table>();
+			return std::make_tuple(&nextPair, sol::user<lua_iterator_state>(rawtable, metatable, s, ipairs), sol::lua_nil);
+		});
+}
+
+sol::object getFromTable(const sol::table& t, const std::vector<std::variant<int, std::string>>& keychain, int depth)
+{
 	sol::table item = t;
 	for(int i = 0; i <= depth; i++) {
-		sol::object o = item.raw_get<sol::object>(keychain[i]);
+		sol::object o;
+		if (std::holds_alternative<int>(keychain[i])) {
+			o = item.raw_get<sol::object>(std::get<int>(keychain[i]));
+		} else {
+			o = item.raw_get<sol::object>(std::get<std::string>(keychain[i]));
+		}
 		if (o.get_type() == sol::type::table) {
 			item = o.as<sol::table>();
 		} else {
@@ -127,42 +185,56 @@ sol::object getFromTable(const sol::table& t, const std::vector<std::string>& ke
 	return item;
 }
 
-std::function<void(sol::object, const std::string&, sol::object, sol::this_state)>
-createNewIndexFunction(std::shared_ptr<Rml::SolLua::SolLuaDataModel> data, const std::vector<std::string>& keychain, int depth)
+std::function<void(sol::object, const sol::object&, sol::object, sol::this_state)>
+createNewIndexFunction(std::shared_ptr<Rml::SolLua::SolLuaDataModel> data, const std::vector<std::variant<int, std::string>>& keychain, int depth)
 {
-	return ([data, keychain, depth] (sol::table t, const std::string& key, sol::object value, sol::this_state s) {
+	return ([data, keychain, depth] (sol::table t, const sol::object& solkey, sol::object value, sol::this_state s) {
 		auto prop = getFromTable(data->Table, keychain, depth-1);
-		auto type = prop.get_type();
-		if (type == sol::type::table) {
-			auto old = prop.as<sol::table>().raw_get<sol::object>(key);
-			if (old != value) {
-				prop.as<sol::table>().raw_set(key, value);
-				std::ostringstream joined;
-				std::copy(keychain.begin(), keychain.end(), std::ostream_iterator<std::string>(joined, "_"));
-
-				data->ObjectMap.insert_or_assign(joined.str() + key, value);
-				data->Handle.DirtyVariable(keychain[0]);
-			}
+		if (!prop.is<sol::table>()) {
+			return;
 		}
+		auto old = prop.as<sol::table>().raw_get<sol::object>(solkey);
+		if (old == value) {
+			return;
+		}
+		if (value.is<sol::table>()) {
+			auto value_raw = value.as<sol::table>().raw_get<sol::object>("__raw");
+			if (value_raw != sol::nil && value_raw.is<sol::function>()) {
+				// new value is a datamodel proxy, so get the underlying table to assign
+				prop.as<sol::table>().raw_set(solkey, value_raw.as<sol::function>().call<sol::object>(value));
+			} else {
+				prop.as<sol::table>().raw_set(solkey, value);
+			}
+		} else {
+			prop.as<sol::table>().raw_set(solkey, value);
+		}
+		data->Handle.DirtyVariable(std::get<std::string>(keychain[0]));
 	});
 }
 
-
-std::function<sol::object(sol::object, const std::string&, sol::this_state)>
-createIndexFunction(std::shared_ptr<Rml::SolLua::SolLuaDataModel> data, const std::vector<std::string>& keychain, int depth)
+std::function<sol::object(sol::object, const sol::object&, sol::this_state)>
+createIndexFunction(std::shared_ptr<Rml::SolLua::SolLuaDataModel> data, const std::vector<std::variant<int, std::string>>& keychain, int depth)
 {
-	return ([data, keychain, depth](sol::table t, const std::string& key, sol::this_state s) {
-		std::vector<std::string> kc{keychain};
-		kc.push_back(key);
+	return ([data, keychain, depth](sol::table t, const sol::object& solkey, sol::this_state s) {
+		std::vector<std::variant<int, std::string>> kc{keychain};
+		if (solkey.is<std::string>())
+			kc.push_back(solkey.as<std::string>());
+		else
+			kc.push_back(solkey.as<int>());
 		auto prop = getFromTable(data->Table, kc, depth);
 		auto type = prop.get_type();
 		if (type == sol::type::table) {
 			sol::state_view bindings{s};
 			sol::table obj_metatable = bindings.create_table();
+			sol::table obj_table = bindings.create_table();
 			obj_metatable[sol::meta_function::index] = createIndexFunction(data, kc, depth+1);
 			obj_metatable[sol::meta_function::new_index] = createNewIndexFunction(data, kc, depth+1);
+			obj_metatable[sol::meta_function::pairs] = createPairsFunction();
+			obj_metatable[sol::meta_function::ipairs] = createPairsFunction(true);
 
-			sol::table obj_table = bindings.create_table();
+			obj_table["__ipairs"] = obj_metatable[sol::meta_function::ipairs];
+			obj_table[sol::meta_function::length] = [prop] () { return prop.as<sol::table>().size(); };
+			obj_table["__raw"] = [prop] () { return prop; };
 			obj_table[sol::metatable_key] = obj_metatable;
 			return sol::make_object(s, obj_table);
 		}
@@ -178,8 +250,7 @@ createIndexFunction(std::shared_ptr<Rml::SolLua::SolLuaDataModel> data, const st
 /// <param name="model">The table to bind as the data model.</param>
 /// <param name="s">Lua state.</param>
 /// <returns>A unique pointer to a Sol Lua Data Model.</returns>
-sol::table openDataModel(Rml::Context& self, const Rml::String& name, sol::object model,
-                         sol::this_state s)
+sol::table openDataModel(Rml::Context& self, const Rml::String& name, sol::object model, sol::this_state s)
 {
 	sol::state_view bindings{s};
 
@@ -210,16 +281,24 @@ sol::table openDataModel(Rml::Context& self, const Rml::String& name, sol::objec
 			auto iter = data->BindingMap.find(key);
 			if (iter == data->BindingMap.end())
 				luaL_error(s, "Assigning a new key ('%s') to the DataModel root is not allowed.", key.c_str());
-
 			if (iter->second == SolLuaDataModel::BindingType::Function)
 				luaL_error(s, "Changing the value of a key ('%s') bound to a Function in a DataModel is not allowed.", key.c_str());
 
 			auto old = data->Table.raw_get<sol::object>(key);
-			if (old == value && value.get_type() != sol::type::table) {
+			if (old == value && !value.is<sol::table>()) {
 				return;
 			}
-			data->Table.raw_set(key, value);
-			data->ObjectMap.insert_or_assign(key, value);
+			if (value.is<sol::table>()) {
+				auto value_raw = value.as<sol::table>().raw_get<sol::object>("__raw");
+				if (value_raw != sol::nil && value_raw.is<sol::function>()) {
+					// new value is a datamodel proxy, so get the underlying table to assign
+					data->Table.raw_set(key, value_raw.as<sol::function>().call<sol::object>(value));
+				} else {
+					data->Table.raw_set(key, value);
+				}
+			} else {
+				data->Table.raw_set(key, value);
+			}
 			data->Handle.DirtyVariable(key);
 		});
 
@@ -229,13 +308,18 @@ sol::table openDataModel(Rml::Context& self, const Rml::String& name, sol::objec
 			auto type = item.get_type();
 			if (type == sol::type::table) {
 				sol::state_view bindings{s};
-				std::vector keychain{key};
+				std::vector<std::variant<int, std::string>> keychain{key};
 
 				sol::table obj_metatable = bindings.create_table();
+				sol::table obj_table = bindings.create_table();
 				obj_metatable[sol::meta_function::new_index] = createNewIndexFunction(data, keychain, 1);
 				obj_metatable[sol::meta_function::index] = createIndexFunction(data, keychain, 1);
+				obj_metatable[sol::meta_function::pairs] = createPairsFunction();
+				obj_metatable[sol::meta_function::ipairs] = createPairsFunction(true);
 
-				sol::table obj_table = bindings.create_table();
+				obj_table["__ipairs"] = obj_metatable[sol::meta_function::ipairs];
+				obj_table[sol::meta_function::length] = [item] () { return item.as<sol::table>().size(); };
+				obj_table["__raw"] = [item] () { return item; };
 				obj_table[sol::metatable_key] = obj_metatable;
 				return sol::make_object(s, obj_table);
 			}
@@ -243,16 +327,24 @@ sol::table openDataModel(Rml::Context& self, const Rml::String& name, sol::objec
 		});
 
 	sol::table obj_metatable = bindings.create_table();
+	sol::table obj_table = bindings.create_table();
 	obj_metatable[sol::meta_function::new_index] = new_index_func;
 	obj_metatable[sol::meta_function::index] = index_function;
+	obj_metatable[sol::meta_function::pairs] = createPairsFunction();
+	obj_metatable[sol::meta_function::ipairs] = createPairsFunction(true);
 
-	sol::table obj_table = bindings.create_table();
+	obj_table["__ipairs"] = obj_metatable[sol::meta_function::ipairs];
+	obj_table[sol::meta_function::length] = [&prop = data->Table] (sol::object o) { return prop.size(); };
 	obj_table["__SetDirty"] = ([data](sol::object t, const std::string& key) {
 			data->Handle.DirtyVariable(key);
 		});
 	obj_table["__GetTable"] = ([data](sol::object t) {
 			return data->Table;
 		});
+	obj_table["__raw"] = ([data](sol::object t) {
+			return data->Table;
+		});
+
 	obj_table[sol::metatable_key] = obj_metatable;
 
 	return obj_table;
@@ -354,7 +446,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 		 */
 		"Update", &Rml::Context::Update,
 		/***
-		 * Create a new data model from a base table `model` and register to the context. The model table is copied. 
+		 * Create a new data model from a base table `model` and register to the context. The model table is copied.
 		 * Note that `widget` does not actually have to be a widget; it can be any table. This table can be accessed in widgets like `<button class="mode-button" onclick="widget:SetCamMode()">Set Dolly Mode</button>`. Also note that your data model is inaccessible in `onx` properties.
 		 * @function RmlUi.Context:OpenDataModel
 		 * @generic T

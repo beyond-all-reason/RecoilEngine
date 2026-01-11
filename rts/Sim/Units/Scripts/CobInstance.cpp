@@ -452,7 +452,8 @@ void CCobInstance::AimShieldWeapon(CPlasmaRepulser* weapon)
 	std::array<int, 1 + MAX_COB_ARGS> callinArgs;
 
 	callinArgs[0] = 2;
-	callinArgs[1] = 0; // compat with AimWeapon (same script is called)
+	callinArgs[1] = 0; // heading - compat with AimWeapon (same script is called)
+	callinArgs[2] = 0; //   pitch - compat with AimWeapon (same script is called)
 
 	Call(COBFN_AimPrimary + COBFN_Weapon_Funcs * weapon->weaponNum, callinArgs, CBAimShield, weapon->weaponNum, nullptr);
 }

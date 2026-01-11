@@ -29,6 +29,9 @@ if(UNIX AND NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
 endif()
 list(APPEND engineDedicatedLibraries ${LZMA_LIBRARY})
 
+#nowide for Windows utf-8 abstraction layer
+list(APPEND engineDedicatedLibraries "nowide::nowide")
+
 ### base64 from pr-downloader
 list(APPEND engineDedicatedLibraries "prd::base64")
 
@@ -58,6 +61,7 @@ include_directories(${ENGINE_SRC_ROOT_DIR}/)
 include_directories(${ENGINE_SRC_ROOT_DIR}/lib/lua/include)
 include_directories(${ENGINE_SRC_ROOT_DIR}/lib/7zip)
 include_directories(${ENGINE_SRC_ROOT_DIR}/lib/asio/include)
+include_directories(${ENGINE_SRC_ROOT_DIR}/lib/nowide/include)
 
 
 
@@ -101,6 +105,7 @@ set(system_files
 	${ENGINE_SRC_ROOT_DIR}/System/Log/ConsoleSink.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Log/TracySink.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Misc/SpringTime.cpp
+	${ENGINE_SRC_ROOT_DIR}/System/Platform/ConsoleInit.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Platform/errorhandler.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Platform/CpuID.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Platform/Misc.cpp

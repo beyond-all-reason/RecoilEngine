@@ -139,6 +139,7 @@ namespace QTPFS {
 			const float3& targetPoint,
 			const float radius,
 			const bool synced,
+			const bool externalRequest,
 			const bool allowRawSearch
 		);
 

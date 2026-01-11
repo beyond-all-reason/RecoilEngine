@@ -17,6 +17,8 @@
 	#include <shlobj.h>
 	#include <shlwapi.h>
 	#include <iphlpapi.h>
+	#include <nowide/convert.hpp>
+	#include <nowide/cstdlib.hpp>
 
 	#ifndef SHGFP_TYPE_CURRENT
 		#define SHGFP_TYPE_CURRENT 0
@@ -98,7 +100,7 @@ static HMODULE GetCurrentModule()
 static std::string GetUserDirFromEnvVar()
 {
 	#ifdef _WIN32
-	const char* home = getenv("LOCALAPPDATA");
+	const char* home = nowide::getenv("LOCALAPPDATA");
 	#else
 	const char* home = getenv("HOME");
 	#endif
@@ -111,7 +113,7 @@ static std::string GetUserDirFromSystemApi()
 	#ifdef _WIN32
 	TCHAR strPath[MAX_PATH + 1];
 	SHGetFolderPath(nullptr, CSIDL_LOCAL_APPDATA, nullptr, SHGFP_TYPE_CURRENT, strPath);
-	return strPath;
+	return nowide::narrow(strPath);
 	#else
 	const struct passwd* pw = getpwuid(getuid());
 	return pw->pw_dir;
@@ -130,8 +132,7 @@ namespace Platform
 		if (!origCWD.empty())
 			return origCWD;
 
-		origCWD = FileSystemAbstraction::GetCwd();
-		FileSystemAbstraction::EnsurePathSepAtEnd(origCWD);
+		origCWD = FileSystem::EnsurePathSepAtEnd(FileSystem::GetCwd());
 		return origCWD;
 	}
 
@@ -172,7 +173,8 @@ namespace Platform
 	// Windows:         GetModuleFileName() with hModule = NULL
 	std::string GetProcessExecutableFile()
 	{
-		const char* procExeFilePath = "";
+		std::string procExeFilePath;
+
 		// error will only be used if procExeFilePath stays empty
 		const char* error = nullptr;
 
@@ -196,7 +198,7 @@ namespace Platform
 		const int ret = ::GetModuleFileName(hModule, procExeFile, sizeof(procExeFile));
 
 		if ((ret != 0) && (ret != sizeof(procExeFile))) {
-			procExeFilePath = procExeFile;
+			procExeFilePath = nowide::narrow(procExeFile);
 		} else {
 			error = "[win32] unknown";
 		}
@@ -304,7 +306,7 @@ namespace Platform
 			hModule = GetCurrentModule();
 		} else {
 			// If this fails, we get a NULL handle
-			hModule = GetModuleHandle(moduleName.c_str());
+			hModule = GetModuleHandle(nowide::widen(moduleName).c_str());
 		}
 
 		if (hModule != nullptr) {
@@ -313,7 +315,7 @@ namespace Platform
 			const int ret = ::GetModuleFileName(hModule, moduleFile, sizeof(moduleFile));
 
 			if ((ret != 0) && (ret != sizeof(moduleFile))) {
-				moduleFilePath = std::string(moduleFile);
+				moduleFilePath = nowide::narrow(moduleFile);
 			} else {
 				error = "Unknown";
 			}
@@ -473,7 +475,7 @@ namespace Platform
 		#ifdef _WIN32
 		ULARGE_INTEGER bytesFree;
 
-		if (!GetDiskFreeSpaceEx(path.c_str(), &bytesFree, nullptr, nullptr))
+		if (!GetDiskFreeSpaceEx(nowide::widen(path).c_str(), &bytesFree, nullptr, nullptr))
 			return 0;
 
 		return (bytesFree.QuadPart / (1024 * 1024));
@@ -523,24 +525,7 @@ namespace Platform
 	int SetEnvironment(const char* name, const char* value, int overwrite)
 	{
 #ifdef _WIN32
-		int errcode = 0;
-		if (!overwrite) {
-			size_t envsize = 0;
-	#ifdef _MSC_VER
-			errcode = getenv_s(&envsize, NULL, 0, name);
-			if (errcode || envsize) return errcode;
-	#else
-			const char* val = getenv(name);
-			if (!val || strlen(val)) return -1;
-	#endif
-		}
-	#ifdef _MSC_VER
-		return _putenv_s(name, value);
-	#else
-		std::array<char, 1024> buffer = {0};
-		sprintf(buffer.data(), "%s = %s", name, value);
-		return putenv(buffer.data());
-	#endif
+		return nowide::setenv(name, value, overwrite);
 #else
 		return setenv(name, value, overwrite);
 #endif // _WIN32
@@ -548,7 +533,11 @@ namespace Platform
 
 	std::string GetEnvironment(const char* name)
 	{
+#ifdef _WIN32
+		const char* val = nowide::getenv(name);
+#else
 		const char* val = getenv(name);
+#endif // _WIN32
 		return val ? std::string(val) : "";
 	}
 
@@ -603,10 +592,10 @@ namespace Platform
 		std::vector<TCHAR> shortPathC(file.size() + 1, 0);
 
 		// FIXME: stackoverflow.com/questions/843843/getshortpathname-unpredictable-results
-		const int length = GetShortPathName(file.c_str(), &shortPathC[0], file.size() + 1);
+		const int length = GetShortPathName(nowide::widen(file).c_str(), &shortPathC[0], file.size() + 1);
 
 		if (length > 0 && length <= (file.size() + 1))
-			return (std::string(reinterpret_cast<const char*>(&shortPathC[0])));
+			return nowide::narrow(shortPathC.data(), shortPathC.size());
 		#endif
 
 		return file;
@@ -619,11 +608,6 @@ namespace Platform
 
 		memset(execError, 0, sizeof(execError));
 		strcpy(execError, "ExecuteProcess failure");
-
-		// "The array of pointers must be terminated by a NULL pointer."
-		// --> always include one extra argument string and leave it NULL
-		std::array<char*, (sizeof(args) / sizeof(args[0])) + 1> argPointers;
-		std::array<char[4096], (sizeof(args) / sizeof(args[0]))> processArgs;
 
 		// "The first argument, by convention, should point to
 		// the filename associated with the file being executed."
@@ -641,28 +625,18 @@ namespace Platform
 			ZeroMemory(&si, sizeof(si)); si.cb = sizeof(si);
 			ZeroMemory(&pi, sizeof(pi));
 
-			char* flatArgsStr = &processArgs[0][0];
+			// flatten args, i.e. from {"s0", "s1", "s2"} to "s0 s1 s2"
+			std::wostringstream flatArgs;
+			for (const auto& arg : args) {
+				if (arg.empty())
+					break;
 
-			{
-				size_t i = 0;
-				size_t n = sizeof(processArgs);
-
-				// flatten args, i.e. from {"s0", "s1", "s2"} to "s0 s1 s2"
-				for (size_t a = 0; a < args.size(); ++a, ++i) {
-					if (args[a].empty())
-						break;
-					if ((i + args[a].size()) >= n)
-						break;
-
-					memcpy(&flatArgsStr[i                  ], args[a].data(), args[a].size());
-					memset(&flatArgsStr[i += args[a].size()], ' ', 1);
-				}
-
-				memset(&flatArgsStr[ std::min(i, n - 1) ], '\0', 1);
+				flatArgs << nowide::widen(arg) << ' ';
 			}
+			flatArgs.seekp(-1, flatArgs.cur);
 
-			if (!CreateProcess(nullptr, flatArgsStr, nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi))
-				LOG("[%s] error %lu creating subprocess with arguments \"%s\"", __func__, GetLastError(), flatArgsStr);
+			if (!CreateProcess(nullptr, flatArgs.str().data(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi))
+				LOG("[%s] error %lu creating subprocess with arguments \"%s\"", __func__, GetLastError(), nowide::narrow(flatArgs.str()).c_str());
 
 			#else
 
@@ -677,24 +651,40 @@ namespace Platform
 			return execError;
 		}
 
-		for (size_t a = 0; a < args.size(); ++a) {
-			if (args[a].empty())
+		#ifdef UNICODE
+		using ArgType = wchar_t;
+		#else
+		using ArgType = char;
+		#endif
+
+		using StringArgType = std::basic_string<ArgType, std::char_traits<ArgType>, std::allocator<ArgType>>;
+
+		// "The array of pointers must be terminated by a NULL pointer."
+		// --> always include one extra argument string and leave it NULL
+		std::array<StringArgType, (sizeof(args) / sizeof(args[0])) + 1> argValues;
+		std::array<ArgType*     , (sizeof(args) / sizeof(args[0])) + 1> argPointers = {nullptr};
+
+		for (size_t i = 0; i < args.size(); ++i) {
+			if (args[i].empty())
 				break;
 
-			memset(&processArgs[a][0], 0, sizeof(processArgs[a]));
-			memcpy(&processArgs[a][0], args[a].c_str(), std::min(args[a].size(), sizeof(processArgs[a]) - 1));
-
-			argPointers[a    ] = &processArgs[a][0];
-			argPointers[a + 1] = nullptr;
+			argValues[i].assign(args[i].begin(), args[i].end());
+			argPointers[i] = argValues[i].data();
 		}
 
 		#ifdef _WIN32
-			#define EXECVP _execvp
+			#ifdef UNICODE
+				#define EXECVP _wexecvp
+			#else
+				#define EXECVP _execvp
+			#endif
 		#else
 			#define EXECVP execvp
 		#endif
 
-		if (EXECVP(args[0].c_str(), &argPointers[0]) == -1) {
+		std::basic_string<ArgType, std::char_traits<ArgType>, std::allocator<ArgType>> fileName(args.front().begin(), args.front().end());
+
+		if (EXECVP(fileName.c_str(), &argPointers[0]) == -1) {
 			STRNCPY(execError, strerror(errno), sizeof(execError) - 1);
 			LOG("[%s] error: \"%s\" %s (%d)", __func__, args[0].c_str(), execError, errno);
 		}

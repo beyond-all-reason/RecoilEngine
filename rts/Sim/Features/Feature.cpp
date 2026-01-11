@@ -155,8 +155,6 @@ void CFeature::Initialize(const FeatureLoadParams& params)
 	RECOIL_DETAILED_TRACY_ZONE;
 	const CSolidObject* po = params.parentObj;
 
-	prevFrameNeedsUpdate = true;
-
 	def = params.featureDef;
 	udef = params.unitDef;
 
@@ -196,6 +194,7 @@ void CFeature::Initialize(const FeatureLoadParams& params)
 
 	// set position before mid-position
 	Move(((po == nullptr)? params.pos: po->pos).cClampInMap(), false);
+
 	// use base-class version, AddFeature() below
 	// will already insert us in the update-queue
 	CWorldObject::SetVelocity((po == nullptr)? params.speed: po->speed);
@@ -481,8 +480,6 @@ void CFeature::ForcedMove(const float3& newPos)
 	// remove from managers
 	quadField.RemoveFeature(this);
 
-	prevFrameNeedsUpdate = true;
-
 	UnBlock();
 	Move(newPos - pos, true);
 	Block();
@@ -504,8 +501,6 @@ void CFeature::ForcedSpin(const float3& newDir)
 	// update local direction-vectors
 	CSolidObject::ForcedSpin(newDir);
 	UpdateTransform(pos, true);
-
-	prevFrameNeedsUpdate = true;
 }
 
 void CFeature::ForcedSpin(const float3& newFrontDir, const float3& newRightDir)
@@ -514,18 +509,21 @@ void CFeature::ForcedSpin(const float3& newFrontDir, const float3& newRightDir)
 	// update local direction-vectors
 	CSolidObject::ForcedSpin(newFrontDir, newRightDir);
 	UpdateTransform(pos, true);
-
-	prevFrameNeedsUpdate = true;
 }
 
+void CFeature::UpdateTransform(const float3& p, bool synced)
+{
+	transMatrix[synced] = std::move(ComposeMatrix(p));
+
+	if (synced)
+		CondUpdatePrevTransform();
+}
 
 void CFeature::UpdateTransformAndPhysState()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	UpdateDirVectors(!def->upright && IsOnGround(), true, 0.0f);
 	UpdateTransform(pos, true);
-
-	prevFrameNeedsUpdate = true;
 
 	UpdatePhysicalStateBit(CSolidObject::PSTATE_BIT_MOVING, (SetSpeed(speed) != 0.0f));
 	UpdatePhysicalState(0.1f);
@@ -585,7 +583,6 @@ bool CFeature::UpdateVelocity(
 bool CFeature::UpdatePosition()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	prevFrameNeedsUpdate = true;
 	// const float4 oldSpd = speed;
 
 	if (moveCtrl.enabled) {
@@ -594,7 +591,13 @@ bool CFeature::UpdatePosition()
 		if (speed.SqLength() != 0.0f)
 			UpdateQuadFieldPosition(speed);
 	} else {
-		const float3 dragAccel = GetDragAccelerationVec(mapInfo->atmosphere.fluidDensity, mapInfo->water.fluidDensity, 1.0f, 0.1f);
+		const float3 dragAccel = GetDragAccelerationVec(
+			mapInfo->atmosphere.fluidDensity,
+			mapInfo->water.fluidDensity,
+			1.0f,
+			0.5f,
+			mapInfo->map.gravity
+		);
 		const float3 gravAccel = UpVector * mapInfo->map.gravity;
 
 		// horizontal movement
@@ -630,15 +633,6 @@ bool CFeature::UpdatePosition()
 	SetVelocityAndSpeed(mix({ZeroVector, 0.0f}, speed * moveCtrl.velocityMask, moveCtrl.enabled));
 
 	return (moveCtrl.enabled);
-}
-
-void CFeature::UpdatePrevFrameTransform()
-{
-	if (!prevFrameNeedsUpdate)
-		return;
-
-	preFrameTra = Transform{ CQuaternion::MakeFrom(GetTransformMatrix(true)), pos };
-	prevFrameNeedsUpdate = false;
 }
 
 bool CFeature::Update()

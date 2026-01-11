@@ -120,7 +120,7 @@ endif()
 		)
 
 	set(test_libs
-			""
+			nowide::nowide
 		)
 
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
@@ -179,6 +179,7 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testMatrix44f.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Matrix44f.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Quaternion.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
 			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
@@ -199,6 +200,7 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testRotationMatrix44f.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Matrix44f.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Quaternion.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
 			${test_Log_sources}
@@ -276,7 +278,6 @@ endif()
 	set(test_name FileSystem)
 	set(test_src
 			"${ENGINE_SOURCE_DIR}/System/FileSystem/FileSystem.cpp"
-			"${ENGINE_SOURCE_DIR}/System/FileSystem/FileSystemAbstraction.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Platform/Misc.cpp"
 			"${ENGINE_SOURCE_DIR}/System/CRC.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Sync/SHA512.cpp"
@@ -287,6 +288,7 @@ endif()
 		)
 	set(test_libs
 			7zip
+			nowide::nowide
 		)
 	if (WIN32)
 		list(APPEND test_src "${ENGINE_SOURCE_DIR}/System/Platform/Win/WinVersion.cpp")
@@ -354,6 +356,7 @@ endif()
 	set(test_libs
 			${CMAKE_DL_LIBS}
 			unitsync
+			${LZMA_LIBRARY}
 		)
 
 	set(test_flags "-DUNITSYNC")

@@ -44,6 +44,8 @@ CR_REG_METADATA(GhostSolidObject, (
 	CR_MEMBER(radius),
 	CR_MEMBER(iconRadius),
 
+	CR_MEMBER(refCount),
+
 	CR_MEMBER(facing),
 	CR_MEMBER(team),
 	CR_IGNORED(currentIconIndex),
@@ -151,15 +153,20 @@ CUnitDrawerData::~CUnitDrawerData()
 			auto& dgb = savedData.deadGhostBuildings[allyTeam][modelType];
 
 			for (auto& gso : dgb) {
-				// <ghost> might be the gbOwner of a decal; groundDecals is deleted after us
-				groundDecals->GhostDestroyed(gso);
-				ghostMemPool.free(gso);
-			}
+				auto* tmpGso = std::exchange(gso, nullptr);
+				if (tmpGso->DecRef())
+					continue;
 
+				// <ghost> might be the gbOwner of a decal; groundDecals is deleted after us
+				groundDecals->GhostDestroyed(tmpGso);
+				ghostMemPool.free(tmpGso);
+			}
 			dgb.clear();
 			lgb.clear();
 		}
 	}
+	assert(ghostMemPool.allocs() == 0);
+	ghostMemPool.clear();
 
 	configHandler->RemoveObserver(this);
 }
@@ -253,20 +260,6 @@ void CUnitDrawerData::UpdateUnitIconsByUnitDef(const UnitDef* ud)
 	}
 }
 
-const std::vector<GhostSolidObject*> CUnitDrawerData::GetDeadGhostBuildings() const
-{
-	std::vector<GhostSolidObject*> dgb;
-
-	for (int at = 0; at < teamHandler.ActiveAllyTeams(); ++at) {
-		for (uint32_t mt = MODELTYPE_3DO; mt < MODELTYPE_CNT; ++mt) {
-			const auto& thisDgb = GetDeadGhostBuildings(at, mt);
-			dgb.insert(dgb.end(), thisDgb.begin(), thisDgb.end());
-		}
-	}
-
-	return dgb;
-}
-
 void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -279,7 +272,7 @@ void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 	bool unitVisible =
 		(losStatus & inLosOrRad) != 0 &&
 		(losStatus & prevMask) == prevMask ||
-		gameSetup->ghostedBuildings && unit->unitDef->IsBuildingUnit() && (losStatus & LOS_PREVLOS) != 0;
+		gameSetup->ghostedBuildings && unit->leavesGhost && (losStatus & LOS_PREVLOS) != 0;
 
 	const bool customIcon = (unitVisible || gu->spectatingFullView);
 
@@ -607,13 +600,16 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 				gso->pos = u->pos;
 				gso->midPos = u->midPos;
 				gso->modelName = gsoModel->name;
+				gso->refCount = 0;
 				gso->facing = u->buildFacing;
 				gso->dir = u->frontdir;
 				gso->team = u->team;
 				gso->radius = u->radius;
 				gso->GetModel();
 
-				gso->currentIconIndex = u->currentIconIndex;
+				// gso is a shared object, we can't rely on the u->currentIconIndex being representative in case the team changes
+				gso->currentIconIndex = icon::iconHandler.GetIconIdxOrDefault(unit->definedIconName);
+
 				gso->iconRadius = u->iconRadius;
 
 				groundDecals->GhostCreated(u, gso);
@@ -623,6 +619,7 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 			// <gso> can be inserted for multiple allyteams
 			// (the ref-counter saves us come deletion time)
 			savedData.deadGhostBuildings[allyTeam][gsoModel->type].push_back(gso);
+			gso->IncRef();
 
 			u->losStatus[allyTeam] &= ~LOS_PREVLOS;
 			if (allyTeam == gu->myAllyTeam)
@@ -639,9 +636,10 @@ void CUnitDrawerData::RenderUnitDestroyed(const CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	CUnit* u = const_cast<CUnit*>(unit);
-	u->currentIconIndex = icon::INVALID_ICON_INDEX;
 
 	UpdateUnitGhosts(unit, unit->leavesGhost);
+	// must happen after UpdateUnitGhosts()
+	u->currentIconIndex = icon::INVALID_ICON_INDEX;
 
 	DelObject(unit, true);	
 
@@ -711,10 +709,20 @@ void CUnitDrawerData::ReviewPrevLos(const CUnit* unit)
 	}
 }
 
+void CUnitDrawerData::PlayerChanged(int playerID)
+{
+	for (auto* unit : unsortedObjects) {
+		UpdateCurrentUnitIcon(unit);
+	}
+}
+
 void CUnitDrawerData::RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSolidObject*>& dgb, int index)
 {
-	groundDecals->GhostDestroyed(gso);
-	ghostMemPool.free(gso);
+	if (!gso->DecRef()) {
+		groundDecals->GhostDestroyed(gso);
+		ghostMemPool.free(gso);
+	}
+
 	dgb[index] = dgb.back();
 	dgb.pop_back();
 }

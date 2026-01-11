@@ -39,19 +39,6 @@
 
 namespace Rml::SolLua
 {
-
-	SolLuaPlugin* Initialise(sol::state_view* state)
-	{
-		SolLuaPlugin* slp;
-		if (state != nullptr)
-		{
-			slp = new SolLuaPlugin(*state);
-			::Rml::RegisterPlugin(slp);
-			RegisterLua(state, slp);
-		}
-		return slp;
-	}
-
 	SolLuaPlugin* Initialise(sol::state_view* state, const Rml::String& lua_environment_identifier)
 	{
 		SolLuaPlugin* slp;
@@ -67,7 +54,7 @@ namespace Rml::SolLua
 	void RegisterLua(sol::state_view* state, SolLuaPlugin* slp)
 	{
 		/***
-		 * Global functions for Recoil's RmlUi implementation. 
+		 * Global functions for Recoil's RmlUi implementation.
 		 * @table RmlUi
 		 */
 		sol::table namespace_table = state->create_named_table("RmlUi");

@@ -49,6 +49,7 @@ void CLuaUnitScriptNames::InitScriptNames()
 
 	scriptNames[LUAFN_MoveFinished] = "MoveFinished";
 	scriptNames[LUAFN_TurnFinished] = "TurnFinished";
+	scriptNames[LUAFN_ScaleFinished] = "ScaleFinished";
 
 	// Also add the weapon aiming stuff
 	scriptNames[LUAFN_QueryWeapon]   = "QueryWeapon";

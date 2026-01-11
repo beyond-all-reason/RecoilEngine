@@ -72,7 +72,6 @@ public:
 	static void InitStatic();
 
 	void SanityCheck() const;
-	void UpdatePrevFrameTransform() override;
 
 	virtual void PreInit(const UnitLoadParams& params);
 	virtual void PostInit(const CUnit* builder);

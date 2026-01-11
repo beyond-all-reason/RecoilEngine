@@ -4,8 +4,8 @@
 
 #include "FileSystem.h"
 
-#include <cstdio>
 #include <string>
+#include <nowide/cstdio.hpp>
 
 // as defined here (DEAD LINK): http://www.brynosaurus.com/cachedir/spec.html
 const std::string CacheDir::tagFile_name          = "CACHEDIR.TAG";
@@ -51,7 +51,7 @@ bool CacheDir::SetCacheDir(const std::string& dir, bool wantedCacheState, const 
 bool CacheDir::FileContentStartsWith(const std::string& filePath, const std::string& content, size_t content_size) {
 	bool startsWith = false;
 
-	FILE* fileH = ::fopen(filePath.c_str(), "r");
+	FILE* fileH = nowide::fopen(filePath.c_str(), "r");
 	if (fileH != nullptr) {
 		content_size = ((content_size > content.size()) ? content.size() : content_size);
 		char currFileChar;
@@ -73,7 +73,7 @@ bool CacheDir::FileContentStartsWith(const std::string& filePath, const std::str
 bool CacheDir::WriteCacheTagFile(const std::string& filePath, const std::string& additionalText) {
 	bool fileWritten = false;
 
-	FILE* fileH = ::fopen(filePath.c_str(), "w");
+	FILE* fileH = nowide::fopen(filePath.c_str(), "w");
 	if (fileH != nullptr) {
 		int ret;
 		ret = fputs(CacheDir::tagFile_content.c_str(), fileH);
@@ -91,8 +91,7 @@ bool CacheDir::WriteCacheTagFile(const std::string& filePath, const std::string&
 }
 
 std::string CacheDir::GetCacheTagFilePath(const std::string& dir) {
-	std::string cacheFile = dir;
-	FileSystem::EnsurePathSepAtEnd(cacheFile);
+	std::string cacheFile = FileSystem::EnsurePathSepAtEnd(dir);
 	cacheFile = cacheFile + CacheDir::tagFile_name;
 
 	return cacheFile;

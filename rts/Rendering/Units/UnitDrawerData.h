@@ -1,6 +1,8 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 #pragma once
 
+#include <ranges>
+
 #include "System/float3.h"
 #include "Rendering/Common/ModelDrawerData.h"
 #include "Rendering/UnitDefImage.h"
@@ -17,6 +19,8 @@ namespace GL {
 class GhostSolidObject {
 	CR_DECLARE_STRUCT(GhostSolidObject)
 public:
+	void IncRef() { (refCount++); }
+	bool DecRef() { return ((refCount--) > 1); }
 	const S3DModel* GetModel() const;
 	void PostLoad();
 public:
@@ -28,6 +32,7 @@ public:
 	float radius;
 	float iconRadius;
 
+	int refCount;
 	int facing; //FIXME replaced with dir-vector just legacy decal drawer uses this
 	uint8_t team;
 	size_t currentIconIndex;
@@ -43,7 +48,8 @@ public:
 			eventName == "RenderUnitPreCreated" ||
 			eventName == "RenderUnitCreated" || eventName == "RenderUnitDestroyed" ||
 			eventName == "UnitEnteredRadar"  || eventName == "UnitEnteredLos"      ||
-			eventName == "UnitLeftRadar"     || eventName == "UnitLeftLos"         ;
+			eventName == "UnitLeftRadar"     || eventName == "UnitLeftLos"         ||
+			eventName == "PlayerChanged";
 	}
 
 	void RenderUnitPreCreated(const CUnit* unit) override;
@@ -55,6 +61,8 @@ public:
 
 	void UnitEnteredLos(const CUnit* unit, int allyTeam) override;
 	void UnitLeftLos(const CUnit* unit, int allyTeam) override;
+
+	void PlayerChanged(int playerID) override;
 
 	bool UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost);
 	void UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost);
@@ -127,7 +135,11 @@ public:
 	const auto& GetTempOpaqueDrawUnits(int modelType) const { return savedData.tempOpaqueUnits[modelType]; }
 	const auto& GetTempAlphaDrawUnits(int modelType) const { return  savedData.tempAlphaUnits[modelType]; }
 
-	const std::vector<GhostSolidObject*> GetDeadGhostBuildings() const;
+	auto GetDeadGhostBuildings(int allyTeam) const {
+		assert((unsigned)gu->myAllyTeam < savedData.deadGhostBuildings.size());
+		return std::views::join(savedData.deadGhostBuildings[allyTeam]);
+	}
+
 	const auto& GetDeadGhostBuildings(int allyTeam, int modelType) const {
 		assert((unsigned)gu->myAllyTeam < savedData.deadGhostBuildings.size());
 		return savedData.deadGhostBuildings[allyTeam][modelType];

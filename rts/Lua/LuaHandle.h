@@ -45,7 +45,7 @@ class LuaShaders;
 class CLuaDisplayLists;
 class CLuaRules;
 class CLuaUI;
-class WeaponDef;
+struct WeaponDef;
 class CCobDeferredCallin;
 
 

@@ -2,6 +2,11 @@
 name: Docker Images Build
 on:
   workflow_dispatch:
+    inputs:
+      update-digests:
+        description: "Commit new image versions to branch"
+        type: boolean
+        default: true
   push:
     branches:
       - master
@@ -26,7 +31,7 @@ jobs:
       packages: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
@@ -36,8 +41,67 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v6
         with:
+          # Disabling cache to make sure that operations like git clone are
+          # not cached and we always pull freshest libs. New images are build
+          # quite rarely so it's not an issue performance wise.
+          no-cache: true
           context: docker-build-v2/${{ matrix.system }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}:latest
+      - name: Write new image digest to file
+        run: echo "${{ steps.build.outputs.digest }}" > ${{ matrix.system }}.txt
+      - name: Save digest in artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: image-digest-${{ matrix.system }}
+          path: ${{ matrix.system }}.txt
+  gather-digests:
+    name: Gather digests
+    runs-on: ubuntu-latest
+    needs: build-images
+    outputs:
+      images_versions: ${{ steps.merge.outputs.images_versions }}
+    steps:
+      - name: Fetch digests
+        uses: actions/download-artifact@v7
+        with:
+          path: .digests
+          pattern: image-digest-*
+          merge-multiple: true
+      - name: Merge digests
+        id: merge
+        run: |
+          echo "images_versions=$(
+            for digest in $(ls .digests); do
+              echo "${digest%.*}=$(cat .digests/$digest)"
+            done | jq -Rnc '[inputs] | map(. | split("=") | {key: .[0], value: .[1]}) | from_entries'
+          )" >> "$GITHUB_OUTPUT"
+  test-build:
+    needs: gather-digests
+    uses: ./.github/workflows/engine-build.yml
+    with:
+      image-versions: ${{ needs.gather-digests.outputs.images_versions }}
+    secrets: inherit
+  publish:
+    name: Update digest branch
+    needs: [test-build, gather-digests]
+    if: github.event_name == 'workflow_dispatch' && inputs.update-digests == true || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Update digests
+        env:
+          images_versions: ${{ needs.gather-digests.outputs.images_versions }}
+        run: |
+          echo "$images_versions" | jq -r 'to_entries[] | "\(.key) \(.value)"' | while read -r platform digest; do
+            sed -i -r "s/(image_version\[$platform\]=)(.*)/\1$digest/" docker-build-v2/images_versions.sh
+          done
+      - name: Commit and push
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          commit_message: Automatic docker build image update from ${{ github.sha }}

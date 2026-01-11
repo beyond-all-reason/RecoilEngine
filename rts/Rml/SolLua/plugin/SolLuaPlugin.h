@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "Rml/Backends/RmlUi_SystemInterface.h"
 #include "Rml/SolLua/TranslationTable.h"
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Platform.h>
@@ -59,6 +60,7 @@ namespace Rml::SolLua
 		void AddDocumentTracking(ElementDocument* document);
 
 		TranslationTable translationTable;
+		RmlSystemInterface* systemInterface;
 	private:
 		int GetEventClasses() override;
 

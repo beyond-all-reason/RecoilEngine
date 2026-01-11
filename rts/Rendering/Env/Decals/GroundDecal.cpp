@@ -12,7 +12,9 @@ decltype(GroundDecal::attributeDefs) GroundDecal::attributeDefs = {
 	VA_ATTR_DEF(GroundDecal,  6, 4, GL_FLOAT, rot           , false, "createParams2"),
 	VA_ATTR_DEF(GroundDecal,  7, 4, GL_FLOAT, createFrameMin, false, "createParams3"),
 	VA_ATTR_DEF(GroundDecal,  8, 4, GL_FLOAT, forcedNormal  , false, "createParams4"),
-	VA_ATTR_DEF(GroundDecal,  9, 4, GL_UNSIGNED_INT, info   , false, "createParams5")
+	VA_ATTR_DEF(GroundDecal,  9, 4, GL_UNSIGNED_INT, info   , false, "createParams5"),
+	VA_ATTR_DEF(GroundDecal, 10, 4, GL_FLOAT, userDefined[0], false, "userDefined0"),
+	VA_ATTR_DEF(GroundDecal, 11, 4, GL_FLOAT, userDefined[1], false, "userDefined1")
 };
 
 #undef VA_ATTR_DEF
@@ -52,5 +54,7 @@ CR_REG_METADATA(GroundDecal, (
 
 	CR_MEMBER(infoRep),
 	CR_MEMBER(tintColor),
-	CR_MEMBER(glowColorMap)
+	CR_MEMBER(glowColorMap),
+
+	CR_MEMBER(userDefined)
 ))

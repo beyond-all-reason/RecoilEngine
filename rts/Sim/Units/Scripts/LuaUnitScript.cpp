@@ -1,6 +1,5 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "System/Misc/TracyDefs.h"
 #define LUA_SYNCED_ONLY
 
 #include "LuaUnitScript.h"
@@ -198,9 +197,13 @@ Spring.UnitScript.Turn(number piece, number axis, number destination[, number sp
 Spring.UnitScript.Move(number piece, number axis, number destination[, number speed]) -> nil
 	Same as COB's move iff speed is given and not zero, and move-now otherwise.
 
+Spring.UnitScript.Scale(number piece, number destination[, number speed]) -> nil
+	Same as COB's scale iff speed is given and not zero, and scale-now otherwise.
+
 Spring.UnitScript.IsInTurn(number piece, number axis) -> boolean
 Spring.UnitScript.IsInMove(number piece, number axis) -> boolean
 Spring.UnitScript.IsInSpin(number piece, number axis) -> boolean
+Spring.UnitScript.IsInScale(number piece) -> boolean
 	Returns true iff such an animation exists, false otherwise.
 
 Spring.UnitScript.WaitForTurn(number piece, number axis) -> boolean
@@ -210,6 +213,10 @@ Spring.UnitScript.WaitForTurn(number piece, number axis) -> boolean
 Spring.UnitScript.WaitForMove(number piece, number axis) -> boolean
 	Returns true iff such an animation exists, false otherwise.  Iff it returns
 	true, the MoveFinished callIn will be called once the move completes.
+
+Spring.UnitScript.WaitForScale(number piece) -> boolean
+	Returns true iff such an animation exists, false otherwise.  Iff it returns
+	true, the ScaleFinished callIn will be called once the scale completes.
 
 Spring.UnitScript.SetDeathScriptFinished(number wreckLevel])
 	Tells Spring the Killed script finished, and which wreckLevel to use.
@@ -924,7 +931,16 @@ float CLuaUnitScript::TargetWeight(int weaponNum, const CUnit* targetUnit)
 void CLuaUnitScript::AnimFinished(AnimType type, int piece, int axis)
 {
 	ZoneScoped;
-	Call((type == AMove)? LUAFN_MoveFinished : LUAFN_TurnFinished, piece + 1, axis + 1);
+	switch (type) {
+	case ATurn:
+		Call(LUAFN_TurnFinished, piece + 1, axis + 1); break;
+	case AMove:
+		Call(LUAFN_MoveFinished, piece + 1, axis + 1); break;
+	case AScale:
+		Call(LUAFN_ScaleFinished, piece + 1); break;
+	default:
+		assert(false);
+	}
 }
 
 
@@ -1043,16 +1059,20 @@ bool CLuaUnitScript::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(MultiTurn);
 	REGISTER_LUA_CFUNC(MultiMove);
 	REGISTER_LUA_CFUNC(MultiExplode);
+	REGISTER_LUA_CFUNC(MultiScale);
 	REGISTER_LUA_CFUNC(IsInTurn);
 	REGISTER_LUA_CFUNC(IsInMove);
 	REGISTER_LUA_CFUNC(IsInSpin);
+	REGISTER_LUA_CFUNC(IsInScale);
 	REGISTER_LUA_CFUNC(WaitForTurn);
 	REGISTER_LUA_CFUNC(WaitForMove);
+	REGISTER_LUA_CFUNC(WaitForScale);
 
 	REGISTER_LUA_CFUNC(SetDeathScriptFinished);
 
 	REGISTER_LUA_CFUNC(GetPieceTranslation);
 	REGISTER_LUA_CFUNC(GetPieceRotation);
+	REGISTER_LUA_CFUNC(GetPieceScale);
 	REGISTER_LUA_CFUNC(GetPiecePosDir);
 
 	REGISTER_LUA_CFUNC(GetActiveUnitID);
@@ -1554,6 +1574,11 @@ int CLuaUnitScript::MultiMove(lua_State* L)
 	return MultiExec(L, &Move, 4);
 }
 
+int CLuaUnitScript::MultiScale(lua_State* L)
+{
+	return MultiExec(L, &Scale, 3);
+}
+
 int CLuaUnitScript::IsInAnimation(lua_State* L, const char* caller, AnimType type)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -1588,6 +1613,18 @@ int CLuaUnitScript::IsInSpin(lua_State* L)
 	return IsInAnimation(L, __func__, ASpin);
 }
 
+int CLuaUnitScript::IsInScale(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	const int piece = luaL_checkint(L, 1) - 1;
+
+	lua_pushboolean(L, activeScript->IsInAnimation(AScale, piece, -1));
+	return 1;
+}
+
 
 int CLuaUnitScript::WaitForAnimation(lua_State* L, const char* caller, AnimType type)
 {
@@ -1619,6 +1656,24 @@ int CLuaUnitScript::WaitForMove(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return WaitForAnimation(L, __func__, AMove);
+}
+
+int CLuaUnitScript::WaitForScale(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	if (activeScript == nullptr)
+		return 0;
+
+	CLuaUnitScript* script = dynamic_cast<CLuaUnitScript*>(activeScript);
+
+	if (script == nullptr)
+		luaL_error(L, "%s(): not a Lua unit script", __func__);
+
+	const int piece = luaL_checkint(L, 1) - 1;
+
+	lua_pushboolean(L, script->NeedsWait(AScale, piece, -1));
+	return 1;
 }
 
 
@@ -1658,6 +1713,17 @@ int CLuaUnitScript::GetPieceRotation(lua_State* L)
 
 	LocalModelPiece* piece = ParseLocalModelPiece(L, activeScript, __func__);
 	return ToLua(L, piece->GetRotation());
+}
+
+int CLuaUnitScript::GetPieceScale(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	LocalModelPiece* piece = ParseLocalModelPiece(L, activeScript, __func__);
+	lua_pushnumber(L, piece->GetScaling());
+	return 1;
 }
 
 

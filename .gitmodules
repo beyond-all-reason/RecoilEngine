@@ -36,3 +36,7 @@
 [submodule "rts/lib/simdjson"]
 	path = rts/lib/simdjson
 	url = https://github.com/simdjson/simdjson
+[submodule "rts/lib/nowide"]
+	path = rts/lib/nowide
+	url = https://github.com/boostorg/nowide
+	branch = standalone

@@ -23,12 +23,16 @@ public:
 
 	void LoadInto(float* xyz) const;
 
-	virtual std::string ToString() const;
+	// NOTE: "virtual" adds unnecessary vtable complexity
+	std::string ToString() const;
 //	virtual int HashCode() const;
 //	virtual bool Equals(const void* obj) const;
 
 	static const AIFloat3 NULL_VALUE;
 }; // class AIFloat3
+
+static_assert(std::is_base_of<float3, AIFloat3>::value);
+static_assert(sizeof(AIFloat3) == sizeof(float3));
 
 }  // namespace springai
 

@@ -418,6 +418,7 @@ public:
 
 	template<bool synced>
 	float3 rotate(float angle, const float3& axis) const {
+		assert(axis.Normalized());
 		float ca;
 		float sa;
 		if constexpr (synced) {
@@ -834,6 +835,7 @@ public:
 	static float3 fabs(const float3 v);
 	static float3 sign(const float3 v);
 
+	static constexpr float apx_eps() { return 1e-02f; }
 	static constexpr float cmp_eps() { return 1e-04f; }
 	static constexpr float nrm_eps() { return 1e-12f; }
 

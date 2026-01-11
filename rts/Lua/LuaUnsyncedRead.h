@@ -219,6 +219,8 @@ class LuaUnsyncedRead {
 		static int GetGroundDecalCreationFrame(lua_State* L);
 		static int GetGroundDecalType(lua_State* L);
 		static int GetGroundDecalOwner(lua_State* L);
+		static int GetGroundDecalGlowParams(lua_State* L);
+		static int GetGroundDecalUserData(lua_State* L);
 
 		static int UnitIconGetDraw(lua_State* L);
 		static int GetUnitIconData(lua_State* L);

@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <SDL_mouse.h>
 
 #include "StartPosSelecter.h"
 #include "MouseHandler.h"
@@ -84,6 +85,9 @@ bool CStartPosSelecter::Ready(bool luaForcedReady)
 bool CStartPosSelecter::MousePress(int x, int y, int button)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	if (button != SDL_BUTTON_LEFT)
+		return false;
 
 	if (modInfo.useStartPositionSelecter == false) {
 		return false;

@@ -62,6 +62,20 @@ public:
 	// a lower number will increase CPU load, but improve reaction time of collision avoidance
 	int groundUnitCollisionAvoidanceUpdateRate;
 
+	// Guard behaviour
+	/// The distance that a guardee must move before the guard goal is recalculated
+	float guardRecalculateThreshold;
+	/// The distance that a guardian will stop at nearing a stopped guardee
+	float guardStoppedProximityGoal;
+	/// The extra distance a guardian will keep from a stopped guardee
+	float guardStoppedExtraDistance;
+	/// The distance the guardian is considered to be in guarding range and will match the velocity
+	float guardMovingProximityGoal;
+	/// A multiplier for the moving goal while guarding, smaller values will result in higher detail movement but more performance cost
+	float guardMovingIntervalMultiplier;
+	/// Limit for the intercept when a guardian is not in guarding range
+	float guardInterceptionLimit;
+
 	// Build behaviour
 	/// Should constructions without builders decay?
 	bool constructionDecay;

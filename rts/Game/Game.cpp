@@ -480,11 +480,6 @@ void CGame::Load(const std::string& mapFileName)
 		// Update height bounds and pathing after pregame or a saved game load.
 		{
 			ENTER_SYNCED_CODE();
-			// update features / units in case they need to be rendered before the sim starts
-			// (e.g. during start position selection)
-			featureHandler.UpdatePostFrame();
-			unitHandler.UpdatePostFrame();
-
 			//needed in case pre-game terraform changed the map
 			readMap->UpdateHeightBounds();
 			Watchdog::ClearTimer(WDT_LOAD);
@@ -1363,6 +1358,7 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 
 	lineDrawer.UpdateLineStipple();
 
+	icon::iconHandler.Update();
 	CNamedTextures::Update();
 
 	// always update InfoTexture and SoundListener at <= 30Hz (even when paused)
@@ -1796,9 +1792,6 @@ void CGame::SimFrame() {
 		teamHandler.GameFrame(gs->frameNum);
 		playerHandler.GameFrame(gs->frameNum);
 		eventHandler.GameFramePost(gs->frameNum);
-
-		unitHandler.UpdatePostFrame();
-		featureHandler.UpdatePostFrame();
 	}
 
 	lastSimFrameTime = spring_gettime();

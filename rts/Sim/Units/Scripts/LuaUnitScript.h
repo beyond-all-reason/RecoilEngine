@@ -170,9 +170,11 @@ private:
 	static int IsInTurn(lua_State* L);
 	static int IsInMove(lua_State* L);
 	static int IsInSpin(lua_State* L);
+	static int IsInScale(lua_State* L);
 	static int WaitForAnimation(lua_State* L, const char* caller, AnimType type);
 	static int WaitForTurn(lua_State* L);
 	static int WaitForMove(lua_State* L);
+	static int WaitForScale(lua_State* L);
 
 	static int MultiExec(lua_State *L, int (*const func)(lua_State*), const int expectedArgs);
 	static int MultiSetPieceVisibility(lua_State* L);
@@ -181,12 +183,14 @@ private:
 	static int MultiExplode(lua_State* L);
 	static int MultiTurn(lua_State* L);
 	static int MultiMove(lua_State* L);
+	static int MultiScale(lua_State* L);
 
 	// Lua COB function to work around lack of working CBCobThreadFinish
 	static int SetDeathScriptFinished(lua_State* L);
 
 	static int GetPieceTranslation(lua_State* L); // matches Move
 	static int GetPieceRotation(lua_State* L);    // matches Turn
+	static int GetPieceScale(lua_State* L);       // matches Scale
 	static int GetPiecePosDir(lua_State* L);      // EmitDirPos (in unit space)
 
 	static int GetActiveUnitID(lua_State* L);

@@ -314,8 +314,8 @@ std::string windows::GetHardwareString()
 	DWORD regType = REG_SZ;
 	HKEY regkey;
 
-	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, "Hardware\\Description\\System\\CentralProcessor\\0", 0, KEY_READ, &regkey) == ERROR_SUCCESS) {
-		if (RegQueryValueEx(regkey, "ProcessorNameString", 0, &regType, regbuf, &regLength) == ERROR_SUCCESS) {
+	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE, L"Hardware\\Description\\System\\CentralProcessor\\0", 0, KEY_READ, &regkey) == ERROR_SUCCESS) {
+		if (RegQueryValueEx(regkey, L"ProcessorNameString", 0, &regType, regbuf, &regLength) == ERROR_SUCCESS) {
 			oss << regbuf << "; ";
 		} else {
 			oss << "cannot read processor data; ";

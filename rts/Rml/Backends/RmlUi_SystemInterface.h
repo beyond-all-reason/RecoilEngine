@@ -45,6 +45,8 @@ public:
 	RmlSystemInterface();
 	~RmlSystemInterface();
 
+	void Reset();
+
 	// -- Inherited from Rml::SystemInterface  --
 	/**
 	 * @brief Call back for any raw text (CDATA in the XML spec) inside the *.rml files.
@@ -62,9 +64,14 @@ public:
 	void SetClipboardText(const Rml::String& text) override;
 	void GetClipboardText(Rml::String& text) override;
 
+	void JoinPath(Rml::String& translated_path, const Rml::String& document_path, const Rml::String& path) override;
+
 	// New hooks for Recoil engine
 	const Rml::String& GetMouseCursor();
 	void SetTranslationTable(TranslationTable* tt);
+
+	std::vector<std::string> GetDocumentPathRequests(const Rml::String& document_path);
+	void ClearDocumentPathRequests(const Rml::String& document_path);
 
 	/**
 	 * <p>
@@ -85,6 +92,7 @@ public:
 
 private:
 	TranslationTable* translationTable = nullptr;
+	std::unordered_map<std::string, std::vector<std::string>> documentPathRequests;
 	Rml::String mouseCursor;
 };
 

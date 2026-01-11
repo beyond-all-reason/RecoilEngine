@@ -54,6 +54,7 @@
 #include "System/FileSystem/FileSystem.h"
 #include "System/creg/STL_Variant.h"
 #include "System/creg/STL_Tuple.h"
+#include "fmt/format.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -90,6 +91,7 @@ CR_REG_METADATA(CGroundDecalHandlerData, (
 	CR_MEMBER_UN(smfDrawer),
 
 	CR_MEMBER_UN(highQuality),
+	CR_MEMBER_UN(ghostDimming),
 	CR_MEMBER_UN(sdbc),
 
 	CR_POSTLOAD(PostLoad)
@@ -103,6 +105,7 @@ CGroundDecalHandlerData::CGroundDecalHandlerData()
 	, decalsUpdateList{ }
 	, smfDrawer{ nullptr }
 	, highQuality{ configHandler->GetBool("HighQualityDecals") && (globalRendering->msaaLevel > 0) }
+	, ghostDimming{ configHandler->GetFloat("UnitGhostIconsDimming") }
 	, sdbc{ highQuality }
 {
 }
@@ -123,7 +126,7 @@ CGroundDecalHandler::CGroundDecalHandler()
 	eventHandler.AddClient(this);
 	CExplosionCreator::AddExplosionListener(this);
 
-	configHandler->NotifyOnChange(this, { "HighQualityDecals" });
+	configHandler->NotifyOnChange(this, { "HighQualityDecals", "UnitGhostIconsDimming" });
 
 	smfDrawer = dynamic_cast<CSMFGroundDrawer*>(readMap->GetGroundDrawer());
 
@@ -150,48 +153,50 @@ CGroundDecalHandler::~CGroundDecalHandler()
 	atlasTex = nullptr;
 }
 
-static auto LoadTexture(const std::string& name, bool convertDecalBitmap)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	std::string fileName = StringToLower(name);
+namespace Impl {
+	auto LoadTexture(const std::string& name, bool convertDecalBitmap, const std::string& errMsg)
+	{
+		RECOIL_DETAILED_TRACY_ZONE;
+		std::string fileName = StringToLower(name);
 
-	if (FileSystem::GetExtension(fileName).empty())
-		fileName += ".bmp";
+		if (FileSystem::GetExtension(fileName).empty())
+			fileName += ".bmp";
 
-	std::string fullName = fileName;
+		std::string fullName = fileName;
 
-	if (!CFileHandler::FileExists(fullName, SPRING_VFS_ALL))
-		fullName = std::string("bitmaps/") + fileName;
+		if (!CFileHandler::FileExists(fullName, SPRING_VFS_ALL))
+			fullName = std::string("bitmaps/") + fileName;
 
-	if (!CFileHandler::FileExists(fullName, SPRING_VFS_ALL))
-		fullName = std::string("unittextures/") + fileName;
+		if (!CFileHandler::FileExists(fullName, SPRING_VFS_ALL))
+			fullName = std::string("unittextures/") + fileName;
 
-	CBitmap bm;
-	if (!bm.Load(fullName))
-		throw content_error("Could not load ground decal \"" + fileName + "\"");
+		CBitmap bm;
+		if (!bm.Load(fullName))
+			throw content_error(fmt::format(", {} file: \"{}\"", errMsg, fileName));
 
-	if (convertDecalBitmap && FileSystem::GetExtension(fullName) == "bmp") {
-		// bitmaps don't have an alpha channel
-		// so use: red := brightness & green := alpha
-		auto* rmem = bm.GetRawMem();
+		if (convertDecalBitmap && FileSystem::GetExtension(fullName) == "bmp") {
+			// bitmaps don't have an alpha channel
+			// so use: red := brightness & green := alpha
+			auto* rmem = bm.GetRawMem();
 
-		for (int y = 0; y < bm.ysize; ++y) {
-			for (int x = 0; x < bm.xsize; ++x) {
-				const int index = ((y * bm.xsize) + x) * 4;
+			for (int y = 0; y < bm.ysize; ++y) {
+				for (int x = 0; x < bm.xsize; ++x) {
+					const int index = ((y * bm.xsize) + x) * 4;
 
-				const auto brightness = rmem[index + 0];
-				const auto alpha      = rmem[index + 1];
+					const auto brightness = rmem[index + 0];
+					const auto alpha = rmem[index + 1];
 
-				rmem[index + 0] = (brightness * 90) / 255;
-				rmem[index + 1] = (brightness * 60) / 255;
-				rmem[index + 2] = (brightness * 30) / 255;
-				rmem[index + 3] = alpha;
+					rmem[index + 0] = (brightness * 90) / 255;
+					rmem[index + 1] = (brightness * 60) / 255;
+					rmem[index + 2] = (brightness * 30) / 255;
+					rmem[index + 3] = alpha;
+				}
 			}
 		}
-	}
-	// non BMP scar textures doesn't follow the above historic convention, so keep them as is
+		// non BMP scar textures doesn't follow the above historic convention, so keep them as is
 
-	return std::make_tuple(bm, fullName);
+		return std::make_tuple(bm, fullName);
+	}
 }
 
 static inline std::string GetExtraTextureName(const std::string& mainTex) {
@@ -200,10 +205,10 @@ static inline std::string GetExtraTextureName(const std::string& mainTex) {
 	return mainTex.substr(0, dotPos) + "_normal" + (dotPos == string::npos ? "" : mainTex.substr(dotPos));
 }
 
-void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP) {
+void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP, const std::string& errMsg) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	try {
-		const auto& [bm, fn] = LoadTexture(filename, convertOldBMP);
+		const auto& [bm, fn] = Impl::LoadTexture(filename, convertOldBMP, errMsg);
 		if (atlasTex->AddTexFromBitmap(name, bm, filename)) {
 			texFileNames.emplace(name, fn);
 		}
@@ -223,7 +228,7 @@ void CGroundDecalHandler::AddBuildingDecalTextures()
 		return bm.CreateTexture();
 	};
 
-	auto ProcessDefs = [this](const auto& defsVector) {
+	auto ProcessDefs = [this](const auto& defsVector, const std::string& defName) {
 		for (const SolidObjectDef& soDef : defsVector) {
 			const SolidObjectDecalDef& decalDef = soDef.decalDef;
 
@@ -236,12 +241,15 @@ void CGroundDecalHandler::AddBuildingDecalTextures()
 			const std::string mainTex =                    (decalDef.groundDecalTypeName);
 			const std::string normTex = GetExtraTextureName(decalDef.groundDecalTypeName);
 
-			AddTexToAtlas(mainTex, mainTex, false);
-			AddTexToAtlas(normTex, normTex, false);
+			const std::string ERR_MSG = fmt::format("Error loading a ground decal texture from {}Defs, def.name = {}", defName, soDef.name);
+
+			AddTexToAtlas(mainTex, mainTex, false, ERR_MSG);
+			AddTexToAtlas(normTex, normTex, false, ERR_MSG);
 		}
 	};
-	ProcessDefs(featureDefHandler->GetFeatureDefsVec());
-	ProcessDefs(unitDefHandler->GetUnitDefsVec());
+
+	ProcessDefs(featureDefHandler->GetFeatureDefsVec(), "Feature");
+	ProcessDefs(unitDefHandler->GetUnitDefsVec(), "Unit");
 }
 
 
@@ -252,6 +260,8 @@ void CGroundDecalHandler::AddTexturesFromTable()
 	if (!resourcesParser.Execute()) {
 		LOG_L(L_ERROR, "Failed to load resources: %s", resourcesParser.GetErrorLog().c_str());
 	}
+
+	const std::string ERR_MSG_SCAR1 = "Error loading a ground scar texture";
 
 	const auto GraphicsTbl = resourcesParser.GetRoot().SubTable("graphics");
 	const LuaTable scarsTable = GraphicsTbl.SubTable("scars");
@@ -268,38 +278,40 @@ void CGroundDecalHandler::AddTexturesFromTable()
 		const auto mainName = IntToString(i, "mainscar_%i");
 		const auto normName = IntToString(i, "normscar_%i");
 
-		AddTexToAtlas(mainName, mainTexFileName,  true);
-		AddTexToAtlas(normName, normTexFileName, false);
+		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_SCAR1);
+		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_SCAR1);
 
 		// check if loaded for real
-		// can't use atlas->TextureExists() as it's only populated after Finalize()
-		maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
+		maxUniqueScars += atlasTex->TextureExists(mainName);
 	}
-
-	if (maxUniqueScars == scarTblSize)
-		return;
 
 	// fill the gaps in case the loop above failed to load some of the scar textures
-	const std::vector<std::string> scarMainTextures = CFileHandler::FindFiles("bitmaps/scars/", "scar?.*");
-	const size_t scarsExtraNum = scarMainTextures.size();
+	if (maxUniqueScars != scarTblSize) {
+		const std::string ERR_MSG_SCAR2 = "Error loading a replacement ground scar texture";
 
-	if (scarsExtraNum > 0) {
-		for (int extraTexNum = 0, i = 1; scarTblSize - maxUniqueScars > 0 && i <= scarTblSize; ++i) {
-			const auto mainName = IntToString(i, "mainscar_%i");
-			if (atlasTex->GetAllocator()->contains(mainName))
-				continue;
+		const std::vector<std::string> scarMainTextures = CFileHandler::FindFiles("bitmaps/scars/", "scar?.*");
+		const size_t scarsExtraNum = scarMainTextures.size();
 
-			const auto normName = IntToString(i, "normscar_%i");
+		if (scarsExtraNum > 0) {
+			for (int extraTexNum = 0, i = 1; scarTblSize - maxUniqueScars > 0 && i <= scarTblSize; ++i) {
+				const auto mainName = IntToString(i, "mainscar_%i");
+				if (atlasTex->GetAllocator()->contains(mainName))
+					continue;
 
-			const std::string mainTexFileName = scarMainTextures[extraTexNum++ % scarsExtraNum];
-			const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
+				const auto normName = IntToString(i, "normscar_%i");
 
-			AddTexToAtlas(mainName, mainTexFileName,  true);
-			AddTexToAtlas(normName, normTexFileName, false);
+				const std::string mainTexFileName = scarMainTextures[extraTexNum++ % scarsExtraNum];
+				const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
 
-			maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
+				AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_SCAR2);
+				AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_SCAR2);
+
+				maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
+			}
 		}
 	}
+
+	const std::string ERR_MSG_DECAL = "Error loading a user provided decal texture";
 
 	const LuaTable decalsTable = GraphicsTbl.SubTable("decals");
 	const int decalsTblSize = decalsTable.GetLength();
@@ -313,22 +325,25 @@ void CGroundDecalHandler::AddTexturesFromTable()
 		const auto mainName = IntToString(i, "maindecal_%i");
 		const auto normName = IntToString(i, "normdecal_%i");
 
-		AddTexToAtlas(mainName, mainTexFileName,  true);
-		AddTexToAtlas(normName, normTexFileName, false);
+		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_DECAL);
+		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_DECAL);
 	}
 }
 
 void CGroundDecalHandler::AddGroundTrackTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	const std::string ERR_MSG = "Error loading a ground track/footprint decal texture";
+
 	const auto fileNames = CFileHandler::FindFiles("bitmaps/tracks/", "");
 	for (const auto& mainTexFileName : fileNames) {
 		const auto mainName = FileSystem::GetBasename(StringToLower(mainTexFileName));
 		const auto normName = mainName + "_norm";
 		const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
 
-		AddTexToAtlas(mainName, mainTexFileName,  true);
-		AddTexToAtlas(normName, normTexFileName, false);
+		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG);
+		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG);
 	}
 }
 
@@ -399,21 +414,17 @@ void CGroundDecalHandler::GenerateAtlasTexture() {
 	AddGroundTrackTextures();
 	AddFallbackTextures();
 
-	if (!atlasTex->Finalize()) {
-		LOG_L(L_ERROR, "Could not finalize %s texture atlas. Use fewer/smaller textures.", atlasTex->GetAtlasName().c_str());
+	if (!atlasTex->CalculateAtlas()) {
+		LOG_L(L_ERROR, "Could not calculate %s texture atlas. Use fewer/smaller textures.", atlasTex->GetAtlasName().c_str());
 	}
 }
 
-void CGroundDecalHandler::ReloadDecalShaders() {
+bool CGroundDecalHandler::ReloadDecalShaders() {
 	if (shaderHandler->ReleaseProgramObjects("[GroundDecalHandler]"))
 		decalShader = nullptr;
 
-	const std::string ver = highQuality ? "#version 400 compatibility\n" : "#version 130\n";
-
 	decalShader = shaderHandler->CreateProgramObject("[GroundDecalHandler]", "DecalShaderGLSL");
-
-	decalShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/GroundDecalsVertProg.glsl",  "", GL_VERTEX_SHADER));
-	decalShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/GroundDecalsFragProg.glsl", ver, GL_FRAGMENT_SHADER));
+	decalShader->LoadFromLua("shaders/GLSL/groundDecals.lua");
 
 	decalShader->SetFlag("DEPTH_CLIP01", globalRendering->supportClipSpaceControl);
 	decalShader->SetFlag("HAVE_SHADOWS", true);
@@ -449,8 +460,8 @@ void CGroundDecalHandler::ReloadDecalShaders() {
 	decalShader->SetUniform("shadowColorTex" , 7);
 	decalShader->SetUniform("infoTex"        , 8);
 
-	decalShader->SetUniform("waterMinColor", 0.0f, 0.0f, 0.0f);
-	decalShader->SetUniform("waterBaseColor", 0.0f, 0.0f, 0.0f);
+	decalShader->SetUniform("waterMinColor"   , 0.0f, 0.0f, 0.0f);
+	decalShader->SetUniform("waterBaseColor"  , 0.0f, 0.0f, 0.0f);
 	decalShader->SetUniform("waterAbsorbColor", 0.0f, 0.0f, 0.0f);
 
 	decalShader->SetUniform("curAdjustedFrame", std::max(gs->frameNum, 0) + globalRendering->timeOffset);
@@ -464,7 +475,7 @@ void CGroundDecalHandler::ReloadDecalShaders() {
 	decalShader->Disable();
 	SunChanged();
 
-	decalShader->Validate();
+	return decalShader->Validate();
 }
 
 void CGroundDecalHandler::BindTextures()
@@ -739,7 +750,7 @@ void CGroundDecalHandler::Draw()
 	if (decals.empty())
 		return;
 
-	if (!atlasTex->IsValid())
+	if (!atlasTex->CreateAtlasTexture())
 		return;
 
 	UpdateDecalsVisibility();
@@ -789,6 +800,11 @@ void CGroundDecalHandler::Draw()
 
 	const bool visWater = smfDrawer->GetReadMap()->HasVisibleWater();
 
+	if (decalShader->IsReloadRequested()) {
+		ReloadDecalShaders();
+		decalShader->SetReloadComplete();
+	}
+
 	decalShader->SetFlag("HAVE_SHADOWS", shadowHandler.ShadowsLoaded());
 	decalShader->SetFlag("HAVE_INFOTEX", infoTextureHandler->IsEnabled());
 	decalShader->SetFlag("SMF_WATER_ABSORPTION", visWater);
@@ -812,6 +828,30 @@ void CGroundDecalHandler::Draw()
 	decalShader->Disable();
 
 	UnbindTextures();
+}
+
+std::array<uint32_t, 3> CGroundDecalHandler::GetTexSize() const
+{
+	if (!atlasTex)
+		return std::array<uint32_t, 3>{0};
+
+	const auto& flatSize = atlasTex->GetAtlasSize();
+	const auto numPages = atlasTex->GetAllocator()->GetNumPages();
+	return std::array<uint32_t, 3>{
+		static_cast<uint32_t>(flatSize.x),
+		static_cast<uint32_t>(flatSize.y),
+		numPages
+	};
+}
+
+uint32_t CGroundDecalHandler::GetTexID() const
+{
+	return atlasTex ? atlasTex->GetTexID() : 0;
+}
+
+uint32_t CGroundDecalHandler::GetTexTarget() const
+{
+	return atlasTex ? atlasTex->GetTexTarget() : 0;
 }
 
 void CGroundDecalHandler::AddSolidObject(const CSolidObject* object) { MoveSolidObject(object, object->pos); }
@@ -847,7 +887,8 @@ void CGroundDecalHandler::MoveSolidObject(const CSolidObject* object, const floa
 	const auto createFrame = static_cast<float>(std::max(gs->frameNum, 0));
 
 	if (const auto doIt = decalOwners.find(object); doIt != decalOwners.end()) {
-		auto& decal = decals.at(doIt->second);
+		assert(doIt->second < decals.size());
+		auto& decal = decals[doIt->second];
 		decal.posTL = posTL;
 		decal.posTR = posTR;
 		decal.posBR = posBR;
@@ -912,7 +953,8 @@ void CGroundDecalHandler::RemoveSolidObject(const CSolidObject* object, const Gh
 		return;
 	}
 
-	auto& decayingDecal = decals.at(pos);
+	assert(pos < decals.size());
+	auto& decayingDecal = decals[pos];
 
 	// we only care about DECAL_PLATE decals below
 	if (decayingDecal.info.type != static_cast<uint8_t>(GroundDecal::Type::DECAL_PLATE)) {
@@ -943,7 +985,8 @@ void CGroundDecalHandler::GhostDestroyed(const GhostSolidObject* gb) {
 	if (doIt == decalOwners.end())
 		return;
 
-	auto& decal = decals.at(doIt->second);
+	assert(doIt->second < decals.size());
+	auto& decal = decals[doIt->second];
 	// just in case
 	if (decal.info.type != static_cast<uint8_t>(GroundDecal::Type::DECAL_PLATE))
 		return;
@@ -1000,7 +1043,8 @@ bool CGroundDecalHandler::DeleteLuaDecal(uint32_t id)
 	if (it == idToPos.end())
 		return false;
 
-	auto& decal = decals.at(it->second);
+	assert(it->second < decals.size());
+	auto& decal = decals[it->second];
 	if (!decal.IsValid())
 		return false;
 
@@ -1020,7 +1064,8 @@ GroundDecal* CGroundDecalHandler::GetDecalById(uint32_t id)
 	if (it == idToPos.end())
 		return nullptr;
 
-	auto& decal = decals.at(it->second);
+	assert(it->second < decals.size());
+	auto& decal = decals[it->second];
 	if (!decal.IsValid())
 		return nullptr;
 
@@ -1035,7 +1080,8 @@ const GroundDecal* CGroundDecalHandler::GetDecalById(uint32_t id) const
 	if (it == idToPos.end())
 		return nullptr;
 
-	const auto& decal = decals.at(it->second);
+	assert(it->second < decals.size());
+	const auto& decal = decals[it->second];
 	if (!decal.IsValid())
 		return nullptr;
 
@@ -1049,7 +1095,8 @@ bool CGroundDecalHandler::SetDecalTexture(uint32_t id, const std::string& texNam
 	if (it == idToPos.end())
 		return false;
 
-	auto& decal = decals.at(it->second);
+	assert(it->second < decals.size());
+	auto& decal = decals[it->second];
 	if (!decal.IsValid())
 		return false;
 
@@ -1059,7 +1106,13 @@ bool CGroundDecalHandler::SetDecalTexture(uint32_t id, const std::string& texNam
 	if (newOffset == AtlasedTexture::DefaultAtlasTexture)
 		return false;
 
-	offset = static_cast<float4>(newOffset);
+	const auto newOffsetf4 = static_cast<float4>(newOffset);
+
+	// micro optimization
+	if (newOffsetf4 == offset)
+		return true;
+
+	offset = newOffsetf4;
 	decalsUpdateList.SetUpdate(it->second);
 	return true;
 }
@@ -1071,13 +1124,15 @@ std::string CGroundDecalHandler::GetDecalTexture(uint32_t id, bool mainTex) cons
 	if (it == idToPos.end())
 		return "";
 
-	const auto& decal = decals.at(it->second);
+	assert(it->second < decals.size());
+	const auto& decal = decals[it->second];
 	if (!decal.IsValid())
 		return "";
 
 	const auto& offset = mainTex ? decal.texMainOffsets : decal.texNormOffsets;
 
-	for (auto& [name, _] : atlasTex->GetAllocator()->GetEntries()) {
+	const auto& nameToUST = atlasTex->GetNameToUniqueSubTexMap();
+	for (auto& [name, _] : nameToUST) {
 		const auto at = static_cast<float4>(atlasTex->GetTexture(name));
 		if (at == offset)
 			return name;
@@ -1099,7 +1154,9 @@ const std::vector<std::string> CGroundDecalHandler::GetDecalTextures(const std::
 	};
 
 	std::vector<std::string> ret;
-	for (auto& [name, _] : atlasTex->GetAllocator()->GetEntries()) {
+
+	const auto& nameToUST = atlasTex->GetNameToUniqueSubTexMap();
+	for (const auto& [name, ust] : nameToUST) {
 		if (!mainTex.has_value()) {
 			ret.emplace_back(name);
 			continue;
@@ -1139,12 +1196,13 @@ const CSolidObject* CGroundDecalHandler::GetDecalSolidObjectOwner(uint32_t id) c
 		if (!std::holds_alternative<const CSolidObject*>(owner))
 			continue;
 
-		const auto& decal = decals.at(pos);
+		assert(pos < decals.size());
+		const auto& decal = decals[pos];
 
 		if (!decal.IsValid())
 			continue;
 
-		if (id != decals.at(pos).info.id)
+		if (id != decals[pos].info.id)
 			continue;
 
 		return std::get<const CSolidObject*>(owner);
@@ -1281,7 +1339,8 @@ void CGroundDecalHandler::AddTrack(const CUnit* unit, const float3& newPos, bool
 	if (!forceEval && createFrameInt % TRACKS_UPDATE_RATE != 0)
 		return;
 
-	GroundDecal& oldDecal = decals.at(doIt->second);
+	assert(doIt->second < decals.size());
+	GroundDecal& oldDecal = decals[doIt->second];
 
 	// just updated
 	if (oldDecal.createFrameMax == createFrame)
@@ -1417,7 +1476,8 @@ void CGroundDecalHandler::CompactDecalsVector(int frameNum)
 
 	// Remove owners of expired items
 	for (const auto& [owner, pos] : decalOwners) {
-		if (const auto& decal = decals.at(pos); decal.IsValid()) {
+		assert(pos < decals.size());
+		if (const auto& decal = decals[pos]; decal.IsValid()) {
 			const uint32_t id = decal.info.id; //can't use bitfield directly below
 			tmpOwnerToId.emplace(id, owner);
 		}
@@ -1482,7 +1542,8 @@ void CGroundDecalHandler::UpdateDecalsVisibility()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	for (const auto& [owner, pos] : decalOwners) {
-		auto& decal = decals.at(pos);
+		assert(pos < decals.size());
+		auto& decal = decals[pos];
 
 		if (decal.info.type != static_cast<uint8_t>(GroundDecal::Type::DECAL_PLATE))
 			continue;
@@ -1495,13 +1556,19 @@ void CGroundDecalHandler::UpdateDecalsVisibility()
 				const bool decalOwnerInCurLOS = ((unit->losStatus[gu->myAllyTeam] &   LOS_INLOS) != 0);
 				const bool decalOwnerInPrvLOS = ((unit->losStatus[gu->myAllyTeam] & LOS_PREVLOS) != 0);
 
+#if 0
 				if (unit->GetIsIcon())
 					wantedMult = 0.0f;
+#endif
+				const bool isGhostNow = gameSetup->ghostedBuildings && decalOwnerInPrvLOS && !decalOwnerInCurLOS;
 
-				if (!gu->spectatingFullView && !decalOwnerInCurLOS && (!gameSetup->ghostedBuildings || !decalOwnerInPrvLOS))
-					wantedMult = 0.0f;
+				if (!gu->spectatingFullView)
+					if (isGhostNow)
+						wantedMult = ghostDimming;
+					else if (!decalOwnerInCurLOS)
+						wantedMult = 0.0f;
 
-				wantedMult = std::min(wantedMult, std::max(0.0f, unit->buildProgress));
+				wantedMult *= std::clamp(unit->buildProgress, 0.0f, 1.0f);
 			}
 			else {
 				const CFeature* feature = static_cast<const CFeature*>(so);
@@ -1534,7 +1601,9 @@ void CGroundDecalHandler::UpdateDecalsVisibility()
 			assert(false);
 			continue;
 		}
-		auto& decal = decals.at(it->second);
+
+		assert(it->second < decals.size());
+		auto& decal = decals[it->second];
 
 		const float currAlpha = decal.alpha - (curAdjustedFrame - decal.createFrameMax) * decal.alphaFalloff;
 		if (currAlpha <= 0.0f)
@@ -1605,6 +1674,7 @@ void CGroundDecalHandler::GameFramePost(int frameNum)
 void CGroundDecalHandler::SunChanged()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
 	auto enToken = decalShader->EnableScoped();
 	decalShader->SetUniform("groundAmbientColor", sunLighting->groundAmbientColor.x, sunLighting->groundAmbientColor.y, sunLighting->groundAmbientColor.z, sunLighting->groundShadowDensity);
 	decalShader->SetUniform("groundDiffuseColor", sunLighting->groundDiffuseColor.x, sunLighting->groundDiffuseColor.y, sunLighting->groundDiffuseColor.z);
@@ -1614,6 +1684,7 @@ void CGroundDecalHandler::SunChanged()
 void CGroundDecalHandler::ViewResize()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
 	auto enToken = decalShader->EnableScoped();
 	decalShader->SetUniform("screenSizeInverse",
 		1.0f / globalRendering->viewSizeX,
@@ -1646,14 +1717,14 @@ void CGroundDecalHandler::ExplosionOccurred(const CExplosionParams& event) {
 void CGroundDecalHandler::ConfigNotify(const std::string& key, const std::string& value)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (key != "HighQualityDecals")
-		return;
 
 	if (bool newHQ = configHandler->GetBool("HighQualityDecals") && (globalRendering->msaaLevel > 0); highQuality != newHQ) {
 		sdbc = ScopedDepthBufferCopy(newHQ);
 		highQuality = newHQ;
 		ReloadDecalShaders();
 	}
+
+	ghostDimming = configHandler->GetFloat("UnitGhostIconsDimming");
 }
 
 void CGroundDecalHandler::RenderUnitCreated(const CUnit* unit, int cloaked) { AddSolidObject(unit); }

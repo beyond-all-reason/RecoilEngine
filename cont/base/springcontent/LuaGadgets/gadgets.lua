@@ -1379,9 +1379,9 @@ end
 --  Unit call-ins
 --
 
-function gadgetHandler:UnitCreated(unitID, unitDefID, unitTeam, builderID)
+function gadgetHandler:UnitCreated(unitID, unitDefID, unitTeam, builderID, builderDefID, builderTeam)
   for _,g in r_ipairs(self.UnitCreatedList) do
-    g:UnitCreated(unitID, unitDefID, unitTeam, builderID)
+    g:UnitCreated(unitID, unitDefID, unitTeam, builderID, builderDefID, builderTeam)
   end
 end
 

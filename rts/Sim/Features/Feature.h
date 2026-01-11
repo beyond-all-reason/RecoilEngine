@@ -77,14 +77,13 @@ public:
 	void ForcedMove(const float3& newPos);
 	void ForcedSpin(const float3& newDir) override;
 	void ForcedSpin(const float3& newFrontDir, const float3& newRightDir) override; 
-	void UpdatePrevFrameTransform() override;
 
 	bool Update();
 	bool UpdatePosition();
 	bool UpdateVelocity(const float3& dragAccel, const float3& gravAccel, const float3& movMask, const float3& velMask);
 
 	void SetTransform(const CMatrix44f& m, bool synced) { transMatrix[synced] = m; }
-	void UpdateTransform(const float3& p, bool synced) { transMatrix[synced] = std::move(ComposeMatrix(p)); }
+	void UpdateTransform(const float3& p, bool synced);
 	void UpdateTransformAndPhysState();
 	void UpdateQuadFieldPosition(const float3& moveVec);
 

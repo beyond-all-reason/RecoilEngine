@@ -51,7 +51,7 @@ CR_REG_METADATA(CSolidObject,
 	CR_MEMBER(team),
 	CR_MEMBER(allyteam),
 
-	CR_MEMBER(prevFrameNeedsUpdate),
+	CR_MEMBER(creationFrame),
 
 	CR_MEMBER(pieceHitFrames),
 
@@ -84,6 +84,10 @@ CR_REG_METADATA(CSolidObject,
 	CR_POSTLOAD(PostLoad)
 ))
 
+
+CSolidObject::CSolidObject()
+	: creationFrame { gs->frameNum }
+{}
 
 void CSolidObject::PostLoad()
 {
@@ -146,11 +150,11 @@ void CSolidObject::Move(const float3& v, bool relative)
 {
 	const float3& dv = relative ? v : (v - pos);
 
-	pos += dv;
+	pos    += dv;
 	midPos += dv;
 	aimPos += dv;
 
-	prevFrameNeedsUpdate = true;
+	CondUpdatePrevTransform();
 }
 
 
@@ -322,7 +326,7 @@ int2 CSolidObject::GetMapPosStatic(const float3& position, int xsize, int zsize)
 	return mp;
 }
 
-float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float waterDensity, float dragCoeff, float frictionCoeff) const
+float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float waterDensity, float dragCoeff, float frictionCoeff, float myGravity) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// KISS: use the cross-sectional area of a sphere, object shapes are complex
@@ -330,34 +334,41 @@ float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float wate
 	// other units as normal: mass in kg, speed in elmos/frame, density in kg/m^3
 	//
 	// params.xyzw map: {{atmosphere, water}Density, {drag, friction}Coefficient}
-	//
+
+	// in elmo/s
+	static constexpr auto STOPPING_SPEED = 0.5f;
+
+	// prevent eternal crawling, also exit early for static objects
+	if (const float perSecSpeed = speed.w * GAME_SPEED; perSecSpeed < STOPPING_SPEED) {
+		return float3(-speed.x, -speed.y, -speed.z);
+	}
+
+	// Typical radiuses in Elmo make no sense given the mass and the fact the robots are made from metal (some heavy alloy)
+	// kg / m3
+	static constexpr float MATERIAL_DENSITY = 8000.0f;
+	const float assumedRadius = math::cbrtf((3.0f * mass) / (4.0f * math::PI * MATERIAL_DENSITY));
+
+	myGravity = math::fabs(myGravity) * GAME_SPEED * GAME_SPEED;
+
 	const float3 speedSignVec = float3(Sign(speed.x), Sign(speed.y), Sign(speed.z));
-	const float3 dragScaleVec = float3(
-		(IsInAir() || IsOnGround()) * dragScales.x * (0.5f * atmosphericDensity * dragCoeff * (math::PI * sqRadius * 0.01f * 0.01f)), // air
-		IsInWater()                 * dragScales.y * (0.5f * waterDensity * dragCoeff * (math::PI * sqRadius * 0.01f * 0.01f)), // water
-		IsOnGround()                * dragScales.z * (frictionCoeff * mass)  // ground
+	const float3 speedDir = float3(speed.x, speed.y, speed.z).ANormalize();
+
+	const auto perSecVelocity = static_cast<float3>(speed) * GAME_SPEED;
+
+	const float dragScalar = 0.5f * dragCoeff * (math::PI * assumedRadius * assumedRadius) * (
+		(IsInAir() || IsOnGround()) * dragScales.x * atmosphericDensity +
+		(IsInWater()              ) * dragScales.y * waterDensity
 	);
 
-	float3 dragAccelVec;
+	const float normalForce = IsOnGround() * dragScales.z * (frictionCoeff * mass * myGravity * updir.y); // ground: fc * mass * g * cos(inclination)
 
-	dragAccelVec.x += (speed.x * speed.x * dragScaleVec.x * -speedSignVec.x);
-	dragAccelVec.y += (speed.y * speed.y * dragScaleVec.x * -speedSignVec.y);
-	dragAccelVec.z += (speed.z * speed.z * dragScaleVec.x * -speedSignVec.z);
-
-	dragAccelVec.x += (speed.x * speed.x * dragScaleVec.y * -speedSignVec.x);
-	dragAccelVec.y += (speed.y * speed.y * dragScaleVec.y * -speedSignVec.y);
-	dragAccelVec.z += (speed.z * speed.z * dragScaleVec.y * -speedSignVec.z);
-
-	// FIXME?
-	//   magnitude of dynamic friction may or may not depend on speed
-	//   coefficient must be multiplied by mass or it will be useless
-	//   (due to division by mass since the coefficient is normalized)
-	dragAccelVec.x += (math::fabs(speed.x) * dragScaleVec.z * -speedSignVec.x);
-	dragAccelVec.y += (math::fabs(speed.y) * dragScaleVec.z * -speedSignVec.y);
-	dragAccelVec.z += (math::fabs(speed.z) * dragScaleVec.z * -speedSignVec.z);
+	float3 dragAccelVec  = -(perSecVelocity * perSecVelocity * dragScalar * speedSignVec + normalForce * speedDir);
 
 	// convert from force
 	dragAccelVec /= mass;
+
+	// convert back to per-frame acceleration from m/s^2
+	dragAccelVec *= INV_GAME_SPEED * INV_GAME_SPEED;
 
 	// limit the acceleration
 	dragAccelVec.x = std::clamp(dragAccelVec.x, -math::fabs(speed.x), math::fabs(speed.x));
@@ -402,7 +413,7 @@ void CSolidObject::SetHeadingFromDirection() {
 	quat.ANormalize();
 
 	const float3 fDir = quat * frontdir;
-	assert(epscmp(fDir.y, 0.0f, float3::cmp_eps()));
+	assert(epscmp(fDir.y, 0.0f, float3::apx_eps()));
 
 	heading = GetHeadingFromVector(fDir.x, fDir.z);
 }
@@ -431,6 +442,26 @@ void CSolidObject::UpdateDirVectors(const float3& uDir)
 	frontdir = quat * fDir;
 	rightdir = quat * rDir;
 	updir = uDir;
+}
+
+void CSolidObject::CondUpdatePrevTransform()
+{
+	// copy every transformation happening on the creation frame
+	// into PrevFrameTransform state
+	// skip otherwise
+	if likely(creationFrame != gs->frameNum)
+		return;
+
+	UpdatePrevFrameTransform();
+}
+
+void CSolidObject::UpdatePrevFrameTransform()
+{
+	for (auto& lmp : localModel.pieces) {
+		lmp.SavePrevModelSpaceTransform();
+	}
+
+	preFrameTra = Transform{ CQuaternion::MakeFrom(GetTransformMatrix(true)), pos };
 }
 
 void CSolidObject::ForcedSpin(const float3& zdir)

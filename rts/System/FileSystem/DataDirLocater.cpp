@@ -2,10 +2,11 @@
 
 #include "DataDirLocater.h"
 
-#include <cstdlib>
 #include <cassert>
 #include <cstring>
 #include <sstream>
+#include <nowide/cstdlib.hpp>
+#include <nowide/convert.hpp>
 
 #ifdef _WIN32
 	#include <io.h>
@@ -26,6 +27,7 @@
 #include "FileSystem.h"
 #include "System/Exceptions.h"
 #include "System/MainDefines.h" // for sPS, cPS, cPD
+#include "System/UnorderedSet.hpp"
 #include "System/Config/ConfigHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Platform/Misc.h"
@@ -91,7 +93,7 @@ static inline void SplitColonString(const std::string& str, const std::function<
 
 DataDir::DataDir(const std::string& path): path(path)
 {
-	FileSystem::EnsurePathSepAtEnd(this->path);
+	this->path = FileSystem::GetNormalizedPath(FileSystem::EnsurePathSepAtEnd(this->path));
 }
 
 
@@ -106,7 +108,7 @@ void DataDirLocater::UpdateIsolationModeByEnvVar()
 	isolationMode = false;
 	isolationModeDir = "";
 
-	const char* const envIsolation = getenv("SPRING_ISOLATED");
+	const char* const envIsolation = nowide::getenv("SPRING_ISOLATED");
 	if (envIsolation != nullptr) {
 		SetIsolationMode(true);
 		SetIsolationModeDir(envIsolation);
@@ -132,9 +134,12 @@ std::string DataDirLocater::SubstEnvVars(const std::string& in) const
 
 #ifdef _WIN32
 	constexpr size_t maxSize = 32 * 1024;
-	char out_c[maxSize];
-	ExpandEnvironmentStrings(in.c_str(), out_c, maxSize); // expands %HOME% etc.
-	out = out_c;
+	std::wstring out_ws; out_ws.resize(maxSize);
+	auto strLen = ExpandEnvironmentStrings(nowide::widen(in).c_str(), out_ws.data(), maxSize); // expands %HOME% etc.
+	if (strLen == 0)
+		return "";
+
+	out = nowide::narrow(out_ws.c_str());
 #else
 	std::string previous = in;
 
@@ -190,40 +195,39 @@ void DataDirLocater::AddDir(const std::string& dir)
 	dataDirs.push_back(newDataDir);
 }
 
-bool DataDirLocater::DeterminePermissions(DataDir* dataDir)
+bool DataDirLocater::DeterminePermissions(const DataDir& dataDir)
 {
 #ifndef _WIN32
-	if ((dataDir->path.c_str()[0] != '/') || (dataDir->path.find("..") != std::string::npos))
+	if ((dataDir.path.c_str()[0] != '/') || (dataDir.path.find("..") != std::string::npos))
 #else
-	if (dataDir->path.find("..") != std::string::npos)
+	if (dataDir.path.find("..") != std::string::npos)
 #endif
 	{
-		throw content_error(std::string("a datadir may not be specified with a relative path: \"") + dataDir->path + "\"");
+		throw content_error(std::string("a datadir may not be specified with a relative path: \"") + dataDir.path + "\"");
 	}
 
-	return FileSystem::DirExists(dataDir->path);
+	return FileSystem::DirExists(dataDir.path);
 }
 
 void DataDirLocater::FilterUsableDataDirs()
 {
 	std::vector<DataDir> newDatadirs;
-	std::string previous; // used to filter out consecutive duplicates
-	// (I did not bother filtering out non-consecutive duplicates because then
-	//  there is the question which of the multiple instances to purge.)
+	spring::unordered_set<std::string> dataDirsSet;
 
-	for (auto& dd : dataDirs) {
-		if (dd.path != previous) {
-			if (DeterminePermissions(&dd)) {
-				newDatadirs.push_back(dd);
-				previous = dd.path;
-				if (dd.writable) {
-					LOG("[DataDirLocater::%s] using read-write data directory: %s", __func__, dd.path.c_str());
-				} else {
-					LOG("[DataDirLocater::%s] using read-only data directory: %s", __func__, dd.path.c_str());
-				}
+	for (const auto& dd : dataDirs) {
+		if (dataDirsSet.contains(dd.path))
+			continue;
+
+		if (DeterminePermissions(dd)) {
+			dataDirsSet.emplace(dd.path);
+			newDatadirs.push_back(dd);
+			if (dd.writable) {
+				LOG("[DataDirLocater::%s] using read-write data directory: %s", __func__, dd.path.c_str());
 			} else {
-				LOG_L(L_DEBUG, "[DataDirLocater::%s] potentional data directory: %s", __func__, dd.path.c_str());
+				LOG("[DataDirLocater::%s] using read-only data directory: %s", __func__, dd.path.c_str());
 			}
+		} else {
+			LOG_L(L_DEBUG, "[DataDirLocater::%s] potentional data directory: %s", __func__, dd.path.c_str());
 		}
 	}
 
@@ -293,8 +297,8 @@ void DataDirLocater::AddHomeDirs()
 	TCHAR pathAppDataC[MAX_PATH];
 	SHGetFolderPath(nullptr, CSIDL_PERSONAL, nullptr, SHGFP_TYPE_CURRENT, pathMyDocsC);
 	SHGetFolderPath(nullptr, CSIDL_COMMON_APPDATA, nullptr, SHGFP_TYPE_CURRENT, pathAppDataC);
-	const std::string pathMyDocs = pathMyDocsC;
-	const std::string pathAppData = pathAppDataC;
+	const std::string pathMyDocs  = nowide::narrow(pathMyDocsC );
+	const std::string pathAppData = nowide::narrow(pathAppDataC);
 
 	// e.g. F:\Dokumente und Einstellungen\Karl-Robert\Eigene Dateien\Spring
 	const std::string dd_myDocs = pathMyDocs + "\\Spring";
@@ -398,7 +402,7 @@ void DataDirLocater::LocateDataDirs()
 		if (!forcedWriteDir.empty())
 			AddDirs(forcedWriteDir);
 
-		const char* env = getenv("SPRING_WRITEDIR");
+		const char* env = nowide::getenv("SPRING_WRITEDIR");
 
 		if (env != nullptr && *env != 0)
 			AddDirs(env); // ENV{SPRING_WRITEDIR}
@@ -425,7 +429,7 @@ void DataDirLocater::LocateDataDirs()
 
 	// LEVEL 3: additional custom data sources
 	{
-		const char* env = getenv("SPRING_DATADIR");
+		const char* env = nowide::getenv("SPRING_DATADIR");
 
 		if (env != nullptr && *env != 0)
 			AddDirs(env); // ENV{SPRING_DATADIR}

@@ -117,6 +117,8 @@ public:
 	bool castShadow = false;
 	bool drawSorted = true;
 
+	bool blockPreciseCol = false;
+
 	float3 dir = FwdVector;        // set via Init()
 	float3 drawPos;
 

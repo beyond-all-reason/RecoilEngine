@@ -1487,24 +1487,50 @@ namespace {
 		RECOIL_DETAILED_TRACY_ZONE;
 		bool success = false;
 
-		switch (hashString(ext)) {
-			case hashString("bmp"): { success = ilSave(IL_BMP, p); } break;
-			case hashString("jpg"): { success = ilSave(IL_JPG, p); } break;
-			case hashString("png"): { success = ilSave(IL_PNG, p); } break;
-			case hashString("tga"): { success = ilSave(IL_TGA, p); } break;
-			case hashString("tif"): [[fallthrough]];
-			case hashString("tiff"): { success = ilSave(IL_TIF, p); } break;
-			case hashString("dds"): { success = ilSave(IL_DDS, p); } break;
-			case hashString("pbm"): [[fallthrough]];
-			case hashString("pgm"): [[fallthrough]];
-			case hashString("ppm"): [[fallthrough]];
-			case hashString("pnm"): { success = ilSave(IL_PNM, p); } break;
-			case hashString("hdr"): { success = ilSave(IL_HDR, p); } break;
-			case hashString("raw"): { success = ilSave(IL_RAW, p); } break;
-		}
+		const auto SaveImage = [](ILenum type, const ILchar* p) -> bool {
+			ILenum err = 0;
+			while (err = ilGetError(), err != IL_NO_ERROR);
 
-		assert(ilGetError() == IL_NO_ERROR);
-		while (auto err = ilGetError() != IL_NO_ERROR);
+			auto sz = ilSaveL(type, nullptr, 0);
+			if (!sz)
+				return false;
+
+			if (err = ilGetError(); err != IL_NO_ERROR)
+				return false;
+
+			std::vector<uint8_t> buffer; buffer.resize(sz);
+
+			if (ilSaveL(type, buffer.data(), sz) != sz)
+				return false;
+
+			if (err = ilGetError(); err != IL_NO_ERROR)
+				return false;
+
+			nowide::fstream fstr(p, std::ios::out | std::ios::binary);
+			if (!fstr.is_open())
+				return false;
+
+			fstr.write(reinterpret_cast<const char*>(buffer.data()), buffer.size());
+			fstr.close();
+
+			return true;
+		};
+
+		switch (hashString(ext)) {
+			case hashString("bmp") : { success = SaveImage(IL_BMP, p); } break;
+			case hashString("jpg") : { success = SaveImage(IL_JPG, p); } break;
+			case hashString("png") : { success = SaveImage(IL_PNG, p); } break;
+			case hashString("tga") : { success = SaveImage(IL_TGA, p); } break;
+			case hashString("tif") : [[fallthrough]];
+			case hashString("tiff"): { success = SaveImage(IL_TIF, p); } break;
+			case hashString("dds") : { success  = SaveImage(IL_DDS, p); } break;
+			case hashString("pbm") : [[fallthrough]];
+			case hashString("pgm") : [[fallthrough]];
+			case hashString("ppm") : [[fallthrough]];
+			case hashString("pnm") : { success = SaveImage(IL_PNM, p); } break;
+			case hashString("hdr") : { success = SaveImage(IL_HDR, p); } break;
+			case hashString("raw") : { success = SaveImage(IL_RAW, p); } break;
+		}
 
 		return success;
 	}

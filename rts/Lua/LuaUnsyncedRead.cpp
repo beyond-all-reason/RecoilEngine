@@ -300,6 +300,8 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetGroundDecalCreationFrame);
 	REGISTER_LUA_CFUNC(GetGroundDecalOwner);
 	REGISTER_LUA_CFUNC(GetGroundDecalType);
+	REGISTER_LUA_CFUNC(GetGroundDecalGlowParams);
+	REGISTER_LUA_CFUNC(GetGroundDecalUserData);
 
 	REGISTER_LUA_CFUNC(UnitIconGetDraw);
 	REGISTER_LUA_CFUNC(GetUnitIconData);
@@ -4861,10 +4863,12 @@ int LuaUnsyncedRead::GetGroundDecalTextures(lua_State* L)
 	if (!lua_isnoneornil(L, 1))
 		isMainTex = luaL_checkboolean(L, 1);
 
+	const auto pushFileNames = luaL_optboolean(L, 2, false);
+
 	const auto& texNames = groundDecals->GetDecalTextures(isMainTex);
 	LuaUtils::PushStringVector(L, texNames);
 
-	if (!luaL_optboolean(L, 2, false))
+	if (!pushFileNames)
 		return 1;
 
 	const auto& texFileNames = groundDecals->GetDecalTextureFileNames(texNames);
@@ -5034,6 +5038,60 @@ int LuaUnsyncedRead::GetGroundDecalOwner(lua_State* L)
 		lua_pushnumber(L,                          so->id);
 
 	return 1;
+}
+
+/***
+ *
+ * @function Spring.GetGroundDecalGlowParams
+ * Gets the glow parameters of the ground decal.
+ * @param decalID integer
+ * @return number? glow Between 0 and 1
+ * @return number glowFalloff Between 0 and 1, per second
+ */
+int LuaUnsyncedRead::GetGroundDecalGlowParams(lua_State* L)
+{
+	const auto* decal = groundDecals->GetDecalById(luaL_checkint(L, 1));
+	if (!decal) {
+		return 0;
+	}
+
+	lua_pushnumber(L, decal->glow);
+	lua_pushnumber(L, decal->glowFalloff * GAME_SPEED);
+
+	//PushNumberContainerAsArray(L, decal->glowColorMap[0].rgba);
+	//PushNumberContainerAsArray(L, decal->glowColorMap[1].rgba);
+
+	return 2;
+}
+
+/***
+ *
+ * @function Spring.GetGroundDecalUserData
+ * Gets the user defined decal data.
+ * @param decalID integer
+ * @param udQuad integer vec4 index, must be within [0;1] for now
+ * @return number? x
+ * @return number y
+ * @return number z
+ * @return number w
+ */
+int LuaUnsyncedRead::GetGroundDecalUserData(lua_State* L)
+{
+	const auto* decal = groundDecals->GetDecalById(luaL_checkint(L, 1));
+	if (!decal) {
+		return 0;
+	}
+
+	const auto quad = static_cast<uint32_t>(luaL_checknumber(L, 2));
+	if (quad >= GroundDecal::NUM_USERDATA) {
+		return 0;
+	}
+
+	const float4& userData = decal->userDefined[quad];
+	for (size_t i = 0; i < 4; ++i)
+		lua_pushnumber(L, userData[i]);
+
+	return 4;
 }
 
 

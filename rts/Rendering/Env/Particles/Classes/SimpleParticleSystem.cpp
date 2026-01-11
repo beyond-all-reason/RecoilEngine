@@ -266,8 +266,3 @@ bool CSimpleParticleSystem::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo
 
 	return false;
 }
-
-
-CR_BIND_DERIVED(CSphereParticleSpawner, CSimpleParticleSystem, )
-
-CR_REG_METADATA(CSphereParticleSpawner, )

@@ -1613,7 +1613,7 @@ int LuaSyncedRead::GetMapStartPositions(lua_State* L)
 		lua_pushnumber(L, pos.x); lua_rawseti(L, -2, 1);
 		lua_pushnumber(L, pos.y); lua_rawseti(L, -2, 2);
 		lua_pushnumber(L, pos.z); lua_rawseti(L, -2, 3);
-		lua_rawseti(L, -2, 1 + teamNum); // [i] = {x,y,z}
+		lua_rawseti(L, -2, teamNum); // [i] = {x,y,z}
 		return true;
 	});
 
@@ -1658,16 +1658,13 @@ int LuaSyncedRead::GetAllyTeamList(lua_State* L)
  */
 int LuaSyncedRead::GetTeamList(lua_State* L)
 {
-	const int args = lua_gettop(L); // number of arguments
-
-	if ((args != 0) && ((args != 1) || !lua_isnumber(L, 1)))
-		luaL_error(L, "Incorrect arguments to GetTeamList([allyTeamID])");
-
-
 	int allyTeamID = -1;
 
-	if (args == 1) {
-		allyTeamID = lua_toint(L, 1);
+	const int args = lua_gettop(L); // number of arguments
+
+	// peek the first argument, but gracefully ignore the rest
+	if (args >= 1) {
+		allyTeamID = luaL_checkinteger(L, 1);
 		if (!teamHandler.IsValidAllyTeam(allyTeamID))
 			return 0;
 	}
@@ -6731,6 +6728,8 @@ int LuaSyncedRead::GetUnitCmdDescs(lua_State* L)
  *
  * @function Spring.FindUnitCmdDesc
  * @param unitID integer
+ * @param cmdID integer
+ * @return integer?
  */
 int LuaSyncedRead::FindUnitCmdDesc(lua_State* L)
 {
@@ -8848,6 +8847,7 @@ int LuaSyncedRead::GetUnitPieceDirection(lua_State* L) {
  *
  * @function Spring.GetUnitPieceMatrix
  * @param unitID integer
+ * @param pieceIndex integer
  * @return number? m11
  * @return number m12
  * @return number m13
@@ -8962,6 +8962,7 @@ int LuaSyncedRead::GetFeaturePieceDirection(lua_State* L) {
  *
  * @function Spring.GetFeaturePieceMatrix
  * @param featureID integer
+ * @param pieceIndex integer
  * @return number? m11
  * @return number m12
  * @return number m13

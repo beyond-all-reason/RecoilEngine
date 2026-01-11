@@ -18,6 +18,7 @@
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/GL/GeometryBuffer.h"
 #include "Rendering/Env/CubeMapHandler.h"
+#include "Rendering/Env/Decals/GroundDecalHandler.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Map/InfoTexture/InfoTexture.h"
 #include "Rendering/Textures/NamedTextures.h"
@@ -123,6 +124,8 @@ LuaMatTexture::Type LuaOpenGLUtils::GetLuaMatTextureType(const std::string& name
 
 		case hashString("$explosions"): { return LuaMatTexture::LUATEX_EXPLOSIONS_ATLAS; } break;
 		case hashString("$groundfx"):   { return LuaMatTexture::LUATEX_GROUNDFX_ATLAS; } break;
+
+		case hashString("$decals"): { return LuaMatTexture::LUATEX_DECALS_ATLAS; } break;
 
 		case hashString("$icons"): [[fallthrough]];
 		case hashString("$icons0"): { return LuaMatTexture::LUATEX_ICONS_ATLAS0; } break;
@@ -630,8 +633,10 @@ GLuint LuaMatTexture::GetTextureID() const
 		case LUATEX_EXPLOSIONS_ATLAS: { texID = projectileDrawer->textureAtlas->GetTexID();  } break;
 		case LUATEX_GROUNDFX_ATLAS:   { texID = projectileDrawer->groundFXAtlas->GetTexID(); } break;
 
+		case LUATEX_DECALS_ATLAS: { texID = groundDecals->GetTexID(); } break;
+
 		case LUATEX_ICONS_ATLAS0: { texID = icon::iconHandler.GetAtlasTextureID(0); } break;
-		case LUATEX_ICONS_ATLAS1: { texID = icon::iconHandler.GetAtlasTextureID(0); } break;
+		case LUATEX_ICONS_ATLAS1: { texID = icon::iconHandler.GetAtlasTextureID(1); } break;
 
 		default: {
 			assert(false);
@@ -748,6 +753,10 @@ GLuint LuaMatTexture::GetTextureTarget() const
 		} break;
 		case LUATEX_GROUNDFX_ATLAS: {
 			texType = projectileDrawer->groundFXAtlas->GetTexTarget();
+		} break;
+
+		case LUATEX_DECALS_ATLAS: {
+			texType = groundDecals->GetTexTarget();
 		} break;
 
 		case LUATEX_ICONS_ATLAS0: [[fallthrough]];
@@ -994,6 +1003,13 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 			auto sz = projectileDrawer->groundFXAtlas->GetSize();
 			return ReturnHelper(sz.x, sz.y);
 		} break;
+
+		case LUATEX_DECALS_ATLAS: {
+			auto sz = groundDecals->GetTexSize();
+			return std::make_tuple(sz[0], sz[1], sz[2]);
+		} break;
+
+
 		case LUATEX_ICONS_ATLAS0: {
 			const auto& sz = icon::iconHandler.GetAtlasSize(0);
 			return ReturnHelper(sz.x, sz.y);
@@ -1092,6 +1108,8 @@ void LuaMatTexture::Print(const string& indent) const
 
 		STRING_CASE(typeName, LUATEX_EXPLOSIONS_ATLAS);
 		STRING_CASE(typeName, LUATEX_GROUNDFX_ATLAS);
+
+		STRING_CASE(typeName, LUATEX_DECALS_ATLAS);
 
 		STRING_CASE(typeName, LUATEX_ICONS_ATLAS0);
 		STRING_CASE(typeName, LUATEX_ICONS_ATLAS1);

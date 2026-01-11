@@ -154,8 +154,8 @@ static inline void DrawFeatureColVol(const CFeature* f)
 	if (!camera->InView(f->pos, f->GetDrawRadius()))
 		return;
 
-	CMatrix44f fm(f->midPos);
-	fm.SetXYZ(f->GetTransformMatrixRef(false));
+	CMatrix44f fm(f->GetTransformMatrixRef(false));
+	fm.Translate(f->relMidPos);
 
 	DrawObjectMidAndAimPos(f);
 	DrawCollisionVolume(&f->selectionVolume, fm, DEFAULT_SELVOL_COLOR);
@@ -236,8 +236,8 @@ static inline void DrawUnitColVol(const CUnit* u)
 
 		DrawObjectMidAndAimPos(u);
 
-		CMatrix44f um(u->midPos);
-		um.SetXYZ(u->GetTransformMatrix(false));
+		CMatrix44f um(u->GetTransformMatrix(false));
+		um.Translate(u->relMidPos);
 		DrawCollisionVolume(&u->selectionVolume, um, DEFAULT_SELVOL_COLOR);
 
 		if (v->DefaultToPieceTree()) {

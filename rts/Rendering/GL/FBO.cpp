@@ -14,6 +14,7 @@
 #include "System/Config/ConfigHandler.h"
 
 #include "System/Misc/TracyDefs.h"
+#include "Rendering/GlobalRendering.h"
 
 CONFIG(bool, AtiSwapRBFix).defaultValue(false);
 
@@ -30,6 +31,11 @@ GLsizei FBO::maxSamples = -1;
 bool FBO::IsSupported()
 {
 	return (GLAD_GL_EXT_framebuffer_object);
+}
+
+bool FBO::IsReady()
+{
+	return globalRendering->active;
 }
 
 

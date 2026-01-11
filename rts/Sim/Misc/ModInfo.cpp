@@ -44,6 +44,24 @@ void CModInfo::ResetState()
 		groundUnitCollisionAvoidanceUpdateRate = 3;
 	}
 	{
+		// Default values for guard behavior (replicates the original behavior)
+		guardRecalculateThreshold = 100.0f;  // Distance that a guardee must move before the guard goal is recalculated
+		guardStoppedProximityGoal = 50.0f;  // Distance that a guardian will stop at nearing a stopped guardee
+		guardStoppedExtraDistance = 100.0f;  // The extra distance a guardian will keep from a stopped guardee
+		guardMovingProximityGoal = 150.0f;   // Distance the guardian is considered to be in guarding range and will match the velocity
+		guardMovingIntervalMultiplier = 0.0f;  // A multiplier for the moving goal while guarding, smaller values will result in higher detail movement but more performance cost
+		guardInterceptionLimit = 0.0f;        // Limit for the intercept when a guardian is not in guarding range
+	}
+	// {
+	// 	Recommended values for guard behavior (units keep formation and do not lag behind, slightly intercept)
+	// 	guardRecalculateThreshold = 100.0f;  // Distance that a guardee must move before the guard goal is recalculated
+	// 	guardStoppedProximityGoal = 50.0f;  // Distance that a guardian will stop at nearing a stopped guardee
+	// 	guardStoppedExtraDistance = 100.0f;  // The extra distance a guardian will keep from a stopped guardee
+	// 	guardMovingProximityGoal = 100.0f;   // Distance the guardian is considered to be in guarding range and will match the velocity
+	// 	guardMovingIntervalMultiplier = 2.13f;  // A multiplier for the moving goal while guarding, smaller values will result in higher detail movement but more performance cost
+	// 	guardInterceptionLimit = 128.0f;        // Limit for the intercept when a guardian is not in guarding range
+	// }
+	{
 		constructionDecay      = true;
 		constructionDecayTime  = int(6.66 * GAME_SPEED);
 		constructionDecaySpeed = 0.03f;
@@ -213,6 +231,19 @@ void CModInfo::Init(const std::string& modFileName)
 		unitQuadPositionUpdateRate = movementTbl.GetInt("unitQuadPositionUpdateRate",  unitQuadPositionUpdateRate);
 		groundUnitCollisionAvoidanceUpdateRate = movementTbl.GetInt("groundUnitCollisionAvoidanceUpdateRate",  groundUnitCollisionAvoidanceUpdateRate);
 
+	}
+
+	{
+		// Guard behaviour
+		const LuaTable& guardTbl = root.SubTable("guard");
+
+		guardRecalculateThreshold = Square(guardTbl.GetFloat("guardRecalculateThreshold", guardRecalculateThreshold));
+		guardStoppedProximityGoal = Square(guardTbl.GetFloat("guardStoppedProximityGoal", guardStoppedProximityGoal));
+		guardMovingProximityGoal = Square(guardTbl.GetFloat("guardMovingProximityGoal", guardMovingProximityGoal));
+
+		guardStoppedExtraDistance = guardTbl.GetFloat("guardStoppedExtraDistance", guardStoppedExtraDistance);
+		guardMovingIntervalMultiplier = guardTbl.GetFloat("guardMovingIntervalMultiplier", guardMovingIntervalMultiplier);
+		guardInterceptionLimit = guardTbl.GetFloat("guardInterceptionLimit", guardInterceptionLimit);
 	}
 
 	{

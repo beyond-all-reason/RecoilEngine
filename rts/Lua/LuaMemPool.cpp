@@ -25,7 +25,6 @@ static std::vector<size_t> gIndcs;
 static std::atomic<size_t> gCount = {0};
 static spring::mutex gMutex;
 
-
 size_t LuaMemPool::GetPoolCount() { return (gCount.load()); }
 
 LuaMemPool* LuaMemPool::GetSharedPtr() { return gSharedPool; }
@@ -112,27 +111,39 @@ void* LuaMemPool::Alloc(size_t size)
 	if (!LuaMemPool::enabled) {
 		allocStats[STAT_NAE] += 1 * (size > 0);
 		allocStats[STAT_NBE] += size;
+#if LUA_MEASURE_ALLOC_TIME == 1
 		auto t0 = spring_now();
+#endif
 		void* ptr = ::operator new(size);
+#if LUA_MEASURE_ALLOC_TIME == 1
 		allocStats[STAT_NTE] += (spring_now() - t0).toMicroSecsi();
+#endif
 		return ptr;
 	}
 
+#if LUA_MEASURE_ALLOC_TIME == 1
 	auto t0 = spring_now();
+#endif
 	auto* ptr = luaMemPoolImpl->allocMem(size);
 	
 	if (size > NUM_BUCKETS * BUCKET_STEP) {
 		allocStats[STAT_NAE] += 1 * (size > 0);
 		allocStats[STAT_NBE] += size;
+#if LUA_MEASURE_ALLOC_TIME == 1
 		allocStats[STAT_NTE] += (spring_now() - t0).toMicroSecsi();
+#endif
 	} else if (luaMemPoolImpl->isAllocInternal(ptr)) {
 		allocStats[STAT_NAI] += 1 * (size > 0);
 		allocStats[STAT_NBI] += size;
+#if LUA_MEASURE_ALLOC_TIME == 1
 		allocStats[STAT_NTI] += (spring_now() - t0).toMicroSecsi();
+#endif
 	} else {
 		allocStats[STAT_NAF] += 1 * (size > 0);
 		allocStats[STAT_NBF] += size;
+#if LUA_MEASURE_ALLOC_TIME == 1
 		allocStats[STAT_NTF] += (spring_now() - t0).toMicroSecsi();
+#endif
 	}
 
 	return ptr;
@@ -152,32 +163,42 @@ void* LuaMemPool::Realloc(void* ptr, size_t nsize, size_t osize)
 
 		allocStats[STAT_NBE] -= osize;
 		allocStats[STAT_NBE] += nsize;
-
+#if LUA_MEASURE_ALLOC_TIME == 1
 		auto t0 = spring_now();
+#endif
 		std::memcpy(newPtr, ptr, std::min(nsize, osize));
 		std::memset(ptr, 0, osize);
 		::operator delete(ptr);
+#if LUA_MEASURE_ALLOC_TIME == 1
 		allocStats[STAT_NTE] += (spring_now() - t0).toMicroSecsi();
+#endif
 
 		return newPtr;
 	}
-
+#if LUA_MEASURE_ALLOC_TIME == 1
 	auto t0 = spring_now();
+#endif
 	auto* ret = luaMemPoolImpl->reAllocMem(ptr, nsize);
 	if (nsize > NUM_BUCKETS * BUCKET_STEP) {
 		allocStats[STAT_NAE] += 1 * (nsize > 0);
 		allocStats[STAT_NBE] += nsize;
+#if LUA_MEASURE_ALLOC_TIME == 1
 		allocStats[STAT_NTE] += (spring_now() - t0).toMicroSecsi();
+#endif
 	}
 	else if (luaMemPoolImpl->isAllocInternal(ret)) {
 		allocStats[STAT_NAI] += 1 * (nsize > 0);
 		allocStats[STAT_NBI] += nsize;
+#if LUA_MEASURE_ALLOC_TIME == 1
 		allocStats[STAT_NTI] += (spring_now() - t0).toMicroSecsi();
+#endif
 	}
 	else {
 		allocStats[STAT_NAF] += 1 * (nsize > 0);
 		allocStats[STAT_NBF] += nsize;
+#if LUA_MEASURE_ALLOC_TIME == 1
 		allocStats[STAT_NTF] += (spring_now() - t0).toMicroSecsi();
+#endif
 	}
 	return ret;
 }

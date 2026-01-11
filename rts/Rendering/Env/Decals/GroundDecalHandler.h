@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <array>
 #include <vector>
 #include <string>
 #include <tuple>
@@ -44,6 +45,10 @@ public:
 	void DumpAtlasTextures() override {}
 
 	void Draw() override {}
+
+	uint32_t GetTexID() const override { return 0; }
+	uint32_t GetTexTarget() const override { return 0; }
+	std::array<uint32_t, 3> GetTexSize() const override { return std::array<uint32_t, 3>{0}; }
 
 	void AddSolidObject(const CSolidObject* object) override {}
 	void ForceRemoveSolidObject(const CSolidObject* object) override {}
@@ -101,6 +106,7 @@ protected:
 	CSMFGroundDrawer* smfDrawer;
 
 	bool highQuality = false;
+	float ghostDimming = 1.0f;
 	ScopedDepthBufferCopy sdbc;
 };
 
@@ -167,6 +173,10 @@ public:
 
 	void Draw() override;
 
+	uint32_t GetTexID() const override;
+	uint32_t GetTexTarget() const override;
+	std::array<uint32_t, 3> GetTexSize() const override;
+
 	void AddSolidObject(const CSolidObject* object) override;
 	void ForceRemoveSolidObject(const CSolidObject* object) override;
 
@@ -191,9 +201,9 @@ private:
 	uint32_t GetDepthBufferTextureTarget() const;
 
 	void GenerateAtlasTexture();
-	void ReloadDecalShaders();
+	bool ReloadDecalShaders();
 
-	void AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP);
+	void AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP, const std::string& errMsg);
 
 	void AddTrack(const CUnit* unit, const float3& newPos, bool forceEval = false);
 

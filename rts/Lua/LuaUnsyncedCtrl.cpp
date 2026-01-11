@@ -101,7 +101,7 @@
 #include <cfloat>
 #include <cinttypes>
 
-#include <fstream>
+#include <nowide/fstream.hpp>
 
 #include <SDL_keyboard.h>
 #include <SDL_clipboard.h>
@@ -323,6 +323,8 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetGroundDecalTint);
 	REGISTER_LUA_CFUNC(SetGroundDecalMisc);
 	REGISTER_LUA_CFUNC(SetGroundDecalCreationFrame);
+	REGISTER_LUA_CFUNC(SetGroundDecalGlowParams);
+	REGISTER_LUA_CFUNC(SetGroundDecalUserData);
 
 	REGISTER_LUA_CFUNC(SDLSetTextInputRect);
 	REGISTER_LUA_CFUNC(SDLStartTextInput);
@@ -2708,7 +2710,7 @@ int LuaUnsyncedCtrl::ExtractModArchiveFile(lua_State* L)
 
 
 	std::vector<uint8_t> buffer;
-	std::fstream fstr(path.c_str(), std::ios::out | std::ios::binary);
+	nowide::fstream fstr(path.c_str(), std::ios::out | std::ios::binary);
 
 	if (!vfsFile.IsBuffered()) {
 		buffer.resize(vfsFile.FileSize(), 0);
@@ -3267,7 +3269,7 @@ static int ReloadOrRestart(const std::string& springArgs, const std::string& scr
 
 	if (!scriptText.empty()) {
 		// create file 'script.txt' with contents given by Lua code
-		std::ofstream scriptFile(scriptFullName.c_str());
+		nowide::ofstream scriptFile(scriptFullName.c_str());
 
 		scriptFile.write(scriptText.c_str(), scriptText.size());
 		scriptFile.close();
@@ -5107,6 +5109,67 @@ int LuaUnsyncedCtrl::SetGroundDecalCreationFrame(lua_State* L)
 	return 1;
 }
 
+/***
+ *
+ * @function Spring.SetGroundDecalGlowParams
+ *
+ * Set decal glow parameters
+ *
+ * @param decalID integer
+ * @param glow number? Between 0 and 1 (Default: currGlow)
+ * @param glowFalloff number? Between 0 and 1, per second (Default: currGlowFallOff)
+ * @return boolean decalSet
+ */
+int LuaUnsyncedCtrl::SetGroundDecalGlowParams(lua_State* L)
+{
+	auto* decal = groundDecals->GetDecalById(luaL_checkint(L, 1));
+	if (!decal) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	decal->glow = luaL_optfloat(L, 2, decal->glow);
+	decal->glowFalloff = luaL_optfloat(L, 3, decal->glowFalloff * GAME_SPEED) / GAME_SPEED;
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+/***
+ *
+ * @function Spring.SetGroundDecalUserData
+ *
+ * Set decal user data. Useful in conjunction with custom decal shaders
+ *
+ * @param decalID integer
+ * @param udQuad integer vec4 index, must be within [0;1] for now
+ * @param x number? Any valid Lua float number (Default: current data)
+ * @param y number? Any valid Lua float number (Default: current data)
+ * @param z number? Any valid Lua float number (Default: current data)
+ * @param w number? Any valid Lua float number (Default: current data)
+ * @return boolean decalSet
+ */
+int LuaUnsyncedCtrl::SetGroundDecalUserData(lua_State* L)
+{
+	auto* decal = groundDecals->GetDecalById(luaL_checkint(L, 1));
+	if (!decal) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	const auto quad = static_cast<uint32_t>(luaL_checknumber(L, 2));
+	if (quad >= GroundDecal::NUM_USERDATA) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	float4& userData = decal->userDefined[quad];
+	for (size_t i = 0; i < 4; ++i)
+		userData[i] = luaL_optfloat(L, 3 + i, userData[i]);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
 
 /******************************************************************************
  * SDL Text

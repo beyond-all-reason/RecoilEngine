@@ -1,5 +1,5 @@
 #include <string>
-#include <cstdio>
+#include <nowide/cstdio.hpp>
 #include <sys/stat.h>
 #include "System/Log/ILog.h"
 
@@ -34,7 +34,7 @@ namespace {
 			}
 		}
 		static void WriteFile(const std::string& filePath, const std::string& content) {
-			FILE* testFile = fopen(filePath.c_str(), "w");
+			FILE* testFile = nowide::fopen(filePath.c_str(), "w");
 			if (testFile != NULL) {
 				fprintf(testFile, "%s", content.c_str());
 				fclose(testFile);
@@ -69,10 +69,10 @@ PrepareFileSystem pfs;
 
 TEST_CASE("FileExists")
 {
-	CHECK(FileSystem::FileExists("testFile.txt"));
-	CHECK_FALSE(FileSystem::FileExists("testFile99.txt"));
-	CHECK_FALSE(FileSystem::FileExists("testDir"));
-	CHECK_FALSE(FileSystem::FileExists("testDir99"));
+	CHECK(FileSystem::FileExists(u8"testFile.txt"));
+	CHECK_FALSE(FileSystem::FileExists(u8"testFile99.txt"));
+	CHECK_FALSE(FileSystem::FileExists(u8"testDir"));
+	CHECK_FALSE(FileSystem::FileExists(u8"testDir99"));
 }
 
 
@@ -97,9 +97,9 @@ TEST_CASE("CreateDirectory")
 {
 	// create & exists
 	CHECK(FileSystem::DirIsWritable("./"));
-	CHECK(FileSystem::DirExists("testDir"));
-	CHECK(FileSystem::DirExists("testDir///"));
-	CHECK(FileSystem::DirExists("testDir////./"));
+	CHECK(FileSystem::DirExists(u8"testDir"));
+	CHECK(FileSystem::DirExists(u8"testDir///"));
+	CHECK(FileSystem::DirExists(u8"testDir////./"));
 	CHECK(FileSystem::ComparePaths("testDir", "testDir////./"));
 	CHECK_FALSE(FileSystem::ComparePaths("testDir", "test Dir2"));
 	CHECK(FileSystem::CreateDirectory("testDir")); // already exists
@@ -116,8 +116,8 @@ TEST_CASE("CreateDirectory")
 	CHECK(FileSystem::DeleteFile("test Dir2"));
 
 	// check if really deleted
-	CHECK_FALSE(FileSystem::DirExists("testDir1"));
-	CHECK_FALSE(FileSystem::DirExists("test Dir2"));
+	CHECK_FALSE(FileSystem::DirExists(u8"testDir1"));
+	CHECK_FALSE(FileSystem::DirExists(u8"test Dir2"));
 }
 
 

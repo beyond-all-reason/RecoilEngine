@@ -3,7 +3,7 @@ add_subdirectory(unitsync)
 add_subdirectory(DemoTool)
 
 if    (NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/pr-downloader/CMakeLists.txt")
-	message(FATAL_ERROR "${CMAKE_CURRENT_SOURCE_DIR}/pr-downloader/ is missing, please run\n git submodule init && git submodule update")
+	message(FATAL_ERROR "${CMAKE_CURRENT_SOURCE_DIR}/pr-downloader/ is missing, please run\n git submodule update --init --recursive")
 endif ()
 
 # This is not part of the official source package

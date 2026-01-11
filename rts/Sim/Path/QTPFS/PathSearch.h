@@ -285,6 +285,20 @@ public:
 			: PathSearch(pathSearchType)
 			{ synced = false; }
 	};
+
+	// Because some paths are managed externally to QTPFS (e.g. Lua paths), we need to be able to mark
+	// their searches as synced, but not have QTPFS manage their life-cycle (i.e. deletion after use).
+	// These paths are also not safe to have their data modified during path rebuilding after map changes because
+	// the rebuilding is order-sensitive and externally-managed paths could be destroyed at any time, which can
+	// change the order of path processing.
+	struct ExternallyManagedPathSearch : public PathSearch {
+		ExternallyManagedPathSearch() {
+			synced = true; // Mark this path as synced explicitly
+		}
+		ExternallyManagedPathSearch(unsigned int pathSearchType)
+			: PathSearch(pathSearchType)
+			{ synced = true; }
+	};
 }
 
 #endif

@@ -81,6 +81,7 @@
 #include "Rendering/Env/IWater.h"
 #include "Rendering/Env/GrassDrawer.h"
 #include "Rendering/Env/Particles/ProjectileDrawer.h"
+#include "Rendering/IconHandler.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Map/InfoTexture/Modern/Path.h"
@@ -3830,11 +3831,16 @@ public:
 			LOG("Dumping decal atlas textures");
 			groundDecals->DumpAtlasTextures();
 		};
+		auto iconsFunc = []() {
+			LOG("Dumping decal atlas textures");
+			icon::iconHandler.DumpAtlasTextures();
+		};
 		std::array argsExec = {
 			ArgTuple(hashString("proj"), false, projFunc),
 			ArgTuple(hashString("3do"), false, threeDoFunc),
 			ArgTuple(hashString("decal"), false, decalsFunc),
-			ArgTuple(hashString("decals"), false, decalsFunc)
+			ArgTuple(hashString("decals"), false, decalsFunc),
+			ArgTuple(hashString("icons"), false, iconsFunc)
 		};
 
 		auto args = CSimpleParser::Tokenize(action.GetArgs(), 1);

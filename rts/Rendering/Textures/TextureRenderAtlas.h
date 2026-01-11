@@ -59,13 +59,18 @@ public:
 	const IAtlasAllocator* GetAllocator() const { return atlasAllocator.get(); }
 	const std::string& GetAtlasName() const { return atlasName; }
 
-	bool Finalize();
+	bool Finalize() { return CalculateAtlas() && CreateAtlasTexture(); }
+	bool CalculateAtlas();
+	bool CreateAtlasTexture();
+
 	bool IsValid() const;
 
 	uint32_t DisownTexture();
 
 	bool DumpTexture() const;
 private:
+
+
 	bool AddTexFromBitmapRaw(const std::string& name, const CBitmap& bm, const float4& subTexCoords, const std::string& refFileName);
 
 	spring::unordered_map<std::string, uint32_t> filenameToTexID;
@@ -81,7 +86,8 @@ private:
 	std::string atlasName;
 	static inline size_t shaderRef = 0;
 	static inline Shader::IProgramObject* shader = nullptr;
-	bool finalized;
+	bool atlasFinalized;
+	bool atlasRendered;
 public:
 	static inline AtlasedTexture dummy = AtlasedTexture{};
 };

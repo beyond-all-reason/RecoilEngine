@@ -185,7 +185,7 @@ void CTeamHandler::UpdateTeamUnitLimitsPreSpawn(int liveTeamNum)
 	liveTeam->SetMaxUnits(tempTeam->GetMaxUnits());
 }
 
-void CTeamHandler::UpdateTeamUnitLimitsPreDeath(int deadTeamNum)
+void CTeamHandler::UpdateTeamUnitLimitsOnDeath(int deadTeamNum)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	CTeam* deadTeam = &teams[deadTeamNum];
@@ -217,6 +217,9 @@ void CTeamHandler::UpdateTeamUnitLimitsPreDeath(int deadTeamNum)
 	//   4 x  625 = 2500 --> 3 x ( 625 + ( 625/3)= 208 =  833)=2499
 	//   3 x  833 = 2499 --> 2 x ( 833 + ( 833/2)= 416 = 1249)=2498
 	//   2 x 1249 = 2498 --> 1 x (1249 + (1249/1)=1249 = 2498)=2498
+	if (deadTeam->GetMaxUnits() == 0)
+		return;
+
 	for (unsigned int tempTeamNum = 0; tempTeamNum < teams.size(); tempTeamNum++) {
 		if (tempTeamNum == deadTeamNum)
 			continue;

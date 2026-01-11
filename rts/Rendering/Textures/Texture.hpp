@@ -94,6 +94,7 @@ namespace GL {
 		}
 		void UploadSubImage(const void* data, int xOffset, int yOffset, int width, int height, int level = 0) const;
 		void ProduceMipmaps() const override;
+		const auto& GetSize() const { return size; }
 	private:
 		int2 size;
 	};
@@ -147,6 +148,8 @@ namespace GL {
 		}
 		void UploadSubImage(const void* data, int layer, int xOffset, int yOffset, int width, int height, int level = 0) const;
 		void ProduceMipmaps() const override;
+		const auto& GetSize() const { return size; }
+		auto GetNumPages() const { return numPages; }
 	private:
 		int2 size;
 		int numPages;

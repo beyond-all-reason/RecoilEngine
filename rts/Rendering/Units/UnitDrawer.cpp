@@ -397,9 +397,10 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 	const auto myAllyTeam = gu->myAllyTeam;
 	const auto isFullView = gu->spectatingFullView;
 	const float ghostIconDimming = modelDrawerData->ghostIconDimming;
+	const auto defIconIdx = icon::iconHandler.GetDefaultIconIdx();
 
 	for (auto* unit : modelDrawerData->GetUnsortedObjects()) {
-		const size_t iconIndex = minimap->UseUnitIcons() ? unit->currentIconIndex : icon::iconHandler.GetDefaultIconIdx();
+		const size_t iconIndex = minimap->UseUnitIcons() ? unit->currentIconIndex : defIconIdx;
 
 		if (iconIndex == icon::INVALID_ICON_INDEX)
 			continue;
@@ -451,13 +452,19 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 	}
 
 	if (!isFullView && ghostIconDimming > 0.0f) {
-		for (auto* ghost : modelDrawerData->GetDeadGhostBuildings()) {
+		for (auto* ghost : modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam)) {
 			if (minimap->UseSimpleColors())
 				currentColor = minimap->GetEnemyTeamIconColor();
 			else
 				currentColor = teamHandler.Team(ghost->team)->color;
 
-			const auto& iconData = icon::iconHandler.GetIconData(ghost->currentIconIndex);
+			const size_t iconIndex = minimap->UseUnitIcons() ? ghost->currentIconIndex : defIconIdx;
+
+			assert(iconIndex != icon::INVALID_ICON_INDEX);
+			if (iconIndex == icon::INVALID_ICON_INDEX)
+				continue;
+
+			const auto& iconData = icon::iconHandler.GetIconData(iconIndex);
 
 			const float iconScale = iconData.GetSize();
 			const float3& pos = ghost->midPos;
@@ -466,7 +473,7 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 			currentColor.g *= ghostIconDimming;
 			currentColor.b *= ghostIconDimming;
 
-			DrawUnitMiniMapIcon(rb, ghost->currentIconIndex, iconScale, pos, currentColor);
+			DrawUnitMiniMapIcon(rb, iconIndex, iconScale, pos, currentColor);
 		}
 	}
 
@@ -476,7 +483,9 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 
 	const auto& atlasTexIDs = icon::iconHandler.GetAtlasTextureIDs();
 	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[0]);
-	glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[1]);
+	if (atlasTexIDs[1]) {
+		glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[1]);
+	}
 
 	icons2DShader->Enable();
 	icons2DShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f); // GL_GREATER > 0.0
@@ -486,7 +495,9 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 	icons2DShader->SetUniform("alphaCtrl", 0.0f, 0.0f, 0.0f, 1.0f);
 	icons2DShader->Disable();
 
-	glBindTexture(GL_TEXTURE_2D, 0);
+	if (atlasTexIDs[1])
+		glBindTexture(GL_TEXTURE_2D, 0);
+
 	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, 0);
 }
 
@@ -582,7 +593,9 @@ void CUnitDrawerGLSL::DrawUnitIcons() const
 
 	const auto& atlasTexIDs = icon::iconHandler.GetAtlasTextureIDs();
 	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[0]);
-	glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[1]);
+	if (atlasTexIDs[1]) {
+		glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[1]);
+	}
 
 	icons3DShader->Enable();
 	icons3DShader->SetUniform("alphaCtrl", 0.05f, 1.0f, 0.0f, 0.0f); // GL_GREATER > 0.05
@@ -592,7 +605,9 @@ void CUnitDrawerGLSL::DrawUnitIcons() const
 	icons3DShader->SetUniform("alphaCtrl", 0.0f, 0.0f, 0.0f, 1.0f);
 	icons3DShader->Disable();
 
-	glBindTexture(GL_TEXTURE_2D, 0);
+	if (atlasTexIDs[1])
+		glBindTexture(GL_TEXTURE_2D, 0);
+
 	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, 0);
 }
 
@@ -695,11 +710,17 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 	}
 	
 	if (!isFullView && ghostIconDimming > 0.0f) {
-		for (auto* ghost : modelDrawerData->GetDeadGhostBuildings()) {
+		for (auto* ghost : modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam)) {
 			float3 pos = ghost->midPos;
 
 			pos = camera->CalcViewPortCoordinates(pos);
 			if (pos.z > 1.0f || pos.z < 0.0f)
+				continue;
+
+			const auto& iconIndex = ghost->currentIconIndex;
+
+			assert(iconIndex != icon::INVALID_ICON_INDEX);
+			if (iconIndex == icon::INVALID_ICON_INDEX)
 				continue;
 
 			currentColor = teamHandler.Team(ghost->team)->color;
@@ -707,7 +728,7 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 			currentColor.g *= ghostIconDimming;
 			currentColor.b *= ghostIconDimming;
 
-			DrawUnitIconScreen(rb, ghost->currentIconIndex, pos, currentColor, ghost->radius, false);
+			DrawUnitIconScreen(rb, iconIndex, pos, currentColor, ghost->radius, false);
 		}
 	}
 
@@ -724,7 +745,9 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 
 	const auto& atlasTexIDs = icon::iconHandler.GetAtlasTextureIDs();
 	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[0]);
-	glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[1]);
+	if (atlasTexIDs[1]) {
+		glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[1]);
+	}
 
 	icons3DShader->Enable();
 	icons3DShader->SetUniform("alphaCtrl", 0.05f, 1.0f, 0.0f, 0.0f); // GL_GREATER > 0.05
@@ -734,7 +757,9 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 	icons3DShader->SetUniform("alphaCtrl", 0.0f, 0.0f, 0.0f, 1.0f);
 	icons3DShader->Disable();
 
-	glBindTexture(GL_TEXTURE_2D, 0);
+	if (atlasTexIDs[1])
+		glBindTexture(GL_TEXTURE_2D, 0);
+
 	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, 0);
 }
 
