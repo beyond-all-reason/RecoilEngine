@@ -1,8 +1,4 @@
 # See README.md for usage instructions
-if (MINGW)
-	remove_flag("-mwindows")
-endif (MINGW)
-
 add_definitions(-DCATCH_AMALGAMATED_CUSTOM_MAIN)
 # defines spring_test_compile_fail macro
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/CompileFailTest/CompileFailTest.cmake)
@@ -24,6 +20,7 @@ include_directories(${CMAKE_BINARY_DIR}/src-generated/engine)
 set(ENGINE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/rts")
 include_directories(${ENGINE_SOURCE_DIR})
 include_directories(${ENGINE_SOURCE_DIR}/lib/asio/include)
+include_directories(${ENGINE_SOURCE_DIR}/lib/nowide/include)
 
 add_definitions(-DSYNCCHECK -DUNIT_TEST)
 remove_definitions(-DTHREADPOOL)
@@ -54,9 +51,14 @@ set(test_List_sources
 	"${ENGINE_SOURCE_DIR}/System/Log/StreamSink.cpp"
 )
 
-set(test_Common_sources ${test_List_sources})
-list(APPEND test_Common_sources
+set(test_Catch_main
 	"lib/catch2/catch_main.cpp"
+)
+
+set(test_Common_sources "")
+list(APPEND test_Common_sources
+	${test_List_sources}
+	${test_Catch_main}
 )
 
 set(test_common_libraries
@@ -138,6 +140,7 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/Sync/TestSyncedPrimitive.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Sync/SyncChecker.cpp"
+			${test_Catch_main}
 		)
 
 	set(test_libs
@@ -264,6 +267,7 @@ endif()
 	set(test_name BitwiseEnum)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/Misc/TestBitwiseEnum.cpp"
+			${test_Catch_main}
 		)
 
 	set(test_libs
