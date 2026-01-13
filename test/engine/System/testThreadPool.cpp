@@ -283,7 +283,7 @@ TEST_CASE("test_parallel_reaction_times")
 	LOG("[%s::test_parallel_reaction_times]", __func__);
 
 	for (int i: {0, 1, 2, 3, 4}) {
-		test_parallel_reaction_times_aux(NUM_RUNS * 2);
+		test_parallel_reaction_times_aux(i * 100);
 	}
 }
 
