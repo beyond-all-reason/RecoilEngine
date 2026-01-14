@@ -3792,7 +3792,7 @@ int LuaSyncedCtrl::SetUnitPieceParent(lua_State* L)
  * @param unitID integer
  * @param pieceNum number
  * @param matrix number[] an array of 16 floats
- * @return nil
+ * @return boolean? valid - if the matrix can be used for the purpose of defining the piece spatial transformation. Blocks the piece animation, if true.
  */
 int LuaSyncedCtrl::SetUnitPieceMatrix(lua_State* L)
 {
@@ -5354,7 +5354,7 @@ int LuaSyncedCtrl::SetFeaturePieceVisible(lua_State* L)
  * @param featureID integer
  * @param pieceIndex number
  * @param matrix number[] an array of 16 floats
- * @return nil
+ * @return boolean? valid - if the matrix can be used for the purpose of defining the piece spatial transformation
  */
 int LuaSyncedCtrl::SetFeaturePieceMatrix(lua_State* L)
 {
