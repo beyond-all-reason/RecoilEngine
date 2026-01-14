@@ -464,6 +464,12 @@ bool CBuilder::UpdateResurrect(const Command& fCommand)
 			// prevent FinishCommand from removing this command when the
 			// feature is deleted, since it is needed to start the repair
 			// (WTF!)
+			//
+			// The future lurker:
+			// if you were searching where the hell the huge floating point number
+			// in params[0] was coming from and traced it back to this WTF hack,
+			// increment the number of wasted hours below:
+			//   number_of_hours_wasted = 3;
 			c.SetParam(0, INT_MAX / 2);
 		}
 
