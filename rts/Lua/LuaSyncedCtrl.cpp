@@ -5351,8 +5351,6 @@ int LuaSyncedCtrl::SetFeaturePieceVisible(lua_State* L)
  *
  * @function Spring.SetFeaturePieceMatrix
  *
- * If any of the first three elements are non-zero, and also blocks all script animations from modifying it until {0, 0, 0} is passed.
- *
  * @param featureID integer
  * @param pieceIndex number
  * @param matrix number[] an array of 16 floats
