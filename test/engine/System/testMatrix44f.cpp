@@ -288,10 +288,3 @@ TEST_CASE("Matrix44MatrixMultiply")
 		}
 	}
 }
-
-TEST_CASE("MatMult")
-{
-	BENCHMARK("MM")	{
-		return 0;
-	};
-}
