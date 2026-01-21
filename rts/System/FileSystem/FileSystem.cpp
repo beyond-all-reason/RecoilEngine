@@ -907,7 +907,28 @@ std::string FileSystem::GetExtension(const std::string& pathStr)
 }
 
 std::string FileSystem::GetNormalizedPath(const std::string& path) {
-	return Impl::StoreUTF8AsString(std::filesystem::path(ForwardSlashes(path)).lexically_normal().generic_u8string());
+	auto forward = ForwardSlashes(path);
+	auto hadDotSlash = forward.starts_with("./");
+	
+	auto normalized = std::filesystem::path(forward).lexically_normal().generic_u8string();
+	auto output = Impl::StoreUTF8AsString(normalized);
+	
+	if (output.size() > 1 && output.ends_with("/")) {
+		output.pop_back();
+	}
+	
+	auto isDot = (output == ".");
+	auto hasDotSlash = output.starts_with("./");
+	auto startsWithDotDot = output.starts_with("..");
+	
+	if (hadDotSlash && !hasDotSlash && !startsWithDotDot && !isDot) {
+		auto isAbsolutePath = output.starts_with("/") || std::isalpha(output[0]) && output.find(":/") == 1;
+		if (!isAbsolutePath) {
+			output = "./" + output;
+		}
+	}
+	
+	return output;
 }
 
 bool FileSystem::CheckFile(const std::string& file)

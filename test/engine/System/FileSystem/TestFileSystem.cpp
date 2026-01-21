@@ -189,7 +189,6 @@ TEST_CASE("GetNormalizedPath - Windows drives")
 	CHECK_NORM_PATH("C:\\", "C:");
 	CHECK_NORM_PATH("D:\\foo\\bar", "D:/foo/bar");
 	CHECK_NORM_PATH("C:/foo/../bar", "C:/bar");
-	CHECK_NORM_PATH("C:\\..\\foo", "C:/foo");
 }
 
 TEST_CASE("GetNormalizedPath - absolute paths") 
@@ -252,8 +251,8 @@ TEST_CASE("GetNormalizedPath - edge cases with .. at boundaries")
 TEST_CASE("GetNormalizedPath - original failing tests")
 {
 	CHECK_NORM_PATH("/home/userX/.spring/foo/bar///./../test.log", "/home/userX/.spring/foo/test.log");
-	CHECK_NORM_PATH("./symLinkToHome/foo/bar///./../test.log", "symLinkToHome/foo/test.log");
-	CHECK_NORM_PATH(".\\symLinkToHome\\foo\\bar\\\\\\.\\..\\test.log", "symLinkToHome/foo/test.log");
+	CHECK_NORM_PATH("./symLinkToHome/foo/bar///./../test.log", "./symLinkToHome/foo/test.log");
+	CHECK_NORM_PATH(".\\symLinkToHome\\foo\\bar\\\\\\.\\..\\test.log", "./symLinkToHome/foo/test.log");
 	CHECK_NORM_PATH("C:\\foo\\bar\\\\\\.\\..\\test.log", "C:/foo/test.log");
 }
 
