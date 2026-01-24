@@ -305,6 +305,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(UnitIconGetDraw);
 	REGISTER_LUA_CFUNC(GetUnitIconData);
+	REGISTER_LUA_CFUNC(GetUnitIcon);
 	REGISTER_LUA_CFUNC(GetIconData);
 	REGISTER_LUA_CFUNC(GetAllIconDataArray);
 
@@ -1444,7 +1445,7 @@ namespace Impl {
  */
 int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
 {
-	CUnit* unit = ParseUnit(L, __func__, 1);
+	const CUnit* unit = ParseUnit(L, __func__, 1);
 	const auto fullData = luaL_optboolean(L, 2, false);
 
 	if (unit == nullptr)
@@ -1454,6 +1455,28 @@ int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
 		return Impl::GetIconDataImpl<true >(L, unit->currentIconIndex);
 	else
 		return Impl::GetIconDataImpl<false>(L, unit->currentIconIndex);
+}
+
+/*** Get unit icon name
+ *
+ * @function Spring.GetUnitIcon
+ * @param unitID number
+ * @return string iconName
+ */
+int LuaUnsyncedRead::GetUnitIcon(lua_State* L)
+{
+	const CUnit* unit = ParseUnit(L, __func__, 1);
+	const auto iconIdx = unit->currentIconIndex;
+
+	if (iconIdx == icon::INVALID_ICON_INDEX) {
+		lua_pushstring(L, "");
+	}
+	else {
+		const auto& iconData = icon::iconHandler.GetIconData(iconIdx);
+		lua_pushstring(L, iconData.GetName().c_str());
+	}
+
+	return 1;
 }
 
 /*** Get icon data
