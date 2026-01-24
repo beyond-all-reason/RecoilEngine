@@ -2573,7 +2573,7 @@ int LuaUnsyncedCtrl::SetUnitIconDraw(lua_State* L)
  *
  * @function Spring.SetUnitIcon
  * @param unitID integer
- * @param iconName string
+ * @param iconName string? supply nil to reset to the default
  * @return nil
  */
 int LuaUnsyncedCtrl::SetUnitIcon(lua_State* L)
@@ -2583,6 +2583,11 @@ int LuaUnsyncedCtrl::SetUnitIcon(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
+	if (lua_isnoneornil(L, 2)) {
+		unitDrawer->UpdateCurrentUnitIcon(unit);
+		return 0;
+	}
+
 	const auto iconName = luaL_checksstring(L, 2);
 	const auto iconIdx = icon::iconHandler.GetIconIdx(iconName);
 
@@ -2591,7 +2596,9 @@ int LuaUnsyncedCtrl::SetUnitIcon(lua_State* L)
 		return 0;
 	}
 
-	unit->currentIconIndex = iconIdx;
+	unit->customIconIndex = iconIdx;
+	unitDrawer->UpdateCurrentUnitIcon(unit);
+
 	return 0;
 }
 
