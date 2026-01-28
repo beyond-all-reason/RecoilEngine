@@ -2584,6 +2584,7 @@ int LuaUnsyncedCtrl::SetUnitIcon(lua_State* L)
 		return 0;
 
 	if (lua_isnoneornil(L, 2)) {
+	    unit->customIconIndex = icon::INVALID_ICON_INDEX;
 		unitDrawer->UpdateCurrentUnitIcon(unit);
 		return 0;
 	}
