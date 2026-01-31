@@ -7293,6 +7293,7 @@ int LuaSyncedCtrl::ForceUnitCollisionUpdate(lua_State* L)
  * @param transporterID integer
  * @param passengerID integer
  * @param pieceNum number
+ * @param force boolean
  * @return nil
  */
 int LuaSyncedCtrl::UnitAttach(lua_State* L)
@@ -7321,7 +7322,9 @@ int LuaSyncedCtrl::UnitAttach(lua_State* L)
 	if (piece >= 0)
 		piece = pieces[piece].scriptPieceIndex;
 
-	transporter->AttachUnit(transportee, piece, !transporter->unitDef->IsTransportUnit());
+	const bool force = luaL_optboolean(L, 4, !transporter->unitDef->IsTransportUnit());
+
+	transporter->AttachUnit(transportee, piece, force);
 	return 0;
 }
 
