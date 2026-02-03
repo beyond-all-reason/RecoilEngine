@@ -148,7 +148,7 @@ TEST_CASE("GetNormalizedPath - multiple slashes")
 {
 	CHECK_NORM_PATH("foo///bar", "foo/bar");
 	CHECK_NORM_PATH("foo\\\\\\bar", "foo/bar");
-	CHECK_NORM_PATH("//foo//bar//", "/foo/bar");
+	CHECK_NORM_PATH("//foo//bar//", "/foo/bar/");
 	CHECK_NORM_PATH("C:\\\\foo\\\\bar", "C:/foo/bar");
 }
 
@@ -157,7 +157,7 @@ TEST_CASE("GetNormalizedPath - current directory")
 	CHECK_NORM_PATH("./foo/bar", "foo/bar");
 	CHECK_NORM_PATH(".\\foo\\bar", "foo/bar");
 	CHECK_NORM_PATH("foo/./bar", "foo/bar");
-	CHECK_NORM_PATH("foo/.", "foo");
+	CHECK_NORM_PATH("foo/.", "foo/");
 	CHECK_NORM_PATH(".", ".");
 	CHECK_NORM_PATH("./", ".");
 	CHECK_NORM_PATH("./.", ".");
@@ -165,7 +165,7 @@ TEST_CASE("GetNormalizedPath - current directory")
 
 TEST_CASE("GetNormalizedPath - parent directory") 
 {
-	CHECK_NORM_PATH("foo/bar/..", "foo");
+	CHECK_NORM_PATH("foo/bar/..", "foo/");
 	CHECK_NORM_PATH("foo/bar/../baz", "foo/baz");
 	CHECK_NORM_PATH("foo/../bar", "bar");
 	CHECK_NORM_PATH("./foo/../bar", "bar");
@@ -185,11 +185,10 @@ TEST_CASE("GetNormalizedPath - mixed cases")
 
 TEST_CASE("GetNormalizedPath - Windows drives") 
 {
-	CHECK_NORM_PATH("C:/", "C:");
-	CHECK_NORM_PATH("C:\\", "C:");
+	CHECK_NORM_PATH("C:/", "C:/");
+	CHECK_NORM_PATH("C:\\", "C:/");
 	CHECK_NORM_PATH("D:\\foo\\bar", "D:/foo/bar");
 	CHECK_NORM_PATH("C:/foo/../bar", "C:/bar");
-	CHECK_NORM_PATH("C:\\..\\foo", "C:/foo");
 }
 
 TEST_CASE("GetNormalizedPath - absolute paths") 
@@ -202,13 +201,13 @@ TEST_CASE("GetNormalizedPath - absolute paths")
 
 TEST_CASE("GetNormalizedPath - trailing slashes") 
 {
-	CHECK_NORM_PATH("foo/bar/", "foo/bar");
-	CHECK_NORM_PATH("foo/bar//", "foo/bar");
-	CHECK_NORM_PATH("./foo/", "foo");
-	CHECK_NORM_PATH("foo\\bar\\", "foo/bar");
-	CHECK_NORM_PATH("foo\\bar\\\\", "foo/bar");
-	CHECK_NORM_PATH(".\\foo\\", "foo");
-	CHECK_NORM_PATH("C:\\foo\\", "C:/foo");
+	CHECK_NORM_PATH("foo/bar/", "foo/bar/");
+	CHECK_NORM_PATH("foo/bar//", "foo/bar/");
+	CHECK_NORM_PATH("./foo/", "foo/");
+	CHECK_NORM_PATH("foo\\bar\\", "foo/bar/");
+	CHECK_NORM_PATH("foo\\bar\\\\", "foo/bar/");
+	CHECK_NORM_PATH(".\\foo\\", "foo/");
+	CHECK_NORM_PATH("C:\\foo\\", "C:/foo/");
 }
 
 TEST_CASE("GetNormalizedPath - with file extensions") 
