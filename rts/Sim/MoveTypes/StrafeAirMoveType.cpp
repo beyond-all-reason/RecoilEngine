@@ -756,9 +756,6 @@ void CStrafeAirMoveType::UpdateAttack()
 		return;
 	}
 
-	if (((gs->frameNum + owner->id) & 3) == 0)
-		CheckForCollision();
-
 	      float3 rightDir2D = rightdir;
 	const float3 difGoalPos = (goalPos - oldGoalPos) * SQUARE_SIZE;
 
@@ -828,9 +825,6 @@ bool CStrafeAirMoveType::UpdateFlying(float wantedHeight, float wantedThrottle)
 	// const float3 goalDir3D = goalVec / goalDist3D;
 
 	const float3 rightDir2D = (rightdir * XZVector).Normalize2D();
-
-	if (((gs->frameNum + owner->id) & 3) == 0)
-		CheckForCollision();
 
 
 	// RHS is needed for moving targets (when called by UpdateAttack)
@@ -1445,4 +1439,3 @@ bool CStrafeAirMoveType::SetMemberValue(unsigned int memberHash, void* memberVal
 
 	return false;
 }
-

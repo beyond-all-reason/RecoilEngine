@@ -245,7 +245,7 @@ void AAirMoveType::UpdateLanding()
 }
 
 
-void AAirMoveType::CheckForCollision()
+void AAirMoveType::CheckForCollision(float dist)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!collide)
@@ -253,8 +253,6 @@ void AAirMoveType::CheckForCollision()
 
 	const SyncedFloat3& pos = owner->midPos;
 	const SyncedFloat3& forward = owner->frontdir;
-
-	float dist = 200.0f;
 
 	QuadFieldQuery qfQuery;
 	quadField.GetUnitsExact(qfQuery, pos + forward * 121.0f, dist);
