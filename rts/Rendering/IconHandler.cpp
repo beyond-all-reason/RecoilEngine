@@ -8,6 +8,8 @@
 #include <cctype>
 #include <cmath>
 
+#include <fmt/format.h>
+
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "System/Log/ILog.h"
@@ -46,10 +48,16 @@ void CIconHandler::Kill()
 
 void CIconHandler::DumpAtlasTextures() const
 {
-	if (atlasTextureIDs[0])
-		glSaveTexture(atlasTextureIDs[0], "IconsAtlas1.png");
-	if (atlasTextureIDs[1])
-		glSaveTexture(atlasTextureIDs[1], "IconsAtlas2.png");
+	if (atlasTextureIDs[0]) {
+		for (int level = 0; level < DEFAULT_NUM_OF_TEXTURE_LEVELS; ++level) {
+			glSaveTexture(atlasTextureIDs[0], fmt::format("IconsAtlas1-{}.png", level).c_str(), level);
+		}
+	}
+	if (atlasTextureIDs[1]) {
+		for (int level = 0; level < DEFAULT_NUM_OF_TEXTURE_LEVELS; ++level) {
+			glSaveTexture(atlasTextureIDs[1], fmt::format("IconsAtlas2-{}.png", level).c_str(), level);
+		}
+	}
 }
 
 bool CIconHandler::UpdateAtlasData(size_t atlasIdx)
@@ -58,7 +66,7 @@ bool CIconHandler::UpdateAtlasData(size_t atlasIdx)
 	if (atlas)
 		return true;
 
-	atlas = std::make_unique<CTextureRenderAtlas>(CTextureAtlas::ATLAS_ALLOC_LEGACY, 0, 0, GL_RGBA8, IntToString(atlasIdx, "IconsAtlas_%i"));
+	atlas = std::make_unique<CTextureRenderAtlas>(CTextureAtlas::ATLAS_ALLOC_LEGACY, 0, 0, DEFAULT_NUM_OF_TEXTURE_LEVELS, GL_RGBA8, IntToString(atlasIdx, "IconsAtlas_%i"));
 
 	spring::unordered_set<std::string> invalidIcons;
 	for (const auto& [iconName, iconIndex] : iconsMap) {
@@ -130,7 +138,6 @@ bool CIconHandler::CreateAtlasTexture(size_t atlasIdx)
 		return true;
 	}
 
-	atlas->SetMaxTexLevel(DEFAULT_NUM_OF_TEXTURE_LEVELS);
 	if (!atlas->CreateAtlasTexture())
 		return false;
 

@@ -30,7 +30,7 @@ public:
 	};
 
 public:
-	CTextureAtlas(uint32_t allocType = ATLAS_ALLOC_LEGACY, int32_t atlasSizeX_ = 0, int32_t atlasSizeY_ = 0, const std::string& name_ = "", bool reloadable_ = false);
+	CTextureAtlas(uint32_t allocType = ATLAS_ALLOC_LEGACY, uint32_t atlasSizeX_ = 0, uint32_t atlasSizeY_ = 0, const std::string& name_ = "", bool reloadable_ = false);
 	CTextureAtlas(CTextureAtlas&& ta) noexcept { *this = std::move(ta); };
 	CTextureAtlas(const CTextureAtlas&) = delete;
 
@@ -145,8 +145,8 @@ protected:
 
 protected:
 	uint32_t allocType;
-	int32_t atlasSizeX;
-	int32_t atlasSizeY;
+	uint32_t atlasSizeX;
+	uint32_t atlasSizeY;
 
 	bool reloadable;
 

@@ -27,7 +27,7 @@ public:
 		bool operator==(const UniqueSubTexture&) const = default;
 	};
 public:
-	CTextureRenderAtlas(CTextureAtlas::AllocatorType allocType, int atlasSizeX, int atlasSizeY, uint32_t glInternalType = /*GL_RGBA8*/0x8058, const std::string& atlasName = "");
+	CTextureRenderAtlas(CTextureAtlas::AllocatorType allocType, int atlasSizeX, int atlasSizeY, int maxLevels, uint32_t glInternalType = /*GL_RGBA8*/0x8058, const std::string& atlasName = "");
 	~CTextureRenderAtlas();
 	CTextureRenderAtlas(const CTextureRenderAtlas&) = delete;
 	CTextureRenderAtlas(CTextureRenderAtlas&&) noexcept = default;
@@ -54,7 +54,6 @@ public:
 	const int2& GetAtlasSize() const;
 	int GetMinDim() const;
 	int GetNumTexLevels() const;
-	void SetMaxTexLevel(int maxLevels);
 
 	const IAtlasAllocator* GetAllocator() const { return atlasAllocator.get(); }
 	const std::string& GetAtlasName() const { return atlasName; }

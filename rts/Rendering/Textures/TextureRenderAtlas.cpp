@@ -62,6 +62,7 @@ CTextureRenderAtlas::CTextureRenderAtlas(
 	CTextureAtlas::AllocatorType allocType_,
 	int atlasSizeX,
 	int atlasSizeY,
+	int maxLevels,
 	uint32_t glInternalType_,
 	const std::string& atlasName_
 	)
@@ -93,6 +94,7 @@ CTextureRenderAtlas::CTextureRenderAtlas(
 	atlasSizeY = std::min<int>(globalRendering->maxTextureSize, (atlasSizeY > 0) ? atlasSizeY : configHandler->GetInt("MaxTextureAtlasSizeY"));
 
 	atlasAllocator->SetMaxSize(atlasSizeX, atlasSizeY);
+	atlasAllocator->SetMaxTexLevel(maxLevels);
 
 	if (shaderRef == 0) {
 		shader = shaderHandler->CreateProgramObject("[TextureRenderAtlas]", "TextureRenderAtlas");
@@ -227,7 +229,7 @@ AtlasedTexture CTextureRenderAtlas::GetTexture(const std::string& texName)
 	if (it == nameToUniqueSubTexStr.end())
 		return AtlasedTexture::DefaultAtlasTexture;
 
-	return AtlasedTexture(atlasAllocator->GetTexCoords(it->second));
+	return AtlasedTexture(atlasAllocator->GetTexCoordsEdge(it->second));
 }
 
 AtlasedTexture CTextureRenderAtlas::GetTexture(const std::string& texName, const std::string& texBackupName)
@@ -238,7 +240,7 @@ AtlasedTexture CTextureRenderAtlas::GetTexture(const std::string& texName, const
 
 	auto it = nameToUniqueSubTexStr.find(texName);
 	if (it != nameToUniqueSubTexStr.end())
-		return AtlasedTexture(atlasAllocator->GetTexCoords(it->second));
+		return AtlasedTexture(atlasAllocator->GetTexCoordsEdge(it->second));
 
 	if (texBackupName.empty())
 		return AtlasedTexture::DefaultAtlasTexture;
@@ -288,12 +290,6 @@ int CTextureRenderAtlas::GetNumTexLevels() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return atlasAllocator->GetNumTexLevels();
-}
-
-void CTextureRenderAtlas::SetMaxTexLevel(int maxLevels)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	atlasAllocator->SetMaxTexLevel(maxLevels);
 }
 
 bool CTextureRenderAtlas::IsValid() const
@@ -409,7 +405,7 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 
 			for (uint32_t page = 0; page < numPages; ++page) {
 				for (uint32_t level = 0; level < numLevels; ++level) {
-					glViewport(0, 0, std::max(atlasSize.x >> level, 1), std::max(atlasSize.y >> level, 1));
+					glViewport(0, 0, std::max(atlasSize.x >> level, 1u), std::max(atlasSize.y >> level, 1u));
 
 					if (numPages > 1)
 						fbo.AttachTextureLayer(atlasTex->GetId(), GL_COLOR_ATTACHMENT0, level, page);
@@ -426,7 +422,7 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 						if (entry.texCoords.pageNum != page)
 							continue;
 
-						const auto atlasedTexCoords = atlasAllocator->GetTexCoords(uniqTexName);
+						const auto atlasedTexCoords = atlasAllocator->GetTexCoordsEdge(uniqTexName);
 						const auto& [srcTexID, srcSubTC] = uniqueSubTextureMap[uniqTexName];
 
 						if (srcTexID == 0)

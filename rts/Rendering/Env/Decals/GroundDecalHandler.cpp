@@ -414,12 +414,10 @@ uint32_t CGroundDecalHandler::GetDepthBufferTextureTarget() const
 	return highQuality ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
 }
 
-static constexpr CTextureAtlas::AllocatorType defAllocType = CTextureAtlas::ATLAS_ALLOC_MP_LEGACY;
-static constexpr int defNumLevels = 4;
+static constexpr auto DEFAULT_ALLOC_TYPE = CTextureAtlas::ATLAS_ALLOC_MP_LEGACY;
+static constexpr auto DEFAULT_NUM_OF_TEXTURE_LEVELS = 4;
 void CGroundDecalHandler::GenerateAtlasTexture() {
-	atlasTex = std::make_unique<CTextureRenderAtlas>(defAllocType, 0, 0, GL_RGBA8, "Decals");
-
-	atlasTex->SetMaxTexLevel(defNumLevels);
+	atlasTex = std::make_unique<CTextureRenderAtlas>(DEFAULT_ALLOC_TYPE, 0, 0, DEFAULT_NUM_OF_TEXTURE_LEVELS, GL_RGBA8, "Decals");
 
 	// often represented by compressed textures, cannot be added to the regular atlas
 	AddBuildingDecalTextures();
