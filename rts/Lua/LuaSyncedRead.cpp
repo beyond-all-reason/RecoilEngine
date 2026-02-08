@@ -4124,36 +4124,33 @@ int LuaSyncedRead::GetUnitDefID(lua_State* L)
 /***
 * @function Spring.GetUnitMoveDefID
 *
-* Returns a numerical movedef ID and its name. For now, ID is not
-* too useful so use the name, but may get deprecated at some point.
+* Returns a numerical movedef ID and its name. For things that have
+* no movedef, returns `false` (to tell them apart from unreadable
+* units while keeping the `if not x` pattern usable). For now, the
+* numerical ID is not too useful so you can use the name, but this
+* may get deprecated at some point.
 * 
 * @param unitID integer
 *
-* @return integer? MoveDefID nil for structures, aircraft
-* @return boolean? hasMoveDef whether given unitID contains MoveDef
-* @return string? MoveDefName
+* @return integer|boolean|nil moveDefID
+* @return string? moveDefName
 */
 
 int LuaSyncedRead::GetUnitMoveDefID(lua_State* L) 
 {
-	const CUnit* unit = ParseInLosUnit(L, __func__, 1); // not mutating only read
+	const auto unit = ParseInLosUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
 
-	if (unit == nullptr) { // no unit/unit not accessible, nil/nil/nil
-		return 0; 
-	}
-
-	if (unit->moveDef == nullptr) { // structure/aircraft, nil/false/nil
-		lua_pushnil(L);
+	const auto moveDef = unit->moveDef;
+	if (moveDef == nullptr) {
 		lua_pushboolean(L, false);
-		return 3;
+		return 1;
 	}
 
-	const MoveDef* moveDef = unit->moveDef; // unit, int/true/str
 	lua_pushnumber(L, moveDef->pathType);
-	lua_pushboolean(L, true);
-	lua_pushsstring(L, moveDef -> name);
-
-	return 3;
+	lua_pushsstring(L, moveDef->name);
+	return 2;
 }
 
 
