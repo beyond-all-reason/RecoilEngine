@@ -166,6 +166,13 @@ void CDemoReader::LoadStats()
 	playerStats.clear();
 	teamStats.clear();
 
+	if (fileHeader.winningAllyTeamsSize < 0 || fileHeader.winningAllyTeamsSize > MAX_TEAMS)
+		return;
+	if (fileHeader.numPlayers < 0 || fileHeader.numPlayers > MAX_PLAYERS)
+		return;
+	if (fileHeader.numTeams < 0 || fileHeader.numTeams > MAX_TEAMS)
+		return;
+
 	for (int allyTeamNum = 0; allyTeamNum < fileHeader.winningAllyTeamsSize; ++allyTeamNum) {
 		unsigned char winnerAllyTeam;
 		playbackDemo->Read((char*) &winnerAllyTeam, sizeof(unsigned char));
