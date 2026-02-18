@@ -186,6 +186,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitsInPlanes);
 	REGISTER_LUA_CFUNC(GetUnitsInSphere);
 	REGISTER_LUA_CFUNC(GetUnitsInCylinder);
+	REGISTER_LUA_CFUNC(GetUnitsInExplosion);
 
 	REGISTER_LUA_CFUNC(GetUnitArrayCentroid);
 	REGISTER_LUA_CFUNC(GetUnitMapCentroid);
@@ -2931,6 +2932,26 @@ int LuaSyncedRead::GetTeamUnitCount(lua_State* L)
 	}
 
 // Macro Requirements:
+//   L, units, closestPt (defined by CUSTOM_TEST)
+
+#define LOOP_UNIT_CONTAINER_WITH_POINT(ALLEGIANCE_TEST, CUSTOM_TEST, NEWTABLE) \
+	{                                                                          \
+		if (NEWTABLE)                                                          \
+			lua_createtable(L, 0, units.size());                               \
+                                                                               \
+		for (const CUnit* unit: units) {                                       \
+			ALLEGIANCE_TEST;                                                   \
+			CUSTOM_TEST;                                                       \
+                                                                               \
+			lua_createtable(L, 3, 0);                                          \
+			lua_pushnumber(L, closestPt.x); lua_rawseti(L, -2, 1);            \
+			lua_pushnumber(L, closestPt.y); lua_rawseti(L, -2, 2);            \
+			lua_pushnumber(L, closestPt.z); lua_rawseti(L, -2, 3);            \
+			lua_rawseti(L, -2, unit->id);                                      \
+		}                                                                      \
+	}
+
+// Macro Requirements:
 //   unit
 //   readTeam   for MY_UNIT_TEST
 //   allegiance for SIMPLE_TEAM_TEST and VISIBLE_TEAM_TEST
@@ -3243,6 +3264,76 @@ int LuaSyncedRead::GetUnitsInSphere(lua_State* L)
 
 	return 1;
 }
+
+/***
+ *
+ * @function Spring.GetUnitsInExplosion
+ * @param x number
+ * @param y number
+ * @param z number
+ * @param radius number
+ * @param allegiance number? (Default: `-1`) teamID when > 0, when < 0 one of AllUnits = -1, MyUnits = -2, AllyUnits = -3, EnemyUnits = -4
+ * @return table<number, number[]> unitIDToClosestPoint a table keyed by unitID, each value is {x, y, z} world-space closest surface point on the unit's collision volume
+ */
+int LuaSyncedRead::GetUnitsInExplosion(lua_State* L)
+{
+	const float x = luaL_checkfloat(L, 1);
+	const float y = luaL_checkfloat(L, 2);
+	const float z = luaL_checkfloat(L, 3);
+	const float radius = luaL_checkfloat(L, 4);
+	const float radSqr = (radius * radius);
+
+	const float3 pos(x, y, z);
+	float3 mins(x - radius, 0.0f, z - radius);
+	float3 maxs(x + radius, 0.0f, z + radius);
+
+	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 5);
+	const int readAllyTeam = CLuaHandle::GetHandleReadAllyTeam(L);
+	const bool fullRead = CLuaHandle::GetHandleFullRead(L);
+
+#define EXPLOSION_TEST                                                              \
+	const float3 closestPt =                                                        \
+		unit->collisionVolume.GetClosestSurfacePoint(unit, nullptr, pos);            \
+	const float dx = (closestPt.x - x);                                            \
+	const float dy = (closestPt.y - y);                                            \
+	const float dz = (closestPt.z - z);                                            \
+	const float distSq = ((dx * dx) + (dy * dy) + (dz * dz));                     \
+	if (distSq > radSqr) {                                                         \
+		continue;                                                                   \
+	}                                                                               \
+
+	if (!fullRead)
+		ApplyPlanarTeamError(L, allegiance, mins, maxs);
+
+	QuadFieldQuery qfQuery;
+	quadField.GetUnitsExact(qfQuery, mins, maxs);
+	const auto& units = (*qfQuery.units);
+
+	if (allegiance >= 0) {
+		if (LuaUtils::IsAlliedTeam(L, allegiance)) {
+			LOOP_UNIT_CONTAINER_WITH_POINT(SIMPLE_TEAM_TEST, EXPLOSION_TEST, true);
+		}
+		else {
+			LOOP_UNIT_CONTAINER_WITH_POINT(VISIBLE_TEAM_TEST, EXPLOSION_TEST, true);
+		}
+	}
+	else if (allegiance == LuaUtils::MyUnits) {
+		const int readTeam = CLuaHandle::GetHandleReadTeam(L);
+		LOOP_UNIT_CONTAINER_WITH_POINT(MY_UNIT_TEST, EXPLOSION_TEST, true);
+	}
+	else if (allegiance == LuaUtils::AllyUnits) {
+		LOOP_UNIT_CONTAINER_WITH_POINT(ALLY_UNIT_TEST, EXPLOSION_TEST, true);
+	}
+	else if (allegiance == LuaUtils::EnemyUnits) {
+		LOOP_UNIT_CONTAINER_WITH_POINT(ENEMY_UNIT_TEST, EXPLOSION_TEST, true);
+	}
+	else { // AllUnits
+		LOOP_UNIT_CONTAINER_WITH_POINT(VISIBLE_TEST, EXPLOSION_TEST, true);
+	}
+
+	return 1;
+}
+
 
 
 struct Plane {
