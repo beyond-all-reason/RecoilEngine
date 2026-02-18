@@ -939,13 +939,21 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 
 						// Find the nearest point on that node to the goal.
 						const auto* curNode = nodeLayer->GetPoolNode(lastNode->GetIndex());
-						const INode::NeighbourPoints& nearestPoint =
-							*std::ranges::min_element(curNode->GetNeighbours(), {}, [&](const INode::NeighbourPoints& np){
-									return SqDistance2D(fwd.tgtPoint, np.netpoints[0]);
-								});
+						float distToGoalSq = 0;
+						if (curNode->GetNeighbours().size() > 0) {
+							const INode::NeighbourPoints& nearestPoint =
+								*std::ranges::min_element(curNode->GetNeighbours(), {}, [&](const INode::NeighbourPoints& np){
+										return SqDistance2D(fwd.tgtPoint, np.netpoints[0]);
+									});
 
-						// Configure the search result params if the path ends within the goal distance.
-						const float distToGoalSq = SqDistance2D(fwd.tgtPoint, nearestPoint.netpoints[0]);
+							// Configure the search result params if the path ends within the goal distance.
+							distToGoalSq = SqDistance2D(fwd.tgtPoint, nearestPoint.netpoints[0]);
+						} else {
+							// If this node has no neighbours, then it is a dead end. Just check the distance from the
+							// node itself. This will only happen if the search starts within an isolated node, which
+							// is a very fringe case, but it is possible.
+							distToGoalSq = SqDistance2D(fwd.tgtPoint, FindNearestPointOnNodeToGoal(*lastNode, goalPos));
+						}
 						if ( distToGoalSq <= goalDistance*goalDistance ){
 							useFwdPathOnly = true;
 							expectIncompletePartialSearch = true;
