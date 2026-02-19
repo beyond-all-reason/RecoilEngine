@@ -979,8 +979,6 @@ void CUnitScript::ShowFlare(int piece)
 #endif
 }
 
-#include <iostream>
-
 /******************************************************************************/
 int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 {
