@@ -17,6 +17,7 @@
 #include "Game/GameSetup.h"
 #include "Game/Camera.h"
 #include "Game/GameHelper.h"
+#include "Game/UI/MouseHandler.h"
 #include "Game/GlobalUnsynced.h"
 #include "Game/Players/Player.h"
 #include "Game/Players/PlayerHandler.h"
@@ -200,6 +201,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(GetUnitNearestAlly);
 	REGISTER_LUA_CFUNC(GetUnitNearestEnemy);
+	REGISTER_LUA_CFUNC(GetMouseNearestEnemy);
 
 	REGISTER_LUA_CFUNC(GetUnitTooltip);
 	REGISTER_LUA_CFUNC(GetUnitDefID);
@@ -3485,6 +3487,47 @@ int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 	const CUnit* target = testLOS?
 		CGameHelper::GetClosestEnemyUnit         (unit, unit->pos, luaL_optnumber(L, 2, 1.0e9f), unit->allyteam                                ):
 		CGameHelper::GetClosestEnemyUnitNoLosTest(unit, unit->pos, luaL_optnumber(L, 2, 1.0e9f), unit->allyteam, sphereDistTest, checkSightDist);
+
+	if (target == nullptr)
+		return 0;
+
+	lua_pushnumber(L, target->id);
+	return 1;
+}
+
+
+/***
+ * 
+ * @function Spring.GetMouseNearestEnemy
+ * @param range number? (Default: `1.0e9`)
+ * @param useLOS boolean? (Default: `false`)
+ * @return integer? unitID
+*/
+int LuaSyncedRead::GetMouseNearestEnemy(lua_State* L)
+{
+	if (mouse == nullptr)
+		return 0;
+
+	const int allyTeam = CLuaHandle::GetHandleReadAllyTeam(L);
+	if (allyTeam < 0)
+		return 0;
+
+	const bool wantLOS = !lua_isboolean(L, 2) || lua_toboolean(L, 2);
+	const bool testLOS = !CLuaHandle::GetHandleFullRead(L) || wantLOS;
+
+	const bool sphereDistTest = luaL_optboolean(L, 3, false);
+	const bool checkSightDist = luaL_optboolean(L, 4, false);
+
+	float3 searchPos = mouse->GetWorldMapPos(); // grabs mouse worldspace position
+	if (searchPos == -OnesVector)
+		return 0;
+
+	// nullptr since determining closest unit to position, not unit
+	// if ignoring LOS, pass checkSightDist=false (by default)
+	// such that enemies outside unit's los-range are included
+	const CUnit* target = testLOS ?
+		CGameHelper::GetClosestEnemyUnit         (nullptr, searchPos, luaL_optnumber(L, 1, 1.0e9f), allyTeam                                ):
+		CGameHelper::GetClosestEnemyUnitNoLosTest(nullptr, searchPos, luaL_optnumber(L, 1, 1.0e9f), allyTeam, sphereDistTest, checkSightDist);
 
 	if (target == nullptr)
 		return 0;
