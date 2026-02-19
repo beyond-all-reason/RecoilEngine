@@ -8,7 +8,7 @@
 #if (!defined(UNITSYNC) && !defined(UNIT_TEST))
 	#include "System/GameLoadThread.h"
 #endif
-#include "System/TimeProfiler.h"
+// #include "System/TimeProfiler.h"
 #include "System/StringUtil.h"
 #ifndef UNIT_TEST
 	#include "System/Config/ConfigHandler.h"
@@ -153,6 +153,7 @@ static bool DoTask(int tid, bool async)
 		auto& queue_background = taskQueuesSyncBackground[async][idx];
 
 		auto tryDequeue = [&](ITaskGroup*& tg){
+		#ifndef UNIT_TEST
 			if (CSyncChecker::InSyncedCode()) {
 				return ( queue.try_dequeue(tg) || queue_background.try_dequeue(tg) );
 			}
@@ -160,6 +161,9 @@ static bool DoTask(int tid, bool async)
 				// Synced tasks take priority over unsynced tasks.
 				return ( queue_background.try_dequeue(tg) || queue.try_dequeue(tg) );
 			}
+		#else
+			return ( queue.try_dequeue(tg) || queue_background.try_dequeue(tg) );
+		#endif
 		};
 
 		#ifdef USE_BOOST_LOCKFREE_QUEUE

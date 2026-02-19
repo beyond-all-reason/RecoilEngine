@@ -302,7 +302,7 @@ public:
 	}
 
 	bool SelfDelete() const override { return (selfDelete.load()); }
-	bool ExecuteStep() override {
+	bool ExecuteStep(int tid) override {
 		// note: *never* called from WaitForFinished
 		(*task)();
 		remainingTasks -= 1;
