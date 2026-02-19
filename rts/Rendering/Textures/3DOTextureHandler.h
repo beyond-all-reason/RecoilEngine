@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "Rendering/GL/myGL.h"
+#include "Rendering/Textures/AtlasedTexture.hpp"
 #include "Rendering/Textures/TAPalette.h"
 #include "System/float4.h"
 #include "System/UnorderedMap.hpp"
@@ -16,7 +17,7 @@ struct TexFile;
 class C3DOTextureHandler
 {
 public:
-	typedef float4 UnitTexture;
+	using UnitTexture = float4;
 
 	void Init();
 	void Kill();

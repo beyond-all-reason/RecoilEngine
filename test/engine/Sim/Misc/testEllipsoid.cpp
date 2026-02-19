@@ -5,8 +5,7 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define CATCH_CONFIG_MAIN
-#include "lib/catch.hpp"
+#include <catch_amalgamated.hpp>
 
 
 static inline float3 randfloat3()
@@ -125,9 +124,9 @@ TEST_CASE("Ellipsoid")
 			const float invDet = 1.0f / (a11 * a22 - a21 * a12);
 
 			theta += (a12 * d2 - a22 * d1) * invDet;
-			theta  = Clamp(theta, 0.0f, math::HALFPI);
+			theta  = std::clamp(theta, 0.0f, math::HALFPI);
 			phi += (a21 * d1 - a11 * d2) * invDet;
-			phi  = Clamp(phi, 0.0f, math::HALFPI);
+			phi  = std::clamp(phi, 0.0f, math::HALFPI);
 		}
 
 		bool failed = false;

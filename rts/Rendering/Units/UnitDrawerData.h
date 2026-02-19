@@ -1,19 +1,17 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 #pragma once
 
+#include <ranges>
+
 #include "System/float3.h"
 #include "Rendering/Common/ModelDrawerData.h"
 #include "Rendering/UnitDefImage.h"
 #include "Game/GlobalUnsynced.h"
 
-struct SolidObjectGroundDecal;
 struct S3DModel;
 class CUnitDrawer;
 struct UnitDef;
 
-namespace icon {
-	class CIconData;
-}
 namespace GL {
 	struct GeometryBuffer;
 }
@@ -26,16 +24,18 @@ public:
 	const S3DModel* GetModel() const;
 	void PostLoad();
 public:
-	SolidObjectGroundDecal* decal; //FIXME defined in legacy decal handler with a lot legacy stuff
 	std::string modelName;
 
 	float3 pos;
+	float3 midPos;
 	float3 dir;
+	float radius;
+	float iconRadius;
 
+	int refCount;
 	int facing; //FIXME replaced with dir-vector just legacy decal drawer uses this
 	uint8_t team;
-	int refCount;
-	int lastDrawFrame;
+	size_t currentIconIndex;
 private:
 	mutable const S3DModel* model;
 };
@@ -62,7 +62,11 @@ public:
 	void UnitEnteredLos(const CUnit* unit, int allyTeam) override;
 	void UnitLeftLos(const CUnit* unit, int allyTeam) override;
 
-	void PlayerChanged(int playerNum) override;
+	void PlayerChanged(int playerID) override;
+
+	bool UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost);
+	void UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost);
+	void ReviewPrevLos(const CUnit* unit);
 public:
 	class TempDrawUnit {
 		CR_DECLARE_STRUCT(TempDrawUnit)
@@ -123,35 +127,36 @@ public:
 	void AddTempDrawUnit(const TempDrawUnit& tempDrawUnit);
 
 	void UpdateGhostedBuildings();
-	void UpdateUnitDefMiniMapIcons(const UnitDef* ud);
+	void UpdateUnitIconsByUnitDef(const UnitDef* ud);
 public:
-	const std::vector<UnitDefImage>& GetUnitDefImages() const { return unitDefImages; }
-	      std::vector<UnitDefImage>& GetUnitDefImages() { return unitDefImages; }
+	const auto& GetUnitDefImages() const { return unitDefImages; }
+	      auto& GetUnitDefImages() { return unitDefImages; }
 
-	const std::vector<TempDrawUnit>& GetTempOpaqueDrawUnits(int modelType) const { return savedData.tempOpaqueUnits[modelType]; }
-	const std::vector<TempDrawUnit>& GetTempAlphaDrawUnits(int modelType) const { return  savedData.tempAlphaUnits[modelType]; }
+	const auto& GetTempOpaqueDrawUnits(int modelType) const { return savedData.tempOpaqueUnits[modelType]; }
+	const auto& GetTempAlphaDrawUnits(int modelType) const { return  savedData.tempAlphaUnits[modelType]; }
 
-	const std::vector<GhostSolidObject*>& GetDeadGhostBuildings(int allyTeam, int modelType) const {
+	auto GetDeadGhostBuildings(int allyTeam) const {
+		assert((unsigned)gu->myAllyTeam < savedData.deadGhostBuildings.size());
+		return std::views::join(savedData.deadGhostBuildings[allyTeam]);
+	}
+
+	const auto& GetDeadGhostBuildings(int allyTeam, int modelType) const {
 		assert((unsigned)gu->myAllyTeam < savedData.deadGhostBuildings.size());
 		return savedData.deadGhostBuildings[allyTeam][modelType];
 	}
-	const std::vector<CUnit*           >& GetLiveGhostBuildings(int allyTeam, int modelType) const {
+	const auto& GetLiveGhostBuildings(int allyTeam, int modelType) const {
 		assert((unsigned)gu->myAllyTeam < savedData.liveGhostBuildings.size());
 		return savedData.liveGhostBuildings[allyTeam][modelType];
 	}
 
 	auto*       GetSavedData()       { return &savedData; }
 	const auto* GetSavedData() const { return &savedData; }
-
-	const spring::unsynced_map<icon::CIconData*, std::vector<const CUnit*> >& GetUnitsByIcon() const { return unitsByIcon; }
 protected:
 	void UpdateObjectDrawFlags(CSolidObject* o) const override;
 private:
-	const icon::CIconData* GetUnitIcon(const CUnit* unit);
-
 	void UpdateTempDrawUnits(std::vector<TempDrawUnit>& tempDrawUnits);
 
-	void UpdateUnitIcon(const CUnit* unit, bool forced, bool killed);
+	void UpdateCurrentUnitIcon(const CUnit* unit);
 	void UpdateUnitIconState(CUnit* unit);
 	void UpdateUnitIconStateScreen(CUnit* unit);
 	static void UpdateDrawPos(CUnit* unit);
@@ -160,12 +165,13 @@ private:
 	bool DrawAsIconByDistance(const CUnit* unit, const float sqUnitCamDist) const;
 	//bool DrawAsIconScreen(CUnit* unit) const;
 public:
-	// lenghts & distances
+	// lengths & distances
 	float unitIconDist;
 	float iconLength;
 
 	//icons
 	bool iconHideWithUI = true;
+	float ghostIconDimming = 0.5f;
 
 	// IconsAsUI
 	bool useScreenIcons = false;
@@ -174,20 +180,19 @@ public:
 	float iconScale = 1.0f;
 	float iconFadeStart = 3000.0f;
 	float iconFadeVanish = 1000.0f;
+
+	void ConfigNotify(const std::string& key, const std::string& value);
 private:
 	SavedData savedData;
 
-	spring::unsynced_map<icon::CIconData*, std::vector<const CUnit*> > unitsByIcon;
-
 	std::vector<UnitDefImage> unitDefImages;
 
-
+	S3DModel* GetUnitModel(const CUnit* unit) const;
+	void RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSolidObject*>& dgb, int index);
 
 	// icons
 	bool useDistToGroundForIcons;
 	float sqCamDistToGroundForIcons;
-
-
 
 	// IconsAsUI
 	static constexpr float iconSizeMult = 0.005f; // 1/200

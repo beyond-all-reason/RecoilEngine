@@ -3,10 +3,11 @@
 #ifndef S3O_PARSER_H
 #define S3O_PARSER_H
 
-#include "3DModel.h"
+#include "3DModelPiece.hpp"
 #include "IModelParser.h"
 
 #include "System/type2.h"
+#include "System/Threading/SpringThreading.h"
 
 enum {
 	S3O_PRIMTYPE_TRIANGLES      = 0,

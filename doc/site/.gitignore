@@ -1,5 +1,10 @@
-_site
-.sass-cache
-.jekyll-cache
-.jekyll-metadata
-vendor
+# lua site generation
+/temp
+
+# Lua Language Server doc output
+/data/doc.json
+/data/doc.md
+
+# Site building resources
+/content/docs/lua-api
+/public

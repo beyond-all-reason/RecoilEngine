@@ -17,7 +17,7 @@
 
 #undef CreateDirectory
 
-CONFIG(int, ScreenshotCounter).deprecated(true);
+CONFIG(int, ScreenshotCounter).description("Deprecated, does nothing, but not marked as such to keep compatibility with older engine versions").defaultValue(0);
 
 struct FunctionArgs
 {
@@ -28,6 +28,8 @@ struct FunctionArgs
 	int y;
 };
 
+static std::shared_future<void> fut = {};
+
 void TakeScreenshot(std::string type, unsigned quality)
 {
 	if (type.empty())
@@ -35,6 +37,11 @@ void TakeScreenshot(std::string type, unsigned quality)
 
 	if (!FileSystem::CreateDirectory("screenshots"))
 		return;
+
+	if (fut.valid()) {
+		fut.get();
+		fut = {};
+	}
 
 	FunctionArgs args;
 	args.x  = globalRendering->winSizeX;
@@ -50,7 +57,7 @@ void TakeScreenshot(std::string type, unsigned quality)
 
 	glReadPixels(0, 0, args.x, args.y, GL_RGBA, GL_UNSIGNED_BYTE, &args.pixelbuf[0]);
 
-	ThreadPool::Enqueue([](const FunctionArgs& args) {
+	fut = ThreadPool::Enqueue([](const FunctionArgs& args) {
 		CBitmap bmp(&args.pixelbuf[0], args.x, args.y);
 		bmp.ReverseYAxis();
 		bmp.Save(args.filename, true, true, args.quality);

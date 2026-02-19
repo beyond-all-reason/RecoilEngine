@@ -30,7 +30,7 @@
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/RenderBuffers.h"
-#include "Rendering/Map/InfoTexture/Legacy/LegacyInfoTextureHandler.h"
+#include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "System/SpringMath.h"
 #include "System/StringUtil.h"
 
@@ -109,7 +109,7 @@ void HAPFSPathDrawer::DrawInMiniMap()
 
 void HAPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int offset, unsigned char* texMem) const {
 	switch (extraTex) {
-		case CLegacyInfoTextureHandler::drawPathTrav: {
+		case IInfoTextureHandler::drawPathTrav: {
 			bool useCurrentBuildOrder = true;
 
 			if (guihandler->inCommand <= 0) {
@@ -148,10 +148,10 @@ void HAPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int
 						}
 
 						const SColor& col = GetBuildColor(status);
-						texMem[idx + CLegacyInfoTextureHandler::COLOR_R] = col.r;
-						texMem[idx + CLegacyInfoTextureHandler::COLOR_G] = col.g;
-						texMem[idx + CLegacyInfoTextureHandler::COLOR_B] = col.b;
-						texMem[idx + CLegacyInfoTextureHandler::COLOR_A] = col.a;
+						texMem[idx + IInfoTextureHandler::COLOR_R] = col.r;
+						texMem[idx + IInfoTextureHandler::COLOR_G] = col.g;
+						texMem[idx + IInfoTextureHandler::COLOR_B] = col.b;
+						texMem[idx + IInfoTextureHandler::COLOR_A] = col.a;
 					}
 				}
 			} else {
@@ -159,6 +159,8 @@ void HAPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int
 
 				if (md != nullptr) {
 					const bool los = (gs->cheatEnabled || gu->spectating);
+
+					int thread = ThreadPool::GetThreadNum();
 
 					for (int ty = starty; ty < endy; ++ty) {
 						for (int tx = 0; tx < mapDims.hmapx; ++tx) {
@@ -170,20 +172,20 @@ void HAPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int
 							float scale = 1.0f;
 
 							if (los || losSqr) {
-								if (CMoveMath::IsBlocked(*md, sqx,     sqy    , nullptr) & CMoveMath::BLOCK_STRUCTURE) { scale -= 0.25f; }
-								if (CMoveMath::IsBlocked(*md, sqx + 1, sqy    , nullptr) & CMoveMath::BLOCK_STRUCTURE) { scale -= 0.25f; }
-								if (CMoveMath::IsBlocked(*md, sqx,     sqy + 1, nullptr) & CMoveMath::BLOCK_STRUCTURE) { scale -= 0.25f; }
-								if (CMoveMath::IsBlocked(*md, sqx + 1, sqy + 1, nullptr) & CMoveMath::BLOCK_STRUCTURE) { scale -= 0.25f; }
+								if (CMoveMath::IsBlocked(*md, sqx,     sqy    , nullptr, thread) & CMoveMath::BLOCK_STRUCTURE) { scale -= 0.25f; }
+								if (CMoveMath::IsBlocked(*md, sqx + 1, sqy    , nullptr, thread) & CMoveMath::BLOCK_STRUCTURE) { scale -= 0.25f; }
+								if (CMoveMath::IsBlocked(*md, sqx,     sqy + 1, nullptr, thread) & CMoveMath::BLOCK_STRUCTURE) { scale -= 0.25f; }
+								if (CMoveMath::IsBlocked(*md, sqx + 1, sqy + 1, nullptr, thread) & CMoveMath::BLOCK_STRUCTURE) { scale -= 0.25f; }
 							}
 
 							// NOTE: raw speedmods are not necessarily clamped to [0, 1]
 							const float sm = CMoveMath::GetPosSpeedMod(*md, sqx, sqy);
 							const SColor& smc = GetSpeedModColor(sm * scale);
 
-							texMem[texIdx + CLegacyInfoTextureHandler::COLOR_R] = smc.r;
-							texMem[texIdx + CLegacyInfoTextureHandler::COLOR_G] = smc.g;
-							texMem[texIdx + CLegacyInfoTextureHandler::COLOR_B] = smc.b;
-							texMem[texIdx + CLegacyInfoTextureHandler::COLOR_A] = smc.a;
+							texMem[texIdx + IInfoTextureHandler::COLOR_R] = smc.r;
+							texMem[texIdx + IInfoTextureHandler::COLOR_G] = smc.g;
+							texMem[texIdx + IInfoTextureHandler::COLOR_B] = smc.b;
+							texMem[texIdx + IInfoTextureHandler::COLOR_A] = smc.a;
 						}
 					}
 				} else {
@@ -192,32 +194,32 @@ void HAPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int
 						for (int tx = 0; tx < mapDims.hmapx; ++tx) {
 							const int texIdx = ((ty * (mapDims.pwr2mapx >> 1)) + tx) * 4 - offset;
 
-							texMem[texIdx + CLegacyInfoTextureHandler::COLOR_R] = 100;
-							texMem[texIdx + CLegacyInfoTextureHandler::COLOR_G] = 0;
-							texMem[texIdx + CLegacyInfoTextureHandler::COLOR_B] = 0;
-							texMem[texIdx + CLegacyInfoTextureHandler::COLOR_A] = 255;
+							texMem[texIdx + IInfoTextureHandler::COLOR_R] = 100;
+							texMem[texIdx + IInfoTextureHandler::COLOR_G] = 0;
+							texMem[texIdx + IInfoTextureHandler::COLOR_B] = 0;
+							texMem[texIdx + IInfoTextureHandler::COLOR_A] = 255;
 						}
 					}
 				}
 			}
 		} break;
 
-		case CLegacyInfoTextureHandler::drawPathHeat: {
+		case IInfoTextureHandler::drawPathHeat: {
 			const HAPFS::PathHeatMap* phm = pm->GetPathHeatMap();
 
 			for (int ty = starty; ty < endy; ++ty) {
 				for (int tx = 0; tx < mapDims.hmapx; ++tx) {
 					const unsigned int texIdx = ((ty * (mapDims.pwr2mapx >> 1)) + tx) * 4 - offset;
 
-					texMem[texIdx + CLegacyInfoTextureHandler::COLOR_R] = Clamp(8 * phm->GetHeatValue(tx << 1, ty << 1), 32, 255);
-					texMem[texIdx + CLegacyInfoTextureHandler::COLOR_G] = 32;
-					texMem[texIdx + CLegacyInfoTextureHandler::COLOR_B] = 32;
-					texMem[texIdx + CLegacyInfoTextureHandler::COLOR_A] = 255;
+					texMem[texIdx + IInfoTextureHandler::COLOR_R] = std::clamp(8 * phm->GetHeatValue(tx << 1, ty << 1), 32, 255);
+					texMem[texIdx + IInfoTextureHandler::COLOR_G] = 32;
+					texMem[texIdx + IInfoTextureHandler::COLOR_B] = 32;
+					texMem[texIdx + IInfoTextureHandler::COLOR_A] = 255;
 				}
 			}
 		} break;
 
-		case CLegacyInfoTextureHandler::drawPathFlow: {
+		case IInfoTextureHandler::drawPathFlow: {
 			const PathFlowMap* pfm = pm->GetPathFlowMap();
 			const float maxFlow = pfm->GetMaxFlow();
 
@@ -227,16 +229,16 @@ void HAPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int
 						const unsigned int texIdx = ((ty * (mapDims.pwr2mapx >> 1)) + tx) * 4 - offset;
 						const float3& flow = pfm->GetFlowVec(tx << 1, ty << 1);
 
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_R] = (((flow.x + 1.0f) * 0.5f) * 255);
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_B] = (((flow.z + 1.0f) * 0.5f) * 255);
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_G] = (( flow.y               ) * 255);
-						texMem[texIdx + CLegacyInfoTextureHandler::COLOR_A] = 255;
+						texMem[texIdx + IInfoTextureHandler::COLOR_R] = (((flow.x + 1.0f) * 0.5f) * 255);
+						texMem[texIdx + IInfoTextureHandler::COLOR_B] = (((flow.z + 1.0f) * 0.5f) * 255);
+						texMem[texIdx + IInfoTextureHandler::COLOR_G] = (( flow.y               ) * 255);
+						texMem[texIdx + IInfoTextureHandler::COLOR_A] = 255;
 					}
 				}
 			}
 		} break;
 
-		case CLegacyInfoTextureHandler::drawPathCost: {
+		case IInfoTextureHandler::drawPathCost: {
 			const PathNodeStateBuffer& maxResStates = pm->GetMaxResPF()->blockStates;
 			const PathNodeStateBuffer& medResStates = pm->GetMedResPS()->blockStates;
 			const PathNodeStateBuffer& lowResStates = pm->GetLowResPS()->blockStates;
@@ -273,10 +275,10 @@ void HAPFSPathDrawer::UpdateExtraTexture(int extraTex, int starty, int endy, int
 					//     the normalisation means each extraTextureUpdate block
 					//     of rows gets assigned different colors when units are
 					//     moving (so view it while paused)
-					texMem[texIdx + CLegacyInfoTextureHandler::COLOR_R] = (gCost[0] / gCostMax[0]) * 255;
-					texMem[texIdx + CLegacyInfoTextureHandler::COLOR_G] = (gCost[1] / gCostMax[1]) * 255;
-					texMem[texIdx + CLegacyInfoTextureHandler::COLOR_B] = (gCost[2] / gCostMax[2]) * 255;
-					texMem[texIdx + CLegacyInfoTextureHandler::COLOR_A] = 255;
+					texMem[texIdx + IInfoTextureHandler::COLOR_R] = (gCost[0] / gCostMax[0]) * 255;
+					texMem[texIdx + IInfoTextureHandler::COLOR_G] = (gCost[1] / gCostMax[1]) * 255;
+					texMem[texIdx + IInfoTextureHandler::COLOR_B] = (gCost[2] / gCostMax[2]) * 255;
+					texMem[texIdx + IInfoTextureHandler::COLOR_A] = 255;
 				}
 			}
 		} break;
@@ -299,13 +301,13 @@ void HAPFSPathDrawer::Draw() const {
 
 		glBegin(GL_LINE_STRIP);
 
-			// draw low-res segments of <path> (green)
+			// draw low-res segments of <path> (blue)
 			glColor4f(0.0f, 0.0f, 1.0f, 1.0f);
 			for (auto pvi = multiPath.lowResPath.path.begin(); pvi != multiPath.lowResPath.path.end(); ++pvi) {
 				float3 pos = *pvi; pos.y += 5; glVertexf3(pos);
 			}
 
-			// draw med-res segments of <path> (blue)
+			// draw med-res segments of <path> (green)
 			glColor4f(0.0f, 1.0f, 0.0f, 1.0f);
 			for (auto pvi = multiPath.medResPath.path.begin(); pvi != multiPath.medResPath.path.end(); ++pvi) {
 				float3 pos = *pvi; pos.y += 5; glVertexf3(pos);
@@ -431,7 +433,7 @@ void HAPFSPathDrawer::Draw(const HAPFS::CPathEstimator* pe) const {
 					if (obz >= peNumBlocks.y) continue;
 
 					const int obBlockNr = obz * peNumBlocks.x + obx;
-					const int vertexNr = vertexBaseNr + blockNr * PATH_DIRECTION_VERTICES + GetBlockVertexOffset(dir, peNumBlocks.x);
+					const int vertexNr = vertexBaseNr + blockNr * PATH_DIRECTION_VERTICES + GetBlockVertexOffset(*md, dir, peNumBlocks.x);
 
 					const float rawCost = ps->GetVertexCosts()[vertexNr];
 					const float nrmCost = (rawCost * PATH_NODE_SPACING) / ps->BLOCK_SIZE;
@@ -470,7 +472,6 @@ void HAPFSPathDrawer::Draw(const HAPFS::CPathEstimator* pe) const {
 		font->DrawWorldBuffered();
 
 		// Draw connecting routes
-		// TK PathingState::CalcVertexPathCost parent 483, child 511 PathCost 15.770721 (result: 0)
 		for (int z = 0; z < peNumBlocks.y; z++) {
 			for (int x = 0; x < peNumBlocks.x; x++) {
 				const int blockNr = ps->BlockPosToIdx(int2(x, z));
@@ -493,7 +494,7 @@ void HAPFSPathDrawer::Draw(const HAPFS::CPathEstimator* pe) const {
 					if (obz >= peNumBlocks.y) continue;
 
 					const int obBlockNr = obz * peNumBlocks.x + obx;
-					const int vertexNr = vertexBaseNr + blockNr * PATH_DIRECTION_VERTICES + GetBlockVertexOffset(dir, peNumBlocks.x);
+					const int vertexNr = vertexBaseNr + blockNr * PATH_DIRECTION_VERTICES + GetBlockVertexOffset(*md, dir, peNumBlocks.x);
 
 					// rescale so numbers remain near 1.0 (more readable)
 					const float rawCost = ps->GetVertexCosts()[vertexNr];

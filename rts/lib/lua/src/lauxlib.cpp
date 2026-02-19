@@ -22,8 +22,10 @@
 
 #include "lua.h"
 #include "lauxlib.h"
+#include "lua_privileges.h"
 
 #include "streflop_cond.h" // SPRING
+#include "System/BranchPrediction.h" // Recoil
 
 
 #define FREELIST_REF	0	/* free list of references */
@@ -111,13 +113,13 @@ LUALIB_API int luaL_checkoption (lua_State *L, int narg, const char *def,
 
 
 LUALIB_API int luaL_newmetatable (lua_State *L, const char *tname) {
-  lua_getfield(L, LUA_REGISTRYINDEX, tname);  /* get registry.name */
+  lua_getfield(L, LUA_REGISTRYINDEX, tname);  /* get lua_registry.name */
   if (!lua_isnil(L, -1))  /* name already in use? */
     return 0;  /* leave previous value on top, but return 0 */
   lua_pop(L, 1);
   lua_newtable(L);  /* create metatable */
   lua_pushvalue(L, -1);
-  lua_setfield(L, LUA_REGISTRYINDEX, tname);  /* registry.name = metatable */
+  lua_setfield(L, LUA_REGISTRYINDEX, tname);  /* lua_registry.name = metatable */
   return 1;
 }
 
@@ -179,15 +181,14 @@ LUALIB_API lua_Number luaL_checknumber (lua_State *L, int narg) {
   if (d == 0 && !lua_isnumber(L, narg))  /* avoid extra test when d is not 0 */
     tag_error(L, narg, LUA_TNUMBER);
 
-#if defined(DEBUG_LUANAN)
+#if defined(REPORT_LUANAN)
   // SPRING
   //   this is used by luaL_optnumber, luaL_optfloat (via luaL_optnumber),
   //   and luaL_checkfloat, so the asserts should cover 90% of all cases
   //   in which non-numbers can infect the engine -- lua_tofloat asserts
   //   take care of the rest
-  if (math::isinf(d) || math::isnan(d)) luaL_argerror(L, narg, "number expected, got NAN (check your code for div0)");
-  //assert(!math::isinf(d));
-  //assert(!math::isnan(d));
+  if unlikely(math::isinf(d)) luaL_argerror(L, narg, "number expected, got +-Inf (check your code for div0)");
+  if unlikely(math::isnan(d)) luaL_argerror(L, narg, "number expected, got +-NaN (check your code for div0)");
 #endif
 
   return d;
@@ -669,5 +670,19 @@ LUALIB_API lua_State *luaL_newstate (void) {
   lua_State *L = lua_newstate(l_alloc, NULL);
   if (L) lua_atpanic(L, &panic);
   return L;
+}
+
+
+/* Recoil Privileged LoadBuffer */
+
+LUALIB_API int luaL_loadbuffer_privileged (lua_State *L, const char *buff, size_t size,
+                                const char *name, bool privileged) {
+  LoadS ls;
+  ls.s = buff;
+  ls.size = size;
+  if unlikely(privileged)
+         return lua_load_privileged(L, getS, &ls, name);
+  else
+         return lua_load(L, getS, &ls, name);
 }
 

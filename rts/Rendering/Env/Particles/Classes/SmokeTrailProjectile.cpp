@@ -12,6 +12,8 @@
 #include "Sim/Misc/GlobalSynced.h"
 #include "System/SpringMath.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CSmokeTrailProjectile, CProjectile, )
 
 CR_REG_METADATA(CSmokeTrailProjectile,(
@@ -78,12 +80,14 @@ CSmokeTrailProjectile::CSmokeTrailProjectile(
 
 void CSmokeTrailProjectile::Serialize(creg::ISerializer* s)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!s->IsWriting())
 		texture = projectileDrawer->smoketrailtex;
 }
 
 void CSmokeTrailProjectile::UpdateEndPos(const float3 pos, const float3 dir)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	pos1 = pos;
 	dir1 = dir;
 
@@ -106,6 +110,7 @@ void CSmokeTrailProjectile::UpdateEndPos(const float3 pos, const float3 dir)
 
 void CSmokeTrailProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float age = gs->frameNum + globalRendering->timeOffset - creationTime;
 	const float invLifeTime = (1.0f / lifeTime);
 
@@ -143,21 +148,24 @@ void CSmokeTrailProjectile::Draw()
 
 		const SColor colm = colBase * std::clamp(lerpm, 0.0f, 1.0f);
 
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
+			texture->pageNum,
 			{ pos1   - (odir1 * size1), texture->xstart, texture->ystart, col1  },
 			{ midpos - (odirm * sizem), midtexx        , texture->ystart, colm },
 			{ midpos + (odirm * sizem), midtexx        , texture->yend  , colm },
 			{ pos1   + (odir1 * size1), texture->xstart, texture->yend  , col1  }
 		);
 
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
+			texture->pageNum,
 			{ midpos - (odirm * sizem), midtexx      ,   texture->ystart, colm },
 			{ pos2   - (odir2 * size2), texture->xend,   texture->ystart, col2 },
 			{ pos2   + (odir2 * size2), texture->xend,   texture->yend  , col2 },
 			{ midpos + (odirm * sizem), midtexx      ,   texture->yend  , colm }
 		);
 	} else {
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
+			texture->pageNum,
 			{ pos1 - (odir1 * size1), texture->xstart, texture->ystart, col1 },
 			{ pos2 - (odir2 * size2), texture->xend  , texture->ystart, col2 },
 			{ pos2 + (odir2 * size2), texture->xend  , texture->yend  , col2 },
@@ -168,6 +176,7 @@ void CSmokeTrailProjectile::Draw()
 
 void CSmokeTrailProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	deleteMe |= (gs->frameNum >= (creationTime + lifeTime));
 }
 

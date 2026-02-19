@@ -7,8 +7,9 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
 
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/LocalModelPiece.hpp"
 #include "System/creg/creg_cond.h"
 
 
@@ -20,37 +21,47 @@ class CUnitScript
 	CR_DECLARE(CUnitScript)
 	CR_DECLARE_SUB(AnimInfo)
 public:
-	enum AnimType {ANone = -1, ATurn = 0, ASpin = 1, AMove = 2};
+	enum AnimType {
+		ANone  = -1,
+		ATurn  =  0,
+		ASpin  =  1,
+		AMove  =  2,
+		AScale =  3,
+		ACount =  4
+	};
 
 protected:
 	CUnit* unit;
-	bool busy;
+	uint32_t checksum;
 
 	struct AnimInfo {
 		CR_DECLARE_STRUCT(AnimInfo)
-		int axis;
-		int piece;
-		float speed;
-		float dest;     // means final position when turning or moving, final speed when spinning
-		float accel;    // used for spinning, can be negative
-		bool done;
-		bool hasWaiting;
+		AnimType animType = ANone;
+		int axis  = -1;
+		int piece = -1;
+		float speed = 0.0f;
+		float dest  = 0.0f;    // means final position when turning or moving, final speed when spinning
+		float accel = 0.0f;    // used for spinning, can be negative
+		bool done = false;
+		bool hasWaiting = false;
 	};
 
-	typedef std::vector<AnimInfo> AnimContainerType;
-	typedef AnimContainerType::iterator AnimContainerTypeIt;
+	using AnimContainerType = std::vector<AnimInfo>;
+	using AnimContainerTypeIt = AnimContainerType::iterator;
 
-	typedef bool(CUnitScript::*TickAnimFunc)(int, LocalModelPiece&, AnimInfo&);
+	using TickAnimFunc = bool(CUnitScript::*)(int, LocalModelPiece&, AnimInfo&);
 
-	AnimContainerType anims[AMove + 1];
+	AnimContainerType anims;
+	AnimContainerType doneAnims;
 
-
+	bool busy;
 	bool hasSetSFXOccupy;
 	bool hasRockUnit;
 	bool hasStartBuilding;
 
 	bool MoveToward(float& cur, float dest, float speed);
 	bool TurnToward(float& cur, float dest, float speed);
+	bool ScaleToward(float& cur, float dest, float speed);
 	bool DoSpin(float& cur, float dest, float& speed, float accel, int divisor);
 
 	AnimContainerTypeIt FindAnim(AnimType type, int piece, int axis);
@@ -63,15 +74,13 @@ protected:
 
 public:
 	// subclass is responsible for populating this with script pieces
+	LocalModelPiece* rootPiece = nullptr;
 	std::vector<LocalModelPiece*> pieces;
 
-	bool PieceExists(unsigned int scriptPieceNum) const {
-		// NOTE: there can be NULL pieces present from the remapping in CobInstance
-		return ((scriptPieceNum < pieces.size()) && (pieces[scriptPieceNum] != nullptr));
-	}
+	auto* SafeGetPiece(uint32_t scriptPieceNum) const {
+		if (scriptPieceNum >= pieces.size())
+			return static_cast<LocalModelPiece*>(nullptr);
 
-	LocalModelPiece* GetScriptLocalModelPiece(unsigned int scriptPieceNum) const {
-		assert(PieceExists(scriptPieceNum));
 		return pieces[scriptPieceNum];
 	}
 
@@ -80,20 +89,21 @@ public:
 
 #define SCRIPT_TO_LOCALPIECE_FUNC(RetType, ScriptFunc, PieceFunc)       \
 	RetType ScriptFunc(int scriptPieceNum) const {                      \
-		if (!PieceExists(scriptPieceNum))                               \
-			return {};                                                  \
-		LocalModelPiece* p = GetScriptLocalModelPiece(scriptPieceNum);  \
-		return (p->PieceFunc());                                        \
+		const auto* p = SafeGetPiece(scriptPieceNum);                   \
+		if (!p)                                                         \
+			return RetType{};                                           \
+		return p->PieceFunc();                                          \
 	}
 
-	SCRIPT_TO_LOCALPIECE_FUNC(    float3, GetPiecePos,    GetAbsolutePos     )
-	SCRIPT_TO_LOCALPIECE_FUNC(CMatrix44f, GetPieceMatrix, GetModelSpaceMatrix)
+	SCRIPT_TO_LOCALPIECE_FUNC(    float3, GetPiecePos      ,    GetAbsolutePos     )
+	SCRIPT_TO_LOCALPIECE_FUNC( Transform, GetPieceTransform, GetModelSpaceTransform)
+	SCRIPT_TO_LOCALPIECE_FUNC(CMatrix44f, GetPieceMatrix   , GetModelSpaceMatrix   )
 
 	bool GetEmitDirPos(int scriptPieceNum, float3& pos, float3& dir) const {
-		if (!PieceExists(scriptPieceNum))
+		const auto* p = SafeGetPiece(scriptPieceNum);
+		if (!p)
 			return true;
 
-		LocalModelPiece* p = GetScriptLocalModelPiece(scriptPieceNum);
 		return (p->GetEmitDirPos(pos, dir));
 	}
 
@@ -106,12 +116,14 @@ public:
 	      CUnit* GetUnit()       { return unit; }
 	const CUnit* GetUnit() const { return unit; }
 
-	bool Tick(int tickRate);
+	auto GetAnimArrayChecksum() const { return checksum; }
+	void TickAllAnims(int tickRate);
+	bool TickAnimFinished();
 	// note: must copy-and-set here (LMP dirty flag, etc)
-	bool TickMoveAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai) { float3 pos = lmp.GetPosition(); const bool ret = MoveToward(pos[ai.axis], ai.dest, ai.speed / tickRate); lmp.SetPosition(pos); return ret; }
-	bool TickTurnAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai) { float3 rot = lmp.GetRotation(); rot[ai.axis] = math::fmod(rot[ai.axis], math::TWOPI); const bool ret = TurnToward(rot[ai.axis], ai.dest, ai.speed / tickRate         ); lmp.SetRotation(rot); return ret; }
-	bool TickSpinAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai) { float3 rot = lmp.GetRotation(); rot[ai.axis] = math::fmod(rot[ai.axis], math::TWOPI); const bool ret =     DoSpin(rot[ai.axis], ai.dest, ai.speed, ai.accel, tickRate); lmp.SetRotation(rot); return ret; }
-	void TickAnims(int tickRate, const TickAnimFunc& tickAnimFunc, AnimContainerType& liveAnims, AnimContainerType& doneAnims);
+	bool TickMoveAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai);
+	bool TickTurnAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai);
+	bool TickSpinAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai);
+	bool TickScaleAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai);
 
 	// animation, used by CCobThread
 	void Spin(int piece, int axis, float speed, float accel);
@@ -120,6 +132,8 @@ public:
 	void Move(int piece, int axis, float speed, float destination);
 	void MoveNow(int piece, int axis, float destination);
 	void TurnNow(int piece, int axis, float destination);
+	void Scale(int piece, float speed, float destination);
+	void ScaleNow(int piece, float destination);
 
 	bool NeedsWait(AnimType type, int piece, int axis);
 
@@ -139,10 +153,10 @@ public:
 	void SetUnitVal(int val, int param);
 
 	bool IsInAnimation(AnimType type, int piece, int axis) {
-		return (FindAnim(type, piece, axis) != anims[type].end());
+		return (FindAnim(type, piece, axis) != anims.end());
 	}
 	bool HaveAnimations() const {
-		return (!anims[ATurn].empty() || !anims[ASpin].empty() || !anims[AMove].empty());
+		return (!anims.empty());
 	}
 
 	// checks for callin existence
@@ -204,6 +218,9 @@ public:
 	virtual bool  BlockShot(int weaponNum, const CUnit* targetUnit, bool userTarget) = 0; // returns whether shot should be blocked
 	virtual float TargetWeight(int weaponNum, const CUnit* targetUnit) = 0; // returns target weight
 	virtual void AnimFinished(AnimType type, int piece, int axis) = 0;
+public:
+	const auto& GetLiveAnims() const { return anims; }
+	const auto& GetDoneAnims() const { return doneAnims; }
 };
 
 #endif // UNIT_SCRIPT_H

@@ -6,6 +6,8 @@
 #include "System/Log/ILog.h"
 #include "System/StringUtil.h"
 
+#include "System/Misc/TracyDefs.h"
+
 
 #define LOG_SECTION_SHADER "Shader"
 LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_SHADER)
@@ -124,7 +126,7 @@ static void CreateBindingTypeMap()
 	bindingType[GL_UNSIGNED_INT_SAMPLER_2D_MULTISAMPLE_ARRAY] = INT1;
 	bindingType[GL_UNSIGNED_INT_SAMPLER_BUFFER]               = INT1;
 	bindingType[GL_UNSIGNED_INT_SAMPLER_2D_RECT]              = INT1;
-/*
+
 	bindingType[GL_IMAGE_1D]                   = INT1;
 	bindingType[GL_IMAGE_2D]                   = INT1;
 	bindingType[GL_IMAGE_3D]                   = INT1;
@@ -159,7 +161,6 @@ static void CreateBindingTypeMap()
 	bindingType[GL_UNSIGNED_INT_IMAGE_2D_MULTISAMPLE_ARRAY] = INT1;
 
 	bindingType[GL_UNSIGNED_INT_ATOMIC_COUNTER] = ATOMIC;
-*/
 }
 
 DO_ONCE(CreateBindingTypeMap)
@@ -167,6 +168,7 @@ DO_ONCE(CreateBindingTypeMap)
 
 static void CopyShaderState_Uniforms(GLuint newProgID, GLuint oldProgID, Shader::IProgramObject::UniformStates* uniformStates)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	GLsizei numUniforms = 0;
 	GLsizei maxUniformNameLength = 0;
 
@@ -200,7 +202,7 @@ static void CopyShaderState_Uniforms(GLuint newProgID, GLuint oldProgID, Shader:
 			continue;
 
 		// try to find old data for the uniform either in the old shader itself or in our own state tracker
-		const size_t hash = hashString(name);
+		const auto hash = hashString(name);
 		const auto hashIt = uniformStates->find(hash);
 
 		Shader::UniformState* oldUniformState = nullptr;
@@ -289,7 +291,8 @@ static void CopyShaderState_Uniforms(GLuint newProgID, GLuint oldProgID, Shader:
 
 static void CopyShaderState_UniformBlocks(GLuint newProgID, GLuint oldProgID)
 {
-	if (!GLEW_ARB_uniform_buffer_object)
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!GLAD_GL_ARB_uniform_buffer_object)
 		return;
 
 	GLint numUniformBlocks, maxNameLength = 0;
@@ -323,8 +326,8 @@ static void CopyShaderState_UniformBlocks(GLuint newProgID, GLuint oldProgID)
 
 static void CopyShaderState_ShaderStorage(GLuint newProgID, GLuint oldProgID)
 {
-#ifdef GL_ARB_program_interface_query
-	if (!GLEW_ARB_program_interface_query)
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!GLAD_GL_ARB_program_interface_query)
 		return;
 
 	GLint numUniformBlocks, maxNameLength = 0;
@@ -357,12 +360,12 @@ static void CopyShaderState_ShaderStorage(GLuint newProgID, GLuint oldProgID)
 			1, nullptr, &value);
 		glShaderStorageBlockBinding(newProgID, newLoc, value);
 	}
-#endif
 }
 
 
 static void CopyShaderState_Attributes(GLuint newProgID, GLuint oldProgID)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	GLsizei numAttributes, maxNameLength = 0;
 	glGetProgramiv(oldProgID, GL_ACTIVE_ATTRIBUTES, &numAttributes);
 	glGetProgramiv(oldProgID, GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &maxNameLength);
@@ -393,9 +396,9 @@ static void CopyShaderState_Attributes(GLuint newProgID, GLuint oldProgID)
 
 static void CopyShaderState_TransformFeedback(GLuint newProgID, GLuint oldProgID)
 {
-#ifdef GL_ARB_transform_feedback3
-	//FIXME find out what extensions are really needed
-	if (!GLEW_ARB_transform_feedback3)
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	if (!GLAD_GL_ARB_transform_feedback3)
 		return;
 
 	GLint bufferMode, numVaryings = 0, maxNameLength = 0;
@@ -424,13 +427,13 @@ static void CopyShaderState_TransformFeedback(GLuint newProgID, GLuint oldProgID
 	}
 
 	glTransformFeedbackVaryings(newProgID, numVaryings, (const GLchar**)&varyingsPtr[0], bufferMode);
-#endif
 }
 
 
 
 static bool CopyShaderState_ContainsGeometryShader(GLuint oldProgID)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	bool ret = false;
 
 	GLsizei numAttachedShaders = 0;
@@ -453,8 +456,8 @@ static bool CopyShaderState_ContainsGeometryShader(GLuint oldProgID)
 
 static void CopyShaderState_Geometry(GLuint newProgID, GLuint oldProgID)
 {
-#if defined(GL_ARB_geometry_shader4) && defined(GL_ARB_get_program_binary)
-	if (!GLEW_ARB_geometry_shader4)
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!GLAD_GL_ARB_geometry_shader4)
 		return;
 	// "GL_INVALID_OPERATION is generated if pname is GL_GEOMETRY_VERTICES_OUT,
 	// GL_GEOMETRY_INPUT_TYPE, or GL_GEOMETRY_OUTPUT_TYPE, and program does not
@@ -471,7 +474,6 @@ static void CopyShaderState_Geometry(GLuint newProgID, GLuint oldProgID)
 	if (inputType != 0)   glProgramParameteri(newProgID, GL_GEOMETRY_INPUT_TYPE, inputType);
 	if (outputType != 0)  glProgramParameteri(newProgID, GL_GEOMETRY_OUTPUT_TYPE, outputType);
 	if (verticesOut != 0) glProgramParameteri(newProgID, GL_GEOMETRY_VERTICES_OUT, verticesOut);
-#endif
 }
 #endif
 

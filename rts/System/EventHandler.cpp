@@ -9,7 +9,7 @@
 #include "System/Platform/Threading.h"
 #include "System/GlobalConfig.h"
 
-#include <tracy/Tracy.hpp>
+#include "System/Misc/TracyDefs.h"
 
 CEventHandler eventHandler;
 
@@ -555,6 +555,12 @@ void CEventHandler::GameFrame(int gameFrame)
 	ITERATE_EVENTCLIENTLIST(GameFrame, gameFrame);
 }
 
+void CEventHandler::GameFramePost(int gameFrame)
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST(GameFramePost, gameFrame);
+}
+
 void CEventHandler::GameProgress(int gameFrame)
 {
 	ZoneScoped;
@@ -685,7 +691,6 @@ DRAW_CALLIN(Genesis)
 DRAW_CALLIN(World)
 DRAW_CALLIN(WorldPreUnit)
 DRAW_CALLIN(PreDecals)
-DRAW_CALLIN(WorldPreParticles)
 DRAW_CALLIN(WaterPost)
 DRAW_CALLIN(WorldShadow)
 DRAW_CALLIN(ShadowPassTransparent)
@@ -746,7 +751,7 @@ template<typename T, typename F, typename... A> std::string ControlReverseIterat
 	for (size_t i = 0; i < list.size(); i++) {
 		CEventClient* ec = list[list.size() - 1 - i];
 
-		std::string str = std::move((ec->*func)(std::forward<A>(args)...));
+		std::string str = (ec->*func)(std::forward<A>(args)...);
 
 		if (str.empty())
 			continue;
@@ -757,12 +762,29 @@ template<typename T, typename F, typename... A> std::string ControlReverseIterat
 	return {};
 }
 
+void CEventHandler::ActiveCommandChanged(const SCommandDescription* cmdDesc)
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST(ActiveCommandChanged, cmdDesc);
+}
+
+void CEventHandler::CameraRotationChanged(const float3& rot)
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST(CameraRotationChanged, rot);
+}
+
+void CEventHandler::CameraPositionChanged(const float3& pos)
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST(CameraPositionChanged, pos);
+}
+
 bool CEventHandler::CommandNotify(const Command& cmd)
 {
 	ZoneScoped;
 	return ControlReverseIterateDefTrue(listCommandNotify, &CEventClient::CommandNotify, cmd);
 }
-
 
 bool CEventHandler::KeyMapChanged()
 {
@@ -948,6 +970,12 @@ void CEventHandler::MetalMapChanged(const int x, const int z)
 	ITERATE_EVENTCLIENTLIST(MetalMapChanged, x, z);
 }
 
+void CEventHandler::DrawWorldPreParticles(bool drawAboveWater, bool drawBelowWater, bool drawReflection, bool drawRefraction)
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST(DrawWorldPreParticles, drawAboveWater, drawBelowWater, drawReflection, drawRefraction);
+}
+
 void CEventHandler::DrawOpaqueUnitsLua(bool deferredPass, bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
@@ -982,6 +1010,15 @@ void CEventHandler::DrawShadowFeaturesLua()
 {
 	ZoneScoped;
 	ITERATE_EVENTCLIENTLIST_NA(DrawShadowFeaturesLua);
+}
+
+/******************************************************************************/
+/******************************************************************************/
+
+void CEventHandler::FontsChanged()
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST_NA(FontsChanged);
 }
 
 /******************************************************************************/

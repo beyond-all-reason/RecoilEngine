@@ -1,10 +1,9 @@
 ---
-name: Engine Crash
-about: Post crash logs with translated stack traces
-title: EngineCrash [EngineVersion] at [last sane source line]
-labels: bug
-assignees: ''
-
+name: "Engine Crash"
+about: "Post crash logs with translated stack traces"
+title: "EngineCrash [EngineVersion] at [last sane source line]"
+labels: "bug"
+assignees: ""
 ---
 
 **URL of infolog.txt**

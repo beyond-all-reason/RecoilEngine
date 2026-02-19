@@ -6,7 +6,7 @@
 #include <array>
 #include <vector>
 
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModelDefs.hpp"
 #include "Rendering/Env/Particles/Classes/FlyingPiece.h"
 #include "System/float3.h"
 #include "System/FreeListMap.h"

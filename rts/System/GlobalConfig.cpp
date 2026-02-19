@@ -22,7 +22,13 @@ CONFIG(int, NetworkTimeout)
 
 CONFIG(int, ReconnectTimeout)
 	.defaultValue(15)
-	.minimumValue(0);
+	.minimumValue(0)
+	.description("On client defines time to wait before reconnection is initiated with the "
+	             "server. On server defines time to wait before reconnection from unknown "
+	             "address can be accepted. Reconnect is required only when client's address "
+	             "changed during the game. Value needs to be smaller than the value of "
+	             "'InitialNetworkTimeout' and 'NetworkTimeout' to trigger. Value '0' "
+	             "disables the feature on server or client side.");
 
 CONFIG(int, MaximumTransmissionUnit)
 	.defaultValue(1400)
@@ -60,10 +66,12 @@ CONFIG(bool, UseNetMessageSmoothingBuffer).defaultValue(true).description("Buffe
 CONFIG(bool, LuaWritableConfigFile).defaultValue(true);
 CONFIG(bool, VFSCacheArchiveFiles).defaultValue(true);
 
-CONFIG(bool, DumpGameStateOnDesync).defaultValue(false).description("Enable writing clientgamestate and servergamestate dumps when a desync is detected");
+CONFIG(bool, DumpGameStateOnDesync).defaultValue(true).description("Enable writing clientgamestate and servergamestate dumps when a desync is detected");
 
 CONFIG(float, MinSimDrawBalance).defaultValue(0.15f).description("Percent of the time for simulation is minimum spend for drawing. E.g. if set to 0.15 then 15% of the total cpu time is exclusively reserved for drawing.");
 CONFIG(int, MinDrawFPS).defaultValue(2).description("Defines how many frames per second should minimally be rendered. To reach this number we will delay simframes.");
+
+CONFIG(float, SelectThroughGround).defaultValue(200.0f).minimumValue(0.0f).description("How far beyond the ground to allow selecting objects.");
 
 void GlobalConfig::Init()
 {
@@ -98,6 +106,8 @@ void GlobalConfig::Init()
 	minDrawFPS = configHandler->GetInt("MinDrawFPS");
 
 	teamHighlight = configHandler->GetInt("TeamHighlight");
+
+	selectThroughGround = configHandler->GetFloat("SelectThroughGround");
 }
 #endif
 

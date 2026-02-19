@@ -4,14 +4,16 @@
 #define _THREADPOOL_H
 
 #ifndef THREADPOOL
-#include  <functional>
+#include <functional>
+#include <future>
 #include "System/Threading/SpringThreading.h"
 
 namespace ThreadPool {
 	template<class F, class... Args>
-	static inline void Enqueue(F&& f, Args&&... args)
+	static auto Enqueue(F&& f, Args&&... args)
+	-> std::shared_future<std::invoke_result_t<F, Args...>>
 	{
-		f(args ...);
+		return std::shared_future(std::async(std::launch::deferred, std::forward<F>(f), std::forward<Args>(args)...));
 	}
 
 	static inline void AddExtJob(spring::thread&& t) { t.join(); }
@@ -64,7 +66,6 @@ static inline auto parallel_reduce(F&& f, G&& g) -> std::invoke_result_t<F>
 
 #else
 
-#include "System/TimeProfiler.h"
 #include "System/Platform/Threading.h"
 #include "System/Threading/SpringThreading.h"
 
@@ -79,13 +80,15 @@ static inline auto parallel_reduce(F&& f, G&& g) -> std::invoke_result_t<F>
 #ifdef UNITSYNC
 	#undef SCOPED_MT_TIMER
 	#define SCOPED_MT_TIMER(x)
+#else
+	#include "System/TimeProfiler.h"
 #endif
 
 class ITaskGroup;
 namespace ThreadPool {
 	template<class F, class... Args>
 	static auto Enqueue(F&& f, Args&&... args)
-	-> std::shared_ptr<std::future<std::invoke_result_t<F, Args...>>>;
+	-> std::shared_future<std::invoke_result_t<F, Args...>>;
 
 	void AddExtJob(spring::thread&& t);
 	void AddExtJob(std::future<void>&& f);
@@ -226,7 +229,7 @@ public:
 
 	AsyncTask(F f, Args... args) : selfDelete(true) {
 		task = std::make_shared<std::packaged_task<return_type()>>(std::bind(f, std::forward<Args>(args)...));
-		result = std::make_shared<std::future<return_type>>(task->get_future());
+		result = std::move(task->get_future());
 
 		remainingTasks += 1;
 	}
@@ -241,16 +244,48 @@ public:
 	}
 
 	// FIXME: rethrow exceptions some time
-	std::shared_ptr<std::future<return_type>> GetFuture() { assert(result->valid()); return std::move(result); }
+	std::shared_future<return_type> GetFuture() { assert(result.valid()); return std::move(result); }
 
 public:
 	// if true, we are not managed by a shared_ptr
 	std::atomic<bool> selfDelete;
 
 	std::shared_ptr<std::packaged_task<return_type()>> task;
-	std::shared_ptr<std::future<return_type>> result;
+	std::shared_future<return_type> result;
 };
 
+
+template<class F, class... Args>
+class SyncTask: public ITaskGroup
+{
+public:
+	using return_type = std::invoke_result_t<F, Args...>;
+
+	SyncTask(F f, Args... args) : selfDelete(true) {
+		task = std::make_shared<std::packaged_task<return_type()>>(std::bind(f, std::forward<Args>(args)...));
+		result = std::move(task->get_future());
+
+		remainingTasks += 1;
+	}
+
+	bool SelfDelete() const override { return (selfDelete.load()); }
+	bool ExecuteStep() override {
+		// note: *never* called from WaitForFinished
+		(*task)();
+		remainingTasks -= 1;
+		return false;
+	}
+
+	// FIXME: rethrow exceptions some time
+	std::shared_future<return_type> GetFuture() { assert(result.valid()); return std::move(result); }
+
+public:
+	// if true, we are not managed by a shared_ptr
+	std::atomic<bool> selfDelete;
+
+	std::shared_ptr<std::packaged_task<return_type()>> task;
+	std::shared_future<return_type> result;
+};
 
 
 template<class F, typename R = int, class... Args>
@@ -267,7 +302,7 @@ public:
 	void Enqueue(F f, Args... args)
 	{
 		auto task = std::make_shared<std::packaged_task<return_type()>>(std::bind(f, std::forward<Args>(args)...));
-		results.emplace_back(task->get_future());
+		results.emplace_back(std::move(task->get_future()));
 		tasks.emplace_back(task);
 		remainingTasks.fetch_add(1, std::memory_order_release);
 	}
@@ -640,12 +675,6 @@ private:
 #endif
 
 
-
-
-
-
-
-
 template <template<typename> class TG, typename F>
 struct TaskPool {
 	typedef TG<F> FuncTaskGroup;
@@ -674,12 +703,6 @@ struct TaskPool {
 		return tg;
 	}
 };
-
-
-
-
-
-
 
 
 template <typename F>
@@ -728,7 +751,7 @@ static inline void for_mt(int start, int end, F&& f)
 }
 
 template <typename F>
-static inline void for_mt_chunk(int b, int e, F&& f, int chunkOrMinChinkSize = 0)
+static inline void for_mt_chunk(int b, int e, F&& f, int minChunkSize = 1, int maxChunkSize = std::numeric_limits<int>::max())
 {
 	const int numElems = e - b;
 	if (numElems <= 0)
@@ -736,28 +759,19 @@ static inline void for_mt_chunk(int b, int e, F&& f, int chunkOrMinChinkSize = 0
 
 	static const int maxThreads = ThreadPool::GetNumThreads();
 
-	int chunkSize = chunkOrMinChinkSize;
-	if (chunkOrMinChinkSize <= 0) {
-		chunkSize = numElems / maxThreads + (numElems % maxThreads != 0); //split the work evenly. Does for_mt() do the same?
-		chunkSize = std::max(chunkSize, -chunkOrMinChinkSize);
-	}
-	chunkSize = std::max(chunkSize, 1);
+	const int chunkSize = std::clamp(numElems / maxThreads + (numElems % maxThreads != 0), minChunkSize, maxChunkSize);
+	const int numThreads = numElems / chunkSize + (numElems % chunkSize != 0);
 
-	const int numChunks = numElems / chunkSize + (numElems % chunkSize != 0);
-
-	if (numChunks == 1) {
+	if (numThreads == 1) {
 		for (int i = b; i < e; ++i)
 			f(i);
 
 		return;
 	}
 
-	const int chunksPerThread = numChunks / maxThreads + (numChunks % maxThreads != 0);
-	const int numThreads = std::min(numChunks, maxThreads);
-
-	for_mt(0, numThreads, 1, [&f, b, e, chunkSize, chunksPerThread](const int jobId) {
-		const int bb = b + jobId * chunksPerThread * chunkSize;
-		const int ee = std::min(bb + chunksPerThread * chunkSize, e);
+	for_mt(0, numThreads, 1, [&f, b, e, chunkSize](const int jobId) {
+		const int bb = b + jobId * chunkSize;
+		const int ee = std::min(bb + chunkSize, e);
 
 		for (int i = bb; i < ee; ++i)
 			std::forward<F>(f)(i);
@@ -788,7 +802,7 @@ static inline void parallel(F&& f)
 }
 
 
-template<class F, class G>
+template<typename TaskType, class F, class G>
 static inline auto parallel_reduce(F&& f, G&& g) -> std::invoke_result_t<F>
 {
 	if (!ThreadPool::HasThreads())
@@ -797,21 +811,18 @@ static inline auto parallel_reduce(F&& f, G&& g) -> std::invoke_result_t<F>
 	SCOPED_MT_TIMER("ThreadPool::AddTask");
 
 	using RetType = std::invoke_result_t<F>;
-	// typedef  typename std::shared_ptr< AsyncTask<F> >  TaskType;
-	typedef           std::shared_ptr< std::future<RetType> >  FoldType;
+	using FoldType = std::shared_future<RetType>;
 
-	// std::array<TaskType, ThreadPool::MAX_THREADS> tasks;
-	std::array<AsyncTask<F>*, ThreadPool::MAX_THREADS> tasks;
+	std::array<TaskType*, ThreadPool::MAX_THREADS> tasks;
 	std::array<FoldType, ThreadPool::MAX_THREADS> results;
 
 	// NOTE:
-	//   results become available in AsyncTask::ExecuteStep, and can allow
+	//   results become available in TaskType::ExecuteStep, and can allow
 	//   accumulate to return (followed by tasks going out of scope) before
 	//   ExecuteStep's themselves have returned --> premature task deletion
 	//   if shared_ptr were used (all tasks *must* have exited ExecuteLoop)
 	//
-	// tasks[0] = std::move(std::make_shared<AsyncTask<F>>(std::forward<F>(f)));
-	tasks[0] = new AsyncTask<F>(std::forward<F>(f));
+	tasks[0] = new TaskType(std::forward<F>(f));
 	results[0] = std::move(tasks[0]->GetFuture());
 
 	// first job in a reduction usually wants to run on the main thread
@@ -819,8 +830,7 @@ static inline auto parallel_reduce(F&& f, G&& g) -> std::invoke_result_t<F>
 
 	// need to push N individual tasks; see NOTE in TParallelTaskGroup
 	for (size_t i = 1, n = ThreadPool::GetNumThreads(); i < n; ++i) {
-		// tasks[i] = std::move(std::make_shared<AsyncTask<F>>(std::forward<F>(f)));
-		tasks[i] = new AsyncTask<F>(std::forward<F>(f));
+		tasks[i] = new TaskType(std::forward<F>(f));
 		results[i] = std::move(tasks[i]->GetFuture());
 
 		// tasks[i]->selfDelete.store(false);
@@ -838,14 +848,14 @@ static inline auto parallel_reduce(F&& f, G&& g) -> std::invoke_result_t<F>
 namespace ThreadPool {
 	template<class F, class... Args>
 	static inline auto Enqueue(F&& f, Args&&... args)
-	-> std::shared_ptr<std::future<std::invoke_result_t<F, Args...>>>
+	-> std::shared_future<std::invoke_result_t<F, Args...>>
 	{
 		using return_type = std::invoke_result_t<F, Args...>;
 
 		if (!ThreadPool::HasThreads()) {
 			// directly process when there are no worker threads
 			auto task = std::make_shared< std::packaged_task<return_type()> >(std::bind(f, args ...));
-			auto fut = std::make_shared<std::future<return_type>>(task->get_future());
+			std::shared_future<return_type> fut = std::move(task->get_future());
 			(*task)();
 			return fut;
 		}

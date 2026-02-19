@@ -19,6 +19,7 @@ struct SResourcePack {
 
 public:
 	SResourcePack() : res1(0.0f), res2(0.0f) {}
+	SResourcePack(const float value) : metal(value), energy(value) {}
 	SResourcePack(const float m, const float e) : metal(m), energy(e) {}
 	CR_DECLARE_STRUCT(SResourcePack)
 
@@ -29,8 +30,17 @@ public:
 		return true;
 	}
 
-	decltype(std::begin(res)) begin() { return std::begin(res); }
-	decltype(std::end(res)) end() { return std::end(res); }
+	SResourcePack& cap_at (const SResourcePack &cap) {
+		for (int i = 0; i < MAX_RESOURCES; ++i)
+			res[i] = std::min(res[i], cap.res[i]);
+
+		return *this;
+	}
+
+	auto begin()       { return std::begin(res); }
+	auto   end()       { return std::  end(res); }
+	auto begin() const { return std::begin(res); }
+	auto   end() const { return std::  end(res); }
 
 	float& operator[](const size_t i) {
 		return res[i];
@@ -72,6 +82,22 @@ public:
 		}
 		return *this;
 	}
+	SResourcePack& operator*=(const SResourcePack& other) {
+		for (int i = 0; i < MAX_RESOURCES; ++i)
+			res[i] *= other.res[i];
+
+		return *this;
+	}
+	SResourcePack& operator/=(const SResourcePack& other) {
+		for (int i = 0; i < MAX_RESOURCES; ++i) {
+			if (!other[i])
+				res[i] = 1.0f;
+			else
+				res[i] /= other[i];
+		}
+
+		return *this;
+	}
 
 	SResourcePack& operator*=(float scale) {
 		for (int i = 0; i < MAX_RESOURCES; ++i) {
@@ -81,6 +107,9 @@ public:
 	}
 };
 
+inline SResourcePack operator * (SResourcePack pack, float scale) { return pack *= scale; }
+inline SResourcePack operator * (SResourcePack lhs, const SResourcePack& rhs) { return lhs *= rhs; }
+inline SResourcePack operator / (SResourcePack lhs, const SResourcePack& rhs) { return lhs /= rhs; }
 
 struct SResourceOrder {
 	SResourcePack use;
@@ -95,8 +124,11 @@ struct SResourceOrder {
 	//! handle resources separate, i.e. when metal storage is full still allow energy one to be filled?
 	bool separate;
 
+	//! should the income multiplier be applied
+	bool useIncomeMultiplier;
+
 public:
-	SResourceOrder() : quantum(false), overflow(false), separate(false) {}
+	SResourceOrder() : quantum(false), overflow(false), separate(false), useIncomeMultiplier(true) {}
 	CR_DECLARE_STRUCT(SResourceOrder)
 };
 

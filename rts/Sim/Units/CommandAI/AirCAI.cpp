@@ -21,6 +21,9 @@
 #include "System/StringUtil.h"
 
 #include <cassert>
+
+#include "System/Misc/TracyDefs.h"
+
 #define AUTO_GENERATE_ATTACK_ORDERS 1
 
 // AirCAI is always assigned to StrafeAirMoveType aircraft
@@ -84,6 +87,7 @@ CAirCAI::CAirCAI(CUnit* owner)
 
 void CAirCAI::GiveCommandReal(const Command& c, bool fromSynced)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// take care not to allow aircraft to be ordered to move out of the map
 	if ((c.GetID() != CMD_MOVE) && !AllowedCommand(c, true))
 		return;
@@ -163,6 +167,7 @@ void CAirCAI::GiveCommandReal(const Command& c, bool fromSynced)
 
 void CAirCAI::SlowUpdate()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// Commands issued may invoke SlowUpdate when paused
 	if (gs->paused)
 		return;
@@ -206,6 +211,7 @@ void CAirCAI::SlowUpdate()
 }
 
 bool CAirCAI::AirAutoGenerateTarget(AAirMoveType* myPlane) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(commandQue.empty());
 	assert(myPlane->owner == owner);
 
@@ -246,13 +252,14 @@ bool CAirCAI::AirAutoGenerateTarget(AAirMoveType* myPlane) {
 		return false;
 
 	commandQue.push_front(Command(CMD_ATTACK, INTERNAL_ORDER, tgt->id));
-	inCommand = false;
+	inCommand = CMD_STOP;
 	return true;
 }
 
 
 void CAirCAI::ExecuteMove(Command& c)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float3 cmdPos = c.GetPos(0);
 
 	AAirMoveType* myPlane = GetStrafeAirMoveType(owner);
@@ -271,6 +278,7 @@ void CAirCAI::ExecuteMove(Command& c)
 
 void CAirCAI::ExecuteFight(Command& c)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const UnitDef* ownerDef = owner->unitDef;
 
 	assert(c.IsInternalOrder() || ownerDef->canFight);
@@ -282,7 +290,7 @@ void CAirCAI::ExecuteFight(Command& c)
 
 	if (tempOrder) {
 		tempOrder = false;
-		inCommand = true;
+		inCommand = CMD_FIGHT;
 	}
 
 	if (c.GetNumParams() < 3) {
@@ -291,7 +299,7 @@ void CAirCAI::ExecuteFight(Command& c)
 	}
 
 	if (c.GetNumParams() >= 6) {
-		if (!inCommand)
+		if (inCommand == CMD_STOP)
 			commandPos1 = c.GetPos(3);
 	} else {
 		// HACK to make sure the line (commandPos1,commandPos2) is NOT
@@ -307,8 +315,8 @@ void CAirCAI::ExecuteFight(Command& c)
 
 	float3 goalPos = c.GetPos(0);
 
-	if (!inCommand) {
-		inCommand = true;
+	if (inCommand == CMD_STOP) {
+		inCommand = CMD_FIGHT;
 		commandPos2 = goalPos;
 	}
 	if (c.GetNumParams() >= 6)
@@ -337,7 +345,7 @@ void CAirCAI::ExecuteFight(Command& c)
 			commandQue.push_front(Command(CMD_ATTACK, c.GetOpts(), enemy->id));
 
 			tempOrder = true;
-			inCommand = false;
+			inCommand = CMD_STOP;
 
 			if (lastPC1 != gs->frameNum) { // avoid infinite loops
 				lastPC1 = gs->frameNum;
@@ -358,7 +366,7 @@ void CAirCAI::ExecuteFight(Command& c)
 				commandQue.push_front(Command(CMD_ATTACK, c.GetOpts(), enemy->id));
 
 				tempOrder = true;
-				inCommand = false;
+				inCommand = CMD_STOP;
 
 				// avoid infinite loops (?)
 				if (lastPC2 != gs->frameNum) {
@@ -375,6 +383,7 @@ void CAirCAI::ExecuteFight(Command& c)
 
 void CAirCAI::ExecuteAttack(Command& c)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(owner->unitDef->canAttack);
 	targetAge++;
 
@@ -387,7 +396,7 @@ void CAirCAI::ExecuteAttack(Command& c)
 		}
 	}
 
-	if (inCommand) {
+	if (inCommand == CMD_ATTACK) {
 		if (targetDied || (c.GetNumParams() == 1 && UpdateTargetLostTimer(int(c.GetParam(0))) == 0)) {
 			StopMoveAndFinishCommand();
 			return;
@@ -427,18 +436,19 @@ void CAirCAI::ExecuteAttack(Command& c)
 			SetOrderTarget(targetUnit);
 			owner->AttackUnit(targetUnit, !c.IsInternalOrder(), false);
 
-			inCommand = true;
+			inCommand = CMD_ATTACK;
 		} else {
 			SetGoal(c.GetPos(0), owner->pos, cancelDistance);
 			owner->AttackGround(c.GetPos(0), !c.IsInternalOrder(), false);
 
-			inCommand = true;
+			inCommand = CMD_ATTACK;
 		}
 	}
 }
 
 void CAirCAI::ExecuteAreaAttack(Command& c)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(owner->unitDef->canAttack);
 
 	// FIXME: check owner->UsingScriptMoveType() and skip rest if true?
@@ -446,15 +456,15 @@ void CAirCAI::ExecuteAreaAttack(Command& c)
 
 	if (targetDied) {
 		targetDied = false;
-		inCommand = false;
+		inCommand = CMD_STOP;
 	}
 
 	const float3& pos = c.GetPos(0);
 	const float radius = c.GetParam(3);
 
-	if (inCommand) {
+	if (inCommand == CMD_ATTACK) {
 		if (myPlane->aircraftState == AAirMoveType::AIRCRAFT_LANDED)
-			inCommand = false;
+			inCommand = CMD_STOP;
 
 		if (orderTarget && orderTarget->pos.SqDistance2D(pos) > Square(radius)) {
 			// target wandered out of the attack-area
@@ -463,7 +473,7 @@ void CAirCAI::ExecuteAreaAttack(Command& c)
 		}
 	} else {
 		if (myPlane->aircraftState != AAirMoveType::AIRCRAFT_LANDED) {
-			inCommand = true;
+			inCommand = CMD_ATTACK;
 
 			SelectNewAreaAttackTargetOrPos(c);
 		}
@@ -472,6 +482,7 @@ void CAirCAI::ExecuteAreaAttack(Command& c)
 
 void CAirCAI::ExecuteGuard(Command& c)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(owner->unitDef->canGuard);
 
 	const CUnit* guardee = unitHandler.GetUnit(c.GetParam(0));
@@ -481,10 +492,6 @@ void CAirCAI::ExecuteGuard(Command& c)
 		return;
 	}
 	if (UpdateTargetLostTimer(guardee->id) == 0) {
-		StopMoveAndFinishCommand();
-		return;
-	}
-	if (guardee->outOfMapTime > (GAME_SPEED * 5)) {
 		StopMoveAndFinishCommand();
 		return;
 	}
@@ -514,6 +521,7 @@ void CAirCAI::ExecuteGuard(Command& c)
 
 int CAirCAI::GetDefaultCmd(const CUnit* pointed, const CFeature* feature)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (pointed != nullptr) {
 		if (!teamHandler.Ally(gu->myAllyTeam, pointed->allyteam)) {
 			if (owner->unitDef->canAttack)
@@ -540,12 +548,14 @@ bool CAirCAI::IsValidTarget(const CUnit* enemy, CWeapon* weapon) const {
 
 void CAirCAI::FinishCommand()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	targetAge = 0;
 	CCommandAI::FinishCommand();
 }
 
 void CAirCAI::BuggerOff(const float3& pos, float radius)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!owner->UsingScriptMoveType()) {
 		static_cast<AAirMoveType*>(owner->moveType)->Takeoff();
 	} else {
@@ -556,6 +566,7 @@ void CAirCAI::BuggerOff(const float3& pos, float radius)
 
 bool CAirCAI::SelectNewAreaAttackTargetOrPos(const Command& ac)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(ac.GetID() == CMD_AREA_ATTACK);
 
 	if (ac.GetID() != CMD_AREA_ATTACK)

@@ -4,14 +4,18 @@
 #include <SDL_scancode.h>
 
 #include "ScanCodes.h"
+#include "Game/UI/MouseHandler.h"
 #include "System/Log/ILog.h"
 #include "System/StringUtil.h"
+
+#include "System/Misc/TracyDefs.h"
 
 CScanCodes scanCodes;
 
 
 int CScanCodes::GetNormalizedSymbol(int sym)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	switch (sym) {
 		case SDL_SCANCODE_RSHIFT: { return SDL_SCANCODE_LSHIFT; } break;
 		case SDL_SCANCODE_RCTRL : { return SDL_SCANCODE_LCTRL ; } break;
@@ -26,6 +30,7 @@ int CScanCodes::GetNormalizedSymbol(int sym)
 
 bool CScanCodes::IsModifier(int code) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	switch (code) {
 		case SDL_SCANCODE_LALT:
 		case SDL_SCANCODE_LCTRL:
@@ -43,6 +48,7 @@ bool CScanCodes::IsModifier(int code) const
 
 void CScanCodes::Reset()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	nameToCode.clear();
 	nameToCode.reserve(64);
 	codeToName.clear();
@@ -208,6 +214,10 @@ void CScanCodes::Reset()
 	AddPair("sc_alt",   SDL_SCANCODE_LALT);
 	AddPair("sc_meta",  SDL_SCANCODE_LGUI);
 
+	for (int i = ACTION_BUTTON_MIN; i <= NUM_BUTTONS; i++) {
+		AddPair("sc_mouse" + IntToString(i), CScanCodes::GetMouseButtonSymbol(i));
+	}
+
 	// Miscellaneous function keys
 	AddPair("sc_help", SDL_SCANCODE_HELP);
 	AddPair("sc_printscreen", SDL_SCANCODE_PRINTSCREEN);
@@ -236,14 +246,24 @@ void CScanCodes::Reset()
 }
 
 
+int CScanCodes::GetMouseButtonSymbol(int button)
+{
+	// magic number here chosen so it won't conflict with SDL reserved values.
+	// just in case taking a value from private unicode area.
+	return 0x100000+button;
+}
+
+
 std::string CScanCodes::GetCodeString(int code)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return IntToString(code, "sc_0x%03X");
 }
 
 
 std::string CScanCodes::GetName(int code) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto iter = std::lower_bound(codeToName.begin(), codeToName.end(), CodeNamePair{code, ""}, codePred);
 
 	if (iter == codeToName.end() || iter->first != code)
@@ -255,6 +275,7 @@ std::string CScanCodes::GetName(int code) const
 
 std::string CScanCodes::GetDefaultName(int code) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto iter = std::lower_bound(defaultCodeToName.begin(), defaultCodeToName.end(), CodeNamePair{code, ""}, codePred);
 
 	if (iter == defaultCodeToName.end() || iter->first != code)
@@ -266,6 +287,7 @@ std::string CScanCodes::GetDefaultName(int code) const
 
 void CScanCodes::PrintNameToCode() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (const auto& p: nameToCode) {
 		LOG("SCANNAME: %s = %d", p.first.c_str(), p.second);
 	}
@@ -274,6 +296,7 @@ void CScanCodes::PrintNameToCode() const
 
 void CScanCodes::PrintCodeToName() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (const auto& p: codeToName) {
 		LOG("SCANCODE: %d = '%s'", p.first, p.second.c_str());
 	}

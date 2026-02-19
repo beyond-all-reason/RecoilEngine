@@ -15,6 +15,9 @@ CallInsList = {
 	"Shutdown",
 	"LayoutButtons",
 	"ConfigureLayout",
+	"ActiveCommandChanged",
+	"CameraRotationChanged",
+	"CameraPositionChanged",
 	"CommandNotify",
 
 	"KeyMapChanged",
@@ -44,6 +47,7 @@ CallInsList = {
 	"UnitFinished",
 	"UnitFromFactory",
 	"UnitReverseBuilt",
+	"UnitConstructionDecayed",
 	"UnitDestroyed",
 	"RenderUnitDestroyed",
 	"UnitTaken",
@@ -70,11 +74,6 @@ CallInsList = {
 	"FeatureDestroyed",
 
 	"DrawGenesis",
-	"DrawWater",
-	"DrawSky",
-	"DrawSun",
-	"DrawGrass",
-	"DrawTrees",
 	"DrawWorld",
 	"DrawWorldPreUnit",
 	"DrawWorldPreParticles",
@@ -92,6 +91,8 @@ CallInsList = {
 	"DrawScreenPost",
 	"DrawScreen",
 	"DrawInMiniMap",
+
+	"FontsChanged",
 
 	"SunChanged",
 

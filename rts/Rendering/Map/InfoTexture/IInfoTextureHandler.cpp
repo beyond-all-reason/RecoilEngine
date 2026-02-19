@@ -1,37 +1,33 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "IInfoTextureHandler.h"
-#include "Legacy/LegacyInfoTextureHandler.h"
 #include "Modern/InfoTextureHandler.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/FBO.h"
+#include "System/Config/ConfigHandler.h"
 #include "System/Exceptions.h"
 #include "System/Log/ILog.h"
 
+#include "System/Misc/TracyDefs.h"
 
-IInfoTextureHandler* infoTextureHandler = nullptr;
+CONFIG(bool, HighResLos).deprecated(true);
+CONFIG(int, ExtraTextureUpdateRate).deprecated(true);
 
+decltype(infoTextureHandler) infoTextureHandler = nullptr;
 
 void IInfoTextureHandler::Create()
 {
-	if (
-		globalRendering->haveGLSL &&
-		globalRendering->supportNonPowerOfTwoTex &&
-		FBO::IsSupported()
-	) {
-		try {
-			infoTextureHandler = new CInfoTextureHandler();
-		} catch (const opengl_error& glerr) {
-			infoTextureHandler = nullptr;
-		}
+	RECOIL_DETAILED_TRACY_ZONE;
+	try {
+#ifdef HEADLESS
+		infoTextureHandler = std::make_unique<CNullInfoTextureHandler>();
+#else
+		infoTextureHandler = std::make_unique<CInfoTextureHandler>();
+#endif
+	} catch (const opengl_error& glerr) {
+		infoTextureHandler = nullptr;
+		throw glerr;
 	}
 
-	if (infoTextureHandler == nullptr)
-		infoTextureHandler = new CLegacyInfoTextureHandler();
-
-	if (dynamic_cast<CInfoTextureHandler*>(infoTextureHandler) != nullptr) {
-		LOG("InfoTexture: shaders");
-	} else {
-		LOG("InfoTexture: legacy");
-	}
+	LOG("InfoTexture: shaders");
 }

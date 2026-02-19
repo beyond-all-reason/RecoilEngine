@@ -54,7 +54,6 @@ public:
 		, energycost(0.0f)
 		, projectilespershot(0)
 		, id(0)
-		, tdfId(0)
 		, turret(false)
 		, onlyForward(false)
 		, fixedLauncher(false)
@@ -172,7 +171,6 @@ public:
 		, energycost(0.0f)
 		, projectilespershot(0)
 		, id(0)
-		, tdfId(0)
 		, turret(false)
 		, onlyForward(false)
 		, fixedLauncher(false)
@@ -305,7 +303,6 @@ public:
 	int projectilespershot;
 
 	int id;
-	int tdfId;                  ///< the id= tag in the tdf
 
 	bool turret;
 	bool onlyForward;
@@ -386,7 +383,7 @@ public:
 	bool avoidFeature;      // if true, try to avoid features while aiming
 	bool avoidNeutral;      // if true, try to avoid neutral units while aiming
 	/**
-	 * If nonzero, targetting units will TryTarget at the edge of collision sphere
+	 * If nonzero, targeting units will TryTarget at the edge of collision sphere
 	 * (radius*tag value, [-1;1]) instead of its centre.
 	 */
 	float targetBorder;
@@ -397,7 +394,7 @@ public:
 	float cylinderTargetting;
 	/**
 	 * For beam-lasers only - always hit with some minimum intensity
-	 * (a damage coeffcient normally dependent on distance).
+	 * (a damage coefficient normally dependent on distance).
 	 * Do not confuse this with the intensity tag, it i completely unrelated.
 	 */
 	float minIntensity;

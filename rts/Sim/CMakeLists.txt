@@ -2,6 +2,9 @@
 # This list was created using this *nix shell command:
 # > find . -name "*.cpp"" | sort
 add_library(engineSim STATIC
+		"${CMAKE_CURRENT_SOURCE_DIR}/Ecs/Helper.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Ecs/Registry.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Ecs/SaveLoadUtils.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Features/Feature.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Features/FeatureDef.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Features/FeatureDefHandler.cpp"
@@ -35,6 +38,7 @@ add_library(engineSim STATIC
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/TeamHandler.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/TeamStatistics.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/Wind.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/YardmapStatusEffectsMap.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/MoveTypes/AAirMoveType.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/MoveTypes/StrafeAirMoveType.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/MoveTypes/GroundMoveType.cpp"
@@ -48,6 +52,10 @@ add_library(engineSim STATIC
 		"${CMAKE_CURRENT_SOURCE_DIR}/MoveTypes/ScriptMoveType.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/MoveTypes/StaticMoveType.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/MoveTypes/HoverAirMoveType.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/MoveTypes/Systems/GeneralMoveSystem.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/MoveTypes/Systems/GroundMoveSystem.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/MoveTypes/Systems/UnitTrapCheckSystem.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/MoveTypes/Utils/UnitTrapCheckUtils.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Objects/SolidObject.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Objects/SolidObjectDef.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Objects/WorldObject.cpp"
@@ -56,15 +64,20 @@ add_library(engineSim STATIC
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/QTPFS/PathCache.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/QTPFS/PathSearch.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/QTPFS/PathManager.cpp"
-		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/PathFinderDef.cpp"
-		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/PathFlowMap.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Path/QTPFS/Registry.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Path/QTPFS/Systems/PathSpeedModInfoSystem.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Path/QTPFS/Systems/RemoveDeadPathsSystem.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Path/QTPFS/Systems/RequeuePathsSystem.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/IPathFinder.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/PathCache.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/PathEstimator.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/PathFinder.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/PathFinderDef.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/PathFlowMap.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/PathHeatMap.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/PathingState.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/PathManager.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Path/HAPFS/Registry.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/IPathController.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Path/IPathManager.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Projectiles/ExpGenSpawnable.cpp"
@@ -97,6 +110,8 @@ add_library(engineSim STATIC
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/CommandAI/CommandDescription.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/CommandAI/FactoryCAI.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/CommandAI/MobileCAI.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Units/CommandAI/BuilderCaches.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Units/Scripts/CobDeferredCallin.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/Scripts/CobEngine.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/Scripts/CobFile.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/Scripts/CobFileHandler.cpp"
@@ -141,9 +156,7 @@ add_library(engineSim STATIC
 		"${CMAKE_CURRENT_SOURCE_DIR}/Weapons/WeaponTarget.cpp"
 	)
 
-target_include_directories(engineSim
-	PRIVATE ${GLEW_INCLUDE_DIR} ${SDL2_INCLUDE_DIR})
-target_link_libraries(engineSim Tracy::TracyClient)
+target_link_libraries(engineSim SDL2::SDL2 Tracy::TracyClient nowide::nowide)
 
 if( CMAKE_COMPILER_IS_GNUCXX)
 	# FIXME: hack to avoid linkers to remove not referenced symbols. required because of

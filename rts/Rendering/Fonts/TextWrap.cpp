@@ -8,9 +8,11 @@
 #include "System/SpringMath.h"
 #include "System/StringUtil.h"
 
+#include "System/Misc/TracyDefs.h"
 
-static const char32_t spaceUTF16    = 0x20;
-static const char32_t ellipsisUTF16 = 0x2026;
+
+static constexpr char32_t spaceUTF16    = 0x20;
+static constexpr char32_t ellipsisUTF16 = 0x2026;
 static const std::string ellipsisUTF8 = utf8::FromUnicode(ellipsisUTF16);
 
 static constexpr const char* spaceStringTable[1 + 10] = {
@@ -32,24 +34,48 @@ static constexpr const char* spaceStringTable[1 + 10] = {
 /*******************************************************************************/
 /*******************************************************************************/
 
-template <typename T>
-static inline int SkipColorCodes(const spring::u8string& text, T* pos, SColor* color)
+uint32_t CTextWrap::SkipColorCodes(const spring::u8string& text, uint32_t idx, ColorCodeText* cctPtr)
 {
-	int colorFound = 0;
-	while (text[(*pos)] == CTextWrap::ColorCodeIndicator) {
-		(*pos) += 4;
-		if ((*pos) >= text.size()) {
-			return -(1 + colorFound);
-		} else {
-			color->r = text[(*pos)-3];
-			color->g = text[(*pos)-2];
-			color->b = text[(*pos)-1];
-			colorFound = 1;
-		}
-	}
-	return colorFound;
-}
+	RECOIL_DETAILED_TRACY_ZONE;
 
+	auto AdvanceAndCopy = [&text, cctPtr](uint32_t& idx, uint32_t c) {
+		if (cctPtr) {
+			std::fill(cctPtr->storage.begin(), cctPtr->storage.end(), 0);
+			std::memcpy(cctPtr->storage.data(), &text[idx], c);
+			cctPtr->size = static_cast<uint8_t>(c);
+		}
+		idx += c;
+	};
+
+	while (idx < text.size()) {
+		switch (text[idx])
+		{
+		case OldColorCodeIndicator:
+			if (fontHandler.disableOldColorIndicators)
+				break;
+			[[fallthrough]];
+		case ColorCodeIndicator: {
+			AdvanceAndCopy(idx, 3 + 1); // I+RGB
+		} continue;
+		case OldColorCodeIndicatorEx:
+			if (fontHandler.disableOldColorIndicators)
+				break;
+			[[fallthrough]];
+		case ColorCodeIndicatorEx: {
+			AdvanceAndCopy(idx, 2 * 4 + 1); // I+RGBA,RGBA
+		} continue;
+		case ColorResetIndicator: {
+			AdvanceAndCopy(idx, 1); // I
+		} continue;
+		default:
+			break; // cause next break to trigger and terminate the loop
+		}
+
+		break;
+	}
+
+	return std::min<uint32_t>(text.size(), idx);
+}
 
 /*******************************************************************************/
 /*******************************************************************************/
@@ -69,6 +95,7 @@ CTextWrap::CTextWrap(const std::string& fontfile, int size, int outlinewidth, fl
  */
 static inline bool IsUpperCase(const char32_t& c)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// overkill to add unicode
 	return
 		(c >= 0x41 && c <= 0x5A) ||
@@ -82,6 +109,7 @@ static inline bool IsUpperCase(const char32_t& c)
 
 static inline bool IsLowerCase(const char32_t& c)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// overkill to add unicode
 	return c >= 0x61 && c <= 0x7A; // only ascii (no latin-1!)
 }
@@ -96,6 +124,7 @@ static inline bool IsLowerCase(const char32_t& c)
  */
 static inline float GetPenalty(const char32_t& c, unsigned int strpos, unsigned int strlen)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float dist = strlen - strpos;
 
 	if (dist > (strlen / 2) && dist < 4) {
@@ -118,6 +147,7 @@ static inline float GetPenalty(const char32_t& c, unsigned int strpos, unsigned 
 
 CTextWrap::word CTextWrap::SplitWord(CTextWrap::word& w, float wantedWidth, bool smart)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// returns two pieces 'L'eft and 'R'ight of the split word (returns L, *wi becomes R)
 
 	word w2;
@@ -190,6 +220,7 @@ CTextWrap::word CTextWrap::SplitWord(CTextWrap::word& w, float wantedWidth, bool
 
 void CTextWrap::AddEllipsis(std::list<line>& lines, std::list<word>& words, float maxWidth)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float ellipsisAdvance = GetGlyph(ellipsisUTF16).advance;
 	const float spaceAdvance = GetGlyph(spaceUTF16).advance;
 
@@ -304,6 +335,7 @@ void CTextWrap::AddEllipsis(std::list<line>& lines, std::list<word>& words, floa
 
 void CTextWrap::WrapTextConsole(std::list<word>& words, float maxWidth, float maxHeight)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (words.empty() || (GetLineHeight()<=0.0f))
 		return;
 	const bool splitAllWords = false;
@@ -414,15 +446,19 @@ void CTextWrap::WrapTextConsole(std::list<word>& words, float maxWidth, float ma
 }
 
 
-void CTextWrap::SplitTextInWords(const spring::u8string& text, std::list<word>* words, std::list<colorcode>* colorcodes)
+void CTextWrap::SplitTextInWords(const spring::u8string& text, std::list<word>* words, std::list<ColorCode>& colorCodes)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const unsigned int length = (unsigned int)text.length();
 	const float spaceAdvance = GetGlyph(spaceUTF16).advance;
+
+	// Scan in advance so we avoid calls on every step of splitting.
+	ScanForWantedGlyphs(text);
 
 	words->push_back(word());
 	word* w = &(words->back());
 
-	unsigned int numChar = 0;
+	uint32_t numChar = 0;
 	for (int pos = 0; pos < length; pos++) {
 		const char8_t& c = text[pos];
 		switch(c) {
@@ -442,39 +478,29 @@ void CTextWrap::SplitTextInWords(const spring::u8string& text, std::list<word>* 
 				break;
 
 			// inlined colorcodes
-			case ColorCodeIndicator: {
-				colorcodes->push_back(colorcode());
-				colorcode& cc = colorcodes->back();
+			case OldColorCodeIndicator:
+				if (fontHandler.disableOldColorIndicators)
+					break;
+				[[fallthrough]];
+			case OldColorCodeIndicatorEx:
+				if (fontHandler.disableOldColorIndicators)
+					break;
+				[[fallthrough]];
+			case ColorCodeIndicatorEx: [[fallthrough]];
+			case ColorCodeIndicator: [[fallthrough]];
+			case ColorResetIndicator: {
+				auto& cc = colorCodes.emplace_back();
 				cc.pos = numChar;
 
-				SkipColorCodes(text, &pos, &(cc.color));
-
-				if (pos < 0) {
-					pos = length;
-				} else {
-					// SkipColorCodes jumps 1 too far (it jumps on the first non
-					// colorcode char, but our for-loop will still do "pos++;")
-					pos--;
-				}
-			} break;
-			case ColorResetIndicator: {
-				if (!colorcodes->empty()) {
-					colorcode* cc = &colorcodes->back();
-
-					if (cc->pos != numChar) {
-						colorcodes->push_back(colorcode());
-						cc = &colorcodes->back();
-						cc->pos = numChar;
-					}
-
-					cc->resetColor = true;
-				}
+				// -1 so for loop can "pos++"
+				pos = SkipColorCodes(text, pos, &cc.colorText) - 1;
 			} break;
 
 			// newlines
-			case 0x0d: // CR+LF
-				pos += (pos + 1 < length && text[pos+1] == 0x0a);
-			case 0x0a: // LF
+			case CR: // CR+LF
+				pos += (pos + 1 < length && text[pos+1] == LF);
+				[[fallthrough]];
+			case LF: // LF
 				if (w->isSpace) {
 					w->width = spaceAdvance * w->numSpaces;
 				} else if (!w->isLineBreak) {
@@ -511,11 +537,13 @@ void CTextWrap::SplitTextInWords(const spring::u8string& text, std::list<word>* 
 }
 
 
-void CTextWrap::RemergeColorCodes(std::list<word>* words, std::list<colorcode>& colorcodes) const
+void CTextWrap::RemergeColorCodes(std::list<word>* words, const std::list<ColorCode>& colorCodes) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto wi = words->begin();
 	auto wi2 = words->begin();
-	for (auto& c: colorcodes) {
+
+	for (const auto& c: colorCodes) {
 		while(wi != words->end() && wi->pos <= c.pos) {
 			wi2 = wi;
 			++wi;
@@ -560,6 +588,7 @@ void CTextWrap::RemergeColorCodes(std::list<word>* words, std::list<colorcode>& 
 
 int CTextWrap::WrapInPlace(spring::u8string& text, float _fontSize, float maxWidth, float maxHeight)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// TODO make an option to insert '-' for word wrappings (and perhaps try to syllabificate)
 
 	if (_fontSize <= 0.0f)
@@ -574,12 +603,12 @@ int CTextWrap::WrapInPlace(spring::u8string& text, float _fontSize, float maxWid
 	constexpr size_t numSpaceStrings = sizeof(spaceStringTable) / sizeof(spaceStringTable[0]);
 
 	std::list<word> words;
-	std::list<colorcode> colorcodes;
+	std::list<ColorCode> colorCodes;
 
-	SplitTextInWords(text, &words, &colorcodes);
+	SplitTextInWords(text, &words, colorCodes);
 	WrapTextConsole(words, maxWidthf, maxHeightf);
 	//WrapTextKnuth(&lines, words, maxWidthf, maxHeightf);
-	RemergeColorCodes(&words, colorcodes);
+	RemergeColorCodes(&words, colorCodes);
 
 	// create the wrapped string
 	text.clear();
@@ -612,6 +641,7 @@ int CTextWrap::WrapInPlace(spring::u8string& text, float _fontSize, float maxWid
 
 spring::u8string CTextWrap::Wrap(const spring::u8string& text, float _fontSize, float maxWidth, float maxHeight)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	spring::u8string out(text);
 	WrapInPlace(out, _fontSize, maxWidth, maxHeight);
 	return out;

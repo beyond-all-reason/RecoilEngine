@@ -4,6 +4,7 @@
 #define FLOAT4_H
 
 #include "System/float3.h"
+#include "System/SpringHash.h"
 #include "System/creg/creg_cond.h"
 
 /** Float3 with a fourth data member, which is basically unused but required
@@ -27,12 +28,16 @@ struct float4 : public float3
 	constexpr float4(const float* f): float3(f[0], f[1], f[2]), w(f[3]) {}
 	constexpr float4(const float x, const float y, const float z, const float w = 0.0f): float3(x, y, z), w(w) {}
 
-	float4 operator * (const float4& f) const { return {x * f.x, y * f.y, z * f.z, w * f.w}; }
-	float4 operator + (const float4& f) const { return {x + f.x, y + f.y, z + f.z, w + f.w}; }
-	float4 operator - (const float4& f) const { return {x - f.x, y - f.y, z - f.z, w - f.w}; }
+	constexpr float4 operator- () const {
+		return float4(-x, -y, -z, -w);
+	}
 
-	float4 operator * (float s) const { return {x * s, y * s, z * s, w * s}; }
-	float4 operator / (float s) const { return ((*this) * (1.0f / s)); }
+	constexpr float4 operator * (const float4& f) const { return {x * f.x, y * f.y, z * f.z, w * f.w}; }
+	constexpr float4 operator + (const float4& f) const { return {x + f.x, y + f.y, z + f.z, w + f.w}; }
+	constexpr float4 operator - (const float4& f) const { return {x - f.x, y - f.y, z - f.z, w - f.w}; }
+
+	constexpr float4 operator * (float s) const { return {x * s, y * s, z * s, w * s}; }
+	constexpr float4 operator / (float s) const { return ((*this) * (1.0f / s)); }
 
 	float4& operator = (const float f[4]) {
 		x = f[0]; y = f[1];
@@ -103,9 +108,20 @@ struct float4 : public float3
 		return (x * f.x) + (y * f.y) + (z * f.z) + (w * f.w);
 	}
 
+	std::string str() const {
+		return std::format("float4({:.3f}, {:.3f}, {:.3f}, {:.3f})", x, y, z, w);
+	}
+
+
 	/// Allows implicit conversion to float* (for passing to gl functions)
 	operator const float* () const { return reinterpret_cast<const float*>(&x); }
 	operator       float* ()       { return reinterpret_cast<      float*>(&x); }
+};
+
+struct float4Hash {
+	uint32_t operator()(const float4& v) const {
+		return spring::LiteHash(&v, sizeof(v));
+	}
 };
 
 #endif /* FLOAT4_H */

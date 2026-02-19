@@ -12,6 +12,9 @@
 #include "System/ContainerUtil.h"
 #include "System/EventHandler.h"
 #include "System/StringHash.h"
+#include "System/StringUtil.h"
+
+#include "System/Misc/TracyDefs.h"
 
 std::vector<CGroupHandler> uiGroupHandlers;
 
@@ -33,6 +36,7 @@ CR_REG_METADATA(CGroupHandler, (
 
 CGroupHandler::CGroupHandler(int teamId): team(teamId)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	groups.reserve(FIRST_SPECIAL_GROUP);
 
 	for (int groupId = 0; groupId < FIRST_SPECIAL_GROUP; ++groupId) {
@@ -43,6 +47,7 @@ CGroupHandler::CGroupHandler(int teamId): team(teamId)
 
 void CGroupHandler::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	{
 		for (CGroup& g: groups) {
 			// may invoke RemoveGroup, but can not cause iterator invalidation
@@ -67,22 +72,79 @@ void CGroupHandler::Update()
 
 bool CGroupHandler::GroupCommand(int num)
 {
-	bool error;
+	/** The following behavior is considered stable and should be modified
+	 *  with care - its purpose is to maintain compatibility with games which
+	 *  still rely upon groupN unsynced command (GroupIDActionExecutor).
+	 */
 
+	RECOIL_DETAILED_TRACY_ZONE;
+	CGroup* group = GetGroup(num);
+
+	// stable equivalents of "set" and "add" commands
 	if (KeyInput::GetKeyModState(KMOD_CTRL))
-		return GroupCommand(num, (!KeyInput::GetKeyModState(KMOD_SHIFT))? "set": "add", error);
+	{
+		// holding shift emulates "add" command
+		if(!KeyInput::GetKeyModState(KMOD_SHIFT))
+			group->ClearUnits();
 
-	if (KeyInput::GetKeyModState(KMOD_SHIFT))
-		return GroupCommand(num, "selectadd", error);
+		for (const int unitID: selectedUnitsHandler.selectedUnits) {
+			CUnit* u = unitHandler.GetUnit(unitID);
 
-	if (KeyInput::GetKeyModState(KMOD_ALT))
-		return GroupCommand(num, "selecttoggle", error);
+			if (u == nullptr) {
+				assert(false);
+				continue;
+			}
 
-	return GroupCommand(num, "", error);
+			// change group, but do not call SUH::AddUnit while iterating
+			u->SetGroup(group, false, false);
+		}
+	}
+	// stable equivalent of "selectadd" command
+	else if (KeyInput::GetKeyModState(KMOD_SHIFT))
+	{
+		// do not select the group, just add its members to the current selection
+		for (const int unitID: group->units) {
+			selectedUnitsHandler.AddUnit(unitHandler.GetUnit(unitID));
+		}
+
+		return true;
+	}
+	// stable equivalent of "selecttoggle" command
+	else if (KeyInput::GetKeyModState(KMOD_ALT))
+	{
+		// do not select the group, just toggle its members with the current selection
+		const auto& selUnits = selectedUnitsHandler.selectedUnits;
+
+		for (const int unitID: group->units) {
+			CUnit* unit = unitHandler.GetUnit(unitID);
+
+			if (selUnits.find(unitID) == selUnits.end()) {
+				selectedUnitsHandler.AddUnit(unit);
+			} else {
+				selectedUnitsHandler.RemoveUnit(unit);
+			}
+		}
+
+		return true;
+	}
+
+	// select or focus group, depending on whether it's already selected
+
+	if (group->units.empty())
+		return false;
+
+	if (selectedUnitsHandler.IsGroupSelected(num)) {
+		camHandler->CameraTransition(0.5f);
+		camHandler->GetCurrentController().SetPos(group->CalculateCenter());
+	}
+
+	selectedUnitsHandler.SelectGroup(num);
+	return true;
 }
 
-bool CGroupHandler::GroupCommand(int num, const std::string& cmd, bool& error)
+bool CGroupHandler::GroupCommand(int num, const std::string& cmd, const std::vector<std::string>& extraArgs, bool& error)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	error = false;
 	CGroup* group = GetGroup(num);
 
@@ -103,6 +165,10 @@ bool CGroupHandler::GroupCommand(int num, const std::string& cmd, bool& error)
 				// change group, but do not call SUH::AddUnit while iterating
 				u->SetGroup(group, false, false);
 			}
+
+			// if adding to group, do not proceed to select/focus logic
+			if(cmd[0] == 'a')
+				return !group->units.empty();
 		} break;
 
 		case hashString("select"): {
@@ -118,7 +184,16 @@ bool CGroupHandler::GroupCommand(int num, const std::string& cmd, bool& error)
 			if (group->units.empty())
 				return false;
 
-			camHandler->CameraTransition(0.5f);
+			float smoothness = 0.5f;
+			// check for optional camera smoothness argument
+			if (extraArgs.size() > 0) {
+				smoothness = StringToFloat(extraArgs[0].c_str(), &error);
+				error |= !(smoothness >= 0.0f); // reject < 0 and NaN
+				if (error)
+					return false;
+			}
+
+			camHandler->CameraTransition(smoothness);
 			camHandler->GetCurrentController().SetPos(group->CalculateCenter());
 
 			return true;
@@ -182,6 +257,7 @@ bool CGroupHandler::GroupCommand(int num, const std::string& cmd, bool& error)
 
 CGroup* CGroupHandler::CreateNewGroup()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (freeGroups.empty()) {
 		groups.emplace_back(firstUnusedGroup++, team);
 		return &groups[groups.size() - 1];
@@ -192,6 +268,7 @@ CGroup* CGroupHandler::CreateNewGroup()
 
 void CGroupHandler::RemoveGroup(CGroup* group)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (group->id < FIRST_SPECIAL_GROUP) {
 		LOG_L(L_WARNING, "[GroupHandler::%s] trying to remove hot-key group %i", __func__, group->id);
 		return;
@@ -206,5 +283,6 @@ void CGroupHandler::RemoveGroup(CGroup* group)
 
 void CGroupHandler::PushGroupChange(int id)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	spring::VectorInsertUnique(changedGroups, id, true);
 }

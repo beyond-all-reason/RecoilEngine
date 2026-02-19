@@ -11,6 +11,8 @@
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Weapons/WeaponDef.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CLaserProjectile, CWeaponProjectile, )
 
 CR_REG_METADATA(CLaserProjectile,(
@@ -60,6 +62,7 @@ CLaserProjectile::CLaserProjectile(const ProjectileParams& params): CWeaponProje
 
 void CLaserProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float4 oldSpeed = speed;
 
 	UpdateIntensity();
@@ -75,8 +78,18 @@ void CLaserProjectile::Update()
 }
 
 void CLaserProjectile::UpdateIntensity() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (ttl > 0) {
-		explGenHandler.GenExplosion(cegID, pos, speed, ttl, intensity, 0.0f, owner(), nullptr);
+		explGenHandler.GenExplosion(
+			cegID,
+			pos,
+			speed,
+			ttl,
+			intensity,
+			0.0f,
+			owner(),
+			ExplosionHitObject()
+		);
 		return;
 	}
 
@@ -94,6 +107,7 @@ void CLaserProjectile::UpdateIntensity() {
 }
 
 void CLaserProjectile::UpdateLength() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (speed != ZeroVector) {
 		// expand bolt to maximum length if not
 		// stopped / collided OR after hardstop
@@ -108,6 +122,7 @@ void CLaserProjectile::UpdateLength() {
 }
 
 void CLaserProjectile::UpdatePos(const float4& oldSpeed) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (luaMoveCtrl)
 		return;
 
@@ -123,6 +138,7 @@ void CLaserProjectile::UpdatePos(const float4& oldSpeed) {
 
 
 void CLaserProjectile::CollisionCommon(const float3& oldPos) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// we will fade out over some time
 	deleteMe = false;
 
@@ -141,6 +157,7 @@ void CLaserProjectile::CollisionCommon(const float3& oldPos) {
 
 void CLaserProjectile::Collision(CUnit* unit)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 oldPos = pos;
 
 	CWeaponProjectile::Collision(unit);
@@ -149,6 +166,7 @@ void CLaserProjectile::Collision(CUnit* unit)
 
 void CLaserProjectile::Collision(CFeature* feature)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 oldPos = pos;
 
 	CWeaponProjectile::Collision(feature);
@@ -157,6 +175,7 @@ void CLaserProjectile::Collision(CFeature* feature)
 
 void CLaserProjectile::Collision()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 oldPos = pos;
 
 	CWeaponProjectile::Collision();
@@ -167,12 +186,15 @@ void CLaserProjectile::Collision()
 
 void CLaserProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// dont draw if a 3d model has been defined for us
 	if (model != nullptr)
 		return;
 
 	if (!validTextures[0])
 		return;
+
+	UpdateAnimParams();
 
 	float3 dif(pos - camera->GetPos());
 	const float camDist = dif.LengthNormalize();
@@ -198,89 +220,109 @@ void CLaserProjectile::Draw()
 	const float size = weaponDef->visuals.thickness;
 	const float coresize = size * weaponDef->visuals.corethickness;
 
+	float3 clampedPrevDrawPos = drawPos - dir * curLength;
+	clampedPrevDrawPos = startPos + std::max(0.0f, dir.dot(clampedPrevDrawPos - startPos)) * dir;
+
+	const float curDrawLen = dir.dot(drawPos - clampedPrevDrawPos);
+
+	if unlikely(curDrawLen <= 0)
+		return;
+
 	if (camDist < weaponDef->visuals.lodDistance) {
-		const float3 pos2 = drawPos - (dir * curLength);
+		const float3 pos2 = drawPos - (dir * curDrawLen);
 		float texStartOffset;
 		float texEndOffset;
 		if (checkCol) { // expanding or contracting?
 			texStartOffset = 0.0f;
-			texEndOffset   = (1.0f - (curLength / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
+			texEndOffset   = (1.0f - (curDrawLen / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 		} else {
-			texStartOffset = (-1.0f + (curLength / maxLength) + ((float)stayTime * (speedf / maxLength))) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
+			texStartOffset = (-1.0f + (curDrawLen / maxLength) + ((float)stayTime * (speedf / maxLength))) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 			texEndOffset   = ((float)stayTime * (speedf / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 		}
 
 		if (validTextures[2]) {
-			AddEffectsQuad(
-				{ drawPos - (dir1 * size) - (dir2 * size),        weaponDef->visuals.texture2->xstart, weaponDef->visuals.texture2->ystart, col },
-				{ drawPos - (dir1 * size),                        midtexx,                             weaponDef->visuals.texture2->ystart, col },
-				{ drawPos + (dir1 * size),                        midtexx,                             weaponDef->visuals.texture2->yend  , col },
-				{ drawPos + (dir1 * size) - (dir2 * size),        weaponDef->visuals.texture2->xstart, weaponDef->visuals.texture2->yend  , col }
+			const auto* tex2 = weaponDef->visuals.texture2;
+			AddEffectsQuad<2>(
+				tex2->pageNum,
+				{ drawPos - (dir1 * size) - (dir2 * size),        tex2->xstart, tex2->ystart, col },
+				{ drawPos - (dir1 * size),                        midtexx,      tex2->ystart, col },
+				{ drawPos + (dir1 * size),                        midtexx,      tex2->yend  , col },
+				{ drawPos + (dir1 * size) - (dir2 * size),        tex2->xstart, tex2->yend  , col }
 			);
 
-			AddEffectsQuad(
-				{ drawPos - (dir1 * coresize) - (dir2 * coresize), weaponDef->visuals.texture2->xstart, weaponDef->visuals.texture2->ystart, col2 },
-				{ drawPos - (dir1 * coresize),                     midtexx,                             weaponDef->visuals.texture2->ystart, col2 },
-				{ drawPos + (dir1 * coresize),                     midtexx,                             weaponDef->visuals.texture2->yend  , col2 },
-				{ drawPos + (dir1 * coresize) - (dir2 * coresize), weaponDef->visuals.texture2->xstart, weaponDef->visuals.texture2->yend  , col2 }
+			AddEffectsQuad<2>(
+				tex2->pageNum,
+				{ drawPos - (dir1 * coresize) - (dir2 * coresize), tex2->xstart, tex2->ystart, col2 },
+				{ drawPos - (dir1 * coresize),                     midtexx,      tex2->ystart, col2 },
+				{ drawPos + (dir1 * coresize),                     midtexx,      tex2->yend  , col2 },
+				{ drawPos + (dir1 * coresize) - (dir2 * coresize), tex2->xstart, tex2->yend  , col2 }
 			);
 		}
 		if (validTextures[1]) {
-			AddEffectsQuad(
-				{ drawPos - (dir1 * size),     weaponDef->visuals.texture1->xstart + texStartOffset, weaponDef->visuals.texture1->ystart, col },
-				{ pos2    - (dir1 * size),     weaponDef->visuals.texture1->xend   + texEndOffset  , weaponDef->visuals.texture1->ystart, col },
-				{ pos2    + (dir1 * size),     weaponDef->visuals.texture1->xend   + texEndOffset  , weaponDef->visuals.texture1->yend  , col },
-				{ drawPos + (dir1 * size),     weaponDef->visuals.texture1->xstart + texStartOffset, weaponDef->visuals.texture1->yend  , col }
+			const auto* tex1 = weaponDef->visuals.texture1;
+			AddEffectsQuad<1>(
+				tex1->pageNum,
+				{ drawPos - (dir1 * size),     tex1->xstart + texStartOffset, tex1->ystart, col },
+				{ pos2    - (dir1 * size),     tex1->xend   + texEndOffset  , tex1->ystart, col },
+				{ pos2    + (dir1 * size),     tex1->xend   + texEndOffset  , tex1->yend  , col },
+				{ drawPos + (dir1 * size),     tex1->xstart + texStartOffset, tex1->yend  , col }
 			);
 
-			AddEffectsQuad(
-				{ drawPos - (dir1 * coresize), weaponDef->visuals.texture1->xstart + texStartOffset, weaponDef->visuals.texture1->ystart, col2 },
-				{ pos2    - (dir1 * coresize), weaponDef->visuals.texture1->xend   + texEndOffset  , weaponDef->visuals.texture1->ystart, col2 },
-				{ pos2    + (dir1 * coresize), weaponDef->visuals.texture1->xend   + texEndOffset  , weaponDef->visuals.texture1->yend  , col2 },
-				{ drawPos + (dir1 * coresize), weaponDef->visuals.texture1->xstart + texStartOffset, weaponDef->visuals.texture1->yend  , col2 }
+			AddEffectsQuad<1>(
+				tex1->pageNum,
+				{ drawPos - (dir1 * coresize), tex1->xstart + texStartOffset, tex1->ystart, col2 },
+				{ pos2    - (dir1 * coresize), tex1->xend   + texEndOffset  , tex1->ystart, col2 },
+				{ pos2    + (dir1 * coresize), tex1->xend   + texEndOffset  , tex1->yend  , col2 },
+				{ drawPos + (dir1 * coresize), tex1->xstart + texStartOffset, tex1->yend  , col2 }
 			);
 		}
 		if (validTextures[2]) {
-			AddEffectsQuad(
-				{ pos2 - (dir1 * size),                         midtexx,                           weaponDef->visuals.texture2->ystart, col },
-				{ pos2 - (dir1 * size) + (dir2 * size),         weaponDef->visuals.texture2->xend, weaponDef->visuals.texture2->ystart, col },
-				{ pos2 + (dir1 * size) + (dir2 * size),         weaponDef->visuals.texture2->xend, weaponDef->visuals.texture2->yend  , col },
-				{ pos2 + (dir1 * size),                         midtexx,                           weaponDef->visuals.texture2->yend  , col }
+			const auto* tex2 = weaponDef->visuals.texture2;
+			AddEffectsQuad<2>(
+				tex2->pageNum,
+				{ pos2 - (dir1 * size),                         midtexx,    tex2->ystart, col },
+				{ pos2 - (dir1 * size) + (dir2 * size),         tex2->xend, tex2->ystart, col },
+				{ pos2 + (dir1 * size) + (dir2 * size),         tex2->xend, tex2->yend  , col },
+				{ pos2 + (dir1 * size),                         midtexx,    tex2->yend  , col }
 			);
 
-			AddEffectsQuad(
-				{ pos2 - (dir1 * coresize),                     midtexx,                           weaponDef->visuals.texture2->ystart, col2 },
-				{ pos2 - (dir1 * coresize) + (dir2 * coresize), weaponDef->visuals.texture2->xend, weaponDef->visuals.texture2->ystart, col2 },
-				{ pos2 + (dir1 * coresize) + (dir2 * coresize), weaponDef->visuals.texture2->xend, weaponDef->visuals.texture2->yend  , col2 },
-				{ pos2 + (dir1 * coresize),                     midtexx,                           weaponDef->visuals.texture2->yend  , col2 }
+			AddEffectsQuad<2>(
+				tex2->pageNum,
+				{ pos2 - (dir1 * coresize),                     midtexx,    tex2->ystart, col2 },
+				{ pos2 - (dir1 * coresize) + (dir2 * coresize), tex2->xend, tex2->ystart, col2 },
+				{ pos2 + (dir1 * coresize) + (dir2 * coresize), tex2->xend, tex2->yend  , col2 },
+				{ pos2 + (dir1 * coresize),                     midtexx,    tex2->yend  , col2 }
 			);
 		}
 	} else {
 		const float3 pos1 = drawPos + (dir * (size * 0.5f));
-		const float3 pos2 = pos1 - (dir * (curLength + size));
+		const float3 pos2 = pos1 - (dir * (curDrawLen + size));
 		float texStartOffset;
 		float texEndOffset;
 
 		if (checkCol) { // expanding or contracting?
 			texStartOffset = 0;
-			texEndOffset   = (1.0f - (curLength / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
+			texEndOffset   = (1.0f - (curDrawLen / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 		} else {
-			texStartOffset = (-1.0f + (curLength / maxLength) + ((float)stayTime * (speedf / maxLength))) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
+			texStartOffset = (-1.0f + (curDrawLen / maxLength) + ((float)stayTime * (speedf / maxLength))) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 			texEndOffset   = ((float)stayTime * (speedf / maxLength)) * (weaponDef->visuals.texture1->xstart - weaponDef->visuals.texture1->xend);
 		}
 		if (validTextures[1]) {
-			AddEffectsQuad(
-				{ pos1 - (dir1 * size),     weaponDef->visuals.texture1->xstart + texStartOffset, weaponDef->visuals.texture1->ystart, col },
-				{ pos2 - (dir1 * size),     weaponDef->visuals.texture1->xend +     texEndOffset, weaponDef->visuals.texture1->ystart, col },
-				{ pos2 + (dir1 * size),     weaponDef->visuals.texture1->xend +     texEndOffset, weaponDef->visuals.texture1->yend  , col },
-				{ pos1 + (dir1 * size),     weaponDef->visuals.texture1->xstart + texStartOffset, weaponDef->visuals.texture1->yend  , col }
+			const auto* tex1 = weaponDef->visuals.texture1;
+			AddEffectsQuad<1>(
+				tex1->pageNum,
+				{ pos1 - (dir1 * size),     tex1->xstart + texStartOffset, tex1->ystart, col },
+				{ pos2 - (dir1 * size),     tex1->xend +     texEndOffset, tex1->ystart, col },
+				{ pos2 + (dir1 * size),     tex1->xend +     texEndOffset, tex1->yend  , col },
+				{ pos1 + (dir1 * size),     tex1->xstart + texStartOffset, tex1->yend  , col }
 			);
 
-			AddEffectsQuad(
-				{ pos1 - (dir1 * coresize), weaponDef->visuals.texture1->xstart + texStartOffset, weaponDef->visuals.texture1->ystart, col2 },
-				{ pos2 - (dir1 * coresize), weaponDef->visuals.texture1->xend +     texEndOffset, weaponDef->visuals.texture1->ystart, col2 },
-				{ pos2 + (dir1 * coresize), weaponDef->visuals.texture1->xend +     texEndOffset, weaponDef->visuals.texture1->yend  , col2 },
-				{ pos1 + (dir1 * coresize), weaponDef->visuals.texture1->xstart + texStartOffset, weaponDef->visuals.texture1->yend  , col2 }
+			AddEffectsQuad<1>(
+				tex1->pageNum,
+				{ pos1 - (dir1 * coresize), tex1->xstart + texStartOffset, tex1->ystart, col2 },
+				{ pos2 - (dir1 * coresize), tex1->xend +     texEndOffset, tex1->ystart, col2 },
+				{ pos2 + (dir1 * coresize), tex1->xend +     texEndOffset, tex1->yend  , col2 },
+				{ pos1 + (dir1 * coresize), tex1->xstart + texStartOffset, tex1->yend  , col2 }
 			);
 		}
 	}
@@ -288,6 +330,7 @@ void CLaserProjectile::Draw()
 
 int CLaserProjectile::ShieldRepulse(const float3& shieldPos, float shieldForce, float shieldMaxSpeed)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (luaMoveCtrl)
 		return 0;
 
@@ -303,6 +346,7 @@ int CLaserProjectile::ShieldRepulse(const float3& shieldPos, float shieldForce, 
 
 int CLaserProjectile::GetProjectilesCount() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return
 		2 * validTextures[1] +
 		4 * validTextures[2];

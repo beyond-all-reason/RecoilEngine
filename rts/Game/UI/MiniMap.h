@@ -15,9 +15,6 @@
 
 
 class CUnit;
-namespace icon {
-	class CIconData;
-}
 
 namespace Shader {
 	struct IProgramObject;
@@ -59,8 +56,6 @@ public:
 	bool GetMinimized() const { return minimized; }
 	bool GetMaximized() const { return maximized; }
 
-	float GetRotation();
-
 	int GetPosX()  const { return curPos.x; }
 	int GetPosY()  const { return curPos.y; }
 	int GetSizeX() const { return curDim.x; }
@@ -68,7 +63,12 @@ public:
 	float GetUnitSizeX() const { return unitSizeX; }
 	float GetUnitSizeY() const { return unitSizeY; }
 
-	float GetFlipped() const { return flipped; }
+	enum RotationOptions { ROTATION_0, ROTATION_90, ROTATION_180, ROTATION_270 };
+
+	void SetRotation(RotationOptions state);
+	float GetRotation() const { return static_cast<int>(rotation) * math::HALFPI; }
+	int minimapCanFlip = 0;
+	RotationOptions GetRotationOption() const { return rotation; }
 
 	void SetSlaveMode(bool value);
 	bool GetSlaveMode() const { return slaveDrawMode; }
@@ -119,7 +119,6 @@ protected:
 
 	void DrawUnitHighlight(const CUnit* unit);
 	void DrawCircle(TypedRenderBuffer<VA_TYPE_C>& rb, const float3& pos, SColor color, float radius) const;
-	const icon::CIconData* GetUnitIcon(const CUnit* unit, float& scale) const;
 
 	void UpdateTextureCache();
 	void ResizeTextureCache();
@@ -140,7 +139,6 @@ protected:
 	float unitSizeY = 0.0f;
 	float unitSelectRadius = 0.0f;
 
-	bool minimapCanFlip = false;
 	bool aspectRatio = false;
 	bool fullProxy = false;
 	bool proxyMode = false;
@@ -153,13 +151,14 @@ protected:
 	bool mouseMove = false;
 	bool mouseResize = false;
 
-	bool flipped = false;
+	RotationOptions rotation = ROTATION_0;
 
 	bool slaveDrawMode = false;
 	bool simpleColors = false;
 
 	bool showButtons = false;
 	bool drawProjectiles = false;
+	bool drawPings = false;
 	bool useIcons = true;
 
 	bool renderToTexture = true;

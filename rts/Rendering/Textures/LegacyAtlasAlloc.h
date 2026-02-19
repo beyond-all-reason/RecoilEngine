@@ -9,9 +9,15 @@
 class CLegacyAtlasAlloc : public IAtlasAllocator
 {
 public:
-	virtual bool Allocate();
-	virtual int GetMaxMipMaps() { return 0; }
+	CLegacyAtlasAlloc() {
+		atlasSize = { 32, 32 };
+		numLevels = 1;
+	}
 
+	bool Allocate() override;
+	int GetNumTexLevels() const override;
+	int GetReqNumTexLevels() const override;
+	uint32_t GetNumPages() const override { return 1; }
 private:
 	bool IncreaseSize();
 	static bool CompareTex(const SAtlasEntry* tex1, const SAtlasEntry* tex2);

@@ -15,9 +15,22 @@ class LuaSyncedRead {
 		static void AllowGameChanges(bool value);
 
 	public: // also used with LuaParser clients
+		static int GetMapOption(lua_State* L);
 		static int GetMapOptions(lua_State* L);
+		static int GetModOption(lua_State* L);
 		static int GetModOptions(lua_State* L);
-
+		static int GetTeamLuaAI(lua_State* L);
+		static int GetTeamList(lua_State* L);
+		static int GetGaiaTeamID(lua_State* L);
+		static int GetAllyTeamList(lua_State* L);
+		static int GetPlayerList(lua_State* L);
+		static int GetTeamInfo(lua_State* L);
+		static int GetAllyTeamInfo(lua_State* L);
+		static int GetAIInfo(lua_State* L);
+		static int GetTeamAllyTeamID(lua_State* L);
+		static int AreTeamsAllied(lua_State* L);
+		static int ArePlayersAllied(lua_State* L);
+		static int GetSideData(lua_State* L);
 	private:
 		static int IsCheatingEnabled(lua_State* L);
 		static int IsGodModeEnabled(lua_State* L);
@@ -30,8 +43,6 @@ class LuaSyncedRead {
 
 		static int IsGameOver(lua_State* L);
 
-		static int GetGaiaTeamID(lua_State* L);
-
 		static int GetGameFrame(lua_State* L);
 		static int GetGameSeconds(lua_State* L);
 
@@ -43,36 +54,26 @@ class LuaSyncedRead {
 
 		static int GetHeadingFromVector(lua_State* L);
 		static int GetVectorFromHeading(lua_State* L);
-
-		static int GetSideData(lua_State* L);
+		static int GetFacingFromHeading(lua_State* L);
+		static int GetHeadingFromFacing(lua_State* L);
 
 		static int GetAllyTeamStartBox(lua_State* L);
 		static int GetTeamStartPosition(lua_State* L);
 		static int GetMapStartPositions(lua_State* L);
 
-		static int GetAllyTeamList(lua_State* L);
-		static int GetTeamList(lua_State* L);
-		static int GetPlayerList(lua_State* L);
-
 		static int GetPlayerInfo(lua_State* L); // no name for synced scripts
 		static int GetPlayerControlledUnit(lua_State* L);
 		static int GetPlayerRulesParam(lua_State* L);
 		static int GetPlayerRulesParams(lua_State* L);
-		static int GetAIInfo(lua_State* L);
 
-		static int GetTeamInfo(lua_State* L);
 		static int GetTeamResources(lua_State* L);
 		static int GetTeamUnitStats(lua_State* L);
 		static int GetTeamResourceStats(lua_State* L);
+		static int GetTeamDamageStats(lua_State* L);
 		static int GetTeamRulesParam(lua_State* L);
 		static int GetTeamRulesParams(lua_State* L);
 		static int GetTeamStatsHistory(lua_State* L);
-		static int GetTeamLuaAI(lua_State* L);
-
-		static int GetAllyTeamInfo(lua_State* L);
-		static int GetTeamAllyTeamID(lua_State* L);
-		static int AreTeamsAllied(lua_State* L);
-		static int ArePlayersAllied(lua_State* L);
+		static int GetTeamMaxUnits(lua_State* L);
 
 		static int GetAllUnits(lua_State* L);
 		static int GetTeamUnits(lua_State* L);
@@ -88,13 +89,19 @@ class LuaSyncedRead {
 		static int GetUnitsInSphere(lua_State* L);
 		static int GetUnitsInCylinder(lua_State* L);
 
+		static int GetUnitArrayCentroid(lua_State* L);
+		static int GetUnitMapCentroid(lua_State* L);
+
 		static int GetUnitNearestAlly(lua_State* L);
 		static int GetUnitNearestEnemy(lua_State* L);
 
 		static int GetFeaturesInRectangle(lua_State* L);
 		static int GetFeaturesInSphere(lua_State* L);
 		static int GetFeaturesInCylinder(lua_State* L);
+
+		static int GetAllProjectiles(lua_State* L);
 		static int GetProjectilesInRectangle(lua_State* L);
+		static int GetProjectilesInSphere(lua_State* L);
 
 		static int ValidUnitID(lua_State* L);
 		static int GetUnitTooltip(lua_State* L);
@@ -106,7 +113,10 @@ class LuaSyncedRead {
 		static int GetUnitIsDead(lua_State* L);
 		static int GetUnitIsStunned(lua_State* L);
 		static int GetUnitIsBeingBuilt(lua_State* L);
+		static int GetUnitCosts(lua_State* L);
+		static int GetUnitCostTable(lua_State* L);
 		static int GetUnitResources(lua_State* L);
+		static int GetUnitStorage(lua_State* L);
 		static int GetUnitMetalExtraction(lua_State* L);
 		static int GetUnitExperience(lua_State* L);
 		static int GetUnitStates(lua_State* L);
@@ -114,12 +124,14 @@ class LuaSyncedRead {
 		static int GetUnitIsActive(lua_State* L);
 		static int GetUnitIsCloaked(lua_State* L);
 		static int GetUnitSeismicSignature(lua_State* L);
+		static int GetUnitLeavesGhost(lua_State* L);
 		static int GetUnitSelfDTime(lua_State* L);
 		static int GetUnitStockpile(lua_State* L);
 		static int GetUnitSensorRadius(lua_State* L);
 		static int GetUnitPosErrorParams(lua_State* L);
 		static int GetUnitHeight(lua_State* L);
 		static int GetUnitRadius(lua_State* L);
+		static int GetUnitBuildeeRadius(lua_State* L);
 		static int GetUnitMass(lua_State* L);
 		static int GetUnitPosition(lua_State* L);
 		static int GetUnitBasePosition(lua_State* L);
@@ -158,13 +170,16 @@ class LuaSyncedRead {
 		static int GetUnitLastAttackedPiece(lua_State* L);
 		static int GetUnitCollisionVolumeData(lua_State* L);
 		static int GetUnitPieceCollisionVolumeData(lua_State* L);
+		static int GetUnitMoveDefID(lua_State* L);
 
 		static int GetUnitBlocking(lua_State* L);
 		static int GetUnitMoveTypeData(lua_State* L);
 
+		static int GetUnitCommandCount(lua_State* L);
 		static int GetUnitCommands(lua_State* L);
 		static int GetUnitCurrentCommand(lua_State* L);
 		static int GetFactoryCounts(lua_State* L);
+		static int GetFactoryCommandCount(lua_State* L);
 		static int GetFactoryCommands(lua_State* L);
 
 		static int GetFactoryBuggerOff(lua_State* L);
@@ -209,6 +224,8 @@ class LuaSyncedRead {
 		static int GetFeatureLastAttackedPiece(lua_State* L);
 		static int GetFeatureCollisionVolumeData(lua_State* L);
 		static int GetFeaturePieceCollisionVolumeData(lua_State* L);
+		static int GetFeatureFireTime(lua_State* L);
+		static int GetFeatureSmokeTime(lua_State* L);
 
 		static int GetFeatureRulesParam(lua_State* L);
 		static int GetFeatureRulesParams(lua_State* L);
@@ -217,10 +234,6 @@ class LuaSyncedRead {
 		static int GetProjectileDirection(lua_State* L);
 		static int GetProjectileVelocity(lua_State* L);
 		static int GetProjectileGravity(lua_State* L);
-		static int GetProjectileSpinAngle(lua_State* L); // DEPRECATED
-		static int GetProjectileSpinSpeed(lua_State* L); // DEPRECATED
-		static int GetProjectileSpinVec(lua_State* L); // DEPRECATED
-		static int GetPieceProjectileParams(lua_State* L);
 		static int GetProjectileTarget(lua_State* L);
 		static int GetProjectileIsIntercepted(lua_State* L);
 		static int GetProjectileTimeToLive(lua_State* L);
@@ -230,8 +243,12 @@ class LuaSyncedRead {
 		static int GetProjectileType(lua_State* L);
 		static int GetProjectileDefID(lua_State* L);
 		static int GetProjectileDamages(lua_State* L);
-		static int GetProjectileName(lua_State* L); // DEPRECATE ME?
+		static int GetPieceProjectileParams(lua_State* L);
+		static int GetPieceProjectileName(lua_State* L);
 
+		static int IsPosInMap(lua_State* L);
+		static int GetWaterPlaneLevel(lua_State* L);
+		static int GetWaterLevel(lua_State* L);
 		static int GetGroundHeight(lua_State* L);
 		static int GetGroundOrigHeight(lua_State* L);
 		static int GetGroundNormal(lua_State* L);
@@ -258,8 +275,10 @@ class LuaSyncedRead {
 		static int IsUnitInJammer(lua_State* L);
 		static int GetClosestValidPosition(lua_State* L);
 
+		static int GetModelRootPiece(lua_State* L);
 		static int GetModelPieceList(lua_State* L);
 		static int GetModelPieceMap(lua_State* L);
+		static int GetUnitRootPiece(lua_State* L);
 		static int GetUnitPieceMap(lua_State* L);
 		static int GetUnitPieceList(lua_State* L);
 		static int GetUnitPieceInfo(lua_State* L);
@@ -271,6 +290,7 @@ class LuaSyncedRead {
 		static int GetUnitScriptPiece(lua_State* L);
 		static int GetUnitScriptNames(lua_State* L);
 
+		static int GetFeatureRootPiece(lua_State* L);
 		static int GetFeaturePieceMap(lua_State* L);
 		static int GetFeaturePieceList(lua_State* L);
 		static int GetFeaturePieceInfo(lua_State* L);
@@ -284,7 +304,8 @@ class LuaSyncedRead {
 		static int TraceRay(lua_State* L);           //TODO: not implemented
 		static int TraceRayUnits(lua_State* L);      //TODO: not implemented
 		static int TraceRayFeatures(lua_State* L);   //TODO: not implemented
-		static int TraceRayGround(lua_State* L);     //TODO: not implemented
+		static int TraceRayGroundBetweenPositions(lua_State* L);
+		static int TraceRayGroundInDirection(lua_State* L);
 };
 
 #endif /* LUA_SYNCED_READ_H */

@@ -32,6 +32,8 @@
 #include "System/Log/ILog.h"
 #include "System/FileSystem/FileHandler.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CONFIG(int, GrassDetail).defaultValue(7).headlessValue(0).minimumValue(0).description("Sets how detailed the engine rendered grass will be on any given map.");
 
 // uses a 'synced' RNG s.t. grass turfs generated from the same
@@ -58,6 +60,7 @@ static GrassRNG grng;
 
 static float GetGrassBlockCamDist(const int x, const int y, const bool square = false)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float qx = x * GSSSQ;
 	const float qz = y * GSSSQ;
 	const float3 mid = float3(qx, CGround::GetHeightReal(qx, qz, false), qz);
@@ -67,12 +70,14 @@ static float GetGrassBlockCamDist(const int x, const int y, const bool square = 
 
 
 static const bool GrassSort(const CGrassDrawer::GrassStruct* a, const CGrassDrawer::GrassStruct* b) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float distA = GetGrassBlockCamDist((a->posX + 0.5f) * grassBlockSize, (a->posZ + 0.5f) * grassBlockSize, true);
 	const float distB = GetGrassBlockCamDist((b->posX + 0.5f) * grassBlockSize, (b->posZ + 0.5f) * grassBlockSize, true);
 	return (distA > distB);
 }
 
 static const bool GrassSortNear(const CGrassDrawer::InviewNearGrass& a, const CGrassDrawer::InviewNearGrass& b) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return (a.dist > b.dist);
 }
 
@@ -218,7 +223,7 @@ CGrassDrawer::CGrassDrawer()
 		}
 
 		// needed to create the far tex
-		if (!GLEW_EXT_framebuffer_blit) {
+		if (!GLAD_GL_EXT_framebuffer_blit) {
 			grassOff = true;
 			return;
 		}
@@ -271,6 +276,7 @@ CGrassDrawer::~CGrassDrawer()
 
 
 void CGrassDrawer::ChangeDetail(int detail) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// TODO: get rid of the magic constants
 	const int detail_lim = std::min(3, detail);
 	maxGrassDist = 800 + std::sqrt((float) detail) * 240;
@@ -291,14 +297,13 @@ void CGrassDrawer::ChangeDetail(int detail) {
 
 
 void CGrassDrawer::ConfigNotify(const std::string& key, const std::string& value) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	ChangeDetail(configHandler->GetInt("GrassDetail"));
 }
 
 
 void CGrassDrawer::LoadGrassShaders() {
-	if (!globalRendering->haveGLSL)
-		return;
-
+	RECOIL_DETAILED_TRACY_ZONE;
 	#define sh shaderHandler
 	grassShaders.resize(GRASS_PROGRAM_LAST, nullptr);
 
@@ -345,6 +350,7 @@ void CGrassDrawer::LoadGrassShaders() {
 
 
 void CGrassDrawer::EnableShader(const GrassShaderProgram type) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 windSpeed = envResHandler.GetCurrentWindVec() * mapInfo->grass.bladeWaveScale;
 
 	grassShader = grassShaders[type];
@@ -376,6 +382,7 @@ void CGrassDrawer::EnableShader(const GrassShaderProgram type) {
 
 static float3 GetTurfParams(GrassRNG& rng, const int x, const int y)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float3 result;
 	result.x = (x + rng.NextFloat()) * GSSSQ;
 	result.y = (y + rng.NextFloat()) * GSSSQ;
@@ -387,6 +394,7 @@ static float3 GetTurfParams(GrassRNG& rng, const int x, const int y)
 
 void CGrassDrawer::DrawNear(const std::vector<InviewNearGrass>& inviewGrass)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (const InviewNearGrass& g: inviewGrass) {
 		grng.Seed(g.y * mapDims.mapx / grassSquareSize + g.x);
 
@@ -413,6 +421,7 @@ void CGrassDrawer::DrawNear(const std::vector<InviewNearGrass>& inviewGrass)
 
 void CGrassDrawer::DrawBillboard(const int x, const int y, const float dist, VA_TYPE_TN* va_tn)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	GrassRNG trng; // need our own, this function may run threaded
 	trng.Seed(y * mapDims.mapx / grassSquareSize + x);
 
@@ -435,6 +444,7 @@ void CGrassDrawer::DrawBillboard(const int x, const int y, const float dist, VA_
 
 void CGrassDrawer::DrawFarBillboards(const std::vector<GrassStruct*>& inviewFarGrass)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// update far grass blocks
 	if (updateBillboards) {
 		updateBillboards = false;
@@ -487,6 +497,7 @@ void CGrassDrawer::DrawFarBillboards(const std::vector<GrassStruct*>& inviewFarG
 
 void CGrassDrawer::DrawNearBillboards(const std::vector<InviewNearGrass>& inviewNearGrass)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (farnearVA.drawIndex() == 0) {
 		auto* va_tn = farnearVA.GetTypedVertexArray<VA_TYPE_TN>(inviewNearGrass.size() * numTurfs * 4);
 
@@ -502,6 +513,7 @@ void CGrassDrawer::DrawNearBillboards(const std::vector<InviewNearGrass>& inview
 
 void CGrassDrawer::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// grass is never drawn in any special (non-opaque) pass
 	const CCamera* cam = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
 
@@ -521,10 +533,9 @@ void CGrassDrawer::Update()
 		readMap->GridVisibility(nullptr, &blockDrawer, maxGrassDist, blockMapSize);
 
 		// ATI crashes w/o an error when shadows are enabled!?
-		static const bool shaders = globalRendering->haveGLSL;
-		       const bool shadows = (shadowHandler.ShadowsLoaded() && globalRendering->amdHacks);
+       const bool shadows = (shadowHandler.ShadowsLoaded() && globalRendering->amdHacks);
 
-		if (shaders && !shadows) {
+		if (!shadows) {
 			std::sort(blockDrawer.inviewFarGrass.begin(), blockDrawer.inviewFarGrass.end(), GrassSort);
 			std::sort(blockDrawer.inviewNearGrass.begin(), blockDrawer.inviewNearGrass.end(), GrassSortNear);
 			farnearVA.Initialize();
@@ -549,6 +560,7 @@ void CGrassDrawer::Update()
 
 void CGrassDrawer::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (grassOff || !readMap->GetGrassShadingTexture())
 		return;
 
@@ -562,10 +574,9 @@ void CGrassDrawer::Draw()
 	}
 
 	// ATI crashes w/o an error when shadows are enabled!?
-	static const bool shaders = globalRendering->haveGLSL;
-	       const bool shadows = (shadowHandler.ShadowsLoaded() && globalRendering->amdHacks);
+    const bool shadows = (shadowHandler.ShadowsLoaded() && globalRendering->amdHacks);
 
-	if (shaders && !shadows && (!blockDrawer.inviewFarGrass.empty() || !blockDrawer.inviewNearGrass.empty())) {
+	if (!shadows && (!blockDrawer.inviewFarGrass.empty() || !blockDrawer.inviewNearGrass.empty())) {
 		SetupGlStateFar();
 			DrawFarBillboards(blockDrawer.inviewFarGrass);
 			DrawNearBillboards(blockDrawer.inviewNearGrass);
@@ -578,6 +589,7 @@ void CGrassDrawer::Draw()
 
 void CGrassDrawer::DrawShadow()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// Grass self-shadowing doesn't look that good atm
 /*	if (grassOff || !readMap->GetGrassShadingTexture())
 		return;
@@ -629,6 +641,7 @@ void CGrassDrawer::DrawShadow()
 
 void CGrassDrawer::SetupGlStateNear()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// bind textures
 	{
 		glActiveTextureARB(GL_TEXTURE0_ARB);
@@ -644,49 +657,19 @@ void CGrassDrawer::SetupGlStateNear()
 	}
 
 	// bind shader
-	if (globalRendering->haveGLSL) {
-		EnableShader(GRASS_PROGRAM_NEAR);
+	EnableShader(GRASS_PROGRAM_NEAR);
 
-		if (shadowHandler.ShadowsLoaded()) {
-			shadowHandler.SetupShadowTexSampler(GL_TEXTURE4);
-			glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, shadowHandler.GetColorTextureID());
-		}
-
-		glMatrixMode(GL_PROJECTION);
-			glPushMatrix();
-			glMultMatrixf(camera->GetViewMatrix());
-		glMatrixMode(GL_MODELVIEW);
-			glPushMatrix();
-			glLoadIdentity();
-	} else {
-		// FPP enable textures
-		glActiveTextureARB(GL_TEXTURE0_ARB);
-			glEnable(GL_TEXTURE_2D);
-		glActiveTextureARB(GL_TEXTURE1_ARB);
-			glEnable(GL_TEXTURE_2D);
-			glMultiTexCoord4f(GL_TEXTURE1_ARB, 1.0f,1.0f,1.0f,1.0f); // workaround a nvidia bug with TexGen
-			SetTexGen(1.0f / (mapDims.mapx * SQUARE_SIZE), 1.0f / (mapDims.mapy * SQUARE_SIZE), 0.0f, 0.0f);
-		glActiveTextureARB(GL_TEXTURE2_ARB);
-			glEnable(GL_TEXTURE_2D);
-			glMultiTexCoord4f(GL_TEXTURE2_ARB, 1.0f,1.0f,1.0f,1.0f); // workaround a nvidia bug with TexGen
-			SetTexGen(1.0f / (mapDims.pwr2mapx * SQUARE_SIZE), 1.0f / (mapDims.pwr2mapy * SQUARE_SIZE), 0.0f, 0.0f);
-			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
-			glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB_ARB, GL_PREVIOUS_ARB);
-			glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB_ARB, GL_TEXTURE);
-			glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_MODULATE);
-			glTexEnvi(GL_TEXTURE_ENV, GL_RGB_SCALE_ARB, 2);
-		if (infoTextureHandler->IsEnabled()) {
-			glActiveTextureARB(GL_TEXTURE3_ARB);
-				glEnable(GL_TEXTURE_2D);
-				glMultiTexCoord4f(GL_TEXTURE3_ARB, 1.0f,1.0f,1.0f,1.0f); // workaround a nvidia bug with TexGen
-				SetTexGen(1.0f / (mapDims.pwr2mapx * SQUARE_SIZE), 1.0f / (mapDims.pwr2mapy * SQUARE_SIZE), 0.0f, 0.0f);
-				glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_ADD_SIGNED_ARB);
-				glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_ARB, GL_MODULATE);
-				glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_ARB, GL_PREVIOUS_ARB);
-				glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_ALPHA_ARB, GL_TEXTURE);
-				glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
-		}
+	if (shadowHandler.ShadowsLoaded()) {
+		shadowHandler.SetupShadowTexSampler(GL_TEXTURE4);
+		glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, shadowHandler.GetColorTextureID());
 	}
+
+	glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glMultMatrixf(camera->GetViewMatrix());
+	glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+		glLoadIdentity();
 
 	glActiveTextureARB(GL_TEXTURE0_ARB);
 	glDisable(GL_BLEND);
@@ -699,43 +682,23 @@ void CGrassDrawer::SetupGlStateNear()
 
 void CGrassDrawer::ResetGlStateNear()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	//CBaseGroundDrawer* gd = readMap->GetGroundDrawer();
 
-	if (globalRendering->haveGLSL) {
-		grassShader->Disable();
+	grassShader->Disable();
 
-		if (shadowHandler.ShadowsLoaded()) {
-			glActiveTextureARB(GL_TEXTURE1_ARB);
-				glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_ARB, GL_NONE);
-				glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE_ARB, GL_LUMINANCE);
-			glActiveTextureARB(GL_TEXTURE0_ARB);
-		}
-
-		glMatrixMode(GL_PROJECTION);
-		glPopMatrix();
-		glMatrixMode(GL_MODELVIEW);
-		glPopMatrix();
-	} else {
+	if (shadowHandler.ShadowsLoaded()) {
 		glActiveTextureARB(GL_TEXTURE1_ARB);
-			glDisable(GL_TEXTURE_2D);
-			glDisable(GL_TEXTURE_GEN_S);
-			glDisable(GL_TEXTURE_GEN_T);
-		glActiveTextureARB(GL_TEXTURE2_ARB);
-			glDisable(GL_TEXTURE_2D);
-			glDisable(GL_TEXTURE_GEN_S);
-			glDisable(GL_TEXTURE_GEN_T);
 			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-			glTexEnvi(GL_TEXTURE_ENV, GL_RGB_SCALE_ARB, 1);
-		if (infoTextureHandler->IsEnabled()) {
-			glActiveTextureARB(GL_TEXTURE3_ARB);
-				glDisable(GL_TEXTURE_2D);
-				glDisable(GL_TEXTURE_GEN_S);
-				glDisable(GL_TEXTURE_GEN_T);
-				glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-		}
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE_ARB, GL_NONE);
+			glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE_ARB, GL_LUMINANCE);
 		glActiveTextureARB(GL_TEXTURE0_ARB);
 	}
+
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+	glMatrixMode(GL_MODELVIEW);
+	glPopMatrix();
 
 	glDisable(GL_TEXTURE_2D);
 	glEnable(GL_BLEND);
@@ -744,8 +707,7 @@ void CGrassDrawer::ResetGlStateNear()
 
 void CGrassDrawer::SetupGlStateFar()
 {
-	assert(globalRendering->haveGLSL);
-
+	RECOIL_DETAILED_TRACY_ZONE;
 	//glEnable(GL_ALPHA_TEST);
 	//glAlphaFunc(GL_GREATER, 0.01f);
 	glEnable(GL_BLEND);
@@ -781,6 +743,7 @@ void CGrassDrawer::SetupGlStateFar()
 
 void CGrassDrawer::ResetGlStateFar()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	grassShader->Disable();
 
 	glMatrixMode(GL_PROJECTION);
@@ -804,6 +767,7 @@ void CGrassDrawer::ResetGlStateFar()
 
 void CGrassDrawer::CreateGrassDispList(int listNum)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CVertexArray* va = GetVertexArray();
 	va->Initialize();
 	grng.Seed(15);
@@ -860,11 +824,12 @@ void CGrassDrawer::CreateGrassDispList(int listNum)
 
 void CGrassDrawer::CreateGrassBladeTex(unsigned char* buf)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float3 redish = float3(0.95f, 0.70f, 0.4f);
 	float3 col = mix(mapInfo->grass.color, redish, 0.1f * grng.NextFloat());
-	col.x = Clamp(col.x, 0.f, 1.f);
-	col.y = Clamp(col.y, 0.f, 1.f);
-	col.z = Clamp(col.z, 0.f, 1.f);
+	col.x = std::clamp(col.x, 0.f, 1.f);
+	col.y = std::clamp(col.y, 0.f, 1.f);
+	col.z = std::clamp(col.z, 0.f, 1.f);
 
 	SColor* img = reinterpret_cast<SColor*>(buf);
 	for (int y=0; y<64; ++y) {
@@ -878,6 +843,7 @@ void CGrassDrawer::CreateGrassBladeTex(unsigned char* buf)
 
 void CGrassDrawer::CreateFarTex()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	//TODO create normalmap, too?
 	const int sizeMod = 2;
 	const int billboardSize = 256;
@@ -892,7 +858,7 @@ void CGrassDrawer::CreateFarTex()
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glSpringTexStorage2D(GL_TEXTURE_2D, -1, GL_RGBA8, texSizeX, texSizeY);
+		RecoilTexStorage2D(GL_TEXTURE_2D, -1, GL_RGBA8, texSizeX, texSizeY);
 	}
 
 	FBO fboTex;
@@ -1017,6 +983,7 @@ void CGrassDrawer::CreateFarTex()
 
 void CGrassDrawer::ResetPos(const int grassBlockX, const int grassBlockZ)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (grassOff)
 		return;
 
@@ -1036,12 +1003,14 @@ void CGrassDrawer::ResetPos(const int grassBlockX, const int grassBlockZ)
 
 void CGrassDrawer::ResetPos(const float3& pos)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	ResetPos(pos.x / BMSSQ, pos.z / BMSSQ);
 }
 
 
 void CGrassDrawer::AddGrass(const float3& pos, const uint8_t grassValue)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (grassMap.empty())
 		return;
 
@@ -1056,6 +1025,7 @@ void CGrassDrawer::AddGrass(const float3& pos, const uint8_t grassValue)
 
 void CGrassDrawer::RemoveGrass(const float3& pos)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (grassMap.empty())
 		return;
 
@@ -1070,6 +1040,7 @@ void CGrassDrawer::RemoveGrass(const float3& pos)
 
 unsigned char CGrassDrawer::GetGrass(const float3& pos)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (grassMap.empty())
 		return -1;
 
@@ -1084,6 +1055,7 @@ unsigned char CGrassDrawer::GetGrass(const float3& pos)
 
 void CGrassDrawer::UnsyncedHeightMapUpdate(const SRectangle& rect)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (int z = rect.z1; z <= rect.z2; ++z) {
 		for (int x = rect.x1; x <= rect.x2; ++x) {
 			ResetPos(float3(x, 0.f, z));

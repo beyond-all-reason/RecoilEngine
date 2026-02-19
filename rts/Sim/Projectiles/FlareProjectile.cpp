@@ -11,6 +11,8 @@
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/Unit.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CFlareProjectile, CProjectile, )
 
 CR_REG_METADATA(CFlareProjectile, (
@@ -51,6 +53,7 @@ CFlareProjectile::CFlareProjectile(const float3& pos, const float3& speed, CUnit
 
 void CFlareProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const CUnit* owner = CProjectile::owner();
 	const UnitDef* ownerDef = (owner != nullptr)? owner->unitDef: nullptr;
 
@@ -108,6 +111,7 @@ void CFlareProjectile::Update()
 
 void CFlareProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (gs->frameNum <= activateFrame)
 		return;
 
@@ -124,14 +128,14 @@ void CFlareProjectile::Draw()
 	for (int a = 0; a < numSubProjs; ++a) {
 		const float3 interPos = subProjPos[a] + subProjVel[a] * globalRendering->timeOffset;
 
-		#define fpt projectileDrawer->flareprojectiletex
-		AddEffectsQuad(
+		const auto* fpt = projectileDrawer->flareprojectiletex;
+		AddEffectsQuad<0>(
+			fpt->pageNum,
 			{ interPos - camera->GetRight() * rad - camera->GetUp() * rad, fpt->xstart, fpt->ystart, col },
 			{ interPos + camera->GetRight() * rad - camera->GetUp() * rad, fpt->xend,   fpt->ystart, col },
 			{ interPos + camera->GetRight() * rad + camera->GetUp() * rad, fpt->xend,   fpt->yend,   col },
 			{ interPos - camera->GetRight() * rad + camera->GetUp() * rad, fpt->xstart, fpt->yend,   col }
 		);
-		#undef fpt
 	}
 }
 

@@ -7,6 +7,8 @@
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/Textures/TextureAtlas.h"
 
+#include "System/Misc/TracyDefs.h"
+
 
 CR_BIND_DERIVED(CGeoSquareProjectile, CProjectile, )
 
@@ -46,6 +48,7 @@ CGeoSquareProjectile::CGeoSquareProjectile(const float3& p1, const float3& p2, c
 
 void CGeoSquareProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	unsigned char col[4];
 	col[0] = (unsigned char) (r * a * 255);
 	col[1] = (unsigned char) (g * a * 255);
@@ -62,16 +65,19 @@ void CGeoSquareProjectile::Draw()
 	const float u = (projectileDrawer->geosquaretex->xstart + projectileDrawer->geosquaretex->xend) / 2;
 	const float v0 = projectileDrawer->geosquaretex->ystart;
 	const float v1 = projectileDrawer->geosquaretex->yend;
+	const auto& pageNum = projectileDrawer->geosquaretex->pageNum;
 
 	if (w2 != 0) {
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
+			pageNum,
 			{ p1 - dir1 * w1, u, v1, col },
 			{ p1 + dir1 * w1, u, v0, col },
 			{ p2 + dir2 * w2, u, v0, col },
 			{ p2 - dir2 * w2, u, v1, col }
 		);
 	} else {
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
+			pageNum,
 			{ p1 - dir1 * w1, u, v1,                    col },
 			{ p1 + dir1 * w1, u, v0,                    col },
 			{ p2,             u, v0 + (v1 - v0) * 0.5f, col },

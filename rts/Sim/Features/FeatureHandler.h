@@ -53,6 +53,7 @@ public:
 	CFeature* CreateWreckage(const FeatureLoadParams& params);
 	CFeature* GetFeature(unsigned int id) { return ((id < features.size())? features[id]: nullptr); }
 
+	void UpdatePreFrame();
 	void Update();
 
 	bool UpdateFeature(CFeature* feature);

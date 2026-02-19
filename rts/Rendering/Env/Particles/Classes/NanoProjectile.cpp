@@ -14,6 +14,8 @@
 #include "Sim/Projectiles/ExpGenSpawnableMemberInfo.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CNanoProjectile, CProjectile, )
 
 CR_REG_METADATA(CNanoProjectile,
@@ -31,6 +33,7 @@ CR_REG_METADATA(CNanoProjectile,
 
 CNanoProjectile::CNanoProjectile()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	deathFrame = 0;
 	color[0] = color[1] = color[2] = color[3] = 255;
 
@@ -43,6 +46,7 @@ CNanoProjectile::CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor 
 	, deathFrame(gs->frameNum + lifeTime)
 	, color(c)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	checkCol = false;
 	drawSorted = false;
 	drawRadius = 3;
@@ -60,11 +64,13 @@ CNanoProjectile::CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor 
 
 CNanoProjectile::~CNanoProjectile()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	projectileHandler.currentNanoParticles -= 1;
 }
 
 void CNanoProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	pos += speed;
 
 	deleteMe |= (gs->frameNum >= deathFrame);
@@ -72,6 +78,7 @@ void CNanoProjectile::Update()
 
 void CNanoProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	{
 		const float t = (gs->frameNum - createFrame + globalRendering->timeOffset);
 		// rotParams.y is acceleration in angle per frame^2
@@ -89,12 +96,12 @@ void CNanoProjectile::Draw()
 	};
 
 	if (math::fabs(rotVal) > 0.01f) {
-		for (auto& b : bounds)
-			b = b.rotate(rotVal, camera->GetForward());
+		float3::rotate<false>(rotVal, camera->GetForward(), bounds);
 	}
 
 	const auto* gfxt = projectileDrawer->gfxtex;
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
+		gfxt->pageNum,
 		{ drawPos + bounds[0], gfxt->xstart, gfxt->ystart, color },
 		{ drawPos + bounds[1], gfxt->xend  , gfxt->ystart, color },
 		{ drawPos + bounds[2], gfxt->xend  , gfxt->yend  , color },
@@ -102,8 +109,9 @@ void CNanoProjectile::Draw()
 	);
 }
 
-void CNanoProjectile::DrawOnMinimap()
+void CNanoProjectile::DrawOnMinimap() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	AddMiniMapVertices({ pos        , color4::green }, { pos + speed, color4::green });
 }
 
@@ -115,11 +123,12 @@ int CNanoProjectile::GetProjectilesCount() const
 
 bool CNanoProjectile::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_INT   (CNanoProjectile, deathFrame)
-	CHECK_MEMBER_INFO_SCOLOR(CNanoProjectile, color     )
+	CHECK_MEMBER_INFO_INT   (CNanoProjectile, deathFrame);
+	CHECK_MEMBER_INFO_SCOLOR(CNanoProjectile, color     );
 
 	return false;
 }

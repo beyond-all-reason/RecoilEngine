@@ -49,6 +49,7 @@ list(APPEND FILES
 	gamedata/resources_map.lua
 	gamedata/sounds.lua
 	gamedata/icontypes.lua
+	anims/cursornormal_0.bmp
 	anims/cursortime_0.png
 	anims/cursordwatch_2.png
 	anims/cursordwatch.txt
@@ -142,6 +143,7 @@ list(APPEND FILES
 	LuaIntro/Addons/main.lua
 	LuaIntro/Addons/music.lua
 	LuaIntro/Addons/bg_texture.lua
+	LuaSocket/socket.lua
 )
 
 create_base_content_archive("base" "springcontent.sdz" "${FILES}")

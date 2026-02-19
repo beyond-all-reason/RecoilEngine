@@ -21,6 +21,7 @@
 #include <chrono>
 #include <vector>
 
+#include <nowide/convert.hpp>
 
 #ifdef _MSC_VER
 #define SYMLENGTH 4096
@@ -45,12 +46,12 @@ namespace CrashHandler {
 struct StacktraceLine {
 	int type;
 
-	char modName[MAX_PATH];
+	TCHAR modName[MAX_PATH];
 	DWORD64 dwModAddr;
 #ifdef _MSC_VER
-	char fileName[MAX_PATH];
+	TCHAR fileName[MAX_PATH];
 	DWORD lineNumber;
-	char symName[SYMLENGTH];
+	TCHAR symName[SYMLENGTH];
 	DWORD64 pcOffset;
 #endif
 };
@@ -177,7 +178,7 @@ inline static void StacktraceInline(const char* threadName, LPEXCEPTION_POINTERS
 	bool glLibFound = false;
 
 	int numFrames = 0;
-	char modName[MAX_PATH];
+	TCHAR modName[MAX_PATH];
 
 	const void* initialPC;
 	const void* initialSP;
@@ -185,7 +186,7 @@ inline static void StacktraceInline(const char* threadName, LPEXCEPTION_POINTERS
 
 	ZeroMemory(&frame, sizeof(frame));
 	ZeroMemory(&context, sizeof(CONTEXT));
-	memset(modName, 0, sizeof(modName));
+	std::fill(std::begin(modName), std::end(modName), TCHAR{ 0 });
 	memset(stacktraceLines, 0, sizeof(stacktraceLines));
 	assert(logFile != nullptr);
 
@@ -290,31 +291,31 @@ inline static void StacktraceInline(const char* threadName, LPEXCEPTION_POINTERS
 		if ((dwModBase = SymGetModuleBase64(process, frame.AddrPC.Offset)) != 0) {
 			GetModuleFileName((HINSTANCE) dwModBase, modName, MAX_PATH);
 		} else {
-			strcpy(modName, "Unknown");
+			::wcscpy(modName, L"Unknown");
 		}
 
 
 		StacktraceLine& stl = stacktraceLines[numFrames++];
 
 #ifdef _MSC_VER
-		char symbuf[sizeof(SYMBOL_INFO) + SYMLENGTH];
+		char symbuf[sizeof(SYMBOL_INFOW) + SYMLENGTH];
 
-		PSYMBOL_INFO pSym = reinterpret_cast<SYMBOL_INFO*>(symbuf);
-		pSym->SizeOfStruct = sizeof(SYMBOL_INFO);
+		auto* pSym = reinterpret_cast<SYMBOL_INFOW*>(symbuf);
+		pSym->SizeOfStruct = sizeof(SYMBOL_INFOW);
 		pSym->MaxNameLen = SYMLENGTH;
 
 		// check if we have symbols, only works on VC (mingw doesn't have a compatible file format)
-		if (SymFromAddr(process, frame.AddrPC.Offset, nullptr, pSym)) {
-			IMAGEHLP_LINE64 line = {0};
+		if (SymFromAddrW(process, frame.AddrPC.Offset, nullptr, pSym)) {
+			IMAGEHLP_LINEW64 line = {};
 			line.SizeOfStruct = sizeof(line);
 
 			DWORD displacement;
-			SymGetLineFromAddr64(GetCurrentProcess(), frame.AddrPC.Offset, &displacement, &line);
+			SymGetLineFromAddrW64(GetCurrentProcess(), frame.AddrPC.Offset, &displacement, &line);
 
 			stl.type = 0;
-			strncpy(stl.fileName, line.FileName ? line.FileName : "<unknown>", MAX_PATH);
+			std::wcsncpy(stl.fileName, line.FileName ? line.FileName : L"<unknown>", MAX_PATH);
 			stl.lineNumber = line.LineNumber;
-			strncpy(stl.symName, pSym->Name, SYMLENGTH);
+			std::wcsncpy(stl.symName, pSym->Name, SYMLENGTH);
 			stl.pcOffset = frame.AddrPC.Offset;
 		} else
 #endif
@@ -322,29 +323,29 @@ inline static void StacktraceInline(const char* threadName, LPEXCEPTION_POINTERS
 			// this is the code path taken on MinGW, and MSVC if no debugging syms are found
 			// for the .exe we need the absolute address while for DLLs we need the module's
 			// internal/relative address
-			if (strstr(modName, ".exe") != nullptr) {
+			if (::wcsstr(modName, L".exe") != nullptr) {
 				dwModAddr = frame.AddrPC.Offset;
 			} else {
 				dwModAddr = frame.AddrPC.Offset - dwModBase;
 			}
 
 			stl.type = 1;
-			strncpy(stl.modName, modName, MAX_PATH);
+			std::wcsncpy(stl.modName, modName, MAX_PATH);
 			stl.dwModAddr = dwModAddr;
 		}
 
 		{
-			aiLibFound |= (strstr(modName, "SkirmishAI.dll") != nullptr);
+			aiLibFound |= (::wcsstr(modName, L"SkirmishAI.dll") != nullptr);
 		}
 		{
 			// OpenGL lib names (ATI): "atioglxx.dll" "atioglx2.dll"
-			glLibFound |= (strstr(modName, "atiogl") != nullptr);
+			glLibFound |= (::wcsstr(modName, L"atiogl") != nullptr);
 			// OpenGL lib names (Nvidia): "nvoglnt.dll" "nvoglv32.dll" "nvoglv64.dll" (last one is a guess)
-			glLibFound |= (strstr(modName, "nvogl") != nullptr);
+			glLibFound |= (::wcsstr(modName, L"nvogl") != nullptr);
 			// OpenGL lib names (Intel): "ig4dev32.dll" "ig4dev64.dll" "ig4icd32.dll"
-			glLibFound |= (strstr(modName, "ig4") != nullptr);
+			glLibFound |= (::wcsstr(modName, L"ig4") != nullptr);
 			// OpenGL lib names (Intel)
-			glLibFound |= (strstr(modName, "ig75icd32.dll") != nullptr);
+			glLibFound |= (::wcsstr(modName, L"ig75icd32.dll") != nullptr);
 		}
 	}
 
@@ -366,11 +367,11 @@ inline static void StacktraceInline(const char* threadName, LPEXCEPTION_POINTERS
 		switch (stl.type) {
 #ifdef _MSC_VER
 			case 0: {
-				LOG_RAW_LINE(logLevel, addrFmts[stl.type], i, stl.fileName, stl.lineNumber, stl.symName, stl.pcOffset);
+				LOG_RAW_LINE(logLevel, addrFmts[stl.type], i, nowide::narrow(stl.fileName).c_str(), stl.lineNumber, nowide::narrow(stl.symName).c_str(), stl.pcOffset);
 			} break;
 #endif
 			case 1: {
-				LOG_RAW_LINE(logLevel, addrFmts[stl.type], i, stl.modName, stl.dwModAddr);
+				LOG_RAW_LINE(logLevel, addrFmts[stl.type], i, nowide::narrow(stl.modName).c_str(), stl.dwModAddr);
 			} break;
 			default: {
 				assert(false);

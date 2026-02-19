@@ -23,6 +23,7 @@ public:
 	void UpdateBuild(CUnit* buildee);
 	void FinishBuild(CUnit* buildee);
 	void StopBuild();
+	bool IsCurrentBuildeeMatchingBuildQueueFront(const CCommandQueue& buildQueue) const;
 	/// @return whether the to-be-built unit is enqueued
 	unsigned int QueueBuild(const UnitDef* buildeeDef, const Command& buildCmd);
 
@@ -34,7 +35,7 @@ public:
 	/// supply the build piece to speed up
 	float3 CalcBuildPos(int buildPiece = -1);
 
-	void KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, bool showDeathSequence = true);
+	void KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID);
 	void PreInit(const UnitLoadParams& params);
 	bool ChangeTeam(int newTeam, ChangeType type);
 

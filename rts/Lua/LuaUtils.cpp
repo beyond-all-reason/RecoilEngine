@@ -9,6 +9,7 @@
 #include "LuaConfig.h"
 
 #include "Game/GameVersion.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Rendering/Models/IModelParser.h"
 #include "Sim/Projectiles/Projectile.h"
 #include "Sim/Features/Feature.h"
@@ -32,9 +33,9 @@
 	#define SCOPED_TIMER(x)
 #endif
 
+#include <tracy/TracyLua.hpp>
 
 static const int maxDepth = 16;
-int LuaUtils::exportedDataSize = 0;
 
 Json::Value LuaUtils::LuaStackDumper::root  = {};
 
@@ -179,6 +180,12 @@ int LuaUtils::CopyData(lua_State* dst, lua_State* src, int count)
 /******************************************************************************/
 /******************************************************************************/
 
+// The functions below are not used anymore for anything in the engine.
+// There are left behind here disabled for archival purposes.
+#if 0
+
+int LuaUtils::exportedDataSize = 0;
+
 static bool BackupData(LuaUtils::DataDump& d, lua_State* src, int index, int depth);
 static bool RestoreData(const LuaUtils::DataDump& d, lua_State* dst, int depth);
 static bool BackupTable(LuaUtils::DataDump& d, lua_State* src, int index, int depth);
@@ -309,6 +316,7 @@ int LuaUtils::Restore(const std::vector<LuaUtils::DataDump>& backup, lua_State* 
 	return count;
 }
 
+#endif
 
 /******************************************************************************/
 /******************************************************************************/
@@ -390,7 +398,7 @@ static void LowerKeysReal(lua_State* L, spring::unsynced_set<const void*>& check
 		lua_pushvalue(L, -2); // the key
 		lua_pushnil(L);
 		lua_rawset(L, sourceTableIdx);
-		// does the lower case key alread exist in the table?
+		// does the lower case key already exist in the table?
 		lua_pushsstring(L, lowerKey);
 		lua_rawget(L, sourceTableIdx);
 
@@ -517,32 +525,24 @@ void* LuaUtils::GetUserData(lua_State* L, int index, const string& type)
 /******************************************************************************/
 /******************************************************************************/
 
+/***
+ * @function Script.IsEngineMinVersion
+ * @param minMajorVer integer
+ * @param minMinorVer integer? (Default: `0`)
+ * @param minCommits integer? (Default: `0`)
+ * @return boolean satisfiesMin `true` if the engine version is greater or equal to the specified version, otherwise `false`.
+ */
 int LuaUtils::IsEngineMinVersion(lua_State* L)
 {
 	const int minMajorVer = luaL_checkint(L, 1);
 	const int minMinorVer = luaL_optint(L, 2, 0);
 	const int minCommits  = luaL_optint(L, 3, 0);
 
-	if (StringToInt(SpringVersion::GetMajor()) < minMajorVer) {
-		lua_pushboolean(L, false);
-		return 1;
-	}
-
-	if (StringToInt(SpringVersion::GetMajor()) == minMajorVer) {
-		if (StringToInt(SpringVersion::GetMinor()) < minMinorVer) {
-			lua_pushboolean(L, false);
-			return 1;
-		}
-
-		if (StringToInt(SpringVersion::GetCommits()) < minCommits) {
-			lua_pushboolean(L, false);
-			return 1;
-		}
-	}
-
-	lua_pushboolean(L, true);
+	lua_pushboolean(L,
+		std::tuple(StringToInt(SpringVersion::GetMajor()), StringToInt(SpringVersion::GetMinor()), StringToInt(SpringVersion::GetCommits())) >=
+		std::tie(minMajorVer, minMinorVer, minCommits)
+	);
 	return 1;
-
 }
 
 /******************************************************************************/
@@ -671,6 +671,29 @@ int LuaUtils::ParseStringVector(lua_State* L, int index, vector<string>& vec)
 	}
 }
 
+int LuaUtils::ParseFloat4Vector(lua_State* L, int index, vector<float4>& vec)
+{
+	if (!lua_istable(L, index) || lua_objlen(L,index) % 4 != 0)
+		return -1;
+
+	vec.clear();
+
+	for (int i = 0, absIdx = PosAbsLuaIndex(L, index); ; i += 4) {
+		lua_rawgeti(L, absIdx, (i + 4));
+		lua_rawgeti(L, absIdx, (i + 3));
+		lua_rawgeti(L, absIdx, (i + 2));
+		lua_rawgeti(L, absIdx, (i + 1));
+
+		if (lua_isnumber(L, -1) && lua_isnumber(L, -2) && lua_isnumber(L, -3) && lua_isnumber(L, -4)) {
+			vec.push_back(float4(lua_tofloat(L, -1), lua_tofloat(L, -2), lua_tofloat(L, -3), lua_tofloat(L, -4)));
+			lua_pop(L, 4);
+			continue;
+		}
+
+		lua_pop(L, 1);
+		return i;
+	}
+}
 
 #if !defined UNITSYNC && !defined DEDICATED && !defined BUILDING_AI
 
@@ -770,9 +793,14 @@ int LuaUtils::PushModelPath(lua_State* L, const SolidObjectDef* def)
 
 int LuaUtils::PushModelTable(lua_State* L, const SolidObjectDef* def) {
 
+	/* Note, the line below loads the model if it isn't already
+	 * preloaded, which can be slow. This is also why this subtable
+	 * doesn't contain things like model type and path that are
+	 * known without loading it - otherwise devs would sometimes
+	 * access it in the slower way without realizing it */
 	const S3DModel* model = def->LoadModel();
 
-	lua_newtable(L);
+	lua_createtable(L, 0, 10);
 
 	if (model != nullptr) {
 		// unit, or non-tree feature
@@ -800,7 +828,7 @@ int LuaUtils::PushModelTable(lua_State* L, const SolidObjectDef* def) {
 	}
 
 	HSTR_PUSH(L, "textures");
-	lua_newtable(L);
+	lua_createtable(L, 0, model != nullptr ? 2 : 0);
 
 	if (model != nullptr) {
 		LuaPushNamedString(L, "tex1", model->texs[0]);
@@ -818,7 +846,7 @@ int LuaUtils::PushModelTable(lua_State* L, const SolidObjectDef* def) {
 int LuaUtils::PushColVolTable(lua_State* L, const CollisionVolume* vol) {
 	assert(vol != nullptr);
 
-	lua_newtable(L);
+	lua_createtable(L, 0, 11);
 	switch (vol->GetVolumeType()) {
 		case CollisionVolume::COLVOL_TYPE_ELLIPSOID:
 			HSTR_PUSH_CSTRING(L, "type", "ellipsoid");
@@ -901,6 +929,23 @@ void LuaUtils::PushCommandParamsTable(lua_State* L, const Command& cmd, bool sub
 		lua_rawset(L, -3);
 }
 
+/***
+ * Full command options object for reading from a `Command`.
+ * 
+ * Note that this has extra fields `internal` and `coded` that are not supported
+ * when creating a command from Lua.
+ * 
+ * @class CommandOptions
+ * @x_helper
+ * @field coded CommandOptionBit|integer Bitmask of command options.
+ * @field alt boolean Alt key pressed.
+ * @field ctrl boolean Ctrl key pressed.
+ * @field shift boolean Shift key pressed.
+ * @field right boolean Right mouse key pressed.
+ * @field meta boolean Meta key (space) pressed.
+ * @field internal boolean
+ */
+
 void LuaUtils::PushCommandOptionsTable(lua_State* L, const Command& cmd, bool subtable)
 {
 	if (subtable)
@@ -934,6 +979,32 @@ int LuaUtils::PushUnitAndCommand(lua_State* L, const CUnit* unit, const Command&
 	return 7;
 }
 
+/***
+ * @alias CommandOptionBit
+ * | 4 # Meta (windows/mac/mod4) key.
+ * | 8 # Internal order.
+ * | 16 # Right mouse key.
+ * | 32 # Shift key.
+ * | 64 # Control key.
+ * | 128 # Alt key.
+ */
+
+/***
+ * @alias CommandOptionName
+ * | "right" # Right mouse key.
+ * | "alt" # Alt key.
+ * | "ctrl" # Control key.
+ * | "shift" # Shift key.
+ * | "meta" # Meta key (space).
+ */
+
+/***
+ * @alias CreateCommandOptions
+ * | CommandOptionName[] # An array of option names.
+ * | table<CommandOptionName, boolean> # A map of command names to booleans, considered held when `true`.
+ * | CommandOptionBit # A specific integer value for a command option.
+ * | integer # A bit mask combination of `CommandOptionBit` values. Pass `0` for no options.
+ */
 
 static bool ParseCommandOptions(
 	lua_State* L,
@@ -943,6 +1014,10 @@ static bool ParseCommandOptions(
 ) {
 	if (lua_isnumber(L, idx)) {
 		cmd.SetOpts(lua_tonumber(L, idx));
+		return true;
+	}
+
+	if (lua_isnoneornil(L, idx)) {
 		return true;
 	}
 
@@ -1022,6 +1097,21 @@ static bool ParseCommandTimeOut(
 	return true;
 }
 
+/***
+ * @alias CreateCommandParams
+ * | number[] # An array of parameters.
+ * | number # A single parameter.
+ */
+
+/** - not documented.
+ * 
+ * Supports the following params, starting from `idx`.
+ * 
+ * @param cmdID CMD|integer The command ID.
+ * @param params CreateCommandParams? Parameters for the given command.
+ * @param options CreateCommandOptions?
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
+ */
 Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
 {
 	// cmdID
@@ -1046,8 +1136,8 @@ Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
 
 				cmd.PushParam(lua_tofloat(L, -1));
 			}
-		} else {
-			luaL_error(L, "%s(): bad param (expected table or number)", caller);
+		} else if (!lua_isnoneornil(L, paramTableIdx)) {
+			luaL_error(L, "%s(): bad param (expected table, number or nil)", caller);
 		}
 	}
 
@@ -1060,6 +1150,16 @@ Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
 	return cmd;
 }
 
+/***
+ * Used when assigning multiple commands at once.
+ * 
+ * @class CreateCommand
+ * @x_helper
+ * @field [1] CMD|integer Command ID.
+ * @field [2] CreateCommandParams? Parameters for the given command.
+ * @field [3] CreateCommandOptions? Command options.
+ * @field [4] integer? Timeout.
+ */
 
 Command LuaUtils::ParseCommandTable(lua_State* L, const char* caller, int tableIdx)
 {
@@ -1090,8 +1190,8 @@ Command LuaUtils::ParseCommandTable(lua_State* L, const char* caller, int tableI
 
 				cmd.PushParam(lua_tofloat(L, -1));
 			}
-		} else {
-			luaL_error(L, "%s(): bad param (expected table or number)", caller);
+		} else if (!lua_isnil(L, -1)) {
+			luaL_error(L, "%s(): bad param (expected table, number or nil)", caller);
 		}
 
 		lua_pop(L, 1);
@@ -1132,6 +1232,25 @@ void LuaUtils::ParseCommandArray(
 	}
 }
 
+/***
+ * Facing direction represented by a string or number.
+ * 
+ * @see FacingInteger
+ * 
+ * @alias Facing
+ * | 0 # South
+ * | 1 # East
+ * | 2 # North
+ * | 3 # West
+ * | "s" # South
+ * | "e" # East
+ * | "n" # North
+ * | "w" # West
+ * | "south" # South
+ * | "east" # East
+ * | "north" # North
+ * | "west" # West
+ */
 
 int LuaUtils::ParseFacing(lua_State* L, const char* caller, int index)
 {
@@ -1142,11 +1261,10 @@ int LuaUtils::ParseFacing(lua_State* L, const char* caller, int index)
 		const char* dir = lua_tostring(L, index);
 
 		switch (dir[0]) {
-			case 'S': case 's': { return 0; } break;
-			case 'E': case 'e': { return 1; } break;
-			case 'N': case 'n': { return 2; } break;
-			case 'W': case 'w': { return 3; } break;
-			default           : {           } break;
+			case 'S': case 's': return FACING_SOUTH;
+			case 'E': case 'e': return FACING_EAST;
+			case 'N': case 'n': return FACING_NORTH;
+			case 'W': case 'w': return FACING_WEST;
 		}
 
 		luaL_error(L, "%s(): bad facing string \"%s\"", caller, dir);
@@ -1270,12 +1388,34 @@ static void LogMsg(lua_State* L, const char* logSection, int logLevel, int argIn
 }
 
 
+/***
+ * Prints values in the spring chat console. Useful for debugging.
+ * 
+ * Hint: the default print() writes to STDOUT.
+ *
+ * @function Spring.Echo
+ * @param arg any
+ * @param ... any
+ *
+ * @return nil
+ */
 int LuaUtils::Echo(lua_State* L)
 {
 	LogMsg(L, nullptr, -1, 1);
 	return 0;
 }
 
+/***
+ * @enum LOG
+ * @see Spring.Log
+ * @field DEBUG 20
+ * @field INFO 30
+ * @field NOTICE 35 Engine default.
+ * @field DEPRECATED 37
+ * @field WARNING 40
+ * @field ERROR 50
+ * @field FATAL 60
+ */
 
 bool LuaUtils::PushLogEntries(lua_State* L)
 {
@@ -1283,11 +1423,24 @@ bool LuaUtils::PushLogEntries(lua_State* L)
 	PUSH_LOG_LEVEL(DEBUG);
 	PUSH_LOG_LEVEL(INFO);
 	PUSH_LOG_LEVEL(NOTICE);
+	PUSH_LOG_LEVEL(DEPRECATED);
 	PUSH_LOG_LEVEL(WARNING);
 	PUSH_LOG_LEVEL(ERROR);
 	PUSH_LOG_LEVEL(FATAL);
 	return true;
 }
+
+/***
+ * @alias LogLevel
+ * | integer
+ * | "debug"      # LOG.DEBUG
+ * | "info"       # LOG.INFO
+ * | "notice"     # LOG.NOTICE (engine default)
+ * | "warning"    # LOG.WARNING
+ * | "deprecated" # LOG.DEPRECATED
+ * | "error"      # LOG.ERROR
+ * | "fatal"      # LOG.FATAL
+ */
 
 int LuaUtils::ParseLogLevel(lua_State* L, int index)
 {
@@ -1295,27 +1448,34 @@ int LuaUtils::ParseLogLevel(lua_State* L, int index)
 		return (lua_tonumber(L, index));
 
 	if (lua_israwstring(L, index)) {
-		switch (lua_tostring(L, index)[0]) {
-			case 'D': case 'd': { return LOG_LEVEL_DEBUG  ; } break;
-			case 'I': case 'i': { return LOG_LEVEL_INFO   ; } break;
-			case 'N': case 'n': { return LOG_LEVEL_NOTICE ; } break;
-			case 'W': case 'w': { return LOG_LEVEL_WARNING; } break;
-			case 'E': case 'e': { return LOG_LEVEL_ERROR  ; } break;
-			case 'F': case 'f': { return LOG_LEVEL_FATAL  ; } break;
-			default           : {                           } break;
+		const char* logLevel = lua_tostring(L, index);
+		switch (logLevel[0]) {
+			case 'D': case 'd': {
+				if (strlen(logLevel) > 2 && (logLevel[2] == 'P' || logLevel[2] == 'p'))
+					return LOG_LEVEL_DEPRECATED;
+				else
+					return LOG_LEVEL_DEBUG;
+			} break;
+			case 'I': case 'i': { return LOG_LEVEL_INFO        ; } break;
+			case 'N': case 'n': { return LOG_LEVEL_NOTICE      ; } break;
+			case 'W': case 'w': { return LOG_LEVEL_WARNING     ; } break;
+			case 'E': case 'e': { return LOG_LEVEL_ERROR       ; } break;
+			case 'F': case 'f': { return LOG_LEVEL_FATAL       ; } break;
+			default           : {                                } break;
 		}
 	}
 
 	return -1;
 }
 
-/*-
-	Logs a msg to the logfile / console
-	@param loglevel loglevel that will be used for the message
-	@param msg string to be logged
-	@fn Spring.Log(string logsection, int loglevel, ...)
-	@fn Spring.Log(string logsection, string loglevel, ...)
-*/
+/***
+ * Logs a message to the logfile/console.
+ * 
+ * @function Spring.Log
+ * @param section string Sets an arbitrary section. Level filtering can be applied per-section
+ * @param logLevel (LogLevel|LOG)? (Default: `"notice"`)
+ * @param ... string messages
+ */
 int LuaUtils::Log(lua_State* L)
 {
 	const int args = lua_gettop(L); // number of arguments
@@ -1380,9 +1540,9 @@ int LuaUtils::PushDebugTraceback(lua_State* L)
 
 
 
-LuaUtils::ScopedDebugTraceBack::ScopedDebugTraceBack(lua_State* _L)
-	: L(_L)
-	, errFuncIdx(PushDebugTraceback(_L))
+LuaUtils::ScopedDebugTraceBack::ScopedDebugTraceBack(lua_State* lst)
+	: L(lst)
+	, errFuncIdx(PushDebugTraceback(lst))
 {
 	assert(errFuncIdx >= 0);
 }
@@ -1409,6 +1569,25 @@ void LuaUtils::PushStringVector(lua_State* L, const vector<string>& vec)
 
 /******************************************************************************/
 /******************************************************************************/
+
+/*** Contains data about a command.
+ * 
+ * @class CommandDescription
+ * @x_helper
+ * @field id (CMD|integer)?
+ * @field type CMDTYPE?
+ * @field name string?
+ * @field action string?
+ * @field tooltip string?
+ * @field texture string?
+ * @field cursor string?
+ * @field queueing boolean?
+ * @field hidden boolean?
+ * @field disabled boolean?
+ * @field showUnique boolean?
+ * @field onlyTexture boolean?
+ * @field params string[]?
+ */
 
 void LuaUtils::PushCommandDesc(lua_State* L, const SCommandDescription& cd)
 {
@@ -1787,3 +1966,49 @@ void LuaUtils::PushAttackerInfo(lua_State* L, const CUnit* const attacker)
 	lua_pushnil(L);
 }
 #endif
+
+
+void LuaUtils::TracyRemoveAlsoExtras(char* script)
+{
+	// tracy's built-in remover; does not handle our local TracyExtra functions
+	tracy::LuaRemove(script);
+
+#ifndef TRACY_ENABLE
+	// Our extras are handled manually below, the same way Tracy does.
+	// Code is on BSD-3 licence, (c) 2017 Bartosz Taudul aka wolfpld
+
+	const auto FindEnd = [] (char *ptr) {
+		unsigned int cnt = 1;
+		while (cnt) {
+			     if (*ptr == '(') ++ cnt;
+			else if (*ptr == ')') -- cnt;
+			++ ptr;
+		}
+		return ptr;
+	};
+
+	const auto Wipe = [&script, FindEnd] (size_t offset) {
+		const auto end = FindEnd(script + offset);
+		memset(script, ' ', end - script);
+		script = end;
+	};
+
+	while (*script) {
+		if (strncmp(script, "tracy.LuaTracyPlot", 18)) {
+			++ script;
+			continue;
+		}
+
+		/* The numbers are (sub)string lengths. Perhaps there could be
+		 * system to magically generate optimal searches from a set of
+		 * strings with long common prefixes, but for now it's manual.
+		 * Keep upstreamability in mind though (that's why strcmp). */
+		if (!strncmp(script + 18, "Config(", 7))
+			Wipe(18 + 7);
+		else if (!strncmp(script + 18, "(", 1))
+			Wipe(18 + 1);
+		else
+			script += 18;
+	}
+#endif
+}

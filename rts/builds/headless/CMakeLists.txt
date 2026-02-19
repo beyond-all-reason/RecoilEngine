@@ -12,11 +12,24 @@ add_definitions(-DNO_SOUND)
 remove_definitions(-DAVI_CAPTURING)
 
 set(OpenGL_GL_PREFERENCE LEGACY)
-include_directories(${OPENAL_INCLUDE_DIR})
 
-find_package(OpenGL REQUIRED)
-find_package(SDL2 REQUIRED)
-include_directories(${SDL2_INCLUDE_DIR})
+find_package(OpenGL 3.0 REQUIRED)
+
+# NOTE(create_headless_target): We don't need to copy COMPILE_DEFINTIONS till the add_definitions are used.
+# We don't need to copy COMPILE_DEFINTIONS because the headless defines are defined at the folder level
+# and we don't want to inherit original ones
+function(create_headless_target_from targetName)
+	get_target_property(targetIncludes ${targetName} INCLUDE_DIRECTORIES)
+	get_target_property(targetSources ${targetName} SOURCES)
+
+	set(newTargetName "${targetName}Headless")
+	add_library(${newTargetName} STATIC)
+	if (targetIncludes)
+		target_include_directories(${newTargetName} PRIVATE ${targetIncludes})
+	endif()
+	target_sources(${newTargetName} PRIVATE ${targetSources})
+endfunction()
+
 
 # headlessstubs are our stubs that replace libGL, libGLU, libGLEW, libSDL (yes really!)
 list(APPEND engineHeadlessLibraries headlessStubs)
@@ -26,16 +39,29 @@ list(APPEND engineHeadlessLibraries ${engineCommonLibraries})
 #list(APPEND engineHeadlessLibraries engineaGui)
 list(APPEND engineHeadlessLibraries no-sound)
 list(APPEND engineHeadlessLibraries engineSim)
+list(APPEND engineHeadlessLibraries squish)
 list(APPEND engineHeadlessLibraries pr-downloader)
+list(APPEND engineHeadlessLibraries RmlUi::Core)
+list(APPEND engineHeadlessLibraries RmlUi::Debugger)
+list(APPEND engineHeadlessLibraries lunasvg)
 
 include_directories(${ENGINE_SRC_ROOT_DIR}/lib/assimp/include)
 include_directories(${ENGINE_SRC_ROOT_DIR}/lib/asio/include)
 include_directories(${ENGINE_SRC_ROOT_DIR}/lib/slimsig/include)
+include_directories(${ENGINE_SRC_ROOT_DIR}/lib/cereal/include)
 
-
+create_headless_target_from(Game)
+target_link_libraries(GameHeadless PRIVATE
+	Tracy::TracyClient
+	headlessStubs
+	RmlUi::Core
+	prd::jsoncpp
+	streflop
+	nowide::nowide
+)
 ### Build the executable
 add_executable(engine-headless ${engineSources} ${ENGINE_ICON})
-target_link_libraries(engine-headless no-sound ${engineHeadlessLibraries} no-sound)
+target_link_libraries(engine-headless no-sound ${engineHeadlessLibraries} GameHeadless no-sound)
 
 if    (MINGW)
 	# To enable console output/force a console window to open

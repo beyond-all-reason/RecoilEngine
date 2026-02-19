@@ -41,7 +41,7 @@
 
 #include <vector>
 
-#include <tracy/Tracy.hpp>
+#include "System/Misc/TracyDefs.h"
 
 CONFIG(int, LoadingMT)
 	.description("Experimental option to load the game in separate thread. Expect visual glitches, crashes and deadlocks")
@@ -64,6 +64,7 @@ CLoadScreen::CLoadScreen(std::string&& _mapFileName, std::string&& _modFileName,
 
 CLoadScreen::~CLoadScreen()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// Kill() must have been called first, such that the loading
 	// thread can not access singleton while its dtor is running
 	assert(!gameLoadThread.joinable());
@@ -87,6 +88,7 @@ CLoadScreen::~CLoadScreen()
 
 bool CLoadScreen::Init()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	activeController = this;
 
 	// When calling this function, mod archives have to be loaded
@@ -106,7 +108,7 @@ bool CLoadScreen::Init()
 	// Create a thread during the loading that pings the host/server, so it knows that this client is still alive/loading
 	clientNet->KeepUpdating(true);
 
-	netHeartbeatThread = std::move(spring::thread(Threading::CreateNewThread(std::bind(&CNetProtocol::UpdateLoop, clientNet))));
+	netHeartbeatThread = spring::thread(Threading::CreateNewThread(std::bind(&CNetProtocol::UpdateLoop, clientNet)));
 	game = new CGame(mapFileName, modFileName, saveFile);
 
 	CglFont::sync.SetThreadSafety(mtLoading);
@@ -114,7 +116,7 @@ bool CLoadScreen::Init()
 	if (mtLoading) {
 		try {
 			// create the game-loading thread; rebinds primary context to hidden window
-			gameLoadThread = std::move(CGameLoadThread(std::bind(&CGame::Load, game, mapFileName)));
+			gameLoadThread = CGameLoadThread(std::bind(&CGame::Load, game, mapFileName));
 
 			while (!Watchdog::HasThread(WDT_LOAD));
 		} catch (const opengl_error& gle) {
@@ -147,6 +149,7 @@ bool CLoadScreen::Init()
 
 void CLoadScreen::Kill()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (mtLoading && !gameLoadThread.joinable())
 		return;
 
@@ -171,6 +174,7 @@ void CLoadScreen::Kill()
 
 static void FinishedLoading()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (gu->globalQuit)
 		return;
 
@@ -192,6 +196,7 @@ static void FinishedLoading()
 
 void CLoadScreen::CreateDeleteInstance(std::string&& mapFileName, std::string&& modFileName, ILoadSaveHandler* saveFile)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (CreateInstance(std::move(mapFileName), std::move(modFileName), saveFile))
 		return;
 
@@ -202,6 +207,7 @@ void CLoadScreen::CreateDeleteInstance(std::string&& mapFileName, std::string&& 
 
 bool CLoadScreen::CreateInstance(std::string&& mapFileName, std::string&& modFileName, ILoadSaveHandler* saveFile)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(singleton == nullptr);
 	singleton = new CLoadScreen(std::move(mapFileName), std::move(modFileName), saveFile);
 
@@ -211,6 +217,7 @@ bool CLoadScreen::CreateInstance(std::string&& mapFileName, std::string&& modFil
 
 void CLoadScreen::DeleteInstance()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (singleton == nullptr)
 		return;
 
@@ -223,6 +230,7 @@ void CLoadScreen::DeleteInstance()
 
 void CLoadScreen::ResizeEvent()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (luaIntro != nullptr)
 		luaIntro->ViewResize();
 }
@@ -230,6 +238,7 @@ void CLoadScreen::ResizeEvent()
 
 int CLoadScreen::KeyPressed(int keyCode, int scanCode, bool isRepeat)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	//FIXME add mouse events
 	if (luaIntro != nullptr)
 		luaIntro->KeyPress(keyCode, scanCode, isRepeat);
@@ -239,6 +248,7 @@ int CLoadScreen::KeyPressed(int keyCode, int scanCode, bool isRepeat)
 
 int CLoadScreen::KeyReleased(int keyCode, int scanCode)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (luaIntro != nullptr)
 		luaIntro->KeyRelease(keyCode, scanCode);
 
@@ -278,6 +288,7 @@ bool CLoadScreen::Update()
 
 bool CLoadScreen::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// limit FPS via sleep to not lock a singlethreaded CPU from loading the game
 	if (mtLoading) {
 		const spring_time now = spring_gettime();
@@ -316,6 +327,7 @@ bool CLoadScreen::Draw()
 
 void CLoadScreen::SetLoadMessage(const std::string& text, bool replaceLast)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	spring::UnfreezeSpring(WDT_LOAD);
 
 	std::lock_guard<spring::recursive_mutex> lck(mutex);

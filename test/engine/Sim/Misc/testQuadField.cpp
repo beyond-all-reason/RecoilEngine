@@ -6,15 +6,17 @@
 #include <stdlib.h>
 #include <time.h>
 
-#define CATCH_CONFIG_MAIN
-#include "lib/catch.hpp"
+#include <catch_amalgamated.hpp>
 
 static inline float randf()
 {
 	return rand() / float(RAND_MAX);
 }
 
-
+template <typename T> T Clamp(T val, T min, T max)
+{
+	return std::min(std::max(val, min), max);
+}
 
 TEST_CASE("QuadField")
 {

@@ -13,6 +13,8 @@
 #include "System/SpringMath.h"
 #include "System/FastMath.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CCannon, CWeapon, )
 
 CR_REG_METADATA(CCannon,(
@@ -29,6 +31,7 @@ CR_REG_METADATA(CCannon,(
 
 void CCannon::Init()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	gravity = mix(mapInfo->map.gravity, -weaponDef->myGravity, weaponDef->myGravity != 0.0f);
 	highTrajectory = (weaponDef->highTrajectory == 1);
 
@@ -37,11 +40,12 @@ void CCannon::Init()
 
 void CCannon::UpdateRange(const float val)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// clamp so as to not extend range if projectile
 	// speed is too low to reach the *updated* range
 	// note: new range can be zero (!) making range
 	// and height factors irrelevant
-	rangeBoostFactor = Clamp((range = val) / GetRange2D(0.0f, 1.0f, heightBoostFactor), 0.0f, 1.0f);
+	rangeBoostFactor = std::clamp((range = val) / GetRange2D(0.0f, 1.0f, heightBoostFactor), 0.0f, 1.0f);
 
 	// magical (but working) equations with useful properties:
 	// if rangeBoostFactor == 1, then heightBoostFactor == 1
@@ -53,8 +57,9 @@ void CCannon::UpdateRange(const float val)
 }
 
 
-bool CCannon::HaveFreeLineOfFire(const float3 srcPos, const float3 tgtPos, const SWeaponTarget& trg) const
+bool CCannon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// assume we can still fire at partially submerged targets
 	if (!weaponDef->waterweapon && TargetUnderWater(tgtPos, trg))
 		return false;
@@ -62,8 +67,8 @@ bool CCannon::HaveFreeLineOfFire(const float3 srcPos, const float3 tgtPos, const
 	if (projectileSpeed == 0.0f)
 		return true;
 
-	float3 launchDir = CalcWantedDir(tgtPos - weaponMuzzlePos);
-	float3 targetVec = (tgtPos - weaponMuzzlePos) * XZVector;
+	float3 launchDir = CalcWantedDir(tgtPos - srcPos);
+	float3 targetVec = (tgtPos - srcPos) * XZVector;
 
 	if (launchDir.SqLength() == 0.0f)
 		return false;
@@ -85,7 +90,7 @@ bool CCannon::HaveFreeLineOfFire(const float3 srcPos, const float3 tgtPos, const
 	// and the prior 10.0f buffer is no longer good enough with the accurate coefficients
 	// TODO: allow this ignore distance to be set on a per-unit basis
 	const float groundDist = ((avoidFlags & Collision::NOGROUND) == 0)?
-		CGround::TrajectoryGroundCol(weaponMuzzlePos, targetVec, groundColCheckDistance, linCoeff, qdrCoeff):
+		CGround::TrajectoryGroundCol(srcPos, targetVec, groundColCheckDistance, linCoeff, qdrCoeff):
 		-1.0f;
 	const float angleSpread = (AccuracyExperience() + SprayAngleExperience()) * 0.6f * 0.9f;
 
@@ -93,38 +98,39 @@ bool CCannon::HaveFreeLineOfFire(const float3 srcPos, const float3 tgtPos, const
 		return false;
 
 	// TODO: add a forcedUserTarget mode (enabled with meta key e.g.) and skip this test accordingly
-	return (!TraceRay::TestTrajectoryCone(weaponMuzzlePos, targetVec, xzTargetDist, linCoeff, qdrCoeff, angleSpread, owner->allyteam, avoidFlags, owner));
+	return (!TraceRay::TestTrajectoryCone(srcPos, targetVec, xzTargetDist, linCoeff, qdrCoeff, angleSpread, owner->allyteam, avoidFlags, owner));
 }
 
 void CCannon::FireImpl(const bool scriptCall)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float3 targetVec = currentTargetPos - weaponMuzzlePos;
 	float3 launchDir = (targetVec.SqLength() > 4.0f) ? GetWantedDir(targetVec) : targetVec; // prevent vertical aim when emit-sfx firing the weapon
 
 	launchDir += (gsRNG.NextVector() * SprayAngleExperience() + SalvoErrorExperience());
 	launchDir.SafeNormalize();
 
-	int ttl = 0;
+	int myTtl = 0;
 	const float sqSpeed2D = launchDir.SqLength2D() * projectileSpeed * projectileSpeed;
 	const int predict = math::ceil((sqSpeed2D == 0.0f) ?
 		(-2.0f * projectileSpeed * launchDir.y / gravity):
 		math::sqrt(targetVec.SqLength2D() / sqSpeed2D));
 
-	if (weaponDef->flighttime > 0) {
-		ttl = weaponDef->flighttime;
+	if (ttl > 0) {
+		myTtl = ttl;
 	} else if (weaponDef->selfExplode) {
-		ttl = (predict + gsRNG.NextFloat() * 2.5f - 0.5f);
+		myTtl = (predict + gsRNG.NextFloat() * 2.5f - 0.5f);
 	} else if ((weaponDef->groundBounce || weaponDef->waterBounce) && weaponDef->numBounce > 0) {
-		ttl = (predict * (1 + weaponDef->numBounce * weaponDef->bounceRebound));
+		myTtl = (predict * (1 + weaponDef->numBounce * weaponDef->bounceRebound));
 	} else {
-		ttl = predict * 2;
+		myTtl = predict * 2;
 	}
 
 	ProjectileParams params = GetProjectileParams();
 	params.pos = weaponMuzzlePos;
 	params.end = currentTargetPos;
 	params.speed = launchDir * projectileSpeed;
-	params.ttl = ttl;
+	params.ttl = myTtl;
 	params.gravity = gravity;
 
 	WeaponProjectileFactory::LoadProjectile(params);
@@ -132,6 +138,7 @@ void CCannon::FireImpl(const bool scriptCall)
 
 void CCannon::SlowUpdate()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (weaponDef->highTrajectory == 2 && owner->useHighTrajectory != highTrajectory)
 		highTrajectory = owner->useHighTrajectory;
 
@@ -141,6 +148,7 @@ void CCannon::SlowUpdate()
 
 float3 CCannon::GetWantedDir(const float3& targetVec)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 tgtDif = targetVec - lastTargetVec;
 
 	// try to cache results, sacrifice some (not much too much even for a pewee) accuracy
@@ -161,6 +169,7 @@ float3 CCannon::GetWantedDir(const float3& targetVec)
 
 float3 CCannon::CalcWantedDir(const float3& targetVec) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float Dsq = targetVec.SqLength();
 	const float DFsq = targetVec.SqLength2D();
 	const float g = gravity;
@@ -208,6 +217,7 @@ float3 CCannon::CalcWantedDir(const float3& targetVec) const
 
 
 float CCannon::GetStaticRange2D(const float2& baseConsts, const float2& projConsts, const float2& boostFacts) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto CalcRange2D = [](const float3& bc, const float2& pc, const float2& bf) {
 		float heightDiff = bc.x;
 
@@ -241,7 +251,7 @@ float CCannon::GetStaticRange2D(const float2& baseConsts, const float2& projCons
 
 	// otherwise need to determine it from scratch as though calling UpdateRange
 	const float wdRangeExclBoost = CalcRange2D({0.0f, 0.7071067f, 100.0f}, projConsts, {1.0f, boostFacts.y});
-	const float wdRangeBoostFact = Clamp(baseConsts.x / wdRangeExclBoost, 0.0f, 1.0f);
+	const float wdRangeBoostFact = std::clamp(baseConsts.x / wdRangeExclBoost, 0.0f, 1.0f);
 
 	float wdHeightBoostFact = boostFacts.y;
 

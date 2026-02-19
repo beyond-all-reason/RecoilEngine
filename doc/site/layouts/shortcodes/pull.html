@@ -1,0 +1,4 @@
+{{ $num := print (.Get 0) }}
+{{ $url := printf "%spull/%s" ($.Site.Params.repo) $num }}
+
+<a href="{{ $url }}">{{ or (.Get 1) (printf "Pull #%s" $num) }}</a>

@@ -456,15 +456,16 @@ public:
 	}
 
 	void Unmap() override {
-		if (!coherent) {
-			this->Bind(); //needed for glFlushMappedBufferRange()
-			glFlushMappedBufferRange(
-				this->target,
-				(this->allocIdx * this->byteSize) + this->mapElemOffet * sizeof(T),
-				this->mapElemCount * sizeof(T)
-			);
-			this->Unbind(); //needed for glFlushMappedBufferRange()
-		}
+		if (coherent)
+			return;
+
+		this->Bind(); //needed for glFlushMappedBufferRange()
+		glFlushMappedBufferRange(
+			this->target,
+			(this->allocIdx * this->byteSize) + this->mapElemOffet * sizeof(T),
+			this->mapElemCount * sizeof(T)
+		);
+		this->Unbind(); //needed for glFlushMappedBufferRange()
 	}
 
 	uint32_t BufferElemOffset() const override {
@@ -581,13 +582,13 @@ inline std::unique_ptr<IStreamBuffer<T>> IStreamBuffer<T>::CreateInstance(IStrea
 		return CreateInstance(p);
 	}
 
-	if (GLEW_ARB_sync) {
+	if (GLAD_GL_ARB_sync) {
 		if (globalRendering->haveAMD) {
 			p.type = SB_PINNEDMEMAMD;
 			return CreateInstance(p);
 		}
 
-		if (GLEW_ARB_buffer_storage) { //core in OpenGL 4.4 or extension
+		if (GLAD_GL_ARB_buffer_storage) { //core in OpenGL 4.4 or extension
 			p.type = SB_PERSISTENTMAP;
 			return CreateInstance(p);
 		}

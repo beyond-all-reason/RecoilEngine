@@ -2,15 +2,17 @@
 
 #include "Height.h"
 #include "Map/HeightLinePalette.h"
-#include "Map/HeightMapTexture.h"
 #include "Map/ReadMap.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
+#include "Rendering/GL/SubState.h"
 #include "System/Color.h"
 #include "System/Exceptions.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/Log/ILog.h"
+
+#include "System/Misc/TracyDefs.h"
 
 
 // currently defined in HeightLinePalette.cpp
@@ -19,62 +21,53 @@
 
 
 CHeightTexture::CHeightTexture()
-: CPboInfoTexture("height")
+: CModernInfoTexture("height")
 , CEventClient("[CHeightTexture]", 271990, false)
 , needUpdate(true)
 {
 	eventHandler.AddClient(this);
 
 	texSize = int2(mapDims.mapxp1, mapDims.mapyp1);
-	texChannels = 4;
 
-	glGenTextures(1, &texture);
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glSpringTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, texSize.x, texSize.y);
+	{
+		GL::TextureCreationParams tcp{
+			.reqNumLevels = 1,
+			.wrapMirror = false,
+			.minFilter = GL_NEAREST,
+			.magFilter = GL_LINEAR
+		};
 
-	glGenTextures(1, &paletteTex);
-	glBindTexture(GL_TEXTURE_2D, paletteTex);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glSpringTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 256, 2);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, &CHeightLinePalette::paletteColored[0].r);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 1, 256, 1, GL_RGBA, GL_UNSIGNED_BYTE, &CHeightLinePalette::paletteBlackAndWhite[0].r);
-
-	if (FBO::IsSupported()) {
-		fbo.Bind();
-		fbo.AttachTexture(texture);
-		/*bool status =*/ fbo.CheckStatus("CHeightTexture");
-		FBO::Unbind();
+		texture = GL::Texture2D(texSize, GL_RGBA8, tcp, false);
+	}
+	{
+		GL::TextureCreationParams tcp{
+			.reqNumLevels = 1,
+			.minFilter = GL_NEAREST,
+			.magFilter = GL_LINEAR,
+			.wrapModes = std::array<int32_t, 3>{ GL_REPEAT, GL_CLAMP_TO_EDGE, GL_REPEAT } // R wrap unused for 2D textures
+		};
+		paletteTex = GL::Texture2D(256, 2, GL_RGBA8, tcp, false);
+		auto binding = paletteTex.ScopedBind();
+		paletteTex.UploadSubImage(CHeightLinePalette::paletteColored      , 0, 0, 256, 1);
+		paletteTex.UploadSubImage(CHeightLinePalette::paletteBlackAndWhite, 0, 1, 256, 1);
 	}
 
-	const std::string vertexCode = R"(
-		#version 120
-		varying vec2 texCoord;
-
-		void main() {
-			gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
-			gl_Position.xy = gl_Vertex.xy * 2.0 - 1.0;
-			texCoord = gl_Vertex.st;
-		}
-	)";
+	CreateFBO("CHeightTexture");
 
 	const std::string fragmentCode = R"(
-		#version 120
+		#version 130
+
 		uniform sampler2D texHeight;
 		uniform sampler2D texPalette;
 		uniform float paletteOffset;
-		varying vec2 texCoord;
+
+		in vec2 uv;
+		out vec4 fragData;
 
 		void main() {
-			float h = texture2D(texHeight, texCoord).r;
+			float h = texture(texHeight, uv).r;
 			vec2 tc = vec2(h * (8. / 256.), paletteOffset);
-			gl_FragColor = texture2D(texPalette, tc);
+			fragData = texture(texPalette, tc);
 		}
 	)";
 
@@ -103,80 +96,42 @@ CHeightTexture::CHeightTexture()
 	}
 }
 
-
-void CHeightTexture::UpdateCPU()
-{
-	const SColor* extraTexPal = CHeightLinePalette::GetData();
-	const float* heightMap = readMap->GetCornerHeightMapUnsynced();
-
-	infoTexPBO.Bind();
-	infoTexPBO.New(texSize.x * texSize.y * texChannels, GL_STREAM_DRAW);
-	auto infoTexMem = reinterpret_cast<SColor*>(infoTexPBO.MapBuffer());
-
-	for (int y = 0; y < texSize.y; ++y) {
-		for (int x = 0; x < texSize.x; ++x) {
-			const int idx = y * texSize.x + x;
-			const float height = heightMap[idx];
-			const unsigned int value = ((unsigned int)(height * 8.0f)) % 255;
-			infoTexMem[idx] = extraTexPal[value];
-		}
-	}
-
-	infoTexPBO.UnmapBuffer();
-	glBindTexture(GL_TEXTURE_2D, texture);
-	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, texSize.x, texSize.y, GL_RGBA, GL_UNSIGNED_BYTE, infoTexPBO.GetPtr());
-	infoTexPBO.Invalidate();
-	infoTexPBO.Unbind();
-}
-
-
 CHeightTexture::~CHeightTexture()
 {
-	glDeleteTextures(1, &paletteTex);
+	RECOIL_DETAILED_TRACY_ZONE;
 	shaderHandler->ReleaseProgramObject("[CHeightTexture]", "CHeightTexture");
 }
 
 
 void CHeightTexture::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	needUpdate = false;
 
-	if (!fbo.IsValid() || !shader->IsValid() || (heightMapTexture->GetTextureID() == 0))
-		return UpdateCPU();
+	const auto hmTexID = readMap->GetHeightMapTexture();
 
-	fbo.Bind();
-	glViewport(0,0, texSize.x, texSize.y);
-	shader->Enable();
-	glDisable(GL_BLEND);
-	glActiveTexture(GL_TEXTURE1);
-	glEnable(GL_TEXTURE_2D);
-	glBindTexture(GL_TEXTURE_2D, paletteTex);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, heightMapTexture->GetTextureID());
-	glBegin(GL_QUADS);
-		glVertex2f(0.f, 0.f);
-		glVertex2f(0.f, 1.f);
-		glVertex2f(1.f, 1.f);
-		glVertex2f(1.f, 0.f);
-	glEnd();
-	shader->Disable();
-	globalRendering->LoadViewport();
-	FBO::Unbind();
+	using namespace GL::State;
+	auto state = GL::SubState(
+		Blending(GL_FALSE)
+	);
+	auto binding = paletteTex.ScopedBind(1);
 
-	// cleanup
-	glActiveTexture(GL_TEXTURE1);
-	glDisable(GL_TEXTURE_2D);
 	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, hmTexID);
+
+	RunFullScreenPass();
 }
 
 
 void CHeightTexture::UnsyncedHeightMapUpdate(const SRectangle& rect)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	needUpdate = true;
 }
 
 
 bool CHeightTexture::IsUpdateNeeded()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return needUpdate;
 }

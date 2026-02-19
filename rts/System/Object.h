@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <functional>
+#include <type_traits>
 #include <vector>
 
 #include "ObjectDependenceTypes.h"
@@ -59,7 +60,7 @@ public:
 			WEAPON=(1<<WEAPON_BIT),
 				DGUNWEAPON,BEAMLASER
 	};
-	// Must also set objType in the contstructors of all classes that need to use this feature
+	// Must also set objType in the constructors of all classes that need to use this feature
 	unsigned objType;
 #define INSTANCE_OF_SUBCLASS_OF(type,obj) ((obj->objType & kind) == kind) // exact class or any subclass of it
 #define INSTANCE_OF(type,obj) (obj->objType == type) // exact class only, saves one instruction yay :)
@@ -125,8 +126,8 @@ protected:
 	template<size_t N> void FilterListening(const TObjFilterPred& fp, std::array<int, N>& ids) const { FilterDepObjects(listening, fp, ids); }
 
 protected:
-	spring::unordered_map<int, size_t> listenersDepTbl; // maps dependence-type to index into listeners
-	spring::unordered_map<int, size_t> listeningDepTbl; // maps dependence-type to index into listening
+	spring::unordered_map<std::underlying_type_t<DependenceType>, size_t> listenersDepTbl; // maps dependence-type to index into listeners
+	spring::unordered_map<std::underlying_type_t<DependenceType>, size_t> listeningDepTbl; // maps dependence-type to index into listening
 
 	TDependenceMap listeners;
 	TDependenceMap listening;

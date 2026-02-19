@@ -1,0 +1,51 @@
+name: Check Lua library
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - rts/Lua/**
+      - rts/Rml/SolLua/**/*.cpp
+      - doc/site/mise.toml
+  push:
+    branches:
+      - master
+    paths:
+      - rts/Lua/**
+      - rts/Rml/SolLua/**/*.cpp
+      - doc/site/mise.toml
+env:
+  RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
+  LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
+  LUA_DOC_EXTRACTOR_VERSION: "3"
+  LUA_LANGUAGE_SERVER_VERSION: "3.15.0"
+jobs:
+  check-library:
+    name: Check library
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Lua CPP files
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            rts/Lua
+            rts/Rml/SolLua
+            doc/site/mise.toml
+
+      - uses: jdx/mise-action@v2
+        with:
+          working_directory: ./doc/site
+          mise_toml: |
+            [tools]
+            lua-language-server = "{{env.LUA_LANGUAGE_SERVER_VERSION}}"
+            "npm:lua-doc-extractor" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
+
+      - name: Run lua-language-server --check
+        working-directory: ./doc/site
+        run: mise run lua_check
+
+      - name: Upload Lua Library artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{github.run_id}}-library
+          path: ${{env.RECOIL_LUA_LIBRARY_DIR}}

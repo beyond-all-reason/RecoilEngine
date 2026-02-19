@@ -21,7 +21,6 @@ public:
 	virtual void UpdateSkyTexture() = 0;
 
 	virtual void Draw() = 0;
-	virtual void DrawSun() = 0;
 
 	virtual void SetLuaTexture(const MapTextureData& td) {}
 
@@ -45,10 +44,17 @@ public:
 	 */
 	void SetupFog();
 
+	bool IsUpdated() {
+		return std::exchange(updated, false);
+	}
+	void SetUpdated() { updated = true; }
 public:
 	static void SetSky();
 	static auto& GetSky() { return sky; }
 	static void KillSky() { sky = nullptr; }
+public:
+	void SetSkyAxisAngle(const float4& skyAxisAngleRaw);
+	const float4& GetSkyAxisAngle() const { return skyAxisAngle; }
 public:
 	float3 skyColor;
 	float3 sunColor;
@@ -58,13 +64,16 @@ public:
 	float fogStart;
 	float fogEnd;
 	float cloudDensity;
-
 protected:
-	static inline std::unique_ptr<ISky> sky = nullptr;
+	float4 skyAxisAngle;
+protected:
+	static std::unique_ptr<ISky> sky;
 
 	ISkyLight* skyLight;
 
 	bool wireFrameMode;
+private:
+	bool updated;
 };
 
 #endif // I_SKY_H

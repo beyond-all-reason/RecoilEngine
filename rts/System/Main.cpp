@@ -15,6 +15,8 @@
 #include "System/Platform/Misc.h"
 #include "System/Log/ILog.h"
 
+#include <nowide/args.hpp>
+
 #include <clocale>
 #include <cstdlib>
 #include <cstdint>
@@ -37,14 +39,15 @@ int Run(int argc, char* argv[])
 		stack_end = (void*) &here;
 	}
 #endif
-
 	// already the default, but be explicit for locale-dependent functions (atof,strtof,...)
 	setlocale(LC_ALL, "C");
 
 	Threading::DetectCores();
 	Threading::SetMainThread();
 
+	LOG("%s: thread affinity %x", __func__, Threading::GetAffinity());
 	SpringApp app(argc, argv);
+	LOG("%s: thread affinity %x", __func__, Threading::GetAffinity());
 	return (app.Run());
 }
 
@@ -79,6 +82,8 @@ static bool SetNvOptimusProfile(const std::string& processFileName)
  */
 int main(int argc, char* argv[])
 {
+	nowide::args a(argc, argv); // Fix arguments - make them UTF-8
+
 // PROFILE builds exit on execv, HEADLESS does not use the GPU
 #if !defined(PROFILE) && !defined(HEADLESS)
 #define MAX_ARGS 32

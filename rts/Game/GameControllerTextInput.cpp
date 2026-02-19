@@ -20,6 +20,8 @@
 #include "System/Log/ILog.h"
 #include "System/Platform/Clipboard.h"
 
+#include "System/Misc/TracyDefs.h"
+
 static constexpr float4 const  defColor(1.0f, 1.0f, 1.0f, 1.0f);
 static constexpr float4 const allyColor(0.5f, 1.0f, 0.5f, 1.0f);
 static constexpr float4 const specColor(1.0f, 1.0f, 0.5f, 1.0f);
@@ -27,6 +29,7 @@ static constexpr float4 const specColor(1.0f, 1.0f, 0.5f, 1.0f);
 GameControllerTextInput gameTextInput;
 
 void GameControllerTextInput::ViewResize() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// inputTextSizeX and inputTextSizeY aren't actually used by anything
 	// so we assume those values are bad, and we could simply ignore the X component
 	// that said, the width of the SDL TextInputRect doesn't seem to matter either, as
@@ -41,6 +44,7 @@ void GameControllerTextInput::ViewResize() {
 }
 
 void GameControllerTextInput::Draw() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!userWriting)
 		return;
 
@@ -96,12 +100,13 @@ void GameControllerTextInput::Draw() {
 
 
 int GameControllerTextInput::SetInputText(const std::string& utf8Text) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!userWriting)
 		return 0;
 
 	const std::string text = ignoreNextChar ? utf8Text.substr(utf8::NextChar(utf8Text, 0)) : utf8Text;
 
-	userInput.insert(writingPos = Clamp<int>(writingPos, 0, userInput.length()), text);
+	userInput.insert(writingPos = std::clamp <int> (writingPos, 0, userInput.length()), text);
 	editText = "";
 
 	writingPos += text.length();
@@ -111,6 +116,7 @@ int GameControllerTextInput::SetInputText(const std::string& utf8Text) {
 
 
 bool GameControllerTextInput::SendPromptInput() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (userWriting)
 		return false;
 	if (!userChatting)
@@ -131,6 +137,7 @@ bool GameControllerTextInput::SendPromptInput() {
 }
 
 bool GameControllerTextInput::SendLabelInput() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (userWriting)
 		return false;
 
@@ -146,6 +153,7 @@ bool GameControllerTextInput::SendLabelInput() {
 
 
 void GameControllerTextInput::PasteClipboard() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const CClipboard clipboard;
 	const std::string text = clipboard.GetContents();
 
@@ -154,7 +162,8 @@ void GameControllerTextInput::PasteClipboard() {
 }
 
 
-bool GameControllerTextInput::HandleChatCommand(int key, const std::string& command) {
+bool GameControllerTextInput::HandleChatCommand(const std::string& command) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	switch (hashString(command.c_str())) {
 		case hashString("chatswitchall"): {
 			if ((userInput.find_first_of("aAsS") == 0) && (userInput[1] == ':')) {
@@ -213,7 +222,7 @@ bool GameControllerTextInput::HandleChatCommand(int key, const std::string& comm
 
 
 // can only be called by CGame (via ConsumePressedKey)
-bool GameControllerTextInput::HandleEditCommand(int keyCode, int scanCode, const std::string& command) {
+bool GameControllerTextInput::HandleEditCommand(const std::string& command) {
 	switch (hashString(command.c_str())) {
 		case hashString("edit_return"): {
 			userWriting = false;
@@ -228,7 +237,7 @@ bool GameControllerTextInput::HandleEditCommand(int keyCode, int scanCode, const
 					cmd = userInput;
 				}
 
-				if (game->ProcessCommandText(keyCode, scanCode, cmd)) {
+				if (game->ProcessCommandText(cmd)) {
 					// execute an action
 					gameConsoleHistory.AddLine(cmd);
 					ClearInput();
@@ -362,7 +371,8 @@ bool GameControllerTextInput::HandleEditCommand(int keyCode, int scanCode, const
 }
 
 
-bool GameControllerTextInput::HandlePasteCommand(int key, const std::string& rawLine) {
+bool GameControllerTextInput::HandlePasteCommand(const std::string& rawLine) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// we cannot use extra commands because tokenization strips multiple
 	// spaces or even trailing spaces, the text should be copied verbatim
 	const std::string pastecommand = "pastetext ";
@@ -378,35 +388,38 @@ bool GameControllerTextInput::HandlePasteCommand(int key, const std::string& raw
 }
 
 bool GameControllerTextInput::CheckHandlePasteCommand(const std::string& rawLine) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!userWriting)
 		return false;
 
-	return (HandlePasteCommand(0, rawLine));
+	return (HandlePasteCommand(rawLine));
 }
 
 
-bool GameControllerTextInput::ProcessKeyPressAction(int keyCode, int scanCode, const Action& action) {
+bool GameControllerTextInput::ProcessKeyPressAction(const Action& action) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(userWriting);
 
 	if (action.command == "pastetext")
-		return (HandlePasteCommand(keyCode, action.rawline));
+		return (HandlePasteCommand(action.rawline));
 
 	if (action.command.find("edit_") == 0)
-		return (HandleEditCommand(keyCode, scanCode, action.command));
+		return (HandleEditCommand(action.command));
 
 	if (action.command.find("chatswitch") == 0)
-		return (HandleChatCommand(keyCode, action.command));
+		return (HandleChatCommand(action.command));
 
 	return false;
 }
 
 
 bool GameControllerTextInput::ConsumePressedKey(int keyCode, int scanCode, const std::vector<Action>& actions) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!userWriting)
 		return false;
 
 	for (const Action& action: actions) {
-		if (!ProcessKeyPressAction(keyCode, scanCode, action))
+		if (!ProcessKeyPressAction(action))
 			continue;
 
 		// the key was used, ignore it (ex: alt+a)
@@ -419,6 +432,7 @@ bool GameControllerTextInput::ConsumePressedKey(int keyCode, int scanCode, const
 
 
 bool GameControllerTextInput::ConsumeReleasedKey(int keyCode, int scanCode) const {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!userWriting)
 		return false;
 	if (keyCodes.IsPrintable(keyCode))

@@ -21,17 +21,10 @@
 
 namespace GL { struct GeometryBuffer; }
 template<typename T> class ScopedModelDrawerImpl;
-class ScopedMatricesMemAlloc;
+class ScopedTransformMemAlloc;
 
-enum ModelDrawerTypes {
-	MODEL_DRAWER_FFP =  0, // fixed-function path
-	MODEL_DRAWER_GLSL = 1, // standard-shader path (GLSL)
-	MODEL_DRAWER_GL4 =  2, // GL4-shader path (GLSL)
-	MODEL_DRAWER_CNT =  3
-};
 
 static constexpr const char* ModelDrawerNames[ModelDrawerTypes::MODEL_DRAWER_CNT] = {
-	"FFP : fixed-function path",
 	"GLSL: legacy standard shader path",
 	"GL4 : modern standard shader path",
 };
@@ -44,7 +37,6 @@ public:
 	static void InitStatic();
 	static void KillStatic(bool reload);
 public:
-	static bool  UseAdvShading() { return advShading; }
 	static bool  DeferredAllowed() { return deferredAllowed; }
 	static bool& WireFrameModeRef() { return wireFrameMode; }
 public:
@@ -55,10 +47,7 @@ public:
 	static GL::GeometryBuffer* GetGeometryBuffer() { return geomBuffer; }
 protected:
 	inline static bool initialized = false;
-
-	inline static bool advShading = false;
 	inline static bool wireFrameMode = false;
-
 	inline static bool deferredAllowed = false;
 protected:
 	inline static GL::LightHandler lightHandler;
@@ -93,7 +82,6 @@ public:
 	}
 public:
 	// Set/Get state from outside
-	static bool& UseAdvShadingRef() { reselectionRequested = true; return advShading; }
 	static bool& WireFrameModeRef() { return wireFrameMode; }
 
 	static int  PreferedDrawerType() { return preferedDrawerType; }
@@ -117,7 +105,7 @@ public:
 	static bool CanDrawDeferred() { return modelDrawerState->CanDrawDeferred(); }
 	static bool SetTeamColor(int team, const float alpha = 1.0f) { return modelDrawerState->SetTeamColor(team, alpha); }
 	static void SetNanoColor(const float4& color) { modelDrawerState->SetNanoColor(color); }
-	static const ScopedMatricesMemAlloc& GetMatricesMemAlloc(const ObjType* o) { return const_cast<const TDrawerData*>(modelDrawerData)->GetObjectMatricesMemAlloc(o); }
+	static const ScopedTransformMemAlloc& GetTransformMemAlloc(const ObjType* o) { return const_cast<const TDrawerData*>(modelDrawerData)->GetObjectTransformMemAlloc(o); }
 public:
 	virtual void Update() const = 0;
 	// Draw*
@@ -232,7 +220,7 @@ inline void CModelDrawerBase<TDrawerData, TDrawer>::InitStatic()
 template<typename TDrawerData, typename TDrawer>
 inline void CModelDrawerBase<TDrawerData, TDrawer>::KillStatic(bool reload)
 {
-	for (int t = ModelDrawerTypes::MODEL_DRAWER_FFP; t < ModelDrawerTypes::MODEL_DRAWER_CNT; ++t) {
+	for (int t = ModelDrawerTypes::MODEL_DRAWER_GLSL; t < ModelDrawerTypes::MODEL_DRAWER_CNT; ++t) {
 		CModelDrawerBase<TDrawerData, TDrawer>::KillInstance(t);
 	}
 
@@ -257,11 +245,6 @@ inline void CModelDrawerBase<TDrawerData, TDrawer>::SelectImplementation(bool fo
 {
 	if (!forceReselection)
 		return;
-
-	if (!advShading) {
-		SelectImplementation(ModelDrawerTypes::MODEL_DRAWER_FFP);
-		return;
-	}
 
 	const auto qualifyDrawerFunc = [legacy, modern](const TDrawer* d, const IModelDrawerState* s) -> bool {
 		if (d == nullptr || s == nullptr)
@@ -299,8 +282,8 @@ inline void CModelDrawerBase<TDrawerData, TDrawer>::SelectImplementation(bool fo
 		return;
 	}
 
-	int best = ModelDrawerTypes::MODEL_DRAWER_FFP;
-	for (int t = ModelDrawerTypes::MODEL_DRAWER_GLSL; t < ModelDrawerTypes::MODEL_DRAWER_CNT; ++t) {
+	int best = ModelDrawerTypes::MODEL_DRAWER_GLSL;
+	for (int t = ModelDrawerTypes::MODEL_DRAWER_GL4; t < ModelDrawerTypes::MODEL_DRAWER_CNT; ++t) {
 		auto d = modelDrawers[t];
 		auto s = IModelDrawerState::modelDrawerStates[t];
 		if (qualifyDrawerFunc(d, s)) {
@@ -319,7 +302,9 @@ inline void CModelDrawerBase<TDrawerData, TDrawer>::SelectImplementation(int tar
 
 	modelDrawerState = IModelDrawerState::modelDrawerStates[targetImplementation];
 	assert(modelDrawerState);
+#ifndef HEADLESS
 	assert(modelDrawerState->CanEnable());
+#endif
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////

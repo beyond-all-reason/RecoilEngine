@@ -31,7 +31,7 @@ namespace spring {
         static bool Empty() { return functions.empty(); }
         static const auto& GetQueuedFunctions() { return functions; }
     private:
-        inline static std::vector<std::unique_ptr<QueuedFunction>> functions = {};
+        static std::vector<std::unique_ptr<QueuedFunction>> functions;
     };
 
     template <typename R, typename... Args>
@@ -55,7 +55,9 @@ namespace spring {
             std::apply(storedFunc, storedArgs);
         }
     private:
-        std::tuple<std::decay_t<Args>...> storedArgs;
         FunctionType storedFunc;
+        std::tuple<std::decay_t<Args>...> storedArgs;
     };
+
+    inline std::vector<std::unique_ptr<QueuedFunction>> QueuedFunction::functions = {};
 }

@@ -1,13 +1,14 @@
 #pragma once
 
 #include "System/float4.h"
-//can't fwd-declare nested class
-#include "Rendering/Textures/S3OTextureHandler.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Textures/S3OTextureHandler.h" //can't fwd-declare nested class
+#include "Rendering/Models/3DModelDefs.hpp"
 
 
 class float3;
 class CCamera;
+struct S3DModel;
+class CSolidObject;
 
 class CModelDrawerHelper {
 public:
@@ -69,8 +70,8 @@ public:
 class CModelDrawerHelperS3O : public CModelDrawerHelper {
 public:
 	// Inherited via CModelDrawerHelper
-	void PushRenderState() const override {/* no need for primitve restart*/ };
-	void PopRenderState() const override {/* no need for primitve restart*/ };
+	void PushRenderState() const override {/* no need for primitive restart*/ };
+	void PopRenderState() const override {/* no need for primitive restart*/ };
 	void BindOpaqueTex(const CS3OTextureHandler::S3OTexMat* textureMat) const override;
 	void UnbindOpaqueTex() const override;
 	void BindShadowTex(const CS3OTextureHandler::S3OTexMat* textureMat) const override;

@@ -6,12 +6,15 @@
 #include "Rendering/Env/CubeMapHandler.h"
 #include "Rendering/LuaObjectDrawer.h"
 
+#include "System/Misc/TracyDefs.h"
+
 void CModelDrawerConcept::InitStatic()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (initialized)
 		return;
 
-	advShading = configHandler->GetBool("AdvUnitShading") && cubeMapHandler.Init();
+	cubeMapHandler.Init();
 	wireFrameMode = false;
 
 	lightHandler.Init(2U, configHandler->GetInt("MaxDynamicModelLights"));
@@ -22,7 +25,6 @@ void CModelDrawerConcept::InitStatic()
 	geomBuffer = LuaObjectDrawer::GetGeometryBuffer();
 	deferredAllowed &= geomBuffer->Valid();
 
-	IModelDrawerState::InitInstance<CModelDrawerStateFFP >(MODEL_DRAWER_FFP );
 	IModelDrawerState::InitInstance<CModelDrawerStateGLSL>(MODEL_DRAWER_GLSL);
 	IModelDrawerState::InitInstance<CModelDrawerStateGL4 >(MODEL_DRAWER_GL4 );
 
@@ -31,13 +33,14 @@ void CModelDrawerConcept::InitStatic()
 
 void CModelDrawerConcept::KillStatic(bool reload)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!initialized)
 		return;
 
 	cubeMapHandler.Free();
 	geomBuffer = nullptr;
 
-	for (int t = ModelDrawerTypes::MODEL_DRAWER_FFP; t < ModelDrawerTypes::MODEL_DRAWER_CNT; ++t) {
+	for (int t = ModelDrawerTypes::MODEL_DRAWER_GLSL; t < ModelDrawerTypes::MODEL_DRAWER_CNT; ++t) {
 		IModelDrawerState::KillInstance(t);
 	}
 

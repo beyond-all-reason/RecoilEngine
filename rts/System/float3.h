@@ -5,11 +5,14 @@
 
 #include <cassert>
 #include <array>
+#include <utility>
+#include <format>
 
 #include "System/BranchPrediction.h"
 #include "lib/streflop/streflop_cond.h"
 #include "System/creg/creg_cond.h"
 #include "System/FastMath.h"
+#include "System/type2.h"
 #ifdef _MSC_VER
 #include "System/Platform/Win/win32.h"
 #endif
@@ -333,14 +336,22 @@ public:
 
 
 	/**
-	 * @brief binary float3 equality
+	 * @brief float3 equality
 	 * @param f float3 to compare to
-	 * @return const whether the two float3 are binary same
+	 * @return const whether the two float3 are same
 	 *
 	 */
 	bool same(const float3& f) const {
 		return x == f.x && y == f.y && z == f.z;
 	}
+
+	/**
+	 * @brief binary float3 equality
+	 * @param f float3 to compare to
+	 * @return const whether the two float3 are binary same
+	 *
+	 */
+	bool binarySame(const float3& f) const;
 
 	/**
 	 * @brief dot product
@@ -384,9 +395,39 @@ public:
 				(x * f.y) - (y * f.x));
 	}
 
+	template<bool synced, typename Iterable>
+	static void rotate(float angle, const float3& axis, Iterable& iterable) {
+		static_assert(std::is_same_v<std::decay_t<decltype(*std::begin(iterable))>, float3>);
+		float ca;
+		float sa;
+		if constexpr (synced) {
+			ca = math::cos(angle);
+			sa = math::sin(angle);
+		}
+		else {
+			ca = fastmath::cos(angle);
+			sa = fastmath::sin(angle);
+		}
+
+		//Rodrigues' rotation formula
+		// https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
+		for (auto& v : iterable) {
+			v = v * ca + axis.cross(v) * sa + axis * axis.dot(v) * (1.0f - ca);
+		}
+	}
+
+	template<bool synced>
 	float3 rotate(float angle, const float3& axis) const {
-		const float ca = math::cos(angle);
-		const float sa = math::sin(angle);
+		assert(axis.Normalized());
+		float ca;
+		float sa;
+		if constexpr (synced) {
+			ca = math::cos(angle);
+			sa = math::sin(angle);
+		} else {
+			ca = fastmath::cos(angle);
+			sa = fastmath::sin(angle);
+		}
 
 		//Rodrigues' rotation formula
 		// https://en.wikipedia.org/wiki/Rodrigues%27_rotation_formula
@@ -422,6 +463,25 @@ public:
 		};
 	}
 
+
+	/**
+	 * Rotate a vector by the angle between rotationVector and RgtVector.
+	 * The result is only normalized if the input vector and self are normalized.
+	 * @return new vector with the result
+	 */
+	float3 rotate2D(const float3& rotationVector) const {
+		// https://blog.demofox.org/2014/12/27/using-imaginary-numbers-to-rotate-2d-vectors/
+		float nx = x * rotationVector.x - z * rotationVector.z;
+		float nz = x * rotationVector.z + z * rotationVector.x;
+		return float3{ nx, y, nz };
+	}
+
+	/**
+	 * Snaps the vector to the closest world axis.
+	 * @return new vector with the result
+	 */
+	float3 snapToAxis() const;
+
 	/**
 	 * @brief distance between float3s
 	 * @param f float3 to compare against
@@ -452,6 +512,23 @@ public:
 	float distance2D(const float3& f) const {
 		const float dx = x - f.x;
 		const float dz = z - f.z;
+		return math::sqrt(dx*dx + dz*dz);
+	}
+
+	/**
+	 * @brief distance2D between float3 and float2 (only x and z)
+	 * @param f float2 to compare against
+	 * @return 2D distance between float3s
+	 *
+	 * Calculates the distance between this float3
+	 * and another float2 2-dimensionally (that is,
+	 * only using the x and z components).  Sums the
+	 * differences in the x and z components, square
+	 * root for pythagorean theorem
+	 */
+	float distance2D(const float2& f) const {
+		const float dx = x - f.x;
+		const float dz = z - f.y;
 		return math::sqrt(dx*dx + dz*dz);
 	}
 
@@ -547,6 +624,14 @@ public:
 		y = 0.0f; return LengthNormalize();
 	}
 
+	/**
+	 * Decomposes into normalized dir and length
+	 */
+	std::pair <float3, float> GetNormalized() const {
+		float3 copy = *this;
+		const float length = copy.LengthNormalize();
+		return {std::move(copy), length};
+	}
 
 	/**
 	 * @brief normalizes the vector using one of Normalize implementations
@@ -670,6 +755,7 @@ public:
 		y = 0.0f; return SafeANormalize();
 	}
 
+	/*
 	// Un must be Normalized()
 	float3& PickNonParallel(const float3 Un) {
 		float d2 = Un.SqLength2D();
@@ -690,7 +776,12 @@ public:
 		*this = float3(Un.z, Un.y, -Un.x); //y component of Un X (*this) is x1^2 + z1^2, which is non-zero
 		return (*this);
 	}
+	*/
 
+	// deterministically pick a non-parallel vector to the current one
+	float3 PickNonParallel() const;
+
+	bool Normalized() const { return math::fabs(1.0f - SqLength()) <= cmp_eps(); }
 	static bool CheckNaN(float c) { return (!math::isnan(c) && !math::isinf(c)); }
 
 	bool CheckNaNs() const { return (CheckNaN(x) && CheckNaN(y) && CheckNaN(z)); }
@@ -744,8 +835,13 @@ public:
 	static float3 fabs(const float3 v);
 	static float3 sign(const float3 v);
 
+	static constexpr float apx_eps() { return 1e-02f; }
 	static constexpr float cmp_eps() { return 1e-04f; }
 	static constexpr float nrm_eps() { return 1e-12f; }
+
+	std::string str() const {
+		return std::format("float3({:.3f}, {:.3f}, {:.3f})", x, y, z);
+	}
 
 	/**
 	 * @brief max x pos

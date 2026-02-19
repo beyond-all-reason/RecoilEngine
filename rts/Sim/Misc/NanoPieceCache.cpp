@@ -4,6 +4,8 @@
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Units/Scripts/UnitScript.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND(NanoPieceCache, )
 
 CR_REG_METADATA(NanoPieceCache, (
@@ -13,7 +15,8 @@ CR_REG_METADATA(NanoPieceCache, (
 ))
 
 int NanoPieceCache::GetNanoPiece(CUnitScript* ownerScript) {
-	curBuildPowerMask |= (1 << (UNIT_SLOWUPDATE_RATE - 1));
+	RECOIL_DETAILED_TRACY_ZONE;
+	curBuildPowerMask |= (1 << (MASK_BITS - 1));
 
 	int nanoPiece = -1;
 
@@ -28,7 +31,7 @@ int NanoPieceCache::GetNanoPiece(CUnitScript* ownerScript) {
 		const int scriptPiece = ownerScript->QueryNanoPiece();
 		const int modelPiece  = ownerScript->ScriptToModel(scriptPiece);
 
-		if (ownerScript->PieceExists(scriptPiece)) {
+		if (auto* p = ownerScript->SafeGetPiece(scriptPiece); p) {
 			nanoPiece = modelPiece;
 
 			if (std::find(nanoPieces.begin(), nanoPieces.end(), nanoPiece) != nanoPieces.end()) {

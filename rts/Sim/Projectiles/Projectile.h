@@ -18,6 +18,7 @@
 
 class CUnit;
 class CFeature;
+class CWeapon;
 class CMatrix44f;
 struct AtlasedTexture;
 class CProjectileDrawer;
@@ -27,6 +28,7 @@ class CProjectile: public CExpGenSpawnable
 	CR_DECLARE_DERIVED(CProjectile)
 
 public:
+	friend class CGenericParticleProjectile;
 	CProjectile();
 	CProjectile(
 		const float3& pos,
@@ -42,13 +44,17 @@ public:
 	virtual void Collision() { Delete(); }
 	virtual void Collision(CUnit* unit) { Collision(); }
 	virtual void Collision(CFeature* feature) { Collision(); }
+	virtual void Collision(CWeapon* weapon) { Collision(); }
 	//Not inheritable - used for removing a projectile from Lua.
 	void Delete();
+	virtual void PreUpdate();
 	virtual void Update();
 	virtual void Init(const CUnit* owner, const float3& offset) override;
 
 	virtual void Draw() {}
-	virtual void DrawOnMinimap();
+	virtual void DrawOnMinimap() const;
+
+	bool UpdateAnimParams() override;
 
 	virtual int GetProjectilesCount() const = 0;
 
@@ -92,8 +98,8 @@ public:
 	// UNSYNCED ONLY
 	CMatrix44f GetTransformMatrix(bool offsetPos) const;
 
-	float GetSortDist() const { return sortDist; }
-	void SetSortDist(float d) { sortDist = d + sortDistOffset; }
+	float GetSortDist(uint32_t camType) const { return sortDist[camType]; }
+	void SetSortDist(uint32_t camType, float d) { sortDist[camType] = d + sortDistOffset; }
 public:
 	bool synced = false;           // is this projectile part of the simulation?
 	bool weapon = false;           // is this a weapon projectile? (true implies synced true)
@@ -111,14 +117,16 @@ public:
 	bool castShadow = false;
 	bool drawSorted = true;
 
-	float3 dir;                    // set via Init()
+	bool blockPreciseCol = false;
+
+	float3 dir = FwdVector;        // set via Init()
 	float3 drawPos;
 
 	float myrange = 0.0f;          // used by WeaponProjectile::TraveledRange
 	float mygravity = 0.0f;
 
-	float sortDist = 0.0f;         // distance used for z-sorting when rendering
-	float sortDistOffset = 0.0f;   // an offset used for z-sorting
+	std::array<float, 3> sortDist = {}; // distance used for z-sorting when rendering
+	float sortDistOffset = 0.0f;        // an offset used for z-sorting
 
 	int drawOrder = 0;
 

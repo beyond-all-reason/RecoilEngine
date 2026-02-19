@@ -11,6 +11,7 @@
 #include "Rendering/Env/IGroundDecalDrawer.h"
 #include "Rendering/Env/ISky.h"
 #include "Rendering/Env/SunLighting.h"
+#include "Rendering/Env/WaterRendering.h"
 #include "Rendering/Env/MapRendering.h"
 #include "Rendering/Env/IWater.h"
 #include "Rendering/CommandDrawer.h"
@@ -22,19 +23,19 @@
 #include "Rendering/Env/Particles/ProjectileDrawer.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/IPathDrawer.h"
+#include "Rendering/DepthBufferCopy.h"
 #include "Rendering/SmoothHeightMeshDrawer.h"
 #include "Rendering/InMapDrawView.h"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Models/IModelParser.h"
-#include "Rendering/Models/3DModelVAO.h"
+#include "Rendering/Models/3DModelVAO.hpp"
 #include "Rendering/Models/ModelsLock.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Textures/ColorMap.h"
 #include "Rendering/Textures/3DOTextureHandler.h"
 #include "Rendering/Textures/S3OTextureHandler.h"
 #include "Map/BaseGroundDrawer.h"
-#include "Map/HeightMapTexture.h"
 #include "Map/ReadMap.h"
 #include "Game/Camera.h"
 #include "Game/SelectedUnitsHandler.h"
@@ -126,7 +127,7 @@ void CWorldDrawer::InitPost() const
 		pathDrawer = IPathDrawer::GetInstance();
 	}
 	{
-		heightMapTexture = new HeightMapTexture();
+		DepthBufferCopy::Init();
 	}
 	{
 		IGroundDecalDrawer::Init();
@@ -171,7 +172,7 @@ void CWorldDrawer::InitPost() const
 
 void CWorldDrawer::Kill()
 {
-	spring::SafeDelete(infoTextureHandler);
+	infoTextureHandler = nullptr;
 
 	IWater::KillWater();
 	ISky::KillSky();
@@ -187,13 +188,12 @@ void CWorldDrawer::Kill()
 	S3DModelVAO::Kill();
 	modelLoader.Kill();
 
-	spring::SafeDelete(heightMapTexture);
-
 	textureHandler3DO.Kill();
 	textureHandlerS3O.Kill();
 
 	readMap->KillGroundDrawer();
 	IGroundDecalDrawer::FreeInstance();
+	DepthBufferCopy::Kill();
 	LuaObjectDrawer::Kill();
 	SmoothHeightMeshDrawer::FreeInstance();
 
@@ -206,18 +206,21 @@ void CWorldDrawer::Kill()
 void CWorldDrawer::Update(bool newSimFrame)
 {
 	SCOPED_TIMER("Update::WorldDrawer");
+
 	LuaObjectDrawer::Update(numUpdates == 0);
 	readMap->UpdateDraw(numUpdates == 0);
 
-	if (globalRendering->drawGround)
+	if (globalRendering->drawGround) {
+		ZoneScopedN("GroundDrawer::Update");
 		(readMap->GetGroundDrawer())->Update();
-
+	}
 	// XXX: done in CGame, needs to get updated even when !doDrawWorld
 	// (it updates unitdrawpos which is used for maximized minimap too)
 	// unitDrawer->Update();
 	// lineDrawer.UpdateLineStipple();
 	CUnitDrawer::UpdateStatic();
 	CFeatureDrawer::UpdateStatic();
+	projectileDrawer->UpdateDrawFlags();
 
 	if (newSimFrame) {
 		projectileDrawer->UpdateTextures();
@@ -244,6 +247,7 @@ void CWorldDrawer::GenerateIBLTextures() const
 
 	if (shadowHandler.ShadowsLoaded()) {
 		SCOPED_TIMER("Draw::World::CreateShadows");
+		SCOPED_GL_DEBUGGROUP("Draw::World::CreateShadows");
 
 		game->SetDrawMode(CGame::gameShadowDraw);
 		shadowHandler.CreateShadows();
@@ -252,29 +256,28 @@ void CWorldDrawer::GenerateIBLTextures() const
 
 	{
 		SCOPED_TIMER("Draw::World::UpdateReflTex");
+		SCOPED_GL_DEBUGGROUP("Draw::World::UpdateReflTex");
 		cubeMapHandler.UpdateReflectionTexture();
 	}
 
-	if (ISky::GetSky()->GetLight()->Update()) {
-		{
-			SCOPED_TIMER("Draw::World::UpdateSpecTex");
-			cubeMapHandler.UpdateSpecularTexture();
-		}
-		{
-			SCOPED_TIMER("Draw::World::UpdateSkyTex");
-			ISky::GetSky()->UpdateSkyTexture();
-		}
+	SCOPED_GL_DEBUGGROUP("Draw::World::UpdateMisc");
+	bool sunDirUpd = ISky::GetSky()->GetLight()->Update();
+	bool sunLightUpd = sunLighting->IsUpdated();
+	bool skyUpd = ISky::GetSky()->IsUpdated();
+	bool waterUpd = waterRendering->IsUpdated();
+
+	if (sunDirUpd) {
+		SCOPED_TIMER("Draw::World::UpdateSpecTex");
+		cubeMapHandler.UpdateSpecularTexture();
 	}
-	{
+	if (sunDirUpd || skyUpd) {
+		SCOPED_TIMER("Draw::World::UpdateSkyTex");
+		ISky::GetSky()->UpdateSkyTexture();
+	}
+	if (sunDirUpd || sunLightUpd || waterUpd) {
 		SCOPED_TIMER("Draw::World::UpdateShadingTex");
 		readMap->UpdateShadingTexture();
 	}
-
-	if (FBO::IsSupported())
-		FBO::Unbind();
-
-	// restore the normal active camera's VP
-	camera->LoadViewport();
 }
 
 void CWorldDrawer::ResetMVPMatrices() const
@@ -295,6 +298,7 @@ void CWorldDrawer::ResetMVPMatrices() const
 void CWorldDrawer::Draw() const
 {
 	SCOPED_TIMER("Draw::World");
+	SCOPED_GL_DEBUGGROUP("Draw::World");
 
 	const auto& sky = ISky::GetSky();
 	glClearColor(sky->fogColor.x, sky->fogColor.y, sky->fogColor.z, 0.0f);
@@ -308,20 +312,13 @@ void CWorldDrawer::Draw() const
 	camera->Update();
 
 	DrawOpaqueObjects();
-	ISky::GetSky()->Draw();
 	DrawAlphaObjects();
-
-	{
-		SCOPED_TIMER("Draw::World::Projectiles");
-		projectileDrawer->Draw(false);
-	}
-
-	ISky::GetSky()->DrawSun();
-
 	{
 		SCOPED_TIMER("Draw::World::DrawWorld");
+		SCOPED_GL_DEBUGGROUP("Draw::World::DrawWorld");
 		eventHandler.DrawWorld();
 	}
+
 
 	DrawMiscObjects();
 	DrawBelowWaterOverlay();
@@ -337,19 +334,29 @@ void CWorldDrawer::DrawOpaqueObjects() const
 	if (globalRendering->drawGround) {
 		{
 			SCOPED_TIMER("Draw::World::Terrain");
+			SCOPED_GL_DEBUGGROUP("Draw::World::Terrain");
 			gd->Draw(DrawPass::Normal);
+			depthBufferCopy->MakeDepthBufferCopy();
 		}
 		{
 			eventHandler.DrawPreDecals();
 			SCOPED_TIMER("Draw::World::Decals");
+			SCOPED_GL_DEBUGGROUP("Draw::World::Decals");
 			groundDecals->Draw();
 			projectileDrawer->DrawGroundFlashes();
 		}
 		{
 			SCOPED_TIMER("Draw::World::Foliage");
+			SCOPED_GL_DEBUGGROUP("Draw::World::Foliage");
 			grassDrawer->Draw();
 		}
 		smoothHeightMeshDrawer->Draw(1.0f);
+	}
+
+	// not an opaque rendering, but makes sense to run after the terrain was rendered
+	{
+		const auto& sky = ISky::GetSky();
+		sky->Draw();
 	}
 
 	selectedUnitsHandler.Draw();
@@ -357,11 +364,18 @@ void CWorldDrawer::DrawOpaqueObjects() const
 
 	{
 		SCOPED_TIMER("Draw::World::Models::Opaque");
+		SCOPED_GL_DEBUGGROUP("Draw::World::Models::Opaque");
 		unitDrawer->Draw(false);
 		featureDrawer->Draw(false);
 	}
 	{
+		SCOPED_TIMER("Draw::World::Models::Projectiles");
+		SCOPED_GL_DEBUGGROUP("Draw::World::Models::Projectiles");
+		projectileDrawer->DrawOpaque(false);
+	}
+	{
 		SCOPED_TIMER("Draw::OpaqueObjects::Debug");
+		SCOPED_GL_DEBUGGROUP("Draw::OpaqueObjects::Debug");
 		DebugColVolDrawer::Draw();
 		DebugVisibilityDrawer::DrawWorld();
 		pathDrawer->DrawAll();
@@ -377,34 +391,53 @@ void CWorldDrawer::DrawAlphaObjects() const
 	static const double belowPlaneEq[4] = {0.0f, -1.0f, 0.0f, 0.0f};
 	static const double abovePlaneEq[4] = {0.0f,  1.0f, 0.0f, 0.0f};
 
+	const bool hasWaterRendering = globalRendering->drawWater && readMap->HasVisibleWater();
+
 	{
 		SCOPED_TIMER("Draw::World::Models::Alpha");
+		SCOPED_GL_DEBUGGROUP("Draw::World::Models::Alpha");
 		// clip in model-space
-		glPushMatrix();
-		glLoadIdentity();
-		glClipPlane(GL_CLIP_PLANE3, belowPlaneEq);
-		glPopMatrix();
-		glEnable(GL_CLIP_PLANE3);
+		if (hasWaterRendering) {
+			glPushMatrix();
+			glLoadIdentity();
+			glClipPlane(GL_CLIP_PLANE3, belowPlaneEq);
+			glPopMatrix();
+			glEnable(GL_CLIP_PLANE3);
+		}
 
 		// draw alpha-objects below water surface (farthest)
 		unitDrawer->DrawAlphaPass(false);
 		featureDrawer->DrawAlphaPass(false);
+	}
+	{
+		SCOPED_TIMER("Draw::World::Particles");
+		SCOPED_GL_DEBUGGROUP("Draw::World::Particles");
+		projectileDrawer->DrawAlpha(!hasWaterRendering, true, false, false);
 
-		glDisable(GL_CLIP_PLANE3);
+		if (hasWaterRendering)
+			glDisable(GL_CLIP_PLANE3);
 	}
 
+	if (!hasWaterRendering)
+		return;
+
 	// draw water (in-between)
-	if (globalRendering->drawWater && !mapRendering->voidWater) {
+	{
 		SCOPED_TIMER("Draw::World::Water");
+		SCOPED_GL_DEBUGGROUP("Draw::World::Water");
 
 		const auto& water = IWater::GetWater();
-		water->UpdateWater(game);
+		{
+			ZoneScopedN("Draw::World::Water::UpdateWater");
+			water->UpdateWater(game);
+		}
 		water->Draw();
 		eventHandler.DrawWaterPost();
 	}
 
 	{
 		SCOPED_TIMER("Draw::World::Models::Alpha");
+		SCOPED_GL_DEBUGGROUP("Draw::World::Alpha");
 		glPushMatrix();
 		glLoadIdentity();
 		glClipPlane(GL_CLIP_PLANE3, abovePlaneEq);
@@ -414,6 +447,11 @@ void CWorldDrawer::DrawAlphaObjects() const
 		// draw alpha-objects above water surface (closest)
 		unitDrawer->DrawAlphaPass(false);
 		featureDrawer->DrawAlphaPass(false);
+	}
+	{
+		SCOPED_TIMER("Draw::World::Particles");
+		SCOPED_GL_DEBUGGROUP("Draw::World::Particles");
+		projectileDrawer->DrawAlpha(true, false, false, false);
 
 		glDisable(GL_CLIP_PLANE3);
 	}

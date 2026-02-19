@@ -13,6 +13,8 @@
 #include "Sim/Misc/Wind.h"
 #include "Sim/Projectiles/ExpGenSpawnableMemberInfo.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CSmokeProjectile, CProjectile, )
 
 CR_REG_METADATA(CSmokeProjectile,
@@ -71,6 +73,7 @@ CSmokeProjectile::CSmokeProjectile(
 
 void CSmokeProjectile::Init(const CUnit* owner, const float3& offset)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	textureNum = (int) (guRNG.NextInt(projectileDrawer->NumSmokeTextures()));
 
 	useAirLos |= (offset.y - CGround::GetApproximateHeight(offset.x, offset.z, false) > 10.0f);
@@ -81,6 +84,7 @@ void CSmokeProjectile::Init(const CUnit* owner, const float3& offset)
 
 void CSmokeProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	pos += speed;
 	pos += (envResHandler.GetCurrentWindVec() * age * 0.05f);
 	age += ageSpeed;
@@ -95,6 +99,7 @@ void CSmokeProjectile::Update()
 
 void CSmokeProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	unsigned char col[4];
 	unsigned char alpha = (unsigned char) ((1 - age) * 255);
 	col[0] = (unsigned char) (color * alpha);
@@ -109,14 +114,14 @@ void CSmokeProjectile::Draw()
 	const float3 pos1 ((camera->GetRight() - camera->GetUp()) * interSize);
 	const float3 pos2 ((camera->GetRight() + camera->GetUp()) * interSize);
 
-	#define st projectileDrawer->GetSmokeTexture(textureNum)
-	AddEffectsQuad(
+	const auto* st = projectileDrawer->GetSmokeTexture(textureNum);
+	AddEffectsQuad<0>(
+		st->pageNum,
 		{ drawPos - pos2, st->xstart, st->ystart, col },
 		{ drawPos + pos1, st->xend,   st->ystart, col },
 		{ drawPos + pos2, st->xend,   st->yend,   col },
 		{ drawPos - pos1, st->xstart, st->yend,   col }
 	);
-	#undef st
 }
 
 int CSmokeProjectile::GetProjectilesCount() const
@@ -127,14 +132,15 @@ int CSmokeProjectile::GetProjectilesCount() const
 
 bool CSmokeProjectile::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, color        )
-	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, size         )
-	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, startSize    )
-	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, sizeExpansion)
-	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, ageSpeed     )
+	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, color        );
+	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, size         );
+	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, startSize    );
+	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, sizeExpansion);
+	CHECK_MEMBER_INFO_FLOAT (CSmokeProjectile, ageSpeed     );
 
 	return false;
 }

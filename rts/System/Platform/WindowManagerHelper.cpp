@@ -49,17 +49,19 @@ void SetIcon(CBitmap* bmp, bool forceResolution) {
 bool SetIconSurface(SDL_Window* win, CBitmap* bmp) {
 	static WindowIcon windowIcon;
 
-	if (windowIcon.bmp == nullptr)
-		windowIcon.bmp = new (windowIcon.bmpMem) CBitmap();
-
 	if (bmp == nullptr) {
 		// only reached on exit
 		SDL_FreeSurface(windowIcon.surf);
 		SDL_SetWindowIcon(win, windowIcon.surf = nullptr);
 
-		*(windowIcon.bmp) = {};
+		if (windowIcon.bmp)
+			*(windowIcon.bmp) = {};
+
 		return false;
 	}
+
+	if (windowIcon.bmp == nullptr)
+		windowIcon.bmp = new (windowIcon.bmpMem) CBitmap();
 
 	*(windowIcon.bmp) = std::move(*bmp);
 	SDL_Surface* surf = windowIcon.bmp->CreateSDLSurface();

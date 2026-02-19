@@ -75,6 +75,7 @@ end
 local system = {
 
   --  Custom packages
+  Encoding = Encoding,
   VFS = VFS,
   Spring = Spring,
 

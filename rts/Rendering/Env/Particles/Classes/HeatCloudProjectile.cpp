@@ -10,6 +10,8 @@
 #include "Rendering/Textures/TextureAtlas.h"
 #include "Sim/Projectiles/ExpGenSpawnableMemberInfo.h"
 
+#include "System/Misc/TracyDefs.h"
+
 
 CR_BIND_DERIVED(CHeatCloudProjectile, CProjectile, )
 
@@ -69,6 +71,7 @@ CHeatCloudProjectile::CHeatCloudProjectile(
 
 void CHeatCloudProjectile::Serialize(creg::ISerializer* s)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	std::string name;
 	if (s->IsWriting())
 		name = projectileDrawer->textureAtlas->GetTextureName(texture);
@@ -80,6 +83,7 @@ void CHeatCloudProjectile::Serialize(creg::ISerializer* s)
 
 void CHeatCloudProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	pos += speed;
 	heat = std::max(heat - heatFalloff, 0.0f);
 
@@ -91,11 +95,13 @@ void CHeatCloudProjectile::Update()
 
 void CHeatCloudProjectile::Init(const CUnit* owner, const float3& offset)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CProjectile::Init(owner, offset);
 }
 
 void CHeatCloudProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	UpdateRotation();
 
 	unsigned char col[4];
@@ -120,10 +126,11 @@ void CHeatCloudProjectile::Draw()
 	};
 
 	if (math::fabs(rotVal) > 0.01f) {
-		for (auto& b : bounds)
-			b = b.rotate(rotVal, camera->GetForward());
+		float3::rotate<false>(rotVal, camera->GetForward(), bounds);
 	}
-	AddEffectsQuad(
+
+	AddEffectsQuad<0>(
+		texture->pageNum,
 		{ drawPos + bounds[0], texture->xstart, texture->ystart, col },
 		{ drawPos + bounds[1], texture->xend,   texture->ystart, col },
 		{ drawPos + bounds[2], texture->xend,   texture->yend,   col },
@@ -139,17 +146,18 @@ int CHeatCloudProjectile::GetProjectilesCount() const
 
 bool CHeatCloudProjectile::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, heat       )
-	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, maxheat    )
-	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, heatFalloff)
-	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, size       )
-	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, sizeGrowth )
-	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, sizemod    )
-	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, sizemodmod )
-	CHECK_MEMBER_INFO_PTR   (CHeatCloudProjectile, texture, projectileDrawer->textureAtlas->GetTexturePtr)
+	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, heat       );
+	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, maxheat    );
+	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, heatFalloff);
+	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, size       );
+	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, sizeGrowth );
+	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, sizemod    );
+	CHECK_MEMBER_INFO_FLOAT (CHeatCloudProjectile, sizemodmod );
+	CHECK_MEMBER_INFO_PTR   (CHeatCloudProjectile, texture, projectileDrawer->textureAtlas->GetTexturePtr);
 
 	return false;
 }

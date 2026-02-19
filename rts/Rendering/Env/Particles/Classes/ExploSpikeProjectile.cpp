@@ -11,6 +11,8 @@
 #include "Rendering/Textures/TextureAtlas.h"
 #include "Sim/Projectiles/ExpGenSpawnableMemberInfo.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CExploSpikeProjectile, CProjectile, )
 
 CR_REG_METADATA(CExploSpikeProjectile,
@@ -61,6 +63,7 @@ CExploSpikeProjectile::CExploSpikeProjectile(
 
 void CExploSpikeProjectile::Init(const CUnit* owner, const float3& offset)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CProjectile::Init(owner, offset);
 
 	lengthGrowth = dir.Length() * (0.5f + guRNG.NextFloat() * 0.4f);
@@ -71,6 +74,7 @@ void CExploSpikeProjectile::Init(const CUnit* owner, const float3& offset)
 
 void CExploSpikeProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	pos += speed;
 	length += lengthGrowth;
 	alpha = std::max(0.0f, alpha - alphaDecay);
@@ -80,6 +84,7 @@ void CExploSpikeProjectile::Update()
 
 void CExploSpikeProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 dif = (pos - camera->GetPos()).ANormalize();
 	const float3 dir2 = (dif.cross(dir)).ANormalize();
 
@@ -93,34 +98,36 @@ void CExploSpikeProjectile::Draw()
 	const float3 l = (dir * length) + (lengthGrowth * globalRendering->timeOffset);
 	const float3 w = dir2 * width;
 
-	#define let projectileDrawer->laserendtex
-	AddEffectsQuad(
+	const auto* let = projectileDrawer->laserendtex;
+	AddEffectsQuad<0>(
+		let->pageNum,
 		{ drawPos - l - w, let->xstart, let->ystart, col },
 		{ drawPos + l - w, let->xend,   let->ystart, col },
 		{ drawPos + l + w, let->xend,   let->yend,   col },
 		{ drawPos - l + w, let->xstart, let->yend,   col }
 	);
-	#undef let
 }
 
 
 
 int CExploSpikeProjectile::GetProjectilesCount() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return 1;
 }
 
 bool CExploSpikeProjectile::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT (CExploSpikeProjectile, length      )
-	CHECK_MEMBER_INFO_FLOAT (CExploSpikeProjectile, width       )
-	CHECK_MEMBER_INFO_FLOAT (CExploSpikeProjectile, alpha       )
-	CHECK_MEMBER_INFO_FLOAT (CExploSpikeProjectile, alphaDecay  )
-	CHECK_MEMBER_INFO_FLOAT (CExploSpikeProjectile, lengthGrowth)
-	CHECK_MEMBER_INFO_FLOAT3(CExploSpikeProjectile, color       )
+	CHECK_MEMBER_INFO_FLOAT (CExploSpikeProjectile, length      );
+	CHECK_MEMBER_INFO_FLOAT (CExploSpikeProjectile, width       );
+	CHECK_MEMBER_INFO_FLOAT (CExploSpikeProjectile, alpha       );
+	CHECK_MEMBER_INFO_FLOAT (CExploSpikeProjectile, alphaDecay  );
+	CHECK_MEMBER_INFO_FLOAT (CExploSpikeProjectile, lengthGrowth);
+	CHECK_MEMBER_INFO_FLOAT3(CExploSpikeProjectile, color       );
 
 	return false;
 }

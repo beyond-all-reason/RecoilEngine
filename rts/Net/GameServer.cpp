@@ -260,7 +260,9 @@ void CGameServer::Initialize()
 	lastNewFrameTick = spring_gettime();
 	lastBandwidthUpdate = spring_gettime();
 
-	thread = std::move(spring::thread(std::bind(&CGameServer::UpdateLoop, this)));
+	thread = spring::thread(std::bind(&CGameServer::UpdateLoop, this));
+
+	LOG("%s: thread affinity %x", __func__, Threading::GetAffinity());
 
 	// Something in CGameServer::CGameServer borks the FPU control word
 	// maybe the threading, or something in CNet::InitServer() ??
@@ -586,7 +588,7 @@ void CGameServer::PrivateMessage(int playerNum, const std::string& message) {
 void CGameServer::CheckSync()
 {
 #ifdef SYNCCHECK
-	std::vector< std::pair<unsigned, unsigned> > checksums; // <response checkum, #clients matching checksum>
+	std::vector< std::pair<unsigned, unsigned> > checksums; // <response checksum, #clients matching checksum>
 	std::vector<int> noSyncResponsePlayers;
 
 	std::map<unsigned, std::vector<int> > desyncGroups; // <desync-checksum, [desynced players]>
@@ -732,7 +734,7 @@ void CGameServer::CheckSync()
 				if (!desyncHasOccurred) {
 					if (globalConfig.dumpGameStateOnDesync) {
 						LOG("Desync detected. Requesting all clients to collect game state information.");
-						Broadcast(CBaseNetProtocol::Get().SendGameStateDump());
+						Broadcast(CBaseNetProtocol::Get().SendGameStateDump(syncErrorFrame));
 					}
 					desyncHasOccurred = true;
 				}
@@ -787,13 +789,13 @@ void CGameServer::CheckSync()
 
 float CGameServer::GetDemoTime() const {
 	if (!gameHasStarted) return gameTime;
-	return (startTime + serverFrameNum / float(GAME_SPEED));
+	return (startTime + serverFrameNum * INV_GAME_SPEED);
 }
 
 
 void CGameServer::Update()
 {
-	const float tdif = spring_tomsecs(spring_gettime() - lastUpdate) * 0.001f;
+	const float tdif = (spring_gettime() - lastUpdate).toSecsf();
 
 	gameTime += tdif;
 	lastUpdate = spring_gettime();
@@ -865,7 +867,7 @@ void CGameServer::Update()
 		bool hasPlayers = false;
 
 		for (const GameParticipant& p: players) {
-			if (hasPlayers |= (p.clientLink != nullptr))
+			if ((hasPlayers |= (p.clientLink != nullptr)))
 				break;
 		}
 
@@ -892,7 +894,7 @@ void CGameServer::LagProtection()
 			Broadcast(CBaseNetProtocol::Get().SendPlayerInfo(player.id, player.cpuUsage, curPing));
 
 			const float playerCpuUsage = player.cpuUsage;
-			const float correctedCpu   = Clamp(playerCpuUsage, 0.0f, 1.0f);
+			const float correctedCpu   = std::clamp(playerCpuUsage, 0.0f, 1.0f);
 
 			if (player.isReconn && curPing < 2 * GAME_SPEED)
 				player.isReconn = false;
@@ -929,7 +931,14 @@ void CGameServer::LagProtection()
 		//internalSpeed holds the current speed the sim is running
 		//refCpuUsage holds the highest cpu if curSpeedCtrl == 0 or median if curSpeedCtrl == 1
 
-		// aim for 60% cpu usage if median is used as reference and 75% cpu usage if max is the reference
+		/* We don't actually aim to maintain the average sim FPS. We want to keep each frame sim time
+		 * under the nominal average. For example at 30 sim FPS, we want to keep all frames under ~33ms.
+		 * But frames have some distribution in how long they run, which isn't entirely predictable on
+		 * engine side (especially due to unequal load distribution in gameside Lua). And these long and
+		 * short frames don't cancel each other out nicely - you get stuttering and miss draw frames.
+		 * This means that we will necessarily have some idle time because the average frame time is now
+		 * lower than the nominal sim FPS, i.e. the ideal CPU% to aim at is less than 100%. The constants
+		 * below have been determined empirically. The max is of course higher than the median. */
 		float wantedCpuUsage = (curSpeedCtrl == 1) ?  0.60f : 0.75f;
 
 		//the following line can actually make it go faster than wanted normal speed ( userSpeedFactor )
@@ -938,7 +947,7 @@ void CGameServer::LagProtection()
 		// to keep cpu load constant
 		float newSpeed = internalSpeed / refCpuUsage * wantedCpuUsage;
 
-		newSpeed = Clamp(newSpeed, 0.1f, userSpeedFactor);
+		newSpeed = std::clamp(newSpeed, 0.1f, userSpeedFactor);
 		//average to smooth the speed change over time to reduce the impact of cpu spikes in the players
 		newSpeed = (newSpeed + internalSpeed) * 0.5f;
 
@@ -948,7 +957,8 @@ void CGameServer::LagProtection()
 		const float invSimDrawFract = 1.0f - globalConfig.minSimDrawBalance;
 		const float maxSimFrameRate = (1000.0f / gu->avgSimFrameTime) * invSimDrawFract;
 
-		newSpeed = Clamp(newSpeed, 0.1f, ((maxSimFrameRate / GAME_SPEED) + internalSpeed) * 0.5f);
+		const float maxNewSpeed = std::max(0.1f, ((maxSimFrameRate / GAME_SPEED) + internalSpeed) * 0.5f);
+		newSpeed = std::clamp(newSpeed, 0.1f, maxNewSpeed);
 #endif
 
 		if (newSpeed != internalSpeed)
@@ -2126,10 +2136,14 @@ void CGameServer::CheckForGameStart(bool forced)
 {
 	assert(!gameHasStarted);
 	bool allReady = true;
+	// anyReady is needed for the case when *nodoby* is connected to the server yet, so in principle
+	// everybody that is, is ready. Without that logic the game will start after XX seconds (see below)
+	// without any players connected to the dedicated server, ignoring value of the InitialNetworkTimeout.
+	bool anyReady = false;
 
 	for (size_t a = static_cast<size_t>(myGameSetup->numDemoPlayers); a < players.size(); a++) {
 		if (players[a].myState == GameParticipant::UNCONNECTED && serverStartTime + spring_secs(30) < spring_gettime()) {
-			// autostart the game when 45 seconds have passed and everyone who managed to connect is ready
+			// autostart the game when 30 seconds have passed and everyone who managed to connect is ready
 			continue;
 		}
 		else if (players[a].myState < GameParticipant::INGAME) {
@@ -2138,13 +2152,15 @@ void CGameServer::CheckForGameStart(bool forced)
 		} else if (!players[a].spectator && teams[players[a].team].IsActive() && !players[a].IsReadyToStart() && demoReader == nullptr) {
 			allReady = false;
 			break;
+		} else {
+			anyReady = true;
 		}
 	}
 
 	// msecs to wait until the game starts after all players are ready
 	const spring_time gameStartDelay = spring_secs(myGameSetup->gameStartDelay);
 
-	if (allReady || forced) {
+	if ((allReady && anyReady) || forced) {
 		if (!spring_istime(readyTime)) {
 			readyTime = spring_gettime();
 
@@ -2702,10 +2718,11 @@ void CGameServer::UpdateLoop()
 		Threading::SetAffinity(~0);
 
 		while (!quitServer) {
-			spring_msecs(loopSleepTime).sleep(true);
 
 			if (udpListener != nullptr)
-				udpListener->Update();
+				udpListener->Update(loopSleepTime);
+			else
+				spring_msecs(loopSleepTime).sleep(true);
 
 			std::lock_guard<spring::recursive_mutex> scoped_lock(gameServerMutex);
 			ServerReadNet();
@@ -2714,6 +2731,8 @@ void CGameServer::UpdateLoop()
 
 		if (hostif != nullptr)
 			hostif->SendQuit();
+
+		LOG("%s: thread affinity %x", __func__, Threading::GetAffinity());
 
 		Broadcast(CBaseNetProtocol::Get().SendQuit("Server shutdown"));
 
@@ -3064,7 +3083,7 @@ void CGameServer::InternalSpeedChange(float newSpeed)
 
 void CGameServer::UserSpeedChange(float newSpeed, int player)
 {
-	if (userSpeedFactor == (newSpeed = Clamp(newSpeed, minUserSpeed, maxUserSpeed)))
+	if (userSpeedFactor == (newSpeed = std::clamp(newSpeed, minUserSpeed, maxUserSpeed)))
 		return;
 
 	if (internalSpeed > newSpeed || internalSpeed == userSpeedFactor) // insta-raise speed when not slowed down

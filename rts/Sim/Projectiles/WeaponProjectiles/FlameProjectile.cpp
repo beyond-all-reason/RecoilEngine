@@ -11,6 +11,8 @@
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Weapons/WeaponDef.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CFlameProjectile, CWeaponProjectile, )
 
 CR_REG_METADATA(CFlameProjectile,(
@@ -40,6 +42,7 @@ CFlameProjectile::CFlameProjectile(const ProjectileParams& params): CWeaponProje
 
 void CFlameProjectile::Collision()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3& norm = CGround::GetNormal(pos.x, pos.z);
 	const float ns = speed.dot(norm);
 
@@ -51,6 +54,7 @@ void CFlameProjectile::Collision()
 
 void CFlameProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!luaMoveCtrl) {
 		SetPosition(pos + speed);
 		UpdateGroundBounce();
@@ -67,27 +71,42 @@ void CFlameProjectile::Update()
 	checkCol &= (curTime <= physLife);
 	deleteMe |= (curTime >= 1.0f);
 
-	explGenHandler.GenExplosion(cegID, pos, speed, curTime, 0.0f, 0.0f, owner(), nullptr);
+	explGenHandler.GenExplosion(
+		cegID,
+		pos,
+		speed,
+		curTime,
+		0.0f,
+		0.0f,
+		owner(),
+		ExplosionHitObject()
+	);
 }
 
 void CFlameProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!validTextures[0])
 		return;
 
+	UpdateAnimParams();
+
 	unsigned char col[4];
 	weaponDef->visuals.colorMap->GetColor(col, curTime);
+	const auto* tex = weaponDef->visuals.texture1;
 
-	AddEffectsQuad(
-		{ drawPos - camera->GetRight() * radius - camera->GetUp() * radius, weaponDef->visuals.texture1->xstart, weaponDef->visuals.texture1->ystart, col },
-		{ drawPos + camera->GetRight() * radius - camera->GetUp() * radius, weaponDef->visuals.texture1->xend,   weaponDef->visuals.texture1->ystart, col },
-		{ drawPos + camera->GetRight() * radius + camera->GetUp() * radius, weaponDef->visuals.texture1->xend,   weaponDef->visuals.texture1->yend,   col },
-		{ drawPos - camera->GetRight() * radius + camera->GetUp() * radius, weaponDef->visuals.texture1->xstart, weaponDef->visuals.texture1->yend,   col }
+	AddEffectsQuad<1>(
+		tex->pageNum,
+		{ drawPos - camera->GetRight() * radius - camera->GetUp() * radius, tex->xstart, tex->ystart, col },
+		{ drawPos + camera->GetRight() * radius - camera->GetUp() * radius, tex->xend,   tex->ystart, col },
+		{ drawPos + camera->GetRight() * radius + camera->GetUp() * radius, tex->xend,   tex->yend,   col },
+		{ drawPos - camera->GetRight() * radius + camera->GetUp() * radius, tex->xstart, tex->yend,   col }
 	);
 }
 
 int CFlameProjectile::ShieldRepulse(const float3& shieldPos, float shieldForce, float shieldMaxSpeed)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (luaMoveCtrl)
 		return 0;
 
@@ -102,5 +121,6 @@ int CFlameProjectile::ShieldRepulse(const float3& shieldPos, float shieldForce, 
 
 int CFlameProjectile::GetProjectilesCount() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return 1 * validTextures[0];
 }

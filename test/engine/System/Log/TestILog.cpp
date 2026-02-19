@@ -3,10 +3,8 @@
 #include "System/Log/FileSink.h"
 #include "System/Log/StreamSink.h"
 #include "System/Log/LogUtil.h"
-#include "System/StringUtil.h" // IntToString() -> header only
 
-#define CATCH_CONFIG_MAIN
-#include "lib/catch.hpp"
+#include <catch_amalgamated.hpp>
 
 #include <cstdarg>
 #include <sstream>
@@ -95,7 +93,7 @@ namespace {
 			//log_sink_stream_setLogStream(&logStream);
 			LOG("static ctor log test");
 			// We can not use Catch here, cause it is not yet initialized,
-			// so we depend on asserts spread throught the logging system.
+			// so we depend on asserts spread throughout the logging system.
 			//TLOG("static ctor log test");
 			//log_sink_stream_setLogStream(NULL);
 		}
@@ -106,7 +104,7 @@ namespace {
 			//log_sink_stream_setLogStream(&logStream);
 			LOG("static dtor log test");
 			// We can not use Catch here, cause it is already
-			// uninitialized, so we depend on asserts spread throught the
+			// uninitialized, so we depend on asserts spread throughout the
 			// logging system.
 			//TLOG("static dtor log test");
 			//log_sink_stream_setLogStream(NULL);

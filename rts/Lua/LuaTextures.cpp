@@ -57,8 +57,8 @@ std::string LuaTextures::Create(const Texture& tex)
 
 	glClearErrors("LuaTex", __func__, globalRendering->glDebugErrors);
 
-	GLenum dataFormat = GL::GetInternalFormatDataFormat(tex.format);
-	GLenum dataType   = GL::GetInternalFormatDataType(tex.format);
+	GLenum dataFormat = GL::GetDataFormatFromInternalFormat(tex.format);
+	GLenum dataType   = GL::GetDataTypeFromInternalFormat(tex.format);
 
 	switch (tex.target) {
 		case GL_TEXTURE_1D: {
@@ -132,7 +132,7 @@ std::string LuaTextures::Create(const Texture& tex)
 			LOG_L(L_ERROR, "[LuaTextures::%s] %s", __func__, e.what());
 		}
 
-		if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT || attachFailure) {
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT || attachFailure) {
 			glDeleteTextures(1, &texID);
 			glDeleteFramebuffersEXT(1, &fbo);
 			glDeleteRenderbuffersEXT(1, &fboDepth);
@@ -151,7 +151,7 @@ std::string LuaTextures::Create(const Texture& tex)
 	newTex.fboDepth = fboDepth;
 
 	if (freeIndices.empty()) {
-		textureMap.insert(str, textureVec.size());
+		textureMap.emplace(str, textureVec.size());
 		textureVec.emplace_back(newTex);
 		return str;
 	}
@@ -258,8 +258,8 @@ void LuaTextures::ApplyParams(const Texture& tex) const
 	if (tex.lodBias != 0.0f)
 		glTexParameterf(tex.target, GL_TEXTURE_LOD_BIAS, tex.lodBias);
 
-	if (tex.aniso != 0.0f && GLEW_EXT_texture_filter_anisotropic)
-		glTexParameterf(tex.target, GL_TEXTURE_MAX_ANISOTROPY_EXT, Clamp(tex.aniso, 1.0f, globalRendering->maxTexAnisoLvl));
+	if (tex.aniso != 0.0f && GLAD_GL_EXT_texture_filter_anisotropic)
+		glTexParameterf(tex.target, GL_TEXTURE_MAX_ANISOTROPY_EXT, std::clamp(tex.aniso, 1.0f, globalRendering->maxTexAnisoLvl));
 }
 
 void LuaTextures::ChangeParams(const Texture& tex)  const

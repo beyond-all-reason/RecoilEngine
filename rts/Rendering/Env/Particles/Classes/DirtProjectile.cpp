@@ -12,6 +12,8 @@
 #include "Rendering/Textures/TextureAtlas.h"
 #include "Sim/Projectiles/ExpGenSpawnableMemberInfo.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CDirtProjectile, CProjectile, )
 
 CR_REG_METADATA(CDirtProjectile,
@@ -65,6 +67,7 @@ CDirtProjectile::CDirtProjectile() :
 
 void CDirtProjectile::Serialize(creg::ISerializer* s)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	std::string name;
 	if (s->IsWriting())
 		name = projectileDrawer->textureAtlas->GetTextureName(texture);
@@ -76,6 +79,7 @@ void CDirtProjectile::Serialize(creg::ISerializer* s)
 
 void CDirtProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	SetVelocityAndSpeed((speed * slowdown) + (UpVector * mygravity));
 	SetPosition(pos + speed);
 
@@ -88,6 +92,7 @@ void CDirtProjectile::Update()
 
 void CDirtProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!IsValidTexture(texture))
 		return;
 
@@ -107,7 +112,8 @@ void CDirtProjectile::Draw()
 	const float interSize = size + globalRendering->timeOffset * sizeExpansion;
 	const float texx = texture->xstart + (texture->xend - texture->xstart) * ((1.0f - partAbove) * 0.5f);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
+		texture->pageNum,
 		{ drawPos - camera->GetRight() * interSize - camera->GetUp() * interSize * partAbove, texx,          texture->ystart, col },
 		{ drawPos - camera->GetRight() * interSize + camera->GetUp() * interSize,             texture->xend, texture->ystart, col },
 		{ drawPos + camera->GetRight() * interSize + camera->GetUp() * interSize,             texture->xend, texture->yend,   col },
@@ -117,22 +123,24 @@ void CDirtProjectile::Draw()
 
 int CDirtProjectile::GetProjectilesCount() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return 1 * IsValidTexture(texture);
 }
 
 
 bool CDirtProjectile::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, alpha        )
-	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, alphaFalloff )
-	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, size         )
-	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, sizeExpansion)
-	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, slowdown     )
-	CHECK_MEMBER_INFO_FLOAT3(CDirtProjectile, color        )
-	CHECK_MEMBER_INFO_PTR   (CDirtProjectile, texture, projectileDrawer->textureAtlas->GetTexturePtr)
+	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, alpha        );
+	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, alphaFalloff );
+	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, size         );
+	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, sizeExpansion);
+	CHECK_MEMBER_INFO_FLOAT (CDirtProjectile, slowdown     );
+	CHECK_MEMBER_INFO_FLOAT3(CDirtProjectile, color        );
+	CHECK_MEMBER_INFO_PTR   (CDirtProjectile, texture, projectileDrawer->textureAtlas->GetTexturePtr);
 
 	return false;
 }

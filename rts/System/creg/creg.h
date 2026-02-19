@@ -1,6 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-// creg - Code compoment registration system
+// creg - Code component registration system
 
 #ifndef _CREG_H
 #define _CREG_H
@@ -62,9 +62,8 @@ namespace creg {
 		static std::unique_ptr<IType> CreateStringType();
 		static std::unique_ptr<IType> CreateObjInstanceType(Class* objectType, size_t size);
 		static std::unique_ptr<IType> CreateIgnoredType(size_t size);
+		static std::unique_ptr<IType> CreateFakeType();
 	};
-
-
 
 	/**
 	 * Represents a C++ class or struct, declared with
@@ -478,6 +477,12 @@ public: \
 #define CR_IGNORED(Member) \
 	class_->AddMember( #Member, creg::IType::CreateIgnoredType(sizeof(Type::Member)), offsetof_creg(Type, Member), alignof(decltype(Type::Member)), (creg::ClassMemberFlag) currentMemberFlags) // NOLINT{misc-sizeof-container}
 
+ /** @def CR_FAKE
+  * Registers a fake member variable, that actually doesn't exist in the class
+  * Useful only for CM_Config scenarios
+  */
+#define CR_FAKE(Member) \
+	class_->AddMember( #Member, creg::IType::CreateFakeType(), 0, 0, (creg::ClassMemberFlag) currentMemberFlags) // NOLINT{misc-sizeof-container}
 
 /** @def CR_MEMBER_UN
  * Registers a member variable that is unsynced.

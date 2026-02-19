@@ -81,14 +81,6 @@ class CQuadField : spring::noncopyable
 
 public:
 
-	/*
-	needed to support dynamic resizing (not used yet)
-	in large games the average loading factor (number of objects per quad)
-	can grow too large to maintain amortized constant performance so more
-	quads are needed
-
-	static void Resize(int quadSize);
-	*/
 
 	void Init(int2 mapDims, int quadSize);
 	void Kill();
@@ -96,6 +88,7 @@ public:
 	void GetQuads(QuadFieldQuery& qfq, float3 pos, float radius);
 	void GetQuadsRectangle(QuadFieldQuery& qfq, const float3& mins, const float3& maxs);
 	void GetQuadsOnRay(QuadFieldQuery& qfq, const float3& start, const float3& dir, float length);
+	void GetQuadsOnWideRay(QuadFieldQuery& qfq, const float3& start, const float3& dir, float length, float width);
 
 	void GetUnitsAndFeaturesColVol(
 		const float3& pos,

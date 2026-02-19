@@ -19,7 +19,7 @@
 
 local SAFEWRAP = 0
 -- 0: disabled
--- 1: enabled, but can be overriden by gadget.GetInfo().unsafe
+-- 1: enabled, but can be overridden by gadget.GetInfo().unsafe
 -- 2: always enabled
 
 
@@ -878,6 +878,12 @@ function gadgetHandler:GameFrame(frameNum)
   end
 end
 
+function gadgetHandler:GameFramePost(frameNum)
+  for _,g in r_ipairs(self.GameFramePostList) do
+    g:GameFramePost(frameNum)
+  end
+end
+
 function gadgetHandler:GamePaused(playerID, paused)
   for _,g in r_ipairs(self.GamePausedList) do
     g:GamePaused(playerID, paused)
@@ -1405,14 +1411,23 @@ function gadgetHandler:UnitReverseBuilt(unitID, unitDefID, unitTeam)
 end
 
 
+function gadgetHandler:UnitConstructionDecayed(unitID, unitDefID, unitTeam, timeSinceLastBuild, iterationPeriod, part)
+  for _,g in r_ipairs(self.UnitConstructionDecayedList) do
+    g:UnitConstructionDecayed(unitID, unitDefID, unitTeam, timeSinceLastBuild, iterationPeriod, part)
+  end
+end
+
+
 function gadgetHandler:UnitDestroyed(
   unitID,     unitDefID,     unitTeam,
-  attackerID, attackerDefID, attackerTeam
+  attackerID, attackerDefID, attackerTeam,
+  weaponDefID
 )
   for _,g in r_ipairs(self.UnitDestroyedList) do
     g:UnitDestroyed(
       unitID,     unitDefID,     unitTeam,
-      attackerID, attackerDefID, attackerTeam
+      attackerID, attackerDefID, attackerTeam,
+      weaponDefID
     )
   end
 end
@@ -1829,6 +1844,24 @@ function gadgetHandler:DefaultCommand(type, id, cmd)
   end
 end
 
+function gadgetHandler:ActiveCommandChanged(id, cmdType)
+  for _,g in r_ipairs(self.ActiveCommandChangedList) do
+    g:ActiveCommandChanged(id, cmdType)
+  end
+end
+
+function gadgetHandler:CameraRotationChanged(rotx, roty, rotz)
+  for _,g in r_ipairs(self.CameraRotationChangedList) do
+    g:CameraRotationChanged(rotx, roty, rotz)
+  end
+end
+
+function gadgetHandler:CameraPositionChanged(posx, posy, posz)
+  for _,g in r_ipairs(self.CameraPositionChangedList) do
+    g:CameraPositionChanged(posx, posy, posz)
+  end
+end
+
 function gadgetHandler:CommandNotify(id, params, options)
   for _,g in r_ipairs(self.CommandNotifyList) do
     if (g:CommandNotify(id, params, options)) then
@@ -2177,6 +2210,15 @@ end
 function gadgetHandler:Pong(pingTag, pktSendTime, pktRecvTime)
   for _,g in r_ipairs(self.PongList) do
     g:Pong(pingTag, pktSendTime, pktRecvTime)
+  end
+end
+
+--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+
+function gadgetHandler:FontsChanged()
+  for _,g in r_ipairs(self.FontsChangedList) do
+    g:FontsChanged()
   end
 end
 

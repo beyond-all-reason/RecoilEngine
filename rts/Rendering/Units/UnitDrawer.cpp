@@ -13,6 +13,7 @@
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
 #include "Rendering/Env/IWater.h"
+#include "Rendering/GL/SubState.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/Shaders/ShaderHandler.h"
@@ -27,7 +28,7 @@
 #include "Rendering/Textures/3DOTextureHandler.h"
 #include "Rendering/Textures/S3OTextureHandler.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
-#include "Rendering/Models/3DModelVAO.h"
+#include "Rendering/Models/3DModelVAO.hpp"
 #include "Rendering/Models/ModelsMemStorage.h"
 
 #include "Sim/Features/Feature.h"
@@ -52,6 +53,8 @@
 
 #include "System/Threading/ThreadPool.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CONFIG(int, UnitIconDist).defaultValue(200).headlessValue(0);
 CONFIG(float, UnitIconScaleUI).defaultValue(1.0f).minimumValue(0.1f).maximumValue(10.0f);
 CONFIG(float, UnitIconFadeStart).defaultValue(3000.0f).minimumValue(1.0f).maximumValue(10000.0f);
@@ -59,12 +62,13 @@ CONFIG(float, UnitIconFadeVanish).defaultValue(1000.0f).minimumValue(1.0f).maxim
 CONFIG(float, UnitTransparency).defaultValue(0.7f);
 CONFIG(bool, UnitIconsAsUI).defaultValue(false).description("Draw unit icons like it is an UI element and not like unit's LOD.");
 CONFIG(bool, UnitIconsHideWithUI).defaultValue(false).description("Hide unit icons when UI is hidden.");
+CONFIG(float, UnitGhostIconsDimming).defaultValue(0.8).minimumValue(0.0f).maximumValue(1.0f).description("Dimming multiplier for out of radar ghost icons. Setting to 0 disables them.");
 
 CONFIG(int, MaxDynamicModelLights)
 	.defaultValue(1)
 	.minimumValue(0);
 
-CONFIG(bool, AdvUnitShading).defaultValue(true).headlessValue(false).safemodeValue(false).description("Determines whether specular highlights and other lighting effects are rendered for units.");
+CONFIG(bool, AdvUnitShading).deprecated(true);
 
 /***********************************************************************/
 
@@ -97,11 +101,12 @@ public:
 	}
 
 	static inline float GetUnitIconScale(const CUnit* unit) {
-		float scale = unit->myIcon->GetSize();
+		const auto& iconData = icon::iconHandler.GetIconData(unit->currentIconIndex);
+		float scale = iconData.GetSize();
 
 		if (!minimap->UseUnitIcons())
 			return scale;
-		if (!unit->myIcon->GetRadiusAdjust())
+		if (!iconData.GetRadiusAdjust())
 			return scale;
 
 		const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
@@ -109,7 +114,7 @@ public:
 		const bool unitVisible = ((losStatus & LOS_INLOS) || ((losStatus & LOS_INRADAR) && ((losStatus & prevMask) == prevMask)));
 
 		if ((unitVisible || gu->spectatingFullView)) {
-			scale *= (unit->radius / unit->myIcon->GetRadiusScale());
+			scale *= (unit->radius / iconData.GetRadiusScale());
 		}
 
 		return scale;
@@ -122,21 +127,58 @@ public:
 
 void CUnitDrawer::InitStatic()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CModelDrawerBase<CUnitDrawerData, CUnitDrawer>::InitStatic();
 
 	LuaObjectDrawer::ReadLODScales(LUAOBJ_UNIT);
 
 	CUnitDrawerHelper::LoadUnitExplosionGenerators();
 
-	CUnitDrawer::InitInstance<CUnitDrawerFFP >(MODEL_DRAWER_FFP );
 	CUnitDrawer::InitInstance<CUnitDrawerGLSL>(MODEL_DRAWER_GLSL);
 	CUnitDrawer::InitInstance<CUnitDrawerGL4 >(MODEL_DRAWER_GL4 );
 
 	SelectImplementation();
+
+	{
+		icons2DShader = shaderHandler->CreateProgramObject("[Icons]", "2D");
+		icons2DShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/Icons2DVS.glsl", "", GL_VERTEX_SHADER));
+		icons2DShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/IconsFS.glsl", "", GL_FRAGMENT_SHADER));
+		icons2DShader->BindAttribLocations<VA_TYPE_2DTC3>();
+		icons2DShader->Link();
+
+		icons2DShader->Enable();
+		icons2DShader->SetUniform("mainTex", 0);
+		icons2DShader->SetUniform("custTex", 1);
+		icons2DShader->Disable();
+		icons2DShader->Validate();
+	}
+	{
+		icons3DShader = shaderHandler->CreateProgramObject("[Icons]", "3D");
+		icons3DShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/Icons3DVS.glsl", "", GL_VERTEX_SHADER));
+		icons3DShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/IconsFS.glsl", "", GL_FRAGMENT_SHADER));
+		icons3DShader->BindAttribLocations<VA_TYPE_TC3>();
+		icons3DShader->Link();
+
+		icons3DShader->Enable();
+		icons3DShader->SetUniform("mainTex", 0);
+		icons3DShader->SetUniform("custTex", 1);
+		icons3DShader->Disable();
+		icons3DShader->Validate();
+	}
+}
+
+void CUnitDrawer::KillStatic(bool reload)
+{
+	CModelDrawerBase<CUnitDrawerData, CUnitDrawer>::KillStatic(reload);
+
+	shaderHandler->ReleaseProgramObjects("[Icons]");
+	icons2DShader = nullptr;
+	icons3DShader = nullptr;
 }
 
 bool CUnitDrawer::ShouldDrawOpaqueUnit(CUnit* u, uint8_t thisPassMask)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (u == ((thisPassMask == DrawFlags::SO_REFLEC_FLAG) ? nullptr : (gu->GetMyPlayer())->fpsController.GetControllee()))
 		return false;
 
@@ -172,6 +214,7 @@ bool CUnitDrawer::ShouldDrawOpaqueUnit(CUnit* u, uint8_t thisPassMask)
 
 bool CUnitDrawer::ShouldDrawAlphaUnit(CUnit* u, uint8_t thisPassMask)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(u);
 	assert(u->model);
 
@@ -204,6 +247,7 @@ bool CUnitDrawer::ShouldDrawAlphaUnit(CUnit* u, uint8_t thisPassMask)
 
 bool CUnitDrawer::ShouldDrawUnitShadow(CUnit* u)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(u);
 	assert(u->model);
 
@@ -232,16 +276,24 @@ void CUnitDrawerBase::Update() const
 
 /***********************************************************************/
 
-void CUnitDrawerLegacy::DrawUnitModel(const CUnit* unit, bool noLuaCall) const
+CUnitDrawerGLSL::CUnitDrawerGLSL()
+{}
+
+CUnitDrawerGLSL::~CUnitDrawerGLSL()
+{}
+
+void CUnitDrawerGLSL::DrawUnitModel(const CUnit* unit, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!noLuaCall && unit->luaDraw && eventHandler.DrawUnit(unit))
 		return;
 
 	unit->localModel.Draw();
 }
 
-void CUnitDrawerLegacy::DrawUnitNoTrans(const CUnit* unit, uint32_t preList, uint32_t postList, bool lodCall, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawUnitNoTrans(const CUnit* unit, uint32_t preList, uint32_t postList, bool lodCall, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const bool noNanoDraw = lodCall || !unit->beingBuilt || !unit->unitDef->showNanoFrame;
 	const bool shadowPass = shadowHandler.InShadowPass();
 
@@ -274,8 +326,9 @@ void CUnitDrawerLegacy::DrawUnitNoTrans(const CUnit* unit, uint32_t preList, uin
 	}
 }
 
-void CUnitDrawerLegacy::DrawUnitTrans(const CUnit* unit, uint32_t preList, uint32_t postList, bool lodCall, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawUnitTrans(const CUnit* unit, uint32_t preList, uint32_t postList, bool lodCall, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	glPushMatrix();
 	glMultMatrixf(unit->GetTransformMatrix());
 
@@ -284,292 +337,435 @@ void CUnitDrawerLegacy::DrawUnitTrans(const CUnit* unit, uint32_t preList, uint3
 	glPopMatrix();
 }
 
-void CUnitDrawerLegacy::DrawUnitMiniMapIcons() const
+void CUnitDrawerGLSL::DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, size_t iconIdx, const float iconScale, const float3& pos, const SColor& color) const
 {
-	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_2DTC>();
-	rb.AssertSubmission();
+	const float iconSizeX = (iconScale * minimap->GetUnitSizeX());
+	const float iconSizeY = (iconScale * minimap->GetUnitSizeY());
+	float posX = pos.x;
+	float posY = pos.z;
 
-	auto& sh = rb.GetShader();
+	switch (minimap->GetRotationOption()) {
+		case CMiniMap::ROTATION_90:
+			posX = mapDims.mapx * SQUARE_SIZE - posX;
 
-	sh.Enable();
-	sh.SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f); // GL_GREATER > 0.0
+			// Normalize the coordinates to the minimap
+			posX = posX / mapDims.mapx * mapDims.mapy;
+			posY = posY / mapDims.mapy * mapDims.mapx;
 
-	static constexpr uint8_t defaultColor[4] = { 255, 255, 255, 255 };
+			std::swap(posX, posY);
+			break;
+		case CMiniMap::ROTATION_180:
+			posX = mapDims.mapx * SQUARE_SIZE - posX;
+			posY = mapDims.mapy * SQUARE_SIZE - posY;
+			break;
+		case CMiniMap::ROTATION_270:
+			posY = mapDims.mapy * SQUARE_SIZE - posY;
 
-	if (!minimap->UseUnitIcons())
-		icon::iconHandler.GetDefaultIconData()->BindTexture();
+			// Normalize the coordinates to the minimap
+			posX = posX / mapDims.mapx * mapDims.mapy;
+			posY = posY / mapDims.mapy * mapDims.mapx;
 
-	for (const auto& [icon, units] : modelDrawerData->GetUnitsByIcon()) {
-
-		if (icon == nullptr)
-			continue;
-		if (units.empty())
-			continue;
-
-		if (minimap->UseUnitIcons())
-			icon->BindTexture();
-
-		for (const CUnit* unit : units) {
-			assert(unit->myIcon == icon);
-			if (unit->noMinimap)
-				continue;
-			if (unit->myIcon == nullptr)
-				continue;
-			if (!unit->drawIcon)
-				continue;
-			if (unit->IsInVoid())
-				continue;
-
-			const uint8_t* color = &defaultColor[0];
-
-			if (!unit->isSelected) {
-				if (minimap->UseSimpleColors()) {
-					if (unit->team == gu->myTeam) {
-						color = minimap->GetMyTeamIconColor();
-					}
-					else if (teamHandler.Ally(gu->myAllyTeam, unit->allyteam)) {
-						color = minimap->GetAllyTeamIconColor();
-					}
-					else {
-						color = minimap->GetEnemyTeamIconColor();
-					}
-				}
-				else {
-					color = teamHandler.Team(unit->team)->color;
-				}
-			}
-
-			const float iconScale = CUnitDrawerHelper::GetUnitIconScale(unit);
-			const float3& iconPos = (!gu->spectatingFullView) ?
-				unit->GetObjDrawErrorPos(gu->myAllyTeam) :
-				unit->GetObjDrawMidPos();
-
-			const float iconSizeX = (iconScale * minimap->GetUnitSizeX());
-			const float iconSizeY = (iconScale * minimap->GetUnitSizeY());
-
-			float x0 = iconPos.x - iconSizeX;
-			float x1 = iconPos.x + iconSizeX;
-			float y0 = iconPos.z - iconSizeY;
-			float y1 = iconPos.z + iconSizeY;
-
-			if (minimap->GetFlipped()) {
-				x0 = mapDims.mapx * SQUARE_SIZE - x0;
-				x1 = mapDims.mapx * SQUARE_SIZE - x1;
-				y0 = mapDims.mapy * SQUARE_SIZE - y0;
-				y1 = mapDims.mapy * SQUARE_SIZE - y1;
-				std::swap(x0, x1);
-				std::swap(y0, y1);
-			}
-
-			rb.AddQuadTriangles(
-				{ x0, y0, 0.0f, 0.0f, color },
-				{ x1, y0, 1.0f, 0.0f, color },
-				{ x1, y1, 1.0f, 1.0f, color },
-				{ x0, y1, 0.0f, 1.0f, color }
-			);
-		}
-
-		rb.Submit(GL_TRIANGLES);
+			std::swap(posX, posY);
+			break;
 	}
+	
+	float x0 = posX - iconSizeX;
+	float x1 = posX + iconSizeX;
+	float y0 = posY - iconSizeY;
+	float y1 = posY + iconSizeY;
 
-	sh.SetUniform("alphaCtrl", 0.0f, 0.0f, 0.0f, 1.0f);
-	sh.Disable();
-	glBindTexture(GL_TEXTURE_2D, 0);
+	const auto& iconData = icon::iconHandler.GetIconData(iconIdx);
+	const auto& tc = iconData.GetTexCoords();
+	const float atlasIdx = static_cast<float>(tc.pageNum);
+
+	rb.AddQuadTriangles(
+		{ x0, y0, tc.x1, tc.y1, atlasIdx, color },
+		{ x1, y0, tc.x2, tc.y1, atlasIdx, color },
+		{ x1, y1, tc.x2, tc.y2, atlasIdx, color },
+		{ x0, y1, tc.x1, tc.y2, atlasIdx, color }
+	);
 }
 
-void CUnitDrawerLegacy::DrawUnitIcons() const
+void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 {
+	ZoneScoped;
+
+	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_2DTC3>();
+	rb.AssertSubmission();
+
+	SColor currentColor;
+	const auto myAllyTeam = gu->myAllyTeam;
+	const auto isFullView = gu->spectatingFullView;
+	const float ghostIconDimming = modelDrawerData->ghostIconDimming;
+	const auto defIconIdx = icon::iconHandler.GetDefaultIconIdx();
+
+	for (auto* unit : modelDrawerData->GetUnsortedObjects()) {
+		const size_t iconIndex = minimap->UseUnitIcons() ? unit->currentIconIndex : defIconIdx;
+
+		if (iconIndex == icon::INVALID_ICON_INDEX)
+			continue;
+
+		if (unit->noMinimap)
+			continue;
+
+		if (!unit->drawIcon)
+			continue;
+
+		if (unit->IsInVoid())
+			continue;
+
+		if (unit->isSelected) {
+			currentColor = color4::white; // selected color
+		}
+		else {
+			if (minimap->UseSimpleColors()) {
+				if (unit->team == gu->myTeam) {
+					currentColor = minimap->GetMyTeamIconColor();
+				}
+				else if (teamHandler.Ally(myAllyTeam, unit->allyteam)) {
+					currentColor = minimap->GetAllyTeamIconColor();
+				}
+				else {
+					currentColor = minimap->GetEnemyTeamIconColor();
+				}
+			}
+			else {
+				currentColor = teamHandler.Team(unit->team)->color;
+			}
+
+			if (!isFullView && !(unit->losStatus[myAllyTeam] & LOS_INRADAR)) {
+				if (ghostIconDimming == 0.0f)
+					continue;
+
+				currentColor.r *= ghostIconDimming;
+				currentColor.g *= ghostIconDimming;
+				currentColor.b *= ghostIconDimming;
+			}
+		}
+
+		const float iconScale = CUnitDrawerHelper::GetUnitIconScale(unit);
+		const float3& pos = (!isFullView) ?
+			unit->GetObjDrawErrorPos(myAllyTeam) :
+			unit->GetObjDrawMidPos();
+
+		DrawUnitMiniMapIcon(rb, iconIndex, iconScale, pos, currentColor);
+	}
+
+	if (!isFullView && ghostIconDimming > 0.0f) {
+		for (auto* ghost : modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam)) {
+			if (minimap->UseSimpleColors())
+				currentColor = minimap->GetEnemyTeamIconColor();
+			else
+				currentColor = teamHandler.Team(ghost->team)->color;
+
+			const size_t iconIndex = minimap->UseUnitIcons() ? ghost->currentIconIndex : defIconIdx;
+
+			assert(iconIndex != icon::INVALID_ICON_INDEX);
+			if (iconIndex == icon::INVALID_ICON_INDEX)
+				continue;
+
+			const auto& iconData = icon::iconHandler.GetIconData(iconIndex);
+
+			const float iconScale = iconData.GetSize();
+			const float3& pos = ghost->midPos;
+
+			currentColor.r *= ghostIconDimming;
+			currentColor.g *= ghostIconDimming;
+			currentColor.b *= ghostIconDimming;
+
+			DrawUnitMiniMapIcon(rb, iconIndex, iconScale, pos, currentColor);
+		}
+	}
+
+
+	if (!rb.ShouldSubmit())
+		return;
+
+	const auto& atlasTexIDs = icon::iconHandler.GetAtlasTextureIDs();
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[0]);
+	if (atlasTexIDs[1]) {
+		glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[1]);
+	}
+
+	icons2DShader->Enable();
+	icons2DShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f); // GL_GREATER > 0.0
+
+	rb.Submit(GL_TRIANGLES);
+
+	icons2DShader->SetUniform("alphaCtrl", 0.0f, 0.0f, 0.0f, 1.0f);
+	icons2DShader->Disable();
+
+	if (atlasTexIDs[1])
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+float CUnitDrawerGLSL::DrawUnitIcon(TypedRenderBuffer<VA_TYPE_TC3>& rb, size_t iconIdx, const float iconRadius, const float unitRadius, float3 pos, const SColor& color) const
+{
+	const auto& iconData = icon::iconHandler.GetIconData(iconIdx);
+
+	// make sure icon is above ground (needed before we calculate scale below)
+	const float h = CGround::GetHeightReal(pos.x, pos.z, false);
+
+	pos.y = std::max(pos.y, h);
+
+	// Calculate the icon size. It scales with:
+	//  * The square root of the camera distance.
+	//  * The mod defined 'iconSize' (which acts a multiplier).
+	//  * The unit radius, depending on whether the mod defined 'radiusadjust' is true or false.
+	const float dist = std::min(8000.0f, fastmath::sqrt_builtin(camera->GetPos().SqDistance(pos)));
+	const float iconScaleDist = 0.4f * fastmath::sqrt_builtin(dist); // makes far icons bigger
+	float scale = iconData.GetSize() * iconScaleDist;
+
+	if (iconData.GetRadiusAdjust() && iconIdx != icon::iconHandler.GetDefaultIconIdx())
+		scale *= (unitRadius / iconData.GetRadiusScale());
+
+	// make sure icon is not partly under ground
+	pos.y = std::max(pos.y, h + scale);
+
+	const float3 dy = camera->GetUp() * scale;
+	const float3 dx = camera->GetRight() * scale;
+	const float3 vn = pos - dx;
+	const float3 vp = pos + dx;
+	const float3 bl = vn - dy; // bottom-left
+	const float3 br = vp - dy; // bottom-right
+	const float3 tl = vn + dy; // top-left
+	const float3 tr = vp + dy; // top-right
+
+	const auto& tc = iconData.GetTexCoords();
+	const float atlasIdx = static_cast<float>(tc.pageNum);
+
+	rb.AddQuadTriangles(
+		{ tl, tc.x1, tc.y1, atlasIdx, color },
+		{ tr, tc.x2, tc.y1, atlasIdx, color },
+		{ br, tc.x2, tc.y2, atlasIdx, color },
+		{ bl, tc.x1, tc.y2, atlasIdx, color }
+	);
+
+	return scale;
+}
+
+void CUnitDrawerGLSL::DrawUnitIcons() const
+{
+	ZoneScoped;
 #if 0
 	if (game->hideInterface && modelDrawerData->iconHideWithUI)
 		return;
 #endif
 
-	// draw unit icons and radar blips
-	glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT);
-	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_BLEND);
-
-	// A2C effectiveness is limited below four samples
-	if (globalRendering->msaaLevel >= 4)
-		glEnable(GL_SAMPLE_ALPHA_TO_COVERAGE_ARB);
-
-	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_TC>();
+	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_TC3>();
 	rb.AssertSubmission();
 
-	auto& sh = rb.GetShader();
-	sh.Enable();
-	sh.SetUniform("alphaCtrl", 0.05f, 1.0f, 0.0f, 0.0f); // GL_GREATER > 0.05
-
-	for (const auto& [icon, units] : modelDrawerData->GetUnitsByIcon())
-	{
-		if (icon == nullptr)
-			continue;
-		if (units.empty())
+	for (auto* unit : modelDrawerData->GetUnsortedObjects()) {
+		if (unit->currentIconIndex == icon::INVALID_ICON_INDEX)
 			continue;
 
-		icon->BindTexture();
+		if (!unit->GetIsIcon())
+			continue;
 
-		for (const CUnit* cu : units)
-		{
-			CUnit* unit = const_cast<CUnit*>(cu);
+		if (!unit->drawIcon)
+			continue;
 
-			if (!unit->GetIsIcon())
-				continue;
-			if (!unit->drawIcon)
-				continue;
+		const auto& iconData = icon::iconHandler.GetIconData(unit->currentIconIndex);
 
-			// drawMidPos is auto-calculated now; can wobble on its own as pieces move
-			float3 pos = (!gu->spectatingFullView) ?
-				unit->GetObjDrawErrorPos(gu->myAllyTeam) :
-				unit->GetObjDrawMidPos();
+		// drawMidPos is auto-calculated now; can wobble on its own as pieces move
+		float3 pos = (!gu->spectatingFullView) ?
+			unit->GetObjDrawErrorPos(gu->myAllyTeam) :
+			unit->GetObjDrawMidPos();
 
-			// make sure icon is above ground (needed before we calculate scale below)
-			const float h = CGround::GetHeightReal(pos.x, pos.z, false);
+		// use white for selected units
+		const auto& iconColor = unit->isSelected ? color4::white : teamHandler.Team(unit->team)->color;
 
-			pos.y = std::max(pos.y, h);
-
-			// Calculate the icon size. It scales with:
-			//  * The square root of the camera distance.
-			//  * The mod defined 'iconSize' (which acts a multiplier).
-			//  * The unit radius, depending on whether the mod defined 'radiusadjust' is true or false.
-			const float dist = std::min(8000.0f, fastmath::sqrt_builtin(camera->GetPos().SqDistance(pos)));
-			const float iconScaleDist = 0.4f * fastmath::sqrt_builtin(dist); // makes far icons bigger
-			float scale = icon->GetSize() * iconScaleDist;
-
-			if (icon->GetRadiusAdjust() && icon != icon::iconHandler.GetDefaultIconData())
-				scale *= (unit->radius / icon->GetRadiusScale());
-
-			// make sure icon is not partly under ground
-			pos.y = std::max(pos.y, h + (unit->iconRadius = scale));
-
-			// use white for selected units
-			const uint8_t* colors[] = { teamHandler.Team(unit->team)->color, color4::white };
-			const uint8_t* color = colors[unit->isSelected];
-
-			const float3 dy = camera->GetUp() * unit->iconRadius;
-			const float3 dx = camera->GetRight() * unit->iconRadius;
-			const float3 vn = pos - dx;
-			const float3 vp = pos + dx;
-			const float3 bl = vn - dy; // bottom-left
-			const float3 br = vp - dy; // bottom-right
-			const float3 tl = vn + dy; // top-left
-			const float3 tr = vp + dy; // top-right
-
-			rb.AddQuadTriangles(
-				{ tl, 0.0f, 0.0f, color },
-				{ tr, 1.0f, 0.0f, color },
-				{ br, 1.0f, 1.0f, color },
-				{ bl, 0.0f, 1.0f, color }
-			);
-		}
-		rb.Submit(GL_TRIANGLES);
+		unit->iconRadius = DrawUnitIcon(rb, unit->currentIconIndex, unit->iconRadius, unit->radius, pos, iconColor);
 	}
-	sh.SetUniform("alphaCtrl", 0.0f, 0.0f, 0.0f, 1.0f);
-	sh.Disable();
-	glBindTexture(GL_TEXTURE_2D, 0);
 
-	glPopAttrib();
+	if (!rb.ShouldSubmit())
+		return;
+
+	using namespace GL::State;
+
+	auto state = GL::SubState(
+		DepthTest(GL_FALSE),
+		Blending(GL_FALSE),
+		AlphaToCoverage(globalRendering->msaaLevel >= 4 ? GL_TRUE : GL_FALSE)
+	);
+
+	const auto& atlasTexIDs = icon::iconHandler.GetAtlasTextureIDs();
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[0]);
+	if (atlasTexIDs[1]) {
+		glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[1]);
+	}
+
+	icons3DShader->Enable();
+	icons3DShader->SetUniform("alphaCtrl", 0.05f, 1.0f, 0.0f, 0.0f); // GL_GREATER > 0.05
+
+	rb.Submit(GL_TRIANGLES);
+
+	icons3DShader->SetUniform("alphaCtrl", 0.0f, 0.0f, 0.0f, 1.0f);
+	icons3DShader->Disable();
+
+	if (atlasTexIDs[1])
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void CUnitDrawerLegacy::DrawUnitIconsScreen() const
+void CUnitDrawerGLSL::DrawUnitIconScreen(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, size_t iconIdx, const float3& pos, SColor& color, float unitRadius, bool isIcon) const
 {
+	const auto& iconData = icon::iconHandler.GetIconData(iconIdx);
+
+	float unitRadiusMult = iconData.GetSize();
+	if (iconData.GetRadiusAdjust() && iconIdx != icon::iconHandler.GetDefaultIconIdx())
+		unitRadiusMult *= (unitRadius / iconData.GetRadiusScale());
+
+	unitRadiusMult = unitRadiusMult * 0.75f + 0.25f;
+
+	// fade icons away in high zoom in levels
+	if (!isIcon) {
+		if (modelDrawerData->iconZoomDist / unitRadiusMult < modelDrawerData->iconFadeVanish)
+			return;
+		else if (modelDrawerData->iconFadeVanish < modelDrawerData->iconFadeStart && modelDrawerData->iconZoomDist / unitRadiusMult < modelDrawerData->iconFadeStart)
+			// alpha range [64, 255], since icons is unrecognisable with alpha < 64
+			color.a = 64 + 191.0f * (modelDrawerData->iconZoomDist / unitRadiusMult - modelDrawerData->iconFadeVanish) / (modelDrawerData->iconFadeStart - modelDrawerData->iconFadeVanish);
+	}
+
+	// calculate the vertices
+	const float offset = modelDrawerData->iconSizeBase / 2.0f * unitRadiusMult;
+
+	const float x0 = (pos.x - offset) / globalRendering->viewSizeX;
+	const float y0 = (pos.y + offset) / globalRendering->viewSizeY;
+	const float x1 = (pos.x + offset) / globalRendering->viewSizeX;
+	const float y1 = (pos.y - offset) / globalRendering->viewSizeY;
+
+	if (x1 < 0 && x0 > 1 && y0 < 0 && y1 > 1)
+		return; // don't try to draw when totally outside the screen
+
+	const auto& tc = iconData.GetTexCoords();
+	const float atlasIdx = static_cast<float>(tc.pageNum);
+
+	rb.AddQuadTriangles(
+		{ x0, y0, tc.x1, tc.y1, atlasIdx, color },
+		{ x1, y0, tc.x2, tc.y1, atlasIdx, color },
+		{ x1, y1, tc.x2, tc.y2, atlasIdx, color },
+		{ x0, y1, tc.x1, tc.y2, atlasIdx, color }
+	);
+}
+
+void CUnitDrawerGLSL::DrawUnitIconsScreen() const
+{
+	ZoneScoped;
+
 	if (game->hideInterface && modelDrawerData->iconHideWithUI)
 		return;
 
-	// draw unit icons and radar blips
-	glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT);
-	glDisable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_2DTC>();
+	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_2DTC3>();
 	rb.AssertSubmission();
 
-	auto& sh = rb.GetShader();
+	SColor currentColor;
+	const auto myAllyTeam = gu->myAllyTeam;
+	const auto isFullView = gu->spectatingFullView;
+	const float ghostIconDimming = modelDrawerData->ghostIconDimming;
 
-	sh.Enable();
-	sh.SetUniform("alphaCtrl", 0.05f, 1.0f, 0.0f, 0.0f); // GL_GREATER > 0.05
-
-	const auto allyTeam = gu->myAllyTeam;
-
-	for (const auto& [icon, units] : modelDrawerData->GetUnitsByIcon())
-	{
-		if (icon == nullptr)
-			continue;
-		if (units.empty())
+	for (auto* unit : modelDrawerData->GetUnsortedObjects()) {
+		if (unit->currentIconIndex == icon::INVALID_ICON_INDEX)
 			continue;
 
-		icon->BindTexture();
+		if (!unit->drawIcon)
+			continue;
 
-		for (const CUnit* unit : units)
-		{
-			if (!unit->drawIcon)
-				continue;
+		// needed?
+		const bool canSee = gu->spectatingFullView || (unit->losStatus[gu->myAllyTeam] && (LOS_INLOS | LOS_CONTRADAR | LOS_PREVLOS) == (LOS_INLOS | LOS_CONTRADAR | LOS_PREVLOS));
+		if (!canSee)
+			continue;
 
-			const bool canSee = gu->spectatingFullView || (unit->losStatus[gu->myAllyTeam] && (LOS_INLOS | LOS_CONTRADAR | LOS_PREVLOS) == (LOS_INLOS | LOS_CONTRADAR | LOS_PREVLOS));
-			if (!canSee)
-				continue;
+		assert(!unit->IsInVoid());
 
-			assert(unit->myIcon == icon);
-			// iconUnits should not never contain void-space units, see UpdateUnitIconState
-			assert(!unit->IsInVoid());
 
-			// drawMidPos is auto-calculated now; can wobble on its own as pieces move
-			float3 pos = (!gu->spectatingFullView) ?
-				unit->GetObjDrawErrorPos(gu->myAllyTeam) :
-				unit->GetObjDrawMidPos();
+		// drawMidPos is auto-calculated now; can wobble on its own as pieces move
+		float3 pos = (!isFullView) ?
+			unit->GetObjDrawErrorPos(myAllyTeam) :
+			unit->GetObjDrawMidPos();
+
+		pos = camera->CalcViewPortCoordinates(pos);
+		if (pos.z > 1.0f || pos.z < 0.0f)
+			continue;
+
+		if (unit->isSelected) {
+			currentColor = color4::white; // selected color
+		}
+		else {
+			currentColor = teamHandler.Team(unit->team)->color;
+			if (!isFullView && !(unit->losStatus[myAllyTeam] & LOS_INRADAR)) {
+				if (ghostIconDimming == 0.0f)
+					continue;
+
+				currentColor.r *= ghostIconDimming;
+				currentColor.g *= ghostIconDimming;
+				currentColor.b *= ghostIconDimming;
+			}
+		}
+
+		DrawUnitIconScreen(rb, unit->currentIconIndex, pos, currentColor, unit->radius, unit->GetIsIcon());
+	}
+	
+	if (!isFullView && ghostIconDimming > 0.0f) {
+		for (auto* ghost : modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam)) {
+			float3 pos = ghost->midPos;
 
 			pos = camera->CalcViewPortCoordinates(pos);
 			if (pos.z > 1.0f || pos.z < 0.0f)
 				continue;
 
-			// use white for selected units
-			SColor color = unit->isSelected ? color4::white : SColor{ teamHandler.Team(unit->team)->color };
+			const auto& iconIndex = ghost->currentIconIndex;
 
-			float unitRadiusMult = icon->GetSize();
-			if (icon->GetRadiusAdjust() && icon != icon::iconHandler.GetDefaultIconData())
-				unitRadiusMult *= (unit->radius / icon->GetRadiusScale());
-			unitRadiusMult = (unitRadiusMult - 1) * 0.75 + 1;
+			assert(iconIndex != icon::INVALID_ICON_INDEX);
+			if (iconIndex == icon::INVALID_ICON_INDEX)
+				continue;
 
-			// fade icons away in high zoom in levels
-			if (!unit->GetIsIcon()) {
-				if (modelDrawerData->iconZoomDist / unitRadiusMult < modelDrawerData->iconFadeVanish)
-					continue;
-				else if (modelDrawerData->iconFadeVanish < modelDrawerData->iconFadeStart && modelDrawerData->iconZoomDist / unitRadiusMult < modelDrawerData->iconFadeStart)
-					// alpha range [64, 255], since icons is unrecognisable with alpha < 64
-					color.a = 64 + 191.0f * (modelDrawerData->iconZoomDist / unitRadiusMult - modelDrawerData->iconFadeVanish) / (modelDrawerData->iconFadeStart - modelDrawerData->iconFadeVanish);
-			}
+			currentColor = teamHandler.Team(ghost->team)->color;
+			currentColor.r *= ghostIconDimming;
+			currentColor.g *= ghostIconDimming;
+			currentColor.b *= ghostIconDimming;
 
-			// calculate the vertices
-			const float offset = modelDrawerData->iconSizeBase / 2.0f * unitRadiusMult;
-
-			const float x0 = (pos.x - offset) / globalRendering->viewSizeX;
-			const float y0 = (pos.y + offset) / globalRendering->viewSizeY;
-			const float x1 = (pos.x + offset) / globalRendering->viewSizeX;
-			const float y1 = (pos.y - offset) / globalRendering->viewSizeY;
-
-			if (x1 < 0 && x0 > 1 && y0 < 0 && y1 > 1)
-				continue; // don't try to draw when totally outside the screen
-
-			rb.AddQuadTriangles(
-				{ x0, y0, 0.0f, 0.0f, color },
-				{ x1, y0, 1.0f, 0.0f, color },
-				{ x1, y1, 1.0f, 1.0f, color },
-				{ x0, y1, 0.0f, 1.0f, color }
-			);
+			DrawUnitIconScreen(rb, iconIndex, pos, currentColor, ghost->radius, false);
 		}
-
-		rb.Submit(GL_TRIANGLES);
 	}
 
-	sh.SetUniform("alphaCtrl", 0.0f, 0.0f, 0.0f, 1.0f);
-	sh.Disable();
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glPopAttrib();
+	if (!rb.ShouldSubmit())
+		return;
+
+	using namespace GL::State;
+
+	auto state = GL::SubState(
+		DepthTest(GL_FALSE),
+		Blending(GL_TRUE),
+		BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+	);
+
+	const auto& atlasTexIDs = icon::iconHandler.GetAtlasTextureIDs();
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[0]);
+	if (atlasTexIDs[1]) {
+		glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, atlasTexIDs[1]);
+	}
+
+	icons3DShader->Enable();
+	icons3DShader->SetUniform("alphaCtrl", 0.05f, 1.0f, 0.0f, 0.0f); // GL_GREATER > 0.05
+
+	rb.Submit(GL_TRIANGLES);
+
+	icons3DShader->SetUniform("alphaCtrl", 0.0f, 0.0f, 0.0f, 1.0f);
+	icons3DShader->Disable();
+
+	if (atlasTexIDs[1])
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-void CUnitDrawerLegacy::DrawObjectsShadow(int modelType) const
+void CUnitDrawerGLSL::DrawObjectsShadow(int modelType) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto& mdlRenderer = modelDrawerData->GetModelRenderer(modelType);
 
 	for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
@@ -585,8 +781,9 @@ void CUnitDrawerLegacy::DrawObjectsShadow(int modelType) const
 	}
 }
 
-void CUnitDrawerLegacy::DrawOpaqueObjects(int modelType, bool drawReflection, bool drawRefraction) const
+void CUnitDrawerGLSL::DrawOpaqueObjects(int modelType, bool drawReflection, bool drawRefraction) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const uint8_t thisPassMask =
 		(1 - (drawReflection || drawRefraction)) * DrawFlags::SO_OPAQUE_FLAG +
 		(drawReflection * DrawFlags::SO_REFLEC_FLAG) +
@@ -606,8 +803,9 @@ void CUnitDrawerLegacy::DrawOpaqueObjects(int modelType, bool drawReflection, bo
 	}
 }
 
-void CUnitDrawerLegacy::DrawAlphaObjects(int modelType, bool drawReflection, bool drawRefraction) const
+void CUnitDrawerGLSL::DrawAlphaObjects(int modelType, bool drawReflection, bool drawRefraction) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const uint8_t thisPassMask =
 		(1 - (drawReflection || drawRefraction)) * DrawFlags::SO_ALPHAF_FLAG +
 		(drawReflection * DrawFlags::SO_REFLEC_FLAG) +
@@ -631,8 +829,9 @@ void CUnitDrawerLegacy::DrawAlphaObjects(int modelType, bool drawReflection, boo
 		DrawGhostedBuildings(modelType);
 }
 
-void CUnitDrawerLegacy::DrawOpaqueObjectsAux(int modelType) const
+void CUnitDrawerGLSL::DrawOpaqueObjectsAux(int modelType) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const std::vector<CUnitDrawerData::TempDrawUnit>& tmpOpaqueUnits = modelDrawerData->GetTempOpaqueDrawUnits(modelType);
 
 	// NOTE: not type-sorted
@@ -644,8 +843,9 @@ void CUnitDrawerLegacy::DrawOpaqueObjectsAux(int modelType) const
 	}
 }
 
-void CUnitDrawerLegacy::DrawAlphaObjectsAux(int modelType) const
+void CUnitDrawerGLSL::DrawAlphaObjectsAux(int modelType) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const std::vector<CUnitDrawerData::TempDrawUnit>& tmpAlphaUnits = modelDrawerData->GetTempAlphaDrawUnits(modelType);
 
 	// NOTE: not type-sorted
@@ -658,8 +858,9 @@ void CUnitDrawerLegacy::DrawAlphaObjectsAux(int modelType) const
 	}
 }
 
-void CUnitDrawerLegacy::DrawGhostedBuildings(int modelType) const
+void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto& deadGhostedBuildings = modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam, modelType);
 	const auto& liveGhostedBuildings = modelDrawerData->GetLiveGhostBuildings(gu->myAllyTeam, modelType);
 
@@ -677,7 +878,6 @@ void CUnitDrawerLegacy::DrawGhostedBuildings(int modelType) const
 
 			dgb->GetModel()->DrawStatic();
 			glPopMatrix();
-			dgb->lastDrawFrame = globalRendering->drawFrame;
 		}
 	}
 
@@ -686,8 +886,9 @@ void CUnitDrawerLegacy::DrawGhostedBuildings(int modelType) const
 	}
 }
 
-void CUnitDrawerLegacy::DrawOpaqueUnit(CUnit* unit, uint8_t thisPassMask) const
+void CUnitDrawerGLSL::DrawOpaqueUnit(CUnit* unit, uint8_t thisPassMask) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!ShouldDrawOpaqueUnit(unit, thisPassMask))
 		return;
 
@@ -696,14 +897,16 @@ void CUnitDrawerLegacy::DrawOpaqueUnit(CUnit* unit, uint8_t thisPassMask) const
 	DrawUnitTrans(unit, 0, 0, false, false);
 }
 
-void CUnitDrawerLegacy::DrawUnitShadow(CUnit* unit) const
+void CUnitDrawerGLSL::DrawUnitShadow(CUnit* unit) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (ShouldDrawUnitShadow(unit))
 		DrawUnitTrans(unit, 0, 0, false, false);
 }
 
-void CUnitDrawerLegacy::DrawAlphaUnit(CUnit* unit, int modelType, uint8_t thisPassMask, bool drawGhostBuildingsPass) const
+void CUnitDrawerGLSL::DrawAlphaUnit(CUnit* unit, int modelType, uint8_t thisPassMask, bool drawGhostBuildingsPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!drawGhostBuildingsPass && !ShouldDrawAlphaUnit(unit, thisPassMask))
 		return;
 
@@ -760,8 +963,9 @@ void CUnitDrawerLegacy::DrawAlphaUnit(CUnit* unit, int modelType, uint8_t thisPa
 	}
 }
 
-void CUnitDrawerLegacy::DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const
+void CUnitDrawerGLSL::DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	glPushMatrix();
 	glTranslatef3(unit.pos);
 	glRotatef(unit.rotation * math::RAD_TO_DEG, 0.0f, 1.0f, 0.0f);
@@ -778,8 +982,9 @@ void CUnitDrawerLegacy::DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& un
 	glPopMatrix();
 }
 
-void CUnitDrawerLegacy::DrawAlphaAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const
+void CUnitDrawerGLSL::DrawAlphaAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	glPushMatrix();
 	glTranslatef3(unit.pos);
 	glRotatef(unit.rotation * math::RAD_TO_DEG, 0.0f, 1.0f, 0.0f);
@@ -796,8 +1001,9 @@ void CUnitDrawerLegacy::DrawAlphaAIUnit(const CUnitDrawerData::TempDrawUnit& uni
 	glPopMatrix();
 }
 
-void CUnitDrawerLegacy::DrawAlphaAIUnitBorder(const CUnitDrawerData::TempDrawUnit& unit) const
+void CUnitDrawerGLSL::DrawAlphaAIUnitBorder(const CUnitDrawerData::TempDrawUnit& unit) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!unit.drawBorder)
 		return;
 
@@ -836,8 +1042,9 @@ void CUnitDrawerLegacy::DrawAlphaAIUnitBorder(const CUnitDrawerData::TempDrawUni
 	glEnable(GL_TEXTURE_2D);
 }
 
-void CUnitDrawerLegacy::DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 stageBounds = { 0.0f, unit->model->CalcDrawHeight(), unit->buildProgress };
 
 	// draw-height defaults to maxs.y - mins.y, but can be overridden for non-3DO models
@@ -886,8 +1093,9 @@ void CUnitDrawerLegacy::DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool no
 	glPopAttrib();
 }
 
-void CUnitDrawerLegacy::DrawModelWireBuildStageShadow(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawModelWireBuildStageShadow(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (globalRendering->amdHacks) {
 		glDisable(GL_CLIP_PLANE0);
 		glDisable(GL_CLIP_PLANE1);
@@ -909,8 +1117,9 @@ void CUnitDrawerLegacy::DrawModelWireBuildStageShadow(const CUnit* unit, const d
 	}
 }
 
-void CUnitDrawerLegacy::DrawModelFlatBuildStageShadow(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawModelFlatBuildStageShadow(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	glPushMatrix();
 	glLoadIdentity();
 	glClipPlane(GL_CLIP_PLANE0, upperPlane);
@@ -920,13 +1129,15 @@ void CUnitDrawerLegacy::DrawModelFlatBuildStageShadow(const CUnit* unit, const d
 	DrawUnitModel(unit, noLuaCall);
 }
 
-void CUnitDrawerLegacy::DrawModelFillBuildStageShadow(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawModelFillBuildStageShadow(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	DrawUnitModel(unit, noLuaCall);
 }
 
-void CUnitDrawerLegacy::DrawUnitModelBeingBuiltOpaque(const CUnit* unit, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawUnitModelBeingBuiltOpaque(const CUnit* unit, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const S3DModel* model = unit->model;
 	const    CTeam* team = teamHandler.Team(unit->team);
 	const   SColor  color = team->color;
@@ -987,8 +1198,9 @@ void CUnitDrawerLegacy::DrawUnitModelBeingBuiltOpaque(const CUnit* unit, bool no
 	glPopAttrib();
 }
 
-void CUnitDrawerLegacy::DrawModelWireBuildStageOpaque(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawModelWireBuildStageOpaque(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (globalRendering->amdHacks) {
 		glDisable(GL_CLIP_PLANE0);
 		glDisable(GL_CLIP_PLANE1);
@@ -1007,16 +1219,18 @@ void CUnitDrawerLegacy::DrawModelWireBuildStageOpaque(const CUnit* unit, const d
 	}
 }
 
-void CUnitDrawerLegacy::DrawModelFlatBuildStageOpaque(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawModelFlatBuildStageOpaque(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	glClipPlane(GL_CLIP_PLANE0, upperPlane);
 	glClipPlane(GL_CLIP_PLANE1, lowerPlane);
 
 	DrawUnitModel(unit, noLuaCall);
 }
 
-void CUnitDrawerLegacy::DrawModelFillBuildStageOpaque(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawModelFillBuildStageOpaque(const CUnit* unit, const double* upperPlane, const double* lowerPlane, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (globalRendering->amdHacks)
 		glDisable(GL_CLIP_PLANE0);
 	else
@@ -1028,9 +1242,10 @@ void CUnitDrawerLegacy::DrawModelFillBuildStageOpaque(const CUnit* unit, const d
 	glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
-void CUnitDrawerLegacy::PushIndividualOpaqueState(const CUnit* unit, bool deferredPass) const { PushIndividualOpaqueState(unit->model, unit->team, deferredPass); }
-void CUnitDrawerLegacy::PushIndividualOpaqueState(const S3DModel* model, int teamID, bool deferredPass) const
+void CUnitDrawerGLSL::PushIndividualOpaqueState(const CUnit* unit, bool deferredPass) const { PushIndividualOpaqueState(unit->model, unit->team, deferredPass); }
+void CUnitDrawerGLSL::PushIndividualOpaqueState(const S3DModel* model, int teamID, bool deferredPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// these are not handled by Setup*Drawing but CGame
 	// easier to assume they no longer have the correct
 	// values at this point
@@ -1043,30 +1258,34 @@ void CUnitDrawerLegacy::PushIndividualOpaqueState(const S3DModel* model, int tea
 	SetTeamColor(teamID);
 }
 
-void CUnitDrawerLegacy::PushIndividualAlphaState(const S3DModel* model, int teamID, bool deferredPass) const
+void CUnitDrawerGLSL::PushIndividualAlphaState(const S3DModel* model, int teamID, bool deferredPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	SetupAlphaDrawing(deferredPass);
 	CModelDrawerHelper::PushModelRenderState(model);
 	SetTeamColor(teamID, IModelDrawerState::alphaValues.x);
 }
 
-void CUnitDrawerLegacy::PopIndividualOpaqueState(const CUnit* unit, bool deferredPass) const { PopIndividualOpaqueState(unit->model, unit->team, deferredPass); }
-void CUnitDrawerLegacy::PopIndividualOpaqueState(const S3DModel* model, int teamID, bool deferredPass) const
+void CUnitDrawerGLSL::PopIndividualOpaqueState(const CUnit* unit, bool deferredPass) const { PopIndividualOpaqueState(unit->model, unit->team, deferredPass); }
+void CUnitDrawerGLSL::PopIndividualOpaqueState(const S3DModel* model, int teamID, bool deferredPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CModelDrawerHelper::PopModelRenderState(model);
 	ResetOpaqueDrawing(deferredPass);
 
 	glPopAttrib();
 }
 
-void CUnitDrawerLegacy::PopIndividualAlphaState(const S3DModel* model, int teamID, bool deferredPass) const
+void CUnitDrawerGLSL::PopIndividualAlphaState(const S3DModel* model, int teamID, bool deferredPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CModelDrawerHelper::PopModelRenderState(model);
 	ResetAlphaDrawing(deferredPass);
 }
 
-void CUnitDrawerLegacy::DrawIndividual(const CUnit* unit, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawIndividual(const CUnit* unit, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (LuaObjectDrawer::DrawSingleObject(unit, LUAOBJ_UNIT /*, noLuaCall*/))
 		return;
 
@@ -1076,8 +1295,9 @@ void CUnitDrawerLegacy::DrawIndividual(const CUnit* unit, bool noLuaCall) const
 	PopIndividualOpaqueState(unit, false);
 }
 
-void CUnitDrawerLegacy::DrawIndividualNoTrans(const CUnit* unit, bool noLuaCall) const
+void CUnitDrawerGLSL::DrawIndividualNoTrans(const CUnit* unit, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (LuaObjectDrawer::DrawSingleObjectNoTrans(unit, LUAOBJ_UNIT /*, noLuaCall*/))
 		return;
 
@@ -1086,8 +1306,9 @@ void CUnitDrawerLegacy::DrawIndividualNoTrans(const CUnit* unit, bool noLuaCall)
 	PopIndividualOpaqueState(unit, false);
 }
 
-void CUnitDrawerLegacy::DrawIndividualDefOpaque(const SolidObjectDef* objectDef, int teamID, bool rawState, bool toScreen) const
+void CUnitDrawerGLSL::DrawIndividualDefOpaque(const SolidObjectDef* objectDef, int teamID, bool rawState, bool toScreen) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const S3DModel* model = objectDef->LoadModel();
 
 	if (model == nullptr)
@@ -1118,8 +1339,9 @@ void CUnitDrawerLegacy::DrawIndividualDefOpaque(const SolidObjectDef* objectDef,
 	}
 }
 
-void CUnitDrawerLegacy::DrawIndividualDefAlpha(const SolidObjectDef* objectDef, int teamID, bool rawState, bool toScreen) const
+void CUnitDrawerGLSL::DrawIndividualDefAlpha(const SolidObjectDef* objectDef, int teamID, bool rawState, bool toScreen) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const S3DModel* model = objectDef->LoadModel();
 
 	if (model == nullptr)
@@ -1142,8 +1364,9 @@ void CUnitDrawerLegacy::DrawIndividualDefAlpha(const SolidObjectDef* objectDef, 
 	}
 }
 
-bool CUnitDrawerLegacy::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std::vector<Command>& commands) const
+bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std::vector<Command>& commands) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	//TODO: make this a lua callin!
 	glDisable(GL_DEPTH_TEST);
 	glEnable(GL_BLEND);
@@ -1157,7 +1380,33 @@ bool CUnitDrawerLegacy::ShowUnitBuildSquare(const BuildInfo& buildInfo, const st
 	std::vector<float3> featureSquares; // occupied squares
 	std::vector<float3> illegalSquares; // non-buildable squares
 
+	struct BuildCache {
+		uint64_t key;
+		int createFrame;
+		bool canBuild;
+		std::vector<float3> buildableSquares; // buildable squares
+		std::vector<float3> featureSquares; // occupied squares
+		std::vector<float3> illegalSquares; // non-buildable squares
+	};
+
+	static std::vector<BuildCache> buildCache;
+
 	const float3& pos = buildInfo.pos;
+
+	uint64_t hashKey = spring::LiteHash(pos);
+	hashKey = spring::hash_combine(spring::LiteHash(buildInfo.buildFacing), hashKey);
+	/*
+	for (const auto& cmd : commands) {
+		const BuildInfo bc(cmd);
+		spring::hash_combine(spring::LiteHash(bc), hash);
+	}
+	*/
+
+	// the chosen number here is arbitrary, feel free to fine balance.
+	static constexpr int CACHE_VALIDITY_PERIOD = GAME_SPEED / 5;
+	std::erase_if(buildCache, [](const BuildCache& bc) {
+		return gs->frameNum - bc.createFrame >= CACHE_VALIDITY_PERIOD;
+	});
 
 	const int x1 = pos.x - (buildInfo.GetXSize() * 0.5f * SQUARE_SIZE);
 	const int x2 = x1 + (buildInfo.GetXSize() * SQUARE_SIZE);
@@ -1167,16 +1416,36 @@ bool CUnitDrawerLegacy::ShowUnitBuildSquare(const BuildInfo& buildInfo, const st
 
 	bool canBuild;
 
-	canBuild = !!CGameHelper::TestUnitBuildSquare(
-		buildInfo,
-		feature,
-		-1,
-		false,
-		&buildableSquares,
-		&featureSquares,
-		&illegalSquares,
-		&commands
-	);
+	const auto it = std::find_if(buildCache.begin(), buildCache.end(), [hashKey](const BuildCache& bc) {
+		return bc.key == hashKey;
+	});
+	if (it != buildCache.end()) {
+		buildableSquares.assign(it->buildableSquares.begin(), it->buildableSquares.end());
+		featureSquares.assign(it->featureSquares.begin(), it->featureSquares.end());
+		illegalSquares.assign(it->illegalSquares.begin(), it->illegalSquares.end());
+		canBuild = it->canBuild;
+	}
+	else {
+		canBuild = !!CGameHelper::TestUnitBuildSquare(
+			buildInfo,
+			feature,
+			-1,
+			false,
+			&buildableSquares,
+			&featureSquares,
+			&illegalSquares,
+			&commands
+		);
+		buildCache.emplace_back();
+		auto& buildCacheItem = buildCache.back();
+
+		buildCacheItem.key = hashKey;
+		buildCacheItem.canBuild = canBuild;
+		buildCacheItem.createFrame = gs->frameNum;
+		buildCacheItem.buildableSquares.assign(buildableSquares.begin(), buildableSquares.end());
+		buildCacheItem.featureSquares.assign(featureSquares.begin(), featureSquares.end());
+		buildCacheItem.illegalSquares.assign(illegalSquares.begin(), illegalSquares.end());
+	}
 
 	static constexpr std::array<float, 4> buildColorT  = { 0.0f, 0.9f, 0.0f, 0.7f };
 	static constexpr std::array<float, 4> buildColorF  = { 0.9f, 0.8f, 0.0f, 0.7f };
@@ -1248,8 +1517,9 @@ bool CUnitDrawerLegacy::ShowUnitBuildSquare(const BuildInfo& buildInfo, const st
 	return canBuild;
 }
 
-void CUnitDrawerLegacy::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon>& buildIcons) const
+void CUnitDrawerGLSL::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon>& buildIcons) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (buildIcons.empty())
 		return;
 
@@ -1281,9 +1551,10 @@ void CUnitDrawerLegacy::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon
 
 /***********************************************************************/
 
-// CUnitDrawerLegacy::DrawBuildIcons is seemingly unbeatable in terms of FPS ?
+// CUnitDrawerGLSL::DrawBuildIcons is seemingly unbeatable in terms of FPS ?
 void CUnitDrawerGL4::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon>& buildIcons) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (buildIcons.empty())
 		return;
 
@@ -1324,7 +1595,7 @@ void CUnitDrawerGL4::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon>& 
 
 			prevModelType = model->type; prevTexType = model->textureType;
 			CModelDrawerHelper::PushModelRenderState(model->type);
-			CModelDrawerHelper::BindModelTypeTexture(model->type, model->textureType); //ineficient rendering, but w/e
+			CModelDrawerHelper::BindModelTypeTexture(model->type, model->textureType); //inefficient rendering, but w/e
 		}
 
 		smv.SubmitImmediately(model, buildIcon.team, DrawFlags::SO_ALPHAF_FLAG);
@@ -1346,6 +1617,7 @@ void CUnitDrawerGL4::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon>& 
 
 void CUnitDrawerGL4::DrawObjectsShadow(int modelType) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto& mdlRenderer = modelDrawerData->GetModelRenderer(modelType);
 
 	auto& smv = S3DModelVAO::GetInstance();
@@ -1387,6 +1659,7 @@ void CUnitDrawerGL4::DrawObjectsShadow(int modelType) const
 
 void CUnitDrawerGL4::DrawOpaqueObjects(int modelType, bool drawReflection, bool drawRefraction) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const uint8_t thisPassMask =
 		(1 - (drawReflection || drawRefraction)) * DrawFlags::SO_OPAQUE_FLAG +
 		(drawReflection * DrawFlags::SO_REFLEC_FLAG) +
@@ -1492,7 +1765,7 @@ void CUnitDrawerGL4::DrawAlphaObjects(int modelType, bool drawReflection, bool d
 
 			if (prevModelType != modelType || prevTexType != dgb->GetModel()->textureType) {
 				prevModelType = modelType; prevTexType = dgb->GetModel()->textureType;
-				CModelDrawerHelper::BindModelTypeTexture(modelType, dgb->GetModel()->textureType); //ineficient rendering, but w/e
+				CModelDrawerHelper::BindModelTypeTexture(modelType, dgb->GetModel()->textureType); //inefficient rendering, but w/e
 			}
 
 			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
@@ -1546,7 +1819,7 @@ void CUnitDrawerGL4::DrawAlphaObjects(int modelType, bool drawReflection, bool d
 
 			if (prevModelType != modelType || prevTexType != model->textureType) {
 				prevModelType = modelType; prevTexType = model->textureType;
-				CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType); //ineficient rendering, but w/e
+				CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType); //inefficient rendering, but w/e
 			}
 
 			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
@@ -1561,6 +1834,7 @@ void CUnitDrawerGL4::DrawAlphaObjects(int modelType, bool drawReflection, bool d
 
 void CUnitDrawerGL4::DrawAlphaObjectsAux(int modelType) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const std::vector<CUnitDrawerData::TempDrawUnit>& tmpAlphaUnits = modelDrawerData->GetTempAlphaDrawUnits(modelType);
 	auto& smv = S3DModelVAO::GetInstance();
 	smv.Bind();
@@ -1582,6 +1856,7 @@ void CUnitDrawerGL4::DrawAlphaObjectsAux(int modelType) const
 
 void CUnitDrawerGL4::DrawAlphaAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	static CMatrix44f staticWorldMat;
 
 	staticWorldMat.LoadIdentity();
@@ -1606,6 +1881,7 @@ void CUnitDrawerGL4::DrawAlphaAIUnit(const CUnitDrawerData::TempDrawUnit& unit) 
 
 void CUnitDrawerGL4::DrawOpaqueObjectsAux(int modelType) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const std::vector<CUnitDrawerData::TempDrawUnit>& tmpOpaqueUnits = modelDrawerData->GetTempOpaqueDrawUnits(modelType);
 	auto& smv = S3DModelVAO::GetInstance();
 	smv.Bind();
@@ -1627,6 +1903,7 @@ void CUnitDrawerGL4::DrawOpaqueObjectsAux(int modelType) const
 
 void CUnitDrawerGL4::DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	static CMatrix44f staticWorldMat;
 
 	staticWorldMat.LoadIdentity();
@@ -1651,6 +1928,7 @@ void CUnitDrawerGL4::DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit)
 
 void CUnitDrawerGL4::DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto& smv = S3DModelVAO::GetInstance();
 
 	const float3 stageBounds = { 0.0f, unit->model->CalcDrawHeight(), unit->buildProgress };
@@ -1726,6 +2004,7 @@ void CUnitDrawerGL4::DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool noLua
 
 void CUnitDrawerGL4::DrawUnitModelBeingBuiltOpaque(const CUnit* unit, bool noLuaCall) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto& smv = S3DModelVAO::GetInstance();
 
 	const    CTeam* team = teamHandler.Team(unit->team);

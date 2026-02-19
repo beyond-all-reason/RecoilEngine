@@ -12,7 +12,6 @@
 
 
 /******************************************************************************
- * @module LuaVBO
  *
  * @see rts/Lua/LuaVBO.cpp
 ******************************************************************************/
@@ -64,7 +63,9 @@ bool LuaVBOs::PushEntries(lua_State* L)
 		"UnbindBufferRange", &LuaVBOImpl::UnbindBufferRange,
 
 		"DumpDefinition", &LuaVBOImpl::DumpDefinition,
-		"GetBufferSize", &LuaVBOImpl::GetBufferSize
+		"GetBufferSize", &LuaVBOImpl::GetBufferSize,
+		"CopyTo", &LuaVBOImpl::CopyTo,
+		"GetID", &LuaVBOImpl::GetID
 	);
 
 	gl.set("VBO", sol::lua_nil); // don't want this to be accessible directly without gl.GetVBO
@@ -122,20 +123,32 @@ LuaVBOs::~LuaVBOs()
 
 
 /***
- *
- * @function gl.GetVBO
- * @number[opt=GL.ARRAY_BUFFER] bufferType one of [`GL.ARRAY_BUFFER`,
- * `GL.ELEMENT_ARRAY_BUFFER`, `GL.UNIFORM_BUFFER`, `GL.SHADER_STORAGE_BUFFER`].
- *
- * Defaults to `GL.ARRAY_BUFFER`, which you should use for vertex data, and
- * `GL.ELEMENT_ARRAY_BUFFER` should be used for vertex indices.
- * @bool[opt=true] freqUpdated whether should be updated frequently, when false
- * will be updated only once
- * @treturn nil|VBO the VBO ref on success, nil if not supported/or other error
- * @see GL.OpenGL_Buffer_Types
- * @usage
+ * Example:
+ * 
+ * ```lua
  * local myVBO = gl.GetVBO()
  * if myVBO == nil then Spring.Echo("Failed to get VBO") end
+ * ```
+ *
+ * @function gl.GetVBO
+ * 
+ * @param bufferType GL? (Default: `GL.ARRAY_BUFFER`) The buffer type to use.
+ *
+ * Accepts the following:
+ * - `GL.ARRAY_BUFFER` for vertex data.
+ * - `GL.ELEMENT_ARRAY_BUFFER` for vertex indices.
+ * - `GL.UNIFORM_BUFFER`
+ * - `GL.SHADER_STORAGE_BUFFER`
+ * 
+ * @param freqUpdated boolean? (Default: `true`)
+ * 
+ * `true` to updated frequently, `false` to update only once.
+ * 
+ * @return VBO? VBO
+ * 
+ * The VBO ref on success, or nil if not supported or an error occurred.
+ * 
+ * @see GL.OpenGL_Buffer_Types
  */
 int LuaVBOs::GetVBO(lua_State* L)
 {

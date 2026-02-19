@@ -1,55 +1,67 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef MATRIX44F_H
-#define MATRIX44F_H
+#pragma once
 
 #include <cmath>
 #include <array>
+#include <tuple>
 
 #include "System/float3.h"
 #include "System/float4.h"
 
+class CQuaternion;
 class CMatrix44f
 {
 public:
 	CR_DECLARE_STRUCT(CMatrix44f)
 
 	// identity
-	CMatrix44f() : m{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f} {};
+	constexpr CMatrix44f() : m{1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f} {};
 	CMatrix44f(const CMatrix44f& mat);
 
-	CMatrix44f(
+	constexpr CMatrix44f(
 		const float  m0, const float  m1, const float  m2, const float  m3,
 		const float  m4, const float  m5, const float  m6, const float  m7,
 		const float  m8, const float  m9, const float m10, const float m11,
 		const float m12, const float m13, const float m14, const float m15) : m{m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15} {};
 
-	CMatrix44f(const float3 pos, const float3 x, const float3 y, const float3 z);
-	CMatrix44f(const float rotX, const float rotY, const float rotZ);
-	explicit CMatrix44f(const float3 pos);
+	explicit CMatrix44f(const float3& pos, const float3& x, const float3& y, const float3& z);
+	explicit CMatrix44f(float rotX, float rotY, float rotZ);
+	explicit CMatrix44f(const float3& pos);
 
 	bool IsOrthoNormal() const;
 	bool IsIdentity() const;
+	bool IsRotMatrix()          const { return IsOrthoNormal() && math::fabs(1.0f - Det4()) <= 8.0f * float3::cmp_eps(); }
+	bool IsRotOrRotTranMatrix() const { return IsOrthoNormal() && math::fabs(1.0f - Det3()) <= 8.0f * float3::cmp_eps(); }
+	float Det3() const;
+	float Det4() const;
 
 	CMatrix44f& LoadIdentity() { return (*this = CMatrix44f()); }
 
-	void SetUpVector(const float3 up);
+	void SetUpVector(const float3& up);
 	CMatrix44f& RotateX(float angle); // (pitch) angle in radians
 	CMatrix44f& RotateY(float angle); // (  yaw) angle in radians
 	CMatrix44f& RotateZ(float angle); // ( roll) angle in radians
-	CMatrix44f& Rotate(float angle, const float3 axis); // assumes axis is normalized
-	CMatrix44f& RotateEulerXYZ(const float3 angles); // executes Rotate{X,Y,Z}
-	CMatrix44f& RotateEulerYXZ(const float3 angles); // executes Rotate{Y,X,Z}
-	CMatrix44f& RotateEulerZXY(const float3 angles); // executes Rotate{Z,X,Y}
-	CMatrix44f& RotateEulerZYX(const float3 angles); // executes Rotate{Z,Y,X}
+	CMatrix44f& Rotate(float angle, const float3& axis); // assumes axis is normalized
+	CMatrix44f& RotateEulerXYZ(const float3& angles); // executes Rotate{X,Y,Z}
+	CMatrix44f& RotateEulerYXZ(const float3& angles); // executes Rotate{Y,X,Z}
+	CMatrix44f& RotateEulerZXY(const float3& angles); // executes Rotate{Z,X,Y}
+	CMatrix44f& RotateEulerZYX(const float3& angles); // executes Rotate{Z,Y,X}
 	CMatrix44f& Translate(const float x, const float y, const float z);
-	CMatrix44f& Translate(const float3 pos) { return Translate(pos.x, pos.y, pos.z); }
-	CMatrix44f& Scale(const float3 scales);
+	CMatrix44f& Translate(const float3& pos) { return Translate(pos.x, pos.y, pos.z); }
+	CMatrix44f& Scale(float s) { return Scale(s, s, s); }
+	CMatrix44f& Scale(const float3& scales);
+	CMatrix44f& Scale(float scaleX, float scaleY, float scaleZ) { return Scale(float3{ scaleX, scaleY, scaleZ }); }
 
-	void SetPos(const float3 pos) { m[12] = pos.x; m[13] = pos.y; m[14] = pos.z; }
-	void SetX  (const float3 dir) { m[ 0] = dir.x; m[ 1] = dir.y; m[ 2] = dir.z; }
-	void SetY  (const float3 dir) { m[ 4] = dir.x; m[ 5] = dir.y; m[ 6] = dir.z; }
-	void SetZ  (const float3 dir) { m[ 8] = dir.x; m[ 9] = dir.y; m[10] = dir.z; }
+	void SetPos(const float3& pos) { m[12] = pos.x; m[13] = pos.y; m[14] = pos.z; }
+	void SetX  (const float3& dir) { m[ 0] = dir.x; m[ 1] = dir.y; m[ 2] = dir.z; }
+	void SetY  (const float3& dir) { m[ 4] = dir.x; m[ 5] = dir.y; m[ 6] = dir.z; }
+	void SetZ  (const float3& dir) { m[ 8] = dir.x; m[ 9] = dir.y; m[10] = dir.z; }
+	void SetXYZ(const CMatrix44f& other) {
+		std::copy(&other.m[0], &other.m[0] + 3, &m[0]);
+		std::copy(&other.m[4], &other.m[4] + 3, &m[4]);
+		std::copy(&other.m[8], &other.m[8] + 3, &m[8]);
+	}
 
 	float3& GetPos() { return col[3]; }
 	const float3& GetPos() const { return col[3]; }
@@ -79,6 +91,8 @@ public:
 	CMatrix44f& InvertAffineInPlace();
 	CMatrix44f  InvertAffine() const;
 
+	std::tuple<float3, CQuaternion, float3> DecomposeIntoTRS() const;
+
 	/// point/vector multiply
 	float3 operator* (const float3 v) const { return ((*this) * float4(v.x, v.y, v.z, 1.0f)); }
 	float4 operator* (const float4 v) const; // M*p (w=1) or M*v (w=0)
@@ -86,8 +100,11 @@ public:
 	float3 Mul(const float3 v) const { return ((*this) * v); }
 	float4 Mul(const float4 v) const { return ((*this) * v); }
 
-	bool operator == (const CMatrix44f& rhs) const { return !(*this == rhs); }
-	bool operator != (const CMatrix44f& rhs) const;
+	/// approximately equal
+	bool equals(const CMatrix44f& rhs) const;
+
+	bool operator == (const CMatrix44f& rhs) const;
+	bool operator != (const CMatrix44f& rhs) const { return !(*this == rhs); }
 	/// matrix multiply
 	CMatrix44f  operator  *  (const CMatrix44f& mat) const;
 	CMatrix44f& operator >>= (const CMatrix44f& mat);
@@ -121,7 +138,7 @@ public:
 		);
 		return z;
 	}
-	static CMatrix44f Identity() { return {}; }
+	static constexpr CMatrix44f Identity() { return {}; }
 	static CMatrix44f PerspProj(float aspect, float thfov, float zn, float zf);
 	static CMatrix44f PerspProj(float l, float r, float b, float t, float zn, float zf);
 	static CMatrix44f OrthoProj(float l, float r, float b, float t, float zn, float zf);
@@ -157,6 +174,12 @@ public:
 		float md[4][4]; // WARNING: it still is column-major, means md[j][i]!!!
 		float4 col[4];
 	};
+
+	std::string str() const {
+		return std::format(
+			"m44(\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f})",
+			m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15]);
+	}
 };
 
 
@@ -194,5 +217,3 @@ void delmat3(T*** mat) {
 	delete [] *mat;
 	delete [] mat;
 }
-
-#endif /* MATRIX44F_H */

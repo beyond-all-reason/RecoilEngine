@@ -5,7 +5,7 @@
 #include <cinttypes> // uintptr_t
 #include <cstring> // strnlen
 #include <cstdlib>
-#include <cstdio>
+#include <cstdio> // utf8 safe on Linux
 #include <string>
 
 #include <array>
@@ -45,7 +45,7 @@
 #define ADDR2LINE "atos"
 #endif
 
-#if (defined(__FreeBSD__))
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 // show function names, demangle
 #define ADDR2LINE_ARGS " -f -C"
 #else
@@ -136,10 +136,10 @@ static std::string CreateAbsolutePath(const std::string& relativePath)
 
 	if (absolutePath.empty() || absolutePath[0] != '/') {
 		// remove initial "./"
-		if (absolutePath.find("./") == 0)
+		if (absolutePath.starts_with("./"))
 			absolutePath = absolutePath.substr(2);
 
-		absolutePath = FileSystemAbstraction::EnsurePathSepAtEnd(GetBinaryLocation()) + absolutePath;
+		absolutePath = FileSystem::EnsurePathSepAtEnd(GetBinaryLocation()) + absolutePath;
 	}
 
 	if (!FileSystem::FileExists(absolutePath))

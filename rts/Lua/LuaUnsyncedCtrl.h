@@ -25,6 +25,13 @@ class LuaUnsyncedCtrl {
 		static int SendMessageToAllyTeam(lua_State* L);
 		static int SendMessageToSpectators(lua_State* L);
 
+		static int RequestStartPosition(lua_State* L);
+
+		static int SendPublicChat(lua_State* L);
+		static int SendAllyChat(lua_State* L);
+		static int SendSpectatorChat(lua_State* L);
+		static int SendPrivateChat(lua_State* L);
+
 		static int LoadSoundDef(lua_State* L);
 		static int PlaySoundFile(lua_State* L);
 		static int PlaySoundStream(lua_State* L);
@@ -34,8 +41,20 @@ class LuaUnsyncedCtrl {
 
 		static int SetCameraState(lua_State* L);
 		static int SetCameraTarget(lua_State* L);
+		static int RunDollyCamera(lua_State* L);
+		static int PauseDollyCamera(lua_State* L);
+		static int ResumeDollyCamera(lua_State* L);
+		static int SetDollyCameraPosition(lua_State* L);
+		static int SetDollyCameraMode(lua_State* L);
+		static int SetDollyCameraCurve(lua_State* L);
+		static int SetDollyCameraLookPosition(lua_State* L);
+		static int SetDollyCameraLookUnit(lua_State* L);
+		static int SetDollyCameraLookCurve(lua_State* L);
+		static int SetDollyCameraRelativeMode(lua_State* L);
 
 		static int DeselectUnit(lua_State* L);
+		static int DeselectUnitMap(lua_State* L);
+		static int DeselectUnitArray(lua_State* L);
 		static int SelectUnit(lua_State* L);
 		static int SelectUnitMap(lua_State* L);
 		static int SelectUnitArray(lua_State* L);
@@ -54,6 +73,7 @@ class LuaUnsyncedCtrl {
 
 		static int SetCustomCommandDrawData(lua_State* L);
 
+		static int SetAutoShowMetal(lua_State* L);
 		static int SetDrawSky(lua_State* L);
 		static int SetDrawWater(lua_State* L);
 		static int SetDrawGround(lua_State* L);
@@ -80,6 +100,8 @@ class LuaUnsyncedCtrl {
 		static int SetUnitEngineDrawMask(lua_State* L);
 		static int SetUnitAlwaysUpdateMatrix(lua_State* L);
 		static int SetUnitNoMinimap(lua_State* L);
+		static int SetMiniMapRotation(lua_State* L);
+		static int SetUnitNoGroup(lua_State* L);
 		static int SetUnitNoSelect(lua_State* L);
 		static int SetUnitLeaveTracks(lua_State* L);
 		static int SetUnitSelectionVolumeData(lua_State* L);
@@ -91,6 +113,7 @@ class LuaUnsyncedCtrl {
 
 		static int AddUnitIcon(lua_State* L);
 		static int FreeUnitIcon(lua_State* L);
+		static int SetUnitIconDraw(lua_State* L);
 		static int UnitIconSetDraw(lua_State* L);
 
 		static int ExtractModArchiveFile(lua_State* L);
@@ -184,13 +207,21 @@ class LuaUnsyncedCtrl {
 		static int PreloadSoundItem(lua_State* L);
 		static int LoadModelTextures(lua_State* L);
 
-		static int CreateDecal(lua_State* L);
-		static int DestroyDecal(lua_State* L);
-		static int SetDecalPos(lua_State* L);
-		static int SetDecalSize(lua_State* L);
-		static int SetDecalRotation(lua_State* L);
-		static int SetDecalTexture(lua_State* L);
-		static int SetDecalAlpha(lua_State* L);
+		static int CreateGroundDecal(lua_State* L);
+		static int DestroyGroundDecal(lua_State* L);
+
+		static int SetGroundDecalPosAndDims(lua_State* L);
+		static int SetGroundDecalQuadPosAndHeight(lua_State* L);
+		static int SetGroundDecalRotation(lua_State* L);
+		static int SetGroundDecalTexture(lua_State* L);
+		static int SetGroundDecalTextureParams(lua_State* L);
+		static int SetGroundDecalAlpha(lua_State* L);
+		static int SetGroundDecalNormal(lua_State* L);
+		static int SetGroundDecalTint(lua_State* L);
+		static int SetGroundDecalMisc(lua_State* L);
+		static int SetGroundDecalCreationFrame(lua_State* L);
+		static int SetGroundDecalGlowParams(lua_State* L);
+		static int SetGroundDecalUserData(lua_State* L);
 
 		static int SDLSetTextInputRect(lua_State* L);
 		static int SDLStartTextInput(lua_State* L);

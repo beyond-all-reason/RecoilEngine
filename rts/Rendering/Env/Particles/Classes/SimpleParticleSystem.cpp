@@ -2,7 +2,6 @@
 
 #include "SimpleParticleSystem.h"
 
-#include "GenericParticleProjectile.h"
 #include "Game/Camera.h"
 #include "Game/GlobalUnsynced.h"
 #include "Rendering/GlobalRendering.h"
@@ -15,6 +14,8 @@
 #include "System/float3.h"
 #include "System/Log/ILog.h"
 #include "System/SpringMath.h"
+
+#include "System/Misc/TracyDefs.h"
 
 CR_BIND_DERIVED(CSimpleParticleSystem, CProjectile, )
 
@@ -86,6 +87,7 @@ CSimpleParticleSystem::CSimpleParticleSystem()
 
 void CSimpleParticleSystem::Serialize(creg::ISerializer* s)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	std::string name;
 	if (s->IsWriting())
 		name = projectileDrawer->textureAtlas->GetTextureName(texture);
@@ -96,9 +98,41 @@ void CSimpleParticleSystem::Serialize(creg::ISerializer* s)
 
 void CSimpleParticleSystem::Draw()
 {
-	UpdateAnimParams();
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!UpdateAnimParams())
+		return;
 
-	std::array<float3, 4> bounds;
+	float3 zdir;
+	float3 ydir;
+	float3 xdir;
+
+	const auto DoParticleDraw = [this](const float3& xdir, const float3& ydir, const float3& zdir, const Particle* p) {
+		const float3 pDrawPos = p->pos + p->speed * globalRendering->timeOffset;
+		const float size = p->size;
+
+		unsigned char color[4];
+		colorMap->GetColor(color, p->life);
+
+		std::array<float3, 4> bounds = {
+			-ydir * size - xdir * size,
+			-ydir * size + xdir * size,
+			 ydir * size + xdir * size,
+			 ydir * size - xdir * size
+		};
+
+		if (math::fabs(p->rotVal) > 0.01f) {
+			float3::rotate<false>(p->rotVal, zdir, bounds);
+		}
+
+		AddEffectsQuad<1>(
+			texture->pageNum,
+			{ pDrawPos + bounds[0], texture->xstart, texture->ystart, color },
+			{ pDrawPos + bounds[1], texture->xend,   texture->ystart, color },
+			{ pDrawPos + bounds[2], texture->xend,   texture->yend,   color },
+			{ pDrawPos + bounds[3], texture->xstart, texture->yend,   color }
+		);
+	};
+
 	const bool shadowPass = (camera->GetCamType() == CCamera::CAMTYPE_SHADOW);
 	if (directional && !shadowPass) {
 		for (int i = 0; i < numParticles; i++) {
@@ -107,50 +141,19 @@ void CSimpleParticleSystem::Draw()
 			if (p->life >= 1.0f)
 				continue;
 
-			const float3 zdir = (p->pos - camera->GetPos()).SafeANormalize();
-			      float3 ydir = zdir.cross(p->speed); float yDirLen2 = ydir.SqLength(); ydir.SafeANormalize();
-			const float3 xdir = ydir.cross(zdir);
-
-			const float3 interPos = p->pos + p->speed * globalRendering->timeOffset;
-			const float size = p->size;
-
-			unsigned char color[4];
-			colorMap->GetColor(color, p->life);
-
-			const float3* fwdDir = &zdir;
-
-			if (yDirLen2 > 0.001f) {
-				bounds = {
-					-ydir * size - xdir * size,
-					-ydir * size + xdir * size,
-					 ydir * size + xdir * size,
-					 ydir * size - xdir * size
-				};
-			} else {
-				// in this case the particle's coor-system is degenerate
-				const float3 cameraRight = camera->GetRight() * p->size;
-				const float3 cameraUp    = camera->GetUp()    * p->size;
-				fwdDir = &camera->GetForward();
-
-				bounds = {
-					-cameraRight - cameraUp,
-					 cameraRight - cameraUp,
-					 cameraRight + cameraUp,
-					-cameraRight + cameraUp
-				};
+			zdir = (p->pos - camera->GetPos()).SafeANormalize();
+			ydir = zdir.cross(p->speed);
+			if likely(ydir.SqLength() > 0.001f) {
+				ydir.SafeANormalize();
+				xdir = ydir.cross(zdir);
+			}
+			else {
+				zdir = camera->GetForward();
+				xdir = camera->GetRight();
+				ydir = camera->GetUp();
 			}
 
-
-			if (math::fabs(p->rotVal) > 0.01f) {
-				for (auto& b : bounds)
-					b = b.rotate(p->rotVal, *fwdDir);
-			}
-			AddEffectsQuad(
-				{ interPos + bounds[0], texture->xstart, texture->ystart, color },
-				{ interPos + bounds[1], texture->xend,   texture->ystart, color },
-				{ interPos + bounds[2], texture->xend,   texture->yend,   color },
-				{ interPos + bounds[3], texture->xstart, texture->yend,   color }
-			);
+			DoParticleDraw(xdir, ydir, zdir, p);
 		}
 		return;
 	}
@@ -162,35 +165,17 @@ void CSimpleParticleSystem::Draw()
 		if (p->life >= 1.0f)
 			continue;
 
-		unsigned char color[4];
-		colorMap->GetColor(color, p->life);
-
-		const float3 interPos = p->pos + p->speed * globalRendering->timeOffset;
-		const float3 cameraRight = camera->GetRight() * p->size;
-		const float3 cameraUp    = camera->GetUp()    * p->size;
-
-		bounds = {
-			-cameraRight - cameraUp,
-			 cameraRight - cameraUp,
-			 cameraRight + cameraUp,
-			-cameraRight + cameraUp
-		};
-
-		if (math::fabs(p->rotVal) > 0.01f) {
-			for (auto& b : bounds)
-				b = b.rotate(p->rotVal, camera->GetForward());
-		}
-		AddEffectsQuad(
-			{ interPos + bounds[0], texture->xstart, texture->ystart, color },
-			{ interPos + bounds[1], texture->xend,   texture->ystart, color },
-			{ interPos + bounds[2], texture->xend,   texture->yend,   color },
-			{ interPos + bounds[3], texture->xstart, texture->yend,   color }
-		);
+		zdir = camera->GetForward();
+		xdir = camera->GetRight();
+		ydir = camera->GetUp();
+		
+		DoParticleDraw(xdir, ydir, zdir, p);
 	}
 }
 
 void CSimpleParticleSystem::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	deleteMe = true;
 
 	for (auto& p: particles) {
@@ -210,6 +195,7 @@ void CSimpleParticleSystem::Update()
 
 void CSimpleParticleSystem::Init(const CUnit* owner, const float3& offset)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CProjectile::Init(owner, offset);
 
 	const float3 up = emitVector;
@@ -219,11 +205,11 @@ void CSimpleParticleSystem::Init(const CUnit* owner, const float3& offset)
 	// FIXME: should catch these earlier and for more projectile-types
 	if (colorMap == nullptr) {
 		colorMap = CColorMap::LoadFromFloatVector(std::vector<float>(8, 1.0f));
-		LOG_L(L_WARNING, "[CSimpleParticleSystem::%s] no color-map specified", __FUNCTION__);
+		LOG_L(L_WARNING, "[CSimpleParticleSystem::%s] no color-map specified", __func__);
 	}
 	if (texture == nullptr) {
 		texture = &projectileDrawer->textureAtlas->GetTexture("simpleparticle");
-		LOG_L(L_WARNING, "[CSimpleParticleSystem::%s] no texture specified", __FUNCTION__);
+		LOG_L(L_WARNING, "[CSimpleParticleSystem::%s] no texture specified", __func__);
 	}
 
 	particles.resize(numParticles);
@@ -237,10 +223,13 @@ void CSimpleParticleSystem::Init(const CUnit* owner, const float3& offset)
 		p.rotVel = rotParams.x; //initial rotation velocity
 		p.life = 0.0f;
 		p.decayrate = 1.0f / (particleLife + (guRNG.NextFloat() * particleLifeSpread));
-		p.size = particleSize + guRNG.NextFloat()*particleSizeSpread;
+		p.size = particleSize + guRNG.NextFloat() * particleSizeSpread;
 	}
 
-	drawRadius = (particleSpeed + particleSpeedSpread) * (particleLife * particleLifeSpread);
+	drawRadius = (particleSpeed + particleSpeedSpread) * (particleLife + particleLifeSpread);
+
+	validTextures[1] = IsValidTexture(texture);
+	validTextures[0] = validTextures[1];
 }
 
 int CSimpleParticleSystem::GetProjectilesCount() const
@@ -252,81 +241,28 @@ int CSimpleParticleSystem::GetProjectilesCount() const
 
 bool CSimpleParticleSystem::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, emitVector         )
-	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, emitMul            )
-	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, gravity            )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSpeed      )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSpeedSpread)
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, emitRot            )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, emitRotSpread      )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleLife       )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleLifeSpread )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSize       )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSizeSpread )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, airdrag            )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, sizeGrowth         )
-	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, sizeMod            )
-	CHECK_MEMBER_INFO_INT   (CSimpleParticleSystem, numParticles       )
-	CHECK_MEMBER_INFO_BOOL  (CSimpleParticleSystem, directional        )
-	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, texture , projectileDrawer->textureAtlas->GetTexturePtr)
-	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, colorMap, CColorMap::LoadFromDefString                 )
+	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, emitVector         );
+	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, emitMul            );
+	CHECK_MEMBER_INFO_FLOAT3(CSimpleParticleSystem, gravity            );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSpeed      );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSpeedSpread);
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, emitRot            );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, emitRotSpread      );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleLife       );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleLifeSpread );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSize       );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, particleSizeSpread );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, airdrag            );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, sizeGrowth         );
+	CHECK_MEMBER_INFO_FLOAT (CSimpleParticleSystem, sizeMod            );
+	CHECK_MEMBER_INFO_INT   (CSimpleParticleSystem, numParticles       );
+	CHECK_MEMBER_INFO_BOOL  (CSimpleParticleSystem, directional        );
+	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, texture, projectileDrawer->textureAtlas->GetTexturePtr);
+	CHECK_MEMBER_INFO_PTR   (CSimpleParticleSystem, colorMap, CColorMap::LoadFromDefString                );
 
 	return false;
-}
-
-
-CR_BIND_DERIVED(CSphereParticleSpawner, CSimpleParticleSystem, )
-
-CR_REG_METADATA(CSphereParticleSpawner, )
-
-void CSphereParticleSpawner::Init(const CUnit* owner, const float3& offset)
-{
-	const float3 up = emitVector;
-	const float3 right = up.cross(float3(up.y, up.z, -up.x));
-	const float3 forward = up.cross(right);
-
-	// FIXME: should catch these earlier and for more projectile-types
-	if (colorMap == nullptr) {
-		colorMap = CColorMap::LoadFromFloatVector(std::vector<float>(8, 1.0f));
-		LOG_L(L_WARNING, "[CSphereParticleSpawner::%s] no color-map specified", __FUNCTION__);
-	}
-	if (texture == nullptr) {
-		texture = &projectileDrawer->textureAtlas->GetTexture("sphereparticle");
-		LOG_L(L_WARNING, "[CSphereParticleSpawner::%s] no texture specified", __FUNCTION__);
-	}
-
-	for (int i = 0; i < numParticles; i++) {
-		const float az = guRNG.NextFloat() * math::TWOPI;
-		const float ay = (emitRot + emitRotSpread*guRNG.NextFloat()) * math::DEG_TO_RAD;
-
-		const float3 pspeed = ((up * emitMul.y) * std::cos(ay) - ((right * emitMul.x) * std::cos(az) - (forward * emitMul.z) * std::sin(az)) * std::sin(ay)) * (particleSpeed + (guRNG.NextFloat() * particleSpeedSpread));
-
-		CGenericParticleProjectile* particle = projMemPool.alloc<CGenericParticleProjectile>(owner, pos + offset, pspeed);
-
-		particle->decayrate = 1.0f / (particleLife + guRNG.NextFloat() * particleLifeSpread);
-		particle->life = 0;
-		particle->size = particleSize + guRNG.NextFloat() * particleSizeSpread;
-
-		particle->texture = texture;
-		particle->colorMap = colorMap;
-
-		particle->airdrag = airdrag;
-		particle->sizeGrowth = sizeGrowth;
-		particle->sizeMod = sizeMod;
-
-		particle->gravity = gravity;
-		particle->directional = directional;
-
-		particle->SetRadiusAndHeight(particle->size + sizeGrowth * particleLife, 0.0f);
-	}
-
-	deleteMe = true;
-}
-
-bool CSphereParticleSpawner::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
-{
-	return CSimpleParticleSystem::GetMemberInfo(memberInfo);
 }

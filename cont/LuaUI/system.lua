@@ -27,6 +27,7 @@ if (System == nil) then
     VFS = VFS,
     Script = Script,
     Spring = Spring,
+    Encoding = Encoding,
     Engine = Engine,
     Platform = Platform,
     Game = Game,
@@ -35,6 +36,7 @@ if (System == nil) then
     CMD = CMD,
     CMDTYPE = CMDTYPE,
     LOG = LOG,
+    RmlUi = RmlUi,
     
     UnitDefs        = UnitDefs,
     UnitDefNames    = UnitDefNames,

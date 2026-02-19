@@ -18,6 +18,8 @@
 #include "System/SpringMath.h"
 #include "System/SpringHash.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CStrafeAirMoveType, AAirMoveType, (nullptr))
 
 CR_REG_METADATA(CStrafeAirMoveType, (
@@ -96,6 +98,7 @@ extern AAirMoveType::EmitCrashTrailFunc amtEmitCrashTrailFuncs[2];
 
 
 static float TurnRadius(const float rawRadius, const float rawSpeed) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return (std::min(1000.0f, rawRadius * rawSpeed));
 }
 
@@ -118,6 +121,7 @@ static float GetRudderDeflection(
 	bool /*avoidCollision*/,
 	bool isAttacking
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float rudder = 0.0f;
 
 	const float minGroundHeight = std::min(groundHeight + 15.0f, wantedHeight) * (1.0f + isAttacking);
@@ -152,6 +156,7 @@ static float GetAileronDeflection(
 	bool /*avoidCollision*/,
 	bool isAttacking
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float aileron = 0.0f;
 
 	// ailerons function less effectively at low (forward) speed
@@ -186,7 +191,7 @@ static float GetAileronDeflection(
 
 		const float clampedBank = 1.0f;
 		// using this directly does not function well at higher pitch-angles, interplay with GetElevatorDeflection
-		// const float clampedBankAbs = math::fabs(Clamp(absRightDirY - maxBank, -1.0f, 1.0f));
+		// const float clampedBankAbs = math::fabs(std::clamp(absRightDirY - maxBank, -1.0f, 1.0f));
 		// const float clampedBank    = std::max(clampedBankAbs, 0.3f);
 
 		aileron -= (clampedBank * minSpeedMult * (goalBankDif < -maxAileronSpeedf2 && rightdir.y <  maxBank));
@@ -223,6 +228,7 @@ static float GetElevatorDeflection(
 	bool avoidCollision,
 	bool isAttacking
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float elevator = 0.0f;
 
 	const float upside = (updir.y >= -0.3f) * 2.0f - 1.0f;
@@ -289,7 +295,7 @@ static float GetElevatorDeflection(
 			const float absFrontDirY = math::fabs(frontdir.y);
 			const float clampedPitch = 1.0f;
 			// using this directly does not function well at higher bank-angles
-			// const float clampedPitchAbs = math::fabs(Clamp(absFrontDirY - maxPitch, -1.0f, 1.0f));
+			// const float clampedPitchAbs = math::fabs(std::clamp(absFrontDirY - maxPitch, -1.0f, 1.0f));
 			// const float clampedPitch    = std::max(clampedPitchAbs, 0.3f);
 
 			elevator -= (clampedPitch * (spd.w > 0.8f) * (difHeight < -maxElevatorSpeedf && frontdir.y  > -maxPitch));
@@ -325,6 +331,7 @@ static float3 GetControlSurfaceAngles(
 	bool avoidCollision,
 	bool isAttacking
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float3 ctrlAngles;
 
 	// yaw (rudder), pitch (elevator), roll (aileron)
@@ -344,6 +351,7 @@ static int SelectLoopBackManeuver(
 	float turnRadius,
 	float groundDist
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// do not start looping if already banked
 	if (math::fabs(rightdir.y) > 0.05f)
 		return CStrafeAirMoveType::MANEUVER_FLY_STRAIGHT;
@@ -365,6 +373,7 @@ static int SelectLoopBackManeuver(
 
 CStrafeAirMoveType::CStrafeAirMoveType(CUnit* owner): AAirMoveType(owner)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	maneuverBlockTime = GAME_SPEED * 3;
 
 	// creg
@@ -416,6 +425,7 @@ CStrafeAirMoveType::CStrafeAirMoveType(CUnit* owner): AAirMoveType(owner)
 
 bool CStrafeAirMoveType::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 lastPos = owner->pos;
 	const float4 lastSpd = owner->speed;
 
@@ -510,10 +520,10 @@ bool CStrafeAirMoveType::Update()
 			break;
 		case AIRCRAFT_CRASHING: {
 			// NOTE: the crashing-state can only be set (and unset) by scripts
-			UpdateAirPhysics({crashRudder, crashElevator, crashAileron, 0.0f}, owner->frontdir);
-
-			if ((CGround::GetHeightAboveWater(owner->pos.x, owner->pos.z) + 5.0f + owner->radius) > owner->pos.y)
-				owner->ForcedKillUnit(nullptr, true, false);
+			if (UpdateAirPhysics({crashRudder, crashElevator, crashAileron, 0.0f}, owner->frontdir)
+					|| (CGround::GetHeightAboveWater(owner->pos.x, owner->pos.z) + 5.0f + owner->radius) > owner->pos.y){
+				owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
+			}
 
 			amtEmitCrashTrailFuncs[crashExpGenID != -1u](owner, crashExpGenID);
 		} break;
@@ -534,6 +544,7 @@ bool CStrafeAirMoveType::Update()
 
 
 bool CStrafeAirMoveType::HandleCollisions(bool checkCollisions) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3& pos = owner->pos;
 
 #ifdef DEBUG_AIRCRAFT
@@ -639,7 +650,7 @@ bool CStrafeAirMoveType::HandleCollisions(bool checkCollisions) {
 			// if crashing and we hit a building, die right now
 			// rather than waiting until we are close enough to
 			// the ground
-			owner->ForcedKillUnit(nullptr, true, false);
+			owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
 			return true;
 		}
 
@@ -665,6 +676,7 @@ bool CStrafeAirMoveType::HandleCollisions(bool checkCollisions) {
 
 void CStrafeAirMoveType::SlowUpdate()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// note: NOT AAirMoveType::SlowUpdate
 	AMoveType::SlowUpdate();
 }
@@ -673,6 +685,7 @@ void CStrafeAirMoveType::SlowUpdate()
 
 void CStrafeAirMoveType::UpdateManeuver()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float speedf = owner->speed.w;
 
 	switch (maneuverState) {
@@ -725,6 +738,7 @@ void CStrafeAirMoveType::UpdateManeuver()
 
 void CStrafeAirMoveType::UpdateAttack()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!isFighter) {
 		UpdateFlying(wantedHeight, 1.0f);
 		return;
@@ -793,6 +807,7 @@ void CStrafeAirMoveType::UpdateAttack()
 
 bool CStrafeAirMoveType::UpdateFlying(float wantedHeight, float wantedThrottle)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3& pos = owner->pos;
 	const float4& spd = owner->speed;
 
@@ -876,6 +891,7 @@ bool CStrafeAirMoveType::UpdateFlying(float wantedHeight, float wantedThrottle)
 
 
 static float GetVTOLAccelerationSign(float curHeight, float wtdHeight, float vertSpeed) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float nxtHeight = curHeight + vertSpeed * 20.0f;
 	const float tgtHeight = wtdHeight * 1.02f;
 
@@ -884,6 +900,7 @@ static float GetVTOLAccelerationSign(float curHeight, float wtdHeight, float ver
 
 void CStrafeAirMoveType::UpdateTakeOff()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3& pos = owner->pos;
 	const float4& spd = owner->speed;
 
@@ -896,7 +913,7 @@ void CStrafeAirMoveType::UpdateTakeOff()
 	const float3 goalDir = (goalPos - pos).Normalize();
 
 	const float yawWeight = maxRudder * spd.y;
-	const float dirWeight = Clamp(goalDir.dot(rightdir), -1.0f, 1.0f);
+	const float dirWeight = std::clamp(goalDir.dot(rightdir), -1.0f, 1.0f);
 	// this tends to alternate between -1 and +1 when goalDir and rightdir are ~orthogonal
 	// const float yawSign = Sign(goalDir.dot(rightdir));
 	const float currentHeight = pos.y - amtGetGroundHeightFuncs[canSubmerge](pos.x, pos.z);
@@ -925,6 +942,7 @@ void CStrafeAirMoveType::UpdateTakeOff()
 
 void CStrafeAirMoveType::UpdateLanding()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 pos = owner->pos;
 
 	SyncedFloat3& rightdir = owner->rightdir;
@@ -1025,8 +1043,9 @@ void CStrafeAirMoveType::UpdateLanding()
 
 
 
-void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const float3& thrustVector)
+bool CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const float3& thrustVector)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3& pos = owner->pos;
 	const float4& spd = owner->speed;
 
@@ -1056,7 +1075,7 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 
 	if (owner->UnderFirstPersonControl()) {
 		if ((pos.y - groundHeight) > wantedHeight * 1.2f)
-			throttle = Clamp(throttle, 0.0f, 1.0f - (pos.y - groundHeight - wantedHeight * 1.2f) / wantedHeight);
+			throttle = std::clamp(throttle, 0.0f, 1.0f - (pos.y - groundHeight - wantedHeight * 1.2f) / wantedHeight);
 
 		// check next position given current (unadjusted) pos and speed
 		nextPosInBounds = (pos + spd).IsInBounds();
@@ -1110,7 +1129,7 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 		owner->Move(spd, true);
 
 	// prevent aircraft from gaining unlimited altitude
-	owner->Move(UpVector * (Clamp(pos.y, groundHeight, readMap->GetCurrMaxHeight() + owner->unitDef->wantedHeight * 5.0f) - pos.y), true);
+	owner->Move(UpVector * (std::clamp(pos.y, groundHeight, readMap->GetCurrMaxHeight() + owner->unitDef->wantedHeight * 5.0f) - pos.y), true);
 
 	// bounce away on ground collisions (including water surface)
 	// NOTE:
@@ -1121,9 +1140,11 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 	//   impulse from weapon impacts can add speed and cause us
 	//   to start bouncing with ever-increasing amplitude while
 	//   stunned, so the same applies there
+	bool crashed = false;
 	if (modInfo.allowAircraftToHitGround) {
 		const bool groundContact = (groundHeight > (owner->midPos.y - owner->radius));
 		const bool handleContact = (aircraftState != AIRCRAFT_LANDED && aircraftState != AIRCRAFT_TAKEOFF);
+
 
 		if (groundContact && handleContact) {
 			const float3  groundOffset = UpVector * (groundHeight - (owner->midPos.y - owner->radius) + 0.01f);
@@ -1131,7 +1152,9 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 
 			const float impactSpeed = -spd.dot(groundNormal) * int(1 - owner->IsStunned());
 
-			owner->Move(groundOffset, true);
+			if (aircraftState != AIRCRAFT_CRASHING)
+				// skip when crashing to explode a bit into the ground
+				owner->Move(groundOffset, true);
 
 			if (impactSpeed > 0.0f) {
 				// fix for mantis #1355
@@ -1151,6 +1174,7 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 				rightdir = frontdir.cross(updir.Normalize());
 				frontdir = updir.cross(rightdir.Normalize());
 			}
+			crashed = true;
 		}
 	}
 
@@ -1163,12 +1187,14 @@ void CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 	owner->SetSpeed(spd);
 	owner->UpdateMidAndAimPos();
 	owner->SetHeadingFromDirection();
+	return crashed;
 }
 
 
 
 void CStrafeAirMoveType::SetState(AAirMoveType::AircraftState newState)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// this state is only used by CHoverAirMoveType, so we should never enter it
 	assert(newState != AIRCRAFT_HOVERING);
 
@@ -1227,7 +1253,8 @@ void CStrafeAirMoveType::SetState(AAirMoveType::AircraftState newState)
 
 float3 CStrafeAirMoveType::FindLandingPos(float3 landPos)
 {
-	if (((landPos.y = CGround::GetHeightReal(landPos)) < 0.0f) && ((mapInfo->water.damage > 0.0f) || !(floatOnWater || canSubmerge)))
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (((landPos.y = CGround::GetHeightReal(landPos)) < CGround::GetWaterLevel(landPos.x, landPos.z)) && ((mapInfo->water.damage > 0.0f) || !(floatOnWater || canSubmerge)))
 		return -OnesVector;
 
 	const int2 os = {owner->xsize, owner->zsize};
@@ -1253,6 +1280,7 @@ float3 CStrafeAirMoveType::FindLandingPos(float3 landPos)
 
 float CStrafeAirMoveType::BrakingDistance(float speed, float rate) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// Denote:
 	//		a_i: Speed after i frames
 	//		s_i: Distance passed after i frames
@@ -1284,6 +1312,7 @@ float CStrafeAirMoveType::BrakingDistance(float speed, float rate) const
 
 void CStrafeAirMoveType::SetMaxSpeed(float speed)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	maxSpeed = speed;
 
 	if (accRate != 0.0f && maxSpeed != 0.0f) {
@@ -1299,11 +1328,13 @@ void CStrafeAirMoveType::SetMaxSpeed(float speed)
 
 void CStrafeAirMoveType::StartMoving(float3 gpos, float goalRadius)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	StartMoving(gpos, goalRadius, maxSpeed);
 }
 
 void CStrafeAirMoveType::StartMoving(float3 pos, float goalRadius, float speed)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	SetWantedMaxSpeed(speed);
 
 	if (aircraftState == AIRCRAFT_LANDED || aircraftState == AIRCRAFT_LANDING)
@@ -1314,6 +1345,7 @@ void CStrafeAirMoveType::StartMoving(float3 pos, float goalRadius, float speed)
 
 void CStrafeAirMoveType::StopMoving(bool callScript, bool hardStop, bool)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	SetGoal(owner->pos);
 	ClearLandingPos();
 	SetWantedMaxSpeed(0.0f);
@@ -1333,6 +1365,7 @@ void CStrafeAirMoveType::StopMoving(bool callScript, bool hardStop, bool)
 
 void CStrafeAirMoveType::Takeoff()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (aircraftState != AAirMoveType::AIRCRAFT_FLYING) {
 		if (aircraftState == AAirMoveType::AIRCRAFT_LANDED) {
 			SetState(AAirMoveType::AIRCRAFT_TAKEOFF);
@@ -1346,6 +1379,7 @@ void CStrafeAirMoveType::Takeoff()
 
 
 bool CStrafeAirMoveType::SetMemberValue(unsigned int memberHash, void* memberValue) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// try the generic members first
 	if (AMoveType::SetMemberValue(memberHash, memberValue))
 		return true;

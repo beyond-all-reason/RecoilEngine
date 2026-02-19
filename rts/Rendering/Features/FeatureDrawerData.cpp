@@ -11,6 +11,8 @@
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CONFIG(float, FeatureDrawDistance)
 .defaultValue(6000.0f)
 .minimumValue(0.0f)
@@ -24,6 +26,7 @@ CONFIG(float, FeatureFadeDistance)
 
 void CFeatureDrawerData::RenderFeaturePreCreated(const CFeature* feature)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (feature->def->drawType != DRAWTYPE_MODEL)
 		return;
 
@@ -33,6 +36,7 @@ void CFeatureDrawerData::RenderFeaturePreCreated(const CFeature* feature)
 //TODO remove
 void CFeatureDrawerData::RenderFeatureCreated(const CFeature* feature)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(
 		feature->def->drawType != DRAWTYPE_MODEL ||
 		std::find(unsortedObjects.begin(), unsortedObjects.end(), feature) != unsortedObjects.end()
@@ -41,6 +45,7 @@ void CFeatureDrawerData::RenderFeatureCreated(const CFeature* feature)
 
 void CFeatureDrawerData::RenderFeatureDestroyed(const CFeature* feature)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	DelObject(feature, feature->def->drawType == DRAWTYPE_MODEL);
 	LuaObjectDrawer::SetObjectLOD(const_cast<CFeature*>(feature), LUAOBJ_FEATURE, 0);
 }
@@ -48,23 +53,23 @@ void CFeatureDrawerData::RenderFeatureDestroyed(const CFeature* feature)
 CFeatureDrawerData::CFeatureDrawerData(bool& mtModelDrawer_)
 	: CFeatureDrawerDataBase("[CFeatureDrawerData]", 313373, mtModelDrawer_)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	eventHandler.AddClient(this); //cannot be done in CModelRenderDataConcept, because object is not fully constructed
 	configHandler->NotifyOnChange(this, { "FeatureDrawDistance", "FeatureFadeDistance" });
 
 	featureDrawDistance = configHandler->GetFloat("FeatureDrawDistance");
 	featureFadeDistance = std::min(configHandler->GetFloat("FeatureFadeDistance"), featureDrawDistance);
-
-	featureFadeDistanceSq = Square(featureFadeDistance);
-	featureDrawDistanceSq = Square(featureDrawDistance);
 }
 
 CFeatureDrawerData::~CFeatureDrawerData()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	configHandler->RemoveObserver(this);
 }
 
 void CFeatureDrawerData::ConfigNotify(const std::string& key, const std::string& value)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	switch (hashStringLower(key.c_str())) {
 	case hashStringLower("FeatureDrawDistance"): {
 		featureDrawDistance = std::strtof(value.c_str(), nullptr);
@@ -77,16 +82,14 @@ void CFeatureDrawerData::ConfigNotify(const std::string& key, const std::string&
 
 	featureDrawDistance = std::max(0.0f, featureDrawDistance);
 	featureFadeDistance = std::max(0.0f, featureFadeDistance);
-	featureFadeDistance = std::min(featureDrawDistance, featureFadeDistance);
-
-	featureFadeDistanceSq = Square(featureFadeDistance);
-	featureDrawDistanceSq = Square(featureDrawDistance);
+	featureFadeDistance = std::min(featureFadeDistance, featureDrawDistance);
 
 	LOG_L(L_INFO, "[FeatureDrawer::%s] {draw,fade}distance set to {%f,%f}", __func__, featureDrawDistance, featureFadeDistance);
 }
 
 void CFeatureDrawerData::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (mtModelDrawer) {
 		for_mt_chunk(0, unsortedObjects.size(), [this](const int k) {
 			CFeature* f = unsortedObjects[k];
@@ -104,11 +107,14 @@ void CFeatureDrawerData::Update()
 
 bool CFeatureDrawerData::IsAlpha(const CFeature* co) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return (co->drawAlpha < 1.0f);
 }
 
 void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
+
 	CFeature* f = static_cast<CFeature*>(o);
 	f->ResetDrawFlag();
 
@@ -136,7 +142,7 @@ void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 		switch (camType)
 			{
 			case CCamera::CAMTYPE_PLAYER: {
-				const float sqrCamDist = (f->drawPos - cam->GetPos()).SqLength();
+				const float camDist = (f->drawPos - cam->GetPos()).Length();
 
 				// special case for non-fading features
 				if (!f->alphaFade) {
@@ -145,30 +151,38 @@ void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 					continue;
 				}
 
-				// draw feature as normal, no fading
-				if (sqrCamDist < featureFadeDistanceSq) {
-					f->SetDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
+				// too far, don't draw at all
+				if (camDist > featureDrawDistance) {
+					f->drawAlpha = 0.0f;
+					continue;
+				}
 
-					if (f->IsInWater())
-						f->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
-
+				// close enough to draw solid
+				if (camDist < featureFadeDistance) {
 					f->drawAlpha = 1.0f;
-					continue;
-				}
-
-				// otherwise save it for the fade-pass
-				if (sqrCamDist < featureDrawDistanceSq) {
-					f->drawAlpha = 1.0f - (sqrCamDist - featureFadeDistanceSq) / (featureDrawDistanceSq - featureFadeDistanceSq);
-					f->SetDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
-
+					f->SetDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
 					if (f->IsInWater())
 						f->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
 
 					continue;
 				}
+
+				// fading is disabled, just don't draw
+				if (featureDrawDistance == featureFadeDistance) {
+					f->drawAlpha = 0.0f;
+					continue;
+				}
+
+				f->drawAlpha = std::max(0.0f, 1.0f - (camDist - featureFadeDistance) / (featureDrawDistance - featureFadeDistance));
+				f->SetDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
+				if (f->IsInWater())
+					f->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
 			} break;
 
 			case CCamera::CAMTYPE_UWREFL: {
+				if (f->drawAlpha <= 0.0f)
+					continue;
+
 				if (!f->HasDrawFlag(DrawFlags::SO_OPAQUE_FLAG) && !f->HasDrawFlag(DrawFlags::SO_ALPHAF_FLAG))
 					continue;
 
@@ -177,10 +191,13 @@ void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 			} break;
 
 			case CCamera::CAMTYPE_SHADOW: {
-				if      (f->HasDrawFlag(DrawFlags::SO_OPAQUE_FLAG))
-					f->AddDrawFlag(DrawFlags::SO_SHOPAQ_FLAG);
-				else if (f->HasDrawFlag(DrawFlags::SO_ALPHAF_FLAG))
+				if (f->drawAlpha <= 0.0f)
+					continue;
+
+				if unlikely(IsAlpha(f))
 					f->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
+				else
+					f->AddDrawFlag(DrawFlags::SO_SHOPAQ_FLAG);
 			} break;
 
 			default: { assert(false); } break;
@@ -194,6 +211,7 @@ void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 
 void CFeatureDrawerData::UpdateDrawPos(CFeature* f)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	f->drawPos    = f->GetDrawPos(globalRendering->timeOffset);
 	f->drawMidPos = f->GetMdlDrawMidPos();
 }

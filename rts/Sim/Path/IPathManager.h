@@ -26,12 +26,16 @@ public:
 	virtual std::int64_t Finalize() { return 0; }
 	virtual std::int64_t PostFinalizeRefresh() { return 0; }
 
+	virtual bool AllowDirectionalPathing() { return false; }
+	virtual bool AllowShortestPath() { return false; }
+
 	/**
 	 * returns if a path was changed after RequestPath returned its pathID
 	 * this can happen eg. if a PathManager reacts to TerrainChange events
 	 * (by re-requesting affected paths without changing their ID's)
 	 */
 	virtual bool PathUpdated(unsigned int pathID) { return false; }
+	virtual void ClearPathUpdated(unsigned int pathID) {}
 
 	virtual void RemoveCacheFiles() {}
 	virtual void Update() {}
@@ -43,7 +47,7 @@ public:
 	 * @param pathID
 	 *     The path-id returned by RequestPath.
 	 */
-	virtual void DeletePath(unsigned int pathID) {}
+	virtual void DeletePath(unsigned int pathID, bool force = false) {}
 
 	/**
 	 * Returns the next waypoint of the path.
@@ -80,6 +84,9 @@ public:
 	) {
 		return -OnesVector;
 	}
+
+	virtual bool CurrentWaypointIsUnreachable(unsigned int pathID) { return false; }
+	virtual bool NextWayPointIsUnreachable(unsigned int pathID) { return false; }
 
 
 	/**
@@ -140,7 +147,8 @@ public:
 		float3 startPos,
 		float3 goalPos,
 		float goalRadius,
-		bool synced
+		bool synced,
+		bool immediateResult = false
 	) {
 		return 0;
 	}
@@ -172,7 +180,6 @@ public:
 
 	virtual int2 GetNumQueuedUpdates() const { return (int2(0, 0)); }
 
-	virtual bool SupportsMultiThreadedRequests() const { return false; }
 	virtual void SavePathCacheForPathId(int pathIdToSave) {};
 };
 

@@ -1,160 +1,131 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef ICON_HANDLER_H
-#define ICON_HANDLER_H
+#pragma once
 
 #include <array>
+#include <vector>
 #include <string>
+#include <bitset>
 
-#include "Icon.h"
 #include "System/float3.h"
 #include "System/UnorderedMap.hpp"
+#include "System/ScopedResource.h"
 #include "Rendering/GL/RenderBuffersFwd.h"
+#include "Rendering/Textures/TextureAtlas.h"
+
+class UnitDef;
+class CTextureRenderAtlas;
 
 namespace icon {
-	class CIconData {
-		public:
-			CIconData() = default;
-			CIconData(CIconData&& id) { *this = std::move(id); }
-			CIconData(
-				const std::string& name,
-				unsigned int texID,
-				float size,
-				float distance,
-				bool radiusAdjust,
-				bool ownTexture,
-				unsigned int xsize,
-				unsigned int ysize
-			);
-			~CIconData();
+	static constexpr size_t INVALID_ICON_INDEX = size_t(-1);
 
-			CIconData& operator = (CIconData&& id) {
-				std::swap(name, id.name);
+	class IconData {
+	public:
+		explicit IconData()
+			: name {}
+			, fileName{}
+			, size{ 0.0f }
+			, distance{ 1.0f }
+			, distSqr{ 1.0f }
+			, radiusAdjust{ false }
+			, srcTexCoords{}
+			, texCoords{}
+		{}
+		explicit IconData(const std::string& name_, const std::string& fileName_, float size_, float distance_, uint32_t atlasIndex_, bool radiusAdjust_, const float4& srcTexCoords_)
+			: name{ name_ }
+			, fileName{ fileName_ }
+			, size{ size_ }
+			, distance{ distance_ }
+			, distSqr{ distance_ * distance_ }
+			, radiusAdjust{ radiusAdjust_ }
+			, srcTexCoords{ srcTexCoords_ }
+			, texCoords{ 0.0f, 0.0f, 1.0f, 1.0f, atlasIndex_ }
+		{}
 
-				std::swap(refCount, id.refCount);
-				std::swap(texID, id.texID);
+		const auto& GetName() const { return name; }
+		const auto& GetSize() const { return size; }
+		const auto& GetDistance() const { return distance; }
+		const auto& GetDistanceSq() const { return distSqr; }
+		const auto& GetRadiusAdjust() const { return radiusAdjust; }
+		const auto& GetSrcTexCoords() const { return srcTexCoords; }
+		const auto& GetTexCoords() const { return texCoords; }
+		const auto& GetAtlasIndex() const { return texCoords.pageNum; }
+		const auto& GetFileName() const { return fileName; }
 
-				xsize = id.xsize;
-				ysize = id.ysize;
+		static constexpr auto GetRadiusScale() { return 30.0f; }
 
-				size = id.size;
-				distance = id.distance;
-				distSqr = id.distSqr;
+		void SetTexCoords(AtlasedTexture&& tc) { texCoords = std::move(tc); }
+		void SetTexCoords(const AtlasedTexture& tc) { texCoords = tc; }
+	private:
+		std::string name;
+		std::string fileName;
+		float size;
+		float distance;
+		float distSqr;
 
-				std::swap(ownTexture, id.ownTexture);
-
-				radiusAdjust = id.radiusAdjust;
-				return *this;
-			}
-
-			void Ref() { refCount++; }
-			void UnRef() {
-				if ((--refCount) > 0)
-					return;
-
-				// trigger texture deletion
-				*this = {};
-			}
-
-			void CopyData(const CIconData* iconData);
-			void SwapOwner(CIconData* iconData) {
-				ownTexture = true;
-				iconData->ownTexture = false;
-			}
-
-			void BindTexture() const;
-			void Draw(float x0, float y0, float x1, float y1) const;
-
-			const std::string& GetName()   const { return name;         }
-
-			unsigned int GetTextureID()    const { return texID;        }
-			int          GetSizeX()        const { return xsize;        }
-			int          GetSizeY()        const { return ysize;        }
-
-			float        GetSize()         const { return size;         }
-			float        GetDistance()     const { return distance;     }
-			float        GetDistanceSqr()  const { return distSqr;      }
-			float        GetRadiusScale()  const { return 30.0f;        }
-
-			bool         GetRadiusAdjust() const { return radiusAdjust; }
-
-		private:
-			std::string name;
-
-			int refCount = 123456;
-			unsigned int texID = 0;
-			int xsize = 1;
-			int ysize = 1;
-
-			float size = 1.0f;
-			float distance = 1.0f;
-			float distSqr = 1.0f;
-
-			bool ownTexture = false;
-			bool radiusAdjust = false;
+		bool radiusAdjust;
+		float4 srcTexCoords;
+		AtlasedTexture texCoords;
 	};
 
-
 	class CIconHandler {
-		friend class CIcon;
-
 		public:
 			CIconHandler() = default;
-			CIconHandler(const CIconHandler&) = delete; // no-copy
+
+			// unique, no copy, no move
+			CIconHandler(const CIconHandler&) = delete;
+			CIconHandler& operator=(const CIconHandler&) = delete;
+			CIconHandler(CIconHandler&&) = delete;
+			CIconHandler& operator=(CIconHandler&&) = delete;
 
 			void Init() { LoadIcons("gamedata/icontypes.lua"); }
 			void Kill();
 
 			bool AddIcon(
+				uint32_t atlasIndex,
 				const std::string& iconName,
-				const std::string& texName,
+				const std::string& texFileName,
 				float size,
 				float distance,
-				bool radiusAdjust
+				bool radAdj,
+				float u0, float v0, float u1, float v1
 			);
 
 			bool FreeIcon(const std::string& iconName);
 
-			CIcon GetIcon(const std::string& iconName) const;
-			CIcon GetSafetyIcon() const { return CIcon(SAFETY_DATA_IDX); }
-			CIcon GetDefaultIcon() const { return CIcon(DEFAULT_DATA_IDX); }
+			void Update();
 
-			static const CIconData* GetSafetyIconData();
-			static const CIconData* GetDefaultIconData();
+			const auto& GetIconsMap() const { return iconsMap; }
+			const auto& GetIconsData() const { return iconsData; }
+			const IconData& GetIconData(const std::string& iconName) const;
+			const IconData& GetIconData(size_t iconIdx) const;
+			size_t GetIconIdx(const std::string& iconName) const;
+			size_t GetIconIdxOrDefault(const std::string& iconName) const;
+			std::pair<bool, spring::unordered_map<std::string, size_t>::const_iterator> FindIconIdx(const std::string& iconName) const;
+			size_t GetDefaultIconIdx() const { return defaultIconIdx; }
 
+			const auto& GetAtlasTextureIDs() const { return atlasTextureIDs; }
+			auto GetAtlasTextureID(size_t i) const { return atlasTextureIDs[i]; }
+			const auto& GetAtlasSize(size_t i) const { return atlasTextureSizes[i]; }
+
+			void DumpAtlasTextures() const;
 		private:
-			CIconData* GetIconDataMut(unsigned int idx) { return (const_cast<CIconData*>(GetIconData(idx))); }
-
-			const CIconData* GetIconData(unsigned int idx) const {
-				switch (idx) {
-					case  SAFETY_DATA_IDX: { return (GetSafetyIconData());  } break;
-					case DEFAULT_DATA_IDX: { return (GetDefaultIconData()); } break;
-					default              : {                                } break;
-				}
-
-				return &iconData[idx - ICON_DATA_OFFSET];
-			}
-
-			bool LoadIcons(const std::string& filename);
-			unsigned int GetDefaultTexture();
-
-		public:
-			static constexpr unsigned int  SAFETY_DATA_IDX = 0;
-			static constexpr unsigned int DEFAULT_DATA_IDX = 1;
-			static constexpr unsigned int ICON_DATA_OFFSET = 2;
-
-			static constexpr unsigned int DEFAULT_TEX_SIZE_X = 128;
-			static constexpr unsigned int DEFAULT_TEX_SIZE_Y = 128;
-
+			bool UpdateAtlasData(size_t atlasIdx);
+			bool CreateAtlasTexture(size_t atlasIdx);
+			void LoadIcons(const std::string& filename);
 		private:
-			unsigned int defTexID = 0;
-			unsigned int numIcons = 0;
+			static constexpr int DEFAULT_NUM_OF_TEXTURE_LEVELS = 4;
 
-			spring::unordered_map<std::string, CIcon> iconMap;
-			std::array<CIconData, 2048> iconData;
+			spring::unordered_map<std::string, size_t> iconsMap;
+			std::vector<IconData> iconsData;
+
+			size_t defaultIconIdx = INVALID_ICON_INDEX;
+
+			std::array<uint32_t, 2> atlasTextureIDs = {};
+			std::array<int2, 2> atlasTextureSizes = {};
+			std::array<std::unique_ptr<CTextureRenderAtlas>, 2> atlases;
+			std::bitset<2> atlasNeedsUpdate = { false };
 	};
 
 	extern CIconHandler iconHandler;
 }
-
-#endif // ICON_HANDLER_H

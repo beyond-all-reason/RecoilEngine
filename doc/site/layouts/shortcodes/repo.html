@@ -1,0 +1,3 @@
+{{ $url := printf "%s%s" ($.Site.Params.repo) (.Get 0) }}
+
+<a href="{{ $url }}">{{ or (.Get 1) $url }}</a>

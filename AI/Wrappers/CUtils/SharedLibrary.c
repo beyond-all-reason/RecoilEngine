@@ -48,7 +48,7 @@ sharedLib_t sharedLib_load(const char* libFilePath) {
 	sharedLib_t lib = NULL;
 
 #if defined _WIN32
-	if ((lib = LoadLibrary(libFilePath)) == NULL) {
+	if ((lib = LoadLibraryA(libFilePath)) == NULL) {
 		fprintf(stderr, "[SharedLibrary.c::sharedLib_load(%s)] LoadLibrary() error %d\n", libFilePath, (int) GetLastError());
 	}
 #else /* defined _WIN32 */

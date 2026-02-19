@@ -7,10 +7,11 @@
 #include <string>
 #include <mutex>
 #include <condition_variable>
+#include <future>
 
-#include "3DModel.h"
 #include "System/UnorderedMap.hpp"
 
+struct S3DModel;
 
 class IModelParser
 {
@@ -60,7 +61,7 @@ private:
 	std::condition_variable_any cv;
 
 	//can't be weak_ptr here, because in that case there are no owners left for futures. preloadFutures needs to own futures
-	std::vector<std::shared_ptr<std::future<void>>> preloadFutures;
+	std::vector<std::shared_future<void>> preloadFutures;
 
 	std::vector<S3DModel> models;
 	std::vector< std::pair<std::string, std::string> > errors;

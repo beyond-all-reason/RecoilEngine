@@ -4,15 +4,19 @@
 #include <SDL_keycode.h>
 
 #include "KeyCodes.h"
+#include "Game/UI/MouseHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Platform/SDL1_keysym.h"
 #include "System/StringUtil.h"
+
+#include "System/Misc/TracyDefs.h"
 
 CKeyCodes keyCodes;
 
 
 int CKeyCodes::GetNormalizedSymbol(int sym)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (sym <= SDLK_DELETE)
 		return (tolower(sym));
 
@@ -30,6 +34,7 @@ int CKeyCodes::GetNormalizedSymbol(int sym)
 
 bool CKeyCodes::IsModifier(int code) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	switch (code) {
 		case SDLK_LALT:
 		case SDLK_LCTRL:
@@ -47,6 +52,7 @@ bool CKeyCodes::IsModifier(int code) const
 
 void CKeyCodes::Reset()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	nameToCode.clear();
 	nameToCode.reserve(64);
 	codeToName.clear();
@@ -154,6 +160,10 @@ void CKeyCodes::Reset()
 	//AddPair("euro", SDLK_EURO);       // Some european keyboards
 	//AddPair("undo", SDLK_UNDO);       // Atari keyboard has Undo
 
+	for (int i = ACTION_BUTTON_MIN; i <= NUM_BUTTONS; i++) {
+		AddPair("mouse" + IntToString(i), CKeyCodes::GetMouseButtonSymbol(i));
+	}
+
 	std::sort(nameToCode.begin(), nameToCode.end(), namePred);
 	std::sort(codeToName.begin(), codeToName.end(), codePred);
 	std::sort(printableCodes.begin(), printableCodes.end());
@@ -173,14 +183,24 @@ void CKeyCodes::Reset()
 }
 
 
+int CKeyCodes::GetMouseButtonSymbol(int button)
+{
+	// magic number here chosen so it won't conflict with SDL or unicode reserved values.
+	// choosing a private part of unicode range.
+	return 0xE000+button;
+}
+
+
 std::string CKeyCodes::GetCodeString(int code)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return IntToString(code, "0x%03X");
 }
 
 
 std::string CKeyCodes::GetName(int code) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto iter = std::lower_bound(codeToName.begin(), codeToName.end(), CodeNamePair{code, ""}, codePred);
 
 	if (iter == codeToName.end() || iter->first != code)
@@ -192,6 +212,7 @@ std::string CKeyCodes::GetName(int code) const
 
 std::string CKeyCodes::GetDefaultName(int code) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto iter = std::lower_bound(defaultCodeToName.begin(), defaultCodeToName.end(), CodeNamePair{code, ""}, codePred);
 
 	if (iter == defaultCodeToName.end() || iter->first != code)
@@ -203,6 +224,7 @@ std::string CKeyCodes::GetDefaultName(int code) const
 
 void CKeyCodes::PrintNameToCode() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (const auto& p: nameToCode) {
 		LOG("KEYNAME: %13s = 0x%03X (SDL1 = 0x%03X)", p.first.c_str(), p.second, SDL21_keysyms(p.second));
 	}
@@ -211,6 +233,7 @@ void CKeyCodes::PrintNameToCode() const
 
 void CKeyCodes::PrintCodeToName() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (const auto& p: codeToName) {
 		LOG("KEYCODE: 0x%03X = '%s' (SDL1 = 0x%03X)", p.first, p.second.c_str(), SDL21_keysyms(p.first));
 	}

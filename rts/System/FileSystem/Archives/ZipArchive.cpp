@@ -1,6 +1,5 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-
 #include "ZipArchive.h"
 
 #include <algorithm>
@@ -9,17 +8,23 @@
 
 #include "System/StringUtil.h"
 #include "System/Log/ILog.h"
-
+#include "System/Threading/ThreadPool.h"
+#include "System/TimeUtil.h"
 
 IArchive* CZipArchiveFactory::DoCreateArchive(const std::string& filePath) const
 {
 	return new CZipArchive(filePath);
 }
 
-
-CZipArchive::CZipArchive(const std::string& archiveName): CBufferedArchive(archiveName)
+CZipArchive::CZipArchive(const std::string& archiveName)
+	: CBufferedArchive(archiveName)
 {
-	std::lock_guard<spring::mutex> lck(archiveLock);
+	static_assert(ThreadPool::MAX_THREADS <= CZipArchive::MAX_THREADS, "MAX_THREADS mismatch");
+	static_assert(sizeof(decltype(afi)::ValueType) * 8 >= ThreadPool::MAX_THREADS);
+
+	std::scoped_lock lck(archiveLock); //not needed?
+
+	unzFile zip = nullptr;
 
 	if ((zip = unzOpen(archiveName.c_str())) == nullptr) {
 		LOG_L(L_ERROR, "[%s] error opening \"%s\"", __func__, archiveName.c_str());
@@ -49,56 +54,96 @@ CZipArchive::CZipArchive(const std::string& archiveName): CBufferedArchive(archi
 		if ((fName[fNameLen - 1] == '/') || (fName[fNameLen - 1] == '\\'))
 			continue;
 
-		FileEntry fd;
-		unzGetFilePos(zip, &fd.fp);
+		unz_file_pos fp{};
+		unzGetFilePos(zip, &fp);
 
-		fd.size = info.uncompressed_size;
-		fd.origName = fName;
-		fd.crc = info.crc;
+		const auto& fd = fileEntries.emplace_back(
+			std::move(fp), //fp
+			info.uncompressed_size, //size
+			fName, //origName
+			info.crc, //crc
+			static_cast<uint32_t>(CTimeUtil::DosTimeToTime64(info.dosDate)) //modTime
+		);
 
-		lcNameIndex.emplace(StringToLower(fd.origName), fileEntries.size());
-		fileEntries.emplace_back(std::move(fd));
+		lcNameIndex.emplace(StringToLower(fd.origName), fileEntries.size() - 1);
 	}
+
+	zipPerThread[0] = zip;
+
+	parallelAccessNum = ThreadPool::GetNumThreads(); // will open NumThreads parallel archives, this way GetFile() is no longer needs to be mutex locked
+	sem = std::make_unique<decltype(sem)::element_type>(parallelAccessNum);
+	const auto maxBitMask = (1u << parallelAccessNum) - 1;
+	afi.SetMaxBitsMask(maxBitMask);
 }
 
 CZipArchive::~CZipArchive()
 {
-	std::lock_guard<spring::mutex> lck(archiveLock);
+	std::scoped_lock lck(archiveLock); //not needed?
 
-	if (zip != nullptr) {
-		unzClose(zip);
-		zip = nullptr;
+	for (auto& zip : zipPerThread) {
+		if (zip) {
+			unzClose(zip);
+			zip = nullptr;
+		}
 	}
 }
 
 
-void CZipArchive::FileInfo(unsigned int fid, std::string& name, int& size) const
+const std::string& CZipArchive::FileName(uint32_t fid) const
 {
 	assert(IsFileId(fid));
-
-	name = fileEntries[fid].origName;
-	size = fileEntries[fid].size;
+	return fileEntries[fid].origName;
 }
 
+int32_t CZipArchive::FileSize(uint32_t fid) const
+{
+	assert(IsFileId(fid));
+	return fileEntries[fid].size;
+}
+
+IArchive::SFileInfo CZipArchive::FileInfo(uint32_t fid) const
+{
+	assert(IsFileId(fid));
+	const auto& fe = fileEntries[fid];
+	return IArchive::SFileInfo {
+		.fileName = fe.origName,
+		.specialFileName = "",
+		.size = fe.size,
+		.modTime = fe.modTime
+	};
+}
 
 // To simplify things, files are always read completely into memory from
 // the zip-file, since zlib does not provide any way of reading more
 // than one file at a time
-int CZipArchive::GetFileImpl(unsigned int fid, std::vector<std::uint8_t>& buffer)
+int CZipArchive::GetFileImpl(uint32_t fid, std::vector<std::uint8_t>& buffer)
 {
+	// this below will lead to expensive on-demand creation of thisThreadZip
+	// in case actual number of parallel threads entering this function is
+	// less than ThreadPool::GetThreadNum(). E.g. when counting_semaphore
+	// dictates for less than ThreadPool::GetThreadNum() simultaneous IO operations
+	//unzFile& thisThreadZip = zipPerThread[ThreadPool::GetThreadNum()];
+
+	const auto tnum = afi.AcquireScoped();
+	assert(tnum < parallelAccessNum);
+	unzFile& thisThreadZip = zipPerThread[tnum];
+
+	if (!thisThreadZip) {
+		thisThreadZip = unzOpen(GetArchiveFile().c_str());
+	}
+
 	// Prevent opening files on missing/invalid archives
-	if (zip == nullptr)
+	if (thisThreadZip == nullptr)
 		return -4;
 
-	// assert(archiveLock.locked());
 	assert(IsFileId(fid));
 
-	unzGoToFilePos(zip, &fileEntries[fid].fp);
+	unzGoToFilePos(thisThreadZip, &fileEntries[fid].fp);
 
 	unz_file_info fi;
-	unzGetCurrentFileInfo(zip, &fi, nullptr, 0, nullptr, 0, nullptr, 0);
+	unzGetCurrentFileInfo(thisThreadZip, &fi, nullptr, 0, nullptr, 0, nullptr, 0);
 
-	if (unzOpenCurrentFile(zip) != UNZ_OK)
+	if (unzOpenCurrentFile(thisThreadZip) != UNZ_OK)
 		return -3;
 
 	buffer.clear();
@@ -106,9 +151,9 @@ int CZipArchive::GetFileImpl(unsigned int fid, std::vector<std::uint8_t>& buffer
 
 	int ret = 1;
 
-	if (!buffer.empty() && unzReadCurrentFile(zip, buffer.data(), buffer.size()) != buffer.size())
+	if (!buffer.empty() && unzReadCurrentFile(thisThreadZip, buffer.data(), buffer.size()) != buffer.size())
 		ret -= 2;
-	if (unzCloseCurrentFile(zip) == UNZ_CRCERROR)
+	if (unzCloseCurrentFile(thisThreadZip) == UNZ_CRCERROR)
 		ret -= 1;
 
 	if (ret != 1)

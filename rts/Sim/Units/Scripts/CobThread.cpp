@@ -2,13 +2,16 @@
 
 
 #include "CobThread.h"
+
+#include "CobDeferredCallin.h"
 #include "CobFile.h"
 #include "CobInstance.h"
+#include "CobOpCodes.h"
 #include "CobEngine.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/GlobalSynced.h"
 
-#include <tracy/Tracy.hpp>
+#include "System/Misc/TracyDefs.h"
 
 CR_BIND(CCobThread, )
 
@@ -75,6 +78,7 @@ CCobThread::CCobThread(CCobInstance* _cobInst)
 
 CCobThread::~CCobThread()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	Stop();
 
 	if (dataStack.capacity() > 0) {
@@ -142,6 +146,7 @@ CCobThread& CCobThread::operator = (const CCobThread& t) {
 
 void CCobThread::Start(int functionId, int sigMask, const std::array<int, 1 + MAX_COB_ARGS>& args, bool schedule)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(callStack.size() == 0);
 
 	state = Run;
@@ -170,6 +175,7 @@ void CCobThread::Start(int functionId, int sigMask, const std::array<int, 1 + MA
 
 void CCobThread::Stop()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (cobInst == nullptr)
 		return;
 
@@ -186,12 +192,14 @@ void CCobThread::Stop()
 
 const std::string& CCobThread::GetName()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return cobFile->scriptNames[callStack[0].functionId];
 }
 
 
 int CCobThread::CheckStack(unsigned int size, bool warn)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (size <= dataStack.size())
 		return size;
 
@@ -210,6 +218,7 @@ int CCobThread::CheckStack(unsigned int size, bool warn)
 
 void CCobThread::InitStack(unsigned int n, CCobThread* t)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(dataStack.size() == 0);
 
 	// move n arguments from caller's stack onto our own
@@ -218,185 +227,12 @@ void CCobThread::InitStack(unsigned int n, CCobThread* t)
 	}
 }
 
-
-
-// Command documentation from http://visualta.tauniverse.com/Downloads/cob-commands.txt
-// And some information from basm0.8 source (basm ops.txt)
-
-// Model interaction
-constexpr int MOVE       = 0x10001000;
-constexpr int TURN       = 0x10002000;
-constexpr int SPIN       = 0x10003000;
-constexpr int STOP_SPIN  = 0x10004000;
-constexpr int SHOW       = 0x10005000;
-constexpr int HIDE       = 0x10006000;
-constexpr int CACHE      = 0x10007000;
-constexpr int DONT_CACHE = 0x10008000;
-constexpr int MOVE_NOW   = 0x1000B000;
-constexpr int TURN_NOW   = 0x1000C000;
-constexpr int SHADE      = 0x1000D000;
-constexpr int DONT_SHADE = 0x1000E000;
-constexpr int EMIT_SFX   = 0x1000F000;
-
-// Blocking operations
-constexpr int WAIT_TURN  = 0x10011000;
-constexpr int WAIT_MOVE  = 0x10012000;
-constexpr int SLEEP      = 0x10013000;
-
-// Stack manipulation
-constexpr int PUSH_CONSTANT    = 0x10021001;
-constexpr int PUSH_LOCAL_VAR   = 0x10021002;
-constexpr int PUSH_STATIC      = 0x10021004;
-constexpr int CREATE_LOCAL_VAR = 0x10022000;
-constexpr int POP_LOCAL_VAR    = 0x10023002;
-constexpr int POP_STATIC       = 0x10023004;
-constexpr int POP_STACK        = 0x10024000; ///< Not sure what this is supposed to do
-
-// Arithmetic operations
-constexpr int ADD         = 0x10031000;
-constexpr int SUB         = 0x10032000;
-constexpr int MUL         = 0x10033000;
-constexpr int DIV         = 0x10034000;
-constexpr int MOD		  = 0x10034001; ///< spring specific
-constexpr int BITWISE_AND = 0x10035000;
-constexpr int BITWISE_OR  = 0x10036000;
-constexpr int BITWISE_XOR = 0x10037000;
-constexpr int BITWISE_NOT = 0x10038000;
-
-// Native function calls
-constexpr int RAND           = 0x10041000;
-constexpr int GET_UNIT_VALUE = 0x10042000;
-constexpr int GET            = 0x10043000;
-
-// Comparison
-constexpr int SET_LESS             = 0x10051000;
-constexpr int SET_LESS_OR_EQUAL    = 0x10052000;
-constexpr int SET_GREATER          = 0x10053000;
-constexpr int SET_GREATER_OR_EQUAL = 0x10054000;
-constexpr int SET_EQUAL            = 0x10055000;
-constexpr int SET_NOT_EQUAL        = 0x10056000;
-constexpr int LOGICAL_AND          = 0x10057000;
-constexpr int LOGICAL_OR           = 0x10058000;
-constexpr int LOGICAL_XOR          = 0x10059000;
-constexpr int LOGICAL_NOT          = 0x1005A000;
-
-// Flow control
-constexpr int START           = 0x10061000;
-constexpr int CALL            = 0x10062000; ///< converted when executed
-constexpr int REAL_CALL       = 0x10062001; ///< spring custom
-constexpr int LUA_CALL        = 0x10062002; ///< spring custom
-constexpr int JUMP            = 0x10064000;
-constexpr int RETURN          = 0x10065000;
-constexpr int JUMP_NOT_EQUAL  = 0x10066000;
-constexpr int SIGNAL          = 0x10067000;
-constexpr int SET_SIGNAL_MASK = 0x10068000;
-
-// Piece destruction
-constexpr int EXPLODE    = 0x10071000;
-constexpr int PLAY_SOUND = 0x10072000;
-
-// Special functions
-constexpr int SET    = 0x10082000;
-constexpr int ATTACH = 0x10083000;
-constexpr int DROP   = 0x10084000;
-
-// Indices for SET, GET, and GET_UNIT_VALUE for LUA return values
-#define LUA0 110 // (LUA0 returns the lua call status, 0 or 1)
-#define LUA1 111
-#define LUA2 112
-#define LUA3 113
-#define LUA4 114
-#define LUA5 115
-#define LUA6 116
-#define LUA7 117
-#define LUA8 118
-#define LUA9 119
-
 #if 0
 #define GET_LONG_PC() (cobFile->code[pc++])
 #else
 // mantis #5981
 #define GET_LONG_PC() (cobFile->code.at(pc++))
 #endif
-
-
-#if 0
-static const char* GetOpcodeName(int opcode)
-{
-	switch (opcode) {
-		case MOVE: return "move";
-		case TURN: return "turn";
-		case SPIN: return "spin";
-		case STOP_SPIN: return "stop-spin";
-		case SHOW: return "show";
-		case HIDE: return "hide";
-		case CACHE: return "cache";
-		case DONT_CACHE: return "dont-cache";
-		case TURN_NOW: return "turn-now";
-		case MOVE_NOW: return "move-now";
-		case SHADE: return "shade";
-		case DONT_SHADE: return "dont-shade";
-		case EMIT_SFX: return "sfx";
-
-		case WAIT_TURN: return "wait-for-turn";
-		case WAIT_MOVE: return "wait-for-move";
-		case SLEEP: return "sleep";
-
-		case PUSH_CONSTANT: return "pushc";
-		case PUSH_LOCAL_VAR: return "pushl";
-		case PUSH_STATIC: return "pushs";
-		case CREATE_LOCAL_VAR: return "clv";
-		case POP_LOCAL_VAR: return "popl";
-		case POP_STATIC: return "pops";
-		case POP_STACK: return "pop-stack";
-
-		case ADD: return "add";
-		case SUB: return "sub";
-		case MUL: return "mul";
-		case DIV: return "div";
-		case MOD: return "mod";
-		case BITWISE_AND: return "and";
-		case BITWISE_OR: return "or";
-		case BITWISE_XOR: return "xor";
-		case BITWISE_NOT: return "not";
-
-		case RAND: return "rand";
-		case GET_UNIT_VALUE: return "getuv";
-		case GET: return "get";
-
-		case SET_LESS: return "setl";
-		case SET_LESS_OR_EQUAL: return "setle";
-		case SET_GREATER: return "setg";
-		case SET_GREATER_OR_EQUAL: return "setge";
-		case SET_EQUAL: return "sete";
-		case SET_NOT_EQUAL: return "setne";
-		case LOGICAL_AND: return "land";
-		case LOGICAL_OR: return "lor";
-		case LOGICAL_XOR: return "lxor";
-		case LOGICAL_NOT: return "neg";
-
-		case START: return "start";
-		case CALL: return "call";
-		case REAL_CALL: return "call";
-		case LUA_CALL: return "lua_call";
-		case JUMP: return "jmp";
-		case RETURN: return "return";
-		case JUMP_NOT_EQUAL: return "jne";
-		case SIGNAL: return "signal";
-		case SET_SIGNAL_MASK: return "mask";
-
-		case EXPLODE: return "explode";
-		case PLAY_SOUND: return "play-sound";
-
-		case SET: return "set";
-		case ATTACH: return "attach";
-		case DROP: return "drop";
-	}
-
-	return "unknown";
-}
-#endif
-
 
 bool CCobThread::Tick()
 {
@@ -422,7 +258,7 @@ bool CCobThread::Tick()
 			} break;
 			case SLEEP: {
 				r1 = PopDataStack();
-				wakeTime = cobEngine->GetCurrentTime() + r1;
+				wakeTime = cobEngine->GetCurrTime() + r1;
 				state = Sleep;
 
 				cobEngine->ScheduleThread(this);
@@ -475,6 +311,15 @@ bool CCobThread::Tick()
 				r1 = GET_LONG_PC();
 			} break;
 
+			case SIGNATURE_LUA: {
+				LOG_L(L_ERROR, "BAD ACCESS: Entered a lua method reference.");
+				state = Dead;
+				return false;
+			} break;
+
+			case BATCH_LUA: {
+				DeferredCall(false);
+			} break;
 
 			case CALL: {
 				r1 = GET_LONG_PC();
@@ -488,8 +333,7 @@ bool CCobThread::Tick()
 
 				cobFile->code[pc - 1] = REAL_CALL;
 
-				// fall-through
-			}
+			} [[fallthrough]];
 			case REAL_CALL: {
 				r1 = GET_LONG_PC();
 				r2 = GET_LONG_PC();
@@ -772,7 +616,17 @@ bool CCobThread::Tick()
 				r3 = PopDataStack();
 				cobInst->TurnNow(r1, r2, r3);
 			} break;
-
+			case SCALE: {
+				r1 = GET_LONG_PC();
+				r3 = PopDataStack();
+				r2 = PopDataStack();
+				cobInst->Scale(r1, r2, r3);
+			} break;
+			case SCALE_NOW: {
+				r1 = GET_LONG_PC();
+				r2 = PopDataStack();
+				cobInst->ScaleNow(r1, r2);
+			} break;
 
 			case WAIT_TURN: {
 				r1 = GET_LONG_PC();
@@ -796,7 +650,16 @@ bool CCobThread::Tick()
 					return true;
 				}
 			} break;
+			case WAIT_SCALE: {
+				r1 = GET_LONG_PC();
 
+				if (cobInst->NeedsWait(CCobInstance::AScale, r1, -1)) {
+					state = WaitScale;
+					waitPiece = r1;
+					waitAxis = -1;
+					return true;
+				}
+			} break;
 
 			case SET: {
 				r2 = PopDataStack();
@@ -891,6 +754,7 @@ bool CCobThread::Tick()
 
 void CCobThread::ShowError(const char* msg)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if ((errorCounter = std::max(errorCounter - 1, 0)) == 0)
 		return;
 
@@ -906,10 +770,44 @@ void CCobThread::ShowError(const char* msg)
 }
 
 
-void CCobThread::LuaCall()
+void CCobThread::DeferredCall(bool synced)
 {
 	const int r1 = GET_LONG_PC(); // script id
 	const int r2 = GET_LONG_PC(); // arg count
+
+	// Make sure to clean args from stack on exit
+	CCobStackGuard guard{&dataStack, r2};
+
+	// sanity checks
+	if (!luaRules) {
+		retCode = 0;
+		return;
+	}
+
+	// check script index validity
+	if (static_cast<size_t>(r1) >= cobFile->luaScripts.size()) {
+		retCode = 0;
+		return;
+	}
+
+	// setup the parameter array
+	auto d = CCobDeferredCallin(cobInst->GetUnit(), cobFile->luaScripts[r1], dataStack, r2);
+
+	cobEngine->AddDeferredCallin(std::move(d));
+
+	// always succeeds
+	retCode = 1;
+}
+
+
+void CCobThread::LuaCall()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const int r1 = GET_LONG_PC(); // script id
+	const int r2 = GET_LONG_PC(); // arg count
+
+	// Make sure to clean args from stack on exit
+	CCobStackGuard guard{&dataStack, r2};
 
 	// setup the parameter array
 	const int size = static_cast<int>(dataStack.size());
@@ -919,12 +817,6 @@ void CCobThread::LuaCall()
 
 	for (int a = 0, i = start; i < end; i++) {
 		luaArgs[a++] = dataStack[i];
-	}
-
-	if (r2 >= size) {
-		dataStack.clear();
-	} else {
-		dataStack.resize(size - r2);
 	}
 
 	if (!luaRules) {
@@ -939,13 +831,13 @@ void CCobThread::LuaCall()
 	}
 
 	int argsCount = argCount;
-	luaRules->Cob2Lua(cobFile->luaScripts[r1], cobInst->GetUnit(), argsCount, luaArgs);
+	luaRules->syncedLuaHandle.Cob2Lua(cobFile->luaScripts[r1], cobInst->GetUnit(), argsCount, luaArgs);
 	retCode = luaArgs[0];
 }
 
-
 void CCobThread::AnimFinished(CUnitScript::AnimType type, int piece, int axis)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (piece != waitPiece || axis != waitAxis)
 		return;
 

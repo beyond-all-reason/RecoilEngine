@@ -21,7 +21,6 @@
 #include "Map/ReadMap.h"
 #include "Rendering/DebugDrawerAI.h"
 #include "Rendering/LineDrawer.h"
-#include "Rendering/Models/3DModel.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/Units/UnitDrawerData.h"
 #include "Sim/Features/Feature.h"
@@ -136,7 +135,7 @@ void CAICallback::SendTextMsg(const char* text, int zone)
 	const std::vector<uint8_t>& teamAIs = skirmishAIHandler.GetSkirmishAIsInTeam(this->team);
 	const SkirmishAIData* aiData = skirmishAIHandler.GetSkirmishAI(teamAIs[0]); // FIXME is there a better way?
 
-	if (!game->ProcessCommandText(-1, -1, text))
+	if (!game->ProcessCommandText(text))
 		return;
 
 	LOG("<SkirmishAI: %s %s (team %d)>: %s", aiData->shortName.c_str(), aiData->version.c_str(), team, text);
@@ -694,7 +693,7 @@ bool CAICallback::IsUnitNeutral(int unitId) {
 int CAICallback::InitPath(const float3& start, const float3& end, int pathType, float goalRadius)
 {
 	assert(((size_t)pathType) < moveDefHandler.GetNumMoveDefs());
-	return pathManager->RequestPath(nullptr, moveDefHandler.GetMoveDefByPathType(pathType), start, end, goalRadius, false);
+	return pathManager->RequestPath(nullptr, moveDefHandler.GetMoveDefByPathType(pathType), start, end, goalRadius, false, true);
 }
 
 float3 CAICallback::GetNextWaypoint(int pathId)

@@ -59,13 +59,13 @@ static void ExitSpringProcess(const char* msg, const char* caption, unsigned int
 
 static void ExitSpringProcess(const char* msg, const char* caption, unsigned int flags)
 {
-	LOG_L(L_ERROR, "[%s] errorMsg=\"%s\" msgCaption=\"%s\" mainThread=%d", __func__, msg, caption, Threading::IsMainThread());
+	LOG_L(L_FATAL, "[%s] errorMsg=\"%s\" msgCaption=\"%s\" mainThread=%d", __func__, msg, caption, Threading::IsMainThread());
 
 	switch (SpringApp::PostKill(Threading::Error(caption, msg, flags))) {
 		case -1: {
 			// main thread; either gets to ESPA first and cleans up our process or exit is forced by this
 			std::function<void()> forcedExitFunc = [&]() { ExitSpringProcessAux(true, false); };
-			spring::thread forcedExitThread = std::move(spring::thread(forcedExitFunc));
+			spring::thread forcedExitThread = spring::thread(forcedExitFunc);
 
 			// .join can (very rarely) throw a no-such-process exception if it runs in parallel with exit
 			assert(forcedExitThread.joinable());

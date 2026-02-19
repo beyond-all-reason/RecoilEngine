@@ -5,13 +5,14 @@
 
 #include <string>
 #include <vector>
+#include <tuple>
 
 #include "System/Color.h"
 
 /**
  * Simple class to interpolate between 32bit RGBA colors
  * Do not delete an instance of this class created by any Load function,
- * they are deleted automaticly.
+ * they are deleted automatically.
  */
 class CColorMap
 {
@@ -38,6 +39,10 @@ public:
 	 * @param pos value between 0.0f and 1.0f, returns pointer to color
 	 */
 	void GetColor(unsigned char* color, float pos);
+	const SColor& GetColor(size_t idx) const { return map[idx]; }
+	std::pair<size_t, size_t> GetIndices(float pos) const;
+	auto GetMapSize() const { return map.size(); }
+	auto Empty() const { return map.empty(); }
 	void Clear() {
 		xsize = 2; nxsize = 1;
 		ysize = 1;

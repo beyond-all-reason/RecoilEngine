@@ -16,6 +16,8 @@
 #include "System/SafeUtil.h"
 #include "System/Log/ILog.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CONFIG(bool, AdvSky).deprecated(true);
 
 ISky::ISky()
@@ -23,23 +25,29 @@ ISky::ISky()
 	, sunColor(mapInfo->atmosphere.sunColor)
 	, cloudColor(mapInfo->atmosphere.cloudColor)
 	, fogColor(mapInfo->atmosphere.fogColor)
+	, skyAxisAngle(mapInfo->atmosphere.skyAxisAngle)
 	, fogStart(mapInfo->atmosphere.fogStart)
 	, fogEnd(mapInfo->atmosphere.fogEnd)
 	, cloudDensity(mapInfo->atmosphere.cloudDensity)
 	, skyLight(nullptr)
 	, wireFrameMode(false)
+	, updated(true)
 {
 	skyLight = new ISkyLight();
 }
 
 ISky::~ISky()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	spring::SafeDelete(skyLight);
 }
+
+std::unique_ptr<ISky> ISky::sky = nullptr;
 
 
 
 void ISky::SetupFog() {
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (globalRendering->drawFog) {
 		glEnable(GL_FOG);
@@ -56,6 +64,7 @@ void ISky::SetupFog() {
 
 void ISky::SetSky()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	sky = nullptr; //break before make
 
 	try {
@@ -80,7 +89,20 @@ void ISky::SetSky()
 	}
 }
 
+void ISky::SetSkyAxisAngle(const float4& skyAxisAngleRaw)
+{
+	auto axis = float3{ skyAxisAngleRaw.x, skyAxisAngleRaw.y, skyAxisAngleRaw.z };
+	const float axisNorm = axis.Length();
+	if (axisNorm < float3::nrm_eps())
+		axis = FwdVector;
+	else
+		axis /= axisNorm;
+
+	skyAxisAngle = float4{ axis, ClampRad(skyAxisAngleRaw.w) };
+}
+
 bool ISky::SunVisible(const float3 pos) const {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const CUnit* hitUnit = nullptr;
 	const CFeature* hitFeature = nullptr;
 

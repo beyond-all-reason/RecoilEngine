@@ -128,7 +128,7 @@ void CEFX::Init(ALCdevice* device) {
 	}
 
 
-	// create our global sfx enviroment
+	// create our global sfx environment
 	alGenAuxiliaryEffectSlots(1, &sfxSlot);
 
 	alGenEffects(1, &sfxReverb);
@@ -258,7 +258,7 @@ void CEFX::CommitEffects(const EAXSfxProps* sfxProps)
 
 void CEFX::SetAirAbsorptionFactor(ALfloat value)
 {
-	airAbsorptionFactor = Clamp(value, AL_MIN_AIR_ABSORPTION_FACTOR, AL_MAX_AIR_ABSORPTION_FACTOR);
+	airAbsorptionFactor = std::clamp(value, AL_MIN_AIR_ABSORPTION_FACTOR, AL_MAX_AIR_ABSORPTION_FACTOR);
 }
 
 void CEFX::ConfigNotify(const std::string& key, const std::string& value)

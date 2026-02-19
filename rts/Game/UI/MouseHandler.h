@@ -13,6 +13,7 @@
 #include "MouseCursor.h"
 
 static const int NUM_BUTTONS = 10;
+static const int ACTION_BUTTON_MIN = 2;
 
 class CInputReceiver;
 class CCameraController;
@@ -87,6 +88,8 @@ public:
 
 	bool GetSelectionBoxVertices(float3& bl, float3& br, float3& tl, float3& tr) const;
 
+	bool ButtonPressed();
+
 private:
 	int2 GetViewMouseCenter() const;
 	void SetCursor(const std::string& cmdName, const bool forceRebind = false);
@@ -116,6 +119,7 @@ public:
 	bool wasLocked = false;
 	bool offscreen = false;
 	bool mmbScroll = false;
+	uint32_t pressedBitMask = 0;
 
 private:
 	bool hideCursor = true;

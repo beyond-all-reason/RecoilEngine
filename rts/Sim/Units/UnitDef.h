@@ -5,7 +5,6 @@
 
 #include <vector>
 
-#include "Rendering/Icon.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/GuiSoundSet.h"
 #include "Sim/Objects/SolidObject.h"
@@ -13,7 +12,7 @@
 #include "System/float3.h"
 #include "System/UnorderedMap.hpp"
 
-#define MAX_UNITDEF_EXPGEN_IDS 32
+static constexpr uint32_t MAX_UNITDEF_EXPGEN_IDS = 32;
 
 
 struct Command;
@@ -43,10 +42,17 @@ struct UnitDefWeapon {
 
 	float3 mainDir = FwdVector;
 
-	bool fastAutoRetargeting = false;	///< pick new targets as soon as possible, don't wait for slow update
+	bool fastAutoRetargeting = false; ///< pick new targets as soon as possible, don't wait for slow update
 	bool fastQueryPointUpdate = false;	///< check in with unitscript to get most current query piece before every friendly fire check, don't wait for slow update
 	bool preaimAtBlockedTargets = false;///< weapon can have target without free line of fire
+	unsigned int accurateLeading = 0;	///< Accurately lead moving targets. The number controls how many calculation iterations are done. 0 = undershoot approaching or retreating targets (default), 1 = sufficient for exact solution for non-parabolic shots and improves parabolic shots, 2+ = extra iterations for parabolic shots
+	unsigned int burstControlWhenOutOfArc = 0; ///< Determines how to handle burst fire, when target is out of arc. 0 = no restrictions (default), 1 = don't fire, 2 = fire in current direction of weapon 
 	float weaponAimAdjustPriority = 1.f;		///< relative importance of picking enemy targets that are in front
+
+
+	static constexpr unsigned int BURST_CONTROL_OUT_OF_ARC_OFF = 0;
+	static constexpr unsigned int BURST_CONTROL_OUT_OF_ARC_HOLD = 1;
+	static constexpr unsigned int BURST_CONTROL_OUT_OF_ARC_FIRE_FORWARD = 2;
 };
 
 
@@ -116,20 +122,17 @@ public:
 
 	const UnitDef* decoyDef;
 
-	float metalUpkeep;
-	float energyUpkeep;
-	float metalMake;		///< metal will always be created
+	SResourcePack upkeep;
+	SResourcePack resourceMake; ///< will always be created
 	float makesMetal;		///< metal will be created when unit is on and enough energy can be drained
-	float energyMake;
 	float buildTime;
+	float buildeeBuildRadius; ///< if >= 0.f, override default radius to use for the buildee in build distance calculations.
 	float extractsMetal;
 	float extractRange;
 	float windGenerator;
 	float tidalGenerator;
-	float metalStorage;
-	float energyStorage;
-	float harvestMetalStorage;
-	float harvestEnergyStorage;
+	SResourcePack storage;
+	SResourcePack harvestStorage;
 
 	float autoHeal;     ///< amount autohealed
 	float idleAutoHeal; ///< amount autohealed only during idling
@@ -166,6 +169,7 @@ public:
 	float seismicSignature;
 	bool stealth;
 	bool sonarStealth;
+	bool leavesGhost;
 
 	bool  buildRange3D;
 	float buildDistance;
@@ -185,12 +189,25 @@ public:
 	bool stopToAttack;
 	float minCollisionSpeed;
 	float slideTolerance;
+	float rollingResistanceCoefficient;
+	float groundFrictionCoefficient;
+	float atmosphericDragCoefficient;
 	float maxHeightDif;   /// maximum terraform height this building allows
 	float waterline;
 	float minWaterDepth;
 	float maxWaterDepth;
 
 	float upDirSmoothing;
+
+	// Apply an additional collision boundary in elmos to keep units separated.
+	// This is used to make units keep a gap between them of the distance specified.
+	// [unit 1] <- separationDistance -> [unit 2]
+	// The larger of two units' separation distance will be applied.
+	// This works best with relatively small values such as 32 elmos or smaller.
+	// This only impacts mobile units to mobile units. This is deliberate because otherwise units
+	// would be unable to squeeze between buildings or would be able to knock over/crush features
+	// they are not touching.
+	float separationDistance;
 
 	unsigned int pathType;
 
@@ -247,7 +264,7 @@ public:
 	const WeaponDef* selfdExpWeaponDef;
 
 	mutable UnitDefImage* buildPic;
-	mutable icon::CIcon iconType;
+	mutable std::string iconName;
 
 	int selfDCountdown;
 
@@ -385,10 +402,8 @@ private:
 	void ParseWeaponsTable(const LuaTable& weaponsTable);
 	void CreateYardMap(std::string&& yardMapStr);
 
-	float realMetalCost;
-	float realEnergyCost;
-	float realMetalUpkeep;
-	float realEnergyUpkeep;
+	SResourcePack realCost;
+	SResourcePack realUpkeep;
 	float realBuildTime;
 };
 

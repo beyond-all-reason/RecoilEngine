@@ -49,9 +49,10 @@ enum NETMSG {
 
 	NETMSG_PLAYERSTAT       = 29, // uint8_t playerNum; CPlayer::Statistics currentStats;
 	NETMSG_GAMEOVER         = 30, // uint8_t playerNum; std::vector<uint8_t> winningAllyTeams
-	NETMSG_MAPDRAW          = 31, // uint8_t messageSize =  8, playerNum, command = MapDrawAction::NET_ERASE; int16_t x, z;
-	                              // uint8_t messageSize = 12, playerNum, command = MapDrawAction::NET_LINE; int16_t x1, z1, x2, z2;
-	                              // /*messageSize*/   uint8_t playerNum, command = MapDrawAction::NET_POINT; int16_t x, z; std::string label;
+	NETMSG_MAPDRAW_OLD	= 31, // old MAPDRAW with int16 coords
+	NETMSG_MAPDRAW          = 32, // uint8_t messageSize =  12, playerNum, command = MapDrawAction::NET_ERASE; int32_t x, z;
+	                              // uint8_t messageSize = 21, playerNum, command = MapDrawAction::NET_LINE; int32_t x1, z1, x2, z2, uint8_t fromLua;
+	                              // /*messageSize*/   uint8_t playerNum, command = MapDrawAction::NET_POINT; int32_t x, z; uint8_t fromLua, std::string label;
 	NETMSG_SYNCRESPONSE     = 33, // uint8_t playerNum; int32_t frameNum; uint32_t checksum;
 	NETMSG_SYSTEMMSG        = 35, // uint8_t playerNum, std::string message;
 	NETMSG_STARTPOS         = 36, // uint8_t playerNum, uint8_t myTeam, ready /*0: not ready, 1: ready, 2: don't update readiness*/; float x, y, z;

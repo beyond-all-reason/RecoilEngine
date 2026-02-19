@@ -117,12 +117,13 @@ private:
 	void ConvertCommands(std::vector<SCommandDescription>& cmds);
 
 	int  FindInCommandPage();
+	void SetActiveCommandIndex(int newIndex);
 	void RevertToCmdDesc(const SCommandDescription& cmdDesc, bool defaultCommand, bool samePage);
 
 	unsigned char CreateOptions(bool rightMouseButton);
 	unsigned char CreateOptions(int button);
 	void FinishCommand(int button);
-	void SetShowingMetal(bool show);
+	void SetShowingMetal(const SCommandDescription *cmdDesc);
 	float GetNumberInput(const SCommandDescription& cmdDesc) const;
 
 	void ProcessFrontPositions(float3& pos0, const float3& pos1);
@@ -174,6 +175,7 @@ public:
 	int inCommand = -1;
 	int buildFacing = FACING_SOUTH;
 	int buildSpacing = 0;
+	bool autoShowMetal = false;
 
 private:
 	int maxPage = 0;
@@ -216,8 +218,6 @@ private:
 	float textureAlpha = 0.8f;
 
 	bool needShift = false;
-	bool showingMetal = false;
-	bool autoShowMetal = false;
 	bool invertQueueKey = false;
 	bool activeMousePress = false;
 	bool forceLayoutUpdate = false;
@@ -263,7 +263,6 @@ private:
 	// DrawMapStuff caches
 	std::vector<BuildInfo> buildInfos;
 	std::vector<Command> buildCommands;
-	std::vector<float4> buildColors;
 
 public:
 	std::vector<SCommandDescription> commands;

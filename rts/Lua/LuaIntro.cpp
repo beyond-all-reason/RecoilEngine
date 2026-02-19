@@ -30,6 +30,8 @@
 #include "System/Threading/SpringThreading.h"
 #include "System/StringUtil.h"
 
+#include "System/Misc/TracyDefs.h"
+
 
 CLuaIntro* luaIntro = nullptr;
 
@@ -44,6 +46,10 @@ DECL_FREE_HANDLER(CLuaIntro, luaIntro)
 
 /******************************************************************************/
 
+/***
+ * @class Intro : Callins
+ * @see Callins
+ */
 CLuaIntro::CLuaIntro()
 : CLuaHandle("LuaIntro", LUA_HANDLE_ORDER_INTRO, true, false)
 {
@@ -97,6 +103,7 @@ CLuaIntro::CLuaIntro()
 
 	// load the spring libraries
 	if (
+	    !AddCommonModules(L)						    ||
 	    !AddEntriesToTable(L, "Spring",    LoadUnsyncedCtrlFunctions)           ||
 	    !AddEntriesToTable(L, "Spring",    LoadUnsyncedReadFunctions)           ||
 	    !AddEntriesToTable(L, "Spring",    LoadSyncedReadFunctions  )           ||
@@ -137,12 +144,14 @@ CLuaIntro::CLuaIntro()
 
 CLuaIntro::~CLuaIntro()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	luaIntro = nullptr;
 }
 
 
 bool CLuaIntro::RemoveSomeOpenGLFunctions(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// remove some spring opengl functions that don't work preloading
 	lua_getglobal(L, "gl"); {
 		#define PUSHNIL(x) lua_pushliteral(L, #x); lua_pushnil(L); lua_rawset(L, -3)
@@ -176,6 +185,7 @@ bool CLuaIntro::RemoveSomeOpenGLFunctions(lua_State* L)
 
 bool CLuaIntro::LoadUnsyncedCtrlFunctions(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, Echo);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, Log);
 
@@ -218,6 +228,7 @@ bool CLuaIntro::LoadUnsyncedCtrlFunctions(lua_State* L)
 
 bool CLuaIntro::LoadUnsyncedReadFunctions(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedRead, IsReplay);
 
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedRead, GetViewGeometry);
@@ -266,6 +277,7 @@ bool CLuaIntro::LoadUnsyncedReadFunctions(lua_State* L)
 
 bool CLuaIntro::LoadSyncedReadFunctions(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	REGISTER_SCOPED_LUA_CFUNC(LuaSyncedRead, AreHelperAIsEnabled);
 	REGISTER_SCOPED_LUA_CFUNC(LuaSyncedRead, FixedAllies);
 
@@ -304,6 +316,7 @@ bool CLuaIntro::LoadSyncedReadFunctions(lua_State* L)
 
 string CLuaIntro::LoadFile(const string& filename) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CFileHandler f(filename, SPRING_VFS_RAW_FIRST);
 
 	string code;
@@ -317,12 +330,14 @@ string CLuaIntro::LoadFile(const string& filename) const
 /******************************************************************************/
 /******************************************************************************/
 
-/*** Draws custom load screens.
+/***
+ * Draws custom load screens.
  *
- * @function DrawLoadScreen()
+ * @function Intro:DrawLoadScreen
  */
 void CLuaIntro::DrawLoadScreen()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
 	luaL_checkstack(L, 2, __func__);
 	static const LuaHashString cmdStr(__func__);
@@ -343,10 +358,13 @@ void CLuaIntro::DrawLoadScreen()
 
 
 /***
- * @function LoadProgress(message, replaceLastLine)
+ * @function Intro:LoadProgress
+ * @param message string
+ * @param replaceLastLine boolean 
  */
 void CLuaIntro::LoadProgress(const std::string& msg, const bool replace_lastline)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
 	luaL_checkstack(L, 4, __func__);
 	static const LuaHashString cmdStr(__func__);

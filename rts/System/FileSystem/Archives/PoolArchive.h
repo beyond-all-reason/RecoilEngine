@@ -5,6 +5,7 @@
 
 #include <zlib.h>
 #include <cstring>
+#include <cassert>
 
 #include "IArchiveFactory.h"
 #include "BufferedArchive.h"
@@ -83,27 +84,17 @@ public:
 	bool IsOpen() override { return isOpen; }
 
 	unsigned NumFiles() const override { return (files.size()); }
-	void FileInfo(unsigned int fid, std::string& name, int& size) const override {
-		assert(IsFileId(fid));
-		name = files[fid].name;
-		size = files[fid].size;
-	}
-	bool CalcHash(uint32_t fid, uint8_t hash[sha512::SHA_LEN], std::vector<std::uint8_t>& fb) override {
-		assert(IsFileId(fid));
-
-		const FileData& fd = files[fid];
-
-		// pool-entry hashes are not calculated until GetFileImpl, must check JIT
-		if (memcmp(fd.shasum.data(), dummyFileHash.data(), sizeof(fd.shasum)) == 0)
-			GetFileImpl(fid, fb);
-
-		memcpy(hash, fd.shasum.data(), sha512::SHA_LEN);
-		return (memcmp(fd.shasum.data(), dummyFileHash.data(), sizeof(fd.shasum)) != 0);
-	}
-
+	const std::string& FileName(uint32_t fid) const override;
+	int32_t FileSize(uint32_t fid) const override;
+	SFileInfo FileInfo(uint32_t fid) const override;
+	bool CalcHash(uint32_t fid, sha512::raw_digest& hash, std::vector<std::uint8_t>& fb) override;
+	static std::string GetPoolRootDirectory(const std::string& sdpName);
+	static std::string GetPoolFileName(const std::array<uint8_t, 16>& md5Sum);
+	static std::string GetPoolFilePath(const std::string& poolRootDir, const std::string& poolFile);
+	static std::string GetPoolFilePath(const std::string& poolRootDir, const std::array<uint8_t, 16>& md5Sum);
 protected:
-	int GetFileImpl(unsigned int fid, std::vector<std::uint8_t>& buffer) override;
-
+	int GetFileImpl(uint32_t fid, std::vector<std::uint8_t>& buffer) override;
+private:
 	std::pair<uint64_t, uint64_t> GetSums() const {
 		std::pair<uint64_t, uint64_t> p;
 
@@ -122,6 +113,7 @@ protected:
 
 		uint32_t crc32;
 		uint32_t size;
+		mutable uint32_t modTime;
 	};
 	struct FileStat {
 		// inverted cmp for descending order
@@ -135,8 +127,6 @@ private:
 	bool isOpen = false;
 
 	std::string poolRootDir;
-	std::array<uint8_t, sha512::SHA_LEN> dummyFileHash;
-
 	std::vector<FileData> files;
 	std::vector<FileStat> stats;
 };

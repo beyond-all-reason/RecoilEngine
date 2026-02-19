@@ -16,16 +16,19 @@ public:
 	virtual void DrawTraingleElements() = 0;
 	virtual void HandleTextureUpdate(CFontTexture& font, bool onlyUpload) = 0;
 	virtual void PushGLState(const CglFont& font) = 0;
-	virtual void PopGLState() = 0;
+	virtual void PopGLState(const CglFont& font) = 0;
 
 	virtual bool IsLegacy() const = 0;
 	virtual bool IsValid() const = 0;
 	virtual void GetStats(std::array<size_t, 8>& stats) const = 0;
 
+	void SetUserDefinedBlending(bool enableUserDefinedBlending) { userDefinedBlending = enableUserDefinedBlending; };
+
 	static std::unique_ptr<CglFontRenderer> CreateInstance();
 	static void DeleteInstance(std::unique_ptr<CglFontRenderer>& instance);
 protected:
 	GLint currProgID = 0;
+	bool userDefinedBlending = false;
 
 	// should be enough to hold all data for a given frame
 	static constexpr size_t NUM_BUFFER_ELEMS = (1 << 14);
@@ -46,7 +49,7 @@ public:
 	void DrawTraingleElements() override;
 	void HandleTextureUpdate(CFontTexture& font, bool onlyUpload) override;
 	void PushGLState(const CglFont& font) override;
-	void PopGLState() override;
+	void PopGLState(const CglFont& font) override;
 
 	bool IsLegacy() const override { return false; }
 	bool IsValid() const override { return fontShader->IsValid(); }
@@ -57,6 +60,8 @@ private:
 
 	static inline size_t fontShaderRefs = 0;
 	static inline std::unique_ptr<Shader::IProgramObject> fontShader = nullptr;
+	static inline size_t fontShaderColorRefs = 0;
+	static inline std::unique_ptr<Shader::IProgramObject> fontShaderColor = nullptr;
 };
 
 class CglNoShaderFontRenderer final: public CglFontRenderer {
@@ -69,7 +74,7 @@ public:
 	void DrawTraingleElements() override;
 	void HandleTextureUpdate(CFontTexture& font, bool onlyUpload) override;
 	void PushGLState(const CglFont& font) override;
-	void PopGLState() override;
+	void PopGLState(const CglFont& font) override;
 
 	bool IsLegacy() const override { return true; }
 	bool IsValid() const override { return true; }
@@ -90,7 +95,7 @@ class CglNullFontRenderer final : public CglFontRenderer {
 	void DrawTraingleElements() override {}
 	void HandleTextureUpdate(CFontTexture& font, bool onlyUpload) override {}
 	void PushGLState(const CglFont& font) override {}
-	void PopGLState() override {}
+	void PopGLState(const CglFont& font) override {}
 	bool IsLegacy() const override { return true; }
 	bool IsValid() const override { return true; }
 	void GetStats(std::array<size_t, 8>& stats) const override;

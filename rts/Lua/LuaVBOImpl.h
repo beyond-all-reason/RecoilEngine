@@ -12,7 +12,7 @@
 #include "lib/sol2/forward.hpp"
 
 #include "Rendering/GL/myGL.h"
-#include "Rendering/Models/3DModelVAO.h"
+#include "Rendering/Models/3DModelVAO.hpp"
 
 class VBO;
 class LuaVAOImpl;
@@ -52,6 +52,10 @@ public:
 	int UnbindBufferRange(const GLuint index, const sol::optional<int> elemOffsetOpt, const sol::optional<int> elemCountOpt, const sol::optional<GLenum> targetOpt);
 
 	void DumpDefinition();
+
+	bool CopyTo(const std::shared_ptr<LuaVBOImpl>& destVBO, int copySizeInBytes);
+
+	uint32_t GetID() const;
 public:
 	static bool Supported(GLenum target);
 private:

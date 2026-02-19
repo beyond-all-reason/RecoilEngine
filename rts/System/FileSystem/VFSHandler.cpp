@@ -176,8 +176,8 @@ bool CVFSHandler::AddArchive(const std::string& archiveName, bool overwrite)
 	files[Section::Temp].reserve(ar->NumFiles());
 
 	for (unsigned fid = 0; fid != ar->NumFiles(); ++fid) {
-		std::pair<std::string, int> fi = ar->FileInfo(fid);
-		std::string name = std::move(StringToLower(fi.first));
+		std::string name = StringToLower(ar->FileName(fid));
+		const auto size = ar->FileSize(fid);
 
 		if (!overwrite) {
 			const auto pred = [](const FileEntry& a, const FileEntry& b) { return (a.first < b.first); };
@@ -195,7 +195,7 @@ bool CVFSHandler::AddArchive(const std::string& archiveName, bool overwrite)
 
 		// can not add directly to files[section], would break lower_bound
 		// note: this means an archive can *internally* contain duplicates
-		files[Section::Temp].emplace_back(name, FileData{ar, fi.second});
+		files[Section::Temp].emplace_back(name, FileData{ ar, size });
 	}
 
 	for (FileEntry& fileEntry: files[Section::Temp]) {
@@ -209,7 +209,7 @@ bool CVFSHandler::AddArchive(const std::string& archiveName, bool overwrite)
 
 bool CVFSHandler::AddArchiveWithDeps(const std::string& archiveName, bool overwrite)
 {
-	const std::vector<std::string> ars = std::move(archiveScanner->GetAllArchivesUsedBy(archiveName));
+	const std::vector<std::string> ars = archiveScanner->GetAllArchivesUsedBy(archiveName);
 
 	if (ars.empty())
 		throw content_error("[AddArchiveWithDeps] could not find any archives for '" + archiveName + "'.");
@@ -405,9 +405,7 @@ void CVFSHandler::SwapArchiveSections(Section src, Section dst)
 
 std::string CVFSHandler::GetNormalizedPath(const std::string& rawPath)
 {
-	std::string lcPath = std::move(StringToLower(rawPath));
-	std::string nPath = std::move(FileSystem::ForwardSlashes(lcPath));
-	return nPath;
+	return FileSystem::GetNormalizedPath(StringToLower(rawPath));
 }
 
 
@@ -479,13 +477,13 @@ std::string CVFSHandler::GetFileAbsolutePath(const std::string& filePath, Sectio
 	const std::string& normalizedPath = GetNormalizedPath(filePath);
 	const FileData& fileData = GetFileData(normalizedPath, section);
 
-	// Only directory archives have an absolute path on disk
-	const auto dirArchive = dynamic_cast<const CDirArchive*>(fileData.ar);
-
-	if (dirArchive == nullptr)
+	if (fileData.ar->GetType() != ARCHIVE_TYPE_SDD)
 		return "";
 
-	const std::string& origFilePath = dirArchive->GetOrigFileName(dirArchive->FindFile(filePath));
+	// Only directory archives have an absolute path on disk
+	const auto* dirArchive = static_cast<const CDirArchive*>(fileData.ar);
+
+	const std::string& origFilePath = dirArchive->FileName(dirArchive->FindFile(filePath));
 	return (fileData.ar->GetArchiveFile() + "/" + origFilePath);
 }
 
@@ -530,7 +528,7 @@ std::vector<std::string> CVFSHandler::GetFilesInDir(const std::string& rawDir, b
 	LOG_L(L_DEBUG, "[%s::%s<this=%p>(rawDir=\"%s\")] section=%d", vfsName, __func__, this, rawDir.c_str(), section);
 
 	std::vector<std::string> dirFiles;
-	std::string dir = std::move(GetNormalizedPath(rawDir));
+	std::string dir = GetNormalizedPath(rawDir);
 
 
 	const auto filesPred = [](const FileEntry& a, const FileEntry& b) { return (a.first < b.first); };
@@ -559,7 +557,7 @@ std::vector<std::string> CVFSHandler::GetFilesInDir(const std::string& rawDir, b
 			continue;
 
 		// strip pathname
-		std::string name = std::move(filesBeg->first.substr(dir.length()));
+		std::string name = filesBeg->first.substr(dir.length());
 
 		// do not return files in subfolders
 		if (!recursive && ((name.find('/') != std::string::npos) || (name.find('\\') != std::string::npos)))
@@ -583,7 +581,7 @@ std::vector<std::string> CVFSHandler::GetDirsInDir(const std::string& rawDir, bo
 
 	std::vector<std::string> dirs;
 	std::vector<std::string>::iterator iter;
-	std::string dir = std::move(GetNormalizedPath(rawDir));
+	std::string dir = GetNormalizedPath(rawDir);
 
 
 	const auto filesPred = [](const FileEntry& a, const FileEntry& b) { return (a.first < b.first); };
@@ -621,7 +619,7 @@ std::vector<std::string> CVFSHandler::GetDirsInDir(const std::string& rawDir, bo
 		if (slash == std::string::npos)
 			continue;
 
-		dirs.emplace_back(std::move(name.substr(0, slash + 1)));
+		dirs.emplace_back(name.substr(0, slash + 1));
 	}
 
 	std::stable_sort(dirs.begin(), dirs.end());

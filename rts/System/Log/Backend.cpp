@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include <cassert>
-#include <cstdio>
 #include <cstdarg>
 #include <cstring>
 
@@ -113,7 +112,7 @@ void log_backend_record(int level, const char* section, const char* fmt, va_list
 	cur_record.cnt += cmp;
 	cur_record.cnt *= cmp;
 
-	if (cur_record.cnt >= log_filter_getRepeatLimit())
+	if (const auto limit = log_filter_getRepeatLimit(); limit && cur_record.cnt >= limit)
 		return;
 
 	// sink the record into each registered sink

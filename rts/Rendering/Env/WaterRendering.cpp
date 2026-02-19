@@ -7,6 +7,8 @@
 #include "Map/MapInfo.h"
 #include "System/EventHandler.h"
 
+#include "System/Misc/TracyDefs.h"
+
 /**
  * @brief waterRenderingInst
  *
@@ -15,8 +17,8 @@
 CWaterRendering waterRenderingInst;
 
 void CWaterRendering::Init() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(mapInfo != nullptr);
-	assert(IsGlobalInstance());
 
 	const CMapInfo::water_t& water = mapInfo->water;
 
@@ -58,8 +60,6 @@ void CWaterRendering::Init() {
 	foamTexture = water.foamTexture;
 	normalTexture = water.normalTexture;
 	causticTextures = water.causticTextures;
-}
 
-bool CWaterRendering::IsGlobalInstance() const {
-	return (this == &waterRenderingInst);
+	updated = true;
 }

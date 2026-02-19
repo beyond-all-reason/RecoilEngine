@@ -37,8 +37,9 @@
 #include "System/Net/UnpackPacket.h"
 #include "System/Sound/ISound.h"
 #include "System/Sync/DumpState.h"
+#include "System/Sync/DumpHistory.h"
 
-#include <tracy/Tracy.hpp>
+#include "System/Misc/TracyDefs.h"
 
 CONFIG(bool, LogClientData).defaultValue(false);
 
@@ -252,7 +253,7 @@ float CGame::GetNetMessageProcessingTimeLimit() const
 	const float minDrawFPS   =         globalConfig.minSimDrawBalance  * 1000.0f / std::max(0.01f, gu->avgDrawFrameTime);
 	const float simDrawRatio = maxSimFPS / minDrawFPS;
 
-	return Clamp(simDrawRatio * gu->avgSimFrameTime, 5.0f, 1000.0f / globalConfig.minDrawFPS);
+	return std::clamp(simDrawRatio * gu->avgSimFrameTime, 5.0f, 1000.0f / globalConfig.minDrawFPS);
 }
 
 void CGame::ClientReadNet()
@@ -290,7 +291,7 @@ void CGame::ClientReadNet()
 
 			if (peekPacket != nullptr && peekPacket->data[0] == NETMSG_SYNCRESPONSE) {
 				if (haveServerDemo && haveClientDemo && gs->godMode != 0) {
-					assert(configHandler->GetBool("DemoFromDemo"));
+					//assert(configHandler->GetBool("DemoFromDemo"));
 
 					const  int32_t syncFrameNum = *reinterpret_cast<const int32_t*>(peekPacket->data + sizeof(uint8_t) + sizeof(uint8_t));
 					const uint32_t syncCheckSum = localSyncChecksums[syncFrameNum];
@@ -604,7 +605,7 @@ void CGame::ClientReadNet()
 				}
 			}
 			case NETMSG_NEWFRAME: {
-				// This is alredy well covered in SimFrame so not adding scope.
+				// This is already well covered in SimFrame so not adding scope.
 				// ZoneScopedN("Net::NewFrame");
 
 				// Just a checkpoint for the speed factors plots.
@@ -863,7 +864,8 @@ void CGame::ClientReadNet()
 						commands.push_back(cmd);
 					}
 
-					assert(aiInstID == MAX_AIS);
+					if (aiInstID != MAX_AIS)
+						throw netcode::UnpackPacketException("Invalid AI instance ID");
 
 					// apply the "AI" commands (which actually originate from LuaUnsyncedCtrl)
 					if (pairwise) {
@@ -1045,8 +1047,8 @@ void CGame::ClientReadNet()
 				CTeam* srcTeam = teamHandler.Team(srcTeamID);
 				CTeam* dstTeam = teamHandler.Team(dstTeamID);
 
-				const float metalShare  = Clamp(*reinterpret_cast<const float*>(&inbuf[4]), 0.0f, srcTeam->res.metal);
-				const float energyShare = Clamp(*reinterpret_cast<const float*>(&inbuf[8]), 0.0f, srcTeam->res.energy);
+				const float metalShare  = std::clamp(*reinterpret_cast<const float*>(&inbuf[4]), 0.0f, srcTeam->res.metal);
+				const float energyShare = std::clamp(*reinterpret_cast<const float*>(&inbuf[8]), 0.0f, srcTeam->res.energy);
 
 				if (metalShare > 0.0f) {
 					if (eventHandler.AllowResourceTransfer(srcTeamID, dstTeamID, "m", metalShare)) {
@@ -1134,6 +1136,10 @@ void CGame::ClientReadNet()
 				if (playerNum >= 0)
 					AddTraffic(playerNum, packetCode, dataLength);
 
+			} break;
+
+			case NETMSG_MAPDRAW_OLD: {
+				LOG_L(L_WARNING, "[Game::%s] Invalid network opcode NETMSG_MAPDRAW_OLD(%d). Are you watching an old replay?", __func__, NETMSG_MAPDRAW_OLD);
 			} break;
 
 			case NETMSG_TEAM: {
@@ -1570,7 +1576,8 @@ void CGame::ClientReadNet()
 			case NETMSG_GAMESTATE_DUMP: {
 				ZoneScopedN("Net::GamestateDump");
 				LOG("Collecting current game state information.");
-				DumpState(gs->frameNum, gs->frameNum, 1, true, true);
+				const uint32_t desyncFrameNum = *reinterpret_cast<const uint32_t*>(inbuf + 1);
+				DumpState(gs->frameNum, gs->frameNum, 1, true, desyncFrameNum, true);
 				break;
 			}
 

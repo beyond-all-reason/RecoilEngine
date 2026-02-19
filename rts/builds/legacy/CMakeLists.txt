@@ -7,50 +7,50 @@
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 
+add_library(Game STATIC)
+target_sources(Game PRIVATE ${sources_engine_Game})
+add_dependencies(Game generateVersionFiles)
+target_include_directories(Game PRIVATE "${CMAKE_BINARY_DIR}/src-generated/engine")
+target_link_libraries(Game PRIVATE
+	 Tracy::TracyClient
+	 SDL2::SDL2
+	 RmlUi::RmlUi
+	 ${sound-impl}
+	 prd::jsoncpp
+	 streflop
+)
 
 ### Assemble libraries
-find_package(SDL2 REQUIRED)
-set(engineIncludes ${SDL2_INCLUDE_DIR})
-set(engineLibraries ${SDL2_LIBRARY})
-if("${SDL2_VERSION_STRING}" VERSION_LESS "2")
-	message(FATAL_ERROR "Found SDL v${SDL2_VERSION_STRING} while 2 is required!")
-endif()
+find_package(SDL2 MODULE REQUIRED)
 
-find_package(Vulkan)
-if    (Vulkan_FOUND)
-	list(APPEND engineIncludes ${Vulkan_INCLUDE_DIRS})
-	add_definitions(-DHAS_VULKAN)
-endif (Vulkan_FOUND)
+
+
+
+
+set(engineLibraries SDL2::SDL2)
 
 set(OpenGL_GL_PREFERENCE LEGACY)
-find_package_static(OpenGL REQUIRED)
-find_package_static(GLEW 1.5.1 REQUIRED)
-list(APPEND engineLibraries ${OPENGL_gl_LIBRARY} ${OPENGL_glu_LIBRARY} ${GLEW_LIBRARIES})
-list(APPEND engineIncludes ${GLEW_INCLUDE_DIR})
+find_package_static(OpenGL 3.0 REQUIRED)
+list(APPEND engineLibraries OpenGL::GL)
 
-find_package_static(FontConfig)
-if    (FONTCONFIG_FOUND)
-	list(APPEND engineIncludes ${FONTCONFIG_INCLUDE_DIR})
-	list(APPEND engineLibraries ${FONTCONFIG_LIBRARIES})
-	add_definitions(-DUSE_FONTCONFIG)
-	if    (PREFER_STATIC_LIBS)
-		prefer_static_libs()
-		find_library(EXPAT_LIBRARY expat)
-		find_library(LIBUUID_LIBRARY uuid)
-		unprefer_static_libs()
-		list(APPEND engineLibraries ${EXPAT_LIBRARY} ${LIBUUID_LIBRARY})
-	endif (PREFER_STATIC_LIBS)
-endif (FONTCONFIG_FOUND)
+find_fontconfig_hack()
+find_package_static(Fontconfig 2.11 REQUIRED)
+list(APPEND engineLibraries Fontconfig::Fontconfig)
+add_definitions(-DUSE_FONTCONFIG)
 
+if (NOT WIN32)
+	find_package_static(EXPAT 2.2.5 REQUIRED)
+	list(APPEND engineLibraries EXPAT::EXPAT)
+endif()
+
+# !!! If you change freetype resolution here, change it also in rts/lib
 find_freetype_hack() # hack to find different named freetype.dll
-find_package_static(Freetype REQUIRED)
-foreach(f ${FREETYPE_INCLUDE_DIRS})
-	list(APPEND engineIncludes ${f})
-endforeach(f)
-list(APPEND engineLibraries ${FREETYPE_LIBRARY})
+find_package_static(Freetype 2.8.1 REQUIRED)
+list(APPEND engineLibraries Freetype::Freetype)
 
 if    (UNIX)
 	find_package(X11 REQUIRED)
+	target_link_libraries(Game PRIVATE X11::Xcursor)
 	list(APPEND engineLibraries ${X11_Xcursor_LIB} ${X11_X11_LIB})
 endif (UNIX)
 
@@ -59,10 +59,7 @@ if (APPLE)
 	list(APPEND engineLibraries ${COREFOUNDATION_LIBRARY})
 endif (APPLE)
 
-if    (USE_LIBSQUISH)
-	list(APPEND engineLibraries squish rgetc1)
-endif (USE_LIBSQUISH)
-
+list(APPEND engineLibraries squish rgetc1)
 list(APPEND engineLibraries ${sound-impl})
 list(APPEND engineLibraries engineSystemNet)
 list(APPEND engineLibraries ${engineCommonLibraries})
@@ -70,17 +67,21 @@ list(APPEND engineLibraries ${engineCommonLibraries})
 list(APPEND engineLibraries ${SPRING_SIM_LIBRARIES})
 list(APPEND engineLibraries engineSim)
 list(APPEND engineLibraries pr-downloader)
+list(APPEND engineLibraries RmlUi::Core)
+list(APPEND engineLibraries RmlUi::Debugger)
+list(APPEND engineLibraries lunasvg)
+list(APPEND engineLibraries glad)
 
-### Assemble external incude dirs
-list(APPEND engineIncludes ${OPENAL_INCLUDE_DIR})
+### Assemble external include dirs
 list(APPEND engineIncludes ${ENGINE_SRC_ROOT_DIR}/lib/asio/include)
 list(APPEND engineIncludes ${ENGINE_SRC_ROOT_DIR}/lib/slimsig/include)
+list(APPEND engineIncludes ${ENGINE_SRC_ROOT_DIR}/lib/cereal/include)
 
 include_directories(${engineIncludes})
 
 ### Build the executable
 add_executable(engine-legacy ${EXE_FLAGS} ${engineSources} ${ENGINE_ICON} ${engineHeaders})
-target_link_libraries(engine-legacy ${engineLibraries})
+target_link_libraries(engine-legacy ${engineLibraries} Game)
 
 
 ### Install the executable

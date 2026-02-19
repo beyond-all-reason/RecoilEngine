@@ -34,7 +34,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."
  */
 void get_executable_name(char *output, int size)
 {
-	if (!GetModuleFileName(GetModuleHandle(NULL), output, size))
+	if (!GetModuleFileNameA(GetModuleHandle(NULL), output, size))
 		*output = 0;
 }
 
@@ -56,7 +56,7 @@ by simply defining ALLEGRO_HAVE_SV_PROCFS. */
 
 /* _find_executable_file:
  *  Helper function: searches path and current directory for executable.
- *  Returns 1 on succes, 0 on failure.
+ *  Returns 1 on success, 0 on failure.
  */
 static int _find_executable_file(const char *filename, char *output, int size)
 {

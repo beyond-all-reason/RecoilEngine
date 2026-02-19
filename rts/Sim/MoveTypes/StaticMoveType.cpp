@@ -2,17 +2,36 @@
 
 
 #include "StaticMoveType.h"
+#include "Components/MoveTypesComponents.h"
 #include "Map/Ground.h"
+#include "Sim/Ecs/Registry.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
+
+#include "System/Misc/TracyDefs.h"
+
+using namespace MoveTypes;
 
 CR_BIND_DERIVED(CStaticMoveType, AMoveType, (nullptr))
 CR_REG_METADATA(CStaticMoveType, (
 	CR_PREALLOC(GetPreallocContainer)
 ))
 
+CStaticMoveType::CStaticMoveType(CUnit* unit) : AMoveType(unit) {
+	RECOIL_DETAILED_TRACY_ZONE;
+	useWantedSpeed[false] = false;
+	useWantedSpeed[ true] = false;
+
+	// creg
+	if (unit == nullptr)
+		return;
+
+	Sim::registry.emplace_or_replace<GeneralMoveType>(unit->entityReference, unit->id);
+}
+
 void CStaticMoveType::SlowUpdate()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// buildings and pseudo-static units can be transported
 	if (owner->GetTransporter() != nullptr)
 		return;

@@ -6,6 +6,8 @@
 #include "Sim/Misc/GlobalConstants.h"
 #include "System/StringUtil.h"
 
+#include "System/Misc/TracyDefs.h"
+
 // script function-indices never change, so this is fine wrt. reloading
 static std::array<std::string, COBFN_NumUnitFuncs> scriptNames;
 static spring::unordered_map<std::string, int> scriptMap;
@@ -70,22 +72,22 @@ void CCobUnitScriptNames::InitScriptNames()
 	scriptMap.reserve(scriptNames.size() + 4 * 3);
 
 	for (size_t i = 0; i < scriptNames.size(); ++i) {
-		scriptMap.insert(scriptNames[i], i);
+		scriptMap.emplace(scriptNames[i], i);
 	}
 
 	// support the old naming scheme
-	scriptMap.insert("QueryPrimary",     COBFN_QueryPrimary                           );
-	scriptMap.insert("QuerySecondary",   COBFN_QueryPrimary   + COBFN_Weapon_Funcs * 1);
-	scriptMap.insert("QueryTertiary",    COBFN_QueryPrimary   + COBFN_Weapon_Funcs * 2);
-	scriptMap.insert("AimPrimary",       COBFN_AimPrimary                             );
-	scriptMap.insert("AimSecondary",     COBFN_AimPrimary     + COBFN_Weapon_Funcs * 1);
-	scriptMap.insert("AimTertiary",      COBFN_AimPrimary     + COBFN_Weapon_Funcs * 2);
-	scriptMap.insert("AimFromPrimary",   COBFN_AimFromPrimary                         );
-	scriptMap.insert("AimFromSecondary", COBFN_AimFromPrimary + COBFN_Weapon_Funcs * 1);
-	scriptMap.insert("AimFromTertiary",  COBFN_AimFromPrimary + COBFN_Weapon_Funcs * 2);
-	scriptMap.insert("FirePrimary",      COBFN_FirePrimary                            );
-	scriptMap.insert("FireSecondary",    COBFN_FirePrimary    + COBFN_Weapon_Funcs * 1);
-	scriptMap.insert("FireTertiary",     COBFN_FirePrimary    + COBFN_Weapon_Funcs * 2);
+	scriptMap.emplace("QueryPrimary",     COBFN_QueryPrimary                           );
+	scriptMap.emplace("QuerySecondary",   COBFN_QueryPrimary   + COBFN_Weapon_Funcs * 1);
+	scriptMap.emplace("QueryTertiary",    COBFN_QueryPrimary   + COBFN_Weapon_Funcs * 2);
+	scriptMap.emplace("AimPrimary",       COBFN_AimPrimary                             );
+	scriptMap.emplace("AimSecondary",     COBFN_AimPrimary     + COBFN_Weapon_Funcs * 1);
+	scriptMap.emplace("AimTertiary",      COBFN_AimPrimary     + COBFN_Weapon_Funcs * 2);
+	scriptMap.emplace("AimFromPrimary",   COBFN_AimFromPrimary                         );
+	scriptMap.emplace("AimFromSecondary", COBFN_AimFromPrimary + COBFN_Weapon_Funcs * 1);
+	scriptMap.emplace("AimFromTertiary",  COBFN_AimFromPrimary + COBFN_Weapon_Funcs * 2);
+	scriptMap.emplace("FirePrimary",      COBFN_FirePrimary                            );
+	scriptMap.emplace("FireSecondary",    COBFN_FirePrimary    + COBFN_Weapon_Funcs * 1);
+	scriptMap.emplace("FireTertiary",     COBFN_FirePrimary    + COBFN_Weapon_Funcs * 2);
 }
 
 
@@ -95,6 +97,7 @@ const spring::unordered_map<std::string, int>& CCobUnitScriptNames::GetScriptMap
 
 int CCobUnitScriptNames::GetScriptNumber(const std::string& fname)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto it = scriptMap.find(fname);
 
 	if (it != scriptMap.end())
@@ -105,6 +108,7 @@ int CCobUnitScriptNames::GetScriptNumber(const std::string& fname)
 
 const std::string& CCobUnitScriptNames::GetScriptName(unsigned int num)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const static std::string empty;
 
 	if (num < scriptNames.size())
