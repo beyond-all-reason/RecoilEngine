@@ -3330,10 +3330,23 @@ int LuaSyncedCtrl::SetUnitNanoPieces(lua_State* L)
  * @param crushable boolean? Enable or disable crushable, or no change if `nil`.
  * @param blockEnemyPushing boolean? Enable or disable blocking enemy pushing, or no change if `nil`.
  * @param blockHeightChanges boolean? Enable or disable blocking height changes, or no change if `nil`.
+ * @param isAirCollide boolean? Enable or disable the collide bool that is used to run air collisions, or no change if `nil`.
  * @return boolean isBlocking
  */
 int LuaSyncedCtrl::SetUnitBlocking(lua_State* L)
 {
+	CUnit* unit = ParseUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	// air unit collision is set at unit creation, by reading the unitdef, and is not affected by subsequent changes to the collision flags
+	// must change the collide var in the movetype directly
+	AAirMoveType* amt = dynamic_cast<AAirMoveType*>(unit->moveType);
+	if (amt != nullptr) {
+		amt->SetCollide(luaL_optboolean(L, 9, amt->collide));
+	}
+
 	return (SetSolidObjectBlocking(L, ParseUnit(L, __func__, 1)));
 }
 

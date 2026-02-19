@@ -47,6 +47,7 @@ public:
 		wantedHeight = altitude;
 		orgWantedHeight = altitude;
 	}
+	void SetCollide(bool newCollide) { collide = newCollide; }
 
 	bool HaveLandingPos() const { return (reservedLandingPos.x != -1.0f); }
 
