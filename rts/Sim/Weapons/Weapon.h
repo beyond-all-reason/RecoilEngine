@@ -79,7 +79,6 @@ public:
 	static float GetLiveRange2D(const CWeapon* w, const WeaponDef* wd, float modHeightDiff, float modProjGravity) { return (w->GetRange2D(0.0f, modHeightDiff)); }
 
 	virtual float GetRange2D(float boost, float ydiff) const;
-	virtual float TargetDistCases(float3 tgtPos, float heightDiff, int rangefrombase) const;
 	virtual void UpdateProjectileSpeed(const float val) { projectileSpeed = val; }
 	virtual void UpdateRange(const float val) { range = val; }
 
