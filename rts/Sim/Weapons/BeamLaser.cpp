@@ -141,7 +141,7 @@ void CBeamLaser::UpdatePosAndMuzzlePos()
 	}
 }
 
-float CBeamLaser::GetPredictedImpactTime(float3 p) const
+float CBeamLaser::GetPredictedImpactTime(const float3& p) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// beamburst tracks the target during the burst so there's no need to lead
@@ -271,6 +271,18 @@ void CBeamLaser::FireImpl(const bool scriptCall)
 	FireInternal(GetFireDir(false, scriptCall));
 }
 
+bool CBeamLaser::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
+{
+	float3 aimDir = (tgtPos - aimFromPos);
+	const float targetDist = aimDir.LengthNormalize();
+
+	if (const auto shapedRange = GetShapedWeaponRange(aimDir, range); targetDist > shapedRange)
+		return false;
+
+	// NOTE: mainDir is in unit-space
+	return (CheckTargetAngleConstraint(aimDir, owner->GetObjectSpaceVec(mainDir)));
+}
+
 void CBeamLaser::FireInternal(float3 curDir)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -312,22 +324,13 @@ void CBeamLaser::FireInternal(float3 curDir)
 		curDir += (gsRNG.NextVector() * SprayAngleExperience());
 		curDir.SafeNormalize();
 
-		// increase range if targets are searched for in a cylinder
-		if (weaponDef->cylinderTargeting > 0.01f) {
-			const float verticalDist = owner->radius * weaponDef->cylinderTargeting * curDir.y;
-			const float maxLengthModSq = maxLength * maxLength + verticalDist * verticalDist;
-
-			maxLength = math::sqrt(maxLengthModSq);
-		}
-
-		// adjust range if targeting edge of hitsphere
-		if (currentTarget.type == Target_Unit && weaponDef->targetBorder != 0.0f) {
-			maxLength += (currentTarget.unit->radius * weaponDef->targetBorder);
-		}
-	} else {
+		maxLength = GetShapedWeaponRange(curDir, maxLength);
+	}
+	else {
 		// restrict the range when sweeping
 		maxLength = std::min(maxLength, sweepFireState.GetTargetDist3D() * 1.125f);
 	}
+
 
 	uint32_t lastProjID = -1;
 	for (int tries = 0; tries < 5 && tryAgain; ++tries) {

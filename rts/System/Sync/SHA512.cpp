@@ -2,7 +2,7 @@
 
 #include <cassert>
 #include <cstring>
-#include <cstdio>
+#include <cstdio> // snprintf
 
 #include "SHA512.hpp"
 

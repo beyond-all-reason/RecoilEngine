@@ -68,7 +68,7 @@ void CMissileLauncher::FireImpl(const bool scriptCall)
 	WeaponProjectileFactory::LoadProjectile(params);
 }
 
-bool CMissileLauncher::HaveFreeLineOfFire(const float3 srcPos, const float3 tgtPos, const SWeaponTarget& trg) const
+bool CMissileLauncher::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// high-trajectory missiles use curved path rather than linear ground intersection

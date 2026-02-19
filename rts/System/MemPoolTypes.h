@@ -203,6 +203,7 @@ public:
 		assert(size <= PAGE_SIZE());
 		t_page_mem* page = page_mem(idx);
 		page_index = page->index = idx;
+		num_allocs++;
 		return page->data;
 	}
 
@@ -221,6 +222,7 @@ public:
 		assert(page->index < (N * K));
 		indcs.push_back(page->index);
 		memset(page, 0, sizeof(t_page_mem));
+		num_allocs--;
 	}
 
 	void reserve(size_t n) { indcs.reserve(n); }
@@ -236,6 +238,7 @@ public:
 		}
 
 		page_index = 0;
+		num_allocs = 0;
 	}
 
 	static constexpr size_t NUM_CHUNKS() { return N; } // size K*S
@@ -249,7 +252,7 @@ public:
 	bool alloced(void* ptr) const { return ((page_index < (num_chunks * K)) && (page_mem(page_index)->data == ptr)); }
 	bool can_alloc() const { return num_chunks < N || !indcs.empty() ; }
 	bool can_free() const { return indcs.size() < (NUM_CHUNKS() * NUM_PAGES()); }
-
+	auto allocs() const { return num_allocs; }
 private:
 	struct t_page_mem {
 		uint32_t index;
@@ -277,6 +280,7 @@ private:
 	std::array<std::unique_ptr<t_chunk_mem>, N> chunks;
 	std::vector<uint32_t> indcs;
 
+	int64_t num_allocs = 0;
 	size_t num_chunks = 0;
 	size_t page_index = 0;
 };

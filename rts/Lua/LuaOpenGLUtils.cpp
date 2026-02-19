@@ -18,6 +18,7 @@
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/GL/GeometryBuffer.h"
 #include "Rendering/Env/CubeMapHandler.h"
+#include "Rendering/Env/Decals/GroundDecalHandler.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Map/InfoTexture/InfoTexture.h"
 #include "Rendering/Textures/NamedTextures.h"
@@ -124,6 +125,11 @@ LuaMatTexture::Type LuaOpenGLUtils::GetLuaMatTextureType(const std::string& name
 		case hashString("$explosions"): { return LuaMatTexture::LUATEX_EXPLOSIONS_ATLAS; } break;
 		case hashString("$groundfx"):   { return LuaMatTexture::LUATEX_GROUNDFX_ATLAS; } break;
 
+		case hashString("$decals"): { return LuaMatTexture::LUATEX_DECALS_ATLAS; } break;
+
+		case hashString("$icons"): [[fallthrough]];
+		case hashString("$icons0"): { return LuaMatTexture::LUATEX_ICONS_ATLAS0; } break;
+		case hashString("$icons1"): { return LuaMatTexture::LUATEX_ICONS_ATLAS1; } break;
 
 		default: {} break;
 	}
@@ -423,24 +429,6 @@ bool LuaOpenGLUtils::ParseTextureImage(lua_State* L, LuaMatTexture& texUnit, con
 			texUnit.data = reinterpret_cast<const void*>(ud);
 		} break;
 
-		case '^': {
-			// unit icon
-			char* endPtr;
-			const char* startPtr = image.c_str() + 1; // skip the '^'
-			const int unitDefID = (int)strtol(startPtr, &endPtr, 10);
-
-			if (endPtr == startPtr)
-				return false;
-
-			const UnitDef* ud = unitDefHandler->GetUnitDefByID(unitDefID);
-
-			if (ud == nullptr)
-				return false;
-
-			texUnit.type = LuaMatTexture::LUATEX_UNITRADARICON;
-			texUnit.data = reinterpret_cast<const void*>(ud);
-		} break;
-
 		case '$': {
 			switch ((texUnit.type = GetLuaMatTextureType(image))) {
 				case LuaMatTexture::LUATEX_NONE: {
@@ -552,10 +540,6 @@ GLuint LuaMatTexture::GetTextureID() const
 			if (unitDefHandler != nullptr)
 				texID = CUnitDrawer::GetUnitDefImage(reinterpret_cast<const UnitDef*>(data));
 		} break;
-		case LUATEX_UNITRADARICON: {
-			texID = (reinterpret_cast<const UnitDef*>(data))->iconType->GetTextureID();
-		} break;
-
 
 		// cubemap textures
 		case LUATEX_MAP_REFLECTION: {
@@ -649,16 +633,21 @@ GLuint LuaMatTexture::GetTextureID() const
 		case LUATEX_EXPLOSIONS_ATLAS: { texID = projectileDrawer->textureAtlas->GetTexID();  } break;
 		case LUATEX_GROUNDFX_ATLAS:   { texID = projectileDrawer->groundFXAtlas->GetTexID(); } break;
 
+		case LUATEX_DECALS_ATLAS: { texID = groundDecals->GetTexID(); } break;
+
+		case LUATEX_ICONS_ATLAS0: { texID = icon::iconHandler.GetAtlasTextureID(0); } break;
+		case LUATEX_ICONS_ATLAS1: { texID = icon::iconHandler.GetAtlasTextureID(1); } break;
+
 		default: {
 			assert(false);
 		} break;
 	}
 
+	return texID;
+
 	#undef udGeomBuff
 	#undef gdGeomBuff
 	#undef groundDrawer
-
-	return texID;
 }
 
 
@@ -696,73 +685,82 @@ GLuint LuaMatTexture::GetTextureTarget() const
 			texType = atlas->GetTexTarget();
 		} break;
 
-		case LUATEX_MAP_REFLECTION:
-		case LUATEX_SKY_REFLECTION:
+		case LUATEX_MAP_REFLECTION: [[fallthrough]];
+		case LUATEX_SKY_REFLECTION: [[fallthrough]];
 		case LUATEX_SPECULAR: {
 			texType = GL_TEXTURE_CUBE_MAP_ARB;
 		} break;
 
-		case LUATEX_NONE:
-		case LUATEX_UNITTEXTURE1:
-		case LUATEX_UNITTEXTURE2:
-		case LUATEX_3DOTEXTURE:
+		case LUATEX_NONE:		  [[fallthrough]];
+		case LUATEX_UNITTEXTURE1: [[fallthrough]];
+		case LUATEX_UNITTEXTURE2: [[fallthrough]];
+		case LUATEX_3DOTEXTURE:   [[fallthrough]];
 
-		case LUATEX_UNITBUILDPIC:
-		case LUATEX_UNITRADARICON:
+		case LUATEX_UNITBUILDPIC: [[fallthrough]];
 
-
-		case LUATEX_SHADOWMAP:
-		case LUATEX_SHADOWCOLOR:
-		case LUATEX_HEIGHTMAP:
+		case LUATEX_SHADOWMAP:   [[fallthrough]];
+		case LUATEX_SHADOWCOLOR: [[fallthrough]];
+		case LUATEX_HEIGHTMAP:	 [[fallthrough]];
 
 
-		case LUATEX_SMF_GRASS:
-		case LUATEX_SMF_DETAIL:
-		case LUATEX_SMF_MINIMAP:
-		case LUATEX_SMF_SHADING:
-		case LUATEX_SMF_NORMALS:
+		case LUATEX_SMF_GRASS:   [[fallthrough]];
+		case LUATEX_SMF_DETAIL:	 [[fallthrough]];
+		case LUATEX_SMF_MINIMAP: [[fallthrough]];
+		case LUATEX_SMF_SHADING: [[fallthrough]];
+		case LUATEX_SMF_NORMALS: [[fallthrough]];
 
-		case LUATEX_SSMF_NORMALS:
-		case LUATEX_SSMF_SPECULAR:
-		case LUATEX_SSMF_SDISTRIB:
-		case LUATEX_SSMF_SDETAIL:
-		case LUATEX_SSMF_SNORMALS:
-		case LUATEX_SSMF_SKYREFL:
-		case LUATEX_SSMF_EMISSION:
-		case LUATEX_SSMF_PARALLAX:
+		case LUATEX_SSMF_NORMALS:  [[fallthrough]];
+		case LUATEX_SSMF_SPECULAR: [[fallthrough]];
+		case LUATEX_SSMF_SDISTRIB: [[fallthrough]];
+		case LUATEX_SSMF_SDETAIL:  [[fallthrough]];
+		case LUATEX_SSMF_SNORMALS: [[fallthrough]];
+		case LUATEX_SSMF_SKYREFL:  [[fallthrough]];
+		case LUATEX_SSMF_EMISSION: [[fallthrough]];
+		case LUATEX_SSMF_PARALLAX: [[fallthrough]];
 
 
-		case LUATEX_INFOTEX_SUFFIX:
+		case LUATEX_INFOTEX_SUFFIX: [[fallthrough]];
 		case LUATEX_INFOTEX_ACTIVE: {
 			texType = GL_TEXTURE_2D;
 		} break;
 
-		case LUATEX_MAP_GBUFFER_NORM:
-		case LUATEX_MAP_GBUFFER_DIFF:
-		case LUATEX_MAP_GBUFFER_SPEC:
-		case LUATEX_MAP_GBUFFER_EMIT:
-		case LUATEX_MAP_GBUFFER_MISC:
+		case LUATEX_MAP_GBUFFER_NORM: [[fallthrough]];
+		case LUATEX_MAP_GBUFFER_DIFF: [[fallthrough]];
+		case LUATEX_MAP_GBUFFER_SPEC: [[fallthrough]];
+		case LUATEX_MAP_GBUFFER_EMIT: [[fallthrough]];
+		case LUATEX_MAP_GBUFFER_MISC: [[fallthrough]];
 		case LUATEX_MAP_GBUFFER_ZVAL: {
 			texType = gdGeomBuff->GetTextureTarget();
 		} break;
 
-		case LUATEX_MODEL_GBUFFER_NORM:
-		case LUATEX_MODEL_GBUFFER_DIFF:
-		case LUATEX_MODEL_GBUFFER_SPEC:
-		case LUATEX_MODEL_GBUFFER_EMIT:
-		case LUATEX_MODEL_GBUFFER_MISC:
+		case LUATEX_MODEL_GBUFFER_NORM: [[fallthrough]];
+		case LUATEX_MODEL_GBUFFER_DIFF: [[fallthrough]];
+		case LUATEX_MODEL_GBUFFER_SPEC: [[fallthrough]];
+		case LUATEX_MODEL_GBUFFER_EMIT: [[fallthrough]];
+		case LUATEX_MODEL_GBUFFER_MISC: [[fallthrough]];
 		case LUATEX_MODEL_GBUFFER_ZVAL: {
 			texType = udGeomBuff->GetTextureTarget();
 		} break;
 
-		case LUATEX_FONT:
+		case LUATEX_FONT: [[fallthrough]];
 		case LUATEX_FONTSMALL: {
 			texType = GL_TEXTURE_2D;
 		} break;
 
 
-		case LUATEX_EXPLOSIONS_ATLAS:
+		case LUATEX_EXPLOSIONS_ATLAS: {
+			texType = projectileDrawer->textureAtlas->GetTexTarget();
+		} break;
 		case LUATEX_GROUNDFX_ATLAS: {
+			texType = projectileDrawer->groundFXAtlas->GetTexTarget();
+		} break;
+
+		case LUATEX_DECALS_ATLAS: {
+			texType = groundDecals->GetTexTarget();
+		} break;
+
+		case LUATEX_ICONS_ATLAS0: [[fallthrough]];
+		case LUATEX_ICONS_ATLAS1: {
 			texType = GL_TEXTURE_2D;
 		} break;
 
@@ -898,12 +896,6 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 				return ReturnHelper(bp->imageSizeX, bp->imageSizeY);
 			}
 		} break;
-		case LUATEX_UNITRADARICON: {
-			const UnitDef* ud = reinterpret_cast<const UnitDef*>(data);
-			const icon::CIcon& it = ud->iconType;
-			return ReturnHelper(it->GetSizeX(), it->GetSizeY());
-		} break;
-
 
 		case LUATEX_MAP_REFLECTION: {
 			return ReturnHelper(cubeMapHandler.GetReflectionTextureSize());
@@ -1012,6 +1004,21 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 			return ReturnHelper(sz.x, sz.y);
 		} break;
 
+		case LUATEX_DECALS_ATLAS: {
+			auto sz = groundDecals->GetTexSize();
+			return std::make_tuple(sz[0], sz[1], sz[2]);
+		} break;
+
+
+		case LUATEX_ICONS_ATLAS0: {
+			const auto& sz = icon::iconHandler.GetAtlasSize(0);
+			return ReturnHelper(sz.x, sz.y);
+		} break;
+		case LUATEX_ICONS_ATLAS1: {
+			const auto& sz = icon::iconHandler.GetAtlasSize(1);
+			return ReturnHelper(sz.x, sz.y);
+		} break;
+
 		case LUATEX_NONE:
 		default: break;
 	}
@@ -1053,7 +1060,6 @@ void LuaMatTexture::Print(const string& indent) const
 		STRING_CASE(typeName, LUATEX_UNITTEXTURE2);
 		STRING_CASE(typeName, LUATEX_3DOTEXTURE);
 		STRING_CASE(typeName, LUATEX_UNITBUILDPIC);
-		STRING_CASE(typeName, LUATEX_UNITRADARICON);
 
 		STRING_CASE(typeName, LUATEX_MAP_REFLECTION);
 		STRING_CASE(typeName, LUATEX_SKY_REFLECTION);
@@ -1102,6 +1108,11 @@ void LuaMatTexture::Print(const string& indent) const
 
 		STRING_CASE(typeName, LUATEX_EXPLOSIONS_ATLAS);
 		STRING_CASE(typeName, LUATEX_GROUNDFX_ATLAS);
+
+		STRING_CASE(typeName, LUATEX_DECALS_ATLAS);
+
+		STRING_CASE(typeName, LUATEX_ICONS_ATLAS0);
+		STRING_CASE(typeName, LUATEX_ICONS_ATLAS1);
 
 		#undef STRING_CASE
 	}

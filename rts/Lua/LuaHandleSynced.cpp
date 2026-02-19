@@ -1635,15 +1635,13 @@ bool CSyncedLuaHandle::FeaturePreDamaged(
  *
  * @function SyncedCallins:ShieldPreDamaged
  *
- * If the weapon is a hitscan type (BeamLaser or LightningCanon) then proID is nil and beamEmitterWeaponNum and beamEmitterUnitID are populated instead.
- *
- * @param projectileID integer
- * @param projectileOwnerID integer
+ * @param projectileID integer `-1` when the weapon type is `BeamLaser` or `LightningCannon`
+ * @param projectileOwnerID integer `-1` when the weapon type is `BeamLaser` or `LightningCannon`
  * @param shieldWeaponNum integer
  * @param shieldCarrierID integer
  * @param bounceProjectile boolean
- * @param beamEmitterWeaponNum integer
- * @param beamEmitterUnitID integer
+ * @param beamEmitterWeaponNum integer? present only when the weapon type is `BeamLaser` or `LightningCannon`
+ * @param beamEmitterUnitID integer? present only when the weapon type is `BeamLaser` or `LightningCannon`
  * @param startX number
  * @param startY number
  * @param startZ number

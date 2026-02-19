@@ -964,7 +964,8 @@ bool CHoverAirMoveType::Update()
 			UpdateHovering();
 			break;
 		case AIRCRAFT_CRASHING: {
-			if (UpdateAirPhysics()) {
+			if (UpdateAirPhysics()
+					|| (CGround::GetHeightAboveWater(owner->pos.x, owner->pos.z) + 5.0f + owner->radius) > owner->pos.y){
 				owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
 			} else {
 				#define SPIN_DIR(o) ((o->id & 1) * 2 - 1)

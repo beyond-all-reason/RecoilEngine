@@ -25,7 +25,7 @@
 CONFIG(int, MaxTextureAtlasSizeX).defaultValue(4096).minimumValue(512).maximumValue(32768).description("The max X size of the projectile and Lua texture atlasses");
 CONFIG(int, MaxTextureAtlasSizeY).defaultValue(4096).minimumValue(512).maximumValue(32768).description("The max Y size of the projectile and Lua texture atlasses");
 
-CTextureAtlas::CTextureAtlas(uint32_t allocType_, int32_t atlasSizeX_, int32_t atlasSizeY_, const std::string& name_, bool reloadable_)
+CTextureAtlas::CTextureAtlas(uint32_t allocType_, uint32_t atlasSizeX_, uint32_t atlasSizeY_, const std::string& name_, bool reloadable_)
 	: allocType{ allocType_ }
 	, atlasSizeX{ atlasSizeX_ }
 	, atlasSizeY{ atlasSizeY_ }
@@ -70,8 +70,8 @@ void CTextureAtlas::ReinitAllocator()
 	}
 
 	// NB: maxTextureSize can be as large as 32768, resulting in a 4GB atlas
-	atlasSizeX = std::min(globalRendering->maxTextureSize, (atlasSizeX > 0) ? atlasSizeX : configHandler->GetInt("MaxTextureAtlasSizeX"));
-	atlasSizeY = std::min(globalRendering->maxTextureSize, (atlasSizeY > 0) ? atlasSizeY : configHandler->GetInt("MaxTextureAtlasSizeY"));
+	atlasSizeX = std::min(static_cast<uint32_t>(globalRendering->maxTextureSize), (atlasSizeX > 0) ? atlasSizeX : static_cast<uint32_t>(configHandler->GetInt("MaxTextureAtlasSizeX")));
+	atlasSizeY = std::min(static_cast<uint32_t>(globalRendering->maxTextureSize), (atlasSizeY > 0) ? atlasSizeY : static_cast<uint32_t>(configHandler->GetInt("MaxTextureAtlasSizeY")));
 
 	atlasAllocator->SetMaxSize(atlasSizeX, atlasSizeY);
 }
@@ -198,7 +198,7 @@ bool CTextureAtlas::CreateTexture()
 		if (pixCoords.pageNum > numPages)
 			continue;
 
-		auto texCoords = atlasAllocator->GetTexCoords(it);
+		auto texCoords = atlasAllocator->GetTexCoordsCntr(it);
 		const int xpos = static_cast<int>(pixCoords.x);
 		const int ypos = static_cast<int>(pixCoords.y);
 

@@ -19,6 +19,7 @@
 #include <iostream>
 #include <sstream>
 #include <ranges>
+#include <nowide/cstdio.hpp>
 
 #include <cassert>
 #include <cstring>
@@ -33,7 +34,7 @@ CONFIG(bool, RotateLogFiles)
 
 CONFIG(std::string, LogSections)
 	.defaultValue("")
-	.description("Comma-separated list of enabled logsections, see infolog.txt / console output for possible values.");
+	.description("Comma-separated list of enabled logsections, use this for log filtering by setting log level for each sections. See infolog.txt / console output for possible values.");
 
 
 CONFIG(int, LogFlushLevel)
@@ -142,8 +143,9 @@ void CLogOutput::RotateLogFile() const
 	if (!FileSystem::FileExists(filePath))
 		return;
 
+	const auto baseDir = FileSystem::GetDirectory(filePath);
 	// logArchiveDir: /absolute/writeable/data/dir/log/
-	const std::string logArchiveDir = filePath.substr(0, filePath.find_last_of("/\\") + 1) + "log" + FileSystem::GetNativePathSeparator();
+	const std::string logArchiveDir = FileSystem::Concatenate({ baseDir, "log/"});
 	const std::string archivedLogFile = logArchiveDir + FileSystem::GetFileModificationDate(filePath) + "_" + fileName;
 
 	// create the log archive dir if it does not exist yet
@@ -151,7 +153,7 @@ void CLogOutput::RotateLogFile() const
 		FileSystem::CreateDirectory(logArchiveDir);
 
 	// move the old log to the archive dir
-	if (rename(filePath.c_str(), archivedLogFile.c_str()) != 0) {
+	if (nowide::rename(filePath.c_str(), archivedLogFile.c_str()) != 0) {
 		// no log here yet
 		std::cerr << "Failed rotating the log file" << std::endl;
 	}

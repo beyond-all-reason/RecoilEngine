@@ -8,6 +8,7 @@
 #include "UnitMemPool.h"
 #include "UnitToolTipMap.hpp"
 #include "UnitTypes/Building.h"
+#include "UnitTypes/ExtractorBuilding.h"
 #include "Scripts/NullUnitScript.h"
 #include "Scripts/UnitScriptFactory.h"
 #include "Scripts/CobInstance.h" // for TAANG2RAD
@@ -31,6 +32,7 @@
 
 #include "Rendering/GroundFlash.h"
 #include "Rendering/Units/UnitDrawer.h"
+#include "Rendering/Models/3DModel.hpp"
 
 #include "Game/UI/Groups/Group.h"
 #include "Game/UI/Groups/GroupHandler.h"
@@ -42,7 +44,6 @@
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/QuadField.h"
-#include "Sim/Misc/ExtractorHandler.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/Wind.h"
 #include "Sim/Misc/ModInfo.h"
@@ -190,20 +191,6 @@ void CUnit::SanityCheck() const
 	}
 }
 
-void CUnit::UpdatePrevFrameTransform()
-{
-	for (auto& lmp : localModel.pieces) {
-		lmp.SavePrevModelSpaceTransform();
-	}
-
-	if (!prevFrameNeedsUpdate)
-		return;
-
-	preFrameTra = Transform{ CQuaternion::MakeFrom(GetTransformMatrix(true)), pos };
-	prevFrameNeedsUpdate = false;
-}
-
-
 void CUnit::PreInit(const UnitLoadParams& params)
 {
 	ZoneScoped;
@@ -330,8 +317,6 @@ void CUnit::PreInit(const UnitLoadParams& params)
 		deathExpDamages = DynDamageArray::IncRef(&unitDef->deathExpWeaponDef->damages);
 
 	commandAI = CUnitLoader::NewCommandAI(this, unitDef);
-
-	extractorHandler.UnitPreInit(this, params);
 }
 
 
@@ -391,6 +376,7 @@ void CUnit::PostInit(const CUnit* builder)
 		commandAI->GiveCommand(Command(CMD_FIRE_STATE, 0, fireState));
 	}
 
+	UpdateRenderParams();
 	eventHandler.RenderUnitPreCreated(this);
 
 	// Lua might call SetUnitHealth within UnitCreated
@@ -412,10 +398,9 @@ void CUnit::PostInit(const CUnit* builder)
 void CUnit::PostLoad()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	UpdateRenderParams();
 	eventHandler.RenderUnitPreCreated(this);
 	eventHandler.RenderUnitCreated(this, isCloaked);
-
-	extractorHandler.UnitPostLoad(this);
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1956,6 +1941,11 @@ bool CUnit::SetGroup(CGroup* newGroup, bool fromFactory, bool autoSelect)
 const CGroup* CUnit::GetGroup() const { return uiGroupHandlers[team].GetUnitGroup(id); }
       CGroup* CUnit::GetGroup()       { return uiGroupHandlers[team].GetUnitGroup(id); }
 
+void CUnit::UpdateRenderParams()
+{
+	definedIconName = unitDef->iconName;
+}
+
 
 /******************************************************************************/
 /******************************************************************************/
@@ -1969,7 +1959,10 @@ void CUnit::TurnIntoNanoframe()
 	SetStorage(0.0f);
 
 	// make sure neighbor extractors update
-	extractorHandler.UnitReverseBuilt(this);
+	const auto extractor = dynamic_cast <CExtractorBuilding*> (this);
+	if (extractor != nullptr)
+		extractor->ResetExtraction();
+
 	eventHandler.UnitReverseBuilt(this);
 }
 
@@ -2388,7 +2381,6 @@ void CUnit::Activate()
 
 	if (IsInLosForAllyTeam(gu->myAllyTeam))
 		Channels::General->PlayRandomSample(unitDef->sounds.activate, this);
-	extractorHandler.UnitActivated(this, true);
 }
 
 
@@ -2406,7 +2398,6 @@ void CUnit::Deactivate()
 
 	if (IsInLosForAllyTeam(gu->myAllyTeam))
 		Channels::General->PlayRandomSample(unitDef->sounds.deactivate, this);
-	extractorHandler.UnitActivated(this, false);
 }
 
 
@@ -3046,7 +3037,8 @@ CR_REG_METADATA(CUnit, (
 
 	CR_MEMBER(selfDCountdown),
 
-	CR_MEMBER_UN(myIcon),
+	CR_MEMBER(definedIconName),
+	CR_MEMBER_UN(currentIconIndex),
 	CR_MEMBER_UN(drawIcon),
 
 	CR_MEMBER(transportedUnits),

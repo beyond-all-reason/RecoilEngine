@@ -25,6 +25,7 @@ void CWordCompletion::Init()
 	AddWordRaw("fullproxy ", false, false, true);
 	AddWordRaw("drawcommands ", false, false, true);
 	AddWordRaw("drawprojectiles ", false, false, true);
+	AddWordRaw("drawpings ", false, false, true);
 	AddWordRaw("icons ", false, false, true);
 	AddWordRaw("unitexp ", false, false, true);
 	AddWordRaw("unitsize ", false, false, true);

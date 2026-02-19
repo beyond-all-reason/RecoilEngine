@@ -62,7 +62,7 @@ namespace creg {
 		static std::unique_ptr<IType> CreateStringType();
 		static std::unique_ptr<IType> CreateObjInstanceType(Class* objectType, size_t size);
 		static std::unique_ptr<IType> CreateIgnoredType(size_t size);
-		static std::unique_ptr<IType> CreateFakeType(const IType* orig);
+		static std::unique_ptr<IType> CreateFakeType();
 	};
 
 	/**
@@ -481,8 +481,8 @@ public: \
   * Registers a fake member variable, that actually doesn't exist in the class
   * Useful only for CM_Config scenarios
   */
-#define CR_FAKE(Member, MemberType) \
-	class_->AddMember( #Member, creg::IType::CreateFakeType(creg::DeduceType<MemberType>::Get().get()), 0, 0, (creg::ClassMemberFlag) currentMemberFlags) // NOLINT{misc-sizeof-container}
+#define CR_FAKE(Member) \
+	class_->AddMember( #Member, creg::IType::CreateFakeType(), 0, 0, (creg::ClassMemberFlag) currentMemberFlags) // NOLINT{misc-sizeof-container}
 
 /** @def CR_MEMBER_UN
  * Registers a member variable that is unsynced.

@@ -42,6 +42,8 @@ ISky::~ISky()
 	spring::SafeDelete(skyLight);
 }
 
+std::unique_ptr<ISky> ISky::sky = nullptr;
+
 
 
 void ISky::SetupFog() {

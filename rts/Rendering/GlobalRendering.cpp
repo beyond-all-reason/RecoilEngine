@@ -17,6 +17,7 @@
 #include "Rendering/GL/glxHandler.h"
 #include "Rendering/UniformConstants.h"
 #include "Rendering/Fonts/glFont.h"
+#include "Rendering/Models/ModelsMemStorage.h"
 #include "System/EventHandler.h"
 #include "System/type2.h"
 #include "System/TimeProfiler.h"
@@ -29,6 +30,7 @@
 #include "System/Platform/CrashHandler.h"
 #include "System/Platform/MessageBox.h"
 #include "System/Platform/Threading.h"
+#include "System/Platform/SharedLib.h"
 #include "System/Platform/WindowManagerHelper.h"
 #include "System/Platform/errorhandler.h"
 #include "System/ScopedResource.h"
@@ -71,6 +73,8 @@ CONFIG(int, MinimizeOnFocusLoss).defaultValue(0).minimumValue(0).maximumValue(1)
 CONFIG(bool, Fullscreen).defaultValue(true).headlessValue(false).description("Sets whether the game will run in fullscreen, as opposed to a window. For Windowed Fullscreen of Borderless Window, set this to 0, WindowBorderless to 1, and WindowPosX and WindowPosY to 0.");
 CONFIG(bool, WindowBorderless).defaultValue(false).description("When set and Fullscreen is 0, will put the game in Borderless Window mode, also known as Windowed Fullscreen. When using this, it is generally best to also set WindowPosX and WindowPosY to 0");
 CONFIG(bool, BlockCompositing).defaultValue(false).safemodeValue(true).description("Disables kwin compositing to fix tearing, possible fixes low FPS in windowed mode, too.");
+// setting this as default 0 for now is because if the frame were to be dropped for being late, DWMFlush will force the compositor to use the framebuffer. This can result in blocking until the framebuffer can be composited (up to 1 frame) and may not be desirable for all use cases (specifically with vsync set to off). However, only more widespread testing and investigation across various hardware/os configs would tell us what advantage DWMFlush would bring.
+CONFIG(int, DWMFlush).defaultValue(0).description("Force Windows Desktop Compositors DWMFlush before each SDL_GL_SwapWindow, preventing dropped frames (use nVidias FrameView to validate dropped frames, or BARs Jitter Timer widget). Value of 1 does DWMFlush before SwapBuffers, value of 2 does DWMFlush after swapbuffers.");
 
 CONFIG(int, XResolution).defaultValue(0).headlessValue(8).minimumValue(0).description("Sets the width of the game screen. If set to 0 Spring will autodetect the current resolution of your desktop.");
 CONFIG(int, YResolution).defaultValue(0).headlessValue(8).minimumValue(0).description("Sets the height of the game screen. If set to 0 Spring will autodetect the current resolution of your desktop.");
@@ -207,6 +211,7 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(borderless),
 
 	CR_IGNORED(underExternalDebug),
+	CR_IGNORED(forceDWMFlush),
 
 	CR_IGNORED(sdlWindow),
 	CR_IGNORED(glContext),
@@ -336,17 +341,26 @@ CGlobalRendering::CGlobalRendering()
 	, fullScreen(configHandler->GetBool("Fullscreen"))
 	, borderless(configHandler->GetBool("WindowBorderless"))
 	, underExternalDebug(false)
+	, forceDWMFlush(configHandler->GetInt("DWMFlush"))
 	, sdlWindow{nullptr}
 	, glContext{nullptr}
 	, glExtensions{}
 	, glTimerQueries{0}
 {
+#ifdef _WIN32
+	dwmApiLib = std::unique_ptr<SharedLib>(SharedLib::Instantiate("dwmapi"));
+	if (dwmApiLib) {
+		DwmGetWindowAttribute = dwmApiLib->FindAddress("DwmGetWindowAttribute");
+		DwmFlush = dwmApiLib->FindAddress("DwmFlush");
+	}
+#endif
 	verticalSync->WrapNotifyOnChange();
 	configHandler->NotifyOnChange(this, {
 		"DualScreenMode",
 		"DualScreenMiniMapOnLeft",
 		"Fullscreen",
 		"WindowBorderless",
+		"DWMFlush",
 		"XResolution",
 		"YResolution",
 		"XResolutionWindowed",
@@ -676,8 +690,26 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 
 		//https://stackoverflow.com/questions/68480028/supporting-opengl-screen-capture-by-third-party-applications
 		glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, 0);
-
+		
+		#ifdef _WIN32
+			using DwmFlushT = HRESULT(WINAPI*)();
+			if (forceDWMFlush == 1){ 
+				ZoneScopedN("CGlobalRendering::SwapBuffers::DWMFlushPre");
+				if (DwmFlush)
+					reinterpret_cast<DwmFlushT>(DwmFlush)();
+			}
+		#endif
+		
 		SDL_GL_SwapWindow(sdlWindow);
+
+		#ifdef _WIN32
+			if (forceDWMFlush == 2){ 
+				ZoneScopedN("CGlobalRendering::SwapBuffers::DWMFlushPost");
+				if (DwmFlush)
+					reinterpret_cast<DwmFlushT>(DwmFlush)();
+			}
+		#endif
+
 		FrameMark;
 	}
 	// exclude debug from SCOPED_TIMER("Misc::SwapBuffers");
@@ -1247,6 +1279,7 @@ void CGlobalRendering::ConfigNotify(const std::string& key, const std::string& v
 		return;
 	}
 	winChgFrame = drawFrame + 1; //need to do on next frame since config mutex is locked inside ConfigNotify
+	forceDWMFlush = configHandler->GetInt("DWMFlush");
 }
 
 void CGlobalRendering::UpdateWindow()
@@ -1622,27 +1655,7 @@ void CGlobalRendering::UpdateWindowBorders(SDL_Window* window) const
 
 	#if defined(_WIN32) && (WINDOWS_NO_INVISIBLE_GRIPS == 1)
 	// W/A for 8 px Aero invisible borders https://github.com/libsdl-org/SDL/commit/7c60bec493404905f512c835f502f1ace4eff003
-	{
-		auto scopedLib = spring::ScopedResource(
-			LoadLibrary("dwmapi.dll"),
-			[](HMODULE lib) { if (lib) FreeLibrary(lib); }
-		);
-
-		if (scopedLib == nullptr)
-			return;
-
-		using DwmGetWindowAttributeT = HRESULT WINAPI(
-			HWND,
-			DWORD,
-			PVOID,
-			DWORD
-		);
-
-		static auto* DwmGetWindowAttribute = reinterpret_cast<DwmGetWindowAttributeT*>(GetProcAddress(scopedLib, "DwmGetWindowAttribute"));
-
-		if (!DwmGetWindowAttribute)
-			return;
-
+	if (DwmGetWindowAttribute) {
 		SDL_SysWMinfo wmInfo;
 		SDL_VERSION(&wmInfo.version);
 		SDL_GetWindowWMInfo(window, &wmInfo);
@@ -1650,8 +1663,10 @@ void CGlobalRendering::UpdateWindowBorders(SDL_Window* window) const
 
 		RECT rect, frame;
 
+		using DwmGetWindowAttributeT = HRESULT(WINAPI*)(HWND, DWORD, PVOID, DWORD);
+
 		static constexpr DWORD DWMWA_EXTENDED_FRAME_BOUNDS = 9; // https://docs.microsoft.com/en-us/windows/win32/api/dwmapi/ne-dwmapi-dwmwindowattribute
-		DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(RECT));
+		reinterpret_cast<DwmGetWindowAttributeT>(DwmGetWindowAttribute)(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &frame, sizeof(RECT));
 		GetWindowRect(hwnd, &rect);
 
 		winBorder[0] -= std::max(0l, frame.top   - rect.top    );

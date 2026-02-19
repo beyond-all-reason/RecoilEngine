@@ -67,7 +67,7 @@ public:
 protected:
 	float4 skyAxisAngle;
 protected:
-	static inline std::unique_ptr<ISky> sky = nullptr;
+	static std::unique_ptr<ISky> sky;
 
 	ISkyLight* skyLight;
 

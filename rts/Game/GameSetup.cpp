@@ -303,10 +303,11 @@ void CGameSetup::LoadStartPositions(bool withoutMap)
 void CGameSetup::LoadMutators(const TdfParser& file, std::vector<std::string>& mutatorsList)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	for (int a = 0; a < 10; ++a) {
+	for (int a = 0; /*NO-OP*/; ++a) {
 		const std::string s = file.SGetValueDef("", IntToString(a, "GAME\\MUTATOR%i"));
 		if (s.empty())
 			break;
+
 		mutatorsList.push_back(s);
 	}
 }

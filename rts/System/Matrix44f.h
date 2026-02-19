@@ -31,8 +31,8 @@ public:
 
 	bool IsOrthoNormal() const;
 	bool IsIdentity() const;
-	bool IsRotMatrix()          const { return IsOrthoNormal() && math::fabs(1.0f - Det4()) <= float3::cmp_eps(); }
-	bool IsRotOrRotTranMatrix() const { return IsOrthoNormal() && math::fabs(1.0f - Det3()) <= float3::cmp_eps(); }
+	bool IsRotMatrix()          const { return IsOrthoNormal() && math::fabs(1.0f - Det4()) <= 8.0f * float3::cmp_eps(); }
+	bool IsRotOrRotTranMatrix() const { return IsOrthoNormal() && math::fabs(1.0f - Det3()) <= 8.0f * float3::cmp_eps(); }
 	float Det3() const;
 	float Det4() const;
 

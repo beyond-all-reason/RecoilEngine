@@ -25,6 +25,8 @@ class LuaUnsyncedCtrl {
 		static int SendMessageToAllyTeam(lua_State* L);
 		static int SendMessageToSpectators(lua_State* L);
 
+		static int RequestStartPosition(lua_State* L);
+
 		static int SendPublicChat(lua_State* L);
 		static int SendAllyChat(lua_State* L);
 		static int SendSpectatorChat(lua_State* L);
@@ -218,6 +220,8 @@ class LuaUnsyncedCtrl {
 		static int SetGroundDecalTint(lua_State* L);
 		static int SetGroundDecalMisc(lua_State* L);
 		static int SetGroundDecalCreationFrame(lua_State* L);
+		static int SetGroundDecalGlowParams(lua_State* L);
+		static int SetGroundDecalUserData(lua_State* L);
 
 		static int SDLSetTextInputRect(lua_State* L);
 		static int SDLStartTextInput(lua_State* L);

@@ -43,6 +43,11 @@ class LuaSyncedCtrl
 		static int AssignPlayerToTeam(lua_State* L);
 		static int GameOver(lua_State* L);
 		static int SetGlobalLos(lua_State* L);
+		static int SetCheatingEnabled(lua_State* L);
+		static int SetGodMode(lua_State* L);
+
+		static int SetTeamStartPosition(lua_State* L);
+		static int SetPlayerReadyState(lua_State* L);
 
 		static int AddTeamResource(lua_State* L);
 		static int UseTeamResource(lua_State* L);
@@ -70,6 +75,7 @@ class LuaSyncedCtrl
 		static int CreateUnit(lua_State* L);
 		static int DestroyUnit(lua_State* L);
 		static int TransferUnit(lua_State* L);
+		static int TransferTeamMaxUnits(lua_State* L);
 
 		static int CreateFeature(lua_State* L);
 		static int DestroyFeature(lua_State* L);
@@ -179,6 +185,7 @@ class LuaSyncedCtrl
 		static int SetFeatureCollisionVolumeData(lua_State* L);
 		static int SetFeaturePieceCollisionVolumeData(lua_State* L);
 		static int SetFeaturePieceVisible(lua_State* L);
+		static int SetFeaturePieceMatrix(lua_State* L);
 
 		static int SetFeatureFireTime(lua_State* L);
 		static int SetFeatureSmokeTime(lua_State* L);

@@ -44,7 +44,7 @@ CBombDropper::CBombDropper(CUnit* owner, const WeaponDef* def, bool useTorps)
 }
 
 
-float CBombDropper::GetPredictedImpactTime(float3 impactPos) const
+float CBombDropper::GetPredictedImpactTime(const float3& impactPos) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (weaponMuzzlePos.y <= impactPos.y)
@@ -77,7 +77,7 @@ float CBombDropper::GetPredictedImpactTime(float3 impactPos) const
 }
 
 
-bool CBombDropper::TestTarget(const float3 pos, const SWeaponTarget& trg) const
+bool CBombDropper::TestTarget(const float3& pos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// assume we can still drop bombs on *partially* submerged targets
@@ -90,21 +90,21 @@ bool CBombDropper::TestTarget(const float3 pos, const SWeaponTarget& trg) const
 	return CWeapon::TestTarget(pos, trg);
 }
 
-bool CBombDropper::TestRange(const float3 pos, const SWeaponTarget& trg) const
+bool CBombDropper::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// bombs always fall down
-	if (aimFromPos.y < pos.y)
+	if (aimFromPos.y < tgtPos.y)
 		return false;
 
-	const float fallTime = GetPredictedImpactTime(pos);
+	const float fallTime = GetPredictedImpactTime(tgtPos);
 	const float dropDist = std::max(1, salvoSize - 1) * salvoDelay * owner->speed.Length2D() * 0.5f;
 
 	// torpedoes especially should not be dropped if the
 	// target position is already behind owner's position
-	const float torpDist = torpMoveRange * (owner->frontdir.dot(pos - aimFromPos) > 0.0f);
+	const float torpDist = torpMoveRange * (owner->frontdir.dot(tgtPos - aimFromPos) > 0.0f);
 
-	return (pos.SqDistance2D(aimFromPos + owner->speed * fallTime) < Square(dropDist + torpDist));
+	return (tgtPos.SqDistance2D(aimFromPos + owner->speed * fallTime) < Square(dropDist + torpDist));
 }
 
 

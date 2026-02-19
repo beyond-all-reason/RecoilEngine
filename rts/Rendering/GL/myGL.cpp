@@ -266,7 +266,7 @@ void RecoilGetTexParams(GLenum target, GLuint textureID, GLint level, TexturePar
 		glGetTexLevelParameteriv(target, level, GL_TEXTURE_DEPTH_SIZE, &_cbits); tp.bpp += _cbits; if (_cbits > 0) { tp.chNum++; tp.isNormalizedDepth = true; tp.prefDataType = GL_FLOAT; }
 
 		if (tp.chNum > 0) {
-			if (auto bytesPerChannel = tp.bpp / tp.chNum; bytesPerChannel == 4)
+			if (auto bytesPerChannel = (tp.bpp / tp.chNum) >> 3; bytesPerChannel == 4)
 				tp.prefDataType = GL_UNSIGNED_INT;
 			else if (bytesPerChannel == 2)
 				tp.prefDataType = GL_UNSIGNED_SHORT;

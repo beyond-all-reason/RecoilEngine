@@ -333,8 +333,7 @@ bool CCobThread::Tick()
 
 				cobFile->code[pc - 1] = REAL_CALL;
 
-				// fall-through
-			}
+			} [[fallthrough]];
 			case REAL_CALL: {
 				r1 = GET_LONG_PC();
 				r2 = GET_LONG_PC();
@@ -617,7 +616,17 @@ bool CCobThread::Tick()
 				r3 = PopDataStack();
 				cobInst->TurnNow(r1, r2, r3);
 			} break;
-
+			case SCALE: {
+				r1 = GET_LONG_PC();
+				r3 = PopDataStack();
+				r2 = PopDataStack();
+				cobInst->Scale(r1, r2, r3);
+			} break;
+			case SCALE_NOW: {
+				r1 = GET_LONG_PC();
+				r2 = PopDataStack();
+				cobInst->ScaleNow(r1, r2);
+			} break;
 
 			case WAIT_TURN: {
 				r1 = GET_LONG_PC();
@@ -641,7 +650,16 @@ bool CCobThread::Tick()
 					return true;
 				}
 			} break;
+			case WAIT_SCALE: {
+				r1 = GET_LONG_PC();
 
+				if (cobInst->NeedsWait(CCobInstance::AScale, r1, -1)) {
+					state = WaitScale;
+					waitPiece = r1;
+					waitAxis = -1;
+					return true;
+				}
+			} break;
 
 			case SET: {
 				r2 = PopDataStack();

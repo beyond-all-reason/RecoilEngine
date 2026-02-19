@@ -19,6 +19,7 @@
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/SubState.h"
 #include "Rendering/GL/RenderBuffers.h"
+#include "Rendering/Models/3DModelPiece.hpp"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Textures/ColorMap.h"
 #include "Rendering/Textures/TextureAtlas.h"
@@ -277,7 +278,7 @@ void CProjectileDrawer::Init() {
 	}
 
 
-	renderProjectiles[false].reserve(projectileHandler.maxParticles + projectileHandler.maxNanoParticles);
+	renderProjectiles.reserve(projectileHandler.maxParticles + projectileHandler.maxNanoParticles);
 	for (auto& mr : modelRenderers) { mr.Clear(); }
 
 	LoadWeaponTextures();
@@ -342,8 +343,7 @@ void CProjectileDrawer::Kill() {
 
 	smokeTextures.clear();
 
-	for (auto& rp : renderProjectiles)
-		rp.clear();
+	renderProjectiles.clear();
 
 	for (auto& dp : drawParticles)
 		dp.clear();
@@ -366,66 +366,70 @@ void CProjectileDrawer::Kill() {
 void CProjectileDrawer::UpdateDrawFlags()
 {
 	ZoneScopedN("ProjectileDrawer::UpdateDrawFlags");
-	for (auto& rp : renderProjectiles) {
-		if (rp.empty())
-			continue;
 
-		auto hasModel = (&rp == &renderProjectiles[true]);
-		for_mt(0, rp.size(), [&rp, hasModel](int i) {
-			CProjectile* p = rp[i];
-			assert((p->model != nullptr) == hasModel);
+	for_mt(0, renderProjectiles.size(), [this](int i) {
+		CProjectile* p = renderProjectiles[i];
+		const bool hasModel = (p->model != nullptr);
 
-			p->drawPos = p->GetDrawPos(globalRendering->timeOffset);
+		p->drawPos = p->GetDrawPos(globalRendering->timeOffset);
 
-			p->previousDrawFlag = p->drawFlag;
-			p->ResetDrawFlag();
+		p->previousDrawFlag = p->drawFlag;
+		p->ResetDrawFlag();
 
-			if (!CanDrawProjectile(p, p->GetAllyteamID()))
-				return;
+		if (!CanDrawProjectile(p, p->GetAllyteamID()))
+			return;
 
-			p->SetDrawFlag(DrawFlags::SO_DRICON_FLAG); //reuse as a minimap draw indication
+		p->SetDrawFlag(DrawFlags::SO_DRICON_FLAG); //reuse as a minimap draw indication
 
-			for (uint32_t camType = CCamera::CAMTYPE_PLAYER; camType < CCamera::CAMTYPE_ENVMAP; ++camType) {
-				if (camType == CCamera::CAMTYPE_UWREFL && !IWater::GetWater()->CanDrawReflectionPass())
-					continue;
+		for (uint32_t camType = CCamera::CAMTYPE_PLAYER; camType < CCamera::CAMTYPE_ENVMAP; ++camType) {
+			if (camType == CCamera::CAMTYPE_UWREFL && !IWater::GetWater()->CanDrawReflectionPass())
+				continue;
 
-				if (camType == CCamera::CAMTYPE_SHADOW && !p->castShadow)
-					continue;
+			if (camType == CCamera::CAMTYPE_SHADOW && !p->castShadow)
+				continue;
 
-				if (camType == CCamera::CAMTYPE_SHADOW && ((shadowHandler.shadowGenBits & CShadowHandler::SHADOWGEN_BIT_PROJ) == 0))
-					continue;
+			if (camType == CCamera::CAMTYPE_SHADOW && ((shadowHandler.shadowGenBits & CShadowHandler::SHADOWGEN_BIT_PROJ) == 0))
+				continue;
 
-				const CCamera* cam = CCameraHandler::GetCamera(camType);
-				if (!cam->InView(p->drawPos, p->GetDrawRadius()))
-					continue;
+			const CCamera* cam = CCameraHandler::GetCamera(camType);
+			if (!cam->InView(p->drawPos, p->GetDrawRadius()))
+				continue;
 
-				p->SetSortDist(camType, cam->ProjectedDistance(p->drawPos));
+			p->SetSortDist(camType, cam->ProjectedDistance(p->drawPos));
 
-				switch (camType)
-				{
-					case CCamera::CAMTYPE_PLAYER: {
-						if (hasModel)
-							p->AddDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
-						else
-							p->AddDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
+			switch (camType)
+			{
+				case CCamera::CAMTYPE_PLAYER: {
+					if (hasModel)
+						p->AddDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
+					else
+						p->AddDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
 
-						if (p->drawPos.y - p->GetDrawRadius() < 0.0f)
-							p->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
-					} break;
-					case CCamera::CAMTYPE_UWREFL: {
-						if (CModelDrawerHelper::ObjectVisibleReflection(p->drawPos, cam->GetPos(), p->GetDrawRadius()))
-							p->AddDrawFlag(DrawFlags::SO_REFLEC_FLAG);
-					} break;
-					case CCamera::CAMTYPE_SHADOW: {
-						if unlikely(hasModel)
-							p->AddDrawFlag(DrawFlags::SO_SHOPAQ_FLAG);
-						else
-							p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
-					} break;
-				}
+					if (p->drawPos.y - p->GetDrawRadius() < 0.0f)
+						p->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
+
+					// Special case of piece projectile, since it has a model and fire particle
+					if (p->piece)
+						p->AddDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
+				} break;
+				case CCamera::CAMTYPE_UWREFL: {
+					if (CModelDrawerHelper::ObjectVisibleReflection(p->drawPos, cam->GetPos(), p->GetDrawRadius()))
+						p->AddDrawFlag(DrawFlags::SO_REFLEC_FLAG);
+				} break;
+				case CCamera::CAMTYPE_SHADOW: {
+					if unlikely(hasModel)
+						p->AddDrawFlag(DrawFlags::SO_SHOPAQ_FLAG);
+					else
+						p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
+
+					// Special case of piece projectile, since it has a model and fire particle
+					if (p->piece)
+						p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
+				} break;
 			}
-		});
-	}
+		}
+	});
+
 }
 
 bool CProjectileDrawer::CheckSoftenExt()
@@ -590,13 +594,26 @@ void CProjectileDrawer::DrawProjectilesMiniMap()
 {
 	ZoneScopedN("ProjectileDrawer::DrawMiniMap");
 
-	for (auto& rp : renderProjectiles) {
-		for (CProjectile* p : rp) {
-			if (!ShouldDrawProjectile(p, DrawFlags::SO_DRICON_FLAG))
-				continue;
+	// draw opaque first
+	for (CProjectile* p : renderProjectiles) {
+		if (!p->model)
+			continue;
 
-			p->DrawOnMinimap();
-		}
+		if (!ShouldDrawProjectile(p, DrawFlags::SO_DRICON_FLAG))
+			continue;
+
+		p->DrawOnMinimap();
+	}
+
+	// draw alpha second
+	for (CProjectile* p : renderProjectiles) {
+		if (p->model)
+			continue;
+
+		if (!ShouldDrawProjectile(p, DrawFlags::SO_DRICON_FLAG))
+			continue;
+
+		p->DrawOnMinimap();
 	}
 
 	auto& sh = TypedRenderBuffer<VA_TYPE_C>::GetShader();
@@ -725,7 +742,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 
 	{
 		ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
-		for (CProjectile* p : renderProjectiles[false]) {
+		for (CProjectile* p : renderProjectiles) {
 			if (!ShouldDrawProjectile(p, thisPassMask))
 				continue;
 
@@ -853,7 +870,7 @@ void CProjectileDrawer::DrawShadowTransparent()
 	// 1) Render opaque objects into depth stencil texture from light's point of view - done elsewhere
 
 	// draw the model-less projectiles
-	for (CProjectile* p : renderProjectiles[false]) {
+	for (CProjectile* p : renderProjectiles) {
 		if (!ShouldDrawProjectile(p, DrawFlags::SO_SHTRAN_FLAG))
 			continue;
 
@@ -1182,9 +1199,10 @@ void CProjectileDrawer::GenerateNoiseTex(uint32_t tex)
 void CProjectileDrawer::RenderProjectileCreated(const CProjectile* p)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	auto& rp = renderProjectiles[p->model != nullptr];
-	const_cast<CProjectile*>(p)->SetRenderIndex(rp.size());
-	rp.push_back(const_cast<CProjectile*>(p));
+	{
+		const_cast<CProjectile*>(p)->SetRenderIndex(renderProjectiles.size());
+		renderProjectiles.push_back(const_cast<CProjectile*>(p));
+	}
 
 	if (p->model != nullptr)
 		modelRenderers[MDL_TYPE(p)].AddObject(p);
@@ -1194,15 +1212,14 @@ void CProjectileDrawer::RenderProjectileDestroyed(const CProjectile* p)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const auto ri = p->GetRenderIndex();
-	auto& rp = renderProjectiles[p->model != nullptr];
-	if (ri >= rp.size()) {
+	if (ri >= renderProjectiles.size()) {
 		assert(false);
 		return;
 	}
 
-	rp[ri] = rp.back();
-	rp[ri]->SetRenderIndex(ri);
-	rp.pop_back();
+	renderProjectiles[ri] = renderProjectiles.back();
+	renderProjectiles[ri]->SetRenderIndex(ri);
+	renderProjectiles.pop_back();
 
 	if (p->model != nullptr)
 		modelRenderers[MDL_TYPE(p)].DelObject(p);

@@ -209,7 +209,7 @@ namespace Rml::SolLua
 			/***
 			 * @function RmlUi.EventListener.OnDetach
 			 * @param element RmlUi.Element
-			 */ 
+			 */
 			"OnDetach", &Rml::EventListener::OnDetach,
 			/***
 			 * @function RmlUi.EventListener.ProcessEvent
@@ -223,17 +223,17 @@ namespace Rml::SolLua
 		 * @alias RmlUi.StyleProxy { [string]: string }
 		 */
 		namespace_table.new_usertype<style::StyleProxy>("StyleProxy", sol::no_constructor,
-														sol::meta_function::index, &style::StyleProxy::Set,
+			sol::meta_function::index, &style::StyleProxy::Get,
 			sol::meta_function::new_index, &style::StyleProxy::Set,
 			sol::meta_function::pairs, &style::StyleProxy::Pairs
 		);
 
-		/***  
+		/***
 		 * Represents an element in the RmlUi document tree. This class cannot be constructed directly; use a Document object to instantiate elements. This is the foundational piece of the DOM.
 		 * @class RmlUi.Element
 		*/
 
-		
+
 
 		namespace_table.new_usertype<Rml::Element>("Element", sol::no_constructor,
 			// M
@@ -287,14 +287,14 @@ namespace Rml::SolLua
 			 * Returns the value of the attribute named name. If no such attribute exists, the empty string will be returned.
 			 * @function RmlUi.Element:GetAttribute
 			 * @param name string
-			 * @return any
+			 * @return string?
 			 */
 			"GetAttribute", &functions::getAttribute,
 			/***
 			 * Returns the descendant element with an id of id.
 			 * @function RmlUi.Element:GetElementById
 			 * @param id string
-			 * @return RmlUi.Element
+			 * @return RmlUi.Element?
 			 */
 			"GetElementById", &Rml::Element::GetElementById,
 			/***
@@ -305,16 +305,17 @@ namespace Rml::SolLua
 			 */
 			"GetElementsByTagName", &functions::getElementsByTagName,
 			/***
-			 * Unsure what this does, but seems powerful?
+			 * JQuery-like element selector
 			 * @function RmlUi.Element:QuerySelector
 			 * @param query string
-			 * @return RmlUi.ElementPtr
+			 * @return RmlUi.ElementPtr?
 			 */
 			"QuerySelector", &Rml::Element::QuerySelector,
 			/***
-			 * Unsure what this does, but seems powerful?
+			 * JQuery-like element selector
 			 * @function RmlUi.Element:QuerySelectorAll
 			 * @param selectors string
+			 * @return RmlUi.ElementPtr[]
 			 */
 			"QuerySelectorAll", &functions::getQuerySelectorAll,
 			/***
@@ -419,7 +420,7 @@ namespace Rml::SolLua
 			"SetPseudoClass", &Rml::Element::SetPseudoClass,
 			/***
 			 * @function RmlUi.Element:IsPseudoClassSet
-			 * @param class_name string 
+			 * @param class_name string
 			 * @return boolean
 			 */
 			"IsPseudoClassSet", &Rml::Element::IsPseudoClassSet,
@@ -447,7 +448,7 @@ namespace Rml::SolLua
 			 */
 			"ProcessDefaultAction", &Rml::Element::ProcessDefaultAction,
 			/***
-			 * Get the value of this element. 
+			 * Get the value of this element.
 			 * @function RmlUi.Element:GetValue
 			 * @return number | string | "" value Returns number if it has the tag "input", a string if it has the tag "textarea", else an empty string.
 			 */

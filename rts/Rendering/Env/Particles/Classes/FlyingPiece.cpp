@@ -8,7 +8,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
 #include "Rendering/Units/UnitDrawer.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModelPiece.hpp"
 #include "Rendering/Textures/S3OTextureHandler.h"
 #include "System/SpringMath.h"
 

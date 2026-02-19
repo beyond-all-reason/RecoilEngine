@@ -64,6 +64,9 @@ namespace Rml::SolLua
 	{
 		auto* context = GetContext();
 
+		// A context isn't present in the case of reloading stylesheets which reprocesses the whole head section.
+		if (context == nullptr) return;
+
 		Rml::String buffer{ "--" };
 		buffer.append("[");
 		buffer.append(context->GetName());

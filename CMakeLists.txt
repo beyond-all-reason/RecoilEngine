@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.27)
 cmake_policy(SET CMP0060 OLD) #causes link errors on Linux otherwise
 cmake_policy(SET CMP0065 OLD) #we need binaries compiled with -rdynamic for BARb to work (cause unknown https://github.com/beyond-all-reason/spring/issues/405)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -13,6 +13,11 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_MODULES_SPRING}")
 set(CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_MODULES_SPRING}/OverrideFlags.cmake")
 
 project(Spring)
+
+# Force Unicode WinAPI
+if (WIN32)
+	add_definitions(-DUNICODE -D_UNICODE)
+endif()
 
 add_definitions(-DFMT_HEADER_ONLY) #for fmt lib
 
@@ -185,6 +190,9 @@ else  (UNIX AND NOT MINGW)
 		add_definitions(-D_ENABLE_EXTENDED_ALIGNED_STORAGE)
 		add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
 		add_compile_options(/bigobj)
+		add_compile_options(/utf-8) ## new FMT refuses to compile w/o it
+		add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/Zc:__cplusplus>) ## define __cplusplus value properly / https://learn.microsoft.com/en-us/cpp/build/reference/zc-cplusplus?view=msvc-170
+		add_definitions(-D_ITERATOR_DEBUG_LEVEL=0) ## attempt to make debug MSVC builds faster
 		#set(EXE_FLAGS WIN32)
 	endif()
 endif (UNIX AND NOT MINGW)
@@ -271,14 +279,19 @@ if    (WIN32)
 	endif(NOT MSVC)
 endif (WIN32)
 
-option(USE_ASAN "Build/link with address sanitizer enabled (for DEBUG builds only)" FALSE)
+option(USE_ASAN "Build/link with address sanitizer enabled" FALSE)
 if    (USE_ASAN)
 	if (UNIX AND NOT MINGW)
-		add_compile_options("$<$<CONFIG:DEBUG>:-fsanitize=address>")
-		add_link_options("$<$<CONFIG:DEBUG>:-fsanitize=address>")
+		# -fsanitize=address: Enable AddressSanitizer for detecting memory errors
+		# -fPIC: Position Independent Code required for shared libraries with ASAN
+		# -fno-omit-frame-pointer: Keep frame pointers for better stack traces in error reports
+		# -fno-optimize-sibling-calls: Prevent tail call optimization to preserve full call chains
+		# -O2: Use moderate optimization for better ASAN error detection and reasonable performance
+		add_compile_options("-fsanitize=address" "-fPIC" "-fno-omit-frame-pointer" "-fno-optimize-sibling-calls" "-O2")
+		add_link_options("-fsanitize=address")
 	endif (UNIX AND NOT MINGW)
 	if (MSVC)
-		add_compile_options("$<$<CONFIG:DEBUG>:/fsanitize=address>")
+		add_compile_options("/fsanitize=address")
 	endif (MSVC)
 endif (USE_ASAN)
 
@@ -382,6 +395,10 @@ if(NOT MSVC)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsignaling-nans")
 	endif()
 
+	## warning: space between quotes and suffix is deprecated in C++23
+	## [[nodiscard]] constexpr uint32_t operator"" _hs(const char* str, std::size_t) noexcept
+	## it's been quite annoying since we switched to C++23
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-literal-operator")
 
 	### CompileTime Warnings
 	set(COMMON_WARNINGS "${COMMON_WARNINGS} -Wformat -Wformat-security")
@@ -599,6 +616,11 @@ add_dependencies(generateSources generateVersionFiles)
 
 # As the libs are required by all the other sub-projects, we add them first
 add_subdirectory(rts/lib)
+
+# Fix for MinGW assembler limitations with large object files
+if(MINGW)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wa,-mbig-obj")
+endif()
 
 if    (NOT "${AI_TYPES}" STREQUAL "NONE")
 	add_subdirectory(AI)

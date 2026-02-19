@@ -2775,7 +2775,7 @@ static inline bool BindUnitTexByString(const std::string& str)
 	return true;
 }
 
-
+/*
 static inline bool BindIconTexByString(const std::string& str)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -2793,6 +2793,18 @@ static inline bool BindIconTexByString(const std::string& str)
 
 	ud->iconType->BindTexture();
 	return true;
+}
+*/
+
+// the archaic code of gui handler was not designed to work with atlased textures
+// like icons are since https://github.com/beyond-all-reason/RecoilEngine/pull/2604 was merged
+// GuiHandler should eventually be replaced by something better,
+// so at the moment I don't feel like fixing it
+// return false and assert instead
+static inline bool BindIconTexByString(const std::string& str)
+{
+	assert(false);
+	return false;
 }
 
 

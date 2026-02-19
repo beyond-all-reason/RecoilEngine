@@ -160,7 +160,7 @@ WEAPONTAG(float, fireStarter).defaultValue(0.0f).minimumValue(0.0f).scaleValue(0
 WEAPONTAG(bool, paralyzer).defaultValue(false).description("Is the weapon a paralyzer? If true the weapon only stuns enemy units and does not cause damage in the form of lost hit-points.");
 WEAPONTAG(int, paralyzeTime,  damages.paralyzeDamageTime).defaultValue(10).minimumValue(0).description("Determines the maximum length of time in seconds that the target will be paralyzed. The timer is restarted every time the target is hit by the weapon. Cannot be less than 0.");
 WEAPONTAG(bool, stockpile).defaultValue(false).description("Does each round of the weapon have to be built and stockpiled by the player? Will only correctly function for the first of each stockpiled weapons a unit has.");
-WEAPONTAG(float, stockpileTime).fallbackName("reload").defaultValue(1.0f).scaleValue(GAME_SPEED).description("The time in seconds taken to stockpile one round of the weapon.");
+WEAPONTAG(float, stockpileTime).fallbackName("reload").defaultValue(1.0f).minimumValue(0.0f).scaleValue(GAME_SPEED).description("The time in seconds taken to stockpile one round of the weapon. Set to 0 for it not to progress (useful for a Lua reimplementation).");
 
 // Interceptor
 WEAPONTAG(int, targetable).defaultValue(0).description("Bitmask representing the types of weapon that can intercept this weapon. Each digit of binary that is set to one means that a weapon with the corresponding digit in its interceptor tag will intercept this weapon. Instant-hitting weapons such as [#BeamLaser], [#LightningCannon] and [#Rifle] cannot be targeted.");
@@ -243,7 +243,7 @@ WEAPONTAG(float3, animParams4, visuals.animParams[3]).fallbackName("animParams")
 // Missile
 WEAPONTAG(bool, smokeTrail, visuals.smokeTrail).defaultValue(false).description("MissileLauncher only. Does it leave a smoke trail ribbon?");
 WEAPONTAG(bool, smokeTrailCastShadow, visuals.smokeTrailCastShadow).defaultValue(true).description("Does the smoke trail cast shadow?");
-WEAPONTAG(int, smokePeriod, visuals.smokePeriod).defaultValue(8).description("Smoke trail update rate - the trail ribbon will make a new vertex this many sim frames. Use for high turn-rate homing missiles to prevent jagged edges. Smaller is smoother but more performance-heavy.");
+WEAPONTAG(int, smokePeriod, visuals.smokePeriod).defaultValue(1).description("Smoke trail update rate - the trail ribbon will make a new vertex this many sim frames. Use for high turn-rate homing missiles to prevent jagged edges. Smaller is smoother but more performance-heavy.");
 WEAPONTAG(int, smokeTime, visuals.smokeTime).defaultValue(2 * GAME_SPEED).description("Smoke trail linger duration, in sim frames");
 WEAPONTAG(float, smokeSize, visuals.smokeSize).defaultValue(7.0f).description("Smoke trail size multiplier");
 WEAPONTAG(float, smokeColor, visuals.smokeColor).defaultValue(0.65f).description("Smoke trail brightness multiplier");

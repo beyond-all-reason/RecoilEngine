@@ -4,6 +4,7 @@
 #include <cinttypes>
 
 #include "3DOParser.h"
+#include "3DModel.hpp"
 
 #include "Sim/Misc/CollisionVolume.h"
 #include "System/Exceptions.h"

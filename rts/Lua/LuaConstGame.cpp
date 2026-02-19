@@ -29,6 +29,10 @@
  * @see rts/Lua/LuaConstGame.cpp
 ******************************************************************************/
 
+/* TODO:
+ * - Inline these declarations (place each above the specific line they are pushed into the constant.
+ * - There are many missing (for example modInfo related ones)
+ */
 /*** Game specific information
  *
  * @table Game
@@ -216,6 +220,8 @@ bool LuaConstGame::PushEntries(lua_State* L)
 		LuaPushNamedNumber(L, "paralyzeDeclineRate", modInfo.paralyzeDeclineRate);
 
 		LuaPushNamedBool  (L, "allowEnginePlayerlist", modInfo.allowEnginePlayerlist);
+		/*** @field Game.nativeExcessSharing boolean whether the engine handles excess resources overflow */
+		LuaPushNamedBool  (L, "nativeExcessSharing", modInfo.nativeExcessSharing);
 	}
 
 	if (archiveScanner != nullptr && mapInfo != nullptr) {

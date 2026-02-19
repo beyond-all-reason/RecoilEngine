@@ -13,6 +13,7 @@
 #include "System/UnorderedSet.hpp"
 #include "System/type2.h"
 
+class SharedLib;
 struct SDL_version;
 struct SDL_Rect;
 struct SDL_Window;
@@ -368,6 +369,17 @@ public:
 	bool borderless;
 
 	bool underExternalDebug;
+	
+	/** 
+	 * @brief Forces Window's desktop compositing before(1)/after(2) each glSwapWindow
+	*/
+	int forceDWMFlush;
+
+	#ifdef _WIN32
+		std::unique_ptr<SharedLib> dwmApiLib;
+		void* DwmGetWindowAttribute = nullptr;
+		void* DwmFlush = nullptr;
+	#endif
 public:
 	SDL_Window* sdlWindow;
 	SDL_GLContext glContext;

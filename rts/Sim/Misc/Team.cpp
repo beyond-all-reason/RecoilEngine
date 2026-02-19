@@ -11,6 +11,7 @@
 #include "Game/GlobalUnsynced.h"
 #include "Map/ReadMap.h"
 #include "Net/Protocol/NetProtocol.h"
+#include "Sim/Misc/ModInfo.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
@@ -233,10 +234,21 @@ void CTeam::GiveEverythingTo(const unsigned toTeam)
 
 	const auto& teamUnits = unitHandler.GetUnitsByTeam(teamNum);
 
+	// Optimistically give *all* of team's unit limit to target
+	// If some transfers fail, need to partially revert this
+	// to ensure this.maxUnits == this.numUnits
+	target->maxUnits += maxUnits;
+	maxUnits = 0;
+
 	// NB: can not be a ranged loop since ChangeTeam removes [i] from teamUnits on success
 	for (size_t i = 0; i < teamUnits.size(); ) {
 		i += (!teamUnits[i]->ChangeTeam(toTeam, CUnit::ChangeGiven));
 	}
+	assert(numUnits == teamUnits.size());
+	// Some of the above transfers may have failed, so set maxUnits=numUnits and 
+	// reduce target->maxUnits by numUnits
+	maxUnits = numUnits;
+	target->maxUnits -= numUnits;
 }
 
 
@@ -261,9 +273,9 @@ void CTeam::Died(bool normalDeath)
 		}
 	}
 
-	// increase per-team unit-limit for each remaining team in _our_ allyteam
-	teamHandler.UpdateTeamUnitLimitsPreDeath(teamNum);
 	eventHandler.TeamDied(teamNum);
+	// increase per-team unit-limit for each remaining team in _our_ allyteam
+	teamHandler.UpdateTeamUnitLimitsOnDeath(teamNum);
 
 	isDead = true;
 }
@@ -357,26 +369,28 @@ void CTeam::SlowUpdate()
 	if (mShare > 0.0f) { dm = std::min(1.0f, mExcess / mShare); }
 
 	// now evenly distribute our excess resources among allied teams
-	for (int a = 0; a < teamHandler.ActiveTeams(); ++a) {
-		if ((a != teamNum) && (teamHandler.AllyTeam(teamNum) == teamHandler.AllyTeam(a))) {
-			CTeam* team = teamHandler.Team(a);
-			if (team->isDead)
-				continue;
+	if (modInfo.nativeExcessSharing) {
+		for (int a = 0; a < teamHandler.ActiveTeams(); ++a) {
+			if ((a != teamNum) && (teamHandler.AllyTeam(teamNum) == teamHandler.AllyTeam(a))) {
+				CTeam* team = teamHandler.Team(a);
+				if (team->isDead)
+					continue;
 
-			//due to precision errors mdif/edif sometimes can be slightly >= than res. If team has no metal income
-			//this causes units with zero fire resources requirements to be unable to fire
-			//when CTeam::HaveResources() is evaluated, thus clamp edif / mdif on both sides
+				//due to precision errors mdif/edif sometimes can be slightly >= than res. If team has no metal income
+				//this causes units with zero fire resources requirements to be unable to fire
+				//when CTeam::HaveResources() is evaluated, thus clamp edif / mdif on both sides
 
-			const float edif = std::clamp(((team->resStorage.energy * 0.99f) - team->res.energy) * de, 0.0f, res.energy);
-			const float mdif = std::clamp(((team->resStorage.metal  * 0.99f) - team->res.metal ) * dm, 0.0f, res.metal );
+				const float edif = std::clamp(((team->resStorage.energy * 0.99f) - team->res.energy) * de, 0.0f, res.energy);
+				const float mdif = std::clamp(((team->resStorage.metal  * 0.99f) - team->res.metal ) * dm, 0.0f, res.metal );
 
-			res.energy     -= edif; team->res.energy         += edif;
-			resSent.energy += edif; team->resReceived.energy += edif;
-			res.metal      -= mdif; team->res.metal          += mdif;
-			resSent.metal  += mdif; team->resReceived.metal  += mdif;
+				res.energy     -= edif; team->res.energy         += edif;
+				resSent.energy += edif; team->resReceived.energy += edif;
+				res.metal      -= mdif; team->res.metal          += mdif;
+				resSent.metal  += mdif; team->resReceived.metal  += mdif;
 
-			currentStats.energySent += edif; team->GetCurrentStats().energyReceived += edif;
-			currentStats.metalSent  += mdif; team->GetCurrentStats().metalReceived  += mdif;
+				currentStats.energySent += edif; team->GetCurrentStats().energyReceived += edif;
+				currentStats.metalSent  += mdif; team->GetCurrentStats().metalReceived  += mdif;
+			}
 		}
 	}
 

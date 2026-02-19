@@ -62,9 +62,14 @@ UnitDefWeapon::UnitDefWeapon(const WeaponDef* weaponDef, const LuaTable& weaponT
 	// Determines how to handle burst fire, when target is out of arc. 0 = no restrictions (default), 1 = don't fire, 2 = fire in current direction of weapon 
 	burstControlWhenOutOfArc = weaponTable.GetInt("burstControlWhenOutOfArc", burstControlWhenOutOfArc);
 
-	// Determines where to calculate weapon range from. 0 = from weapon->aimFromPos (default), 1 = from owner->pos + aimFromPos.y, 2 = from owner->aimPos
+	// Perform more math to accurately lead moving targets. 
+	// 0 = undershoot approaching or retreating targets (default)
+	// 1 = exact solution for non-parabolic shots and 1 accuracy iteration for parabolic shots
+	// 2+ = extra iterations for parabolic shots. Iterations terminate early once 1-frame accuracy is achieved. 
+	accurateLeading = weaponTable.GetInt("accurateLeading", accurateLeading);
+  
+  // Determines where to calculate weapon range from. 0 = from weapon->aimFromPos (default), 1 = from owner->pos + aimFromPos.y, 2 = from owner->aimPos
 	rangefrombase = weaponTable.GetInt("rangefrombase", rangefrombase);
-
 }
 
 
@@ -561,7 +566,7 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	category = CCategoryHandler::Instance()->GetCategories(udTable.GetString("category", ""));
 	noChaseCategory = CCategoryHandler::Instance()->GetCategories(udTable.GetString("noChaseCategory", ""));
 
-	iconType = icon::iconHandler.GetIcon(udTable.GetString("iconType", "default"));
+	iconName = udTable.GetString("iconType", "default");
 
 	shieldWeaponDef    = nullptr;
 	stockpileWeaponDef = nullptr;

@@ -46,6 +46,9 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/cereal/include)
 
 
+#nowide for Windows utf-8 abstraction layer
+list(APPEND engineCommonLibraries "nowide::nowide")
+
 ### base64 from pr-downloader
 list(APPEND engineCommonLibraries "prd::base64")
 

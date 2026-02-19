@@ -161,6 +161,18 @@ static inline int_type StringToInt(const std::string & str, bool* failed = NULL)
 	return buffer;
 }
 
+static inline float StringToFloat(const std::string& str, bool* failed = NULL)
+{
+	char* endPtr;
+	const char* startPtr = str.c_str();
+	const float value = (float)strtod(startPtr, &endPtr);
+
+	if (failed != NULL)
+		*failed = (endPtr == startPtr);
+
+	return value;
+}
+
 /**
  * Returns true of the argument string matches "0|n|no|f|false".
  * The matching is done case insensitive.

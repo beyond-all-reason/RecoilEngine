@@ -4,6 +4,8 @@
 #include <fstream>
 #include <vector>
 #include <list>
+#include <ranges>
+#include <concepts>
 
 #include "fmt/format.h"
 #include "fmt/printf.h"
@@ -16,7 +18,8 @@
 #include "Game/GlobalUnsynced.h"
 #include "Game/GameVersion.h"
 #include "Net/GameServer.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModel.hpp"
+#include "Rendering/Models/3DModelPiece.hpp"
 #include "Rendering/Models/IModelParser.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureDef.h"
@@ -30,6 +33,9 @@
 #include "Sim/Projectiles/Projectile.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Units/CommandAI/CommandAI.h"
+#include "Sim/Units/Scripts/UnitScriptEngine.h"
+#include "Sim/Units/Scripts/CobThread.h"
+#include "Sim/Units/Scripts/CobFile.h"
 #include "Sim/Units/Scripts/CobEngine.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
@@ -108,6 +114,85 @@ namespace {
 			p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15]
 		);
 	}
+
+	template<typename T>
+	concept StringLike = std::convertible_to<std::remove_cvref_t<T>, std::string_view>;
+
+	template<typename T>
+	concept SequenceContainer = std::ranges::range<T>
+		&& !StringLike<T>
+		&& !requires { typename T::key_type; };
+
+	template<typename T>
+	concept SetLikeContainer = requires { typename T::key_type; }
+	&& !requires { typename T::mapped_type; };
+
+	template<typename T>
+	concept MapLikeContainer = requires {
+		typename T::key_type;
+		typename T::mapped_type;
+	};
+
+	template<typename T>
+	concept Numeric = std::integral<T> || std::floating_point<T>;
+
+	template <typename T>
+	struct is_tuple : std::false_type {};
+	template <typename... Args>
+	struct is_tuple<std::tuple<Args...>> : std::true_type {};
+	template <typename T>
+	concept IsTuple = is_tuple<T>::value;
+
+	template<StringLike S>
+	inline uint32_t CheckSum(S&& str, uint32_t cs = 0u) {
+		std::string_view view = str;
+		return spring::LiteHash(view.data(), static_cast<uint32_t>(view.size()), cs);
+	}
+
+	template<Numeric N>
+	inline uint32_t CheckSum(N n, uint32_t cs = 0u) {
+		return spring::LiteHash(n, cs);
+	}
+
+	template<SequenceContainer C>
+	inline uint32_t CheckSum(C&& c, uint32_t cs = 0u) {
+		for (auto it = std::begin(c); it != std::end(c); ++it) {
+			cs = CheckSum(*it, cs);
+		}
+		return cs;
+	}
+
+	template<SetLikeContainer C>
+	inline uint32_t CheckSum(C&& c, uint32_t cs = 0u) {
+		for (const auto& k : c) {
+			cs = CheckSum(k, cs);
+		}
+		return cs;
+	}
+
+	template<MapLikeContainer C>
+	inline uint32_t CheckSum(C&& c, uint32_t cs = 0u) {
+		for (const auto& [k, v] :  c) {
+			cs = CheckSum(k, cs);
+			cs = CheckSum(v, cs);
+		}
+		return cs;
+	}
+
+	template<IsTuple Tpl>
+	inline uint32_t CheckSum(Tpl&& t, uint32_t cs = 0u) {
+		std::apply([&cs](auto&&... args) {
+			((cs = CheckSum(args, cs)), ...);
+		}, t);
+		return cs;
+	}
+
+	template<typename T>
+	inline uint32_t CheckSum(T&&, uint32_t cs = 0u)
+	{
+		static_assert(false, "Not implemented <T>");
+		return cs;
+	}
 }
 
 
@@ -116,7 +201,7 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 	if (outputFloats.has_value())
 		onlyHash = !outputFloats.value();
 
-	static std::fstream file;
+	static nowide::fstream file;
 	static int gMinFrameNum = -1;
 	static int gMaxFrameNum = -1;
 	static int gFramePeriod =  1;
@@ -132,48 +217,18 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 		return;
 
 	// adjust the bounds if the new values are valid
-	if (newMinFrameNum >= 0) gMinFrameNum = newMinFrameNum;
-	if (newMaxFrameNum >= 0) gMaxFrameNum = newMaxFrameNum;
 	if (newFramePeriod >= 1) gFramePeriod = newFramePeriod;
+	if (newMinFrameNum >= 0) gMinFrameNum = AlignUp  (static_cast<uint32_t>(newMinFrameNum), static_cast<uint32_t>(gFramePeriod));
+	if (newMaxFrameNum >= 0) gMaxFrameNum = AlignDown(static_cast<uint32_t>(newMaxFrameNum), static_cast<uint32_t>(gFramePeriod));
 
 	if ((gMinFrameNum != oldMinFrameNum) || (gMaxFrameNum != oldMaxFrameNum)) {
-		LOG("[%s] dumping state (from %d to %d step %d)", __func__, gMinFrameNum, gMaxFrameNum, gFramePeriod);
-		// bounds changed, open a new file
+		// bounds changed, close the old file
 		if (file.is_open()) {
 			file.flush();
 			file.close();
 		}
-
-		gHistoryFrame = historyFrame.value_or(-1);
-
-		std::string name = (gameServer != nullptr)? "Server": "Client";
-		name += "GameState-";
-		name += IntToString(guRNG.NextInt());
-		name += "-[";
-		name += IntToString(gMinFrameNum);
-		name += "-";
-		name += IntToString(gMaxFrameNum);
-		name += "].txt";
-
-		file.open(name.c_str(), std::ios::out);
-
-		if (file.is_open()) {
-			file << " mapName: " << gameSetup->mapName << "\n";
-			file << " modName: " << gameSetup->modName << "\n";
-			file << "minFrame: " << gMinFrameNum << "\n";
-			file << "maxFrame: " << gMaxFrameNum << "\n";
-			file << "randSeed: " << gsRNG.GetLastSeed() << "\n";
-			file << "initSeed: " << gsRNG.GetInitSeed() << "\n";
-			file << "genState: " << gsRNG.GetGenState() << "\n";
-			file << "  gameID: " << DumpGameID(game->gameID) << "\n";
-			file << " syncVer: " << SpringVersion::GetSync() << "\n";
-		}
-
-		LOG("[%s] using dump-file \"%s\"", __func__, name.c_str());
 	}
 
-	if (file.bad() || !file.is_open())
-		return;
 	// check if the CURRENT frame lies within the bounds
 	if (gs->frameNum < gMinFrameNum)
 		return;
@@ -182,12 +237,6 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 	if ((gs->frameNum % gFramePeriod) != 0)
 		return;
 
-	// we only care about the synced projectile data here
-	const std::vector<CUnit*>& activeUnits = unitHandler.GetActiveUnits();
-	const auto& activeFeatureIDs = featureHandler.GetActiveFeatureIDs();
-	const auto& projectiles = projectileHandler.GetActiveProjectiles(true);
-
-	file << "frame: " << gs->frameNum << ", seed: " << gsRNG.GetLastSeed() << "\n";
 
 	#define DUMP_MATH_CONST
 	#define DUMP_MODEL_DATA
@@ -198,7 +247,8 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 	#define DUMP_UNIT_COMMANDAI_DATA
 	#define DUMP_UNIT_MOVETYPE_DATA
 	#define DUMP_UNIT_BUILDER_DATA
-	#define DUMP_UNIT_SCRIPT_DATA
+	#define DUMP_UNIT_SCRIPT_COB_DATA
+	#define DUMP_UNIT_SCRIPT_ANIM
 	#define DUMP_FEATURE_DATA
 	#define DUMP_PROJECTILE_DATA
 	#define DUMP_TEAM_DATA
@@ -209,8 +259,47 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 	//#define DUMP_SMOOTHMESH
 	#define DUMP_SMOOTHMESH_CHECKSUM
 
-	#ifdef DUMP_MATH_CONST
-	if (gs->frameNum == gMinFrameNum) { //dump once
+	if (!file.is_open()) {
+		gHistoryFrame = historyFrame.value_or(-1);
+
+		std::string fileName;
+
+		if (gameServer == nullptr)
+			fileName = "Client";
+		else if (gameServer->GetGameSetup()->hostDemo)
+			fileName = "Replay";
+		else
+			fileName = "Server";
+
+		fileName += "GameState-";
+		fileName += IntToString(guRNG.NextInt());
+		fileName += "-[";
+		fileName += IntToString(gMinFrameNum);
+		fileName += "-";
+		fileName += IntToString(gMaxFrameNum);
+		fileName += "].txt";
+
+		file.open(fileName.c_str(), std::ios::out);
+
+		if (file.bad() || !file.is_open())
+			return;
+
+		LOG("[%s] dumping state (from %d to %d step %d) to dump-file %s", __func__, gMinFrameNum, gMaxFrameNum, gFramePeriod, fileName.c_str());
+
+		file << " syncVer: " << SpringVersion::GetSync() << "\n";
+		file << " mapName: " << gameSetup->mapName << "\n";
+		file << " modName: " << gameSetup->modName << "\n";
+		file << "minFrame: " << gMinFrameNum << "\n";
+		file << "maxFrame: " << gMaxFrameNum << "\n";
+		file << "frameStp: " << gFramePeriod << "\n";
+
+		file << "initSeed: " << gsRNG.GetInitSeed() << "\n";
+
+		file << "  gameID: " << DumpGameID(game->gameID) << "\n";
+
+		file << "-----------================================-----------" << "\n";
+
+#ifdef DUMP_MATH_CONST
 		file << "\tmath constants:\n";
 		#define TAP_MATH_CONST(name) file << "\t\t" << #name << ": " << TapFloats(math::name)
 		TAP_MATH_CONST(PI);
@@ -232,35 +321,44 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 
 		TAP_MATH_CONST(RAD_TO_DEG);
 		TAP_MATH_CONST(DEG_TO_RAD);
+		file << "-----------================================-----------" << "\n";
 		#undef TAP_MATH_CONST
+#endif
+#ifdef DUMP_CS_DATA
+		{
+			sha512::hex_digest hexDigest;
+			{
+				hexDigest = { 0 };
+				const auto mapCheckSum = archiveScanner->GetArchiveCompleteChecksumBytes(gameSetup->mapName);
+				sha512::dump_digest(mapCheckSum, hexDigest);
+				file << "\tmapCheckSum: " << std::string(hexDigest.data()) << "\n";
+			}
+			{
+				hexDigest = { 0 };
+				const auto modCheckSum = archiveScanner->GetArchiveCompleteChecksumBytes(gameSetup->modName);
+				sha512::dump_digest(modCheckSum, hexDigest);
+				file << "\tmodCheckSum: " << std::string(hexDigest.data()) << "\n";
+			}
+			/*
+			for (const auto& ari : archiveScanner->GetAllArchives()) {
+				hexDigest = { 0 };
+				const auto cs = archiveScanner->GetArchiveCompleteChecksumBytes(ari.GetNameVersioned());
+				sha512::dump_digest(cs, hexDigest);
+				file << "\tArchive: " << ari.GetNameVersioned() << " checkSum: " << std::string(hexDigest.data()) << "\n";
+			}
+			*/
+			file << "-----------================================-----------" << "\n";
+		}
+#endif
 	}
-	#endif
 
-	#ifdef DUMP_CS_DATA
-	if (gs->frameNum == gMinFrameNum) { //dump once
-		sha512::hex_digest hexDigest;
-		{
-			hexDigest = { 0 };
-			const auto mapCheckSum = archiveScanner->GetArchiveCompleteChecksumBytes(gameSetup->mapName);
-			sha512::dump_digest(mapCheckSum, hexDigest);
-			file << "\tmapCheckSum: " << std::string(hexDigest.data()) << "\n";
-		}
-		{
-			hexDigest = { 0 };
-			const auto modCheckSum = archiveScanner->GetArchiveCompleteChecksumBytes(gameSetup->modName);
-			sha512::dump_digest(modCheckSum, hexDigest);
-			file << "\tmodCheckSum: " << std::string(hexDigest.data()) << "\n";
-		}
-		/*
-		for (const auto& ari : archiveScanner->GetAllArchives()) {
-			hexDigest = { 0 };
-			const auto cs = archiveScanner->GetArchiveCompleteChecksumBytes(ari.GetNameVersioned());
-			sha512::dump_digest(cs, hexDigest);
-			file << "\tArchive: " << ari.GetNameVersioned() << " checkSum: " << std::string(hexDigest.data()) << "\n";
-		}
-		*/
-	}
-	#endif
+	file << "frame: " << gs->frameNum << ", seed: " << gsRNG.GetLastSeed() << "\n";
+	file << "genState: " << gsRNG.GetGenState() << "\n";
+
+	// we only care about the synced projectile data here
+	const std::vector<CUnit*>& activeUnits = unitHandler.GetActiveUnits();
+	const auto& activeFeatureIDs = featureHandler.GetActiveFeatureIDs();
+	const auto& projectiles = projectileHandler.GetActiveProjectiles(true);
 
 	#ifdef DUMP_MODEL_DATA
 	if (gs->frameNum == gMinFrameNum) { //dump once
@@ -296,9 +394,12 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 				file << "\t\t\tbposeTransform(t): " << TapFloats(p->bposeTransform.t);
 				file << "\t\t\tbposeTransform(r): " << TapFloats(float4{ p->bposeTransform.r.x, p->bposeTransform.r.y, p->bposeTransform.r.z, p->bposeTransform.r.r });
 				file << "\t\t\tbposeTransform(s): " << TapFloats(p->bposeTransform.s);
-				file << "\t\t\tbakedTransform(t): " << TapFloats(p->bakedTransform.t);
-				file << "\t\t\tbakedTransform(r): " << TapFloats(float4{ p->bakedTransform.r.x, p->bakedTransform.r.y, p->bakedTransform.r.z, p->bakedTransform.r.r });
-				file << "\t\t\tbakedTransform(s): " << TapFloats(p->bakedTransform.s);
+				if (p->HasBackedTra()) {
+					const auto bakedTransform = p->bakedTransform.value();
+					file << "\t\t\tbakedTransform(t): " << TapFloats(bakedTransform.t);
+					file << "\t\t\tbakedTransform(r): " << TapFloats(float4{ bakedTransform.r.x, bakedTransform.r.y, bakedTransform.r.z, bakedTransform.r.r });
+					file << "\t\t\tbakedTransform(s): " << TapFloats(bakedTransform.s);
+				}
 				file << "\t\t\toffset: " << TapFloats(p->offset);
 				file << "\t\t\tgoffset: " << TapFloats(p->goffset);
 				file << "\t\t\tscales: " << TapFloats(p->scale);
@@ -457,18 +558,26 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 		file << "\t\tunitID: " << u->id << " (name: " << u->unitDef->name << ")\n";
 	}
 	#endif
-	#ifdef DUMP_UNIT_SCRIPT_DATA
+	#ifdef DUMP_UNIT_SCRIPT_COB_DATA
 	{
 		file << "\tCobEngine:\n";
 		file << "\t\tcurrentTime: " << cobEngine->GetCurrTime();
 		file << "\t\tCobThreads: " << cobEngine->GetThreadInstances().size() << "\n";
 		for (const auto& [tid, thread] : cobEngine->GetThreadInstances()) {
 			auto ownerID = thread.cobInst->GetUnit() ? thread.cobInst->GetUnit()->id : -1;
-			file << "\t\t\tid: " << tid << " t.id " << thread.GetID() << " t.wt " << thread.GetWakeTime()
-				 << " owner " << ownerID
-				 << " t.state " << +thread.GetState() << " t.sigmask " << thread.GetSignalMask()
-				 << " t.retc " << thread.GetRetCode()
-				 << " dead|gargage|waiting " << thread.IsDead() << "|" << thread.IsGarbage() << "|" << thread.IsWaiting() << "\n";
+			file
+				<< "\t\t\tid: " << tid << " t.id " << thread.GetID() << " t.wt " << thread.GetWakeTime()
+				<< " owner " << ownerID
+				<< " fn " << thread.cobFile->name
+				<< " code cs " << CheckSum(thread.cobFile->code)
+				<< " scriptNames cs " << CheckSum(thread.cobFile->scriptNames)
+				<< " pieceNames cs " << CheckSum(thread.cobFile->pieceNames)
+				<< " scriptOffLen cs " << CheckSum(std::tie(thread.cobFile->scriptOffsets, thread.cobFile->scriptLengths))
+				<< " scriptIndex cs " << CheckSum(thread.cobFile->scriptIndex)
+				<< " scriptMap cs " << CheckSum(thread.cobFile->scriptIndex)
+				<< " t.state " << +thread.GetState() << " t.sigmask " << thread.GetSignalMask()
+				<< " t.retc " << thread.GetRetCode()
+				<< " dead|garbage|waiting " << thread.IsDead() << "|" << thread.IsGarbage() << "|" << thread.IsWaiting() << "\n";
 		}
 		file << "\t\tWaitingThreads: " << cobEngine->GetWaitingThreadIDs().size();
 		file << "\t\t\tids:";
@@ -486,6 +595,49 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 			zzzThreads.pop();
 		}
 		file << "\n";
+	}
+	#endif
+	#ifdef DUMP_UNIT_SCRIPT_ANIM
+	{
+		const auto& allAnimScripts = unitScriptEngine->GetAnimating();
+		file << "\tUnitScript count: " << allAnimScripts.size() << "\n";
+		for (const auto* animScript : allAnimScripts) {
+			const auto* unit = animScript->GetUnit();
+			file << "\t\tU.id: " << unit->id << "\n";
+
+			{
+				const auto& animVec = animScript->GetLiveAnims();
+				file << "\t\tAnims(L) count: " << animVec.size() << "\n";
+				for (const auto& a : animVec) {
+					file
+						<< "\t\t\ttype: " << a.animType
+						<< " axis: " << a.axis
+						<< " piece: " << a.piece
+						<< " speed: " << a.speed
+						<< " dest: " << a.dest
+						<< " accel: " << a.accel
+						<< " done: " << int(a.done)
+						<< " hasWaiting: " << int(a.hasWaiting)
+						<< "\n";
+				}
+			}
+			{
+				const auto& animVec = animScript->GetDoneAnims();
+				file << "\t\tAnims(D) count: " << animVec.size() << "\n";
+				for (const auto& a : animVec) {
+					file
+						<< "\t\t\ttype: " << a.animType
+						<< " axis: " << a.axis
+						<< " piece: " << a.piece
+						<< " speed: " << a.speed
+						<< " dest: " << a.dest
+						<< " accel: " << a.accel
+						<< " done: " << int(a.done)
+						<< " hasWaiting: " << int(a.hasWaiting)
+						<< "\n";
+				}
+			}
+		}
 	}
 	#endif
 
@@ -658,21 +810,22 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 	file << "\tsmoothMesh checksum as uint32t: " << smCs << "\n";
 	#endif
 
-	file.flush();
 	if (gs->frameNum == gMaxFrameNum) {
 		if (gHistoryFrame > -1)
 			DumpHistory(file, gHistoryFrame, serverRequest);
-		file.close();
-	}
 
-	gMinFrameNum = -1;
-	gMaxFrameNum = -1;
-	gFramePeriod =  1;
+		file.flush();
+		file.close();
+
+		gMinFrameNum = -1;
+		gMaxFrameNum = -1;
+		gFramePeriod = 1;
+	}
 }
 
 void DumpRNG(int newMinFrameNum, int newMaxFrameNum)
 {
-	static std::fstream file;
+	static nowide::fstream file;
 	static int gMinFrameNum = -1;
 	static int gMaxFrameNum = -1;
 

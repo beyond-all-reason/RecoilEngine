@@ -10,6 +10,7 @@
 #include "System/UnorderedMap.hpp"
 
 #define LMP_USE_CHUNK_TABLE 0
+#define LUA_MEASURE_ALLOC_TIME 0
 
 class CLuaHandle;
 class LuaMemPool {

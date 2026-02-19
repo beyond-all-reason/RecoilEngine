@@ -12,7 +12,7 @@
 
 #include "System/Misc/TracyDefs.h"
 
-static int NODE_MIN_SIZE = 8;
+static constexpr uint32_t NODE_MIN_SIZE = 8;
 
 
 struct QuadTreeNode {
@@ -227,7 +227,13 @@ int CQuadtreeAtlasAlloc::GetNumTexLevels() const
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!root) return 0;
 	return std::min(
-		std::bit_width(static_cast<uint32_t>(root->GetMinSize())),
+		GetReqNumTexLevels(),
 		numLevels
 	);
+}
+
+int CQuadtreeAtlasAlloc::GetReqNumTexLevels() const
+{
+	if (!root) return 0;
+	return std::bit_width(static_cast<uint32_t>(root->GetMinSize()));
 }

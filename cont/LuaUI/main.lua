@@ -67,7 +67,7 @@ activePage = 0
 forceLayout = true
 
 
-function Update()
+function Update(dt)
   local currentPage = Spring.GetActivePage()
   if (forceLayout or (currentPage ~= activePage)) then
     Spring.ForceLayoutUpdate()  --  for the page number indicator
@@ -75,9 +75,9 @@ function Update()
   end
   activePage = currentPage
 
-  fontHandler.Update()
+  fontHandler.Update(dt)
 
-  widgetHandler:Update()
+  widgetHandler:Update(dt)
 
   return
 end

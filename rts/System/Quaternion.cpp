@@ -239,7 +239,7 @@ const CQuaternion& CQuaternion::AssertNormalized(const CQuaternion& q)
 
 bool CQuaternion::Normalized() const
 {
-	return math::fabs(1.0f - (r * r + x * x + y * y + z * z)) <= float3::cmp_eps();
+	return math::fabs(1.0f - (r * r + x * x + y * y + z * z)) <= float3::apx_eps();
 }
 
 CQuaternion& CQuaternion::Normalize()

@@ -9,7 +9,8 @@
 #include "S3OParser.h"
 #include "AssParser.h"
 #include "GLTFParser.h"
-#include "3DModelVAO.h"
+#include "3DModel.hpp"
+#include "3DModelVAO.hpp"
 #include "ModelsLock.h"
 #include "Game/GlobalUnsynced.h"
 #include "Rendering/Textures/S3OTextureHandler.h"
@@ -161,6 +162,7 @@ void CModelLoader::InitParsers() const
 	RECOIL_DETAILED_TRACY_ZONE;
 	g3DOParser.Init();
 	gS3OParser.Init();
+	gGLTFParser.Init();
 	gAssParser.Init();
 }
 
@@ -187,6 +189,7 @@ void CModelLoader::KillParsers() const
 	RECOIL_DETAILED_TRACY_ZONE;
 	g3DOParser.Kill();
 	gS3OParser.Kill();
+	gGLTFParser.Kill();
 	gAssParser.Kill();
 }
 
@@ -392,19 +395,12 @@ void CModelLoader::DrainPreloadFutures(uint32_t numAllowed)
 IModelParser* CModelLoader::GetFormatParser(const std::string& pathExt)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// cached record
-	static std::pair<std::string, IModelParser*> lastParser = {};
-
 	const std::string extension = StringToLower(pathExt);
-
-	if (lastParser.first == extension)
-		return lastParser.second;
 
 	const auto it = std::find_if(parsers.begin(), parsers.end(), [&extension](const auto& item) { return item.first == extension; });
 	if (it == parsers.end())
 		return nullptr;
 
-	lastParser = *it;
 	return it->second;
 }
 

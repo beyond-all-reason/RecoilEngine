@@ -8,6 +8,7 @@
 #include "Game/GlobalUnsynced.h"
 #include "Map/Ground.h"
 #include "Map/MapInfo.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Rendering/Env/Particles/Classes/BubbleProjectile.h"
 #include "Rendering/Env/Particles/Classes/GeoThermSmokeProjectile.h"
 #include "Rendering/Env/Particles/Classes/SmokeProjectile.h"
@@ -154,8 +155,6 @@ void CFeature::Initialize(const FeatureLoadParams& params)
 	RECOIL_DETAILED_TRACY_ZONE;
 	const CSolidObject* po = params.parentObj;
 
-	prevFrameNeedsUpdate = true;
-
 	def = params.featureDef;
 	udef = params.unitDef;
 
@@ -195,6 +194,7 @@ void CFeature::Initialize(const FeatureLoadParams& params)
 
 	// set position before mid-position
 	Move(((po == nullptr)? params.pos: po->pos).cClampInMap(), false);
+
 	// use base-class version, AddFeature() below
 	// will already insert us in the update-queue
 	CWorldObject::SetVelocity((po == nullptr)? params.speed: po->speed);
@@ -462,6 +462,7 @@ void CFeature::DependentDied(CObject *o)
 void CFeature::SetVelocity(const float3& v)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
 	CWorldObject::SetVelocity(v * moveCtrl.velocityMask);
 	CWorldObject::SetSpeed(v * moveCtrl.velocityMask);
 
@@ -477,10 +478,12 @@ void CFeature::SetVelocity(const float3& v)
 void CFeature::ForcedMove(const float3& newPos)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	// shouldn't rely on preFrameTra.t here, as ForcedMove can be called multiple times a synced frame
+	// and we better convey each movement separately
+	const float3 oldPos = pos;
 	// remove from managers
 	quadField.RemoveFeature(this);
-
-	prevFrameNeedsUpdate = true;
 
 	UnBlock();
 	Move(newPos - pos, true);
@@ -490,7 +493,7 @@ void CFeature::ForcedMove(const float3& newPos)
 	// (features are only Update()'d when in the FH queue)
 	UpdateTransformAndPhysState();
 
-	eventHandler.FeatureMoved(this, preFrameTra.t);
+	eventHandler.FeatureMoved(this, oldPos);
 
 	// insert into managers
 	quadField.AddFeature(this);
@@ -503,8 +506,6 @@ void CFeature::ForcedSpin(const float3& newDir)
 	// update local direction-vectors
 	CSolidObject::ForcedSpin(newDir);
 	UpdateTransform(pos, true);
-
-	prevFrameNeedsUpdate = true;
 }
 
 void CFeature::ForcedSpin(const float3& newFrontDir, const float3& newRightDir)
@@ -513,18 +514,21 @@ void CFeature::ForcedSpin(const float3& newFrontDir, const float3& newRightDir)
 	// update local direction-vectors
 	CSolidObject::ForcedSpin(newFrontDir, newRightDir);
 	UpdateTransform(pos, true);
-
-	prevFrameNeedsUpdate = true;
 }
 
+void CFeature::UpdateTransform(const float3& p, bool synced)
+{
+	transMatrix[synced] = std::move(ComposeMatrix(p));
+
+	if (synced)
+		CondUpdatePrevTransform();
+}
 
 void CFeature::UpdateTransformAndPhysState()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	UpdateDirVectors(!def->upright && IsOnGround(), true, 0.0f);
 	UpdateTransform(pos, true);
-
-	prevFrameNeedsUpdate = true;
 
 	UpdatePhysicalStateBit(CSolidObject::PSTATE_BIT_MOVING, (SetSpeed(speed) != 0.0f));
 	UpdatePhysicalState(0.1f);
@@ -584,7 +588,9 @@ bool CFeature::UpdateVelocity(
 bool CFeature::UpdatePosition()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	prevFrameNeedsUpdate = true;
+
+	// can't rely on preFrameTra.t here, as it's getting updated with every change of the position on creationFrame
+	const float3 oldPos = pos;
 	// const float4 oldSpd = speed;
 
 	if (moveCtrl.enabled) {
@@ -618,8 +624,8 @@ bool CFeature::UpdatePosition()
 	Block(); // does the check if wanted itself
 
 	// use an exact comparison for the y-component (gravity is small)
-	if (!pos.equals(preFrameTra.t, float3(float3::cmp_eps(), 0.0f, float3::cmp_eps()))) {
-		eventHandler.FeatureMoved(this, preFrameTra.t);
+	if (!pos.equals(oldPos, float3(float3::cmp_eps(), 0.0f, float3::cmp_eps())) || gs->frameNum == creationFrame) {
+		eventHandler.FeatureMoved(this, oldPos);
 		return true;
 	}
 
@@ -628,16 +634,7 @@ bool CFeature::UpdatePosition()
 	// nullify the vector to prevent visual extrapolation jitter
 	SetVelocityAndSpeed(mix({ZeroVector, 0.0f}, speed * moveCtrl.velocityMask, moveCtrl.enabled));
 
-	return (moveCtrl.enabled);
-}
-
-void CFeature::UpdatePrevFrameTransform()
-{
-	if (!prevFrameNeedsUpdate)
-		return;
-
-	preFrameTra = Transform{ CQuaternion::MakeFrom(GetTransformMatrix(true)), pos };
-	prevFrameNeedsUpdate = false;
+	return moveCtrl.enabled;
 }
 
 bool CFeature::Update()

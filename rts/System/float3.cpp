@@ -3,6 +3,7 @@
 #include "System/float3.h"
 
 #include <algorithm>
+#include <cstring>
 
 #include "System/creg/creg_cond.h"
 #include "System/SpringMath.h"
@@ -83,6 +84,11 @@ float3 float3::sign(const float3 v)
 bool float3::equals(const float3& f, const float3& eps) const
 {
 	return (epscmp(x, f.x, eps.x) && epscmp(y, f.y, eps.y) && epscmp(z, f.z, eps.z));
+}
+
+bool float3::binarySame(const float3& f) const
+{
+	return !std::memcmp(&x, &f.x, sizeof(float3));
 }
 
 float3 float3::snapToAxis() const {

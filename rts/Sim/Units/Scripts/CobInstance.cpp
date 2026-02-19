@@ -15,6 +15,9 @@
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Projectiles/PieceProjectile.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
+#include "Rendering/Models/3DModel.hpp"
+#include "Rendering/Models/3DModelPiece.hpp"
+#include "Rendering/Models/LocalModelPiece.hpp"
 #include "Rendering/Env/Particles/Classes/BubbleProjectile.h"
 #include "Rendering/Env/Particles/Classes/HeatCloudProjectile.h"
 #include "Rendering/Env/Particles/Classes/MuzzleFlame.h"
@@ -134,7 +137,10 @@ void CCobInstance::MapScriptToModelPieces(LocalModel* lmodel)
 	// clear the default assumed 1:1 mapping
 	for (size_t lmodelPieceNum = 0; lmodelPieceNum < lmodelPieces.size(); lmodelPieceNum++) {
 		lmodelPieces[lmodelPieceNum].SetScriptPieceIndex(-1);
+		if (!lmodelPieces[lmodelPieceNum].parent)
+			rootPiece = &lmodelPieces[lmodelPieceNum];
 	}
+	assert(rootPiece);
 	for (size_t scriptPieceNum = 0; scriptPieceNum < pieceNames.size(); scriptPieceNum++) {
 		unsigned int lmodelPieceNum;
 
@@ -446,7 +452,8 @@ void CCobInstance::AimShieldWeapon(CPlasmaRepulser* weapon)
 	std::array<int, 1 + MAX_COB_ARGS> callinArgs;
 
 	callinArgs[0] = 2;
-	callinArgs[1] = 0; // compat with AimWeapon (same script is called)
+	callinArgs[1] = 0; // heading - compat with AimWeapon (same script is called)
+	callinArgs[2] = 0; //   pitch - compat with AimWeapon (same script is called)
 
 	Call(COBFN_AimPrimary + COBFN_Weapon_Funcs * weapon->weaponNum, callinArgs, CBAimShield, weapon->weaponNum, nullptr);
 }

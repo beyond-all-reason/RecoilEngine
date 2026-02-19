@@ -7,7 +7,7 @@
 
 #include "WorldObject.h"
 #include "Lua/LuaRulesParams.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/LocalModel.hpp"
 #include "Sim/Misc/CollisionVolume.h"
 #include "System/Matrix44f.h"
 #include "System/type2.h"
@@ -19,6 +19,7 @@
 struct MoveDef;
 struct LocalModelPiece;
 struct SolidObjectDef;
+struct LuaObjectMaterialData;
 
 class DamageArray;
 class CUnit;
@@ -123,6 +124,7 @@ public:
 		DAMAGE_KILLED_LUA = 21
 	};
 
+	CSolidObject();
 	virtual ~CSolidObject() {}
 
 	void PostLoad();
@@ -137,7 +139,7 @@ public:
 
 	virtual const YardMapStatus* GetBlockMap() const { return nullptr; }
 
-	virtual void ForcedMove(const float3& newPos) {}
+	virtual void ForcedMove(const float3& newPos) = 0;
 	virtual void ForcedSpin(const float3& newDir);
 	virtual void ForcedSpin(const float3& newFrontDir, const float3& newRightDir);
 
@@ -158,7 +160,7 @@ public:
 	}
 
 
-	void SetDirVectorsEuler(const float3 angles);
+	void SetDirVectorsEuler(const float3& angles);
 	void SetDirVectors(const CMatrix44f& matrix) {
 		rightdir.x = -matrix[0]; updir.x = matrix[4]; frontdir.x = matrix[ 8];
 		rightdir.y = -matrix[1]; updir.y = matrix[5]; frontdir.y = matrix[ 9];
@@ -184,22 +186,16 @@ public:
 	void UpdateDirVectors(bool useGroundNormal, bool useObjectNormal, float dirSmoothing);
 	void UpdateDirVectors(const float3& uDir);
 
-	virtual void UpdatePrevFrameTransform() = 0;
+	void CondUpdatePrevTransform();
+	void UpdatePrevFrameTransform();
 
 	CMatrix44f ComposeMatrix(const float3& p) const { return (CMatrix44f(p, -rightdir, updir, frontdir)); }
 	virtual CMatrix44f GetTransformMatrix(bool synced = false, bool fullread = false) const = 0;
 
-	const CollisionVolume* GetCollisionVolume(const LocalModelPiece* lmp) const {
-		if (lmp == nullptr)
-			return &collisionVolume;
-		if (!collisionVolume.DefaultToPieceTree())
-			return &collisionVolume;
+	const CollisionVolume* GetCollisionVolume(const LocalModelPiece* lmp) const;
 
-		return (lmp->GetCollisionVolume());
-	}
-
-	const LuaObjectMaterialData* GetLuaMaterialData() const { return (localModel.GetLuaMaterialData()); }
-	      LuaObjectMaterialData* GetLuaMaterialData()       { return (localModel.GetLuaMaterialData()); }
+	const LuaObjectMaterialData* GetLuaMaterialData() const;
+	      LuaObjectMaterialData* GetLuaMaterialData();
 
 	const LocalModelPiece* GetLastHitPiece(int frame, int synced = true) const {
 		if (frame == pieceHitFrames[synced])
@@ -240,8 +236,8 @@ public:
 	float3 GetObjectSpaceDrawPos(const float3& p) const { return (drawPos + GetObjectSpaceVec(p)); }
 
 	// unsynced mid-{position,vector}s
-	float3 GetMdlDrawMidPos() const { return (GetObjectSpaceDrawPos(WORLD_TO_OBJECT_SPACE * localModel.GetRelMidPos())); }
-	float3 GetObjDrawMidPos() const { return (GetObjectSpaceDrawPos(WORLD_TO_OBJECT_SPACE *               relMidPos  )); }
+	float3 GetMdlDrawMidPos() const;
+	float3 GetObjDrawMidPos() const;
 
 
 	int2 GetMapPos() const { return (GetMapPos(pos)); }
@@ -253,7 +249,7 @@ public:
 	float3 GetDragAccelerationVec(float atmosphericDensity, float waterDensity, float dragCoeff, float frictionCoeff) const;
 	float3 GetWantedUpDir(bool useGroundNormal, bool useObjectNormal, float dirSmoothing) const;
 
-	float GetDrawRadius() const override { return (localModel.GetDrawRadius()); }
+	float GetDrawRadius() const override;
 	float CalcFootPrintMinExteriorRadius(float scale = 1.0f) const;
 	float CalcFootPrintMaxInteriorRadius(float scale = 1.0f) const;
 	float CalcFootPrintAxisStretchFactor() const;
@@ -392,8 +388,8 @@ public:
 	///< allyteam that this->team is part of
 	int allyteam = 0;
 
-	// the object could be spawned before the frame start (via cheats) or during the normal sim frame
-	bool prevFrameNeedsUpdate = true;
+	// useful to track the objects that just got created
+	int creationFrame = -1;
 
 	///< [i] := frame on which hitModelPieces[i] was last hit
 	int pieceHitFrames[2] = {-1, -1};

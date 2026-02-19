@@ -43,6 +43,7 @@ enum {
 	LUAFN_QueryBuildInfo,       // ( ) -> number piece
 	LUAFN_MoveFinished,         // ( piece, axis ) -> nil
 	LUAFN_TurnFinished,         // ( piece, axis ) -> nil
+	LUAFN_ScaleFinished,        // ( piece ) -> nil
 
 	// Weapon functions
 	LUAFN_QueryWeapon,   // ( ) -> number piece

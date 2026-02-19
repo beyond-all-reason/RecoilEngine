@@ -45,6 +45,7 @@
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/Features/FeatureDrawer.h"
+#include "Rendering/IconHandler.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Features/FeatureHandler.h"
@@ -299,8 +300,13 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetGroundDecalCreationFrame);
 	REGISTER_LUA_CFUNC(GetGroundDecalOwner);
 	REGISTER_LUA_CFUNC(GetGroundDecalType);
+	REGISTER_LUA_CFUNC(GetGroundDecalGlowParams);
+	REGISTER_LUA_CFUNC(GetGroundDecalUserData);
 
 	REGISTER_LUA_CFUNC(UnitIconGetDraw);
+	REGISTER_LUA_CFUNC(GetUnitIconData);
+	REGISTER_LUA_CFUNC(GetIconData);
+	REGISTER_LUA_CFUNC(GetAllIconDataArray);
 
 	REGISTER_LUA_CFUNC(GetSyncedGCInfo);
 	REGISTER_LUA_CFUNC(SolveNURBSCurve);
@@ -1354,6 +1360,150 @@ int LuaUnsyncedRead::UnitIconGetDraw(lua_State* L) {
 	return 1;
 }
 
+/*** Icon Data
+ *
+ * @class IconData
+ */
+
+/***
+ * @class TexCoords
+ * @field x0 number left coordinate in the normalized range
+ * @field x1 number right coordinate in the normalized range
+ * @field y0 number top coordinate in the normalized range
+ * @field y1 number bottom coordinate in the normalized range
+ * @field atlasIndex integer? Means the atlas page number in case the texture is arrayed or points to another sequential texture in other rare cases
+ */
+
+namespace Impl {
+	template<bool full>
+	void PushIconData(lua_State* L, const icon::IconData& iconData) {
+		lua_createtable(L, 0, 2 + 5 * !full);
+
+		/*** @field IconData.name string */
+		LuaPushNamedString(L, "name", iconData.GetName());
+		if constexpr (full) {
+			/*** @field IconData.fileName string? */
+			LuaPushNamedString(L, "fileName", iconData.GetFileName());
+			/*** @field IconData.size number? Relative size of the icon */
+			LuaPushNamedNumber(L, "size", iconData.GetSize());
+			/*** @field IconData.distance number? When squared used as a icon length multiplier */
+			LuaPushNamedNumber(L, "distance", iconData.GetDistance());
+			/*** @field IconData.radiusAdjust boolean? Controls whether the unit radius affects the icon size */
+			LuaPushNamedBool(L, "radiusAdjust", iconData.GetRadiusAdjust());
+
+			/*** @field IconData.srcTexCoords TexCoords? */
+			{
+				const auto& stc = iconData.GetSrcTexCoords();
+				lua_pushliteral(L, "srcTexCoords");
+				lua_createtable(L, 0, 4);
+
+				LuaPushNamedNumber(L, "x0", stc.x1);
+				LuaPushNamedNumber(L, "y0", stc.y1);
+				LuaPushNamedNumber(L, "x1", stc.x2);
+				LuaPushNamedNumber(L, "y1", stc.y2);
+
+				lua_rawset(L, -3);
+			}
+		}
+
+		/*** @field IconData.atlasTexCoords TexCoords atlasIndex points to $icons0 or $icons1 texture */
+		const auto& atc = iconData.GetTexCoords();
+		{
+			lua_pushliteral(L, "atlasTexCoords");
+			lua_createtable(L, 0, 5);
+
+			LuaPushNamedNumber(L, "x0", atc.x1);
+			LuaPushNamedNumber(L, "y0", atc.y1);
+			LuaPushNamedNumber(L, "x1", atc.x2);
+			LuaPushNamedNumber(L, "y1", atc.y2);
+			LuaPushNamedNumber(L, "atlasIndex", atc.pageNum);
+
+			lua_rawset(L, -3);
+		}
+	}
+
+	template<bool full>
+	int GetIconDataImpl(lua_State* L, size_t iconIdx) {
+		if (iconIdx == icon::INVALID_ICON_INDEX)
+			return 0;
+
+		const auto& iconData = icon::iconHandler.GetIconData(iconIdx);
+
+		PushIconData<full>(L, iconData);
+		return 1;
+	}
+}
+
+/*** Get unit icon data
+ *
+ * @function Spring.GetUnitIconData
+ * @param unitID number
+ * @param fullData boolean? (Default: false) Whether additional information about the icon is returned, otherwise only `name` and `atlasTexCoords` are returned
+ * @return IconData iconData
+ * @see Spring.GetIconData
+ */
+int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+	const auto fullData = luaL_optboolean(L, 2, false);
+
+	if (unit == nullptr)
+		return 0;
+
+	if (fullData)
+		return Impl::GetIconDataImpl<true >(L, unit->currentIconIndex);
+	else
+		return Impl::GetIconDataImpl<false>(L, unit->currentIconIndex);
+}
+
+/*** Get icon data
+ *
+ * @function Spring.GetIconData
+ * @param iconName string
+ * @param fullData boolean? (Default: false) Whether additional information about the icon is returned, otherwise only `name` and `atlasTexCoords` are returned
+ * @return IconData iconData
+ * @see Spring.GetUnitIconData
+ */
+int LuaUnsyncedRead::GetIconData(lua_State* L)
+{
+	const auto iconName = luaL_checkstring(L, 1);
+	const auto fullData = luaL_optboolean(L, 2, false);
+
+	const auto iconIdx = icon::iconHandler.GetIconIdx(iconName);
+
+	if (fullData)
+		return Impl::GetIconDataImpl<true >(L, iconIdx);
+	else
+		return Impl::GetIconDataImpl<false>(L, iconIdx);
+}
+
+/*** Get icon data
+ *
+ * @function Spring.GetAllIconDataArray
+ * @param fullData boolean? (Default: false) Whether additional information about each icon is returned, otherwise only `name` and `atlasTexCoords` are returned
+ * @return IconData[] iconDataList
+ * @see Spring.GetUnitIconData
+ * @see Spring.GetIconData
+ */
+int LuaUnsyncedRead::GetAllIconDataArray(lua_State* L)
+{
+	const auto fullData = luaL_optboolean(L, 1, false);
+
+	const auto& iconsData = icon::iconHandler.GetIconsData();
+
+	lua_createtable(L, iconsData.size(), 0);
+	for (size_t i = 0; i < iconsData.size(); ++i) {
+		const auto& iconData = iconsData[i];
+		if (fullData)
+			Impl::PushIconData<true >(L, iconData);
+		else
+			Impl::PushIconData<false>(L, iconData);
+
+		lua_rawseti(L, -2, i + 1);
+	}
+
+	return 1;
+}
 
 /***
  *
@@ -2725,14 +2875,14 @@ int LuaUnsyncedRead::GetCameraNames(lua_State* L)
 
 /***
  * @function Spring.GetCameraState
- * @param useReturns false
- * @return CameraState cameraState
+ * @param useTable false
+ * @return CameraName name
+ * @return any ... depends on the current controller mode.
  */
 /***
  * @function Spring.GetCameraState
- * @param useReturns true? (Default: `true`) Return multiple values instead of a table.
- * @return CameraName name
- * @return any ... depend on current controller mode.
+ * @param useTable true? (Default: `true`) Return a table instead of multiple values.
+ * @return CameraState cameraState
  */
 int LuaUnsyncedRead::GetCameraState(lua_State* L)
 {
@@ -4713,10 +4863,12 @@ int LuaUnsyncedRead::GetGroundDecalTextures(lua_State* L)
 	if (!lua_isnoneornil(L, 1))
 		isMainTex = luaL_checkboolean(L, 1);
 
+	const auto pushFileNames = luaL_optboolean(L, 2, false);
+
 	const auto& texNames = groundDecals->GetDecalTextures(isMainTex);
 	LuaUtils::PushStringVector(L, texNames);
 
-	if (!luaL_optboolean(L, 2, false))
+	if (!pushFileNames)
 		return 1;
 
 	const auto& texFileNames = groundDecals->GetDecalTextureFileNames(texNames);
@@ -4886,6 +5038,60 @@ int LuaUnsyncedRead::GetGroundDecalOwner(lua_State* L)
 		lua_pushnumber(L,                          so->id);
 
 	return 1;
+}
+
+/***
+ *
+ * @function Spring.GetGroundDecalGlowParams
+ * Gets the glow parameters of the ground decal.
+ * @param decalID integer
+ * @return number? glow Between 0 and 1
+ * @return number glowFalloff Between 0 and 1, per second
+ */
+int LuaUnsyncedRead::GetGroundDecalGlowParams(lua_State* L)
+{
+	const auto* decal = groundDecals->GetDecalById(luaL_checkint(L, 1));
+	if (!decal) {
+		return 0;
+	}
+
+	lua_pushnumber(L, decal->glow);
+	lua_pushnumber(L, decal->glowFalloff * GAME_SPEED);
+
+	//PushNumberContainerAsArray(L, decal->glowColorMap[0].rgba);
+	//PushNumberContainerAsArray(L, decal->glowColorMap[1].rgba);
+
+	return 2;
+}
+
+/***
+ *
+ * @function Spring.GetGroundDecalUserData
+ * Gets the user defined decal data.
+ * @param decalID integer
+ * @param udQuad integer vec4 index, must be within [0;1] for now
+ * @return number? x
+ * @return number y
+ * @return number z
+ * @return number w
+ */
+int LuaUnsyncedRead::GetGroundDecalUserData(lua_State* L)
+{
+	const auto* decal = groundDecals->GetDecalById(luaL_checkint(L, 1));
+	if (!decal) {
+		return 0;
+	}
+
+	const auto quad = static_cast<uint32_t>(luaL_checknumber(L, 2));
+	if (quad >= GroundDecal::NUM_USERDATA) {
+		return 0;
+	}
+
+	const float4& userData = decal->userDefined[quad];
+	for (size_t i = 0; i < 4; ++i)
+		lua_pushnumber(L, userData[i]);
+
+	return 4;
 }
 
 

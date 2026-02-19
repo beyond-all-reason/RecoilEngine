@@ -25,7 +25,7 @@
 // note that the same values for clients also need to be set here
 [GAME]
 {
-	MapName=;           // with .smf extension
+	MapName=;           // without any extension
 	GameType=Balanced Annihilation V6.81; // either primary mod NAME, rapid tag name or archive name
 	GameStartDelay=4;   // optional, in seconds (unsigned int), default: 4
 	                    // The number of seconds till the game starts,

@@ -10,6 +10,7 @@
 
 #include "System/Misc/TracyDefs.h"
 
+IGroundDecalDrawer* groundDecals = nullptr;
 
 CONFIG(bool, GroundDecals).defaultValue(true).headlessValue(false).description("Controls whether ground decals underneath buildings, unit tracks & footprints as well as ground scars from explosions will be rendered.");
 
@@ -31,27 +32,27 @@ void IGroundDecalDrawer::Init()
 void IGroundDecalDrawer::FreeInstance()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (singleton)
-		spring::SafeDelete(singleton);
+	if (groundDecals)
+		spring::SafeDelete(groundDecals);
 }
 
 void IGroundDecalDrawer::SetDrawDecals(bool v)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
-	if (singleton && v == GetDrawDecals())
+	if (groundDecals && v == GetDrawDecals())
 		return;
 
 	FreeInstance();
 
 	hasDecals = v;
-	assert(!singleton);
+	assert(!groundDecals);
 	if (IGroundDecalDrawer::GetDrawDecals()) {
-		singleton = new CGroundDecalHandler();
+		groundDecals = new CGroundDecalHandler();
 		LOG_L(L_INFO, "Loaded DecalsDrawer: %s", "standard");
 	}
 	else {
-		singleton = new NullGroundDecalDrawer();
+		groundDecals = new NullGroundDecalDrawer();
 		LOG_L(L_INFO, "Loaded DecalsDrawer: %s", "null");
 	}
 

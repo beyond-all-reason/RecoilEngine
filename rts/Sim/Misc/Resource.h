@@ -37,8 +37,10 @@ public:
 		return *this;
 	}
 
-	decltype(std::begin(res)) begin() { return std::begin(res); }
-	decltype(std::end(res)) end() { return std::end(res); }
+	auto begin()       { return std::begin(res); }
+	auto   end()       { return std::  end(res); }
+	auto begin() const { return std::begin(res); }
+	auto   end() const { return std::  end(res); }
 
 	float& operator[](const size_t i) {
 		return res[i];

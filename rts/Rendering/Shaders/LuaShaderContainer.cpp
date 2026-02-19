@@ -5,6 +5,7 @@
 #include "Lua/LuaUtils.h"
 #include "Lua/LuaUnsyncedCtrl.h"
 #include "Lua/LuaUnsyncedRead.h"
+#include "Lua/LuaVFS.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
@@ -170,6 +171,10 @@ bool LoadFromLua(Shader::IProgramObject* program, const std::string& filename)
 	p.AddFunc("GetConfigString",  LuaUnsyncedRead::GetConfigString);
 	p.AddFunc("GetLosViewColors", LuaUnsyncedRead::GetLosViewColors);
 	p.AddFunc("GetSelectedUnitsCount", LuaUnsyncedRead::GetSelectedUnitsCount);
+	p.EndTable();
+
+	p.GetTable("VFS");
+	p.PushFunc(LuaVFS::PushUnsynced);
 	p.EndTable();
 
 	if (!p.Execute()) {

@@ -8,19 +8,22 @@
 #include <cctype>
 #include <cmath>
 
+#include <fmt/format.h>
+
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "System/Log/ILog.h"
+#include "System/UnorderedSet.hpp"
+#include "System/UnorderedMap.hpp"
+#include "System/StringUtil.h"
 #include "Lua/LuaParser.h"
 #include "Textures/Bitmap.h"
+#include "Textures/TextureRenderAtlas.h"
 #include "System/Exceptions.h"
 
 namespace icon {
 
 CIconHandler iconHandler;
-
-static CIconData dummyIconData[CIconHandler::ICON_DATA_OFFSET];
-
 
 /******************************************************************************/
 //
@@ -29,331 +32,281 @@ static CIconData dummyIconData[CIconHandler::ICON_DATA_OFFSET];
 
 void CIconHandler::Kill()
 {
-	glDeleteTextures(1, &defTexID);
+	defaultIconIdx = INVALID_ICON_INDEX;
 
-	defTexID = 0;
-	numIcons = 0;
+	glDeleteTextures(2, atlasTextureIDs.data());
+	atlasTextureIDs = { 0 };
+	atlasTextureSizes = { int2{0, 0}, int2{0, 0} };
 
-	dummyIconData[ SAFETY_DATA_IDX] = {};
-	dummyIconData[DEFAULT_DATA_IDX] = {};
+	atlases = { nullptr };
+	atlasNeedsUpdate = { false };
 
-	iconMap.clear();
-
-	for (CIconData& id: iconData) {
-		id = {};
-	}
+	iconsMap.clear();
+	iconsData.clear();
 }
 
 
-bool CIconHandler::LoadIcons(const std::string& filename)
+void CIconHandler::DumpAtlasTextures() const
+{
+	if (atlasTextureIDs[0]) {
+		for (int level = 0; level < DEFAULT_NUM_OF_TEXTURE_LEVELS; ++level) {
+			glSaveTexture(atlasTextureIDs[0], fmt::format("IconsAtlas1-{}.png", level).c_str(), level);
+		}
+	}
+	if (atlasTextureIDs[1]) {
+		for (int level = 0; level < DEFAULT_NUM_OF_TEXTURE_LEVELS; ++level) {
+			glSaveTexture(atlasTextureIDs[1], fmt::format("IconsAtlas2-{}.png", level).c_str(), level);
+		}
+	}
+}
+
+bool CIconHandler::UpdateAtlasData(size_t atlasIdx)
+{
+	auto& atlas = atlases[atlasIdx];
+	if (atlas)
+		return true;
+
+	atlas = std::make_unique<CTextureRenderAtlas>(CTextureAtlas::ATLAS_ALLOC_LEGACY, 0, 0, DEFAULT_NUM_OF_TEXTURE_LEVELS, GL_RGBA8, IntToString(atlasIdx, "IconsAtlas_%i"));
+
+	spring::unordered_set<std::string> invalidIcons;
+	for (const auto& [iconName, iconIndex] : iconsMap) {
+
+		const auto& iconData = iconsData[iconIndex];
+
+		if (iconData.GetAtlasIndex() != atlasIdx)
+			continue;
+
+		if (!atlas->AddTexFromFile(iconName, iconData.GetFileName(), iconData.GetSrcTexCoords())) {
+			LOG_L(L_WARNING, "[CIconHandler::%s] Failed to load icon=%s, bitmap=%s", __func__, iconName.c_str(), iconData.GetFileName().c_str());
+			invalidIcons.emplace(iconName);
+		}
+	}
+
+	// everything above was loaded from a single image atlas, no need to run CTextureRenderAtlas machinery
+	if (auto allFiles = atlas->GetAllFileNames(); allFiles.size() == 1) {
+		const auto& uniqueSubTexMap = atlas->GetUniqueSubTexMap();
+		for (const auto& [iconName, uniqSubTexName] : atlas->GetNameToUniqueSubTexMap()) {
+			auto it = uniqueSubTexMap.find(uniqSubTexName);
+			auto& item = iconsData[*iconsMap.try_get(iconName)];
+			item.SetTexCoords(AtlasedTexture{ it->second.subTexCoords, 0 });
+		}
+	}
+
+	if (auto it = invalidIcons.find("default"); it != invalidIcons.end()) {
+		bool res = atlas->AddTexFromFile("default", "bitmaps/defaultradardot.png");
+		assert(res);
+		invalidIcons.erase(it);
+	}
+
+	if (!atlas->CalculateAtlas()) {
+		atlas = nullptr;
+		return false;
+	}
+
+	for (const auto& [iconName, _] : atlas->GetNameToUniqueSubTexMap()) {
+		auto& item = iconsData[*iconsMap.try_get(iconName)];
+		item.SetTexCoords(atlas->GetTexture(iconName));
+	}
+
+	const auto& defTC = iconsData[defaultIconIdx].GetTexCoords();
+	for (const auto& iconName : invalidIcons) {
+		auto& item = iconsData[*iconsMap.try_get(iconName)];
+		item.SetTexCoords(defTC);
+	}
+
+	return true;
+}
+
+bool CIconHandler::CreateAtlasTexture(size_t atlasIdx)
+{
+	auto& atlas = atlases[atlasIdx];
+
+	if (!atlas)
+		return false;
+
+	if (auto allFiles = atlas->GetAllFileNames(); allFiles.size() == 1) {
+		CBitmap bm;
+
+		if (!bm.Load(*allFiles.begin()))
+			return false;
+
+		glDeleteTextures(1, &atlasTextureIDs[atlasIdx]);
+		atlasTextureIDs[atlasIdx] = 0; // just in case
+		atlasTextureIDs[atlasIdx] = bm.CreateMipMapTexture();
+		atlasTextureSizes[atlasIdx] = int2(bm.xsize, bm.ysize);
+
+		return true;
+	}
+
+	if (!atlas->CreateAtlasTexture())
+		return false;
+
+	atlasTextureSizes[atlasIdx] = atlas->GetAtlasSize();
+
+	if (atlasTextureIDs[atlasIdx]) {
+		glDeleteTextures(1, &atlasTextureIDs[atlasIdx]);
+		atlasTextureIDs[atlasIdx] = 0; // just in case
+	}
+
+	atlasTextureIDs[atlasIdx] = atlas->DisownTexture();
+	atlas = nullptr;
+
+	return true;
+}
+
+void CIconHandler::LoadIcons(const std::string& filename)
 {
 	LuaParser luaParser(filename, SPRING_VFS_MOD_BASE, SPRING_VFS_MOD_BASE);
 
 	if (!luaParser.Execute())
-		LOG_L(L_WARNING, "%s: %s", filename.c_str(), luaParser.GetErrorLog().c_str());
+		throw content_error(fmt::format("{}: {}", filename, luaParser.GetErrorLog()));
 
 	const LuaTable iconTypes = luaParser.GetRoot();
 
 	std::vector<std::string> iconNames;
 	iconTypes.GetKeys(iconNames);
 
-	dummyIconData[ SAFETY_DATA_IDX] = {};
-	dummyIconData[DEFAULT_DATA_IDX] = {"default", GetDefaultTexture(), 1.0f, 1.0f, false, false, DEFAULT_TEX_SIZE_X, DEFAULT_TEX_SIZE_Y};
-
-	for (const std::string& iconName : iconNames) {
-		const LuaTable iconTable = iconTypes.SubTable(iconName);
-
-		AddIcon(
+	for (const auto& iconName : iconNames) {
+		const auto iconTable = iconTypes.SubTable(iconName);
+		AddIcon(0,
 			iconName,
-			iconTable.GetString("bitmap",       ""),
-			iconTable.GetFloat ("size",         1.0f),
-			iconTable.GetFloat ("distance",     1.0f),
-			iconTable.GetBool  ("radiusAdjust", false)
+			iconTable.GetString("bitmap", ""),
+			iconTable.GetFloat("size", 1.0f),
+			iconTable.GetFloat("distance", 1.0f),
+			iconTable.GetBool("radiusAdjust", false),
+			iconTable.GetFloat("u0", 0.0f),
+			iconTable.GetFloat("v0", 0.0f),
+			iconTable.GetFloat("u1", 1.0f),
+			iconTable.GetFloat("v1", 1.0f)
 		);
 	}
 
-	const auto it = iconMap.find("default");
+	atlasNeedsUpdate.set(0);
 
-	if (it != iconMap.end()) {
-		dummyIconData[DEFAULT_DATA_IDX].CopyData(GetIconData(it->second.dataIdx));
-		dummyIconData[DEFAULT_DATA_IDX].SwapOwner(GetIconDataMut(it->second.dataIdx));
-	} else {
-		iconMap["default"] = CIcon(DEFAULT_DATA_IDX);
-	}
-
-	return true;
+	// force Update()
+	Update();
 }
 
-
 bool CIconHandler::AddIcon(
+	uint32_t atlasIndex,
 	const std::string& iconName,
-	const std::string& texName,
+	const std::string& texFileName,
 	float size,
 	float distance,
-	bool radAdj
+	bool radAdj,
+	float u0, float v0, float u1, float v1
 ) {
-	if (numIcons == iconData.size()) {
-		LOG_L(L_DEBUG, "[IconHandler::%s] too many icons added (maximum=%u)", __func__, numIcons);
-		return false;
-	}
-
-	unsigned int texID = 0;
-	unsigned int xsize = 0;
-	unsigned int ysize = 0;
-
-	bool ownTexture = true;
-
-	try {
-		CBitmap bitmap;
-
-		if ((ownTexture = !texName.empty() && bitmap.Load(texName))) {
-			texID = bitmap.CreateMipMapTexture();
-
-			glBindTexture(GL_TEXTURE_2D, texID);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			xsize = bitmap.xsize;
-			ysize = bitmap.ysize;
-		} else {
-			texID = GetDefaultTexture();
-			xsize = DEFAULT_TEX_SIZE_X;
-			ysize = DEFAULT_TEX_SIZE_Y;
-		}
-	} catch (const content_error& ex) {
-		// bail on non-existent file
-		LOG_L(L_DEBUG, "[IconHandler::%s] exception \"%s\" adding icon \"%s\" with texture \"%s\"", __func__, ex.what(), iconName.c_str(), texName.c_str());
-		return false;
-	}
-
-	const auto it = iconMap.find(iconName);
-
-	if (it != iconMap.end())
+	auto it = iconsMap.find(iconName);
+	if (it != iconsMap.end()) {
 		FreeIcon(iconName);
-
-	// data must be constructed first since CIcon's ctor will Ref() it
-	iconData[numIcons] = {iconName, texID,  size, distance, radAdj, ownTexture, xsize, ysize};
-	// indices 0 and 1 are reserved
-	iconMap[iconName] = CIcon(ICON_DATA_OFFSET + numIcons++);
-
-	if (iconName == "default") {
-		dummyIconData[DEFAULT_DATA_IDX].CopyData(&iconData[numIcons - 1]);
-		dummyIconData[DEFAULT_DATA_IDX].SwapOwner(&iconData[numIcons - 1]);
+	} else {
+		it = iconsMap.emplace(iconName, iconsData.size()).first;
+		iconsData.emplace_back();
 	}
 
-	return true;
+	iconsData[it->second] = IconData{
+		iconName,
+		texFileName,
+		size,
+		distance,
+		atlasIndex,
+		radAdj,
+		float4{u0, v0, u1, v1}
+	};
+
+	// do basic check instead of the full load procedure
+	return CFileHandler::FileExists(texFileName, SPRING_VFS_ALL);
 }
 
 
 bool CIconHandler::FreeIcon(const std::string& iconName)
 {
-	const auto it = iconMap.find(iconName);
-
-	if (it == iconMap.end())
-		return false;
 	if (iconName == "default")
 		return false;
 
-	// fill with default data (TODO: reuse freed slots)
-	GetIconDataMut(it->second.dataIdx)->CopyData(&dummyIconData[DEFAULT_DATA_IDX]);
+	auto it = iconsMap.find(iconName);
 
-	iconMap.erase(iconName);
+	if (it == iconsMap.end())
+		return false;
+
+	if (const auto& ai = iconsData[it->second].GetAtlasIndex(); ai > 0) {
+		atlasNeedsUpdate.set(ai);
+	}
+
+	iconsData[it->second] = IconData{};
+	it->second = defaultIconIdx;
+
 	return true;
 }
 
-
-CIcon CIconHandler::GetIcon(const std::string& iconName) const
+void CIconHandler::Update()
 {
-	const auto it = iconMap.find(iconName);
+	if (atlasNeedsUpdate.none())
+		return;
 
-	if (it == iconMap.end())
-		return GetDefaultIcon();
-
-	return it->second;
-}
-
-const CIconData* CIconHandler::GetSafetyIconData() { return &dummyIconData[SAFETY_DATA_IDX]; }
-const CIconData* CIconHandler::GetDefaultIconData() { return &dummyIconData[DEFAULT_DATA_IDX]; }
-
-
-unsigned int CIconHandler::GetDefaultTexture()
-{
-	// FIXME: just use a PNG ?
-
-	if (defTexID != 0)
-		return defTexID;
-
-	unsigned char si[DEFAULT_TEX_SIZE_X * DEFAULT_TEX_SIZE_Y * 4];
-	for (int y = 0; y < DEFAULT_TEX_SIZE_Y; ++y) {
-		for (int x = 0; x < DEFAULT_TEX_SIZE_X; ++x) {
-			const int index = ((y * DEFAULT_TEX_SIZE_X) + x) * 4;
-			const int dx = (x - 64);
-			const int dy = (y - 64);
-			const float r = std::sqrt((dx * dx) + (dy * dy)) / 64.0f;
-			if (r > 1.0f) {
-				si[index + 0] = 0;
-				si[index + 1] = 0;
-				si[index + 2] = 0;
-				si[index + 3] = 0;
-			} else {
-				const unsigned char val = (unsigned char)(255 - (r * r * r * 255));
-				si[index + 0] = val;
-				si[index + 1] = val;
-				si[index + 2] = val;
-				si[index + 3] = 255;
+	auto defIt = iconsMap.find("default");
+	if (defIt == iconsMap.end()) {
+		defIt = iconsMap.emplace("default", iconsData.size()).first;
+		iconsData.emplace_back(
+			"default",
+			"bitmaps/defaultradardot.png",
+			1.0f,
+			1.0f,
+			0,
+			false,
+			float4{
+				0.0f,
+				0.0f,
+				1.0f,
+				1.0f
 			}
-		}
+		);
 	}
 
-	CBitmap bitmap(si, DEFAULT_TEX_SIZE_X, DEFAULT_TEX_SIZE_Y);
+	defaultIconIdx = defIt->second;
 
-	glBindTexture(GL_TEXTURE_2D, defTexID = bitmap.CreateTexture());
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	for (size_t i = 0; i < atlasNeedsUpdate.size(); ++i) {
+		if (!atlasNeedsUpdate.test(i))
+			continue;
 
-	return defTexID;
-}
-
-
-
-/******************************************************************************/
-//
-//  CIcon
-//
-
-CIcon::CIcon()
-{
-	CIconData* data = nullptr;
-
-	// use default data if handler is initialized
-	if (iconHandler.defTexID != 0) {
-		data = &dummyIconData[dataIdx = CIconHandler::DEFAULT_DATA_IDX];
-	} else {
-		data = &dummyIconData[dataIdx = CIconHandler::SAFETY_DATA_IDX];
+		if (UpdateAtlasData(i) && CreateAtlasTexture(i))
+			atlasNeedsUpdate.reset(i);
 	}
-
-	data->Ref();
 }
 
-
-CIcon::CIcon(unsigned int idx)
+std::pair<bool, spring::unordered_map<std::string, size_t>::const_iterator> CIconHandler::FindIconIdx(const std::string& iconName) const
 {
-	iconHandler.GetIconDataMut(dataIdx = idx)->Ref();
+	const auto it = iconsMap.find(iconName);
+	return std::make_pair(it != iconsMap.end(), it);
 }
 
-CIcon::CIcon(const CIcon& icon)
+const IconData& CIconHandler::GetIconData(const std::string& iconName) const
 {
-	iconHandler.GetIconDataMut(dataIdx = icon.dataIdx)->Ref();
+	const auto* ptrIconIdx = iconsMap.try_get(iconName);
+	assert(ptrIconIdx != nullptr && (*ptrIconIdx) < iconsData.size());
+	return iconsData[*ptrIconIdx];
 }
 
-CIcon::~CIcon()
+const IconData& CIconHandler::GetIconData(size_t iconIdx) const
 {
-	// NB: icons can outlive the handler
-	UnRefData(&iconHandler);
+	assert(iconIdx < iconsData.size());
+	return iconsData[iconIdx];
 }
 
-
-CIcon& CIcon::operator=(const CIcon& icon)
+size_t CIconHandler::GetIconIdx(const std::string& iconName) const
 {
-	if (dataIdx != icon.dataIdx) {
-		CIconData* iconData = iconHandler.GetIconDataMut(dataIdx);
-
-		iconData->UnRef();
-		iconData = iconHandler.GetIconDataMut(dataIdx = icon.dataIdx);
-		iconData->Ref();
-	}
-
-	return *this;
+	if (const auto& [found, it] = FindIconIdx(iconName); found)
+		return it->second;
+	else
+		return INVALID_ICON_INDEX;
 }
 
-
-void CIcon::UnRefData(CIconHandler* ih) {
-	if (ih != nullptr)
-		ih->GetIconDataMut(dataIdx)->UnRef();
-
-	dataIdx = CIconHandler::SAFETY_DATA_IDX;
-}
-
-const CIconData* CIcon::operator->()  const { return iconHandler.GetIconData(dataIdx); }
-const CIconData* CIcon::GetIconData() const { return iconHandler.GetIconData(dataIdx); }
-
-
-
-
-
-
-/******************************************************************************/
-//
-//  CIconData
-//
-
-CIconData::CIconData(
-	const std::string& _name,
-	unsigned int _texID,
-	float _size,
-	float _distance,
-	bool radAdj,
-	bool ownTex,
-	unsigned int _xsize,
-	unsigned int _ysize
-)
-	: name(_name)
-	, refCount(0)
-
-	, texID(_texID)
-	, xsize(_xsize)
-	, ysize(_ysize)
-
-	, size(_size)
-	, distance(_distance)
-	, distSqr(distance * distance)
-
-	, ownTexture(ownTex)
-	, radiusAdjust(radAdj)
+size_t CIconHandler::GetIconIdxOrDefault(const std::string& iconName) const
 {
-}
-
-CIconData::~CIconData()
-{
-	if (ownTexture) {
-		#ifndef HEADLESS
-		assert(texID != 0);
-		#endif
-		glDeleteTextures(1, &texID);
-	}
-
-	texID = 0;
-}
-
-
-void CIconData::CopyData(const CIconData* iconData)
-{
-	name         = iconData->name;
-	texID        = iconData->texID;
-	size         = iconData->size;
-	distance     = iconData->distance;
-	distSqr      = iconData->distSqr;
-	radiusAdjust = iconData->radiusAdjust;
-	xsize        = iconData->xsize;
-	ysize        = iconData->ysize;
-	ownTexture   = false;
-}
-
-void CIconData::BindTexture() const
-{
-	glBindTexture(GL_TEXTURE_2D, texID);
-}
-
-
-void CIconData::Draw(float x0, float y0, float x1, float y1) const
-{
-	glBindTexture(GL_TEXTURE_2D, texID);
-	glBegin(GL_QUADS);
-	glTexCoord2f(0.0f, 0.0f); glVertex2f(x0, y0);
-	glTexCoord2f(1.0f, 0.0f); glVertex2f(x1, y0);
-	glTexCoord2f(1.0f, 1.0f); glVertex2f(x1, y1);
-	glTexCoord2f(0.0f, 1.0f); glVertex2f(x0, y1);
-	glEnd();
+	if (const auto& [found, it] = FindIconIdx(iconName); found)
+		return it->second;
+	else
+		return defaultIconIdx;
 }
 
 }
-

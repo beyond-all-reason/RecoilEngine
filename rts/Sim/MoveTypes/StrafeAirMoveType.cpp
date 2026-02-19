@@ -520,8 +520,10 @@ bool CStrafeAirMoveType::Update()
 			break;
 		case AIRCRAFT_CRASHING: {
 			// NOTE: the crashing-state can only be set (and unset) by scripts
-			if (UpdateAirPhysics({crashRudder, crashElevator, crashAileron, 0.0f}, owner->frontdir))
+			if (UpdateAirPhysics({crashRudder, crashElevator, crashAileron, 0.0f}, owner->frontdir)
+					|| (CGround::GetHeightAboveWater(owner->pos.x, owner->pos.z) + 5.0f + owner->radius) > owner->pos.y){
 				owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
+			}
 
 			amtEmitCrashTrailFuncs[crashExpGenID != -1u](owner, crashExpGenID);
 		} break;

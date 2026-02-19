@@ -56,7 +56,6 @@
 #include "Rendering/GL/myGL.h"
 #include "Rendering/CommandDrawer.h"
 #include "Rendering/IconHandler.h"
-#include "Rendering/Models/3DModel.h"
 #include "Rendering/Models/IModelParser.h"
 #include "Rendering/Features/FeatureDrawer.h"
 #include "Rendering/Units/UnitDrawer.h"
@@ -102,7 +101,7 @@
 #include <cfloat>
 #include <cinttypes>
 
-#include <fstream>
+#include <nowide/fstream.hpp>
 
 #include <SDL_keyboard.h>
 #include <SDL_clipboard.h>
@@ -324,6 +323,8 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetGroundDecalTint);
 	REGISTER_LUA_CFUNC(SetGroundDecalMisc);
 	REGISTER_LUA_CFUNC(SetGroundDecalCreationFrame);
+	REGISTER_LUA_CFUNC(SetGroundDecalGlowParams);
+	REGISTER_LUA_CFUNC(SetGroundDecalUserData);
 
 	REGISTER_LUA_CFUNC(SDLSetTextInputRect);
 	REGISTER_LUA_CFUNC(SDLStartTextInput);
@@ -333,7 +334,9 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetWindowMinimized);
 	REGISTER_LUA_CFUNC(SetWindowMaximized);
 	REGISTER_LUA_CFUNC(SetMiniMapRotation);
-	
+
+	REGISTER_LUA_CFUNC(RequestStartPosition);
+
 	REGISTER_LUA_CFUNC(Yield);
 
 	return true;
@@ -716,6 +719,32 @@ int LuaUnsyncedCtrl::SendMessageToAllyTeam(lua_State* L)
 {
 	if (luaL_checkint(L, 1) == gu->myAllyTeam)
 		PrintMessage(L, luaL_checksstring(L, 2));
+
+	return 0;
+}
+
+/*** @function Spring.RequestStartPosition
+ *
+ * Requests a startpoint, as if clicking the spot with the native GUI.
+ *
+ * @param x number
+ * @param y number
+ * @param z number
+ * @param ready? boolean
+ */
+int LuaUnsyncedCtrl::RequestStartPosition(lua_State* L) {
+	const float3 pickPos =
+		{ luaL_checkfloat(L, 1)
+		, luaL_checkfloat(L, 2)
+		, luaL_checkfloat(L, 3)
+	};
+	const bool isReady = luaL_optboolean(L, 4, playerHandler.Player(gu->myPlayerNum)->IsReadyToStart());
+
+	const int readyState = isReady
+		? CPlayer::PLAYER_RDYSTATE_READIED
+		: CPlayer::PLAYER_RDYSTATE_UPDATED
+	;
+	clientNet->Send(CBaseNetProtocol::Get().SendStartPos(gu->myPlayerNum, gu->myTeam, readyState, pickPos.x, pickPos.y, pickPos.z));
 
 	return 0;
 }
@@ -2456,6 +2485,10 @@ int LuaUnsyncedCtrl::SetFeatureSelectionVolumeData(lua_State* L)
  * @param size number?
  * @param dist number?
  * @param radAdjust number?
+ * @param u0 number?
+ * @param v0 number?
+ * @param u1 number?
+ * @param v1 number?
  *
  * @return boolean added
  */
@@ -2464,15 +2497,21 @@ int LuaUnsyncedCtrl::AddUnitIcon(lua_State* L)
 	if (CLuaHandle::GetHandleSynced(L))
 		return 0;
 
-	const string iconName  = luaL_checkstring(L, 1);
-	const string texName   = luaL_checkstring(L, 2);
+	const string iconName = luaL_checkstring(L, 1);
+	const string texName = luaL_checkstring(L, 2);
 
-	const float  size      = luaL_optnumber(L, 3, 1.0f);
-	const float  dist      = luaL_optnumber(L, 4, 1.0f);
+	const float  size = luaL_optnumber(L, 3, 1.0f);
+	const float  dist = luaL_optnumber(L, 4, 1.0f);
 
 	const bool   radAdjust = luaL_optboolean(L, 5, false);
 
-	lua_pushboolean(L, icon::iconHandler.AddIcon(iconName, texName, size, dist, radAdjust));
+	const float  u0 = luaL_optnumber(L, 6, 0.0f);
+	const float  v0 = luaL_optnumber(L, 7, 0.0f);
+
+	const float  u1 = luaL_optnumber(L, 8, 1.0f);
+	const float  v1 = luaL_optnumber(L, 9, 1.0f);
+
+	lua_pushboolean(L, icon::iconHandler.AddIcon(1, iconName, texName, size, dist, radAdjust, u0, v0, u1, v1));
 	return 1;
 }
 
@@ -2546,26 +2585,34 @@ int LuaUnsyncedCtrl::SetUnitDefIcon(lua_State* L)
 	if (ud == nullptr)
 		return 0;
 
-	ud->iconType = icon::iconHandler.GetIcon(luaL_checksstring(L, 2));
+	const auto iconName = luaL_checksstring(L, 2);
+	const auto& [found, _] = icon::iconHandler.FindIconIdx(iconName);
+
+	if (!found) {
+		luaL_error(L, "Invalid icon name \"%s\"", iconName.c_str());
+		return 0;
+	}
+
+	ud->iconName = iconName;
 
 	// set decoys to the same icon
 	if (ud->decoyDef != nullptr)
-		ud->decoyDef->iconType = ud->iconType;
+		ud->decoyDef->iconName = ud->iconName;
 
 	// spring::unordered_map<int, std::vector<int> >
 	const auto& decoyMap = unitDefHandler->GetDecoyDefIDs();
-	const auto decoyMapIt = decoyMap.find((ud->decoyDef != nullptr)? ud->decoyDef->id: ud->id);
+	const auto decoyMapIt = decoyMap.find((ud->decoyDef != nullptr) ? ud->decoyDef->id : ud->id);
 
 	if (decoyMapIt != decoyMap.end()) {
 		const auto& decoySet = decoyMapIt->second;
 
-		for (const int decoyDefID: decoySet) {
+		for (const int decoyDefID : decoySet) {
 			const UnitDef* decoyDef = unitDefHandler->GetUnitDefByID(decoyDefID);
-			decoyDef->iconType = ud->iconType;
+			decoyDef->iconName = ud->iconName;
 		}
 	}
 
-	unitDrawer->UpdateUnitDefMiniMapIcons(ud);
+	unitDrawer->UpdateUnitIconsByUnitDef(ud);
 	return 0;
 }
 
@@ -2663,7 +2710,7 @@ int LuaUnsyncedCtrl::ExtractModArchiveFile(lua_State* L)
 
 
 	std::vector<uint8_t> buffer;
-	std::fstream fstr(path.c_str(), std::ios::out | std::ios::binary);
+	nowide::fstream fstr(path.c_str(), std::ios::out | std::ios::binary);
 
 	if (!vfsFile.IsBuffered()) {
 		buffer.resize(vfsFile.FileSize(), 0);
@@ -3222,7 +3269,7 @@ static int ReloadOrRestart(const std::string& springArgs, const std::string& scr
 
 	if (!scriptText.empty()) {
 		// create file 'script.txt' with contents given by Lua code
-		std::ofstream scriptFile(scriptFullName.c_str());
+		nowide::ofstream scriptFile(scriptFullName.c_str());
 
 		scriptFile.write(scriptText.c_str(), scriptText.size());
 		scriptFile.close();
@@ -3839,6 +3886,7 @@ int LuaUnsyncedCtrl::SetLastMessagePosition(lua_State* L)
  * @param z number
  * @param text string? (Default: `""`)
  * @param localOnly boolean?
+ * @param playerID number? Local labels pretend they are from this player
  * @return nil
  */
 int LuaUnsyncedCtrl::MarkerAddPoint(lua_State* L)
@@ -5062,6 +5110,67 @@ int LuaUnsyncedCtrl::SetGroundDecalCreationFrame(lua_State* L)
 	return 1;
 }
 
+/***
+ *
+ * @function Spring.SetGroundDecalGlowParams
+ *
+ * Set decal glow parameters
+ *
+ * @param decalID integer
+ * @param glow number? Between 0 and 1 (Default: currGlow)
+ * @param glowFalloff number? Between 0 and 1, per second (Default: currGlowFallOff)
+ * @return boolean decalSet
+ */
+int LuaUnsyncedCtrl::SetGroundDecalGlowParams(lua_State* L)
+{
+	auto* decal = groundDecals->GetDecalById(luaL_checkint(L, 1));
+	if (!decal) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	decal->glow = luaL_optfloat(L, 2, decal->glow);
+	decal->glowFalloff = luaL_optfloat(L, 3, decal->glowFalloff * GAME_SPEED) / GAME_SPEED;
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+/***
+ *
+ * @function Spring.SetGroundDecalUserData
+ *
+ * Set decal user data. Useful in conjunction with custom decal shaders
+ *
+ * @param decalID integer
+ * @param udQuad integer vec4 index, must be within [0;1] for now
+ * @param x number? Any valid Lua float number (Default: current data)
+ * @param y number? Any valid Lua float number (Default: current data)
+ * @param z number? Any valid Lua float number (Default: current data)
+ * @param w number? Any valid Lua float number (Default: current data)
+ * @return boolean decalSet
+ */
+int LuaUnsyncedCtrl::SetGroundDecalUserData(lua_State* L)
+{
+	auto* decal = groundDecals->GetDecalById(luaL_checkint(L, 1));
+	if (!decal) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	const auto quad = static_cast<uint32_t>(luaL_checknumber(L, 2));
+	if (quad >= GroundDecal::NUM_USERDATA) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	float4& userData = decal->userDefined[quad];
+	for (size_t i = 0; i < 4; ++i)
+		userData[i] = luaL_optfloat(L, 3 + i, userData[i]);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
 
 /******************************************************************************
  * SDL Text

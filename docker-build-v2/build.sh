@@ -10,10 +10,12 @@ if [[ $(id -u) -eq 0 ]]; then
   echo "See official docs: https://docs.docker.com/engine/install/linux-postinstall/"
 fi
 
-USAGE="Usage: $0 [--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] {windows|linux} [cmake_flag...]"
+USAGE="Usage: $0 [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] {windows|linux} [cmake_flag...]"
 export CONFIGURE=true
 export COMPILE=true
 export CMAKE_BUILD_PARALLEL_LEVEL=
+
+ARCH=amd64
 OS=
 while (( $# > 0 )); do
   case $1 in
@@ -27,13 +29,15 @@ while (( $# > 0 )); do
       COMPILE=true
       shift
       ;;
-    --help)
+    -h|--help)
       echo $USAGE
       echo "Options:"
-      echo "  --help       print this help message"
+      echo "  -h, --help   print this help message"
       echo "  --configure  only configure, don't compile"
       echo "  --compile    only compile, don't configure"
       echo "  -j, --jobs   number of concurrent processes to use when building"
+      echo ""
+      echo "Some behaviors can be changed by setting environment variables. Consult the script source for those more advanced use cases."
       exit 0
       ;;
     -j|--jobs)
@@ -60,34 +64,123 @@ if [[ -z $OS ]]; then
   exit 1
 fi
 
+PLATFORM="$ARCH-$OS"
+
 cd "$(dirname "$(readlink -f "$0")")/.."
 mkdir -p build-$OS .cache/ccache-$OS
 
-# Use locally build image if available, and pull from upstream if not
-image=recoil-build-amd64-$OS:latest
-if [[ -z "$(docker images -q $image 2> /dev/null)" ]]; then
-  image=ghcr.io/beyond-all-reason/recoil-build-amd64-$OS:latest
-  docker pull $image
+# Build container image selection, allow overriding.
+if [[ -n "${CONTAINER_IMAGE:-}" ]]; then
+  IMAGE="$CONTAINER_IMAGE"
+else
+  source docker-build-v2/images_versions.sh
+  IMAGE=ghcr.io/beyond-all-reason/recoil-build-$PLATFORM@${image_version[$PLATFORM]}
 fi
 
-docker run -it --rm \
-    -v /etc/passwd:/etc/passwd:ro \
-    -v /etc/group:/etc/group:ro \
-    --user=$(id -u):$(id -g) \
-    -v $(pwd):/build/src:ro \
-    -v $(pwd)/.cache/ccache-$OS:/build/cache:rw \
-    -v $(pwd)/build-$OS:/build/out:rw \
+# Detect and select container runtime. Support explicit override, docker and
+# podman, with docker being the default as that's likely more expected behavior.
+if [[ -n "${CONTAINER_RUNTIME:-}" ]]; then
+    RUNTIME="$CONTAINER_RUNTIME"
+elif command -v docker &> /dev/null &&
+     # We verify the output of docker version to detect podman-docker package
+     # and aliases from podman to docker people might have.
+     ! docker version | grep -qi podman; then
+    RUNTIME=docker
+elif command -v podman &> /dev/null; then
+    RUNTIME=podman
+else
+    echo "Neither docker nor podman is installed. Please install one of them."
+    exit 1
+fi
+
+# With the most common rootful docker as runtime, the users inside of the
+# container maps directly to users on the host and because user in container
+# is root, all files created in mounted volumes are owned by root outside of
+# container. To avoid this, we mount /etc/passwd and /etc/group and use --user
+# flag to run the container as current host user.
+#
+# This is not the case when using rootless podman or docker, because the root
+# inside of container is mapped via user namespaces to the calling user on
+# the host. Another option we handle is Docker Desktop, which runs containers
+# in a separate VM and does special remapping for mounted volumes, except when
+# we run from WSL because then it's WSL that's the VM.
+#
+# Because this heuristic might not work in some esoteric setups we haven't
+# foreseen, we allow specifying behavior with FORCE_UID_FLAGS and
+# FORCE_NO_UID_FLAGS environment variables. We also try to detect the
+# misconfiguration inside the container and error out with instructions to set
+# the variables and report the issue.
+UID_FLAGS=""
+if [[ -n "${FORCE_UID_FLAGS:-}" ]] || (
+       [[ -z "${FORCE_NO_UID_FLAGS:-}" && "$RUNTIME" == "docker" ]] &&
+       [[ "$(docker info -f '{{.OperatingSystem}}')" != "Docker Desktop" || -n "${WSL_DISTRO_NAME:-}" ]] &&
+       ! docker info -f '{{.SecurityOptions}}' | grep -q rootless
+   ); then
+    UID_FLAGS="-v /etc/passwd:/etc/passwd:ro -v /etc/group:/etc/group:ro --user=$(id -u):$(id -g)"
+fi
+
+# Allow passing extra arguments to runtime for example to mount additional volumes
+EXTRA_ARGS=()
+if [[ -n "${CONTAINER_RUNTIME_EXTRA_ARGS:-}" ]]; then
+  eval "EXTRA_ARGS=($CONTAINER_RUNTIME_EXTRA_ARGS)"
+fi
+
+# Support running directly from Windows without WSL layer: we need to pass real
+# native Windows path to docker.
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+  CWD="$(cygpath -w -a .)"
+  P="\\"
+else
+  CWD="$(pwd)"
+  P="/"
+fi
+
+# Handle git worktrees: the container needs access to the shared .git directory
+# for version generation. In a worktree, --absolute-git-dir returns the
+# worktree-specific dir while --git-common-dir returns the shared .git root.
+WORKTREE_MOUNTS=""
+GIT_DIR=$(git rev-parse --absolute-git-dir)
+GIT_COMMON_DIR=$(git rev-parse --path-format=absolute --git-common-dir)
+if [[ "$GIT_DIR" != "$GIT_COMMON_DIR" ]]; then
+  WORKTREE_MOUNTS="-v $GIT_COMMON_DIR:$GIT_COMMON_DIR:ro"
+fi
+
+$RUNTIME run -it --rm \
+    -v "$CWD${P}":/build/src:z,ro \
+    -v "$CWD${P}.cache${P}ccache-$OS":/build/cache:z,rw \
+    -v "$CWD${P}build-$OS":/build/out:z,rw \
+    $UID_FLAGS \
+    $WORKTREE_MOUNTS \
     -e CONFIGURE \
     -e COMPILE \
     -e CMAKE_BUILD_PARALLEL_LEVEL \
-    $image \
+    "${EXTRA_ARGS[@]}" \
+    $IMAGE \
     bash -c '
 set -e
-echo "$@"
+
+if [[ "$(id -u)" != "$(stat -c %u /build/src)" ]]; then
+  echo "Error: Inside the container, the user ($(id -u)) does not match"
+  echo "the owner of the source code files ($(stat -c %u /build/src))."
+  echo ""
+  echo "This likely means that the script failed to apply heuristics and"
+  echo "set flags for the runtime correctly. Please report this issue on"
+  echo "GitHub and include information about your environment and output"
+  echo "of \`docker info\`."
+  echo ""
+  echo "As a workaround, try setting the environment variable"
+  echo "FORCE_UID_FLAGS=1 or FORCE_NO_UID_FLAGS=1."
+  exit 1
+fi
+
 cd /build/src/docker-build-v2/scripts
 $CONFIGURE && ./configure.sh "$@"
 if $COMPILE; then
-  ./compile.sh
+  if $CONFIGURE; then
+    ./compile.sh
+  else
+    ./compile.sh "$@"
+  fi
   # When compiling for windows, we must strip debug info because windows does
   # not handle the output binary size...
   if [[ $ENGINE_PLATFORM =~ .*windows ]]; then

@@ -4,17 +4,17 @@
 #include <optional>
 #include <string>
 
-#include "3DModel.h"
+#include "VertexData.hpp"
 
 class LuaTable;
+struct S3DModel;
+struct S3DModelPiece;
 
 namespace Skinning {
 	struct SkinnedMesh {
 		std::vector<SVertexData> verts;
 		std::vector<uint32_t> indcs;
 	};
-
-	static std::vector<size_t> boneWeights;
 
 	uint16_t GetBoneID(const SVertexData& vert, size_t wi);
 

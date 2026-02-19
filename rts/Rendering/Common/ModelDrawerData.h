@@ -15,7 +15,7 @@
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Models/ModelsMemStorage.h"
 #include "Rendering/Models/ModelRenderContainer.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Rendering/Env/IWater.h"
 #include "Map/ReadMap.h"
 #include "Game/Camera.h"
@@ -80,8 +80,8 @@ protected:
 	std::array<ModelRenderContainer<T>, MODELTYPE_CNT> modelRenderers;
 
 	std::vector<T*> unsortedObjects;
-	std::unordered_map<T*, ScopedTransformMemAlloc> scTransMemAllocMap;
-	std::unordered_map<const T*, int32_t> lastSyncedFrameUpload;
+	spring::unordered_map<const T*, ScopedTransformMemAlloc> scTransMemAllocMap;
+	spring::unordered_map<const T*, int32_t> lastSyncedFrameUpload;
 
 	bool& mtModelDrawer;
 };
@@ -128,7 +128,8 @@ inline void CModelDrawerDataBase<T>::AddObject(const T* co, bool add)
 
 	const uint32_t numMatrices = ((o->model ? o->model->numPieces : 0) + 1u) * 2;
 	scTransMemAllocMap.emplace(o, ScopedTransformMemAlloc(numMatrices));
-	lastSyncedFrameUpload.emplace(o, -1);
+	static constexpr auto INITIAL_FRAME_NUM = std::numeric_limits<typename decltype(lastSyncedFrameUpload)::mapped_type>::lowest();
+	lastSyncedFrameUpload.emplace(o, INITIAL_FRAME_NUM); //set to INITIAL_FRAME_NUM to update at least once before the sim starts
 
 	modelUniformsStorage.AddObject(co);
 }

@@ -3,7 +3,6 @@
 
 #include <cmath>
 #include <cstdlib>
-#include <cstdio>
 
 #if !defined(HEADLESS)
 	#include "lib/squish/squish.h"
@@ -34,8 +33,6 @@
 #include "System/Threading/ThreadPool.h" // for_mt
 
 #include "System/Misc/TracyDefs.h"
-
-using std::sprintf;
 
 #define LOG_SECTION_SMF_GROUND_TEXTURES "CSMFGroundTextures"
 LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_SMF_GROUND_TEXTURES)

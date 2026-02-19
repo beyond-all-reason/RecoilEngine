@@ -11,7 +11,7 @@
 #include "Rendering/Colors.h"
 #include "Rendering/Env/Particles/ProjectileDrawer.h"
 #include "Rendering/Env/Particles/Classes/SmokeTrailProjectile.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModelPiece.hpp"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"

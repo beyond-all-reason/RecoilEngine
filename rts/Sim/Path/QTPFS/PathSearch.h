@@ -270,6 +270,35 @@ public:
 		static float MAP_RELATIVE_MAX_NODES_SEARCHED;
 		static int MAP_MAX_NODES_SEARCHED;
 	};
+
+	// Because AI can request path searches at any time, we need to separate out unsynced path searches from synced
+	// searches. Even though unsynced searches are carried out immediately, they could be inserted and removed at
+	// different times relative to the insertion of synced searches, which means when the unsynced search is removed,
+	// it can cause the synced searches to be reordered. This matters because some searches are waiting on results from
+	// others in order to reuse results. If the order of the searches are changed, then on one machine a specific
+	// search could resolve on frame x and on another machine frame x + 1.
+	struct UnsyncedPathSearch : public PathSearch {
+		UnsyncedPathSearch() {
+			synced = false; // Mark this path as unsynced explicitly
+		}
+		UnsyncedPathSearch(unsigned int pathSearchType)
+			: PathSearch(pathSearchType)
+			{ synced = false; }
+	};
+
+	// Because some paths are managed externally to QTPFS (e.g. Lua paths), we need to be able to mark
+	// their searches as synced, but not have QTPFS manage their life-cycle (i.e. deletion after use).
+	// These paths are also not safe to have their data modified during path rebuilding after map changes because
+	// the rebuilding is order-sensitive and externally-managed paths could be destroyed at any time, which can
+	// change the order of path processing.
+	struct ExternallyManagedPathSearch : public PathSearch {
+		ExternallyManagedPathSearch() {
+			synced = true; // Mark this path as synced explicitly
+		}
+		ExternallyManagedPathSearch(unsigned int pathSearchType)
+			: PathSearch(pathSearchType)
+			{ synced = true; }
+	};
 }
 
 #endif

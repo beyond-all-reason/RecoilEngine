@@ -81,6 +81,7 @@
 #include "Rendering/Env/IWater.h"
 #include "Rendering/Env/GrassDrawer.h"
 #include "Rendering/Env/Particles/ProjectileDrawer.h"
+#include "Rendering/IconHandler.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Map/InfoTexture/Modern/Path.h"
@@ -1159,7 +1160,7 @@ public:
 	SpecFullViewActionExecutor() : IUnsyncedActionExecutor(
 		"SpecFullView",
 		"Sets or toggles LOS settings if the local user is a spectator. Fullview: See everything, otherwise visibility is determined by the current team. Fullselect: Whether all units can be selected",
-		false, 
+		false,
 		{
 			{"", "Toggles both Fullview and Fullselect from current values"},
 			{"0", "Not Fullview, Not Fullselect"},
@@ -1259,7 +1260,7 @@ public:
 	GroupActionExecutor() : IUnsyncedActionExecutor("Group", "Manage control groups", false, {
 			{"<n>", "Select group <n>, also focuses on second call (deprecated)"},
 			{"select <n>", "Select group <n>"},
-			{"focus <n>", "Focus camera on group <n>"},
+			{"focus <n> [smoothness]", "Focus camera on group <n> with optional camera smoothness"},
 			{"set <n>", "Set current selected units as group <n>"},
 			{"add <n>", "Add current selected units to group <n> (does not change selection)"},
 			{"unset", "Deassign control group for currently selected units"},
@@ -1296,6 +1297,7 @@ public:
 				groupId = StringToInt(args[0], &parseFailure);
 				break;
 			case 2:
+			case 3: // NOTE: Right now GroupCommand's longest command only has 3 args
 				subCommand = args[0];
 				groupId = StringToInt(args[1], &parseFailure);
 				break;
@@ -1310,9 +1312,14 @@ public:
 		if (groupId < 0 || groupId > 9)
 			return WrongSyntax("groupId must be single digit number");
 
+		// NOTE: This only works with group commands that take exactly 1 required argument
+		std::vector<std::string> extraArgs = {};
+		for (int i = 2; i < args.size(); i++)
+			extraArgs.push_back(args[i]);
+
 		// Finally, actually run the command.
 		bool error;
-		const bool halt = uiGroupHandlers[gu->myTeam].GroupCommand(groupId, subCommand, error);
+		const bool halt = uiGroupHandlers[gu->myTeam].GroupCommand(groupId, subCommand, extraArgs, error);
 
 		if (error)
 			return WrongSyntax("subcommand " + subCommand + " not found");
@@ -2963,7 +2970,24 @@ public:
 
 class MiniMapActionExecutor : public IUnsyncedActionExecutor {
 public:
-	MiniMapActionExecutor() : IUnsyncedActionExecutor("MiniMap", "FIXME document subcommands") {
+	MiniMapActionExecutor() : IUnsyncedActionExecutor("MiniMap", "Various subcommands to control the minimap", false, {
+			{"fullproxy [0|1]", "Enable (1) or disable (0) full proxy mode. No argument toggles."},
+			{"icons [0|1]", "Enable (1) or disable (0) unit icons. No argument toggles."},
+			{"unitexp <float>", "Set unit size exponent (float)."},
+			{"unitsize <float>", "Set base unit size (float, min 0.0)."},
+			{"drawcommands [<int>]", "Set draw commands level (int >= 0). No argument toggles between 0 and 1."},
+			{"drawprojectiles [0|1]", "Enable (1) or disable (0) drawing projectiles. No argument toggles."},
+			{"drawpings [0|1]", "Enable (1) or disable (0) drawing pings. No argument toggles. Disabling clears pings."},
+			{"simplecolors [0|1]", "Enable (1) or disable (0) simple minimap colors. No argument toggles."},
+			{"geo <geometry>", "Set minimap geometry (not available in dualscreen mode)."},
+			{"geometry <geometry>", "Set minimap geometry (not available in dualscreen mode)."},
+			{"min [0|1]", "Minimize (1) or restore (0) minimap (not available in dualscreen mode). No argument toggles."},
+			{"minimize [0|1]", "Minimize (1) or restore (0) minimap (not available in dualscreen mode). No argument toggles."},
+			{"max [0|1]", "Maximize (1) or restore (0) minimap (not available in dualscreen mode). No argument toggles."},
+			{"maximize [0|1]", "Maximize (1) or restore (0) minimap (not available in dualscreen mode). No argument toggles."},
+			{"maxspect [0|1]", "Maximize (1) or restore (0) minimap with aspect ratio (not available in dualscreen mode). No argument toggles."},
+			{"mouseevents [0|1]", "Enable (1) or disable (0) mouse interaction. No argument toggles."},
+			}) {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
@@ -3807,11 +3831,16 @@ public:
 			LOG("Dumping decal atlas textures");
 			groundDecals->DumpAtlasTextures();
 		};
+		auto iconsFunc = []() {
+			LOG("Dumping decal atlas textures");
+			icon::iconHandler.DumpAtlasTextures();
+		};
 		std::array argsExec = {
 			ArgTuple(hashString("proj"), false, projFunc),
 			ArgTuple(hashString("3do"), false, threeDoFunc),
 			ArgTuple(hashString("decal"), false, decalsFunc),
-			ArgTuple(hashString("decals"), false, decalsFunc)
+			ArgTuple(hashString("decals"), false, decalsFunc),
+			ArgTuple(hashString("icons"), false, iconsFunc)
 		};
 
 		auto args = CSimpleParser::Tokenize(action.GetArgs(), 1);
@@ -4220,4 +4249,3 @@ void UnsyncedGameCommands::DestroyInstance(bool reload) {
 	spring::SafeDestruct(singleton);
 	std::memset(ugcSingletonMem, 0, sizeof(ugcSingletonMem));
 }
-

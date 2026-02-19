@@ -370,6 +370,22 @@ bool LuaConstGL::PushEntries(lua_State* L)
 	PUSH_GL(NICEST);
 
 	/***
+	 * Stencil ops
+	 * @section stencilops
+	 */
+	/*** @field GL.KEEP integer */
+	PUSH_GL(KEEP);
+	/*** @field GL.INCR integer */
+	PUSH_GL(INCR);
+	/*** @field GL.DECR integer */
+	PUSH_GL(DECR);
+	/*** @field GL.INCR_WRAP integer */
+	PUSH_GL(INCR_WRAP);
+	/*** @field GL.DECR_WRAP integer */
+	PUSH_GL(DECR_WRAP);
+	// INVERT, ZERO, REPLACE are also valid stencil ops but already defined in other categories
+
+	/***
 	 * Light Specification
 	 * @section lightspecification
 	 */

@@ -9,6 +9,7 @@
 #include "LuaConfig.h"
 
 #include "Game/GameVersion.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Rendering/Models/IModelParser.h"
 #include "Sim/Projectiles/Projectile.h"
 #include "Sim/Features/Feature.h"

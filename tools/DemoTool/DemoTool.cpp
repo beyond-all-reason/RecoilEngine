@@ -25,7 +25,7 @@ no console output (you still could use this.exe > z.tzt though).
 */
 
 	DEFINE_string(demofile,     "",    "Path to demo file");
-	DEFINE_bool  (dump,         false, "Only dump networc traffic saved in demo");
+	DEFINE_bool  (dump,         false, "Only dump network traffic saved in demo");
 	DEFINE_bool  (stats,        false, "Print all game, player and team stats");
 	DEFINE_bool  (header,       false, "Print demoheader content");
 	DEFINE_bool  (playerstats,  false, "Print playerstats");

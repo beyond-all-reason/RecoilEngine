@@ -28,6 +28,8 @@ public:
 	bool IsValid() const { return info.type > static_cast<uint8_t>(Type::DECAL_NONE); }
 	void MarkInvalid() { info.type = static_cast<uint8_t>(Type::DECAL_NONE); }
 public:
+	static constexpr size_t NUM_USERDATA = 2;
+
 	float refHeight;
 	float minHeight;
 	float maxHeight;
@@ -65,7 +67,9 @@ public:
 	};
 	SColor tintColor;
 	std::array<SColor, 2> glowColorMap;
+
+	std::array<float4, NUM_USERDATA> userDefined;
 public:
-	static const std::array<AttributeDef, 10> attributeDefs;
+	static const std::array<AttributeDef, 12> attributeDefs;
 };
 static_assert(sizeof(GroundDecal::info) == 4u);

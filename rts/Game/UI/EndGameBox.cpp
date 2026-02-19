@@ -17,32 +17,26 @@
 #include "Sim/Misc/TeamStatistics.h"
 #include "System/Exceptions.h"
 
-#include <cstdio>
 #include <sstream>
+#include <fmt/printf.h>
 
 #include "System/Misc/TracyDefs.h"
-
-using std::sprintf;
 
 
 static std::string FloatToSmallString(float num, float mul = 1) {
 	RECOIL_DETAILED_TRACY_ZONE;
 
-	char c[50];
-
 	if (num == 0) {
-		sprintf(c, "0");
+		return std::string("0");
 	} else if (math::fabs(num) < 10 * mul) {
-		sprintf(c, "%.1f",  num);
+		return fmt::sprintf("%.1f",  num);
 	} else if (math::fabs(num) < 10000 * mul) {
-		sprintf(c, "%.0f",  num);
+		return fmt::sprintf("%.0f",  num);
 	} else if (math::fabs(num) < 10000000 * mul) {
-		sprintf(c, "%.0fk", num / 1000);
+		return fmt::sprintf("%.0fk", num / 1000);
 	} else {
-		sprintf(c, "%.0fM", num / 1000000);
+		return fmt::sprintf("%.0fM", num / 1000000);
 	}
-
-	return c;
 }
 
 

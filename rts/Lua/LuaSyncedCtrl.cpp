@@ -12,6 +12,7 @@
 #include "LuaHashString.h"
 #include "LuaMetalMap.h"
 #include "LuaSyncedMoveCtrl.h"
+#include "LuaUI.h"
 #include "LuaUtils.h"
 #include "Game/Game.h"
 #include "Game/GameSetup.h"
@@ -38,7 +39,6 @@
 #include "Sim/Misc/DamageArray.h"
 #include "Sim/Misc/DamageArrayHandler.h"
 #include "Sim/Misc/LosHandler.h"
-#include "Sim/Misc/ExtractorHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/SmoothHeightMesh.h"
 #include "Sim/Misc/Team.h"
@@ -56,7 +56,6 @@
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectile.h"
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectileFactory.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
-#include "Sim/Units/Components/Extractor.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
@@ -70,6 +69,7 @@
 #include "Sim/Units/CommandAI/Command.h"
 #include "Sim/Units/CommandAI/CommandAI.h"
 #include "Sim/Units/CommandAI/FactoryCAI.h"
+#include "Sim/Units/UnitTypes/ExtractorBuilding.h"
 #include "Sim/Weapons/PlasmaRepulser.h"
 #include "Sim/Weapons/Weapon.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
@@ -92,6 +92,30 @@ static int heightMapz2 = 0;
 static float heightMapAmountChanged = 0.0f;
 static float originalHeightMapAmountChanged = 0.0f;
 static float smoothMeshAmountChanged = 0.0f;
+
+namespace Impl {
+	int SetObjectPieceMatrix(lua_State* L, CSolidObject* so)
+	{
+		if (so == nullptr)
+			return 0;
+
+		LocalModelPiece* lmp = ParseObjectLocalModelPiece(L, so, 2);
+
+		if (lmp == nullptr)
+			return 0;
+
+		CMatrix44f mat;
+
+		if (LuaUtils::ParseFloatArray(L, 3, &mat.m[0], 16) == -1)
+			return 0;
+
+		if (lmp->SetPieceSpaceMatrix(mat))
+			lmp->SetDirty();
+
+		lua_pushboolean(L, lmp->blockScriptAnims);
+		return 1;
+	}
+}
 
 /***
 Synced Lua API
@@ -142,6 +166,11 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(AssignPlayerToTeam);
 	REGISTER_LUA_CFUNC(GameOver);
 	REGISTER_LUA_CFUNC(SetGlobalLos);
+	REGISTER_LUA_CFUNC(SetCheatingEnabled);
+	REGISTER_LUA_CFUNC(SetGodMode);
+
+	REGISTER_LUA_CFUNC(SetPlayerReadyState);
+	REGISTER_LUA_CFUNC(SetTeamStartPosition);
 
 	REGISTER_LUA_CFUNC(AddTeamResource);
 	REGISTER_LUA_CFUNC(UseTeamResource);
@@ -158,6 +187,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(CreateUnit);
 	REGISTER_LUA_CFUNC(DestroyUnit);
 	REGISTER_LUA_CFUNC(TransferUnit);
+	REGISTER_LUA_CFUNC(TransferTeamMaxUnits);
 
 	REGISTER_LUA_CFUNC(CreateFeature);
 	REGISTER_LUA_CFUNC(DestroyFeature);
@@ -268,6 +298,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetFeatureCollisionVolumeData);
 	REGISTER_LUA_CFUNC(SetFeaturePieceCollisionVolumeData);
 	REGISTER_LUA_CFUNC(SetFeaturePieceVisible);
+	REGISTER_LUA_CFUNC(SetFeaturePieceMatrix);
 
 	REGISTER_LUA_CFUNC(SetFeatureFireTime);
 	REGISTER_LUA_CFUNC(SetFeatureSmokeTime);
@@ -784,7 +815,6 @@ static int SetSolidObjectPhysicalState(lua_State* L, CSolidObject* o)
 	drag.y = std::clamp(luaL_optnumber(L, 12, drag.y), 0.0f, 1.0f);
 	drag.z = std::clamp(luaL_optnumber(L, 13, drag.z), 0.0f, 1.0f);
 
-	o->Move(pos, false);
 	o->SetDirVectorsEuler(rot);
 	// do not need ForcedSpin, above three calls cover it
 	o->ForcedMove(pos);
@@ -945,6 +975,63 @@ int LuaSyncedCtrl::AssignPlayerToTeam(lua_State* L)
 	return 0;
 }
 
+/*** Set the starting position of a team.
+ *
+ * If the position argument is outside the team's startbox, the position is clamped.
+ * 
+ * @function Spring.SetTeamStartPosition
+ * @param teamID integer
+ * @param x number left position (elmos)
+ * @param y number vertical position (elmos)
+ * @param z number top position (elmos)
+ * @return boolean true if the position was set, false if the teamID is invalid
+ */
+int LuaSyncedCtrl::SetTeamStartPosition(lua_State* L)
+{
+	const unsigned int teamID = luaL_checkint(L, 1);
+	float3 pickPos =
+		{ luaL_checkfloat(L, 2)
+		, luaL_checkfloat(L, 3)
+		, luaL_checkfloat(L, 4)
+	};
+
+	if (!teamHandler.IsValidTeam(teamID)) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	CTeam* team = teamHandler.Team(teamID);
+	team->ClampStartPosInStartBox(&pickPos);
+	team->SetStartPos(pickPos);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+/*** Set the ready state of a player.
+ *
+ * Use to mark a player (un)ready in the pregame phase.
+ *
+ * @function Spring.SetPlayerReadyState
+ * @param playerID integer
+ * @param ready boolean
+ * @return boolean true if the state was set, false if the playerID was invalid
+ */
+int LuaSyncedCtrl::SetPlayerReadyState(lua_State* L)
+{
+	const unsigned int playerID = luaL_checkint(L, 1);
+	const bool isReady = luaL_checkboolean(L, 2);
+
+	if (!playerHandler.IsValidPlayer(playerID)) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	playerHandler.Player(playerID)->SetReadyToStart(isReady);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
 
 /*** Changes access to global line of sight for a team and its allies.
  *
@@ -964,6 +1051,40 @@ int LuaSyncedCtrl::SetGlobalLos(lua_State* L)
 	return 0;
 }
 
+/*** Changes whether activating cheats is allowed.
+ * Note that already activated cheats (e.g. god mode) stay active even if you disallow activating.
+ *
+ * @function Spring.SetCheatingEnabled
+ * @param cheatsEnabled boolean
+ * @return nil
+ */
+int LuaSyncedCtrl::SetCheatingEnabled(lua_State* L)
+{
+	gs->cheatEnabled = luaL_checkboolean(L, 1);
+	return 0;
+}
+
+/*** Toggles 'god mode', i.e. whether control of teams other than one's own is allowed.
+ * Affects all teams.
+ *
+ * @function Spring.SetGodMode
+ * @param controlAllies boolean?
+ * @param controlEnemies boolean?
+ * @return nil
+ */
+int LuaSyncedCtrl::SetGodMode(lua_State* L)
+{
+	const bool controlAllies  = luaL_optboolean(L, 1, (gs->godMode & GODMODE_ATC_BIT) != 0);
+	const bool controlEnemies = luaL_optboolean(L, 2, (gs->godMode & GODMODE_ETC_BIT) != 0);
+
+	gs->godMode = controlAllies  * GODMODE_ATC_BIT
+	            + controlEnemies * GODMODE_ETC_BIT;
+
+	CLuaUI::UpdateTeams();
+	CPlayer::UpdateControlledTeams();
+
+	return 0;
+}
 
 /***
  * Game End
@@ -1074,6 +1195,7 @@ int LuaSyncedCtrl::SetWind(lua_State* L)
 }
 
 /*** Adds metal or energy resources to the specified team.
+ * Counts as production in post-game graph statistics.
  *
  * @function Spring.AddTeamResource
  * @param teamID integer
@@ -1111,6 +1233,7 @@ int LuaSyncedCtrl::AddTeamResource(lua_State* L)
 
 /***
  * Consumes metal or energy resources of the specified team.
+ * Counts as usage in post-game graph statistics.
  *
  * @function Spring.UseTeamResource
  * @param teamID integer
@@ -1121,6 +1244,7 @@ int LuaSyncedCtrl::AddTeamResource(lua_State* L)
  */
 /***
  * Consumes metal and/or energy resources of the specified team.
+ * Counts as usage in post-game graph statistics.
  *
  * @function Spring.UseTeamResource
  * @param teamID integer
@@ -1293,6 +1417,10 @@ int LuaSyncedCtrl::SetTeamShareLevel(lua_State* L)
 
 
 /*** Transfers resources between two teams.
+ * Transfers directly, without involving AllowResourceTransfer callin.
+ * Approximately equivalent to doing Use and Add for the sender and receiver,
+ * the difference being that it counts to sent/received stats rather than
+ * used/produced in end-game statistics graphs.
  *
  * @function Spring.ShareTeamResource
  * @param teamID_src integer
@@ -1333,26 +1461,22 @@ int LuaSyncedCtrl::ShareTeamResource(lua_State* L)
 		case 'm': {
 			amount = std::min(amount, (float)team1->res.metal);
 
-			if (eventHandler.AllowResourceTransfer(teamID1, teamID2, "m", amount)) { //FIXME can cause an endless loop
-				team1->res.metal                       -= amount;
-				team1->resSent.metal                   += amount;
-				team1->GetCurrentStats().metalSent     += amount;
-				team2->res.metal                       += amount;
-				team2->resReceived.metal               += amount;
-				team2->GetCurrentStats().metalReceived += amount;
-			}
+			team1->res.metal                       -= amount;
+			team1->resSent.metal                   += amount;
+			team1->GetCurrentStats().metalSent     += amount;
+			team2->res.metal                       += amount;
+			team2->resReceived.metal               += amount;
+			team2->GetCurrentStats().metalReceived += amount;
 		} break;
 		case 'e': {
 			amount = std::min(amount, (float)team1->res.energy);
 
-			if (eventHandler.AllowResourceTransfer(teamID1, teamID2, "e", amount)) { //FIXME can cause an endless loop
-				team1->res.energy                       -= amount;
-				team1->resSent.energy                   += amount;
-				team1->GetCurrentStats().energySent     += amount;
-				team2->res.energy                       += amount;
-				team2->resReceived.energy               += amount;
-				team2->GetCurrentStats().energyReceived += amount;
-			}
+			team1->res.energy                       -= amount;
+			team1->resSent.energy                   += amount;
+			team1->GetCurrentStats().energySent     += amount;
+			team2->res.energy                       += amount;
+			team2->resReceived.energy               += amount;
+			team2->GetCurrentStats().energyReceived += amount;
 		} break;
 		default: {
 		} break;
@@ -1843,7 +1967,8 @@ int LuaSyncedCtrl::DestroyUnit(lua_State* L)
  * @param unitID integer
  * @param newTeamID integer
  * @param given boolean? (Default: `true`) if false, the unit is captured.
- * @return nil
+ * @param adjustUnitLimit boolean? (Default: `false`) if true, also transfer the limit slot
+ * @return boolean successfulTransfer
  */
 int LuaSyncedCtrl::TransferUnit(lua_State* L)
 {
@@ -1853,29 +1978,89 @@ int LuaSyncedCtrl::TransferUnit(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
-	const int newTeam = luaL_checkint(L, 2);
-	if (!teamHandler.IsValidTeam(newTeam))
+	const int newTeamID = luaL_checkint(L, 2);
+	if (!teamHandler.IsValidTeam(newTeamID))
 		return 0;
 
-	const CTeam* team = teamHandler.Team(newTeam);
-	if (team == nullptr)
+	CTeam* newTeam = teamHandler.Team(newTeamID);
+	if (newTeam == nullptr)
 		return 0;
 
 	bool given = true;
 	if (FullCtrl(L) && lua_isboolean(L, 3))
 		given = lua_toboolean(L, 3);
 
+	bool adjustUnitLimit = luaL_optboolean(L, 4, false);
+
+	CTeam* oldTeam = teamHandler.Team(unit->team);
+	if (oldTeam == nullptr) {
+		return 0;
+	}
+
 	if (inTransferUnit >= MAX_CMD_RECURSION_DEPTH)
 		luaL_error(L, "TransferUnit() recursion is not permitted, max depth: %d", MAX_CMD_RECURSION_DEPTH);
 
 	++ inTransferUnit;
 	ASSERT_SYNCED(unit->id);
-	ASSERT_SYNCED((int)newTeam);
+	ASSERT_SYNCED(oldTeam->teamNum);
+	ASSERT_SYNCED((int)newTeamID);
 	ASSERT_SYNCED(given);
-	unit->ChangeTeam(newTeam, given ? CUnit::ChangeGiven
+	ASSERT_SYNCED(adjustUnitLimit);
+	if (adjustUnitLimit) {
+		newTeam->maxUnits++;
+		oldTeam->maxUnits--;
+	}
+	bool successfulTransfer = unit->ChangeTeam(newTeamID, given ? CUnit::ChangeGiven
 	                                : CUnit::ChangeCaptured);
+	if (adjustUnitLimit && !successfulTransfer) {
+		newTeam->maxUnits--;
+		oldTeam->maxUnits++;
+	}
 	-- inTransferUnit;
-	return 0;
+
+	lua_pushboolean(L, successfulTransfer);
+	return 1;
+}
+
+/*** Transfer capacity of units from one team to another
+ *
+ * @function Spring.TransferTeamMaxUnits
+ *
+ * There are some conditions that must be satisfied for the operation to be successful:
+ * - `transferAmnt` must be lower or equal than the origin team current maxunits (can't transfer limit team does not have available)
+ * - `transferAmnt` must be lower than origin team maxunits - currentunitscount (can't transfer limit if origin team would be already over the limit after transfer)
+ *
+ * @param fromTeamID number
+ * @param newTeamID number
+ * @param transferAmnt number
+ * @return boolean successfulTransfer Whether the max unit limit was successfully transferred.
+ */
+int LuaSyncedCtrl::TransferTeamMaxUnits(lua_State* L)
+{
+	CheckAllowGameChanges(L);
+
+	const int fromTeamID = luaL_checkint(L, 1);
+	if (!teamHandler.IsValidTeam(fromTeamID))
+		return 0;
+
+	const int newTeamID = luaL_checkint(L, 2);
+	if (!teamHandler.IsValidTeam(newTeamID))
+		return 0;
+
+	CTeam* fromTeam = teamHandler.Team(fromTeamID);
+	if (fromTeam == nullptr)
+		return 0;
+
+	CTeam* toTeam = teamHandler.Team(newTeamID);
+	if (toTeam == nullptr)
+		return 0;
+
+	const int transferAmnt = luaL_checkint(L, 3);
+
+	bool success = teamHandler.TransferTeamMaxUnits(fromTeam, toTeam, transferAmnt);
+
+	lua_pushboolean(L, success);
+	return 1;
 }
 
 /******************************************************************************
@@ -2956,7 +3141,7 @@ int LuaSyncedCtrl::SetUnitMetalExtraction(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
-	auto mex = extractorHandler.TryGetExtractor(unit);
+	CExtractorBuilding* mex = dynamic_cast<CExtractorBuilding*>(unit);
 
 	if (mex == nullptr)
 		return 0;
@@ -3606,30 +3791,12 @@ int LuaSyncedCtrl::SetUnitPieceParent(lua_State* L)
  * @param unitID integer
  * @param pieceNum number
  * @param matrix number[] an array of 16 floats
- * @return nil
+ * @return boolean? valid - if the matrix can be used for the purpose of defining the piece spatial transformation. Blocks the piece animation, if true.
  */
 int LuaSyncedCtrl::SetUnitPieceMatrix(lua_State* L)
 {
 	CUnit* unit = ParseUnit(L, __func__, 1);
-
-	if (unit == nullptr)
-		return 0;
-
-	LocalModelPiece* lmp = ParseObjectLocalModelPiece(L, unit, 2);
-
-	if (lmp == nullptr)
-		return 0;
-
-	CMatrix44f mat;
-
-	if (LuaUtils::ParseFloatArray(L, 3, &mat.m[0], 16) == -1)
-		return 0;
-
-	if (lmp->SetPieceSpaceMatrix(mat))
-		lmp->SetDirty();
-
-	lua_pushboolean(L, lmp->blockScriptAnims);
-	return 1;
+	return Impl::SetObjectPieceMatrix(L, unit);
 }
 
 
@@ -4498,9 +4665,9 @@ int LuaSyncedCtrl::RemoveGrass(lua_State* L)
  * @param y number
  * @param z number
  * @param heading Heading?
- * @param AllyTeamID integer?
+ * @param teamID integer?
  * @param featureID integer?
- * @return integer featureID
+ * @return integer? featureID returns nil if creation was unsuccessful
  */
 int LuaSyncedCtrl::CreateFeature(lua_State* L)
 {
@@ -5179,6 +5346,21 @@ int LuaSyncedCtrl::SetFeaturePieceVisible(lua_State* L)
 	return (SetSolidObjectPieceVisible(L, ParseFeature(L, __func__, 1)));
 }
 
+/*** Sets the local (i.e. parent-relative) matrix of the given piece, for a feature.
+ *
+ * @function Spring.SetFeaturePieceMatrix
+ *
+ * @param featureID integer
+ * @param pieceIndex number
+ * @param matrix number[] an array of 16 floats
+ * @return boolean? valid - if the matrix can be used for the purpose of defining the piece spatial transformation
+ */
+int LuaSyncedCtrl::SetFeaturePieceMatrix(lua_State* L)
+{
+	CFeature* feature = ParseFeature(L, __func__, 1);
+	return Impl::SetObjectPieceMatrix(L, feature);
+}
+
 
 /*** Set the fire timer for a feature.
  *
@@ -5516,6 +5698,10 @@ int LuaSyncedCtrl::SetProjectileTarget(lua_State* L)
 
 			lua_pushboolean(L, wpro->GetTargetObject() == nullptr);
 			return 1;
+		} break;
+
+		default: {
+			luaL_error(L, "Incorrect arguments to SetProjectileTarget");
 		} break;
 	}
 
@@ -7106,6 +7292,7 @@ int LuaSyncedCtrl::ForceUnitCollisionUpdate(lua_State* L)
  * @param transporterID integer
  * @param passengerID integer
  * @param pieceNum number
+ * @param force boolean
  * @return nil
  */
 int LuaSyncedCtrl::UnitAttach(lua_State* L)
@@ -7134,7 +7321,9 @@ int LuaSyncedCtrl::UnitAttach(lua_State* L)
 	if (piece >= 0)
 		piece = pieces[piece].scriptPieceIndex;
 
-	transporter->AttachUnit(transportee, piece, !transporter->unitDef->IsTransportUnit());
+	const bool force = luaL_optboolean(L, 4, !transporter->unitDef->IsTransportUnit());
+
+	transporter->AttachUnit(transportee, piece, force);
 	return 0;
 }
 

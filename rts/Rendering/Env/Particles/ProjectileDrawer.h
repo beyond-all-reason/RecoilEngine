@@ -10,7 +10,6 @@
 #include "Rendering/GL/FBO.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
-#include "Rendering/Models/3DModel.h"
 #include "Rendering/Models/ModelRenderContainer.h"
 #include "Rendering/DepthBufferCopy.h"
 #include "System/EventClient.h"
@@ -158,8 +157,8 @@ private:
 
 	std::vector<const AtlasedTexture*> smokeTextures;
 
-	/// projectiles container {modelless, model}
-	std::array<std::vector<CProjectile*>, 2> renderProjectiles;
+	/// projectiles container
+	std::vector<CProjectile*> renderProjectiles;
 
 	/// projectiles with a model, binned by model type and textures
 	std::array<ModelRenderContainer<CProjectile>, MODELTYPE_CNT> modelRenderers;

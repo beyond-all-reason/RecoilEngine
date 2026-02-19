@@ -16,6 +16,13 @@ class CUnit;
 class CWeaponProjectile;
 struct WeaponDef;
 
+struct WeaponVectorsState {
+	float3 relAimFromPos;
+	float3 relWeaponMuzzlePos;
+	float3 aimFromPos;
+	float3 weaponMuzzlePos;
+	float3 weaponDir;
+};
 
 class CWeapon : public CObject
 {
@@ -51,11 +58,11 @@ public:
 
 public:
 	/// test if the weapon is able to attack an enemy/mapspot just by its properties (no range check, no FreeLineOfFire check, ...)
-	virtual bool TestTarget(const float3 tgtPos, const SWeaponTarget& trg) const;
+	virtual bool TestTarget(const float3& pos, const SWeaponTarget& trg) const;
 	/// test if the enemy/mapspot is in range/angle
-	virtual bool TestRange(const float3 tgtPos, const SWeaponTarget& trg) const;
+	virtual bool TestRange(const float3& tgtPos, const SWeaponTarget& trg) const;
 	/// test if something is blocking our LineOfFire
-	virtual bool HaveFreeLineOfFire(const float3 srcPos, const float3 tgtPos, const SWeaponTarget& trg) const;
+	virtual bool HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const;
 
 	virtual bool CanFire(bool ignoreAngleGood, bool ignoreTargetType, bool ignoreRequestedDir) const;
 
@@ -64,9 +71,10 @@ public:
 	bool TryTargetRotate(float3 tgtPos, bool userTarget, bool manualFire);
 	bool TryTargetHeading(short heading, const SWeaponTarget& trg);
 
+	bool WantOwnerRotation() const { return onlyForward; }
 public:
-	bool CheckTargetAngleConstraint(const float3 worldTargetDir, const float3 worldWeaponDir) const;
-	float3 GetTargetBorderPos(const CUnit* targetUnit, const float3 rawTargetPos, const float3 rawTargetDir) const;
+	bool CheckTargetAngleConstraint(const float3& worldTargetDir, const float3& worldWeaponDir) const;
+	float3 GetTargetBorderPos(const CUnit* targetUnit, const float3& rawTargetPos, const float3& rawTargetDir) const;
 
 	void AdjustTargetPosToWater(float3& tgtPos, bool attackGround) const;
 	float3 GetUnitPositionWithError(const CUnit* unit) const;
@@ -98,20 +106,25 @@ public:
 	bool IsFastAutoRetargetingEnabled() const { return fastAutoRetargeting; }
 	void UpdateWeaponErrorVector();
 	void UpdateWeaponVectors();
-
 protected:
 	virtual void FireImpl(const bool scriptCall) {}
 	virtual void UpdateWantedDir();
-	virtual float GetPredictedImpactTime(float3 p) const; //< how long time we predict it take for a projectile to reach target
+	virtual float GetPredictedImpactTime(const float3& p) const; //< how long time we predict it take for a projectile to reach target
 
 	ProjectileParams GetProjectileParams();
-	static bool TargetUnderWater(const float3 tgtPos, const SWeaponTarget&);
-	static bool TargetInWater(const float3 tgtPos, const SWeaponTarget&);
+	static bool TargetUnderWater(const float3& tgtPos, const SWeaponTarget&);
+	static bool TargetInWater(const float3& tgtPos, const SWeaponTarget&);
 
 	void UpdateWeaponPieces(const bool updateAimFrom = true);
 	float3 GetLeadVec(const CUnit* unit) const;
+	float GetAccuratePredictedImpactTime(const CUnit* unit) const;
+	float GetSafeInterceptTime(const CUnit* unit, float predictMult) const;
 
+	float GetShapedWeaponRange(const float3& dir, float maxLength) const;
 private:
+	WeaponVectorsState SaveWeaponVectors() const;
+	void LoadWeaponVectors(const WeaponVectorsState& wvs);
+
 	void UpdateAim();
 	void UpdateFire();
 	bool UpdateStockpile();
@@ -125,8 +138,7 @@ private:
 	bool CallAimingScript(bool waitForAim);
 	void HoldIfTargetInvalid();
 
-	bool TryTarget(const float3 tgtPos, const SWeaponTarget& trg, bool preFire = false) const;
-
+	bool TryTarget(const float3& tgtPos, const SWeaponTarget& trg, bool preFire = false) const;
 public:
 	CUnit* owner;
 	CWeapon* slavedTo;                      // use this weapon to choose target
@@ -205,6 +217,7 @@ public:
 	float weaponAimAdjustPriority;
 	bool fastAutoRetargeting;
 	bool fastQueryPointUpdate;
+	unsigned int accurateLeading;
 	unsigned int burstControlWhenOutOfArc;
 	unsigned int rangefrombase;
 

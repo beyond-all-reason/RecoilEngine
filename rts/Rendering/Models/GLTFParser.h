@@ -5,8 +5,10 @@
 #include <vector>
 #include <cstdint>
 
-#include "3DModel.h"
+#include "3DModelPiece.hpp"
 #include "IModelParser.h"
+
+#include "System/Threading/SpringThreading.h"
 
 namespace fastgltf {
 	class Asset;

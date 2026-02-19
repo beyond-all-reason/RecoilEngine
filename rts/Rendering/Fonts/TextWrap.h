@@ -5,6 +5,7 @@
 
 #include <string>
 #include <list>
+#include <array>
 
 #include "FontHandler.h"
 #include "CFontTexture.h"
@@ -26,33 +27,27 @@ public:
 	static constexpr char8_t ColorCodeIndicatorEx = 0x12; // dc2
 	static constexpr char8_t ColorResetIndicator  = 0x08; // =: '\\b'
 
+	static constexpr char8_t CR = '\r';
+	static constexpr char8_t LF = '\n';
+public:
+	struct ColorCodeText {
+		std::array<char8_t, 1 + 4 + 4 + 1> storage; // reserve for [I,R,G,B,A,R,G,B,A] + \0
+		uint8_t size;
+	};
+	struct ColorCode {
+		auto tostring() const { return std::string(reinterpret_cast<const char*>(colorText.storage.data()), colorText.size); }
+		ColorCodeText colorText;
+		uint32_t pos;
+	};
 protected:
 	CTextWrap(const std::string& fontfile, int size, int outlinesize, float  outlineweight);
 	virtual ~CTextWrap() {}
+protected:
+	uint32_t SkipColorCodes(const spring::u8string& text, uint32_t idx, ColorCodeText* cctPtr = nullptr);
 public:
 	virtual float GetTextWidth(const std::string& text) = 0;
 	virtual void ScanForWantedGlyphs(const spring::u8string& str) = 0;
 private:
-	struct colorcode {
-		colorcode() : resetColor(false),color(1.f,1.f,1.f,1.f),pos(0) {};
-		bool resetColor;
-		SColor color;
-		unsigned int pos;
-
-		std::string tostring() const {
-			std::string out;
-			out.reserve(4);
-			if (resetColor) {
-				out = ColorResetIndicator;
-			} else {
-				out = fontHandler.disableOldColorIndicators ? ColorCodeIndicator : OldColorCodeIndicator;
-				out += color.r;
-				out += color.g;
-				out += color.b;
-			}
-			return out;
-		}
-	};
 	struct word {
 		word() : width(0.0f), text(""), isSpace(false), isLineBreak(false), isColorCode(false), numSpaces(0), pos(0) {};
 
@@ -75,8 +70,8 @@ private:
 
 	word SplitWord(word& w, float wantedWidth, bool smart = true);
 
-	void SplitTextInWords(const spring::u8string& text, std::list<word>* words, std::list<colorcode>* colorcodes);
-	void RemergeColorCodes(std::list<word>* words, std::list<colorcode>& colorcodes) const;
+	void SplitTextInWords(const spring::u8string& text, std::list<word>* words, std::list<ColorCode>& colorCodes);
+	void RemergeColorCodes(std::list<word>* words, const std::list<ColorCode>& colorCodes) const;
 
 	void AddEllipsis(std::list<line>& lines, std::list<word>& words, float maxWidth);
 

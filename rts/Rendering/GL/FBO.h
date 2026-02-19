@@ -25,6 +25,7 @@ public:
 	 * if FrameBuffers are supported by the current platform
 	 */
 	static bool IsSupported();
+	static bool IsReady();
 	static GLint GetCurrentBoundFBO();
 
 	FBO(         ) { Init(false); }

@@ -5,7 +5,7 @@
 #include <cinttypes> // uintptr_t
 #include <cstring> // strnlen
 #include <cstdlib>
-#include <cstdio>
+#include <cstdio> // utf8 safe on Linux
 #include <string>
 
 #include <array>
@@ -139,7 +139,7 @@ static std::string CreateAbsolutePath(const std::string& relativePath)
 		if (absolutePath.starts_with("./"))
 			absolutePath = absolutePath.substr(2);
 
-		absolutePath = FileSystemAbstraction::EnsurePathSepAtEnd(GetBinaryLocation()) + absolutePath;
+		absolutePath = FileSystem::EnsurePathSepAtEnd(GetBinaryLocation()) + absolutePath;
 	}
 
 	if (!FileSystem::FileExists(absolutePath))

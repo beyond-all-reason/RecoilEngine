@@ -8,6 +8,7 @@
 #include <vector>
 #include <al.h>
 #include <alc.h>
+#include <SDL.h>
 
 #include "System/Sound/ISound.h"
 #include "System/float3.h"
@@ -79,6 +80,7 @@ private:
 private:
 	void Cleanup();
 	void OpenOpenALDevice(const std::string& deviceName);
+	bool OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec);
 	void OpenLoopbackDevice(const std::string& deviceName);
 
 	void InitThread(int cfgMaxSounds);

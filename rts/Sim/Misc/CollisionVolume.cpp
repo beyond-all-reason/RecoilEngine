@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "CollisionVolume.h"
-#include "Rendering/Models/3DModel.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Features/Feature.h"
 #include "System/Matrix44f.h"

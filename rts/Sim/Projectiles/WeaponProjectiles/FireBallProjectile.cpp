@@ -32,7 +32,8 @@ CR_REG_METADATA_SUB(CFireBallProjectile, Spark, (
 ))
 
 
-CFireBallProjectile::CFireBallProjectile(const ProjectileParams& params): CWeaponProjectile(params)
+CFireBallProjectile::CFireBallProjectile(const ProjectileParams& params)
+	: CWeaponProjectile(params)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	projectileType = WEAPON_FIREBALL_PROJECTILE;
@@ -46,6 +47,8 @@ CFireBallProjectile::CFireBallProjectile(const ProjectileParams& params): CWeapo
 	validTextures[1] = IsValidTexture(projectileDrawer->explotex);
 	validTextures[2] = IsValidTexture(projectileDrawer->dguntex);
 	validTextures[0] = validTextures[1] || validTextures[2];
+
+	blockPreciseCol = true;
 }
 
 void CFireBallProjectile::Draw()

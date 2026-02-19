@@ -31,7 +31,7 @@ int NanoPieceCache::GetNanoPiece(CUnitScript* ownerScript) {
 		const int scriptPiece = ownerScript->QueryNanoPiece();
 		const int modelPiece  = ownerScript->ScriptToModel(scriptPiece);
 
-		if (ownerScript->PieceExists(scriptPiece)) {
+		if (auto* p = ownerScript->SafeGetPiece(scriptPiece); p) {
 			nanoPiece = modelPiece;
 
 			if (std::find(nanoPieces.begin(), nanoPieces.end(), nanoPiece) != nanoPieces.end()) {

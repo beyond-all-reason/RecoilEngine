@@ -18,8 +18,8 @@ namespace GL {
 		virtual ~TextureBase();
 
 		bool IsValid() const { return texID != 0; }
-		const auto GetId() const { return texID; }
-		const auto DisOwn() { ownTexID = false; return texID; }
+		auto GetId() const { return texID; }
+		auto DisOwn() { ownTexID = false; return texID; }
 
 		[[nodiscard]] GL::TexBind ScopedBind();
 		[[nodiscard]] GL::TexBind ScopedBind(uint32_t relSlot);
@@ -51,8 +51,8 @@ namespace GL {
 		Texture2D()
 			: TextureBase(0x0DE1/*GL_TEXTURE_2D*/)
 		{}
-		Texture2D(int xsize_, int ysize_, uint32_t intFormat_, const TextureCreationParams& tcp_, bool wantCompress = true);
-		Texture2D(const int2& size, uint32_t intFormat_, const TextureCreationParams& tcp_, bool wantCompress = true)
+		Texture2D(uint32_t xsize_, uint32_t ysize_, uint32_t intFormat_, const TextureCreationParams& tcp_, bool wantCompress = true);
+		Texture2D(const uint2& size, uint32_t intFormat_, const TextureCreationParams& tcp_, bool wantCompress = true)
 			: Texture2D(size.x, size.y, intFormat_, tcp_, wantCompress)
 		{}
 
@@ -94,6 +94,7 @@ namespace GL {
 		}
 		void UploadSubImage(const void* data, int xOffset, int yOffset, int width, int height, int level = 0) const;
 		void ProduceMipmaps() const override;
+		const auto& GetSize() const { return size; }
 	private:
 		int2 size;
 	};
@@ -104,8 +105,8 @@ namespace GL {
 			: TextureBase(0x8C1A/*GL_TEXTURE_2D_ARRAY*/)
 			, numPages(0)
 		{}
-		Texture2DArray(int xsize_, int ysize_, int numPages_, uint32_t intFormat_, const TextureCreationParams& tcp_, bool wantCompress = true);
-		Texture2DArray(const int2& size, int numPages_, uint32_t intFormat_, const TextureCreationParams& tcp_, bool wantCompress = true)
+		Texture2DArray(uint32_t xsize_, uint32_t ysize_, uint32_t numPages_, uint32_t intFormat_, const TextureCreationParams& tcp_, bool wantCompress = true);
+		Texture2DArray(const uint2& size, uint32_t numPages_, uint32_t intFormat_, const TextureCreationParams& tcp_, bool wantCompress = true)
 			: Texture2DArray(size.x, size.y, numPages_, intFormat_, tcp_, wantCompress)
 		{}
 
@@ -147,8 +148,10 @@ namespace GL {
 		}
 		void UploadSubImage(const void* data, int layer, int xOffset, int yOffset, int width, int height, int level = 0) const;
 		void ProduceMipmaps() const override;
+		const auto& GetSize() const { return size; }
+		auto GetNumPages() const { return numPages; }
 	private:
 		int2 size;
-		int numPages;
+		uint32_t numPages;
 	};
 }

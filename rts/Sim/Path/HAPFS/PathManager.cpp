@@ -442,7 +442,7 @@ unsigned int CPathManager::RequestPath(
 	if (!IsFinalized())
 		return 0;
 
-	if (!immediateResult) {
+	if (synced && !immediateResult) {
 		assert(!ThreadPool::inMultiThreadedSection);
 
 		PathSearch* existingSearch = nullptr;

@@ -57,6 +57,7 @@ target_link_libraries(GameHeadless PRIVATE
 	RmlUi::Core
 	prd::jsoncpp
 	streflop
+	nowide::nowide
 )
 ### Build the executable
 add_executable(engine-headless ${engineSources} ${ENGINE_ICON})

@@ -405,9 +405,7 @@ void CVFSHandler::SwapArchiveSections(Section src, Section dst)
 
 std::string CVFSHandler::GetNormalizedPath(const std::string& rawPath)
 {
-	std::string lcPath = StringToLower(rawPath);
-	std::string nPath = std::move(FileSystem::ForwardSlashes(lcPath));
-	return nPath;
+	return FileSystem::GetNormalizedPath(StringToLower(rawPath));
 }
 
 

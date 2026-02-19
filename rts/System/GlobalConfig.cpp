@@ -22,7 +22,13 @@ CONFIG(int, NetworkTimeout)
 
 CONFIG(int, ReconnectTimeout)
 	.defaultValue(15)
-	.minimumValue(0);
+	.minimumValue(0)
+	.description("On client defines time to wait before reconnection is initiated with the "
+	             "server. On server defines time to wait before reconnection from unknown "
+	             "address can be accepted. Reconnect is required only when client's address "
+	             "changed during the game. Value needs to be smaller than the value of "
+	             "'InitialNetworkTimeout' and 'NetworkTimeout' to trigger. Value '0' "
+	             "disables the feature on server or client side.");
 
 CONFIG(int, MaximumTransmissionUnit)
 	.defaultValue(1400)

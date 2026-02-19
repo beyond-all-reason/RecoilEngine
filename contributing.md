@@ -4,7 +4,7 @@
 * To report a bug or make a suggestion/request, [create a github ticket](https://github.com/beyond-all-reason/RecoilEngine/issues/new/choose).
 * If you want to contribute something **not covered by an existing ticket, make one or at least talk to responsible devs listed below** to make sure your work won't get rejected.
 * Be aware that we're volunteers working in our free time, every interaction may take a while.
-* Consider getting familiar with [the build process](https://beyond-all-reason.github.io/RecoilEngine/development) and [guides](https://beyond-all-reason.github.io/RecoilEngine/guides)/[articles](https://beyond-all-reason.github.io/RecoilEngine/articles) relating to your contribution area.
+* Consider getting familiar with [the build process](https://recoilengine.org/development/) and [guides](https://recoilengine.org/docs/guides/)/[articles](https://recoilengine.org/articles/) relating to your contribution area.
 * If an existing ticket provides a bill of materials it is strongly recommended to follow it.
 * Keep in mind Recoil is not just for BAR. Don't put overt game design in the engine.
 

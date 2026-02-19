@@ -14,6 +14,8 @@
 #include "Rendering/ModelsDataUploader.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/VBO.h"
+#include "Rendering/Models/3DModel.hpp"
+#include "Rendering/Models/ModelsMemStorage.h"
 #include "Rendering/Env/Particles/ProjectileDrawer.h"
 #include "Sim/Objects/SolidObjectDef.h"
 #include "Sim/Features/Feature.h"

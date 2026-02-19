@@ -120,7 +120,17 @@ public:
 
 		return (minLevels == std::numeric_limits<int>::max()) ? 0 : minLevels;
 	}
-	uint32_t GetNumPages() const override { return allocators.size(); }
+
+	int GetReqNumTexLevels() const override
+	{
+		int reqLevels = std::numeric_limits<int>::max();
+		for (auto& allocator : allocators) {
+			reqLevels = std::min(reqLevels, allocator->GetNumTexLevels());
+		}
+
+		return (reqLevels == std::numeric_limits<int>::max()) ? 0 : reqLevels;
+	}
+	uint32_t GetNumPages() const override { return static_cast<uint32_t>(allocators.size()); }
 private:
 	uint32_t maxPages;
 	std::vector<std::unique_ptr<AtlasAlloc>> allocators;

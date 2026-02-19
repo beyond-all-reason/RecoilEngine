@@ -119,7 +119,7 @@ namespace GL {
 		return *this;
 	}
 
-	Texture2D::Texture2D(int xsize_, int ysize_, uint32_t intFormat_, const TextureCreationParams& tcp, bool wantCompress)
+	Texture2D::Texture2D(uint32_t xsize_, uint32_t ysize_, uint32_t intFormat_, const TextureCreationParams& tcp, bool wantCompress)
 		: Texture2D()
 	{
 		size = int2(xsize_, ysize_);
@@ -183,7 +183,7 @@ namespace GL {
 	}
 
 
-	Texture2DArray::Texture2DArray(int xsize_, int ysize_, int numPages_, uint32_t intFormat_, const TextureCreationParams& tcp, bool wantCompress)
+	Texture2DArray::Texture2DArray(uint32_t xsize_, uint32_t ysize_, uint32_t numPages_, uint32_t intFormat_, const TextureCreationParams& tcp, bool wantCompress)
 		: Texture2DArray()
 	{
 		size = int2(xsize_, ysize_);

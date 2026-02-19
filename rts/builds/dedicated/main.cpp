@@ -6,6 +6,8 @@
 #include <windows.h>
 #endif
 
+#include <nowide/args.hpp>
+
 #include "Game/GameSetup.h"
 #include "Game/ClientSetup.h"
 #include "Game/GameData.h"
@@ -27,6 +29,7 @@
 #include "System/Log/DefaultFilter.h"
 #include "System/LogOutput.h"
 #include "System/Misc/SpringTime.h"
+#include "System/Platform/ConsoleInit.hpp"
 #include "System/Platform/CrashHandler.h"
 #include "System/Platform/errorhandler.h"
 #include "System/Platform/Threading.h"
@@ -107,6 +110,8 @@ void ParseCmdLine(int argc, char* argv[], std::string& scriptName)
 
 int main(int argc, char* argv[])
 {
+	nowide::args a(argc, argv); // Fix arguments - make them UTF-8
+
 	Threading::SetMainThread();
 	try {
 		spring_clock::PushTickRate();
@@ -121,6 +126,8 @@ int main(int argc, char* argv[])
 		gflags::SetUsageMessage("Usage: " + binaryName + " [options] path_to_script.txt");
 		gflags::SetVersionString(SpringVersion::GetFull());
 		gflags::ParseCommandLineFlags(&argc, &argv, true);
+		Recoil::InitConsole();
+
 		ParseCmdLine(argc, argv, scriptName);
 
 		CLogOutput::LogSectionInfo();

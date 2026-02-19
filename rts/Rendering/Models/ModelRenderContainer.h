@@ -1,15 +1,16 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef MODEL_RENDER_CONTAINER_HDR
-#define MODEL_RENDER_CONTAINER_HDR
-
-#define MDL_TYPE(o) (o->model->type)
+#pragma once
 
 #include <array>
 #include <vector>
 
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModelDefs.hpp"
 #include "System/ContainerUtil.h"
+#include "System/ForceInline.hpp"
+
+template<typename T>
+RECOIL_FORCE_INLINE const auto& MDL_TYPE(T* o) { return o->model->type; }
 
 template<typename TObject>
 class ModelRenderContainerSelector {
@@ -114,6 +115,3 @@ public:
 
 	const ObjectBin& GetObjectBin(unsigned int idx) const { return bins[idx]; }
 };
-
-#endif
-

@@ -1,12 +1,13 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "3DModelVAO.h"
+#include "3DModelVAO.hpp"
 
 #include <algorithm>
 #include <iterator>
 
-#include "Rendering/Models/3DModel.h"
-#include "Rendering/Models/IModelParser.h"
+#include "3DModel.hpp"
+#include "3DModelPiece.hpp"
+#include "IModelParser.h"
 #include "Rendering/ModelsDataUploader.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
@@ -66,6 +67,8 @@ S3DModelVAO::S3DModelVAO()
 	instVBO.New(S3DModelVAO::INSTANCE_BUFFER_NUM_ELEMS * sizeof(SInstanceData), GL_STREAM_DRAW);
 	instVBO.Unbind();
 }
+
+std::unique_ptr<S3DModelVAO> S3DModelVAO::instance = nullptr;
 
 void S3DModelVAO::ProcessVertices(const S3DModel* model)
 {

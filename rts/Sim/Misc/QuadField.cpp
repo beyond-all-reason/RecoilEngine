@@ -49,7 +49,7 @@ CR_REG_METADATA_SUB(CQuadField, Quad, (
 
 
 CQuadField quadField;
-
+//#define DEBUG_QUADFIELD
 
 void CQuadField::Quad::PostLoad()
 {

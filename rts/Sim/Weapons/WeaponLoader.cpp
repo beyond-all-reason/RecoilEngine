@@ -24,19 +24,28 @@
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
+#include "Sim/Units/UnitDefHandler.h"
 #include "System/Log/ILog.h"
 
 #include "System/Misc/TracyDefs.h"
 
-static std::array<uint8_t, 2048> udWeaponCounts;
+static std::vector<uint8_t> udWeaponCounts;
 
 WeaponMemPool weaponMemPool;
 
 static_assert((sizeof(UnitDef::weapons) / sizeof(UnitDef::weapons[0])) == MAX_WEAPONS_PER_UNIT, "");
 static_assert(MAX_WEAPONS_PER_UNIT < std::numeric_limits<decltype(udWeaponCounts)::value_type>::max(), "");
 
-void CWeaponLoader::InitStatic() { udWeaponCounts.fill(MAX_WEAPONS_PER_UNIT + 1); weaponMemPool.reserve(128); }
-void CWeaponLoader::KillStatic() { udWeaponCounts.fill(MAX_WEAPONS_PER_UNIT + 1); weaponMemPool.clear(); }
+void CWeaponLoader::InitStatic(const CUnitDefHandler *udh) {
+	udWeaponCounts.clear();
+	udWeaponCounts.resize(udh->NumUnitDefs() + 1, MAX_WEAPONS_PER_UNIT + 1);
+	weaponMemPool.reserve(128);
+}
+void CWeaponLoader::KillStatic() {
+	udWeaponCounts.clear();
+	udWeaponCounts.shrink_to_fit();
+	weaponMemPool.clear();
+}
 
 
 
@@ -44,19 +53,25 @@ void CWeaponLoader::LoadWeapons(CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const UnitDef* unitDef = unit->unitDef;
-	const UnitDefWeapon* udWeapons = &unitDef->GetWeapon(0);
 
-	unsigned int i = 0;
-	unsigned int n = 0;
+	assert(unitDef->id < udWeaponCounts.size());
+	auto& wc = udWeaponCounts[unitDef->id];
 
-	if ((n = udWeaponCounts.at(unitDef->id)) > MAX_WEAPONS_PER_UNIT)
-		n = (udWeaponCounts.at(unitDef->id) = unitDef->NumWeapons());
+	// initialize only once per unitdef as this function deals with units and not their defs
+	if (wc > MAX_WEAPONS_PER_UNIT)
+		wc = unitDef->NumWeapons();
 
-	for (unit->weapons.reserve(n); i < n; i++) {
-		CWeapon* weapon = LoadWeapon(unit, udWeapons[i].def);
+	// unitDef->NumWeapons() is guaranteed to be <= MAX_WEAPONS_PER_UNIT
+	unit->weapons.reserve(wc);
+
+	for (size_t i = 0, cwc = 0; cwc < wc && i < MAX_WEAPONS_PER_UNIT; ++i) {
+		CWeapon* weapon = LoadWeapon(unit, unitDef->GetWeapon(i).def);
+		if (!weapon)
+			continue;
 
 		weapon->SetWeaponNum(unit->weapons.size());
 		unit->weapons.push_back(weapon);
+		++cwc;
 	}
 }
 
@@ -189,6 +204,7 @@ void CWeaponLoader::InitWeapon(CUnit* owner, CWeapon* weapon, const UnitDefWeapo
 	weapon->weaponAimAdjustPriority = defWeapon->weaponAimAdjustPriority;
 	weapon->fastAutoRetargeting = defWeapon->fastAutoRetargeting;
 	weapon->fastQueryPointUpdate = defWeapon->fastQueryPointUpdate;
+	weapon->accurateLeading = defWeapon->accurateLeading;
 	weapon->burstControlWhenOutOfArc = defWeapon->burstControlWhenOutOfArc;
 	weapon->rangefrombase = defWeapon->rangefrombase;
 

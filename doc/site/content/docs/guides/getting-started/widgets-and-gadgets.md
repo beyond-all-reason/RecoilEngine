@@ -3,21 +3,39 @@ title = "Widgets and Gadgets"
 weight = 1
 +++
 
-Strictly speaking, Recoil does not have a concept of UI and game rules. It simply has a `draw` command, and a number of so-called "callins" that lua scripts can respond to. Most games, however, have abstractions on top of this to make these much simpler. By far the most pervasive of these are the "Widgets" and "Gadgets", collectively known as "Addons". Pretty much everything you will be doing during the course of developing your game will concern addons, unit defs, and feature defs. Let's take a look at some of the concepts here.
+## Introduction
+Before we get to Widgets and Gadgets we will start with an overview of some key areas of Recoil and the entry points into game code.
 
-## Addons
+### Engine Concepts Refresh
+- Synced mode is the environment that affects game simulation e.g ordering units around. Synced commands are distributed and run by all players in the game to ensure the simulation remains synced. 
+- Unsynced mode is the players own environment, functionality here could for example enhance controls, display helpful information.
 
-Addons are files that override callins. For a refresher, callins (or callbacks) are functions that are invoked by the engine to define specific behavior. For those that are familiar with other engines, this is analagous to the virtual script functions in others like `func _process(delta: float)` in Godot, or `void Update(float delta)` in Unity. This isn't exact, however; for more information, see the "Handlers" section, but at the high level this is the general concept.
+When in Unsynced mode LuaIntro, LuaUi, LuaRules and LuaGaia provide read access to synced but only LuaRules and LuaGaia have full access to simulation information (all players units etc.). In LuaIntro and LuaUi read access to synced is scoped to just what that player can see i.e. observing LoS & radar ranges. 
 
-### Synced and Unsynced
+### Key Areas
+- LuaRules - Generally home to lower level customisations that affect unit behavior or overall game operation
+- LuaGaia - The controller of world objects not owned by a player (e.g wrecks, map features)
+- LuaIntro - The handler for showing the game load screens.
+- LuaMenu - The handler for showing the main menu, both present on game launch (if no script is specified) and can be switched back to at any time during the game.
+- LuaUI - The handler for the in-game UI.
 
-This is an incredibly importand concept in regards to addons. When you write an addon, you are really writing *two* addons: one that runs in a synced context, and one in an unsynced context. But, what does this mean?
-- Synced code is anything that affects the game simulation: ordering units around, etc. since it runs on a fixed tick rate.
-- Unsynced code is anything that doesn't care about the tick rate of the simulation state, like reading unit position, etc.
+### Entrypoint into Lua code
+Each of these handlers will provide a Lua environment with some predefined globals and start by executing a main.lua file within their respective folders in the game. (LuaGaia and LuaRules have two entry points main.lua for Synced and draw.lua for Unsynced) [more information on the environments and what is available is here](https://springrts.com/wiki/Lua:Environments) 
 
-### Basic Outline
+To allow you to control and extend the game/engine behavior predefined functions in your lua code will be called (if they are present) by the engine at certain hook points or on events in the engine. These are commonly referred to as call-ins (but could also be known as event handlers, callbacks). The list of available call-ins is extensive and can be retrieved in Lua using Script.GetCallInList()
 
-Both widgets and gadgets follow this basic blueprint:
+## Widgets and Gadgets
+Widgets and Gadgets are concepts that have been adopted by several games using Recoil as a modular way to extend the game and are not an engine level concept. Practically at a general functionality level both widgets and gadgets are the same and often abstracted to just the term addon. The different terms are mostly used to logically separate the types of addons.
+
+Gadgets typically being lower level game logic, unit behaviour functionality that defines your game and should be present for all players, they are typically only found in LuaRules and LuaGaia and are often included using VFS.ZIP_ONLY so as not to be easily overridden by end users (your packaged version takes priority). 
+
+Widgets usually involve improving UX or showing helpful UI interfaces, and are often considered things that users can turn on/off in the game to suit their needs, be it through settings or a widget manager UI. They are usually specific to LuaIntro, LuaMenu and LuaUi.
+
+To manage the invocation of Widgets & Gadgets a "**handler**" is setup in the Lua entrypoint. For environments with synced and unsyned entry points these typically use the same handler which calls the same widgets/gadgets but use a function the he handler like IsSyncedCode to check if they are being run in synced mode or unsynced mode and running the appropriate section of code.
+
+### Basic Addon Outline
+
+Both widgets and gadgets usually follow a basic blueprint like this:
 
 ```lua
 -- There is an injected global called addon/widget/gadget.
@@ -36,7 +54,7 @@ end
 
 -- Actual functional code
 
-if addonHandler:isSynced() then
+if addonHandler:IsSyncedCode() then
     -- Your synced code goes here.
     function addon:Initialize()
         Spring.Echo("We have liftoff!")
@@ -66,49 +84,61 @@ end
 
 ```
 
-## Widgets - UI
-
-Widgets are addons that specialize in adding UI to your game. Synced code for these are buttons that affect the world, such as issuing commands. These lie in the "LuaUI/Widgets" folder. There are a few UI frameworks available to you if you'd rather not make your own. The major ones are:
-- Chili: A legacy UI framework using a retained-mode model. It's largely unmaintained and should be considered EOL, but it still functions.
-- RmlUi: A brand-new HTML/CSS style UI framework. If you have experience with web dev, you will feel at home here. It's very new, so the documentation and implementation has some rough edges. See the [article on it](docs/guides/ui/getting started with rmlui.md).
-
-TODO: Example
-TODO: Link to docs
-
-## Gadgets - Game logic
-
-Gadgets are anything that affects how the game works: unit commands, behaviors, that sort of thing. This is where the vast majority of your game code and logic will lie. These lie in the "LuaRules/Gadgets" folder.
-
-TODO: An example of a unit action
-TODO: Link to docs
-
 ## Handlers
+Handlers are the code that runs in the entry point to load in addons/widgets/gadgets and distribute callins to them, and example implementation of a handler is included in the [Recoil base content](https://github.com/beyond-all-reason/RecoilEngine/blob/master/cont/base/springcontent/LuaHandler/handler.lua) for LuaIntro, LuaRules and LuaUi, and will likely do well for a simple game, although many games eventually choose to make their own handlers. This means for LuaIntro and LuaUi you can start creating widgets without worrying about handlers in the luaintro/widgets or luaui/widgets folders, and for creating gadgets for LuaRules in luarules/gadgets folder.
 
-Let's talk about *how* addons are implemented. This is by using "**handlers**". Example implementations of these handlers are found in [basecontent]({{% ref "/docs/guides/getting-started/basecontent" %}}), and do well for a simple game, although many games eventually choose to make their own handlers.
-
-What *are* handlers, though? They keep track of registered addons, and forward callins to them. They can be thought of as sort of like an API endpoint, for the web devs out there. The handler receives callins from the engine, and then forwards them to the addons. Let's take a look at a pseudocode handler:
-
+Below is a very simplified pseudocode example of a handler is below to illustrate adding a gadget and forwarding callins to gadgets.
 ```lua
 --- @class GadgetHandler
 --- @field gadgets Gadget[]
 GadgetHandler = {
-    gadgets = {}
+    gadgets = {},
+    shared_table = {}
 }
 
 --- @param file string filepath to gadget
-function GadgetHandler:add_gadget(self, file)
+function register_gadget(file)
+    if not VFS.FileExists(filename) then
+        return {}
+    end
+    
+    local gadget_env = {}
+    gadget_env.shared_table = GadgetHandler.shared_table
+    local success, rvalue = pcall(VFS.Include, filename, gadget_env)
+    if success then
+        return gadget_env.gadget
+    end
+    
+    return {}
+end
+
+--- @param file string filepath to gadget
+function GadgetHandler:add_gadget(file)
     local new_gadget = register_gadget(file)
-    table.insert(self.gadgets, new_gadget)
+    table.insert(GadgetHandler.gadgets, new_gadget)
 end
 
 --- @param delta number
-function callins:Update(self, delta)
-    for _, gadget in self.gadgets do
+function Update(delta)
+    for _, gadget in GadgetHandler.gadgets do
         if gadget:Update then
             gadget:Update(delta)
         end
     end
 end
+
+Spring.UpdateCallin('Update')
+
+GadgetHandler:add_gadget("luarules/gadgets/testwidget.lua")
 ```
 
-This isn't how it's implemented exactly, but it illustrates the concept. The gadgets are loaded from a file and added to the handler's list of gadgets. When a callin is triggered, such as `Update` here, it calls `Update()` on all gadgets that have it overridden.
+This isn't how it's implemented exactly, but it illustrates the concept. The gadgets are loaded from a file and added to the handler's list of gadgets. When a callin is triggered, such as `Update` here, it calls `Update()` on all gadgets that have it overridden (be aware that the available callins vary by endpoint (Intro/Menu/Ui/Rules/Gaia) you can use Script.GetCallInList() to check what is available).
+
+## Widget/Gadget Communication
+For information on how widgets and gadgets can communicate between themselves and to other environments see [Wupget communication and best practices]({{% ref "../wupget" %}})
+
+## Creating User Interfaces
+
+Whether you decide to use a widget based approach or not you will inevitably need to create user interfaces in the game, there are two main options for doing this:-
+- OpenGL drawing, this can be done with direct OpenGL commands using the `gl` global provided in Lua environment or using a framework like [FlowUi](https://github.com/beyond-all-reason/Beyond-All-Reason/blob/master/luaui/Widgets/flowui_gl4.lua) from Beyond All Reason or Chili [Chili](https://springrts.com/wiki/Chili) from the game lobby Chobby.
+- Recoil has built in support for the [RmlUi framework](https://mikke89.github.io/RmlUiDoc/) which allows you to create user interfaces using HTML/CSS style markup, this was added in 2024. There is a recoil specific article on it here [article on it]({{% ref "getting-started-with-rmlui" %}}).

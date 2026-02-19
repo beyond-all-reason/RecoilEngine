@@ -71,6 +71,7 @@ CONFIG(bool, MiniMapIcons).defaultValue(true).headlessValue(false);
 CONFIG(int, MiniMapDrawCommands).defaultValue(1).headlessValue(0).minimumValue(0);
 
 CONFIG(bool, MiniMapDrawProjectiles).defaultValue(true).headlessValue(false);
+CONFIG(bool, MiniMapDrawPings).defaultValue(true).headlessValue(false).description("Whether to draw pings on the minimap.");
 CONFIG(bool, SimpleMiniMapColors).defaultValue(false);
 
 CONFIG(bool, MiniMapRenderToTexture).defaultValue(true).safemodeValue(false).description("Asynchronous render MiniMap to a texture independent of screen FPS.");
@@ -107,7 +108,7 @@ CMiniMap::CMiniMap()
 
 	ConfigUpdate();
 
-	configHandler->NotifyOnChange(this, {"DualScreenMiniMapAspectRatio", "MiniMapCanFlip", "MiniMapDrawProjectiles", "MiniMapCursorScale", "MiniMapIcons", "MiniMapDrawCommands", "MiniMapButtonSize"});
+	configHandler->NotifyOnChange(this, {"DualScreenMiniMapAspectRatio", "MiniMapCanFlip", "MiniMapDrawProjectiles", "MiniMapDrawPings", "MiniMapCursorScale", "MiniMapIcons", "MiniMapDrawCommands", "MiniMapButtonSize"});
 
 	UpdateGeometry();
 
@@ -191,6 +192,7 @@ void CMiniMap::ConfigUpdate()
 	aspectRatio = configHandler->GetBool("DualScreenMiniMapAspectRatio");
 	buttonSize = configHandler->GetInt("MiniMapButtonSize");
 	drawProjectiles = configHandler->GetBool("MiniMapDrawProjectiles");
+	drawPings = configHandler->GetBool("MiniMapDrawPings");
 	drawCommands = configHandler->GetInt("MiniMapDrawCommands");
 	cursorScale = configHandler->GetFloat("MiniMapCursorScale");
 	useIcons = configHandler->GetBool("MiniMapIcons");
@@ -397,6 +399,12 @@ void CMiniMap::ConfigCommand(const std::string& line)
 		} break;
 		case hashString("drawprojectiles"): {
 			drawProjectiles = (words.size() >= 2) ? !!atoi(words[1].c_str()) : !drawProjectiles;
+		} break;
+		case hashString("drawpings"): {
+			drawPings = (words.size() >= 2) ? !!atoi(words[1].c_str()) : !drawPings;
+			if (!drawPings) {
+				notes.clear();
+			}
 		} break;
 		case hashString("simplecolors"): {
 			simpleColors = (words.size() >= 2) ? !!atoi(words[1].c_str()) : !simpleColors;
@@ -995,6 +1003,11 @@ std::string CMiniMap::GetTooltip(int x, int y)
 void CMiniMap::AddNotification(float3 pos, float3 color, float alpha)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	if (!drawPings) {
+		return;
+	}
+
 	Notification n;
 	n.pos = pos;
 	n.color[0] = color.x;
@@ -1675,7 +1688,7 @@ void CMiniMap::DrawButtons()
 void CMiniMap::DrawNotes()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (notes.empty()) {
+	if (notes.empty() || !drawPings) {
 		return;
 	}
 

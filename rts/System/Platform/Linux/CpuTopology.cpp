@@ -31,9 +31,61 @@ Vendor detect_cpu_vendor() {
 	return VENDOR_UNKNOWN;
 }
 
-// Get number of logical CPUs
-int get_cpu_count() {
-	return sysconf(_SC_NPROCESSORS_CONF);
+std::vector<int> get_online_cpus() {
+	std::vector<int> cpus;
+	std::ifstream file("/sys/devices/system/cpu/online");
+	if (file) {
+		// This is a comma-seperated list of ranges
+		// or single values.
+		// Ex: 0,2,4,6 or 0-7 or 0-3,8-15
+		std::string line;
+		std::getline(file, line);
+		std::istringstream ss(line);
+		int min_cpu;
+		int max_cpu;
+		char sep;
+		while (ss >> min_cpu) {
+			if ((ss >> sep) && sep == '-') {
+				// Range of CPUs separted by '-'
+				if (!(ss >> max_cpu)) {
+					// Should not ever happen (would need to be a malformed online file)
+					if (min_cpu >= MAX_CPUS) {
+						LOG_L(L_WARNING, "CPU index %d exceeds bitset limit.", min_cpu);
+					} else {
+						cpus.push_back(min_cpu);
+					}
+					break;
+				}
+				for (int cpu = min_cpu; cpu <= max_cpu; ++cpu) {
+					if (cpu >= MAX_CPUS) {
+						LOG_L(L_WARNING, "CPU index %d exceeds bitset limit.", cpu);
+						continue;
+					}
+					cpus.push_back(cpu);
+				}
+				// Consume the trailing comma
+				ss >> sep;
+			} else {
+				// Single CPU
+				if (min_cpu >= MAX_CPUS) {
+					LOG_L(L_WARNING, "CPU index %d exceeds bitset limit.", min_cpu);
+					continue;
+				}
+				cpus.push_back(min_cpu);
+			}
+		}
+	} else {
+		// Fallback in case of permission issues reading from sysfs
+		int num_cpus = sysconf(_SC_NPROCESSORS_CONF);
+		for (int cpu = 0; cpu < num_cpus; ++cpu) {
+			if (cpu >= MAX_CPUS) {
+				LOG_L(L_WARNING, "CPU index %d exceeds bitset limit.", cpu);
+				continue;
+			}
+			cpus.push_back(cpu);
+		}
+	}
+	return cpus;
 }
 
 // Set CPU affinity to a specific core
@@ -98,14 +150,9 @@ void collect_intel_affinity_masks(std::bitset<MAX_CPUS> &eff_mask,
 								  std::bitset<MAX_CPUS> &perf_mask,
 								  std::bitset<MAX_CPUS> &low_ht_mask,
 								  std::bitset<MAX_CPUS> &high_ht_mask) {
-	int num_cpus = get_cpu_count();
+	const auto cpus = get_online_cpus();
 
-	for (int cpu = 0; cpu < num_cpus; ++cpu) {
-		if (cpu >= MAX_CPUS) {
-			LOG_L(L_WARNING, "CPU index %d exceeds bitset limit.", cpu);
-			continue;
-		}
-
+	for (const auto cpu : cpus) {
 		CoreType core_type = get_intel_core_type(cpu);
 		// default to performance core.
 		if (core_type == CORE_UNKNOWN) core_type = CORE_PERFORMANCE;
@@ -122,14 +169,9 @@ void collect_amd_affinity_masks(std::bitset<MAX_CPUS> &eff_mask,
 								std::bitset<MAX_CPUS> &perf_mask,
 								std::bitset<MAX_CPUS> &low_smt_mask,
 								std::bitset<MAX_CPUS> &high_smt_mask) {
-	int num_cpus = get_cpu_count();
+	const auto cpus = get_online_cpus();
 
-	for (int cpu = 0; cpu < num_cpus; ++cpu) {
-		if (cpu >= MAX_CPUS) {
-			LOG_L(L_WARNING, "CPU index %d exceeds bitset limit.", cpu);
-			continue;
-		}
-
+	for (const auto cpu : cpus) {
 		perf_mask.set(cpu);
 
 		collect_smt_affinity_masks(cpu, low_smt_mask, high_smt_mask);
@@ -195,13 +237,9 @@ ProcessorGroupCaches& get_group_cache(ProcessorCaches& processorCaches, uint32_t
 // We are also only looking at L3 caches at the moment.
 ProcessorCaches GetProcessorCache() {
 	ProcessorCaches processorCaches;
-	int num_cpus = get_cpu_count();
+	const auto cpus = get_online_cpus();
 
-	for (int cpu = 0; cpu < num_cpus; ++cpu) {
-		if (cpu >= MAX_CPUS) {
-			LOG_L(L_WARNING, "CPU index %d exceeds bitset limit.", cpu);
-			continue;
-		}
+	for (const auto cpu : cpus) {
 		uint32_t cacheSize = get_thread_cache(cpu);
 		ProcessorGroupCaches& groupCache = get_group_cache(processorCaches, cacheSize);
 

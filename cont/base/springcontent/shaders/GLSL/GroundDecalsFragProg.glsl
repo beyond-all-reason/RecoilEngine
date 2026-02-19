@@ -1,3 +1,5 @@
+#version 400 compatibility
+
 #ifdef HIGH_QUALITY
 	uniform sampler2DMS depthTex;
 #else

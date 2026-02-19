@@ -58,7 +58,8 @@
 #include "Rendering/Env/MapRendering.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/TexBind.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModelMisc.hpp"
+#include "Rendering/Models/3DModelPiece.hpp"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Textures/Bitmap.h"
 #include "Rendering/Textures/TextureAtlas.h"
@@ -4734,7 +4735,7 @@ int LuaOpenGL::MultiTexGen(lua_State* L)
  * For format parameters refer to
  * https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindImageTexture.xhtml
  * and
- * https://beyond-all-reason.github.io/RecoilEngine/lua-api/types/GL#rgba32f
+ * https://recoilengine.org/docs/lua-api/#GL.RGBA32F and further
  * 
  * Example uses
  * local my_texture_id = gl.CreateTexture(...)

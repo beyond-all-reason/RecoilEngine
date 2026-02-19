@@ -40,6 +40,11 @@
 #include "fmt/format.h"
 #include "fmt/printf.h"
 
+#ifdef _WIN32
+	#include <nowide/convert.hpp>
+#endif // _WIN32
+
+
 #include "System/Misc/TracyDefs.h"
 
 #define SUPPORT_AMD_HACKS_HERE
@@ -129,7 +134,9 @@ public:
 		if (basePattern) {
 			FcPatternDestroy(basePattern);
 		}
-		FcFini();
+		// Not calling FcFini since it can cause problems on shutdown because of conflicts with window
+		// decorations also using fontconfig.
+		//FcFini();
 		config = nullptr;
 		#endif
 	}
@@ -174,13 +181,16 @@ public:
 			// and system fonts included. also linux actually has system config files that can be used by fontconfig.
 
 			#ifdef _WIN32
-			static constexpr auto winFontPath = "%WINDIR%\\fonts";
+			static constexpr auto winFontPath = L"%WINDIR%\\fonts";
 			const int neededSize = ExpandEnvironmentStrings(winFontPath, nullptr, 0);
-			std::vector <char> osFontsDir (neededSize);
+			std::vector <TCHAR> osFontsDir(neededSize);
 			ExpandEnvironmentStrings(winFontPath, osFontsDir.data(), osFontsDir.size());
 
-			static constexpr const char* configFmt = R"(<fontconfig><dir>%s</dir><cachedir>fontcache</cachedir></fontconfig>)";
-			const std::string configFmtVar = fmt::sprintf(configFmt, osFontsDir.data());
+			std::wostringstream ss;
+			ss << "<fontconfig><dir>" << std::wstring(osFontsDir.data()) << "</dir><cachedir>fontcache</cachedir></fontconfig>";
+
+			// pass utf8 to fontconfig and hope for the best
+			const std::string configFmtVar = nowide::narrow(ss.str());
 			#else
 			const std::string configFmtVar = R"(<fontconfig><cachedir>fontcache</cachedir></fontconfig>)";
 			#endif
@@ -253,7 +263,7 @@ public:
 
 	void InitFailed() {
 		FcConfigDestroy(config);
-		FcFini();
+		//FcFini();
 		config = nullptr;
 	}
 	static bool InitSingletonFontconfig(bool console) { return singleton->InitFontconfig(console); }
@@ -320,8 +330,10 @@ private:
 	bool searchFontAttributes;
 	bool searchApplySubstitutions;
 
-	static inline std::unique_ptr<FtLibraryHandler> singleton = nullptr;
+	static std::unique_ptr<FtLibraryHandler> singleton;
 };
+
+std::unique_ptr<FtLibraryHandler> FtLibraryHandler::singleton = nullptr;
 #endif
 
 
@@ -1162,7 +1174,9 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& allWanted)
 			thisGlyph.texCord       = IGlyphRect(texpos1.x1, texpos1.y1, texpos1.x2 - texpos1.x1, texpos1.y2 - texpos1.y1);
 			thisGlyph.shadowTexCord = IGlyphRect(texpos2.x1, texpos2.y1, texpos2.x2 - texpos2.x1, texpos2.y2 - texpos2.y1);
 
-			const size_t glyphIdx = reinterpret_cast<size_t>(atlasAlloc.GetEntryData(glyphName));
+			auto it = glyphNameToIdx.find(glyphName);
+			assert(it != glyphNameToIdx.end());
+			const size_t glyphIdx = it != glyphNameToIdx.end() ? it->second : 0;
 
 			assert(glyphIdx < atlasGlyphs.size());
 
@@ -1182,6 +1196,7 @@ void CFontTexture::LoadWantedGlyphs(const std::vector<char32_t>& allWanted)
 		}
 
 		atlasAlloc.clear();
+		glyphNameToIdx.clear();
 		atlasGlyphs.clear();
 	}
 
@@ -1286,8 +1301,9 @@ void CFontTexture::LoadGlyph(std::shared_ptr<FontFace>& f, char32_t ch, unsigned
 	else
 		atlasGlyphs.emplace_back(slot->bitmap.buffer, width, height, channels);
 
-	atlasAlloc.AddEntry(IntToString(ch)       , int2(width         , height         ), reinterpret_cast<void*>(atlasGlyphs.size() - 1));
-	atlasAlloc.AddEntry(IntToString(ch) + "sh", int2(width + olSize, height + olSize)                                                 );
+	atlasAlloc.AddEntry(IntToString(ch)       , int2(width         , height         ));
+	atlasAlloc.AddEntry(IntToString(ch) + "sh", int2(width + olSize, height + olSize));
+	glyphNameToIdx[IntToString(ch)] = atlasGlyphs.size() - 1;
 #endif
 }
 

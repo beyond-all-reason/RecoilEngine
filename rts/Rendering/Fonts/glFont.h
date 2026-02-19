@@ -166,7 +166,6 @@ private:
 extern std::shared_ptr<CglFont> font;
 extern std::shared_ptr<CglFont> smallFont;
 
-
 // wrappers
 float CglFont::GetTextWidth(const std::string& text)
 {

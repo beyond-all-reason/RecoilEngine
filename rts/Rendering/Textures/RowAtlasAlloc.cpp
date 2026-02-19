@@ -110,7 +110,7 @@ bool CRowAtlasAlloc::Allocate()
 	}
 	std::stable_sort(memtextures.begin(), memtextures.end(), CRowAtlasAlloc::CompareTex);
 
-	int padding = 1 << GetNumTexLevels();
+	int padding = GetPadding();
 
 	// find space for them
 	for (auto& curtex: memtextures) {
@@ -130,6 +130,7 @@ bool CRowAtlasAlloc::Allocate()
 	}
 
 	atlasSize.y = nextRowPos;
+	SizeRoundUp();
 
 	return success;
 }
@@ -138,9 +139,14 @@ int CRowAtlasAlloc::GetNumTexLevels() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return std::min(
-		std::bit_width(static_cast<uint32_t>(GetMinDim())),
+		GetReqNumTexLevels(),
 		numLevels
 	);
+}
+
+int CRowAtlasAlloc::GetReqNumTexLevels() const
+{
+	return std::bit_width(static_cast<uint32_t>(GetMinDim()));
 }
 
 

@@ -11,6 +11,8 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <nowide/cstdio.hpp>
+
 #include "Logger.h"
 #include "System/StringUtil.h"
 #include "System/SafeCStrings.h"
@@ -111,7 +113,7 @@ void CLogger::FlushBuffer()
 
 	if (!logfile) {
 		assert(filename);
-		if (!(logfile = fopen(filename, "a")))
+		if (!(logfile = nowide::fopen(filename, "a")))
 			return;
 
 		time_t t;

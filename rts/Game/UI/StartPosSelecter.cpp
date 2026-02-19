@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <SDL_mouse.h>
 
 #include "StartPosSelecter.h"
 #include "MouseHandler.h"
@@ -16,6 +17,7 @@
 #include "Rendering/Fonts/glFont.h"
 #include "Net/Protocol/NetProtocol.h"
 #include "Sim/Misc/TeamHandler.h"
+#include "Sim/Misc/ModInfo.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -83,6 +85,14 @@ bool CStartPosSelecter::Ready(bool luaForcedReady)
 bool CStartPosSelecter::MousePress(int x, int y, int button)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	if (button != SDL_BUTTON_LEFT)
+		return false;
+
+	if (modInfo.useStartPositionSelecter == false) {
+		return false;
+	}
+
 	// Not ready to process mouse clicks yet. Pass.
 	if (!game->IsDoneLoading())
 		return false;
@@ -105,92 +115,6 @@ bool CStartPosSelecter::MousePress(int x, int y, int button)
 
 	return true;
 }
-
-
-#if 0
-void CStartPosSelecter::DrawStartBox(GL::RenderDataBufferC* buffer, Shader::IProgramObject* shader) const
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	glAttribStatePtr->EnableDepthTest();
-
-	const AllyTeam& myStartData = teamHandler.GetAllyTeam(gu->myAllyTeam);
-
-	const float by = myStartData.startRectTop * mapDims.mapy * SQUARE_SIZE;
-	const float bx = myStartData.startRectLeft * mapDims.mapx * SQUARE_SIZE;
-
-	const float dy = (myStartData.startRectBottom - myStartData.startRectTop ) * mapDims.mapy * SQUARE_SIZE / 10;
-	const float dx = (myStartData.startRectRight  - myStartData.startRectLeft) * mapDims.mapx * SQUARE_SIZE / 10;
-
-	// draw starting-rectangle restrictions
-	for (int a = 0; a < 10; ++a) {
-		float3 pos1(bx + (a    ) * dx, 0.0f, by); // tl
-		float3 pos2(bx + (a + 1) * dx, 0.0f, by); // tr
-
-		pos1.y = CGround::GetHeightAboveWater(pos1.x, pos1.z, false);
-		pos2.y = CGround::GetHeightAboveWater(pos2.x, pos2.z, false);
-
-		buffer->AddVertex({pos1                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos2                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos2 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-
-		buffer->AddVertex({pos2 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos1 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos1                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-
-
-		pos1 = float3(bx + (a    ) * dx, 0.0f, by + dy * 10.0f);
-		pos2 = float3(bx + (a + 1) * dx, 0.0f, by + dy * 10.0f);
-		pos1.y = CGround::GetHeightAboveWater(pos1.x, pos1.z, false);
-		pos2.y = CGround::GetHeightAboveWater(pos2.x, pos2.z, false);
-
-		buffer->AddVertex({pos1                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos2                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos2 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-
-		buffer->AddVertex({pos2 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos1 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos1                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-
-
-		pos1 = float3(bx, 0.0f, by + dy * (a    ));
-		pos2 = float3(bx, 0.0f, by + dy * (a + 1));
-		pos1.y = CGround::GetHeightAboveWater(pos1.x, pos1.z, false);
-		pos2.y = CGround::GetHeightAboveWater(pos2.x, pos2.z, false);
-
-		buffer->AddVertex({pos1                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos2                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos2 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-
-		buffer->AddVertex({pos2 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos1 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos1                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-
-
-		pos1 = float3(bx + dx * 10.0f, 0.0f, by + dy * (a    ));
-		pos2 = float3(bx + dx * 10.0f, 0.0f, by + dy * (a + 1));
-		pos1.y = CGround::GetHeightAboveWater(pos1.x, pos1.z, false);
-		pos2.y = CGround::GetHeightAboveWater(pos2.x, pos2.z, false);
-
-		buffer->AddVertex({pos1                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos2                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos2 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-
-		buffer->AddVertex({pos2 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos1 + UpVector * 100.0f, {0.2f, 0.8f, 0.2f, 0.5f}});
-		buffer->AddVertex({pos1                    , {0.2f, 0.8f, 0.2f, 0.5f}});
-	}
-
-	shader->Enable();
-	GL::RenderDataBuffer::SetMatrixStackMode(shader, GL::RenderDataBuffer::ShaderTransformType::SHDR_TRANSFORM_ORTHO01);
-	//shader->SetUniformMatrix4x4<float>("u_movi_mat", false, CMatrix44f::Identity());
-	//shader->SetUniformMatrix4x4<float>("u_proj_mat", false, CMatrix44f::ClipOrthoProj01());
-	buffer->Submit(GL_TRIANGLES);
-	shader->Disable();
-
-	glAttribStatePtr->DisableDepthTest();
-}
-#endif
-
 
 void CStartPosSelecter::Draw()
 {

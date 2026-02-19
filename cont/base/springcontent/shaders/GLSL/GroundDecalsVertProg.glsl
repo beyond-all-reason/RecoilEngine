@@ -10,6 +10,9 @@ in vec4 createParams2;
 in vec4 createParams3;
 in vec4 createParams4;
 in uvec4 createParams5; // { type:8; id:24; }
+// unused below
+in vec4 userDefined0;
+in vec4 userDefined1;
 
 uniform sampler2D heightTex;
 uniform sampler2D groundNormalTex;

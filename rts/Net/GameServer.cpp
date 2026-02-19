@@ -795,7 +795,7 @@ float CGameServer::GetDemoTime() const {
 
 void CGameServer::Update()
 {
-	const float tdif = spring_tomsecs(spring_gettime() - lastUpdate) * 0.001f;
+	const float tdif = (spring_gettime() - lastUpdate).toSecsf();
 
 	gameTime += tdif;
 	lastUpdate = spring_gettime();
@@ -2718,10 +2718,11 @@ void CGameServer::UpdateLoop()
 		Threading::SetAffinity(~0);
 
 		while (!quitServer) {
-			spring_msecs(loopSleepTime).sleep(true);
 
 			if (udpListener != nullptr)
-				udpListener->Update();
+				udpListener->Update(loopSleepTime);
+			else
+				spring_msecs(loopSleepTime).sleep(true);
 
 			std::lock_guard<spring::recursive_mutex> scoped_lock(gameServerMutex);
 			ServerReadNet();

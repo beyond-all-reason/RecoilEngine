@@ -12,6 +12,7 @@
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
 #include "System/ContainerUtil.h"
+#include "System/HashSpec.h"
 #include "System/SafeUtil.h"
 #include "System/Config/ConfigHandler.h"
 
@@ -140,18 +141,24 @@ void CUnitScriptEngine::Tick(int deltaTime)
 	}
 	{
 		ZoneScopedN("CUnitScriptEngine::Tick(ST)");
-		for (size_t i = 0; i < animating.size(); ) {
-			currentScript = animating[i];
 
-			if (!currentScript->TickAnimFinished(deltaTime)) {
+		uint32_t cs = 0;
+		for (size_t i = 0; i < animating.size(); /*NO-OP*/) {
+			currentScript = animating[i];
+			// deal with synced checksum here, before animating is possibly popped below
+			cs = spring::hash_combine(currentScript->GetAnimArrayChecksum(), cs);
+
+			if (!currentScript->TickAnimFinished()) {
 				animating[i] = animating.back();
 				animating.pop_back();
 				continue;
 			}
 			i++;
 		}
+
+		currentScript = nullptr;
+		Sync::Assert(cs, "animating");
 	}
 
-	currentScript = nullptr;
 	cobEngine->RunDeferredCallins();
 }

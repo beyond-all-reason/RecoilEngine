@@ -40,6 +40,8 @@
 #include "Sim/Weapons/PlasmaRepulser.h"
 #include "Sim/Weapons/Weapon.h"
 #include "Sim/Weapons/WeaponDef.h"
+#include "Rendering/Models/3DModel.hpp"
+#include "Rendering/Models/3DModelPiece.hpp"
 #include "System/FastMath.h"
 #include "System/SpringMath.h"
 #include "System/Log/ILog.h"
@@ -54,11 +56,13 @@ CR_BIND_INTERFACE(CUnitScript)
 
 CR_REG_METADATA(CUnitScript, (
 	CR_MEMBER(unit),
+	CR_MEMBER(checksum),
 	CR_MEMBER(busy),
 	CR_MEMBER(anims),
 	CR_MEMBER(doneAnims),
 
 	//Populated by children
+	CR_IGNORED(rootPiece),
 	CR_IGNORED(pieces),
 	CR_IGNORED(hasSetSFXOccupy),
 	CR_IGNORED(hasRockUnit),
@@ -68,6 +72,7 @@ CR_REG_METADATA(CUnitScript, (
 CR_BIND(CUnitScript::AnimInfo,)
 
 CR_REG_METADATA_SUB(CUnitScript, AnimInfo,(
+	CR_MEMBER(animType),
 	CR_MEMBER(axis),
 	CR_MEMBER(piece),
 	CR_MEMBER(speed),
@@ -80,6 +85,7 @@ CR_REG_METADATA_SUB(CUnitScript, AnimInfo,(
 
 CUnitScript::CUnitScript(CUnit* unit)
 	: unit(unit)
+	, checksum(0)
 	, busy(false)
 	, hasSetSFXOccupy(false)
 	, hasRockUnit(false)
@@ -144,6 +150,20 @@ bool CUnitScript::TurnToward(float& cur, float dest, float speed)
 	return false;
 }
 
+// copy of MoveToward for now
+bool CUnitScript::ScaleToward(float& cur, float dest, float speed)
+{
+	const float delta = dest - cur;
+
+	if (math::fabsf(delta) <= speed) {
+		cur = dest;
+		return true;
+	}
+
+	cur += (speed * Sign(delta));
+	return false;
+}
+
 
 /**
  * @brief Updates spin animations
@@ -179,32 +199,80 @@ void CUnitScript::TickAllAnims(int deltaTime)
 {
 	ZoneScoped;
 
+	// optimize the memory access patterns of the procedure below
+	std::sort(anims.begin(), anims.end(), [](const auto& lhs, const auto& rhs) {
+		return std::tie(lhs.piece, lhs.animType, lhs.axis) < std::tie(rhs.piece, rhs.animType, rhs.axis);
+	});
+
 	// tick-functions; these never change address
-	static constexpr std::array<TickAnimFunc, ACount> TICK_ANIM_FUNCS = { &CUnitScript::TickTurnAnim, &CUnitScript::TickSpinAnim, &CUnitScript::TickMoveAnim };
+	static constexpr std::array<TickAnimFunc, ACount> TICK_ANIM_FUNCS = { &CUnitScript::TickTurnAnim, &CUnitScript::TickSpinAnim, &CUnitScript::TickMoveAnim, &CUnitScript::TickScaleAnim };
 
 	const int tickRate = 1000 / deltaTime;
 
-	for (int animType = ATurn; animType < ACount; animType++) {
-		auto& currAnims = anims[animType];
-		const auto& currFunc = TICK_ANIM_FUNCS[animType];
-		auto& currDoneAnims = doneAnims[animType];
+	// clear doneAnims here to preserve them for DumpState
+	doneAnims.clear();
 
-		for (size_t i = 0; i < currAnims.size(); ) {
-			AnimInfo& ai = currAnims[i];
-			LocalModelPiece& lmp = *pieces[ai.piece];
+	for (auto& ai : anims) {
+		LocalModelPiece& lmp = *pieces[ai.piece];
+		const auto& currFunc = TICK_ANIM_FUNCS[ai.animType];
+		if (ai.done |= std::invoke(currFunc, this, tickRate, lmp, ai)) {
+			if (ai.hasWaiting)
+				doneAnims.emplace_back(ai);
+		}
 
-			if ((ai.done |= std::invoke(currFunc, this, tickRate, lmp, ai))) {
-				if (ai.hasWaiting)
-					currDoneAnims.emplace_back(ai);
+		// checksum all anims (live + done)
+		checksum = spring::LiteHash(ai, checksum);
+	}
 
-				ai = std::move(currAnims.back());
-				currAnims.pop_back();
-				continue;
-			}
+	spring::VectorEraseIfAll(anims, [](const auto& ai) { return ai.done; });
+#if 1
+	// BFS pass
+	std::deque<std::pair<LocalModelPiece*, Transform>> q;
+	q.push_front({ rootPiece, Transform{} });
 
-			++i;
+	while (!q.empty()) {
+		// copy
+		auto [lmp, pTra] = q.front();
+		q.pop_front();
+
+		if (lmp->GetDirty()) {
+			lmp->SetDirtyRaw(false);
+			lmp->SetWasUpdatedRaw(true);
+			lmp->UpdatePieceSpaceTransform();
+			lmp->UpdateModelSpaceTransform(pTra);
+		}
+
+		const Transform& modelTra = lmp->GetModelSpaceTransformRaw();
+
+		for (auto* child : lmp->children) {
+			q.push_back({ child, modelTra });
 		}
 	}
+#else
+	// DFS pass
+	auto WalkDFS = [](this auto&& self, LocalModelPiece* lmp, const Transform& pTra) -> void {
+		if (lmp->GetDirty()) {
+			lmp->SetDirtyRaw(false);
+			lmp->SetWasUpdatedRaw(true);
+			lmp->UpdatePieceSpaceTransform();
+			lmp->UpdateModelSpaceTransform(pTra);
+		}
+
+		const Transform& modelTra = lmp->GetModelSpaceTransformRaw();
+
+		for (auto* p : lmp->children)
+			self(p, modelTra);
+	};
+
+	WalkDFS(rootPiece, Transform{});
+#endif
+#ifdef _DEBUG
+	for (auto* p : pieces) {
+		// NOTE: p can actually be nullptr when the cob script mentions pieces that don't exist in the model!
+		if (p) assert(!p->GetDirty());
+	}
+#endif // _DEBUG
+
 }
 
 /**
@@ -213,23 +281,20 @@ void CUnitScript::TickAllAnims(int deltaTime)
 		This is not multi threaded as it guarantees that AnimFinished will be called in consistent order for
 		all anims for all participants of the simulation, and guarantees that the order of the animating
 		vector in CUnitScriptEngine::Tick is preserved.
-* @param deltaTime int delta time to update
 * @return true if there are still active animations
 */
-bool CUnitScript::TickAnimFinished(int deltaTime)
+bool CUnitScript::TickAnimFinished()
 {
 	ZoneScoped;
 
 	// Tell listeners to unblock, and remove finished animations from the unit/script.
-	for (int animType = ATurn; animType <= AMove; animType++) {
-		auto& currDoneAnims = doneAnims[animType];
-		for (const auto& ai : currDoneAnims)
-			AnimFinished(static_cast<AnimType>(animType), ai.piece, ai.axis);
+	for (const auto& ai : doneAnims)
+		AnimFinished(ai.animType, ai.piece, ai.axis);
 
-		currDoneAnims.clear();
-	}
+	// don't clear doneAnims for the purpose of capturing them in DumpState
+	//doneAnims.clear();
 
-	return (HaveAnimations());
+	return HaveAnimations();
 }
 
 bool CUnitScript::TickMoveAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai)
@@ -264,18 +329,28 @@ bool CUnitScript::TickSpinAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai)
 	return ret;
 }
 
+bool CUnitScript::TickScaleAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai)
+{
+	auto scale = lmp.GetScaling();
+	const bool ret = ScaleToward(scale, ai.dest, ai.speed / tickRate);
+	lmp.SetScaling(scale);
+	lmp.SetScalingNoInterpolation(false);
+
+	return ret;
+}
+
 CUnitScript::AnimContainerTypeIt CUnitScript::FindAnim(AnimType type, int piece, int axis)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const auto& pred = [&](const AnimInfo& ai) { return (ai.piece == piece && ai.axis == axis); };
-	const auto& iter = std::find_if(anims[type].begin(), anims[type].end(), pred);
+	const auto& pred = [&](const AnimInfo& ai) { return ai.animType == type && ai.piece == piece && ai.axis == axis; };
+	const auto& iter = std::find_if(anims.begin(), anims.end(), pred);
 	return iter;
 }
 
 void CUnitScript::RemoveAnim(AnimType type, const AnimContainerTypeIt& animInfoIt)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (animInfoIt == anims[type].end())
+	if (animInfoIt == anims.end())
 		return;
 
 	AnimInfo& ai = *animInfoIt;
@@ -285,8 +360,8 @@ void CUnitScript::RemoveAnim(AnimType type, const AnimContainerTypeIt& animInfoI
 	if (ai.hasWaiting)
 		AnimFinished(type, ai.piece, ai.axis);
 
-	ai = anims[type].back();
-	anims[type].pop_back();
+	ai = anims.back();
+	anims.pop_back();
 
 	// If this was the last animation, remove from currently animating list
 	// FIXME: this could be done in a cleaner way
@@ -303,7 +378,8 @@ void CUnitScript::RemoveAnim(AnimType type, const AnimContainerTypeIt& animInfoI
 void CUnitScript::AddAnim(AnimType type, int piece, int axis, float speed, float dest, float accel)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
 		ShowUnitScriptError("[US::AddAnim] invalid script piece index");
 		return;
 	}
@@ -311,7 +387,7 @@ void CUnitScript::AddAnim(AnimType type, int piece, int axis, float speed, float
 	float destf = 0.0f;
 
 	if (type == AMove) {
-		destf = pieces[piece]->original->offset[axis] + dest;
+		destf = p->original->offset[axis] + dest;
 	} else {
 		// clamp destination (angle) for turn-anims
 		destf = mix(dest, ClampRad(dest), type == ATurn);
@@ -337,29 +413,34 @@ void CUnitScript::AddAnim(AnimType type, int piece, int axis, float speed, float
 		case AMove: {
 			// ensure we never remove an animation of this type
 			overrideType = AMove;
-			animInfoIt = anims[overrideType].end();
+			animInfoIt = anims.end();
+		} break;
+		case AScale: {
+			// ensure we never remove an animation of this type
+			overrideType = AScale;
+			animInfoIt = anims.end();
 		} break;
 		default: {
 		} break;
 	}
 	assert(overrideType >= 0);
 
-	if (animInfoIt != anims[overrideType].end())
+	if (animInfoIt != anims.end())
 		RemoveAnim(overrideType, animInfoIt);
 
 	// now find an animation of our own type
 	animInfoIt = FindAnim(type, piece, axis);
 
-	if (animInfoIt == anims[type].end()) {
+	if (animInfoIt == anims.end()) {
 		// If we were not animating before, inform the engine of this so it can schedule us
 		// FIXME: this could be done in a cleaner way
 		if (!HaveAnimations())
 			unitScriptEngine->AddInstance(this);
 
-		anims[type].emplace_back();
-		ai = &anims[type].back();
-		ai->piece = piece;
+		ai = &anims.emplace_back();
+		ai->animType = type;
 		ai->axis = axis;
+		ai->piece = piece;
 	} else {
 		ai = &(*animInfoIt);
 	}
@@ -377,7 +458,7 @@ void CUnitScript::Spin(int piece, int axis, float speed, float accel)
 	auto animInfoIt = FindAnim(ASpin, piece, axis);
 
 	// if we are already spinning, we may have to decelerate to the new speed
-	if (animInfoIt != anims[ASpin].end()) {
+	if (animInfoIt != anims.end()) {
 		AnimInfo* ai = &(*animInfoIt);
 		ai->dest = speed;
 
@@ -409,7 +490,7 @@ void CUnitScript::StopSpin(int piece, int axis, float decel)
 	if (decel <= 0.0f) {
 		RemoveAnim(ASpin, animInfoIt);
 	} else {
-		if (animInfoIt == anims[ASpin].end())
+		if (animInfoIt == anims.end())
 			return;
 
 		AnimInfo* ai = &(*animInfoIt);
@@ -432,21 +513,29 @@ void CUnitScript::Move(int piece, int axis, float speed, float destination)
 	AddAnim(AMove, piece, axis, math::fabs(speed), destination, 0);
 }
 
+void CUnitScript::Scale(int piece, float speed, float destination)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	AddAnim(AScale, piece, -1, math::fabs(speed), destination, 0);
+}
 
 void CUnitScript::MoveNow(int piece, int axis, float destination)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
 		ShowUnitScriptError("[US::MoveNow] invalid script piece index");
 		return;
 	}
 
-	LocalModelPiece* p = pieces[piece];
-
 	float3 pos = p->GetPosition();
 	float3 ofs = p->original->offset;
 
-	pos[axis] = ofs[axis] + destination;
+	const float newValue = ofs[axis] + destination;
+	if (pos[axis] == newValue)
+		return;
+
+	pos[axis] = newValue;
 
 	p->SetPosition(pos);
 	p->SetPositionNoInterpolation(true);
@@ -456,31 +545,51 @@ void CUnitScript::MoveNow(int piece, int axis, float destination)
 void CUnitScript::TurnNow(int piece, int axis, float destination)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
 		ShowUnitScriptError("[US::TurnNow] invalid script piece index");
 		return;
 	}
 	destination = ClampRad(destination);
 
-	LocalModelPiece* p = pieces[piece];
-
 	float3 rot = p->GetRotation();
+
+	if (rot[axis] == destination)
+		return;
+
 	rot[axis] = destination;
 
 	p->SetRotation(rot);
 	p->SetRotationNoInterpolation(true);
 }
 
+void CUnitScript::ScaleNow(int piece, float destination)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
+		ShowUnitScriptError("[US::TurnNow] invalid script piece index");
+		return;
+	}
+
+	if (p->GetScaling() == destination)
+		return;
+
+	p->SetScaling(destination);
+	p->SetScalingNoInterpolation(true);
+}
+
 
 void CUnitScript::SetVisibility(int piece, bool visible)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
 		ShowUnitScriptError("[US::SetVisibility] invalid script piece index");
 		return;
 	}
 
-	pieces[piece]->SetScriptVisible(visible);
+	p->SetScriptVisible(visible);
 }
 
 
@@ -488,7 +597,8 @@ bool CUnitScript::EmitSfx(int sfxType, int sfxPiece)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 #ifndef _CONSOLE
-	if (!PieceExists(sfxPiece)) {
+	auto* p = SafeGetPiece(sfxPiece);
+	if (!p) {
 		ShowUnitScriptError("[US::EmitSFX] invalid script piece index");
 		return false;
 	}
@@ -718,7 +828,7 @@ void CUnitScript::AttachUnit(int piece, int u)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// -1 is valid, indicates that the unit should be hidden
-	if ((piece >= 0) && (!PieceExists(piece))) {
+	if ((piece >= 0) && (!SafeGetPiece(piece))) {
 		ShowUnitScriptError("[US::AttachUnit] invalid script piece index");
 		return;
 	}
@@ -754,7 +864,7 @@ bool CUnitScript::NeedsWait(AnimType type, int piece, int axis)
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto animInfoIt = FindAnim(type, piece, axis);
 
-	if (animInfoIt == anims[type].end())
+	if (animInfoIt == anims.end())
 		return false;
 
 	AnimInfo& ai = *animInfoIt;
@@ -781,7 +891,8 @@ bool CUnitScript::NeedsWait(AnimType type, int piece, int axis)
 void CUnitScript::Explode(int piece, int flags)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	auto* p = SafeGetPiece(piece);
+	if (!p) {
 		ShowUnitScriptError("[US::Explode] invalid script piece index");
 		return;
 	}
@@ -798,7 +909,7 @@ void CUnitScript::Explode(int piece, int flags)
 	if (flags & PF_NONE)
 		return;
 
-	if (pieces[piece]->original == nullptr)
+	if (p->original == nullptr)
 		return;
 
 	if (flags & PF_Shatter) {
@@ -856,7 +967,7 @@ void CUnitScript::Shatter(int piece, const float3& pos, const float3& speed)
 void CUnitScript::ShowFlare(int piece)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(piece)) {
+	if (!SafeGetPiece(piece)) {
 		ShowUnitScriptError("[US::ShowFlare] invalid script piece index");
 		return;
 	}
@@ -910,7 +1021,7 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 	} break;
 
 	case PIECE_XZ: {
-		if (!PieceExists(p1)) {
+		if (!SafeGetPiece(p1)) {
 			ShowUnitScriptError("[US::GetUnitVal::PIECE_XZ] invalid script piece index");
 			break;
 		}
@@ -919,7 +1030,7 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		return PACKXZ(absPos.x, absPos.z);
 	} break;
 	case PIECE_Y: {
-		if (!PieceExists(p1)) {
+		if (!SafeGetPiece(p1)) {
 			ShowUnitScriptError("[US::GetUnitVal::PIECE_Y] invalid script piece index");
 			break;
 		}
@@ -1636,12 +1747,12 @@ void CUnitScript::SetUnitVal(int val, int param)
 
 int CUnitScript::ScriptToModel(int scriptPieceNum) const {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!PieceExists(scriptPieceNum))
+	const LocalModelPiece* smp = SafeGetPiece(scriptPieceNum);
+
+	if (!smp)
 		return -1;
 
-	const LocalModelPiece* smp = GetScriptLocalModelPiece(scriptPieceNum);
-
-	return (smp->GetLModelPieceIndex());
+	return smp->GetLModelPieceIndex();
 }
 
 int CUnitScript::ModelToScript(int lmodelPieceNum) const {

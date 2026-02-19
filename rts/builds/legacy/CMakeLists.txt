@@ -22,11 +22,16 @@ target_link_libraries(Game PRIVATE
 
 ### Assemble libraries
 find_package(SDL2 MODULE REQUIRED)
+
+
+
+
+
 set(engineLibraries SDL2::SDL2)
 
 set(OpenGL_GL_PREFERENCE LEGACY)
 find_package_static(OpenGL 3.0 REQUIRED)
-list(APPEND engineLibraries OpenGL::GL OpenGL::GLU)
+list(APPEND engineLibraries OpenGL::GL)
 
 find_fontconfig_hack()
 find_package_static(Fontconfig 2.11 REQUIRED)

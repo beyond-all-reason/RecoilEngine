@@ -127,7 +127,7 @@ TEST_CASE("test_parallel_reduce")
 		return threadnum;
 	};
 
-	const int result = parallel_reduce(TestFunc, ReduceFunc);
+	const int result = parallel_reduce<SyncTask<decltype(TestFunc)>>(TestFunc, ReduceFunc);
 	CHECK(result == ((NUM_THREADS - 1) * ((NUM_THREADS - 1) + 1)) / 2);
 }
 
@@ -283,7 +283,7 @@ TEST_CASE("test_parallel_reaction_times")
 	LOG("[%s::test_parallel_reaction_times]", __func__);
 
 	for (int i: {0, 1, 2, 3, 4}) {
-		test_parallel_reaction_times_aux(NUM_RUNS * 2);
+		test_parallel_reaction_times_aux(i * 100);
 	}
 }
 

@@ -20,7 +20,7 @@ You might also want to produce more to counteract the reduced variety.
 * burst weapons can now be made to respect firing angle restrictions. See the burst section below.
 
 # Features
-* The `select` action now composes `IdMatches` filters as *OR* statements see [The select command]({{ site.baseurl }}{% link articles/select-command.markdown %}#idmatches_string) for further reference.
+* The `select` action now composes `IdMatches` filters as *OR* statements see [The select command]({{< base_url >}}/docs/guides/select-command/#idmatches_string) for further reference.
 * added a new optional boolean parameter to `Spring.GetUnitHeading`, default false. If true, the value returned is in radians instead of the TA 16-bit angular unit.
 * added a new callin, `GameFramePost(number frame)`. This is the last callin in a sim frame (regular `GameFrame` is the first).
 * added a new callin, `UnitArrivedAtGoal(unitID, unitDefID, teamID)`, for when a unit arrives at its movement goal (incl. raw move).
@@ -40,8 +40,8 @@ There is currently no corresponding Set.
 * added normal mapping to all decals (explosion scars, building plates, tank tracks).
 Name the normalmap the same as the base decal but with `_normal` at the end., e.g. when you use `scar1.tga` as a decal diffuse/alpha, use `scar1_normal.tga` as a normal map texture.
 * alpha channel of normal map is now used for explosion decal glow. Scales with weapon damage. Full opacity (255) represents the hottest part.
-* added a Lua interface to create and edit decals. Check the [control](https://beyond-all-reason.github.io/RecoilEngine/ldoc/modules/UnsyncedCtrl.html#Decals)
-and [read](https://beyond-all-reason.github.io/RecoilEngine/ldoc/modules/UnsyncedRead.html#Decals) parts in the API listings.
+* added a Lua interface to create and edit decals. Check the [control](https://recoilengine.org/ldoc/modules/UnsyncedCtrl.html#Decals)
+and [read](https://recoilengine.org/ldoc/modules/UnsyncedRead.html#Decals) parts in the API listings.
 * added a shader interface for decal rendering. No documentation of uniforms/attributes/etc seems to exist at the moment,
 but you can look up the default shader implementation ([fragment](https://github.com/beyond-all-reason/RecoilEngine/blob/BAR105/cont/base/springcontent/shaders/GLSL/GroundDecalsFragProg.glsl), [vertex](https://github.com/beyond-all-reason/RecoilEngine/blob/BAR105/cont/base/springcontent/shaders/GLSL/GroundDecalsVertProg.glsl)).
 * replaced scar bitmaps in basecontent. See the caveats section above.

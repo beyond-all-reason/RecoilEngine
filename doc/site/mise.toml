@@ -53,7 +53,7 @@
 	tools."aqua:jqlang/jq" = "{{env.JQ_VERSION}}"
 	tools."aqua:ip7z/7zip" = "{{env.7Z_VERSION}}"
 	run = '''
-		download_url=$(jq -r '.assets[] | select(.name | contains("_linux-64-minimal-portable")).browser_download_url' {{vars.latest_release_data}})
+		download_url=$(jq -r '.assets[] | select(.name | contains("amd64-linux.7z")).browser_download_url' {{vars.latest_release_data}})
 
 		temp_dir=temp/release
 		rm -rf $temp_dir
