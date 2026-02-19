@@ -979,6 +979,7 @@ void CUnitScript::ShowFlare(int piece)
 #endif
 }
 
+#include <iostream>
 
 /******************************************************************************/
 int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
@@ -1038,7 +1039,15 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		const float3 absPos = unit->GetObjectSpacePos(relPos);
 		return int(absPos.y * COBSCALE);
 	} break;
-
+	case PIECE_HEADING: {
+		const LocalModelPiece* piece = SafeGetPiece(p1);
+		if (piece == nullptr) {
+			ShowUnitScriptError("[US::GetUnitVal::PIECE_HEADING] invalid script piece index");
+			break;
+		}
+		const float3 dir = piece->GetModelSpaceTransform() * float4(0.0f, 0.0f, 1.0f, 0.0f);
+		return GetHeadingFromVector(dir.x, dir.z);
+	} break;
 	case UNIT_XZ: {
 		if (p1 <= 0)
 			return PACKXZ(unit->pos.x, unit->pos.z);
