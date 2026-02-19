@@ -760,8 +760,8 @@ void CHoverAirMoveType::UpdateVerticalSpeed(const float4& spd, float curRelHeigh
 		const float3 sdir = lastCollidee->speed - spd;
 
 		if (spd.dot(dir + sdir * 20.0f) < 0.0f) {
-			wh -= (30.0f * (lastCollidee->midPos.y >  owner->midpos.y));
-			wh += (50.0f * (lastCollidee->midPos.y <= owner->midpos.y));
+			wh -= (30.0f * (lastCollidee->midPos.y >  owner->midPos.y));
+			wh += (50.0f * (lastCollidee->midPos.y <= owner->midPos.y));
 		}
 	}
 
