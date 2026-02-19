@@ -116,7 +116,7 @@ CR_REG_METADATA(CWeapon, (
 	CR_MEMBER(fastQueryPointUpdate),
 	CR_MEMBER(burstControlWhenOutOfArc),
 	CR_MEMBER(accurateLeading),
-  CR_MEMBER(rangefrombase)
+	CR_MEMBER(rangefrombase)
 ))
 
 
