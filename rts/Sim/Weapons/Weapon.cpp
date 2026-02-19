@@ -200,7 +200,7 @@ CWeapon::CWeapon(CUnit* owner, const WeaponDef* def):
 	fastQueryPointUpdate(false),
 	burstControlWhenOutOfArc(0),
 	accurateLeading(0),
-  rangefrombase(0)
+	rangefrombase(0)
 {
 	assert(weaponMemPool.alloced(this));
 }
