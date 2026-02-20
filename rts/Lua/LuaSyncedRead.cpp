@@ -187,6 +187,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitsInSphere);
 	REGISTER_LUA_CFUNC(GetUnitsInCylinder);
 	REGISTER_LUA_CFUNC(GetUnitsInExplosion);
+	REGISTER_LUA_CFUNC(GetUnitClosestPointFromExplosion);
 
 	REGISTER_LUA_CFUNC(GetUnitArrayCentroid);
 	REGISTER_LUA_CFUNC(GetUnitMapCentroid);
@@ -3292,8 +3293,26 @@ int LuaSyncedRead::GetUnitsInExplosion(lua_State* L)
 	const bool fullRead = CLuaHandle::GetHandleFullRead(L);
 
 #define EXPLOSION_TEST                                                              \
-	const float3 closestPt =                                                        \
-		unit->collisionVolume.GetClosestSurfacePoint(unit, nullptr, pos);            \
+	float3 closestPt;                                                               \
+	if (unit->collisionVolume.DefaultToPieceTree()) {                               \
+		float bestDistSq = 1e30f;                                                  \
+		for (unsigned int n = 0; n < unit->localModel.pieces.size(); n++) {         \
+			const LocalModelPiece* lmp = unit->localModel.GetPiece(n);             \
+			const CollisionVolume* lmpVol = lmp->GetCollisionVolume();              \
+			if (!lmp->GetScriptVisible() || lmpVol->IgnoreHits())                  \
+				continue;                                                           \
+			const float3 pt =                                                       \
+				lmpVol->GetClosestSurfacePoint(unit, lmp, pos);                    \
+			const float dSq = (pt - pos).SqLength();                               \
+			if (dSq < bestDistSq) {                                                \
+				bestDistSq = dSq;                                                  \
+				closestPt = pt;                                                     \
+			}                                                                       \
+		}                                                                           \
+	} else {                                                                        \
+		closestPt =                                                                 \
+			unit->collisionVolume.GetClosestSurfacePoint(unit, nullptr, pos);      \
+	}                                                                               \
 	const float dx = (closestPt.x - x);                                            \
 	const float dy = (closestPt.y - y);                                            \
 	const float dz = (closestPt.z - z);                                            \
@@ -3334,6 +3353,60 @@ int LuaSyncedRead::GetUnitsInExplosion(lua_State* L)
 	return 1;
 }
 
+
+/***
+ *
+ * @function Spring.GetUnitClosestPointFromExplosion
+ * @param unitID integer
+ * @param x number explosion center X
+ * @param y number explosion center Y
+ * @param z number explosion center Z
+ * @return number? closestX
+ * @return number? closestY
+ * @return number? closestZ
+ */
+int LuaSyncedRead::GetUnitClosestPointFromExplosion(lua_State* L)
+{
+	const CUnit* unit = ParseUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	const float x = luaL_checkfloat(L, 2);
+	const float y = luaL_checkfloat(L, 3);
+	const float z = luaL_checkfloat(L, 4);
+	const float3 pos(x, y, z);
+
+	float3 closestPt;
+
+	if (unit->collisionVolume.DefaultToPieceTree()) {
+		float bestDistSq = 1e30f;
+
+		for (unsigned int n = 0; n < unit->localModel.pieces.size(); n++) {
+			const LocalModelPiece* lmp = unit->localModel.GetPiece(n);
+			const CollisionVolume* lmpVol = lmp->GetCollisionVolume();
+
+			if (!lmp->GetScriptVisible() || lmpVol->IgnoreHits())
+				continue;
+
+			const float3 pt = lmpVol->GetClosestSurfacePoint(unit, lmp, pos);
+			const float dSq = (pt - pos).SqLength();
+
+			if (dSq < bestDistSq) {
+				bestDistSq = dSq;
+				closestPt = pt;
+			}
+		}
+	}
+	else {
+		closestPt = unit->collisionVolume.GetClosestSurfacePoint(unit, nullptr, pos);
+	}
+
+	lua_pushnumber(L, closestPt.x);
+	lua_pushnumber(L, closestPt.y);
+	lua_pushnumber(L, closestPt.z);
+	return 3;
+}
 
 
 struct Plane {

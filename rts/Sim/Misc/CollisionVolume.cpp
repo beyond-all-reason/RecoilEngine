@@ -661,3 +661,67 @@ float3 CollisionVolume::GetEllipsoidClosestPoint(const float3& pv) const
 
 	return closest;
 }
+
+
+float3 CollisionVolume::GetClosestSurfacePointFromLineSegment(const CUnit* u, const LocalModelPiece* lmp, const float3& p1, const float3& p2) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	return (GetClosestSurfacePointFromLineSegment(u, lmp, u->GetTransformMatrix(true), p1, p2));
+}
+
+float3 CollisionVolume::GetClosestSurfacePointFromLineSegment(const CFeature* f, const LocalModelPiece* lmp, const float3& p1, const float3& p2) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	return (GetClosestSurfacePointFromLineSegment(f, lmp, f->GetTransformMatrixRef(true), p1, p2));
+}
+
+float3 CollisionVolume::GetClosestSurfacePointFromLineSegment(
+	const CSolidObject* obj,
+	const LocalModelPiece* lmp,
+	const CMatrix44f& mat,
+	const float3& p1,
+	const float3& p2
+) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	CMatrix44f vm = mat;
+
+	if (lmp != nullptr && (obj->collisionVolume).DefaultToPieceTree()) {
+		assert(this == lmp->GetCollisionVolume());
+		vm <<= lmp->GetModelSpaceMatrix();
+	}
+	else {
+		vm.Translate(obj->relMidPos);
+	}
+
+	vm.Translate(GetOffsets());
+
+	const CMatrix44f mv = vm.InvertAffine();
+
+	return (GetClosestSurfacePointFromLineSegment(mv, vm, p1, p2));
+}
+
+float3 CollisionVolume::GetClosestSurfacePointFromLineSegment(const CMatrix44f& mv, const CMatrix44f& vm, const float3& p1, const float3& p2) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	// The distance from a point on a line segment to a convex body surface
+	// is a convex function of the line parameter t in [0,1].
+	// Ternary search finds the minimum of a convex function reliably.
+	const float3 dir = p2 - p1;
+
+	float lo = 0.0f;
+	float hi = 1.0f;
+
+	for (int i = 0; i < 32; i++) {
+		const float m1 = lo + (hi - lo) / 3.0f;
+		const float m2 = hi - (hi - lo) / 3.0f;
+
+		const float d1 = GetPointSurfaceDistance(mv, p1 + dir * m1);
+		const float d2 = GetPointSurfaceDistance(mv, p1 + dir * m2);
+
+		if (d1 < d2)
+			hi = m2;
+		else
+			lo = m1;
+	}
+
+	const float tBest = (lo + hi) * 0.5f;
+	return (GetClosestSurfacePoint(mv, vm, p1 + dir * tBest));
+}
+
