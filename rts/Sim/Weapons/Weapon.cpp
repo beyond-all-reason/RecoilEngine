@@ -749,13 +749,14 @@ bool CWeapon::AutoTarget()
 			continue;
 
 		// Checks to see if target is shootable, has free line of fire.
-		if (!TryTarget(SWeaponTarget(unit, false, true)))
+		if (!TryTarget(SWeaponTarget(unit, false, true))) {
 			if (preaimAtBlockedTargets) {
 				if (blockedTargetUnit == nullptr) {
 					blockedTargetUnit = unit;
 				}
 			}
 			continue;
+		}
 
 		if (isBadTarget) {
 			badTargetUnit = unit;
@@ -962,9 +963,11 @@ bool CWeapon::TryTarget(const float3& tgtPos, const SWeaponTarget& trg, bool pre
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(GetLeadTargetPos(trg).SqDistance(tgtPos) < Square(250.0f));
 
-	// auto-targeted units already passed a TestTarget check, and are allowed to be out of range
-	// (UpdateFire will still block firing at such units)
-	if (!trg.isAutoTarget && (!TestTarget(tgtPos, trg) || !TestRange(tgtPos, trg)))
+	// auto-targeted units already passed a TestTarget check
+	if (!trg.isAutoTarget && !TestTarget(tgtPos, trg))
+		return false;
+
+	if (!TestRange(tgtPos, trg))
 		return false;
 
 	// no LOF if aim-position is below ground (not in HFLOF, is overridden)
