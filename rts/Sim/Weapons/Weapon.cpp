@@ -744,6 +744,10 @@ bool CWeapon::AutoTarget()
 		if (isBadTarget && (badTargetUnit != nullptr))
 			continue;
 
+		// skip target if it is neutral and we are not allowed to fire at neutral
+		if (unit->IsNeutral() && (owner->fireState < FIRESTATE_FIREATNEUTRAL))
+			continue;
+
 		// Checks to see if target is shootable, has free line of fire.
 		if (!TryTarget(SWeaponTarget(unit, false, true)))
 			if (preaimAtBlockedTargets) {
@@ -751,10 +755,6 @@ bool CWeapon::AutoTarget()
 					blockedTargetUnit = unit;
 				}
 			}
-			continue;
-
-		// skip target if it is neutral and we are not allowed to fire at neutral
-		if (unit->IsNeutral() && (owner->fireState < FIRESTATE_FIREATNEUTRAL))
 			continue;
 
 		if (isBadTarget) {
@@ -775,7 +775,7 @@ bool CWeapon::AutoTarget()
 
 	if (goodTargetUnit != nullptr) {
 		// pick our new target
-		SetAttackTarget(SWeaponTarget(goodTargetUnit));
+		SetAttackTarget(SWeaponTarget(goodTargetUnit, false, true));
 		return true;
 	}
 
