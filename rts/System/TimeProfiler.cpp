@@ -154,7 +154,7 @@ bool CTimeProfiler::RegisterTimer(const char* timerName)
 	const auto iter = hashToName.find(nameHash);
 
 	if (iter == hashToName.end()) {
-		hashToName.insert(nameHash, timerName);
+		hashToName.emplace(nameHash, timerName);
 		return true;
 	}
 	if (iter->second == timerName)
@@ -229,6 +229,9 @@ void CTimeProfiler::Update()
 	UpdateRaw();
 	ResortProfilesRaw();
 	RefreshProfilesRaw();
+	// Now cleanup old thread profiles, no need to do it if
+	// disabled since won't be accepting data.
+	CleanupOldThreadProfiles();
 }
 
 void CTimeProfiler::UpdateRaw()
@@ -289,7 +292,7 @@ void CTimeProfiler::ResortProfilesRaw()
 				if (iter == hashToName.end()) {
 					LOG_L(L_ERROR, "[%s] timer with hash %u wasn't registered", __func__, profile.first);
 					assert(false);
-					hashToName.insert(profile.first, "???");
+					hashToName.emplace(profile.first, "???");
 					continue;
 				}
 
@@ -328,6 +331,22 @@ void CTimeProfiler::RefreshProfilesRaw()
 	}
 }
 
+void CTimeProfiler::CleanupOldThreadProfiles()
+{
+	#ifdef THREADPOOL
+	const spring_time curTime = spring_gettime();
+	const spring_time maxTime = spring_secs(MAX_THREAD_HIST_TIME);
+	const size_t numThreads = std::min(threadProfiles.size(), (size_t)ThreadPool::GetNumThreads());
+	size_t i = 0;
+
+	for (auto& threadProf: threadProfiles) {
+		if (i++ >= numThreads) break;
+		while (!threadProf.empty() && (curTime - threadProf.front().second) > maxTime) {
+			threadProf.pop_front();
+		}
+	}
+	#endif
+}
 
 const CTimeProfiler::TimeRecord& CTimeProfiler::GetTimeRecord(const char* name) const
 {

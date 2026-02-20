@@ -1,7 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include <cstdio>
 #include <algorithm>
+#include <nowide/cstdio.hpp>
 
 #include "KeyBindings.h"
 #include "KeyCodes.h"
@@ -14,6 +14,8 @@
 #include "System/Log/ILog.h"
 #include "System/StringUtil.h"
 #include "System/Config/ConfigHandler.h"
+
+#include "System/Misc/TracyDefs.h"
 
 
 #define LOG_SECTION_KEY_BINDINGS "KeyBindings"
@@ -262,6 +264,7 @@ static const DefaultBinding defaultBindings[] = {
 
 void CKeyBindings::Init()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	fakeMetaKey = -1;
 	keyChainTimeout = 750;
 
@@ -301,6 +304,7 @@ void CKeyBindings::Init()
 	RegisterAction("keyprint");
 	SortRegisteredActions();
 
+	keyChainTimeout = configHandler->GetInt("KeyChainTimeout");
 	configHandler->NotifyOnChange(this, {"KeyChainTimeout"});
 }
 
@@ -320,6 +324,7 @@ void CKeyBindings::Kill()
 
 void FilterByKeychain(const ActionList & in, const CKeyChain & kc, ActionList & out)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (const Action& action: in)
 		if (kc.fit(action.keyChain))
 			out.push_back(action);
@@ -328,6 +333,7 @@ void FilterByKeychain(const ActionList & in, const CKeyChain & kc, ActionList & 
 
 void MergeActionListsByTrigger(const ActionList& actionListA, const ActionList& actionListB, ActionList & out)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// When we are retrieving actionlists for a given keyboard state we need to
 	// remove duplicate actions that might arise from binding the same action
 	// to both key and scancodes
@@ -337,7 +343,7 @@ void MergeActionListsByTrigger(const ActionList& actionListA, const ActionList& 
 	//
 	// A duplicate is an action for which theres a correspondent and only one
 	// identical action present, but bound to a different key.
-	// This is guaranteed by the logic in ::Bind, which also imples it will
+	// This is guaranteed by the logic in ::Bind, which also implies it will
 	// invariably be the opposite of the action keytype (scancode<->keycode)
 	// Duplicates will not exist in a single list but would exist if both lists
 	// were merged without care.
@@ -391,6 +397,7 @@ void MergeActionListsByTrigger(const ActionList& actionListA, const ActionList& 
 
 const ActionList & CKeyBindings::GetActionList(const CKeySet& ks, bool forceAny) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	static ActionList empty;
 
 	if (ks.Key() < 0)
@@ -411,6 +418,7 @@ const ActionList & CKeyBindings::GetActionList(const CKeySet& ks, bool forceAny)
 
 ActionList CKeyBindings::GetActionList(const CKeyChain& kc) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	ActionList out;
 
 	if (kc.empty())
@@ -430,6 +438,7 @@ ActionList CKeyBindings::GetActionList(const CKeyChain& kc) const
 
 ActionList CKeyBindings::GetActionList(const CKeyChain& kc, const CKeyChain& sc) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// Recover the actionLists we need to merge.
 	ActionList merged;
 
@@ -466,12 +475,14 @@ ActionList CKeyBindings::GetActionList(const CKeyChain& kc, const CKeyChain& sc)
 
 ActionList CKeyBindings::GetActionList(int keyCode, int scanCode) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return GetActionList(keyCode, scanCode, CKeySet::GetCurrentModifiers());
 }
 
 
 ActionList CKeyBindings::GetActionList(int keyCode, int scanCode, unsigned char modifiers) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CKeyChain codeChain;
 	CKeyChain scanChain;
 
@@ -484,6 +495,7 @@ ActionList CKeyBindings::GetActionList(int keyCode, int scanCode, unsigned char 
 
 ActionList CKeyBindings::GetActionList() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	ActionList merged;
 
 	// If hotkey map is built hotkey size is often equal to action count, + 1 for recently bound action
@@ -509,6 +521,7 @@ ActionList CKeyBindings::GetActionList() const
 
 
 void CKeyBindings::DebugActionList(const ActionList& actionList) const {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LOG("Action List:");
 	if (actionList.empty()) {
 		LOG("   EMPTY");
@@ -523,6 +536,7 @@ void CKeyBindings::DebugActionList(const ActionList& actionList) const {
 
 const CKeyBindings::HotkeyList& CKeyBindings::GetHotkeys(const std::string& action) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto it = hotkeys.find(action);
 	if (it == hotkeys.end()) {
 		static HotkeyList empty;
@@ -536,6 +550,7 @@ const CKeyBindings::HotkeyList& CKeyBindings::GetHotkeys(const std::string& acti
 
 static bool ParseSingleChain(const std::string& keystr, CKeyChain* kc)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	kc->clear();
 	CKeySet ks;
 
@@ -559,6 +574,7 @@ static bool ParseSingleChain(const std::string& keystr, CKeyChain* kc)
 
 static bool ParseKeyChain(std::string keystr, CKeyChain* kc, const size_t pos = std::string::npos)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// recursive function to allow "," as separator-char & as shortcut
 	// -> when parsing fails, this functions replaces one by one all "," by their hexcode
 	//    and tries then to reparse it
@@ -585,6 +601,7 @@ static bool ParseKeyChain(std::string keystr, CKeyChain* kc, const size_t pos = 
 
 void CKeyBindings::AddActionToKeyMap(KeyMap& bindings, Action& action)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CKeySet& ks = action.keyChain.back();
 
 	const auto it = bindings.find(ks);
@@ -614,6 +631,7 @@ void CKeyBindings::AddActionToKeyMap(KeyMap& bindings, Action& action)
 
 bool CKeyBindings::Bind(const std::string& keystr, const std::string& line)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s] index=%i keystr=%s line=%s", __func__, bindingsCount + 1, keystr.c_str(), line.c_str());
 
@@ -643,6 +661,7 @@ bool CKeyBindings::Bind(const std::string& keystr, const std::string& line)
 
 bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CKeySet ks;
 	if (!ks.Parse(keystr)) {
 		LOG_L(L_WARNING, "UnBind: could not parse key: %s", keystr.c_str());
@@ -670,6 +689,7 @@ bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 
 bool CKeyBindings::UnBindKeyset(const std::string& keystr)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s] keystr=%s", __func__, keystr.c_str());
 
@@ -693,6 +713,7 @@ bool CKeyBindings::UnBindKeyset(const std::string& keystr)
 
 bool CKeyBindings::RemoveActionFromKeyMap(const std::string& command, KeyMap& bindings)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	bool success = false;
 
 	auto it = bindings.begin();
@@ -716,6 +737,7 @@ bool CKeyBindings::RemoveActionFromKeyMap(const std::string& command, KeyMap& bi
 
 bool CKeyBindings::UnBindAction(const std::string& command)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s] command=%s", __func__, command.c_str());
 	return RemoveActionFromKeyMap(command, codeBindings) || RemoveActionFromKeyMap(command, scanBindings);
@@ -724,6 +746,7 @@ bool CKeyBindings::UnBindAction(const std::string& command)
 
 bool CKeyBindings::SetFakeMetaKey(const std::string& keystr)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CKeySet ks;
 	if (StringToLower(keystr) == "none") {
 		fakeMetaKey = -1;
@@ -744,6 +767,7 @@ bool CKeyBindings::SetFakeMetaKey(const std::string& keystr)
 
 bool CKeyBindings::AddKeySymbol(const std::string& keysym, const std::string& code)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CKeySet ks;
 	if (!ks.Parse(code)) {
 		LOG_L(L_WARNING, "AddKeySymbol: could not parse key: %s", code.c_str());
@@ -759,6 +783,7 @@ bool CKeyBindings::AddKeySymbol(const std::string& keysym, const std::string& co
 
 bool CKeyBindings::RemoveCommandFromList(ActionList& al, const std::string& command)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	bool success = false;
 
 	auto it = al.begin();
@@ -778,12 +803,14 @@ bool CKeyBindings::RemoveCommandFromList(ActionList& al, const std::string& comm
 
 void CKeyBindings::ConfigNotify(const std::string& key, const std::string& value)
 {
-	keyChainTimeout = atoi(value.c_str());
+	RECOIL_DETAILED_TRACY_ZONE;
+	keyChainTimeout = configHandler->GetInt("KeyChainTimeout");
 }
 
 
 void CKeyBindings::LoadDefaults()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const bool tmpBuildHotkeyMap = buildHotkeyMap;
 	buildHotkeyMap = false;
 
@@ -804,6 +831,7 @@ void CKeyBindings::LoadDefaults()
 
 void CKeyBindings::PushAction(const Action& action)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (action.command == "keysave") {
 		static const std::string defaultOutFilename = "uikeys.tmp"; // tmp, not txt
 
@@ -832,6 +860,7 @@ void CKeyBindings::PushAction(const Action& action)
 
 bool CKeyBindings::ExecuteCommand(const std::string& line)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const std::vector<std::string> words = CSimpleParser::Tokenize(line, 2);
 
 	if (words.empty())
@@ -919,6 +948,7 @@ bool CKeyBindings::ExecuteCommand(const std::string& line)
 
 bool CKeyBindings::Load(const std::string& filename)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (std::find(loadStack.begin(), loadStack.end(), filename) != loadStack.end()) {
 		LOG_L(L_WARNING, "[CKeyBindings::%s] Cyclic keys file inclusion: %s, load stack:", __func__, filename.c_str());
 		LOG_L(L_WARNING, " !-> %s", filename.c_str());
@@ -956,6 +986,7 @@ bool CKeyBindings::Load(const std::string& filename)
 
 void CKeyBindings::BuildHotkeyMap()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s]", __func__);
 
@@ -973,13 +1004,15 @@ void CKeyBindings::BuildHotkeyMap()
 
 void CKeyBindings::Print() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	FileSave(stdout);
 }
 
 
 bool CKeyBindings::Save(const std::string& filename) const
 {
-	FILE* out = fopen(filename.c_str(), "wt");
+	RECOIL_DETAILED_TRACY_ZONE;
+	FILE* out = nowide::fopen(filename.c_str(), "wt");
 	if (out == nullptr)
 		return false;
 
@@ -991,6 +1024,7 @@ bool CKeyBindings::Save(const std::string& filename) const
 
 bool CKeyBindings::FileSave(FILE* out) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (out == nullptr)
 		return false;
 

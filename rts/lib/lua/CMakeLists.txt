@@ -4,8 +4,6 @@
 remove_flag("-fsignaling-nans")
 
 INCLUDE_DIRECTORIES(BEFORE ../streflop include)
-FIND_PACKAGE_STATIC(GLEW 1.5.1 REQUIRED) #FIXME: LuaUser.cpp requires glew...
-INCLUDE_DIRECTORIES(${GLEW_INCLUDE_DIR})
 
 SET(luaSources
 		"src/lapi.cpp"
@@ -38,6 +36,7 @@ SET(luaSources
 		"src/lvm.cpp"
 		"src/lzio.cpp"
 		"src/print.cpp"
+		"src/lua_privileges.cpp"
 		"include/LuaUser.cpp"
 	)
 
@@ -49,9 +48,10 @@ else ()
 TARGET_LINK_LIBRARIES(lua)
 endif ()
 
+target_include_directories(lua PUBLIC include)
+
 if (UNIX)
 	SET_TARGET_PROPERTIES(lua PROPERTIES COMPILE_FLAGS "-DLUA_USE_MKSTEMP ${PIC_FLAG}")
 else (UNIX)
 	SET_TARGET_PROPERTIES(lua PROPERTIES COMPILE_FLAGS "${PIC_FLAG}")
 endif (UNIX)
-

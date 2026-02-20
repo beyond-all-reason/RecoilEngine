@@ -27,13 +27,14 @@
 #include "lib/luasocket/src/luasocket.h"
 #include "LuaUI.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CLuaMenu* luaMenu = nullptr;
 
-/******************************************************************************
- * Lua Menu API
- * @module LuaMenu
- * @see rts/Lua/LuaMenu.cpp
-******************************************************************************/
+/***
+ * @class Menu : Callins
+ * @see Callins
+ */
 
 static spring::mutex m_singleton;
 
@@ -47,6 +48,7 @@ DECL_FREE_HANDLER(CLuaMenu, luaMenu)
 CLuaMenu::CLuaMenu()
 : CLuaHandle("LuaMenu", LUA_HANDLE_ORDER_MENU, true, false)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	luaMenu = this;
 
 	if (!IsValid())
@@ -107,6 +109,7 @@ CLuaMenu::CLuaMenu()
 
 	// load the spring libraries
 	if (
+		!AddCommonModules(L)						   ||
 		!AddEntriesToTable(L, "Spring",    LoadUnsyncedCtrlFunctions)      ||
 		!AddEntriesToTable(L, "Spring",    LoadUnsyncedReadFunctions)      ||
 		!AddEntriesToTable(L, "Spring",    LoadLuaMenuFunctions)           ||
@@ -143,12 +146,14 @@ CLuaMenu::CLuaMenu()
 
 CLuaMenu::~CLuaMenu()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	luaMenu = nullptr;
 }
 
 
 string CLuaMenu::LoadFile(const string& name) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CFileHandler f(name, SPRING_VFS_MENU SPRING_VFS_MOD SPRING_VFS_BASE);
 
 	string code;
@@ -160,6 +165,7 @@ string CLuaMenu::LoadFile(const string& name) const
 
 
 void CLuaMenu::InitLuaSocket(lua_State* L) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	std::string code;
 	std::string filename = "socket.lua";
 	CFileHandler f(filename);
@@ -321,6 +327,7 @@ bool CLuaMenu::LoadUnsyncedReadFunctions(lua_State* L)
 
 bool CLuaMenu::Enable(bool enableCommand)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (luaMenu != nullptr) {
 		if (enableCommand) {
 			LOG_L(L_WARNING, "[CLuaMenu] LuaMenu is already enabled");
@@ -349,6 +356,7 @@ bool CLuaMenu::Enable(bool enableCommand)
 
 bool CLuaMenu::Disable()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (luaMenu == nullptr) {
 		LOG_L(L_WARNING, "[CLuaMenu] LuaMenu is already disabled");
 		return false;
@@ -364,10 +372,11 @@ bool CLuaMenu::Disable()
 
 /*** Called whenever LuaMenu is on with no game loaded.
  *
- * @function ActivateMenu()
+ * @function Menu:ActivateMenu
  */
 void CLuaMenu::ActivateMenu(const std::string& msg)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
 	luaL_checkstack(L, 3, __func__);
 
@@ -384,10 +393,11 @@ void CLuaMenu::ActivateMenu(const std::string& msg)
 
 /*** Called whenever LuaMenu is on with a game loaded.
  *
- * @function ActivateGame()
+ * @function Menu:ActivateGame
  */
 void CLuaMenu::ActivateGame()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
 	luaL_checkstack(L, 2, __func__);
 
@@ -401,13 +411,17 @@ void CLuaMenu::ActivateGame()
 }
 
 
-/*** Enables Draw{Genesis,Screen,ScreenPost} callins if true is returned, otherwise they are called once every 30 seconds. Only active when a game isn't running.
+/***
+ * Enables Draw{Genesis,Screen,ScreenPost} callins if true is returned,
+ * otherwise they are called once every 30 seconds. Only active when a game
+ * isn't running.
  *
- * @function AllowDraw()
+ * @function Menu:AllowDraw
  * @return boolean allowDraw
  */
 bool CLuaMenu::AllowDraw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
 	luaL_checkstack(L, 2, __func__);
 
@@ -430,6 +444,7 @@ bool CLuaMenu::AllowDraw()
 
 int CLuaMenu::SendLuaUIMsg(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (luaUI != nullptr)
 		luaUI->RecvLuaMsg(luaL_checksstring(L, 1), 0);
 

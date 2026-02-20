@@ -51,6 +51,7 @@
 #include "System/SpringMath.h"
 #include "System/LoadLock.h"
 
+#include "System/Misc/TracyDefs.h"
 
 
 LuaRulesParams::Params  CSplitLuaHandle::gameParams;
@@ -83,6 +84,9 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 	if (!IsValid())
 		return false;
 
+	// other watch defs not initialized here since unsupported on unsynced
+	watchExplosionDefs.resize(weaponDefHandler->NumWeaponDefs(), false);
+
 	// load the standard libraries
 	LUA_OPEN_LIB(L, luaopen_base);
 	LUA_OPEN_LIB(L, luaopen_math);
@@ -92,6 +96,7 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 	//LUA_OPEN_LIB(L, luaopen_os);
 	//LUA_OPEN_LIB(L, luaopen_package);
 	//LUA_OPEN_LIB(L, luaopen_debug);
+	EnactDevMode();
 
 	// delete some dangerous functions
 	lua_pushnil(L); lua_setglobal(L, "dofile");
@@ -109,8 +114,9 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 		LuaPushNamedNil(L, "Kill");
 	lua_pop(L, 1);
 
-	LuaPushNamedCFunc(L, "loadstring", CSplitLuaHandle::LoadStringData);
+	LuaPushNamedCFunc(L, "loadstring", CLuaHandle::LoadStringData);
 	LuaPushNamedCFunc(L, "CallAsTeam", CSplitLuaHandle::CallAsTeam);
+	/*** @global COBSCALE integer */ 
 	LuaPushNamedNumber(L, "COBSCALE",  COBSCALE);
 
 	// load our libraries
@@ -118,6 +124,7 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 		#define KILL { KillLua(); return false; }
 		if (!LuaSyncedTable::PushEntries(L)) KILL
 
+		if (!AddCommonModules(L)						       ) KILL
 		if (!AddEntriesToTable(L, "VFS",                   LuaVFS::PushUnsynced       )) KILL
 		if (!AddEntriesToTable(L, "VFS",         LuaZipFileReader::PushUnsynced       )) KILL
 		if (!AddEntriesToTable(L, "VFS",         LuaZipFileWriter::PushUnsynced       )) KILL
@@ -162,11 +169,15 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 }
 
 
-/******************************************************************************
- * Callins, functions called by the Engine (Synced)
- *
- * @module LuaHandleSynced
- * @see rts/Lua/LuaHandleSynced.cpp
+void CUnsyncedLuaHandle::EnactDevMode() const
+{
+	SwapEnableModule(L, devMode, LUA_DBLIBNAME, luaopen_debug);
+}
+
+
+/***
+ * @class UnsyncedCallins
+ * Functions called by the Engine (Unsynced).
  */
 
 /**********************
@@ -177,10 +188,8 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 
 /*** Receives data sent via `SendToUnsynced` callout.
  *
- * @function RecvFromSynced
- * @tparam any arg1
- * @tparam any arg2
- * @tparam any argn
+ * @function UnsyncedCallins:RecvFromSynced
+ * @param ... any
  */
 void CUnsyncedLuaHandle::RecvFromSynced(lua_State* srcState, int args)
 {
@@ -210,13 +219,15 @@ void CUnsyncedLuaHandle::RecvFromSynced(lua_State* srcState, int args)
 
 /*** For custom rendering of units
  *
- * @function DrawUnit
- * @number unitID
- * @number drawMode
- * @treturn bool suppressEngineDraw
+ * @function UnsyncedCallins:DrawUnit
+ * @param unitID integer
+ * @param drawMode number
+ * @return boolean suppressEngineDraw
+ * @deprecated
  */
 bool CUnsyncedLuaHandle::DrawUnit(const CUnit* unit)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, false);
 	luaL_checkstack(L, 4, __func__);
 
@@ -245,13 +256,15 @@ bool CUnsyncedLuaHandle::DrawUnit(const CUnit* unit)
 
 /*** For custom rendering of features
  *
- * @function DrawFeature
- * @number featureID
- * @number drawMode
- * @treturn bool suppressEngineDraw
+ * @function UnsyncedCallins:DrawFeature
+ * @param featureID integer
+ * @param drawMode number
+ * @return boolean suppressEngineDraw
+ * @deprecated
  */
 bool CUnsyncedLuaHandle::DrawFeature(const CFeature* feature)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, false);
 	luaL_checkstack(L, 4, __func__);
 
@@ -279,14 +292,16 @@ bool CUnsyncedLuaHandle::DrawFeature(const CFeature* feature)
 
 /*** For custom rendering of shields.
  *
- * @function DrawShield
- * @number featureID
- * @number weaponID
- * @number drawMode
- * @treturn bool suppressEngineDraw
+ * @function UnsyncedCallins:DrawShield
+ * @param featureID integer
+ * @param weaponID integer
+ * @param drawMode number
+ * @return boolean suppressEngineDraw
+ * @deprecated
  */
 bool CUnsyncedLuaHandle::DrawShield(const CUnit* unit, const CWeapon* weapon)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, false);
 	luaL_checkstack(L, 5, __func__);
 
@@ -316,13 +331,15 @@ bool CUnsyncedLuaHandle::DrawShield(const CUnit* unit, const CWeapon* weapon)
 
 /*** For custom rendering of weapon (& other) projectiles
  *
- * @function DrawProjectile
- * @number projectileID
- * @number drawMode
- * @treturn bool suppressEngineDraw
+ * @function UnsyncedCallins:DrawProjectile
+ * @param projectileID integer
+ * @param drawMode number
+ * @return boolean suppressEngineDraw
+ * @deprecated
  */
 bool CUnsyncedLuaHandle::DrawProjectile(const CProjectile* projectile)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(projectile->weapon || projectile->piece);
 
 	LUA_CALL_IN_CHECK(L, false);
@@ -352,13 +369,15 @@ bool CUnsyncedLuaHandle::DrawProjectile(const CProjectile* projectile)
 
 /***
  *
- * @function DrawMaterial
- * @number uuid
- * @number drawMode
- * @treturn bool suppressEngineDraw
+ * @function UnsyncedCallins:DrawMaterial
+ * @param uuid integer
+ * @param drawMode number
+ * @return boolean suppressEngineDraw
+ * @deprecated
  */
 bool CUnsyncedLuaHandle::DrawMaterial(const LuaMaterial* material)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, false);
 	luaL_checkstack(L, 4, __func__);
 
@@ -418,6 +437,7 @@ CSyncedLuaHandle::~CSyncedLuaHandle()
 
 bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!IsValid())
 		return false;
 
@@ -436,6 +456,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	//SPRING_LUA_OPEN_LIB(L, luaopen_os);
 	//SPRING_LUA_OPEN_LIB(L, luaopen_package);
 	//SPRING_LUA_OPEN_LIB(L, luaopen_debug);
+	EnactDevMode();
 
 	lua_getglobal(L, "next");
 	origNextRef = luaL_ref(L, LUA_REGISTRYINDEX);
@@ -455,7 +476,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	lua_pushnil(L); lua_setglobal(L, "collectgarbage");
 
 	lua_pushvalue(L, LUA_GLOBALSINDEX);
-	LuaPushNamedCFunc(L, "loadstring", CSplitLuaHandle::LoadStringData);
+	LuaPushNamedCFunc(L, "loadstring", CLuaHandle::LoadStringData);
 	LuaPushNamedCFunc(L, "pairs", SyncedPairs);
 	LuaPushNamedCFunc(L, "next",  SyncedNext);
 	lua_pop(L, 1);
@@ -495,6 +516,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	// load our libraries  (LuaSyncedCtrl overrides some LuaUnsyncedCtrl entries)
 	{
 		#define KILL { KillLua(); return false; }
+		if (!AddCommonModules(L)						     ) KILL
 		if (!AddEntriesToTable(L, "VFS",                   LuaVFS::PushSynced       )) KILL
 		if (!AddEntriesToTable(L, "VFS",         LuaZipFileReader::PushSynced       )) KILL
 		if (!AddEntriesToTable(L, "VFS",         LuaZipFileWriter::PushSynced       )) KILL
@@ -536,12 +558,24 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 }
 
 
+void CSyncedLuaHandle::EnactDevMode() const
+{
+	SwapEnableModule(L, devMode, LUA_DBLIBNAME, luaopen_debug);
+}
+
+
 //
 // Call-Ins
 //
 
+/***
+ * @class SyncedCallins
+ * Functions called by the Engine (Synced).
+ */
+
 bool CSyncedLuaHandle::SyncedActionFallback(const std::string& msg, int playerID)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	string cmd = msg;
 	const std::string::size_type pos = cmd.find_first_of(" \t");
 	if (pos != string::npos)
@@ -557,15 +591,15 @@ bool CSyncedLuaHandle::SyncedActionFallback(const std::string& msg, int playerID
 
 /*** Called when the unit reaches an unknown command in its queue (i.e. one not handled by the engine).
  *
- * @function CommandFallback
- * @number unitID
- * @number unitDefID
- * @number unitTeam
- * @number cmdID
- * @tparam {number,...} cmdParams
- * @tparam cmdOptions cmdOptions
- * @number cmdTag
- * @treturn boolean whether to remove the command from the queue
+ * @function SyncedCallins:CommandFallback
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param unitTeam integer
+ * @param cmdID integer
+ * @param cmdParams number[]
+ * @param cmdOptions CommandOptions
+ * @param cmdTag number
+ * @return boolean whether to remove the command from the queue
  */
 bool CSyncedLuaHandle::CommandFallback(const CUnit* unit, const Command& cmd)
 {
@@ -590,23 +624,24 @@ bool CSyncedLuaHandle::CommandFallback(const CUnit* unit, const Command& cmd)
 
 /*** Called when the command is given, before the unit's queue is altered.
  *
- * @function AllowCommand
+ * @function SyncedCallins:AllowCommand
  *
  * The queue remains untouched when a command is blocked, whether it would be queued or replace the queue.
  *
- * @number unitID
- * @number unitDefID
- * @number unitTeam
- * @number cmdID
- * @tparam {number,...} cmdParams
- * @tparam cmdOptions cmdOptions
- * @number cmdTag
- * @bool synced
- * @bool fromLua
- * @treturn bool whether it should be let into the queue.
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param unitTeam integer
+ * @param cmdID integer
+ * @param cmdParams number[]
+ * @param cmdOptions CommandOptions
+ * @param cmdTag number
+ * @param synced boolean
+ * @param fromLua boolean
+ * @return boolean whether it should be let into the queue.
  */
 bool CSyncedLuaHandle::AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 7 + 3, __func__);
 
@@ -633,15 +668,15 @@ bool CSyncedLuaHandle::AllowCommand(const CUnit* unit, const Command& cmd, int p
 
 /*** Called just before unit is created.
  *
- * @function AllowUnitCreation
- * @number unitDefID
- * @number builderID
- * @number builderTeam
- * @number x
- * @number y
- * @number z
- * @number facing
- * @treturn bool allow, bool dropOrder
+ * @function SyncedCallins:AllowUnitCreation
+ * @param unitDefID integer
+ * @param builderID integer
+ * @param builderTeam integer
+ * @param x number
+ * @param y number
+ * @param z number
+ * @param facing FacingInteger
+ * @return boolean allow, boolean dropOrder
  */
 std::pair <bool, bool> CSyncedLuaHandle::AllowUnitCreation(
 	const UnitDef* unitDef,
@@ -680,16 +715,17 @@ std::pair <bool, bool> CSyncedLuaHandle::AllowUnitCreation(
 
 /*** Called just before a unit is transferred to a different team.
  *
- * @function AllowUnitTransfer
- * @number unitID
- * @number unitDefID
- * @number oldTeam
- * @number newTeam
- * @bool capture
- * @treturn bool whether or not the transfer is permitted.
+ * @function SyncedCallins:AllowUnitTransfer
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param oldTeam integer
+ * @param newTeam integer
+ * @param capture boolean
+ * @return boolean whether or not the transfer is permitted.
  */
 bool CSyncedLuaHandle::AllowUnitTransfer(const CUnit* unit, int newTeam, bool capture)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 7, __func__);
 
@@ -716,16 +752,17 @@ bool CSyncedLuaHandle::AllowUnitTransfer(const CUnit* unit, int newTeam, bool ca
 
 /*** Called just before a unit progresses its build percentage.
  *
- * @function AllowUnitBuildStep
- * @number builderID
- * @number builderTeam
- * @number unitID
- * @number unitDefID
- * @number part
- * @treturn bool whether or not the build makes progress.
+ * @function SyncedCallins:AllowUnitBuildStep
+ * @param builderID integer
+ * @param builderTeam integer
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param part number
+ * @return boolean whether or not the build makes progress.
  */
 bool CSyncedLuaHandle::AllowUnitBuildStep(const CUnit* builder, const CUnit* unit, float part)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 7, __func__);
 
@@ -752,16 +789,17 @@ bool CSyncedLuaHandle::AllowUnitBuildStep(const CUnit* builder, const CUnit* uni
 
 /***
  *
- * @function AllowUnitCaptureStep
- * @number builderID
- * @number builderTeam
- * @number unitID
- * @number unitDefID
- * @number part
- * @treturn bool whether or not the capture makes progress.
+ * @function SyncedCallins:AllowUnitCaptureStep
+ * @param builderID integer
+ * @param builderTeam integer
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param part number
+ * @return boolean whether or not the capture makes progress.
  */
 bool CSyncedLuaHandle::AllowUnitCaptureStep(const CUnit* builder, const CUnit* unit, float part)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 7, __func__);
 
@@ -788,17 +826,18 @@ bool CSyncedLuaHandle::AllowUnitCaptureStep(const CUnit* builder, const CUnit* u
 
 /***
  *
- * @function AllowUnitTransport
- * @number transporterID
- * @number transporterUnitDefID
- * @number transporterTeam
- * @number transporteeID
- * @number transporteeUnitDefID
- * @number transporteeTeam
- * @treturn bool whether or not the transport is allowed
+ * @function SyncedCallins:AllowUnitTransport
+ * @param transporterID integer
+ * @param transporterUnitDefID integer
+ * @param transporterTeam integer
+ * @param transporteeID integer
+ * @param transporteeUnitDefID integer
+ * @param transporteeTeam integer
+ * @return boolean whether or not the transport is allowed
  */
 bool CSyncedLuaHandle::AllowUnitTransport(const CUnit* transporter, const CUnit* transportee)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 2 + 6, __func__);
 
@@ -825,17 +864,17 @@ bool CSyncedLuaHandle::AllowUnitTransport(const CUnit* transporter, const CUnit*
 
 /***
  *
- * @function AllowUnitTransportLoad
- * @number transporterID
- * @number transporterUnitDefID
- * @number transporterTeam
- * @number transporteeID
- * @number transporteeUnitDefID
- * @number transporteeTeam
- * @number x
- * @number y
- * @number z
- * @treturn bool whether or not the transport load is allowed
+ * @function SyncedCallins:AllowUnitTransportLoad
+ * @param transporterID integer
+ * @param transporterUnitDefID integer
+ * @param transporterTeam integer
+ * @param transporteeID integer
+ * @param transporteeUnitDefID integer
+ * @param transporteeTeam integer
+ * @param x number
+ * @param y number
+ * @param z number
+ * @return boolean whether or not the transport load is allowed
  */
 bool CSyncedLuaHandle::AllowUnitTransportLoad(
 	const CUnit* transporter,
@@ -843,6 +882,7 @@ bool CSyncedLuaHandle::AllowUnitTransportLoad(
 	const float3& loadPos,
 	bool allowed
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 2 + 9, __func__);
 
@@ -874,17 +914,17 @@ bool CSyncedLuaHandle::AllowUnitTransportLoad(
 
 /***
  *
- * @function AllowUnitTransportUnload
- * @number transporterID
- * @number transporterUnitDefID
- * @number transporterTeam
- * @number transporteeID
- * @number transporteeUnitDefID
- * @number transporteeTeam
- * @number x
- * @number y
- * @number z
- * @treturn bool whether or not the transport unload is allowed
+ * @function SyncedCallins:AllowUnitTransportUnload
+ * @param transporterID integer
+ * @param transporterUnitDefID integer
+ * @param transporterTeam integer
+ * @param transporteeID integer
+ * @param transporteeUnitDefID integer
+ * @param transporteeTeam integer
+ * @param x number
+ * @param y number
+ * @param z number
+ * @return boolean whether or not the transport unload is allowed
  */
 bool CSyncedLuaHandle::AllowUnitTransportUnload(
 	const CUnit* transporter,
@@ -892,6 +932,7 @@ bool CSyncedLuaHandle::AllowUnitTransportUnload(
 	const float3& unloadPos,
 	bool allowed
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 2 + 9, __func__);
 
@@ -921,13 +962,14 @@ bool CSyncedLuaHandle::AllowUnitTransportUnload(
 
 /***
  *
- * @function AllowUnitCloak
- * @number unitID
- * @number[opt] enemyID
- * @treturn bool whether unit is allowed to cloak
+ * @function SyncedCallins:AllowUnitCloak
+ * @param unitID integer
+ * @param enemyID integer?
+ * @return boolean whether unit is allowed to cloak
  */
 bool CSyncedLuaHandle::AllowUnitCloak(const CUnit* unit, const CUnit* enemy)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 2 + 2, __func__);
 
@@ -956,14 +998,15 @@ bool CSyncedLuaHandle::AllowUnitCloak(const CUnit* unit, const CUnit* enemy)
 
 /***
  *
- * @function AllowUnitCloak
- * @number unitID
- * @number[opt] objectID
- * @number[opt] weaponNum
- * @treturn bool whether unit is allowed to decloak
+ * @function SyncedCallins:AllowUnitCloak
+ * @param unitID integer
+ * @param objectID integer?
+ * @param weaponNum number?
+ * @return boolean whether unit is allowed to decloak
  */
 bool CSyncedLuaHandle::AllowUnitDecloak(const CUnit* unit, const CSolidObject* object, const CWeapon* weapon)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 2 + 3, __func__);
 
@@ -999,13 +1042,14 @@ bool CSyncedLuaHandle::AllowUnitDecloak(const CUnit* unit, const CSolidObject* o
 
 /***
  *
- * @function AllowUnitKamikaze
- * @number unitID
- * @number targetID
- * @treturn bool whether unit is allowed to selfd
+ * @function SyncedCallins:AllowUnitKamikaze
+ * @param unitID integer
+ * @param targetID integer
+ * @return boolean whether unit is allowed to selfd
  */
 bool CSyncedLuaHandle::AllowUnitKamikaze(const CUnit* unit, const CUnit* target, bool allowed)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 2 + 2, __func__);
 
@@ -1028,16 +1072,17 @@ bool CSyncedLuaHandle::AllowUnitKamikaze(const CUnit* unit, const CUnit* target,
 
 /*** Called just before feature is created.
  *
- * @function AllowFeatureCreation
- * @number featureDefID
- * @number teamID
- * @number x
- * @number y
- * @number z
- * @treturn bool whether or not the creation is permitted
+ * @function SyncedCallins:AllowFeatureCreation
+ * @param featureDefID integer
+ * @param teamID integer
+ * @param x number
+ * @param y number
+ * @param z number
+ * @return boolean whether or not the creation is permitted
  */
 bool CSyncedLuaHandle::AllowFeatureCreation(const FeatureDef* featureDef, int teamID, const float3& pos)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 7, __func__);
 
@@ -1064,24 +1109,25 @@ bool CSyncedLuaHandle::AllowFeatureCreation(const FeatureDef* featureDef, int te
 
 /*** Called just before a feature changes its build percentage.
  *
- * @function AllowFeatureBuildStep
+ * @function SyncedCallins:AllowFeatureBuildStep
  *
  * Note that this is also called for resurrecting features, and for refilling features with resources before resurrection.
- * On reclaim the part values are negative, and on refill and ressurect they are positive.
+ * On reclaim the part values are negative, and on refill and resurrect they are positive.
  * Part is the percentage the feature be built or reclaimed per frame.
  * Eg. for a 30 workertime builder, that's a build power of 1 per frame.
  * For a 50 buildtime feature reclaimed by this builder, part will be 100/-50(/1) = -2%, or -0.02 numerically.
  *
- * @number builderID
- * @number builderTeam
- * @number featureID
- * @number featureDefID
- * @number part
+ * @param builderID integer
+ * @param builderTeam integer
+ * @param featureID integer
+ * @param featureDefID integer
+ * @param part number
  *
- * @treturn bool whether or not the change is permitted
+ * @return boolean whether or not the change is permitted
  */
 bool CSyncedLuaHandle::AllowFeatureBuildStep(const CUnit* builder, const CFeature* feature, float part)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 7, __func__);
 
@@ -1108,14 +1154,15 @@ bool CSyncedLuaHandle::AllowFeatureBuildStep(const CUnit* builder, const CFeatur
 
 /*** Called when a team sets the sharing level of a resource.
  *
- * @function AllowResourceLevel
- * @number teamID
- * @string res
- * @number level
- * @treturn bool whether or not the sharing level is permitted
+ * @function SyncedCallins:AllowResourceLevel
+ * @param teamID integer
+ * @param res string
+ * @param level number
+ * @return boolean whether or not the sharing level is permitted
  */
 bool CSyncedLuaHandle::AllowResourceLevel(int teamID, const std::string& type, float level)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 5, __func__);
 
@@ -1140,15 +1187,16 @@ bool CSyncedLuaHandle::AllowResourceLevel(int teamID, const std::string& type, f
 
 /*** Called just before resources are transferred between players.
  *
- * @function AllowResourceTransfer
- * @number oldTeamID
- * @number newTeamID
- * @string res
- * @number amount
- * @treturn bool whether or not the transfer is permitted.
+ * @function SyncedCallins:AllowResourceTransfer
+ * @param oldTeamID integer
+ * @param newTeamID integer
+ * @param res string
+ * @param amount number
+ * @return boolean whether or not the transfer is permitted.
  */
 bool CSyncedLuaHandle::AllowResourceTransfer(int oldTeam, int newTeam, const char* type, float amount)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 6, __func__);
 
@@ -1174,15 +1222,16 @@ bool CSyncedLuaHandle::AllowResourceTransfer(int oldTeam, int newTeam, const cha
 
 /*** Determines if this unit can be controlled directly in FPS view.
  *
- * @function AllowDirectUnitControl
- * @number unitID
- * @number unitDefID
- * @number unitTeam
- * @number playerID
- * @treturn bool allow
+ * @function SyncedCallins:AllowDirectUnitControl
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param unitTeam integer
+ * @param playerID integer
+ * @return boolean allow
  */
 bool CSyncedLuaHandle::AllowDirectUnitControl(int playerID, const CUnit* unit)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 6, __func__);
 
@@ -1208,23 +1257,25 @@ bool CSyncedLuaHandle::AllowDirectUnitControl(int playerID, const CUnit* unit)
 
 /*** Called when a construction unit wants to "use his nano beams".
  *
- * @function AllowBuilderHoldFire
+ * @function SyncedCallins:AllowBuilderHoldFire
  *
- * @number unitID
- * @number unitDefID
- * @number action one of following:
- *
- *   -1 Build
- *   CMD.REPAIR Repair
- *   CMD.RECLAIM Reclaim
- *   CMD.RESTORE Restore
- *   CMD.RESURRECT Resurrect
- *   CMD.CAPTURE Capture
- *
- * @treturn bool actionAllowed
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param action -1|CMD
+ * 
+ * One of the following:
+ * 	- `-1` build,
+ * 	- `CMD.REPAIR` repair,
+ * 	- `CMD.RECLAIM` reclaim,
+ * 	- `CMD.RESTORE` restore,
+ * 	- `CMD.RESURRECT` resurrect, or
+ * 	- `CMD.CAPTURE` capture.
+ * 
+ * @return boolean actionAllowed
  */
 bool CSyncedLuaHandle::AllowBuilderHoldFire(const CUnit* unit, int action)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 2 + 3 + 1, __func__);
 
@@ -1249,7 +1300,7 @@ bool CSyncedLuaHandle::AllowBuilderHoldFire(const CUnit* unit, int action)
 
 /*** Whether a start position should be allowed
  *
- * @function AllowStartPosition
+ * @function SyncedCallins:AllowStartPosition
  *
  * clamped{X,Y,Z} are the coordinates clamped into start-boxes, raw is where player tried to place their marker.
  *
@@ -1261,22 +1312,21 @@ bool CSyncedLuaHandle::AllowBuilderHoldFire(const CUnit* unit, int action)
  *     3 - the player failed to load.
  *     The default 'failed to choose' start-position is the north-west point of their startbox, or (0,0,0) if they do not have a startbox.
  *
- * NB: The order of the parameters changed with the addition of teamID in 104.0. Previouly it was: clampedX, clampedY, clampedZ, playerID, readyState, rawX, rawY, rawZ
+ * @param playerID integer
+ * @param teamID integer
+ * @param readyState number
+ * @param clampedX number
+ * @param clampedY number
+ * @param clampedZ number
+ * @param rawX number
+ * @param rawY number
+ * @param rawZ number
  *
- * @number playerID
- * @number teamID
- * @number readyState
- * @number clampedX
- * @number clampedY
- * @number clampedZ
- * @number rawX
- * @number rawY
- * @number rawZ
- *
- * @treturn bool allow
+ * @return boolean allow
  */
 bool CSyncedLuaHandle::AllowStartPosition(int playerID, int teamID, unsigned char readyState, const float3& clampedPos, const float3& rawPickPos)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
 	luaL_checkstack(L, 13, __func__);
 
@@ -1308,17 +1358,18 @@ bool CSyncedLuaHandle::AllowStartPosition(int playerID, int teamID, unsigned cha
 
 /*** Enable both Spring.MoveCtrl.SetCollideStop and Spring.MoveCtrl.SetTrackGround to enable this call-in.
  *
- * @function MoveCtrlNotify
+ * @function SyncedCallins:MoveCtrlNotify
  *
- * @number unitID
- * @number unitDefID
- * @number unitTeam
- * @number data was supposed to indicate the type of notification but currently never has a value other than 1 ("unit hit the ground").
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param unitTeam integer
+ * @param data number was supposed to indicate the type of notification but currently never has a value other than 1 ("unit hit the ground").
  *
- * @treturn bool whether or not the unit should remain script-controlled (false) or return to engine controlled movement (true).
+ * @return boolean whether or not the unit should remain script-controlled (false) or return to engine controlled movement (true).
  */
 bool CSyncedLuaHandle::MoveCtrlNotify(const CUnit* unit, int data)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, false);
 	luaL_checkstack(L, 6, __func__);
 
@@ -1345,17 +1396,18 @@ bool CSyncedLuaHandle::MoveCtrlNotify(const CUnit* unit, int data)
 
 /*** Called when pre-building terrain levelling terraforms are completed (c.f. levelGround)
  *
- * @function TerraformComplete
- * @number unitID
- * @number unitDefID
- * @number unitTeam
- * @number buildUnitID
- * @number buildUnitDefID
- * @number buildUnitTeam
- * @treturn bool if true the current build order is terminated
+ * @function SyncedCallins:TerraformComplete
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param unitTeam integer
+ * @param buildUnitID integer
+ * @param buildUnitDefID integer
+ * @param buildUnitTeam integer
+ * @return boolean if true the current build order is terminated
  */
 bool CSyncedLuaHandle::TerraformComplete(const CUnit* unit, const CUnit* build)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, false);
 	luaL_checkstack(L, 8, __func__);
 
@@ -1402,7 +1454,7 @@ bool CSyncedLuaHandle::TerraformComplete(const CUnit* unit, const CUnit* build)
 
 /*** Called before damage is applied to the unit, allows fine control over how much damage and impulse is applied.
  *
- * @function UnitPreDamaged
+ * @function SyncedCallins:UnitPreDamaged
  *
  * Called after every damage modification (even `HitByWeaponId`) but before the damage is applied
  *
@@ -1410,16 +1462,16 @@ bool CSyncedLuaHandle::TerraformComplete(const CUnit* unit, const CUnit* build)
  * 1st is stored under *newDamage if newDamage != NULL
  * 2nd is stored under *impulseMult if impulseMult != NULL
  *
- * @number unitID
- * @number unitDefID
- * @number unitTeam
- * @number damage
- * @bool paralyzer
- * @number[opt] weaponDefID Synced Only
- * @number[opt] projectileID Synced Only
- * @number[opt] attackerID Synced Only
- * @number[opt] attackerDefID Synced Only
- * @number[opt] attackerTeam Synced Only
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param unitTeam integer
+ * @param damage number
+ * @param paralyzer boolean
+ * @param weaponDefID integer? Synced Only
+ * @param projectileID integer? Synced Only
+ * @param attackerID integer? Synced Only
+ * @param attackerDefID integer? Synced Only
+ * @param attackerTeam integer? Synced Only
  *
  * @return number newDamage, number impulseMult
  */
@@ -1433,6 +1485,7 @@ bool CSyncedLuaHandle::UnitPreDamaged(
 	float* newDamage,
 	float* impulseMult
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, false);
 	luaL_checkstack(L, 2 + 2 + 10, __func__);
 
@@ -1497,21 +1550,21 @@ bool CSyncedLuaHandle::UnitPreDamaged(
 
 /*** Called before damage is applied to the feature.
  *
- * @function FeaturePreDamaged
+ * @function SyncedCallins:FeaturePreDamaged
  *
  * Allows fine control over how much damage and impulse is applied.
  *
- * @number featureID
- * @number featureDefID
- * @number featureTeam
- * @number damage
- * @number weaponDefID
- * @number projectileID
- * @number attackerID
- * @number attackerDefID
- * @number attackerTeam
- * @treturn number newDamage
- * @treturn number impulseMult
+ * @param featureID integer
+ * @param featureDefID integer
+ * @param featureTeam integer
+ * @param damage number
+ * @param weaponDefID integer
+ * @param projectileID integer
+ * @param attackerID integer
+ * @param attackerDefID integer
+ * @param attackerTeam integer
+ * @return number newDamage
+ * @return number impulseMult
  */
 bool CSyncedLuaHandle::FeaturePreDamaged(
 	const CFeature* feature,
@@ -1522,6 +1575,7 @@ bool CSyncedLuaHandle::FeaturePreDamaged(
 	float* newDamage,
 	float* impulseMult
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(newDamage != nullptr);
 	assert(impulseMult != nullptr);
 
@@ -1579,25 +1633,23 @@ bool CSyncedLuaHandle::FeaturePreDamaged(
 
 /*** Called before any engine shield-vs-projectile logic executes.
  *
- * @function ShieldPreDamaged
+ * @function SyncedCallins:ShieldPreDamaged
  *
- * If the weapon is a hitscan type (BeamLaser or LightningCanon) then proID is nil and beamEmitterWeaponNum and beamEmitterUnitID are populated instead.
+ * @param projectileID integer `-1` when the weapon type is `BeamLaser` or `LightningCannon`
+ * @param projectileOwnerID integer `-1` when the weapon type is `BeamLaser` or `LightningCannon`
+ * @param shieldWeaponNum integer
+ * @param shieldCarrierID integer
+ * @param bounceProjectile boolean
+ * @param beamEmitterWeaponNum integer? present only when the weapon type is `BeamLaser` or `LightningCannon`
+ * @param beamEmitterUnitID integer? present only when the weapon type is `BeamLaser` or `LightningCannon`
+ * @param startX number
+ * @param startY number
+ * @param startZ number
+ * @param hitX number
+ * @param hitY number
+ * @param hitZ number
  *
- * @number projectileID
- * @number projectileOwnerID
- * @number shieldWeaponNum
- * @number shieldCarrierID
- * @bool bounceProjectile
- * @number beamEmitterWeaponNum
- * @number beamEmitterUnitID
- * @number startX
- * @number startY
- * @number startZ
- * @number hitX
- * @number hitY
- * @number hitZ
- *
- * @treturn bool if true the gadget handles the collision event and the engine does not remove the projectile
+ * @return boolean if true the gadget handles the collision event and the engine does not remove the projectile
  */
 bool CSyncedLuaHandle::ShieldPreDamaged(
 	const CProjectile* projectile,
@@ -1609,6 +1661,7 @@ bool CSyncedLuaHandle::ShieldPreDamaged(
 	const float3& startPos,
 	const float3& hitPos
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert((projectile != nullptr) || ((beamEmitter != nullptr) && (beamCarrier != nullptr)));
 	LUA_CALL_IN_CHECK(L, false);
 	luaL_checkstack(L, 2 + 7 + 1, __func__);
@@ -1660,15 +1713,23 @@ bool CSyncedLuaHandle::ShieldPreDamaged(
 
 /*** Determines if this weapon can automatically generate targets itself. See also commandFire weaponDef tag.
  *
- * @function AllowWeaponTargetCheck
- * @number attackerID
- * @number attackerWeaponNum
- * @number attackerWeaponDefID
- * @treturn bool allowCheck
- * @treturn bool ignoreCheck
+ * @function SyncedCallins:AllowWeaponTargetCheck
+ *
+ * Only called for weaponDefIDs registered via `Script.SetWatchAllowTarget` or `Script.SetWatchWeapon`.
+ *
+ * @param attackerID integer
+ * @param attackerWeaponNum integer
+ * @param attackerWeaponDefID integer
+ *
+ * @return boolean allowCheck
+ * @return boolean ignoreCheck
+ *
+ * @see Script.SetWatchAllowTarget
+ * @see Script.SetWatchWeapon
  */
 int CSyncedLuaHandle::AllowWeaponTargetCheck(unsigned int attackerID, unsigned int attackerWeaponNum, unsigned int attackerWeaponDefID)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	int ret = -1;
 
 	if (!watchAllowTargetDefs[attackerWeaponDefID])
@@ -1699,14 +1760,21 @@ int CSyncedLuaHandle::AllowWeaponTargetCheck(unsigned int attackerID, unsigned i
 
 /*** Controls blocking of a specific target from being considered during a weapon's periodic auto-targeting sweep.
  *
- * @function AllowWeaponTarget
- * @number attackerID
- * @number targetID
- * @number attackerWeaponNum
- * @number attackerWeaponDefID
- * @number defPriority
- * @treturn bool allowed
- * @treturn number the new priority for this target (if you don't want to change it, return defPriority). Lower priority targets are targeted first.
+ * @function SyncedCallins:AllowWeaponTarget
+ *
+ * Only called for weaponDefIDs registered via `Script.SetWatchAllowTarget` or `Script.SetWatchWeapon`.
+ *
+ * @param attackerID integer
+ * @param targetID integer
+ * @param attackerWeaponNum integer
+ * @param attackerWeaponDefID integer
+ * @param defPriority number
+ *
+ * @return boolean allowed
+ * @return number the new priority for this target (if you don't want to change it, return defPriority). Lower priority targets are targeted first.
+ *
+ * @see Script.SetWatchAllowTarget
+ * @see Script.SetWatchWeapon
  */
 bool CSyncedLuaHandle::AllowWeaponTarget(
 	unsigned int attackerID,
@@ -1715,6 +1783,7 @@ bool CSyncedLuaHandle::AllowWeaponTarget(
 	unsigned int attackerWeaponDefID,
 	float* targetPriority
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	bool ret = true;
 
 	if (!watchAllowTargetDefs[attackerWeaponDefID])
@@ -1761,21 +1830,25 @@ bool CSyncedLuaHandle::AllowWeaponTarget(
 
 /*** Controls blocking of a specific intercept target from being considered during an interceptor weapon's periodic auto-targeting sweep.
  *
- * @function AllowWeaponInterceptTarget
+ * @function SyncedCallins:AllowWeaponInterceptTarget
  *
- * Only called for weaponDefIDs registered via Script.SetWatchWeapon.
+ * Only called for weaponDefIDs registered via `Script.SetWatchAllowTarget` or `Script.SetWatchWeapon`.
  *
- * @number interceptorUnitID
- * @number interceptorWeaponID
- * @number targetProjectileID
+ * @param interceptorUnitID integer
+ * @param interceptorWeaponID integer
+ * @param targetProjectileID integer
  *
- * @treturn bool allowed
+ * @return boolean allowed
+ *
+ * @see Script.SetWatchAllowTarget
+ * @see Script.SetWatchWeapon
  */
 bool CSyncedLuaHandle::AllowWeaponInterceptTarget(
 	const CUnit* interceptorUnit,
 	const CWeapon* interceptorWeapon,
 	const CProjectile* interceptorTarget
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	bool ret = true;
 
 	if (!watchAllowTargetDefs[interceptorWeapon->weaponDef->id])
@@ -1810,6 +1883,7 @@ bool CSyncedLuaHandle::AllowWeaponInterceptTarget(
 
 int CSyncedLuaHandle::SyncedRandom(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	#if 0
 	spring_lua_synced_rand(L);
 	return 1;
@@ -1844,7 +1918,7 @@ int CSyncedLuaHandle::SyncedRandom(lua_State* L)
 				const float diff  = (upper - lower);
 				const float r = gsRNG.NextFloat(); // [0,1], not [0,1) ?
 
-				lua_pushnumber(L, Clamp(lower + int(r * (diff + 1)), lower, upper));
+				lua_pushnumber(L, std::clamp(lower + int(r * (diff + 1)), lower, upper));
 				return 1;
 			}
 		} break;
@@ -1859,6 +1933,7 @@ int CSyncedLuaHandle::SyncedRandom(lua_State* L)
 
 int CSyncedLuaHandle::SyncedRandomSeed(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	gsRNG.SetSeed(luaL_checkint(L, -1), false);
 	return 0;
 }
@@ -1866,6 +1941,7 @@ int CSyncedLuaHandle::SyncedRandomSeed(lua_State* L)
 
 int CSyncedLuaHandle::SyncedNext(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	constexpr int whiteList[] = {
 		LUA_TSTRING,
 		LUA_TNUMBER,
@@ -1912,6 +1988,7 @@ int CSyncedLuaHandle::SyncedNext(lua_State* L)
 
 int CSyncedLuaHandle::SyncedPairs(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	/* copied from lbaselib.cpp */
 	luaL_checktype(L, 1, LUA_TTABLE);
 	lua_pushcfunction(L, SyncedNext);  /* return generator, */
@@ -1921,8 +1998,20 @@ int CSyncedLuaHandle::SyncedPairs(lua_State* L)
 }
 
 
+/***
+ * Invoke `UnsyncedCallins:RecvFromSynced` callin with the given arguments.
+ * 
+ * @function SyncedCallins.SendToUnsynced
+ *
+ * @param ... nil|boolean|number|string|table Arguments. Typically the first argument is the name of a function to call.
+ *
+ * Argument tables will be recursively copied and stripped of unsupported types and metatables.
+ *
+ * @see UnsyncedCallins:RecvFromSynced
+ */
 int CSyncedLuaHandle::SendToUnsynced(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const int args = lua_gettop(L);
 	if (args <= 0) {
 		luaL_error(L, "Incorrect arguments to SendToUnsynced()");
@@ -1933,6 +2022,7 @@ int CSyncedLuaHandle::SendToUnsynced(lua_State* L)
 		| (1 << LUA_TBOOLEAN)
 		| (1 << LUA_TNUMBER)
 		| (1 << LUA_TSTRING)
+		| (1 << LUA_TTABLE)
 	;
 
 	for (int i = 1; i <= args; i++) {
@@ -1950,6 +2040,7 @@ int CSyncedLuaHandle::SendToUnsynced(lua_State* L)
 
 int CSyncedLuaHandle::AddSyncedActionFallback(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	std::string cmdRaw = "/" + std::string(luaL_checkstring(L, 1));
 	std::string cmd = cmdRaw;
 
@@ -1973,6 +2064,7 @@ int CSyncedLuaHandle::AddSyncedActionFallback(lua_State* L)
 
 int CSyncedLuaHandle::RemoveSyncedActionFallback(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	//TODO move to LuaHandle
 	std::string cmdRaw = "/" + std::string(luaL_checkstring(L, 1));
 	std::string cmd = cmdRaw;
@@ -2005,9 +2097,9 @@ int CSyncedLuaHandle::RemoveSyncedActionFallback(lua_State* L)
 
 
 
-#define GetWatchDef(DefType)                                                \
-	int CSyncedLuaHandle::GetWatch ## DefType ## Def(lua_State* L) {        \
-		const CSyncedLuaHandle* lhs = GetSyncedHandle(L);                   \
+#define GetWatchDef(HandleType, DefType)                                                \
+	int C ## HandleType ## LuaHandle::GetWatch ## DefType ## Def(lua_State* L) {        \
+		const C ## HandleType ## LuaHandle* lhs = Get ## HandleType ## Handle(L);                   \
 		const auto& vec = lhs->watch ## DefType ## Defs;                    \
                                                                             \
 		const uint32_t defIdx = luaL_checkint(L, 1);                        \
@@ -2024,9 +2116,9 @@ int CSyncedLuaHandle::RemoveSyncedActionFallback(lua_State* L)
 		return 1;                                                           \
 	}
 
-#define SetWatchDef(DefType)                                                \
-	int CSyncedLuaHandle::SetWatch ## DefType ## Def(lua_State* L) {        \
-		CSyncedLuaHandle* lhs = GetSyncedHandle(L);                         \
+#define SetWatchDef(HandleType, DefType)                                                \
+	int C ## HandleType ## LuaHandle::SetWatch ## DefType ## Def(lua_State* L) {        \
+		C ## HandleType ## LuaHandle* lhs = Get ## HandleType ## Handle(L);                         \
 		auto& vec = lhs->watch ## DefType ## Defs;                          \
                                                                             \
 		const uint32_t defIdx = luaL_checkint(L, 1);                        \
@@ -2044,6 +2136,7 @@ int CSyncedLuaHandle::RemoveSyncedActionFallback(lua_State* L)
 	}
 
 int CSyncedLuaHandle::GetWatchWeaponDef(lua_State* L) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	bool watched = false;
 
 	// trickery to keep Script.GetWatchWeapon backward-compatible
@@ -2067,17 +2160,194 @@ int CSyncedLuaHandle::GetWatchWeaponDef(lua_State* L) {
 	return 1;
 }
 
-GetWatchDef(Unit)
-GetWatchDef(Feature)
-GetWatchDef(Explosion)
-GetWatchDef(Projectile)
-GetWatchDef(AllowTarget)
+/*** Register/deregister callins working per defID.
+ *
+ * Some of the engine callins can result in so many callins the engine doesn't forward them until registered
+ * through the following SetWatch* methods.
+ *
+ * The GetWatch* methods can be used to query the currently registered defIDs.
+ *
+ * @section watch_methods
+ */
 
-SetWatchDef(Unit)
-SetWatchDef(Feature)
-SetWatchDef(Explosion)
-SetWatchDef(Projectile)
-SetWatchDef(AllowTarget)
+/*** Query whether any callins are registered for a unitDefID.
+ *
+ * @function Script.GetWatchUnit
+ *
+ * @param unitDefID integer
+ * @return boolean watched Watch status.
+ *
+ * @see Script.SetWatchUnit
+ */
+
+GetWatchDef(Synced, Unit)
+
+
+/*** Query whether any callins are registered for a featureDefID.
+ *
+ * @function Script.GetWatchFeature
+ *
+ * @param featureDefID integer
+ * @return boolean watched `true` if callins are registered, otherwise `false`.
+ *
+ * @see Script.SetWatchFeature
+ */
+
+GetWatchDef(Synced, Feature)
+
+
+/*** Query whether any callins are registered for a weaponDefID.
+ *
+ * @function Script.GetWatchWeapon
+ *
+ * Same as calling:
+ * ```lua
+ * Script.GetWatchExplosion(weaponDefID) or Script.GetWatchProjectile(weaponDefID) or Script.GetWatchAllowTarget(weaponDefID)
+ * ```
+ *
+ * @param weaponDefID integer
+ * @return boolean watched True if watch is enabled for any weaponDefID callins.
+ *
+ * @see Script.SetWatchWeapon
+ */
+
+/*** Query whether explosion callins are registered for a weaponDefID.
+ *
+ * @function Script.GetWatchExplosion
+ *
+ * @param weaponDefID integer
+ * @return boolean watched `true` if callins are registered, otherwise `false`.
+ *
+ * @see Script.SetWatchExplosion
+ */
+
+GetWatchDef(Synced, Explosion)
+GetWatchDef(Unsynced, Explosion)
+
+
+/*** Query whether projectile callins are registered for a weaponDefID.
+ *
+ * @function Script.GetWatchProjectile
+ *
+ * @param weaponDefID integer
+ * @return boolean watched `true` if callins are registered, otherwise `false`.
+ *
+ * @see Script.SetWatchProjectile
+ */
+
+GetWatchDef(Synced, Projectile)
+
+
+/*** Query whether weapon targeting callins are registered for a weaponDefID.
+ *
+ * @function Script.GetWatchAllowTarget
+ *
+ * @param weaponDefID integer
+ * @return boolean watched `true` if callins are registered, otherwise `false`.
+ *
+ * @see Script.SetWatchAllowTarget
+ */
+
+GetWatchDef(Synced, AllowTarget)
+
+
+/*** Register or deregister unitDefID for expensive callins.
+ *
+ * @function Script.SetWatchUnit
+ *
+ * @param unitDefID integer
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchUnit
+ * @see Callins:UnitFeatureCollision
+ * @see Callins:UnitUnitCollision
+ * @see Callins:UnitMoveFailed
+ */
+
+SetWatchDef(Synced, Unit)
+
+
+/*** Register or deregister featureDefID for expensive callins.
+ *
+ * @function Script.SetWatchFeature
+ *
+ * @param featureDefID integer
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchFeature
+ * @see Callins:UnitFeatureCollision
+ */
+
+SetWatchDef(Synced, Feature)
+
+
+/*** Register or deregister weaponDefID for all expensive callins.
+ *
+ * @function Script.SetWatchWeapon
+ *
+ * Equivalent to calling:
+ *
+ * ```lua
+ * Script.SetWatchExplosion(weaponDefID)
+ * Script.SetWatchProjectile(weaponDefID)
+ * Script.SetWatchAllowTarget(weaponDefID)
+ * ```
+ *
+ * Generally it's better to use those methods to avoid registering uneeded callins.
+ *
+ * @param weaponDefID integer
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchWeapon
+ * @see Script.SetWatchExplosion
+ * @see Script.SetWatchProjectile
+ * @see Script.SetWatchAllowTarget
+ */
+
+/*** Register or deregister weaponDefID for explosion callins.
+ *
+ * @function Script.SetWatchExplosion
+ *
+ * @param weaponDefID integer
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchExplosion
+ * @see Callins:Explosion
+ */
+
+SetWatchDef(Synced, Explosion)
+SetWatchDef(Unsynced, Explosion)
+
+
+/*** Register or deregister weaponDefID for expensive projectile callins.
+ *
+ * @function Script.SetWatchProjectile
+ *
+ * @param weaponDefID integer weaponDefID for weapons or -1 to watch for debris.
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchProjectile
+ * @see Callins:ProjectileCreated
+ * @see Callins:ProjectileDestroyed
+ */
+
+SetWatchDef(Synced, Projectile)
+
+
+/*** Register or deregister weaponDefID for weapon targeting callins.
+ *
+ * @function Script.SetWatchAllowTarget
+ *
+ * @param weaponDefID integer
+ * @param watch boolean Whether to register or deregister.
+ *
+ * @see Script.GetWatchAllowTarget
+ * @see SyncedCallins:AllowWeaponTargetCheck
+ * @see SyncedCallins:AllowWeaponTarget
+ * @see SyncedCallins:AllowWeaponInterceptTarget
+ */
+
+SetWatchDef(Synced, AllowTarget)
 
 #undef GetWatchDef
 #undef SetWatchDef
@@ -2102,6 +2372,7 @@ CSplitLuaHandle::CSplitLuaHandle(const std::string& _name, int _order)
 
 CSplitLuaHandle::~CSplitLuaHandle()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// must be called before their dtors!!!
 	syncedLuaHandle.KillLua();
 	unsyncedLuaHandle.KillLua();
@@ -2110,6 +2381,7 @@ CSplitLuaHandle::~CSplitLuaHandle()
 
 bool CSplitLuaHandle::InitSynced(bool dryRun)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!IsValid()) {
 		KillLua();
 		return false;
@@ -2139,6 +2411,7 @@ bool CSplitLuaHandle::InitSynced(bool dryRun)
 
 bool CSplitLuaHandle::InitUnsynced()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!IsValid()) {
 		KillLua();
 		return false;
@@ -2165,6 +2438,7 @@ bool CSplitLuaHandle::InitUnsynced()
 
 bool CSplitLuaHandle::Init(bool dryRun)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	SetFullCtrl(true);
 	SetFullRead(true);
 	SetCtrlTeam(CEventClient::AllAccessTeam);
@@ -2178,6 +2452,7 @@ bool CSplitLuaHandle::Init(bool dryRun)
 
 bool CSplitLuaHandle::FreeUnsynced()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!unsyncedLuaHandle.IsValid())
 		return false;
 
@@ -2190,6 +2465,7 @@ bool CSplitLuaHandle::FreeUnsynced()
 
 bool CSplitLuaHandle::LoadUnsynced()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	::new (&unsyncedLuaHandle) CUnsyncedLuaHandle(this, syncedLuaHandle.GetName(), syncedLuaHandle.GetOrder() + 1);
 
 	if (!unsyncedLuaHandle.IsValid()) {
@@ -2203,6 +2479,7 @@ bool CSplitLuaHandle::LoadUnsynced()
 
 bool CSplitLuaHandle::SwapSyncedHandle(lua_State* L, lua_State* L_GC)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	eventHandler.RemoveClient(&syncedLuaHandle);
 
 	LUA_CLOSE(&syncedLuaHandle.L);
@@ -2220,6 +2497,7 @@ bool CSplitLuaHandle::SwapSyncedHandle(lua_State* L, lua_State* L_GC)
 
 string CSplitLuaHandle::LoadFile(const std::string& filename, const std::string& modes) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	string vfsModes(modes);
 	if (CSyncedLuaHandle::devMode)
 		vfsModes = SPRING_VFS_RAW + vfsModes;
@@ -2236,34 +2514,32 @@ string CSplitLuaHandle::LoadFile(const std::string& filename, const std::string&
 // Call-Outs
 //
 
-int CSplitLuaHandle::LoadStringData(lua_State* L)
-{
-	size_t len;
-	const char *str    = luaL_checklstring(L, 1, &len);
-	const char *chunkname = luaL_optstring(L, 2, str);
+/***
+ * @class CallAsTeamOptions
+ * @x_helper
+ * @field ctrl integer Ctrl team ID.
+ * @field read integer Read team ID.
+ * @field select integer Select team ID.
+ */
 
-	if (luaL_loadbuffer(L, str, len, chunkname) != 0) {
-		lua_pushnil(L);
-		lua_insert(L, -2);
-		return 2; // nil, then the error message
-	}
-
-	// set the chunk's fenv to the current fenv
-	if (lua_istable(L, 3)) {
-		lua_pushvalue(L, 3);
-	} else {
-		LuaUtils::PushCurrentFuncEnv(L, __func__);
-	}
-
-	if (lua_setfenv(L, -2) == 0)
-		luaL_error(L, "[%s] error with setfenv", __func__);
-
-	return 1;
-}
-
-
+/*** Calls a function from given team's PoV. In particular this makes callouts obey that team's visibility rules.
+ *
+ * @function Spring.CallAsTeam
+ * @param teamID integer Team ID.
+ * @param func fun(...) The function to call.
+ * @param ... any Arguments to pass to the function.
+ * @return any ... The return values of the function.
+ */
+/***
+ * @function Spring.CallAsTeam
+ * @param options CallAsTeamOptions Options.
+ * @param func fun(...) The function to call.
+ * @param ... any Arguments to pass to the function.
+ * @return any ... The return values of the function.
+ */
 int CSplitLuaHandle::CallAsTeam(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const int args = lua_gettop(L);
 	if ((args < 2) || !lua_isfunction(L, 2))
 		luaL_error(L, "[%s] incorrect arguments", __func__);

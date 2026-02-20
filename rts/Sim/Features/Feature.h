@@ -74,15 +74,16 @@ public:
 	bool AddBuildPower(CUnit* builder, float amount);
 	void DoDamage(const DamageArray& damages, const float3& impulse, CUnit* attacker, int weaponDefID, int projectileID);
 	void SetVelocity(const float3& v);
-	void ForcedMove(const float3& newPos);
-	void ForcedSpin(const float3& newDir);
+	void ForcedMove(const float3& newPos) override;
+	void ForcedSpin(const float3& newDir) override;
+	void ForcedSpin(const float3& newFrontDir, const float3& newRightDir) override; 
 
 	bool Update();
 	bool UpdatePosition();
 	bool UpdateVelocity(const float3& dragAccel, const float3& gravAccel, const float3& movMask, const float3& velMask);
 
 	void SetTransform(const CMatrix44f& m, bool synced) { transMatrix[synced] = m; }
-	void UpdateTransform(const float3& p, bool synced) { transMatrix[synced] = std::move(ComposeMatrix(p)); }
+	void UpdateTransform(const float3& p, bool synced);
 	void UpdateTransformAndPhysState();
 	void UpdateQuadFieldPosition(const float3& moveVec);
 
@@ -97,8 +98,10 @@ public:
 	// NOTE:
 	//   unlike CUnit which recalculates the matrix on each call
 	//   (and uses the synced and error args) CFeature caches it
-	CMatrix44f GetTransformMatrix(bool synced = false, bool fullread = false) const final { return transMatrix[synced]; }
+	CMatrix44f GetTransformMatrix(bool synced = false, bool fullread = false) const override final { return transMatrix[synced]; }
 	const CMatrix44f& GetTransformMatrixRef(bool synced = false) const { return transMatrix[synced]; }
+
+	CFeature* CreateWreck(int wreckLevel, int smokeTime);
 
 private:
 	void PostLoad();

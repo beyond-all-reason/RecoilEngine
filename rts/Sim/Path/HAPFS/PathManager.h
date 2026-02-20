@@ -5,10 +5,12 @@
 
 #include <cinttypes>
 
+#include "Sim/Misc/ModInfo.h"
 #include "Sim/Path/IPathManager.h"
 #include "IPath.h"
 #include "IPathFinder.h"
 #include "PathFinderDef.h"
+#include "Registry.h"
 #include "System/UnorderedMap.hpp"
 
 #include <mutex>
@@ -59,6 +61,8 @@ public:
 			moveDef = mp.moveDef;
 			caller  = mp.caller;
 
+			updated = mp.updated;
+
 			return *this;
 		}
 		MultiPath& operator = (MultiPath&& mp) {
@@ -77,6 +81,9 @@ public:
 
 			mp.moveDef = nullptr;
 			mp.caller  = nullptr;
+
+			updated = mp.updated;
+			
 			return *this;
 		}
 
@@ -97,6 +104,8 @@ public:
 
 		// additional information
 		CSolidObject* caller;
+
+		bool updated = false;
 	};
 
 public:
@@ -109,23 +118,12 @@ public:
 	std::int64_t Finalize() override;
 	std::int64_t PostFinalizeRefresh() override;
 
+	bool AllowDirectionalPathing() override { return true; }
+
 	void RemoveCacheFiles() override;
 	void Update() override;
 	void UpdatePath(const CSolidObject*, unsigned int) override;
-	void DeletePath(unsigned int pathID) override {
-		if (pathID == 0)
-			return;
-		{
-			const std::lock_guard<std::mutex> lock(pathMapUpdate);
-			const auto pi = pathMap.find(pathID);
-
-			if (pi == pathMap.end())
-				return;
-
-			pathMap.erase(pi);
-		}
-	}
-
+	void DeletePath(unsigned int pathID, bool force = false) override;
 
 	float3 NextWayPoint(
 		const CSolidObject* owner,
@@ -136,13 +134,18 @@ public:
 		bool synced
 	) override;
 
+	// Isn't used here due to the way waypoints get consumed and then a noPoint
+	// is returned when out of points.
+	bool CurrentWaypointIsUnreachable(unsigned int pathID) override { return false; }
+
 	unsigned int RequestPath(
 		CSolidObject* caller,
 		const MoveDef* moveDef,
 		float3 startPos,
 		float3 goalPos,
 		float goalRadius,
-		bool synced
+		bool synced,
+		bool immediateResult = false
 	) override;
 
 	/**
@@ -190,6 +193,24 @@ public:
 private:
 
 	void InitStatic();
+
+	MultiPath IssuePathRequest(
+		CSolidObject* caller,
+		const MoveDef* moveDef,
+		float3 startPos,
+		float3 goalPos,
+		float goalRadius,
+		bool synced
+	);
+
+	MultiPath ExpandCurrentPath(
+		const CSolidObject* owner,
+		unsigned int pathID,
+		unsigned int numRetries,
+		float3 callerPos,
+		float radius,
+		bool extendMedResPath
+	);
 
 	IPath::SearchResult ArrangePath(
 		MultiPath* newPath,
@@ -239,13 +260,10 @@ private:
 
 	static void FinalizePath(MultiPath* path, const float3 startPos, const float3 goalPos, const bool cantGetCloser);
 
-	void LowRes2MedRes(MultiPath& path, const float3& startPos, const CSolidObject* owner, bool synced) const;
-	void MedRes2MaxRes(MultiPath& path, const float3& startPos, const CSolidObject* owner, bool synced) const;
+	void LowRes2MaxRes(MultiPath& path, const float3& startPos, const CSolidObject* owner, bool synced) const;
 
-	//bool IsFinalized() const { return (maxResPF != nullptr); }
 	bool IsFinalized() const { return finalized; }
 
-	bool SupportsMultiThreadedRequests() const; //{ return true; }
 	void SavePathCacheForPathId(int pathIdToSave) override;
 
 private:

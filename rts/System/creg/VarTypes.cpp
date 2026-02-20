@@ -1,8 +1,8 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 /*
- * creg - Code compoment registration system
- * Classes for serialization of registrated class instances
+ * creg - Code component registration system
+ * Classes for serialization of registered class instances
  */
 
 #include "VarTypes.h"
@@ -83,4 +83,9 @@ std::string DynamicArrayBaseType::GetName() const
 std::unique_ptr<IType> IType::CreateIgnoredType(size_t size)
 {
 	return std::unique_ptr<IType>(new IgnoredType(size));
+}
+
+std::unique_ptr<IType> creg::IType::CreateFakeType()
+{
+	return std::unique_ptr<IType>(new FakeType());
 }

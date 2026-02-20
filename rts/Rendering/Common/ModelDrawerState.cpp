@@ -13,7 +13,6 @@
 #include "Rendering/Env/SkyLight.h"
 #include "Rendering/GL/GeometryBuffer.h"
 #include "Rendering/GL/myGL.h"
-#include "Rendering/Common/ModelDrawer.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
@@ -23,10 +22,13 @@
 #include "System/SpringMath.h"
 #include "System/StringUtil.h"
 
+#include "System/Misc/TracyDefs.h"
+
 
 
 bool IModelDrawerState::SetTeamColor(int team, float alpha) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// need this because we can be called by no-team projectiles
 	if (!teamHandler.IsValidTeam(team))
 		return false;
@@ -40,6 +42,7 @@ bool IModelDrawerState::SetTeamColor(int team, float alpha) const
 
 void IModelDrawerState::SetupOpaqueDrawing(bool deferredPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE * CModelDrawerConcept::WireFrameModeRef() + GL_FILL * (1 - CModelDrawerConcept::WireFrameModeRef()));
 
@@ -56,6 +59,7 @@ void IModelDrawerState::SetupOpaqueDrawing(bool deferredPass) const
 
 void IModelDrawerState::ResetOpaqueDrawing(bool deferredPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	Disable(deferredPass);
 
 	if (IsLegacy())
@@ -66,6 +70,7 @@ void IModelDrawerState::ResetOpaqueDrawing(bool deferredPass) const
 
 void IModelDrawerState::SetupAlphaDrawing(bool deferredPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_POLYGON_BIT | (GL_COLOR_BUFFER_BIT * IsLegacy()));
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE * CModelDrawerConcept::WireFrameModeRef() + GL_FILL * (1 - CModelDrawerConcept::WireFrameModeRef()));
 
@@ -85,179 +90,21 @@ void IModelDrawerState::SetupAlphaDrawing(bool deferredPass) const
 
 void IModelDrawerState::ResetAlphaDrawing(bool deferredPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	Disable(/*deferredPass*/ false);
 	glPopAttrib();
 }
 
 
-////////////// FFP ////////////////
-
-/**
- * Set up the texture environment in texture unit 0
- * to give an S3O texture its team-colour.
- *
- * Also:
- * - call SetBasicTeamColour to set the team colour to transform to.
- * - Replace the output alpha channel. If not, only the team-coloured bits will show, if that. Or something.
- */
-void CModelDrawerStateFFP::SetupBasicS3OTexture0()
-{
-	glActiveTexture(GL_TEXTURE0);
-	glEnable(GL_TEXTURE_2D);
-
-	// RGB = Texture * (1 - Alpha) + Teamcolor * Alpha
-	glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_INTERPOLATE_ARB);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB_ARB, GL_TEXTURE);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB_ARB, GL_CONSTANT_ARB);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE2_RGB_ARB, GL_TEXTURE);
-	glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND2_RGB_ARB, GL_ONE_MINUS_SRC_ALPHA);
-	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
-
-	// ALPHA = Ignore
-}
-
-/**
- * This sets the first texture unit to GL_MODULATE the colours from the
- * first texture unit with the current glColor.
- *
- * Normal S3O drawing sets the color to full white; translucencies
- * use this setup to 'tint' the drawn model.
- *
- * - Leaves glActivateTextureARB at the first unit.
- * - This doesn't tinker with the output alpha, either.
- */
-void CModelDrawerStateFFP::SetupBasicS3OTexture1()
-{
-	glActiveTexture(GL_TEXTURE1);
-	glEnable(GL_TEXTURE_2D);
-
-	// RGB = Primary Color * Previous
-	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE_ARB);
-	glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_MODULATE);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB_ARB, GL_PRIMARY_COLOR_ARB);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB_ARB, GL_PREVIOUS_ARB);
-
-	// ALPHA = Current alpha * Alpha mask
-	glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA_ARB, GL_MODULATE);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_ALPHA_ARB, GL_TEXTURE);
-	glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND0_ALPHA_ARB, GL_SRC_ALPHA);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_ALPHA_ARB, GL_PRIMARY_COLOR_ARB);
-	glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND1_ALPHA_ARB, GL_SRC_ALPHA);
-}
-
-void CModelDrawerStateFFP::CleanupBasicS3OTexture1()
-{
-	// reset texture1 state
-	glActiveTexture(GL_TEXTURE1);
-	glDisable(GL_TEXTURE_2D);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_ALPHA_ARB, GL_PREVIOUS_ARB);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE0_RGB_ARB, GL_TEXTURE);
-	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-}
-
-void CModelDrawerStateFFP::CleanupBasicS3OTexture0()
-{
-	// reset texture0 state
-	glActiveTexture(GL_TEXTURE0);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE1_RGB_ARB, GL_PREVIOUS_ARB);
-	glTexEnvi(GL_TEXTURE_ENV, GL_SOURCE2_RGB_ARB, GL_CONSTANT_ARB);
-	glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND2_RGB_ARB, GL_SRC_ALPHA);
-	glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB_ARB, GL_MODULATE);
-	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
-}
-
-CModelDrawerStateFFP::CModelDrawerStateFFP() {}
-CModelDrawerStateFFP::~CModelDrawerStateFFP() {}
-
-bool CModelDrawerStateFFP::SetTeamColor(int team, float alpha) const
-{
-	if (!IModelDrawerState::SetTeamColor(team, alpha))
-		return false;
-
-	// non-shader case via texture combiners
-	const float4 m = { 1.0f, 1.0f, 1.0f, alpha };
-
-	glActiveTexture(GL_TEXTURE0);
-	glTexEnvfv(GL_TEXTURE_ENV, GL_TEXTURE_ENV_COLOR, std::move(CModelDrawerHelper::GetTeamColor(team, alpha)));
-	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, &m.x);
-
-	return true;
-}
-
-void CModelDrawerStateFFP::Enable(bool deferredPass, bool alphaPass) const
-{
-	glEnable(GL_LIGHTING);
-	// only for the advshading=0 case
-	glLightfv(GL_LIGHT1, GL_POSITION, ISky::GetSky()->GetLight()->GetLightDir());
-	glLightfv(GL_LIGHT1, GL_AMBIENT, sunLighting->modelAmbientColor);
-	glLightfv(GL_LIGHT1, GL_DIFFUSE, sunLighting->modelDiffuseColor);
-	glLightfv(GL_LIGHT1, GL_SPECULAR, sunLighting->modelSpecularColor);
-	glEnable(GL_LIGHT1);
-
-	CModelDrawerStateFFP::SetupBasicS3OTexture1();
-	CModelDrawerStateFFP::SetupBasicS3OTexture0();
-
-	const float4 color = { 1.0f, 1.0f, 1.0, mix(1.0f, alphaValues.x, (1.0f * alphaPass)) };
-
-	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, &color.x);
-	glColor4fv(&color.x);
-
-	CModelDrawerHelper::PushTransform(camera);
-}
-
-void CModelDrawerStateFFP::Disable(bool deferredPass) const
-{
-	CModelDrawerHelper::PopTransform();
-
-	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-	glDisable(GL_LIGHTING);
-	glDisable(GL_LIGHT1);
-
-	CModelDrawerStateFFP::CleanupBasicS3OTexture1();
-	CModelDrawerStateFFP::CleanupBasicS3OTexture0();
-}
-
-void CModelDrawerStateFFP::SetNanoColor(const float4& color) const
-{
-	if (color.a > 0.0f) {
-		DisableTextures();
-		glColorf4(color);
-	}
-	else {
-		EnableTextures();
-		glColorf3(OnesVector);
-	}
-}
-
-void CModelDrawerStateFFP::EnableTextures() const
-{
-	glEnable(GL_LIGHTING);
-	glColor3f(1.0f, 1.0f, 1.0f);
-	glEnable(GL_TEXTURE_2D);
-	glActiveTexture(GL_TEXTURE1);
-	glEnable(GL_TEXTURE_2D);
-	glActiveTexture(GL_TEXTURE0);
-}
-
-void CModelDrawerStateFFP::DisableTextures() const
-{
-	glDisable(GL_LIGHTING);
-	glDisable(GL_TEXTURE_2D);
-	glActiveTexture(GL_TEXTURE1);
-	glDisable(GL_TEXTURE_2D);
-	glActiveTexture(GL_TEXTURE0);
-	glDisable(GL_TEXTURE_2D);
-}
-
-////////////// GSSL ////////////////
+////////////// GLSL ////////////////
 
 CModelDrawerStateGLSL::CModelDrawerStateGLSL()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!CanEnable())
 		return;
 
-	#define sh shaderHandler
+	auto* sh = shaderHandler;
 
 	const GL::LightHandler* lightHandler = CModelDrawerConcept::GetLightHandler();
 	static const std::string shaderNames[MODEL_SHADER_COUNT] = {
@@ -311,27 +158,29 @@ CModelDrawerStateGLSL::CModelDrawerStateGLSL()
 
 	// make the active shader non-NULL
 	SetActiveShader(shadowHandler.ShadowsLoaded(), false);
-
-	#undef sh
 }
 
 CModelDrawerStateGLSL::~CModelDrawerStateGLSL()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	modelShaders.fill(nullptr);
 	modelShader = nullptr;
 	shaderHandler->ReleaseProgramObjects(PO_CLASS);
 }
 
-bool CModelDrawerStateGLSL::CanEnable() const { return globalRendering->haveGLSL && CModelDrawerConcept::UseAdvShading(); }
+bool CModelDrawerStateGLSL::CanEnable() const { return true; }
 bool CModelDrawerStateGLSL::CanDrawDeferred() const { return CModelDrawerConcept::DeferredAllowed(); }
 
 bool CModelDrawerStateGLSL::SetTeamColor(int team, float alpha) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!IModelDrawerState::SetTeamColor(team, alpha))
 		return false;
 
 	assert(modelShader != nullptr);
+#ifndef HEADLESS
 	assert(modelShader->IsBound());
+#endif
 
 	float4 teamColor = CModelDrawerHelper::GetTeamColor(team, alpha);
 	modelShader->SetUniform4v("teamColor", &teamColor.r);
@@ -341,6 +190,7 @@ bool CModelDrawerStateGLSL::SetTeamColor(int team, float alpha) const
 
 void CModelDrawerStateGLSL::Enable(bool deferredPass, bool alphaPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// body of former EnableCommon();
 	CModelDrawerHelper::PushTransform(camera);
 	CModelDrawerHelper::EnableTexturesCommon();
@@ -362,6 +212,7 @@ void CModelDrawerStateGLSL::Enable(bool deferredPass, bool alphaPass) const
 
 void CModelDrawerStateGLSL::Disable(bool deferredPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(modelShader != nullptr);
 
 	modelShader->Disable();
@@ -373,6 +224,7 @@ void CModelDrawerStateGLSL::Disable(bool deferredPass) const
 
 void CModelDrawerStateGLSL::SetNanoColor(const float4& color) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(modelShader->IsBound());
 	modelShader->SetUniform4v("nanoColor", &color.x);
 }
@@ -384,12 +236,12 @@ void CModelDrawerStateGLSL::DisableTextures() const { CModelDrawerHelper::Disabl
 
 CModelDrawerStateGL4::CModelDrawerStateGL4()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!CanEnable())
-	return;
+		return;
 
-	#define sh shaderHandler
+	auto* sh = shaderHandler;
 
-	const GL::LightHandler* lightHandler = CModelDrawerConcept::GetLightHandler();
 	static const std::string shaderNames[MODEL_SHADER_COUNT] = {
 		"ModelShaderGL4-NoShadowStandard",
 		"ModelShaderGL4-ShadowedStandard",
@@ -425,16 +277,18 @@ CModelDrawerStateGL4::CModelDrawerStateGL4()
 
 CModelDrawerStateGL4::~CModelDrawerStateGL4()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	modelShaders.fill(nullptr);
 	modelShader = nullptr;
 	shaderHandler->ReleaseProgramObjects(PO_CLASS);
 }
 
-bool CModelDrawerStateGL4::CanEnable() const { return globalRendering->haveGL4 && CModelDrawerConcept::UseAdvShading(); }
+bool CModelDrawerStateGL4::CanEnable() const { return globalRendering->haveGL4; }
 bool CModelDrawerStateGL4::CanDrawDeferred() const { return CModelDrawerConcept::DeferredAllowed(); }
 
 bool CModelDrawerStateGL4::SetTeamColor(int team, float alpha) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!IModelDrawerState::SetTeamColor(team, alpha))
 		return false;
 
@@ -448,6 +302,7 @@ bool CModelDrawerStateGL4::SetTeamColor(int team, float alpha) const
 
 void CModelDrawerStateGL4::Enable(bool deferredPass, bool alphaPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// body of former EnableCommon();
 	CModelDrawerHelper::EnableTexturesCommon();
 
@@ -476,6 +331,7 @@ void CModelDrawerStateGL4::Enable(bool deferredPass, bool alphaPass) const
 
 void CModelDrawerStateGL4::Disable(bool deferredPass) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(modelShader != nullptr);
 
 	modelShader->Disable();
@@ -498,6 +354,7 @@ void CModelDrawerStateGL4::Disable(bool deferredPass) const
 
 void CModelDrawerStateGL4::SetNanoColor(const float4& color) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(modelShader != nullptr);
 	assert(modelShader->IsBound());
 
@@ -509,6 +366,7 @@ void CModelDrawerStateGL4::DisableTextures() const { CModelDrawerHelper::Disable
 
 void CModelDrawerStateGL4::SetColorMultiplier(float r, float g, float b, float a) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(modelShader != nullptr);
 	assert(modelShader->IsBound());
 	modelShader->SetUniform("colorMult", r, g, b, a);
@@ -516,6 +374,7 @@ void CModelDrawerStateGL4::SetColorMultiplier(float r, float g, float b, float a
 
 ShaderCameraModes CModelDrawerStateGL4::SetCameraMode(ShaderCameraModes scm_) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(modelShader != nullptr);
 	assert(modelShader->IsBound());
 
@@ -540,6 +399,7 @@ ShaderCameraModes CModelDrawerStateGL4::SetCameraMode(ShaderCameraModes scm_) co
 
 ShaderMatrixModes CModelDrawerStateGL4::SetMatrixMode(ShaderMatrixModes smm_) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(modelShader != nullptr);
 	assert(modelShader->IsBound());
 
@@ -551,6 +411,7 @@ ShaderMatrixModes CModelDrawerStateGL4::SetMatrixMode(ShaderMatrixModes smm_) co
 
 ShaderShadingModes CModelDrawerStateGL4::SetShadingMode(ShaderShadingModes ssm_) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(modelShader != nullptr);
 	assert(modelShader->IsBound());
 
@@ -562,6 +423,7 @@ ShaderShadingModes CModelDrawerStateGL4::SetShadingMode(ShaderShadingModes ssm_)
 
 void CModelDrawerStateGL4::SetStaticModelMatrix(const CMatrix44f& mat) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	assert(modelShader != nullptr);
 	assert(modelShader->IsBound());
 
@@ -570,6 +432,7 @@ void CModelDrawerStateGL4::SetStaticModelMatrix(const CMatrix44f& mat) const
 
 void CModelDrawerStateGL4::SetClipPlane(uint8_t idx, const float4& cp) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	switch (idx)
 	{
 	case 0: //upper construction clip plane
@@ -589,6 +452,7 @@ void CModelDrawerStateGL4::SetClipPlane(uint8_t idx, const float4& cp) const
 
 IModelDrawerState::IModelDrawerState()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	modelShaders.fill(nullptr);
 
 	//dup with every instance, but ok
@@ -600,6 +464,7 @@ IModelDrawerState::IModelDrawerState()
 
 bool IModelDrawerState::IsValid() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	bool valid = true;
 	for (auto ms : modelShaders) {
 		if (!ms)

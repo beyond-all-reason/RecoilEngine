@@ -1,9 +1,15 @@
 #pragma once
 
+#include <memory>
 #include <functional>
 #include <tuple>
+#include <variant>
 #include <type_traits>
 
+#include "Matrix44f.h"
+#include "Transform.hpp"
+
+// TODO Move to namespace Recoil
 namespace spring {
 	template<bool...> struct bool_pack;
 	template<bool... bs>
@@ -170,6 +176,7 @@ namespace spring {
 	template<typename ReturnType, typename... ArgTypes>
 	struct func_signature<ReturnType(ArgTypes...)> {
 		using type = std::tuple<ArgTypes...>;
+		using ret = ReturnType;
 	};
 
 	template<typename FuncType>
@@ -200,3 +207,44 @@ namespace spring {
 	template<auto FuncPtr, typename... FallbackSignature>
 	using func_ptr_signature_t = typename func_ptr_signature<FuncPtr, FallbackSignature...>::type;
 };
+
+namespace Recoil {
+	// taken from https://github.com/spnda/fastgltf/blob/main/include/fastgltf/util.hpp
+	// The MIT License
+	// Copyright (C) 2022 - 2025 Sean Apeler
+	template <typename Visitor, typename Variant, std::size_t... i>
+	constexpr bool is_exhaustive_visitor(std::integer_sequence<std::size_t, i...>) noexcept {
+		return std::conjunction_v<std::is_invocable<Visitor, std::variant_alternative_t<i, std::remove_cvref_t<Variant>>>...>;
+	}
+
+	/**
+	 * Simple wrapper around std::visit for a single variant that checks at compile-time if the given visitor contains
+	 * overloads for *all* required alternatives.
+	 */
+	template<typename Visitor, typename Variant>
+		constexpr decltype(auto) visit_exhaustive(Visitor&& visitor, Variant&& variant) {
+		static_assert(is_exhaustive_visitor<Visitor, Variant>(std::make_index_sequence<std::variant_size_v<std::remove_cvref_t<Variant>>>()),
+			"The visitor does not include all necessary overloads for the given variant");
+		return std::visit(std::forward<Visitor>(visitor), std::forward<Variant>(variant));
+	}
+
+	// useful in the context of static_assert(always_false_v<T>, ...)
+	// https://stackoverflow.com/a/76675119
+	template <typename T>
+	constexpr bool always_false_v = false;
+}
+
+namespace Concepts {
+	template <typename T>
+	concept HasSizeAndData = requires(T t) {
+		{ t.size() } -> std::same_as<std::size_t>;
+		{ t.data() } -> std::convertible_to<const typename T::value_type*>;
+	};
+	template<typename T>
+	concept HasMemberBeginEnd = requires(T t) {
+		{ t.begin() } -> std::input_or_output_iterator;
+		{ t.end() } -> std::sentinel_for<decltype(t.begin())>;
+	};
+	template <typename T>
+	concept CanTransform = std::same_as<T, CMatrix44f> || std::same_as<T, Transform>;
+}

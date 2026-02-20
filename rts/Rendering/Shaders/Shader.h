@@ -16,7 +16,7 @@
 #include "System/Cpp11Compat.hpp"
 #include "Rendering/GL/VertexArrayTypes.h"
 
-struct fast_hash : public spring::unary_function<int, size_t>
+struct fast_hash
 {
 	size_t operator()(const int a) const
 	{
@@ -96,7 +96,7 @@ namespace Shader {
 			std::string log;
 		};
 
-		/// @brief Returns a GLSL shader object in an unqiue pointer that auto deletes that instance.
+		/// @brief Returns a GLSL shader object in an unique pointer that auto deletes that instance.
 		///        Quote of GL docs: If a shader object is deleted while it is attached to a program object,
 		///        it will be flagged for deletion, and deletion will not occur until glDetachShader is called
 		///        to detach it from all program objects to which it is attached.
@@ -104,8 +104,20 @@ namespace Shader {
 		CompiledShaderObjectUniquePtr CompileShaderObject();
 	};
 
+	struct IProgramObject;
+	struct ShaderEnabledToken {
+		ShaderEnabledToken(IProgramObject* prog_);
 
+		ShaderEnabledToken(ShaderEnabledToken&& rhs) noexcept { *this = std::move(rhs); }
+		ShaderEnabledToken& operator=(ShaderEnabledToken&& rhs) noexcept { std::swap(prog, rhs.prog); return *this; }
 
+		ShaderEnabledToken(const ShaderEnabledToken&) = delete;
+		ShaderEnabledToken& operator=(const ShaderEnabledToken& rhs) = delete;
+
+		~ShaderEnabledToken();
+	private:
+		IProgramObject* prog = nullptr;
+	};
 
 	struct IProgramObject {
 	public:
@@ -125,11 +137,15 @@ namespace Shader {
 		bool LoadFromLua(const std::string& filename);
 
 		virtual void BindAttribLocation(const std::string& name, uint32_t index) {}
+		virtual void BindOutputLocation(const std::string& name, uint32_t index) {}
 		template<typename VAT>
 		void BindAttribLocations();
 
 		void SetLogReporting(bool b, bool shObjects = true);
 
+		[[nodiscard]] ShaderEnabledToken EnableScoped() {
+			return ShaderEnabledToken(this);
+		}
 		virtual void Enable();
 		virtual void Disable();
 		virtual void EnableRaw() {}
@@ -178,9 +194,15 @@ namespace Shader {
 		template<typename TV> inline void SetUniform(const char* name, TV v0, TV v1, TV v2)  { SetUniform(GetUniformState(name), v0, v1, v2); }
 		template<typename TV> inline void SetUniform(const char* name, TV v0, TV v1, TV v2, TV v3)  { SetUniform(GetUniformState(name), v0, v1, v2, v3); }
 
-		template<typename TV> inline void SetUniform2v(const char* name, const TV* v) { SetUniform2v(GetUniformState(name), v); }
-		template<typename TV> inline void SetUniform3v(const char* name, const TV* v) { SetUniform3v(GetUniformState(name), v); }
-		template<typename TV> inline void SetUniform4v(const char* name, const TV* v) { SetUniform4v(GetUniformState(name), v); }
+		template<typename TV> inline void SetUniform2v(const char* name, const TV* v) { SetUniform2v(GetUniformState(name), 1, v); }
+		template<typename TV> inline void SetUniform3v(const char* name, const TV* v) { SetUniform3v(GetUniformState(name), 1, v); }
+		template<typename TV> inline void SetUniform4v(const char* name, const TV* v) { SetUniform4v(GetUniformState(name), 1, v); }
+
+		/// variants with count param
+		template<typename TV> inline void SetUniform1v(const char* name, const GLsizei count, const TV* v) { SetUniform1v(GetUniformState(name), count, v); }
+		template<typename TV> inline void SetUniform2v(const char* name, const GLsizei count, const TV* v) { SetUniform2v(GetUniformState(name), count, v); }
+		template<typename TV> inline void SetUniform3v(const char* name, const GLsizei count, const TV* v) { SetUniform3v(GetUniformState(name), count, v); }
+		template<typename TV> inline void SetUniform4v(const char* name, const GLsizei count, const TV* v) { SetUniform4v(GetUniformState(name), count, v); }
 
 		template<typename TV> inline void SetUniformMatrix2x2(const char* name, bool transp, const TV* v) { SetUniformMatrix2x2(GetUniformState(name), transp, v); }
 		template<typename TV> inline void SetUniformMatrix3x3(const char* name, bool transp, const TV* v) { SetUniformMatrix3x3(GetUniformState(name), transp, v); }
@@ -210,6 +232,16 @@ namespace Shader {
 		virtual void SetUniform3fv(int idx, const float* v) = 0;
 		virtual void SetUniform4fv(int idx, const float* v) = 0;
 
+		/// variants with count param
+		virtual void SetUniform1iv(int idx, GLsizei count, const int*   v) = 0;
+		virtual void SetUniform2iv(int idx, GLsizei count, const int*   v) = 0;
+		virtual void SetUniform3iv(int idx, GLsizei count, const int*   v) = 0;
+		virtual void SetUniform4iv(int idx, GLsizei count, const int*   v) = 0;
+		virtual void SetUniform1fv(int idx, GLsizei count, const float* v) = 0;
+		virtual void SetUniform2fv(int idx, GLsizei count, const float* v) = 0;
+		virtual void SetUniform3fv(int idx, GLsizei count, const float* v) = 0;
+		virtual void SetUniform4fv(int idx, GLsizei count, const float* v) = 0;
+
 		virtual void SetUniformMatrix2fv(int idx, bool transp, const float* v) {}
 		virtual void SetUniformMatrix3fv(int idx, bool transp, const float* v) {}
 		virtual void SetUniformMatrix4fv(int idx, bool transp, const float* v) {}
@@ -218,6 +250,7 @@ namespace Shader {
 		/// interface to auto-bind textures with the shader
 		void AddTextureBinding(const int texUnit, const std::string& luaTexName);
 		void BindTextures() const;
+		void UnbindTextures() const;
 
 	protected:
 		/// internal
@@ -229,13 +262,15 @@ namespace Shader {
 		virtual void SetUniform(UniformState* uState, float v0, float v1, float v2) { SetUniform3f(uState->GetLocation(), v0, v1, v2); }
 		virtual void SetUniform(UniformState* uState, int   v0, int   v1, int   v2, int   v3) { SetUniform4i(uState->GetLocation(), v0, v1, v2, v3); }
 		virtual void SetUniform(UniformState* uState, float v0, float v1, float v2, float v3) { SetUniform4f(uState->GetLocation(), v0, v1, v2, v3); }
-
-		virtual void SetUniform2v(UniformState* uState, const int*   v) { SetUniform2iv(uState->GetLocation(), v); }
-		virtual void SetUniform2v(UniformState* uState, const float* v) { SetUniform2fv(uState->GetLocation(), v); }
-		virtual void SetUniform3v(UniformState* uState, const int*   v) { SetUniform3iv(uState->GetLocation(), v); }
-		virtual void SetUniform3v(UniformState* uState, const float* v) { SetUniform3fv(uState->GetLocation(), v); }
-		virtual void SetUniform4v(UniformState* uState, const int*   v) { SetUniform4iv(uState->GetLocation(), v); }
-		virtual void SetUniform4v(UniformState* uState, const float* v) { SetUniform4fv(uState->GetLocation(), v); }
+		
+		virtual void SetUniform1v(UniformState* uState, GLsizei count, const int*   v) { SetUniform1iv(uState->GetLocation(), count, v); }
+		virtual void SetUniform1v(UniformState* uState, GLsizei count, const float* v) { SetUniform1fv(uState->GetLocation(), count, v); }
+		virtual void SetUniform2v(UniformState* uState, GLsizei count, const int*   v) { SetUniform2iv(uState->GetLocation(), count, v); }
+		virtual void SetUniform2v(UniformState* uState, GLsizei count, const float* v) { SetUniform2fv(uState->GetLocation(), count, v); }
+		virtual void SetUniform3v(UniformState* uState, GLsizei count, const int*   v) { SetUniform3iv(uState->GetLocation(), count, v); }
+		virtual void SetUniform3v(UniformState* uState, GLsizei count, const float* v) { SetUniform3fv(uState->GetLocation(), count, v); }
+		virtual void SetUniform4v(UniformState* uState, GLsizei count, const int*   v) { SetUniform4iv(uState->GetLocation(), count, v); }
+		virtual void SetUniform4v(UniformState* uState, GLsizei count, const float* v) { SetUniform4fv(uState->GetLocation(), count, v); }
 
 		virtual void SetUniformMatrix2x2(UniformState* uState, bool transp, const float* m) { SetUniformMatrix2fv(uState->GetLocation(), transp, m); }
 		virtual void SetUniformMatrix3x3(UniformState* uState, bool transp, const float* m) { SetUniformMatrix3fv(uState->GetLocation(), transp, m); }
@@ -282,11 +317,12 @@ namespace Shader {
 		ShaderFlags shaderFlags;
 
 	public:
-		//using UniformStates = std::unordered_map<std::size_t, UniformState, fast_hash>; //nicer for debug
-		using UniformStates = spring::unsynced_map<std::size_t, UniformState, fast_hash>;
+		//using UniformStates = std::unordered_map<std::uint32_t, UniformState, fast_hash>; //nicer for debug
+		using UniformStates = spring::unsynced_map<std::uint32_t, UniformState, fast_hash>;
 		UniformStates uniformStates;
 		spring::unsynced_map<int, LuaMatTexture> luaTextures;
 		spring::unsynced_map<std::string, int> attribLocations;
+		spring::unsynced_map<std::string, int> outputLocations;
 	};
 
 
@@ -319,6 +355,16 @@ namespace Shader {
 		void SetUniform2fv(int idx, const float* v) override {}
 		void SetUniform3fv(int idx, const float* v) override {}
 		void SetUniform4fv(int idx, const float* v) override {}
+
+		/// variants with count param
+		void SetUniform1iv(int idx, GLsizei count, const int*   v) override {}
+		void SetUniform2iv(int idx, GLsizei count, const int*   v) override {}
+		void SetUniform3iv(int idx, GLsizei count, const int*   v) override {}
+		void SetUniform4iv(int idx, GLsizei count, const int*   v) override {}
+		void SetUniform1fv(int idx, GLsizei count, const float* v) override {}
+		void SetUniform2fv(int idx, GLsizei count, const float* v) override {}
+		void SetUniform3fv(int idx, GLsizei count, const float* v) override {}
+		void SetUniform4fv(int idx, GLsizei count, const float* v) override {}
 	};
 
 
@@ -354,6 +400,16 @@ namespace Shader {
 		void SetUniform3fv(int idx, const float* v) override;
 		void SetUniform4fv(int idx, const float* v) override;
 
+		/// variants with count param
+		void SetUniform1iv(int idx, GLsizei count, const int*   v) override { SetUniform1i(idx, v[0]); }
+		void SetUniform2iv(int idx, GLsizei count, const int*   v) override { SetUniform2iv(idx, v); }
+		void SetUniform3iv(int idx, GLsizei count, const int*   v) override { SetUniform3iv(idx, v); }
+		void SetUniform4iv(int idx, GLsizei count, const int*   v) override { SetUniform4iv(idx, v); }
+		void SetUniform1fv(int idx, GLsizei count, const float* v) override { SetUniform1f(idx, v[0]); }
+		void SetUniform2fv(int idx, GLsizei count, const float* v) override { SetUniform2fv(idx, v); }
+		void SetUniform3fv(int idx, GLsizei count, const float* v) override { SetUniform3fv(idx, v); }
+		void SetUniform4fv(int idx, GLsizei count, const float* v) override { SetUniform4fv(idx, v); }
+
 	private:
 		int uniformTarget;
 	};
@@ -365,6 +421,7 @@ namespace Shader {
 		~GLSLProgramObject() override { Release(); }
 
 		void BindAttribLocation(const std::string& name, uint32_t index) override;
+		void BindOutputLocation(const std::string& name, uint32_t index) override;
 
 		void Enable() override;
 		void Disable() override { DisableRaw(); }
@@ -394,6 +451,16 @@ namespace Shader {
 		void SetUniform3fv(int idx, const float* v) override;
 		void SetUniform4fv(int idx, const float* v) override;
 
+		/// variants with count param
+		void SetUniform1iv(int idx, GLsizei count, const int*   v) override;
+		void SetUniform2iv(int idx, GLsizei count, const int*   v) override;
+		void SetUniform3iv(int idx, GLsizei count, const int*   v) override;
+		void SetUniform4iv(int idx, GLsizei count, const int*   v) override;
+		void SetUniform1fv(int idx, GLsizei count, const float* v) override;
+		void SetUniform2fv(int idx, GLsizei count, const float* v) override;
+		void SetUniform3fv(int idx, GLsizei count, const float* v) override;
+		void SetUniform4fv(int idx, GLsizei count, const float* v) override;
+
 		void SetUniformMatrix2fv(int idx, bool transp, const float* v) override;
 		void SetUniformMatrix3fv(int idx, bool transp, const float* v) override;
 		void SetUniformMatrix4fv(int idx, bool transp, const float* v) override;
@@ -409,14 +476,17 @@ namespace Shader {
 		void SetUniform(UniformState* uState, int   v0, int   v1, int   v2) override;
 		void SetUniform(UniformState* uState, float v0, float v1, float v2) override;
 		void SetUniform(UniformState* uState, int   v0, int   v1, int   v2, int   v3) override;
-		void SetUniform(UniformState* uState, float v0, float v1, float v2, float v3);
+		void SetUniform(UniformState* uState, float v0, float v1, float v2, float v3) override;
 
-		void SetUniform2v(UniformState* uState, const int*   v) override;
-		void SetUniform2v(UniformState* uState, const float* v) override;
-		void SetUniform3v(UniformState* uState, const int*   v) override;
-		void SetUniform3v(UniformState* uState, const float* v) override;
-		void SetUniform4v(UniformState* uState, const int*   v) override;
-		void SetUniform4v(UniformState* uState, const float* v) override;
+		/// variants with count param
+		void SetUniform1v(UniformState* uState, GLsizei count, const int*   v) override;
+		void SetUniform1v(UniformState* uState, GLsizei count, const float* v) override;
+		void SetUniform2v(UniformState* uState, GLsizei count, const int*   v) override;
+		void SetUniform2v(UniformState* uState, GLsizei count, const float* v) override;
+		void SetUniform3v(UniformState* uState, GLsizei count, const int*   v) override;
+		void SetUniform3v(UniformState* uState, GLsizei count, const float* v) override;
+		void SetUniform4v(UniformState* uState, GLsizei count, const int*   v) override;
+		void SetUniform4v(UniformState* uState, GLsizei count, const float* v) override;
 
 		void SetUniformMatrix2x2(UniformState* uState, bool transp, const float*  v) override;
 		void SetUniformMatrix3x3(UniformState* uState, bool transp, const float*  v) override;

@@ -15,13 +15,27 @@
 #include "Rendering/Fonts/glFont.h"
 #include "System/Exceptions.h"
 
+#include "System/Misc/TracyDefs.h"
+
+
+/***
+ * Lua opengl font object.
+ *
+ * @class LuaFont
+ * @table LuaFont
+ * @see gl.LoadFont
+ */
+
 
 bool LuaFonts::PushEntries(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CreateMetatable(L);
 
 	REGISTER_LUA_CFUNC(LoadFont);
 	REGISTER_LUA_CFUNC(DeleteFont);
+	REGISTER_LUA_CFUNC(AddFallbackFont);
+	REGISTER_LUA_CFUNC(ClearFallbackFonts);
 
 	return true;
 }
@@ -29,6 +43,7 @@ bool LuaFonts::PushEntries(lua_State* L)
 
 bool LuaFonts::CreateMetatable(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	luaL_newmetatable(L, "Font");
 
 	HSTR_PUSH_CFUNC(L, "__gc",        meta_gc);
@@ -65,6 +80,7 @@ bool LuaFonts::CreateMetatable(lua_State* L)
 
 inline void CheckDrawingEnabled(lua_State* L, const char* caller)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (LuaOpenGL::IsDrawingEnabled(L))
 		return;
 
@@ -74,6 +90,7 @@ inline void CheckDrawingEnabled(lua_State* L, const char* caller)
 
 inline CglFont* tofont(lua_State* L, int idx)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto font = static_cast<std::shared_ptr<CglFont>*>(luaL_checkudata(L, idx, "Font"));
 
 	if (*font == nullptr)
@@ -88,6 +105,7 @@ inline CglFont* tofont(lua_State* L, int idx)
 
 int LuaFonts::meta_gc(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (lua_isnil(L, 1))
 		return 0;
 
@@ -100,6 +118,7 @@ int LuaFonts::meta_gc(lua_State* L)
 
 int LuaFonts::meta_index(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// first check if there is a function
 	luaL_getmetatable(L, "Font");
 	lua_pushvalue(L, 2);
@@ -175,6 +194,7 @@ int LuaFonts::meta_index(lua_State* L)
 
 int LuaFonts::LoadFont(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto f = CglFont::LoadFont(luaL_checkstring(L, 1), luaL_optint(L, 2, 14), luaL_optint(L, 3, 2), luaL_optfloat(L, 4, 15.0f));
 	if (f == nullptr)
 		return 0;
@@ -192,15 +212,60 @@ int LuaFonts::LoadFont(lua_State* L)
 
 int LuaFonts::DeleteFont(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return meta_gc(L);
 }
 
+/*** Adds a fallback font for the font rendering engine.
+ *
+ * Fonts added first will have higher priority.
+ * When a glyph isn't found when rendering a font, the fallback fonts
+ * will be searched first, otherwise os fonts will be used.
+ *
+ * The application should listen for the unsynced 'FontsChanged' callin so
+ * modules can clear any already reserved display lists or other relevant
+ * caches.
+ *
+ * Note the callin won't be executed at the time of calling this method,
+ * but later, on the Update cycle (before other Update and Draw callins).
+ *
+ * @function gl.AddFallbackFont
+ * @param filePath string VFS path to the file, for example "fonts/myfont.ttf". Uses VFS.RAW_FIRST access mode.
+ * @return boolean success
+ */
+int LuaFonts::AddFallbackFont(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	const auto font = luaL_checkstring(L, 1);
+
+	const bool res = CFontTexture::AddFallbackFont(font);
+	lua_pushboolean(L, res);
+	return 1;
+}
+
+/*** Clears all fallback fonts.
+ *
+ * See the note at 'AddFallbackFont' about the 'FontsChanged' callin,
+ * it also applies when calling this method.
+ *
+ * @function gl.ClearFallbackFonts
+ * @return nil
+ */
+int LuaFonts::ClearFallbackFonts(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	CFontTexture::ClearFallbackFonts();
+	return 0;
+}
 
 /******************************************************************************/
 /******************************************************************************/
 
 int LuaFonts::Print(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 
 	const int args = lua_gettop(L); // number of arguments
@@ -248,6 +313,7 @@ int LuaFonts::Print(lua_State* L)
 
 int LuaFonts::PrintWorld(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 
 	const int args = lua_gettop(L); // number of arguments
@@ -299,31 +365,61 @@ int LuaFonts::PrintWorld(lua_State* L)
 /******************************************************************************/
 /******************************************************************************/
 
+/*** Begin a block of font commands.
+ *
+ * @function LuaFont:Begin
+ *
+ * Fonts can be printed without using Start/End, but when doing several operations it's more optimal
+ * if done inside a block.
+ *
+ * Also allows disabling automatic setting of the blend mode. Otherwise the font will always print
+ * with `BlendFunc(GL.SRC_ALPHA, GL.ONE_MINUS_SRC_ALPHA)`.
+
+ * @param userDefinedBlending boolean? When `true` doesn't set the gl.BlendFunc automatically. Defaults to `false`.
+ *
+ * @see gl.BlendFunc
+ * @see gl.BlendFuncSeparate
+ */
 int LuaFonts::Begin(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 	auto f = tofont(L, 1);
-	f->Begin();
+	auto userDefinedBlending = luaL_optboolean(L, 2, false);
+	f->Begin(userDefinedBlending);
 	return 0;
 }
 
 int LuaFonts::End(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 	auto f = tofont(L, 1);
 	f->End();
 	return 0;
 }
 
+/*** Draws text printed with the `buffered` option.
+ *
+ * @function LuaFont:SubmitBuffered
+ *
+ * @param noBillboarding boolean? When `false` sets 3d billboard mode. Defaults to `true`.
+ * @param userDefinedBlending boolean? When `true` doesn't set the gl.BlendFunc automatically. Defaults to `false`.
+ *
+ * @see gl.BlendFunc
+ * @see gl.BlendFuncSeparate
+ */
 int LuaFonts::SubmitBuffered(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 	auto f = tofont(L, 1);
+	auto userDefinedBlending = luaL_optboolean(L, 3, false);
 
 	if (luaL_optboolean(L, 2, true)) // world or not
-		f->DrawBuffered();
+		f->DrawBuffered(userDefinedBlending);
 	else
-		f->DrawWorldBuffered();
+		f->DrawWorldBuffered(userDefinedBlending);
 
 	return 0;
 }
@@ -334,6 +430,7 @@ int LuaFonts::SubmitBuffered(lua_State* L)
 
 int LuaFonts::WrapText(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto f = tofont(L, 1);
 
 	std::string text(luaL_checkstring(L, 2), lua_strlen(L, 2));
@@ -354,6 +451,7 @@ int LuaFonts::WrapText(lua_State* L)
 
 int LuaFonts::GetTextWidth(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto f = tofont(L, 1);
 
 	lua_pushnumber(L, f->GetTextWidth(std::string(luaL_checkstring(L, 2), lua_strlen(L, 2))));
@@ -363,6 +461,7 @@ int LuaFonts::GetTextWidth(lua_State* L)
 
 int LuaFonts::GetTextHeight(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto f = tofont(L, 1);
 
 	const std::string text(luaL_checkstring(L, 2), lua_strlen(L, 2));
@@ -382,6 +481,7 @@ int LuaFonts::GetTextHeight(lua_State* L)
 
 static int SetTextColorShared(lua_State* L, bool outline)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto f = tofont(L, 1);
 
 	const int args = lua_gettop(L); // number of arguments
@@ -416,6 +516,7 @@ int LuaFonts::SetOutlineColor(lua_State* L) { return (SetTextColorShared(L, true
 
 int LuaFonts::SetAutoOutlineColor(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto f = tofont(L, 1);
 	f->SetAutoOutlineColor(luaL_checkboolean(L, 2));
 	return 0;
@@ -427,6 +528,7 @@ int LuaFonts::SetAutoOutlineColor(lua_State* L)
 
 int LuaFonts::BindTexture(lua_State* L)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CheckDrawingEnabled(L, __func__);
 
 	auto f = tofont(L, 1);
@@ -436,4 +538,3 @@ int LuaFonts::BindTexture(lua_State* L)
 
 	return 0;
 }
-

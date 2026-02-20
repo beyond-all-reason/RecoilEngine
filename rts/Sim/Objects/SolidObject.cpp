@@ -1,6 +1,5 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-
 #include "SolidObject.h"
 #include "SolidObjectDef.h"
 #include "Map/ReadMap.h"
@@ -11,6 +10,9 @@
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Game/GameHelper.h"
 #include "System/SpringMath.h"
+#include "System/Quaternion.h"
+
+#include "System/Misc/TracyDefs.h"
 
 int CSolidObject::deletingRefID = -1;
 
@@ -20,6 +22,7 @@ CR_REG_METADATA(CSolidObject,
 (
 	CR_MEMBER(health),
 	CR_MEMBER(maxHealth),
+	CR_MEMBER(entityReference),
 
 	CR_MEMBER(mass),
 	CR_MEMBER(crushResistance),
@@ -48,6 +51,8 @@ CR_REG_METADATA(CSolidObject,
 	CR_MEMBER(team),
 	CR_MEMBER(allyteam),
 
+	CR_MEMBER(creationFrame),
+
 	CR_MEMBER(pieceHitFrames),
 
 	CR_MEMBER(moveDef),
@@ -56,8 +61,6 @@ CR_REG_METADATA(CSolidObject,
 	CR_MEMBER(collisionVolume),
 	CR_MEMBER(selectionVolume), // unsynced, could also be ignored
 	CR_MEMBER(hitModelPieces),
-
-	CR_IGNORED(groundDecal), // loaded from render*Created
 
 	CR_MEMBER(frontdir),
 	CR_MEMBER(rightdir),
@@ -75,9 +78,6 @@ CR_REG_METADATA(CSolidObject,
 	CR_MEMBER(drawPos),
 	CR_MEMBER(drawMidPos),
 
-	CR_MEMBER(drawFlag),
-	CR_MEMBER(previousDrawFlag),
-
 	CR_MEMBER(buildFacing),
 	CR_MEMBER(modParams),
 
@@ -85,8 +85,13 @@ CR_REG_METADATA(CSolidObject,
 ))
 
 
+CSolidObject::CSolidObject()
+	: creationFrame { gs->frameNum }
+{}
+
 void CSolidObject::PostLoad()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if ((model = GetDef()->LoadModel()) == nullptr)
 		return;
 
@@ -96,8 +101,11 @@ void CSolidObject::PostLoad()
 
 void CSolidObject::UpdatePhysicalState(float eps)
 {
-	const float gh = CGround::GetHeightReal(pos.x, pos.z);
-	const float wh = std::max(gh, 0.0f);
+	RECOIL_DETAILED_TRACY_ZONE;
+	const float waterLevel = CGround::GetWaterLevel(pos.x, pos.z);
+	const float groundHeight = CGround::GetHeightReal(pos.x, pos.z);
+	// Get height of whichever surface is higher between ground and water
+	const float topSurfaceHeight = std::max(groundHeight, waterLevel);
 
 	unsigned int ps = physicalState;
 
@@ -113,13 +121,13 @@ void CSolidObject::UpdatePhysicalState(float eps)
 	//   the height property is used for much fewer purposes
 	//   than radius, so less reliable for determining state
 	#define MASK_NOAIR (PSTATE_BIT_ONGROUND | PSTATE_BIT_INWATER | PSTATE_BIT_UNDERWATER | PSTATE_BIT_UNDERGROUND)
-	ps |= (PSTATE_BIT_ONGROUND    * ((   pos.y -         gh) <=  eps));
-	ps |= (PSTATE_BIT_INWATER     * ((   pos.y             ) <= 0.0f));
+	ps |= (PSTATE_BIT_ONGROUND    * ((   pos.y -         groundHeight) <=  eps));
+	ps |= (PSTATE_BIT_INWATER     * ((   pos.y             ) <= waterLevel));
 //	ps |= (PSTATE_BIT_UNDERWATER  * ((   pos.y +     height) <  0.0f));
-//	ps |= (PSTATE_BIT_UNDERGROUND * ((   pos.y +     height) <    gh));
-	ps |= (PSTATE_BIT_UNDERWATER  * ((midPos.y +     radius) <  0.0f));
-	ps |= (PSTATE_BIT_UNDERGROUND * ((midPos.y +     radius) <    gh));
-	ps |= (PSTATE_BIT_INAIR       * ((   pos.y -         wh) >   eps));
+//	ps |= (PSTATE_BIT_UNDERGROUND * ((   pos.y +     height) <    groundHeight));
+	ps |= (PSTATE_BIT_UNDERWATER  * ((midPos.y +     radius) <  waterLevel));
+	ps |= (PSTATE_BIT_UNDERGROUND * ((midPos.y +     radius) <    groundHeight));
+	ps |= (PSTATE_BIT_INAIR       * ((   pos.y -         topSurfaceHeight) >   eps));
 	ps |= (PSTATE_BIT_INAIR       * ((    ps   & MASK_NOAIR) ==    0));
 	#undef MASK_NOAIR
 
@@ -129,7 +137,7 @@ void CSolidObject::UpdatePhysicalState(float eps)
 	// fails then A and B *must* both be false
 	//
 	// problem case: pos.y < eps (but > 0) &&
-	// gh < -eps causes ONGROUND and INAIR to
+	// groundHeight < -eps causes ONGROUND and INAIR to
 	// both be false but INWATER will fail too
 	#if 0
 	assert((IsInAir() != IsOnGround()) || IsInWater());
@@ -138,9 +146,21 @@ void CSolidObject::UpdatePhysicalState(float eps)
 	#endif
 }
 
+void CSolidObject::Move(const float3& v, bool relative)
+{
+	const float3& dv = relative ? v : (v - pos);
+
+	pos    += dv;
+	midPos += dv;
+	aimPos += dv;
+
+	CondUpdatePrevTransform();
+}
+
 
 bool CSolidObject::SetVoidState()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (IsInVoid())
 		return false;
 
@@ -160,6 +180,7 @@ bool CSolidObject::SetVoidState()
 
 bool CSolidObject::ClearVoidState()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!IsInVoid())
 		return false;
 
@@ -175,6 +196,7 @@ bool CSolidObject::ClearVoidState()
 
 void CSolidObject::UpdateVoidState(bool set)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (set) {
 		SetVoidState();
 	} else {
@@ -187,12 +209,14 @@ void CSolidObject::UpdateVoidState(bool set)
 
 void CSolidObject::SetMass(float newMass)
 {
-	mass = Clamp(newMass, MINIMUM_MASS, MAXIMUM_MASS);
+	RECOIL_DETAILED_TRACY_ZONE;
+	mass = std::clamp(newMass, MINIMUM_MASS, MAXIMUM_MASS);
 }
 
 
 void CSolidObject::UnBlock()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!IsBlocking())
 		return;
 
@@ -202,6 +226,7 @@ void CSolidObject::UnBlock()
 
 void CSolidObject::Block()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// no point calling this if object is not
 	// collidable in principle, but simplifies
 	// external code to allow it
@@ -237,7 +262,7 @@ bool CSolidObject::FootPrintOnGround() const {
 	for (int z = hmFpr.z1; z <= hmFpr.z2; ++z) {
 		const float* hPtr = CGround::GetApproximateHeightUnsafePtr(hmFpr.x1, z, true);
 		for (int x = hmFpr.x1; x <= hmFpr.x2; ++x) {
-			const auto heightAboveWaterHere = std::max(*hPtr, 0.0f);
+			const auto heightAboveWaterHere = std::max(*hPtr, CGround::GetWaterLevel(x, z));
 			if ((pos.y - SQUARE_SIZE) <= heightAboveWaterHere)
 				return true;
 			hPtr++;
@@ -250,87 +275,84 @@ bool CSolidObject::FootPrintOnGround() const {
 
 YardMapStatus CSolidObject::GetGroundBlockingMaskAtPos(float3 gpos) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const YardMapStatus* blockMap = GetBlockMap();
-
 	if (blockMap == nullptr)
 		return YARDMAP_OPEN;
 
-	const int hxsize = footprint.x >> 1;
-	const int hzsize = footprint.y >> 1;
+	const int2 hFootprint{footprint.x >> 1, footprint.y >> 1};
+	const int2 hSize{ xsize >> 1, zsize >> 1};
 
-	float3 frontv;
-	float3 rightv;
+	const int2 gPos2
+			{ int(gpos.x / SQUARE_SIZE)
+			, int(gpos.z / SQUARE_SIZE)};
+	const int2 diff = gPos2 - (mapPos + hSize);
 
-	#if 1
-		// use continuous floating-point space
-		gpos   -= pos;
-		gpos.x += SQUARE_SIZE / 2; //??? needed to move to SQUARE-center? (possibly current input is wrong)
-		gpos.z += SQUARE_SIZE / 2;
+	constexpr int2 rotationDirs[] = { {0,1}, {1,0}, {0,-1}, {-1,0}, {0,1} };
+	const int2 front = rotationDirs[buildFacing];
+	const int2 right = rotationDirs[buildFacing+1];
 
-		frontv =  frontdir;
-		rightv = -rightdir; // world-space is RH, unit-space is LH
-	#else
-		// use old fixed space (4 facing dirs & ints for unit positions)
+	// corrections needed because the rotation is off centre.
+	constexpr int2 rotationCorrections[] = { {0,0}, {-1,0}, {-1,-1}, {0,-1} };
+	const int2 adjust = rotationCorrections[buildFacing];
 
-		// form the rotated axis vectors
-		static constexpr float3 fronts[] = {FwdVector,  RgtVector, -FwdVector, -RgtVector};
-		static constexpr float3 rights[] = {RgtVector, -FwdVector, -RgtVector,  FwdVector};
+	// Translate from map-space to yardmap-space
+	// negative result overflows to super high number
+	const uint32_t by = (front.x*diff.x) + (front.y*diff.y) + hFootprint.y + adjust.y;
+	const uint32_t bx = (right.x*diff.x) + (right.y*diff.y) + hFootprint.x + adjust.x;
 
-		// get used axis vectors
-		frontv = fronts[buildFacing];
-		rightv = rights[buildFacing];
-
-		gpos -= float3(mapPos.x * SQUARE_SIZE, 0.0f, mapPos.y * SQUARE_SIZE);
-
-		// need to revert some of the transformations of CSolidObject::GetMapPos()
-		gpos.x += SQUARE_SIZE / 2 - (this->xsize >> 1) * SQUARE_SIZE;
-		gpos.z += SQUARE_SIZE / 2 - (this->zsize >> 1) * SQUARE_SIZE;
-	#endif
-
-	// transform worldspace pos to unit rotation dependent `centered blockmap space` [-hxsize .. +hxsize] x [-hzsize .. +hzsize]
-	float by = frontv.dot(gpos) / SQUARE_SIZE;
-	float bx = rightv.dot(gpos) / SQUARE_SIZE;
-
-	// outside of `blockmap space`?
-	if ((math::fabsf(bx) >= hxsize) || (math::fabsf(by) >= hzsize))
+	if ((bx >= footprint.x) || (by >= footprint.y))
 		return YARDMAP_OPEN;
 
-	// transform: [(-hxsize + eps) .. (+hxsize - eps)] x [(-hzsize + eps) .. (+hzsize - eps)] -> [0 .. (xsize - 1)] x [0 .. (zsize - 1)]
-	bx += hxsize;
-	by += hzsize;
-
-	assert(int(bx) >= 0 && int(bx) < footprint.x);
-	assert(int(by) >= 0 && int(by) < footprint.y);
-
 	// read from blockmap
-	return blockMap[int(bx) + int(by) * footprint.x];
+	return blockMap[bx + by*footprint.x];
 }
+
+
+// unsynced mid-{position,vector}s
+float3 CSolidObject::GetMdlDrawMidPos() const { return (GetObjectSpaceDrawPos(WORLD_TO_OBJECT_SPACE * localModel.GetRelMidPos())); }
+float3 CSolidObject::GetObjDrawMidPos() const { return (GetObjectSpaceDrawPos(WORLD_TO_OBJECT_SPACE * relMidPos                )); }
 
 int2 CSolidObject::GetMapPosStatic(const float3& position, int xsize, int zsize)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	int2 mp;
 
-	mp.x = (int(position.x + SQUARE_SIZE / 2) / SQUARE_SIZE) - (xsize / 2);
-	mp.y = (int(position.z + SQUARE_SIZE / 2) / SQUARE_SIZE) - (zsize / 2);
-	mp.x = Clamp(mp.x, 0, mapDims.mapx - xsize);
-	mp.y = Clamp(mp.y, 0, mapDims.mapy - zsize);
+	mp.x = (int(position.x /*+ SQUARE_SIZE / 2*/) / SQUARE_SIZE) - (xsize / 2);
+	mp.y = (int(position.z /*+ SQUARE_SIZE / 2*/) / SQUARE_SIZE) - (zsize / 2);
+	mp.x = std::clamp(mp.x, 0, mapDims.mapx - xsize);
+	mp.y = std::clamp(mp.y, 0, mapDims.mapy - zsize);
 
 	return mp;
 }
 
-float3 CSolidObject::GetDragAccelerationVec(const float4& params) const
+float3 CSolidObject::GetDragAccelerationVec(float atmosphericDensity, float waterDensity, float dragCoeff, float frictionCoeff) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// KISS: use the cross-sectional area of a sphere, object shapes are complex
 	// this is a massive over-estimation so pretend the radius is in centimeters
 	// other units as normal: mass in kg, speed in elmos/frame, density in kg/m^3
 	//
 	// params.xyzw map: {{atmosphere, water}Density, {drag, friction}Coefficient}
 	//
+
+	static constexpr auto STOPPING_SPEED = 0.5f;
+	// prevent eternal crawling, also exit early for static objects
+	if (const float perSecSpeed = speed.w * GAME_SPEED; perSecSpeed < STOPPING_SPEED) {
+		return float3(-speed.x, -speed.y, -speed.z);
+	}
+
+	// Typical radiuses in Elmo make no sense given the mass and the fact the robots are made from metal (some heavy alloy)
+	// kg / m3
+	static constexpr float MATERIAL_DENSITY = 8000.0f;
+	const float assumedRadius = math::cbrtf((3.0f * mass) / (4.0f * math::PI * MATERIAL_DENSITY));
+	const float assumedSectionArea = math::PI * assumedRadius * assumedRadius;
+
 	const float3 speedSignVec = float3(Sign(speed.x), Sign(speed.y), Sign(speed.z));
 	const float3 dragScaleVec = float3(
-		IsInAir()    * dragScales.x * (0.5f * params.x * params.z * (math::PI * sqRadius * 0.01f * 0.01f)), // air
-		IsInWater()  * dragScales.y * (0.5f * params.y * params.z * (math::PI * sqRadius * 0.01f * 0.01f)), // water
-		IsOnGround() * dragScales.z * (                  params.w * (                               mass))  // ground
+		(IsInAir() || IsOnGround()) * dragScales.x * (0.5f * atmosphericDensity * dragCoeff * assumedSectionArea), // air
+		IsInWater()                 * dragScales.y * (0.5f * waterDensity * dragCoeff * assumedSectionArea), // water
+		IsOnGround()                * dragScales.z * (frictionCoeff * mass)  // ground
 	);
 
 	float3 dragAccelVec;
@@ -355,15 +377,16 @@ float3 CSolidObject::GetDragAccelerationVec(const float4& params) const
 	dragAccelVec /= mass;
 
 	// limit the acceleration
-	dragAccelVec.x = Clamp(dragAccelVec.x, -math::fabs(speed.x), math::fabs(speed.x));
-	dragAccelVec.y = Clamp(dragAccelVec.y, -math::fabs(speed.y), math::fabs(speed.y));
-	dragAccelVec.z = Clamp(dragAccelVec.z, -math::fabs(speed.z), math::fabs(speed.z));
+	dragAccelVec.x = std::clamp(dragAccelVec.x, -math::fabs(speed.x), math::fabs(speed.x));
+	dragAccelVec.y = std::clamp(dragAccelVec.y, -math::fabs(speed.y), math::fabs(speed.y));
+	dragAccelVec.z = std::clamp(dragAccelVec.z, -math::fabs(speed.z), math::fabs(speed.z));
 
 	return dragAccelVec;
 }
 
 float3 CSolidObject::GetWantedUpDir(bool useGroundNormal, bool useObjectNormal, float dirSmoothing) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 groundUp = CGround::GetSmoothNormal(pos.x, pos.z);
 	const float3 curUpDir = float3{updir};
 	const float3 objectUp = mix(UpVector, curUpDir, useObjectNormal);
@@ -375,8 +398,9 @@ float3 CSolidObject::GetWantedUpDir(bool useGroundNormal, bool useObjectNormal, 
 
 
 
-void CSolidObject::SetDirVectorsEuler(const float3 angles)
+void CSolidObject::SetDirVectorsEuler(const float3& angles)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CMatrix44f matrix;
 
 	// our system is left-handed, so R(X)R(Y)R(Z) is really T(R(-Z)R(-Y)R(-X))
@@ -387,33 +411,68 @@ void CSolidObject::SetDirVectorsEuler(const float3 angles)
 	UpdateMidAndAimPos();
 }
 
-void CSolidObject::SetHeadingFromDirection() { heading = GetHeadingFromVector(frontdir.x, frontdir.z); }
+void CSolidObject::SetHeadingFromDirection() {
+	// undo UpdateDirVectors transformation
+
+	// construct quaternion to describe rotation from uDir to UpVector
+	CQuaternion quat(-updir.z, 0.0f, updir.x, 1.0f + updir.y); // same angle as in UpdateDirVectors, but inverted axis
+	quat.ANormalize();
+
+	const float3 fDir = quat * frontdir;
+	assert(epscmp(fDir.y, 0.0f, float3::apx_eps()));
+
+	heading = GetHeadingFromVector(fDir.x, fDir.z);
+}
 void CSolidObject::SetFacingFromHeading() { buildFacing = GetFacingFromHeading(heading); }
 
 void CSolidObject::UpdateDirVectors(bool useGroundNormal, bool useObjectNormal, float dirSmoothing)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 uDir = GetWantedUpDir(useGroundNormal, useObjectNormal, dirSmoothing);
 	UpdateDirVectors(uDir);
 }
 
 void CSolidObject::UpdateDirVectors(const float3& uDir)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// set initial rotation of the object around updir=UpVector first
 	const float3 fDir = GetVectorFromHeading(heading);
+	const float3 rDir = float3{ -fDir.z, 0.0f, fDir.x };
 
-	if likely(1.0f - math::fabs(uDir.y) >= 1e-6f) {
-		const float3 norm = float3{ uDir.z, 0.0f, -uDir.x }.Normalize(); //same as UpVector.cross(uDir) to obtain normal vector, which will serve as a rotation axis
-		frontdir = fDir.rotateByUpVector(uDir, norm); //doesn't change vector magnitude
-	}
-	else {
-		frontdir = fDir;
-	}
-	rightdir = (frontdir.cross(uDir)).Normalize();
+	// construct quaternion to describe rotation from UpVector to uDir
+	// can use CQuaternion::MakeFrom(const float3& v1, const float3& v2);
+	// but simplified given UpVector is trivial
+	CQuaternion quat(uDir.z, 0.0f, -uDir.x, 1.0f + uDir.y);
+	quat.ANormalize();
+
+	frontdir = quat * fDir;
+	rightdir = quat * rDir;
 	updir = uDir;
+}
+
+void CSolidObject::CondUpdatePrevTransform()
+{
+	// copy every transformation happening on the creation frame
+	// into PrevFrameTransform state
+	// skip otherwise
+	if likely(creationFrame != gs->frameNum)
+		return;
+
+	UpdatePrevFrameTransform();
+}
+
+void CSolidObject::UpdatePrevFrameTransform()
+{
+	for (auto& lmp : localModel.pieces) {
+		lmp.SavePrevModelSpaceTransform();
+	}
+
+	preFrameTra = Transform{ CQuaternion::MakeFrom(GetTransformMatrix(true)), pos };
 }
 
 void CSolidObject::ForcedSpin(const float3& zdir)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// new front-direction should be normalized
 	assert(math::fabsf(zdir.SqLength() - 1.0f) <= float3::cmp_eps());
 
@@ -433,15 +492,43 @@ void CSolidObject::ForcedSpin(const float3& zdir)
 	UpdateMidAndAimPos();
 }
 
+void CSolidObject::ForcedSpin(const float3& newFrontDir, const float3& newRightDir)
+{
+	// new front & right directions should be normalized
+	assert(math::fabsf(newFrontDir.SqLength() - 1.0f) <= float3::cmp_eps());
+	assert(math::fabsf(newRightDir.SqLength() - 1.0f) <= float3::cmp_eps());
+
+	frontdir = newFrontDir;
+	rightdir = newRightDir;
+	   updir = (newRightDir.cross(newFrontDir)).Normalize();
+
+	SetHeadingFromDirection();
+	UpdateMidAndAimPos();
+}
+
 
 
 void CSolidObject::Kill(CUnit* killer, const float3& impulse, bool crushed)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	UpdateVoidState(false);
 	DoDamage(DamageArray(health + 1.0f), impulse, killer, crushed? -DAMAGE_EXTSOURCE_CRUSHED: -DAMAGE_EXTSOURCE_KILLED, -1);
 }
 
+const CollisionVolume* CSolidObject::GetCollisionVolume(const LocalModelPiece* lmp) const {
+	if (lmp == nullptr)
+		return &collisionVolume;
+	if (!collisionVolume.DefaultToPieceTree())
+		return &collisionVolume;
 
+	return (lmp->GetCollisionVolume());
+}
+
+      LuaObjectMaterialData* CSolidObject::GetLuaMaterialData()       { return (localModel.GetLuaMaterialData()); }
+const LuaObjectMaterialData* CSolidObject::GetLuaMaterialData() const { return (localModel.GetLuaMaterialData()); }
+
+
+float CSolidObject::GetDrawRadius() const { return localModel.GetDrawRadius(); }
 
 float CSolidObject::CalcFootPrintMinExteriorRadius(float scale) const { return ((math::sqrt((xsize * xsize + zsize * zsize)) * 0.5f * SQUARE_SIZE) * scale); }
 float CSolidObject::CalcFootPrintMaxInteriorRadius(float scale) const { return ((std::max(xsize, zsize) * 0.5f * SQUARE_SIZE) * scale); }

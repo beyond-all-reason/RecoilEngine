@@ -9,6 +9,8 @@
 #include "Sim/Units/Unit.h"
 #include "System/SpringMath.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CTorpedoLauncher, CWeapon, )
 CR_REG_METADATA(CTorpedoLauncher,(
 	CR_MEMBER(tracking)
@@ -16,14 +18,16 @@ CR_REG_METADATA(CTorpedoLauncher,(
 
 CTorpedoLauncher::CTorpedoLauncher(CUnit* owner, const WeaponDef* def): CWeapon(owner, def)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// null happens when loading
 	if (def != nullptr)
 		tracking = weaponDef->turnrate * def->tracks;
 }
 
 
-bool CTorpedoLauncher::TestTarget(const float3 pos, const SWeaponTarget& trg) const
+bool CTorpedoLauncher::TestTarget(const float3& pos, const SWeaponTarget& trg) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// by default we are a waterweapon, therefore:
 	//   if muzzle is above water, target position is only allowed to be IN water
 	//   if muzzle is below water, target position being valid depends on submissile
@@ -50,6 +54,7 @@ bool CTorpedoLauncher::TestTarget(const float3 pos, const SWeaponTarget& trg) co
 
 void CTorpedoLauncher::FireImpl(const bool scriptCall)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float3 dir = currentTargetPos - weaponMuzzlePos;
 	float3 vel;
 
@@ -66,7 +71,7 @@ void CTorpedoLauncher::FireImpl(const bool scriptCall)
 	params.speed = vel;
 	params.pos = weaponMuzzlePos;
 	params.end = currentTargetPos;
-	params.ttl = (weaponDef->flighttime == 0)? math::ceil(std::max(dist, range) / projectileSpeed + 25): weaponDef->flighttime;
+	params.ttl = (ttl == 0)? math::ceil(std::max(dist, range) / projectileSpeed + 25): ttl;
 	params.tracking = tracking;
 
 	WeaponProjectileFactory::LoadProjectile(params);

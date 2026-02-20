@@ -185,7 +185,7 @@ end
 --  Calls
 --
 
-local function MakeWords(line)
+local function splitBySpace(line)
   local words = {}
   for w in string.gmatch(line, "[^%s]+") do
     table.insert(words, w)
@@ -211,7 +211,7 @@ local function TryAction(actionMap, cmd, optLine, optWords, isRepeat, release, a
 end
 
 
-function actionHandler:KeyAction(press, _, _, isRepeat, actions)
+function actionHandler:KeyAction(press, _, _, isRepeat, _, actions)
   if (not(actions and next(actions))) then return false end
 
   local actionSet
@@ -220,10 +220,11 @@ function actionHandler:KeyAction(press, _, _, isRepeat, actions)
   else
     actionSet = self.keyReleaseActions
   end
-  for _,bAction in ipairs(actions) do
-    local bCmd, bOpts = next(bAction, nil)
-    local words = MakeWords(bOpts)
-    if (TryAction(actionSet, bCmd, bOpts, words, isRepeat, not press, actions)) then
+  for _, action in ipairs(actions) do
+    local cmd = action["command"]
+    local extra = action["extra"]
+    local args = splitBySpace(extra)
+    if (TryAction(actionSet, cmd, extra, args, isRepeat, not press, actions)) then
       return true
     end
   end
@@ -233,7 +234,7 @@ end
 
 
 function actionHandler:TextAction(line)
-  local words = MakeWords(line)
+  local words = splitBySpace(line)
   local cmd = words[1]
   if (cmd == nil) then
     return false

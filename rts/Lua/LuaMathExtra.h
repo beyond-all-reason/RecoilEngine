@@ -18,6 +18,13 @@ class LuaMathExtra {
 		static int round(lua_State* L);
 		static int erf(lua_State* L);
 		static int smoothstep(lua_State* L);
+		static int normalize(lua_State* L);
+
+		static int bit_or(lua_State* L);
+		static int bit_and(lua_State* L);
+		static int bit_xor(lua_State* L);
+		static int bit_inv(lua_State* L);
+		static int bit_bits(lua_State* L);
 };
 
 #endif /* LUA_MATH_EXTRA_H */

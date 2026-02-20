@@ -3,6 +3,7 @@
 
 #include "Sim/Misc/GlobalConstants.h"
 #include "CobFile.h"
+#include "CobOpCodes.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Sound/ISound.h"
@@ -14,12 +15,14 @@
 #include <cctype>
 #include <cstring>
 
+#include "System/Misc/TracyDefs.h"
+
 
 //The following structure is taken from http://visualta.tauniverse.com/Downloads/ta-cob-fmt.txt
 //Information on missing fields from Format_Cob.pas
 typedef struct tagCOBHeader
 {
-	int VersionSignature;
+	int VersionSignature; // 4 for TA, 6 for TA:K
 	int NumberOfScripts;
 	int NumberOfPieces;
 	int TotalScriptLen;
@@ -87,6 +90,7 @@ static std::vector<uint8_t> cobFileData;
 
 CCobFile::CCobFile(CFileHandler& in, const std::string& scriptName)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	name.assign(scriptName);
 	scriptIndex.fill(-1);
 
@@ -121,19 +125,25 @@ CCobFile::CCobFile(CFileHandler& in, const std::string& scriptName)
 	scriptLengths.reserve(ch.NumberOfScripts);
 	pieceNames.reserve(ch.NumberOfPieces);
 
+	// code accessor so we don't need to process code area yet, while being able to access its contents
+	int* preCode = reinterpret_cast<int*>(&cobFileData[ch.OffsetToScriptCode]);
+
 	for (int i = 0; i < ch.NumberOfScripts; ++i) {
 		int ofs = *(int *) &cobFileData[ch.OffsetToScriptNameOffsetArray + i * 4];
 		swabDWordInPlace(ofs);
 		scriptNames.emplace_back(reinterpret_cast<const char*>(&cobFileData[ofs]));
 
+		ofs = *(int *) &cobFileData[ch.OffsetToScriptCodeIndexArray + i * 4];
+		swabDWordInPlace(ofs);
+
 		if (scriptNames[scriptNames.size() - 1].find("lua_") == 0) {
 			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str() + sizeof("lua_") - 1);
+		} else if (swabDWord(*(preCode + ofs)) == SIGNATURE_LUA) {
+			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str());
 		} else {
 			luaScripts.emplace_back("");
 		}
 
-		ofs = *(int *) &cobFileData[ch.OffsetToScriptCodeIndexArray + i * 4];
-		swabDWordInPlace(ofs);
 		scriptOffsets.push_back(ofs);
 	}
 
@@ -201,6 +211,7 @@ CCobFile::CCobFile(CFileHandler& in, const std::string& scriptName)
 
 int CCobFile::GetFunctionId(const std::string& name)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto i = scriptMap.find(name);
 
 	if (i != scriptMap.end())

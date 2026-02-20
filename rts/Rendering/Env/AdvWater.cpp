@@ -13,12 +13,15 @@
 #include "Rendering/GL/VertexArray.h"
 #include "System/Exceptions.h"
 
+#include "System/Misc/TracyDefs.h"
+
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
 
 void CAdvWater::InitResources(bool loadShader)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!FBO::IsSupported())
 		throw content_error("Water Error: missing FBO support");
 
@@ -105,6 +108,7 @@ void CAdvWater::InitResources(bool loadShader)
 
 void CAdvWater::FreeResources()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto DeleteTexture = [](GLuint& texID) { if (texID > 0) { glDeleteTextures(1, &texID); texID = 0; } };
 	DeleteTexture(reflectTexture);
 	DeleteTexture(bumpTexture);
@@ -117,11 +121,13 @@ void CAdvWater::FreeResources()
 
 void CAdvWater::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	Draw(true);
 }
 
 void CAdvWater::Draw(bool useBlending)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 
@@ -178,7 +184,7 @@ void CAdvWater::Draw(bool useBlending)
 
 	CVertexArray* va = GetVertexArray();
 	va->Initialize();
-	va->EnlargeArrays(5 * numDivs * (numDivs + 1) * 2, 5 * numDivs, VA_SIZE_TC); //! alloc room for all vertexes and strips
+	va->EnlargeArrays(5 * numDivs * (numDivs + 1) * 2, 5 * numDivs, VA_SIZE_TC); //! alloc room for all vertices and strips
 
 	for (int a = 0; a < 5; ++a) { //! CAUTION: loop count must match EnlargeArrays above
 		bool maxReached = false;
@@ -245,6 +251,7 @@ void CAdvWater::Draw(bool useBlending)
 
 void CAdvWater::UpdateWater(const CGame* game)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 

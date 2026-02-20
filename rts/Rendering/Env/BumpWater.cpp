@@ -22,7 +22,6 @@
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Textures/Bitmap.h"
 #include "Rendering/Textures/TextureAtlas.h"
-#include "System/bitops.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/FastMath.h"
 #include "System/SpringMath.h"
@@ -33,6 +32,9 @@
 #include "System/Exceptions.h"
 #include "System/SpringFormat.h"
 #include "System/StringUtil.h"
+
+#include "System/Misc/TracyDefs.h"
+#include <bit>
 
 using std::string;
 using std::vector;
@@ -93,6 +95,7 @@ static void GLSLDefineConstf1(string& str, const string& name, float x)
 
 static GLuint LoadTexture(const string& filename, const float anisotropy = 0.0f, int* sizeX = nullptr, int* sizeY = nullptr)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CBitmap bm;
 
 	if (!bm.Load(filename))
@@ -111,6 +114,7 @@ static GLuint LoadTexture(const string& filename, const float anisotropy = 0.0f,
 
 static TypedRenderBuffer<VA_TYPE_0> GenWaterPlaneBuffer(bool radial)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto rb = TypedRenderBuffer<VA_TYPE_0>(9 * 9 * 6, 0, IStreamBufferConcept::Types::SB_BUFFERDATA);
 
 	if (radial) {
@@ -191,14 +195,16 @@ CBumpWater::CBumpWater()
 
 CBumpWater::~CBumpWater()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	FreeResources();
 	eventHandler.RemoveClient(this);
 }
 
 void CBumpWater::InitResources(bool loadShader)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// LOAD USER CONFIGS
-	reflTexSize  = next_power_of_2(configHandler->GetInt("BumpWaterTexSizeReflection"));
+	reflTexSize  = std::bit_ceil <uint32_t> (configHandler->GetInt("BumpWaterTexSizeReflection"));
 	reflection   = configHandler->GetInt("BumpWaterReflection");
 	refraction   = configHandler->GetInt("BumpWaterRefraction");
 	anisotropy   = configHandler->GetFloat("BumpWaterAnisotropy");
@@ -211,14 +217,8 @@ void CBumpWater::InitResources(bool loadShader)
 	               && ((readMap->HasVisibleWater()) || (waterRendering->forceRendering));
 	dynWaves     = (configHandler->GetBool("BumpWaterDynamicWaves")) && (waterRendering->numTiles > 1);
 
-	// CHECK HARDWARE
-	if (!globalRendering->haveGLSL) {
-		throw content_error("[" LOG_SECTION_BUMP_WATER "] your hardware/driver setup does not support GLSL");
-	}
-
 	shoreWaves = shoreWaves && (FBO::IsSupported());
-	dynWaves   = dynWaves && (FBO::IsSupported() && GLEW_ARB_imaging);
-
+	dynWaves   = dynWaves && (FBO::IsSupported() && GLAD_GL_ARB_imaging);
 
 	// LOAD TEXTURES
 	foamTexture   = LoadTexture(waterRendering->foamTexture);
@@ -319,14 +319,6 @@ void CBumpWater::InitResources(bool loadShader)
 
 
 	// CREATE TEXTURES
-	if ((refraction > 0) || depthCopy) {
-		// ATIs do not have GLSL support for texrects
-		if (!globalRendering->supportNonPowerOfTwoTex) {
-			screenTextureX = next_power_of_2(screenTextureX);
-			screenTextureY = next_power_of_2(screenTextureY);
-		}
-	}
-
 	if (refraction > 0) {
 		// CREATE REFRACTION TEXTURE
 		glGenTextures(1, &refractTexture);
@@ -346,13 +338,8 @@ void CBumpWater::InitResources(bool loadShader)
 		glBindTexture(GL_TEXTURE_2D, reflectTexture);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		if (GLEW_EXT_texture_edge_clamp) {
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		} else {
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		}
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, reflTexSize, reflTexSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	}
 
@@ -529,6 +516,7 @@ void CBumpWater::InitResources(bool loadShader)
 
 void CBumpWater::FreeResources()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto DeleteTexture = [](GLuint& texID) { if (texID > 0) { glDeleteTextures(1, &texID); texID = 0; } };
 
 	DeleteTexture(reflectTexture);
@@ -553,6 +541,7 @@ void CBumpWater::FreeResources()
 
 void CBumpWater::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 
@@ -571,6 +560,7 @@ void CBumpWater::Update()
 
 void CBumpWater::UpdateWater(const CGame* game)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 
@@ -591,6 +581,7 @@ void CBumpWater::UpdateWater(const CGame* game)
 
 CBumpWater::CoastAtlasRect::CoastAtlasRect(const SRectangle& rect)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	ix1 = std::max(rect.x1 - 15,            0);
 	iy1 = std::max(rect.y1 - 15,            0);
 	ix2 = std::min(rect.x2 + 15, mapDims.mapx);
@@ -609,6 +600,7 @@ CBumpWater::CoastAtlasRect::CoastAtlasRect(const SRectangle& rect)
 
 void CBumpWater::UnsyncedHeightMapUpdate(const SRectangle& rect)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!shoreWaves || !readMap->HasVisibleWater())
 		return;
 
@@ -618,6 +610,7 @@ void CBumpWater::UnsyncedHeightMapUpdate(const SRectangle& rect)
 
 void CBumpWater::UploadCoastline(const bool forceFull)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// optimize update area (merge overlapping areas etc.)
 	heightmapUpdates.Process(forceFull);
 
@@ -642,7 +635,6 @@ void CBumpWater::UploadCoastline(const bool forceFull)
 
 	// create a texture atlas for the to-be-updated areas
 	CTextureAtlas atlas;
-	atlas.SetFreeTexture(false);
 
 	const float* heightMap = (!gs->PreSimFrame()) ? readMap->GetCornerHeightMapUnsynced() : readMap->GetCornerHeightMapSynced();
 
@@ -678,6 +670,9 @@ void CBumpWater::UploadCoastline(const bool forceFull)
 		return;
 	}
 
+	// must happen after atlas.Finalize()
+	atlas.DisOwnTexture();
+
 	coastUpdateTexture = atlas.GetTexID();
 	atlasX = (atlas.GetSize()).x;
 	atlasY = (atlas.GetSize()).y;
@@ -685,7 +680,7 @@ void CBumpWater::UploadCoastline(const bool forceFull)
 	// save the area positions in the texture atlas
 	for (size_t i = 0; i < coastmapAtlasRects.size(); i++) {
 		CoastAtlasRect& r = coastmapAtlasRects[i];
-		const AtlasedTexture& tex = atlas.GetTexture(IntToString(i));
+		const auto& tex = atlas.GetTexture(IntToString(i));
 		r.tx1 = tex.xstart;
 		r.tx2 = tex.xend;
 		r.ty1 = tex.ystart;
@@ -696,6 +691,7 @@ void CBumpWater::UploadCoastline(const bool forceFull)
 
 void CBumpWater::UpdateCoastmap(const bool initialize)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	coastFBO.Bind();
 	glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_ENABLE_BIT);
 
@@ -816,6 +812,7 @@ void CBumpWater::UpdateCoastmap(const bool initialize)
 
 void CBumpWater::UpdateDynWaves(const bool initialize)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!dynWaves || !dynWavesFBO.IsValid())
 		return;
 
@@ -899,6 +896,7 @@ void CBumpWater::UpdateDynWaves(const bool initialize)
 
 void CBumpWater::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 
@@ -978,7 +976,8 @@ void CBumpWater::Draw()
 }
 
 void CBumpWater::DrawRefraction(const CGame* game)
-{
+{	
+	ZoneScopedN("BumpWater::DrawRefraction");
 	// _RENDER_ REFRACTION TEXTURE
 	refractFBO.Bind();
 
@@ -1012,6 +1011,7 @@ void CBumpWater::DrawRefraction(const CGame* game)
 
 void CBumpWater::DrawReflection(const CGame* game)
 {
+	ZoneScopedN("BumpWater::DrawReflection");
 	reflectFBO.Bind();
 
 	const auto& sky = ISky::GetSky();

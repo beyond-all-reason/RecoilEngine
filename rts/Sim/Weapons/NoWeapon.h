@@ -16,7 +16,7 @@ public:
 	void Init() override final {}
 
 private:
-	bool TestTarget(const float3 pos, const SWeaponTarget& trg) const override final { return false; }
+	bool TestTarget(const float3& pos, const SWeaponTarget& trg) const override final { return false; }
 	void FireImpl(const bool scriptCall) override final {}
 };
 

@@ -10,6 +10,8 @@
 #include "Sim/Projectiles/ProjectileMemPool.h"
 #include "System/SpringMath.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CSpherePartProjectile, CProjectile, )
 
 CR_REG_METADATA(CSpherePartProjectile, (
@@ -70,6 +72,7 @@ CSpherePartProjectile::CSpherePartProjectile(
 
 void CSpherePartProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	deleteMe |= ((age += 1) >= ttl);
 	sphereSize += expansionSpeed;
 	pos = centerPos + vectors[12] * sphereSize;
@@ -77,10 +80,13 @@ void CSpherePartProjectile::Update()
 
 void CSpherePartProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	unsigned char col0[4];
 	unsigned char col1[4];
 
 	const float interSize = sphereSize + expansionSpeed * globalRendering->timeOffset;
+
+	const auto& pageNum = projectileDrawer->sphereparttex->pageNum;
 
 	for (int y = 0; y < 4; ++y) {
 		for (int x = 0; x < 4; ++x) {
@@ -101,7 +107,8 @@ void CSpherePartProjectile::Draw()
 			col1[2] = (unsigned char)(color.z * 255.0f * alpha);
 			col1[3] = ((unsigned char)(40 * alpha)) + 1;
 
-			AddEffectsQuad(
+			AddEffectsQuad<0>(
+				pageNum,
 				{ centerPos + vectors[y*5 + x    ]     * interSize, texx, texy, col0 },
 				{ centerPos + vectors[y*5 + x + 1]     * interSize, texx, texy, col0 },
 				{ centerPos+vectors[(y + 1)*5 + x + 1] * interSize, texx, texy, col1 },
@@ -118,6 +125,7 @@ int CSpherePartProjectile::GetProjectilesCount() const
 
 void CSpherePartProjectile::CreateSphere(const CUnit* owner, int ttl, float alpha, float expansionSpeed, float3 pos, float3 color)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (int y = 0; y < 16; y += 4) {
 		for (int x = 0; x < 32; x += 4) {
 			projMemPool.alloc<CSpherePartProjectile>(owner, pos, x, y, expansionSpeed, alpha, ttl, color);
@@ -152,6 +160,7 @@ CR_REG_METADATA(CSpherePartSpawner,
 
 void CSpherePartSpawner::Init(const CUnit* owner, const float3& offset)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CProjectile::Init(owner, offset);
 	deleteMe = true;
 	CSpherePartProjectile::CreateSphere(owner, ttl, alpha, expansionSpeed, pos, color);
@@ -165,13 +174,14 @@ int CSpherePartSpawner::GetProjectilesCount() const
 
 bool CSpherePartSpawner::GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (CProjectile::GetMemberInfo(memberInfo))
 		return true;
 
-	CHECK_MEMBER_INFO_FLOAT (CSpherePartSpawner, alpha         )
-	CHECK_MEMBER_INFO_FLOAT (CSpherePartSpawner, expansionSpeed)
-	CHECK_MEMBER_INFO_INT   (CSpherePartSpawner, ttl           )
-	CHECK_MEMBER_INFO_FLOAT3(CSpherePartSpawner, color         )
+	CHECK_MEMBER_INFO_FLOAT (CSpherePartSpawner, alpha         );
+	CHECK_MEMBER_INFO_FLOAT (CSpherePartSpawner, expansionSpeed);
+	CHECK_MEMBER_INFO_INT   (CSpherePartSpawner, ttl           );
+	CHECK_MEMBER_INFO_FLOAT3(CSpherePartSpawner, color         );
 
 	return false;
 }

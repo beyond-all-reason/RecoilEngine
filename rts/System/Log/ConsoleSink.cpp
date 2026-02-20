@@ -4,13 +4,14 @@
  * This is a simple sink for the ILog.h logging API.
  * It routes all logging messages to the console (stdout & stderr).
  */
+#include "ConsoleSink.h"
 
 #include "Backend.h"
 #include "FramePrefixer.h"
 #include "Level.h" // for LOG_LEVEL_*
 #include "System/MainDefines.h"
 
-#include <cstdio>
+#include <cstdio> // for stderr, stdout
 
 
 #ifdef __cplusplus
@@ -39,12 +40,14 @@ static void log_sink_record_console(int level, const char* section, const char* 
 	char framePrefix[128] = {'\0'};
 	log_framePrefixer_createPrefix(framePrefix, sizeof(framePrefix));
 
-	FILE* outStream = (level >= LOG_LEVEL_WARNING)? stderr: stdout;
+	FILE* outStream = stdout;
 
 	const char* fstr = "%s%s\n";
 	if (colorizedOutput) {
 		if (level >= LOG_LEVEL_ERROR) {
 			fstr = "\033[90m%s\033[31m%s\033[39m\n";
+		} else if (level == LOG_LEVEL_DEPRECATED) {
+			fstr = "\033[90m%s\033[34m%s\033[39m\n";
 		} else if (level >= LOG_LEVEL_WARNING) {
 			fstr = "\033[90m%s\033[33m%s\033[39m\n";
 		} else {
@@ -61,20 +64,13 @@ static void log_sink_record_console(int level, const char* section, const char* 
 
 ///@}
 
-
-namespace {
-	/// Auto-registers the sink defined in this file before main() is called
-	struct ConsoleSinkRegistrator {
-		ConsoleSinkRegistrator() {
-			log_backend_registerSink(&log_sink_record_console);
-		}
-		~ConsoleSinkRegistrator() {
-			log_backend_unregisterSink(&log_sink_record_console);
-		}
-	} consoleSinkRegistrator;
-}
-
 #ifdef __cplusplus
 } // extern "C"
 #endif
 
+ConsoleSinkRegistrator::ConsoleSinkRegistrator() {
+	log_backend_registerSink(&log_sink_record_console);
+}
+ConsoleSinkRegistrator::~ConsoleSinkRegistrator() {
+	log_backend_unregisterSink(&log_sink_record_console);
+}

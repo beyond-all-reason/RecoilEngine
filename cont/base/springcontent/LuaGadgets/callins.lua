@@ -30,6 +30,7 @@ CALLIN_LIST = {
 	"GameStart",
 	"GameOver",
 	"GameFrame",
+	"GameFramePost", -- Called after all other Sim operations are completed
 	"GamePaused",
 	"GameProgress",
 	"GameID",
@@ -48,6 +49,7 @@ CALLIN_LIST = {
 	"UnitFinished",
 	"UnitFromFactory",
 	"UnitReverseBuilt",
+	"UnitConstructionDecayed",
 	"UnitDestroyed",
 	"RenderUnitDestroyed",
 	"UnitExperience",
@@ -165,6 +167,8 @@ CALLIN_LIST = {
 	"DrawProjectile",
 	"DrawMaterial",
 
+	"FontsChanged",
+
 	"SunChanged",
 
 	-- unsynced message callins
@@ -172,6 +176,9 @@ CALLIN_LIST = {
 	"RecvSkirmishAIMessage",
 
 	"DefaultCommand",
+	"ActiveCommandChanged",
+	"CameraRotationChanged",
+	"CameraPositionChanged",
 	"CommandNotify",
 
 	"ViewResize", -- FIXME ?

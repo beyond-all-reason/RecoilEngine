@@ -18,6 +18,8 @@
 #include <string>
 #include <iostream>
 #include <sstream>
+#include <ranges>
+#include <nowide/cstdio.hpp>
 
 #include <cassert>
 #include <cstring>
@@ -32,7 +34,7 @@ CONFIG(bool, RotateLogFiles)
 
 CONFIG(std::string, LogSections)
 	.defaultValue("")
-	.description("Comma-separated list of enabled logsections, see infolog.txt / console output for possible values.");
+	.description("Comma-separated list of enabled logsections, use this for log filtering by setting log level for each sections. See infolog.txt / console output for possible values.");
 
 
 CONFIG(int, LogFlushLevel)
@@ -40,8 +42,8 @@ CONFIG(int, LogFlushLevel)
 	.description("Flush the logfile when a message's level exceeds this value. ERROR is flushed by default, WARNING is not.");
 
 CONFIG(int, LogRepeatLimit)
-	.defaultValue(10)
-	.description("Allow at most this many consecutive identical messages to be logged.");
+	.defaultValue(0)
+	.description("Allow at most this many consecutive identical messages to be logged. Set to 0 to disable the limit.");
 
 /******************************************************************************/
 /******************************************************************************/
@@ -49,8 +51,7 @@ CONFIG(int, LogRepeatLimit)
 static spring::unordered_map<std::string, int> GetEnabledSections() {
 	spring::unordered_map<std::string, int> sectionLevelMap;
 
-	std::string enabledSections = ",";
-	std::string envSections = ",";
+	std::string enabledSections = "";
 
 #if defined(UNITSYNC)
 	#if defined(DEBUG)
@@ -64,16 +65,15 @@ static spring::unordered_map<std::string, int> GetEnabledSections() {
 	#endif
 	#if !defined(DEBUG)
 	// Always show at least INFO level of these sections
-	enabledSections += "Sound:35,VFS:30";
+	enabledSections += "Sound:35,VFS:30,";
 	#endif
 	enabledSections += StringToLower(configHandler->GetString("LogSections"));
+	enabledSections += ",";
 #endif
 
-	if (getenv("SPRING_LOG_SECTIONS") != nullptr) {
+	if (auto envVar = getenv("SPRING_LOG_SECTIONS"); envVar != nullptr) {
 		// allow disabling all sections from the env var by setting it to "none"
-		envSections += getenv("SPRING_LOG_SECTIONS");
-		envSections = StringToLower(envSections);
-
+		std::string envSections = StringToLower(envVar);
 		if (envSections == "none") {
 			enabledSections = "";
 		} else {
@@ -84,38 +84,28 @@ static spring::unordered_map<std::string, int> GetEnabledSections() {
 	enabledSections = StringToLower(enabledSections);
 	enabledSections = StringStrip(enabledSections, " \t\n\r");
 
-	// make the last "section:level" substring findable
-	if (!enabledSections.empty() && enabledSections.back() != ',')
-		enabledSections += ",";
+	for (const auto& subView: enabledSections | std::views::split(',')) {
+		auto sub = std::string_view(subView.begin(), subView.end());
+		if (sub.empty())
+			continue;
 
-	// n=1 because <enabledSections> always starts with a ',' (if non-empty)
-	for (size_t n = 1; n < enabledSections.size(); ) {
-		const size_t k = enabledSections.find(',', n);
-
-		if (k != std::string::npos) {
-			const std::string& sub = enabledSections.substr(n, k - n);
-
-			if (!sub.empty()) {
-				const size_t sepChr = sub.find(':');
-
-				const std::string& logSec = (sepChr != std::string::npos)? sub.substr(         0,            sepChr): sub;
-				const std::string& logLvl = (sepChr != std::string::npos)? sub.substr(sepChr + 1, std::string::npos):  "";
-
-				if (!logLvl.empty()) {
-					sectionLevelMap[logSec] = StringToInt(logLvl);
-				} else {
-					#if defined(DEBUG)
-					sectionLevelMap[logSec] = LOG_LEVEL_DEBUG;
-					#else
-					sectionLevelMap[logSec] = DEFAULT_LOG_LEVEL;
-					#endif
-
-				}
-			}
-
-			n = k + 1;
+		std::string logSec, logLvl;
+		if (const size_t sepChr = sub.find(':'); sepChr != std::string_view::npos) {
+			logSec = sub.substr(0, sepChr);
+			logLvl = sub.substr(sepChr + 1, std::string_view::npos);
 		} else {
-			n = k;
+			logSec = sub;
+			logLvl = "";
+		}
+
+		if (!logLvl.empty()) {
+			sectionLevelMap[logSec] = StringToInt(logLvl);
+		} else {
+			#if defined(DEBUG)
+			sectionLevelMap[logSec] = LOG_LEVEL_DEBUG;
+			#else
+			sectionLevelMap[logSec] = DEFAULT_LOG_LEVEL;
+			#endif
 		}
 	}
 
@@ -153,8 +143,9 @@ void CLogOutput::RotateLogFile() const
 	if (!FileSystem::FileExists(filePath))
 		return;
 
+	const auto baseDir = FileSystem::GetDirectory(filePath);
 	// logArchiveDir: /absolute/writeable/data/dir/log/
-	const std::string logArchiveDir = filePath.substr(0, filePath.find_last_of("/\\") + 1) + "log" + FileSystem::GetNativePathSeparator();
+	const std::string logArchiveDir = FileSystem::Concatenate({ baseDir, "log/"});
 	const std::string archivedLogFile = logArchiveDir + FileSystem::GetFileModificationDate(filePath) + "_" + fileName;
 
 	// create the log archive dir if it does not exist yet
@@ -162,7 +153,7 @@ void CLogOutput::RotateLogFile() const
 		FileSystem::CreateDirectory(logArchiveDir);
 
 	// move the old log to the archive dir
-	if (rename(filePath.c_str(), archivedLogFile.c_str()) != 0) {
+	if (nowide::rename(filePath.c_str(), archivedLogFile.c_str()) != 0) {
 		// no log here yet
 		std::cerr << "Failed rotating the log file" << std::endl;
 	}

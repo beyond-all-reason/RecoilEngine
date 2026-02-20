@@ -12,13 +12,11 @@
 #include <cinttypes>
 #include <queue>
 
-
 #include "ProtocolDef.h"
 #include "UDPConnection.h"
 #include "Socket.h"
 #include "System/Log/ILog.h"
 #include "System/Platform/errorhandler.h"
-#include "System/StringUtil.h" // for IntToString (header only)
 
 
 namespace netcode
@@ -54,7 +52,7 @@ std::string UDPListener::TryBindSocket(int port, std::shared_ptr<asio::ip::udp::
 		asio::error_code err;
 
 		if ((port < 0) || (port > 65535))
-			throw std::range_error("Port is out of range [0, 65535]: " + IntToString(port));
+			throw std::range_error("Port is out of range [0, 65535]: " + std::to_string(port));
 
 		sock.reset(new ip::udp::socket(netservice));
 		sock->open(ip::udp::v6(), err); // test IP v6 support
@@ -107,8 +105,19 @@ std::string UDPListener::TryBindSocket(int port, std::shared_ptr<asio::ip::udp::
 	return errorMsg;
 }
 
-void UDPListener::Update() {
-	netservice.poll();
+void UDPListener::Update(int loopSleepTime) {
+	if (loopSleepTime == 0)
+		netservice.poll();
+	else {
+		fd_set rset;
+		FD_ZERO(&rset);
+		FD_SET(socket->native_handle(), &rset);
+		timeval to = {
+			(loopSleepTime / 1000),       // long tv_sec
+			(loopSleepTime % 1000) * 1000 // long tv_usec
+		};
+		::select(1, &rset, nullptr, nullptr, &to);
+	}
 
 	size_t bytesAvailable = 0;
 

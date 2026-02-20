@@ -19,6 +19,8 @@
 #include "Sim/Weapons/WeaponDef.h"
 #include "System/SpringMath.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CTorpedoProjectile, CWeaponProjectile, )
 
 CR_REG_METADATA(CTorpedoProjectile,(
@@ -59,6 +61,7 @@ CTorpedoProjectile::CTorpedoProjectile(const ProjectileParams& params): CWeaponP
 
 float3 CTorpedoProjectile::UpdateTargetingPos()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float3 targetVel;
 
 	if (target != nullptr) {
@@ -90,6 +93,7 @@ float3 CTorpedoProjectile::UpdateTargetingPos()
 
 float3 CTorpedoProjectile::UpdateTargetingDir(const float3& targetObjVel)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 targetLeadVec = targetObjVel * (pos.distance(targetPos) / maxSpeed) * 0.7f;
 	const float3 targetLeadDir = (targetPos + targetLeadVec - pos).Normalize();
 
@@ -108,6 +112,7 @@ float3 CTorpedoProjectile::UpdateTargetingDir(const float3& targetObjVel)
 
 void CTorpedoProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// tracking only works when we are underwater
 	if (!weaponDef->submissile && pos.y > 0.0f) {
 		if (!luaMoveCtrl) {
@@ -126,7 +131,16 @@ void CTorpedoProjectile::Update()
 				CWorldObject::SetVelocity(targetHitVel);
 			}
 
-			explGenHandler.GenExplosion(cegID, pos, speed, ttl, damages->damageAreaOfEffect, 0.0f, owner(), nullptr);
+			explGenHandler.GenExplosion(
+				cegID,
+				pos,
+				speed,
+				ttl,
+				damages->damageAreaOfEffect,
+				0.0f,
+				owner(),
+				ExplosionHitObject()
+			);
 		} else {
 			if (!luaMoveCtrl) {
 				// must update dir and speed.w here
@@ -162,9 +176,12 @@ void CTorpedoProjectile::Update()
 
 void CTorpedoProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// do not draw if a 3D model has been defined for us
 	if (model != nullptr)
 		return;
+
+	//UpdateAnimParams();
 
 	float3 r = dir.cross(UpVector);
 
@@ -177,56 +194,66 @@ void CTorpedoProjectile::Draw()
 	const float w = 2;
 	const SColor col(60, 60, 100, 255);
 
-	AddEffectsQuad(
+	const auto& pageNum = projectileDrawer->torpedotex->pageNum;
+
+	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos + (r * w),             texx, texy, col },
 		{ drawPos + (u * w),             texx, texy, col },
 		{ drawPos + (u * w) + (dir * h), texx, texy, col },
 		{ drawPos + (r * w) + (dir * h), texx, texy, col }
 	);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos + (u * w),             texx, texy, col },
 		{ drawPos - (r * w),             texx, texy, col },
 		{ drawPos - (r * w) + (dir * h), texx, texy, col },
 		{ drawPos + (u * w) + (dir * h), texx, texy, col }
 	);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos - (r * w),             texx, texy, col },
 		{ drawPos - (u * w),             texx, texy, col },
 		{ drawPos - (u * w) + (dir * h), texx, texy, col },
 		{ drawPos - (r * w) + (dir * h), texx, texy, col }
 	);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos - (u * w),             texx, texy, col },
 		{ drawPos + (r * w),             texx, texy, col },
 		{ drawPos + (r * w) + (dir * h), texx, texy, col },
 		{ drawPos - (u * w) + (dir * h), texx, texy, col }
 	);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos + (r * w) + (dir * h), texx, texy, col },
 		{ drawPos + (u * w) + (dir * h), texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col }
 	);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos + (u * w) + (dir * h), texx, texy, col },
 		{ drawPos - (r * w) + (dir * h), texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col }
 	);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos - (r * w) + (dir * h), texx, texy, col },
 		{ drawPos - (u * w) + (dir * h), texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col }
 	);
 
-	AddEffectsQuad(
+	AddEffectsQuad<0>(
+		pageNum,
 		{ drawPos - (u * w) + (dir * h), texx, texy, col },
 		{ drawPos + (r * w) + (dir * h), texx, texy, col },
 		{ drawPos + (dir * h * 1.2f),    texx, texy, col },

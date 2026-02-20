@@ -87,10 +87,10 @@ int LuaPathFinder::PushPathNodes(lua_State* L, const int pathID)
 	const int startCount = starts.size();
 
 	{
-		lua_newtable(L);
+		lua_createtable(L, pointCount, 0);
 
 		for (int i = 0; i < pointCount; i++) {
-			lua_newtable(L); {
+			lua_createtable(L, 3, 0); {
 				const float3& p = points[i];
 				lua_pushnumber(L, p.x); lua_rawseti(L, -2, 1);
 				lua_pushnumber(L, p.y); lua_rawseti(L, -2, 2);
@@ -101,7 +101,7 @@ int LuaPathFinder::PushPathNodes(lua_State* L, const int pathID)
 	}
 
 	{
-		lua_newtable(L);
+		lua_createtable(L, startCount, 0);
 
 		for (int i = 0; i < startCount; i++) {
 			lua_pushnumber(L, starts[i] + 1);
@@ -235,7 +235,7 @@ int LuaPathFinder::RequestPath(lua_State* L)
 	const float radius = luaL_optfloat(L, 8, 8.0f);
 
 	const bool synced = CLuaHandle::GetHandleSynced(L);
-	const int pathID = pathManager->RequestPath(nullptr, moveDef, start, end, radius, synced);
+	const int pathID = pathManager->RequestPath(nullptr, moveDef, start, end, radius, synced, true);
 
 	if (pathID == 0)
 		return 0;

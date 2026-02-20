@@ -12,6 +12,8 @@
 
 #include <vector>
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CLightningCannon, CWeapon, )
 CR_REG_METADATA(CLightningCannon, (
 	CR_MEMBER(color)
@@ -19,14 +21,28 @@ CR_REG_METADATA(CLightningCannon, (
 
 CLightningCannon::CLightningCannon(CUnit* owner, const WeaponDef* def): CWeapon(owner, def)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// null happens when loading
 	if (def != nullptr)
 		color = def->visuals.color;
 }
 
 
+bool CLightningCannon::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
+{
+	float3 aimDir = (tgtPos - aimFromPos);
+	const float targetDist = aimDir.LengthNormalize();
+
+	if (const auto shapedRange = GetShapedWeaponRange(aimDir, range); targetDist > shapedRange)
+		return false;
+
+	// NOTE: mainDir is in unit-space
+	return (CheckTargetAngleConstraint(aimDir, owner->GetObjectSpaceVec(mainDir)));
+}
+
 void CLightningCannon::FireImpl(const bool scriptCall)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float3 curPos = weaponMuzzlePos;
 	float3 curDir = (currentTargetPos - weaponMuzzlePos).SafeNormalize();
 
@@ -35,9 +51,12 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 
 	CUnit* hitUnit = nullptr;
 	CFeature* hitFeature = nullptr;
+	CPlasmaRepulser* hitShield = nullptr;
 	CollisionQuery hitColQuery;
 
-	float boltLength = TraceRay::TraceRay(curPos, curDir, range, collisionFlags, owner, hitUnit, hitFeature, &hitColQuery);
+	const auto shapedRange = GetShapedWeaponRange(curDir, range);
+
+	float boltLength = TraceRay::TraceRay(curPos, curDir, shapedRange, collisionFlags, owner, hitUnit, hitFeature, &hitColQuery);
 
 	if (!weaponDef->waterweapon) {
 		// terminate bolt at water surface if necessary
@@ -50,12 +69,13 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 
 	static std::vector<TraceRay::SShieldDist> hitShields;
 	hitShields.clear();
-	TraceRay::TraceRayShields(this, curPos, curDir, range, hitShields);
+	TraceRay::TraceRayShields(this, curPos, curDir, shapedRange, hitShields);
 	for (const TraceRay::SShieldDist& sd: hitShields) {
 		if (sd.dist < boltLength && sd.rep->IncomingBeam(this, curPos, curPos + (curDir * sd.dist), 1.0f)) {
 			boltLength = sd.dist;
 			hitUnit = nullptr;
 			hitFeature = nullptr;
+			hitShield = sd.rep;
 			break;
 		}
 	}
@@ -63,34 +83,35 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 	if (hitUnit != nullptr)
 		hitUnit->SetLastHitPiece(hitColQuery.GetHitPiece(), gs->frameNum);
 
-
-	const DamageArray& damageArray = damages->GetDynamicDamages(weaponMuzzlePos, currentTargetPos);
-	const CExplosionParams params = {
-		curPos + curDir * boltLength,                     // hitPos (same as hitColQuery.GetHitPos() if no water or shield in way)
-		curDir,
-		damageArray,
-		weaponDef,
-		owner,
-		hitUnit,
-		hitFeature,
-		damages->craterAreaOfEffect,
-		damages->damageAreaOfEffect,
-		damages->edgeEffectiveness,
-		damages->explosionSpeed,
-		0.5f,                                             // gfxMod
-		weaponDef->impactOnly,
-		weaponDef->noExplode || weaponDef->noSelfDamage,  // ignoreOwner
-		false,                                            // damageGround
-		-1u                                               // projectileID
-	};
-
-	helper->Explosion(params);
+	assert(1 * (!!hitUnit) + 1 * (!!hitFeature) + 1 * (!!hitShield) <= 1);
 
 	ProjectileParams pparams = GetProjectileParams();
 	pparams.pos = curPos;
 	pparams.end = curPos + curDir * (boltLength + 10.0f);
 	pparams.ttl = weaponDef->beamLaserTTL;
 
-	WeaponProjectileFactory::LoadProjectile(pparams);
+	auto projID = WeaponProjectileFactory::LoadProjectile(pparams);
+
+	const DamageArray& damageArray = damages->GetDynamicDamages(weaponMuzzlePos, currentTargetPos);
+	const CExplosionParams params = {
+		.pos                  = curPos + curDir * boltLength,
+		.dir                  = curDir,
+		.damages              = damageArray,
+		.weaponDef            = weaponDef,
+		.owner                = owner,
+		.hitObject            = ExplosionHitObject(hitUnit, hitFeature, hitShield),
+		.craterAreaOfEffect   = damages->craterAreaOfEffect,
+		.damageAreaOfEffect   = damages->damageAreaOfEffect,
+		.edgeEffectiveness    = damages->edgeEffectiveness,
+		.explosionSpeed       = damages->explosionSpeed,
+		.gfxMod               = 0.5f,
+		.maxGroundDeformation = 0.0f,
+		.impactOnly           = weaponDef->impactOnly,
+		.ignoreOwner          = weaponDef->noExplode || weaponDef->noSelfDamage,
+		.damageGround         = false,
+		.projectileID         = projID
+	};
+
+	helper->Explosion(params);
 }
 

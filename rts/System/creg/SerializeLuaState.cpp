@@ -74,11 +74,11 @@ static spring::unsynced_map<lua_CFunction, std::string> funcToName;
  */
 
 
-#define sizeCclosure(n)	(cast(int, sizeof(CClosure)) + \
-                         cast(int, sizeof(TValue)*((n)-1)))
+#define sizeCclosure(n)	(lua_cast(int, sizeof(CClosure)) + \
+                         lua_cast(int, sizeof(TValue)*((n)-1)))
 
-#define sizeLclosure(n)	(cast(int, sizeof(LClosure)) + \
-                         cast(int, sizeof(TValue *)*((n)-1)))
+#define sizeLclosure(n)	(lua_cast(int, sizeof(LClosure)) + \
+                         lua_cast(int, sizeof(TValue *)*((n)-1)))
 
 
 /*
@@ -316,7 +316,7 @@ struct creg_global_State {
 	creg_GCObject *grayagain;  /* list of objects to be traversed atomically */
 	creg_GCObject *weak;  /* list of weak tables (to be cleared) */
 	creg_GCObject *tmudata;  /* last element of list of userdata to be GC */
-	Mbuffer buff;  /* temporary buffer for string concatentation */
+	Mbuffer buff;  /* temporary buffer for string concatenation */
 	lu_mem GCthreshold;
 	lu_mem totalbytes;  /* number of bytes currently allocated */
 	lu_mem estimate;  /* an estimate of number of bytes actually in use */

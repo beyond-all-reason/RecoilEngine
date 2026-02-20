@@ -5,12 +5,15 @@
 #include "Lua/LuaUtils.h"
 #include "Lua/LuaUnsyncedCtrl.h"
 #include "Lua/LuaUnsyncedRead.h"
+#include "Lua/LuaVFS.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
 #include "System/StringUtil.h"
 #include "System/Log/ILog.h"
 #include <sstream>
+
+#include "System/Misc/TracyDefs.h"
 
 
 enum {
@@ -22,6 +25,7 @@ enum {
 
 static void ParseUniformsTable(Shader::IProgramObject* program, const LuaTable* root, const std::string& fieldName, int type)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const LuaTable subTable = root->SubTable(fieldName);
 	std::vector<std::string> keys;
 	subTable.GetKeys(keys);
@@ -87,6 +91,7 @@ static void ParseUniformsTable(Shader::IProgramObject* program, const LuaTable* 
 
 static void ParseUniformSetupTables(Shader::IProgramObject* program, const LuaTable* root)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	ParseUniformsTable(program, root, "uniform",       UNIFORM_TYPE_FLOAT       );
 	ParseUniformsTable(program, root, "uniformFloat",  UNIFORM_TYPE_FLOAT       );
 	ParseUniformsTable(program, root, "uniformInt",    UNIFORM_TYPE_INT         );
@@ -100,6 +105,7 @@ static void CreateShaderObject(
 	const std::string& sources,
 	const GLenum type
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (sources.empty())
 		return;
 
@@ -112,6 +118,7 @@ static void ParseShaderTable(
 	const std::string key,
 	std::stringstream& data
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto keyType = root->GetType(key);
 
 	switch (keyType) {
@@ -134,6 +141,7 @@ static void ParseShaderTable(
 
 static void LoadTextures(Shader::IProgramObject* program, const LuaTable* root)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const LuaTable& textures = root->SubTable("textures");
 	std::vector<std::pair<int, std::string>> data;
 
@@ -149,11 +157,9 @@ static void LoadTextures(Shader::IProgramObject* program, const LuaTable* root)
 namespace Shader {
 bool LoadFromLua(Shader::IProgramObject* program, const std::string& filename)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// lua only supports glsl shaders
 	assert(dynamic_cast<Shader::GLSLProgramObject*>(program) != nullptr);
-	if (!globalRendering->haveGLSL) {
-		return false;
-	}
 
 	LuaParser p(filename, SPRING_VFS_RAW_FIRST, SPRING_VFS_MOD_BASE);
 	p.SetLowerKeys(false);
@@ -165,6 +171,10 @@ bool LoadFromLua(Shader::IProgramObject* program, const std::string& filename)
 	p.AddFunc("GetConfigString",  LuaUnsyncedRead::GetConfigString);
 	p.AddFunc("GetLosViewColors", LuaUnsyncedRead::GetLosViewColors);
 	p.AddFunc("GetSelectedUnitsCount", LuaUnsyncedRead::GetSelectedUnitsCount);
+	p.EndTable();
+
+	p.GetTable("VFS");
+	p.PushFunc(LuaVFS::PushUnsynced);
 	p.EndTable();
 
 	if (!p.Execute()) {

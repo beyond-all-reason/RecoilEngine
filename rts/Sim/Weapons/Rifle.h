@@ -13,7 +13,7 @@ public:
 
 private:
 	void FireImpl(const bool scriptCall) override final;
-	float GetPredictedImpactTime(float3 p) const override final { return 0.0f; }
+	float GetPredictedImpactTime(const float3& p) const override final { return 0.0f; }
 };
 
 #endif /* RIFLE_H */

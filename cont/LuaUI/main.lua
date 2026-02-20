@@ -13,7 +13,8 @@
 
 Spring.SendCommands({"ctrlpanel " .. LUAUI_DIRNAME .. "ctrlpanel.txt"})
 
-VFS.Include(LUAUI_DIRNAME .. 'utils.lua', utilFile)
+VFS.Include(LUAUI_DIRNAME .. "rml_setup.lua",  nil, VFS.ZIP)
+VFS.Include(LUAUI_DIRNAME .. 'utils.lua', nil, VFS.ZIP)
 
 include("setupdefs.lua")
 include("savetable.lua")
@@ -66,7 +67,7 @@ activePage = 0
 forceLayout = true
 
 
-function Update()
+function Update(dt)
   local currentPage = Spring.GetActivePage()
   if (forceLayout or (currentPage ~= activePage)) then
     Spring.ForceLayoutUpdate()  --  for the page number indicator
@@ -74,9 +75,9 @@ function Update()
   end
   activePage = currentPage
 
-  fontHandler.Update()
+  fontHandler.Update(dt)
 
-  widgetHandler:Update()
+  widgetHandler:Update(dt)
 
   return
 end
@@ -94,6 +95,18 @@ end
 
 function ConfigureLayout(command)
   return widgetHandler:ConfigureLayout(command)
+end
+
+function ActiveCommandChanged(id, cmdType)
+  return widgetHandler:ActiveCommandChanged(id, cmdType)
+end
+
+function CameraRotationChanged(rotx, roty, rotz)
+  return widgetHandler:CameraRotationChanged(rotx, roty, rotz)
+end
+
+function CameraPositionChanged(posx, posy, posz)
+  return widgetHandler:CameraPositionChanged(posx, posy, posz)
 end
 
 function CommandNotify(id, params, options)

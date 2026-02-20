@@ -223,7 +223,7 @@ endmacro (get_version_plus_dep_file vers_var versDepFile_var)
 
 
 # Recursively lists all native source files in a given directory,
-# relative to _relDir, or absolut, If _relDir == "".
+# relative to _relDir, or absolute, If _relDir == "".
 macro    (get_native_sources_recursive _var _dir _relDir)
 	set(NATIVE_SOURCE_EXTENSIONS ".c;.cpp;.c++;.cxx")
 	foreach    (_ext ${NATIVE_SOURCE_EXTENSIONS})
@@ -256,6 +256,18 @@ macro    (catch_regex_group pattern group var str)
 	endif  ()
 endmacro (catch_regex_group)
 
+
+# macro that adds "fontconfig fontconfig-1" to find_library on win32
+macro(find_fontconfig_hack)
+	if (WIN32)
+		prefer_static_libs()
+		find_library( Fontconfig_LIBRARY
+									NAMES
+									fontconfig fontconfig-1
+		)
+		unprefer_static_libs()
+	endif()
+endmacro()
 
 # macro that adds "freetype-6 freetype6" to find_library on win32
 macro(find_freetype_hack)

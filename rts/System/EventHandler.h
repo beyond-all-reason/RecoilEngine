@@ -11,10 +11,12 @@
 #include "Sim/Features/Feature.h"
 #include "Sim/Projectiles/Projectile.h"
 
+struct CExplosionParams;
 class CWeapon;
 struct Command;
 struct BuildInfo;
 class LuaMaterial;
+struct WeaponDef;
 
 class CEventHandler
 {
@@ -53,6 +55,7 @@ class CEventHandler
 		void GameOver(const std::vector<unsigned char>& winningAllyTeams);
 		void GamePaused(int playerID, bool paused);
 		void GameFrame(int gameFrame);
+		void GameFramePost(int gameFrame);
 		void GameID(const unsigned char* gameID, unsigned int numBytes);
 
 		void TeamDied(int teamID);
@@ -64,8 +67,9 @@ class CEventHandler
 		void UnitCreated(const CUnit* unit, const CUnit* builder);
 		void UnitFinished(const CUnit* unit);
 		void UnitReverseBuilt(const CUnit* unit);
+		void UnitConstructionDecayed(const CUnit* unit, float timeSinceLastBuild, float iterationPeriod, float part);
 		void UnitFromFactory(const CUnit* unit, const CUnit* factory, bool userOrders);
-		void UnitDestroyed(const CUnit* unit, const CUnit* attacker);
+		void UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID);
 		void UnitTaken(const CUnit* unit, int oldTeam, int newTeam);
 		void UnitGiven(const CUnit* unit, int oldTeam, int newTeam);
 
@@ -118,6 +122,7 @@ class CEventHandler
 		bool UnitFeatureCollision(const CUnit* collider, const CFeature* collidee);
 		void UnitMoved(const CUnit* unit);
 		void UnitMoveFailed(const CUnit* unit);
+		void UnitArrivedAtGoal(const CUnit* unit);
 
 		void FeatureCreated(const CFeature* feature);
 		void FeatureDestroyed(const CFeature* feature);
@@ -132,7 +137,7 @@ class CEventHandler
 		void ProjectileCreated(const CProjectile* proj, int allyTeam);
 		void ProjectileDestroyed(const CProjectile* proj, int allyTeam);
 
-		bool Explosion(int weaponDefID, int projectileID, const float3& pos, const CUnit* owner);
+		bool Explosion(int weaponDefID, const WeaponDef* weaponDef, const CExplosionParams& params);
 
 		void StockpileChanged(const CUnit* unit,
 		                      const CWeapon* weapon, int oldCount);
@@ -231,6 +236,9 @@ class CEventHandler
 
 		void DefaultCommand(const CUnit* unit, const CFeature* feature, int& cmd);
 
+		void ActiveCommandChanged(const SCommandDescription *cmdDesc);
+		void CameraRotationChanged(const float3& rot);
+		void CameraPositionChanged(const float3& pos);
 		bool CommandNotify(const Command& cmd);
 
 		bool AddConsoleLine(const std::string& msg, const std::string& section, int level);
@@ -239,6 +247,7 @@ class CEventHandler
 
 		bool GroupChanged(int groupID);
 
+		void FontsChanged();
 		bool GameSetup(const std::string& state, bool& ready,
 		               const std::vector< std::pair<int, std::string> >& playerStates);
 		void DownloadQueued(int ID, const string& archiveName, const string& archiveType);
@@ -265,7 +274,7 @@ class CEventHandler
 		void DrawWorld();
 		void DrawWorldPreUnit();
 		void DrawPreDecals();
-		void DrawWorldPreParticles();
+		void DrawWorldPreParticles(bool drawAboveWater, bool drawBelowWater, bool drawReflection, bool drawRefraction);
 		void DrawWaterPost();
 		void DrawWorldShadow();
 		void DrawShadowPassTransparent();
@@ -407,9 +416,9 @@ inline void CEventHandler::UnitCreated(const CUnit* unit, const CUnit* builder)
 }
 
 
-inline void CEventHandler::UnitDestroyed(const CUnit* unit, const CUnit* attacker)
+inline void CEventHandler::UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID)
 {
-	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitDestroyed, unit, attacker)
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitDestroyed, unit, attacker, weaponDefID)
 }
 
 #define UNIT_CALLIN_NO_PARAM(name)                                 \
@@ -430,6 +439,7 @@ UNIT_CALLIN_NO_PARAM(UnitReverseBuilt);
 UNIT_CALLIN_NO_PARAM(UnitFinished)
 UNIT_CALLIN_NO_PARAM(UnitIdle)
 UNIT_CALLIN_NO_PARAM(UnitMoveFailed)
+UNIT_CALLIN_NO_PARAM(UnitArrivedAtGoal)
 UNIT_CALLIN_NO_PARAM(UnitEnteredUnderwater)
 UNIT_CALLIN_NO_PARAM(UnitEnteredWater)
 UNIT_CALLIN_NO_PARAM(UnitEnteredAir)
@@ -460,6 +470,12 @@ UNIT_CALLIN_LOS_PARAM(LeftRadar)
 UNIT_CALLIN_LOS_PARAM(LeftLos)
 
 
+inline void CEventHandler::UnitConstructionDecayed(const CUnit* unit,
+                                                   float timeSinceLastBuild, float iterationPeriod,
+                                                   float part)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitConstructionDecayed, unit, timeSinceLastBuild, iterationPeriod, part)
+}
 
 inline void CEventHandler::UnitFromFactory(const CUnit* unit,
                                                const CUnit* factory,
@@ -688,7 +704,7 @@ inline void CEventHandler::UnsyncedHeightMapUpdate(const SRectangle& rect)
 
 
 
-inline bool CEventHandler::Explosion(int weaponDefID, int projectileID, const float3& pos, const CUnit* owner)
+inline bool CEventHandler::Explosion(int weaponDefID, const WeaponDef* weaponDef, const CExplosionParams& params)
 {
 	auto& clients = listExplosion;
 
@@ -698,7 +714,7 @@ inline bool CEventHandler::Explosion(int weaponDefID, int projectileID, const fl
 		// discard return-value from clients lacking full-read access
 		// (redundant for synced gadgets; watchWeaponDefs is checked)
 		// NOTE: the call-in may remove itself from the client list
-		if (!ec->Explosion(weaponDefID, projectileID, pos, owner) || !ec->GetFullRead()) {
+		if (!ec->Explosion(weaponDefID, weaponDef, params) || !ec->GetFullRead()) {
 			i += (i < clients.size() && ec == clients[i]);
 			continue;
 		}

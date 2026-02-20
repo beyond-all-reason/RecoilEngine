@@ -26,9 +26,10 @@
 #include "System/SafeUtil.h"
 #include "lib/lua/include/LuaUser.h" // spring_lua_alloc_get_stats
 
+#include "System/Misc/TracyDefs.h"
+
 ProfileDrawer* ProfileDrawer::instance = nullptr;
 
-static constexpr float MAX_THREAD_HIST_TIME = 0.5f; // secs
 static constexpr float MAX_FRAMES_HIST_TIME = 0.5f; // secs
 
 static constexpr float  MIN_X_COOR = 0.6f;
@@ -56,6 +57,7 @@ ProfileDrawer::ProfileDrawer()
 
 void ProfileDrawer::SetEnabled(bool enable)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!enable) {
 		spring::SafeDelete(instance);
 		return;
@@ -72,6 +74,7 @@ void ProfileDrawer::SetEnabled(bool enable)
 
 static void DrawBufferStats(const float2 pos)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float4 drawArea = {pos.x, pos.y + 0.02f, 0.2f, pos.y - (0.23f + 0.02f)};
 
 	auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_C>();
@@ -135,16 +138,11 @@ static void DrawBufferStats(const float2 pos)
 
 static void DrawTimeSlices(
 	std::deque<TimeSlice>& frames,
-	const spring_time curTime,
 	const spring_time maxTime,
 	const float4& drawArea,
 	const float4& sliceColor
 ) {
-	// remove old entries
-	while (!frames.empty() && (curTime - frames.front().second) > maxTime) {
-		frames.pop_front();
-	}
-
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float y1 = drawArea.y;
 	const float y2 = drawArea.w;
 
@@ -188,6 +186,7 @@ static void DrawTimeSlices(
 
 static void DrawThreadBarcode(TypedRenderBuffer<VA_TYPE_C   >& rb)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto& profiler = CTimeProfiler::GetInstance();
 	constexpr SColor    barColor = SColor{0.0f, 0.0f, 0.0f, 0.5f};
 	constexpr SColor feederColor = SColor{1.0f, 0.0f, 0.0f, 1.0f};
@@ -214,9 +213,10 @@ static void DrawThreadBarcode(TypedRenderBuffer<VA_TYPE_C   >& rb)
 		font->glFormat(drawArea[0], drawArea[3], 0.7f, FONT_TOP | DBG_FONT_FLAGS | FONT_BUFFERED, "ThreadPool (%.1f seconds :: %u threads)", MAX_THREAD_HIST_TIME, numThreads);
 	}
 	{
-		// need to lock; DrawTimeSlice pop_front()'s old entries from
-		// threadProf while ~ScopedMtTimer can modify it concurrently
+		// Need to lock; CleanupOldThreadProfiles pop_front()'s old entries
+		// from threadProf while ~ScopedMtTimer can modify it concurrently.
 		profiler.ToggleLock(true);
+		profiler.CleanupOldThreadProfiles();
 
 		// bars for each pool-thread profile
 		// Create a virtual row at the top to give some space to see the threads without the title getting in the way.
@@ -227,7 +227,7 @@ static void DrawThreadBarcode(TypedRenderBuffer<VA_TYPE_C   >& rb)
 			float drawArea2[4] = {drawArea[0], 0.0f, drawArea[2], 0.0f};
 			drawArea2[1] = drawArea[1] + ((drawArea[3] - drawArea[1]) / numRows) * i++;
 			drawArea2[3] = drawArea[1] + ((drawArea[3] - drawArea[1]) / numRows) * i - (4 * globalRendering->pixelY);
-			DrawTimeSlices(threadProf, curTime, maxTime, drawArea2, {1.0f, 0.0f, 0.0f, 0.6f});
+			DrawTimeSlices(threadProf, maxTime, drawArea2, {1.0f, 0.0f, 0.0f, 0.6f});
 		}
 
 		profiler.ToggleLock(false);
@@ -250,6 +250,7 @@ static void DrawThreadBarcode(TypedRenderBuffer<VA_TYPE_C   >& rb)
 
 static void DrawFrameBarcode(TypedRenderBuffer<VA_TYPE_C   >& rb)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	constexpr SColor    barColor = SColor{0.0f, 0.0f, 0.0f, 0.5f};
 	constexpr SColor feederColor = SColor{1.0f, 0.0f, 0.0f, 1.0f};
 
@@ -280,11 +281,11 @@ static void DrawFrameBarcode(TypedRenderBuffer<VA_TYPE_C   >& rb)
 		, MAX_FRAMES_HIST_TIME
 	);
 
-	DrawTimeSlices(lgcFrames, curTime, maxTime, drawArea, {1.0f, 0.5f, 1.0f, 0.55f}); // gc frames
-	DrawTimeSlices(uusFrames, curTime, maxTime, drawArea, {1.0f, 1.0f, 0.0f, 0.90f}); // unsynced-update frames
-	DrawTimeSlices(swpFrames, curTime, maxTime, drawArea, {0.0f, 0.0f, 1.0f, 0.55f}); // video swap frames
-	DrawTimeSlices(vidFrames, curTime, maxTime, drawArea, {0.0f, 1.0f, 0.0f, 0.55f}); // video frames
-	DrawTimeSlices(simFrames, curTime, maxTime, drawArea, {1.0f, 0.0f, 0.0f, 0.55f}); // sim frames
+	DrawTimeSlices(lgcFrames, maxTime, drawArea, {1.0f, 0.5f, 1.0f, 0.55f}); // gc frames
+	DrawTimeSlices(uusFrames, maxTime, drawArea, {1.0f, 1.0f, 0.0f, 0.90f}); // unsynced-update frames
+	DrawTimeSlices(swpFrames, maxTime, drawArea, {0.0f, 0.0f, 1.0f, 0.55f}); // video swap frames
+	DrawTimeSlices(vidFrames, maxTime, drawArea, {0.0f, 1.0f, 0.0f, 0.55f}); // video frames
+	DrawTimeSlices(simFrames, maxTime, drawArea, {1.0f, 0.0f, 0.0f, 0.55f}); // sim frames
 
 	{
 		// draw 'feeder' (indicates current time pos)
@@ -317,6 +318,7 @@ static void DrawFrameBarcode(TypedRenderBuffer<VA_TYPE_C   >& rb)
 
 static void DrawProfiler(TypedRenderBuffer<VA_TYPE_C   >& rb)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto& profiler = CTimeProfiler::GetInstance();
 	font->SetTextColor(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -459,6 +461,7 @@ static void DrawProfiler(TypedRenderBuffer<VA_TYPE_C   >& rb)
 
 static void DrawInfoText(TypedRenderBuffer<VA_TYPE_C   >& rb)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	constexpr SColor bgColor = SColor{0.0f, 0.0f, 0.0f, 0.5f};
 
 	// background
@@ -556,6 +559,7 @@ static void DrawInfoText(TypedRenderBuffer<VA_TYPE_C   >& rb)
 
 void ProfileDrawer::DrawScreen()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_C>();
 	auto& shader = rb.GetShader();
 
@@ -584,6 +588,7 @@ void ProfileDrawer::DrawScreen()
 
 bool ProfileDrawer::MousePress(int x, int y, int button)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto& profiler = CTimeProfiler::GetInstance();
 	if (!IsAbove(x, y))
 		return false;
@@ -607,6 +612,7 @@ bool ProfileDrawer::MousePress(int x, int y, int button)
 
 bool ProfileDrawer::IsAbove(int x, int y)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const float mx = CInputReceiver::MouseX(x);
 	const float my = CInputReceiver::MouseY(y);
 
@@ -617,6 +623,7 @@ bool ProfileDrawer::IsAbove(int x, int y)
 
 void ProfileDrawer::DbgTimingInfo(DbgTimingInfoType type, const spring_time start, const spring_time end)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!IsEnabled())
 		return;
 
@@ -639,5 +646,33 @@ void ProfileDrawer::DbgTimingInfo(DbgTimingInfoType type, const spring_time star
 		default: {
 		} break;
 	}
+}
+
+static void DiscardOldTimeSlices(
+       std::deque<TimeSlice>& frames,
+       const spring_time curTime,
+       const spring_time maxTime
+) {
+	RECOIL_DETAILED_TRACY_ZONE;
+	// remove old entries
+	while (!frames.empty() && (curTime - frames.front().second) > maxTime) {
+		frames.pop_front();
+	}
+}
+
+void ProfileDrawer::Update()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const spring_time curTime = spring_now();
+	const spring_time maxTime = spring_secs(MAX_FRAMES_HIST_TIME);
+
+	// cleanup old frame records
+	DiscardOldTimeSlices(lgcFrames, curTime, maxTime);
+	DiscardOldTimeSlices(uusFrames, curTime, maxTime);
+	DiscardOldTimeSlices(swpFrames, curTime, maxTime);
+	DiscardOldTimeSlices(vidFrames, curTime, maxTime);
+	DiscardOldTimeSlices(simFrames, curTime, maxTime);
+
+	// old ThreadProfile records get cleaned up inside TimeProfiler and DrawThreadBarcode
 }
 

@@ -9,7 +9,7 @@
 
 #include "lib/sol2/forward.hpp"
 #include "Rendering/GL/myGL.h"
-#include "Rendering/Models/3DModelVAO.h"
+#include "Rendering/Models/3DModelVAO.hpp"
 
 class VAO;
 class VBO;

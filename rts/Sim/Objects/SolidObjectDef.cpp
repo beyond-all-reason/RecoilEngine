@@ -3,9 +3,12 @@
 #include "SolidObjectDef.h"
 #include "Lua/LuaParser.h"
 #include "Rendering/Models/IModelParser.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Sim/Misc/CollisionVolume.h"
 #include "System/EventHandler.h"
 #include "System/Log/ILog.h"
+
+#include "System/Misc/TracyDefs.h"
 
 SolidObjectDecalDef::SolidObjectDecalDef()
 	: useGroundDecal(false)
@@ -15,7 +18,7 @@ SolidObjectDecalDef::SolidObjectDecalDef()
 	, groundDecalDecaySpeed(0.0f)
 
 	, leaveTrackDecals(false)
-	, trackDecalType(-1)
+	//, trackDecalType(-1)
 	, trackDecalWidth(0.0f)
 	, trackDecalOffset(0.0f)
 	, trackDecalStrength(0.0f)
@@ -33,7 +36,7 @@ void SolidObjectDecalDef::Parse(const LuaTable& table) {
 	groundDecalDecaySpeed = table.GetFloat("groundDecalDecaySpeed", table.GetFloat("buildingGroundDecalDecaySpeed", 0.1f));
 
 	leaveTrackDecals   = table.GetBool("leaveTracks", false);
-	trackDecalType     = -1;
+	//trackDecalType     = -1;
 	trackDecalWidth    = table.GetFloat("trackWidth",   32.0f);
 	trackDecalOffset   = table.GetFloat("trackOffset",   0.0f);
 	trackDecalStrength = table.GetFloat("trackStrength", 0.0f);
@@ -46,8 +49,7 @@ SolidObjectDef::SolidObjectDef()
 	, xsize(0)
 	, zsize(0)
 
-	, metal(0.0f)
-	, energy(0.0f)
+	, cost(0.0f)
 	, health(0.0f)
 	, mass(0.0f)
 	, crushResistance(0.0f)
@@ -63,6 +65,7 @@ SolidObjectDef::SolidObjectDef()
 
 void SolidObjectDef::PreloadModel() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (model != nullptr)
 		return;
 	if (modelName.empty())
@@ -73,6 +76,7 @@ void SolidObjectDef::PreloadModel() const
 
 S3DModel* SolidObjectDef::LoadModel() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (model != nullptr)
 		return model;
 	if (modelName.empty())
@@ -83,12 +87,14 @@ S3DModel* SolidObjectDef::LoadModel() const
 
 float SolidObjectDef::GetModelRadius() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return ((LoadModel() != nullptr)? model->GetDrawRadius(): 0.0f);
 }
 
 
 void SolidObjectDef::ParseCollisionVolume(const LuaTable& odTable)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const LuaTable& cvTable = odTable.SubTable("collisionVolume");
 	const std::string& cvType = odTable.GetString("collisionVolumeType", "");
 
@@ -118,6 +124,7 @@ void SolidObjectDef::ParseCollisionVolume(const LuaTable& odTable)
 
 void SolidObjectDef::ParseSelectionVolume(const LuaTable& odTable)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const LuaTable& svTable = odTable.SubTable("selectionVolume");
 	const std::string& svType = odTable.GetString("selectionVolumeType", odTable.GetString("collisionVolumeType", ""));
 

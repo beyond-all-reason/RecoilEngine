@@ -10,6 +10,8 @@
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Weapons/WeaponDef.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CLightningProjectile, CWeaponProjectile, )
 
 CR_REG_METADATA(CLightningProjectile,(
@@ -41,10 +43,20 @@ CLightningProjectile::CLightningProjectile(const ProjectileParams& params): CWea
 
 void CLightningProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (--ttl <= 0) {
 		deleteMe = true;
 	} else {
-		explGenHandler.GenExplosion(cegID, startPos + ((targetPos - startPos) / ttl), (targetPos - startPos), 0.0f, displacements1[0], 0.0f, owner(), nullptr);
+		explGenHandler.GenExplosion(
+			cegID,
+			startPos + ((targetPos - startPos) / ttl),
+			targetPos - startPos,
+			0.0f,
+			displacements1[0],
+			0.0f,
+			owner(),
+			ExplosionHitObject()
+		);
 	}
 
 	for (size_t d = 1; d < displacements_size; ++d) {
@@ -57,8 +69,11 @@ void CLightningProjectile::Update()
 
 void CLightningProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!validTextures[0])
 		return;
+
+	UpdateAnimParams();
 
 	uint8_t col[4] {
 		(uint8_t)(color.x * 255),
@@ -81,7 +96,8 @@ void CLightningProjectile::Draw()
 			tempPos  = (startPos * (1.0f - f)) + (targetPos * f);
 
 			const auto& WDV = weaponDef->visuals;
-			AddEffectsQuad(
+			AddEffectsQuad<1>(
+				WDV.texture1->pageNum,
 				{ tempPosO + (dir1 * (displacement[d    ] + WDV.thickness)), WDV.texture1->xstart, WDV.texture1->ystart, col },
 				{ tempPos  + (dir1 * (displacement[d + 1] + WDV.thickness)), WDV.texture1->xend,   WDV.texture1->ystart, col },
 				{ tempPos  + (dir1 * (displacement[d + 1] - WDV.thickness)), WDV.texture1->xend,   WDV.texture1->yend,   col },
@@ -91,8 +107,9 @@ void CLightningProjectile::Draw()
 	}
 }
 
-void CLightningProjectile::DrawOnMinimap()
+void CLightningProjectile::DrawOnMinimap() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const SColor lcolor = SColor{
 		color[0],
 		color[1],
@@ -104,5 +121,6 @@ void CLightningProjectile::DrawOnMinimap()
 
 int CLightningProjectile::GetProjectilesCount() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return 2 * displacements_size * validTextures[0];
 }

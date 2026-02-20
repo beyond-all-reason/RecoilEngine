@@ -12,7 +12,13 @@
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
 #include "System/ContainerUtil.h"
+#include "System/HashSpec.h"
 #include "System/SafeUtil.h"
+#include "System/Config/ConfigHandler.h"
+
+#include "System/Misc/TracyDefs.h"
+
+CONFIG(bool, AnimationMT).deprecated(true);
 
 static CCobEngine gCobEngine;
 static CCobFileHandler gCobFileHandler;
@@ -34,6 +40,7 @@ CR_REG_METADATA(CUnitScriptEngine, (
 
 
 void CUnitScriptEngine::InitStatic() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	cobEngine = &gCobEngine;
 	cobFileHandler = &gCobFileHandler;
 	unitScriptEngine = &gUnitScriptEngine;
@@ -44,6 +51,7 @@ void CUnitScriptEngine::InitStatic() {
 }
 
 void CUnitScriptEngine::KillStatic() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	cobEngine->Kill();
 	cobFileHandler->Kill();
 	unitScriptEngine->Kill();
@@ -57,6 +65,7 @@ void CUnitScriptEngine::KillStatic() {
 
 void CUnitScriptEngine::ReloadScripts(const UnitDef* udef)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const CCobFile* oldScriptFile = cobFileHandler->GetScriptFile(udef->scriptName);
 
 	if (oldScriptFile == nullptr) {
@@ -99,6 +108,7 @@ void CUnitScriptEngine::ReloadScripts(const UnitDef* udef)
 
 void CUnitScriptEngine::AddInstance(CUnitScript* instance)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (instance == currentScript)
 		return;
 
@@ -107,30 +117,48 @@ void CUnitScriptEngine::AddInstance(CUnitScript* instance)
 
 void CUnitScriptEngine::RemoveInstance(CUnitScript* instance)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (instance == currentScript)
 		return;
 
 	spring::VectorErase(animating, instance);
 }
 
-
 void CUnitScriptEngine::Tick(int deltaTime)
 {
+	SCOPED_TIMER("CUnitScriptEngine::Tick");
+
 	cobEngine->Tick(deltaTime);
 
 	// tick all (COB or LUS) script instances that have registered themselves as animating
-	for (size_t i = 0; i < animating.size(); ) {
-		currentScript = animating[i];
+	{
+		ZoneScopedN("CUnitScriptEngine::Tick(MT)");
 
-		if (!currentScript->Tick(deltaTime)) {
-			animating[i] = animating.back();
-			animating.pop_back();
-			continue;
+		// setting currentScript = animating[i]; is not required here, only in ST section below
+		for_mt(0, animating.size(), [&](const int i) {
+			animating[i]->TickAllAnims(deltaTime);
+		});
+	}
+	{
+		ZoneScopedN("CUnitScriptEngine::Tick(ST)");
+
+		uint32_t cs = 0;
+		for (size_t i = 0; i < animating.size(); /*NO-OP*/) {
+			currentScript = animating[i];
+			// deal with synced checksum here, before animating is possibly popped below
+			cs = spring::hash_combine(currentScript->GetAnimArrayChecksum(), cs);
+
+			if (!currentScript->TickAnimFinished()) {
+				animating[i] = animating.back();
+				animating.pop_back();
+				continue;
+			}
+			i++;
 		}
 
-		i++;
+		currentScript = nullptr;
+		Sync::Assert(cs, "animating");
 	}
 
-	currentScript = nullptr;
+	cobEngine->RunDeferredCallins();
 }
-

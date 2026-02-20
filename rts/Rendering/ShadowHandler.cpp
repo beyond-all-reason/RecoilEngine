@@ -51,8 +51,8 @@ void CShadowHandler::Reload(const char* argv)
 		return;
 
 	configHandler->Set("Shadows", nextShadowConfig & 0xF);
-	configHandler->Set("ShadowMapSize", Clamp(nextShadowMapSize, int(MIN_SHADOWMAP_SIZE), int(MAX_SHADOWMAP_SIZE)));
-	configHandler->Set("ShadowProjectionMode", Clamp(nextShadowProMode, int(SHADOWPROMODE_MAP_CENTER), int(SHADOWPROMODE_MIX_CAMMAP)));
+	configHandler->Set("ShadowMapSize", std::clamp(nextShadowMapSize, int(MIN_SHADOWMAP_SIZE), int(MAX_SHADOWMAP_SIZE)));
+	configHandler->Set("ShadowProjectionMode", std::clamp(nextShadowProMode, int(SHADOWPROMODE_MAP_CENTER), int(SHADOWPROMODE_MIX_CAMMAP)));
 	configHandler->Set("ShadowColorMode", static_cast<bool>(nextShadowColorMode));
 
 	Kill();
@@ -83,7 +83,7 @@ void CShadowHandler::Init()
 
 	// possible values for the "Shadows" config-parameter:
 	// < 0: disable and don't try to initialize
-	//   0: disable, but still check if the hardware is able to run them
+	//   0: disable, but create a fallback FBO
 	// > 0: enabled (by default for all shadow-casting geometry if equal to 1)
 	if (shadowConfig < 0) {
 		LOG("[%s] shadow rendering is disabled (config-value %d)", __func__, shadowConfig);
@@ -100,24 +100,6 @@ void CShadowHandler::Init()
 	if (SpringVersion::IsHeadless())
 		return;
 
-	if (!globalRendering->haveGLSL) {
-		LOG_L(L_WARNING, "[%s] GPU does not support either GLSL shaders for shadow rendering", __func__);
-		return;
-	}
-
-	if (!globalRendering->haveGLSL) {
-		if (!GLEW_ARB_shadow || !GLEW_ARB_depth_texture || !GLEW_ARB_texture_env_combine) {
-			LOG_L(L_WARNING, "[%s] required OpenGL ARB-extensions missing for shadow rendering", __func__);
-			// NOTE: these should only be relevant for FFP shadows
-			// return;
-		}
-		if (!GLEW_ARB_shadow_ambient) {
-			// can't use arbitrary texvals in case the depth comparison op fails (only 0)
-			LOG_L(L_WARNING, "[%s] \"ARB_shadow_ambient\" extension missing (will probably make shadows darker than they should be)", __func__);
-		}
-	}
-
-
 	if (!InitFBOAndTextures()) {
 		// free any resources allocated by InitFBOAndTextures()
 		FreeFBOAndTextures();
@@ -129,16 +111,10 @@ void CShadowHandler::Init()
 	if (tmpFirstInit)
 		shadowsSupported = true;
 
-	if (shadowConfig == 0) {
-		// free any resources allocated by InitFBOAndTextures()
-		FreeFBOAndTextures();
-
-		// shadowsLoaded is still false
-		return;
-	}
-
 	LoadProjectionMatrix(CCameraHandler::GetCamera(CCamera::CAMTYPE_SHADOW));
-	LoadShadowGenShaders();
+
+	if (shadowConfig > 0)
+		LoadShadowGenShaders();
 }
 
 void CShadowHandler::Kill()
@@ -234,9 +210,6 @@ void CShadowHandler::LoadProjectionMatrix(const CCamera* shadowCam)
 
 void CShadowHandler::LoadShadowGenShaders()
 {
-	if (!globalRendering->haveGLSL)
-		return;
-
 	#define sh shaderHandler
 	static const std::string shadowGenProgHandles[SHADOWGEN_PROGRAM_COUNT] = {
 		"ShadowGenShaderProgModel",
@@ -353,6 +326,9 @@ void CShadowHandler::LoadShadowGenShaders()
 
 bool CShadowHandler::InitFBOAndTextures()
 {
+	//create dummy textures / FBO in case shadowConfig is 0
+	const int realShTexSize = shadowConfig > 0 ? shadowMapSize : 1;
+
 	// smOpaqFBO is no-op constructed, has to be initialized manually
 	smOpaqFBO.Init(false);
 
@@ -371,6 +347,8 @@ bool CShadowHandler::InitFBOAndTextures()
 		{GL_CLAMP_TO_EDGE  , GL_NEAREST, "SHADOW-COMPAT"},
 	};
 
+	static constexpr float one[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
 	bool status = false;
 	for (const auto& preset : presets)
 	{
@@ -381,7 +359,7 @@ bool CShadowHandler::InitFBOAndTextures()
 		glDeleteTextures(1, &shadowDepthTexture);
 		glGenTextures(1, &shadowDepthTexture);
 		glBindTexture(GL_TEXTURE_2D, shadowDepthTexture);
-		constexpr float one[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, one);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, preset.clampMode);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, preset.clampMode);
@@ -394,39 +372,36 @@ bool CShadowHandler::InitFBOAndTextures()
 		const GLint depthFormat = CGlobalRendering::DepthBitsToFormat(depthBits);
 
 		glTexParameteri(GL_TEXTURE_2D, GL_DEPTH_TEXTURE_MODE, GL_LUMINANCE);
-		glTexImage2D(GL_TEXTURE_2D, 0, depthFormat, shadowMapSize, shadowMapSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+		glTexImage2D(GL_TEXTURE_2D, 0, depthFormat, realShTexSize, realShTexSize, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+		glBindTexture(GL_TEXTURE_2D, 0);
 
 		/// color
 		glDeleteTextures(1, &shadowColorTexture);
 		glGenTextures(1, &shadowColorTexture);
 		glBindTexture(GL_TEXTURE_2D, shadowColorTexture);
-		// TODO: Figure out if mips make sense here.
+
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, one);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, preset.clampMode);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, preset.clampMode);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, preset.filterMode);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, preset.filterMode);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0); //no mips
+		// TODO: Figure out if mips make sense here.
 
 		if (static_cast<bool>(shadowColorMode)) {
-			// Store full color here, so special effects can cast nice color shadow.
-#if 0
-			if (GLEW_EXT_packed_float)
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F, shadowMapSize, shadowMapSize, 0, GL_RGB, GL_FLOAT, nullptr);
-			else
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, shadowMapSize, shadowMapSize, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-#else
 			// seems like GL_RGB8 has enough precision
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, shadowMapSize, shadowMapSize, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-#endif
-			constexpr GLint swizzleMask[] = { GL_RED, GL_GREEN, GL_BLUE, GL_ONE };
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, realShTexSize, realShTexSize, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+			static constexpr GLint swizzleMask[] = { GL_RED, GL_GREEN, GL_BLUE, GL_ONE };
 			glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzleMask);
 
 		}
 		else {
 			// Conserve VRAM
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, shadowMapSize, shadowMapSize, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
-			constexpr GLint swizzleMask[] = { GL_RED, GL_RED, GL_RED, GL_ONE };
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, realShTexSize, realShTexSize, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+			static constexpr GLint swizzleMask[] = { GL_RED, GL_RED, GL_RED, GL_ONE };
 			glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzleMask);
 		}
-
-
 		glBindTexture(GL_TEXTURE_2D, 0);
 
 		// Mesa complains about an incomplete FBO if calling Bind before TexImage (?)
@@ -444,7 +419,17 @@ bool CShadowHandler::InitFBOAndTextures()
 			break;
 	}
 
+	glClearDepth(1.0f);
+	glClear(GL_DEPTH_BUFFER_BIT);
+	EnableColorOutput(true);
+	glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+
 	smOpaqFBO.Unbind();
+
+	// revert to FBO = 0 default
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
 	return status;
 }
 
@@ -467,9 +452,9 @@ void CShadowHandler::DrawShadowPasses()
 		grassDrawer->DrawShadow();
 	}
 
-	if ((shadowGenBits & SHADOWGEN_BIT_PROJ) != 0)
-		projectileDrawer->DrawShadowPassOpaque();
-
+	if ((shadowGenBits & SHADOWGEN_BIT_PROJ) != 0){
+		projectileDrawer->DrawShadowOpaque();
+	}
 	if ((shadowGenBits & SHADOWGEN_BIT_MODEL) != 0) {
 		unitDrawer->DrawShadowPass();
 		featureDrawer->DrawShadowPass();
@@ -489,12 +474,14 @@ void CShadowHandler::DrawShadowPasses()
 	// Restore GL_BACK culling, because Lua shadow materials might
 	// have changed culling at their own discretion
 	glCullFace(GL_BACK);
-	if ((shadowGenBits & SHADOWGEN_BIT_MAP) != 0)
+	if ((shadowGenBits & SHADOWGEN_BIT_MAP) != 0){
+		ZoneScopedN("Draw::World::CreateShadows::Terrain");
 		readMap->GetGroundDrawer()->DrawShadowPass();
+	}
 
 	//transparent pass, comes last
 	if ((shadowGenBits & SHADOWGEN_BIT_PROJ) != 0) {
-		projectileDrawer->DrawShadowPassTransparent();
+		projectileDrawer->DrawShadowTransparent();
 		eventHandler.DrawShadowPassTransparent();
 	}
 
@@ -576,6 +563,8 @@ void CShadowHandler::SetShadowMatrix(CCamera* playerCam, CCamera* shadowCam)
 
 void CShadowHandler::SetShadowCamera(CCamera* shadowCam)
 {
+	const int realShTexSize = shadowConfig > 0 ? shadowMapSize : 1;
+
 	// first set matrices needed by shaders (including ShadowGenVertProg)
 	shadowCam->SetProjMatrix(projMatrix[SHADOWMAT_TYPE_DRAWING]);
 	shadowCam->SetViewMatrix(viewMatrix[SHADOWMAT_TYPE_DRAWING]);
@@ -584,7 +573,7 @@ void CShadowHandler::SetShadowCamera(CCamera* shadowCam)
 	// convert xy-diameter to radius
 	shadowCam->SetFrustumScales(shadowProjScales * float4(0.5f, 0.5f, 1.0f, 1.0f));
 	shadowCam->UpdateFrustum();
-	shadowCam->UpdateLoadViewport(0, 0, shadowMapSize, shadowMapSize);
+	shadowCam->UpdateLoadViewport(0, 0, realShTexSize, realShTexSize);
 	// load matrices into gl_{ModelView,Projection}Matrix
 	shadowCam->Update({false, false, false, false, false});
 

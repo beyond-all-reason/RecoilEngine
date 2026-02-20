@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <bit>
 
 #include "DynWater.h"
 #include "WaterRendering.h"
@@ -22,8 +23,9 @@
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "System/Log/ILog.h"
-#include "System/bitops.h"
 #include "System/Exceptions.h"
+
+#include "System/Misc/TracyDefs.h"
 
 #define LOG_SECTION_DYN_WATER "DynWater"
 LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_DYN_WATER)
@@ -45,6 +47,7 @@ LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_DYN_WATER)
 */
 void CDynWater::InitResources(bool loadShader)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!FBO::IsSupported())
 		throw content_error("DynWater Error: missing FBO support");
 
@@ -96,10 +99,10 @@ void CDynWater::InitResources(bool loadShader)
 	if (!foam.LoadGrayscale(waterRendering->foamTexture))
 		LOG_L(L_WARNING, "[%s] could not load grayscale foam-texture %s\n", __func__, waterRendering->foamTexture.c_str());
 
-	if ((count_bits_set(foam.xsize) != 1) || (count_bits_set(foam.ysize) != 1))
-		foam.CreateRescaled(next_power_of_2(foam.xsize), next_power_of_2(foam.ysize));
+	if (!std::has_single_bit <uint32_t> (foam.xsize) || !std::has_single_bit <uint32_t> (foam.ysize))
+		foam.CreateRescaled(std::bit_ceil <uint32_t> (foam.xsize), std::bit_ceil <uint32_t> (foam.ysize));
 
-	foamTex = foam.CreateTexture(0.0f, 0.0f, true);
+	foamTex = foam.CreateMipMapTexture(0.0f, 0.0f, 0);
 
 
 	if (ProgramStringIsNative(GL_VERTEX_PROGRAM_ARB, "ARB/waterDyn.vp")) {
@@ -252,6 +255,7 @@ void CDynWater::InitResources(bool loadShader)
 
 void CDynWater::FreeResources()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const auto DeleteTexture = [](GLuint& texID) { if (texID > 0) { glDeleteTextures(1, &texID); texID = 0; } };
 	const auto DeleteProgram = [](GLuint& proID) { if (proID > 0) { glSafeDeleteProgram(proID); proID = 0; } };
 
@@ -295,6 +299,7 @@ void CDynWater::FreeResources()
 
 void CDynWater::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 
@@ -342,7 +347,7 @@ void CDynWater::Draw()
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 11, -camPosX/256.0f + 0.5f, -camPosZ/256.0f + 0.5f, 0, 0);
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 12, 1.0f/WF_SIZE, 1.0f/WF_SIZE, 0, 0);
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 13, -(camPosBig.x - WH_SIZE)/WF_SIZE, -(camPosBig.z - WH_SIZE)/WF_SIZE, 0, 0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 14, 1.0f/(mapDims.pwr2mapx * SQUARE_SIZE), 1.0f/(mapDims.pwr2mapy * SQUARE_SIZE), 0, 0);
+	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 14, 1.0f/(mapDims.mapxp1 * SQUARE_SIZE), 1.0f/(mapDims.mapyp1 * SQUARE_SIZE), 0, 0);
 	//glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 0, 1.0f/4096.0f, 1.0f/4096.0f, 0, 0);
 	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 1, camera->GetPos().x, camera->GetPos().y, camera->GetPos().z, 0);
 	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 2, reflectRight.x, reflectRight.y, reflectRight.z, 0);
@@ -393,6 +398,7 @@ void CDynWater::Draw()
 
 void CDynWater::UpdateWater(const CGame* game)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 
@@ -419,6 +425,7 @@ void CDynWater::UpdateWater(const CGame* game)
 
 void CDynWater::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 
@@ -447,6 +454,7 @@ void CDynWater::Update()
 
 void CDynWater::DrawReflection(const CGame* game)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	reflectFBO.Bind();
 
 	const auto& sky = ISky::GetSky();
@@ -480,6 +488,7 @@ void CDynWater::DrawReflection(const CGame* game)
 
 void CDynWater::DrawRefraction(const CGame* game)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	camera->Update();
 
 	refractRight = camera->GetRight();
@@ -516,6 +525,7 @@ void CDynWater::DrawRefraction(const CGame* game)
 
 void CDynWater::DrawWaves()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float dx = camPosBig.x - oldCamPosBig.x;
 	float dy = camPosBig.z - oldCamPosBig.z;
 
@@ -551,7 +561,7 @@ void CDynWater::DrawWaves()
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 9,  0,          1.0f/1024, 0,0);
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 10, 1.0f/1024,  1.0f/1024, 0,0);
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 11, 1.0f/1024,  0, 0,0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 12, float(WF_SIZE)/(mapDims.pwr2mapx*SQUARE_SIZE), float(WF_SIZE)/(mapDims.pwr2mapy*SQUARE_SIZE), 0, 0);
+	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 12, float(WF_SIZE)/(mapDims.mapxp1*SQUARE_SIZE), float(WF_SIZE)/(mapDims.mapyp1*SQUARE_SIZE), 0, 0);
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 13, (camPosBig.x-WH_SIZE)/(mapDims.pwr2mapx*SQUARE_SIZE), (camPosBig.z-WH_SIZE)/(mapDims.pwr2mapy*SQUARE_SIZE), 0, 0);
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 14, dx/WF_SIZE, dy/WF_SIZE, 0, 0);
 	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 15, (camPosBig.x-WH_SIZE)/WF_SIZE*4, (camPosBig.x-WH_SIZE)/WF_SIZE*4, 0, 0);
@@ -563,7 +573,7 @@ void CDynWater::DrawWaves()
 
 	glViewport(0, 0, 1024, 1024);
 
-	if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s][1] FBO not ready", __func__);
 
 	glActiveTextureARB(GL_TEXTURE0_ARB);
@@ -604,7 +614,7 @@ void CDynWater::DrawWaves()
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, frameBuffer);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, waveTex2, 0);
 
-	if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s][2] FBO not ready", __func__);
 
 
@@ -658,7 +668,7 @@ void CDynWater::DrawWaves()
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, frameBuffer);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, waveTex1, 0);
 
-	if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s][3] FBO not ready", __func__);
 
 	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, waveNormalFP);
@@ -700,6 +710,7 @@ void CDynWater::DrawWaves()
 
 void CDynWater::DrawHeightTex()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glOrtho(0, 1, 0, 1, -1, 1);
@@ -716,7 +727,7 @@ void CDynWater::DrawHeightTex()
 
 	glViewport(0, 0, 256, 256);
 
-	if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s] FBO not ready", __func__);
 
 	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, waveCopyHeightFP);
@@ -766,6 +777,7 @@ static inline void DrawVertexAQ(int x, int y)
 
 void CDynWater::DrawWaterSurface()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	bool inStrip = false;
 
 	va = GetVertexArray();
@@ -945,6 +957,7 @@ void CDynWater::DrawWaterSurface()
 
 void CDynWater::DrawDetailNormalTex()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (int a = 0; a < 8; ++a) {
 		glActiveTextureARB(GL_TEXTURE0_ARB + a);
 		glBindTexture(GL_TEXTURE_2D, rawBumpTexture[0]);
@@ -956,7 +969,7 @@ void CDynWater::DrawDetailNormalTex()
 
 	glViewport(0, 0, 256, 256);
 
-	if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s] FBO not ready", __func__);
 
 	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, dwDetailNormalFP);
@@ -1008,6 +1021,7 @@ void CDynWater::DrawDetailNormalTex()
 
 void CDynWater::AddShipWakes()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, frameBuffer);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, waveTex1, 0);
 
@@ -1021,7 +1035,7 @@ void CDynWater::AddShipWakes()
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s] FBO not ready", __func__);
 
 	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, dwAddSplashFP);
@@ -1125,6 +1139,7 @@ void CDynWater::AddShipWakes()
 
 void CDynWater::AddExplosions()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (explosions.empty()) {
 		return;
 	}
@@ -1145,7 +1160,7 @@ void CDynWater::AddExplosions()
 	glActiveTextureARB(GL_TEXTURE0_ARB);
 	glBindTexture(GL_TEXTURE_2D, splashTex);
 
-	if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
 		LOG_L(L_WARNING, "[DynWater::%s][1] FBO not ready", __func__);
 
 	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, dwAddSplashFP);
@@ -1208,6 +1223,7 @@ void CDynWater::AddExplosions()
 
 void CDynWater::AddExplosion(const float3& pos, float strength, float size)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if ((pos.y > size) || (size < 8)) {
 		return;
 	}
@@ -1217,6 +1233,7 @@ void CDynWater::AddExplosion(const float3& pos, float strength, float size)
 
 void CDynWater::DrawUpdateSquare(float dx, float dy, int* resetTexs)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float startx = std::max(0.f, -dx/WF_SIZE);
 	float starty = std::max(0.f, -dy/WF_SIZE);
 	float endx   = std::min(1.f, 1 - dx/WF_SIZE);
@@ -1247,6 +1264,7 @@ void CDynWater::DrawUpdateSquare(float dx, float dy, int* resetTexs)
 
 void CDynWater::DrawSingleUpdateSquare(float startx, float starty, float endx, float endy)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float texstart = 0.1f / 1024;
 	float texend = 1023.9f / 1024;
 	float texdif = texend - texstart;
@@ -1265,6 +1283,7 @@ void CDynWater::DrawSingleUpdateSquare(float startx, float starty, float endx, f
 
 void CDynWater::DrawOuterSurface()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CVertexArray* va = GetVertexArray();
 	va->Initialize();
 

@@ -2,9 +2,18 @@
 
 #include "IArchive.h"
 
-#include "System/StringUtil.h"
+#include <cassert>
 
-unsigned int IArchive::FindFile(const std::string& filePath) const
+#include "System/StringUtil.h"
+#include "System/Threading/ThreadPool.h"
+
+IArchive::IArchive(const std::string& archiveFile)
+	: archiveFile(archiveFile)
+{
+	static_assert(decltype(sem)::element_type::max() >= ThreadPool::MAX_THREADS);
+}
+
+uint32_t IArchive::FindFile(const std::string& filePath) const
 {
 	const std::string& normalizedFilePath = StringToLower(filePath);
 	const auto it = lcNameIndex.find(normalizedFilePath);
@@ -15,22 +24,9 @@ unsigned int IArchive::FindFile(const std::string& filePath) const
 	return NumFiles();
 }
 
-bool IArchive::CalcHash(uint32_t fid, uint8_t hash[sha512::SHA_LEN], std::vector<std::uint8_t>& fb)
-{
-	// NOTE: should be possible to avoid a re-read for buffered archives
-	if (!GetFile(fid, fb))
-		return false;
-
-	if (fb.empty())
-		return false;
-
-	sha512::calc_digest(fb.data(), fb.size(), hash);
-	return true;
-}
-
 bool IArchive::GetFile(const std::string& name, std::vector<std::uint8_t>& buffer)
 {
-	const unsigned int fid = FindFile(name);
+	const uint32_t fid = FindFile(name);
 
 	if (!IsFileId(fid))
 		return false;
@@ -39,3 +35,27 @@ bool IArchive::GetFile(const std::string& name, std::vector<std::uint8_t>& buffe
 	return true;
 }
 
+bool IArchive::CalcHash(uint32_t fid, sha512::raw_digest& hash, std::vector<std::uint8_t>& fb)
+{
+	// NOTE: should be possible to avoid a re-read for buffered archives
+	if (!GetFile(fid, fb))
+		return false;
+
+	if (fb.empty())
+		return false;
+
+	sha512::calc_digest(fb.data(), fb.size(), hash.data());
+	return true;
+}
+
+uint32_t IArchive::GetSpinningDiskParallelAccessNum()
+{
+#ifdef _WIN32
+	static constexpr int NUM_PARALLEL_FILE_READS_SD = 4;
+#else
+	// Linux FS even on spinning disk seems far more tolerant to parallel reads, use all threads
+	const int NUM_PARALLEL_FILE_READS_SD = ThreadPool::GetNumThreads();
+#endif // _WIN32
+
+	return NUM_PARALLEL_FILE_READS_SD;
+}

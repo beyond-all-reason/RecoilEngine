@@ -25,7 +25,9 @@ CR_REG_METADATA(SResourceOrder,(
 	CR_MEMBER(use),
 	CR_MEMBER(add),
 	CR_MEMBER(quantum),
-	CR_MEMBER(overflow)
+	CR_MEMBER(overflow),
+	CR_MEMBER(separate),
+	CR_MEMBER(useIncomeMultiplier)
 ))
 
 

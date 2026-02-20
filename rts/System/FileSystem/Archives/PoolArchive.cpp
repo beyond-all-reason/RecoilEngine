@@ -1,6 +1,5 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-
 #include "PoolArchive.h"
 
 #include <algorithm>
@@ -10,9 +9,13 @@
 #include <cassert>
 #include <cstring>
 #include <iostream>
+#include <format>
 
 #include "System/FileSystem/DataDirsAccess.h"
 #include "System/FileSystem/FileSystem.h"
+#include "System/Threading/SpringThreading.h"
+#include "System/Threading/ThreadPool.h"
+#include "System/Misc/SpringTime.h"
 #include "System/Exceptions.h"
 #include "System/StringUtil.h"
 #include "System/Log/ILog.h"
@@ -39,16 +42,19 @@ static uint32_t parse_uint32(uint8_t c[4])
 	return i;
 }
 
-static bool gz_really_read(gzFile file, voidp buf, unsigned int len)
+static bool gz_really_read(gzFile file, voidp buf, uint32_t len)
 {
 	return (gzread(file, reinterpret_cast<char*>(buf), len) == len);
 }
 
-
-
-CPoolArchive::CPoolArchive(const std::string& name): CBufferedArchive(name)
+CPoolArchive::CPoolArchive(const std::string& name)
+	: CBufferedArchive(name)
 {
-	memset(&dummyFileHash, 0, sizeof(dummyFileHash));
+	{
+		auto isOnSpinningDisk = FileSystem::IsPathOnSpinningDisk(CPoolArchive::GetPoolRootDirectory(archiveFile));
+		// each file is one gzip instance, can MT
+		parallelAccessNum = isOnSpinningDisk ? GetSpinningDiskParallelAccessNum() : ThreadPool::GetNumThreads();
+	}
 
 	char c_name[255];
 	uint8_t c_md5sum[16];
@@ -65,9 +71,7 @@ CPoolArchive::CPoolArchive(const std::string& name): CBufferedArchive(name)
 	stats.reserve(1024);
 
 	// get pool dir from .sdp absolute path
-	assert(FileSystem::IsAbsolutePath(name));
-	poolRootDir = FileSystem::GetParent(FileSystem::GetDirectory(name));
-	assert(!poolRootDir.empty());
+	poolRootDir = GetPoolRootDirectory(name);
 
 	while (gz_really_read(in, &length, 1)) {
 		if (!gz_really_read(in, &c_name, length)) break;
@@ -75,18 +79,17 @@ CPoolArchive::CPoolArchive(const std::string& name): CBufferedArchive(name)
 		if (!gz_really_read(in, &c_crc32, 4)) break;
 		if (!gz_really_read(in, &c_size, 4)) break;
 
-		files.emplace_back();
-		stats.emplace_back();
-		FileData& f = files.back();
-		FileStat& s = stats.back();
+		FileData& f = files.emplace_back();
+		FileStat& s = stats.emplace_back();
 
-		f.name = std::move(std::string(c_name, length));
+		f.name = std::string(c_name, length);
 
 		std::memcpy(&f.md5sum, &c_md5sum, sizeof(f.md5sum));
 		std::memset(&f.shasum, 0, sizeof(f.shasum));
 
 		f.crc32 = parse_uint32(c_crc32);
 		f.size = parse_uint32(c_size);
+		f.modTime = 0; // it's expensive and wasteful to set it here, set in FileInfo() instead
 
 		s.fileIndx = files.size() - 1;
 		s.readTime = 0;
@@ -123,32 +126,99 @@ CPoolArchive::~CPoolArchive()
 	}
 }
 
-int CPoolArchive::GetFileImpl(unsigned int fid, std::vector<std::uint8_t>& buffer)
+const std::string& CPoolArchive::FileName(uint32_t fid) const
+{
+	assert(IsFileId(fid));
+	return files[fid].name;
+}
+
+int32_t CPoolArchive::FileSize(uint32_t fid) const
+{
+	assert(IsFileId(fid));
+	return files[fid].size;
+}
+
+IArchive::SFileInfo CPoolArchive::FileInfo(uint32_t fid) const
+{
+	assert(IsFileId(fid));
+	auto& file = files[fid];
+
+	if (file.modTime == 0) {
+		auto scopedSemAcq = AcquireSemaphoreScoped();
+		file.modTime = FileSystem::GetFileModificationTime(GetPoolFilePath(poolRootDir, file.md5sum)); // file.modTime is mutable
+	}
+
+	return IArchive::SFileInfo{
+		.fileName = file.name,
+		.specialFileName = GetPoolFileName(file.md5sum),
+		.size = static_cast<int32_t>(file.size),
+		.modTime = file.modTime
+	};
+}
+
+bool CPoolArchive::CalcHash(uint32_t fid, sha512::raw_digest& hash, std::vector<std::uint8_t>& fb)
 {
 	assert(IsFileId(fid));
 
-	FileData* f = &files[fid];
-	FileStat* s = &stats[fid];
+	const FileData& fd = files[fid];
 
-	constexpr const char table[] = "0123456789abcdef";
+	// pool-entry hashes are not calculated until GetFileImpl, must check JIT
+	if (fd.shasum == sha512::NULL_RAW_DIGEST)
+		GetFileImpl(fid, fb);
+
+	hash = fd.shasum;
+	return (fd.shasum != sha512::NULL_RAW_DIGEST);
+}
+
+std::string CPoolArchive::GetPoolRootDirectory(const std::string& sdpName)
+{
+	// get pool dir from .sdp absolute path
+	assert(FileSystem::IsAbsolutePath(sdpName));
+	std::string poolRootDir = FileSystem::GetParent(FileSystem::GetDirectory(sdpName));
+	assert(!poolRootDir.empty());
+
+	return poolRootDir;
+}
+
+std::string CPoolArchive::GetPoolFileName(const std::array<uint8_t, 16>& md5Sum)
+{
+	static constexpr const char table[] = "0123456789abcdef";
 	char c_hex[32];
 
 	for (int i = 0; i < 16; ++i) {
-		c_hex[2 * i    ] = table[(f->md5sum[i] >> 4) & 0xf];
-		c_hex[2 * i + 1] = table[ f->md5sum[i]       & 0xf];
+		c_hex[2 * i    ] = table[(md5Sum[i] >> 4) & 0xF];
+		c_hex[2 * i + 1] = table[(md5Sum[i]     ) & 0xF];
 	}
 
-	const std::string prefix(c_hex,      2);
+	const std::string prefix(c_hex    ,  2);
 	const std::string pstfix(c_hex + 2, 30);
+	return std::format("{}/{}.gz", prefix, pstfix);
+}
 
-	      std::string rpath = poolRootDir + "/pool/" + prefix + "/" + pstfix + ".gz";
-	const std::string  path = FileSystem::FixSlashes(rpath);
+std::string CPoolArchive::GetPoolFilePath(const std::string& poolRootDir, const std::string& poolFile)
+{
+	return FileSystem::Concatenate({ poolRootDir.c_str(), "pool", poolFile.c_str() });
+}
+
+std::string CPoolArchive::GetPoolFilePath(const std::string& poolRootDir, const std::array<uint8_t, 16>& md5Sum)
+{
+	return GetPoolFilePath(poolRootDir, GetPoolFileName(md5Sum));
+}
+
+int CPoolArchive::GetFileImpl(uint32_t fid, std::vector<std::uint8_t>& buffer)
+{
+	assert(IsFileId(fid));
+
+	auto& f = files[fid];
+	auto& s = stats[fid];
+
+	const auto path = GetPoolFilePath(poolRootDir, f.md5sum);
 
 	const spring_time startTime = spring_now();
 
 
 	buffer.clear();
-	buffer.resize(f->size);
+	buffer.resize(f.size);
 
 	const auto GzRead = [&f, &path, &buffer](bool report) -> int {
 		gzFile in = gzopen(path.c_str(), "rb");
@@ -163,7 +233,7 @@ int CPoolArchive::GetFileImpl(unsigned int fid, std::vector<std::uint8_t>& buffe
 			const char* errgz = gzerror(in, &errnum);
 			const char* errsys = std::strerror(errnum);
 
-			LOG_L(L_ERROR, "[PoolArchive::%s] could not read file GZIP reason: \"%s\", SYSTEM reason: \"%s\" (bytesRead=%d fileSize=%u)", __func__, errgz, errsys, bytesRead, f->size);
+			LOG_L(L_ERROR, "[PoolArchive::%s] could not read file GZIP reason: \"%s\", SYSTEM reason: \"%s\" (bytesRead=%d fileSize=%u)", __func__, errgz, errsys, bytesRead, f.size);
 		}
 
 		gzclose(in);
@@ -186,7 +256,7 @@ int CPoolArchive::GetFileImpl(unsigned int fid, std::vector<std::uint8_t>& buffe
 		std::this_thread::sleep_for(std::chrono::microseconds(100));
 	}
 
-	s->readTime = (spring_now() - startTime).toNanoSecsi();
+	s.readTime = (spring_now() - startTime).toNanoSecsi();
 
 	if (bytesRead != buffer.size()) {
 		LOG_L(L_ERROR, "[PoolArchive::%s] failed to read file \"%s\" after %d tries", __func__, path.c_str(), readRetries);
@@ -197,6 +267,6 @@ int CPoolArchive::GetFileImpl(unsigned int fid, std::vector<std::uint8_t>& buffe
 		LOG_L(L_WARNING, "[PoolArchive::%s] could read file \"%s\" only after %d tries", __func__, path.c_str(), readTry);
 	}
 
-	sha512::calc_digest(buffer.data(), buffer.size(), f->shasum.data());
+	sha512::calc_digest(buffer.data(), buffer.size(), f.shasum.data());
 	return 1;
 }

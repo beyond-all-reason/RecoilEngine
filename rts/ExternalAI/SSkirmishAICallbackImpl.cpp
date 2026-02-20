@@ -390,12 +390,6 @@ EXPORT(int) skirmishAiCallback_Engine_executeCommand(
 			SetCommonCmdParams(&cmd, rc, unitId, groupId);
 			ret = skirmishAiCallback_Engine_handleCommand(skirmishAIId, COMMAND_TO_ID_ENGINE, -1, aiCmdId, &cmd);
 		} break;
-		case COMMAND_UNIT_AI_SELECT: {
-			SAiSelectUnitCommand cmd;
-
-			SetCommonCmdParams(&cmd, rc, unitId, groupId);
-			ret = skirmishAiCallback_Engine_handleCommand(skirmishAIId, COMMAND_TO_ID_ENGINE, -1, aiCmdId, &cmd);
-		} break;
 		case COMMAND_UNIT_GROUP_ADD: {
 			SGroupAddUnitCommand cmd;
 			cmd.toGroupId = (int) rc->params[0];
@@ -1500,141 +1494,60 @@ EXPORT(int) skirmishAiCallback_Game_getTeamAllyTeam(int skirmishAIId, int otherT
 	return teamHandler.AllyTeam(otherTeamId);
 }
 
+static inline float aiGetTeamResource(int skirmishAiID, int teamID, int resourceID, SResourcePack CTeam::* resourcePack)
+{
+	if (!teamHandler.AlliedTeams(AI_TEAM_IDS[skirmishAiID], teamID) && !skirmishAiCallback_Cheats_isEnabled(skirmishAiID))
+		return -1.0f;
 
+	if (!resourceHandler->IsValidId(resourceID))
+		return -1.0f;
+
+	return (teamHandler.Team(teamID)->*resourcePack)[resourceID];
+}
 
 EXPORT(float) skirmishAiCallback_Game_getTeamResourceCurrent(int skirmishAIId, int otherTeamId, int resourceId)
 {
-	float res = -1.0f;
-
-	if (teamHandler.AlliedTeams(AI_TEAM_IDS[skirmishAIId], otherTeamId) || skirmishAiCallback_Cheats_isEnabled(skirmishAIId)) {
-		if (resourceId == resourceHandler->GetMetalId()) {
-			res = teamHandler.Team(otherTeamId)->res.metal;
-		} else if (resourceId == resourceHandler->GetEnergyId()) {
-			res = teamHandler.Team(otherTeamId)->res.energy;
-		}
-	}
-
-	return res;
+	return aiGetTeamResource(skirmishAIId, otherTeamId, resourceId, &CTeam::res);
 }
 
 EXPORT(float) skirmishAiCallback_Game_getTeamResourceIncome(int skirmishAIId, int otherTeamId, int resourceId)
 {
-	float res = -1.0f;
-
-	if (teamHandler.AlliedTeams(AI_TEAM_IDS[skirmishAIId], otherTeamId) || skirmishAiCallback_Cheats_isEnabled(skirmishAIId)) {
-		if (resourceId == resourceHandler->GetMetalId()) {
-			res = teamHandler.Team(otherTeamId)->resPrevIncome.metal;
-		} else if (resourceId == resourceHandler->GetEnergyId()) {
-			res = teamHandler.Team(otherTeamId)->resPrevIncome.energy;
-		}
-	}
-
-	return res;
+	return aiGetTeamResource(skirmishAIId, otherTeamId, resourceId, &CTeam::resPrevIncome);
 }
 
 EXPORT(float) skirmishAiCallback_Game_getTeamResourceUsage(int skirmishAIId, int otherTeamId, int resourceId)
 {
-	float res = -1.0f;
-
-	if (teamHandler.AlliedTeams(AI_TEAM_IDS[skirmishAIId], otherTeamId) || skirmishAiCallback_Cheats_isEnabled(skirmishAIId)) {
-		if (resourceId == resourceHandler->GetMetalId()) {
-			res = teamHandler.Team(otherTeamId)->resPrevExpense.metal;
-		} else if (resourceId == resourceHandler->GetEnergyId()) {
-			res = teamHandler.Team(otherTeamId)->resPrevExpense.energy;
-		}
-	}
-
-	return res;
+	return aiGetTeamResource(skirmishAIId, otherTeamId, resourceId, &CTeam::resPrevExpense);
 }
 
 EXPORT(float) skirmishAiCallback_Game_getTeamResourceStorage(int skirmishAIId, int otherTeamId, int resourceId)
 {
-	float res = -1.0f;
-
-	if (teamHandler.AlliedTeams(AI_TEAM_IDS[skirmishAIId], otherTeamId) || skirmishAiCallback_Cheats_isEnabled(skirmishAIId)) {
-		if (resourceId == resourceHandler->GetMetalId()) {
-			res = teamHandler.Team(otherTeamId)->resStorage.metal;
-		} else if (resourceId == resourceHandler->GetEnergyId()) {
-			res = teamHandler.Team(otherTeamId)->resStorage.energy;
-		}
-	}
-
-	return res;
+	return aiGetTeamResource(skirmishAIId, otherTeamId, resourceId, &CTeam::resStorage);
 }
 
 EXPORT(float) skirmishAiCallback_Game_getTeamResourcePull(int skirmishAIId, int otherTeamId, int resourceId)
 {
-	float res = -1.0f;
-
-	if (teamHandler.AlliedTeams(AI_TEAM_IDS[skirmishAIId], otherTeamId) || skirmishAiCallback_Cheats_isEnabled(skirmishAIId)) {
-		if (resourceId == resourceHandler->GetMetalId()) {
-			res = teamHandler.Team(otherTeamId)->resStorage.metal;
-		} else if (resourceId == resourceHandler->GetEnergyId()) {
-			res = teamHandler.Team(otherTeamId)->resStorage.energy;
-		}
-	}
-
-	return res;
+	return aiGetTeamResource(skirmishAIId, otherTeamId, resourceId, &CTeam::resPrevPull);
 }
 
 EXPORT(float) skirmishAiCallback_Game_getTeamResourceShare(int skirmishAIId, int otherTeamId, int resourceId)
 {
-	float res = -1.0f;
-
-	if (teamHandler.AlliedTeams(AI_TEAM_IDS[skirmishAIId], otherTeamId) || skirmishAiCallback_Cheats_isEnabled(skirmishAIId)) {
-		if (resourceId == resourceHandler->GetMetalId()) {
-			res = teamHandler.Team(otherTeamId)->resShare.metal;
-		} else if (resourceId == resourceHandler->GetEnergyId()) {
-			res = teamHandler.Team(otherTeamId)->resShare.energy;
-		}
-	}
-
-	return res;
+	return aiGetTeamResource(skirmishAIId, otherTeamId, resourceId, &CTeam::resShare);
 }
 
 EXPORT(float) skirmishAiCallback_Game_getTeamResourceSent(int skirmishAIId, int otherTeamId, int resourceId)
 {
-	float res = -1.0f;
-
-	if (teamHandler.AlliedTeams(AI_TEAM_IDS[skirmishAIId], otherTeamId) || skirmishAiCallback_Cheats_isEnabled(skirmishAIId)) {
-		if (resourceId == resourceHandler->GetMetalId()) {
-			res = teamHandler.Team(otherTeamId)->resPrevSent.metal;
-		} else if (resourceId == resourceHandler->GetEnergyId()) {
-			res = teamHandler.Team(otherTeamId)->resPrevSent.energy;
-		}
-	}
-
-	return res;
+	return aiGetTeamResource(skirmishAIId, otherTeamId, resourceId, &CTeam::resPrevSent);
 }
 
 EXPORT(float) skirmishAiCallback_Game_getTeamResourceReceived(int skirmishAIId, int otherTeamId, int resourceId)
 {
-	float res = -1.0f;
-
-	if (teamHandler.AlliedTeams(AI_TEAM_IDS[skirmishAIId], otherTeamId) || skirmishAiCallback_Cheats_isEnabled(skirmishAIId)) {
-		if (resourceId == resourceHandler->GetMetalId()) {
-			res = teamHandler.Team(otherTeamId)->resPrevReceived.metal;
-		} else if (resourceId == resourceHandler->GetEnergyId()) {
-			res = teamHandler.Team(otherTeamId)->resPrevReceived.energy;
-		}
-	}
-
-	return res;
+	return aiGetTeamResource(skirmishAIId, otherTeamId, resourceId, &CTeam::resPrevReceived);
 }
 
 EXPORT(float) skirmishAiCallback_Game_getTeamResourceExcess(int skirmishAIId, int otherTeamId, int resourceId)
 {
-	float res = -1.0f;
-
-	if (teamHandler.AlliedTeams(AI_TEAM_IDS[skirmishAIId], otherTeamId) || skirmishAiCallback_Cheats_isEnabled(skirmishAIId)) {
-		if (resourceId == resourceHandler->GetMetalId()) {
-			res = teamHandler.Team(otherTeamId)->resPrevExcess.metal;
-		} else if (resourceId == resourceHandler->GetEnergyId()) {
-			res = teamHandler.Team(otherTeamId)->resPrevExcess.energy;
-		}
-	}
-
-	return res;
+	return aiGetTeamResource(skirmishAIId, otherTeamId, resourceId, &CTeam::resPrevExcess);
 }
 
 EXPORT(bool) skirmishAiCallback_Game_isAllied(int skirmishAIId, int firstAllyTeamId, int secondAllyTeamId) {
@@ -1710,7 +1623,7 @@ EXPORT(const char*) skirmishAiCallback_Game_getRulesParamString(int skirmishAIId
 }
 
 
-//########### BEGINN Mod
+//########### BEGIN Mod
 
 EXPORT(const char*) skirmishAiCallback_Mod_getFileName(int skirmishAIId) {
 	return modInfo.filename.c_str();
@@ -1847,7 +1760,7 @@ EXPORT(bool) skirmishAiCallback_Mod_getRequireSonarUnderWater(int skirmishAIId) 
 
 
 
-//########### BEGINN Map
+//########### BEGIN Map
 EXPORT(bool) skirmishAiCallback_Map_isPosInCamera(int skirmishAIId, float* pos_posF3, float radius) {
 	return GetCallBack(skirmishAIId)->PosInCamera(pos_posF3, radius);
 }
@@ -2264,7 +2177,7 @@ EXPORT(bool) skirmishAiCallback_File_getContent(int skirmishAIId, const char* fi
 
 
 
-// BEGINN OBJECT Resource
+// BEGIN OBJECT Resource
 EXPORT(int) skirmishAiCallback_getResources(int skirmishAIId) {
 	return resourceHandler->GetNumResources();
 }
@@ -2405,7 +2318,7 @@ EXPORT(const char*) skirmishAiCallback_Game_getSetupScript(int skirmishAIId) {
 
 
 
-//########### BEGINN UnitDef
+//########### BEGIN UnitDef
 EXPORT(int) skirmishAiCallback_getUnitDefs(
 	int skirmishAIId,
 	int* unitDefIds,
@@ -2458,11 +2371,8 @@ EXPORT(const char*) skirmishAiCallback_UnitDef_getHumanName(int skirmishAIId, in
 EXPORT(float) skirmishAiCallback_UnitDef_getUpkeep(int skirmishAIId, int unitDefId, int resourceId) {
 	const UnitDef* ud = getUnitDefById(skirmishAIId, unitDefId);
 
-	if (resourceId == resourceHandler->GetMetalId())
-		return ud->metalUpkeep;
-
-	if (resourceId == resourceHandler->GetEnergyId())
-		return ud->energyUpkeep;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return ud->upkeep[resourceId];
 
 	return 0.0f;
 }
@@ -2470,11 +2380,8 @@ EXPORT(float) skirmishAiCallback_UnitDef_getUpkeep(int skirmishAIId, int unitDef
 EXPORT(float) skirmishAiCallback_UnitDef_getResourceMake(int skirmishAIId, int unitDefId, int resourceId) {
 	const UnitDef* ud = getUnitDefById(skirmishAIId, unitDefId);
 
-	if (resourceId == resourceHandler->GetMetalId())
-		return ud->metalMake;
-
-	if (resourceId == resourceHandler->GetEnergyId())
-		return ud->energyMake;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return ud->resourceMake[resourceId];
 
 	return 0.0f;
 }
@@ -2493,11 +2400,8 @@ EXPORT(float) skirmishAiCallback_UnitDef_getMakesResource(int skirmishAIId,
 EXPORT(float) skirmishAiCallback_UnitDef_getCost(int skirmishAIId, int unitDefId, int resourceId) {
 	const UnitDef* ud = getUnitDefById(skirmishAIId, unitDefId);
 
-	if (resourceId == resourceHandler->GetMetalId())
-		return ud->metal;
-
-	if (resourceId == resourceHandler->GetEnergyId())
-		return ud->energy;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return ud->cost[resourceId];
 
 	return 0.0f;
 }
@@ -2541,11 +2445,8 @@ EXPORT(float) skirmishAiCallback_UnitDef_getTidalResourceGenerator(int skirmishA
 EXPORT(float) skirmishAiCallback_UnitDef_getStorage(int skirmishAIId, int unitDefId, int resourceId) {
 	const UnitDef* ud = getUnitDefById(skirmishAIId, unitDefId);
 
-	if (resourceId == resourceHandler->GetMetalId())
-		return ud->metalStorage;
-
-	if (resourceId == resourceHandler->GetEnergyId())
-		return ud->energyStorage;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return ud->storage[resourceId];
 
 	return 0.0f;
 }
@@ -3401,7 +3302,7 @@ EXPORT(int) skirmishAiCallback_UnitDef_WeaponMount_getOnlyTargetCategory(int ski
 
 
 
-//########### BEGINN Unit
+//########### BEGIN Unit
 EXPORT(int) skirmishAiCallback_Unit_getLimit(int skirmishAIId) {
 	const int team = AI_TEAM_IDS[skirmishAIId];
 	const int limit = teamHandler.Team(team)->GetMaxUnits();
@@ -3957,7 +3858,7 @@ EXPORT(int) skirmishAiCallback_getTeamUnits(int skirmishAIId, int* unitIds, int 
 }
 
 
-//########### BEGINN Team
+//########### BEGIN Team
 EXPORT(bool) skirmishAiCallback_Team_hasAIController(int skirmishAIId, int teamId) {
 	// return (AI_TEAM_IDS[skirmishAIId] == teamId);
 	const auto pred = [&](const int aiTeamID) { return (teamId == aiTeamID); };
@@ -4031,7 +3932,7 @@ EXPORT(const char*) skirmishAiCallback_Team_getRulesParamString(int skirmishAIId
 //########### END Team
 
 
-//########### BEGINN FeatureDef
+//########### BEGIN FeatureDef
 EXPORT(int) skirmishAiCallback_getFeatureDefs(int skirmishAIId, int* featureDefIds, int featureDefIdsMaxSize) {
 	const auto& featureDefs = featureDefHandler->GetFeatureDefsVec();
 	const int featureDefIdsRealSize = featureDefs.size();
@@ -4065,11 +3966,8 @@ EXPORT(float) skirmishAiCallback_FeatureDef_getContainedResource(int skirmishAII
 
 	const FeatureDef* fd = getFeatureDefById(skirmishAIId, featureDefId);
 
-	if (resourceId == resourceHandler->GetMetalId())
-		return fd->metal;
-
-	if (resourceId == resourceHandler->GetEnergyId())
-		return fd->energy;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return fd->cost[resourceId];
 
 	return 0.0f;
 }
@@ -4313,7 +4211,7 @@ EXPORT(short) skirmishAiCallback_Feature_getBuildingFacing(int skirmishAIId, int
 }
 
 
-//########### BEGINN WeaponDef
+//########### BEGIN WeaponDef
 EXPORT(int) skirmishAiCallback_getWeaponDefs(int skirmishAIId) {
 	return (weaponDefHandler->NumWeaponDefs());
 }
@@ -4497,11 +4395,8 @@ EXPORT(int) skirmishAiCallback_WeaponDef_getFlightTime(int skirmishAIId, int wea
 EXPORT(float) skirmishAiCallback_WeaponDef_getCost(int skirmishAIId, int weaponDefId, int resourceId) {
 	const WeaponDef* wd = getWeaponDefById(skirmishAIId, weaponDefId);
 
-	if (resourceId == resourceHandler->GetMetalId())
-		return wd->metalcost;
-
-	if (resourceId == resourceHandler->GetEnergyId())
-		return wd->energycost;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return wd->cost[resourceId];
 
 	return 0.0f;
 }
@@ -4509,10 +4404,6 @@ EXPORT(float) skirmishAiCallback_WeaponDef_getCost(int skirmishAIId, int weaponD
 EXPORT(int) skirmishAiCallback_WeaponDef_getProjectilesPerShot(int skirmishAIId, int weaponDefId) {
 	return getWeaponDefById(skirmishAIId, weaponDefId)->projectilespershot;
 }
-
-//EXPORT(int) skirmishAiCallback_WeaponDef_getTdfId(int skirmishAIId, int weaponDefId) {
-//	return getWeaponDefById(skirmishAIId, weaponDefId)->tdfId;
-//}
 
 EXPORT(bool) skirmishAiCallback_WeaponDef_isTurret(int skirmishAIId, int weaponDefId) {
 	return getWeaponDefById(skirmishAIId, weaponDefId)->turret;
@@ -4826,7 +4717,7 @@ EXPORT(int) skirmishAiCallback_WeaponDef_getCustomParams(
 //########### END WeaponDef
 
 
-//########### BEGINN Weapon
+//########### BEGIN Weapon
 EXPORT(int) skirmishAiCallback_Unit_Weapon_getDef(int skirmishAIId, int unitId, int weaponId) {
 	const CUnit* unit = getUnit(unitId);
 

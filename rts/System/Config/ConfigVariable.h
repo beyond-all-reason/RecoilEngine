@@ -3,11 +3,15 @@
 #ifndef CONFIG_VALUE_H
 #define CONFIG_VALUE_H
 
-#include "System/Misc/NonCopyable.h"
 #include <algorithm>
 #include <map>
 #include <string>
+#include <string_view>
+#include <format>
+
+#include "System/Misc/NonCopyable.h"
 #include "System/StringConvertibleOptionalValue.h"
+#include "System/BranchPrediction.h"
 
 
 
@@ -142,13 +146,25 @@ public:
 	ConfigVariableBuilder(ConfigVariableTypedMetaData<T>& data) : data(&data) {}
 	const ConfigVariableMetaData* GetData() const { return data; }
 
+	ConfigVariableBuilder& declarationFile(const char* file) {
+		std::string_view svFile(file);
+		auto off = std::min(svFile.rfind("/rts/"), svFile.rfind("\\rts\\"));
+		if unlikely(off == std::string::npos) {
+			data->declarationFile = std::string(file);
+			return *this;
+		}
+
+		svFile.remove_prefix(off + 1);
+		data->declarationFile = std::string(svFile);
+		return *this;
+	}
+
 #define MAKE_CHAIN_METHOD(property, type) \
 	ConfigVariableBuilder& property(type const& x) { \
 		data->property = x; \
 		return *this; \
 	}
 
-	MAKE_CHAIN_METHOD(declarationFile, const char*);
 	MAKE_CHAIN_METHOD(declarationLine, int);
 	MAKE_CHAIN_METHOD(description, std::string);
 	MAKE_CHAIN_METHOD(readOnly, bool);

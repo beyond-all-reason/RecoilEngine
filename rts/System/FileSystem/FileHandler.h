@@ -5,8 +5,8 @@
 
 #include <vector>
 #include <string>
-#include <fstream>
 #include <cinttypes>
+#include <nowide/fstream.hpp>
 
 #include "VFSModes.h"
 
@@ -16,12 +16,13 @@
  * have a look at the FileSystem class.
  *
  * This class should be threadsafe (multiple threads can use multiple
- * CFileHandler pointing to the same file simulatneously) as long as there are
+ * CFileHandler pointing to the same file simultaneously) as long as there are
  * no new Archives added to the VFS (which should not happen after PreGame).
  */
 class CFileHandler
 {
 public:
+	CFileHandler() { Close(); }
 	CFileHandler(const char* fileName, const char* modes = SPRING_VFS_RAW_FIRST);
 	CFileHandler(const std::string& fileName, const std::string& modes = SPRING_VFS_RAW_FIRST);
 	virtual ~CFileHandler() { Close(); }
@@ -63,7 +64,6 @@ public:
 
 
 protected:
-	CFileHandler() { Close(); } // for CGZFileHandler
 
 	virtual bool TryReadFromPWD(const std::string& fileName);
 	virtual bool TryReadFromRawFS(const std::string& fileName);
@@ -76,7 +76,7 @@ protected:
 	static bool InsertVFSDirs(std::vector<std::string>& dirSet, const std::string& path, const std::string& pattern, bool recursive, int section);
 
 	std::string fileName;
-	std::ifstream ifs;
+	nowide::ifstream ifs;
 	std::vector<std::uint8_t> fileBuffer;
 
 	int filePos = 0;

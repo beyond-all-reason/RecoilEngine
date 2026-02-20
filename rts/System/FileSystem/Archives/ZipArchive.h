@@ -6,10 +6,10 @@
 #include "IArchiveFactory.h"
 #include "BufferedArchive.h"
 #include "minizip/unzip.h"
+#include "System/Threading/AtomicFirstIndex.hpp"
 
 #include <string>
 #include <vector>
-
 
 /**
  * Creates zip compressed, single-file archives.
@@ -35,32 +35,39 @@ public:
 
 	int GetType() const override { return ARCHIVE_TYPE_SDZ; }
 
-	bool IsOpen() override { return (zip != nullptr); }
+	bool IsOpen() override { return (zipPerThread[0] != nullptr); }
 
-	unsigned int NumFiles() const override { return (fileEntries.size()); }
-	void FileInfo(unsigned int fid, std::string& name, int& size) const override;
+	uint32_t NumFiles() const override { return (fileEntries.size()); }
+	const std::string& FileName(uint32_t fid) const override;
+	int32_t FileSize(uint32_t fid) const override;
+	SFileInfo FileInfo(uint32_t fid) const override;
 
 	#if 0
-	unsigned int GetCrc32(unsigned int fid) {
+	uint32_t GetCrc32(uint32_t fid) {
 		assert(IsFileId(fid));
 		return fileEntries[fid].crc;
 	}
 	#endif
-
 protected:
-	unzFile zip;
+	int GetFileImpl(uint32_t fid, std::vector<std::uint8_t>& buffer) override;
+private:
+	static constexpr int MAX_THREADS = 32;
+
+	Recoil::AtomicFirstIndex<uint32_t> afi;
+	std::array<unzFile, MAX_THREADS> zipPerThread = {nullptr};
 
 	// actual data is in BufferedArchive
 	struct FileEntry {
 		unz_file_pos fp;
 		int size;
 		std::string origName;
-		unsigned int crc;
+		uint32_t crc;
+		uint32_t modTime;
 	};
 
 	std::vector<FileEntry> fileEntries;
 
-	int GetFileImpl(unsigned int fid, std::vector<std::uint8_t>& buffer) override;
+	static inline spring::mutex archiveLock;
 };
 
 #endif // _ZIP_ARCHIVE_H

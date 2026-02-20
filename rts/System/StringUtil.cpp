@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "System/StringUtil.h"
-#include "System/bitops.h"
 
 #include <zlib.h>
 
@@ -9,6 +8,7 @@
 	#include <intrin.h>
 #endif
 
+#include <bit>
 #include <cstring>
 #include <cinttypes>
 
@@ -127,7 +127,7 @@ char32_t utf8::GetNextChar(const std::string& text, int& pos, bool advance)
 	// 2Bytes encoded char: 110xxxxxxx 10xxxxxx
 	// 3Bytes encoded char: 1110xxxxxx 10xxxxxx 10xxxxxx
 	// 4Bytes encoded char: 11110xxxxx 10xxxxxx 10xxxxxx 10xxxxxx
-	// Originaly there were 5&6 byte versions too, but they were dropped in RFC 3629.
+	// Originally there were 5&6 byte versions too, but they were dropped in RFC 3629.
 	// So UTF8 maps to UTF16 range only.
 
 	static constexpr auto UTF8_CONT_MASK = 0xC0; // 11xxxxxx
@@ -159,7 +159,7 @@ char32_t utf8::GetNextChar(const std::string& text, int& pos, bool advance)
 	}
 
 	// how many bytes are requested for our multi-byte utf8 sequence
-	unsigned clo = count_leading_ones(utf8.c[0]);
+	unsigned clo = std::countl_one(utf8.c[0]);
 	if (clo>4 || clo==0) clo = 1; // ignore >=5 byte ones cause of RFC 3629
 
 	// how many healthy utf8 bytes are following

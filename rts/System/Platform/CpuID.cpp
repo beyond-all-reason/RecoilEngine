@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "CpuID.h"
-#include "lib/libcpuid/libcpuid/libcpuid.h"
 #include "System/MainDefines.h"
 #include "System/Platform/Threading.h"
 #include "System/Log/ILog.h"
@@ -14,6 +13,8 @@
 #include "System/Threading/SpringThreading.h"
 #include "System/UnorderedSet.hpp"
 
+#include <algorithm>
+#include <bitset>
 #include <cassert>
 #include <tuple>
 
@@ -88,106 +89,59 @@ namespace springproc {
 	}
 
 	CPUID::CPUID()
-		: shiftCore(0)
-		, shiftPackage(0)
-
-		, maskVirtual(0)
-		, maskCore(0)
-		, maskPackage(0)
-
-		, hasLeaf11(false)
 	{
 		uint32_t regs[REG_CNT] = {0, 0, 0, 0};
-
-		SetDefault();
-
-		// check for CPUID presence
-		if (!cpuid_present()) {
-			LOG_L(L_WARNING, "[CpuId] failed cpuid_present check");
-			return;
-		}
 
 		EnumerateCores();
 	}
 
 	void CPUID::EnumerateCores() {
-		const auto oldAffinity = Threading::GetAffinity();
+		processorMasks = cpu_topology::GetProcessorMasks();
+		processorCaches = cpu_topology::GetProcessorCache();
 
-		availableProceesorAffinityMask = 0;
-		numLogicalCores = 0;
-		numPhysicalCores = 0;
+		// Sort the logical processor groups to move the groups with the largest cache to the front. This will make it
+		// easier for policies to make decisions on logical processor groups based on cache size.
+		std::ranges::stable_sort
+			( processorCaches.groupCaches
+			// sort larger to the bottom.
+			, [](const auto &lh, const auto &rh) -> bool { return lh.cacheSizes[2] > rh.cacheSizes[2]; });
 
-		auto cpuID = spring::ScopedResource(
-			[]() {
-				cpu_raw_data_array_t raw_array;
-				system_id_t system;
+		std::ranges::for_each
+			( processorCaches.groupCaches
+			, [](const auto& cache) -> void { LOG("Found logical processors (mask 0x%08x) using L3 cache (sized %dKB) ", cache.groupMask, cache.cacheSizes[2] / 1024); });
 
-				bool badResult = false;
-				if (cpuid_get_all_raw_data(&raw_array) < 0) //necessary to call as it calls raw_array constructor
-					badResult = true;
+		const uint32_t logicalCountMask  = (processorMasks.efficiencyCoreMask | processorMasks.performanceCoreMask);
+		const uint32_t perfCoreCountMask = processorMasks.performanceCoreMask & ~processorMasks.hyperThreadHighMask;
+		const uint32_t coreCountMask     = logicalCountMask & ~processorMasks.hyperThreadHighMask;
+	
+		numLogicalCores     = std::popcount(logicalCountMask);
+		numPhysicalCores    = std::popcount(coreCountMask);
+		numPerformanceCores = std::popcount(perfCoreCountMask);
 
-				if (cpu_identify_all(&raw_array, &system) < 0) //necessary to call as it calls system constructor
-					badResult = true;
-
-				return std::make_tuple(raw_array, system, badResult);
-			}(),
-			[](auto&& item) {
-				cpuid_free_raw_data_array(&std::get<0>(item));
-				cpuid_free_system_id(&std::get<1>(item));
-			}
-		);
-
-		auto& [raw_array, system, badResult] = cpuID.Get();
-
-		Threading::SetAffinity(oldAffinity);
-		if (badResult) {
-			LOG_L(L_WARNING, "[CpuId] error: %s", cpuid_error());
-			return;
-		}
-
-		for (int group = 0; group < system.num_cpu_types; ++group) {
-			cpu_id_t cpu_id = system.cpu_types[group];
-			switch(cpu_id.purpose) {
-			case PURPOSE_GENERAL:
-			case PURPOSE_PERFORMANCE:
-				availableProceesorAffinityMask |= *(uint64_t*)&cpu_id.affinity_mask;
-				numLogicalCores += cpu_id.num_logical_cpus;
-				numPhysicalCores += cpu_id.num_cores;
-				LOG("[CpuId] found %d cores and %d logical cpus (mask: 0x%x) of type %s"
-						, cpu_id.num_cores
-						, cpu_id.num_logical_cpus
-						, *(int*)&cpu_id.affinity_mask
-						, cpu_purpose_str(cpu_id.purpose));
-				LOG("[CpuId] setting logical cpu affinity mask to 0x%x", (int)availableProceesorAffinityMask);
-			// ignore case PURPOSE_EFFICIENCY:
-			}
-		}
+		smtDetected = !!( processorMasks.hyperThreadLowMask | processorMasks.hyperThreadHighMask );
 	}
+	std::string CPUID::GetCPUBrandString() {
+        // Check if the CPU supports the extended CPUID leaves for the brand string
+        unsigned int eax = 0x80000000, ebx, ecx, edx;
+        ExecCPUID(&eax, &ebx, &ecx, &edx);
+        if (eax < 0x80000004) {
+            return "Unknown CPU";
+        }
 
-	void CPUID::SetDefault()
-	{
-		numLogicalCores = spring::thread::hardware_concurrency();
-		numPhysicalCores = numLogicalCores >> 1; //In 2022 HyperThreading is likely more common rather than not
-		availableProceesorAffinityMask = 1;
-		totalNumPackages = 1;
+        // Buffer to hold the 48-byte brand string
+        char brand[49] = {0};
+        unsigned int regs[REG_CNT];
 
-		// affinity mask is a uint64_t, but spring uses uint32_t
-		assert(numLogicalCores <= MAX_PROCESSORS);
+        // Query leaves 0x80000002, 0x80000003, and 0x80000004
+        for (int i = 0; i < 3; ++i) {
+            regs[REG_EAX] = 0x80000002 + i;
+            regs[REG_ECX] = 0; // Subleaf is 0
+            ExecCPUID(&regs[REG_EAX], &regs[REG_EBX], &regs[REG_ECX], &regs[REG_EDX]);
+            std::memcpy(&brand[i * 16], regs, 16);
+        }
 
-		static_assert(sizeof(affinityMaskOfCores   ) == (MAX_PROCESSORS * sizeof(affinityMaskOfCores   [0])), "");
-		static_assert(sizeof(affinityMaskOfPackages) == (MAX_PROCESSORS * sizeof(affinityMaskOfPackages[0])), "");
-
-		memset(affinityMaskOfCores   , 0, sizeof(affinityMaskOfCores   ));
-		memset(affinityMaskOfPackages, 0, sizeof(affinityMaskOfPackages));
-		memset(processorApicIds      , 0, sizeof(processorApicIds      ));
-
-		for (int i = 0; i<numLogicalCores; ++i)
-			availableProceesorAffinityMask |= 1 << i;
-
-		// failed to determine CPU anatomy, just set affinity mask to (-1)
-		for (int i = 0; i < numLogicalCores; i++) {
-			affinityMaskOfCores[i] = affinityMaskOfPackages[i] = -1;
-		}
-	}
+        // Return the brand string as a std::string
+        return std::string(brand);
+    }
 
 }

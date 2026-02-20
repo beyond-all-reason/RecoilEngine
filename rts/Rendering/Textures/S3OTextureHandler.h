@@ -42,7 +42,7 @@ public:
 	void Reload();
 
 	void LoadTexture(S3DModel* model);
-	void PreloadTexture(S3DModel* model, bool invertAxis = false, bool invertAlpha = false);
+	void PreloadTexture(S3DModel* model, bool invertAxis, bool invertAlpha);
 
 public:
 	const S3OTexMat* GetTexture(unsigned int num) {

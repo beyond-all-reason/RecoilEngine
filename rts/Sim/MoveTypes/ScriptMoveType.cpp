@@ -3,8 +3,10 @@
 
 #include "ScriptMoveType.h"
 
+#include "Components/MoveTypesComponents.h"
 #include "Map/Ground.h"
 #include "Map/MapInfo.h"
+#include "Sim/Ecs/Registry.h"
 #include "Sim/Misc/Wind.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/Units/UnitDef.h"
@@ -12,6 +14,10 @@
 #include "System/EventHandler.h"
 #include "System/Matrix44f.h"
 #include "System/SpringMath.h"
+
+#include "System/Misc/TracyDefs.h"
+
+using namespace MoveTypes;
 
 CR_BIND_DERIVED(CScriptMoveType, AMoveType, (nullptr))
 CR_REG_METADATA(CScriptMoveType, (
@@ -48,24 +54,35 @@ CR_REG_METADATA(CScriptMoveType, (
 ))
 
 
-CScriptMoveType::CScriptMoveType(CUnit* owner): AMoveType(owner)
+CScriptMoveType::CScriptMoveType(CUnit* unit): AMoveType(unit)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// use the transformation matrix instead of heading
 	UseHeading(false);
+
+	// creg
+	if (unit == nullptr)
+		return;
+
+	Sim::registry.emplace_or_replace<GeneralMoveType>(owner->entityReference, owner->id);
 }
 
 
 CScriptMoveType::~CScriptMoveType()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// clean up if noBlocking was made true at
 	// some point during this script's lifetime
 	// and not reset
 	owner->UnBlock();
+
+	Sim::registry.remove<GeneralMoveType>(owner->entityReference);
 }
 
 
 void CScriptMoveType::CheckNotify()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (scriptNotify == HitNothing)
 		return;
 
@@ -80,6 +97,7 @@ void CScriptMoveType::CheckNotify()
 
 bool CScriptMoveType::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (useRotVel)
 		owner->SetDirVectorsEuler(rot += rotVel);
 
@@ -147,6 +165,7 @@ bool CScriptMoveType::Update()
 
 void CScriptMoveType::CheckLimits()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float3 pos = owner->pos;
 	float4 vel = owner->speed;
 
@@ -176,6 +195,7 @@ void CScriptMoveType::CheckLimits()
 
 void CScriptMoveType::SetPhysics(const float3& _pos, const float3& _vel, const float3& _rot)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	SetPosition(_pos);
 	SetVelocity(_vel);
 	SetRotation(_rot);
@@ -192,17 +212,20 @@ void CScriptMoveType::SetRotationVelocity(const float3& _rotVel) { useRotVel = (
 
 void CScriptMoveType::SetRotation(const float3& _rot)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	owner->SetDirVectorsEuler(rot = _rot);
 }
 
 void CScriptMoveType::SetHeading(short heading)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	owner->SetHeading(heading, trackSlope, false, 0.0f);
 }
 
 
 void CScriptMoveType::SetNoBlocking(bool state)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// if false, forces blocking-map updates
 	if ((noBlocking = state)) {
 		owner->UnBlock();

@@ -38,13 +38,8 @@ class DamageArray;
 class DynDamageArray;
 struct SolidObjectDef;
 struct UnitDef;
-struct UnitTrackStruct;
 struct UnitLoadParams;
 struct SLosInstance;
-
-namespace icon {
-	class CIconData;
-}
 
 // LOS state bits
 static constexpr uint8_t LOS_INLOS     = (1 << 0);  // the unit is currently in the los of the allyteam
@@ -77,7 +72,6 @@ public:
 	static void InitStatic();
 
 	void SanityCheck() const;
-	void PreUpdate() { preFramePos = pos; }
 
 	virtual void PreInit(const UnitLoadParams& params);
 	virtual void PostInit(const CUnit* builder);
@@ -101,26 +95,26 @@ public:
 	int GetBlockingMapID() const { return id; }
 
 	void ChangeLos(int losRad, int airRad);
+
+	void TurnIntoNanoframe();
+
 	// negative amount=reclaim, return= true -> build power was successfully applied
 	bool AddBuildPower(CUnit* builder, float amount);
 
 	virtual void Activate();
 	virtual void Deactivate();
 
-	void ForcedMove(const float3& newPos);
+	void ForcedMove(const float3& newPos) override;
 
 	void DeleteScript();
 	void EnableScriptMoveType();
 	void DisableScriptMoveType();
 
-	CMatrix44f GetTransformMatrix(bool synced = false, bool fullread = false) const final;
+	CMatrix44f GetTransformMatrix(bool synced = false, bool fullread = false) const override final;
 
 	void DependentDied(CObject* o);
 
 	bool AllowedReclaim(CUnit* builder) const;
-
-	void SetMetalStorage(float newStorage);
-	void SetEnergyStorage(float newStorage);
 
 	bool UseMetal(float metal);
 	void AddMetal(float metal, bool useIncomeMultiplier = true);
@@ -158,8 +152,6 @@ public:
 	float3 GetLuaErrorVector(int allyteam, bool fullRead) const { return (fullRead? ZeroVector: GetErrorVector(allyteam)); }
 	float3 GetLuaErrorPos(int allyteam, bool fullRead) const { return (midPos + GetLuaErrorVector(allyteam, fullRead)); }
 
-	float3 GetDrawDeltaPos(float dt) const { return ((pos - preFramePos) * dt); }
-
 	void UpdatePosErrorParams(bool updateError, bool updateDelta);
 
 	bool UsingScriptMoveType() const { return (prevMoveType != nullptr); }
@@ -194,7 +186,10 @@ public:
 	unsigned short CalcLosStatus(int allyTeam);
 	void UpdateLosStatus(int allyTeam);
 
+	void SetLeavesGhost(bool newLeavesGhost, bool leaveDeadGhost);
+
 	void UpdateWeapons();
+	void UpdateWeaponVectors();
 
 	void SlowUpdateWeapons();
 	void SlowUpdateKamikaze(bool scanForTargets);
@@ -239,9 +234,10 @@ public:
 
 public:
 	void KilledScriptFinished(int wreckLevel) { deathScriptFinished = true; delayedWreckLevel = wreckLevel; }
-	void ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, bool showDeathSequence = true);
-	virtual void KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, bool showDeathSequence = true);
+	void ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
+	virtual void KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
 	virtual void IncomingMissile(CMissileProjectile* missile);
+	CFeature* CreateWreck(int wreckLevel, int smokeTime);
 
 	void TempHoldFire(int cmdID);
 	void SetHoldFire(bool b) { onTempHoldFire = b; }
@@ -249,7 +245,6 @@ public:
 	// start this unit in free fall from parent unit
 	void Drop(const float3& parentPos, const float3& parentDir, CUnit* parent);
 	void PostLoad();
-
 protected:
 	void ChangeTeamReset();
 	void UpdateResources();
@@ -269,25 +264,12 @@ public: // unsynced methods
 			DelDrawFlag(DrawFlags::SO_DRICON_FLAG);
 	}
 public:
-	static void  SetEmpDeclineRate(float value) { empDeclineRate = value; }
-	static void  SetExpMultiplier(float value) { expMultiplier = value; }
-	static void  SetExpPowerScale(float value) { expPowerScale = value; }
-	static void  SetExpHealthScale(float value) { expHealthScale = value; }
-	static void  SetExpReloadScale(float value) { expReloadScale = value; }
-	static void  SetExpGrade(float value) { expGrade = value; }
-
-	static float GetExpMultiplier() { return expMultiplier; }
-	static float GetExpPowerScale() { return expPowerScale; }
-	static float GetExpHealthScale() { return expHealthScale; }
-	static float GetExpReloadScale() { return expReloadScale; }
-	static float GetExpGrade() { return expGrade; }
-
-	static float ExperienceScale(const float limExperience, const float experienceWeight) {
-		// limExperience ranges from 0.0 to 0.9999..., experienceWeight
-		// should be in [0, 1] and have no effect on accuracy when zero
-		return (1.0f - (limExperience * experienceWeight));
+	static float ExperienceScale(float limExperience, float experienceWeight) {
+		// limExperience ranges from 0.0 to 0.9999...
+		return std::max(0.0f, 1.0f - (limExperience * experienceWeight));
 	}
-
+private:
+	void UpdateRenderParams();
 public:
 	const UnitDef* unitDef = nullptr;
 
@@ -347,12 +329,6 @@ public:
 	// incoming projectiles for which flares can cause retargeting
 	std::array<CMissileProjectile*, /*MAX_INCOMING_MISSILES*/ 8> incomingMissiles{{nullptr}};
 
-
-	// position at start of current simframe; updated by ForcedMove
-	// used as interpolation reference for drawpos since a unit can
-	// move along vectors other than its velocity
-	float3 preFramePos;
-
 	float3 lastMuzzleFlameDir = UpVector;
 	// units take less damage when attacked from this dir (encourage flanking fire)
 	float3 flankingBonusDir = RgtVector;
@@ -364,7 +340,7 @@ public:
 
 	int featureDefID = -1; // FeatureDef id of the wreck we spawn on death
 
-	// indicate the relative power of the unit, used for experience calulations etc
+	// indicate the relative power of the unit, used for experience calculations etc
 	float power = 100.0f;
 
 	// 0.0-1.0
@@ -406,7 +382,6 @@ public:
 
 	// how long the unit has been inactive
 	unsigned int restTime = 0;
-	unsigned int outOfMapTime = 0;
 
 	float reloadSpeed = 1.0f;
 	float maxRange = 0.0f;
@@ -460,7 +435,7 @@ public:
 	// the amount of storage the unit contributes to the team
 	SResourcePack storage;
 
-	// per unit metal storage (gets filled on reclaim and needs then to be unloaded at some storage building -> 2nd part is lua's job)
+	// per unit storage (gets filled on reclaim and needs then to be unloaded at some storage building -> 2nd part is lua's job)
 	SResourcePack harvestStorage;
 	SResourcePack harvested;
 
@@ -552,30 +527,39 @@ public:
 	bool isCloaked = false;
 	// true if the unit currently wants to be cloaked
 	bool wantCloak = false;
-
+	// true if the unit leaves static ghosts
+	bool leavesGhost = false;
 
 	// unsynced vars
 	bool noMinimap = false;
 	bool leaveTracks = false;
 
 	bool isSelected = false;
+	// if true, unit can not be added to groups by a player (UNSYNCED)
+	bool noGroup = false;
 
 	float iconRadius = 0.0f;
 
-	UnitTrackStruct* myTrack = nullptr;
-	icon::CIconData* myIcon = nullptr;
+	mutable std::string definedIconName;
+	mutable size_t currentIconIndex = size_t(-1); // icon::INVALID_ICON_INDEX;
 
 	bool drawIcon = true;
 private:
 	// if we are stunned by a weapon or for other reason, access via IsStunned/SetStunned(bool)
 	bool stunned = false;
-
-	static float empDeclineRate;
-	static float expMultiplier;
-	static float expPowerScale;
-	static float expHealthScale;
-	static float expReloadScale;
-	static float expGrade;
 };
+
+struct GlobalUnitParams {
+	CR_DECLARE_STRUCT(GlobalUnitParams)
+
+	float empDeclineRate = 0.0f;
+	float expMultiplier  = 0.0f;
+	float expPowerScale  = 0.0f;
+	float expHealthScale = 0.0f;
+	float expReloadScale = 0.0f;
+	float expGrade       = 0.0f;
+};
+
+extern GlobalUnitParams globalUnitParams;
 
 #endif // UNIT_H

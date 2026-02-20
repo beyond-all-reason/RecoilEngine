@@ -38,7 +38,7 @@ public:
 	void Update();
 
 	bool GroupCommand(int num);
-	bool GroupCommand(int num, const std::string& cmd, bool& error);
+	bool GroupCommand(int num, const std::string& cmd, const std::vector<std::string>& extraArgs, bool& error);
 
 	// NOTE: only invoked by AI's, but can invalidate pointers
 	CGroup* CreateNewGroup();
@@ -71,7 +71,7 @@ public:
 		if (g == nullptr)
 			return false;
 
-		unitGroups.insert(unitID, g->id);
+		unitGroups.emplace(unitID, g->id);
 		return true;
 	}
 

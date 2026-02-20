@@ -12,7 +12,7 @@
 #ifdef __APPLE__
 #include <libkern/OSAtomic.h> // OSAtomicIncrement64
 #endif
-
+#include "CpuTopology.h"
 #include "System/Platform/Win/win32.h"
 #include "System/Threading/SpringThreading.h"
 
@@ -103,6 +103,7 @@ namespace Threading {
 
 	inline bool NativeThreadIdsEqual(const NativeThreadId thID1, const NativeThreadId thID2);
 
+	cpu_topology::ThreadPinPolicy GetChosenThreadPinPolicy();
 
 	/**
 	 * Sets the affinity of the current thread
@@ -122,7 +123,13 @@ namespace Threading {
 	 */
 	int GetPhysicalCpuCores(); /// physical cores only (excluding hyperthreading)
 	int GetLogicalCpuCores();  /// physical + hyperthreading
+	int GetPerformanceCpuCores(); /// performance physical cores only (excluding hyperthreading or efficiency cores)
 	bool HasHyperThreading();
+	std::string GetCPUBrand();
+
+	uint32_t GetSystemAffinityMask(int forThreadCount = std::numeric_limits<int>::max());
+	uint32_t GetPreferredMainThreadMask(uint32_t affinityMask);
+	uint32_t GetOptimalThreadCount();
 
 	/**
 	 * Inform the OS kernel that we are a cpu-intensive task
@@ -203,7 +210,7 @@ namespace Threading {
 namespace Threading {
 	bool NativeThreadIdsEqual(const NativeThreadId thID1, const NativeThreadId thID2)
 	{
-	#ifdef __APPLE__
+	#if defined(__APPLE__) || defined(__OpenBSD__)
 		// quote from the pthread_equal manpage:
 		// Implementations may choose to define a thread ID as a structure.
 		// This allows additional flexibility and robustness over using an int.

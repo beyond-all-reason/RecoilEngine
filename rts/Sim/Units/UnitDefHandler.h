@@ -58,6 +58,8 @@ public:
 	const spring::unordered_map<std::string, int>& GetUnitDefIDs() const { return unitDefIDs; }
 	const spring::unordered_map<int, std::vector<int> >& GetDecoyDefIDs() const { return decoyMap; }
 
+	void SanitizeUnitDefs();
+
 protected:
 	void UnitDefLoadSounds(UnitDef*, const LuaTable&);
 	void LoadSounds(const LuaTable&, GuiSoundSet&, const std::string& soundName);

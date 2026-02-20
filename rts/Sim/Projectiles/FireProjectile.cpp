@@ -17,6 +17,8 @@
 #include "Sim/Units/Unit.h"
 #include "System/creg/STL_Deque.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CFireProjectile, CProjectile, )
 CR_BIND(CFireProjectile::SubParticle, )
 
@@ -71,6 +73,7 @@ CFireProjectile::CFireProjectile(
 
 void CFireProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if ((--ttl) > 0) {
 		const float partSat = (gs->frameNum & 1) ? 1.0f : 0.8f;
 		if (projectileHandler.GetParticleSaturation() < partSat) {
@@ -141,11 +144,12 @@ void CFireProjectile::Update()
 
 void CFireProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	uint8_t col[4];
 	col[3] = 1;
 	uint8_t col2[4];
-	size_t sz2 = subParticles2.size();
-	size_t sz = subParticles.size();
+
+	const auto* et = projectileDrawer->explotex;
 
 	for (const SubParticle& pi: subParticles2) {
 		const float  age = pi.age + ageSpeed * globalRendering->timeOffset;
@@ -164,15 +168,17 @@ void CFireProjectile::Draw()
 		col[1] = (uint8_t) ((1 - age) * 255);
 		col[2] = (uint8_t) ((1 - age) * 255);
 
-		AddEffectsQuad(
-			{ interPos - dir1 - dir2, projectileDrawer->explotex->xstart, projectileDrawer->explotex->ystart, col },
-			{ interPos + dir1 - dir2, projectileDrawer->explotex->xend,   projectileDrawer->explotex->ystart, col },
-			{ interPos + dir1 + dir2, projectileDrawer->explotex->xend,   projectileDrawer->explotex->yend,   col },
-			{ interPos - dir1 + dir2, projectileDrawer->explotex->xstart, projectileDrawer->explotex->yend,   col }
+		AddEffectsQuad<0>(
+			et->pageNum,
+			{ interPos - dir1 - dir2, et->xstart, et->ystart, col },
+			{ interPos + dir1 - dir2, et->xend,   et->ystart, col },
+			{ interPos + dir1 + dir2, et->xend,   et->yend,   col },
+			{ interPos - dir1 + dir2, et->xstart, et->yend,   col }
 		);
 	}
+
 	for (const SubParticle& pi: subParticles) {
-		const AtlasedTexture* at = projectileDrawer->GetSmokeTexture(pi.smokeType);
+		const auto* at = projectileDrawer->GetSmokeTexture(pi.smokeType);
 
 		const float  age = pi.age + ageSpeed * globalRendering->timeOffset;
 		const float size = pi.maxSize * fastmath::apxsqrt(age);
@@ -192,11 +198,12 @@ void CFireProjectile::Draw()
 			col[2] = (uint8_t) ((1 - age * 1.3f) * 255);
 			col[3] = 1;
 
-			AddEffectsQuad(
-				{ interPos - dir1 - dir2, projectileDrawer->explotex->xstart, projectileDrawer->explotex->ystart, col },
-				{ interPos + dir1 - dir2, projectileDrawer->explotex->xend,   projectileDrawer->explotex->ystart, col },
-				{ interPos + dir1 + dir2, projectileDrawer->explotex->xend,   projectileDrawer->explotex->yend,   col },
-				{ interPos - dir1 + dir2, projectileDrawer->explotex->xstart, projectileDrawer->explotex->yend,   col }
+			AddEffectsQuad<0>(
+				et->pageNum,
+				{ interPos - dir1 - dir2, et->xstart, et->ystart, col },
+				{ interPos + dir1 - dir2, et->xend,   et->ystart, col },
+				{ interPos + dir1 + dir2, et->xend,   et->yend,   col },
+				{ interPos - dir1 + dir2, et->xstart, et->yend,   col }
 			);
 		}
 
@@ -211,7 +218,8 @@ void CFireProjectile::Draw()
 		col2[2] = (uint8_t) (c * 0.6f);
 		col2[3] = c;
 
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
+			at->pageNum,
 			{ interPos - dir1 - dir2, at->xstart, at->ystart, col2 },
 			{ interPos + dir1 - dir2, at->xend,   at->ystart, col2 },
 			{ interPos + dir1 + dir2, at->xend,   at->yend,   col2 },
@@ -223,6 +231,7 @@ void CFireProjectile::Draw()
 
 int CFireProjectile::GetProjectilesCount() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return subParticles2.size() + subParticles.size() * 2;
 }
 

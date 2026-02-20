@@ -87,9 +87,9 @@ public:
 		float  cloudDensity;
 		float  fogStart;
 		float  fogEnd;
+		float4 skyAxisAngle;
 		float4 fogColor;
 		float3 skyColor;
-		float3 skyDir;
 		float3 sunColor;
 		float3 cloudColor;
 		float  minWind;
@@ -219,6 +219,8 @@ public:
 			unsigned int numSpeedModBins;
 			float        minSpeedModVal;
 			float        maxSpeedModVal;
+			unsigned int maxNodesSearched;
+			float        maxRelativeNodesSearched;
 		} qtpfs_constants;
 	} pfs;
 

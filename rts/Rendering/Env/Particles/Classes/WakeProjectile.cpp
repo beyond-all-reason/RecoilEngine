@@ -11,6 +11,8 @@
 #include "Rendering/Textures/TextureAtlas.h"
 #include "System/SpringMath.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CWakeProjectile, CProjectile, )
 
 CR_REG_METADATA(CWakeProjectile,(
@@ -57,6 +59,7 @@ CWakeProjectile::CWakeProjectile(
 
 void CWakeProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	pos += speed;
 	rotation += rotSpeed;
 	alpha -= alphaFalloff;
@@ -82,6 +85,7 @@ void CWakeProjectile::Update()
 
 void CWakeProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	unsigned char col[4];
 	col[0] = (unsigned char) (255 * alpha);
 	col[1] = (unsigned char) (255 * alpha);
@@ -94,14 +98,14 @@ void CWakeProjectile::Draw()
 	const float3 dir1 = float3(std::cos(interRot), 0, std::sin(interRot)) * interSize;
 	const float3 dir2 = dir1.cross(UpVector);
 
-	#define wt projectileDrawer->waketex
-	AddEffectsQuad(
+	const auto* wt = projectileDrawer->waketex;
+	AddEffectsQuad<0>(
+		wt->pageNum,
 		{ drawPos + dir1 + dir2, wt->xstart, wt->ystart, col },
 		{ drawPos - dir1 + dir2, wt->xend,   wt->ystart, col },
 		{ drawPos - dir1 - dir2, wt->xend,   wt->yend,   col },
 		{ drawPos + dir1 - dir2, wt->xstart, wt->yend,   col }
 	);
-	#undef wt
 }
 
 int CWakeProjectile::GetProjectilesCount() const

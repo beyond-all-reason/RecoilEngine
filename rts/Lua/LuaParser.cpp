@@ -14,9 +14,11 @@
 
 #include "LuaConstGame.h"
 #include "LuaConstEngine.h"
+#include "LuaEncoding.h"
 #include "LuaIO.h"
 #include "LuaVFS.h"
 #include "LuaUtils.h"
+#include "LuaMathExtra.h"
 
 #include "Sim/Misc/GlobalSynced.h" // gsRNG
 #include "System/Log/ILog.h"
@@ -27,7 +29,7 @@
 #include "System/ScopedFPUSettings.h"
 #include "System/StringUtil.h"
 
-#include <tracy/Tracy.hpp>
+#include "System/Misc/TracyDefs.h"
 #include <tracy/TracyLua.hpp>
 
 LuaParser* GetLuaParser(lua_State* L) {
@@ -141,6 +143,7 @@ void LuaParser::SetupEnv(bool isSyncedCtxt, bool isDefsParser)
 
 	{
 		lua_getglobal(L, "math");
+		LuaMathExtra::PushEntries(L);
 		if (isSyncedCtxt) {
 			LuaPushNamedCFunc(L, "random", Random);
 			LuaPushNamedCFunc(L, "randomseed", RandomSeed);
@@ -157,6 +160,10 @@ void LuaParser::SetupEnv(bool isSyncedCtxt, bool isDefsParser)
 	AddFunc("Echo", LuaUtils::Echo);
 	AddFunc("Log", LuaUtils::Log);
 	AddFunc("TimeCheck", TimeCheck);
+	EndTable();
+
+	GetTable("Encoding");
+	LuaEncoding::PushEntries(L);
 	EndTable();
 
 	GetTable("Script");
@@ -236,7 +243,7 @@ bool LuaParser::Execute()
 	char errorBuf[4096] = {0};
 	int errorNum = 0;
 
-	tracy::LuaRemove(code.data());
+	LuaUtils::TracyRemoveAlsoExtras(code.data());
 	if ((errorNum = luaL_loadbuffer(L, code.c_str(), code.size(), codeLabel.c_str())) != 0) {
 		SNPRINTF(errorBuf, sizeof(errorBuf), "[loadbuf] error %d (\"%s\") in %s", errorNum, lua_tostring(L, -1), codeLabel.c_str());
 		LUA_CLOSE(&L);
@@ -427,6 +434,12 @@ void LuaParser::AddString(const std::string& key, const std::string& value)
 	lua_pushsstring(L, key);
 	lua_pushsstring(L, value);
 	PushParam();
+}
+
+void LuaParser::PushFunc(bool(*func)(lua_State*))
+{
+	assert(initDepth > 0);
+	func(L);
 }
 
 
@@ -643,7 +656,7 @@ int LuaParser::Include(lua_State* L)
  		lua_error(L);
 	}
 
-	tracy::LuaRemove(code.data());
+	LuaUtils::TracyRemoveAlsoExtras(code.data());
 	int error = luaL_loadbuffer(L, code.c_str(), code.size(), filename.c_str());
 	if (error != 0) {
 		char buf[1024];
@@ -1075,7 +1088,7 @@ bool LuaTable::PushValue(const std::string& mixedKey) const
 /******************************************************************************/
 /******************************************************************************/
 //
-//  Key existance testing
+//  Key existence testing
 //
 
 bool LuaTable::KeyExists(int key) const

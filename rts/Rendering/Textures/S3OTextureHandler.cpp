@@ -8,7 +8,7 @@
 #include "System/FileSystem/SimpleParser.h"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Units/UnitDrawer.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModel.hpp"
 #include "Rendering/Models/ModelsLock.h"
 #include "Rendering/Textures/Bitmap.h"
 #include "System/StringUtil.h"
@@ -20,6 +20,8 @@
 #include <cctype>
 #include <set>
 #include <sstream>
+
+#include "System/Misc/TracyDefs.h"
 
 #define LOG_SECTION_TEXTURE "Texture"
 LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_TEXTURE)
@@ -43,6 +45,7 @@ CS3OTextureHandler textureHandlerS3O;
 
 void CS3OTextureHandler::Init()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	textures.reserve(128);
 
 	// dummies
@@ -52,6 +55,7 @@ void CS3OTextureHandler::Init()
 
 void CS3OTextureHandler::Kill()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (S3OTexMat& texture: textures) {
 		glDeleteTextures(1, &(texture.tex1));
 		glDeleteTextures(1, &(texture.tex2));
@@ -65,6 +69,7 @@ void CS3OTextureHandler::Kill()
 
 void CS3OTextureHandler::Reload()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto lock = CModelsLock::GetScopedLock(); //needed?
 
 	for (auto& [texName, texData] : textureCache) {
@@ -81,7 +86,7 @@ void CS3OTextureHandler::Reload()
 			if (texData.invertAxis)
 				bitmap.ReverseYAxis();
 
-			uint32_t newTexId = bitmap.CreateTexture(0.0f, 0.0f, true, texData.texID);
+			uint32_t newTexId = bitmap.CreateMipMapTexture(0.0f, 0.0f, 0, texData.texID);
 			assert(newTexId == texData.texID);
 		}
 	}
@@ -90,6 +95,7 @@ void CS3OTextureHandler::Reload()
 
 void CS3OTextureHandler::PreloadTexture(S3DModel* model, bool invertAxis, bool invertAlpha)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto lock = CModelsLock::GetScopedLock();
 
 	LoadAndCacheTexture(model, 0, invertAxis, invertAlpha, true);
@@ -99,6 +105,7 @@ void CS3OTextureHandler::PreloadTexture(S3DModel* model, bool invertAxis, bool i
 
 void CS3OTextureHandler::LoadTexture(S3DModel* model)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	auto lock = CModelsLock::GetScopedLock();
 
 	const unsigned int tex1ID = LoadAndCacheTexture(model, 0, false, false, false);
@@ -122,6 +129,7 @@ unsigned int CS3OTextureHandler::LoadAndCacheTexture(
 	bool invertAlpha,
 	bool preloadCall
 ) {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CBitmap* bitmap = nullptr;
 
 	const auto& textureName = model->texs[texNum];
@@ -165,7 +173,9 @@ unsigned int CS3OTextureHandler::LoadAndCacheTexture(
 	}
 
 	const unsigned int texID = preloadCall ? 0 : bitmap->CreateMipMapTexture();
+#ifndef HEADLESS
 	assert(preloadCall || texID > 0);
+#endif
 
 	if (textureIt != textureCache.end() && texID > 0) {
 		assert(!preloadCall);

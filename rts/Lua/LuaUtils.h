@@ -4,8 +4,6 @@
 #define LUA_UTILS_H
 
 #include <string>
-#include <vector>
-#include <unordered_map>
 
 #include "lib/fmt/printf.h"
 
@@ -37,6 +35,8 @@
 
 struct SolidObjectDef;
 struct SCommandDescription;
+static constexpr int LUA_TABLE_VALUE_INDEX = -1;
+static constexpr int LUA_TABLE_KEY_INDEX = -2;
 
 namespace Json{
 	class Value;
@@ -79,21 +79,6 @@ class LuaUtils {
 		};
 
 	public:
-		struct DataDump {
-			int type;
-			std::string str;
-			float num;
-			bool bol;
-			std::vector<std::pair<DataDump, DataDump> > table;
-		};
-		struct ShallowDataDump {
-			int type;
-			union {
-				std::string *str;
-				float num;
-				bool bol;
-			} data;
-		};
 		// 0 and positive numbers are teams (not allyTeams)
 		enum UnitAllegiance {
 			AllUnits = -1,
@@ -102,11 +87,22 @@ class LuaUtils {
 			EnemyUnits = -4
 		};
 
-	public:
+// The functions below are not used anymore for anything in the engine.
+// There are left behind here disabled for archival purposes.
+#if 0
+		struct DataDump {
+			int type;
+			std::string str;
+			float num;
+			bool bol;
+			std::vector<std::pair<DataDump, DataDump> > table;
+		};
+
 		// Backups lua data into a c++ vector and restores it from it
 		static int exportedDataSize; //< performance stat
 		static int Backup(std::vector<DataDump> &backup, lua_State* src, int count);
 		static int Restore(const std::vector<DataDump> &backup, lua_State* dst);
+#endif
 
 		// Copies lua data between 2 lua_States
 		static int CopyData(lua_State* dst, lua_State* src, int count);
@@ -172,6 +168,8 @@ class LuaUtils {
 		                            vector<float>& vec);
 		static int ParseStringVector(lua_State* L, int tableIndex,
 		                             vector<string>& vec);
+		static int ParseFloat4Vector(lua_State* L, int tableIndex,
+		                            vector<float4>& vec);
 
 		static void PushStringVector(lua_State* L, const vector<string>& vec);
 
@@ -208,6 +206,8 @@ class LuaUtils {
 		static const TObj* IdToObject(int id, const char* func = nullptr);
 		template<typename TObj>
 		static const TObj* SolIdToObject(int id, const char* func = nullptr);
+
+		static void TracyRemoveAlsoExtras(char *script);
 };
 
 
@@ -222,9 +222,9 @@ static void PushObjectDefProxyTable(
 	const ObjectDefType* def
 ) {
 	lua_pushnumber(L, def->id);
-	lua_newtable(L); { // the proxy table
+	lua_createtable(L, 0, iterFuncsSize); { // the proxy table
 
-		lua_newtable(L); // the metatable
+		lua_createtable(L, 0, indxFuncsSize); // the metatable
 
 		for (size_t n = 0; n < indxFuncsSize; n++) {
 			indxOpers[n].Push(L);
@@ -271,6 +271,13 @@ static inline void LuaPushNamedNumber(lua_State* L, const string& key, lua_Numbe
 	lua_rawset(L, -3);
 }
 
+
+static inline void LuaPushNamedChar(lua_State* L, char const *name, char value)
+{
+	lua_pushstring(L, name);
+	lua_pushlstring(L, &value, 1);
+	lua_rawset(L, -3);
+}
 
 static inline void LuaPushNamedString(lua_State* L, const string& key, const string& value)
 {

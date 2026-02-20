@@ -1,0 +1,48 @@
+{{ define "main" }}
+	<div class='hx-mx-auto hx-flex {{ partial "utils/page-width" . }}'>
+	{{ partial "sidebar.html" (dict "context" .) }}
+	{{ partial "toc.html" . }}
+
+	<article class="hx-w-full hx-break-words hx-flex hx-min-h-[calc(100vh-var(--navbar-height))] hx-min-w-0 hx-justify-center hx-pb-8 hx-pr-[calc(env(safe-area-inset-right)-1.5rem)]">
+		<main class="hx-w-full hx-min-w-0 hx-max-w-6xl hx-px-6 hx-pt-4 md:hx-px-12">
+			<div class="content">
+				{{ if .Title }}<h1>{{ .Title }}</h1>{{ end }}
+
+				{{ $data := index .Site.Data .Params.context }}
+				{{ range $data }}
+					<h2>
+						{{ .command }}<span class="hx-absolute -hx-mt-20" id="{{ .command }}"></span>
+
+							<a href="#{{ .command }}" class="subheading-anchor" aria-label="Permalink for this section"></a>
+					</h2>
+					<p>{{ .description }}</p>
+
+					{{ if .cheatRequired }}
+						<b>Cheats are required for this command.</b>
+					{{ else }}
+						<p>Cheats are <b>not</b> required for this command.</p>
+					{{ end }}
+
+					{{ if .arguments }}
+						<h4>Arguments</h4>
+						<dl>
+						{{ range $argname, $argdesc := .arguments }}
+							{{ if $argname }}
+								<dt><code>{{ $argname }}</code></dt>
+								<dd>{{ $argdesc }}</dd>
+							{{ else }}
+								<dt>No arguments provided</dt>
+								<dd>{{ $argdesc }}</dd>
+							{{ end }}
+						{{ end }}
+						</dl>
+					{{ end }}
+				{{ end }}
+			</div>
+		{{ partial "components/last-updated.html" . }}
+		{{ partial "components/pager.html" . }}
+		{{ partial "components/comments.html" . }}
+		</main>
+	</article>
+	</div>
+{{ end }}

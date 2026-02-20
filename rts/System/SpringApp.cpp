@@ -1,7 +1,5 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "System/Input/InputHandler.h"
-
 #include <functional>
 #include <iostream>
 #include <chrono>
@@ -49,6 +47,7 @@
 #include "Net/GameServer.h"
 #include "Net/Protocol/NetProtocol.h" // clientNet
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/Fonts/FontHandler.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/GL/FBO.h"
 #include "Rendering/Models/ModelsMemStorage.h"
@@ -61,7 +60,6 @@
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"
-#include "System/bitops.h"
 #include "System/ScopedResource.h"
 #include "System/EventHandler.h"
 #include "System/Exceptions.h"
@@ -83,6 +81,7 @@
 #include "System/FileSystem/FileHandler.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/FileSystem/FileSystemInitializer.h"
+#include "System/FileSystem/Misc.hpp"
 #include "System/Input/KeyInput.h"
 #include "System/Input/MouseInput.h"
 #include "System/LoadSave/LoadSaveHandler.h"
@@ -91,6 +90,7 @@
 #include "System/Log/DefaultFilter.h"
 #include "System/LogOutput.h"
 #include "System/Platform/errorhandler.h"
+#include "System/Platform/ConsoleInit.hpp"
 #include "System/Platform/CrashHandler.h"
 #include "System/Platform/Threading.h"
 #include "System/Platform/Watchdog.h"
@@ -109,6 +109,11 @@ CONFIG(unsigned, TextureMemPoolSize).defaultValue(512).minimumValue(0).descripti
 CONFIG(bool, UseLuaMemPools).defaultValue(true).description("Whether Lua VM memory allocations are made from pools.");
 CONFIG(bool, UseHighResTimer).defaultValue(false).description("On Windows, sets whether Spring will use low- or high-resolution timer functions for tasks like graphical interpolation between game frames.");
 CONFIG(bool, UseFontConfigLib).defaultValue(true).description("Whether the system fontconfig library (if present and enabled at compile-time) should be used for handling fonts.");
+CONFIG(bool, UseFontConfigSystemFonts).defaultValue(true).description("Whether the system fonts will be searched by fontconfig.");
+CONFIG(bool, FontConfigSearchAttributes).defaultValue(true).description("Whether the font characteristics will used to refine the search by fontconfig. Results in better glyph matches in some cases, but has a nontrivial performance cost.");
+CONFIG(bool, FontConfigApplySubstitutions).defaultValue(true).description("[EXPERIMENTAL] In case it's disabled FcConfigSubstitute is not getting called, this might break non-ASCII font rendering.");
+CONFIG(int, MaxFontTries).defaultValue(5).description("Represents the maximum number of attempts to search for a glyph replacement using the FontConfig library (lower = foreign glyphs may fail to render, higher = searching for foreign glyphs can lag the game).");
+CONFIG(int, MaxPinnedFonts).defaultValue(10).description("Maximum number of fonts to pin to cache. Increasing this will eventually use more memory, but can alleviate processing spikes when rendering new glyphs.");
 
 CONFIG(std::string, name).defaultValue(UnnamedPlayerName).description("Sets your name in the game. Since this is overridden by lobbies with your lobby username when playing, it usually only comes up when viewing replays or starting the engine directly for testing purposes.");
 CONFIG(std::string, DefaultStartScript).defaultValue("").description("filename of script.txt to use when no command line parameters are specified.");
@@ -145,6 +150,13 @@ DEFINE_string   (map,                                      "",    "Specify the m
 DEFINE_string   (menu,                                     "",    "Specify a lua menu archive to be used by spring");
 DEFINE_string   (name,                                     "",    "Set your player name");
 DEFINE_bool     (oldmenu,                                  false, "Start the old menu");
+DEFINE_string_EX(calc_checksum,      "calc-checksum",      "",    "Calculate named archive checksum and write to cache, cant run in parallel");
+
+/* Startscript sets the listening port number. Replays use the entire startscript, including the port number.
+ * So normally if two games were originally played on the same port number, you can't watch their replays in
+ * parallel because they both try to open the same port. This makes automated replay parsing difficult when
+ * the same port number is heavily reused across many replays. Forcing onlyLocal solves this. */
+DEFINE_bool_EX  (onlyLocal,              "only-local",     false, "Force OnlyLocal mode (no network listening sockets). Use for parallelized watching of multiplayer replays");
 
 
 
@@ -153,7 +165,7 @@ int spring::exitCode = spring::EXIT_CODE_SUCCESS;
 static unsigned int reloadCount = 0;
 static unsigned int killedCount = 0;
 
-
+static constexpr auto RECOIL_SDL_WINDOWEVENT_DISPLAY_CHANGED = 18;
 
 // initialize basic systems for command line help / output
 static void ConsolePrintInitialize(const std::string& configSource, bool safemode)
@@ -169,6 +181,7 @@ static void ConsolePrintInitialize(const std::string& configSource, bool safemod
 
 static void FlushExit()
 {
+	LOG_CLEANUP();
 	std::fflush(stdout);
 }
 
@@ -187,6 +200,7 @@ SpringApp::SpringApp(int argc, char** argv)
 	gflags::SetUsageMessage("Usage: " + std::string(argv[0]) + " [options] [path_to_script.txt or demo.sdfz]");
 	gflags::SetVersionString(SpringVersion::GetFull());
 	gflags::ParseCommandLineFlags(&argc, &argv, true);
+	Recoil::InitConsole();
 
 	// also initializes configHandler and logOutput
 	ParseCmdLine(argc, argv);
@@ -242,10 +256,12 @@ bool SpringApp::Init()
 	Watchdog::RegisterThread(WDT_MAIN, true);
 
 	// Create Window
-	if (!InitWindow(("Spring " + SpringVersion::GetSync()).c_str())) {
+	if (!InitWindow(("Recoil " + SpringVersion::GetFull()).c_str())) {
 		SDL_Quit();
 		return false;
 	}
+
+	Threading::SetThreadName("recoil-main"); // set default threadname for pstree
 
 	// Init OpenGL
 	globalRendering->PostInit();
@@ -264,17 +280,18 @@ bool SpringApp::Init()
 	if (!InitFileSystem())
 		return false;
 
-	// Multithreading & Affinity
-	Threading::SetThreadName("spring-main"); // set default threadname for pstree
+	// Affinity
 	Threading::SetThreadScheduler();
 
 	CInfoConsole::InitStatic();
 	CMouseHandler::InitStatic();
 
-	input.AddHandler(std::bind(&SpringApp::MainEventHandler, this, std::placeholders::_1));
+	inputToken = input.AddHandler([this](const SDL_Event& event) { return SpringApp::MainEventHandler(event); });
 
 	// Global structures
+	ENTER_SYNCED_CODE();
 	gs->Init();
+	LEAVE_SYNCED_CODE();
 	gu->Init();
 
 	// GUIs
@@ -300,7 +317,7 @@ bool SpringApp::Init()
 
 bool SpringApp::InitPlatformLibs()
 {
-#if !(defined(_WIN32) || defined(__APPLE__) || defined(HEADLESS))
+#if !(defined(_WIN32) || defined(__APPLE__) || defined(HEADLESS)) || defined(__OpenBSD__)
 	// MUST run before any other X11 call (including
 	// those by SDL) to make calls to X11 threadsafe
 	if (!XInitThreads()) {
@@ -315,7 +332,7 @@ bool SpringApp::InitPlatformLibs()
 		// suppress dialog box if gdb helpers aren't found
 		const UINT oldErrorMode = SetErrorMode(SEM_FAILCRITICALERRORS);
 
-		if (LoadLibrary("gdbmacros.dll"))
+		if (LoadLibrary(L"gdbmacros.dll"))
 			LOG_L(L_DEBUG, "[SpringApp::%s] QTCreator's gdbmacros.dll loaded", __func__);
 
 		SetErrorMode(oldErrorMode);
@@ -327,9 +344,11 @@ bool SpringApp::InitPlatformLibs()
 
 bool SpringApp::InitFonts()
 {
+	fontHandler.Init();
 	FtLibraryHandlerProxy::InitFtLibrary();
-	FtLibraryHandlerProxy::CheckGenFontConfigFast();
-	return CglFont::LoadConfigFonts() && FtLibraryHandlerProxy::CheckGenFontConfigFull(false);
+	FtLibraryHandlerProxy::InitFontconfig(false);
+	CFontTexture::InitFonts();
+	return CglFont::LoadConfigFonts();
 /*
 	using namespace std::chrono_literals;
 	auto future = std::async(std::launch::async, []() {
@@ -375,19 +394,11 @@ bool SpringApp::InitFileSystem()
 	// FileSystem is mostly self-contained, don't need locks
 	// (at this point neither the platform CWD nor data-dirs
 	// have been set yet by FSI, can only use absolute paths)
-	const std::string cwd = std::move(FileSystem::EnsurePathSepAtEnd(FileSystemAbstraction::GetCwd()));
-	const std::string ssd = std::move(FileSystem::EnsurePathSepAtEnd(configHandler->GetString("SplashScreenDir")));
-
-	std::vector<std::string> splashScreenFiles = dataDirsAccess.FindFiles(FileSystem::IsAbsolutePath(ssd)? ssd: cwd + ssd, "*.{png,jpg}", 0);
-
-	if (splashScreenFiles.empty()) {
-		auto logoPath = FileSystem::EnsurePathSepAtEnd(FileSystem::GetNormalizedPath(FileSystem::EnsurePathSepAtEnd(FileSystemAbstraction::GetSpringExecutableDir()) + "base"));
-		splashScreenFiles = dataDirsAccess.FindFiles(logoPath, "*.{png,jpg}", 0);
-	}
 
 	spring::thread fsInitThread(FileSystemInitializer::InitializeThr, &ret);
 
 	#ifndef HEADLESS
+	const auto splashScreenFiles = FileSystemMisc::GetSplashScreenFiles();
 	if (!splashScreenFiles.empty()) {
 		ShowSplashScreen(splashScreenFiles[ guRNG.NextInt(splashScreenFiles.size()) ], SpringVersion::GetFull(), [&]() { return (FileSystemInitializer::Initialized()); });
 	} else {
@@ -484,7 +495,7 @@ void SpringApp::ParseCmdLine(int argc, char* argv[])
 			spring_time::setstarttime(spring_time::gettime(true));
 		}
 		FtLibraryHandlerProxy::InitFtLibrary();
-		if (FtLibraryHandlerProxy::CheckGenFontConfigFull(true)) {
+		if (FtLibraryHandlerProxy::InitFontconfig(true)) {
 			printf("[FtLibraryHandler::GenFontConfig] is succesfull\n");
 			exit(spring::EXIT_CODE_SUCCESS);
 		}
@@ -544,8 +555,29 @@ void SpringApp::ParseCmdLine(int argc, char* argv[])
 		AILibraryManager::OutputSkirmishAIInfo();
 		exit(spring::EXIT_CODE_SUCCESS);
 	}
+	else if (!FLAGS_calc_checksum.empty()) {
+		ConsolePrintInitialize(FLAGS_config, FLAGS_safemode);
+		try {
+			FileSystemInitializer::InitializeTry();
+			archiveScanner->ResetNumFilesHashed();
+
+			const std::string archive = archiveScanner->ArchiveFromName(FLAGS_calc_checksum);
+			const auto cs = archiveScanner->GetArchiveCompleteChecksumBytes(archive);
+
+			sha512::hex_digest hexCs = { 0 };
+			sha512::dump_digest(cs, hexCs);
+
+			LOG("Archive \"%s\", checksum = \"%s\"", FLAGS_calc_checksum.c_str(), hexCs.data());
+			FileSystemInitializer::Cleanup();
+			exit(spring::EXIT_CODE_SUCCESS);
+		}
+		CATCH_SPRING_ERRORS
+		exit(spring::EXIT_CODE_CRASHED);
+	}
 
 	CTextureAtlas::SetDebug(FLAGS_textureatlas);
+
+	CGameSetup::forceOnlyLocal = FLAGS_onlyLocal;
 
 	// if this fails, configHandler remains null
 	// logOutput's init depends on configHandler
@@ -559,7 +591,8 @@ CGameController* SpringApp::LoadSaveFile(const std::string& saveFile)
 	clientSetup->isHost = true;
 
 	pregame = new CPreGame(clientSetup);
-	pregame->LoadSaveFile(saveFile);
+	pregame->AsyncExecute(&CPreGame::LoadSaveFile, saveFile);
+	//pregame->LoadSaveFile(saveFile);
 	return pregame;
 }
 
@@ -570,7 +603,8 @@ CGameController* SpringApp::LoadDemoFile(const std::string& demoFile)
 	clientSetup->myPlayerName += " (spec)";
 
 	pregame = new CPreGame(clientSetup);
-	pregame->LoadDemoFile(demoFile);
+	pregame->AsyncExecute(&CPreGame::LoadDemoFile, demoFile);
+	//pregame->LoadDemoFile(demoFile);
 	return pregame;
 }
 
@@ -600,8 +634,10 @@ CGameController* SpringApp::RunScript(const std::string& buf)
 
 	pregame = new CPreGame(clientSetup);
 
-	if (clientSetup->isHost)
-		pregame->LoadSetupScript(buf);
+	if (clientSetup->isHost) {
+		pregame->AsyncExecute(&CPreGame::LoadSetupScript, buf);
+		//pregame->LoadSetupScript(buf);
+	}
 
 	return pregame;
 }
@@ -793,9 +829,13 @@ void SpringApp::Reload(const std::string script)
 
 	LOG("[SpringApp::%s][10]", __func__);
 
-	matricesMemStorage.Reset();
+	transformsMemStorage.Reset();
 	gu->ResetState();
+
+	ENTER_SYNCED_CODE();
 	gs->ResetState();
+	LEAVE_SYNCED_CODE();
+
 	// will be reconstructed from given script
 	gameSetup->ResetState();
 
@@ -1163,6 +1203,12 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 					// and make sure to un-capture mouse
 					globalRendering->SetWindowInputGrabbing(false);
 				} break;
+				// replace with normal SDL_WINDOWEVENT_DISPLAY_CHANGED when our Linux SDL2 is updated
+				case RECOIL_SDL_WINDOWEVENT_DISPLAY_CHANGED: {
+					LOG("[SpringApp::%s][SDL_WINDOWEVENT_DISPLAY_CHANGED] to display %d\n", __func__, event.window.data1);
+					// try to reinit GL context
+					globalRendering->MakeCurrentContext(false);
+				} break;
 
 				case SDL_WINDOWEVENT_CLOSE: {
 					gu->globalQuit = true;
@@ -1171,6 +1217,10 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 		} break;
 		case SDL_AUDIODEVICEREMOVED: {
 			LOG("[SpringApp::%s][SDL_AUDIODEVICEREMOVED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.iscapture));
+			sound->DeviceChanged(event.adevice.which);
+		} break;
+		case SDL_AUDIODEVICEADDED: {
+			LOG("[SpringApp::%s][SDL_AUDIODEVICEADDED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.iscapture));
 			sound->DeviceChanged(event.adevice.which);
 		} break;
 		case SDL_QUIT: {

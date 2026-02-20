@@ -36,9 +36,15 @@ private:
 	float length;
 	float sizeGrowth;
 	float frontOffset;
+	float particleSpeed;
+	float particleSpeedSpread;
+	float airdrag;
+	float3 gravity;
 	int ttl;
 
 	float invttl;
+
+	bool fixedSideDir;
 };
 
 #endif // BITMAP_MUZZLE_FLAME_H

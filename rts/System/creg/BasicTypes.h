@@ -59,6 +59,24 @@ namespace creg {
 		}
 	};
 
+	class FakeType : public IType
+	{
+	public:
+		FakeType()
+			: IType(0)
+		{}
+		~FakeType() {}
+
+		void Serialize(ISerializer* s, void* instance)
+		{}
+		std::string GetName() const
+		{
+			return "fake";
+		}
+	protected:
+		const std::string name;
+	};
+
 	class BasicType : public IType
 	{
 	public:

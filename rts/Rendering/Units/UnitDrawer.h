@@ -23,7 +23,7 @@ class CUnitDrawer : public CModelDrawerBase<CUnitDrawerData, CUnitDrawer>
 {
 public:
 	static void InitStatic();
-	//static void KillStatic(bool reload); //use base
+	static void KillStatic(bool reload); //use base
 	//static void UpdateStatic(); //use base
 public:
 	// Interface with CUnitDrawerData
@@ -54,6 +54,7 @@ public:
 	static const std::vector<CUnit*>& GetUnsortedUnits() { return modelDrawerData->GetUnsortedObjects(); }
 
 	static void ClearPreviousDrawFlags() { modelDrawerData->ClearPreviousDrawFlags(); }
+	static void UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost) { modelDrawerData->UnitLeavesGhostChanged(unit, leaveDeadGhost); }
 public:
 	// DrawUnit*
 	virtual void DrawUnitNoTrans(const CUnit* unit, uint32_t preList, uint32_t postList, bool lodCall, bool noLuaCall) const = 0;
@@ -67,7 +68,7 @@ public:
 
 	// Icons Minimap
 	virtual void DrawUnitMiniMapIcons() const = 0;
-	        void UpdateUnitDefMiniMapIcons(const UnitDef* ud) { modelDrawerData->UpdateUnitDefMiniMapIcons(ud); }
+	        void UpdateUnitIconsByUnitDef(const UnitDef* ud) { modelDrawerData->UpdateUnitIconsByUnitDef(ud); }
 
 	// Icons Map
 	virtual void DrawUnitIcons() const = 0;
@@ -84,6 +85,9 @@ protected:
 	static bool ShouldDrawUnitShadow(CUnit* u);
 
 	virtual void DrawGhostedBuildings(int modelType) const = 0;
+protected:
+	inline static Shader::IProgramObject* icons2DShader = nullptr;
+	inline static Shader::IProgramObject* icons3DShader = nullptr;
 private:
 	inline static std::array<CUnitDrawer*, ModelDrawerTypes::MODEL_DRAWER_CNT> unitDrawers = {};
 public:
@@ -93,13 +97,6 @@ public:
 		BUILDSTAGE_FILL = 2,
 		BUILDSTAGE_NONE = 3,
 		BUILDSTAGE_CNT = 4,
-	};
-	enum ModelShaderProgram {
-		MODEL_SHADER_NOSHADOW_STANDARD = 0, ///< model shader (V+F) without self-shadowing
-		MODEL_SHADER_SHADOWED_STANDARD = 1, ///< model shader (V+F) with    self-shadowing
-		MODEL_SHADER_NOSHADOW_DEFERRED = 2, ///< deferred version of MODEL_SHADER_NOSHADOW (GLSL-only)
-		MODEL_SHADER_SHADOWED_DEFERRED = 3, ///< deferred version of MODEL_SHADER_SHADOW   (GLSL-only)
-		MODEL_SHADER_COUNT = 4,
 	};
 };
 
@@ -124,7 +121,10 @@ protected:
 	void Update() const override;
 };
 
-class CUnitDrawerLegacy : public CUnitDrawerBase {
+class CUnitDrawerGLSL : public CUnitDrawerBase {
+public:
+	CUnitDrawerGLSL();
+	~CUnitDrawerGLSL() override;
 public:
 	void Draw(bool drawReflection, bool drawRefraction = false) const override {
 		DrawImpl<true, LuaObjType::LUAOBJ_UNIT>(drawReflection, drawRefraction);
@@ -184,16 +184,14 @@ protected:
 	void PopIndividualOpaqueState(const CUnit* unit, bool deferredPass) const;
 	void PopIndividualOpaqueState(const S3DModel* model, int teamID, bool deferredPass) const;
 	void PopIndividualAlphaState(const S3DModel* model, int teamID, bool deferredPass) const;
-protected:
 
+	void DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, size_t iconIdx, const float iconScale, const float3& pos, const SColor& color) const;
+	float DrawUnitIcon(TypedRenderBuffer<VA_TYPE_TC3>& rb, size_t iconIdx, const float iconRadius, const float unitRadius, float3 pos, const SColor& color) const;
+	void DrawUnitIconScreen(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, size_t iconIdx, const float3& pos, SColor& color, float unitRadius, bool isIcon) const;
 };
 
-class CUnitDrawerFFP  final : public CUnitDrawerLegacy {};
-class CUnitDrawerARB  final : public CUnitDrawerLegacy {};
-class CUnitDrawerGLSL final : public CUnitDrawerLegacy {};
-
 //TODO remove CUnitDrawerLegacy inheritance
-class CUnitDrawerGL4 final : public CUnitDrawerLegacy {
+class CUnitDrawerGL4 final : public CUnitDrawerGLSL {
 public:
 	void Draw(bool drawReflection, bool drawRefraction = false) const override {
 		DrawImpl<false, LuaObjType::LUAOBJ_UNIT>(drawReflection, drawRefraction);

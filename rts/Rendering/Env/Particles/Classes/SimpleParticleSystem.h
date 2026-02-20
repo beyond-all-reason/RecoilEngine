@@ -74,22 +74,4 @@ protected:
 	 std::vector<Particle> particles;
 };
 
-/**
- * Same behaviour as CSimpleParticleSystem but spawns the particles
- * as independant objects
- */
-class CSphereParticleSpawner : public CSimpleParticleSystem
-{
-	CR_DECLARE_DERIVED(CSphereParticleSpawner)
-
-public:
-	CSphereParticleSpawner() {}
-
-	void Draw() override {}
-	void Update() override {}
-	void Init(const CUnit* owner, const float3& offset) override;
-
-	static bool GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo);
-};
-
 #endif // SIMPLE_PARTICLE_SYSTEM_H

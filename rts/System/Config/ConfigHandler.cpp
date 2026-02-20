@@ -10,9 +10,6 @@
 #include "System/UnorderedMap.hpp"
 #include "System/Threading/SpringThreading.h"
 
-#include <cstdio>
-#include <cstring>
-
 #include <stdexcept>
 
 CONFIG(bool, StoreDefaultSettings).defaultValue(false).description("springsettings.cfg will save the settings values, if they match the implicit defaults and were set by a user explicitly");
@@ -37,6 +34,7 @@ public:
 	std::string GetString(const std::string& key) const override;
 	bool IsSet(const std::string& key) const override;
 	bool IsReadOnly(const std::string& key) const override;
+	bool IsDeprecated(const std::string& key) const override;
 	void Delete(const std::string& key) override;
 	std::string GetConfigFile() const override;
 	const StringMap GetData() const override;
@@ -261,6 +259,16 @@ bool ConfigHandlerImpl::IsReadOnly(const std::string& key) const
 		return false;
 
 	return (meta->GetReadOnly().Get() || meta->GetDeprecated().Get());
+}
+
+bool ConfigHandlerImpl::IsDeprecated(const std::string& key) const
+{
+	const ConfigVariableMetaData* meta = ConfigVariable::GetMetaData(key);
+
+	if (meta == nullptr)
+		return false;
+
+	return meta->GetDeprecated().Get();
 }
 
 std::string ConfigHandlerImpl::GetString(const std::string& key) const

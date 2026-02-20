@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "CobThread.h"
+#include "CobDeferredCallin.h"
 #include "System/creg/creg_cond.h"
 #include "System/creg/STL_Queue.h"
 #include "System/creg/STL_Map.h"
@@ -33,7 +34,7 @@ public:
 		int wt;
 	};
 
-	struct CCobThreadComp: public spring::binary_function<const SleepingThread&, const SleepingThread&, bool> {
+	struct CCobThreadComp {
 	public:
 		bool operator() (const SleepingThread& a, const SleepingThread& b) const {
 			return a.wt > b.wt || (a.wt == b.wt && a.id > b.id);
@@ -48,13 +49,18 @@ public:
 		runningThreadIDs.reserve(512);
 		waitingThreadIDs.reserve(512);
 
+		sleepingThreadIDs = {};
+
+		curThread = nullptr;
+
+		currentTime = 0;
 		threadCounter = 0;
 	}
 	void Kill() {
-		// threadInstances is never explicitly iterated, so
-		// calling clear_unordered_map (between reloads) is
-		// unnecessary here
-		threadInstances.clear();
+		// threadInstances is never explicitly iterated in the actual code,
+		// but iterated during sync dumps, so clean it with clear_unordered_map
+		spring::clear_unordered_map(threadInstances);
+		spring::clear_unordered_map(deferredCallins);
 		tickAddedThreads.clear();
 
 		runningThreadIDs.clear();
@@ -81,7 +87,6 @@ public:
 	bool RemoveThread(int threadID);
 	int AddThread(CCobThread&& thread);
 	int GenThreadID() { return (threadCounter++); }
-	int GetCurrentTime() const { return currentTime; }
 
 	void QueueAddThread(CCobThread&& thread) { tickAddedThreads.emplace_back(std::move(thread)); }
 	void QueueRemoveThread(int threadID) { tickRemovedThreads.emplace_back(threadID); }
@@ -99,6 +104,9 @@ public:
 	const auto  GetCurrTime() const { return currentTime; }
 	const auto  GetThreadCounter() const { return threadCounter; }
 	const auto  GetCurrCounter() const { return threadCounter; }
+
+	void AddDeferredCallin(CCobDeferredCallin&& deferredCallin);
+	void RunDeferredCallins();
 private:
 	void TickThread(CCobThread* thread);
 
@@ -115,6 +123,8 @@ private:
 
 	std::vector<int> runningThreadIDs;
 	std::vector<int> waitingThreadIDs;
+
+	spring::unordered_map<int, std::vector<CCobDeferredCallin> > deferredCallins;
 
 	// stores <id, waketime> pairs s.t. after waking up the ID can be checked
 	// for validity; thread owner might get removed while a thread is sleeping

@@ -18,12 +18,15 @@
 #include "Sim/Misc/CollisionHandler.h"
 #include "Sim/Misc/CollisionVolume.h"
 
+#include "System/Misc/TracyDefs.h"
+
 CR_BIND_DERIVED(CMissileLauncher, CWeapon, )
 CR_REG_METADATA(CMissileLauncher, )
 
 
 void CMissileLauncher::UpdateWantedDir()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CWeapon::UpdateWantedDir();
 
 	if (weaponDef->trajectoryHeight > 0.0f) {
@@ -34,6 +37,7 @@ void CMissileLauncher::UpdateWantedDir()
 
 void CMissileLauncher::FireImpl(const bool scriptCall)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	float3 targetVec = currentTargetPos - weaponMuzzlePos;
 	const float targetDist = targetVec.LengthNormalize();
 
@@ -58,13 +62,15 @@ void CMissileLauncher::FireImpl(const bool scriptCall)
 	params.pos = weaponMuzzlePos;
 	params.end = currentTargetPos;
 	params.speed = startSpeed;
-	params.ttl = weaponDef->flighttime == 0? math::ceil(std::max(targetDist, range) / projectileSpeed + 25 * weaponDef->selfExplode): weaponDef->flighttime;
+	params.ttl = (ttl == 0) ? math::ceil(std::max(targetDist, range) / projectileSpeed + 25 * weaponDef->selfExplode) : ttl;
+	params.gravity = -weaponDef->myGravity;
 
 	WeaponProjectileFactory::LoadProjectile(params);
 }
 
-bool CMissileLauncher::HaveFreeLineOfFire(const float3 srcPos, const float3 tgtPos, const SWeaponTarget& trg) const
+bool CMissileLauncher::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// high-trajectory missiles use curved path rather than linear ground intersection
 	if (weaponDef->trajectoryHeight <= 0.0f)
 		return (CWeapon::HaveFreeLineOfFire(srcPos, tgtPos, trg));
@@ -222,7 +228,7 @@ bool CMissileLauncher::HaveFreeLineOfFire(const float3 srcPos, const float3 tgtP
 				// chord check here
 				const CollisionVolume* cv = &u->collisionVolume;
 				const float3 cvRelVec = cv->GetWorldSpacePos(u) - srcPos;
-				const float  cvRelDst = Clamp(cvRelVec.dot(targetVec), 0.0f, xzTargetDist);
+				const float  cvRelDst = std::clamp(cvRelVec.dot(targetVec), 0.0f, xzTargetDist);
 				const CMatrix44f objTransform = u->GetTransformMatrix(true);
 				for (int i = 1; i < 9; i++) {
 					if (cvRelDst < mdist[i]) {
@@ -265,7 +271,7 @@ bool CMissileLauncher::HaveFreeLineOfFire(const float3 srcPos, const float3 tgtP
 				// chord check here
 				const CollisionVolume* cv = &u->collisionVolume;
 				const float3 cvRelVec = cv->GetWorldSpacePos(u) - srcPos;
-				const float  cvRelDst = Clamp(cvRelVec.dot(targetVec), 0.0f, xzTargetDist);
+				const float  cvRelDst = std::clamp(cvRelVec.dot(targetVec), 0.0f, xzTargetDist);
 				const CMatrix44f objTransform = u->GetTransformMatrix(true);
 				for (int i = 1; i < 9; i++) {
 					if (cvRelDst < mdist[i]) {
@@ -304,7 +310,7 @@ bool CMissileLauncher::HaveFreeLineOfFire(const float3 srcPos, const float3 tgtP
 				// chord check here
 				const CollisionVolume* cv = &f->collisionVolume;
 				const float3 cvRelVec = cv->GetWorldSpacePos(f) - srcPos;
-				const float  cvRelDst = Clamp(cvRelVec.dot(targetVec), 0.0f, xzTargetDist);
+				const float  cvRelDst = std::clamp(cvRelVec.dot(targetVec), 0.0f, xzTargetDist);
 				const CMatrix44f objTransform = f->GetTransformMatrix(true);
 				for (int i = 1; i < 9; i++) {
 					if (cvRelDst < mdist[i]) {

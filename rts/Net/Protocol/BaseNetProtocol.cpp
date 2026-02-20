@@ -322,7 +322,7 @@ PacketType CBaseNetProtocol::SendGameOver(uint8_t playerNum, const std::vector<u
 }
 
 
-PacketType CBaseNetProtocol::SendMapErase(uint8_t playerNum, int16_t x, int16_t z)
+PacketType CBaseNetProtocol::SendMapErase(uint8_t playerNum, uint32_t x, uint32_t z)
 {
 	constexpr uint8_t drawType = MAPDRAW_ERASE;
 
@@ -336,7 +336,7 @@ PacketType CBaseNetProtocol::SendMapErase(uint8_t playerNum, int16_t x, int16_t 
 }
 
 
-PacketType CBaseNetProtocol::SendMapDrawPoint(uint8_t playerNum, int16_t x, int16_t z, const std::string& label, bool fromLua)
+PacketType CBaseNetProtocol::SendMapDrawPoint(uint8_t playerNum, uint32_t x, uint32_t z, const std::string& label, bool fromLua)
 {
 	constexpr uint8_t drawType = MAPDRAW_POINT;
 
@@ -356,7 +356,7 @@ PacketType CBaseNetProtocol::SendMapDrawPoint(uint8_t playerNum, int16_t x, int1
 	return PacketType(packet);
 }
 
-PacketType CBaseNetProtocol::SendMapDrawLine(uint8_t playerNum, int16_t x1, int16_t z1, int16_t x2, int16_t z2, bool fromLua)
+PacketType CBaseNetProtocol::SendMapDrawLine(uint8_t playerNum, uint32_t x1, uint32_t z1, uint32_t x2, uint32_t z2, bool fromLua)
 {
 	constexpr uint8_t drawType = MAPDRAW_LINE;
 
@@ -605,9 +605,10 @@ PacketType CBaseNetProtocol::SendSdBlockresponse(uint8_t playerNum, std::vector<
 }
 #endif // SYNCDEBUG
 
-PacketType CBaseNetProtocol::SendGameStateDump()
+PacketType CBaseNetProtocol::SendGameStateDump(uint32_t frameNum)
 {
-	PackPacket* packet = new PackPacket(sizeof(uint8_t), NETMSG_GAMESTATE_DUMP);
+	PackPacket* packet = new PackPacket(sizeof(uint8_t) + sizeof(frameNum), NETMSG_GAMESTATE_DUMP);
+	*packet << frameNum;
 	return PacketType(packet);
 }
 
@@ -680,6 +681,6 @@ CBaseNetProtocol::CBaseNetProtocol()
 	proto->AddType(NETMSG_SD_BLKRESPONSE, -2);
 #endif // SYNCDEBUG
 
-	proto->AddType(NETMSG_GAMESTATE_DUMP, 1);
+	proto->AddType(NETMSG_GAMESTATE_DUMP, 1 + sizeof(uint32_t));
 }
 

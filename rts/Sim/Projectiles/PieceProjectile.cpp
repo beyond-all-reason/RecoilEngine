@@ -11,7 +11,7 @@
 #include "Rendering/Colors.h"
 #include "Rendering/Env/Particles/ProjectileDrawer.h"
 #include "Rendering/Env/Particles/Classes/SmokeTrailProjectile.h"
-#include "Rendering/Models/3DModel.h"
+#include "Rendering/Models/3DModelPiece.hpp"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"
@@ -21,6 +21,8 @@
 #include "Sim/Units/UnitDef.h"
 #include "System/Matrix44f.h"
 #include "System/SpringMath.h"
+
+#include "System/Misc/TracyDefs.h"
 
 static constexpr int   SMOKE_TIME   = 40;
 static constexpr int   SMOKE_SIZE   = 14;
@@ -56,6 +58,7 @@ CPieceProjectile::CPieceProjectile(
 	omp((lmp != nullptr) ? lmp->original : nullptr),
 	smokeTrail(nullptr)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (owner != nullptr) {
 		const UnitDef* ud = owner->unitDef;
 
@@ -63,7 +66,16 @@ CPieceProjectile::CPieceProjectile(
 			cegID = guRNG.NextInt(ud->GetPieceExpGenCount());
 			cegID = ud->GetPieceExpGenID(cegID);
 
-			explGenHandler.GenExplosion(cegID, pos, speed, 100, 0.0f, 0.0f, nullptr, nullptr);
+			explGenHandler.GenExplosion(
+				cegID,
+				pos,
+				speed,
+				100.0f,
+				0.0f,
+				0.0f,
+				nullptr,
+				ExplosionHitObject()
+			);
 		}
 
 		model = owner->model;
@@ -102,6 +114,7 @@ CPieceProjectile::CPieceProjectile(
 
 void CPieceProjectile::Collision()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	Collision(nullptr, nullptr);
 	if (gsRNG.NextFloat() < 0.666f) { // give it a small chance to `ground bounce`
 		CProjectile::Collision();
@@ -118,6 +131,7 @@ void CPieceProjectile::Collision()
 
 void CPieceProjectile::Collision(CFeature* f)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	Collision(nullptr, f);
 	CProjectile::Collision(f);
 }
@@ -125,6 +139,7 @@ void CPieceProjectile::Collision(CFeature* f)
 
 void CPieceProjectile::Collision(CUnit* unit)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	Collision(unit, nullptr);
 	CProjectile::Collision(unit);
 }
@@ -138,22 +153,22 @@ void CPieceProjectile::Collision(CUnit* unit, CFeature* feature)
 	if ((explFlags & PF_Explode) && (unit || feature)) {
 		const DamageArray damageArray(modInfo.debrisDamage);
 		const CExplosionParams params = {
-			pos,
-			ZeroVector,
-			damageArray,
-			nullptr,           // weaponDef
-			owner(),
-			unit,              // hitUnit
-			feature,           // hitFeature
-			0.0f,              // craterAreaOfEffect
-			5.0f,              // damageAreaOfEffect
-			0.0f,              // edgeEffectiveness
-			10.0f,             // explosionSpeed
-			1.0f,              // gfxMod
-			true,              // impactOnly
-			false,             // ignoreOwner
-			false,             // damageGround
-			static_cast<unsigned int>(id)
+			.pos                  = pos,
+			.dir                  = ZeroVector,
+			.damages              = damageArray,
+			.weaponDef            = nullptr,
+			.owner                = owner(),
+			.hitObject            = ExplosionHitObject(unit, feature),
+			.craterAreaOfEffect   = modInfo.debrisDamage * 0.25f,
+			.damageAreaOfEffect   = modInfo.debrisDamage * 0.5f,
+			.edgeEffectiveness    = 0.0f,
+			.explosionSpeed       = 10.0f,
+			.gfxMod               = 1.0f,
+			.maxGroundDeformation = 0.0f,
+			.impactOnly           = true,
+			.ignoreOwner          = false,
+			.damageGround         = false,
+			.projectileID         = static_cast<uint32_t>(id)
 		};
 
 		helper->Explosion(params);
@@ -183,6 +198,7 @@ void CPieceProjectile::Collision(CUnit* unit, CFeature* feature)
 
 float3 CPieceProjectile::RandomVertexPos() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (omp == nullptr)
 		return ZeroVector;
 	#define rf guRNG.NextFloat()
@@ -192,12 +208,14 @@ float3 CPieceProjectile::RandomVertexPos() const
 
 float CPieceProjectile::GetDrawAngle() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return spinAngle + spinSpeed * globalRendering->timeOffset;
 }
 
 
 void CPieceProjectile::Update()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!luaMoveCtrl) {
 		speed.y += mygravity;
 		SetVelocityAndSpeed(speed * 0.997f);
@@ -210,7 +228,16 @@ void CPieceProjectile::Update()
 
 	if ((explFlags & PF_NoCEGTrail) == 0) {
 		// TODO: pass a more sensible ttl to the CEG (age-related?)
-		explGenHandler.GenExplosion(cegID, pos, speed, 100, 0.0f, 0.0f, nullptr, nullptr);
+		explGenHandler.GenExplosion(
+			cegID,
+			pos,
+			speed,
+			100,
+			0.0f,
+			0.0f,
+			nullptr,
+			ExplosionHitObject()
+		);
 		return;
 	}
 
@@ -254,18 +281,20 @@ void CPieceProjectile::Update()
 }
 
 
-void CPieceProjectile::DrawOnMinimap()
+void CPieceProjectile::DrawOnMinimap() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	AddMiniMapVertices({ pos        , color4::red }, { pos + speed, color4::red });
 }
 
 
 void CPieceProjectile::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if ((explFlags & PF_Fire) == 0)
 		return;
 
-	static const SColor lightOrange(1.f, 0.78f, 0.59f, 0.2f);
+	static constexpr SColor lightOrange(1.f, 0.78f, 0.59f, 0.2f);
 
 	for (unsigned int age = 0; age < NUM_TRAIL_PARTS; ++age) {
 		const float3 interPos = fireTrailPoints[age].pos;
@@ -276,7 +305,8 @@ void CPieceProjectile::Draw()
 		const SColor col = lightOrange * alpha;
 
 		const auto eft = projectileDrawer->explofadetex;
-		AddEffectsQuad(
+		AddEffectsQuad<0>(
+			eft->pageNum,
 			{ interPos - camera->GetRight() * drawsize - camera->GetUp() * drawsize, eft->xstart, eft->ystart, col },
 			{ interPos + camera->GetRight() * drawsize - camera->GetUp() * drawsize, eft->xend,   eft->ystart, col },
 			{ interPos + camera->GetRight() * drawsize + camera->GetUp() * drawsize, eft->xend,   eft->yend,   col },
@@ -288,5 +318,6 @@ void CPieceProjectile::Draw()
 
 int CPieceProjectile::GetProjectilesCount() const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return NUM_TRAIL_PARTS;
 }

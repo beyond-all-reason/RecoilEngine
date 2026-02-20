@@ -11,6 +11,7 @@
 #include "Game/GlobalUnsynced.h"
 #include "Map/ReadMap.h"
 #include "Net/Protocol/NetProtocol.h"
+#include "Sim/Misc/ModInfo.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
@@ -21,6 +22,8 @@
 #include "System/creg/STL_Set.h"
 #include "System/creg/STL_List.h"
 #include "System/creg/STL_Map.h"
+
+#include "System/Misc/TracyDefs.h"
 
 
 CR_BIND_DERIVED(CTeam, TeamBase, )
@@ -77,13 +80,12 @@ CTeam::CTeam():
 
 void CTeam::SetDefaultStartPos()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const int allyTeam = teamHandler.AllyTeam(teamNum);
-	const std::vector<AllyTeam>& allyStartData = CGameSetup::GetAllyStartingData();
 
-	assert(!allyStartData.empty());
 	assert(allyTeam == teamAllyteam);
 
-	const AllyTeam& allyTeamData = allyStartData[allyTeam];
+	const AllyTeam& allyTeamData = teamHandler.GetAllyTeam(allyTeam);
 	// pick a spot near the center of our startbox
 	const float xmin = (mapDims.mapx * SQUARE_SIZE) * allyTeamData.startRectLeft;
 	const float zmin = (mapDims.mapy * SQUARE_SIZE) * allyTeamData.startRectTop;
@@ -101,9 +103,9 @@ void CTeam::SetDefaultStartPos()
 
 void CTeam::ClampStartPosInStartBox(float3* pos) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const int allyTeam = teamHandler.AllyTeam(teamNum);
-	const std::vector<AllyTeam>& allyStartData = CGameSetup::GetAllyStartingData();
-	const AllyTeam& allyTeamData = allyStartData[allyTeam];
+	const AllyTeam& allyTeamData = teamHandler.GetAllyTeam(allyTeam);
 	const SRectangle rect(
 		allyTeamData.startRectLeft   * mapDims.mapx * SQUARE_SIZE,
 		allyTeamData.startRectTop    * mapDims.mapy * SQUARE_SIZE,
@@ -120,6 +122,7 @@ void CTeam::ClampStartPosInStartBox(float3* pos) const
 
 bool CTeam::UseMetal(float amount)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (res.metal < amount)
 		return false;
 
@@ -130,6 +133,7 @@ bool CTeam::UseMetal(float amount)
 
 bool CTeam::UseEnergy(float amount)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (res.energy < amount)
 		return false;
 
@@ -142,6 +146,7 @@ bool CTeam::UseEnergy(float amount)
 
 void CTeam::AddMetal(float amount, bool useIncomeMultiplier)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (useIncomeMultiplier)
 		amount *= GetIncomeMultiplier();
 
@@ -157,6 +162,7 @@ void CTeam::AddMetal(float amount, bool useIncomeMultiplier)
 
 void CTeam::AddEnergy(float amount, bool useIncomeMultiplier)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (useIncomeMultiplier)
 		amount *= GetIncomeMultiplier();
 
@@ -172,12 +178,14 @@ void CTeam::AddEnergy(float amount, bool useIncomeMultiplier)
 
 bool CTeam::HaveResources(const SResourcePack& amount) const
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return (res >= amount);
 }
 
 
 void CTeam::AddResources(SResourcePack amount, bool useIncomeMultiplier)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (useIncomeMultiplier)
 		amount *= GetIncomeMultiplier();
 
@@ -195,7 +203,8 @@ void CTeam::AddResources(SResourcePack amount, bool useIncomeMultiplier)
 
 bool CTeam::UseResources(const SResourcePack& amount)
 {
-	if (!(res >= amount))
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!HaveResources(amount))
 		return false;
 
 	res -= amount;
@@ -206,6 +215,7 @@ bool CTeam::UseResources(const SResourcePack& amount)
 
 void CTeam::GiveEverythingTo(const unsigned toTeam)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CTeam* target = teamHandler.Team(toTeam);
 
 	if (target == nullptr) {
@@ -224,15 +234,27 @@ void CTeam::GiveEverythingTo(const unsigned toTeam)
 
 	const auto& teamUnits = unitHandler.GetUnitsByTeam(teamNum);
 
+	// Optimistically give *all* of team's unit limit to target
+	// If some transfers fail, need to partially revert this
+	// to ensure this.maxUnits == this.numUnits
+	target->maxUnits += maxUnits;
+	maxUnits = 0;
+
 	// NB: can not be a ranged loop since ChangeTeam removes [i] from teamUnits on success
 	for (size_t i = 0; i < teamUnits.size(); ) {
 		i += (!teamUnits[i]->ChangeTeam(toTeam, CUnit::ChangeGiven));
 	}
+	assert(numUnits == teamUnits.size());
+	// Some of the above transfers may have failed, so set maxUnits=numUnits and 
+	// reduce target->maxUnits by numUnits
+	maxUnits = numUnits;
+	target->maxUnits -= numUnits;
 }
 
 
 void CTeam::Died(bool normalDeath)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (isDead)
 		return;
 
@@ -251,15 +273,16 @@ void CTeam::Died(bool normalDeath)
 		}
 	}
 
-	// increase per-team unit-limit for each remaining team in _our_ allyteam
-	teamHandler.UpdateTeamUnitLimitsPreDeath(teamNum);
 	eventHandler.TeamDied(teamNum);
+	// increase per-team unit-limit for each remaining team in _our_ allyteam
+	teamHandler.UpdateTeamUnitLimitsOnDeath(teamNum);
 
 	isDead = true;
 }
 
 void CTeam::AddPlayer(int playerNum)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// note: does it matter if this team was already dead?
 	// (besides needing to restore its original unit-limit)
 	if (isDead)
@@ -276,6 +299,7 @@ void CTeam::AddPlayer(int playerNum)
 
 void CTeam::KillAIs()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	for (const uint8_t id: skirmishAIHandler.GetSkirmishAIsInTeam(teamNum, gu->myPlayerNum)) {
 		skirmishAIHandler.SetLocalKillFlag(id, 2 /* = team died */);
 	}
@@ -285,6 +309,7 @@ void CTeam::KillAIs()
 
 void CTeam::ResetResourceState()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// reset all state variables that were
 	// potentially modified during the last
 	// <TEAM_SLOWUPDATE_RATE> frames
@@ -304,6 +329,7 @@ void CTeam::ResetResourceState()
 
 void CTeam::SlowUpdate()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	TeamStatistics& currentStats = GetCurrentStats();
 
 	float eShare = 0.0f;
@@ -343,26 +369,28 @@ void CTeam::SlowUpdate()
 	if (mShare > 0.0f) { dm = std::min(1.0f, mExcess / mShare); }
 
 	// now evenly distribute our excess resources among allied teams
-	for (int a = 0; a < teamHandler.ActiveTeams(); ++a) {
-		if ((a != teamNum) && (teamHandler.AllyTeam(teamNum) == teamHandler.AllyTeam(a))) {
-			CTeam* team = teamHandler.Team(a);
-			if (team->isDead)
-				continue;
+	if (modInfo.nativeExcessSharing) {
+		for (int a = 0; a < teamHandler.ActiveTeams(); ++a) {
+			if ((a != teamNum) && (teamHandler.AllyTeam(teamNum) == teamHandler.AllyTeam(a))) {
+				CTeam* team = teamHandler.Team(a);
+				if (team->isDead)
+					continue;
 
-			//due to precision errors mdif/edif sometimes can be slightly >= than res. If team has no metal income
-			//this causes units with zero fire resources requirements to be unable to fire
-			//when CTeam::HaveResources() is evaluated, thus clamp edif / mdif on both sides
+				//due to precision errors mdif/edif sometimes can be slightly >= than res. If team has no metal income
+				//this causes units with zero fire resources requirements to be unable to fire
+				//when CTeam::HaveResources() is evaluated, thus clamp edif / mdif on both sides
 
-			const float edif = std::clamp(((team->resStorage.energy * 0.99f) - team->res.energy) * de, 0.0f, res.energy);
-			const float mdif = std::clamp(((team->resStorage.metal  * 0.99f) - team->res.metal ) * dm, 0.0f, res.metal );
+				const float edif = std::clamp(((team->resStorage.energy * 0.99f) - team->res.energy) * de, 0.0f, res.energy);
+				const float mdif = std::clamp(((team->resStorage.metal  * 0.99f) - team->res.metal ) * dm, 0.0f, res.metal );
 
-			res.energy     -= edif; team->res.energy         += edif;
-			resSent.energy += edif; team->resReceived.energy += edif;
-			res.metal      -= mdif; team->res.metal          += mdif;
-			resSent.metal  += mdif; team->resReceived.metal  += mdif;
+				res.energy     -= edif; team->res.energy         += edif;
+				resSent.energy += edif; team->resReceived.energy += edif;
+				res.metal      -= mdif; team->res.metal          += mdif;
+				resSent.metal  += mdif; team->resReceived.metal  += mdif;
 
-			currentStats.energySent += edif; team->GetCurrentStats().energyReceived += edif;
-			currentStats.metalSent  += mdif; team->GetCurrentStats().metalReceived  += mdif;
+				currentStats.energySent += edif; team->GetCurrentStats().energyReceived += edif;
+				currentStats.metalSent  += mdif; team->GetCurrentStats().metalReceived  += mdif;
+			}
 		}
 	}
 
@@ -383,7 +411,7 @@ void CTeam::SlowUpdate()
 	}
 
 	// make sure the stats update is always in a SlowUpdate
-	assert(((TeamStatistics::statsPeriod * GAME_SPEED) % TEAM_SLOWUPDATE_RATE) == 0);
+	static_assert(((TeamStatistics::statsPeriod * GAME_SPEED) % TEAM_SLOWUPDATE_RATE) == 0);
 
 	if (nextHistoryEntry <= gs->frameNum) {
 		currentStats.frame = gs->frameNum;
@@ -397,6 +425,7 @@ void CTeam::SlowUpdate()
 
 void CTeam::AddUnit(CUnit* unit, AddType type)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	numUnits++;
 
 	switch (type) {
@@ -415,6 +444,7 @@ void CTeam::AddUnit(CUnit* unit, AddType type)
 
 void CTeam::RemoveUnit(CUnit* unit, RemoveType type)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	numUnits--;
 
 	switch (type) {
@@ -431,6 +461,7 @@ void CTeam::RemoveUnit(CUnit* unit, RemoveType type)
 }
 
 void CTeam::UpdateControllerName() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	// format is "Joe[, AI: ABCAI 0.1 ('Killer')[, AI: DEFAI 1.2 ('Slayer')[, ...]]]"
 	memset(controllerName, 0, sizeof(controllerName));
 

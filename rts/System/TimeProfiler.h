@@ -15,7 +15,7 @@
 #include "System/StringHash.h"
 #include "System/UnorderedMap.hpp"
 
-#include <tracy/Tracy.hpp>
+#include "System/Misc/TracyDefs.h"
 
 // disable these for minimal profiling; all special
 // timers contribute even when profiler is disabled
@@ -29,6 +29,8 @@
 #define SCOPED_MT_TIMER(name)  ScopedMtTimer __scopedTimer(hashString(name));
 
 #define SCOPED_ONCE_TIMER(name) ZoneScopedNC(name, tracy::Color::Purple); ScopedOnceTimer __timer(name);
+
+static constexpr float MAX_THREAD_HIST_TIME = 0.5f; // secs
 
 class BasicTimer : public spring::noncopyable
 {
@@ -183,6 +185,7 @@ public:
 	void ResortProfilesRaw();
 	void RefreshProfiles();
 	void RefreshProfilesRaw();
+	void CleanupOldThreadProfiles();
 
 	void SetEnabled(bool b) { enabled = b; }
 	void PrintProfilingInfo() const;

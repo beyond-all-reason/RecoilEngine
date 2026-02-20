@@ -1,12 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include <string>
-#include <cstdio>
-
-using std::fopen;
-using std::fread;
-using std::fwrite;
-using std::fclose;
+#include <nowide/cstdio.hpp>
 
 #include "ResourceMapAnalyzer.h"
 
@@ -24,6 +19,8 @@ using std::fclose;
 #include "System/Log/ILog.h"
 
 #include <stdexcept>
+
+#include "System/Misc/TracyDefs.h"
 
 static constexpr float3 ERRORVECTOR(-1, 0, 0);
 static std::string CACHE_BASE("");
@@ -53,12 +50,13 @@ CResourceMapAnalyzer::CResourceMapAnalyzer(int resourceId)
 	, doubleRadius(0)
 {
 	if (CACHE_BASE.empty())
-		CACHE_BASE = dataDirsAccess.LocateDir(FileSystem::GetCacheDir() + "/analyzedResourceMaps/", FileQueryFlags::WRITE | FileQueryFlags::CREATE_DIRS);
+		CACHE_BASE = dataDirsAccess.LocateDir(FileSystem::GetCacheDir() + FileSystem::GetNativePathSeparator() + "analyzedResourceMaps" + FileSystem::GetNativePathSeparator(), FileQueryFlags::WRITE | FileQueryFlags::CREATE_DIRS);
 }
 
 
 
 float3 CResourceMapAnalyzer::GetNearestSpot(int builderUnitId, const UnitDef* extractor) const {
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	const CUnit* builder = unitHandler.GetUnit(builderUnitId);
 
@@ -71,6 +69,7 @@ float3 CResourceMapAnalyzer::GetNearestSpot(int builderUnitId, const UnitDef* ex
 }
 
 float3 CResourceMapAnalyzer::GetNearestSpot(float3 fromPos, int team, const UnitDef* extractor) const {
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	float tempScore = 0.0f;
 	float maxDivergence = 16.0f;
@@ -111,6 +110,7 @@ float3 CResourceMapAnalyzer::GetNearestSpot(float3 fromPos, int team, const Unit
 
 
 void CResourceMapAnalyzer::Init() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const CResourceDescription* resource = resourceHandler->GetResource(resourceId);
 
 	mapWidth = resourceHandler->GetResourceMapWidth(resourceId);
@@ -138,11 +138,13 @@ void CResourceMapAnalyzer::Init() {
 }
 
 float CResourceMapAnalyzer::GetAverageIncome() const {
+	RECOIL_DETAILED_TRACY_ZONE;
 	return averageIncome;
 }
 
 
 void CResourceMapAnalyzer::GetResourcePoints() {
+	RECOIL_DETAILED_TRACY_ZONE;
 	std::vector<int> xend(doubleRadius + 1);
 
 	for (int a = 0; a < doubleRadius + 1; a++) {
@@ -500,16 +502,18 @@ void CResourceMapAnalyzer::GetResourcePoints() {
 
 template<typename T>
 static inline void writeToFile(const T& value, FILE* file) {
+	RECOIL_DETAILED_TRACY_ZONE;
 
-	if (fwrite(&value, sizeof(T), 1, file) != 1) {
+	if (std::fwrite(&value, sizeof(T), 1, file) != 1) {
 		throw std::runtime_error("failed to write value to file");
 	}
 }
 
 void CResourceMapAnalyzer::SaveResourceMap() {
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	const std::string cacheFileName = GetCacheFileName();
-	FILE* saveFile = fopen(cacheFileName.c_str(), "wb");
+	FILE* saveFile = nowide::fopen(cacheFileName.c_str(), "wb");
 
 	try {
 		if (saveFile == nullptr)
@@ -525,23 +529,25 @@ void CResourceMapAnalyzer::SaveResourceMap() {
 		LOG_L(L_WARNING, "Failed to save the analyzed resource-map to file %s, reason: %s", cacheFileName.c_str(), err.what());
 	}
 
-	fclose(saveFile);
+	std::fclose(saveFile);
 }
 
 static void fileReadChecked(void* buf, size_t size, size_t count, FILE* fstream) {
+	RECOIL_DETAILED_TRACY_ZONE;
 
-	if (fread(buf, size, count, fstream) != count) {
+	if (std::fread(buf, size, count, fstream) != count) {
 		throw std::runtime_error("Failed to read the required number of items");
 	}
 }
 
 bool CResourceMapAnalyzer::LoadResourceMap() {
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	bool loaded = false;
 
 	const std::string cacheFileName = GetCacheFileName();
 
-	FILE* cacheFile = fopen(cacheFileName.c_str(), "rb");
+	FILE* cacheFile = nowide::fopen(cacheFileName.c_str(), "rb");
 
 	if (cacheFile != nullptr) {
 		try {
@@ -563,6 +569,7 @@ bool CResourceMapAnalyzer::LoadResourceMap() {
 
 
 std::string CResourceMapAnalyzer::GetCacheFileName() const {
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	const CResourceDescription* resource = resourceHandler->GetResource(resourceId);
 	std::string absFile = CACHE_BASE + gameSetup->mapName + resource->name;

@@ -7,10 +7,11 @@ class CUnit;
 class CWeapon;
 struct UnitDefWeapon;
 struct WeaponDef;
+class CUnitDefHandler;
 
 class CWeaponLoader {
 public:
-	static void InitStatic();
+	static void InitStatic(const CUnitDefHandler *udh);
 	static void KillStatic();
 
 	static void LoadWeapons(CUnit* unit);

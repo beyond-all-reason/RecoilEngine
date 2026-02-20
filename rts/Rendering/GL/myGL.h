@@ -3,22 +3,13 @@
 #ifndef _MY_GL_H
 #define _MY_GL_H
 
-#define GLEW_STATIC
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 
 #include <array>
 
-#if       defined(HEADLESS)
-	#undef WINGDIAPI
-	#define WINGDIAPI //working around https://github.com/beyond-all-reason/spring/issues/27
-	#include "lib/headlessStubs/glewstub.h"
-	#undef WINGDIAPI
-#else
-	#include <GL/glew.h>
-#endif // defined(HEADLESS)
-
+#include <glad/glad.h>
 
 #include "System/float3.h"
 #include "System/float4.h"
@@ -26,6 +17,7 @@
 #include "System/UnorderedMap.hpp"
 
 #include "glStateDebug.h"
+#include "glDebugGroup.hpp"
 
 #if       defined(HEADLESS)
 	// All OpenGL functions should always exists on HEADLESS.
@@ -36,12 +28,8 @@
 	#define IS_GL_FUNCTION_AVAILABLE(functionName) true
 #else
 	// Check if the functions address is non-NULL.
-	#define IS_GL_FUNCTION_AVAILABLE(functionName) (functionName != NULL)
+	#define IS_GL_FUNCTION_AVAILABLE(functionName) (functionName != nullptr)
 #endif // defined(HEADLESS)
-
-#ifndef GL_INVALID_INDEX
-	#define GL_INVALID_INDEX -1
-#endif
 
 struct TextureParameters {
 	GLint intFmt;
@@ -51,19 +39,16 @@ struct TextureParameters {
 	GLint bpp;
 	GLint chNum;
 	GLint imageSize;
-	GLboolean isDepth;
+	GLint prefDataType;
+	GLboolean isNormalizedDepth;
 	GLboolean isCompressed;
 };
 
 static inline void glVertexf3(const float3& v)    { glVertex3f(v.r, v.g, v.b); }
 static inline void glColorf3(const float3& v)     { glColor3f(v.r, v.g, v.b); }
 static inline void glColorf4(const float4& v)     { glColor4f(v.r, v.g, v.b, v.a); }
-static inline void glNormalf3(const float3& v)    { glNormal3f(v.r, v.g, v.b); }
 static inline void glTranslatef3(const float3& v) { glTranslatef(v.r, v.g, v.b); }
-static inline void glSecondaryColorf3(const float3& v) { glSecondaryColor3f(v.r, v.g, v.b); }
 static inline void glColorf4(const float3& v, const float alpha) { glColor4f(v.r, v.g, v.b, alpha); }
-static inline void glUniformf3(const GLint location, const float3& v) { glUniform3f(location, v.r, v.g, v.b); }
-
 
 typedef   void   (*   glOrthoFuncPtr) (GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdouble near, GLdouble far);
 typedef   void   (*gluOrtho2DFuncPtr) (GLdouble left, GLdouble right, GLdouble bottom, GLdouble top);
@@ -107,20 +92,19 @@ static constexpr  glFrustumFuncPtr  glFrustumFuncs[2] = {__spring_glFrustum_noCC
 
 
 void WorkaroundATIPointSizeBug();
-void SetTexGen(const float scaleX, const float scaleZ, const float offsetX, const float offsetZ);
 
-void glSpringGetTexParams(GLenum target, GLuint textureID, GLint level, TextureParameters& textureParameters);
+void glSaveTextureArray(const GLuint textureID, const char* filename, int level = 0, int page = 0);
 void glSaveTexture(const GLuint textureID, const char* filename, int level = 0);
-void glSpringBindTextures(GLuint first, GLsizei count, const GLuint* textures);
-void glSpringTexStorage2D(GLenum target, GLint levels, GLint internalFormat, GLsizei width, GLsizei height);
-void glBuildMipmaps(const GLenum target, GLint internalFormat, const GLsizei width, const GLsizei height, const GLenum format, const GLenum type, const void* data);
+
+void RecoilGetTexParams(GLenum target, GLuint textureID, GLint level, TextureParameters& textureParameters);
+void RecoilTexStorage2D(GLenum target, GLint levels, GLint internalFormat, GLsizei width, GLsizei height);
+void RecoilTexStorage3D(GLenum target, GLint levels, GLint internalFormat, GLsizei width, GLsizei height, GLsizei depth);
+void RecoilBuildMipmaps(const GLenum target, GLint internalFormat, const GLsizei width, const GLsizei height, const GLenum format, const GLenum type, const void* data, int32_t numLevels = 0);
 bool glSpringBlitImages(
 	GLuint srcName, GLenum srcTarget, GLint srcLevel, GLint srcX, GLint srcY, GLint srcZ,
 	GLuint dstName, GLenum dstTarget, GLint dstLevel, GLint dstX, GLint dstY, GLint dstZ,
 	GLsizei srcWidth, GLsizei srcHeight, GLsizei srcDepth
 );
-
-void glSpringMatrix2dProj(const int sizex, const int sizey);
 
 void ClearScreen();
 
@@ -159,11 +143,13 @@ struct SDrawElementsIndirectCommand {
 
 struct SInstanceData {
 	SInstanceData() = default;
-	SInstanceData(uint32_t matOffset_, uint8_t teamIndex, uint8_t drawFlags, uint8_t numPieces, uint32_t uniOffset_, uint32_t bposeMatOffset_)
-		: matOffset{ matOffset_ }						// updated during the following draw frames
-		, uniOffset{ uniOffset_ }						// updated during the following draw frames
-		, info{ teamIndex, drawFlags, 0, numPieces }	// not updated during the following draw frames
-		, bposeMatOffset { bposeMatOffset_ }			// updated during the following draw frames
+	SInstanceData(uint32_t matOffset_, uint8_t teamIndex, uint8_t drawFlags, uint16_t numPieces, uint32_t uniOffset_, uint32_t bposeMatOffset_)
+		: matOffset{ matOffset_ }                         // updated during the following draw frames
+		, uniOffset{ uniOffset_ }                         // updated during the following draw frames
+		, info{ teamIndex, drawFlags                      // not updated during the following draw frames
+			, static_cast<uint8_t>((numPieces >> 8) & 0xFF)
+			, static_cast<uint8_t>((numPieces     ) & 0xFF) }
+		, bposeMatOffset { bposeMatOffset_ }              // updated during the following draw frames
 	{}
 
 	uint32_t matOffset;

@@ -1,0 +1,122 @@
+{{- $context := .context -}}
+{{- $topEntries := .context.Params.entries | default slice -}}
+
+{{- $disableSidebar := .disableSidebar | default false -}}
+{{- $displayPlaceholder := .displayPlaceholder | default false -}}
+
+{{- $sidebarClass := cond $disableSidebar (cond $displayPlaceholder "md:hx-hidden xl:hx-block" "md:hx-hidden") "md:hx-sticky" -}}
+
+{{- $navRoot := cond (eq site.Home.Type "docs") site.Home $context.FirstSection -}}
+{{- $pageURL := $context.RelPermalink -}}
+
+{{/* EXPERIMENTAL */}}
+{{- if .context.Params.sidebar.hide -}}
+  {{- $disableSidebar = true -}}
+  {{- $displayPlaceholder = true -}}
+{{- end -}}
+
+
+<aside class="sidebar-container hx-flex hx-flex-col print:hx-hidden md:hx-top-16 md:hx-shrink-0 md:hx-w-64 md:hx-self-start max-md:[transform:translate3d(0,-100%,0)] {{ $sidebarClass }}">
+  <!-- Search bar on small screen -->
+  <div class="hx-px-4 hx-pt-4 md:hx-hidden">
+    {{ partial "search.html" }}
+  </div>
+  <div class="hextra-scrollbar hx-overflow-y-auto hx-overflow-x-hidden hx-p-4 hx-grow md:hx-h-[calc(100vh-var(--navbar-height)-var(--menu-height))]">
+    <ul class="hx-flex hx-flex-col hx-gap-1 md:hx-hidden">
+      <!-- Nav -->
+      {{ template "api-sidebar-main" (dict "entries" $topEntries) -}}
+    </ul>
+
+    <!-- Sidebar on large screen -->
+    {{- if $disableSidebar -}}
+      {{- if $displayPlaceholder }}<div class="max-xl:hx-hidden hx-h-0 hx-w-64 hx-shrink-0"></div>{{ end -}}
+      {{ .context.Scratch.Set "enableFooterSwitches" true }}
+    {{- else -}}
+      <ul class="hx-flex hx-flex-col hx-gap-1 max-md:hx-hidden">
+        {{ template "api-sidebar-main" (dict "entries" $topEntries) -}}
+      </ul>
+    {{ end -}}
+  </div>
+  {{/* Hide theme switch when sidebar is disabled */}}
+  {{ $switchesClass := cond $disableSidebar "md:hx-hidden" "" -}}
+  {{ $displayThemeToggle := (site.Params.theme.displayToggle | default true) -}}
+
+  {{ if or hugo.IsMultilingual $displayThemeToggle }}
+    <div class="{{ $switchesClass }} {{ with hugo.IsMultilingual }}hx-justify-end{{ end }} hx-sticky hx-bottom-0 hx-max-h-(--menu-height) hx-bg-white dark:hx-bg-dark hx-mx-4 hx-py-4 hx-shadow-[0_-12px_16px_#fff] hx-flex hx-items-center hx-gap-2 hx-border-gray-200 dark:hx-border-neutral-800 dark:hx-shadow-[0_-12px_16px_#111] contrast-more:hx-border-neutral-400 contrast-more:hx-shadow-none contrast-more:dark:hx-shadow-none hx-border-t" data-toggle-animation="show">
+      {{- with hugo.IsMultilingual -}}
+        {{- partial "language-switch" (dict "context" $context "grow" true) -}}
+        {{- with $displayThemeToggle }}{{ partial "theme-toggle" (dict "hideLabel" true) }}{{ end -}}
+      {{- else -}}
+        {{- with $displayThemeToggle -}}
+          <div class="hx-flex hx-grow hx-flex-col">{{ partial "theme-toggle" }}</div>
+        {{- end -}}
+      {{- end -}}
+    </div>
+  {{- end -}}
+</aside>
+
+{{- define "api-sidebar-main" -}}
+  {{ template "api-sidebar-tree" (dict "entries" .entries "level" 0) }}
+{{- end -}}
+
+{{- define "api-sidebar-tree" -}}
+  {{- if ge .level 4 -}}
+    {{- return -}}
+  {{- end -}}
+
+  {{- $self := . -}}
+  {{- $level := .level -}}
+  {{- $toc := true -}}
+
+  {{- with $items := .entries -}}
+    {{- if eq $level 0 -}}
+      {{- range $items }}
+				{{- $active := false -}}
+				{{- $shouldOpen := false }}
+				<li class="{{ if $shouldOpen }}open{{ end }}">
+					{{- template "api-sidebar-item-link" . -}}
+					{{- template "api-sidebar-tree" . -}}
+				</li>
+      {{- end -}}
+    {{- else -}}
+      <div class="ltr:hx-pr-0 hx-overflow-hidden">
+        <ul class='hx-relative hx-flex hx-flex-col hx-gap-1 before:hx-absolute before:hx-inset-y-1 before:hx-w-px before:hx-bg-gray-200 before:hx-content-[""] ltr:hx-ml-3 ltr:hx-pl-3 ltr:before:hx-left-0 rtl:hx-mr-3 rtl:hx-pr-3 rtl:before:hx-right-0 dark:before:hx-bg-neutral-800'>
+          {{- range $items }}
+            {{- $active := false -}}
+            {{- $shouldOpen := false }}
+            <li class="hx-flex hx-flex-col {{ if $shouldOpen }}open{{ end }}">
+              {{- template "api-sidebar-item-link" . -}}
+              {{ template "api-sidebar-tree" . }}
+            </li>
+          {{- end -}}
+        </ul>
+      </div>
+    {{- end -}}
+  {{- end }}
+{{- end -}}
+
+{{- define "api-sidebar-item-link" -}}
+  {{- $external := strings.HasPrefix .ref "http" -}}
+  {{- $open := .open | default false -}}
+  <a
+    class="hx-flex hx-items-center hx-justify-between hx-gap-2 hx-cursor-pointer hx-rounded hx-px-2 hx-py-1.5 hx-text-sm hx-transition-colors [-webkit-tap-highlight-color:transparent] [-webkit-touch-callout:none] [word-break:break-word]
+    {{- if .active }}
+      sidebar-active-item hx-bg-primary-100 hx-font-semibold hx-text-primary-800 contrast-more:hx-border contrast-more:hx-border-primary-500 dark:hx-bg-primary-400/10 dark:hx-text-primary-600 contrast-more:dark:hx-border-primary-500
+    {{- else }}
+      hx-text-gray-500 hover:hx-bg-gray-100 hover:hx-text-gray-900 contrast-more:hx-border contrast-more:hx-border-transparent contrast-more:hx-text-gray-900 contrast-more:hover:hx-border-gray-900 dark:hx-text-neutral-400 dark:hover:hx-bg-primary-100/5 dark:hover:hx-text-gray-50 contrast-more:dark:hx-text-gray-50 contrast-more:dark:hover:hx-border-gray-50
+    {{- end -}}"
+    href="{{ .link }}"
+    {{ if $external }}target="_blank" rel="noreferrer"{{ end }}
+  >
+    {{- .name -}}
+		{{- with .entries }}
+			<span class="hextra-sidebar-collapsible-button">
+				{{- template "api-sidebar-collapsible-button" -}}
+			</span>
+		{{- end }}
+  </a>
+{{- end -}}
+
+{{- define "api-sidebar-collapsible-button" -}}
+  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" class="hx-h-[18px] hx-min-w-[18px] hx-rounded-sm hx-p-0.5 hover:hx-bg-gray-800/5 dark:hover:hx-bg-gray-100/5"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" class="hx-origin-center hx-transition-transform rtl:-hx-rotate-180"></path></svg>
+{{- end -}}

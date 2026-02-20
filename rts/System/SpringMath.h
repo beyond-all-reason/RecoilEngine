@@ -104,7 +104,7 @@ float3 SolveIntersectingPoint(int zeroCoord, int coord1, int coord2, const float
  * @brief Returns the intersection points of a ray with the map boundary (2d only)
  * @param start float3 the start point of the line
  * @param dir float3 direction of the ray
- * @return <near,far> std::pair<float,float> distance to the intersection points in mulitples of `dir`
+ * @return <near,far> std::pair<float,float> distance to the intersection points in multiples of `dir`
  */
 float2 GetMapBoundaryIntersectionPoints(const float3 start, const float3 dir) _pure _warn_unused_result;
 
@@ -165,7 +165,7 @@ template<typename T, typename ...Ts>
 inline T argmax(const T v1, const Ts... vs) { return argmax(v1, argmax(vs...)); }
 
 // template<class T> T mix(const T v1, const T v2, const float a) { return (v1 * (1.0f - a) + v2 * a); }
-template<class T, typename T2> constexpr T mix(const T v1, const T v2, const T2 a) { return (v1 + (v2 - v1) * a); }
+template<class T, typename T2> constexpr T mix(const T& v1, const T& v2, const T2& a) { return (v1 + (v2 - v1) * a); }
 
 template <class T, class T2> constexpr T mixRotation(T v1, T v2, T2 a) {
     v1=ClampRad(v1);
@@ -178,7 +178,7 @@ template<class T> constexpr T Blend(const T v1, const T v2, const float a) { ret
 int Round(const float f) _const _warn_unused_result;
 
 template<class T> constexpr T Square(const T x) { return x*x; }
-template<class T> constexpr T Clamp(const T v, const T vmin, const T vmax) { return std::min(vmax, std::max(vmin, v)); }
+template<class T> constexpr T SignedSquare(const T x) { return x * std::abs(x); }
 // NOTE: '>' instead of '>=' s.t. Sign(int(true)) != Sign(int(false)) --> zero is negative!
 template<class T> constexpr T Sign(const T v) { return ((v > T(0)) * T(2) - T(1)); }
 
@@ -223,6 +223,12 @@ void ClampRad(float* f);
 float3 ClampRad(float3 v);
 
 /**
+ * @brief Clamps a radian angle between -pi and pi
+ * @param v float3 value to clamp
+ */
+float3 ClampRadPrincipal(float3 v);
+
+/**
  * @brief Shortest angle in radians
  * @param f1 float first compare value
  * @param f2 float first compare value
@@ -239,7 +245,7 @@ float3 GetRadAngleToward(float3 v1, float3 v2);
 
 
 /**
- * @brief Checks if 2 radian values discribe the same angle
+ * @brief Checks if 2 radian values describe the same angle
  * @param f1 float* first compare value
  * @param f2 float* second compare value
  */

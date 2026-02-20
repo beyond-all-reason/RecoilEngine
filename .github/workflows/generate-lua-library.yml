@@ -1,0 +1,71 @@
+name: Generate Lua library
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - rts/Lua/**
+      - rts/Rml/SolLua/**/*.cpp
+      - doc/site/mise.toml
+env:
+  RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
+  LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
+  LUA_DOC_EXTRACTOR_VERSION: "3"
+jobs:
+  generate-library:
+    if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
+    name: Regenerate library
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure git
+        run: |
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+      - name: Checkout Lua CPP files
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            rts/Lua
+            rts/Rml/SolLua
+            doc/site/mise.toml
+          path: recoil
+
+      - uses: jdx/mise-action@v2
+        with:
+          working_directory: ./recoil/doc/site
+          mise_toml: |
+            [tools]
+            "npm:lua-doc-extractor" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
+
+      - name: Generate Lua library
+        working-directory: ./recoil/doc/site
+        run: mise run lua_library
+
+      - name: Check out library repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.RECOIL_LUA_LIBRARY_RESPOSITORY }}
+          ssh-key: ${{ secrets.RECOIL_LUA_LIBRARY_SSH_KEY }}
+          path: library
+
+      - name: Copy changes into library repo
+        run: |
+          rm -rf library/library
+          cp -r "recoil/${{env.RECOIL_LUA_LIBRARY_DIR}}" library
+
+      # Always try to update library repo (even if generation did not make changes).
+      # Hand-written files may have changed without generated output changing,
+      # and library may simply be out of date for whatever reason.
+      #
+      # NOTE: The commit message will only be present on a push event.
+      - name: Commit and push library repo
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          repository: ./library
+          commit_message: |
+            Update library
+            Generated from ${{env.LUA_DOC_EXTRACTOR_SOURCE_REF}}
+
+            ${{ github.event.head_commit.message }}

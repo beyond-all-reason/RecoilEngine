@@ -24,6 +24,8 @@
 #include "System/Config/ConfigHandler.h"
 #include "System/Log/ILog.h"
 
+#include "System/Misc/TracyDefs.h"
+
 #define LOG_SECTION_SKY_BOX "SkyBox"
 LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_SKY_BOX)
 
@@ -35,6 +37,7 @@ LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_SKY_BOX)
 
 void CSkyBox::Init(uint32_t textureID, uint32_t xsize, uint32_t ysize, bool convertToCM)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	shader = nullptr;
 #ifndef HEADLESS
 	if (textureID == 0)
@@ -216,6 +219,7 @@ CSkyBox::CSkyBox(const std::string& texture)
 
 CSkyBox::~CSkyBox()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 #ifndef HEADLESS
 	if (shader)
 		shaderHandler->ReleaseProgramObject("[SkyBox]", "SkyBox");
@@ -224,6 +228,7 @@ CSkyBox::~CSkyBox()
 
 void CSkyBox::Draw()
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 #ifndef HEADLESS
 	if (!globalRendering->drawSky)
 		return;
@@ -237,9 +242,9 @@ void CSkyBox::Draw()
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
-	CMatrix44f view = camera->GetViewMatrix();
-	view.SetPos(float3());
-	glLoadMatrixf(view);
+	CMatrix44f model; model.Rotate(skyAxisAngle.w, float3{ skyAxisAngle.x, skyAxisAngle.y, skyAxisAngle.z });
+	CMatrix44f view = camera->GetViewMatrix(); view.SetPos(float3());
+	glLoadMatrixf(view * model);
 
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();

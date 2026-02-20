@@ -1,0 +1,119 @@
+[tools]
+	# We only install tools required for each task on each task, unless all tasks use a tool here
+	# For CI when we need to install and cache all tools, see mise.ci.toml
+
+[env]
+	HUGO_VERSION = "0.147.9"
+	LUA_DOC_EXTRACTOR_VERSION = "3" # lua_library lua_check
+	EMMYLUA_DOC_CLI_VERSION = "0.8.2" # lua_pages lua_library lua_check
+	LUA_LANGUAGE_SERVER_VERSION = "3.15.0" # lua_check
+	JQ_VERSION = "1.8.0" # binary_pages
+	7Z_VERSION = "24.09" # binary_pages
+	RUBY_VERSION = "3.3" # lua_pages
+	LUA_DOC_EXTRACTOR_SOURCE_REF = "https://github.com/beyond-all-reason/RecoilEngine/blob/master"
+	RECOIL_LUA_LIBRARY_DIR = "rts/Lua/library"
+
+[vars]
+	lua_doc_gen_dest = "$RECOIL_LUA_LIBRARY_DIR/generated"
+	site_dir = 'doc/site'
+	site_temp_dir = "{{vars.site_dir}}/temp"
+	lua_doc_paths = 'rts/{Lua,Rml/SolLua}/**/*.cpp'
+	lua_pages_dir = "{{vars.site_dir}}/content/docs/lua-api"
+	emmylua_cli_template = "{{vars.site_dir}}/emmylua-doc-cli-template"
+	latest_release_data = 'data/latest_release.json'
+
+[tasks]
+	[tasks.server]
+	description = "Run the site server locally"
+	tools.hugo = "{{env.HUGO_VERSION}}"
+	run = "hugo server --navigateToChanged"
+
+	[tasks.server_full]
+	depends = ["lua_pages", "binary_pages"]
+	description = "Run the site server locally, with all possible content"
+	tools.hugo = "{{env.HUGO_VERSION}}"
+	run = "hugo server --navigateToChanged"
+
+	[tasks.lua_pages]
+	description = "Generate Lua API Pages"
+	depends = ["lua_json"]
+	tools.ruby = "{{env.RUBY_VERSION}}"
+	run = "ruby docgen/generator.rb --out=content/docs/lua-api/_index.md --doc=data/doc.json"
+
+	[tasks.lua_json]
+	description = "Generate Lua JSON export"
+	tools."cargo:emmylua_doc_cli" = "{{env.EMMYLUA_DOC_CLI_VERSION}}"
+	depends = ["lua_library"]
+	dir = "../../"
+	run = "emmylua_doc_cli -f json -i $RECOIL_LUA_LIBRARY_DIR -o {{vars.site_dir}}/data"
+
+	[tasks.binary_pages]
+	depends = ["latest_release_data"]
+	description = "Generate Docs from Recoil binary"
+	tools."aqua:jqlang/jq" = "{{env.JQ_VERSION}}"
+	tools."aqua:ip7z/7zip" = "{{env.7Z_VERSION}}"
+	run = '''
+		download_url=$(jq -r '.assets[] | select(.name | contains("amd64-linux.7z")).browser_download_url' {{vars.latest_release_data}})
+
+		temp_dir=temp/release
+		rm -rf $temp_dir
+		mkdir -p $temp_dir
+		cd $temp_dir
+
+		echo "> downloading latest engine release from $download_url"
+		curl -L $download_url -o engine.7z
+
+		echo "> extracting release binary"
+		7z -y e engine.7z spring
+
+		data_dir="../../data"
+
+		config_file="$data_dir/configs.json"
+		wdefs_file="$data_dir/weapondefs.json"
+		commands_file="$data_dir/unsynced_commands.json"
+		synced_commands_file="$data_dir/synced_commands.json"
+
+		echo "> writing $config_file"
+		rm -f $config_file
+		./spring --list-config-vars | grep -v "^\[t=" > $config_file
+
+		echo "> writing $wdefs_file"
+		rm -f $wdefs_file
+		./spring --list-def-tags | grep -v "^\[t=" > $wdefs_file
+
+		echo "> writing $commands_file"
+		rm -f $commands_file
+		./spring --list-unsynced-commands | grep -v "^\[t=" > $commands_file
+
+		echo "> writing $synced_commands_file"
+		rm -f $synced_commands_file
+		./spring --list-synced-commands | grep -v "^\[t=" > $synced_commands_file
+	'''
+
+	[tasks.lua_check]
+	description = "Sanity check lua library with lua language server"
+	depends = ["lua_library"]
+	tools.lua-language-server = "{{env.LUA_LANGUAGE_SERVER_VERSION}}"
+	dir = "../../"
+	run = [
+		"lua-language-server --check \"${RECOIL_LUA_LIBRARY_DIR}\""
+	]
+
+	[tasks.lua_library]
+	description = "Generate Lua Docs"
+	tools."npm:lua-doc-extractor" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
+	dir = "../../"
+	run = [
+		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_doc_gen_dest}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\""
+	]
+
+	[tasks.latest_release_data]
+	description = "Get latest release data"
+	tools."aqua:jqlang/jq" = "{{env.JQ_VERSION}}"
+	run = [
+		"rm -f temp/latest_release.json",
+		"mkdir -p temp",
+		"curl -s https://api.github.com/repos/beyond-all-reason/RecoilEngine/releases/latest > temp/latest_release.json",
+		"mv temp/latest_release.json {{vars.latest_release_data}}",
+		"jq '.' {{vars.latest_release_data}}"
+	]

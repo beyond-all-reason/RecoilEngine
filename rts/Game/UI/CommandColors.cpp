@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "System/Misc/TracyDefs.h"
+
 /******************************************************************************/
 
 
@@ -85,7 +87,8 @@ CCommandColors::CCommandColors()
 
 static bool ParseBlendMode(const std::string& word, unsigned int& mode)
 {
-	std::string lower = std::move(StringToLower(word));
+	RECOIL_DETAILED_TRACY_ZONE;
+	std::string lower = StringToLower(word);
 
 	switch (hashString(lower.c_str())) {
 		case hashString("zero"               ): { mode = GL_ZERO;                return true; } break;
@@ -108,6 +111,7 @@ static bool ParseBlendMode(const std::string& word, unsigned int& mode)
 
 static bool IsValidSrcMode(unsigned int mode)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	switch (mode) {
 		case GL_ZERO:
 		case GL_ONE:
@@ -127,6 +131,7 @@ static bool IsValidSrcMode(unsigned int mode)
 
 static bool IsValidDstMode(unsigned int mode)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	switch (mode) {
 		case GL_ZERO:
 		case GL_ONE:
@@ -146,6 +151,7 @@ static bool IsValidDstMode(unsigned int mode)
 
 static bool SafeAtoF(float& var, const std::string& value)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const char* startPtr = value.c_str();
 	      char*   endPtr = nullptr;
 
@@ -160,6 +166,7 @@ static bool SafeAtoF(float& var, const std::string& value)
 
 static bool SafeAtoI(unsigned int& var, const std::string& value)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	const char* startPtr = value.c_str();
 	      char*   endPtr = nullptr;
 
@@ -175,6 +182,7 @@ static bool SafeAtoI(unsigned int& var, const std::string& value)
 
 bool CCommandColors::LoadConfigFromFile(const std::string& filename)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CFileHandler ifs(filename);
 	std::string cfg;
 	ifs.LoadStringData(cfg);
@@ -184,20 +192,21 @@ bool CCommandColors::LoadConfigFromFile(const std::string& filename)
 
 bool CCommandColors::LoadConfigFromString(const std::string& cfg)
 {
+	RECOIL_DETAILED_TRACY_ZONE;
 	CSimpleParser parser(cfg);
 
 	while (true) {
-		const std::string line = std::move(parser.GetCleanLine());
+		const std::string line = parser.GetCleanLine();
 
 		if (line.empty())
 			break;
 
-		const std::vector<std::string> words = std::move(parser.Tokenize(line, 1));
+		const std::vector<std::string> words = parser.Tokenize(line, 1);
 
 		if (words.size() <= 1)
 			continue;
 
-		const std::string command = std::move(StringToLower(words[0]));
+		const std::string command = StringToLower(words[0]);
 
 		switch (hashString(command.c_str())) {
 			case hashString("alwaysdrawqueue"): {
