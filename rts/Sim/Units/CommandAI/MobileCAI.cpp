@@ -845,9 +845,8 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 
 		if (owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, true)) {
 			// StopMoveAndKeepPointing calls StopMove before KeepPointingTo
-			// but we want to call it *after* KeepPointingTo to prevent 4131
+			// but we want to keep trying to move towards the target until we successfully fire. StopMove is called after we fire.
 			owner->moveType->KeepPointingTo(attackPos, owner->maxRange * 0.9f, true);
-			StopMove();
 		}
 
 		return;

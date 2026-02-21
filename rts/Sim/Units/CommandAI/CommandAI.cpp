@@ -1759,6 +1759,7 @@ void CCommandAI::WeaponFired(CWeapon* weapon, const bool searchForNewTarget, boo
 		// salvo if they have more orders queued
 		if (weapon->weaponDef->manualfire && !(c.GetOpts() & META_KEY))
 			orderFinished = true;
+			StopMove();
 
 		if (weapon->noAutoTarget && !(c.GetOpts() & META_KEY) && haveGroundAttackCmd && HasMoreMoveCommands())
 			orderFinished = true;
