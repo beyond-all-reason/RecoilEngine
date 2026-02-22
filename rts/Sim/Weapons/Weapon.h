@@ -219,7 +219,7 @@ public:
 	bool fastQueryPointUpdate;
 	unsigned int accurateLeading;
 	unsigned int burstControlWhenOutOfArc;
-	unsigned int rangefrombase;
+	unsigned int rangeFromBase;
 
 protected:
 	SWeaponTarget currentTarget;

@@ -68,8 +68,11 @@ UnitDefWeapon::UnitDefWeapon(const WeaponDef* weaponDef, const LuaTable& weaponT
 	// 2+ = extra iterations for parabolic shots. Iterations terminate early once 1-frame accuracy is achieved. 
 	accurateLeading = weaponTable.GetInt("accurateLeading", accurateLeading);
   
-  // Determines where to calculate weapon range from. 0 = from weapon->aimFromPos (default), 1 = from owner->pos + aimFromPos.y, 2 = from owner->aimPos
-	rangefrombase = weaponTable.GetInt("rangefrombase", rangefrombase);
+    // Determines where to calculate weapon range from:
+	// 0 = default, from weapon AimFrom position. For physically accurate range from the weapon location on the unit model.
+	// 1 = from unit XZ center and AimFrom Y height. For accurate range from the center of the unit, for more predictable "game" mechanics.
+	// 2 = from the unit's own target (AimPos) position. For better symmetry in unit mirror matchups, particularly for tall units engaging across elevation differences.
+	rangeFromBase = weaponTable.GetInt("rangeFromBase", rangeFromBase);
 }
 
 

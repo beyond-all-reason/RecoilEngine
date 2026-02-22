@@ -206,7 +206,7 @@ void CWeaponLoader::InitWeapon(CUnit* owner, CWeapon* weapon, const UnitDefWeapo
 	weapon->fastQueryPointUpdate = defWeapon->fastQueryPointUpdate;
 	weapon->accurateLeading = defWeapon->accurateLeading;
 	weapon->burstControlWhenOutOfArc = defWeapon->burstControlWhenOutOfArc;
-	weapon->rangefrombase = defWeapon->rangefrombase;
+	weapon->rangeFromBase = defWeapon->rangeFromBase;
 
 	weapon->ttl = weaponDef->flighttime;
 }
