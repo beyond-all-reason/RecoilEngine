@@ -1043,7 +1043,7 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 			ShowUnitScriptError("[US::GetUnitVal::PIECE_HEADING] invalid script piece index");
 			break;
 		}
-		const float3 dir = piece->GetModelSpaceTransform() * float4(0.0f, 0.0f, 1.0f, 0.0f);
+		const float3 dir = piece->GetModelSpaceTransform() * float4(FwdVector);
 		return GetHeadingFromVector(dir.x, dir.z);
 	} break;
 	case PIECE_PITCH: {
@@ -1052,7 +1052,7 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 			ShowUnitScriptError("[US::GetUnitVal::PIECE_PITCH] invalid script piece index");
 			break;
 		}
-		const float3 dir = piece->GetModelSpaceTransform() * float4(0.0f, 0.0f, 1.0f, 0.0f);
+		const float3 dir = piece->GetModelSpaceTransform() * float4(FwdVector);
 		// returns pitch with same sign convention as the pitch given to AimWeaponX
 		return short(math::asin(std::clamp(dir.y, -1.0f, 1.0f)) * RAD2TAANG);
 	} break;
