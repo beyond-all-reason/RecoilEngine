@@ -1759,7 +1759,7 @@ void CCommandAI::WeaponFired(CWeapon* weapon, const bool searchForNewTarget, boo
 		// salvo if they have more orders queued
 		if (weapon->weaponDef->manualfire && !(c.GetOpts() & META_KEY)) {
 			orderFinished = true;
-			StopMove();
+			StopMove(); // additional fix for https://springrts.com/mantis/view.php?id=4131
 		} 
 		
 		if (weapon->noAutoTarget && !(c.GetOpts() & META_KEY) && haveGroundAttackCmd && HasMoreMoveCommands())

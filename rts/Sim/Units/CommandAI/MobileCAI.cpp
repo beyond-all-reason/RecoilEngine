@@ -847,6 +847,11 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 			// StopMoveAndKeepPointing calls StopMove before KeepPointingTo
 			// but we want to keep trying to move towards the target until we successfully fire. StopMove is called after we fire.
 			owner->moveType->KeepPointingTo(attackPos, owner->maxRange * 0.9f, true);
+			StopMove();
+		} else {
+			// we are out of range of CMD_MANUALFIRE, perhaps either still out of range, or an animation brought us out of range, set a movegoal 
+			// ok to call if a goal already exists, SetGoal checks if owner already has a goal to this position
+			SetGoal(c.GetPos(0), owner->pos); 
 		}
 
 		return;
