@@ -845,15 +845,8 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 
 		if (owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, true)) {
 			// StopMoveAndKeepPointing calls StopMove before KeepPointingTo
-			// but we want to call it *after* KeepPointingTo to prevent 4131
-			owner->moveType->KeepPointingTo(attackPos, owner->maxRange * 0.9f, true);
-			StopMove();
-		} else {
-			// we are out of range of CMD_MANUALFIRE, perhaps either still out of range, or an animation brought us out of range
-			// ok to call if a goal already exists, SetGoal checks if owner already has a goal to this position
-			SetGoal(c.GetPos(0), owner->pos); 
-		}
-
+			StopMoveAndKeepPointing(attackPos, owner->maxRange * 0.9f, true);
+		} 
 		return;
 	}
 
