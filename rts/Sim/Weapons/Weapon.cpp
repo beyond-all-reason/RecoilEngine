@@ -332,6 +332,24 @@ void CWeapon::Update()
 			AutoTarget();
 	}
 
+	// handle movegoals if the weapon is commandFire/manualfire
+	// CAI only checks if the target is shootable on SlowUpdates, 
+	// so it is too slow at issuing new movegoals if the weaponMuzzlePos is moved out of range before the weapon fires
+	if (weaponDef->manualfire && owner->moveType->IsAtGoal() && owner->curTarget.type != Target_None) {
+		if (!Attack(owner->curTarget)) {
+			switch (owner->curTarget.type) {
+				case Target_Unit: {
+					owner->commandAI->SetGoal(owner->curTarget.pos)
+					break
+				}
+				case Target_Pos: {
+					owner->commandAI->SetGoal(owner->curTarget.groundPos)
+					break
+				}
+			}
+		}
+	}
+
 	// SlowUpdate() only generates targets when we are in range
 	// esp. for bombs this is often too late (SlowUpdate gets only called twice per second)
 	// so check unit's target this check every frame (unit target has highest priority even in SlowUpdate!)
