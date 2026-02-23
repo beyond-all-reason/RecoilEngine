@@ -202,7 +202,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitNearestAlly);
 	REGISTER_LUA_CFUNC(GetUnitNearestEnemy);
 	REGISTER_LUA_CFUNC(GetClosestEnemyUnit);
-	REGISTER_LUA_CFUNC(GetMouseNearestEnemy);
+	REGISTER_LUA_CFUNC(GetMouseClosestEnemy);
 
 	REGISTER_LUA_CFUNC(GetUnitTooltip);
 	REGISTER_LUA_CFUNC(GetUnitDefID);
@@ -3545,7 +3545,7 @@ int LuaSyncedRead::GetClosestEnemyUnit(lua_State* L)
 
 /***
  * 
- * @function Spring.GetMouseNearestEnemy
+ * @function Spring.GetMouseClosestEnemy
  * @param range number? (Default: `1.0e9`)
  * @param useLOS boolean? (Default: `true`)
  * @return integer? unitID

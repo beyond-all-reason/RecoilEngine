@@ -94,7 +94,6 @@ class LuaSyncedRead {
 
 		static int GetUnitNearestAlly(lua_State* L);
 		static int GetUnitNearestEnemy(lua_State* L);
-		static int GetMouseNearestEnemy(lua_State* L);
 		static int GetClosestEnemyUnit(lua_State* L);
 		static int GetMouseClosestEnemy(lua_State* L);
 
