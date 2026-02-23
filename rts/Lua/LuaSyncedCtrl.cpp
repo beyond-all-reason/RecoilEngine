@@ -69,6 +69,7 @@
 #include "Sim/Units/CommandAI/Command.h"
 #include "Sim/Units/CommandAI/CommandAI.h"
 #include "Sim/Units/CommandAI/FactoryCAI.h"
+#include "Sim/Units/CommandAI/MobileCAI.h"
 #include "Sim/Units/UnitTypes/ExtractorBuilding.h"
 #include "Sim/Weapons/PlasmaRepulser.h"
 #include "Sim/Weapons/Weapon.h"
@@ -207,6 +208,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitWeaponState);
 	REGISTER_LUA_CFUNC(SetUnitWeaponDamages);
 	REGISTER_LUA_CFUNC(SetUnitMaxRange);
+	REGISTER_LUA_CFUNC(SetUnitEngagementRange);
 	REGISTER_LUA_CFUNC(SetUnitExperience);
 	REGISTER_LUA_CFUNC(AddUnitExperience);
 	REGISTER_LUA_CFUNC(SetUnitArmored);
@@ -2772,6 +2774,36 @@ int LuaSyncedCtrl::SetUnitMaxRange(lua_State* L)
 	return 0;
 }
 
+/***
+ * @function Spring.SetUnitEngagementRange
+ * @param unitID integer
+ * @param idleSearchRadius number? optional idle auto-target search radius
+ * @param fightSearchRadius number? optional fight-move search radius
+ * @return nil
+ */
+int LuaSyncedCtrl::SetUnitEngagementRange(lua_State* L)
+{
+	// Sets the engagement search radius for a unit's auto-target selection.
+	// Overrides the default search radius the unit uses to automatically find
+	// targets when idle and when fight moving.
+	CUnit* unit = ParseUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	CMobileCAI* mCAI = dynamic_cast<CMobileCAI*>(unit->commandAI);
+
+	if (mCAI == nullptr)
+		return 0;
+
+	if (!lua_isnoneornil(L, 2))
+		mCAI->engagementRange = luaL_checkfloat(L, 2);
+
+	if (!lua_isnoneornil(L, 3))
+		mCAI->fightEngagementRange = luaL_checkfloat(L, 3);
+
+	return 0;
+}
 
 /***
  * @function Spring.SetUnitExperience

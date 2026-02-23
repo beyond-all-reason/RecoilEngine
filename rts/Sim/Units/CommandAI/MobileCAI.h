@@ -90,6 +90,10 @@ public:
 	float buggerOffRadius;
 	float repairBelowHealth;
 
+	// Lua-settable engagement range overrides (-1 means use default)
+	float engagementRange = -1.0f;
+	float fightEngagementRange = -1.0f;
+
 	bool tempOrder;
 
 protected:
