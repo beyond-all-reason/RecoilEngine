@@ -201,6 +201,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(GetUnitNearestAlly);
 	REGISTER_LUA_CFUNC(GetUnitNearestEnemy);
+	REGISTER_LUA_CFUNC(GetClosestEnemyUnit);
 	REGISTER_LUA_CFUNC(GetMouseNearestEnemy);
 
 	REGISTER_LUA_CFUNC(GetUnitTooltip);
@@ -3495,39 +3496,45 @@ int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 	return 1;
 }
 
-
 /***
- * 
- * @function Spring.GetMouseNearestEnemy
+ * @note probably need to change function name but keep as is for now. 
+ * @function Spring.GetPosNearestEnemy
+ * @param x number x coordinate of query position
+ * @param y number y coordinate of query position
+ * @param z number z coordinate of query position
  * @param range number? (Default: `1.0e9`)
- * @param useLOS boolean? (Default: `false`)
+ * @param useLOS boolean? (Default: `true`)
  * @return integer? unitID
+ * 
 */
-int LuaSyncedRead::GetMouseNearestEnemy(lua_State* L)
+int LuaSyncedRead::GetClosestEnemyUnit(lua_State* L)
 {
-	if (mouse == nullptr)
+	float x = luaL_optnumber(L, 1, 1.0f);
+	float y = luaL_optnumber(L, 2, 1.0f);
+	float z = luaL_optnumber(L, 3, 1.0f);
+
+	float3 pos(x, y, z);
+	pos.ClampInMap();
+
+	if (pos.equals(OnesVector, ZeroVector)) // no tolerance for invalid call from mouse, similar for invalid params
 		return 0;
 
 	const int allyTeam = CLuaHandle::GetHandleReadAllyTeam(L);
 	if (allyTeam < 0)
 		return 0;
 
-	const bool wantLOS = !lua_isboolean(L, 2) || lua_toboolean(L, 2);
+	const bool wantLOS = !lua_isboolean(L, 4) || lua_toboolean(L, 2);
 	const bool testLOS = !CLuaHandle::GetHandleFullRead(L) || wantLOS;
 
-	const bool sphereDistTest = luaL_optboolean(L, 3, false);
-	const bool checkSightDist = luaL_optboolean(L, 4, false);
-
-	float3 searchPos = mouse->GetWorldMapPos(); // grabs mouse worldspace position
-	if (searchPos == -OnesVector)
-		return 0;
+	const bool sphereDistTest = luaL_optboolean(L, 5, false);
+	const bool checkSightDist = luaL_optboolean(L, 6, false);
 
 	// nullptr since determining closest unit to position, not unit
 	// if ignoring LOS, pass checkSightDist=false (by default)
 	// such that enemies outside unit's los-range are included
 	const CUnit* target = testLOS ?
-		CGameHelper::GetClosestEnemyUnit         (nullptr, searchPos, luaL_optnumber(L, 1, 1.0e9f), allyTeam                                ):
-		CGameHelper::GetClosestEnemyUnitNoLosTest(nullptr, searchPos, luaL_optnumber(L, 1, 1.0e9f), allyTeam, sphereDistTest, checkSightDist);
+		CGameHelper::GetClosestEnemyUnit(nullptr, pos, luaL_optnumber(L, 1, 1.0e9f), allyTeam) :
+		CGameHelper::GetClosestEnemyUnitNoLosTest(nullptr, pos, luaL_optnumber(L, 1, 1.0e9f), allyTeam, sphereDistTest, checkSightDist);
 
 	if (target == nullptr)
 		return 0;
@@ -3536,6 +3543,31 @@ int LuaSyncedRead::GetMouseNearestEnemy(lua_State* L)
 	return 1;
 }
 
+/***
+ * 
+ * @function Spring.GetMouseNearestEnemy
+ * @param range number? (Default: `1.0e9`)
+ * @param useLOS boolean? (Default: `true`)
+ * @return integer? unitID
+ *
+*/
+int LuaSyncedRead::GetMouseClosestEnemy(lua_State* L) {
+	if (mouse == nullptr) {
+		return 0;
+	}
+
+	float3 search = mouse->GetWorldMapPos();
+	lua_pushnumber(L, search.x);
+	lua_insert(L, 1);
+
+	lua_pushnumber(L, search.y);
+	lua_insert(L, 2);
+
+	lua_pushnumber(L, search.z);
+	lua_insert(L, 3);
+
+	return GetClosestEnemyUnit(L);
+}
 
 /******************************************************************************
  * Spatial feature queries
