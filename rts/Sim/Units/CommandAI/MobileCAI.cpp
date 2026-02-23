@@ -902,7 +902,6 @@ void CMobileCAI::ExecuteAttack(Command& c)
 		const float3& closestPos = ClosestPointOnLine(commandPos1, commandPos2, owner->pos);
 
 		const float curTargetDist = LinePointDist(closestPos, commandPos2, orderTarget->pos);
-		//const float maxTargetDist = (owner->moveType->GetManeuverLeash() * owner->moveState + owner->maxRange);
 		const float maxTargetDist = (engagementRange >= 0.0f) ? engagementRange : (owner->moveType->GetManeuverLeash() * owner->moveState + owner->maxRange);
 		
 		if (owner->moveState < MOVESTATE_ROAM && curTargetDist > maxTargetDist) {
