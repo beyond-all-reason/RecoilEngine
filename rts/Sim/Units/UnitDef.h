@@ -171,6 +171,7 @@ public:
 	bool leavesGhost;
 
 	bool  buildRange3D;
+	bool  canBuildWhileMoving;
 	float buildDistance;
 	float buildSpeed;
 	float reclaimSpeed;

@@ -184,6 +184,8 @@ UnitDef::UnitDef()
 	, canBeAssisted(false)
 	, canSelfRepair(false)
 
+	, canBuildWhileMoving(false)
+
 	, canFireControl(false)
 	, canManualFire(false)
 
@@ -399,6 +401,8 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 
 	canBeAssisted = udTable.GetBool("canBeAssisted", true);
 	canSelfRepair = udTable.GetBool("canSelfRepair", false);
+
+	canBuildWhileMoving = udTable.GetBool("canBuildWhileMoving", false);
 
 	canFireControl = !udTable.GetBool("noAutoFire", false);
 	canManualFire = udTable.GetBool("canManualFire", udTable.GetBool("canDGun", false));

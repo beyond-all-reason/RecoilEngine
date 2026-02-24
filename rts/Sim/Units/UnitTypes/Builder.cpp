@@ -569,6 +569,21 @@ void CBuilder::SlowUpdate()
 		mapDamage->RecalcArea(tx1 - tsr, tx2 + tsr, tz1 - tsr, tz2 + tsr);
 	}
 
+	// [MOBILE BUILD] Re-orient the nano-piece toward the current work target
+	// while this unit is moving.  SlowUpdate cadence (~16 frames) is sufficient
+	// since script animation is not frame-perfect and the visual difference vs.
+	// a per-frame update is imperceptible.
+	if (unitDef->canBuildWhileMoving && IsMoving()) {
+
+		const bool CalledScriptStartBuilding =
+			(curBuild      != nullptr) ? ScriptStartBuilding(curBuild->pos, /*silent=*/true)     :
+			(curReclaim    != nullptr) ? ScriptStartBuilding(curReclaim->pos, /*silent=*/true)   :
+			(curResurrect  != nullptr) ? ScriptStartBuilding(curResurrect->pos, /*silent=*/true) :
+			(curCapture    != nullptr) ? ScriptStartBuilding(curCapture->pos, /*silent=*/true)   :
+			(helpTerraform != nullptr) ? ScriptStartBuilding(helpTerraform->terraformCenter, /*silent=*/true) : false;
+
+	}
+
 	CUnit::SlowUpdate();
 }
 

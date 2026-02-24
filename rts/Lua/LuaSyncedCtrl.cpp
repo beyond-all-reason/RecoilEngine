@@ -224,6 +224,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitBuildSpeed);
 	REGISTER_LUA_CFUNC(SetUnitBuildParams);
 	REGISTER_LUA_CFUNC(SetUnitNanoPieces);
+	REGISTER_LUA_CFUNC(SetUnitBuilderTarget);
 
 	REGISTER_LUA_CFUNC(SetUnitBlocking);
 	REGISTER_LUA_CFUNC(SetUnitCrashing);
@@ -3317,6 +3318,75 @@ int LuaSyncedCtrl::SetUnitNanoPieces(lua_State* L)
 	}
 
 	return 0;
+}
+
+/***
+ * @function Spring.SetUnitBuilderTarget
+ * @param builderID  integer   unit ID of the builder
+ * @param targetType string    "repair" | "reclaim" | "resurrect" | "capture"
+ * @param targetID   integer   unit ID (repair/reclaim-unit/capture) or
+ *                             feature ID (reclaim-feature/resurrect)
+ * @return boolean success
+ */
+int LuaSyncedCtrl::SetUnitBuilderTarget(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
+
+	CBuilder* builder = dynamic_cast<CBuilder*>(unit);
+	if (builder == nullptr)
+		return 0;
+
+	const std::string targetType = luaL_checkstring(L, 2);
+	const int targetID = luaL_checkint(L, 3);
+
+	if (targetType == "repair") {
+		CUnit* target = unitHandler.GetUnit(targetID);
+		if (target == nullptr)
+			return 0;
+		builder->SetRepairTarget(target);
+
+	}
+	else if (targetType == "capture") {
+		CUnit* target = unitHandler.GetUnit(targetID);
+		if (target == nullptr)
+			return 0;
+		builder->SetCaptureTarget(target);
+
+	}
+	else if (targetType == "reclaim") {
+		// targetID may be a unit or a feature
+		// Feature IDs in Lua are offset by unitHandler.MaxUnits()
+		const int maxUnits = unitHandler.MaxUnits();
+		if (targetID >= maxUnits) {
+			CFeature* feature = featureHandler.GetFeature(targetID - maxUnits);
+			if (feature == nullptr)
+				return 0;
+			builder->SetReclaimTarget(feature);
+		}
+		else {
+			CUnit* target = unitHandler.GetUnit(targetID);
+			if (target == nullptr)
+				return 0;
+			builder->SetReclaimTarget(target);
+		}
+
+	}
+	else if (targetType == "resurrect") {
+		CFeature* feature = featureHandler.GetFeature(targetID - unitHandler.MaxUnits());
+		if (feature == nullptr)
+			return 0;
+		builder->SetResurrectTarget(feature);
+
+	}
+	else {
+		luaL_error(L, "SetUnitBuilderTarget: unknown targetType '%s'", targetType.c_str());
+		return 0;
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
 }
 
 

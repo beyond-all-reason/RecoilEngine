@@ -450,8 +450,36 @@ void CBuilderCAI::GiveCommandReal(const Command& c, bool fromSynced)
 	// FIXME should happen just before CMobileCAI::GiveCommandReal? (the new cmd can still be skipped!)
 	if ((c.GetID() != CMD_WAIT) && !(c.GetOpts() & SHIFT_KEY)) {
 		if (nonQueingCommands.find(c.GetID()) == nonQueingCommands.end()) {
-			building = false;
-			static_cast<CBuilder*>(owner)->StopBuild();
+			// [MOBILE BUILD] Pure movement commands (MOVE, FIGHT, PATROL) directed
+			// at a canBuildWhileMoving unit should not interrupt ongoing work as
+			// long as the builder remains in range of its current target.
+			// The movement goal is updated by CMobileCAI::GiveCommandReal below,
+			// and Builder::Update() will keep applying build power each frame that
+			// IsInBuildRange() is satisfied.  If the new waypoint takes the unit
+			// out of range, Builder::Update() simply stops producing build power
+			// until range is re-established (or a new build command is issued).
+			const bool isMoveCmd =
+				(c.GetID() == CMD_MOVE   ||
+				 c.GetID() == CMD_FIGHT  ||
+				 c.GetID() == CMD_PATROL);
+
+			const CBuilder* b = static_cast<CBuilder*>(owner);
+			const bool hasActiveTarget =
+				(b->curBuild     != nullptr) ||
+				(b->curReclaim   != nullptr) ||
+				(b->curResurrect != nullptr) ||
+				(b->curCapture   != nullptr) ||
+				 b->terraforming;
+
+			const bool suppressStop =
+				isMoveCmd &&
+				owner->unitDef->canBuildWhileMoving &&
+				hasActiveTarget;
+
+			if (!suppressStop) {
+				building = false;
+				static_cast<CBuilder*>(owner)->StopBuild();
+			} 
 		}
 	}
 
@@ -1741,4 +1769,3 @@ void CBuilderCAI::BuggerOff(const float3& pos, float radius) {
 
 	CMobileCAI::BuggerOff(pos, radius);
 }
-
