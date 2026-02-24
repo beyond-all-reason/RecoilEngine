@@ -56,6 +56,45 @@ If you are just starting out and want to get an engine binary, we recommend usin
 
 If you want to compile the engine without Docker to use a different compiler, to have a better setup with code completion in an IDE, etc., you might want to follow the [building without Docker article](https://recoilengine.org/development/building-without-docker/).
 
+### macOS (Apple Clang / Xcode) quick build
+
+Prerequisites:
+
+- Xcode Command Line Tools (`xcode-select --install`)
+- CMake 3.27+
+- Homebrew
+
+Install dependencies:
+
+```bash
+brew install cmake sdl2 devil freetype fontconfig expat libunwind openal-soft libvorbis
+```
+
+Clone with submodules:
+
+```bash
+git clone --recursive https://github.com/beyond-all-reason/RecoilEngine.git
+cd RecoilEngine
+```
+
+Configure and build (Debug):
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j
+```
+
+Run a minimal smoke check:
+
+```bash
+ctest --test-dir build -R testCreg --output-on-failure
+```
+
+Troubleshooting:
+
+- Missing `DevIL`, `SDL2`, `Fontconfig`, or `Freetype` at configure time usually means Homebrew dependencies were not installed.
+- If submodule sources are missing, run: `git submodule update --init --recursive`.
+
 ## License
 
 Our Terms are documented in the [LICENSE](LICENSE).

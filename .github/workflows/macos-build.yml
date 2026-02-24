@@ -1,0 +1,29 @@
+name: macOS build
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: brew install cmake sdl2 devil freetype fontconfig expat libunwind openal-soft libvorbis
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+
+      - name: Build
+        run: cmake --build build -j --target spring-headless
+
+      - name: Smoke test
+        run: ctest --test-dir build -R testCreg --output-on-failure

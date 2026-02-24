@@ -48,11 +48,11 @@ find_freetype_hack() # hack to find different named freetype.dll
 find_package_static(Freetype 2.8.1 REQUIRED)
 list(APPEND engineLibraries Freetype::Freetype)
 
-if    (UNIX)
+if    (UNIX AND NOT APPLE)
 	find_package(X11 REQUIRED)
 	target_link_libraries(Game PRIVATE X11::Xcursor)
 	list(APPEND engineLibraries ${X11_Xcursor_LIB} ${X11_X11_LIB})
-endif (UNIX)
+endif (UNIX AND NOT APPLE)
 
 if (APPLE)
 	find_library(COREFOUNDATION_LIBRARY Foundation)
