@@ -2796,11 +2796,21 @@ int LuaSyncedCtrl::SetUnitEngagementRange(lua_State* L)
 	if (mCAI == nullptr)
 		return 0;
 
-	if (!lua_isnoneornil(L, 2))
-		mCAI->engagementRange = luaL_checkfloat(L, 2);
+	const int args = lua_gettop(L);
 
-	if (!lua_isnoneornil(L, 3))
-		mCAI->fightEngagementRange = luaL_checkfloat(L, 3);
+	if (args >= 2) {
+		if (lua_isnoneornil(L, 2) || (lua_isboolean(L, 2)))
+			mCAI->engagementRange = -1.0f;
+		else
+			mCAI->engagementRange = luaL_checkfloat(L, 2);
+	}
+
+	if (args >= 3) {
+		if (lua_isnoneornil(L, 3) || (lua_isboolean(L, 3)))
+			mCAI->fightEngagementRange = -1.0f;
+		else
+			mCAI->fightEngagementRange = luaL_checkfloat(L, 3);
+	}
 
 	return 0;
 }
