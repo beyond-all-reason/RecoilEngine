@@ -492,7 +492,7 @@ local function FreeFonts()
 end
 
 
-local function Update(dt)
+function widget:Update(dt)
   timeStamp = timeStamp + dt
   if (timeStamp < (lastUpdate + 1.0)) then
     return  -- only update every 1.0 seconds
@@ -557,3 +557,4 @@ return FH
 
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
+
