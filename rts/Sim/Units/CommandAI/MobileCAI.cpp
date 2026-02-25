@@ -345,7 +345,6 @@ void CMobileCAI::SlowUpdate()
 
 	if (!commandQue.empty() && commandQue.front().GetTimeOut() < gs->frameNum) {
 		StopMoveAndFinishCommand();
-		return;
 	}
 
 	if (commandQue.empty()) {
@@ -1275,8 +1274,7 @@ bool CMobileCAI::GenerateAttackCmd()
 		return false;
 
 	Command c(CMD_ATTACK, INTERNAL_ORDER, newAttackTargetId);
-	const int attackTimeout = math::floor(std::max(5.0f, 2 * searchRadius / owner->unitDef->speed));
-	c.SetTimeOut(gs->frameNum + GAME_SPEED * attackTimeout);
+	c.SetTimeOut(gs->frameNum + GAME_SPEED * 5);
 	commandQue.push_front(c);
 
 	commandPos1 = owner->pos;
