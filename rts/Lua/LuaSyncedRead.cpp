@@ -9,7 +9,6 @@
 #include "LuaHashString.h"
 #include "LuaMetalMap.h"
 #include "LuaPathFinder.h"
-#include "LuaReadCommon.h"
 #include "LuaRules.h"
 #include "LuaRulesParams.h"
 #include "LuaUtils.h"
@@ -2934,25 +2933,42 @@ void ApplyPlanarTeamError(lua_State* L, int allegiance, float3& mins, float3& ma
  * @param inRegion A lambda checking if the unit position is in the region
  */
 template<typename InRegion>
-static void GetFilteredUnits(lua_State *L, int allegiance, const std::vector<CUnit *> &units, InRegion inRegion) {
-	unsigned int count = 0;
-
+static void GetFilteredUnits(lua_State *L, int allegiance, const std::vector<CUnit*>& units, InRegion inRegion) {
 	const int readTeam = CLuaHandle::GetHandleReadTeam(L);
 	const int readAllyTeam = CLuaHandle::GetHandleReadAllyTeam(L);
 	const bool fullRead = CLuaHandle::GetHandleFullRead(L);
 
-	auto isDisqualified = GetIsUnitDisqualifiedTest(L, allegiance, readTeam, readAllyTeam);
+	auto runLoop = [&](auto disqualifier) {
+		unsigned int count = 0;
+		for (const CUnit* unit : units) {
+			if (disqualifier(unit))
+				continue;
 
-	for(const CUnit *unit: units) {
-		if(isDisqualified(unit))
-			continue;
+			float3 pos = unit->midPos + unit->GetLuaErrorVector(readAllyTeam, fullRead);
+			if (!inRegion(unit, pos))
+				continue;
 
-		float3 pos = unit->midPos + unit->GetLuaErrorVector(readAllyTeam, fullRead);
-		if(!inRegion(unit, pos))
-			continue;
+			lua_pushnumber(L, unit->id);
+			lua_rawseti(L, -2, ++count);
+		}
+	};
 
-		lua_pushnumber(L, unit->id);
-		lua_rawseti(L, -2, ++count);
+	switch (allegiance) {
+		case LuaUtils::AllUnits:
+			runLoop([L](const CUnit* u) { return !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::MyUnits:
+			runLoop([L, readTeam](const CUnit* u) { return u->team != readTeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::AllyUnits:
+			runLoop([L, readAllyTeam](const CUnit* u) { return u->allyteam != readAllyTeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::EnemyUnits:
+			runLoop([L, readAllyTeam](const CUnit* u) { return u->allyteam == readAllyTeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		default:
+			runLoop([L, allegiance](const CUnit* u) { return u->team != allegiance || !LuaUtils::IsUnitVisible(L, u); });
+			break;
 	}
 }
 

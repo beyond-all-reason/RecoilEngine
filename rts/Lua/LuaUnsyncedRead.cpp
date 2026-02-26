@@ -6,7 +6,6 @@
 #include "LuaInclude.h"
 #include "LuaHandle.h"
 #include "LuaHashString.h"
-#include "LuaReadCommon.h"
 #include "LuaUtils.h"
 #include "LuaRules.h"
 #include "Game/Camera.h"
@@ -2409,38 +2408,56 @@ int LuaUnsyncedRead::GetUnitsInScreenRectangle(lua_State* L)
 
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 5);
 
-	auto disqualifierFunc = GetIsUnitDisqualifiedTest(L, allegiance, readTeam, readATeam);
-
 	// Even though we're in unsynced it's ok to use gs->tempNum since its exact value
 	// doesn't matter
 	const int tempNum = gs->GetTempNum();
 	lua_createtable(L, unitQuadIter.GetObjectCount(), 0);
 
-	uint32_t count = 0;
-	for (auto visUnitList : unitQuadIter.GetObjectLists()) {
-		for (CUnit* unit : *visUnitList) {
-			if (disqualifierFunc(unit))
-				continue;
+	auto runLoop = [&](auto disqualifier) {
+		uint32_t count = 0;
+		for (auto visUnitList : unitQuadIter.GetObjectLists()) {
+			for (CUnit* unit : *visUnitList) {
+				if (disqualifier(unit))
+					continue;
 
-			if (unit->tempNum == tempNum)
-				continue;
+				if (unit->tempNum == tempNum)
+					continue;
 
-			unit->tempNum = tempNum;
+				unit->tempNum = tempNum;
 
-			const float3 vpPos = camera->CalcViewPortCoordinates(unit->drawPos);
+				const float3 vpPos = camera->CalcViewPortCoordinates(unit->drawPos);
 
-			if (vpPos.x > r || vpPos.x < l)
-				continue;
+				if (vpPos.x > r || vpPos.x < l)
+					continue;
 
-			if (vpPos.y > b || vpPos.y < t)
-				continue;
+				if (vpPos.y > b || vpPos.y < t)
+					continue;
 
-			if (vpPos.z > 1.0f || vpPos.z < 0.0f)
-				continue;
+				if (vpPos.z > 1.0f || vpPos.z < 0.0f)
+					continue;
 
-			lua_pushnumber(L, unit->id);
-			lua_rawseti(L, -2, ++count);
+				lua_pushnumber(L, unit->id);
+				lua_rawseti(L, -2, ++count);
+			}
 		}
+	};
+
+	switch (allegiance) {
+		case LuaUtils::AllUnits:
+			runLoop([L](const CUnit* u) { return !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::MyUnits:
+			runLoop([L, readTeam](const CUnit* u) { return u->team != readTeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::AllyUnits:
+			runLoop([L, readATeam](const CUnit* u) { return u->allyteam != readATeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::EnemyUnits:
+			runLoop([L, readATeam](const CUnit* u) { return u->allyteam == readATeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		default:
+			runLoop([L, allegiance](const CUnit* u) { return u->team != allegiance || !LuaUtils::IsUnitVisible(L, u); });
+			break;
 	}
 
 	return 1;

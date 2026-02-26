@@ -35,7 +35,6 @@ set(sources_engine_Lua
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaRBOs.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaRules.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaRulesParams.cpp"
-		"${CMAKE_CURRENT_SOURCE_DIR}/LuaReadCommon.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaScream.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaShaders.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaSyncedCtrl.cpp"
