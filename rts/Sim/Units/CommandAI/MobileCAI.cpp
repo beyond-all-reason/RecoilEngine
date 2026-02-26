@@ -914,7 +914,8 @@ void CMobileCAI::ExecuteAttack(Command& c)
 		// it controls when a unit disengages from an attack target. 
 		// this value *can* be set game-side via SetMoveTypeData, but we also want sane default values, such that attack commands from idle or fight don't immediately cancel. 
 		// So, we assume game-side gives us permission to use engagementLeash (overriding GetManeuverLeash) if they use SetUnitEngagementRange to set an EngagementRange.
-		const float maxTargetDist = (engagementLeash >= 0.0f) ? engagementLeash : (owner->moveType->GetManeuverLeash() * owner->moveState + owner->maxRange);
+		const float maneuverLeash = (engagementLeash >= 0.0f) ? engagementLeash : std::max(idleEngagementRange, fightEngagementRange);
+		const float maxTargetDist = (maneuverLeash >= 0.0f) ? maneuverLeash : (owner->moveType->GetManeuverLeash() * owner->moveState + owner->maxRange);
 		
 		if (owner->moveState < MOVESTATE_ROAM && curTargetDist > maxTargetDist) {
 			StopMoveAndFinishCommand();
