@@ -237,8 +237,14 @@ namespace SAT {
 		const MoveDef* collideeMD,
 		const float3& separationVec
 	) {
-		const float2 colliderSize = collider->GetFootPrint(0.5f * SQUARE_SIZE);
-		const float2 collideeSize = collidee->GetFootPrint(0.5f * SQUARE_SIZE);
+		// collider is always a mobile unit whose xsize/zsize were overridden by MoveDef,
+		// so use footprint (original UnitDef values) for the collision shape
+		const float2 colliderSize = float2(collider->footprint) * (0.5f * SQUARE_SIZE);
+		// collidee may be a mobile unit (MoveDef override), immobile unit, or feature;
+		// mobile units need footprint, others have correct xsize/zsize already
+		const float2 collideeSize = (collideeMD != nullptr)
+			? float2(collidee->footprint) * (0.5f * SQUARE_SIZE)
+			: collidee->GetFootPrint(0.5f * SQUARE_SIZE);
 
 		// true if no overlap on at least one axis
 		bool haveAxis = false;
@@ -2527,8 +2533,10 @@ void CGroundMoveType::HandleObjectCollisions()
 	// NOTE:
 	//   use the collider's UnitDef footprint as radius for collision
 	//   detection (its MoveDef footprint may be smaller for pathfinding)
-	const float colliderFootPrintRadius = collider->CalcFootPrintMaxInteriorRadius();
-	const float colliderAxisStretchFact = collider->CalcFootPrintAxisStretchFactor();
+	//   must read from footprint directly since xsize/zsize are overridden
+	//   to match the MoveDef during GroundMoveType initialization
+	const float colliderFootPrintRadius = std::max(collider->footprint.x, collider->footprint.y) * 0.5f * SQUARE_SIZE;
+	const float colliderAxisStretchFact = std::abs(collider->footprint.x - collider->footprint.y) * 1.0f / (collider->footprint.x + collider->footprint.y);
 
 	HandleUnitCollisions(collider, {collider->speed.w, colliderFootPrintRadius, colliderAxisStretchFact}, colliderUD, colliderMD, curThread);
 	HandleFeatureCollisions(collider, {collider->speed.w, colliderFootPrintRadius, colliderAxisStretchFact}, colliderUD, colliderMD, curThread);
@@ -2845,11 +2853,17 @@ void CGroundMoveType::HandleUnitCollisions(
 		if (collider->loadingTransportId == collidee->id) continue;
 		if (collidee->loadingTransportId == collider->id) continue;
 
-		const float collDist = collidee->CalcFootPrintMaxInteriorRadius();
+		// mobile collidees have xsize/zsize overridden by MoveDef, so use footprint (original UnitDef values)
+		const float collDist = (collideeMobile)
+			? std::max(collidee->footprint.x, collidee->footprint.y) * 0.5f * SQUARE_SIZE
+			: collidee->CalcFootPrintMaxInteriorRadius();
 		const float2 collideeParams = {collidee->speed.w, collDist};
 		const float4 separationVect = {collider->pos - collidee->pos, Square(colliderParams.y + collideeParams.y)};
 
-		const int collisionFunc = (allowSAT && (forceSAT || (collideeMobile && collidee->CalcFootPrintAxisStretchFactor() > 0.1f)));
+		const float collideeAxisStretch = (collideeMobile)
+			? std::abs(collidee->footprint.x - collidee->footprint.y) * 1.0f / (collidee->footprint.x + collidee->footprint.y)
+			: 0.0f;
+		const int collisionFunc = (allowSAT && (forceSAT || (collideeMobile && collideeAxisStretch > 0.1f)));
 		const bool isCollision = (checkCollisionFuncs[collisionFunc](separationVect, collider, collidee, colliderMD, collideeMD));
 
 		// check for separation
