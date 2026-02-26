@@ -2798,23 +2798,42 @@ int LuaSyncedCtrl::SetUnitEngagementRange(lua_State* L)
 		return 0;
 
 	if (!lua_isnoneornil(L, 2)) {
-		if (lua_isboolean(L, 2))
+		if (lua_isboolean(L, 2) && !lua_toboolean(L, 2)) {
 			mCAI->idleEngagementRange = -1.0f;
-		else
-			mCAI->idleEngagementRange = luaL_checkfloat(L, 2);
+		} else {
+			if (lua_isboolean(L, 2) && lua_toboolean(L, 2))
+				luaL_error(L, "Invalid Argument, got bool true, expected a positive float or bool false");
+			const float idleEngagementRange = luaL_checkfloat(L, 2);
+			if (idleEngagementRange<0)
+				luaL_error(L, "Invalid Argument, got negative float, expected a positive float or bool false");
+			mCAI->idleEngagementRange = idleEngagementRange;
+		}
 	}
 
 	if (!lua_isnoneornil(L, 3)) {
-		if (lua_isboolean(L, 3))
+		if (lua_isboolean(L, 3) && !lua_toboolean(L, 3)) {
 			mCAI->fightEngagementRange = -1.0f;
-		else
-			mCAI->fightEngagementRange = luaL_checkfloat(L, 3);
+		} else {
+			if (lua_isboolean(L, 3) && lua_toboolean(L, 3))
+				luaL_error(L, "Invalid Argument, got bool true, expected a positive float or bool false");
+			const float fightEngagementRange = luaL_checkfloat(L, 3);
+			if (fightEngagementRange<0)
+				luaL_error(L, "Invalid Argument, got negative float, expected a positive float or bool false");
+			mCAI->fightEngagementRange = fightEngagementRange;
+		}
 	}
 
-	if (lua_isnoneornil(L, 4)) {
-		mCAI->engagementLeash = std::max(mCAI->fightEngagementRange, mCAI->idleEngagementRange);
-	} else {
-		mCAI->engagementLeash = luaL_checkfloat(L, 4);
+	if (!lua_isnoneornil(L, 4)) {
+		if (lua_isboolean(L, 4) && !lua_toboolean(L, 4)) {
+			mCAI->engagementLeash = -1.0f;
+		} else {
+			if (lua_isboolean(L, 4) && lua_toboolean(L, 4))
+				luaL_error(L, "Invalid Argument, got bool true, expected a positive float or bool false");
+			const float engagementLeash = luaL_checkfloat(L, 4);
+			if (engagementLeash<0)
+				luaL_error(L, "Invalid Argument, got negative float, expected a positive float or bool false");
+			mCAI->engagementLeash = engagementLeash;
+		}
 	}
 
 	return 0;
