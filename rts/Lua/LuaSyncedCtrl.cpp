@@ -2823,9 +2823,11 @@ int LuaSyncedCtrl::SetUnitEngagementRange(lua_State* L)
 }
 
 /***
+ * Overrides the default rate for re-scanning for better targets. Defaults are (GAME_SPEED * 5 = 150 frames) for mobile unit autotarget, and 65 frames for weapon autotarget.
+ * 
  * @function Spring.SetUnitAutoTargetRate
  * @param unitID integer
- * @param timeout integer timeout in frames for auto-generated unit and weapon attack commands; pass any boolean to reset to default [(GAME_SPEED * 5 = 150) for unit autotarget, 65 for weapon autotarget].
+ * @param timeout integer timeout in frames for auto-generated unit and weapon attack commands; pass any boolean to reset to default
  * @return nil
  */
 int LuaSyncedCtrl::SetUnitAutoTargetRate(lua_State* L)
@@ -2835,7 +2837,7 @@ int LuaSyncedCtrl::SetUnitAutoTargetRate(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
-	if (lua_isboolean(L, 2))
+	if (lua_isboolean(L, 2) && !lua_toboolean(L, 2))
 		unit->commandAI->attackCmdTimeout = -1;   // reset to default
 	else
 		unit->commandAI->attackCmdTimeout = luaL_checkint(L, 2);

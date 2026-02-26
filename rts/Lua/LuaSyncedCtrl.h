@@ -13,6 +13,7 @@ class LuaSyncedCtrl
 	public:
 		static bool PushEntries(lua_State* L);
 		static void CheckAllowGameChanges(lua_State* L);
+		static float CheckPositiveFloatOrDisable(lua_State* L, int idx);
 
 	private:
 		/* Recursion counters: call-ins have a limit on
