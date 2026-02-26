@@ -342,7 +342,7 @@ void CMobileCAI::SlowUpdate()
 
 	if (!commandQue.empty() && commandQue.front().GetTimeOut() < gs->frameNum) {
 		StopMoveAndFinishCommand();
-		//return;
+		return;
 	}
 
 	if (commandQue.empty()) {
@@ -845,7 +845,7 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 		assert(owner->unitDef->canManualFire);
 
 		if (owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, true)) {
-			// StopMoveAndKeepPointing calls StopMove before KeepPointingTo
+			// Command fire weapon in range. Stop moving. May take a few frames to actually fire due to aiming animation.
 			StopMoveAndKeepPointing(attackPos, owner->maxRange * 0.9f, true);
 		} 
 		return;
@@ -874,6 +874,10 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 		owner->moveType->KeepPointingTo(attackTgtInfo.groundPos, owner->maxRange * 0.9f, true);
 	}
 
+	// TODO: expose this unconditional "do not approach the target any closer" value to lua
+	//if (attackVec.SqLength2D() >= Square(owner->maxRange * 0.9f))
+	//	return;
+	
 	// no weapon succeeded with AttackGround, keep approaching target
 	SetGoal(c.GetPos(0), owner->pos);
 

@@ -340,20 +340,6 @@ void CWeapon::Update()
 
 	currentTargetPos = GetLeadTargetPos(currentTarget);
 
-	// handle movegoals if the weapon is commandFire/manualfire
-	// CAI only checks if the target is shootable on SlowUpdates, 
-	// so it is too slow at issuing new movegoals if the weaponMuzzlePos is moved out of range before the weapon fires
-	if (weaponDef->manualfire && owner->moveType->IsAtGoal() && owner->curTarget.type != Target_None) {
-		if (!Attack(owner->curTarget)) {
-			// check if owner already has a move order to this position with the same radius
-			if (owner->moveType->IsMovingTowards(currentTargetPos, SQUARE_SIZE, true))
-				return;
-
-			// give new move order
-			owner->moveType->StartMoving(currentTargetPos, SQUARE_SIZE);
-		}
-	}
-
 	if (!UpdateStockpile())
 		return;
 
