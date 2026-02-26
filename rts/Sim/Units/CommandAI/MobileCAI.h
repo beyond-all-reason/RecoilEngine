@@ -91,8 +91,10 @@ public:
 	float repairBelowHealth;
 
 	// Lua-settable engagement range overrides (-1 means use default)
-	float engagementRange = -1.0f;
+	float idleEngagementRange = -1.0f;
 	float fightEngagementRange = -1.0f;
+	float engagementLeash = -1.0f;
+	int attackCmdTimeout = 150;
 
 	bool tempOrder;
 

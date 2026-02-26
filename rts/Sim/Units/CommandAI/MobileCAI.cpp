@@ -69,8 +69,10 @@ CR_REG_METADATA(CMobileCAI, (
 	CR_MEMBER(buggerOffRadius),
 	CR_MEMBER(repairBelowHealth),
 
-	CR_MEMBER(engagementRange),
+	CR_MEMBER(idleEngagementRange),
 	CR_MEMBER(fightEngagementRange),
+	CR_MEMBER(engagementLeash),
+	CR_MEMBER(attackCmdTimeout),
 
 	CR_MEMBER(tempOrder),
 	CR_MEMBER(slowGuard),
@@ -345,6 +347,7 @@ void CMobileCAI::SlowUpdate()
 
 	if (!commandQue.empty() && commandQue.front().GetTimeOut() < gs->frameNum) {
 		StopMoveAndFinishCommand();
+		return;
 	}
 
 	if (commandQue.empty()) {
@@ -901,7 +904,12 @@ void CMobileCAI::ExecuteAttack(Command& c)
 		const float3& closestPos = ClosestPointOnLine(commandPos1, commandPos2, owner->pos);
 
 		const float curTargetDist = LinePointDist(closestPos, commandPos2, orderTarget->pos);
-		const float maxTargetDist = (engagementRange >= 0.0f) ? engagementRange : (owner->moveType->GetManeuverLeash() * owner->moveState + owner->maxRange);
+
+		// this is the only use of GetManeuverLeash() in the codebase
+		// it controls when a unit disengages from an attack target. 
+		// this value *can* be set game-side via SetMoveTypeData, but we also want sane default values, such that attack commands from idle or fight don't immediately cancel. 
+		// So, we assume game-side gives us permission to use engagementLeash (overriding GetManeuverLeash) if they use SetUnitEngagementRange to set an EngagementRange.
+		const float maxTargetDist = (engagementLeash >= 0.0f) ? engagementLeash : (owner->moveType->GetManeuverLeash() * owner->moveState + owner->maxRange);
 		
 		if (owner->moveState < MOVESTATE_ROAM && curTargetDist > maxTargetDist) {
 			StopMoveAndFinishCommand();
@@ -1214,8 +1222,8 @@ bool CMobileCAI::GenerateAttackCmd()
 		return false;
 
 	float searchRadius;
-	if (engagementRange >= 0.0f) {
-		searchRadius = engagementRange;
+	if (idleEngagementRange >= 0.0f) {
+		searchRadius = idleEngagementRange;
 	}
 	else {
 		float extraRadius = 200.0f * owner->moveState * owner->moveState;
@@ -1274,7 +1282,7 @@ bool CMobileCAI::GenerateAttackCmd()
 		return false;
 
 	Command c(CMD_ATTACK, INTERNAL_ORDER, newAttackTargetId);
-	c.SetTimeOut(gs->frameNum + GAME_SPEED * 5);
+	c.SetTimeOut(gs->frameNum + attackCmdTimeout);
 	commandQue.push_front(c);
 
 	commandPos1 = owner->pos;

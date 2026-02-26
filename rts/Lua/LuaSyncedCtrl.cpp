@@ -209,6 +209,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitWeaponDamages);
 	REGISTER_LUA_CFUNC(SetUnitMaxRange);
 	REGISTER_LUA_CFUNC(SetUnitEngagementRange);
+	REGISTER_LUA_CFUNC(SetUnitAutoTargetRate);
 	REGISTER_LUA_CFUNC(SetUnitExperience);
 	REGISTER_LUA_CFUNC(AddUnitExperience);
 	REGISTER_LUA_CFUNC(SetUnitArmored);
@@ -2775,17 +2776,17 @@ int LuaSyncedCtrl::SetUnitMaxRange(lua_State* L)
 }
 
 /***
- * @function Spring.SetUnitEngagementRange
+ * Overrides the default search radius the unit uses to automatically find targets when idle and when fight moving.
+ *
+ * @function Spring.SetUnitEngagementRange 
  * @param unitID integer
- * @param idleSearchRadius number? optional idle auto-target search radius
- * @param fightSearchRadius number? optional fight-move search radius
+ * @param idleSearchRadius number? optional idle auto-target search radius. Any boolean or negative value restores default behavior.
+ * @param fightSearchRadius number? optional fight-move search radius. Any boolean or negative value restores default behavior.
+ * @param engagementLeash number? optional disengage distance. By default it is the max of idleSearchRadius and fightSearchRadius, if any of them are set, overriding engine default disengage distance logic.
  * @return nil
  */
 int LuaSyncedCtrl::SetUnitEngagementRange(lua_State* L)
 {
-	// Sets the engagement search radius for a unit's auto-target selection.
-	// Overrides the default search radius the unit uses to automatically find
-	// targets when idle and when fight moving.
 	CUnit* unit = ParseUnit(L, __func__, 1);
 
 	if (unit == nullptr)
@@ -2798,9 +2799,9 @@ int LuaSyncedCtrl::SetUnitEngagementRange(lua_State* L)
 
 	if (!lua_isnoneornil(L, 2)) {
 		if (lua_isboolean(L, 2))
-			mCAI->engagementRange = -1.0f;
+			mCAI->idleEngagementRange = -1.0f;
 		else
-			mCAI->engagementRange = luaL_checkfloat(L, 2);
+			mCAI->idleEngagementRange = luaL_checkfloat(L, 2);
 	}
 
 	if (!lua_isnoneornil(L, 3)) {
@@ -2809,6 +2810,38 @@ int LuaSyncedCtrl::SetUnitEngagementRange(lua_State* L)
 		else
 			mCAI->fightEngagementRange = luaL_checkfloat(L, 3);
 	}
+
+	if (lua_isnoneornil(L, 4)) {
+		mCAI->engagementLeash = std::max(mCAI->fightEngagementRange, mCAI->idleEngagementRange);
+	} else {
+		mCAI->engagementLeash = luaL_checkfloat(L, 4);
+	}
+
+	return 0;
+}
+
+/***
+ * @function Spring.SetUnitAutoTargetRate
+ * @param unitID integer
+ * @param timeout number? timeout in frames for auto-generated unit and weapon attack commands; pass false or nil to reset to default (GAME_SPEED * 5)
+ * @return nil
+ */
+int LuaSyncedCtrl::SetUnitAutoTargetRate(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	CMobileCAI* mCAI = dynamic_cast<CMobileCAI*>(unit->commandAI);
+
+	if (mCAI == nullptr)
+		return 0;
+
+	if (lua_isboolean(L, 2))
+		mCAI->attackCmdTimeout = 150;   // reset to default
+	else
+		mCAI->attackCmdTimeout = luaL_checkint(L, 2);
 
 	return 0;
 }
