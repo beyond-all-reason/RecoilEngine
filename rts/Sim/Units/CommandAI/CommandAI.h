@@ -125,7 +125,7 @@ public:
 	int lastUserCommand;
 	int selfDCountdown;
 	int lastFinishCommand;
-	int attackCmdTimeout = -1;
+	float attackCmdTimeout = -1.0f;
 
 	CUnit* owner;
 	CUnit* orderTarget;

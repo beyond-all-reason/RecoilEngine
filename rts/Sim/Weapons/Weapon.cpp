@@ -707,7 +707,7 @@ bool CWeapon::AllowWeaponAutoTarget() const
 	if (currentTarget.isUserTarget)
 		return false;
 
-	return (gs->frameNum > (lastTargetRetry + (owner->commandAI->attackCmdTimeout >= 0 ? owner->commandAI->attackCmdTimeout : 65)));
+	return (gs->frameNum > (lastTargetRetry + (owner->commandAI->attackCmdTimeout >= 0 ? GAME_SPEED * owner->commandAI->attackCmdTimeout : 65)));
 }
 
 bool CWeapon::AutoTarget()
