@@ -187,14 +187,14 @@ private:
 
     void HandleUnitCollisions(
         CUnit *collider,
-        const float3 &colliderParams,
+        const float4 &colliderParams,
         const UnitDef *colliderUD,
         const MoveDef *colliderMD,
         int curThread);
-    float3 CalculatePushVector(const float3 &colliderParams, const float2 &collideeParams, const bool allowUCO, const float4 &separationVect, CUnit *collider, CUnit *collidee);
+    float3 CalculatePushVector(const float4 &colliderParams, const float2 &collideeParams, const bool allowUCO, const float4 &separationVect, CUnit *collider, CUnit *collidee);
     void HandleFeatureCollisions(
         CUnit *collider,
-        const float3 &colliderParams,
+        const float4 &colliderParams,
         const UnitDef *colliderUD,
         const MoveDef *colliderMD,
         int curThread);
@@ -309,4 +309,3 @@ private:
 };
 
 #endif // GROUNDMOVETYPE_H
-
