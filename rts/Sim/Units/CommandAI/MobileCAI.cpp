@@ -784,8 +784,7 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 		return;
 	}
 
-	// aircraft and strafeToAttack units care about this 90% of max range threshold
-	// TODO: have this 0.9f be setable by lua or unitdef? Or reconsider how strafeToAttack and IsHoveringAirUnit shoud work?
+	// do not get any closer than 90% of the unit's maxRange (settable via SetUnitMaxRange)
 	if (targetMidPosDist2D < (owner->maxRange * 0.9f)) {
 		if (owner->unitDef->IsHoveringAirUnit() || (targetMidPosVec.SqLength2D() < 1024) || tryOwnerRotation) {
 			StopMove();
@@ -809,9 +808,8 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 			goalDiff += orderTarget->pos;
 
 			SetGoal(goalDiff, owner->pos);
-			return;
 		}
-
+		return;
 	}
 
 	// not a temporary order or not on hold-position; close in on target more
@@ -874,9 +872,11 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 		owner->moveType->KeepPointingTo(attackTgtInfo.groundPos, owner->maxRange * 0.9f, true);
 	}
 
-	// TODO: expose this unconditional "do not approach the target any closer" value to lua
-	//if (attackVec.SqLength2D() >= Square(owner->maxRange * 0.9f))
-	//	return;
+	// do not get any closer than 90% of the unit's maxRange (settable via SetUnitMaxRange)
+	if (attackVec.SqLength2D() <= Square(owner->maxRange * 0.9f))
+		owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, false);
+		StopMoveAndKeepPointing(attackPos, owner->maxRange * 0.9f, true);
+		return;
 	
 	// no weapon succeeded with AttackGround, keep approaching target
 	SetGoal(c.GetPos(0), owner->pos);
