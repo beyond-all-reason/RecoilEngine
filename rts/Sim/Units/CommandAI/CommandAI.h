@@ -48,6 +48,7 @@ public:
 	void WeaponFired(CWeapon* weapon, const bool searchForNewTarget, bool raiseEvent = true);
 
 	virtual bool CanWeaponAutoTarget(const CWeapon* weapon) const { return true; }
+
 	virtual int GetDefaultCmd(const CUnit* pointed, const CFeature* feature);
 	virtual void SlowUpdate();
 	virtual void GiveCommandReal(const Command& c, bool fromSynced = true);
@@ -124,6 +125,7 @@ public:
 	int lastUserCommand;
 	int selfDCountdown;
 	int lastFinishCommand;
+	int attackCmdTimeout = -1;
 
 	CUnit* owner;
 	CUnit* orderTarget;

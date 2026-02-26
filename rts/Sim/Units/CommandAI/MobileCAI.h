@@ -94,7 +94,6 @@ public:
 	float idleEngagementRange = -1.0f;
 	float fightEngagementRange = -1.0f;
 	float engagementLeash = -1.0f;
-	int attackCmdTimeout = 150;
 
 	bool tempOrder;
 

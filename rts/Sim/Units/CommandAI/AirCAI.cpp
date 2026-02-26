@@ -225,8 +225,8 @@ bool CAirCAI::AirAutoGenerateTarget(AAirMoveType* myPlane) {
 	const bool isFlying = (myPlane->aircraftState == AAirMoveType::AIRCRAFT_FLYING);
 
 	float searchRadius;
-	if (engagementRange >= 0.0f) {
-		searchRadius = engagementRange;
+	if (idleEngagementRange >= 0.0f) {
+		searchRadius = idleEngagementRange;
 	}
 	else {
 		searchRadius = 1000.0f * owner->moveState;

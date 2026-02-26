@@ -72,7 +72,6 @@ CR_REG_METADATA(CMobileCAI, (
 	CR_MEMBER(idleEngagementRange),
 	CR_MEMBER(fightEngagementRange),
 	CR_MEMBER(engagementLeash),
-	CR_MEMBER(attackCmdTimeout),
 
 	CR_MEMBER(tempOrder),
 	CR_MEMBER(slowGuard),
@@ -352,14 +351,15 @@ void CMobileCAI::SlowUpdate()
 	}
 
 	if (commandQue.empty()) {
+		// prevent infinite recursion if the attack order terminates directly
+		// while still allowing the unit to immediately execute an attack cmd acquired this slowupdate
 		if (lastAutoGenerateTargetFrame == gs->frameNum)
 			return;
 
 		lastAutoGenerateTargetFrame = gs->frameNum;
 		MobileAutoGenerateTarget();
 
-		// the attack order could terminate directly and thus cause a loop
-		if (commandQue.empty() || (commandQue.front()).GetID() == CMD_ATTACK)
+		if (commandQue.empty())
 			return;
 	}
 
@@ -1287,7 +1287,7 @@ bool CMobileCAI::GenerateAttackCmd()
 		return false;
 
 	Command c(CMD_ATTACK, INTERNAL_ORDER, newAttackTargetId);
-	c.SetTimeOut(gs->frameNum + attackCmdTimeout);
+	c.SetTimeOut(gs->frameNum + (attackCmdTimeout >= 0 ? attackCmdTimeout : GAME_SPEED * 5));
 	commandQue.push_front(c);
 
 	commandPos1 = owner->pos;
