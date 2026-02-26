@@ -237,9 +237,8 @@ namespace SAT {
 		const MoveDef* collideeMD,
 		const float3& separationVec
 	) {
-		// const float2 colliderSize = (colliderMD != nullptr)? colliderMD->GetFootPrint(0.5f * SQUARE_SIZE): collider->GetFootPrint(0.5f * SQUARE_SIZE);
-		const float2 colliderSize =                          colliderMD->GetFootPrint(0.5f * SQUARE_SIZE)                                            ;
-		const float2 collideeSize = (collideeMD != nullptr)? collideeMD->GetFootPrint(0.5f * SQUARE_SIZE): collidee->GetFootPrint(0.5f * SQUARE_SIZE);
+		const float2 colliderSize = collider->GetFootPrint(0.5f * SQUARE_SIZE);
+		const float2 collideeSize = collidee->GetFootPrint(0.5f * SQUARE_SIZE);
 
 		// true if no overlap on at least one axis
 		bool haveAxis = false;
@@ -2526,10 +2525,10 @@ void CGroundMoveType::HandleObjectCollisions()
 	forceFromStaticCollidees = ZeroVector;
 
 	// NOTE:
-	//   use the collider's MoveDef footprint as radius since it is
-	//   always mobile (its UnitDef footprint size may be different)
-	const float colliderFootPrintRadius = colliderMD->CalcFootPrintMaxInteriorRadius();
-	const float colliderAxisStretchFact = colliderMD->CalcFootPrintAxisStretchFactor();
+	//   use the collider's UnitDef footprint as radius for collision
+	//   detection (its MoveDef footprint may be smaller for pathfinding)
+	const float colliderFootPrintRadius = collider->CalcFootPrintMaxInteriorRadius();
+	const float colliderAxisStretchFact = collider->CalcFootPrintAxisStretchFactor();
 
 	HandleUnitCollisions(collider, {collider->speed.w, colliderFootPrintRadius, colliderAxisStretchFact}, colliderUD, colliderMD, curThread);
 	HandleFeatureCollisions(collider, {collider->speed.w, colliderFootPrintRadius, colliderAxisStretchFact}, colliderUD, colliderMD, curThread);
@@ -2846,11 +2845,11 @@ void CGroundMoveType::HandleUnitCollisions(
 		if (collider->loadingTransportId == collidee->id) continue;
 		if (collidee->loadingTransportId == collider->id) continue;
 
-		const float collDist = (collideeMobile) ? collideeMD->CalcFootPrintMaxInteriorRadius() : collidee->CalcFootPrintMaxInteriorRadius();
+		const float collDist = collidee->CalcFootPrintMaxInteriorRadius();
 		const float2 collideeParams = {collidee->speed.w, collDist};
 		const float4 separationVect = {collider->pos - collidee->pos, Square(colliderParams.y + collideeParams.y)};
 
-		const int collisionFunc = (allowSAT && (forceSAT || (collideeMobile && collideeMD->CalcFootPrintAxisStretchFactor() > 0.1f)));
+		const int collisionFunc = (allowSAT && (forceSAT || (collideeMobile && collidee->CalcFootPrintAxisStretchFactor() > 0.1f)));
 		const bool isCollision = (checkCollisionFuncs[collisionFunc](separationVect, collider, collidee, colliderMD, collideeMD));
 
 		// check for separation
