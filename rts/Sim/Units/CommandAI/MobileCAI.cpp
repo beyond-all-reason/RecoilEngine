@@ -85,6 +85,7 @@ CR_REG_METADATA(CMobileCAI, (
 	CR_MEMBER(lastBuggerOffTime),
 	CR_MEMBER(buggerOffAttempts),
 	CR_MEMBER(lastIdleCheck),
+	CR_MEMBER(lastAutoGenerateTargetFrame),
 
 	CR_PREALLOC(GetPreallocContainer)
 ))
@@ -351,6 +352,10 @@ void CMobileCAI::SlowUpdate()
 	}
 
 	if (commandQue.empty()) {
+		if (lastAutoGenerateTargetFrame == gs->frameNum)
+			return;
+
+		lastAutoGenerateTargetFrame = gs->frameNum;
 		MobileAutoGenerateTarget();
 
 		// the attack order could terminate directly and thus cause a loop
