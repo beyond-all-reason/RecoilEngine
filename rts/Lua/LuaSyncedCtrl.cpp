@@ -2780,9 +2780,9 @@ int LuaSyncedCtrl::SetUnitMaxRange(lua_State* L)
  *
  * @function Spring.SetUnitEngagementRange 
  * @param unitID integer
- * @param idleSearchRadius number? optional idle auto-target search radius. Any boolean or negative value restores default behavior.
- * @param fightSearchRadius number? optional fight-move search radius. Any boolean or negative value restores default behavior.
- * @param engagementLeash number? optional disengage distance. By default it is the max of idleSearchRadius and fightSearchRadius, if any of them are set, overriding engine default disengage distance logic.
+ * @param idleSearchRadius number? optional idle auto-target search radius. Passing bool false restores default behavior.
+ * @param fightSearchRadius number? optional fight-move search radius. Passing bool false restores default behavior.
+ * @param engagementLeash number? optional disengage distance. Disengage distance by default will use the max of idleSearchRadius and fightSearchRadius, if any of them are set, overriding engine default disengage distance logic.
  * @return nil
  */
 int LuaSyncedCtrl::SetUnitEngagementRange(lua_State* L)
