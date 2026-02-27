@@ -979,7 +979,6 @@ void CUnitScript::ShowFlare(int piece)
 #endif
 }
 
-
 /******************************************************************************/
 int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 {
@@ -1038,7 +1037,25 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		const float3 absPos = unit->GetObjectSpacePos(relPos);
 		return int(absPos.y * COBSCALE);
 	} break;
-
+	case PIECE_HEADING: {
+		const LocalModelPiece* piece = SafeGetPiece(p1);
+		if (piece == nullptr) {
+			ShowUnitScriptError("[US::GetUnitVal::PIECE_HEADING] invalid script piece index");
+			break;
+		}
+		const float3 dir = piece->GetModelSpaceTransform() * float4(FwdVector);
+		return GetHeadingFromVector(dir.x, dir.z);
+	} break;
+	case PIECE_PITCH: {
+		const LocalModelPiece* piece = SafeGetPiece(p1);
+		if (piece == nullptr) {
+			ShowUnitScriptError("[US::GetUnitVal::PIECE_PITCH] invalid script piece index");
+			break;
+		}
+		const float3 dir = piece->GetModelSpaceTransform() * float4(FwdVector);
+		// returns pitch with same sign convention as the pitch given to AimWeaponX
+		return short(math::asin(std::clamp(dir.y, -1.0f, 1.0f)) * RAD2TAANG);
+	} break;
 	case UNIT_XZ: {
 		if (p1 <= 0)
 			return PACKXZ(unit->pos.x, unit->pos.z);
