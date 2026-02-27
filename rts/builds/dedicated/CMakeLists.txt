@@ -1,6 +1,6 @@
 add_definitions    (-DDEDICATED ${PIC_FLAG} -DNOT_USING_CREG)
 add_definitions    (-DHEADLESS -DNO_SOUND)
-remove_definitions (-DSTREFLOP_SSE -DAVI_CAPTURING)
+remove_definitions (-DSTREFLOP_SSE -DSTREFLOP_NEON -DAVI_CAPTURING)
 remove_definitions (-DTRACE_SYNC -DSYNCDEBUG)
 remove_definitions (-DTHREADPOOL)
 

@@ -1,6 +1,10 @@
 cmake_minimum_required(VERSION 3.27)
-cmake_policy(SET CMP0060 OLD) #causes link errors on Linux otherwise
-cmake_policy(SET CMP0065 OLD) #we need binaries compiled with -rdynamic for BARb to work (cause unknown https://github.com/beyond-all-reason/spring/issues/405)
+# CMP0060 and CMP0065 removed: CMake 4.x no longer supports OLD behavior.
+# CMP0060 (OLD): was used to avoid link errors on Linux -- monitor for regressions.
+# CMP0065 (OLD): was used for -rdynamic needed by BARb -- added explicitly below.
+if(NOT APPLE)
+  string(APPEND CMAKE_EXE_LINKER_FLAGS " -rdynamic")
+endif()
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -114,6 +118,14 @@ if    (CMAKE_SIZEOF_VOID_P EQUAL 8)
 else  (CMAKE_SIZEOF_VOID_P EQUAL 8)
 	message(FATAL_ERROR "RecoilEngine does not support 32 bits." )
 endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
+
+# Detect ARM64 architecture
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+	set(IS_ARM64_BUILD TRUE)
+	message(STATUS "Detected ARM64 architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+else()
+	set(IS_ARM64_BUILD FALSE)
+endif()
 
 message(STATUS "Building Spring on ${MARCH_BITS}bit environment")
 set(BUILD_BITS "${MARCH_BITS}" CACHE STRING "Target arch machine type")
@@ -425,14 +437,39 @@ endif()
 option(ENABLE_STREFLOP "build Spring with streflop support (REQUIRED FOR MULTIPLAYER)" TRUE)
 
 if (ENABLE_STREFLOP)
-## note: is removed in ./AI/CMakeLists.txt since it would break AI compilation
-add_definitions(-DSTREFLOP_SSE)
+	## note: is removed in ./AI/CMakeLists.txt since it would break AI compilation
+	if (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+		# Apple ARM64: use NEON FPU with deterministic rounding.
+		# NEON mode uses hardware float with FPCR rounding control,
+		# which works correctly on macOS ARM64 (no fenv.h issues).
+		add_definitions(-DSTREFLOP_NEON)
+	elseif (APPLE)
+		# Apple x86_64: use SSE (same as Linux x86_64)
+		add_definitions(-DSTREFLOP_SSE)
+	elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+		add_definitions(-DSTREFLOP_NEON)
+	else ()
+		add_definitions(-DSTREFLOP_SSE)
+	endif ()
 else ()
-add_definitions(-DNOT_USING_STREFLOP)
+	add_definitions(-DNOT_USING_STREFLOP)
 endif ()
 
 ### Asio
 add_definitions(-DASIO_STANDALONE)
+
+### sse2neon
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+	add_definitions(-DSSE2NEON)
+	add_definitions(-DSSE2NEON_SUPPRESS_WARNINGS)
+
+#   These are mentioned by sse2neon docs, do *not* use them. They will cause desyncs!
+#	add_definitions(-DSSE2NEON_PRECISE_MINMAX)
+#	add_definitions(-DSSE2NEON_PRECISE_DIV)
+#	add_definitions(-DSSE2NEON_PRECISE_SQRT)
+#	add_definitions(-DSSE2NEON_PRECISE_DP)
+endif()
+
 
 ### compiler specific flags
 set(CXX_FLAGS_DEBUG_ADDITIONAL "")
@@ -451,6 +488,8 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 
 	if (NOT MARCH_FLAG STREQUAL "generic")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${MARCH_FLAG} -mtune=${MARCH_FLAG}") #march/mtune define SSE flags
+	elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a+simd ${FP_CONTRACT_FLAG}")
 	else (NOT MARCH_FLAG STREQUAL "generic")
 		set(FALLBACK_SSE_FLAGS "-msse")
 		#set(FALLBACK_SSE_FLAGS "${FALLBACK_SSE_FLAGS} -mmmx")
@@ -473,12 +512,26 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${FALLBACK_MARCH} -mtune=generic ${FALLBACK_SSE_FLAGS}")
 	endif (NOT MARCH_FLAG STREQUAL "generic")
 
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -mfpmath=sse") #SSE_FLAGS are now user input only
+	if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -mfpmath=sse") #SSE_FLAGS are now user input only
+	endif ()
 elseif (MSVC)
 	set(MSVC_CXX_FLAGS "/arch:SSE2") #default, but still set explicitly
 	# silence warnings
 	add_definitions(-D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS)
-else   (MSVC)
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+	# Clang on ARM64: no SSE flags needed, use armv8-a with NEON SIMD
+	if (IS_ARM64_BUILD)
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${FP_CONTRACT_FLAG}")
+	else()
+		# Clang on x86_64: use SSE like GCC
+		if (NOT MARCH_FLAG OR MARCH_FLAG STREQUAL "" OR MARCH_FLAG STREQUAL "generic")
+			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse -mfpmath=sse")
+		else()
+			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${MARCH_FLAG} -mtune=${MARCH_FLAG}")
+		endif()
+	endif()
+else()
 	message(WARNING "unknown compiler")
 endif (CMAKE_COMPILER_IS_GNUCXX)
 
@@ -502,8 +555,14 @@ if    (MSVC)
 	set(CMAKE_CXX_FLAGS_PROFILE               "${CMAKE_CXX_FLAGS_PROFILE} /LTCG")
 else  (MSVC)
 	if (CMAKE_COMPILER_IS_GNUCXX)
+		# -fsingle-precision-constant: treat FP constants as float, not double (GCC-only)
+		# -frounding-math: honor runtime rounding mode (GCC-only)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsingle-precision-constant -frounding-math")
-	endif(CMAKE_COMPILER_IS_GNUCXX)
+	elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+		# Clang does not support -fsingle-precision-constant.
+		# -frounding-math is supported on Clang 14+; use it if available.
+		check_and_add_flags(CMAKE_CXX_FLAGS "-frounding-math")
+	endif()
 	# Experiment with frame pointers to see whether it improves the quality of the stack unwinds.
 	# We're having trouble getting meaningful information form crash reports. Trying this before
 	# moving onto more performance-impacting methods.
