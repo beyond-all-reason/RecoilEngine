@@ -124,6 +124,7 @@ public:
 	int lastUserCommand;
 	int selfDCountdown;
 	int lastFinishCommand;
+	float autoTargetRate = -1.0f;
 
 	CUnit* owner;
 	CUnit* orderTarget;

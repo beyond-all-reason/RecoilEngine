@@ -69,6 +69,10 @@ CR_REG_METADATA(CMobileCAI, (
 	CR_MEMBER(buggerOffRadius),
 	CR_MEMBER(repairBelowHealth),
 
+	CR_MEMBER(idleEngagementRange),
+	CR_MEMBER(fightEngagementRange),
+	CR_MEMBER(engagementLeash),
+
 	CR_MEMBER(tempOrder),
 	CR_MEMBER(slowGuard),
 	CR_MEMBER(moveDir),
@@ -80,6 +84,7 @@ CR_REG_METADATA(CMobileCAI, (
 	CR_MEMBER(lastBuggerOffTime),
 	CR_MEMBER(buggerOffAttempts),
 	CR_MEMBER(lastIdleCheck),
+	CR_MEMBER(lastAutoGenerateTargetFrame),
 
 	CR_PREALLOC(GetPreallocContainer)
 ))
@@ -346,10 +351,15 @@ void CMobileCAI::SlowUpdate()
 	}
 
 	if (commandQue.empty()) {
+		// prevent infinite recursion if the attack order terminates directly
+		// while still allowing the unit to immediately execute an attack cmd acquired this slowupdate
+		if (lastAutoGenerateTargetFrame == gs->frameNum)
+			return;
+
+		lastAutoGenerateTargetFrame = gs->frameNum;
 		MobileAutoGenerateTarget();
 
-		// the attack order could terminate directly and thus cause a loop
-		if (commandQue.empty() || (commandQue.front()).GetID() == CMD_ATTACK)
+		if (commandQue.empty())
 			return;
 	}
 
@@ -545,8 +555,14 @@ void CMobileCAI::ExecuteFight(Command& c)
 	if (owner->unitDef->canAttack && owner->fireState >= FIRESTATE_FIREATWILL && !owner->weapons.empty()) {
 		const float3 curPosOnLine = ClosestPointOnLine(commandPos1, commandPos2, owner->pos);
 
-		const float leashRadius = 100.0f * owner->moveState * owner->moveState;
-		const float searchRadius = owner->maxRange + leashRadius;
+		float searchRadius;
+		if (fightEngagementRange >= 0.0f) {
+			searchRadius = fightEngagementRange;
+		}
+		else {
+			const float leashRadius = 100.0f * owner->moveState * owner->moveState;
+			searchRadius = owner->maxRange + leashRadius;
+		}
 
 		CUnit* enemy = CGameHelper::GetClosestValidTarget(curPosOnLine, searchRadius, owner->allyteam, this);
 
@@ -893,8 +909,14 @@ void CMobileCAI::ExecuteAttack(Command& c)
 		const float3& closestPos = ClosestPointOnLine(commandPos1, commandPos2, owner->pos);
 
 		const float curTargetDist = LinePointDist(closestPos, commandPos2, orderTarget->pos);
-		const float maxTargetDist = (owner->moveType->GetManeuverLeash() * owner->moveState + owner->maxRange);
 
+		// this is the only use of GetManeuverLeash() in the codebase
+		// it controls when a unit disengages from an attack target. 
+		// this value *can* be set game-side via SetMoveTypeData, but we also want sane default values, such that attack commands from idle or fight don't immediately cancel. 
+		// So, we assume game-side gives us permission to use engagementLeash (overriding GetManeuverLeash) if they use SetUnitEngagementRange to set an EngagementRange.
+		const float maneuverLeash = (engagementLeash >= 0.0f) ? engagementLeash : std::max(idleEngagementRange, fightEngagementRange);
+		const float maxTargetDist = (maneuverLeash >= 0.0f) ? maneuverLeash : (owner->moveType->GetManeuverLeash() * owner->moveState + owner->maxRange);
+		
 		if (owner->moveState < MOVESTATE_ROAM && curTargetDist > maxTargetDist) {
 			StopMoveAndFinishCommand();
 			return;
@@ -1205,8 +1227,14 @@ bool CMobileCAI::GenerateAttackCmd()
 	if (owner->fireState == FIRESTATE_HOLDFIRE)
 		return false;
 
-	float  extraRadius = 200.0f * owner->moveState * owner->moveState;
-	float searchRadius = owner->maxRange + extraRadius;
+	float searchRadius;
+	if (idleEngagementRange >= 0.0f) {
+		searchRadius = idleEngagementRange;
+	}
+	else {
+		float extraRadius = 200.0f * owner->moveState * owner->moveState;
+		searchRadius = owner->maxRange + extraRadius;
+	}
 
 	int newAttackTargetId = -1;
 
@@ -1260,7 +1288,7 @@ bool CMobileCAI::GenerateAttackCmd()
 		return false;
 
 	Command c(CMD_ATTACK, INTERNAL_ORDER, newAttackTargetId);
-	c.SetTimeOut(gs->frameNum + GAME_SPEED * 5);
+	c.SetTimeOut(static_cast <int> (gs->frameNum + GAME_SPEED * (autoTargetRate >= 0 ? autoTargetRate : 5)));
 	commandQue.push_front(c);
 
 	commandPos1 = owner->pos;

@@ -13,6 +13,7 @@ class LuaSyncedCtrl
 	public:
 		static bool PushEntries(lua_State* L);
 		static void CheckAllowGameChanges(lua_State* L);
+		static float CheckPositiveFloatOrDisable(lua_State* L, int idx);
 
 	private:
 		/* Recursion counters: call-ins have a limit on
@@ -93,6 +94,8 @@ class LuaSyncedCtrl
 		static int SetUnitWeaponState(lua_State* L);
 		static int SetUnitWeaponDamages(lua_State* L);
 		static int SetUnitMaxRange(lua_State* L);
+		static int SetUnitEngagementRange(lua_State* L);
+		static int SetUnitAutoTargetRate(lua_State* L);
 		static int SetUnitExperience(lua_State* L);
 		static int AddUnitExperience(lua_State* L);
 		static int SetUnitArmored(lua_State* L);

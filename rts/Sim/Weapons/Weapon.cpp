@@ -714,7 +714,7 @@ bool CWeapon::AllowWeaponAutoTarget() const
 	if (currentTarget.isUserTarget)
 		return false;
 
-	return (gs->frameNum > (lastTargetRetry + 65));
+	return (gs->frameNum > (lastTargetRetry + (owner->commandAI->autoTargetRate >= 0 ? GAME_SPEED * owner->commandAI->autoTargetRate : 65)));
 }
 
 bool CWeapon::AutoTarget()

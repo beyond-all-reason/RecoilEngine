@@ -78,6 +78,7 @@ CR_REG_METADATA(CCommandAI, (
 	CR_MEMBER(inCommand),
 	CR_MEMBER(commandDeathDependences),
 	CR_MEMBER(targetLostTimer),
+	CR_MEMBER(autoTargetRate),
 
 	CR_PREALLOC(GetPreallocContainer)
 ))

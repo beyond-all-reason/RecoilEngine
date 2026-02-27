@@ -90,6 +90,11 @@ public:
 	float buggerOffRadius;
 	float repairBelowHealth;
 
+	// Lua-settable engagement range overrides (-1 means use default)
+	float idleEngagementRange = -1.0f;
+	float fightEngagementRange = -1.0f;
+	float engagementLeash = -1.0f;
+
 	bool tempOrder;
 
 protected:
@@ -104,6 +109,7 @@ protected:
 	int lastBuggerOffTime = -BUGGER_OFF_TTL;
 	int lastIdleCheck = 0;
 	int buggerOffAttempts = 0;
+	int lastAutoGenerateTargetFrame = -1;
 
 	static constexpr int MAX_CLOSE_IN_RETRY_TICKS = 30;
 	static constexpr int BUGGER_OFF_TTL = 200;

@@ -69,6 +69,7 @@
 #include "Sim/Units/CommandAI/Command.h"
 #include "Sim/Units/CommandAI/CommandAI.h"
 #include "Sim/Units/CommandAI/FactoryCAI.h"
+#include "Sim/Units/CommandAI/MobileCAI.h"
 #include "Sim/Units/UnitTypes/ExtractorBuilding.h"
 #include "Sim/Weapons/PlasmaRepulser.h"
 #include "Sim/Weapons/Weapon.h"
@@ -132,6 +133,19 @@ inline void LuaSyncedCtrl::CheckAllowGameChanges(lua_State* L)
 	}
 }
 
+// Returns -1.0f for bool false (disabled), or a validated positive float.
+inline float LuaSyncedCtrl::CheckPositiveFloatOrDisable(lua_State* L, int idx)
+{
+    if (lua_isboolean(L, idx)) {
+        if (!lua_toboolean(L, idx))
+            return -1.0f;  // false == disabled
+        luaL_error(L, "Invalid Argument, got bool true, expected a positive float or bool false");
+    }
+    const float value = luaL_checkfloat(L, idx);
+    if (value < 0)
+        luaL_error(L, "Invalid Argument, got negative float, expected a positive float or bool false");
+    return value;
+}
 
 /******************************************************************************/
 /******************************************************************************/
@@ -207,6 +221,8 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitWeaponState);
 	REGISTER_LUA_CFUNC(SetUnitWeaponDamages);
 	REGISTER_LUA_CFUNC(SetUnitMaxRange);
+	REGISTER_LUA_CFUNC(SetUnitEngagementRange);
+	REGISTER_LUA_CFUNC(SetUnitAutoTargetRate);
 	REGISTER_LUA_CFUNC(SetUnitExperience);
 	REGISTER_LUA_CFUNC(AddUnitExperience);
 	REGISTER_LUA_CFUNC(SetUnitArmored);
@@ -2772,6 +2788,67 @@ int LuaSyncedCtrl::SetUnitMaxRange(lua_State* L)
 	return 0;
 }
 
+/***
+ * Overrides the default search radius the unit uses to automatically find targets when idle and when fight moving.
+ *
+ * @function Spring.SetUnitEngagementRange 
+ * @param unitID integer
+ * @param idleSearchRadius number? optional idle auto-target search radius. Passing bool false restores default behavior.
+ * @param fightSearchRadius number? optional fight-move search radius. Passing bool false restores default behavior.
+ * @param engagementLeash number? optional disengage distance. Disengage distance by default will use the max of idleSearchRadius and fightSearchRadius, if any of them are set, overriding engine default disengage distance logic.
+ * @return nil
+ */
+int LuaSyncedCtrl::SetUnitEngagementRange(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	CMobileCAI* mCAI = dynamic_cast<CMobileCAI*>(unit->commandAI);
+
+	if (mCAI == nullptr)
+		return 0;
+
+	if (!lua_isnoneornil(L, 2))
+    	mCAI->idleEngagementRange  = CheckPositiveFloatOrDisable(L, 2);
+
+	if (!lua_isnoneornil(L, 3))
+    	mCAI->fightEngagementRange = CheckPositiveFloatOrDisable(L, 3);
+
+	if (!lua_isnoneornil(L, 4))
+    	mCAI->engagementLeash      = CheckPositiveFloatOrDisable(L, 4);
+
+	return 0;
+}
+
+/***
+ * Overrides the default rate for re-scanning for better targets. Defaults are (GAME_SPEED * 5 = 150 frames) for mobile unit autotarget, and 65 frames for weapon autotarget.
+ * 
+ * @function Spring.SetUnitAutoTargetRate
+ * @param unitID integer
+ * @param autoTargetRate number in seconds for auto-generated unit and weapon attack commands to rescan for new targets; pass any boolean to reset to default
+ * @return nil
+ */
+int LuaSyncedCtrl::SetUnitAutoTargetRate(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	if (lua_isboolean(L, 2) && !lua_toboolean(L, 2)) {
+		if (!lua_toboolean(L, 2)) {
+			unit->commandAI->autoTargetRate = -1;   // reset to default
+		} else {
+			luaL_error(L, "Invalid Argument, got bool true, expected bool false to reset to default autoTargetRate");
+		}
+	} else {
+		unit->commandAI->autoTargetRate = luaL_checkfloat(L, 2);
+	}
+
+	return 0;
+}
 
 /***
  * @function Spring.SetUnitExperience
