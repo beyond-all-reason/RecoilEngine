@@ -2650,7 +2650,13 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 		float3 intersectSqrSumPosition;
 
 		const float3 rightDir2D = (rgt * XZVector).SafeNormalize();
+		const float3 frontDir2D = (collider->frontdir * XZVector).SafeNormalize();
 		const float3 speedDir2D = (vel * XZVector).SafeNormalize();
+
+		// OBB half-extents in world-space for oriented footprint (used for nose/tail push-out)
+		// These are based on the unit's actual xsize/zsize, not just the MoveDef zone.
+		const float obbHalfX = (collider->xsize * 0.5f * SQUARE_SIZE) + squareRadius;
+		const float obbHalfZ = (collider->zsize * 0.5f * SQUARE_SIZE) + squareRadius;
 
 		const int xmid = (pos.x + vel.x) / SQUARE_SIZE;
 		const int zmid = (pos.z + vel.z) / SQUARE_SIZE;
@@ -2672,8 +2678,19 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 		const int zsh = colliderMD->zsizeh * (checkYardMap || (checkTerrain && colliderMD->allowTerrainCollisions));
 		const int intersectSize = colliderMD->xsize;
 
-		const int xmin = std::min(-1, -xsh), xmax = std::max(1, xsh);
-		const int zmin = std::min(-1, -zsh), zmax = std::max(1, zsh);
+		// Widen the scan to cover the AABB of the unit's oriented OBB so that squares
+		// overlapping the nose/tail (which lie outside the axis-aligned MoveDef zone) are
+		// also visited. Without this, long ships can phase their nose through buildings.
+		const int obbHalfXSq = static_cast<int>(std::ceil(obbHalfX / SQUARE_SIZE));
+		const int obbHalfZSq = static_cast<int>(std::ceil(obbHalfZ / SQUARE_SIZE));
+		// AABB of rotated OBB in grid squares
+		const int obbAABBX = static_cast<int>(std::ceil(
+			math::fabs(frontDir2D.x) * obbHalfZSq + math::fabs(rightDir2D.x) * obbHalfXSq));
+		const int obbAABBZ = static_cast<int>(std::ceil(
+			math::fabs(frontDir2D.z) * obbHalfZSq + math::fabs(rightDir2D.z) * obbHalfXSq));
+
+		const int xmin = std::min(-1, -std::max(xsh, obbAABBX)), xmax = std::max(1, std::max(xsh, obbAABBX));
+		const int zmin = std::min(-1, -std::max(zsh, obbAABBZ)), zmax = std::max(1, std::max(zsh, obbAABBZ));
 
 		if (DEBUG_DRAWING_ENABLED){
 			geometryLock.lock();
@@ -2716,7 +2733,9 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 				const float   squarePenDistance = std::min(squareSepDistance - squareColRadiusSum, 0.0f);
 				// const float  squareColSlideSign = -Sign(squarePos.dot(rightDir2D) - pos.dot(rightDir2D));
 
-				if (x >= realMinX && x <= realMaxX && z >= realMinZ && z <= realMaxZ){
+				// NOTE: realMinX/realMaxX are absolute grid coords; compare against xabs/zabs (also absolute)
+				const bool inMoveDefZone = (xabs >= realMinX && xabs <= realMaxX && zabs >= realMinZ && zabs <= realMaxZ);
+				if (inMoveDefZone) {
 					if (intersectSize > 1) {
 						intersectDistance = std::min(intersectDistance, squarePenDistance);
 						intersectSqrSumPosition += (squarePos * XZVector);
@@ -2724,6 +2743,50 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 					}
 					if (checkYardMap && !positionStuck)
 						positionStuck = true;
+				} else {
+					// Square is outside the axis-aligned MoveDef zone but may still overlap
+					// the unit's oriented bounding box (OBB). This handles long ships whose
+					// nose/tail extends well beyond the MoveDef footprint center.
+					//
+					// We cannot use squarePenDistance (sphere distance from unit center) here
+					// because nose/tail squares are far from center, so squareSepDistance >
+					// squareColRadiusSum and squarePenDistance == 0 -- no force would result.
+					//
+					// Instead, compute penetration in OBB-local space and apply a direct
+					// axial push force. positionStuck is NOT set here to keep pathfinder and
+					// collision detection in agreement.
+					const float3 squareVec2D = squareVec * XZVector; // pos - squarePos, in XZ
+					const float signedFront = squareVec2D.dot(frontDir2D); // +ve = square is in front of center
+					const float signedRight = squareVec2D.dot(rightDir2D);
+					const float absFront = math::fabs(signedFront);
+					const float absRight = math::fabs(signedRight);
+
+					if (absFront <= obbHalfZ && absRight <= obbHalfX) {
+						// Penetration depth along each OBB axis (positive = inside OBB)
+						const float penDepthFront = obbHalfZ - absFront;
+						const float penDepthRight = obbHalfX - absRight;
+
+						// Push along whichever axis has the least penetration (shallowest exit).
+						// For a nose-first collision, penDepthFront will be small (square just
+						// entered the nose) and penDepthRight will be large (square is well
+						// inside laterally) -- so we push along frontDir, backward.
+						//
+						// The push magnitude includes the velocity component along the push
+						// axis so that the force always exceeds the speed driving the unit
+						// into the building. Without this, penetration depth ≈ velocity and
+						// the nose settles into a jittery steady-state inside the structure.
+						float3 obbPushVec;
+						if (penDepthFront <= penDepthRight) {
+							// Exit via front/back face -- push unit along frontDir
+							const float velComponent = math::fabs(vel.dot(frontDir2D));
+							obbPushVec = frontDir2D * (Sign(signedFront) * (penDepthFront + velComponent));
+						} else {
+							// Exit via side face -- push unit along rightDir
+							const float velComponent = math::fabs(vel.dot(rightDir2D));
+							obbPushVec = rightDir2D * (Sign(signedRight) * (penDepthRight + velComponent));
+						}
+						forceFromStaticCollidees += obbPushVec;
+					}
 				}
 
 				// ignore squares behind us (relative to velocity vector)
