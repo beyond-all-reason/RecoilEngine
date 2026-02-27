@@ -3039,6 +3039,7 @@ CR_REG_METADATA(CUnit, (
 
 	CR_MEMBER(definedIconName),
 	CR_MEMBER_UN(currentIconIndex),
+	CR_MEMBER(customIconIndex),
 	CR_MEMBER_UN(drawIcon),
 
 	CR_MEMBER(transportedUnits),
