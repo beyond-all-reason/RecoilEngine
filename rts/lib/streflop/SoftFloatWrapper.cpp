@@ -202,6 +202,21 @@ template<> struct FloatConverter<N_SPECIALIZED, double, 8> {
     }
 };
 
+// Specialization for long double when sizeof(long double) == 8 (ARM64 macOS/Linux)
+// On ARM64, long double is identical to double (both 8 bytes), but it's a distinct C++ type.
+#if defined(__aarch64__) || defined(__arm64__)
+template<> struct FloatConverter<N_SPECIALIZED, long double, 8> {
+    static inline SF_TYPE
+    convert_from_float(const long double a_float) {
+        return SF_APPEND(float64_to_)(*reinterpret_cast<const float64*>(&a_float));
+    }
+    static inline long double convert_to_float(SF_TYPE value) {
+        float64 res = SF_PREPEND(_to_float64)(value);
+        return *reinterpret_cast<long double*>(&res);
+    }
+};
+#endif
+
 // Specialization for floatx80 when C long double type size is 12 (there is 16 bit padding, endian dependent)
 template<> struct FloatConverter<N_SPECIALIZED, long double, 12> {
 // Little endian OK: both address are the same

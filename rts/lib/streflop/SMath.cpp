@@ -30,11 +30,13 @@ namespace streflop {
 
 
 
-    // Default environment. Initialized to 0, and really set on first access
+// Default environment. Initialized to 0, and really set on first access
 #if defined(STREFLOP_X87)
     fpenv_t FE_DFL_ENV = 0;
 #elif defined(STREFLOP_SSE)
     fpenv_t FE_DFL_ENV = {0,0};
+#elif defined(STREFLOP_NEON)
+    fpenv_t FE_DFL_ENV = {0};
 #elif defined(STREFLOP_SOFT)
     fpenv_t FE_DFL_ENV = {42,0,0};
 #else

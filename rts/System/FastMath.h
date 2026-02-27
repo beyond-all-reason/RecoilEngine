@@ -4,10 +4,12 @@
 #define FASTMATH_H
 
 #ifndef DEDICATED_NOSSE
-#include <xmmintrin.h>
+	#include "System/simd_compat.h"
 #endif
 #include <cinttypes>
 
+// Tell streflop_cond.h not to define math::sqrt(float) - we'll provide a faster one
+#define MATH_SQRT_OVERRIDE 1
 #include "lib/streflop/streflop_cond.h"
 #include "System/MainDefines.h"
 #include "System/MathConstants.h"
@@ -226,6 +228,10 @@ namespace math {
 	inline float sqrt(float x) { return fastmath::sqrt_sse(x); }
 	inline float sqrtf(float x) { return fastmath::sqrt_sse(x); }
 	inline float isqrt(float x) { return fastmath::isqrt2_nosse(x); }
+
+	// Resolve ambiguity between sqrt(float) and sqrt(double) when called with int.
+	// Without this, integer arguments are equally viable for both overloads.
+	inline float sqrt(int x) { return fastmath::sqrt_sse(static_cast<float>(x)); }
 
 	using fastmath::floor;
 }

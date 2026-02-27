@@ -40,6 +40,9 @@ these four paragraphs for those parts of this code that are retained.
 /*----------------------------------------------------------------------------
 | Include common integer types and flags.
 *----------------------------------------------------------------------------*/
+#ifndef SOFTFLOAT_MILIEU_H
+#define SOFTFLOAT_MILIEU_H
+
 #include "../System.h"
 
 
@@ -99,3 +102,5 @@ enum {
 
 }
 }
+
+#endif // SOFTFLOAT_MILIEU_H
