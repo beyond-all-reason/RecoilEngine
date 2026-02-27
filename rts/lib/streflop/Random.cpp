@@ -15,9 +15,15 @@
 #include "streflop.h"
 
 // Include endian-specific code
+// Note: System.h has include guards, so if already included via streflop.h,
+// the #undef + re-include trick won't re-define the macros. Define directly.
 #undef __BYTE_ORDER
 #undef __FLOAT_WORD_ORDER
 #include "System.h"
+#ifndef __FLOAT_WORD_ORDER
+#define __BYTE_ORDER 1234
+#define __FLOAT_WORD_ORDER 1234
+#endif
 
 namespace streflop {
 

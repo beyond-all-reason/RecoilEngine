@@ -12,12 +12,16 @@
 #include "System/Platform/CpuID.h"
 
 #ifndef STREFLOP_H
-void good_fpu_control_registers(const char* text) { LOG_L(L_WARNING, "[%s](%s) streflop is disabled", __func__, text); }
+void good_fpu_control_registers(const char* text) {
+	static bool once = false;
+	if (!once) { LOG_L(L_WARNING, "[%s](%s) streflop is disabled", __func__, text); once = true; }
+}
 void good_fpu_init() { LOG_L(L_WARNING, "[%s] streflop is disabled", __func__); }
 
 #else
 
 #ifdef STREFLOP_SSE
+#elif STREFLOP_NEON
 #elif STREFLOP_X87
 #else
 	#error "streflop FP-math mode must be either SSE or X87"
@@ -71,6 +75,8 @@ MaskRsvd:    0    0    0  1  1  1  1  1|   0    0   1  1  1  1  1  1 = 0x1F3F
 		MaskRsvd - Masks out the reserved bits.
 
 	Source: Intel Architecture Software Development Manual, Volume 1, Basic Architecture
+
+TODO: NEON VERSION
 */
 
 void good_fpu_control_registers(const char* text)
@@ -137,6 +143,8 @@ void good_fpu_init()
 #ifdef STREFLOP_H
 	#if (defined(STREFLOP_SSE))
 	LOG("[%s][STREFLOP_SSE]", __func__);
+	#elif (defined(STREFLOP_NEON))
+	LOG("[%s][STREFLOP_NEON]", __func__);
 	#elif (defined(STREFLOP_X87))
 	LOG("[%s][STREFLOP_X87]", __func__);
 	#else
@@ -153,6 +161,8 @@ void good_fpu_init()
 	#if (defined(STREFLOP_SSE))
 	if (sseFlag == 0)
 		throw unsupported_error("CPU is missing SSE 1.0 instruction support");
+	#elif (defined(STREFLOP_NEON))
+	LOG_L(L_WARNING, "\tStreflop NEON mode, FPUCHECK NOT IMPLEMENTED. glhf");
 	#elif (defined(STREFLOP_X87))
 	LOG_L(L_WARNING, "\tStreflop floating-point math is set to X87 mode");
 	LOG_L(L_WARNING, "\tThis may cause desyncs during multi-player games");
