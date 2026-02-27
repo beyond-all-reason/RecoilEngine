@@ -48,7 +48,6 @@ public:
 	void WeaponFired(CWeapon* weapon, const bool searchForNewTarget, bool raiseEvent = true);
 
 	virtual bool CanWeaponAutoTarget(const CWeapon* weapon) const { return true; }
-
 	virtual int GetDefaultCmd(const CUnit* pointed, const CFeature* feature);
 	virtual void SlowUpdate();
 	virtual void GiveCommandReal(const Command& c, bool fromSynced = true);
@@ -125,7 +124,7 @@ public:
 	int lastUserCommand;
 	int selfDCountdown;
 	int lastFinishCommand;
-	float attackCmdTimeout = -1.0f;
+	float autoTargetRate = -1.0f;
 
 	CUnit* owner;
 	CUnit* orderTarget;

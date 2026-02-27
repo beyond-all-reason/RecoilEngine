@@ -2827,7 +2827,7 @@ int LuaSyncedCtrl::SetUnitEngagementRange(lua_State* L)
  * 
  * @function Spring.SetUnitAutoTargetRate
  * @param unitID integer
- * @param timeout number timeout in seconds for auto-generated unit and weapon attack commands; pass any boolean to reset to default
+ * @param autoTargetRate number in seconds for auto-generated unit and weapon attack commands to rescan for new targets; pass any boolean to reset to default
  * @return nil
  */
 int LuaSyncedCtrl::SetUnitAutoTargetRate(lua_State* L)
@@ -2837,10 +2837,15 @@ int LuaSyncedCtrl::SetUnitAutoTargetRate(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
-	if (lua_isboolean(L, 2) && !lua_toboolean(L, 2))
-		unit->commandAI->attackCmdTimeout = -1;   // reset to default
-	else
-		unit->commandAI->attackCmdTimeout = luaL_checkfloat(L, 2);
+	if (lua_isboolean(L, 2) && !lua_toboolean(L, 2)) {
+		if (!lua_toboolean(L, 2)) {
+			unit->commandAI->autoTargetRate = -1;   // reset to default
+		} else {
+			luaL_error(L, "Invalid Argument, got bool true, expected bool false to reset to default autoTargetRate");
+		}
+	} else {
+		unit->commandAI->autoTargetRate = luaL_checkfloat(L, 2);
+	}
 
 	return 0;
 }

@@ -1288,7 +1288,7 @@ bool CMobileCAI::GenerateAttackCmd()
 		return false;
 
 	Command c(CMD_ATTACK, INTERNAL_ORDER, newAttackTargetId);
-	c.SetTimeOut(static_cast <int> (gs->frameNum + GAME_SPEED * (attackCmdTimeout >= 0 ? attackCmdTimeout : 5)));
+	c.SetTimeOut(static_cast <int> (gs->frameNum + GAME_SPEED * (autoTargetRate >= 0 ? autoTargetRate : 5)));
 	commandQue.push_front(c);
 
 	commandPos1 = owner->pos;
