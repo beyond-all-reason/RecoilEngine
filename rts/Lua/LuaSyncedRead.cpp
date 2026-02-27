@@ -3336,9 +3336,9 @@ int LuaSyncedRead::GetUnitNearestAlly(lua_State* L)
  * @function Spring.GetUnitNearestEnemy
  * @param unitID integer
  * @param range number? (Default: `1.0e9`) range of the search.
- * @param useLOS boolean? (Default: true) requires LOS/radar visibility of allied team.
- * @param sphereDistTest? (Default: false) determines if using cylindrical or spherical search.
- * @param checkSightDist? (Default: false) toggles additional LOS test. In particular, checks if candidate enemy units have LOS to queried unit.
+ * @param useLOS boolean? (Default: `true`) requires LOS/radar visibility of allied team.
+ * @param sphereDistTest boolean? (Default: `false`) determines if using spherical(3D, includes target radius) or cylindrical(2D) search.
+ * @param checkSightDist boolean? (Default: `false`) determine if during filter process, if candidate distance to be within candidate LOS radius.
  */
 int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 {
@@ -3372,8 +3372,8 @@ int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
  * @param z number z coordinate of query position
  * @param range number? (Default: `1.0e9`)
  * @param useLOS boolean? (Default: true) requires LOS/radar visibility or not. False if you want to use cylindrical search.
- * @param sphereDistTest? (Default: false) determines if using cylindrical or spherical search.
- * @param checkSightDist? (Default: false) toggles additional LOS test. In particular, checks if candidate enemy units have LOS to queried position.
+ * @param sphereDistTest boolean? (Default: `false`) determines if using spherical(3D, includes target radius) or cylindrical(2D) search.
+ * @param checkSightDist boolean? (Default: `false`) determine if during filter process, if candidate distance to be within candidate LOS radius.
  * @return integer? unitID
  * 
 */
