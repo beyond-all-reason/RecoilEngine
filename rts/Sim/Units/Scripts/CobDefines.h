@@ -114,5 +114,6 @@ static constexpr int KSIN                    = 135; // get (kiloSine    : 1024*s
 static constexpr int KCOS                    = 136; // get (kiloCosine  : 1024*cos(x))
 static constexpr int KTAN                    = 137; // get (kiloTangent : 1024*tan(x))
 static constexpr int SQRT                    = 138; // get (square root)
-
+static constexpr int PIECE_HEADING			 = 139; // get
+static constexpr int PIECE_PITCH			 = 140; // get
 // NOTE: shared variables use codes [1024 - 5119]

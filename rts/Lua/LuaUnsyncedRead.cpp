@@ -305,6 +305,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(UnitIconGetDraw);
 	REGISTER_LUA_CFUNC(GetUnitIconData);
+	REGISTER_LUA_CFUNC(GetUnitIcon);
 	REGISTER_LUA_CFUNC(GetIconData);
 	REGISTER_LUA_CFUNC(GetAllIconDataArray);
 
@@ -1444,7 +1445,7 @@ namespace Impl {
  */
 int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
 {
-	CUnit* unit = ParseUnit(L, __func__, 1);
+	const CUnit* unit = ParseUnit(L, __func__, 1);
 	const auto fullData = luaL_optboolean(L, 2, false);
 
 	if (unit == nullptr)
@@ -1454,6 +1455,28 @@ int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
 		return Impl::GetIconDataImpl<true >(L, unit->currentIconIndex);
 	else
 		return Impl::GetIconDataImpl<false>(L, unit->currentIconIndex);
+}
+
+/*** Get unit icon name
+ *
+ * @function Spring.GetUnitIcon
+ * @param unitID number
+ * @return string iconName
+ */
+int LuaUnsyncedRead::GetUnitIcon(lua_State* L)
+{
+	const CUnit* unit = ParseUnit(L, __func__, 1);
+	const auto iconIdx = unit->currentIconIndex;
+
+	if (iconIdx == icon::INVALID_ICON_INDEX) {
+		lua_pushstring(L, "");
+	}
+	else {
+		const auto& iconData = icon::iconHandler.GetIconData(iconIdx);
+		lua_pushstring(L, iconData.GetName().c_str());
+	}
+
+	return 1;
 }
 
 /*** Get icon data
@@ -2408,70 +2431,56 @@ int LuaUnsyncedRead::GetUnitsInScreenRectangle(lua_State* L)
 
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 5);
 
-	std::function<bool(const CUnit*)> disqualifierFunc;
-
-	switch (allegiance)
-	{
-	case LuaUtils::AllUnits:
-		disqualifierFunc = [L](const CUnit* unit) -> bool { return !LuaUtils::IsUnitVisible(L, unit); };
-		break;
-	case LuaUtils::MyUnits:
-		disqualifierFunc = [readTeam](const CUnit* unit) -> bool { return unit->team != readTeam; };
-		break;
-	case LuaUtils::AllyUnits:
-		disqualifierFunc = [readATeam](const CUnit* unit) -> bool { return unit->allyteam != readATeam; };
-		break;
-	case LuaUtils::EnemyUnits:
-		disqualifierFunc = [readATeam](const CUnit* unit) -> bool { return unit->allyteam == readATeam; };
-		break;
-	default: {
-		if (LuaUtils::IsAlliedTeam(L, allegiance)) {
-			disqualifierFunc = [allegiance](const CUnit* unit) -> bool { return unit->team != allegiance; };
-		}
-		else {
-			disqualifierFunc = [allegiance, L](const CUnit* unit) -> bool {
-				if (unit->team != allegiance)
-					return true;
-
-				if (!LuaUtils::IsUnitVisible(L, unit))
-					return true;
-
-				return false;
-			};
-		}
-	} break;
-	}
-
 	// Even though we're in unsynced it's ok to use gs->tempNum since its exact value
 	// doesn't matter
 	const int tempNum = gs->GetTempNum();
 	lua_createtable(L, unitQuadIter.GetObjectCount(), 0);
 
-	uint32_t count = 0;
-	for (auto visUnitList : unitQuadIter.GetObjectLists()) {
-		for (CUnit* unit : *visUnitList) {
-			if (disqualifierFunc(unit))
-				continue;
+	auto runLoop = [&](auto disqualifier) {
+		uint32_t count = 0;
+		for (auto visUnitList : unitQuadIter.GetObjectLists()) {
+			for (CUnit* unit : *visUnitList) {
+				if (disqualifier(unit))
+					continue;
 
-			if (unit->tempNum == tempNum)
-				continue;
+				if (unit->tempNum == tempNum)
+					continue;
 
-			unit->tempNum = tempNum;
+				unit->tempNum = tempNum;
 
-			const float3 vpPos = camera->CalcViewPortCoordinates(unit->drawPos);
+				const float3 vpPos = camera->CalcViewPortCoordinates(unit->drawPos);
 
-			if (vpPos.x > r || vpPos.x < l)
-				continue;
+				if (vpPos.x > r || vpPos.x < l)
+					continue;
 
-			if (vpPos.y > b || vpPos.y < t)
-				continue;
+				if (vpPos.y > b || vpPos.y < t)
+					continue;
 
-			if (vpPos.z > 1.0f || vpPos.z < 0.0f)
-				continue;
+				if (vpPos.z > 1.0f || vpPos.z < 0.0f)
+					continue;
 
-			lua_pushnumber(L, unit->id);
-			lua_rawseti(L, -2, ++count);
+				lua_pushnumber(L, unit->id);
+				lua_rawseti(L, -2, ++count);
+			}
 		}
+	};
+
+	switch (allegiance) {
+		case LuaUtils::AllUnits:
+			runLoop([L](const CUnit* u) { return !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::MyUnits:
+			runLoop([L, readTeam](const CUnit* u) { return u->team != readTeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::AllyUnits:
+			runLoop([L, readATeam](const CUnit* u) { return u->allyteam != readATeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::EnemyUnits:
+			runLoop([L, readATeam](const CUnit* u) { return u->allyteam == readATeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		default:
+			runLoop([L, allegiance](const CUnit* u) { return u->team != allegiance || !LuaUtils::IsUnitVisible(L, u); });
+			break;
 	}
 
 	return 1;

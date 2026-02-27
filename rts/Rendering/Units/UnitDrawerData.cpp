@@ -274,14 +274,18 @@ void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 		(losStatus & prevMask) == prevMask ||
 		gameSetup->ghostedBuildings && unit->leavesGhost && (losStatus & LOS_PREVLOS) != 0;
 
-	const bool customIcon = (unitVisible || gu->spectatingFullView);
+	const bool typedIcon = (unitVisible || gu->spectatingFullView);
 
-	if (customIcon)
-		unit->currentIconIndex = icon::iconHandler.GetIconIdxOrDefault(unit->definedIconName);
-	else if ((losStatus & LOS_INRADAR) != 0)
+	if (typedIcon) {
+		unit->currentIconIndex =
+			(unit->customIconIndex != icon::INVALID_ICON_INDEX) ? unit->customIconIndex : icon::iconHandler.GetIconIdxOrDefault(unit->definedIconName);
+	}
+	else if ((losStatus & LOS_INRADAR) != 0) {
 		unit->currentIconIndex = icon::iconHandler.GetDefaultIconIdx();
-	else
+	}
+	else {
 		unit->currentIconIndex = icon::INVALID_ICON_INDEX;
+	}
 }
 
 void CUnitDrawerData::UpdateUnitIconState(CUnit* unit)

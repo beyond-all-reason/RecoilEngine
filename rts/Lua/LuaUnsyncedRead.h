@@ -224,6 +224,7 @@ class LuaUnsyncedRead {
 
 		static int UnitIconGetDraw(lua_State* L);
 		static int GetUnitIconData(lua_State* L);
+		static int GetUnitIcon(lua_State* L);
 		static int GetIconData(lua_State* L);
 		static int GetAllIconDataArray(lua_State* L);
 
