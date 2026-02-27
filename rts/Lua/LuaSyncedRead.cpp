@@ -17,7 +17,6 @@
 #include "Game/GameSetup.h"
 #include "Game/Camera.h"
 #include "Game/GameHelper.h"
-#include "Game/UI/MouseHandler.h"
 #include "Game/GlobalUnsynced.h"
 #include "Game/Players/Player.h"
 #include "Game/Players/PlayerHandler.h"
@@ -3466,9 +3465,10 @@ int LuaSyncedRead::GetUnitNearestAlly(lua_State* L)
  *
  * @function Spring.GetUnitNearestEnemy
  * @param unitID integer
- * @param range number? (Default: `1.0e9`)
- * @param useLOS boolean? (Default: `true`)
- * @return integer? unitID
+ * @param range number? (Default: `1.0e9`) range of the search
+ * @param useLOS boolean? (Default: `true`) requires LOS/radar visibility of allied team.
+ * @param sphereDistTest (Default: `false`) determines if using cylindrical or spherical search
+ * @param checkSightDist (Default: `false`) toggles additional LOS test. In particular, checks if candidate enemy units have LOS to queried unit.
  */
 int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 {
@@ -3496,13 +3496,14 @@ int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 }
 
 /***
- * @note probably need to change function name but keep as is for now.
  * @function Spring.GetPosNearestEnemy
  * @param x number x coordinate of query position
  * @param y number y coordinate of query position
  * @param z number z coordinate of query position
  * @param range number? (Default: `1.0e9`)
- * @param useLOS boolean? (Default: `true`)
+ * @param useLOS boolean? (Default: `true`) requires LOS/radar visibility or not. False if you want to use cylindrical search.
+ * @param sphereDistTest (Default: `false`) determines if using cylindrical or spherical search
+ * @param checkSightDist (Default: `false`) toggles additional LOS test. In particular, checks if candidate enemy units have LOS to queried position.
  * @return integer? unitID
  * 
 */
@@ -3513,16 +3514,12 @@ int LuaSyncedRead::GetClosestEnemyUnit(lua_State* L)
 	float z = luaL_optnumber(L, 3, 1.0f);
 
 	float3 pos(x, y, z);
-	pos.ClampInMap();
-
-	if (pos.equals(OnesVector, ZeroVector)) // no tolerance for invalid call from mouse, similar for invalid params
-		return 0;
 
 	const int allyTeam = CLuaHandle::GetHandleReadAllyTeam(L);
 	if (allyTeam < 0)
 		return 0;
 
-	const bool wantLOS = !lua_isboolean(L, 5) || lua_toboolean(L, 5);
+	const bool wantLOS = luaL_optboolean(L, 5, true);
 	const bool testLOS = !CLuaHandle::GetHandleFullRead(L) || wantLOS;
 
 	const bool sphereDistTest = luaL_optboolean(L, 6, false);
