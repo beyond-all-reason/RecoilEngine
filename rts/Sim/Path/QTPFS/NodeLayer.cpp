@@ -14,7 +14,7 @@ inline int __bsfd (int mask)
 	return index;
 }
 #elif defined(__GNUC__)
-#include <x86intrin.h>
+#include "System/simd_compat.h"
 #else
 #error no bsfd intrinsic currently set
 #endif
