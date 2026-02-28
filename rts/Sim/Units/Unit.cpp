@@ -261,6 +261,7 @@ void CUnit::PreInit(const UnitLoadParams& params)
 	ASSERT_SYNCED(pos);
 
 	footprint = int2(unitDef->xsize, unitDef->zsize);
+	hasElongatedFootprint = (static_cast<float>(std::abs(footprint.x - footprint.y)) / (footprint.x + footprint.y)) > 0.1f;
 
 	beingBuilt = params.beingBuilt;
 	mass = (beingBuilt)? mass: unitDef->mass;
@@ -3039,6 +3040,7 @@ CR_REG_METADATA(CUnit, (
 
 	CR_MEMBER(definedIconName),
 	CR_MEMBER_UN(currentIconIndex),
+	CR_MEMBER(customIconIndex),
 	CR_MEMBER_UN(drawIcon),
 
 	CR_MEMBER(transportedUnits),

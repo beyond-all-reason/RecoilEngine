@@ -527,6 +527,9 @@ public:
 	bool isCloaked = false;
 	// true if the unit currently wants to be cloaked
 	bool wantCloak = false;
+	// true if the unit's UnitDef footprint is significantly non-square (stretch factor > 0.1);
+	// gates elongated-footprint collision logic (OBB scan expansion, projected radii, etc.)
+	bool hasElongatedFootprint = false;
 	// true if the unit leaves static ghosts
 	bool leavesGhost = false;
 
@@ -542,6 +545,7 @@ public:
 
 	mutable std::string definedIconName;
 	mutable size_t currentIconIndex = size_t(-1); // icon::INVALID_ICON_INDEX;
+	mutable size_t customIconIndex = size_t(-1); // icon::INVALID_ICON_INDEX;
 
 	bool drawIcon = true;
 private:

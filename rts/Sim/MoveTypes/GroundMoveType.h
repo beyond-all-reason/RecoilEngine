@@ -33,6 +33,13 @@ public:
 		std::array<std::pair<unsigned int, float*>, 9> floats;
 	};
 
+	struct ColliderParams {
+		float speed;              /// owner speed magnitude
+		float footprintRadius;    /// max half-extent of the UnitDef footprint (collision shape)
+		float axisStretchFactor;  /// 0 for square units, >0.1 triggers elongated-footprint logic
+		float moveDefRadius;      /// MoveDef-based radius for separation/push forces
+	};
+
 	void PostLoad();
 	void* GetPreallocContainer() { return owner; }  // creg
 
@@ -187,14 +194,14 @@ private:
 
     void HandleUnitCollisions(
         CUnit *collider,
-        const float4 &colliderParams,
+        const ColliderParams &colliderParams,
         const UnitDef *colliderUD,
         const MoveDef *colliderMD,
         int curThread);
-    float3 CalculatePushVector(const float4 &colliderParams, const float2 &collideeParams, const bool allowUCO, const float4 &separationVect, CUnit *collider, CUnit *collidee);
+    float3 CalculatePushVector(const ColliderParams &colliderParams, const float2 &collideeParams, const bool allowUCO, const float4 &separationVect, CUnit *collider, CUnit *collidee);
     void HandleFeatureCollisions(
         CUnit *collider,
-        const float4 &colliderParams,
+        const ColliderParams &colliderParams,
         const UnitDef *colliderUD,
         const MoveDef *colliderMD,
         int curThread);
@@ -266,6 +273,7 @@ private:
 
 	float3 forceFromMovingCollidees;
 	float3 forceFromStaticCollidees;
+	float3 forceFromOBBCollidees;
 	float3 resultantForces;
 
 	unsigned int pathID = 0;
