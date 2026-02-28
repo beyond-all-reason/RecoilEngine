@@ -4,12 +4,12 @@ remove_definitions(-DNO_SOUND)
 
 # Dummy Sound implementation
 set(noSoundSources
-		IAudioChannel.cpp
-		ISound.cpp
-		Null/SoundChannels.cpp
-		Null/NullSound.cpp
-        SoundStatics.cpp
-	)
+	IAudioChannel.cpp
+	ISound.cpp
+	Null/SoundChannels.cpp
+	Null/NullSound.cpp
+	SoundStatics.cpp
+)
 
 add_library(no-sound STATIC EXCLUDE_FROM_ALL ${noSoundSources})
 set_target_properties(no-sound PROPERTIES COMPILE_FLAGS "-DNO_SOUND")
@@ -26,25 +26,25 @@ endif (NO_SOUND)
 # Real Sound implementation
 if    (NOT NO_SOUND)
 	set(soundSources
-			ISound.cpp
-			IAudioChannel.cpp
-			Null/NullSound.cpp
-			OpenAL/ALShared.cpp
-			OpenAL/EFX.cpp
-			OpenAL/EFXfuncs.cpp
-			OpenAL/EFXPresets.cpp
-			OpenAL/AudioChannel.cpp
-			OpenAL/OggDecoder.cpp
-			OpenAL/Mp3Decoder.cpp
-			OpenAL/MusicStream.cpp
-			OpenAL/Sound.cpp
-			OpenAL/SoundChannels.cpp
-			OpenAL/SoundBuffer.cpp
-			OpenAL/SoundItem.cpp
-			OpenAL/SoundSource.cpp
-			OpenAL/VorbisShared.cpp
-            SoundStatics.cpp
-		)
+		ISound.cpp
+		IAudioChannel.cpp
+		Null/NullSound.cpp
+		OpenAL/ALShared.cpp
+		OpenAL/EFX.cpp
+		OpenAL/EFXfuncs.cpp
+		OpenAL/EFXPresets.cpp
+		OpenAL/AudioChannel.cpp
+		OpenAL/OggDecoder.cpp
+		OpenAL/Mp3Decoder.cpp
+		OpenAL/MusicStream.cpp
+		OpenAL/Sound.cpp
+		OpenAL/SoundChannels.cpp
+		OpenAL/SoundBuffer.cpp
+		OpenAL/SoundItem.cpp
+		OpenAL/SoundSource.cpp
+		OpenAL/VorbisShared.cpp
+		SoundStatics.cpp
+	)
 
 	find_package_static(OpenAL 1.18.2 REQUIRED)
 	find_package_static(OggVorbis 1.3.4 REQUIRED)
