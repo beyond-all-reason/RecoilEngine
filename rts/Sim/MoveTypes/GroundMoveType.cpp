@@ -144,7 +144,7 @@ CR_REG_METADATA(CGroundMoveType, (
 	CR_MEMBER(resultantForces),
 	CR_MEMBER(forceFromMovingCollidees),
 	CR_MEMBER(forceFromStaticCollidees),
-	CR_MEMBER(forceFromOBBCollidees),
+	CR_MEMBER(hasOBBCollision),
 
 	CR_MEMBER(pathID),
 	CR_MEMBER(nextPathId),
@@ -213,8 +213,32 @@ static CGroundMoveType::MemberData gmtMemberData = {
 	}},
 };
 
+// Helpers for footprint-based collision calculations.
+// Mobile units have xsize/zsize overridden by MoveDef, so these read from the
+// original UnitDef footprint (int2) to get the true physical shape.
+// For CUnit*, prefer the pre-computed fields (footprintHalfExtents, footprintMaxRadius)
+// where available. These helpers exist for CSolidObject* paths (SAT, features).
 
+/// Axis stretch factor: 0 for square, approaches 1 for extremely elongated.
+static float CalcFootprintStretchFactor(const int2& footprint) {
+	return static_cast<float>(std::abs(footprint.x - footprint.y)) / (footprint.x + footprint.y);
+}
 
+/// Half-extents as a float2 in world units (x, z).
+/// Subtracts 1 square per axis before halving, matching the MoveDef size pattern.
+static float2 CalcFootprintHalfExtents(const int2& footprint) {
+	return float2(footprint.x - 1, footprint.y - 1) * (0.5f * SQUARE_SIZE);
+}
+
+// Returns the radius of an oriented rectangle (halfX x halfZ) projected onto a separation
+// direction — an ellipse approximation of the OBB extents. Gives a direction-aware radius:
+// tight on the sides, long nose-to-nose, without requiring SAT.
+// Formula: sqrt( (halfX * |dir·right|)² + (halfZ * |dir·front|)² )
+static float CalcProjectedFootprintRadius(const CSolidObject* obj, const float2& halfExtents, const float3& dir) {
+	const float dx = math::fabs(dir.dot(obj->rightdir)) * halfExtents.x;
+	const float dz = math::fabs(dir.dot(obj->frontdir)) * halfExtents.y;
+	return math::sqrt(dx * dx + dz * dz);
+}
 
 namespace SAT {
 	static float CalcSeparatingDist(
@@ -239,13 +263,12 @@ namespace SAT {
 		const float3& separationVec
 	) {
 		// collider is always a mobile unit whose xsize/zsize were overridden by MoveDef,
-		// so use footprint (original UnitDef values) for the collision shape
-		// Subtract 1 square per axis before halving to match MoveDef size construction.
-		const float2 colliderSize = float2(collider->footprint.x - 1, collider->footprint.y - 1) * (0.5f * SQUARE_SIZE);
+		// so use the original UnitDef footprint for the collision shape.
+		const float2 colliderSize = CalcFootprintHalfExtents(collider->footprint);
 		// collidee may be a mobile unit (MoveDef override), immobile unit, or feature;
 		// mobile units need footprint, others have correct xsize/zsize already
 		const float2 collideeSize = (collideeMD != nullptr)
-			? float2(collidee->footprint.x - 1, collidee->footprint.y - 1) * (0.5f * SQUARE_SIZE)
+			? CalcFootprintHalfExtents(collidee->footprint)
 			: collidee->GetFootPrint(0.5f * SQUARE_SIZE);
 
 		// true if no overlap on at least one axis
@@ -258,39 +281,6 @@ namespace SAT {
 		return haveAxis;
 	}
 };
-
-
-// Helpers for footprint-based collision calculations.
-// Mobile units have xsize/zsize overridden by MoveDef, so these read from the
-// original UnitDef footprint (int2) to get the true physical shape.
-
-/// Axis stretch factor: 0 for square, approaches 1 for extremely elongated.
-static float CalcFootprintStretchFactor(const int2& footprint) {
-	return static_cast<float>(std::abs(footprint.x - footprint.y)) / (footprint.x + footprint.y);
-}
-
-/// Max half-extent in world units — the radius of the bounding circle.
-/// Subtracts 1 square (SQUARE_SIZE) from each axis before halving, matching the
-/// pattern used by MoveDef to construct its interior radius.
-static float CalcFootprintMaxRadius(const int2& footprint) {
-	return (std::max(footprint.x, footprint.y) - 1) * 0.5f * SQUARE_SIZE;
-}
-
-/// Half-extents as a float2 in world units (x, z).
-/// Subtracts 1 square per axis before halving, matching the MoveDef size pattern.
-static float2 CalcFootprintHalfExtents(const int2& footprint) {
-	return float2(footprint.x - 1, footprint.y - 1) * (0.5f * SQUARE_SIZE);
-}
-
-// Returns the radius of an oriented rectangle (halfX x halfZ) projected onto a separation
-// direction — an ellipse approximation of the OBB extents. Gives a direction-aware radius:
-// tight on the sides, long nose-to-nose, without requiring SAT.
-// Formula: sqrt( (halfX * |dir·right|)² + (halfZ * |dir·front|)² )
-static float CalcProjectedFootprintRadius(const CSolidObject* obj, const float2& halfExtents, const float3& dir) {
-	const float dx = math::fabs(dir.dot(obj->rightdir)) * halfExtents.x;
-	const float dz = math::fabs(dir.dot(obj->frontdir)) * halfExtents.y;
-	return math::sqrt(dx * dx + dz * dz);
-}
 
 static bool CheckCollisionExclSAT(
 	const float4& separationVec,
@@ -2563,14 +2553,13 @@ void CGroundMoveType::HandleObjectCollisions()
 	resultantForces = ZeroVector;
 	forceFromMovingCollidees = ZeroVector;
 	forceFromStaticCollidees = ZeroVector;
-	forceFromOBBCollidees = ZeroVector;
+	hasOBBCollision = false;
 
 	// NOTE:
 	//   use the collider's UnitDef footprint as radius for collision
 	//   detection (its MoveDef footprint may be smaller for pathfinding)
-	//   must read from footprint directly since xsize/zsize are overridden
-	//   to match the MoveDef during GroundMoveType initialization
-	const float colliderFootPrintRadius = CalcFootprintMaxRadius(collider->footprint);
+	//   Pre-computed on CUnit from the original UnitDef footprint.
+	const float colliderFootPrintRadius = collider->footprintMaxRadius;
 	const float colliderAxisStretchFact = collider->hasElongatedFootprint
 		? CalcFootprintStretchFactor(collider->footprint)
 		: 0.0f;
@@ -2616,20 +2605,12 @@ void CGroundMoveType::HandleObjectCollisions()
 			(resultantForces.Normalize()) *= maxSpeed;
 	}
 
-	// OBB nose/tail forces correct physical overlap between the unit's
-	// oriented bounding box and blocked squares. These must be prioritized
-	// because:
-	// 1. UpdatePos validates against the MoveDef footprint, which is smaller
-	//    than the physical OBB — backward pushes from nose collisions can
-	//    land on squares still "blocked" in MoveDef terms, zeroing the result.
-	// 2. In blob scenarios, forceFromMovingCollidees (unit-push) can overpower
-	//    the static collision component, pushing the nose into buildings.
-	//
-	// When OBB overlap is detected, drop unit-push forces (like positionStuck
-	// does for MoveDef-zone overlap) so the building collision response wins.
-	// Then unconditionally add the OBB force to ensure the nose is pushed out
-	// even if the base static forces alone are insufficient.
-	if (!forceFromOBBCollidees.same(ZeroVector)) {
+	// When the nose/tail of an elongated unit overlaps a blocked square, drop unit-push
+	// forces and rely solely on static-collision response. This prevents other units from
+	// pushing an elongated unit's nose further into a building — the same principle as the
+	// positionStuck fallback above, but for OBB-zone overlap that the MoveDef footprint
+	// cannot detect.
+	if (hasOBBCollision) {
 		resultantForces = forceFromStaticCollidees;
 		if (resultantForces.SqLength() > maxPushForceSq)
 			(resultantForces.Normalize()) *= maxSpeed;
@@ -2702,14 +2683,12 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 		const float3 speedDir2D = (vel * XZVector).SafeNormalize();
 
 		// OBB half-extents in world-space for oriented footprint (used for nose/tail push-out)
-		// Must use collider->footprint (UnitDef dimensions), NOT collider->xsize/zsize
+		// Uses the pre-computed footprintHalfExtents (from UnitDef dimensions), NOT xsize/zsize
 		// which are overridden to match the MoveDef during GroundMoveType initialization.
-		// Using xsize/zsize would give a near-square OBB matching the (small) MoveDef
-		// instead of the actual elongated physical shape, causing nose squares to fall
-		// outside the OBB and receive no collision response.
+		// squareRadius is added to account for the blocked square's own half-extent.
 		// Only needed for elongated units; square units skip OBB logic entirely.
-		const float obbHalfX = collider->hasElongatedFootprint ? ((collider->footprint.x - 1) * 0.5f * SQUARE_SIZE) + squareRadius : 0.0f;
-		const float obbHalfZ = collider->hasElongatedFootprint ? ((collider->footprint.y - 1) * 0.5f * SQUARE_SIZE) + squareRadius : 0.0f;
+		const float obbHalfX = collider->hasElongatedFootprint ? collider->footprintHalfExtents.x + squareRadius : 0.0f;
+		const float obbHalfZ = collider->hasElongatedFootprint ? collider->footprintHalfExtents.y + squareRadius : 0.0f;
 
 		const int xmid = (pos.x + vel.x) / SQUARE_SIZE;
 		const int zmid = (pos.z + vel.z) / SQUARE_SIZE;
@@ -2804,19 +2783,33 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 					if (checkYardMap && !positionStuck)
 						positionStuck = true;
 				} else if (collider->hasElongatedFootprint) {
-					// Square is outside the axis-aligned MoveDef zone but may still overlap
-					// the unit's oriented bounding box (OBB). This handles long ships whose
-					// nose/tail extends well beyond the MoveDef footprint center.
+					// --- OBB nose/tail collision response for elongated units ---
 					//
-					// We cannot use squarePenDistance (sphere distance from unit center) here
-					// because nose/tail squares are far from center, so squareSepDistance >
-					// squareColRadiusSum and squarePenDistance == 0 -- no force would result.
+					// WHY THIS EXISTS (not redundant with SAT):
+					// SAT (Separating Axis Theorem) determines whether two objects'
+					// bounding boxes overlap — it answers "is there a collision?"
+					// That detection gates entry into HandleStaticObjectCollision.
 					//
-					// Instead, compute penetration in OBB-local space and apply a direct
-					// axial push force. positionStuck is NOT set here to keep pathfinder and
-					// collision detection in agreement.
-					const float3 squareVec2D = squareVec * XZVector; // pos - squarePos, in XZ
-					const float signedFront = squareVec2D.dot(frontDir2D); // +ve = square is in front of center
+					// Once inside, this per-square scan determines the *response
+					// direction*. The MoveDef-zone scan (above) only covers the
+					// axis-aligned MoveDef footprint, which is typically much smaller
+					// than the actual elongated physical shape (e.g. 3×3 MoveDef for
+					// a 3×10 ship). The nose and tail extend beyond the MoveDef zone
+					// and can overlap blocked squares that the MoveDef scan never visits.
+					//
+					// Without this branch, the nose clips through buildings because:
+					// - squarePenDistance is computed from the unit's *center*, so
+					//   nose/tail squares are far away and produce zero penetration
+					// - the MoveDef scan range doesn't reach nose/tail squares at all
+					//
+					// The OBB branch computes penetration in the unit's local coordinate
+					// frame, producing an axial push along the front/back direction.
+					// Only nose/tail squares fire (penDepthFront <= penDepthRight) to
+					// avoid lateral forces from side-body squares, which would cause
+					// oscillation in hallways. Lateral clearance is the MoveDef-zone
+					// strafe/bounce system's responsibility.
+					const float3 squareVec2D = squareVec * XZVector;
+					const float signedFront = squareVec2D.dot(frontDir2D);
 					const float signedRight = squareVec2D.dot(rightDir2D);
 					const float absFront = math::fabs(signedFront);
 					const float absRight = math::fabs(signedRight);
@@ -2825,42 +2818,20 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 						const float penDepthFront = obbHalfZ - absFront;
 						const float penDepthRight = obbHalfX - absRight;
 
-						// --- NEW: Only apply OBB push for nose/tail squares ---
-						// The MoveDef zone covers the unit's center body. OBB logic
-						// exists specifically for nose/tail overhang beyond that zone.
-						// Body-side squares (high penDepthFront = deep along the length,
-						// meaning the square is near the center) create opposing lateral
-						// forces in hallways. Skip them — they're the MoveDef zone's job.
-						//
-						// A square is "nose/tail" if penDepthFront is small relative to
-						// penDepthRight, i.e. it's near the front/back face of the OBB.
-						// We only fire when penDepthFront is the minimum axis — this is
-						// already the nose-collision case in the original logic.
+						// Only push for nose/tail squares (front face is the shallow axis).
+						// Side-face squares (penDepthRight < penDepthFront) are skipped —
+						// they sit alongside the body and would create opposing lateral
+						// forces from both walls of a hallway.
 						if (penDepthFront <= penDepthRight) {
-							//const float velComponent = math::fabs(vel.dot(frontDir2D));
-							float3 obbPushVec = frontDir2D * (Sign(signedFront) * (penDepthFront));
-							forceFromStaticCollidees += obbPushVec;
-							forceFromOBBCollidees += obbPushVec;
-							//limitSpeedForTurning = std::max(limitSpeedForTurning, (short)2);
+							forceFromStaticCollidees += frontDir2D * (Sign(signedFront) * penDepthFront);
+							hasOBBCollision = true;
 						}
-						// Side-face pushes (penDepthRight < penDepthFront) are deliberately
-						// skipped for OBB-zone squares. These squares are alongside the body
-						// and in a hallway produce opposing lateral forces from both walls.
-						// The MoveDef-zone strafe/bounce system handles lateral clearance.
 					}
 				}
 
 				// ignore squares behind us (relative to velocity vector)
 				if (squareVec.dot(vel) > 0.0f)
 					continue;
-
-				// Only accumulate strafe/bounce for squares within the MoveDef zone.
-				// OBB-zone squares outside the MoveDef zone are handled by their own
-				// push logic above; letting them feed into strafe/bounce causes
-				// oscillation in hallways because the expanded scan picks up wall
-				// squares on both sides whose lateral components flip frame-to-frame.
-				//if (!inMoveDefZone)
-				//	continue;
 
 				// this tends to cancel out too much on average
 				// strafeVec += (rightDir2D * sqColSlideSign);
@@ -2999,10 +2970,10 @@ void CGroundMoveType::HandleUnitCollisions(
 		if (collider->loadingTransportId == collidee->id) continue;
 		if (collidee->loadingTransportId == collider->id) continue;
 
-		// mobile collidees have xsize/zsize overridden by MoveDef, so use footprint (original UnitDef values)
-		// Subtract 1 square before halving to match MoveDef size construction.
+		// mobile collidees have xsize/zsize overridden by MoveDef, so use the pre-computed
+		// footprintMaxRadius (from original UnitDef values).
 		const float collDist = (collideeMobile)
-			? (std::max(collidee->footprint.x, collidee->footprint.y) - 1) * 0.5f * SQUARE_SIZE
+			? collidee->footprintMaxRadius
 			: collidee->CalcFootPrintMaxInteriorRadius();
 		const float2 collideeParams = {collidee->speed.w, collDist};
 
@@ -3020,12 +2991,10 @@ void CGroundMoveType::HandleUnitCollisions(
 			const float3 sepDir2D = (collider->pos - collidee->pos).SafeNormalize2D();
 
 			if (colliderElongated) {
-				const float2 colliderHalfFP = float2(collider->footprint.x - 1, collider->footprint.y - 1) * (0.5f * SQUARE_SIZE);
-				colliderCircleRadius = CalcProjectedFootprintRadius(collider, colliderHalfFP, sepDir2D);
+				colliderCircleRadius = CalcProjectedFootprintRadius(collider, collider->footprintHalfExtents, sepDir2D);
 			}
 			if (collideeElongated) {
-				const float2 collideeHalfFP = float2(collidee->footprint.x - 1, collidee->footprint.y - 1) * (0.5f * SQUARE_SIZE);
-				collideeCircleRadius = CalcProjectedFootprintRadius(collidee, collideeHalfFP, sepDir2D);
+				collideeCircleRadius = CalcProjectedFootprintRadius(collidee, collidee->footprintHalfExtents, sepDir2D);
 			}
 		}
 
