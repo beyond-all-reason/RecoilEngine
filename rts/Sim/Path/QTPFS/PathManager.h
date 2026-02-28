@@ -130,6 +130,7 @@ namespace QTPFS {
 		void RemovePathSearch(QTPFS::entity pathEntity);
 
 		void ReadyQueuedSearches();
+		void ProcessPathSearch(int i, bool shouldBeRaw);
 		void ExecuteQueuedSearches();
 		void QueueDeadPathSearches();
 
