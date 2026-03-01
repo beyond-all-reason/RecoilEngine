@@ -2935,7 +2935,7 @@ void CGroundMoveType::HandleUnitCollisions(
 	const float colliderSeparationDist = (pushResistant && pushResistanceBlockActive) ? 0.f : colliderUD->separationDistance;
 
 	// Account for units that are larger than one's self.
-	const float maxCollisionRadius = colliderParams.y + moveDefHandler.GetLargestFootPrintSizeH();
+	const float maxCollisionRadius = collider->hasElongatedFootprint ? collider->footprintMaxRadius + moveDefHandler.GetLargestFootPrintSizeH() : colliderParams.y + moveDefHandler.GetLargestFootPrintSizeH();
 	const float searchRadius = colliderParams.x + maxCollisionRadius + colliderSeparationDist;
 
 	MoveTypes::CheckCollisionQuery colliderInfo(collider);
@@ -2984,7 +2984,7 @@ void CGroundMoveType::HandleUnitCollisions(
 		const float3 sepDir2D = (collider->pos - collidee->pos).SafeNormalize2D();
 		const float colliderCircleRadius = (collider->hasElongatedFootprint) ? CalcProjectedFootprintRadius(collider, collider->footprintHalfExtents, sepDir2D) : colliderParams.y;
 		const float collideeCircleRadius = (!collideeMobile) ? collidee->CalcFootPrintMaxInteriorRadius() :
-							   (collidee->hasElongatedFootprint) ? CalcProjectedFootprintRadius(collider, collider->footprintHalfExtents, sepDir2D) : collideeMD->CalcFootPrintMaxInteriorRadius();
+							   (collidee->hasElongatedFootprint) ? CalcProjectedFootprintRadius(collidee, collidee->footprintHalfExtents, sepDir2D) : collideeMD->CalcFootPrintMaxInteriorRadius();
 
 		const float2 collideeParams = { collidee->speed.w, collideeCircleRadius };
 		const float4 separationVect = { collider->pos - collidee->pos, Square(colliderCircleRadius + collideeCircleRadius) };
