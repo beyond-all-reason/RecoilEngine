@@ -40,3 +40,6 @@
 	path = rts/lib/nowide
 	url = https://github.com/boostorg/nowide
 	branch = standalone
+[submodule "rts/lib/fmt"]
+	path = rts/lib/fmt
+	url = https://github.com/fmtlib/fmt.git

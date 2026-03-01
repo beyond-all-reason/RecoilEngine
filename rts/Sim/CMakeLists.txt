@@ -157,7 +157,7 @@ add_library(engineSim STATIC
 		"${CMAKE_CURRENT_SOURCE_DIR}/Weapons/WeaponTarget.cpp"
 	)
 
-target_link_libraries(engineSim SDL2::SDL2 Tracy::TracyClient nowide::nowide)
+target_link_libraries(engineSim SDL2::SDL2 Tracy::TracyClient nowide::nowide fmt::fmt)
 
 if( CMAKE_COMPILER_IS_GNUCXX)
 	# FIXME: hack to avoid linkers to remove not referenced symbols. required because of

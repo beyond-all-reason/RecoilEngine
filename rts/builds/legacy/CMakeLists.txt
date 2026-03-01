@@ -18,6 +18,7 @@ target_link_libraries(Game PRIVATE
 	 ${sound-impl}
 	 prd::jsoncpp
 	 streflop
+	 fmt::fmt
 )
 
 ### Assemble libraries

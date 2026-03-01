@@ -5,8 +5,8 @@
 #include <sstream>
 
 #include "lib/sol2/sol.hpp"
-#include "lib/fmt/format.h"
-#include "lib/fmt/printf.h"
+#include <fmt/format.h>
+#include <fmt/printf.h>
 
 #include "System/Log/ILog.h"
 #include "System/SpringMem.h"

@@ -5,7 +5,7 @@
 
 #include <string>
 
-#include "lib/fmt/printf.h"
+#include <fmt/printf.h>
 
 #include "LuaHashString.h"
 #include "LuaInclude.h"
