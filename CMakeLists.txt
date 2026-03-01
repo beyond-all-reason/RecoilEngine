@@ -19,9 +19,6 @@ if (WIN32)
 	add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
-# Force spdlog to use external fmt library (not bundled)
-add_compile_definitions(SPDLOG_FMT_EXTERNAL)
-
 option(INSTALL_PORTABLE "Make a portable installation (instead of regular system installation)" TRUE)
 
 # Allow to set PREFER_STATIC_LIBS from env, defaults to false
@@ -617,9 +614,6 @@ add_dependencies(generateSources generateVersionFiles)
 
 # As the libs are required by all the other sub-projects, we add them first
 add_subdirectory(rts/lib)
-
-# Add fmt include path globally since SPDLOG_FMT_EXTERNAL is enabled
-include_directories(${CMAKE_SOURCE_DIR}/rts/lib/fmt/include)
 
 # Fix for MinGW assembler limitations with large object files
 if(MINGW)
