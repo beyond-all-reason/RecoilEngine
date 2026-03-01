@@ -64,6 +64,7 @@ list(APPEND test_Common_sources
 set(test_common_libraries
 	Tracy::TracyClient
 	Catch2
+	fmt::fmt
 )
 
 add_custom_target(tests)
