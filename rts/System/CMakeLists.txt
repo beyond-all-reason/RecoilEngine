@@ -233,3 +233,10 @@ endif  ()
 
 add_subdirectory(FileSystem)
 add_subdirectory(Net)
+
+# Natvis files for MSVC debugging visualization
+set(RECOIL_NATVIS_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/SpringHashMap.natvis"
+    "${CMAKE_CURRENT_SOURCE_DIR}/SpringHashSet.natvis"
+    CACHE INTERNAL "Recoil Natvis files for MSVC debugging"
+)

@@ -177,6 +177,12 @@ add_executable(engine-dedicated
 		main.cpp
 	)
 target_link_libraries(engine-dedicated ${engineDedicatedLibraries})
+
+if(MSVC)
+    foreach(natvis_file ${RECOIL_NATVIS_FILES})
+        target_sources(engine-dedicated PRIVATE "${natvis_file}")
+    endforeach()
+endif()
 if    (MINGW)
 	target_link_libraries(engine-dedicated ${WS2_32_LIBRARY} ${IMAGEHLP_LIBRARY} ${IPHLPAPI_LIBRARY} ${WINMM_LIBRARY})
 endif (MINGW)

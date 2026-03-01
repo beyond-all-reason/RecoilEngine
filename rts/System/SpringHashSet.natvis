@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Natvis visualizer for emilib::HashSet
+  (https://github.com/emilk/emilib)
+
+  Supports:
+    - emilib::HashSet<K,Hash,Comp>  – shows live elements
+    - emilib::HashSet<...>::iterator
+    - emilib::HashSet<...>::const_iterator
+-->
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <!-- ================================================================
+       emilib::HashSet
+       State enum (uint8_t): INACTIVE=0  ACTIVE=1  FILLED=2
+       ================================================================ -->
+  <Type Name="emilib::HashSet&lt;*>">
+
+    <!-- Summary line shown inline in the Watch / Locals window -->
+    <DisplayString Condition="_num_buckets == 0">{{ empty }}</DisplayString>
+    <DisplayString>{{ size={_num_filled}, buckets={_num_buckets} }}</DisplayString>
+
+    <Expand>
+      <!-- Scalar metadata -->
+      <Item Name="[size]"             ExcludeView="simple">_num_filled</Item>
+      <Item Name="[bucket_count]"     ExcludeView="simple">_num_buckets</Item>
+      <Item Name="[max_probe_length]" ExcludeView="simple">_max_probe_length</Item>
+
+      <!-- Walk every bucket; emit only FILLED ones (state value == 2).
+           The cast to (unsigned char) avoids enum-class comparison issues
+           in older natvis engines. -->
+      <CustomListItems MaxItemsPerView="5000" ExcludeView="simple">
+        <Variable Name="i" InitialValue="0"/>
+        <Loop>
+          <Break Condition="i >= _num_buckets"/>
+          <If Condition="(unsigned char)_states[i] == 2">
+            <!-- HashSet only stores keys -->
+            <Item>_keys[i]</Item>
+          </If>
+          <Exec>i++</Exec>
+        </Loop>
+      </CustomListItems>
+
+      <!-- Raw bucket array (debug aid, hidden from simple view) -->
+      <ArrayItems ExcludeView="simple">
+        <Size>_num_buckets</Size>
+        <ValuePointer>_keys</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+
+  <!-- ================================================================
+       emilib::HashSet::iterator
+       ================================================================ -->
+  <Type Name="emilib::HashSet&lt;*>::iterator">
+
+    <!-- Show current key when pointing at a valid FILLED bucket -->
+    <DisplayString Condition="_set == 0">{{ invalid }}</DisplayString>
+    <DisplayString Condition="_bucket >= _set->_num_buckets">{{ end() }}</DisplayString>
+    <DisplayString>[bucket {_bucket}]  {_set->_keys[_bucket]}</DisplayString>
+
+    <Expand>
+      <Item Name="value"  Condition="_set != 0 && _bucket < _set->_num_buckets">_set->_keys[_bucket]</Item>
+      <Item Name="bucket">_bucket</Item>
+      <Item Name="[set]"  ExcludeView="simple">*_set</Item>
+    </Expand>
+  </Type>
+
+
+  <!-- ================================================================
+       emilib::HashSet::const_iterator
+       (identical layout to iterator, but _set is const MyType*)
+       ================================================================ -->
+  <Type Name="emilib::HashSet&lt;*>::const_iterator">
+
+    <DisplayString Condition="_set == 0">{{ invalid }}</DisplayString>
+    <DisplayString Condition="_bucket >= _set->_num_buckets">{{ end() }}</DisplayString>
+    <DisplayString>[bucket {_bucket}]  {_set->_keys[_bucket]}</DisplayString>
+
+    <Expand>
+      <Item Name="value"  Condition="_set != 0 && _bucket < _set->_num_buckets">_set->_keys[_bucket]</Item>
+      <Item Name="bucket">_bucket</Item>
+      <Item Name="[set]"  ExcludeView="simple">*_set</Item>
+    </Expand>
+  </Type>
+
+</AutoVisualizer>

@@ -83,6 +83,12 @@ include_directories(${engineIncludes})
 add_executable(engine-legacy ${EXE_FLAGS} ${engineSources} ${ENGINE_ICON} ${engineHeaders})
 target_link_libraries(engine-legacy ${engineLibraries} Game)
 
+if(MSVC)
+    foreach(natvis_file ${RECOIL_NATVIS_FILES})
+        target_sources(engine-legacy PRIVATE "${natvis_file}")
+    endforeach()
+endif()
+
 
 ### Install the executable
 install(TARGETS engine-legacy DESTINATION ${BINDIR})

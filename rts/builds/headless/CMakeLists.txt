@@ -63,6 +63,12 @@ target_link_libraries(GameHeadless PRIVATE
 add_executable(engine-headless ${engineSources} ${ENGINE_ICON})
 target_link_libraries(engine-headless no-sound ${engineHeadlessLibraries} GameHeadless no-sound)
 
+if(MSVC)
+    foreach(natvis_file ${RECOIL_NATVIS_FILES})
+        target_sources(engine-headless PRIVATE "${natvis_file}")
+    endforeach()
+endif()
+
 if    (MINGW)
 	# To enable console output/force a console window to open
 	set_target_properties(engine-headless PROPERTIES LINK_FLAGS "-Wl,-subsystem,console")
