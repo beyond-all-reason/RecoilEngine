@@ -2766,8 +2766,8 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 						hasOBBCollision = true;
 						// OBB nose/tail squares must also contribute to the push-out force
 						const float3 pushDir = (pos - squarePos).SafeNormalize2D();
-						const float intoWall = std::min(0.0f, vel.dot(pushDir)); // negative = moving toward square
-						forceFromStaticCollidees += pushDir * (intoWall * squarePenDistance / squareColRadiusSum);
+						const float vmag = std::abs(vel.dot(pushDir)); // negative = moving toward square
+						forceFromStaticCollidees += pushDir * (-vmag * 0.5f * squarePenDistance / squareColRadiusSum);
 					}
 
 				}
