@@ -406,6 +406,32 @@ namespace Platform
 		return (Platform::GetOSFamilyStr() + " " + Platform::GetWordSizeStr());
 	}
 
+	std::string GetArchStr()
+	{
+		#if defined(_WIN32)
+		SYSTEM_INFO sysInfo;
+		GetNativeSystemInfo(&sysInfo);
+		
+		switch (sysInfo.wProcessorArchitecture) {
+			case PROCESSOR_ARCHITECTURE_AMD64:
+				return "x86_64";
+			case PROCESSOR_ARCHITECTURE_ARM64:
+				return "arm64";
+			case PROCESSOR_ARCHITECTURE_ARM:
+				return "arm";
+			case PROCESSOR_ARCHITECTURE_INTEL:
+				return "x86";
+			default:
+				return "unknown";
+		}
+		#else
+		struct utsname info;
+		if (uname(&info) == 0)
+			return std::string(info.machine);
+		return "unknown";
+		#endif
+	}
+
 	#if (defined(_WIN32))
 	std::string GetHardwareStr() { return (windows::GetHardwareString()); }
 	#else
