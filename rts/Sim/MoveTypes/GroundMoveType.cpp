@@ -219,21 +219,18 @@ static CGroundMoveType::MemberData gmtMemberData = {
 // For CUnit*, prefer the pre-computed fields (footprintHalfExtents, footprintMaxRadius)
 // where available. These helpers exist for CSolidObject* paths (SAT, features).
 
-/// Axis stretch factor: 0 for square, approaches 1 for extremely elongated.
+// Axis stretch factor: 0 for square, approaches 1 for extremely elongated.
 static float CalcFootprintStretchFactor(const int2& footprint) {
 	return static_cast<float>(std::abs(footprint.x - footprint.y)) / (footprint.x + footprint.y);
 }
 
-/// Half-extents as a float2 in world units (x, z).
-/// Subtracts 1 square per axis before halving, matching the MoveDef size pattern.
+// Half-extents as a float2 in world units (x, z).
+// Subtracts 1 square per axis before halving, matching the MoveDef centering method.
 static float2 CalcFootprintHalfExtents(const int2& footprint) {
 	return float2(footprint.x - 1, footprint.y - 1) * (0.5f * SQUARE_SIZE);
 }
 
-// Returns the radius of an oriented rectangle (halfX x halfZ) projected onto a separation
-// direction — an ellipse approximation of the OBB extents. Gives a direction-aware radius:
-// tight on the sides, long nose-to-nose, without requiring SAT.
-// Formula: sqrt( (halfX * |dir·right|)² + (halfZ * |dir·front|)² )
+// Gives a direction-aware radius (ellipse):
 static float CalcProjectedFootprintRadius(const CSolidObject* obj, const float2& halfExtents, const float3& dir) {
 	const float dx = math::fabs(dir.dot(obj->rightdir)) * halfExtents.x;
 	const float dz = math::fabs(dir.dot(obj->frontdir)) * halfExtents.y;
@@ -2555,23 +2552,22 @@ void CGroundMoveType::HandleObjectCollisions()
 	forceFromStaticCollidees = ZeroVector;
 	hasOBBCollision = false;
 
-	// NOTE:
-	//   use the collider's UnitDef footprint as radius for collision
-	//   detection (its MoveDef footprint may be smaller for pathfinding)
-	//   Pre-computed on CUnit from the original UnitDef footprint.
-	const float colliderFootPrintRadius = collider->footprintMaxRadius;
+	const float colliderMoveDefRadius = colliderMD->CalcFootPrintMaxInteriorRadius();
+
+	//   Also send the collider's UnitDef footprint for collision detection
+	//   (its MoveDef footprint may be smaller for pathfinding)
+	//   Pre-computed on CUnit from the UnitDef footprint.
+	//const float colliderFootPrintRadius = collider->footprintMaxRadius;
 	const float colliderAxisStretchFact = collider->hasElongatedFootprint
 		? CalcFootprintStretchFactor(collider->footprint)
 		: 0.0f;
-	// Use the MoveDef (pathfinding) footprint radius for separation checks and push forces.
-	// This prevents elongated footprints (e.g. 3x10) from pushing units away in all directions
-	// like a 10x10 circle — collision detection (SAT) still uses the full oriented footprint.
-	const float colliderMoveDefRadius = colliderMD->CalcFootPrintMinExteriorRadius();
+	HandleUnitCollisions(collider, {collider->speed.w, colliderMoveDefRadius, colliderAxisStretchFact}, colliderUD, colliderMD, curThread);
+	HandleFeatureCollisions(collider, {collider->speed.w, colliderMoveDefRadius, colliderAxisStretchFact}, colliderUD, colliderMD, curThread);
 
-	const ColliderParams colliderParams = {collider->speed.w, colliderFootPrintRadius, colliderAxisStretchFact, colliderMoveDefRadius};
+	//const ColliderParams colliderParams = {collider->speed.w, colliderFootPrintRadius, colliderAxisStretchFact, colliderMoveDefRadius};
 
-	HandleUnitCollisions(collider, colliderParams, colliderUD, colliderMD, curThread);
-	HandleFeatureCollisions(collider, colliderParams, colliderUD, colliderMD, curThread);
+	//HandleUnitCollisions(collider, colliderParams, colliderUD, colliderMD, curThread);
+	//HandleFeatureCollisions(collider, colliderParams, colliderUD, colliderMD, curThread);
 
 	if (forceStaticObjectCheck) {
 		MoveTypes::CheckCollisionQuery colliderInfo(collider);
@@ -2607,9 +2603,7 @@ void CGroundMoveType::HandleObjectCollisions()
 
 	// When the nose/tail of an elongated unit overlaps a blocked square, drop unit-push
 	// forces and rely solely on static-collision response. This prevents other units from
-	// pushing an elongated unit's nose further into a building — the same principle as the
-	// positionStuck fallback above, but for OBB-zone overlap that the MoveDef footprint
-	// cannot detect.
+	// pushing an elongated unit's nose further into a building
 	if (hasOBBCollision) {
 		resultantForces = forceFromStaticCollidees;
 		if (resultantForces.SqLength() > maxPushForceSq)
@@ -2679,13 +2673,9 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 		float3 intersectSqrSumPosition;
 
 		const float3 rightDir2D = (rgt * XZVector).SafeNormalize();
-		const float3 frontDir2D = (collider->frontdir * XZVector).SafeNormalize();
 		const float3 speedDir2D = (vel * XZVector).SafeNormalize();
 
-		// OBB half-extents in world-space for oriented footprint (used for nose/tail push-out)
-		// Uses the pre-computed footprintHalfExtents (from UnitDef dimensions), NOT xsize/zsize
-		// which are overridden to match the MoveDef during GroundMoveType initialization.
-		// squareRadius is added to account for the blocked square's own half-extent.
+		// OBB half-extents in world-space for oriented footprint 
 		// Only needed for elongated units; square units skip OBB logic entirely.
 		const float obbHalfX = collider->hasElongatedFootprint ? collider->footprintHalfExtents.x + squareRadius : 0.0f;
 		const float obbHalfZ = collider->hasElongatedFootprint ? collider->footprintHalfExtents.y + squareRadius : 0.0f;
@@ -2713,6 +2703,13 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 		int xmin, xmax, zmin, zmax;
 
 		if (collider->hasElongatedFootprint) {
+
+			const float3 frontDir2D = (collider->frontdir * XZVector).SafeNormalize();
+			// OBB half-extents in world-space for oriented footprint 
+			// Only needed for elongated units; square units skip OBB logic entirely.
+			const float obbHalfX = collider->hasElongatedFootprint ? collider->footprintHalfExtents.x + squareRadius : 0.0f;
+			const float obbHalfZ = collider->hasElongatedFootprint ? collider->footprintHalfExtents.y + squareRadius : 0.0f;
+
 			// Widen the scan to cover the AABB of the unit's oriented OBB so that squares
 			// overlapping the nose/tail (which lie outside the axis-aligned MoveDef zone) are
 			// also visited. Without this, long ships can phase their nose through buildings.
@@ -2767,13 +2764,28 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 				const float3 squareVec = pos - squarePos;
 
 
-				const float  squareColRadiusSum = colliderRadius + squareRadius;
+				const float  squareColRadiusSum = collider->hasElongatedFootprint ? collider->footprintMaxRadius + squareRadius : colliderRadius + squareRadius;
 				const float   squareSepDistance = squareVec.Length2D() + 0.1f;
 				const float   squarePenDistance = std::min(squareSepDistance - squareColRadiusSum, 0.0f);
 				// const float  squareColSlideSign = -Sign(squarePos.dot(rightDir2D) - pos.dot(rightDir2D));
 
-				// NOTE: realMinX/realMaxX are absolute grid coords; compare against xabs/zabs (also absolute)
-				const bool inMoveDefZone = (xabs >= realMinX && xabs <= realMaxX && zabs >= realMinZ && zabs <= realMaxZ);
+				if (collider->hasElongatedFootprint) {
+					// NOTE: realMinX/realMaxX are absolute grid coords; compare against xabs/zabs (also absolute)
+					const bool inMoveDefZone = (xabs >= realMinX && xabs <= realMaxX && zabs >= realMinZ && zabs <= realMaxZ);
+					if (!inMoveDefZone) {
+						hasOBBCollision |= true;
+					}
+				}
+
+				if (intersectSize > 1) {
+					intersectDistance = std::min(intersectDistance, squarePenDistance);
+					intersectSqrSumPosition += (squarePos * XZVector);
+					intersectSqrCount++;
+				}
+				if (checkYardMap && !positionStuck)
+					positionStuck = true;
+
+				/*
 				if (inMoveDefZone) {
 					if (intersectSize > 1) {
 						intersectDistance = std::min(intersectDistance, squarePenDistance);
@@ -2828,6 +2840,7 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 						}
 					}
 				}
+				*/
 
 				// ignore squares behind us (relative to velocity vector)
 				if (squareVec.dot(vel) > 0.0f)
@@ -2904,7 +2917,7 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 
 void CGroundMoveType::HandleUnitCollisions(
 	CUnit* collider,
-	const ColliderParams& colliderParams,
+	const float3& colliderParams,
 	const UnitDef* colliderUD,
 	const MoveDef* colliderMD,
 	int curThread
@@ -2917,7 +2930,7 @@ void CGroundMoveType::HandleUnitCollisions(
 	const bool allowCAU = modInfo.allowCrushingAlliedUnits;
 	const bool allowPEU = modInfo.allowPushingEnemyUnits;
 	const bool allowSAT = modInfo.allowSepAxisCollisionTest;
-	const bool forceSAT = (colliderParams.axisStretchFactor > 0.1f);
+	const bool forceSAT = (colliderParams.z > 0.1f);
 
 	const float3 crushImpulse = owner->speed * owner->mass * Sign(int(!reversing));
 
@@ -2926,8 +2939,8 @@ void CGroundMoveType::HandleUnitCollisions(
 	const float colliderSeparationDist = (pushResistant && pushResistanceBlockActive) ? 0.f : colliderUD->separationDistance;
 
 	// Account for units that are larger than one's self.
-	const float maxCollisionRadius = colliderParams.footprintRadius + moveDefHandler.GetLargestFootPrintSizeH();
-	const float searchRadius = colliderParams.speed + maxCollisionRadius + colliderSeparationDist;
+	const float maxCollisionRadius = colliderParams.y + moveDefHandler.GetLargestFootPrintSizeH();
+	const float searchRadius = colliderParams.x + maxCollisionRadius + colliderSeparationDist;
 
 	MoveTypes::CheckCollisionQuery colliderInfo(collider);
 	if ( !colliderMD->overrideUnitWaterline )
@@ -2971,12 +2984,19 @@ void CGroundMoveType::HandleUnitCollisions(
 		if (collidee->loadingTransportId == collider->id) continue;
 
 		// mobile collidees have xsize/zsize overridden by MoveDef, so use the pre-computed
-		// footprintMaxRadius (from original UnitDef values).
-		const float collDist = (collideeMobile)
-			? collidee->footprintMaxRadius
-			: collidee->CalcFootPrintMaxInteriorRadius();
-		const float2 collideeParams = {collidee->speed.w, collDist};
+		// footprintMaxRadius (from original UnitDef values) for enlongated units.
+		// for unit "separation", assume enlongated units have an ellipse shape.
+		// and that the "separation" distance acts from this ellipse.
+		const float3 sepDir2D = (collider->pos - collidee->pos).SafeNormalize2D();
+		const float colliderCircleRadius = (collider->hasElongatedFootprint) ? CalcProjectedFootprintRadius(collider, collider->footprintHalfExtents, sepDir2D) : colliderParams.y;
+		const float collideeCircleRadius = (!collideeMobile) ? collidee->CalcFootPrintMaxInteriorRadius() :
+							   (collidee->hasElongatedFootprint) ? CalcProjectedFootprintRadius(collider, collider->footprintHalfExtents, sepDir2D) : collideeMD->CalcFootPrintMaxInteriorRadius();
 
+		const float2 collideeParams = { collidee->speed.w, collideeCircleRadius };
+		const float4 separationVect = { collider->pos - collidee->pos, Square(colliderCircleRadius + collideeCircleRadius) };
+		//const float collideeCircleRadius = collidee->hasElongatedFootprint ? collidee->footprintMaxRadius : collideeParams.y;
+		
+		/*
 		// Compute a direction-aware collision radius for each unit by projecting its oriented
 		// footprint rectangle onto the separation direction (ellipse approximation of the OBB).
 		// This makes a 3x10 ship collide like a 3x10 shape — tight on the sides, long nose-to-nose —
@@ -3001,6 +3021,10 @@ void CGroundMoveType::HandleUnitCollisions(
 		const float4 separationVect = {collider->pos - collidee->pos, Square(colliderCircleRadius + collideeCircleRadius)};
 
 		const int collisionFunc = (allowSAT && (forceSAT || collideeElongated));
+		const bool isCollision = (checkCollisionFuncs[collisionFunc](separationVect, collider, collidee, colliderMD, collideeMD));
+		*/ 
+		
+		const int collisionFunc = (allowSAT && (forceSAT || (collideeMobile && collidee->hasElongatedFootprint)));
 		const bool isCollision = (checkCollisionFuncs[collisionFunc](separationVect, collider, collidee, colliderMD, collideeMD));
 
 		// Separation zone also uses projected radii (+ MoveDef base for push forces)
@@ -3041,7 +3065,7 @@ void CGroundMoveType::HandleUnitCollisions(
 			// const bool ignoreCollidee = (collideeYields && alliedCollision);
 
 			crushCollidee |= (!alliedCollision || allowCAU);
-			crushCollidee &= ((colliderParams.speed * collider->mass) > (collideeParams.x * collidee->mass));
+			crushCollidee &= ((colliderParams.x * collider->mass) > (collideeParams.x * collidee->mass));
 
 			if (crushCollidee && !CMoveMath::CrushResistant(*colliderMD, collidee)) {
 				auto& events = Sim::registry.get<UnitCrushEvents>(owner->entityReference);
@@ -3082,7 +3106,7 @@ void CGroundMoveType::HandleUnitCollisions(
 			const bool allowNewPath = (!atEndOfPath && !atGoal);
 			const bool checkYardMap = ((pushCollider || pushCollidee) || collideeUD->IsFactoryUnit());
 
-			if (HandleStaticObjectCollision(collider, collidee, colliderMD,  colliderParams.moveDefRadius, collideeParams.y,  separationVect, allowNewPath, checkYardMap, false, curThread)) {
+			if (HandleStaticObjectCollision(collider, collidee, colliderMD,  colliderParams.y, collideeParams.y,  separationVect, allowNewPath, checkYardMap, false, curThread)) {
 				ReRequestPath(false);
 			}
 
@@ -3092,27 +3116,24 @@ void CGroundMoveType::HandleUnitCollisions(
 		const bool moveCollider = ((pushCollider || !pushCollidee) && colliderMobile);
 		if (moveCollider) {
 			if (isCollision) {
-				// Use projected radii for push magnitude — correct for elongated footprints
-				const ColliderParams colliderPushParams = {colliderParams.speed, colliderCircleRadius, colliderParams.axisStretchFactor, colliderCircleRadius};
-				const float2 collideePushParams  = {collidee->speed.w, collideeCircleRadius};
-				const float4 pushSepVect = {static_cast<float3>(separationVect), Square(colliderCircleRadius + collideeCircleRadius)};
-				forceFromMovingCollidees += CalculatePushVector(colliderPushParams, collideePushParams, allowUCO, pushSepVect, collider, collidee);
+				const float3 colliderParams1 = { colliderParams.x, colliderCircleRadius, colliderParams.z };
+				forceFromMovingCollidees += CalculatePushVector(colliderParams1, collideeParams, allowUCO, separationVect, collider, collidee);
 			} else {
 				// push units away from each other though they are not colliding.
-				const ColliderParams colliderParams2 = {colliderParams.speed, colliderCircleRadius + separationDist * 0.5f, colliderParams.axisStretchFactor, colliderCircleRadius + separationDist * 0.5f};
-				const float2 collideeParams2  = {collidee->speed.w, collideeCircleRadius + separationDist * 0.5f};
-				const float4 separationVect2  = {static_cast<float3>(separationVect), Square(colliderCircleRadius + collideeCircleRadius)};
+				const float3 colliderParams2 = { colliderParams.x, colliderCircleRadius + separationDist * 0.5f, colliderParams.z };
+				const float2 collideeParams2 = { collidee->speed.w, collideeCircleRadius + separationDist * 0.5f };
+				const float4 separationVect2 = { static_cast<float3>(separationVect), Square(colliderParams.y + collideeParams.y) };
 				forceFromMovingCollidees += CalculatePushVector(colliderParams2, collideeParams2, allowUCO, separationVect2, collider, collidee);
 			}
 		}
 	}
 }
 
-float3 CGroundMoveType::CalculatePushVector(const ColliderParams &colliderParams, const float2 &collideeParams, const bool allowUCO, const float4 &separationVect, CUnit *collider, CUnit *collidee)
+float3 CGroundMoveType::CalculatePushVector(const float3 &colliderParams, const float2 &collideeParams, const bool allowUCO, const float4 &separationVect, CUnit *collider, CUnit *collidee)
 {
-    const float colliderRelRadius = colliderParams.footprintRadius / (colliderParams.footprintRadius + collideeParams.y);
-    const float collideeRelRadius = collideeParams.y / (colliderParams.footprintRadius + collideeParams.y);
-    const float collisionRadiusSum = allowUCO ? (colliderParams.footprintRadius * colliderRelRadius + collideeParams.y * collideeRelRadius) : (colliderParams.footprintRadius + collideeParams.y);
+    const float colliderRelRadius = colliderParams.y / (colliderParams.y + collideeParams.y);
+    const float collideeRelRadius = collideeParams.y / (colliderParams.y + collideeParams.y);
+    const float collisionRadiusSum = allowUCO ? (colliderParams.y * colliderRelRadius + collideeParams.y * collideeRelRadius) : (colliderParams.y + collideeParams.y);
 
     const float sepDistance = separationVect.Length() + 0.1f;
     const float penDistance = std::max(collisionRadiusSum - sepDistance, 1.0f);
@@ -3124,7 +3145,7 @@ float3 CGroundMoveType::CalculatePushVector(const ColliderParams &colliderParams
     const float
         m1 = collider->mass,
         m2 = collidee->mass,
-        v1 = std::max(1.0f, colliderParams.speed),
+        v1 = std::max(1.0f, colliderParams.x),
         v2 = std::max(1.0f, collideeParams.x),
         c1 = 1.0f + (1.0f - math::fabs(collider->frontdir.dot(-sepDirection))) * 5.0f,
         c2 = 1.0f + (1.0f - math::fabs(collidee->frontdir.dot(sepDirection))) * 5.0f,
@@ -3157,14 +3178,14 @@ float3 CGroundMoveType::CalculatePushVector(const ColliderParams &colliderParams
 
 void CGroundMoveType::HandleFeatureCollisions(
 	CUnit* collider,
-	const ColliderParams& colliderParams,
+	const float3& colliderParams,
 	const UnitDef* colliderUD,
 	const MoveDef* colliderMD,
 	int curThread
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const bool allowSAT = modInfo.allowSepAxisCollisionTest;
-	const bool forceSAT = (colliderParams.axisStretchFactor > 0.1f);
+	const bool forceSAT = (colliderParams.z > 0.1f);
 
 	const float3 crushImpulse = owner->speed * owner->mass * Sign(int(!reversing));
 	MoveTypes::CheckCollisionQuery colliderInfo(collider);
@@ -3172,14 +3193,14 @@ void CGroundMoveType::HandleFeatureCollisions(
 	// copy on purpose, since DoDamage below can call Lua
 	QuadFieldQuery qfQuery;
 	qfQuery.threadOwner = curThread;
-	quadField.GetFeaturesExact(qfQuery, collider->pos, colliderParams.speed + (colliderParams.footprintRadius * 2.0f));
+	quadField.GetFeaturesExact(qfQuery, collider->pos, colliderParams.x + (colliderParams.y * 2.0f));
 
 	for (CFeature* collidee: *qfQuery.features) {
 		// const FeatureDef* collideeFD = collidee->def;
 
 		// use the collidee's Feature (not FeatureDef) footprint as radius
 		const float2 collideeParams = {0.0f, collidee->CalcFootPrintMaxInteriorRadius()};
-		const float4 separationVect = {collider->pos - collidee->pos, Square(colliderParams.footprintRadius + collideeParams.y)};
+		const float4 separationVect = {collider->pos - collidee->pos, Square(colliderParams.y + collideeParams.y)};
 
 		if (!checkCollisionFuncs[allowSAT && (forceSAT || (collidee->CalcFootPrintAxisStretchFactor() > 0.1f))](separationVect, collider, collidee, colliderMD, nullptr))
 			continue;
@@ -3203,7 +3224,7 @@ void CGroundMoveType::HandleFeatureCollisions(
 		}
 
 		if (!collidee->IsMoving()) {
-			if (HandleStaticObjectCollision(collider, collidee, colliderMD,  colliderParams.moveDefRadius, collideeParams.y,  separationVect, (!atEndOfPath && !atGoal), true, false, curThread)) {
+			if (HandleStaticObjectCollision(collider, collidee, colliderMD,  colliderParams.y, collideeParams.y,  separationVect, (!atEndOfPath && !atGoal), true, false, curThread)) {
 				ReRequestPath(false);
 			}
 
@@ -3211,7 +3232,7 @@ void CGroundMoveType::HandleFeatureCollisions(
 		}
 
 		const float  sepDistance    = separationVect.Length() + 0.1f;
-		const float  penDistance    = std::max((colliderParams.footprintRadius + collideeParams.y) - sepDistance, 1.0f);
+		const float  penDistance    = std::max((colliderParams.y + collideeParams.y) - sepDistance, 1.0f);
 		const float  sepResponse    = std::min(SQUARE_SIZE * 2.0f, penDistance * 0.5f);
 
 		const float3 sepDirection   = separationVect / sepDistance;
@@ -3223,7 +3244,7 @@ void CGroundMoveType::HandleFeatureCollisions(
 		const float
 			m1 = collider->mass,
 			m2 = collidee->mass * 10000.0f,
-			v1 = std::max(1.0f, colliderParams.speed),
+			v1 = std::max(1.0f, colliderParams.x),
 			v2 = 1.0f,
 			c1 = (1.0f - math::fabs( collider->frontdir.dot(-sepDirection))) * 5.0f,
 			c2 = (1.0f - math::fabs(-collider->frontdir.dot( sepDirection))) * 5.0f,
