@@ -408,26 +408,15 @@ namespace Platform
 
 	std::string GetArchStr()
 	{
-		#if defined(_WIN32)
-		SYSTEM_INFO sysInfo;
-		GetNativeSystemInfo(&sysInfo);
-		
-		switch (sysInfo.wProcessorArchitecture) {
-			case PROCESSOR_ARCHITECTURE_AMD64:
-				return "x86_64";
-			case PROCESSOR_ARCHITECTURE_ARM64:
-				return "arm64";
-			case PROCESSOR_ARCHITECTURE_ARM:
-				return "arm";
-			case PROCESSOR_ARCHITECTURE_INTEL:
-				return "x86";
-			default:
-				return "unknown";
-		}
+		#if defined(__x86_64__) || defined(__amd64__) || defined(_M_X64) || defined(_M_AMD64)
+		return "x86_64";
+		#elif defined(__i386__) || defined(__i686__) || defined(_M_IX86)
+		return "x86";
+		#elif defined(__aarch64__) || defined(_M_ARM64)
+		return "arm64";
+		#elif defined(__arm__) || defined(_M_ARM)
+		return "arm";
 		#else
-		struct utsname info;
-		if (uname(&info) == 0)
-			return std::string(info.machine);
 		return "unknown";
 		#endif
 	}
