@@ -2564,11 +2564,6 @@ void CGroundMoveType::HandleObjectCollisions()
 	HandleUnitCollisions(collider, {collider->speed.w, colliderMoveDefRadius, colliderAxisStretchFact}, colliderUD, colliderMD, curThread);
 	HandleFeatureCollisions(collider, {collider->speed.w, colliderMoveDefRadius, colliderAxisStretchFact}, colliderUD, colliderMD, curThread);
 
-	//const ColliderParams colliderParams = {collider->speed.w, colliderFootPrintRadius, colliderAxisStretchFact, colliderMoveDefRadius};
-
-	//HandleUnitCollisions(collider, colliderParams, colliderUD, colliderMD, curThread);
-	//HandleFeatureCollisions(collider, colliderParams, colliderUD, colliderMD, curThread);
-
 	if (forceStaticObjectCheck) {
 		MoveTypes::CheckCollisionQuery colliderInfo(collider);
 		positionStuck |= !colliderMD->TestMoveSquare(colliderInfo, owner->pos, owner->speed, true, false, true, nullptr, nullptr, curThread);
@@ -2780,63 +2775,6 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 				if (checkYardMap && !positionStuck)
 					positionStuck = true;
 
-				/*
-				if (inMoveDefZone) {
-					if (intersectSize > 1) {
-						intersectDistance = std::min(intersectDistance, squarePenDistance);
-						intersectSqrSumPosition += (squarePos * XZVector);
-						intersectSqrCount++;
-					}
-					if (checkYardMap && !positionStuck)
-						positionStuck = true;
-				} else if (collider->hasElongatedFootprint) {
-					// --- OBB nose/tail collision response for elongated units ---
-					//
-					// WHY THIS EXISTS (not redundant with SAT):
-					// SAT (Separating Axis Theorem) determines whether two objects'
-					// bounding boxes overlap — it answers "is there a collision?"
-					// That detection gates entry into HandleStaticObjectCollision.
-					//
-					// Once inside, this per-square scan determines the *response
-					// direction*. The MoveDef-zone scan (above) only covers the
-					// axis-aligned MoveDef footprint, which is typically much smaller
-					// than the actual elongated physical shape (e.g. 3×3 MoveDef for
-					// a 3×10 ship). The nose and tail extend beyond the MoveDef zone
-					// and can overlap blocked squares that the MoveDef scan never visits.
-					//
-					// Without this branch, the nose clips through buildings because:
-					// - squarePenDistance is computed from the unit's *center*, so
-					//   nose/tail squares are far away and produce zero penetration
-					// - the MoveDef scan range doesn't reach nose/tail squares at all
-					//
-					// The OBB branch computes penetration in the unit's local coordinate
-					// frame, producing an axial push along the front/back direction.
-					// Only nose/tail squares fire (penDepthFront <= penDepthRight) to
-					// avoid lateral forces from side-body squares, which would cause
-					// oscillation in hallways. Lateral clearance is the MoveDef-zone
-					// strafe/bounce system's responsibility.
-					const float3 squareVec2D = squareVec * XZVector;
-					const float signedFront = squareVec2D.dot(frontDir2D);
-					const float signedRight = squareVec2D.dot(rightDir2D);
-					const float absFront = math::fabs(signedFront);
-					const float absRight = math::fabs(signedRight);
-
-					if (absFront <= obbHalfZ && absRight <= obbHalfX) {
-						const float penDepthFront = obbHalfZ - absFront;
-						const float penDepthRight = obbHalfX - absRight;
-
-						// Only push for nose/tail squares (front face is the shallow axis).
-						// Side-face squares (penDepthRight < penDepthFront) are skipped —
-						// they sit alongside the body and would create opposing lateral
-						// forces from both walls of a hallway.
-						if (penDepthFront <= penDepthRight) {
-							forceFromStaticCollidees += frontDir2D * (Sign(signedFront) * penDepthFront);
-							hasOBBCollision = true;
-						}
-					}
-				}
-				*/
-
 				// ignore squares behind us (relative to velocity vector)
 				if (squareVec.dot(vel) > 0.0f)
 					continue;
@@ -2988,36 +2926,7 @@ void CGroundMoveType::HandleUnitCollisions(
 
 		const float2 collideeParams = { collidee->speed.w, collideeCircleRadius };
 		const float4 separationVect = { collider->pos - collidee->pos, Square(colliderCircleRadius + collideeCircleRadius) };
-		//const float collideeCircleRadius = collidee->hasElongatedFootprint ? collidee->footprintMaxRadius : collideeParams.y;
-		
-		/*
-		// Compute a direction-aware collision radius for each unit by projecting its oriented
-		// footprint rectangle onto the separation direction (ellipse approximation of the OBB).
-		// This makes a 3x10 ship collide like a 3x10 shape — tight on the sides, long nose-to-nose —
-		// without needing SAT. Falls back to isotropic max-radius for non-mobile/non-elongated units.
-		const bool colliderElongated = collider->hasElongatedFootprint;
-		const bool collideeElongated = collideeMobile && collidee->hasElongatedFootprint;
-
-		float colliderCircleRadius = colliderParams.footprintRadius;
-		float collideeCircleRadius = collDist;
-
-		if (colliderElongated || collideeElongated) {
-			const float3 sepDir2D = (collider->pos - collidee->pos).SafeNormalize2D();
-
-			if (colliderElongated) {
-				colliderCircleRadius = CalcProjectedFootprintRadius(collider, collider->footprintHalfExtents, sepDir2D);
-			}
-			if (collideeElongated) {
-				collideeCircleRadius = CalcProjectedFootprintRadius(collidee, collidee->footprintHalfExtents, sepDir2D);
-			}
-		}
-
-		const float4 separationVect = {collider->pos - collidee->pos, Square(colliderCircleRadius + collideeCircleRadius)};
-
-		const int collisionFunc = (allowSAT && (forceSAT || collideeElongated));
-		const bool isCollision = (checkCollisionFuncs[collisionFunc](separationVect, collider, collidee, colliderMD, collideeMD));
-		*/ 
-		
+				
 		const int collisionFunc = (allowSAT && (forceSAT || (collideeMobile && collidee->hasElongatedFootprint)));
 		const bool isCollision = (checkCollisionFuncs[collisionFunc](separationVect, collider, collidee, colliderMD, collideeMD));
 

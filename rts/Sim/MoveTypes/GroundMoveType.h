@@ -33,13 +33,6 @@ public:
 		std::array<std::pair<unsigned int, float*>, 9> floats;
 	};
 
-	//struct ColliderParams {
-	//	float speed;              /// owner speed magnitude
-	//	float footprintRadius;    /// max half-extent of the UnitDef footprint (collision shape)
-	//	float axisStretchFactor;  /// 0 for square units, >0.1 triggers elongated-footprint logic
-	//	float moveDefRadius;      /// MoveDef-based radius for separation/push forces
-	//};
-
 	void PostLoad();
 	void* GetPreallocContainer() { return owner; }  // creg
 
