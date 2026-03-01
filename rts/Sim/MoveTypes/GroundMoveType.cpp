@@ -2838,7 +2838,6 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 
 	{
 		const float  colRadiusSum = collider->hasElongatedFootprint ? collider->footprintMaxRadius + collideeRadius : colliderRadius + collideeRadius;
-		//const float  colRadiusSum = colliderRadius + collideeRadius;
 		const float   sepDistance = separationVector.Length() + 0.1f;
 		const float   penDistance = std::min(sepDistance - colRadiusSum, 0.0f);
 		const float  colSlideSign = -Sign(collidee->pos.dot(rgt) - pos.dot(rgt));
