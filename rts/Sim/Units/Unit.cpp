@@ -2405,7 +2405,7 @@ void CUnit::Deactivate()
 void CUnit::UpdateWind(float x, float z, float strength)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const float windHeading = ClampRad(GetHeadingFromVectorF(-x, -z) - heading * TAANG2RAD);
+	const float windHeading = ClampRadPi(GetHeadingFromVectorF(-x, -z) - heading * TAANG2RAD);
 	const float windStrength = std::min(strength, unitDef->windGenerator);
 
 	script->WindChanged(windHeading, windStrength);

@@ -151,7 +151,7 @@ inline float ClampRad(float f)
 	f  = math::fmod(f, math::TWOPI);
 	f += (math::TWOPI * (f < 0.0f));
 	*/
-	f = f - math::TWOPI * math::floor(f / math::TWOPI);
+	f = f - math::TWOPI * math::floorf(f / math::TWOPI);
 
 	// there should be no negative zeros (-0.0f) or negatives in general
 	assert(!std::signbit(f));
@@ -167,6 +167,23 @@ inline float3 ClampRad(float3 v)
 	v.z = ClampRad(v.z);
 	return v;
 }
+
+inline float ClampRadPi(float f)
+{
+	// first wrap to [0, 2pi)
+	f = f - math::TWOPI * math::floorf(f / math::TWOPI);
+
+	// now shift to [-pi, pi)
+	if (f >= math::PI)
+		f -= math::TWOPI;
+
+	f += 0.0f;
+
+	// final invariant: f in [-pi, pi), no negative zero
+	assert(f >= -math::PI && f < math::PI);
+	return f;
+}
+
 
 inline float3 ClampRadPrincipal(float3 v)
 {

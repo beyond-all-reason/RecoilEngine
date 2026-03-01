@@ -932,7 +932,7 @@ bool CBuilder::ScriptStartBuilding(float3 pos, bool silent)
 		// clamping p - pitch not needed, range of asin is -PI/2..PI/2,
 		// so max difference between two asin calls is PI.
 		// FIXME: convert CSolidObject::heading to radians too.
-		script->StartBuilding(ClampRad(h - heading * TAANG2RAD), p - pitch);
+		script->StartBuilding(ClampRadPi(h - heading * TAANG2RAD), p - pitch);
 	}
 
 	if ((!silent || inBuildStance) && IsInLosForAllyTeam(gu->myAllyTeam))
