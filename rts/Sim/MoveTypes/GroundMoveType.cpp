@@ -2764,16 +2764,24 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 					const bool inMoveDefZone = (xabs >= realMinX && xabs <= realMaxX && zabs >= realMinZ && zabs <= realMaxZ);
 					if (!inMoveDefZone) {
 						hasOBBCollision = true;
+						// OBB nose/tail squares must also contribute to the push-out force
+						const float3 pushDir = (pos - squarePos).SafeNormalize2D();
+						const float intoWall = std::min(0.0f, vel.dot(pushDir)); // negative = moving toward square
+						forceFromStaticCollidees += pushDir * (intoWall * squarePenDistance / squareColRadiusSum);
 					}
+
 				}
 
-				if (intersectSize > 1) {
-					intersectDistance = std::min(intersectDistance, squarePenDistance);
-					intersectSqrSumPosition += (squarePos * XZVector);
-					intersectSqrCount++;
+				if (x >= realMinX && x <= realMaxX && z >= realMinZ && z <= realMaxZ) {
+			
+					if (intersectSize > 1) {
+						intersectDistance = std::min(intersectDistance, squarePenDistance);
+						intersectSqrSumPosition += (squarePos * XZVector);
+						intersectSqrCount++;
+					}
+					if (checkYardMap && !positionStuck)
+						positionStuck = true;
 				}
-				if (checkYardMap && !positionStuck)
-					positionStuck = true;
 
 				// ignore squares behind us (relative to velocity vector)
 				if (squareVec.dot(vel) > 0.0f)
