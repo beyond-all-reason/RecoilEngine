@@ -11,56 +11,61 @@ on:
     branches:
       - master
     paths:
-      - 'docker-build-v2/amd64-linux/**'
-      - 'docker-build-v2/amd64-windows/**'
+      - 'docker-build-v2/images/**'
   pull_request:
     paths:
-      - 'docker-build-v2/amd64-linux/**'
-      - 'docker-build-v2/amd64-windows/**'
+      - 'docker-build-v2/images/**'
 jobs:
   build-images:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
-    name: Build ${{ matrix.system }} docker image
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.system.target }} docker image
+    runs-on: ${{ matrix.system.runs-on }}
     strategy:
       matrix:
         system:
-          - amd64-linux
-          - amd64-windows
+          - target: amd64-linux
+            runs-on: ubuntu-24.04
+          - target: arm64-linux
+            runs-on: ubuntu-24.04-arm
+          - target: amd64-windows
+            runs-on: ubuntu-24.04
     permissions:
       packages: write
       contents: read
     steps:
       - uses: actions/checkout@v6
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Build and push
-        id: build
-        uses: docker/build-push-action@v6
-        with:
-          # Disabling cache to make sure that operations like git clone are
-          # not cached and we always pull freshest libs. New images are build
-          # quite rarely so it's not an issue performance wise.
-          no-cache: true
-          context: docker-build-v2/${{ matrix.system }}
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}:latest
+      - name: Build image
+        run: |
+          docker-build-v2/images/${{ matrix.system.target }}/build.sh \
+            --no-cache \
+            -t ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system.target }}:latest
+      - name: Push image
+        id: push
+        if: github.event_name != 'pull_request'
+        run: |
+          output=$(docker push ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system.target }}:latest)
+          echo "$output"
+          digest=$(echo "$output" | grep -oP 'digest: \Ksha256:[a-f0-9]+')
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
       - name: Write new image digest to file
-        run: echo "${{ steps.build.outputs.digest }}" > ${{ matrix.system }}.txt
+        if: github.event_name != 'pull_request'
+        run: echo "${{ steps.push.outputs.digest }}" > ${{ matrix.system.target }}.txt
       - name: Save digest in artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v6
         with:
-          name: image-digest-${{ matrix.system }}
-          path: ${{ matrix.system }}.txt
+          name: image-digest-${{ matrix.system.target }}
+          path: ${{ matrix.system.target }}.txt
   gather-digests:
     name: Gather digests
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request'
     needs: build-images
     outputs:
       images_versions: ${{ steps.merge.outputs.images_versions }}
@@ -81,6 +86,7 @@ jobs:
           )" >> "$GITHUB_OUTPUT"
   test-build:
     needs: gather-digests
+    if: github.event_name != 'pull_request'
     uses: ./.github/workflows/engine-build.yml
     with:
       image-versions: ${{ needs.gather-digests.outputs.images_versions }}

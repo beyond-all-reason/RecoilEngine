@@ -58,16 +58,30 @@ on:
 jobs:
   build-engine:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
+    permissions:
+      packages: read
+      contents: read
     strategy:
+      fail-fast: false
       matrix:
         system:
-          - amd64-linux
-          - amd64-windows
+          - target: amd64-linux
+            runs-on: nscloud-ubuntu-24.04-amd64-8x16-with-cache
+            bazel-remote-sha: "0e3ccc67bced00bc783ee395160092c107a4699e06586a68dcd53fcfa7d8063e"
+            bazel-remote-bin: "bazel-remote-2.5.0-linux-x86_64"
+          - target: amd64-windows
+            runs-on: nscloud-ubuntu-24.04-amd64-8x16-with-cache
+            bazel-remote-sha: "0e3ccc67bced00bc783ee395160092c107a4699e06586a68dcd53fcfa7d8063e"
+            bazel-remote-bin: "bazel-remote-2.5.0-linux-x86_64"
+          - target: arm64-linux
+            runs-on: nscloud-ubuntu-24.04-arm64-8x16-with-cache
+            bazel-remote-sha: "a08cae80a214ae64a878a2c14bdd3f646bbe7a1108b77f65b0dcd2ace0d24739"
+            bazel-remote-bin: "bazel-remote-2.5.0-linux-arm64"
     runs-on:
-      # Run on 8 core, 16GiB ubuntu 24.04 machine.
-      - nscloud-ubuntu-24.04-amd64-8x16-with-cache
-      # Mount named cache volume `engine-${{ matrix.system }}`.
-      - nscloud-cache-tag-engine-${{ matrix.system }}
+      # Run on 8 core, 16GiB machine (platform selected by matrix).
+      - ${{ matrix.system.runs-on }}
+      # Mount named cache volume `engine-${{ matrix.system.target }}`.
+      - nscloud-cache-tag-engine-${{ matrix.system.target }}
       # The cache volume should be 20GiB (minimal size).
       - nscloud-cache-size-20gb
       # Also cache the git checkouts in datacenter local namespace git mirror
@@ -98,8 +112,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: bazel-remote-data-overlay.tar
-          key: pr-bazel-remote-data-${{ matrix.system }}-${{ github.run_id }}
-          restore-keys: pr-bazel-remote-data-${{ matrix.system }}-
+          key: pr-bazel-remote-data-${{ matrix.system.target }}-${{ github.run_id }}
+          restore-keys: pr-bazel-remote-data-${{ matrix.system.target }}-
       - name: Mount bazel remote overlay
         id: mount-overlay
         if: github.event_name == 'pull_request'
@@ -118,8 +132,8 @@ jobs:
           BAZEL_REMOTE_S3_SECRET_ACCESS_KEY: ${{ github.event_name == 'pull_request' && vars.R2_RO_ACCESS_KEY_SECRET || secrets.R2_ACCESS_KEY_SECRET }}
         with:
           run: |
-            if ! sha256sum --status -c <<< "0e3ccc67bced00bc783ee395160092c107a4699e06586a68dcd53fcfa7d8063e tools/bazel-remote"; then
-              curl -L https://github.com/buchgr/bazel-remote/releases/download/v2.5.0/bazel-remote-2.5.0-linux-x86_64 -o bazel-remote
+            if ! sha256sum --status -c <<< "${{ matrix.system.bazel-remote-sha }} tools/bazel-remote"; then
+              curl -L https://github.com/buchgr/bazel-remote/releases/download/v2.5.0/${{ matrix.system.bazel-remote-bin }} -o bazel-remote
               chmod +x bazel-remote
               mv bazel-remote tools/bazel-remote
             fi
@@ -146,6 +160,12 @@ jobs:
           wait-on: |
             http-get://127.0.0.1:8085/cas/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
           wait-for: 3m
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Pull builder image
         id: resolve-image
         # Fetching image from GitHub can be *incredibly* slow, so cache layers also in the
@@ -153,9 +173,9 @@ jobs:
         run: |
           source src/docker-build-v2/images_versions.sh
 
-          digest=${{ fromJson(inputs.image-versions || '{}')[matrix.system] || format('${{image_version[{0}]}}', matrix.system) }}
-          ghcr_image=ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}
-          nsc_image=${{ env.NSC_CONTAINER_REGISTRY }}/recoil-build-${{ matrix.system }}
+          digest=${{ fromJson(inputs.image-versions || '{}')[matrix.system.target] || format('${{image_version[{0}]}}', matrix.system.target) }}
+          ghcr_image=ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system.target }}
+          nsc_image=${{ env.NSC_CONTAINER_REGISTRY }}/recoil-build-${{ matrix.system.target }}
 
           docker version
           docker pull $nsc_image@$digest || true
@@ -194,7 +214,7 @@ jobs:
         uses: actions/upload-artifact@v4
         id: save-artifact
         with:
-          name: engine-artifacts-${{ matrix.system }}-${{ inputs.package-suffix }}
+          name: engine-artifacts-${{ matrix.system.target }}-${{ inputs.package-suffix }}
           path: ./artifacts
           compression-level: 0  # already compressed
       - name: Unmount bazel remote overlay
