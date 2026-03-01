@@ -92,12 +92,16 @@ Double __nextafter(Double x, Double y) { return ::nextafter(x, y); }
 Double __expm1(Double x) { return ::expm1(x); }
 Double __log1p(Double x) { return ::log1p(x); }
 Double __erf(Double x) { return ::erf(x); }
+// POSIX Bessel functions: available on Linux/macOS but not on Windows (MSVCRT).
+// These are only used for double-precision paths which are not sync-critical.
+#if !defined(_WIN32)
 Double __ieee754_j0(Double x) { return ::j0(x); }
 Double __ieee754_j1(Double x) { return ::j1(x); }
 Double __ieee754_jn(int n, Double x) { return ::jn(n, x); }
 Double __ieee754_y0(Double x) { return ::y0(x); }
 Double __ieee754_y1(Double x) { return ::y1(x); }
 Double __ieee754_yn(int n, Double x) { return ::yn(n, x); }
+#endif
 Double __scalbn(Double x, int n) { return ::scalbn(x, n); }
 Double __scalbln(Double x, long int n) { return ::scalbln(x, n); }
 
