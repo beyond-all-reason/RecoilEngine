@@ -7,4 +7,7 @@ SET(CMAKE_DLLTOOL "x86_64-w64-mingw32-dlltool")
 SET(DLLTOOL "x86_64-w64-mingw32-dlltool")
 SET(CMAKE_CXX_FLAGS_INIT "-static-libstdc++ -static-libgcc")
 SET(CMAKE_C_FLAGS_INIT "-static-libstdc++ -static-libgcc")
+# Use static library for compiler tests — avoids -rdynamic link failure
+# (CMake's platform module adds -rdynamic after toolchain loads, MinGW rejects it)
+SET(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 SET(CMAKE_DISABLE_PRECOMPILE_HEADERS ON)  # Little usage, only rmlui, improves ccache hit ratio

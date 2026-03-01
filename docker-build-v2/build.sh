@@ -10,12 +10,18 @@ if [[ $(id -u) -eq 0 ]]; then
   echo "See official docs: https://docs.docker.com/engine/install/linux-postinstall/"
 fi
 
-USAGE="Usage: $0 [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] {windows|linux} [cmake_flag...]"
+USAGE="Usage: $0 [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {amd64|arm64}] {windows|linux} [cmake_flag...]"
 export CONFIGURE=true
 export COMPILE=true
 export CMAKE_BUILD_PARALLEL_LEVEL=
 
-ARCH=amd64
+# Auto-detect host architecture
+case $(uname -m) in
+  aarch64|arm64) ARCH=arm64 ;;
+  x86_64|amd64)  ARCH=amd64 ;;
+  *)             ARCH=amd64 ;;
+esac
+
 OS=
 while (( $# > 0 )); do
   case $1 in
@@ -29,13 +35,24 @@ while (( $# > 0 )); do
       COMPILE=true
       shift
       ;;
+    --arch)
+      shift
+      if [[ "${1-}" != "amd64" && "${1-}" != "arm64" ]]; then
+        echo "Error: --arch must be 'amd64' or 'arm64'"
+        echo $USAGE
+        exit 1
+      fi
+      ARCH="$1"
+      shift
+      ;;
     -h|--help)
       echo $USAGE
       echo "Options:"
-      echo "  -h, --help   print this help message"
-      echo "  --configure  only configure, don't compile"
-      echo "  --compile    only compile, don't configure"
-      echo "  -j, --jobs   number of concurrent processes to use when building"
+      echo "  -h, --help       print this help message"
+      echo "  --configure      only configure, don't compile"
+      echo "  --compile        only compile, don't configure"
+      echo "  --arch ARCH      target architecture: amd64 (default) or arm64"
+      echo "  -j, --jobs       number of concurrent processes to use when building"
       echo ""
       echo "Some behaviors can be changed by setting environment variables. Consult the script source for those more advanced use cases."
       exit 0
@@ -64,10 +81,16 @@ if [[ -z $OS ]]; then
   exit 1
 fi
 
+# Validate arch+OS combination
+if [[ "$ARCH" == "arm64" && "$OS" == "windows" ]]; then
+  echo "Error: arm64-windows is not supported"
+  exit 1
+fi
+
 PLATFORM="$ARCH-$OS"
 
 cd "$(dirname "$(readlink -f "$0")")/.."
-mkdir -p build-$OS .cache/ccache-$OS
+mkdir -p build-$PLATFORM .cache/ccache-$PLATFORM
 
 # Build container image selection, allow overriding.
 if [[ -n "${CONTAINER_IMAGE:-}" ]]; then
@@ -147,8 +170,8 @@ fi
 
 $RUNTIME run -it --rm \
     -v "$CWD${P}":/build/src:z,ro \
-    -v "$CWD${P}.cache${P}ccache-$OS":/build/cache:z,rw \
-    -v "$CWD${P}build-$OS":/build/out:z,rw \
+    -v "$CWD${P}.cache${P}ccache-$PLATFORM":/build/cache:z,rw \
+    -v "$CWD${P}build-$PLATFORM":/build/out:z,rw \
     $UID_FLAGS \
     $WORKTREE_MOUNTS \
     -e CONFIGURE \
