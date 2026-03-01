@@ -809,6 +809,7 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 
 			SetGoal(goalDiff, owner->pos);
 		}
+
 		return;
 	}
 
@@ -845,39 +846,40 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 		if (owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, true)) {
 			// Command fire weapon in range. Stop moving. May take a few frames to actually fire due to aiming animation.
 			StopMoveAndKeepPointing(attackPos, owner->maxRange * 0.9f, true);
-		} 
-		return;
-	}
-
-	for (CWeapon* w: owner->weapons) {
-		// NOTE:
-		//   we call TryTargetHeading which is less restrictive than TryTarget
-		//   (eg. the former succeeds even if the unit has not already aligned
-		//   itself with <attackVec>)
-		if (!w->TryTargetHeading(attackHeading, attackTgtInfo))
-			continue;
-
-		if (owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, false)) {
-			StopMoveAndKeepPointing(attackTgtInfo.groundPos, owner->maxRange * 0.9f, true);
 			return;
-		}
+		} 
+	} else {
+		for (CWeapon* w: owner->weapons) {
+			// NOTE:
+			//   we call TryTargetHeading which is less restrictive than TryTarget
+			//   (eg. the former succeeds even if the unit has not already aligned
+			//   itself with <attackVec>)
+			if (!w->TryTargetHeading(attackHeading, attackTgtInfo))
+				continue;
 
-		// for gunships, this pitches the nose down such that
-		// TryTargetRotate (which also checks range for itself)
-		// has a bigger chance of succeeding
-		//
-		// hence it must be called as soon as we get in range
-		// and may not depend on what TryTargetRotate returns
-		// (otherwise we might never get a firing solution)
-		owner->moveType->KeepPointingTo(attackTgtInfo.groundPos, owner->maxRange * 0.9f, true);
+			if (owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, false)) {
+				StopMoveAndKeepPointing(attackTgtInfo.groundPos, owner->maxRange * 0.9f, true);
+				return;
+			}
+
+			// for gunships, this pitches the nose down such that
+			// TryTargetRotate (which also checks range for itself)
+			// has a bigger chance of succeeding
+			//
+			// hence it must be called as soon as we get in range
+			// and may not depend on what TryTargetRotate returns
+			// (otherwise we might never get a firing solution)
+			owner->moveType->KeepPointingTo(attackTgtInfo.groundPos, owner->maxRange * 0.9f, true);
+		}
 	}
 
 	// do not get any closer than 90% of the unit's maxRange (settable via SetUnitMaxRange)
-	if (attackVec.SqLength2D() <= Square(owner->maxRange * 0.9f))
+	if (attackVec.SqLength2D() <= Square(owner->maxRange * 0.9f)) {
 		owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, false);
 		StopMoveAndKeepPointing(attackPos, owner->maxRange * 0.9f, true);
 		return;
-	
+	}
+
 	// no weapon succeeded with AttackGround, keep approaching target
 	SetGoal(c.GetPos(0), owner->pos);
 
