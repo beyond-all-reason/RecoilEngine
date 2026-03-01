@@ -2675,11 +2675,6 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 		const float3 rightDir2D = (rgt * XZVector).SafeNormalize();
 		const float3 speedDir2D = (vel * XZVector).SafeNormalize();
 
-		// OBB half-extents in world-space for oriented footprint 
-		// Only needed for elongated units; square units skip OBB logic entirely.
-		const float obbHalfX = collider->hasElongatedFootprint ? collider->footprintHalfExtents.x + squareRadius : 0.0f;
-		const float obbHalfZ = collider->hasElongatedFootprint ? collider->footprintHalfExtents.y + squareRadius : 0.0f;
-
 		const int xmid = (pos.x + vel.x) / SQUARE_SIZE;
 		const int zmid = (pos.z + vel.z) / SQUARE_SIZE;
 
@@ -2773,7 +2768,7 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 					// NOTE: realMinX/realMaxX are absolute grid coords; compare against xabs/zabs (also absolute)
 					const bool inMoveDefZone = (xabs >= realMinX && xabs <= realMaxX && zabs >= realMinZ && zabs <= realMaxZ);
 					if (!inMoveDefZone) {
-						hasOBBCollision |= true;
+						hasOBBCollision = true;
 					}
 				}
 
@@ -2896,7 +2891,8 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 	}
 
 	{
-		const float  colRadiusSum = colliderRadius + collideeRadius;
+		const float  colRadiusSum = collider->hasElongatedFootprint ? collider->footprintMaxRadius + collideeRadius : colliderRadius + collideeRadius;
+		//const float  colRadiusSum = colliderRadius + collideeRadius;
 		const float   sepDistance = separationVector.Length() + 0.1f;
 		const float   penDistance = std::min(sepDistance - colRadiusSum, 0.0f);
 		const float  colSlideSign = -Sign(collidee->pos.dot(rgt) - pos.dot(rgt));
@@ -2917,7 +2913,7 @@ bool CGroundMoveType::HandleStaticObjectCollision(
 
 void CGroundMoveType::HandleUnitCollisions(
 	CUnit* collider,
-	const float3& colliderParams,
+	const float3& colliderParams, // .x := speed, .y := radius, .z := fpstretch
 	const UnitDef* colliderUD,
 	const MoveDef* colliderMD,
 	int curThread
@@ -2983,8 +2979,6 @@ void CGroundMoveType::HandleUnitCollisions(
 		if (collider->loadingTransportId == collidee->id) continue;
 		if (collidee->loadingTransportId == collider->id) continue;
 
-		// mobile collidees have xsize/zsize overridden by MoveDef, so use the pre-computed
-		// footprintMaxRadius (from original UnitDef values) for enlongated units.
 		// for unit "separation", assume enlongated units have an ellipse shape.
 		// and that the "separation" distance acts from this ellipse.
 		const float3 sepDir2D = (collider->pos - collidee->pos).SafeNormalize2D();
@@ -3116,13 +3110,13 @@ void CGroundMoveType::HandleUnitCollisions(
 		const bool moveCollider = ((pushCollider || !pushCollidee) && colliderMobile);
 		if (moveCollider) {
 			if (isCollision) {
-				const float3 colliderParams1 = { colliderParams.x, colliderCircleRadius, colliderParams.z };
+				const float3 colliderParams1 = {colliderParams.x, colliderCircleRadius, colliderParams.z};
 				forceFromMovingCollidees += CalculatePushVector(colliderParams1, collideeParams, allowUCO, separationVect, collider, collidee);
 			} else {
 				// push units away from each other though they are not colliding.
-				const float3 colliderParams2 = { colliderParams.x, colliderCircleRadius + separationDist * 0.5f, colliderParams.z };
-				const float2 collideeParams2 = { collidee->speed.w, collideeCircleRadius + separationDist * 0.5f };
-				const float4 separationVect2 = { static_cast<float3>(separationVect), Square(colliderParams.y + collideeParams.y) };
+				const float3 colliderParams2 = {colliderParams.x, colliderCircleRadius + separationDist * 0.5f, colliderParams.z};
+				const float2 collideeParams2 = {collidee->speed.w, collideeCircleRadius + separationDist * 0.5f};
+				const float4 separationVect2 = {static_cast<float3>(separationVect), Square(colliderCircleRadius + collideeCircleRadius)};
 				forceFromMovingCollidees += CalculatePushVector(colliderParams2, collideeParams2, allowUCO, separationVect2, collider, collidee);
 			}
 		}
