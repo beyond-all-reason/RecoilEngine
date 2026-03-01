@@ -261,7 +261,7 @@ void CUnit::PreInit(const UnitLoadParams& params)
 	ASSERT_SYNCED(pos);
 
 	footprint = int2(unitDef->xsize, unitDef->zsize);
-	hasElongatedFootprint = (static_cast<float>(std::abs(footprint.x - footprint.y)) / (footprint.x + footprint.y)) > 0.1f;
+	hasElongatedFootprint = modInfo.allowSepAxisCollisionTest && (static_cast<float>(std::abs(footprint.x - footprint.y)) / (footprint.x + footprint.y)) > 0.1f;
 	footprintHalfExtents = float2(footprint.x - 1, footprint.y - 1) * (0.5f * SQUARE_SIZE);
 	footprintMaxRadius = (std::max(footprint.x, footprint.y) - 1) * 0.5f * SQUARE_SIZE;
 
@@ -402,7 +402,7 @@ void CUnit::PostLoad()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// Recompute derived footprint geometry (not serialized, derived from footprint int2).
-	hasElongatedFootprint = (static_cast<float>(std::abs(footprint.x - footprint.y)) / (footprint.x + footprint.y)) > 0.1f;
+	hasElongatedFootprint = modInfo.allowSepAxisCollisionTest && (static_cast<float>(std::abs(footprint.x - footprint.y)) / (footprint.x + footprint.y)) > 0.1f;
 	footprintHalfExtents = float2(footprint.x - 1, footprint.y - 1) * (0.5f * SQUARE_SIZE);
 	footprintMaxRadius = (std::max(footprint.x, footprint.y) - 1) * 0.5f * SQUARE_SIZE;
 
