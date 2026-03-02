@@ -362,7 +362,7 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	resurrectSpeed = udTable.GetFloat("resurrectSpeed", buildSpeed);
 	captureSpeed   = udTable.GetFloat("captureSpeed",   buildSpeed);
 	terraformSpeed = udTable.GetFloat("terraformSpeed", buildSpeed);
-	nanoAimRate    = udTable.GetFloat("nanoAimRate",   nanoAimRate);
+	nanoAimRate    = udTable.GetFloat("nanoAimRate",		  0.5f);
 
 	upDirSmoothing = std::clamp(udTable.GetFloat("upDirSmoothing", 0.0f), 0.0f, 0.95f);
 	separationDistance = std::max(udTable.GetInt("separationDistance", 0), 0);
