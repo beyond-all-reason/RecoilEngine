@@ -180,6 +180,7 @@ public:
 	float resurrectSpeed;
 	float captureSpeed;
 	float terraformSpeed;
+	float nanoAimRate;
 
 	bool canSubmerge;
 	bool canfly;

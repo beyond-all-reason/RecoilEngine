@@ -59,7 +59,8 @@ CR_REG_METADATA(CBuilder, (
 	CR_MEMBER(terraformCenter),
 	CR_MEMBER(terraformRadius),
 	CR_MEMBER(terraformType),
-	CR_MEMBER(nanoPieceCache)
+	CR_MEMBER(nanoPieceCache),
+	CR_MEMBER(lastNanoPieceOrientationUpdate)
 ))
 
 
@@ -93,7 +94,8 @@ CBuilder::CBuilder():
 	tz1(0),
 	tz2(0),
 	terraformCenter(ZeroVector),
-	terraformRadius(0)
+	terraformRadius(0),
+	lastNanoPieceOrientationUpdate(0.5)
 {
 }
 
@@ -548,6 +550,19 @@ void CBuilder::Update()
 
 	nanoPieceCache.Update();
 
+	// [MOBILE BUILD] Re-orient the nano-piece toward the current work target
+	if (unitDef->canBuildWhileMoving && (gs->frameNum >= lastNanoPieceOrientationUpdate)) {
+		lastNanoPieceOrientationUpdate = gs->frameNum + (unitDef->nanoAimRate * GAME_SPEED);
+
+		const bool CalledScriptStartBuilding =
+			(curBuild != nullptr) ? ScriptStartBuilding(curBuild->pos, /*silent=*/true) :
+			(curReclaim != nullptr) ? ScriptStartBuilding(curReclaim->pos, /*silent=*/true) :
+			(curResurrect != nullptr) ? ScriptStartBuilding(curResurrect->pos, /*silent=*/true) :
+			(curCapture != nullptr) ? ScriptStartBuilding(curCapture->pos, /*silent=*/true) :
+			(helpTerraform != nullptr) ? ScriptStartBuilding(helpTerraform->terraformCenter, /*silent=*/true) : false;
+
+	}
+
 	if (!beingBuilt && !IsStunned()) {
 		updated = updated || UpdateTerraform(fCommand);
 		updated = updated || AssistTerraform(fCommand);
@@ -567,21 +582,6 @@ void CBuilder::SlowUpdate()
 	if (terraforming) {
 		constexpr int tsr = TERRA_SMOOTHING_RADIUS;
 		mapDamage->RecalcArea(tx1 - tsr, tx2 + tsr, tz1 - tsr, tz2 + tsr);
-	}
-
-	// [MOBILE BUILD] Re-orient the nano-piece toward the current work target
-	// while this unit is moving.  SlowUpdate cadence (~16 frames) is sufficient
-	// since script animation is not frame-perfect and the visual difference vs.
-	// a per-frame update is imperceptible.
-	if (unitDef->canBuildWhileMoving && IsMoving()) {
-
-		const bool CalledScriptStartBuilding =
-			(curBuild      != nullptr) ? ScriptStartBuilding(curBuild->pos, /*silent=*/true)     :
-			(curReclaim    != nullptr) ? ScriptStartBuilding(curReclaim->pos, /*silent=*/true)   :
-			(curResurrect  != nullptr) ? ScriptStartBuilding(curResurrect->pos, /*silent=*/true) :
-			(curCapture    != nullptr) ? ScriptStartBuilding(curCapture->pos, /*silent=*/true)   :
-			(helpTerraform != nullptr) ? ScriptStartBuilding(helpTerraform->terraformCenter, /*silent=*/true) : false;
-
 	}
 
 	CUnit::SlowUpdate();
