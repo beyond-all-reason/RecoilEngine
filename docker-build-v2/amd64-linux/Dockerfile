@@ -39,7 +39,7 @@ WORKDIR /build
 RUN mkdir src cache out artifacts && chmod a+rwx cache out artifacts
 
 # Fetch library dependencies and configure resolution
-RUN git clone --depth=1 https://github.com/beyond-all-reason/spring-static-libs.git -b 18.04 spring-static-libs
+# RUN git clone --depth=1 https://github.com/beyond-all-reason/spring-static-libs.git -b 18.04 spring-static-libs
 ENV PKG_CONFIG_LIBDIR=/build/spring-static-libs/lib/pkgconfig
 ENV PKG_CONFIG="pkg-config --define-prefix --static"
 ENV CMAKE_PREFIX_PATH=/build/spring-static-libs/
