@@ -95,7 +95,7 @@ CBuilder::CBuilder():
 	tz2(0),
 	terraformCenter(ZeroVector),
 	terraformRadius(0),
-	lastNanoPieceOrientationUpdate(0.5)
+	lastNanoPieceOrientationUpdate(0)
 {
 }
 
