@@ -177,6 +177,7 @@ inline float ClampRadPi(float f)
 	if (f >= math::PI)
 		f -= math::TWOPI;
 
+	// Precaution: turn -0.0f into +0.0f
 	f += 0.0f;
 
 	// final invariant: f in [-pi, pi), no negative zero
