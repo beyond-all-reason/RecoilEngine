@@ -58,6 +58,7 @@ target_link_libraries(GameHeadless PRIVATE
 	prd::jsoncpp
 	streflop
 	nowide::nowide
+	fmt::fmt
 )
 ### Build the executable
 add_executable(engine-headless ${engineSources} ${ENGINE_ICON})

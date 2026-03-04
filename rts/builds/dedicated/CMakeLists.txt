@@ -32,6 +32,9 @@ list(APPEND engineDedicatedLibraries ${LZMA_LIBRARY})
 #nowide for Windows utf-8 abstraction layer
 list(APPEND engineDedicatedLibraries "nowide::nowide")
 
+# fmt library
+list(APPEND engineDedicatedLibraries "fmt::fmt")
+
 ### base64 from pr-downloader
 list(APPEND engineDedicatedLibraries "prd::base64")
 
