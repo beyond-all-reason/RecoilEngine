@@ -493,7 +493,7 @@ end
 
 
 local function Update(dt)
-  timeStamp = timeStamp + dt
+  timeStamp = timeStamp + (dt or Spring.GetLastUpdateSeconds())
   if (timeStamp < (lastUpdate + 1.0)) then
     return  -- only update every 1.0 seconds
   end
