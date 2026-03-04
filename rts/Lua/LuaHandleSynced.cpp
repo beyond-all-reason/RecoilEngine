@@ -758,7 +758,7 @@ bool CSyncedLuaHandle::AllowUnitTransfer(const CUnit* unit, int newTeam, bool ca
  * @param part number
  * @return boolean whether or not the build makes progress.
  */
-bool CSyncedLuaHandle::AllowUnitBuildStep(const CUnit* builder, const CUnit* unit, float part)
+std::pair <float, float> CSyncedLuaHandle::AllowUnitBuildStep(const CUnit* builder, const CUnit* unit, float part)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, true);
@@ -779,9 +779,20 @@ bool CSyncedLuaHandle::AllowUnitBuildStep(const CUnit* builder, const CUnit* uni
 		return true;
 
 	// get the results
-	const bool allow = luaL_optboolean(L, -1, true);
-	lua_pop(L, 1);
-	return allow;
+	float mult = 1.0f;
+	switch ( lua_type(L, -2) ) {
+		case LUA_TBOOLEAN:
+			mult = luaL_toboolean(L,-2) ? 1.0f: 0.0f;
+			break;
+		case LUA_TNUMBER:
+			mult = std::max(0.0f,lua_tofloat(L,-2));
+			break;
+		default:
+			mult = 0.0f;
+	}
+	float resMult = std::max(0.0f,lua_optfloat(L,-1, 1.0f));
+	lua_pop(L, 2);
+	return mult, resMult;
 }
 
 

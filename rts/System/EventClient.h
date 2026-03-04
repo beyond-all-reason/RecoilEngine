@@ -210,7 +210,7 @@ class CEventClient
 
 		virtual std::pair <bool, bool> AllowUnitCreation(const UnitDef* unitDef, const CUnit* builder, const BuildInfo* buildInfo) { return {true, true}; }
 		virtual bool AllowUnitTransfer(const CUnit* unit, int newTeam, bool capture) { return true; }
-		virtual bool AllowUnitBuildStep(const CUnit* builder, const CUnit* unit, float part) { return true; }
+		virtual std::pair <float, float>  AllowUnitBuildStep(const CUnit* builder, const CUnit* unit, float part) { return {1.0f, 1.0f}; }
 		virtual bool AllowUnitCaptureStep(const CUnit* builder, const CUnit* unit, float part) { return true; }
 		virtual bool AllowUnitTransport(const CUnit* transporter, const CUnit* transportee) { return true; }
 		virtual bool AllowUnitTransportLoad(const CUnit* transporter, const CUnit* transportee, const float3& loadPos, bool allowed) { return true; }

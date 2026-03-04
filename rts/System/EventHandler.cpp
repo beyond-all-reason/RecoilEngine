@@ -282,7 +282,7 @@ bool CEventHandler::AllowUnitTransfer(const CUnit* unit, int newTeam, bool captu
 	return ControlIterateDefTrue(listAllowUnitTransfer, &CEventClient::AllowUnitTransfer, unit, newTeam, capture);
 }
 
-bool CEventHandler::AllowUnitBuildStep(const CUnit* builder, const CUnit* unit, float part)
+std::pair <float, float>  CEventHandler::AllowUnitBuildStep(const CUnit* builder, const CUnit* unit, float part)
 {
 	ZoneScoped;
 	return ControlIterateDefTrue(listAllowUnitBuildStep, &CEventClient::AllowUnitBuildStep, builder, unit, part);
