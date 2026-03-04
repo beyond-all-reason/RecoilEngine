@@ -15,7 +15,7 @@
 #include "System/Log/ILog.h"
 #include "System/StringHash.h"
 #include "System/StringUtil.h"
-#include "System/Sound/SoundStatics.h"
+#include "System/Sound/SoundUtils.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -575,9 +575,9 @@ WeaponDef::WeaponDef(const LuaTable& wdTable, const std::string& name_, int id_)
 
 void WeaponDef::ParseWeaponSounds(const LuaTable& wdTable) {
     RECOIL_DETAILED_TRACY_ZONE;
-    SoundStatics::LoadSound(wdTable, "soundStart" , fireSound);
-    SoundStatics::LoadSound(wdTable, "soundHitDry",  hitSound);
-    SoundStatics::LoadSound(wdTable, "soundHitWet",  hitSound);
+    SoundUtils::LoadSound(wdTable, "soundStart" , fireSound);
+    SoundUtils::LoadSound(wdTable, "soundHitDry",  hitSound);
+    SoundUtils::LoadSound(wdTable, "soundHitWet",  hitSound);
 }
 
 S3DModel* WeaponDef::LoadModel()

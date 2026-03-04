@@ -1,15 +1,13 @@
-#ifndef SOUNDSTATICS_H
-#define SOUNDSTATICS_H
+#ifndef SOUNDUTILS_H
+#define SOUNDUTILS_H
 
 #include <cstdint>
 #include <string>
-#include <unordered_map>
 #include "Lua/LuaParser.h"
 #include "Sim/Misc/GuiSoundSet.h"
 
-class SoundStatics {
+class SoundUtils {
     private:
-        static const std::unordered_map<uint32_t, std::string> soundFallbackMap;
         static constexpr int MAX_SOUND_FILES = 8;
     public:
         static std::string GetSoundFallbackKey(const std::string& soundKey);
@@ -22,4 +20,3 @@ class SoundStatics {
 };
 
 #endif
-
