@@ -43,3 +43,6 @@
 [submodule "rts/lib/fmt"]
 	path = rts/lib/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "rts/lib/mimalloc"]
+	path = rts/lib/mimalloc
+	url = https://github.com/microsoft/mimalloc
