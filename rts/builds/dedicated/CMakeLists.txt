@@ -181,6 +181,9 @@ add_executable(engine-dedicated
 	)
 target_link_libraries(engine-dedicated ${engineDedicatedLibraries})
 
+# Export symbols for plugin access (replaces CMP0065 OLD behavior)
+set_target_properties(engine-dedicated PROPERTIES ENABLE_EXPORTS TRUE)
+
 if(MSVC)
     target_link_libraries(engine-dedicated engine-natvis)
 endif()
