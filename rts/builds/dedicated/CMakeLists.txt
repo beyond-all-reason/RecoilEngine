@@ -41,6 +41,11 @@ list(APPEND engineDedicatedLibraries "prd::base64")
 ### smmalloc
 list(APPEND engineDedicatedLibraries "smmalloc")
 
+### mimalloc
+if (USE_MIMALLOC)
+    list(APPEND engineDedicatedLibraries $<TARGET_NAME:mimalloc-static>)
+endif()
+
 if (WIN32)
 	list(APPEND engineDedicatedLibraries ${WINMM_LIBRARY})
 endif (WIN32)

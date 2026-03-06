@@ -5,6 +5,16 @@ ADD_SUBDIRECTORY(fmt)
 set_target_properties(fmt PROPERTIES POSITION_INDEPENDENT_CODE ON)
 ADD_SUBDIRECTORY(glad)
 ADD_SUBDIRECTORY(smmalloc)
+
+# Mimalloc - only build if USE_MIMALLOC is enabled
+if (USE_MIMALLOC)
+	# Disable mimalloc tests and shared library to speed up build
+	set(MI_BUILD_TESTS OFF CACHE BOOL "Disable mimalloc tests" FORCE)
+	set(MI_BUILD_SHARED OFF CACHE BOOL "Disable mimalloc shared library" FORCE)
+	set(MI_BUILD_STATIC ON CACHE BOOL "Enable mimalloc static library" FORCE)
+	ADD_SUBDIRECTORY(mimalloc)
+endif()
+
 ADD_SUBDIRECTORY(lua)
 ADD_SUBDIRECTORY(luasocket)
 ADD_SUBDIRECTORY(minizip)
