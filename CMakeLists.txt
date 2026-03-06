@@ -17,6 +17,8 @@ if (WIN32)
 	add_definitions(-DUNICODE -D_UNICODE)
 endif()
 
+find_package(Threads REQUIRED)
+
 option(INSTALL_PORTABLE "Make a portable installation (instead of regular system installation)" TRUE)
 
 # Allow to set PREFER_STATIC_LIBS from env, defaults to false
