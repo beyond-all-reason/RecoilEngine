@@ -142,6 +142,9 @@ CWeaponProjectile::CWeaponProjectile(const ProjectileParams& params)
 		ownerID = params.ownerID;
 		teamID = params.teamID;
 		allyteamID = teamHandler.IsValidTeam(teamID)? teamHandler.AllyTeam(teamID): -1;
+	} else if (params.teamID != -1u) {
+		teamID = params.teamID;
+		allyteamID = teamHandler.IsValidTeam(teamID)? teamHandler.AllyTeam(teamID): -1;
 	}
 
 	if (ownerID != -1u && weaponNum != -1u) {
@@ -201,6 +204,7 @@ void CWeaponProjectile::Explode(
 		.damages              = damageArray,
 		.weaponDef            = weaponDef,
 		.owner                = owner(),
+		.ownerTeamID          = teamID,
 		.hitObject            = ExplosionHitObject(hitUnit, hitFeature, hitWeapon),
 		.craterAreaOfEffect   = damages->craterAreaOfEffect,
 		.damageAreaOfEffect   = damages->damageAreaOfEffect,

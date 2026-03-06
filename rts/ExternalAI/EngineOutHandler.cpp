@@ -331,7 +331,7 @@ void CEngineOutHandler::UnitCaptured(const CUnit& unit, int oldTeam, int newTeam
 	}
 }
 
-void CEngineOutHandler::UnitDestroyed(const CUnit& destroyed, const CUnit* attacker, int weaponDefID) {
+void CEngineOutHandler::UnitDestroyed(const CUnit& destroyed, const CUnit* attacker, int weaponDefID, int attackerTeamID) {
 	AI_SCOPED_TIMER();
 
 	const int destroyedId = destroyed.id;
@@ -381,7 +381,8 @@ void CEngineOutHandler::UnitDamaged(
 	float damage,
 	int weaponDefID,
 	int projectileID,
-	bool paralyzer
+	bool paralyzer,
+	int attackerTeamID
 ) {
 	AI_SCOPED_TIMER();
 

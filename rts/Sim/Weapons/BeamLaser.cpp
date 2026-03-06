@@ -427,6 +427,7 @@ void CBeamLaser::FireInternal(float3 curDir)
 			.damages              = da,
 			.weaponDef            = weaponDef,
 			.owner                = owner,
+			.ownerTeamID          = owner->team,
 			.hitObject            = ExplosionHitObject(hitUnit, hitFeature, hitShield),
 			.craterAreaOfEffect   = damages->craterAreaOfEffect,
 			.damageAreaOfEffect   = damages->damageAreaOfEffect,

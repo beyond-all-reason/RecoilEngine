@@ -60,8 +60,8 @@ public:
 	void UnitIdle(const CUnit& unit);
 	void UnitCreated(const CUnit& unit, const CUnit* builder);
 	void UnitFinished(const CUnit& unit);
-	void UnitDestroyed(const CUnit& destroyed, const CUnit* attacker, int weaponDefID);
-	void UnitDamaged(const CUnit& damaged, const CUnit* attacker, float damage, int weaponDefID, int projectileID, bool paralyzer);
+	void UnitDestroyed(const CUnit& destroyed, const CUnit* attacker, int weaponDefID, int attackerTeamID = -1);
+	void UnitDamaged(const CUnit& damaged, const CUnit* attacker, float damage, int weaponDefID, int projectileID, bool paralyzer, int attackerTeamID = -1);
 	void UnitMoveFailed(const CUnit& unit);
 	void UnitCaptured(const CUnit& unit, int oldTeam, int newTeam);
 	void UnitGiven(const CUnit& unit, int oldTeam, int newTeam);

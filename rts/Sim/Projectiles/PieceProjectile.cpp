@@ -158,6 +158,7 @@ void CPieceProjectile::Collision(CUnit* unit, CFeature* feature)
 			.damages              = damageArray,
 			.weaponDef            = nullptr,
 			.owner                = owner(),
+			.ownerTeamID          = teamID,
 			.hitObject            = ExplosionHitObject(unit, feature),
 			.craterAreaOfEffect   = modInfo.debrisDamage * 0.25f,
 			.damageAreaOfEffect   = modInfo.debrisDamage * 0.5f,

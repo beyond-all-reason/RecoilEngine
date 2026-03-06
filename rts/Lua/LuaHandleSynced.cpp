@@ -1483,7 +1483,8 @@ bool CSyncedLuaHandle::UnitPreDamaged(
 	int projectileID,
 	bool paralyzer,
 	float* newDamage,
-	float* impulseMult
+	float* impulseMult,
+	int attackerTeamID
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L, false);
@@ -1513,6 +1514,12 @@ bool CSyncedLuaHandle::UnitPreDamaged(
 			lua_pushnumber(L, attacker->id);
 			lua_pushnumber(L, attacker->unitDef->id);
 			lua_pushnumber(L, attacker->team);
+		} else if (attackerTeamID >= 0) {
+			lua_pushnil(L);  // attackerID
+			lua_pushnil(L);  // attackerDefID
+			lua_pushnumber(L, attackerTeamID);
+		}
+		if (attacker != nullptr || attackerTeamID >= 0) {
 			inArgCount += 3;
 		}
 	}
@@ -1573,7 +1580,8 @@ bool CSyncedLuaHandle::FeaturePreDamaged(
 	int weaponDefID,
 	int projectileID,
 	float* newDamage,
-	float* impulseMult
+	float* impulseMult,
+	int attackerTeamID
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(newDamage != nullptr);
@@ -1604,6 +1612,11 @@ bool CSyncedLuaHandle::FeaturePreDamaged(
 			lua_pushnumber(L, attacker->id);
 			lua_pushnumber(L, attacker->unitDef->id);
 			lua_pushnumber(L, attacker->team);
+			inArgCount += 3;
+		} else if (attackerTeamID >= 0) {
+			lua_pushnil(L);  // attackerID
+			lua_pushnil(L);  // attackerDefID
+			lua_pushnumber(L, attackerTeamID);
 			inArgCount += 3;
 		}
 	}

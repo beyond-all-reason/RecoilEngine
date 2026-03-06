@@ -393,7 +393,8 @@ void CFeature::DoDamage(
 	const float3& impulse,
 	CUnit* attacker,
 	int weaponDefID,
-	int projectileID
+	int projectileID,
+	int attackerTeamID
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// do nothing if already marked for deletion this frame, i.e. isDead
@@ -409,7 +410,7 @@ void CFeature::DoDamage(
 	float baseDamage = damages.GetDefault();
 	float impulseMult = float((def->drawType >= DRAWTYPE_TREE) || (udef != nullptr && !udef->IsImmobileUnit()));
 
-	if (eventHandler.FeaturePreDamaged(this, attacker, baseDamage, weaponDefID, projectileID, &baseDamage, &impulseMult))
+	if (eventHandler.FeaturePreDamaged(this, attacker, baseDamage, weaponDefID, projectileID, &baseDamage, &impulseMult, attackerTeamID))
 		return;
 
 	// NOTE:
@@ -422,7 +423,7 @@ void CFeature::DoDamage(
 	health -= baseDamage;
 	health = std::min(health, def->health);
 
-	eventHandler.FeatureDamaged(this, attacker, baseDamage, weaponDefID, projectileID);
+	eventHandler.FeatureDamaged(this, attacker, baseDamage, weaponDefID, projectileID, attackerTeamID);
 
 	if (health <= 0.0f && def->destructable) {
 		CreateWreck(0, 0);
