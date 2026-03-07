@@ -8,6 +8,8 @@ ADD_SUBDIRECTORY(smmalloc)
 
 # Mimalloc - only build if USE_MIMALLOC is enabled
 if (USE_MIMALLOC)
+	# Disable mimalloc's built-in override - we provide our own custom override
+	set(MI_OVERRIDE OFF CACHE BOOL "Disable mimalloc built-in override" FORCE)
 	# Disable mimalloc tests and shared library to speed up build
 	set(MI_BUILD_TESTS OFF CACHE BOOL "Disable mimalloc tests" FORCE)
 	set(MI_BUILD_SHARED OFF CACHE BOOL "Disable mimalloc shared library" FORCE)
