@@ -13,7 +13,7 @@
 #endif
 #endif
 
-#include <utility>
+#include <algorithm>
 #include <new>
 
 // ----------------------------------------------------------------------------
