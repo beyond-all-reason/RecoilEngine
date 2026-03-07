@@ -1,16 +1,140 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifdef USE_MIMALLOC
-
 #include "MemoryOverride.h"
+
+#ifdef USE_MIMALLOC
 #include <mimalloc.h>
+#else
+#include <cstdlib>
+#ifdef _WIN32
+#include <malloc.h>
+#else
+#include <malloc.h>  // for malloc_usable_size on Linux
+#endif
+#endif
+
+#include <utility>
 #include <new>
+
+// ----------------------------------------------------------------------------
+// recoil namespace memory allocation functions
+// ----------------------------------------------------------------------------
+
+namespace recoil {
+
+void* malloc(size_t size)
+{
+#ifdef USE_MIMALLOC
+	return mi_malloc(size);
+#else
+	return std::malloc(size);
+#endif
+}
+
+void* calloc(size_t count, size_t size)
+{
+#ifdef USE_MIMALLOC
+	return mi_calloc(count, size);
+#else
+	return std::calloc(count, size);
+#endif
+}
+
+void* realloc(void* ptr, size_t size)
+{
+#ifdef USE_MIMALLOC
+	return mi_realloc(ptr, size);
+#else
+	return std::realloc(ptr, size);
+#endif
+}
+
+void free(void* ptr)
+{
+#ifdef USE_MIMALLOC
+	mi_free(ptr);
+#else
+	std::free(ptr);
+#endif
+}
+
+void* aligned_alloc(size_t alignment, size_t size)
+{
+#ifdef USE_MIMALLOC
+	return mi_aligned_alloc(alignment, size);
+#else
+	#if defined(_WIN32) || defined(__MINGW32__)
+		return _aligned_malloc(size, alignment);
+	#else
+		return std::aligned_alloc(alignment, size);
+	#endif
+#endif
+}
+
+void* aligned_realloc(void* ptr, size_t oldsize, size_t newsize, size_t alignment)
+{
+	alignment = std::max<size_t>(alignment, 1);
+#ifdef USE_MIMALLOC
+	return mi_realloc_aligned(ptr, newsize, alignment);
+#else
+	#if defined(_WIN32) || defined(__MINGW32__)
+		return _aligned_realloc(ptr, newsize, alignment);
+	#else
+		void* const tmp = realloc(ptr, newsize);
+		if (!tmp)
+			throw std::bad_alloc();
+		ptr = tmp;
+		if (reinterpret_cast<std::uintptr_t>(ptr) % alignment == 0)
+			return ptr;
+
+		// bad luck: realloc didn't give us the right alignment
+		void* newPtr = nullptr;
+		if (posix_memalign(&newPtr, alignment, newsize) != 0) {
+			free(ptr);
+			throw std::bad_alloc();
+		}
+		std::memcpy(newPtr, ptr, std::min(oldsize, newsize));
+		free(ptr);
+		return newPtr;
+	#endif
+#endif
+}
+
+void aligned_free(void* ptr)
+{
+#ifdef USE_MIMALLOC
+	mi_free(ptr);  // mimalloc handles aligned free automatically
+#else
+	#if defined(_WIN32) || defined(__MINGW32__)
+		_aligned_free(ptr);
+	#else
+		std::free(ptr);
+	#endif
+#endif
+}
+
+size_t usable_size(void* ptr)
+{
+#ifdef USE_MIMALLOC
+	return mi_usable_size(ptr);
+#else
+	#if defined(_WIN32) || defined(__MINGW32__)
+		return _msize(ptr);
+	#else
+		return malloc_usable_size(ptr);
+	#endif
+#endif
+}
+
+} // namespace recoil
 
 // ----------------------------------------------------------------------------
 // Custom operator new/delete overrides using mimalloc
 // This file should be compiled only once into the engine
 // Based on mimalloc-new-delete.h from mimalloc distribution
 // ----------------------------------------------------------------------------
+
+#ifdef USE_MIMALLOC
 
 // C++98 delete operators
 void operator delete(void* p) noexcept
