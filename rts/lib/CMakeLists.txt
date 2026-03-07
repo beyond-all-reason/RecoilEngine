@@ -15,23 +15,20 @@ if (USE_MIMALLOC)
 	set(MI_BUILD_SHARED OFF CACHE BOOL "Disable mimalloc shared library" FORCE)
 	set(MI_BUILD_STATIC ON CACHE BOOL "Enable mimalloc static library" FORCE)
 
-	# Temporarily remove _WIN32_WINNT to avoid redefinition warning with mimalloc
-	# mimalloc defines _WIN32_WINNT=0x600 for MinGW in its CMakeLists.txt
 	if(MINGW)
+		# Temporarily remove _WIN32_WINNT to avoid redefinition warning with mimalloc
+		# mimalloc defines _WIN32_WINNT=0x600 for MinGW in its CMakeLists.txt
 		remove_definitions(-D_WIN32_WINNT=0x0601)
+
+		# Suppress visibility attribute warnings for ALL mimalloc targets.
+		add_compile_options(-Wno-attributes)
 	endif()
 
 	ADD_SUBDIRECTORY(mimalloc)
 
-	# Restore _WIN32_WINNT definition after mimalloc
 	if(MINGW)
+		# Restore _WIN32_WINNT definition after mimalloc
 		add_definitions(-D_WIN32_WINNT=0x0601)
-	endif()
-
-	# Suppress visibility attribute warnings on MinGW
-	# Windows PE binaries don't support -fvisibility but mimalloc uses it
-	if(MINGW)
-		target_compile_options(mimalloc-static PRIVATE -Wno-attributes)
 	endif()
 endif()
 

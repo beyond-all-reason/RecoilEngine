@@ -24,14 +24,18 @@
 
 namespace recoil {
 
+// malloc and free are inline in the header when USE_MIMALLOC is not enabled
+#if defined(USE_MIMALLOC) && USE_MIMALLOC
 void* malloc(size_t size)
 {
-#ifdef USE_MIMALLOC
 	return mi_malloc(size);
-#else
-	return std::malloc(size);
-#endif
 }
+
+void free(void* ptr)
+{
+	mi_free(ptr);
+}
+#endif
 
 void* calloc(size_t count, size_t size)
 {
@@ -48,15 +52,6 @@ void* realloc(void* ptr, size_t size)
 	return mi_realloc(ptr, size);
 #else
 	return std::realloc(ptr, size);
-#endif
-}
-
-void free(void* ptr)
-{
-#ifdef USE_MIMALLOC
-	mi_free(ptr);
-#else
-	std::free(ptr);
 #endif
 }
 

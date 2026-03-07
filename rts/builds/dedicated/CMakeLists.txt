@@ -134,6 +134,7 @@ set(system_files
 	${ENGINE_SRC_ROOT_DIR}/System/StringUtil.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/float3.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/float4.cpp
+	${ENGINE_SRC_ROOT_DIR}/System/MemoryOverride.cpp
 	)
 if    (WIN32)
 	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/Win/Hardware.cpp)

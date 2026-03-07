@@ -32,6 +32,7 @@
 #include "System/Platform/Misc.h"
 #include "System/Platform/errorhandler.h"
 #include "System/Platform/Threading.h"
+#include "System/MemoryOverride.h"
 
 #ifndef DEDICATED
 #include "System/Platform/Watchdog.h"
@@ -265,7 +266,7 @@ static void ExtractSymbols(char** lines, StackTrace& stacktrace)
 		l++;
 	}
 
-	free(lines);
+	recoil::free(lines);
 }
 
 static int CommonStringLength(const std::string& str1, const std::string& str2)

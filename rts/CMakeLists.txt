@@ -100,7 +100,7 @@ if (WIN32)
 	list(APPEND engineCommonLibraries ${WIN32_LIBRARIES})
 endif (WIN32)
 
-option(USE_MIMALLOC "Use mimalloc memory allocator" FALSE)
+option(USE_MIMALLOC "Use mimalloc memory allocator" TRUE)
 if    (USE_MIMALLOC)
     message(STATUS "Using mimalloc")
     list(APPEND engineCommonLibraries $<TARGET_NAME:mimalloc-static>)
