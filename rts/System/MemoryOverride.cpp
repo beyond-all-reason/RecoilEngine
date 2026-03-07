@@ -5,7 +5,9 @@
 #ifdef USE_MIMALLOC
 #include <mimalloc.h>
 #else
+#include <cstring>
 #include <cstdlib>
+#include <cstdint>
 #ifdef _WIN32
 #include <malloc.h>
 #else
