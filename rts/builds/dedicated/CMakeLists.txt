@@ -43,7 +43,7 @@ list(APPEND engineDedicatedLibraries "smmalloc")
 
 ### mimalloc
 if (USE_MIMALLOC)
-    list(APPEND engineDedicatedLibraries $<TARGET_NAME:mimalloc-static>)
+    list(APPEND engineDedicatedLibraries mimalloc-static)
 endif()
 
 if (WIN32)

@@ -613,6 +613,8 @@ add_dependencies(generateSources generateVersionFiles)
 ### Where the other CMakeLists.txt are
 
 # As the libs are required by all the other sub-projects, we add them first
+# Options that affect lib selection must be declared here, before rts/lib is processed
+option(USE_MIMALLOC "Use mimalloc memory allocator" TRUE)
 add_subdirectory(rts/lib)
 
 # Fix for MinGW assembler limitations with large object files
