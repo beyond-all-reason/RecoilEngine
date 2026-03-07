@@ -46,6 +46,7 @@
  * @field wordSize number Indicates the build type always 64 these days
  * @field gameSpeed number Number of simulation gameframes per second
  * @field textColorCodes TextColorCode Table containing keys that represent the color code operations during font rendering
+ * @field isHeadless boolean? Whether this is a headless engine build. Not available in synced
  */
 
 bool LuaConstEngine::PushEntries(lua_State* L)
@@ -58,6 +59,9 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	LuaPushNamedString(L, "commitsNumber"  , SpringVersion::GetCommits()   );
 	LuaPushNamedString(L, "buildFlags"     , SpringVersion::GetAdditional());
 	LuaPushNamedNumber(L, "wordSize", (!CLuaHandle::GetHandleSynced(L))? Platform::NativeWordSize() * 8: 0);
+
+	if (!CLuaHandle::GetHandleSynced(L))
+		LuaPushNamedBool(L, "isHeadless", SpringVersion::IsHeadless());
 
 	LuaPushNamedNumber(L, "gameSpeed", GAME_SPEED);
 
