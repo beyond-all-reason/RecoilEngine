@@ -1,6 +1,7 @@
 #include "System/Platform/CpuTopology.h"
 
 #include "System/Log/ILog.h"
+#include "System/MemoryOverride.hpp"
 
 #include <bit>
 #include <set>
@@ -67,7 +68,7 @@ namespace spring_overrides {
 			GROUP_RELATIONSHIP     Group;
 		} DUMMYUNIONNAME;
 	} SYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX, *PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX;
-	
+
 	#if _WIN32_WINNT >= 0x0601
 	typedef BOOL (WINAPI *GetLogicalProcessorInformationExFunc)(
 		LOGICAL_PROCESSOR_RELATIONSHIP,
@@ -102,14 +103,13 @@ BOOL GetProcessorInformation
 
 		if (FALSE == rc)
 		{
-			if (GetLastError() == ERROR_INSUFFICIENT_BUFFER)
-			{
+			if (GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
 				if (buffer)
-					free(buffer);
+					recoil::free(buffer);
 
-				buffer = (spring_overrides::PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)malloc(returnLength);
+				buffer = (spring_overrides::PSYSTEM_LOGICAL_PROCESSOR_INFORMATION_EX)recoil::malloc(returnLength);
 
-				if (NULL == buffer)
+				if (buffer == nullptr)
 					return FALSE;
 			}
 			else
@@ -179,7 +179,7 @@ ProcessorMasks GetProcessorMasks() {
 	}
 
 	if (buffer)
-		free(buffer);
+		recoil::free(buffer);
 
 	return processorMasks;
 }
@@ -222,7 +222,7 @@ ProcessorCaches GetProcessorCache() {
 	}
 
 	if (buffer)
-		free(buffer);
+		recoil::free(buffer);
 
 	return processorCaches;
 }

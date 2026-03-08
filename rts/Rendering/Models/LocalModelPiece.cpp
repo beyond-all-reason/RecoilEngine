@@ -44,8 +44,7 @@ CR_REG_METADATA(LocalModelPiece, (
  */
 
 LocalModelPiece::LocalModelPiece(const S3DModelPiece* piece)
-	: colvol(piece->GetCollisionVolume())
-	, dirty(true)
+	: dirty(true)
 	, wasUpdated{ true }
 	, noInterpolation{ false }
 
@@ -68,6 +67,13 @@ LocalModelPiece::LocalModelPiece(const S3DModelPiece* piece)
 	prevModelSpaceTra = Transform{ };
 
 	children.reserve(piece->children.size());
+
+	colvol = new CollisionVolume(piece->GetCollisionVolume());
+}
+
+LocalModelPiece::~LocalModelPiece()
+{
+	spring::SafeDelete(colvol);
 }
 
 void LocalModelPiece::SetDirty() {

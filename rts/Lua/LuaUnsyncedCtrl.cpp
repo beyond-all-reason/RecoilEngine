@@ -101,7 +101,7 @@
 #include <cfloat>
 #include <cinttypes>
 
-#include <fstream>
+#include <nowide/fstream.hpp>
 
 #include <SDL_keyboard.h>
 #include <SDL_clipboard.h>
@@ -220,6 +220,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(FreeUnitIcon);
 	REGISTER_LUA_CFUNC(UnitIconSetDraw); // deprecated
 	REGISTER_LUA_CFUNC(SetUnitIconDraw);
+	REGISTER_LUA_CFUNC(SetUnitIcon);
 
 
 	REGISTER_LUA_CFUNC(ExtractModArchiveFile);
@@ -2568,6 +2569,40 @@ int LuaUnsyncedCtrl::SetUnitIconDraw(lua_State* L)
 	return 0;
 }
 
+/***
+ *
+ * @function Spring.SetUnitIcon
+ * @param unitID integer
+ * @param iconName string? supply nil to reset to the default
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SetUnitIcon(lua_State* L)
+{
+	CUnit* unit = ParseCtrlUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	if (lua_isnoneornil(L, 2)) {
+	    unit->customIconIndex = icon::INVALID_ICON_INDEX;
+		unitDrawer->UpdateCurrentUnitIcon(unit);
+		return 0;
+	}
+
+	const auto iconName = luaL_checksstring(L, 2);
+	const auto iconIdx = icon::iconHandler.GetIconIdx(iconName);
+
+	if (iconIdx == icon::INVALID_ICON_INDEX) {
+		luaL_error(L, "Invalid icon name \"%s\"", iconName.c_str());
+		return 0;
+	}
+
+	unit->customIconIndex = iconIdx;
+	unitDrawer->UpdateCurrentUnitIcon(unit);
+
+	return 0;
+}
+
 
 /***
  *
@@ -2710,7 +2745,7 @@ int LuaUnsyncedCtrl::ExtractModArchiveFile(lua_State* L)
 
 
 	std::vector<uint8_t> buffer;
-	std::fstream fstr(path.c_str(), std::ios::out | std::ios::binary);
+	nowide::fstream fstr(path.c_str(), std::ios::out | std::ios::binary);
 
 	if (!vfsFile.IsBuffered()) {
 		buffer.resize(vfsFile.FileSize(), 0);
@@ -3269,7 +3304,7 @@ static int ReloadOrRestart(const std::string& springArgs, const std::string& scr
 
 	if (!scriptText.empty()) {
 		// create file 'script.txt' with contents given by Lua code
-		std::ofstream scriptFile(scriptFullName.c_str());
+		nowide::ofstream scriptFile(scriptFullName.c_str());
 
 		scriptFile.write(scriptText.c_str(), scriptText.size());
 		scriptFile.close();
@@ -3886,6 +3921,7 @@ int LuaUnsyncedCtrl::SetLastMessagePosition(lua_State* L)
  * @param z number
  * @param text string? (Default: `""`)
  * @param localOnly boolean?
+ * @param playerID number? Local labels pretend they are from this player
  * @return nil
  */
 int LuaUnsyncedCtrl::MarkerAddPoint(lua_State* L)

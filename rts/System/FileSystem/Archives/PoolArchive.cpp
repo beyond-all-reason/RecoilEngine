@@ -145,7 +145,7 @@ IArchive::SFileInfo CPoolArchive::FileInfo(uint32_t fid) const
 
 	if (file.modTime == 0) {
 		auto scopedSemAcq = AcquireSemaphoreScoped();
-		file.modTime = FileSystemAbstraction::GetFileModificationTime(GetPoolFilePath(poolRootDir, file.md5sum)); // file.modTime is mutable
+		file.modTime = FileSystem::GetFileModificationTime(GetPoolFilePath(poolRootDir, file.md5sum)); // file.modTime is mutable
 	}
 
 	return IArchive::SFileInfo{
@@ -197,8 +197,7 @@ std::string CPoolArchive::GetPoolFileName(const std::array<uint8_t, 16>& md5Sum)
 
 std::string CPoolArchive::GetPoolFilePath(const std::string& poolRootDir, const std::string& poolFile)
 {
-	std::string rpath = std::format("{}/pool/{}", poolRootDir, poolFile);
-	return FileSystem::FixSlashes(rpath);
+	return FileSystem::Concatenate({ poolRootDir.c_str(), "pool", poolFile.c_str() });
 }
 
 std::string CPoolArchive::GetPoolFilePath(const std::string& poolRootDir, const std::array<uint8_t, 16>& md5Sum)

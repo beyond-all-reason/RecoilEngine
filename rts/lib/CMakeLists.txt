@@ -1,11 +1,51 @@
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/rts)
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/rts/lib)
 
+ADD_SUBDIRECTORY(fmt)
+set_target_properties(fmt PROPERTIES POSITION_INDEPENDENT_CODE ON)
 ADD_SUBDIRECTORY(glad)
 ADD_SUBDIRECTORY(smmalloc)
+
+# Mimalloc - only build if USE_MIMALLOC is enabled
+if (USE_MIMALLOC)
+	# Disable mimalloc's built-in override - we provide our own custom override
+	set(MI_OVERRIDE OFF CACHE BOOL "Disable mimalloc built-in override" FORCE)
+	# Disable mimalloc tests and shared library to speed up build
+	set(MI_BUILD_TESTS OFF CACHE BOOL "Disable mimalloc tests" FORCE)
+	set(MI_BUILD_SHARED OFF CACHE BOOL "Disable mimalloc shared library" FORCE)
+	set(MI_BUILD_STATIC ON CACHE BOOL "Enable mimalloc static library" FORCE)
+
+	# Integrate ASAN/Valgrind tracking with mimalloc
+	# When the engine is built with USE_ASAN, enable MI_TRACK_ASAN for mimalloc
+	# When the engine is built with USE_VALGRIND, enable MI_TRACK_VALGRIND for mimalloc
+	if (USE_ASAN)
+		set(MI_TRACK_ASAN ON CACHE BOOL "Enable mimalloc ASAN support" FORCE)
+	endif()
+	if (VALGRIND_FOUND)
+		set(MI_TRACK_VALGRIND ON CACHE BOOL "Enable mimalloc Valgrind support" FORCE)
+	endif()
+
+	if(MINGW)
+		# Temporarily remove _WIN32_WINNT to avoid redefinition warning with mimalloc
+		# mimalloc defines _WIN32_WINNT=0x600 for MinGW in its CMakeLists.txt
+		remove_definitions(-D_WIN32_WINNT=0x0601)
+
+		# Suppress visibility attribute warnings for ALL mimalloc targets.
+		add_compile_options(-Wno-attributes)
+	endif()
+
+	ADD_SUBDIRECTORY(mimalloc)
+
+	if(MINGW)
+		# Restore _WIN32_WINNT definition after mimalloc
+		add_definitions(-D_WIN32_WINNT=0x0601)
+	endif()
+endif()
+
 ADD_SUBDIRECTORY(lua)
 ADD_SUBDIRECTORY(luasocket)
 ADD_SUBDIRECTORY(minizip)
+ADD_SUBDIRECTORY(nowide)
 ADD_SUBDIRECTORY(headlessStubs)
 if (ENABLE_STREFLOP)
 ADD_SUBDIRECTORY(streflop)
@@ -21,7 +61,14 @@ SET(GFLAGS_INSTALL_HEADERS            FALSE)
 SET(GFLAGS_INSTALL_SHARED_LIBS        FALSE)
 SET(GFLAGS_INSTALL_STATIC_LIBS        FALSE)
 
+#Meh-meh
+if (WIN32)
+	remove_definitions(-DUNICODE -D_UNICODE)
+endif()
 ADD_SUBDIRECTORY(gflags)
+if (WIN32)
+	add_definitions(-DUNICODE -D_UNICODE)
+endif()
 
 
 # to change assimp for springs need, see fix_assimp.sh

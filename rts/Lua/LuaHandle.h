@@ -45,7 +45,7 @@ class LuaShaders;
 class CLuaDisplayLists;
 class CLuaRules;
 class CLuaUI;
-class WeaponDef;
+struct WeaponDef;
 class CCobDeferredCallin;
 
 
@@ -75,8 +75,6 @@ class CLuaHandle : public CEventClient
 		static bool GetHandleSynced(const lua_State* L) { return GetLuaContextData(L)->synced; }
 
 		bool GetUserMode() const { return userMode; }
-
-		static int GetHandleAllowChanges(const lua_State* L) { return GetLuaContextData(L)->allowChanges; }
 
 		static CLuaHandle* GetHandle(lua_State* L) { return (GetLuaContextData(L)->owner); }
 
@@ -221,6 +219,10 @@ class CLuaHandle : public CEventClient
 		void ActiveCommandChanged(const SCommandDescription* cmdDesc) override;
 		void CameraRotationChanged(const float3& rot) override;
 		void CameraPositionChanged(const float3& pos) override;
+
+		void MiniMapRotationChanged(const float newRot, const float oldRot) override;
+		void MiniMapStateChanged(const bool isMinimized, const bool isMaximized, const bool isSlaved) override;
+		void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim) override;
 
 		bool CommandNotify(const Command& cmd) override;
 

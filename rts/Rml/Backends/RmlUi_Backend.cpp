@@ -134,6 +134,7 @@ bool RmlGui::Initialize()
 		LOG_L(L_ERROR, "[RmlGui::%s] Could not initialize render interface.", __func__);
 		return false;
 	}
+	state->system_interface.Reset();
 
 	auto winX = globalRendering->winSizeX;
 	auto winY = globalRendering->winSizeY;
@@ -175,6 +176,7 @@ bool RmlGui::InitializeLua(lua_State* lua_state)
 	sol::state_view lua(lua_state);
 	state->ls = lua_state;
 	state->luaPlugin = Rml::SolLua::Initialise(&lua, "rmlDocumentId");
+	state->luaPlugin->systemInterface = &state->system_interface;
 	state->system_interface.SetTranslationTable(&state->luaPlugin->translationTable);
 	return true;
 }

@@ -114,6 +114,7 @@ class LuaUnsyncedCtrl {
 		static int AddUnitIcon(lua_State* L);
 		static int FreeUnitIcon(lua_State* L);
 		static int SetUnitIconDraw(lua_State* L);
+		static int SetUnitIcon(lua_State* L);
 		static int UnitIconSetDraw(lua_State* L);
 
 		static int ExtractModArchiveFile(lua_State* L);

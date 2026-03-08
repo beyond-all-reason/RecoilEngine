@@ -74,17 +74,4 @@ protected:
 	 std::vector<Particle> particles;
 };
 
-/**
-* old CSphereParticleSpawner (it used to spawns the particles as independent CProjectile objects)
-* has proven to be slower
-*/
-class CSphereParticleSpawner : public CSimpleParticleSystem {
-	CR_DECLARE_DERIVED(CSphereParticleSpawner)
-public:
-	CSphereParticleSpawner() {}
-	static bool GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo) {
-		return CSimpleParticleSystem::GetMemberInfo(memberInfo);
-	}
-};
-
 #endif // SIMPLE_PARTICLE_SYSTEM_H

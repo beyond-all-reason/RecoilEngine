@@ -155,6 +155,10 @@ namespace QTPFS {
 			return numRootNodes;
 		}
 
+		int GetNodeCount() const {
+			return POOL_TOTAL_SIZE - nodeIndcs.size();
+		}
+
 		int GetNodelayer() const {
 			return layerNumber;
 		}

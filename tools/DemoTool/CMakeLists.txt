@@ -36,7 +36,6 @@ set(demoToolSpringSources
 	${ENGINE_SRC_ROOT_DIR}/Sim/Misc/TeamStatistics.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/FileSystem/FileHandler.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/FileSystem/FileSystem.cpp
-	${ENGINE_SRC_ROOT_DIR}/System/FileSystem/FileSystemAbstraction.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/FileSystem/GZFileHandler.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/Platform/Misc.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/CRC.cpp

@@ -18,6 +18,7 @@ target_link_libraries(Game PRIVATE
 	 ${sound-impl}
 	 prd::jsoncpp
 	 streflop
+	 fmt::fmt
 )
 
 ### Assemble libraries
@@ -82,6 +83,13 @@ include_directories(${engineIncludes})
 ### Build the executable
 add_executable(engine-legacy ${EXE_FLAGS} ${engineSources} ${ENGINE_ICON} ${engineHeaders})
 target_link_libraries(engine-legacy ${engineLibraries} Game)
+
+# Export symbols for plugin access (replaces CMP0065 OLD behavior)
+set_target_properties(engine-legacy PROPERTIES ENABLE_EXPORTS TRUE)
+
+if(MSVC)
+    target_link_libraries(engine-legacy engine-natvis)
+endif()
 
 
 ### Install the executable

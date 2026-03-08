@@ -180,6 +180,10 @@ bool LuaConstCOB::PushEntries(lua_State* L)
 	PUSH_COB(ABS);
 	/*** @field COB.GAME_FRAME  integer */
 	PUSH_COB(GAME_FRAME);
+	/*** @field COB.PIECE_HEADING integer */
+	PUSH_COB(PIECE_HEADING);
+	/*** @field COB.PIECE_PITCH integer */
+	PUSH_COB(PIECE_PITCH);
 
 	// NOTE: shared variables use codes [1024 - 5119]
 

@@ -2299,7 +2299,7 @@ static bool LimitToFullStorage(const CUnit* u, const CTeam* team, SResourceOrder
 		GetScale(order->use[i], team->res[i], &scale);
 
 		if (u->harvestStorage.empty()) {
-			GetScale(order->add[i], team->resStorage.res[i] - team->res[i], &scale);
+			GetScale(order->add[i], team->resStorage[i] - team->res[i], &scale);
 		} else {
 			GetScale(order->add[i], u->harvestStorage[i] - u->harvested[i], &scale);
 		}
@@ -2409,7 +2409,7 @@ void CUnit::Deactivate()
 void CUnit::UpdateWind(float x, float z, float strength)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const float windHeading = ClampRad(GetHeadingFromVectorF(-x, -z) - heading * TAANG2RAD);
+	const float windHeading = ClampRadPi(GetHeadingFromVectorF(-x, -z) - heading * TAANG2RAD);
 	const float windStrength = std::min(strength, unitDef->windGenerator);
 
 	script->WindChanged(windHeading, windStrength);
@@ -3043,6 +3043,7 @@ CR_REG_METADATA(CUnit, (
 
 	CR_MEMBER(definedIconName),
 	CR_MEMBER_UN(currentIconIndex),
+	CR_MEMBER(customIconIndex),
 	CR_MEMBER_UN(drawIcon),
 
 	CR_MEMBER(transportedUnits),

@@ -218,6 +218,9 @@ public:
 	virtual bool  BlockShot(int weaponNum, const CUnit* targetUnit, bool userTarget) = 0; // returns whether shot should be blocked
 	virtual float TargetWeight(int weaponNum, const CUnit* targetUnit) = 0; // returns target weight
 	virtual void AnimFinished(AnimType type, int piece, int axis) = 0;
+public:
+	const auto& GetLiveAnims() const { return anims; }
+	const auto& GetDoneAnims() const { return doneAnims; }
 };
 
 #endif // UNIT_SCRIPT_H

@@ -52,7 +52,10 @@ namespace spring {
 			static_assert(start < end);
 
 			constexpr auto name = function.substr(start, (end - start));
-		#if defined(_MSC_VER)
+
+		#if defined(__clang__) || defined(__GNUC__)
+			return substring_as_char_n(name, std::make_index_sequence<name.size()>{});
+		#elif defined(_MSC_VER)
 			constexpr auto begSp = name.find(space) + space.size();
 
 			static_assert(begSp < name.size());
@@ -60,7 +63,7 @@ namespace spring {
 			constexpr auto cleanName = name.substr(begSp); //remove "class "/"struct ", etc
 			return substring_as_char_n(cleanName, std::make_index_sequence<cleanName.size()>{});
 		#else
-			return substring_as_char_n(name, std::make_index_sequence<name.size()>{});
+			#error Unsupported compiler
 		#endif
 		}
 

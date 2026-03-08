@@ -755,13 +755,13 @@ void CHoverAirMoveType::UpdateVerticalSpeed(const float4& spd, float curRelHeigh
 	// first restore original vertical speed
 	owner->SetVelocity((spd * XZVector) + (UpVector * curVertSpeed));
 
-	if (collisionState == COLLISION_DIRECT) {
+	if (collisionState == COLLISION_DIRECT && aircraftState != AIRCRAFT_TAKEOFF) {
 		const float3 dir = lastCollidee->midPos - owner->midPos;
 		const float3 sdir = lastCollidee->speed - spd;
 
 		if (spd.dot(dir + sdir * 20.0f) < 0.0f) {
-			wh -= (30.0f * (lastCollidee->midPos.y >  owner->pos.y));
-			wh += (50.0f * (lastCollidee->midPos.y <= owner->pos.y));
+			wh -= (30.0f * (lastCollidee->midPos.y >  owner->midPos.y));
+			wh += (50.0f * (lastCollidee->midPos.y <= owner->midPos.y));
 		}
 	}
 

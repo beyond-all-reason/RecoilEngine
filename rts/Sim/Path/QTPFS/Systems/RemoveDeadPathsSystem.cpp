@@ -32,7 +32,10 @@ using namespace QTPFS;
 void RemoveDeadPathsSystem::Init()
 {
     RECOIL_DETAILED_TRACY_ZONE;
+
     auto& comp = systemGlobals.CreateSystemComponent<RemoveDeadPathsComponent>();
+    comp.deleteAll = false;
+
     systemUtils.OnUpdate().connect<&RemoveDeadPathsSystem::Update>();
 }
 
@@ -41,14 +44,14 @@ void RemoveDeadPathsSystem::Update()
     SCOPED_TIMER("ECS::RemoveDeadPathsSystem::Update");
 
     auto& comp = systemGlobals.GetSystemComponent<RemoveDeadPathsComponent>();
-    if (gs->frameNum % comp.refreshRate != comp.refreshOffset) return;
+    if (gs->frameNum % comp.refreshRate != comp.refreshOffset && !comp.deleteAll) return;
 
     auto* pm = dynamic_cast<PathManager*>(pathManager);
 
     auto view = registry.view<PathDelayedDelete>();
     for (auto pathEntity : view) {
         auto deleteOnFrame = view.get<PathDelayedDelete>(pathEntity).value;
-        if (gs->frameNum > deleteOnFrame) {
+        if (comp.deleteAll || gs->frameNum > deleteOnFrame) {
             pm->DeletePathEntity(pathEntity);
         }
     }
@@ -56,5 +59,11 @@ void RemoveDeadPathsSystem::Update()
 
 void RemoveDeadPathsSystem::Shutdown() {
     RECOIL_DETAILED_TRACY_ZONE;
+
+    auto& comp = systemGlobals.GetSystemComponent<RemoveDeadPathsComponent>();
+    comp.deleteAll = true;
+
+    Update();
+
     systemUtils.OnUpdate().disconnect<&RemoveDeadPathsSystem::Update>();
 }

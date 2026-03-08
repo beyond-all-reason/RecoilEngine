@@ -6,9 +6,11 @@
 #include <cstdlib>
 #include <tracy/Tracy.hpp>
 
+#include "System/MemoryOverride.hpp"
+
 void* operator new(std::size_t count)
 {
-	auto ptr = malloc(count);
+	auto ptr = recoil::malloc(count);
 	TracyAlloc(ptr, count);
 	return ptr;
 }
@@ -16,7 +18,7 @@ void* operator new(std::size_t count)
 void operator delete (void* ptr) noexcept
 {
 	TracyFree(ptr);
-	free(ptr);
+	recoil::free(ptr);
 }
 
 #endif

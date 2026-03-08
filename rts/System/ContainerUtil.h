@@ -48,6 +48,7 @@ namespace spring {
 		return true;
 	}
 
+	// doesn't preserve order like `std::erase_if`, but cheaper
 	template<typename T, typename UnaryPredicate>
 	static bool VectorEraseIfAll(std::vector<T>& v, UnaryPredicate&& p)
 	{
@@ -70,6 +71,7 @@ namespace spring {
 		return removed > 0;
 	}
 
+	// doesn't preserve order like `std::erase`, but cheaper
 	template<typename T>
 	static bool VectorEraseAll(std::vector<T>& v, const T& e)
 	{

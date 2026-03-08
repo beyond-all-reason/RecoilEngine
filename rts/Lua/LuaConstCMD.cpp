@@ -329,7 +329,7 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	/*** @field CMD.MANUALFIRE 105 */
 	PUSH_CMD(MANUALFIRE);
 	/*** @field CMD.DGUN 105 */
-	LuaInsertDualMapPair(L, "DGUN", CMD_MANUALFIRE); // backward compatibility (TODO: find a way to print a warning when used!)
+	LuaPushNamedNumber(L, "DGUN", CMD_MANUALFIRE); // backward compatibility (TODO: find a way to print a warning when used!)
 	/*** @field CMD.RESTORE 110 */
 	PUSH_CMD(RESTORE);
 	/*** @field CMD.REPEAT 115 */
@@ -343,7 +343,7 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	/*** @field CMD.AUTOREPAIRLEVEL 135 */
 	PUSH_CMD(AUTOREPAIRLEVEL);
 	/*** @field CMD.LOOPBACKATTACK 20 */
-	LuaInsertDualMapPair(L, "LOOPBACKATTACK", CMD_ATTACK); // backward compatibility (TODO: find a way to print a warning when used!)
+	LuaPushNamedNumber(L, "LOOPBACKATTACK", CMD_ATTACK); // backward compatibility (TODO: find a way to print a warning when used!)
 	/*** @field CMD.IDLEMODE 145  */
 	PUSH_CMD(IDLEMODE);
 

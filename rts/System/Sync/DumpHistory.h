@@ -3,6 +3,8 @@
 #ifndef DUMPHISTORY_H
 #define DUMPHISTORY_H
 
-extern void DumpHistory(std::fstream& file, int frameNum, bool serverRequest);
+#include <nowide/fstream.hpp>
+
+extern void DumpHistory(nowide::fstream& file, int frameNum, bool serverRequest);
 
 #endif /* DUMPHISTORY_H */

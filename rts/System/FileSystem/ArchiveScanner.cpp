@@ -2,10 +2,11 @@
 
 #include <algorithm>
 #include <array>
-#include <cstdio>
 #include <memory>
 #include <random>
 #include <chrono>
+
+#include <nowide/cstdio.hpp>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -58,7 +59,7 @@ LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_ARCHIVESCANNER)
  * but mapping them all, every time to make the list is)
  */
 
-constexpr static int INTERNAL_VER = 20;
+constexpr static int INTERNAL_VER = 22;
 
 
 /*
@@ -543,8 +544,8 @@ void CArchiveScanner::ScanDir(const std::string& curPath, std::deque<std::string
 		subDirs.pop_front();
 
 		for (const std::string& fileName: foundFiles) {
-			const std::string& fileNameNoSep = FileSystem::EnsureNoPathSepAtEnd(fileName);
-			const std::string& lcFilePath = StringToLower(FileSystem::GetDirectory(fileNameNoSep));
+			const std::string fileNameNoSep = FileSystem::EnsureNoPathSepAtEnd(fileName);
+			const std::string lcFilePath = StringToLower(FileSystem::GetDirectory(fileNameNoSep));
 
 			// Exclude archive files found inside directory archives (.sdd)
 			if (lcFilePath.find(".sdd") != std::string::npos)
@@ -813,7 +814,7 @@ void CArchiveScanner::ScanArchive(const std::string& fullName, bool doChecksum)
 	// Store modinfo.lua/mapinfo.lua modified timestamp for directory archives, as only they can change.
 	if (ar->GetType() == ARCHIVE_TYPE_SDD && !luaInfoFile.empty()) {
 		ai.archiveDataPath = ar->GetArchiveFile() + "/" + static_cast<const CDirArchive*>(ar.get())->FileName(ar->FindFile(luaInfoFile));
-		ai.modifiedArchiveData = FileSystemAbstraction::GetFileModificationTime(ai.archiveDataPath);
+		ai.modifiedArchiveData = FileSystem::GetFileModificationTime(ai.archiveDataPath);
 	}
 
 	ai.origName = fname;
@@ -837,7 +838,7 @@ bool CArchiveScanner::CheckCachedData(const std::string& fullName, uint32_t& mod
 	// if stat fails, assume the archive is not broken nor cached
 	// it would also fail in the case of virtual archives and cause
 	// warning-spam which is suppressed by the extension-test above
-	if ((modified = FileSystemAbstraction::GetFileModificationTime(fullName)) == 0)
+	if ((modified = FileSystem::GetFileModificationTime(fullName)) == 0)
 		return false;
 
 	const std::string& fileName      = FileSystem::GetFilename(fullName);
@@ -872,7 +873,7 @@ bool CArchiveScanner::CheckCachedData(const std::string& fullName, uint32_t& mod
 
 	const bool haveValidCacheData = (modified == ai.modified && filePath == ai.path);
 	// check if the archive data file (modinfo.lua/mapinfo.lua) has changed
-	const bool archiveDataChanged = (!ai.archiveDataPath.empty() && FileSystemAbstraction::GetFileModificationTime(ai.archiveDataPath) != ai.modifiedArchiveData);
+	const bool archiveDataChanged = (!ai.archiveDataPath.empty() && FileSystem::GetFileModificationTime(ai.archiveDataPath) != ai.modifiedArchiveData);
 
 	if (haveValidCacheData && !archiveDataChanged) {
 		// archive found in cache, update checksum if wanted
@@ -1151,7 +1152,7 @@ bool CArchiveScanner::ReadCacheData(const std::string& filename, bool loadOldVer
 	static const auto ReadFileInfoMap = [](const LuaTable& filesInfoTbl, spring::unordered_map<std::string, FileInfo>& filesInfoMap) {
 		for (int j = 1; filesInfoTbl.KeyExists(j); ++j) {
 			const LuaTable fileInfoTbl = filesInfoTbl.SubTable(j);
-			const auto fn = fileInfoTbl.GetString("fileName", "");
+			const auto fn = FileSystem::ForwardSlashes(fileInfoTbl.GetString("fileName", ""));
 			if (fn.empty())
 				continue;
 
@@ -1176,8 +1177,8 @@ bool CArchiveScanner::ReadCacheData(const std::string& filename, bool loadOldVer
 		ArchiveInfo& ai = GetAddArchiveInfo(curArchiveNameLC);
 
 		ai.origName 	   = curArchiveName;
-		ai.path     	   = curArchiveTbl.GetString("path", "");
-		ai.archiveDataPath = curArchiveTbl.GetString("archiveDataPath", "");
+		ai.path     	   = FileSystem::ForwardSlashes(curArchiveTbl.GetString("path", ""));
+		ai.archiveDataPath = FileSystem::ForwardSlashes(curArchiveTbl.GetString("archiveDataPath", ""));
 
 		// do not use LuaTable.GetInt() for integers: the engine's lua
 		// library uses 32-bit floats to represent numbers, which can only
@@ -1322,7 +1323,7 @@ void CArchiveScanner::WriteCacheData(const std::string& filename)
 		}
 	}
 
-	FILE* out = fopen(filename.c_str(), "wt");
+	FILE* out = nowide::fopen(filename.c_str(), "wt");
 	if (out == nullptr) {
 		LOG_L(L_ERROR, "[AS::%s] failed to write to \"%s\"!", __func__, filename.c_str());
 		return;
@@ -1350,7 +1351,7 @@ void CArchiveScanner::WriteCacheData(const std::string& filename)
 
 		fprintf(out, "\t\t{\n");
 		SafeStr(out, "\t\t\tname = ",              arcInfo.origName);
-		SafeStr(out, "\t\t\tpath = ",              arcInfo.path);
+		SafeStr(out, "\t\t\tpath = ",              arcInfo.path    );
 		fprintf(out, "\t\t\tmodified = \"%u\",\n", arcInfo.modified);
 		fprintf(out, "\t\t\tchecksum = \"%s\",\n", hexDigest.data());
 		SafeStr(out, "\t\t\treplaced = ",          arcInfo.replaced);

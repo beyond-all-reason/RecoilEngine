@@ -128,8 +128,8 @@ public:
 	static bool CanDrawProjectile(const CProjectile* pro, int allyTeam);
 	static bool ShouldDrawProjectile(const CProjectile* pro, uint8_t thisPassMask);
 
-	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapLinesRB() { return minimapLinesRB; }
-	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapPointsRB() { return minimapPointsRB; }
+	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapLinesRB();
+	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapPointsRB();
 private:
 	static void ParseAtlasTextures(const bool, const LuaTable&, spring::unordered_set<std::string>&, CTextureAtlas*);
 
@@ -182,8 +182,9 @@ private:
 
 	std::unique_ptr<ScopedDepthBufferCopy> sdbc;
 
-	static TypedRenderBuffer<VA_TYPE_C> minimapLinesRB;
-	static TypedRenderBuffer<VA_TYPE_C> minimapPointsRB;
+	// Instance members to ensure proper cleanup during Kill() before OpenGL context is destroyed
+	TypedRenderBuffer<VA_TYPE_C> minimapLinesRB{ 1 << 12, 0 };
+	TypedRenderBuffer<VA_TYPE_C> minimapPointsRB{ 1 << 14, 0 };
 };
 
 extern CProjectileDrawer* projectileDrawer;

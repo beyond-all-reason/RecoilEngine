@@ -27,6 +27,7 @@ struct LocalModelPiece
 		, noInterpolation { false }
 	{}
 	LocalModelPiece(const S3DModelPiece* piece);
+	~LocalModelPiece();
 
 	void AddChild(LocalModelPiece* c) { children.push_back(c); }
 	void RemoveChild(LocalModelPiece* c) { children.erase(std::find(children.begin(), children.end(), c)); }
@@ -87,8 +88,8 @@ struct LocalModelPiece
 	const Transform&  GetModelSpaceTransform() const;
 	const CMatrix44f& GetModelSpaceMatrix()    const;
 
-	const CollisionVolume* GetCollisionVolume() const { return &colvol; }
-	      CollisionVolume* GetCollisionVolume()       { return &colvol; }
+	const CollisionVolume* GetCollisionVolume() const { return colvol; }
+	      CollisionVolume* GetCollisionVolume()       { return colvol; }
 
 	bool GetScriptVisible() const { return scriptSetVisible; }
 	void SetScriptVisible(bool b);
@@ -98,32 +99,35 @@ struct LocalModelPiece
 
 	void PostLoad();
 private:
+	mutable CMatrix44f modelSpaceMat; // transform relative to root LMP (SYNCED), chained pieceSpaceMat's
+	mutable Transform pieceSpaceTra;  // transform relative to parent LMP (SYNCED), combines <pos> and <rot>
+	mutable Transform modelSpaceTra;  // transform relative to root LMP (SYNCED), chained pieceSpaceTra's
+
 	float3 pos;      // translation relative to parent LMP, *INITIALLY* equal to original->offset
 	float3 rot;      // orientation relative to parent LMP, in radians (updated by scripts)
 	float scale;     // uniform scaling
-	float3 dir;      // cached copy of original->GetEmitDir()
 
-	Transform prevModelSpaceTra;
-	mutable Transform pieceSpaceTra;  // transform relative to parent LMP (SYNCED), combines <pos> and <rot>
-	mutable Transform modelSpaceTra;  // transform relative to root LMP (SYNCED), chained pieceSpaceMat's
-	mutable CMatrix44f modelSpaceMat; // same as above, except matrix
-
-	CollisionVolume colvol;
-
-	mutable std::array<bool, 2> wasUpdated; // currFrame, prevFrame
 	mutable std::array<bool, 3> noInterpolation; // rotate, move, scale
 	mutable bool dirty;
+
+	Transform prevModelSpaceTra;
+
+	CollisionVolume* colvol;
+
+	float3 dir;      // cached copy of original->GetEmitDir()
+
+	mutable std::array<bool, 2> wasUpdated; // currFrame, prevFrame
 	bool scriptSetVisible; // TODO: add (visibility) maxradius!
 public:
 	bool blockScriptAnims; // if true, Set{Position,Rotation} are ignored for this piece
-
-	uint32_t lmodelPieceIndex; // index of this piece into LocalModel::pieces
-	uint32_t scriptPieceIndex; // index of this piece into UnitScript::pieces
-
-	const S3DModelPiece* original;
-	LocalModelPiece* parent;
-	LocalModel* localModel;
+	int32_t lmodelPieceIndex; // index of this piece into LocalModel::pieces
+	int32_t scriptPieceIndex; // index of this piece into UnitScript::pieces
 
 	std::vector<LocalModelPiece*> children;
+	LocalModelPiece* parent;
+
 	std::vector<uint32_t> lodDispLists;
+	const S3DModelPiece* original;
+
+	LocalModel* localModel;
 };

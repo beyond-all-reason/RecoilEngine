@@ -43,12 +43,6 @@ namespace Rml::SolLua
 {
 	/// <summary>
 	/// Initializes RmlSolLua using the supplied Lua state.
-	/// </summary>
-	/// <param name="state">The Lua state to initialize into.</param>
-	SolLuaPlugin* Initialise(sol::state_view* state);
-
-	/// <summary>
-	/// Initializes RmlSolLua using the supplied Lua state.
 	/// Sets the Lua variable specified by lua_environment_identifier to the document's id when running Lua code.
 	/// </summary>
 	/// <param name="state">The Lua state to initialize into.</param>

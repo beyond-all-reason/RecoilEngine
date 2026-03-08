@@ -1,7 +1,5 @@
 # See README.md for usage instructions
-if (MINGW)
-	remove_flag("-mwindows")
-endif (MINGW)
+add_definitions(-DCATCH_AMALGAMATED_CUSTOM_MAIN)
 # defines spring_test_compile_fail macro
 include(${CMAKE_CURRENT_SOURCE_DIR}/tools/CompileFailTest/CompileFailTest.cmake)
 
@@ -22,6 +20,7 @@ include_directories(${CMAKE_BINARY_DIR}/src-generated/engine)
 set(ENGINE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/rts")
 include_directories(${ENGINE_SOURCE_DIR})
 include_directories(${ENGINE_SOURCE_DIR}/lib/asio/include)
+include_directories(${ENGINE_SOURCE_DIR}/lib/nowide/include)
 
 add_definitions(-DSYNCCHECK -DUNIT_TEST)
 remove_definitions(-DTHREADPOOL)
@@ -41,20 +40,31 @@ if (NOT ${IPV6_RET} EQUAL 0)
 	message(STATUS "No ipv6 support, disabling test")
 endif (NOT ${IPV6_RET} EQUAL 0)
 
-set(test_Log_sources
-		"${ENGINE_SOURCE_DIR}/System/SafeCStrings.c"
-		"${ENGINE_SOURCE_DIR}/System/Log/Backend.cpp"
-		"${ENGINE_SOURCE_DIR}/System/Log/LogUtil.c"
-		"${ENGINE_SOURCE_DIR}/System/Log/DefaultFilter.cpp"
-		"${ENGINE_SOURCE_DIR}/System/Log/DefaultFormatter.cpp"
-		"${ENGINE_SOURCE_DIR}/System/Log/FramePrefixer.cpp"
-		"${ENGINE_SOURCE_DIR}/System/Log/ConsoleSink.cpp"
-		"${ENGINE_SOURCE_DIR}/System/Log/StreamSink.cpp"
-	)
+set(test_List_sources
+	"${ENGINE_SOURCE_DIR}/System/SafeCStrings.c"
+	"${ENGINE_SOURCE_DIR}/System/Log/Backend.cpp"
+	"${ENGINE_SOURCE_DIR}/System/Log/LogUtil.c"
+	"${ENGINE_SOURCE_DIR}/System/Log/DefaultFilter.cpp"
+	"${ENGINE_SOURCE_DIR}/System/Log/DefaultFormatter.cpp"
+	"${ENGINE_SOURCE_DIR}/System/Log/FramePrefixer.cpp"
+	"${ENGINE_SOURCE_DIR}/System/Log/ConsoleSink.cpp"
+	"${ENGINE_SOURCE_DIR}/System/Log/StreamSink.cpp"
+)
+
+set(test_Catch_main
+	"lib/catch2/catch_main.cpp"
+)
+
+set(test_Common_sources "")
+list(APPEND test_Common_sources
+	${test_List_sources}
+	${test_Catch_main}
+)
 
 set(test_common_libraries
 	Tracy::TracyClient
 	Catch2
+	fmt::fmt
 )
 
 add_custom_target(tests)
@@ -67,7 +77,7 @@ macro (add_spring_test target sources libraries flags)
 	add_dependencies(tests test_${target})
 	add_dependencies(check test_${target})
 	add_dependencies(install-tests test_${target})
-	add_executable(test_${target} EXCLUDE_FROM_ALL ${sources})
+	add_executable(test_${target} ${sources})
 	target_link_libraries(test_${target} ${libraries} ${test_common_libraries})
 	set_target_properties(test_${target} PROPERTIES COMPILE_FLAGS "${flags}")
 	#install(TARGETS test_${target} DESTINATION ${BINDIR})
@@ -93,7 +103,7 @@ if(NOT DEFINED ENV{CI})
 		"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/NullGlobalConfig.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/Nullerrorhandler.cpp"
 		${sources_engine_System_Threading}
-		${test_Log_sources}
+		${test_Common_sources}
 	)
 
 	set(test_libs
@@ -116,11 +126,11 @@ endif()
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/Log/TestILog.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Log/FileSink.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Log/OutputDebugStringSink.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 
 	set(test_libs
-			""
+			nowide::nowide
 		)
 
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
@@ -131,6 +141,7 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/Sync/TestSyncedPrimitive.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Sync/SyncChecker.cpp"
+			${test_Catch_main}
 		)
 
 	set(test_libs
@@ -145,7 +156,7 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/Misc/RectangleOverlapHandler.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Misc/RectangleOverlapHandler.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 
 	set(test_libs
@@ -164,7 +175,7 @@ endif()
 			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
 			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
 			${sources_engine_System_Threading}
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 
 	set(test_libs
@@ -179,12 +190,13 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testMatrix44f.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Matrix44f.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Quaternion.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
 			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
 			${sources_engine_System_Threading}
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 
 	set(test_libs
@@ -199,9 +211,10 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testRotationMatrix44f.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Matrix44f.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Quaternion.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 
 	set(test_libs
@@ -220,7 +233,7 @@ endif()
 			"${ENGINE_SOURCE_DIR}/System/Transform.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
 			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 
 	set(test_libs
@@ -237,7 +250,7 @@ endif()
 			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
 			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
 			${sources_engine_System_Threading}
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 
 	set(test_libs
@@ -255,6 +268,7 @@ endif()
 	set(test_name BitwiseEnum)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/Misc/TestBitwiseEnum.cpp"
+			${test_Catch_main}
 		)
 
 	set(test_libs
@@ -276,17 +290,18 @@ endif()
 	set(test_name FileSystem)
 	set(test_src
 			"${ENGINE_SOURCE_DIR}/System/FileSystem/FileSystem.cpp"
-			"${ENGINE_SOURCE_DIR}/System/FileSystem/FileSystemAbstraction.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Platform/Misc.cpp"
 			"${ENGINE_SOURCE_DIR}/System/CRC.cpp"
+			"${ENGINE_SOURCE_DIR}/System/TimeUtil.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Sync/SHA512.cpp"
 			"${ENGINE_SOURCE_DIR}/System/StringUtil.cpp"
 			"${ENGINE_SOURCE_DIR}/Game/GameVersion.cpp"
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/FileSystem/TestFileSystem.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 	set(test_libs
 			7zip
+			nowide::nowide
 		)
 	if (WIN32)
 		list(APPEND test_src "${ENGINE_SOURCE_DIR}/System/Platform/Win/WinVersion.cpp")
@@ -305,7 +320,7 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/lib/luasocket/TestRestriction.cpp"
 			"${ENGINE_SOURCE_DIR}/lib/luasocket/src/restrictions.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 
 	set(test_libs
@@ -326,7 +341,7 @@ endif()
 				"${ENGINE_SOURCE_DIR}/System/creg/Serializer.cpp"
 				"${ENGINE_SOURCE_DIR}/System/creg/VarTypes.cpp"
 				"${ENGINE_SOURCE_DIR}/System/creg/creg.cpp"
-				${test_Log_sources}
+				${test_Common_sources}
 			)
 
 		set(test_libs
@@ -348,12 +363,13 @@ endif()
 			"${ENGINE_SOURCE_DIR}/System/GlobalConfig.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
 			${sources_engine_System_Threading}
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 
 	set(test_libs
 			${CMAKE_DL_LIBS}
 			unitsync
+			${LZMA_LIBRARY}
 		)
 
 	set(test_flags "-DUNITSYNC")
@@ -372,7 +388,7 @@ endif()
 			"${ENGINE_SOURCE_DIR}/System/Platform/CpuTopologyCommon.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Platform/Threading.cpp"
 			${sources_engine_System_Threading}
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 	if (WIN32)
 		list(APPEND test_src "${ENGINE_SOURCE_DIR}/System/Platform/Win/CpuTopology.cpp")
@@ -397,7 +413,7 @@ endif()
 			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
 			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
 			${sources_engine_System_Threading}
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 
 	set(test_libs
@@ -413,7 +429,7 @@ endif()
 	set(test_name Ellipsoid)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/Misc/testEllipsoid.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 	set(test_libs
 			""
@@ -427,7 +443,7 @@ endif()
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/Misc/testQuadField.cpp"
 			"${ENGINE_SOURCE_DIR}/Sim/Misc/QuadField.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 	set(test_libs
 			""
@@ -443,7 +459,7 @@ endif()
 			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
 			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
 			${sources_engine_System_Threading}
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 	set(test_libs
 			streflop
@@ -453,11 +469,27 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
 
 ################################################################################
+### ClampRad
+	set(test_name ClampRad)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testClampRad.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+	set(test_libs
+			${WINMM_LIBRARY}
+		)
+	set(test_flags "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
+
+################################################################################
 ### EventClient
 	set(test_name EventClient)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/EventClient.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 	set(test_libs
 			""
@@ -476,7 +508,7 @@ endif()
 			"${ENGINE_SOURCE_DIR}/System/creg/SerializeLuaState.cpp"
 			"${ENGINE_SOURCE_DIR}/System/creg/creg.cpp"
 			${sources_engine_System_Threading}
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 	set(test_libs
 			lua
@@ -493,7 +525,7 @@ endif()
 	set(test_name MemPoolTypes)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/other/testMemPoolTypes.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 	set(test_libs
 		smmalloc
@@ -506,7 +538,7 @@ endif()
 	set(test_name benchmarkMemPoolTypes)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/other/benchmarkMemPoolTypes.cpp"
-			${test_Log_sources}
+			${test_Common_sources}
 		)
 	set(test_libs
 			benchmark

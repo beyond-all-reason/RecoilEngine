@@ -129,6 +129,8 @@ public:
 	void UpdateGhostedBuildings();
 	void UpdateUnitIconsByUnitDef(const UnitDef* ud);
 public:
+	void UpdateCurrentUnitIcon(const CUnit* unit);
+
 	const auto& GetUnitDefImages() const { return unitDefImages; }
 	      auto& GetUnitDefImages() { return unitDefImages; }
 
@@ -156,7 +158,6 @@ protected:
 private:
 	void UpdateTempDrawUnits(std::vector<TempDrawUnit>& tempDrawUnits);
 
-	void UpdateCurrentUnitIcon(const CUnit* unit);
 	void UpdateUnitIconState(CUnit* unit);
 	void UpdateUnitIconStateScreen(CUnit* unit);
 	static void UpdateDrawPos(CUnit* unit);

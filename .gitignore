@@ -74,6 +74,7 @@ progress.make
 
 # Windows libraries used by spring when compiling with Visual Studio
 /vclibs
+/vclibs64
 
 # Installer files
 /external
