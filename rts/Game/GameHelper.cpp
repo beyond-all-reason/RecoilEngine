@@ -107,7 +107,7 @@ float CGameHelper::CalcImpulseScale(const DamageArray& damages, const float expD
 void CGameHelper::DoExplosionDamage(
 	CUnit* unit,
 	const CUnit* owner,
-	int ownerTeamID, // REVIEW -- OK
+	int ownerTeamID,
 	const float3& expPos,
 	const float expRadius,
 	const float expSpeed,
