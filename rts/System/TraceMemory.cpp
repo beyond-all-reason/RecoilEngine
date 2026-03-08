@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <tracy/Tracy.hpp>
 
-#include "System/MemoryOverride.h"
+#include "System/MemoryOverride.hpp"
 
 void* operator new(std::size_t count)
 {

@@ -20,7 +20,7 @@
 #include "System/ContainerUtil.h"
 #include "System/SafeUtil.h"
 #include "System/Log/ILog.h"
-#include "System/MemoryOverride.h"
+#include "System/MemoryOverride.hpp"
 #include "System/SpringMath.h"
 #include "System/StringUtil.h"
 #include "System/Threading/ThreadPool.h"

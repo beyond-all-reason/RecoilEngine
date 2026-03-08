@@ -9,7 +9,7 @@
 #include <fmt/printf.h>
 
 #include "System/Log/ILog.h"
-#include "System/MemoryOverride.h"
+#include "System/MemoryOverride.hpp"
 #include "System/SafeUtil.h"
 #include "Rendering/ModelsDataUploader.h"
 #include "Rendering/GlobalRendering.h"

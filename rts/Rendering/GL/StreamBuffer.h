@@ -14,7 +14,7 @@
 #include <stdexcept>
 
 
-#include "System/MemoryOverride.h"
+#include "System/MemoryOverride.hpp"
 #include "System/SpringMath.h"
 #include "System/TypeToStr.h"
 #include "Rendering/GlobalRendering.h"

@@ -1,6 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "MemoryOverride.h"
+#include "MemoryOverride.hpp"
 
 #ifdef USE_MIMALLOC
 #include <mimalloc.h>
