@@ -21,7 +21,6 @@
 #include "../tools/pr-downloader/src/pr-downloader.h"
 #include "fmt/format.h"
 
-#include "System/MemoryOverride.h"
 #include "System/Misc/TracyDefs.h"
 #include <tracy/TracyLua.hpp>
 
@@ -934,7 +933,7 @@ int LuaVFS::CalculateHash(lua_State* L)
 		case HASHTYPE_MD5: {
 			// base64(MD5); pr-downloader only accepts type=0
 			lua_pushstring(L, hash = CalcHash(sstr, slen, HASHTYPE_MD5));
-			recoil::free((char*) hash);
+			free((char*) hash);  // CalcHash in pr-downloader uses system malloc, cannot use recoil::free((char*) hash);
 		} break;
 		case HASHTYPE_SHA: {
 			sha512::hex_digest hexHash;

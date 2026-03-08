@@ -1,5 +1,7 @@
 
-if (TRACY_PROFILE_MEMORY)
+# When USE_MIMALLOC is enabled, MemoryOverride.cpp handles operator new/delete with Tracy tracking.
+# Only compile TraceMemory.cpp when Tracy memory profiling is enabled but mimalloc is not used.
+if (TRACY_PROFILE_MEMORY AND NOT USE_MIMALLOC)
 	set(memoryProfileSource "${CMAKE_CURRENT_SOURCE_DIR}/TraceMemory.cpp")
 endif()
 

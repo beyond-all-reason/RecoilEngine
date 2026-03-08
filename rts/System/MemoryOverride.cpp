@@ -15,7 +15,12 @@
 #endif
 #endif
 
+#ifdef TRACY_ENABLE
+#include <tracy/Tracy.hpp>
+#endif
+
 #include <algorithm>
+#include <cassert>
 #include <new>
 
 // ----------------------------------------------------------------------------
@@ -63,6 +68,9 @@ void* aligned_alloc(size_t alignment, size_t size)
 	#if defined(_WIN32) || defined(__MINGW32__)
 		return _aligned_malloc(size, alignment);
 	#else
+		// std::aligned_alloc requires size to be a multiple of alignment (C11/C++17);
+		// unlike posix_memalign, passing a non-multiple is undefined behaviour
+		assert(size % alignment == 0);
 		return std::aligned_alloc(alignment, size);
 	#endif
 #endif
@@ -129,6 +137,7 @@ size_t usable_size(void* ptr)
 // Custom operator new/delete overrides using mimalloc
 // This file should be compiled only once into the engine
 // Based on mimalloc-new-delete.h from mimalloc distribution
+// When TRACY_ENABLE is defined, also tracks allocations with Tracy
 // ----------------------------------------------------------------------------
 
 #ifdef USE_MIMALLOC
@@ -136,58 +145,92 @@ size_t usable_size(void* ptr)
 // C++98 delete operators
 void operator delete(void* p) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free(p);
 }
 
 void operator delete[](void* p) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free(p);
 }
 
 // C++98 no-throw delete operators
 void operator delete(void* p, const std::nothrow_t&) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free(p);
 }
 
 void operator delete[](void* p, const std::nothrow_t&) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free(p);
 }
 
 // C++98 new operators
 void* operator new(std::size_t n) noexcept(false)
 {
-	return mi_new(n);
+	void* p = mi_new(n);
+#ifdef TRACY_ENABLE
+	TracyAlloc(p, n);
+#endif
+	return p;
 }
 
 void* operator new[](std::size_t n) noexcept(false)
 {
-	return mi_new(n);
+	void* p = mi_new(n);
+#ifdef TRACY_ENABLE
+	TracyAlloc(p, n);
+#endif
+	return p;
 }
 
 // C++98 no-throw new operators
 void* operator new(std::size_t n, const std::nothrow_t& tag) noexcept
 {
 	(void)(tag);
-	return mi_new_nothrow(n);
+	void* p = mi_new_nothrow(n);
+#ifdef TRACY_ENABLE
+	TracyAlloc(p, n);
+#endif
+	return p;
 }
 
 void* operator new[](std::size_t n, const std::nothrow_t& tag) noexcept
 {
 	(void)(tag);
-	return mi_new_nothrow(n);
+	void* p = mi_new_nothrow(n);
+#ifdef TRACY_ENABLE
+	TracyAlloc(p, n);
+#endif
+	return p;
 }
 
 // C++14 sized deallocation operators
 #if (__cplusplus >= 201402L || _MSC_VER >= 1916)
 void operator delete(void* p, std::size_t n) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free_size(p, n);
 }
 
 void operator delete[](void* p, std::size_t n) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free_size(p, n);
 }
 #endif
@@ -196,52 +239,86 @@ void operator delete[](void* p, std::size_t n) noexcept
 #if (__cplusplus > 201402L || defined(__cpp_aligned_new))
 void operator delete(void* p, std::align_val_t al) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free_aligned(p, static_cast<size_t>(al));
 }
 
 void operator delete[](void* p, std::align_val_t al) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free_aligned(p, static_cast<size_t>(al));
 }
 
 void operator delete(void* p, std::size_t n, std::align_val_t al) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free_size_aligned(p, n, static_cast<size_t>(al));
 }
 
 void operator delete[](void* p, std::size_t n, std::align_val_t al) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free_size_aligned(p, n, static_cast<size_t>(al));
 }
 
 void operator delete(void* p, std::align_val_t al, const std::nothrow_t&) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free_aligned(p, static_cast<size_t>(al));
 }
 
 void operator delete[](void* p, std::align_val_t al, const std::nothrow_t&) noexcept
 {
+#ifdef TRACY_ENABLE
+	TracyFree(p);
+#endif
 	mi_free_aligned(p, static_cast<size_t>(al));
 }
 
 void* operator new(std::size_t n, std::align_val_t al) noexcept(false)
 {
-	return mi_new_aligned(n, static_cast<size_t>(al));
+	void* p = mi_new_aligned(n, static_cast<size_t>(al));
+#ifdef TRACY_ENABLE
+	TracyAlloc(p, n);
+#endif
+	return p;
 }
 
 void* operator new[](std::size_t n, std::align_val_t al) noexcept(false)
 {
-	return mi_new_aligned(n, static_cast<size_t>(al));
+	void* p = mi_new_aligned(n, static_cast<size_t>(al));
+#ifdef TRACY_ENABLE
+	TracyAlloc(p, n);
+#endif
+	return p;
 }
 
 void* operator new(std::size_t n, std::align_val_t al, const std::nothrow_t&) noexcept
 {
-	return mi_new_aligned_nothrow(n, static_cast<size_t>(al));
+	void* p = mi_new_aligned_nothrow(n, static_cast<size_t>(al));
+#ifdef TRACY_ENABLE
+	TracyAlloc(p, n);
+#endif
+	return p;
 }
 
 void* operator new[](std::size_t n, std::align_val_t al, const std::nothrow_t&) noexcept
 {
-	return mi_new_aligned_nothrow(n, static_cast<size_t>(al));
+	void* p = mi_new_aligned_nothrow(n, static_cast<size_t>(al));
+#ifdef TRACY_ENABLE
+	TracyAlloc(p, n);
+#endif
+	return p;
 }
 #endif
 
