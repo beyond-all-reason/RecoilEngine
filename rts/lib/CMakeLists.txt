@@ -15,6 +15,16 @@ if (USE_MIMALLOC)
 	set(MI_BUILD_SHARED OFF CACHE BOOL "Disable mimalloc shared library" FORCE)
 	set(MI_BUILD_STATIC ON CACHE BOOL "Enable mimalloc static library" FORCE)
 
+	# Integrate ASAN/Valgrind tracking with mimalloc
+	# When the engine is built with USE_ASAN, enable MI_TRACK_ASAN for mimalloc
+	# When the engine is built with USE_VALGRIND, enable MI_TRACK_VALGRIND for mimalloc
+	if (USE_ASAN)
+		set(MI_TRACK_ASAN ON CACHE BOOL "Enable mimalloc ASAN support" FORCE)
+	endif()
+	if (VALGRIND_FOUND)
+		set(MI_TRACK_VALGRIND ON CACHE BOOL "Enable mimalloc Valgrind support" FORCE)
+	endif()
+
 	if(MINGW)
 		# Temporarily remove _WIN32_WINNT to avoid redefinition warning with mimalloc
 		# mimalloc defines _WIN32_WINNT=0x600 for MinGW in its CMakeLists.txt
