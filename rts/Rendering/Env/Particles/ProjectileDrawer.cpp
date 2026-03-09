@@ -970,9 +970,6 @@ void CProjectileDrawer::DrawProjectileModel(const CProjectile* p)
 			else {
 				// Apply the rotation+scale from bposeTransform (but NOT translation, which is the
 				// piece's model-space offset and is irrelevant for a standalone flying piece).
-				// Vertices are stored in piece-local space (bposeTransform.Invert() was applied during
-				// model loading), so without this the baked coordinate-system rotation and scale are lost,
-				// causing pieces to appear at the wrong size/orientation (e.g. 4x bigger with scale=0.25).
 				{
 					const auto& bpose = pp->omp->bposeTransform;
 					const Transform bposeNoTrans{ bpose.r, ZeroVector, bpose.s };

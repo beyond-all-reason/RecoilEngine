@@ -36,8 +36,6 @@ void S3DModelPiece::DrawStaticLegacyRecImpl(const float3& rootT) const
 	//   rotation + scale  come from this piece's own accumulated bposeTransform
 	//   translation       is the offset from the root piece in model space (bpose.t - rootT),
 	//                     so the chunk flies as a connected rigid body centered at drawPos.
-	// Vertices are stored in piece-local space (bposeTransform.Invert() was applied during
-	// model loading), so the bpose rotation+scale must be re-applied here.
 	const CMatrix44f relMat = Transform(bposeTransform.r, bposeTransform.t - rootT, bposeTransform.s).ToMatrix();
 	glPushMatrix();
 	glMultMatrixf(relMat);
