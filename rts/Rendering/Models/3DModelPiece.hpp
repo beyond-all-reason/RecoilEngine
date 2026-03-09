@@ -95,6 +95,7 @@ public:
 	bool HasBackedTra() const { return bakedTransform.has_value(); }
 private:
 	void CreateShatterPiecesVariation(int num);
+	void DrawStaticLegacyRecImpl(const float3& rootT) const;
 public:
 	std::string name;
 	std::vector<S3DModelPiece*> children;
