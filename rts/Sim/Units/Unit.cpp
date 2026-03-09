@@ -479,7 +479,7 @@ void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, i
 	isDead = true;
 
 	// release attached units
-	ReleaseTransportees(attacker, selfDestruct, reclaimed);
+	ReleaseTransportees(attacker, selfDestruct, reclaimed, attackerTeamID);
 
 	// pre-destruction event; unit may be kept around for its death sequence
 	eventHandler.UnitDestroyed(this, attacker, weaponDefID, attackerTeamID);
@@ -758,7 +758,7 @@ void CUnit::UpdateTransportees()
 	}
 }
 
-void CUnit::ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaimed)
+void CUnit::ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaimed, int attackerTeamID)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	for (TransportedUnit& tu: transportedUnits) {
@@ -775,9 +775,9 @@ void CUnit::ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaim
 		if (!unitDef->releaseHeld) {
 			// we don't want transportees to leave a corpse
 			if (!selfDestruct)
-				transportee->DoDamage(DamageArray(1e6f), ZeroVector, nullptr, -CSolidObject::DAMAGE_TRANSPORT_KILLED, -1);
+				transportee->DoDamage(DamageArray(1e6f), ZeroVector, nullptr, -CSolidObject::DAMAGE_TRANSPORT_KILLED, -1, attackerTeamID);
 
-			transportee->KillUnit(attacker, selfDestruct, reclaimed, -CSolidObject::DAMAGE_TRANSPORT_KILLED);
+			transportee->KillUnit(attacker, selfDestruct, reclaimed, -CSolidObject::DAMAGE_TRANSPORT_KILLED, attackerTeamID);
 		} else {
 			// NOTE: game's responsibility to deal with edge-cases now
 			transportee->Move(transportee->pos.cClampInBounds(), false);

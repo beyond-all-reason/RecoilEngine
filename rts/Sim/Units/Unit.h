@@ -132,7 +132,7 @@ public:
 	void UpdateWind(float x, float z, float strength);
 
 	void UpdateTransportees();
-	void ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaimed);
+	void ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaimed, int attackerTeamID);
 	void TransporteeKilled(const CObject* o);
 
 	void AddExperience(float exp);
