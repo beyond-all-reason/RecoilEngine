@@ -464,6 +464,9 @@ void CUnit::FinishedBuilding(bool postInit)
 void CUnit::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID, int attackerTeamID)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (attacker != nullptr && attackerTeamID == -1)
+		attackerTeamID = attacker->team;
+
 	if (IsCrashing() && !beingBuilt)
 		return;
 
@@ -473,6 +476,9 @@ void CUnit::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int wea
 void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID, int attackerTeamID)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (attacker != nullptr && attackerTeamID == -1)
+		attackerTeamID = attacker->team;
+
 	if (isDead)
 		return;
 
