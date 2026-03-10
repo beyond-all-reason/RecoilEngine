@@ -32,11 +32,19 @@ list(APPEND engineDedicatedLibraries ${LZMA_LIBRARY})
 #nowide for Windows utf-8 abstraction layer
 list(APPEND engineDedicatedLibraries "nowide::nowide")
 
+# fmt library
+list(APPEND engineDedicatedLibraries "fmt::fmt")
+
 ### base64 from pr-downloader
 list(APPEND engineDedicatedLibraries "prd::base64")
 
 ### smmalloc
 list(APPEND engineDedicatedLibraries "smmalloc")
+
+### mimalloc
+if (USE_MIMALLOC)
+    list(APPEND engineDedicatedLibraries mimalloc-static)
+endif()
 
 if (WIN32)
 	list(APPEND engineDedicatedLibraries ${WINMM_LIBRARY})
@@ -126,6 +134,7 @@ set(system_files
 	${ENGINE_SRC_ROOT_DIR}/System/StringUtil.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/float3.cpp
 	${ENGINE_SRC_ROOT_DIR}/System/float4.cpp
+	${ENGINE_SRC_ROOT_DIR}/System/MemoryOverride.cpp
 	)
 if    (WIN32)
 	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/Win/Hardware.cpp)
@@ -177,6 +186,13 @@ add_executable(engine-dedicated
 		main.cpp
 	)
 target_link_libraries(engine-dedicated ${engineDedicatedLibraries})
+
+# Export symbols for plugin access (replaces CMP0065 OLD behavior)
+set_target_properties(engine-dedicated PROPERTIES ENABLE_EXPORTS TRUE)
+
+if(MSVC)
+    target_link_libraries(engine-dedicated engine-natvis)
+endif()
 if    (MINGW)
 	target_link_libraries(engine-dedicated ${WS2_32_LIBRARY} ${IMAGEHLP_LIBRARY} ${IPHLPAPI_LIBRARY} ${WINMM_LIBRARY})
 endif (MINGW)

@@ -43,7 +43,8 @@ CZipArchive::CZipArchive(const std::string& archiveName)
 		unz_file_info info;
 		char fName[512];
 
-		unzGetCurrentFileInfo(zip, &info, fName, sizeof(fName), nullptr, 0, nullptr, 0);
+		if (unzGetCurrentFileInfo(zip, &info, fName, sizeof(fName), nullptr, 0, nullptr, 0) != UNZ_OK)
+			continue;
 
 		if (fName[0] == 0)
 			continue;

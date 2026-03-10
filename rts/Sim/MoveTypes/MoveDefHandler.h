@@ -86,7 +86,7 @@ struct MoveDef {
 		const MoveTypes::CheckCollisionQuery* collider,
 		const float3 testMovePos,
 		int magicNum,
-		int thread
+		int thread = 0
 	) const;
 
 	bool IsInExitOnly(float3 testMovePos) const;

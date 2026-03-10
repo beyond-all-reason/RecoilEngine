@@ -64,6 +64,7 @@ list(APPEND test_Common_sources
 set(test_common_libraries
 	Tracy::TracyClient
 	Catch2
+	fmt::fmt
 )
 
 add_custom_target(tests)
@@ -465,6 +466,22 @@ endif()
 			${WINMM_LIBRARY}
 		)
 	set(test_flags "-DNOT_USING_CREG -DBUILDING_AI")
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
+
+################################################################################
+### ClampRad
+	set(test_name ClampRad)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testClampRad.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+	set(test_libs
+			${WINMM_LIBRARY}
+		)
+	set(test_flags "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
 
 ################################################################################

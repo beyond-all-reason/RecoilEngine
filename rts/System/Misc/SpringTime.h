@@ -5,17 +5,12 @@
 
 #include "System/creg/creg_cond.h"
 
-#include <cinttypes>
+#include <cstdint>
 #include <cassert>
 
 #undef gt
 #include <chrono>
 namespace chrono { using namespace std::chrono; }
-
-
-
-
-
 
 namespace spring_clock {
 	// NOTE:
@@ -24,47 +19,44 @@ namespace spring_clock {
 	//   ToSecs is inaccurate in that case
 	//   these cannot be written as integer divisions or tests
 	//   will fail because of intermediate conversions to FP32
-	template<typename T> static T ToSecs     (const std::int64_t ns) { return (ns * 1e-9); }
-	template<typename T> static T ToMilliSecs(const std::int64_t ns) { return (ns * 1e-6); }
-	template<typename T> static T ToMicroSecs(const std::int64_t ns) { return (ns * 1e-3); }
-	template<typename T> static T ToNanoSecs (const std::int64_t ns) { return (ns       ); }
+	template<typename T> static T ToSecs     (int64_t ns) { return static_cast<T>(ns * 1e-9); }
+	template<typename T> static T ToMilliSecs(int64_t ns) { return static_cast<T>(ns * 1e-6); }
+	template<typename T> static T ToMicroSecs(int64_t ns) { return static_cast<T>(ns * 1e-3); }
+	template<typename T> static T ToNanoSecs (int64_t ns) { return static_cast<T>(ns       ); }
 
 	// specializations
-	template<> std::int64_t ToSecs     <std::int64_t>(const std::int64_t ns) { return (ns / std::int64_t(1e9)); }
-	template<> std::int64_t ToMilliSecs<std::int64_t>(const std::int64_t ns) { return (ns / std::int64_t(1e6)); }
-	template<> std::int64_t ToMicroSecs<std::int64_t>(const std::int64_t ns) { return (ns / std::int64_t(1e3)); }
+	template<> int64_t ToSecs     <int64_t>(int64_t ns) { return (ns / int64_t(1e9)); }
+	template<> int64_t ToMilliSecs<int64_t>(int64_t ns) { return (ns / int64_t(1e6)); }
+	template<> int64_t ToMicroSecs<int64_t>(int64_t ns) { return (ns / int64_t(1e3)); }
 
-	template<typename T> static std::int64_t FromSecs     (const T  s) { return ( s * std::int64_t(1e9)); }
-	template<typename T> static std::int64_t FromMilliSecs(const T ms) { return (ms * std::int64_t(1e6)); }
-	template<typename T> static std::int64_t FromMicroSecs(const T us) { return (us * std::int64_t(1e3)); }
-	template<typename T> static std::int64_t FromNanoSecs (const T ns) { return (ns                      ); }
+	template<typename T> static int64_t FromSecs     (const T  s) { return ( s * int64_t(1e9)); }
+	template<typename T> static int64_t FromMilliSecs(const T ms) { return (ms * int64_t(1e6)); }
+	template<typename T> static int64_t FromMicroSecs(const T us) { return (us * int64_t(1e3)); }
+	template<typename T> static int64_t FromNanoSecs (const T ns) { return static_cast<int64_t>(ns); }
 
 	void PushTickRate(bool hres = false);
 	void PopTickRate();
 
 	// number of ticks since clock epoch
-	std::int64_t GetTicks();
+	int64_t GetTicks();
 	const char* GetName();
 }
-
-
 
 // class Timer
 struct spring_time {
 private:
 	CR_DECLARE_STRUCT(spring_time)
-
-	typedef std::int64_t int64;
-
 public:
-	spring_time(): x(0) {}
+	spring_time()
+		: x(0)
+	{}
 	template<typename T> explicit spring_time(const T millis): x(spring_clock::FromMilliSecs(millis)) {}
 
 	spring_time& operator+=(const spring_time st)       { x += st.x; return *this; }
 	spring_time& operator-=(const spring_time st)       { x -= st.x; return *this; }
 	spring_time& operator%=(const spring_time mt)       { x %= mt.x; return *this; }
-	spring_time& operator*=(const int n)                { x *= n; return *this; }
-	spring_time& operator*=(const float n)              { x *= n; return *this; }
+	spring_time& operator*=(int n)                      { x *= n; return *this; }
+	spring_time& operator*=(float n)                    { x *= n; return *this; }
 	spring_time   operator-(const spring_time st) const { return spring_time_native(x - st.x); }
 	spring_time   operator+(const spring_time st) const { return spring_time_native(x + st.x); }
 	spring_time   operator%(const spring_time mt) const { return spring_time_native(x % mt.x); }
@@ -77,10 +69,10 @@ public:
 	spring_time   operator*(const float n) const { return spring_time_native(x * n); }
 
 	// short-hands
-	int64 toSecsi()        const { return (toSecs     <int64>()); }
-	int64 toMilliSecsi()   const { return (toMilliSecs<int64>()); }
-	int64 toMicroSecsi()   const { return (toMicroSecs<int64>()); }
-	int64 toNanoSecsi()    const { return (toNanoSecs <int64>()); }
+	int64_t toSecsi()        const { return (toSecs     <int64_t>()); }
+	int64_t toMilliSecsi()   const { return (toMilliSecs<int64_t>()); }
+	int64_t toMicroSecsi()   const { return (toMicroSecs<int64_t>()); }
+	int64_t toNanoSecsi()    const { return (toNanoSecs <int64_t>()); }
 
 	float toSecsf()      const { return (toSecs     <float>()); }
 	float toMilliSecsf() const { return (toMilliSecs<float>()); }
@@ -107,23 +99,22 @@ public:
 
 	static void setstarttime(const spring_time t) { assert(xs == 0); xs = t.x; assert(xs != 0); }
 
-	static spring_time fromNanoSecs (const int64 ns) { return spring_time_native(spring_clock::FromNanoSecs( ns)); }
-	static spring_time fromMicroSecs(const int64 us) { return spring_time_native(spring_clock::FromMicroSecs(us)); }
-	static spring_time fromMilliSecs(const int64 ms) { return spring_time_native(spring_clock::FromMilliSecs(ms)); }
-	static spring_time fromSecs     (const int64  s) { return spring_time_native(spring_clock::FromSecs     ( s)); }
+	static spring_time fromNanoSecs (int64_t ns) { return spring_time_native(spring_clock::FromNanoSecs( ns)); }
+	static spring_time fromMicroSecs(int64_t us) { return spring_time_native(spring_clock::FromMicroSecs(us)); }
+	static spring_time fromMilliSecs(int64_t ms) { return spring_time_native(spring_clock::FromMilliSecs(ms)); }
+	static spring_time fromSecs     (int64_t  s) { return spring_time_native(spring_clock::FromSecs     ( s)); }
 
 private:
 	// convert integer to spring_time (n is interpreted as number of nanoseconds)
-	static spring_time spring_time_native(const int64 n) { spring_time s; s.x = n; return s; }
+	static spring_time spring_time_native(const int64_t n) { spring_time s; s.x = n; return s; }
 	void Serialize(creg::ISerializer* s);
 
 private:
-	int64 x;
-
+	int64_t x;
 	// initial time (the "Spring epoch", program start)
 	// all other time-points *must* be larger than this
 	// if the clock is monotonically increasing
-	static int64 xs;
+	static int64_t xs;
 };
 
 
@@ -143,11 +134,7 @@ static const spring_time spring_nulltime(0);
 #define spring_msecs(msecs) spring_time(msecs)
 #define spring_secs(secs) spring_time((secs) * 1000)
 
-
-
-
-
-#define spring_difftime(now, before)  (now - before)
+#define spring_difftime(now, before)   (now - before)
 #define spring_diffsecs(now, before)  ((now - before).toSecsi())
 #define spring_diffmsecs(now, before) ((now - before).toMilliSecsi())
 

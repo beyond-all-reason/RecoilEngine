@@ -20,7 +20,7 @@
 #include "System/ContainerUtil.h"
 #include "System/SafeUtil.h"
 #include "System/Log/ILog.h"
-#include "System/SpringMem.h"
+#include "System/MemoryOverride.hpp"
 #include "System/SpringMath.h"
 #include "System/StringUtil.h"
 #include "System/Threading/ThreadPool.h"
@@ -103,7 +103,7 @@ private:
 	      uint8_t* Base()       { return memArray.data(); }
 public:
 	~TexMemPool() override {
-		spring::FreeAlignedMemory(memArray.data());
+		recoil::aligned_free(memArray.data());
 		memArray = {};
 		freeList = {};
 	}
@@ -222,7 +222,7 @@ public:
 
 			const size_t oldSize = Size();
 			memArray = std::span(
-				reinterpret_cast<uint8_t*>(spring::ReallocateAlignedMemory(memArray.data(), size, 64)),
+				reinterpret_cast<uint8_t*>(recoil::aligned_realloc(memArray.data(), oldSize, size, 64)),
 				size
 			);
 			std::fill(memArray.begin() + oldSize, memArray.end(), 0);
@@ -233,7 +233,7 @@ public:
 
 			const size_t oldSize = Size();
 			memArray = std::span(
-				reinterpret_cast<uint8_t*>(spring::ReallocateAlignedMemory(memArray.data(), size, 64)),
+				reinterpret_cast<uint8_t*>(recoil::aligned_realloc(memArray.data(), oldSize, size, 64)),
 				size
 			);
 			std::fill(memArray.begin() + oldSize, memArray.end(), 0);
@@ -328,7 +328,7 @@ public:
 		numAllocs += 1;
 		allocSize += size;
 
-		return static_cast<uint8_t*>(spring::AllocateAlignedMemory(size, sizeof(uint64_t)));
+		return static_cast<uint8_t*>(recoil::aligned_alloc(sizeof(uint64_t), size));
 	}
 	void FreeRaw(uint8_t* mem, size_t size) override
 	{
@@ -339,7 +339,7 @@ public:
 		freeSize += size;
 		allocSize -= size;
 
-		spring::FreeAlignedMemory(mem);
+		recoil::aligned_free(mem);
 	}
 	void Resize(size_t size) override {}
 	bool Defrag() override { return true; }

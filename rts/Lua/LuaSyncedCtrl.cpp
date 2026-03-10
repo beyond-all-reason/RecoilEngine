@@ -125,17 +125,6 @@ Synced Lua API
 
 /******************************************************************************/
 
-inline void LuaSyncedCtrl::CheckAllowGameChanges(lua_State* L)
-{
-	if (!CLuaHandle::GetHandleAllowChanges(L)) {
-		luaL_error(L, "Unsafe attempt to change game state");
-	}
-}
-
-
-/******************************************************************************/
-/******************************************************************************/
-
 bool LuaSyncedCtrl::PushEntries(lua_State* L)
 {
 	{
@@ -1725,7 +1714,6 @@ static inline void ParseCobArgs(
  */
 int LuaSyncedCtrl::CallCOBScript(lua_State* L)
 {
-//FIXME?	CheckAllowGameChanges(L);
 	const int numArgs = lua_gettop(L);
 
 	if (numArgs < 3)
@@ -1835,8 +1823,6 @@ int LuaSyncedCtrl::GetCOBScriptID(lua_State* L)
  */
 int LuaSyncedCtrl::CreateUnit(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	if (inCreateUnit >= MAX_CMD_RECURSION_DEPTH) {
 		luaL_error(L, "[%s()]: recursion is not permitted, max depth: %d", __func__, MAX_CMD_RECURSION_DEPTH);
 		return 0;
@@ -1929,7 +1915,6 @@ int LuaSyncedCtrl::CreateUnit(lua_State* L)
  */
 int LuaSyncedCtrl::DestroyUnit(lua_State* L)
 {
-	CheckAllowGameChanges(L); // FIXME -- recursion protection
 	CUnit* unit = ParseUnit(L, __func__, 1);
 
 	if (unit == nullptr)
@@ -1972,7 +1957,6 @@ int LuaSyncedCtrl::DestroyUnit(lua_State* L)
  */
 int LuaSyncedCtrl::TransferUnit(lua_State* L)
 {
-	CheckAllowGameChanges(L);
 	CUnit* unit = ParseUnit(L, __func__, 1);
 
 	if (unit == nullptr)
@@ -2037,8 +2021,6 @@ int LuaSyncedCtrl::TransferUnit(lua_State* L)
  */
 int LuaSyncedCtrl::TransferTeamMaxUnits(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	const int fromTeamID = luaL_checkint(L, 1);
 	if (!teamHandler.IsValidTeam(fromTeamID))
 		return 0;
@@ -3979,7 +3961,6 @@ int LuaSyncedCtrl::SetUnitPosErrorParams(lua_State* L)
  */
 int LuaSyncedCtrl::SetUnitMoveGoal(lua_State* L)
 {
-	CheckAllowGameChanges(L);
 	CUnit* unit = ParseUnit(L, __func__, 1);
 
 	if (unit == nullptr)
@@ -4369,8 +4350,6 @@ static std::optional<std::tuple<float, int, CUnit*, int, float3> > ParseDamagePa
  */
 int LuaSyncedCtrl::AddFeatureDamage(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	CFeature* feature = ParseFeature(L, __func__, 1);
 
 	if (feature == nullptr)
@@ -4671,8 +4650,6 @@ int LuaSyncedCtrl::RemoveGrass(lua_State* L)
  */
 int LuaSyncedCtrl::CreateFeature(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	const FeatureDef* featureDef = nullptr;
 
 	if (lua_israwstring(L, 1)) {
@@ -4765,7 +4742,6 @@ void LuaSyncedCtrl::DestroyFeatureCommon(lua_State* L, CFeature* feature)
  */
 int LuaSyncedCtrl::DestroyFeature(lua_State* L)
 {
-	CheckAllowGameChanges(L);
 	CFeature* feature = ParseFeature(L, __func__, 1);
 	if (feature == nullptr)
 		return 0;
@@ -4785,7 +4761,6 @@ int LuaSyncedCtrl::DestroyFeature(lua_State* L)
  */
 int LuaSyncedCtrl::TransferFeature(lua_State* L)
 {
-	CheckAllowGameChanges(L);
 	CFeature* feature = ParseFeature(L, __func__, 1);
 	if (feature == nullptr)
 		return 0;
@@ -5446,7 +5421,6 @@ int LuaSyncedCtrl::SetFeatureSmokeTime(lua_State* L)
  */
 int LuaSyncedCtrl::CreateUnitWreck(lua_State* L)
 {
-	CheckAllowGameChanges(L);
 	CUnit* unit = ParseUnit(L, __func__, 1);
 
 	if (unit == nullptr)
@@ -5478,7 +5452,6 @@ int LuaSyncedCtrl::CreateUnitWreck(lua_State* L)
 
 int LuaSyncedCtrl::CreateFeatureWreck(lua_State* L)
 {
-	CheckAllowGameChanges(L);
 	CFeature* feature = ParseFeature(L, __func__, 1);
 
 	if (feature == nullptr)
@@ -5917,8 +5890,6 @@ int LuaSyncedCtrl::SetProjectileCEG(lua_State* L)
  */
 int LuaSyncedCtrl::UnitFinishCommand(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	CUnit* unit = ParseUnit(L, __func__, 1);
 	if (unit == nullptr)
 		luaL_error(L, "[%s] invalid unitID", __func__);
@@ -5942,8 +5913,6 @@ int LuaSyncedCtrl::UnitFinishCommand(lua_State* L)
  */
 int LuaSyncedCtrl::GiveOrderToUnit(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	CUnit* unit = ParseUnit(L, __func__, 1);
 
 	if (unit == nullptr)
@@ -5981,8 +5950,6 @@ int LuaSyncedCtrl::GiveOrderToUnit(lua_State* L)
  */
 int LuaSyncedCtrl::GiveOrderToUnitMap(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	// units
 	std::vector<CUnit*> units;
 
@@ -6025,8 +5992,6 @@ int LuaSyncedCtrl::GiveOrderToUnitMap(lua_State* L)
  */
 int LuaSyncedCtrl::GiveOrderToUnitArray(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	// units
 	std::vector<CUnit*> units;
 
@@ -6068,8 +6033,6 @@ int LuaSyncedCtrl::GiveOrderToUnitArray(lua_State* L)
  */
 int LuaSyncedCtrl::GiveOrderArrayToUnit(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	CUnit* const unit = ParseUnit(L, __func__, 1);
 	if (unit == nullptr)
 		luaL_error(L, "[%s] invalid unitID", __func__);
@@ -6108,8 +6071,6 @@ int LuaSyncedCtrl::GiveOrderArrayToUnit(lua_State* L)
  */
 int LuaSyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	std::vector<CUnit*> units;
 	std::vector<Command> commands;
 
@@ -6157,8 +6118,6 @@ int LuaSyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
  */
 int LuaSyncedCtrl::GiveOrderArrayToUnitArray(lua_State* L)
 {
-	CheckAllowGameChanges(L);
-
 	// units
 	std::vector<CUnit*> units;
 	std::vector<Command> commands;

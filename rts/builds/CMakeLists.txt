@@ -93,6 +93,11 @@ if    (WIN32)
 	endif()
 endif (WIN32)
 
+if (MSVC)
+	add_library(engine-natvis INTERFACE)
+	target_sources(engine-natvis INTERFACE ${RECOIL_NATVIS_FILES})
+endif()
+
 # the build targets
 add_engine_build(legacy)
 add_engine_build(dedicated)

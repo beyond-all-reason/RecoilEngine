@@ -4,7 +4,7 @@
 
 #include "Backend.h"
 #include "LogUtil.h"
-#include "lib/fmt/format.h"
+#include <fmt/format.h>
 
 #include <algorithm>
 #include "System/Misc/TracyDefs.h"

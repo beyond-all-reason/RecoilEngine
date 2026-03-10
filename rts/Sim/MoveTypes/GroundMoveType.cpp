@@ -2054,7 +2054,7 @@ float CGroundMoveType::Distance2D(CSolidObject* object1, CSolidObject* object2, 
 unsigned int CGroundMoveType::GetNewPath()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	assert(!ThreadPool::inMultiThreadedSection);
+	assert(!ThreadPool::IsInMultiThreadedSection());
 	unsigned int newPathID = 0;
 
 	#ifdef PATHING_DEBUG
@@ -2106,7 +2106,7 @@ unsigned int CGroundMoveType::GetNewPath()
 void CGroundMoveType::ReRequestPath(bool forceRequest) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (forceRequest) {
-		assert(!ThreadPool::inMultiThreadedSection);
+		assert(!ThreadPool::IsInMultiThreadedSection());
 		// StopEngine(false);
 		StartEngine(false);
 		wantRepath = false;
@@ -2437,7 +2437,7 @@ void CGroundMoveType::StartEngine(bool callScript) {
 
 void CGroundMoveType::StopEngine(bool callScript, bool hardStop) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	assert(!ThreadPool::inMultiThreadedSection);
+	assert(!ThreadPool::IsInMultiThreadedSection());
 	if (pathID != 0 || nextPathId != 0) {
 		if (pathID != 0) {
 			pathManager->DeletePath(pathID);
@@ -2489,7 +2489,7 @@ No more trials will be done before a new goal is given.
 void CGroundMoveType::Fail(bool callScript)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	assert(!ThreadPool::inMultiThreadedSection);
+	assert(!ThreadPool::IsInMultiThreadedSection());
 	LOG_L(L_DEBUG, "[%s] unit %i failed", __func__, owner->id);
 
 	StopEngine(callScript);

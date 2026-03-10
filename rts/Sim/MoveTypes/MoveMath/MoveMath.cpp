@@ -345,16 +345,8 @@ CMoveMath::BlockType CMoveMath::RangeIsBlocked(int xmin, int xmax, int zmin, int
 	xmax = std::min(xmax, mapDims.mapx - 1);
 	zmax = std::min(zmax, mapDims.mapy - 1);
 
-	BlockType ret = BLOCK_NONE;
-	if (ThreadPool::inMultiThreadedSection) {
-		const int tempNum = gs->GetMtTempNum(thread);
-		ret = CMoveMath::RangeIsBlockedMt(xmin, xmax, zmin, zmax, collider, thread, tempNum);
-	} else {
-		const int tempNum = gs->GetTempNum();
-		ret = CMoveMath::RangeIsBlockedSt(xmin, xmax, zmin, zmax, collider, tempNum);
-	}
-
-	return ret;
+	const int tempNum = gs->GetMtTempNum(thread);
+	return CMoveMath::RangeIsBlockedMt(xmin, xmax, zmin, zmax, collider, tempNum, thread);
 }
 
 CMoveMath::BlockType CMoveMath::RangeIsBlockedTempNum(int xmin, int xmax, int zmin, int zmax, const MoveTypes::CheckCollisionQuery* collider, int tempNum, int thread)
@@ -365,51 +357,11 @@ CMoveMath::BlockType CMoveMath::RangeIsBlockedTempNum(int xmin, int xmax, int zm
 	xmax = std::min(xmax, mapDims.mapx - 1);
 	zmax = std::min(zmax, mapDims.mapy - 1);
 
-	BlockType ret = BLOCK_NONE;
-	if (ThreadPool::inMultiThreadedSection) {
-		const int tempNum = gs->GetMtTempNum(thread);
-		ret = CMoveMath::RangeIsBlockedHashedMt(xmin, xmax, zmin, zmax, collider, tempNum, thread);
-	} else {
-		const int tempNum = gs->GetTempNum();
-		ret = CMoveMath::RangeIsBlockedHashedSt(xmin, xmax, zmin, zmax, collider, tempNum);
-	}
-
-	return ret;
-}
-
-CMoveMath::BlockType CMoveMath::RangeIsBlockedSt(int xmin, int xmax, int zmin, int zmax, const MoveTypes::CheckCollisionQuery* collider, int tempNum)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	BlockType ret = BLOCK_NONE;
-
-	// footprints are point-symmetric around <xSquare, zSquare>
-	for (int z = zmin; z <= zmax; z += FOOTPRINT_ZSTEP) {
-		const int zOffset = z * mapDims.mapx;
-
-		for (int x = xmin; x <= xmax; x += FOOTPRINT_XSTEP) {
-			const CGroundBlockingObjectMap::BlockingMapCell& cell = groundBlockingObjectMap.GetCellUnsafeConst(zOffset + x);
-
-			for (size_t i = 0, n = cell.size(); i < n; i++) {
-				CSolidObject* collidee = cell[i];
-
-				if (collidee->tempNum == tempNum)
-					continue;
-
-				collidee->tempNum = tempNum;
-
-				if (((ret |= ObjectBlockType(collidee, collider)) & BLOCK_STRUCTURE) == 0)
-					continue;
-
-				return ret;
-			}
-		}
-	}
-
-	return ret;
+	return CMoveMath::RangeIsBlockedHashedMt(xmin, xmax, zmin, zmax, collider, tempNum, thread);
 }
 
 
-CMoveMath::BlockType CMoveMath::RangeIsBlockedMt(int xmin, int xmax, int zmin, int zmax, const MoveTypes::CheckCollisionQuery* collider, int thread, int tempNum)
+CMoveMath::BlockType CMoveMath::RangeIsBlockedMt(int xmin, int xmax, int zmin, int zmax, const MoveTypes::CheckCollisionQuery* collider, int tempNum, int thread)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	BlockType ret = BLOCK_NONE;
@@ -440,46 +392,6 @@ CMoveMath::BlockType CMoveMath::RangeIsBlockedMt(int xmin, int xmax, int zmin, i
 	return ret;
 }
 
-CMoveMath::BlockType CMoveMath::RangeIsBlockedHashedSt(int xmin, int xmax, int zmin, int zmax, const MoveTypes::CheckCollisionQuery* collider, int tempNum)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	BlockType ret = BLOCK_NONE;
-
-	static spring::unordered_map<CSolidObject*, CMoveMath::BlockType> blockMap(10);
-	static int lastTempNum = -1;
-
-	if (lastTempNum != tempNum){
-		blockMap.clear();
-		lastTempNum = tempNum;
-	}
-
-	// footprints are point-symmetric around <xSquare, zSquare>
-	for (int z = zmin; z <= zmax; z += FOOTPRINT_ZSTEP) {
-		const int zOffset = z * mapDims.mapx;
-
-		for (int x = xmin; x <= xmax; x += FOOTPRINT_XSTEP) {
-			const CGroundBlockingObjectMap::BlockingMapCell& cell = groundBlockingObjectMap.GetCellUnsafeConst(zOffset + x);
-
-			for (size_t i = 0, n = cell.size(); i < n; i++) {
-				CSolidObject* collidee = cell[i];
-
-				auto blockMapResult = blockMap.find(collidee);
-				if (blockMapResult == blockMap.end()) {
-					blockMapResult = blockMap.emplace(collidee, ObjectBlockType(collidee, collider)).first;
-				}
-
-				ret |= blockMapResult->second;
-
-				if ((ret & BLOCK_STRUCTURE) == 0)
-					continue;
-
-				return ret;
-			}
-		}
-	}
-
-	return ret;
-}
 
 static std::array<spring::unordered_map<CSolidObject*, CMoveMath::BlockType>, ThreadPool::MAX_THREADS> blockMaps;
 static std::array<int, ThreadPool::MAX_THREADS> lastTempNums;

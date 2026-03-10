@@ -42,10 +42,10 @@ on:
       package-suffix:
         description: 'Custom suffix for the package name'
         type: string
-      image-versions:
-        description: 'Allows override image-versions for this run'
-        type: string
-        default: '{}'
+      image-artifacts:
+        description: 'Use build-image-* docker image artifacts for build'
+        type: boolean
+        default: false
   pull_request:
     paths-ignore:
       - 'doc/**'
@@ -146,14 +146,26 @@ jobs:
           wait-on: |
             http-get://127.0.0.1:8085/cas/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
           wait-for: 3m
+      - name: Download docker image artifact
+        if: inputs.image-artifacts
+        uses: actions/download-artifact@v8
+        with:
+          name: build-image-${{ matrix.system }}
+          path: ${{ runner.temp }}
       - name: Pull builder image
         id: resolve-image
         # Fetching image from GitHub can be *incredibly* slow, so cache layers also in the
         # namespace.so container registry.
         run: |
+          if [[ -f ${{ runner.temp }}/image.tar ]]; then
+            docker load --input ${{ runner.temp }}/image.tar
+            echo "image=recoil-build-${{ matrix.system }}:latest" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
           source src/docker-build-v2/images_versions.sh
 
-          digest=${{ fromJson(inputs.image-versions || '{}')[matrix.system] || format('${{image_version[{0}]}}', matrix.system) }}
+          digest=${image_version[${{ matrix.system }}]}
           ghcr_image=ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}
           nsc_image=${{ env.NSC_CONTAINER_REGISTRY }}/recoil-build-${{ matrix.system }}
 

@@ -265,7 +265,7 @@ static void ExtractSymbols(char** lines, StackTrace& stacktrace)
 		l++;
 	}
 
-	free(lines);
+	free(lines);  // backtrace_symbols allocates via system malloc; must match with system free
 }
 
 static int CommonStringLength(const std::string& str1, const std::string& str2)

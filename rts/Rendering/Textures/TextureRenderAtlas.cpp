@@ -380,6 +380,12 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 		}
 	}
 
+#ifdef HEADLESS
+	// Skip OpenGL rendering in headless mode
+	atlasRendered = true;
+	return true;
+#endif
+
 	{
 		using namespace GL::State;
 		auto state = GL::SubState(

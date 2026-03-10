@@ -68,6 +68,8 @@ forceLayout = true
 
 
 function Update(dt)
+  dt = dt or Spring.GetLastUpdateSeconds()
+
   local currentPage = Spring.GetActivePage()
   if (forceLayout or (currentPage ~= activePage)) then
     Spring.ForceLayoutUpdate()  --  for the page number indicator

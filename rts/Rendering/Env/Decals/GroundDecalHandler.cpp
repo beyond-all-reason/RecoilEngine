@@ -384,11 +384,6 @@ uint32_t CGroundDecalHandler::GetNextId()
 
 void CGroundDecalHandler::BindVertexAttributes()
 {
-	for (int i = 0; i <= 8; ++i) {
-		glEnableVertexAttribArray(i);
-		glVertexAttribDivisor(i, 1);
-	}
-
 	for (const AttributeDef& ad : GroundDecal::attributeDefs) {
 		glEnableVertexAttribArray(ad.index);
 		glVertexAttribDivisor(ad.index, 1);

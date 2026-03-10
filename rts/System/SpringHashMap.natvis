@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Natvis visualizer for emilib::HashMap
+  (https://github.com/emilk/emilib)
+
+  Supports:
+    - emilib::HashMap<K,V,Hash,Comp>  – shows live entries as [key] = value
+    - emilib::HashMap<...>::iterator
+    - emilib::HashMap<...>::const_iterator
+-->
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+
+  <!-- ================================================================
+       emilib::HashMap
+       State enum (uint8_t): INACTIVE=0  ACTIVE=1  FILLED=2
+       ================================================================ -->
+  <Type Name="emilib::HashMap&lt;*&gt;">
+
+    <!-- Summary line shown inline in the Watch / Locals window -->
+    <DisplayString Condition="_num_buckets == 0">{{ empty }}</DisplayString>
+    <DisplayString>{{ size={_num_filled}, buckets={_num_buckets} }}</DisplayString>
+
+    <Expand>
+      <!-- Scalar metadata -->
+      <Item Name="[size]"             ExcludeView="simple">_num_filled</Item>
+      <Item Name="[bucket_count]"     ExcludeView="simple">_num_buckets</Item>
+      <Item Name="[max_probe_length]" ExcludeView="simple">_max_probe_length</Item>
+
+      <!-- Walk every bucket; emit only FILLED ones (state value == 2).
+           The cast to (unsigned char) avoids enum-class comparison issues
+           in older natvis engines. -->
+      <CustomListItems MaxItemsPerView="5000" ExcludeView="simple">
+        <Variable Name="i" InitialValue="0"/>
+        <Loop>
+          <Break Condition="i >= _num_buckets"/>
+          <If Condition="(unsigned char)_states[i] == 2">
+            <!-- Name shows the key; expanding the row reveals the value -->
+            <Item Name="[{_pairs[i].first}]">_pairs[i].second</Item>
+          </If>
+          <Exec>i++</Exec>
+        </Loop>
+      </CustomListItems>
+
+      <!-- Raw bucket array (debug aid, hidden from simple view) -->
+      <ArrayItems ExcludeView="simple">
+        <Size>_num_buckets</Size>
+        <ValuePointer>_pairs</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+
+
+  <!-- ================================================================
+       emilib::HashMap::iterator
+       ================================================================ -->
+  <Type Name="emilib::HashMap&lt;*&gt;::iterator">
+
+    <!-- Show key→value when pointing at a valid FILLED bucket -->
+    <DisplayString Condition="_map == 0">{{ invalid }}</DisplayString>
+    <DisplayString Condition="_bucket &gt;= _map->_num_buckets">{{ end() }}</DisplayString>
+    <DisplayString>[bucket {_bucket}]  {_map->_pairs[_bucket].first} → {_map->_pairs[_bucket].second}</DisplayString>
+
+    <Expand>
+      <Item Name="key"    Condition="_map != 0 &amp;&amp; _bucket &lt; _map->_num_buckets">_map->_pairs[_bucket].first</Item>
+      <Item Name="value"  Condition="_map != 0 &amp;&amp; _bucket &lt; _map->_num_buckets">_map->_pairs[_bucket].second</Item>
+      <Item Name="bucket">_bucket</Item>
+      <Item Name="[map]"  ExcludeView="simple">*_map</Item>
+    </Expand>
+  </Type>
+
+
+  <!-- ================================================================
+       emilib::HashMap::const_iterator
+       (identical layout to iterator, but _map is const MyType*)
+       ================================================================ -->
+  <Type Name="emilib::HashMap&lt;*&gt;::const_iterator">
+
+    <DisplayString Condition="_map == 0">{{ invalid }}</DisplayString>
+    <DisplayString Condition="_bucket &gt;= _map->_num_buckets">{{ end() }}</DisplayString>
+    <DisplayString>[bucket {_bucket}]  {_map->_pairs[_bucket].first} → {_map->_pairs[_bucket].second}</DisplayString>
+
+    <Expand>
+      <Item Name="key"    Condition="_map != 0 &amp;&amp; _bucket &lt; _map->_num_buckets">_map->_pairs[_bucket].first</Item>
+      <Item Name="value"  Condition="_map != 0 &amp;&amp; _bucket &lt; _map->_num_buckets">_map->_pairs[_bucket].second</Item>
+      <Item Name="bucket">_bucket</Item>
+      <Item Name="[map]"  ExcludeView="simple">*_map</Item>
+    </Expand>
+  </Type>
+
+</AutoVisualizer>

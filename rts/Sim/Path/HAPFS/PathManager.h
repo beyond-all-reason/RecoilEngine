@@ -240,7 +240,7 @@ private:
 	}
 
 	const MultiPath* GetMultiPathConst(int pathID) const {
-		assert(!ThreadPool::inMultiThreadedSection);
+		assert(!ThreadPool::IsInMultiThreadedSection());
 		const auto pi = pathMap.find(pathID);
 		if (pi == pathMap.end())
 			return nullptr;

@@ -12,7 +12,7 @@
 #include "System/Exceptions.h"
 #include "System/SpringMath.h"
 
-#include "lib/fmt/format.h"
+#include <fmt/format.h>
 
 #include <bit>
 

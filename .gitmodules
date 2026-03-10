@@ -40,6 +40,12 @@
 	path = rts/lib/nowide
 	url = https://github.com/boostorg/nowide
 	branch = standalone
+[submodule "rts/lib/fmt"]
+	path = rts/lib/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "rts/lib/mimalloc"]
+	path = rts/lib/mimalloc
+	url = https://github.com/microsoft/mimalloc
 [submodule "rts/lib/sse2neon"]
 	path = rts/lib/sse2neon
 	url = https://github.com/DLTcollab/sse2neon.git

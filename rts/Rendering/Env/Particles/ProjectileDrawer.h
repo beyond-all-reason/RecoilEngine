@@ -7,6 +7,7 @@
 
 #include "Sim/Projectiles/Projectile.h"
 #include "Rendering/GL/myGL.h"
+#include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/GL/FBO.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
@@ -126,6 +127,9 @@ public:
 public:
 	static bool CanDrawProjectile(const CProjectile* pro, int allyTeam);
 	static bool ShouldDrawProjectile(const CProjectile* pro, uint8_t thisPassMask);
+
+	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapLinesRB();
+	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapPointsRB();
 private:
 	static void ParseAtlasTextures(const bool, const LuaTable&, spring::unordered_set<std::string>&, CTextureAtlas*);
 
@@ -177,6 +181,10 @@ private:
 	bool wantDrawOrder = true;
 
 	std::unique_ptr<ScopedDepthBufferCopy> sdbc;
+
+	// Instance members to ensure proper cleanup during Kill() before OpenGL context is destroyed
+	TypedRenderBuffer<VA_TYPE_C> minimapLinesRB{ 1 << 12, 0 };
+	TypedRenderBuffer<VA_TYPE_C> minimapPointsRB{ 1 << 14, 0 };
 };
 
 extern CProjectileDrawer* projectileDrawer;

@@ -5,11 +5,11 @@
 #include <sstream>
 
 #include "lib/sol2/sol.hpp"
-#include "lib/fmt/format.h"
-#include "lib/fmt/printf.h"
+#include <fmt/format.h>
+#include <fmt/printf.h>
 
 #include "System/Log/ILog.h"
-#include "System/SpringMem.h"
+#include "System/MemoryOverride.hpp"
 #include "System/SafeUtil.h"
 #include "Rendering/ModelsDataUploader.h"
 #include "Rendering/GlobalRendering.h"
@@ -120,7 +120,7 @@ void LuaVBOImpl::Delete()
 		spring::SafeDelete(vbo);
 
 	if (bufferData) {
-		spring::FreeAlignedMemory(bufferData);
+		recoil::aligned_free(bufferData);
 		bufferData = nullptr;
 	}
 
@@ -1532,7 +1532,7 @@ void LuaVBOImpl::AllocGLBuffer(size_t byteSize)
 	vbo->Unbind();
 
 	//allocate shadow buffer
-	bufferData = spring::AllocateAlignedMemory(bufferSizeInBytes, 32);
+	bufferData = recoil::aligned_alloc(32, bufferSizeInBytes);
 
 	vboOwner = true;
 }

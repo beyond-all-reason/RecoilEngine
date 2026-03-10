@@ -183,7 +183,7 @@ namespace QTPFS {
 		bool ExecutePathSearch();
 		bool ExecuteRawSearch();
 
-		void SetForwardSearchLimit();
+		void SetNodeSearchLimit();
 
 		void GetRectangleCollisionVolume(const SearchNode& snode, CollisionVolume& v, float3& rm) const;
 
@@ -238,7 +238,7 @@ namespace QTPFS {
 		int fwdStepIndex = 0;
 		int bwdStepIndex = 0;
 
-		int fwdNodeSearchLimit = 0;
+		int nodeSearchLimit = 0;
 
 		size_t fwdNodesSearched = 0;
 		size_t bwdNodesSearched = 0;

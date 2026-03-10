@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <type_traits>
 
-#include "lib/fmt/format.h"
-#include "lib/fmt/printf.h"
+#include <fmt/format.h>
+#include <fmt/printf.h>
 
 #include "lib/sol2/sol.hpp"
 
