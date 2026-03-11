@@ -56,7 +56,7 @@ int GetNextBitShift(int n)
     int c = 0;
 	n = (n > 0) ? n - 1 : 0;
     while (n >>= 1) {
-        c = c << 1;
+        c++;
     }
     return c + 1;
 }
