@@ -32,6 +32,7 @@ namespace QTPFS {
 
         // This ensures the index range for nodes is fully convered.
         static_assert((POOL_TOTAL_SIZE - 1) == DENSE_MASK);
+        static_assert(DENSE_BITS + GEN_BITS == sizeof(uint32_t) * 8);
 
         void Reset(size_t sparseSize) {
             {
