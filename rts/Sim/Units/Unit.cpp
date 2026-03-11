@@ -958,6 +958,21 @@ void CUnit::SetStunned(bool stun) {
 	eventHandler.UnitStunned(this, stun);
 }
 
+// e.g. [+1, -9, -8, +4] -> { [1, 0, 0, 4], [0, 9, 8, 0] }
+// hopefully a temporary hack, see call site for rationale
+static auto SplitResourcePackIntoPositiveNegative (const SResourcePack &pack)
+{
+	SResourcePack positive {0.0f}, negative {0.0f};
+
+	for (auto [resourceID, value] : std::views::enumerate (pack)) {
+		if (value < 0.0f)
+			negative[resourceID] = -value;
+		else
+			positive[resourceID] = value;
+	}
+
+	return std::make_pair (positive, negative);
+}
 
 void CUnit::SlowUpdate()
 {
@@ -1056,7 +1071,15 @@ void CUnit::SlowUpdate()
 	AddResources(unitDef->resourceMake * 0.5f);
 
 	if (activated) {
-		if (UseResources(unitDef->upkeep * 0.5f)) {
+
+		/* Due to legacy API limitations, games often define conditional resourcing via negative upkeep.
+		 * Handle this separately via Add; this doesn't change the resulting resource totals, but makes it
+		 * show up the expected way in GUI tooltips and endgame stats. Encourage games to eventually use
+		 * `makesResources` instead, once that becomes available. */
+		const auto [positiveUpkeep, negativeUpkeep] = SplitResourcePackIntoPositiveNegative(unitDef->upkeep);
+		AddResources(negativeUpkeep * 0.5f);
+
+		if (UseResources(positiveUpkeep * 0.5f)) {
 			AddResources(unitDef->makesResources * 0.5f);
 
 			if (unitDef->extractsMetal > 0.0f)
