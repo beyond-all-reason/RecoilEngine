@@ -1,6 +1,7 @@
 #ifndef PATH_THREADS_H__
 #define PATH_THREADS_H__
 
+#include <bit>
 #include <cstddef>
 #include <functional>
 #include <queue>
@@ -24,8 +25,8 @@ namespace QTPFS {
 
         uint32_t currentGeneration = 0;
 
-        static constexpr uint32_t DENSE_BITS = 19;
-        static constexpr uint32_t GEN_BITS   = 13;
+        static constexpr uint32_t DENSE_BITS = std::bit_width(POOL_TOTAL_SIZE) - 1;
+        static constexpr uint32_t GEN_BITS   = (sizeof(uint32_t) * 8) - DENSE_BITS;
         static constexpr uint32_t DENSE_MASK = (1u << DENSE_BITS) - 1; // 0x0007FFFF
         static constexpr uint32_t GEN_SHIFT  = DENSE_BITS;
 
