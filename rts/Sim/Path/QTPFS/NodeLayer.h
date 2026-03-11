@@ -181,7 +181,6 @@ namespace QTPFS {
 
 public:
 		static constexpr unsigned int NUM_POOL_CHUNKS = sizeof(poolNodes) / sizeof(poolNodes[0]);
-		static constexpr unsigned int POOL_TOTAL_SIZE = (1024 * 1024) / 2;
 		static constexpr unsigned int POOL_CHUNK_SIZE = POOL_TOTAL_SIZE / NUM_POOL_CHUNKS;
 
 		void SetRootMask(uint32_t newMask) { rootMask = newMask; }
