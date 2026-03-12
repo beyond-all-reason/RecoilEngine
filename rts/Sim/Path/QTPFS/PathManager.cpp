@@ -507,16 +507,16 @@ std::uint64_t QTPFS::PathManager::GetMemFootPrint() const {
 					* sizeof(decltype(nodeLayersMapDamageTrack.mapChangeTrackers)::value_type);
 
 
-	for (auto threadData : searchThreadData) {
+	for (auto& threadData : searchThreadData) {
 		memFootPrint += threadData.GetMemFootPrint();
 	}
-	for (auto threadData : updateThreadData) {
+	for (auto& threadData : updateThreadData) {
 		memFootPrint += threadData.GetMemFootPrint();
 	}
 	for (unsigned int i = 0; i < nodeLayers.size(); i++) {
 		memFootPrint += nodeLayers[i].GetMemFootPrint();
 	}
-	for (auto trace : pathTraces) {
+	for (auto& trace : pathTraces) {
 		memFootPrint += sizeof(decltype(*trace.second));
 		memFootPrint += trace.second->GetMemFootPrint();
 	}

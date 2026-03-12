@@ -11,6 +11,7 @@
 
 #include "Map/ReadMap.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
+#include "System/ChunkedArray.h"
 #include "System/Rectangle.h"
 
 namespace QTPFS {
@@ -21,7 +22,7 @@ namespace QTPFS {
     template<typename T>
     struct SparseData {
         std::vector<uint32_t> sparseIndex;
-        std::vector<T> denseData;
+        recoil::ChunkedArray<T, 1024> denseData;
 
         uint32_t currentGeneration = 0;
 
@@ -39,7 +40,7 @@ namespace QTPFS {
                 ZoneScopedN("sparseIndex.assign");
                 sparseIndex.assign(sparseSize, 0);
             }
-            denseData.clear();
+            denseData.reset();
         }
 
         void Reserve(size_t denseSize) {
@@ -54,7 +55,7 @@ namespace QTPFS {
                 Reset(POOL_TOTAL_SIZE);
                 currentGeneration = 1; // start from 1 to avoid confusion with default-initialized values in sparseIndex
             } else
-                denseData.clear();
+                denseData.reset();
         }
 
         uint32_t GetDenseIndex(size_t index) const {
@@ -183,7 +184,7 @@ namespace QTPFS {
             ResetQueue();
 		}
 
-        std::size_t GetMemFootPrint() {
+        std::size_t GetMemFootPrint() const {
             std::size_t memFootPrint = 0;
 
             for (int i=0; i<SEARCH_DIRECTIONS; ++i) {
@@ -260,7 +261,7 @@ namespace QTPFS {
             moveDef = nullptr;
         }
 
-        std::size_t GetMemFootPrint() {
+        std::size_t GetMemFootPrint() const {
             std::size_t memFootPrint = 0;
 
             memFootPrint += maxBlockBits.size()   * sizeof(decltype(maxBlockBits)::value_type);

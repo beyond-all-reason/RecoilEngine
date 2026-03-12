@@ -194,7 +194,7 @@ namespace QTPFS {
 
 	struct NodeSearched {};
 
-	struct SearchNode {
+	struct alignas(64) SearchNode {
 
 		SearchNode() {}
 
@@ -289,6 +289,9 @@ namespace QTPFS {
 		unsigned int nodeNumber = -1;
 		bool badNode = false;
 	};
+
+	static_assert (sizeof(SearchNode) <= 64, "SearchNode should fit in a single cache line");
+	static_assert (std::is_trivially_destructible<SearchNode>::value, "SearchNode should be trivially destructible or else performance in SearchThreadData will degrade.");
 }
 
 #endif
