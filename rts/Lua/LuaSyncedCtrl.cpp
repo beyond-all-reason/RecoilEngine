@@ -1290,12 +1290,12 @@ int LuaSyncedCtrl::UseTeamResource(lua_State* L)
 				continue;
 
 			const char* key = lua_tostring(L, LUA_TABLE_KEY_INDEX);
-			const float value = lua_tofloat(L, LUA_TABLE_VALUE_INDEX);
+			const float value = std::max(0.0f, lua_tofloat(L, LUA_TABLE_VALUE_INDEX));
 
 			switch (key[0]) {
-				case 'm': { metal  = std::max(0.0f, value); } break;
-				case 'e': { energy = std::max(0.0f, value); } break;
-				default : {                                 } break;
+				case 'm': { metal  = value; } break;
+				case 'e': { energy = value; } break;
+				default : {                 } break;
 			}
 		}
 
@@ -4471,9 +4471,10 @@ int LuaSyncedCtrl::AddUnitResource(lua_State* L)
 	if (type.empty())
 		return 0;
 
+	const auto value = std::max(0.0f, luaL_checkfloat(L, 3));
 	switch (type[0]) {
-		case 'm': { unit->AddMetal (std::max(0.0f, luaL_checkfloat(L, 3))); } break;
-		case 'e': { unit->AddEnergy(std::max(0.0f, luaL_checkfloat(L, 3))); } break;
+		case 'm': { unit->AddMetal (value); } break;
+		case 'e': { unit->AddEnergy(value); } break;
 		default: {} break;
 	}
 
@@ -4505,11 +4506,12 @@ int LuaSyncedCtrl::UseUnitResource(lua_State* L)
 
 	if (lua_isstring(L, 2)) {
 		const char* type = lua_tostring(L, 2);
+		const auto value = std::max(0.0f, lua_tofloat(L, 3));
 
 		switch (type[0]) {
-			case 'm': { lua_pushboolean(L, unit->UseMetal (std::max(0.0f, lua_tofloat(L, 3)))); return 1; } break;
-			case 'e': { lua_pushboolean(L, unit->UseEnergy(std::max(0.0f, lua_tofloat(L, 3)))); return 1; } break;
-			default : {                                                                                   } break;
+			case 'm': { lua_pushboolean(L, unit->UseMetal (value)); return 1; } break;
+			case 'e': { lua_pushboolean(L, unit->UseEnergy(value)); return 1; } break;
+			default : {                                                       } break;
 		}
 
 		return 0;
@@ -4524,7 +4526,7 @@ int LuaSyncedCtrl::UseUnitResource(lua_State* L)
 		for (lua_pushnil(L); lua_next(L, tableIdx) != 0; lua_pop(L, 1)) {
 			if (lua_israwstring(L, LUA_TABLE_KEY_INDEX) && lua_isnumber(L, LUA_TABLE_VALUE_INDEX)) {
 				const char* key = lua_tostring(L, LUA_TABLE_KEY_INDEX);
-				const float val = std::max(0.0f, lua_tofloat(L, -1));
+				const float val = std::max(0.0f, lua_tofloat(L, LUA_TABLE_VALUE_INDEX));
 
 				switch (key[0]) {
 					case 'm': {  metal = val; } break;
