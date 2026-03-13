@@ -226,6 +226,7 @@ namespace math {
 	float isqrt(float x) _const;
 
 	inline float sqrt(float x) { return fastmath::sqrt_sse(x); }
+	inline float sqrt(int x) { return fastmath::sqrt_sse(static_cast<float>(x)); }
 	inline float sqrtf(float x) { return fastmath::sqrt_sse(x); }
 	inline float isqrt(float x) { return fastmath::isqrt2_nosse(x); }
 	using fastmath::floor;
