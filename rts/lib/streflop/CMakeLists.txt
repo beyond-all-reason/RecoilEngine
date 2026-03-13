@@ -252,13 +252,6 @@ if(NOT MSVC)
 	SET(streflop_cxx_flags "${streflop_cxx_flags} -w -Wno-narrowing")
 endif()
 
-# Which FP execution unit to use
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
-	SET(streflop_cxx_flags "${streflop_cxx_flags} -march=armv8-a+simd")
-else()
-	SET(streflop_cxx_flags "${streflop_cxx_flags} -mfpmath=sse -msse -msse2")
-endif()
-
 # Set compile flags for libm sources.
 # -ffp-contract=off prevents FMA fusion (fmadd/fmsub) in transcendental functions;
 if(MSVC)
@@ -351,15 +344,6 @@ endif()
 if(STREFLOP_NO_DENORMALS)
 	target_compile_definitions(streflop PUBLIC STREFLOP_NO_DENORMALS)
 endif()
-
-# Apply core compile flags (matching original Makefile.common)
-if(NOT MSVC)
-	target_compile_options(streflop PRIVATE
-		-O3 -pipe -g -frename-registers
-		-frounding-math -fsignaling-nans -fno-strict-aliasing -Wall
-	)
-endif()
-
 
 # Set library properties
 if(NOT MSVC)
