@@ -16,7 +16,7 @@
  */
 
 
-#include "SMath.h"
+#include "math.h"
 #include "math_private.h"
 
 namespace streflop_libm {

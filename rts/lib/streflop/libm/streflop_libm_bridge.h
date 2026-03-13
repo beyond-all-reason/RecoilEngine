@@ -224,7 +224,8 @@ enum
 // eval method is 0 for x87, sse, soft, that is float_t has size float and double_t has size double
 #define FLT_EVAL_METHOD 0
 
-
+// Alias streflop's fpenv_t to standard C name fenv_t for libm compatibility
+using fenv_t = streflop::fpenv_t;
 
 // Endianity checking
 #if __FLOAT_WORD_ORDER == 1234
