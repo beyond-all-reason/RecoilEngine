@@ -28,7 +28,7 @@ if(STREFLOP_AUTO AND NOT STREFLOP_SSE AND NOT STREFLOP_NEON AND NOT STREFLOP_SOF
 		set(STREFLOP_SSE ON CACHE BOOL "Use SSE (autodetected)" FORCE)
 		message(STATUS "STREFLOP: Autodetected x86/x86_64 platform - enabling SSE mode")
 	else()
-		message(FATAL_ERROR "STREFLOP: Unknown architecture '${_streflop_processor}' - defaulting to X87 mode")
+		message(FATAL_ERROR "STREFLOP: Unknown architecture '${_streflop_processor}', cannot proceed with autodetection")
 	endif()
 endif()
 
