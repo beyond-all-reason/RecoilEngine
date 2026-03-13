@@ -113,7 +113,7 @@ static char rcsid[] = "$NetBSD: s_expm1.c,v 1.8 1995/05/10 20:47:09 jtc Exp $";
  * to produce the hexadecimal values shown.
  */
 
-#include "math.h"
+#include "libm_math.h"
 #include "math_private.h"
 #define one Q[0]
 namespace streflop_libm {

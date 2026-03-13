@@ -26,7 +26,7 @@ static char rcsid[] = "$NetBSD: s_asinh.c,v 1.9 1995/05/12 04:57:37 jtc Exp $";
  *		 := sign(x)*log1p(|x| + x^2/(1 + sqrt(1+x^2)))
  */
 
-#include "math.h"
+#include "libm_math.h"
 #include "math_private.h"
 
 namespace streflop_libm {

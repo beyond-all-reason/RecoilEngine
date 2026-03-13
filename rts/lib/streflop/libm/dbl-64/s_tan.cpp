@@ -38,7 +38,7 @@
 #include "dla.h"
 #include "mpa.h"
 #include "MathLib.h"
-#include "math.h"
+#include "libm_math.h"
 
 namespace streflop_libm {
 static Double tanMp(Double);

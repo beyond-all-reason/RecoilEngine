@@ -43,7 +43,7 @@
 #include "MathLib.h"
 #include "uatan.tbl"
 #include "atnat.h"
-#include "math.h"
+#include "libm_math.h"
 
 namespace streflop_libm {
 void __mpatan(mp_no *,mp_no *,int);          /* see definition in mpatan.c */

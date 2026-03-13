@@ -19,7 +19,7 @@ static char rcsid[] = "$NetBSD: w_exp.c,v 1.6 1995/05/10 20:48:51 jtc Exp $";
  * wrapper exp(x)
  */
 
-#include "math.h"
+#include "libm_math.h"
 #include "math_private.h"
 
 namespace streflop_libm {

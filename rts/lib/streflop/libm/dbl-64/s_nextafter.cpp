@@ -26,7 +26,7 @@ static char rcsid[] = "$NetBSD: s_nextafter.c,v 1.8 1995/05/10 20:47:58 jtc Exp 
 #define __nexttoward __internal___nexttoward
 #define nexttoward __internal_nexttoward
 
-#include "math.h"
+#include "libm_math.h"
 #include "math_private.h"
 #include "../streflop_libm_bridge.h"
 

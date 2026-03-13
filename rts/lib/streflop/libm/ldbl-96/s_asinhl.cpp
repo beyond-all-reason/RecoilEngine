@@ -30,7 +30,7 @@ static char rcsid[] = "$NetBSD: $";
  *		  := signl(x)*log1pl(|x| + x^2/(1 + sqrtl(1+x^2)))
  */
 
-#include "math.h"
+#include "SMath.h"
 #include "math_private.h"
 
 namespace streflop_libm {

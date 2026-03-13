@@ -37,7 +37,7 @@ static char rcsid[] = "$NetBSD: $";
  *	only sinhl(0)=0 is exact for finite x.
  */
 
-#include "math.h"
+#include "SMath.h"
 #include "math_private.h"
 
 namespace streflop_libm {

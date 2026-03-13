@@ -28,7 +28,7 @@ static char rcsid[] = "$NetBSD: $";
  *	Inexact flag raised if x not equal to floor(x).
  */
 
-#include "math.h"
+#include "SMath.h"
 #include "math_private.h"
 
 namespace streflop_libm {

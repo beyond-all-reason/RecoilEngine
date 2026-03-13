@@ -51,7 +51,7 @@ static char rcsid[] = "$NetBSD: $";
  * 	than 1 ulps (units in the last place)
  */
 
-#include "math.h"
+#include "SMath.h"
 #include "math_private.h"
 
 namespace streflop_libm {

@@ -32,7 +32,7 @@
 #include "../streflop_libm_bridge.h"
 #include "../streflop_libm_bridge.h"
 #include "ieee754.h"
-#include "math.h"
+#include "libm_math.h"
 #include "../streflop_libm_bridge.h"
 #include "../streflop_libm_bridge.h"
 #include "math_private.h"

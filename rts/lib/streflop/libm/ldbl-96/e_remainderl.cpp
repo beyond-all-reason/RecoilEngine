@@ -28,7 +28,7 @@ static char rcsid[] = "$NetBSD: $";
  *	Based on fmod() return x-[x/p]chopped*p exactlp.
  */
 
-#include "math.h"
+#include "SMath.h"
 #include "math_private.h"
 
 namespace streflop_libm {

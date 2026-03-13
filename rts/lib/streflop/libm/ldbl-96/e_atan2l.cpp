@@ -46,7 +46,7 @@ static char rcsid[] = "$NetBSD: $";
  * to produce the hexadecimal values shown.
  */
 
-#include "math.h"
+#include "SMath.h"
 #include "math_private.h"
 
 namespace streflop_libm {

@@ -24,7 +24,7 @@ static char rcsid[] = "$NetBSD: $";
  * no branching!
  */
 
-#include "math.h"
+#include "SMath.h"
 #include "math_private.h"
 
 namespace streflop_libm {

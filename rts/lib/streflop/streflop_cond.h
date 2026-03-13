@@ -182,7 +182,7 @@ namespace std {
 		auto t = std::min(x, y);
 		     x = std::max(x, y);
 		t = t / x;
-		return x * std::sqrt(1.0f + t*t);
+		return x * math::sqrt(1.0f + t*t);
 	}
 }
 #endif

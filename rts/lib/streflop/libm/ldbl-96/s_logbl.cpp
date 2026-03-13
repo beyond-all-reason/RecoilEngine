@@ -25,7 +25,7 @@ static char rcsid[] = "$NetBSD: $";
  * Use ilogb instead.
  */
 
-#include "math.h"
+#include "SMath.h"
 #include "math_private.h"
 
 namespace streflop_libm {
