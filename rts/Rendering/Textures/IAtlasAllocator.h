@@ -18,126 +18,53 @@ class IAtlasAllocator
 public:
 	struct SAtlasEntry
 	{
-		SAtlasEntry() = default;
-		SAtlasEntry(const int2 _size, std::string _name)
-			: size(_size)
-			, name(std::move(_name))
-			, texCoords()
-		{}
+		SAtlasEntry();
+		SAtlasEntry(const int2 _size, std::string _name);
 
 		int2 size;
 		std::string name;
 		AtlasedTexture texCoords;
 	};
 public:
-	IAtlasAllocator() = default;
-	virtual ~IAtlasAllocator() {}
+	IAtlasAllocator();
+	virtual ~IAtlasAllocator();
 
-	void SetMaxSize(uint32_t xsize, uint32_t ysize) { maxsize = uint2(xsize, ysize); }
+	void SetMaxSize(uint32_t xsize, uint32_t ysize);
 public:
 	virtual bool Allocate() = 0;
 	virtual int GetNumTexLevels() const = 0;
 	virtual int GetReqNumTexLevels() const = 0;
 	virtual uint32_t GetNumPages() const = 0;
-	void SetMaxTexLevel(int maxLevels) { numLevels = maxLevels; };
+	void SetMaxTexLevel(int maxLevels);
 public:
-	void AddEntry(const SAtlasEntry& ae) { AddEntry(ae.name, ae.size); }
-	void AddEntry(const std::string& name, const int2& size)
-	{
-		minDim = argmin(minDim, size.x, size.y);
-		entries[name] = SAtlasEntry(size, name);
-	}
+	void AddEntry(const SAtlasEntry& ae);
+	void AddEntry(const std::string& name, const int2& size);
 
-	inline int GetPadding() const
-	{
-		return 1 << (numLevels - 1);
-	}
+	int GetPadding() const;
 
-	void SizeRoundUp()
-	{
-		atlasSize.x = std::min(AlignUp(atlasSize.x, GetPadding()), maxsize.x);
-		atlasSize.y = std::min(AlignUp(atlasSize.y, GetPadding()), maxsize.y);
-	}
+	void SizeRoundUp();
 
-	auto FindEntry(const std::string& name) const
-	{
-		return entries.find(name);
-	}
+	spring::unordered_map<std::string, SAtlasEntry>::const_iterator FindEntry(const std::string& name) const;
 
-	const auto& GetEntry(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it) const {
-		if (it == entries.end())
-			return AtlasedTexture::DefaultAtlasTexture;
-
-		return it->second.texCoords;
-	}
-	const auto& GetEntry(const std::string& name) const { return GetEntry(FindEntry(name));	}
-	const auto& GetEntries() const { return entries; }
+	const AtlasedTexture& GetEntry(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it) const;
+	const AtlasedTexture& GetEntry(const std::string& name) const;
+	const spring::unordered_map<std::string, SAtlasEntry>& GetEntries() const;
 
 	// pixel center based UV
-	AtlasedTexture GetTexCoordsCntr(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it)
-	{
-		if (it == entries.end())
-			return AtlasedTexture::DefaultAtlasTexture;
-
-		const AtlasedTexture& a = it->second.texCoords; // all coords are inclusive
-		AtlasedTexture uv = a;
-
-		const float invW = 1.0f / atlasSize.x;
-		const float invH = 1.0f / atlasSize.y;
-
-		// Convert inclusive texel indices -> normalized coordinates of texel centers.
-		uv.x1 = (a.x1 + 0.5f) * invW;
-		uv.y1 = (a.y1 + 0.5f) * invH;
-		uv.x2 = (a.x2 + 0.5f) * invW;
-		uv.y2 = (a.y2 + 0.5f) * invH;
-
-		return uv;
-	}
+	AtlasedTexture GetTexCoordsCntr(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it);
 
 	// pixel edges based UV
-	AtlasedTexture GetTexCoordsEdge(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it) const
-	{
-		if (it == entries.end())
-			return AtlasedTexture::DefaultAtlasTexture;
+	AtlasedTexture GetTexCoordsEdge(const spring::unordered_map<std::string, SAtlasEntry>::const_iterator& it) const;
 
-		const AtlasedTexture& a = it->second.texCoords; // all coords are inclusive
-		AtlasedTexture uv = a;
+	AtlasedTexture GetTexCoordsCntr(const std::string& name);
+	AtlasedTexture GetTexCoordsEdge(const std::string& name);
 
-		const float invW = 1.0f / atlasSize.x;
-		const float invH = 1.0f / atlasSize.y;
-
-		// Edges in texel space are [x1, x2+1] and [y1, y2+1] because x2/y2 are inclusive.
-		uv.x1 = (a.x1       ) * invW;
-		uv.y1 = (a.y1       ) * invH;
-		uv.x2 = (a.x2 + 1.0f) * invW;
-		uv.y2 = (a.y2 + 1.0f) * invH;
-
-		return uv;
-	}
-
-	AtlasedTexture GetTexCoordsCntr(const std::string& name)
-	{
-		return GetTexCoordsCntr(FindEntry(name));
-	}
-
-	AtlasedTexture GetTexCoordsEdge(const std::string& name)
-	{
-		return GetTexCoordsEdge(FindEntry(name));
-	}
-
-	bool contains(const std::string& name) const
-	{
-		return entries.contains(name);
-	}
+	bool contains(const std::string& name) const;
 
 	//! note: it doesn't clear the atlas! it only clears the entry db!
-	void clear()
-	{
-		minDim = std::numeric_limits<int>::max();
-		entries.clear();
-	}
+	void clear();
 
-	int GetMinDim() const { return minDim < std::numeric_limits<int>::max() ? minDim : 1; }
+	int GetMinDim() const;
 
 	const auto& GetMaxSize() const { return maxsize; }
 	const auto& GetAtlasSize() const { return atlasSize; }

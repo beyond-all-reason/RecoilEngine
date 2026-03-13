@@ -693,15 +693,15 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FLOAT("energyUpkeep",   ud.upkeep.energy);
 	ADD_FLOAT("metalMake",      ud.resourceMake.metal);
 	ADD_FLOAT("energyMake",     ud.resourceMake.energy);
-	ADD_FLOAT("makesMetal",     ud.makesMetal);
+	ADD_FLOAT("makesMetal",     ud.makesResources.metal);
 	ADD_FLOAT("metalCost",      ud.cost.metal);
 	ADD_FLOAT("energyCost",     ud.cost.energy);
 	ADD_FLOAT("buildTime",      ud.buildTime);
 	ADD_FLOAT("buildeeBuildRadius", ud.buildeeBuildRadius);
 	ADD_FLOAT("extractsMetal",  ud.extractsMetal);
 	ADD_FLOAT("extractRange",   ud.extractRange);
-	ADD_FLOAT("windGenerator",  ud.windGenerator);
-	ADD_FLOAT("tidalGenerator", ud.tidalGenerator);
+	ADD_FLOAT("windGenerator",  ud.windGenerator.energy);
+	ADD_FLOAT("tidalGenerator", ud.tidalGenerator.energy);
 	ADD_FLOAT("metalStorage",   ud.storage.metal);
 	ADD_FLOAT("energyStorage",  ud.storage.energy);
 

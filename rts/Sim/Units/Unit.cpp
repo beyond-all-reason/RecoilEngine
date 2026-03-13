@@ -336,7 +336,7 @@ void CUnit::PostInit(const CUnit* builder)
 
 	// done once again in UnitFinished() too
 	// but keep the old behavior for compatibility purposes
-	if (unitDef->windGenerator > 0.0f)
+	if (!unitDef->windGenerator.empty())
 		envResHandler.AddGenerator(this);
 
 	UpdateTerrainType();
@@ -434,7 +434,7 @@ void CUnit::FinishedBuilding(bool postInit)
 	// Sets the frontdir in sync with heading.
 	UpdateDirVectors(!upright && IsOnGround(), false, 0.0f);
 
-	if (unitDef->windGenerator > 0.0f) {
+	if (!unitDef->windGenerator.empty()) {
 		// trigger sending the wind update by removing
 		envResHandler.DelGenerator(this);
 		//  and adding back this windgen
@@ -485,7 +485,7 @@ void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, i
 	eventHandler.UnitDestroyed(this, attacker, weaponDefID);
 	eoh->UnitDestroyed(*this, attacker, weaponDefID);
 
-	if (unitDef->windGenerator > 0.0f)
+	if (!unitDef->windGenerator.empty())
 		envResHandler.DelGenerator(this);
 
 	blockHeightChanges = false;
@@ -1023,7 +1023,7 @@ void CUnit::SlowUpdate()
 			health         = std::max(0.0f, health - maxHealth * buildDecay);
 			buildProgress -= buildDecay;
 
-			AddMetal(cost.metal * buildDecay, false);
+			AddResources({cost.metal * buildDecay, 0.0f}, false);
 
 			eventHandler.UnitConstructionDecayed(this
 				, INV_GAME_SPEED * framesSinceLastNanoAdd
@@ -1056,26 +1056,18 @@ void CUnit::SlowUpdate()
 	AddResources(unitDef->resourceMake * 0.5f);
 
 	if (activated) {
-		if (UseEnergy(unitDef->upkeep.energy * 0.5f)) {
-			AddMetal(unitDef->makesMetal * 0.5f);
+		if (UseResources(unitDef->upkeep * 0.5f)) {
+			AddResources(unitDef->makesResources * 0.5f);
 
 			if (unitDef->extractsMetal > 0.0f)
-				AddMetal(metalExtract * 0.5f);
+				AddResources({metalExtract * 0.5f, 0.0f});
 		}
 
-		UseMetal(unitDef->upkeep.metal * 0.5f);
-
-		if (unitDef->windGenerator > 0.0f) {
-			if (envResHandler.GetCurrentWindStrength() > unitDef->windGenerator) {
- 				AddEnergy(unitDef->windGenerator * 0.5f);
-			} else {
-				AddEnergy(envResHandler.GetCurrentWindStrength() * 0.5f);
-			}
-		}
+		AddResources(SResourcePack(envResHandler.GetCurrentWindStrength()).cap_at(unitDef->windGenerator) * 0.5f);
 	}
 
 	// FIXME: tidal part should be under "if (activated)"?
-	AddEnergy((unitDef->tidalGenerator * envResHandler.GetCurrentTidalStrength()) * 0.5f);
+	AddResources(unitDef->tidalGenerator * (envResHandler.GetCurrentTidalStrength() * 0.5f));
 
 
 	if (health < maxHealth) {
@@ -2011,19 +2003,17 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		else if (health < maxHealth) {
 			// repair
 			const float step = std::min(amount / buildTime, 1.0f - (health / maxHealth));
-			const float energyUse = (cost.energy * step);
-			const float energyUseScaled = energyUse * modInfo.repairEnergyCostFactor;
+			const auto resourceUse = cost * step * modInfo.repairCostFactor;
 
-			if ((builderTeam->res.energy < energyUseScaled)) {
-				// update the energy and metal required counts
-				builderTeam->resPull.energy += energyUseScaled;
+			if (!builderTeam->HaveResources(resourceUse)) {
+				builderTeam->resPull += resourceUse;
 				return false;
 			}
 
 			if (!eventHandler.AllowUnitBuildStep(builder, this, step))
 				return false;
 
-	  		if (!builder->UseEnergy(energyUseScaled)) {
+			if (!builder->UseResources(resourceUse)) {
 				return false;
 			}
 
@@ -2041,10 +2031,9 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		}
 
 		const float step = std::max(amount / buildTime, -buildProgress);
-		const float energyRefundStep = cost.energy * step;
-		const float metalRefundStep  =  cost.metal * step;
-		const float metalRefundStepScaled  =  metalRefundStep * modInfo.reclaimUnitEfficiency;
-		const float energyRefundStepScaled = energyRefundStep * modInfo.reclaimUnitEnergyCostFactor;
+		const auto costFraction = cost * -step;
+		const auto refund  = costFraction * modInfo.reclaimUnitEfficiency;
+		const auto useCost = costFraction * modInfo.reclaimUnitCostFactor;
 		const float healthStep        = modInfo.reclaimUnitDrainHealth ? maxHealth * step : 0;
 		const float buildProgressStep = int(modInfo.reclaimUnitMethod == 0) * step;
 		const float postHealth        = health + healthStep;
@@ -2060,16 +2049,16 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		SResourceOrder order;
 		order.quantum    = false;
 		order.overflow   = true;
-		order.use.energy = -energyRefundStepScaled;
+		order.use = useCost;
 		order.useIncomeMultiplier = false; // Dont apply income bonus to reclaimed units
 		
 		if (modInfo.reclaimUnitMethod == 0) {
-			// gradual reclamation of invested metal
-			order.add.metal = -metalRefundStepScaled;
+			// gradual reclamation of invested resources
+			order.add = refund;
 		} else {
-			// lump reclamation of invested metal
+			// lump reclamation of invested resources
 			if (postHealth <= 0.0f || postBuildProgress <= 0.0f) {
-				order.add.metal = (cost.metal * buildProgress) * modInfo.reclaimUnitEfficiency;
+				order.add = cost * buildProgress * modInfo.reclaimUnitEfficiency;
 				killMe = true; // to make 100% sure the unit gets killed, and so no resources are reclaimed twice!
 			}
 		}
@@ -2406,7 +2395,7 @@ void CUnit::UpdateWind(float x, float z, float strength)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const float windHeading = ClampRadPi(GetHeadingFromVectorF(-x, -z) - heading * TAANG2RAD);
-	const float windStrength = std::min(strength, unitDef->windGenerator);
+	const float windStrength = std::min(strength, unitDef->windGenerator.energy);
 
 	script->WindChanged(windHeading, windStrength);
 }

@@ -32,6 +32,8 @@ public:
 
 	const spring::unordered_map<std::string, UnitTexture>& GetAtlasTextures() const { return textures; }
 
+	void DumpAtlasTextures() const;
+
 private:
 	std::vector<TexFile> LoadTexFiles();
 
@@ -46,6 +48,7 @@ private:
 	GLuint atlas3do2 = 0;
 	int bigTexX = 0;
 	int bigTexY = 0;
+	int numLevels = 0;
 };
 
 extern C3DOTextureHandler textureHandler3DO;

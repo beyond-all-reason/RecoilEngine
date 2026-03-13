@@ -21,6 +21,8 @@
 #include "System/FileSystem/SimpleParser.h"
 #include "System/Log/ILog.h"
 
+#include <fmt/format.h>
+
 #include "System/Misc/TracyDefs.h"
 
 //////////////////////////////////////////////////////////////////////
@@ -35,7 +37,7 @@ struct TexFile {
 	std::string name;
 };
 
-
+static constexpr auto DEFAULT_NUM_OF_TEXTURE_LEVELS = 4;
 void C3DOTextureHandler::Init()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -49,6 +51,7 @@ void C3DOTextureHandler::Init()
 
 	// NOTE: most Intels report maxTextureSize=2048, some even 1024 (!)
 	atlasAlloc->SetMaxSize(std::min(globalRendering->maxTextureSize, 4096), std::min(globalRendering->maxTextureSize, 4096));
+	atlasAlloc->SetMaxTexLevel(DEFAULT_NUM_OF_TEXTURE_LEVELS);
 
 	// default for 3DO primitives that point to non-existing textures
 	textures["___dummy___"] = UnitTexture(0.0f, 0.0f, 1.0f, 1.0f);
@@ -118,7 +121,7 @@ void C3DOTextureHandler::Init()
 		textures[texFile.name] = UnitTexture(texCoords);
 	}
 
-	const int numLevels = atlasAlloc->GetNumTexLevels();
+	numLevels = atlasAlloc->GetNumTexLevels();
 
 	{
 		glGenTextures(1, &atlas3do1);
@@ -170,6 +173,21 @@ void C3DOTextureHandler::Kill()
 	atlas3do2 = 0;
 
 	textures.clear();
+}
+
+void C3DOTextureHandler::DumpAtlasTextures() const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (atlas3do1) {
+		for (int level = 0; level < numLevels; ++level) {
+			glSaveTexture(atlas3do1, fmt::format("3DOAtlas1-{}.png", level).c_str(), level);
+		}
+	}
+	if (atlas3do2) {
+		for (int level = 0; level < numLevels; ++level) {
+			glSaveTexture(atlas3do2, fmt::format("3DOAtlas2-{}.png", level).c_str(), level);
+		}
+	}
 }
 
 

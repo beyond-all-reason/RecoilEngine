@@ -197,15 +197,15 @@ bool LuaConstGame::PushEntries(lua_State* L)
 		LuaPushNamedNumber(L, "multiReclaim"                  , modInfo.multiReclaim);
 		LuaPushNamedNumber(L, "reclaimMethod"                 , modInfo.reclaimMethod);
 		LuaPushNamedNumber(L, "reclaimUnitMethod"             , modInfo.reclaimUnitMethod);
-		LuaPushNamedNumber(L, "reclaimUnitEnergyCostFactor"   , modInfo.reclaimUnitEnergyCostFactor);
-		LuaPushNamedNumber(L, "reclaimUnitEfficiency"         , modInfo.reclaimUnitEfficiency);
-		LuaPushNamedNumber(L, "reclaimFeatureEnergyCostFactor", modInfo.reclaimFeatureEnergyCostFactor);
+		LuaPushNamedNumber(L, "reclaimUnitEnergyCostFactor"   , modInfo.reclaimUnitCostFactor.energy);
+		LuaPushNamedNumber(L, "reclaimUnitEfficiency"         , modInfo.reclaimUnitEfficiency.metal);
+		LuaPushNamedNumber(L, "reclaimFeatureEnergyCostFactor", modInfo.reclaimFeatureCostFactor.energy);
 		LuaPushNamedBool  (L, "reclaimUnitDrainHealth"        , modInfo.reclaimUnitDrainHealth);
 		LuaPushNamedBool  (L, "reclaimAllowEnemies"           , modInfo.reclaimAllowEnemies);
 		LuaPushNamedBool  (L, "reclaimAllowAllies"            , modInfo.reclaimAllowAllies);
-		LuaPushNamedNumber(L, "repairEnergyCostFactor"        , modInfo.repairEnergyCostFactor);
-		LuaPushNamedNumber(L, "resurrectEnergyCostFactor"     , modInfo.resurrectEnergyCostFactor);
-		LuaPushNamedNumber(L, "captureEnergyCostFactor"       , modInfo.captureEnergyCostFactor);
+		LuaPushNamedNumber(L, "repairEnergyCostFactor"        , modInfo.repairCostFactor.energy);
+		LuaPushNamedNumber(L, "resurrectEnergyCostFactor"     , modInfo.resurrectCostFactor.energy);
+		LuaPushNamedNumber(L, "captureEnergyCostFactor"       , modInfo.captureCostFactor.energy);
 
 		// Despite being bools, these are exposed to Lua as 0/1 for legacy reasons
 		LuaPushNamedNumber(L, "transportAir"   , modInfo.transportAir);

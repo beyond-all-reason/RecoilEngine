@@ -336,13 +336,13 @@ bool CFeature::AddBuildPower(CUnit* builder, float amount)
 	const float reclaimLeftTemp = std::max(0.0f, reclaimLeft - step);
 	const float fractionReclaimed = oldReclaimLeft - reclaimLeftTemp;
 	const auto resourceFraction = (defResources * fractionReclaimed).cap_at(resources);
-	const float energyUseScaled = resourceFraction.metal * modInfo.reclaimFeatureEnergyCostFactor;
+	const auto resourceCost = resourceFraction.metal * modInfo.reclaimFeatureCostFactor;
 
 	SResourceOrder order;
 	order.quantum    = false;
 	order.overflow   = builder->harvestStorage.empty();
 	order.separate   = true;
-	order.use.energy = energyUseScaled;
+	order.use = resourceCost;
 	order.useIncomeMultiplier = false; // Dont apply income multiplier to reclaim
 
 	if (reclaimLeftTemp == 0.0f) {
