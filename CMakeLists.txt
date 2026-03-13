@@ -116,7 +116,7 @@ else  (CMAKE_SIZEOF_VOID_P EQUAL 8)
 endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
 
 # Detect ARM64 architecture
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
 	set(IS_ARM64_BUILD TRUE)
 	message(STATUS "Detected ARM64 architecture: ${CMAKE_SYSTEM_PROCESSOR}")
 else()
@@ -438,15 +438,7 @@ endif()
 option(ENABLE_STREFLOP "build Spring with streflop support (REQUIRED FOR MULTIPLAYER)" TRUE)
 
 if (ENABLE_STREFLOP)
-	if (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
-		set(STREFLOP_NEON ON CACHE BOOL "Use ARM NEON" FORCE)
-	elseif (APPLE)
-		set(STREFLOP_SSE ON CACHE BOOL "Use SSE" FORCE)
-	elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
-		set(STREFLOP_NEON ON CACHE BOOL "Use ARM NEON" FORCE)
-	else ()
-		set(STREFLOP_SSE ON CACHE BOOL "Use SSE" FORCE)
-	endif ()
+	set(STREFLOP_AUTO ON CACHE BOOL "Enable STREFLOP autodetection" FORCE)
 else ()
 	add_definitions(-DNOT_USING_STREFLOP)
 endif ()
@@ -455,7 +447,7 @@ endif ()
 add_definitions(-DASIO_STANDALONE)
 
 ### sse2neon
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
 	add_definitions(-DSSE2NEON)
 	add_definitions(-DSSE2NEON_SUPPRESS_WARNINGS)
 
@@ -484,7 +476,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 
 	if (NOT MARCH_FLAG STREQUAL "generic")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${MARCH_FLAG} -mtune=${MARCH_FLAG}") #march/mtune define SSE flags
-	elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+	elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a+simd ${FP_CONTRACT_FLAG}")
 	else (NOT MARCH_FLAG STREQUAL "generic")
 		set(FALLBACK_SSE_FLAGS "-msse")
@@ -508,7 +500,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${FALLBACK_MARCH} -mtune=generic ${FALLBACK_SSE_FLAGS}")
 	endif (NOT MARCH_FLAG STREQUAL "generic")
 
-	if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+	if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -mfpmath=sse") #SSE_FLAGS are now user input only
 	endif ()
 elseif (MSVC)

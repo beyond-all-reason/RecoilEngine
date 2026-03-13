@@ -5,19 +5,32 @@ project(streflop C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Auto-detect ARM64
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
-	set(IS_ARM64_BUILD TRUE)
-else()
-	set(IS_ARM64_BUILD FALSE)
-endif()
-
 # Options
+option(STREFLOP_AUTO "Autodetect the most appropriate Streflop implementation" ON)
 option(STREFLOP_SSE "Use SSE instead of x87 extended precision" OFF)
-option(STREFLOP_NEON "Use ARM NEON (auto-enabled on ARM64 when SSE/SOFT are off)" ${IS_ARM64_BUILD})
+option(STREFLOP_NEON "Use ARM NEON (auto-enabled on ARM64 when SSE/SOFT are off)" OFF)
 option(STREFLOP_SOFT "Use soft float" OFF)
 option(STREFLOP_NO_DENORMALS "Squash denormals to zero" OFF)
 option(BUILD_TESTS "Build test executables" OFF)
+
+# Autodetect STREFLOP mode when STREFLOP_AUTO is ON and no explicit mode is selected
+if(STREFLOP_AUTO AND NOT STREFLOP_SSE AND NOT STREFLOP_NEON AND NOT STREFLOP_SOFT AND NOT STREFLOP_NO_DENORMALS AND NOT BUILD_TESTS)
+	# Use HOST processor as fallback when cross-compiling (CMAKE_SYSTEM_PROCESSOR may be empty)
+	if(NOT CMAKE_SYSTEM_PROCESSOR AND CMAKE_HOST_SYSTEM_PROCESSOR)
+		set(_streflop_processor "${CMAKE_HOST_SYSTEM_PROCESSOR}")
+	else()
+		set(_streflop_processor "${CMAKE_SYSTEM_PROCESSOR}")
+	endif()
+	if(_streflop_processor MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
+		set(STREFLOP_NEON ON CACHE BOOL "Use ARM NEON (autodetected)" FORCE)
+		message(STATUS "STREFLOP: Autodetected ARM64 platform - enabling NEON mode")
+	elseif(_streflop_processor MATCHES "x86|i686|amd64|AMD64|x86_64")
+		set(STREFLOP_SSE ON CACHE BOOL "Use SSE (autodetected)" FORCE)
+		message(STATUS "STREFLOP: Autodetected x86/x86_64 platform - enabling SSE mode")
+	else()
+		message(FATAL_ERROR "STREFLOP: Unknown architecture '${_streflop_processor}' - defaulting to X87 mode")
+	endif()
+endif()
 
 # Float-32 source files
 SET(libm_flt32_source
@@ -240,7 +253,7 @@ if(NOT MSVC)
 endif()
 
 # Which FP execution unit to use
-if(IS_ARM64_BUILD)
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
 	SET(streflop_cxx_flags "${streflop_cxx_flags} -march=armv8-a+simd")
 else()
 	SET(streflop_cxx_flags "${streflop_cxx_flags} -mfpmath=sse -msse -msse2")
@@ -362,16 +375,16 @@ if(BUILD_TESTS)
 	target_link_libraries(randomTest streflop)
 endif()
 
-# Installation rules
-install(TARGETS streflop ARCHIVE DESTINATION lib)
-install(FILES 
-	Math.h
-	Random.h
-	streflop.h
-	FPUSettings.h
-	IntegerTypes.h
-	System.h
-	X87DenormalSquasher.h
-	SoftFloatWrapper.h
-	DESTINATION include/streflop
-)
+## Installation rules
+#install(TARGETS streflop ARCHIVE DESTINATION lib)
+#install(FILES
+#	SMath.h
+#	Random.h
+#	streflop.h
+#	FPUSettings.h
+#	IntegerTypes.h
+#	System.h
+#	X87DenormalSquasher.h
+#	SoftFloatWrapper.h
+#	DESTINATION include/streflop
+#)

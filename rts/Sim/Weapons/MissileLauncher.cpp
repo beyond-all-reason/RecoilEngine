@@ -19,7 +19,6 @@
 #include "Sim/Misc/CollisionVolume.h"
 
 #include "System/Misc/TracyDefs.h"
-#include "streflop/SMath.h"
 
 CR_BIND_DERIVED(CMissileLauncher, CWeapon, )
 CR_REG_METADATA(CMissileLauncher, )
