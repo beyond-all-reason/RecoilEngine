@@ -8,8 +8,6 @@
 #endif
 #include <cinttypes>
 
-// Tell streflop_cond.h not to define math::sqrt(float) - we'll provide a faster one
-#define MATH_SQRT_OVERRIDE 1
 #include "lib/streflop/streflop_cond.h"
 #include "System/MainDefines.h"
 #include "System/MathConstants.h"
