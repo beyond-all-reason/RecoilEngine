@@ -17,8 +17,6 @@ RUN mkdir src cache out artifacts && chmod a+rwx cache out artifacts
 RUN git clone --depth=1 https://github.com/beyond-all-reason/mingwlibs64.git
 ENV MINGWLIBS=/build/mingwlibs64
 
-# Set up default cmake toolchain
-COPY toolchain.cmake .
 ENV CMAKE_TOOLCHAIN_FILE=/build/toolchain.cmake
 
 # Configure ccache caching

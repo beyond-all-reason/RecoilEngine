@@ -45,8 +45,6 @@ ENV PKG_CONFIG="pkg-config --define-prefix --static"
 ENV CMAKE_PREFIX_PATH=/build/spring-static-libs/
 ENV PREFER_STATIC_LIBS=TRUE
 
-# Set up default cmake toolchain
-COPY toolchain.cmake .
 ENV CMAKE_TOOLCHAIN_FILE=/build/toolchain.cmake
 
 # Configure ccache caching

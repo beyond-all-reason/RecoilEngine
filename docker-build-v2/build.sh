@@ -149,6 +149,7 @@ $RUNTIME run -it --rm \
     -v "$CWD${P}":/build/src:z,ro \
     -v "$CWD${P}.cache${P}ccache-$OS":/build/cache:z,rw \
     -v "$CWD${P}build-$OS":/build/out:z,rw \
+    -v "$CWD${P}docker-build-v2${P}$PLATFORM${P}toolchain.cmake":/build/toolchain.cmake:z,ro \
     $UID_FLAGS \
     $WORKTREE_MOUNTS \
     -e CONFIGURE \
