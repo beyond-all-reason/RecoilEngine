@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
 project(streflop C CXX)
 
-# Set C++20 standard
-set(CMAKE_CXX_STANDARD 20)
+# Set C++17 standard
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Options
@@ -359,16 +359,27 @@ if(BUILD_TESTS)
 	target_link_libraries(randomTest streflop)
 endif()
 
-## Installation rules
-#install(TARGETS streflop ARCHIVE DESTINATION lib)
-#install(FILES
-#	SMath.h
-#	Random.h
-#	streflop.h
-#	FPUSettings.h
-#	IntegerTypes.h
-#	System.h
-#	X87DenormalSquasher.h
-#	SoftFloatWrapper.h
-#	DESTINATION include/streflop
-#)
+if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.21")
+  set(STREFLOP_STANDALONE ${PROJECT_IS_TOP_LEVEL})
+else()
+  if(CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    set(STREFLOP_STANDALONE TRUE)
+  else()
+    set(STREFLOP_STANDALONE FALSE)
+  endif()
+endif()
+
+if(STREFLOP_STANDALONE)
+  install(TARGETS streflop ARCHIVE DESTINATION lib)
+  install(FILES
+    SMath.h
+    Random.h
+    streflop.h
+    FPUSettings.h
+    IntegerTypes.h
+    System.h
+    X87DenormalSquasher.h
+    SoftFloatWrapper.h
+    DESTINATION include/streflop
+  )
+endif()
