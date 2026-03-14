@@ -11,20 +11,24 @@
 #include "System/Log/ILog.h"
 #include "System/Platform/CpuID.h"
 
-#ifndef STREFLOP_H
-void good_fpu_control_registers(const char* text) {
-	static bool once = false;
-	if (!once) { LOG_L(L_WARNING, "[%s](%s) streflop is disabled", __func__, text); once = true; }
+#ifdef NOT_USING_STREFLOP
+#include <mutex>
+
+void good_fpu_control_registers(const char*) {
+	static std::once_flag fpu_warning_once;
+	std::call_once(fpu_warning_once, []() {
+		LOG_L(L_WARNING, "[%s] streflop is disabled", __func__);
+	});
 }
-void good_fpu_init() { LOG_L(L_WARNING, "[%s] streflop is disabled", __func__); }
+
+void good_fpu_init() {
+	LOG_L(L_WARNING, "[%s] streflop is disabled", __func__);
+}
 
 #else
 
-#ifdef STREFLOP_SSE
-#elif STREFLOP_NEON
-#elif STREFLOP_X87
-#else
-	#error "streflop FP-math mode must be either SSE or X87"
+#if !defined(STREFLOP_SSE) && !defined(STREFLOP_NEON) && !defined(STREFLOP_X87)
+	#error "streflop FP-math mode must be either SSE or NEON or X87"
 #endif
 
 
