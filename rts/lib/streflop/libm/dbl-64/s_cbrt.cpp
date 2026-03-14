@@ -51,7 +51,7 @@ __cbrt (Double x)
      if necessary.
      Note: *Our* version of `frexp' sets XE to zero if the argument is
      Inf or NaN.  This is not portable but faster.  */
-  if (xe == 0 && fpclassify (x) <= FP_ZERO)
+  if (xe == 0 && streflop_libm::fpclassify (x) <= FP_ZERO)
     return x + x;
 
  u = (0.354895765043919860

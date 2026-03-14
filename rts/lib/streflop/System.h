@@ -15,12 +15,24 @@
 
 #if defined(STREFLOP_SSE) || defined(STREFLOP_X87)
 // SSE or X87 machines are little-endian
+#ifdef __BYTE_ORDER
+#undef __BYTE_ORDER
+#endif
+#ifdef __FLOAT_WORD_ORDER
+#undef __FLOAT_WORD_ORDER
+#endif
 #define __BYTE_ORDER 1234
 #define __FLOAT_WORD_ORDER 1234
 
 // Softfloat or other unknown FPU. TODO: Try some header autodetect?
 #else
 
+#ifdef __BYTE_ORDER
+#undef __BYTE_ORDER
+#endif
+#ifdef __FLOAT_WORD_ORDER
+#undef __FLOAT_WORD_ORDER
+#endif
 #define __BYTE_ORDER 1234
 #define __FLOAT_WORD_ORDER 1234
 /*

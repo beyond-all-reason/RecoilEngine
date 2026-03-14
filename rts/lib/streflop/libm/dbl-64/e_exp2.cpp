@@ -54,7 +54,7 @@ __ieee754_exp2 (Double x)
   static const Double lomark = (Double) (DBL_MIN_EXP - DBL_MANT_DIG - 1);
 
   /* Check for usual case.  */
-  if (isless (x, himark) && isgreaterequal (x, lomark))
+  if (streflop_libm::isless (x, himark) && streflop_libm::isgreaterequal (x, lomark))
     {
       static const Double THREEp42 = 13194139533312.0;
       int tval, unsafe;
@@ -122,7 +122,7 @@ __ieee754_exp2 (Double x)
 	return result * scale_u.d();
     }
   /* Exceptional cases:  */
-  else if (isless (x, himark))
+  else if (streflop_libm::isless (x, himark))
     {
       if (__isinf (x))
 	/* e^-inf == 0, with no error.  */

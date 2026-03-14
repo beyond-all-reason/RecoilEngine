@@ -50,7 +50,7 @@ __ieee754_exp2f (Simple x)
   static const Simple lomark = (Simple) (FLT_MIN_EXP - FLT_MANT_DIG - 1);
 
   /* Check for usual case.  */
-  if (isless (x, himark) && isgreaterequal (x, lomark))
+  if (streflop_libm::isless (x, himark) && streflop_libm::isgreaterequal (x, lomark))
     {
       static const Simple THREEp14 = 49152.0f;
       int tval, unsafe;
@@ -115,7 +115,7 @@ __ieee754_exp2f (Simple x)
 	return result * scale_u.f();
     }
   /* Exceptional cases:  */
-  else if (isless (x, himark))
+  else if (streflop_libm::isless (x, himark))
     {
       if (__isinff (x))
 	/* e^-inf == 0, with no error.  */

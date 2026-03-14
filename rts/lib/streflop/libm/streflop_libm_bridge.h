@@ -126,25 +126,25 @@ enum
     inline int fpclassify(Simple x) {return streflop_libm::__fpclassifyf(x);}
     inline int isnan(Simple x) {return streflop_libm::__isnanf(x);}
     inline int isinf(Simple x) {return streflop_libm::__isinff(x);}
-    inline int isfinite(Simple x) {return !(isnan(x) || isinf(x));}
-    inline int isnormal(Simple x) {return fpclassify(x) == FP_NORMAL;}
+    inline int isfinite(Simple x) {return !(streflop_libm::isnan(x) || streflop_libm::isinf(x));}
+    inline int isnormal(Simple x) {return streflop_libm::fpclassify(x) == FP_NORMAL;}
     inline bool isunordered(Simple x, Simple y) {
-        return (fpclassify(x) == FP_NAN) || (fpclassify (y) == FP_NAN);
+        return (streflop_libm::fpclassify(x) == FP_NAN) || (streflop_libm::fpclassify(y) == FP_NAN);
     }
     inline bool isgreater(Simple x, Simple y) {
-        return (!isunordered(x,y)) && (x > y);
+        return (!streflop_libm::isunordered(x,y)) && (x > y);
     }
     inline bool isgreaterequal(Simple x, Simple y) {
-        return (!isunordered(x,y)) && (x >= y);
+        return (!streflop_libm::isunordered(x,y)) && (x >= y);
     }
     inline bool isless(Simple x, Simple y) {
-        return (!isunordered(x,y)) && (x < y);
+        return (!streflop_libm::isunordered(x,y)) && (x < y);
     }
     inline bool islessequal(Simple x, Simple y) {
-        return (!isunordered(x,y)) && (x <= y);
+        return (!streflop_libm::isunordered(x,y)) && (x <= y);
     }
     inline bool islessgreater(Simple x, Simple y) {
-        return (!isunordered(x,y)) && ((x < y) || (x > y));
+        return (!streflop_libm::isunordered(x,y)) && ((x < y) || (x > y));
     }
     extern const Simple SimplePositiveInfinity;
     extern const Simple SimpleNegativeInfinity;
@@ -158,25 +158,25 @@ enum
     inline int fpclassify(Double x) {return streflop_libm::__fpclassify(x);}
     inline int isnan(Double x) {return streflop_libm::__isnanl(x);}
     inline int isinf(Double x) {return streflop_libm::__isinf(x);}
-    inline int isfinite(Double x) {return !(isnan(x) || isinf(x));}
-    inline int isnormal(Double x) {return fpclassify(x) == FP_NORMAL;}
+    inline int isfinite(Double x) {return !(streflop_libm::isnan(x) || streflop_libm::isinf(x));}
+    inline int isnormal(Double x) {return streflop_libm::fpclassify(x) == FP_NORMAL;}
     inline bool isunordered(Double x, Double y) {
-        return (fpclassify(x) == FP_NAN) || (fpclassify (y) == FP_NAN);
+        return (streflop_libm::fpclassify(x) == FP_NAN) || (streflop_libm::fpclassify(y) == FP_NAN);
     }
     inline bool isgreater(Double x, Double y) {
-        return (!isunordered(x,y)) && (x > y);
+        return (!streflop_libm::isunordered(x,y)) && (x > y);
     }
     inline bool isgreaterequal(Double x, Double y) {
-        return (!isunordered(x,y)) && (x >= y);
+        return (!streflop_libm::isunordered(x,y)) && (x >= y);
     }
     inline bool isless(Double x, Double y) {
-        return (!isunordered(x,y)) && (x < y);
+        return (!streflop_libm::isunordered(x,y)) && (x < y);
     }
     inline bool islessequal(Double x, Double y) {
-        return (!isunordered(x,y)) && (x <= y);
+        return (!streflop_libm::isunordered(x,y)) && (x <= y);
     }
     inline bool islessgreater(Double x, Double y) {
-        return (!isunordered(x,y)) && ((x < y) || (x > y));
+        return (!streflop_libm::isunordered(x,y)) && ((x < y) || (x > y));
     }
     extern const Double DoublePositiveInfinity;
     extern const Double DoubleNegativeInfinity;
@@ -191,25 +191,25 @@ enum
     inline int fpclassify(Extended x) {return streflop_libm::__fpclassifyl(x);}
     inline int isnan(Extended x) {return streflop_libm::__isnanl(x);}
     inline int isinf(Extended x) {return streflop_libm::__isinfl(x);}
-    inline int isfinite(Extended x) {return !(isnan(x) || isinf(x));}
-    inline int isnormal(Extended x) {return fpclassify(x) == FP_NORMAL;}
+    inline int isfinite(Extended x) {return !(streflop_libm::isnan(x) || streflop_libm::isinf(x));}
+    inline int isnormal(Extended x) {return streflop_libm::fpclassify(x) == FP_NORMAL;}
     inline bool isunordered(Extended x, Extended y) {
-        return (fpclassify(x) == FP_NAN) || (fpclassify (y) == FP_NAN);
+        return (streflop_libm::fpclassify(x) == FP_NAN) || (streflop_libm::fpclassify(y) == FP_NAN);
     }
     inline bool isgreater(Extended x, Extended y) {
-        return (!isunordered(x,y)) && (x > y);
+        return (!streflop_libm::isunordered(x,y)) && (x > y);
     }
     inline bool isgreaterequal(Extended x, Extended y) {
-        return (!isunordered(x,y)) && (x >= y);
+        return (!streflop_libm::isunordered(x,y)) && (x >= y);
     }
     inline bool isless(Extended x, Extended y) {
-        return (!isunordered(x,y)) && (x < y);
+        return (!streflop_libm::isunordered(x,y)) && (x < y);
     }
     inline bool islessequal(Extended x, Extended y) {
-        return (!isunordered(x,y)) && (x <= y);
+        return (!streflop_libm::isunordered(x,y)) && (x <= y);
     }
     inline bool islessgreater(Extended x, Extended y) {
-        return (!isunordered(x,y)) && ((x < y) || (x > y));
+        return (!streflop_libm::isunordered(x,y)) && ((x < y) || (x > y));
     }
     extern const Extended ExtendedPositiveInfinity;
     extern const Extended ExtendedNegativeInfinity;

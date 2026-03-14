@@ -83,8 +83,18 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
 	if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
 		add_compile_options(-march=armv8-a+simd)
 	else()
-		# x86: SSE math, restrict to SSE1 baseline (match engine fallback)
-		add_compile_options(-msse -mfpmath=sse)
+		# x86: SSE instructions available, but FPU math mode varies by STREFLOP mode
+		add_compile_options(-msse -msse2)
+		if(STREFLOP_MODE STREQUAL "X87")
+			# X87 mode: use 387 FPU to match streflop library
+			# Force IEEE 754 compliance - store to memory after each FPU operation
+			add_compile_options(-mfpmath=387 -ffloat-store)
+		else()
+			# SSE/SOFT/NEON: use SSE for FPU math
+			add_compile_options(-mfpmath=sse)
+		endif()
+		# Restrict to SSE2 baseline
+		# However my tests (ivand, 14/03/2026) show that removing these next two lines is not harmful for the sync
 		add_compile_options(-mno-sse3 -mno-ssse3 -mno-sse4.1 -mno-sse4.2 -mno-sse4 -mno-sse4a)
 		add_compile_options(-mno-avx -mno-fma -mno-fma4 -mno-xop -mno-lwp -mno-avx2)
 	endif()

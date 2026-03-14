@@ -80,7 +80,7 @@ ivln2_l  =  7.0526075433e-06f; /* 0x36eca570 =1/ln2 tail*/
 
     /* x==+-1 */
 	if(x == 1.0f) return one;
-	if(x == -1.0f && isinf(y)) return one;
+	if(x == -1.0f && streflop_libm::isinf(y)) return one;
 
     /* +-NaN return x+y */
 	if(ix > 0x7f800000 ||

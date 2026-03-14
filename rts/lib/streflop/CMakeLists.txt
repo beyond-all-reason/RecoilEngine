@@ -336,7 +336,9 @@ else()
 	# Default to X87 mode
 	target_compile_definitions(streflop PUBLIC STREFLOP_X87)
 	if(NOT MSVC)
-		target_compile_options(streflop PRIVATE -mfpmath=387)
+		# X87 mode: use 387 FPU
+		# Force IEEE 754 compliance by storing to memory after each FPU operation
+		target_compile_options(streflop PRIVATE -mfpmath=387 -ffloat-store)
 	endif()
 endif()
 
