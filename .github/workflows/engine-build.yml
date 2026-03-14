@@ -187,6 +187,7 @@ jobs:
             -v /etc/group:/etc/group:ro \
             --user="$(id -u):$(id -g)" \
             -v $(pwd)/src:/build/src:ro \
+            -v $(pwd)/src/docker-build-v2/${{ matrix.system }}/toolchain.cmake:/build/toolchain.cmake:ro \
             -v $(pwd)/remote_ccache.conf:/build/ccache.conf:ro \
             -v $(pwd)/artifacts:/build/artifacts:rw \
             -e CCACHE_${{ inputs.recache && 'RECACHE' || 'NORECACHE' }}=1 \
