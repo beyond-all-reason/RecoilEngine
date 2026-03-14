@@ -369,9 +369,6 @@ namespace recoil {
         [[nodiscard]] size_t capacity()    const noexcept { return chunks.size() * CHUNK_SIZE; }
         [[nodiscard]] bool   empty()       const noexcept { return elemCount == 0; }
         [[nodiscard]] size_t size()        const noexcept { return elemCount; }
-        // Returns the number of allocated chunks, which may exceed the number of
-        // chunks containing live elements after reserve() or reset(). Use
-        // for_each_chunk() to iterate only over chunks with live data.
         [[nodiscard]] size_t chunk_count() const noexcept { return chunks.size(); }
 
         // Grow to exactly count elements, default-constructing any new ones.
@@ -427,29 +424,29 @@ namespace recoil {
         // Element access
         // -----------------------------------------------------------------------
 
-        reference       operator[](size_t idx)       { return chunks[Helper::ChunkIndex(idx)].get()[Helper::OffsetIndex(idx)]; }
-        const_reference operator[](size_t idx) const { return chunks[Helper::ChunkIndex(idx)].get()[Helper::OffsetIndex(idx)]; }
+        decltype(auto) operator[](size_t idx)       { return chunks[Helper::ChunkIndex(idx)].get()[Helper::OffsetIndex(idx)]; }
+        decltype(auto) operator[](size_t idx) const { return chunks[Helper::ChunkIndex(idx)].get()[Helper::OffsetIndex(idx)]; }
 
-        reference at(size_t idx) {
+        decltype(auto) at(size_t idx) {
             if (idx >= elemCount) [[unlikely]] throw std::out_of_range("ChunkedArray::at index out of range");
             return (*this)[idx];
         }
-        const_reference at(size_t idx) const {
+        decltype(auto) at(size_t idx) const {
             if (idx >= elemCount) [[unlikely]] throw std::out_of_range("ChunkedArray::at index out of range");
             return (*this)[idx];
         }
 
-        reference       front()       { assert(elemCount > 0); return (*this)[0]; }
-        const_reference front() const { assert(elemCount > 0); return (*this)[0]; }
-        reference       back()        { assert(elemCount > 0); return (*this)[elemCount - 1]; }
-        const_reference back()  const { assert(elemCount > 0); return (*this)[elemCount - 1]; }
+        decltype(auto) front()       { assert(elemCount > 0); return (*this)[0]; }
+        decltype(auto) front() const { assert(elemCount > 0); return (*this)[0]; }
+        decltype(auto) back()        { assert(elemCount > 0); return (*this)[elemCount - 1]; }
+        decltype(auto) back()  const { assert(elemCount > 0); return (*this)[elemCount - 1]; }
 
         // -----------------------------------------------------------------------
         // Modifiers
         // -----------------------------------------------------------------------
 
         template<typename... Args>
-        reference emplace_back(Args&&... args) {
+        decltype(auto) emplace_back(Args&&... args) {
             if (m_writePtr == m_chunkEnd) [[unlikely]]
                 allocate_new_chunk();
             T* slot = m_writePtr;
@@ -466,18 +463,7 @@ namespace recoil {
             assert(elemCount > 0);
             --elemCount;
             std::destroy_at(std::addressof((*this)[elemCount]));
-            // Fast path: the freed slot and the new write position are in the same
-            // chunk, so we can simply step m_writePtr back by one.
-            // This holds when the new elemCount is NOT the last slot of its chunk —
-            // equivalently when OffsetIndex(elemCount) != CHUNK_SIZE-1 — because if
-            // it were, then m_writePtr (which points at slot elemCount+1) would be
-            // sitting at the first slot of the *next* chunk (a separate allocation),
-            // and --m_writePtr would step before that chunk into unrelated memory.
-            if (Helper::OffsetIndex(elemCount) != Helper::MASK) [[likely]] {
-                --m_writePtr;
-            } else {
-                update_write_ptr();
-            }
+            update_write_ptr();
         }
 
         // Removes the element at idx in O(1) by moving the last element into the
@@ -501,68 +487,27 @@ namespace recoil {
 
         std::span<T> get_chunk_span(size_t chunk_idx) noexcept {
             if (chunk_idx >= chunks.size()) [[unlikely]] return {};
-            const size_t chunk_base = chunk_idx * CHUNK_SIZE;
-            if (chunk_base >= elemCount) return {};
-            return {chunks[chunk_idx].get(), std::min(CHUNK_SIZE, elemCount - chunk_base)};
+            T* start = chunks[chunk_idx].get();
+            if (chunk_idx == chunks.size() - 1) {
+                const size_t base = chunk_idx * CHUNK_SIZE;
+                return {start, elemCount > base ? elemCount - base : 0};
+            }
+            return {start, CHUNK_SIZE};
         }
 
         std::span<const T> get_chunk_span(size_t chunk_idx) const noexcept {
             if (chunk_idx >= chunks.size()) [[unlikely]] return {};
-            const size_t chunk_base = chunk_idx * CHUNK_SIZE;
-            if (chunk_base >= elemCount) return {};
-            return {chunks[chunk_idx].get(), std::min(CHUNK_SIZE, elemCount - chunk_base)};
+            const T* start = chunks[chunk_idx].get();
+            if (chunk_idx == chunks.size() - 1) {
+                const size_t base = chunk_idx * CHUNK_SIZE;
+                return {start, elemCount > base ? elemCount - base : 0};
+            }
+            return {start, CHUNK_SIZE};
         }
 
         // -----------------------------------------------------------------------
-        // Chunk iteration
-        //
-        // Chunk-first iteration is the canonical fast path for large workloads.
-        // The inner loop over each span is pure pointer iteration with no branch
-        // overhead, and each span is contiguous — ideal for prefetching, SIMD,
-        // and auto-vectorization.
-        //
-        // Job-system parallelism is trivially expressible:
-        //
-        //   arr.for_each_chunk_indexed([&](size_t c, std::span<T> chunk) {
-        //       jobSystem.schedule([chunk] {
-        //           for (T& t : chunk) update(t);
-        //       });
-        //   });
-        //
-        // Note: chunk spans must not outlive the ChunkedArray, and the array
-        // must not be mutated while spans are in use.
+        // Iterators
         // -----------------------------------------------------------------------
-
-        // Calls f(std::span<T>) for each live chunk in order.
-        template<typename F>
-        void for_each_chunk(F&& f) {
-            const size_t live = elemCount > 0 ? Helper::ChunkIndex(elemCount - 1) + 1 : 0;
-            for (size_t c = 0; c < live; ++c)
-                f(get_chunk_span(c));
-        }
-
-        template<typename F>
-        void for_each_chunk(F&& f) const {
-            const size_t live = elemCount > 0 ? Helper::ChunkIndex(elemCount - 1) + 1 : 0;
-            for (size_t c = 0; c < live; ++c)
-                f(get_chunk_span(c));
-        }
-
-        // Calls f(size_t chunkIndex, std::span<T>) for each live chunk in order.
-        // The chunk index enables job-system scheduling and per-chunk bookkeeping.
-        template<typename F>
-        void for_each_chunk_indexed(F&& f) {
-            const size_t live = elemCount > 0 ? Helper::ChunkIndex(elemCount - 1) + 1 : 0;
-            for (size_t c = 0; c < live; ++c)
-                f(c, get_chunk_span(c));
-        }
-
-        template<typename F>
-        void for_each_chunk_indexed(F&& f) const {
-            const size_t live = elemCount > 0 ? Helper::ChunkIndex(elemCount - 1) + 1 : 0;
-            for (size_t c = 0; c < live; ++c)
-                f(c, get_chunk_span(c));
-        }
 
         iterator       begin()        { return iterator(this, 0); }
         iterator       end()          { return iterator(this, elemCount); }
@@ -689,4 +634,4 @@ namespace recoil {
         }
     };
 
-} // namespace recoil
+}
