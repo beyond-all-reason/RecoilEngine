@@ -448,7 +448,7 @@ endif ()
 add_definitions(-DASIO_STANDALONE)
 
 ### sse2neon
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
+if (IS_ARM64_BUILD)
 	add_definitions(-DSSE2NEON)
 	add_definitions(-DSSE2NEON_SUPPRESS_WARNINGS)
 
@@ -477,7 +477,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 
 	if (NOT MARCH_FLAG STREQUAL "generic")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${MARCH_FLAG} -mtune=${MARCH_FLAG}") #march/mtune define SSE flags
-	elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
+	elseif (IS_ARM64_BUILD)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a+simd ${FP_CONTRACT_FLAG}")
 	else (NOT MARCH_FLAG STREQUAL "generic")
 		set(FALLBACK_SSE_FLAGS "-msse")
@@ -501,7 +501,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${FALLBACK_MARCH} -mtune=generic ${FALLBACK_SSE_FLAGS}")
 	endif (NOT MARCH_FLAG STREQUAL "generic")
 
-	if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
+	if (NOT IS_ARM64_BUILD)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -mfpmath=sse") #SSE_FLAGS are now user input only
 	endif ()
 elseif (MSVC)
