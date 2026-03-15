@@ -154,8 +154,6 @@ jobs:
           path: ${{ runner.temp }}
       - name: Pull builder image
         id: resolve-image
-        # Fetching image from GitHub can be *incredibly* slow, so cache layers also in the
-        # namespace.so container registry.
         run: |
           if [[ -f ${{ runner.temp }}/image.tar ]]; then
             docker load --input ${{ runner.temp }}/image.tar
@@ -167,14 +165,9 @@ jobs:
 
           digest=${image_version[${{ matrix.system }}]}
           ghcr_image=ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}
-          nsc_image=${{ env.NSC_CONTAINER_REGISTRY }}/recoil-build-${{ matrix.system }}
 
           docker version
-          docker pull $nsc_image@$digest || true
           docker pull $ghcr_image@$digest
-          docker image tag $ghcr_image@$digest $nsc_image
-          docker push $nsc_image
-
           echo "image=$ghcr_image@$digest" >> "$GITHUB_OUTPUT"
       - name: Build
         # Instead of manually running docker, it would be cool to just run whole GitHub actions
