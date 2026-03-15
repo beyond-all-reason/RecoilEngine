@@ -11,7 +11,8 @@ if [[ $(id -u) -eq 0 && -z "${SKIP_ROOT_CHECK:-}" ]]; then
   exit 2
 fi
 
-USAGE="Usage: $0 [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] {windows|linux} [cmake_flag...]"
+USAGE="Usage: $0 [--help] [--configure|--deps|--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] {windows|linux} [cmake_flag...]"
+export DEPS=true
 export CONFIGURE=true
 export COMPILE=true
 export CMAKE_BUILD_PARALLEL_LEVEL=
@@ -22,15 +23,23 @@ case $(uname -m) in
   *) ARCH=unknown ;;
 esac
 
-OS=
+export OS=
 while (( $# > 0 )); do
   case $1 in
+    --deps)
+      DEPS=true
+      CONFIGURE=false
+      COMPILE=false
+      shift
+      ;;
     --configure)
+      DEPS=false
       CONFIGURE=true
       COMPILE=false
       shift
       ;;
     --compile)
+      DEPS=false
       CONFIGURE=false
       COMPILE=true
       shift
@@ -39,6 +48,7 @@ while (( $# > 0 )); do
       echo "$USAGE"
       echo "Options:"
       echo "  -h, --help   print this help message"
+      echo "  --deps       only install conan dependencies, don't configure or compile"
       echo "  --configure  only configure, don't compile"
       echo "  --compile    only compile, don't configure"
       echo "  -j, --jobs   number of concurrent processes to use when building"
@@ -115,7 +125,9 @@ if [[ -n "$UNSYNCED_SUBMODULES" ]]; then
   fi
 fi
 
-mkdir -p build-$PLATFORM .cache/ccache-$PLATFORM
+mkdir -p build-$PLATFORM .cache/ccache-$PLATFORM .conan2-$PLATFORM/profiles
+cp docker-build-v2/images/$ARCH-all/conan_build_profile .conan2-$PLATFORM/profiles
+cp docker-build-v2/images/$PLATFORM/conan_profile .conan2-$PLATFORM/profiles
 
 # Build container image selection, allow overriding.
 if [[ -n "${CONTAINER_IMAGE:-}" ]]; then
@@ -190,12 +202,15 @@ fi
 
 $RUNTIME run --platform=linux/$ARCH -i $TTY_FLAG --rm \
     -v "$CWD${P}":/build/src:z,ro \
-    -v "$CWD${P}.cache${P}ccache-$PLATFORM":/build/cache:z,rw \
-    -v "$CWD${P}build-$PLATFORM":/build/out:z,rw \
+    -v "$CWD${P}.cache${P}ccache-${PLATFORM}${P}":/build/cache:z,rw \
+    -v "$CWD${P}build-${PLATFORM}${P}":/build/out:z,rw \
+    -v "$CWD${P}.conan2-${PLATFORM}${P}":/build/.conan2:rw \
     $UID_FLAGS \
     $WORKTREE_MOUNTS \
+    -e DEPS \
     -e CONFIGURE \
     -e COMPILE \
+    -e OS \
     -e CMAKE_BUILD_PARALLEL_LEVEL \
     "${EXTRA_ARGS[@]}" \
     $IMAGE \
@@ -217,7 +232,10 @@ if [[ "$(id -u)" != "$(stat -c %u /build/src)" ]]; then
 fi
 
 cd /build/src/docker-build-v2/scripts
+$DEPS && ./graph-deps.sh "$@"
+$DEPS && ./deps.sh "$@"
 $CONFIGURE && ./configure.sh "$@"
+export OS
 if $COMPILE; then
   if $CONFIGURE; then
     ./compile.sh

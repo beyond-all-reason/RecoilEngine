@@ -11,8 +11,19 @@ RUN apt-get update \
  && add-apt-repository ppa:ubuntu-toolchain-r/test --yes \
  && apt-get update \
  && apt-get install --no-install-recommends --yes \
-    curl gcc-13 g++-13 git ninja-build curl p7zip-full python3-pip python3-setuptools \
-    libsdl2-dev libopenal-dev libfreetype6-dev libfontconfig1-dev \
+    curl gcc-13 g++-13 git ninja-build curl p7zip-full xz-utils build-essential \
+    python3.8 python3.8-distutils libx11-dev libx11-xcb-dev libfontenc-dev xkb-data \
+    libice-dev libsm-dev libxau-dev libxaw7-dev libegl1-mesa-dev libgl1-mesa-dev \
+    libx11-dev libx11-xcb-dev libfontenc-dev libice-dev libsm-dev libxau-dev libxaw7-dev \
+    libxcomposite-dev libxcursor-dev libxdamage-dev libxdmcp-dev libxext-dev libxfixes-dev \
+    libxi-dev libxinerama-dev libxkbfile-dev libxmu-dev libxmuu-dev \
+    libxpm-dev libxrandr-dev libxrender-dev libxres-dev libxss-dev libxt-dev libxtst-dev \
+    libxv-dev libxxf86vm-dev libxcb-glx0-dev libxcb-render0-dev \
+    libxcb-render-util0-dev libxcb-xkb-dev libxcb-icccm4-dev libxcb-image0-dev \
+    libxcb-keysyms1-dev libxcb-randr0-dev libxcb-shape0-dev libxcb-sync-dev libxcb-xfixes0-dev \
+    libxcb-xinerama0-dev libxcb-dri3-dev uuid-dev libxcb-cursor-dev libxcb-dri2-0-dev \
+    libxcb-dri3-dev libxcb-present-dev libxcb-composite0-dev libxcb-ewmh-dev \
+    libxcb-res0-dev libxcb-util-dev pkg-config \
  && apt-get remove --purge --yes software-properties-common \
  && apt-get autoremove --purge --yes \
  && apt-get upgrade --yes \
@@ -35,23 +46,19 @@ RUN git clone --depth 1 --branch v1.5.7 https://github.com/facebook/zstd.git \
  && cd .. \
  && rm -rf zstd
 
-RUN pip3 install --upgrade pip \
- && pip3 install scikit-build \
- && pip3 install cmake==3.27.*
+RUN curl -L -O https://bootstrap.pypa.io/pip/3.8/get-pip.py && python3.8 get-pip.py && rm get-pip.py
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 10
+
+RUN python3.8 -m pip install --upgrade pip \
+ && python3.8 -m pip install scikit-build cmake==3.27.* conan
 
 WORKDIR /build
 RUN mkdir src cache out artifacts && chmod a+rwx cache out artifacts
 
-# Fetch library dependencies and configure resolution
-RUN git clone --depth=1 https://github.com/beyond-all-reason/spring-static-libs.git -b ${STATIC_LIBS_BRANCH} spring-static-libs
-ENV PKG_CONFIG_LIBDIR=/build/spring-static-libs/lib/pkgconfig
-ENV PKG_CONFIG="pkg-config --define-prefix --static"
-ENV CMAKE_PREFIX_PATH=/build/spring-static-libs/
-ENV PREFER_STATIC_LIBS=TRUE
-
 # Set up default cmake toolchain
 COPY all-linux/toolchain.cmake .
 ENV CMAKE_TOOLCHAIN_FILE=/build/toolchain.cmake
+ENV CONAN_HOME=/build/.conan2
 
 # Configure ccache caching
 COPY all/ccache.conf .

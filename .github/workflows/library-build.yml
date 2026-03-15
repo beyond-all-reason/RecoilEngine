@@ -1,0 +1,103 @@
+# Builds docker images used by engine-build.yml
+name: Library Dep Build
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - 'docker-build-v2/amd64-linux/**'
+      - 'docker-build-v2/amd64-windows/**'
+      - conanfile.py
+  pull_request:
+    paths:
+      - 'docker-build-v2/amd64-linux/**'
+      - 'docker-build-v2/amd64-windows/**'
+      - conanfile.py
+jobs:
+  build-dependencies:
+    if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
+    strategy:
+      matrix:
+        system:
+          - amd64-linux
+          - amd64-windows
+    runs-on:
+      # Run on 8 core, 16GiB ubuntu 24.04 machine.
+      - nscloud-ubuntu-24.04-amd64-8x16-with-cache
+      # Mount named cache volume `engine-${{ matrix.system }}`.
+      - nscloud-cache-tag-engine-${{ matrix.system }}
+      # The cache volume should be 20GiB (minimal size).
+      - nscloud-cache-size-20gb
+      # Also cache the git checkouts in datacenter local namespace git mirror
+      # to speed them up.
+      - nscloud-git-mirror-5gb
+      # Also cache docker pulls in volume so images don't have to be pulled
+      # and unpacked every time.
+      - nscloud-exp-container-image-cache
+    steps:
+      - name: Checkout code
+        uses: namespacelabs/nscloud-checkout-action@v7
+        with:
+          # We fetch full history because engine automatic version naming uses
+          # that.
+          fetch-depth: 0
+          dissociate: true
+          path: src
+      - name: Download docker image artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: build-image-${{ matrix.system }}
+          path: ${{ runner.temp }}
+      - name: Pull builder image
+        id: resolve-image
+        # Fetching image from GitHub can be *incredibly* slow, so cache layers also in the
+        # namespace.so container registry.
+        run: |
+          if [[ -f ${{ runner.temp }}/image.tar ]]; then
+            docker load --input ${{ runner.temp }}/image.tar
+            echo "image=recoil-build-${{ matrix.system }}:latest" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          source src/docker-build-v2/images_versions.sh
+
+          digest=${image_version[${{ matrix.system }}]}
+          ghcr_image=ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system }}
+          nsc_image=${{ env.NSC_CONTAINER_REGISTRY }}/recoil-build-${{ matrix.system }}
+
+          docker version
+          docker pull $nsc_image@$digest || true
+          docker pull $ghcr_image@$digest
+          docker image tag $ghcr_image@$digest $nsc_image
+          docker push $nsc_image
+
+          echo "image=$ghcr_image@$digest" >> "$GITHUB_OUTPUT"
+      - name: Build
+        # Instead of manually running docker, it would be cool to just run whole GitHub actions
+        # in container, but unfortunately ubuntu 18.04 is just too old to be able to do it ;(.
+        run: |
+          source src/docker-build-v2/images_versions.sh
+          mkdir -p artifacts
+          mkdir -p .conan2
+          docker run -i --rm \
+            -v /etc/passwd:/etc/passwd:ro \
+            -v /etc/group:/etc/group:ro \
+            --user="$(id -u):$(id -g)" \
+            -v $(pwd)/src:/build/src:ro \
+            -v $(pwd)/.conan2:/build/.conan2:rw \
+            --network host \
+            ${{ steps.resolve-image.outputs.image }} \
+            bash <<EOF
+          set -e
+          cd /build/src/docker-build-v2/scripts
+          ./graph-deps.sh
+          ./deps.sh
+          EOF
+      - name: Save
+        #if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        id: save-artifact
+        with:
+          name: engine-static-libs-${{ matrix.system }}
+          path: ./.conan2

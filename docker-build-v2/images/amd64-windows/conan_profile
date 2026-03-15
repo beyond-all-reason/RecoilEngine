@@ -1,0 +1,25 @@
+[settings]
+arch=x86_64
+build_type=RelWithDebInfo
+compiler=gcc
+compiler.cppstd=gnu20
+compiler.libcxx=libstdc++11
+compiler.version=13
+os=Windows
+
+[conf]
+tools.build:compiler_executables={'c': 'x86_64-w64-mingw32-gcc-posix', 'cpp': 'x86_64-w64-mingw32-g++-posix' }
+tools.cmake.cmaketoolchain:user_toolchain+=/build/toolchain.cmake
+user.cmake.cmake_layout:build_folder=/build/out
+tools.build.cross_building:cross_build=True
+tools.cmake.cmaketoolchain:generator=Ninja
+
+[buildenv]
+CC=x86_64-w64-mingw32-gcc-posix
+CXX=x86_64-w64-mingw32-g++-posix
+WINDRES=x86_64-w64-mingw32-windres
+AR=x86_64-w64-mingw32-ar
+AS=x86_64-w64-mingw32-as
+RANLIB=x86_64-w64-mingw32-ranlib
+STRIP=x86_64-w64-mingw32-strip
+RC=x86_64-w64-mingw32-windres

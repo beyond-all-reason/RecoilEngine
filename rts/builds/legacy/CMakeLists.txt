@@ -19,33 +19,27 @@ target_link_libraries(Game PRIVATE
 	 prd::jsoncpp
 	 streflop
 	 fmt::fmt
+	 ${ZLIB_LIBRARIES}
 )
 
 ### Assemble libraries
-find_package(SDL2 MODULE REQUIRED)
-
-
-
-
+find_package(SDL2 REQUIRED)
 
 set(engineLibraries SDL2::SDL2)
 
 set(OpenGL_GL_PREFERENCE LEGACY)
-find_package_static(OpenGL 3.0 REQUIRED)
+find_package_static(OpenGL REQUIRED)
 list(APPEND engineLibraries OpenGL::GL)
 
-find_fontconfig_hack()
-find_package_static(Fontconfig 2.11 REQUIRED)
+find_package_static(Fontconfig REQUIRED)
 list(APPEND engineLibraries Fontconfig::Fontconfig)
 add_definitions(-DUSE_FONTCONFIG)
 
 if (NOT WIN32)
-	find_package_static(EXPAT 2.2.5 REQUIRED)
-	list(APPEND engineLibraries EXPAT::EXPAT)
+	find_package_static(EXPAT REQUIRED)
+	list(APPEND engineLibraries expat::expat)
 endif()
 
-# !!! If you change freetype resolution here, change it also in rts/lib
-find_freetype_hack() # hack to find different named freetype.dll
 find_package_static(Freetype 2.8.1 REQUIRED)
 list(APPEND engineLibraries Freetype::Freetype)
 
@@ -64,7 +58,6 @@ list(APPEND engineLibraries squish rgetc1)
 list(APPEND engineLibraries ${sound-impl})
 list(APPEND engineLibraries engineSystemNet)
 list(APPEND engineLibraries ${engineCommonLibraries})
-#list(APPEND engineLibraries engineaGui)
 list(APPEND engineLibraries ${SPRING_SIM_LIBRARIES})
 list(APPEND engineLibraries engineSim)
 list(APPEND engineLibraries pr-downloader)
@@ -72,6 +65,7 @@ list(APPEND engineLibraries RmlUi::Core)
 list(APPEND engineLibraries RmlUi::Debugger)
 list(APPEND engineLibraries lunasvg)
 list(APPEND engineLibraries glad)
+list(APPEND engineLibraries ${ZLIB_LIBRARIES})
 
 ### Assemble external include dirs
 list(APPEND engineIncludes ${ENGINE_SRC_ROOT_DIR}/lib/asio/include)
