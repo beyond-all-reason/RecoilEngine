@@ -424,29 +424,29 @@ namespace recoil {
         // Element access
         // -----------------------------------------------------------------------
 
-        decltype(auto) operator[](size_t idx)       { return chunks[Helper::ChunkIndex(idx)].get()[Helper::OffsetIndex(idx)]; }
-        decltype(auto) operator[](size_t idx) const { return chunks[Helper::ChunkIndex(idx)].get()[Helper::OffsetIndex(idx)]; }
+        reference       operator[](size_t idx)       { return chunks[Helper::ChunkIndex(idx)].get()[Helper::OffsetIndex(idx)]; }
+        const_reference operator[](size_t idx) const { return chunks[Helper::ChunkIndex(idx)].get()[Helper::OffsetIndex(idx)]; }
 
-        decltype(auto) at(size_t idx) {
+        reference at(size_t idx) {
             if (idx >= elemCount) [[unlikely]] throw std::out_of_range("ChunkedArray::at index out of range");
             return (*this)[idx];
         }
-        decltype(auto) at(size_t idx) const {
+        const_reference at(size_t idx) const {
             if (idx >= elemCount) [[unlikely]] throw std::out_of_range("ChunkedArray::at index out of range");
             return (*this)[idx];
         }
 
-        decltype(auto) front()       { assert(elemCount > 0); return (*this)[0]; }
-        decltype(auto) front() const { assert(elemCount > 0); return (*this)[0]; }
-        decltype(auto) back()        { assert(elemCount > 0); return (*this)[elemCount - 1]; }
-        decltype(auto) back()  const { assert(elemCount > 0); return (*this)[elemCount - 1]; }
+        reference       front()       { assert(elemCount > 0); return (*this)[0]; }
+        const_reference front() const { assert(elemCount > 0); return (*this)[0]; }
+        reference       back()        { assert(elemCount > 0); return (*this)[elemCount - 1]; }
+        const_reference back()  const { assert(elemCount > 0); return (*this)[elemCount - 1]; }
 
         // -----------------------------------------------------------------------
         // Modifiers
         // -----------------------------------------------------------------------
 
         template<typename... Args>
-        decltype(auto) emplace_back(Args&&... args) {
+        reference emplace_back(Args&&... args) {
             if (m_writePtr == m_chunkEnd) [[unlikely]]
                 allocate_new_chunk();
             T* slot = m_writePtr;
@@ -463,7 +463,11 @@ namespace recoil {
             assert(elemCount > 0);
             --elemCount;
             std::destroy_at(std::addressof((*this)[elemCount]));
-            update_write_ptr();
+            if (Helper::OffsetIndex(elemCount) != Helper::MASK) [[likely]] {
+                --m_writePtr;
+            } else {
+                update_write_ptr();
+            }
         }
 
         // Removes the element at idx in O(1) by moving the last element into the
@@ -487,22 +491,16 @@ namespace recoil {
 
         std::span<T> get_chunk_span(size_t chunk_idx) noexcept {
             if (chunk_idx >= chunks.size()) [[unlikely]] return {};
-            T* start = chunks[chunk_idx].get();
-            if (chunk_idx == chunks.size() - 1) {
-                const size_t base = chunk_idx * CHUNK_SIZE;
-                return {start, elemCount > base ? elemCount - base : 0};
-            }
-            return {start, CHUNK_SIZE};
+            const size_t chunk_base = chunk_idx * CHUNK_SIZE;
+            if (chunk_base >= elemCount) return {};
+            return {chunks[chunk_idx].get(), std::min(CHUNK_SIZE, elemCount - chunk_base)};
         }
 
         std::span<const T> get_chunk_span(size_t chunk_idx) const noexcept {
             if (chunk_idx >= chunks.size()) [[unlikely]] return {};
-            const T* start = chunks[chunk_idx].get();
-            if (chunk_idx == chunks.size() - 1) {
-                const size_t base = chunk_idx * CHUNK_SIZE;
-                return {start, elemCount > base ? elemCount - base : 0};
-            }
-            return {start, CHUNK_SIZE};
+            const size_t chunk_base = chunk_idx * CHUNK_SIZE;
+            if (chunk_base >= elemCount) return {};
+            return {chunks[chunk_idx].get(), std::min(CHUNK_SIZE, elemCount - chunk_base)};
         }
 
         // -----------------------------------------------------------------------
@@ -583,8 +581,10 @@ namespace recoil {
         }
 
         void allocate_new_chunk() {
-            chunks.push_back(make_chunk());
-            m_writePtr = chunks.back().get();
+            const size_t next_chunk = Helper::ChunkIndex(elemCount);
+            if (next_chunk >= chunks.size())
+                chunks.push_back(make_chunk());
+            m_writePtr = chunks[next_chunk].get();
             m_chunkEnd = m_writePtr + CHUNK_SIZE;
         }
 
