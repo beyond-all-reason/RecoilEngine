@@ -31,6 +31,70 @@ namespace QTPFS {
 		static size_t MaxSpeedModTypeValue() { return (std::numeric_limits<SpeedModType>::max()); }
 		static size_t MaxSpeedBinTypeValue() { return (std::numeric_limits<SpeedBinType>::max()); }
 
+		struct MapSquareData {
+			SpeedBinType bin = 0;
+
+			static constexpr SpeedBinType EXIT_ONLY_MASK = 0x80;
+			static constexpr SpeedBinType BIN_VALUE_MASK = 0x7F;
+
+			MapSquareData() = default;
+			MapSquareData(SpeedBinType binValue, bool exitOnly) {
+				SetBinAndExitOnly(binValue, exitOnly);
+			}
+			MapSquareData(const MapSquareData& other) = default;
+
+			MapSquareData& operator= (const MapSquareData& other) {
+				bin = other.bin;
+				return *this;
+			}
+
+			bool IsExitOnly() const {
+				return !!(bin & EXIT_ONLY_MASK);
+			}
+
+			SpeedBinType GetBinValue() const {
+				return bin & BIN_VALUE_MASK;
+			}
+
+			void SetExitOnly() {
+				bin |= EXIT_ONLY_MASK;
+			}
+
+			void ClearExitOnly() {
+				bin &= ~EXIT_ONLY_MASK;
+			}
+
+			void SetBinValue(SpeedBinType value) {
+				bin = (bin & ~BIN_VALUE_MASK) | (value & BIN_VALUE_MASK);
+			}
+
+			void SetBinAndExitOnly(SpeedBinType value, bool exitOnly) {
+				bin = (value & BIN_VALUE_MASK) | (exitOnly ? EXIT_ONLY_MASK : 0);
+			}
+
+			bool operator== (const MapSquareData& other) const {
+				return bin == other.bin;
+			}
+
+			bool operator!= (const MapSquareData& other) const {
+				return bin != other.bin;
+			}
+		};
+
+		constexpr static unsigned int NODE_CACHE_SECTOR_SIZE = QTPFS_MAP_DAMAGE_SIZE * QTPFS_MAP_DAMAGE_SIZE;
+
+		struct NodeSpeedBinCache : public std::array<MapSquareData, NODE_CACHE_SECTOR_SIZE> {
+			// NOTE: This is used to cache the speed mod bins for each node, so that we don't have to recalculate them every time we need them.
+			//       The cache is indexed by the node index, and the value is an array of speed mod bins for each cell in the node's area.
+		};
+
+		struct ExitOnlyCacheView {
+			const NodeSpeedBinCache& data;
+			uint32_t stride;
+			uint32_t xOffset;
+			uint32_t zOffset;
+		};
+
 		~NodeLayer() { registry.clear(); }
 
 		NodeLayer() = default;
@@ -117,6 +181,21 @@ namespace QTPFS {
 
 		const std::vector<SpeedBinType>& GetCurSpeedBins() const { return curSpeedBins; }
 		const std::vector<SpeedModType>& GetCurSpeedMods() const { return curSpeedMods; }
+		const NodeSpeedBinCache& GetNodeSpeedBinCache(int x, int z) const {
+			const uint32_t sectorIndex = ((z * xsize) / NODE_CACHE_SECTOR_SIZE) + (x / QTPFS_MAP_DAMAGE_SIZE);
+			return mapSquareStatusCache[sectorIndex];
+		}
+
+		ExitOnlyCacheView GetExitOnlyCacheView(uint32_t x1, uint32_t z1) const {
+			const uint32_t sectorIndex = ((z1 * xsize) / NODE_CACHE_SECTOR_SIZE) 
+									+ (x1 / QTPFS_MAP_DAMAGE_SIZE);
+			return {
+				mapSquareStatusCache[sectorIndex],
+				QTPFS_MAP_DAMAGE_SIZE,
+				x1 % QTPFS_MAP_DAMAGE_SIZE,
+				z1 % QTPFS_MAP_DAMAGE_SIZE
+			};
+		}
 
 		void SetNumLeafNodes(unsigned int n) { numLeafNodes = n; }
 		unsigned int GetNumLeafNodes() const { return numLeafNodes; }
@@ -127,6 +206,7 @@ namespace QTPFS {
 			std::uint64_t memFootPrint = sizeof(NodeLayer);
 			memFootPrint += (curSpeedMods.size() * sizeof(SpeedModType));
 			memFootPrint += (curSpeedBins.size() * sizeof(SpeedBinType));
+			memFootPrint += (mapSquareStatusCache.size() * sizeof(decltype(mapSquareStatusCache)::value_type));
 
 			memFootPrint += (selectedNodes.size() * sizeof(decltype(selectedNodes)::value_type));
 			memFootPrint += (openNodes.size()     * sizeof(decltype(openNodes)::value_type));
@@ -178,6 +258,8 @@ namespace QTPFS {
 
 		std::vector<SpeedModType> curSpeedMods;
 		std::vector<SpeedBinType> curSpeedBins;
+
+		std::vector<NodeSpeedBinCache> mapSquareStatusCache;
 
 public:
 		static constexpr unsigned int NUM_POOL_CHUNKS = sizeof(poolNodes) / sizeof(poolNodes[0]);
@@ -236,4 +318,3 @@ private:
 }
 
 #endif
-

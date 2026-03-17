@@ -623,32 +623,34 @@ bool QTPFS::QTNode::UpdateMoveCost(
 
 
 bool QTPFS::QTNode::UpdateExitOnly(NodeLayer& nl, bool& needSplit) {
-	bool exitOnlyStatePresent[2] = {false, false};
+    ZoneScoped;
 
-	auto checkRangeForSplit = [this, &nl, &exitOnlyStatePresent]() {
-		MoveDef *md = moveDefHandler.GetMoveDefByPathType(nl.GetNodelayer());
+    const auto cacheView = nl.GetExitOnlyCacheView(xmin(), zmin());
+    bool hasNormal   = false;
+    bool hasExitOnly = false;
 
-		for (int z = zmin(); z < zmax(); ++z) {
-			for (int x = xmin(); x < xmax(); ++x) {
-				bool isExitOnlyZone = md->IsInExitOnly(x, z);
-				exitOnlyStatePresent[isExitOnlyZone] = true;
+    for (int z = 0; z < int(zsize()); ++z) {
+        for (int x = 0; x < int(xsize()); ++x) {
+            const int i = (cacheView.zOffset + z) * cacheView.stride
+                        + (cacheView.xOffset + x);
 
-				// if the other state is also true, then multiple exitOnly states are present and a split is
-				// needed.
-				if (exitOnlyStatePresent[!isExitOnlyZone] == true)
-					return true;
-			}
-		}
-		return false;
-	};
-	needSplit = checkRangeForSplit();
+            if (cacheView.data[i].IsExitOnly())
+                hasExitOnly = true;
+            else
+                hasNormal = true;
 
-	if (!needSplit) {
-		bool isExitOnlyZone = exitOnlyStatePresent[true];
-		index |= uint32_t(isExitOnlyZone)<<EXIT_ONLY_BIT_OFFSET;
-	}
+            if (hasNormal && hasExitOnly) {
+                needSplit = true;
+                return true;
+            }
+        }
+    }
 
-	return needSplit;
+    if (hasExitOnly)
+        index |= (1u << EXIT_ONLY_BIT_OFFSET);
+
+    needSplit = false;
+    return false;
 }
 
 // get the maximum number of neighbors this node

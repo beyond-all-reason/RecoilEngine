@@ -77,12 +77,17 @@ void QTPFS::NodeLayer::Init(unsigned int layerNum) {
 
 	MoveDef* md = moveDefHandler.GetMoveDefByPathType(layerNum);
 	useShortestPath = md->preferShortestPath;
+
+	const uint32_t mapSize = xsize * zsize;
+	mapSquareStatusCache.clear();
+	mapSquareStatusCache.resize( mapSize / NODE_CACHE_SECTOR_SIZE );
 }
 
 void QTPFS::NodeLayer::Clear() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	curSpeedMods.clear();
 	curSpeedBins.clear();
+	mapSquareStatusCache.clear();
 }
 
 
@@ -96,6 +101,8 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData) {
 	// nodes have divided they will never again grow larger than 16x16 squares in a match.
 	const SRectangle& r = threadData.areaRelinkedInner;
 	const MoveDef* md = threadData.moveDef;
+
+	assert( r.GetWidth() == QTPFS_MAP_DAMAGE_SIZE && r.GetHeight() == QTPFS_MAP_DAMAGE_SIZE );
 
 	auto &blockRect = threadData.areaMaxBlockBits;
 	auto &blockBits = threadData.maxBlockBits;
@@ -117,7 +124,7 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData) {
 		const int zmax = (chmz + md.zsizeh) - blockRect.z1;
 		const int blockRectWidth = blockRect.GetWidth();
 		int ret = 0;
-		
+
 		// footprints are point-symmetric around <xSquare, zSquare>
 		for (int z = zmin; z <= zmax; z += 2/*FOOTPRINT_ZSTEP*/) {
 			for (int x = xmin; x <= xmax; x += 2/*FOOTPRINT_XSTEP*/) {
@@ -148,11 +155,14 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData) {
 		return CMoveMath::RangeIsBlockedHashedMt(xmin, xmax, zmin, zmax, &virtualObject, tempNum, threadData.threadId);
 	};
 
-	// divide speed-modifiers into bins
-	for (unsigned int hmz = r.z1; hmz < r.z2; hmz++) {
-		for (unsigned int hmx = r.x1; hmx < r.x2; hmx++) {
-			const unsigned int recIdx = (hmz - r.z1) * r.GetWidth() + (hmx - r.x1);
+	bool updateRequired = false;
+	const uint32_t sectorIndex = ((r.z1 * xsize) / NODE_CACHE_SECTOR_SIZE) + (r.x1 / QTPFS_MAP_DAMAGE_SIZE);
+	auto& sectorCache = mapSquareStatusCache[sectorIndex];
 
+	// divide speed-modifiers into bins
+	unsigned int recIdx =  0;
+	for (unsigned int hmz = r.z1; hmz < r.z2; ++hmz) {
+		for (unsigned int hmx = r.x1; hmx < r.x2; ++hmx, ++recIdx) {
 			// don't tesselate map edges when footprint extends across them in IsBlocked*
 			const int chmx = std::clamp(int(hmx), md->xsizeh, mapDims.mapxm1 + (-md->xsizeh));
 			const int chmz = std::clamp(int(hmz), md->zsizeh, mapDims.mapym1 + (-md->zsizeh));
@@ -190,10 +200,16 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData) {
 			// need to keep track of these for Tesselate
 			curSpeedMods[recIdx] = newRelSpeedMod * float(MaxSpeedModTypeValue());
 			curSpeedBins[recIdx] = newSpeedModBin;
+
+			const bool isExitOnlyZone = md->IsInExitOnly(hmx, hmz);
+			MapSquareData curSquareState(curSpeedBins[recIdx], isExitOnlyZone);
+			if (curSquareState != sectorCache[recIdx]) {
+				sectorCache[recIdx] = curSquareState;
+				updateRequired = true;
+			}
 		}
 	}
-
-	return true;
+	return updateRequired;
 }
 
 
@@ -227,8 +243,7 @@ void QTPFS::NodeLayer::ExecNodeNeighborCacheUpdates(const SRectangle& ur, Update
 	SRectangle searchArea(xmin, zmin, xmax, zmax);
 	GetNodesInArea(searchArea, selectedNodes);
 
-	threadData.relinkNodeGrid.clear();
-	threadData.relinkNodeGrid.resize(threadData.areaRelinked.GetArea(), nullptr);
+	threadData.relinkNodeGrid.assign(threadData.areaRelinked.GetArea(), nullptr);
 
 	// Build grid with selected nodes.
 	std::for_each(selectedNodes.begin(), selectedNodes.end(), [&threadData](INode *curNode){
