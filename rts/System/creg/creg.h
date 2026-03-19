@@ -144,7 +144,6 @@ namespace creg {
 		ClassFlags flags;
 		bool hasVTable;
 		bool isCregStruct;
-		bool isAlignableAddress;
 
 		std::vector<Member> members;
 		const char* name;

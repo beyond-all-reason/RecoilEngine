@@ -68,7 +68,6 @@ Class::Class(const char* className, ClassFlags cf,
 	, serializeProc(nullptr)
 	, postLoadProc(nullptr)
 	, getSizeProc(nullptr)
-	, isAlignableAddress(false)
 {
 	System::AddClass(this);
 
@@ -189,8 +188,7 @@ void* Class::CreateInstance(size_t size)
 	if (poolAlloc != nullptr) {
 		inst = poolAlloc(size);
 	} else {
-		inst = ::operator new(size, std::align_val_t{(size_t)alignment});
-		isAlignableAddress = true;
+		inst = ::operator new(size);
 	}
 
 	if (constructor != nullptr)
@@ -217,10 +215,7 @@ void Class::DeleteInstance(void* inst)
 	if (poolFree != nullptr) {
 		poolFree(inst);
 	} else {
-		if (isAlignableAddress)
-			::operator delete(inst, std::align_val_t{(size_t)alignment});
-		else
-			::operator delete(inst);
+		::operator delete(inst);
 	}
 }
 
