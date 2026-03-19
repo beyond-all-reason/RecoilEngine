@@ -201,7 +201,7 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData) {
 			curSpeedMods[recIdx] = newRelSpeedMod * float(MaxSpeedModTypeValue());
 			curSpeedBins[recIdx] = newSpeedModBin;
 
-			const bool isExitOnlyZone = md->IsInExitOnly(hmx, hmz);
+			const bool isExitOnlyZone = md->IsInExitOnly(chmx, chmz);
 			MapSquareData curSquareState(curSpeedBins[recIdx], isExitOnlyZone);
 			if (curSquareState != sectorCache[recIdx]) {
 				sectorCache[recIdx] = curSquareState;

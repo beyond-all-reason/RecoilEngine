@@ -251,7 +251,9 @@ namespace QTPFS {
 
 	private:
 		uint32_t GetSectorIndex(uint32_t x, uint32_t z) const {
-			return ((z * xsize) / NODE_CACHE_SECTOR_SIZE) + (x / NODE_CACHE_SECTOR_STRIDE);
+			const uint32_t sectorsPerRow = xsize / NODE_CACHE_SECTOR_STRIDE;
+			return (z / NODE_CACHE_SECTOR_STRIDE) * sectorsPerRow
+			     + (x / NODE_CACHE_SECTOR_STRIDE);
 		}
 
 		std::vector<QTNode> poolNodes[16];
