@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <cstring>
 #include <algorithm>
+#include <compare>
 #include <stdexcept>
 #include <iterator>
 #include <initializer_list>
@@ -25,7 +26,7 @@ namespace recoil {
  * The tradeoff is that this vector is limited to uint32_t max elements (~4 billion),
  * which is not a practical limitation for most use cases.
  *
- * @note Requires C++17 or later (uses if constexpr, std::enable_if_t, and is_integral_v).
+ * @note Requires C++20 or later (uses if constexpr, std::enable_if_t, is_integral_v, and <=>).
  * @note Assumes destructors are non-throwing (consistent with std::vector).
  * @note insert(pos, T&&) with self-moved values is not supported (use insert(pos, T) instead).
  *
@@ -416,7 +417,8 @@ public:
         size_type idx = static_cast<size_type>(pos - cbegin());
 
         size_type count = 0;
-        for (InputIt it = first; it != last; ++it, ++count) {}
+        for (InputIt it = first; it != last; ++it)
+            ++count;
 
         if (count == 0)
             return m_data + idx;
@@ -486,13 +488,9 @@ public:
 
     [[nodiscard]] bool operator!=(const CompactVector& other) const { return !operator==(other); }
 
-    [[nodiscard]] bool operator<(const CompactVector& other) const {
-        return std::lexicographical_compare(begin(), end(), other.begin(), other.end());
+    [[nodiscard]] auto operator<=>(const CompactVector& other) const {
+        return std::lexicographical_compare_three_way(begin(), end(), other.begin(), other.end());
     }
-
-    [[nodiscard]] bool operator<=(const CompactVector& other) const { return !other.operator<(*this); }
-    [[nodiscard]] bool operator>(const CompactVector& other) const  { return  other.operator<(*this); }
-    [[nodiscard]] bool operator>=(const CompactVector& other) const { return !operator<(other); }
 
 private:
     // -------------------------------------------------------------------------
