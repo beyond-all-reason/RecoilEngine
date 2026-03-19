@@ -625,32 +625,35 @@ bool QTPFS::QTNode::UpdateMoveCost(
 bool QTPFS::QTNode::UpdateExitOnly(NodeLayer& nl, bool& needSplit) {
     ZoneScoped;
 
-    const auto cacheView = nl.GetExitOnlyCacheView(xmin(), zmin());
-    bool hasNormal   = false;
-    bool hasExitOnly = false;
+	bool hasExitOnly = false;
+	auto checkRangeForSplit = [this, &nl, &hasExitOnly]() -> bool {
+		const auto cacheView = nl.GetExitOnlyCacheView(xmin(), zmin());
+		bool hasNormal = false;
 
-    for (int z = 0; z < int(zsize()); ++z) {
-        for (int x = 0; x < int(xsize()); ++x) {
-            const int i = (cacheView.zOffset + z) * cacheView.stride
-                        + (cacheView.xOffset + x);
+		uint32_t xWidth = xsize();
+		uint32_t zWidth = zsize();
+		for (uint32_t z = 0; z < zWidth; ++z) {
+			for (uint32_t x = 0; x < xWidth; ++x) {
+				const uint32_t i = (cacheView.zOffset + z) * cacheView.stride
+				                 + (cacheView.xOffset + x);
 
-            if (cacheView.data[i].IsExitOnly())
-                hasExitOnly = true;
-            else
-                hasNormal = true;
+				if (cacheView.data[i].IsExitOnly())
+					hasExitOnly = true;
+				else
+					hasNormal = true;
 
-            if (hasNormal && hasExitOnly) {
-                needSplit = true;
-                return true;
-            }
-        }
-    }
+				if (hasNormal && hasExitOnly) return true;
+			}
+		}
+		return false;
+	};
+
+	needSplit = checkRangeForSplit();
 
     if (hasExitOnly)
         index |= (1u << EXIT_ONLY_BIT_OFFSET);
 
-    needSplit = false;
-    return false;
+    return needSplit;
 }
 
 // get the maximum number of neighbors this node
