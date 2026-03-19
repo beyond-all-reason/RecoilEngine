@@ -81,7 +81,10 @@ namespace QTPFS {
 			}
 		};
 
-		constexpr static unsigned int NODE_CACHE_SECTOR_SIZE = QTPFS_MAP_DAMAGE_SIZE * QTPFS_MAP_DAMAGE_SIZE;
+		constexpr static unsigned int NODE_CACHE_SECTOR_SIZE   = QTPFS_MAP_DAMAGE_SIZE * QTPFS_MAP_DAMAGE_SIZE;
+		// Row stride within a NodeSpeedBinCache: equal to the sector width.
+		// Expressed here so callers never need to reference QTPFS_MAP_DAMAGE_SIZE directly.
+		constexpr static unsigned int NODE_CACHE_SECTOR_STRIDE = QTPFS_MAP_DAMAGE_SIZE;
 
 		struct NodeSpeedBinCache : public std::array<MapSquareData, NODE_CACHE_SECTOR_SIZE> {
 			// NOTE: This is used to cache the speed mod bins for each node, so that we don't have to recalculate them every time we need them.
@@ -182,18 +185,15 @@ namespace QTPFS {
 		const std::vector<SpeedBinType>& GetCurSpeedBins() const { return curSpeedBins; }
 		const std::vector<SpeedModType>& GetCurSpeedMods() const { return curSpeedMods; }
 		const NodeSpeedBinCache& GetNodeSpeedBinCache(int x, int z) const {
-			const uint32_t sectorIndex = ((z * xsize) / NODE_CACHE_SECTOR_SIZE) + (x / QTPFS_MAP_DAMAGE_SIZE);
-			return mapSquareStatusCache[sectorIndex];
+			return mapSquareStatusCache[GetSectorIndex(x, z)];
 		}
 
 		ExitOnlyCacheView GetExitOnlyCacheView(uint32_t x1, uint32_t z1) const {
-			const uint32_t sectorIndex = ((z1 * xsize) / NODE_CACHE_SECTOR_SIZE) 
-									+ (x1 / QTPFS_MAP_DAMAGE_SIZE);
 			return {
-				mapSquareStatusCache[sectorIndex],
-				QTPFS_MAP_DAMAGE_SIZE,
-				x1 % QTPFS_MAP_DAMAGE_SIZE,
-				z1 % QTPFS_MAP_DAMAGE_SIZE
+				mapSquareStatusCache[GetSectorIndex(x1, z1)],
+				NODE_CACHE_SECTOR_STRIDE,
+				x1 % NODE_CACHE_SECTOR_STRIDE,
+				z1 % NODE_CACHE_SECTOR_STRIDE
 			};
 		}
 
@@ -250,6 +250,10 @@ namespace QTPFS {
 		bool UseShortestPath() { return useShortestPath; }
 
 	private:
+		uint32_t GetSectorIndex(uint32_t x, uint32_t z) const {
+			return ((z * xsize) / NODE_CACHE_SECTOR_SIZE) + (x / NODE_CACHE_SECTOR_STRIDE);
+		}
+
 		std::vector<QTNode> poolNodes[16];
 		std::vector<unsigned int> nodeIndcs;
 

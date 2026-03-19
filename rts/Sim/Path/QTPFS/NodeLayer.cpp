@@ -102,7 +102,8 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData) {
 	const SRectangle& r = threadData.areaRelinkedInner;
 	const MoveDef* md = threadData.moveDef;
 
-	assert( r.GetWidth() == QTPFS_MAP_DAMAGE_SIZE && r.GetHeight() == QTPFS_MAP_DAMAGE_SIZE );
+	assert( r.GetWidth() == QTPFS_MAP_DAMAGE_SIZE );
+	assert( r.GetHeight() == QTPFS_MAP_DAMAGE_SIZE );
 
 	auto &blockRect = threadData.areaMaxBlockBits;
 	auto &blockBits = threadData.maxBlockBits;
@@ -156,8 +157,7 @@ bool QTPFS::NodeLayer::Update(UpdateThreadData& threadData) {
 	};
 
 	bool updateRequired = false;
-	const uint32_t sectorIndex = ((r.z1 * xsize) / NODE_CACHE_SECTOR_SIZE) + (r.x1 / QTPFS_MAP_DAMAGE_SIZE);
-	auto& sectorCache = mapSquareStatusCache[sectorIndex];
+	auto& sectorCache = mapSquareStatusCache[GetSectorIndex(r.x1, r.z1)];
 
 	// divide speed-modifiers into bins
 	unsigned int recIdx =  0;
