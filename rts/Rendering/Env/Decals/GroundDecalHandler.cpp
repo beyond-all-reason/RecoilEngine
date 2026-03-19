@@ -1563,10 +1563,9 @@ void CGroundDecalHandler::UpdateDecalsVisibility()
 				const bool decalOwnerInCurLOS = ((unit->losStatus[gu->myAllyTeam] &   LOS_INLOS) != 0);
 				const bool decalOwnerInPrvLOS = ((unit->losStatus[gu->myAllyTeam] & LOS_PREVLOS) != 0);
 
-#if 0
 				if (unit->GetIsIcon())
 					wantedMult = 0.0f;
-#endif
+
 				const bool isGhostNow = gameSetup->ghostedBuildings && decalOwnerInPrvLOS && !decalOwnerInCurLOS;
 
 				if (!gu->spectatingFullView)
