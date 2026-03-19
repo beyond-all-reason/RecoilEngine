@@ -1562,17 +1562,18 @@ void CGroundDecalHandler::UpdateDecalsVisibility()
 			if (const CUnit* unit = dynamic_cast<const CUnit*>(so); unit != nullptr) {
 				const bool decalOwnerInCurLOS = ((unit->losStatus[gu->myAllyTeam] &   LOS_INLOS) != 0);
 				const bool decalOwnerInPrvLOS = ((unit->losStatus[gu->myAllyTeam] & LOS_PREVLOS) != 0);
-
-				if (unit->GetIsIcon())
-					wantedMult = 0.0f;
-
 				const bool isGhostNow = gameSetup->ghostedBuildings && decalOwnerInPrvLOS && !decalOwnerInCurLOS;
+				const bool iconOnly = (unit->GetDrawFlag() == DrawFlags::SO_DRICON_FLAG);
 
-				if (!gu->spectatingFullView)
-					if (isGhostNow)
-						wantedMult = ghostDimming;
-					else if (!decalOwnerInCurLOS)
-						wantedMult = 0.0f;
+				if (!gu->spectatingFullView && isGhostNow) {
+					wantedMult = ghostDimming;          // ghost wins over icon, only when !spectatingFullView
+				}
+				else if (iconOnly) {
+					wantedMult = 0.0f;                  // icon -> hide decal (covers both spectating modes)
+				}
+				else if (!gu->spectatingFullView && !decalOwnerInCurLOS) {
+					wantedMult = 0.0f;                  // out of LOS, !ghost, !spectatingFullView -> hide
+				}
 
 				wantedMult *= std::clamp(unit->buildProgress, 0.0f, 1.0f);
 			}
