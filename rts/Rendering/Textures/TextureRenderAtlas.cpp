@@ -308,7 +308,7 @@ uint32_t CTextureRenderAtlas::DisownTexture()
 	return atlasTex->DisOwn();
 }
 
-bool CTextureRenderAtlas::DumpTexture() const
+bool CTextureRenderAtlas::DumpTexture(const std::string& fileExt) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
@@ -322,13 +322,13 @@ bool CTextureRenderAtlas::DumpTexture() const
 	if (numPages > 1) {
 		for (uint32_t page = 0; page < numPages; ++page) {
 			for (uint32_t level = 0; level < numLevels; ++level) {
-				glSaveTextureArray(atlasTex->GetId(), fmt::format("{}_{}_{}.png", atlasName, page, level).c_str(), level, page);
+				glSaveTextureArray(atlasTex->GetId(), fmt::format("{}_{}_{}.{}", atlasName, page, level, fileExt).c_str(), level, page);
 			}
 		}
 	}
 	else {
 		for (uint32_t level = 0; level < numLevels; ++level) {
-			glSaveTexture(atlasTex->GetId(), fmt::format("{}_{}.png", atlasName, level).c_str(), level);
+			glSaveTexture(atlasTex->GetId(), fmt::format("{}_{}.{}", atlasName, level, fileExt).c_str(), level);
 		}
 	}
 

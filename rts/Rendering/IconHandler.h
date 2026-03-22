@@ -108,7 +108,7 @@ namespace icon {
 			auto GetAtlasTextureID(size_t i) const { return atlasTextureIDs[i]; }
 			const auto& GetAtlasSize(size_t i) const { return atlasTextureSizes[i]; }
 
-			void DumpAtlasTextures() const;
+			void DumpAtlasTextures(const std::string& fileExt = "png") const;
 		private:
 			bool UpdateAtlasData(size_t atlasIdx);
 			bool CreateAtlasTexture(size_t atlasIdx);

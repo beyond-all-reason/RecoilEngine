@@ -737,10 +737,10 @@ void CGroundDecalHandler::ReloadTextures()
 	decalsUpdateList.SetNeedUpdateAll();
 }
 
-void CGroundDecalHandler::DumpAtlasTextures()
+void CGroundDecalHandler::DumpAtlasTextures(const std::string& fileExt)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	atlasTex->DumpTexture();
+	atlasTex->DumpTexture(fileExt);
 }
 
 void CGroundDecalHandler::Draw()

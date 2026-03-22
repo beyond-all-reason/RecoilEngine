@@ -46,16 +46,16 @@ void CIconHandler::Kill()
 }
 
 
-void CIconHandler::DumpAtlasTextures() const
+void CIconHandler::DumpAtlasTextures(const std::string& fileExt) const
 {
 	if (atlasTextureIDs[0]) {
 		for (int level = 0; level < DEFAULT_NUM_OF_TEXTURE_LEVELS; ++level) {
-			glSaveTexture(atlasTextureIDs[0], fmt::format("IconsAtlas1-{}.png", level).c_str(), level);
+			glSaveTexture(atlasTextureIDs[0], fmt::format("IconsAtlas1-{}.{}", level, fileExt).c_str(), level);
 		}
 	}
 	if (atlasTextureIDs[1]) {
 		for (int level = 0; level < DEFAULT_NUM_OF_TEXTURE_LEVELS; ++level) {
-			glSaveTexture(atlasTextureIDs[1], fmt::format("IconsAtlas2-{}.png", level).c_str(), level);
+			glSaveTexture(atlasTextureIDs[1], fmt::format("IconsAtlas2-{}.{}", level, fileExt).c_str(), level);
 		}
 	}
 }

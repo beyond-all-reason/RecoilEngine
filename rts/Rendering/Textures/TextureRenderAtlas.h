@@ -67,7 +67,7 @@ public:
 
 	uint32_t DisownTexture();
 
-	bool DumpTexture() const;
+	bool DumpTexture(const std::string& fileExt = "png") const;
 private:
 
 
