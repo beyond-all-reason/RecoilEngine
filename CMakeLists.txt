@@ -113,12 +113,15 @@ else  (CMAKE_SIZEOF_VOID_P EQUAL 8)
 	message(FATAL_ERROR "RecoilEngine does not support 32 bits." )
 endif (CMAKE_SIZEOF_VOID_P EQUAL 8)
 
-# Detect ARM64 architecture
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+# Detect architecture
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|armv8|ARM64|AARCH64")
 	set(IS_ARM64_BUILD TRUE)
 	message(STATUS "Detected ARM64 architecture: ${CMAKE_SYSTEM_PROCESSOR}")
-else()
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
 	set(IS_ARM64_BUILD FALSE)
+	message(STATUS "Detected x86-64 architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+else()
+	message(FATAL_ERROR "Unsupported architecture: ${CMAKE_SYSTEM_PROCESSOR}. Only ARM64 and x86-64 are supported.")
 endif()
 
 message(STATUS "Building Spring on ${MARCH_BITS}bit environment")
@@ -436,20 +439,7 @@ endif()
 option(ENABLE_STREFLOP "build Spring with streflop support (REQUIRED FOR MULTIPLAYER)" TRUE)
 
 if (ENABLE_STREFLOP)
-	## note: is removed in ./AI/CMakeLists.txt since it would break AI compilation
-	if (APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
-		# Apple ARM64: use NEON FPU with deterministic rounding.
-		# NEON mode uses hardware float with FPCR rounding control,
-		# which works correctly on macOS ARM64 (no fenv.h issues).
-		add_definitions(-DSTREFLOP_NEON)
-	elseif (APPLE)
-		# Apple x86_64: use SSE (same as Linux x86_64)
-		add_definitions(-DSTREFLOP_SSE)
-	elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
-		add_definitions(-DSTREFLOP_NEON)
-	else ()
-		add_definitions(-DSTREFLOP_SSE)
-	endif ()
+	set(STREFLOP_AUTO ON CACHE BOOL "Enable STREFLOP autodetection" FORCE)
 else ()
 	add_definitions(-DNOT_USING_STREFLOP)
 endif ()
@@ -458,7 +448,7 @@ endif ()
 add_definitions(-DASIO_STANDALONE)
 
 ### sse2neon
-if (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+if (IS_ARM64_BUILD)
 	add_definitions(-DSSE2NEON)
 	add_definitions(-DSSE2NEON_SUPPRESS_WARNINGS)
 
@@ -487,7 +477,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 
 	if (NOT MARCH_FLAG STREQUAL "generic")
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${MARCH_FLAG} -mtune=${MARCH_FLAG}") #march/mtune define SSE flags
-	elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+	elseif (IS_ARM64_BUILD)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=armv8-a+simd ${FP_CONTRACT_FLAG}")
 	else (NOT MARCH_FLAG STREQUAL "generic")
 		set(FALLBACK_SSE_FLAGS "-msse")
@@ -511,7 +501,7 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${FALLBACK_MARCH} -mtune=generic ${FALLBACK_SSE_FLAGS}")
 	endif (NOT MARCH_FLAG STREQUAL "generic")
 
-	if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+	if (NOT IS_ARM64_BUILD)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -mfpmath=sse") #SSE_FLAGS are now user input only
 	endif ()
 elseif (MSVC)

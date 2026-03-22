@@ -6,8 +6,12 @@
 
 #include <algorithm>
 #include <bitset>
-#if !defined(__aarch64__) && !defined(__arm__)
+#if defined(__x86_64__) || defined(_M_X64) || defined(__amd64__)
 #include <cpuid.h>
+#elif defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
+// ARM doesn't need cpuid.h
+#else
+	#error "Unsupported architecture"
 #endif
 #include <pthread.h>
 #include <unistd.h>
@@ -132,7 +136,7 @@ ThreadPinPolicy GetThreadPinPolicy() {
 	return THREAD_PIN_POLICY_ANY_PERF_CORE;
 }
 
-#if !defined(__aarch64__) && !defined(__arm__)
+#if defined(__x86_64__) || defined(_M_X64) || defined(__amd64__)
 
 enum Vendor { VENDOR_INTEL, VENDOR_AMD, VENDOR_UNKNOWN };
 
@@ -262,9 +266,7 @@ ProcessorCaches GetProcessorCache() {
 	return processorCaches;
 }
 
-#endif // x86 specific code
-
-#if defined(__aarch64__) || defined(__arm__)
+#elif defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
 
 // Get the highest cache index available for a CPU (2 for L2, 3 for L3)
 int get_arm_highest_cache_index(int cpu) {
@@ -526,6 +528,8 @@ ProcessorCaches GetProcessorCache() {
 	return processorCaches;
 }
 
-#endif // ARM specific code
+#else
+	#error "Unsupported architecture"
+#endif
 
 } //namespace cpu_topology

@@ -222,14 +222,16 @@ namespace Threading {
 
 		// Excessive threads will overload the memory bus. We need to chose an optimal number based on cache groups.
 		// Try to get at least threadCountThreshold threads, but can be more.
-#if !defined(__aarch64__) && !defined(__arm__)
+#if defined(__x86_64__) || defined(_M_X64) || defined(__amd64__)
 		// AMD Ryzen CCDs are grouped into either 6 or 8 cores - so we should try to avoid spreading the game
 		// across multiple CCDs, which is especially important for the X3D processors.
 		constexpr uint32_t threadCountThreshold = 6;
-#else
+#elif defined(__aarch64__) || defined(__arm__) || defined(_M_ARM64)
 		// Apple Silicon CCDs are grouped into a minimum of 4 cores with atrocious cross-CCD latency, so avoid
 		// multiple CCDs there as well.
 		constexpr uint32_t threadCountThreshold = 4;
+#else
+		#error "Unsupported architecture"
 #endif
 
 		// The cache groups from GetProcessorCaches() are sorted in order of largest first.
