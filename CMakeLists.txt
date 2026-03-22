@@ -596,11 +596,28 @@ set_source_files_properties(
 	PROPERTIES GENERATED TRUE
 )
 
-# This is always executed (on every run of "make"),
-# but the actual version files are only written in case of a change
-# in the version info they use, or in the template file content.
-add_custom_target(generateVersionFiles)
-add_custom_command(TARGET generateVersionFiles
+# Find git metadata files to depend on, so version regenerates when commits change
+if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+	if(EXISTS "${CMAKE_SOURCE_DIR}/.git/index")
+		list(APPEND VERSION_GIT_DEPS "${CMAKE_SOURCE_DIR}/.git/index")
+	endif()
+	if(EXISTS "${CMAKE_SOURCE_DIR}/.git/HEAD")
+		list(APPEND VERSION_GIT_DEPS "${CMAKE_SOURCE_DIR}/.git/HEAD")
+	endif()
+endif()
+
+# Declare template files as inputs (for proper dependency tracking)
+set(VERSION_TEMPLATE_FILES
+	"${CMAKE_SOURCE_DIR}/rts/System/VersionGenerated.h.template"
+	"${CMAKE_SOURCE_DIR}/VERSION.template"
+)
+
+# Use add_custom_command(OUTPUT ...) to properly declare file outputs.
+# This creates real file-level dependencies (not just order-only deps),
+# fixing race conditions where compilation starts before version generation.
+# Remove any existing generated files first to ensure fresh generation.
+add_custom_command(
+	OUTPUT ${VERSION_GENERATE_SOURCES}
 	COMMAND "${CMAKE_COMMAND}"
 		"-DSOURCE_ROOT=${CMAKE_SOURCE_DIR}"
 		"-DCMAKE_MODULES_SPRING=${CMAKE_MODULES_SPRING}"
@@ -608,9 +625,13 @@ add_custom_command(TARGET generateVersionFiles
 		"-DVERSION_ADDITIONAL=${VERSION_ADDITIONAL}"
 		-P "${CMAKE_MODULES_SPRING}/ConfigureVersion.cmake"
 		"${VERSION_GENERATE_DIR}"
-	COMMENT
-		"  Configuring Version files ..." VERBATIM
+	DEPENDS ${VERSION_TEMPLATE_FILES} ${VERSION_GIT_DEPS}
+	COMMENT "  Configuring Version files ..."
+	VERBATIM
 )
+
+# Target for dependency purposes
+add_custom_target(generateVersionFiles DEPENDS ${VERSION_GENERATE_SOURCES})
 
 add_dependencies(generateSources generateVersionFiles)
 
