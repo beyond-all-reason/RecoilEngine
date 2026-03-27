@@ -69,8 +69,17 @@ bool CIconHandler::UpdateAtlasData(size_t atlasIdx)
 	atlas = std::make_unique<CTextureRenderAtlas>(CTextureAtlas::ATLAS_ALLOC_LEGACY, 0, 0, DEFAULT_NUM_OF_TEXTURE_LEVELS, GL_RGBA8, IntToString(atlasIdx, "IconsAtlas_%i"));
 
 	spring::unordered_set<std::string> invalidIcons;
-	for (const auto& [iconName, iconIndex] : iconsMap) {
 
+	// Sort icon names to ensure deterministic ordering across runs
+	std::vector<std::string> sortedIconNames;
+	sortedIconNames.reserve(iconsMap.size());
+	for (const auto& [iconName, _] : iconsMap) {
+		sortedIconNames.push_back(iconName);
+	}
+	std::sort(sortedIconNames.begin(), sortedIconNames.end());
+
+	for (const auto& iconName : sortedIconNames) {
+		const auto iconIndex = iconsMap[iconName];
 		const auto& iconData = iconsData[iconIndex];
 
 		if (iconData.GetAtlasIndex() != atlasIdx)
