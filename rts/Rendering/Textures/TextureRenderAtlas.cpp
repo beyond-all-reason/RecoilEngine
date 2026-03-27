@@ -55,7 +55,7 @@ void main() {
 
 std::string CTextureRenderAtlas::UniqueSubTexture::GetName() const
 {
-	return fmt::format("{};{},{},{},{}", texID, subTexCoords.x1, subTexCoords.y1, subTexCoords.x2, subTexCoords.y2);
+	return fmt::format("{};{},{},{},{}", stableIdx, subTexCoords.x1, subTexCoords.y1, subTexCoords.x2, subTexCoords.y2);
 }
 
 CTextureRenderAtlas::CTextureRenderAtlas(
@@ -122,10 +122,10 @@ CTextureRenderAtlas::~CTextureRenderAtlas()
 	if (shaderRef == 0)
 		shaderHandler->ReleaseProgramObjects("[TextureRenderAtlas]");
 
-	for (auto& [_, tID] : filenameToTexID) {
-		if (tID) {
-			glDeleteTextures(1, &tID);
-			tID = 0;
+	for (auto& [_, entry] : filenameToTexID) {
+		if (entry.texID) {
+			glDeleteTextures(1, &entry.texID);
+			entry.texID = 0;
 		}
 	}
 
@@ -181,11 +181,14 @@ bool CTextureRenderAtlas::AddTexFromBitmapRaw(const std::string& name, const CBi
 
 	auto it = filenameToTexID.find(refFileName);
 	if (it == filenameToTexID.end()) {
-		it = filenameToTexID.emplace(refFileName, bm.CreateMipMapTexture()).first;
+		// Assign stable index at insertion time so all icons sharing a file get the same index
+		const uint32_t stableIdx = static_cast<uint32_t>(filenameToTexID.size());
+		it = filenameToTexID.emplace(refFileName, FileTexEntry{ bm.CreateMipMapTexture(), stableIdx }).first;
 	}
 
 	const auto uniqueSubTex = UniqueSubTexture(
-		it->second,
+		it->second.texID,
+		it->second.stableIdx,
 		subTexCoords
 	);
 	const auto uniqueSubTexStr = uniqueSubTex.GetName();
@@ -429,7 +432,7 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 							continue;
 
 						const auto atlasedTexCoords = atlasAllocator->GetTexCoordsEdge(uniqTexName);
-						const auto& [srcTexID, srcSubTC] = uniqueSubTextureMap[uniqTexName];
+						const auto& [srcTexID, _stableIdx, srcSubTC] = uniqueSubTextureMap[uniqTexName];
 
 						if (srcTexID == 0)
 							continue;
@@ -469,10 +472,10 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 	if (!atlasRendered)
 		return false;
 
-	for (auto& [_, texID] : filenameToTexID) {
-		if (texID) {
-			glDeleteTextures(1, &texID);
-			texID = 0;
+	for (auto& [_, entry] : filenameToTexID) {
+		if (entry.texID) {
+			glDeleteTextures(1, &entry.texID);
+			entry.texID = 0;
 		}
 	}
 

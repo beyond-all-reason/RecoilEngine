@@ -459,8 +459,16 @@ void CProjectileDrawer::ParseAtlasTextures(
 	textureTable.GetMap(texturesMap);
 	textureTable.GetKeys(subTables);
 
-	for (auto texturesMapIt = texturesMap.begin(); texturesMapIt != texturesMap.end(); ++texturesMapIt) {
-		const std::string textureName = StringToLower(texturesMapIt->first);
+	// Sort texture names to ensure deterministic ordering across runs
+	std::vector<std::string> sortedTexNames;
+	sortedTexNames.reserve(texturesMap.size());
+	for (const auto& [name, _] : texturesMap) {
+		sortedTexNames.emplace_back(name);
+	}
+	std::sort(sortedTexNames.begin(), sortedTexNames.end());
+
+	for (const auto& texName : sortedTexNames) {
+		const std::string textureName = StringToLower(texName);
 
 		// no textures added to this atlas are allowed
 		// to be overwritten later by other textures of
@@ -469,7 +477,7 @@ void CProjectileDrawer::ParseAtlasTextures(
 			blockedTextures.insert(textureName);
 
 		if (blockTextures || (blockedTextures.find(textureName) == blockedTextures.end()))
-			texAtlas->AddTexFromFile(texturesMapIt->first, "bitmaps/" + texturesMapIt->second);
+			texAtlas->AddTexFromFile(texName, "bitmaps/" + texturesMap[texName]);
 	}
 
 	texturesMap.clear();
@@ -482,14 +490,22 @@ void CProjectileDrawer::ParseAtlasTextures(
 
 		textureSubTable.GetMap(texturesMap);
 
-		for (auto texturesMapIt = texturesMap.begin(); texturesMapIt != texturesMap.end(); ++texturesMapIt) {
-			const std::string textureName = StringToLower(texturesMapIt->first);
+		// Sort texture names to ensure deterministic ordering across runs
+		sortedTexNames.clear();
+		sortedTexNames.reserve(texturesMap.size());
+		for (const auto& [name, _] : texturesMap) {
+			sortedTexNames.emplace_back(name);
+		}
+		std::sort(sortedTexNames.begin(), sortedTexNames.end());
+
+		for (const auto& texName : sortedTexNames) {
+			const std::string textureName = StringToLower(texName);
 
 			if (blockTextures)
 				blockedTextures.insert(textureName);
 
 			if (blockTextures || (blockedTextures.find(textureName) == blockedTextures.end()))
-				texAtlas->AddTexFromFile(texturesMapIt->first, "bitmaps/" + texturesMapIt->second);
+				texAtlas->AddTexFromFile(texName, "bitmaps/" + texturesMap[texName]);
 		}
 
 		texturesMap.clear();
