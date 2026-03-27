@@ -144,6 +144,11 @@ bool CIconHandler::CreateAtlasTexture(size_t atlasIdx)
 		atlasTextureIDs[atlasIdx] = bm.CreateMipMapTexture();
 		atlasTextureSizes[atlasIdx] = int2(bm.xsize, bm.ysize);
 
+		// CBitmap::CreateTexture defaults to GL_REPEAT, which is not what we want for atlas
+		glBindTexture(GL_TEXTURE_2D, atlasTextureIDs[atlasIdx]);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
 		return true;
 	}
 
