@@ -120,9 +120,10 @@ void CBuilder::PreInit(const UnitLoadParams& params)
 bool CBuilder::CanAssistUnit(const CUnit* u, const UnitDef* def) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!unitDef->canAssist)
-		return false;
-
+	if (!unitDef->canAssist && u->mainBuilder != this) /* needs review please: is "this" inherently != from mainBuilder because mainBuilder is CUnit* while this is CBuilder* ? */ 
+	{
+	return false;	
+	}
 	return ((def == nullptr || u->unitDef == def) && u->beingBuilt && (u->buildProgress < 1.0f) && (u->soloBuilder == nullptr || u->soloBuilder == this));
 }
 
