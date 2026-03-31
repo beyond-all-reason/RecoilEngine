@@ -282,6 +282,7 @@ public:
 	const DynDamageArray* deathExpDamages = nullptr;
 
 	CUnit* soloBuilder = nullptr;
+	CUnit* mainBuilder = nullptr;
 	CUnit* lastAttacker = nullptr;
 	// transport that the unit is currently in
 	CUnit* transporter = nullptr;
