@@ -2,18 +2,18 @@
 name: Library Dep Build
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - master
-    paths:
-      - 'docker-build-v2/amd64-linux/**'
-      - 'docker-build-v2/amd64-windows/**'
-      - conanfile.py
-  pull_request:
-    paths:
-      - 'docker-build-v2/amd64-linux/**'
-      - 'docker-build-v2/amd64-windows/**'
-      - conanfile.py
+#  push:
+#    branches:
+#      - master
+#    paths:
+#      - 'docker-build-v2/amd64-linux/**'
+#      - 'docker-build-v2/amd64-windows/**'
+#      - conanfile.py
+#  pull_request:
+#    paths:
+#      - 'docker-build-v2/amd64-linux/**'
+#      - 'docker-build-v2/amd64-windows/**'
+#      - conanfile.py
 jobs:
   build-dependencies:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
