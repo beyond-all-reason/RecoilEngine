@@ -37,7 +37,11 @@ add_definitions(-DUSE_FONTCONFIG)
 
 if (NOT WIN32)
 	find_package_static(EXPAT REQUIRED)
-	list(APPEND engineLibraries expat::expat)
+	if (TARGET expat::expat)
+		list(APPEND engineLibraries expat::expat)
+	else()
+		list(APPEND engineLibraries EXPAT::EXPAT)
+	endif()
 endif()
 
 find_package_static(Freetype 2.8.1 REQUIRED)
