@@ -90,6 +90,31 @@ if ! [[ "$PLATFORM" =~ ^(amd64-windows|amd64-linux|arm64-linux)$ ]]; then
 fi
 
 cd "$(dirname "$(readlink -f "$0")")/.."
+
+# The engine uses git submodules quite extensively and it's a common noob trap
+# that people forget to update and initialize them. Let's block the build when
+# we detect that it's the case and allow to continue after creation of escape
+# hatch file.
+UNSYNCED_SUBMODULES="$(git submodule status --recursive | grep -E '^(\+|-)' | awk '{ print " - " $2 }')"
+if [[ -n "$UNSYNCED_SUBMODULES" ]]; then
+  echo "WARNING: You have unsynced git submodules!"
+  echo ""
+  echo "$UNSYNCED_SUBMODULES"
+  echo ""
+  echo "Running following command should be sufficient to synchronize them:"
+  echo ""
+  echo "  git submodule update --init --recursive"
+  echo ""
+  if [[ -f ".i-understand-git-submodules.txt" ]]; then
+    echo "Continuing the build because .i-understand-git-submodules.txt file exists."
+  else
+    echo 'If that is intended and you know what you are doing create `.i-understand-git-submodules.txt` file to skip this warning.'
+    echo ""
+    echo "Exiting the build."
+    exit 1
+  fi
+fi
+
 mkdir -p build-$PLATFORM .cache/ccache-$PLATFORM
 
 # Build container image selection, allow overriding.

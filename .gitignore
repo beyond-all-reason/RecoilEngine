@@ -173,3 +173,5 @@ build-*
 
 # IDE
 /.idea
+
+/.i-understand-git-submodules.txt
