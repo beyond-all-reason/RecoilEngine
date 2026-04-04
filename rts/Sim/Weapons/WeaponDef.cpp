@@ -574,10 +574,10 @@ WeaponDef::WeaponDef(const LuaTable& wdTable, const std::string& name_, int id_)
 }
 
 void WeaponDef::ParseWeaponSounds(const LuaTable& wdTable) {
-    RECOIL_DETAILED_TRACY_ZONE;
-    SoundUtils::LoadSound(wdTable, "soundStart" , fireSound);
-    SoundUtils::LoadSound(wdTable, "soundHitDry",  hitSound);
-    SoundUtils::LoadSound(wdTable, "soundHitWet",  hitSound);
+	RECOIL_DETAILED_TRACY_ZONE;
+	SoundUtils::LoadSound(wdTable, "soundStart" , fireSound);
+	SoundUtils::LoadSound(wdTable, "soundHitDry", hitSound );
+	SoundUtils::LoadSound(wdTable, "soundHitWet", hitSound );
 }
 
 S3DModel* WeaponDef::LoadModel()

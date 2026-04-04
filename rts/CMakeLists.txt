@@ -134,7 +134,6 @@ make_global_var(engineSources
 		${sources_engine_Lua}
 		${sources_engine_Map}
 		${sources_engine_Rendering}
-        ${sources_engine_Audio}
 		${sources_engine_aGui}
 		${sources_engine_Rml}
 		${sources_engine_RmlSolLua}
