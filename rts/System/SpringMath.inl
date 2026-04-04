@@ -168,6 +168,24 @@ inline float3 ClampRad(float3 v)
 	return v;
 }
 
+inline float ClampRadPi(float f)
+{
+	// first wrap to [0, 2pi)
+	f = f - math::TWOPI * math::floor(f / math::TWOPI);
+
+	// now shift to [-pi, pi)
+	if (f >= math::PI)
+		f -= math::TWOPI;
+
+	// Precaution: turn -0.0f into +0.0f
+	f += 0.0f;
+
+	// final invariant: f in [-pi, pi), no negative zero
+	assert(f >= -math::PI && f < math::PI);
+	return f;
+}
+
+
 inline float3 ClampRadPrincipal(float3 v)
 {
 	v.x = ClampRad(v.x);

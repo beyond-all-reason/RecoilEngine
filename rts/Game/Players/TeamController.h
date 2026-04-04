@@ -47,9 +47,6 @@ public:
  *
  * Note: This class should be seen as abstract,
  * even though it is not, C++ technically speaking.
- *
- * This should be the base class of PlayerStatistics and SkirmishAIStatistics,
- * which it is not yet.
  */
 struct TeamControllerStatistics {
 public:

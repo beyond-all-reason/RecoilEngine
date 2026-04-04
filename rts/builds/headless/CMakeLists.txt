@@ -58,10 +58,18 @@ target_link_libraries(GameHeadless PRIVATE
 	prd::jsoncpp
 	streflop
 	nowide::nowide
+	fmt::fmt
 )
 ### Build the executable
 add_executable(engine-headless ${engineSources} ${ENGINE_ICON})
 target_link_libraries(engine-headless no-sound ${engineHeadlessLibraries} GameHeadless no-sound)
+
+# Export symbols for plugin access (replaces CMP0065 OLD behavior)
+set_target_properties(engine-headless PROPERTIES ENABLE_EXPORTS TRUE)
+
+if(MSVC)
+    target_link_libraries(engine-headless engine-natvis)
+endif()
 
 if    (MINGW)
 	# To enable console output/force a console window to open

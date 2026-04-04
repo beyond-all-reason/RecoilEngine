@@ -16,7 +16,7 @@
 #include <variant>
 #include <span>
 
-#include "lib/fmt/format.h"
+#include <fmt/format.h>
 
 #include "LuaOpenGL.h"
 

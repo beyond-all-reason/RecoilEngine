@@ -2,20 +2,26 @@
 
 set -e -u -o pipefail
 
-if [[ $(id -u) -eq 0 ]]; then
+if [[ $(id -u) -eq 0 && -z "${SKIP_ROOT_CHECK:-}" ]]; then
   echo "You are trying to run build.sh as root, that won't work!"
   echo ""
   echo "If you get permission errors when running docker, check if you've finished the"
   echo "post installation steps and are member of \`docker\` system group."
   echo "See official docs: https://docs.docker.com/engine/install/linux-postinstall/"
+  exit 2
 fi
 
-USAGE="Usage: $0 [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] {windows|linux} [cmake_flag...]"
+USAGE="Usage: $0 [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] {windows|linux} [cmake_flag...]"
 export CONFIGURE=true
 export COMPILE=true
 export CMAKE_BUILD_PARALLEL_LEVEL=
 
-ARCH=amd64
+case $(uname -m) in
+  x86_64) ARCH=amd64 ;;
+  aarch64) ARCH=arm64 ;;
+  *) ARCH=unknown ;;
+esac
+
 OS=
 while (( $# > 0 )); do
   case $1 in
@@ -30,21 +36,29 @@ while (( $# > 0 )); do
       shift
       ;;
     -h|--help)
-      echo $USAGE
+      echo "$USAGE"
       echo "Options:"
       echo "  -h, --help   print this help message"
       echo "  --configure  only configure, don't compile"
       echo "  --compile    only compile, don't configure"
       echo "  -j, --jobs   number of concurrent processes to use when building"
+      echo "  --arch       arm64 or amd64, defaults to host"
       echo ""
       echo "Some behaviors can be changed by setting environment variables. Consult the script source for those more advanced use cases."
       exit 0
+      ;;
+    --arch)
+      shift
+      ARCH="$1"
+      shift
       ;;
     -j|--jobs)
       shift
       # Match numeric, starting with non-zero digit
       if ! [[ "${1-}" =~ ^[1-9]+[0-9]*$ ]]; then
-        echo $USAGE
+        echo "--jobs requires a number"
+        echo ""
+        echo "$USAGE"
         exit 1
       fi
       CMAKE_BUILD_PARALLEL_LEVEL="$1"
@@ -60,14 +74,23 @@ while (( $# > 0 )); do
   esac
 done
 if [[ -z $OS ]]; then
-  echo $USAGE
+  echo "$USAGE"
   exit 1
 fi
 
 PLATFORM="$ARCH-$OS"
+if ! [[ "$PLATFORM" =~ ^(amd64-windows|amd64-linux|arm64-linux)$ ]]; then
+  echo "Target platform $PLATFORM is not supported, supported platforms are:"
+  echo " - amd64-windows"
+  echo " - amd64-linux"
+  echo " - arm64-linux"
+  echo ""
+  echo "$USAGE"
+  exit 1
+fi
 
 cd "$(dirname "$(readlink -f "$0")")/.."
-mkdir -p build-$OS .cache/ccache-$OS
+mkdir -p build-$PLATFORM .cache/ccache-$PLATFORM
 
 # Build container image selection, allow overriding.
 if [[ -n "${CONTAINER_IMAGE:-}" ]]; then
@@ -77,21 +100,7 @@ else
   IMAGE=ghcr.io/beyond-all-reason/recoil-build-$PLATFORM@${image_version[$PLATFORM]}
 fi
 
-# Detect and select container runtime. Support explicit override, docker and
-# podman, with docker being the default as that's likely more expected behavior.
-if [[ -n "${CONTAINER_RUNTIME:-}" ]]; then
-    RUNTIME="$CONTAINER_RUNTIME"
-elif command -v docker &> /dev/null &&
-     # We verify the output of docker version to detect podman-docker package
-     # and aliases from podman to docker people might have.
-     ! docker version | grep -qi podman; then
-    RUNTIME=docker
-elif command -v podman &> /dev/null; then
-    RUNTIME=podman
-else
-    echo "Neither docker nor podman is installed. Please install one of them."
-    exit 1
-fi
+source docker-build-v2/_resolve_container_runtime.sh
 
 # With the most common rootful docker as runtime, the users inside of the
 # container maps directly to users on the host and because user in container
@@ -145,10 +154,10 @@ if [[ "$GIT_DIR" != "$GIT_COMMON_DIR" ]]; then
   WORKTREE_MOUNTS="-v $GIT_COMMON_DIR:$GIT_COMMON_DIR:ro"
 fi
 
-$RUNTIME run -it --rm \
+$RUNTIME run --platform=linux/$ARCH -it --rm \
     -v "$CWD${P}":/build/src:z,ro \
-    -v "$CWD${P}.cache${P}ccache-$OS":/build/cache:z,rw \
-    -v "$CWD${P}build-$OS":/build/out:z,rw \
+    -v "$CWD${P}.cache${P}ccache-$PLATFORM":/build/cache:z,rw \
+    -v "$CWD${P}build-$PLATFORM":/build/out:z,rw \
     $UID_FLAGS \
     $WORKTREE_MOUNTS \
     -e CONFIGURE \

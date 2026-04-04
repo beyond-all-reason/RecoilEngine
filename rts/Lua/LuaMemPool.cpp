@@ -10,7 +10,7 @@
 #include "System/SafeUtil.h"
 #include "System/Log/ILog.h"
 #include "System/Threading/SpringThreading.h"
-#include "lib/fmt/printf.h"
+#include <fmt/printf.h>
 
 #include "System/Misc/TracyDefs.h"
 

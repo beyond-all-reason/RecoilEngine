@@ -9,12 +9,12 @@
 
 namespace QTPFS {
 
-    float GetMaxSpeedModForLayer(int layerNum) {
+    inline float GetMaxSpeedModForLayer(int layerNum) {
         auto& comp = systemGlobals.GetSystemComponent<PathSpeedModInfoSystemComponent>();
         return comp.relSpeedModinfos[layerNum].max;
     }
 
-    void RequestMaxSpeedModRefreshForLayer(int layerNum) {
+    inline void RequestMaxSpeedModRefreshForLayer(int layerNum) {
         auto& comp = systemGlobals.GetSystemComponent<PathSpeedModInfoSystemComponent>();
         if (comp.startRefreshOnFrame == NEXT_FRAME_NEVER)
             comp.startRefreshOnFrame = gs->frameNum + comp.refeshDelayInFrames;

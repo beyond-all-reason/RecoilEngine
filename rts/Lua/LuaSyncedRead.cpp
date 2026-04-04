@@ -4547,7 +4547,7 @@ int LuaSyncedRead::GetUnitHeading(lua_State* L)
 
 	float heading = unit->heading;
 	if (luaL_optboolean(L, 2, false)) {
-		heading = ClampRad(math::PI / 32768.0f * heading);
+		heading = ClampRadPi(math::PI / 32768.0f * heading);
 	}
 
 	lua_pushnumber(L, heading);

@@ -79,7 +79,7 @@ UnitDef::UnitDef()
 	, decoyDef(nullptr)
 	, upkeep(0.0f)
 	, resourceMake(0.0f)
-	, makesMetal(0.0f)
+	, makesResources(0.0f)
 	, buildTime(0.0f)
 	, buildeeBuildRadius(-1.f)
 	, extractsMetal(0.0f)
@@ -303,8 +303,15 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	};
 
 	extractsMetal  = udTable.GetFloat("extractsMetal",  0.0f);
-	windGenerator  = udTable.GetFloat("windGenerator",  0.0f);
-	tidalGenerator = udTable.GetFloat("tidalGenerator", 0.0f);
+
+	windGenerator =
+		{ 0.0f
+		, udTable.GetFloat("windGenerator", 0.0f)
+	};
+	tidalGenerator =
+		{ 0.0f
+		, udTable.GetFloat("tidalGenerator", 0.0f)
+	};
 
 	upkeep =
 		{ udTable.GetFloat( "metalUpkeep", udTable.GetFloat( "metalUse", 0.0f))
@@ -314,7 +321,10 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 		{ udTable.GetFloat( "metalMake", 0.0f)
 		, udTable.GetFloat("energyMake", 0.0f)
 	};
-	makesMetal   = udTable.GetFloat("makesMetal", 0.0f);
+	makesResources =
+		{ udTable.GetFloat("makesMetal", 0.0f)
+		, 0.0f
+	};
 
 	autoHeal     = udTable.GetFloat("autoHeal",      0.0f) * (UNIT_SLOWUPDATE_RATE * INV_GAME_SPEED);
 	idleAutoHeal = udTable.GetFloat("idleAutoHeal", 10.0f) * (UNIT_SLOWUPDATE_RATE * INV_GAME_SPEED);

@@ -265,7 +265,7 @@ static void ExtractSymbols(char** lines, StackTrace& stacktrace)
 		l++;
 	}
 
-	free(lines);
+	free(lines);  // backtrace_symbols allocates via system malloc; must match with system free
 }
 
 static int CommonStringLength(const std::string& str1, const std::string& str2)
@@ -709,7 +709,7 @@ namespace CrashHandler
 
 		unw_cursor_t cursor;
 
-#if (defined(__arm__) || defined(__APPLE__))
+#if (defined(__arm__) || defined(__aarch64__) || defined(__APPLE__))
 		// ucontext_t and unw_context_t are not aliases here
 		unw_context_t thisctx;
 		unw_getcontext(&thisctx);
@@ -742,7 +742,7 @@ namespace CrashHandler
 		}
 		*/
 
-#if (defined(__arm__) || defined(__APPLE__))
+#if (defined(__arm__) || defined(__aarch64__) || defined(__APPLE__))
 		const int err = unw_init_local(&cursor, &thisctx);
 #else
 		const int err = unw_init_local(&cursor, uc);

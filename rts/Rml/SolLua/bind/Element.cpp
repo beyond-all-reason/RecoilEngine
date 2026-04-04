@@ -111,6 +111,11 @@ namespace Rml::SolLua
 			self.QuerySelectorAll(result, selector);
 			return result;
 		}
+
+		static auto getVisible(Rml::Element& self)
+		{
+			return self.IsVisible();
+		}
 	}
 
 	namespace child
@@ -282,7 +287,10 @@ namespace Rml::SolLua
 			 * Gives input focus to this element.
 			 * @function RmlUi.Element:Focus
 			 */
-			"Focus", &Rml::Element::Focus,
+			"Focus", sol::overload(
+				&Rml::Element::Focus,
+				[](Rml::Element& self) { self.Focus(true); }
+			),
 			/***
 			 * Returns the value of the attribute named name. If no such attribute exists, the empty string will be returned.
 			 * @function RmlUi.Element:GetAttribute
@@ -318,6 +326,13 @@ namespace Rml::SolLua
 			 * @return RmlUi.ElementPtr[]
 			 */
 			"QuerySelectorAll", &functions::getQuerySelectorAll,
+			/***
+			 * Checks if the current element matches the given RCSS selector(s).
+			 * @function RmlUi.Element:Matches
+			 * @param selectors string
+			 * @return boolean
+			 */
+			"Matches", &Rml::Element::Matches,
 			/***
 			 * Returns True if the element has a value for the attribute named name, False if not.
 			 * @function RmlUi.Element:HasAttribute
@@ -448,6 +463,15 @@ namespace Rml::SolLua
 			 */
 			"ProcessDefaultAction", &Rml::Element::ProcessDefaultAction,
 			/***
+			 * @function RmlUi.Element:IsVisible
+			 * True if the element is visible, false otherwise.
+			 * @return boolean
+			 */
+			"IsVisible", sol::overload(
+				&functions::getVisible,
+				&Rml::Element::IsVisible
+			),
+			/***
 			 * Get the value of this element.
 			 * @function RmlUi.Element:GetValue
 			 * @return number | string | "" value Returns number if it has the tag "input", a string if it has the tag "textarea", else an empty string.
@@ -534,7 +558,7 @@ namespace Rml::SolLua
 			/*** @field RmlUi.Element.line_height integer Read-only. The computed line height of the element. */
 			"line_height", sol::readonly_property(&Rml::Element::GetLineHeight),
 			/*** @field RmlUi.Element.visible boolean Read-only. True if the element is visible, false otherwise. */
-			"visible", sol::readonly_property(&Rml::Element::IsVisible),
+			"visible", sol::readonly_property(&functions::getVisible),
 			/*** @field RmlUi.Element.z_index integer Read-only. The computed z-index of the element. */
 			"z_index", sol::readonly_property(&Rml::Element::GetZIndex)
 		);

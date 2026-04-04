@@ -6,6 +6,7 @@
 #include "CobDefines.h"
 #include "CobFile.h"
 #include "CobInstance.h"
+#include "System/SafeUtil.h"
 #include "UnitScriptEngine.h"
 
 #ifndef _CONSOLE
@@ -1157,8 +1158,14 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		return !!unit->wantCloak;
 	case UPRIGHT:
 		return !!unit->upright;
-	case POW:
-		return int(math::pow((p1 * 1.0f) / COBSCALE, (p2 * 1.0f) / COBSCALE) * COBSCALE);
+	case POW: {
+		const auto res = math::pow(static_cast<float>(p1) / COBSCALE, static_cast<float>(p2) / COBSCALE) * COBSCALE;
+		if likely(!math::isnan(res)) {
+			return spring::SafeCast<int>(res);
+		}
+		LOG_L(L_WARNING, "[%s] Incorrect inputs to %s(%d, %d), the output is sanitized to %d", __func__, "POW", p1, p2, p1);
+		return 0;
+	}
 	case PRINT: {
 		const char*   unitName = unit->unitDef->name.c_str();
 		const char* scriptName = unit->unitDef->scriptName.c_str();
@@ -1357,13 +1364,25 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 	case ABS:
 		return std::abs(p1);
 	case KSIN:
-		return int(1024*math::sinf(TAANG2RAD*(float)p1));
+		return int(1024 * math::sinf(TAANG2RAD * static_cast<float>(p1)));
 	case KCOS:
-		return int(1024*math::cosf(TAANG2RAD*(float)p1));
-	case KTAN:
-		return int(1024*math::tanf(TAANG2RAD*(float)p1));
-	case SQRT:
-		return int(math::sqrt((float)p1));
+		return int(1024 * math::cosf(TAANG2RAD * static_cast<float>(p1)));
+	case KTAN: {
+		const auto res = 1024 * math::tanf(TAANG2RAD * static_cast<float>(p1));
+		if likely(!math::isnan(res)) {
+			return spring::SafeCast<int>(res);
+		}
+		LOG_L(L_WARNING, "[%s] Incorrect inputs to %s(%d), the output is sanitized to %d", __func__, "KTAN", p1, 0);
+		return 0;
+	}
+	case SQRT: {
+		const auto res = math::sqrt(static_cast<float>(p1));
+		if likely(!math::isnan(res)) {
+			return spring::SafeCast<int>(res);
+		}
+		LOG_L(L_WARNING, "[%s] Incorrect inputs to %s(%d), the output is sanitized to %d", __func__, "SQRT", p1, p1);
+		return 0;
+	}
 
 	case FLANK_B_MODE:
 		return unit->flankingBonusMode;

@@ -37,6 +37,8 @@ static constexpr uint32_t QTPFS_PARTIAL_SHARE_PATH_MAX_SIZE = 32;
 
 static constexpr uint32_t QTPFS_MAP_DAMAGE_SIZE = 16;
 
+static constexpr unsigned int POOL_TOTAL_SIZE = (1024 * 1024) / 2;
+
 // Though there are four quads per level, having nothing is like a 5th state. So 3 bits, not 2, is needed per level.
 static constexpr uint32_t QTPFS_NODE_NUMBER_SHIFT_STEP = 3;
 

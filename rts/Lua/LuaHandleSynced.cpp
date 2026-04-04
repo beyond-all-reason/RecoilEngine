@@ -72,7 +72,6 @@ CUnsyncedLuaHandle::CUnsyncedLuaHandle(CSplitLuaHandle* _base, const std::string
 	: CLuaHandle(_name, _order, false, false)
 	, base(*_base)
 {
-	D.allowChanges = false;
 }
 
 
@@ -424,7 +423,6 @@ CSyncedLuaHandle::CSyncedLuaHandle(CSplitLuaHandle* _base, const std::string& _n
 	, base(*_base)
 	, origNextRef(-1)
 {
-	D.allowChanges = true;
 }
 
 

@@ -56,7 +56,7 @@ int GetNextBitShift(int n)
     int c = 0;
 	n = (n > 0) ? n - 1 : 0;
     while (n >>= 1) {
-        c = c << 1;
+        c++;
     }
     return c + 1;
 }
@@ -151,6 +151,11 @@ void QTPFS::PathSearch::InitializeThread(SearchThreadData* threadData) {
 	searchThreadData = threadData;
 
 	badGoal = false;
+
+	// Note initializing the sparse thread is fairly expensive, so want to avoid doing it more than
+	// necessary by not initializing it for raw path checks, which don't use it.
+	if (rawPathCheck)
+		return;
 
 	// add 2 just in case the start and end nodes are closed. They can escape those nodes and check
 	// all the open nodes. No more is required because nodes don't link themselves to closed nodes.
@@ -521,30 +526,30 @@ void QTPFS::PathSearch::LoadRepairPath() {
 
 bool QTPFS::PathSearch::Execute(unsigned int searchStateOffset) {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	if (rawPathCheck)
+		return ExecuteRawSearch();
+
 	auto& fwd = directionalSearchData[SearchThreadData::SEARCH_FORWARD];
 	auto& bwd = directionalSearchData[SearchThreadData::SEARCH_BACKWARD];
 
 	haveFullPath = (fwd.srcSearchNode == fwd.tgtSearchNode);
 	havePartPath = false;
 
-	// early-out, but not for a repair path because it needs to build out the remaining path.
-	if (haveFullPath && !doPathRepair) {
+	// early-out, but not for a repair path because it needs to build out the remaining path, but not if there is no
+	// further path to build out.
+	if (haveFullPath && (!doPathRepair || bwd.srcSearchNode->prevNode == nullptr)) {
 		// Ensure the node data is pulled
-		if ( !rawPathCheck ) {
-			{
-			auto* curNode = nodeLayer->GetPoolNode(fwd.srcSearchNode->GetIndex());
-			InitSearchNodeData(fwd.srcSearchNode, curNode);
-			}
-			{ // bwd node may not be the same as fwd if path repair is on
-			auto* curNode = nodeLayer->GetPoolNode(bwd.srcSearchNode->GetIndex());
-			InitSearchNodeData(bwd.srcSearchNode, curNode);
-			}
+		{
+		auto* curNode = nodeLayer->GetPoolNode(fwd.srcSearchNode->GetIndex());
+		InitSearchNodeData(fwd.srcSearchNode, curNode);
+		}
+		{ // bwd node may not be the same as fwd if path repair is on
+		auto* curNode = nodeLayer->GetPoolNode(bwd.srcSearchNode->GetIndex());
+		InitSearchNodeData(bwd.srcSearchNode, curNode);
 		}
 		return true;
 	}
-
-	if (rawPathCheck)
-		return ExecuteRawSearch();
 
 	return ExecutePathSearch();
 }
@@ -560,9 +565,9 @@ void QTPFS::PathSearch::InitStartingSearchNodes() {
 		int relativeLimit = nodeLayer->GetNumOpenNodes() * relativeModifier;
 		int absoluteLimit = std::max(MAP_MAX_NODES_SEARCHED, modInfo.qtMaxNodesSearched);
 
-		fwdNodeSearchLimit = std::max(absoluteLimit, relativeLimit) >> 1;
+		nodeSearchLimit = std::max(absoluteLimit, relativeLimit) >> 1;
 	} else {
-		fwdNodeSearchLimit = std::numeric_limits<int>::max();
+		nodeSearchLimit = std::numeric_limits<int>::max();
 	}
 
 	searchThreadData->ResetQueue();
@@ -649,39 +654,37 @@ bool QTPFS::PathSearch::IsNodeActive(const SearchNode& curSearchNode) const {
 
 static float CircularEaseOut(float t) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// Only using 0-1 range, the sqrt is too intense early on.
-	return /*math::sqrt(*/ 1 - Square(t-1); //);
+	// Only using 0-1 range.
+	return math::sqrt( 1 - Square(t-1) );
 }
 
-void QTPFS::PathSearch::SetForwardSearchLimit() {
+void QTPFS::PathSearch::SetNodeSearchLimit() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (pathOwner == nullptr) return;
 
 	auto& fwd = directionalSearchData[SearchThreadData::SEARCH_FORWARD];
-	auto& bwd = directionalSearchData[SearchThreadData::SEARCH_BACKWARD];
 
-	/* These values have been chosen by testing and analysis. They give a reasonable starting point
-	 * balancing performance gains against the chance that a poor path will result. I suspect these
-	 * can be improved, but this will need further stress testing.
-	 * 
-	 * TODO: make into mod rules so that games can calibrate them.
-	 */
-	float dist = 0.f;
+	// math::SQRT2 is the ratio of the distance between a square's diagonals and it's side. (approx 1.41)
+	// We need to approximate the average distance a QTPFS node presents. Just using the length would leave us quite
+	// short because paths generally don't cross nodes on only orthogonal angles. Using the diagonal lenth may be too
+	// much. So let's take the average of the two.
+	constexpr float LENGTH_ADJUST_RATIO = (1.f + math::SQRT2) * 0.5;
 
-	if (hCostMult != 0.f) {
-		dist = bwd.minSearchNode->GetPathCost(NODE_PATH_COST_H) / hCostMult;
-	}
-	else {
-		dist = fwd.tgtPoint.distance2D(fwd.srcPoint);
-	}
+	const float dist = fwd.tgtPoint.distance2D(fwd.srcPoint);
+	const float avgNodeLength = math::sqrt(float(mapDims.mapSquares) / float(nodeLayer->GetNumLeafNodes())) * LENGTH_ADJUST_RATIO * SQUARE_SIZE;
+
+	// Approximate the distance the pathing system can search out to. The calculation takes into account that we use
+	// bi-directional path finding.
+	const float maxDist = math::sqrt(modInfo.qtMaxNodesSearched>>1) * 2 * avgNodeLength;
 
 	constexpr int minNodesSearched = 256;
-
 	const int limit = modInfo.qtMaxNodesSearched>>1;
-	const float maxDist = modInfo.qtMaxNodesSearched;
 
 	const float interp = std::clamp(dist / maxDist, 0.f, 1.f);
-	fwdNodeSearchLimit = std::max(minNodesSearched, int(limit * CircularEaseOut(interp)));
+	nodeSearchLimit = std::max(minNodesSearched, int(limit * CircularEaseOut(interp)));
+
+	// LOG("%s: Pathing ease out for layer %d is (srchMax: %d, sqrs: %d, nodes: %d, dist: %f, avg: %f, max: %f) %d", __func__, nodeLayer->GetNodelayer(),
+	// 	modInfo.qtMaxNodesSearched, mapDims.mapSquares, nodeLayer->GetNumLeafNodes(), dist, avgNodeLength, maxDist, nodeSearchLimit);
 }
 
 // #pragma GCC push_options
@@ -719,6 +722,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 
 	auto reverseTrace = [this](int dir) {
 		auto& fwd = directionalSearchData[dir];
+		auto& bwd = directionalSearchData[1 - dir];
 		auto& fwdSearchNodes = searchThreadData->allSearchedNodes[dir];
 		auto& revSearchNodes = searchThreadData->allSearchedNodes[1 - dir];
 		auto* prevFwdNode = fwd.tgtSearchNode;
@@ -730,6 +734,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 			return;
 
 		SearchNode* revCurNode = &revSearchNodes[fwd.tgtSearchNode->GetIndex()];
+		SearchNode* revStartingNode = &revSearchNodes[bwd.srcSearchNode->GetIndex()];
 		// if ((searchID == 7340095 || searchID == 10485810) /*&& pathOwner != nullptr && pathOwner->id == 30809 */ && dir == SearchThreadData::SEARCH_BACKWARD){
 		// 	LOG("%s: revMinNode-- %d [%x] g=%d (%d,%d)-(%d,%d) [%f,%f]", __func__
 		// 		, revCurNode->index, revCurNode->nodeNumber
@@ -825,6 +830,12 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 			// 		, revCurNode->xmin, revCurNode->zmin, revCurNode->xmax, revCurNode->zmax
 			// 		);
 			// }
+			
+			// If we reach the source node of the reverse of this search then we can stop. It is possible that the path
+			// can continue because the shared path may run through the source node.
+			if (revCurNode->GetIndex() == revStartingNode->GetIndex()) {
+				break;
+			}
 
 			revCurNode = revCurNode->GetPrevNode();
 		}
@@ -832,6 +843,16 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 		// if ((searchID == 7340095 || searchID == 10485810) /*&& pathOwner != nullptr && pathOwner->id == 30809 */ && dir == SearchThreadData::SEARCH_BACKWARD){
 		// 	LOG("Switch to: %d", fwdCurNode->GetIndex());
 		// }
+
+		// If we've traced a path to the target node, so we have a full path.
+		if (dir == SearchThreadData::SEARCH_FORWARD) {
+			if (fwdCurNode->GetIndex() == fwd.tgtSearchNode->GetIndex() || fwdCurNode->GetIndex() == revStartingNode->GetIndex()) {
+				haveFullPath = true;
+				useFwdPathOnly = true;
+				searchEarlyDrop = false;
+			}
+		}
+
 		fwd.tgtSearchNode = fwdCurNode;//&fwdSearchNodes[revCurNode->GetIndex()];
 		fwd.minSearchNode = fwd.tgtSearchNode;
 
@@ -885,6 +906,25 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 	// 			);
 	// }
 
+	// The early out check didn't apply to path repairs because it needs to build out the rest of the path. Check for
+	// it now and trigger a reverse path build. We don't need to go through the search loop.
+	if (doPathRepair) {
+		// If true, this means the forward and reverse searches are staring on the same node.
+		if (haveFullPath) {
+			const float2& searchTransitionPoint = bwd.srcSearchNode->GetNeighborEdgeTransitionPoint();
+
+			// step back into the exist reverse path. The forward search needs to point to the current node.
+			bwd.tgtSearchNode = bwd.srcSearchNode->prevNode;
+			fwd.tgtSearchNode->SetNeighborEdgeTransitionPoint(searchTransitionPoint);
+			bwd.tgtPoint = float3(searchTransitionPoint.x, 0.f, searchTransitionPoint.y);
+
+			AssertPointIsOnNodeEdge(bwd.tgtPoint, bwd.tgtSearchNode);
+			AssertPointIsOnNodeEdge(bwd.tgtPoint, fwd.tgtSearchNode);
+
+			continueSearching = false;
+		}
+	}
+
 	while (continueSearching) {
 		if (!(*fwd.openNodes).empty()) {
 			fwdNodesSearched++;
@@ -895,7 +935,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 			// several scenarios that impact performance.
 			// 1. Maps with huge islands.
 			// 2. Players wall off the map in PvE modes, create huge artificial islands.
-			if (fwdNodesSearched >= fwdNodeSearchLimit)
+			if (fwdNodesSearched >= nodeSearchLimit)
 				searchThreadData->ResetQueue(SearchThreadData::SEARCH_FORWARD);
 
 			assert(curSearchNode->GetNeighborEdgeTransitionPoint().x != 0.f
@@ -916,6 +956,12 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 					// If step Index is 0, then a full path was found. This can happen for partial
 					// searches, if the partial path isn't actually close enough.
 					if (curSearchNode->GetStepIndex() == 0) { isFullSearch = true; }
+					
+					// If the current node is the target node and the is was a partial search, then we is now a full search.
+					// This is here to catch the situation where the reverse path are bad nodes.
+					if (curSearchNode == fwd.tgtSearchNode && !isFullSearch) {
+						isFullSearch = true;
+					}
 
 					fwd.tgtSearchNode = curSearchNode;
 					searchThreadData->ResetQueue(SearchThreadData::SEARCH_FORWARD);
@@ -974,6 +1020,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 						// Can only happen with path repairs, because partial paths require both fwd and bwd to set
 						// haveFullPath, which means the fwd going first can't get here if the starting node is on a
 						// shared path.
+						assert(bwdNode.prevNode != nullptr);
 						bwd.tgtSearchNode = bwdNode.prevNode;
 						fwd.tgtSearchNode = fwd.minSearchNode = curSearchNode;
 
@@ -1023,7 +1070,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 
 			// We're done with the forward path and we expect the reverse path to fail so stop it right there.
 			if ((*fwd.openNodes).empty() && expectIncompletePartialSearch){
-				SetForwardSearchLimit();
+				SetNodeSearchLimit();
 			// 	searchEarlyDrop = true;
 			// 	//bwd.tgtSearchNode = curSearchNode;
 			// 	searchThreadData->ResetQueue(SearchThreadData::SEARCH_BACKWARD);
@@ -1037,7 +1084,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 			// if (curSearchNode->GetIndex() == 20076 && (searchID == 7340095 || searchID == 10485810) /*&& pathOwner != nullptr && pathOwner->id == 30809 */ && gs->frameNum == 10213)
 			// 	LOG("Whoops!");
 
-			if (bwdNodesSearched >= fwdNodeSearchLimit)
+			if (bwdNodesSearched >= nodeSearchLimit)
 				searchThreadData->ResetQueue(SearchThreadData::SEARCH_BACKWARD);
 
 			assert(curSearchNode->GetNeighborEdgeTransitionPoint().x != 0.f
@@ -1124,7 +1171,7 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 			// Limit forward search to avoid excessively costly searches when the path cannot be
 			// joined. This should be okay for partial searches as well.
 			if ((*bwd.openNodes).empty() && !bwdPathConnected)
-				SetForwardSearchLimit();
+				SetNodeSearchLimit();
 		}
 
 		// stop if forward search is done, even if reverse search can continue. If forward search
@@ -1144,26 +1191,15 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 	if (doPathRepair) {
 		// Move the backwards source node to where it would be if this was complete path search, rather than a repair.
 		bwd.srcSearchNode = bwd.repairPathRealSrcSearchNode;
-	
-		if (!haveFullPath) {
-			// Prevent this request from being processed further.
-			haveFullPath = havePartPath = false;
-
-			// This will have the path request rescheduled for the next frame.
-			pathRequestWaiting = true;
-
-			// If a complete repair path cannot be found, then abort this search and switch to a full repath.
-			return false;
-		}
 	} 
 	
 	if (searchEarlyDrop) {
 		// move forward only needed for incomplete partial searches,
 		// but only if forward was able to find the partially shared path.
-		if (fwdPathConnected) {
+		if (fwdPathConnected)
 			reverseTrace(SearchThreadData::SEARCH_FORWARD);
-		}
-		reverseTrace(SearchThreadData::SEARCH_BACKWARD);
+		if (bwdPathConnected && !useFwdPathOnly)
+			reverseTrace(SearchThreadData::SEARCH_BACKWARD);
 	} else if (doPartialSearch) {
 		// Sanity check the path is properly connected. Partial searches can fail this check.
 		// If a partial search found a full path instead of connecting to the partial path, then
@@ -1193,6 +1229,17 @@ bool QTPFS::PathSearch::ExecutePathSearch() {
 			}
 		}
 	}
+
+	if (doPathRepair && !haveFullPath) {
+		// Prevent this request from being processed further.
+		haveFullPath = havePartPath = false;
+
+		// This will have the path request rescheduled for the next frame.
+		pathRequestWaiting = true;
+
+		// If a complete repair path cannot be found, then abort this search and switch to a full repath.
+		return false;
+	} 
 
 	havePartPath = (fwd.minSearchNode != fwd.srcSearchNode)
 				// Normally now, we would count this as a part path to avoid units smashing against
@@ -1471,7 +1518,7 @@ void QTPFS::PathSearch::IterateNodeNeighbors(const INode* curNode, unsigned int 
 	// Allow units to escape if starting in a closed node - a cost of infinity would prevent them escaping.
 	const float curNodeSanitizedCost = curNode->AllSquaresImpassable() ? QTPFS_CLOSED_NODE_COST : curNode->GetMoveCost();
 
-	const std::vector<INode::NeighbourPoints>& nxtNodes = curNode->GetNeighbours();
+	const auto& nxtNodes = curNode->GetNeighbours();
 	for (unsigned int i = 0; i < nxtNodes.size(); i++) {
 		// NOTE:
 		//   this uses the actual distance that edges of the final path will cover,
@@ -1590,8 +1637,8 @@ void QTPFS::PathSearch::Finalize(IPath* path) {
 		SmoothPath(path);
 		#endif
 	} else {
-		auto& fwd = directionalSearchData[SearchThreadData::SEARCH_FORWARD];
 
+		auto& fwd = directionalSearchData[SearchThreadData::SEARCH_FORWARD];
 		path->AllocPoints(2);
 		path->SetSourcePoint({fwd.srcPoint.x, 0.f, fwd.srcPoint.z});
 		path->SetTargetPoint({fwd.tgtPoint.x, 0.f, fwd.tgtPoint.z});
@@ -1662,19 +1709,20 @@ float3 QTPFS::PathSearch::FindNearestPointOnNodeToGoal(const QTPFS::SearchNode& 
 // #pragma GCC push_options
 // #pragma GCC optimize ("O0")
 
+constexpr uint32_t ONLY_NODE_ID_MASK = 0x80000000;
+
 template<typename L, typename T>
 bool isPresent(const L& list, const T& node) {
-	return std::find_if(list.begin(), list.end(), [&node](auto& next){ return next.nodeId == node.nodeId; }) != list.end();
+	return std::find_if(list.begin(), list.end(), [&node](auto& next){ return (next.nodeId & ~ONLY_NODE_ID_MASK) == (node.nodeId & ~ONLY_NODE_ID_MASK); }) != list.end();
 }
 
 template<typename L>
 bool isPresent(const L& list, const QTPFS::SearchNode& node) {
-	return std::find_if(list.begin(), list.end(), [&node](auto& next){ return next.nodeId == node.GetIndex(); }) != list.end();
+	return std::find_if(list.begin(), list.end(), [&node](auto& next){ return (next.nodeId & ~ONLY_NODE_ID_MASK) == (node.GetIndex() & ~ONLY_NODE_ID_MASK); }) != list.end();
 }
 
 void QTPFS::PathSearch::TracePath(IPath* path) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	constexpr uint32_t ONLY_NODE_ID_MASK = 0x80000000;
 	struct TracePoint{
 		float3 point;
 		uint32_t nodeId;

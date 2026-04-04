@@ -30,18 +30,29 @@ void S3DModelPiece::DrawStaticLegacy(bool bind, bool bindPosMat) const
 	if (bind) S3DModelHelpers::UnbindLegacyAttrVBOs();
 }
 
+void S3DModelPiece::DrawStaticLegacyRecImpl(const float3& rootT) const
+{
+	// Build a per-piece transform that correctly positions it relative to the root piece:
+	//   rotation + scale  come from this piece's own accumulated bposeTransform
+	//   translation       is the offset from the root piece in model space (bpose.t - rootT),
+	//                     so the chunk flies as a connected rigid body centered at drawPos.
+	const CMatrix44f relMat = Transform(bposeTransform.r, bposeTransform.t - rootT, bposeTransform.s).ToMatrix();
+	glPushMatrix();
+	glMultMatrixf(relMat);
+	DrawElements();
+	glPopMatrix();
+
+	for (const S3DModelPiece* childPiece : children) {
+		childPiece->DrawStaticLegacyRecImpl(rootT);
+	}
+}
+
 // only used by projectiles with the PF_Recursive flag
 void S3DModelPiece::DrawStaticLegacyRec() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	S3DModelHelpers::BindLegacyAttrVBOs();
-
-	DrawStaticLegacy(false, false);
-
-	for (const S3DModelPiece* childPiece : children) {
-		childPiece->DrawStaticLegacy(false, false);
-	}
-
+	DrawStaticLegacyRecImpl(bposeTransform.t);
 	S3DModelHelpers::UnbindLegacyAttrVBOs();
 }
 

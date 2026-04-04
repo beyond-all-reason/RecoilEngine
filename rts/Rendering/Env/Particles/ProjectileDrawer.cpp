@@ -77,9 +77,14 @@ void CProjectileDrawer::KillStatic(bool reload) {
 	if (reload)
 		return;
 
+	// minimapLinesRB and minimapPointsRB are now instance members,
+	// destroyed by spring::SafeDestruct() below before OpenGL context is destroyed
 	spring::SafeDestruct(projectileDrawer);
 	memset(projectileDrawerMem, 0, sizeof(projectileDrawerMem));
 }
+
+TypedRenderBuffer<VA_TYPE_C>& CProjectileDrawer::GetMiniMapLinesRB() { return projectileDrawer->minimapLinesRB; }
+TypedRenderBuffer<VA_TYPE_C>& CProjectileDrawer::GetMiniMapPointsRB() { return projectileDrawer->minimapPointsRB; }
 
 void CProjectileDrawer::Init() {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -454,8 +459,16 @@ void CProjectileDrawer::ParseAtlasTextures(
 	textureTable.GetMap(texturesMap);
 	textureTable.GetKeys(subTables);
 
-	for (auto texturesMapIt = texturesMap.begin(); texturesMapIt != texturesMap.end(); ++texturesMapIt) {
-		const std::string textureName = StringToLower(texturesMapIt->first);
+	// Sort texture names to ensure deterministic ordering across runs
+	std::vector<std::string> sortedTexNames;
+	sortedTexNames.reserve(texturesMap.size());
+	for (const auto& [name, _] : texturesMap) {
+		sortedTexNames.emplace_back(name);
+	}
+	std::sort(sortedTexNames.begin(), sortedTexNames.end());
+
+	for (const auto& texName : sortedTexNames) {
+		const std::string textureName = StringToLower(texName);
 
 		// no textures added to this atlas are allowed
 		// to be overwritten later by other textures of
@@ -464,7 +477,7 @@ void CProjectileDrawer::ParseAtlasTextures(
 			blockedTextures.insert(textureName);
 
 		if (blockTextures || (blockedTextures.find(textureName) == blockedTextures.end()))
-			texAtlas->AddTexFromFile(texturesMapIt->first, "bitmaps/" + texturesMapIt->second);
+			texAtlas->AddTexFromFile(texName, "bitmaps/" + texturesMap[texName]);
 	}
 
 	texturesMap.clear();
@@ -477,14 +490,22 @@ void CProjectileDrawer::ParseAtlasTextures(
 
 		textureSubTable.GetMap(texturesMap);
 
-		for (auto texturesMapIt = texturesMap.begin(); texturesMapIt != texturesMap.end(); ++texturesMapIt) {
-			const std::string textureName = StringToLower(texturesMapIt->first);
+		// Sort texture names to ensure deterministic ordering across runs
+		sortedTexNames.clear();
+		sortedTexNames.reserve(texturesMap.size());
+		for (const auto& [name, _] : texturesMap) {
+			sortedTexNames.emplace_back(name);
+		}
+		std::sort(sortedTexNames.begin(), sortedTexNames.end());
+
+		for (const auto& texName : sortedTexNames) {
+			const std::string textureName = StringToLower(texName);
 
 			if (blockTextures)
 				blockedTextures.insert(textureName);
 
 			if (blockTextures || (blockedTextures.find(textureName) == blockedTextures.end()))
-				texAtlas->AddTexFromFile(texturesMapIt->first, "bitmaps/" + texturesMapIt->second);
+				texAtlas->AddTexFromFile(texName, "bitmaps/" + texturesMap[texName]);
 		}
 
 		texturesMap.clear();
@@ -630,11 +651,11 @@ void CProjectileDrawer::DrawProjectilesMiniMap()
 	sh.Enable();
 	{
 		ZoneScopedN("DrawProjectilesMiniMap::MiniMapLinesRB");
-		CProjectile::GetMiniMapLinesRB().DrawArrays(GL_LINES);
+		GetMiniMapLinesRB().DrawArrays(GL_LINES);
 	}
 	{
 		ZoneScopedN("DrawProjectilesMiniMap::MiniMapPointsRB");
-		CProjectile::GetMiniMapPointsRB().DrawArrays(GL_POINTS);
+		GetMiniMapPointsRB().DrawArrays(GL_POINTS);
 	}
 	sh.Disable();
 
@@ -959,10 +980,17 @@ void CProjectileDrawer::DrawProjectileModel(const CProjectile* p)
 			}
 
 			if ((pp->explFlags & PF_Recursive) != 0) {
+				// DrawStaticLegacyRec applies bpose rotation+scale per-piece internally
 				pp->omp->DrawStaticLegacyRec();
 			}
 			else {
-				// non-recursive, only draw one piece
+				// Apply the rotation+scale from bposeTransform (but NOT translation, which is the
+				// piece's model-space offset and is irrelevant for a standalone flying piece).
+				{
+					const auto& bpose = pp->omp->bposeTransform;
+					const Transform bposeNoTrans{ bpose.r, ZeroVector, bpose.s };
+					glMultMatrixf(bposeNoTrans.ToMatrix());
+				}
 				pp->omp->DrawStaticLegacy(true, false);
 			}
 

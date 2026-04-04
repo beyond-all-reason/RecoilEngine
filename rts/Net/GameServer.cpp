@@ -192,7 +192,7 @@ void CGameServer::Initialize()
 		netPingTimings.fill(spring_notime);
 		mapDrawTimings.fill({spring_notime, 0});
 		chatMutedFlags.fill({false, false});
-		aiControlFlags.fill(false);
+		aiControlFlags.fill(true);
 
 		const std::vector<PlayerBase>& playerStartData = myGameSetup->GetPlayerStartingDataCont();
 		const std::vector<TeamBase>&     teamStartData = myGameSetup->GetTeamStartingDataCont();

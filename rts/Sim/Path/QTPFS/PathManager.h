@@ -93,6 +93,9 @@ namespace QTPFS {
 
 		const spring::unordered_map<unsigned int, PathSearchTrace::Execution*>& GetPathTraces() const { return pathTraces; }
 
+		void RemovePathFromShared(QTPFS::entity entity);
+		void RemovePathFromPartialShared(QTPFS::entity entity);
+
 	private:
 		void MapChanged(int x1, int z1, int x2, int z2);
 
@@ -124,11 +127,10 @@ namespace QTPFS {
 		void UpdateNodeLayer(unsigned int layerNum, const SRectangle& r, int currentThread);
 
 		bool InitializeSearch(QTPFS::entity searchEntity);
-		void RemovePathFromShared(QTPFS::entity entity);
-		void RemovePathFromPartialShared(QTPFS::entity entity);
 		void RemovePathSearch(QTPFS::entity pathEntity);
 
 		void ReadyQueuedSearches();
+		void ProcessPathSearch(int i, bool shouldBeRaw);
 		void ExecuteQueuedSearches();
 		void QueueDeadPathSearches();
 
@@ -155,7 +157,8 @@ namespace QTPFS {
 		bool ExecuteSearch(
 			PathSearch* search,
 			NodeLayer& nodeLayer,
-			unsigned int pathType
+			unsigned int pathType,
+			bool immediateSearch
 		);
 
 		unsigned int ExecuteImmediateSearch(unsigned int pathId);

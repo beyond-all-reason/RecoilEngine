@@ -636,6 +636,7 @@ void CArchiveScanner::ReadCache()
 				continue;
 
 			brokenArchives.clear();
+			brokenArchivesIndex.clear();
 
 			// nullify hashes, filesInfo
 			for (auto& ai : archiveInfos) {

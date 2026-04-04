@@ -56,12 +56,13 @@ After installing requirements, you can execute the build locally using the `buil
 
 ```console
 $ docker-build-v2/build.sh --help
-Usage: docker-build-v2/build.sh [--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] {windows|linux} [cmake_flag...]
+Usage: docker-build-v2/build.sh [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] {windows|linux} [cmake_flag...]
 Options:
   -h, --help   print this help message
   --configure  only configure, don't compile
   --compile    only compile, don't configure
   -j, --jobs   number of concurrent processes to use when building
+  --arch       arm64 or amd64, defaults to host
 
 Some behaviors can be changed by setting environment variables. Consult the script source for those more advanced use cases.
 ```
@@ -78,18 +79,18 @@ will:
 2. Configure the release configuration of the engine build
 3. Compile and install the engine using the following paths in the repository root:
    - `.cache`: compilation cache
-   - `build-windows`: compilation output
-   - `build-windows/install`: ready to use installation
+   - `build-amd64-windows`: compilation output
+   - `build-amd64-windows/install`: ready to use installation
 
 > [!CAUTION]
-> The build output like in archives fetched from the [releases page](https://github.com/beyond-all-reason/RecoilEngine/releases) is inside of `build-windows/install` directory, **not** `build-windows`. The improvement is tracked in [#2742](https://github.com/beyond-all-reason/RecoilEngine/issues/2747).
+> The build output like in archives fetched from the [releases page](https://github.com/beyond-all-reason/RecoilEngine/releases) is inside of `build-amd64-windows/install` directory, **not** `build-amd64-windows`. The improvement is tracked in [#2742](https://github.com/beyond-all-reason/RecoilEngine/issues/2747).
 
 > **TODO:** Link to documentation article about how to start engine, load game in it etc once it exists. Some current references of not best quality specifically for BAR:
 >   - https://github.com/beyond-all-reason/Beyond-All-Reason/wiki/Testing-New-Engine-Releases-in-BAR
 >   - https://discord.com/channels/549281623154229250/724924957074915358/1411338224114204693
 
 > [!TIP]
-> Don't forget that symlinks exist and can be used to link compilation output `build-windows/install` to the game installation folder. It can be helpful if your Recoil game/lobby supports starting arbitrary engine versions. For example, [skylobby](https://github.com/skynet-gh/skylobby) for generic lobby software, and for BAR, there is the [Debug Launcher](https://github.com/beyond-all-reason/bar_debug_launcher).
+> Don't forget that symlinks exist and can be used to link compilation output `build-amd64-windows/install` to the game installation folder. It can be helpful if your Recoil game/lobby supports starting arbitrary engine versions. For example, [skylobby](https://github.com/skynet-gh/skylobby) for generic lobby software, and for BAR, there is the [Debug Launcher](https://github.com/beyond-all-reason/bar_debug_launcher).
 > - Windows: [mklink](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/mklink) or third-party [Link Shell Extension (LSE)](https://schinagl.priv.at/nt/hardlinkshellext/linkshellextension.html).
 > - Linux: [`ln -s`](https://linuxize.com/post/how-to-create-symbolic-links-in-linux-using-the-ln-command/)
 
@@ -124,7 +125,7 @@ configuration phase takes precedent over the arguments.
 The official images are built as part of a CI workflow (see [Implementation Overview](#implementation-overview)), but if you want to adjust the Docker build image or test local changes, you can build it locally:
 
 ```shell
-docker build -t recoil-build-amd64-windows docker-build-v2/amd64-windows
+docker-build-v2/images/amd64-windows/build.sh
 ```
 
 and then pass the custom image to the build script via the environment variable `CONTAINER_IMAGE`:
@@ -139,7 +140,7 @@ For details on private testing, check the wiki [here](https://github.com/beyond-
 
 ## Implementation Overview
 
-There are two separate build images, one for Windows, one for Linux. The Docker images are built as part of a [GitHub Actions workflow](../../.github/workflows/docker-images-build.yml) and stored in the GitHub Package repository. The images are relatively small (~300-400MiB compressed) and building them takes 2-3 minutes.
+There are multiple separate build images, for Windows, for Linux, and each supported architecture. The Docker images are built as part of a [GitHub Actions workflow](../../.github/workflows/docker-images-build.yml) and stored in the GitHub Package repository. The images are relatively small (~300-400MiB compressed) and building them takes 2-3 minutes.
 
 Each of the images contains a complete required build environment with all dependencies installed (including [mingwlibs](https://github.com/beyond-all-reason/mingwlibs64) etc.), configured for proper resolution from engine CMake configuration, and caching with [ccache](https://ccache.dev/).
 

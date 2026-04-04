@@ -34,7 +34,6 @@ public:
 	, parser(nullptr)
 
 	, synced(false)
-	, allowChanges(false)
 	, drawingEnabled(false)
 
 	, running(0)
@@ -84,7 +83,6 @@ public:
 	LuaParser* parser;
 
 	bool synced;
-	bool allowChanges;
 	bool drawingEnabled;
 
 	// greater than 0 if currently running a callin; 0 if not

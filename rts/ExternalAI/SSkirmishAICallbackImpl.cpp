@@ -1677,15 +1677,15 @@ EXPORT(int) skirmishAiCallback_Mod_getReclaimUnitMethod(int skirmishAIId) {
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getReclaimUnitEnergyCostFactor(int skirmishAIId) {
-	return modInfo.reclaimUnitEnergyCostFactor;
+	return modInfo.reclaimUnitCostFactor.energy;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getReclaimUnitEfficiency(int skirmishAIId) {
-	return modInfo.reclaimUnitEfficiency;
+	return modInfo.reclaimUnitEfficiency.metal;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getReclaimFeatureEnergyCostFactor(int skirmishAIId) {
-	return modInfo.reclaimFeatureEnergyCostFactor;
+	return modInfo.reclaimFeatureCostFactor.energy;
 }
 
 EXPORT(bool) skirmishAiCallback_Mod_getReclaimUnitDrainHealth(int skirmishAIId) {
@@ -1701,15 +1701,15 @@ EXPORT(bool) skirmishAiCallback_Mod_getReclaimAllowAllies(int skirmishAIId) {
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getRepairEnergyCostFactor(int skirmishAIId) {
-	return modInfo.repairEnergyCostFactor;
+	return modInfo.repairCostFactor.energy;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getResurrectEnergyCostFactor(int skirmishAIId) {
-	return modInfo.resurrectEnergyCostFactor;
+	return modInfo.resurrectCostFactor.energy;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getCaptureEnergyCostFactor(int skirmishAIId) {
-	return modInfo.captureEnergyCostFactor;
+	return modInfo.captureCostFactor.energy;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getTransportGround(int skirmishAIId) {
@@ -2390,11 +2390,10 @@ EXPORT(float) skirmishAiCallback_UnitDef_getMakesResource(int skirmishAIId,
 		int unitDefId, int resourceId) {
 
 	const UnitDef* ud = getUnitDefById(skirmishAIId, unitDefId);
-	if (resourceId == resourceHandler->GetMetalId()) {
-		return ud->makesMetal;
-	} else {
-		return 0.0f;
-	}
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return ud->makesResources[resourceId];
+
+	return 0.0f;
 }
 
 EXPORT(float) skirmishAiCallback_UnitDef_getCost(int skirmishAIId, int unitDefId, int resourceId) {
@@ -2427,8 +2426,8 @@ EXPORT(float) skirmishAiCallback_UnitDef_getResourceExtractorRange(int skirmishA
 EXPORT(float) skirmishAiCallback_UnitDef_getWindResourceGenerator(int skirmishAIId, int unitDefId, int resourceId) {
 	const UnitDef* ud = getUnitDefById(skirmishAIId, unitDefId);
 
-	if (resourceId == resourceHandler->GetEnergyId())
-		return ud->windGenerator;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return ud->windGenerator[resourceId];
 
 	return 0.0f;
 }
@@ -2436,8 +2435,8 @@ EXPORT(float) skirmishAiCallback_UnitDef_getWindResourceGenerator(int skirmishAI
 EXPORT(float) skirmishAiCallback_UnitDef_getTidalResourceGenerator(int skirmishAIId, int unitDefId, int resourceId) {
 	const UnitDef* ud = getUnitDefById(skirmishAIId, unitDefId);
 
-	if (resourceId == resourceHandler->GetEnergyId())
-		return ud->tidalGenerator;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return ud->tidalGenerator[resourceId];
 
 	return 0.0f;
 }
@@ -4583,8 +4582,8 @@ EXPORT(int) skirmishAiCallback_WeaponDef_getVisibleShieldHitFrames(int skirmishA
 EXPORT(float) skirmishAiCallback_WeaponDef_Shield_getResourceUse(int skirmishAIId, int weaponDefId, int resourceId) {
 	const WeaponDef* wd = getWeaponDefById(skirmishAIId, weaponDefId);
 
-	if (resourceId == resourceHandler->GetEnergyId())
-		return wd->shieldEnergyUse;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return wd->shieldResourceUse[resourceId];
 
 	return 0.0f;
 }
@@ -4612,8 +4611,8 @@ EXPORT(float) skirmishAiCallback_WeaponDef_Shield_getPowerRegen(int skirmishAIId
 EXPORT(float) skirmishAiCallback_WeaponDef_Shield_getPowerRegenResource(int skirmishAIId, int weaponDefId, int resourceId) {
 	const WeaponDef* wd = getWeaponDefById(skirmishAIId, weaponDefId);
 
-	if (resourceId == resourceHandler->GetEnergyId())
-		return wd->shieldPowerRegenEnergy;
+	if (resourceId >= 0 && resourceId < SResourcePack::MAX_RESOURCES)
+		return wd->shieldPowerRegenCost[resourceId];
 
 	return 0.0f;
 }

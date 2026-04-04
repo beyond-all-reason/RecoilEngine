@@ -142,16 +142,13 @@ protected:
 	uint32_t collisionFlags = 0;
 	uint32_t renderIndex = -1u;
 
-	static TypedRenderBuffer<VA_TYPE_C> mmLnsRB;
-	static TypedRenderBuffer<VA_TYPE_C> mmPtsRB;
-
 	static bool GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo);
 	static bool IsValidTexture(const AtlasedTexture* tex);
 public:
 	static void AddMiniMapVertices(VA_TYPE_C&& v1, VA_TYPE_C&& v2);
 
-	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapLinesRB() { return mmLnsRB; }
-	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapPointsRB() { return mmPtsRB; }
+	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapLinesRB();
+	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapPointsRB();
 
 	//static TypedRenderBuffer<VA_TYPE_C >& GetAnimationRenderBuffer();
 	std::vector<int> quads;

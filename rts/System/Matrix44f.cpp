@@ -11,8 +11,7 @@
 #include <algorithm>
 #include <cstring>
 
-#include <xmmintrin.h>
-#include <emmintrin.h>
+#include "System/simd_compat.h"
 
 CR_BIND(CMatrix44f, )
 
@@ -56,8 +55,8 @@ bool CMatrix44f::IsOrthoNormal() const
 	const float3 dots = {xdir.dot(ydir), ydir.dot(zdir), xdir.dot(zdir)};
 	const float3 lens = {xdir.SqLength(), ydir.SqLength(), zdir.SqLength()};
 
-	constexpr float3 epsd = {float3::cmp_eps() *  8.0f, float3::cmp_eps() *  8.0f, float3::cmp_eps() *  8.0f};
-	constexpr float3 epsl = {float3::cmp_eps() * 16.0f, float3::cmp_eps() * 16.0f, float3::cmp_eps() * 16.0f};
+	constexpr float3 epsd = {float3::cmp_eps() *  64.0f, float3::cmp_eps() *  64.0f, float3::cmp_eps() *  64.0f};
+	constexpr float3 epsl = {float3::cmp_eps() * 128.0f, float3::cmp_eps() * 128.0f, float3::cmp_eps() * 128.0f};
 
 	bool on  = dots.equals(ZeroVector, epsd);
 	     on &= lens.equals(OnesVector, epsl);
@@ -69,6 +68,16 @@ bool CMatrix44f::IsIdentity() const
 {
 	static constexpr CMatrix44f IDENTITY = CMatrix44f();
 	return (*this) == IDENTITY;
+}
+
+bool CMatrix44f::IsRotMatrix() const
+{
+	return IsOrthoNormal() && math::fabs(1.0f - Det4()) <= 64.0f * float3::cmp_eps();
+}
+
+bool CMatrix44f::IsRotOrRotTranMatrix() const
+{
+	return IsOrthoNormal() && math::fabs(1.0f - Det3()) <= 64.0f * float3::cmp_eps();
 }
 
 float CMatrix44f::Det3() const

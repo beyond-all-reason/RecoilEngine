@@ -14,11 +14,10 @@ struct SResourcePack {
 	union {
 		float res[MAX_RESOURCES];
 		struct { float metal, energy; };
-		struct { float res1, res2; };
 	};
 
 public:
-	SResourcePack() : res1(0.0f), res2(0.0f) {}
+	SResourcePack() : metal(0.0f), energy(0.0f) {}
 	SResourcePack(const float value) : metal(value), energy(value) {}
 	SResourcePack(const float m, const float e) : metal(m), energy(e) {}
 	CR_DECLARE_STRUCT(SResourcePack)

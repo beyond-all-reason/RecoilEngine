@@ -565,13 +565,13 @@ static bool InitParamMap()
 	ADD_BOOL("visibleShield",           wd.visibleShield);
 	ADD_BOOL("visibleShieldRepulse",    wd.visibleShieldRepulse);
 	ADD_INT( "visibleShieldHitFrames",  wd.visibleShieldHitFrames);
-	ADD_FLOAT("shieldEnergyUse",        wd.shieldEnergyUse);
+	ADD_FLOAT("shieldEnergyUse",        wd.shieldResourceUse.energy);
 	ADD_FLOAT("shieldRadius",           wd.shieldRadius);
 	ADD_FLOAT("shieldForce",            wd.shieldForce);
 	ADD_FLOAT("shieldMaxSpeed",         wd.shieldMaxSpeed);
 	ADD_FLOAT("shieldPower",            wd.shieldPower);
 	ADD_FLOAT("shieldPowerRegen",       wd.shieldPowerRegen);
-	ADD_FLOAT("shieldPowerRegenEnergy", wd.shieldPowerRegenEnergy);
+	ADD_FLOAT("shieldPowerRegenEnergy", wd.shieldPowerRegenCost.energy);
 	ADD_INT(  "shieldRechargeDelay",    wd.shieldRechargeDelay);
 	ADD_FLOAT("shieldGoodColorR",       wd.shieldGoodColor.x);
 	ADD_FLOAT("shieldGoodColorG",       wd.shieldGoodColor.y);
