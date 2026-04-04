@@ -31,7 +31,6 @@ class RecoilConan(ConanFile):
 
     def requirements(self):
         self.requires("opengl/system")
-        self.requires("glew/2.2.0")
         self.requires("devil/1.8.0")
         self.requires("zlib/1.3.1")
         if self.settings.os == "Linux":
