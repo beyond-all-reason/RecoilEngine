@@ -190,15 +190,12 @@ jobs:
             -v $(pwd)/src:/build/src:ro \
             -v $(pwd)/remote_ccache.conf:/build/ccache.conf:ro \
             -v $(pwd)/artifacts:/build/artifacts:rw \
-            -v $(pwd)/.conan2:/build/.conan2:rw \
             -e CCACHE_${{ inputs.recache && 'RECACHE' || 'NORECACHE' }}=1 \
             --network host \
             ${{ steps.resolve-image.outputs.image }} \
             bash <<EOF
           set -e
           cd /build/src/docker-build-v2/scripts
-          ./graph-deps.sh
-          ./deps.sh
           ./configure.sh ${{ inputs.cmake-options || '' }}
           ./compile.sh
           ${{ ((github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.split-debug-info == false) && 'echo "Not splitting debug info."' || './split-debug-info.sh' }}

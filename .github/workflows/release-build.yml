@@ -34,10 +34,6 @@ jobs:
           else
             echo "tag_name=recoil{$(git rev-parse --abbrev-ref HEAD)}$(git describe --abbrev=7)" >> "$GITHUB_OUTPUT"
           fi
-#  build-libraries:
-#    needs: get-tag
-#    uses: ./.github/workflows/library-build.yml
-#    secrets: inherit
   build-engine:
     needs: get-tag
     uses: ./.github/workflows/engine-build.yml
