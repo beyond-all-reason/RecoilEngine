@@ -69,11 +69,7 @@ CLuaMenu::CLuaMenu()
 		return;
 	}
 
-	// load the standard libraries
-	LuaLibs::OpenSynced(L, false);
-	LUA_OPEN_LIB(L, luaopen_io);
-	LUA_OPEN_LIB(L, luaopen_os);
-	LUA_OPEN_LIB(L, luaopen_debug);
+	LuaLibs::OpenUnsynced(L);
 
 	// setup the lua IO access check functions
 	lua_set_fopen(L, LuaIO::fopen);

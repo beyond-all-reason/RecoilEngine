@@ -21,4 +21,12 @@ namespace LuaLibs {
 		}
 	}
 
+	void OpenUnsynced(lua_State* L)
+	{
+		OpenSynced(L, false);
+		LUA_OPEN_LIB(L, luaopen_io);
+		LUA_OPEN_LIB(L, luaopen_os);
+		LUA_OPEN_LIB(L, luaopen_debug);
+	}
+
 } // namespace LuaLibs
