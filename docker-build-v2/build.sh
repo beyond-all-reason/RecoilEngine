@@ -11,11 +11,11 @@ if [[ $(id -u) -eq 0 && -z "${SKIP_ROOT_CHECK:-}" ]]; then
   exit 2
 fi
 
-USAGE="Usage: $0 [--help] [--configure|--deps|--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] {windows|linux} [cmake_flag...]"
-export DEPS=true
+USAGE="Usage: $0 [--help] [--configure|--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] [--local-conan] {windows|linux} [cmake_flag...]"
 export CONFIGURE=true
 export COMPILE=true
 export CMAKE_BUILD_PARALLEL_LEVEL=
+export LOCAL_CONAN=false
 
 case $(uname -m) in
   x86_64) ARCH=amd64 ;;
@@ -23,23 +23,15 @@ case $(uname -m) in
   *) ARCH=unknown ;;
 esac
 
-export OS=
+OS=
 while (( $# > 0 )); do
   case $1 in
-    --deps)
-      DEPS=true
-      CONFIGURE=false
-      COMPILE=false
-      shift
-      ;;
     --configure)
-      DEPS=false
       CONFIGURE=true
       COMPILE=false
       shift
       ;;
     --compile)
-      DEPS=false
       CONFIGURE=false
       COMPILE=true
       shift
@@ -47,12 +39,12 @@ while (( $# > 0 )); do
     -h|--help)
       echo "$USAGE"
       echo "Options:"
-      echo "  -h, --help   print this help message"
-      echo "  --deps       only install conan dependencies, don't configure or compile"
-      echo "  --configure  only configure, don't compile"
-      echo "  --compile    only compile, don't configure"
-      echo "  -j, --jobs   number of concurrent processes to use when building"
-      echo "  --arch       arm64 or amd64, defaults to host"
+      echo "  -h, --help     print this help message"
+      echo "  --configure    only configure, don't compile"
+      echo "  --compile      only compile, don't configure"
+      echo "  -j, --jobs     number of concurrent processes to use when building"
+      echo "  --arch         arm64 or amd64, defaults to host"
+      echo "  --local-conan  compile conan libs and don't depend on version in image"
       echo ""
       echo "Some behaviors can be changed by setting environment variables. Consult the script source for those more advanced use cases."
       exit 0
@@ -73,6 +65,10 @@ while (( $# > 0 )); do
       fi
       CMAKE_BUILD_PARALLEL_LEVEL="$1"
       shift
+      ;;
+    --local-conan)
+      shift
+      LOCAL_CONAN=true
       ;;
     windows|linux)
       OS="$1"
@@ -125,9 +121,7 @@ if [[ -n "$UNSYNCED_SUBMODULES" ]]; then
   fi
 fi
 
-mkdir -p build-$PLATFORM .cache/ccache-$PLATFORM .conan2-$PLATFORM/profiles
-cp docker-build-v2/images/$ARCH-all/conan_build_profile .conan2-$PLATFORM/profiles
-cp docker-build-v2/images/$PLATFORM/conan_profile .conan2-$PLATFORM/profiles
+mkdir -p build-$PLATFORM .cache/ccache-$PLATFORM
 
 # Build container image selection, allow overriding.
 if [[ -n "${CONTAINER_IMAGE:-}" ]]; then
@@ -181,6 +175,14 @@ else
   P="/"
 fi
 
+CONAN_MOUNTS=""
+if $LOCAL_CONAN; then
+  mkdir -p .cache/conan-$PLATFORM/profiles
+  cp docker-build-v2/images/$ARCH-all/conan_build_profile .cache/conan-$PLATFORM/profiles
+  cp docker-build-v2/images/$PLATFORM/conan_profile .cache/conan-$PLATFORM/profiles
+  CONAN_MOUNTS="-v "$CWD${P}.cache${P}conan-${PLATFORM}${P}":/build/conan-home:rw --tmpfs /build/conan-out:rw,mode=1777"
+fi
+
 # Handle git worktrees: the container needs access to the shared .git directory
 # for version generation. In a worktree, --absolute-git-dir returns the
 # worktree-specific dir while --git-common-dir returns the shared .git root.
@@ -190,8 +192,6 @@ GIT_COMMON_DIR=$(git rev-parse --path-format=absolute --git-common-dir)
 if [[ "$GIT_DIR" != "$GIT_COMMON_DIR" ]]; then
   WORKTREE_MOUNTS="-v $GIT_COMMON_DIR:$GIT_COMMON_DIR:ro"
 fi
-
-    # -v "$CWD${P}.conan2-${PLATFORM}${P}":/build/.conan2:rw \
 
 # Docker's -t requires stdin AND stdout to be TTYs; in CI, pipes, or agent
 # contexts one or both are missing and docker errors out with "the input
@@ -207,8 +207,9 @@ $RUNTIME run --platform=linux/$ARCH -i $TTY_FLAG --rm \
     -v "$CWD${P}.cache${P}ccache-${PLATFORM}${P}":/build/cache:z,rw \
     -v "$CWD${P}build-${PLATFORM}${P}":/build/out:z,rw \
     $UID_FLAGS \
+    $CONAN_MOUNTS \
+    -e LOCAL_CONAN \
     $WORKTREE_MOUNTS \
-    -e DEPS \
     -e CONFIGURE \
     -e COMPILE \
     -e OS \
@@ -233,10 +234,8 @@ if [[ "$(id -u)" != "$(stat -c %u /build/src)" ]]; then
 fi
 
 cd /build/src/docker-build-v2/scripts
-# $DEPS && ./graph-deps.sh "$@"
-# $DEPS && ./deps.sh "$@"
+$LOCAL_CONAN && ./deps.sh
 $CONFIGURE && ./configure.sh "$@"
-export OS
 if $COMPILE; then
   if $CONFIGURE; then
     ./compile.sh
