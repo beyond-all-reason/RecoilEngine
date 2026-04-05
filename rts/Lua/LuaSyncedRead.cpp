@@ -3365,42 +3365,46 @@ int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 	return 1;
 }
 
-/***
- * @function Spring.GetPosNearestEnemy
+/*** Returns the enemy unit closest to a position.
+ *
+ * @function Spring.GetClosestEnemyUnit
  * @param x number x coordinate of query position
  * @param y number y coordinate of query position
  * @param z number z coordinate of query position
  * @param range number? (Default: `1.0e9`)
- * @param useLOS boolean? (Default: true) requires LOS/radar visibility or not. False if you want to use cylindrical search.
- * @param sphereDistTest boolean? (Default: `false`) determines if using spherical(3D, includes target radius) or cylindrical(2D) search.
- * @param checkSightDist boolean? (Default: `false`) determine if during filter process, if candidate distance to be within candidate LOS radius.
+ * @param allyTeamID number? whose enemies to consider, always own in non-full-read contexts
+ * @param useLOS boolean? (Default: true) requires LOS/radar visibility or not. Always true in non-full-read contexts
+ * @param sphereDistTest boolean? (Default: `false`) For non-LOS mode only. Determines if using spherical(3D, includes target radius) or cylindrical(2D) search
+ * @param checkSightDist boolean? (Default: `false`) For non-LOS mode only. Determine if during filter process, if candidate distance to be within candidate LOS radius
  * @return integer? unitID
- * 
-*/
+ */
 int LuaSyncedRead::GetClosestEnemyUnit(lua_State* L)
 {
-	float x = luaL_optnumber(L, 1, 1.0f);
-	float y = luaL_optnumber(L, 2, 1.0f);
-	float z = luaL_optnumber(L, 3, 1.0f);
+	const float3 pos
+		( luaL_checkfloat(L, 1)
+		, luaL_checkfloat(L, 2)
+		, luaL_checkfloat(L, 3)
+	);
 
-	float3 pos(x, y, z);
+	const auto range = luaL_optnumber(L, 4, 1.0e9f);
 
-	const int allyTeam = CLuaHandle::GetHandleReadAllyTeam(L);
-	if (allyTeam < 0)
+	const auto allyTeamID = CLuaHandle::GetHandleFullRead(L)
+		? luaL_checkint(L, 5)
+		: CLuaHandle::GetHandleReadAllyTeam(L)
+	;
+	if (!teamHandler.IsValidAllyTeam(allyTeamID))
 		return 0;
 
-	const bool wantLOS = luaL_optboolean(L, 5, true);
-	const bool testLOS = !CLuaHandle::GetHandleFullRead(L) || wantLOS;
+	const auto wantLOS = luaL_optboolean(L, 6, true);
+	const auto testLOS = wantLOS || !CLuaHandle::GetHandleFullRead(L);
 
-	const bool sphereDistTest = luaL_optboolean(L, 6, false);
-	const bool checkSightDist = luaL_optboolean(L, 7, false);
+	const auto sphereDistTest = luaL_optboolean(L, 7, false);
+	const auto checkSightDist = luaL_optboolean(L, 8, false);
 
-	// nullptr since determining closest unit to position, not unit
-	// if ignoring LOS, pass checkSightDist=false (by default)
-	// such that enemies outside unit's los-range are included
-	const CUnit* target = testLOS ?
-		CGameHelper::GetClosestEnemyUnit(nullptr, pos, luaL_optnumber(L, 4, 1.0e9f), allyTeam) :
-		CGameHelper::GetClosestEnemyUnitNoLosTest(nullptr, pos, luaL_optnumber(L, 4, 1.0e9f), allyTeam, sphereDistTest, checkSightDist);
+	const auto target = testLOS
+		? CGameHelper::GetClosestEnemyUnit         (nullptr, pos, range, allyTeamID)
+		: CGameHelper::GetClosestEnemyUnitNoLosTest(nullptr, pos, range, allyTeamID, sphereDistTest, checkSightDist)
+	;
 
 	if (target == nullptr)
 		return 0;
