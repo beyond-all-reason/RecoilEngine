@@ -110,10 +110,6 @@ CLuaUI::CLuaUI()
 	LUA_OPEN_LIB(L, luaopen_string);
 	LUA_OPEN_LIB(L, luaopen_debug);
 
-	// initialize luasocket
-	if (luaSocketEnabled)
-		InitLuaSocket(L);
-
 	// setup the lua IO access check functions
 	lua_set_fopen(L, LuaIO::fopen);
 	lua_set_popen(L, LuaIO::popen, LuaIO::pclose);
@@ -135,6 +131,9 @@ CLuaUI::CLuaUI()
 		//lua_pushliteral(L, "setlocale"); lua_pushnil(L); lua_rawset(L, -3);
 	}
 	lua_pop(L, 1); // os
+
+	if (luaSocketEnabled)
+		InitLuaSocket(L);
 
 	lua_pushvalue(L, LUA_GLOBALSINDEX);
 
