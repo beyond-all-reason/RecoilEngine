@@ -191,6 +191,8 @@ if [[ "$GIT_DIR" != "$GIT_COMMON_DIR" ]]; then
   WORKTREE_MOUNTS="-v $GIT_COMMON_DIR:$GIT_COMMON_DIR:ro"
 fi
 
+    # -v "$CWD${P}.conan2-${PLATFORM}${P}":/build/.conan2:rw \
+
 # Docker's -t requires stdin AND stdout to be TTYs; in CI, pipes, or agent
 # contexts one or both are missing and docker errors out with "the input
 # device is not a TTY". Only add -t when it's safe; -i is harmless either
@@ -204,7 +206,6 @@ $RUNTIME run --platform=linux/$ARCH -i $TTY_FLAG --rm \
     -v "$CWD${P}":/build/src:z,ro \
     -v "$CWD${P}.cache${P}ccache-${PLATFORM}${P}":/build/cache:z,rw \
     -v "$CWD${P}build-${PLATFORM}${P}":/build/out:z,rw \
-    -v "$CWD${P}.conan2-${PLATFORM}${P}":/build/.conan2:rw \
     $UID_FLAGS \
     $WORKTREE_MOUNTS \
     -e DEPS \
@@ -232,8 +233,8 @@ if [[ "$(id -u)" != "$(stat -c %u /build/src)" ]]; then
 fi
 
 cd /build/src/docker-build-v2/scripts
-$DEPS && ./graph-deps.sh "$@"
-$DEPS && ./deps.sh "$@"
+# $DEPS && ./graph-deps.sh "$@"
+# $DEPS && ./deps.sh "$@"
 $CONFIGURE && ./configure.sh "$@"
 export OS
 if $COMPILE; then

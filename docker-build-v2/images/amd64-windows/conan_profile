@@ -8,9 +8,8 @@ compiler.version=13
 os=Windows
 
 [conf]
-tools.build:compiler_executables={'c': 'x86_64-w64-mingw32-gcc-posix', 'cpp': 'x86_64-w64-mingw32-g++-posix' }
 tools.cmake.cmaketoolchain:user_toolchain+=/build/toolchain.cmake
-user.cmake.cmake_layout:build_folder=/build/out
+user.cmake.cmake_layout:build_folder=/build/conan-out
 tools.build.cross_building:cross_build=True
 tools.cmake.cmaketoolchain:generator=Ninja
 
