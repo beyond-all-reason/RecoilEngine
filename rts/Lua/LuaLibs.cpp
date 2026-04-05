@@ -2,7 +2,21 @@
 
 #include "LuaLibs.h"
 
+#include "LuaIO.h"
 #include "lib/lua/include/LuaInclude.h"
+
+#include <initializer_list>
+
+static void RemoveMethods(lua_State* L, const char *lib, const std::initializer_list <const char *> &methods)
+{
+	lua_getglobal(L, lib);
+	for (const auto &method : methods) {
+		lua_pushstring(L, method);
+		lua_pushnil(L);
+		lua_rawset(L, -3);
+	}
+	lua_pop(L, 1);
+}
 
 namespace LuaLibs {
 
@@ -27,6 +41,21 @@ namespace LuaLibs {
 		LUA_OPEN_LIB(L, luaopen_io);
 		LUA_OPEN_LIB(L, luaopen_os);
 		LUA_OPEN_LIB(L, luaopen_debug);
+
+		lua_set_fopen (L, LuaIO::fopen);
+		lua_set_system(L, LuaIO::system);
+		lua_set_remove(L, LuaIO::remove);
+		lua_set_rename(L, LuaIO::rename);
+
+		RemoveMethods(L, "io",
+			{ "popen"
+		});
+		RemoveMethods(L, "os",
+			{ "exit"
+			, "execute"
+			, "tmpname"
+			, "getenv"
+		});
 	}
 
 } // namespace LuaLibs

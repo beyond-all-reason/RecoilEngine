@@ -8,7 +8,6 @@
 #include "LuaConstEngine.h"
 #include "LuaConstGL.h"
 #include "LuaConstPlatform.h"
-#include "LuaIO.h"
 #include "LuaLibs.h"
 #include "LuaOpenGL.h"
 #include "LuaScream.h"
@@ -70,28 +69,6 @@ CLuaMenu::CLuaMenu()
 	}
 
 	LuaLibs::OpenUnsynced(L);
-
-	// setup the lua IO access check functions
-	lua_set_fopen(L, LuaIO::fopen);
-	lua_set_popen(L, LuaIO::popen, LuaIO::pclose);
-	lua_set_system(L, LuaIO::system);
-	lua_set_remove(L, LuaIO::remove);
-	lua_set_rename(L, LuaIO::rename);
-
-	// remove a few dangerous calls
-	lua_getglobal(L, "io");
-	lua_pushstring(L, "popen"); lua_pushnil(L); lua_rawset(L, -3);
-	lua_pop(L, 1);
-	lua_getglobal(L, "os"); {
-		lua_pushliteral(L, "exit");      lua_pushnil(L); lua_rawset(L, -3);
-		lua_pushliteral(L, "execute");   lua_pushnil(L); lua_rawset(L, -3);
-		//lua_pushliteral(L, "remove");    lua_pushnil(L); lua_rawset(L, -3);
-		//lua_pushliteral(L, "rename");    lua_pushnil(L); lua_rawset(L, -3);
-		lua_pushliteral(L, "tmpname");   lua_pushnil(L); lua_rawset(L, -3);
-		lua_pushliteral(L, "getenv");    lua_pushnil(L); lua_rawset(L, -3);
-		//lua_pushliteral(L, "setlocale"); lua_pushnil(L); lua_rawset(L, -3);
-	}
-	lua_pop(L, 1); // os
 
 	if (luaSocketEnabled)
 		InitLuaSocket(L);
