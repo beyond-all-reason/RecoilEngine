@@ -9,6 +9,7 @@
 #include "LuaConstGL.h"
 #include "LuaConstPlatform.h"
 #include "LuaIO.h"
+#include "LuaLibs.h"
 #include "LuaOpenGL.h"
 #include "LuaScream.h"
 #include "LuaUtils.h"
@@ -69,12 +70,9 @@ CLuaMenu::CLuaMenu()
 	}
 
 	// load the standard libraries
-	LUA_OPEN_LIB(L, luaopen_base);
+	LuaLibs::OpenSynced(L, false);
 	LUA_OPEN_LIB(L, luaopen_io);
 	LUA_OPEN_LIB(L, luaopen_os);
-	LUA_OPEN_LIB(L, luaopen_math);
-	LUA_OPEN_LIB(L, luaopen_table);
-	LUA_OPEN_LIB(L, luaopen_string);
 	LUA_OPEN_LIB(L, luaopen_debug);
 
 	// setup the lua IO access check functions

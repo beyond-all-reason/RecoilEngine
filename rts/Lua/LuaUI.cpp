@@ -15,6 +15,7 @@
 #include "LuaConstPlatform.h"
 #include "LuaSyncedRead.h"
 #include "LuaInterCall.h"
+#include "LuaLibs.h"
 #include "LuaUnsyncedRead.h"
 #include "LuaUICommand.h"
 #include "LuaFeatureDefs.h"
@@ -102,12 +103,9 @@ CLuaUI::CLuaUI()
 	}
 
 	// load the standard libraries
-	LUA_OPEN_LIB(L, luaopen_base);
+	LuaLibs::OpenSynced(L, false);
 	LUA_OPEN_LIB(L, luaopen_io);
 	LUA_OPEN_LIB(L, luaopen_os);
-	LUA_OPEN_LIB(L, luaopen_math);
-	LUA_OPEN_LIB(L, luaopen_table);
-	LUA_OPEN_LIB(L, luaopen_string);
 	LUA_OPEN_LIB(L, luaopen_debug);
 
 	// setup the lua IO access check functions

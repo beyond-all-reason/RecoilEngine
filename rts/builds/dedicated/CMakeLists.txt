@@ -167,6 +167,7 @@ set(engineDedicatedSources
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaConstEngine.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaEncoding.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaIO.cpp
+	${ENGINE_SRC_ROOT_DIR}/Lua/LuaLibs.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMathExtra.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMemPool.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaParser.cpp

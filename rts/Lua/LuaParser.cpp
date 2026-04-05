@@ -16,6 +16,7 @@
 #include "LuaConstEngine.h"
 #include "LuaEncoding.h"
 #include "LuaIO.h"
+#include "LuaLibs.h"
 #include "LuaVFS.h"
 #include "LuaUtils.h"
 #include "LuaMathExtra.h"
@@ -123,14 +124,7 @@ void LuaParser::SetupLua(bool isSyncedCtxt, bool isDefsParser)
 
 void LuaParser::SetupEnv(bool isSyncedCtxt, bool isDefsParser)
 {
-	LUA_OPEN_LIB(L, luaopen_base);
-	LUA_OPEN_LIB(L, luaopen_math);
-	LUA_OPEN_LIB(L, luaopen_table);
-	LUA_OPEN_LIB(L, luaopen_string);
-	//LUA_OPEN_LIB(L, luaopen_io);
-	//LUA_OPEN_LIB(L, luaopen_os);
-	//LUA_OPEN_LIB(L, luaopen_package);
-	//LUA_OPEN_LIB(L, luaopen_debug);
+	LuaLibs::OpenSynced(L, false);
 
 	// delete some dangerous/unsynced functions
 	lua_pushnil(L); lua_setglobal(L, "dofile");
