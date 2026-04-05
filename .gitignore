@@ -130,9 +130,6 @@ progress.make
 /build-*
 /docker-build/cache
 
-# conan dir
-/.conan2-*
-
 #installer downloaded/generated stuff
 /installer/Springlobby/
 /installer/*.exe
