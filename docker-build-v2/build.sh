@@ -44,7 +44,7 @@ while (( $# > 0 )); do
       echo "  --compile      only compile, don't configure"
       echo "  -j, --jobs     number of concurrent processes to use when building"
       echo "  --arch         arm64 or amd64, defaults to host"
-      echo "  --local-conan  compile conan libs and don't depend on version in image"
+      echo "  --local-conan  compile dependencies instead of using precompiled ones"
       echo ""
       echo "Some behaviors can be changed by setting environment variables. Consult the script source for those more advanced use cases."
       exit 0
