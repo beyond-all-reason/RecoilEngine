@@ -9,7 +9,8 @@ conan install \
     -pr:h conan_profile \
     -pr:b conan_build_profile \
     --build=missing \
-    -c tools.system.package_manager:mode=install
+    -c tools.system.package_manager:mode=install \
+    /build/src
 conan cache clean
 rm -rf /var/lib/apt/lists/*
 rm -rf /root/.cache

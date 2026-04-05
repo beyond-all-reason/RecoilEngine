@@ -29,7 +29,7 @@ RUN mkdir -p $CONAN_HOME/profiles
 COPY docker-build-v2/images/amd64-all/conan_build_profile $CONAN_HOME/profiles
 COPY docker-build-v2/images/amd64-windows/conan_profile $CONAN_HOME/profiles
 COPY docker-build-v2/images/all/conan-deps.sh .
-COPY conanfile.py .
+COPY conanfile.py src
 RUN ./conan-deps.sh
 ENV CMAKE_TOOLCHAIN_FILE=/build/conan-out/conan/conan_toolchain.cmake
 
