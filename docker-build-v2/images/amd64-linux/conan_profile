@@ -12,4 +12,4 @@ tools.cmake.cmaketoolchain:user_toolchain+=/build/toolchain.cmake
 user.cmake.cmake_layout:build_folder=/build/conan-out
 
 [platform_tool_requires]
-cmake/3.31.10
+cmake/{{ os.getenv("CMAKE_VERSION") }}

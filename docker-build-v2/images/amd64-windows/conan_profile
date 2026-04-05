@@ -24,4 +24,4 @@ STRIP=x86_64-w64-mingw32-strip
 RC=x86_64-w64-mingw32-windres
 
 [platform_tool_requires]
-cmake/3.31.10
+cmake/{{ os.getenv("CMAKE_VERSION") }}

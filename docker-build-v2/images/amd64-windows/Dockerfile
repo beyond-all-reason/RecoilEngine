@@ -15,7 +15,8 @@ RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 10 \
  && update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-13 10
 
 # Using `pipx --global` would be better but it's available only since pipx 1.5
-RUN PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install cmake==3.31.10 conan==2.*
+ENV CMAKE_VERSION=3.31.10
+RUN PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install cmake==$CMAKE_VERSION conan==2.*
 
 WORKDIR /build
 RUN mkdir conan-out src cache out artifacts && chmod a+rwx cache out artifacts
