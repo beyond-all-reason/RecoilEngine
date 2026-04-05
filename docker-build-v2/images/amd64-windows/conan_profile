@@ -22,3 +22,6 @@ AS=x86_64-w64-mingw32-as
 RANLIB=x86_64-w64-mingw32-ranlib
 STRIP=x86_64-w64-mingw32-strip
 RC=x86_64-w64-mingw32-windres
+
+[platform_tool_requires]
+cmake/3.31.10

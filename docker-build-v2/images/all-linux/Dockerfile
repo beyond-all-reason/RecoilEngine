@@ -44,7 +44,7 @@ RUN git clone --depth 1 --branch v1.5.7 https://github.com/facebook/zstd.git \
  && rm -rf zstd
 
 RUN curl -L -O https://bootstrap.pypa.io/pip/3.8/get-pip.py && python3.8 get-pip.py && rm get-pip.py
-RUN python3 -m pip install scikit-build cmake==3.27.* conan==2.*
+RUN python3 -m pip install scikit-build cmake==3.31.10 conan==2.*
 
 WORKDIR /build
 RUN mkdir conan-out src cache out artifacts && chmod a+rwx cache out artifacts
