@@ -177,10 +177,10 @@ fi
 
 CONAN_MOUNTS=""
 if $LOCAL_CONAN; then
-  mkdir -p .cache/conan-$PLATFORM/profiles
+  mkdir -p .cache/conan-$PLATFORM/profiles build-$PLATFORM/conan
   cp docker-build-v2/images/$ARCH-all/conan_build_profile .cache/conan-$PLATFORM/profiles
   cp docker-build-v2/images/$PLATFORM/conan_profile .cache/conan-$PLATFORM/profiles
-  CONAN_MOUNTS="-v "$CWD${P}.cache${P}conan-${PLATFORM}${P}":/build/conan-home:rw --tmpfs /build/conan-out:rw,mode=1777"
+  CONAN_MOUNTS="-v "$CWD${P}.cache${P}conan-${PLATFORM}${P}":/build/conan-home:z,rw -v $CWD${P}build-${PLATFORM}${P}conan${P}:/build/conan-out:z,rw"
 fi
 
 # Handle git worktrees: the container needs access to the shared .git directory
@@ -234,7 +234,7 @@ if [[ "$(id -u)" != "$(stat -c %u /build/src)" ]]; then
 fi
 
 cd /build/src/docker-build-v2/scripts
-$LOCAL_CONAN && ./deps.sh
+$CONFIGURE && $LOCAL_CONAN && ./deps.sh
 $CONFIGURE && ./configure.sh "$@"
 if $COMPILE; then
   if $CONFIGURE; then
