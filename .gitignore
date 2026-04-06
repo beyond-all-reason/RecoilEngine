@@ -176,3 +176,6 @@ build-*
 .kilo
 
 /.i-understand-git-submodules.txt
+
+# For local conan usage
+/CMakeUserPresets.json
