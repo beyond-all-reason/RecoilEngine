@@ -98,9 +98,19 @@ IK::FABRIKResult IK::SolveFABRIK(
 		// Forward pass: pull effector to goal, propagate toward root
 		positions[n - 1] = goal;
 		for (size_t i = n - 1; i-- > 0; ) {
-			float3 dir = (positions[i] - positions[i + 1]);
-			dir.SafeNormalize();
-			positions[i] = positions[i + 1] + dir * segLengths[i];
+			float3 boneDir = (positions[i + 1] - positions[i]);
+			boneDir.SafeNormalize();
+
+		// https://stackoverflow.com/questions/76805554/is-it-a-known-issue-that-2d-inverse-kinematics-with-fabrik-plus-angle-constraint
+		// has it incorrect. In case the constraints are not applied here, the impact is massive 20% of the solutions deadlock vs only 0.31% otherwise
+#if 1
+			if (!constraints.empty() && !std::holds_alternative<std::monostate>(constraints[i])) {
+				float3 restDir = (i > 0) ? (positions[i] - positions[i - 1]) : bposeRootDir;
+				restDir.SafeNormalize();
+				boneDir = ApplyConstraintWorldSpace(constraints[i], boneDir, restDir);
+			}
+#endif
+			positions[i] = positions[i + 1] - boneDir * segLengths[i];
 		}
 
 		// Backward pass: fix root, propagate toward effector with constraints

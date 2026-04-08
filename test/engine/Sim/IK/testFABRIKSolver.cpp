@@ -82,6 +82,48 @@ static void ScramblePositions(std::vector<float3>& positions,
 	}
 }
 
+// Scramble positions while respecting ball joint constraints.
+// Each bone direction is randomized within the cone at its joint.
+static void ScrambleBallConstrained(std::vector<float3>& positions,
+                                    const std::vector<float>& segLengths,
+                                    const std::vector<IK::Constraint>& constraints)
+{
+	for (size_t i = 0; i < positions.size() - 1; i++) {
+		if (const auto* bc = std::get_if<IK::BallJointConstraint>(&constraints[i])) {
+			float3 dir = RandomDirInCone(bc->coneAxis, bc->coneAngle * 0.9f);
+			positions[i + 1] = positions[i] + dir * segLengths[i];
+		} else {
+			float3 dir = RandomDir();
+			positions[i + 1] = positions[i] + dir * segLengths[i];
+		}
+	}
+}
+
+// Scramble positions while respecting hinge joint constraints.
+// The first bone is unconstrained; subsequent bones use the previous bone
+// direction as rest reference and pick a random angle within the hinge range.
+static void ScrambleHingeConstrained(std::vector<float3>& positions,
+                                     const std::vector<float>& segLengths,
+                                     const std::vector<IK::Constraint>& constraints)
+{
+	{
+		float3 dir = RandomDir();
+		positions[1] = positions[0] + dir * segLengths[0];
+	}
+
+	for (size_t i = 1; i < positions.size() - 1; i++) {
+		if (const auto* hc = std::get_if<IK::HingeJointConstraint>(&constraints[i])) {
+			float3 restDir = (positions[i] - positions[i - 1]);
+			restDir.SafeNormalize();
+			float3 dir = RandomDirInHinge(hc->axis, restDir, hc->minAngle, hc->maxAngle);
+			positions[i + 1] = positions[i] + dir * segLengths[i];
+		} else {
+			float3 dir = RandomDir();
+			positions[i + 1] = positions[i] + dir * segLengths[i];
+		}
+	}
+}
+
 // Build a valid chain reaching a goal. Returns positions with the effector
 // exactly at a reachable point. Segment lengths are randomised.
 struct ChainSetup {
@@ -358,26 +400,24 @@ TEST_CASE("FABRIKBallConstraint")
 			constraints[i] = bc;
 		}
 
-		// Scramble and solve
+		// Scramble within constraints and solve
 		auto positions = validPositions;
-		ScramblePositions(positions, segLengths);
+		ScrambleBallConstrained(positions, segLengths, constraints);
 		float3 rootDir = RandomDirInCone(coneAxis, coneAngle);
 
 		auto result = IK::SolveFABRIK(positions, segLengths, constraints, rootDir,
 		                               goal, MAX_ITERATIONS * 2, SOLVE_PRECISION * 2.0f);
 
-		CHECK((result == IK::FABRIKResult::FOUND || result == IK::FABRIKResult::FAILED));
+		CHECK(result == IK::FABRIKResult::FOUND);
 		CHECK(positions[0].distance(root) < 0.01f);
 		CheckSegmentLengths(positions, segLengths, SEG_LEN_TOL);
 
-		// Verify ball constraints are satisfied on each bone (only when converged)
-		if (result == IK::FABRIKResult::FOUND) {
-			for (size_t i = 0; i < numJoints - 1; i++) {
-				float3 boneDir = (positions[i + 1] - positions[i]);
-				boneDir.SafeNormalize();
-				const auto& bc = std::get<IK::BallJointConstraint>(constraints[i]);
-				CHECK(IsBallConstraintSatisfied(boneDir, bc, 0.05f));
-			}
+		// Verify ball constraints are satisfied on each bone
+		for (size_t i = 0; i < numJoints - 1; i++) {
+			float3 boneDir = (positions[i + 1] - positions[i]);
+			boneDir.SafeNormalize();
+			const auto& bc = std::get<IK::BallJointConstraint>(constraints[i]);
+			CHECK(IsBallConstraintSatisfied(boneDir, bc, 0.05f));
 		}
 	}
 }
@@ -389,6 +429,7 @@ TEST_CASE("FABRIKHingeConstraint")
 {
 	srand(300);
 
+	int numDeadlocked = 0;
 	for (int trial = 0; trial < NUM_TRIALS; trial++) {
 		const float3 root{srandf() * 50.0f, srandf() * 50.0f, srandf() * 50.0f};
 		const size_t numJoints = 4;
@@ -427,35 +468,48 @@ TEST_CASE("FABRIKHingeConstraint")
 			constraints[i] = hc;
 		}
 
-		// Scramble and solve
+		// Scramble within constraints and solve
 		auto positions = validPositions;
-		ScramblePositions(positions, segLengths);
+		ScrambleHingeConstrained(positions, segLengths, constraints);
 
-		// bindPoseRootDir = initial first bone direction
 		float3 initBoneDir = (validPositions[1] - validPositions[0]);
 		initBoneDir.SafeNormalize();
 
 		auto result = IK::SolveFABRIK(positions, segLengths, constraints, initBoneDir,
 		                               goal, MAX_ITERATIONS * 2, SOLVE_PRECISION * 2.0f);
 
-		CHECK((result == IK::FABRIKResult::FOUND || result == IK::FABRIKResult::FAILED));
+		if (result == IK::FABRIKResult::FAILED) {
+			// Verify it's trapped in a local minimum (static deadlock, ping-pong, or complex cycle).
+			// If we run 20 more iterations and it fails to make at least 0.5 units of progress,
+			// it is mathematically trapped by the saddle point geometry.
+			float startDist = positions.back().distance(goal);
+			auto posCopy = positions;
+			IK::SolveFABRIK(posCopy, segLengths, constraints, initBoneDir, goal, 20, SOLVE_PRECISION * 2.0f);
+			float endDist = posCopy.back().distance(goal);
+
+			bool isTrapped = (endDist >= startDist - 0.5f);
+			if (isTrapped) numDeadlocked++;
+			CHECK(isTrapped);
+		} else {
+			CHECK(result == IK::FABRIKResult::FOUND);
+		}
 		CHECK(positions[0].distance(root) < 0.01f);
 		CheckSegmentLengths(positions, segLengths, SEG_LEN_TOL);
 
-		// Verify hinge constraints on interior joints (only when converged)
-		if (result == IK::FABRIKResult::FOUND) {
-			for (size_t i = 1; i < numJoints - 1; i++) {
-				float3 boneDir = (positions[i + 1] - positions[i]);
-				boneDir.SafeNormalize();
-				float3 restDir = (positions[i] - positions[i - 1]);
-				restDir.SafeNormalize();
-				const auto& hc = std::get<IK::HingeJointConstraint>(constraints[i]);
-				CHECK(IsHingeConstraintSatisfied(boneDir, restDir, hc, 0.1f));
-			}
+		// Verify hinge constraints on interior joints
+		for (size_t i = 1; i < numJoints - 1; i++) {
+			float3 boneDir = (positions[i + 1] - positions[i]);
+			boneDir.SafeNormalize();
+			float3 restDir = (positions[i] - positions[i - 1]);
+			restDir.SafeNormalize();
+			const auto& hc = std::get<IK::HingeJointConstraint>(constraints[i]);
+			CHECK(IsHingeConstraintSatisfied(boneDir, restDir, hc, 0.1f));
 		}
 	}
-}
 
+	printf("FABRIKHingeConstraint: %d deadlocks (%.2f%%) correctly detected out of %d trials\n",
+	       numDeadlocked, (float)numDeadlocked / NUM_TRIALS * 100.0f, NUM_TRIALS);
+}
 
 // ---- Test 9: Zero-length segment (degenerate case) ----
 
