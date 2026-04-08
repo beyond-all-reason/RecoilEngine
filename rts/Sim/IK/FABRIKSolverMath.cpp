@@ -4,54 +4,74 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <variant>
 
 #include "System/float3.h"
+#include "System/SpringMath.h"
+
+static float3 ApplyHingeConstraint(const float3& boneDir, const float3& restDirNormalized, const IK::HingeJointConstraint& hc)
+{
+	float3 axisW = hc.axis;
+	axisW.SafeNormalize();
+
+	// Preserve the component along the hinge axis for 3D realism
+	const float axialComponent = boneDir.dot(axisW);
+	float3 dirProj  = boneDir - axisW * axialComponent;
+	float3 restProj = restDirNormalized - axisW * restDirNormalized.dot(axisW);
+
+	// Fallback if restProj is zero (parent is parallel to hinge axis)
+	if (restProj.SqLength() < 1e-4f) {
+		float3 alt = (std::abs(axisW.x) < 0.9f) ? RgtVector : UpVector;
+		restProj = axisW.cross(alt);
+	}
+	restProj.SafeNormalize();
+
+	// If dirProj is zero, the bone is pointing along the axis; pick any valid start in plane
+	if (dirProj.SqLength() < 1e-4f) {
+		dirProj = restProj;
+	} else {
+		dirProj.Normalize();
+	}
+
+	const float cosA    = std::clamp(dirProj.dot(restProj), -1.0f, 1.0f);
+	const float sinSign = restProj.cross(dirProj).dot(axisW) >= 0.0f ? 1.0f : -1.0f;
+	const float angle   = std::clamp(sinSign * math::acos(cosA), std::min(hc.minAngle, hc.maxAngle), std::max(hc.minAngle, hc.maxAngle));
+
+	float3 result = restProj * math::cos(angle) + axisW.cross(restProj) * math::sin(angle);
+	// Result is already unit-length and orthogonal to axisW
+	return result;
+}
+
 
 // World-space constraint application.
-// Identical to ApplyConstraint in FABRIKSolver.cpp but constraint axes are
-// already in world space — no model↔world conversion is performed.
+// Constraint axes are already in world space — no model<=>world conversion is performed.
 static float3 ApplyConstraintWorldSpace(
 	const IK::Constraint& c,
 	float3 dir,
-	const float3& restDir)
+	const float3& restDirNormalized)
 {
 	if (std::holds_alternative<IK::BallJointConstraint>(c)) {
 		const auto& bc = std::get<IK::BallJointConstraint>(c);
-		if (bc.coneAngle <= 0.0f)
+		if (bc.coneAngle < 0.0f)
 			return dir;
 
 		float3 coneAxisW = bc.coneAxis;
 		coneAxisW.SafeNormalize();
 
-		const float cosLimit = std::cos(bc.coneAngle);
+		const float cosLimit = math::cos(bc.coneAngle);
 		const float cosActual = dir.dot(coneAxisW);
 		if (cosActual < cosLimit) {
 			float3 perp = dir - coneAxisW * cosActual;
+			if (perp.SqLength() < 1e-6f)
+				return coneAxisW;
+
 			perp.SafeNormalize();
-			dir = coneAxisW * cosLimit + perp * std::sin(bc.coneAngle);
+			dir = coneAxisW * cosLimit + perp * math::sin(bc.coneAngle);
 			dir.SafeNormalize();
 		}
 	}
 	else if (std::holds_alternative<IK::HingeJointConstraint>(c)) {
-		const auto& hc = std::get<IK::HingeJointConstraint>(c);
-
-		float3 axisW = hc.axis;
-		axisW.SafeNormalize();
-
-		float3 dirProj  = dir     - axisW * dir.dot(axisW);
-		float3 restProj = restDir - axisW * restDir.dot(axisW);
-		dirProj.SafeNormalize();
-		restProj.SafeNormalize();
-
-		const float cosA    = std::clamp(dirProj.dot(restProj), -1.0f, 1.0f);
-		const float sinSign = restProj.cross(dirProj).dot(axisW) >= 0.0f ? 1.0f : -1.0f;
-		float angle = sinSign * std::acos(cosA);
-
-		angle = std::clamp(angle, hc.minAngle, hc.maxAngle);
-		dir   = restProj * std::cos(angle) + axisW.cross(restProj) * std::sin(angle);
-		dir.SafeNormalize();
+		return ApplyHingeConstraint(dir, restDirNormalized, std::get<IK::HingeJointConstraint>(c));
 	}
 	return dir;
 }
@@ -69,10 +89,18 @@ IK::FABRIKResult IK::SolveFABRIK(
 	const size_t n = positions.size();
 
 	if (n < 2)
-		return FABRIKResult::FAILED;
+		return FABRIKResult::ERR_INPUTS;
 
-	assert(segLengths.size() == n - 1);
-	assert(constraints.empty() || constraints.size() == n);
+	if (segLengths.size() != n - 1)
+		return FABRIKResult::ERR_INPUTS;
+
+	if (!constraints.empty() && constraints.size() != n - 1)
+		return FABRIKResult::ERR_INPUTS;
+
+	for (float len : segLengths) {
+		if (len <= 0.0f)
+			return FABRIKResult::ERR_INPUTS;
+	}
 
 	const float3 rootPos = positions[0];
 
@@ -80,7 +108,7 @@ IK::FABRIKResult IK::SolveFABRIK(
 	for (size_t i = 0; i < n - 1; i++)
 		totalLen += segLengths[i];
 
-	if (rootPos.distance(goal) >= totalLen) {
+	if (rootPos.distance(goal) > totalLen) {
 		// Goal is unreachable: stretch chain straight toward goal
 		for (size_t i = 0; i < n - 1; i++) {
 			float3 dir = (goal - positions[i]);
@@ -101,12 +129,12 @@ IK::FABRIKResult IK::SolveFABRIK(
 			float3 boneDir = (positions[i + 1] - positions[i]);
 			boneDir.SafeNormalize();
 
-		// https://stackoverflow.com/questions/76805554/is-it-a-known-issue-that-2d-inverse-kinematics-with-fabrik-plus-angle-constraint
-		// has it incorrect. In case the constraints are not applied here, the impact is massive 20% of the solutions deadlock vs only 0.31% otherwise
+
+		// Unlike the outcomes in https://stackoverflow.com/questions/76805554/is-it-a-known-issue-that-2d-inverse-kinematics-with-fabrik-plus-angle-constraint
+		// applying constraints in the forward pass seems to improve the convergence of the solver.
 #if 1
 			if (!constraints.empty() && !std::holds_alternative<std::monostate>(constraints[i])) {
-				float3 restDir = (i > 0) ? (positions[i] - positions[i - 1]) : bposeRootDir;
-				restDir.SafeNormalize();
+				float3 restDir = (i > 0) ? (positions[i] - positions[i - 1]).SafeNormalize() : bposeRootDir;
 				boneDir = ApplyConstraintWorldSpace(constraints[i], boneDir, restDir);
 			}
 #endif
@@ -120,8 +148,7 @@ IK::FABRIKResult IK::SolveFABRIK(
 			dir.SafeNormalize();
 
 			if (!constraints.empty() && !std::holds_alternative<std::monostate>(constraints[i])) {
-				float3 restDir = (i > 0) ? (positions[i] - positions[i - 1]) : bposeRootDir;
-				restDir.SafeNormalize();
+				float3 restDir = (i > 0) ? (positions[i] - positions[i - 1]).SafeNormalize() : bposeRootDir;
 				dir = ApplyConstraintWorldSpace(constraints[i], dir, restDir);
 			}
 

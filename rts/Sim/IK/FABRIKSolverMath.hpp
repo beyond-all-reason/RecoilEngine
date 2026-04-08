@@ -13,7 +13,8 @@ namespace IK {
 	enum class FABRIKResult : uint8_t {
 		FOUND = 0,
 		STRETCHING = 1,
-		FAILED = 2
+		FAILED = 2,
+		ERR_INPUTS = 3
 	};
 
 	// Pure FABRIK solver operating entirely on world-space positions.
@@ -22,7 +23,7 @@ namespace IK {
 	//
 	// positions:        in/out joint positions; positions[0] is the root (pinned)
 	// segLengths:       bone lengths between consecutive joints (size = positions.size() - 1)
-	// constraints:      per-joint constraints (size = positions.size(), or empty for unconstrained)
+	// constraints:      per-joint constraints (size = positions.size() - 1, or empty for unconstrained)
 	// bindPoseRootDir:  rest direction for constraint reference at the root joint (i=0)
 	// goal:             desired world-space position for the effector (last joint)
 	// maxIterations:    maximum FABRIK iteration count

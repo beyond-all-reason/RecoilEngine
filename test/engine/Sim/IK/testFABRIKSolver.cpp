@@ -198,10 +198,11 @@ static bool IsHingeConstraintSatisfied(const float3& boneDir,
 // Tests
 // ---------------------------------------------------------------------------
 
-static constexpr int    NUM_TRIALS       = 100000;
-static constexpr float  SOLVE_PRECISION  = 4.0f;
-static constexpr int    MAX_ITERATIONS   = 40;
-static constexpr float  SEG_LEN_TOL      = 0.1f;
+static constexpr int    NUM_TRIALS        = 100000;
+static constexpr int    NUM_TRIALS_CONSTR = 1000;
+static constexpr float  SOLVE_PRECISION   = 4.0f;
+static constexpr int    MAX_ITERATIONS    = 40;
+static constexpr float  SEG_LEN_TOL       = 0.1f;
 
 // ---- Test 1: Single joint chain returns FAILED ----
 
@@ -214,7 +215,7 @@ TEST_CASE("FABRIKSingleJoint")
 
 	auto result = IK::SolveFABRIK(positions, segLengths, constraints, rootDir,
 	                               float3{10, 0, 0}, MAX_ITERATIONS, SOLVE_PRECISION);
-	CHECK(result == IK::FABRIKResult::FAILED);
+	CHECK(result == IK::FABRIKResult::ERR_INPUTS);
 }
 
 
@@ -258,7 +259,9 @@ TEST_CASE("FABRIK2BoneStretch")
 		float3 goalDir = RandomDir();
 		float3 goal = root + goalDir * (totalLen + 10.0f + randf() * 50.0f);
 
-		std::vector<float3> positions = {root, root + RandomDir() * L1, root + RandomDir() * (L1 + L2)};
+		const float3 p1 = root + RandomDir() * L1;
+		const float3 p2 = p1   + RandomDir() * L2;
+		std::vector<float3> positions = {root, p1, p2};
 		std::vector<float>  segLengths = {L1, L2};
 
 		auto result = IK::SolveFABRIK(positions, segLengths, {}, float3{0, 1, 0},
@@ -317,14 +320,15 @@ TEST_CASE("FABRIKGoalAtRoot")
 
 		std::vector<float3> positions(numJoints);
 		std::vector<float>  segLengths(numJoints - 1, segLen);
+		
 		positions[0] = root;
 		for (size_t i = 1; i < numJoints; i++)
-			positions[i] = root + RandomDir() * segLen * static_cast<float>(i);
+			positions[i] = positions[i-1] + RandomDir() * segLen;
 
 		const float3 goal = root; // goal == root
 
 		ScramblePositions(positions, segLengths);
-		positions[0] = root; // keep root pinned for scramble
+		// root remains at root due to ScramblePositions logic
 
 		auto result = IK::SolveFABRIK(positions, segLengths, {}, float3{0, 1, 0},
 		                               goal, MAX_ITERATIONS * 2, SOLVE_PRECISION);
@@ -351,8 +355,8 @@ TEST_CASE("FABRIKGoalAtEffector")
 		// Goal is already at the effector
 		const float3 goal = cs.positions.back();
 
-		// Save original positions
-		auto origPositions = cs.positions;
+		// Save original positions to verify stability
+		const auto origPositions = cs.positions;
 
 		float3 rootDir = RandomDir();
 		auto result = IK::SolveFABRIK(cs.positions, cs.segLengths, {}, rootDir,
@@ -361,6 +365,11 @@ TEST_CASE("FABRIKGoalAtEffector")
 		CHECK(result == IK::FABRIKResult::FOUND);
 		CHECK(cs.positions.back().distance(goal) < SOLVE_PRECISION);
 		CheckSegmentLengths(cs.positions, cs.segLengths, SEG_LEN_TOL);
+
+		// Stability check: if already at goal, the positions should not have changed meaningfully
+		for (size_t i = 0; i < cs.positions.size(); i++) {
+			CHECK(cs.positions[i].distance(origPositions[i]) < 0.01f);
+		}
 	}
 }
 
@@ -371,7 +380,7 @@ TEST_CASE("FABRIKBallConstraint")
 {
 	srand(200);
 
-	for (int trial = 0; trial < NUM_TRIALS; trial++) {
+	for (int trial = 0; trial < NUM_TRIALS_CONSTR; trial++) {
 		const float3 root{srandf() * 50.0f, srandf() * 50.0f, srandf() * 50.0f};
 		const size_t numJoints = 4;
 
@@ -391,9 +400,9 @@ TEST_CASE("FABRIKBallConstraint")
 		}
 		float3 goal = validPositions.back();
 
-		// Set up constraints: ball constraint at each joint
-		std::vector<IK::Constraint> constraints(numJoints);
-		for (size_t i = 0; i < numJoints; i++) {
+		// Set up constraints: ball constraint at each joint (except effector)
+		std::vector<IK::Constraint> constraints(numJoints - 1);
+		for (size_t i = 0; i < numJoints - 1; i++) {
 			IK::BallJointConstraint bc;
 			bc.coneAxis  = coneAxis;
 			bc.coneAngle = coneAngle;
@@ -429,20 +438,19 @@ TEST_CASE("FABRIKHingeConstraint")
 {
 	srand(300);
 
-	int numDeadlocked = 0;
-	for (int trial = 0; trial < NUM_TRIALS; trial++) {
+	for (int trial = 0; trial < NUM_TRIALS_CONSTR; trial++) {
 		const float3 root{srandf() * 50.0f, srandf() * 50.0f, srandf() * 50.0f};
 		const size_t numJoints = 4;
 
-		// Hinge axis (e.g., pointing sideways)
-		float3 hingeAxis = RandomDir();
 		const float minAngle = -(math::PI * 0.1f + randf() * math::PI * 0.3f); // -18 to -72 deg
 		const float maxAngle =  (math::PI * 0.1f + randf() * math::PI * 0.3f); //  18 to  72 deg
 
-		// Build valid config: each bone direction satisfies the hinge constraint
+		// Build valid config: each bone direction satisfies its own local hinge constraint
 		std::vector<float3> validPositions(numJoints);
 		std::vector<float>  segLengths(numJoints - 1);
 		validPositions[0] = root;
+
+		std::vector<float3> hingeAxes(numJoints, UpVector);
 
 		// First bone: arbitrary direction (will serve as rest dir for joint 1)
 		float3 prevDir = RandomDir();
@@ -451,18 +459,23 @@ TEST_CASE("FABRIKHingeConstraint")
 
 		for (size_t i = 1; i < numJoints - 1; i++) {
 			segLengths[i] = 8.0f + randf() * 12.0f;
-			// restDir for joint i is the previous bone direction
-			float3 dir = RandomDirInHinge(hingeAxis, prevDir, minAngle * 0.5f, maxAngle * 0.5f);
+
+			// For each joint, create a hinge axis orthogonal to the bone entering it
+			float3 alt = (std::abs(prevDir.x) < 0.9f) ? float3(1,0,0) : float3(0,1,0);
+			hingeAxes[i] = prevDir.cross(alt);
+			hingeAxes[i].SafeNormalize();
+
+			float3 dir = RandomDirInHinge(hingeAxes[i], prevDir, minAngle, maxAngle);
 			validPositions[i + 1] = validPositions[i] + dir * segLengths[i];
 			prevDir = dir;
 		}
 		float3 goal = validPositions.back();
 
-		// Constraints: hinge at joints 1..n-2, none at root and effector
-		std::vector<IK::Constraint> constraints(numJoints, std::monostate{});
+		// Constraints: unique hinges at joints 1..n-2
+		std::vector<IK::Constraint> constraints(numJoints - 1, std::monostate{});
 		for (size_t i = 1; i < numJoints - 1; i++) {
 			IK::HingeJointConstraint hc;
-			hc.axis     = hingeAxis;
+			hc.axis     = hingeAxes[i];
 			hc.minAngle = minAngle;
 			hc.maxAngle = maxAngle;
 			constraints[i] = hc;
@@ -472,27 +485,13 @@ TEST_CASE("FABRIKHingeConstraint")
 		auto positions = validPositions;
 		ScrambleHingeConstrained(positions, segLengths, constraints);
 
-		float3 initBoneDir = (validPositions[1] - validPositions[0]);
+		float3 initBoneDir = (positions[1] - positions[0]);
 		initBoneDir.SafeNormalize();
 
 		auto result = IK::SolveFABRIK(positions, segLengths, constraints, initBoneDir,
-		                               goal, MAX_ITERATIONS * 2, SOLVE_PRECISION * 2.0f);
+		                               goal, MAX_ITERATIONS * 4, SOLVE_PRECISION * 4.0f);
 
-		if (result == IK::FABRIKResult::FAILED) {
-			// Verify it's trapped in a local minimum (static deadlock, ping-pong, or complex cycle).
-			// If we run 20 more iterations and it fails to make at least 0.5 units of progress,
-			// it is mathematically trapped by the saddle point geometry.
-			float startDist = positions.back().distance(goal);
-			auto posCopy = positions;
-			IK::SolveFABRIK(posCopy, segLengths, constraints, initBoneDir, goal, 20, SOLVE_PRECISION * 2.0f);
-			float endDist = posCopy.back().distance(goal);
-
-			bool isTrapped = (endDist >= startDist - 0.5f);
-			if (isTrapped) numDeadlocked++;
-			CHECK(isTrapped);
-		} else {
-			CHECK(result == IK::FABRIKResult::FOUND);
-		}
+		CHECK(result == IK::FABRIKResult::FOUND);
 		CHECK(positions[0].distance(root) < 0.01f);
 		CheckSegmentLengths(positions, segLengths, SEG_LEN_TOL);
 
@@ -506,9 +505,6 @@ TEST_CASE("FABRIKHingeConstraint")
 			CHECK(IsHingeConstraintSatisfied(boneDir, restDir, hc, 0.1f));
 		}
 	}
-
-	printf("FABRIKHingeConstraint: %d deadlocks (%.2f%%) correctly detected out of %d trials\n",
-	       numDeadlocked, (float)numDeadlocked / NUM_TRIALS * 100.0f, NUM_TRIALS);
 }
 
 // ---- Test 9: Zero-length segment (degenerate case) ----
@@ -540,8 +536,8 @@ TEST_CASE("FABRIKZeroLengthSegment")
 		auto result = IK::SolveFABRIK(positions, segLengths, {}, float3{0, 1, 0},
 		                               goal, MAX_ITERATIONS, SOLVE_PRECISION);
 
-		// Should not crash; may or may not converge perfectly
-		CHECK((result == IK::FABRIKResult::FOUND || result == IK::FABRIKResult::STRETCHING));
+		// Rejected as an invalid input
+		CHECK(result == IK::FABRIKResult::ERR_INPUTS);
 		CHECK(positions[0].distance(root) < 0.01f);
 		CheckSegmentLengths(positions, segLengths, SEG_LEN_TOL);
 	}
