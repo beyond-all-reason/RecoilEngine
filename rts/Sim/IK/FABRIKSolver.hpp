@@ -3,30 +3,17 @@
 #pragma once
 
 #include <vector>
-#include <variant>
 #include <cstdint>
 #include <memory>
 
 #include "System/creg/creg_cond.h"
-#include "System/float3.h"
 #include "System/Quaternion.h"
+#include "Sim/IK/IKTypes.hpp"
 
 class CSolidObject;
 struct LocalModelPiece;
 
 namespace IK {
-	struct BallJointConstraint {
-		float3 coneAxis = float3(0.0f, 1.0f, 0.0f);
-		float coneAngle = 0.0f;
-	};
-
-	struct HingeJointConstraint {
-		float3 axis = float3(0.0f, 1.0f, 0.0f);
-		float minAngle = 0.0f;
-		float maxAngle = 0.0f;
-	};
-
-	using Constraint = std::variant<std::monostate, BallJointConstraint, HingeJointConstraint>;
 
 	struct Joint {
 		const LocalModelPiece* piece;	// Direct reference to LocalModelPiece

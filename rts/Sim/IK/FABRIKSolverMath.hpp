@@ -6,7 +6,7 @@
 #include <cstdint>
 
 #include "System/float3.h"
-#include "Sim/IK/FABRIKSolver.hpp" // for Constraint types
+#include "Sim/IK/IKTypes.hpp"
 
 namespace IK {
 

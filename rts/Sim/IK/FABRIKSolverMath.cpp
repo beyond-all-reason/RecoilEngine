@@ -122,5 +122,8 @@ IK::FABRIKResult IK::SolveFABRIK(
 			break;
 	}
 
+	if (positions[n - 1].distance(goal) >= precision)
+		return FABRIKResult::FAILED;
+
 	return FABRIKResult::FOUND;
 }

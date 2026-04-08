@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "FABRIKSolver.hpp"
+#include "FABRIKSolverMath.hpp"
 
 #include <vector>
 #include <deque>
@@ -33,61 +34,7 @@ static float3 ModelDirToWorldDir(const float3& md, const CSolidObject& so)
 	return so.frontdir * md.z - so.rightdir * md.x + so.updir * md.y;
 }
 
-// Apply the joint constraint at joint[i] to clamp the bone direction toward joint[i+1].
-// dir     : current bone direction in world space (normalized)
-// restDir : reference direction for hinge angle measurement:
-//             i > 0 → current parent-bone direction (pos[i] - pos[i-1]), updated per iteration
-//             i = 0 → bind-pose bone direction (no parent bone in the chain)
-static float3 ApplyConstraint(
-	const IK::Constraint& c,
-	float3 dir,
-	const float3& restDir,
-	const CSolidObject& so)
-{
-	if (std::holds_alternative<IK::BallJointConstraint>(c)) {
-		const auto& bc = std::get<IK::BallJointConstraint>(c);
-		if (bc.coneAngle <= 0.0f)
-			return dir;
 
-		// coneAxis is in model space; convert to world space
-		float3 coneAxisW = ModelDirToWorldDir(bc.coneAxis, so);
-		coneAxisW.SafeNormalize();
-
-		const float cosLimit = std::cos(bc.coneAngle);
-		const float cosActual = dir.dot(coneAxisW);
-		if (cosActual < cosLimit) {
-			// dir is outside the cone; project it onto the cone boundary
-			float3 perp = dir - coneAxisW * cosActual;
-			perp.SafeNormalize();
-			dir = coneAxisW * cosLimit + perp * std::sin(bc.coneAngle);
-			dir.SafeNormalize();
-		}
-	}
-	else if (std::holds_alternative<IK::HingeJointConstraint>(c)) {
-		const auto& hc = std::get<IK::HingeJointConstraint>(c);
-
-		// hinge axis in world space
-		float3 axisW = ModelDirToWorldDir(hc.axis, so);
-		axisW.SafeNormalize();
-
-		// Project dir and restDir onto the hinge plane (perpendicular to axisW)
-		float3 dirProj  = dir     - axisW * dir.dot(axisW);
-		float3 restProj = restDir - axisW * restDir.dot(axisW);
-		dirProj.SafeNormalize();
-		restProj.SafeNormalize();
-
-		// Signed angle of dirProj relative to restProj around axisW
-		const float cosA    = std::clamp(dirProj.dot(restProj), -1.0f, 1.0f);
-		const float sinSign = restProj.cross(dirProj).dot(axisW) >= 0.0f ? 1.0f : -1.0f;
-		float angle = sinSign * std::acos(cosA);
-
-		// Clamp to [minAngle, maxAngle] and reconstruct via Rodrigues (axis ⊥ restProj)
-		angle = std::clamp(angle, hc.minAngle, hc.maxAngle);
-		dir   = restProj * std::cos(angle) + axisW.cross(restProj) * std::sin(angle);
-		dir.SafeNormalize();
-	}
-	return dir;
-}
 
 
 Chain::Chain(const Skeleton& skeleton, uint32_t rootID, uint32_t effectorID, float chainWeight)
@@ -232,66 +179,41 @@ std::vector<ChainSolution> Skeleton::SolveAllChains(uint32_t maxIterations, floa
 		// held constant throughout solving. This preserves whatever bone lengths the
 		// animation system has already set rather than reverting to bind-pose lengths.
 		std::vector<float> segLen(n - 1);
-		float totalLen = 0.0f;
-		for (size_t i = 0; i < n - 1; i++) {
+		for (size_t i = 0; i < n - 1; i++)
 			segLen[i] = pos[i + 1].distance(pos[i]);
-			totalLen += segLen[i];
-		}
 
 		const float3 goal    = ch->GetGoal();
 		const float3 rootPos = pos[0];
 
+		// Bind-pose direction of the root bone in world space — used as the hinge reference
+		// for the root joint (i=0) only, since it has no parent bone in the chain.
+		float3 bposeRootDir = (joints[ji[1]].piece->original->bposeTransform.t
+		                     - joints[ji[0]].piece->original->bposeTransform.t);
+		bposeRootDir.SafeNormalize();
+		bposeRootDir = ModelDirToWorldDir(bposeRootDir, *so);
+		bposeRootDir.SafeNormalize();
+
+		// Convert constraints into world space for the math solver
+		std::vector<Constraint> worldConstraints(n);
+		for (size_t i = 0; i < n; i++) {
+			worldConstraints[i] = joints[ji[i]].constraint;
+			if (auto* bc = std::get_if<BallJointConstraint>(&worldConstraints[i])) {
+				bc->coneAxis = ModelDirToWorldDir(bc->coneAxis, *so);
+				bc->coneAxis.SafeNormalize();
+			} else if (auto* hc = std::get_if<HingeJointConstraint>(&worldConstraints[i])) {
+				hc->axis = ModelDirToWorldDir(hc->axis, *so);
+				hc->axis.SafeNormalize();
+			}
+		}
+
+		IK::FABRIKResult resultCode = IK::SolveFABRIK(pos, segLen, worldConstraints, bposeRootDir, goal, maxIterations, precision);
 		ChainSolution::SolutionKind kind;
 
-		if (rootPos.distance(goal) >= totalLen) {
-			// Goal is unreachable: stretch chain straight toward goal
-			kind = ChainSolution::SolutionKind::STRETCHING;
-			for (size_t i = 0; i < n - 1; i++) {
-				float3 dir = (goal - pos[i]);
-				dir.SafeNormalize();
-				pos[i + 1] = pos[i] + dir * segLen[i];
-			}
-		} else {
-			// Goal is reachable: run FABRIK iterations
-			kind = ChainSolution::SolutionKind::FOUND;
-
-			// Bind-pose direction of the root bone in world space — used as the hinge reference
-			// for the root joint (i=0) only, since it has no parent bone in the chain.
-			float3 bposeRootDir = (joints[ji[1]].piece->original->bposeTransform.t
-			                     - joints[ji[0]].piece->original->bposeTransform.t);
-			bposeRootDir.SafeNormalize();
-			bposeRootDir = ModelDirToWorldDir(bposeRootDir, *so);
-			bposeRootDir.SafeNormalize();
-
-			for (uint32_t iter = 0; iter < maxIterations; iter++) {
-				// Forward pass: pull effector to goal, propagate toward root
-				pos[n - 1] = goal;
-				for (int i = static_cast<int>(n) - 2; i >= 0; i--) {
-					float3 dir = (pos[i] - pos[i + 1]);
-					dir.SafeNormalize();
-					pos[i] = pos[i + 1] + dir * segLen[i];
-				}
-				// Backward pass: fix root, propagate toward effector with constraint clamping.
-				// The hinge reference direction is the current parent-bone direction (pos[i] - pos[i-1]),
-				// recomputed each iteration so constraints track the moving skeleton rather than
-				// being measured against a static bind-pose reference.
-				pos[0] = rootPos;
-				for (size_t i = 0; i < n - 1; i++) {
-					float3 dir = (pos[i + 1] - pos[i]);
-					dir.SafeNormalize();
-
-					const auto& constraint = joints[ji[i]].constraint;
-					if (!std::holds_alternative<std::monostate>(constraint)) {
-						float3 restDir = (i > 0) ? (pos[i] - pos[i - 1]) : bposeRootDir;
-						restDir.SafeNormalize();
-						dir = ApplyConstraint(constraint, dir, restDir, *so);
-					}
-
-					pos[i + 1] = pos[i] + dir * segLen[i];
-				}
-				if (pos[n - 1].distance(goal) < precision)
-					break;
-			}
+		switch (resultCode) {
+			case IK::FABRIKResult::STRETCHING: kind = ChainSolution::SolutionKind::STRETCHING; break;
+			case IK::FABRIKResult::FOUND:      kind = ChainSolution::SolutionKind::FOUND;      break;
+			case IK::FABRIKResult::FAILED:     kind = ChainSolution::SolutionKind::FAILED;     break;
+			default:                           kind = ChainSolution::SolutionKind::FAILED;     break;
 		}
 
 		// Convert solved world positions to piece-local YPR rotations.
