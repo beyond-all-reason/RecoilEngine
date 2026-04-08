@@ -571,5 +571,26 @@ endif()
 
 ################################################################################
 
+################################################################################
+### FABRIKSolver
+	set(test_name FABRIKSolver)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/IK/testFABRIKSolver.cpp"
+			"${ENGINE_SOURCE_DIR}/Sim/IK/FABRIKSolverMath.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Matrix44f.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Quaternion.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Transform.cpp"
+			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
+			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
+			${test_Common_sources}
+		)
+	set(test_libs
+			streflop
+			${WINMM_LIBRARY}
+		)
+	set(test_flags "-DNOT_USING_CREG -DBUILDING_AI -DHEADLESS")
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
+
+################################################################################
 
 add_subdirectory(headercheck)
