@@ -572,11 +572,12 @@ endif()
 ################################################################################
 
 ################################################################################
-### FABRIKSolver
-	set(test_name FABRIKSolver)
+### IKSolver
+	set(test_name IKSolver)
 	set(test_src
-			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/IK/testFABRIKSolver.cpp"
-			"${ENGINE_SOURCE_DIR}/Sim/IK/FABRIKSolverMath.cpp"
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/IK/testIKSolver.cpp"
+			"${ENGINE_SOURCE_DIR}/Sim/IK/IKSolverMath.cpp"
+			"${ENGINE_SOURCE_DIR}/Sim/IK/CCDSolverMath.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Matrix44f.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Quaternion.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Transform.cpp"

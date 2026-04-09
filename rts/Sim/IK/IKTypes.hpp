@@ -9,12 +9,12 @@
 
 namespace IK {
 	struct BallJointConstraint {
-		float3 coneAxis = float3(0.0f, 1.0f, 0.0f);
+		float3 coneAxis = FwdVector;
 		float coneAngle = 0.0f;
 	};
 
 	struct HingeJointConstraint {
-		float3 axis = float3(0.0f, 1.0f, 0.0f);
+		float3 axis = FwdVector;
 		float minAngle = 0.0f;
 		float maxAngle = 0.0f;
 	};

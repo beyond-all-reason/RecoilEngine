@@ -1,14 +1,12 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "FABRIKSolver.hpp"
-#include "FABRIKSolverMath.hpp"
+#include "IKSolver.hpp"
+#include "IKSolverMath.hpp"
 
 #include <vector>
-#include <deque>
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <stdexcept>
 
 #include "Rendering/Models/3DModelPiece.hpp"
 #include "Sim/Objects/SolidObject.h"
@@ -31,36 +29,26 @@ float3 Skeleton::ModelDirToWorldDir(const float3& md) const
 	return so->frontdir * md.z - so->rightdir * md.x + so->updir * md.y;
 }
 
-Chain::Chain(const Skeleton& skeleton, uint32_t rootID, uint32_t effectorID, float chainWeight)
-	: skel(&skeleton)
-	, rID(rootID)
-	, eID(effectorID)
-	, eGoal()
+Chain::Chain(const Skeleton& skeleton, std::vector<uint32_t> indices, float chainWeight)
+	: rID(indices.front())
+	, eID(indices.back())
 	, weight(chainWeight)
+	, skel(&skeleton)
+	, jointIdcs(std::move(indices))
 {
-	const auto& lm = skel->GetSolidObject()->localModel;
 	const auto& skelJoints = skel->GetJoints();
+	const size_t n = jointIdcs.size();
+	boneLengths.resize(n > 0 ? n - 1 : 0);
 
-	auto currID = eID;
-	jointIdcs.emplace_back(currID);
-
-	while (currID < skelJoints.size() && currID != rID) {
-		currID = lm.pieces[currID].parent ? lm.pieces[currID].parent->GetLModelPieceIndex() : uint32_t(-1);
-		jointIdcs.emplace_back(currID);
-	}
-
-	// order rID --> eID
-	std::reverse(jointIdcs.begin(), jointIdcs.end());
-
-	// path to the rID from the eID doesn't exist
-	if (currID != rID) {
-		jointIdcs = {};
-		throw std::logic_error("EffectorID and RootID don't belong to the same hierarchy");
+	for (size_t i = 0; i + 1 < n; ++i) {
+		boneLengths[i] = skelJoints[jointIdcs[i]].piece->GetAbsolutePos().distance(
+			skelJoints[jointIdcs[i + 1]].piece->GetAbsolutePos());
 	}
 }
 
 Skeleton::Skeleton(const CSolidObject& solidObject)
 	: so{ &solidObject }
+	, solver{ &IK::GetFABRIKSolver() }
 {
 	const auto& lm = so->localModel;
 
@@ -76,6 +64,11 @@ Skeleton::Skeleton(const CSolidObject& solidObject)
 	UpdateAllJoints();
 }
 
+void Skeleton::SetSolver(const IIKSolver* ikSolver)
+{
+	solver = (ikSolver != nullptr) ? ikSolver : &IK::GetFABRIKSolver();
+}
+
 bool Skeleton::SetJointConstraint(uint32_t jointID, const Constraint& constraint)
 {
 	if (jointID >= joints.size())
@@ -89,16 +82,14 @@ void Skeleton::UpdateJointHierarchy(uint32_t jointID)
 {
 	const auto& lm = so->localModel;
 
-	std::deque<uint32_t> queue;
+	std::vector<uint32_t> queue;
 	queue.push_back(jointID);
 
-	while (!queue.empty()) {
-		jointID = queue.front();
-		queue.pop_front();
+	for (size_t head = 0; head < queue.size(); ++head) {
+		const auto id = queue[head];
+		UpdateJoint(id);
 
-		UpdateJoint(jointID);
-
-		for (const auto* lmp : lm.pieces[jointID].children) {
+		for (const auto* lmp : lm.pieces[id].children) {
 			queue.push_back(lmp->GetLModelPieceIndex());
 		}
 	}
@@ -123,27 +114,27 @@ void Skeleton::UpdateAllJoints()
 std::shared_ptr<Chain> Skeleton::CreateChain(uint32_t effectorID, uint32_t rootID, float chainWeight)
 {
 	const auto& lm = so->localModel;
-	auto currID = effectorID;
 
+	std::vector<uint32_t> indices;
+	indices.emplace_back(effectorID);
+
+	auto currID = effectorID;
 	while (currID < joints.size() && currID != rootID) {
 		currID = lm.pieces[currID].parent ? lm.pieces[currID].parent->GetLModelPieceIndex() : uint32_t(-1);
+		if (currID < joints.size())
+			indices.emplace_back(currID);
 	}
 
-	// path to the rootID from the effectorID doesn't exist
 	if (currID != rootID)
-		return std::shared_ptr<Chain>(nullptr);
+		return nullptr;
 
-	try {
-		return chains.emplace_back(std::make_shared<Chain>(
-			*this,
-			rootID,
-			effectorID,
-			chainWeight
-		)).lock();
-	}
-	catch (std::logic_error&) {
-		return std::shared_ptr<Chain>(nullptr);
-	}
+	std::reverse(indices.begin(), indices.end());
+
+	return chains.emplace_back(std::make_shared<Chain>(
+		*this,
+		std::move(indices),
+		chainWeight
+	)).lock();
 }
 
 std::vector<ChainSolution> Skeleton::SolveAllChains(uint32_t maxIterations, float precision)
@@ -186,7 +177,7 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 		const uint32_t jIdx = ji[i];
 		const uint32_t nextJIdx = ji[i + 1];
 
-		chain[i].length = joints[jIdx].piece->GetAbsolutePos().distance(joints[nextJIdx].piece->GetAbsolutePos());
+		chain[i].length = ch->GetBoneLengths()[i];
 		chain[i].constraint = joints[jIdx].constraint;
 
 		// Initial orientation rotates kBoneRestAxis to current bone direction in model space
@@ -194,7 +185,8 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 		chain[i].orientation = MakeOrientationFromBoneDir(currDirModel);
 	}
 
-	const FABRIKResult resultCode = IK::SolveFABRIK(chain, goalModel, maxIterations, precision);
+	assert(solver != nullptr);
+	const FABRIKResult resultCode = solver->Solve(chain, goalModel, maxIterations, precision);
 
 	// Convert solved orientations back to piece-local YPR rotations.
 	std::vector<std::pair<int, float3>> solution;
