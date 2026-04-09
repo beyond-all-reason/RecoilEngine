@@ -16,7 +16,7 @@ namespace IK {
 		const float3& boneDir,
 		const CQuaternion& parentOri)
 	{
-		static constexpr float3 defaultAxis = float3(0.0f, 1.0f, 0.0f);
+		static constexpr float3 defaultAxis = FwdVector;
 
 		if (const auto* bc = std::get_if<BallJointConstraint>(&c)) {
 			if (bc->coneAngle < 0.0f)
@@ -30,7 +30,7 @@ namespace IK {
 			const float cosActual = std::clamp(boneDir.dot(coneAxisW), -1.0f, 1.0f);
 			if (cosActual < cosLimit) {
 				float3 perp = boneDir - coneAxisW * cosActual;
-				if (perp.SqLength() < 1e-6f)
+				if (perp.SqLength() < float3::apx_eps())
 					return coneAxisW;
 
 				perp.SafeNormalize();
@@ -47,25 +47,25 @@ namespace IK {
 			float3 axisL = hc->axis;
 			axisL.SafeNormalize();
 
-			// restProjL is the parent bone direction in local space (identity by our convention)
-			float3 restProjL = defaultAxis - axisL * axisL.y;
-			if (restProjL.SqLength() < 1e-4f) {
-				float3 alt = (std::abs(axisL.x) < 0.9f) ? float3(1,0,0) : float3(0,0,1);
+			// restProjL is the parent bone direction in local space
+			float3 restProjL = defaultAxis - axisL * axisL.z;
+			if (restProjL.SqLength() < float3::apx_eps()) {
+				float3 alt = (std::abs(axisL.x) < 0.9f) ? RgtVector : UpVector;
 				restProjL = axisL.cross(alt);
 			}
 			restProjL.SafeNormalize();
 
 			const float axialComponent = dirL.dot(axisL);
 			float3 dirProjL = dirL - axisL * axialComponent;
-			if (dirProjL.SqLength() < 1e-4f) {
+			if (dirProjL.SqLength() < float3::apx_eps()) {
 				dirProjL = restProjL;
 			} else {
 				dirProjL.Normalize();
 			}
 
-			const float cosA = std::clamp(dirProjL.dot(restProjL), -1.0f, 1.0f);
-			const float sinSign = restProjL.cross(dirProjL).dot(axisL) >= 0.0f ? 1.0f : -1.0f;
-			const float angle = std::clamp(sinSign * math::acos(cosA), std::min(hc->minAngle, hc->maxAngle), std::max(hc->minAngle, hc->maxAngle));
+			const float dot = dirProjL.dot(restProjL);
+			const float det = restProjL.cross(dirProjL).dot(axisL);
+			const float angle = std::clamp(math::atan2(det, dot), std::min(hc->minAngle, hc->maxAngle), std::max(hc->minAngle, hc->maxAngle));
 
 			float3 resultL = restProjL * math::cos(angle) + axisL.cross(restProjL) * math::sin(angle);
 			return parentOri.Rotate(resultL);
@@ -87,11 +87,13 @@ namespace IK {
 		if (iterCount != nullptr)
 			*iterCount = 0;
 
-		const float3 defaultAxis = float3(0.0f, 1.0f, 0.0f);
+		static constexpr float3 defaultAxis = FwdVector;
 
 		// Initial positions in root-relative frame
 		std::vector<float3> pos(n + 1);
-		pos[0] = float3(0.0f, 0.0f, 0.0f);
+
+		//pos[0] = ZeroVector;
+
 		for (size_t i = 0; i < n; i++) {
 			pos[i + 1] = pos[i] + chain[i].orientation.Rotate(defaultAxis) * chain[i].length;
 		}
@@ -105,16 +107,17 @@ namespace IK {
 		if (distSq > (totalLen + precision) * (totalLen + precision)) {
 			float3 goalDir = goal;
 			goalDir.SafeNormalize();
-			pos[0] = float3(0, 0, 0);
+			pos[0] = ZeroVector;
 			for (size_t i = 0; i < n; i++) {
 				pos[i + 1] = pos[i] + goalDir * chain[i].length;
 			}
 			// Update orientations
 			for (size_t i = 0; i < n; i++) {
 				float3 newDir = (pos[i+1] - pos[i]).SafeNormalize();
-				float3 oldDir = chain[i].orientation.Rotate(defaultAxis);
-				CQuaternion delta = CQuaternion::MakeFrom(oldDir, newDir);
-				chain[i].orientation = (delta * chain[i].orientation).Normalize();
+				CQuaternion parentOri = (i > 0) ? chain[i-1].orientation : CQuaternion();
+				float3 restDirW = parentOri.Rotate(defaultAxis);
+				CQuaternion delta = CQuaternion::MakeFrom(restDirW, newDir).Normalize();
+				chain[i].orientation = (delta * parentOri).Normalize();
 			}
 			return FABRIKResult::STRETCHING;
 		}
@@ -129,19 +132,16 @@ namespace IK {
 				float3 boneDir = (pos[i + 1] - pos[i]);
 				boneDir.SafeNormalize();
 
-				// For forward pass constraints, the "parent" reference is less intuitive, 
+				// For forward pass constraints, the "parent" reference is less intuitive,
 				// but applying them relative to current orientation helps stability.
-				// improves success rate, but slows down the solver convergence
-				#if 0
 				CQuaternion parentOri = (i > 0) ? chain[i - 1].orientation : CQuaternion();
 				boneDir = ApplyConstraint(chain[i].constraint, boneDir, parentOri);
-				#endif
 
 				pos[i] = pos[i + 1] - boneDir * chain[i].length;
 			}
 
 			// Backward pass: root to effector
-			pos[0] = float3(0, 0, 0);
+			pos[0] = ZeroVector;
 			for (size_t i = 0; i < n; i++) {
 				float3 boneDir = (pos[i + 1] - pos[i]);
 				boneDir.SafeNormalize();
@@ -151,10 +151,12 @@ namespace IK {
 
 				pos[i + 1] = pos[i] + boneDir * chain[i].length;
 
-				// Update orientation immediately for the next bone's constraint reference
-				float3 oldDir = chain[i].orientation.Rotate(defaultAxis);
-				CQuaternion delta = CQuaternion::MakeFrom(oldDir, boneDir);
-				chain[i].orientation = (delta * chain[i].orientation).Normalize();
+				// Update orientation immediately for the next bone's constraint reference.
+				// We derive the new orientation from parentOri to maintain consistent roll
+				// and avoid drift across iterations.
+				float3 restDirW = parentOri.Rotate(defaultAxis);
+				CQuaternion delta = CQuaternion::MakeFrom(restDirW, boneDir).Normalize();
+				chain[i].orientation = (delta * parentOri).Normalize();
 			}
 
 			if (pos[n].distance(goal) < precision)

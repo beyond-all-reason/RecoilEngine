@@ -33,11 +33,33 @@ static float3 RandomDir()
 	float3 d;
 	do {
 		d = float3{srandf(), srandf(), srandf()};
-	} while (d.SqLength() < 1e-4f);
+	} while (d.SqLength() < float3::apx_eps());
 	d.Normalize();
 	return d;
 }
 
+/**
+ * @brief Get the reference "zero-angle" direction for a hinge axis.
+ *
+ * In standard orientation, a bone points at (0, 0, 1). For a hinge, we need
+ * to project this "rest" direction onto the plane orthogonal to the hinge axis
+ * to find the direction that corresponds to an angle of 0.
+ */
+static float3 GetHingeRestDir(const float3& axisL)
+{
+	static constexpr float3 defaultAxis = FwdVector;
+	// Project the default forward vector onto the hinge plane
+	float3 restProjL = defaultAxis - axisL * axisL.z;
+
+	// If the axis is parallel to the bone, the projection is zero.
+	// Fall back to an arbitrary orthogonal vector in the hinge plane.
+	if (restProjL.SqLength() < float3::apx_eps()) {
+		float3 alt = (std::abs(axisL.x) < 0.9f) ? RgtVector : UpVector;
+		restProjL = axisL.cross(alt);
+	}
+	restProjL.Normalize();
+	return restProjL;
+}
 
 
 // ---------------------------------------------------------------------------
@@ -66,16 +88,16 @@ TEST_CASE("FABRIK2BoneReach")
 
 		std::vector<IK::Bone> chain(2);
 		chain[0].length = L1;
-		chain[0].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+		chain[0].orientation = CQuaternion::MakeFrom(FwdVector, RandomDir());
 		chain[1].length = L2;
-		chain[1].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+		chain[1].orientation = CQuaternion::MakeFrom(FwdVector, RandomDir());
 
 		float3 goal = RandomDir() * ((L1 + L2) * 0.8f);
 
 		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS, SOLVE_PRECISION);
 
 		CHECK(result == IK::FABRIKResult::FOUND);
-		float3 effector = chain[0].orientation.Rotate(float3(0,1,0)) * L1 + chain[1].orientation.Rotate(float3(0,1,0)) * L2;
+		float3 effector = chain[0].orientation.Rotate(FwdVector) * L1 + chain[1].orientation.Rotate(FwdVector) * L2;
 		CHECK(effector.distance(goal) < SOLVE_PRECISION);
 	}
 }
@@ -93,15 +115,15 @@ TEST_CASE("FABRIK2BoneStretch")
 
 		std::vector<IK::Bone> chain(2);
 		chain[0].length = L1;
-		chain[0].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+		chain[0].orientation = CQuaternion::MakeFrom(FwdVector, RandomDir());
 		chain[1].length = L2;
-		chain[1].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+		chain[1].orientation = CQuaternion::MakeFrom(FwdVector, RandomDir());
 
 		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS, SOLVE_PRECISION);
 
 		CHECK(result == IK::FABRIKResult::STRETCHING);
-		float3 d0 = chain[0].orientation.Rotate(float3(0,1,0));
-		float3 d1 = chain[1].orientation.Rotate(float3(0,1,0));
+		float3 d0 = chain[0].orientation.Rotate(FwdVector);
+		float3 d1 = chain[1].orientation.Rotate(FwdVector);
 		CHECK(d0.dot(goalDir) > 0.99f);
 		CHECK(d1.dot(goalDir) > 0.99f);
 	}
@@ -114,16 +136,16 @@ TEST_CASE("FABRIKGoalAtRoot")
 		const float L = 10.0f;
 		std::vector<IK::Bone> chain(2);
 		chain[0].length = L;
-		chain[0].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+		chain[0].orientation = CQuaternion::MakeFrom(FwdVector, RandomDir());
 		chain[1].length = L;
-		chain[1].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+		chain[1].orientation = CQuaternion::MakeFrom(FwdVector, RandomDir());
 
-		float3 goal = float3(0, 0, 0);
+		float3 goal = ZeroVector;
 
-		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS * 2, SOLVE_PRECISION);
+		auto result = IK::SolveFABRIK(chain, goal, 1000, SOLVE_PRECISION);
 
 		CHECK(result == IK::FABRIKResult::FOUND);
-		float3 effector = chain[0].orientation.Rotate(float3(0,1,0)) * L + chain[1].orientation.Rotate(float3(0,1,0)) * L;
+		float3 effector = chain[0].orientation.Rotate(FwdVector) * L + chain[1].orientation.Rotate(FwdVector) * L;
 		CHECK(effector.distance(goal) < SOLVE_PRECISION);
 	}
 }
@@ -133,24 +155,58 @@ TEST_CASE("FABRIKBallConstraint")
 	srand(200);
 	for (int trial = 0; trial < NUM_TRIALS_CONSTR; trial++) {
 		const float coneAngle = math::PI * 0.4f;
-		float3 localConeAxis = float3(0, 1, 0); // Along the bone
+		const float3 localConeAxis = FwdVector; // Along the bone
 
 		std::vector<IK::Bone> chain(3);
 		for (size_t i = 0; i < 3; i++) {
 			chain[i].length = 10.0f;
-			chain[i].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
 			IK::BallJointConstraint bc;
 			bc.coneAxis = localConeAxis;
 			bc.coneAngle = coneAngle;
 			chain[i].constraint = bc;
 		}
 
-		float3 goal = RandomDir() * 15.0f;
-		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS * 2, SOLVE_PRECISION);
+		// Calculate a reachable goal via FK
+		float3 goal;
+		{
+			CQuaternion cur;
+			for (int i = 0; i < 3; i++) {
+				// Random direction within cone
+				float3 dir;
+				float cosLim = math::cos(coneAngle);
+				do {
+					dir = RandomDir();
+				} while (dir.dot(FwdVector) < cosLim);
+
+				float3 dirW = cur.Rotate(dir);
+				float3 oldW = cur.Rotate(FwdVector);
+				cur = (CQuaternion::MakeFrom(oldW, dirW) * cur).Normalize();
+				goal += dirW * chain[i].length;
+			}
+		}
+
+		// Randomize initial chain state (within constraints)
+		{
+			CQuaternion cur;
+			for (int i = 0; i < 3; i++) {
+				float3 dir;
+				float cosLim = math::cos(coneAngle);
+				do {
+					dir = RandomDir();
+				} while (dir.dot(FwdVector) < cosLim);
+
+				float3 dirW = cur.Rotate(dir);
+				float3 oldW = cur.Rotate(FwdVector);
+				cur = (CQuaternion::MakeFrom(oldW, dirW) * cur).Normalize();
+				chain[i].orientation = cur;
+			}
+		}
+
+		auto result = IK::SolveFABRIK(chain, goal, 1000, SOLVE_PRECISION);
 		CHECK(result == IK::FABRIKResult::FOUND);
 		if (result == IK::FABRIKResult::FOUND) {
 			for (size_t i = 0; i < 3; i++) {
-				float3 dirW = chain[i].orientation.Rotate(float3(0,1,0));
+				float3 dirW = chain[i].orientation.Rotate(FwdVector);
 				CQuaternion parentOri = (i > 0) ? chain[i-1].orientation : CQuaternion();
 				float3 coneAxisW = parentOri.Rotate(localConeAxis);
 				CHECK(dirW.dot(coneAxisW) >= math::cos(coneAngle) - 0.05f);
@@ -167,14 +223,13 @@ TEST_CASE("FABRIKHingeConstraint")
 		std::vector<IK::Bone> chain(numBones);
 
 		for (int i = 0; i < numBones; i++) {
-			chain[i].length = 5.0f + randf() * 5.0f; // 5 to 10
+			chain[i].length = 5.0f + randf() * 5.0f;
 
-			// Random axis unique per joint, orthogonal to bone direction (0,1,0)
+			// Randomized axis - avoid being nearly parallel to bone (pure roll)
 			float3 axis;
 			do {
-				axis = float3(srandf(), 0, srandf());
-			} while (axis.SqLength() < 1e-2f);
-			axis.Normalize();
+				axis = RandomDir();
+			} while (std::abs(axis.z) > 0.8f); // ~36 degrees min angle
 
 			IK::HingeJointConstraint hc;
 			hc.axis = axis;
@@ -184,16 +239,21 @@ TEST_CASE("FABRIKHingeConstraint")
 			chain[i].constraint = hc;
 		}
 
-		// Calculate a reachable goal by picking random valid angles
-		float3 goal(0, 0, 0);
+		// Calculate a reachable goal
+		float3 goal;
 		{
 			CQuaternion currentGoalOri;
 			for (int i = 0; i < numBones; i++) {
 				const auto& hc = std::get<IK::HingeJointConstraint>(chain[i].constraint);
 				float angle = hc.minAngle + randf() * (hc.maxAngle - hc.minAngle);
-				CQuaternion localRot = CQuaternion::MakeFrom(angle, hc.axis);
-				currentGoalOri = (currentGoalOri * localRot).Normalize();
-				goal += currentGoalOri.Rotate(float3(0, 1, 0)) * chain[i].length;
+
+				float3 restL = GetHingeRestDir(hc.axis);
+				float3 resL  = restL.rotate<true>(angle, hc.axis);
+				float3 resW  = currentGoalOri.Rotate(resL);
+
+				float3 oldW = currentGoalOri.Rotate(FwdVector);
+				currentGoalOri = (CQuaternion::MakeFrom(oldW, resW) * currentGoalOri).Normalize();
+				goal += resW * chain[i].length;
 			}
 		}
 
@@ -203,26 +263,36 @@ TEST_CASE("FABRIKHingeConstraint")
 			for (int i = 0; i < numBones; i++) {
 				const auto& hc = std::get<IK::HingeJointConstraint>(chain[i].constraint);
 				float angle = hc.minAngle + randf() * (hc.maxAngle - hc.minAngle);
-				CQuaternion localRot = CQuaternion::MakeFrom(angle, hc.axis);
-				currentStartOri = (currentStartOri * localRot).Normalize();
+
+				float3 restL = GetHingeRestDir(hc.axis);
+				float3 resL  = restL.rotate<true>(angle, hc.axis);
+				float3 resW  = currentStartOri.Rotate(resL);
+
+				float3 oldW = currentStartOri.Rotate(FwdVector);
+				currentStartOri = (CQuaternion::MakeFrom(oldW, resW) * currentStartOri).Normalize();
 				chain[i].orientation = currentStartOri;
 			}
 		}
 
-		auto result = IK::SolveFABRIK(chain, goal, 2000, SOLVE_PRECISION * 4.0f);
+		auto result = IK::SolveFABRIK(chain, goal, 10000, SOLVE_PRECISION * 4.0f);
 		CHECK(result == IK::FABRIKResult::FOUND);
 
 		if (result == IK::FABRIKResult::FOUND) {
 			for (size_t i = 0; i < numBones; i++) {
 				const auto& hc = std::get<IK::HingeJointConstraint>(chain[i].constraint);
-				float3 dirW = chain[i].orientation.Rotate(float3(0, 1, 0));
+				float3 dirW = chain[i].orientation.Rotate(FwdVector);
 				CQuaternion parentOri = (i > 0) ? chain[i - 1].orientation : CQuaternion();
 
 				float3 dirL = parentOri.Inverse().Rotate(dirW);
 				float3 axisL = hc.axis;
-				float3 restL = float3(0, 1, 0);
+				float3 restL = GetHingeRestDir(axisL);
 
-				float3 projL = (dirL - axisL * dirL.dot(axisL)).SafeNormalize();
+				float3 projL = dirL - axisL * dirL.dot(axisL);
+				if (projL.SqLength() < 1e-4f) {
+					projL = restL;
+				} else {
+					projL.Normalize();
+				}
 				float cosA = std::clamp(projL.dot(restL), -1.0f, 1.0f);
 				float sinSign = restL.cross(projL).dot(axisL) >= 0.0f ? 1.0f : -1.0f;
 				float angle = sinSign * math::acos(cosA);
@@ -235,7 +305,7 @@ TEST_CASE("FABRIKHingeConstraint")
 }
 TEST_CASE("FABRIKBenchmarks", "[!benchmark]")
 {
-	const int benchmarkTrials = 2000; 
+	const int benchmarkTrials = 2000;
 	srand(1337);
 
 	{
@@ -245,9 +315,9 @@ TEST_CASE("FABRIKBenchmarks", "[!benchmark]")
 			const float L1 = 10.0f, L2 = 10.0f;
 			std::vector<IK::Bone> chain(2);
 			chain[0].length = L1;
-			chain[0].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+			chain[0].orientation = CQuaternion::MakeFrom(FwdVector, RandomDir());
 			chain[1].length = L2;
-			chain[1].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+			chain[1].orientation = CQuaternion::MakeFrom(FwdVector, RandomDir());
 
 			float3 goal = RandomDir() * 15.0f;
 			uint32_t iters = 0;
@@ -263,16 +333,17 @@ TEST_CASE("FABRIKBenchmarks", "[!benchmark]")
 	{
 		uint64_t totalIters = 0;
 		int successes = 0;
-		const float coneAngle = math::PI * 0.4f;
-		for (int trial = 0; trial < benchmarkTrials; trial++) {
-			std::vector<IK::Bone> chain(3);
-			for (size_t i = 0; i < 3; i++) {
-				chain[i].length = 10.0f;
-				chain[i].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
-				IK::BallJointConstraint bc;
-				bc.coneAngle = coneAngle;
-				chain[i].constraint = bc;
-			}
+			const float coneAngle = math::PI * 0.4f;
+			for (int trial = 0; trial < benchmarkTrials; trial++) {
+				std::vector<IK::Bone> chain(3);
+				for (size_t i = 0; i < 3; i++) {
+					chain[i].length = 10.0f;
+					chain[i].orientation = CQuaternion::MakeFrom(FwdVector, RandomDir());
+					IK::BallJointConstraint bc;
+					bc.coneAxis = FwdVector;
+					bc.coneAngle = coneAngle;
+					chain[i].constraint = bc;
+				}
 			float3 goal = RandomDir() * 15.0f;
 			uint32_t iters = 0;
 			auto res = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS * 2, SOLVE_PRECISION, &iters);
@@ -292,9 +363,10 @@ TEST_CASE("FABRIKBenchmarks", "[!benchmark]")
 			std::vector<IK::Bone> chain(numBones);
 			for (int i = 0; i < numBones; i++) {
 				chain[i].length = 10.0f;
-				float3 axis = float3(srandf(), 0, srandf());
-				if (axis.SqLength() < 1e-4f) axis = float3(1, 0, 0);
-				axis.Normalize();
+				float3 axis;
+				do {
+					axis = RandomDir();
+				} while (std::abs(axis.y) > 0.8f);
 
 				IK::HingeJointConstraint hc;
 				hc.axis = axis;
@@ -309,8 +381,14 @@ TEST_CASE("FABRIKBenchmarks", "[!benchmark]")
 				for (int i = 0; i < numBones; i++) {
 					const auto& hc = std::get<IK::HingeJointConstraint>(chain[i].constraint);
 					float a = hc.minAngle + randf() * (hc.maxAngle - hc.minAngle);
-					cur = (cur * CQuaternion::MakeFrom(a, hc.axis)).Normalize();
-					goal += cur.Rotate(float3(0, 1, 0)) * chain[i].length;
+
+					float3 restL = GetHingeRestDir(hc.axis);
+					float3 resL  = restL.rotate<true>(a, hc.axis);
+					float3 resW  = cur.Rotate(resL);
+					float3 oldW  = cur.Rotate(FwdVector);
+					cur = (CQuaternion::MakeFrom(oldW, resW) * cur).Normalize();
+
+					goal += resW * chain[i].length;
 				}
 			}
 
@@ -320,7 +398,13 @@ TEST_CASE("FABRIKBenchmarks", "[!benchmark]")
 				for (int i = 0; i < numBones; i++) {
 					const auto& hc = std::get<IK::HingeJointConstraint>(chain[i].constraint);
 					float a = hc.minAngle + randf() * (hc.maxAngle - hc.minAngle);
-					cur = (cur * CQuaternion::MakeFrom(a, hc.axis)).Normalize();
+
+					float3 restL = GetHingeRestDir(hc.axis);
+					float3 resL  = restL.rotate<true>(a, hc.axis);
+					float3 resW  = cur.Rotate(resL);
+					float3 oldW  = cur.Rotate(FwdVector);
+					cur = (CQuaternion::MakeFrom(oldW, resW) * cur).Normalize();
+
 					chain[i].orientation = cur;
 				}
 			}
