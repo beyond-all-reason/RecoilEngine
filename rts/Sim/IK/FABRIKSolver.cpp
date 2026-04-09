@@ -31,9 +31,6 @@ float3 Skeleton::ModelDirToWorldDir(const float3& md) const
 	return so->frontdir * md.z - so->rightdir * md.x + so->updir * md.y;
 }
 
-
-
-
 Chain::Chain(const Skeleton& skeleton, uint32_t rootID, uint32_t effectorID, float chainWeight)
 	: skel(&skeleton)
 	, rID(rootID)
@@ -171,62 +168,36 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 	if (!ch)
 		return { FABRIKResult::ERR_INPUTS, {} };
 
-	const auto& ji = ch->GetJoints(); // root-to-effector joint indices
+	const auto& ji = ch->GetJoints();
 	const size_t n = ji.size();
 
 	if (n < 2)
 		return { FABRIKResult::ERR_INPUTS, {} };
 
-	// Collect current world positions
-	std::vector<float3> pos(n);
-	for (size_t i = 0; i < n; i++)
-		pos[i] = joints[ji[i]].worldPos;
+	// Preparations for the redesigned SolveFABRIK:
+	// 1. Goal relative to root joint in model space
+	const float3 rootWorldPos = joints[ji[0]].worldPos;
+	const float3 goalModel = WorldDirToModelDir(ch->GetGoal() - rootWorldPos);
 
-	// Segment lengths are taken from the current (possibly animated) pose and
-	// held constant throughout solving. This preserves whatever bone lengths the
-	// animation system has already set rather than reverting to bind-pose lengths.
-	std::vector<float> segLen(n - 1);
-	for (size_t i = 0; i < n - 1; i++)
-		segLen[i] = pos[i + 1].distance(pos[i]);
+	// 2. Bone hierarchy with local-space constraints and model-space orientations.
+	// We use the convention that in the solver's coordinate system, a bone with 
+	// identity orientation points along float3(0, 1, 0).
+	std::vector<Bone> chain(n - 1);
+	for (size_t i = 0; i < n - 1; i++) {
+		const uint32_t jIdx = ji[i];
+		const uint32_t nextJIdx = ji[i + 1];
 
-	const float3 goal = ch->GetGoal();
+		chain[i].length = joints[jIdx].piece->GetAbsolutePos().distance(joints[nextJIdx].piece->GetAbsolutePos());
+		chain[i].constraint = joints[jIdx].constraint;
 
-	// Bind-pose direction of the root bone in world space — used as the hinge reference
-	// for the root joint (i=0) only, since it has no parent bone in the chain.
-	float3 bposeRootDir = (joints[ji[1]].piece->original->bposeTransform.t
-	                     - joints[ji[0]].piece->original->bposeTransform.t);
-	bposeRootDir.SafeNormalize();
-	bposeRootDir = ModelDirToWorldDir(bposeRootDir);
-	bposeRootDir.SafeNormalize();
-
-	// Convert constraints into world space for the math solver
-	std::vector<IK::Constraint> worldConstraints(n);
-	for (size_t i = 0; i < n; i++) {
-		worldConstraints[i] = joints[ji[i]].constraint;
-		if (auto* bc = std::get_if<BallJointConstraint>(&worldConstraints[i])) {
-			bc->coneAxis = ModelDirToWorldDir(bc->coneAxis);
-			bc->coneAxis.SafeNormalize();
-		} else if (auto* hc = std::get_if<HingeJointConstraint>(&worldConstraints[i])) {
-			hc->axis = ModelDirToWorldDir(hc->axis);
-			hc->axis.SafeNormalize();
-		}
+		// Initial orientation rotates (0,1,0) to current bone direction in model space
+		const float3 currDirModel = WorldDirToModelDir(joints[nextJIdx].worldPos - joints[jIdx].worldPos).SafeNormalize();
+		chain[i].orientation = CQuaternion::MakeFrom(float3(0, 1, 0), currDirModel);
 	}
 
-	const FABRIKResult resultCode = IK::SolveFABRIK(pos, segLen, worldConstraints, bposeRootDir, goal, maxIterations, precision);
+	const FABRIKResult resultCode = IK::SolveFABRIK(chain, goalModel, maxIterations, precision);
 
-	// Convert solved world positions to piece-local YPR rotations.
-	//
-	// For each bone (joint[i] -> joint[i+1]), we find the rotation at joint[i]
-	// that orients the bone toward the solved direction.
-	//
-	// The bpose (bind-pose) model-space transform of each piece gives:
-	//   bposeRot = accumulated model-space rotation with no script rotation
-	// The script rotation (what SetRotation sets) is applied on top of bposeRot:
-	//   modelRot = bposeRot * scriptRot
-	//
-	// After FABRIK we want modelRot_new = delta * bposeRot, where delta rotates
-	// the rest bone direction to the solved bone direction in model space.
-	// Therefore: scriptRot_new = bposeRot^-1 * delta * bposeRot
+	// Convert solved orientations back to piece-local YPR rotations.
 	std::vector<std::pair<int, float3>> solution;
 	solution.reserve(n - 1);
 
@@ -235,21 +206,16 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 		const auto& bposeTraNext = joints[ji[i + 1]].piece->original->bposeTransform;
 
 		// Bind-pose bone direction in model space
-		float3 bposeBoneDir = (bposeTraNext.t - bposeTra.t);
-		bposeBoneDir.SafeNormalize();
+		const float3 bposeBoneDir = (bposeTraNext.t - bposeTra.t).SafeNormalize();
 
-		// Solved bone direction: world space -> model space
-		float3 solvedWorldDir = (pos[i + 1] - pos[i]);
-		solvedWorldDir.SafeNormalize();
-		float3 solvedModelDir = WorldDirToModelDir(solvedWorldDir);
-		solvedModelDir.SafeNormalize();
+		// Solved bone direction in model space
+		const float3 solvedDirModel = chain[i].orientation.Rotate(float3(0, 1, 0));
 
-		// Delta rotation in model space: bposeBoneDir -> solvedModelDir
-		const CQuaternion delta       = CQuaternion::MakeFrom(bposeBoneDir, solvedModelDir);
+		// Compute final script rotation relative to bind-pose
+		const CQuaternion delta       = CQuaternion::MakeFrom(bposeBoneDir, solvedDirModel);
 		const CQuaternion newModelRot = (delta * bposeTra.r).Normalize();
 		CQuaternion scriptRot         = (bposeTra.r.InverseNormalized() * newModelRot).Normalize();
 
-		// Blend toward identity by chain weight (weight=0 → no IK, weight=1 → full IK)
 		if (ch->weight < 1.0f)
 			scriptRot = CQuaternion::SLerp(CQuaternion{}, scriptRot, ch->weight).Normalize();
 

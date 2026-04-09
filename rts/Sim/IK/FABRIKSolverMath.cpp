@@ -4,163 +4,167 @@
 
 #include <algorithm>
 #include <cassert>
-#include <variant>
 
 #include "System/float3.h"
 #include "System/SpringMath.h"
+#include "System/Quaternion.h"
 
-static float3 ApplyHingeConstraint(const float3& boneDir, const float3& restDirNormalized, const IK::HingeJointConstraint& hc)
-{
-	float3 axisW = hc.axis;
-	axisW.SafeNormalize();
+namespace IK {
 
-	// Preserve the component along the hinge axis for 3D realism
-	const float axialComponent = boneDir.dot(axisW);
-	float3 dirProj  = boneDir - axisW * axialComponent;
-	float3 restProj = restDirNormalized - axisW * restDirNormalized.dot(axisW);
+	static float3 ApplyConstraint(
+		const Constraint& c,
+		const float3& boneDir,
+		const CQuaternion& parentOri)
+	{
+		static constexpr float3 defaultAxis = float3(0.0f, 1.0f, 0.0f);
 
-	// Fallback if restProj is zero (parent is parallel to hinge axis)
-	if (restProj.SqLength() < 1e-4f) {
-		float3 alt = (std::abs(axisW.x) < 0.9f) ? RgtVector : UpVector;
-		restProj = axisW.cross(alt);
-	}
-	restProj.SafeNormalize();
+		if (const auto* bc = std::get_if<BallJointConstraint>(&c)) {
+			if (bc->coneAngle < 0.0f)
+				return boneDir;
 
-	// If dirProj is zero, the bone is pointing along the axis; pick any valid start in plane
-	if (dirProj.SqLength() < 1e-4f) {
-		dirProj = restProj;
-	} else {
-		dirProj.Normalize();
-	}
+			// coneAxis is in parent's local space
+			float3 coneAxisW = parentOri.Rotate(bc->coneAxis);
+			coneAxisW.SafeNormalize();
 
-	const float cosA    = std::clamp(dirProj.dot(restProj), -1.0f, 1.0f);
-	const float sinSign = restProj.cross(dirProj).dot(axisW) >= 0.0f ? 1.0f : -1.0f;
-	const float angle   = std::clamp(sinSign * math::acos(cosA), std::min(hc.minAngle, hc.maxAngle), std::max(hc.minAngle, hc.maxAngle));
+			const float cosLimit = math::cos(bc->coneAngle);
+			const float cosActual = std::clamp(boneDir.dot(coneAxisW), -1.0f, 1.0f);
+			if (cosActual < cosLimit) {
+				float3 perp = boneDir - coneAxisW * cosActual;
+				if (perp.SqLength() < 1e-6f)
+					return coneAxisW;
 
-	float3 result = restProj * math::cos(angle) + axisW.cross(restProj) * math::sin(angle);
-	// Result is already unit-length and orthogonal to axisW
-	return result;
-}
-
-
-// World-space constraint application.
-// Constraint axes are already in world space — no model<=>world conversion is performed.
-static float3 ApplyConstraintWorldSpace(
-	const IK::Constraint& c,
-	float3 dir,
-	const float3& restDirNormalized)
-{
-	if (std::holds_alternative<IK::BallJointConstraint>(c)) {
-		const auto& bc = std::get<IK::BallJointConstraint>(c);
-		if (bc.coneAngle < 0.0f)
-			return dir;
-
-		float3 coneAxisW = bc.coneAxis;
-		coneAxisW.SafeNormalize();
-
-		const float cosLimit = math::cos(bc.coneAngle);
-		const float cosActual = dir.dot(coneAxisW);
-		if (cosActual < cosLimit) {
-			float3 perp = dir - coneAxisW * cosActual;
-			if (perp.SqLength() < 1e-6f)
-				return coneAxisW;
-
-			perp.SafeNormalize();
-			dir = coneAxisW * cosLimit + perp * math::sin(bc.coneAngle);
-			dir.SafeNormalize();
+				perp.SafeNormalize();
+				float3 result = coneAxisW * cosLimit + perp * math::sin(bc->coneAngle);
+				result.SafeNormalize();
+				return result;
+			}
+			return boneDir;
 		}
+
+		if (const auto* hc = std::get_if<HingeJointConstraint>(&c)) {
+			// Transform boneDir to parent space
+			float3 dirL = parentOri.Inverse().Rotate(boneDir);
+			float3 axisL = hc->axis;
+			axisL.SafeNormalize();
+
+			// restProjL is the parent bone direction in local space (identity by our convention)
+			float3 restProjL = defaultAxis - axisL * axisL.y;
+			if (restProjL.SqLength() < 1e-4f) {
+				float3 alt = (std::abs(axisL.x) < 0.9f) ? float3(1,0,0) : float3(0,0,1);
+				restProjL = axisL.cross(alt);
+			}
+			restProjL.SafeNormalize();
+
+			const float axialComponent = dirL.dot(axisL);
+			float3 dirProjL = dirL - axisL * axialComponent;
+			if (dirProjL.SqLength() < 1e-4f) {
+				dirProjL = restProjL;
+			} else {
+				dirProjL.Normalize();
+			}
+
+			const float cosA = std::clamp(dirProjL.dot(restProjL), -1.0f, 1.0f);
+			const float sinSign = restProjL.cross(dirProjL).dot(axisL) >= 0.0f ? 1.0f : -1.0f;
+			const float angle = std::clamp(sinSign * math::acos(cosA), std::min(hc->minAngle, hc->maxAngle), std::max(hc->minAngle, hc->maxAngle));
+
+			float3 resultL = restProjL * math::cos(angle) + axisL.cross(restProjL) * math::sin(angle);
+			return parentOri.Rotate(resultL);
+		}
+		return boneDir;
 	}
-	else if (std::holds_alternative<IK::HingeJointConstraint>(c)) {
-		return ApplyHingeConstraint(dir, restDirNormalized, std::get<IK::HingeJointConstraint>(c));
-	}
-	return dir;
-}
 
-
-IK::FABRIKResult IK::SolveFABRIK(
-	std::vector<float3>& positions,
-	const std::vector<float>& segLengths,
-	const std::vector<Constraint>& constraints,
-	const float3& bindPoseRootDir,
-	const float3& goal,
-	uint32_t maxIterations,
-	float precision)
-{
-	const size_t n = positions.size();
-
-	if (n < 2)
-		return FABRIKResult::ERR_INPUTS;
-
-	if (segLengths.size() != n - 1)
-		return FABRIKResult::ERR_INPUTS;
-
-	if (!constraints.empty() && constraints.size() != n - 1)
-		return FABRIKResult::ERR_INPUTS;
-
-	for (float len : segLengths) {
-		if (len <= 0.0f)
+	FABRIKResult SolveFABRIK(
+		std::vector<Bone>& chain,
+		const float3& goal,
+		uint32_t maxIterations,
+		float precision,
+		uint32_t* iterCount)
+	{
+		const size_t n = chain.size();
+		if (n == 0)
 			return FABRIKResult::ERR_INPUTS;
-	}
 
-	const float3 rootPos = positions[0];
+		if (iterCount != nullptr)
+			*iterCount = 0;
 
-	float totalLen = 0.0f;
-	for (size_t i = 0; i < n - 1; i++)
-		totalLen += segLengths[i];
+		const float3 defaultAxis = float3(0.0f, 1.0f, 0.0f);
 
-	if (rootPos.distance(goal) > totalLen) {
-		// Goal is unreachable: stretch chain straight toward goal
-		for (size_t i = 0; i < n - 1; i++) {
-			float3 dir = (goal - positions[i]);
-			dir.SafeNormalize();
-			positions[i + 1] = positions[i] + dir * segLengths[i];
+		// Initial positions in root-relative frame
+		std::vector<float3> pos(n + 1);
+		pos[0] = float3(0.0f, 0.0f, 0.0f);
+		for (size_t i = 0; i < n; i++) {
+			pos[i + 1] = pos[i] + chain[i].orientation.Rotate(defaultAxis) * chain[i].length;
 		}
-		return FABRIKResult::STRETCHING;
-	}
 
-	// Rest direction for root joint constraint reference (i=0 has no parent bone)
-	float3 bposeRootDir = bindPoseRootDir;
-	bposeRootDir.SafeNormalize();
+		// Reachability check
+		float totalLen = 0.0f;
+		for (const auto& b : chain)
+			totalLen += b.length;
 
-	for (uint32_t iter = 0; iter < maxIterations; iter++) {
-		// Forward pass: pull effector to goal, propagate toward root
-		positions[n - 1] = goal;
-		for (size_t i = n - 1; i-- > 0; ) {
-			float3 boneDir = (positions[i + 1] - positions[i]);
-			boneDir.SafeNormalize();
-
-
-		// Unlike the outcomes in https://stackoverflow.com/questions/76805554/is-it-a-known-issue-that-2d-inverse-kinematics-with-fabrik-plus-angle-constraint
-		// applying constraints in the forward pass seems to improve the convergence of the solver.
-#if 1
-			if (!constraints.empty() && !std::holds_alternative<std::monostate>(constraints[i])) {
-				float3 restDir = (i > 0) ? (positions[i] - positions[i - 1]).SafeNormalize() : bposeRootDir;
-				boneDir = ApplyConstraintWorldSpace(constraints[i], boneDir, restDir);
+		const float distSq = goal.SqLength();
+		if (distSq > (totalLen + precision) * (totalLen + precision)) {
+			float3 goalDir = goal;
+			goalDir.SafeNormalize();
+			pos[0] = float3(0, 0, 0);
+			for (size_t i = 0; i < n; i++) {
+				pos[i + 1] = pos[i] + goalDir * chain[i].length;
 			}
-#endif
-			positions[i] = positions[i + 1] - boneDir * segLengths[i];
+			// Update orientations
+			for (size_t i = 0; i < n; i++) {
+				float3 newDir = (pos[i+1] - pos[i]).SafeNormalize();
+				float3 oldDir = chain[i].orientation.Rotate(defaultAxis);
+				CQuaternion delta = CQuaternion::MakeFrom(oldDir, newDir);
+				chain[i].orientation = (delta * chain[i].orientation).Normalize();
+			}
+			return FABRIKResult::STRETCHING;
 		}
 
-		// Backward pass: fix root, propagate toward effector with constraints
-		positions[0] = rootPos;
-		for (size_t i = 0; i < n - 1; i++) {
-			float3 dir = (positions[i + 1] - positions[i]);
-			dir.SafeNormalize();
+		for (uint32_t iter = 0; iter < maxIterations; iter++) {
+			if (iterCount != nullptr)
+				*iterCount = iter + 1;
 
-			if (!constraints.empty() && !std::holds_alternative<std::monostate>(constraints[i])) {
-				float3 restDir = (i > 0) ? (positions[i] - positions[i - 1]).SafeNormalize() : bposeRootDir;
-				dir = ApplyConstraintWorldSpace(constraints[i], dir, restDir);
+			// Forward pass: effector to root
+			pos[n] = goal;
+			for (size_t i = n; i-- > 0; ) {
+				float3 boneDir = (pos[i + 1] - pos[i]);
+				boneDir.SafeNormalize();
+
+				// For forward pass constraints, the "parent" reference is less intuitive, 
+				// but applying them relative to current orientation helps stability.
+				// improves success rate, but slows down the solver convergence
+				#if 0
+				CQuaternion parentOri = (i > 0) ? chain[i - 1].orientation : CQuaternion();
+				boneDir = ApplyConstraint(chain[i].constraint, boneDir, parentOri);
+				#endif
+
+				pos[i] = pos[i + 1] - boneDir * chain[i].length;
 			}
 
-			positions[i + 1] = positions[i] + dir * segLengths[i];
+			// Backward pass: root to effector
+			pos[0] = float3(0, 0, 0);
+			for (size_t i = 0; i < n; i++) {
+				float3 boneDir = (pos[i + 1] - pos[i]);
+				boneDir.SafeNormalize();
+
+				CQuaternion parentOri = (i > 0) ? chain[i - 1].orientation : CQuaternion();
+				boneDir = ApplyConstraint(chain[i].constraint, boneDir, parentOri);
+
+				pos[i + 1] = pos[i] + boneDir * chain[i].length;
+
+				// Update orientation immediately for the next bone's constraint reference
+				float3 oldDir = chain[i].orientation.Rotate(defaultAxis);
+				CQuaternion delta = CQuaternion::MakeFrom(oldDir, boneDir);
+				chain[i].orientation = (delta * chain[i].orientation).Normalize();
+			}
+
+			if (pos[n].distance(goal) < precision)
+				break;
 		}
 
-		if (positions[n - 1].distance(goal) < precision)
-			break;
+		if (pos[n].distance(goal) > precision)
+			return FABRIKResult::FAILED;
+
+		return FABRIKResult::FOUND;
 	}
 
-	if (positions[n - 1].distance(goal) >= precision)
-		return FABRIKResult::FAILED;
-
-	return FABRIKResult::FOUND;
-}
+} // namespace IK

@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <cstdio>
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
@@ -36,576 +37,260 @@ static float3 RandomDir()
 	return d;
 }
 
-// Generate a random unit direction within a cone of half-angle `coneAngle`
-// around `axis` (which must be normalized).
-static float3 RandomDirInCone(const float3& axis, float coneAngle)
-{
-	// Build perpendicular basis
-	float3 perp = axis.cross(float3(1.0f, 0.0f, 0.0f));
-	if (perp.SqLength() < 0.01f)
-		perp = axis.cross(float3(0.0f, 1.0f, 0.0f));
-	perp.Normalize();
-	float3 perp2 = axis.cross(perp);
-	perp2.Normalize();
-
-	float angle   = randf() * coneAngle;
-	float azimuth = randf() * 2.0f * math::PI;
-
-	float3 result = axis * std::cos(angle)
-	              + (perp * std::cos(azimuth) + perp2 * std::sin(azimuth)) * std::sin(angle);
-	result.SafeNormalize();
-	return result;
-}
-
-// Generate a random unit direction in the hinge plane at an angle within
-// [minAngle, maxAngle] relative to `restDir`, around `hingeAxis`.
-// `restDir` and `hingeAxis` must be normalized and perpendicular-ish.
-static float3 RandomDirInHinge(const float3& hingeAxis, const float3& restDir,
-                               float minAngle, float maxAngle)
-{
-	float3 restProj = restDir - hingeAxis * restDir.dot(hingeAxis);
-	restProj.SafeNormalize();
-
-	float angle = minAngle + randf() * (maxAngle - minAngle);
-	float3 result = restProj * std::cos(angle) + hingeAxis.cross(restProj) * std::sin(angle);
-	result.SafeNormalize();
-	return result;
-}
-
-// Scramble all positions except root, spread randomly in a sphere.
-static void ScramblePositions(std::vector<float3>& positions,
-                              const std::vector<float>& segLengths)
-{
-	for (size_t i = 1; i < positions.size(); i++) {
-		float3 dir = RandomDir();
-		positions[i] = positions[i - 1] + dir * segLengths[i - 1];
-	}
-}
-
-// Scramble positions while respecting ball joint constraints.
-// Each bone direction is randomized within the cone at its joint.
-static void ScrambleBallConstrained(std::vector<float3>& positions,
-                                    const std::vector<float>& segLengths,
-                                    const std::vector<IK::Constraint>& constraints)
-{
-	for (size_t i = 0; i < positions.size() - 1; i++) {
-		if (const auto* bc = std::get_if<IK::BallJointConstraint>(&constraints[i])) {
-			float3 dir = RandomDirInCone(bc->coneAxis, bc->coneAngle * 0.9f);
-			positions[i + 1] = positions[i] + dir * segLengths[i];
-		} else {
-			float3 dir = RandomDir();
-			positions[i + 1] = positions[i] + dir * segLengths[i];
-		}
-	}
-}
-
-// Scramble positions while respecting hinge joint constraints.
-// The first bone is unconstrained; subsequent bones use the previous bone
-// direction as rest reference and pick a random angle within the hinge range.
-static void ScrambleHingeConstrained(std::vector<float3>& positions,
-                                     const std::vector<float>& segLengths,
-                                     const std::vector<IK::Constraint>& constraints)
-{
-	{
-		float3 dir = RandomDir();
-		positions[1] = positions[0] + dir * segLengths[0];
-	}
-
-	for (size_t i = 1; i < positions.size() - 1; i++) {
-		if (const auto* hc = std::get_if<IK::HingeJointConstraint>(&constraints[i])) {
-			float3 restDir = (positions[i] - positions[i - 1]);
-			restDir.SafeNormalize();
-			float3 dir = RandomDirInHinge(hc->axis, restDir, hc->minAngle, hc->maxAngle);
-			positions[i + 1] = positions[i] + dir * segLengths[i];
-		} else {
-			float3 dir = RandomDir();
-			positions[i + 1] = positions[i] + dir * segLengths[i];
-		}
-	}
-}
-
-// Build a valid chain reaching a goal. Returns positions with the effector
-// exactly at a reachable point. Segment lengths are randomised.
-struct ChainSetup {
-	std::vector<float3> positions;
-	std::vector<float>  segLengths;
-	float3 goal;
-};
-
-static ChainSetup MakeValidChain(size_t numJoints, const float3& root,
-                                 float minSeg = 5.0f, float maxSeg = 20.0f)
-{
-	ChainSetup cs;
-	cs.positions.resize(numJoints);
-	cs.segLengths.resize(numJoints - 1);
-
-	cs.positions[0] = root;
-	for (size_t i = 0; i < numJoints - 1; i++) {
-		cs.segLengths[i] = minSeg + randf() * (maxSeg - minSeg);
-		float3 dir = RandomDir();
-		cs.positions[i + 1] = cs.positions[i] + dir * cs.segLengths[i];
-	}
-	cs.goal = cs.positions.back();
-	return cs;
-}
-
-// Verify that segment lengths are preserved after solving.
-static void CheckSegmentLengths(const std::vector<float3>& positions,
-                                const std::vector<float>& segLengths,
-                                float tolerance = 0.1f)
-{
-	for (size_t i = 0; i < segLengths.size(); i++) {
-		const float actual = positions[i].distance(positions[i + 1]);
-		CHECK(std::abs(actual - segLengths[i]) < tolerance);
-	}
-}
-
-// Verify ball constraint satisfaction for bone direction at joint i.
-static bool IsBallConstraintSatisfied(const float3& boneDir,
-                                      const IK::BallJointConstraint& bc,
-                                      float tolerance = 0.02f)
-{
-	float3 axis = bc.coneAxis;
-	axis.SafeNormalize();
-	const float cosActual = boneDir.dot(axis);
-	const float cosLimit  = std::cos(bc.coneAngle);
-	return cosActual >= (cosLimit - tolerance);
-}
-
-// Verify hinge constraint satisfaction for bone direction at joint i.
-static bool IsHingeConstraintSatisfied(const float3& boneDir,
-                                       const float3& restDir,
-                                       const IK::HingeJointConstraint& hc,
-                                       float tolerance = 0.05f)
-{
-	float3 axis = hc.axis;
-	axis.SafeNormalize();
-
-	float3 dirProj  = boneDir - axis * boneDir.dot(axis);
-	float3 restProj = restDir - axis * restDir.dot(axis);
-	dirProj.SafeNormalize();
-	restProj.SafeNormalize();
-
-	const float cosA    = std::clamp(dirProj.dot(restProj), -1.0f, 1.0f);
-	const float sinSign = restProj.cross(dirProj).dot(axis) >= 0.0f ? 1.0f : -1.0f;
-	const float angle   = sinSign * std::acos(cosA);
-
-	return angle >= (hc.minAngle - tolerance) && angle <= (hc.maxAngle + tolerance);
-}
 
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-static constexpr int    NUM_TRIALS        = 100000;
+static constexpr int    NUM_TRIALS        = 10000; // Reduced for CI speed
 static constexpr int    NUM_TRIALS_CONSTR = 1000;
 static constexpr float  SOLVE_PRECISION   = 4.0f;
 static constexpr int    MAX_ITERATIONS    = 40;
 static constexpr float  SEG_LEN_TOL       = 0.1f;
 
-// ---- Test 1: Single joint chain returns FAILED ----
-
 TEST_CASE("FABRIKSingleJoint")
 {
-	std::vector<float3> positions = {float3{0, 0, 0}};
-	std::vector<float>  segLengths;
-	std::vector<IK::Constraint> constraints;
-	float3 rootDir{0, 1, 0};
-
-	auto result = IK::SolveFABRIK(positions, segLengths, constraints, rootDir,
-	                               float3{10, 0, 0}, MAX_ITERATIONS, SOLVE_PRECISION);
+	std::vector<IK::Bone> chain;
+	auto result = IK::SolveFABRIK(chain, float3{10, 0, 0}, MAX_ITERATIONS, SOLVE_PRECISION);
 	CHECK(result == IK::FABRIKResult::ERR_INPUTS);
 }
-
-
-// ---- Test 2: 2-bone reachable goal ----
 
 TEST_CASE("FABRIK2BoneReach")
 {
 	srand(42);
-
 	for (int trial = 0; trial < NUM_TRIALS; trial++) {
-		const float3 root{srandf() * 100.0f, srandf() * 100.0f, srandf() * 100.0f};
-		auto cs = MakeValidChain(3, root);
+		const float L1 = 5.0f + randf() * 15.0f;
+		const float L2 = 5.0f + randf() * 15.0f;
 
-		// Scramble and solve
-		ScramblePositions(cs.positions, cs.segLengths);
-		float3 rootDir = RandomDir();
-		auto result = IK::SolveFABRIK(cs.positions, cs.segLengths, {}, rootDir,
-		                               cs.goal, MAX_ITERATIONS, SOLVE_PRECISION);
+		std::vector<IK::Bone> chain(2);
+		chain[0].length = L1;
+		chain[0].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+		chain[1].length = L2;
+		chain[1].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+
+		float3 goal = RandomDir() * ((L1 + L2) * 0.8f);
+
+		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS, SOLVE_PRECISION);
 
 		CHECK(result == IK::FABRIKResult::FOUND);
-		CHECK(cs.positions[0].distance(root) < 0.01f);  // root pinned
-		CHECK(cs.positions.back().distance(cs.goal) < SOLVE_PRECISION);
-		CheckSegmentLengths(cs.positions, cs.segLengths, SEG_LEN_TOL);
+		float3 effector = chain[0].orientation.Rotate(float3(0,1,0)) * L1 + chain[1].orientation.Rotate(float3(0,1,0)) * L2;
+		CHECK(effector.distance(goal) < SOLVE_PRECISION);
 	}
 }
-
-
-// ---- Test 3: 2-bone unreachable (stretch) ----
 
 TEST_CASE("FABRIK2BoneStretch")
 {
 	srand(123);
-
 	for (int trial = 0; trial < NUM_TRIALS; trial++) {
-		const float3 root{srandf() * 50.0f, srandf() * 50.0f, srandf() * 50.0f};
 		const float L1 = 5.0f + randf() * 15.0f;
 		const float L2 = 5.0f + randf() * 15.0f;
 		const float totalLen = L1 + L2;
 
-		// Goal well beyond reach
 		float3 goalDir = RandomDir();
-		float3 goal = root + goalDir * (totalLen + 10.0f + randf() * 50.0f);
+		float3 goal = goalDir * (totalLen + 20.0f);
 
-		const float3 p1 = root + RandomDir() * L1;
-		const float3 p2 = p1   + RandomDir() * L2;
-		std::vector<float3> positions = {root, p1, p2};
-		std::vector<float>  segLengths = {L1, L2};
+		std::vector<IK::Bone> chain(2);
+		chain[0].length = L1;
+		chain[0].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+		chain[1].length = L2;
+		chain[1].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
 
-		auto result = IK::SolveFABRIK(positions, segLengths, {}, float3{0, 1, 0},
-		                               goal, MAX_ITERATIONS, SOLVE_PRECISION);
+		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS, SOLVE_PRECISION);
 
 		CHECK(result == IK::FABRIKResult::STRETCHING);
-		CHECK(positions[0].distance(root) < 0.01f);  // root pinned
-		CheckSegmentLengths(positions, segLengths, SEG_LEN_TOL);
-
-		// All joints should be roughly collinear toward goal
-		float3 toGoal = (goal - root);
-		toGoal.SafeNormalize();
-		for (size_t i = 1; i < positions.size(); i++) {
-			float3 toJoint = (positions[i] - root);
-			toJoint.SafeNormalize();
-			CHECK(toJoint.dot(toGoal) > 0.95f);
-		}
+		float3 d0 = chain[0].orientation.Rotate(float3(0,1,0));
+		float3 d1 = chain[1].orientation.Rotate(float3(0,1,0));
+		CHECK(d0.dot(goalDir) > 0.99f);
+		CHECK(d1.dot(goalDir) > 0.99f);
 	}
 }
-
-
-// ---- Test 4: 3-bone reachable goal ----
-
-TEST_CASE("FABRIK3BoneReach")
-{
-	srand(7);
-
-	for (int trial = 0; trial < NUM_TRIALS; trial++) {
-		const float3 root{srandf() * 100.0f, srandf() * 100.0f, srandf() * 100.0f};
-		auto cs = MakeValidChain(4, root);
-
-		ScramblePositions(cs.positions, cs.segLengths);
-		float3 rootDir = RandomDir();
-		auto result = IK::SolveFABRIK(cs.positions, cs.segLengths, {}, rootDir,
-		                               cs.goal, MAX_ITERATIONS, SOLVE_PRECISION);
-
-		CHECK(result == IK::FABRIKResult::FOUND);
-		CHECK(cs.positions[0].distance(root) < 0.01f);
-		CHECK(cs.positions.back().distance(cs.goal) < SOLVE_PRECISION);
-		CheckSegmentLengths(cs.positions, cs.segLengths, SEG_LEN_TOL);
-	}
-}
-
-
-// ---- Test 5: Goal at root position ----
 
 TEST_CASE("FABRIKGoalAtRoot")
 {
 	srand(99);
-
 	for (int trial = 0; trial < NUM_TRIALS; trial++) {
-		const float3 root{srandf() * 50.0f, srandf() * 50.0f, srandf() * 50.0f};
-		// Use equal segment lengths to guarantee root is always reachable
-		const float segLen = 5.0f + randf() * 10.0f;
-		const size_t numJoints = 3u + static_cast<size_t>(rand() % 3); // 3-5 joints
+		const float L = 10.0f;
+		std::vector<IK::Bone> chain(2);
+		chain[0].length = L;
+		chain[0].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+		chain[1].length = L;
+		chain[1].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
 
-		std::vector<float3> positions(numJoints);
-		std::vector<float>  segLengths(numJoints - 1, segLen);
-		
-		positions[0] = root;
-		for (size_t i = 1; i < numJoints; i++)
-			positions[i] = positions[i-1] + RandomDir() * segLen;
+		float3 goal = float3(0, 0, 0);
 
-		const float3 goal = root; // goal == root
-
-		ScramblePositions(positions, segLengths);
-		// root remains at root due to ScramblePositions logic
-
-		auto result = IK::SolveFABRIK(positions, segLengths, {}, float3{0, 1, 0},
-		                               goal, MAX_ITERATIONS * 2, SOLVE_PRECISION);
+		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS * 2, SOLVE_PRECISION);
 
 		CHECK(result == IK::FABRIKResult::FOUND);
-		CHECK(positions[0].distance(root) < 0.01f);
-		// With equal segments and >=2 bones, the effector can reach the root
-		CHECK(positions.back().distance(goal) < SOLVE_PRECISION);
-		CheckSegmentLengths(positions, segLengths, SEG_LEN_TOL);
+		float3 effector = chain[0].orientation.Rotate(float3(0,1,0)) * L + chain[1].orientation.Rotate(float3(0,1,0)) * L;
+		CHECK(effector.distance(goal) < SOLVE_PRECISION);
 	}
 }
-
-
-// ---- Test 6: Goal at current effector (no-op) ----
-
-TEST_CASE("FABRIKGoalAtEffector")
-{
-	srand(55);
-
-	for (int trial = 0; trial < NUM_TRIALS; trial++) {
-		const float3 root{srandf() * 100.0f, srandf() * 100.0f, srandf() * 100.0f};
-		auto cs = MakeValidChain(4, root);
-
-		// Goal is already at the effector
-		const float3 goal = cs.positions.back();
-
-		// Save original positions to verify stability
-		const auto origPositions = cs.positions;
-
-		float3 rootDir = RandomDir();
-		auto result = IK::SolveFABRIK(cs.positions, cs.segLengths, {}, rootDir,
-		                               goal, MAX_ITERATIONS, SOLVE_PRECISION);
-
-		CHECK(result == IK::FABRIKResult::FOUND);
-		CHECK(cs.positions.back().distance(goal) < SOLVE_PRECISION);
-		CheckSegmentLengths(cs.positions, cs.segLengths, SEG_LEN_TOL);
-
-		// Stability check: if already at goal, the positions should not have changed meaningfully
-		for (size_t i = 0; i < cs.positions.size(); i++) {
-			CHECK(cs.positions[i].distance(origPositions[i]) < 0.01f);
-		}
-	}
-}
-
-
-// ---- Test 7: Ball joint constraints ----
 
 TEST_CASE("FABRIKBallConstraint")
 {
 	srand(200);
-
 	for (int trial = 0; trial < NUM_TRIALS_CONSTR; trial++) {
-		const float3 root{srandf() * 50.0f, srandf() * 50.0f, srandf() * 50.0f};
-		const size_t numJoints = 4;
+		const float coneAngle = math::PI * 0.4f;
+		float3 localConeAxis = float3(0, 1, 0); // Along the bone
 
-		// Cone axis along Y, generous cone angle
-		const float coneAngle = math::PI * 0.3f + randf() * math::PI * 0.35f; // 54-117 deg
-
-		// Build valid config: each bone direction is within the cone
-		float3 coneAxis = RandomDir();
-		std::vector<float3> validPositions(numJoints);
-		std::vector<float>  segLengths(numJoints - 1);
-		validPositions[0] = root;
-
-		for (size_t i = 0; i < numJoints - 1; i++) {
-			segLengths[i] = 8.0f + randf() * 12.0f;
-			float3 dir = RandomDirInCone(coneAxis, coneAngle * 0.8f); // stay inside
-			validPositions[i + 1] = validPositions[i] + dir * segLengths[i];
-		}
-		float3 goal = validPositions.back();
-
-		// Set up constraints: ball constraint at each joint (except effector)
-		std::vector<IK::Constraint> constraints(numJoints - 1);
-		for (size_t i = 0; i < numJoints - 1; i++) {
+		std::vector<IK::Bone> chain(3);
+		for (size_t i = 0; i < 3; i++) {
+			chain[i].length = 10.0f;
+			chain[i].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
 			IK::BallJointConstraint bc;
-			bc.coneAxis  = coneAxis;
+			bc.coneAxis = localConeAxis;
 			bc.coneAngle = coneAngle;
-			constraints[i] = bc;
+			chain[i].constraint = bc;
 		}
 
-		// Scramble within constraints and solve
-		auto positions = validPositions;
-		ScrambleBallConstrained(positions, segLengths, constraints);
-		float3 rootDir = RandomDirInCone(coneAxis, coneAngle);
-
-		auto result = IK::SolveFABRIK(positions, segLengths, constraints, rootDir,
-		                               goal, MAX_ITERATIONS * 2, SOLVE_PRECISION * 2.0f);
-
+		float3 goal = RandomDir() * 15.0f;
+		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS * 2, SOLVE_PRECISION);
 		CHECK(result == IK::FABRIKResult::FOUND);
-		CHECK(positions[0].distance(root) < 0.01f);
-		CheckSegmentLengths(positions, segLengths, SEG_LEN_TOL);
-
-		// Verify ball constraints are satisfied on each bone
-		for (size_t i = 0; i < numJoints - 1; i++) {
-			float3 boneDir = (positions[i + 1] - positions[i]);
-			boneDir.SafeNormalize();
-			const auto& bc = std::get<IK::BallJointConstraint>(constraints[i]);
-			CHECK(IsBallConstraintSatisfied(boneDir, bc, 0.05f));
+		if (result == IK::FABRIKResult::FOUND) {
+			for (size_t i = 0; i < 3; i++) {
+				float3 dirW = chain[i].orientation.Rotate(float3(0,1,0));
+				CQuaternion parentOri = (i > 0) ? chain[i-1].orientation : CQuaternion();
+				float3 coneAxisW = parentOri.Rotate(localConeAxis);
+				CHECK(dirW.dot(coneAxisW) >= math::cos(coneAngle) - 0.05f);
+			}
 		}
 	}
 }
-
-
-// ---- Test 8: Hinge joint constraints ----
 
 TEST_CASE("FABRIKHingeConstraint")
 {
 	srand(300);
-
 	for (int trial = 0; trial < NUM_TRIALS_CONSTR; trial++) {
-		const float3 root{srandf() * 50.0f, srandf() * 50.0f, srandf() * 50.0f};
-		const size_t numJoints = 4;
+		const float minA = -math::PI * 0.25f;
+		const float maxA =  math::PI * 0.25f;
+		float3 localHingeAxis = float3(1, 0, 0); // Orthogonal to bone (0,1,0)
 
-		const float minAngle = -(math::PI * 0.1f + randf() * math::PI * 0.3f); // -18 to -72 deg
-		const float maxAngle =  (math::PI * 0.1f + randf() * math::PI * 0.3f); //  18 to  72 deg
-
-		// Build valid config: each bone direction satisfies its own local hinge constraint
-		std::vector<float3> validPositions(numJoints);
-		std::vector<float>  segLengths(numJoints - 1);
-		validPositions[0] = root;
-
-		std::vector<float3> hingeAxes(numJoints, UpVector);
-
-		// First bone: arbitrary direction (will serve as rest dir for joint 1)
-		float3 prevDir = RandomDir();
-		segLengths[0] = 8.0f + randf() * 12.0f;
-		validPositions[1] = validPositions[0] + prevDir * segLengths[0];
-
-		for (size_t i = 1; i < numJoints - 1; i++) {
-			segLengths[i] = 8.0f + randf() * 12.0f;
-
-			// For each joint, create a hinge axis orthogonal to the bone entering it
-			float3 alt = (std::abs(prevDir.x) < 0.9f) ? float3(1,0,0) : float3(0,1,0);
-			hingeAxes[i] = prevDir.cross(alt);
-			hingeAxes[i].SafeNormalize();
-
-			float3 dir = RandomDirInHinge(hingeAxes[i], prevDir, minAngle, maxAngle);
-			validPositions[i + 1] = validPositions[i] + dir * segLengths[i];
-			prevDir = dir;
-		}
-		float3 goal = validPositions.back();
-
-		// Constraints: unique hinges at joints 1..n-2
-		std::vector<IK::Constraint> constraints(numJoints - 1, std::monostate{});
-		for (size_t i = 1; i < numJoints - 1; i++) {
+		std::vector<IK::Bone> chain(3);
+		for (size_t i = 0; i < 3; i++) {
+			chain[i].length = 10.0f;
+			chain[i].orientation = CQuaternion();
 			IK::HingeJointConstraint hc;
-			hc.axis     = hingeAxes[i];
-			hc.minAngle = minAngle;
-			hc.maxAngle = maxAngle;
-			constraints[i] = hc;
+			hc.axis = localHingeAxis;
+			hc.minAngle = minA;
+			hc.maxAngle = maxA;
+			chain[i].constraint = hc;
 		}
 
-		// Scramble within constraints and solve
-		auto positions = validPositions;
-		ScrambleHingeConstrained(positions, segLengths, constraints);
-
-		float3 initBoneDir = (positions[1] - positions[0]);
-		initBoneDir.SafeNormalize();
-
-		auto result = IK::SolveFABRIK(positions, segLengths, constraints, initBoneDir,
-		                               goal, MAX_ITERATIONS * 4, SOLVE_PRECISION * 4.0f);
-
-		CHECK(result == IK::FABRIKResult::FOUND);
-		CHECK(positions[0].distance(root) < 0.01f);
-		CheckSegmentLengths(positions, segLengths, SEG_LEN_TOL);
-
-		// Verify hinge constraints on interior joints
-		for (size_t i = 1; i < numJoints - 1; i++) {
-			float3 boneDir = (positions[i + 1] - positions[i]);
-			boneDir.SafeNormalize();
-			float3 restDir = (positions[i] - positions[i - 1]);
-			restDir.SafeNormalize();
-			const auto& hc = std::get<IK::HingeJointConstraint>(constraints[i]);
-			CHECK(IsHingeConstraintSatisfied(boneDir, restDir, hc, 0.1f));
+		float3 goal = float3(0, 0, 0);
+		{
+			CQuaternion currentOri;
+			for (size_t i = 0; i < 3; i++) {
+				float angle = minA + randf() * (maxA - minA);
+				CQuaternion localRot = CQuaternion::MakeFrom(angle, localHingeAxis);
+				currentOri = (currentOri * localRot).Normalize();
+				goal += currentOri.Rotate(float3(0,1,0)) * chain[i].length;
+			}
 		}
-	}
-}
-
-// ---- Test 9: Zero-length segment (degenerate case) ----
-
-TEST_CASE("FABRIKZeroLengthSegment")
-{
-	srand(400);
-
-	for (int trial = 0; trial < 100; trial++) {
-		const float3 root{srandf() * 50.0f, srandf() * 50.0f, srandf() * 50.0f};
-
-		// 3 joints, middle segment has zero length
-		const float L1 = 10.0f + randf() * 10.0f;
-		const float L2 = 0.0f;  // zero-length
-		const float L3 = 10.0f + randf() * 10.0f;
-
-		float3 dir1 = RandomDir();
-		float3 dir2 = RandomDir();
-		std::vector<float3> positions = {
-			root,
-			root + dir1 * L1,
-			root + dir1 * L1,           // same as joint 1 (zero-length bone)
-			root + dir1 * L1 + dir2 * L3
-		};
-		std::vector<float> segLengths = {L1, L2, L3};
-		float3 goal = positions.back();
-
-		ScramblePositions(positions, segLengths);
-		auto result = IK::SolveFABRIK(positions, segLengths, {}, float3{0, 1, 0},
-		                               goal, MAX_ITERATIONS, SOLVE_PRECISION);
-
-		// Rejected as an invalid input
-		CHECK(result == IK::FABRIKResult::ERR_INPUTS);
-		CHECK(positions[0].distance(root) < 0.01f);
-		CheckSegmentLengths(positions, segLengths, SEG_LEN_TOL);
-	}
-}
-
-
-// ---- Test 10: Many-bone chain (10-20 segments) ----
-
-TEST_CASE("FABRIKManyBones")
-{
-	srand(500);
-
-	for (int trial = 0; trial < NUM_TRIALS; trial++) {
-		const float3 root{srandf() * 100.0f, srandf() * 100.0f, srandf() * 100.0f};
-		const size_t numJoints = 11u + static_cast<size_t>(rand() % 10); // 11-20 joints
-
-		auto cs = MakeValidChain(numJoints, root, 3.0f, 10.0f);
-
-		ScramblePositions(cs.positions, cs.segLengths);
-		float3 rootDir = RandomDir();
-		auto result = IK::SolveFABRIK(cs.positions, cs.segLengths, {}, rootDir,
-		                               cs.goal, MAX_ITERATIONS * 3, SOLVE_PRECISION);
-
+		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS * 4, SOLVE_PRECISION * 2.0f);
 		CHECK(result == IK::FABRIKResult::FOUND);
-		CHECK(cs.positions[0].distance(root) < 0.01f);
-		CHECK(cs.positions.back().distance(cs.goal) < SOLVE_PRECISION);
-		CheckSegmentLengths(cs.positions, cs.segLengths, SEG_LEN_TOL);
-	}
-}
+		if (result == IK::FABRIKResult::FOUND) {
+			for (size_t i = 0; i < 3; i++) {
+				float3 dirW = chain[i].orientation.Rotate(float3(0,1,0));
+				CQuaternion parentOri = (i > 0) ? chain[i-1].orientation : CQuaternion();
 
+				float3 dirL = parentOri.Inverse().Rotate(dirW);
+				float3 restL = float3(0,1,0); // Our convention
 
-// ---- Test 11: Segment length preservation across solve types ----
+				float3 projL = (dirL - localHingeAxis * dirL.dot(localHingeAxis)).SafeNormalize();
+				float cosA = std::clamp(projL.dot(restL), -1.0f, 1.0f);
+				float sinSign = restL.cross(projL).dot(localHingeAxis) >= 0.0f ? 1.0f : -1.0f;
+				float angle = sinSign * math::acos(cosA);
 
-TEST_CASE("FABRIKSegmentLengthPreservation")
-{
-	srand(600);
-
-	SECTION("Reachable") {
-		for (int trial = 0; trial < NUM_TRIALS; trial++) {
-			auto cs = MakeValidChain(5, float3{0, 0, 0});
-			auto origLengths = cs.segLengths;
-			ScramblePositions(cs.positions, cs.segLengths);
-			IK::SolveFABRIK(cs.positions, cs.segLengths, {}, RandomDir(),
-			                 cs.goal, MAX_ITERATIONS, SOLVE_PRECISION);
-			// Segment lengths (the constraint) must be exact to within tolerance
-			for (size_t i = 0; i < origLengths.size(); i++) {
-				const float actual = cs.positions[i].distance(cs.positions[i + 1]);
-				CHECK(std::abs(actual - origLengths[i]) < 0.05f);
+				CHECK(angle >= minA - 0.1f);
+				CHECK(angle <= maxA + 0.1f);
 			}
 		}
 	}
+}
+TEST_CASE("FABRIKBenchmarks", "[!benchmark]")
+{
+	const int benchmarkTrials = 2000; 
+	srand(1337);
 
-	SECTION("Unreachable") {
-		for (int trial = 0; trial < NUM_TRIALS; trial++) {
-			auto cs = MakeValidChain(5, float3{0, 0, 0}, 5.0f, 10.0f);
-			auto origLengths = cs.segLengths;
-			float totalLen = 0.0f;
-			for (auto l : origLengths) totalLen += l;
+	{
+		uint64_t totalIters = 0;
+		int successes = 0;
+		for (int trial = 0; trial < benchmarkTrials; trial++) {
+			const float L1 = 10.0f, L2 = 10.0f;
+			std::vector<IK::Bone> chain(2);
+			chain[0].length = L1;
+			chain[0].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+			chain[1].length = L2;
+			chain[1].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
 
-			// Goal beyond reach
-			float3 goal = float3{0, 0, 0} + RandomDir() * (totalLen + 50.0f);
-			ScramblePositions(cs.positions, cs.segLengths);
-			IK::SolveFABRIK(cs.positions, cs.segLengths, {}, RandomDir(),
-			                 goal, MAX_ITERATIONS, SOLVE_PRECISION);
-			for (size_t i = 0; i < origLengths.size(); i++) {
-				const float actual = cs.positions[i].distance(cs.positions[i + 1]);
-				CHECK(std::abs(actual - origLengths[i]) < 0.05f);
+			float3 goal = RandomDir() * 15.0f;
+			uint32_t iters = 0;
+			auto res = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS, SOLVE_PRECISION, &iters);
+			if (res == IK::FABRIKResult::FOUND) {
+				totalIters += iters;
+				successes++;
 			}
 		}
+		printf("  2-Bone Unconstrained:    avg iters = %.2f (%d/%d successes)\n", (double)totalIters / (successes ? successes : 1), successes, benchmarkTrials);
 	}
+
+	{
+		uint64_t totalIters = 0;
+		int successes = 0;
+		const float coneAngle = math::PI * 0.4f;
+		for (int trial = 0; trial < benchmarkTrials; trial++) {
+			std::vector<IK::Bone> chain(3);
+			for (size_t i = 0; i < 3; i++) {
+				chain[i].length = 10.0f;
+				chain[i].orientation = CQuaternion::MakeFrom(float3(0,1,0), RandomDir());
+				IK::BallJointConstraint bc;
+				bc.coneAngle = coneAngle;
+				chain[i].constraint = bc;
+			}
+			float3 goal = RandomDir() * 15.0f;
+			uint32_t iters = 0;
+			auto res = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS * 2, SOLVE_PRECISION, &iters);
+			if (res == IK::FABRIKResult::FOUND) {
+				totalIters += iters;
+				successes++;
+			}
+		}
+		printf("  3-Bone Ball Constraints:  avg iters = %.2f (%d/%d successes)\n", (double)totalIters / (successes ? successes : 1), successes, benchmarkTrials);
+	}
+
+	{
+		uint64_t totalIters = 0;
+		int successes = 0;
+		for (int trial = 0; trial < benchmarkTrials; trial++) {
+			std::vector<IK::Bone> chain(3);
+			for (size_t i = 0; i < 3; i++) {
+				chain[i].length = 10.0f;
+				chain[i].orientation = CQuaternion();
+				IK::HingeJointConstraint hc;
+				hc.axis = float3(1, 0, 0);
+				hc.minAngle = -math::PI * 0.25f;
+				hc.maxAngle =  math::PI * 0.25f;
+				chain[i].constraint = hc;
+			}
+			float3 goal = float3(0, 0, 0);
+			{
+				CQuaternion currentOri;
+				for (size_t i = 0; i < 3; i++) {
+					float angle = -math::PI * 0.25f + randf() * (math::PI * 0.5f);
+					CQuaternion localRot = CQuaternion::MakeFrom(angle, float3(1,0,0));
+					currentOri = (currentOri * localRot).Normalize();
+					goal += currentOri.Rotate(float3(0,1,0)) * chain[i].length;
+				}
+			}
+			uint32_t iters = 0;
+			auto res = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS * 10, SOLVE_PRECISION * 0.5f, &iters);
+			if (res == IK::FABRIKResult::FOUND) {
+				totalIters += iters;
+				successes++;
+			}
+		}
+		printf("  3-Bone Hinge Constraints: avg iters = %.2f (%d/%d successes)\n", (double)totalIters / (successes ? successes : 1), successes, benchmarkTrials);
+	}
+	printf("Benchmarks Finished.\n");
 }

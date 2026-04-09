@@ -5,6 +5,7 @@
 #include <variant>
 
 #include "System/float3.h"
+#include "System/Quaternion.h"
 
 namespace IK {
 	struct BallJointConstraint {
@@ -19,4 +20,10 @@ namespace IK {
 	};
 
 	using Constraint = std::variant<std::monostate, BallJointConstraint, HingeJointConstraint>;
+
+	struct Bone {
+		float length = 0.0f;
+		CQuaternion orientation; // root-relative (model space) orientation
+		Constraint constraint;
+	};
 }
