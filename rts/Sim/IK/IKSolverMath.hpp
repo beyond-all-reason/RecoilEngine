@@ -21,7 +21,7 @@ namespace IK {
 		return orientation.Rotate(kBoneRestAxis);
 	}
 
-	enum class FABRIKResult : uint8_t {
+	enum class Result : uint8_t {
 		FOUND      = 0,
 		STRETCHING = 1,
 		FAILED     = 2,
@@ -33,7 +33,7 @@ namespace IK {
 	public:
 		virtual ~IIKSolver() = default;
 
-		virtual FABRIKResult Solve(
+		virtual Result Solve(
 			std::vector<Bone>& chain,
 			const float3& goal,
 			uint32_t maxIterations = 10,
@@ -50,7 +50,7 @@ namespace IK {
 	// precision:        convergence threshold (effector-to-goal distance).
 	//
 	// Results are naturally expressed in the frame where the root joint is at (0,0,0).
-	FABRIKResult SolveFABRIK(
+	Result SolveFABRIK(
 		std::vector<Bone>& chain,
 		const float3& goal,
 		uint32_t maxIterations = 10,
@@ -59,7 +59,7 @@ namespace IK {
 	);
 
 	// Pure CCD solver operating on the same bone hierarchy representation as FABRIK.
-	FABRIKResult SolveCCD(
+	Result SolveCCD(
 		std::vector<Bone>& chain,
 		const float3& goal,
 		uint32_t maxIterations = 10,

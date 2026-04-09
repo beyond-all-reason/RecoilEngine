@@ -10,7 +10,7 @@
 #include "System/MathConstants.h"
 #include "System/float3.h"
 #include "Sim/IK/IKSolverMath.hpp"
-#include "Sim/IK/CCDSolverMath.hpp"
+#include "Sim/IK/IKSolverMath.hpp"
 
 #include <catch_amalgamated.hpp>
 
@@ -72,7 +72,7 @@ static constexpr float  SOLVE_PRECISION   = 4.0f;
 static constexpr int    MAX_ITERATIONS    = 40;
 static constexpr float  SEG_LEN_TOL       = 0.1f;
 
-static IK::FABRIKResult SolveByName(
+static IK::Result SolveByName(
 	const IK::IIKSolver& solver,
 	std::vector<IK::Bone>& chain,
 	const float3& goal,
@@ -103,7 +103,7 @@ TEST_CASE("IKVirtualSolverInterfaceParity")
 		uint32_t iters = 0;
 		const auto result = solver->Solve(chain, goal, 120, 0.5f, &iters);
 
-		CHECK(result == IK::FABRIKResult::FOUND);
+		CHECK(result == IK::Result::FOUND);
 		CHECK(iters > 0);
 
 		const float3 effector =
@@ -118,7 +118,7 @@ TEST_CASE("CCDInputValidation")
 {
 	std::vector<IK::Bone> chain;
 	auto result = IK::GetCCDSolver().Solve(chain, float3{10, 0, 0}, MAX_ITERATIONS, SOLVE_PRECISION);
-	CHECK(result == IK::FABRIKResult::ERR_INPUTS);
+	CHECK(result == IK::Result::ERR_INPUTS);
 }
 
 TEST_CASE("CCD2BoneReach")
@@ -137,7 +137,7 @@ TEST_CASE("CCD2BoneReach")
 		const float3 goal = RandomDir() * ((L1 + L2) * 0.8f);
 
 		const auto result = SolveByName(IK::GetCCDSolver(), chain, goal, 200, SOLVE_PRECISION);
-		CHECK(result == IK::FABRIKResult::FOUND);
+		CHECK(result == IK::Result::FOUND);
 
 		const float3 effector = chain[0].orientation.Rotate(FwdVector) * L1 + chain[1].orientation.Rotate(FwdVector) * L2;
 		CHECK(effector.distance(goal) < SOLVE_PRECISION);
@@ -162,7 +162,7 @@ TEST_CASE("CCD2BoneStretch")
 		chain[1].orientation = CQuaternion::MakeFrom(FwdVector, RandomDir());
 
 		const auto result = SolveByName(IK::GetCCDSolver(), chain, goal, 200, SOLVE_PRECISION);
-		CHECK(result == IK::FABRIKResult::STRETCHING);
+		CHECK(result == IK::Result::STRETCHING);
 
 		const float3 d0 = chain[0].orientation.Rotate(FwdVector);
 		const float3 d1 = chain[1].orientation.Rotate(FwdVector);
@@ -192,8 +192,8 @@ TEST_CASE("CCDVsFABRIK2BoneReachComparison")
 		const auto resultFABRIK = SolveByName(IK::GetFABRIKSolver(), chainFABRIK, goal, 200, SOLVE_PRECISION);
 		const auto resultCCD = SolveByName(IK::GetCCDSolver(), chainCCD, goal, 200, SOLVE_PRECISION);
 
-		CHECK(resultFABRIK == IK::FABRIKResult::FOUND);
-		CHECK(resultCCD == IK::FABRIKResult::FOUND);
+		CHECK(resultFABRIK == IK::Result::FOUND);
+		CHECK(resultCCD == IK::Result::FOUND);
 
 		const float3 effectorFABRIK = chainFABRIK[0].orientation.Rotate(FwdVector) * L1 + chainFABRIK[1].orientation.Rotate(FwdVector) * L2;
 		const float3 effectorCCD = chainCCD[0].orientation.Rotate(FwdVector) * L1 + chainCCD[1].orientation.Rotate(FwdVector) * L2;
@@ -207,7 +207,7 @@ TEST_CASE("FABRIKSingleJoint")
 {
 	std::vector<IK::Bone> chain;
 	auto result = IK::SolveFABRIK(chain, float3{10, 0, 0}, MAX_ITERATIONS, SOLVE_PRECISION);
-	CHECK(result == IK::FABRIKResult::ERR_INPUTS);
+	CHECK(result == IK::Result::ERR_INPUTS);
 }
 
 TEST_CASE("FABRIKWrapperAxisContract")
@@ -234,9 +234,9 @@ TEST_CASE("FABRIKWrapperAxisContract")
 
 		float3 goal = RandomDir() * ((L1 + L2) * 0.8f);
 		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS, SOLVE_PRECISION);
-		CHECK(result == IK::FABRIKResult::FOUND);
+		CHECK(result == IK::Result::FOUND);
 
-		if (result == IK::FABRIKResult::FOUND) {
+		if (result == IK::Result::FOUND) {
 			float3 effector =
 				chain[0].orientation.Rotate(FwdVector) * L1 +
 				chain[1].orientation.Rotate(FwdVector) * L2;
@@ -262,7 +262,7 @@ TEST_CASE("FABRIK2BoneReach")
 
 		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS, SOLVE_PRECISION);
 
-		CHECK(result == IK::FABRIKResult::FOUND);
+		CHECK(result == IK::Result::FOUND);
 		float3 effector = chain[0].orientation.Rotate(FwdVector) * L1 + chain[1].orientation.Rotate(FwdVector) * L2;
 		CHECK(effector.distance(goal) < SOLVE_PRECISION);
 	}
@@ -287,7 +287,7 @@ TEST_CASE("FABRIK2BoneStretch")
 
 		auto result = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS, SOLVE_PRECISION);
 
-		CHECK(result == IK::FABRIKResult::STRETCHING);
+		CHECK(result == IK::Result::STRETCHING);
 		float3 d0 = chain[0].orientation.Rotate(FwdVector);
 		float3 d1 = chain[1].orientation.Rotate(FwdVector);
 		CHECK(d0.dot(goalDir) > 0.99f);
@@ -310,7 +310,7 @@ TEST_CASE("FABRIKGoalAtRoot")
 
 		auto result = IK::SolveFABRIK(chain, goal, 1000, SOLVE_PRECISION);
 
-		CHECK(result == IK::FABRIKResult::FOUND);
+		CHECK(result == IK::Result::FOUND);
 		float3 effector = chain[0].orientation.Rotate(FwdVector) * L + chain[1].orientation.Rotate(FwdVector) * L;
 		CHECK(effector.distance(goal) < SOLVE_PRECISION);
 	}
@@ -369,8 +369,8 @@ TEST_CASE("FABRIKBallConstraint")
 		}
 
 		auto result = IK::SolveFABRIK(chain, goal, 1000, SOLVE_PRECISION);
-		CHECK(result == IK::FABRIKResult::FOUND);
-		if (result == IK::FABRIKResult::FOUND) {
+		CHECK(result == IK::Result::FOUND);
+		if (result == IK::Result::FOUND) {
 			float3 effector = ZeroVector;
 			for (size_t i = 0; i < 3; i++) {
 				effector += chain[i].orientation.Rotate(FwdVector) * chain[i].length;
@@ -447,7 +447,7 @@ TEST_CASE("FABRIKHingeConstraint")
 		}
 
 		auto result = IK::SolveFABRIK(chain, goal, 10000, SOLVE_PRECISION * 4.0f);
-		CHECK(result == IK::FABRIKResult::FOUND);
+		CHECK(result == IK::Result::FOUND);
 
 		for (size_t i = 0; i < numBones; i++) {
 			const auto& hc = std::get<IK::HingeJointConstraint>(chain[i].constraint);
@@ -472,7 +472,7 @@ TEST_CASE("FABRIKHingeConstraint")
 			CHECK(angle <= hc.maxAngle + 0.15f);
 		}
 
-		if (result == IK::FABRIKResult::FOUND) {
+		if (result == IK::Result::FOUND) {
 			float3 effector = ZeroVector;
 			for (int i = 0; i < numBones; i++) {
 				effector += chain[i].orientation.Rotate(FwdVector) * chain[i].length;
@@ -503,7 +503,7 @@ TEST_CASE("FABRIKBenchmarks", "[!benchmark]")
 			float3 goal = RandomDir() * 15.0f;
 			uint32_t iters = 0;
 			auto res = IK::SolveFABRIK(chain, goal, MAX_ITERATIONS, benchUnconstrainedPrecision, &iters);
-			if (res == IK::FABRIKResult::FOUND) {
+			if (res == IK::Result::FOUND) {
 				totalIters += iters;
 				successes++;
 			}
@@ -561,7 +561,7 @@ TEST_CASE("FABRIKBenchmarks", "[!benchmark]")
 
 			uint32_t iters = 0;
 			auto res = IK::SolveFABRIK(chain, goal, 5000, benchBallPrecision, &iters);
-			if (res == IK::FABRIKResult::FOUND) {
+			if (res == IK::Result::FOUND) {
 				totalIters += iters;
 				successes++;
 			}
@@ -626,7 +626,7 @@ TEST_CASE("FABRIKBenchmarks", "[!benchmark]")
 
 			uint32_t iters = 0;
 			auto res = IK::SolveFABRIK(chain, goal, 30000, benchHingePrecision, &iters);
-			if (res == IK::FABRIKResult::FOUND) {
+			if (res == IK::Result::FOUND) {
 				totalIters += iters;
 				successes++;
 			}
@@ -659,7 +659,7 @@ TEST_CASE("CCDBenchmarks", "[!benchmark]")
 			const float3 goal = RandomDir() * 15.0f;
 			uint32_t iters = 0;
 			const auto res = SolveByName(solver, chain, goal, MAX_ITERATIONS * 5, benchUnconstrainedPrecision, &iters);
-			if (res == IK::FABRIKResult::FOUND) {
+			if (res == IK::Result::FOUND) {
 				totalIters += iters;
 				successes++;
 			}
@@ -717,7 +717,7 @@ TEST_CASE("CCDBenchmarks", "[!benchmark]")
 
 			uint32_t iters = 0;
 			const auto res = SolveByName(solver, chain, goal, 5000, benchBallPrecision, &iters);
-			if (res == IK::FABRIKResult::FOUND) {
+			if (res == IK::Result::FOUND) {
 				totalIters += iters;
 				successes++;
 			}
@@ -782,7 +782,7 @@ TEST_CASE("CCDBenchmarks", "[!benchmark]")
 
 			uint32_t iters = 0;
 			const auto res = SolveByName(solver, chain, goal, 30000, benchHingePrecision, &iters);
-			if (res == IK::FABRIKResult::FOUND) {
+			if (res == IK::Result::FOUND) {
 				totalIters += iters;
 				successes++;
 			}
@@ -823,7 +823,7 @@ TEST_CASE("CCDVsFABRIKBenchmarks", "[!benchmark]")
 			const clock_t t0 = std::clock();
 			const auto res = SolveByName(fabrik, chain, goal, MAX_ITERATIONS, precision, &iters);
 			fabrikTicks += (std::clock() - t0);
-			if (res == IK::FABRIKResult::FOUND) {
+			if (res == IK::Result::FOUND) {
 				fabrikIters += iters;
 				fabrikSuccesses++;
 			}
@@ -835,7 +835,7 @@ TEST_CASE("CCDVsFABRIKBenchmarks", "[!benchmark]")
 			const clock_t t0 = std::clock();
 			const auto res = SolveByName(ccd, chain, goal, MAX_ITERATIONS * 5, precision, &iters);
 			ccdTicks += (std::clock() - t0);
-			if (res == IK::FABRIKResult::FOUND) {
+			if (res == IK::Result::FOUND) {
 				ccdIters += iters;
 				ccdSuccesses++;
 			}

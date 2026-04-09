@@ -194,6 +194,25 @@ private:
 	static int GetPiecePosDir(lua_State* L);      // EmitDirPos (in unit space)
 
 	static int GetActiveUnitID(lua_State* L);
+
+	static int CreateIKSkeleton(lua_State* L);
+	static bool CreateIKMetatables(lua_State* L);
+
+	static int Skeleton_meta_gc(lua_State* L);
+	static int Skeleton_meta_index(lua_State* L);
+	static int Chain_meta_gc(lua_State* L);
+	static int Chain_meta_index(lua_State* L);
+
+	static int Skeleton_CreateChain(lua_State* L);
+	static int Skeleton_SetBallJointConstraint(lua_State* L);
+	static int Skeleton_SetHingeJointConstraint(lua_State* L);
+	static int Skeleton_ClearJointConstraint(lua_State* L);
+	static int Skeleton_SolveAllChains(lua_State* L);
+	static int Skeleton_SolveChain(lua_State* L);
+
+	static int Chain_SetGoal(lua_State* L);
+	static int Chain_GetGoal(lua_State* L);
+	static int Chain_SetSolver(lua_State* L);
 };
 
 #endif

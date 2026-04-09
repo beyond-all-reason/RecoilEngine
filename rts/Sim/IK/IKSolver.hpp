@@ -10,7 +10,6 @@
 #include "System/Quaternion.h"
 #include "Sim/IK/IKTypes.hpp"
 #include "Sim/IK/IKSolverMath.hpp"
-#include "Sim/IK/CCDSolverMath.hpp"
 
 class CSolidObject;
 struct LocalModelPiece;
@@ -32,19 +31,22 @@ namespace IK {
 		const auto& GetGoal() const { return eGoal; }
 		const auto& GetJoints() const { return jointIdcs; }
 		const auto& GetBoneLengths() const { return boneLengths; }
+		void SetSolver(const IIKSolver* ikSolver);
+		const IIKSolver* GetSolver() const { return solver; }
 	public:
 		const uint32_t rID;
 		const uint32_t eID;
 		float weight = 0.0f;
 	private:
 		const Skeleton* skel = nullptr;
+		const IIKSolver* solver = nullptr;
 		std::vector<uint32_t> jointIdcs;
 		std::vector<float> boneLengths;
 		float3 eGoal; // in world space
 	};
 
 	struct ChainSolution {
-		FABRIKResult solutionKind;
+		Result solutionKind;
 		std::vector<std::pair<int, float3>> solution; // joint/piece id and YPR angles
 	};
 
@@ -53,8 +55,6 @@ namespace IK {
 		Skeleton(const CSolidObject& solidObject);
 
 		bool SetJointConstraint(uint32_t jointID, const Constraint& constraint);
-		void SetSolver(const IIKSolver* ikSolver);
-		const IIKSolver* GetSolver() const { return solver; }
 		void UpdateJointHierarchy(uint32_t jointID);
 		void UpdateJoint(uint32_t jointID);
 		void UpdateAllJoints();
@@ -68,7 +68,6 @@ namespace IK {
 		float3 ModelDirToWorldDir(const float3& md) const;
 	private:
 		const CSolidObject* so = nullptr;
-		const IIKSolver* solver = nullptr;
 		std::vector<Joint> joints;
 		std::vector<std::weak_ptr<Chain>> chains;
 	};

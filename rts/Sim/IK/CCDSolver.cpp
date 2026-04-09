@@ -1,6 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "CCDSolverMath.hpp"
+#include "IKSolverMath.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -14,7 +14,7 @@ namespace IK {
 		class CCDSolver final: public IIKSolver
 		{
 		public:
-			FABRIKResult Solve(
+			Result Solve(
 				std::vector<Bone>& chain,
 				const float3& goal,
 				uint32_t maxIterations,
@@ -26,7 +26,7 @@ namespace IK {
 		};
 	}
 
-	FABRIKResult SolveCCD(
+	Result SolveCCD(
 		std::vector<Bone>& chain,
 		const float3& goal,
 		uint32_t maxIterations,
@@ -35,7 +35,7 @@ namespace IK {
 	{
 		const size_t n = chain.size();
 		if (n == 0)
-			return FABRIKResult::ERR_INPUTS;
+			return Result::ERR_INPUTS;
 
 		if (iterCount != nullptr)
 			*iterCount = 0;
@@ -64,7 +64,7 @@ namespace IK {
 				pos[i + 1] = pos[i] + constrainedDir * chain[i].length;
 			}
 
-			return FABRIKResult::STRETCHING;
+			return Result::STRETCHING;
 		}
 
 		const float precisionSq = precision * precision;
@@ -116,7 +116,7 @@ namespace IK {
 			}
 		}
 
-		return (pos[n].SqDistance(goal) <= precisionSq) ? FABRIKResult::FOUND : FABRIKResult::FAILED;
+		return (pos[n].SqDistance(goal) <= precisionSq) ? Result::FOUND : Result::FAILED;
 	}
 
 	const IIKSolver& GetCCDSolver()

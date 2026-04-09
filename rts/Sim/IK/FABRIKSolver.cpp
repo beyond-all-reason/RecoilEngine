@@ -15,7 +15,7 @@ namespace IK {
 		class FABRIKSolver final: public IIKSolver
 		{
 		public:
-			FABRIKResult Solve(
+			Result Solve(
 				std::vector<Bone>& chain,
 				const float3& goal,
 				uint32_t maxIterations,
@@ -90,7 +90,7 @@ namespace IK {
 		return boneDir;
 	}
 
-	FABRIKResult SolveFABRIK(
+	Result SolveFABRIK(
 		std::vector<Bone>& chain,
 		const float3& goal,
 		uint32_t maxIterations,
@@ -99,7 +99,7 @@ namespace IK {
 	{
 		const size_t n = chain.size();
 		if (n == 0)
-			return FABRIKResult::ERR_INPUTS;
+			return Result::ERR_INPUTS;
 
 		if (iterCount != nullptr)
 			*iterCount = 0;
@@ -127,7 +127,7 @@ namespace IK {
 				CQuaternion delta = CQuaternion::MakeFrom(restDirW, constrainedDir).Normalize();
 				chain[i].orientation = (delta * parentOri).Normalize();
 			}
-			return FABRIKResult::STRETCHING;
+			return Result::STRETCHING;
 		}
 
 		const float precisionSq = precision * precision;
@@ -194,9 +194,9 @@ namespace IK {
 		}
 
 		if (pos[n].SqDistance(goal) > precisionSq)
-			return FABRIKResult::FAILED;
+			return Result::FAILED;
 
-		return FABRIKResult::FOUND;
+		return Result::FOUND;
 	}
 
 	const IIKSolver& GetFABRIKSolver()

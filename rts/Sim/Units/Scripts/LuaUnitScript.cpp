@@ -24,6 +24,7 @@
 #include "System/SafeUtil.h"
 #include "System/StringUtil.h"
 #include "Rendering/Models/3DModelPiece.hpp"
+#include "Sim/IK/IKSolver.hpp"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -100,6 +101,82 @@ static inline int ToLua(lua_State* L, const float3& v)
 	lua_pushnumber(L, v.y);
 	lua_pushnumber(L, v.z);
 	return 3;
+}
+
+static inline IK::Skeleton* toSkeleton(lua_State* L, int idx)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto ud = static_cast<std::shared_ptr<IK::Skeleton>*>(luaL_checkudata(L, idx, "IKSkeleton"));
+	if (*ud == nullptr)
+		luaL_error(L, "attempt to use a deleted IK skeleton");
+	return ud->get();
+}
+
+static inline IK::Chain* toChain(lua_State* L, int idx)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto ud = static_cast<std::shared_ptr<IK::Chain>*>(luaL_checkudata(L, idx, "IKChain"));
+	if (*ud == nullptr)
+		luaL_error(L, "attempt to use a deleted IK chain");
+	return ud->get();
+}
+
+static inline std::shared_ptr<IK::Chain> toChainShared(lua_State* L, int idx)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto ud = static_cast<std::shared_ptr<IK::Chain>*>(luaL_checkudata(L, idx, "IKChain"));
+	if (*ud == nullptr)
+		luaL_error(L, "attempt to use a deleted IK chain");
+	return *ud;
+}
+
+static int PushChainSolution(lua_State* L, const IK::ChainSolution& solution)
+{
+	lua_createtable(L, 0, 2);
+
+	const char* statusStr;
+	switch (solution.solutionKind) {
+		case IK::Result::FOUND:      statusStr = "found";      break;
+		case IK::Result::STRETCHING: statusStr = "stretching"; break;
+		case IK::Result::FAILED:     statusStr = "failed";     break;
+		default:                           statusStr = "error";      break;
+	}
+
+	lua_pushstring(L, "status");
+	lua_pushstring(L, statusStr);
+	lua_rawset(L, -3);
+
+	lua_pushstring(L, "joints");
+	const size_t n = solution.solution.size();
+	lua_createtable(L, n, 0);
+
+	for (size_t i = 0; i < n; ++i) {
+		const auto& [pieceIdx, ypr] = solution.solution[i];
+
+		lua_createtable(L, 0, 4);
+
+		lua_pushstring(L, "piece");
+		lua_pushnumber(L, pieceIdx + 1);
+		lua_rawset(L, -3);
+
+		lua_pushstring(L, "rx");
+		lua_pushnumber(L, ypr.x);
+		lua_rawset(L, -3);
+
+		lua_pushstring(L, "ry");
+		lua_pushnumber(L, ypr.y);
+		lua_rawset(L, -3);
+
+		lua_pushstring(L, "rz");
+		lua_pushnumber(L, ypr.z);
+		lua_rawset(L, -3);
+
+		lua_rawseti(L, -2, i + 1);
+	}
+
+	lua_rawset(L, -3);
+
+	return 1;
 }
 
 /*
@@ -1032,6 +1109,8 @@ bool CLuaUnitScript::PushEntries(lua_State* L)
 		activeScript = nullptr;
 	}
 
+	CreateIKMetatables(L);
+
 	lua_pushstring(L, "UnitScript");
 	lua_createtable(L, 0, 25);
 
@@ -1076,6 +1155,8 @@ bool CLuaUnitScript::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetPiecePosDir);
 
 	REGISTER_LUA_CFUNC(GetActiveUnitID);
+
+	REGISTER_LUA_CFUNC(CreateIKSkeleton);
 
 	lua_rawset(L, -3);
 
@@ -1759,4 +1840,444 @@ int CLuaUnitScript::GetActiveUnitID(lua_State* L)
 
 	lua_pushnumber(L, activeUnit->id);
 	return 1;
+}
+
+/******************************************************************************/
+/******************************************************************************/
+//
+// IK (Inverse Kinematics) support
+//
+
+bool CLuaUnitScript::CreateIKMetatables(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	// IKSkeleton metatable
+	luaL_newmetatable(L, "IKSkeleton");
+
+	HSTR_PUSH_CFUNC(L, "__gc",        Skeleton_meta_gc);
+	HSTR_PUSH_CFUNC(L, "__index",     Skeleton_meta_index);
+	LuaPushNamedString(L, "__metatable", "protected metatable");
+
+		LuaPushRawNamedCFunc(L, "CreateChain",              Skeleton_CreateChain);
+		LuaPushRawNamedCFunc(L, "SetBallJointConstraint",    Skeleton_SetBallJointConstraint);
+		LuaPushRawNamedCFunc(L, "SetHingeJointConstraint",   Skeleton_SetHingeJointConstraint);
+		LuaPushRawNamedCFunc(L, "ClearJointConstraint",      Skeleton_ClearJointConstraint);
+		LuaPushRawNamedCFunc(L, "SolveAllChains",            Skeleton_SolveAllChains);
+		LuaPushRawNamedCFunc(L, "SolveChain",                Skeleton_SolveChain);
+
+	lua_pop(L, 1);
+
+	// IKChain metatable
+	luaL_newmetatable(L, "IKChain");
+
+	HSTR_PUSH_CFUNC(L, "__gc",        Chain_meta_gc);
+	HSTR_PUSH_CFUNC(L, "__index",     Chain_meta_index);
+	LuaPushNamedString(L, "__metatable", "protected metatable");
+
+		LuaPushRawNamedCFunc(L, "SetGoal",   Chain_SetGoal);
+		LuaPushRawNamedCFunc(L, "GetGoal",   Chain_GetGoal);
+		LuaPushRawNamedCFunc(L, "SetSolver", Chain_SetSolver);
+
+	lua_pop(L, 1);
+
+	return true;
+}
+
+
+/******************************************************************************/
+/******************************************************************************/
+//
+//  Skeleton metatable
+//
+
+int CLuaUnitScript::Skeleton_meta_gc(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (lua_isnil(L, 1))
+		return 0;
+
+	auto skel = std::move(*static_cast<std::shared_ptr<IK::Skeleton>*>(luaL_checkudata(L, 1, "IKSkeleton")));
+	skel = {};
+
+	return 0;
+}
+
+
+int CLuaUnitScript::Skeleton_meta_index(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	luaL_getmetatable(L, "IKSkeleton");
+	lua_pushvalue(L, 2);
+	lua_rawget(L, -2);
+	if (!lua_isnil(L, -1))
+		return 1;
+
+	lua_pop(L, 1);
+
+	return 0;
+}
+
+
+/******************************************************************************/
+/******************************************************************************/
+//
+//  Chain metatable
+//
+
+int CLuaUnitScript::Chain_meta_gc(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (lua_isnil(L, 1))
+		return 0;
+
+	auto chain = std::move(*static_cast<std::shared_ptr<IK::Chain>*>(luaL_checkudata(L, 1, "IKChain")));
+	chain = {};
+
+	return 0;
+}
+
+
+int CLuaUnitScript::Chain_meta_index(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	luaL_getmetatable(L, "IKChain");
+	lua_pushvalue(L, 2);
+	lua_rawget(L, -2);
+	if (!lua_isnil(L, -1))
+		return 1;
+
+	lua_pop(L, 1);
+
+	auto* chain = toChain(L, 1);
+
+	if (lua_israwstring(L, 2)) {
+		switch (hashString(lua_tostring(L, 2))) {
+			case hashString("rootPiece"): {
+				lua_pushnumber(L, chain->rID + 1);
+				return 1;
+			} break;
+			case hashString("effectorPiece"): {
+				lua_pushnumber(L, chain->eID + 1);
+				return 1;
+			} break;
+			case hashString("weight"): {
+				lua_pushnumber(L, chain->weight);
+				return 1;
+			} break;
+			default: {
+			} break;
+		}
+	}
+
+	return 0;
+}
+
+
+/******************************************************************************/
+/******************************************************************************/
+//
+//  IK static callout
+//
+
+/*** Creates an IK skeleton for the currently active unit.
+ *
+ * The skeleton mirrors the unit's piece hierarchy. Each piece becomes a joint
+ * that can have optional constraints (ball-joint or hinge). The skeleton is
+ * garbage-collected when the Lua reference is lost.
+ *
+ * Must be called inside a unit script context (e.g. within CallAsUnit).
+ *
+ * @function Spring.UnitScript.CreateIKSkeleton
+ * @return IKSkeleton? userdata, or nil if no unit is active or the skeleton is too small.
+ */
+int CLuaUnitScript::CreateIKSkeleton(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeUnit == nullptr)
+		return 0;
+
+	try {
+		auto skeleton = std::make_shared<IK::Skeleton>(*activeUnit);
+
+		auto ud = static_cast<std::shared_ptr<IK::Skeleton>*>(lua_newuserdata(L, sizeof(std::shared_ptr<IK::Skeleton>)));
+		memset(ud, 0, sizeof(std::shared_ptr<IK::Skeleton>));
+		*ud = std::move(skeleton);
+
+		luaL_getmetatable(L, "IKSkeleton");
+		lua_setmetatable(L, -2);
+		return 1;
+	} catch (const std::exception& e) {
+		LOG_L(L_ERROR, "CreateIKSkeleton: %s", e.what());
+		return 0;
+	}
+}
+
+
+/******************************************************************************/
+/******************************************************************************/
+//
+//  Skeleton userdata callouts
+//
+
+/*** Creates an IK chain from root to effector piece.
+ *
+ * The chain walks the piece tree from effector up to root via parent links.
+ * Both pieces must be on the same ancestor path, otherwise returns nil.
+ *
+ * @function IKSkeleton:CreateChain
+ * @param effectorPiece number 1-based piece index of the end-effector.
+ * @param rootPiece number? 1-based piece index of the chain root. Defaults to 1 (base piece).
+ * @param weight number? Blend weight for the solution (0..1). Defaults to 1.0.
+ * @return IKChain? userdata, or nil if the path from effector to root is invalid.
+ */
+int CLuaUnitScript::Skeleton_CreateChain(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* skel = toSkeleton(L, 1);
+
+	const uint32_t effectorID = static_cast<uint32_t>(luaL_checkint(L, 2) - 1);
+	const uint32_t rootID = static_cast<uint32_t>(luaL_optint(L, 3, 1) - 1);
+	const float weight = luaL_optfloat(L, 4, 1.0f);
+
+	auto chain = skel->CreateChain(effectorID, rootID, weight);
+	if (!chain)
+		return 0;
+
+	auto ud = static_cast<std::shared_ptr<IK::Chain>*>(lua_newuserdata(L, sizeof(std::shared_ptr<IK::Chain>)));
+	memset(ud, 0, sizeof(std::shared_ptr<IK::Chain>));
+	*ud = std::move(chain);
+
+	luaL_getmetatable(L, "IKChain");
+	lua_setmetatable(L, -2);
+	return 1;
+}
+
+
+/*** Sets a ball-joint (cone) constraint on a joint.
+ *
+ * Limits the bone leaving this joint to stay within a cone of the given angle
+ * around the specified axis.
+ *
+ * @function IKSkeleton:SetBallJointConstraint
+ * @param piece number 1-based piece index.
+ * @param axisX number Cone axis X component.
+ * @param axisY number Cone axis Y component.
+ * @param axisZ number Cone axis Z component.
+ * @param angle number Half-angle of the cone in radians.
+ * @return nil
+ */
+int CLuaUnitScript::Skeleton_SetBallJointConstraint(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* skel = toSkeleton(L, 1);
+
+	const uint32_t piece = static_cast<uint32_t>(luaL_checkint(L, 2) - 1);
+
+	IK::BallJointConstraint constraint;
+	constraint.coneAxis = float3(
+		luaL_checkfloat(L, 3),
+		luaL_checkfloat(L, 4),
+		luaL_checkfloat(L, 5)
+	);
+	constraint.coneAngle = luaL_checkfloat(L, 6);
+
+	skel->SetJointConstraint(piece, constraint);
+	return 0;
+}
+
+
+/*** Sets a hinge-joint constraint on a joint.
+ *
+ * Limits the bone leaving this joint to rotate only around the specified axis,
+ * within the given angular range.
+ *
+ * @function IKSkeleton:SetHingeJointConstraint
+ * @param piece number 1-based piece index.
+ * @param axisX number Hinge axis X component.
+ * @param axisY number Hinge axis Y component.
+ * @param axisZ number Hinge axis Z component.
+ * @param minAngle number Minimum angle in radians.
+ * @param maxAngle number Maximum angle in radians.
+ * @return nil
+ */
+int CLuaUnitScript::Skeleton_SetHingeJointConstraint(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* skel = toSkeleton(L, 1);
+
+	const uint32_t piece = static_cast<uint32_t>(luaL_checkint(L, 2) - 1);
+
+	IK::HingeJointConstraint constraint;
+	constraint.axis = float3(
+		luaL_checkfloat(L, 3),
+		luaL_checkfloat(L, 4),
+		luaL_checkfloat(L, 5)
+	);
+	constraint.minAngle = luaL_checkfloat(L, 6);
+	constraint.maxAngle = luaL_checkfloat(L, 7);
+
+	skel->SetJointConstraint(piece, constraint);
+	return 0;
+}
+
+
+/*** Removes any constraint from a joint.
+ *
+ * @function IKSkeleton:ClearJointConstraint
+ * @param piece number 1-based piece index.
+ * @return nil
+ */
+int CLuaUnitScript::Skeleton_ClearJointConstraint(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* skel = toSkeleton(L, 1);
+
+	const uint32_t piece = static_cast<uint32_t>(luaL_checkint(L, 2) - 1);
+
+	skel->SetJointConstraint(piece, std::monostate{});
+	return 0;
+}
+
+
+/*** Solves all chains owned by this skeleton.
+ *
+ * Automatically updates all joint positions before solving.
+ * Expired chains (whose Lua-side IKChain userdata was garbage-collected) are
+ * pruned first. Each remaining chain is solved using its own solver.
+ *
+ * The returned solution tables contain:
+ *   status: "found" | "stretching" | "failed" | "error"
+ *   joints: {{piece=n, rx=n, ry=n, rz=n}, ...}
+ * where piece is 1-based and rx/ry/rz are Euler angles in radians.
+ *
+ * @function IKSkeleton:SolveAllChains
+ * @param maxIterations number? Maximum solver iterations per chain. Defaults to 10.
+ * @param precision number? Convergence threshold (distance). Defaults to 1.0.
+ * @return table[] Array of solution tables, one per chain.
+ */
+int CLuaUnitScript::Skeleton_SolveAllChains(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* skel = toSkeleton(L, 1);
+
+	const uint32_t maxIter = static_cast<uint32_t>(luaL_optint(L, 2, 10));
+	const float precision = luaL_optfloat(L, 3, 1.0f);
+
+	auto solutions = skel->SolveAllChains(maxIter, precision);
+
+	const size_t n = solutions.size();
+	lua_createtable(L, n, 0);
+
+	for (size_t i = 0; i < n; ++i) {
+		PushChainSolution(L, solutions[i]);
+		lua_rawseti(L, -2, i + 1);
+	}
+
+	return 1;
+}
+
+
+/*** Solves a single IK chain.
+ *
+ * Automatically updates all joint positions before solving.
+ * The chain uses its own solver (see IKChain:SetSolver).
+ *
+ * See SolveAllChains for the solution table format.
+ *
+ * @function IKSkeleton:SolveChain
+ * @param chain IKChain The chain to solve.
+ * @param maxIterations number? Maximum solver iterations. Defaults to 10.
+ * @param precision number? Convergence threshold (distance). Defaults to 1.0.
+ * @return table Solution table with "status" and "joints" fields.
+ */
+int CLuaUnitScript::Skeleton_SolveChain(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* skel = toSkeleton(L, 1);
+	auto chain = toChainShared(L, 2);
+
+	const uint32_t maxIter = static_cast<uint32_t>(luaL_optint(L, 3, 10));
+	const float precision = luaL_optfloat(L, 4, 1.0f);
+
+	auto solution = skel->SolveChain(chain, maxIter, precision);
+	return PushChainSolution(L, solution);
+}
+
+
+/******************************************************************************/
+/******************************************************************************/
+//
+//  Chain userdata callouts
+//
+
+/*** Sets the target goal position for the chain effector.
+ *
+ * The goal is in world-space coordinates.
+ *
+ * @function IKChain:SetGoal
+ * @param x number Goal X in world space.
+ * @param y number Goal Y in world space.
+ * @param z number Goal Z in world space.
+ * @return nil
+ */
+int CLuaUnitScript::Chain_SetGoal(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* chain = toChain(L, 1);
+
+	const float x = luaL_checkfloat(L, 2);
+	const float y = luaL_checkfloat(L, 3);
+	const float z = luaL_checkfloat(L, 4);
+
+	chain->SetGoal(float3(x, y, z));
+	return 0;
+}
+
+
+/*** Returns the current goal position of the chain effector.
+ *
+ * @function IKChain:GetGoal
+ * @return number x X component.
+ * @return number y Y component.
+ * @return number z Z component.
+ */
+int CLuaUnitScript::Chain_GetGoal(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* chain = toChain(L, 1);
+
+	const auto& goal = chain->GetGoal();
+	return ToLua(L, goal);
+}
+
+
+/*** Selects the IK solver algorithm for this chain.
+ *
+ * Each chain can use a different solver. Defaults to "fabrik".
+ *
+ * @function IKChain:SetSolver
+ * @param name string Solver name: "fabrik" or "ccd".
+ * @return nil
+ */
+int CLuaUnitScript::Chain_SetSolver(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* chain = toChain(L, 1);
+
+	const char* name = luaL_checkstring(L, 2);
+
+	switch (hashString(name)) {
+		case hashString("fabrik"):
+			chain->SetSolver(&IK::GetFABRIKSolver());
+			break;
+		case hashString("ccd"):
+			chain->SetSolver(&IK::GetCCDSolver());
+			break;
+		default:
+			luaL_error(L, "Unknown IK solver: %s (use 'fabrik' or 'ccd')", name);
+			break;
+	}
+
+	return 0;
 }

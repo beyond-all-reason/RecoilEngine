@@ -34,6 +34,7 @@ Chain::Chain(const Skeleton& skeleton, std::vector<uint32_t> indices, float chai
 	, eID(indices.back())
 	, weight(chainWeight)
 	, skel(&skeleton)
+	, solver(&IK::GetFABRIKSolver())
 	, jointIdcs(std::move(indices))
 {
 	const auto& skelJoints = skel->GetJoints();
@@ -46,9 +47,13 @@ Chain::Chain(const Skeleton& skeleton, std::vector<uint32_t> indices, float chai
 	}
 }
 
+void Chain::SetSolver(const IIKSolver* ikSolver)
+{
+	solver = (ikSolver != nullptr) ? ikSolver : &IK::GetFABRIKSolver();
+}
+
 Skeleton::Skeleton(const CSolidObject& solidObject)
 	: so{ &solidObject }
-	, solver{ &IK::GetFABRIKSolver() }
 {
 	const auto& lm = so->localModel;
 
@@ -62,11 +67,6 @@ Skeleton::Skeleton(const CSolidObject& solidObject)
 		joint.piece = &piece;
 	}
 	UpdateAllJoints();
-}
-
-void Skeleton::SetSolver(const IIKSolver* ikSolver)
-{
-	solver = (ikSolver != nullptr) ? ikSolver : &IK::GetFABRIKSolver();
 }
 
 bool Skeleton::SetJointConstraint(uint32_t jointID, const Constraint& constraint)
@@ -139,6 +139,8 @@ std::shared_ptr<Chain> Skeleton::CreateChain(uint32_t effectorID, uint32_t rootI
 
 std::vector<ChainSolution> Skeleton::SolveAllChains(uint32_t maxIterations, float precision)
 {
+	UpdateAllJoints();
+
 	// remove chains expired somewhere else
 	spring::VectorEraseIfAll(chains, [](const auto& chWPtr) { return chWPtr.expired(); });
 
@@ -157,13 +159,15 @@ std::vector<ChainSolution> Skeleton::SolveAllChains(uint32_t maxIterations, floa
 ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t maxIterations, float precision)
 {
 	if (!ch)
-		return { FABRIKResult::ERR_INPUTS, {} };
+		return { Result::ERR_INPUTS, {} };
+
+	UpdateAllJoints();
 
 	const auto& ji = ch->GetJoints();
 	const size_t n = ji.size();
 
 	if (n < 2)
-		return { FABRIKResult::ERR_INPUTS, {} };
+		return { Result::ERR_INPUTS, {} };
 
 	// Preparations for the redesigned SolveFABRIK:
 	// 1. Goal relative to root joint in model space
@@ -185,8 +189,8 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 		chain[i].orientation = MakeOrientationFromBoneDir(currDirModel);
 	}
 
-	assert(solver != nullptr);
-	const FABRIKResult resultCode = solver->Solve(chain, goalModel, maxIterations, precision);
+	assert(ch->GetSolver() != nullptr);
+	const Result resultCode = ch->GetSolver()->Solve(chain, goalModel, maxIterations, precision);
 
 	// Convert solved orientations back to piece-local YPR rotations.
 	std::vector<std::pair<int, float3>> solution;
