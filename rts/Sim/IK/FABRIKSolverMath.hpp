@@ -9,6 +9,17 @@
 #include "IKTypes.hpp"
 
 namespace IK {
+	inline constexpr float3 kBoneRestAxis = FwdVector;
+
+	inline CQuaternion MakeOrientationFromBoneDir(const float3& boneDir)
+	{
+		return CQuaternion::MakeFrom(kBoneRestAxis, boneDir);
+	}
+
+	inline float3 BoneDirFromOrientation(const CQuaternion& orientation)
+	{
+		return orientation.Rotate(kBoneRestAxis);
+	}
 
 	enum class FABRIKResult : uint8_t {
 		FOUND      = 0,

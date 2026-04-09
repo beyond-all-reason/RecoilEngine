@@ -180,8 +180,7 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 	const float3 goalModel = WorldDirToModelDir(ch->GetGoal() - rootWorldPos);
 
 	// 2. Bone hierarchy with local-space constraints and model-space orientations.
-	// We use the convention that in the solver's coordinate system, a bone with 
-	// identity orientation points along float3(0, 1, 0).
+	// The math solver and wrapper conversions share kBoneRestAxis.
 	std::vector<Bone> chain(n - 1);
 	for (size_t i = 0; i < n - 1; i++) {
 		const uint32_t jIdx = ji[i];
@@ -190,9 +189,9 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 		chain[i].length = joints[jIdx].piece->GetAbsolutePos().distance(joints[nextJIdx].piece->GetAbsolutePos());
 		chain[i].constraint = joints[jIdx].constraint;
 
-		// Initial orientation rotates (0,1,0) to current bone direction in model space
+		// Initial orientation rotates kBoneRestAxis to current bone direction in model space
 		const float3 currDirModel = WorldDirToModelDir(joints[nextJIdx].worldPos - joints[jIdx].worldPos).SafeNormalize();
-		chain[i].orientation = CQuaternion::MakeFrom(float3(0, 1, 0), currDirModel);
+		chain[i].orientation = MakeOrientationFromBoneDir(currDirModel);
 	}
 
 	const FABRIKResult resultCode = IK::SolveFABRIK(chain, goalModel, maxIterations, precision);
@@ -209,7 +208,7 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 		const float3 bposeBoneDir = (bposeTraNext.t - bposeTra.t).SafeNormalize();
 
 		// Solved bone direction in model space
-		const float3 solvedDirModel = chain[i].orientation.Rotate(float3(0, 1, 0));
+		const float3 solvedDirModel = BoneDirFromOrientation(chain[i].orientation);
 
 		// Compute final script rotation relative to bind-pose
 		const CQuaternion delta       = CQuaternion::MakeFrom(bposeBoneDir, solvedDirModel);
