@@ -29,10 +29,11 @@ namespace IK {
 		Chain(const Skeleton& skeleton, std::vector<uint32_t> indices, float chainWeight);
 		void SetGoal(const float3& effectorGoal) { eGoal = effectorGoal; }
 		const auto& GetGoal() const { return eGoal; }
-		const auto& GetJoints() const { return jointIdcs; }
-		const auto& GetBoneLengths() const { return boneLengths; }
+		const std::vector<uint32_t>& GetJoints() const { return jointIdcs; }
+		const std::vector<float>& GetBoneLengths() const { return boneLengths; }
 		void SetSolver(const IIKSolver* ikSolver);
 		const IIKSolver* GetSolver() const { return solver; }
+		const Skeleton* GetSkeleton() const { return skel; }
 	public:
 		const uint32_t rID;
 		const uint32_t eID;
@@ -48,7 +49,10 @@ namespace IK {
 	struct ChainSolution {
 		Result solutionKind;
 		std::vector<std::pair<int, float3>> solution; // joint/piece id and YPR angles
+		std::vector<CQuaternion> rotations;           // script-relative rotation (relative to bind pose)
 	};
+
+	const char* ResultToString(Result result);
 
 	class Skeleton {
 	public:
@@ -60,7 +64,8 @@ namespace IK {
 		void UpdateAllJoints();
 		std::shared_ptr<Chain> CreateChain(uint32_t effectorID, uint32_t rootID = 0, float chainWeight = 1.0f);
 		std::vector<ChainSolution> SolveAllChains(uint32_t maxIterations = 10, float precision = 1.0f);
-		ChainSolution SolveChain(const std::shared_ptr<Chain>& chain, uint32_t maxIterations = 10, float precision = 1.0f);
+		ChainSolution SolveChain(const std::shared_ptr<Chain>& chain, uint32_t maxIterations = 10, float precision = 1.0f, int skipCount = 0);
+		void ApplySolution(const Chain& chain, const ChainSolution& sol, int skipCount = 0);
 		const auto* GetSolidObject() const { return so; }
 		const auto& GetJoints() const { return joints; }
 	private:

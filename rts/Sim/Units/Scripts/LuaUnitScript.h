@@ -192,6 +192,7 @@ private:
 	static int GetPieceRotation(lua_State* L);    // matches Turn
 	static int GetPieceScale(lua_State* L);       // matches Scale
 	static int GetPiecePosDir(lua_State* L);      // EmitDirPos (in unit space)
+	static int GetPieceParent(lua_State* L);
 
 	static int GetActiveUnitID(lua_State* L);
 
@@ -213,6 +214,8 @@ private:
 	static int Chain_SetGoal(lua_State* L);
 	static int Chain_GetGoal(lua_State* L);
 	static int Chain_SetSolver(lua_State* L);
+	static int Chain_GetBoneLengths(lua_State* L);
+	static int Chain_ApplyToPieces(lua_State* L);
 };
 
 #endif

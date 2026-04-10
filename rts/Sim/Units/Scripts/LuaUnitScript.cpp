@@ -28,6 +28,8 @@
 
 #include "System/Misc/TracyDefs.h"
 
+#include <new>
+
 CR_BIND_DERIVED(CLuaUnitScript, CUnitScript, )
 
 CR_REG_METADATA(CLuaUnitScript, (
@@ -1153,6 +1155,7 @@ bool CLuaUnitScript::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetPieceRotation);
 	REGISTER_LUA_CFUNC(GetPieceScale);
 	REGISTER_LUA_CFUNC(GetPiecePosDir);
+	REGISTER_LUA_CFUNC(GetPieceParent);
 
 	REGISTER_LUA_CFUNC(GetActiveUnitID);
 
@@ -1827,6 +1830,24 @@ int CLuaUnitScript::GetPiecePosDir(lua_State* L)
 	return 6;
 }
 
+int CLuaUnitScript::GetPieceParent(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	LocalModelPiece* piece = ParseLocalModelPiece(L, activeScript, __func__);
+
+	if (piece->parent == nullptr) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	const int parentScript = activeScript->ModelToScript(piece->parent->GetLModelPieceIndex());
+	lua_pushnumber(L, parentScript + 1);
+	return 1;
+}
+
 /******************************************************************************/
 /******************************************************************************/
 
@@ -1878,6 +1899,8 @@ bool CLuaUnitScript::CreateIKMetatables(lua_State* L)
 		LuaPushRawNamedCFunc(L, "SetGoal",   Chain_SetGoal);
 		LuaPushRawNamedCFunc(L, "GetGoal",   Chain_GetGoal);
 		LuaPushRawNamedCFunc(L, "SetSolver", Chain_SetSolver);
+		LuaPushRawNamedCFunc(L, "GetBoneLengths", Chain_GetBoneLengths);
+		LuaPushRawNamedCFunc(L, "ApplyToPieces",  Chain_ApplyToPieces);
 
 	lua_pop(L, 1);
 
@@ -2001,11 +2024,11 @@ int CLuaUnitScript::CreateIKSkeleton(lua_State* L)
 		auto skeleton = std::make_shared<IK::Skeleton>(*activeUnit);
 
 		auto ud = static_cast<std::shared_ptr<IK::Skeleton>*>(lua_newuserdata(L, sizeof(std::shared_ptr<IK::Skeleton>)));
-		memset(ud, 0, sizeof(std::shared_ptr<IK::Skeleton>));
-		*ud = std::move(skeleton);
+		new (ud) std::shared_ptr<IK::Skeleton>(std::move(skeleton));
 
 		luaL_getmetatable(L, "IKSkeleton");
 		lua_setmetatable(L, -2);
+		LOG_L(L_DEBUG, "CreateIKSkeleton: unit=%d joints=%u", activeUnit->id, unsigned(ud->get()->GetJoints().size()));
 		return 1;
 	} catch (const std::exception& e) {
 		LOG_L(L_ERROR, "CreateIKSkeleton: %s", e.what());
@@ -2036,20 +2059,36 @@ int CLuaUnitScript::Skeleton_CreateChain(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto* skel = toSkeleton(L, 1);
 
-	const uint32_t effectorID = static_cast<uint32_t>(luaL_checkint(L, 2) - 1);
-	const uint32_t rootID = static_cast<uint32_t>(luaL_optint(L, 3, 1) - 1);
+	if (activeScript == nullptr)
+		luaL_error(L, "%s(): no active script", __func__);
+
+	const int scriptEffector = luaL_checkint(L, 2) - 1;
+	const int scriptRoot = luaL_optint(L, 3, 1) - 1;
 	const float weight = luaL_optfloat(L, 4, 1.0f);
 
-	auto chain = skel->CreateChain(effectorID, rootID, weight);
-	if (!chain)
+	const int effectorID = activeScript->ScriptToModel(scriptEffector);
+	const int rootID = activeScript->ScriptToModel(scriptRoot);
+
+	if (effectorID < 0 || rootID < 0) {
+		LOG_L(L_WARNING, "Skeleton_CreateChain: bad piece mapping script(eff=%d root=%d) -> model(eff=%d root=%d)",
+			scriptEffector, scriptRoot, effectorID, rootID);
 		return 0;
+	}
+
+	auto chain = skel->CreateChain(static_cast<uint32_t>(effectorID), static_cast<uint32_t>(rootID), weight);
+	if (!chain) {
+		LOG_L(L_WARNING, "Skeleton_CreateChain: invalid chain model root=%d effector=%d (script root=%d effector=%d)",
+			rootID, effectorID, scriptRoot, scriptEffector);
+		return 0;
+	}
 
 	auto ud = static_cast<std::shared_ptr<IK::Chain>*>(lua_newuserdata(L, sizeof(std::shared_ptr<IK::Chain>)));
-	memset(ud, 0, sizeof(std::shared_ptr<IK::Chain>));
-	*ud = std::move(chain);
+	new (ud) std::shared_ptr<IK::Chain>(std::move(chain));
 
 	luaL_getmetatable(L, "IKChain");
 	lua_setmetatable(L, -2);
+	LOG_L(L_WARNING, "Skeleton_CreateChain: script(eff=%d root=%d) -> model(eff=%d root=%d) weight=%.3f joints=%u",
+		scriptEffector, scriptRoot, effectorID, rootID, weight, unsigned(ud->get()->GetJoints().size()));
 	return 1;
 }
 
@@ -2072,7 +2111,14 @@ int CLuaUnitScript::Skeleton_SetBallJointConstraint(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto* skel = toSkeleton(L, 1);
 
-	const uint32_t piece = static_cast<uint32_t>(luaL_checkint(L, 2) - 1);
+	if (activeScript == nullptr)
+		luaL_error(L, "%s(): no active script", __func__);
+
+	const int scriptPiece = luaL_checkint(L, 2) - 1;
+	const int modelPiece = activeScript->ScriptToModel(scriptPiece);
+	if (modelPiece < 0)
+		luaL_error(L, "%s(): invalid piece %d", __func__, scriptPiece + 1);
+	const uint32_t piece = static_cast<uint32_t>(modelPiece);
 
 	IK::BallJointConstraint constraint;
 	constraint.coneAxis = float3(
@@ -2106,7 +2152,14 @@ int CLuaUnitScript::Skeleton_SetHingeJointConstraint(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto* skel = toSkeleton(L, 1);
 
-	const uint32_t piece = static_cast<uint32_t>(luaL_checkint(L, 2) - 1);
+	if (activeScript == nullptr)
+		luaL_error(L, "%s(): no active script", __func__);
+
+	const int scriptPiece = luaL_checkint(L, 2) - 1;
+	const int modelPiece = activeScript->ScriptToModel(scriptPiece);
+	if (modelPiece < 0)
+		luaL_error(L, "%s(): invalid piece %d", __func__, scriptPiece + 1);
+	const uint32_t piece = static_cast<uint32_t>(modelPiece);
 
 	IK::HingeJointConstraint constraint;
 	constraint.axis = float3(
@@ -2133,7 +2186,14 @@ int CLuaUnitScript::Skeleton_ClearJointConstraint(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto* skel = toSkeleton(L, 1);
 
-	const uint32_t piece = static_cast<uint32_t>(luaL_checkint(L, 2) - 1);
+	if (activeScript == nullptr)
+		luaL_error(L, "%s(): no active script", __func__);
+
+	const int scriptPiece = luaL_checkint(L, 2) - 1;
+	const int modelPiece = activeScript->ScriptToModel(scriptPiece);
+	if (modelPiece < 0)
+		luaL_error(L, "%s(): invalid piece %d", __func__, scriptPiece + 1);
+	const uint32_t piece = static_cast<uint32_t>(modelPiece);
 
 	skel->SetJointConstraint(piece, std::monostate{});
 	return 0;
@@ -2280,4 +2340,44 @@ int CLuaUnitScript::Chain_SetSolver(lua_State* L)
 	}
 
 	return 0;
+}
+
+int CLuaUnitScript::Chain_GetBoneLengths(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* chain = toChain(L, 1);
+	const auto& lengths = chain->GetBoneLengths();
+
+	lua_createtable(L, lengths.size(), 0);
+	for (size_t i = 0; i < lengths.size(); ++i) {
+		lua_pushnumber(L, lengths[i]);
+		lua_rawseti(L, -2, i + 1);
+	}
+	return 1;
+}
+
+int CLuaUnitScript::Chain_ApplyToPieces(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto chain = toChainShared(L, 1);
+	const int skipCount = luaL_optint(L, 2, 0);
+
+	auto* skel = const_cast<IK::Skeleton*>(chain->GetSkeleton());
+	if (skel == nullptr)
+		luaL_error(L, "%s(): chain has no skeleton", __func__);
+
+	const auto sol = skel->SolveChain(chain, 15, 3.0f, skipCount);
+	skel->ApplySolution(*chain, sol, skipCount);
+	if (sol.solutionKind == IK::Result::FAILED) {
+		LOG_L(L_WARNING, "Chain_ApplyToPieces: unit=%d root=%u effector=%u skip=%d status=%s joints=%u",
+			(activeUnit != nullptr) ? activeUnit->id : -1,
+			chain->rID, chain->eID, skipCount, IK::ResultToString(sol.solutionKind), unsigned(sol.solution.size()));
+	} else {
+		LOG_L(L_DEBUG, "Chain_ApplyToPieces: unit=%d root=%u effector=%u skip=%d status=%s joints=%u",
+			(activeUnit != nullptr) ? activeUnit->id : -1,
+			chain->rID, chain->eID, skipCount, IK::ResultToString(sol.solutionKind), unsigned(sol.solution.size()));
+	}
+
+	lua_pushstring(L, IK::ResultToString(sol.solutionKind));
+	return 1;
 }
