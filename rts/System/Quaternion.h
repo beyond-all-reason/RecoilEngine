@@ -63,6 +63,12 @@ public:
 	static CQuaternion MakeFrom(const float3& newFwdDir);
 	static CQuaternion MakeFrom(const CMatrix44f& mat);
 
+	// Decompose a quaternion into swing and twist components
+	// Q = swing * twist
+	// swing is the part of the rotation that is aligned with the axis
+	// twist is the part of the rotation that is perpendicular to the axis
+	static std::pair<CQuaternion, CQuaternion> SwingTwist(const CQuaternion& Q, const float3& axis);
+
 	static const CQuaternion& AssertNormalized(const CQuaternion& q);
 public:
 	bool Normalized() const;

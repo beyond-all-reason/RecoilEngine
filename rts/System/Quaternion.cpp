@@ -128,30 +128,11 @@ CQuaternion CQuaternion::MakeFrom(const float3& v1, const float3& v2)
 {
 	assert(v1.Normalized());
 	assert(v2.Normalized());
-#if 0
-	if unlikely(v1.same(v2)) {
-		return CQuaternion(v1, 0.0f).Normalize();
-	}
-	else if unlikely(v1.same(-v2)) {
-		float3 v;
-		if (v1.x > -float3::cmp_eps() && v1.x < float3::cmp_eps())       // if x ~= 0
-			v = { 1.0f, 0.0f, 0.0f };
-		else if (v1.y > -float3::cmp_eps() && v1.y < float3::cmp_eps())  // if y ~= 0
-			v = { 0.0f, 1.0f, 0.0f };
-		else                                                             // if z ~= 0
-			v = { 0.0f, 0.0f, 1.0f };
 
-		return CQuaternion(v, math::HALFPI).Normalize();
-	}
-	else {
-		float3 v = v1.cross(u2);                         // compute rotation axis
-		float angle = math::acosf(v1.dot(v2));	         // rotation angle
-		return CQuaternion(v, angle * 0.5f).Normalize(); // half angle
-	}
-#else
 	// https://raw.org/proof/quaternion-from-two-vectors/
 
 	const auto dp = v1.dot(v2);
+	// v1 and v2 are antiparallel
 	if unlikely(epscmp(dp, -1.0f, float3::cmp_eps())) {
 		// any perpendicular vector to v1/v2 will suffice
 		float3 npVec = v1.PickNonParallel();
@@ -162,7 +143,6 @@ CQuaternion CQuaternion::MakeFrom(const float3& v1, const float3& v2)
 		const auto cp = v1.cross(v2);
 		return CQuaternion(cp, 1.0f + dp).ANormalize();
 	}
-#endif
 }
 
 /// <summary>
@@ -229,6 +209,29 @@ CQuaternion CQuaternion::MakeFrom(const CMatrix44f& mat)
 			(mat.md[0][1] - mat.md[1][0]) * invs
 		));
 	}
+}
+
+std::pair<CQuaternion, CQuaternion> CQuaternion::SwingTwist(const CQuaternion& Q, const float3& axis)
+{
+	assert(axis.Normalized());
+
+    const float3 v = float3(Q.x, Q.y, Q.z);
+    const float  dp = v.dot(axis);
+
+	if unlikely(CQuaternion(axis * dp, Q.r).SqNorm() < float3::apx_eps() * float3::apx_eps()) {
+		// singularity: 180 degree rotation perpendicular to axis → full twist
+		const CQuaternion twist = CQuaternion(axis, 0.0f); // 180 degree around axis
+		const CQuaternion swing = Q * twist.InverseNormalized();
+		return std::make_pair(swing, twist);
+	}
+
+    // Twist: rotation around `axis` — project vector part onto axis, keep Q.w
+    const CQuaternion twist = CQuaternion(axis * dp, Q.r).ANormalize();
+
+    // Swing: the remainder — rotation perpendicular to `axis`
+    const CQuaternion swing = Q * twist.InverseNormalized();
+
+    return std::make_pair(swing, twist);
 }
 
 const CQuaternion& CQuaternion::AssertNormalized(const CQuaternion& q)
