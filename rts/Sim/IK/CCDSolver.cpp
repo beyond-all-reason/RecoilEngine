@@ -60,8 +60,12 @@ namespace IK {
 
 				const float3 restDirW = parentOri.Rotate(kBoneRestAxis);
 				const CQuaternion delta = CQuaternion::MakeFrom(restDirW, constrainedDir).Normalize();
-				chain[i].orientation = (delta * parentOri).Normalize();
-				pos[i + 1] = pos[i] + constrainedDir * chain[i].length;
+
+				const bool isRigid = !chain[i].canRotate || (i + 1 < n && !chain[i + 1].canMove);
+				if (!isRigid)
+					chain[i].orientation = (delta * parentOri).Normalize();
+
+				pos[i + 1] = pos[i] + BoneDirFromOrientation(chain[i].orientation) * chain[i].length;
 			}
 
 			return Result::STRETCHING;
@@ -78,6 +82,10 @@ namespace IK {
 
 			// Standard CCD pass from effector parent toward root.
 			for (size_t i = n; i-- > 0; ) {
+				const bool isRigid = !chain[i].canRotate || (i + 1 < n && !chain[i + 1].canMove);
+				if (isRigid)
+					continue;
+
 				float3 toEffector = (pos[n] - pos[i]);
 				float3 toGoal = (goal - pos[i]);
 

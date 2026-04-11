@@ -107,9 +107,11 @@ namespace IK {
 		std::vector<float3> pos(n + 1);
 		float totalLen = 0.0f;
 
+		std::vector<float3> initDirs(n);
 		for (size_t i = 0; i < n; i++) {
 			totalLen += chain[i].length;
 			pos[i + 1] = pos[i] + BoneDirFromOrientation(chain[i].orientation) * chain[i].length;
+			initDirs[i] = BoneDirFromOrientation(chain[i].orientation);
 		}
 
 		const float distSq = goal.SqLength();
@@ -123,9 +125,12 @@ namespace IK {
 
 				pos[i + 1] = pos[i] + constrainedDir * chain[i].length;
 
-				float3 restDirW = parentOri.Rotate(kBoneRestAxis);
-				CQuaternion delta = CQuaternion::MakeFrom(restDirW, constrainedDir).Normalize();
-				chain[i].orientation = (delta * parentOri).Normalize();
+				const bool isRigid = !chain[i].canRotate || (i + 1 < n && !chain[i + 1].canMove);
+				if (!isRigid) {
+					float3 restDirW = parentOri.Rotate(kBoneRestAxis);
+					CQuaternion delta = CQuaternion::MakeFrom(restDirW, constrainedDir).Normalize();
+					chain[i].orientation = (delta * parentOri).Normalize();
+				}
 			}
 			return Result::STRETCHING;
 		}
@@ -161,11 +166,18 @@ namespace IK {
 			// Constrained forward pass uses the snapshot parent frames above.
 			pos[n] = goal;
 			for (size_t i = n; i-- > 0; ) {
-				float3 boneDir = (pos[i + 1] - pos[i]);
-				boneDir.SafeNormalize();
+				float3 boneDir;
+				const bool isRigid = !chain[i].canRotate || (i + 1 < n && !chain[i + 1].canMove);
 
-				CQuaternion parentOri = (i > 0) ? fwdOri[i - 1] : CQuaternion();
-				boneDir = ApplyConstraint(chain[i].constraint, boneDir, parentOri);
+				if (isRigid) {
+					boneDir = initDirs[i];
+				} else {
+					boneDir = (pos[i + 1] - pos[i]);
+					boneDir.SafeNormalize();
+
+					CQuaternion parentOri = (i > 0) ? fwdOri[i - 1] : CQuaternion();
+					boneDir = ApplyConstraint(chain[i].constraint, boneDir, parentOri);
+				}
 
 				pos[i] = pos[i + 1] - boneDir * chain[i].length;
 			}
@@ -173,20 +185,25 @@ namespace IK {
 			// Backward pass: root to effector
 			pos[0] = ZeroVector;
 			for (size_t i = 0; i < n; i++) {
-				float3 boneDir = (pos[i + 1] - pos[i]);
-				boneDir.SafeNormalize();
+				float3 boneDir;
+				const bool isRigid = !chain[i].canRotate || (i + 1 < n && !chain[i + 1].canMove);
 
-				CQuaternion parentOri = (i > 0) ? chain[i - 1].orientation : CQuaternion();
-				boneDir = ApplyConstraint(chain[i].constraint, boneDir, parentOri);
+				if (isRigid) {
+					boneDir = BoneDirFromOrientation(chain[i].orientation);
+				} else {
+					boneDir = (pos[i + 1] - pos[i]);
+					boneDir.SafeNormalize();
+
+					CQuaternion parentOri = (i > 0) ? chain[i - 1].orientation : CQuaternion();
+					boneDir = ApplyConstraint(chain[i].constraint, boneDir, parentOri);
+
+					// Update orientation immediately for the next bone's constraint reference.
+					float3 restDirW = parentOri.Rotate(kBoneRestAxis);
+					CQuaternion delta = CQuaternion::MakeFrom(restDirW, boneDir).Normalize();
+					chain[i].orientation = (delta * parentOri).Normalize();
+				}
 
 				pos[i + 1] = pos[i] + boneDir * chain[i].length;
-
-				// Update orientation immediately for the next bone's constraint reference.
-				// We derive the new orientation from parentOri to maintain consistent roll
-				// and avoid drift across iterations.
-				float3 restDirW = parentOri.Rotate(kBoneRestAxis);
-				CQuaternion delta = CQuaternion::MakeFrom(restDirW, boneDir).Normalize();
-				chain[i].orientation = (delta * parentOri).Normalize();
 			}
 
 			if (pos[n].SqDistance(goal) < precisionSq)

@@ -20,6 +20,8 @@ namespace IK {
 		const LocalModelPiece* piece;	// Direct reference to LocalModelPiece
 		Constraint constraint;			// Joint constraint (ball, hinge, or none)
 		float3 worldPos;				// Cached current world position
+		bool canRotate = true;
+		bool canMove = true;
 	};
 
 	class Skeleton;
@@ -48,6 +50,7 @@ namespace IK {
 
 	struct ChainSolution {
 		Result solutionKind;
+		uint32_t iterations = 0;
 		std::vector<std::pair<int, float3>> solution; // joint/piece id and YPR angles
 		std::vector<CQuaternion> rotations;           // script-relative rotation (relative to bind pose)
 	};
@@ -59,13 +62,14 @@ namespace IK {
 		Skeleton(const CSolidObject& solidObject);
 
 		bool SetJointConstraint(uint32_t jointID, const Constraint& constraint);
+		bool SetJointProperties(uint32_t jointID, bool canRotate, bool canMove);
 		void UpdateJointHierarchy(uint32_t jointID);
 		void UpdateJoint(uint32_t jointID);
 		void UpdateAllJoints();
 		std::shared_ptr<Chain> CreateChain(uint32_t effectorID, uint32_t rootID = 0, float chainWeight = 1.0f);
 		std::vector<ChainSolution> SolveAllChains(uint32_t maxIterations = 10, float precision = 1.0f);
-		ChainSolution SolveChain(const std::shared_ptr<Chain>& chain, uint32_t maxIterations = 10, float precision = 1.0f, int skipCount = 0);
-		void ApplySolution(const Chain& chain, const ChainSolution& sol, int skipCount = 0);
+		ChainSolution SolveChain(const std::shared_ptr<Chain>& chain, uint32_t maxIterations = 10, float precision = 1.0f);
+		void ApplySolution(const Chain& chain, const ChainSolution& sol);
 		const auto* GetSolidObject() const { return so; }
 		const auto& GetJoints() const { return joints; }
 	private:

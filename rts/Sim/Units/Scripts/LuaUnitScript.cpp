@@ -132,54 +132,27 @@ static inline std::shared_ptr<IK::Chain> toChainShared(lua_State* L, int idx)
 	return *ud;
 }
 
-static int PushChainSolution(lua_State* L, const IK::ChainSolution& solution)
+struct IKSolution {
+	IK::ChainSolution sol;
+	std::shared_ptr<IK::Chain> chain;
+};
+
+static inline IKSolution* toSolution(lua_State* L, int idx)
 {
-	lua_createtable(L, 0, 2);
+	RECOIL_DETAILED_TRACY_ZONE;
+	return static_cast<IKSolution*>(luaL_checkudata(L, idx, "IKSolution"));
+}
 
-	const char* statusStr;
-	switch (solution.solutionKind) {
-		case IK::Result::FOUND:      statusStr = "found";      break;
-		case IK::Result::STRETCHING: statusStr = "stretching"; break;
-		case IK::Result::FAILED:     statusStr = "failed";     break;
-		default:                           statusStr = "error";      break;
-	}
+static int PushChainSolution(lua_State* L, const IK::ChainSolution& solution, std::shared_ptr<IK::Chain> chain)
+{
+	auto* ud = static_cast<IKSolution*>(lua_newuserdata(L, sizeof(IKSolution)));
+	new (ud) IKSolution{ solution, std::move(chain) };
 
-	lua_pushstring(L, "status");
-	lua_pushstring(L, statusStr);
-	lua_rawset(L, -3);
-
-	lua_pushstring(L, "joints");
-	const size_t n = solution.solution.size();
-	lua_createtable(L, n, 0);
-
-	for (size_t i = 0; i < n; ++i) {
-		const auto& [pieceIdx, ypr] = solution.solution[i];
-
-		lua_createtable(L, 0, 4);
-
-		lua_pushstring(L, "piece");
-		lua_pushnumber(L, pieceIdx + 1);
-		lua_rawset(L, -3);
-
-		lua_pushstring(L, "rx");
-		lua_pushnumber(L, ypr.x);
-		lua_rawset(L, -3);
-
-		lua_pushstring(L, "ry");
-		lua_pushnumber(L, ypr.y);
-		lua_rawset(L, -3);
-
-		lua_pushstring(L, "rz");
-		lua_pushnumber(L, ypr.z);
-		lua_rawset(L, -3);
-
-		lua_rawseti(L, -2, i + 1);
-	}
-
-	lua_rawset(L, -3);
-
+	luaL_getmetatable(L, "IKSolution");
+	lua_setmetatable(L, -2);
 	return 1;
 }
+
 
 /*
 
@@ -1155,6 +1128,9 @@ bool CLuaUnitScript::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetPieceRotation);
 	REGISTER_LUA_CFUNC(GetPieceScale);
 	REGISTER_LUA_CFUNC(GetPiecePosDir);
+	REGISTER_LUA_CFUNC(GetPieceBasePos);
+	REGISTER_LUA_CFUNC(GetPieceWorldBasePos);
+	REGISTER_LUA_CFUNC(GetPieceBounds);
 	REGISTER_LUA_CFUNC(GetPieceParent);
 
 	REGISTER_LUA_CFUNC(GetActiveUnitID);
@@ -1830,6 +1806,43 @@ int CLuaUnitScript::GetPiecePosDir(lua_State* L)
 	return 6;
 }
 
+int CLuaUnitScript::GetPieceBasePos(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr || activeUnit == nullptr) return 0;
+	LocalModelPiece* piece = ParseLocalModelPiece(L, activeScript, __func__);
+	const float3& off = piece->original->offset;
+	lua_pushnumber(L, off.x);
+	lua_pushnumber(L, off.y);
+	lua_pushnumber(L, off.z);
+	lua_pushnumber(L, off.Length());
+	return 4;
+}
+
+int CLuaUnitScript::GetPieceWorldBasePos(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr || activeUnit == nullptr) return 0;
+	LocalModelPiece* piece = ParseLocalModelPiece(L, activeScript, __func__);
+	const float3 pos = activeUnit->GetObjectSpacePos(piece->GetAbsolutePos());
+	return ToLua(L, pos);
+}
+
+int CLuaUnitScript::GetPieceBounds(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr || activeUnit == nullptr) return 0;
+	LocalModelPiece* piece = ParseLocalModelPiece(L, activeScript, __func__);
+	const S3DModelPiece* omp = piece->original;
+	lua_pushnumber(L, omp->mins.x);
+	lua_pushnumber(L, omp->mins.y);
+	lua_pushnumber(L, omp->mins.z);
+	lua_pushnumber(L, omp->maxs.x);
+	lua_pushnumber(L, omp->maxs.y);
+	lua_pushnumber(L, omp->maxs.z);
+	return 6;
+}
+
 int CLuaUnitScript::GetPieceParent(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -1881,27 +1894,36 @@ bool CLuaUnitScript::CreateIKMetatables(lua_State* L)
 	LuaPushNamedString(L, "__metatable", "protected metatable");
 
 		LuaPushRawNamedCFunc(L, "CreateChain",              Skeleton_CreateChain);
+		LuaPushRawNamedCFunc(L, "SetJointProperties",       Skeleton_SetJointProperties);
 		LuaPushRawNamedCFunc(L, "SetBallJointConstraint",    Skeleton_SetBallJointConstraint);
 		LuaPushRawNamedCFunc(L, "SetHingeJointConstraint",   Skeleton_SetHingeJointConstraint);
 		LuaPushRawNamedCFunc(L, "ClearJointConstraint",      Skeleton_ClearJointConstraint);
-		LuaPushRawNamedCFunc(L, "SolveAllChains",            Skeleton_SolveAllChains);
+		LuaPushRawNamedCFunc(L, "GetJointBasePos",           Skeleton_GetJointBasePos);
+		LuaPushRawNamedCFunc(L, "GetJointWorldBasePos",      Skeleton_GetJointWorldBasePos);
+		LuaPushRawNamedCFunc(L, "GetJointBounds",            Skeleton_GetJointBounds);
 		LuaPushRawNamedCFunc(L, "SolveChain",                Skeleton_SolveChain);
 
 	lua_pop(L, 1);
 
 	// IKChain metatable
 	luaL_newmetatable(L, "IKChain");
-
 	HSTR_PUSH_CFUNC(L, "__gc",        Chain_meta_gc);
 	HSTR_PUSH_CFUNC(L, "__index",     Chain_meta_index);
 	LuaPushNamedString(L, "__metatable", "protected metatable");
 
-		LuaPushRawNamedCFunc(L, "SetGoal",   Chain_SetGoal);
-		LuaPushRawNamedCFunc(L, "GetGoal",   Chain_GetGoal);
-		LuaPushRawNamedCFunc(L, "SetSolver", Chain_SetSolver);
-		LuaPushRawNamedCFunc(L, "GetBoneLengths", Chain_GetBoneLengths);
-		LuaPushRawNamedCFunc(L, "ApplyToPieces",  Chain_ApplyToPieces);
+	LuaPushRawNamedCFunc(L, "SetGoal",          Chain_SetGoal);
+	LuaPushRawNamedCFunc(L, "GetGoal",          Chain_GetGoal);
+	LuaPushRawNamedCFunc(L, "SetSolver",        Chain_SetSolver);
+	LuaPushRawNamedCFunc(L, "GetBoneLengths",   Chain_GetBoneLengths);
+	lua_pop(L, 1);
 
+	// IKSolution metatable
+	luaL_newmetatable(L, "IKSolution");
+	HSTR_PUSH_CFUNC(L, "__gc",        Solution_meta_gc);
+	HSTR_PUSH_CFUNC(L, "__index",     Solution_meta_index);
+	LuaPushNamedString(L, "__metatable", "protected metatable");
+
+	LuaPushRawNamedCFunc(L, "Apply",           Solution_Apply);
 	lua_pop(L, 1);
 
 	return true;
@@ -2200,42 +2222,101 @@ int CLuaUnitScript::Skeleton_ClearJointConstraint(lua_State* L)
 }
 
 
-/*** Solves all chains owned by this skeleton.
+/*** Returns the baked offset and length of an IK joint's piece.
  *
- * Automatically updates all joint positions before solving.
- * Expired chains (whose Lua-side IKChain userdata was garbage-collected) are
- * pruned first. Each remaining chain is solved using its own solver.
- *
- * The returned solution tables contain:
- *   status: "found" | "stretching" | "failed" | "error"
- *   joints: {{piece=n, rx=n, ry=n, rz=n}, ...}
- * where piece is 1-based and rx/ry/rz are Euler angles in radians.
- *
- * @function IKSkeleton:SolveAllChains
- * @param maxIterations number? Maximum solver iterations per chain. Defaults to 10.
- * @param precision number? Convergence threshold (distance). Defaults to 1.0.
- * @return table[] Array of solution tables, one per chain.
+ * @function IKSkeleton:GetJointBasePos
+ * @param piece number 1-based piece index.
+ * @return number offX
+ * @return number offY
+ * @return number offZ
+ * @return number length
  */
-int CLuaUnitScript::Skeleton_SolveAllChains(lua_State* L)
+int CLuaUnitScript::Skeleton_GetJointBasePos(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto* skel = toSkeleton(L, 1);
-
-	const uint32_t maxIter = static_cast<uint32_t>(luaL_optint(L, 2, 10));
-	const float precision = luaL_optfloat(L, 3, 1.0f);
-
-	auto solutions = skel->SolveAllChains(maxIter, precision);
-
-	const size_t n = solutions.size();
-	lua_createtable(L, n, 0);
-
-	for (size_t i = 0; i < n; ++i) {
-		PushChainSolution(L, solutions[i]);
-		lua_rawseti(L, -2, i + 1);
+	if (activeScript == nullptr) luaL_error(L, "%s(): no active script", __func__);
+	const int scriptPiece = luaL_checkint(L, 2) - 1;
+	const int modelPiece = activeScript->ScriptToModel(scriptPiece);
+	if (modelPiece < 0) return 0;
+	const auto& joints = skel->GetJoints();
+	for (const auto& joint : joints) {
+		if (joint.piece->lmodelPieceIndex == modelPiece) {
+			const auto& off = joint.piece->original->offset;
+			lua_pushnumber(L, off.x);
+			lua_pushnumber(L, off.y);
+			lua_pushnumber(L, off.z);
+			lua_pushnumber(L, off.Length());
+			return 4;
+		}
 	}
-
-	return 1;
+	return 0;
 }
+
+
+/*** Returns the world-space position of an IK joint as it currently is.
+ *
+ * @function IKSkeleton:GetJointWorldBasePos
+ * @param piece number 1-based piece index.
+ * @return number x
+ * @return number y
+ * @return number z
+ */
+int CLuaUnitScript::Skeleton_GetJointWorldBasePos(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* skel = toSkeleton(L, 1);
+	if (activeScript == nullptr) luaL_error(L, "%s(): no active script", __func__);
+	const int scriptPiece = luaL_checkint(L, 2) - 1;
+	const int modelPiece = activeScript->ScriptToModel(scriptPiece);
+	if (modelPiece < 0) return 0;
+	const auto& joints = skel->GetJoints();
+	for (const auto& joint : joints) {
+		if (joint.piece->lmodelPieceIndex == modelPiece) {
+			return ToLua(L, joint.worldPos);
+		}
+	}
+	return 0;
+}
+
+
+/*** Returns the model-space bounding box for an IK joint's piece.
+ *
+ * @function IKSkeleton:GetJointBounds
+ * @param piece number 1-based piece index.
+ * @return number minX
+ * @return number minY
+ * @return number minZ
+ * @return number maxX
+ * @return number maxY
+ * @return number maxZ
+ */
+int CLuaUnitScript::Skeleton_GetJointBounds(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* skel = toSkeleton(L, 1);
+	if (activeScript == nullptr) luaL_error(L, "%s(): no active script", __func__);
+	const int scriptPiece = luaL_checkint(L, 2) - 1;
+	const int modelPiece = activeScript->ScriptToModel(scriptPiece);
+	if (modelPiece < 0) return 0;
+	const auto& joints = skel->GetJoints();
+	for (const auto& joint : joints) {
+		if (joint.piece->lmodelPieceIndex == modelPiece) {
+			const auto* omp = joint.piece->original;
+			lua_pushnumber(L, omp->mins.x);
+			lua_pushnumber(L, omp->mins.y);
+			lua_pushnumber(L, omp->mins.z);
+			lua_pushnumber(L, omp->maxs.x);
+			lua_pushnumber(L, omp->maxs.y);
+			lua_pushnumber(L, omp->maxs.z);
+			return 6;
+		}
+	}
+	return 0;
+}
+
+
+
 
 
 /*** Solves a single IK chain.
@@ -2243,13 +2324,16 @@ int CLuaUnitScript::Skeleton_SolveAllChains(lua_State* L)
  * Automatically updates all joint positions before solving.
  * The chain uses its own solver (see IKChain:SetSolver).
  *
- * See SolveAllChains for the solution table format.
+ * The returned IKSolution object provides:
+ *   status: "found" | "stretching" | "failed"
+ *   iterations: number
+ *   joints: table of piecewise solutions
  *
  * @function IKSkeleton:SolveChain
  * @param chain IKChain The chain to solve.
  * @param maxIterations number? Maximum solver iterations. Defaults to 10.
  * @param precision number? Convergence threshold (distance). Defaults to 1.0.
- * @return table Solution table with "status" and "joints" fields.
+ * @return IKSolution The solution object.
  */
 int CLuaUnitScript::Skeleton_SolveChain(lua_State* L)
 {
@@ -2261,7 +2345,7 @@ int CLuaUnitScript::Skeleton_SolveChain(lua_State* L)
 	const float precision = luaL_optfloat(L, 4, 1.0f);
 
 	auto solution = skel->SolveChain(chain, maxIter, precision);
-	return PushChainSolution(L, solution);
+	return PushChainSolution(L, solution, chain);
 }
 
 
@@ -2356,28 +2440,100 @@ int CLuaUnitScript::Chain_GetBoneLengths(lua_State* L)
 	return 1;
 }
 
-int CLuaUnitScript::Chain_ApplyToPieces(lua_State* L)
+
+
+int CLuaUnitScript::Skeleton_SetJointProperties(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	auto chain = toChainShared(L, 1);
-	const int skipCount = luaL_optint(L, 2, 0);
+	auto* skel = toSkeleton(L, 1);
 
-	auto* skel = const_cast<IK::Skeleton*>(chain->GetSkeleton());
-	if (skel == nullptr)
-		luaL_error(L, "%s(): chain has no skeleton", __func__);
+	if (activeScript == nullptr)
+		luaL_error(L, "%s(): no active script", __func__);
 
-	const auto sol = skel->SolveChain(chain, 15, 3.0f, skipCount);
-	skel->ApplySolution(*chain, sol, skipCount);
-	if (sol.solutionKind == IK::Result::FAILED) {
-		LOG_L(L_WARNING, "Chain_ApplyToPieces: unit=%d root=%u effector=%u skip=%d status=%s joints=%u",
-			(activeUnit != nullptr) ? activeUnit->id : -1,
-			chain->rID, chain->eID, skipCount, IK::ResultToString(sol.solutionKind), unsigned(sol.solution.size()));
-	} else {
-		LOG_L(L_DEBUG, "Chain_ApplyToPieces: unit=%d root=%u effector=%u skip=%d status=%s joints=%u",
-			(activeUnit != nullptr) ? activeUnit->id : -1,
-			chain->rID, chain->eID, skipCount, IK::ResultToString(sol.solutionKind), unsigned(sol.solution.size()));
+	const int scriptPiece = luaL_checkint(L, 2) - 1;
+	const bool canRotate = lua_toboolean(L, 3);
+	const bool canMove = lua_toboolean(L, 4);
+
+	const int modelPiece = activeScript->ScriptToModel(scriptPiece);
+	if (modelPiece < 0)
+		luaL_error(L, "%s(): invalid piece %d", __func__, scriptPiece + 1);
+
+	skel->SetJointProperties(static_cast<uint32_t>(modelPiece), canRotate, canMove);
+	return 0;
+}
+
+/******************************************************************************/
+/******************************************************************************/
+//
+//  Solution metatable
+//
+
+int CLuaUnitScript::Solution_meta_gc(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* ud = toSolution(L, 1);
+	ud->~IKSolution();
+	return 0;
+}
+
+
+int CLuaUnitScript::Solution_meta_index(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* ud = toSolution(L, 1);
+	const char* key = luaL_checkstring(L, 2);
+
+	switch (hashString(key)) {
+		case hashString("status"): {
+			switch (ud->sol.solutionKind) {
+				case IK::Result::FOUND:      lua_pushstring(L, "found");      break;
+				case IK::Result::STRETCHING: lua_pushstring(L, "stretching"); break;
+				case IK::Result::FAILED:     lua_pushstring(L, "failed");     break;
+				default:                     lua_pushstring(L, "error");      break;
+			}
+			return 1;
+		}
+		case hashString("iterations"): {
+			lua_pushnumber(L, ud->sol.iterations);
+			return 1;
+		}
+		case hashString("joints"): {
+			const size_t n = ud->sol.solution.size();
+			lua_createtable(L, n, 0);
+			for (size_t i = 0; i < n; ++i) {
+				const auto& [pieceIdx, ypr] = ud->sol.solution[i];
+				lua_createtable(L, 0, 4);
+				lua_pushstring(L, "piece");
+				lua_pushnumber(L, pieceIdx + 1);
+				lua_rawset(L, -3);
+				lua_pushstring(L, "rx"); lua_pushnumber(L, ypr.x); lua_rawset(L, -3);
+				lua_pushstring(L, "ry"); lua_pushnumber(L, ypr.y); lua_rawset(L, -3);
+				lua_pushstring(L, "rz"); lua_pushnumber(L, ypr.z); lua_rawset(L, -3);
+				lua_rawseti(L, -2, i + 1);
+			}
+			return 1;
+		}
+		default: break;
 	}
 
-	lua_pushstring(L, IK::ResultToString(sol.solutionKind));
+	luaL_getmetatable(L, "IKSolution");
+	lua_pushvalue(L, 2);
+	lua_rawget(L, -2);
 	return 1;
+}
+
+
+int CLuaUnitScript::Solution_Apply(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* ud = toSolution(L, 1);
+	if (ud->chain == nullptr)
+		luaL_error(L, "%s(): solution chain is null", __func__);
+
+	auto* skel = const_cast<IK::Skeleton*>(ud->chain->GetSkeleton());
+	if (skel == nullptr)
+		luaL_error(L, "%s(): solution chain has no skeleton", __func__);
+
+	skel->ApplySolution(*ud->chain, ud->sol);
+	return 0;
 }

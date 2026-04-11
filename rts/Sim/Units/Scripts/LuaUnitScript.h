@@ -192,6 +192,9 @@ private:
 	static int GetPieceRotation(lua_State* L);    // matches Turn
 	static int GetPieceScale(lua_State* L);       // matches Scale
 	static int GetPiecePosDir(lua_State* L);      // EmitDirPos (in unit space)
+	static int GetPieceBasePos(lua_State* L);     // baked offset
+	static int GetPieceWorldBasePos(lua_State* L); // current world pivot
+	static int GetPieceBounds(lua_State* L);       // geometry mins/maxs
 	static int GetPieceParent(lua_State* L);
 
 	static int GetActiveUnitID(lua_State* L);
@@ -203,19 +206,25 @@ private:
 	static int Skeleton_meta_index(lua_State* L);
 	static int Chain_meta_gc(lua_State* L);
 	static int Chain_meta_index(lua_State* L);
+	static int Solution_meta_gc(lua_State* L);
+	static int Solution_meta_index(lua_State* L);
 
 	static int Skeleton_CreateChain(lua_State* L);
+	static int Skeleton_SetJointProperties(lua_State* L);
 	static int Skeleton_SetBallJointConstraint(lua_State* L);
 	static int Skeleton_SetHingeJointConstraint(lua_State* L);
 	static int Skeleton_ClearJointConstraint(lua_State* L);
-	static int Skeleton_SolveAllChains(lua_State* L);
+	static int Skeleton_GetJointBasePos(lua_State* L);
+	static int Skeleton_GetJointWorldBasePos(lua_State* L);
+	static int Skeleton_GetJointBounds(lua_State* L);
 	static int Skeleton_SolveChain(lua_State* L);
 
 	static int Chain_SetGoal(lua_State* L);
 	static int Chain_GetGoal(lua_State* L);
 	static int Chain_SetSolver(lua_State* L);
 	static int Chain_GetBoneLengths(lua_State* L);
-	static int Chain_ApplyToPieces(lua_State* L);
+
+	static int Solution_Apply(lua_State* L);
 };
 
 #endif

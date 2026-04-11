@@ -25,5 +25,7 @@ namespace IK {
 		float length = 0.0f;
 		CQuaternion orientation; // root-relative (model space) orientation
 		Constraint constraint;
+		bool canRotate = true;
+		bool canMove = true;
 	};
 }

@@ -286,6 +286,9 @@ class LuaSyncedRead {
 		static int GetUnitPiecePosition(lua_State* L);
 		static int GetUnitPieceDirection(lua_State* L);
 		static int GetUnitPiecePosDir(lua_State* L);
+		static int GetUnitPieceBasePos(lua_State* L);
+		static int GetUnitPieceWorldBasePos(lua_State* L);
+		static int GetUnitPieceBounds(lua_State* L);
 		static int GetUnitPieceMatrix(lua_State* L);
 
 		static int GetUnitScriptPiece(lua_State* L);
@@ -298,6 +301,9 @@ class LuaSyncedRead {
 		static int GetFeaturePiecePosition(lua_State* L);
 		static int GetFeaturePieceDirection(lua_State* L);
 		static int GetFeaturePiecePosDir(lua_State* L);
+		static int GetFeaturePieceBasePos(lua_State* L);
+		static int GetFeaturePieceWorldBasePos(lua_State* L);
+		static int GetFeaturePieceBounds(lua_State* L);
 		static int GetFeaturePieceMatrix(lua_State* L);
 
 		static int GetRadarErrorParams(lua_State* L);

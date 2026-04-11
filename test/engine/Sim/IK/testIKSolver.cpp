@@ -855,3 +855,70 @@ TEST_CASE("CCDVsFABRIKBenchmarks", "[!benchmark]")
 		ccdMs / std::max(fabrikMs, static_cast<double>(1e-6f))
 	);
 }
+
+TEST_CASE("IKSolverProperties")
+{
+	std::vector<const IK::IIKSolver*> solvers = {
+		&IK::GetFABRIKSolver(),
+		&IK::GetCCDSolver(),
+	};
+
+	for (const IK::IIKSolver* solver: solvers) {
+		const std::string name = (solver == &IK::GetFABRIKSolver()) ? "FABRIK" : "CCD";
+		INFO("solver = " << name);
+
+		SECTION(name + " - canRotate = false") {
+			std::vector<IK::Bone> chain(2);
+			chain[0].length = 10.0f;
+			chain[0].orientation = CQuaternion{}; // Identity (FwdVector)
+			chain[0].canRotate = false; // Lock first bone
+			chain[1].length = 10.0f;
+			chain[1].orientation = CQuaternion{};
+
+			const CQuaternion initialOri0 = chain[0].orientation;
+
+			// Goal that requires first bone to move if it weren't locked, but reachable by bone 1 alone.
+			const float3 goal{8.0f, 0.0f, 16.0f};
+			const auto result = solver->Solve(chain, goal, 200, 0.01f);
+
+			// 1. Property check: orientation must NOT change
+			CHECK(chain[0].orientation.equals(initialOri0));
+
+			// 2. Convergence check: MUST find solution
+			CHECK(result == IK::Result::FOUND);
+
+			// 3. Accuracy check: MUST be at goal
+			const float3 effector =
+				chain[0].orientation.Rotate(FwdVector) * chain[0].length +
+				chain[1].orientation.Rotate(FwdVector) * chain[1].length;
+			CHECK(effector.distance(goal) < 0.05f);
+		}
+
+		SECTION(name + " - canMove = false (hierarchical pin)") {
+			std::vector<IK::Bone> chain(2);
+			chain[0].length = 10.0f;
+			chain[0].orientation = CQuaternion::MakeFrom(FwdVector, UpVector);
+			chain[0].canMove = false;
+			chain[1].length = 10.0f;
+			chain[1].orientation = CQuaternion{};
+			chain[1].canMove = false;   // Lock joint 1 relative to joint 0 -> locks bone 0
+
+			const CQuaternion initialOri0 = chain[0].orientation;
+
+			const float3 goal{0.0f, 16.0f, 8.0f}; // Exactly distance 10 from joint 1 (0, 10, 0)
+			const auto result = solver->Solve(chain, goal, 200, 0.01f);
+
+			// 1. Property check: hierarchical pin must keep bone 0 rigid
+			CHECK(chain[0].orientation.equals(initialOri0));
+
+			// 2. Convergence check
+			CHECK(result == IK::Result::FOUND);
+
+			// 3. Accuracy check
+			const float3 effector =
+				chain[0].orientation.Rotate(FwdVector) * chain[0].length +
+				chain[1].orientation.Rotate(FwdVector) * chain[1].length;
+			CHECK(effector.distance(goal) < 0.05f);
+		}
+	}
+}

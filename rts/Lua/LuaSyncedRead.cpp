@@ -384,6 +384,9 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitPiecePosition);
 	REGISTER_LUA_CFUNC(GetUnitPieceDirection);
 	REGISTER_LUA_CFUNC(GetUnitPiecePosDir);
+	REGISTER_LUA_CFUNC(GetUnitPieceBasePos);
+	REGISTER_LUA_CFUNC(GetUnitPieceWorldBasePos);
+	REGISTER_LUA_CFUNC(GetUnitPieceBounds);
 	REGISTER_LUA_CFUNC(GetUnitPieceMatrix);
 	REGISTER_LUA_CFUNC(GetUnitScriptPiece);
 	REGISTER_LUA_CFUNC(GetUnitScriptNames);
@@ -395,6 +398,9 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetFeaturePiecePosition);
 	REGISTER_LUA_CFUNC(GetFeaturePieceDirection);
 	REGISTER_LUA_CFUNC(GetFeaturePiecePosDir);
+	REGISTER_LUA_CFUNC(GetFeaturePieceBasePos);
+	REGISTER_LUA_CFUNC(GetFeaturePieceWorldBasePos);
+	REGISTER_LUA_CFUNC(GetFeaturePieceBounds);
 	REGISTER_LUA_CFUNC(GetFeaturePieceMatrix);
 
 	REGISTER_LUA_CFUNC(TraceRayGroundInDirection);
@@ -8656,6 +8662,43 @@ static int GetSolidObjectPiecePosDir(lua_State* L, const CSolidObject* o)
 	return 6;
 }
 
+static int GetSolidObjectPieceBasePos(lua_State* L, const CSolidObject* o)
+{
+	const LocalModelPiece* lmp = ParseObjectConstLocalModelPiece(L, o, 2);
+	if (lmp == nullptr) return 0;
+	const float3& off = lmp->original->offset;
+	lua_pushnumber(L, off.x);
+	lua_pushnumber(L, off.y);
+	lua_pushnumber(L, off.z);
+	lua_pushnumber(L, off.Length());
+	return 4;
+}
+
+static int GetSolidObjectPieceWorldBasePos(lua_State* L, const CSolidObject* o)
+{
+	const LocalModelPiece* lmp = ParseObjectConstLocalModelPiece(L, o, 2);
+	if (lmp == nullptr) return 0;
+	const float3 pos = o->GetObjectSpacePos(lmp->GetAbsolutePos());
+	lua_pushnumber(L, pos.x);
+	lua_pushnumber(L, pos.y);
+	lua_pushnumber(L, pos.z);
+	return 3;
+}
+
+static int GetSolidObjectPieceBounds(lua_State* L, const CSolidObject* o)
+{
+	const LocalModelPiece* lmp = ParseObjectConstLocalModelPiece(L, o, 2);
+	if (lmp == nullptr) return 0;
+	const S3DModelPiece* omp = lmp->original;
+	lua_pushnumber(L, omp->mins.x);
+	lua_pushnumber(L, omp->mins.y);
+	lua_pushnumber(L, omp->mins.z);
+	lua_pushnumber(L, omp->maxs.x);
+	lua_pushnumber(L, omp->maxs.y);
+	lua_pushnumber(L, omp->maxs.z);
+	return 6;
+}
+
 static int GetSolidObjectPieceMatrix(lua_State* L, const CSolidObject* o)
 {
 	if (o == nullptr)
@@ -8765,6 +8808,52 @@ int LuaSyncedRead::GetUnitPieceInfo(lua_State* L) {
  */
 int LuaSyncedRead::GetUnitPiecePosDir(lua_State* L) {
 	return (GetSolidObjectPiecePosDir(L, ParseTypedUnit(L, __func__, 1)));
+}
+
+
+/*** Returns the piece's baked offset and length.
+ *
+ * @function Spring.GetUnitPieceBasePos
+ * @param unitID integer
+ * @param pieceIndex integer
+ * @return number offX
+ * @return number offY
+ * @return number offZ
+ * @return number length
+ */
+int LuaSyncedRead::GetUnitPieceBasePos(lua_State* L) {
+	return (GetSolidObjectPieceBasePos(L, ParseTypedUnit(L, __func__, 1)));
+}
+
+
+/*** Returns the world-space position of a piece's origin.
+ *
+ * @function Spring.GetUnitPieceWorldBasePos
+ * @param unitID integer
+ * @param pieceIndex integer
+ * @return number posX
+ * @return number posY
+ * @return number posZ
+ */
+int LuaSyncedRead::GetUnitPieceWorldBasePos(lua_State* L) {
+	return (GetSolidObjectPieceWorldBasePos(L, ParseTypedUnit(L, __func__, 1)));
+}
+
+
+/*** Returns the model-space bounding box of a piece.
+ *
+ * @function Spring.GetUnitPieceBounds
+ * @param unitID integer
+ * @param pieceIndex integer
+ * @return number minX
+ * @return number minY
+ * @return number minZ
+ * @return number maxX
+ * @return number maxY
+ * @return number maxZ
+ */
+int LuaSyncedRead::GetUnitPieceBounds(lua_State* L) {
+	return (GetSolidObjectPieceBounds(L, ParseTypedUnit(L, __func__, 1)));
 }
 
 
@@ -8880,6 +8969,52 @@ int LuaSyncedRead::GetFeaturePieceInfo(lua_State* L) {
  */
 int LuaSyncedRead::GetFeaturePiecePosDir(lua_State* L) {
 	return (GetSolidObjectPiecePosDir(L, ParseFeature(L, __func__, 1)));
+}
+
+
+/*** Returns the feature piece's baked offset and length.
+ *
+ * @function Spring.GetFeaturePieceBasePos
+ * @param featureID integer
+ * @param pieceIndex integer
+ * @return number offX
+ * @return number offY
+ * @return number offZ
+ * @return number length
+ */
+int LuaSyncedRead::GetFeaturePieceBasePos(lua_State* L) {
+	return (GetSolidObjectPieceBasePos(L, ParseFeature(L, __func__, 1)));
+}
+
+
+/*** Returns the world-space position of a feature piece's origin.
+ *
+ * @function Spring.GetFeaturePieceWorldBasePos
+ * @param featureID integer
+ * @param pieceIndex integer
+ * @return number posX
+ * @return number posY
+ * @return number posZ
+ */
+int LuaSyncedRead::GetFeaturePieceWorldBasePos(lua_State* L) {
+	return (GetSolidObjectPieceWorldBasePos(L, ParseFeature(L, __func__, 1)));
+}
+
+
+/*** Returns the model-space bounding box of a feature piece.
+ *
+ * @function Spring.GetFeaturePieceBounds
+ * @param featureID integer
+ * @param pieceIndex integer
+ * @return number minX
+ * @return number minY
+ * @return number minZ
+ * @return number maxX
+ * @return number maxY
+ * @return number maxZ
+ */
+int LuaSyncedRead::GetFeaturePieceBounds(lua_State* L) {
+	return (GetSolidObjectPieceBounds(L, ParseFeature(L, __func__, 1)));
 }
 
 
