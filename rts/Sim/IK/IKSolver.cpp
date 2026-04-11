@@ -108,13 +108,14 @@ bool Skeleton::SetJointProperties(uint32_t jointID, bool canRotate, bool canMove
 	return true;
 }
 
-bool Skeleton::SetJointTerrainAlignment(uint32_t jointID, bool enabled, const float3& localAxis)
+bool Skeleton::SetJointAlignment(uint32_t jointID, AlignMode mode, const float3& localAxis, const float3& customDir)
 {
 	if (jointID >= joints.size())
 		return false;
 
-	joints[jointID].alignToTerrain = enabled;
-	joints[jointID].terrainAlignAxis = localAxis;
+	joints[jointID].alignMode = mode;
+	joints[jointID].alignAxis = localAxis;
+	joints[jointID].alignCustomDir = customDir;
 	return true;
 }
 
@@ -228,17 +229,23 @@ void Skeleton::ApplySolution(const Chain& chain, const ChainSolution& sol)
 	}
 
 	const auto& effectorJoint = joints[chain.eID];
-	if (effectorJoint.alignToTerrain) {
+	if (effectorJoint.alignMode != AlignMode::NONE) {
 		const auto* effPiece = effectorJoint.piece;
 
 		const auto& effTransform = effPiece->GetModelSpaceTransform();
 		const float3 effWorldPos = so->pos + ModelDirToWorldDir(effTransform.t);
 
-		const float3 terrainNormalWorld = CGround::GetNormal(effWorldPos.x, effWorldPos.z);
-		const float3 tnIntModel = WorldDirToModelDir(terrainNormalWorld);
+		float3 targetDirWorld;
+		if (effectorJoint.alignMode == AlignMode::TERRAIN) {
+			targetDirWorld = CGround::GetNormal(effWorldPos.x, effWorldPos.z);
+		} else {
+			targetDirWorld = effectorJoint.alignCustomDir;
+		}
+
+		const float3 tnIntModel = WorldDirToModelDir(targetDirWorld);
 
 		const CQuaternion pieceModelRot = effTransform.r;
-		const float3 currentAxis = pieceModelRot.Rotate(effectorJoint.terrainAlignAxis);
+		const float3 currentAxis = pieceModelRot.Rotate(effectorJoint.alignAxis);
 		const CQuaternion deltaRot = CQuaternion::MakeFrom(currentAxis, tnIntModel);
 		const CQuaternion desiredModelRot = (deltaRot * pieceModelRot).Normalize();
 
@@ -251,9 +258,10 @@ void Skeleton::ApplySolution(const Chain& chain, const ChainSolution& sol)
 		const float3 ypr = scriptRot.ToEulerYPR();
 		const_cast<LocalModelPiece*>(effPiece)->SetRotation(ypr);
 
-		LOG_L(L_NOTICE, "IK-DIAG: terrain-align eff=%u normal=(%.3f,%.3f,%.3f) tnModel=(%.3f,%.3f,%.3f) ypr=(%.4f,%.4f,%.4f)",
+		LOG_L(L_NOTICE, "IK-DIAG: joint-align eff=%u mode=%s target=(%.3f,%.3f,%.3f) tnModel=(%.3f,%.3f,%.3f) ypr=(%.4f,%.4f,%.4f)",
 			chain.eID,
-			terrainNormalWorld.x, terrainNormalWorld.y, terrainNormalWorld.z,
+			effectorJoint.alignMode == AlignMode::TERRAIN ? "terrain" : "custom",
+			targetDirWorld.x, targetDirWorld.y, targetDirWorld.z,
 			tnIntModel.x, tnIntModel.y, tnIntModel.z,
 			ypr.x, ypr.y, ypr.z);
 	}

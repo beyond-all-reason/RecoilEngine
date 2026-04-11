@@ -16,6 +16,12 @@ struct LocalModelPiece;
 
 namespace IK {
 
+	enum class AlignMode : uint8_t {
+		NONE    = 0,
+		TERRAIN = 1,
+		CUSTOM  = 2,
+	};
+
 	struct Joint {
 		const LocalModelPiece* piece;	// Direct reference to LocalModelPiece
 		Constraint constraint;			// Joint constraint (ball, hinge, or none)
@@ -23,8 +29,9 @@ namespace IK {
 		float3 bindPosePos;			// Bind-pose absolute position in model space (set once)
 		bool canRotate = true;
 		bool canMove = true;
-		bool alignToTerrain = false;
-		float3 terrainAlignAxis = {0.0f, 1.0f, 0.0f};
+		AlignMode alignMode = AlignMode::NONE;
+		float3 alignAxis = {0.0f, 1.0f, 0.0f};
+		float3 alignCustomDir = {0.0f, 1.0f, 0.0f};
 	};
 
 	class Skeleton;
@@ -66,7 +73,7 @@ namespace IK {
 
 		bool SetJointConstraint(uint32_t jointID, const Constraint& constraint);
 		bool SetJointProperties(uint32_t jointID, bool canRotate, bool canMove);
-		bool SetJointTerrainAlignment(uint32_t jointID, bool enabled, const float3& localAxis = {0.0f, 1.0f, 0.0f});
+		bool SetJointAlignment(uint32_t jointID, AlignMode mode, const float3& localAxis = {0.0f, 1.0f, 0.0f}, const float3& customDir = {});
 		void UpdateJointHierarchy(uint32_t jointID);
 		void UpdateJoint(uint32_t jointID);
 		void UpdateAllJoints();

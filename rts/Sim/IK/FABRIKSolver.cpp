@@ -33,7 +33,7 @@ namespace IK {
 		const CQuaternion& parentOri)
 	{
 		if (const auto* bc = std::get_if<BallJointConstraint>(&c)) {
-			if (bc->coneAngle < 0.0f)
+			if (bc->coneAngle < 0.0f || bc->coneAngle >= math::PI)
 				return boneDir;
 
 			// coneAxis is in parent's local space

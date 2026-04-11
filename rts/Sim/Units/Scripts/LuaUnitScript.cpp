@@ -1900,7 +1900,7 @@ bool CLuaUnitScript::CreateIKMetatables(lua_State* L)
 		LuaPushRawNamedCFunc(L, "GetJointBasePos",           Skeleton_GetJointBasePos);
 		LuaPushRawNamedCFunc(L, "GetJointWorldBasePos",      Skeleton_GetJointWorldBasePos);
 		LuaPushRawNamedCFunc(L, "GetJointBounds",            Skeleton_GetJointBounds);
-		LuaPushRawNamedCFunc(L, "SetJointTerrainAlignment",  Skeleton_SetJointTerrainAlignment);
+		LuaPushRawNamedCFunc(L, "SetJointAlignment",         Skeleton_SetJointAlignment);
 		LuaPushRawNamedCFunc(L, "SolveChain",                Skeleton_SolveChain);
 
 	lua_pop(L, 1);
@@ -2319,21 +2319,28 @@ int CLuaUnitScript::Skeleton_GetJointBounds(lua_State* L)
 
 
 
-/*** Enables or disables terrain-aligned rotation for a joint.
+/*** Sets alignment behaviour for a joint after IK solve.
  *
- * When enabled, the joint's piece will be rotated after IK solve so that
- * its local align axis matches the terrain surface normal at the piece's
- * world position.
+ * After the IK solver runs, the joint's piece can be rotated so that a
+ * chosen local axis points along a target direction.
  *
- * @function IKSkeleton:SetJointTerrainAlignment
+ * Overload 1 — disable:
+ *   SetJointAlignment(pieceIndex, false | nil)
+ *
+ * Overload 2 — terrain normal:
+ *   SetJointAlignment(pieceIndex, "terrain" [, {ax, ay, az}])
+ *   The local axis (default Y-up) is aligned to the terrain normal at the
+ *   piece's world position.
+ *
+ * Overload 3 — arbitrary world direction:
+ *   SetJointAlignment(pieceIndex, {wx, wy, wz} [, {ax, ay, az}])
+ *   The local axis (default Y-up) is aligned to the given world-space vector.
+ *
+ * @function IKSkeleton:SetJointAlignment
  * @param piece number 1-based piece index.
- * @param enabled boolean Whether to enable terrain alignment.
- * @param localAxisX number? Local axis X component. Defaults to 0.
- * @param localAxisY number? Local axis Y component. Defaults to 1.
- * @param localAxisZ number? Local axis Z component. Defaults to 0.
  * @return nil
  */
-int CLuaUnitScript::Skeleton_SetJointTerrainAlignment(lua_State* L)
+int CLuaUnitScript::Skeleton_SetJointAlignment(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto* skel = toSkeleton(L, 1);
@@ -2342,16 +2349,47 @@ int CLuaUnitScript::Skeleton_SetJointTerrainAlignment(lua_State* L)
 		luaL_error(L, "%s(): no active script", __func__);
 
 	const int scriptPiece = luaL_checkint(L, 2) - 1;
-	const bool enabled = lua_toboolean(L, 3);
-	const float ax = luaL_optfloat(L, 4, 0.0f);
-	const float ay = luaL_optfloat(L, 5, 1.0f);
-	const float az = luaL_optfloat(L, 6, 0.0f);
-
 	const int modelPiece = activeScript->ScriptToModel(scriptPiece);
 	if (modelPiece < 0)
 		luaL_error(L, "%s(): invalid piece %d", __func__, scriptPiece + 1);
 
-	skel->SetJointTerrainAlignment(static_cast<uint32_t>(modelPiece), enabled, float3(ax, ay, az));
+	IK::AlignMode mode = IK::AlignMode::NONE;
+	float3 alignAxis = {0.0f, 1.0f, 0.0f};
+	float3 customDir = {0.0f, 1.0f, 0.0f};
+
+	if (lua_isnoneornil(L, 3) || (lua_isboolean(L, 3) && !lua_toboolean(L, 3))) {
+		// Disable
+		mode = IK::AlignMode::NONE;
+	} else if (lua_isstring(L, 3)) {
+		const char* modeStr = lua_tostring(L, 3);
+		if (strcmp(modeStr, "terrain") == 0) {
+			mode = IK::AlignMode::TERRAIN;
+		} else {
+			luaL_error(L, "%s(): unknown align mode '%s' (use 'terrain')", __func__, modeStr);
+		}
+		// Optional axis table at arg 4
+		if (lua_istable(L, 4)) {
+			lua_rawgeti(L, 4, 1); alignAxis.x = luaL_checkfloat(L, -1); lua_pop(L, 1);
+			lua_rawgeti(L, 4, 2); alignAxis.y = luaL_checkfloat(L, -1); lua_pop(L, 1);
+			lua_rawgeti(L, 4, 3); alignAxis.z = luaL_checkfloat(L, -1); lua_pop(L, 1);
+		}
+	} else if (lua_istable(L, 3)) {
+		// Custom world direction
+		mode = IK::AlignMode::CUSTOM;
+		lua_rawgeti(L, 3, 1); customDir.x = luaL_checkfloat(L, -1); lua_pop(L, 1);
+		lua_rawgeti(L, 3, 2); customDir.y = luaL_checkfloat(L, -1); lua_pop(L, 1);
+		lua_rawgeti(L, 3, 3); customDir.z = luaL_checkfloat(L, -1); lua_pop(L, 1);
+		// Optional axis table at arg 4
+		if (lua_istable(L, 4)) {
+			lua_rawgeti(L, 4, 1); alignAxis.x = luaL_checkfloat(L, -1); lua_pop(L, 1);
+			lua_rawgeti(L, 4, 2); alignAxis.y = luaL_checkfloat(L, -1); lua_pop(L, 1);
+			lua_rawgeti(L, 4, 3); alignAxis.z = luaL_checkfloat(L, -1); lua_pop(L, 1);
+		}
+	} else {
+		luaL_error(L, "%s(): second argument must be false/nil, 'terrain', or a world vector table", __func__);
+	}
+
+	skel->SetJointAlignment(static_cast<uint32_t>(modelPiece), mode, alignAxis, customDir);
 	return 0;
 }
 
