@@ -1900,6 +1900,7 @@ bool CLuaUnitScript::CreateIKMetatables(lua_State* L)
 		LuaPushRawNamedCFunc(L, "GetJointBasePos",           Skeleton_GetJointBasePos);
 		LuaPushRawNamedCFunc(L, "GetJointWorldBasePos",      Skeleton_GetJointWorldBasePos);
 		LuaPushRawNamedCFunc(L, "GetJointBounds",            Skeleton_GetJointBounds);
+		LuaPushRawNamedCFunc(L, "SetJointTerrainAlignment",  Skeleton_SetJointTerrainAlignment);
 		LuaPushRawNamedCFunc(L, "SolveChain",                Skeleton_SolveChain);
 
 	lua_pop(L, 1);
@@ -2316,6 +2317,43 @@ int CLuaUnitScript::Skeleton_GetJointBounds(lua_State* L)
 
 
 
+
+
+/*** Enables or disables terrain-aligned rotation for a joint.
+ *
+ * When enabled, the joint's piece will be rotated after IK solve so that
+ * its local align axis matches the terrain surface normal at the piece's
+ * world position.
+ *
+ * @function IKSkeleton:SetJointTerrainAlignment
+ * @param piece number 1-based piece index.
+ * @param enabled boolean Whether to enable terrain alignment.
+ * @param localAxisX number? Local axis X component. Defaults to 0.
+ * @param localAxisY number? Local axis Y component. Defaults to 1.
+ * @param localAxisZ number? Local axis Z component. Defaults to 0.
+ * @return nil
+ */
+int CLuaUnitScript::Skeleton_SetJointTerrainAlignment(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto* skel = toSkeleton(L, 1);
+
+	if (activeScript == nullptr)
+		luaL_error(L, "%s(): no active script", __func__);
+
+	const int scriptPiece = luaL_checkint(L, 2) - 1;
+	const bool enabled = lua_toboolean(L, 3);
+	const float ax = luaL_optfloat(L, 4, 0.0f);
+	const float ay = luaL_optfloat(L, 5, 1.0f);
+	const float az = luaL_optfloat(L, 6, 0.0f);
+
+	const int modelPiece = activeScript->ScriptToModel(scriptPiece);
+	if (modelPiece < 0)
+		luaL_error(L, "%s(): invalid piece %d", __func__, scriptPiece + 1);
+
+	skel->SetJointTerrainAlignment(static_cast<uint32_t>(modelPiece), enabled, float3(ax, ay, az));
+	return 0;
+}
 
 
 /*** Solves a single IK chain.

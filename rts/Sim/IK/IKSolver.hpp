@@ -23,6 +23,8 @@ namespace IK {
 		float3 bindPosePos;			// Bind-pose absolute position in model space (set once)
 		bool canRotate = true;
 		bool canMove = true;
+		bool alignToTerrain = false;
+		float3 terrainAlignAxis = {0.0f, 1.0f, 0.0f};
 	};
 
 	class Skeleton;
@@ -64,6 +66,7 @@ namespace IK {
 
 		bool SetJointConstraint(uint32_t jointID, const Constraint& constraint);
 		bool SetJointProperties(uint32_t jointID, bool canRotate, bool canMove);
+		bool SetJointTerrainAlignment(uint32_t jointID, bool enabled, const float3& localAxis = {0.0f, 1.0f, 0.0f});
 		void UpdateJointHierarchy(uint32_t jointID);
 		void UpdateJoint(uint32_t jointID);
 		void UpdateAllJoints();

@@ -14,6 +14,7 @@
 #include "System/ContainerUtil.h"
 #include "System/float3.h"
 #include "System/Log/ILog.h"
+#include "Map/Ground.h"
 
 using namespace IK;
 
@@ -104,6 +105,16 @@ bool Skeleton::SetJointProperties(uint32_t jointID, bool canRotate, bool canMove
 
 	joints[jointID].canRotate = canRotate;
 	joints[jointID].canMove = canMove;
+	return true;
+}
+
+bool Skeleton::SetJointTerrainAlignment(uint32_t jointID, bool enabled, const float3& localAxis)
+{
+	if (jointID >= joints.size())
+		return false;
+
+	joints[jointID].alignToTerrain = enabled;
+	joints[jointID].terrainAlignAxis = localAxis;
 	return true;
 }
 
@@ -214,6 +225,37 @@ void Skeleton::ApplySolution(const Chain& chain, const ChainSolution& sol)
 		LOG_L(L_NOTICE, "IK-DIAG: apply[%u] piece=%d ypr=(%.4f,%.4f,%.4f)", unsigned(i), pieceIdx, ypr.x, ypr.y, ypr.z);
 
 		const_cast<LocalModelPiece*>(piece)->SetRotation(ypr);
+	}
+
+	const auto& effectorJoint = joints[chain.eID];
+	if (effectorJoint.alignToTerrain) {
+		const auto* effPiece = effectorJoint.piece;
+
+		const auto& effTransform = effPiece->GetModelSpaceTransform();
+		const float3 effWorldPos = so->pos + ModelDirToWorldDir(effTransform.t);
+
+		const float3 terrainNormalWorld = CGround::GetNormal(effWorldPos.x, effWorldPos.z);
+		const float3 tnIntModel = WorldDirToModelDir(terrainNormalWorld);
+
+		const CQuaternion pieceModelRot = effTransform.r;
+		const float3 currentAxis = pieceModelRot.Rotate(effectorJoint.terrainAlignAxis);
+		const CQuaternion deltaRot = CQuaternion::MakeFrom(currentAxis, tnIntModel);
+		const CQuaternion desiredModelRot = (deltaRot * pieceModelRot).Normalize();
+
+		const CQuaternion parentModelRot = effPiece->parent
+			? effPiece->parent->GetModelSpaceTransform().r
+			: CQuaternion{};
+		const CQuaternion bakedLocalRot = effPiece->original->ComposeTransform(ZeroVector, ZeroVector, 1.0f).r;
+		const CQuaternion scriptRot = (bakedLocalRot.InverseNormalized() * (parentModelRot.InverseNormalized() * desiredModelRot)).Normalize();
+
+		const float3 ypr = scriptRot.ToEulerYPR();
+		const_cast<LocalModelPiece*>(effPiece)->SetRotation(ypr);
+
+		LOG_L(L_NOTICE, "IK-DIAG: terrain-align eff=%u normal=(%.3f,%.3f,%.3f) tnModel=(%.3f,%.3f,%.3f) ypr=(%.4f,%.4f,%.4f)",
+			chain.eID,
+			terrainNormalWorld.x, terrainNormalWorld.y, terrainNormalWorld.z,
+			tnIntModel.x, tnIntModel.y, tnIntModel.z,
+			ypr.x, ypr.y, ypr.z);
 	}
 }
 
