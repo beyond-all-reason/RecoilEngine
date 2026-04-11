@@ -45,6 +45,7 @@ class LuaSyncedRead {
 
 		static int GetGameFrame(lua_State* L);
 		static int GetGameSeconds(lua_State* L);
+		static int GetPrevFrameChecksum(lua_State* L);
 
 		static int GetGameRulesParam(lua_State* L);
 		static int GetGameRulesParams(lua_State* L);
