@@ -1824,8 +1824,7 @@ int CLuaUnitScript::GetPieceWorldBasePos(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (activeScript == nullptr || activeUnit == nullptr) return 0;
 	LocalModelPiece* piece = ParseLocalModelPiece(L, activeScript, __func__);
-	const float3 pos = activeUnit->GetObjectSpacePos(piece->GetAbsolutePos());
-	return ToLua(L, pos);
+	return ToLua(L, piece->GetAbsolutePos());
 }
 
 int CLuaUnitScript::GetPieceBounds(lua_State* L)

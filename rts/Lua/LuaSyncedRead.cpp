@@ -8678,7 +8678,7 @@ static int GetSolidObjectPieceWorldBasePos(lua_State* L, const CSolidObject* o)
 {
 	const LocalModelPiece* lmp = ParseObjectConstLocalModelPiece(L, o, 2);
 	if (lmp == nullptr) return 0;
-	const float3 pos = o->GetObjectSpacePos(lmp->GetAbsolutePos());
+	const float3& pos = lmp->GetAbsolutePos();
 	lua_pushnumber(L, pos.x);
 	lua_pushnumber(L, pos.y);
 	lua_pushnumber(L, pos.z);

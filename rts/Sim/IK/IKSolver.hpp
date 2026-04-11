@@ -20,6 +20,7 @@ namespace IK {
 		const LocalModelPiece* piece;	// Direct reference to LocalModelPiece
 		Constraint constraint;			// Joint constraint (ball, hinge, or none)
 		float3 worldPos;				// Cached current world position
+		float3 bindPosePos;			// Bind-pose absolute position in model space (set once)
 		bool canRotate = true;
 		bool canMove = true;
 	};
