@@ -948,7 +948,8 @@ int LuaSyncedRead::GetGameSeconds(lua_State* L)
  * built with `LUA_NUMBER = float`, which cannot represent a 32-bit
  * checksum losslessly.
  *
- * Returns `nil` on builds without `SYNCCHECK`.
+ * Returns `nil` on builds without `SYNCCHECK`. Check
+ * `Engine.FeatureSupport.hasChecksums` to detect availability.
  *
  * @function Spring.GetPrevFrameChecksum
  *

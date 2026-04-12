@@ -28,6 +28,7 @@
  * @field noHandicapForReclaim boolean Whether handicap is applied to income from reclaim
  * @field groupAddDoesntSelect boolean Whether 'group add' also selects the group (does both if false)
  * @field deadTeamsKeepUnitLimit boolean Whether engine redistributes dead team unitlimit to allies (false) or keeps it as-is (true)
+ * @field hasChecksums boolean Whether the engine was built with SYNCCHECK (i.e. Spring.GetPrevFrameChecksum() returns a value)
  */
 
 /***
@@ -70,7 +71,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	 *
 	 * will be compatible even on engines that don't yet know about the entry at all. */
 	lua_pushliteral(L, "FeatureSupport");
-	lua_createtable(L, 0, 11);
+	lua_createtable(L, 0, 12);
 		LuaPushNamedBool(L, "NegativeGetUnitCurrentCommand", true);
 		LuaPushNamedBool(L, "hasExitOnlyYardmaps", true);
 		LuaPushNamedNumber(L, "rmlUiApiVersion", 1);
@@ -84,6 +85,11 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "noHandicapForReclaim", true);
 		LuaPushNamedBool(L, "groupAddDoesntSelect", true);
 		LuaPushNamedBool(L, "deadTeamsKeepUnitLimit", false);
+#ifdef SYNCCHECK
+		LuaPushNamedBool(L, "hasChecksums", true);
+#else
+		LuaPushNamedBool(L, "hasChecksums", false);
+#endif
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");
