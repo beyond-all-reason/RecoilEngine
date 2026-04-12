@@ -279,6 +279,14 @@ void CIconHandler::Update()
 
 	defaultIconIdx = defIt->second;
 
+#ifdef HEADLESS
+	// Headless builds don't render icons; skip the atlas pipeline entirely.
+	// Clearing the bits makes the atlasNeedsUpdate.none() check above short-circuit
+	// all subsequent calls to Update().
+	atlasNeedsUpdate.reset();
+	return;
+#endif
+
 	for (size_t i = 0; i < atlasNeedsUpdate.size(); ++i) {
 		if (!atlasNeedsUpdate.test(i))
 			continue;
