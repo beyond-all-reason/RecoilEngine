@@ -61,6 +61,8 @@ public:
 	static CQuaternion MakeFrom(const float3& v1, const float3& v2);
 	static CQuaternion MakeFrom(const float3& newFwdDir);
 	static CQuaternion MakeFrom(const CMatrix44f& mat);
+	static CQuaternion MakeFromChain(const float3& v10, const float3& v21);
+	static CQuaternion MakeFromAxes(const float3& xAxis, const float3& yAxis, const float3& zAxis);
 
 	// Decompose a quaternion into swing and twist components
 	// Q = swing * twist

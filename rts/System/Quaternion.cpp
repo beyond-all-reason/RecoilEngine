@@ -163,52 +163,97 @@ CQuaternion CQuaternion::MakeFrom(const float3& newFwdDir)
 /// </summary>
 CQuaternion CQuaternion::MakeFrom(const CMatrix44f& mat)
 {
-	assert(mat.IsRotOrRotTranMatrix());
-	const float trace = mat.md[0][0] + mat.md[1][1] + mat.md[2][2];
+    assert(mat.IsRotOrRotTranMatrix());
+    return MakeFromAxes(mat.col[0], mat.col[1], mat.col[2]);
+}
 
-	if (trace > 0.0f) {
-		const float s = 0.5f * InvSqrt(trace + 1.0f);
+/// <summary>
+/// Quaternion from three orthonormal axes expressed in world space.
+/// Axes form the columns of the equivalent rotation matrix:
+///   xAxis = local +X (right),  yAxis = local +Y (up),  zAxis = local +Z (forward)
+/// Implements Shepperd's method — branches on the largest diagonal
+/// to avoid numerical instability near zero.
+/// Input axes must be orthonormal; output is a unit quaternion.
+/// </summary>
+CQuaternion CQuaternion::MakeFromAxes(
+    const float3& xAxis,
+    const float3& yAxis,
+    const float3& zAxis)
+{
+    const float trace = xAxis.x + yAxis.y + zAxis.z;
 
-		return AssertNormalized(CQuaternion(
-			s * (mat.md[1][2] - mat.md[2][1]),
-			s * (mat.md[2][0] - mat.md[0][2]),
-			s * (mat.md[0][1] - mat.md[1][0]),
-			0.25f / s
-		));
-	}
-	else if (mat.md[0][0] > mat.md[1][1] && mat.md[0][0] > mat.md[2][2]) {
-		const float s = 2.0f * math::sqrt(1.0f + mat.md[0][0] - mat.md[1][1] - mat.md[2][2]);
-		const float invs = 1.0f / s;
+    if (trace > 0.0f) {
+        const float s    = 0.5f * InvSqrt(trace + 1.0f);
 
-		return AssertNormalized(CQuaternion(
-			0.25f * s,
-			(mat.md[1][0] + mat.md[0][1]) * invs,
-			(mat.md[2][0] + mat.md[0][2]) * invs,
-			(mat.md[1][2] - mat.md[2][1]) * invs
-		));
-	}
-	else if (mat.md[1][1] > mat.md[2][2]) {
-		const float s = 2.0f * math::sqrt(1.0f + mat.md[1][1] - mat.md[0][0] - mat.md[2][2]);
-		const float invs = 1.0f / s;
+        return AssertNormalized(CQuaternion(
+            s * (yAxis.z - zAxis.y),
+            s * (zAxis.x - xAxis.z),
+            s * (xAxis.y - yAxis.x),
+            0.25f / s
+        ));
+    }
+    else if (xAxis.x > yAxis.y && xAxis.x > zAxis.z) {
+        const float s    = 2.0f * math::sqrt(1.0f + xAxis.x - yAxis.y - zAxis.z);
+        const float invs = 1.0f / s;
 
-		return AssertNormalized(CQuaternion(
-			(mat.md[1][0] + mat.md[0][1]) * invs,
-			0.25f * s,
-			(mat.md[2][1] + mat.md[1][2]) * invs,
-			(mat.md[2][0] - mat.md[0][2]) * invs
-		));
-	}
-	else {
-		const float s = 2.0f * math::sqrt(1.0f + mat.md[2][2] - mat.md[0][0] - mat.md[1][1]);
-		const float invs = 1.0f / s;
+        return AssertNormalized(CQuaternion(
+            0.25f * s,
+            (yAxis.x + xAxis.y) * invs,
+            (zAxis.x + xAxis.z) * invs,
+            (yAxis.z - zAxis.y) * invs
+        ));
+    }
+    else if (yAxis.y > zAxis.z) {
+        const float s    = 2.0f * math::sqrt(1.0f + yAxis.y - xAxis.x - zAxis.z);
+        const float invs = 1.0f / s;
 
-		return AssertNormalized(CQuaternion(
-			(mat.md[2][0] + mat.md[0][2]) * invs,
-			(mat.md[2][1] + mat.md[1][2]) * invs,
-			0.25f * s,
-			(mat.md[0][1] - mat.md[1][0]) * invs
-		));
-	}
+        return AssertNormalized(CQuaternion(
+            (yAxis.x + xAxis.y) * invs,
+            0.25f * s,
+            (zAxis.y + yAxis.z) * invs,
+            (zAxis.x - xAxis.z) * invs
+        ));
+    }
+    else {
+        const float s    = 2.0f * math::sqrt(1.0f + zAxis.z - xAxis.x - yAxis.y);
+        const float invs = 1.0f / s;
+
+        return AssertNormalized(CQuaternion(
+            (zAxis.x + xAxis.z) * invs,
+            (zAxis.y + yAxis.z) * invs,
+            0.25f * s,
+            (xAxis.y - yAxis.x) * invs
+        ));
+    }
+}
+
+/// <summary>
+/// Orientation quaternion for a bone segment with fixed roll.
+///   v10 = normalize(v - v_parent)             local +Z, bone axis
+///   v21 = normalize(v_grandparent - v_parent) roll reference, local +Y plane
+/// Degenerate (v10 ∥ v21): fallback matches MakeFrom(v1, v2) antiparallel case.
+/// </summary>
+CQuaternion CQuaternion::MakeFromChain(
+    const float3& v10,   // local +Z
+    const float3& v21)   // roll reference
+{
+    assert(v10.Normalized());
+    assert(v21.Normalized());
+
+    // Gram-Schmidt: project v21 onto plane ⊥ to v10 → local +Y
+    const float proj = v10.dot(v21);
+    float3 yAxis;
+	if unlikely(epscmp(std::abs(proj), 1.0f, float3::cmp_eps())) {
+		const float3 npVec = v10.PickNonParallel();
+        yAxis = v10.cross(npVec).Normalize();
+    } else {
+        yAxis = (v21 - v10 * proj).Normalize();
+    }
+
+    // Y × Z = X
+    const float3 xAxis = yAxis.cross(v10);
+
+    return MakeFromAxes(xAxis, yAxis, v10);
 }
 
 std::pair<CQuaternion, CQuaternion> CQuaternion::SwingTwist(const CQuaternion& Q, const float3& axis)
