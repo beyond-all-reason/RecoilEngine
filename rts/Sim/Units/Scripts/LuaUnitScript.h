@@ -216,7 +216,6 @@ private:
 	static int Skeleton_ClearJointConstraint(lua_State* L);
 	static int Skeleton_GetJointBasePos(lua_State* L);
 	static int Skeleton_GetJointWorldBasePos(lua_State* L);
-	static int Skeleton_GetJointBounds(lua_State* L);
 	static int Skeleton_SetJointAlignment(lua_State* L);
 	static int Skeleton_SolveChain(lua_State* L);
 

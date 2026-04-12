@@ -1899,7 +1899,6 @@ bool CLuaUnitScript::CreateIKMetatables(lua_State* L)
 		LuaPushRawNamedCFunc(L, "ClearJointConstraint",      Skeleton_ClearJointConstraint);
 		LuaPushRawNamedCFunc(L, "GetJointBasePos",           Skeleton_GetJointBasePos);
 		LuaPushRawNamedCFunc(L, "GetJointWorldBasePos",      Skeleton_GetJointWorldBasePos);
-		LuaPushRawNamedCFunc(L, "GetJointBounds",            Skeleton_GetJointBounds);
 		LuaPushRawNamedCFunc(L, "SetJointAlignment",         Skeleton_SetJointAlignment);
 		LuaPushRawNamedCFunc(L, "SolveChain",                Skeleton_SolveChain);
 
@@ -2278,46 +2277,6 @@ int CLuaUnitScript::Skeleton_GetJointWorldBasePos(lua_State* L)
 	}
 	return 0;
 }
-
-
-/*** Returns the model-space bounding box for an IK joint's piece.
- *
- * @function IKSkeleton:GetJointBounds
- * @param piece number 1-based piece index.
- * @return number minX
- * @return number minY
- * @return number minZ
- * @return number maxX
- * @return number maxY
- * @return number maxZ
- */
-int CLuaUnitScript::Skeleton_GetJointBounds(lua_State* L)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	auto* skel = toSkeleton(L, 1);
-	if (activeScript == nullptr) luaL_error(L, "%s(): no active script", __func__);
-	const int scriptPiece = luaL_checkint(L, 2) - 1;
-	const int modelPiece = activeScript->ScriptToModel(scriptPiece);
-	if (modelPiece < 0) return 0;
-	const auto& joints = skel->GetJoints();
-	for (const auto& joint : joints) {
-		if (joint.piece->lmodelPieceIndex == modelPiece) {
-			const auto* omp = joint.piece->original;
-			lua_pushnumber(L, omp->mins.x);
-			lua_pushnumber(L, omp->mins.y);
-			lua_pushnumber(L, omp->mins.z);
-			lua_pushnumber(L, omp->maxs.x);
-			lua_pushnumber(L, omp->maxs.y);
-			lua_pushnumber(L, omp->maxs.z);
-			return 6;
-		}
-	}
-	return 0;
-}
-
-
-
-
 
 /*** Sets alignment behaviour for a joint after IK solve.
  *

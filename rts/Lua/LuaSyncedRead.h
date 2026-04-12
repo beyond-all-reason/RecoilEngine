@@ -286,8 +286,10 @@ class LuaSyncedRead {
 		static int GetUnitPiecePosition(lua_State* L);
 		static int GetUnitPieceDirection(lua_State* L);
 		static int GetUnitPiecePosDir(lua_State* L);
-		static int GetUnitPieceBasePos(lua_State* L);
-		static int GetUnitPieceWorldBasePos(lua_State* L);
+		static int GetUnitPieceModelPos(lua_State* L);
+		static int GetUnitPieceWorldPos(lua_State* L);
+		static int GetUnitPieceModelDir(lua_State* L);
+		static int GetUnitPieceWorldDir(lua_State* L);
 		static int GetUnitPieceBounds(lua_State* L);
 		static int GetUnitPieceMatrix(lua_State* L);
 
@@ -301,8 +303,10 @@ class LuaSyncedRead {
 		static int GetFeaturePiecePosition(lua_State* L);
 		static int GetFeaturePieceDirection(lua_State* L);
 		static int GetFeaturePiecePosDir(lua_State* L);
-		static int GetFeaturePieceBasePos(lua_State* L);
-		static int GetFeaturePieceWorldBasePos(lua_State* L);
+		static int GetFeaturePieceModelPos(lua_State* L);
+		static int GetFeaturePieceWorldPos(lua_State* L);
+		static int GetFeaturePieceModelDir(lua_State* L);
+		static int GetFeaturePieceWorldDir(lua_State* L);
 		static int GetFeaturePieceBounds(lua_State* L);
 		static int GetFeaturePieceMatrix(lua_State* L);
 

@@ -384,8 +384,10 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitPiecePosition);
 	REGISTER_LUA_CFUNC(GetUnitPieceDirection);
 	REGISTER_LUA_CFUNC(GetUnitPiecePosDir);
-	REGISTER_LUA_CFUNC(GetUnitPieceBasePos);
-	REGISTER_LUA_CFUNC(GetUnitPieceWorldBasePos);
+	REGISTER_LUA_CFUNC(GetUnitPieceModelPos);
+	REGISTER_LUA_CFUNC(GetUnitPieceWorldPos);
+	REGISTER_LUA_CFUNC(GetUnitPieceModelDir);
+	REGISTER_LUA_CFUNC(GetUnitPieceWorldDir);
 	REGISTER_LUA_CFUNC(GetUnitPieceBounds);
 	REGISTER_LUA_CFUNC(GetUnitPieceMatrix);
 	REGISTER_LUA_CFUNC(GetUnitScriptPiece);
@@ -398,8 +400,10 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetFeaturePiecePosition);
 	REGISTER_LUA_CFUNC(GetFeaturePieceDirection);
 	REGISTER_LUA_CFUNC(GetFeaturePiecePosDir);
-	REGISTER_LUA_CFUNC(GetFeaturePieceBasePos);
-	REGISTER_LUA_CFUNC(GetFeaturePieceWorldBasePos);
+	REGISTER_LUA_CFUNC(GetFeaturePieceModelPos);
+	REGISTER_LUA_CFUNC(GetFeaturePieceWorldPos);
+	REGISTER_LUA_CFUNC(GetFeaturePieceModelDir);
+	REGISTER_LUA_CFUNC(GetFeaturePieceWorldDir);
 	REGISTER_LUA_CFUNC(GetFeaturePieceBounds);
 	REGISTER_LUA_CFUNC(GetFeaturePieceMatrix);
 
@@ -8635,6 +8639,88 @@ static int GetSolidObjectPieceDirection(lua_State* L, const CSolidObject* o)
 	return 3;
 }
 
+static int GetSolidObjectPieceModelDir(lua_State* L, const CSolidObject* o)
+{
+	if (o == nullptr)
+		return 0;
+
+	const LocalModelPiece* lmp = ParseObjectConstLocalModelPiece(L, o, 2);
+
+	if (lmp == nullptr)
+		return 0;
+
+	const float3 dir = lmp->GetDirection();
+
+	const int args = lua_gettop(L);
+	if (args >= 4) {
+		float3 d;
+		if (lua_istable(L, 3)) {
+			lua_rawgeti(L, 3, 1); lua_rawgeti(L, 3, 2); lua_rawgeti(L, 3, 3);
+			d.x = luaL_optnumber(L, -3, 0.0f);
+			d.y = luaL_optnumber(L, -2, 0.0f);
+			d.z = luaL_optnumber(L, -1, 0.0f);
+			lua_pop(L, 3);
+		} else {
+			d.x = luaL_optnumber(L, 3, 0.0f);
+			d.y = luaL_optnumber(L, 4, 0.0f);
+			d.z = luaL_optnumber(L, 5, 0.0f);
+		}
+
+		d = lmp->GetModelSpaceTransform().r * d * WORLD_TO_OBJECT_SPACE;
+
+		lua_pushnumber(L, d.x);
+		lua_pushnumber(L, d.y);
+		lua_pushnumber(L, d.z);
+		return 3;
+	}
+
+	lua_pushnumber(L, dir.x);
+	lua_pushnumber(L, dir.y);
+	lua_pushnumber(L, dir.z);
+	return 3;
+}
+
+static int GetSolidObjectPieceWorldDir(lua_State* L, const CSolidObject* o)
+{
+	if (o == nullptr)
+		return 0;
+
+	const LocalModelPiece* lmp = ParseObjectConstLocalModelPiece(L, o, 2);
+
+	if (lmp == nullptr)
+		return 0;
+
+	float3 dir;
+
+	const int args = lua_gettop(L);
+	if (args >= 4) {
+		if (lua_istable(L, 3)) {
+			lua_rawgeti(L, 3, 1); lua_rawgeti(L, 3, 2); lua_rawgeti(L, 3, 3);
+			dir.x = luaL_optnumber(L, -3, 0.0f);
+			dir.y = luaL_optnumber(L, -2, 0.0f);
+			dir.z = luaL_optnumber(L, -1, 0.0f);
+			lua_pop(L, 3);
+		} else {
+			dir.x = luaL_optnumber(L, 3, 0.0f);
+			dir.y = luaL_optnumber(L, 4, 0.0f);
+			dir.z = luaL_optnumber(L, 5, 0.0f);
+		}
+
+		dir = o->GetObjectSpaceVec(lmp->GetModelSpaceTransform().r * dir * WORLD_TO_OBJECT_SPACE);
+
+		lua_pushnumber(L, dir.x);
+		lua_pushnumber(L, dir.y);
+		lua_pushnumber(L, dir.z);
+		return 3;
+	}
+
+	dir = o->GetObjectSpaceVec(lmp->GetDirection());
+	lua_pushnumber(L, dir.x);
+	lua_pushnumber(L, dir.y);
+	lua_pushnumber(L, dir.z);
+	return 3;
+}
+
 static int GetSolidObjectPiecePosDir(lua_State* L, const CSolidObject* o)
 {
 	if (o == nullptr)
@@ -8665,23 +8751,77 @@ static int GetSolidObjectPiecePosDir(lua_State* L, const CSolidObject* o)
 static int GetSolidObjectPieceBasePos(lua_State* L, const CSolidObject* o)
 {
 	const LocalModelPiece* lmp = ParseObjectConstLocalModelPiece(L, o, 2);
-	if (lmp == nullptr) return 0;
-	const float3& off = lmp->original->offset;
-	lua_pushnumber(L, off.x);
-	lua_pushnumber(L, off.y);
-	lua_pushnumber(L, off.z);
-	lua_pushnumber(L, off.Length());
-	return 4;
+	if (lmp == nullptr)
+		return 0;
+
+	const float3& goff = lmp->original->goffset;
+
+	const int args = lua_gettop(L);
+	if (args >= 4) {
+		float3 pos;
+		if (lua_istable(L, 3)) {
+			lua_rawgeti(L, 3, 1); lua_rawgeti(L, 3, 2); lua_rawgeti(L, 3, 3);
+			pos.x = luaL_optnumber(L, -3, 0.0f);
+			pos.y = luaL_optnumber(L, -2, 0.0f);
+			pos.z = luaL_optnumber(L, -1, 0.0f);
+			lua_pop(L, 3);
+		} else {
+			pos.x = luaL_optnumber(L, 3, 0.0f);
+			pos.y = luaL_optnumber(L, 4, 0.0f);
+			pos.z = luaL_optnumber(L, 5, 0.0f);
+		}
+
+		pos = lmp->GetModelSpaceTransform() * pos * WORLD_TO_OBJECT_SPACE;
+
+		lua_pushnumber(L, pos.x);
+		lua_pushnumber(L, pos.y);
+		lua_pushnumber(L, pos.z);
+		return 3;
+	}
+
+	lua_pushnumber(L, goff.x);
+	lua_pushnumber(L, goff.y);
+	lua_pushnumber(L, goff.z);
+
+	return 3;
 }
 
 static int GetSolidObjectPieceWorldBasePos(lua_State* L, const CSolidObject* o)
 {
 	const LocalModelPiece* lmp = ParseObjectConstLocalModelPiece(L, o, 2);
-	if (lmp == nullptr) return 0;
-	const float3& pos = lmp->GetAbsolutePos();
+	if (lmp == nullptr)
+		return 0;
+
+	float3 pos;
+
+	const int args = lua_gettop(L);
+	if (args >= 4) {
+		if (lua_istable(L, 3)) {
+			lua_rawgeti(L, 3, 1); lua_rawgeti(L, 3, 2); lua_rawgeti(L, 3, 3);
+			pos.x = luaL_optnumber(L, -3, 0.0f);
+			pos.y = luaL_optnumber(L, -2, 0.0f);
+			pos.z = luaL_optnumber(L, -1, 0.0f);
+			lua_pop(L, 3);
+		} else {
+			pos.x = luaL_optnumber(L, 3, 0.0f);
+			pos.y = luaL_optnumber(L, 4, 0.0f);
+			pos.z = luaL_optnumber(L, 5, 0.0f);
+		}
+
+		pos = o->GetObjectSpacePos(lmp->GetModelSpaceTransform() * pos * WORLD_TO_OBJECT_SPACE);
+
+		lua_pushnumber(L, pos.x);
+		lua_pushnumber(L, pos.y);
+		lua_pushnumber(L, pos.z);
+
+		return 3;
+	}
+
+	pos = o->GetObjectSpacePos(lmp->GetAbsolutePos());
 	lua_pushnumber(L, pos.x);
 	lua_pushnumber(L, pos.y);
 	lua_pushnumber(L, pos.z);
+
 	return 3;
 }
 
@@ -8811,36 +8951,67 @@ int LuaSyncedRead::GetUnitPiecePosDir(lua_State* L) {
 }
 
 
-/*** Returns the piece's baked offset and length.
+/*** Returns the piece's baked offset, or transforms a local position.
  *
- * @function Spring.GetUnitPieceBasePos
+ * @function Spring.GetUnitPieceModelPos
  * @param unitID integer
  * @param pieceIndex integer
+ * @param[opt] localPos table|number,number,number local position to transform
  * @return number offX
  * @return number offY
  * @return number offZ
- * @return number length
  */
-int LuaSyncedRead::GetUnitPieceBasePos(lua_State* L) {
+int LuaSyncedRead::GetUnitPieceModelPos(lua_State* L) {
 	return (GetSolidObjectPieceBasePos(L, ParseTypedUnit(L, __func__, 1)));
 }
 
 
-/*** Returns the world-space position of a piece's origin.
+/*** Returns the world-space position of a piece's origin, or transforms a local position.
  *
- * @function Spring.GetUnitPieceWorldBasePos
+ * @function Spring.GetUnitPieceWorldPos
  * @param unitID integer
  * @param pieceIndex integer
+ * @param[opt] localPos table|number,number,number local position to transform
  * @return number posX
  * @return number posY
  * @return number posZ
  */
-int LuaSyncedRead::GetUnitPieceWorldBasePos(lua_State* L) {
+int LuaSyncedRead::GetUnitPieceWorldPos(lua_State* L) {
 	return (GetSolidObjectPieceWorldBasePos(L, ParseTypedUnit(L, __func__, 1)));
 }
 
 
-/*** Returns the model-space bounding box of a piece.
+/*** Returns the piece's model-space direction, or transforms a local direction.
+ *
+ * @function Spring.GetUnitPieceModelDir
+ * @param unitID integer
+ * @param pieceIndex integer
+ * @param[opt] localDir table|number,number,number local direction to transform
+ * @return number dirX
+ * @return number dirY
+ * @return number dirZ
+ */
+int LuaSyncedRead::GetUnitPieceModelDir(lua_State* L) {
+	return (GetSolidObjectPieceModelDir(L, ParseTypedUnit(L, __func__, 1)));
+}
+
+
+/*** Returns the piece's world-space direction, or transforms a local direction.
+ *
+ * @function Spring.GetUnitPieceWorldDir
+ * @param unitID integer
+ * @param pieceIndex integer
+ * @param[opt] localDir table|number,number,number local direction to transform
+ * @return number dirX
+ * @return number dirY
+ * @return number dirZ
+ */
+int LuaSyncedRead::GetUnitPieceWorldDir(lua_State* L) {
+	return (GetSolidObjectPieceWorldDir(L, ParseTypedUnit(L, __func__, 1)));
+}
+
+
+/*** Returns the local-space bounding box of a piece.
  *
  * @function Spring.GetUnitPieceBounds
  * @param unitID integer
@@ -8974,7 +9145,7 @@ int LuaSyncedRead::GetFeaturePiecePosDir(lua_State* L) {
 
 /*** Returns the feature piece's baked offset and length.
  *
- * @function Spring.GetFeaturePieceBasePos
+ * @function Spring.GetFeaturePieceModelPos
  * @param featureID integer
  * @param pieceIndex integer
  * @return number offX
@@ -8982,22 +9153,52 @@ int LuaSyncedRead::GetFeaturePiecePosDir(lua_State* L) {
  * @return number offZ
  * @return number length
  */
-int LuaSyncedRead::GetFeaturePieceBasePos(lua_State* L) {
+int LuaSyncedRead::GetFeaturePieceModelPos(lua_State* L) {
 	return (GetSolidObjectPieceBasePos(L, ParseFeature(L, __func__, 1)));
 }
 
 
 /*** Returns the world-space position of a feature piece's origin.
  *
- * @function Spring.GetFeaturePieceWorldBasePos
+ * @function Spring.GetFeaturePieceWorldPos
  * @param featureID integer
  * @param pieceIndex integer
  * @return number posX
  * @return number posY
  * @return number posZ
  */
-int LuaSyncedRead::GetFeaturePieceWorldBasePos(lua_State* L) {
+int LuaSyncedRead::GetFeaturePieceWorldPos(lua_State* L) {
 	return (GetSolidObjectPieceWorldBasePos(L, ParseFeature(L, __func__, 1)));
+}
+
+
+/*** Returns the feature piece's model-space direction, or transforms a local direction.
+ *
+ * @function Spring.GetFeaturePieceModelDir
+ * @param featureID integer
+ * @param pieceIndex integer
+ * @param[opt] localDir table|number,number,number local direction to transform
+ * @return number dirX
+ * @return number dirY
+ * @return number dirZ
+ */
+int LuaSyncedRead::GetFeaturePieceModelDir(lua_State* L) {
+	return (GetSolidObjectPieceModelDir(L, ParseFeature(L, __func__, 1)));
+}
+
+
+/*** Returns the feature piece's world-space direction, or transforms a local direction.
+ *
+ * @function Spring.GetFeaturePieceWorldDir
+ * @param featureID integer
+ * @param pieceIndex integer
+ * @param[opt] localDir table|number,number,number local direction to transform
+ * @return number dirX
+ * @return number dirY
+ * @return number dirZ
+ */
+int LuaSyncedRead::GetFeaturePieceWorldDir(lua_State* L) {
+	return (GetSolidObjectPieceWorldDir(L, ParseFeature(L, __func__, 1)));
 }
 
 

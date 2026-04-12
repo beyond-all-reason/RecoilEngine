@@ -210,8 +210,8 @@ void Skeleton::ApplySolution(const Chain& chain, const ChainSolution& sol)
 
 	const auto& ji = chain.GetJoints();
 
-	LOG_L(L_NOTICE, "IK-DIAG: === ApplySolution root=%u eff=%u solSize=%u ===",
-		chain.rID, chain.eID, unsigned(sol.solution.size()));
+	//LOG_L(L_NOTICE, "IK-DIAG: === ApplySolution root=%u eff=%u solSize=%u ===",
+	//	chain.rID, chain.eID, unsigned(sol.solution.size()));
 
 	for (size_t i = 0; i < sol.solution.size(); ++i) {
 		const auto pieceIdx = sol.solution[i].first;
@@ -219,11 +219,11 @@ void Skeleton::ApplySolution(const Chain& chain, const ChainSolution& sol)
 		const auto* piece = joints[ji[i]].piece;
 
 		if (!joints[ji[i]].canRotate) {
-			LOG_L(L_NOTICE, "IK-DIAG: apply[%u] piece=%d LOCKED (rotating=false)", unsigned(i), pieceIdx);
+			//LOG_L(L_NOTICE, "IK-DIAG: apply[%u] piece=%d LOCKED (rotating=false)", unsigned(i), pieceIdx);
 			continue;
 		}
 
-		LOG_L(L_NOTICE, "IK-DIAG: apply[%u] piece=%d ypr=(%.4f,%.4f,%.4f)", unsigned(i), pieceIdx, ypr.x, ypr.y, ypr.z);
+		//LOG_L(L_NOTICE, "IK-DIAG: apply[%u] piece=%d ypr=(%.4f,%.4f,%.4f)", unsigned(i), pieceIdx, ypr.x, ypr.y, ypr.z);
 
 		const_cast<LocalModelPiece*>(piece)->SetRotation(ypr);
 	}
@@ -258,12 +258,12 @@ void Skeleton::ApplySolution(const Chain& chain, const ChainSolution& sol)
 		const float3 ypr = scriptRot.ToEulerYPR();
 		const_cast<LocalModelPiece*>(effPiece)->SetRotation(ypr);
 
-		LOG_L(L_NOTICE, "IK-DIAG: joint-align eff=%u mode=%s target=(%.3f,%.3f,%.3f) tnModel=(%.3f,%.3f,%.3f) ypr=(%.4f,%.4f,%.4f)",
-			chain.eID,
-			effectorJoint.alignMode == AlignMode::TERRAIN ? "terrain" : "custom",
-			targetDirWorld.x, targetDirWorld.y, targetDirWorld.z,
-			tnIntModel.x, tnIntModel.y, tnIntModel.z,
-			ypr.x, ypr.y, ypr.z);
+		//LOG_L(L_NOTICE, "IK-DIAG: joint-align eff=%u mode=%s target=(%.3f,%.3f,%.3f) tnModel=(%.3f,%.3f,%.3f) ypr=(%.4f,%.4f,%.4f)",
+		//	chain.eID,
+		//	effectorJoint.alignMode == AlignMode::TERRAIN ? "terrain" : "custom",
+		//	targetDirWorld.x, targetDirWorld.y, targetDirWorld.z,
+		//	tnIntModel.x, tnIntModel.y, tnIntModel.z,
+		//	ypr.x, ypr.y, ypr.z);
 	}
 }
 
@@ -297,13 +297,13 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 	// Diagnostic: compare goal in model space with effector's bind-pose position
 	const float3 effBindPos = joints[ji[numBones]].bindPosePos;
 
-	LOG_L(L_NOTICE, "IK-DIAG: === SolveChain root=%u eff=%u goalWorld=(%.1f,%.1f,%.1f) goalModelFull=(%.1f,%.1f,%.1f) effBindPose=(%.1f,%.1f,%.1f) rootModel=(%.1f,%.1f,%.1f) goalModel=(%.1f,%.1f,%.1f) ===",
-		ch->rID, ch->eID,
-		ch->GetGoal().x, ch->GetGoal().y, ch->GetGoal().z,
-		goalModelFull.x, goalModelFull.y, goalModelFull.z,
-		effBindPos.x, effBindPos.y, effBindPos.z,
-		rootModelPos.x, rootModelPos.y, rootModelPos.z,
-		goalModel.x, goalModel.y, goalModel.z);
+	//LOG_L(L_NOTICE, "IK-DIAG: === SolveChain root=%u eff=%u goalWorld=(%.1f,%.1f,%.1f) goalModelFull=(%.1f,%.1f,%.1f) effBindPose=(%.1f,%.1f,%.1f) rootModel=(%.1f,%.1f,%.1f) goalModel=(%.1f,%.1f,%.1f) ===",
+	//	ch->rID, ch->eID,
+	//	ch->GetGoal().x, ch->GetGoal().y, ch->GetGoal().z,
+	//	goalModelFull.x, goalModelFull.y, goalModelFull.z,
+	//	effBindPos.x, effBindPos.y, effBindPos.z,
+	//	rootModelPos.x, rootModelPos.y, rootModelPos.z,
+	//	goalModel.x, goalModel.y, goalModel.z);
 
 	std::vector<Bone> chain(numBones);
 	for (size_t i = 0; i < numBones; i++) {
@@ -320,9 +320,9 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 		const float3 boneDirModel = (joints[nextJIdx].worldPos - joints[jIdx].worldPos).SafeNormalize();
 		chain[i].orientation = MakeOrientationFromBoneDir(boneDirModel);
 
-		LOG_L(L_NOTICE, "IK-DIAG: bone[%u] ji=%u->%u len=%.3f canRot=%d canMove=%d boneDir=(%.3f,%.3f,%.3f)",
-			unsigned(i), jIdx, nextJIdx, chain[i].length, chain[i].canRotate, chain[i].canMove,
-			boneDirModel.x, boneDirModel.y, boneDirModel.z);
+		//LOG_L(L_NOTICE, "IK-DIAG: bone[%u] ji=%u->%u len=%.3f canRot=%d canMove=%d boneDir=(%.3f,%.3f,%.3f)",
+		//	unsigned(i), jIdx, nextJIdx, chain[i].length, chain[i].canRotate, chain[i].canMove,
+		//	boneDirModel.x, boneDirModel.y, boneDirModel.z);
 
 	}
 
@@ -344,10 +344,10 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 	const float3 solvedEffPos = calcEffectorPos(chain);
 	float postSolveDistance = solvedEffPos.distance(goalModel);
 
-	LOG_L(L_NOTICE, "IK-DIAG: solver status=%s postDist=%.3f iters=%u solvedEffModel=(%.2f,%.2f,%.2f) goalModel=(%.2f,%.2f,%.2f)",
-		ResultToString(resultCode), postSolveDistance, iters,
-		solvedEffPos.x, solvedEffPos.y, solvedEffPos.z,
-		goalModel.x, goalModel.y, goalModel.z);
+	//LOG_L(L_NOTICE, "IK-DIAG: solver status=%s postDist=%.3f iters=%u solvedEffModel=(%.2f,%.2f,%.2f) goalModel=(%.2f,%.2f,%.2f)",
+	//	ResultToString(resultCode), postSolveDistance, iters,
+	//	solvedEffPos.x, solvedEffPos.y, solvedEffPos.z,
+	//	goalModel.x, goalModel.y, goalModel.z);
 
 	cs.solution.reserve(numBones);
 	cs.rotations.reserve(numBones);
@@ -399,28 +399,28 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 
 		const float3 ypr = scriptRot.ToEulerYPR();
 
-		LOG_L(L_NOTICE, "IK-DIAG: bone[%u] piece=%u canRot=%d swing=(%.3f,%.3f,%.3f,%.3f) twist=(%.3f,%.3f,%.3f,%.3f) ypr=(%.4f,%.4f,%.4f)",
-			unsigned(i), ji[i], joints[ji[i]].canRotate,
-			swing.x, swing.y, swing.z, swing.r,
-			twist.x, twist.y, twist.z, twist.r,
-			ypr.x, ypr.y, ypr.z);
+		//LOG_L(L_NOTICE, "IK-DIAG: bone[%u] piece=%u canRot=%d swing=(%.3f,%.3f,%.3f,%.3f) twist=(%.3f,%.3f,%.3f,%.3f) ypr=(%.4f,%.4f,%.4f)",
+		//	unsigned(i), ji[i], joints[ji[i]].canRotate,
+		//	swing.x, swing.y, swing.z, swing.r,
+		//	twist.x, twist.y, twist.z, twist.r,
+		//	ypr.x, ypr.y, ypr.z);
 
 		cs.solution.emplace_back(static_cast<int>(ji[i]), ypr);
 		cs.rotations.push_back(scriptRot);
 	}
 
 	if (resultCode == Result::FAILED) {
-		LOG_L(L_WARNING, "IK::SolveChain: root=%u effector=%u joints=%u status=%s postDist=%.3f goal=(%.1f, %.1f, %.1f) iters=%u eps=%.3f",
-			ch->rID, ch->eID, unsigned(n), ResultToString(resultCode),
-			postSolveDistance,
-			ch->GetGoal().x, ch->GetGoal().y, ch->GetGoal().z,
-			maxIterations, precision);
+		//LOG_L(L_WARNING, "IK::SolveChain: root=%u effector=%u joints=%u status=%s postDist=%.3f goal=(%.1f, %.1f, %.1f) iters=%u eps=%.3f",
+		//	ch->rID, ch->eID, unsigned(n), ResultToString(resultCode),
+		//	postSolveDistance,
+		//	ch->GetGoal().x, ch->GetGoal().y, ch->GetGoal().z,
+		//	maxIterations, precision);
 	} else {
-		LOG_L(L_DEBUG, "IK::SolveChain: root=%u effector=%u joints=%u status=%s postDist=%.3f goal=(%.1f, %.1f, %.1f) iters=%u eps=%.3f",
-			ch->rID, ch->eID, unsigned(n), ResultToString(resultCode),
-			postSolveDistance,
-			ch->GetGoal().x, ch->GetGoal().y, ch->GetGoal().z,
-			maxIterations, precision);
+		//LOG_L(L_DEBUG, "IK::SolveChain: root=%u effector=%u joints=%u status=%s postDist=%.3f goal=(%.1f, %.1f, %.1f) iters=%u eps=%.3f",
+		//	ch->rID, ch->eID, unsigned(n), ResultToString(resultCode),
+		//	postSolveDistance,
+		//	ch->GetGoal().x, ch->GetGoal().y, ch->GetGoal().z,
+		//	maxIterations, precision);
 	}
 
 	return cs;
