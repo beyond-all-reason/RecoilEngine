@@ -323,7 +323,9 @@ ChainSolution Skeleton::SolveChain(const std::shared_ptr<Chain>& ch, uint32_t ma
 		LOG_L(L_NOTICE, "IK-DIAG: bone[%u] ji=%u->%u len=%.3f canRot=%d canMove=%d boneDir=(%.3f,%.3f,%.3f)",
 			unsigned(i), jIdx, nextJIdx, chain[i].length, chain[i].canRotate, chain[i].canMove,
 			boneDirModel.x, boneDirModel.y, boneDirModel.z);
+
 	}
+
 
 	assert(ch->GetSolver() != nullptr);
 	uint32_t iters = 0;

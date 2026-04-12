@@ -56,8 +56,15 @@ namespace IK {
 		}
 
 		if (const auto* hc = std::get_if<HingeJointConstraint>(&c)) {
-			// Transform boneDir to parent space
-			float3 dirL = parentOri.InverseNormalized().Rotate(boneDir);
+			// Reconstruct a clean look-rotation frame from the parent's forward
+			// direction.  The solver's parentOri has arbitrary roll from
+			// MakeFrom(), which makes the constraint axis meaningless — different
+			// bone directions map the same local (1,0,0) to different model-space
+			// axes.  Look-rotation fixes this by aligning local Y ≈ model up.
+			const float3 parentFwd = parentOri.Rotate(kBoneRestAxis);
+			const CQuaternion lookOri = MakeOrientationFromBoneDir(parentFwd);
+
+			float3 dirL = lookOri.InverseNormalized().Rotate(boneDir);
 			float3 axisL = hc->axis;
 			axisL.SafeNormalize();
 
@@ -85,7 +92,7 @@ namespace IK {
 			const float angle = std::clamp(unclampedAngle, minAngle, maxAngle);
 
 			float3 resultL = restProjL * math::cos(angle) + axisL.cross(restProjL) * math::sin(angle);
-			return parentOri.Rotate(resultL);
+			return lookOri.Rotate(resultL);
 		}
 		return boneDir;
 	}
@@ -136,34 +143,16 @@ namespace IK {
 		}
 
 		const float precisionSq = precision * precision;
-		std::vector<CQuaternion> fwdOri(n);
 
 		for (uint32_t iter = 0; iter < maxIterations; iter++) {
 			if (iterCount != nullptr)
 				*iterCount = iter + 1;
 
-			// Forward pass: effector to root
-			pos[n] = goal;
-
-			// Build a forward-pass parent orientation snapshot from an unconstrained
-			// effector->root position solve, so parent frames used by constraints are
-			// coherent with the same iteration geometry.
-			for (size_t i = n; i-- > 0; ) {
-				float3 boneDir = (pos[i + 1] - pos[i]);
-				boneDir.SafeNormalize();
-				pos[i] = pos[i + 1] - boneDir * chain[i].length;
-			}
-
-			for (size_t i = 0; i < n; ++i) {
-				CQuaternion parentOri = (i > 0) ? fwdOri[i - 1] : CQuaternion();
-				float3 boneDir = (pos[i + 1] - pos[i]);
-				boneDir.SafeNormalize();
-				float3 restDirW = parentOri.Rotate(kBoneRestAxis);
-				CQuaternion delta = CQuaternion::MakeFrom(restDirW, boneDir).Normalize();
-				fwdOri[i] = (delta * parentOri).Normalize();
-			}
-
-			// Constrained forward pass uses the snapshot parent frames above.
+			// Forward pass: effector to root, unconstrained.
+			// Standard FABRIK position adjustment — just maintain bone lengths
+			// and move joints toward the goal. No constraint evaluation here;
+			// constraints are only applied in the backward pass to avoid
+			// fighting between the two passes.
 			pos[n] = goal;
 			for (size_t i = n; i-- > 0; ) {
 				float3 boneDir;
@@ -174,15 +163,15 @@ namespace IK {
 				} else {
 					boneDir = (pos[i + 1] - pos[i]);
 					boneDir.SafeNormalize();
-
-					CQuaternion parentOri = (i > 0) ? fwdOri[i - 1] : CQuaternion();
-					boneDir = ApplyConstraint(chain[i].constraint, boneDir, parentOri);
 				}
 
 				pos[i] = pos[i + 1] - boneDir * chain[i].length;
 			}
 
-			// Backward pass: root to effector
+			// Backward pass: root to effector, constrained.
+			// This is the sole source of constraint evaluation — cascades
+			// orientations root→effector so every bone sees its parent's
+			// just-updated orientation. No inconsistency with a forward pass.
 			pos[0] = ZeroVector;
 			for (size_t i = 0; i < n; i++) {
 				float3 boneDir;
