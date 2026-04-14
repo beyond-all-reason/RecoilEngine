@@ -79,7 +79,6 @@
 #include "System/FileSystem/FileHandler.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/StringUtil.h"
-#include "System/Sync/SyncChecker.h"
 
 #include <cctype>
 #include <functional>
@@ -122,7 +121,6 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(GetGameFrame);
 	REGISTER_LUA_CFUNC(GetGameSeconds);
-	REGISTER_LUA_CFUNC(GetPrevFrameChecksum);
 
 	REGISTER_LUA_CFUNC(GetGameRulesParam);
 	REGISTER_LUA_CFUNC(GetGameRulesParams);
@@ -931,39 +929,6 @@ int LuaSyncedRead::GetGameFrame(lua_State* L)
 int LuaSyncedRead::GetGameSeconds(lua_State* L)
 {
 	lua_pushnumber(L, gs->GetLuaSimFrame() * INV_GAME_SPEED);
-	return 1;
-}
-
-
-/***
- *
- * Returns the engine's final sync checksum for the previous simulation
- * frame as an 8-character lowercase hex string (e.g. `"fade1eaf"`).
- * The value is stable for the entire duration of the current frame
- * (independent of gadget/callin ordering) and is identical across all
- * in-sync clients, so it can be folded into a deterministic per-run
- * artifact for sync testing (e.g. fightertest).
- *
- * Returned as a string rather than a number because Spring's Lua is
- * built with `LUA_NUMBER = float`, which cannot represent a 32-bit
- * checksum losslessly.
- *
- * Returns `nil` on builds without `SYNCCHECK`. Check
- * `Engine.FeatureSupport.hasChecksums` to detect availability.
- *
- * @function Spring.GetPrevFrameChecksum
- *
- * @return string|nil checksum
- */
-int LuaSyncedRead::GetPrevFrameChecksum(lua_State* L)
-{
-#ifdef SYNCCHECK
-	char buf[16];
-	snprintf(buf, sizeof(buf), "%08x", CSyncChecker::GetPrevChecksum());
-	lua_pushstring(L, buf);
-#else
-	lua_pushnil(L);
-#endif
 	return 1;
 }
 

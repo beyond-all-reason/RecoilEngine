@@ -623,9 +623,9 @@ void CGame::ClientReadNet()
 				ASSERT_SYNCED(CSyncChecker::GetChecksum());
 				clientNet->Send(CBaseNetProtocol::Get().SendSyncResponse(gu->myPlayerNum, gs->frameNum, CSyncChecker::GetChecksum()));
 
-				// Cache the just-sent, frame-closed checksum so Lua gadgets
-				// running in the NEXT sim frame can read a stable value via
-				// Spring.GetPrevFrameChecksum(). Must happen before the
+				// Cache the just-closed frame's checksum so Lua can read a
+				// stable value during the next sim frame via
+				// Spring.GetPrevFrameSyncChecksum(). Must run before the
 				// 4096-frame reset below so we capture the pre-reset value.
 				CSyncChecker::SetPrevChecksum(CSyncChecker::GetChecksum());
 

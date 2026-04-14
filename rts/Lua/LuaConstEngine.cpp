@@ -28,7 +28,6 @@
  * @field noHandicapForReclaim boolean Whether handicap is applied to income from reclaim
  * @field groupAddDoesntSelect boolean Whether 'group add' also selects the group (does both if false)
  * @field deadTeamsKeepUnitLimit boolean Whether engine redistributes dead team unitlimit to allies (false) or keeps it as-is (true)
- * @field hasChecksums boolean Whether the engine was built with SYNCCHECK (i.e. Spring.GetPrevFrameChecksum() returns a value)
  */
 
 /***
@@ -47,6 +46,7 @@
  * @field gameSpeed number Number of simulation gameframes per second
  * @field textColorCodes TextColorCode Table containing keys that represent the color code operations during font rendering
  * @field isHeadless boolean? Whether this is a headless engine build. Not available in synced
+ * @field hasSyncChecksums boolean? Whether the engine was built with sync-check support (i.e. Spring.GetPrevFrameSyncChecksum() returns a meaningful value). Not available in synced
  */
 
 bool LuaConstEngine::PushEntries(lua_State* L)
@@ -60,6 +60,14 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	LuaPushNamedString(L, "buildFlags"     , SpringVersion::GetAdditional());
 	LuaPushNamedNumber(L, "wordSize", (!CLuaHandle::GetHandleSynced(L))? Platform::NativeWordSize() * 8: 0);
 
+	if (!CLuaHandle::GetHandleSynced(L)) {
+#ifdef SYNCCHECK
+		LuaPushNamedBool(L, "hasSyncChecksums", true);
+#else
+		LuaPushNamedBool(L, "hasSyncChecksums", false);
+#endif
+	}
+
 	LuaPushNamedNumber(L, "gameSpeed", GAME_SPEED);
 	LuaPushNamedNumber(L, "maxCustomPaletteID", MAX_CUSTOM_COLORS - 1);
 
@@ -71,7 +79,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	 *
 	 * will be compatible even on engines that don't yet know about the entry at all. */
 	lua_pushliteral(L, "FeatureSupport");
-	lua_createtable(L, 0, 12);
+	lua_createtable(L, 0, 11);
 		LuaPushNamedBool(L, "NegativeGetUnitCurrentCommand", true);
 		LuaPushNamedBool(L, "hasExitOnlyYardmaps", true);
 		LuaPushNamedNumber(L, "rmlUiApiVersion", 1);
@@ -85,11 +93,6 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "noHandicapForReclaim", true);
 		LuaPushNamedBool(L, "groupAddDoesntSelect", true);
 		LuaPushNamedBool(L, "deadTeamsKeepUnitLimit", false);
-#ifdef SYNCCHECK
-		LuaPushNamedBool(L, "hasChecksums", true);
-#else
-		LuaPushNamedBool(L, "hasChecksums", false);
-#endif
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");

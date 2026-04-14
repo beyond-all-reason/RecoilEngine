@@ -75,6 +75,7 @@
 #include "System/Sound/ISound.h"
 #include "System/Sound/ISoundChannels.h"
 #include "System/StringUtil.h"
+#include "System/Sync/SyncChecker.h"
 #include "System/Misc/SpringTime.h"
 #include "System/ScopedResource.h"
 #include "System/Math/NURBS.h"
@@ -120,6 +121,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetGameSecondsInterpolated);
 	REGISTER_LUA_CFUNC(GetLastUpdateSeconds);
 	REGISTER_LUA_CFUNC(GetVideoCapturingMode);
+	REGISTER_LUA_CFUNC(GetPrevFrameSyncChecksum);
 
 	REGISTER_LUA_CFUNC(GetNumDisplays);
 	REGISTER_LUA_CFUNC(GetViewGeometry);
@@ -1232,6 +1234,35 @@ int LuaUnsyncedRead::GetLastUpdateSeconds(lua_State* L)
 int LuaUnsyncedRead::GetVideoCapturingMode(lua_State* L)
 {
 	lua_pushboolean(L, videoCapturing->AllowRecord());
+	return 1;
+}
+
+
+/***
+ *
+ * Returns the engine's sync checksum for the previous simframe,
+ * useful for testing. The returned string is NOT convertible to
+ * a number within Lua.
+ *
+ * Returns a dummy value if `Engine.hasSyncChecksums` is false,
+ * or if no frames were processed yet.
+ *
+ * @function Spring.GetPrevFrameSyncChecksum
+ *
+ * @return string checksum
+ */
+int LuaUnsyncedRead::GetPrevFrameSyncChecksum(lua_State* L)
+{
+#ifdef SYNCCHECK
+	unsigned checksum = CSyncChecker::GetPrevChecksum();
+#else
+	unsigned checksum = 0;
+#endif
+
+	char buf[9];
+	snprintf(buf, sizeof(buf), "%08x", checksum);
+	lua_pushstring(L, buf);
+
 	return 1;
 }
 
