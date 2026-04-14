@@ -446,10 +446,6 @@ void CSound::OpenOpenALDevice(const std::string& deviceName)
 
 #ifdef ALC_SOFT_loopback
 
-static LPALCLOOPBACKOPENDEVICESOFT alcLoopbackOpenDeviceSOFT;
-static LPALCISRENDERFORMATSUPPORTEDSOFT alcIsRenderFormatSupportedSOFT;
-static LPALCRENDERSAMPLESSOFT alcRenderSamplesSOFT;
-
 static void SDLCALL RenderSDLSamples(void* userdata, Uint8* stream, int len)
 {
 	CSound* snd = reinterpret_cast<CSound*>(userdata);
@@ -578,15 +574,6 @@ void CSound::OpenLoopbackDevice(const std::string& deviceName)
 	}
 
 #ifdef ALC_SOFT_loopback
-#define LOAD_PROC(x) ((x) = (decltype(x)) alcGetProcAddress(nullptr, #x))
-	LOAD_PROC(alcLoopbackOpenDeviceSOFT);
-	LOAD_PROC(alcIsRenderFormatSupportedSOFT);
-	LOAD_PROC(alcRenderSamplesSOFT);
-#undef LOAD_PROC
-
-	if (alcLoopbackOpenDeviceSOFT == nullptr || alcIsRenderFormatSupportedSOFT == nullptr || alcRenderSamplesSOFT == nullptr)
-		return;
-
 	if (!configHandler->GetBool("UseSDLAudio")) {
 		LOG("[Sound::%s] UseSDLAudio is NOT set, falling back to openal-soft backends", __func__);
 		return;

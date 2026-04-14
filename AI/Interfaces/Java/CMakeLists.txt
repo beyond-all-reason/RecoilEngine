@@ -530,12 +530,6 @@ if    (BUILD_${myName}_AIINTERFACE)
 
 	# Build the native part
 	# ---------------------
-	if    (MINGW)
-		# It is important that this is used instead of the one
-		# from the installed JDK, as the jni_md.h is in here too,
-		# and this file contains OS (win32) specific information.
-		include_directories(BEFORE ${MINGWLIBS}/include/java)
-	endif (MINGW)
 	include_directories(BEFORE "${rts}/lib/streflop" "${myNativeSourceDir}" "${myNativeGeneratedSourceDir}")
 	add_library(${myNativeTarget} MODULE ${myNativeSources} ${myNativeGeneratedSources} ${ai_common_SRC} ${myVersionDepFile})
 	add_dependencies(${myNativeTarget} generateVersionFiles)

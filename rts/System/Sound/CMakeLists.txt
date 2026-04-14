@@ -30,7 +30,6 @@ if    (NOT NO_SOUND)
 			Null/NullSound.cpp
 			OpenAL/ALShared.cpp
 			OpenAL/EFX.cpp
-			OpenAL/EFXfuncs.cpp
 			OpenAL/EFXPresets.cpp
 			OpenAL/AudioChannel.cpp
 			OpenAL/OggDecoder.cpp
@@ -47,12 +46,13 @@ if    (NOT NO_SOUND)
 	find_package_static(OpenAL 1.18.2 REQUIRED)
 	find_package_static(OggVorbis 1.3.4 REQUIRED)
 
-	find_package(SDL2 MODULE REQUIRED)
+	find_package(SDL2 REQUIRED)
 
 	include_directories(${CMAKE_SOURCE_DIR}/include/)
 	include_directories(${CMAKE_SOURCE_DIR}/include/AL)
 
 	add_library(sound STATIC EXCLUDE_FROM_ALL ${soundSources})
+	target_compile_definitions(sound PRIVATE AL_ALEXT_PROTOTYPES)
 	target_link_libraries(sound SDL2::SDL2)
 	target_link_libraries(sound vorbis::vorbisfile vorbis::vorbis Ogg::ogg)
 	target_link_libraries(sound OpenAL::OpenAL)

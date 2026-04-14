@@ -11,10 +11,11 @@ if [[ $(id -u) -eq 0 && -z "${SKIP_ROOT_CHECK:-}" ]]; then
   exit 2
 fi
 
-USAGE="Usage: $0 [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] {windows|linux} [cmake_flag...]"
+USAGE="Usage: $0 [--help] [--configure|--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] [--local-conan] {windows|linux} [cmake_flag...]"
 export CONFIGURE=true
 export COMPILE=true
 export CMAKE_BUILD_PARALLEL_LEVEL=
+export LOCAL_CONAN=false
 
 case $(uname -m) in
   x86_64) ARCH=amd64 ;;
@@ -38,11 +39,12 @@ while (( $# > 0 )); do
     -h|--help)
       echo "$USAGE"
       echo "Options:"
-      echo "  -h, --help   print this help message"
-      echo "  --configure  only configure, don't compile"
-      echo "  --compile    only compile, don't configure"
-      echo "  -j, --jobs   number of concurrent processes to use when building"
-      echo "  --arch       arm64 or amd64, defaults to host"
+      echo "  -h, --help     print this help message"
+      echo "  --configure    only configure, don't compile"
+      echo "  --compile      only compile, don't configure"
+      echo "  -j, --jobs     number of concurrent processes to use when building"
+      echo "  --arch         arm64 or amd64, defaults to host"
+      echo "  --local-conan  compile dependencies instead of using precompiled ones"
       echo ""
       echo "Some behaviors can be changed by setting environment variables. Consult the script source for those more advanced use cases."
       exit 0
@@ -63,6 +65,10 @@ while (( $# > 0 )); do
       fi
       CMAKE_BUILD_PARALLEL_LEVEL="$1"
       shift
+      ;;
+    --local-conan)
+      shift
+      LOCAL_CONAN=true
       ;;
     windows|linux)
       OS="$1"
@@ -169,6 +175,14 @@ else
   P="/"
 fi
 
+CONAN_MOUNTS=""
+if $LOCAL_CONAN; then
+  mkdir -p .cache/conan-$PLATFORM/profiles build-$PLATFORM/conan
+  cp docker-build-v2/images/$ARCH-all/conan_build_profile .cache/conan-$PLATFORM/profiles
+  cp docker-build-v2/images/$PLATFORM/conan_profile .cache/conan-$PLATFORM/profiles
+  CONAN_MOUNTS="-v "$CWD${P}.cache${P}conan-${PLATFORM}${P}":/build/conan-home:z,rw -v $CWD${P}build-${PLATFORM}${P}conan${P}:/build/conan-out:z,rw"
+fi
+
 # Handle git worktrees: the container needs access to the shared .git directory
 # for version generation. In a worktree, --absolute-git-dir returns the
 # worktree-specific dir while --git-common-dir returns the shared .git root.
@@ -181,12 +195,15 @@ fi
 
 $RUNTIME run --platform=linux/$ARCH -it --rm \
     -v "$CWD${P}":/build/src:z,ro \
-    -v "$CWD${P}.cache${P}ccache-$PLATFORM":/build/cache:z,rw \
-    -v "$CWD${P}build-$PLATFORM":/build/out:z,rw \
+    -v "$CWD${P}.cache${P}ccache-${PLATFORM}${P}":/build/cache:z,rw \
+    -v "$CWD${P}build-${PLATFORM}${P}":/build/out:z,rw \
     $UID_FLAGS \
+    $CONAN_MOUNTS \
+    -e LOCAL_CONAN \
     $WORKTREE_MOUNTS \
     -e CONFIGURE \
     -e COMPILE \
+    -e OS \
     -e CMAKE_BUILD_PARALLEL_LEVEL \
     "${EXTRA_ARGS[@]}" \
     $IMAGE \
@@ -208,6 +225,7 @@ if [[ "$(id -u)" != "$(stat -c %u /build/src)" ]]; then
 fi
 
 cd /build/src/docker-build-v2/scripts
+$CONFIGURE && $LOCAL_CONAN && ./deps.sh
 $CONFIGURE && ./configure.sh "$@"
 if $COMPILE; then
   if $CONFIGURE; then

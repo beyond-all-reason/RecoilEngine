@@ -152,41 +152,6 @@ else  (UNIX AND NOT MINGW)
 	set(DOCDIR  "doc" CACHE STRING "Where to install basic project documentation (README, LICENSE, etc.)")
 	set(DATADIR "." CACHE STRING "Where to install game content")
 
-	if    (NOT MINGWLIBS)
-		if (DEFINED ENV{MINGWLIBS})
-			set(MINGWLIBS $ENV{MINGWLIBS} CACHE PATH "Location of the mingwlibs package")
-		elseif(MSVC)
-			set(MINGWLIBS ${CMAKE_SOURCE_DIR}/vclibs64 CACHE PATH "Location of the vclibs package")
-		else()
-			set(MINGWLIBS ${CMAKE_SOURCE_DIR}/mingwlibs64 CACHE PATH "Location of the mingwlibs package")
-		endif()
-	endif ()
-	if    (EXISTS "${MINGWLIBS}" AND IS_DIRECTORY "${MINGWLIBS}")
-		if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.17.0")
-			#rectifying dll search issue present in CMake >= 3.17.0, see https://discourse.cmake.org/t/findzlib-fails-starting-with-cmake-3-17/6046/4
-			set(CMAKE_FIND_LIBRARY_SUFFIXES ".dll" ${CMAKE_FIND_LIBRARY_SUFFIXES})
-		endif()
-
-		# MinGW needs an additional library, mwindows
-		# It's total link flags should look like -lmingw32 -lSDL2main -lSDL2 -lmwindows
-		# (Actually on second look, I think it only needs one of the m* libraries.)
-		if(NOT MSVC)
-			set(MINGW32_LIBRARY mingw32 CACHE STRING "mwindows for MinGW")
-		endif(NOT MSVC)
-		set(SDL2_INCLUDE_DIR "${MINGWLIBS}/include/SDL2")
-		set(CMAKE_PREFIX_PATH ${MINGWLIBS})
-		include_directories(${MINGWLIBS}/include)
-		set(CMAKE_LIBRARY_PATH ${MINGWLIBS}/dll ${MINGWLIBS}/lib)
-
-		# some cross-compile fixes
-		set(CMAKE_FIND_ROOT_PATH ${MINGWLIBS} ${CMAKE_FIND_ROOT_PATH})
-		set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-		set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-	else()
-		message(WARNING "Compiling for windows. MINGWLIBS '${MINGWLIBS}' is not a valid directory, trying system libs")
-	endif ()
-
-
 	add_definitions(-D_WIN32_WINNT=0x0601) ## Win7 is minimum due to processor group affinity
 	add_definitions(-D__USE_MINGW_ANSI_STDIO=1) ## use __mingw_sprintf instead of __builtin_sprintf (it's used by lua in a synced way, and builtin doesn't sync)
 
@@ -314,7 +279,7 @@ endif (RECOIL_DETAILED_TRACY_ZONING)
 
 # Note the missing REQUIRED, as headless & dedi may not depend on those.
 #  So req. checks are done in the build target's CMakeLists.txt.
-find_package(SDL2 MODULE)
+find_package(SDL2)
 
 find_package_static(DevIL 1.8.0 REQUIRED)
 

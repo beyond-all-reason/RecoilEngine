@@ -21,7 +21,6 @@ set(ENGINE_SOURCE_DIR "${CMAKE_SOURCE_DIR}/rts")
 include_directories(${ENGINE_SOURCE_DIR})
 include_directories(${ENGINE_SOURCE_DIR}/lib/asio/include)
 include_directories(${ENGINE_SOURCE_DIR}/lib/nowide/include)
-
 add_definitions(-DSYNCCHECK -DUNIT_TEST)
 remove_definitions(-DTHREADPOOL)
 
@@ -65,6 +64,7 @@ set(test_common_libraries
 	Tracy::TracyClient
 	Catch2
 	fmt::fmt
+	${ZLIB_LIBRARIES}
 )
 
 add_custom_target(tests)
