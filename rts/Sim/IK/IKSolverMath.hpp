@@ -4,7 +4,6 @@
 
 #include <vector>
 #include <cstdint>
-#include <cmath>
 
 #include "System/float3.h"
 #include "System/SpringMath.h"
@@ -19,36 +18,18 @@ namespace IK {
 	/// bone directions, which is critical for hinge joint constraints.
 	inline CQuaternion MakeOrientationFromBoneDir(const float3& boneDir)
 	{
-		float3 fwd = boneDir;
-		fwd.SafeNormalize();
+		const float3& z = boneDir;
 
-		// Step 1: Minimal rotation from (0,0,1) to fwd (has arbitrary roll).
-		CQuaternion Q = CQuaternion::MakeFrom(kBoneRestAxis, fwd);
+		float3 y = UpVector - z * z.dot(UpVector);
+		if unlikely(auto ySqLen = y.SqLength(); ySqLen < float3::apx_eps()) {
+			return CQuaternion::MakeFrom(kBoneRestAxis, z); // degenerate case
+		} else {
+			y *= math::isqrt(ySqLen);
+		}
 
-		// Step 2: Compute desired Y — model up projected perpendicular to fwd.
-		float3 desiredY = UpVector - fwd * fwd.dot(UpVector);
-		if (desiredY.SqLength() < float3::apx_eps())
-			return Q; // fwd is parallel to up, roll is undefined
-		desiredY.SafeNormalize();
+		float3 x = y.cross(z); // x is already normalized since y and z are orthogonal
 
-		// Step 3: Compute current Y in the same perpendicular plane.
-		float3 curY = Q.Rotate(UpVector);
-		curY = curY - fwd * curY.dot(fwd);
-		if (curY.SqLength() < float3::apx_eps())
-			return Q;
-		curY.SafeNormalize();
-
-		// Step 4: Roll angle to align curY with desiredY (rotation around fwd).
-		const float cosA = curY.dot(desiredY);
-		const float sinA = curY.cross(desiredY).dot(fwd);
-		const float roll = math::atan2(sinA, cosA);
-
-		if (math::fabs(roll) < float3::cmp_eps())
-			return Q;
-
-		// Step 5: Apply roll correction.
-		const CQuaternion rollFix = CQuaternion::MakeFrom(roll, fwd);
-		return (rollFix * Q).Normalize();
+		return CQuaternion::MakeFromAxes(x, y, z);
 	}
 
 	inline float3 BoneDirFromOrientation(const CQuaternion& orientation)
