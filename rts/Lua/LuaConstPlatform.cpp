@@ -129,8 +129,8 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	LuaPushNamedString(L, "osVersion", Platform::GetOSVersionStr());
 	/*** @field Platform.osFamily "Windows"|"Linux"|"MacOSX"|"FreeBSD"|"Unknown" */
 	LuaPushNamedString(L, "osFamily", Platform::GetOSFamilyStr());
-	/*** @field Platform.arch string CPU architecture (e.g., "x86_64", "arm64", "aarch64") */
-	LuaPushNamedString(L, "arch", Platform::GetArchStr());
+	/*** @field Platform.architecture string CPU architecture (e.g., "x86_64", "arm64") */
+	LuaPushNamedString(L, "architecture", Platform::GetArchitectureStr());
 	/*** @field Platform.hwConfig string */
 	LuaPushNamedString(L, "hwConfig", Platform::GetHardwareStr());
 	/*** @field Platform.cpuLogicalCores integer */
