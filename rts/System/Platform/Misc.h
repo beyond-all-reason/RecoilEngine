@@ -85,17 +85,7 @@ namespace Platform
 	std::string GetOSFamilyStr();
 	std::string GetWordSizeStr();
 	std::string GetPlatformStr(); // OS family + wordsize
-	// CPU architecture (e.g., "x86_64", "arm64")
-	constexpr const char* GetArchitectureStr()
-	{
-		#if defined(__x86_64__) || defined(__amd64__) || defined(_M_X64) || defined(_M_AMD64)
-		return "x86_64";
-		#elif defined(__aarch64__) || defined(_M_ARM64)
-		return "arm64";
-		#else
-		#error "Unsupported architecture"
-		#endif
-	}
+	std::string GetArchitectureStr(); // CPU architecture (e.g., "x86_64", "arm64")
 	std::string GetHardwareStr(); // processor + memory
 	std::string GetSysInfoHash();
 	std::string GetMacAddrHash();
