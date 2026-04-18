@@ -627,8 +627,8 @@ int LuaUnsyncedRead::GetLuaMemUsage(lua_State* L)
 
 	// sum up the individual (unsynced and synced) state footprints
 	for (bool synced: {false, true}) {
-		lgs.allocedBytes = {0};
-		lgs.numLuaAllocs = {0};
+		lgs.allocedBytes = 0;
+		lgs.numLuaAllocs = 0;
 
 		for (const luaContextData* lcd: *LUAHANDLE_CONTEXTS[synced]) {
 			lhs = &lcd->allocState;

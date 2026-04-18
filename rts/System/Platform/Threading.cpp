@@ -201,10 +201,11 @@ namespace Threading {
 			, [affinityMask](const auto& gc) -> bool { return !!(affinityMask & gc.groupMask); });
 		
 		std::call_once(preferredMaskDetailsLogFlag, [&](){
-			if (preferredCache != pc.groupCaches.end())
+			if (preferredCache != pc.groupCaches.end()) {
 				LOG("[Threading] Preferred performance cache mask is: 0x%08x (L3 sized: %dKB)", preferredCache->groupMask, preferredCache->cacheSizes[2]/1024);
-			else
+			} else {
 				LOG_L(L_WARNING, "[Threading] Failed to find a preferred performance cache mask");
+			}
 		});
 
 		const uint32_t policy = affinityMask
@@ -241,10 +242,11 @@ namespace Threading {
 		const uint32_t fallbackThreadCount = GetPerformanceCpuCores();
 		
 		std::call_once(optimalThreadCountLogFlag, [&](){
-			if (optimalThreadCount > 0)
+			if (optimalThreadCount > 0) {
 				LOG("[Threading] Optimal thread count is %d", optimalThreadCount);
-			else
+			} else {
 				LOG_L(L_WARNING, "[Threading] Failed to determine optimal thread count. Falling back to %d", fallbackThreadCount);
+			}
 		});
 
 		return (optimalThreadCount > 0) ? optimalThreadCount : fallbackThreadCount;
