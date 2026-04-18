@@ -3,8 +3,12 @@
 #ifndef ASS_IO_H
 #define ASS_IO_H
 
+// assimp public headers modify #pragma pack across includes (clang -Wpragma-pack)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wpragma-pack"
 #include "lib/assimp/include/assimp/IOStream.hpp"
 #include "lib/assimp/include/assimp/IOSystem.hpp"
+#pragma clang diagnostic pop
 class CFileHandler;
 
 // Custom implementation of Assimp IOStream to support Spring's VFS
