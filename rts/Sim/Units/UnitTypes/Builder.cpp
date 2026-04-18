@@ -470,7 +470,7 @@ bool CBuilder::UpdateResurrect(const Command& fCommand)
 			// in params[0] was coming from and traced it back to this WTF hack,
 			// increment the number of wasted hours below:
 			//   number_of_hours_wasted = 3;
-			c.SetParam(0, INT_MAX / 2);
+			c.SetParam(0, static_cast<float>(INT_MAX / 2));
 		}
 
 		// this takes one simframe to do the deletion
