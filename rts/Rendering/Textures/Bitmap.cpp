@@ -1230,7 +1230,7 @@ bool CBitmap::Load(std::string const& filename, float defaultAlpha, uint32_t req
 	// files ending in ".DDS" would appear upside-down if loaded by nv_dds
 	//
 	// const bool loadDDS = (filename.find(".dds") != std::string::npos || filename.find(".DDS") != std::string::npos);
-	const bool loadDDS = (FileSystem::GetExtension(filename) == "dds"); // always lower-case
+	const bool loadDDS = (FileSystem::GetExtensionLowerCase(filename) == "dds");
 	const bool flipDDS = (filename.find("unitpics") == std::string::npos); // keep buildpics as-is
 
 	const size_t curMemSize = GetMemSize();
@@ -1585,7 +1585,7 @@ bool CBitmap::Save(const std::string& filename, bool dontSaveAlpha, bool logged,
 		assert(ilGetError() == IL_NO_ERROR);
 	}
 
-	const std::string& fsImageExt = FileSystem::GetExtension(filename);
+	const std::string& fsImageExt = FileSystem::GetExtensionLowerCase(filename);
 	const std::string& fsFullPath = dataDirsAccess.LocateFile(filename, FileQueryFlags::WRITE);
 	const std::wstring& ilFullPath = std::wstring(fsFullPath.begin(), fsFullPath.end());
 
@@ -1702,7 +1702,7 @@ bool CBitmap::SaveFloat(std::string const& filename) const
 
 	ITexMemPool::texMemPool->FreeRaw(reinterpret_cast<uint8_t*>(ctb), channels * xsize * ysize * sizeof(ConvertType));
 
-	const std::string fsImageExt = FileSystem::GetExtension(filename);
+	const std::string fsImageExt = FileSystem::GetExtensionLowerCase(filename);
 	const std::string fsFullPath = dataDirsAccess.LocateFile(filename, FileQueryFlags::WRITE);
 	const std::wstring ilFullPath = std::wstring(fsFullPath.begin(), fsFullPath.end());
 

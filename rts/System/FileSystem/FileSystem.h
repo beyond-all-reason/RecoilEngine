@@ -172,7 +172,7 @@ public:
 	 * "/home/user/.spring/test.txt..." -> "txt"
 	 * "/home/user/.spring/test.txt. . ." -> "txt"
 	 */
-	static std::string GetExtension(const std::string& path);
+	static std::string GetExtensionLowerCase(const std::string& path);
 	/**
 	 * Converts the given path into a canonicalized one.
 	 * CAUTION: be careful where using this, as it easily allows to link to

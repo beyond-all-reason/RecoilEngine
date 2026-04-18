@@ -895,7 +895,7 @@ std::string FileSystem::GetBasename(const std::string& pathStr)
 	return Impl::StorePathAsString(p.stem());
 }
 
-std::string FileSystem::GetExtension(const std::string& pathStr)
+std::string FileSystem::GetExtensionLowerCase(const std::string& pathStr)
 {
 	const auto p = Recoil::filesystem::u8path(pathStr);
 	auto ext = p.extension().generic_u8string();

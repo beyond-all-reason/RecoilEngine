@@ -183,7 +183,7 @@ static std::string LocateSymbolFile(const std::string& binaryFile)
 
 	const std::string binPath = FileSystem::GetDirectory(binaryFile);
 	const std::string binFile = FileSystem::GetFilename(binaryFile);
-	// const std::string binExt  = FileSystem::GetExtension(binaryFile);
+	// const std::string binExt  = FileSystem::GetExtensionLowerCase(binaryFile);
 
 	if (FileSystem::IsReadableFile(symbolFile = binPath + binFile + ".dbg"))
 		return symbolFile;

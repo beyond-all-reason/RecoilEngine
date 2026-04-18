@@ -163,7 +163,7 @@ namespace Impl {
 		RECOIL_DETAILED_TRACY_ZONE;
 		std::string fileName = StringToLower(name);
 
-		if (FileSystem::GetExtension(fileName).empty())
+		if (FileSystem::GetExtensionLowerCase(fileName).empty())
 			fileName += ".bmp";
 
 		std::string fullName = fileName;
@@ -182,7 +182,7 @@ namespace Impl {
 		if (!bm.Load(fullName))
 			return std::make_tuple(LoadResult::BITMAP_ERROR, CBitmap(), fullName);
 
-		if (convertDecalBitmap && FileSystem::GetExtension(fullName) == "bmp") {
+		if (convertDecalBitmap && FileSystem::GetExtensionLowerCase(fullName) == "bmp") {
 			// bitmaps don't have an alpha channel
 			// so use: red := brightness & green := alpha
 			auto* rmem = bm.GetRawMem();

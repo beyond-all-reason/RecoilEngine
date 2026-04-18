@@ -551,7 +551,7 @@ void CAssParser::Load(S3DModel& model, const std::string& modelFilePath)
 	}
 
 	if (modelTable.GetBool("nodenamesfromids", false)) {
-		assert(FileSystem::GetExtension(modelFilePath) == "dae");
+		assert(FileSystem::GetExtensionLowerCase(modelFilePath) == "dae");
 		PreProcessFileBuffer(fileBuf);
 	}
 

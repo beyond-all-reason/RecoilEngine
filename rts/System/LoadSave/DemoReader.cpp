@@ -51,8 +51,8 @@ static bool CheckDemoHeader(const DemoFileHeader& fileHeader)
 
 CDemoReader::CDemoReader(const std::string& filename, float curTime): playbackDemo(new CGZFileHandler(filename, SPRING_VFS_PWD_ALL))
 {
-	if (FileSystem::GetExtension(filename) != "sdfz")
-		throw content_error("Unknown demo extension: " + FileSystem::GetExtension(filename));
+	if (FileSystem::GetExtensionLowerCase(filename) != "sdfz")
+		throw content_error("Unknown demo extension: " + FileSystem::GetExtensionLowerCase(filename));
 
 	// file not found -> exception
 	if (!playbackDemo->FileExists())

@@ -605,7 +605,7 @@ std::string CArchiveScanner::SearchMapFile(const IArchive* ar, std::string& erro
 	// check for smf and if the uncompression of important files is too costy
 	for (uint32_t fid = 0; fid != ar->NumFiles(); ++fid) {
 		const auto& fn = ar->FileName(fid);
-		const std::string ext = FileSystem::GetExtension(StringToLower(fn));
+		const std::string ext = FileSystem::GetExtensionLowerCase(StringToLower(fn));
 
 		if (ext == "smf")
 			return fn;
@@ -832,7 +832,7 @@ bool CArchiveScanner::CheckCachedData(const std::string& fullName, uint32_t& mod
 {
 	// virtual archives do not exist on disk, and thus do not have a modification time
 	// they should still be scanned as normal archives so we only skip the cache-check
-	if (FileSystem::GetExtension(fullName) == "sva")
+	if (FileSystem::GetExtensionLowerCase(fullName) == "sva")
 		return false;
 
 	// if stat fails, assume the archive is not broken nor cached
@@ -1801,7 +1801,7 @@ CArchiveScanner::ArchiveData CArchiveScanner::GetArchiveDataByArchive(const std:
 int CArchiveScanner::GetMetaFileClass(const std::string& filePath)
 {
 	const std::string& lowerFilePath = StringToLower(filePath);
-	// const std::string& ext = FileSystem::GetExtension(lowerFilePath);
+	// const std::string& ext = FileSystem::GetExtensionLowerCase(lowerFilePath);
 	const auto it = metaFileClasses.find(lowerFilePath);
 
 	if (it != metaFileClasses.end())

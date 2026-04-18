@@ -778,7 +778,7 @@ int LuaUtils::PushModelName(lua_State* L, const SolidObjectDef* def)
 int LuaUtils::PushModelType(lua_State* L, const SolidObjectDef* def)
 {
 	const std::string& modelPath = modelLoader.FindModelPath(def->modelName);
-	const std::string& modelType = StringToLower(FileSystem::GetExtension(modelPath));
+	const std::string& modelType = StringToLower(FileSystem::GetExtensionLowerCase(modelPath));
 	lua_pushsstring(L, modelType);
 	return 1;
 }
