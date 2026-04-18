@@ -903,7 +903,7 @@ std::string FileSystem::GetExtension(const std::string& pathStr)
 		return "";
 
 	assert(ext[0] == u8'.');
-	return Impl::StorePathAsString(ext.substr(1, ext.length() - 1));
+	return StringToLower(Impl::StorePathAsString(ext.substr(1, ext.length() - 1)));
 }
 
 std::string FileSystem::GetNormalizedPath(const std::string& path) {
