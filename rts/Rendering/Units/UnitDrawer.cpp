@@ -367,8 +367,10 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, 
 
 			std::swap(posX, posY);
 			break;
+		case CMiniMap::ROTATION_0:
+			break;
 	}
-	
+
 	float x0 = posX - iconSizeX;
 	float x1 = posX + iconSizeX;
 	float y0 = posY - iconSizeY;

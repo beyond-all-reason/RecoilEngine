@@ -356,11 +356,11 @@ void ITexMemPool::Init(size_t size)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (size == 0) {
-		if (texMemPool == nullptr || typeid(*texMemPool.get()) != typeid(TexNoMemPool))
+		if (dynamic_cast<TexNoMemPool*>(texMemPool.get()) == nullptr)
 			texMemPool = std::make_unique<TexNoMemPool>();
 	}
 	else {
-		if (texMemPool == nullptr || typeid(*texMemPool.get()) != typeid(  TexMemPool))
+		if (dynamic_cast<  TexMemPool*>(texMemPool.get()) == nullptr)
 			texMemPool = std::make_unique<  TexMemPool>();
 	}
 	texMemPool->Resize(size);
@@ -405,6 +405,7 @@ public:
 	BitmapAction(CBitmap* bmp_)
 		: bmp{ bmp_ }
 	{}
+	virtual ~BitmapAction() = default;
 
 	BitmapAction(const BitmapAction& ba) = delete;
 	BitmapAction(BitmapAction&& ba) noexcept = delete;
