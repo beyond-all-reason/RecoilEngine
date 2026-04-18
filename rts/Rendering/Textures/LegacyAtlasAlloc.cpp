@@ -118,7 +118,7 @@ bool CLegacyAtlasAlloc::Allocate()
 				thisSub.clear();
 				continue;
 			}
-			if (thisSub.front().y + curtex->size.y > max.y) {
+			if (thisSub.front().y + curtex->size.y + padding > max.y) {
 				thisSub.pop_front();
 				continue;
 			}

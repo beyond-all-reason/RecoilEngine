@@ -70,6 +70,7 @@ namespace Rml::SolLua
 		bind_global(namespace_table, slp);
 		bind_vector(namespace_table);
 		bind_convert(namespace_table);
+		bind_stylesheet(namespace_table);
 	}
 
 } // end namespace Rml::SolLua

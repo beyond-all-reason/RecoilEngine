@@ -302,6 +302,7 @@ int LuaArchive::GetNameFromRapidTag(lua_State* L)
  * @x_helper
  * @field shortName string
  * @field version string
+ * @field isLuaAI boolean
  */
 
 /*** Get a list of all Spring AIs.
@@ -352,7 +353,7 @@ int LuaArchive::GetAvailableAIs(lua_State* L)
 		unsigned int count = 0;
 
 		for (const auto& luaAIInfo: luaAIInfoItems) {
-			lua_createtable(L, 0, luaAIInfo.size()); {
+			lua_createtable(L, 0, 3); {
 				for (const auto& luaAIInfoItem: luaAIInfo) {
 					if (luaAIInfoItem.key == SKIRMISH_AI_PROPERTY_SHORT_NAME) {
 						HSTR_PUSH_STRING(L, "shortName", luaAIInfoItem.GetValueAsString());
@@ -360,14 +361,16 @@ int LuaArchive::GetAvailableAIs(lua_State* L)
 						HSTR_PUSH_STRING(L, "version", luaAIInfoItem.GetValueAsString());
 					}
 				}
+				HSTR_PUSH_BOOL(L, "isLuaAI", true);
 			}
 			lua_rawseti(L, -2, ++count);
 		}
 
 		for (const auto& aiKey: skirmishAIKeys) {
-			lua_createtable(L, 0, 2); {
+			lua_createtable(L, 0, 3); {
 				HSTR_PUSH_STRING(L, "shortName", aiKey.GetShortName());
 				HSTR_PUSH_STRING(L, "version", aiKey.GetVersion());
+				HSTR_PUSH_BOOL(L, "isLuaAI", false);
 			}
 			lua_rawseti(L, -2, ++count);
 		}

@@ -11,7 +11,7 @@
 
 #include "Map/ReadMap.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
-#include "System/ChunkedArray.h"
+#include "System/ChunkedArray.hpp"
 #include "System/Rectangle.h"
 
 namespace QTPFS {

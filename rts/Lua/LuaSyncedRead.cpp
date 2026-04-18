@@ -202,6 +202,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(GetUnitNearestAlly);
 	REGISTER_LUA_CFUNC(GetUnitNearestEnemy);
+	REGISTER_LUA_CFUNC(GetClosestEnemyUnit);
 
 	REGISTER_LUA_CFUNC(GetUnitTooltip);
 	REGISTER_LUA_CFUNC(GetUnitDefID);
@@ -3334,9 +3335,10 @@ int LuaSyncedRead::GetUnitNearestAlly(lua_State* L)
  *
  * @function Spring.GetUnitNearestEnemy
  * @param unitID integer
- * @param range number? (Default: `1.0e9`)
- * @param useLOS boolean? (Default: `true`)
- * @return integer? unitID
+ * @param range number? (Default: `1.0e9`) range of the search.
+ * @param useLOS boolean? (Default: `true`) requires LOS/radar visibility of allied team.
+ * @param sphereDistTest boolean? (Default: `false`) determines if using spherical(3D, includes target radius) or cylindrical(2D) search.
+ * @param checkSightDist boolean? (Default: `false`) determine if during filter process, if candidate distance to be within candidate LOS radius.
  */
 int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 {
@@ -3363,6 +3365,53 @@ int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 	return 1;
 }
 
+/*** Returns the enemy unit closest to a position.
+ *
+ * @function Spring.GetClosestEnemyUnit
+ * @param x number x coordinate of query position
+ * @param y number y coordinate of query position
+ * @param z number z coordinate of query position
+ * @param range number? (Default: `1.0e9`)
+ * @param allyTeamID number? whose enemies to consider, always own in non-full-read contexts
+ * @param useLOS boolean? (Default: true) requires LOS/radar visibility or not. Always true in non-full-read contexts
+ * @param sphereDistTest boolean? (Default: `false`) For non-LOS mode only. Determines if using spherical(3D, includes target radius) or cylindrical(2D) search
+ * @param checkSightDist boolean? (Default: `false`) For non-LOS mode only. Determine if during filter process, if candidate distance to be within candidate LOS radius
+ * @return integer? unitID
+ */
+int LuaSyncedRead::GetClosestEnemyUnit(lua_State* L)
+{
+	const float3 pos
+		( luaL_checkfloat(L, 1)
+		, luaL_checkfloat(L, 2)
+		, luaL_checkfloat(L, 3)
+	);
+
+	const auto range = luaL_optnumber(L, 4, 1.0e9f);
+
+	const auto allyTeamID = CLuaHandle::GetHandleFullRead(L)
+		? luaL_checkint(L, 5)
+		: CLuaHandle::GetHandleReadAllyTeam(L)
+	;
+	if (!teamHandler.IsValidAllyTeam(allyTeamID))
+		return 0;
+
+	const auto wantLOS = luaL_optboolean(L, 6, true);
+	const auto testLOS = wantLOS || !CLuaHandle::GetHandleFullRead(L);
+
+	const auto sphereDistTest = luaL_optboolean(L, 7, false);
+	const auto checkSightDist = luaL_optboolean(L, 8, false);
+
+	const auto target = testLOS
+		? CGameHelper::GetClosestEnemyUnit         (nullptr, pos, range, allyTeamID)
+		: CGameHelper::GetClosestEnemyUnitNoLosTest(nullptr, pos, range, allyTeamID, sphereDistTest, checkSightDist)
+	;
+
+	if (target == nullptr)
+		return 0;
+
+	lua_pushnumber(L, target->id);
+	return 1;
+}
 
 /******************************************************************************
  * Spatial feature queries

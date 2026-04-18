@@ -3817,22 +3817,42 @@ public:
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		auto projFunc = []() {
+		auto args = CSimpleParser::Tokenize(action.GetArgs(), 1);
+
+		// extract optional file extension (last arg if not a known atlas name)
+		std::string fileExt = "png";
+		if (!args.empty()) {
+			auto lastArg = StringToLower(args.back());
+			switch (hashString(lastArg.c_str())) {
+				case hashString("proj"):
+				case hashString("3do"):
+				case hashString("decal"):
+				case hashString("decals"):
+				case hashString("icons"):
+					break;
+				default:
+					fileExt = std::move(lastArg);
+					args.pop_back();
+					break;
+			}
+		}
+
+		auto projFunc = [&fileExt]() {
 			LOG("Dumping projectile textures");
-			projectileDrawer->textureAtlas->DumpTexture("TextureAtlas");
-			projectileDrawer->groundFXAtlas->DumpTexture("GroundFXAtlas");
+			projectileDrawer->textureAtlas->DumpTexture("TextureAtlas", fileExt);
+			projectileDrawer->groundFXAtlas->DumpTexture("GroundFXAtlas", fileExt);
 		};
-		auto threeDoFunc = []() {
+		auto threeDoFunc = [&fileExt]() {
 			LOG("Dumping 3do atlas textures");
-			textureHandler3DO.DumpAtlasTextures();
+			textureHandler3DO.DumpAtlasTextures(fileExt);
 		};
-		auto decalsFunc = []() {
+		auto decalsFunc = [&fileExt]() {
 			LOG("Dumping decal atlas textures");
-			groundDecals->DumpAtlasTextures();
+			groundDecals->DumpAtlasTextures(fileExt);
 		};
-		auto iconsFunc = []() {
-			LOG("Dumping decal atlas textures");
-			icon::iconHandler.DumpAtlasTextures();
+		auto iconsFunc = [&fileExt]() {
+			LOG("Dumping icon atlas textures");
+			icon::iconHandler.DumpAtlasTextures(fileExt);
 		};
 		std::array argsExec = {
 			ArgTuple(hashString("proj"), false, projFunc),
@@ -3842,7 +3862,6 @@ public:
 			ArgTuple(hashString("icons"), false, iconsFunc)
 		};
 
-		auto args = CSimpleParser::Tokenize(action.GetArgs(), 1);
 		return GenericArgsExecutor(args, argsExec);
 	}
 };

@@ -1518,7 +1518,7 @@ void QTPFS::PathSearch::IterateNodeNeighbors(const INode* curNode, unsigned int 
 	// Allow units to escape if starting in a closed node - a cost of infinity would prevent them escaping.
 	const float curNodeSanitizedCost = curNode->AllSquaresImpassable() ? QTPFS_CLOSED_NODE_COST : curNode->GetMoveCost();
 
-	const std::vector<INode::NeighbourPoints>& nxtNodes = curNode->GetNeighbours();
+	const auto& nxtNodes = curNode->GetNeighbours();
 	for (unsigned int i = 0; i < nxtNodes.size(); i++) {
 		// NOTE:
 		//   this uses the actual distance that edges of the final path will cover,
