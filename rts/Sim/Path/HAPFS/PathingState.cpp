@@ -395,7 +395,7 @@ void PathingState::CalcVertexPathCosts(const MoveDef& moveDef, int2 block, unsig
 	// other four directions are stored at the adjacent vertices)
 	auto idx = BlockPosToIdx(block);
 	const uint8_t nodeLinksObsoleteFlags = blockStates.nodeLinksObsoleteFlags[idx]
-								  		 & (moveDef.allowDirectionalPathing) ? PATH_DIRECTIONS_MASK : PATH_DIRECTIONS_HALF_MASK;
+								  		 & ((moveDef.allowDirectionalPathing) ? PATH_DIRECTIONS_MASK : PATH_DIRECTIONS_HALF_MASK);
 
 	int pathdir = 0;
 	for (int checkBit = 1; checkBit <= PATHDIR_LEFT_DOWN_MASK; checkBit <<= 1, ++pathdir) {
