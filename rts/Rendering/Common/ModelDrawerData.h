@@ -49,7 +49,7 @@ public:
 	CModelDrawerDataBase(const std::string& ecName, int ecOrder, bool& mtModelDrawer_);
 	virtual ~CModelDrawerDataBase() override;
 public:
-	virtual void Update() = 0;
+	void Update() override = 0;
 protected:
 	virtual bool IsAlpha(const T* co) const = 0;
 private:

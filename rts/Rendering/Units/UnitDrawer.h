@@ -153,7 +153,7 @@ public:
 	void DrawUnitIconsScreen() const override;
 protected:
 	void DrawObjectsShadow(int modelType) const override;
-	void DrawOpaqueObjects(int modelType, bool drawReflection, bool drawRefraction) const;
+	void DrawOpaqueObjects(int modelType, bool drawReflection, bool drawRefraction) const override;
 	void DrawOpaqueObjectsAux(int modelType) const override; //AI units
 
 	void DrawAlphaObjects(int modelType, bool drawReflection, bool drawRefraction) const override;
