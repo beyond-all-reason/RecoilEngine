@@ -4480,8 +4480,6 @@ int LuaSyncedCtrl::AddUnitResource(lua_State* L)
 	return 0;
 }
 
-/*
-
 /***
  * @function Spring.UseUnitResource
  * @param unitID integer

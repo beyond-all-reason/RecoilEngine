@@ -168,7 +168,7 @@ public:
 		return mem;
 	}
 
-	void FreeRaw(uint8_t* mem, size_t size) {
+	void FreeRaw(uint8_t* mem, size_t size) override {
 		RECOIL_DETAILED_TRACY_ZONE;
 		if (mem == nullptr)
 			return;
@@ -207,7 +207,7 @@ public:
 			DefragRaw();
 	}
 
-	void Resize(size_t size) {
+	void Resize(size_t size) override {
 		RECOIL_DETAILED_TRACY_ZONE;
 		size = AlignUp(size, sizeof(uint64_t));
 
