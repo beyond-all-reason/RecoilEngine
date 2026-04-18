@@ -336,7 +336,7 @@ MoveDef::MoveDef(const LuaTable& moveDefTable): MoveDef() {
 		waterline = std::abs(moveDefTable.GetInt("waterline", defaultWaterline));
 		overrideUnitWaterline = moveDefTable.GetBool("overrideUnitWaterline", overrideUnitWaterline);
 	} else {
-		waterline = std::numeric_limits<int>::max();
+		waterline = std::numeric_limits<float>::max();
 	}
 
 	height = std::max(1, moveDefTable.GetInt("height", defaultHeight));
