@@ -179,9 +179,6 @@ public:
 		int allyteam,
 		bool synced,
 		BuildableData* buildableData = nullptr,
-		std::vector<float3>* canbuildpos = nullptr,
-		std::vector<float3>* featurepos = nullptr,
-		std::vector<float3>* nobuildpos = nullptr,
 		const std::vector<Command>* commands = nullptr,
 		int threadOwner = 0
 	);

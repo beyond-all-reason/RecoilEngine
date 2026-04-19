@@ -1371,18 +1371,12 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 	CFeature* feature = nullptr;
 
 	BuildableData buildableData;
-	std::vector<float3> buildableSquares;
-	std::vector<float3> featureSquares;
-	std::vector<float3> illegalSquares;
 
 	struct BuildCache {
 		uint64_t key;
 		int createFrame;
 		bool canBuild;
 		BuildableData buildableData;
-		std::vector<float3> buildableSquares;
-		std::vector<float3> featureSquares;
-		std::vector<float3> illegalSquares;
 	};
 
 	static std::vector<BuildCache> buildCache;
@@ -1411,9 +1405,6 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 	if (it != buildCache.end()) {
 		buildableData = it->buildableData;
 		canBuild = it->canBuild;
-		buildableSquares = it->buildableSquares;
-		featureSquares = it->featureSquares;
-		illegalSquares = it->illegalSquares;
 	}
 	else {
 		canBuild = !!CGameHelper::TestUnitBuildSquare(
@@ -1422,9 +1413,6 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 			-1,
 			false,
 			&buildableData,
-			&buildableSquares,
-			&featureSquares,
-			&illegalSquares,
 			&commands
 		);
 		buildCache.emplace_back();
@@ -1434,9 +1422,6 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 		buildCacheItem.canBuild = canBuild;
 		buildCacheItem.createFrame = gs->frameNum;
 		buildCacheItem.buildableData = buildableData;
-		buildCacheItem.buildableSquares = buildableSquares;
-		buildCacheItem.featureSquares = featureSquares;
-		buildCacheItem.illegalSquares = illegalSquares;
 	}
 
 	if (!CUnitDrawer::EngineBuildSquareRendering()) {
@@ -1467,34 +1452,38 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 	sh.Enable();
 
-	const float* color = canBuild ? &buildColorT[0] : &buildColorF[0];
-	for (const auto& buildableSquare : buildableSquares) {
-		rb.AddQuadLines(
-			{ buildableSquare                                      , color },
-			{ buildableSquare + float3(SQUARE_SIZE, 0, 0          ), color },
-			{ buildableSquare + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
-			{ buildableSquare + float3(0          , 0, SQUARE_SIZE), color }
-		);
-	}
+	const float* buildColor = canBuild ? &buildColorT[0] : &buildColorF[0];
+	const int numX = buildableData.xmax - buildableData.xmin + 1;
+	const int numZ = buildableData.zmax - buildableData.zmin + 1;
 
-	color = &featureColor[0];
-	for (const auto& featureSquare : featureSquares) {
-		rb.AddQuadLines(
-			{ featureSquare                                      , color },
-			{ featureSquare + float3(SQUARE_SIZE, 0, 0          ), color },
-			{ featureSquare + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
-			{ featureSquare + float3(0          , 0, SQUARE_SIZE), color }
-		);
-	}
-
-	color = &illegalColor[0];
-	for (const auto& illegalSquare : illegalSquares) {
-		rb.AddQuadLines(
-			{ illegalSquare                                      , color },
-			{ illegalSquare + float3(SQUARE_SIZE, 0, 0          ), color },
-			{ illegalSquare + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
-			{ illegalSquare + float3(0          , 0, SQUARE_SIZE), color }
-		);
+	for (int zi = 0; zi < numZ; zi++) {
+		for (int xi = 0; xi < numX; xi++) {
+			const auto status = static_cast<CGameHelper::BuildSquareStatus>(buildableData.statuses[zi * numX + xi]);
+			const float3 sqrPos = {
+				static_cast<float>((buildableData.xmin + xi) * SQUARE_SIZE),
+				h,
+				static_cast<float>((buildableData.zmin + zi) * SQUARE_SIZE)
+			};
+			const float* color;
+			switch (status) {
+				case CGameHelper::BUILDSQUARE_OPEN:
+					color = buildColor;
+					break;
+				case CGameHelper::BUILDSQUARE_OCCUPIED:
+				case CGameHelper::BUILDSQUARE_RECLAIMABLE:
+					color = &featureColor[0];
+					break;
+				default:
+					color = &illegalColor[0];
+					break;
+			}
+			rb.AddQuadLines(
+				{ sqrPos                                      , color },
+				{ sqrPos + float3(SQUARE_SIZE, 0, 0          ), color },
+				{ sqrPos + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
+				{ sqrPos + float3(0          , 0, SQUARE_SIZE), color }
+			);
+		}
 	}
 	rb.Submit(GL_LINES);
 

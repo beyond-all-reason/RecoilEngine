@@ -2825,7 +2825,7 @@ DRAW_CALLIN(DrawShadowFeaturesLua)
  * @param x number
  * @param z number
  * @param facing number
- * @param buildableData table {xmin, xmax, zmin, zmax, statuses[]}
+ * @param buildableData table {xmin, xmax, zmin, zmax, statuses[]} where statuses are BuildSquareStatus values: BLOCKED=0, OCCUPIED=1, RECLAIMABLE=2, OPEN=3
  */
 void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, const BuildableData& buildableData)
 {

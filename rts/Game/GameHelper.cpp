@@ -1268,9 +1268,6 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 	int allyteam,
 	bool synced,
 	BuildableData* buildableData,
-	std::vector<float3>* canbuildpos,
-	std::vector<float3>* featurepos,
-	std::vector<float3>* nobuildpos,
 	const std::vector<Command>* commands,
 	int threadOwner
 ) {
@@ -1387,25 +1384,7 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 
 				if (buildableData != nullptr) {
 					const int idx = (z - z1) * (x2 - x1) + (x - x1);
-					switch (sqrStatus) {
-						case BUILDSQUARE_BLOCKED:     buildableData->statuses[idx] = 2; break;
-						case BUILDSQUARE_OCCUPIED:
-						case BUILDSQUARE_RECLAIMABLE: buildableData->statuses[idx] = 1; break;
-						case BUILDSQUARE_OPEN:        buildableData->statuses[idx] = 0; break;
-					}
-				}
-
-				switch (sqrStatus) {
-					case BUILDSQUARE_OPEN:
-						canbuildpos->push_back(sqrPos);
-						break;
-					case BUILDSQUARE_RECLAIMABLE:
-					case BUILDSQUARE_OCCUPIED:
-						featurepos->push_back(sqrPos);
-						break;
-					case BUILDSQUARE_BLOCKED:
-						nobuildpos->push_back(sqrPos);
-						break;
+					buildableData->statuses[idx] = sqrStatus;
 				}
 
 				testStatus = std::min(testStatus, sqrStatus);
@@ -1426,12 +1405,7 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 
 				if (buildableData != nullptr) {
 					const int idx = (z - z1) * (x2 - x1) + (x - x1);
-					switch (sqrStatus) {
-						case BUILDSQUARE_BLOCKED:     buildableData->statuses[idx] = 2; break;
-						case BUILDSQUARE_OCCUPIED:
-						case BUILDSQUARE_RECLAIMABLE: buildableData->statuses[idx] = 1; break;
-						case BUILDSQUARE_OPEN:        buildableData->statuses[idx] = 0; break;
-					}
+					buildableData->statuses[idx] = sqrStatus;
 				}
 
 				if ((testStatus = std::min(testStatus, sqrStatus)) == BUILDSQUARE_BLOCKED) {
