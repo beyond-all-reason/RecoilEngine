@@ -284,6 +284,8 @@ class CLuaHandle : public CEventClient
 		void DrawShadowUnitsLua() override;
 		void DrawShadowFeaturesLua() override;
 
+		void BuildSquareReceived(int unitDefID, int x, int z, int facing, const BuildableData& buildableData) override;
+
 		void GameProgress(int frameNum) override;
 		void Pong(uint8_t pingTag, const spring_time pktSendTime, const spring_time pktRecvTime) override;
 

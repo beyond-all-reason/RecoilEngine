@@ -2,6 +2,7 @@
 
 #include "System/EventHandler.h"
 
+#include "Game/GameHelper.h"
 #include "Lua/LuaCallInCheck.h"
 #include "Lua/LuaOpenGL.h"  // FIXME -- should be moved
 
@@ -1028,6 +1029,12 @@ void CEventHandler::DrawShadowFeaturesLua()
 {
 	ZoneScoped;
 	ITERATE_EVENTCLIENTLIST_NA(DrawShadowFeaturesLua);
+}
+
+void CEventHandler::BuildSquareReceived(int unitDefID, int x, int z, int facing, const BuildableData& buildableData)
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST(BuildSquareReceived, unitDefID, x, z, facing, buildableData);
 }
 
 /******************************************************************************/

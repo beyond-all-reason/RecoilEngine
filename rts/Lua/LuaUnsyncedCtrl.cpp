@@ -186,6 +186,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetDrawGround);
 	REGISTER_LUA_CFUNC(SetDrawGroundDeferred);
 	REGISTER_LUA_CFUNC(SetDrawModelsDeferred);
+	REGISTER_LUA_CFUNC(SetEngineBuildSquareRendering);
 	REGISTER_LUA_CFUNC(SetVideoCapturingMode);
 	REGISTER_LUA_CFUNC(SetVideoCapturingTimeOffset);
 
@@ -4445,6 +4446,17 @@ int LuaUnsyncedCtrl::SetDrawModelsDeferred(lua_State* L)
 	lua_pushboolean(L,    unitDrawer->DrawForward());
 	lua_pushboolean(L, featureDrawer->DrawForward());
 	return 4;
+}
+
+
+/*** @function Spring.SetEngineBuildSquareRendering
+ * @param enabled boolean
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SetEngineBuildSquareRendering(lua_State* L)
+{
+	CUnitDrawer::EngineBuildSquareRendering() = !!luaL_checkboolean(L, 1);
+	return 0;
 }
 
 

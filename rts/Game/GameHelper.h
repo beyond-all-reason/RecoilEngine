@@ -14,10 +14,11 @@
 
 #include <array>
 #include <bit>
-#include <vector>
 #include <memory>
 #include <variant>
 #include <type_traits>
+
+class CGameHelper;
 
 class CUnit;
 class CWeapon;
@@ -177,6 +178,7 @@ public:
 		CFeature*&,
 		int allyteam,
 		bool synced,
+		BuildableData* buildableData = nullptr,
 		std::vector<float3>* canbuildpos = nullptr,
 		std::vector<float3>* featurepos = nullptr,
 		std::vector<float3>* nobuildpos = nullptr,

@@ -1367,26 +1367,22 @@ void CUnitDrawerGLSL::DrawIndividualDefAlpha(const SolidObjectDef* objectDef, in
 bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std::vector<Command>& commands) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	//TODO: make this a lua callin!
-	glDisable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glDisable(GL_TEXTURE_2D);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	CFeature* feature = nullptr;
 
-	std::vector<float3> buildableSquares; // buildable squares
-	std::vector<float3> featureSquares; // occupied squares
-	std::vector<float3> illegalSquares; // non-buildable squares
+	BuildableData buildableData;
+	std::vector<float3> buildableSquares;
+	std::vector<float3> featureSquares;
+	std::vector<float3> illegalSquares;
 
 	struct BuildCache {
 		uint64_t key;
 		int createFrame;
 		bool canBuild;
-		std::vector<float3> buildableSquares; // buildable squares
-		std::vector<float3> featureSquares; // occupied squares
-		std::vector<float3> illegalSquares; // non-buildable squares
+		BuildableData buildableData;
+		std::vector<float3> buildableSquares;
+		std::vector<float3> featureSquares;
+		std::vector<float3> illegalSquares;
 	};
 
 	static std::vector<BuildCache> buildCache;
@@ -1395,14 +1391,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 	uint64_t hashKey = spring::LiteHash(pos);
 	hashKey = spring::hash_combine(spring::LiteHash(buildInfo.buildFacing), hashKey);
-	/*
-	for (const auto& cmd : commands) {
-		const BuildInfo bc(cmd);
-		spring::hash_combine(spring::LiteHash(bc), hash);
-	}
-	*/
 
-	// the chosen number here is arbitrary, feel free to fine balance.
 	static constexpr int CACHE_VALIDITY_PERIOD = GAME_SPEED / 5;
 	std::erase_if(buildCache, [](const BuildCache& bc) {
 		return gs->frameNum - bc.createFrame >= CACHE_VALIDITY_PERIOD;
@@ -1420,10 +1409,11 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 		return bc.key == hashKey;
 	});
 	if (it != buildCache.end()) {
-		buildableSquares.assign(it->buildableSquares.begin(), it->buildableSquares.end());
-		featureSquares.assign(it->featureSquares.begin(), it->featureSquares.end());
-		illegalSquares.assign(it->illegalSquares.begin(), it->illegalSquares.end());
+		buildableData = it->buildableData;
 		canBuild = it->canBuild;
+		buildableSquares = it->buildableSquares;
+		featureSquares = it->featureSquares;
+		illegalSquares = it->illegalSquares;
 	}
 	else {
 		canBuild = !!CGameHelper::TestUnitBuildSquare(
@@ -1431,6 +1421,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 			feature,
 			-1,
 			false,
+			&buildableData,
 			&buildableSquares,
 			&featureSquares,
 			&illegalSquares,
@@ -1442,10 +1433,27 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 		buildCacheItem.key = hashKey;
 		buildCacheItem.canBuild = canBuild;
 		buildCacheItem.createFrame = gs->frameNum;
-		buildCacheItem.buildableSquares.assign(buildableSquares.begin(), buildableSquares.end());
-		buildCacheItem.featureSquares.assign(featureSquares.begin(), featureSquares.end());
-		buildCacheItem.illegalSquares.assign(illegalSquares.begin(), illegalSquares.end());
+		buildCacheItem.buildableData = buildableData;
+		buildCacheItem.buildableSquares = buildableSquares;
+		buildCacheItem.featureSquares = featureSquares;
+		buildCacheItem.illegalSquares = illegalSquares;
 	}
+
+	if (!CUnitDrawer::EngineBuildSquareRendering()) {
+		eventHandler.BuildSquareReceived(
+			buildInfo.def->id,
+			static_cast<int>(pos.x),
+			static_cast<int>(pos.z),
+			buildInfo.buildFacing,
+			buildableData
+		);
+		return canBuild;
+	}
+
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_TEXTURE_2D);
 
 	static constexpr std::array<float, 4> buildColorT  = { 0.0f, 0.9f, 0.0f, 0.7f };
 	static constexpr std::array<float, 4> buildColorF  = { 0.9f, 0.8f, 0.0f, 0.7f };
@@ -1491,8 +1499,8 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 	rb.Submit(GL_LINES);
 
 	if (h < 0.0f) {
-		constexpr uint8_t s[] = { 0,   0, 255, 128 }; // start color
-		constexpr uint8_t e[] = { 0, 128, 255, 255 }; // end color
+		constexpr uint8_t s[] = { 0,   0, 255, 128 };
+		constexpr uint8_t e[] = { 0, 128, 255, 255 };
 
 		rb.AddVertex({ float3(x1, h, z1), s }); rb.AddVertex({ float3(x1, 0.f, z1), e });
 		rb.AddVertex({ float3(x1, h, z2), s }); rb.AddVertex({ float3(x1, 0.f, z2), e });
@@ -1511,8 +1519,6 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 
 	glEnable(GL_DEPTH_TEST);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	// glDisable(GL_BLEND);
 
 	return canBuild;
 }
