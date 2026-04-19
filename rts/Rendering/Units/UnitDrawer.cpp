@@ -1440,10 +1440,10 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glDisable(GL_TEXTURE_2D);
 
-	static constexpr std::array<float, 4> buildColorT  = { 0.0f, 0.9f, 0.0f, 0.7f };
-	static constexpr std::array<float, 4> buildColorF  = { 0.9f, 0.8f, 0.0f, 0.7f };
-	static constexpr std::array<float, 4> featureColor = { 0.9f, 0.8f, 0.0f, 0.7f };
-	static constexpr std::array<float, 4> illegalColor = { 0.9f, 0.0f, 0.0f, 0.7f };
+	static constexpr SColor buildColorT  = { 0.0f, 0.9f, 0.0f, 0.7f };
+	static constexpr SColor buildColorF  = { 0.9f, 0.8f, 0.0f, 0.7f };
+	static constexpr SColor featureColor = { 0.9f, 0.8f, 0.0f, 0.7f };
+	static constexpr SColor illegalColor = { 0.9f, 0.0f, 0.0f, 0.7f };
 
 	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_C>();
 	rb.AssertSubmission();
@@ -1452,7 +1452,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 	sh.Enable();
 
-	const float* buildColor = canBuild ? &buildColorT[0] : &buildColorF[0];
+	const auto* buildColor = canBuild ? &buildColorT : &buildColorF;
 	const int numX = buildInfo.GetXSize();
 	const int numZ = buildInfo.GetZSize();
 	const int sx1 = int(pos.x / SQUARE_SIZE) - (numX >> 1);
@@ -1466,32 +1466,32 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 				h,
 				static_cast<float>((sz1 + zi) * SQUARE_SIZE)
 			};
-			const float* color;
+			const SColor* color = nullptr;
 			switch (status) {
 				case CGameHelper::BUILDSQUARE_OPEN:
 					color = buildColor;
 					break;
 				case CGameHelper::BUILDSQUARE_OCCUPIED:
 				case CGameHelper::BUILDSQUARE_RECLAIMABLE:
-					color = &featureColor[0];
+					color = &featureColor;
 					break;
 				default:
-					color = &illegalColor[0];
+					color = &illegalColor;
 					break;
 			}
 			rb.AddQuadLines(
-				{ sqrPos                                      , color },
-				{ sqrPos + float3(SQUARE_SIZE, 0, 0          ), color },
-				{ sqrPos + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
-				{ sqrPos + float3(0          , 0, SQUARE_SIZE), color }
+				{ sqrPos                                      , *color },
+				{ sqrPos + float3(SQUARE_SIZE, 0, 0          ), *color },
+				{ sqrPos + float3(SQUARE_SIZE, 0, SQUARE_SIZE), *color },
+				{ sqrPos + float3(0          , 0, SQUARE_SIZE), *color }
 			);
 		}
 	}
 	rb.Submit(GL_LINES);
 
 	if (h < 0.0f) {
-		constexpr uint8_t s[] = { 0,   0, 255, 128 };
-		constexpr uint8_t e[] = { 0, 128, 255, 255 };
+		constexpr SColor s = { 0,   0, 255, 128 };
+		constexpr SColor e = { 0, 128, 255, 255 };
 
 		rb.AddVertex({ float3(x1, h, z1), s }); rb.AddVertex({ float3(x1, 0.f, z1), e });
 		rb.AddVertex({ float3(x1, h, z2), s }); rb.AddVertex({ float3(x1, 0.f, z2), e });
