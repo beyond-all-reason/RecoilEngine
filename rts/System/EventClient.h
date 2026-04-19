@@ -14,7 +14,6 @@
 class CGameHelper;
 
 struct BuildableData {
-	uint32_t xmin = 0, xmax = 0, zmin = 0, zmax = 0;
 	std::vector<uint8_t> statuses;
 };
 

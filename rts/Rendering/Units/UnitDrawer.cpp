@@ -1453,16 +1453,18 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 	sh.Enable();
 
 	const float* buildColor = canBuild ? &buildColorT[0] : &buildColorF[0];
-	const int numX = buildableData.xmax - buildableData.xmin + 1;
-	const int numZ = buildableData.zmax - buildableData.zmin + 1;
+	const int numX = buildInfo.GetXSize();
+	const int numZ = buildInfo.GetZSize();
+	const int sx1 = int(pos.x / SQUARE_SIZE) - (numX >> 1);
+	const int sz1 = int(pos.z / SQUARE_SIZE) - (numZ >> 1);
 
 	for (int zi = 0; zi < numZ; zi++) {
 		for (int xi = 0; xi < numX; xi++) {
 			const auto status = static_cast<CGameHelper::BuildSquareStatus>(buildableData.statuses[zi * numX + xi]);
 			const float3 sqrPos = {
-				static_cast<float>((buildableData.xmin + xi) * SQUARE_SIZE),
+				static_cast<float>((sx1 + xi) * SQUARE_SIZE),
 				h,
-				static_cast<float>((buildableData.zmin + zi) * SQUARE_SIZE)
+				static_cast<float>((sz1 + zi) * SQUARE_SIZE)
 			};
 			const float* color;
 			switch (status) {

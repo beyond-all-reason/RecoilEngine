@@ -1286,10 +1286,6 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 	const int2 zrange = int2(z1, z2);
 
 	if (buildableData != nullptr) {
-		buildableData->xmin = x1;
-		buildableData->xmax = x2 - 1;
-		buildableData->zmin = z1;
-		buildableData->zmax = z2 - 1;
 		const int numCells = (x2 - x1) * (z2 - z1);
 		buildableData->statuses.assign(numCells, 0);
 	}

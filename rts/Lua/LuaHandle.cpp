@@ -2821,21 +2821,19 @@ DRAW_CALLIN(DrawShadowFeaturesLua)
 
 /*** @function Callins:BuildSquareReceived
  * Called when engine rendering is disabled and build square data is computed.
+ * Grid dimensions can be inferred from UnitDefs[unitDefID].xsize and UnitDefs[unitDefID].zsize.
+ * Grid origin in square coords: x - xsize/2, z - zsize/2 (accounting for facing).
  * @param unitDefID number
- * @param x number
- * @param z number
- * @param facing number
- * @param xmin number grid x start (in square coords)
- * @param xmax number grid x end (inclusive, in square coords)
- * @param zmin number grid z start (in square coords)
- * @param zmax number grid z end (inclusive, in square coords)
+ * @param x number build position x
+ * @param z number build position z
+ * @param facing number build facing
  * @param statuses table flat 1D row-major array of BuildSquareStatus values: BLOCKED=0, OCCUPIED=1, RECLAIMABLE=2, OPEN=3
  */
 void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, const BuildableData& buildableData)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
-	luaL_checkstack(L, 12, __func__);
+	luaL_checkstack(L, 8, __func__);
 	static const LuaHashString cmdStr(__func__);
 	if (!cmdStr.GetGlobalFunc(L))
 		return;
@@ -2844,10 +2842,6 @@ void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, co
 	lua_pushnumber(L, x);
 	lua_pushnumber(L, z);
 	lua_pushnumber(L, facing);
-	lua_pushnumber(L, buildableData.xmin);
-	lua_pushnumber(L, buildableData.xmax);
-	lua_pushnumber(L, buildableData.zmin);
-	lua_pushnumber(L, buildableData.zmax);
 
 	lua_createtable(L, buildableData.statuses.size(), 0);
 	for (size_t i = 0; i < buildableData.statuses.size(); ++i) {
@@ -2855,7 +2849,7 @@ void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, co
 		lua_rawseti(L, -2, i + 1);
 	}
 
-	RunCallIn(L, cmdStr, 9, 0);
+	RunCallIn(L, cmdStr, 5, 0);
 }
 
 /***
