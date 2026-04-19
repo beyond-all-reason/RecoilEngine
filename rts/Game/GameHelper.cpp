@@ -1267,7 +1267,7 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 	CFeature*& feature,
 	int allyteam,
 	bool synced,
-	BuildableData* buildableData,
+	std::vector<uint8_t>* statuses,
 	const std::vector<Command>* commands,
 	int threadOwner
 ) {
@@ -1285,9 +1285,9 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 	const int2 xrange = int2(x1, x2);
 	const int2 zrange = int2(z1, z2);
 
-	if (buildableData != nullptr) {
+	if (statuses != nullptr) {
 		const int numCells = (x2 - x1) * (z2 - z1);
-		buildableData->statuses.assign(numCells, 0);
+		statuses->assign(numCells, 0);
 	}
 
 	const MoveDef* moveDef = (buildInfo.def->pathType != -1U) ? moveDefHandler.GetMoveDefByPathType(buildInfo.def->pathType) : nullptr;
@@ -1378,9 +1378,9 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 					}
 				}
 
-				if (buildableData != nullptr) {
+				if (statuses != nullptr) {
 					const int idx = (z - z1) * (x2 - x1) + (x - x1);
-					buildableData->statuses[idx] = sqrStatus;
+					(*statuses)[idx] = sqrStatus;
 				}
 
 				testStatus = std::min(testStatus, sqrStatus);
@@ -1399,9 +1399,9 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 
 				const BuildSquareStatus sqrStatus = TestBuildSquare(sqrPos, xrange, zrange, buildInfo, moveDef, feature, allyteam, synced);
 
-				if (buildableData != nullptr) {
+				if (statuses != nullptr) {
 					const int idx = (z - z1) * (x2 - x1) + (x - x1);
-					buildableData->statuses[idx] = sqrStatus;
+					(*statuses)[idx] = sqrStatus;
 				}
 
 				if ((testStatus = std::min(testStatus, sqrStatus)) == BUILDSQUARE_BLOCKED) {

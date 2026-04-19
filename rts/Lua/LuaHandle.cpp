@@ -2829,7 +2829,7 @@ DRAW_CALLIN(DrawShadowFeaturesLua)
  * @param facing number build facing
  * @param statuses table flat 1D row-major array of BuildSquareStatus values: BLOCKED=0, OCCUPIED=1, RECLAIMABLE=2, OPEN=3
  */
-void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, const BuildableData& buildableData)
+void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
@@ -2843,9 +2843,9 @@ void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, co
 	lua_pushnumber(L, z);
 	lua_pushnumber(L, facing);
 
-	lua_createtable(L, buildableData.statuses.size(), 0);
-	for (size_t i = 0; i < buildableData.statuses.size(); ++i) {
-		lua_pushinteger(L, buildableData.statuses[i]);
+	lua_createtable(L, statuses.size(), 0);
+	for (size_t i = 0; i < statuses.size(); ++i) {
+		lua_pushinteger(L, statuses[i]);
 		lua_rawseti(L, -2, i + 1);
 	}
 

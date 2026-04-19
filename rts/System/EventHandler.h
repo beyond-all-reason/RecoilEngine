@@ -11,9 +11,6 @@
 #include "Sim/Features/Feature.h"
 #include "Sim/Projectiles/Projectile.h"
 
-class CGameHelper;
-struct BuildableData;
-
 struct CExplosionParams;
 class CWeapon;
 struct Command;
@@ -312,7 +309,7 @@ class CEventHandler
 		void DrawShadowUnitsLua();
 		void DrawShadowFeaturesLua();
 
-		void BuildSquareReceived(int unitDefID, int x, int z, int facing, const BuildableData& buildableData);
+		void BuildSquareReceived(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses);
 
 		/// @brief this UNSYNCED event is generated every GameServer::gameProgressFrameInterval
 		/// it skips network queuing and caching and can be used to calculate the current catchup

@@ -1370,13 +1370,13 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 	CFeature* feature = nullptr;
 
-	BuildableData buildableData;
+	std::vector<uint8_t> statuses;
 
 	struct BuildCache {
 		uint64_t key;
 		int createFrame;
 		bool canBuild;
-		BuildableData buildableData;
+		std::vector<uint8_t> statuses;
 	};
 
 	static std::vector<BuildCache> buildCache;
@@ -1403,7 +1403,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 		return bc.key == hashKey;
 	});
 	if (it != buildCache.end()) {
-		buildableData = it->buildableData;
+		statuses = it->statuses;
 		canBuild = it->canBuild;
 	}
 	else {
@@ -1412,7 +1412,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 			feature,
 			-1,
 			false,
-			&buildableData,
+			&statuses,
 			&commands
 		);
 		buildCache.emplace_back();
@@ -1421,7 +1421,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 		buildCacheItem.key = hashKey;
 		buildCacheItem.canBuild = canBuild;
 		buildCacheItem.createFrame = gs->frameNum;
-		buildCacheItem.buildableData = buildableData;
+		buildCacheItem.statuses = statuses;
 	}
 
 	if (!CUnitDrawer::EngineBuildSquareRendering()) {
@@ -1430,7 +1430,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 			static_cast<int>(pos.x),
 			static_cast<int>(pos.z),
 			buildInfo.buildFacing,
-			buildableData
+			statuses
 		);
 		return canBuild;
 	}
@@ -1460,7 +1460,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 	for (int zi = 0; zi < numZ; zi++) {
 		for (int xi = 0; xi < numX; xi++) {
-			const auto status = static_cast<CGameHelper::BuildSquareStatus>(buildableData.statuses[zi * numX + xi]);
+			const auto status = static_cast<CGameHelper::BuildSquareStatus>(statuses[zi * numX + xi]);
 			const float3 sqrPos = {
 				static_cast<float>((sx1 + xi) * SQUARE_SIZE),
 				h,

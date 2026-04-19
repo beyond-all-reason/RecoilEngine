@@ -11,12 +11,6 @@
 #include "System/float3.h"
 #include "System/Misc/SpringTime.h"
 
-class CGameHelper;
-
-struct BuildableData {
-	std::vector<uint8_t> statuses;
-};
-
 #if defined(__APPLE__) || defined(__OpenBSD__)
 // defined in X11/X.h
 #undef KeyPress
@@ -376,7 +370,7 @@ class CEventClient
 		virtual void DrawShadowUnitsLua() {}
 		virtual void DrawShadowFeaturesLua() {}
 
-		virtual void BuildSquareReceived(int unitDefID, int x, int z, int facing, const BuildableData& buildableData) {}
+		virtual void BuildSquareReceived(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses) {}
 
 		virtual void FontsChanged() {}
 

@@ -178,7 +178,7 @@ public:
 		CFeature*&,
 		int allyteam,
 		bool synced,
-		BuildableData* buildableData = nullptr,
+		std::vector<uint8_t>* statuses = nullptr,
 		const std::vector<Command>* commands = nullptr,
 		int threadOwner = 0
 	);
