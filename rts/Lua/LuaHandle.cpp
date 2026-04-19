@@ -2825,13 +2825,17 @@ DRAW_CALLIN(DrawShadowFeaturesLua)
  * @param x number
  * @param z number
  * @param facing number
- * @param buildableData table {xmin, xmax, zmin, zmax, statuses[]} where statuses are BuildSquareStatus values: BLOCKED=0, OCCUPIED=1, RECLAIMABLE=2, OPEN=3
+ * @param xmin number grid x start (in square coords)
+ * @param xmax number grid x end (inclusive, in square coords)
+ * @param zmin number grid z start (in square coords)
+ * @param zmax number grid z end (inclusive, in square coords)
+ * @param statuses table flat 1D row-major array of BuildSquareStatus values: BLOCKED=0, OCCUPIED=1, RECLAIMABLE=2, OPEN=3
  */
 void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, const BuildableData& buildableData)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
-	luaL_checkstack(L, 8, __func__);
+	luaL_checkstack(L, 12, __func__);
 	static const LuaHashString cmdStr(__func__);
 	if (!cmdStr.GetGlobalFunc(L))
 		return;
@@ -2840,25 +2844,18 @@ void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, co
 	lua_pushnumber(L, x);
 	lua_pushnumber(L, z);
 	lua_pushnumber(L, facing);
-
-	lua_createtable(L, 0, 5);
 	lua_pushnumber(L, buildableData.xmin);
-	lua_setfield(L, -2, "xmin");
 	lua_pushnumber(L, buildableData.xmax);
-	lua_setfield(L, -2, "xmax");
 	lua_pushnumber(L, buildableData.zmin);
-	lua_setfield(L, -2, "zmin");
 	lua_pushnumber(L, buildableData.zmax);
-	lua_setfield(L, -2, "zmax");
 
 	lua_createtable(L, buildableData.statuses.size(), 0);
 	for (size_t i = 0; i < buildableData.statuses.size(); ++i) {
 		lua_pushinteger(L, buildableData.statuses[i]);
 		lua_rawseti(L, -2, i + 1);
 	}
-	lua_setfield(L, -2, "statuses");
 
-	RunCallIn(L, cmdStr, 5, 0);
+	RunCallIn(L, cmdStr, 9, 0);
 }
 
 /***
