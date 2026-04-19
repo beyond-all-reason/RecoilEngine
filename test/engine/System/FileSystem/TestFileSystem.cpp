@@ -133,6 +133,12 @@ TEST_CASE("GetDirectory")
 }
 
 
+TEST_CASE("GetExtensionLowerCase")
+{
+	CHECK(FileSystem::GetExtensionLowerCase("SCRIPT.COB") == "cob");
+}
+
+
 #define CHECK_NORM_PATH(path, normPath) \
 		CHECK(FileSystem::GetNormalizedPath(path) == normPath)
 
