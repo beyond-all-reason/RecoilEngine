@@ -41,7 +41,8 @@ CDemoRecorder::CDemoRecorder(const std::string& mapName, const std::string& modN
 	SetFileHeader();
 	WriteFileHeader(false);
 
-	file = gzopen(demoName.c_str(), "wb9");
+	std::string absoluteFilePath = dataDirsAccess.LocateFile(demoName, FileQueryFlags::WRITE);
+	file = gzopen(absoluteFilePath.c_str(), "wb9");
 }
 
 CDemoRecorder::~CDemoRecorder()
@@ -167,7 +168,7 @@ void CDemoRecorder::SetName(const std::string& mapName, const std::string& modNa
 		buf << oss.str() << "_" << n++ << ".sdfz";
 	}
 
-	demoName = dataDirsAccess.LocateFile(buf.str(), FileQueryFlags::WRITE);
+	demoName = buf.str();
 }
 
 void CDemoRecorder::SetGameID(const unsigned char* buf)
