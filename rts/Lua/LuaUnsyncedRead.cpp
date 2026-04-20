@@ -66,6 +66,7 @@
 #include "System/Config/ConfigVariable.h"
 #include "System/Input/KeyInput.h"
 #include "System/LoadSave/DemoReader.h"
+#include "System/LoadSave/DemoRecorder.h"
 #include "System/Log/DefaultFilter.h"
 #include "System/Platform/SDL1_keysym.h"
 #include "System/Platform/Misc.h"
@@ -102,6 +103,8 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetReplayLength);
 
 	REGISTER_LUA_CFUNC(GetGameName);
+	REGISTER_LUA_CFUNC(GetReplayFilePath);
+	REGISTER_LUA_CFUNC(GetReplayRecordingFilePath);
 	REGISTER_LUA_CFUNC(GetMenuName);
 
 	REGISTER_LUA_CFUNC(GetProfilerTimeRecord);
@@ -514,6 +517,58 @@ int LuaUnsyncedRead::GetGameName(lua_State* L)
 {
 	lua_pushstring(L, modInfo.humanNameVersioned.c_str());
 	return 1;
+}
+
+/*** If a replay is currently being watched, returns its file path.
+ *
+ * @function Spring.GetReplayFilePath
+ *
+ * @return string filePath
+ */
+int LuaUnsyncedRead::GetReplayFilePath(lua_State* L)
+{
+	if (gameServer != nullptr) {
+		if (gameServer->GetDemoReader()) {
+			lua_pushsstring(L, gameServer->GetDemoReader()->GetName());
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/*** If a replay is being recorded, returns its projected file path.
+ * Note that replay contents are only written there at game exit.
+ * Note also that watching a replay also records a meta-replay
+ * if the DemoFromDemo springsetting is set.
+ *
+ * @function Spring.GetReplayRecordingFilePath
+ *
+ * @return string filePath
+ */
+int LuaUnsyncedRead::GetReplayRecordingFilePath(lua_State* L)
+{
+	/* TODO: why are there two places that keep a recording?
+	 * Check for logic duplication and perhaps remove one.
+	 * See https://github.com/beyond-all-reason/RecoilEngine/issues/2942 */
+
+	if (clientNet != nullptr) {
+		const CDemoRecorder* dr = clientNet->GetDemoRecorder();
+
+		if (dr != nullptr && dr->IsValid()) {
+			lua_pushsstring(L, dr->GetName());
+			return 1;
+		}
+	}
+
+	if (gameServer != nullptr) {
+		if (gameServer->GetDemoRecorder()) {
+			lua_pushsstring(L, gameServer->GetDemoRecorder()->GetName());
+			return 1;
+		}
+	}
+
+	return 0;
 }
 
 /***

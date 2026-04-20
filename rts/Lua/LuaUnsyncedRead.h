@@ -17,6 +17,8 @@ class LuaUnsyncedRead {
 		static int GetReplayLength(lua_State* L);
 
 		static int GetGameName(lua_State* L);
+		static int GetReplayFilePath(lua_State* L);
+		static int GetReplayRecordingFilePath(lua_State* L);
 		static int GetMenuName(lua_State* L);
 
 		static int GetProfilerTimeRecord(lua_State* L);
