@@ -221,6 +221,7 @@ void CUnit::PreInit(const UnitLoadParams& params)
 	}
 
 	team = params.teamID;
+	paletteIndex = static_cast<uint16_t>(team);
 	allyteam = teamHandler.AllyTeam(team);
 
 	buildFacing = std::abs(params.facing) % NUM_FACINGS;
@@ -1561,6 +1562,8 @@ bool CUnit::ChangeTeam(int newteam, ChangeType type)
 
 
 	team = newteam;
+	if (paletteIndex == static_cast<uint16_t>(oldteam))
+		paletteIndex = static_cast<uint16_t>(newteam);
 	allyteam = teamHandler.AllyTeam(newteam);
 	neutral = false;
 

@@ -52,6 +52,8 @@
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/TeamHandler.h"
+#include "Sim/Misc/GlobalConstants.h"
+#include "Sim/Misc/CustomColorPalette.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Projectiles/Projectile.h"
 #include "Sim/Units/Unit.h"
@@ -176,6 +178,11 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(GetTeamColor);
 	REGISTER_LUA_CFUNC(GetTeamOrigColor);
+
+	REGISTER_LUA_CFUNC(GetCustomPaletteColor);
+	REGISTER_LUA_CFUNC(GetUnitPaletteIndex);
+	REGISTER_LUA_CFUNC(GetFeaturePaletteIndex);
+	REGISTER_LUA_CFUNC(GetCustomPaletteColorPaletteBase);
 
 	REGISTER_LUA_CFUNC(GetLocalPlayerID);
 	REGISTER_LUA_CFUNC(GetLocalTeamID);
@@ -3307,6 +3314,87 @@ int LuaUnsyncedRead::GetTeamOrigColor(lua_State* L)
 	lua_pushnumber(L, team->origColor[2] / 255.0f);
 	lua_pushnumber(L, team->origColor[3] / 255.0f);
 	return 4;
+}
+
+
+/***
+ *
+ * @function Spring.GetCustomPaletteColor
+ * @param index integer 0-based index into custom palette
+ * @return number? r factor from 0 to 1
+ * @return number? g factor from 0 to 1
+ * @return number? b factor from 0 to 1
+ */
+int LuaUnsyncedRead::GetCustomPaletteColor(lua_State* L)
+{
+	const int index = luaL_checkint(L, 1);
+	if (index < 0 || index >= MAX_CUSTOM_COLORS)
+		return 0;
+
+	const float4 color = customColorPalette.GetColor(static_cast<uint16_t>(index));
+	lua_pushnumber(L, color.x);
+	lua_pushnumber(L, color.y);
+	lua_pushnumber(L, color.z);
+	return 3;
+}
+
+
+/***
+ * Returns the custom palette index for a unit, or nil if using team color.
+ * @function Spring.GetUnitPaletteIndex
+ * @param unitID integer
+ * @return integer? customIndex [0..MAX_CUSTOM_COLORS) if unit uses a custom color, nil if using team color
+ */
+int LuaUnsyncedRead::GetUnitPaletteIndex(lua_State* L)
+{
+	const int unitID = luaL_checkint(L, 1);
+	const CUnit* unit = unitHandler.GetUnit(unitID);
+	if (unit == nullptr)
+		return 0;
+
+	if (unit->paletteIndex >= CUSTOM_COLOR_PALETTE_BASE) {
+		lua_pushnumber(L, unit->paletteIndex - CUSTOM_COLOR_PALETTE_BASE);
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+
+/***
+ * Returns the custom palette index for a feature, or nil if using team color.
+ * @function Spring.GetFeaturePaletteIndex
+ * @param featureID integer
+ * @return integer? customIndex [0..MAX_CUSTOM_COLORS) if feature uses a custom color, nil if using team color
+ */
+int LuaUnsyncedRead::GetFeaturePaletteIndex(lua_State* L)
+{
+	const int featureID = luaL_checkint(L, 1);
+	const CFeature* feature = featureHandler.GetFeature(featureID);
+	if (feature == nullptr)
+		return 0;
+
+	if (feature->paletteIndex >= CUSTOM_COLOR_PALETTE_BASE) {
+		lua_pushnumber(L, feature->paletteIndex - CUSTOM_COLOR_PALETTE_BASE);
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+
+/***
+ * Returns the starting palette index for custom colors (256).
+ * Primarily useful for GL4 shaders that need to compute the UBO offset
+ * into the teamColor array for custom palette entries.
+ *
+ * @function Spring.GetCustomPaletteColorPaletteBase
+ * @return integer paletteBase The starting index for custom colors (256)
+ */
+int LuaUnsyncedRead::GetCustomPaletteColorPaletteBase(lua_State* L)
+{
+	lua_pushnumber(L, CUSTOM_COLOR_PALETTE_BASE);
+	return 1;
 }
 
 

@@ -76,6 +76,10 @@ static constexpr int TEAM_SLOWUPDATE_RATE = 30;
  */
 static constexpr int MAX_TEAMS = 255;
 
+static constexpr int MAX_PALETTE_COLORS = 2048;
+static constexpr int CUSTOM_COLOR_PALETTE_BASE = 256; // first custom color index (power of 2 aligned)
+static constexpr int MAX_CUSTOM_COLORS  = MAX_PALETTE_COLORS - CUSTOM_COLOR_PALETTE_BASE; // 1792
+
 /**
  * @brief max players
  *

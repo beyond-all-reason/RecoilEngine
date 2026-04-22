@@ -66,6 +66,8 @@
 #include "Sim/Features/FeatureDefHandler.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Misc/TeamHandler.h"
+#include "Sim/Misc/GlobalConstants.h"
+#include "Sim/Misc/CustomColorPalette.h"
 #include "Sim/Projectiles/Projectile.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Units/Unit.h"
@@ -174,6 +176,10 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(DrawUnitCommands);
 
 	REGISTER_LUA_CFUNC(SetTeamColor);
+
+	REGISTER_LUA_CFUNC(SetCustomPaletteColor);
+	REGISTER_LUA_CFUNC(SetUnitPaletteIndex);
+	REGISTER_LUA_CFUNC(SetFeaturePaletteIndex);
 
 	REGISTER_LUA_CFUNC(AssignMouseCursor);
 	REGISTER_LUA_CFUNC(ReplaceMouseCursor);
@@ -2975,6 +2981,88 @@ int LuaUnsyncedCtrl::SetTeamColor(lua_State* L)
 	team->color[1] = (unsigned char)(std::clamp(luaL_checkfloat(L, 3      ), 0.0f, 1.0f) * 255.0f);
 	team->color[2] = (unsigned char)(std::clamp(luaL_checkfloat(L, 4      ), 0.0f, 1.0f) * 255.0f);
 	team->color[3] = (unsigned char)(std::clamp(luaL_optfloat  (L, 5, 1.0f), 0.0f, 1.0f) * 255.0f);
+	return 0;
+}
+
+
+/***
+ *
+ * @function Spring.SetCustomPaletteColor
+ * @param index integer 0-based index into custom palette (0..1791, maps to palette slots 256..2047)
+ * @param r number
+ * @param g number
+ * @param b number
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SetCustomPaletteColor(lua_State* L)
+{
+	const int index = luaL_checkint(L, 1);
+	if (index < 0 || index >= MAX_CUSTOM_COLORS)
+		return 0;
+
+	const float r = std::clamp(luaL_checkfloat(L, 2), 0.0f, 1.0f);
+	const float g = std::clamp(luaL_checkfloat(L, 3), 0.0f, 1.0f);
+	const float b = std::clamp(luaL_checkfloat(L, 4), 0.0f, 1.0f);
+
+	customColorPalette.SetColor(static_cast<uint16_t>(index), r, g, b);
+	return 0;
+}
+
+
+/***
+ * Sets a custom color for a unit from the palette. Custom assignments are permanent
+ * until explicitly reset by passing nil, and are NOT affected by team changes.
+ * @function Spring.SetUnitPaletteIndex
+ * @param unitID integer
+ * @param customIndex integer? [0..MAX_CUSTOM_COLORS) index into custom palette, or nil to reset to team color
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SetUnitPaletteIndex(lua_State* L)
+{
+	const int unitID = luaL_checkint(L, 1);
+	CUnit* unit = unitHandler.GetUnit(unitID);
+	if (unit == nullptr)
+		return 0;
+
+	if (lua_isnoneornil(L, 2)) {
+		unit->paletteIndex = static_cast<uint16_t>(unit->team);
+		return 0;
+	}
+
+	const int customIndex = luaL_checkint(L, 2);
+	if (customIndex < 0 || customIndex >= MAX_CUSTOM_COLORS)
+		return 0;
+
+	unit->paletteIndex = static_cast<uint16_t>(CUSTOM_COLOR_PALETTE_BASE + customIndex);
+	return 0;
+}
+
+
+/***
+ * Sets a custom color for a feature from the palette. Custom assignments are permanent
+ * until explicitly reset by passing nil, and are NOT affected by team changes.
+ * @function Spring.SetFeaturePaletteIndex
+ * @param featureID integer
+ * @param customIndex integer? [0..MAX_CUSTOM_COLORS) index into custom palette, or nil to reset to team color
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SetFeaturePaletteIndex(lua_State* L)
+{
+	const int featureID = luaL_checkint(L, 1);
+	CFeature* feature = featureHandler.GetFeature(featureID);
+	if (feature == nullptr)
+		return 0;
+
+	if (lua_isnoneornil(L, 2)) {
+		feature->paletteIndex = static_cast<uint16_t>(feature->team);
+		return 0;
+	}
+
+	const int customIndex = luaL_checkint(L, 2);
+	if (customIndex < 0 || customIndex >= MAX_CUSTOM_COLORS)
+		return 0;
+
+	feature->paletteIndex = static_cast<uint16_t>(CUSTOM_COLOR_PALETTE_BASE + customIndex);
 	return 0;
 }
 

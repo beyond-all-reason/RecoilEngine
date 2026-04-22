@@ -1598,7 +1598,7 @@ void CUnitDrawerGL4::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon>& 
 			CModelDrawerHelper::BindModelTypeTexture(model->type, model->textureType); //inefficient rendering, but w/e
 		}
 
-		smv.SubmitImmediately(model, buildIcon.team, DrawFlags::SO_ALPHAF_FLAG);
+		smv.SubmitImmediately(model, static_cast<uint16_t>(buildIcon.team));
 	}
 
 	if (prevModelType != -1)
@@ -1769,7 +1769,7 @@ void CUnitDrawerGL4::DrawAlphaObjects(int modelType, bool drawReflection, bool d
 			}
 
 			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
-			smv.SubmitImmediately(dgb->GetModel(), dgb->team, DrawFlags::SO_ALPHAF_FLAG); //need to submit immediately every model because of static per-model matrix
+			smv.SubmitImmediately(dgb->GetModel(), static_cast<uint16_t>(dgb->team)); //need to submit immediately every model because of static per-model matrix
 		}
 	}
 
@@ -1823,7 +1823,7 @@ void CUnitDrawerGL4::DrawAlphaObjects(int modelType, bool drawReflection, bool d
 			}
 
 			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
-			smv.SubmitImmediately(model, lgb->team, DrawFlags::SO_ALPHAF_FLAG); //need to submit immediately every model because of static per-model matrix
+			smv.SubmitImmediately(model, static_cast<uint16_t>(lgb->team)); //need to submit immediately every model because of static per-model matrix
 		}
 	}
 
@@ -1876,7 +1876,7 @@ void CUnitDrawerGL4::DrawAlphaAIUnit(const CUnitDrawerData::TempDrawUnit& unit) 
 	SetTeamColor(unit.team, IModelDrawerState::alphaValues.x);
 	modelDrawerState->SetStaticModelMatrix(staticWorldMat);
 
-	smv.SubmitImmediately(mdl, unit.team, DrawFlags::SO_ALPHAF_FLAG);
+	smv.SubmitImmediately(mdl, static_cast<uint16_t>(unit.team));
 }
 
 void CUnitDrawerGL4::DrawOpaqueObjectsAux(int modelType) const
@@ -1923,7 +1923,7 @@ void CUnitDrawerGL4::DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit)
 	SetTeamColor(unit.team);
 	modelDrawerState->SetStaticModelMatrix(staticWorldMat);
 
-	smv.SubmitImmediately(mdl, unit.team, DrawFlags::SO_OPAQUE_FLAG);
+	smv.SubmitImmediately(mdl, static_cast<uint16_t>(unit.team));
 }
 
 void CUnitDrawerGL4::DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool noLuaCall) const

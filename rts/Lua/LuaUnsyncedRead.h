@@ -95,6 +95,11 @@ class LuaUnsyncedRead {
 		static int GetTeamColor(lua_State* L);
 		static int GetTeamOrigColor(lua_State* L);
 
+		static int GetCustomPaletteColor(lua_State* L);
+		static int GetUnitPaletteIndex(lua_State* L);
+		static int GetFeaturePaletteIndex(lua_State* L);
+		static int GetCustomPaletteColorPaletteBase(lua_State* L);
+
 		static int GetLocalPlayerID(lua_State* L);
 		static int GetLocalTeamID(lua_State* L);
 		static int GetLocalAllyTeamID(lua_State* L);
