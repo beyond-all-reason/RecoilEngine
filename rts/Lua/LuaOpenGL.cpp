@@ -2922,9 +2922,9 @@ int LuaOpenGL::DispatchCompute(lua_State* L)
 
 	static std::array<GLint, 3> maxNumGroups = maxCompWGFunc();
 
-	if (numGroupX < 0 && numGroupX > maxNumGroups[0] ||
-		numGroupY < 0 && numGroupY > maxNumGroups[1] ||
-		numGroupZ < 0 && numGroupZ > maxNumGroups[2])
+	if (numGroupX < 0 || numGroupX > maxNumGroups[0] ||
+		numGroupY < 0 || numGroupY > maxNumGroups[1] ||
+		numGroupZ < 0 || numGroupZ > maxNumGroups[2])
 		luaL_error(L, "%s Incorrect number of work groups specified x: 0 > %d < %d; y: 0 > %d < %d; z: 0 > %d < %d", __func__, numGroupX, maxNumGroups[0], numGroupY, maxNumGroups[1], numGroupZ, maxNumGroups[2]);
 
 	glDispatchCompute(numGroupX, numGroupY, numGroupZ);

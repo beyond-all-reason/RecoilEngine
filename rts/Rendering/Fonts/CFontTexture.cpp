@@ -924,7 +924,7 @@ void CFontTexture::PinFont(std::shared_ptr<FontFace>& face, const std::string& f
 		cached->second.timestamp = time;
 	} else {
 		if (pinnedRecentFonts.size() >= maxPinnedFonts) {
-			SizedFontKey* oldest;
+			SizedFontKey* oldest = nullptr;
 			float oldestTime = time;
 			for(auto &[key, timestampedFont]: pinnedRecentFonts) {
 				if (timestampedFont.timestamp <= oldestTime) {
