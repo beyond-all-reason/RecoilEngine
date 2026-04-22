@@ -301,7 +301,7 @@ void UniformConstants::UpdateParamsImpl(UniformParamsBuffer* updateBuffer)
 	}
 
 	for (int i = 0; i < MAX_CUSTOM_COLORS; ++i) {
-		updateBuffer->teamColor[CUSTOM_COLOR_PALETTE_BASE + i] = customColorPalette.GetColor(i);
+		updateBuffer->teamColor[CCustomColorPalette::EncodePaletteIndex(i)] = customColorPalette.GetColor(i);
 	}
 }
 

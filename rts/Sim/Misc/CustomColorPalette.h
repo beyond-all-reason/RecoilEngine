@@ -16,6 +16,18 @@ public:
 	float4 GetColor(uint16_t index) const;
 	static bool IsValidIndex(uint16_t index);
 
+	static uint16_t EncodePaletteIndex(uint16_t customIndex) {
+		return CUSTOM_COLOR_PALETTE_BASE + customIndex;
+	}
+
+	static uint16_t DecodePaletteIndex(uint16_t paletteIndex) {
+		return paletteIndex - CUSTOM_COLOR_PALETTE_BASE;
+	}
+
+	static bool IsCustomPaletteIndex(uint16_t paletteIndex) {
+		return paletteIndex >= CUSTOM_COLOR_PALETTE_BASE;
+	}
+
 	static CCustomColorPalette& GetInstance() {
 		static CCustomColorPalette instance;
 		return instance;

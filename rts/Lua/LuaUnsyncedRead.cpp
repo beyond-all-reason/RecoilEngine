@@ -3350,8 +3350,8 @@ int LuaUnsyncedRead::GetUnitPaletteIndex(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
-	if (unit->paletteIndex >= CUSTOM_COLOR_PALETTE_BASE) {
-		lua_pushnumber(L, unit->paletteIndex - CUSTOM_COLOR_PALETTE_BASE);
+	if (CCustomColorPalette::IsCustomPaletteIndex(unit->paletteIndex)) {
+		lua_pushnumber(L, CCustomColorPalette::DecodePaletteIndex(unit->paletteIndex));
 	} else {
 		lua_pushnil(L);
 	}
@@ -3372,8 +3372,8 @@ int LuaUnsyncedRead::GetFeaturePaletteIndex(lua_State* L)
 	if (feature == nullptr)
 		return 0;
 
-	if (feature->paletteIndex >= CUSTOM_COLOR_PALETTE_BASE) {
-		lua_pushnumber(L, feature->paletteIndex - CUSTOM_COLOR_PALETTE_BASE);
+	if (CCustomColorPalette::IsCustomPaletteIndex(feature->paletteIndex)) {
+		lua_pushnumber(L, CCustomColorPalette::DecodePaletteIndex(feature->paletteIndex));
 	} else {
 		lua_pushnil(L);
 	}

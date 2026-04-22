@@ -3033,7 +3033,7 @@ int LuaUnsyncedCtrl::SetUnitPaletteIndex(lua_State* L)
 	if (customIndex < 0 || customIndex >= MAX_CUSTOM_COLORS)
 		return 0;
 
-	unit->paletteIndex = static_cast<uint16_t>(CUSTOM_COLOR_PALETTE_BASE + customIndex);
+	unit->paletteIndex = CCustomColorPalette::EncodePaletteIndex(static_cast<uint16_t>(customIndex));
 	return 0;
 }
 
@@ -3062,7 +3062,7 @@ int LuaUnsyncedCtrl::SetFeaturePaletteIndex(lua_State* L)
 	if (customIndex < 0 || customIndex >= MAX_CUSTOM_COLORS)
 		return 0;
 
-	feature->paletteIndex = static_cast<uint16_t>(CUSTOM_COLOR_PALETTE_BASE + customIndex);
+	feature->paletteIndex = CCustomColorPalette::EncodePaletteIndex(static_cast<uint16_t>(customIndex));
 	return 0;
 }
 
