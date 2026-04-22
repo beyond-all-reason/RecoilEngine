@@ -51,14 +51,14 @@ local keyU = spGetKeyCode("u")
 function widget:Initialize()
   -- Initialize some custom colors for demonstration
   -- These are stored at indices 0-7 in the custom palette
-  spSetCustomPaletteColor(0, 1.0, 0.0, 0.0, 1.0) -- Red
-  spSetCustomPaletteColor(1, 0.0, 1.0, 0.0, 1.0) -- Green
-  spSetCustomPaletteColor(2, 0.0, 0.0, 1.0, 1.0) -- Blue
-  spSetCustomPaletteColor(3, 1.0, 1.0, 0.0, 1.0) -- Yellow
-  spSetCustomPaletteColor(4, 1.0, 0.0, 1.0, 1.0) -- Magenta
-  spSetCustomPaletteColor(5, 0.0, 1.0, 1.0, 1.0) -- Cyan
-  spSetCustomPaletteColor(6, 1.0, 0.5, 0.0, 1.0) -- Orange
-  spSetCustomPaletteColor(7, 0.5, 0.0, 1.0, 1.0) -- Purple
+  spSetCustomPaletteColor(0, 1.0, 0.0, 0.0) -- Red
+  spSetCustomPaletteColor(1, 0.0, 1.0, 0.0) -- Green
+  spSetCustomPaletteColor(2, 0.0, 0.0, 1.0) -- Blue
+  spSetCustomPaletteColor(3, 1.0, 1.0, 0.0) -- Yellow
+  spSetCustomPaletteColor(4, 1.0, 0.0, 1.0) -- Magenta
+  spSetCustomPaletteColor(5, 0.0, 1.0, 1.0) -- Cyan
+  spSetCustomPaletteColor(6, 1.0, 0.5, 0.0) -- Orange
+  spSetCustomPaletteColor(7, 0.5, 0.0, 1.0) -- Purple
 
   spEcho("[CustomUnitColor] Demo widget loaded")
   spEcho("[CustomUnitColor] Custom palette starts at index: " .. customColorBase)
@@ -89,14 +89,14 @@ function widget:KeyPress(key)
       currentCustomIndex = (currentCustomIndex + 1) % 8
 
       -- Get the color we just set
-      local r, g, b, a = spGetCustomPaletteColor(currentCustomIndex)
+      local r, g, b = spGetCustomPaletteColor(currentCustomIndex)
       
       -- Apply custom color to unit (pass custom index directly)
       spSetUnitPaletteIndex(unitID, currentCustomIndex)
       
       spEcho("[CustomUnitColor] Unit " .. unitID .. " now uses custom color " .. 
              currentCustomIndex .. ": " ..
-             string.format("%.2f,%.2f,%.2f,%.2f", r, g, b, a))
+             string.format("%.2f,%.2f,%.2f", r, g, b))
     end
     return true
   end
@@ -127,9 +127,9 @@ function widget:GetTooltip(mx, my)
   if customIdx == nil then
     return "Unit " .. unitID .. " uses team color"
   else
-    local r, g, b, a = spGetCustomPaletteColor(customIdx)
+    local r, g, b = spGetCustomPaletteColor(customIdx)
     return "Unit " .. unitID .. " uses custom color " .. customIdx .. 
-           "\nColor: " .. string.format("%.2f, %.2f, %.2f, %.2f", r, g, b, a)
+           "\nColor: " .. string.format("%.2f, %.2f, %.2f", r, g, b)
   end
 end
 
