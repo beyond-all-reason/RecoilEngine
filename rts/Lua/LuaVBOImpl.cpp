@@ -1201,8 +1201,8 @@ size_t LuaVBOImpl::ModelsVBO()
  * Data Layout:
  * ```
  * SInstanceData:
- *    , traOffset{ matOffset_ }            // updated during the following draw frames
- *    , uniOffset{ uniOffset_ }            // updated during the following draw frames
+ *    , traOffset{ matOffset_ }         // updated during the following draw frames
+ *    , uniOffset{ uniOffset_ }         // updated during the following draw frames
  *    , info{ paletteIndex, numPieces } // not updated during the following draw frames
  *    , aux1 { 0u }
  * ```
@@ -1240,8 +1240,8 @@ size_t LuaVBOImpl::InstanceDataFromUnitDefIDs(const sol::stack_table& ids, int a
  * Data Layout
  * ```
  * SInstanceData:
- *    , traOffset{ matOffset_ }            // updated during the following draw frames
- *    , uniOffset{ uniOffset_ }            // updated during the following draw frames
+ *    , traOffset{ matOffset_ }         // updated during the following draw frames
+ *    , uniOffset{ uniOffset_ }         // updated during the following draw frames
  *    , info{ paletteIndex, numPieces } // not updated during the following draw frames
  *    , aux1 { 0u }
  * ```
@@ -1280,8 +1280,8 @@ size_t LuaVBOImpl::InstanceDataFromFeatureDefIDs(const sol::stack_table& ids, in
  *
  * ```
  * SInstanceData:
- *    , traOffset{ matOffset_ }            // updated during the following draw frames
- *    , uniOffset{ uniOffset_ }            // updated during the following draw frames
+ *    , traOffset{ matOffset_ }         // updated during the following draw frames
+ *    , uniOffset{ uniOffset_ }         // updated during the following draw frames
  *    , info{ paletteIndex, numPieces } // not updated during the following draw frames
  *    , aux1 { 0u }
  * ```
