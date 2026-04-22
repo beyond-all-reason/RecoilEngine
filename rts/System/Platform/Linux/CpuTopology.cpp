@@ -142,7 +142,7 @@ enum Vendor { VENDOR_INTEL, VENDOR_AMD, VENDOR_UNKNOWN };
 
 // Detect CPU vendor (Intel or VENDOR_AMD)
 Vendor detect_cpu_vendor() {
-	unsigned int eax, ebx, ecx, edx;
+	unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
 	__get_cpuid(0, &eax, &ebx, &ecx, &edx);
 	if (ebx == 0x756E6547) return VENDOR_INTEL; // "GenuineIntel"
 	if (ebx == 0x68747541) return VENDOR_AMD;   // "AuthenticAMD"
@@ -152,7 +152,7 @@ Vendor detect_cpu_vendor() {
 // Detect Intel core type using CPUID 0x1A
 CoreType get_intel_core_type(int cpu) {
 	set_cpu_affinity(cpu);
-	unsigned int eax, ebx, ecx, edx;
+	unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
 	if (__get_cpuid(0x1A, &eax, &ebx, &ecx, &edx)) {
 		uint8_t coreType = ( eax & 0xFF000000 ) >> 24;  // Extract core type
 

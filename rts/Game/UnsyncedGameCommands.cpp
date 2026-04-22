@@ -270,7 +270,7 @@ public:
 		}
 
 		auto args = CSimpleParser::Tokenize(action.GetArgs());
-		bool parseFailure;
+		bool parseFailure = false;
 
 		int smfMeshDrawerArg = (!args.empty()) ? StringToInt(args[0], &parseFailure) : -1.0;
 		if (parseFailure) smfMeshDrawerArg = -1.0;

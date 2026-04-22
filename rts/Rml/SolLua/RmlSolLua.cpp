@@ -41,7 +41,7 @@ namespace Rml::SolLua
 {
 	SolLuaPlugin* Initialise(sol::state_view* state, const Rml::String& lua_environment_identifier)
 	{
-		SolLuaPlugin* slp;
+		SolLuaPlugin* slp = nullptr;
 		if (state != nullptr)
 		{
 			slp = new SolLuaPlugin(*state, lua_environment_identifier);

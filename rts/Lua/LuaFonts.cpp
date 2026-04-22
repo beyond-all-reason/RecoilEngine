@@ -200,9 +200,7 @@ int LuaFonts::LoadFont(lua_State* L)
 		return 0;
 
 	auto shPtrFontPtr = static_cast<decltype(f)*>(lua_newuserdata(L, sizeof(decltype(f))));
-	memset(shPtrFontPtr, 0, sizeof(decltype(f)));
-
-	*shPtrFontPtr = std::move(f);
+	new (shPtrFontPtr) decltype(f)(std::move(f));
 
 	luaL_getmetatable(L, "Font");
 	lua_setmetatable(L, -2);
