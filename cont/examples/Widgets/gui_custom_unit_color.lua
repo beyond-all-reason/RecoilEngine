@@ -39,8 +39,6 @@ local spSetCustomPaletteColor = Spring.SetCustomPaletteColor
 local spEcho                  = Spring.Echo
 local spGetKeyCode            = Spring.GetKeyCode
 
-local customColorBase = Spring.GetCustomPaletteColorPaletteBase()
-
 local currentCustomIndex = 0
 
 local keyU = spGetKeyCode("u")
@@ -61,7 +59,6 @@ function widget:Initialize()
   spSetCustomPaletteColor(7, 0.5, 0.0, 1.0) -- Purple
 
   spEcho("[CustomUnitColor] Demo widget loaded")
-  spEcho("[CustomUnitColor] Custom palette starts at index: " .. customColorBase)
   spEcho("[CustomUnitColor] Select a unit and press U to cycle colors")
 end
 

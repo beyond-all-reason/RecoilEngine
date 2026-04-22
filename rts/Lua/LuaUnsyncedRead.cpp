@@ -182,8 +182,6 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetCustomPaletteColor);
 	REGISTER_LUA_CFUNC(GetUnitPaletteIndex);
 	REGISTER_LUA_CFUNC(GetFeaturePaletteIndex);
-	REGISTER_LUA_CFUNC(GetCustomPaletteColorPaletteBase);
-
 	REGISTER_LUA_CFUNC(GetLocalPlayerID);
 	REGISTER_LUA_CFUNC(GetLocalTeamID);
 	REGISTER_LUA_CFUNC(GetLocalAllyTeamID);
@@ -3379,21 +3377,6 @@ int LuaUnsyncedRead::GetFeaturePaletteIndex(lua_State* L)
 	} else {
 		lua_pushnil(L);
 	}
-	return 1;
-}
-
-
-/***
- * Returns the starting palette index for custom colors (256).
- * Primarily useful for GL4 shaders that need to compute the UBO offset
- * into the teamColor array for custom palette entries.
- *
- * @function Spring.GetCustomPaletteColorPaletteBase
- * @return integer paletteBase The starting index for custom colors (256)
- */
-int LuaUnsyncedRead::GetCustomPaletteColorPaletteBase(lua_State* L)
-{
-	lua_pushnumber(L, CUSTOM_COLOR_PALETTE_BASE);
 	return 1;
 }
 
