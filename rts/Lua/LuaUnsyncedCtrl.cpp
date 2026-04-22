@@ -2996,15 +2996,15 @@ int LuaUnsyncedCtrl::SetTeamColor(lua_State* L)
  */
 int LuaUnsyncedCtrl::SetCustomPaletteColor(lua_State* L)
 {
-	const int index = luaL_checkint(L, 1);
-	if (index < 0 || index >= MAX_CUSTOM_COLORS)
-		return 0;
+	const auto index = static_cast<uint16_t>(luaL_checkint(L, 1));
+	if (!CCustomColorPalette::IsValidIndex(index))
+		luaL_error(L, "[%s] paletteID has to be [0; %d)\n", __func__, MAX_CUSTOM_COLORS);
 
 	const float r = std::clamp(luaL_checkfloat(L, 2), 0.0f, 1.0f);
 	const float g = std::clamp(luaL_checkfloat(L, 3), 0.0f, 1.0f);
 	const float b = std::clamp(luaL_checkfloat(L, 4), 0.0f, 1.0f);
 
-	customColorPalette.SetColor(static_cast<uint16_t>(index), r, g, b);
+	customColorPalette.SetColor(index, r, g, b);
 	return 0;
 }
 

@@ -3327,11 +3327,11 @@ int LuaUnsyncedRead::GetTeamOrigColor(lua_State* L)
  */
 int LuaUnsyncedRead::GetCustomPaletteColor(lua_State* L)
 {
-	const int index = luaL_checkint(L, 1);
-	if (index < 0 || index >= MAX_CUSTOM_COLORS)
+	const auto index = static_cast<uint16_t>(luaL_checkint(L, 1));
+	if (!CCustomColorPalette::IsValidIndex(index))
 		return 0;
 
-	const float4 color = customColorPalette.GetColor(static_cast<uint16_t>(index));
+	const float4 color = customColorPalette.GetColor(index);
 	lua_pushnumber(L, color.x);
 	lua_pushnumber(L, color.y);
 	lua_pushnumber(L, color.z);

@@ -14,7 +14,7 @@ public:
 
 	void SetColor(uint16_t index, float r, float g, float b);
 	float4 GetColor(uint16_t index) const;
-	bool IsValidIndex(uint16_t index) const;
+	static bool IsValidIndex(uint16_t index);
 
 	static CCustomColorPalette& GetInstance() {
 		static CCustomColorPalette instance;
