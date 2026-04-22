@@ -26,8 +26,10 @@
 #include "System/FileSystem/FileSystem.h"
 
 // assimp public headers modify #pragma pack across includes (clang -Wpragma-pack)
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wpragma-pack"
+#endif
 #include "lib/assimp/include/assimp/config.h"
 #include "lib/assimp/include/assimp/defs.h"
 #include "lib/assimp/include/assimp/types.h"
@@ -35,7 +37,9 @@
 #include "lib/assimp/include/assimp/postprocess.h"
 #include "lib/assimp/include/assimp/Importer.hpp"
 #include "lib/assimp/include/assimp/DefaultLogger.hpp"
+#ifdef __clang__
 #pragma clang diagnostic pop
+#endif
 
 #include "System/Misc/TracyDefs.h"
 
