@@ -932,7 +932,9 @@ void CFontTexture::PinFont(std::shared_ptr<FontFace>& face, const std::string& f
 					oldestTime = timestampedFont.timestamp;
 				}
 			}
-			pinnedRecentFonts.erase(*oldest);
+			if (oldest != nullptr) {
+				pinnedRecentFonts.erase(*oldest);
+			}
 		}
 		pinnedRecentFonts[fontKey] = { face, time };
 	}
