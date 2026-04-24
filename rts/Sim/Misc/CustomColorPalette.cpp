@@ -43,7 +43,3 @@ float4 CCustomColorPalette::GetColor(uint16_t index) const
 	return colors[index];
 }
 
-bool CCustomColorPalette::IsValidIndex(uint16_t index)
-{
-	return index < MAX_CUSTOM_COLORS;
-}

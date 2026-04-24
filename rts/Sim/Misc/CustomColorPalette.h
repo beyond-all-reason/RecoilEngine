@@ -4,8 +4,11 @@
 #include <array>
 #include <cstdint>
 
-#include "Sim/Misc/GlobalConstants.h"
 #include "System/float4.h"
+
+static constexpr int MAX_PALETTE_COLORS = 2048;
+static constexpr int CUSTOM_COLOR_PALETTE_BASE = 256; // first custom color index (power of 2 aligned)
+static constexpr int MAX_CUSTOM_COLORS  = MAX_PALETTE_COLORS - CUSTOM_COLOR_PALETTE_BASE; // 1792
 
 class CCustomColorPalette {
 public:
@@ -14,7 +17,7 @@ public:
 
 	void SetColor(uint16_t index, float r, float g, float b);
 	float4 GetColor(uint16_t index) const;
-	static bool IsValidIndex(uint16_t index);
+	static bool IsValidIndex(uint16_t index) { return index < MAX_CUSTOM_COLORS; }
 
 	static uint16_t EncodePaletteIndex(uint16_t customIndex) {
 		return CUSTOM_COLOR_PALETTE_BASE + customIndex;

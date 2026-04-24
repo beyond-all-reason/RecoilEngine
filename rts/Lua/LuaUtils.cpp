@@ -18,6 +18,7 @@
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/CommandAI/CommandDescription.h"
+#include "Sim/Misc/CustomColorPalette.h"
 #include "Sim/Misc/LosHandler.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/Log/ILog.h"
@@ -2011,4 +2012,13 @@ void LuaUtils::TracyRemoveAlsoExtras(char* script)
 			script += 18;
 	}
 #endif
+}
+
+uint16_t LuaUtils::ParsePalette(lua_State* L, int index)
+{
+	const int paletteID = static_cast<uint16_t>(luaL_checkint(L, index));
+	if (!CCustomColorPalette::IsValidIndex(paletteID))
+		luaL_error(L, "[%s] paletteID has to be [0; %d)\n", __func__, MAX_CUSTOM_COLORS);
+
+	return paletteID;
 }

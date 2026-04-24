@@ -49,6 +49,7 @@ local keyU = spGetKeyCode("u")
 function widget:Initialize()
   -- Initialize some custom colors for demonstration
   -- These are stored at indices 0-7 in the custom palette
+  assert(Engine.maxCustomPaletteID >= 7)
   spSetCustomPaletteColor(0, 1.0, 0.0, 0.0) -- Red
   spSetCustomPaletteColor(1, 0.0, 1.0, 0.0) -- Green
   spSetCustomPaletteColor(2, 0.0, 0.0, 1.0) -- Blue

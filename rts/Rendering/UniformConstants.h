@@ -12,6 +12,7 @@
 #include "System/SpringMath.h"
 #include "System/creg/creg.h"
 #include "Sim/Misc/GlobalConstants.h"
+#include "Sim/Misc/CustomColorPalette.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/StreamBuffer.h"
 
