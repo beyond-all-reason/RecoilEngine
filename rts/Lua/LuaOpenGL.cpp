@@ -2904,7 +2904,7 @@ int LuaOpenGL::TexRect(lua_State* L)
  * @param numGroupX integer
  * @param numGroupY integer
  * @param numGroupZ integer
- * @param barriers integer? (Default: `4`)
+ * @param barriers integer? (Default: `0`)
  */
 int LuaOpenGL::DispatchCompute(lua_State* L)
 {
