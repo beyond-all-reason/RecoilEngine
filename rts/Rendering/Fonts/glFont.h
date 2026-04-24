@@ -86,15 +86,17 @@ public:
 	void glFormat(float x, float y, float s, const int options, const char* fmt, Args&&... args);
 
 	void SetAutoOutlineColor(bool enable); // auto-select outline color for in-text-colorcodes
-	void SetTextColor(const float4* color = nullptr);
-	void SetOutlineColor(const float4* color = nullptr);
-	void SetColors(const float4* textColor = nullptr, const float4* outlineColor = nullptr);
-	void SetTextColor(float r, float g, float b, float a) { const float4 f{r, g, b, a}; SetTextColor(&f); }
-	void SetOutlineColor(float r, float g, float b, float a) { const float4 f{r, g, b, a}; SetOutlineColor(&f); }
-	void SetTextColor(SColor rgba) { const float4 f = rgba; SetTextColor(&f); }
-	void SetOutlineColor(SColor rgba) { const float4 f = rgba; SetOutlineColor(&f); }
+	void SetTextColor(const SColor* color = nullptr);
+	void SetOutlineColor(const SColor* color = nullptr);
+	void SetColors(const SColor* textColor = nullptr, const SColor* outlineColor = nullptr);
+	void SetTextColor(float r, float g, float b, float a) { const SColor f{r, g, b, a}; SetTextColor(&f); }
+	void SetOutlineColor(float r, float g, float b, float a) { const SColor f{r, g, b, a}; SetOutlineColor(&f); }
+	void SetTextColor(SColor rgba) { SetTextColor(&rgba); }
+	void SetOutlineColor(SColor rgba) {SetOutlineColor(&rgba); }
 	void SetTextDepth(float z = 0.0f) { textDepth.x = z; }
 	void SetOutlineDepth(float z = 0.0f) { textDepth.y = z; }
+
+
 
 	float GetCharacterWidth(const char32_t c);
 
@@ -107,7 +109,14 @@ public:
 
 	void GetStats(std::array<size_t, 8>& stats) const;
 private:
-	static const float4* ChooseOutlineColor(const float4& textColor);
+	static const SColor* ChooseOutlineColor(const SColor& textColor);
+
+	// Friend classes to avoid exposing internal state via getters
+	friend class WidthCalculator;
+	friend class HeightCalculator;
+	friend class GlyphScanner;
+	friend struct SplitIntoLinesHandler;
+	template<int, int, bool> friend class StringRenderer;
 
 	template<int shiftXC, int shiftYC, bool outline>
 	void RenderStringImpl(float x, float y, float scaleX, float scaleY, const std::string& str);
@@ -121,11 +130,6 @@ private:
 	void RenderStringShadow(float x, float y, float scaleX, float scaleY, const std::string& str) {
 		RenderStringImpl<10, 10, true >(x, y, scaleX, scaleY, str);
 	}
-	bool SkipColorCodesAndNewLines(
-		const spring::u8string& text,
-		int& curIndex,
-		int& numLines
-	);
 private:
 	float GetTextWidth_(const spring::u8string& text);
 	float GetTextHeight_(const spring::u8string& text, float* descender = nullptr, int* numLines = nullptr);
@@ -140,12 +144,12 @@ private:
 	bool inBeginEndBlock = false; // implies bufferMutex is locked
 	bool autoOutlineColor = false; // auto-select outline color for in-text-colorcodes
 
-	float4 textColor;
-	float4 outlineColor;
+	SColor textColor;
+	SColor outlineColor;
 
 	// colors set when glPrint was called; ColorResetIndicator will reset to these
-	float4 baseTextColor;
-	float4 baseOutlineColor;
+	SColor baseTextColor;
+	SColor baseOutlineColor;
 
 	float2 textDepth;
 

@@ -212,6 +212,14 @@ namespace Recoil {
 	// taken from https://github.com/spnda/fastgltf/blob/main/include/fastgltf/util.hpp
 	// The MIT License
 	// Copyright (C) 2022 - 2025 Sean Apeler
+
+	template<class... Ts>
+		struct visitor : Ts... {
+		using Ts::operator()...;
+	};
+
+	template<class... Ts> visitor(Ts...) -> visitor<Ts...>;
+
 	template <typename Visitor, typename Variant, std::size_t... i>
 	constexpr bool is_exhaustive_visitor(std::integer_sequence<std::size_t, i...>) noexcept {
 		return std::conjunction_v<std::is_invocable<Visitor, std::variant_alternative_t<i, std::remove_cvref_t<Variant>>>...>;

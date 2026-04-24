@@ -1,9 +1,12 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
-/// REMEMBER TO PORT BAR105 CHANGES!!!
+
+#include <cstdint>
 
 #include "TextWrap.h"
 #include "glFont.h"
 #include "FontLogSection.h"
+#include "FontConstants.hpp"
+#include "TextIterator.hpp"
 #include "System/Log/ILog.h"
 #include "System/SpringMath.h"
 #include "System/StringUtil.h"
@@ -11,9 +14,6 @@
 #include "System/Misc/TracyDefs.h"
 
 
-static constexpr char32_t spaceUTF16    = 0x20;
-static constexpr char32_t ellipsisUTF16 = 0x2026;
-static const std::string ellipsisUTF8 = utf8::FromUnicode(ellipsisUTF16);
 
 static constexpr const char* spaceStringTable[1 + 10] = {
 	"",
@@ -28,54 +28,6 @@ static constexpr const char* spaceStringTable[1 + 10] = {
 	"         ",
 	"          ",
 };
-
-
-
-/*******************************************************************************/
-/*******************************************************************************/
-
-uint32_t CTextWrap::SkipColorCodes(const spring::u8string& text, uint32_t idx, ColorCodeText* cctPtr)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-
-	auto AdvanceAndCopy = [&text, cctPtr](uint32_t& idx, uint32_t c) {
-		if (cctPtr) {
-			std::fill(cctPtr->storage.begin(), cctPtr->storage.end(), 0);
-			std::memcpy(cctPtr->storage.data(), &text[idx], c);
-			cctPtr->size = static_cast<uint8_t>(c);
-		}
-		idx += c;
-	};
-
-	while (idx < text.size()) {
-		switch (text[idx])
-		{
-		case OldColorCodeIndicator:
-			if (fontHandler.disableOldColorIndicators)
-				break;
-			[[fallthrough]];
-		case ColorCodeIndicator: {
-			AdvanceAndCopy(idx, 3 + 1); // I+RGB
-		} continue;
-		case OldColorCodeIndicatorEx:
-			if (fontHandler.disableOldColorIndicators)
-				break;
-			[[fallthrough]];
-		case ColorCodeIndicatorEx: {
-			AdvanceAndCopy(idx, 2 * 4 + 1); // I+RGBA,RGBA
-		} continue;
-		case ColorResetIndicator: {
-			AdvanceAndCopy(idx, 1); // I
-		} continue;
-		default:
-			break; // cause next break to trigger and terminate the loop
-		}
-
-		break;
-	}
-
-	return std::min<uint32_t>(text.size(), idx);
-}
 
 /*******************************************************************************/
 /*******************************************************************************/
@@ -122,7 +74,7 @@ static inline bool IsLowerCase(const char32_t& c)
  * @param strlen total length of the word
  * @return penalty (smaller is better) to split a word at that position
  */
-static inline float GetPenalty(const char32_t& c, unsigned int strpos, unsigned int strlen)
+static inline float GetPenalty(const char32_t& c, uint32_t strpos, uint32_t strlen)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const float dist = strlen - strpos;
@@ -145,7 +97,7 @@ static inline float GetPenalty(const char32_t& c, unsigned int strpos, unsigned 
 }
 
 
-CTextWrap::word CTextWrap::SplitWord(CTextWrap::word& w, float wantedWidth, bool smart)
+TextWrapHelpers::word CTextWrap::SplitWord(TextWrapHelpers::word& w, float wantedWidth, bool smart)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// returns two pieces 'L'eft and 'R'ight of the split word (returns L, *wi becomes R)
@@ -177,36 +129,51 @@ CTextWrap::word CTextWrap::SplitWord(CTextWrap::word& w, float wantedWidth, bool
 			}
 		}
 
-		float width = 0.0f;
-		int i = 0;
-		float min_penalty = 1e9;
-		unsigned int goodbreak = 0;
-		char32_t c = utf8::GetNextChar(w.text,i);
-		const GlyphInfo* curGlyph = &GetGlyph(c);
-		const GlyphInfo* nextGlyph = curGlyph;
+		// Use TextIterator to iterate through the word
+		struct SplitWordHandler : public TextIteratorHandler {
+			CTextWrap* font;
+			float wantedWidth;
+			bool smart;
+			float width = 0.0f;
+			float minPenalty = 1e9f;
+			uint32_t goodbreak = 0;
+			const GlyphInfo* prevGlyph = nullptr;
+			int textLen;
 
-		do {
-			const int lastCharPos = i;
-			const char32_t co     = c;
-			curGlyph = nextGlyph;
-			c = utf8::GetNextChar(w.text,i);
-			nextGlyph = &GetGlyph(c);
-			width += GetKerning(*curGlyph, *nextGlyph);
+			SplitWordHandler(CTextWrap* f, float w, bool s, int len)
+				: font(f), wantedWidth(w), smart(s), textLen(len) {}
 
-			if (width > wantedWidth) {
-				break;
-			}
-
-			if (smart) {
-				const float penalty = GetPenalty(co, lastCharPos, w.text.length());
-				if (penalty < min_penalty) {
-					min_penalty = penalty;
-					goodbreak   = lastCharPos;
+			bool OnPrintable(const CharEvent& e) override {
+				char32_t c = std::get<char32_t>(e.value);
+				const GlyphInfo* curGlyph = &font->GetGlyph(c);
+				if (prevGlyph != nullptr) {
+					width += font->GetKerning(*prevGlyph, *curGlyph);
 				}
-			} else {
-				goodbreak = i;
+				if (width > wantedWidth) {
+					return false; // stop further processing
+				}
+				if (smart) {
+					float penalty = GetPenalty(c, e.startIdx, static_cast<uint32_t>(textLen));
+					if (penalty < minPenalty) {
+						minPenalty = penalty;
+						goodbreak = e.startIdx;
+					}
+				} else {
+					goodbreak = e.endIdx;
+				}
+				prevGlyph = curGlyph;
+				return true;
 			}
-		} while(i < w.text.length());
+			bool OnSpace(const CharEvent& e) override {
+				return OnPrintable(e); // treat spaces like printable
+			}
+		};
+
+		SplitWordHandler handler(this, wantedWidth, smart, w.text.length());
+		TextIterator iterator(w.text, handler);
+		iterator.Execute();
+
+		uint32_t goodbreak = handler.goodbreak;
 
 		w2.text  = toustring(w.text.substr(0,goodbreak));
 		w2.width = GetTextWidth(w2.text);
@@ -339,7 +306,7 @@ void CTextWrap::WrapTextConsole(std::list<word>& words, float maxWidth, float ma
 	if (words.empty() || (GetLineHeight()<=0.0f))
 		return;
 	const bool splitAllWords = false;
-	const unsigned int maxLines = (unsigned int)std::floor(std::max(0.0f, maxHeight / GetLineHeight()));
+	const uint32_t maxLines = (uint32_t)std::floor(std::max(0.0f, maxHeight / GetLineHeight()));
 
 	line* currLine;
 	word linebreak;
@@ -445,97 +412,126 @@ void CTextWrap::WrapTextConsole(std::list<word>& words, float maxWidth, float ma
 	wi = words.erase(wi, words.end());
 }
 
+struct SplitWordsHandler final : TextIteratorHandler {
+	CTextWrap& wrap;
+	const spring::u8string& text;
 
-void CTextWrap::SplitTextInWords(const spring::u8string& text, std::list<word>* words, std::list<ColorCode>& colorCodes)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	const unsigned int length = (unsigned int)text.length();
-	const float spaceAdvance = GetGlyph(spaceUTF16).advance;
+	std::list<word>& words;
+	std::list<ColorCode>& colorCodes;
 
-	// Scan in advance so we avoid calls on every step of splitting.
-	ScanForWantedGlyphs(text);
-
-	words->push_back(word());
-	word* w = &(words->back());
-
+	const float spaceAdvance;
+	word* w = nullptr;
 	uint32_t numChar = 0;
-	for (int pos = 0; pos < length; pos++) {
-		const char8_t& c = text[pos];
-		switch(c) {
-			// space
-			case spaceUTF16:
-				if (!w->isSpace) {
-					if (!w->isLineBreak) {
-						w->width = GetTextWidth(w->text);
-					}
-					words->push_back(word());
-					w = &(words->back());
-					w->isSpace = true;
-					w->pos     = numChar;
-				}
-				w->numSpaces++;
-				w->width = spaceAdvance * w->numSpaces;
-				break;
 
-			// inlined colorcodes
-			case OldColorCodeIndicator:
-				if (fontHandler.disableOldColorIndicators)
-					break;
-				[[fallthrough]];
-			case OldColorCodeIndicatorEx:
-				if (fontHandler.disableOldColorIndicators)
-					break;
-				[[fallthrough]];
-			case ColorCodeIndicatorEx: [[fallthrough]];
-			case ColorCodeIndicator: [[fallthrough]];
-			case ColorResetIndicator: {
-				auto& cc = colorCodes.emplace_back();
-				cc.pos = numChar;
+	SplitWordsHandler(CTextWrap& wrap,
+		const spring::u8string& text,
+		std::list<word>& words,
+		std::list<ColorCode>& colorCodes,
+		float spaceAdvance)
+		: wrap(wrap)
+		, text(text)
+		, words(words)
+		, colorCodes(colorCodes)
+		, spaceAdvance(spaceAdvance)
+	{
+		words.emplace_back();
+		w = &words.back();
+	}
 
-				// -1 so for loop can "pos++"
-				pos = SkipColorCodes(text, pos, &cc.colorText) - 1;
-			} break;
-
-			// newlines
-			case CR: // CR+LF
-				pos += (pos + 1 < length && text[pos+1] == LF);
-				[[fallthrough]];
-			case LF: // LF
-				if (w->isSpace) {
-					w->width = spaceAdvance * w->numSpaces;
-				} else if (!w->isLineBreak) {
-					w->width = GetTextWidth(w->text);
-				}
-				words->push_back(word());
-				w = &(words->back());
-				w->isLineBreak = true;
-				w->pos = numChar;
-				break;
-
-			// printable chars
-			default:
-				if (w->isSpace || w->isLineBreak) {
-					if (w->isSpace) {
-						w->width = spaceAdvance * w->numSpaces;
-					} else if (!w->isLineBreak) {
-						w->width = GetTextWidth(w->text);
-					}
-					words->push_back(word());
-					w = &(words->back());
-					w->pos = numChar;
-				}
-				w->text += c;
-				numChar++;
+	void FinalizeCurrentWord()
+	{
+		if (!w) return;
+		if (w->isSpace) {
+			w->width = spaceAdvance * w->numSpaces;
+		}
+		else if (!w->isLineBreak) {
+			w->width = wrap.GetTextWidth(w->text);
 		}
 	}
 
-	if (w->isSpace) {
-		w->width = spaceAdvance * w->numSpaces;
-	} else if (!w->isLineBreak) {
-		w->width = GetTextWidth(w->text);
+	void StartWord(uint32_t pos, bool isSpace, bool isLineBreak)
+	{
+		words.emplace_back();
+		w = &words.back();
+		w->pos = pos;
+		w->isSpace = isSpace;
+		w->isLineBreak = isLineBreak;
 	}
-}
 
+	bool OnColorCode(const CharEvent& e) override
+	{
+		const auto& col = std::get<SColor>(e.value);
+		ColorCode cc;
+		cc.pos = numChar;
+		cc.colorText = col;
+		colorCodes.emplace_back(cc);
+
+		return true;
+	}
+
+	bool OnColorCodeEx(const CharEvent& e) override
+	{
+		const auto& fc = std::get<FontColors>(e.value);
+		ColorCode cc;
+		cc.pos = numChar;
+		cc.colorText = fc.textColor;
+
+		colorCodes.emplace_back(cc);
+		return true;
+	}
+
+	bool OnSpace(const CharEvent&) override
+	{
+		if (!w->isSpace) {
+			FinalizeCurrentWord();
+			StartWord(numChar, /*isSpace=*/true, /*isLineBreak=*/false);
+		}
+		w->numSpaces++;
+		w->width = spaceAdvance * w->numSpaces;
+		return true;
+	}
+
+	bool OnNewline(const CharEvent&) override
+	{
+		FinalizeCurrentWord();
+		StartWord(numChar, /*isSpace=*/false, /*isLineBreak=*/true);
+		return true;
+	}
+
+	bool OnPrintable(const CharEvent& e) override
+	{
+		if (w->isSpace || w->isLineBreak) {
+			FinalizeCurrentWord();
+			StartWord(numChar, /*isSpace=*/false, /*isLineBreak=*/false);
+		}
+
+		// Append original UTF-8 bytes for this codepoint:
+		w->text.append(text.begin() + e.startIdx, text.begin() + e.endIdx);
+
+		// only increment on printable (not on spaces/newlines)
+		numChar++;
+		return true;
+	}
+
+	void OnEnd() override
+	{
+		FinalizeCurrentWord();
+	}
+};
+
+void CTextWrap::SplitTextInWords(const spring::u8string& text,
+	std::list<word>* words,
+	std::list<ColorCode>& colorCodes)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	ScanForWantedGlyphs(text);
+	const float spaceAdvance = GetGlyph(spaceUTF16).advance;
+
+	SplitWordsHandler h(*this, text, *words, colorCodes, spaceAdvance);
+	TextIterator it(text, h);
+	it.Execute();
+}
 
 void CTextWrap::RemergeColorCodes(std::list<word>* words, const std::list<ColorCode>& colorCodes) const
 {
@@ -617,7 +613,7 @@ int CTextWrap::WrapInPlace(spring::u8string& text, float _fontSize, float maxWid
 	if (words.empty())
 		return 0;
 
-	unsigned int numlines = 1;
+	uint32_t numlines = 1;
 
 	for (const auto& w: words) {
 		if (w.isSpace) {
@@ -628,7 +624,7 @@ int CTextWrap::WrapInPlace(spring::u8string& text, float _fontSize, float maxWid
 				text.append(w.numSpaces - (numSpaceStrings - 1), ' ');
 			}
 		} else if (w.isLineBreak) {
-			text.append("\x0d\x0a");
+			text.append(CRLF);
 			numlines++;
 		} else {
 			text.append(w.text);
@@ -649,3 +645,32 @@ spring::u8string CTextWrap::Wrap(const spring::u8string& text, float _fontSize, 
 
 /*******************************************************************************/
 /*******************************************************************************/
+
+std::string TextWrapHelpers::ColorCode::tostring() const
+{
+	return std::visit([](const auto& v) -> std::string {
+		using T = std::decay_t<decltype(v)>;
+		std::string res;
+		if constexpr (std::is_same_v<T, SColor>) {
+			res.resize(1 + 3);
+			res[0] = fontHandler.disableOldColorIndicators ? ColorCodeIndicator : OldColorCodeIndicator;
+			res[1] = v.r;
+			res[2] = v.g;
+			res[3] = v.b;
+		}
+		else if constexpr (std::is_same_v<T, FontColors>) {
+			res.resize(1 + 4 + 4);
+			res[0] = fontHandler.disableOldColorIndicators ? ColorCodeIndicatorEx : OldColorCodeIndicatorEx;
+			res[1] = v.textColor.r;
+			res[2] = v.textColor.g;
+			res[3] = v.textColor.b;
+			res[4] = v.textColor.a;
+			res[5] = v.outlineColor.r;
+			res[6] = v.outlineColor.g;
+			res[7] = v.outlineColor.b;
+			res[8] = v.outlineColor.a;
+		}
+
+		return res;
+	}, colorText);
+}

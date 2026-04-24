@@ -1594,8 +1594,8 @@ void CGame::DrawInterfaceWidgets()
 	#define INF_FONT_FLAGS (FONT_RIGHT | FONT_SCALE | FONT_NORM | (FONT_OUTLINE * guihandler->GetOutlineFonts()))
 
 	if (showClock) {
-		static constexpr float4 white(0.9f, 0.9f, 0.9f, 1.0f);
-		smallFont->SetColors(&white, NULL);
+		static constexpr SColor white(0.9f, 0.9f, 0.9f, 1.0f);
+		smallFont->SetColors(&white, nullptr);
 
 		const int seconds = (gs->frameNum / GAME_SPEED);
 		if (seconds < 3600) {
@@ -1606,14 +1606,14 @@ void CGame::DrawInterfaceWidgets()
 	}
 
 	if (showFPS) {
-		static constexpr float4 yellow(1.0f, 1.0f, 0.25f, 1.0f);
-		smallFont->SetColors(&yellow,NULL);
+		static constexpr SColor yellow(1.0f, 1.0f, 0.25f, 1.0f);
+		smallFont->SetColors(&yellow, nullptr);
 		smallFont->glFormat(0.99f, 0.92f, 1.0f, INF_FONT_FLAGS, "%.0f", globalRendering->FPS);
 	}
 
 	if (showSpeed) {
-		const float4 speedcol(1.0f, gs->speedFactor < gs->wantedSpeedFactor * 0.99f ? 0.25f : 1.0f, 0.25f, 1.0f);
-		smallFont->SetColors(&speedcol, NULL);
+		const SColor speedcol(1.0f, gs->speedFactor < gs->wantedSpeedFactor * 0.99f ? 0.25f : 1.0f, 0.25f, 1.0f);
+		smallFont->SetColors(&speedcol, nullptr);
 		smallFont->glFormat(0.99f, 0.90f, 1.0f, INF_FONT_FLAGS, "%2.2f", gs->speedFactor);
 	}
 

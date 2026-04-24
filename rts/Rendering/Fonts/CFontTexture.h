@@ -105,6 +105,8 @@ It works only and only with UTF32 chars
 class CFontTexture
 {
 public:
+	static inline const GlyphInfo dummyGlyph = GlyphInfo();
+public:
 	friend class CglFontRenderer;
 	friend class CglShaderFontRenderer;
 	friend class CglNoShaderFontRenderer;
@@ -133,10 +135,17 @@ public:
 	float GetDescender() const { return fontDescender; }
 	int GetTexture() const { return glyphAtlasTextureID; }
 
+	friend class WidthCalculator;
+	friend class HeightCalculator;
+	friend class GlyphScanner;
+	friend struct SplitIntoLinesHandler;
+	template<int, int, bool> friend class StringRenderer;
+
 	const std::string& GetFamily() const { return fontFamily; }
 	const std::string& GetStyle() const { return fontStyle; }
 
 	const GlyphInfo& GetGlyph(char32_t ch); //< Get a glyph
+	float GetKerning(const GlyphInfo& lgl, const GlyphInfo& rgl);
 public:
 	void ReallocAtlases(bool pre);
 	bool HasColor() const { return needsColor; }
@@ -156,11 +165,9 @@ private:
 	bool ClearGlyphs();
 	void PreloadGlyphs();
 protected:
-	float GetKerning(const GlyphInfo& lgl, const GlyphInfo& rgl);
-protected:
 	static inline std::vector<std::weak_ptr<CFontTexture>> allFonts = {};
 
-	static inline const GlyphInfo dummyGlyph = GlyphInfo();
+
 	static inline bool needsClearGlyphs = false;
 
 	std::array<float, 128 * 128> kerningPrecached = {}; // contains ASCII kerning

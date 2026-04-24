@@ -148,12 +148,12 @@ void GameSetupDrawer::Draw()
 	font->glPrint(0.3f, 0.7f, 1.0f, FONT_OUTLINE | FONT_SCALE | FONT_NORM, startState);
 
 	for (unsigned int a = 0; a <= numPlayers; a++) {
-		static constexpr float4      red(1.0f, 0.2f, 0.2f, 1.0f);
-		static constexpr float4    green(0.2f, 1.0f, 0.2f, 1.0f);
-		static constexpr float4   yellow(0.8f, 0.8f, 0.2f, 1.0f);
-		static constexpr float4    white(1.0f, 1.0f, 1.0f, 1.0f);
-		static constexpr float4     cyan(0.0f, 0.9f, 0.9f, 1.0f);
-		static constexpr float4 lightred(1.0f, 0.5f, 0.5f, 1.0f);
+		static constexpr SColor      red(1.0f, 0.2f, 0.2f, 1.0f);
+		static constexpr SColor    green(0.2f, 1.0f, 0.2f, 1.0f);
+		static constexpr SColor   yellow(0.8f, 0.8f, 0.2f, 1.0f);
+		static constexpr SColor    white(1.0f, 1.0f, 1.0f, 1.0f);
+		static constexpr SColor     cyan(0.0f, 0.9f, 0.9f, 1.0f);
+		static constexpr SColor lightred(1.0f, 0.5f, 0.5f, 1.0f);
 
 		const float fontScale = 1.0f;
 		const float fontSize  = fontScale * font->GetSize();
@@ -163,7 +163,7 @@ void GameSetupDrawer::Draw()
 		const float xPos = 10.0f * globalRendering->pixelX;
 
 		const CPlayer* player = nullptr;
-		const float4* color = nullptr;
+		const SColor* color = nullptr;
 
 		std::string name;
 

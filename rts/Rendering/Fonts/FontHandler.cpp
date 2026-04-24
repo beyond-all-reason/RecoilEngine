@@ -10,9 +10,7 @@ CFontHandler fontHandler;
 
 
 CFontHandler::CFontHandler()
-{
-}
-
+{}
 
 bool CFontHandler::Init()
 {

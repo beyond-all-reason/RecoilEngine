@@ -12,6 +12,8 @@
 #include "Map/MetalMap.h"
 #include "Map/ReadMap.h"
 #include "Rendering/Fonts/glFont.h"
+#include "Rendering/Fonts/FontHandler.h"
+#include "Rendering/Fonts/FontConstants.hpp"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/CategoryHandler.h"
 #include "Sim/Misc/DamageArrayHandler.h"
@@ -22,7 +24,6 @@
 #include "System/FileSystem/ArchiveScanner.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/StringUtil.h"
-#include "Rendering/Fonts/FontHandler.h"
 
 /******************************************************************************
  * Game constants
@@ -336,9 +337,9 @@ bool LuaConstGame::PushEntries(lua_State* L)
 
 		lua_pushliteral(L, "textColorCodes");
 		lua_createtable(L, 0, 3);
-			LuaPushNamedChar(L, "Color"          , static_cast<char>(newIndicators ? CglFont::ColorCodeIndicator : CglFont::OldColorCodeIndicator)  );
-			LuaPushNamedChar(L, "ColorAndOutline", static_cast<char>(newIndicators ? CglFont::ColorCodeIndicatorEx : CglFont::OldColorCodeIndicatorEx));
-			LuaPushNamedChar(L, "Reset"          , static_cast<char>(CglFont::ColorResetIndicator) );
+			LuaPushNamedChar(L, "Color"          , static_cast<char>(newIndicators ? ColorCodeIndicator : OldColorCodeIndicator)  );
+			LuaPushNamedChar(L, "ColorAndOutline", static_cast<char>(newIndicators ? ColorCodeIndicatorEx : OldColorCodeIndicatorEx));
+			LuaPushNamedChar(L, "Reset"          , static_cast<char>(ColorResetIndicator) );
 		lua_rawset(L, -3);
 	}
 

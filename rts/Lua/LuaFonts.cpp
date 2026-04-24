@@ -489,18 +489,20 @@ static int SetTextColorShared(lua_State* L, bool outline)
 	if (args < 2)
 		luaL_error(L, "[%s] insufficient arguments to font:SetText%sColor(font,table|number*)", __func__, outline? "Outline": "");
 
-	float4 color = {1.0f, 1.0f, 1.0f, 1.0f};
+	float4 fColor = {1.0f, 1.0f, 1.0f, 1.0f};
 
 	if (lua_istable(L, 2)) {
-		LuaUtils::ParseFloatArray(L, 2, &color.x, 4);
+		LuaUtils::ParseFloatArray(L, 2, &fColor.x, 4);
 	} else if (args >= 4) {
-		color.x = luaL_optfloat(L, 2, color.x);
-		color.y = luaL_optfloat(L, 3, color.y);
-		color.z = luaL_optfloat(L, 4, color.z);
-		color.w = luaL_optfloat(L, 5, color.w);
+		fColor.x = luaL_optfloat(L, 2, fColor.x);
+		fColor.y = luaL_optfloat(L, 3, fColor.y);
+		fColor.z = luaL_optfloat(L, 4, fColor.z);
+		fColor.w = luaL_optfloat(L, 5, fColor.w);
 	} else if (!lua_isnil(L, 2)) {
 		luaL_error(L, "[%s] incorrect arguments to font:SetText%sColor(font,table|number*)", __func__, outline? "Outline": "");
 	}
+
+	SColor color(fColor);
 
 	if (outline)
 		f->SetOutlineColor(&color);

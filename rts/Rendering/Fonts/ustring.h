@@ -9,8 +9,8 @@ namespace spring {
 	public:
 		// copy ctors
 		//using string::string; // gcc4.8 and newer
-		explicit u8string(const std::string& s) : std::string(s) {}
-		u8string(const char* c) : std::string(c) {}
+		constexpr explicit u8string(const std::string& s) : std::string(s) {}
+		constexpr u8string(const char* c) : std::string(c) {}
 
 		//! this is an important difference, we return an unsigned value here!
 		//! std::string returns a _signed_ one and breaks this way:

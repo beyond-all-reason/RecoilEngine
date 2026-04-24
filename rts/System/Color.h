@@ -19,10 +19,10 @@ struct SColor
 	constexpr SColor() : r(255), g(255), b(255), a(255) {}
 
 	/// Initialize with values in the range [0, 255]
-	constexpr SColor(const std::uint8_t r, const std::uint8_t g, const std::uint8_t b, const std::uint8_t a = 255)
+	constexpr SColor(const uint8_t r, const uint8_t g, const uint8_t b, const uint8_t a = 255)
 		: r(r), g(g), b(b), a(a) {}
 	/// Initialize with values in the range [0, 255]
-	constexpr SColor(const int r, const int g, const int b, const int a = 255)
+	constexpr SColor(int r, int g, int b, int a = 255)
 		: r(r), g(g), b(b), a(a) {}
 	/// Initialize with values in the range [0.0, 1.0]
 	constexpr SColor(float r, float g, float b, float a = 1.0f)
@@ -135,8 +135,8 @@ struct SColor
 public:
 	union {
 		/// individual color channel values in the range [0, 255]
-		struct { std::uint8_t r, g, b, a; };
-		std::array<std::uint8_t, 4> rgba;
+		struct { uint8_t r, g, b, a; };
+		std::array<uint8_t, 4> rgba;
 		/// The color as a single 32bit value
 		std::uint32_t i;
 	};

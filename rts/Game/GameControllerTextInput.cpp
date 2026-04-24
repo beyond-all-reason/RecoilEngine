@@ -22,9 +22,9 @@
 
 #include "System/Misc/TracyDefs.h"
 
-static constexpr float4 const  defColor(1.0f, 1.0f, 1.0f, 1.0f);
-static constexpr float4 const allyColor(0.5f, 1.0f, 0.5f, 1.0f);
-static constexpr float4 const specColor(1.0f, 1.0f, 0.5f, 1.0f);
+static constexpr SColor const  defColor(1.0f, 1.0f, 1.0f, 1.0f);
+static constexpr SColor const allyColor(0.5f, 1.0f, 0.5f, 1.0f);
+static constexpr SColor const specColor(1.0f, 1.0f, 0.5f, 1.0f);
 
 GameControllerTextInput gameTextInput;
 
@@ -78,7 +78,7 @@ void GameControllerTextInput::Draw() {
 	}
 
 	// setup the color
-	const float4* textColor = &defColor;
+	const auto* textColor = &defColor;
 
 	if (userInput.length() < 2) {
 		textColor = &defColor;
