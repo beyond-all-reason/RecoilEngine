@@ -2929,7 +2929,7 @@ int LuaOpenGL::DispatchCompute(lua_State* L)
 
 	glDispatchCompute(numGroupX, numGroupY, numGroupZ);
 
-	GLbitfield barriers = (GLbitfield)luaL_optint(L, 1, 4);
+	GLbitfield barriers = (GLbitfield)luaL_optint(L, 4, 0);
 	//skip checking the correctness of values :)
 
 	if (barriers > 0u)
