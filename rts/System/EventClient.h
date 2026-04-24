@@ -370,7 +370,7 @@ class CEventClient
 		virtual void DrawShadowUnitsLua() {}
 		virtual void DrawShadowFeaturesLua() {}
 
-		virtual void BuildSquareReceived(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses) {}
+		virtual void DrawBuildSquare(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses) {}
 
 		virtual void FontsChanged() {}
 

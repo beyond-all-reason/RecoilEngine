@@ -95,7 +95,7 @@ CallInsList = {
 	"DrawScreen",
 	"DrawInMiniMap",
 
-	"BuildSquareReceived",
+	"DrawBuildSquare",
 
 	"FontsChanged",
 

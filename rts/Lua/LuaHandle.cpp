@@ -2819,8 +2819,8 @@ DRAW_CALLIN(DrawShadowUnitsLua)
  */
 DRAW_CALLIN(DrawShadowFeaturesLua)
 
-/*** @function Callins:BuildSquareReceived
- * Called when engine rendering is disabled and build square data is computed.
+/*** @function Callins:DrawBuildSquare
+ * Called when build square data is computed, before engine rendering.
  * Grid dimensions can be inferred from UnitDefs[unitDefID].xsize and UnitDefs[unitDefID].zsize.
  * Grid origin in square coords: x - xsize/2, z - zsize/2 (accounting for facing).
  * @param unitDefID number
@@ -2829,7 +2829,7 @@ DRAW_CALLIN(DrawShadowFeaturesLua)
  * @param facing number build facing
  * @param statuses table flat 1D row-major array of BuildSquareStatus values: BLOCKED=0, OCCUPIED=1, RECLAIMABLE=2, OPEN=3
  */
-void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses)
+void CLuaHandle::DrawBuildSquare(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
@@ -2849,7 +2849,9 @@ void CLuaHandle::BuildSquareReceived(int unitDefID, int x, int z, int facing, co
 		lua_rawseti(L, -2, i + 1);
 	}
 
+	LuaOpenGL::SetDrawingEnabled(L, true);
 	RunCallIn(L, cmdStr, 5, 0);
+	LuaOpenGL::SetDrawingEnabled(L, false);
 }
 
 /***

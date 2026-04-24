@@ -1424,14 +1424,15 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 		buildCacheItem.statuses = statuses;
 	}
 
+	eventHandler.DrawBuildSquare(
+		buildInfo.def->id,
+		static_cast<int>(pos.x),
+		static_cast<int>(pos.z),
+		buildInfo.buildFacing,
+		statuses
+	);
+
 	if (!CUnitDrawer::EngineBuildSquareRendering()) {
-		eventHandler.BuildSquareReceived(
-			buildInfo.def->id,
-			static_cast<int>(pos.x),
-			static_cast<int>(pos.z),
-			buildInfo.buildFacing,
-			statuses
-		);
 		return canBuild;
 	}
 

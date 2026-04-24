@@ -1031,10 +1031,10 @@ void CEventHandler::DrawShadowFeaturesLua()
 	ITERATE_EVENTCLIENTLIST_NA(DrawShadowFeaturesLua);
 }
 
-void CEventHandler::BuildSquareReceived(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses)
+void CEventHandler::DrawBuildSquare(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses)
 {
 	ZoneScoped;
-	ITERATE_EVENTCLIENTLIST(BuildSquareReceived, unitDefID, x, z, facing, statuses);
+	ITERATE_EVENTCLIENTLIST(DrawBuildSquare, unitDefID, x, z, facing, statuses);
 }
 
 /******************************************************************************/
