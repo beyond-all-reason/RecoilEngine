@@ -1387,11 +1387,13 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 			}
 		}
 	} else {
+		// out of map?
 		if (static_cast<unsigned>(x1) > mapDims.mapx || static_cast<unsigned>(x2) > mapDims.mapx ||
 			static_cast<unsigned>(z1) > mapDims.mapy || static_cast<unsigned>(z2) > mapDims.mapy) {
 			return BUILDSQUARE_BLOCKED;
 		}
 
+		// this can be called in either context (synced and unsynced)
 		for (int z = z1; z < z2; z++) {
 			for (int x = x1; x < x2; x++) {
 				sqrPos.x = x * SQUARE_SIZE;
