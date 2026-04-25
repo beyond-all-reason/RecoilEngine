@@ -31,6 +31,7 @@ protected:
 	static CEndGameBox* endGameBox;
 	void FillTeamStats();
 	void addVertices(TypedRenderBuffer<VA_TYPE_C> &rbC, const std::vector<float>& statValues, size_t numPoints, float scalex, float scaley, const uint8_t (&color)[4]);
+	float calcVertexY(float, float);
 
 	TRectangle<float> box;
 

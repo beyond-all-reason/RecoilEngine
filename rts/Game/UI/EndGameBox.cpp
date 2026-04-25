@@ -454,6 +454,11 @@ void CEndGameBox::Draw()
 			{
 				const std::vector<float>& statValues = stats[stat1].values[teamNum];
 				addVertices(rbC, statValues, numPoints, scalex, scaley, team->color);
+				if (teamNum == gu->myTeam) {
+					float v1 = calcVertexY(statValues[numPoints - 1], statValues[numPoints - 2]);
+					font->SetTextColor(float(team->color[0])/255.0f, float(team->color[1])/255.0f, float(team->color[2])/255.0f, 1.0f);
+					font->glPrint(box.x2 - 0.028f, box.y1 + 0.08f + v1 * scaley, 0.7f, FONT_VCENTER | FONT_SCALE | FONT_NORM | FONT_BUFFERED, "You");
+				}
 			}
 
 			if (stat2 != -1) {
@@ -479,22 +484,27 @@ void CEndGameBox::addVertices(TypedRenderBuffer<VA_TYPE_C> &rbC, const std::vect
 {
 	float v0 = 0.0f;
 	for (size_t a = 0, n = numPoints - 1; a < n; ++a) {
-		float v1 = 0.0f;
-
-		if (dispMode == 1) {
-			v1 = statValues[a + 1];
-		} else {
-			// deltas
-			v1 = (statValues[a + 1] - statValues[a    ]) / TeamStatistics::statsPeriod;
-		}
-		if (logScale){
-			v1 = v1 <= 1.0f ? 1.0f : v1;
-			v1 = std::log(v1);
-		}
+		float v1 = calcVertexY(statValues[a + 1], statValues[a]);
 		rbC.AddVertex({{box.x1 + 0.15f + (a    ) * scalex, box.y1 + 0.08f + v0 * scaley, 0.0f}, color});
 		rbC.AddVertex({{box.x1 + 0.15f + (a + 1) * scalex, box.y1 + 0.08f + v1 * scaley, 0.0f}, color});
 		v0 = v1;
 	}
+}
+
+float CEndGameBox::calcVertexY(float val, float prevVal)
+{
+	float v = 0.0f;
+	if (dispMode == 1) {
+		v = val;
+	} else {
+		// deltas
+		v = (val - prevVal) / TeamStatistics::statsPeriod;
+	}
+	if (logScale){
+		v = v <= 1.0f ? 1.0f : v;
+		v = std::log(v);
+	}
+	return v;
 }
 
 std::string CEndGameBox::GetTooltip(int x, int y)
