@@ -51,6 +51,27 @@ public:
 	void Initialize();
 	bool IsInitialized() const { return (!filePath.empty()); }
 
+	/**
+	 * @brief clear the log file currently being written
+	 *
+	 * Flushes and replaces the log file with an empty one.
+	 * Returns true on success.
+	 *
+	 * Must only be called after Initialize().
+	 */
+	bool ClearLog();
+
+	/**
+	 * @brief rotate the log file
+	 *
+	 * Moves the current log file into the "log/" subfolder under
+	 * the same naming scheme used at startup, then opens a fresh empty
+	 * log file. Returns true on success.
+	 *
+	 * Must only be called after Initialize().
+	 */
+	bool RotateLog();
+
 
 	/**
 	 * Log()s system information (CPU, 32/64bit, gcc/boost version, ...)

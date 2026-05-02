@@ -34,6 +34,10 @@ namespace log_file {
 			return outStream;
 		}
 
+		void SetOutStream(FILE* newStream) {
+			outStream = newStream;
+		}
+
 		bool IsLogging(int level, const char* section) const {
 			return ((level >= minLevel) && (sections.empty() || (sections.find("," + std::string(section) + ",") != std::string::npos)));
 		}
@@ -278,6 +282,99 @@ FILE* log_file_getLogFileStream(const char* filePath) {
 	}
 
 	return nullptr;
+}
+
+
+static FILE* log_file_openFreshLogFile(const char* filePath) {
+	FILE* tmpStream = nowide::fopen(filePath, "wb");
+
+	if (tmpStream == nullptr)
+		return nullptr;
+
+	fwrite("\xEF\xBB\xBF", 1, 3, tmpStream); // 3-byte UTF-8 byte order mark
+	setvbuf(tmpStream, nullptr, _IOFBF, std::min(BUFSIZ, 8192));
+	return tmpStream;
+}
+
+
+int log_file_truncateLogFile(const char* filePath) {
+	assert(filePath != nullptr);
+
+	auto& logFiles = log_file::getLogFiles();
+
+	const auto pred = [](const log_file::LogFilePair& a, const log_file::LogFilePair& b) { return (a.first < b.first); };
+	const auto iter = std::lower_bound(logFiles.begin(), logFiles.end(), log_file::LogFilePair{filePath, nullptr}, pred);
+
+	if (iter == logFiles.end() || iter->first != filePath)
+		return 0;
+
+	// flush & close current stream so the truncate is observed by the OS
+	if (FILE* oldStream = iter->second.GetOutStream(); oldStream != nullptr) {
+		fflush(oldStream);
+		fclose(oldStream);
+		iter->second.SetOutStream(nullptr);
+	}
+
+	FILE* newStream = log_file_openFreshLogFile(filePath);
+
+	if (newStream == nullptr) {
+		LOG_L(L_ERROR, "[%s] failed to reopen log file \"%s\" after truncate", __func__, filePath);
+		// drop the entry so subsequent writes do not target a closed stream
+		const size_t idx = iter - logFiles.begin();
+		for (size_t i = idx, n = logFiles.size() - 1; i < n; i++) {
+			logFiles[i].first  = std::move(logFiles[i + 1].first );
+			logFiles[i].second = std::move(logFiles[i + 1].second);
+		}
+		logFiles.pop_back();
+		return -1;
+	}
+
+	iter->second.SetOutStream(newStream);
+	return 1;
+}
+
+
+int log_file_rotateLogFile(const char* filePath, const char* archivePath) {
+	assert(filePath != nullptr);
+	assert(archivePath != nullptr);
+
+	auto& logFiles = log_file::getLogFiles();
+
+	const auto pred = [](const log_file::LogFilePair& a, const log_file::LogFilePair& b) { return (a.first < b.first); };
+	const auto iter = std::lower_bound(logFiles.begin(), logFiles.end(), log_file::LogFilePair{filePath, nullptr}, pred);
+
+	if (iter == logFiles.end() || iter->first != filePath)
+		return 0;
+
+	// flush & close current stream before renaming the file on disk
+	if (FILE* oldStream = iter->second.GetOutStream(); oldStream != nullptr) {
+		fflush(oldStream);
+		fclose(oldStream);
+		iter->second.SetOutStream(nullptr);
+	}
+
+	int rc = 1;
+
+	if (nowide::rename(filePath, archivePath) != 0) {
+		LOG_L(L_ERROR, "[%s] failed to rename \"%s\" to \"%s\"", __func__, filePath, archivePath);
+		rc = -1;
+	}
+
+	FILE* newStream = log_file_openFreshLogFile(filePath);
+
+	if (newStream == nullptr) {
+		LOG_L(L_ERROR, "[%s] failed to reopen log file \"%s\" after rotate", __func__, filePath);
+		const size_t idx = iter - logFiles.begin();
+		for (size_t i = idx, n = logFiles.size() - 1; i < n; i++) {
+			logFiles[i].first  = std::move(logFiles[i + 1].first );
+			logFiles[i].second = std::move(logFiles[i + 1].second);
+		}
+		logFiles.pop_back();
+		return -1;
+	}
+
+	iter->second.SetOutStream(newStream);
+	return rc;
 }
 
 

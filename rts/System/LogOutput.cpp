@@ -13,6 +13,7 @@
 #include "System/Log/LogUtil.h"
 #include "System/Platform/Misc.h"
 #include "System/Platform/Threading.h"
+#include "System/TimeUtil.h"
 #include "System/UnorderedMap.hpp"
 
 #include <string>
@@ -146,7 +147,7 @@ void CLogOutput::RotateLogFile() const
 	const auto baseDir = FileSystem::GetDirectory(filePath);
 	// logArchiveDir: /absolute/writeable/data/dir/log/
 	const std::string logArchiveDir = FileSystem::Concatenate({ baseDir, "log/"});
-	const std::string archivedLogFile = logArchiveDir + FileSystem::GetFileModificationDate(filePath) + "_" + fileName;
+	const std::string archivedLogFile = logArchiveDir + CTimeUtil::GetCurrentTimeStr() + "_" + fileName;
 
 	// create the log archive dir if it does not exist yet
 	if (!FileSystem::DirExists(logArchiveDir))
@@ -282,3 +283,38 @@ void CLogOutput::LogExceptionInfo(const char* src, const char* msg)
 	LOG_L(L_ERROR, "[%s] exception \"%s\"", src, msg);
 }
 
+bool CLogOutput::ClearLog()
+{
+	if (!IsInitialized()) {
+		LOG_L(L_WARNING, "[%s] log output not yet initialized", __func__);
+		return false;
+	}
+
+	const int rc = log_file_truncateLogFile(filePath.c_str());
+	if (rc <= 0) {
+		LOG_L(L_ERROR, "[%s] failed to truncate log file \"%s\"", __func__, filePath.c_str());
+		return false;
+	}
+
+	LOG("Log file cleared");
+	return true;
+}
+
+bool CLogOutput::RotateLog()
+{
+	if (!IsInitialized()) {
+		LOG_L(L_WARNING, "[%s] log output not yet initialized", __func__);
+		return false;
+	}
+
+	RotateLogFile();
+
+	const int rc = log_file_truncateLogFile(filePath.c_str());
+	if (rc <= 0) {
+		LOG_L(L_ERROR, "[%s] failed to truncate log file \"%s\"", __func__, filePath.c_str());
+		return false;
+	}
+
+	LOG("Log file rotated");
+	return true;
+}
