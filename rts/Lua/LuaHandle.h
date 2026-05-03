@@ -303,6 +303,7 @@ class CLuaHandle : public CEventClient
 		void Shutdown();
 		bool GotChatMsg(const std::string& msg, int playerID);
 		bool RecvLuaMsg(const std::string& msg, int playerID);
+		bool RecvDediMsg(const std::string& msg, int header);
 
 	public:
 		// custom call-in  (inter-script calls)
@@ -409,6 +410,7 @@ class CLuaHandle : public CEventClient
 		static bool GetDevMode() { return devMode; }
 
 		static void HandleLuaMsg(int playerID, int script, int mode, const std::vector<std::uint8_t>& msg);
+		static void HandleDediMsg(int header, const std::vector<std::uint8_t>& msg);
 
 	protected: // static
 		static bool devMode; // allows real file access

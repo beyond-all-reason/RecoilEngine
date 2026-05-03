@@ -149,6 +149,30 @@ enum EVENT
 	GAME_LUAMSG = 20,
 
 	/**
+	 * Private message from a player to the dedicated server / autohost.
+	 *
+	 *   (uint8 magic = 79, uint16 msgsize, uint8 playernumber, uint16 header, uint8[msgsize - 6] payload)
+	 *
+	 * The message data is a straight copy of the whole NETMSG_DEDIMSG packet
+	 * including the magic 79 byte. See CBaseNetProtocol::SendDediMsg.
+	 *
+	 * Unlike GAME_LUAMSG, these packets are never broadcast to other players
+	 * and never written to demos -- they exist specifically as a private
+	 * channel for game-side widgets/gadgets to talk to the autohost without
+	 * leaving a replay trace (e.g. moderation reports, bulk stats).
+	 *
+	 * The autohost can reply to a player by injecting the PushAction command
+	 *   /dedimsgbynum <playerNum-decimal> <header-decimal> <text-payload>
+	 * over the existing chat-message UDP channel (see GetChatMessage). The
+	 * text-payload must not contain NUL bytes, the substring "//" (treated as
+	 * a comment marker by Action parsing), or trailing whitespace (rtrim'd).
+	 *
+	 * Headers in the range 0x0001..0x0FFF are reserved for the engine; game
+	 * code must use 0x1000..0xFFFF.
+	 */
+	GAME_DEDIMSG = 21,
+
+	/**
 	 * Team statistics
 	 *
 	 *   (uint8 teamnumber, TeamStatistics stats)
@@ -368,6 +392,17 @@ void AutohostInterface::SendLuaMsg(const std::uint8_t* msg, size_t msgSize)
 	if (autohost.is_open()) {
 		std::vector<std::uint8_t> buffer(msgSize+1);
 		buffer[0] = GAME_LUAMSG;
+		std::copy(msg, msg + msgSize, buffer.begin() + 1);
+
+		Send(asio::buffer(buffer));
+	}
+}
+
+void AutohostInterface::SendDediMsg(const std::uint8_t* msg, size_t msgSize)
+{
+	if (autohost.is_open()) {
+		std::vector<std::uint8_t> buffer(msgSize+1);
+		buffer[0] = GAME_DEDIMSG;
 		std::copy(msg, msg + msgSize, buffer.begin() + 1);
 
 		Send(asio::buffer(buffer));

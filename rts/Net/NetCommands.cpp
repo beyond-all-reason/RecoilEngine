@@ -1031,6 +1031,47 @@ void CGame::ClientReadNet()
 				}
 			} break;
 
+			case NETMSG_DEDIMSG: {
+				ZoneScopedN("Net::DediMsg");
+				try {
+					netcode::UnpackPacket unpack(packet, sizeof(uint8_t));
+
+					std::uint16_t packetSize;
+					std::uint8_t  playerNum;
+					std::uint16_t header;
+					std::vector<std::uint8_t> data;
+
+					unpack >> packetSize;
+					if (packetSize != packet->length)
+						throw netcode::UnpackPacketException("invalid packet-size");
+
+					// Min legal size = cmd + size + playerNum + header (6).
+					// Validate before computing data.resize() to avoid an
+					// attacker-controlled size underflow.
+					constexpr std::uint16_t kMinPacketSize =
+						sizeof(std::uint8_t) + sizeof(std::uint16_t)
+						+ sizeof(std::uint8_t) + sizeof(std::uint16_t);
+					if (packetSize < kMinPacketSize)
+						throw netcode::UnpackPacketException("packet too short");
+
+					unpack >> playerNum;
+					// DEDIMSG arriving at a client must be server-originated by
+					// convention (see GameServer.cpp PushAction "dedimsgbynum").
+					if (playerNum != SERVER_PLAYER)
+						throw netcode::UnpackPacketException("non-server source");
+
+					unpack >> header;
+
+					data.resize(packetSize - kMinPacketSize);
+					unpack >> data;
+
+					CLuaHandle::HandleDediMsg(header, data);
+					AddTraffic(playerNum, packetCode, dataLength);
+				} catch (const netcode::UnpackPacketException& ex) {
+					LOG_L(L_ERROR, "[Game::%s][NETMSG_DEDIMSG] exception \"%s\"", __func__, ex.what());
+				}
+			} break;
+
 
 			case NETMSG_SHARE: {
 				ZoneScopedN("Net::Share");

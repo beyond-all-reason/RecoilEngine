@@ -2362,6 +2362,37 @@ bool CLuaHandle::RecvLuaMsg(const string& msg, int playerID)
 }
 
 
+/*** Receives messages from the dedicated server / autohost over the private
+ * NETMSG_DEDIMSG channel. The local Lua side sends these via
+ * `Spring.SendDediMsg`; the autohost replies via the `/dedimsgbynum` PushAction.
+ * Always unsynced -- never fires on synced handles.
+ *
+ * @function Callins:RecvDediMsg
+ * @param msg string  raw bytes from the server (may contain embedded 0's)
+ * @param header integer  record-type tag in [1, 65535]; 1..0xFFF is engine-reserved
+ */
+bool CLuaHandle::RecvDediMsg(const string& msg, int header)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L, false);
+	luaL_checkstack(L, 8, __func__);
+
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return false;
+
+	lua_pushsstring(L, msg); // allows embedded 0's
+	lua_pushnumber(L, header);
+
+	if (!RunCallIn(L, cmdStr, 2, 1))
+		return false;
+
+	const bool retval = luaL_optboolean(L, -1, false);
+	lua_pop(L, 1);
+	return retval;
+}
+
+
 /******************************************************************************/
 
 void CLuaHandle::SetDevMode(bool value)
@@ -2466,6 +2497,25 @@ void CLuaHandle::HandleLuaMsg(int playerID, int script, int mode, const std::vec
 				luaRules->RecvLuaMsg(msg, playerID);
 		} break;
 	}
+}
+
+
+void CLuaHandle::HandleDediMsg(int header, const std::vector<std::uint8_t>& data)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	std::string msg;
+	msg.resize(data.size());
+	std::copy(data.begin(), data.end(), msg.begin());
+
+	// Unsynced fan-out only. luaUI is unsynced; luaGaia/luaRules dispatch via
+	// CSplitLuaHandle::RecvDediMsg which forwards to unsyncedLuaHandle (see
+	// LuaHandleSynced.h) -- this is where the unsynced-only invariant lives.
+	if (luaUI != nullptr)
+		luaUI->RecvDediMsg(msg, header);
+	if (luaGaia != nullptr)
+		luaGaia->RecvDediMsg(msg, header);
+	if (luaRules != nullptr)
+		luaRules->RecvDediMsg(msg, header);
 }
 
 

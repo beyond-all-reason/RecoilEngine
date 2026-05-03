@@ -1396,7 +1396,8 @@ void CGameServer::ProcessPacket(const unsigned playerNum, std::shared_ptr<const 
 				}
 				bytesInWindow += static_cast<uint32_t>(payloadLen);
 
-				// DO SOMETHING in future PR
+				if (hostif != nullptr)
+					hostif->SendDediMsg(packet->data, packet->length);
 			} catch (const netcode::UnpackPacketException& ex) {
 				Message(spring::format("[GameServer::%s][NETMSG_DEDIMSG] exception \"%s\" from player \"%s\"", __func__, ex.what(), players[a].name.c_str()));
 			}
@@ -2456,6 +2457,52 @@ void CGameServer::PushAction(const Action& action, bool fromAutoHost)
 
 			if (iter != players.end())
 				SpecPlayer(iter->id);
+		} break;
+
+
+		case hashString("dedimsgbynum"): {
+			// Autohost-originated reply over the private NETMSG_DEDIMSG channel.
+			// Format: <player-id-decimal> <header-decimal> <text-payload>
+			// Constraints on the text-payload (imposed by Action parsing and the
+			// chat-message UDP recv at AutohostInterface.cpp:GetChatMessage):
+			//   - no NUL bytes (UDP recv treats the datagram as a C-string)
+			//   - no "//" substring (Action.cpp strips it as a comment marker)
+			//   - no trailing whitespace (Action.cpp rtrim's it)
+			if (!fromAutoHost) {
+				LOG_L(L_WARNING, "[%s] /%s only allowed from autohost", __func__, action.command.c_str());
+				return;
+			}
+
+			// Tokenize(.., 2) returns at most 3 entries: player, header, then
+			// everything else as one string (with internal whitespace preserved).
+			const std::vector<std::string> tokens = CSimpleParser::Tokenize(action.extra, 2);
+			if (tokens.size() < 2) {
+				LOG_L(L_WARNING, "[%s] usage: /%s <player-id> <header> <payload>", __func__, action.command.c_str());
+				return;
+			}
+
+			const int playerNum = atoi(tokens[0].c_str());
+			const int header    = atoi(tokens[1].c_str());
+
+			if (playerNum < 0 || (size_t)playerNum >= players.size()) {
+				LOG_L(L_WARNING, "[%s] /%s invalid player-id '%s'", __func__, action.command.c_str(), tokens[0].c_str());
+				return;
+			}
+			if (header < 1 || header > 0xFFFF) {
+				LOG_L(L_WARNING, "[%s] /%s invalid header '%s' (must be decimal 1..65535)", __func__, action.command.c_str(), tokens[1].c_str());
+				return;
+			}
+
+			const std::string& payload = (tokens.size() >= 3) ? tokens[2] : std::string();
+			const std::vector<std::uint8_t> payloadBytes(payload.begin(), payload.end());
+
+			try {
+				players[playerNum].SendData(
+					CBaseNetProtocol::Get().SendDediMsg(
+						SERVER_PLAYER, static_cast<std::uint16_t>(header), payloadBytes));
+			} catch (const netcode::PackPacketException& ex) {
+				LOG_L(L_ERROR, "[%s] /%s pack error: %s", __func__, action.command.c_str(), ex.what());
+			}
 		} break;
 
 

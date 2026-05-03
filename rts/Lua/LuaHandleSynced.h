@@ -188,6 +188,10 @@ class CSplitLuaHandle
 			return syncedLuaHandle.RecvLuaMsg(msg, playerID);
 		}
 
+		bool RecvDediMsg(const std::string& msg, int header) {
+			return unsyncedLuaHandle.RecvDediMsg(msg, header);
+		}
+
 	public:
 		void CheckStack() {
 			syncedLuaHandle.CheckStack();

@@ -47,6 +47,7 @@ public:
 	void Warning(const std::string& message);
 
 	void SendLuaMsg(const std::uint8_t* msg, size_t msgSize);
+	void SendDediMsg(const std::uint8_t* msg, size_t msgSize);
 	void Send(const std::uint8_t* msg, size_t msgSize);
 
 	/**

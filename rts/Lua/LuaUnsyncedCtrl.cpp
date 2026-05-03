@@ -3909,6 +3909,12 @@ constexpr uint16_t kDediMsgGameRangeMin   = 0x1000;
  * in the game-private range 0x1000..0xFFFF; values below 0x1000 are reserved
  * for engine use.
  *
+ * The dedi forwards each frame to the autohost as EVENT GAME_DEDIMSG (see
+ * AutohostInterface.cpp). The autohost can reply by injecting the PushAction
+ * `/dedimsgbynum <playerNum-decimal> <header-decimal> <text-payload>`, which
+ * arrives at the originating client as a `Callins:RecvDediMsg(msg, header)`
+ * callin on unsynced handles only.
+ *
  * @param header  integer  record-type tag in [0x1000, 0xFFFF]
  * @param payload string   raw bytes, up to 65529 bytes
  * @return nil
