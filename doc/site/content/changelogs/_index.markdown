@@ -50,6 +50,20 @@ This is the bleeding-edge changelog since version 2025.06, for **pre-release 202
 - unsynced LuaRules (incl. unsynced LuaGaia) now has access to `io` and `os` libraries.
 - unsynced LuaRules (incl. unsynced LuaGaia) now has access to the `debug` library by default (no longer requires devmode).
 
+### Custom teamcolor palette
+- add `Spring.SetCustomPaletteColor(paletteID, r, g, b) → nil`. Sets a palette color for shader use. See below.
+- add `Spring.GetCustomPaletteColor(paletteID) → r, g, b`.
+- add `Engine.maxCustomPaletteID`, the highest available palette ID.
+- add `Spring.SetUnitPaletteIndex(unitID, paletteID?) → nil`. Assigns a paletteID to a unit. Use nil to reset to the default palette.
+- add `Spring.GetUnitPaletteIndex(unitID) → paletteID?`.
+- add `Spring.SetFeaturePaletteIndex(featureID, paletteID?)`.
+- add `Spring.GetFeaturePaletteIndex(featureID) → paletteID?`.
+- the `teamColor` array in shaders now has much more room and contains both teamcolors and colors of the custom palette, as per above.
+- the actual teamID is now available as the fifth byte (first byte of the second 4-byte composite) in model uniform data.
+- note that the value of the palette index is different than what is seen from Lua. Units with no custom paletteID have the index point to an entry that contains their team color.
+- the basecontent teamcolor shader takes the above changes into account. Existing custom shaders that use `instData.z & 0xFF` for teamID should keep working as long as the palette feature isn't used, to support it properly the constant needs to be `0x7FF` instead.
+- projectiles, and ghosts (buildings out of sight and queued things) unchanged, they still just draw teamcolor naively and cannot use a shader.
+
 ### Replay path getters
 - add `Spring.GetReplayFilePath() → string?`, returns path of replay being watched.
 - add `Spring.GetReplayRecordingFilePath() → string?`, returns path of replay to be produced. Note that this is just a prospective file path (nothing is written until the match ends), and that it possible to record a replay of a replay.
