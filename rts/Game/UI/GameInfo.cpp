@@ -12,7 +12,7 @@
 #include "Rendering/Fonts/glFont.h"
 #include "Sim/Misc/Team.h"
 #include "Sim/Misc/Wind.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Path/IPathManager.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/StringUtil.h"

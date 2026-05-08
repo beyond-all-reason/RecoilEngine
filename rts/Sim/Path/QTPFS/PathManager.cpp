@@ -23,7 +23,7 @@
 #include "Map/MapInfo.h"
 
 #include "Sim/Misc/GlobalSynced.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/MoveTypes/MoveMath/MoveMath.h"
@@ -816,14 +816,14 @@ void QTPFS::PathManager::Update() {
 			int updatedBlocks = nodeLayersMapDamageTrack.mapChangeTrackers[layerNum].damageQueue.size();
 			{
 				constexpr int BLOCKS_TO_UPDATE = 16;
-				const int progressiveUpdates = std::ceil(updatedBlocks * (1.f / (BLOCKS_TO_UPDATE<<3)) * modInfo.pfUpdateRateScale);
+				const int progressiveUpdates = std::ceil(updatedBlocks * (1.f / (BLOCKS_TO_UPDATE<<3)) * modRules.pfUpdateRateScale);
 				constexpr int MIN_BLOCKS_TO_UPDATE = 0;
 				constexpr int MAX_BLOCKS_TO_UPDATE = std::max<int>(BLOCKS_TO_UPDATE, MIN_BLOCKS_TO_UPDATE);
 
 				blocksToUpdate = std::clamp(progressiveUpdates, MIN_BLOCKS_TO_UPDATE, MAX_BLOCKS_TO_UPDATE);
 			
 				// LOG("[%d] blocksToUpdate=%d updatedBlocks=%d [%f]"
-				// 		, layerNum, blocksToUpdate, updatedBlocks, modInfo.pfUpdateRateScale);
+				// 		, layerNum, blocksToUpdate, updatedBlocks, modRules.pfUpdateRateScale);
 			}
 			return blocksToUpdate;
 		};

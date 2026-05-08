@@ -39,7 +39,7 @@
 #include "Sim/Misc/DamageArray.h"
 #include "Sim/Misc/DamageArrayHandler.h"
 #include "Sim/Misc/LosHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/SmoothHeightMesh.h"
 #include "Sim/Misc/Team.h"
 #include "Sim/Misc/TeamHandler.h"
@@ -2382,7 +2382,7 @@ int LuaSyncedCtrl::SetUnitHealth(lua_State* L)
 				} break;
 				case hashString("paralyze"): {
 					const float argValue = lua_tofloat(L, LUA_TABLE_VALUE_INDEX);
-					const float refValue = modInfo.paralyzeOnMaxHealth? unit->maxHealth: unit->health;
+					const float refValue = modRules.paralyzeOnMaxHealth? unit->maxHealth: unit->health;
 
 					if ((unit->paralyzeDamage = std::max(0.0f, argValue)) > refValue) {
 						unit->SetStunned(true);

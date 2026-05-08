@@ -11,7 +11,7 @@
 #include "Game/GlobalUnsynced.h"
 #include "Map/ReadMap.h"
 #include "Net/Protocol/NetProtocol.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
@@ -370,7 +370,7 @@ void CTeam::SlowUpdate()
 	if (mShare > 0.0f) { dm = std::min(1.0f, mExcess / mShare); }
 
 	// now evenly distribute our excess resources among allied teams
-	if (modInfo.nativeExcessSharing) {
+	if (modRules.nativeExcessSharing) {
 		for (int a = 0; a < teamHandler.ActiveTeams(); ++a) {
 			if ((a != teamNum) && (teamHandler.AllyTeam(teamNum) == teamHandler.AllyTeam(a))) {
 				CTeam* team = teamHandler.Team(a);

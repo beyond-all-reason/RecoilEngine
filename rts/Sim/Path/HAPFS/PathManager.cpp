@@ -14,7 +14,7 @@
 #include "PathSearch.h"
 #include "Registry.h"
 #include "Map/MapInfo.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Objects/SolidObject.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "System/Log/ILog.h"
@@ -315,7 +315,7 @@ IPath::SearchResult CPathManager::ArrangePath(
 
 	{
 		RECOIL_DETAILED_TRACY_ZONE;
-		if (heurGoalDist2D <= (MAXRES_SEARCH_DISTANCE * modInfo.pfRawDistMult)) {
+		if (heurGoalDist2D <= (MAXRES_SEARCH_DISTANCE * modRules.pfRawDistMult)) {
 			pfDef->AllowRawPathSearch( true);
 			pfDef->AllowDefPathSearch(false); // block default search
 

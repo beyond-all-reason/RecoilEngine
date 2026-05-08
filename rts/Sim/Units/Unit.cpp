@@ -46,7 +46,7 @@
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/Wind.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/MoveTypes/GroundMoveType.h"
 #include "Sim/MoveTypes/HoverAirMoveType.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
@@ -157,12 +157,12 @@ CFeature* CUnit::CreateWreck(int wreckLevel, int smokeTime)
 void CUnit::InitStatic()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	globalUnitParams.empDeclineRate = 1.0f / modInfo.paralyzeDeclineRate;
-	globalUnitParams.expMultiplier = modInfo.unitExpMultiplier;
-	globalUnitParams.expPowerScale = modInfo.unitExpPowerScale;
-	globalUnitParams.expHealthScale = modInfo.unitExpHealthScale;
-	globalUnitParams.expReloadScale = modInfo.unitExpReloadScale;
-	globalUnitParams.expGrade = modInfo.unitExpGrade;
+	globalUnitParams.empDeclineRate = 1.0f / modRules.paralyzeDeclineRate;
+	globalUnitParams.expMultiplier  = modRules.unitExpMultiplier;
+	globalUnitParams.expPowerScale  = modRules.unitExpPowerScale;
+	globalUnitParams.expHealthScale = modRules.unitExpHealthScale;
+	globalUnitParams.expReloadScale = modRules.unitExpReloadScale;
+	globalUnitParams.expGrade       = modRules.unitExpGrade;
 
 	CBuilderCaches::InitStatic();
 	unitToolTipMap.Clear();
@@ -820,7 +820,7 @@ void CUnit::ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaim
 			if (unitDef->canfly && transportee->unitDef->canmove)
 				transportee->commandAI->GiveCommand(Command(CMD_MOVE, transportee->pos));
 
-			transportee->SetStunned(transportee->paralyzeDamage > (modInfo.paralyzeOnMaxHealth? transportee->maxHealth: transportee->health));
+			transportee->SetStunned(transportee->paralyzeDamage > (modRules.paralyzeOnMaxHealth? transportee->maxHealth: transportee->health));
 			transportee->SetVelocityAndSpeed(speed * (0.5f + 0.5f * gsRNG.NextFloat()));
 
 			eventHandler.UnitUnloaded(transportee, this);
@@ -995,7 +995,7 @@ void CUnit::SlowUpdate()
 		// DoDamage) we potentially start decaying from a lower damage
 		// level and would otherwise be de-paralyzed more quickly than
 		// specified by <paralyzeTime>
-		paralyzeDamage -= ((modInfo.paralyzeOnMaxHealth? maxHealth: health) * (UNIT_SLOWUPDATE_RATE * INV_GAME_SPEED) * globalUnitParams.empDeclineRate);
+		paralyzeDamage -= ((modRules.paralyzeOnMaxHealth? maxHealth: health) * (UNIT_SLOWUPDATE_RATE * INV_GAME_SPEED) * globalUnitParams.empDeclineRate);
 		paralyzeDamage = std::max(paralyzeDamage, 0.0f);
 	}
 
@@ -1006,7 +1006,7 @@ void CUnit::SlowUpdate()
 		// which would make us invulnerable to most non-/small-AOE weapon impacts
 		static_cast<AMoveType*>(moveType)->SlowUpdate();
 
-		const bool notStunned = (paralyzeDamage <= (modInfo.paralyzeOnMaxHealth? maxHealth: health));
+		const bool notStunned = (paralyzeDamage <= (modRules.paralyzeOnMaxHealth? maxHealth: health));
 		const bool inFireBase = (transporter == nullptr || !transporter->unitDef->IsTransportUnit() || transporter->unitDef->isFirePlatform);
 
 		// de-stun only if we are not (still) inside a non-firebase transport
@@ -1030,8 +1030,8 @@ void CUnit::SlowUpdate()
 
 	if (beingBuilt) {
 		const auto framesSinceLastNanoAdd = gs->frameNum - lastNanoAdd;
-		if (modInfo.constructionDecay && (modInfo.constructionDecayTime < framesSinceLastNanoAdd)) {
-			float buildDecay = buildTime * modInfo.constructionDecaySpeed;
+		if (modRules.constructionDecay && (modRules.constructionDecayTime < framesSinceLastNanoAdd)) {
+			float buildDecay = buildTime * modRules.constructionDecaySpeed;
 
 			buildDecay = 1.0f / std::max(0.001f, buildDecay);
 			buildDecay = std::min(buildProgress, buildDecay);
@@ -1259,7 +1259,7 @@ void CUnit::ApplyDamage(CUnit* attacker, const DamageArray& damages, float& base
 			health -= baseDamage;
 			health = std::min(health, maxHealth);
 
-			if (health > paralyzeDamage && !modInfo.paralyzeOnMaxHealth) {
+			if (health > paralyzeDamage && !modRules.paralyzeOnMaxHealth) {
 				SetStunned(false);
 			}
 		}
@@ -1273,7 +1273,7 @@ void CUnit::ApplyDamage(CUnit* attacker, const DamageArray& damages, float& base
 		//
 		// rate of paralysis-damage reduction is lower if the unit has less than
 		// maximum health to ensure stun-time is always equal to <paralyzeTime>
-		const float baseHealth = (modInfo.paralyzeOnMaxHealth? maxHealth: health);
+		const float baseHealth = (modRules.paralyzeOnMaxHealth? maxHealth: health);
 		const float paralysisDecayRate = baseHealth * globalUnitParams.empDeclineRate;
 		const float sumParalysisDamage = paralysisDecayRate * damages.paralyzeDamageTime;
 		const float maxParalysisDamage = std::max(baseHealth + sumParalysisDamage - paralyzeDamage, 0.0f);
@@ -2029,7 +2029,7 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		else if (health < maxHealth) {
 			// repair
 			const float step = std::min(amount / buildTime, 1.0f - (health / maxHealth));
-			const auto resourceUse = cost * step * modInfo.repairCostFactor;
+			const auto resourceUse = cost * step * modRules.repairCostFactor;
 
 			if (!builderTeam->HaveResources(resourceUse)) {
 				builderTeam->resPull += resourceUse;
@@ -2058,10 +2058,10 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 
 		const float step = std::max(amount / buildTime, -buildProgress);
 		const auto costFraction = cost * -step;
-		const auto refund  = costFraction * modInfo.reclaimUnitEfficiency;
-		const auto useCost = costFraction * modInfo.reclaimUnitCostFactor;
-		const float healthStep        = modInfo.reclaimUnitDrainHealth ? maxHealth * step : 0;
-		const float buildProgressStep = int(modInfo.reclaimUnitMethod == 0) * step;
+		const auto refund  = costFraction * modRules.reclaimUnitEfficiency;
+		const auto useCost = costFraction * modRules.reclaimUnitCostFactor;
+		const float healthStep        = modRules.reclaimUnitDrainHealth ? maxHealth * step : 0;
+		const float buildProgressStep = int(modRules.reclaimUnitMethod == 0) * step;
 		const float postHealth        = health + healthStep;
 		const float postBuildProgress = buildProgress + buildProgressStep;
 
@@ -2078,13 +2078,13 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		order.use = useCost;
 		order.useIncomeMultiplier = false; // Dont apply income bonus to reclaimed units
 		
-		if (modInfo.reclaimUnitMethod == 0) {
+		if (modRules.reclaimUnitMethod == 0) {
 			// gradual reclamation of invested resources
 			order.add = refund;
 		} else {
 			// lump reclamation of invested resources
 			if (postHealth <= 0.0f || postBuildProgress <= 0.0f) {
-				order.add = cost * buildProgress * modInfo.reclaimUnitEfficiency;
+				order.add = cost * buildProgress * modRules.reclaimUnitEfficiency;
 				killMe = true; // to make 100% sure the unit gets killed, and so no resources are reclaimed twice!
 			}
 		}
@@ -2094,7 +2094,7 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		}
 
 		// turn reclaimee into nanoframe (even living units)
-		if (modInfo.reclaimUnitMethod == 0)
+		if (modRules.reclaimUnitMethod == 0)
 			TurnIntoNanoframe();
 
 		// reduce health & resources
@@ -2125,9 +2125,9 @@ bool CUnit::AllowedReclaim(CUnit* builder) const
 	// Don't allow the reclaim if the unit is finished and we arent allowed to reclaim it
 	if (!beingBuilt) {
 		if (allyteam == builder->allyteam) {
-			if ((team != builder->team) && (!modInfo.reclaimAllowAllies)) return false;
+			if ((team != builder->team) && (!modRules.reclaimAllowAllies)) return false;
 		} else {
-			if (!modInfo.reclaimAllowEnemies) return false;
+			if (!modRules.reclaimAllowEnemies) return false;
 		}
 	}
 
@@ -2515,7 +2515,7 @@ bool CUnit::GetNewCloakState(bool stunCheck) {
 	const CUnit* closestEnemy = this;
 
 	if (!stunCheck)
-		closestEnemy = CGameHelper::GetClosestEnemyUnitNoLosTest(this, midPos, decloakDistance, allyteam, unitDef->decloakSpherical, modInfo.decloakRequiresLineOfSight);
+		closestEnemy = CGameHelper::GetClosestEnemyUnitNoLosTest(this, midPos, decloakDistance, allyteam, unitDef->decloakSpherical, modRules.decloakRequiresLineOfSight);
 
 	return (eventHandler.AllowUnitCloak(this, closestEnemy));
 }
@@ -2734,7 +2734,7 @@ bool CUnit::DetachUnitCore(CUnit* unit)
 			unit->moveType->UseHeading(true);
 
 		// de-stun detaching units in case we are not a fire-platform
-		unit->SetStunned(unit->paralyzeDamage > (modInfo.paralyzeOnMaxHealth? unit->maxHealth: unit->health));
+		unit->SetStunned(unit->paralyzeDamage > (modRules.paralyzeOnMaxHealth? unit->maxHealth: unit->health));
 
 		unit->moveType->SlowUpdate();
 		unit->moveType->LeaveTransport();

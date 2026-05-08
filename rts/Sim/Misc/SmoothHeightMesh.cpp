@@ -8,7 +8,7 @@
 
 #include "Map/Ground.h"
 #include "Map/ReadMap.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "System/float3.h"
 #include "System/Log/ILog.h"
 #include "System/SpringMath.h"
@@ -86,7 +86,7 @@ void SmoothHeightMesh::Init(int2 max, int res, int smoothRad)
 	RECOIL_DETAILED_TRACY_ZONE;
 	Kill();
 
-	enabled = modInfo.enableSmoothMesh;
+	enabled = modRules.enableSmoothMesh;
 
 	// we use SSE in performance sensitive code, don't let the window size be too small.
 	if (smoothRad < 4) smoothRad = 4;

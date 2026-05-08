@@ -12,7 +12,7 @@
 #include "Map/Ground.h"
 #include "Map/ReadMap.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/GeometricObjects.h"
 #include "System/MathConstants.h"
 #include "System/TimeProfiler.h"

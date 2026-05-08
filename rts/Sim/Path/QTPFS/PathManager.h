@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Path/IPathManager.h"
 #include "NodeLayer.h"
 #include "PathCache.h"

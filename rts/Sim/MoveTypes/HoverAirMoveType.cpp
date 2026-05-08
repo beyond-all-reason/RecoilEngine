@@ -9,7 +9,7 @@
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/QuadField.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Units/Scripts/UnitScript.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
@@ -828,7 +828,7 @@ bool CHoverAirMoveType::UpdateAirPhysics()
 	// note: unlike StrafeAirMoveType, UpdateTakeoff and UpdateLanding call
 	// UpdateAirPhysics() so we ignore terrain while we are in those states
 	bool crashed = false;
-	if (modInfo.allowAircraftToHitGround) {
+	if (modRules.allowAircraftToHitGround) {
 		const bool cpGroundContact = (cpGroundHeight > ownerMinHeight);
 		const bool bpGroundContact = (bpGroundHeight > ownerMinHeight);
 		const bool   handleContact = (aircraftState != AIRCRAFT_LANDED && aircraftState != AIRCRAFT_TAKEOFF);
@@ -874,7 +874,7 @@ bool CHoverAirMoveType::UpdateAirPhysics()
 	//   VS on that
 	UpdateVerticalSpeed(spd, pos.y - std::max(cpGroundHeight, bpGroundHeight), verticalSpeed);
 
-	if (modInfo.allowAircraftToLeaveMap || (pos + spd).IsInBounds())
+	if (modRules.allowAircraftToLeaveMap || (pos + spd).IsInBounds())
 		owner->Move(spd, true);
 
 	return crashed;

@@ -8,7 +8,7 @@
 #include "Map/ReadMap.h"
 #include "Sim/Misc/GeometricObjects.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Units/Scripts/UnitScript.h"
 #include "Sim/Units/Unit.h"
@@ -619,7 +619,7 @@ bool CStrafeAirMoveType::HandleCollisions(bool checkCollisions) {
 					owner->Move(-dif * (dist - totRad), true);
 					owner->SetVelocity(owner->speed * 0.99f);
 
-					if (modInfo.allowUnitCollisionDamage) {
+					if (modRules.allowUnitCollisionDamage) {
 						owner->DoDamage(DamageArray(damage), ZeroVector, nullptr, -CSolidObject::DAMAGE_COLLISION_OBJECT, -1);
 						unit->DoDamage(DamageArray(damage), ZeroVector, nullptr, -CSolidObject::DAMAGE_COLLISION_OBJECT, -1);
 					}
@@ -635,7 +635,7 @@ bool CStrafeAirMoveType::HandleCollisions(bool checkCollisions) {
 					if (!unit->UsingScriptMoveType())
 						unit->Move(dif * (dist - totRad) * (part), true);
 
-					if (modInfo.allowUnitCollisionDamage) {
+					if (modRules.allowUnitCollisionDamage) {
 						owner->DoDamage(DamageArray(damage), ZeroVector, nullptr, -CSolidObject::DAMAGE_COLLISION_OBJECT, -1);
 						unit->DoDamage(DamageArray(damage), ZeroVector, nullptr, -CSolidObject::DAMAGE_COLLISION_OBJECT, -1);
 					}
@@ -1141,7 +1141,7 @@ bool CStrafeAirMoveType::UpdateAirPhysics(const float4& controlInputs, const flo
 	//   to start bouncing with ever-increasing amplitude while
 	//   stunned, so the same applies there
 	bool crashed = false;
-	if (modInfo.allowAircraftToHitGround) {
+	if (modRules.allowAircraftToHitGround) {
 		const bool groundContact = (groundHeight > (owner->midPos.y - owner->radius));
 		const bool handleContact = (aircraftState != AIRCRAFT_LANDED && aircraftState != AIRCRAFT_TAKEOFF);
 

@@ -13,7 +13,7 @@
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/InterceptHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/MoveTypes/AAirMoveType.h"
@@ -1032,9 +1032,9 @@ bool CWeapon::TestTarget(const float3& tgtPos, const SWeaponTarget& trg) const
 				return false;
 			if ((trg.unit->category & onlyTargetCategory) == 0)
 				return false;
-			if (trg.unit->isDead && !modInfo.fireAtKilled)
+			if (trg.unit->isDead && !modRules.fireAtKilled)
 				return false;
-			if (trg.unit->IsCrashing() && !modInfo.fireAtCrashing)
+			if (trg.unit->IsCrashing() && !modRules.fireAtCrashing)
 				return false;
 			if ((trg.unit->losStatus[owner->allyteam] & (LOS_INLOS | LOS_INRADAR)) == 0)
 				return false;
@@ -1045,7 +1045,7 @@ bool CWeapon::TestTarget(const float3& tgtPos, const SWeaponTarget& trg) const
 				return false;
 
 			if (trg.unit->GetTransporter() != nullptr) {
-				if (!modInfo.targetableTransportedUnits)
+				if (!modRules.targetableTransportedUnits)
 					return false;
 				// the transportee might be "hidden" below terrain, in which case we can't target it
 				if (trg.unit->pos.y < CGround::GetHeightReal(trg.unit->pos.x, trg.unit->pos.z))

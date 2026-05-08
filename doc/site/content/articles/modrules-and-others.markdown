@@ -13,13 +13,12 @@ This article will briefly describe all of them in a way that hopefully prevents 
 * lives in `./modinfo.lua`, hence the name.
 * many mature games put `"$VERSION"` as the version. This is a magic value replaced by the Rapid distribution system with the actual version string. Check out Rapid's documentation for specifics.
 * this file is both necessary and sufficient for a Recoil game, and its contents can consist of just the `name` entry as well.
-* for engine devs: note that in engine internals, modinfo is **not** represented by the `CModInfo` class, that one is actually _mod rules_! Modinfo is a "class 1 meta file" only really referred to in the archive scanner.
 
 ### Mod rules
 * a hardcoded set of knobs for tweaking engine behaviour.
 * some technical (like the choice of pathfinding system or allocation limits) and some gameplay related (like the resource cost scaling for repairing).
 * everything is a single constant global value. No per-unit rules, no changing at runtime, no rules outside the limited set exposed by the engine.
-* read from `./gamedata/modrules.lua`, hence the name. Internal engine C++ code stores them in the `CModInfo` class.
+* read from `./gamedata/modrules.lua`, hence the name.
 * can depend on modoptions.
 
 ### Mod options

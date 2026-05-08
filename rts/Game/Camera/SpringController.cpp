@@ -16,7 +16,7 @@
 #include "System/SpringMath.h"
 #include "System/Input/KeyInput.h"
 #include "Sim/Misc/SmoothHeightMesh.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -80,7 +80,7 @@ void CSpringController::ConfigUpdate()
 	meshBlendMinDist = configHandler->GetFloat("CamSpringSmoothMeshBlendMinDist");
 	meshBlendMaxDist = std::max(configHandler->GetFloat("CamSpringSmoothMeshBlendMaxDist"), meshBlendMinDist + 1.0f);
 
-	if (trackMapHeight == HeightTracking::Smooth && !modInfo.enableSmoothMesh) {
+	if (trackMapHeight == HeightTracking::Smooth && !modRules.enableSmoothMesh) {
 		LOG_L(L_WARNING, "[CSpringController] smoothmesh height tracking (mode 2) requested but the game disabled the smooth mesh, falling back to terrain tracking");
 		trackMapHeight = HeightTracking::Terrain;
 	}

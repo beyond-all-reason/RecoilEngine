@@ -17,7 +17,7 @@
 #include "Rendering/Fonts/glFont.h"
 #include "Net/Protocol/NetProtocol.h"
 #include "Sim/Misc/TeamHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -89,7 +89,7 @@ bool CStartPosSelecter::MousePress(int x, int y, int button)
 	if (button != SDL_BUTTON_LEFT)
 		return false;
 
-	if (modInfo.useStartPositionSelecter == false) {
+	if (modRules.useStartPositionSelecter == false) {
 		return false;
 	}
 

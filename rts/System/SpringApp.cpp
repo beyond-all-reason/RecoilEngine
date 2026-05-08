@@ -61,7 +61,7 @@
 #include "Rendering/Textures/TextureAtlas.h"
 #include "Sim/Misc/DefinitionTag.h" // DefType
 #include "Sim/Misc/GlobalSynced.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "System/ScopedResource.h"
 #include "System/EventHandler.h"
@@ -852,7 +852,7 @@ void SpringApp::Reload(const std::string script)
 	gameSetup->ResetState();
 
 	CTimeProfiler::GetInstance().ResetState();
-	modInfo.ResetState();
+	modRules.ResetState();
 
 	LOG("[SpringApp::%s][11]", __func__);
 

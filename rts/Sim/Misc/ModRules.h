@@ -1,16 +1,15 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef MOD_INFO_H
-#define MOD_INFO_H
+#pragma once
 
 #include <string>
 #include "Sim/Misc/Resource.h"
 #include "Sim/Path/PFSTypes.h"
 
-class CModInfo
+class CModRules
 {
 public:
-	CModInfo() { ResetState(); }
+	CModRules() { ResetState(); }
 
 	void ResetState();
 	void Init(const std::string& modFileName);
@@ -256,6 +255,4 @@ public:
 	bool useStartPositionSelecter;
 };
 
-extern CModInfo modInfo;
-
-#endif // MOD_INFO_H
+extern CModRules modRules;

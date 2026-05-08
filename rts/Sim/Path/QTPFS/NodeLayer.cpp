@@ -24,7 +24,7 @@ inline int __bsfd (int mask)
 #include "Node.h"
 
 #include "Map/MapInfo.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/MoveTypes/MoveMath/MoveMath.h"

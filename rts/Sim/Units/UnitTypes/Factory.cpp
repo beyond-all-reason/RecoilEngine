@@ -7,7 +7,7 @@
 #include "Map/Ground.h"
 #include "Map/ReadMap.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/MoveTypes/MoveType.h"
@@ -455,7 +455,7 @@ void CFactory::AssignBuildeeOrders(CUnit* unit) {
 
 	Command c(CMD_MOVE);
 
-	if (!unit->unitDef->canfly && modInfo.insertBuiltUnitMoveCommand) {
+	if (!unit->unitDef->canfly && modRules.insertBuiltUnitMoveCommand) {
 		// HACK: when a factory has a rallypoint set far enough away
 		// to trigger the non-admissible path estimators, we want to
 		// avoid units getting stuck inside by issuing them an extra
@@ -484,7 +484,7 @@ void CFactory::AssignBuildeeOrders(CUnit* unit) {
 	}
 
 	if (unitCmdQue.empty()) {
-		if (modInfo.insertBuiltUnitMoveCommand) {
+		if (modRules.insertBuiltUnitMoveCommand) {
 			unitCAI->GiveCommand(c);
 		}
 
@@ -508,7 +508,7 @@ void CFactory::AssignBuildeeOrders(CUnit* unit) {
 
 			unitCAI->GiveCommand(c);
 		}
-	} else if (modInfo.insertBuiltUnitMoveCommand) {
+	} else if (modRules.insertBuiltUnitMoveCommand) {
 		unitCmdQue.push_front(c);
 	}
 }

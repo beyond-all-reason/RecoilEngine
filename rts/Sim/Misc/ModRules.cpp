@@ -1,7 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 
-#include "ModInfo.h"
+#include "ModRules.h"
 
 #include "Lua/LuaParser.h"
 #include "Lua/LuaSyncedRead.h"
@@ -16,9 +16,9 @@
 
 #include <bit>
 
-CModInfo modInfo;
+CModRules modRules;
 
-void CModInfo::ResetState()
+void CModRules::ResetState()
 {
 	filename.clear();
 	humanName.clear();
@@ -157,7 +157,7 @@ void CModInfo::ResetState()
 	}
 }
 
-void CModInfo::Init(const std::string& modFileName)
+void CModRules::Init(const std::string& modFileName)
 {
 	{
 		filename = modFileName;

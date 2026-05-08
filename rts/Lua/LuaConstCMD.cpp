@@ -261,7 +261,7 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 *
 	 * ## Other modifiers
 	 *
-	 * - `modInfo.targetableTransportedUnits`: Controls whether transported units are targetable.
+	 * - `modRules.targetableTransportedUnits`: Controls whether transported units are targetable.
 	 *
 	 * ## Callins
 	 *
