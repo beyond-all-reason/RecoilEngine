@@ -74,7 +74,7 @@ This is the bleeding-edge changelog since version 2025.06, for **pre-release 202
 - add `Spring.GetClosestEnemyUnit(x, y, z, range = inf, allyTeamID, bool useLoS = true, bool spherical = false, bool requireEnemyToSeePos = false) → unitID?` to LuaRules.
 - large QTPFS perf improvements.
 - always output logs to stdout.
-- add `Engine.isHeadless`, available in unsynced only.
+- add boolean `Platform.isHeadless`.
 - archive cache version 20 → 21.
 
 ## Fixes

@@ -2,6 +2,7 @@
 
 #include "LuaConstPlatform.h"
 #include "LuaUtils.h"
+#include "Game/GameVersion.h"
 #include "System/Platform/Hardware.h"
 #include "System/Platform/Misc.h"
 #include "Rendering/GlobalRendering.h"
@@ -146,6 +147,9 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	LuaPushNamedString(L, "sysInfoHash", Platform::GetSysInfoHash());
 	/*** @field Platform.macAddrHash string */
 	LuaPushNamedString(L, "macAddrHash", Platform::GetMacAddrHash());
+
+	/*** @field Platform.isHeadless boolean Is this a headless build which only simulates and doesnt offer interactive IO? */
+	LuaPushNamedBool(L, "isHeadless", SpringVersion::IsHeadless());
 
 	return true;
 }
