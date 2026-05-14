@@ -1191,7 +1191,7 @@ void CLuaHandle::UnitConstructionDecayed(const CUnit* unit, float timeSinceLastB
  * @param unitTeam integer
  * @param attackerID integer? Subject to visibility rules
  * @param attackerDefID integer? Subject to visibility rules
- * @param attackerTeam number? Subject to visibility rules
+ * @param attackerTeam integer? Subject to visibility rules
  * @param weaponDefID integer
  */
 void CLuaHandle::UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID)
