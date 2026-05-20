@@ -1981,8 +1981,23 @@ void CGameServer::ServerReadNet()
 			if (packet->length >= 5) {
 				cmdID = packet->data[0];
 
-				if (cmdID == NETMSG_AICOMMAND || cmdID == NETMSG_AICOMMAND_TRACKED || cmdID == NETMSG_AICOMMANDS || cmdID == NETMSG_AISHARE)
+				if (cmdID == NETMSG_AICOMMAND || cmdID == NETMSG_AICOMMAND_TRACKED || cmdID == NETMSG_AICOMMANDS || cmdID == NETMSG_AISHARE){
 					aiID = packet->data[4];
+
+					// Players themselves are not valid targets for AI messages.
+					if (aiID >= MAX_AIS || !skirmishAIs[aiID].first) {
+						Message(spring::format("Player %s sent invalid SkirmishAI ID %d in AICOMMAND %d", player.name.c_str(), (int)aiID, cmdID));
+						continue;
+					}
+
+					// AI Commands must be sent to the correct AI client and must specify the correct team ID for the AI.
+					// NETMSG_AICOMMANDS behaves differently. I don't know why it passes aiID as the aiTeamID in practice.
+					uint8_t aiTeamID = ((cmdID == NETMSG_AICOMMANDS) ? aiID : packet->data[5]);
+					if (skirmishAIs[aiID].second.team != aiTeamID) {
+						Message(spring::format("Player %s sent invalid team ID %d for SkirmishAI ID %d in AICOMMAND %d", player.name.c_str(), (int)aiTeamID, (int)aiID, cmdID));
+						continue;
+					}
+				}
 			}
 
 			const auto aiLinkIt = aiClientLinks.find(aiID);
