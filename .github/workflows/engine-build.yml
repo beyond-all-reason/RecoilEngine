@@ -72,7 +72,7 @@ jobs:
       - nscloud-cache-size-20gb
       # Also cache the git checkouts in datacenter local namespace git mirror
       # to speed them up.
-      - nscloud-git-mirror-5gb
+      #- nscloud-git-mirror-5gb
       # Also cache docker pulls in volume so images don't have to be pulled
       # and unpacked every time.
       - nscloud-exp-container-image-cache
