@@ -8157,7 +8157,12 @@ int LuaSyncedRead::GetPositionLosState(lua_State* L)
 
 	const bool inLos    = losHandler->InLos(pos, allyTeamID);
 	const bool inRadar  = losHandler->InRadar(pos, allyTeamID);
-	const bool inJammer = losHandler->InJammer(pos, allyTeamID);
+	bool inJammer;
+	if (pos.y < 0.0f) {
+		inJammer = losHandler->InSonarJammer(pos, allyTeamID);
+	} else {
+		inJammer = losHandler->InJammer(pos, allyTeamID);
+	}
 
 	lua_pushboolean(L, inLos || inRadar);
 	lua_pushboolean(L, inLos);
@@ -8393,8 +8398,18 @@ int LuaSyncedRead::IsUnitInJammer(lua_State* L)
 		luaL_argerror(L, 2, "Invalid allyTeam");
 		return 0;
 	}
-
-	lua_pushboolean(L, losHandler->InJammer(unit, allyTeamID)); //FIXME
+	bool inJammer;
+	if (unit->IsUnderWater()) {
+		inJammer = losHandler->InSonarJammer(unit, allyTeamID);
+	}
+	else if (unit->IsInWater()) {
+		inJammer = (losHandler->InSonarJammer(unit, allyTeamID) && (losHandler->InJammer(unit, allyTeamID)));
+	} 
+	else 
+	{
+		inJammer = losHandler->InJammer(unit, allyTeamID);
+	}
+	lua_pushboolean(L, inJammer);
 	return 1;
 }
 
