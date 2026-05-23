@@ -1939,6 +1939,54 @@ void CGameServer::HandleConnectionAttempts()
 	}
 }
 
+bool CGameServer::ValidateAICommandTeam(uint8_t aiID, int cmdID, const netcode::RawPacket& packet, const GameParticipant& player)
+{
+	// NETMSG_AICOMMANDS handles permissions differently to the other AI commands.
+	if (cmdID == NETMSG_AICOMMANDS)
+		return true;
+
+	uint8_t aiTeamID = packet.data[5];
+
+	// aiID == MAX_AIS is a general command.
+	if (aiID >= MAX_AIS) {
+
+		// aiTeamID == MAX_AIS is special case handled client side (in the same way as NETMSG_AICOMMANDS).
+		if (aiTeamID < MAX_AIS) {
+
+			auto skimishAIIt = std::find_if(skirmishAIs.begin(), skirmishAIs.end(), [aiTeamID](const std::pair<bool, GameSkirmishAI>& ai) { return ai.second.team == aiTeamID; });
+			if (skimishAIIt == skirmishAIs.end()) {
+
+				// If the command is targeting a player, then it is only permitted to target the sender.
+				if (aiTeamID != players[player.id].team) {
+					Message(spring::format("Player %s sent invalid team ID %d for player %d team %d", player.name.c_str(), (int)aiTeamID, player.id, players[player.id].team));
+					return false;
+				}
+			}
+			else {
+				auto skirmishAI = *skimishAIIt;
+
+				// Only permit AI Commands to target AI teams under the controlling player.
+				if (skirmishAI.first && skirmishAI.second.hostPlayer != player.id) {
+					Message(spring::format("Player %s sent AICOMMAND %d to SkirmishAI team %d, but they don't host it", player.name.c_str(), cmdID, (int)aiTeamID));
+					return false;
+				}
+
+				// If the command is targeting a player, then it is only permitted to target the sender.
+				if (!skirmishAI.first && aiTeamID != players[player.id].team) {
+					Message(spring::format("Player %s sent invalid team ID %d for player %d team %d", player.name.c_str(), (int)aiTeamID, player.id, players[player.id].team));
+					return false;
+				}
+			}
+		}
+	}
+	// Direct command to an AI. Make sure the correct AI TeamID is used.
+	else if (skirmishAIs[aiID].second.team != aiTeamID) {
+		Message(spring::format("Player %s sent invalid team ID %d for SkirmishAI ID %d in AICOMMAND %d", player.name.c_str(), (int)aiTeamID, (int)aiID, cmdID));
+		return false;
+	}
+
+	return true;
+}
 
 void CGameServer::ServerReadNet()
 {
@@ -1984,19 +2032,8 @@ void CGameServer::ServerReadNet()
 				if (cmdID == NETMSG_AICOMMAND || cmdID == NETMSG_AICOMMAND_TRACKED || cmdID == NETMSG_AICOMMANDS || cmdID == NETMSG_AISHARE){
 					aiID = packet->data[4];
 
-					// Players themselves are not valid targets for AI messages.
-					if (aiID >= MAX_AIS || !skirmishAIs[aiID].first) {
-						Message(spring::format("Player %s sent invalid SkirmishAI ID %d in AICOMMAND %d", player.name.c_str(), (int)aiID, cmdID));
+					if (!ValidateAICommandTeam(aiID, cmdID, *packet, player))
 						continue;
-					}
-
-					// AI Commands must be sent to the correct AI client and must specify the correct team ID for the AI.
-					// NETMSG_AICOMMANDS behaves differently. I don't know why it passes aiID as the aiTeamID in practice.
-					uint8_t aiTeamID = ((cmdID == NETMSG_AICOMMANDS) ? aiID : packet->data[5]);
-					if (skirmishAIs[aiID].second.team != aiTeamID) {
-						Message(spring::format("Player %s sent invalid team ID %d for SkirmishAI ID %d in AICOMMAND %d", player.name.c_str(), (int)aiTeamID, (int)aiID, cmdID));
-						continue;
-					}
 				}
 			}
 
