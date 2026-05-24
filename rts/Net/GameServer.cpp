@@ -1957,7 +1957,7 @@ bool CGameServer::ValidateAICommandTeam(uint8_t aiID, int cmdID, const netcode::
 			if (skimishAIIt == skirmishAIs.end()) {
 
 				// If the command is targeting a player, then it is only permitted to target the sender.
-				if (aiTeamID != players[player.id].team) {
+				if (players[player.id].spectator || aiTeamID != players[player.id].team) {
 					Message(spring::format("Player %s sent invalid team ID %d for player %d team %d", player.name.c_str(), (int)aiTeamID, player.id, players[player.id].team));
 					return false;
 				}
@@ -1972,7 +1972,7 @@ bool CGameServer::ValidateAICommandTeam(uint8_t aiID, int cmdID, const netcode::
 				}
 
 				// If the command is targeting a player, then it is only permitted to target the sender.
-				if (!skirmishAI.first && aiTeamID != players[player.id].team) {
+				if (!skirmishAI.first && (players[player.id].spectator || aiTeamID != players[player.id].team)) {
 					Message(spring::format("Player %s sent invalid team ID %d for player %d team %d", player.name.c_str(), (int)aiTeamID, player.id, players[player.id].team));
 					return false;
 				}
