@@ -66,6 +66,7 @@
 #include "System/TimeProfiler.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/Config/ConfigVariable.h"
+#include "System/Input/ControllerInput.h"
 #include "System/Input/KeyInput.h"
 #include "System/LoadSave/DemoReader.h"
 #include "System/LoadSave/DemoRecorder.h"
@@ -252,6 +253,8 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetMouseState);
 	REGISTER_LUA_CFUNC(GetMouseCursor);
 	REGISTER_LUA_CFUNC(GetMouseStartPosition);
+	REGISTER_LUA_CFUNC(GetAvailableControllers);
+	REGISTER_LUA_CFUNC(GetControllerState);
 
 	REGISTER_LUA_CFUNC(GetKeyFromScanSymbol);
 	REGISTER_LUA_CFUNC(GetKeyState);
@@ -3968,6 +3971,99 @@ int LuaUnsyncedRead::GetMouseButtonsPressed(lua_State* L)
 	}
 
 	return numArgs;
+}
+
+
+/******************************************************************************
+ * Controller Input
+ * @section controllerinput
+******************************************************************************/
+
+static void PushControllerInfo(lua_State* L, const CControllerInput::ControllerStateSnapshot& controller)
+{
+	lua_createtable(L, 0, 3);
+	HSTR_PUSH_NUMBER(L, "instanceId", controller.instanceId);
+	HSTR_PUSH_NUMBER(L, "deviceId", controller.deviceId);
+	HSTR_PUSH_STRING(L, "name", controller.name);
+}
+
+static void PushControllerButtons(lua_State* L, const CControllerInput::ControllerStateSnapshot& controller)
+{
+	lua_createtable(L, static_cast<int>(controller.buttons.size()), 0);
+
+	for (size_t buttonId = 0; buttonId < controller.buttons.size(); ++buttonId) {
+		lua_pushnumber(L, controller.buttons[buttonId]);
+		lua_rawseti(L, -2, static_cast<int>(buttonId));
+	}
+}
+
+static void PushControllerAxes(lua_State* L, const CControllerInput::ControllerStateSnapshot& controller)
+{
+	lua_createtable(L, static_cast<int>(controller.axes.size()), 0);
+
+	for (size_t axisId = 0; axisId < controller.axes.size(); ++axisId) {
+		lua_pushnumber(L, controller.axes[axisId]);
+		lua_rawseti(L, -2, static_cast<int>(axisId));
+	}
+}
+
+static void PushControllerState(lua_State* L, const CControllerInput::ControllerStateSnapshot& controller)
+{
+	lua_createtable(L, 0, 4);
+	HSTR_PUSH_NUMBER(L, "instanceId", controller.instanceId);
+	HSTR_PUSH_STRING(L, "name", controller.name);
+
+	HSTR_PUSH(L, "buttons");
+	PushControllerButtons(L, controller);
+	lua_rawset(L, -3);
+
+	HSTR_PUSH(L, "axes");
+	PushControllerAxes(L, controller);
+	lua_rawset(L, -3);
+}
+
+/***
+ *
+ * @function Spring.GetAvailableControllers
+ * @return { instanceId: number, deviceId: number, name: string }[] controllers
+ */
+int LuaUnsyncedRead::GetAvailableControllers(lua_State* L)
+{
+	if (controllerInput == nullptr) {
+		lua_createtable(L, 0, 0);
+		return 1;
+	}
+
+	const auto controllers = controllerInput->GetAvailableControllers();
+	lua_createtable(L, static_cast<int>(controllers.size()), 0);
+
+	for (size_t i = 0; i < controllers.size(); ++i) {
+		PushControllerInfo(L, controllers[i]);
+		lua_rawseti(L, -2, static_cast<int>(i + 1));
+	}
+
+	return 1;
+}
+
+/***
+ *
+ * @function Spring.GetControllerState
+ * @param instanceId number
+ * @return table? controllerState with 0-based `buttons` and `axes` tables keyed by SDL id
+ */
+int LuaUnsyncedRead::GetControllerState(lua_State* L)
+{
+	if (controllerInput == nullptr)
+		return 0;
+
+	const int instanceId = luaL_checkint(L, 1);
+
+	CControllerInput::ControllerStateSnapshot controller;
+	if (!controllerInput->GetControllerState(instanceId, controller))
+		return 0;
+
+	PushControllerState(L, controller);
+	return 1;
 }
 
 
