@@ -1,4 +1,4 @@
-/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+/* This file is part of the Recoil engine (GPL v2 or later), see LICENSE.html */
 
 #pragma once
 
@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -17,51 +18,42 @@ class CControllerInput
 {
 public:
 	static CControllerInput* GetInstance();
-	static void FreeInstance(CControllerInput* controllerInput);
+	static void FreeInstance();
 
 	CControllerInput();
 	~CControllerInput();
 
-	struct ControllerStateSnapshot {
-		int deviceId = -1;
-		int instanceId = -1;
+	struct ControllerState {
+		int deviceID = -1;
+		int instanceID = -1;
 		std::string name;
 
-		std::array<std::int16_t, 16> axes = {};
-		std::array<std::uint8_t, 32> buttons = {};
+		std::array<std::int16_t, SDL_CONTROLLER_AXIS_MAX> axes = {};
+		std::array<std::uint8_t, SDL_CONTROLLER_BUTTON_MAX> buttons = {};
 	};
 
-	std::vector<ControllerStateSnapshot> GetAvailableControllers() const;
-	bool GetControllerState(int instanceId, ControllerStateSnapshot& state) const;
+	std::vector<ControllerState> GetAvailableControllers() const;
+	std::optional<ControllerState> GetControllerState(int instanceID) const;
 
 	bool HandleSDLControllerEvent(const SDL_Event& event);
 
 private:
-	struct ControllerState {
-		int deviceId = -1;
-		int instanceId = -1;
-		std::string name;
-
+	struct TrackedControllerState : public ControllerState {
 		SDL_GameController* gameController = nullptr;
-
-		std::array<std::int16_t, 16> axes = {};
-		std::array<std::uint8_t, 32> buttons = {};
 	};
 
-	static ControllerStateSnapshot MakeControllerStateSnapshot(const ControllerState& state);
-
-	void LogAvailableController(int deviceId) const;
+	void LogAvailableController(int deviceID) const;
 	void ScanExistingControllers();
-	void HandleDeviceAdded(int deviceId);
-	void HandleDeviceRemoved(int instanceId);
-	void HandleDeviceRemapped(int instanceId);
-	void HandleButtonDown(int instanceId, int buttonId, std::uint8_t value);
-	void HandleButtonUp(int instanceId, int buttonId, std::uint8_t value);
-	void HandleAxisMotion(int instanceId, int axisId, std::int16_t value);
+	void HandleDeviceAdded(int deviceID);
+	void HandleDeviceRemoved(int instanceID);
+	void HandleDeviceRemapped(int instanceID);
+	void HandleButtonDown(int instanceID, int buttonID, std::uint8_t value);
+	void HandleButtonUp(int instanceID, int buttonID, std::uint8_t value);
+	void HandleAxisMotion(int instanceID, int axisID, std::int16_t value);
 
 private:
 	InputHandler::HandlerTokenT inputCon;
-	std::unordered_map<int, ControllerState> controllersByInstanceId;
+	std::unordered_map<int, TrackedControllerState> controllersByInstanceID;
 };
 
 extern CControllerInput* controllerInput;

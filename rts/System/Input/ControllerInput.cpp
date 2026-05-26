@@ -1,4 +1,4 @@
-/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+/* This file is part of the Recoil engine (GPL v2 or later), see LICENSE.html */
 
 #include "ControllerInput.h"
 
@@ -28,47 +28,32 @@ CControllerInput* CControllerInput::GetInstance()
 	return controllerInput;
 }
 
-void CControllerInput::FreeInstance(CControllerInput* controllerInputPtr)
+void CControllerInput::FreeInstance()
 {
-	if (controllerInputPtr == controllerInput) {
-		delete controllerInput;
-		controllerInput = nullptr;
-	}
+	delete controllerInput;
+	controllerInput = nullptr;
 }
 
-CControllerInput::ControllerStateSnapshot CControllerInput::MakeControllerStateSnapshot(const ControllerState& state)
+std::vector<CControllerInput::ControllerState> CControllerInput::GetAvailableControllers() const
 {
-	ControllerStateSnapshot snapshot;
-	snapshot.deviceId = state.deviceId;
-	snapshot.instanceId = state.instanceId;
-	snapshot.name = state.name;
-	snapshot.axes = state.axes;
-	snapshot.buttons = state.buttons;
+	std::vector<ControllerState> controllers;
+	controllers.reserve(controllersByInstanceID.size());
 
-	return snapshot;
-}
-
-std::vector<CControllerInput::ControllerStateSnapshot> CControllerInput::GetAvailableControllers() const
-{
-	std::vector<ControllerStateSnapshot> controllers;
-	controllers.reserve(controllersByInstanceId.size());
-
-	for (const auto& controllerIt : controllersByInstanceId) {
-		controllers.push_back(MakeControllerStateSnapshot(controllerIt.second));
+	for (const auto& controllerIt : controllersByInstanceID) {
+		controllers.push_back(controllerIt.second);
 	}
 
 	return controllers;
 }
 
-bool CControllerInput::GetControllerState(int instanceId, ControllerStateSnapshot& state) const
+std::optional<CControllerInput::ControllerState> CControllerInput::GetControllerState(int instanceID) const
 {
-	auto controllerIt = controllersByInstanceId.find(instanceId);
-	if (controllerIt == controllersByInstanceId.end()) {
-		return false;
+	const auto controllerIt = controllersByInstanceID.find(instanceID);
+	if (controllerIt == controllersByInstanceID.end()) {
+		return std::nullopt;
 	}
 
-	state = MakeControllerStateSnapshot(controllerIt->second);
-	return true;
+	return controllerIt->second;
 }
 
 #ifndef HEADLESS
@@ -96,7 +81,7 @@ CControllerInput::CControllerInput()
 
 CControllerInput::~CControllerInput()
 {
-	for (auto& controllerIt : controllersByInstanceId) {
+	for (auto& controllerIt : controllersByInstanceID) {
 		auto& state = controllerIt.second;
 
 		if (state.gameController != nullptr) {
@@ -105,7 +90,7 @@ CControllerInput::~CControllerInput()
 		}
 	}
 
-	controllersByInstanceId.clear();
+	controllersByInstanceID.clear();
 
 	LOG_L(L_INFO, "[ControllerInput] Shutting down SDL controller input handler");
 }
@@ -144,16 +129,16 @@ bool CControllerInput::HandleSDLControllerEvent(const SDL_Event& event)
 	return false;
 }
 
-void CControllerInput::LogAvailableController(int deviceId) const
+void CControllerInput::LogAvailableController(int deviceID) const
 {
-	if (SDL_IsGameController(deviceId)) {
-		const char* name = SDL_GameControllerNameForIndex(deviceId);
-		LOG_L(L_INFO, "[ControllerInput] SDL game controller available: deviceId=%d name=%s", deviceId, name != nullptr ? name : "unknown");
+	if (SDL_IsGameController(deviceID)) {
+		const char* name = SDL_GameControllerNameForIndex(deviceID);
+		LOG_L(L_INFO, "[ControllerInput] SDL game controller available: deviceID=%d name=%s", deviceID, name != nullptr ? name : "unknown");
 		return;
 	}
 
-	const char* name = SDL_JoystickNameForIndex(deviceId);
-	LOG_L(L_INFO, "[ControllerInput] SDL joystick available but not game controller: deviceId=%d name=%s", deviceId, name != nullptr ? name : "unknown");
+	const char* name = SDL_JoystickNameForIndex(deviceID);
+	LOG_L(L_INFO, "[ControllerInput] SDL joystick available but not game controller: deviceID=%d name=%s", deviceID, name != nullptr ? name : "unknown");
 }
 
 void CControllerInput::ScanExistingControllers()
@@ -161,136 +146,136 @@ void CControllerInput::ScanExistingControllers()
 	const int joystickCount = SDL_NumJoysticks();
 	LOG_L(L_INFO, "[ControllerInput] Scanning existing SDL joysticks: count=%d", joystickCount);
 
-	for (int deviceId = 0; deviceId < joystickCount; ++deviceId) {
-		LogAvailableController(deviceId);
+	for (int deviceID = 0; deviceID < joystickCount; ++deviceID) {
+		LogAvailableController(deviceID);
 
-		if (SDL_IsGameController(deviceId)) {
-			HandleDeviceAdded(deviceId);
+		if (SDL_IsGameController(deviceID)) {
+			HandleDeviceAdded(deviceID);
 			continue;
 		}
 
-		LOG_L(L_INFO, "[ControllerInput] Skipping existing non-game-controller device: deviceId=%d", deviceId);
+		LOG_L(L_INFO, "[ControllerInput] Skipping existing non-game-controller device: deviceID=%d", deviceID);
 	}
 }
 
-void CControllerInput::HandleDeviceAdded(int deviceId)
+void CControllerInput::HandleDeviceAdded(int deviceID)
 {
-	LOG_L(L_INFO, "[ControllerInput] Controller device added: deviceId=%d", deviceId);
-	LogAvailableController(deviceId);
+	LOG_L(L_INFO, "[ControllerInput] Controller device added: deviceID=%d", deviceID);
+	LogAvailableController(deviceID);
 
-	if (!SDL_IsGameController(deviceId)) {
-		LOG_L(L_INFO, "[ControllerInput] Ignoring non-game-controller device: deviceId=%d", deviceId);
+	if (!SDL_IsGameController(deviceID)) {
+		LOG_L(L_INFO, "[ControllerInput] Ignoring non-game-controller device: deviceID=%d", deviceID);
 		return;
 	}
 
-	SDL_GameController* gameController = SDL_GameControllerOpen(deviceId);
+	SDL_GameController* gameController = SDL_GameControllerOpen(deviceID);
 	if (gameController == nullptr) {
-		LOG_L(L_WARNING, "[ControllerInput] Failed to open SDL game controller: deviceId=%d error=%s", deviceId, SDL_GetError());
+		LOG_L(L_WARNING, "[ControllerInput] Failed to open SDL game controller: deviceID=%d error=%s", deviceID, SDL_GetError());
 		return;
 	}
 
 	SDL_Joystick* joystick = SDL_GameControllerGetJoystick(gameController);
-	const int instanceId = joystick != nullptr ? SDL_JoystickInstanceID(joystick) : -1;
+	const int instanceID = joystick != nullptr ? SDL_JoystickInstanceID(joystick) : -1;
 
-	if (instanceId < 0) {
-		LOG_L(L_WARNING, "[ControllerInput] Failed to get joystick instance id: deviceId=%d", deviceId);
+	if (instanceID < 0) {
+		LOG_L(L_WARNING, "[ControllerInput] Failed to get joystick instance ID: deviceID=%d", deviceID);
 		SDL_GameControllerClose(gameController);
 		return;
 	}
 
-	ControllerState state;
-	state.deviceId = deviceId;
-	state.instanceId = instanceId;
+	TrackedControllerState state;
+	state.deviceID = deviceID;
+	state.instanceID = instanceID;
 
 	const char* name = SDL_GameControllerName(gameController);
 	state.name = name != nullptr ? name : "unknown";
 	state.gameController = gameController;
 
-	auto existingIt = controllersByInstanceId.find(instanceId);
-	if (existingIt != controllersByInstanceId.end() && existingIt->second.gameController != nullptr) {
+	auto existingIt = controllersByInstanceID.find(instanceID);
+	if (existingIt != controllersByInstanceID.end() && existingIt->second.gameController != nullptr) {
 		SDL_GameControllerClose(existingIt->second.gameController);
 	}
 
-	controllersByInstanceId[instanceId] = state;
+	controllersByInstanceID[instanceID] = state;
 
-	LOG_L(L_INFO, "[ControllerInput] Controller connected: deviceId=%d instanceId=%d name=%s", deviceId, instanceId, state.name.c_str());
+	LOG_L(L_INFO, "[ControllerInput] Controller connected: deviceID=%d instanceID=%d name=%s", deviceID, instanceID, state.name.c_str());
 }
 
-void CControllerInput::HandleDeviceRemoved(int instanceId)
+void CControllerInput::HandleDeviceRemoved(int instanceID)
 {
-	LOG_L(L_INFO, "[ControllerInput] Controller device removed: instanceId=%d", instanceId);
+	LOG_L(L_INFO, "[ControllerInput] Controller device removed: instanceID=%d", instanceID);
 
-	auto it = controllersByInstanceId.find(instanceId);
-	if (it == controllersByInstanceId.end()) {
+	auto it = controllersByInstanceID.find(instanceID);
+	if (it == controllersByInstanceID.end()) {
 		return;
 	}
 
-	LOG_L(L_INFO, "[ControllerInput] Removed tracked controller: instanceId=%d name=%s", instanceId, it->second.name.c_str());
+	LOG_L(L_INFO, "[ControllerInput] Removed tracked controller: instanceID=%d name=%s", instanceID, it->second.name.c_str());
 
 	if (it->second.gameController != nullptr) {
 		SDL_GameControllerClose(it->second.gameController);
 		it->second.gameController = nullptr;
 	}
 
-	controllersByInstanceId.erase(it);
+	controllersByInstanceID.erase(it);
 }
 
-void CControllerInput::HandleDeviceRemapped(int instanceId)
+void CControllerInput::HandleDeviceRemapped(int instanceID)
 {
-	LOG_L(L_INFO, "[ControllerInput] Controller remapped: instanceId=%d", instanceId);
+	LOG_L(L_INFO, "[ControllerInput] Controller remapped: instanceID=%d", instanceID);
 }
 
-void CControllerInput::HandleButtonDown(int instanceId, int buttonId, std::uint8_t value)
+void CControllerInput::HandleButtonDown(int instanceID, int buttonID, std::uint8_t value)
 {
-	auto controllerIt = controllersByInstanceId.find(instanceId);
-	if (controllerIt == controllersByInstanceId.end()) {
+	auto controllerIt = controllersByInstanceID.find(instanceID);
+	if (controllerIt == controllersByInstanceID.end()) {
 		return;
 	}
 
 	auto& state = controllerIt->second;
 
-	if (buttonId >= 0 && buttonId < static_cast<int>(state.buttons.size())) {
-		state.buttons[buttonId] = value;
+	if (buttonID >= 0 && buttonID < static_cast<int>(state.buttons.size())) {
+		state.buttons[buttonID] = value;
 	}
 
 #if CONTROLLER_INPUT_LOG_EVENTS
-	LOG_L(L_INFO, "[ControllerInput] ButtonDown: instanceId=%d buttonId=%d value=%u", instanceId, buttonId, static_cast<unsigned int>(value));
+	LOG_L(L_INFO, "[ControllerInput] ButtonDown: instanceID=%d buttonID=%d value=%u", instanceID, buttonID, static_cast<unsigned int>(value));
 #endif
 }
 
-void CControllerInput::HandleButtonUp(int instanceId, int buttonId, std::uint8_t value)
+void CControllerInput::HandleButtonUp(int instanceID, int buttonID, std::uint8_t value)
 {
-	auto controllerIt = controllersByInstanceId.find(instanceId);
-	if (controllerIt == controllersByInstanceId.end()) {
+	auto controllerIt = controllersByInstanceID.find(instanceID);
+	if (controllerIt == controllersByInstanceID.end()) {
 		return;
 	}
 
 	auto& state = controllerIt->second;
 
-	if (buttonId >= 0 && buttonId < static_cast<int>(state.buttons.size())) {
-		state.buttons[buttonId] = value;
+	if (buttonID >= 0 && buttonID < static_cast<int>(state.buttons.size())) {
+		state.buttons[buttonID] = value;
 	}
 
 #if CONTROLLER_INPUT_LOG_EVENTS
-	LOG_L(L_INFO, "[ControllerInput] ButtonUp: instanceId=%d buttonId=%d value=%u", instanceId, buttonId, static_cast<unsigned int>(value));
+	LOG_L(L_INFO, "[ControllerInput] ButtonUp: instanceID=%d buttonID=%d value=%u", instanceID, buttonID, static_cast<unsigned int>(value));
 #endif
 }
 
-void CControllerInput::HandleAxisMotion(int instanceId, int axisId, std::int16_t value)
+void CControllerInput::HandleAxisMotion(int instanceID, int axisID, std::int16_t value)
 {
-	auto controllerIt = controllersByInstanceId.find(instanceId);
-	if (controllerIt == controllersByInstanceId.end()) {
+	auto controllerIt = controllersByInstanceID.find(instanceID);
+	if (controllerIt == controllersByInstanceID.end()) {
 		return;
 	}
 
 	auto& state = controllerIt->second;
 
-	if (axisId >= 0 && axisId < static_cast<int>(state.axes.size())) {
-		state.axes[axisId] = value;
+	if (axisID >= 0 && axisID < static_cast<int>(state.axes.size())) {
+		state.axes[axisID] = value;
 	}
 
 #if CONTROLLER_INPUT_LOG_EVENTS
-	LOG_L(L_INFO, "[ControllerInput] AxisMotion: instanceId=%d axisId=%d value=%d", instanceId, axisId, static_cast<int>(value));
+	LOG_L(L_INFO, "[ControllerInput] AxisMotion: instanceID=%d axisID=%d value=%d", instanceID, axisID, static_cast<int>(value));
 #endif
 }
 

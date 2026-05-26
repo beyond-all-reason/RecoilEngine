@@ -135,13 +135,15 @@ void CMouseHandler::InitStatic()
 	controllerInput = CControllerInput::GetInstance();
 	mouse = new CMouseHandler();
 }
+
 void CMouseHandler::KillStatic()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	spring::SafeDelete(mouse);
-	CControllerInput::FreeInstance(controllerInput);
+	CControllerInput::FreeInstance();
 	IMouseInput::FreeInstance(mouseInput);
 }
+
 
 void CMouseHandler::ReloadCursors()
 {
