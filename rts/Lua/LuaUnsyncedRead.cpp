@@ -4025,7 +4025,7 @@ static void PushControllerState(lua_State* L, const CControllerInput::Controller
 /***
  *
  * @function Spring.GetAvailableControllers
- * @return { instanceID: number, deviceID: number, name: string }[] controllers
+ * @return table controllers 1-indexed array of controller info tables. Each controller info table has instanceID, deviceID, and name fields.
  */
 int LuaUnsyncedRead::GetAvailableControllers(lua_State* L)
 {
@@ -4049,7 +4049,7 @@ int LuaUnsyncedRead::GetAvailableControllers(lua_State* L)
  *
  * @function Spring.GetControllerState
  * @param instanceID number
- * @return table? controllerState with `buttons` and `axes` as 1-indexed Lua arrays in SDL controller enum order
+ * @return table? controllerState controller state table with instanceID, name, buttons, and axes fields. The buttons and axes fields are 1-indexed Lua arrays in SDL controller enum order.
  */
 int LuaUnsyncedRead::GetControllerState(lua_State* L)
 {
