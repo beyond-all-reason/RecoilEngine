@@ -2,12 +2,11 @@
 
 layout (location = 0) in vec3 pos;
 layout (location = 1) in vec3 normal;
-layout (location = 2) in vec3 T;
-layout (location = 3) in vec3 B;
-layout (location = 4) in vec4 uv;
-layout (location = 5) in uvec3 bonesInfo; //boneIDsLow, boneWeights, boneIDsHigh
+layout (location = 2) in vec4 tangent; // xyz = tangent, w = handedness sign for bitangent reconstruction
+layout (location = 3) in vec4 uv;
+layout (location = 4) in uvec3 bonesInfo; //boneID0|boneID1, boneID2|boneID3, boneWeights
 
-layout (location = 6) in uvec4 instData;
+layout (location = 5) in uvec4 instData;
 // u32 matOffset
 // u32 uniOffset
 // u32 {paletteIndex[0:10], reserved[11:15], numPieces[16:31]}
@@ -109,6 +108,7 @@ out Data {
 
 	vec4 worldPos;
 	vec3 worldNormal;
+	vec4 worldTangent;
 
 	// main light vector(s)
 	vec3 worldCameraDir;
@@ -133,8 +133,13 @@ void TransformPlayerCamStaticMat(vec4 worldPos) {
 	gl_Position = cameraViewProj * worldPos;
 }
 
-uint GetUnpackedValue(uint packedValue, uint byteNum) {
-	return (packedValue >> (8u * byteNum)) & 0xFFu;
+uint GetBoneWeight(uint boneIdx) {
+	return (bonesInfo.z >> (8u * boneIdx)) & 0xFFu;
+}
+
+uint UnpackBoneID(uint boneIdx) {
+    uint words[2] = uint[2](bonesInfo.x, bonesInfo.y);
+    return (words[boneIdx >> 1u] >> ((boneIdx & 1u) * 16u)) & 0xFFFFu;
 }
 
 // BEGIN TRS LIB
@@ -260,49 +265,60 @@ Transform Lerp(Transform t0, Transform t1, float a) {
 
 // END TRS LIB
 
-void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
+void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal, out vec3 msTangent)
 {
 	bool staticModel = (matrixMode > 0);
 
 	vec4 piecePos = vec4(pos, 1.0);
 	vec4 normal4 = vec4(normal, 0.0);
+	vec4 tangent4 = vec4(tangent.xyz, 0.0); // tangent.w (handedness) is not transformed
 
-	uint bID0 = GetUnpackedValue(bonesInfo.x, 0u) + (GetUnpackedValue(bonesInfo.z, 0u) << 8u); //first boneID
+	uint bID0 = UnpackBoneID(0u);
 	
-	Transform tx;
+	// Get bind pose transform for the primary bone
+	Transform bposeTx = transforms[instData.w + bID0];
+	Transform bposeInvTx = InvertTransformAffine(bposeTx);
+
+	// Get current piece transform
+	Transform currentTx;
 	if (staticModel) {
-		tx = transforms[instData.x + bID0];
+		currentTx = transforms[instData.x + bID0];
 	} else {
 		// do interpolation
-		tx = Lerp(
+		currentTx = Lerp(
 			transforms[instData.x + 2u * (1u + bID0) + 0u],
 			transforms[instData.x + 2u * (1u + bID0) + 1u],
 			timeInfo.w
 		);
-		//tx = transforms[instData.x + 2u * (1u + bID0) + 1u];
 	}
 
 	vec4 weights = vec4(
-		float(GetUnpackedValue(bonesInfo.y, 0u)) / 255.0,
-		float(GetUnpackedValue(bonesInfo.y, 1u)) / 255.0,
-		float(GetUnpackedValue(bonesInfo.y, 2u)) / 255.0,
-		float(GetUnpackedValue(bonesInfo.y, 3u)) / 255.0
-	) * float(tx.trSc.w > 0.0);
+		float(GetBoneWeight(0u)) / 255.0,
+		float(GetBoneWeight(1u)) / 255.0,
+		float(GetBoneWeight(2u)) / 255.0,
+		float(GetBoneWeight(3u)) / 255.0
+	) * float(currentTx.trSc.w > 0.0);
 
-	msPosition = ApplyTransform(tx, piecePos);
-	msNormal   = ApplyTransform(tx, normal4).xyz;
+	// Delta transform: current * inverse(bpose)
+	// This transforms from model-space (bpose) to animated model-space
+	Transform deltaTx = ApplyTransform(currentTx, bposeInvTx);
+
+	msPosition = ApplyTransform(deltaTx, piecePos);
+	msNormal   = ApplyTransform(deltaTx, normal4).xyz;
+	msTangent  = ApplyTransform(deltaTx, tangent4).xyz;
 
 	if (staticModel || weights[0] == 1.0)
 		return;
 
 	msPosition *= weights[0];
 	msNormal   *= weights[0];
+	msTangent  *= weights[0];
 
-	Transform bposeTra = transforms[instData.w + bID0];
-
-	// Vertex[ModelSpace,BoneX] = PieceMat[BoneX] * InverseBindPosMat[BoneX] * BindPosMat[Bone0] * Vertex[Bone0]
-	for (uint bi = 1; bi < 3; ++bi) {
-		uint bID = GetUnpackedValue(bonesInfo.x, bi) + (GetUnpackedValue(bonesInfo.z, bi) << 8u);
+	// Multi-bone skinning
+	// For model-space vertices, we need: boneTx * bposeInv * vertexInModelSpace
+	// NOT: boneTx * bposeInv * bpose0 * vertex (the old formula)
+	for (uint bi = 1; bi < 4; ++bi) {
+		uint bID = UnpackBoneID(bi);
 
 		if (bID == 0xFFFFu || weights[bi] == 0.0)
 			continue;
@@ -314,14 +330,16 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 			timeInfo.w
 		);
 
-		// emulate boneTx * bposeInvTra * bposeTra * piecePos
-		vec4 txPiecePos = ApplyTransform(ApplyTransform(boneTx, ApplyTransform(bposeInvTra, bposeTra)), piecePos);
+		// For model-space vertices: boneTx * bposeInvTra * piecePos
+		// This transforms the model-space vertex to the space of bone bi
+		Transform skinTx = ApplyTransform(boneTx, bposeInvTra);
+		vec4 txPiecePos = ApplyTransform(skinTx, piecePos);
+		vec3 txPieceNormal = ApplyTransform(skinTx, normal4).xyz;
+		vec3 txPieceTangent = ApplyTransform(skinTx, tangent4).xyz;
 
-		// emulate boneTx * bposeInvTra * bposeTra * normal
-		vec3 txPieceNormal = ApplyTransform(ApplyTransform(boneTx, ApplyTransform(bposeInvTra, bposeTra)), normal4).xyz;
-
-		msPosition += txPiecePos    * weights[bi];
-		msNormal   += txPieceNormal * weights[bi];
+		msPosition += txPiecePos     * weights[bi];
+		msNormal   += txPieceNormal  * weights[bi];
+		msTangent  += txPieceTangent * weights[bi];
 	}
 }
 
@@ -331,11 +349,16 @@ void main(void)
 
 	vec4 modelPos;
 	vec3 modelNormal;
-	GetModelSpaceVertex(modelPos, modelNormal);
+	vec3 modelTangent;
+	GetModelSpaceVertex(modelPos, modelNormal, modelTangent);
+
+	// Preserve the handedness sign (w component) - it should NOT be transformed
+	float tangentHandedness = tangent.w;
 
 	if (staticModel) {
 		worldPos = staticModelMatrix * modelPos;
 		worldNormal = mat3(staticModelMatrix) * modelNormal;
+		worldTangent = vec4(mat3(staticModelMatrix) * modelTangent, tangentHandedness);
 	} else {
 		// do interpolation
 		Transform tx = Lerp(
@@ -347,6 +370,7 @@ void main(void)
 		worldPos = ApplyTransform(tx, modelPos);
 		tx.trSc = vec4(0, 0, 0, 1); //nullify the transform part
 		worldNormal = ApplyTransform(tx, modelNormal);
+		worldTangent = vec4(ApplyTransform(tx, modelTangent), tangentHandedness);
 	}
 
 	gl_ClipDistance[0] = dot(modelPos, clipPlane0); //upper construction clip plane

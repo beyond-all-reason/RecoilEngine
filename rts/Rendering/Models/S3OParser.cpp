@@ -22,35 +22,17 @@
 
 
 
-void CS3OParser::Init() { numPoolPieces = 0; }
 void CS3OParser::Kill() {
 	RECOIL_DETAILED_TRACY_ZONE;
-	LOG_L(L_INFO, "[S3OParser::%s] allocated %u pieces", __func__, numPoolPieces);
-
-	// reuse piece innards when reloading
-	// piecePool.clear();
-	for (unsigned int i = 0; i < numPoolPieces; i++) {
-		piecePool[i].Clear();
-	}
-
-	numPoolPieces = 0;
+	LOG_L(L_INFO, "[S3OParser::%s] allocated %u pieces", __func__, static_cast<uint32_t>(pieces.size()));
+	pieces.clear(); pieces.shrink_to_fit();
 }
 
 void CS3OParser::Load(S3DModel& model, const std::string& name)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	CFileHandler file(name);
-	std::vector<uint8_t> fileBuf;
 
-	if (!file.FileExists())
-		throw content_error("[S3OParser] could not find model-file " + name);
-
-	if (!file.IsBuffered()) {
-		fileBuf.resize(file.FileSize(), 0);
-		file.Read(fileBuf.data(), fileBuf.size());
-	} else {
-		fileBuf = std::move(file.GetBuffer());
-	}
+	auto fileBuf = LoadFromFile(name);
 
 	if (fileBuf.size() < sizeof(S3OHeader))
 		throw content_error("[S3OParser] corrupted header for model-file " + name);
@@ -64,8 +46,6 @@ void CS3OParser::Load(S3DModel& model, const std::string& name)
 	model.numPieces = 0;
 	model.texs[0] = (header.texture1 == 0)? "" : (char*) &fileBuf[header.texture1];
 	model.texs[1] = (header.texture2 == 0)? "" : (char*) &fileBuf[header.texture2];
-	model.mins = DEF_MIN_SIZE;
-	model.maxs = DEF_MAX_SIZE;
 
 	textureHandlerS3O.PreloadTexture(
 		&model,
@@ -74,31 +54,23 @@ void CS3OParser::Load(S3DModel& model, const std::string& name)
 	);
 
 	model.FlattenPieceTree(LoadPiece(&model, nullptr, fileBuf, header.rootPiece));
+	model.SetPieceMatrices();
 
 	// set after the extrema are known
-	model.radius = (header.radius <= 0.01f)? model.CalcDrawRadius(): header.radius;
-	model.height = (header.height <= 0.01f)? model.CalcDrawHeight(): header.height;
-	model.relMidPos = float3(header.midx, header.midy, header.midz);
+	if (header.radius > 0.01f)
+		model.modelParams.radius = header.radius;
+
+	if (header.height > 0.01f)
+		model.modelParams.height = header.height;
+
+	model.modelParams.relMidPos = float3(header.midx, header.midy, header.midz);
 }
 
 
 SS3OPiece* CS3OParser::AllocPiece()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	std::lock_guard<spring::mutex> lock(poolMutex);
-
-	// lazily reserve pool here instead of during Init
-	// this way games using only one model-type do not
-	// cause redundant allocation
-	if (piecePool.empty())
-		piecePool.resize(MAX_MODEL_OBJECTS * AVG_MODEL_PIECES);
-
-	if (numPoolPieces >= piecePool.size()) {
-		throw std::bad_alloc();
-		return nullptr;
-	}
-
-	return &piecePool[numPoolPieces++];
+	return static_cast<SS3OPiece*>(AllocPieceImpl());
 }
 
 SS3OPiece* CS3OParser::LoadPiece(S3DModel* model, SS3OPiece* parent, std::vector<uint8_t>& buf, int offset)
@@ -131,7 +103,7 @@ SS3OPiece* CS3OParser::LoadPiece(S3DModel* model, SS3OPiece* parent, std::vector
 	piece->SetParentModel(model);
 
 	// retrieve vertices
-	piece->SetVertexCount(fp->numVertices);
+	piece->tmpVerts.resize(fp->numVertices);
 	for (int a = 0; a < fp->numVertices; ++a) {
 		Vertex* v = vertexList++;
 		v->swap();
@@ -149,27 +121,19 @@ SS3OPiece* CS3OParser::LoadPiece(S3DModel* model, SS3OPiece* parent, std::vector
 		sv.texCoords[0] = float2(v->texu, v->texv);
 		sv.texCoords[1] = float2(v->texu, v->texv);
 
-		piece->SetVertex(a, sv);
+		piece->tmpVerts[a] = sv;
 	}
 
 	// retrieve draw indices
-	piece->SetIndexCount(fp->vertexTableSize);
+	piece->tmpIndcs.resize(fp->vertexTableSize);
 	for (int a = 0; a < fp->vertexTableSize; ++a) {
-		piece->SetIndex(a, swabDWord(*(indexList++)));
+		piece->tmpIndcs[a] = swabDWord(*(indexList++));
 	}
 
 	// post process the piece
 	{
-		piece->goffset = piece->offset + ((parent != NULL)? parent->goffset: ZeroVector);
-
 		piece->Trianglize();
 		piece->SetVertexTangents();
-		piece->SetMinMaxExtends();
-
-		model->mins = float3::min(piece->goffset + piece->mins, model->mins);
-		model->maxs = float3::max(piece->goffset + piece->maxs, model->maxs);
-
-		piece->SetCollisionVolume(CollisionVolume('b', 'z', piece->maxs - piece->mins, (piece->maxs + piece->mins) * 0.5f));
 	}
 
 	// load children pieces
@@ -184,16 +148,6 @@ SS3OPiece* CS3OParser::LoadPiece(S3DModel* model, SS3OPiece* parent, std::vector
 	return piece;
 }
 
-void SS3OPiece::SetMinMaxExtends()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	for (const SVertexData& v: vertices) {
-		mins = float3::min(mins, v.pos);
-		maxs = float3::max(maxs, v.pos);
-	}
-}
-
-
 void SS3OPiece::Trianglize()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -201,51 +155,51 @@ void SS3OPiece::Trianglize()
 		case S3O_PRIMTYPE_TRIANGLES: {
 		} break;
 		case S3O_PRIMTYPE_TRIANGLE_STRIP: {
-			if (indices.size() < 3) {
+			if (tmpIndcs.size() < 3) {
 				primType = S3O_PRIMTYPE_TRIANGLES;
-				indices.clear();
+				tmpIndcs.clear();
 				return;
 			}
 
-			decltype(indices) newIndices;
-			newIndices.resize(indices.size() * 3); // each index (can) create a new triangle
+			decltype(tmpIndcs) newIndices;
+			newIndices.resize(tmpIndcs.size() * 3); // each index (can) create a new triangle
 
-			for (size_t i = 0; (i + 2) < indices.size(); ++i) {
-				// indices can contain end-of-strip markers (-1U)
-				if (indices[i + 0] == -1 || indices[i + 1] == -1 || indices[i + 2] == -1)
+			for (size_t i = 0; (i + 2) < tmpIndcs.size(); ++i) {
+				// tmpIndcs can contain end-of-strip markers (-1U)
+				if (tmpIndcs[i + 0] == -1 || tmpIndcs[i + 1] == -1 || tmpIndcs[i + 2] == -1)
 					continue;
 
-				newIndices.push_back(indices[i + 0]);
-				newIndices.push_back(indices[i + 1]);
-				newIndices.push_back(indices[i + 2]);
+				newIndices.push_back(tmpIndcs[i + 0]);
+				newIndices.push_back(tmpIndcs[i + 1]);
+				newIndices.push_back(tmpIndcs[i + 2]);
 			}
 
 			primType = S3O_PRIMTYPE_TRIANGLES;
-			indices.swap(newIndices);
+			tmpIndcs.swap(newIndices);
 		} break;
 		case S3O_PRIMTYPE_QUADS: {
-			if (indices.size() % 4 != 0) {
+			if (tmpIndcs.size() % 4 != 0) {
 				primType = S3O_PRIMTYPE_TRIANGLES;
-				indices.clear();
+				tmpIndcs.clear();
 				return;
 			}
 
-			decltype(indices) newIndices;
-			const size_t oldCount = indices.size();
+			decltype(tmpIndcs) newIndices;
+			const size_t oldCount = tmpIndcs.size();
 			newIndices.resize(oldCount + oldCount / 2); // 4 indices become 6
 
-			for (size_t i = 0, j = 0; i < indices.size(); i += 4) {
-				newIndices[j++] = indices[i + 0];
-				newIndices[j++] = indices[i + 1];
-				newIndices[j++] = indices[i + 2];
+			for (size_t i = 0, j = 0; i < tmpIndcs.size(); i += 4) {
+				newIndices[j++] = tmpIndcs[i + 0];
+				newIndices[j++] = tmpIndcs[i + 1];
+				newIndices[j++] = tmpIndcs[i + 2];
 
-				newIndices[j++] = indices[i + 0];
-				newIndices[j++] = indices[i + 2];
-				newIndices[j++] = indices[i + 3];
+				newIndices[j++] = tmpIndcs[i + 0];
+				newIndices[j++] = tmpIndcs[i + 2];
+				newIndices[j++] = tmpIndcs[i + 3];
 			}
 
 			primType = S3O_PRIMTYPE_TRIANGLES;
-			indices.swap(newIndices);
+			tmpIndcs.swap(newIndices);
 		} break;
 
 		default: {
@@ -255,5 +209,5 @@ void SS3OPiece::Trianglize()
 
 void SS3OPiece::SetVertexTangents()
 {
-	ModelUtils::CalculateTangents(vertices, indices);
+	ModelUtils::CalculateTangents(tmpVerts, tmpIndcs);
 }

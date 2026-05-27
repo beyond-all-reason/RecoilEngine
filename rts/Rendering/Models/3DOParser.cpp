@@ -54,8 +54,8 @@ static std::string GET_TEXT(int pos, const std::vector<unsigned char>& fileBuf, 
 static void READ_3DOBJECT(TA3DO::_3DObject& o, const std::vector<unsigned char>& fileBuf, int& curOffset)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	unsigned int __tmp;
-	unsigned short __isize = sizeof(unsigned int);
+	uint32_t __tmp;
+	unsigned short __isize = sizeof(uint32_t);
 	STREAM_READ(&__tmp,__isize, fileBuf, curOffset);
 	o.VersionSignature = (int)swabDWord(__tmp);
 	STREAM_READ(&__tmp,__isize, fileBuf, curOffset);
@@ -88,8 +88,8 @@ static void READ_3DOBJECT(TA3DO::_3DObject& o, const std::vector<unsigned char>&
 static void READ_VERTEX(float3& v, const std::vector<unsigned char>& fileBuf, int& curOffset)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	unsigned int __tmp;
-	unsigned short __isize = sizeof(unsigned int);
+	uint32_t __tmp;
+	unsigned short __isize = sizeof(uint32_t);
 	STREAM_READ(&__tmp,__isize, fileBuf, curOffset);
 	v.x = (int)swabDWord(__tmp);
 	STREAM_READ(&__tmp,__isize, fileBuf, curOffset);
@@ -102,8 +102,8 @@ static void READ_VERTEX(float3& v, const std::vector<unsigned char>& fileBuf, in
 static void READ_PRIMITIVE(TA3DO::_Primitive& p, const std::vector<unsigned char>& fileBuf, int& curOffset)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	unsigned int __tmp;
-	unsigned short __isize = sizeof(unsigned int);
+	uint32_t __tmp;
+	unsigned short __isize = sizeof(uint32_t);
 	STREAM_READ(&__tmp,__isize, fileBuf, curOffset);
 	p.PaletteEntry = (int)swabDWord(__tmp);
 	STREAM_READ(&__tmp,__isize, fileBuf, curOffset);
@@ -139,58 +139,30 @@ void C3DOParser::Init()
 	while (!parser.Eof()) {
 		teamTextures.insert(StringToLower(parser.GetCleanLine()));
 	}
-
-	numPoolPieces = 0;
 }
 
 void C3DOParser::Kill()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	teamTextures.clear();
-	LOG_L(L_INFO, "[3DOParser::%s] allocated %u pieces", __func__, numPoolPieces);
-
-	// reuse piece innards when reloading
-	// piecePool.clear();
-	for (unsigned int i = 0; i < numPoolPieces; i++) {
-		piecePool[i].Clear();
-	}
-
-	numPoolPieces = 0;
+	LOG_L(L_INFO, "[3DOParser::%s] allocated %u pieces", __func__, static_cast<uint32_t>(pieces.size()));
+	pieces.clear(); pieces.shrink_to_fit();
 }
 
 
 void C3DOParser::Load(S3DModel& model, const std::string& name)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	CFileHandler file(name);
-	std::vector<uint8_t> fileBuf;
 
-	if (!file.FileExists())
-		throw content_error("[3DOParser] could not find model-file " + name);
-
-	if (!file.IsBuffered()) {
-		fileBuf.resize(file.FileSize(), 0);
-
-		if (file.Read(fileBuf.data(), fileBuf.size()) == 0)
-			throw content_error("[3DOParser] failed to read model-file " + name);
-	} else {
-		fileBuf = std::move(file.GetBuffer());
-	}
-
+	auto fileBuf = LoadFromFile(name);
 
 	model.name = name;
 	model.type = MODELTYPE_3DO;
 	model.textureType = 0;
 	model.numPieces   = 0;
-	model.mins = DEF_MIN_SIZE;
-	model.maxs = DEF_MAX_SIZE;
 
 	model.FlattenPieceTree(LoadPiece(&model, nullptr, fileBuf, 0));
-
-	// set after the extrema are known
-	model.radius = model.CalcDrawRadius();
-	model.height = model.CalcDrawHeight();
-	model.relMidPos = model.CalcDrawMidPos();
+	model.SetPieceMatrices();
 }
 
 
@@ -343,20 +315,7 @@ void S3DOPiece::GetPrimitives(
 S3DOPiece* C3DOParser::AllocPiece()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	std::lock_guard<spring::mutex> lock(poolMutex);
-
-	// lazily reserve pool here instead of during Init
-	// this way games using only one model-type do not
-	// cause redundant allocation
-	if (piecePool.empty())
-		piecePool.resize(MAX_MODEL_OBJECTS * AVG_MODEL_PIECES);
-
-	if (numPoolPieces >= piecePool.size()) {
-		throw std::bad_alloc();
-		return nullptr;
-	}
-
-	return &piecePool[numPoolPieces++];
+	return static_cast<S3DOPiece*>(AllocPieceImpl());
 }
 
 S3DOPiece* C3DOParser::LoadPiece(S3DModel* model, S3DOPiece* parent, const std::vector<uint8_t>& buf, int pos)
@@ -379,27 +338,13 @@ S3DOPiece* C3DOParser::LoadPiece(S3DModel* model, S3DOPiece* parent, const std::
 	piece->offset.x =  me.XFromParent * SCALE_FACTOR_3DO;
 	piece->offset.y =  me.YFromParent * SCALE_FACTOR_3DO;
 	piece->offset.z = -me.ZFromParent * SCALE_FACTOR_3DO;
-	piece->goffset = piece->offset + ((parent != nullptr)? parent->goffset: ZeroVector);
 
 	piece->GetVertices(&me, buf);
 	piece->GetPrimitives(model, me.OffsetToPrimitiveArray, me.NumberOfPrimitives, ((pos == 0)? me.SelectionPrimitive: -1), buf, teamTextures);
 
 	piece->CalcNormals();
-	piece->SetMinMaxExtends();
-
-	switch (piece->verts.size()) {
-		case 0: { piece->emitDir =    FwdVector   ; } break;
-		case 1: { piece->emitDir = piece->verts[0]; } break;
-		default: {
-			piece->emitPos = piece->verts[0];
-			piece->emitDir = piece->verts[1] - piece->verts[0];
-		} break;
-	}
-
-	model->mins = float3::min(piece->goffset + piece->mins, model->mins);
-	model->maxs = float3::max(piece->goffset + piece->maxs, model->maxs);
-
-	piece->SetCollisionVolume(CollisionVolume('b', 'z', piece->maxs - piece->mins, (piece->maxs + piece->mins) * 0.5f));
+	piece->Trianglize();
+	ModelUtils::CalculateTangents(piece->tmpVerts, piece->tmpIndcs);
 
 	if (me.OffsetToChildObject > 0)
 		piece->children.push_back(LoadPiece(model, piece, buf, me.OffsetToChildObject));
@@ -411,16 +356,15 @@ S3DOPiece* C3DOParser::LoadPiece(S3DModel* model, S3DOPiece* parent, const std::
 }
 
 
-void S3DOPiece::PostProcessGeometry(uint32_t pieceIndex)
+void S3DOPiece::Trianglize()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// cannot use HasGeometryData because vboIndices is still empty
 	if (prims.empty())
 		return;
 
 	// assume all faces are quads
-	indices.reserve(prims.size() * 6);
-	vertices.reserve(prims.size() * 4);
+	tmpIndcs.reserve(prims.size() * 6);
+	tmpVerts.reserve(prims.size() * 4);
 
 	// trianglize all input
 	for (const S3DOPrimitive& ps: prims) {
@@ -428,42 +372,40 @@ void S3DOPiece::PostProcessGeometry(uint32_t pieceIndex)
 
 		if (ps.indices.size() == 4) {
 			// quad
-			indices.push_back(vertices.size() + 0);
-			indices.push_back(vertices.size() + 1);
-			indices.push_back(vertices.size() + 2);
-			indices.push_back(vertices.size() + 0);
-			indices.push_back(vertices.size() + 2);
-			indices.push_back(vertices.size() + 3);
-			vertices.emplace_back(verts[ps.indices[0]], ps.vnormals[0], float3{}, float3{}, float2(tex->xstart, tex->ystart), float2{});
-			vertices.emplace_back(verts[ps.indices[1]], ps.vnormals[1], float3{}, float3{}, float2(tex->xend,   tex->ystart), float2{});
-			vertices.emplace_back(verts[ps.indices[2]], ps.vnormals[2], float3{}, float3{}, float2(tex->xend,   tex->yend),   float2{});
-			vertices.emplace_back(verts[ps.indices[3]], ps.vnormals[3], float3{}, float3{}, float2(tex->xstart, tex->yend),   float2{});
+			tmpIndcs.push_back(tmpVerts.size() + 0);
+			tmpIndcs.push_back(tmpVerts.size() + 1);
+			tmpIndcs.push_back(tmpVerts.size() + 2);
+			tmpIndcs.push_back(tmpVerts.size() + 0);
+			tmpIndcs.push_back(tmpVerts.size() + 2);
+			tmpIndcs.push_back(tmpVerts.size() + 3);
+			tmpVerts.emplace_back(verts[ps.indices[0]], ps.vnormals[0], float3{}, float3{}, float2(tex->xstart, tex->ystart), float2{});
+			tmpVerts.emplace_back(verts[ps.indices[1]], ps.vnormals[1], float3{}, float3{}, float2(tex->xend,   tex->ystart), float2{});
+			tmpVerts.emplace_back(verts[ps.indices[2]], ps.vnormals[2], float3{}, float3{}, float2(tex->xend,   tex->yend),   float2{});
+			tmpVerts.emplace_back(verts[ps.indices[3]], ps.vnormals[3], float3{}, float3{}, float2(tex->xstart, tex->yend),   float2{});
 		} else if (ps.indices.size() == 3) {
 			// triangle
-			indices.push_back(vertices.size() + 0);
-			indices.push_back(vertices.size() + 1);
-			indices.push_back(vertices.size() + 2);
-			vertices.emplace_back(verts[ps.indices[0]], ps.vnormals[0], float3{}, float3{}, float2(tex->xstart, tex->ystart), float2{});
-			vertices.emplace_back(verts[ps.indices[1]], ps.vnormals[1], float3{}, float3{}, float2(tex->xend,   tex->ystart), float2{});
-			vertices.emplace_back(verts[ps.indices[2]], ps.vnormals[2], float3{}, float3{}, float2(tex->xend,   tex->yend),   float2{});
+			tmpIndcs.push_back(tmpVerts.size() + 0);
+			tmpIndcs.push_back(tmpVerts.size() + 1);
+			tmpIndcs.push_back(tmpVerts.size() + 2);
+			tmpVerts.emplace_back(verts[ps.indices[0]], ps.vnormals[0], float3{}, float3{}, float2(tex->xstart, tex->ystart), float2{});
+			tmpVerts.emplace_back(verts[ps.indices[1]], ps.vnormals[1], float3{}, float3{}, float2(tex->xend,   tex->ystart), float2{});
+			tmpVerts.emplace_back(verts[ps.indices[2]], ps.vnormals[2], float3{}, float3{}, float2(tex->xend,   tex->yend),   float2{});
 		} else if (ps.indices.size() >= 3) {
 			// fan
 			for (int i = 2; i < ps.indices.size(); ++i) {
-				indices.push_back(vertices.size() + 0);
-				indices.push_back(vertices.size() + i - 1);
-				indices.push_back(vertices.size() + i - 0);
+				tmpIndcs.push_back(tmpVerts.size() + 0);
+				tmpIndcs.push_back(tmpVerts.size() + i - 1);
+				tmpIndcs.push_back(tmpVerts.size() + i - 0);
 			}
 			for (int i = 0; i < ps.indices.size(); ++i) {
-				vertices.emplace_back(verts[ps.indices[i]], ps.vnormals[i], float3{}, float3{}, float2(tex->xstart, tex->ystart), float2{});
+				tmpVerts.emplace_back(verts[ps.indices[i]], ps.vnormals[i], float3{}, float3{}, float2(tex->xstart, tex->ystart), float2{});
 			}
 		}
 	}
 
-	S3DModelPiece::PostProcessGeometry(pieceIndex);
-
 	// NOTE: wasteful to keep these around, but still needed (eg. for Shatter())
-	// vertices.clear();
-	// indices.clear();
+	// tmpVerts.clear();
+	// tmpIndcs.clear();
 }
 
 void S3DOPiece::CalcNormals()
@@ -502,16 +444,6 @@ void S3DOPiece::CalcNormals()
 			// now make the normal for vertex <a> equal the smoothed normal
 			curFace.vnormals[a] = smoothedNormal.SafeANormalize();
 		}
-	}
-}
-
-
-void S3DOPiece::SetMinMaxExtends()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	for (const float3 vp: verts) {
-		mins = float3::min(mins, vp);
-		maxs = float3::max(maxs, vp);
 	}
 }
 

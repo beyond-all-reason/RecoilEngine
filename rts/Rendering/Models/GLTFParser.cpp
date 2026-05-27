@@ -110,8 +110,7 @@ namespace Impl {
 					} break;
 					case hashString("TANGENT"): {
 						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
-							verts[prevVertSize + idx].sTangent = float3{ val.x(), val.y(), val.z() }.ANormalize();
-							verts[prevVertSize + idx].tTangent = val.w() * verts[prevVertSize + idx].normal.cross(verts[prevVertSize + idx].sTangent).ANormalize();
+							verts[prevVertSize + idx].tangent = float4{ val.x(), val.y(), val.z(), val.w() }.ANormalize();
 						});
 						seenTangents = true;
 					} break;
@@ -203,15 +202,16 @@ namespace Impl {
 	template<typename UM>
 	void ReplaceNodeIndexWithPieceIndex(std::vector<SVertexData>& verts, const UM& nodeIdxToPieceIdx) {
 		for (auto& vert : verts) {
-			for (size_t wi = 0; wi < vert.boneIDsLow.size(); ++wi) {
-				const auto nodeIdx = Skinning::GetBoneID(vert, wi);
+			for (size_t wi = 0; wi < SVertexData::MAX_BONES_PER_VERTEX; ++wi) {
+				const auto nodeIdx = vert.boneIDs[wi];
 				if (nodeIdx == INV_PIECE_NUM)
 					continue;
 
 				const auto pIt = nodeIdxToPieceIdx.find(nodeIdx);
 				assert(pIt != nodeIdxToPieceIdx.end());
-				vert.boneIDsLow [wi] = static_cast<uint8_t>((pIt->second >> 0) & 0xFF);
-				vert.boneIDsHigh[wi] = static_cast<uint8_t>((pIt->second >> 8) & 0xFF);
+
+				// Update individual bone ID
+				vert.boneIDs[wi] = static_cast<uint16_t>(pIt->second);
 			}
 		}
 	}
@@ -221,8 +221,6 @@ namespace Impl {
 		auto it = transforms.find(nodeIdx);
 		assert(it != transforms.end());
 
-		// Skins are expected to be in the model space anyway,
-		// So this whole function is mostly a precaution
 		if likely(it->second.IsIdentity())
 			return;
 
@@ -339,6 +337,13 @@ namespace Impl {
 	}
 }
 
+void CGLTFParser::Kill()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LOG_L(L_INFO, "[CGLTFParser::%s] allocated %u pieces", __func__, static_cast<uint32_t>(pieces.size()));
+	pieces.clear(); pieces.shrink_to_fit();
+}
+
 void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -386,9 +391,8 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 
 	fastgltf::Parser parser;
 
-	ModelUtils::ModelParams optionalModelParams;
 	parser.setExtrasParseCallback(&Impl::ParseSceneExtra);
-	parser.setUserPointer(&optionalModelParams);
+	parser.setUserPointer(&model.modelParams);
 
 	auto maybeGltf = parser.loadGltf(gltfFile.get(), modelPath, PARSER_OPTION, PARSER_CATEGORIES);
 	if (auto error = maybeGltf.error(); error != fastgltf::Error::None) {
@@ -425,27 +429,26 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 		LOG_SL(LOG_SECTION_MODEL, L_INFO, "No valid model metadata in '%s' or no meta-file", metaFileName.c_str());
 	}
 
+	auto& modelParams = model.modelParams;
 	// optionalModelParams will contain all non-empty data from the modelTable
-	ModelUtils::GetModelParams(modelTable, optionalModelParams);
+	ModelUtils::GetModelParams(modelTable, modelParams);
 
 	// Load textures
-	Impl::FindTextures(&model, asset, modelName, optionalModelParams);
+	Impl::FindTextures(&model, asset, modelName, modelParams);
 	LOG_SL(LOG_SECTION_MODEL, L_INFO, "Loading textures. Tex1: '%s' Tex2: '%s'", model.texs[0].c_str(), model.texs[1].c_str());
 
 	textureHandlerS3O.PreloadTexture(
 		&model,
-		optionalModelParams.flipTextures.value_or(false),
-		optionalModelParams.invertTeamColor.value_or(false)
+		modelParams.flipTextures.value_or(false),
+		modelParams.invertTeamColor.value_or(false)
 	);
 
 	model.name = modelFilePath;
 	model.type = MODELTYPE_ASS; // Revise?
 	model.numPieces = 0;
-	model.mins = DEF_MIN_SIZE;
-	model.maxs = DEF_MAX_SIZE;
 
 	// GLTF model MUST be exported with Z axis UP. We will rotate it here by ourselves
-	const auto initTransform = (optionalModelParams.s3oCompat.value_or(false)) ?
+	const auto initTransform = (modelParams.s3oCompat.value_or(false)) ?
 		Transform(CQuaternion(0, -math::HALFSQRT2, -math::HALFSQRT2, 0)): // Rotate so xyz ==> (-x,z, y)
 		Transform(CQuaternion( math::HALFSQRT2, 0, 0, -math::HALFSQRT2)); // Rotate so xyz ==> ( x,z,-y)
 
@@ -453,6 +456,7 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 
 	auto* rootPiece = AllocRootEmptyPiece(&model, initTransform, asset, defaultSceneIdx);
 	model.FlattenPieceTree(rootPiece);
+	model.SetPieceMatrices();
 
 	spring::unordered_map<size_t, size_t> nodeIdxToPieceIdx;
 	for (size_t pi = 0; pi < model.pieceObjects.size(); ++pi) {
@@ -467,8 +471,7 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 	// except this one doesn't ignore nodes with skinned meshes
 	const auto modelTransforms = Impl::GetModelTransforms(asset, defaultSceneIdx, initTransform);
 
-	std::vector<Skinning::SkinnedMesh> allSkinnedMeshes;
-
+	// Collect skinned mesh data directly into model.skinnedVerts/skinnedIndcs
 	for (size_t ni = 0; ni < asset.nodes.size(); ++ni) {
 		const auto& node = asset.nodes[ni];
 		if (!node.meshIndex.has_value())
@@ -479,69 +482,36 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 
 		const auto& skin = asset.skins[*node.skinIndex];
 		const auto& mesh = asset.meshes[*node.meshIndex];
-		auto& skinnedMesh = allSkinnedMeshes.emplace_back();
 
-		Impl::ReadGeometryData(asset, mesh.primitives, skinnedMesh.verts, skinnedMesh.indcs, ni, &skin);
-		Impl::TransformSkinsToModelSpace(skinnedMesh.verts, ni, modelTransforms);
-		Impl::ReplaceNodeIndexWithPieceIndex(skinnedMesh.verts, nodeIdxToPieceIdx);
+		// Append vertices and indices to model's skinned mesh
+		const auto vertOffset = model.skinnedVerts.size();
+		Impl::ReadGeometryData(asset, mesh.primitives, model.skinnedVerts, model.skinnedIndcs, ni, &skin);
+		Impl::TransformSkinsToModelSpace(model.skinnedVerts, ni, modelTransforms);
+		Impl::ReplaceNodeIndexWithPieceIndex(model.skinnedVerts, nodeIdxToPieceIdx);
+
+		// Adjust indices for the appended vertices
+		for (size_t i = vertOffset; i < model.skinnedIndcs.size(); ++i) {
+			model.skinnedIndcs[i] += vertOffset;
+		}
 	}
 
 	// non-skinning case
-	if (allSkinnedMeshes.empty()) {
-		for (size_t pi = 0; pi < model.pieceObjects.size(); ++pi) {
-			auto* piece = static_cast<GLTFPiece*>(model.pieceObjects[pi]);
-			if (piece->nodeIndex == GLTFPiece::INVALID_NODE_INDEX)
-				continue;
+	for (size_t pi = 0; pi < model.pieceObjects.size(); ++pi) {
+		auto* piece = static_cast<GLTFPiece*>(model.pieceObjects[pi]);
+		if (piece->nodeIndex == GLTFPiece::INVALID_NODE_INDEX)
+			continue;
 
-			if (piece->GetVerticesVec().empty())
-				continue;
+		if (piece->tmpVerts.empty())
+			continue;
 
-			Impl::ReplaceNodeIndexWithPieceIndex(piece->GetVerticesVec(), nodeIdxToPieceIdx);
-		}
+		Impl::ReplaceNodeIndexWithPieceIndex(piece->tmpVerts, nodeIdxToPieceIdx);
 	}
-
-	spring::unordered_set<size_t> allBones;
-	for (const auto& skin : asset.skins) {
-		for (size_t ji = 0; ji < skin.joints.size(); ++ji) {
-			allBones.emplace(skin.joints[ji]);
-		}
-	}
-
-	if (!allSkinnedMeshes.empty()) {
-		// Skinning::<> code below needs correct bposeTransforms
-		model.SetPieceMatrices();
-
-		// if numMeshes >= numBones reparent the whole meshes
-		// else reparent meshes per-triangle
-		if (allSkinnedMeshes.size() >= allBones.size())
-			Skinning::ReparentCompleteMeshesToBones(&model, allSkinnedMeshes);
-		else
-			Skinning::ReparentMeshesTrianglesToBones(&model, allSkinnedMeshes);
-	}
-
-	// will also calculate pieces / model bounding box
-	ModelUtils::ApplyModelProperties(&model, optionalModelParams);
-
-	ModelLog::LogModelProperties(model);
 }
 
 GLTFPiece* CGLTFParser::AllocPiece()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	std::lock_guard<spring::mutex> lock(poolMutex);
-
-	// lazily reserve pool here instead of during Init
-	// this way games using only one model-type do not
-	// cause redundant allocation
-	if (piecePool.empty())
-		piecePool.resize(MAX_MODEL_OBJECTS * AVG_MODEL_PIECES);
-
-	if (numPoolPieces >= piecePool.size()) {
-		throw std::bad_alloc();
-		return nullptr;
-	}
-
-	return &piecePool[numPoolPieces++];
+	return static_cast<GLTFPiece*>(AllocPieceImpl());
 }
 
 GLTFPiece* CGLTFParser::AllocRootEmptyPiece(S3DModel* model, const Transform& parentTransform, const fastgltf::Asset& asset, size_t sceneIndex)
@@ -559,6 +529,7 @@ GLTFPiece* CGLTFParser::AllocRootEmptyPiece(S3DModel* model, const Transform& pa
 	bakedTransform.s = 1.0f;
 	piece->SetBakedTransform(bakedTransform); // bakedRotAngles are not read or supported for GLTF
 	piece->offset = parentTransform.t;
+	piece->goffset = piece->offset;
 	piece->scale = parentTransform.s;
 
 
@@ -613,8 +584,8 @@ GLTFPiece* CGLTFParser::LoadPiece(S3DModel* model, GLTFPiece* parentPiece, const
 	if (!node.meshIndex.has_value())
 		return piece;
 
-	auto& verts = piece->GetVerticesVec();
-	auto& indcs = piece->GetIndicesVec();
+	auto& verts = piece->tmpVerts;
+	auto& indcs = piece->tmpIndcs;
 	const auto& mesh = asset.meshes[*node.meshIndex];
 	Impl::ReadGeometryData(asset, mesh.primitives, verts, indcs, nodeIndex, nullptr);
 

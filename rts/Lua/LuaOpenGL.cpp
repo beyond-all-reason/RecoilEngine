@@ -1509,7 +1509,8 @@ static void GLObjectPieceMultMatrix(lua_State* L, const CSolidObject* obj)
 	if (lmp == nullptr)
 		return;
 
-	glMultMatrixf(lmp->GetModelSpaceMatrix());
+	// Use delta transform for rendering vertices that are already in model space
+	glMultMatrixf(lmp->GetDeltaTransformMatrix());
 }
 
 static bool GLObjectDrawWithLuaMat(lua_State* L, CSolidObject* obj, LuaObjType objType)

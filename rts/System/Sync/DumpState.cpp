@@ -382,8 +382,8 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 			file << "\t\tmodelType: " << m.type << "\n";
 			file << "\t\tradius: " << TapFloats(m.radius);
 			file << "\t\theight: " << TapFloats(m.height);
-			file << "\t\tmins: " << TapFloats(m.mins);
-			file << "\t\tmaxs: " << TapFloats(m.maxs);
+			file << "\t\tmins: " << TapFloats(m.aabb.mins);
+			file << "\t\tmaxs: " << TapFloats(m.aabb.maxs);
 			file << "\t\trelMidPos: " << TapFloats(m.relMidPos);
 			file << "\t\tpieceObjects: " << m.pieceObjects.size() << "\n";
 			for (const auto* p : m.pieceObjects) {
@@ -403,22 +403,10 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 				file << "\t\t\toffset: " << TapFloats(p->offset);
 				file << "\t\t\tgoffset: " << TapFloats(p->goffset);
 				file << "\t\t\tscales: " << TapFloats(p->scale);
-				file << "\t\t\tscales: " << TapFloats(p->mins);
-				file << "\t\t\tscales: " << TapFloats(p->maxs);
-
-				// GetVerticesVec and GetIndicesVec are now empty after upload to GPu is complete
-#if 0
-				file << "\t\t\tvertices.size(): " << p->GetVerticesVec().size() << "\n";
-				for (const auto& v : p->GetVerticesVec()) { //is it sync significant?
-					file << "\t\t\tpos: " << TapFloats(v.pos);
-				}
-
-				file << "\t\t\tindices.size(): " << p->GetIndicesVec().size() << "\n";
-				file << "\t\t\t";
-				for (const auto& i : p->GetIndicesVec()) { //is it sync significant?
-					file << i << ", ";
-				}
-#endif
+				file << "\t\t\tmins: " << TapFloats(p->aabb.mins);
+				file << "\t\t\tmaxs: " << TapFloats(p->aabb.maxs);
+				file << "\t\t\tvertCount: " << p->relVertCnt << "\n";
+				file << "\t\t\tindxCount: " << p->relIndxCnt << "\n";
 				file << "\n";
 			}
 			file << "\n";

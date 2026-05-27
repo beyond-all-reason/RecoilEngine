@@ -5911,14 +5911,14 @@ int LuaSyncedRead::GetUnitDefDimensions(lua_State* L)
 	HSTR_PUSH_NUMBER(L, "height", m.height);
 	HSTR_PUSH_NUMBER(L, "radius", m.radius);
 	HSTR_PUSH_NUMBER(L, "midx",   mid.x);
-	HSTR_PUSH_NUMBER(L, "minx",   m.mins.x);
-	HSTR_PUSH_NUMBER(L, "maxx",   m.maxs.x);
+	HSTR_PUSH_NUMBER(L, "minx",   m.aabb.mins.x);
+	HSTR_PUSH_NUMBER(L, "maxx",   m.aabb.maxs.x);
 	HSTR_PUSH_NUMBER(L, "midy",   mid.y);
-	HSTR_PUSH_NUMBER(L, "miny",   m.mins.y);
-	HSTR_PUSH_NUMBER(L, "maxy",   m.maxs.y);
+	HSTR_PUSH_NUMBER(L, "miny",   m.aabb.mins.y);
+	HSTR_PUSH_NUMBER(L, "maxy",   m.aabb.maxs.y);
 	HSTR_PUSH_NUMBER(L, "midz",   mid.z);
-	HSTR_PUSH_NUMBER(L, "minz",   m.mins.z);
-	HSTR_PUSH_NUMBER(L, "maxz",   m.maxs.z);
+	HSTR_PUSH_NUMBER(L, "minz",   m.aabb.mins.z);
+	HSTR_PUSH_NUMBER(L, "maxz",   m.aabb.maxs.z);
 	return 1;
 }
 
@@ -8556,17 +8556,17 @@ static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 
 	HSTR_PUSH(L, "min");
 	lua_createtable(L, 3, 0); {
-		lua_pushnumber(L, op.mins.x); lua_rawseti(L, -2, 1);
-		lua_pushnumber(L, op.mins.y); lua_rawseti(L, -2, 2);
-		lua_pushnumber(L, op.mins.z); lua_rawseti(L, -2, 3);
+		lua_pushnumber(L, op.aabb.mins.x); lua_rawseti(L, -2, 1);
+		lua_pushnumber(L, op.aabb.mins.y); lua_rawseti(L, -2, 2);
+		lua_pushnumber(L, op.aabb.mins.z); lua_rawseti(L, -2, 3);
 	}
 	lua_rawset(L, -3);
 
 	HSTR_PUSH(L, "max");
 	lua_createtable(L, 3, 0); {
-		lua_pushnumber(L, op.maxs.x); lua_rawseti(L, -2, 1);
-		lua_pushnumber(L, op.maxs.y); lua_rawseti(L, -2, 2);
-		lua_pushnumber(L, op.maxs.z); lua_rawseti(L, -2, 3);
+		lua_pushnumber(L, op.aabb.maxs.x); lua_rawseti(L, -2, 1);
+		lua_pushnumber(L, op.aabb.maxs.y); lua_rawseti(L, -2, 2);
+		lua_pushnumber(L, op.aabb.maxs.z); lua_rawseti(L, -2, 3);
 	}
 	lua_rawset(L, -3);
 

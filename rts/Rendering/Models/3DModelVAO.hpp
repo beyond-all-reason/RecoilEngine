@@ -50,8 +50,7 @@ public:
 
 	uint32_t GetVertOffset() const { return static_cast<uint32_t>(vertData.size()); }
 
-	void ProcessVertices(const S3DModel* model);
-	void ProcessIndicies(S3DModel* model);
+	void AddModelGeometry(S3DModel* model);
 	void CreateVAO();
 	void UploadVBOs();
 

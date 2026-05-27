@@ -15,8 +15,11 @@
 #include "System/SafeUtil.h"
 #include "System/creg/creg_cond.h"
 #include "System/Misc/SpringTime.h"
+#include "System/Threading/ThreadPool.h"
 
 #include <ctime>
+#include <algorithm>
+#include <array>
 
 #include "System/Misc/TracyDefs.h"
 
@@ -28,7 +31,10 @@
  */
 
 CGlobalUnsynced guOBJ;
+
 CGlobalUnsyncedRNG guRNG;
+static_assert(guThreadRNGs.size() == ThreadPool::MAX_THREADS);
+decltype(guThreadRNGs) guThreadRNGs;
 
 CGlobalUnsynced* gu = &guOBJ;
 
@@ -83,7 +89,10 @@ void CGlobalUnsynced::ResetState()
 	globalQuit = false;
 	globalReload = false;
 
-	guRNG.Seed(time(nullptr) % ((spring_gettime().toNanoSecsi() + 1) * 9007));
+	auto GetSeed = []() { return PCG32::val_type{ spring::LiteHash(time(nullptr)) }; };
+
+	guRNG.Seed(GetSeed());
+	std::for_each(guThreadRNGs.begin(), guThreadRNGs.end(), [&](auto& rng) { rng.Seed(GetSeed()); });
 	playerHandler.ResetState();
 }
 

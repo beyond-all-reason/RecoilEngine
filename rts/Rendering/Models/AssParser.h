@@ -16,35 +16,20 @@
 struct aiNode;
 struct aiScene;
 class LuaTable;
-struct SPseudoAssPiece;
 class CQuaternion;
 
 struct SAssPiece: public S3DModelPiece
 {
 	SAssPiece() = default;
 	SAssPiece(const SAssPiece&) = delete;
-	SAssPiece(SAssPiece&& p) { *this = std::move(p); }
+	SAssPiece(SAssPiece&& p) noexcept = delete;
 
 	SAssPiece& operator = (const SAssPiece& p) = delete;
-	SAssPiece& operator = (SAssPiece&& p) {
-		#if 0
-		// piece is never actually moved, just need the operator for pool
-		vertices = std::move(p.vertices);
-		indices = std::move(p.indices);
-		#endif
-		return *this;
-	}
-
-	void Clear() override {
-		S3DModelPiece::Clear();
-
-		vertices.clear();
-		indices.clear();
-	}
+	SAssPiece& operator = (SAssPiece&& p) noexcept = delete;
 };
 
 
-class CAssParser: public IModelParser
+class CAssParser: public TypedModelParser<SAssPiece>
 {
 public:
 	using ModelPieceMap = spring::unordered_map<std::string, S3DModelPiece*>;
@@ -72,13 +57,6 @@ private:
 	);
 	static void LoadPieceTransformations(
 		SAssPiece* piece,
-		const S3DModel* model,
-		const aiNode* pieceNode,
-		const LuaTable& pieceTable,
-		const CQuaternion* optRotation = nullptr
-	);
-	static void LoadPieceTransformations(
-		SPseudoAssPiece* piece,
 		const S3DModel* model,
 		const aiNode* pieceNode,
 		const LuaTable& pieceTable,
@@ -115,10 +93,6 @@ private:
 private:
 	unsigned int maxIndices = 0;
 	unsigned int maxVertices = 0;
-	unsigned int numPoolPieces = 0;
-
-	std::vector<SAssPiece> piecePool;
-	spring::mutex poolMutex;
 };
 
 #endif /* ASS_PARSER_H */

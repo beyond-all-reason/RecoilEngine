@@ -62,43 +62,14 @@ struct S3DOPiece: public S3DModelPiece
 {
 	S3DOPiece() = default;
 	S3DOPiece(const S3DOPiece&) = delete;
-	S3DOPiece(S3DOPiece&& p) { *this = std::move(p); }
+	S3DOPiece(S3DOPiece&& p) noexcept = delete;
 
 	S3DOPiece& operator = (const S3DOPiece& p) = delete;
-	S3DOPiece& operator = (S3DOPiece&& p) {
-		#if 0
-		// piece is never actually moved, just need the operator for pool
-		emitPos = p.emitPos;
-		emitDir = p.emitDir;
+	S3DOPiece& operator = (S3DOPiece&& p) noexcept = delete;
 
-		verts = std::move(p.verts);
-		prims = std::move(p.prims);
+	void Trianglize();
 
-		vertices = std::move(p.vertexAttribs);
-		indices = std::move(p.vertexIndices);
-		#endif
-		return *this;
-	}
-
-	void Clear() override {
-		S3DModelPiece::Clear();
-
-		verts.clear();
-		prims.clear();
-
-		vertices.clear();
-		indices.clear();
-
-		emitPos = ZeroVector;
-		emitDir = ZeroVector;
-	}
-
-	void PostProcessGeometry(uint32_t pieceIndex) override;
-
-	float3 GetEmitPos() const override { return emitPos; }
-	float3 GetEmitDir() const override { return emitDir; }
 public:
-	void SetMinMaxExtends();
 	void CalcNormals();
 
 	void GetVertices(const TA3DO::_3DObject* o, const std::vector<unsigned char>& fileBuf);
@@ -128,7 +99,7 @@ public:
 };
 
 
-class C3DOParser: public IModelParser
+class C3DOParser: public TypedModelParser<S3DOPiece>
 {
 public:
 	void Init() override;
@@ -142,13 +113,8 @@ public:
 private:
 	C3DOTextureHandler::UnitTexture* GetTexture(S3DOPiece* obj, TA3DO::_Primitive* p, const std::vector<unsigned char>& fileBuf) const;
 	static bool IsBasePlate(S3DOPiece* obj, S3DOPrimitive* face);
-
 private:
 	spring::unordered_set<std::string> teamTextures;
-	std::vector<S3DOPiece> piecePool;
-	spring::mutex poolMutex;
-
-	unsigned int numPoolPieces = 0;
 };
 
 #endif // SPRING_3DOPARSER_H

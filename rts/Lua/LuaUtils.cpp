@@ -805,12 +805,12 @@ int LuaUtils::PushModelTable(lua_State* L, const SolidObjectDef* def) {
 
 	if (model != nullptr) {
 		// unit, or non-tree feature
-		HSTR_PUSH_NUMBER(L, "minx", model->mins.x);
-		HSTR_PUSH_NUMBER(L, "miny", model->mins.y);
-		HSTR_PUSH_NUMBER(L, "minz", model->mins.z);
-		HSTR_PUSH_NUMBER(L, "maxx", model->maxs.x);
-		HSTR_PUSH_NUMBER(L, "maxy", model->maxs.y);
-		HSTR_PUSH_NUMBER(L, "maxz", model->maxs.z);
+		HSTR_PUSH_NUMBER(L, "minx", model->aabb.mins.x);
+		HSTR_PUSH_NUMBER(L, "miny", model->aabb.mins.y);
+		HSTR_PUSH_NUMBER(L, "minz", model->aabb.mins.z);
+		HSTR_PUSH_NUMBER(L, "maxx", model->aabb.maxs.x);
+		HSTR_PUSH_NUMBER(L, "maxy", model->aabb.maxs.y);
+		HSTR_PUSH_NUMBER(L, "maxz", model->aabb.maxs.z);
 
 		HSTR_PUSH_NUMBER(L, "midx", model->relMidPos.x);
 		HSTR_PUSH_NUMBER(L, "midy", model->relMidPos.y);

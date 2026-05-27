@@ -122,8 +122,7 @@ void LocalModel::UpdateBoundingVolume()
 	ZoneScoped;
 
 	// bounding-box extrema (local space)
-	float3 bbMins = DEF_MIN_SIZE;
-	float3 bbMaxs = DEF_MAX_SIZE;
+	AABB bb;
 
 	for (const auto& lmPiece: pieces) {
 		const auto& tra = lmPiece.GetModelSpaceTransform();
@@ -133,32 +132,11 @@ void LocalModel::UpdateBoundingVolume()
 		if (!piece->HasGeometryData())
 			continue;
 
-		// transform only the corners of the piece's bounding-box
-		const float3 pMins = piece->mins;
-		const float3 pMaxs = piece->maxs;
-		const float3 verts[8] = {
-			// bottom
-			float3(pMins.x,  pMins.y,  pMins.z),
-			float3(pMaxs.x,  pMins.y,  pMins.z),
-			float3(pMaxs.x,  pMins.y,  pMaxs.z),
-			float3(pMins.x,  pMins.y,  pMaxs.z),
-			// top
-			float3(pMins.x,  pMaxs.y,  pMins.z),
-			float3(pMaxs.x,  pMaxs.y,  pMins.z),
-			float3(pMaxs.x,  pMaxs.y,  pMaxs.z),
-			float3(pMins.x,  pMaxs.y,  pMaxs.z),
-		};
-
-		for (const float3& v: verts) {
-			const float3 vertex = tra * v;
-
-			bbMins = float3::min(bbMins, vertex);
-			bbMaxs = float3::max(bbMaxs, vertex);
-		}
+		bb.Combine(piece->aabb.CalcTransformed(tra));
 	}
 
 	// note: offset is relative to object->pos
-	boundingVolume.InitBox(bbMaxs - bbMins, (bbMaxs + bbMins) * 0.5f);
+	boundingVolume.InitBox(bb.CalcFullScales(), bb.CalcCenter());
 
 	needsBoundariesRecalc = false;
 }

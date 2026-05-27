@@ -88,6 +88,11 @@ struct LocalModelPiece
 	const Transform&  GetModelSpaceTransform() const;
 	const CMatrix44f& GetModelSpaceMatrix()    const;
 
+	// Delta transform for animating model-space vertices
+	// Returns: currentTransform * inverse(bposeTransform)
+	// This is needed because vertices are stored in model space (pre-transformed by bposeTransform)
+	CMatrix44f GetDeltaTransformMatrix() const;
+
 	const CollisionVolume* GetCollisionVolume() const { return colvol; }
 	      CollisionVolume* GetCollisionVolume()       { return colvol; }
 

@@ -2,12 +2,11 @@
 
 layout (location = 0) in vec3 pos;
 layout (location = 1) in vec3 normal;
-layout (location = 2) in vec3 T;
-layout (location = 3) in vec3 B;
-layout (location = 4) in vec4 uv;
-layout (location = 5) in uvec3 bonesInfo; //boneIDsLow, boneWeights, boneIDsHigh
+layout (location = 2) in vec4 tangent; // xyz = tangent, w = handedness sign for bitangent reconstruction
+layout (location = 3) in vec4 uv;
+layout (location = 4) in uvec3 bonesInfo; //boneID0|boneID1, boneID2|boneID3, boneWeights
 
-layout (location = 6) in uvec4 instData;
+layout (location = 5) in uvec4 instData;
 // u32 matOffset
 // u32 uniOffset
 // u32 {paletteIndex[0:10], reserved[11:15], numPieces[16:31]}
@@ -118,8 +117,13 @@ void TransformShadowCam(vec4 worldPos, vec3 worldNormal) {
 
 #line 1119
 
-uint GetUnpackedValue(uint packedValue, uint byteNum) {
-	return (packedValue >> (8u * byteNum)) & 0xFFu;
+uint GetBoneWeight(uint boneIdx) {
+	return (bonesInfo.z >> (8u * boneIdx)) & 0xFFu;
+}
+
+uint UnpackBoneID(uint boneIdx) {
+    uint words[2] = uint[2](bonesInfo.x, bonesInfo.y);
+    return (words[boneIdx >> 1u] >> ((boneIdx & 1u) * 16u)) & 0xFFFFu;
 }
 
 // BEGIN TRS LIB
@@ -251,26 +255,32 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 	vec4 normal4 = vec4(normal, 0.0);
 
 	vec4 weights = vec4(
-		float(GetUnpackedValue(bonesInfo.y, 0u)) / 255.0,
-		float(GetUnpackedValue(bonesInfo.y, 1u)) / 255.0,
-		float(GetUnpackedValue(bonesInfo.y, 2u)) / 255.0,
-		float(GetUnpackedValue(bonesInfo.y, 3u)) / 255.0
+		float(GetBoneWeight(0u)) / 255.0,
+		float(GetBoneWeight(1u)) / 255.0,
+		float(GetBoneWeight(2u)) / 255.0,
+		float(GetBoneWeight(3u)) / 255.0
 	);
 
-	uint bID0 = GetUnpackedValue(bonesInfo.x, 0u) + (GetUnpackedValue(bonesInfo.z, 0u) << 8u); //first boneID
+	uint bID0 = UnpackBoneID(0u);
 	
-	// do interpolation
-	Transform tx = Lerp(
+	// Get bind pose transform for the primary bone
+	Transform bposeTx = transforms[instData.w + bID0];
+	Transform bposeInvTx = InvertTransformAffine(bposeTx);
+
+	// Get current piece transform (interpolated)
+	Transform currentTx = Lerp(
 		transforms[instData.x + 2u * (1u + bID0) + 0u],
 		transforms[instData.x + 2u * (1u + bID0) + 1u],
 		timeInfo.w
 	);
 
-	//tx = transforms[instData.x + 2u + 2u * bID0 + 1u];
+	weights[0] *= float(currentTx.trSc.w > 0.0);
 
-	weights[0] *= float(tx.trSc.w > 0.0);
-	msPosition = ApplyTransform(tx, piecePos);
-	msNormal = ApplyTransform(tx, normal4).xyz;
+	// Delta transform: current * inverse(bpose)
+	Transform deltaTx = ApplyTransform(currentTx, bposeInvTx);
+
+	msPosition = ApplyTransform(deltaTx, piecePos);
+	msNormal = ApplyTransform(deltaTx, normal4).xyz;
 
 	if (weights[0] == 1.0)
 		return;
@@ -281,11 +291,9 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 	msNormal   *= weights[0];
 	wSum       += weights[0];
 
-	Transform bposeTra = transforms[instData.w + bID0];
-
-	// Vertex[ModelSpace,BoneX] = PieceMat[BoneX] * InverseBindPosMat[BoneX] * BindPosMat[Bone0] * Vertex[Bone0]
-	for (uint bi = 1; bi < 3; ++bi) {
-		uint bID = GetUnpackedValue(bonesInfo.x, bi) + (GetUnpackedValue(bonesInfo.z, bi) << 8u);
+	// Multi-bone skinning
+	for (uint bi = 1; bi < 4; ++bi) {
+		uint bID = UnpackBoneID(bi);
 
 		if (bID == 0xFFFFu || weights[bi] == 0.0)
 			continue;
@@ -299,11 +307,9 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 
 		weights[bi] *= float(boneTx.trSc.w > 0.0);
 
-		// emulate boneTx * bposeInvTra * bposeTra * piecePos
-		vec4 txPiecePos = ApplyTransform(ApplyTransform(boneTx, ApplyTransform(bposeInvTra, bposeTra)), piecePos);
-
-		// emulate boneTx * bposeInvTra * bposeTra * normal
-		vec3 txPieceNormal = ApplyTransform(ApplyTransform(boneTx, ApplyTransform(bposeInvTra, bposeTra)), normal4).xyz;
+		// For model-space vertices: boneTx * bposeInvTra * piecePos
+		vec4 txPiecePos = ApplyTransform(ApplyTransform(boneTx, bposeInvTra), piecePos);
+		vec3 txPieceNormal = ApplyTransform(ApplyTransform(boneTx, bposeInvTra), normal4).xyz;
 
 		msPosition += txPiecePos    * weights[bi];
 		msNormal   += txPieceNormal * weights[bi];

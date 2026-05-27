@@ -11,49 +11,21 @@
 #include "Sim/Misc/CollisionVolume.h"
 #include "System/Matrix44f.h"
 #include "System/Transform.hpp"
+#include "System/AABB.hpp"
 
 struct S3DModel;
 struct S3DModelPiece {
 	S3DModelPiece() = default;
+	S3DModelPiece(const S3DModelPiece&) = delete;
+	S3DModelPiece(S3DModelPiece&& p) noexcept = delete;
 
-	virtual void Clear() {
-		name.clear();
-		children.clear();
+	S3DModelPiece& operator = (const S3DModelPiece& p) = delete;
+	S3DModelPiece& operator = (S3DModelPiece&& p) noexcept = delete;
 
-		for (S3DModelPiecePart& p : shatterParts) {
-			p.renderData.clear();
-		}
+	void SetEmitters();
 
-		vertices.clear();
-		indices.clear();
-		shatterIndices.clear();
-
-		parent = nullptr;
-		colvol = {};
-
-		bposeTransform.LoadIdentity();
-
-		offset = ZeroVector;
-		goffset = ZeroVector;
-		scale = 1.0f;
-
-		mins = DEF_MIN_SIZE;
-		maxs = DEF_MAX_SIZE;
-
-		vertIndex = ~0u;
-		indxStart = ~0u;
-		indxCount = ~0u;
-	}
-
-	virtual float3 GetEmitPos() const;
-	virtual float3 GetEmitDir() const;
-
-	// internal use
-	const float3& GetVertexPos(const int idx) const { return vertices[idx].pos; }
-	const float3& GetNormal(const int idx) const { return vertices[idx].normal; }
-
-	virtual void PostProcessGeometry(uint32_t pieceIndex);
-
+	const auto& GetEmitPos() const { return emitPos; }
+	const auto& GetEmitDir() const { return emitDir; }
 
 	void DrawElements(uint32_t prim = 0x0004/*GL_TRIANGLES*/) const;
 	static void DrawShatterElements(uint32_t vboIndxStart, uint32_t vboIndxCount, uint32_t prim = 0x0004/*GL_TRIANGLES*/);
@@ -62,7 +34,7 @@ public:
 	void DrawStaticLegacyRec() const;
 
 	void CreateShatterPieces();
-	void Shatter(float, int, int, int, const float3, const float3, const CMatrix44f&) const;
+	void Shatter(float pieceChance, int modelType, int texType, int team, const float3 pos, const float3 speed, const CMatrix44f& m) const;
 
 	void SetPieceTransform(const Transform& parentTra);
 	void SetBakedTransform(const Transform& tra) {
@@ -76,56 +48,53 @@ public:
 
 	void SetCollisionVolume(const CollisionVolume& cv) { colvol = cv; }
 	const CollisionVolume* GetCollisionVolume() const { return &colvol; }
-	      CollisionVolume* GetCollisionVolume()       { return &colvol; }
 
-	bool HasGeometryData() const { return indices.size() >= 3; }
+	bool HasGeometryData() const { return relIndxCnt >= 3; }
 	void SetParentModel(S3DModel* model_) { model = model_; }
 	const S3DModel* GetParentModel() const { return model; }
 
-	void ReleaseShatterIndices();
-
-	const std::vector<SVertexData>& GetVerticesVec() const { return vertices; }
-	const std::vector<uint32_t>& GetIndicesVec() const { return indices; }
-	const std::vector<uint32_t>& GetShatterIndicesVec() const { return shatterIndices; }
-
-	std::vector<SVertexData>& GetVerticesVec() { return vertices; }
-	std::vector<uint32_t>& GetIndicesVec() { return indices; }
-	std::vector<uint32_t>& GetShatterIndicesVec() { return shatterIndices; }
-
 	bool HasBackedTra() const { return bakedTransform.has_value(); }
+
+	void SetGlobalOffset();
 private:
 	void CreateShatterPiecesVariation(int num);
-	void DrawStaticLegacyRecImpl(const float3& rootT) const;
+	void DrawStaticLegacyRecImpl() const;
+	CollisionVolume colvol;
 public:
 	std::string name;
 	std::vector<S3DModelPiece*> children;
 	std::array<S3DModelPiecePart, S3DModelPiecePart::SHATTER_VARIATIONS> shatterParts;
 
 	S3DModelPiece* parent = nullptr;
-	CollisionVolume colvol;
 
 	// bind-pose transform, including baked rots
 	Transform bposeTransform;
+	// inverse of bposeTransform, cached for delta transform calculations
+	Transform bposeTransformInv;
 
 	// baked local-space rotations
 	std::optional<Transform> bakedTransform;
+
+	float3 emitPos = ZeroVector;
+	float3 emitDir = ZeroVector;
 
 	float3 offset;      /// local (piece-space) offset wrt. parent piece
 	float3 goffset;     /// global (model-space) offset wrt. root piece
 	float scale{1.0f};  /// baked uniform scaling factor (assimp-only)
 
-	float3 mins = DEF_MIN_SIZE;
-	float3 maxs = DEF_MAX_SIZE;
+	AABB aabb;
 
-	uint32_t vertIndex = ~0u; // global vertex number offset
-	uint32_t indxStart = ~0u; // global Index VBO offset
-	uint32_t indxCount = ~0u;
-protected:
-	std::vector<SVertexData> vertices;
-	std::vector<uint32_t> indices;
-	std::vector<uint32_t> shatterIndices;
+	// Relative offset/count within model's VBO allocation
+	// Absolute index offset = model.indxStart + piece.relIndxOff
+	uint32_t relVertOff = ~0u;
+	uint32_t relVertCnt = 0;
+	uint32_t relIndxOff = ~0u;
+	uint32_t relIndxCnt = 0;
 
-	S3DModel* model;
-public:
-	friend class CAssParser;
+	// Temporary vertex and index data, cleared after upload to GPU
+	std::vector<SVertexData> tmpVerts;
+	std::vector<uint32_t> tmpIndcs;
+	std::vector<uint32_t> tmpShIndcs;
+
+	S3DModel* model = nullptr;
 };

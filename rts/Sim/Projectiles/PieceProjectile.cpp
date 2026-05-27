@@ -201,8 +201,8 @@ float3 CPieceProjectile::RandomVertexPos() const
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (omp == nullptr)
 		return ZeroVector;
-	#define rf guRNG.NextFloat()
-	return mix(omp->mins, omp->maxs, float3(rf,rf,rf));
+
+	return mix(omp->aabb.mins, omp->aabb.maxs, float3(guRNG.NextFloat(), guRNG.NextFloat(), guRNG.NextFloat()));
 }
 
 

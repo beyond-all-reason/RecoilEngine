@@ -13,38 +13,6 @@
 #include "System/Sync/SyncChecker.h"
 #endif
 
-
-#if 0
-struct LCG16 {
-public:
-	typedef uint16_t res_type;
-	typedef uint32_t val_type;
-
-	LCG16(const val_type _val = def_val, const val_type _seq = def_seq) { seed(_val, _seq); }
-	LCG16(const LCG16& rng) { *this = rng; }
-
-	void seed(const val_type initval, const val_type initseq) {
-		val = initval;
-		seq = initseq;
-	}
-
-	res_type next() { return (((val = (val * 214013L + seq)) >> 16) & max_res); }
-	res_type bnext(const res_type bound) { return (next() % bound); }
-
-	val_type state() const { return val; }
-
-public:
-	static constexpr res_type min_res = 0;
-	static constexpr res_type max_res = 0x7fff;
-	static constexpr val_type def_val = 0;
-	static constexpr val_type def_seq = 2531011L;
-
-private:
-	val_type val;
-	val_type seq;
-};
-#endif
-
 struct PCG32 {
 public:
 	typedef uint32_t res_type;
@@ -98,6 +66,12 @@ private:
 };
 
 template<typename RNG, bool synced, bool assuresynced = false> class CGlobalRNG {
+public:
+	CGlobalRNG() = default;
+	CGlobalRNG(const CGlobalRNG&) = delete;
+	CGlobalRNG& operator=(const CGlobalRNG&) = delete;
+	CGlobalRNG(CGlobalRNG&&) = delete;
+	CGlobalRNG& operator=(CGlobalRNG&&) = delete;
 public:
 	typedef typename RNG::val_type rng_val_type;
 	typedef typename RNG::res_type rng_res_type;

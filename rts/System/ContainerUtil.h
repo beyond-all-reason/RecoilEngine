@@ -189,7 +189,17 @@ namespace spring {
 	}
 
 	template<typename T>
-	static T VectorBackPop(std::vector<T>& v) { T e = std::move(v.back()); v.pop_back(); return e; }
+	static inline T VectorBackPop(std::vector<T>& v) { T e = std::move(v.back()); v.pop_back(); return e; }
+
+	template<typename Container, typename Range>
+	constexpr inline void AppendRange(Container& c, Range&& r) {
+	#if defined(__cpp_lib_containers_ranges) && __cpp_lib_containers_ranges >= 202202L
+		c.append_range(std::forward<Range>(r));
+	#else
+		using std::begin, std::end;
+		c.insert(c.end(), begin(r), end(r));
+	#endif
+	}
 };
 
 #undef VUS

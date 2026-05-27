@@ -173,5 +173,6 @@ public:
 
 extern CGlobalUnsynced* gu;
 extern CGlobalUnsyncedRNG guRNG;
+extern std::array<CGlobalUnsyncedRNG, 32/*ThreadPool::MAX_THREADS*/> guThreadRNGs;
 
 #endif /* _GLOBAL_UNSYNCED_H */

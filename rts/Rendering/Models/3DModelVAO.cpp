@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <ranges>
 
 #include "3DModel.hpp"
 #include "3DModelPiece.hpp"
@@ -14,32 +15,32 @@
 #include "Sim/Features/Feature.h"
 
 #include "System/Misc/TracyDefs.h"
+#include "System/ContainerUtil.h"
 
 
 void S3DModelVAO::EnableAttribs(bool inst) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!inst) {
-		for (int i = 0; i <= 5; ++i) {
+		for (int i = 0; i <= 4; ++i) {
 			glEnableVertexAttribArray(i);
 			glVertexAttribDivisor(i, 0);
 		}
 
 		glVertexAttribPointer (0, 3, GL_FLOAT       , false, sizeof(SVertexData), (const void*)offsetof(SVertexData, pos         ));
 		glVertexAttribPointer (1, 3, GL_FLOAT       , false, sizeof(SVertexData), (const void*)offsetof(SVertexData, normal      ));
-		glVertexAttribPointer (2, 3, GL_FLOAT       , false, sizeof(SVertexData), (const void*)offsetof(SVertexData, sTangent    ));
-		glVertexAttribPointer (3, 3, GL_FLOAT       , false, sizeof(SVertexData), (const void*)offsetof(SVertexData, tTangent    ));
-		glVertexAttribPointer (4, 4, GL_FLOAT       , false, sizeof(SVertexData), (const void*)offsetof(SVertexData, texCoords[0]));
-		glVertexAttribIPointer(5, 3, GL_UNSIGNED_INT,        sizeof(SVertexData), (const void*)offsetof(SVertexData, boneIDsLow  ));
+		glVertexAttribPointer (2, 4, GL_FLOAT       , false, sizeof(SVertexData), (const void*)offsetof(SVertexData, tangent     ));
+		glVertexAttribPointer (3, 4, GL_FLOAT       , false, sizeof(SVertexData), (const void*)offsetof(SVertexData, texCoords[0]));
+		glVertexAttribIPointer(4, 3, GL_UNSIGNED_INT,        sizeof(SVertexData), (const void*)offsetof(SVertexData, boneIDs  ));
 	}
 	else {
-		for (int i = 6; i <= 6; ++i) {
+		for (int i = 5; i <= 5; ++i) {
 			glEnableVertexAttribArray(i);
 			glVertexAttribDivisor(i, 1);
 		}
 
 		// covers all 4 uints of SInstanceData
-		glVertexAttribIPointer(6, 4, GL_UNSIGNED_INT, sizeof(SInstanceData), (const void*)offsetof(SInstanceData, matOffset));
+		glVertexAttribIPointer(5, 4, GL_UNSIGNED_INT, sizeof(SInstanceData), (const void*)offsetof(SInstanceData, matOffset));
 	}
 }
 
@@ -70,72 +71,33 @@ S3DModelVAO::S3DModelVAO()
 
 std::unique_ptr<S3DModelVAO> S3DModelVAO::instance = nullptr;
 
-void S3DModelVAO::ProcessVertices(const S3DModel* model)
+void S3DModelVAO::AddModelGeometry(S3DModel* model)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	assert(model);
-	assert(model->loadStatus == S3DModel::LoadStatus::LOADING);
 
-	if (const auto* root = model->GetRootPiece(); root->vertIndex != ~0u)
-		return;
+	const auto baseVertNum = static_cast<uint32_t>(vertData.size());
 
-	uint32_t vertIndex = static_cast<uint32_t>(vertData.size());
-	for (auto* modelPiece : model->pieceObjects) {
-		modelPiece->vertIndex = vertIndex;
-		const auto& modelPieceVerts = modelPiece->GetVerticesVec();
-		vertIndex += modelPieceVerts.size();
-		vertData.insert(vertData.end(), modelPieceVerts.begin(), modelPieceVerts.end()); //append
-	}
-}
+	auto& skinnedVerts = model->skinnedVerts;
+	auto& skinnedIndcs = model->skinnedIndcs;
+	auto& shatterIndcs = model->shatterIndcs;
 
-void S3DModelVAO::ProcessIndicies(S3DModel* model)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	assert(model);
-	if (model->indxStart != ~0u)
-		return;
+	spring::AppendRange(vertData, skinnedVerts);
 
-	//models should know their index offset
-	model->indxStart = static_cast<uint32_t>(std::distance(indxData.cbegin(), indxData.cend()));
+	model->indxStart = static_cast<uint32_t>(indxData.size());
+	model->indxCount = static_cast<uint32_t>(skinnedIndcs.size());
 
-	for (auto* modelPiece : model->pieceObjects) {
-		if (!modelPiece->HasGeometryData()) {
-			modelPiece->indxStart = static_cast<uint32_t>(indxData.size());
-			modelPiece->indxCount = 0;
-			continue;
-		}
+	spring::AppendRange(indxData,
+		skinnedIndcs | std::views::transform([baseVertNum](auto v) { return baseVertNum + v; }) // add baseVertNum to indices
+	);
 
-		const auto& modelPieceIndcs = modelPiece->GetIndicesVec();
-		indxData.insert(indxData.end(), modelPieceIndcs.begin(), modelPieceIndcs.end()); //append
+	// Add shatter indices to the end of indxData
+	spring::AppendRange(indxData,
+		shatterIndcs | std::views::transform([baseVertNum](auto v) { return baseVertNum + v; })
+	);
 
-		const auto endIdx = indxData.end();
-		const auto begIdx = endIdx - modelPieceIndcs.size();
-
-		std::for_each(begIdx, endIdx, [offset = modelPiece->vertIndex](uint32_t& indx) { indx += offset; }); // add per piece vertex offset to indices
-
-		//model pieces should know their index offset
-		modelPiece->indxStart = static_cast<uint32_t>(std::distance(indxData.begin(), begIdx));
-
-		//model pieces should know their index count
-		modelPiece->indxCount = static_cast<uint32_t>(modelPieceIndcs.size());
-	}
-	//models should know their index count
-	model->indxCount = static_cast<uint32_t>(indxData.size() - model->indxStart);
-
-	//add shatter indices to the end of indxData
-	for (const auto* modelPiece : model->pieceObjects) {
-		if (!modelPiece->HasGeometryData())
-			continue;
-
-		const auto& mdlPcsShatIndcs = modelPiece->GetShatterIndicesVec();
-
-		indxData.insert(indxData.end(), mdlPcsShatIndcs.begin(), mdlPcsShatIndcs.end()); //append
-
-		const auto endIdx = indxData.end();
-		const auto begIdx = endIdx - mdlPcsShatIndcs.size();
-
-		std::for_each(begIdx, endIdx, [offset = modelPiece->vertIndex](uint32_t& indx) { indx += offset; }); // add per piece vertex offset to indices
-	}
+	skinnedVerts.clear();
+	skinnedIndcs.clear();
+	shatterIndcs.clear();
 }
 
 void S3DModelVAO::CreateVAO()
@@ -239,7 +201,7 @@ void S3DModelVAO::BindLegacyVertexAttribsAndVBOs() const
 	glVertexPointer(3, GL_FLOAT, sizeof(SVertexData), vertVBO.GetPtr(offsetof(SVertexData, pos)));
 
 	glEnableClientState(GL_NORMAL_ARRAY);
-	glNormalPointer(GL_FLOAT, sizeof(SVertexData), vertVBO.GetPtr(offsetof(SVertexData, normal)));
+	glNormalPointer(GL_FLOAT   , sizeof(SVertexData), vertVBO.GetPtr(offsetof(SVertexData, normal)));
 
 	glClientActiveTexture(GL_TEXTURE0);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -251,18 +213,12 @@ void S3DModelVAO::BindLegacyVertexAttribsAndVBOs() const
 
 	glClientActiveTexture(GL_TEXTURE5);
 	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-	glTexCoordPointer(3, GL_FLOAT, sizeof(SVertexData), vertVBO.GetPtr(offsetof(SVertexData, sTangent)));
-
-	glClientActiveTexture(GL_TEXTURE6);
-	glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-	glTexCoordPointer(3, GL_FLOAT, sizeof(SVertexData), vertVBO.GetPtr(offsetof(SVertexData, tTangent)));
+	glTexCoordPointer(4, GL_FLOAT, sizeof(SVertexData), vertVBO.GetPtr(offsetof(SVertexData, tangent)));
 }
 
 void S3DModelVAO::UnbindLegacyVertexAttribsAndVBOs() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glClientActiveTexture(GL_TEXTURE6);
-	glDisableClientState(GL_TEXTURE_COORD_ARRAY);
 
 	glClientActiveTexture(GL_TEXTURE5);
 	glDisableClientState(GL_TEXTURE_COORD_ARRAY);

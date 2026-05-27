@@ -954,13 +954,13 @@ void CProjectileDrawer::DrawProjectileModel(const CProjectile* p)
 
 			CUnitDrawer::SetTeamColor(wp->GetTeamID());
 
-			glPushMatrix();
-				glMultMatrixf(wp->GetTransformMatrix(wp->GetProjectileType() == WEAPON_MISSILE_PROJECTILE));
+			auto scopedPushPop = spring::ScopedNullResource(glPushMatrix, glPopMatrix);
 
-				if (!p->luaDraw || !eventHandler.DrawProjectile(p))
-					wp->model->DrawStatic();
+			glMultMatrixf(wp->GetTransformMatrix(wp->GetProjectileType() == WEAPON_MISSILE_PROJECTILE));
 
-			glPopMatrix();
+			if (!p->luaDraw || !eventHandler.DrawProjectile(p))
+				wp->model->DrawStatic();
+
 			return;
 		} break;
 
@@ -972,25 +972,24 @@ void CProjectileDrawer::DrawProjectileModel(const CProjectile* p)
 
 			auto scopedPushPop = spring::ScopedNullResource(glPushMatrix, glPopMatrix);
 
-			glTranslatef3(pp->drawPos);
-			glRotatef(pp->GetDrawAngle(), pp->spinVec.x, pp->spinVec.y, pp->spinVec.z);
+			Transform pieceTra(CQuaternion::MakeFrom(pp->GetDrawAngle() * math::DEG_TO_RAD, pp->spinVec), pp->drawPos);
+			// Vertices are stored in model space (bpose baked in during TransferPiecesToSkinnedMesh).
+			// bposeTransformInv normalises back to local piece space, so the result is:
+			//   spin.Rotate(v_local) + drawPos
+			// — the piece spins cleanly around spinVec in its local-space shape, centred at drawPos.
+			// (Equivalent to master's glTranslate(drawPos)*glRotate(spin) path for local-space verts.)
+			const CMatrix44f deltaMat = (pieceTra * pp->omp->bposeTransformInv).ToMatrix();
+			glMultMatrixf(deltaMat);
 
 			if (p->luaDraw && eventHandler.DrawProjectile(p)) {
 				return;
 			}
 
 			if ((pp->explFlags & PF_Recursive) != 0) {
-				// DrawStaticLegacyRec applies bpose rotation+scale per-piece internally
 				pp->omp->DrawStaticLegacyRec();
 			}
 			else {
-				// Apply the rotation+scale from bposeTransform (but NOT translation, which is the
-				// piece's model-space offset and is irrelevant for a standalone flying piece).
-				{
-					const auto& bpose = pp->omp->bposeTransform;
-					const Transform bposeNoTrans{ bpose.r, ZeroVector, bpose.s };
-					glMultMatrixf(bposeNoTrans.ToMatrix());
-				}
+				// non-recursive, only draw one piece
 				pp->omp->DrawStaticLegacy(true, false);
 			}
 

@@ -48,6 +48,7 @@ in Data {
 
 	vec4 worldPos;
 	vec3 worldNormal;
+	vec4 worldTangent;
 
 	// main light vector(s)
 	vec3 worldCameraDir;
@@ -88,6 +89,15 @@ vec3 GetShadowMult(vec3 shadowCoord, float NdotL) {
 
 #define NORM2SNORM(value) (value * 2.0 - 1.0)
 #define SNORM2NORM(value) (value * 0.5 + 0.5)
+
+// Calculate Tangent-Bitangent-Normal matrix for normal mapping
+mat3 CalculateTBN()
+{
+	vec3 N = normalize(worldNormal);
+	vec3 T = normalize(worldTangent.xyz - dot(worldTangent.xyz, N) * N);
+	vec3 B = cross(N, T) * worldTangent.w; // already normalized as the cross product of orthogonal vectors
+	return mat3(T, B, N);
+}
 
 void main(void)
 {

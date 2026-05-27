@@ -153,6 +153,24 @@ const CMatrix44f& LocalModelPiece::GetModelSpaceMatrix() const
 	return modelSpaceMat;
 }
 
+CMatrix44f LocalModelPiece::GetDeltaTransformMatrix() const
+{
+	// Ensure transforms are up to date
+	if (dirty)
+		UpdateParentMatricesRec();
+
+	// Delta transform: currentTransform * inverse(bposeTransform)
+	// This transforms vertices from model-space (at bind pose) to animated model-space
+	// Vertices are stored pre-transformed by bposeTransform, so we need this delta
+	// Use the cached inverse from the original piece
+	const Transform& currentTra = modelSpaceTra;
+	const Transform& bposeInvTra = original->bposeTransformInv;
+
+	// Compute: current * inverse(bpose)
+	Transform deltaTra = currentTra * bposeInvTra;
+	return deltaTra.ToMatrix();
+}
+
 void LocalModelPiece::SetScriptVisible(bool b)
 {
 	scriptSetVisible = b;
@@ -267,8 +285,10 @@ void LocalModelPiece::Draw() const
 
 	assert(original);
 
+	// Vertices are stored in model space (pre-transformed by bposeTransform)
+	// We need to apply the delta transform: current * inverse(bpose)
 	glPushMatrix();
-	glMultMatrixf(GetModelSpaceMatrix());
+	glMultMatrixf(GetDeltaTransformMatrix());
 	S3DModelHelpers::BindLegacyAttrVBOs();
 	original->DrawElements();
 	S3DModelHelpers::UnbindLegacyAttrVBOs();
@@ -284,8 +304,10 @@ void LocalModelPiece::DrawLOD(uint32_t lod) const
 	if (!original->HasGeometryData())
 		return;
 
+	// Vertices are stored in model space (pre-transformed by bposeTransform)
+	// We need to apply the delta transform: current * inverse(bpose)
 	glPushMatrix();
-	glMultMatrixf(GetModelSpaceMatrix());
+	glMultMatrixf(GetDeltaTransformMatrix());
 	if (const auto ldl = lodDispLists[lod]; ldl == 0) {
 		S3DModelHelpers::BindLegacyAttrVBOs();
 		original->DrawElements();

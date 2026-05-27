@@ -21,6 +21,7 @@
  * @field rmlUiApiVersion integer Version of Recoil's rmlUI API
  * @field noAutoShowMetal boolean Whether the engine switches to the metal view when selecting a "build metal extractor" command (yes if false)
  * @field maxPiecesPerModel integer How many pieces supported for 3d models?
+ * @field modelMesh boolean Whether the engine supports the model mesh system in GL4 shaders
  * @field gunshipCruiseAltitudeMultiplier number For gunships, the cruiseAltitude from the unit def is multiplied by this much
  * @field noRefundForConstructionDecay boolean Whether there is no refund for construction decay (100% metal back if false)
  * @field noRefundForFactoryCancel boolean Whether there is no refund for factory cancel (100% metal back if false)
@@ -73,13 +74,14 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	 *
 	 * will be compatible even on engines that don't yet know about the entry at all. */
 	lua_pushliteral(L, "FeatureSupport");
-	lua_createtable(L, 0, 11);
+	lua_createtable(L, 0, 12);
 		LuaPushNamedBool(L, "NegativeGetUnitCurrentCommand", true);
 		LuaPushNamedBool(L, "hasExitOnlyYardmaps", true);
 		LuaPushNamedNumber(L, "rmlUiApiVersion", 1);
 		LuaPushNamedBool(L, "noAutoShowMetal", false);
 		LuaPushNamedNumber(L, "maxPiecesPerModel", MAX_PIECES_PER_MODEL);
 		LuaPushNamedBool(L, "transformsInGL4", true);
+		LuaPushNamedBool(L, "modelMesh", true);
 		LuaPushNamedNumber(L, "gunshipCruiseAltitudeMultiplier", 1.5f); // see https://github.com/beyond-all-reason/spring/issues/1028
 		LuaPushNamedBool(L, "noRefundForConstructionDecay", false);
 		LuaPushNamedBool(L, "noRefundForFactoryCancel", false);

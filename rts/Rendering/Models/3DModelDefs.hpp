@@ -4,7 +4,6 @@
 #include "System/float3.h"
 
 static constexpr int MAX_MODEL_OBJECTS  = 3840;
-static constexpr int AVG_MODEL_PIECES   = 16; // as it used to be
 static constexpr int MAX_PIECES_PER_MODEL = std::numeric_limits<uint16_t>::max() - 1;
 static constexpr int INV_PIECE_NUM = MAX_PIECES_PER_MODEL + 1; // invalid piece
 

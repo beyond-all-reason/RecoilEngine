@@ -93,7 +93,6 @@ set(sources_engine_Rendering
 		"${CMAKE_CURRENT_SOURCE_DIR}/Models/3DModelPiece.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Models/3DModelVAO.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Models/3DOParser.cpp"
-		"${CMAKE_CURRENT_SOURCE_DIR}/Models/AssIO.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Models/AssParser.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Models/GLTFParser.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Models/IModelParser.cpp"

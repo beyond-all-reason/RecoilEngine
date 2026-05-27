@@ -26,8 +26,7 @@ S3DModel& S3DModel::operator= (S3DModel&& m) noexcept {
 	radius = m.radius;
 	height = m.height;
 
-	mins = m.mins;
-	maxs = m.maxs;
+	aabb = m.aabb;
 	relMidPos = m.relMidPos;
 
 	indxStart = m.indxStart;
@@ -40,6 +39,11 @@ S3DModel& S3DModel::operator= (S3DModel&& m) noexcept {
 
 	loadStatus = m.loadStatus;
 	uploaded = m.uploaded;
+
+	skinnedVerts = std::move(m.skinnedVerts);
+	skinnedIndcs = std::move(m.skinnedIndcs);
+	shatterIndcs = std::move(m.shatterIndcs);
+	modelParams = std::move(m.modelParams);
 
 	std::swap(traAlloc, m.traAlloc);
 
@@ -110,6 +114,8 @@ void S3DModel::FlattenPieceTree(S3DModelPiece* root)
 
 	while (!stack.empty()) {
 		S3DModelPiece* p = stack.back();
+		// use this opportunity to set gOffset
+		p->SetGlobalOffset();
 
 		stack.pop_back();
 		pieceObjects.push_back(p);
@@ -134,13 +140,42 @@ void S3DModel::DrawStatic() const
 	S3DModelHelpers::UnbindLegacyAttrVBOs();
 }
 
-void S3DModel::UpdatePiecesMinMaxExtents()
+void S3DModel::FinalizeLoad()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	for (auto* piece : pieceObjects) {
-		for (const auto& vertex : piece->GetVerticesVec()) {
-			piece->mins = float3::min(piece->mins, vertex.pos);
-			piece->maxs = float3::max(piece->maxs, vertex.pos);
-		}
+
+	// cache inverse bpose transforms for all pieces
+	std::vector<Transform> invBposeTransforms;
+	invBposeTransforms.reserve(pieceObjects.size());
+	for (const auto* piece : pieceObjects) {
+		invBposeTransforms.push_back(piece->bposeTransform.InvertAffine());
 	}
+
+	aabb.Reset();
+	for (const auto& vert : skinnedVerts) {
+		aabb.AddPoint(vert.pos);
+
+		const uint16_t pieceIdx = vert.boneIDs[0];
+		assert(pieceIdx != SVertexData::INVALID_BONEID);
+		assert(pieceIdx < pieceObjects.size());
+
+		auto* piece = pieceObjects[pieceIdx];
+		const auto localPos = invBposeTransforms[pieceIdx] * float4{ vert.pos, 1.0f };
+		piece->aabb.AddPoint(localPos);
+	}
+
+	// GCC-13 doesn't like recursive lambdas with auto&& self, so we have to declare it separately and capture it by reference
+	//auto TraversePieceTree = [](this auto&& self, S3DModelPiece* piece) -> void {
+	auto TraversePieceTree = [](auto&& self, S3DModelPiece* piece) -> void {
+		if (piece->aabb.IsReset())
+			piece->SetCollisionVolume(CollisionVolume('b', 'z', ZeroVector, ZeroVector));
+		else
+			piece->SetCollisionVolume(CollisionVolume('b', 'z', piece->aabb.CalcFullScales(), piece->aabb.CalcCenter()));
+
+		for (S3DModelPiece* childPiece : piece->children) {
+			self(self, childPiece);
+		}
+	};
+
+	TraversePieceTree(TraversePieceTree, GetRootPiece());
 }

@@ -251,7 +251,9 @@ void CUnitScript::TickAllAnims(int deltaTime)
 	}
 #else
 	// DFS pass
-	auto WalkDFS = [](this auto&& self, LocalModelPiece* lmp, const Transform& pTra) -> void {
+	// GCC-13 doesn't like recursive lambdas with auto&& self, so we have to declare it separately and capture it by reference
+	//auto WalkDFS = [](this auto&& self, LocalModelPiece* lmp, const Transform& pTra) -> void {
+	auto WalkDFS = [](auto&& self, LocalModelPiece* lmp, const Transform& pTra) -> void {
 		if (lmp->GetDirty()) {
 			lmp->SetDirtyRaw(false);
 			lmp->SetWasUpdatedRaw(true);
@@ -262,10 +264,10 @@ void CUnitScript::TickAllAnims(int deltaTime)
 		const Transform& modelTra = lmp->GetModelSpaceTransformRaw();
 
 		for (auto* p : lmp->children)
-			self(p, modelTra);
+			self(self, p, modelTra);
 	};
 
-	WalkDFS(rootPiece, Transform{});
+	WalkDFS(WalkDFS, rootPiece, Transform{});
 #endif
 #ifdef _DEBUG
 	for (auto* p : pieces) {
@@ -959,7 +961,7 @@ void CUnitScript::Shatter(int piece, const float3& pos, const float3& speed)
 
 	const float pieceChance = 1.0f - (projectileHandler.GetCurrentParticles() - (projectileHandler.maxParticles - 2000)) / 2000.0f;
 	if (pieceChance > 0.0f) {
-		const CMatrix44f m = unit->GetTransformMatrix() * lmp->GetModelSpaceMatrix();
+		const CMatrix44f m = unit->GetTransformMatrix() * lmp->GetDeltaTransformMatrix();
 		omp->Shatter(pieceChance, unit->model->type, unit->model->textureType, unit->team, pos, speed, m);
 	}
 }

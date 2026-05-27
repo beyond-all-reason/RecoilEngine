@@ -8,7 +8,9 @@
 
 #include "3DModelDefs.hpp"
 #include "ModelsMemStorage.h"
+#include "ModelUtils.h"
 #include "System/float3.h"
+#include "System/AABB.hpp"
 
 struct S3DModelPiece;
 
@@ -19,7 +21,7 @@ struct S3DModelPiece;
  */
 struct S3DModel
 {
-	enum LoadStatus {
+	enum class LoadStatus {
 		NOTLOADED,
 		LOADING,
 		LOADED
@@ -37,11 +39,9 @@ struct S3DModel
 		, radius(0.0f)
 		, height(0.0f)
 
-		, mins(DEF_MIN_SIZE)
-		, maxs(DEF_MAX_SIZE)
 		, relMidPos(ZeroVector)
 
-		, loadStatus(NOTLOADED)
+		, loadStatus(LoadStatus::NOTLOADED)
 		, uploaded(false)
 
 		, traAlloc(ScopedTransformMemAlloc())
@@ -59,23 +59,22 @@ struct S3DModel
 
 	S3DModelPiece* GetPiece(size_t i) const { assert(i < pieceObjects.size()); return pieceObjects[i]; }
 	S3DModelPiece* GetRootPiece() const { return (GetPiece(GetRootPieceIndex())); }
-	size_t GetRootPieceIndex() const { return 0; }
+	constexpr size_t GetRootPieceIndex() const { return 0; }
 
 	void AddPiece(S3DModelPiece* p) { pieceObjects.push_back(p); }
 	void DrawStatic() const;
 	void SetPieceMatrices();
 
 	void FlattenPieceTree(S3DModelPiece* root);
-
-	void UpdatePiecesMinMaxExtents();
+	void FinalizeLoad();
 
 	// default values set by parsers; radius is also cached in WorldObject::drawRadius (used by projectiles)
-	float CalcDrawRadius() const { return ((maxs - mins).Length() * 0.5f); }
-	float CalcDrawHeight() const { return (maxs.y - mins.y); }
+	float CalcDrawRadius() const { return aabb.CalcRadius(); }
+	float CalcDrawHeight() const { return (aabb.maxs.y - aabb.mins.y); }
 	float GetDrawRadius() const { return radius; }
 	float GetDrawHeight() const { return height; }
 
-	float3 CalcDrawMidPos() const { return ((maxs + mins) * 0.5f); }
+	float3 CalcDrawMidPos() const { return aabb.CalcCenter(); }
 	float3 GetDrawMidPos() const { return relMidPos; }
 
 	const ScopedTransformMemAlloc& GetTransformAlloc() const { return traAlloc; }
@@ -92,20 +91,26 @@ public:
 	int numPieces;
 	int textureType;            /// FIXME: MAKE S3O ONLY (0 = 3DO, otherwise S3O or ASSIMP)
 
-	uint32_t indxStart; //global VBO offset, size data
-	uint32_t indxCount;
+	uint32_t indxStart; //global VBO offset
+	uint32_t indxCount; //global VBO count
 
 	ModelType type;
 
 	float radius;
 	float height;
 
-	float3 mins;
-	float3 maxs;
+	AABB aabb;
 	float3 relMidPos;
 
 	LoadStatus loadStatus;
 	bool uploaded;
+
+	// Skinned mesh data (for models with bone-based skinning)
+	std::vector<SVertexData> skinnedVerts;
+	std::vector<uint32_t> skinnedIndcs;
+	std::vector<uint32_t> shatterIndcs;
+	// needs to be stored so it can be processed after the model is loaded
+	ModelUtils::ModelParams modelParams;
 private:
 	ScopedTransformMemAlloc traAlloc;
 };

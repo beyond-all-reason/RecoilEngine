@@ -4,24 +4,41 @@
 #define IMODELPARSER_H
 
 #include <vector>
+#include <deque>
 #include <string>
 #include <mutex>
 #include <condition_variable>
 #include <future>
 
 #include "System/UnorderedMap.hpp"
+#include "System/Threading/SpringThreading.h"
 
 struct S3DModel;
+struct S3DModelPiece;
 
 class IModelParser
 {
 public:
 	virtual ~IModelParser() = default;
-	virtual void Init() {}
-	virtual void Kill() {}
+	virtual void Init() = 0;
+	virtual void Kill() = 0;
 	virtual void Load(S3DModel& model, const std::string& name) = 0;
+protected:
+	virtual S3DModelPiece* AllocPieceImpl() = 0;
+	std::vector<uint8_t> LoadFromFile(const std::string& fileName);
 };
 
+template<typename PieceType>
+class TypedModelParser : public IModelParser {
+protected:
+	S3DModelPiece* AllocPieceImpl() override {
+		std::scoped_lock lock(mutex);
+		return &pieces.emplace_back();
+	}
+	std::deque<PieceType> pieces;
+private:
+	spring::spinlock mutex;
+};
 
 class CModelLoader
 {
@@ -51,7 +68,7 @@ private:
 	void KillModels();
 	void KillParsers() const;
 
-	void PostProcessGeometry(S3DModel* o);
+	void AddGeometryToVBO(S3DModel* o);
 	void Upload(S3DModel* o) const;
 
 private:
