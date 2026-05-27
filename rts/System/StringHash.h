@@ -36,4 +36,9 @@ struct compileTimeHasher<length, step, idx, idx> {
 	}
 };
 
-#define COMPILE_TIME_HASH(str) compileTimeHasher<sizeof(str) - 1>::hash(str)
+template <unsigned N>
+[[nodiscard]] constexpr uint32_t LuaHashStringLiteral(const char (&literal)[N]) noexcept
+{
+	static_assert(N > 0);
+	return compileTimeHasher<N - 1>::hash(literal);
+}

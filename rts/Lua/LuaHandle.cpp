@@ -116,7 +116,7 @@ void CLuaHandle::PushTracebackFuncToRegistry(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	SPRING_LUA_OPEN_LIB(L, luaopen_debug);
-		HSTR_PUSH(L, "traceback");
+		LuaPushHString(L, "traceback");
 		LuaUtils::PushDebugTraceback(L);
 		lua_rawset(L, LUA_REGISTRYINDEX);
 	// We only need the debug.traceback function, the others are unsafe for syncing.
@@ -2638,11 +2638,11 @@ bool CLuaHandle::DefaultCommand(const CUnit* unit,
 		return false;
 
 	if (unit) {
-		HSTR_PUSH(L, "unit");
+		LuaPushHString(L, "unit");
 		lua_pushnumber(L, unit->id);
 	}
 	else if (feature) {
-		HSTR_PUSH(L, "feature");
+		LuaPushHString(L, "feature");
 		lua_pushnumber(L, feature->id);
 	}
 	else {
@@ -2653,14 +2653,14 @@ bool CLuaHandle::DefaultCommand(const CUnit* unit,
 
 /* FIXME
 	else if (groundPos) {
-		HSTR_PUSH(L, "ground");
+		LuaPushHString(L, "ground");
 		lua_pushnumber(L, groundPos->x);
 		lua_pushnumber(L, groundPos->y);
 		lua_pushnumber(L, groundPos->z);
 		args = 4;
 	}
 	else {
-		HSTR_PUSH(L, "selection");
+		LuaPushHString(L, "selection");
 		args = 1;
 	}
 */
@@ -3179,10 +3179,10 @@ bool CLuaHandle::KeyPress(int keyCode, int scanCode, bool isRepeat)
 	lua_pushinteger(L, SDL21_keysyms(keyCode));
 
 	lua_createtable(L, 0, 4);
-	HSTR_PUSH_BOOL(L, "alt",   !!KeyInput::GetKeyModState(KMOD_ALT));
-	HSTR_PUSH_BOOL(L, "ctrl",  !!KeyInput::GetKeyModState(KMOD_CTRL));
-	HSTR_PUSH_BOOL(L, "meta",  !!KeyInput::GetKeyModState(KMOD_GUI));
-	HSTR_PUSH_BOOL(L, "shift", !!KeyInput::GetKeyModState(KMOD_SHIFT));
+	LuaPushNamedBool(L, "alt",   !!KeyInput::GetKeyModState(KMOD_ALT));
+	LuaPushNamedBool(L, "ctrl",  !!KeyInput::GetKeyModState(KMOD_CTRL));
+	LuaPushNamedBool(L, "meta",  !!KeyInput::GetKeyModState(KMOD_GUI));
+	LuaPushNamedBool(L, "shift", !!KeyInput::GetKeyModState(KMOD_SHIFT));
 
 	lua_pushboolean(L, isRepeat);
 
@@ -3242,10 +3242,10 @@ bool CLuaHandle::KeyRelease(int keyCode, int scanCode)
 	lua_pushinteger(L, SDL21_keysyms(keyCode));
 
 	lua_createtable(L, 0, 4);
-	HSTR_PUSH_BOOL(L, "alt",   !!KeyInput::GetKeyModState(KMOD_ALT));
-	HSTR_PUSH_BOOL(L, "ctrl",  !!KeyInput::GetKeyModState(KMOD_CTRL));
-	HSTR_PUSH_BOOL(L, "meta",  !!KeyInput::GetKeyModState(KMOD_GUI));
-	HSTR_PUSH_BOOL(L, "shift", !!KeyInput::GetKeyModState(KMOD_SHIFT));
+	LuaPushNamedBool(L, "alt",   !!KeyInput::GetKeyModState(KMOD_ALT));
+	LuaPushNamedBool(L, "ctrl",  !!KeyInput::GetKeyModState(KMOD_CTRL));
+	LuaPushNamedBool(L, "meta",  !!KeyInput::GetKeyModState(KMOD_GUI));
+	LuaPushNamedBool(L, "shift", !!KeyInput::GetKeyModState(KMOD_SHIFT));
 
 	CKeySet ks(keyCode);
 	lua_pushsstring(L, ks.GetString(true));
@@ -3789,24 +3789,24 @@ string CLuaHandle::WorldTooltip(const CUnit* unit,
 
 	int args;
 	if (unit) {
-		HSTR_PUSH(L, "unit");
+		LuaPushHString(L, "unit");
 		lua_pushnumber(L, unit->id);
 		args = 2;
 	}
 	else if (feature) {
-		HSTR_PUSH(L, "feature");
+		LuaPushHString(L, "feature");
 		lua_pushnumber(L, feature->id);
 		args = 2;
 	}
 	else if (groundPos) {
-		HSTR_PUSH(L, "ground");
+		LuaPushHString(L, "ground");
 		lua_pushnumber(L, groundPos->x);
 		lua_pushnumber(L, groundPos->y);
 		lua_pushnumber(L, groundPos->z);
 		args = 4;
 	}
 	else {
-		HSTR_PUSH(L, "selection");
+		LuaPushHString(L, "selection");
 		args = 1;
 	}
 
@@ -3865,7 +3865,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 	lua_pushnumber(L, playerID);
 
 	if (type == MAPDRAW_POINT) {
-		HSTR_PUSH(L, "point");
+		LuaPushHString(L, "point");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -3873,7 +3873,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 		args = 6;
 	}
 	else if (type == MAPDRAW_LINE) {
-		HSTR_PUSH(L, "line");
+		LuaPushHString(L, "line");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -3883,7 +3883,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 		args = 8;
 	}
 	else if (type == MAPDRAW_ERASE) {
-		HSTR_PUSH(L, "erase");
+		LuaPushHString(L, "erase");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -4225,29 +4225,29 @@ void CLuaHandle::CollectGarbage(bool forced)
 bool CLuaHandle::AddBasicCalls(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	HSTR_PUSH(L, "Script");
+	LuaPushHString(L, "Script");
 	lua_createtable(L, 0, 17); {
-		HSTR_PUSH_CFUNC(L, "Kill",            KillActiveHandle);
-		HSTR_PUSH_CFUNC(L, "UpdateCallIn",    CallOutUpdateCallIn);
-		HSTR_PUSH_CFUNC(L, "GetName",         CallOutGetName);
-		HSTR_PUSH_CFUNC(L, "GetSynced",       CallOutGetSynced);
-		HSTR_PUSH_CFUNC(L, "GetFullCtrl",     CallOutGetFullCtrl);
-		HSTR_PUSH_CFUNC(L, "GetFullRead",     CallOutGetFullRead);
-		HSTR_PUSH_CFUNC(L, "GetCtrlTeam",     CallOutGetCtrlTeam);
-		HSTR_PUSH_CFUNC(L, "GetReadTeam",     CallOutGetReadTeam);
-		HSTR_PUSH_CFUNC(L, "GetReadAllyTeam", CallOutGetReadAllyTeam);
-		HSTR_PUSH_CFUNC(L, "GetSelectTeam",   CallOutGetSelectTeam);
-		HSTR_PUSH_CFUNC(L, "GetGlobal",       CallOutGetGlobal);
-		HSTR_PUSH_CFUNC(L, "GetRegistry",     CallOutGetRegistry);
-		HSTR_PUSH_CFUNC(L, "GetCallInList",   CallOutGetCallInList);
-		HSTR_PUSH_CFUNC(L, "DelayByFrames",   CallOutDelayByFrames);
-		HSTR_PUSH_CFUNC(L, "IsEngineMinVersion", CallOutIsEngineMinVersion);
+		LuaPushNamedCFunc(L, "Kill",               KillActiveHandle);
+		LuaPushNamedCFunc(L, "UpdateCallIn",       CallOutUpdateCallIn);
+		LuaPushNamedCFunc(L, "GetName",            CallOutGetName);
+		LuaPushNamedCFunc(L, "GetSynced",          CallOutGetSynced);
+		LuaPushNamedCFunc(L, "GetFullCtrl",        CallOutGetFullCtrl);
+		LuaPushNamedCFunc(L, "GetFullRead",        CallOutGetFullRead);
+		LuaPushNamedCFunc(L, "GetCtrlTeam",        CallOutGetCtrlTeam);
+		LuaPushNamedCFunc(L, "GetReadTeam",        CallOutGetReadTeam);
+		LuaPushNamedCFunc(L, "GetReadAllyTeam",    CallOutGetReadAllyTeam);
+		LuaPushNamedCFunc(L, "GetSelectTeam",      CallOutGetSelectTeam);
+		LuaPushNamedCFunc(L, "GetGlobal",          CallOutGetGlobal);
+		LuaPushNamedCFunc(L, "GetRegistry",        CallOutGetRegistry);
+		LuaPushNamedCFunc(L, "GetCallInList",      CallOutGetCallInList);
+		LuaPushNamedCFunc(L, "DelayByFrames",      CallOutDelayByFrames);
+		LuaPushNamedCFunc(L, "IsEngineMinVersion", CallOutIsEngineMinVersion);
 		// special team constants
 
 		/*** @field Script.NO_ACCESS_TEAM -1 */
-		HSTR_PUSH_NUMBER(L, "NO_ACCESS_TEAM",  CEventClient::NoAccessTeam);
+		LuaPushNamedNumber(L, "NO_ACCESS_TEAM",  CEventClient::NoAccessTeam);
 		/*** @field Script.ALL_ACCESS_TEAM -2 */
-		HSTR_PUSH_NUMBER(L, "ALL_ACCESS_TEAM", CEventClient::AllAccessTeam);
+		LuaPushNamedNumber(L, "ALL_ACCESS_TEAM", CEventClient::AllAccessTeam);
 	}
 	lua_rawset(L, -3);
 

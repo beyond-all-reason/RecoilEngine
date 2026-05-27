@@ -356,21 +356,21 @@ int LuaArchive::GetAvailableAIs(lua_State* L)
 			lua_createtable(L, 0, 3); {
 				for (const auto& luaAIInfoItem: luaAIInfo) {
 					if (luaAIInfoItem.key == SKIRMISH_AI_PROPERTY_SHORT_NAME) {
-						HSTR_PUSH_STRING(L, "shortName", luaAIInfoItem.GetValueAsString());
+						LuaPushNamedString(L, "shortName", luaAIInfoItem.GetValueAsString());
 					} else if (luaAIInfoItem.key == SKIRMISH_AI_PROPERTY_VERSION) {
-						HSTR_PUSH_STRING(L, "version", luaAIInfoItem.GetValueAsString());
+						LuaPushNamedString(L, "version", luaAIInfoItem.GetValueAsString());
 					}
 				}
-				HSTR_PUSH_BOOL(L, "isLuaAI", true);
+				LuaPushNamedBool(L, "isLuaAI", true);
 			}
 			lua_rawseti(L, -2, ++count);
 		}
 
 		for (const auto& aiKey: skirmishAIKeys) {
 			lua_createtable(L, 0, 3); {
-				HSTR_PUSH_STRING(L, "shortName", aiKey.GetShortName());
-				HSTR_PUSH_STRING(L, "version", aiKey.GetVersion());
-				HSTR_PUSH_BOOL(L, "isLuaAI", false);
+				LuaPushNamedString(L, "shortName", aiKey.GetShortName());
+				LuaPushNamedString(L, "version", aiKey.GetVersion());
+				LuaPushNamedBool(L, "isLuaAI", false);
 			}
 			lua_rawseti(L, -2, ++count);
 		}

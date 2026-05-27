@@ -2078,35 +2078,35 @@ int LuaSyncedRead::GetTeamStatsHistory(lua_State* L)
 					// the `stats.frame` var indicates the frame when a new entry needs to get added,
 					// for the most recent stats entry this lies obviously in the future,
 					// so we just output the current frame here
-					HSTR_PUSH_NUMBER(L, "time",         gs->GetLuaSimFrame() / GAME_SPEED);
-					HSTR_PUSH_NUMBER(L, "frame",        gs->GetLuaSimFrame());
+					LuaPushNamedNumber(L, "time",         gs->GetLuaSimFrame() / GAME_SPEED);
+					LuaPushNamedNumber(L, "frame",        gs->GetLuaSimFrame());
 				} else {
-					HSTR_PUSH_NUMBER(L, "time",         stats.frame / GAME_SPEED);
-					HSTR_PUSH_NUMBER(L, "frame",        stats.frame);
+					LuaPushNamedNumber(L, "time",         stats.frame / GAME_SPEED);
+					LuaPushNamedNumber(L, "frame",        stats.frame);
 				}
 
-				HSTR_PUSH_NUMBER(L, "metalUsed",        stats.metalUsed);
-				HSTR_PUSH_NUMBER(L, "metalProduced",    stats.metalProduced);
-				HSTR_PUSH_NUMBER(L, "metalExcess",      stats.metalExcess);
-				HSTR_PUSH_NUMBER(L, "metalReceived",    stats.metalReceived);
-				HSTR_PUSH_NUMBER(L, "metalSent",        stats.metalSent);
+				LuaPushNamedNumber(L, "metalUsed",        stats.metalUsed);
+				LuaPushNamedNumber(L, "metalProduced",    stats.metalProduced);
+				LuaPushNamedNumber(L, "metalExcess",      stats.metalExcess);
+				LuaPushNamedNumber(L, "metalReceived",    stats.metalReceived);
+				LuaPushNamedNumber(L, "metalSent",        stats.metalSent);
 
-				HSTR_PUSH_NUMBER(L, "energyUsed",       stats.energyUsed);
-				HSTR_PUSH_NUMBER(L, "energyProduced",   stats.energyProduced);
-				HSTR_PUSH_NUMBER(L, "energyExcess",     stats.energyExcess);
-				HSTR_PUSH_NUMBER(L, "energyReceived",   stats.energyReceived);
-				HSTR_PUSH_NUMBER(L, "energySent",       stats.energySent);
+				LuaPushNamedNumber(L, "energyUsed",       stats.energyUsed);
+				LuaPushNamedNumber(L, "energyProduced",   stats.energyProduced);
+				LuaPushNamedNumber(L, "energyExcess",     stats.energyExcess);
+				LuaPushNamedNumber(L, "energyReceived",   stats.energyReceived);
+				LuaPushNamedNumber(L, "energySent",       stats.energySent);
 
-				HSTR_PUSH_NUMBER(L, "damageDealt",      stats.damageDealt);
-				HSTR_PUSH_NUMBER(L, "damageReceived",   stats.damageReceived);
+				LuaPushNamedNumber(L, "damageDealt",      stats.damageDealt);
+				LuaPushNamedNumber(L, "damageReceived",   stats.damageReceived);
 
-				HSTR_PUSH_NUMBER(L, "unitsProduced",    stats.unitsProduced);
-				HSTR_PUSH_NUMBER(L, "unitsDied",        stats.unitsDied);
-				HSTR_PUSH_NUMBER(L, "unitsReceived",    stats.unitsReceived);
-				HSTR_PUSH_NUMBER(L, "unitsSent",        stats.unitsSent);
-				HSTR_PUSH_NUMBER(L, "unitsCaptured",    stats.unitsCaptured);
-				HSTR_PUSH_NUMBER(L, "unitsOutCaptured", stats.unitsOutCaptured);
-				HSTR_PUSH_NUMBER(L, "unitsKilled",      stats.unitsKilled);
+				LuaPushNamedNumber(L, "unitsProduced",    stats.unitsProduced);
+				LuaPushNamedNumber(L, "unitsDied",        stats.unitsDied);
+				LuaPushNamedNumber(L, "unitsReceived",    stats.unitsReceived);
+				LuaPushNamedNumber(L, "unitsSent",        stats.unitsSent);
+				LuaPushNamedNumber(L, "unitsCaptured",    stats.unitsCaptured);
+				LuaPushNamedNumber(L, "unitsOutCaptured", stats.unitsOutCaptured);
+				LuaPushNamedNumber(L, "unitsKilled",      stats.unitsKilled);
 			}
 			lua_rawseti(L, -2, count++);
 		}
@@ -2309,8 +2309,8 @@ int LuaSyncedRead::GetAIInfo(lua_State* L)
 
 	// no unsynced Skirmish AI info for synchronized scripts
 	if (CLuaHandle::GetHandleSynced(L)) {
-		HSTR_PUSH(L, "SYNCED_NOSHORTNAME");
-		HSTR_PUSH(L, "SYNCED_NOVERSION");
+		LuaPushHString(L, "SYNCED_NOSHORTNAME");
+		LuaPushHString(L, "SYNCED_NOVERSION");
 		lua_newtable(L);
 	} else if (skirmishAIHandler.IsLocalSkirmishAI(skirmishAIId)) {
 		lua_pushsstring(L, aiData->shortName);
@@ -2324,8 +2324,8 @@ int LuaSyncedRead::GetAIInfo(lua_State* L)
 			lua_rawset(L, -3);
 		}
 	} else {
-		HSTR_PUSH(L, "UNKNOWN");
-		HSTR_PUSH(L, "UNKNOWN");
+		LuaPushHString(L, "UNKNOWN");
+		LuaPushHString(L, "UNKNOWN");
 		lua_newtable(L);
 	}
 	numVals += 3;
@@ -2629,7 +2629,7 @@ int LuaSyncedRead::GetTeamUnitsSorted(lua_State* L)
 		}
 
 		if (!gtuObjectIDs.empty()) {
-			HSTR_PUSH(L, "unknown");
+			LuaPushHString(L, "unknown");
 
 			defCount += 1;
 			unitCount = 1;
@@ -2723,7 +2723,7 @@ int LuaSyncedRead::GetTeamUnitsCounts(lua_State* L)
 		defCount++;
 	}
 	if (unknownCount > 0) {
-		HSTR_PUSH_NUMBER(L, "unknown", unknownCount);
+		LuaPushNamedNumber(L, "unknown", unknownCount);
 		defCount++;
 	}
 
@@ -3736,16 +3736,16 @@ int LuaSyncedRead::GetUnitStates(lua_State* L)
 		lua_createtable(L, 0, 9);
 
 		{
-			HSTR_PUSH_NUMBER(L, "firestate",  unit->fireState);
-			HSTR_PUSH_NUMBER(L, "movestate",  unit->moveState);
-			HSTR_PUSH_NUMBER(L, "autorepairlevel", (mCAI != nullptr)? mCAI->repairBelowHealth: -1.0f);
+			LuaPushNamedNumber(L, "firestate",  unit->fireState);
+			LuaPushNamedNumber(L, "movestate",  unit->moveState);
+			LuaPushNamedNumber(L, "autorepairlevel", (mCAI != nullptr)? mCAI->repairBelowHealth: -1.0f);
 		}
 
 		if (binState) {
-			HSTR_PUSH_BOOL(L, "repeat",     unit->commandAI->repeatOrders);
-			HSTR_PUSH_BOOL(L, "cloak",      unit->wantCloak);
-			HSTR_PUSH_BOOL(L, "active",     unit->activated);
-			HSTR_PUSH_BOOL(L, "trajectory", unit->useHighTrajectory);
+			LuaPushNamedBool(L, "repeat",     unit->commandAI->repeatOrders);
+			LuaPushNamedBool(L, "cloak",      unit->wantCloak);
+			LuaPushNamedBool(L, "active",     unit->activated);
+			LuaPushNamedBool(L, "trajectory", unit->useHighTrajectory);
 		}
 
 		if (amtState) {
@@ -3753,14 +3753,14 @@ int LuaSyncedRead::GetUnitStates(lua_State* L)
 			const CStrafeAirMoveType* sAMT = nullptr;
 
 			if ((hAMT = dynamic_cast<const CHoverAirMoveType*>(mt)) != nullptr) {
-				HSTR_PUSH_BOOL(L, "autoland",       hAMT->autoLand);
-				HSTR_PUSH_BOOL(L, "loopbackattack", false);
+				LuaPushNamedBool(L, "autoland",       hAMT->autoLand);
+				LuaPushNamedBool(L, "loopbackattack", false);
 				return 1;
 			}
 
 			if ((sAMT = dynamic_cast<const CStrafeAirMoveType*>(mt)) != nullptr) {
-				HSTR_PUSH_BOOL(L, "autoland",       sAMT->autoLand);
-				HSTR_PUSH_BOOL(L, "loopbackattack", sAMT->loopbackAttack);
+				LuaPushNamedBool(L, "autoland",       sAMT->autoLand);
+				LuaPushNamedBool(L, "loopbackattack", sAMT->loopbackAttack);
 				return 1;
 			}
 		}
@@ -5908,17 +5908,17 @@ int LuaSyncedRead::GetUnitDefDimensions(lua_State* L)
 	const S3DModel& m = *model;
 	const float3& mid = model->relMidPos;
 	lua_createtable(L, 0, 11);
-	HSTR_PUSH_NUMBER(L, "height", m.height);
-	HSTR_PUSH_NUMBER(L, "radius", m.radius);
-	HSTR_PUSH_NUMBER(L, "midx",   mid.x);
-	HSTR_PUSH_NUMBER(L, "minx",   m.mins.x);
-	HSTR_PUSH_NUMBER(L, "maxx",   m.maxs.x);
-	HSTR_PUSH_NUMBER(L, "midy",   mid.y);
-	HSTR_PUSH_NUMBER(L, "miny",   m.mins.y);
-	HSTR_PUSH_NUMBER(L, "maxy",   m.maxs.y);
-	HSTR_PUSH_NUMBER(L, "midz",   mid.z);
-	HSTR_PUSH_NUMBER(L, "minz",   m.mins.z);
-	HSTR_PUSH_NUMBER(L, "maxz",   m.maxs.z);
+	LuaPushNamedNumber(L, "height", m.height);
+	LuaPushNamedNumber(L, "radius", m.radius);
+	LuaPushNamedNumber(L, "midx",   mid.x);
+	LuaPushNamedNumber(L, "minx",   m.mins.x);
+	LuaPushNamedNumber(L, "maxx",   m.maxs.x);
+	LuaPushNamedNumber(L, "midy",   mid.y);
+	LuaPushNamedNumber(L, "miny",   m.mins.y);
+	LuaPushNamedNumber(L, "maxy",   m.maxs.y);
+	LuaPushNamedNumber(L, "midz",   mid.z);
+	LuaPushNamedNumber(L, "minz",   m.mins.z);
+	LuaPushNamedNumber(L, "maxz",   m.maxs.z);
 	return 1;
 }
 
@@ -5966,49 +5966,49 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 	AMoveType* amt = unit->moveType;
 
 	lua_createtable(L, 0, 26);
-	HSTR_PUSH_NUMBER(L, "maxSpeed", amt->GetMaxSpeed() * GAME_SPEED);
-	HSTR_PUSH_NUMBER(L, "maxWantedSpeed", amt->GetMaxWantedSpeed() * GAME_SPEED);
-	HSTR_PUSH_NUMBER(L, "goalx", amt->goalPos.x);
-	HSTR_PUSH_NUMBER(L, "goaly", amt->goalPos.y);
-	HSTR_PUSH_NUMBER(L, "goalz", amt->goalPos.z);
+	LuaPushNamedNumber(L, "maxSpeed", amt->GetMaxSpeed() * GAME_SPEED);
+	LuaPushNamedNumber(L, "maxWantedSpeed", amt->GetMaxWantedSpeed() * GAME_SPEED);
+	LuaPushNamedNumber(L, "goalx", amt->goalPos.x);
+	LuaPushNamedNumber(L, "goaly", amt->goalPos.y);
+	LuaPushNamedNumber(L, "goalz", amt->goalPos.z);
 
 	switch (amt->progressState) {
 		case AMoveType::Done:
-			HSTR_PUSH_CSTRING(L, "progressState", "done");
+			LuaPushNamedString(L, "progressState", "done");
 			break;
 		case AMoveType::Active:
-			HSTR_PUSH_CSTRING(L, "progressState", "active");
+			LuaPushNamedString(L, "progressState", "active");
 			break;
 		case AMoveType::Failed:
-			HSTR_PUSH_CSTRING(L, "progressState", "failed");
+			LuaPushNamedString(L, "progressState", "failed");
 			break;
 	}
 
 	const CGroundMoveType* groundmt = dynamic_cast<CGroundMoveType*>(unit->moveType);
 
 	if (groundmt != nullptr) {
-		HSTR_PUSH_CSTRING(L, "name", "ground");
+		LuaPushNamedString(L, "name", "ground");
 
-		HSTR_PUSH_NUMBER(L, "turnRate", groundmt->GetTurnRate());
-		HSTR_PUSH_NUMBER(L, "accRate", groundmt->GetAccRate());
-		HSTR_PUSH_NUMBER(L, "decRate", groundmt->GetDecRate());
+		LuaPushNamedNumber(L, "turnRate", groundmt->GetTurnRate());
+		LuaPushNamedNumber(L, "accRate", groundmt->GetAccRate());
+		LuaPushNamedNumber(L, "decRate", groundmt->GetDecRate());
 
-		HSTR_PUSH_NUMBER(L, "maxReverseSpeed", groundmt->GetMaxReverseSpeed() * GAME_SPEED);
-		HSTR_PUSH_NUMBER(L, "wantedSpeed", groundmt->GetWantedSpeed() * GAME_SPEED);
-		HSTR_PUSH_NUMBER(L, "currentSpeed", groundmt->GetCurrentSpeed() * GAME_SPEED);
+		LuaPushNamedNumber(L, "maxReverseSpeed", groundmt->GetMaxReverseSpeed() * GAME_SPEED);
+		LuaPushNamedNumber(L, "wantedSpeed", groundmt->GetWantedSpeed() * GAME_SPEED);
+		LuaPushNamedNumber(L, "currentSpeed", groundmt->GetCurrentSpeed() * GAME_SPEED);
 
-		HSTR_PUSH_NUMBER(L, "goalRadius", groundmt->GetGoalRadius());
+		LuaPushNamedNumber(L, "goalRadius", groundmt->GetGoalRadius());
 
-		HSTR_PUSH_NUMBER(L, "currwaypointx", (groundmt->GetCurrWayPoint()).x);
-		HSTR_PUSH_NUMBER(L, "currwaypointy", (groundmt->GetCurrWayPoint()).y);
-		HSTR_PUSH_NUMBER(L, "currwaypointz", (groundmt->GetCurrWayPoint()).z);
-		HSTR_PUSH_NUMBER(L, "nextwaypointx", (groundmt->GetNextWayPoint()).x);
-		HSTR_PUSH_NUMBER(L, "nextwaypointy", (groundmt->GetNextWayPoint()).y);
-		HSTR_PUSH_NUMBER(L, "nextwaypointz", (groundmt->GetNextWayPoint()).z);
+		LuaPushNamedNumber(L, "currwaypointx", (groundmt->GetCurrWayPoint()).x);
+		LuaPushNamedNumber(L, "currwaypointy", (groundmt->GetCurrWayPoint()).y);
+		LuaPushNamedNumber(L, "currwaypointz", (groundmt->GetCurrWayPoint()).z);
+		LuaPushNamedNumber(L, "nextwaypointx", (groundmt->GetNextWayPoint()).x);
+		LuaPushNamedNumber(L, "nextwaypointy", (groundmt->GetNextWayPoint()).y);
+		LuaPushNamedNumber(L, "nextwaypointz", (groundmt->GetNextWayPoint()).z);
 
-		HSTR_PUSH_NUMBER(L, "requestedSpeed", 0.0f);
+		LuaPushNamedNumber(L, "requestedSpeed", 0.0f);
 
-		HSTR_PUSH_NUMBER(L, "pathFailures", 0);
+		LuaPushNamedNumber(L, "pathFailures", 0);
 
 		return 1;
 	}
@@ -6016,62 +6016,62 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 	const CHoverAirMoveType* hAMT = dynamic_cast<CHoverAirMoveType*>(unit->moveType);
 
 	if (hAMT != nullptr) {
-		HSTR_PUSH_CSTRING(L, "name", "gunship");
+		LuaPushNamedString(L, "name", "gunship");
 
-		HSTR_PUSH_NUMBER(L, "wantedHeight", hAMT->wantedHeight);
-		HSTR_PUSH_BOOL(L, "collide", hAMT->collide);
-		HSTR_PUSH_BOOL(L, "useSmoothMesh", hAMT->useSmoothMesh);
+		LuaPushNamedNumber(L, "wantedHeight", hAMT->wantedHeight);
+		LuaPushNamedBool(L, "collide", hAMT->collide);
+		LuaPushNamedBool(L, "useSmoothMesh", hAMT->useSmoothMesh);
 
 		switch (hAMT->aircraftState) {
 			case AAirMoveType::AIRCRAFT_LANDED:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "landed");
+				LuaPushNamedString(L, "aircraftState", "landed");
 				break;
 			case AAirMoveType::AIRCRAFT_FLYING:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "flying");
+				LuaPushNamedString(L, "aircraftState", "flying");
 				break;
 			case AAirMoveType::AIRCRAFT_LANDING:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "landing");
+				LuaPushNamedString(L, "aircraftState", "landing");
 				break;
 			case AAirMoveType::AIRCRAFT_CRASHING:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "crashing");
+				LuaPushNamedString(L, "aircraftState", "crashing");
 				break;
 			case AAirMoveType::AIRCRAFT_TAKEOFF:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "takeoff");
+				LuaPushNamedString(L, "aircraftState", "takeoff");
 				break;
 			case AAirMoveType::AIRCRAFT_HOVERING:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "hovering");
+				LuaPushNamedString(L, "aircraftState", "hovering");
 				break;
 		};
 
 		switch (hAMT->flyState) {
 			case CHoverAirMoveType::FLY_CRUISING:
-				HSTR_PUSH_CSTRING(L, "flyState", "cruising");
+				LuaPushNamedString(L, "flyState", "cruising");
 				break;
 			case CHoverAirMoveType::FLY_CIRCLING:
-				HSTR_PUSH_CSTRING(L, "flyState", "circling");
+				LuaPushNamedString(L, "flyState", "circling");
 				break;
 			case CHoverAirMoveType::FLY_ATTACKING:
-				HSTR_PUSH_CSTRING(L, "flyState", "attacking");
+				LuaPushNamedString(L, "flyState", "attacking");
 				break;
 			case CHoverAirMoveType::FLY_LANDING:
-				HSTR_PUSH_CSTRING(L, "flyState", "landing");
+				LuaPushNamedString(L, "flyState", "landing");
 				break;
 		}
 
-		HSTR_PUSH_NUMBER(L, "goalDistance", hAMT->goalDistance);
+		LuaPushNamedNumber(L, "goalDistance", hAMT->goalDistance);
 
-		HSTR_PUSH_BOOL(L, "bankingAllowed", hAMT->bankingAllowed);
-		HSTR_PUSH_NUMBER(L, "currentBank", hAMT->currentBank);
-		HSTR_PUSH_NUMBER(L, "currentPitch", hAMT->currentPitch);
+		LuaPushNamedBool  (L, "bankingAllowed", hAMT->bankingAllowed);
+		LuaPushNamedNumber(L, "currentBank", hAMT->currentBank);
+		LuaPushNamedNumber(L, "currentPitch", hAMT->currentPitch);
 
-		HSTR_PUSH_NUMBER(L, "turnRate", hAMT->turnRate);
-		HSTR_PUSH_NUMBER(L, "accRate", hAMT->accRate);
-		HSTR_PUSH_NUMBER(L, "decRate", hAMT->decRate);
-		HSTR_PUSH_NUMBER(L, "altitudeRate", hAMT->altitudeRate);
+		LuaPushNamedNumber(L, "turnRate",     hAMT->turnRate);
+		LuaPushNamedNumber(L, "accRate",      hAMT->accRate);
+		LuaPushNamedNumber(L, "decRate",      hAMT->decRate);
+		LuaPushNamedNumber(L, "altitudeRate", hAMT->altitudeRate);
 
-		HSTR_PUSH_NUMBER(L, "brakeDistance", -1.0f); // DEPRECATED
-		HSTR_PUSH_BOOL(L, "dontLand", hAMT->GetAllowLanding());
-		HSTR_PUSH_NUMBER(L, "maxDrift", hAMT->maxDrift);
+		LuaPushNamedNumber(L, "brakeDistance", -1.0f); // DEPRECATED
+		LuaPushNamedBool  (L, "dontLand", hAMT->GetAllowLanding());
+		LuaPushNamedNumber(L, "maxDrift", hAMT->maxDrift);
 
 		return 1;
 	}
@@ -6079,42 +6079,42 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 	const CStrafeAirMoveType* sAMT = dynamic_cast<CStrafeAirMoveType*>(unit->moveType);
 
 	if (sAMT != nullptr) {
-		HSTR_PUSH_CSTRING(L, "name", "airplane");
+		LuaPushNamedString(L, "name", "airplane");
 
 		switch (sAMT->aircraftState) {
 			case AAirMoveType::AIRCRAFT_LANDED:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "landed");
+				LuaPushNamedString(L, "aircraftState", "landed");
 				break;
 			case AAirMoveType::AIRCRAFT_FLYING:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "flying");
+				LuaPushNamedString(L, "aircraftState", "flying");
 				break;
 			case AAirMoveType::AIRCRAFT_LANDING:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "landing");
+				LuaPushNamedString(L, "aircraftState", "landing");
 				break;
 			case AAirMoveType::AIRCRAFT_CRASHING:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "crashing");
+				LuaPushNamedString(L, "aircraftState", "crashing");
 				break;
 			case AAirMoveType::AIRCRAFT_TAKEOFF:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "takeoff");
+				LuaPushNamedString(L, "aircraftState", "takeoff");
 				break;
 			case AAirMoveType::AIRCRAFT_HOVERING:
-				HSTR_PUSH_CSTRING(L, "aircraftState", "hovering");
+				LuaPushNamedString(L, "aircraftState", "hovering");
 				break;
 		};
-		HSTR_PUSH_NUMBER(L, "wantedHeight", sAMT->wantedHeight);
-		HSTR_PUSH_BOOL(L, "collide", sAMT->collide);
-		HSTR_PUSH_BOOL(L, "useSmoothMesh", sAMT->useSmoothMesh);
+		LuaPushNamedNumber(L, "wantedHeight",  sAMT->wantedHeight);
+		LuaPushNamedBool  (L, "collide",       sAMT->collide);
+		LuaPushNamedBool  (L, "useSmoothMesh", sAMT->useSmoothMesh);
 
-		HSTR_PUSH_NUMBER(L, "myGravity", sAMT->myGravity);
+		LuaPushNamedNumber(L, "myGravity", sAMT->myGravity);
 
-		HSTR_PUSH_NUMBER(L, "maxBank", sAMT->maxBank);
-		HSTR_PUSH_NUMBER(L, "maxPitch", sAMT->maxBank);
-		HSTR_PUSH_NUMBER(L, "turnRadius", sAMT->turnRadius);
+		LuaPushNamedNumber(L, "maxBank",    sAMT->maxBank);
+		LuaPushNamedNumber(L, "maxPitch",   sAMT->maxBank);
+		LuaPushNamedNumber(L, "turnRadius", sAMT->turnRadius);
 
-		HSTR_PUSH_NUMBER(L, "maxAcc", sAMT->accRate);
-		HSTR_PUSH_NUMBER(L, "maxAileron", sAMT->maxAileron);
-		HSTR_PUSH_NUMBER(L, "maxElevator", sAMT->maxElevator);
-		HSTR_PUSH_NUMBER(L, "maxRudder", sAMT->maxRudder);
+		LuaPushNamedNumber(L, "maxAcc",      sAMT->accRate);
+		LuaPushNamedNumber(L, "maxAileron",  sAMT->maxAileron);
+		LuaPushNamedNumber(L, "maxElevator", sAMT->maxElevator);
+		LuaPushNamedNumber(L, "maxRudder",   sAMT->maxRudder);
 
 		return 1;
 	}
@@ -6122,18 +6122,18 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 	const CStaticMoveType* staticmt = dynamic_cast<CStaticMoveType*>(unit->moveType);
 
 	if (staticmt != nullptr) {
-		HSTR_PUSH_CSTRING(L, "name", "static");
+		LuaPushNamedString(L, "name", "static");
 		return 1;
 	}
 
 	const CScriptMoveType* scriptmt = dynamic_cast<CScriptMoveType*>(unit->moveType);
 
 	if (scriptmt != nullptr) {
-		HSTR_PUSH_CSTRING(L, "name", "script");
+		LuaPushNamedString(L, "name", "script");
 		return 1;
 	}
 
-	HSTR_PUSH_CSTRING(L, "name", "unknown");
+	LuaPushNamedString(L, "name", "unknown");
 	return 1;
 }
 
@@ -6152,14 +6152,14 @@ static void PackCommand(lua_State* L, const Command& cmd)
 {
 	lua_createtable(L, 0, 4);
 
-	HSTR_PUSH_NUMBER(L, "id", cmd.GetID());
+	LuaPushNamedNumber(L, "id", cmd.GetID());
 
 	// t["params"] = {[1] = param1, ...}
 	LuaUtils::PushCommandParamsTable(L, cmd, true);
 	// t["options"] = {key1 = val1, ...}
 	LuaUtils::PushCommandOptionsTable(L, cmd, true);
 
-	HSTR_PUSH_NUMBER(L, "tag", cmd.GetTag());
+	LuaPushNamedNumber(L, "tag", cmd.GetTag());
 }
 
 
@@ -7807,7 +7807,7 @@ int LuaSyncedRead::GetGroundBlocked(lua_State* L)
 			const CFeature* feature = dynamic_cast<const CFeature*>(s);
 			if (feature != nullptr) {
 				if (LuaUtils::IsFeatureVisible(L, feature)) {
-					HSTR_PUSH(L, "feature");
+					LuaPushHString(L, "feature");
 					lua_pushnumber(L, feature->id);
 					return 2;
 				}
@@ -7818,7 +7818,7 @@ int LuaSyncedRead::GetGroundBlocked(lua_State* L)
 			const CUnit* unit = dynamic_cast<const CUnit*>(s);
 			if (unit != nullptr) {
 				if (CLuaHandle::GetHandleFullRead(L) || (unit->losStatus[CLuaHandle::GetHandleReadAllyTeam(L)] & LOS_INLOS)) {
-					HSTR_PUSH(L, "unit");
+					LuaPushHString(L, "unit");
 					lua_pushnumber(L, unit->id);
 					return 2;
 				}
@@ -8291,13 +8291,13 @@ int LuaSyncedRead::GetUnitLosState(lua_State* L)
 
 	lua_createtable(L, 0, 3);
 	if (losStatus & LOS_INLOS) {
-		HSTR_PUSH_BOOL(L, "los", true);
+		LuaPushNamedBool(L, "los", true);
 	}
 	if (losStatus & LOS_INRADAR) {
-		HSTR_PUSH_BOOL(L, "radar", true);
+		LuaPushNamedBool(L, "radar", true);
 	}
 	if ((losStatus & LOS_INLOS) || isTyped) {
-		HSTR_PUSH_BOOL(L, "typed", true);
+		LuaPushNamedBool(L, "typed", true);
 	}
 	return 1;
 }
@@ -8539,10 +8539,10 @@ static int GetSolidObjectPieceList(lua_State* L, const CSolidObject* o)
 static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 {
 	lua_createtable(L, 0, 7);
-	HSTR_PUSH_STRING(L, "name", op.name);
-	HSTR_PUSH_STRING(L, "parent", ((op.parent != nullptr) ? op.parent->name : "[null]"));
+	LuaPushNamedString(L, "name",   op.name);
+	LuaPushNamedString(L, "parent", ((op.parent != nullptr) ? op.parent->name : "[null]"));
 
-	HSTR_PUSH(L, "children");
+	LuaPushHString(L, "children");
 	lua_createtable(L, op.children.size(), 0);
 	for (size_t c = 0; c < op.children.size(); c++) {
 		lua_pushsstring(L, op.children[c]->name);
@@ -8550,11 +8550,9 @@ static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 	}
 	lua_rawset(L, -3);
 
-	HSTR_PUSH(L, "isEmpty");
-	lua_pushboolean(L, !op.HasGeometryData());
-	lua_rawset(L, -3);
+	LuaPushNamedBool(L, "isEmpty", !op.HasGeometryData());
 
-	HSTR_PUSH(L, "min");
+	LuaPushHString(L, "min");
 	lua_createtable(L, 3, 0); {
 		lua_pushnumber(L, op.mins.x); lua_rawseti(L, -2, 1);
 		lua_pushnumber(L, op.mins.y); lua_rawseti(L, -2, 2);
@@ -8562,7 +8560,7 @@ static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 	}
 	lua_rawset(L, -3);
 
-	HSTR_PUSH(L, "max");
+	LuaPushHString(L, "max");
 	lua_createtable(L, 3, 0); {
 		lua_pushnumber(L, op.maxs.x); lua_rawseti(L, -2, 1);
 		lua_pushnumber(L, op.maxs.y); lua_rawseti(L, -2, 2);
@@ -8570,7 +8568,7 @@ static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 	}
 	lua_rawset(L, -3);
 
-	HSTR_PUSH(L, "offset");
+	LuaPushHString(L, "offset");
 	lua_createtable(L, 3, 0); {
 		lua_pushnumber(L, op.offset.x); lua_rawseti(L, -2, 1);
 		lua_pushnumber(L, op.offset.y); lua_rawseti(L, -2, 2);

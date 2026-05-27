@@ -3092,7 +3092,7 @@ int LuaUnsyncedRead::GetCameraFOV(lua_State* L)
 int LuaUnsyncedRead::GetCameraVectors(lua_State* L)
 {
 #define PACK_CAMERA_VECTOR(s,n) \
-	HSTR_PUSH(L, #s);           \
+	lua_pushhstring(L, LuaHashStringLiteral(#s), #s, sizeof(#s) - 1); \
 	lua_createtable(L, 3, 0);            \
 	lua_pushnumber(L, camera-> n .x); lua_rawseti(L, -2, 1); \
 	lua_pushnumber(L, camera-> n .y); lua_rawseti(L, -2, 2); \

@@ -64,9 +64,9 @@ bool LuaFBOs::CreateMetatable(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	luaL_newmetatable(L, "FBO");
-	HSTR_PUSH_CFUNC(L, "__gc",        meta_gc);
-	HSTR_PUSH_CFUNC(L, "__index",     meta_index);
-	HSTR_PUSH_CFUNC(L, "__newindex",  meta_newindex);
+	LuaPushNamedCFunc(L, "__gc",        meta_gc);
+	LuaPushNamedCFunc(L, "__index",     meta_index);
+	LuaPushNamedCFunc(L, "__newindex",  meta_newindex);
 	lua_pop(L, 1);
 	return true;
 }
