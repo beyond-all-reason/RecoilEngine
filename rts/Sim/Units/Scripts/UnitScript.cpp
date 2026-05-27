@@ -803,6 +803,7 @@ bool CUnitScript::EmitAbsSFX(int sfxType, const float3& absPos, const float3& ab
 					.damages              = *weapon->damages,
 					.weaponDef            = weaponDef,
 					.owner                = unit,
+					.ownerTeamID          = unit->team,
 					.hitObject            = ExplosionHitObject(),
 					.craterAreaOfEffect   = weapon->damages->craterAreaOfEffect,
 					.damageAreaOfEffect   = weapon->damages->damageAreaOfEffect,

@@ -462,29 +462,35 @@ void CUnit::FinishedBuilding(bool postInit)
 }
 
 
-void CUnit::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID)
+void CUnit::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID, int attackerTeamID)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (attacker != nullptr && attackerTeamID == -1)
+		attackerTeamID = attacker->team;
+
 	if (IsCrashing() && !beingBuilt)
 		return;
 
-	ForcedKillUnit(attacker, selfDestruct, reclaimed, weaponDefID);
+	ForcedKillUnit(attacker, selfDestruct, reclaimed, weaponDefID, attackerTeamID);
 }
 
-void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID)
+void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID, int attackerTeamID)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (attacker != nullptr && attackerTeamID == -1)
+		attackerTeamID = attacker->team;
+
 	if (isDead)
 		return;
 
 	isDead = true;
 
 	// release attached units
-	ReleaseTransportees(attacker, selfDestruct, reclaimed);
+	ReleaseTransportees(attacker, selfDestruct, reclaimed, attackerTeamID);
 
 	// pre-destruction event; unit may be kept around for its death sequence
-	eventHandler.UnitDestroyed(this, attacker, weaponDefID);
-	eoh->UnitDestroyed(*this, attacker, weaponDefID);
+	eventHandler.UnitDestroyed(this, attacker, weaponDefID, attackerTeamID);
+	eoh->UnitDestroyed(*this, attacker, weaponDefID, attackerTeamID);
 
 	if (!unitDef->windGenerator.empty())
 		envResHandler.DelGenerator(this);
@@ -506,6 +512,7 @@ void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, i
 			.damages              = *da,
 			.weaponDef            = wd,
 			.owner                = this,
+			.ownerTeamID          = team,
 			.hitObject            = ExplosionHitObject(),
 			.craterAreaOfEffect   = da->craterAreaOfEffect,
 			.damageAreaOfEffect   = da->damageAreaOfEffect,
@@ -758,7 +765,7 @@ void CUnit::UpdateTransportees()
 	}
 }
 
-void CUnit::ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaimed)
+void CUnit::ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaimed, int attackerTeamID)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	for (TransportedUnit& tu: transportedUnits) {
@@ -775,9 +782,9 @@ void CUnit::ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaim
 		if (!unitDef->releaseHeld) {
 			// we don't want transportees to leave a corpse
 			if (!selfDestruct)
-				transportee->DoDamage(DamageArray(1e6f), ZeroVector, nullptr, -CSolidObject::DAMAGE_TRANSPORT_KILLED, -1);
+				transportee->DoDamage(DamageArray(1e6f), ZeroVector, nullptr, -CSolidObject::DAMAGE_TRANSPORT_KILLED, -1, attackerTeamID);
 
-			transportee->KillUnit(attacker, selfDestruct, reclaimed, -CSolidObject::DAMAGE_TRANSPORT_KILLED);
+			transportee->KillUnit(attacker, selfDestruct, reclaimed, -CSolidObject::DAMAGE_TRANSPORT_KILLED, attackerTeamID);
 		} else {
 			// NOTE: game's responsibility to deal with edge-cases now
 			transportee->Move(transportee->pos.cClampInBounds(), false);
@@ -1227,13 +1234,16 @@ void CUnit::DoWaterDamage()
 
 
 
-static void AddUnitDamageStats(CUnit* unit, float damage, bool dealt)
+static void AddUnitDamageStats(CUnit* unit, float damage, bool dealt, int teamID = -1)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (unit == nullptr)
+	
+	const int targetTeamID = (unit != nullptr) ? unit->team : teamID;
+
+	if (targetTeamID < 0)
 		return;
 
-	CTeam* team = teamHandler.Team(unit->team);
+	CTeam* team = teamHandler.Team(targetTeamID);
 	TeamStatistics& stats = team->GetCurrentStats();
 
 	if (dealt) {
@@ -1243,14 +1253,14 @@ static void AddUnitDamageStats(CUnit* unit, float damage, bool dealt)
 	}
 }
 
-void CUnit::ApplyDamage(CUnit* attacker, const DamageArray& damages, float& baseDamage, float& experienceMod)
+void CUnit::ApplyDamage(CUnit* attacker, const DamageArray& damages, float& baseDamage, float& experienceMod, int attackerTeamID)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (damages.paralyzeDamageTime == 0) {
 		// real damage
 		if (baseDamage > 0.0f) {
 			// do not log overkill damage, so nukes etc do not inflate values
-			AddUnitDamageStats(attacker, std::clamp(maxHealth - health, 0.0f, baseDamage), true);
+			AddUnitDamageStats(attacker, std::clamp(maxHealth - health, 0.0f, baseDamage), true, attackerTeamID);
 			AddUnitDamageStats(this, std::clamp(maxHealth - health, 0.0f, baseDamage), false);
 
 			health -= baseDamage;
@@ -1311,12 +1321,17 @@ void CUnit::DoDamage(
 	const float3& impulse,
 	CUnit* attacker,
 	int weaponDefID,
-	int projectileID
+	int projectileID,
+	int attackerTeamID
 ) {
 	if (isDead)
 		return;
 	if (IsCrashing() || IsInVoid())
 		return;
+
+	if (attacker != nullptr && attackerTeamID == -1) {
+		attackerTeamID = attacker->team;
+	}
 
 	float baseDamage = damages.Get(armorType);
 	float experienceMod = globalUnitParams.expMultiplier;
@@ -1328,7 +1343,6 @@ void CUnit::DoDamage(
 	if (!isCollision && baseDamage > 0.0f) {
 		if (attacker != nullptr) {
 			SetLastAttacker(attacker);
-
 			// FIXME -- not the impulse direction?
 			baseDamage *= GetFlankingDamageBonus((attacker->pos - pos).SafeNormalize());
 		}
@@ -1337,15 +1351,15 @@ void CUnit::DoDamage(
 		restTime = 0; // bleeding != resting
 	}
 
-	if (eventHandler.UnitPreDamaged(this, attacker, baseDamage, weaponDefID, projectileID, isParalyzer, &baseDamage, &impulseMult))
+	if (eventHandler.UnitPreDamaged(this, attacker, baseDamage, weaponDefID, projectileID, isParalyzer, &baseDamage, &impulseMult, attackerTeamID))
 		return;
 
 	script->WorldHitByWeapon(-(impulse * impulseMult).SafeNormalize2D(), weaponDefID, /*inout*/ baseDamage);
 	ApplyImpulse((impulse * impulseMult) / mass);
-	ApplyDamage(attacker, damages, baseDamage, experienceMod);
+	ApplyDamage(attacker, damages, baseDamage, experienceMod, attackerTeamID);
 
 	{
-		eventHandler.UnitDamaged(this, attacker, baseDamage, weaponDefID, projectileID, isParalyzer);
+		eventHandler.UnitDamaged(this, attacker, baseDamage, weaponDefID, projectileID, isParalyzer, attackerTeamID);
 
 		// unit might have been killed via Lua from within UnitDamaged (e.g.
 		// through a recursive DoDamage call from AddUnitDamage or directly
@@ -1353,7 +1367,7 @@ void CUnit::DoDamage(
 		if (isDead)
 			return;
 
-		eoh->UnitDamaged(*this, attacker, baseDamage, weaponDefID, projectileID, isParalyzer);
+		eoh->UnitDamaged(*this, attacker, baseDamage, weaponDefID, projectileID, isParalyzer, attackerTeamID);
 	}
 
 	if (!isCollision && baseDamage > 0.0f) {
@@ -1370,22 +1384,18 @@ void CUnit::DoDamage(
 	if (health > 0.0f)
 		return;
 
-	KillUnit(attacker, false, false, weaponDefID);
+	KillUnit(attacker, false, false, weaponDefID, attackerTeamID);
 
 	if (!isDead)
 		return;
 	if (beingBuilt)
 		return;
-	if (attacker == nullptr)
-		return;
 
-	if (teamHandler.Ally(allyteam, attacker->allyteam))
-		return;
+	CTeam* attackerTeam = (attackerTeamID >= 0) ? teamHandler.Team(attackerTeamID) : nullptr;
 
-	CTeam* attackerTeam = teamHandler.Team(attacker->team);
-	TeamStatistics& attackerStats = attackerTeam->GetCurrentStats();
-
-	attackerStats.unitsKilled += (1 - isCollision);
+	if (attackerTeam != nullptr && !teamHandler.Ally(allyteam, attackerTeam->teamAllyteam)) {
+		attackerTeam->GetCurrentStats().unitsKilled += (1 - isCollision);
+	}
 }
 
 

@@ -96,7 +96,8 @@ class CSyncedLuaHandle : public CLuaHandle
 			int projectileID,
 			bool paralyzer,
 			float* newDamage,
-			float* impulseMult
+			float* impulseMult,
+			int attackerTeamID = -1
 		) override;
 
 		bool FeaturePreDamaged(
@@ -106,7 +107,8 @@ class CSyncedLuaHandle : public CLuaHandle
 			int weaponDefID,
 			int projectileID,
 			float* newDamage,
-			float* impulseMult
+			float* impulseMult,
+			int attackerTeamID = -1
 		) override;
 
 		bool ShieldPreDamaged(

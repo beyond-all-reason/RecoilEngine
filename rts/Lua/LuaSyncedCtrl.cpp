@@ -4380,6 +4380,7 @@ int LuaSyncedCtrl::AddFeatureDamage(lua_State* L)
  * @param impulseX number?
  * @param impulseY number?
  * @param impulseZ number?
+ * @param attackerTeamID integer? (Default: `-1`) - Used if attackerID is nil/invalid
  * @return nil
  */
 int LuaSyncedCtrl::AddUnitDamage(lua_State* L)
@@ -4401,7 +4402,19 @@ int LuaSyncedCtrl::AddUnitDamage(lua_State* L)
 	if (paralyze)
 		damages.paralyzeDamageTime = paralyze;
 
-	unit->DoDamage(damages, impulse, attacker, weaponDefID, -1);
+	const int rawTeamID = luaL_optint(L, 9, -1);
+	const int attackerTeamID = (rawTeamID >= 0 && static_cast<size_t>(rawTeamID) < teamHandler.ActiveTeams()) ? rawTeamID : -1;
+
+	// If attacker is valid, use the normal 5-argument form
+	if (attacker != nullptr) {
+		unit->DoDamage(damages, impulse, attacker, weaponDefID, -1);
+	} else if (attackerTeamID >= 0 && static_cast<size_t>(attackerTeamID) < teamHandler.ActiveTeams()) {
+		// If no attacker but attackerTeamID is valid, use the 6-argument form with team ID
+		unit->DoDamage(damages, impulse, nullptr, weaponDefID, -1, attackerTeamID);
+	} else {
+		// No valid attacker or team fallback
+		unit->DoDamage(damages, impulse, nullptr, weaponDefID, -1);
+	}
 	return 0;
 }
 
@@ -7489,6 +7502,9 @@ static int SetExplosionParam(lua_State* L, CExplosionParams& params, DamageArray
 		case hashString("owner"): {
 			params.owner = ParseUnit(L, __func__, index + 1);
 		} break;
+		case hashString("ownerTeamID"): {
+			params.ownerTeamID = lua_toint(L, index + 1);
+		} break;
 
 		case hashString("hitUnit"): {
 			params.hitObject = ParseUnit(L, __func__, index + 1);
@@ -7587,6 +7603,7 @@ int LuaSyncedCtrl::SpawnExplosion(lua_State* L)
 			.damages              = damages,
 			.weaponDef            = nullptr,
 			.owner                = nullptr,
+			.ownerTeamID          = -1,
 			.hitObject            = ExplosionHitObject(),
 			.craterAreaOfEffect   = 0.0f,
 			.damageAreaOfEffect   = 0.0f,
@@ -7604,6 +7621,11 @@ int LuaSyncedCtrl::SpawnExplosion(lua_State* L)
 			SetExplosionParam(L, params, damages, -2);
 		}
 
+		if (params.owner != nullptr)
+			params.ownerTeamID = params.owner->team;
+		else if (params.ownerTeamID >= 0 && static_cast<size_t>(params.ownerTeamID) >= teamHandler.ActiveTeams())
+			params.ownerTeamID = -1;
+
 		helper->Explosion(params);
 	} else {
 		DamageArray damages(luaL_optfloat(L, 7, 1.0f));
@@ -7612,6 +7634,7 @@ int LuaSyncedCtrl::SpawnExplosion(lua_State* L)
 		// parse remaining arguments in order of expected usage frequency
 		params.weaponDef  = weaponDefHandler->GetWeaponDefByID(luaL_optint(L, 16, -1));
 		params.owner      = ParseUnit   (L, __func__, 18);
+		params.ownerTeamID = (params.owner != nullptr) ? params.owner->team : -1;
 		params.hitObject  = ParseUnit   (L, __func__, 19);
 		params.hitObject  = ParseFeature(L, __func__, 20);
 		//params.hitWeapon = nullptr; // not implemented

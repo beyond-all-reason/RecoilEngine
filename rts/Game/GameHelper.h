@@ -94,6 +94,7 @@ struct CExplosionParams {
 	const WeaponDef* weaponDef;
 
 	CUnit* owner;
+	int ownerTeamID;
 
 	ExplosionHitObject hitObject;
 
@@ -218,7 +219,8 @@ public:
 
 	void DoExplosionDamage(
 		CUnit* unit,
-		CUnit* owner,
+		const CUnit* owner,
+		int ownerTeamID,
 		const float3& expPos,
 		const float expRadius,
 		const float expSpeed,
@@ -230,7 +232,8 @@ public:
 	);
 	void DoExplosionDamage(
 		CFeature* feature,
-		CUnit* owner,
+		const CUnit* owner,
+		int ownerTeamID,
 		const float3& expPos,
 		const float expRadius,
 		const float expEdgeEffect,
@@ -244,8 +247,9 @@ public:
 
 private:
 	struct WaitingDamage {
-		WaitingDamage(const DamageArray& _damage, const float3& _impulse, int _attackerID, int _targetID, int _weaponID, int _projectileID)
+		WaitingDamage(const DamageArray& _damage, const float3& _impulse, int _attackerID, int _attackerTeamID, int _targetID, int _weaponID, int _projectileID)
 		: attackerID(_attackerID)
+		, attackerTeamID(_attackerTeamID)
 		, targetID(_targetID)
 		, weaponID(_weaponID)
 		, projectileID(_projectileID)
@@ -254,6 +258,7 @@ private:
 		{}
 
 		int attackerID;
+		int attackerTeamID;
 		int targetID;
 		int weaponID;
 		int projectileID;

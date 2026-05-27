@@ -1314,6 +1314,8 @@ ProjectileParams CWeapon::GetProjectileParams()
 	ProjectileParams params;
 	params.weaponNum = weaponNum;
 	params.owner = owner;
+	params.ownerID = (owner != nullptr) ? owner->id : -1u;
+	params.teamID = (owner != nullptr) ? owner->team : -1u;
 	params.weaponDef = weaponDef;
 
 	switch (currentTarget.type) {

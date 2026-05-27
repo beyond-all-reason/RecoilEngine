@@ -81,11 +81,11 @@ public:
 
 	const SolidObjectDef* GetDef() const { return ((const SolidObjectDef*) unitDef); }
 
-	virtual void DoDamage(const DamageArray& damages, const float3& impulse, CUnit* attacker, int weaponDefID, int projectileID);
+	virtual void DoDamage(const DamageArray& damages, const float3& impulse, CUnit* attacker, int weaponDefID, int projectileID, int attackerTeamID = -1);
 	virtual void DoWaterDamage();
 	virtual void FinishedBuilding(bool postInit);
 
-	void ApplyDamage(CUnit* attacker, const DamageArray& damages, float& baseDamage, float& experienceMod);
+	void ApplyDamage(CUnit* attacker, const DamageArray& damages, float& baseDamage, float& experienceMod, int attackerTeamID = -1);
 	void ApplyImpulse(const float3& impulse);
 
 	bool AttackUnit(CUnit* unit, bool isUserTarget, bool wantManualFire, bool fpsMode = false);
@@ -132,7 +132,7 @@ public:
 	void UpdateWind(float x, float z, float strength);
 
 	void UpdateTransportees();
-	void ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaimed);
+	void ReleaseTransportees(CUnit* attacker, bool selfDestruct, bool reclaimed, int attackerTeamID);
 	void TransporteeKilled(const CObject* o);
 
 	void AddExperience(float exp);
@@ -234,8 +234,8 @@ public:
 
 public:
 	void KilledScriptFinished(int wreckLevel) { deathScriptFinished = true; delayedWreckLevel = wreckLevel; }
-	void ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
-	virtual void KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
+	void ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0, int attackerTeamID = -1);
+	virtual void KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0, int attackerTeamID = -1);
 	virtual void IncomingMissile(CMissileProjectile* missile);
 	CFeature* CreateWreck(int wreckLevel, int smokeTime);
 

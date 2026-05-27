@@ -440,10 +440,11 @@ bool CEventHandler::UnitPreDamaged(
 	int projectileID,
 	bool paralyzer,
 	float* newDamage,
-	float* impulseMult
+	float* impulseMult,
+	int attackerTeamID
 ) {
 	ZoneScoped;
-	return ControlIterateDefFalse(listUnitPreDamaged, &CEventClient::UnitPreDamaged, unit, attacker, damage, weaponDefID, projectileID, paralyzer, newDamage, impulseMult);
+	return ControlIterateDefFalse(listUnitPreDamaged, &CEventClient::UnitPreDamaged, unit, attacker, damage, weaponDefID, projectileID, paralyzer, newDamage, impulseMult, attackerTeamID);
 }
 
 
@@ -454,10 +455,11 @@ bool CEventHandler::FeaturePreDamaged(
 	int weaponDefID,
 	int projectileID,
 	float* newDamage,
-	float* impulseMult
+	float* impulseMult,
+	int attackerTeamID
 ) {
 	ZoneScoped;
-	return ControlIterateDefFalse(listFeaturePreDamaged, &CEventClient::FeaturePreDamaged, feature, attacker, damage, weaponDefID, projectileID, newDamage, impulseMult);
+	return ControlIterateDefFalse(listFeaturePreDamaged, &CEventClient::FeaturePreDamaged, feature, attacker, damage, weaponDefID, projectileID, newDamage, impulseMult, attackerTeamID);
 }
 
 
