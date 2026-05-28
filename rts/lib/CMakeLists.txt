@@ -111,7 +111,9 @@ endforeach()
 ADD_SUBDIRECTORY(assimp)
 target_compile_definitions(assimp PRIVATE -DASSIMP_BUILD_NO_OWN_ZLIB)
 
-# Suppress warnings-as-errors in vendored assimp (ASSIMP_WERROR=ON).
+# Suppress warnings in vendored assimp (we're not going to modify the library code)
+# Vendored assimp 4.0.1 trips these warnings in its own code.
+# Recheck this list if assimp is upgraded; later releases fixed some of these.
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	set(_assimp_warns
 		-Wno-pragma-pack
@@ -159,6 +161,9 @@ ADD_SUBDIRECTORY(fastgltf)
 ADD_SUBDIRECTORY(squish)
 ADD_SUBDIRECTORY(rg-etc1)
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	# Benign clang-only warnings in vendored rg_etc1.cpp (no-op labs() on unsigned +
+	# bare mark-as-used statements).
+	# We're not going to touch the decades old impl, so suppress the warnings.
 	target_compile_options(rgetc1 PRIVATE -Wno-absolute-value -Wno-unused-value)
 endif()
 
@@ -199,5 +204,7 @@ set(CMAKE_CXX_FLAGS ${SAVED_CMAKE_FLAGS})
 
 add_subdirectory(RmlUi)
 if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND TARGET rmlui_core)
+	# Known GCC-only -Warray-bounds false positive in vendored RmlUi at -O2+.
+	# Fixed in GCC 14 -- retest dropping this once CI is off GCC 13.
 	target_compile_options(rmlui_core PRIVATE -Wno-array-bounds)
 endif()

@@ -56,10 +56,9 @@ else (UNIX)
 	SET_TARGET_PROPERTIES(lua PROPERTIES COMPILE_FLAGS "${PIC_FLAG}")
 endif (UNIX)
 
-# Suppress clang -Werror warnings in vendored lua sources.
+# Vendored lua has an intentional empty-body loop (lauxlib.cpp shebang skip).
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	target_compile_options(lua PRIVATE
 		-Wno-empty-body
-		-Wno-implicit-int-float-conversion
 	)
 endif()
