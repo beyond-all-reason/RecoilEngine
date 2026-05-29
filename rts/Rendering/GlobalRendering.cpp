@@ -1599,8 +1599,19 @@ void CGlobalRendering::SaveWindowPosAndSize()
 	// do not notify about changes to block update loop
 	configHandler->Set("WindowPosX", winPosX, false, false);
 	configHandler->Set("WindowPosY", winPosY, false, false);
-	configHandler->Set("XResolutionWindowed", winSizeX, false, false);
-	configHandler->Set("YResolutionWindowed", winSizeY, false, false);
+
+	// Persist the logical (point) window size, not backing pixels.
+	// GetCfgWinRes feeds the saved value straight to SDL_CreateWindow, which
+	// expects logical points. On HiDPI displays (macOS Retina, Wayland/X11
+	// HiDPI) winSizeX/Y can hold the backing-pixel size; persisting that
+	// round-tripped to a 2x-too-big request each launch, then clamped to the
+	// screen as a portrait sliver. Querying SDL directly here pins the saved
+	// value to logical points regardless of how winSize is wired upstream.
+	int saveW = winSizeX, saveH = winSizeY;
+	if (sdlWindow != nullptr)
+		SDL_GetWindowSize(sdlWindow, &saveW, &saveH);
+	configHandler->Set("XResolutionWindowed", saveW, false, false);
+	configHandler->Set("YResolutionWindowed", saveH, false, false);
 }
 
 
