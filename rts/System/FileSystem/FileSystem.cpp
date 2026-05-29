@@ -61,7 +61,7 @@ namespace Impl {
 		return std::string(reinterpret_cast<const char*>(utf8.c_str()));
 	}
 	RECOIL_FORCE_INLINE std::string StoreUTF8AsString(const std::u8string_view& utf8) {
-		return std::string(reinterpret_cast<const char*>(utf8.data()));
+		return std::string(reinterpret_cast<const char*>(utf8.data()), utf8.size());
 	}
 	RECOIL_FORCE_INLINE std::string StorePathAsString(const fs::path& path) {
 		return StoreUTF8AsString(path.u8string());
