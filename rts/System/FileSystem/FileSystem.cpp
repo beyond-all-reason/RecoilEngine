@@ -54,16 +54,16 @@
 namespace fs = std::filesystem;
 
 namespace Impl {
-	RECOIL_FORCE_INLINE std::u8string StoreStringAsUTF8(const std::string& s) {
+	inline std::u8string StoreStringAsUTF8(const std::string& s) {
 		return std::u8string(reinterpret_cast<const char8_t*>(s.c_str()), s.size());
 	}
-	RECOIL_FORCE_INLINE std::string StoreUTF8AsString(const std::u8string& utf8) {
+	inline std::string StoreUTF8AsString(const std::u8string& utf8) {
 		return std::string(reinterpret_cast<const char*>(utf8.c_str()));
 	}
-	RECOIL_FORCE_INLINE std::string StoreUTF8AsString(const std::u8string_view& utf8) {
+	inline std::string StoreUTF8AsString(const std::u8string_view& utf8) {
 		return std::string(reinterpret_cast<const char*>(utf8.data()), utf8.size());
 	}
-	RECOIL_FORCE_INLINE std::string StorePathAsString(const fs::path& path) {
+	inline std::string StorePathAsString(const fs::path& path) {
 		return StoreUTF8AsString(path.u8string());
 	}
 }
