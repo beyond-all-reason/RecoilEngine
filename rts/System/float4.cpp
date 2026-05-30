@@ -1,6 +1,9 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "System/float4.h"
+
+#include <format>
+
 #include "System/creg/creg_cond.h"
 #include "System/SpringMath.h"
 
@@ -16,5 +19,10 @@ bool float4::operator == (const float4& f) const
 	#define eps float3::cmp_eps()
 	return (epscmp(x, f.x, eps) && epscmp(y, f.y, eps) && epscmp(z, f.z, eps) && epscmp(w, f.w, eps));
 	#undef eps
+}
+
+std::string float4::str() const
+{
+	return std::format("float4({:.3f}, {:.3f}, {:.3f}, {:.3f})", x, y, z, w);
 }
 

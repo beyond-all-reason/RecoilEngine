@@ -9,6 +9,7 @@
 
 #include <memory.h>
 #include <algorithm>
+#include <format>
 #include <cstring>
 
 #include "System/simd_compat.h"
@@ -870,5 +871,12 @@ CMatrix44f CMatrix44f::LookAtView(const float3& eye, const float3& center, const
 	viewMatrix[14] = f.dot( eye);
 
 	return viewMatrix;
+}
+
+std::string CMatrix44f::str() const
+{
+	return std::format(
+		"m44(\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f})",
+		m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15]);
 }
 
