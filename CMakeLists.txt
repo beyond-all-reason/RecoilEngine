@@ -195,7 +195,6 @@ else  (UNIX AND NOT MINGW)
 	endif()
 
 	if(MSVC)
-		set (CMAKE_VS_JUST_MY_CODE_DEBUGGING 1)
 		add_definitions(-D_ENABLE_EXTENDED_ALIGNED_STORAGE)
 		add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
 		add_compile_options(/bigobj)
