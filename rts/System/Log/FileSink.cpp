@@ -191,6 +191,28 @@ namespace log_file {
 }
 
 
+static FILE* log_file_openLogFile(const char* filePath, const char* mode, bool writeByteOrderMark) {
+	FILE* tmpStream = nowide::fopen(filePath, mode);
+
+	if (tmpStream == nullptr)
+		return nullptr;
+
+	if (writeByteOrderMark)
+		fwrite("\xEF\xBB\xBF", 1, 3, tmpStream); // Write the 3-byte UTF-8 byte order mark
+
+	setvbuf(tmpStream, nullptr, _IOFBF, std::min(BUFSIZ, 8192)); // limit buffer to 8kB
+	return tmpStream;
+}
+
+static FILE* log_file_openFreshLogFile(const char* filePath) {
+	return log_file_openLogFile(filePath, "wb", true);
+}
+
+static FILE* log_file_reopenExistingLogFile(const char* filePath) {
+	return log_file_openLogFile(filePath, "ab", false);
+}
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -215,15 +237,12 @@ void log_file_addLogFile(
 	if (iter != logFiles.end() && iter->first == filePathStr)
 		return;
 
-	FILE* tmpStream = nowide::fopen(filePath, "wb");
+	FILE* tmpStream = log_file_openFreshLogFile(filePath);
 
 	if (tmpStream == nullptr) {
 		LOG_L(L_ERROR, "[%s] failed to open log file \"%s\" for writing", __func__, filePath);
 		return;
 	}
-
-	fwrite("\xEF\xBB\xBF", 1, 3, tmpStream); // Write the 3-byte UTF-8 byte order mark
-	setvbuf(tmpStream, nullptr, _IOFBF, std::min(BUFSIZ, 8192)); // limit buffer to 8kB
 
 	logFiles.emplace_back(filePathStr, log_file::LogFileDetails(tmpStream, sectionsStr, minLevel, flushLevel));
 
@@ -285,18 +304,6 @@ FILE* log_file_getLogFileStream(const char* filePath) {
 }
 
 
-static FILE* log_file_openFreshLogFile(const char* filePath) {
-	FILE* tmpStream = nowide::fopen(filePath, "wb");
-
-	if (tmpStream == nullptr)
-		return nullptr;
-
-	fwrite("\xEF\xBB\xBF", 1, 3, tmpStream); // 3-byte UTF-8 byte order mark
-	setvbuf(tmpStream, nullptr, _IOFBF, std::min(BUFSIZ, 8192));
-	return tmpStream;
-}
-
-
 int log_file_truncateLogFile(const char* filePath) {
 	assert(filePath != nullptr);
 
@@ -343,22 +350,39 @@ int log_file_rotateLogFile(const char* filePath, const char* archivePath) {
 	const auto pred = [](const log_file::LogFilePair& a, const log_file::LogFilePair& b) { return (a.first < b.first); };
 	const auto iter = std::lower_bound(logFiles.begin(), logFiles.end(), log_file::LogFilePair{filePath, nullptr}, pred);
 
-	if (iter == logFiles.end() || iter->first != filePath)
-		return 0;
+	const bool isRegistered = (iter != logFiles.end() && iter->first == filePath);
 
-	// flush & close current stream before renaming the file on disk
-	if (FILE* oldStream = iter->second.GetOutStream(); oldStream != nullptr) {
+	if (isRegistered && iter->second.GetOutStream() != nullptr) {
+		FILE* oldStream = iter->second.GetOutStream();
 		fflush(oldStream);
 		fclose(oldStream);
 		iter->second.SetOutStream(nullptr);
 	}
 
-	int rc = 1;
-
 	if (nowide::rename(filePath, archivePath) != 0) {
 		LOG_L(L_ERROR, "[%s] failed to rename \"%s\" to \"%s\"", __func__, filePath, archivePath);
-		rc = -1;
+
+		if (isRegistered) {
+			FILE* reopenedStream = log_file_reopenExistingLogFile(filePath);
+
+			if (reopenedStream == nullptr) {
+				LOG_L(L_ERROR, "[%s] failed to reopen log file \"%s\" after rotate", __func__, filePath);
+				const size_t idx = iter - logFiles.begin();
+				for (size_t i = idx, n = logFiles.size() - 1; i < n; i++) {
+					logFiles[i].first  = std::move(logFiles[i + 1].first );
+					logFiles[i].second = std::move(logFiles[i + 1].second);
+				}
+				logFiles.pop_back();
+			} else {
+				iter->second.SetOutStream(reopenedStream);
+			}
+		}
+
+		return -1;
 	}
+
+	if (!isRegistered)
+		return 1;
 
 	FILE* newStream = log_file_openFreshLogFile(filePath);
 
@@ -374,7 +398,7 @@ int log_file_rotateLogFile(const char* filePath, const char* archivePath) {
 	}
 
 	iter->second.SetOutStream(newStream);
-	return rc;
+	return 1;
 }
 
 

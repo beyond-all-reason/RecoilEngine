@@ -53,10 +53,10 @@ void log_file_removeAllLogFiles();
 int log_file_truncateLogFile(const char* filePath);
 
 /**
- * Rotate the registered log file at @p filePath, moving it to @p archivePath
- * and starting a fresh empty log file in its place. The sink remains active
- * across the rotation. Returns 1 on success, 0 if no such log file is
- * registered, -1 if rename or reopen failed.
+ * Rotate @p filePath by moving it to @p archivePath. If @p filePath is a
+ * registered log file, its stream is flushed and closed before the move and
+ * replaced with a fresh empty stream afterwards. Returns 1 on success, -1 if
+ * rename or reopen failed.
  */
 int log_file_rotateLogFile(const char* filePath, const char* archivePath);
 

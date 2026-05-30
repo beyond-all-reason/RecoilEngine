@@ -20,7 +20,6 @@
 #include <iostream>
 #include <sstream>
 #include <ranges>
-#include <nowide/cstdio.hpp>
 
 #include <cassert>
 #include <cstring>
@@ -139,10 +138,10 @@ std::string CLogOutput::CreateFilePath(const std::string& fileName)
 }
 
 
-void CLogOutput::RotateLogFile() const
+bool CLogOutput::RotateLogFile() const
 {
 	if (!FileSystem::FileExists(filePath))
-		return;
+		return false;
 
 	const auto baseDir = FileSystem::GetDirectory(filePath);
 	// logArchiveDir: /absolute/writeable/data/dir/log/
@@ -150,14 +149,18 @@ void CLogOutput::RotateLogFile() const
 	const std::string archivedLogFile = logArchiveDir + CTimeUtil::GetCurrentTimeStr() + "_" + fileName;
 
 	// create the log archive dir if it does not exist yet
-	if (!FileSystem::DirExists(logArchiveDir))
-		FileSystem::CreateDirectory(logArchiveDir);
+	if (!FileSystem::DirExists(logArchiveDir) && !FileSystem::CreateDirectory(logArchiveDir)) {
+		std::cerr << "Failed creating log archive directory" << std::endl;
+		return false;
+	}
 
 	// move the old log to the archive dir
-	if (nowide::rename(filePath.c_str(), archivedLogFile.c_str()) != 0) {
-		// no log here yet
+	if (log_file_rotateLogFile(filePath.c_str(), archivedLogFile.c_str()) <= 0) {
 		std::cerr << "Failed rotating the log file" << std::endl;
+		return false;
 	}
+
+	return true;
 }
 
 
@@ -307,11 +310,8 @@ bool CLogOutput::RotateLog()
 		return false;
 	}
 
-	RotateLogFile();
-
-	const int rc = log_file_truncateLogFile(filePath.c_str());
-	if (rc <= 0) {
-		LOG_L(L_ERROR, "[%s] failed to truncate log file \"%s\"", __func__, filePath.c_str());
+	if (!RotateLogFile()) {
+		LOG_L(L_ERROR, "[%s] failed to rotate log file \"%s\"", __func__, filePath.c_str());
 		return false;
 	}
 

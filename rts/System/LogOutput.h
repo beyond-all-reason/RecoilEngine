@@ -4,7 +4,6 @@
 #define LOG_OUTPUT_H
 
 #include <string>
-#include <vector>
 
 
 /**
@@ -91,12 +90,11 @@ private:
 	static std::string CreateFilePath(const std::string& fileName);
 
 	/**
-	 * @brief moves the log file of the last run
+	 * @brief rotate the current log file into the archive directory
 	 *
-	 * Moves the log file of the last run, to preserve it,
-	 *
+	 * If the file sink is already active, it is reopened on a fresh log file.
 	 */
-	void RotateLogFile() const;
+	bool RotateLogFile() const;
 
 
 	std::string fileName;
