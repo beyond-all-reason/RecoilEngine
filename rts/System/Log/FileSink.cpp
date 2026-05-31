@@ -83,6 +83,7 @@ namespace log_file {
 	using LogFilePair = LogFilesContainer::LogFilePair;
 	using LogFilesMap = LogFilesContainer::LogFilesMap;
 
+	constexpr auto kLogFilePred = [](const LogFilePair& a, const LogFilePair& b) { return (a.first < b.first); };
 
 	inline LogFilesMap& getLogFiles() {
 		static LogFilesContainer logFilesContainer;
@@ -309,8 +310,7 @@ int log_file_truncateLogFile(const char* filePath) {
 
 	auto& logFiles = log_file::getLogFiles();
 
-	const auto pred = [](const log_file::LogFilePair& a, const log_file::LogFilePair& b) { return (a.first < b.first); };
-	const auto iter = std::lower_bound(logFiles.begin(), logFiles.end(), log_file::LogFilePair{filePath, nullptr}, pred);
+	const auto iter = std::lower_bound(logFiles.begin(), logFiles.end(), log_file::LogFilePair{filePath, nullptr}, log_file::kLogFilePred);
 
 	if (iter == logFiles.end() || iter->first != filePath)
 		return 0;
@@ -327,12 +327,7 @@ int log_file_truncateLogFile(const char* filePath) {
 	if (newStream == nullptr) {
 		LOG_L(L_ERROR, "[%s] failed to reopen log file \"%s\" after truncate", __func__, filePath);
 		// drop the entry so subsequent writes do not target a closed stream
-		const size_t idx = iter - logFiles.begin();
-		for (size_t i = idx, n = logFiles.size() - 1; i < n; i++) {
-			logFiles[i].first  = std::move(logFiles[i + 1].first );
-			logFiles[i].second = std::move(logFiles[i + 1].second);
-		}
-		logFiles.pop_back();
+		logFiles.erase(iter);
 		return -1;
 	}
 
@@ -347,8 +342,7 @@ int log_file_rotateLogFile(const char* filePath, const char* archivePath) {
 
 	auto& logFiles = log_file::getLogFiles();
 
-	const auto pred = [](const log_file::LogFilePair& a, const log_file::LogFilePair& b) { return (a.first < b.first); };
-	const auto iter = std::lower_bound(logFiles.begin(), logFiles.end(), log_file::LogFilePair{filePath, nullptr}, pred);
+	const auto iter = std::lower_bound(logFiles.begin(), logFiles.end(), log_file::LogFilePair{filePath, nullptr}, log_file::kLogFilePred);
 
 	const bool isRegistered = (iter != logFiles.end() && iter->first == filePath);
 
@@ -367,12 +361,7 @@ int log_file_rotateLogFile(const char* filePath, const char* archivePath) {
 
 			if (reopenedStream == nullptr) {
 				LOG_L(L_ERROR, "[%s] failed to reopen log file \"%s\" after rotate", __func__, filePath);
-				const size_t idx = iter - logFiles.begin();
-				for (size_t i = idx, n = logFiles.size() - 1; i < n; i++) {
-					logFiles[i].first  = std::move(logFiles[i + 1].first );
-					logFiles[i].second = std::move(logFiles[i + 1].second);
-				}
-				logFiles.pop_back();
+				logFiles.erase(iter);
 			} else {
 				iter->second.SetOutStream(reopenedStream);
 			}
@@ -388,12 +377,7 @@ int log_file_rotateLogFile(const char* filePath, const char* archivePath) {
 
 	if (newStream == nullptr) {
 		LOG_L(L_ERROR, "[%s] failed to reopen log file \"%s\" after rotate", __func__, filePath);
-		const size_t idx = iter - logFiles.begin();
-		for (size_t i = idx, n = logFiles.size() - 1; i < n; i++) {
-			logFiles[i].first  = std::move(logFiles[i + 1].first );
-			logFiles[i].second = std::move(logFiles[i + 1].second);
-		}
-		logFiles.pop_back();
+		logFiles.erase(iter);
 		return -1;
 	}
 

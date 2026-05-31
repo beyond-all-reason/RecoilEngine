@@ -138,7 +138,7 @@ std::string CLogOutput::CreateFilePath(const std::string& fileName)
 }
 
 
-bool CLogOutput::RotateLogFile() const
+bool CLogOutput::RotateLogFile(std::string* rotatedFilePath) const
 {
 	if (!FileSystem::FileExists(filePath))
 		return false;
@@ -159,6 +159,9 @@ bool CLogOutput::RotateLogFile() const
 		std::cerr << "Failed rotating the log file" << std::endl;
 		return false;
 	}
+
+	if (rotatedFilePath != nullptr)
+		*rotatedFilePath = archivedLogFile;
 
 	return true;
 }
@@ -299,7 +302,7 @@ bool CLogOutput::ClearLog()
 		return false;
 	}
 
-	LOG("Log file cleared");
+	LOG("The log file \"%s\" was cleared.", filePath.c_str());
 	return true;
 }
 
@@ -310,11 +313,12 @@ bool CLogOutput::RotateLog()
 		return false;
 	}
 
-	if (!RotateLogFile()) {
+	std::string rotatedFilePath;
+	if (!RotateLogFile(&rotatedFilePath)) {
 		LOG_L(L_ERROR, "[%s] failed to rotate log file \"%s\"", __func__, filePath.c_str());
 		return false;
 	}
 
-	LOG("Log file rotated");
+	LOG("The log file was rotated to \"%s\".", rotatedFilePath.c_str());
 	return true;
 }

@@ -94,7 +94,7 @@ private:
 	 *
 	 * If the file sink is already active, it is reopened on a fresh log file.
 	 */
-	bool RotateLogFile() const;
+	bool RotateLogFile(std::string* rotatedFilePath = nullptr) const;
 
 
 	std::string fileName;
