@@ -4,6 +4,7 @@
 #define LOG_OUTPUT_H
 
 #include <string>
+#include <optional>
 
 
 /**
@@ -93,8 +94,9 @@ private:
 	 * @brief rotate the current log file into the archive directory
 	 *
 	 * If the file sink is already active, it is reopened on a fresh log file.
+	 * Returns the filename of the archived file.
 	 */
-	bool RotateLogFile(std::string* rotatedFilePath = nullptr) const;
+	std::optional <std::string> RotateLogFile() const;
 
 
 	std::string fileName;
