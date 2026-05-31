@@ -138,10 +138,10 @@ std::string CLogOutput::CreateFilePath(const std::string& fileName)
 }
 
 
-bool CLogOutput::RotateLogFile(std::string* rotatedFilePath) const
+std::optional <std::string> CLogOutput::RotateLogFile() const
 {
 	if (!FileSystem::FileExists(filePath))
-		return false;
+		return {};
 
 	const auto baseDir = FileSystem::GetDirectory(filePath);
 	// logArchiveDir: /absolute/writeable/data/dir/log/
@@ -151,19 +151,16 @@ bool CLogOutput::RotateLogFile(std::string* rotatedFilePath) const
 	// create the log archive dir if it does not exist yet
 	if (!FileSystem::DirExists(logArchiveDir) && !FileSystem::CreateDirectory(logArchiveDir)) {
 		std::cerr << "Failed creating log archive directory" << std::endl;
-		return false;
+		return {};
 	}
 
 	// move the old log to the archive dir
 	if (log_file_rotateLogFile(filePath.c_str(), archivedLogFile.c_str()) <= 0) {
 		std::cerr << "Failed rotating the log file" << std::endl;
-		return false;
+		return {};
 	}
 
-	if (rotatedFilePath != nullptr)
-		*rotatedFilePath = archivedLogFile;
-
-	return true;
+	return archivedLogFile;
 }
 
 
@@ -313,12 +310,12 @@ bool CLogOutput::RotateLog()
 		return false;
 	}
 
-	std::string rotatedFilePath;
-	if (!RotateLogFile(&rotatedFilePath)) {
+	const auto rotatedFilePath = RotateLogFile();
+	if (!rotatedFilePath) {
 		LOG_L(L_ERROR, "[%s] failed to rotate log file \"%s\"", __func__, filePath.c_str());
 		return false;
 	}
 
-	LOG("The log file was rotated to \"%s\".", rotatedFilePath.c_str());
+	LOG("The log file was rotated to \"%s\".", rotatedFilePath->c_str());
 	return true;
 }
