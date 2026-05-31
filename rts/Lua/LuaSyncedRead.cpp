@@ -245,6 +245,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitBuildFacing);
 	REGISTER_LUA_CFUNC(GetUnitIsBuilding);
 	REGISTER_LUA_CFUNC(GetUnitWorkerTask);
+	REGISTER_LUA_CFUNC(GetUnitFactoryBuilding);
 	REGISTER_LUA_CFUNC(GetUnitEffectiveBuildRange);
 	REGISTER_LUA_CFUNC(GetUnitCurrentBuildPower);
 	REGISTER_LUA_CFUNC(GetUnitHarvestStorage);
@@ -4704,6 +4705,42 @@ int LuaSyncedRead::GetUnitWorkerTask(lua_State* L)
 		return GetBuilderWorkerTask(L, builder);
 	if (const auto factory = dynamic_cast <const CFactory *> (unit); factory)
 		return GetFactoryWorkerTask(L, factory);
+
+	return 0;
+}
+
+/*** Returns the factory producing given unit.
+ *
+ * @function Spring.GetUnitFactoryBuilding
+ *
+ * @param unitID integer
+ * @return integer factoryID of the factory currently building the unit, or nil if not being built by a factory
+ */
+int LuaSyncedRead::GetUnitFactoryBuilding(lua_State* L)
+{
+	const auto unit = ParseInLosUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
+
+	if (!unit->beingBuilt)
+		return 0;
+
+	if (unit->soloBuilder != nullptr) {
+		if (const auto factory = dynamic_cast<const CFactory*>(unit->soloBuilder); factory) {
+			lua_pushnumber(L, factory->id);
+			return 1;
+		}
+		return 0;
+	}
+
+	for (const CUnit* potentialBuilder : unitHandler.GetActiveUnits()) {
+		if (const auto factory = dynamic_cast<const CFactory*>(potentialBuilder); factory) {
+			if (factory->curBuild == unit) {
+				lua_pushnumber(L, factory->id);
+				return 1;
+			}
+		}
+	}
 
 	return 0;
 }
