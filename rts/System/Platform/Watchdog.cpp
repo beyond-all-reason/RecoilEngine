@@ -66,6 +66,12 @@ namespace Watchdog
 	};
 
 	struct WatchDogThreadSlot {
+		void Reset() {
+			primary  = false;
+			active   = false;
+			regorder = 0;
+		}
+
 		std::atomic<bool> primary = {false};
 		std::atomic<bool> active = {false};
 		std::atomic<unsigned int> regorder = {0};
@@ -374,11 +380,8 @@ namespace Watchdog
 			registeredThreads[i] = &registeredThreadsData[WDT_COUNT];
 			threadNumTable[hashString(threadNames[i])] = i;
 		}
-		for (auto& slot : threadSlots) {
-			slot.primary   = false;
-			slot.active    = false;
-			slot.regorder  = 0;
-		}
+		for (auto& slot : threadSlots)
+			slot.Reset();
 
 		// disable if gdb is running
 		if (Platform::IsRunningInDebugger()) {
@@ -429,11 +432,8 @@ namespace Watchdog
 		}
 		for (unsigned int i = 0; i < WDT_COUNT; ++i)
 			registeredThreads[i] = &registeredThreadsData[WDT_COUNT];
-		for (auto& slot : threadSlots) {
-			slot.primary   = false;
-			slot.active    = false;
-			slot.regorder  = 0;
-		}
+		for (auto& slot : threadSlots)
+			slot.Reset();
 		threadNumTable.clear();
 	}
 }
