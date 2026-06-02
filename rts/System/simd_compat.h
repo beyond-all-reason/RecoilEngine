@@ -3,13 +3,8 @@
 
 #ifdef SSE2NEON
     #include "lib/sse2neon/sse2neon.h"
-    // sse2neon.h includes <fenv.h> purely to implement its rounding-mode
-    // helpers; it captures the FE_XXX values into its own inline code at this
-    // point and exposes only _MM_ROUND_* publicly. The leaked system FE_XXX
-    // macros, however, collide with the ones streflop (re)defines for its NEON
-    // FPU control, making streflop emit a redefinition #warning in every TU
-    // that includes it afterwards. Drop the leaked macros to contain the leak
-    // at this boundary; streflop then sees a clean slate and defines its own.
+    // sse2neon leaks <fenv.h>'s FE_XXX macros, which collide with the ones streflop
+    // redefines and trigger a #warning. Undef them here so streflop gets a clean slate.
     #undef FE_INVALID
     #undef FE_DENORMAL
     #undef FE_DIVBYZERO
