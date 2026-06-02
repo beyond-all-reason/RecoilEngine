@@ -317,6 +317,13 @@ public: \
 	void TCls::_DestructInstance(void* d) { ((MyType*)d)->~MyType(); } \
 	creg::Class TCls::creg_class(#TCls, creg::CF_None, &TBase::creg_class, &TCls::_CregRegisterMembers, sizeof(TCls), alignof(TCls), std::is_polymorphic<TCls>::value, TCls::creg_isStruct, TCls::_ConstructInstance, TCls::_DestructInstance, TCls::_Alloc, TCls::_Free);
 
+/** @def CR_BIND_TEMPLATE_DECLARE
+ * Declares that TCls::creg_class is defined elsewhere (via CR_BIND_TEMPLATE),
+ * so using-only TUs don't warn about an undefined static template member.
+ */
+#define CR_BIND_TEMPLATE_DECLARE(TCls) \
+	template<> creg::Class TCls::creg_class;
+
 /** @def CR_BIND_TEMPLATE
  *  @see CR_BIND
  */
