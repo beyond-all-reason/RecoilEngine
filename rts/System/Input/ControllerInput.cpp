@@ -34,6 +34,8 @@ void CControllerInput::FreeInstance()
 	controllerInput = nullptr;
 }
 
+#ifndef HEADLESS
+
 std::vector<CControllerInput::ControllerState> CControllerInput::GetAvailableControllers() const
 {
 	std::vector<ControllerState> controllers;
@@ -55,8 +57,6 @@ std::optional<CControllerInput::ControllerState> CControllerInput::GetController
 
 	return controllerIt->second;
 }
-
-#ifndef HEADLESS
 
 CControllerInput::CControllerInput()
 {
@@ -283,6 +283,16 @@ void CControllerInput::HandleAxisMotion(int instanceID, int axisID, std::int16_t
 
 CControllerInput::CControllerInput() = default;
 CControllerInput::~CControllerInput() = default;
+
+std::vector<CControllerInput::ControllerState> CControllerInput::GetAvailableControllers() const
+{
+	return {};
+}
+
+std::optional<CControllerInput::ControllerState> CControllerInput::GetControllerState(int) const
+{
+	return std::nullopt;
+}
 
 bool CControllerInput::HandleSDLControllerEvent(const SDL_Event&)
 {
