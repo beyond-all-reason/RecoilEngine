@@ -2,6 +2,8 @@
 
 #include "UnitDrawer.h"
 
+#include <map>
+
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
 #include "Game/Game.h"
@@ -1742,88 +1744,88 @@ void CUnitDrawerGL4::DrawAlphaObjects(int modelType, bool drawReflection, bool d
 	if (gu->spectatingFullView)
 		return;
 
-	const auto& deadGhostBuildings = modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam, modelType);
+	// Ghost buildings are static (no animation, never move), so each gets a single world-transform
+	// slot in the transforms SSBO and is drawn batched through ARRAY_MATMODE - one multidraw per
+	// (color bucket x texture type) instead of one immediate draw per ghost.
+	const auto oldMM = modelDrawerState->SetMatrixMode(ShaderMatrixModes::ARRAY_MATMODE);
 
-	const auto oldMM = modelDrawerState->SetMatrixMode(ShaderMatrixModes::STATIC_MATMODE);
-	// deadGhostedBuildings
+	struct GhostInstance {
+		const S3DModel* model;
+		uint32_t worldTransformOffset;
+		uint8_t team;
+	};
+	// bind the texture once per group, accumulate, then one Submit (=one multidraw) per texture type
+	const auto flushGhosts = [&](const std::map<int, std::vector<GhostInstance>>& byTex) {
+		for (const auto& [texType, instances] : byTex) {
+			CModelDrawerHelper::BindModelTypeTexture(modelType, texType);
+			for (const auto& gi : instances)
+				smv.AddToSubmission(gi.model, gi.worldTransformOffset, gi.team);
+			smv.Submit(GL_TRIANGLES, false);
+		}
+	};
+
+	// deadGhostedBuildings (single color state)
 	{
-		modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
-		modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.y); //teamID doesn't matter here
+		const auto& deadGhostBuildings = modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam, modelType);
 
-		int prevModelType = -1;
-		int prevTexType = -1;
+		static std::map<int, std::vector<GhostInstance>> byTex;
+		byTex.clear();
 		for (const auto* dgb : deadGhostBuildings) {
-			if (!camera->InView(dgb->pos, dgb->GetModel()->GetDrawRadius()))
+			const S3DModel* model = dgb->GetModel();
+			if (!camera->InView(dgb->pos, model->GetDrawRadius()))
+				continue;
+			if (dgb->worldTransformOffset == TransformsMemStorage::INVALID_INDEX)
 				continue;
 
-			static CMatrix44f staticWorldMat;
+			byTex[model->textureType].push_back({ model, static_cast<uint32_t>(dgb->worldTransformOffset), dgb->team });
+		}
 
-			staticWorldMat.LoadIdentity();
-			staticWorldMat.Translate(dgb->pos);
-
-			staticWorldMat.RotateY(-dgb->facing * math::DEG_TO_RAD * 90.0f);
-
-			if (prevModelType != modelType || prevTexType != dgb->GetModel()->textureType) {
-				prevModelType = modelType; prevTexType = dgb->GetModel()->textureType;
-				CModelDrawerHelper::BindModelTypeTexture(modelType, dgb->GetModel()->textureType); //inefficient rendering, but w/e
-			}
-
-			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
-			smv.SubmitImmediately(dgb->GetModel(), static_cast<uint16_t>(dgb->team)); //need to submit immediately every model because of static per-model matrix
+		if (!byTex.empty()) {
+			modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
+			modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.y); //teamID is per-instance
+			flushGhosts(byTex);
 		}
 	}
 
-	// liveGhostedBuildings
+	// liveGhostedBuildings (two color states: normal and CONTRADAR)
 	{
 		const auto& liveGhostedBuildings = modelDrawerData->GetLiveGhostBuildings(gu->myAllyTeam, modelType);
 
-		int prevModelType = -1;
-		int prevTexType = -1;
+		static std::map<int, std::vector<GhostInstance>> byTexNormal;
+		static std::map<int, std::vector<GhostInstance>> byTexContradar;
+		byTexNormal.clear();
+		byTexContradar.clear();
+
 		for (const auto* lgb : liveGhostedBuildings) {
 			if (!camera->InView(lgb->pos, lgb->model->GetDrawRadius()))
 				continue;
 
 			// check for decoy models
 			const UnitDef* decoyDef = lgb->unitDef->decoyDef;
-			const S3DModel* model = nullptr;
-
-			if (decoyDef == nullptr) {
-				model = lgb->model;
-			}
-			else {
-				model = decoyDef->LoadModel();
-			}
+			const S3DModel* model = (decoyDef == nullptr) ? lgb->model : decoyDef->LoadModel();
 
 			// FIXME: needs a second pass
 			if (model->type != modelType)
 				continue;
 
-			static CMatrix44f staticWorldMat;
-
-			staticWorldMat.LoadIdentity();
-			staticWorldMat.Translate(lgb->pos);
-
-			staticWorldMat.RotateY(-lgb->buildFacing * math::DEG_TO_RAD * 90.0f);
+			const size_t xfOffset = modelDrawerData->GetLiveGhostTransform(lgb);
+			if (xfOffset == TransformsMemStorage::INVALID_INDEX)
+				continue;
 
 			const unsigned short losStatus = lgb->losStatus[gu->myAllyTeam];
+			auto& byTex = (losStatus & LOS_CONTRADAR) ? byTexContradar : byTexNormal;
+			byTex[model->textureType].push_back({ model, static_cast<uint32_t>(xfOffset), static_cast<uint8_t>(lgb->team) });
+		}
 
-			// ghosted enemy units
-			if (losStatus & LOS_CONTRADAR) {
-				modelDrawerState->SetColorMultiplier(0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z);
-				modelDrawerState->SetTeamColor(lgb->team, IModelDrawerState::alphaValues.z);
-			}
-			else {
-				modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
-				modelDrawerState->SetTeamColor(lgb->team, IModelDrawerState::alphaValues.y);
-			}
-
-			if (prevModelType != modelType || prevTexType != model->textureType) {
-				prevModelType = modelType; prevTexType = model->textureType;
-				CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType); //inefficient rendering, but w/e
-			}
-
-			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
-			smv.SubmitImmediately(model, static_cast<uint16_t>(lgb->team)); //need to submit immediately every model because of static per-model matrix
+		if (!byTexNormal.empty()) {
+			modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
+			modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.y);
+			flushGhosts(byTexNormal);
+		}
+		if (!byTexContradar.empty()) {
+			modelDrawerState->SetColorMultiplier(0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z);
+			modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.z);
+			flushGhosts(byTexContradar);
 		}
 	}
 

@@ -29,8 +29,21 @@
 #include "Map/ReadMap.h"
 
 #include "System/Misc/TracyDefs.h"
+#include "System/Matrix44f.h"
+#include "System/MathConstants.h"
+#include "System/Transform.hpp"
+#include "Rendering/Models/ModelsMemStorage.h"
 
 static FixedDynMemPoolT<MAX_UNITS / 1000, MAX_UNITS / 32, GhostSolidObject> ghostMemPool;
+
+// world transform of a (static) ghost building, matching the legacy staticModelMatrix construction
+static Transform MakeGhostWorldTransform(const float3& pos, int facing)
+{
+	CMatrix44f m;
+	m.Translate(pos);
+	m.RotateY(-facing * math::DEG_TO_RAD * 90.0f);
+	return Transform::FromMatrix(m);
+}
 
 ///////////////////////////
 
@@ -50,6 +63,7 @@ CR_REG_METADATA(GhostSolidObject, (
 	CR_MEMBER(team),
 	CR_IGNORED(currentIconIndex),
 
+	CR_IGNORED(worldTransformOffset),
 	CR_IGNORED(model),
 
 	CR_POSTLOAD(PostLoad)
@@ -88,6 +102,10 @@ void GhostSolidObject::PostLoad()
 	RECOIL_DETAILED_TRACY_ZONE;
 	model = nullptr;
 	GetModel();
+
+	// the GPU world transform slot is render-only state; re-create it from the saved pos/facing
+	worldTransformOffset = transformsMemStorage.Allocate(1);
+	transformsMemStorage.UpdateForced(worldTransformOffset, MakeGhostWorldTransform(pos, facing));
 }
 
 const S3DModel* GhostSolidObject::GetModel() const
@@ -157,6 +175,9 @@ CUnitDrawerData::~CUnitDrawerData()
 				if (tmpGso->DecRef())
 					continue;
 
+				if (tmpGso->worldTransformOffset != TransformsMemStorage::INVALID_INDEX)
+					transformsMemStorage.Free(tmpGso->worldTransformOffset, 1, &Transform::Zero());
+
 				// <ghost> might be the gbOwner of a decal; groundDecals is deleted after us
 				groundDecals->GhostDestroyed(tmpGso);
 				ghostMemPool.free(tmpGso);
@@ -165,6 +186,11 @@ CUnitDrawerData::~CUnitDrawerData()
 			lgb.clear();
 		}
 	}
+	for (auto& [unit, entry] : liveGhostTransforms) {
+		if (entry.first != TransformsMemStorage::INVALID_INDEX)
+			transformsMemStorage.Free(entry.first, 1, &Transform::Zero());
+	}
+	liveGhostTransforms.clear();
 	assert(ghostMemPool.allocs() == 0);
 	ghostMemPool.clear();
 
@@ -215,6 +241,8 @@ void CUnitDrawerData::Update()
 		for (CUnit* unit : unsortedObjects)
 			updateBody(unit);
 	}
+
+	UpdateLiveGhostTransforms();
 
 	if ((useDistToGroundForIcons = (camHandler->GetCurrentController()).GetUseDistToGroundForIcons())) {
 		const float3& camPos = camera->GetPos();
@@ -625,6 +653,9 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 
 				gso->iconRadius = u->iconRadius;
 
+				gso->worldTransformOffset = transformsMemStorage.Allocate(1);
+				transformsMemStorage.UpdateForced(gso->worldTransformOffset, MakeGhostWorldTransform(gso->pos, gso->facing));
+
 				groundDecals->GhostCreated(u, gso);
 
 			}
@@ -696,6 +727,40 @@ void CUnitDrawerData::UnitLeftLos(const CUnit* unit, int allyTeam)
 	UpdateCurrentUnitIcon(unit);
 }
 
+void CUnitDrawerData::UpdateLiveGhostTransforms()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// Maintain one world-transform slot per live ghost building drawn for the local allyTeam.
+	// Ghosts are static, so each slot is filled once on first sight; entries not seen this sweep
+	// (units that regained LOS, died, or belong to a different allyTeam now) are freed.
+	const int stamp = ++liveGhostSweepStamp;
+
+	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
+		for (const CUnit* u : savedData.liveGhostBuildings[gu->myAllyTeam][modelType]) {
+			const auto it = liveGhostTransforms.find(u);
+			if (it == liveGhostTransforms.end()) {
+				const size_t off = transformsMemStorage.Allocate(1);
+				transformsMemStorage.UpdateForced(off, MakeGhostWorldTransform(u->pos, u->buildFacing));
+				liveGhostTransforms.emplace(u, std::make_pair(off, stamp));
+			}
+			else {
+				it->second.second = stamp;
+			}
+		}
+	}
+
+	for (auto it = liveGhostTransforms.begin(); it != liveGhostTransforms.end(); ) {
+		if (it->second.second != stamp) {
+			if (it->second.first != TransformsMemStorage::INVALID_INDEX)
+				transformsMemStorage.Free(it->second.first, 1, &Transform::Zero());
+			it = liveGhostTransforms.erase(it);
+		}
+		else {
+			++it;
+		}
+	}
+}
+
 void CUnitDrawerData::UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost)
 {
 	if (unit->leavesGhost) {
@@ -732,6 +797,9 @@ void CUnitDrawerData::PlayerChanged(int playerID)
 void CUnitDrawerData::RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSolidObject*>& dgb, int index)
 {
 	if (!gso->DecRef()) {
+		if (gso->worldTransformOffset != TransformsMemStorage::INVALID_INDEX)
+			transformsMemStorage.Free(gso->worldTransformOffset, 1, &Transform::Zero());
+
 		groundDecals->GhostDestroyed(gso);
 		ghostMemPool.free(gso);
 	}

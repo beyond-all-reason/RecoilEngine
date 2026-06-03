@@ -271,7 +271,13 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 	
 	Transform tx;
 	if (staticModel) {
-		tx = transforms[instData.x + bID0];
+		// matrixMode == 2 (static instanced): pieces come from the bind-pose block (instData.w),
+		// because instData.x holds the per-instance world transform instead of the bind pose.
+		// matrixMode == 1 (static): for model submits instData.x == instData.w == bind pose.
+		if (matrixMode == 2)
+			tx = transforms[instData.w + bID0];
+		else
+			tx = transforms[instData.x + bID0];
 	} else {
 		// do interpolation
 		tx = Lerp(
@@ -333,7 +339,13 @@ void main(void)
 	vec3 modelNormal;
 	GetModelSpaceVertex(modelPos, modelNormal);
 
-	if (staticModel) {
+	if (matrixMode == 2) {
+		// static instanced: per-instance world transform read from the SSBO (no interpolation)
+		Transform wtx = transforms[instData.x + 0u];
+		worldPos = ApplyTransform(wtx, modelPos);
+		wtx.trSc = vec4(0, 0, 0, 1); //nullify the translation part for the normal
+		worldNormal = ApplyTransform(wtx, modelNormal);
+	} else if (staticModel) {
 		worldPos = staticModelMatrix * modelPos;
 		worldNormal = mat3(staticModelMatrix) * modelNormal;
 	} else {

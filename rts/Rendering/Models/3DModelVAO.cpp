@@ -330,6 +330,30 @@ bool S3DModelVAO::AddToSubmission(const S3DModel* model, uint16_t paletteIndex)
 	return AddToSubmissionImpl(model, model->indxStart, model->indxCount, paletteIndex);
 }
 
+bool S3DModelVAO::AddToSubmission(const S3DModel* model, uint32_t worldTransformOffset, uint16_t paletteIndex)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	assert(model);
+
+	// bind-pose block for the model's pieces (read via instData.w in ARRAY_MATMODE)
+	const auto bposeIndex = transformsUploader.GetElemOffset(model);
+	if (bposeIndex == TransformsMemStorage::INVALID_INDEX)
+		return false;
+
+	const auto uniIndex = modelUniformsStorage.GetObjOffset(model); //sentinel for bare models; unused by the shader
+
+	auto& modelInstanceData = modelDataToInstance[SIndexAndCount{ model->indxStart, model->indxCount }];
+	modelInstanceData.emplace_back(SInstanceData(
+		worldTransformOffset,                         // matOffset = instData.x = per-instance world transform
+		paletteIndex,
+		static_cast<uint16_t>(model->numPieces),
+		static_cast<uint32_t>(uniIndex),
+		static_cast<uint32_t>(bposeIndex)             // bposeMatOffset = instData.w = model bind pose
+	));
+
+	return true;
+}
+
 bool S3DModelVAO::AddToSubmission(const CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
