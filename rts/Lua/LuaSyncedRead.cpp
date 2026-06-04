@@ -4722,27 +4722,11 @@ int LuaSyncedRead::GetUnitFactoryBuilding(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
-	if (!unit->beingBuilt)
+	if (unit->producingFactory == nullptr)
 		return 0;
 
-	if (unit->soloBuilder != nullptr) {
-		if (const auto factory = dynamic_cast<const CFactory*>(unit->soloBuilder); factory) {
-			lua_pushnumber(L, factory->id);
-			return 1;
-		}
-		return 0;
-	}
-
-	for (const CUnit* potentialBuilder : unitHandler.GetActiveUnits()) {
-		if (const auto factory = dynamic_cast<const CFactory*>(potentialBuilder); factory) {
-			if (factory->curBuild == unit) {
-				lua_pushnumber(L, factory->id);
-				return 1;
-			}
-		}
-	}
-
-	return 0;
+	lua_pushnumber(L, unit->producingFactory->id);
+	return 1;
 }
 
 /***
