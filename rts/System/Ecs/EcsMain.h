@@ -9,6 +9,8 @@
 // entt 3.10.3 uses std::aligned_storage_t, deprecated in C++23; bump entt to drop this
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+// entt 3.10.3 declares `operator"" _hs` with a space, deprecated in C++23; bump entt to drop this
+#pragma GCC diagnostic ignored "-Wdeprecated-literal-operator"
 #endif
 
 #include "lib/entt/src/entt/entt.hpp"
