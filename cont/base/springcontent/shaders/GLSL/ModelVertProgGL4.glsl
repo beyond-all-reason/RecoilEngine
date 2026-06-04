@@ -271,13 +271,10 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 	
 	Transform tx;
 	if (staticModel) {
-		// matrixMode == 2 (static instanced): pieces come from the bind-pose block (instData.w),
-		// because instData.x holds the per-instance world transform instead of the bind pose.
-		// matrixMode == 1 (static): for model submits instData.x == instData.w == bind pose.
-		if (matrixMode == 2)
-			tx = transforms[instData.w + bID0];
-		else
-			tx = transforms[instData.x + bID0];
+		// pieces always come from the bind-pose block (instData.w). In ARRAY_MATMODE
+		// instData.x is the per-instance world transform, not the bind pose; for static
+		// model submits instData.x == instData.w anyway, so instData.w is correct for both.
+		tx = transforms[instData.w + bID0];
 	} else {
 		// do interpolation
 		tx = Lerp(
