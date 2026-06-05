@@ -6,6 +6,9 @@
 #include <signal.h>
 
 #include "System/Platform/CrashHandler.h"
+
+#include <cassert>
+
 #include "System/Platform/errorhandler.h"
 #include "System/Log/ILog.h"
 #include "System/Log/FileSink.h"

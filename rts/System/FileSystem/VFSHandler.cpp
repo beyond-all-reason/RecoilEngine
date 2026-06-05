@@ -4,6 +4,7 @@
 #include "VFSHandler.h"
 
 #include <algorithm>
+#include <cassert>
 #include <cstring>
 
 #include "ArchiveLoader.h"

@@ -2,6 +2,7 @@
 
 #include <concepts>
 #include <atomic>
+#include <cassert>
 
 #include "../ScopedResource.h"
 

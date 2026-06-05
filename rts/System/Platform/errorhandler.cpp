@@ -10,6 +10,11 @@
 
 #include <string>
 #include <functional>
+#include <cassert>
+
+#ifdef _MSC_VER
+#include "asio/basic_random_access_file.hpp"
+#endif
 
 #include "System/SpringExitCode.h"
 #include "System/Log/ILog.h"
