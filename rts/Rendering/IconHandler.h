@@ -13,7 +13,7 @@
 #include "Rendering/GL/RenderBuffersFwd.h"
 #include "Rendering/Textures/TextureAtlas.h"
 
-class UnitDef;
+struct UnitDef;
 class CTextureRenderAtlas;
 
 namespace icon {

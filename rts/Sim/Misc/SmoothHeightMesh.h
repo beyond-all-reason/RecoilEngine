@@ -22,7 +22,7 @@ namespace SmoothHeightMeshNamespace {
  */
 class SmoothHeightMesh
 {
-	friend class SmoothHeightMeshDrawer;
+	friend struct SmoothHeightMeshDrawer;
 
 public:
 
