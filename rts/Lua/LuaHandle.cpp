@@ -176,6 +176,7 @@ CLuaHandle::CLuaHandle(const string& _name, int _order, bool _userMode, bool _sy
 	#ifdef TRACY_ENABLE
 		lua_getglobal(L, "tracy");
 		LuaTracyExtra::PushEntries(L);
+		LuaTracyExtra::PushGpuProfile(L); // absent unless the TracyLuaGpuZones config is set
 		lua_pop(L, 1);
 	#endif
 }
