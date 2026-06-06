@@ -1436,7 +1436,7 @@ bool CGame::Draw() {
 	const spring_time currentTimePreDraw = spring_gettime();
 
 	SCOPED_SPECIAL_TIMER("Draw");
-	SCOPED_GL_DEBUGGROUP("Draw");
+	SCOPED_GL_GPU_ZONE("Draw");
 	globalRendering->SetGLTimeStamp(CGlobalRendering::FRAME_REF_TIME_QUERY_IDX);
 
 	SetDrawMode(gameNormalDraw);
@@ -1510,7 +1510,7 @@ bool CGame::Draw() {
 
 	{
 		SCOPED_TIMER("Draw::Screen");
-		SCOPED_GL_DEBUGGROUP("Draw::Screen");
+		SCOPED_GL_GPU_ZONE("Draw::Screen");
 		if (CUnitDrawer::UseScreenIcons())
 			unitDrawer->DrawUnitIconsScreen();
 
@@ -1566,12 +1566,12 @@ void CGame::DrawInputReceivers()
 		{
 			// this has MANUAL ordering, draw it last (front-most)
 			SCOPED_TIMER("Draw::Screen::DrawScreen");
-			SCOPED_GL_DEBUGGROUP("Draw::Screen::DrawScreen");
+			SCOPED_GL_GPU_ZONE("Draw::Screen::DrawScreen");
 			luaInputReceiver->Draw();
 		}
 	} else {
 		SCOPED_TIMER("Draw::Screen::Minimap");
-		SCOPED_GL_DEBUGGROUP("Draw::Screen::Minimap");
+		SCOPED_GL_GPU_ZONE("Draw::Screen::Minimap");
 
 		if (globalRendering->dualScreenMode) {
 			// minimap is on its own screen, so always draw it

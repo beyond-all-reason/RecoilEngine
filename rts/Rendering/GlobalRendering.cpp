@@ -665,6 +665,15 @@ void CGlobalRendering::PostInit() {
 	RenderBuffer::InitStatic();
 	GL::shapes.Init();
 
+	// Tracy GPU profiling context: one per primary context, on the main/render
+	// thread. Query objects are owned by the GL context, so they survive the
+	// later load-time thread/context migrations. Gate on the same extension the
+	// engine's own GL frame timer requires (see SetGLTimeStamp).
+	#if !defined(HEADLESS) && defined(TRACY_ENABLE)
+	if (GLAD_GL_ARB_timer_query)
+		TracyGpuContext;
+	#endif
+
 	UpdateTimer();
 }
 

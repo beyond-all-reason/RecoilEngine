@@ -892,6 +892,14 @@ bool SpringApp::Update()
 
 	// always swap by default, not doing so can upset some drivers
 	globalRendering->SwapBuffers(swap, false);
+
+	// Collect Tracy GPU query results here, in the genuine frame loop on the
+	// primary context — NOT next to the FrameMark inside SwapBuffers, which is
+	// also driven by the load/splash screens and Lua gl.SwapBuffers.
+	#if !defined(HEADLESS) && defined(TRACY_ENABLE)
+	TracyGpuCollect;
+	#endif
+
 	return retc;
 }
 
