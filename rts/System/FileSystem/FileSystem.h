@@ -124,6 +124,15 @@ public:
 	static char GetNativePathSeparator();
 	static bool IsAbsolutePath(const std::string& path);
 
+	/**
+	 * @brief list files/dirs matching @p regex under @p dataDir + @p dir
+	 *
+	 * Each match is returned as `dir + <path relative to dir>`. @p dataDir is the
+	 * filesystem root used only to locate the search directory and is NEVER part of
+	 * the result. Consequently the result is absolute iff @p dir is absolute:
+	 *   - relative dir:  dataDir = "/root/", dir = "sub/"   -> "sub/file"
+	 *   - absolute dir:  dataDir = "",       dir = "/abs/"  -> "/abs/file"
+	 */
 	static void FindFiles(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dir, const std::string& regex, int flags);
 
 	/**

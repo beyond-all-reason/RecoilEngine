@@ -643,15 +643,19 @@ namespace Impl {
 	{
 		const auto dirFullStr = FileSystem::ForwardSlashes(dataDir + dirStr);
 
-		auto dir = Recoil::filesystem::u8path(dirFullStr);
-		if (!fs::exists(dir))
+		const auto dirFullPath = Recoil::filesystem::u8path(dirFullStr);
+		if (!fs::exists(dirFullPath))
 			return;
+
+		// Each match is `dirStr + <entry below dirStr>`; the dataDir prefix must not leak
+		// in, so prepend dirStr ourselves instead of emitting the iterated full path.
+		const auto dirRelPrefix = FileSystem::ForwardSlashes(dirStr);
 
 		std::variant<fs::directory_iterator, fs::recursive_directory_iterator> dirIterator;
 		if ((flags & FileQueryFlags::RECURSE) != 0)
-			dirIterator = fs::recursive_directory_iterator(dir);
+			dirIterator = fs::recursive_directory_iterator(dirFullPath);
 		else
-			dirIterator = fs::directory_iterator(dir);
+			dirIterator = fs::directory_iterator(dirFullPath);
 
 		std::visit([&](auto&& dirIterator) {
 			for (const fs::directory_entry& entry : dirIterator) {
@@ -670,13 +674,14 @@ namespace Impl {
 				const auto entryPathFnStr = entry.path().filename().generic_u8string();
 
 				if (spring::regex_match(StoreUTF8AsString(entryPathFnStr), regexPattern)) {
-					auto entryPathStr = entry.path().generic_u8string();
+					const auto entryRelStr = entry.path().lexically_relative(dirFullPath).generic_u8string();
+					std::string entryPathStr = dirRelPrefix + Impl::StoreUTF8AsString(entryRelStr);
 
 					// the previous convention to add a trailing slash
-					if (isDir && !entryPathStr.empty() && entryPathStr.back() != u8'/') {
-						entryPathStr += u8'/';
+					if (isDir && !entryPathStr.empty() && entryPathStr.back() != '/') {
+						entryPathStr += '/';
 					}
-					matches.emplace_back(Impl::StoreUTF8AsString(entryPathStr));
+					matches.emplace_back(std::move(entryPathStr));
 				}
 			}
 		}, std::move(dirIterator));
