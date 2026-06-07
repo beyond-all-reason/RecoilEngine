@@ -26,13 +26,16 @@ CONFIG(std::string, DemoFileExtension).defaultValue("sdfz").description("Comma-s
 std::vector<std::string> GetDemoFileExtensions()
 {
 	const auto configValue = configHandler->GetString("DemoFileExtension");
-	auto extensions = std::vector<std::string>
-		( std::from_range
-		, configValue
-			| std::views::split(',')
-			| std::views::transform([](const auto& r) { return StringTrim(std::string(r.begin(), r.end())); })
-			| std::views::filter([](const std::string& s) { return !s.empty() && s.find_first_of("/\\.") == std::string::npos; })
-		);
+
+	std::vector<std::string> extensions;
+
+	for (const auto& part : configValue | std::views::split(',')) {
+		auto extension = StringTrim(std::string(part.begin(), part.end()));
+
+		if (!extension.empty() && extension.find_first_of("/\\.") == std::string::npos)
+			extensions.emplace_back(std::move(extension));
+	}
+
 	if (extensions.empty())
 		extensions.emplace_back("sdfz");
 	return extensions;

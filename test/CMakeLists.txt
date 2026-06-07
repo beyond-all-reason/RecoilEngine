@@ -332,6 +332,21 @@ endif()
 
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DTEST")
 
+################################################################################
+### DemoFileExtension
+	set(test_name DemoFileExtension)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/LoadSave/testDemoFileExtension.cpp"
+			"${ENGINE_SOURCE_DIR}/System/StringUtil.cpp"
+			${test_Common_sources}
+		)
+
+	set(test_libs
+			z
+		)
+
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+
 	if    (NOT NO_CREG)
 ################################################################################
 ### CREG
