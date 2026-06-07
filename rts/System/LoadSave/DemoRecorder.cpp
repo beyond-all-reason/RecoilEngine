@@ -4,8 +4,6 @@
 #include <cerrno>
 #include <cstring>
 #include <memory>
-#include <ranges>
-
 #include "DemoRecorder.h"
 #include "DemoFileExtension.h"
 #include "base64.h"
@@ -20,26 +18,6 @@
 #include "System/FileSystem/FileHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Threading/ThreadPool.h"
-
-CONFIG(std::string, DemoFileExtension).defaultValue("sdfz").description("Comma-separated list of replay file extensions. The first entry is used when recording; all entries are accepted when loading. Set by the lobby (e.g. 'barreplay,sdfz' for BAR).");
-
-std::vector<std::string> GetDemoFileExtensions()
-{
-	const auto configValue = configHandler->GetString("DemoFileExtension");
-
-	std::vector<std::string> extensions;
-
-	for (const auto& part : configValue | std::views::split(',')) {
-		auto extension = StringTrim(std::string(part.begin(), part.end()));
-
-		if (!extension.empty() && extension.find_first_of("/\\.") == std::string::npos)
-			extensions.emplace_back(std::move(extension));
-	}
-
-	if (extensions.empty())
-		extensions.emplace_back("sdfz");
-	return extensions;
-}
 
 #ifdef CreateDirectory
 #undef CreateDirectory

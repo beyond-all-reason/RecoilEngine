@@ -3,7 +3,6 @@
 #include <cstdio>
 #include <cstring>
 #include <map>
-#include <ranges>
 #include <string>
 #include <vector>
 
@@ -11,47 +10,36 @@
 
 #include <catch_amalgamated.hpp>
 
-#include "System/LoadSave/demofile.h"
-#include "System/StringUtil.h"
+#include "System/Config/ConfigHandler.h"
+#include "System/LoadSave/DemoFileExtension.h"
 
-class ConfigHandler {
-public:
-	virtual ~ConfigHandler() = default;
-	virtual std::string GetString(const std::string& key) const = 0;
-};
-
+// Minimal ConfigHandler stub — just enough for GetDemoFileExtensions()
 class StubConfigHandler : public ConfigHandler {
 public:
 	std::map<std::string, std::string> values;
 
+	void FinalizeLoad() override {}
+	void SetString(const std::string&, const std::string&, bool, bool) override {}
 	std::string GetString(const std::string& key) const override
 	{
 		auto it = values.find(key);
 		return (it != values.end()) ? it->second : std::string{};
 	}
+	bool IsSet(const std::string&) const override { return true; }
+	bool IsReadOnly(const std::string&) const override { return false; }
+	bool IsDeprecated(const std::string&) const override { return false; }
+	void Delete(const std::string&) override {}
+	std::string GetConfigFile() const override { return {}; }
+	const std::map<std::string, std::string> GetData() const override { return {}; }
+	std::map<std::string, std::string> GetDataWithoutDefaults() const override { return {}; }
+	void Update() override {}
+	void EnableWriting(bool) override {}
+protected:
+	void AddObserver(ConfigNotifyCallback, void*, const std::vector<std::string>&) override {}
+	void RemoveObserver(void*) override {}
 };
 
 ConfigHandler* configHandler = nullptr;
-
-std::vector<std::string> GetDemoFileExtensions()
-{
-	const auto configValue = configHandler->GetString("DemoFileExtension");
-
-	std::vector<std::string> extensions;
-
-	for (const auto& part : configValue | std::views::split(',')) {
-		auto extension = StringTrim(std::string(part.begin(), part.end()));
-
-		if (!extension.empty() && extension.find_first_of("/\\.") == std::string::npos)
-			extensions.emplace_back(std::move(extension));
-	}
-
-	if (extensions.empty())
-		extensions.emplace_back("sdfz");
-	return extensions;
-}
-
-#include "System/LoadSave/DemoFileExtension.h"
 
 struct TempGzFile {
 	std::string path;
@@ -172,11 +160,12 @@ TEST_CASE_METHOD(DemoExtFixture, "IsDemoExtension: unknown extension rejected", 
 	CHECK_FALSE(IsDemoExtension(""));
 }
 
-TEST_CASE_METHOD(DemoExtFixture, "IsDemoExtension: case sensitive", "[DemoFileExtension]")
+TEST_CASE_METHOD(DemoExtFixture, "IsDemoExtension: case insensitive", "[DemoFileExtension]")
 {
 	stub.values["DemoFileExtension"] = "sdfz";
-	CHECK_FALSE(IsDemoExtension("SDFZ"));
-	CHECK_FALSE(IsDemoExtension("Sdfz"));
+	CHECK(IsDemoExtension("SDFZ"));
+	CHECK(IsDemoExtension("Sdfz"));
+	CHECK(IsDemoExtension("sdfz"));
 }
 
 // ========================= ContentsLookLikeAReplay =========================

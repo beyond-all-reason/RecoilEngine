@@ -3,8 +3,8 @@
 #pragma once
 
 #include <algorithm>
+#include <cctype>
 #include <cstring>
-#include <ranges>
 #include <string>
 #include <vector>
 
@@ -19,8 +19,10 @@ inline bool IsDemoExtension(const std::string& ext)
 #ifdef TOOLS
 	return true;
 #else
+	std::string lower = ext;
+	std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
 	const auto extensions = GetDemoFileExtensions();
-	return std::ranges::contains(extensions, ext);
+	return std::ranges::contains(extensions, lower);
 #endif
 }
 

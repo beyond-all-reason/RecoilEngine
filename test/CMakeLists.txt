@@ -337,6 +337,8 @@ endif()
 	set(test_name DemoFileExtension)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/LoadSave/testDemoFileExtension.cpp"
+			"${ENGINE_SOURCE_DIR}/System/LoadSave/DemoFileExtension.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Config/ConfigVariable.cpp"
 			"${ENGINE_SOURCE_DIR}/System/StringUtil.cpp"
 			${test_Common_sources}
 		)
