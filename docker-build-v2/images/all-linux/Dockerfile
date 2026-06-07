@@ -11,7 +11,7 @@ RUN apt-get update \
  && add-apt-repository ppa:ubuntu-toolchain-r/test --yes \
  && apt-get update \
  && apt-get install --no-install-recommends --yes \
-    curl gcc-13 g++-13 git ninja-build curl p7zip-full python3-pip python3-setuptools \
+    curl gcc-15 g++-15 git ninja-build curl p7zip-full python3-pip python3-setuptools \
     libsdl2-dev libopenal-dev libfreetype6-dev libfontconfig1-dev \
  && apt-get remove --purge --yes software-properties-common \
  && apt-get autoremove --purge --yes \
@@ -30,7 +30,7 @@ RUN export CCACHE_ARCHIVE="ccache-${CCACHE_VERSION}-linux-$(uname -m)-musl-stati
 # And need newer zstd :(, fortunately it's quick build
 RUN git clone --depth 1 --branch v1.5.7 https://github.com/facebook/zstd.git \
  && cd zstd \
- && CC=g++-13 make -j$(nproc) \
+ && CC=gcc-15 make -j$(nproc) \
  && mv programs/zstd /usr/local/bin \
  && cd .. \
  && rm -rf zstd

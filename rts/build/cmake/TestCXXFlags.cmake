@@ -166,7 +166,3 @@ if   (CMAKE_COMPILER_IS_GNUCXX)
 endif()
 
 
-if   (CMAKE_COMPILER_IS_GNUCXX)
-	set(MPX_FLAGS "")
-	check_and_add_flags(MPX_FLAGS -fcheck-pointer-bounds -mmpx -Wchkp)
-endif()
