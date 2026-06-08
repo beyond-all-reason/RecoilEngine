@@ -641,7 +641,7 @@ namespace Impl {
 
 	void FindFilesStd(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dirStr, const spring::regex& regexPattern, int flags)
 	{
-		const auto dirFullStr = FileSystem::ForwardSlashes(dataDir + dirStr);
+		const std::string dirFullStr = FileSystem::ForwardSlashes(dataDir + dirStr);
 
 		const fs::path dirFullPath = Recoil::filesystem::u8path(dirFullStr);
 		if (!fs::exists(dirFullPath))
@@ -671,10 +671,10 @@ namespace Impl {
 
 				// hope std::regex_match will not trip up on UTF-8, if it does, will need to convert to std::wregex
 				// the previous implementation relied on checking the filename only
-				const auto entryPathFnStr = entry.path().filename().generic_u8string();
+				const std::u8string entryPathFnStr = entry.path().filename().generic_u8string();
 
 				if (spring::regex_match(StoreUTF8AsString(entryPathFnStr), regexPattern)) {
-					const auto entryRelStr = entry.path().lexically_relative(dirFullPath).generic_u8string();
+					const std::u8string entryRelStr = entry.path().lexically_relative(dirFullPath).generic_u8string();
 					std::string entryPathStr = dirRelPrefix + Impl::StoreUTF8AsString(entryRelStr);
 
 					// the previous convention to add a trailing slash
