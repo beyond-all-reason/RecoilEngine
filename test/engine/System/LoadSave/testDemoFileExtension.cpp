@@ -1,4 +1,4 @@
-/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+/* This file is part of the Recoil engine (GPL v2 or later), see LICENSE.html */
 
 #include <cstdio>
 #include <cstring>
@@ -12,6 +12,7 @@
 
 #include "System/Config/ConfigHandler.h"
 #include "System/LoadSave/DemoFileExtension.h"
+#include "System/LoadSave/demofile.h"
 
 // Minimal ConfigHandler stub — just enough for GetDemoFileExtensions()
 class StubConfigHandler : public ConfigHandler {

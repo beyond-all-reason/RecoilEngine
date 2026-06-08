@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cstring>
 #include <memory>
+
 #include "DemoRecorder.h"
 #include "DemoFileExtension.h"
 #include "base64.h"
