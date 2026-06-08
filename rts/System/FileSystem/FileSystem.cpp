@@ -643,13 +643,13 @@ namespace Impl {
 	{
 		const auto dirFullStr = FileSystem::ForwardSlashes(dataDir + dirStr);
 
-		const auto dirFullPath = Recoil::filesystem::u8path(dirFullStr);
+		const fs::path dirFullPath = Recoil::filesystem::u8path(dirFullStr);
 		if (!fs::exists(dirFullPath))
 			return;
 
 		// Each match is `dirStr + <entry below dirStr>`; the dataDir prefix must not leak
 		// in, so prepend dirStr ourselves instead of emitting the iterated full path.
-		const auto dirRelPrefix = FileSystem::ForwardSlashes(dirStr);
+		const std::string dirRelPrefix = FileSystem::ForwardSlashes(dirStr);
 
 		std::variant<fs::directory_iterator, fs::recursive_directory_iterator> dirIterator;
 		if ((flags & FileQueryFlags::RECURSE) != 0)
