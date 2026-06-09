@@ -12,6 +12,7 @@
 #include "Rendering/GL/StreamBuffer.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/GL/myGL.h"
+#include "Rendering/GL/GpuMemTracyHooks.h"
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/glxHandler.h"
@@ -589,6 +590,10 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 
 	gladLoadGL();
 	GLX::Load(sdlWindow);
+
+	// redirect glad's texture/renderbuffer entry points through VRAM-tracking
+	// wrappers (no-op unless TRACY_ENABLE && !HEADLESS); must follow gladLoadGL
+	GL::InstallGpuMemHooks();
 
 	if (!CheckGLContextVersion(minCtx)) {
 		int ctxProfile = 0;
