@@ -429,7 +429,11 @@ option(ENABLE_STREFLOP "build Spring with streflop support (REQUIRED FOR MULTIPL
 
 if (ENABLE_STREFLOP)
 ## note: is removed in ./AI/CMakeLists.txt since it would break AI compilation
-add_definitions(-DSTREFLOP_SSE)
+if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+	add_definitions(-DSTREFLOP_SOFT)
+else ()
+	add_definitions(-DSTREFLOP_SSE)
+endif ()
 else ()
 add_definitions(-DNOT_USING_STREFLOP)
 endif ()

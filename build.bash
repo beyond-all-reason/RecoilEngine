@@ -1,0 +1,16 @@
+cmake --fresh \
+	-DCMAKE_TOOLCHAIN_FILE="../toolchain/clang_arm64-apple-darwin.cmake" \
+	-DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+	-DCMAKE_C_COMPILER_LAUNCHER=ccache \
+	-DCMAKE_CXX_FLAGS="-include cmath" \
+	-DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O3 -g -DNDEBUG" \
+	-DCMAKE_C_FLAGS_RELWITHDEBINFO="-O3 -g -DNDEBUG" \
+	-DCMAKE_BUILD_TYPE=RELWITHDEBINFO \
+	-DCMAKE_COLOR_DIAGNOSTICS=ON \
+	-DAI_TYPES=NATIVE \
+	-DCMAKE_INSTALL_PREFIX="$(dirname $(realpath "$0"))/install" \
+	-DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+	-G Ninja \
+	..
+
+ninja
