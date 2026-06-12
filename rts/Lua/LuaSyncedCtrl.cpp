@@ -1212,9 +1212,9 @@ int LuaSyncedCtrl::AddTeamResource(lua_State* L)
 	const float value = max(0.0f, luaL_checkfloat(L, 3));
 
 	switch (type[0]) {
-		case 'm': { team->AddMetal (value); } break;
-		case 'e': { team->AddEnergy(value); } break;
-		default : {                         } break;
+		case 'm': { team->AddResources({value, 0.0f}); } break;
+		case 'e': { team->AddResources({0.0f, value}); } break;
+		default : {                                    } break;
 	}
 
 	return 0;
@@ -1264,12 +1264,12 @@ int LuaSyncedCtrl::UseTeamResource(lua_State* L)
 		switch (type[0]) {
 			case 'm': {
 				team->resPull.metal += value;
-				lua_pushboolean(L, team->UseMetal(value));
+				lua_pushboolean(L, team->UseResources({value, 0.0f}));
 				return 1;
 			} break;
 			case 'e': {
 				team->resPull.energy += value;
-				lua_pushboolean(L, team->UseEnergy(value));
+				lua_pushboolean(L, team->UseResources({0.0f, value}));
 				return 1;
 			} break;
 			default: {
@@ -1290,12 +1290,12 @@ int LuaSyncedCtrl::UseTeamResource(lua_State* L)
 				continue;
 
 			const char* key = lua_tostring(L, LUA_TABLE_KEY_INDEX);
-			const float value = lua_tofloat(L, LUA_TABLE_VALUE_INDEX);
+			const float value = std::max(0.0f, lua_tofloat(L, LUA_TABLE_VALUE_INDEX));
 
 			switch (key[0]) {
-				case 'm': { metal  = std::max(0.0f, value); } break;
-				case 'e': { energy = std::max(0.0f, value); } break;
-				default : {                                 } break;
+				case 'm': { metal  = value; } break;
+				case 'e': { energy = value; } break;
+				default : {                 } break;
 			}
 		}
 
@@ -1303,8 +1303,7 @@ int LuaSyncedCtrl::UseTeamResource(lua_State* L)
 		team->resPull.energy += energy;
 
 		if ((team->res.metal >= metal) && (team->res.energy >= energy)) {
-			team->UseMetal(metal);
-			team->UseEnergy(energy);
+			team->UseResources({metal, energy});
 			lua_pushboolean(L, true);
 		} else {
 			lua_pushboolean(L, false);
@@ -4471,16 +4470,15 @@ int LuaSyncedCtrl::AddUnitResource(lua_State* L)
 	if (type.empty())
 		return 0;
 
+	const auto value = std::max(0.0f, luaL_checkfloat(L, 3));
 	switch (type[0]) {
-		case 'm': { unit->AddMetal (std::max(0.0f, luaL_checkfloat(L, 3))); } break;
-		case 'e': { unit->AddEnergy(std::max(0.0f, luaL_checkfloat(L, 3))); } break;
+		case 'm': { unit->AddResources({value, 0.0f}); } break;
+		case 'e': { unit->AddResources({0.0f, value}); } break;
 		default: {} break;
 	}
 
 	return 0;
 }
-
-/*
 
 /***
  * @function Spring.UseUnitResource
@@ -4505,11 +4503,12 @@ int LuaSyncedCtrl::UseUnitResource(lua_State* L)
 
 	if (lua_isstring(L, 2)) {
 		const char* type = lua_tostring(L, 2);
+		const auto value = std::max(0.0f, lua_tofloat(L, 3));
 
 		switch (type[0]) {
-			case 'm': { lua_pushboolean(L, unit->UseMetal (std::max(0.0f, lua_tofloat(L, 3)))); return 1; } break;
-			case 'e': { lua_pushboolean(L, unit->UseEnergy(std::max(0.0f, lua_tofloat(L, 3)))); return 1; } break;
-			default : {                                                                                   } break;
+			case 'm': { lua_pushboolean(L, unit->UseResources({value, 0.0f})); return 1; } break;
+			case 'e': { lua_pushboolean(L, unit->UseResources({0.0f, value})); return 1; } break;
+			default : {                                                                  } break;
 		}
 
 		return 0;
@@ -4524,7 +4523,7 @@ int LuaSyncedCtrl::UseUnitResource(lua_State* L)
 		for (lua_pushnil(L); lua_next(L, tableIdx) != 0; lua_pop(L, 1)) {
 			if (lua_israwstring(L, LUA_TABLE_KEY_INDEX) && lua_isnumber(L, LUA_TABLE_VALUE_INDEX)) {
 				const char* key = lua_tostring(L, LUA_TABLE_KEY_INDEX);
-				const float val = std::max(0.0f, lua_tofloat(L, -1));
+				const float val = std::max(0.0f, lua_tofloat(L, LUA_TABLE_VALUE_INDEX));
 
 				switch (key[0]) {
 					case 'm': {  metal = val; } break;
@@ -4537,8 +4536,7 @@ int LuaSyncedCtrl::UseUnitResource(lua_State* L)
 		CTeam* team = teamHandler.Team(unit->team);
 
 		if ((team->res.metal >= metal) && (team->res.energy >= energy)) {
-			unit->UseMetal(metal);
-			unit->UseEnergy(energy);
+			unit->UseResources({metal, energy});
 			lua_pushboolean(L, true);
 		} else {
 			team->resPull.metal  += metal;

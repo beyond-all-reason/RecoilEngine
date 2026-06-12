@@ -612,6 +612,12 @@ void CBuilderCAI::ExecuteBuildCmd(Command& c)
 		// <build> is never parsed (except in PostLoad) so just copy it
 		build = bi;
 		inCommand = c.GetID();
+
+		// One-time early check: if repeating the order (or first run), skip immediately if now blocked
+		if (IsBuildPosBlocked(build)) {
+			StopMoveAndFinishCommand();
+			return;
+		}
 	}
 
 	// guard against dangling non-build commands

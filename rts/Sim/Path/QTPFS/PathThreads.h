@@ -1,6 +1,7 @@
 #ifndef PATH_THREADS_H__
 #define PATH_THREADS_H__
 
+#include <bit>
 #include <cstddef>
 #include <functional>
 #include <queue>
@@ -10,6 +11,7 @@
 
 #include "Map/ReadMap.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
+#include "System/ChunkedArray.hpp"
 #include "System/Rectangle.h"
 
 namespace QTPFS {
@@ -19,20 +21,47 @@ namespace QTPFS {
     // per thread
     template<typename T>
     struct SparseData {
-        std::vector<int> sparseIndex;
-        std::vector<T> denseData;
+        std::vector<uint32_t> sparseIndex;
+        recoil::ChunkedArray<T, 1024> denseData;
+
+        uint32_t currentGeneration = 0;
+
+        static constexpr uint32_t DENSE_BITS = std::bit_width(POOL_TOTAL_SIZE) - 1;
+        static constexpr uint32_t GEN_BITS   = (sizeof(uint32_t) * 8) - DENSE_BITS;
+        static constexpr uint32_t DENSE_MASK = (1u << DENSE_BITS) - 1; // 0x0007FFFF
+        static constexpr uint32_t GEN_SHIFT  = DENSE_BITS;
+
+        // This ensures the index range for nodes is fully convered.
+        static_assert((POOL_TOTAL_SIZE - 1) == DENSE_MASK);
+        static_assert(DENSE_BITS + GEN_BITS == sizeof(uint32_t) * 8);
 
         void Reset(size_t sparseSize) {
             {
                 ZoneScopedN("sparseIndex.assign");
                 sparseIndex.assign(sparseSize, 0);
             }
-            denseData.clear();
-            denseData.emplace_back(T()); // 0-th element represents a dummy record.
+            denseData.reset();
         }
 
         void Reserve(size_t denseSize) {
             denseData.reserve(denseSize);
+        }
+
+        void InitNewSearch() {
+            // ZoneScopedN("SparseData::InitNewSearch");
+            currentGeneration = (currentGeneration + 1) % (1u << GEN_BITS);
+            if (currentGeneration == 0) {
+                // generation wrapped around, need to clear sparseIndex to avoid confusion with old generations
+                Reset(POOL_TOTAL_SIZE);
+                currentGeneration = 1; // start from 1 to avoid confusion with default-initialized values in sparseIndex
+            } else
+                denseData.reset();
+        }
+
+        uint32_t GetDenseIndex(size_t index) const {
+            assert(index < sparseIndex.size());
+            assert( isSet(index) );
+            return sparseIndex[index] & DENSE_MASK;
         }
 
         // iterators walk backwards
@@ -41,42 +70,43 @@ namespace QTPFS {
 
         void InsertAtIndex(T&& data, int index) {
             assert(size_t(index) < sparseIndex.size());
-            if (sparseIndex[index] == 0) {
+            if ( !isSet(index) ) {
                 denseData.emplace_back(data);
-                sparseIndex[index] = denseData.size() - 1;
+                sparseIndex[index] = (denseData.size() - 1) | (currentGeneration << GEN_SHIFT);
             } else {
-                denseData[sparseIndex[index]] = data;
+                denseData[GetDenseIndex(index)] = data;
             }
         }
 
         T& InsertINode(int nodeId) {
             assert(size_t(nodeId) < sparseIndex.size());
-            assert( sparseIndex[nodeId] == 0 );
+            assert( !isSet(nodeId) );
             InsertAtIndex(T(nodeId), nodeId);
             return operator[](nodeId);
         }
 
         T& InsertINodeIfNotPresent(int nodeId) {
             assert(size_t(nodeId) < sparseIndex.size());
-            if (sparseIndex[nodeId] == 0)
+            if ( !isSet(nodeId) )
                 InsertAtIndex(T(nodeId), nodeId);
             return operator[](nodeId);
         }
 
         auto& operator[](const size_t i) {
             assert(i < sparseIndex.size());
-            assert( sparseIndex[i] != 0 );
-            return denseData[sparseIndex[i]];
+            assert( isSet(i) );
+            return denseData[GetDenseIndex(i)];
         }
         const auto& operator[](const size_t i) const {
             assert(i < sparseIndex.size());
-            assert( sparseIndex[i] != 0 );
-            return denseData[sparseIndex[i]];
+            assert( isSet(i) );
+            return denseData[GetDenseIndex(i)];
         }
 
         bool isSet(size_t i) const {
             assert(i < sparseIndex.size());
-            return (sparseIndex[i] != 0);
+            uint32_t gen = sparseIndex[i] >> GEN_SHIFT;
+            return (gen == currentGeneration);
         }
 
         std::size_t GetMemFootPrint() const {
@@ -110,7 +140,14 @@ namespace QTPFS {
 
     // Reminder that std::priority does comparisons to push element back to the bottom. So using
     // ShouldMoveTowardsBottomOfPriorityQueue here means the smallest value will be top()
-    typedef std::priority_queue<SearchQueueNode, std::vector<SearchQueueNode>, ShouldMoveTowardsBottomOfPriorityQueue> SearchPriorityQueue;
+    // typedef std::priority_queue<SearchQueueNode, std::vector<SearchQueueNode>, ShouldMoveTowardsBottomOfPriorityQueue> SearchPriorityQueue;
+
+    // This approach avoids the slow method of clearing by calling pop() until empty; however, the underlying objects must all be trivial objects.
+    struct SearchPriorityQueue : public std::priority_queue<SearchQueueNode, std::vector<SearchQueueNode>, ShouldMoveTowardsBottomOfPriorityQueue> {
+        void clear() { c.clear(); }
+    };
+
+    static_assert(std::is_trivially_destructible_v<SearchQueueNode>);
 
 	struct SearchThreadData {
 
@@ -126,24 +163,28 @@ namespace QTPFS {
 		SearchThreadData(size_t nodeCount, int curThreadId)
 			// : allSearchedNodes(nodeCount)
             /*,*/ : threadId(curThreadId)
-			{}
+        {
+            for (int i=0; i<SEARCH_DIRECTIONS; ++i) {
+                allSearchedNodes[i].Reset(POOL_TOTAL_SIZE);
+            }
+        }
 
         void ResetQueue() { ZoneScoped; for (int i=0; i<SEARCH_DIRECTIONS; ++i) ResetQueue(i); }
 
-        void ResetQueue(int i) { ZoneScoped; while (!openNodes[i].empty()) openNodes[i].pop(); }
+        void ResetQueue(int i) { ZoneScoped; /*while (!openNodes[i].empty()) openNodes[i].pop();*/ openNodes[i].clear(); }
 
 		void Init(size_t sparseSize, size_t denseSize) {
             constexpr size_t tmpNodeStoreInitialReserve = 128;
 
             for (int i=0; i<SEARCH_DIRECTIONS; ++i) {
-                allSearchedNodes[i].Reset(sparseSize);
-                allSearchedNodes[i].denseData.reserve(denseSize + 1); // +1 for dummy record
+                allSearchedNodes[i].InitNewSearch();
+                allSearchedNodes[i].denseData.reserve(denseSize);
             }
             tmpNodesStore.reserve(tmpNodeStoreInitialReserve);
             ResetQueue();
 		}
 
-        std::size_t GetMemFootPrint() {
+        std::size_t GetMemFootPrint() const {
             std::size_t memFootPrint = 0;
 
             for (int i=0; i<SEARCH_DIRECTIONS; ++i) {
@@ -220,7 +261,7 @@ namespace QTPFS {
             moveDef = nullptr;
         }
 
-        std::size_t GetMemFootPrint() {
+        std::size_t GetMemFootPrint() const {
             std::size_t memFootPrint = 0;
 
             memFootPrint += maxBlockBits.size()   * sizeof(decltype(maxBlockBits)::value_type);

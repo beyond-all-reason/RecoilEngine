@@ -52,6 +52,10 @@ namespace spring {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #endif
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wimplicit-const-int-float-conversion"
+#endif
     template<typename TOut, typename TIn>
     inline TOut SafeCast(TIn value)
     {
@@ -96,6 +100,9 @@ namespace spring {
         // limits have been checked, therefore safe to cast
         return static_cast<TOut>(value);
     }
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif

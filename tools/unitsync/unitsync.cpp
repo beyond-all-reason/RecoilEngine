@@ -604,7 +604,7 @@ static bool internal_GetMapInfo(const char* mapName, InternalMapInfo* outInfo)
 
 	// Retrieve the map header as well
 	if (err.empty()) {
-		const std::string extension = FileSystem::GetExtension(mapFile);
+		const std::string extension = FileSystem::GetExtensionLowerCase(mapFile);
 		if (extension == "smf") {
 			try {
 				const CSMFMapFile file(mapFile);
@@ -972,7 +972,7 @@ EXPORT(unsigned short*) GetMinimap(const char* mapName, int mipLevel)
 		ScopedMapLoader mapLoader(mapName, mapFile);
 
 		unsigned short* ret = nullptr;
-		const std::string extension = FileSystem::GetExtension(mapFile);
+		const std::string extension = FileSystem::GetExtensionLowerCase(mapFile);
 		if (extension == "smf") {
 			ret = GetMinimapSMF(mapFile, mipLevel);
 		} else if (extension == "sm3") {

@@ -16,7 +16,7 @@ class CUnit;
 
 class CExpGenSpawnable : public CWorldObject
 {
-	CR_DECLARE(CExpGenSpawnable)
+	CR_DECLARE_DERIVED(CExpGenSpawnable)
 public:
 	using AllocFunc = CExpGenSpawnable*(*)();
 	using GetMemberInfoFunc = bool(*)(SExpGenSpawnableMemberInfo&);

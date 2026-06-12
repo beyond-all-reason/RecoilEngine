@@ -126,7 +126,7 @@ linux_signal::linux_signal() noexcept
 
 linux_signal::~linux_signal()
 {
-	gen = {0};
+	gen = 0;
 	mtx = 0;
 }
 

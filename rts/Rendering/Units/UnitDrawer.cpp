@@ -367,8 +367,10 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, 
 
 			std::swap(posX, posY);
 			break;
+		case CMiniMap::ROTATION_0:
+			break;
 	}
-	
+
 	float x0 = posX - iconSizeX;
 	float x1 = posX + iconSizeX;
 	float y0 = posY - iconSizeY;
@@ -1367,26 +1369,16 @@ void CUnitDrawerGLSL::DrawIndividualDefAlpha(const SolidObjectDef* objectDef, in
 bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std::vector<Command>& commands) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	//TODO: make this a lua callin!
-	glDisable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glDisable(GL_TEXTURE_2D);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	CFeature* feature = nullptr;
 
-	std::vector<float3> buildableSquares; // buildable squares
-	std::vector<float3> featureSquares; // occupied squares
-	std::vector<float3> illegalSquares; // non-buildable squares
+	std::vector<uint8_t> statuses;
 
 	struct BuildCache {
 		uint64_t key;
 		int createFrame;
 		bool canBuild;
-		std::vector<float3> buildableSquares; // buildable squares
-		std::vector<float3> featureSquares; // occupied squares
-		std::vector<float3> illegalSquares; // non-buildable squares
+		std::vector<uint8_t> statuses;
 	};
 
 	static std::vector<BuildCache> buildCache;
@@ -1395,14 +1387,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 	uint64_t hashKey = spring::LiteHash(pos);
 	hashKey = spring::hash_combine(spring::LiteHash(buildInfo.buildFacing), hashKey);
-	/*
-	for (const auto& cmd : commands) {
-		const BuildInfo bc(cmd);
-		spring::hash_combine(spring::LiteHash(bc), hash);
-	}
-	*/
 
-	// the chosen number here is arbitrary, feel free to fine balance.
 	static constexpr int CACHE_VALIDITY_PERIOD = GAME_SPEED / 5;
 	std::erase_if(buildCache, [](const BuildCache& bc) {
 		return gs->frameNum - bc.createFrame >= CACHE_VALIDITY_PERIOD;
@@ -1420,9 +1405,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 		return bc.key == hashKey;
 	});
 	if (it != buildCache.end()) {
-		buildableSquares.assign(it->buildableSquares.begin(), it->buildableSquares.end());
-		featureSquares.assign(it->featureSquares.begin(), it->featureSquares.end());
-		illegalSquares.assign(it->illegalSquares.begin(), it->illegalSquares.end());
+		statuses = it->statuses;
 		canBuild = it->canBuild;
 	}
 	else {
@@ -1431,9 +1414,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 			feature,
 			-1,
 			false,
-			&buildableSquares,
-			&featureSquares,
-			&illegalSquares,
+			&statuses,
 			&commands
 		);
 		buildCache.emplace_back();
@@ -1442,15 +1423,30 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 		buildCacheItem.key = hashKey;
 		buildCacheItem.canBuild = canBuild;
 		buildCacheItem.createFrame = gs->frameNum;
-		buildCacheItem.buildableSquares.assign(buildableSquares.begin(), buildableSquares.end());
-		buildCacheItem.featureSquares.assign(featureSquares.begin(), featureSquares.end());
-		buildCacheItem.illegalSquares.assign(illegalSquares.begin(), illegalSquares.end());
+		buildCacheItem.statuses = statuses;
 	}
 
-	static constexpr std::array<float, 4> buildColorT  = { 0.0f, 0.9f, 0.0f, 0.7f };
-	static constexpr std::array<float, 4> buildColorF  = { 0.9f, 0.8f, 0.0f, 0.7f };
-	static constexpr std::array<float, 4> featureColor = { 0.9f, 0.8f, 0.0f, 0.7f };
-	static constexpr std::array<float, 4> illegalColor = { 0.9f, 0.0f, 0.0f, 0.7f };
+	eventHandler.DrawBuildSquare(
+		buildInfo.def->id,
+		static_cast<int>(pos.x),
+		static_cast<int>(pos.z),
+		buildInfo.buildFacing,
+		statuses
+	);
+
+	if (!CUnitDrawer::EngineBuildSquareRendering()) {
+		return canBuild;
+	}
+
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_TEXTURE_2D);
+
+	static constexpr SColor buildColorT  = { 0.0f, 0.9f, 0.0f, 0.7f };
+	static constexpr SColor buildColorF  = { 0.9f, 0.8f, 0.0f, 0.7f };
+	static constexpr SColor featureColor = { 0.9f, 0.8f, 0.0f, 0.7f };
+	static constexpr SColor illegalColor = { 0.9f, 0.0f, 0.0f, 0.7f };
 
 	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_C>();
 	rb.AssertSubmission();
@@ -1459,40 +1455,46 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 	sh.Enable();
 
-	const float* color = canBuild ? &buildColorT[0] : &buildColorF[0];
-	for (const auto& buildableSquare : buildableSquares) {
-		rb.AddQuadLines(
-			{ buildableSquare                                      , color },
-			{ buildableSquare + float3(SQUARE_SIZE, 0, 0          ), color },
-			{ buildableSquare + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
-			{ buildableSquare + float3(0          , 0, SQUARE_SIZE), color }
-		);
-	}
+	const auto* buildColor = canBuild ? &buildColorT : &buildColorF;
+	const int numX = buildInfo.GetXSize();
+	const int numZ = buildInfo.GetZSize();
+	const int sx1 = int(pos.x / SQUARE_SIZE) - (numX >> 1);
+	const int sz1 = int(pos.z / SQUARE_SIZE) - (numZ >> 1);
 
-	color = &featureColor[0];
-	for (const auto& featureSquare : featureSquares) {
-		rb.AddQuadLines(
-			{ featureSquare                                      , color },
-			{ featureSquare + float3(SQUARE_SIZE, 0, 0          ), color },
-			{ featureSquare + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
-			{ featureSquare + float3(0          , 0, SQUARE_SIZE), color }
-		);
-	}
-
-	color = &illegalColor[0];
-	for (const auto& illegalSquare : illegalSquares) {
-		rb.AddQuadLines(
-			{ illegalSquare                                      , color },
-			{ illegalSquare + float3(SQUARE_SIZE, 0, 0          ), color },
-			{ illegalSquare + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
-			{ illegalSquare + float3(0          , 0, SQUARE_SIZE), color }
-		);
+	for (int zi = 0; zi < numZ; zi++) {
+		for (int xi = 0; xi < numX; xi++) {
+			const auto status = static_cast<CGameHelper::BuildSquareStatus>(statuses[zi * numX + xi]);
+			const float3 sqrPos = {
+				static_cast<float>((sx1 + xi) * SQUARE_SIZE),
+				h,
+				static_cast<float>((sz1 + zi) * SQUARE_SIZE)
+			};
+			const SColor* color = nullptr;
+			switch (status) {
+				case CGameHelper::BUILDSQUARE_OPEN:
+					color = buildColor;
+					break;
+				case CGameHelper::BUILDSQUARE_OCCUPIED:
+				case CGameHelper::BUILDSQUARE_RECLAIMABLE:
+					color = &featureColor;
+					break;
+				default:
+					color = &illegalColor;
+					break;
+			}
+			rb.AddQuadLines(
+				{ sqrPos                                      , *color },
+				{ sqrPos + float3(SQUARE_SIZE, 0, 0          ), *color },
+				{ sqrPos + float3(SQUARE_SIZE, 0, SQUARE_SIZE), *color },
+				{ sqrPos + float3(0          , 0, SQUARE_SIZE), *color }
+			);
+		}
 	}
 	rb.Submit(GL_LINES);
 
 	if (h < 0.0f) {
-		constexpr uint8_t s[] = { 0,   0, 255, 128 }; // start color
-		constexpr uint8_t e[] = { 0, 128, 255, 255 }; // end color
+		constexpr SColor s = { 0,   0, 255, 128 };
+		constexpr SColor e = { 0, 128, 255, 255 };
 
 		rb.AddVertex({ float3(x1, h, z1), s }); rb.AddVertex({ float3(x1, 0.f, z1), e });
 		rb.AddVertex({ float3(x1, h, z2), s }); rb.AddVertex({ float3(x1, 0.f, z2), e });
@@ -1511,8 +1513,6 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 
 	glEnable(GL_DEPTH_TEST);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	// glDisable(GL_BLEND);
 
 	return canBuild;
 }
@@ -1598,7 +1598,7 @@ void CUnitDrawerGL4::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon>& 
 			CModelDrawerHelper::BindModelTypeTexture(model->type, model->textureType); //inefficient rendering, but w/e
 		}
 
-		smv.SubmitImmediately(model, buildIcon.team, DrawFlags::SO_ALPHAF_FLAG);
+		smv.SubmitImmediately(model, static_cast<uint16_t>(buildIcon.team));
 	}
 
 	if (prevModelType != -1)
@@ -1769,7 +1769,7 @@ void CUnitDrawerGL4::DrawAlphaObjects(int modelType, bool drawReflection, bool d
 			}
 
 			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
-			smv.SubmitImmediately(dgb->GetModel(), dgb->team, DrawFlags::SO_ALPHAF_FLAG); //need to submit immediately every model because of static per-model matrix
+			smv.SubmitImmediately(dgb->GetModel(), static_cast<uint16_t>(dgb->team)); //need to submit immediately every model because of static per-model matrix
 		}
 	}
 
@@ -1823,7 +1823,7 @@ void CUnitDrawerGL4::DrawAlphaObjects(int modelType, bool drawReflection, bool d
 			}
 
 			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
-			smv.SubmitImmediately(model, lgb->team, DrawFlags::SO_ALPHAF_FLAG); //need to submit immediately every model because of static per-model matrix
+			smv.SubmitImmediately(model, static_cast<uint16_t>(lgb->team)); //need to submit immediately every model because of static per-model matrix
 		}
 	}
 
@@ -1876,7 +1876,7 @@ void CUnitDrawerGL4::DrawAlphaAIUnit(const CUnitDrawerData::TempDrawUnit& unit) 
 	SetTeamColor(unit.team, IModelDrawerState::alphaValues.x);
 	modelDrawerState->SetStaticModelMatrix(staticWorldMat);
 
-	smv.SubmitImmediately(mdl, unit.team, DrawFlags::SO_ALPHAF_FLAG);
+	smv.SubmitImmediately(mdl, static_cast<uint16_t>(unit.team));
 }
 
 void CUnitDrawerGL4::DrawOpaqueObjectsAux(int modelType) const
@@ -1923,7 +1923,7 @@ void CUnitDrawerGL4::DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit)
 	SetTeamColor(unit.team);
 	modelDrawerState->SetStaticModelMatrix(staticWorldMat);
 
-	smv.SubmitImmediately(mdl, unit.team, DrawFlags::SO_OPAQUE_FLAG);
+	smv.SubmitImmediately(mdl, static_cast<uint16_t>(unit.team));
 }
 
 void CUnitDrawerGL4::DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool noLuaCall) const

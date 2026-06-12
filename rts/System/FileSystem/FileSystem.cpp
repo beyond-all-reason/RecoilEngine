@@ -641,17 +641,21 @@ namespace Impl {
 
 	void FindFilesStd(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dirStr, const spring::regex& regexPattern, int flags)
 	{
-		const auto dirFullStr = FileSystem::ForwardSlashes(dataDir + dirStr);
+		const std::string dirFullStr = FileSystem::ForwardSlashes(dataDir + dirStr);
 
-		auto dir = Recoil::filesystem::u8path(dirFullStr);
-		if (!fs::exists(dir))
+		const fs::path dirFullPath = Recoil::filesystem::u8path(dirFullStr);
+		if (!fs::exists(dirFullPath))
 			return;
+
+		// Each match is `dirStr + <entry below dirStr>`; the dataDir prefix must not leak
+		// in, so prepend dirStr ourselves instead of emitting the iterated full path.
+		const std::string dirRelPrefix = FileSystem::ForwardSlashes(dirStr);
 
 		std::variant<fs::directory_iterator, fs::recursive_directory_iterator> dirIterator;
 		if ((flags & FileQueryFlags::RECURSE) != 0)
-			dirIterator = fs::recursive_directory_iterator(dir);
+			dirIterator = fs::recursive_directory_iterator(dirFullPath);
 		else
-			dirIterator = fs::directory_iterator(dir);
+			dirIterator = fs::directory_iterator(dirFullPath);
 
 		std::visit([&](auto&& dirIterator) {
 			for (const fs::directory_entry& entry : dirIterator) {
@@ -667,16 +671,17 @@ namespace Impl {
 
 				// hope std::regex_match will not trip up on UTF-8, if it does, will need to convert to std::wregex
 				// the previous implementation relied on checking the filename only
-				const auto entryPathFnStr = entry.path().filename().generic_u8string();
+				const std::u8string entryPathFnStr = entry.path().filename().generic_u8string();
 
 				if (spring::regex_match(StoreUTF8AsString(entryPathFnStr), regexPattern)) {
-					auto entryPathStr = entry.path().generic_u8string();
+					const std::u8string entryRelStr = entry.path().lexically_relative(dirFullPath).generic_u8string();
+					std::string entryPathStr = dirRelPrefix + Impl::StoreUTF8AsString(entryRelStr);
 
 					// the previous convention to add a trailing slash
-					if (isDir && !entryPathStr.empty() && entryPathStr.back() != u8'/') {
-						entryPathStr += u8'/';
+					if (isDir && !entryPathStr.empty() && entryPathStr.back() != '/') {
+						entryPathStr += '/';
 					}
-					matches.emplace_back(Impl::StoreUTF8AsString(entryPathStr));
+					matches.emplace_back(std::move(entryPathStr));
 				}
 			}
 		}, std::move(dirIterator));
@@ -895,7 +900,7 @@ std::string FileSystem::GetBasename(const std::string& pathStr)
 	return Impl::StorePathAsString(p.stem());
 }
 
-std::string FileSystem::GetExtension(const std::string& pathStr)
+std::string FileSystem::GetExtensionLowerCase(const std::string& pathStr)
 {
 	const auto p = Recoil::filesystem::u8path(pathStr);
 	auto ext = p.extension().generic_u8string();
@@ -903,7 +908,7 @@ std::string FileSystem::GetExtension(const std::string& pathStr)
 		return "";
 
 	assert(ext[0] == u8'.');
-	return Impl::StorePathAsString(ext.substr(1, ext.length() - 1));
+	return StringToLower(Impl::StorePathAsString(ext.substr(1, ext.length() - 1)));
 }
 
 std::string FileSystem::GetNormalizedPath(const std::string& path) {

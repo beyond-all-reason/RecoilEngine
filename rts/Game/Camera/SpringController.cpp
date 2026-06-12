@@ -67,7 +67,7 @@ void CSpringController::ConfigUpdate()
 	RECOIL_DETAILED_TRACY_ZONE;
 	scrollSpeed = configHandler->GetFloat("CamSpringScrollSpeed") * 0.1f;
 	fov = configHandler->GetFloat("CamSpringFOV");
-	minDist = configHandler->GetFloat("CamSpringMinZoomDistance");
+	minDist = std::max(configHandler->GetFloat("CamSpringMinZoomDistance"), 0.1f);
 	cursorZoomIn = configHandler->GetBool("CamSpringZoomInToMousePos");
 	cursorZoomOut = configHandler->GetBool("CamSpringZoomOutFromMousePos");
 	fastScaleMove = configHandler->GetFloat("CamSpringFastScaleMouseMove");

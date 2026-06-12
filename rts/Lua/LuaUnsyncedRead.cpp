@@ -52,6 +52,8 @@
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/TeamHandler.h"
+#include "Sim/Misc/GlobalConstants.h"
+#include "Sim/Misc/CustomColorPalette.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Projectiles/Projectile.h"
 #include "Sim/Units/Unit.h"
@@ -66,6 +68,7 @@
 #include "System/Config/ConfigVariable.h"
 #include "System/Input/KeyInput.h"
 #include "System/LoadSave/DemoReader.h"
+#include "System/LoadSave/DemoRecorder.h"
 #include "System/Log/DefaultFilter.h"
 #include "System/Platform/SDL1_keysym.h"
 #include "System/Platform/Misc.h"
@@ -102,6 +105,8 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetReplayLength);
 
 	REGISTER_LUA_CFUNC(GetGameName);
+	REGISTER_LUA_CFUNC(GetReplayFilePath);
+	REGISTER_LUA_CFUNC(GetReplayRecordingFilePath);
 	REGISTER_LUA_CFUNC(GetMenuName);
 
 	REGISTER_LUA_CFUNC(GetProfilerTimeRecord);
@@ -177,6 +182,9 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetTeamColor);
 	REGISTER_LUA_CFUNC(GetTeamOrigColor);
 
+	REGISTER_LUA_CFUNC(GetCustomPaletteColor);
+	REGISTER_LUA_CFUNC(GetUnitPaletteIndex);
+	REGISTER_LUA_CFUNC(GetFeaturePaletteIndex);
 	REGISTER_LUA_CFUNC(GetLocalPlayerID);
 	REGISTER_LUA_CFUNC(GetLocalTeamID);
 	REGISTER_LUA_CFUNC(GetLocalAllyTeamID);
@@ -516,6 +524,58 @@ int LuaUnsyncedRead::GetGameName(lua_State* L)
 	return 1;
 }
 
+/*** If a replay is currently being watched, returns its file path.
+ *
+ * @function Spring.GetReplayFilePath
+ *
+ * @return string filePath
+ */
+int LuaUnsyncedRead::GetReplayFilePath(lua_State* L)
+{
+	if (gameServer != nullptr) {
+		if (gameServer->GetDemoReader()) {
+			lua_pushsstring(L, gameServer->GetDemoReader()->GetName());
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/*** If a replay is being recorded, returns its projected file path.
+ * Note that replay contents are only written there at game exit.
+ * Note also that watching a replay also records a meta-replay
+ * if the DemoFromDemo springsetting is set.
+ *
+ * @function Spring.GetReplayRecordingFilePath
+ *
+ * @return string filePath
+ */
+int LuaUnsyncedRead::GetReplayRecordingFilePath(lua_State* L)
+{
+	/* TODO: why are there two places that keep a recording?
+	 * Check for logic duplication and perhaps remove one.
+	 * See https://github.com/beyond-all-reason/RecoilEngine/issues/2942 */
+
+	if (clientNet != nullptr) {
+		const CDemoRecorder* dr = clientNet->GetDemoRecorder();
+
+		if (dr != nullptr && dr->IsValid()) {
+			lua_pushsstring(L, dr->GetName());
+			return 1;
+		}
+	}
+
+	if (gameServer != nullptr) {
+		if (gameServer->GetDemoRecorder()) {
+			lua_pushsstring(L, gameServer->GetDemoRecorder()->GetName());
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 /***
  *
  * @function Spring.GetMenuName
@@ -627,8 +687,8 @@ int LuaUnsyncedRead::GetLuaMemUsage(lua_State* L)
 
 	// sum up the individual (unsynced and synced) state footprints
 	for (bool synced: {false, true}) {
-		lgs.allocedBytes = {0};
-		lgs.numLuaAllocs = {0};
+		lgs.allocedBytes = 0;
+		lgs.numLuaAllocs = 0;
 
 		for (const luaContextData* lcd: *LUAHANDLE_CONTEXTS[synced]) {
 			lhs = &lcd->allocState;
@@ -3307,6 +3367,70 @@ int LuaUnsyncedRead::GetTeamOrigColor(lua_State* L)
 	lua_pushnumber(L, team->origColor[2] / 255.0f);
 	lua_pushnumber(L, team->origColor[3] / 255.0f);
 	return 4;
+}
+
+
+/***
+ *
+ * @function Spring.GetCustomPaletteColor
+ * @param index integer 0-based index into custom palette
+ * @return number? r factor from 0 to 1
+ * @return number? g factor from 0 to 1
+ * @return number? b factor from 0 to 1
+ */
+int LuaUnsyncedRead::GetCustomPaletteColor(lua_State* L)
+{
+	const auto customIndex = LuaUtils::ParsePalette(L, 1);
+	const float4 color = customColorPalette.GetColor(customIndex);
+
+	lua_pushnumber(L, color.x);
+	lua_pushnumber(L, color.y);
+	lua_pushnumber(L, color.z);
+	return 3;
+}
+
+
+/***
+ * Returns the custom palette index for a unit, or nil if using team color.
+ * @function Spring.GetUnitPaletteIndex
+ * @param unitID integer
+ * @return integer? customIndex [0..MAX_CUSTOM_COLORS) if unit uses a custom color, nil if using team color
+ */
+int LuaUnsyncedRead::GetUnitPaletteIndex(lua_State* L)
+{
+	const int unitID = luaL_checkint(L, 1);
+	const CUnit* unit = unitHandler.GetUnit(unitID);
+	if (unit == nullptr)
+		return 0;
+
+	if (CCustomColorPalette::IsCustomPaletteIndex(unit->paletteIndex)) {
+		lua_pushnumber(L, CCustomColorPalette::DecodePaletteIndex(unit->paletteIndex));
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+
+/***
+ * Returns the custom palette index for a feature, or nil if using team color.
+ * @function Spring.GetFeaturePaletteIndex
+ * @param featureID integer
+ * @return integer? customIndex [0..MAX_CUSTOM_COLORS) if feature uses a custom color, nil if using team color
+ */
+int LuaUnsyncedRead::GetFeaturePaletteIndex(lua_State* L)
+{
+	const int featureID = luaL_checkint(L, 1);
+	const CFeature* feature = featureHandler.GetFeature(featureID);
+	if (feature == nullptr)
+		return 0;
+
+	if (CCustomColorPalette::IsCustomPaletteIndex(feature->paletteIndex)) {
+		lua_pushnumber(L, CCustomColorPalette::DecodePaletteIndex(feature->paletteIndex));
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
 }
 
 

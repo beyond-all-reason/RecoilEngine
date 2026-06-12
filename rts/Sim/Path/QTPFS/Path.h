@@ -100,6 +100,7 @@ namespace QTPFS {
 			havePartialPath = other.havePartialPath;
 			boundingBoxOverride = other.boundingBoxOverride;
 			isRawPath = other.isRawPath;
+			repathTriggered = other.repathTriggered;
 			points = other.points;
 			nodes = other.nodes;
 
@@ -132,6 +133,7 @@ namespace QTPFS {
 			havePartialPath = other.havePartialPath;
 			boundingBoxOverride = other.boundingBoxOverride;
 			isRawPath = other.isRawPath;
+			repathTriggered = other.repathTriggered;
 			points = std::move(other.points);
 			nodes = std::move(other.nodes);
 
@@ -162,6 +164,8 @@ namespace QTPFS {
 		void SetSynced(bool synced) { this->synced = synced; }
 		void SetHasFullPath(bool fullPath) { this->haveFullPath = fullPath; }
 		void SetHasPartialPath(bool partialPath) { this->havePartialPath = partialPath; }
+		void SetRepathTriggered(bool triggered) { this->repathTriggered = triggered; }
+		bool IsRepathTriggered() const { return repathTriggered; }
 
 		float GetRadius() const { return radius; }
 		PathHashType GetHash() const { return hash; }
@@ -391,6 +395,7 @@ namespace QTPFS {
 		bool havePartialPath = false;
 		bool boundingBoxOverride = false;
 		bool isRawPath = false;
+		bool repathTriggered = false;
 
 		std::vector<float3> points;
 		std::vector<PathNodeData> nodes;

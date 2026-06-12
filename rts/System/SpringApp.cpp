@@ -689,7 +689,7 @@ void SpringApp::LoadSpringMenu()
 void SpringApp::Startup()
 {
 	// bash input
-	const std::string& extension = FileSystem::GetExtension(inputFile);
+	const std::string& extension = FileSystem::GetExtensionLowerCase(inputFile);
 
 	// note: avoid any .get() leaks between here and GameServer!
 	clientSetup.reset(new ClientSetup());

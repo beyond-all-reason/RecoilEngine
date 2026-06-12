@@ -4,10 +4,9 @@
 #include "LuaHandle.h"
 #include "LuaUtils.h"
 #include "Game/GameVersion.h"
-#include "System/Config/ConfigHandler.h"
 #include "System/Platform/Misc.h"
 #include "Rendering/Fonts/glFont.h"
-#include "Rendering/Fonts/FontHandler.h"
+#include "Sim/Misc/CustomColorPalette.h"
 
 /******************************************************************************
  * Engine constants
@@ -64,6 +63,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "isHeadless", SpringVersion::IsHeadless());
 
 	LuaPushNamedNumber(L, "gameSpeed", GAME_SPEED);
+	LuaPushNamedNumber(L, "maxCustomPaletteID", MAX_CUSTOM_COLORS - 1);
 
 	/* If possible, entries should be bools that resolve to false in the "old" version
 	 * and to true in the "new" version; this is because any version beforehand has it

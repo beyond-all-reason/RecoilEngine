@@ -507,16 +507,16 @@ std::uint64_t QTPFS::PathManager::GetMemFootPrint() const {
 					* sizeof(decltype(nodeLayersMapDamageTrack.mapChangeTrackers)::value_type);
 
 
-	for (auto threadData : searchThreadData) {
+	for (auto& threadData : searchThreadData) {
 		memFootPrint += threadData.GetMemFootPrint();
 	}
-	for (auto threadData : updateThreadData) {
+	for (auto& threadData : updateThreadData) {
 		memFootPrint += threadData.GetMemFootPrint();
 	}
 	for (unsigned int i = 0; i < nodeLayers.size(); i++) {
 		memFootPrint += nodeLayers[i].GetMemFootPrint();
 	}
-	for (auto trace : pathTraces) {
+	for (auto& trace : pathTraces) {
 		memFootPrint += sizeof(decltype(*trace.second));
 		memFootPrint += trace.second->GetMemFootPrint();
 	}
@@ -685,8 +685,10 @@ void QTPFS::PathManager::UpdateNodeLayer(unsigned int layerNum, const SRectangle
 	// adjust the borders so we are not left with "rims" of
 	// impassable squares when eg. a structure is reclaimed
 
+	const bool isIncrementalUpdate = (rect.x1 == 0 && rect.x2 == 0);
 	SRectangle r(rect);
-	if (rect.x1 == 0 && rect.x2 == 0) {
+
+	if (isIncrementalUpdate) {
 		auto& nlMapDmgTracker = nodeLayersMapDamageTrack.mapChangeTrackers[layerNum];
 
 		// No more damaged areas. Finish up.
@@ -727,7 +729,12 @@ void QTPFS::PathManager::UpdateNodeLayer(unsigned int layerNum, const SRectangle
 	// 		}}}
 
 	updateThreadData[currentThread].InitUpdate(r, *containingNode, *md, currentThread);
-	const bool needTesselation = nodeLayers[layerNum].Update(updateThreadData[currentThread]);
+	const bool needTesselation = [=]() {
+		if (isIncrementalUpdate)
+			return this->nodeLayers[layerNum].IncrementalUpdate(this->updateThreadData[currentThread]);
+		else
+			return this->nodeLayers[layerNum].InitialUpdate(this->updateThreadData[currentThread]);
+	}();
 
 	// process the affected root nodes.
 
@@ -941,7 +948,9 @@ bool QTPFS::PathManager::InitializeSearch(QTPFS::entity searchEntity) {
 				if (sharedPathsIt == sharedPaths.end()) {
 					registry.emplace<SharedPathChain>(pathEntity, pathEntity, pathEntity);
 					sharedPaths[path->GetHash()] = pathEntity;
+					search->fullSharedPathHead = pathEntity;
 				} else {
+					search->fullSharedPathHead = sharedPathsIt->second;
 					linkedListHelper.InsertChain<SharedPathChain>(sharedPaths[path->GetHash()], pathEntity);
 				}
 			}
@@ -952,7 +961,9 @@ bool QTPFS::PathManager::InitializeSearch(QTPFS::entity searchEntity) {
 				if (partialSharedPathsIt == partialSharedPaths.end()) {
 					registry.emplace<PartialSharedPathChain>(pathEntity, pathEntity, pathEntity);
 					partialSharedPaths[path->GetVirtualHash()] = pathEntity;
+					search->partSharedPathHead = pathEntity;
 				} else {
+					search->partSharedPathHead = partialSharedPathsIt->second;
 					linkedListHelper.InsertChain<PartialSharedPathChain>(partialSharedPaths[path->GetVirtualHash()], pathEntity);
 				}
 			}
@@ -1136,15 +1147,13 @@ bool QTPFS::PathManager::ExecuteSearch(
 	{
 		// Always clear incase the situation has changed since the last frame, if a partial search
 		// was intended, but not carried out. For example, a full-path share wait.
-		if (search->doPartialSearch)
-			search->doPartialSearch = false;
+		search->doPartialSearch = false;
 
 		if (search->allowPartialSearch)
 		{
-			PartialSharedPathMap::const_iterator partialSharedPathsIt = partialSharedPaths.find(path->GetVirtualHash());
-			if (partialSharedPathsIt != partialSharedPaths.end()) {
+			if (search->partSharedPathHead != entt::null && QTPFS::registry.valid(search->partSharedPathHead)) {
 				assert(path->GetVirtualHash() != QTPFS::BAD_HASH);
-				partialChainHeadEntity = partialSharedPathsIt->second;
+				partialChainHeadEntity = search->partSharedPathHead;
 				if (partialChainHeadEntity != pathEntity) {
 					bool pathIsCopyable = !registry.all_of<PathSearchRef>(partialChainHeadEntity);
 					if (!pathIsCopyable) {
@@ -1161,6 +1170,7 @@ bool QTPFS::PathManager::ExecuteSearch(
 					// had a real bounding box computed from node boundaries. If this assert triggers then it means
 					// that the headPath is a straight line between two points and has nothing to share.
 					IPath* headPath = registry.try_get<IPath>(partialChainHeadEntity);
+					assert(headPath != nullptr);
 					assert(headPath->IsBoundingBoxOverriden());
 					#endif
 					
@@ -1175,9 +1185,8 @@ bool QTPFS::PathManager::ExecuteSearch(
 			}
 		}
 		{
-			SharedPathMap::const_iterator sharedPathsIt = sharedPaths.find(path->GetHash());
-			if (sharedPathsIt != sharedPaths.end()) {
-				chainHeadEntity = sharedPathsIt->second;
+			if (search->fullSharedPathHead != entt::null && QTPFS::registry.valid(search->fullSharedPathHead)) {
+				chainHeadEntity = search->fullSharedPathHead;
 				// LOG("%s: chainHeadEntity %x != pathEntity %x", __func__
 				// 		, entt::to_integral(chainHeadEntity), entt::to_integral(pathEntity));
 				if (chainHeadEntity != pathEntity){
@@ -1193,10 +1202,9 @@ bool QTPFS::PathManager::ExecuteSearch(
 						// 	LOG("%s: full shared (%d)", __func__, search->GetID());
 					}
 					else {
-						PartialSharedPathMap::const_iterator partialSharedPathsIt = partialSharedPaths.find(path->GetVirtualHash());
-						if (partialSharedPathsIt != partialSharedPaths.end()) {
+						if (search->partSharedPathHead != entt::null && QTPFS::registry.valid(search->partSharedPathHead)) {
 							assert(path->GetVirtualHash() != QTPFS::BAD_HASH);
-							partialChainHeadEntity = partialSharedPathsIt->second;
+							partialChainHeadEntity = search->partSharedPathHead;
 
 							// If this path is the head of a partial path, we need to make sure it isn't blocking the head
 							// of the full path copy (which would cause a deadlock.)
@@ -1229,13 +1237,13 @@ bool QTPFS::PathManager::ExecuteSearch(
 	bool isHeadOfPathSharing = !search->doPartialSearch;
 	search->tryPathRepair &= isHeadOfPathSharing;
 
-	search->InitializeThread(&searchThreadData[currentThread]);
+	search->InitializeThread(&searchThreadData[currentThread], path);
 
 	if (search->doPartialSearch) {
-		auto* path = &registry.get<IPath>(partialChainHeadEntity);
-		search->LoadPartialPath(path);
+		auto* sharedPath = &registry.get<IPath>(partialChainHeadEntity);
+		search->LoadPartialPath(sharedPath);
 	} else if (search->doPathRepair) {
-		search->LoadRepairPath();
+		search->LoadRepairPath(path);
 	}
 
 	if (search->Execute(searchStateOffset)) {
@@ -1762,7 +1770,7 @@ float3 QTPFS::PathManager::NextWayPoint(
 
 	// If this is the first call then we may need to jump a bit further in the path if the unit
 	// managed to travel past the first point in the time it took to make the route. 
-	if (nextPointIndex == 1)  {
+	if (nextPointIndex == 1) {
 		constexpr float invSin45deg = 1.42f; // to account for a square's diagonal being longer.
 		constexpr float squareRadius = SQUARE_SIZE*SQUARE_SIZE*invSin45deg;
 		for (unsigned int i = (livePath->GetNextPointIndex()); i < lastPointIndex; i++) {
@@ -1797,12 +1805,15 @@ float3 QTPFS::PathManager::NextWayPoint(
 	// 	LOG("%s: repath target waypoint (%d) current waypoint (%d) of (%d) pathId=%d", __func__
 	// 			, livePath->GetRepathTriggerIndex(), nextPointIndex, lastPointIndex, pathID);
 
-	if (livePath->GetRepathTriggerIndex() > 0 && nextPointIndex >= livePath->GetRepathTriggerIndex()) {
+	if (livePath->GetRepathTriggerIndex() > 0
+			&& nextPointIndex >= livePath->GetRepathTriggerIndex()
+			&& !livePath->IsRepathTriggered()) {
 		// Request an update to the path.
 		assert(livePath->GetOwner() != nullptr);
 		assert(registry.all_of<PathRequeueSearch>(pathEntity));
 		registry.get<PathRequeueSearch>(pathEntity).value = true;
-		livePath->ClearGetRepathTriggerIndex();
+		// livePath->ClearGetRepathTriggerIndex();
+		livePath->SetRepathTriggered(true);
 	}
 
 	return livePath->GetPoint(nextPointIndex);

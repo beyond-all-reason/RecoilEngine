@@ -11,8 +11,7 @@
 #include <algorithm>
 #include <cstring>
 
-#include <xmmintrin.h>
-#include <emmintrin.h>
+#include "System/simd_compat.h"
 
 CR_BIND(CMatrix44f, )
 

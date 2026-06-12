@@ -16,6 +16,7 @@
 #include "LuaConstGame.h"
 #include "LuaConstPlatform.h"
 #include "LuaInterCall.h"
+#include "LuaLibs.h"
 #include "LuaSyncedCtrl.h"
 #include "LuaSyncedRead.h"
 #include "LuaSyncedTable.h"
@@ -87,15 +88,7 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 	watchExplosionDefs.resize(weaponDefHandler->NumWeaponDefs(), false);
 
 	// load the standard libraries
-	LUA_OPEN_LIB(L, luaopen_base);
-	LUA_OPEN_LIB(L, luaopen_math);
-	LUA_OPEN_LIB(L, luaopen_table);
-	LUA_OPEN_LIB(L, luaopen_string);
-	//LUA_OPEN_LIB(L, luaopen_io);
-	//LUA_OPEN_LIB(L, luaopen_os);
-	//LUA_OPEN_LIB(L, luaopen_package);
-	//LUA_OPEN_LIB(L, luaopen_debug);
-	EnactDevMode();
+	LuaLibs::OpenUnsynced(L);
 
 	// delete some dangerous functions
 	lua_pushnil(L); lua_setglobal(L, "dofile");
@@ -166,13 +159,6 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 	eventHandler.AddClient(this);
 	return true;
 }
-
-
-void CUnsyncedLuaHandle::EnactDevMode() const
-{
-	SwapEnableModule(L, devMode, LUA_DBLIBNAME, luaopen_debug);
-}
-
 
 /***
  * @class UnsyncedCallins
@@ -446,14 +432,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	watchAllowTargetDefs.resize(weaponDefHandler->NumWeaponDefs(), false);
 
 	// load the standard libraries
-	SPRING_LUA_OPEN_LIB(L, luaopen_base);
-	SPRING_LUA_OPEN_LIB(L, luaopen_math);
-	SPRING_LUA_OPEN_LIB(L, luaopen_table);
-	SPRING_LUA_OPEN_LIB(L, luaopen_string);
-	//SPRING_LUA_OPEN_LIB(L, luaopen_io);
-	//SPRING_LUA_OPEN_LIB(L, luaopen_os);
-	//SPRING_LUA_OPEN_LIB(L, luaopen_package);
-	//SPRING_LUA_OPEN_LIB(L, luaopen_debug);
+	LuaLibs::OpenSynced(L, true);
 	EnactDevMode();
 
 	lua_getglobal(L, "next");

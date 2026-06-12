@@ -3,6 +3,7 @@
 #ifndef LUA_UTILS_H
 #define LUA_UTILS_H
 
+#include <cstdint>
 #include <string>
 
 #include <fmt/printf.h>
@@ -150,6 +151,7 @@ class LuaUtils {
 		// (implementation copied from lua/src/lib/lbaselib.c)
 		static int Echo(lua_State* L);
 		static int ParseLogLevel(lua_State* L, int index);
+		static uint16_t ParsePalette(lua_State* L, int index);
 		static int Log(lua_State* L);
 		static bool PushLogEntries(lua_State* L);
 

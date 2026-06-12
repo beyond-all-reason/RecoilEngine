@@ -264,15 +264,17 @@ void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
-	constexpr unsigned short inLosOrRad = (LOS_INLOS | LOS_INRADAR);
 	constexpr unsigned short prevMask = (LOS_PREVLOS | LOS_CONTRADAR);
 
 	// use the unit's custom icon if we can currently see it,
 	// or have seen it before and did not lose contact since
-	bool unitVisible =
-		(losStatus & inLosOrRad) != 0 &&
-		(losStatus & prevMask) == prevMask ||
-		gameSetup->ghostedBuildings && unit->leavesGhost && (losStatus & LOS_PREVLOS) != 0;
+	bool isInLOS    = (losStatus & LOS_INLOS  ) == LOS_INLOS;
+	bool isInPrvLos = (losStatus & LOS_PREVLOS) == LOS_PREVLOS;
+	bool isInRadar  = (losStatus & LOS_INRADAR) == LOS_INRADAR;
+	bool seenUnit   = (losStatus & prevMask   ) == prevMask;
+	bool isGhostBuilding = gameSetup->ghostedBuildings && unit->leavesGhost && isInPrvLos;
+
+	bool unitVisible = isInLOS || (isInRadar && seenUnit) || isGhostBuilding;
 
 	const bool typedIcon = (unitVisible || gu->spectatingFullView);
 
@@ -291,6 +293,12 @@ void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 void CUnitDrawerData::UpdateUnitIconState(CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	if unlikely(unit->currentIconIndex == icon::INVALID_ICON_INDEX) {
+		unit->SetIsIcon(false);
+		return;
+	}
+
 	const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
 
 	unit->SetIsIcon((losStatus & LOS_INRADAR) != 0);
@@ -299,12 +307,13 @@ void CUnitDrawerData::UpdateUnitIconState(CUnit* unit)
 	if ((losStatus & LOS_INLOS) != 0 || gu->spectatingFullView) {
 		bool asIcon = true;
 
-		asIcon &= (!unit->noDraw);
-		asIcon &= (!unit->IsInVoid());
+		asIcon = asIcon && !unit->noDraw;
+		asIcon = asIcon && !unit->IsInVoid();
 
-		asIcon &= DrawAsIconByDistance(unit, (unit->pos - camera->GetPos()).SqLength());
+		asIcon = asIcon && DrawAsIconByDistance(unit, (unit->pos - camera->GetPos()).SqLength());
 		// drawing icons is cheap but not free, avoid a perf-hit when many are offscreen
-		asIcon &= (camera->InView(unit->drawMidPos, unit->GetDrawRadius()));
+		asIcon = asIcon && camera->InView(unit->drawMidPos, unit->GetDrawRadius());
+
 		unit->SetIsIcon(asIcon);
 	}
 }

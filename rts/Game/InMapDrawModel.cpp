@@ -94,7 +94,7 @@ bool CInMapDrawModel::AddPoint(const float3& constPos, const std::string& label,
 	// let the engine handle it (disallowed
 	// points added here are filtered while
 	// rendering the quads)
-	MapPoint point(sender->spectator, sender->team, sender, pos, label);
+	MapPoint point(sender->spectator, sender->team, pos, label);
 
 	const int quad = int(pos.z * QUAD_SCALE) * drawQuadsX +
 	                 int(pos.x * QUAD_SCALE);
@@ -127,7 +127,7 @@ bool CInMapDrawModel::AddLine(const float3& constPos1, const float3& constPos2, 
 	}
 
 
-	MapLine line(sender->spectator, sender->team, sender, pos1, pos2);
+	MapLine line(sender->spectator, sender->team, pos1, pos2);
 
 	const int quad = int(pos1.z * QUAD_SCALE) * drawQuadsX +
 	                 int(pos1.x * QUAD_SCALE);
@@ -145,7 +145,7 @@ void CInMapDrawModel::EraseNear(const float3& constPos, int playerID, const bool
 	if (!playerHandler.IsValidPlayer(playerID))
 		return;
 
-	const CPlayer* sender;
+	const CPlayer* sender = nullptr;
 
 	if (!alwaysErase) // we don't need to check sender if we always erase regardless of sender
 		sender = playerHandler.Player(playerID);

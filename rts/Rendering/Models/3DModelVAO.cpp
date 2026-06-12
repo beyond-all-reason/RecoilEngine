@@ -287,7 +287,7 @@ void S3DModelVAO::DrawElements(GLenum prim, uint32_t vboIndxStart, uint32_t vboI
 }
 
 template<typename TObj>
-bool S3DModelVAO::AddToSubmissionImpl(const TObj* obj, uint32_t indexStart, uint32_t indexCount, uint8_t teamID, uint8_t drawFlags)
+bool S3DModelVAO::AddToSubmissionImpl(const TObj* obj, uint32_t indexStart, uint32_t indexCount, uint16_t paletteIndex)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const auto traIndex = transformsUploader.GetElemOffset(obj);
@@ -313,8 +313,7 @@ bool S3DModelVAO::AddToSubmissionImpl(const TObj* obj, uint32_t indexStart, uint
 	auto& modelInstanceData = modelDataToInstance[SIndexAndCount{ indexStart, indexCount }];
 	modelInstanceData.emplace_back(SInstanceData(
 		static_cast<uint32_t>(traIndex),
-		teamID,
-		drawFlags,
+		paletteIndex,
 		numPieces,
 		static_cast<uint32_t>(uniIndex),
 		static_cast<uint32_t>(bposeIndex)
@@ -323,12 +322,12 @@ bool S3DModelVAO::AddToSubmissionImpl(const TObj* obj, uint32_t indexStart, uint
 	return true;
 }
 
-bool S3DModelVAO::AddToSubmission(const S3DModel* model, uint8_t teamID, uint8_t drawFlags)
+bool S3DModelVAO::AddToSubmission(const S3DModel* model, uint16_t paletteIndex)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(model);
 
-	return AddToSubmissionImpl(model, model->indxStart, model->indxCount, teamID, drawFlags);
+	return AddToSubmissionImpl(model, model->indxStart, model->indxCount, paletteIndex);
 }
 
 bool S3DModelVAO::AddToSubmission(const CUnit* unit)
@@ -339,7 +338,7 @@ bool S3DModelVAO::AddToSubmission(const CUnit* unit)
 	const S3DModel* model = unit->model;
 	assert(model);
 
-	return AddToSubmissionImpl(unit, model->indxStart, model->indxCount, unit->team, unit->drawFlag);
+	return AddToSubmissionImpl(unit, model->indxStart, model->indxCount, unit->paletteIndex);
 }
 
 bool S3DModelVAO::AddToSubmission(const CFeature* feature)
@@ -350,10 +349,10 @@ bool S3DModelVAO::AddToSubmission(const CFeature* feature)
 	const S3DModel* model = feature->model;
 	assert(model);
 
-	return AddToSubmissionImpl(feature, model->indxStart, model->indxCount, feature->team, feature->drawFlag);
+	return AddToSubmissionImpl(feature, model->indxStart, model->indxCount, feature->paletteIndex);
 }
 
-bool S3DModelVAO::AddToSubmission(const UnitDef* unitDef, uint8_t teamID)
+bool S3DModelVAO::AddToSubmission(const UnitDef* unitDef, uint16_t paletteIndex)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(unitDef);
@@ -361,7 +360,7 @@ bool S3DModelVAO::AddToSubmission(const UnitDef* unitDef, uint8_t teamID)
 	const S3DModel* model = unitDef->model;
 	assert(model);
 
-	return AddToSubmissionImpl(unitDef, model->indxStart, model->indxCount, teamID, 0);
+	return AddToSubmissionImpl(unitDef, model->indxStart, model->indxCount, paletteIndex);
 }
 
 
@@ -414,7 +413,7 @@ void S3DModelVAO::Submit(GLenum mode, bool bindUnbind)
 }
 
 template<typename TObj>
-bool S3DModelVAO::SubmitImmediatelyImpl(const TObj* obj, uint32_t indexStart, uint32_t indexCount, uint8_t teamID, uint8_t drawFlags, GLenum mode, bool bindUnbind)
+bool S3DModelVAO::SubmitImmediatelyImpl(const TObj* obj, uint32_t indexStart, uint32_t indexCount, uint16_t paletteIndex, GLenum mode, bool bindUnbind)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	std::size_t traIndex = transformsUploader.GetElemOffset(obj);
@@ -434,7 +433,7 @@ bool S3DModelVAO::SubmitImmediatelyImpl(const TObj* obj, uint32_t indexStart, ui
 		bposeIndex = transformsUploader.GetElemOffset(obj->model);
 	}
 
-	SInstanceData instanceData(static_cast<uint32_t>(traIndex), teamID, drawFlags, numPieces, uniIndex, bposeIndex);
+	SInstanceData instanceData(static_cast<uint32_t>(traIndex), paletteIndex, numPieces, uniIndex, bposeIndex);
 	const uint32_t immediateBaseInstanceAbs = INSTANCE_BUFFER_NUM_BATCHED + immediateBaseInstance;
 
 	static SDrawElementsIndirectCommand scmd;
@@ -469,11 +468,11 @@ bool S3DModelVAO::SubmitImmediatelyImpl(const TObj* obj, uint32_t indexStart, ui
 	return true;
 }
 
-bool S3DModelVAO::SubmitImmediately(const S3DModel* model, uint8_t teamID, uint8_t drawFlags, GLenum mode, bool bindUnbind)
+bool S3DModelVAO::SubmitImmediately(const S3DModel* model, uint16_t paletteIndex, GLenum mode, bool bindUnbind)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(model);
-	return SubmitImmediatelyImpl(model, model->indxStart, model->indxCount, teamID, drawFlags, mode, bindUnbind);
+	return SubmitImmediatelyImpl(model, model->indxStart, model->indxCount, paletteIndex, mode, bindUnbind);
 }
 
 bool S3DModelVAO::SubmitImmediately(const CUnit* unit, const GLenum mode, bool bindUnbind)
@@ -484,7 +483,7 @@ bool S3DModelVAO::SubmitImmediately(const CUnit* unit, const GLenum mode, bool b
 	const S3DModel* model = unit->model;
 	assert(model);
 
-	return SubmitImmediatelyImpl(unit, model->indxStart, model->indxCount, unit->team, unit->drawFlag, mode, bindUnbind);
+	return SubmitImmediatelyImpl(unit, model->indxStart, model->indxCount, unit->paletteIndex, mode, bindUnbind);
 }
 
 bool S3DModelVAO::SubmitImmediately(const CFeature* feature, GLenum mode, bool bindUnbind)
@@ -495,7 +494,7 @@ bool S3DModelVAO::SubmitImmediately(const CFeature* feature, GLenum mode, bool b
 	const S3DModel* model = feature->model;
 	assert(model);
 
-	return SubmitImmediatelyImpl(feature, model->indxStart, model->indxCount, feature->team, feature->drawFlag, mode, bindUnbind);
+	return SubmitImmediatelyImpl(feature, model->indxStart, model->indxCount, feature->paletteIndex, mode, bindUnbind);
 }
 
 bool S3DModelVAO::SubmitImmediately(const UnitDef* unitDef, int teamID, GLenum mode, bool bindUnbind)
@@ -506,5 +505,5 @@ bool S3DModelVAO::SubmitImmediately(const UnitDef* unitDef, int teamID, GLenum m
 	const S3DModel* model = unitDef->model;
 	assert(model);
 
-	return SubmitImmediatelyImpl(unitDef, model->indxStart, model->indxCount, teamID, 0, mode, bindUnbind);
+	return SubmitImmediatelyImpl(unitDef, model->indxStart, model->indxCount, static_cast<uint16_t>(teamID), mode, bindUnbind);
 }

@@ -35,8 +35,6 @@ class CUnsyncedLuaHandle : public CLuaHandle
 
 		bool Init(std::string code, const std::string& file);
 
-		void EnactDevMode() const override;
-
 		static CUnsyncedLuaHandle* GetUnsyncedHandle(lua_State* L) {
 			assert(dynamic_cast<CUnsyncedLuaHandle*>(CLuaHandle::GetHandle(L)) != nullptr);
 			return static_cast<CUnsyncedLuaHandle*>(CLuaHandle::GetHandle(L));

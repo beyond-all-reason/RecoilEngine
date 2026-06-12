@@ -1,6 +1,6 @@
 add_definitions    (-DDEDICATED ${PIC_FLAG} -DNOT_USING_CREG)
 add_definitions    (-DHEADLESS -DNO_SOUND)
-remove_definitions (-DSTREFLOP_SSE -DAVI_CAPTURING)
+remove_definitions (-DAVI_CAPTURING)
 remove_definitions (-DTRACE_SYNC -DSYNCDEBUG)
 remove_definitions (-DTHREADPOOL)
 
@@ -167,6 +167,7 @@ set(engineDedicatedSources
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaConstEngine.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaEncoding.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaIO.cpp
+	${ENGINE_SRC_ROOT_DIR}/Lua/LuaLibs.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMathExtra.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMemPool.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaParser.cpp
