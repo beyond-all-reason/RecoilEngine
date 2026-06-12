@@ -314,6 +314,7 @@ endif (RECOIL_DETAILED_TRACY_ZONING)
 
 # Note the missing REQUIRED, as headless & dedi may not depend on those.
 #  So req. checks are done in the build target's CMakeLists.txt.
+# (FindSDL2.cmake is an SDL3 compatibility shim; see that file.)
 find_package(SDL2 MODULE)
 
 find_package_static(DevIL 1.8.0 REQUIRED)

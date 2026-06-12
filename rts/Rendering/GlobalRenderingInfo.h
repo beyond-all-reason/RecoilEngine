@@ -39,8 +39,9 @@ struct GlobalRenderingInfo {
 	int2 glContextVersion;
 	int2 gpuMemorySize;
 
-	SDL_version sdlVersionCompiled;
-	SDL_version sdlVersionLinked;
+	// SDL3 replaced the SDL_version struct with a packed version number (int).
+	int sdlVersionCompiled;
+	int sdlVersionLinked;
 
 	std::vector<AvailableVideoMode> availableVideoModes;
 };

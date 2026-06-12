@@ -12,7 +12,7 @@
 	typedef unsigned char byte;
 #else
 	#include <X11/Xcursor/Xcursor.h>
-	#include <SDL_syswm.h>
+	#include "System/Platform/SDL2WMCompat.h"
 #endif
 
 #include "HwMouseCursor.h"
@@ -23,7 +23,7 @@
 #include "System/SpringMath.h"
 
 #include <SDL_config.h>
-#include <SDL_syswm.h>
+#include "System/Platform/SDL2WMCompat.h"
 #include <SDL_mouse.h>
 #include <SDL_events.h>
 #endif
@@ -216,7 +216,6 @@ IHardwareCursor* IHardwareCursor::Alloc(void* mem) {
 	static_assert(sizeof(HardwareCursorSDL) <= CMouseCursor::HWC_MEM_SIZE, "");
 
 	SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
 
 	if (SDL_GetWindowWMInfo(globalRendering->GetWindow(), &info)) {
 		switch (info.subsystem)
@@ -552,7 +551,6 @@ void HardwareCursorWindows::Bind()
 	RECOIL_DETAILED_TRACY_ZONE;
 	#if 0
 	SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
 
 	if (!SDL_GetWMInfo(&info)) {
 		LOG_L(L_ERROR, "[%s::%s] SDL error: can't get window handle", spring::TypeToCStr<decltype(*this)>(), __func__);
@@ -563,7 +561,7 @@ void HardwareCursorWindows::Bind()
 	SetClassLong(info.window, GCL_HCURSOR, (LONG) cursor);
 	#endif
 
-	SDL_ShowCursor(SDL_ENABLE);
+	SDL_ShowCursor();
 	SetCursor(cursor);
 	mouseInput->SetWMMouseCursor(cursor);
 }
@@ -591,7 +589,6 @@ void HardwareCursorX11::Kill()
 
 	if (cursor != 0) {
 		SDL_SysWMinfo info;
-		SDL_VERSION(&info.version);
 
 		if (!SDL_GetWindowWMInfo(globalRendering->GetWindow(), &info)) {
 			LOG_L(L_ERROR, "[%s::%s] SDL error: can't get window info", spring::TypeToCStr<decltype(*this)>(), __func__);
@@ -699,7 +696,6 @@ void HardwareCursorX11::Finish()
 	}
 
 	SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
 	if (!SDL_GetWindowWMInfo(globalRendering->GetWindow(), &info)) {
 		LOG_L(L_ERROR, "[%s::%s] SDL error: can't get window info", spring::TypeToCStr<decltype(*this)>(), __func__);
 		XcursorImagesDestroy(cis);
@@ -716,7 +712,6 @@ void HardwareCursorX11::Bind()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
 
 	if (!SDL_GetWindowWMInfo(globalRendering->GetWindow(), &info)) {
 		LOG_L(L_ERROR, "[%s::%s] SDL error: can't get window info", spring::TypeToCStr<decltype(*this)>(), __func__);
@@ -724,7 +719,7 @@ void HardwareCursorX11::Bind()
 	}
 
 	// do between lock/unlock so SDL's default cursor doesn't flicker in
-	SDL_ShowCursor(SDL_ENABLE);
+	SDL_ShowCursor();
 	XDefineCursor(info.info.x11.display, info.info.x11.window, cursor);
 }
 
@@ -822,7 +817,7 @@ void HardwareCursorSDL::Kill()
 void HardwareCursorSDL::Bind()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-    SDL_ShowCursor(SDL_ENABLE);
+    SDL_ShowCursor();
     if (!this->frames.empty()) {
         SDL_SetCursor(this->frames[0].cursor);
     }

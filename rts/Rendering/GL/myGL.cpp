@@ -49,45 +49,52 @@ CVertexArray* GetVertexArray()
 bool CheckAvailableVideoModes()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// Get available fullscreen/hardware modes
-	const int numDisplays = SDL_GetNumVideoDisplays();
+	// Get available fullscreen/hardware modes.
+	// SDL3: displays are identified by SDL_DisplayID (no longer 0..N indices) and
+	// the mode getters return pointers into SDL-owned storage.
+	int numDisplays = 0;
+	SDL_DisplayID* displays = SDL_GetDisplays(&numDisplays);
 
-	SDL_DisplayMode ddm = {0, 0, 0, 0, nullptr};
-	SDL_DisplayMode cdm = {0, 0, 0, 0, nullptr};
+	const SDL_DisplayID primaryDisplay = (displays != nullptr && numDisplays > 0) ? displays[0] : SDL_GetPrimaryDisplay();
 
 	// ddm is virtual, contains all displays in multi-monitor setups
 	// for fullscreen windows with non-native resolutions, ddm holds
 	// the original screen mode and cdm is the changed mode
-	SDL_GetDesktopDisplayMode(0, &ddm);
-	SDL_GetCurrentDisplayMode(0, &cdm);
+	const SDL_DisplayMode* ddmPtr = SDL_GetDesktopDisplayMode(primaryDisplay);
+	const SDL_DisplayMode* cdmPtr = SDL_GetCurrentDisplayMode(primaryDisplay);
+	SDL_DisplayMode ddm = (ddmPtr != nullptr) ? *ddmPtr : SDL_DisplayMode{};
+	SDL_DisplayMode cdm = (cdmPtr != nullptr) ? *cdmPtr : SDL_DisplayMode{};
 
 	globalRenderingInfo.availableVideoModes.clear();
 
 	LOG(
 		"[GL::%s] desktop={%ix%ix%ibpp@%iHz} current={%ix%ix%ibpp@%iHz}",
 		__func__,
-		ddm.w, ddm.h, SDL_BPP(ddm.format), ddm.refresh_rate,
-		cdm.w, cdm.h, SDL_BPP(cdm.format), cdm.refresh_rate
+		ddm.w, ddm.h, SDL_BPP(ddm.format), int(ddm.refresh_rate),
+		cdm.w, cdm.h, SDL_BPP(cdm.format), int(cdm.refresh_rate)
 	);
 
 	for (int k = 0; k < numDisplays; ++k) {
-		const int numModes = SDL_GetNumDisplayModes(k);
+		const SDL_DisplayID disp = displays[k];
 
-		if (numModes <= 0) {
+		int numModes = 0;
+		SDL_DisplayMode** modes = SDL_GetFullscreenDisplayModes(disp, &numModes);
+
+		if (modes == nullptr || numModes <= 0) {
 			LOG("\tdisplay=%d bounds=N/A modes=N/A", k + 1);
+			SDL_free(modes);
 			continue;
 		}
 
-		SDL_DisplayMode cm = {0, 0, 0, 0, nullptr};
-		SDL_DisplayMode pm = {0, 0, 0, 0, nullptr};
+		SDL_DisplayMode pm = {};
 		SDL_Rect db;
-		SDL_GetDisplayBounds(k, &db);
-		const std::string dn = SDL_GetDisplayName(k);
+		SDL_GetDisplayBounds(disp, &db);
+		const std::string dn = SDL_GetDisplayName(disp);
 
 		LOG("\tDisplay (%s)=%d modes=%d bounds={x=%d, y=%d, w=%d, h=%d}", dn.c_str(), k + 1, numModes, db.x, db.y, db.w, db.h);
 
 		for (int i = 0; i < numModes; ++i) {
-			SDL_GetDisplayMode(k, i, &cm);
+			const SDL_DisplayMode& cm = *modes[i];
 
 			// skip resolutions less than minimum / per dimension
 			if (cm.w < globalRendering->minRes.x || cm.h < globalRendering->minRes.y)
@@ -103,13 +110,17 @@ bool CheckAvailableVideoModes()
 				cm.w,
 				cm.h,
 				static_cast<int32_t>(SDL_BPP(cm.format)),
-				cm.refresh_rate
+				static_cast<int32_t>(cm.refresh_rate)
 			});
 
-			LOG("\t\t[%2i] %ix%ix%ibpp@%iHz", int(i + 1), cm.w, cm.h, SDL_BPP(cm.format), cm.refresh_rate);
+			LOG("\t\t[%2i] %ix%ix%ibpp@%iHz", int(i + 1), cm.w, cm.h, SDL_BPP(cm.format), int(cm.refresh_rate));
 			pm = cm;
 		}
+
+		SDL_free(modes);
 	}
+
+	SDL_free(displays);
 
 	// we need at least 24bpp or window-creation will fail
 	return (SDL_BPP(ddm.format) >= 24);

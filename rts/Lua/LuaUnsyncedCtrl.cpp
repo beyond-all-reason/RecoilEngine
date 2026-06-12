@@ -5324,7 +5324,7 @@ int LuaUnsyncedCtrl::SDLSetTextInputRect(lua_State* L)
 	textWindow.y = luaL_checkint(L, 2);
 	textWindow.w = luaL_checkint(L, 3);
 	textWindow.h = luaL_checkint(L, 4);
-	SDL_SetTextInputRect(&textWindow);
+	SDL_SetTextInputArea(globalRendering->GetWindow(), &textWindow, 0);
 	return 0;
 }
 
@@ -5335,7 +5335,7 @@ int LuaUnsyncedCtrl::SDLSetTextInputRect(lua_State* L)
  */
 int LuaUnsyncedCtrl::SDLStartTextInput(lua_State* L)
 {
-	SDL_StartTextInput();
+	SDL_StartTextInput(globalRendering->GetWindow());
 	return 0;
 }
 
@@ -5346,7 +5346,7 @@ int LuaUnsyncedCtrl::SDLStartTextInput(lua_State* L)
  */
 int LuaUnsyncedCtrl::SDLStopTextInput(lua_State* L)
 {
-	SDL_StopTextInput();
+	SDL_StopTextInput(globalRendering->GetWindow());
 	return 0;
 }
 

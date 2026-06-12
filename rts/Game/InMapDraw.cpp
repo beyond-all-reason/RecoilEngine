@@ -266,7 +266,7 @@ void CInMapDraw::PromptLabel(const float3& pos)
 
 	gameTextInput.PromptLabel();
 	SetDrawMode(false);
-	SDL_StartTextInput();
+	SDL_StartTextInput(globalRendering->GetWindow());
 }
 
 

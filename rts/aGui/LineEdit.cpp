@@ -100,7 +100,7 @@ bool LineEdit::HandleEventSelf(const SDL_Event& ev)
 			if (!hasFocus) {
 				break;
 			}
-			switch(ev.key.keysym.sym)
+			switch(ev.key.key)
 			{
 				case SDLK_BACKSPACE: {
 					if (cursorPos > 0) {

@@ -1389,7 +1389,7 @@ public:
 
 public:
 	bool Execute(const UnsyncedAction& action) const final {
-		SDL_StartTextInput();
+		SDL_StartTextInput(globalRendering->GetWindow());
 
 		gameTextInput.PromptInput(setUserInputPrefix? &userInputPrefix: nullptr);
 		gameConsoleHistory.ResetPosition();

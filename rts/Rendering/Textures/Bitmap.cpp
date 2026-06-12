@@ -2017,7 +2017,10 @@ SDL_Surface* CBitmap::CreateSDLSurface()
 
 	// this will only work with 24bit RGB and 32bit RGBA pictures
 	// note: does NOT create a copy of mem, must keep this around
-	surface = SDL_CreateRGBSurfaceFrom(GetRawMem(), xsize, ysize, 8 * channels, xsize * channels, 0x000000FF, 0x0000FF00, 0x00FF0000, (channels == 4) ? 0xFF000000 : 0);
+	// SDL3: SDL_CreateRGBSurfaceFrom (masks) was replaced by SDL_CreateSurfaceFrom
+	// (byte-order pixel format). Our raw mem is byte-order RGB(A).
+	const SDL_PixelFormat sdlFmt = (channels == 4) ? SDL_PIXELFORMAT_RGBA32 : SDL_PIXELFORMAT_RGB24;
+	surface = SDL_CreateSurfaceFrom(xsize, ysize, sdlFmt, GetRawMem(), xsize * channels);
 
 	if (surface == nullptr)
 		LOG_L(L_WARNING, "CBitmap::CreateSDLSurface Failed!");

@@ -117,7 +117,7 @@ CMouseHandler::~CMouseHandler()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (hwHideCursor)
-		SDL_ShowCursor(SDL_ENABLE);
+		SDL_ShowCursor();
 
 	configHandler->RemoveObserver(this);
 }
@@ -778,7 +778,7 @@ void CMouseHandler::ShowMouse()
 
 	hideCursor = false;
 
-	SDL_SetRelativeMouseMode(SDL_FALSE);
+	SDL_SetWindowRelativeMouseMode(globalRendering->GetWindow(), false);
 
 	// don't use SDL_ShowCursor here since it would cause flickering with hwCursor
 	// (by switching between default cursor and later the real one, e.g. `attack`)
@@ -797,12 +797,12 @@ void CMouseHandler::HideMouse()
 	hideCursor = true;
 	hwHideCursor = true;
 
-	SDL_ShowCursor(SDL_DISABLE);
+	SDL_HideCursor();
 	// signal that we are only interested in relative motion events when MMB-scrolling
 	// this way the mouse position will never change so it is also unnecessary to call
 	// SDL_WarpMouseInWindow and handle the associated wart of filtering motion events
 	// technically supersedes SDL_ShowCursor as well
-	SDL_SetRelativeMouseMode(SDL_TRUE);
+	SDL_SetWindowRelativeMouseMode(globalRendering->GetWindow(), true);
 
 	const int2 viewMouseCenter = GetViewMouseCenter();
 
@@ -838,7 +838,7 @@ void CMouseHandler::ToggleHwCursor(bool enable)
 		hwHideCursor = true;
 	} else {
 		mouseInput->SetWMMouseCursor(nullptr);
-		SDL_ShowCursor(SDL_DISABLE);
+		SDL_HideCursor();
 	}
 
 	// force hardware cursor rebinding, otherwise we get a standard b&w cursor
@@ -874,10 +874,10 @@ void CMouseHandler::SetCursor(const std::string& cmdName, const bool forceRebind
 		return;
 
 	if ((hwHideCursor = !loadedCursors[activeCursorIdx].IsHWValid())) {
-		SDL_ShowCursor(SDL_DISABLE);
+		SDL_HideCursor();
 		mouseInput->SetWMMouseCursor(nullptr);
 	} else {
-		loadedCursors[activeCursorIdx].BindHwCursor(); // calls SDL_ShowCursor(SDL_ENABLE);
+		loadedCursors[activeCursorIdx].BindHwCursor(); // calls SDL_ShowCursor();
 	}
 }
 

@@ -165,7 +165,6 @@ int spring::exitCode = spring::EXIT_CODE_SUCCESS;
 static unsigned int reloadCount = 0;
 static unsigned int killedCount = 0;
 
-static constexpr auto RECOIL_SDL_WINDOWEVENT_DISPLAY_CHANGED = 18;
 
 // initialize basic systems for command line help / output
 static void ConsolePrintInitialize(const std::string& configSource, bool safemode)
@@ -1063,8 +1062,8 @@ void SpringApp::Kill(bool fromRun)
 bool SpringApp::MainEventHandler(const SDL_Event& event)
 {
 	switch (event.type) {
-		case SDL_WINDOWEVENT: {
-			switch (event.window.event) {
+			// SDL3: the former SDL_WINDOWEVENT sub-types are now top-level event
+			// types (the SDL_WINDOWEVENT_* names below map to them via oldnames).
 				case SDL_WINDOWEVENT_MOVED: {
 					LOG("[SpringApp::%s][SDL_WINDOWEVENT_MOVED][1] di=%d, ssx=%d, ssy=%d, wsx=%d, wsy=%d, wpx=%d, wpy=%d"
 						, __func__
@@ -1187,7 +1186,7 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 
 							SDL_Event event;
 							event.type = event.button.type = SDL_MOUSEBUTTONUP;
-							event.button.state = SDL_RELEASED;
+							event.button.down = false;
 							event.button.which = 0;
 							event.button.button = i;
 							event.button.x = -1;
@@ -1203,8 +1202,7 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 					// and make sure to un-capture mouse
 					globalRendering->SetWindowInputGrabbing(false);
 				} break;
-				// replace with normal SDL_WINDOWEVENT_DISPLAY_CHANGED when our Linux SDL2 is updated
-				case RECOIL_SDL_WINDOWEVENT_DISPLAY_CHANGED: {
+				case SDL_WINDOWEVENT_DISPLAY_CHANGED: {
 					LOG("[SpringApp::%s][SDL_WINDOWEVENT_DISPLAY_CHANGED] to display %d\n", __func__, event.window.data1);
 					// try to reinit GL context
 					globalRendering->MakeCurrentContext(false);
@@ -1213,14 +1211,12 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 				case SDL_WINDOWEVENT_CLOSE: {
 					gu->globalQuit = true;
 				} break;
-			};
-		} break;
 		case SDL_AUDIODEVICEREMOVED: {
-			LOG("[SpringApp::%s][SDL_AUDIODEVICEREMOVED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.iscapture));
+			LOG("[SpringApp::%s][SDL_AUDIODEVICEREMOVED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.recording));
 			sound->DeviceChanged(event.adevice.which);
 		} break;
 		case SDL_AUDIODEVICEADDED: {
-			LOG("[SpringApp::%s][SDL_AUDIODEVICEADDED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.iscapture));
+			LOG("[SpringApp::%s][SDL_AUDIODEVICEADDED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.recording));
 			sound->DeviceChanged(event.adevice.which);
 		} break;
 		case SDL_QUIT: {
@@ -1240,8 +1236,8 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 			KeyInput::Update(keyBindings.GetFakeMetaKey());
 
 			if (activeController != nullptr) {
-				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.keysym.sym);
-				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.keysym.scancode);
+				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.key);
+				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.scancode);
 				activeController->KeyPressed(keyCode, scanCode, event.key.repeat);
 			}
 
@@ -1251,8 +1247,8 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 
 			if (activeController != nullptr) {
 				gameTextInput.ignoreNextChar = false;
-				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.keysym.sym);
-				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.keysym.scancode);
+				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.key);
+				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.scancode);
 				activeController->KeyReleased(keyCode, scanCode);
 			}
 		} break;

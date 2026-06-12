@@ -64,8 +64,9 @@ void AviVideoCapturing::StartCapturing()
 
 	aviGenerator = new CAVIGenerator(fileName, videoSizeX, videoSizeY, 30);
 
-	const int savedCursorMode = SDL_ShowCursor(SDL_QUERY);
-	SDL_ShowCursor(SDL_ENABLE);
+	// SDL3 split the tri-state SDL_ShowCursor into Show/Hide/CursorVisible.
+	const bool savedCursorVisible = SDL_CursorVisible();
+	SDL_ShowCursor();
 
 	if (!aviGenerator->InitEngine()) {
 		capturing = false;
@@ -77,7 +78,7 @@ void AviVideoCapturing::StartCapturing()
 		LOG("Recording avi to %s size %i x %i", fileName.c_str(), videoSizeX, videoSizeY);
 	}
 
-	SDL_ShowCursor(savedCursorMode);
+	if (savedCursorVisible) SDL_ShowCursor(); else SDL_HideCursor();
 	//aviGenerator->InitEngine() (avicap32.dll)? modifies the FPU control word.
 	//Setting it back to default state.
 	streflop::streflop_init<streflop::Simple>();

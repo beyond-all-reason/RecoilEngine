@@ -869,7 +869,11 @@ int LuaUnsyncedRead::DiffTimers(lua_State* L)
  */
 int LuaUnsyncedRead::GetNumDisplays(lua_State* L)
 {
-	lua_pushnumber(L, SDL_GetNumVideoDisplays());
+	// SDL3: SDL_GetNumVideoDisplays() -> SDL_GetDisplays(&count)
+	int numDisplays = 0;
+	SDL_DisplayID* displays = SDL_GetDisplays(&numDisplays);
+	SDL_free(displays);
+	lua_pushnumber(L, numDisplays);
 	return 1;
 }
 
@@ -952,13 +956,16 @@ int LuaUnsyncedRead::GetWindowGeometry(lua_State* L)
  */
 int LuaUnsyncedRead::GetWindowDisplayMode(lua_State* L)
 {
-	SDL_DisplayMode dmode;
-	if (!SDL_GetWindowDisplayMode(globalRendering->GetWindow(), &dmode)) {
-		lua_pushnumber(L, dmode.w);
-		lua_pushnumber(L, dmode.h);
-		lua_pushnumber(L, SDL_BITSPERPIXEL(dmode.format));
-		lua_pushnumber(L, dmode.refresh_rate);
-		lua_pushstring(L, SDL_GetPixelFormatName(dmode.format));
+	// SDL3: SDL_GetWindowDisplayMode() was removed; query the current mode of the
+	// display the window is on (returns a pointer into SDL-owned storage).
+	const SDL_DisplayID disp = SDL_GetDisplayForWindow(globalRendering->GetWindow());
+	const SDL_DisplayMode* dmode = SDL_GetCurrentDisplayMode(disp);
+	if (dmode != nullptr) {
+		lua_pushnumber(L, dmode->w);
+		lua_pushnumber(L, dmode->h);
+		lua_pushnumber(L, SDL_BITSPERPIXEL(dmode->format));
+		lua_pushnumber(L, dmode->refresh_rate);
+		lua_pushstring(L, SDL_GetPixelFormatName(dmode->format));
 		return 5;
 	}
 	return 0;
@@ -4109,7 +4116,7 @@ int LuaUnsyncedRead::GetKeyFromScanSymbol(lua_State* L)
 		return 1;
 	}
 
-	SDL_Keycode keyCode = (SDL_Keycode)SDL_GetKeyFromScancode(scanCode);
+	SDL_Keycode keyCode = (SDL_Keycode)SDL_GetKeyFromScancode(scanCode, SDL_KMOD_NONE, false);
 	if (keyCode <= 0 || keyCode == 0x40000000) {
 		lua_pushstring(L, result.c_str());
 		return 1;

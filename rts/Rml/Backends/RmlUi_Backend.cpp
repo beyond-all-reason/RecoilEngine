@@ -551,15 +551,14 @@ bool processContextEvent(Rml::Context* context, const SDL_Event& event)
 		case SDL_TEXTINPUT:
 			return true;  // handled elsewhere
 
-		case SDL_WINDOWEVENT: {
-			if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
-				auto x = event.window.data1;
-				auto y = event.window.data2;
+		// SDL3: window sub-events are now top-level event types.
+		case SDL_WINDOWEVENT_SIZE_CHANGED: {
+			auto x = event.window.data1;
+			auto y = event.window.data2;
 
-				state->render_interface.SetViewport(x, y);
-				state->winX = x;
-				state->winY = y;
-			}
+			state->render_interface.SetViewport(x, y);
+			state->winX = x;
+			state->winY = y;
 		} break;
 
 		default:

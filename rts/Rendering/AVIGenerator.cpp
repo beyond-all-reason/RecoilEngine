@@ -16,7 +16,7 @@
 
 #ifdef _WIN32
 	#include <windows.h>
-	#include <SDL_syswm.h>
+	#include "System/Platform/SDL2WMCompat.h"
 #endif
 
 #if defined(_WIN32) && !defined(__MINGW32__)
@@ -339,9 +339,8 @@ bool CAVIGenerator::InitEngine()
 	}
 
 	SDL_SysWMinfo wmInfo;
-	SDL_VERSION(&wmInfo.version);
 	SDL_GetWindowWMInfo(globalRendering->GetWindow(), &wmInfo);
-	HWND& mainWindow = wmInfo.info.win.window;
+	HWND mainWindow = (HWND)wmInfo.info.win.window;
 
 	if (globalRendering->fullScreen)
 		ShowWindow(mainWindow, SW_SHOWMINNOACTIVE);
