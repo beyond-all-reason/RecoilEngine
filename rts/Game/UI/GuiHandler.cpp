@@ -2236,7 +2236,10 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 
 			const BuildInfo bi(unitdef, cameraPos + mouseDir * dist, buildFacing);
 
-			if (GetQueueKeystate() && (button == SDL_BUTTON_LEFT)) {
+			// in previews the stored press position is only a valid drag
+			// origin while the button is still held; outside previews we
+			// are called on release, after pressed has been cleared
+			if (button == SDL_BUTTON_LEFT && (!preview || mouse->buttons[SDL_BUTTON_LEFT].pressed)) {
 				const float3 camTracePos = mouse->buttons[SDL_BUTTON_LEFT].camPos;
 				const float3 camTraceDir = mouse->buttons[SDL_BUTTON_LEFT].dir;
 
@@ -2260,16 +2263,29 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 
 			}
 
+			// the first order of a drag keeps the real modifier state so it
+			// replaces the existing queue unless queueing is active (Shift
+			// by default, see InvertQueueKey and the rocker logic in
+			// CreateOptions); the rest of the drag must queue after it
+			unsigned char firstOpts = CreateOptions(button);
+
+			// ALT only selects the placement shape of a drag; strip it from
+			// the orders so games do not see it as a command modifier
+			if (buildInfos.size() > 1)
+				firstOpts &= ~ALT_KEY;
+
+			const unsigned char queueOpts = (firstOpts | SHIFT_KEY);
+
 			if (!preview) {
 				// only issue if more than one entry, i.e. user created some
 				// kind of line/area queue (caller handles the last command)
 				for (auto beg = buildInfos.cbegin(), end = --buildInfos.cend(); beg != end; ++beg) {
-					GiveCommand(beg->CreateCommand(CreateOptions(button)));
+					GiveCommand(beg->CreateCommand((beg == buildInfos.cbegin()) ? firstOpts : queueOpts));
 				}
 			}
 
 			buildCommands.clear();
-			return CheckCommand((buildInfos.back()).CreateCommand(CreateOptions(button)));
+			return CheckCommand((buildInfos.back()).CreateCommand((buildInfos.size() == 1) ? firstOpts : queueOpts));
 		}
 
 		case CMDTYPE_ICON_UNIT: {
@@ -2510,7 +2526,7 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 	buildInfos.clear();
 	buildInfos.reserve(16);
 
-	if (GetQueueKeystate() && KeyInput::GetKeyModState(KMOD_CTRL)) {
+	if (KeyInput::GetKeyModState(KMOD_CTRL)) {
 		const CUnit* unit = nullptr;
 		const CFeature* feature = nullptr;
 
@@ -2531,7 +2547,7 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 		}
 	}
 
-	if (other.def && GetQueueKeystate() && KeyInput::GetKeyModState(KMOD_CTRL)) {
+	if (other.def && KeyInput::GetKeyModState(KMOD_CTRL)) {
 		// circle build around building
 		const int oxsize = other.GetXSize() * SQUARE_SIZE;
 		const int ozsize = other.GetZSize() * SQUARE_SIZE;
@@ -2564,8 +2580,10 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 		float xstep = (int)((0 < delta.x) ? xsize : -xsize);
 		float zstep = (int)((0 < delta.z) ? zsize : -zsize);
 
-		if (KeyInput::GetKeyModState(KMOD_ALT)) {
-			// build a (filled or hollow) rectangle
+		const bool lineBuildMode = KeyInput::GetKeyModState(KMOD_ALT);
+
+		if (!lineBuildMode) {
+			// build a (filled or hollow) rectangle by default
 			if (KeyInput::GetKeyModState(KMOD_CTRL)) {
 				if ((1 < xnum) && (1 < znum)) {
 					// go "down" on the "left" side
@@ -2596,7 +2614,7 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 				}
 			}
 		} else {
-			// build a line
+			// line-build mode
 			const bool xDominatesZ = (math::fabs(delta.x) > math::fabs(delta.z));
 
 			if (xDominatesZ) {
@@ -3819,7 +3837,7 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 				const float3 cPos = tracePos + traceDir * rayTraceDist;
 
 				const CMouseHandler::ButtonPressEvt& bp = mouse->buttons[SDL_BUTTON_LEFT];
-				if (GetQueueKeystate() && bp.pressed) {
+				if (bp.pressed) {
 					const float bpDist = CGround::LineGroundWaterCol(bp.camPos, bp.dir, maxTraceDist, buildeeDef->floatOnWater, false);
 					const float3 bPos = bp.camPos + bp.dir * bpDist;
 					const BuildInfo cInfo = BuildInfo(buildeeDef, cPos, buildFacing);
@@ -3854,7 +3872,7 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 						glSurfaceCircle(buildPos, wd->coverageRange, { cmdColors.rangeInterceptorOn }, 40);
 					}
 
-					if (GetQueueKeystate()) {
+					{
 						buildCommands.clear();
 
 						const Command c = bi.CreateCommand();
