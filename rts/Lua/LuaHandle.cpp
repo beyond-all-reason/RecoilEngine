@@ -3865,7 +3865,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 	lua_pushnumber(L, playerID);
 
 	if (type == MAPDRAW_POINT) {
-		LuaPushString(L, "point");
+		LuaPushString (L, "point");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -3873,7 +3873,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 		args = 6;
 	}
 	else if (type == MAPDRAW_LINE) {
-		LuaPushString(L, "line");
+		LuaPushString (L, "line");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -3883,7 +3883,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 		args = 8;
 	}
 	else if (type == MAPDRAW_ERASE) {
-		LuaPushString(L, "erase");
+		LuaPushString (L, "erase");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
