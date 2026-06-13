@@ -22,7 +22,6 @@
 #include "System/Log/ILog.h"
 #include "System/SpringMath.h"
 
-#include <SDL_config.h>
 #include "System/Platform/SDL2WMCompat.h"
 #include <SDL_mouse.h>
 #include <SDL_events.h>
