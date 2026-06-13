@@ -315,6 +315,27 @@ endif (RECOIL_DETAILED_TRACY_ZONING)
 # Note the missing REQUIRED, as headless & dedi may not depend on those.
 #  So req. checks are done in the build target's CMakeLists.txt.
 # (FindSDL2.cmake is an SDL3 compatibility shim; see that file.)
+#
+# Optionally build and statically link SDL3 from source. When enabled we fetch
+# SDL, build it as a static library only, and the SDL2::SDL2 shim target will
+# pick up the resulting SDL3::SDL3-static target. Otherwise the system SDL3 is
+# used (typically a shared library).
+option(RECOIL_SDL3_STATIC "Build and statically link SDL3 from source" OFF)
+set(RECOIL_SDL3_VERSION "release-3.2.10" CACHE STRING "SDL3 git tag to vendor when RECOIL_SDL3_STATIC is ON")
+if    (RECOIL_SDL3_STATIC)
+	include(FetchContent)
+	set(SDL_SHARED  OFF CACHE BOOL "" FORCE)
+	set(SDL_STATIC  ON  CACHE BOOL "" FORCE)
+	set(SDL_TEST    OFF CACHE BOOL "" FORCE)
+	set(SDL_TESTS   OFF CACHE BOOL "" FORCE)
+	set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+	FetchContent_Declare(SDL3
+		GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+		GIT_TAG        ${RECOIL_SDL3_VERSION}
+		GIT_SHALLOW    TRUE
+	)
+	FetchContent_MakeAvailable(SDL3)
+endif ()
 find_package(SDL2 MODULE)
 
 find_package_static(DevIL 1.8.0 REQUIRED)

@@ -2,8 +2,14 @@
 #
 # The engine has been migrated to SDL3, but a lot of build targets still call
 # find_package(SDL2 ...) and link the SDL2::SDL2 target. Rather than touch every
-# one of those sites, this module resolves SDL3 (via its installed CMake config)
-# and re-exports it under the legacy SDL2::SDL2 name.
+# one of those sites, this module resolves SDL3 and re-exports it under the
+# legacy SDL2::SDL2 name.
+#
+# SDL3 can come from two places:
+#   - the system (an installed SDL3 CMake config), or
+#   - a vendored/static build that already created the SDL3::SDL3[-static]
+#     target before this module runs (see RECOIL_SDL3_STATIC in the top-level
+#     CMakeLists.txt). In that case we reuse the existing target.
 #
 # Two compatibility concerns are handled here:
 #   1. Linking: prefer the static SDL3 target (SDL3::SDL3-static) when present,
@@ -13,15 +19,22 @@
 #      <SDL3/...> subdirectory, so we add that subdir to the include path and
 #      the existing bare includes keep resolving unchanged.
 
-find_package(SDL3 QUIET CONFIG)
+# Only probe the system if a vendored SDL3 target isn't already present.
+if (NOT TARGET SDL3::SDL3 AND NOT TARGET SDL3::SDL3-static)
+  find_package(SDL3 QUIET CONFIG)
+endif ()
+
+if (TARGET SDL3::SDL3 OR TARGET SDL3::SDL3-static)
+  set(SDL2_FOUND TRUE)
+endif ()
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(SDL2
-  REQUIRED_VARS SDL3_DIR
+  REQUIRED_VARS SDL2_FOUND
   FAIL_MESSAGE "SDL3 not found (the SDL2 find-module is an SDL3 shim)"
 )
 
-if (SDL3_FOUND AND NOT TARGET SDL2::SDL2)
+if (SDL2_FOUND AND NOT TARGET SDL2::SDL2)
   if    (TARGET SDL3::SDL3-static)
     set(_recoil_sdl3_target SDL3::SDL3-static)
   else  ()
@@ -36,9 +49,13 @@ if (SDL3_FOUND AND NOT TARGET SDL2::SDL2)
   # bare-include shim: locate the dir holding the SDL3/ header subdir and add
   # that subdir so the engine's bare <SDL_xxx.h> includes resolve. SDL3's own
   # include dirs live on a sub-target, so resolve the path independently here.
+  # HINTS cover both the system layout and a vendored source tree.
   find_path(SDL2_SHIM_INCLUDE_DIR
     NAMES SDL3/SDL.h
-    HINTS ${SDL3_DIR}/../../../include
+    HINTS
+      ${SDL3_DIR}/../../../include
+      ${SDL3_INCLUDE_DIRS}
+      ${sdl3_SOURCE_DIR}/include
   )
   if (SDL2_SHIM_INCLUDE_DIR)
     set_property(TARGET SDL2::SDL2 APPEND PROPERTY
