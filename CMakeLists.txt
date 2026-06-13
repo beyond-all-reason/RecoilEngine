@@ -321,7 +321,7 @@ endif (RECOIL_DETAILED_TRACY_ZONING)
 # pick up the resulting SDL3::SDL3-static target. Otherwise the system SDL3 is
 # used (typically a shared library).
 option(RECOIL_SDL3_STATIC "Build and statically link SDL3 from source" OFF)
-set(RECOIL_SDL3_VERSION "release-3.2.10" CACHE STRING "SDL3 git tag to vendor when RECOIL_SDL3_STATIC is ON")
+set(RECOIL_SDL3_VERSION "release-3.4.2" CACHE STRING "SDL3 git tag to vendor when RECOIL_SDL3_STATIC is ON")
 if    (RECOIL_SDL3_STATIC)
 	include(FetchContent)
 	set(SDL_SHARED  OFF CACHE BOOL "" FORCE)
