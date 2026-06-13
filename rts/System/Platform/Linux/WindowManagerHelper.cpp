@@ -19,7 +19,7 @@ void BlockCompositing(SDL_Window* window)
 	if (!SDL_GetWindowWMInfo(window, &info))
 		return;
 
-	auto x11display = info.info.x11.display;
+	Display* x11display = static_cast<Display*>(info.info.x11.display);
 	auto x11window  = info.info.x11.window;
 
 	bool b = true;
@@ -40,7 +40,7 @@ int GetWindowState(SDL_Window* window)
 	if (!SDL_GetWindowWMInfo(window, &info))
 		return 0;
 
-	auto x11display = info.info.x11.display;
+	Display* x11display = static_cast<Display*>(info.info.x11.display);
 	auto x11window  = info.info.x11.window;
 
 	// XGetWindowProperty stuff

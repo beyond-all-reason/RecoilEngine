@@ -16,7 +16,7 @@ void GLX::Load(SDL_Window* window)
 	switch (info.subsystem)
 	{
 	case SDL_SYSWM_X11: {
-		Display* display = info.info.x11.display;
+		Display* display = static_cast<Display*>(info.info.x11.display);
 		supported = static_cast<bool>(gladLoadGLX(display, DefaultScreen(display)));
 	} break;
 	case SDL_SYSWM_WAYLAND: {

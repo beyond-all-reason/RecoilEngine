@@ -594,7 +594,7 @@ void HardwareCursorX11::Kill()
 			return;
 		}
 
-		XFreeCursor(info.info.x11.display, cursor);
+		XFreeCursor(static_cast<Display*>(info.info.x11.display), cursor);
 	}
 }
 
@@ -702,7 +702,7 @@ void HardwareCursorX11::Finish()
 		return;
 	}
 
-	cursor = XcursorImagesLoadCursor(info.info.x11.display, cis);
+	cursor = XcursorImagesLoadCursor(static_cast<Display*>(info.info.x11.display), cis);
 	XcursorImagesDestroy(cis);
 	cimages.clear();
 }
@@ -719,7 +719,7 @@ void HardwareCursorX11::Bind()
 
 	// do between lock/unlock so SDL's default cursor doesn't flicker in
 	SDL_ShowCursor();
-	XDefineCursor(info.info.x11.display, info.info.x11.window, cursor);
+	XDefineCursor(static_cast<Display*>(info.info.x11.display), info.info.x11.window, cursor);
 }
 
 
