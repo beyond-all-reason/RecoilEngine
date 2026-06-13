@@ -57,8 +57,12 @@ if     (APPLE)
 elseif (MINGW)
 	set(PIC_FLAG "")
 else   ()
-	if (CMAKE_SIZEOF_VOID_P EQUAL 8) # add fpic flag on 64 bit platforms
-		set(PIC_FLAG "-fpic")
+	if (CMAKE_SIZEOF_VOID_P EQUAL 8) # add fPIC flag on 64 bit platforms
+		# Use -fPIC (not -fpic): identical to -fpic on x86-64, but on aarch64 the
+		# lowercase -fpic uses a small-GOT model (R_AARCH64_LD64_GOTPAGE_LO15,
+		# ~28KB GOT) that overflows once we statically link SDL3. -fPIC emits the
+		# unbounded GOT relocations.
+		set(PIC_FLAG "-fPIC")
 	else () #no fpic needed on 32bit
 		set(CMAKE_POSITION_INDEPENDENT_CODE FALSE)
 		set(PIC_FLAG "")
