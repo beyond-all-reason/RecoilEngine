@@ -2309,8 +2309,8 @@ int LuaSyncedRead::GetAIInfo(lua_State* L)
 
 	// no unsynced Skirmish AI info for synchronized scripts
 	if (CLuaHandle::GetHandleSynced(L)) {
-		LuaPushHString(L, "SYNCED_NOSHORTNAME");
-		LuaPushHString(L, "SYNCED_NOVERSION");
+		LuaPushString(L, "SYNCED_NOSHORTNAME");
+		LuaPushString(L, "SYNCED_NOVERSION");
 		lua_newtable(L);
 	} else if (skirmishAIHandler.IsLocalSkirmishAI(skirmishAIId)) {
 		lua_pushsstring(L, aiData->shortName);
@@ -2324,8 +2324,8 @@ int LuaSyncedRead::GetAIInfo(lua_State* L)
 			lua_rawset(L, -3);
 		}
 	} else {
-		LuaPushHString(L, "UNKNOWN");
-		LuaPushHString(L, "UNKNOWN");
+		LuaPushString(L, "UNKNOWN");
+		LuaPushString(L, "UNKNOWN");
 		lua_newtable(L);
 	}
 	numVals += 3;
@@ -2629,7 +2629,7 @@ int LuaSyncedRead::GetTeamUnitsSorted(lua_State* L)
 		}
 
 		if (!gtuObjectIDs.empty()) {
-			LuaPushHString(L, "unknown");
+			LuaPushString(L, "unknown");
 
 			defCount += 1;
 			unitCount = 1;
@@ -7807,7 +7807,7 @@ int LuaSyncedRead::GetGroundBlocked(lua_State* L)
 			const CFeature* feature = dynamic_cast<const CFeature*>(s);
 			if (feature != nullptr) {
 				if (LuaUtils::IsFeatureVisible(L, feature)) {
-					LuaPushHString(L, "feature");
+					LuaPushString(L, "feature");
 					lua_pushnumber(L, feature->id);
 					return 2;
 				}
@@ -7818,7 +7818,7 @@ int LuaSyncedRead::GetGroundBlocked(lua_State* L)
 			const CUnit* unit = dynamic_cast<const CUnit*>(s);
 			if (unit != nullptr) {
 				if (CLuaHandle::GetHandleFullRead(L) || (unit->losStatus[CLuaHandle::GetHandleReadAllyTeam(L)] & LOS_INLOS)) {
-					LuaPushHString(L, "unit");
+					LuaPushString(L, "unit");
 					lua_pushnumber(L, unit->id);
 					return 2;
 				}
@@ -8542,7 +8542,7 @@ static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 	LuaPushNamedString(L, "name",   op.name);
 	LuaPushNamedString(L, "parent", ((op.parent != nullptr) ? op.parent->name : "[null]"));
 
-	LuaPushHString(L, "children");
+	LuaPushString(L, "children");
 	lua_createtable(L, op.children.size(), 0);
 	for (size_t c = 0; c < op.children.size(); c++) {
 		lua_pushsstring(L, op.children[c]->name);
@@ -8552,7 +8552,7 @@ static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 
 	LuaPushNamedBool(L, "isEmpty", !op.HasGeometryData());
 
-	LuaPushHString(L, "min");
+	LuaPushString(L, "min");
 	lua_createtable(L, 3, 0); {
 		lua_pushnumber(L, op.mins.x); lua_rawseti(L, -2, 1);
 		lua_pushnumber(L, op.mins.y); lua_rawseti(L, -2, 2);
@@ -8560,7 +8560,7 @@ static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 	}
 	lua_rawset(L, -3);
 
-	LuaPushHString(L, "max");
+	LuaPushString(L, "max");
 	lua_createtable(L, 3, 0); {
 		lua_pushnumber(L, op.maxs.x); lua_rawseti(L, -2, 1);
 		lua_pushnumber(L, op.maxs.y); lua_rawseti(L, -2, 2);
@@ -8568,7 +8568,7 @@ static int GetSolidObjectPieceInfoHelper(lua_State* L, const S3DModelPiece& op)
 	}
 	lua_rawset(L, -3);
 
-	LuaPushHString(L, "offset");
+	LuaPushString(L, "offset");
 	lua_createtable(L, 3, 0); {
 		lua_pushnumber(L, op.offset.x); lua_rawseti(L, -2, 1);
 		lua_pushnumber(L, op.offset.y); lua_rawseti(L, -2, 2);

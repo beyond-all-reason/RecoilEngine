@@ -256,7 +256,7 @@ static void PushObjectDefProxyTable(
 template <unsigned N>
 static inline void LuaPushNamedNil(lua_State* L, const char (&key) [N])
 {
-	lua_pushhstring(L, LuaHashStringLiteral(key), key, N - 1);
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
 	lua_pushnil(L);
 	lua_rawset(L, -3);
 }
@@ -272,7 +272,7 @@ static inline void LuaPushNamedNil(lua_State* L,
 template <unsigned N>
 static inline void LuaPushNamedBool(lua_State* L, const char (&key) [N], bool value)
 {
-	lua_pushhstring(L, LuaHashStringLiteral(key), key, N - 1);
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
 	lua_pushboolean(L, value);
 	lua_rawset(L, -3);
 }
@@ -287,7 +287,7 @@ static inline void LuaPushNamedBool(lua_State* L, const string& key, bool value)
 template <unsigned N>
 static inline void LuaPushNamedNumber(lua_State* L, const char (&key) [N], lua_Number value) 
 {
-	lua_pushhstring(L, LuaHashStringLiteral(key), key, N - 1);
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
 	lua_pushnumber(L, value);
 	lua_rawset(L, -3);
 }
@@ -302,7 +302,7 @@ static inline void LuaPushNamedNumber(lua_State* L, const string& key, lua_Numbe
 template <unsigned N>
 static inline void LuaPushNamedChar(lua_State* L, const char (&key) [N], char value)
 {
-	lua_pushhstring(L, LuaHashStringLiteral(key), key, N - 1);
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
 	lua_pushlstring(L, &value, 1);
 	lua_rawset(L, -3);
 }
@@ -317,15 +317,15 @@ static inline void LuaPushNamedChar(lua_State* L, char const *name, char value)
 template <unsigned N0, unsigned N1>
 static inline void LuaPushNamedString(lua_State* L, const char (&key) [N0], const char (&value) [N1])
 {
-	lua_pushhstring(L, LuaHashStringLiteral(key), key, N0 - 1);
-	lua_pushhstring(L, LuaHashStringLiteral(value), value, N1 - 1);
+	lua_pushhstring(L, CompileTimeHash(key), key, N0 - 1);
+	lua_pushhstring(L, CompileTimeHash(value), value, N1 - 1);
 	lua_rawset(L, -3);
 }
 
 template <unsigned N>
 static inline void LuaPushNamedString(lua_State* L, const char (&key) [N], const string& value)
 {
-	lua_pushhstring(L, LuaHashStringLiteral(key), key, N - 1);
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
 	lua_pushsstring(L, value);
 	lua_rawset(L, -3);
 }
@@ -340,7 +340,7 @@ static inline void LuaPushNamedString(lua_State* L, const string& key, const str
 template <unsigned N>
 static inline void LuaPushNamedCFunc(lua_State* L, const char (&key) [N], lua_CFunction func)
 {
-	lua_pushhstring(L, LuaHashStringLiteral(key), key, N - 1);
+	lua_pushhstring(L, CompileTimeHash(key), key, N - 1);
 	lua_pushcfunction(L, func);
 	lua_rawset(L, -3);
 }
@@ -358,6 +358,17 @@ static inline void LuaPushRawNamedCFunc(lua_State* L, const char* key, lua_CFunc
 	lua_pushcfunction(L, func);
 	lua_rawset(L, -3);
 }
+
+template <unsigned N>
+static inline void LuaPushString(lua_State* L, const char (&str)[N])
+{
+	static_assert(N > 1);
+	lua_pushhstring(L, CompileTimeHash(str), str, N - 1);
+}
+
+static inline void LuaPushString(lua_State* L, const string& str) {
+	lua_pushsstring(L, str);
+} 
 
 #define REGISTER_LUA_CFUNC(func)                LuaPushRawNamedCFunc(L, #func,        func)
 #define REGISTER_NAMED_LUA_CFUNC(name, func)    LuaPushRawNamedCFunc(L,  name,        func)

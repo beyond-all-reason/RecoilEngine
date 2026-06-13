@@ -8,13 +8,6 @@
 #include "LuaInclude.h"
 #include "System/StringHash.h"
 
-template <unsigned N>
-static inline void LuaPushHString(lua_State* L, const char (&str)[N])
-{
-	static_assert(N > 1);
-	lua_pushhstring(L, LuaHashStringLiteral(str), str, N - 1);
-}
-
 struct LuaHashString {
 	public:
 		LuaHashString(const char* s): hash(lua_calchash(s, slen = strlen(s))) {

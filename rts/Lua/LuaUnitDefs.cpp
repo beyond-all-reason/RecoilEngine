@@ -377,11 +377,11 @@ static int WeaponsTable(lua_State* L, const void* data)
 			LuaPushNamedNumber(L, "mainDirY",    udw.mainDir.y);
 			LuaPushNamedNumber(L, "mainDirZ",    udw.mainDir.z);
 
-			LuaPushHString(L, "badTargets");
+			LuaPushString(L, "badTargets");
 			CategorySetFromBits(L, &udw.badTargetCat);
 			lua_rawset(L, -3);
 
-			LuaPushHString(L, "onlyTargets");
+			LuaPushString(L, "onlyTargets");
 			CategorySetFromBits(L, &udw.onlyTargetCat);
 			lua_rawset(L, -3);
 		}

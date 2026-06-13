@@ -961,7 +961,7 @@ int LuaShaders::GetActiveUniforms(lua_State* L)
 		}
 		lua_rawseti(L, -2, i + 1);
 		++i;
-	} 
+	}
 
 	return 1;
 }

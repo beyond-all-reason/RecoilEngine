@@ -762,9 +762,9 @@ int LuaUtils::PushModelRadius(lua_State* L, const SolidObjectDef* def, bool isUn
 int LuaUtils::PushFeatureModelDrawType(lua_State* L, const FeatureDef* def)
 {
 	switch (def->drawType) {
-		case DRAWTYPE_NONE:  { LuaPushHString(L, "none"); } break;
-		case DRAWTYPE_MODEL: { LuaPushHString(L, "model"); } break;
-		default:             { LuaPushHString(L, "tree"); } break;
+		case DRAWTYPE_NONE:  { LuaPushString(L,  "none"); } break;
+		case DRAWTYPE_MODEL: { LuaPushString(L, "model"); } break;
+		default:             { LuaPushString(L,  "tree"); } break;
 	}
 
 	return 1;
@@ -828,7 +828,7 @@ int LuaUtils::PushModelTable(lua_State* L, const SolidObjectDef* def) {
 		LuaPushNamedNumber(L, "midz", 0.0f);
 	}
 
-	LuaPushHString(L, "textures");
+	LuaPushString(L, "textures");
 	lua_createtable(L, 0, model != nullptr ? 2 : 0);
 
 	if (model != nullptr) {
@@ -917,7 +917,7 @@ int LuaUtils::ParseColVolData(lua_State* L, int idx, CollisionVolume* vol)
 void LuaUtils::PushCommandParamsTable(lua_State* L, const Command& cmd, bool subtable)
 {
 	if (subtable)
-		LuaPushHString(L, "params");
+		LuaPushString(L, "params");
 
 	lua_createtable(L, cmd.GetNumParams(), 0);
 
@@ -950,7 +950,7 @@ void LuaUtils::PushCommandParamsTable(lua_State* L, const Command& cmd, bool sub
 void LuaUtils::PushCommandOptionsTable(lua_State* L, const Command& cmd, bool subtable)
 {
 	if (subtable)
-		LuaPushHString(L, "options");
+		LuaPushString(L, "options");
 
 	lua_createtable(L, 0, 7);
 	LuaPushNamedNumber(L, "coded", cmd.GetOpts());
@@ -1605,13 +1605,13 @@ void LuaUtils::PushCommandDesc(lua_State* L, const SCommandDescription& cd)
 	LuaPushNamedString(L, "tooltip",     cd.tooltip);
 	LuaPushNamedString(L, "texture",     cd.iconname);
 	LuaPushNamedString(L, "cursor",      cd.mouseicon);
-	LuaPushNamedBool(L,   "queueing",    cd.queueing);
-	LuaPushNamedBool(L,   "hidden",      cd.hidden);
-	LuaPushNamedBool(L,   "disabled",    cd.disabled);
-	LuaPushNamedBool(L,   "showUnique",  cd.showUnique);
-	LuaPushNamedBool(L,   "onlyTexture", cd.onlyTexture);
+	LuaPushNamedBool  (L, "queueing",    cd.queueing);
+	LuaPushNamedBool  (L, "hidden",      cd.hidden);
+	LuaPushNamedBool  (L, "disabled",    cd.disabled);
+	LuaPushNamedBool  (L, "showUnique",  cd.showUnique);
+	LuaPushNamedBool  (L, "onlyTexture", cd.onlyTexture);
 
-	LuaPushHString(L, "params");
+	LuaPushString(L, "params");
 
 	lua_createtable(L, 0, numParams);
 

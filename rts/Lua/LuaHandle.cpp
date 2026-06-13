@@ -116,7 +116,7 @@ void CLuaHandle::PushTracebackFuncToRegistry(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	SPRING_LUA_OPEN_LIB(L, luaopen_debug);
-		LuaPushHString(L, "traceback");
+		LuaPushString(L, "traceback");
 		LuaUtils::PushDebugTraceback(L);
 		lua_rawset(L, LUA_REGISTRYINDEX);
 	// We only need the debug.traceback function, the others are unsafe for syncing.
@@ -2638,11 +2638,11 @@ bool CLuaHandle::DefaultCommand(const CUnit* unit,
 		return false;
 
 	if (unit) {
-		LuaPushHString(L, "unit");
+		LuaPushString(L, "unit");
 		lua_pushnumber(L, unit->id);
 	}
 	else if (feature) {
-		LuaPushHString(L, "feature");
+		LuaPushString(L, "feature");
 		lua_pushnumber(L, feature->id);
 	}
 	else {
@@ -2653,14 +2653,14 @@ bool CLuaHandle::DefaultCommand(const CUnit* unit,
 
 /* FIXME
 	else if (groundPos) {
-		LuaPushHString(L, "ground");
+		LuaPushString(L, "ground");
 		lua_pushnumber(L, groundPos->x);
 		lua_pushnumber(L, groundPos->y);
 		lua_pushnumber(L, groundPos->z);
 		args = 4;
 	}
 	else {
-		LuaPushHString(L, "selection");
+		LuaPushString(L, "selection");
 		args = 1;
 	}
 */
@@ -3789,24 +3789,24 @@ string CLuaHandle::WorldTooltip(const CUnit* unit,
 
 	int args;
 	if (unit) {
-		LuaPushHString(L, "unit");
+		LuaPushString(L, "unit");
 		lua_pushnumber(L, unit->id);
 		args = 2;
 	}
 	else if (feature) {
-		LuaPushHString(L, "feature");
+		LuaPushString(L, "feature");
 		lua_pushnumber(L, feature->id);
 		args = 2;
 	}
 	else if (groundPos) {
-		LuaPushHString(L, "ground");
+		LuaPushString(L, "ground");
 		lua_pushnumber(L, groundPos->x);
 		lua_pushnumber(L, groundPos->y);
 		lua_pushnumber(L, groundPos->z);
 		args = 4;
 	}
 	else {
-		LuaPushHString(L, "selection");
+		LuaPushString(L, "selection");
 		args = 1;
 	}
 
@@ -3865,7 +3865,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 	lua_pushnumber(L, playerID);
 
 	if (type == MAPDRAW_POINT) {
-		LuaPushHString(L, "point");
+		LuaPushString(L, "point");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -3873,7 +3873,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 		args = 6;
 	}
 	else if (type == MAPDRAW_LINE) {
-		LuaPushHString(L, "line");
+		LuaPushString(L, "line");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -3883,7 +3883,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 		args = 8;
 	}
 	else if (type == MAPDRAW_ERASE) {
-		LuaPushHString(L, "erase");
+		LuaPushString(L, "erase");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -4225,7 +4225,7 @@ void CLuaHandle::CollectGarbage(bool forced)
 bool CLuaHandle::AddBasicCalls(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	LuaPushHString(L, "Script");
+	LuaPushString(L, "Script");
 	lua_createtable(L, 0, 17); {
 		LuaPushNamedCFunc(L, "Kill",               KillActiveHandle);
 		LuaPushNamedCFunc(L, "UpdateCallIn",       CallOutUpdateCallIn);
