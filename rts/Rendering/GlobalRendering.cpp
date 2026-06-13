@@ -1,5 +1,9 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+// win32.h must come first (NOMINMAX + windows.h); the win-path WM code below
+// uses windows.h types that SDL_syswm.h used to pull in transitively.
+#include "System/Platform/Win/win32.h"
+
 #include <string>
 #include <sstream>
 #include <iomanip>

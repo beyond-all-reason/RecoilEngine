@@ -119,6 +119,10 @@ bool IMouseInput::HandleSDLMouseEvent(const SDL_Event& event)
 
 #if defined(_WIN32) && !defined(HEADLESS)
 
+// windows.h used to be pulled in transitively via SDL_syswm.h; the SDL3
+// WM-info compat shim does not include it, so do it explicitly here.
+#include <windows.h>
+
 class CWin32MouseInput : public IMouseInput
 {
 public:

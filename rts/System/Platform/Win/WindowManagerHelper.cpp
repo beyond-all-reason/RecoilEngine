@@ -37,7 +37,7 @@ int GetWindowState(SDL_Window* window)
 	struct SDL_SysWMinfo info;
 	SDL_GetWindowWMInfo(window, &info);
 
-	if (GetWindowPlacement(info.info.win.window, &wp)) {
+	if (GetWindowPlacement((HWND)info.info.win.window, &wp)) {
 		if (wp.showCmd == SW_SHOWMAXIMIZED)
 			state = SDL_WINDOW_MAXIMIZED;
 		if (wp.showCmd == SW_SHOWMINIMIZED)
@@ -55,7 +55,7 @@ void SetWindowResizable(SDL_Window* window, bool resizable)
 	SDL_SysWMinfo info;
 	SDL_GetWindowWMInfo(window, &info);
 
-	HWND hwnd = info.info.win.window;
+	HWND hwnd = (HWND)info.info.win.window;
 	DWORD style = GetWindowLong(hwnd, GWL_STYLE);
 	if (resizable) {
 		style |= (WS_THICKFRAME | WS_MAXIMIZEBOX);
