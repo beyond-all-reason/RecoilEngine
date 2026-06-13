@@ -727,9 +727,10 @@ void HardwareCursorX11::Bind()
 void HardwareCursorSDL::PushImage(int xsize, int ysize, const void* mem)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-    auto surface = SDL_CreateRGBSurface(0, xsize, ysize, 32, 0x000000FF, 0x0000FF00, 0x00FF0000,  0xFF000000);
+    // SDL3: SDL_CreateRGBSurface (masks) -> SDL_CreateSurface (byte-order format).
+    auto surface = SDL_CreateSurface(xsize, ysize, SDL_PIXELFORMAT_RGBA32);
     if (!surface) {
-        LOG_L(L_ERROR, "SDL_CreateRGBSurface failed: %s", SDL_GetError());
+        LOG_L(L_ERROR, "SDL_CreateSurface failed: %s", SDL_GetError());
         return;
     }
     SDL_memcpy(surface->pixels, mem, xsize * ysize * 4);
