@@ -127,13 +127,15 @@ void CSound::Kill()
 
 void CSound::Cleanup() {
 #ifdef ALC_SOFT_loopback
-	if (hasAlcSoftLoopBack && sdlDeviceID != 0) {
-		LOG("[Sound::%s][SDL_CloseAudioDevice(%d)]", __func__, sdlDeviceID);
-		SDL_CloseAudioDevice(sdlDeviceID);
-		SDL_CloseAudio();
+	if (hasAlcSoftLoopBack && sdlStream != nullptr) {
+		LOG("[Sound::%s][SDL_DestroyAudioStream(%u)]", __func__, sdlDeviceID);
+		// SDL3: destroying a stream created by SDL_OpenAudioDeviceStream also
+		// closes the bound logical device.
+		SDL_DestroyAudioStream(sdlStream);
+		sdlStream = nullptr;
 		SDL_QuitSubSystem(SDL_INIT_AUDIO);
 
-		sdlDeviceID = -1;
+		sdlDeviceID = 0;
 	}
 #endif
 
@@ -364,10 +366,11 @@ void CSound::DeviceChanged(uint32_t sdlDeviceIndex)
 	std::lock_guard<spring::recursive_mutex> lck(soundMutex);
 
 	LOG("[Sound::%s] Pausing audio", __func__);
-	SDL_PauseAudioDevice(sdlDeviceID, 1); // stop SDL-callback 'RenderSDLSamples'
+	SDL_PauseAudioStreamDevice(sdlStream); // stop SDL-callback 'RenderSDLSamples'
 
 	LOG("[Sound::%s] Closing audio device", __func__);
-	SDL_CloseAudioDevice(sdlDeviceID);
+	SDL_DestroyAudioStream(sdlStream);
+	sdlStream = nullptr;
 	sdlDeviceID = 0;
 
 	LOG("[Sound::%s] Attempt to reopen device", __func__);
@@ -391,7 +394,7 @@ void CSound::DeviceChanged(uint32_t sdlDeviceIndex)
 	//
 	// ToDo: Once OpenAL-Soft is updated, we can make use of alcReopenDeviceSOFT, etc.
 
-	SDL_PauseAudioDevice(sdlDeviceID, 0);  // Resume SDL-callback 'RenderSDLSamples'
+	SDL_ResumeAudioStreamDevice(sdlStream);  // Resume SDL-callback 'RenderSDLSamples'
 	LOG("[Sound::%s] Reopened device", __func__);
 }
 
@@ -450,13 +453,26 @@ static LPALCLOOPBACKOPENDEVICESOFT alcLoopbackOpenDeviceSOFT;
 static LPALCISRENDERFORMATSUPPORTEDSOFT alcIsRenderFormatSupportedSOFT;
 static LPALCRENDERSAMPLESSOFT alcRenderSamplesSOFT;
 
-static void SDLCALL RenderSDLSamples(void* userdata, Uint8* stream, int len)
+// SDL3 audio-stream callback: instead of writing into a provided buffer, we
+// render the requested amount and push it into the stream.
+static void SDLCALL RenderSDLSamples(void* userdata, SDL_AudioStream* stream, int additional_amount, int total_amount)
 {
+	if (additional_amount <= 0)
+		return;
+
 	CSound* snd = reinterpret_cast<CSound*>(userdata);
 	ALCdevice* dev = snd->GetCurrentDevice();
 
-	assert(snd->GetFrameSize() > 0);
-	alcRenderSamplesSOFT(dev, stream, len / snd->GetFrameSize());
+	const int frameSize = snd->GetFrameSize();
+	assert(frameSize > 0);
+
+	Uint8* buf = static_cast<Uint8*>(SDL_malloc(additional_amount));
+	if (buf == nullptr)
+		return;
+
+	alcRenderSamplesSOFT(dev, buf, additional_amount / frameSize);
+	SDL_PutAudioStreamData(stream, buf, additional_amount);
+	SDL_free(buf);
 }
 
 static const char* ChannelsName(ALCenum chans)
@@ -490,68 +506,61 @@ static const char* TypeName(ALCenum type)
 
 bool CSound::OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec)
 {
-	if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
+	if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) { // SDL3: returns true on success
 		LOG("[Sound::%s] failed to initialize SDL audio, error:  \"%s\"", __func__, SDL_GetError());
 		return false;
 	}
 
-	if (SDL_GetNumAudioDevices(0) <= 0) {
+	// SDL3: enumerate playback devices (SDL_GetNumAudioDevices/SDL_GetAudioDeviceName
+	// by index are gone; devices are identified by SDL_AudioDeviceID).
+	int numDevices = 0;
+	SDL_AudioDeviceID* devices = SDL_GetAudioPlaybackDevices(&numDevices);
+
+	if (devices == nullptr || numDevices <= 0) {
 		LOG("[Sound::%s] UseSDLAudio is set, but no SDL sound devices for playback can be found. Falling back to openal-soft backends", __func__);
+		SDL_free(devices);
 		return false;
 	}
 
+	// resolve the target device id: the configured device by name, else default
+	SDL_AudioDeviceID targetDevice = SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+	selectedDeviceName = "default";
+
 	LOG("[Sound::%s] SDL audio device(s): ", __func__);
-	for (int i = 0, n = SDL_GetNumAudioDevices(0); i < n; ++i) {
-		LOG("[Sound::%s]  * \"%d\" \"%s\"", __func__, i, SDL_GetAudioDeviceName(i, 0));
-	}
+	for (int i = 0; i < numDevices; ++i) {
+		const char* dn = SDL_GetAudioDeviceName(devices[i]);
+		LOG("[Sound::%s]  * \"%u\" \"%s\"", __func__, devices[i], (dn != nullptr) ? dn : "");
 
-	SDL_AudioSpec desiredSpec;
-
-	desiredSpec.format = AUDIO_S16SYS;
-	desiredSpec.freq = 44100;
-	desiredSpec.padding = 0;
-	desiredSpec.samples = 4096;
-	desiredSpec.callback = RenderSDLSamples;
-	desiredSpec.userdata = this;
-	
-	/* SDL bug: can return devices with >2 channels (3D surround), even if we ask for just 2.
-	 * This causes the 2 "primary" channels to be moved in the 3D space compared to their "normal" state
-	 * and directional sound doesn't work anymore (though volume change with distance still does).
-	 * For this reason, the engine rejects such devices down the road. Don't let it get that far and retry instead.
-	 *
-	 * Note that proper support for 3D surround sounds sounds hard, for example as of 2023 counter-strike has very weak support
-	 * for it, apparently noticeably worse than just stereo according to players, despite being in a more relevant genre. */
-	selectedDeviceName = "";
-	for (int channelsDesired : {2, 1}) {
-		desiredSpec.channels = channelsDesired;
-
-		sdlDeviceID = 0;
-
-		if (!deviceName.empty()) {
-			LOG("[Sound::%s] opening configured device \"%s\"", __func__, deviceName.c_str());
-			sdlDeviceID = SDL_OpenAudioDevice(deviceName.c_str(), 0, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_ANY_CHANGE & ~SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
+		if (!deviceName.empty() && dn != nullptr && deviceName == dn) {
+			targetDevice = devices[i];
 			selectedDeviceName = deviceName;
 		}
-
-		if (sdlDeviceID == 0) {
-			LOG("[Sound::%s] opening default device", __func__);
-			sdlDeviceID = SDL_OpenAudioDevice(nullptr, 0, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_ANY_CHANGE & ~SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
-			selectedDeviceName = "default";
-		}
-
-		if (obtainedSpec.channels == desiredSpec.channels) {
-			break;
-		}
-
-		LOG("[Sound::%s] SDL returned %d channels, when we asked for %d. Closing previously opened device.", __func__, obtainedSpec.channels, desiredSpec.channels);
-		SDL_CloseAudioDevice(sdlDeviceID);
 	}
+	SDL_free(devices);
 
-	if (sdlDeviceID == 0) {
+	// SDL3 audio streams transparently convert between our format and the
+	// device's, so unlike SDL2 we always get exactly the channel count we ask
+	// for and no longer need the >2-channel retry/reject dance.
+	SDL_AudioSpec desiredSpec;
+	SDL_zero(desiredSpec);
+	desiredSpec.format = AUDIO_S16SYS;
+	desiredSpec.freq = 44100;
+	desiredSpec.channels = 2;
+
+	LOG("[Sound::%s] opening device \"%s\"", __func__, selectedDeviceName.c_str());
+	sdlStream = SDL_OpenAudioDeviceStream(targetDevice, &desiredSpec, RenderSDLSamples, this);
+
+	if (sdlStream == nullptr) {
 		LOG("[Sound::%s] failed to open SDL audio, error:  \"%s\"", __func__, SDL_GetError());
 		SDL_QuitSubSystem(SDL_INIT_AUDIO);
 		return false;
 	}
+
+	sdlDeviceID = SDL_GetAudioStreamDevice(sdlStream);
+
+	// our side of the stream is exactly desiredSpec; the device opens paused and
+	// is resumed once the OpenAL loopback device behind the callback is ready.
+	obtainedSpec = desiredSpec;
 
 	// needs to be at least 1 or the callback will divide by 0
 	if ((frameSize = obtainedSpec.channels * SDL_AUDIO_BITSIZE(obtainedSpec.format) / 8) <= 0) {
@@ -617,7 +626,7 @@ void CSound::OpenLoopbackDevice(const std::string& deviceName)
 	switch (obtainedSpec.format) {
 		case AUDIO_U8    : { attrs[3] = ALC_UNSIGNED_BYTE_SOFT ; } break;
 		case AUDIO_S8    : { attrs[3] = ALC_BYTE_SOFT          ; } break;
-		case AUDIO_U16SYS: { attrs[3] = ALC_UNSIGNED_SHORT_SOFT; } break;
+		// SDL3 dropped the U16 audio formats (AUDIO_U16SYS no longer exists).
 		case AUDIO_S16SYS: { attrs[3] = ALC_SHORT_SOFT         ; } break;
 		case AUDIO_F32   : { attrs[3] = ALC_FLOAT_SOFT         ; } break;
 		default: {
@@ -739,8 +748,8 @@ void CSound::InitThread(int cfgMaxSounds)
 
 	canLoadDefs = true;
 #ifdef ALC_SOFT_loopback
-	if (hasAlcSoftLoopBack && sdlDeviceID != 0)
-		SDL_PauseAudioDevice(sdlDeviceID, 0);
+	if (hasAlcSoftLoopBack && sdlStream != nullptr)
+		SDL_ResumeAudioStreamDevice(sdlStream); // start playback now the loopback device exists
 #endif
 }
 
