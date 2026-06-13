@@ -329,6 +329,9 @@ if    (RECOIL_SDL3_STATIC)
 	set(SDL_TEST    OFF CACHE BOOL "" FORCE)
 	set(SDL_TESTS   OFF CACHE BOOL "" FORCE)
 	set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+	# XTEST (X11 input synthesis) is unused by the engine and libxtst-dev is not
+	# present in the CI image; disable it so the X11 backend still builds.
+	set(SDL_X11_XTEST OFF CACHE BOOL "" FORCE)
 	FetchContent_Declare(SDL3
 		GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
 		GIT_TAG        ${RECOIL_SDL3_VERSION}
