@@ -46,17 +46,24 @@ if (SDL2_FOUND AND NOT TARGET SDL2::SDL2)
     INTERFACE_LINK_LIBRARIES "${_recoil_sdl3_target}"
   )
 
-  # bare-include shim: locate the dir holding the SDL3/ header subdir and add
-  # that subdir so the engine's bare <SDL_xxx.h> includes resolve. SDL3's own
-  # include dirs live on a sub-target, so resolve the path independently here.
-  # HINTS cover both the system layout and a vendored source tree.
-  find_path(SDL2_SHIM_INCLUDE_DIR
-    NAMES SDL3/SDL.h
-    HINTS
-      ${SDL3_DIR}/../../../include
-      ${SDL3_INCLUDE_DIRS}
-      ${sdl3_SOURCE_DIR}/include
-  )
+  # bare-include shim: add the dir holding the SDL3/ header subdir so the
+  # engine's bare <SDL_xxx.h> includes resolve. SDL3's own include dirs live on a
+  # sub-target, so resolve the path independently here.
+  #
+  # For a vendored SDL3 (FetchContent) the headers are in the fetched source
+  # tree. We set the path directly because find_path() is restricted to
+  # CMAKE_FIND_ROOT_PATH under cross-compilation (e.g. the mingw CI build) and
+  # would not see the source tree. For a system SDL3 we fall back to find_path.
+  if    (DEFINED sdl3_SOURCE_DIR AND EXISTS "${sdl3_SOURCE_DIR}/include/SDL3/SDL.h")
+    set(SDL2_SHIM_INCLUDE_DIR "${sdl3_SOURCE_DIR}/include")
+  else  ()
+    find_path(SDL2_SHIM_INCLUDE_DIR
+      NAMES SDL3/SDL.h
+      HINTS
+        ${SDL3_DIR}/../../../include
+        ${SDL3_INCLUDE_DIRS}
+    )
+  endif ()
   if (SDL2_SHIM_INCLUDE_DIR)
     set_property(TARGET SDL2::SDL2 APPEND PROPERTY
       INTERFACE_INCLUDE_DIRECTORIES "${SDL2_SHIM_INCLUDE_DIR}/SDL3")
