@@ -62,6 +62,22 @@
 CONFIG(bool, MiniMapMarker).defaultValue(true).headlessValue(false);
 CONFIG(bool, InvertQueueKey).defaultValue(false);
 
+// Which held key combination (any of "shift", "ctrl", "alt", joined however) draws which
+// build-drag shape. "shift" means the queue key must be held. See GetBuildPositions().
+// By default every shape requires the queue key ("shift"), drop "shift" from a shape to 
+// let it drag order without queueing.
+CONFIG(std::string, BuildShapeDiagonal    ).defaultValue("shift").description("Modifier keys that drag-build a free-angle line of buildings.");
+CONFIG(std::string, BuildShapeStraightLine).defaultValue("ctrl+shift").description("Modifier keys that drag-build a line locked to its dominant axis.");
+CONFIG(std::string, BuildShapeFlood       ).defaultValue("shift+alt").description("Modifier keys that fill the dragged rectangle solidly with buildings.");
+CONFIG(std::string, BuildShapeHollowBox   ).defaultValue("ctrl+shift+alt").description("Modifier keys that place buildings only along the dragged rectangle's perimeter.");
+CONFIG(std::string, BuildShapeSurround    ).defaultValue("ctrl+shift").description("Modifier keys that ring an existing building with buildings when pointed at it.");
+CONFIG(std::string, BuildShapeFallback    ).defaultValue("single").description("Shape used when the held keys match no configured build shape: one of single/straightline/diagonal/flood/hollowbox/surround.");
+
+// defined further down alongside the build-shape tables they operate on
+static void ReadBuildShapeConfig();
+static uint8_t GetBuildPosModifiers(bool primary, bool secondary);
+static bool BuildPosWantsDrag(uint8_t mods, bool queue);
+
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
@@ -81,6 +97,16 @@ CGuiHandler::CGuiHandler()
 	miniMapMarker = configHandler->GetBool("MiniMapMarker");
 	invertQueueKey = configHandler->GetBool("InvertQueueKey");
 
+	ReadBuildShapeConfig();
+	configHandler->NotifyOnChange(this, {
+		"BuildShapeDiagonal",
+		"BuildShapeStraightLine",
+		"BuildShapeFlood",
+		"BuildShapeHollowBox",
+		"BuildShapeSurround",
+		"BuildShapeFallback",
+	});
+
 
 	autoShowMetal = mapInfo->gui.autoShowMetal;
 	useStencil = false;
@@ -92,6 +118,20 @@ CGuiHandler::CGuiHandler()
 	}
 
 	failedSound = sound->GetDefSoundId("FailedCommand");
+}
+
+
+CGuiHandler::~CGuiHandler()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	configHandler->RemoveObserver(this);
+}
+
+
+void CGuiHandler::ConfigNotify(const std::string& key, const std::string& value)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	ReadBuildShapeConfig();
 }
 
 
@@ -2236,7 +2276,11 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 
 			const BuildInfo bi(unitdef, cameraPos + mouseDir * dist, buildFacing);
 
-			if (GetQueueKeystate() && (button == SDL_BUTTON_LEFT)) {
+			// whether the held keys select a drag-spanning shape (vs a single building);
+			const uint8_t buildMods = GetBuildPosModifiers(KeyInput::GetKeyModState(KMOD_CTRL), KeyInput::GetKeyModState(KMOD_ALT));
+			const bool wantsDrag = (button == SDL_BUTTON_LEFT) && BuildPosWantsDrag(buildMods, GetQueueKeystate());
+
+			if (wantsDrag) {
 				const float3 camTracePos = mouse->buttons[SDL_BUTTON_LEFT].camPos;
 				const float3 camTraceDir = mouse->buttons[SDL_BUTTON_LEFT].dir;
 
@@ -2260,16 +2304,26 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 
 			}
 
+			// The first building keeps the user's real queue state, so without the queue key
+			// the shape replaces the existing order; every later building in the same shape
+			// must append (force the queue flag) or they would overwrite each other.
+			const unsigned char firstOptions = CreateOptions(button);
+			const unsigned char contOptions  = firstOptions | SHIFT_KEY;
+
 			if (!preview) {
 				// only issue if more than one entry, i.e. user created some
 				// kind of line/area queue (caller handles the last command)
+				bool first = true;
 				for (auto beg = buildInfos.cbegin(), end = --buildInfos.cend(); beg != end; ++beg) {
-					GiveCommand(beg->CreateCommand(CreateOptions(button)));
+					GiveCommand(beg->CreateCommand(first ? firstOptions : contOptions));
+					first = false;
 				}
 			}
 
 			buildCommands.clear();
-			return CheckCommand((buildInfos.back()).CreateCommand(CreateOptions(button)));
+			// the last entry appends only when it follows others (a multi-building shape)
+			const unsigned char lastOptions = (buildInfos.size() > 1) ? contOptions : firstOptions;
+			return CheckCommand((buildInfos.back()).CreateCommand(lastOptions));
 		}
 
 		case CMDTYPE_ICON_UNIT: {
@@ -2496,117 +2550,306 @@ static void FillRowOfBuildPos(const BuildInfo& startInfo, float x, float z, floa
 }
 
 
+// The distinct layouts a build-drag can produce. A shape is described purely by its geometry; 
+enum class BuildPosShape {
+	Single,        // a single building (drag too small to fit more)
+	StraightLine,  // a line locked to its dominant (x or z) axis
+	Diagonal,      // a free-angle line following the drag direction
+	Flood,         // a solid, filled rectangle
+	HollowBox,     // only the outline (perimeter) of a rectangle
+	Surround,      // a ring around an existing building under the cursor
+};
+
+
+// Build-shape modifier keys, as a bitmask, so shape bindings can be expressed as data.
+enum BuildPosModifier : uint8_t {
+	BUILD_MOD_NONE = 0,
+	BUILD_MOD_PRIMARY = 1 << 0, // generally Ctrl
+	BUILD_MOD_SECONDARY = 1 << 1, // generally Alt
+};
+
+// Maps a held key combination to the shape it draws. The key combos are loaded from
+// config (see ReadBuildShapeConfig), so games can rebind them; the constraints in
+// ResolveBuildPosShape (a Surround needs a target, a too-small drag is always Single)
+// are intrinsic and stay in code.
+struct BuildPosShapeBinding {
+	BuildPosShape shape;     // shape this binding selects
+	const char* configKey;   // config var holding the key combo that selects it
+	uint8_t modifiers;       // BuildPosModifier flags, parsed from config at load
+	bool requiresQueue;      // whether the queue key must be held, parsed from config at load
+};
+
+static BuildPosShapeBinding buildPosShapeBindings[] = {
+	{ BuildPosShape::Diagonal,     "BuildShapeDiagonal",     BUILD_MOD_NONE,                          true },
+	{ BuildPosShape::StraightLine, "BuildShapeStraightLine", BUILD_MOD_PRIMARY,                       true },
+	{ BuildPosShape::Flood,        "BuildShapeFlood",        BUILD_MOD_SECONDARY,                     true },
+	{ BuildPosShape::HollowBox,    "BuildShapeHollowBox",    BUILD_MOD_SECONDARY | BUILD_MOD_PRIMARY, true },
+};
+
+// Modifier(s) that arm the Surround shape when a building is under the cursor. Any extra
+// modifiers held alongside these are ignored, so Surround still wins over the line/rect
+// shapes that would otherwise match the same keys.
+static uint8_t buildPosSurroundModifier = BUILD_MOD_PRIMARY;
+// Whether the queue key must also be held for Surround to arm.
+static bool buildPosSurroundRequiresQueue = true;
+
+// Shape drawn for any modifier combination not listed in buildPosShapeBindings.
+static BuildPosShape buildPosFallbackShape = BuildPosShape::Single;
+
+
+// Parse a config key-combo string (e.g. "shift+ctrl") into modifier flags + queue requirement.
+// Token order and separators are irrelevant; unrecognised tokens are ignored.
+static void ParseBuildKeyCombo(const std::string& spec, uint8_t& modifiers, bool& requiresQueue)
+{
+	const std::string s = StringToLower(spec);
+
+	modifiers = BUILD_MOD_NONE;
+	modifiers |= (s.find("ctrl") != std::string::npos) ? BUILD_MOD_PRIMARY   : 0;
+	modifiers |= (s.find("alt")  != std::string::npos) ? BUILD_MOD_SECONDARY : 0;
+
+	requiresQueue = (s.find("shift") != std::string::npos);
+}
+
+static BuildPosShape ParseBuildPosShapeName(const std::string& name, BuildPosShape fallback)
+{
+	const std::string s = StringToLower(name);
+
+	if (s == "single")       return BuildPosShape::Single;
+	if (s == "straightline") return BuildPosShape::StraightLine;
+	if (s == "diagonal")     return BuildPosShape::Diagonal;
+	if (s == "flood")        return BuildPosShape::Flood;
+	if (s == "hollowbox")    return BuildPosShape::HollowBox;
+	if (s == "surround")     return BuildPosShape::Surround;
+
+	return fallback;
+}
+
+// (Re)load every build-shape key binding from config. Safe to call again on config change.
+static void ReadBuildShapeConfig()
+{
+	for (BuildPosShapeBinding& binding: buildPosShapeBindings)
+		ParseBuildKeyCombo(configHandler->GetString(binding.configKey), binding.modifiers, binding.requiresQueue);
+
+	ParseBuildKeyCombo(configHandler->GetString("BuildShapeSurround"), buildPosSurroundModifier, buildPosSurroundRequiresQueue);
+
+	buildPosFallbackShape = ParseBuildPosShapeName(configHandler->GetString("BuildShapeFallback"), BuildPosShape::Single);
+}
+
+
+static uint8_t GetBuildPosModifiers(bool primary, bool secondary)
+{
+	return (primary ? BUILD_MOD_PRIMARY : BUILD_MOD_NONE) | (secondary ? BUILD_MOD_SECONDARY : BUILD_MOD_NONE);
+}
+
+// Whether the queue key requirement is satisfied: a binding that does not require the
+// queue key matches regardless of its state, one that does only matches while it is held.
+static bool BuildPosQueueSatisfied(bool requiresQueue, bool queue)
+{
+	return !requiresQueue || queue;
+}
+
+static bool BuildPosModsArmSurround(uint8_t mods, bool queue)
+{
+	if (!BuildPosQueueSatisfied(buildPosSurroundRequiresQueue, queue))
+		return false;
+
+	return (mods & buildPosSurroundModifier) == buildPosSurroundModifier;
+}
+
+
+static BuildPosShape ResolveBuildPosShape(uint8_t mods, bool queue, bool hasSurroundTarget, bool singleCell)
+{
+	if (hasSurroundTarget)
+		return BuildPosShape::Surround;
+
+	// no room for more than one building along either axis
+	if (singleCell)
+		return BuildPosShape::Single;
+
+	for (const BuildPosShapeBinding& binding: buildPosShapeBindings) {
+		if (binding.modifiers == mods && BuildPosQueueSatisfied(binding.requiresQueue, queue))
+			return binding.shape;
+	}
+
+	// no binding for this combination, use the configured fallback
+	return buildPosFallbackShape;
+}
+
+// Whether the current keys select a shape that spans a drag (rather than a single
+// building). Decides whether the caller feeds GetBuildPositions the drag span or a single
+// point, so the queue-key requirement of each shape governs drag-building. The surround
+// target is unknown here, but a surround-armed combo still resolves to a drag shape (its
+// line/box fallback when no building is targeted), so it is reported as wanting a drag.
+static bool BuildPosWantsDrag(uint8_t mods, bool queue)
+{
+	return ResolveBuildPosShape(mods, queue, false, false) != BuildPosShape::Single;
+}
+
+
+// Single: one building at the drag start.
+static void AddSingleBuildPos(const BuildInfo& startInfo, const float3& start, std::vector<BuildInfo>& buildInfos)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	FillRowOfBuildPos(startInfo, start.x, start.z, 0.0f, 0.0f, 1, 0, false, buildInfos);
+}
+
+
+// Straight line / Diagonal: a single row of buildings spanning the drag.
+// When axisLocked (CTRL) the row snaps to its dominant axis; otherwise it
+// follows the drag slope to form a diagonal.
+static void AddLineBuildPositions(const BuildInfo& startInfo, const float3& start, const float3& delta, int xnum, int znum, float xstep, float zstep, bool axisLocked, std::vector<BuildInfo>& buildInfos)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const bool xDominatesZ = (math::fabs(delta.x) > math::fabs(delta.z));
+
+	if (xDominatesZ) {
+		zstep = axisLocked ? 0 : xstep * delta.z / (delta.x ? delta.x : 1);
+	} else {
+		xstep = axisLocked ? 0 : zstep * delta.x / (delta.z ? delta.z : 1);
+	}
+
+	FillRowOfBuildPos(startInfo, start.x, start.z, xstep, zstep, xDominatesZ ? xnum : znum, 0, false, buildInfos);
+}
+
+
+// Flood: a solid rectangle filled row by row in a boustrophedon (zig-zag) order.
+static void AddFloodBuildPositions(const BuildInfo& startInfo, const float3& start, int xnum, int znum, float xstep, float zstep, std::vector<BuildInfo>& buildInfos)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	int zn = 0;
+	for (float z = start.z; zn < znum; ++zn) {
+		if (zn & 1) {
+			// every odd line "right" to "left"
+			FillRowOfBuildPos(startInfo, start.x + (xnum - 1) * xstep, z, -xstep, 0, xnum, 0, false, buildInfos);
+		} else {
+			// every even line "left" to "right"
+			FillRowOfBuildPos(startInfo, start.x                     , z,  xstep, 0, xnum, 0, false, buildInfos);
+		}
+		z += zstep;
+	}
+}
+
+
+// Hollow box: just the perimeter of a rectangle; collapses to a line when one side is a single cell.
+static void AddHollowBoxBuildPositions(const BuildInfo& startInfo, const float3& start, int xnum, int znum, float xstep, float zstep, std::vector<BuildInfo>& buildInfos)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if ((1 < xnum) && (1 < znum)) {
+		// go "down" on the "left" side
+		FillRowOfBuildPos(startInfo, start.x                     , start.z + zstep             ,      0,  zstep, znum - 1, 0, false, buildInfos);
+		// go "right" on the "bottom" side
+		FillRowOfBuildPos(startInfo, start.x + xstep             , start.z + (znum - 1) * zstep,  xstep,      0, xnum - 1, 0, false, buildInfos);
+		// go "up" on the "right" side
+		FillRowOfBuildPos(startInfo, start.x + (xnum - 1) * xstep, start.z + (znum - 2) * zstep,      0, -zstep, znum - 1, 0, false, buildInfos);
+		// go "left" on the "top" side
+		FillRowOfBuildPos(startInfo, start.x + (xnum - 2) * xstep, start.z                     , -xstep,      0, xnum - 1, 0, false, buildInfos);
+	} else if (1 == xnum) {
+		FillRowOfBuildPos(startInfo, start.x, start.z, 0, zstep, znum, 0, false, buildInfos);
+	} else if (1 == znum) {
+		FillRowOfBuildPos(startInfo, start.x, start.z, xstep, 0, xnum, 0, false, buildInfos);
+	}
+}
+
+
+// Surround: a ring of buildings hugging the outside of an existing building.
+static void AddSurroundBuildPositions(const BuildInfo& startInfo, const BuildInfo& other, std::vector<BuildInfo>& buildInfos)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const int oxsize = other.GetXSize() * SQUARE_SIZE;
+	const int ozsize = other.GetZSize() * SQUARE_SIZE;
+	const int xsize = startInfo.GetXSize() * SQUARE_SIZE;
+	const int zsize = startInfo.GetZSize() * SQUARE_SIZE;
+
+	float3 start = CGameHelper::Pos2BuildPos(other, false);
+	float3 end = start;
+	start.x -= oxsize / 2;
+	start.z -= ozsize / 2;
+	end.x += oxsize / 2;
+	end.z += ozsize / 2;
+
+	const int nvert = 1 + (oxsize / xsize);
+	const int nhori = 1 + (ozsize / xsize);
+
+	FillRowOfBuildPos(startInfo, end.x   + zsize / 2, start.z + xsize / 2,      0,  xsize, nhori, 3, true, buildInfos);
+	FillRowOfBuildPos(startInfo, end.x   - xsize / 2, end.z   + zsize / 2, -xsize,      0, nvert, 2, true, buildInfos);
+	FillRowOfBuildPos(startInfo, start.x - zsize / 2, end.z   - xsize / 2,      0, -xsize, nhori, 1, true, buildInfos);
+	FillRowOfBuildPos(startInfo, start.x + xsize / 2, start.z - zsize / 2,  xsize,      0, nvert, 0, true, buildInfos);
+}
+
+
+// Find the building under the cursor; it becomes the centre of a Surround pattern.
+static BuildInfo FindSurroundTarget(const BuildInfo& startInfo, const float3& cameraPos, const float3& mouseDir)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	BuildInfo other;
+
+	const CUnit* unit = nullptr;
+	const CFeature* feature = nullptr;
+
+	TraceRay::GuiTraceRay(cameraPos, mouseDir, camera->GetFarPlaneDist() * 1.4f, nullptr, unit, feature, startInfo.def->floatOnWater);
+
+	if (unit != nullptr) {
+		other.def = unit->unitDef;
+		other.pos = unit->pos;
+		other.buildFacing = unit->buildFacing;
+	} else {
+		const Command c = CGameHelper::GetBuildCommand(cameraPos, mouseDir);
+
+		if (c.GetID() < 0 && c.GetNumParams() == 4) {
+			other.pos = c.GetPos(0);
+			other.def = unitDefHandler->GetUnitDefByID(-c.GetID());
+			other.buildFacing = int(c.GetParam(3));
+		}
+	}
+
+	return other;
+}
+
+
 size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInfo& endInfo, const float3& cameraPos, const float3& mouseDir)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// both builds must have the same unitdef
 	assert(startInfo.def == endInfo.def);
 
-	float3 start = CGameHelper::Pos2BuildPos(startInfo, false);
-	float3 end = CGameHelper::Pos2BuildPos(endInfo, false);
+	const float3 start = CGameHelper::Pos2BuildPos(startInfo, false);
+	const float3 end = CGameHelper::Pos2BuildPos(endInfo, false);
+	const float3 delta = end - start;
 
-	BuildInfo other; // the unit around which buildings can be circled
+	const bool queue = GetQueueKeystate();
+	const uint8_t mods = GetBuildPosModifiers(KeyInput::GetKeyModState(KMOD_CTRL), KeyInput::GetKeyModState(KMOD_ALT));
 
 	buildInfos.clear();
 	buildInfos.reserve(16);
 
-	if (GetQueueKeystate() && KeyInput::GetKeyModState(KMOD_CTRL)) {
-		const CUnit* unit = nullptr;
-		const CFeature* feature = nullptr;
+	// surrounding is only offered while the surround keys are held and a building is targeted
+	const bool surroundMode = BuildPosModsArmSurround(mods, queue);
 
-		TraceRay::GuiTraceRay(cameraPos, mouseDir, camera->GetFarPlaneDist() * 1.4f, nullptr, unit, feature, startInfo.def->floatOnWater);
+	BuildInfo other; // the unit around which buildings can be circled
+	if (surroundMode)
+		other = FindSurroundTarget(startInfo, cameraPos, mouseDir);
 
-		if (unit != nullptr) {
-			other.def = unit->unitDef;
-			other.pos = unit->pos;
-			other.buildFacing = unit->buildFacing;
-		} else {
-			const Command c = CGameHelper::GetBuildCommand(cameraPos, mouseDir);
+	// world-space size of one build-grid cell of the building being placed
+	const float xsize = SQUARE_SIZE * (startInfo.GetXSize() + buildSpacing * 2);
+	const float zsize = SQUARE_SIZE * (startInfo.GetZSize() + buildSpacing * 2);
 
-			if (c.GetID() < 0 && c.GetNumParams() == 4) {
-				other.pos = c.GetPos(0);
-				other.def = unitDefHandler->GetUnitDefByID(-c.GetID());
-				other.buildFacing = int(c.GetParam(3));
-			}
-		}
-	}
+	// how many buildings fit along each axis of the dragged rectangle
+	const int xnum = (int)((math::fabs(delta.x) + xsize * 1.4f) / xsize);
+	const int znum = (int)((math::fabs(delta.z) + zsize * 1.4f) / zsize);
 
-	if (other.def && GetQueueKeystate() && KeyInput::GetKeyModState(KMOD_CTRL)) {
-		// circle build around building
-		const int oxsize = other.GetXSize() * SQUARE_SIZE;
-		const int ozsize = other.GetZSize() * SQUARE_SIZE;
-		const int xsize = startInfo.GetXSize() * SQUARE_SIZE;
-		const int zsize = startInfo.GetZSize() * SQUARE_SIZE;
+	const float xstep = (int)((0 < delta.x) ? xsize : -xsize);
+	const float zstep = (int)((0 < delta.z) ? zsize : -zsize);
 
-		start = end = CGameHelper::Pos2BuildPos(other, false);
-		start.x -= oxsize / 2;
-		start.z -= ozsize / 2;
-		end.x += oxsize / 2;
-		end.z += ozsize / 2;
+	const bool hasSurroundTarget = surroundMode && (other.def != nullptr);
+	const bool singleCell = (xnum == 1 && znum == 1);
 
-		const int nvert = 1 + (oxsize / xsize);
-		const int nhori = 1 + (ozsize / xsize);
-
-		FillRowOfBuildPos(startInfo, end.x   + zsize / 2, start.z + xsize / 2,      0,  xsize, nhori, 3, true, buildInfos);
-		FillRowOfBuildPos(startInfo, end.x   - xsize / 2, end.z   + zsize / 2, -xsize,      0, nvert, 2, true, buildInfos);
-		FillRowOfBuildPos(startInfo, start.x - zsize / 2, end.z   - xsize / 2,      0, -xsize, nhori, 1, true, buildInfos);
-		FillRowOfBuildPos(startInfo, start.x + xsize / 2, start.z - zsize / 2,  xsize,      0, nvert, 0, true, buildInfos);
-	} else {
-		// rectangle or line
-		const float3 delta = end - start;
-
-		const float xsize = SQUARE_SIZE * (startInfo.GetXSize() + buildSpacing * 2);
-		const float zsize = SQUARE_SIZE * (startInfo.GetZSize() + buildSpacing * 2);
-
-		const int xnum = (int)((math::fabs(delta.x) + xsize * 1.4f)/xsize);
-		const int znum = (int)((math::fabs(delta.z) + zsize * 1.4f)/zsize);
-
-		float xstep = (int)((0 < delta.x) ? xsize : -xsize);
-		float zstep = (int)((0 < delta.z) ? zsize : -zsize);
-
-		if (KeyInput::GetKeyModState(KMOD_ALT)) {
-			// build a (filled or hollow) rectangle
-			if (KeyInput::GetKeyModState(KMOD_CTRL)) {
-				if ((1 < xnum) && (1 < znum)) {
-					// go "down" on the "left" side
-					FillRowOfBuildPos(startInfo, start.x                     , start.z + zstep             ,      0,  zstep, znum - 1, 0, false, buildInfos);
-					// go "right" on the "bottom" side
-					FillRowOfBuildPos(startInfo, start.x + xstep             , start.z + (znum - 1) * zstep,  xstep,      0, xnum - 1, 0, false, buildInfos);
-					// go "up" on the "right" side
-					FillRowOfBuildPos(startInfo, start.x + (xnum - 1) * xstep, start.z + (znum - 2) * zstep,      0, -zstep, znum - 1, 0, false, buildInfos);
-					// go "left" on the "top" side
-					FillRowOfBuildPos(startInfo, start.x + (xnum - 2) * xstep, start.z                     , -xstep,      0, xnum - 1, 0, false, buildInfos);
-				} else if (1 == xnum) {
-					FillRowOfBuildPos(startInfo, start.x, start.z, 0, zstep, znum, 0, false, buildInfos);
-				} else if (1 == znum) {
-					FillRowOfBuildPos(startInfo, start.x, start.z, xstep, 0, xnum, 0, false, buildInfos);
-				}
-			} else {
-				// filled
-				int zn = 0;
-				for (float z = start.z; zn < znum; ++zn) {
-					if (zn & 1) {
-						// every odd line "right" to "left"
-						FillRowOfBuildPos(startInfo, start.x + (xnum - 1) * xstep, z, -xstep, 0, xnum, 0, false, buildInfos);
-					} else {
-						// every even line "left" to "right"
-						FillRowOfBuildPos(startInfo, start.x                     , z,  xstep, 0, xnum, 0, false, buildInfos);
-					}
-					z += zstep;
-				}
-			}
-		} else {
-			// build a line
-			const bool xDominatesZ = (math::fabs(delta.x) > math::fabs(delta.z));
-
-			if (xDominatesZ) {
-				zstep = KeyInput::GetKeyModState(KMOD_CTRL) ? 0 : xstep * delta.z / (delta.x ? delta.x : 1);
-			} else {
-				xstep = KeyInput::GetKeyModState(KMOD_CTRL) ? 0 : zstep * delta.x / (delta.z ? delta.z : 1);
-			}
-
-			FillRowOfBuildPos(startInfo, start.x, start.z, xstep, zstep, xDominatesZ ? xnum : znum, 0, false, buildInfos);
-		}
+	switch (ResolveBuildPosShape(mods, queue, hasSurroundTarget, singleCell)) {
+		case BuildPosShape::Single:       AddSingleBuildPos         (startInfo, start, buildInfos);                                          break;
+		case BuildPosShape::StraightLine: AddLineBuildPositions     (startInfo, start, delta, xnum, znum, xstep, zstep, true,  buildInfos); break;
+		case BuildPosShape::Diagonal:     AddLineBuildPositions     (startInfo, start, delta, xnum, znum, xstep, zstep, false, buildInfos); break;
+		case BuildPosShape::Flood:        AddFloodBuildPositions    (startInfo, start, xnum, znum, xstep, zstep, buildInfos);               break;
+		case BuildPosShape::HollowBox:    AddHollowBoxBuildPositions(startInfo, start, xnum, znum, xstep, zstep, buildInfos);               break;
+		case BuildPosShape::Surround:     AddSurroundBuildPositions (startInfo, other, buildInfos);                                         break;
 	}
 
 	return (buildInfos.size());
@@ -3818,8 +4061,12 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 				// get the build information
 				const float3 cPos = tracePos + traceDir * rayTraceDist;
 
+				// preview the dragged shape while the button is held; the queue-key
+				// requirement lives in the shape config (mirrors GetCommand's gate)
+				const uint8_t buildMods = GetBuildPosModifiers(KeyInput::GetKeyModState(KMOD_CTRL), KeyInput::GetKeyModState(KMOD_ALT));
+
 				const CMouseHandler::ButtonPressEvt& bp = mouse->buttons[SDL_BUTTON_LEFT];
-				if (GetQueueKeystate() && bp.pressed) {
+				if (bp.pressed && BuildPosWantsDrag(buildMods, GetQueueKeystate())) {
 					const float bpDist = CGround::LineGroundWaterCol(bp.camPos, bp.dir, maxTraceDist, buildeeDef->floatOnWater, false);
 					const float3 bPos = bp.camPos + bp.dir * bpDist;
 					const BuildInfo cInfo = BuildInfo(buildeeDef, cPos, buildFacing);
