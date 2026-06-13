@@ -5,6 +5,7 @@
 
 #ifndef HEADLESS
 	#include <X11/Xlib.h>
+	#include <X11/Xatom.h> // XA_INTEGER (previously pulled in via SDL_syswm.h)
 	#undef KeyPress
 	#undef KeyRelease
 	#undef GrayScale
