@@ -115,7 +115,7 @@ namespace spring {
         static_assert(std::is_trivially_copyable<TIn>::value , "Requires TriviallyCopyable input");
         static_assert(std::is_trivially_copyable<TOut>::value, "Requires TriviallyCopyable output");
         static_assert(std::is_trivially_default_constructible<TOut>::value,
-            "This implementation additionally requires destination type to be trivially constructible");
+            "This implementation additionally requires destination type to be trivially default-constructible");
 
         TOut t2;
         std::memcpy(std::addressof(t2), std::addressof(t1), sizeof(TIn));
