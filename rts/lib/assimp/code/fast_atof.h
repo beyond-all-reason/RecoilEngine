@@ -348,7 +348,7 @@ inline const char* fast_atoreal_move(const char* c, Real& out, bool check_comma 
         if (einv) {
             exp = -exp;
         }
-        f *= math::pow(static_cast<Real>(10.0), exp);
+        f *= math::pow(static_cast<float>(10.0), static_cast<float>(exp));
     }
 
     if (inv) {

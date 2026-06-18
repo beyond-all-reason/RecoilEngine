@@ -30,6 +30,9 @@
 #include <SDL_events.h>
 #include <SDL_hints.h>
 #include <SDL_syswm.h>
+#ifdef __APPLE__
+#include <SDL_video.h>
+#endif
 
 
 IMouseInput* mouseInput = nullptr;
@@ -62,25 +65,72 @@ IMouseInput::~IMouseInput()
 }
 
 
+#ifdef __APPLE__
+// SDL emits mouse events in logical (point) coordinates. On the macOS
+// surfaceless+pbuffer path the engine viewport is in backing-pixel
+// coordinates (viewSize/winSize are tied to the pbuffer FBO; see
+// GlobalRendering::ReadWindowPosAndSize). Without rescaling, windowed-
+// mode clicks land at half the cursor position on Retina displays.
+static int2 ScaleMouseCoords(int x, int y)
+{
+	int sdlW = 1, sdlH = 1;
+	if (globalRendering->sdlWindow != nullptr)
+		SDL_GetWindowSize(globalRendering->sdlWindow, &sdlW, &sdlH);
+	if (sdlW < 1) sdlW = 1;
+	if (sdlH < 1) sdlH = 1;
+	const int scaledX = (int)((float)x * (float)globalRendering->viewSizeX / (float)sdlW);
+	const int scaledY = (int)((float)y * (float)globalRendering->viewSizeY / (float)sdlH);
+	return int2(scaledX, scaledY);
+}
+
+static float ScaleMouseDelta(float d, int sdlSize, int viewSize)
+{
+	if (sdlSize < 1) sdlSize = 1;
+	return d * (float)viewSize / (float)sdlSize;
+}
+#endif
+
+
 bool IMouseInput::HandleSDLMouseEvent(const SDL_Event& event)
 {
 	switch (event.type) {
 		case SDL_MOUSEMOTION: {
+#ifdef __APPLE__
+			mousepos = ScaleMouseCoords(event.motion.x, event.motion.y);
+
+			if (mouse != nullptr) {
+				int sdlW = 1, sdlH = 1;
+				if (globalRendering->sdlWindow != nullptr)
+					SDL_GetWindowSize(globalRendering->sdlWindow, &sdlW, &sdlH);
+				mouse->MouseMove(mousepos.x, mousepos.y,
+					ScaleMouseDelta(event.motion.xrel, sdlW, globalRendering->viewSizeX),
+					ScaleMouseDelta(event.motion.yrel, sdlH, globalRendering->viewSizeY));
+			}
+#else
 			mousepos = int2(event.motion.x, event.motion.y);
 
 			if (mouse != nullptr)
 				mouse->MouseMove(mousepos.x, mousepos.y, event.motion.xrel, event.motion.yrel);
+#endif
 
 		} break;
 		case SDL_MOUSEBUTTONDOWN: {
+#ifdef __APPLE__
+			mousepos = ScaleMouseCoords(event.button.x, event.button.y);
+#else
 			mousepos = int2(event.button.x, event.button.y);
+#endif
 
 			if (mouse != nullptr)
 				mouse->MousePress(mousepos.x, mousepos.y, event.button.button);
 
 		} break;
 		case SDL_MOUSEBUTTONUP: {
+#ifdef __APPLE__
+			mousepos = ScaleMouseCoords(event.button.x, event.button.y);
+#else
 			mousepos = int2(event.button.x, event.button.y);
+#endif
 
 			if (mouse != nullptr)
 				mouse->MouseRelease(mousepos.x, mousepos.y, event.button.button);

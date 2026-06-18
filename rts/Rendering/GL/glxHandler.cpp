@@ -1,3 +1,4 @@
+#ifndef __APPLE__
 #include "glxHandler.h"
 
 #if !defined(HEADLESS) && !defined(_WIN32) && !defined(__APPLE__)
@@ -61,3 +62,4 @@ void GLX::Load(SDL_Window* window) {}
 void GLX::Unload() {}
 bool GLX::GetVideoMemInfoMESA(int* memInfo) { return false; }
 #endif
+#endif // __APPLE__

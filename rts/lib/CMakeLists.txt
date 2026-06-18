@@ -60,6 +60,13 @@ SET(GFLAGS_BUILD_TESTING              FALSE)
 SET(GFLAGS_INSTALL_HEADERS            FALSE)
 SET(GFLAGS_INSTALL_SHARED_LIBS        FALSE)
 SET(GFLAGS_INSTALL_STATIC_LIBS        FALSE)
+# As a subdirectory build, gflags defaults to namespace "gflags" only. On
+# macOS Homebrew's <gflags/gflags.h> may be picked up first via
+# /opt/homebrew/include (DevIL etc. drag it in), and that header pins
+# GFLAGS_NAMESPACE=google -- causing the DEFINE_* macros in engine code to
+# emit google::FlagRegisterer references. Build the vendored gflags with
+# both namespaces so the resulting static lib resolves either spelling.
+SET(GFLAGS_NAMESPACE "google;gflags")
 
 #Meh-meh
 if (WIN32)

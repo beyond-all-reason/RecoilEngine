@@ -1,3 +1,4 @@
+#ifndef __APPLE__
 #pragma once
 
 struct SDL_Window;
@@ -11,3 +12,4 @@ struct GLX {
 private:
 	static inline bool supported = false;
 };
+#endif // __APPLE__

@@ -197,7 +197,7 @@ namespace Threading {
 
 		// The cache groups from GetProcessorCaches() are sorted in order of largest first. Find the first group that
 		// has a logical processor that will be used to pin the main/worker threads.
-		auto preferredCache = std::ranges::find_if(pc.groupCaches
+		auto preferredCache = std::find_if(pc.groupCaches.begin(), pc.groupCaches.end()
 			, [affinityMask](const auto& gc) -> bool { return !!(affinityMask & gc.groupMask); });
 		
 		std::call_once(preferredMaskDetailsLogFlag, [&](){

@@ -51,6 +51,13 @@ if    (NOT NO_SOUND)
 
 	include_directories(${CMAKE_SOURCE_DIR}/include/)
 	include_directories(${CMAKE_SOURCE_DIR}/include/AL)
+	if(APPLE)
+		# macOS OpenAL.framework has no EFX support, so we vendor the EFX
+		# headers under include/Mac/AL/ and search that path only on Apple.
+		# Linux's system OpenAL-Soft devel package provides these headers via
+		# the OpenAL::OpenAL target, so we must not shadow them there.
+		include_directories(${CMAKE_SOURCE_DIR}/include/Mac/AL)
+	endif()
 
 	add_library(sound STATIC EXCLUDE_FROM_ALL ${soundSources})
 	target_link_libraries(sound SDL2::SDL2)

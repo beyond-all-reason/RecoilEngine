@@ -28,6 +28,7 @@
 #include <initializer_list>
 #include <memory>
 #include <stdint.h>
+#include <type_traits>
 
 //#define SMMALLOC_STATS_SUPPORT
 
@@ -660,7 +661,7 @@ struct TlsPoolBucket
     }
 };
 
-static_assert((std::is_trivial<TlsPoolBucket>::value && std::is_standard_layout<TlsPoolBucket>::value) == true, "TlsPoolBucket must be POD type, stored in TLS");
+static_assert(std::is_trivially_copyable_v<TlsPoolBucket>, "TlsPoolBucket must be POD type, stored in TLS");
 static_assert(sizeof(TlsPoolBucket) <= 64, "TlsPoolBucket sizeof must be less than CPU cache line");
 } // namespace internal
 

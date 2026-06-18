@@ -24,7 +24,7 @@ list(APPEND engineDedicatedLibraries ${Boost_REGEX_LIBRARY})
 list(APPEND engineDedicatedLibraries lua archives_nothreadpool 7zip prd::jsoncpp
 	${SPRING_MINIZIP_LIBRARY} ZLIB::ZLIB gflags_nothreads_static Tracy::TracyClient)
 list(APPEND engineDedicatedLibraries headlessStubs engineSystemNet)
-if(UNIX AND NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
+if(UNIX AND NOT APPLE AND NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
 	list(APPEND engineDedicatedLibraries libunwind::libunwind)
 endif()
 list(APPEND engineDedicatedLibraries ${LZMA_LIBRARY})
@@ -83,6 +83,11 @@ elseif	(WIN32)
 	set(sources_engine_Platform_CrashHandler
 		${ENGINE_SRC_ROOT_DIR}/System/Platform/Win/seh.cpp
 		${ENGINE_SRC_ROOT_DIR}/System/Platform/Win/CrashHandler.cpp)
+elseif (APPLE)
+	set(sources_engine_Platform_CrashHandler
+		${ENGINE_SRC_ROOT_DIR}/System/Platform/CpuID.cpp
+		${ENGINE_SRC_ROOT_DIR}/System/Platform/Threading.cpp
+		${ENGINE_SRC_ROOT_DIR}/System/Platform/Mac/CrashHandler.cpp)
 else	()
 	set(sources_engine_Platform_CrashHandler
 		${ENGINE_SRC_ROOT_DIR}/System/Platform/CpuID.cpp
@@ -141,8 +146,14 @@ if    (WIN32)
 	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/Win/WinVersion.cpp)
 	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/SharedLib.cpp)
 	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/Win/DllLib.cpp)
-else  ()
+elseif (APPLE)
 	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/Linux/Hardware.cpp)
+	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/SharedLib.cpp)
+	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/Linux/SoLib.cpp)
+else ()
+	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/Linux/Hardware.cpp)
+	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/SharedLib.cpp)
+	list(APPEND system_files ${ENGINE_SRC_ROOT_DIR}/System/Platform/Linux/SoLib.cpp)
 endif ()
 
 set(engineDedicatedSources

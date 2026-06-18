@@ -36,6 +36,10 @@ endif()
 
 ### give error when not found
 find_package_static(DevIL REQUIRED)
+# DevIL's CMake module sets IL_INCLUDE_DIR to the directory containing il.h (e.g. /include/IL)
+# but code uses #include <IL/il.h>, so we need the parent directory
+get_filename_component(_IL_PARENT_DIR "${IL_INCLUDE_DIR}" DIRECTORY)
+include_directories(${_IL_PARENT_DIR})
 
 ### Assemble common include dirs
 include_directories(BEFORE lib)
@@ -106,7 +110,7 @@ if    (USE_MIMALLOC)
 endif (USE_MIMALLOC)
 
 
-if(UNIX AND NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
+if(UNIX AND NOT APPLE AND NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
 	find_package_static(Libunwind 1.4.0 REQUIRED)
 	prefer_static_libs()
 	find_library(LZMA_LIBRARY lzma)

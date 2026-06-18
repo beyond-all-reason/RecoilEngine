@@ -22,6 +22,10 @@
 #include <fastgltf/core.hpp>
 #include <fastgltf/tools.hpp>
 #include <fastgltf/math.hpp>
+// smmalloc.h leaks `#define INLINE inline` which conflicts with simdjson's layout_mode::INLINE enum
+#ifdef INLINE
+#undef INLINE
+#endif
 #include <simdjson.h>
 
 

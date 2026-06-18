@@ -12,8 +12,12 @@
 #include <functional>
 
 #ifndef _WIN32
-	#include <sys/syscall.h>
-	#include <linux/futex.h>
+	#ifndef __APPLE__
+		#include <sys/syscall.h>
+		#include <linux/futex.h>
+	#else
+		#include <os/lock.h>
+	#endif
 #endif
 
 #ifdef _WIN32
@@ -37,6 +41,19 @@ InitSpringTime ist;
 		*m = 0;
 	}
 
+#ifdef __APPLE__
+	static os_unfair_lock apple_lock = OS_UNFAIR_LOCK_INIT;
+	static void futex_lock(futex* m)
+	{
+		os_unfair_lock_lock(&apple_lock);
+		*m = 1;
+	}
+	static void futex_unlock(futex* m)
+	{
+		*m = 0;
+		os_unfair_lock_unlock(&apple_lock);
+	}
+#else
 	static void futex_lock(futex* m)
 	{
 		futex c;
@@ -55,6 +72,7 @@ InitSpringTime ist;
 			syscall(SYS_futex, m, FUTEX_WAKE_PRIVATE, 1, NULL, NULL, 0);
 		}
 	}
+#endif
 #endif
 
 

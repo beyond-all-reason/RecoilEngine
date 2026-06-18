@@ -136,7 +136,21 @@ bool CLoadScreen::Init()
 	// the global font), the latter will cause problems in GL4
 	{
 		auto lock = CLoadLock::GetUniqueLock();
+#if defined(__APPLE__)
+		// The Lua intro was disabled on macOS as an EGL-path workaround (it uses
+		// the global font / gl.*Text which broke under the old core-profile
+		// shaders). With the compatibility-profile context + fixed font/render-
+		// buffer shaders it renders correctly (full BAR splash + progress), so
+		// it is enabled by default. Set SPRING_MAC_DISABLE_LUAINTRO=1 to skip it
+		// (falls back to a black load screen) if it ever misbehaves.
+		if (getenv("SPRING_MAC_DISABLE_LUAINTRO") != nullptr) {
+			LOG("[LoadScreen::%s] skipping CLuaIntro (SPRING_MAC_DISABLE_LUAINTRO)", __func__);
+		} else {
+			CLuaIntro::LoadFreeHandler();
+		}
+#else
 		CLuaIntro::LoadFreeHandler();
+#endif
 	}
 
 	if (mtLoading)

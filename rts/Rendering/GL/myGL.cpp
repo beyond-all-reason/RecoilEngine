@@ -151,7 +151,11 @@ static bool GetVideoMemInfoATI(GLint* memInfo)
 static bool GetVideoMemInfoMESA(GLint* memInfo)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	#ifndef __APPLE__
 	return GLX::GetVideoMemInfoMESA(memInfo);
+#else
+	return false;
+#endif
 }
 #endif
 

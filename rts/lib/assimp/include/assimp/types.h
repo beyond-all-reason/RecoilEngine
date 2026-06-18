@@ -65,6 +65,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "quaternion.h"
 
 #ifdef __cplusplus
+#include <cmath>
 #include <cstring>
 #include <new>      // for std::nothrow_t
 #include <string>   // for aiString::Set(const std::string&)
@@ -219,7 +220,7 @@ struct aiColor3D
     /** Check whether a color is black */
     bool IsBlack() const {
         static const ai_real epsilon = ai_real(10e-3);
-        return math::fabs( r ) < epsilon && math::fabs( g ) < epsilon && math::fabs( b ) < epsilon;
+        return math::fabs( static_cast<float>(r) ) < epsilon && math::fabs( static_cast<float>(g) ) < epsilon && math::fabs( static_cast<float>(b) ) < epsilon;
     }
 
 #endif // !__cplusplus

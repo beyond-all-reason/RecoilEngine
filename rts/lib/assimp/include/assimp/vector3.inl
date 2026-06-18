@@ -1,3 +1,4 @@
+#include <cmath>
 /*
 ---------------------------------------------------------------------------
 Open Asset Import Library (assimp)
@@ -50,6 +51,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #ifdef __cplusplus
 #include "vector3.h"
 
+#include <cmath>
 #include "lib/streflop/streflop_cond.h"
 
 // ------------------------------------------------------------------------------------------------
@@ -94,7 +96,7 @@ AI_FORCE_INLINE TReal aiVector3t<TReal>::SquareLength() const {
 // ------------------------------------------------------------------------------------------------
 template <typename TReal>
 AI_FORCE_INLINE TReal aiVector3t<TReal>::Length() const {
-    return math::sqrt( SquareLength());
+    return static_cast<TReal>(math::sqrt(static_cast<float>(SquareLength())));
 }
 // ------------------------------------------------------------------------------------------------
 template <typename TReal>

@@ -119,7 +119,9 @@ public:
 	int2 GetSize() const;
 	std::string GetName() const { return name; }
 
-	uint32_t GetTexID() const { return atlasTex->GetId(); }
+	// atlasTex stays null if Finalize()/Allocate() failed; guard so a failed
+	// atlas degrades (no texture) instead of crashing on a null deref.
+	uint32_t GetTexID() const { return atlasTex ? atlasTex->GetId() : 0; }
 	uint32_t GetTexTarget() const;
 	uint32_t GetNumPages() const;
 
@@ -128,7 +130,7 @@ public:
 
 	void BindTexture();
 	void UnbindTexture();
-	void DisOwnTexture() { atlasTex->DisOwn(); }
+	void DisOwnTexture() { if (atlasTex) atlasTex->DisOwn(); }
 	void SetName(const std::string& s) { name = s; }
 
 	static void SetDebug(bool b) { debug = b; }

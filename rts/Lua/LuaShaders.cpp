@@ -657,6 +657,27 @@ int LuaShaders::CreateShader(lua_State* L)
 	if (!ParseShaderTable(L, 1, "fragment", fragSrcs))
 		return 0;
 
+	if (!geomSrcs.empty()) {
+#if defined(__APPLE__)
+		// macOS via Mesa Zink / KosmicKrisp on Apple Silicon: Vulkan reports
+		// geometryShader = false (Metal has no GS stage). Mesa advertises
+		// GL_MAX_GEOMETRY_OUTPUT_VERTICES > 0 anyway, so the GL query cannot
+		// detect the missing capability. Strip GS so the program at least
+		// links; widgets that need GS-style point expansion have a Lua-layer
+		// NoGS fallback (see Beyond-All-Reason PR for the dual-path widgets).
+		GLint maxGeomOutputVerts = 0;
+		glGetIntegerv(GL_MAX_GEOMETRY_OUTPUT_VERTICES, &maxGeomOutputVerts);
+		const GLenum err = glGetError();
+		LOG_L(L_WARNING, "[LuaShaders::%s] GS check: GL_MAX_GEOMETRY_OUTPUT_VERTICES=%d, glErr=0x%x, geomSrcs=%d",
+		      __func__, maxGeomOutputVerts, err, (int)geomSrcs.size());
+		LOG_L(L_WARNING,
+		      "[LuaShaders::%s] GS unconditionally stripped on macOS "
+		      "(Metal has no GS stage). maxGeomVerts=%d",
+		      __func__, maxGeomOutputVerts);
+		geomSrcs.clear();
+#endif  // __APPLE__
+	}
+
 	if (!ParseShaderTable(L, 1, "compute", compSrcs))
 		return 0;
 

@@ -1,3 +1,4 @@
+#include <cstdlib>
 // The MIT License (MIT)
 //
 // 	Copyright (c) 2017-2021 Sergey Makeev
@@ -20,7 +21,7 @@
 // 	OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // 	THE SOFTWARE.
 #include "smmalloc.h"
-#include <stdlib.h>
+#include <cstdlib>
 
 struct Header
 {

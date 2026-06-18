@@ -7,6 +7,315 @@
 #include <SDL.h>
 
 #include "GlobalRendering.h"
+
+#if defined(__APPLE__) && !defined(HEADLESS)
+#include <EGL/egl.h>
+#include <SDL_syswm.h>
+#include <objc/message.h>
+#include <objc/runtime.h>
+#include "System/Platform/Mac/MetalPresent.h"
+
+static EGLDisplay g_eglDisplay = EGL_NO_DISPLAY;
+static EGLContext g_eglContext = EGL_NO_CONTEXT;
+static EGLSurface g_eglSurface = EGL_NO_SURFACE;
+static void*      g_metalLayer = nullptr; // CAMetalLayer attached to the window's NSView
+static int        g_pbufW = 1280;         // pbuffer (default framebuffer) dimensions
+static int        g_pbufH = 720;
+static std::vector<unsigned char> g_presentBuf; // reused glReadPixels staging buffer
+
+// Downsample-before-readback FBO. Engine renders at full
+// pbuffer (Retina) resolution into the default FBO so UI layout is correct;
+// before glReadPixels we glBlitFramebuffer (GL_LINEAR) into this smaller FBO,
+// so the readback only pays for the smaller buffer. Enabled with
+// SPRING_DOWNSAMPLE_READBACK=<2..8>.
+// GL headers aren't included this early in the TU; use the underlying integer
+// type. On every platform we target, GLuint is uint32_t == unsigned int, so
+// taking &g_dsFBO and passing it to glGenFramebuffers is ABI-safe.
+static unsigned int g_dsFBO = 0;
+static unsigned int g_dsTex = 0;
+static int          g_dsW = 0;
+static int          g_dsH = 0;
+
+// Double-buffered Pixel Buffer Objects for async readback.
+// Frame N submits glReadPixels into g_pbos[curIdx] (non-blocking GPU command);
+// the previous frame's PBO is mapped and memcpy'd into the IOSurface. The
+// glReadPixels stall (15-44ms while the GPU drains its pipeline) is hidden
+// behind a 1-frame latency. Disable with SPRING_NO_PBO=1.
+//
+// The truly zero-copy path (render the engine FBO directly into the
+// IOSurface that Metal samples — no readback at all) is blocked on Mesa
+// upstream work: KosmicKrisp's VK_EXT_external_memory_metal needs to grow
+// IOSurface/MTLTexture handle support (today it only handles MTLHeap), and
+// Zink needs a new MESA_memory_object_metal GL extension to consume the
+// resulting VkImage as a GL FBO color attachment. The KosmicKrisp lead
+// (Aitor Camacho at LunarG) authored the underlying VK spec, so the
+// Vulkan half is unusually low-risk; the Zink consumer is the LOC sink.
+// Estimated ~1 month of focused upstream work — worth doing if the port
+// commits long-term, not in scope for shipping today.
+static unsigned int g_pbos[2]   = { 0, 0 };
+static int          g_pboW      = 0;
+static int          g_pboH      = 0;
+static int          g_pboCurIdx = 0;
+static bool         g_pboHasPrev = false;
+
+static void* GetNSViewFromSDLWindow(SDL_Window* window) {
+    SDL_SysWMinfo info;
+    SDL_VERSION(&info.version);
+    if (!SDL_GetWindowWMInfo(window, &info))
+        return nullptr;
+    id nswindow = (id)info.info.cocoa.window;
+    id view = ((id(*)(id, SEL))objc_msgSend)(nswindow, sel_registerName("contentView"));
+
+    // Set up CAMetalLayer on the view BEFORE passing to EGL
+    // This prevents crashes in wsi_metal_layer_size
+    Class CAMetalLayerClass = objc_getClass("CAMetalLayer");
+    if (CAMetalLayerClass && view) {
+        // [view setWantsLayer:YES]
+        ((void(*)(id, SEL, BOOL))objc_msgSend)(view, sel_registerName("setWantsLayer:"), YES);
+
+        // Create CAMetalLayer
+        id metalLayer = ((id(*)(id, SEL))objc_msgSend)((id)CAMetalLayerClass, sel_registerName("layer"));
+        if (metalLayer) {
+            // Get view bounds
+            typedef struct { double x, y, w, h; } CGRectD;
+            CGRectD (*getBounds)(id, SEL) = (CGRectD(*)(id, SEL))objc_msgSend;
+            CGRectD bounds = getBounds(view, sel_registerName("bounds"));
+
+            // [metalLayer setFrame:bounds]
+            ((void(*)(id, SEL, CGRectD))objc_msgSend)(metalLayer, sel_registerName("setFrame:"), bounds);
+
+            // [metalLayer setOpaque:YES]
+            ((void(*)(id, SEL, BOOL))objc_msgSend)(metalLayer, sel_registerName("setOpaque:"), YES);
+
+            // Get backing scale factor: [view window] -> [window backingScaleFactor]
+            id win = ((id(*)(id, SEL))objc_msgSend)(view, sel_registerName("window"));
+            if (win) {
+                double (*getScale)(id, SEL) = (double(*)(id, SEL))objc_msgSend;
+                double scale = getScale(win, sel_registerName("backingScaleFactor"));
+                // [metalLayer setContentsScale:scale]
+                ((void(*)(id, SEL, double))objc_msgSend)(metalLayer, sel_registerName("setContentsScale:"), scale);
+            }
+
+            // [view setLayer:metalLayer]
+            ((void(*)(id, SEL, id))objc_msgSend)(view, sel_registerName("setLayer:"), metalLayer);
+
+            return (void*)metalLayer;
+        }
+    }
+    return (void*)view;
+}
+
+// Returns the SDL window's NSWindow.backingScaleFactor (1.0 on non-Retina,
+// 2.0 on standard Retina). Used to size the pbuffer (= GL default framebuffer)
+// in physical pixels so full-resolution rendering isn't clipped.
+static double GetBackingScaleFactor(SDL_Window* window) {
+    SDL_SysWMinfo wmInfo;
+    SDL_VERSION(&wmInfo.version);
+    if (!SDL_GetWindowWMInfo(window, &wmInfo))
+        return 1.0;
+
+    id nswindow = (id)wmInfo.info.cocoa.window;
+    if (!nswindow)
+        return 1.0;
+
+    double (*getScale)(id, SEL) = (double(*)(id, SEL))objc_msgSend;
+    double scale = getScale(nswindow, sel_registerName("backingScaleFactor"));
+    return (scale > 0.0) ? scale : 1.0;
+}
+
+static bool InitEGLContext(SDL_Window* window, int major, int minor) {
+    fprintf(stderr, "[EGL] eglGetDisplay(EGL_DEFAULT_DISPLAY)...\n");
+    g_eglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    fprintf(stderr, "[EGL] eglGetDisplay -> %p (lastError=0x%x)\n", (void*)g_eglDisplay, eglGetError());
+    if (g_eglDisplay == EGL_NO_DISPLAY) return false;
+
+    EGLint eglMajor = 0, eglMinor = 0;
+    EGLBoolean initOk = eglInitialize(g_eglDisplay, &eglMajor, &eglMinor);
+    fprintf(stderr, "[EGL] eglInitialize -> %d (version %d.%d, lastError=0x%x)\n",
+            (int)initOk, eglMajor, eglMinor, eglGetError());
+    if (!initOk) return false;
+
+    const char* vendor   = eglQueryString(g_eglDisplay, EGL_VENDOR);
+    const char* version  = eglQueryString(g_eglDisplay, EGL_VERSION);
+    const char* clientApis = eglQueryString(g_eglDisplay, EGL_CLIENT_APIS);
+    fprintf(stderr, "[EGL] vendor=%s version=%s clientApis=%s\n",
+            vendor ? vendor : "?", version ? version : "?", clientApis ? clientApis : "?");
+
+    EGLBoolean bindOk = eglBindAPI(EGL_OPENGL_API);
+    fprintf(stderr, "[EGL] eglBindAPI(EGL_OPENGL_API) -> %d (lastError=0x%x)\n",
+            (int)bindOk, eglGetError());
+
+    // On macOS with Mesa-surfaceless EGL, EGL_WINDOW_BIT is unsupported.
+    // The actual presentation happens via the CAMetalLayer + KosmicKrisp WSI
+    // (Vulkan -> Metal), so we only need a pbuffer-capable config here.
+    EGLint configAttribs[] = {
+        EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
+        EGL_DEPTH_SIZE, 24, EGL_STENCIL_SIZE, 8,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT,
+        EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+        EGL_NONE
+    };
+    EGLConfig eglConfig;
+    EGLint numConfigs = 0;
+    EGLBoolean cfgOk = eglChooseConfig(g_eglDisplay, configAttribs, &eglConfig, 1, &numConfigs);
+    fprintf(stderr, "[EGL] eglChooseConfig -> %d (numConfigs=%d, lastError=0x%x)\n",
+            (int)cfgOk, numConfigs, eglGetError());
+    if (!cfgOk || numConfigs == 0)
+        return false;
+
+    void* nativeView = GetNSViewFromSDLWindow(window);
+    g_metalLayer = nativeView; // CAMetalLayer for the manual present path
+
+    // Size the pbuffer (= the GL default framebuffer) to the window's *backing*
+    // pixel size, so the engine's full-resolution (Retina) rendering isn't
+    // clipped. SDL_GetWindowSizeInPixels returns logical points on this
+    // surfaceless/borderless setup, so compute backing pixels explicitly via
+    // the window size in points * backingScaleFactor. The manual Metal present
+    // reads this whole buffer back each SwapBuffers.
+    //
+    // glReadPixels of the full Retina pbuffer is the
+    // dominant per-frame cost (measured 40-55ms at 2944x1908). The Metal
+    // present pass linear-samples the IOSurface into the drawable, so we can
+    // render at logical (1x) resolution and let CoreAnimation upscale to
+    // Retina with negligible cost — at ~4x less readback data. Opt in with
+    // SPRING_MAC_NO_RETINA=1.
+    int winW = 0, winH = 0;
+    SDL_GetWindowSize(window, &winW, &winH);
+    const double bsfTrue   = GetBackingScaleFactor(window);
+    const bool   noRetina  = (getenv("SPRING_MAC_NO_RETINA") != nullptr);
+    const double bsf       = noRetina ? 1.0 : bsfTrue;
+    int pxW = (int)(winW * bsf + 0.5);
+    int pxH = (int)(winH * bsf + 0.5);
+    if (pxW <= 0 || pxH <= 0) { pxW = 1280; pxH = 720; }
+    g_pbufW = pxW;
+    g_pbufH = pxH;
+    fprintf(stderr, "[EGL] window %dx%d pts * %.2f scale -> pbuffer %dx%d px%s\n",
+            winW, winH, bsf, pxW, pxH,
+            noRetina ? " (SPRING_MAC_NO_RETINA=1; native scale was " : "");
+    if (noRetina)
+        fprintf(stderr, "      (true backing scale=%.2f; CoreAnimation will upscale)\n", bsfTrue);
+
+    if (nativeView) {
+        g_eglSurface = eglCreateWindowSurface(g_eglDisplay, eglConfig, (EGLNativeWindowType)nativeView, NULL);
+    }
+    if (g_eglSurface == EGL_NO_SURFACE) {
+        EGLint pbAttribs[] = { EGL_WIDTH, g_pbufW, EGL_HEIGHT, g_pbufH, EGL_NONE };
+        g_eglSurface = eglCreatePbufferSurface(g_eglDisplay, eglConfig, pbAttribs);
+        if (g_eglSurface == EGL_NO_SURFACE) return false;
+        fprintf(stderr, "[EGL] FALLBACK to PbufferSurface %dx%d surface=%p\n", g_pbufW, g_pbufH, (void*)g_eglSurface);
+    }
+
+    // Dump what the chosen config actually supports.
+    {
+        EGLint cfgRenderable = 0, cfgSurface = 0, cfgConformant = 0;
+        eglGetConfigAttrib(g_eglDisplay, eglConfig, EGL_RENDERABLE_TYPE, &cfgRenderable);
+        eglGetConfigAttrib(g_eglDisplay, eglConfig, EGL_SURFACE_TYPE, &cfgSurface);
+        eglGetConfigAttrib(g_eglDisplay, eglConfig, EGL_CONFORMANT, &cfgConformant);
+        fprintf(stderr, "[EGL] Config: renderable=0x%x surfaceType=0x%x conformant=0x%x (OPENGL_BIT=0x%x)\n",
+                cfgRenderable, cfgSurface, cfgConformant, EGL_OPENGL_BIT);
+    }
+    // Prefer a COMPATIBILITY-profile context. Mesa 26.2 Zink grants GL 4.6
+    // compat on KosmicKrisp (verified: "4.6 (Compatibility Profile)"), which is
+    // a strict superset of core: it keeps all modern GL4 features AND the legacy
+    // paths BAR pervasively relies on (immediate mode / glBegin, display lists,
+    // the fixed-function matrix stack, and '#version ... compatibility' GLSL).
+    // This eliminates an otherwise huge per-shader core-profile port. We fall
+    // back to a CORE context if compat is refused, or if SPRING_MAC_GL_CORE is
+    // set to force the old behavior.
+    //
+    // Note: geometry shaders are unavailable regardless of profile because
+    // KosmicKrisp's Vulkan reports geometryShader=false (Metal has no GS stage);
+    // that is a separate problem from the GL profile.
+    const int2 tryVersions[] = {
+        {4,6},{4,5},{4,4},{4,3},{4,2},{4,1},{4,0},{3,3},{3,2}
+    };
+    const bool forceCore = (getenv("SPRING_MAC_GL_CORE") != nullptr);
+
+    if (!forceCore) {
+        EGLint compatAttribs[] = {
+            EGL_CONTEXT_MAJOR_VERSION, 0,
+            EGL_CONTEXT_MINOR_VERSION, 0,
+            EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
+            EGL_NONE
+        };
+        for (const auto& v : tryVersions) {
+            compatAttribs[1] = v.x;
+            compatAttribs[3] = v.y;
+            g_eglContext = eglCreateContext(g_eglDisplay, eglConfig, EGL_NO_CONTEXT, compatAttribs);
+            EGLint err = eglGetError();
+            fprintf(stderr, "[EGL] eglCreateContext(%d.%d COMPAT) -> %p (lastError=0x%x)\n",
+                    v.x, v.y, (void*)g_eglContext, err);
+            if (g_eglContext != EGL_NO_CONTEXT)
+                break;
+        }
+        fprintf(stderr, g_eglContext != EGL_NO_CONTEXT
+            ? "[EGL] COMPAT profile context obtained.\n"
+            : "[EGL] COMPAT profile unavailable; falling back to CORE.\n");
+    }
+
+    EGLint contextAttribs[] = {
+        EGL_CONTEXT_MAJOR_VERSION, 0,
+        EGL_CONTEXT_MINOR_VERSION, 0,
+        EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
+        EGL_NONE
+    };
+    for (const auto& v : tryVersions) {
+        if (g_eglContext != EGL_NO_CONTEXT)
+            break;
+        contextAttribs[1] = v.x;
+        contextAttribs[3] = v.y;
+        g_eglContext = eglCreateContext(g_eglDisplay, eglConfig, EGL_NO_CONTEXT, contextAttribs);
+        EGLint err = eglGetError();
+        fprintf(stderr, "[EGL] eglCreateContext(%d.%d core) -> %p (lastError=0x%x)\n",
+                v.x, v.y, (void*)g_eglContext, err);
+        if (g_eglContext != EGL_NO_CONTEXT)
+            break;
+    }
+    (void)major; (void)minor;
+    if (g_eglContext == EGL_NO_CONTEXT) return false;
+
+    EGLBoolean mcOk = eglMakeCurrent(g_eglDisplay, g_eglSurface, g_eglSurface, g_eglContext);
+    fprintf(stderr, "[EGL] eglMakeCurrent -> %d (lastError=0x%x)\n", (int)mcOk, eglGetError());
+    if (!mcOk)
+        return false;
+
+    // Probe GL via eglGetProcAddress before the engine's glad pass runs.
+    // Using raw types because GL headers aren't included this high in the file.
+    typedef const unsigned char* (*PFN_glGetString)(unsigned int);
+    auto p_glGetString = (PFN_glGetString)eglGetProcAddress("glGetString");
+    if (p_glGetString) {
+        const char* glVer    = (const char*)p_glGetString(0x1F02u);  // GL_VERSION
+        const char* glVendor = (const char*)p_glGetString(0x1F00u);  // GL_VENDOR
+        const char* glRend   = (const char*)p_glGetString(0x1F01u);  // GL_RENDERER
+        const char* glsl     = (const char*)p_glGetString(0x8B8Cu);  // GL_SHADING_LANGUAGE_VERSION
+        fprintf(stderr, "[EGL/GL] vendor='%s'\n",   glVendor ? glVendor : "(null)");
+        fprintf(stderr, "[EGL/GL] renderer='%s'\n", glRend   ? glRend   : "(null)");
+        fprintf(stderr, "[EGL/GL] version='%s'\n",  glVer    ? glVer    : "(null)");
+        fprintf(stderr, "[EGL/GL] glsl='%s'\n",     glsl     ? glsl     : "(null)");
+    } else {
+        fprintf(stderr, "[EGL/GL] eglGetProcAddress(glGetString) returned NULL\n");
+    }
+
+    // Set up the manual present path now that the layer + context exist.
+    if (!MacMetalPresent_Init(g_metalLayer))
+        fprintf(stderr, "[EGL] MacMetalPresent_Init failed; window will not show frames\n");
+
+    return true;
+}
+
+static void DestroyEGLContext() {
+    if (g_eglDisplay != EGL_NO_DISPLAY) {
+        eglMakeCurrent(g_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        if (g_eglContext != EGL_NO_CONTEXT) eglDestroyContext(g_eglDisplay, g_eglContext);
+        if (g_eglSurface != EGL_NO_SURFACE) eglDestroySurface(g_eglDisplay, g_eglSurface);
+        eglTerminate(g_eglDisplay);
+    }
+    g_eglDisplay = EGL_NO_DISPLAY;
+    g_eglContext = EGL_NO_CONTEXT;
+    g_eglSurface = EGL_NO_SURFACE;
+}
+#endif // __APPLE__ && !HEADLESS
+
 #include "GlobalRenderingInfo.h"
 #include "Rendering/VerticalSync.h"
 #include "Rendering/GL/StreamBuffer.h"
@@ -425,7 +734,11 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 	//   SDL_WINDOW_FULLSCREEN_DESKTOP for "fake" fullscreen that takes the size of the desktop;
 	//   and 0 for windowed mode.
 
+#if defined(__APPLE__) && !defined(HEADLESS)
+	uint32_t sdlFlags  = (SDL_WINDOW_RESIZABLE);
+#else
 	uint32_t sdlFlags  = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+#endif
 	         sdlFlags |= (borderless_ ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen_;
 	         sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
 
@@ -584,11 +897,58 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 		WindowManagerHelper::BlockCompositing(sdlWindow);
 #endif
 
+#if defined(__APPLE__) && !defined(HEADLESS)
+	if (!InitEGLContext(sdlWindow, minCtx.x, minCtx.y)) {
+		handleerror(nullptr, "Failed to create EGL context on macOS", "ERROR", MBF_OK | MBF_EXCL);
+		return false;
+	}
+	glContext = (SDL_GLContext)g_eglContext;
+#else
 	if ((glContext = CreateGLContext(minCtx)) == nullptr)
 		return false;
+#endif
 
+#if defined(__APPLE__) && !defined(HEADLESS)
+	gladLoadGLLoader((GLADloadproc)eglGetProcAddress);
+#else
 	gladLoadGL();
+#endif
+#ifndef __APPLE__
+#ifndef __APPLE__
 	GLX::Load(sdlWindow);
+#endif
+#endif
+
+#if defined(__APPLE__) && !defined(HEADLESS)
+	// Tracer bullet: when SPRING_MAC_PRESENT_TEST is set, flash the window
+	// red/blue for ~8s by rendering a clear and presenting it to the window's
+	// CAMetalLayer via the manual Metal present path (glReadPixels -> MTLTexture
+	// -> blit to drawable). If the window now flashes, the manual present works
+	// and can be wired into SwapBuffers for real frames.
+	if (const char* e = getenv("SPRING_MAC_PRESENT_TEST"); e != nullptr && e[0] == '1') {
+		const bool metalOk = MacMetalPresent_Init(g_metalLayer);
+		GLint vp[4] = {0, 0, 1280, 720};
+		glGetIntegerv(GL_VIEWPORT, vp);
+		const int rw = (vp[2] > 0) ? vp[2] : 1280;
+		const int rh = (vp[3] > 0) ? vp[3] : 720;
+		std::vector<unsigned char> buf(static_cast<size_t>(rw) * rh * 4);
+		fprintf(stderr, "[PRESENT_TEST] metalInit=%d flashing ~8s via Metal (%dx%d)\n", (int)metalOk, rw, rh);
+		for (int i = 0; i < 16; i++) {
+			const bool odd = (i % 2) != 0;
+			glClearColor(odd ? 1.0f : 0.0f, 0.15f, odd ? 0.0f : 1.0f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
+			glReadPixels(0, 0, rw, rh, GL_BGRA, GL_UNSIGNED_BYTE, buf.data());
+			MacMetalPresent_PresentBGRA(rw, rh, buf.data(), false); // solid color: no flip needed
+			fprintf(stderr, "[PRESENT_TEST] frame %d color=%s\n", i, odd ? "RED" : "BLUE");
+			// Pump the Cocoa run loop so CoreAnimation actually composites each
+			// presented frame (otherwise only the final frame shows on screen).
+			SDL_PumpEvents();
+			SDL_Event ev; while (SDL_PollEvent(&ev)) {}
+			SDL_Delay(500);
+		}
+		fprintf(stderr, "[PRESENT_TEST] done\n");
+	}
+#endif
 
 	if (!CheckGLContextVersion(minCtx)) {
 		int ctxProfile = 0;
@@ -610,7 +970,14 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 
 
 void CGlobalRendering::MakeCurrentContext(bool clear) const {
+#if defined(__APPLE__) && !defined(HEADLESS)
+	if (clear)
+		eglMakeCurrent(g_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+	else
+		eglMakeCurrent(g_eglDisplay, g_eglSurface, g_eglSurface, g_eglContext);
+#else
 	SDL_GL_MakeCurrent(sdlWindow, clear ? nullptr : glContext);
+#endif
 }
 
 
@@ -632,7 +999,11 @@ void CGlobalRendering::DestroyWindowAndContext() {
 	sdlWindow = nullptr;
 	glContext = nullptr;
 
+#ifndef __APPLE__
+#ifndef __APPLE__
 	GLX::Unload();
+#endif
+#endif
 }
 
 void CGlobalRendering::KillSDL() const {
@@ -668,6 +1039,71 @@ void CGlobalRendering::PostInit() {
 	UpdateTimer();
 }
 
+#if defined(__APPLE__) && !defined(HEADLESS)
+// Lazily allocate (or resize) the downsample-readback FBO.
+// Returns false on allocation/completeness failure; caller should fall back
+// to a full-resolution readback.
+static bool EnsureDownscaleReadbackFBO(int w, int h)
+{
+	if (g_dsFBO != 0 && g_dsW == w && g_dsH == h)
+		return true;
+	if (g_dsFBO == 0) {
+		glGenFramebuffers(1, &g_dsFBO);
+		glGenTextures(1, &g_dsTex);
+	}
+	glBindTexture(GL_TEXTURE_2D, g_dsTex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,     GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,     GL_CLAMP_TO_EDGE);
+
+	GLint prevDrawFBO = 0;
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prevDrawFBO);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, g_dsFBO);
+	glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_dsTex, 0);
+	const GLenum st = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, (GLuint)prevDrawFBO);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	if (st != GL_FRAMEBUFFER_COMPLETE) {
+		fprintf(stderr, "[spring-mac/downsample] FBO incomplete: 0x%04x\n", (unsigned)st);
+		return false;
+	}
+	g_dsW = w;
+	g_dsH = h;
+	return true;
+}
+
+// Allocate or resize the two readback PBOs. Tightly packed
+// BGRA (no row padding); the IOSurface row stride is handled at memcpy time.
+// Returns false on allocation failure; caller falls back to sync readback.
+static bool EnsureReadbackPBOs(int w, int h)
+{
+	if (g_pbos[0] != 0 && g_pboW == w && g_pboH == h)
+		return true;
+	if (g_pbos[0] == 0)
+		glGenBuffers(2, g_pbos);
+	const GLsizeiptr nBytes = (GLsizeiptr)w * (GLsizeiptr)h * 4;
+	for (int i = 0; i < 2; ++i) {
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, g_pbos[i]);
+		glBufferData(GL_PIXEL_PACK_BUFFER, nBytes, nullptr, GL_STREAM_READ);
+	}
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+	g_pboW = w;
+	g_pboH = h;
+	g_pboHasPrev = false;
+	g_pboCurIdx  = 0;
+
+	static bool s_logged = false;
+	if (!s_logged) {
+		fprintf(stderr, "[spring-mac/pbo] async readback active (%dx%d, 1-frame latency)\n", w, h);
+		s_logged = true;
+	}
+	return true;
+}
+#endif
+
 void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 {
 	spring_time pre;
@@ -679,6 +1115,35 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 		// silently or verbosely clear queue at the end of every frame
 		if (clearErrors || glDebugErrors)
 			glClearErrors("GR", __func__, glDebugErrors);
+
+#if defined(__APPLE__) && !defined(HEADLESS)
+		// Headless verification capture. Draw() has already rendered into
+		// the default FBO by the time SwapBuffers() runs, so we can read it
+		// back here even when the actual present/swap is suppressed
+		// (allowSwapBuffers==false, e.g. an unfocused/background launch).
+		// Writes <prefix>.NNNN.raw (uint32 w,h header + w*h*4 BGRA, bottom-up).
+		if (const char* cp = getenv("SPRING_FRAME_CAPTURE")) {
+			if (g_eglDisplay != EGL_NO_DISPLAY && g_eglSurface != EGL_NO_SURFACE && g_pbufW > 0 && g_pbufH > 0) {
+				static int s_cap = 0;
+				if ((s_cap % 30) == 0 && s_cap < 1800) {
+					const size_t need = static_cast<size_t>(g_pbufW) * g_pbufH * 4;
+					if (g_presentBuf.size() < need)
+						g_presentBuf.resize(need);
+					glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+					glReadPixels(0, 0, g_pbufW, g_pbufH, GL_BGRA, GL_UNSIGNED_BYTE, g_presentBuf.data());
+					char path[1024];
+					snprintf(path, sizeof(path), "%s.%04d.raw", cp, s_cap);
+					if (FILE* f = fopen(path, "wb")) {
+						const uint32_t hdr[2] = { (uint32_t)g_pbufW, (uint32_t)g_pbufH };
+						fwrite(hdr, sizeof(hdr), 1, f);
+						fwrite(g_presentBuf.data(), 1, need, f);
+						fclose(f);
+					}
+				}
+				s_cap++;
+			}
+		}
+#endif
 
 		if (!allowSwapBuffers && !forceSwapBuffers)
 			return;
@@ -700,6 +1165,204 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 			}
 		#endif
 		
+#if defined(__APPLE__) && !defined(HEADLESS)
+		if (g_eglDisplay != EGL_NO_DISPLAY && g_eglSurface != EGL_NO_SURFACE) {
+			// eglSwapBuffers on the (surfaceless) pbuffer presents nowhere, so
+			// read the rendered default framebuffer back and blit it onto the
+			// window's CAMetalLayer via Metal.
+			//
+			// Fast path: glReadPixels writes directly into an IOSurface-backed
+			// MTLTexture (no CPU intermediate buffer, no CPU Y-flip, no
+			// replaceRegion upload — Metal samples the same backing store and
+			// flips during a one-triangle render pass to the drawable).
+			//
+			// Fallback path: SPRING_MAC_LEGACY_PRESENT=1 or AcquireIOSurfaceBuffer
+			// failure routes through the original CPU staging path.
+			const bool wantLegacy = (getenv("SPRING_MAC_LEGACY_PRESENT") != nullptr);
+			// Per-frame timing instrumentation. Set SPRING_TIME_PRESENT=1
+			// to log a breakdown of (lock-wait | glReadPixels | Metal present | other)
+			// averaged over every 60 frames. Use to attribute the per-frame cost.
+			static const bool s_timePresent = (getenv("SPRING_TIME_PRESENT") != nullptr);
+
+			// Optional downsample-before-readback. The engine
+			// renders at full pbuffer res (UI layout uses that viewport, so it
+			// looks right), but we blit-downsample to (rdW x rdH) before
+			// glReadPixels — readback data drops by dsFactor^2.
+			static const int s_dsFactor = []() -> int {
+				if (const char* s = getenv("SPRING_DOWNSAMPLE_READBACK")) {
+					const int v = atoi(s);
+					if (v >= 2 && v <= 8) return v;
+				}
+				return 1;
+			}();
+			const int  rdW          = std::max(1, g_pbufW / s_dsFactor);
+			const int  rdH          = std::max(1, g_pbufH / s_dsFactor);
+			const bool doDownsample = (s_dsFactor > 1 && EnsureDownscaleReadbackFBO(rdW, rdH));
+
+			const spring_time tEntry = s_timePresent ? spring_now() : spring_notime;
+			size_t ioRowBytes = 0;
+			void*  ioBase     = wantLegacy ? nullptr
+			                               : MacMetalPresent_AcquireIOSurfaceBuffer(rdW, rdH, &ioRowBytes);
+			const spring_time tAfterAcquire = s_timePresent ? spring_now() : spring_notime;
+
+			if (ioBase != nullptr) {
+				if (doDownsample) {
+					// Blit default FBO (full Retina render target) → smaller FBO with linear filter.
+					glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+					glBindFramebuffer(GL_DRAW_FRAMEBUFFER, g_dsFBO);
+					glBlitFramebuffer(0, 0, g_pbufW, g_pbufH,
+					                  0, 0, rdW,     rdH,
+					                  GL_COLOR_BUFFER_BIT, GL_LINEAR);
+					glBindFramebuffer(GL_READ_FRAMEBUFFER, g_dsFBO);
+				}
+				// Async PBO readback is the default — measured
+				// 3x FPS win in busy scenes vs the sync path at the same
+				// resolution (NO_RETINA=1: sync drops 60->22 fps as scene grows;
+				// PBO holds steady at 65-75 fps). The 1-frame present latency
+				// is imperceptible. Opt out with SPRING_NO_PBO=1 to restore
+				// the direct-into-IOSurface sync glReadPixels — useful for
+				// debugging perf regressions or when running at 4x pixel counts
+				// where the per-frame GPU budget is tight enough that
+				// glMapBufferRange can still block.
+				static const bool s_noPBO = (getenv("SPRING_NO_PBO") != nullptr);
+				const size_t srcRowBytes = (size_t)rdW * 4;
+
+				if (s_noPBO) {
+					// Sync path: glReadPixels stalls until the GPU pipeline drains.
+					const int rowPixels = static_cast<int>(ioRowBytes / 4);
+					if (rowPixels != rdW)
+						glPixelStorei(GL_PACK_ROW_LENGTH, rowPixels);
+					glReadPixels(0, 0, rdW, rdH, GL_BGRA, GL_UNSIGNED_BYTE, ioBase);
+					if (rowPixels != rdW)
+						glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+				} else {
+					// Async path: glReadPixels into a PBO is non-blocking; we
+					// then map the *previous* frame's PBO (one frame of present
+					// latency) and memcpy into the IOSurface. The pipeline stall
+					// is hidden because the GPU has had a full frame to finish
+					// writing PBO[prev] before we ask to map it.
+					EnsureReadbackPBOs(rdW, rdH);
+					glBindBuffer(GL_PIXEL_PACK_BUFFER, g_pbos[g_pboCurIdx]);
+					// Tightly packed into the PBO; pack alignment 4 (BGRA) is fine.
+					glReadPixels(0, 0, rdW, rdH, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+
+					if (g_pboHasPrev) {
+						const int prevIdx = 1 - g_pboCurIdx;
+						glBindBuffer(GL_PIXEL_PACK_BUFFER, g_pbos[prevIdx]);
+						const GLsizeiptr nBytes = (GLsizeiptr)rdW * (GLsizeiptr)rdH * 4;
+						void* mapped = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, nBytes, GL_MAP_READ_BIT);
+						if (mapped != nullptr) {
+							if (ioRowBytes == srcRowBytes) {
+								std::memcpy(ioBase, mapped, srcRowBytes * (size_t)rdH);
+							} else {
+								const uint8_t* src = static_cast<const uint8_t*>(mapped);
+								uint8_t*       dst = static_cast<uint8_t*>(ioBase);
+								for (int y = 0; y < rdH; ++y) {
+									std::memcpy(dst + (size_t)y * ioRowBytes,
+									            src + (size_t)y * srcRowBytes,
+									            srcRowBytes);
+								}
+							}
+							glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+						}
+					}
+					glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+					g_pboHasPrev = true;
+					g_pboCurIdx  = 1 - g_pboCurIdx;
+				}
+
+				if (doDownsample) {
+					// Restore default read FBO so downstream code finds the state it expects.
+					glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+					glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+				}
+
+				// Debug: dump rendered frames to raw files for inspection.
+				// SPRING_MAC_DUMP_FRAME=<prefix>; writes <prefix>.NNN.raw
+				// (8-byte header: uint32 w,h; then row-major BGRA, bottom-up).
+				if (const char* dp = getenv("SPRING_MAC_DUMP_FRAME")) {
+					static int s_df = 0;
+					if (s_df < 80 && (s_df % 6) == 0) {
+						char path[1024];
+						snprintf(path, sizeof(path), "%s.%03d.raw", dp, s_df);
+						if (FILE* f = fopen(path, "wb")) {
+							const uint32_t hdr[2] = { (uint32_t)rdW, (uint32_t)rdH };
+							fwrite(hdr, sizeof(hdr), 1, f);
+							const uint8_t* row = static_cast<const uint8_t*>(ioBase);
+							for (int y = 0; y < rdH; ++y) {
+								fwrite(row + (size_t)y * ioRowBytes, 1, (size_t)rdW * 4, f);
+							}
+							fclose(f);
+						}
+					}
+					s_df++;
+				}
+
+				const spring_time tAfterRead = s_timePresent ? spring_now() : spring_notime;
+				MacMetalPresent_PresentIOSurface(true);
+				if (s_timePresent) {
+					const spring_time tAfterPresent = spring_now();
+					static int    s_frameCnt = 0;
+					static double s_sumAcquireMs = 0.0;
+					static double s_sumReadMs    = 0.0;
+					static double s_sumPresentMs = 0.0;
+					static double s_sumTotalMs   = 0.0;
+					s_sumAcquireMs += (tAfterAcquire - tEntry).toMilliSecsf();
+					s_sumReadMs    += (tAfterRead    - tAfterAcquire).toMilliSecsf();
+					s_sumPresentMs += (tAfterPresent - tAfterRead).toMilliSecsf();
+					s_sumTotalMs   += (tAfterPresent - tEntry).toMilliSecsf();
+					if (++s_frameCnt >= 60) {
+						const double n = (double)s_frameCnt;
+						fprintf(stderr,
+						    "[spring-mac/present] avg over %d frames: acquire(=lock-wait) %.2fms | "
+						    "glReadPixels %.2fms | metal-submit %.2fms | total %.2fms (=> %.1f fps if loop-bound)\n",
+						    s_frameCnt,
+						    s_sumAcquireMs / n,
+						    s_sumReadMs    / n,
+						    s_sumPresentMs / n,
+						    s_sumTotalMs   / n,
+						    1000.0 / std::max(0.001, s_sumTotalMs / n));
+						s_frameCnt     = 0;
+						s_sumAcquireMs = 0.0;
+						s_sumReadMs    = 0.0;
+						s_sumPresentMs = 0.0;
+						s_sumTotalMs   = 0.0;
+					}
+				}
+			} else {
+				static bool s_loggedLegacy = false;
+				if (!s_loggedLegacy) {
+					fprintf(stderr, "[MetalPresent] LEGACY CPU-staging path active (%s)\n",
+					        wantLegacy ? "forced via SPRING_MAC_LEGACY_PRESENT" : "IOSurface acquire failed");
+					s_loggedLegacy = true;
+				}
+				// Legacy CPU-staging fallback.
+				const size_t need = static_cast<size_t>(g_pbufW) * g_pbufH * 4;
+				if (g_presentBuf.size() < need)
+					g_presentBuf.resize(need);
+				glReadPixels(0, 0, g_pbufW, g_pbufH, GL_BGRA, GL_UNSIGNED_BYTE, g_presentBuf.data());
+				if (const char* dp = getenv("SPRING_MAC_DUMP_FRAME")) {
+					static int s_df = 0;
+					if (s_df < 80 && (s_df % 6) == 0) {
+						char path[1024];
+						snprintf(path, sizeof(path), "%s.%03d.raw", dp, s_df);
+						if (FILE* f = fopen(path, "wb")) {
+							const uint32_t hdr[2] = { (uint32_t)g_pbufW, (uint32_t)g_pbufH };
+							fwrite(hdr, sizeof(hdr), 1, f);
+							fwrite(g_presentBuf.data(), 1, need, f);
+							fclose(f);
+						}
+					}
+					s_df++;
+				}
+				MacMetalPresent_PresentBGRA(g_pbufW, g_pbufH, g_presentBuf.data(), true);
+			}
+			// We replaced SDL_GL_SwapWindow (which serviced the Cocoa run loop),
+			// so pump events here to let CoreAnimation actually composite the
+			// presented drawable — including during the single-threaded load.
+			SDL_PumpEvents();
+		} else
+#endif
 		SDL_GL_SwapWindow(sdlWindow);
 
 		#ifdef _WIN32
@@ -780,6 +1443,12 @@ void CGlobalRendering::CheckGLExtensions()
 	#endif
 
 	if (underExternalDebug)
+		return;
+
+	// In an OpenGL CORE profile context these ARB extensions are not advertised
+	// by name (they were folded into GL 1.3/2.0/3.0 long ago) but their
+	// functionality is guaranteed by the spec. Skip the legacy-extension check.
+	if (globalRenderingInfo.glContextIsCore)
 		return;
 
 	char extMsg[ 128] = {0};
@@ -1569,6 +2238,33 @@ void CGlobalRendering::ReadWindowPosAndSize()
 		UpdateWindowBorders(sdlWindow);
 
 	SDL_GetWindowSize(sdlWindow, &winSizeX, &winSizeY);
+#if defined(__APPLE__) && !defined(HEADLESS)
+	{
+		// Engine contract: winSize/viewSize must match the pbuffer FBO the
+		// engine actually renders into — *not* the CAMetalLayer drawableSize.
+		// They are equal by accident at full Retina (drawable == backing ==
+		// pbuffer size), but diverge under SPRING_MAC_NO_RETINA=1 (FBO at
+		// logical 1x; drawable kept at full Retina backing so CoreAnimation
+		// upscales for free). Reading the drawable here used to silently
+		// align them; with the upscale optimization it breaks viewport =
+		// 4x FBO area, so geometry ends up in the bottom-left quadrant of
+		// the FBO and the rest of the UI is clipped. Bind to the FBO size
+		// instead.
+		const int sdlW_saved = winSizeX, sdlH_saved = winSizeY;
+		if (g_pbufW > 1 && g_pbufH > 1) {
+			winSizeX = g_pbufW;
+			winSizeY = g_pbufH;
+		} else {
+			// Pre-EGL-init fallback: mirror InitEGLContext's pbuffer sizing
+			// so loading UI starts at the right resolution.
+			const bool   noRetina = (getenv("SPRING_MAC_NO_RETINA") != nullptr);
+			const double scale    = noRetina ? 1.0 : GetBackingScaleFactor(sdlWindow);
+			winSizeX = std::max(1, int(std::lround(double(sdlW_saved) * scale)));
+			winSizeY = std::max(1, int(std::lround(double(sdlH_saved) * scale)));
+		}
+		SDL_GetWindowPosition(sdlWindow, &winPosX, &winPosY);
+	}
+#endif
 	SDL_GetWindowPosition(sdlWindow, &winPosX, &winPosY);
 
 	//enforce >=0 https://github.com/beyond-all-reason/spring/issues/23
@@ -1599,8 +2295,19 @@ void CGlobalRendering::SaveWindowPosAndSize()
 	// do not notify about changes to block update loop
 	configHandler->Set("WindowPosX", winPosX, false, false);
 	configHandler->Set("WindowPosY", winPosY, false, false);
-	configHandler->Set("XResolutionWindowed", winSizeX, false, false);
-	configHandler->Set("YResolutionWindowed", winSizeY, false, false);
+
+	// Persist the logical (point) window size, not backing pixels.
+	// GetCfgWinRes feeds the saved value straight to SDL_CreateWindow, which
+	// expects logical points. On HiDPI displays (macOS Retina, Wayland/X11
+	// HiDPI) winSizeX/Y can hold the backing-pixel size; persisting that
+	// round-tripped to a 2x-too-big request each launch, then clamped to the
+	// screen as a portrait sliver. Querying SDL directly here pins the saved
+	// value to logical points regardless of how winSize is wired upstream.
+	int saveW = winSizeX, saveH = winSizeY;
+	if (sdlWindow != nullptr)
+		SDL_GetWindowSize(sdlWindow, &saveW, &saveH);
+	configHandler->Set("XResolutionWindowed", saveW, false, false);
+	configHandler->Set("YResolutionWindowed", saveH, false, false);
 }
 
 
