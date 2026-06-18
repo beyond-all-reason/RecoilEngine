@@ -4,6 +4,7 @@
 
 #include "System/Log/ILog.h"
 #include "System/Platform/CpuID.h"
+#include "System/Cpp20Compat.hpp"
 
 #ifndef UNIT_TEST
 	#include "System/Config/ConfigHandler.h"
@@ -197,7 +198,7 @@ namespace Threading {
 
 		// The cache groups from GetProcessorCaches() are sorted in order of largest first. Find the first group that
 		// has a logical processor that will be used to pin the main/worker threads.
-		auto preferredCache = std::ranges::find_if(pc.groupCaches
+		auto preferredCache = Recoil::ranges::find_if(pc.groupCaches
 			, [affinityMask](const auto& gc) -> bool { return !!(affinityMask & gc.groupMask); });
 		
 		std::call_once(preferredMaskDetailsLogFlag, [&](){
