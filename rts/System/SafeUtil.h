@@ -5,6 +5,8 @@
 
 #include <limits>
 #include <cstring>
+#include <type_traits>
+#include <memory>
 
 namespace spring {
 	template<class T> inline void SafeDestruct(T*& p)
@@ -112,7 +114,7 @@ namespace spring {
         static_assert(sizeof(TIn) == sizeof(TOut), "Types must match sizes");
         static_assert(std::is_trivially_copyable<TIn>::value , "Requires TriviallyCopyable input");
         static_assert(std::is_trivially_copyable<TOut>::value, "Requires TriviallyCopyable output");
-        static_assert(std::is_trivially_constructible_v<TOut>,
+        static_assert(std::is_trivially_default_constructible<TOut>::value,
             "This implementation additionally requires destination type to be trivially constructible");
 
         TOut t2;
