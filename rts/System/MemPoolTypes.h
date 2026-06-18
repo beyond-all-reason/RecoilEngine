@@ -13,7 +13,7 @@
 #include <map>
 #include <memory>
 
-#include "smmalloc/smmalloc.h"
+#include "System/recoil-smmalloc.h"
 
 #include "System/UnorderedMap.hpp"
 #include "System/ContainerUtil.h"
