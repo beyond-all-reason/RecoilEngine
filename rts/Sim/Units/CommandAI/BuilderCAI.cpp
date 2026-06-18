@@ -891,13 +891,13 @@ void CBuilderCAI::ExecuteGuard(Command& c)
 				StopSlowGuard();
 			}
 			return;
-		} else if (b->curReclaim && owner->unitDef->canReclaim) {
+		} else if (b->curReclaim && !b->curReclaim->detached && owner->unitDef->canReclaim) {
 			StopSlowGuard();
 			if (!ReclaimObject(b->curReclaim)) {
 				StopMove();
 			}
 			return;
-		} else if (b->curResurrect && owner->unitDef->canResurrect) {
+		} else if (b->curResurrect && !b->curResurrect->detached && owner->unitDef->canResurrect) {
 			StopSlowGuard();
 			if (!ResurrectObject(b->curResurrect)) {
 				StopMove();
