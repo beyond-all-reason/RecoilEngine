@@ -87,6 +87,13 @@ target_link_libraries(engine-legacy ${engineLibraries} Game)
 # Export symbols for plugin access (replaces CMP0065 OLD behavior)
 set_target_properties(engine-legacy PROPERTIES ENABLE_EXPORTS TRUE)
 
+# Suppress "ignoring duplicate libraries" linker warning on macOS.
+# Static library transitive deps (engineSim, pr-downloader, sound, etc.) propagate
+# dependencies that are already in engineLibraries, causing benign duplicates.
+if(APPLE)
+	target_link_options(engine-legacy PRIVATE "LINKER:-no_warn_duplicate_libraries")
+endif()
+
 if(MSVC)
     target_link_libraries(engine-legacy engine-natvis)
 endif()

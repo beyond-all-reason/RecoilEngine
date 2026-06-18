@@ -48,14 +48,25 @@ if (LIBUNWIND_INCLUDE_DIR AND LIBUNWIND_LIBRARY)
   set(LIBUNWIND_DEFINITIONS "LIBUNWIND")
   set(LIBUNWIND_INCLUDE_DIRS ${LIBUNWIND_INCLUDE_DIR})
   set(LIBUNWIND_LIBRARIES ${LIBUNWIND_LIBRARY})
-  
+
   if (NOT TARGET libunwind::libunwind)
-    add_library(libunwind::libunwind UNKNOWN IMPORTED)
-    set_target_properties(libunwind::libunwind PROPERTIES
-                          INTERFACE_COMPILE_DEFINITIONS ${LIBUNWIND_DEFINITIONS}
-                          INTERFACE_INCLUDE_DIRECTORIES ${LIBUNWIND_INCLUDE_DIR}
-                          IMPORTED_LOCATION ${LIBUNWIND_LIBRARY}
-    )
+    if (APPLE)
+      # On macOS, libunwind is a system library; use INTERFACE library to avoid
+      # IMPORTED_LOCATION issues with "-framework Cocoa" in Unix Makefiles
+      add_library(libunwind::libunwind INTERFACE IMPORTED)
+      set_target_properties(libunwind::libunwind PROPERTIES
+                            INTERFACE_COMPILE_DEFINITIONS ${LIBUNWIND_DEFINITIONS}
+                            INTERFACE_INCLUDE_DIRECTORIES ${LIBUNWIND_INCLUDE_DIR}
+                            INTERFACE_LINK_LIBRARIES "${LIBUNWIND_LIBRARY}"
+      )
+    else()
+      add_library(libunwind::libunwind UNKNOWN IMPORTED)
+      set_target_properties(libunwind::libunwind PROPERTIES
+                            INTERFACE_COMPILE_DEFINITIONS ${LIBUNWIND_DEFINITIONS}
+                            INTERFACE_INCLUDE_DIRECTORIES ${LIBUNWIND_INCLUDE_DIR}
+                            IMPORTED_LOCATION ${LIBUNWIND_LIBRARY}
+      )
+    endif()
   endif()
 endif()
 

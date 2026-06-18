@@ -60,6 +60,9 @@ SET(GFLAGS_BUILD_TESTING              FALSE)
 SET(GFLAGS_INSTALL_HEADERS            FALSE)
 SET(GFLAGS_INSTALL_SHARED_LIBS        FALSE)
 SET(GFLAGS_INSTALL_STATIC_LIBS        FALSE)
+# As a subdirectory build, gflags defaults to namespace "gflags" only.
+# Engine code uses the "google" namespace, so include it explicitly.
+SET(GFLAGS_NAMESPACE "google;gflags")
 
 #Meh-meh
 if (WIN32)

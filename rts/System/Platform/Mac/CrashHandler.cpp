@@ -116,7 +116,11 @@ static void TranslateStackTrace(StackTrace& stacktrace, const int logLevel)
 		execCommandString.clear();
 		stackFrameIndices.clear();
 
+#if defined(__aarch64__) || defined(__arm64__)
+		execCommandBuffer << ADDR2LINE << " -o " << modulePath << " -arch arm64 -l " << std::hex << addrPathPair.first;
+#else
 		execCommandBuffer << ADDR2LINE << " -o " << modulePath << " -arch x86_64 -l " << std::hex << addrPathPair.first;
+#endif
 
 		// insert requested addresses that should be translated by atos
 		int i = 0;

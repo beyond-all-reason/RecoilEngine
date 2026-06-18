@@ -63,6 +63,7 @@
 #include "System/Log/ILog.h"
 #include "System/Matrix44f.h"
 #include "System/SpringMath.h"
+#include "System/Cpp23Compat.hpp"
 #include "System/creg/DefTypes.h"
 #include "System/creg/STL_List.h"
 #include "System/Sound/ISoundChannels.h"
@@ -965,7 +966,7 @@ static auto SplitResourcePackIntoPositiveNegative (const SResourcePack &pack)
 {
 	SResourcePack positive {0.0f}, negative {0.0f};
 
-	for (auto [resourceID, value] : std::views::enumerate (pack)) {
+	for (auto [resourceID, value] : Recoil::enumerate(pack)) {
 		if (value < 0.0f)
 			negative[resourceID] = -value;
 		else

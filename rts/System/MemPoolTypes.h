@@ -21,6 +21,21 @@
 #include "System/Platform/Threading.h"
 #include "System/Log/ILog.h"
 
+namespace {
+	// Helper to get a numeric thread ID for logging (handles pthread_t being a pointer on macOS)
+	inline uint64_t GetThreadIdForLog() {
+#ifdef __APPLE__
+		// On macOS, pthread_t is a pointer - cast to integer for logging
+		return reinterpret_cast<uint64_t>(Threading::GetCurrentThreadId());
+#elif defined(_WIN32)
+		return static_cast<uint64_t>(Threading::GetCurrentThreadId());
+#else
+		// Linux pthread_t is typically unsigned long
+		return static_cast<uint64_t>(Threading::GetCurrentThreadId());
+#endif
+	}
+}
+
 template<uint32_t NumBuckets, size_t BucketSize> struct PassThroughPool {
 public:
 	PassThroughPool() {
@@ -431,7 +446,7 @@ inline size_t StablePosAllocator<T>::Allocate(size_t numElems)
 	if (positionToSize.empty()) {
 		size_t returnPos = data.size();
 		data.resize(data.size() + numElems);
-		myLog("StablePosAllocator<T>::Allocate(%u) = %u [thread_id = %u]", uint32_t(numElems), uint32_t(returnPos), static_cast<uint32_t>(Threading::GetCurrentThreadId()));
+		myLog("StablePosAllocator<T>::Allocate(%u) = %u [thread_id = 0x%llx]", uint32_t(numElems), uint32_t(returnPos), static_cast<unsigned long long>(GetThreadIdForLog()));
 		return returnPos;
 	}
 
