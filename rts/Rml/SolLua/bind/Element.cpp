@@ -158,7 +158,7 @@ namespace Rml::SolLua
 
 			void Set(const sol::this_state L, const std::string& name, const sol::object& value)
 			{
-				if (value.get_type() == sol::type::nil) {
+				if (value.get_type() == sol::type::lua_nil) {
 					m_element->RemoveProperty(name);
 					return;
 				}
