@@ -17,7 +17,9 @@
 #include <memory>
 #include <numeric>
 #include <cinttypes>
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+#if defined(__APPLE__)
+	#include <pthread/qos.h>
+#elif defined(__FreeBSD__) || defined(__OpenBSD__)
 #elif defined(_WIN32)
 	#include <windows.h>
 	#include "System/Platform/Win/DllLib.h"
@@ -277,7 +279,16 @@ namespace Threading {
 		if (coreMask == 0)
 			return (~0);
 
-	#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+	#if defined(__APPLE__)
+		// macOS has no per-thread CPU affinity API. The closest equivalent is a
+		// QoS hint: QOS_CLASS_USER_INTERACTIVE biases the scheduler toward the
+		// performance cores (and away from the efficiency cores). We can't honor
+		// the specific coreMask, so apply the hint and report the affinity as
+		// "not set" (~0) -- final core placement is left to the scheduler.
+		pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+		return (~0);
+
+	#elif defined(__FreeBSD__) || defined(__OpenBSD__)
 		// These platforms don't support thread affinity; return ~0 ("not set")
 		return (~0);
 
