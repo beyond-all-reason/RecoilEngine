@@ -12,6 +12,7 @@ set(ENGINE_SRC_ROOT_DIR "${CMAKE_SOURCE_DIR}/rts")
 find_package(ZLIB REQUIRED)
 
 include_directories(${ENGINE_SRC_ROOT_DIR})
+include_directories(${ENGINE_SRC_ROOT_DIR}/lib/nowide/include)
 include_directories(${CMAKE_BINARY_DIR}/src-generated/engine)
 include_directories(${gflags_BINARY_DIR}/include)
 
@@ -71,6 +72,7 @@ target_link_libraries(demotool
 		7zip
 		${ZLIB_LIBRARY}
 		${PLATFORM_LIBS}
+		fmt
 		Tracy::TracyClient
 	)
 add_dependencies(demotool generateVersionFiles)
