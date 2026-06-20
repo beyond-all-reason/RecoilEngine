@@ -82,6 +82,10 @@ set(main_files
 	"${ENGINE_SRC_ROOT}/System/Misc/SpringTime.cpp"
 	"${ENGINE_SRC_ROOT}/System/Platform/CpuID.cpp"
 	"${ENGINE_SRC_ROOT}/System/Platform/CpuTopologyCommon.cpp"
+	## unitsync needs the thread pool (for parallel archive scanning) but never
+	## pins threads, so it links a generic cpu_topology instead of the real
+	## per-platform Platform/{Linux,Win,Mac}/CpuTopology.cpp detection.
+	"${ENGINE_SRC_ROOT}/System/Platform/CpuTopologyGeneric.cpp"
 	"${ENGINE_SRC_ROOT}/System/Platform/Misc.cpp"
 	"${ENGINE_SRC_ROOT}/System/Platform/ScopedFileLock.cpp"
 	"${ENGINE_SRC_ROOT}/System/Platform/Threading.cpp"
@@ -102,20 +106,24 @@ set(main_files
 	"${ENGINE_SRC_ROOT}/System/StringUtil.cpp"
 	)
 if (WIN32)
-	list(APPEND main_files "${ENGINE_SRC_ROOT}/System/Platform/Win/CpuTopology.cpp")
 	list(APPEND main_files "${ENGINE_SRC_ROOT}/System/Platform/Win/Hardware.cpp")
 	list(APPEND main_files "${ENGINE_SRC_ROOT}/System/Platform/Win/WinVersion.cpp")
 	list(APPEND main_files "${ENGINE_SRC_ROOT}/System/Platform/SharedLib.cpp")
 	list(APPEND main_files "${ENGINE_SRC_ROOT}/System/Platform/Win/DllLib.cpp")
 else (WIN32)
-	list(APPEND main_files "${ENGINE_SRC_ROOT}/System/Platform/Linux/CpuTopology.cpp")
 	list(APPEND main_files "${ENGINE_SRC_ROOT}/System/Platform/Linux/Hardware.cpp")
 	list(APPEND main_files "${ENGINE_SRC_ROOT}/System/Platform/Linux/ThreadSupport.cpp")
 endif (WIN32)
 
+# The shared engine threading source list pulls in the real per-platform
+# Platform/{Linux,Win,Mac}/CpuTopology.cpp. unitsync links a generic
+# cpu_topology instead (see main_files above), so strip the platform file here.
+set(unitsync_threading_files ${sources_engine_System_Threading})
+list(FILTER unitsync_threading_files EXCLUDE REGEX "Platform/(Linux|Win|Mac)/CpuTopology\\.cpp$")
+
 set(unitsync_files
 	${sources_engine_System_FileSystem}
-	${sources_engine_System_Threading}
+	${unitsync_threading_files}
 	${sources_engine_System_Log}
 	${sources_engine_System_Log_sinkFile}
 	${sources_engine_System_Log_sinkOutputDebugString}
