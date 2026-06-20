@@ -232,6 +232,8 @@ ShieldSegmentProjectile::ShieldSegmentProjectile(
 	useAirLos     = true;
 	drawRadius    = shieldWeaponDef->shieldRadius * 0.4f;
 	mygravity     = 0.0f;
+	// Draw() mutates the shared ShieldSegmentCollection and calls eventHandler.DrawShield (Lua)
+	drawThreaded  = false;
 
 	vertices = GetSegmentVertices(xpart, ypart);
 	texCoors = GetSegmentTexCoords(collection->GetShieldTexture(), xpart, ypart);

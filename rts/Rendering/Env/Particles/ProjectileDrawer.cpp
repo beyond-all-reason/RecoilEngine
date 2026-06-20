@@ -779,12 +779,20 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 	if (doBuild) {
 		for (auto& dp : drawParticles)
 			dp.clear();
+		serialParticles.clear();
 
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
 			for (CProjectile* p : renderProjectiles) {
 				if (!ShouldDrawProjectile(p, buildMask))
 					continue;
+
+				// particles that can't be filled off-thread (GL / shared state / Lua)
+				// are collected separately and drawn serially below.
+				if (!p->drawThreaded) {
+					serialParticles.emplace_back(p);
+					continue;
+				}
 
 				drawParticles[drawSorted && p->drawSorted].emplace_back(p);
 			}
@@ -804,17 +812,59 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		// record the index range this build appends so reuse passes can re-submit it
 		build.eboStart = rb.GetIndcs().size();
 
+		// flat draw list: sorted bucket (back-to-front) followed by unsorted; both are
+		// parallel-safe. Chunks are contiguous slices, so an in-order concat of the
+		// per-chunk accumulators reproduces the exact serial vertex/index order.
+		drawList.clear();
+		drawList.insert(drawList.end(), drawParticles[ true].begin(), drawParticles[ true].end());
+		drawList.insert(drawList.end(), drawParticles[false].begin(), drawParticles[false].end());
+
 		{
-			ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
-			for (auto p : drawParticles[ true]) {
-				p->Draw();
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DS+DU)");
+
+			const int listSize = static_cast<int>(drawList.size());
+			const int numChunks = (listSize > 0)
+				? std::clamp(4 * ThreadPool::GetNumThreads(), 1, std::min(ThreadPool::MAX_THREADS, listSize))
+				: 0;
+
+			if (numChunks <= 1) {
+				// inline fast path (also the empty case): fill the primary directly (tls null)
+				for (CProjectile* p : drawList)
+					p->Draw();
+			} else {
+				const int chunkSize = (listSize + numChunks - 1) / numChunks;
+
+				for_mt(0, numChunks, [this, chunkSize, listSize](int c) {
+					auto& acc = fillBuffers[c];
+					acc.GetElems().clear();
+					acc.GetIndcs().clear();
+
+					CExpGenSpawnable::SetThreadRenderBuffer(&acc);
+
+					const int bb = c * chunkSize;
+					const int ee = std::min(bb + chunkSize, listSize);
+					for (int i = bb; i < ee; ++i)
+						drawList[i]->Draw();
+
+					CExpGenSpawnable::SetThreadRenderBuffer(nullptr);
+				});
+
+				// serial in-order concat => byte-identical to the serial fill
+				for (int c = 0; c < numChunks; ++c) {
+					const auto& acc = fillBuffers[c];
+					const auto base = static_cast<int32_t>(rb.GetElems().size());
+					rb.AddVertices(acc.GetElems());
+					rb.AddIndices(acc.GetIndcs(), base);
+				}
 			}
 		}
+
+		// serial bucket (render thread, tls null): shields append to the primary buffer
+		// (inside the cached range), tracers self-draw GL (append nothing). Once per build.
 		{
-			ZoneScopedN("ProjectileDrawer::DrawAlpha(DU)");
-			for (auto p : drawParticles[false]) {
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DSerial)");
+			for (CProjectile* p : serialParticles)
 				p->Draw();
-			}
 		}
 
 		build.eboCount = rb.GetIndcs().size() - build.eboStart;
