@@ -55,6 +55,47 @@ static bool CProjectileSortingPredicate(const CProjectile* p1, const CProjectile
 	return std::forward_as_tuple(p1->GetSortDist(sortCamType), p1) > std::forward_as_tuple(p2->GetSortDist(sortCamType), p2);
 };
 
+// below this bucket size std::sort with the tuple comparator beats the radix overhead
+static constexpr size_t PROJECTILE_RADIX_SORT_MIN = 256;
+
+// Map a float to a uint32 whose unsigned order matches the float's ordering, for all
+// floats incl. negatives (sortDist can carry a negative sortDistOffset).
+static inline uint32_t FloatToSortableU32(float f) noexcept {
+	const uint32_t u = std::bit_cast<uint32_t>(f);
+	return u ^ ((static_cast<uint32_t>(-static_cast<int32_t>(u >> 31))) | 0x80000000u);
+}
+
+// Stable LSD radix sort (8-bit passes) of (key, ptr) pairs by ascending key, using
+// `aux` as ping-pong scratch. `passes` low bytes; 4 and 8 are both even so the sorted
+// result lands back in `keys`. Stability gives deterministic ties (replacing the
+// pointer tiebreak the tuple comparator used).
+static void RadixSortByKey(std::vector<std::pair<uint64_t, CProjectile*>>& keys,
+                           std::vector<std::pair<uint64_t, CProjectile*>>& aux, int passes) noexcept
+{
+	const size_t n = keys.size();
+	aux.resize(n);
+
+	auto* src = keys.data();
+	auto* dst = aux.data();
+
+	for (int pass = 0; pass < passes; ++pass) {
+		const int shift = pass * 8;
+		size_t count[256] = {};
+		for (size_t i = 0; i < n; ++i)
+			++count[(src[i].first >> shift) & 0xFFu];
+
+		size_t offset[256];
+		for (size_t k = 0, sum = 0; k < 256; ++k) { offset[k] = sum; sum += count[k]; }
+
+		for (size_t i = 0; i < n; ++i)
+			dst[offset[(src[i].first >> shift) & 0xFFu]++] = src[i];
+
+		std::swap(src, dst);
+	}
+
+	assert(src == keys.data()); // passes is even (4 or 8)
+}
+
 CProjectileDrawer* projectileDrawer = nullptr;
 
 // can not be a CProjectileDrawer; destruction in global
@@ -803,10 +844,39 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
-			if (wantDrawOrder)
-				std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileDrawOrderSortingPredicate);
-			else
-				std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileSortingPredicate);
+			auto& sorted = drawParticles[true];
+
+			if (sorted.size() < PROJECTILE_RADIX_SORT_MIN) {
+				if (wantDrawOrder)
+					std::sort(sorted.begin(), sorted.end(), CProjectileDrawOrderSortingPredicate);
+				else
+					std::sort(sorted.begin(), sorted.end(), CProjectileSortingPredicate);
+			} else {
+				// O(n) radix on a composite key: ascending drawOrder (primary), then
+				// descending sortDist (back-to-front). When drawOrder is uniform (the
+				// common case / !wantDrawOrder) the high 32 bits don't vary, so 4 byte
+				// passes over the low word suffice instead of 8.
+				sortKeys.clear();
+				sortKeys.reserve(sorted.size());
+
+				uint32_t hi0 = 0;
+				bool hiUniform = true;
+				for (CProjectile* p : sorted) {
+					const uint32_t distDesc = ~FloatToSortableU32(p->GetSortDist(camType));
+					const uint32_t hi = wantDrawOrder ? (static_cast<uint32_t>(p->drawOrder) ^ 0x80000000u) : 0u;
+
+					if (sortKeys.empty())
+						hi0 = hi;
+					hiUniform &= (hi == hi0);
+
+					sortKeys.emplace_back((static_cast<uint64_t>(hi) << 32) | distDesc, p);
+				}
+
+				RadixSortByKey(sortKeys, sortKeysAux, hiUniform ? 4 : 8);
+
+				for (size_t i = 0, n = sorted.size(); i < n; ++i)
+					sorted[i] = sortKeys[i].second;
+			}
 		}
 
 		// record the index range this build appends so reuse passes can re-submit it
