@@ -170,6 +170,12 @@ private:
 	/// used to render particle effects in back-to-front order. {unsorted, sorted}
 	std::array<std::vector<CProjectile*>, 2> drawParticles;
 
+	/// per-frame cache of the alpha-particle geometry built per camera, so the
+	/// DP+SO+DS+DU pipeline runs once per camera instead of once per pass. Only
+	/// CAMTYPE_PLAYER and CAMTYPE_UWREFL reach DrawAlpha. Reset in UpdateDrawFlags.
+	struct AlphaBuild { bool valid = false; size_t eboStart = 0; size_t eboCount = 0; };
+	std::array<AlphaBuild, 2> alphaBuilds;
+
 	bool drawSorted = true;
 
 	Shader::IProgramObject* fxShader = nullptr;

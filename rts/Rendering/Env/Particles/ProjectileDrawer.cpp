@@ -372,6 +372,10 @@ void CProjectileDrawer::UpdateDrawFlags()
 {
 	ZoneScopedN("ProjectileDrawer::UpdateDrawFlags");
 
+	// invalidate the per-camera alpha-particle geometry cache for the new frame
+	for (auto& build : alphaBuilds)
+		build.valid = false;
+
 	for_mt(0, renderProjectiles.size(), [this](int i) {
 		CProjectile* p = renderProjectiles[i];
 		const bool hasModel = (p->model != nullptr);
@@ -753,46 +757,68 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 	};
 	const auto& clipPlane = clipPlanes[1U * drawBelowWater + 2U * drawAboveWater];
 
-	const uint8_t thisPassMask =
-		(1 - (drawReflection || drawRefraction)) * DrawFlags::SO_ALPHAF_FLAG +
-		(drawReflection * DrawFlags::SO_REFLEC_FLAG) +
-		(drawRefraction * DrawFlags::SO_REFRAC_FLAG);
+	// Only the player and underwater-reflection cameras reach DrawAlpha. All three
+	// player passes (below-water, above-water, refraction) produce identical billboard
+	// geometry and sort order; they differ only in the clip-plane uniform, soften state
+	// and target FBO. So build the geometry once per camera and re-submit the cached
+	// vertex/index range for the remaining passes. SO_REFRAC_FLAG ⊆ SO_ALPHAF_FLAG, so
+	// the player build uses the ALPHAF superset; above-water quads in the refraction pass
+	// are clipped in hardware (gl_ClipDistance) just as the REFRAC subset would be.
+	const uint32_t camType = camera->GetCamType();
+	assert(camType == CCamera::CAMTYPE_PLAYER || camType == CCamera::CAMTYPE_UWREFL);
 
-	for (auto& dp : drawParticles)
-		dp.clear();
+	auto& build = alphaBuilds[camType];
+	const bool doBuild = !build.valid;
 
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
-		for (CProjectile* p : renderProjectiles) {
-			if (!ShouldDrawProjectile(p, thisPassMask))
-				continue;
+	const uint8_t buildMask = (camType == CCamera::CAMTYPE_UWREFL)
+		? DrawFlags::SO_REFLEC_FLAG
+		: DrawFlags::SO_ALPHAF_FLAG;
 
-			drawParticles[drawSorted && p->drawSorted].emplace_back(p);
+	auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
+
+	if (doBuild) {
+		for (auto& dp : drawParticles)
+			dp.clear();
+
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
+			for (CProjectile* p : renderProjectiles) {
+				if (!ShouldDrawProjectile(p, buildMask))
+					continue;
+
+				drawParticles[drawSorted && p->drawSorted].emplace_back(p);
+			}
 		}
-	}
 
-	// set static variable to facilite sorting
-	sortCamType = camera->GetCamType();
+		// set static variable to facilite sorting
+		sortCamType = camType;
 
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
-		if (wantDrawOrder)
-			std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileDrawOrderSortingPredicate);
-		else
-			std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileSortingPredicate);
-	}
-
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
-		for (auto p : drawParticles[ true]) {
-			p->Draw();
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
+			if (wantDrawOrder)
+				std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileDrawOrderSortingPredicate);
+			else
+				std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileSortingPredicate);
 		}
-	}
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(DU)");
-		for (auto p : drawParticles[false]) {
-			p->Draw();
+
+		// record the index range this build appends so reuse passes can re-submit it
+		build.eboStart = rb.GetIndcs().size();
+
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
+			for (auto p : drawParticles[ true]) {
+				p->Draw();
+			}
 		}
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DU)");
+			for (auto p : drawParticles[false]) {
+				p->Draw();
+			}
+		}
+
+		build.eboCount = rb.GetIndcs().size() - build.eboStart;
+		build.valid = true;
 	}
 
 	{
@@ -809,8 +835,9 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 
 		eventHandler.DrawWorldPreParticles(drawAboveWater, drawBelowWater, drawReflection, drawRefraction);
 
-		auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
-		if (!rb.ShouldSubmit())
+		// gate on the cached count, not ShouldSubmit(): a reuse pass appends nothing,
+		// so ShouldSubmit() would be false and wrongly skip the re-submit.
+		if (build.eboCount == 0)
 			return;
 
 		const bool needSoften = (wantSoften > 0) && !drawReflection && !drawRefraction;
@@ -835,7 +862,13 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		fxShader->SetUniform("fogColor", sky->fogColor.x, sky->fogColor.y, sky->fogColor.z);
 		fxShader->SetUniform("fogParams", sky->fogStart * camPlayer->GetFarPlaneDist(), sky->fogEnd * camPlayer->GetFarPlaneDist());
 
-		rb.DrawElements(GL_TRIANGLES);
+		// build pass: rewinding draw of the just-appended range (also advances the
+		// buffer's start indices so a later build / consumer appends cleanly).
+		// reuse pass: non-advancing draw of the cached range.
+		if (doBuild)
+			rb.DrawElements(GL_TRIANGLES);
+		else
+			rb.DrawElementsRange(GL_TRIANGLES, build.eboStart, build.eboCount);
 
 		fxShader->Disable();
 
