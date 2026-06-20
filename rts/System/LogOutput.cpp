@@ -288,6 +288,7 @@ void CLogOutput::LogExceptionInfo(const char* src, const char* msg)
 
 bool CLogOutput::ClearLog()
 {
+	// defensive, not actually supposed to ever happen
 	if (!IsInitialized()) {
 		LOG_L(L_WARNING, "[%s] log output not yet initialized", __func__);
 		return false;
