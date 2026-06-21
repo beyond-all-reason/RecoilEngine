@@ -557,6 +557,31 @@ endif()
 	# target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
 
 ################################################################################
+### CollisionHandler
+	set(test_name CollisionHandler)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/Misc/CollisionHandler_test.cpp"
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/Misc/CollisionHandlerSupport.cpp"
+			"${ENGINE_SOURCE_DIR}/Sim/Misc/CollisionHandlerVolumes.cpp"
+			"${ENGINE_SOURCE_DIR}/Sim/Misc/CollisionVolume.cpp"
+			# "${ENGINE_SOURCE_DIR}/Game/Camera.cpp" # brings in too much
+			"${ENGINE_SOURCE_DIR}/System/Matrix44f.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Quaternion.cpp"
+			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
+			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+
+	set(test_libs
+			${WINMM_LIBRARY}
+		)
+
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
+
+################################################################################
 ### BenchmarkMimalloc
 	set(test_name Mimalloc)
 	set(test_src

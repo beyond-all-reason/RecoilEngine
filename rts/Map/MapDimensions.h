@@ -5,6 +5,7 @@
 
 #include <bit>
 #include <cassert>
+#include <cstdint>
 #include "System/creg/creg_cond.h"
 
 struct MapDimensions {

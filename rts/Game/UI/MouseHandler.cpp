@@ -541,30 +541,22 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 
 		if (bp.movement > dragSelectionThreshold && selectedUnitsHandler.GetBoxSelectionHandledByEngine()) {
 			// select box
-			float2 topright;
-			float2 bttmleft;
+			const float left   = std::min(float(bp.x), float(x));
+			const float right  = std::max(float(bp.x), float(x));
+			const float top    = std::min(float(bp.y), float(y));
+			const float bottom = std::max(float(bp.y), float(y));
 
-			GetSelectionBoxCoeff(bp.camPos, bp.dir, camera->GetPos(), dir, topright, bttmleft);
+			const float vx = std::max(float(globalRendering->viewSizeX), 1.0f);
+			const float vy = std::max(float(globalRendering->viewSizeY), 1.0f);
 
-			// GetSelectionBoxCoeff returns us the corner pos, but we want to do a inview frustum check.
-			// To do so we need the frustum planes (= plane normal + plane offset).
-			float3 norm1 =  camera->GetUp();
-			float3 norm2 = -camera->GetUp();
-			float3 norm3 =  camera->GetRight();
-			float3 norm4 = -camera->GetRight();
+			const float l = std::clamp(left   / vx, 0.0f, 1.0f);
+			const float t = std::clamp(top    / vy, 0.0f, 1.0f);
+			const float r = std::clamp(right  / vx, 0.0f, 1.0f);
+			const float b = std::clamp(bottom / vy, 0.0f, 1.0f);
 
-			#define signf(x) ((x > 0.0f) ? 1.0f : -1.0f)
-			if (topright.y != 0.0f) norm1 = (camera->GetDir() * signf(-topright.y)) + (camera->GetUp()    / math::fabs(topright.y));
-			if (bttmleft.y != 0.0f) norm2 = (camera->GetDir() * signf( bttmleft.y)) - (camera->GetUp()    / math::fabs(bttmleft.y));
-			if (topright.x != 0.0f) norm3 = (camera->GetDir() * signf(-topright.x)) + (camera->GetRight() / math::fabs(topright.x));
-			if (bttmleft.x != 0.0f) norm4 = (camera->GetDir() * signf( bttmleft.x)) - (camera->GetRight() / math::fabs(bttmleft.x));
+			CCamera::Frustum fr = camera->BuildSelectionFrustum(l, t, r, b);
 
-			const float4 plane1(norm1, -(norm1.dot(camera->GetPos())));
-			const float4 plane2(norm2, -(norm2.dot(camera->GetPos())));
-			const float4 plane3(norm3, -(norm3.dot(camera->GetPos())));
-			const float4 plane4(norm4, -(norm4.dot(camera->GetPos())));
-
-			selectedUnitsHandler.HandleUnitBoxSelection(plane1, plane2, plane3, plane4);
+			selectedUnitsHandler.HandleUnitBoxSelection(fr);
 		} else {
 			const CUnit* unit = nullptr;
 			const CFeature* feature = nullptr;

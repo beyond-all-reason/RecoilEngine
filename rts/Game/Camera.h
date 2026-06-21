@@ -78,7 +78,7 @@ public:
 
 	struct Frustum {
 	public:
-		bool IntersectSphere(float3 p, float radius, uint8_t testMask) const;
+		bool IntersectSphere(float3 p, float radius, uint8_t testMask = 0x3F) const;
 		bool IntersectAABB(const AABB& b, uint8_t testMask = 0x3F) const;
 
 	public:
@@ -247,7 +247,42 @@ public:
 	void ConfigNotify(const std::string& key, const std::string& value);
 	void ConfigUpdate();
 
+	/**
+	 * Inputs must be normalized from 0 to 1
+	 *
+	 * @param l
+	 * @param t
+	 * @param r
+	 * @param b
+	 * @return Frustum
+	 */
+	Frustum BuildSelectionFrustum(float l, float t, float r, float b) const;
+
+	/**
+	 * Two conditions must hold:
+	 * RgtVector and FwdVector should be unit length.
+	 * They should be orthogonal on the selection plane.
+	 *
+	 * @param r0
+	 * @param r1
+	 * @param f0
+	 * @param f1
+	 * @param worldYMin
+	 * @param worldYMax
+	 * @param RgtVector
+	 * @param FwdVector
+	 * @return Frustum
+	 */
+	static Frustum MakeBasisProjectedFrustum(float r0, float r1, float f0, float f1,
+	        float worldYMin, float worldYMax, const float3& RgtVector, const float3& FwdVector);
+
 private:
+	Frustum BuildPerspectiveSubFrustum(float l, float t, float r, float b) const;
+	Frustum BuildOrthoSubFrustum(float l, float t, float r, float b) const;
+	void FillFrustum(Frustum& fr, const float2& nAxisScales, const float2& fAxisScales) const;
+	void FinalizeFrustum(Frustum& fr) const;
+	float GetViewCoeffX(float x) const;
+	float GetViewCoeffY(float y) const;
 	void gluPerspectiveSpring(const float aspect, const float zn, const float zf);
 	void glOrthoScaledSpring(const float sx, const float sy, const float zn, const float zf);
 

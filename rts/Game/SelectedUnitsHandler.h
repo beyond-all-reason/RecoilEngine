@@ -8,6 +8,7 @@
 
 #include "Game/UI/Groups/Group.h"
 #include "Sim/Units/CommandAI/Command.h"
+#include "Camera.h"
 #include "System/float4.h"
 #include "System/Object.h"
 #include "System/UnorderedSet.hpp"
@@ -43,7 +44,7 @@ public:
 	void ClearSelected();
 
 	/// used by MouseHandler.cpp & MiniMap.cpp
-	void HandleUnitBoxSelection(const float4& planeRight, const float4& planeLeft, const float4& planeTop, const float4& planeBottom);
+	void HandleUnitBoxSelection(const CCamera::Frustum& frustum);
 	void HandleSingleUnitClickSelection(CUnit* unit, bool doInViewTest, bool selectType);
 
 	void ToggleBuildIconsFirst();
@@ -69,7 +70,7 @@ public:
 	void SelectCycle(const std::string& command);
 
 	bool GetBoxSelectionHandledByEngine() const { return ubHandledByEngine; }
-	void SetBoxSelectionHandledByEngine(bool b) { ubHandledByEngine = b; }
+	void SetBoxSelectionHandledByEngine(bool b, int selectionPrimitive = 0) { ubHandledByEngine = b; this->selectionPrimitive = selectionPrimitive;}
 
 	static bool CanISelectTeam(const CPlayer* myPlayer, int teamID);
 private:
@@ -81,6 +82,7 @@ private:
 	bool buildIconsFirst = false;
 
 	bool ubHandledByEngine = true;
+	int selectionPrimitive = 0;
 public:
 	bool selectionChanged = false;
 	bool possibleCommandsChanged = true;

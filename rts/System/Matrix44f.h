@@ -96,6 +96,13 @@ public:
 	/// point/vector multiply
 	float3 operator* (const float3 v) const { return ((*this) * float4(v.x, v.y, v.z, 1.0f)); }
 	float4 operator* (const float4 v) const; // M*p (w=1) or M*v (w=0)
+	float3 MulDir(const float3 v) const {
+		return {
+			m[0] * v.x + m[4] * v.y + m[8 ] * v.z,
+			m[1] * v.x + m[5] * v.y + m[9 ] * v.z,
+			m[2] * v.x + m[6] * v.y + m[10] * v.z
+		};
+	}
 
 	float3 Mul(const float3 v) const { return ((*this) * v); }
 	float4 Mul(const float4 v) const { return ((*this) * v); }
@@ -179,6 +186,11 @@ public:
 		return std::format(
 			"m44(\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f})",
 			m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15]);
+	}
+	std::string str_serialize() const {
+		return std::format(
+			"{:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f, {:.5f}f",
+			m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10], m[11], m[12], m[13], m[14], m[15]);
 	}
 };
 

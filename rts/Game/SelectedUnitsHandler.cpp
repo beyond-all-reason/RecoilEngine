@@ -2,7 +2,6 @@
 
 #include "SelectedUnitsHandler.h"
 #include "SelectedUnitsAI.h"
-#include "Camera.h"
 #include "GlobalUnsynced.h"
 #include "WaitCommandsAI.h"
 #include "Game/Players/Player.h"
@@ -18,6 +17,7 @@
 #include "Rendering/GL/RenderBuffers.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/GlobalSynced.h"
+#include "Sim/Misc/CollisionHandler.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Units/Unit.h"
@@ -285,7 +285,7 @@ bool CSelectedUnitsHandler::CanISelectTeam(const CPlayer* myPlayer, int teamID)
 	return false;
 }
 
-void CSelectedUnitsHandler::HandleUnitBoxSelection(const float4& planeRight, const float4& planeLeft, const float4& planeTop, const float4& planeBottom)
+void CSelectedUnitsHandler::HandleUnitBoxSelection(const CCamera::Frustum& frustum)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	CUnit* unit = nullptr;
@@ -307,16 +307,30 @@ void CSelectedUnitsHandler::HandleUnitBoxSelection(const float4& planeRight, con
 			continue;
 
 		for (CUnit* u: unitHandler.GetUnitsByTeam(team)) {
-			const float4 vec(u->midPos, 1.0f);
+			if (!selectionPrimitive) {
+				const float4 vec(u->midPos, 1.0f);
 
-			if (vec.dot4(planeRight) >= 0.0f)
-				continue;
-			if (vec.dot4(planeLeft) >= 0.0f)
-				continue;
-			if (vec.dot4(planeTop) >= 0.0f)
-				continue;
-			if (vec.dot4(planeBottom) >= 0.0f)
-				continue;
+				if (vec.dot4(frustum.planes[CCamera::FRUSTUM_PLANE_RGT]) >= 0.0f)
+					continue;
+				if (vec.dot4(frustum.planes[CCamera::FRUSTUM_PLANE_LFT]) >= 0.0f)
+					continue;
+				if (vec.dot4(frustum.planes[CCamera::FRUSTUM_PLANE_TOP]) >= 0.0f)
+					continue;
+				if (vec.dot4(frustum.planes[CCamera::FRUSTUM_PLANE_BOT]) >= 0.0f)
+					continue;
+			} else {
+				const CollisionVolume* unitVol = &u->collisionVolume;
+				if (selectionPrimitive == 2)
+					unitVol = &u->selectionVolume;
+				if (selectionPrimitive == 3)
+					unitVol = &u->unitDef->selectionVolume;
+
+				CMatrix44f unitMat(u->GetTransformMatrix(false));
+				unitMat.Translate(u->relMidPos);
+
+				if (unitVol == nullptr || !CCollisionHandler::IntersectVolumeWithFrustum(frustum, *unitVol, unitMat))
+					continue;
+			}
 
 			if (KeyInput::GetKeyModState(KMOD_CTRL) && (selectedUnits.find(u->id) != selectedUnits.end())) {
 				RemoveUnit(u);

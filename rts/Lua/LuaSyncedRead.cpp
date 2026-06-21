@@ -1647,15 +1647,15 @@ int LuaSyncedRead::GetAllyTeamList(lua_State* L)
 
 /***
  * Get all team IDs.
- * 
+ *
  * @function Spring.GetTeamList
- * @param allyTeamID -1|nil (Default: `-1`) 
+ * @param allyTeamID -1|nil (Default: `-1`)
  * @return number[] teamIDs List of team IDs.
  */
 
 /***
  * Get team IDs in a specific ally team.
- * 
+ *
  * @function Spring.GetTeamList
  * @param allyTeamID integer The ally team ID to filter teams by. A value less than 0 will return all teams.
  * @return number[]? teamIDs List of team IDs or `nil` if `allyTeamID` is invalid.
@@ -2927,8 +2927,8 @@ void ApplyPlanarTeamError(lua_State* L, int allegiance, float3& mins, float3& ma
 
 /**
  * @brief This populates the Lua table with the unit IDs of units that are in a
- * particular region. 
- * 
+ * particular region.
+ *
  * @param allegiance The allegiance of the units to add to the table.
  * @param units The units to add to the table.
  * @param inRegion A lambda checking if the unit position is in the region
@@ -2973,6 +2973,20 @@ static void GetFilteredUnits(lua_State *L, int allegiance, const std::vector<CUn
 	}
 }
 
+const CollisionVolume* getVolumeForSelectionPrimitive(const CUnit* unit, int value)
+{
+	switch (value) {
+		case 1:
+			return &unit->collisionVolume;
+		case 2:
+			return &unit->selectionVolume;
+		case 3:
+			return &unit->unitDef->selectionVolume;
+		default:
+			return nullptr;
+	}
+}
+
 /***
  *
  * @function Spring.GetUnitsInRectangle
@@ -2981,6 +2995,7 @@ static void GetFilteredUnits(lua_State *L, int allegiance, const std::vector<CUn
  * @param xmax number
  * @param zmax number
  * @param allegiance number?
+ * @param selectionPrimitive number? (Default: `0`) 0 - midPos, 1 - collisionVolume, 2 - selectionVolume, 3 - UnitDef selectionVolume
  * @return number[] unitIDs
  */
 int LuaSyncedRead::GetUnitsInRectangle(lua_State* L)
@@ -2994,12 +3009,36 @@ int LuaSyncedRead::GetUnitsInRectangle(lua_State* L)
 	float3 maxs(xmax, 0.0f, zmax);
 
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 5);
+	const int selectionPrimitive = luaL_optint(L, 6, 0);
 
-	const auto rectangleCheck = [&](const CUnit *unit, const float3 &pos) {
-		if((pos.x < xmin) || (pos.x > xmax))
+	CCamera::Frustum frustum;
+	if (selectionPrimitive) {
+		frustum = CCamera::MakeBasisProjectedFrustum(
+			mins.x, maxs.x,
+			mins.z, maxs.z,
+			-1.0e6f, 1.0e6f,
+			RgtVector,
+			FwdVector
+		);
+	}
+
+	const auto rectangleCheck = [&](const CUnit *unit, const float3 &visibleMidPos) {
+		if (selectionPrimitive) {
+			const CollisionVolume* unitVol = getVolumeForSelectionPrimitive(unit, selectionPrimitive);
+			if (unitVol != nullptr) {
+				const float3 visibleBasePos = visibleMidPos - unit->relMidPos;
+				CMatrix44f volMat = unit->ComposeMatrix(visibleBasePos);
+				volMat.Translate(unit->relMidPos);
+
+				return CCollisionHandler::IntersectVolumeWithFrustum(frustum, *unitVol, volMat);
+			}
+		}
+
+		if ((visibleMidPos.x < xmin) || (visibleMidPos.x > xmax))
 			return false;
-		if((pos.z < zmin) || (pos.z > zmax))
+		if ((visibleMidPos.z < zmin) || (visibleMidPos.z > zmax))
 			return false;
+
 		return true;
 	};
 
@@ -3029,6 +3068,7 @@ int LuaSyncedRead::GetUnitsInRectangle(lua_State* L)
  * @param ymax number
  * @param zmax number
  * @param allegiance number?
+ * @param selectionPrimitive number? (Default: `0`) 0 - midPos, 1 - collisionVolume, 2 - selectionVolume, 3 - UnitDef selectionVolume
  * @return number[] unitIDs
  */
 int LuaSyncedRead::GetUnitsInBox(lua_State* L)
@@ -3044,9 +3084,37 @@ int LuaSyncedRead::GetUnitsInBox(lua_State* L)
 	float3 maxs(xmax, 0.0f, zmax);
 
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 7);
+	const int selectionPrimitive = luaL_optint(L, 8, 0);
 
-	const auto boxCheck = [&](const CUnit *unit, float3 pos) {
-		return AABB(float3(xmin, ymin, zmin), float3(xmax, ymax, zmax)).Contains(pos);
+	CollisionVolume queryVol;
+	CMatrix44f queryMat;
+	if (selectionPrimitive != 0) {
+		queryVol.InitBox(float3(
+			xmax - xmin,
+			ymax - ymin,
+			zmax - zmin
+		));
+
+		queryMat.LoadIdentity();
+		queryMat.Translate(float3(
+			(xmin + xmax) * 0.5f,
+			(ymin + ymax) * 0.5f,
+			(zmin + zmax) * 0.5f
+		));
+	}
+	const auto boxCheck = [&](const CUnit *unit, float3 visibleMidPos) {
+		if (selectionPrimitive) {
+			const CollisionVolume* unitVol = getVolumeForSelectionPrimitive(unit, selectionPrimitive);
+
+			if (unitVol != nullptr) {
+				const float3 visibleBasePos = visibleMidPos - unit->relMidPos;
+				CMatrix44f volMat = unit->ComposeMatrix(visibleBasePos);
+				volMat.Translate(unit->relMidPos);
+
+				return CCollisionHandler::IntersectVolume(*unitVol, volMat, queryVol, queryMat);
+			}
+		}
+		return AABB(float3(xmin, ymin, zmin), float3(xmax, ymax, zmax)).Contains(visibleMidPos);
 	};
 
 	const bool fullRead = CLuaHandle::GetHandleFullRead(L);
@@ -3070,6 +3138,8 @@ int LuaSyncedRead::GetUnitsInBox(lua_State* L)
  * @param x number
  * @param z number
  * @param radius number
+ * @param allegiance number?
+ * @param selectionPrimitive number? (Default: `0`) 0 - midPos, 1 - collisionVolume, 2 - selectionVolume, 3 - UnitDef selectionVolume
  * @return number[] unitIDs
  */
 int LuaSyncedRead::GetUnitsInCylinder(lua_State* L)
@@ -3083,9 +3153,33 @@ int LuaSyncedRead::GetUnitsInCylinder(lua_State* L)
 	float3 maxs(x + radius, 0.0f, z + radius);
 
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 4);
+	const int selectionPrimitive = luaL_optint(L, 5, 0);
 
-	const auto cylinderCheck = [&](const CUnit *unit, const float3 &p) {
-		return p.SqDistance2D(float3{x, 0.0, z}) <= radSqr;
+	CollisionVolume queryVol;
+	CMatrix44f queryMat;
+	if (selectionPrimitive) {
+		queryVol.InitShape(float3(radius * 2.0f, 1.0e6f, radius * 2.0f), ZeroVector,
+		                   CollisionVolume::COLVOL_TYPE_CYLINDER, CollisionVolume::COLVOL_HITTEST_CONT,
+		                   CollisionVolume::COLVOL_AXIS_Y);
+
+		queryMat.LoadIdentity();
+		queryMat.Translate(float3(x, 1.0e6f * 0.5f, z));
+	}
+
+	const auto cylinderCheck = [&](const CUnit* unit, const float3& visibleMidPos) {
+		if (selectionPrimitive) {
+			const CollisionVolume* unitVol = getVolumeForSelectionPrimitive(unit, selectionPrimitive);
+			if (unitVol != nullptr) {
+				const float3 visibleBasePos = visibleMidPos - unit->relMidPos;
+
+				CMatrix44f volMat = unit->ComposeMatrix(visibleBasePos);
+				volMat.Translate(unit->relMidPos);
+
+				return CCollisionHandler::IntersectVolume(*unitVol, volMat, queryVol, queryMat);
+			}
+		}
+
+		return visibleMidPos.SqDistance2D(float3{x, 0.0f, z}) <= radSqr;
 	};
 
 	const bool fullRead = CLuaHandle::GetHandleFullRead(L);
@@ -3111,6 +3205,8 @@ int LuaSyncedRead::GetUnitsInCylinder(lua_State* L)
  * @param y number
  * @param z number
  * @param radius number
+ * @param allegiance number?
+ * @param selectionPrimitive number? (Default: `0`) 0 - midPos, 1 - collisionVolume, 2 - selectionVolume, 3 - UnitDef selectionVolume
  * @return number[] unitIDs
  */
 int LuaSyncedRead::GetUnitsInSphere(lua_State* L)
@@ -3125,9 +3221,29 @@ int LuaSyncedRead::GetUnitsInSphere(lua_State* L)
 	float3 maxs(x + radius, 0.0f, z + radius);
 
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 5);
+	const int selectionPrimitive = luaL_optint(L, 6, 0);
 
-	const auto sphereCheck = [&](const CUnit *unit, const float3 &p) {
-		return p.SqDistance(float3(x, y, z)) <= radSqr;
+	CollisionVolume queryVol;
+	CMatrix44f queryMat;
+	if (selectionPrimitive) {
+		queryVol.InitSphere(radius);
+		queryMat.LoadIdentity();
+		queryMat.Translate(float3(x, y, z));
+	}
+
+	const auto sphereCheck = [&](const CUnit* unit, const float3& visibleMidPos) {
+		if (selectionPrimitive) {
+			const CollisionVolume* unitVol = getVolumeForSelectionPrimitive(unit, selectionPrimitive);
+			if (unitVol != nullptr) {
+				const float3 visibleBasePos = visibleMidPos - unit->relMidPos;
+				CMatrix44f volMat = unit->ComposeMatrix(visibleBasePos);
+				volMat.Translate(unit->relMidPos);
+
+				return CCollisionHandler::IntersectVolume(*unitVol, volMat, queryVol, queryMat);
+			}
+		}
+
+		return visibleMidPos.SqDistance(float3(x, y, z)) <= radSqr;
 	};
 
 	const bool fullRead = CLuaHandle::GetHandleFullRead(L);
@@ -3144,7 +3260,6 @@ int LuaSyncedRead::GetUnitsInSphere(lua_State* L)
 
 	return 1;
 }
-
 
 struct Plane {
 	float x, y, z, d;  // ax + by + cz + d = 0
@@ -4048,14 +4163,14 @@ int LuaSyncedRead::GetUnitDefID(lua_State* L)
 * units while keeping the `if not x` pattern usable). For now, the
 * numerical ID is not too useful so you can use the name, but this
 * may get deprecated at some point.
-* 
+*
 * @param unitID integer
 *
 * @return integer|boolean|nil moveDefID
 * @return string? moveDefName
 */
 
-int LuaSyncedRead::GetUnitMoveDefID(lua_State* L) 
+int LuaSyncedRead::GetUnitMoveDefID(lua_State* L)
 {
 	const auto unit = ParseInLosUnit(L, __func__, 1);
 	if (unit == nullptr)
@@ -4444,7 +4559,7 @@ int LuaSyncedRead::GetUnitPosition(lua_State* L)
  *
  * @function Spring.GetUnitBasePosition
  * The same as `Spring.GetUnitPosition`, but without the optional midpoint calculations.
- * @see Spring.GetUnitPosition 
+ * @see Spring.GetUnitPosition
  * @param unitID integer
  * @return number? posX
  * @return number? posY
@@ -6186,9 +6301,9 @@ static void PackCommandQueue(lua_State* L, const CCommandQueue& commands, size_t
 
 // FIXME: Probably more aptly named `Spring.GetUnitCommand`? It's just default argument that gets current command. Also in line with `Spring.GetUnitCommands`.
 /*** Get a command from a units command queue.
- * 
+ *
  * For factories, this function uses the command queue automatically assigned to new units.
- * 
+ *
  * @see Spring.GetFactoryCommands for getting factory build queue commands
  *
  * @function Spring.GetUnitCurrentCommand
@@ -6977,7 +7092,7 @@ int LuaSyncedRead::GetFeatureDirection(lua_State* L)
  * @function Spring.GetFeatureVelocity
  * Returns nil if no feature found with ID.
  * @param featureID integer
- * @return number? x 
+ * @return number? x
  * @return number? y
  * @return number? z
  * @return number? w

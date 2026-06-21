@@ -7,7 +7,6 @@
 #include "UI/MouseHandler.h"
 #include "Map/Ground.h"
 #include "Map/ReadMap.h"
-#include "Rendering/GL/myGL.h"
 #include "Rendering/GlobalRendering.h"
 #include "System/SpringMath.h"
 #include "System/float3.h"
@@ -161,43 +160,34 @@ void CCamera::Update(const UpdateParams& p)
 	// LoadViewPort();
 }
 
-void CCamera::UpdateFrustum()
+void CCamera::FillFrustum(Frustum& fr, const float2& nAxisScales, const float2& fAxisScales) const
 {
-	RECOIL_DETAILED_TRACY_ZONE;
-	// scale-factors for {x,y}-axes
-	float2 nAxisScales;
-	float2 fAxisScales;
 
-	assert(projType <= PROJTYPE_ORTHO);
-	if (projType == PROJTYPE_PERSP) {
-		const float2 tanHalfFOVs = {math::tan(GetHFOV() * 0.5f * math::DEG_TO_RAD), tanHalfFov}; // horz, vert
-		nAxisScales = {frustum.scales.z * tanHalfFOVs.x, frustum.scales.z * tanHalfFOVs.y}; // x, y
-		fAxisScales = {frustum.scales.w * tanHalfFOVs.x, frustum.scales.w * tanHalfFOVs.y}; // x, y
-	} else { //PROJTYPE_ORTHO
-		nAxisScales = {frustum.scales.x, frustum.scales.y};
-		fAxisScales = {frustum.scales.x, frustum.scales.y};
-	}
+	fr.verts[FRUSTUM_POINT_NBL] = pos + (forward * fr.scales.z) + (right * -nAxisScales.x) + (up * -nAxisScales.y);
+	fr.verts[FRUSTUM_POINT_NBR] = pos + (forward * fr.scales.z) + (right *  nAxisScales.x) + (up * -nAxisScales.y);
+	fr.verts[FRUSTUM_POINT_NTR] = pos + (forward * fr.scales.z) + (right *  nAxisScales.x) + (up *  nAxisScales.y);
+	fr.verts[FRUSTUM_POINT_NTL] = pos + (forward * fr.scales.z) + (right * -nAxisScales.x) + (up *  nAxisScales.y);
 
-	frustum.verts[FRUSTUM_POINT_NBL] = pos + (forward * frustum.scales.z) + (right * -nAxisScales.x) + (up * -nAxisScales.y); // nbl
-	frustum.verts[FRUSTUM_POINT_NBR] = pos + (forward * frustum.scales.z) + (right *  nAxisScales.x) + (up * -nAxisScales.y); // nbr
-	frustum.verts[FRUSTUM_POINT_NTR] = pos + (forward * frustum.scales.z) + (right *  nAxisScales.x) + (up *  nAxisScales.y); // ntr
-	frustum.verts[FRUSTUM_POINT_NTL] = pos + (forward * frustum.scales.z) + (right * -nAxisScales.x) + (up *  nAxisScales.y); // ntl
-	frustum.verts[FRUSTUM_POINT_FBL] = pos + (forward * frustum.scales.w) + (right * -fAxisScales.x) + (up * -fAxisScales.y); // fbl
-	frustum.verts[FRUSTUM_POINT_FBR] = pos + (forward * frustum.scales.w) + (right *  fAxisScales.x) + (up * -fAxisScales.y); // fbr
-	frustum.verts[FRUSTUM_POINT_FTR] = pos + (forward * frustum.scales.w) + (right *  fAxisScales.x) + (up *  fAxisScales.y); // ftr
-	frustum.verts[FRUSTUM_POINT_FTL] = pos + (forward * frustum.scales.w) + (right * -fAxisScales.x) + (up *  fAxisScales.y); // ftl
+	fr.verts[FRUSTUM_POINT_FBL] = pos + (forward * fr.scales.w) + (right * -fAxisScales.x) + (up * -fAxisScales.y);
+	fr.verts[FRUSTUM_POINT_FBR] = pos + (forward * fr.scales.w) + (right *  fAxisScales.x) + (up * -fAxisScales.y);
+	fr.verts[FRUSTUM_POINT_FTR] = pos + (forward * fr.scales.w) + (right *  fAxisScales.x) + (up *  fAxisScales.y);
+	fr.verts[FRUSTUM_POINT_FTL] = pos + (forward * fr.scales.w) + (right * -fAxisScales.x) + (up *  fAxisScales.y);
+}
 
-	const auto SetFrustumPlane = [this](uint32_t i, uint32_t v1i, uint32_t v2i, uint32_t v3i) {
-		const auto& v1 = frustum.verts[v1i];
-		const auto& v2 = frustum.verts[v2i];
-		const auto& v3 = frustum.verts[v3i];
+void CCamera::FinalizeFrustum(Frustum& fr) const
+{
+
+	const auto SetFrustumPlane = [&fr](uint32_t i, uint32_t v1i, uint32_t v2i, uint32_t v3i) {
+		const auto& v1 = fr.verts[v1i];
+		const auto& v2 = fr.verts[v2i];
+		const auto& v3 = fr.verts[v3i];
 
 		const float3 u = v1 - v2;
 		const float3 v = v3 - v2;
 
 		const float3 n = v.cross(u).UnsafeANormalize();
 		const float  d = -n.dot(v2);
-		frustum.planes[i] = float4(n, d);
+		fr.planes[i] = float4(n, d);
 	};
 
 	SetFrustumPlane(FRUSTUM_PLANE_LFT, FRUSTUM_POINT_NTL, FRUSTUM_POINT_NBL, FRUSTUM_POINT_FBL);
@@ -207,12 +197,35 @@ void CCamera::UpdateFrustum()
 	SetFrustumPlane(FRUSTUM_PLANE_NEA, FRUSTUM_POINT_NTL, FRUSTUM_POINT_NTR, FRUSTUM_POINT_NBR);
 	SetFrustumPlane(FRUSTUM_PLANE_FAR, FRUSTUM_POINT_FTR, FRUSTUM_POINT_FTL, FRUSTUM_POINT_FBL);
 
-	frustum.edges[FRUSTUM_EDGE_NTR_NTL] = (frustum.verts[FRUSTUM_POINT_NTR] - frustum.verts[FRUSTUM_POINT_NTL]).UnsafeANormalize(); // ntr - ntl (same as ftr - ftl)
-	frustum.edges[FRUSTUM_EDGE_NTL_NBL] = (frustum.verts[FRUSTUM_POINT_NTL] - frustum.verts[FRUSTUM_POINT_NBL]).UnsafeANormalize(); // ntl - nbl (same as ftl - fbl)
-	frustum.edges[FRUSTUM_EDGE_FTL_NTL] = (frustum.verts[FRUSTUM_POINT_FTL] - frustum.verts[FRUSTUM_POINT_NTL]).UnsafeANormalize(); // ftl - ntl
-	frustum.edges[FRUSTUM_EDGE_FTR_NTR] = (frustum.verts[FRUSTUM_POINT_FTR] - frustum.verts[FRUSTUM_POINT_NTR]).UnsafeANormalize(); // ftr - ntr
-	frustum.edges[FRUSTUM_EDGE_FBR_NBR] = (frustum.verts[FRUSTUM_POINT_FBR] - frustum.verts[FRUSTUM_POINT_NBR]).UnsafeANormalize(); // fbr - nbr
-	frustum.edges[FRUSTUM_EDGE_FBL_NBL] = (frustum.verts[FRUSTUM_POINT_FBL] - frustum.verts[FRUSTUM_POINT_NBL]).UnsafeANormalize(); // fbl - nbl
+	fr.edges[FRUSTUM_EDGE_NTR_NTL] = (fr.verts[FRUSTUM_POINT_NTR] - fr.verts[FRUSTUM_POINT_NTL]).UnsafeANormalize(); // ntr - ntl (same as ftr - ftl)
+	fr.edges[FRUSTUM_EDGE_NTL_NBL] = (fr.verts[FRUSTUM_POINT_NTL] - fr.verts[FRUSTUM_POINT_NBL]).UnsafeANormalize(); // ntl - nbl (same as ftl - fbl)
+	fr.edges[FRUSTUM_EDGE_FTL_NTL] = (fr.verts[FRUSTUM_POINT_FTL] - fr.verts[FRUSTUM_POINT_NTL]).UnsafeANormalize(); // ftl - ntl
+	fr.edges[FRUSTUM_EDGE_FTR_NTR] = (fr.verts[FRUSTUM_POINT_FTR] - fr.verts[FRUSTUM_POINT_NTR]).UnsafeANormalize(); // ftr - ntr
+	fr.edges[FRUSTUM_EDGE_FBR_NBR] = (fr.verts[FRUSTUM_POINT_FBR] - fr.verts[FRUSTUM_POINT_NBR]).UnsafeANormalize(); // fbr - nbr
+	fr.edges[FRUSTUM_EDGE_FBL_NBL] = (fr.verts[FRUSTUM_POINT_FBL] - fr.verts[FRUSTUM_POINT_NBL]).UnsafeANormalize(); // fbl - nbl
+}
+
+void CCamera::UpdateFrustum()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	// scale-factors for {x,y}-axes
+	float2 nAxisScales;
+	float2 fAxisScales;
+
+	assert(projType <= PROJTYPE_ORTHO);
+	if (projType == PROJTYPE_PERSP) {
+    const float tanHalfHFov = tanHalfFov * aspectRatio;
+
+    nAxisScales = {frustum.scales.z * tanHalfHFov, frustum.scales.z * tanHalfFov}; // x, y
+    fAxisScales = {frustum.scales.w * tanHalfHFov, frustum.scales.w * tanHalfFov}; // x, y
+	} else {
+		nAxisScales = {frustum.scales.x, frustum.scales.y};
+		fAxisScales = {frustum.scales.x, frustum.scales.y};
+	}
+
+	FillFrustum(frustum, nAxisScales, fAxisScales);
+	FinalizeFrustum(frustum);
 
 	if (camType == CAMTYPE_VISCUL)
 		return;
@@ -363,6 +376,144 @@ bool CCamera::InView(const AABB& aabb) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return InView(aabb.CalcCenter(), aabb.CalcRadius()) && frustum.IntersectAABB(aabb, inViewPlanesMask);
+}
+
+inline float CCamera::GetViewCoeffX(float x) const
+{
+	return ((x * 2.0f) - 1.0f);
+}
+
+inline float CCamera::GetViewCoeffY(float y) const
+{
+	return (1.0f - (y * 2.0f));
+}
+
+CCamera::Frustum CCamera::BuildPerspectiveSubFrustum(float l, float t, float r, float b) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	assert(projType == PROJTYPE_PERSP);
+
+	Frustum fr;
+	fr.scales = float4(0.0f, 0.0f, frustum.scales.z, frustum.scales.w);
+
+	const float nearDist = fr.scales.z;
+	const float farDist  = fr.scales.w;
+
+	const float tanHalfHFov = tanHalfFov * aspectRatio;
+	const float tanHalfVFov = tanHalfFov;
+
+	const float cx0 = GetViewCoeffX(l) * tanHalfHFov;
+	const float cx1 = GetViewCoeffX(r) * tanHalfHFov;
+	const float cy0 = GetViewCoeffY(t) * tanHalfVFov;
+	const float cy1 = GetViewCoeffY(b) * tanHalfVFov;
+
+	fr.verts[FRUSTUM_POINT_NBL] = pos + (forward * nearDist) + (right * (cx0 * nearDist)) + (up * (cy1 * nearDist));
+	fr.verts[FRUSTUM_POINT_NBR] = pos + (forward * nearDist) + (right * (cx1 * nearDist)) + (up * (cy1 * nearDist));
+	fr.verts[FRUSTUM_POINT_NTR] = pos + (forward * nearDist) + (right * (cx1 * nearDist)) + (up * (cy0 * nearDist));
+	fr.verts[FRUSTUM_POINT_NTL] = pos + (forward * nearDist) + (right * (cx0 * nearDist)) + (up * (cy0 * nearDist));
+
+	fr.verts[FRUSTUM_POINT_FBL] = pos + (forward * farDist) + (right * (cx0 * farDist)) + (up * (cy1 * farDist));
+	fr.verts[FRUSTUM_POINT_FBR] = pos + (forward * farDist) + (right * (cx1 * farDist)) + (up * (cy1 * farDist));
+	fr.verts[FRUSTUM_POINT_FTR] = pos + (forward * farDist) + (right * (cx1 * farDist)) + (up * (cy0 * farDist));
+	fr.verts[FRUSTUM_POINT_FTL] = pos + (forward * farDist) + (right * (cx0 * farDist)) + (up * (cy0 * farDist));
+
+	FinalizeFrustum(fr);
+	return fr;
+}
+
+CCamera::Frustum CCamera::BuildOrthoSubFrustum(float l, float t, float r, float b) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	assert(projType == PROJTYPE_ORTHO);
+
+	Frustum fr;
+	fr.scales = frustum.scales;
+
+	const float nearDist = fr.scales.z;
+	const float farDist  = fr.scales.w;
+
+	// Full ortho half-extents already stored in frustum.scales.{x,y}
+	const float halfX = frustum.scales.x;
+	const float halfY = frustum.scales.y;
+
+	// Normalized screen coords [0,1] -> local ortho offsets in [-half,+half]
+	const float x0 = GetViewCoeffX(l) * halfX;
+	const float x1 = GetViewCoeffX(r) * halfX;
+	const float y0 = GetViewCoeffY(t) * halfY;
+	const float y1 = GetViewCoeffY(b) * halfY;
+
+	fr.verts[FRUSTUM_POINT_NBL] = pos + (forward * nearDist) + (right * x0) + (up * y1);
+	fr.verts[FRUSTUM_POINT_NBR] = pos + (forward * nearDist) + (right * x1) + (up * y1);
+	fr.verts[FRUSTUM_POINT_NTR] = pos + (forward * nearDist) + (right * x1) + (up * y0);
+	fr.verts[FRUSTUM_POINT_NTL] = pos + (forward * nearDist) + (right * x0) + (up * y0);
+
+	fr.verts[FRUSTUM_POINT_FBL] = pos + (forward * farDist) + (right * x0) + (up * y1);
+	fr.verts[FRUSTUM_POINT_FBR] = pos + (forward * farDist) + (right * x1) + (up * y1);
+	fr.verts[FRUSTUM_POINT_FTR] = pos + (forward * farDist) + (right * x1) + (up * y0);
+	fr.verts[FRUSTUM_POINT_FTL] = pos + (forward * farDist) + (right * x0) + (up * y0);
+
+	// For ortho cameras, preserve the sub-frustum x/y half-extents.
+	// This is useful if other code relies on fr.scales.x/y.
+	fr.scales.x = 0.5f * math::fabs(x1 - x0);
+	fr.scales.y = 0.5f * math::fabs(y0 - y1);
+
+	FinalizeFrustum(fr);
+	return fr;
+}
+
+CCamera::Frustum CCamera::BuildSelectionFrustum(float l, float t, float r, float b) const
+{
+	switch (projType) {
+		case PROJTYPE_PERSP:
+			return BuildPerspectiveSubFrustum(l, t, r, b);
+		case PROJTYPE_ORTHO:
+			return BuildOrthoSubFrustum(l, t, r, b);
+		default:
+			assert(false);
+			return Frustum{};
+	}
+}
+
+CCamera::Frustum CCamera::MakeBasisProjectedFrustum(float r0, float r1, float f0, float f1, float worldYMin,
+                                                               float worldYMax, const float3& RgtVector,
+                                                               const float3& FwdVector)
+{
+	CCamera::Frustum fr;
+
+	const float rmin = std::min(r0, r1);
+	const float rmax = std::max(r0, r1);
+	const float fmin = std::min(f0, f1);
+	const float fmax = std::max(f0, f1);
+
+	const float3 UpVector(0.0f, 1.0f, 0.0f);
+
+	fr.verts[FRUSTUM_POINT_NBL] = RgtVector * rmin + UpVector * worldYMin + FwdVector * fmin;
+	fr.verts[FRUSTUM_POINT_NBR] = RgtVector * rmax + UpVector * worldYMin + FwdVector * fmin;
+	fr.verts[FRUSTUM_POINT_NTR] = RgtVector * rmax + UpVector * worldYMin + FwdVector * fmax;
+	fr.verts[FRUSTUM_POINT_NTL] = RgtVector * rmin + UpVector * worldYMin + FwdVector * fmax;
+
+	fr.verts[FRUSTUM_POINT_FBL] = RgtVector * rmin + UpVector * worldYMax + FwdVector * fmin;
+	fr.verts[FRUSTUM_POINT_FBR] = RgtVector * rmax + UpVector * worldYMax + FwdVector * fmin;
+	fr.verts[FRUSTUM_POINT_FTR] = RgtVector * rmax + UpVector * worldYMax + FwdVector * fmax;
+	fr.verts[FRUSTUM_POINT_FTL] = RgtVector * rmin + UpVector * worldYMax + FwdVector * fmax;
+
+	fr.planes[FRUSTUM_PLANE_LFT] = float4(RgtVector, -rmin);
+	fr.planes[FRUSTUM_PLANE_RGT] = float4(-RgtVector, rmax);
+	fr.planes[FRUSTUM_PLANE_BOT] = float4(FwdVector, -fmin);
+	fr.planes[FRUSTUM_PLANE_TOP] = float4(-FwdVector, fmax);
+	fr.planes[FRUSTUM_PLANE_NEA] = float4(UpVector, -worldYMin);
+	fr.planes[FRUSTUM_PLANE_FAR] = float4(-UpVector, worldYMax);
+
+	fr.edges[FRUSTUM_EDGE_NTR_NTL] = fr.verts[FRUSTUM_POINT_NTR] - fr.verts[FRUSTUM_POINT_NTL];
+	fr.edges[FRUSTUM_EDGE_NTL_NBL] = fr.verts[FRUSTUM_POINT_NTL] - fr.verts[FRUSTUM_POINT_NBL];
+	fr.edges[FRUSTUM_EDGE_FTL_NTL] = fr.verts[FRUSTUM_POINT_FTL] - fr.verts[FRUSTUM_POINT_NTL];
+	fr.edges[FRUSTUM_EDGE_FTR_NTR] = fr.verts[FRUSTUM_POINT_FTR] - fr.verts[FRUSTUM_POINT_NTR];
+	fr.edges[FRUSTUM_EDGE_FBR_NBR] = fr.verts[FRUSTUM_POINT_FBR] - fr.verts[FRUSTUM_POINT_NBR];
+	fr.edges[FRUSTUM_EDGE_FBL_NBL] = fr.verts[FRUSTUM_POINT_FBL] - fr.verts[FRUSTUM_POINT_NBL];
+
+	fr.scales = float4(rmax - rmin, fmax - fmin, worldYMin, worldYMax);
+
+	return fr;
 }
 
 #if 0
@@ -716,7 +867,7 @@ float3 CCamera::GetMoveVectorFromState(bool fromKeyState) const
 
 	if (useInterpolate > 0)
 		camDeltaTime = 1000.0f / std::fmax(globalRendering->FPS, 1.0f);
-	
+
 	float camMoveSpeed = 1.0f;
 
 	camMoveSpeed *= movState[MOVE_STATE_SLW] ? moveSlowMult : 1.0f;

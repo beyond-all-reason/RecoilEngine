@@ -673,12 +673,12 @@ int LuaUnsyncedCtrl::SendMessage(lua_State* L)
 
 /*** @function Spring.SendMessageToSpectators
  * @param message string ``"`<PLAYER#>`"`` where `#` is a player ID.
- * 
+ *
  * This will be replaced with the player's name. e.g.
  * ```lua
  * Spring.SendMessage("`<PLAYER1>` did something") -- "ProRusher did something"
  * ```
- * 
+ *
  * @return nil
  */
 int LuaUnsyncedCtrl::SendMessageToSpectators(lua_State* L)
@@ -1273,7 +1273,7 @@ int LuaUnsyncedCtrl::SetCameraOffset(lua_State* L)
  * @function Spring.SetCameraState
  *
  * @param cameraState CameraState The fields must be consistent with the name/mode and current/new camera mode.
- * 
+ *
  * @param transitionTime number? (Default: `0`) in nanoseconds
  *
  * @param transitionTimeFactor number?
@@ -1377,7 +1377,7 @@ int LuaUnsyncedCtrl::SetDollyCameraPosition(lua_State* L)
  *
  * @class ControlPoint
  * @x_helper
- * 
+ *
  * @field [1] number x
  * @field [2] number y
  * @field [3] number z
@@ -2245,12 +2245,12 @@ int LuaUnsyncedCtrl::SetUnitNoMinimap(lua_State* L)
  */
 int LuaUnsyncedCtrl::SetMiniMapRotation(lua_State* L)
 {
-	
+
 	const float radians = luaL_checkfloat(L, 1);
-	
+
 	if (minimap == nullptr)
 		return 0;
-	
+
 	if (minimap->minimapCanFlip)
 		return 0;
 
@@ -2949,12 +2949,14 @@ int LuaUnsyncedCtrl::SetDrawSelectionInfo(lua_State* L)
  *
  * @function Spring.SetBoxSelectionByEngine
  * @param state boolean
+ * @param selectionPrimitive number 0 - midPos, 1 - collisionVolume, 2 - selectionVolume, 3 - UnitDef selectionVolume
  * @return nil
  */
 int LuaUnsyncedCtrl::SetBoxSelectionByEngine(lua_State* L)
 {
 	bool b = luaL_checkboolean(L, 1);
-	selectedUnitsHandler.SetBoxSelectionHandledByEngine(b);
+	int selectionPrimitive = luaL_optint(L, 2, 0);
+	selectedUnitsHandler.SetBoxSelectionHandledByEngine(b, selectionPrimitive);
 	return 0;
 }
 

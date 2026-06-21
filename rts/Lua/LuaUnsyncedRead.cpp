@@ -49,6 +49,8 @@
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Features/FeatureHandler.h"
+#include "Sim/Misc/CollisionHandler.h"
+#include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/TeamHandler.h"
@@ -86,6 +88,7 @@
 
 #include <cctype>
 #include <algorithm>
+#include <cmath>
 
 #include <SDL_keyboard.h>
 #include <SDL_clipboard.h>
@@ -2469,6 +2472,7 @@ int LuaUnsyncedRead::ClearFeaturesPreviousDrawFlag(lua_State* L)
  * @param right number
  * @param bottom number
  * @param allegiance number? (Default: `-1`) teamID when > 0, when < 0 one of AllUnits = -1, MyUnits = -2, AllyUnits = -3, EnemyUnits = -4
+ * @param selectionPrimitive number? (Default: `0`) 0 - drawPos, 1 - collisionVolume, 2 - selectionVolume, 3 - UnitDef selectionVolume
  * @return number[]? unitIDs
  */
 int LuaUnsyncedRead::GetUnitsInScreenRectangle(lua_State* L)
@@ -2477,6 +2481,7 @@ int LuaUnsyncedRead::GetUnitsInScreenRectangle(lua_State* L)
 	float t = luaL_checkfloat(L, 2);
 	float r = luaL_checkfloat(L, 3);
 	float b = luaL_checkfloat(L, 4);
+	const int selectionPrimitive = luaL_optint(L, 6, 0);
 
 	if (l > r) std::swap(l, r);
 	if (t > b) std::swap(t, b);
@@ -2498,6 +2503,18 @@ int LuaUnsyncedRead::GetUnitsInScreenRectangle(lua_State* L)
 
 	auto runLoop = [&](auto disqualifier) {
 		uint32_t count = 0;
+		CCamera::Frustum fr;
+		if (selectionPrimitive) {
+			const float vx = std::max(float(globalRendering->viewSizeX), 1.0f);
+			const float vy = std::max(float(globalRendering->viewSizeY), 1.0f);
+			const float nl = std::clamp(l / vx, 0.f, 1.f);
+			const float nr = std::clamp( r / vx, 0.f, 1.f);
+			// Viewport coordinates use a bottom-left origin, while BuildSelectionFrustum
+			// expects normalized screen coordinates with a top-left origin.
+			const float nt = std::clamp(1.0f - (b / vy), 0.f, 1.f);
+			const float nb = std::clamp(1.0f - (t / vy), 0.f, 1.f);
+			fr = camera->BuildSelectionFrustum(nl, nt, nr, nb);
+		}
 		for (auto visUnitList : unitQuadIter.GetObjectLists()) {
 			for (CUnit* unit : *visUnitList) {
 				if (disqualifier(unit))
@@ -2509,18 +2526,28 @@ int LuaUnsyncedRead::GetUnitsInScreenRectangle(lua_State* L)
 				unit->tempNum = tempNum;
 
 				const float3 vpPos = camera->CalcViewPortCoordinates(unit->drawPos);
+				bool inRect = false;
+				// fast check with center point
+				if (vpPos.x <= r && vpPos.x >= l && vpPos.y <= b && vpPos.y >= t && vpPos.z <= 1.0f && vpPos.z >= 0.0f) {
+					inRect = true;
+				}
+				// slow check with collision volume
+				if (selectionPrimitive && !inRect) {
+					const CollisionVolume* unitVol = &unit->collisionVolume;
+					if (selectionPrimitive == 2)
+						unitVol = &unit->selectionVolume;
+					if (selectionPrimitive == 3)
+						unitVol = &unit->unitDef->selectionVolume;
 
-				if (vpPos.x > r || vpPos.x < l)
-					continue;
+					CMatrix44f unitMat(unit->GetTransformMatrix(false));
+					unitMat.Translate(unit->relMidPos);
 
-				if (vpPos.y > b || vpPos.y < t)
-					continue;
-
-				if (vpPos.z > 1.0f || vpPos.z < 0.0f)
-					continue;
-
-				lua_pushnumber(L, unit->id);
-				lua_rawseti(L, -2, ++count);
+					inRect = CCollisionHandler::IntersectVolumeWithFrustum(fr, *unitVol, unitMat);
+				}
+				if (inRect) {
+					lua_pushnumber(L, unit->id);
+					lua_rawseti(L, -2, ++count);
+				}
 			}
 		}
 	};
@@ -3047,7 +3074,7 @@ int LuaUnsyncedRead::GetCameraDirection(lua_State* L)
 }
 
 /*** Get camera rotation in radians.
- * 
+ *
  * @function Spring.GetCameraRotation
  * @return number rotX Rotation around X axis in radians.
  * @return number rotY Rotation around Y axis in radians.
@@ -3779,9 +3806,9 @@ int LuaUnsyncedRead::GetCmdDescIndex(lua_State* L)
 
 /***
  * Facing direction represented as an integer only.
- * 
+ *
  * @see Facing
- * 
+ *
  * @alias FacingInteger
  * | 0 # South
  * | 1 # East

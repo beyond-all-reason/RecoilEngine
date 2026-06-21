@@ -5,6 +5,7 @@
 
 #include "System/creg/creg_cond.h"
 #include "System/float3.h"
+#include "Game/Camera.h"
 #include "System/Matrix44f.h"
 
 #include <algorithm>
@@ -166,6 +167,22 @@ class CCollisionHandler {
 		static bool IntersectEllipsoid(const CollisionVolume* v, const float3& pi0, const float3& pi1, CollisionQuery* cq);
 		static bool IntersectCylinder(const CollisionVolume* v, const float3& pi0, const float3& pi1, CollisionQuery* cq);
 		static bool IntersectBox(const CollisionVolume* v, const float3& pi0, const float3& pi1, CollisionQuery* cq);
+
+		/**
+		 * Test if a volume intersects another collision volume.
+		 * @param vol1 first volume
+		 * @param vol1Mat first volume transformation matrix
+		 * @param vol2 second volume
+		 * @param vol2Mat second volume transformation matrix
+		 */
+		static bool IntersectVolume(const CollisionVolume& vol1, const CMatrix44f& vol1Mat, const CollisionVolume& vol2, const CMatrix44f& vol2Mat);
+		/**
+		 * Test if a volume intersects a frustum.
+		 * @param frustum frustum
+		 * @param vol volume
+		 * @param volumeToWorld volume transformation matrix
+		 */
+		static bool IntersectVolumeWithFrustum(const CCamera::Frustum& frustum, const CollisionVolume& vol, const CMatrix44f& volumeToWorld);
 
 	private:
 		static unsigned int numDiscTests; // number of discrete hit-tests executed

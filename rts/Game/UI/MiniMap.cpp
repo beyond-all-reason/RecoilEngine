@@ -275,7 +275,7 @@ void CMiniMap::SetRotation(RotationOptions state) // 0 1 2 3: 0 90 180 270
 void CMiniMap::SetMinimized(bool state)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	
+
 	if (minimized == state)
 		return;
 
@@ -628,20 +628,17 @@ void CMiniMap::SelectUnits(int x, int y)
 
 	if (fullProxy && (bp.movement > mouse->dragSelectionThreshold)) {
 		// use a selection box
-		const float3 newMapPos = GetMapPosition(x, y);
-		const float3 oldMapPos = GetMapPosition(bp.x, bp.y);
+		const float3 p0 = GetMapPosition(x, y);
+		const float3 p1 = GetMapPosition(bp.x, bp.y);
 
-		const float xmin = std::min(oldMapPos.x, newMapPos.x);
-		const float xmax = std::max(oldMapPos.x, newMapPos.x);
-		const float zmin = std::min(oldMapPos.z, newMapPos.z);
-		const float zmax = std::max(oldMapPos.z, newMapPos.z);
+		const float r0 = p0.dot(RgtVector);
+		const float r1 = p1.dot(RgtVector);
+		const float f0 = p0.dot(FwdVector);
+		const float f1 = p1.dot(FwdVector);
 
-		const float4  planeRight(-RgtVector,  xmin);
-		const float4   planeLeft( RgtVector, -xmax);
-		const float4    planeTop( FwdVector, -zmax);
-		const float4 planeBottom(-FwdVector,  zmin);
+		CCamera::Frustum fr = CCamera::MakeBasisProjectedFrustum(r0, r1, f0, f1, -1.0e6f, 1.0e6f, RgtVector, FwdVector);
 
-		selectedUnitsHandler.HandleUnitBoxSelection(planeRight, planeLeft, planeTop, planeBottom);
+		selectedUnitsHandler.HandleUnitBoxSelection(fr);
 	} else {
 		// Single unit
 		const float3 pos = GetMapPosition(x, y);
@@ -894,12 +891,12 @@ float3 CMiniMap::GetMapPosition(int x, int y) const
 		std::swap(sx, sz);
 		sx = 1.0f - sx;
 		break;
-	
+
 	case ROTATION_180:
 		sx = 1.0f - sx;
 		sz = 1.0f - sz;
 		break;
-	
+
 	case ROTATION_270:
 		std::swap(sx, sz);
 		sz = 1.0f - sz;
@@ -1417,7 +1414,7 @@ void CMiniMap::DrawCameraFrustumAndMouseSelection()
 	// switch to top-down map/world coords (z is twisted with y compared to the real map/world coords)
 	glPushMatrix();
 
-	switch (rotation) 
+	switch (rotation)
 	{
 		case ROTATION_0:
 			glTranslatef(0.0f, +1.0f, 0.0f);
@@ -1860,7 +1857,7 @@ void CMiniMap::DrawBackground() const
 				{ 1.0f, 0.0f, 1.0f, 0.0f }, // br
 				{ 1.0f, 1.0f, 0.0f, 0.0f }  // bl
 			);
-			break;		
+			break;
 	}
 
 	//glMatrixMode(GL_MODELVIEW);
@@ -1963,7 +1960,7 @@ void CMiniMap::DrawWorldStuff() const
 
 	// normalize coords
 	glRotatef(90.0f, +1.0f, 0.0f, 0.0f); // real 'world' coordinates
-	
+
 	switch (rotation) // skip the y-coord (Lua's DrawScreen is perspective and so any z-coord in it influence the x&y, too)
 	{
 		case ROTATION_0:
