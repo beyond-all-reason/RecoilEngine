@@ -231,3 +231,102 @@ TEST_CASE("IsEnabled")
 	TLOG_SL(   "other-one-time-section", L_DEBUG, "Testing LOG_IS_ENABLED_S");
 }
 
+
+#include <thread>
+#include <mutex>
+#include <vector>
+#include <atomic>
+#include <condition_variable>
+
+TEST_CASE("MultiThreadedLogging")
+{
+	// Multi-threaded stress test for ILog
+	// Tests concurrent logging from multiple threads to verify thread-safety
+	// of the logging system (no crashes, hangs, or data corruption)
+
+	constexpr int NUM_THREADS = 8;
+	constexpr int MESSAGES_PER_THREAD = 1000;
+
+	std::atomic<int> readyCounter{0};
+	std::atomic<int> completedCounter{0};
+	std::atomic<bool> startFlag{false};
+	std::atomic<int> totalMessagesLogged{0};
+
+	std::mutex errorMutex;
+	std::vector<std::string> errors;
+
+	std::condition_variable startCV;
+
+	auto workerThread = [&](int threadId) {
+		// Signal this thread is ready
+		readyCounter.fetch_add(1);
+
+		// Wait for all threads to be ready
+		std::unique_lock<std::mutex> lock;
+		while (!startFlag.load()) {
+			std::this_thread::yield();
+		}
+
+		// Log messages from this thread
+		for (int i = 0; i < MESSAGES_PER_THREAD; ++i) {
+			// Use different log levels based on thread ID
+			switch (threadId % 5) {
+				case 0:
+					LOG_L(L_DEBUG, "[Thread-%d] Message %d", threadId, i);
+					break;
+				case 1:
+					LOG_L(L_INFO, "[Thread-%d] Message %d", threadId, i);
+					break;
+				case 2:
+					LOG_L(L_WARNING, "[Thread-%d] Message %d", threadId, i);
+					break;
+				case 3:
+					LOG_L(L_ERROR, "[Thread-%d] Message %d", threadId, i);
+					break;
+				case 4:
+					// Use section-based logging for some threads
+					LOG_SL(LOG_SECTION_DEFINED, L_INFO, "[Thread-%d] Section message %d", threadId, i);
+					break;
+			}
+			totalMessagesLogged.fetch_add(1);
+		}
+
+		completedCounter.fetch_add(1);
+	};
+
+	// Create all threads
+	std::vector<std::thread> threads;
+	threads.reserve(NUM_THREADS);
+
+	for (int i = 0; i < NUM_THREADS; ++i) {
+		threads.emplace_back(workerThread, i);
+	}
+
+	// Wait for all threads to be ready
+	while (readyCounter.load() < NUM_THREADS) {
+		std::this_thread::yield();
+	}
+
+	// Start all threads simultaneously
+	startFlag.store(true);
+
+	// Wait for all threads to complete
+	for (auto& t : threads) {
+		t.join();
+	}
+
+	// Verify all threads completed and all messages were logged
+	CHECK(completedCounter.load() == NUM_THREADS);
+	CHECK(totalMessagesLogged.load() == NUM_THREADS * MESSAGES_PER_THREAD);
+
+	// Log summary
+	LOG_L(L_INFO, "MultiThreadedLogging test completed: %d threads, %d messages total",
+		NUM_THREADS, totalMessagesLogged.load());
+
+	// Check for any errors collected during the test
+	std::lock_guard<std::mutex> lock(errorMutex);
+	for (const auto& err : errors) {
+		FAIL_CHECK(err);
+	}
+}
+

@@ -11,6 +11,7 @@
 #include "DefaultFilter.h"
 #include "LogUtil.h"
 #include "System/MainDefines.h"
+#include "System/Threading/SpringThreading.h"
 
 #define MAX_LOG_SINKS 8
 
@@ -64,15 +65,16 @@ namespace log_formatter {
 	}
 }
 
+// Global spinlock to protect all sink calls
+static spring::spinlock sinkMutex;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 
-// note: no real point to TLS, sinks themselves are not thread-safe
-static _threadlocal log_record_t cur_record = {{0}, "", "",  0, 0};
-static _threadlocal log_record_t prv_record = {{0}, "", "",  0, 0};
+static log_record_t cur_record = {{0}, "", "",  0, 0};
+static log_record_t prv_record = {{0}, "", "",  0, 0};
 
 
 extern void log_formatter_format(log_record_t* log, va_list arguments);
@@ -97,6 +99,8 @@ void log_backend_record(int level, const char* section, const char* fmt, va_list
 
 	if (log_formatter::numSinks == 0)
 		return;
+
+	std::scoped_lock lock(sinkMutex);
 
 	cur_record.sec = section;
 	cur_record.fmt = fmt;
