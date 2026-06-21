@@ -2,11 +2,13 @@
 #include <cstdarg>
 #include <cassert>
 
+#include <atomic>
 #include <string>
 
 #include <algorithm>
 #include <stack>
 
+#include "Backend.h"
 #include "DefaultFilter.h"
 #include "Level.h"
 #include "Section.h"
@@ -36,9 +38,12 @@ struct log_filter_section_compare {
 
 
 namespace log_filter {
-	static int minLogLevel = LOG_LEVEL_ALL;
-	static int repeatLimit = 1;
+	// atomic so the common "min log level" check in log_frontend_isEnabled()
+	// can early-out without taking the full log mutex
+	static std::atomic<int> minLogLevel = LOG_LEVEL_ALL;
+	static std::atomic<int> repeatLimit = 1;
 
+	// guarded by log_getMutex()
 	static size_t numLevels = 0;
 	static size_t numSections = 0;
 
@@ -106,6 +111,8 @@ void log_filter_setRepeatLimit(int limit) { log_filter::repeatLimit = limit; }
 
 int log_filter_section_getMinLevel(const char* section)
 {
+	LogMutexGuard lock(log_getMutex());
+
 	int level = -1;
 
 	using P = decltype(log_filter::sectionMinLevels)::value_type;
@@ -127,6 +134,8 @@ int log_filter_section_getMinLevel(const char* section)
 // also by LuaUnsyncedCtrl::SetLogSectionFilterLevel
 void log_filter_section_setMinLevel(int level, const char* section)
 {
+	LogMutexGuard lock(log_getMutex());
+
 	log_filter_checkCompileTimeMinLevel(level);
 
 	auto& regSecs = log_filter::registeredSections;
@@ -189,6 +198,8 @@ void log_filter_section_setMinLevel(int level, const char* section)
 
 void log_enable_and_disable(const bool enable)
 {
+	LogMutexGuard lock(log_getMutex());
+
 	static std::stack<int> oldLevels;
 	int newLevel;
 
@@ -205,10 +216,14 @@ void log_enable_and_disable(const bool enable)
 }
 
 int log_filter_section_getNumRegisteredSections() {
+	LogMutexGuard lock(log_getMutex());
+
 	return log_filter::numSections;
 }
 
 const char* log_filter_section_getRegisteredIndex(int index) {
+	LogMutexGuard lock(log_getMutex());
+
 	if (index < 0)
 		return nullptr;
 	if (index >= static_cast<int>(log_filter::numSections))
@@ -237,8 +252,11 @@ static void log_filter_record(int level, const char* section, const char* fmt, v
 ///@{
 
 bool log_frontend_isEnabled(int level, const char* section) {
+	// lock-free fast path: global min-level is atomic, so the common rejected
+	// case never touches the log mutex
 	if (level < log_filter_global_getMinLevel())
 		return false;
+	// section lookup reads shared arrays under the log mutex (taken by the callee)
 	if (level < log_filter_section_getMinLevel(section))
 		return false;
 
@@ -249,6 +267,8 @@ bool log_frontend_isEnabled(int level, const char* section) {
 void log_frontend_register_section(const char* section) {
 	if (LOG_SECTION_IS_DEFAULT(section))
 		return;
+
+	LogMutexGuard lock(log_getMutex());
 
 	auto& regSecs = log_filter::registeredSections;
 	auto regSec = std::lower_bound(regSecs.begin(), regSecs.begin() + log_filter::numSections, section, log_filter_section_compare());
@@ -275,6 +295,8 @@ void log_frontend_register_section(const char* section) {
 }
 
 void log_frontend_register_runtime_section(int level, const char* section_cstr_tmp) {
+	LogMutexGuard lock(log_getMutex());
+
 	const char* section_cstr = log_filter_section_getSectionCString(section_cstr_tmp);
 
 	log_frontend_register_section(section_cstr);
@@ -287,6 +309,8 @@ void log_frontend_record(int level, const char* section, const char* fmt, ...)
 	assert(level > LOG_LEVEL_ALL);
 	assert(level < LOG_LEVEL_NONE);
 
+	LogMutexGuard lock(log_getMutex());
+
 	// pass the log record on to the filter
 	va_list arguments;
 	va_start(arguments, fmt);
@@ -295,6 +319,8 @@ void log_frontend_record(int level, const char* section, const char* fmt, ...)
 }
 
 void log_frontend_cleanup() {
+	LogMutexGuard lock(log_getMutex());
+
 	log_backend_cleanup();
 }
 
@@ -309,11 +335,15 @@ void log_frontend_cleanup() {
 
 const char** log_filter_section_getRegisteredSet()
 {
+	LogMutexGuard lock(log_getMutex());
+
 	return &log_filter::registeredSections[0];
 }
 
 const char* log_filter_section_getSectionCString(const char* section_cstr_tmp)
 {
+	LogMutexGuard lock(log_getMutex());
+
 	// cache for log_frontend_register_runtime_section; services LuaUnsyced
 	static std::array<char[1024], MAX_LOG_SECTIONS> cache;
 	static spring::unordered_map<std::string, size_t> index;

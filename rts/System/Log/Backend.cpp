@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
+#include <mutex>
 
 #include "Backend.h"
 #include "DefaultFilter.h"
@@ -65,6 +67,59 @@ namespace log_formatter {
 }
 
 
+std::recursive_timed_mutex& log_getMutex() {
+	// construct-on-first-use and intentionally never destroyed, see
+	// the declaration in Backend.h.
+	static std::recursive_timed_mutex* logMutex = new std::recursive_timed_mutex();
+	return *logMutex;
+}
+
+
+// stacktrace-dump state, all per-thread so concurrent dumps on different threads
+// never clobber each other (see log_lockForStacktrace)
+static thread_local bool tlsLogMutexBypass = false; // read by LogMutexGuard
+static thread_local int  tlsStacktraceDepth = 0;
+static thread_local bool tlsStacktraceOwnsMutex = false;
+static thread_local bool tlsStacktraceSavedBypass = false;
+
+bool log_getMutexBypass() {
+	return tlsLogMutexBypass;
+}
+
+void log_lockForStacktrace() {
+	// only the outermost call on this thread establishes the lock/bypass state
+	if (tlsStacktraceDepth++ > 0)
+		return;
+
+	tlsStacktraceSavedBypass = tlsLogMutexBypass;
+
+	// bounded wait: long enough to ride out a normal in-progress log record,
+	// short enough not to stall a crash/hang dump if a thread is truly stuck
+	if (log_getMutex().try_lock_for(std::chrono::seconds(1))) {
+		tlsStacktraceOwnsMutex = true;
+	} else {
+		// could not acquire -> bypass the mutex on this thread so the dump
+		// cannot deadlock against whoever is holding it
+		tlsStacktraceOwnsMutex = false;
+		tlsLogMutexBypass = true;
+	}
+}
+
+void log_unlockForStacktrace() {
+	if (tlsStacktraceDepth == 0) // unbalanced; ignore
+		return;
+	if (--tlsStacktraceDepth > 0)
+		return;
+
+	if (tlsStacktraceOwnsMutex) {
+		tlsStacktraceOwnsMutex = false;
+		log_getMutex().unlock();
+	}
+
+	tlsLogMutexBypass = tlsStacktraceSavedBypass;
+}
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -77,11 +132,11 @@ static _threadlocal log_record_t prv_record = {{0}, "", "",  0, 0};
 
 extern void log_formatter_format(log_record_t* log, va_list arguments);
 
-void log_backend_registerSink(log_sink_ptr sink) { log_formatter::insert_sink(sink); }
-void log_backend_unregisterSink(log_sink_ptr sink) { log_formatter::remove_sink(sink); }
+void log_backend_registerSink(log_sink_ptr sink) { LogMutexGuard lock(log_getMutex()); log_formatter::insert_sink(sink); }
+void log_backend_unregisterSink(log_sink_ptr sink) { LogMutexGuard lock(log_getMutex()); log_formatter::remove_sink(sink); }
 
-void log_backend_registerCleanup(log_cleanup_ptr cleanupFunc) { log_formatter::insert_func(cleanupFunc); }
-void log_backend_unregisterCleanup(log_cleanup_ptr cleanupFunc) { log_formatter::remove_func(cleanupFunc); }
+void log_backend_registerCleanup(log_cleanup_ptr cleanupFunc) { LogMutexGuard lock(log_getMutex()); log_formatter::insert_func(cleanupFunc); }
+void log_backend_unregisterCleanup(log_cleanup_ptr cleanupFunc) { LogMutexGuard lock(log_getMutex()); log_formatter::remove_func(cleanupFunc); }
 
 
 /**
@@ -93,6 +148,8 @@ void log_backend_unregisterCleanup(log_cleanup_ptr cleanupFunc) { log_formatter:
 // formats and routes the record to all sinks
 void log_backend_record(int level, const char* section, const char* fmt, va_list arguments)
 {
+	LogMutexGuard lock(log_getMutex());
+
 	const auto& sinks = log_formatter::sinks;
 
 	if (log_formatter::numSinks == 0)
@@ -129,6 +186,8 @@ void log_backend_record(int level, const char* section, const char* fmt, va_list
 
 /// Passes on a cleanup request to all sinks
 void log_backend_cleanup() {
+	LogMutexGuard lock(log_getMutex());
+
 	const auto& funcs = log_formatter::cleanupFuncs;
 
 	for (size_t i = 0; i < log_formatter::numFuncs; i++) {

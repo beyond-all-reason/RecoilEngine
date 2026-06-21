@@ -65,6 +65,10 @@ namespace log_file {
 		typedef std::vector<LogFilePair> LogFilesMap;
 
 		~LogFilesContainer() {
+			// hold the lock so a concurrent logger can't see validTracker==true
+			// and touch the container mid-destruction (removeAllLogFiles
+			// re-locks recursively)
+			LogMutexGuard lock(log_getMutex());
 			log_file_removeAllLogFiles();
 			validTracker = false;
 		}
@@ -199,6 +203,8 @@ void log_file_addLogFile(
 ) {
 	assert(filePath != nullptr);
 
+	LogMutexGuard lock(log_getMutex());
+
 	auto& logFiles = log_file::getLogFiles();
 
 	const std::string sectionsStr = (sections == nullptr) ? "" : sections;
@@ -235,6 +241,8 @@ void log_file_addLogFile(
 void log_file_removeLogFile(const char* filePath) {
 	assert(filePath != nullptr);
 
+	LogMutexGuard lock(log_getMutex());
+
 	auto& logFiles = log_file::getLogFiles();
 
 	const auto pred = [](const log_file::LogFilePair& a, const log_file::LogFilePair& b) { return (a.first < b.first); };
@@ -257,6 +265,8 @@ void log_file_removeLogFile(const char* filePath) {
 }
 
 void log_file_removeAllLogFiles() {
+	LogMutexGuard lock(log_getMutex());
+
 	auto& logFiles = log_file::getLogFiles();
 
 	for (auto& logFilePair: logFiles) {
@@ -268,6 +278,8 @@ void log_file_removeAllLogFiles() {
 
 
 FILE* log_file_getLogFileStream(const char* filePath) {
+	LogMutexGuard lock(log_getMutex());
+
 	const auto& logFiles = log_file::getLogFiles();
 
 	for (const auto& p: logFiles) {
@@ -280,8 +292,6 @@ FILE* log_file_getLogFileStream(const char* filePath) {
 	return nullptr;
 }
 
-
-
 /**
  * @name logging_sink_file
  * ILog.h sink implementation.
@@ -291,6 +301,8 @@ FILE* log_file_getLogFileStream(const char* filePath) {
 /// Records a log entry
 static void log_sink_record_file(int level, const char* section, const char* record)
 {
+	LogMutexGuard lock(log_getMutex());
+
 	if (log_file::validTracker && log_file::isActivelyLogging()) {
 		// write buffer to log file
 		log_file::writeBufferToFiles();
@@ -305,6 +317,8 @@ static void log_sink_record_file(int level, const char* section, const char* rec
 
 /// Cleans up all log streams, by flushing them.
 static void log_sink_cleanup_file() {
+	LogMutexGuard lock(log_getMutex());
+
 	if (!log_file::isActivelyLogging())
 		return;
 

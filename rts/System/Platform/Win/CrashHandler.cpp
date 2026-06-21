@@ -8,6 +8,7 @@
 #include "System/Platform/CrashHandler.h"
 #include "System/Platform/errorhandler.h"
 #include "System/Log/ILog.h"
+#include "System/Log/Backend.h"
 #include "System/Log/FileSink.h"
 #include "System/Log/LogSinkHandler.h"
 #include "System/LogOutput.h"
@@ -400,6 +401,12 @@ void Stacktrace(Threading::NativeThreadHandle thread, const std::string& threadN
 
 void PrepareStacktrace(const int logLevel) {
 	EnterCriticalSection(&stackLock);
+
+	// lock the dump against log rotation and other loggers, so the streams
+	// we write stay valid and no suspended thread holds the log mutex (or bypass
+	// it if it can't be acquired; see log_lockForStacktrace)
+	log_lockForStacktrace();
+
 	InitImageHlpDll();
 
 	// sidestep any kind of hidden allocation which might cause a deadlock
@@ -422,6 +429,8 @@ void CleanupStacktrace(const int logLevel) {
 	// Uninitialize IMAGEHLP.DLL
 	SymCleanup(GetCurrentProcess());
 	imageHelpInitialised = false;
+
+	log_unlockForStacktrace();
 
 	LeaveCriticalSection(&stackLock);
 }
