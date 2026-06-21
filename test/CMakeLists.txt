@@ -140,6 +140,17 @@ endif()
 
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
 
+	# Always build the ILog test with ThreadSanitizer so its multithreaded cases
+	# (tagged [.multithreaded]) can detect logging data races without a separate
+	# -DUSE_TSAN build tree. test_ILog does not link mimalloc, so this is safe.
+	# Skipped where it can't apply: TSan is unsupported on MSVC/MinGW and mutually
+	# exclusive with ASan; when the whole build is already TSan (USE_TSAN) the
+	# global flags already cover it.
+	if (UNIX AND NOT MINGW AND NOT USE_ASAN AND NOT USE_TSAN)
+		target_compile_options(test_ILog PRIVATE -fsanitize=thread -g -fno-omit-frame-pointer)
+		target_link_options(test_ILog PRIVATE -fsanitize=thread)
+	endif()
+
 ################################################################################
 ### SyncedPrimitive
 	set(test_name SyncedPrimitive)
