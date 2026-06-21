@@ -4,7 +4,7 @@ ENV ENGINE_PLATFORM=amd64-windows
 RUN apt-get update \
  && apt-get upgrade --yes \
  && apt-get install --no-install-recommends --yes \
-    g++-mingw-w64-x86-64-posix git ninja-build ccache pipx p7zip-full binutils zstd \
+    g++-mingw-w64-x86-64-posix git ninja-build ccache pipx p7zip-full binutils zstd curl \
  && rm -rf /var/lib/apt/lists/*
 
 # Using `pipx --global` would be better but it's available only since pipx 1.5
@@ -14,8 +14,18 @@ WORKDIR /build
 RUN mkdir src cache out artifacts && chmod a+rwx cache out artifacts
 
 # Fetch library dependencies and configure resolution
-RUN git clone --depth=1 https://github.com/beyond-all-reason/mingwlibs64.git
-ENV MINGWLIBS=/build/mingwlibs64
+ARG LOCAL_TARBALL=""
+ARG RECOIL_LIBS_VERSION
+RUN mkdir recoil-libs \
+  && if [ -f "/build/local_tarball.tar.gz" ]; then \
+         echo "Using local tarball at /build/local_tarball.tar.gz"; \
+         tar -xzf "/build/local_tarball.tar.gz" -C recoil-libs; \
+     else \
+         echo "Downloading tarball"; \
+         curl -fsSL "https://github.com/RecoilEngine/RecoilEngineLibs/releases/download/${RECOIL_LIBS_VERSION}/recoil-libs-x64-mingw.tar.gz" \
+             | tar -xz -C recoil-libs; \
+     fi
+ENV MINGWLIBS=/build/recoil-libs
 
 # Set up default cmake toolchain
 COPY amd64-windows/toolchain.cmake .

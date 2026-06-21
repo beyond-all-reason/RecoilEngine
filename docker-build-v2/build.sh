@@ -11,10 +11,11 @@ if [[ $(id -u) -eq 0 && -z "${SKIP_ROOT_CHECK:-}" ]]; then
   exit 2
 fi
 
-USAGE="Usage: $0 [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] {windows|linux} [cmake_flag...]"
+USAGE="Usage: $0 [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] {windows|linux} [--local-libs <path>] [cmake_flag...]"
 export CONFIGURE=true
 export COMPILE=true
 export CMAKE_BUILD_PARALLEL_LEVEL=
+export LOCAL_LIBS_PATH=""
 
 case $(uname -m) in
   x86_64) ARCH=amd64 ;;
@@ -43,6 +44,7 @@ while (( $# > 0 )); do
       echo "  --compile    only compile, don't configure"
       echo "  -j, --jobs   number of concurrent processes to use when building"
       echo "  --arch       arm64 or amd64, defaults to host"
+      echo "  --local-libs path to local RecoilEngineLibs checkout (uses pre-built libs)"
       echo ""
       echo "Some behaviors can be changed by setting environment variables. Consult the script source for those more advanced use cases."
       exit 0
@@ -50,6 +52,11 @@ while (( $# > 0 )); do
     --arch)
       shift
       ARCH="$1"
+      shift
+      ;;
+    --local-libs)
+      shift
+      LOCAL_LIBS_PATH="$1"
       shift
       ;;
     -j|--jobs)
@@ -117,6 +124,28 @@ fi
 
 mkdir -p build-$PLATFORM .cache/ccache-$PLATFORM
 
+# Resolve local libs path to absolute and validate
+LOCAL_LIBS_MOUNT=()
+if [[ -n "$LOCAL_LIBS_PATH" ]]; then
+  LOCAL_LIBS_PATH="$(cd "$LOCAL_LIBS_PATH" && pwd)"
+  case "$PLATFORM" in
+    amd64-linux)    LOCAL_LIBS_TRIPLET="x64-linux" ;;
+    arm64-linux)    LOCAL_LIBS_TRIPLET="arm64-linux" ;;
+    amd64-windows)  LOCAL_LIBS_TRIPLET="x64-mingw" ;;
+  esac
+  LOCAL_LIBS_DIR="${LOCAL_LIBS_PATH}/output/installed/${LOCAL_LIBS_TRIPLET}"
+  if [[ ! -d "$LOCAL_LIBS_DIR" ]]; then
+    echo "Error: Local libs directory not found: $LOCAL_LIBS_DIR"
+    echo "Expected triplet '${LOCAL_LIBS_TRIPLET}' for platform '${PLATFORM}'."
+    exit 1
+  fi
+  if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+    LOCAL_LIBS_DIR="$(cygpath -w -a "$LOCAL_LIBS_DIR")"
+  fi
+  LOCAL_LIBS_MOUNT=(-v "$LOCAL_LIBS_DIR":/build/recoil-libs:z,ro)
+  echo "Using local libs from: $LOCAL_LIBS_DIR"
+fi
+
 # Build container image selection, allow overriding.
 if [[ -n "${CONTAINER_IMAGE:-}" ]]; then
   IMAGE="$CONTAINER_IMAGE"
@@ -179,46 +208,52 @@ if [[ "$GIT_DIR" != "$GIT_COMMON_DIR" ]]; then
   WORKTREE_MOUNTS="-v $GIT_COMMON_DIR:$GIT_COMMON_DIR:ro"
 fi
 
-$RUNTIME run --platform=linux/$ARCH -it --rm \
-    -v "$CWD${P}":/build/src:z,ro \
-    -v "$CWD${P}.cache${P}ccache-$PLATFORM":/build/cache:z,rw \
-    -v "$CWD${P}build-$PLATFORM":/build/out:z,rw \
-    $UID_FLAGS \
-    $WORKTREE_MOUNTS \
-    -e CONFIGURE \
-    -e COMPILE \
-    -e CMAKE_BUILD_PARALLEL_LEVEL \
-    "${EXTRA_ARGS[@]}" \
-    $IMAGE \
-    bash -c '
-set -e
-
-if [[ "$(id -u)" != "$(stat -c %u /build/src)" ]]; then
-  echo "Error: Inside the container, the user ($(id -u)) does not match"
-  echo "the owner of the source code files ($(stat -c %u /build/src))."
-  echo ""
-  echo "This likely means that the script failed to apply heuristics and"
-  echo "set flags for the runtime correctly. Please report this issue on"
-  echo "GitHub and include information about your environment and output"
-  echo "of \`docker info\`."
-  echo ""
-  echo "As a workaround, try setting the environment variable"
-  echo "FORCE_UID_FLAGS=1 or FORCE_NO_UID_FLAGS=1."
-  exit 1
+TTY_FLAG="-it"
+if [[ ! -t 0 ]]; then
+  TTY_FLAG=""
 fi
 
-cd /build/src/docker-build-v2/scripts
-$CONFIGURE && ./configure.sh "$@"
-if $COMPILE; then
-  if $CONFIGURE; then
-    ./compile.sh
-  else
-    ./compile.sh "$@"
-  fi
-  # When compiling for windows, we must strip debug info because windows does
-  # not handle the output binary size...
-  if [[ $ENGINE_PLATFORM =~ .*windows ]]; then
-    ./split-debug-info.sh
-  fi
-fi
-' -- "$@"
+$RUNTIME run --platform=linux/$ARCH $TTY_FLAG --rm \
+     -v "$CWD${P}":/build/src:z,ro \
+     -v "$CWD${P}.cache${P}ccache-$PLATFORM":/build/cache:z,rw \
+     -v "$CWD${P}build-$PLATFORM":/build/out:z,rw \
+     "${LOCAL_LIBS_MOUNT[@]}" \
+     $UID_FLAGS \
+     $WORKTREE_MOUNTS \
+     -e CONFIGURE \
+     -e COMPILE \
+     -e CMAKE_BUILD_PARALLEL_LEVEL \
+     "${EXTRA_ARGS[@]}" \
+     $IMAGE \
+     bash -c '
+ set -e
+
+ if [[ "$(id -u)" != "$(stat -c %u /build/src)" ]]; then
+   echo "Error: Inside the container, the user ($(id -u)) does not match"
+   echo "the owner of the source code files ($(stat -c %u /build/src))."
+   echo ""
+   echo "This likely means that the script failed to apply heuristics and"
+   echo "set flags for the runtime correctly. Please report this issue on"
+   echo "GitHub and include information about your environment and output"
+   echo "of \`docker info\`."
+   echo ""
+   echo "As a workaround, try setting the environment variable"
+   echo "FORCE_UID_FLAGS=1 or FORCE_NO_UID_FLAGS=1."
+   exit 1
+ fi
+
+ cd /build/src/docker-build-v2/scripts
+ $CONFIGURE && ./configure.sh "$@"
+ if $COMPILE; then
+   if $CONFIGURE; then
+     ./compile.sh
+   else
+     ./compile.sh "$@"
+   fi
+   # When compiling for windows, we must strip debug info because windows does
+   # not handle the output binary size...
+   if [[ $ENGINE_PLATFORM =~ .*windows ]]; then
+     ./split-debug-info.sh
+   fi
+ fi
+ ' -- "$@"

@@ -74,7 +74,7 @@ find_path(IL_INCLUDE_DIR il.h
 #message("IL_INCLUDE_DIR is ${IL_INCLUDE_DIR}")
 
 find_library(IL_LIBRARIES
-             NAMES IL DEVIL
+             NAMES IL DEVIL DevIL
              PATH_SUFFIXES libx32 lib64 lib lib32
              DOC "The file that corresponds to the base il library."
 )
@@ -98,10 +98,10 @@ find_library(ILU_LIBRARIES
 # Need additional dependencies if building statically
 if(PREFER_STATIC_LIBS)
   prefer_static_libs()
-  find_package(PNG 1.6.37 QUIET)
-  find_package(TIFF 4.1.0 QUIET)
-  find_package(JPEG 90 QUIET)
-  find_package(GIF 5.2.1 QUIET)
+  find_package(PNG QUIET)
+  find_package(TIFF QUIET)
+  find_package(JPEG QUIET)
+  find_package(GIF QUIET)
   unprefer_static_libs()
   
   FIND_PACKAGE_HANDLE_STANDARD_ARGS(DevIL DEFAULT_MSG
