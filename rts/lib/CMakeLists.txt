@@ -45,6 +45,31 @@ endif()
 ADD_SUBDIRECTORY(lua)
 ADD_SUBDIRECTORY(luasocket)
 ADD_SUBDIRECTORY(minizip)
+
+# zstd decompress-only static library, reusing the vendored Tracy zstd sources.
+# Required to read .sdzst archives (zip containers with zstd / method-93 entries).
+set(ZSTD_DEC_DIR "${CMAKE_SOURCE_DIR}/rts/lib/tracy/zstd")
+set(zstdDecSources
+	"${ZSTD_DEC_DIR}/common/debug.c"
+	"${ZSTD_DEC_DIR}/common/entropy_common.c"
+	"${ZSTD_DEC_DIR}/common/error_private.c"
+	"${ZSTD_DEC_DIR}/common/fse_decompress.c"
+	"${ZSTD_DEC_DIR}/common/pool.c"
+	"${ZSTD_DEC_DIR}/common/threading.c"
+	"${ZSTD_DEC_DIR}/common/xxhash.c"
+	"${ZSTD_DEC_DIR}/common/zstd_common.c"
+	"${ZSTD_DEC_DIR}/decompress/huf_decompress.c"
+	"${ZSTD_DEC_DIR}/decompress/zstd_ddict.c"
+	"${ZSTD_DEC_DIR}/decompress/zstd_decompress.c"
+	"${ZSTD_DEC_DIR}/decompress/zstd_decompress_block.c"
+)
+add_library(zstd_dec STATIC EXCLUDE_FROM_ALL ${zstdDecSources})
+target_include_directories(zstd_dec PUBLIC ${ZSTD_DEC_DIR})
+target_compile_definitions(zstd_dec PRIVATE ZSTD_DISABLE_ASM)
+set_target_properties(zstd_dec PROPERTIES COMPILE_FLAGS "${PIC_FLAG}")
+set_global(SPRING_ZSTD_INCLUDE_DIR "${ZSTD_DEC_DIR}")
+set_global(SPRING_ZSTD_LIBRARY zstd_dec)
+
 ADD_SUBDIRECTORY(nowide)
 ADD_SUBDIRECTORY(headlessStubs)
 if (ENABLE_STREFLOP)

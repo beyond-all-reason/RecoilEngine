@@ -25,6 +25,19 @@ private:
 
 
 /**
+ * Creates archives stored as a zip with zstd-compressed (method 93) entries.
+ * Backed by the same CZipArchive as .sdz; only the extension differs.
+ */
+class CZipStdArchiveFactory : public IArchiveFactory {
+public:
+	CZipStdArchiveFactory(): IArchiveFactory("sdzst") {}
+
+private:
+	IArchive* DoCreateArchive(const std::string& filePath) const;
+};
+
+
+/**
  * A zip compressed, single-file archive.
  */
 class CZipArchive : public CBufferedArchive

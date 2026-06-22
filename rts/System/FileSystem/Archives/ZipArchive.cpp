@@ -6,6 +6,9 @@
 #include <stdexcept>
 #include <cassert>
 
+#include <zstd.h>
+#include <zlib.h>
+
 #include "System/StringUtil.h"
 #include "System/Log/ILog.h"
 #include "System/Threading/ThreadPool.h"
@@ -13,6 +16,13 @@
 
 IArchive* CZipArchiveFactory::DoCreateArchive(const std::string& filePath) const
 {
+	return new CZipArchive(filePath);
+}
+
+IArchive* CZipStdArchiveFactory::DoCreateArchive(const std::string& filePath) const
+{
+	// .sdzst is a regular zip whose entries use zstd (method 93); CZipArchive
+	// reads both transparently, see CZipArchive::GetFileImpl.
 	return new CZipArchive(filePath);
 }
 
@@ -143,6 +153,41 @@ int CZipArchive::GetFileImpl(uint32_t fid, std::vector<std::uint8_t>& buffer)
 
 	unz_file_info fi;
 	unzGetCurrentFileInfo(thisThreadZip, &fi, nullptr, 0, nullptr, 0, nullptr, 0);
+
+	// minizip cannot decode zstd entries (method 93). Read the raw compressed
+	// frame and decompress it here; CRC is verified manually since raw reads
+	// bypass minizip's CRC-on-close check (see unzip.h Z_ZSTDED note).
+	if (fi.compression_method == Z_ZSTDED) {
+		int method = 0;
+		int level = 0;
+		if (unzOpenCurrentFile2(thisThreadZip, &method, &level, 1 /*raw*/) != UNZ_OK)
+			return -3;
+
+		std::vector<std::uint8_t> compressed(fi.compressed_size);
+
+		const bool readOk = compressed.empty() ||
+			unzReadCurrentFile(thisThreadZip, compressed.data(), compressed.size()) == static_cast<int>(compressed.size());
+		unzCloseCurrentFile(thisThreadZip);
+
+		if (!readOk)
+			return -1;
+
+		buffer.clear();
+		buffer.resize(fi.uncompressed_size);
+
+		const size_t dSize = ZSTD_decompress(buffer.data(), buffer.size(), compressed.data(), compressed.size());
+		if (ZSTD_isError(dSize) || dSize != buffer.size()) {
+			buffer.clear();
+			return -1;
+		}
+
+		if (crc32(0, buffer.data(), buffer.size()) != fileEntries[fid].crc) {
+			buffer.clear();
+			return 0;
+		}
+
+		return 1;
+	}
 
 	if (unzOpenCurrentFile(thisThreadZip) != UNZ_OK)
 		return -3;
