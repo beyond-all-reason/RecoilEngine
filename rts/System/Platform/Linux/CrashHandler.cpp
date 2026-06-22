@@ -25,6 +25,7 @@
 #include "System/FileSystem/FileSystem.h"
 #include "System/SpringExitCode.h"
 #include "System/Log/ILog.h"
+#include "System/Log/Backend.h"
 #include "System/Log/LogSinkHandler.h"
 #include "System/LogOutput.h"
 #include "System/StringUtil.h"
@@ -703,7 +704,10 @@ namespace CrashHandler
 	 * So, it is used by both the HaltedStacktrace and the SuspendedStacktrace.
 	 * Since this method is pure implementation, it's
 	 */
-	int thread_unwind(ucontext_t* uc, void** iparray, StackTrace& stacktrace)
+	// unwInitErrOut: if set, the unw_init_local() error is returned here instead
+	// of logged, so SuspendedStacktrace can report it after Resume() -- logging
+	// while a thread is suspended could deadlock on the log mutex it may hold.
+	int thread_unwind(ucontext_t* uc, void** iparray, StackTrace& stacktrace, int* unwInitErrOut = nullptr)
 	{
 		assert(iparray != nullptr);
 
@@ -749,7 +753,10 @@ namespace CrashHandler
 #endif
 
 		if (err != 0) {
-			LOG_L(L_ERROR, "unw_init_local returned %d", err);
+			if (unwInitErrOut != nullptr)
+				*unwInitErrOut = err; // caller logs this once it is safe to do so
+			else
+				LOG_L(L_ERROR, "unw_init_local returned %d", err);
 			return 0;
 		}
 
@@ -855,9 +862,16 @@ namespace CrashHandler
 			// process and analyse the raw stack trace
 			void* iparray[MAX_STACKTRACE_DEPTH];
 
+			// no logging between Suspend/Resume: a LOG_*() could deadlock on the
+			// log mutex if the suspended thread holds it; report after Resume()
+			int unwInitErr = 0;
+
 			ctls->Suspend();
-			const int numLines = thread_unwind(&ctls->ucontext, iparray, stacktrace);
+			const int numLines = thread_unwind(&ctls->ucontext, iparray, stacktrace, &unwInitErr);
 			ctls->Resume();
+
+			if (unwInitErr != 0)
+				LOG_L(L_ERROR, "unw_init_local returned %d", unwInitErr);
 
 			LOG_L(L_DEBUG, "[%s][2]", __func__);
 
@@ -931,8 +945,15 @@ namespace CrashHandler
     }
 
 
-	void PrepareStacktrace(const int logLevel) {}
-	void CleanupStacktrace(const int logLevel) { LOG_CLEANUP(); }
+	void PrepareStacktrace(const int logLevel) {
+		// lock the dump against log rotation / other loggers, or bypass the
+		// mutex on this thread if it cannot be acquired (see log_lockForStacktrace)
+		log_lockForStacktrace();
+	}
+	void CleanupStacktrace(const int logLevel) {
+		LOG_CLEANUP();
+		log_unlockForStacktrace();
+	}
 
 
 	void HandleSignal(int signal, siginfo_t* siginfo, void* pctx)

@@ -304,6 +304,19 @@ if    (USE_ASAN)
 	endif (MSVC)
 endif (USE_ASAN)
 
+option(USE_TSAN "Build/link with thread sanitizer enabled" FALSE)
+if    (USE_TSAN)
+	if (UNIX AND NOT MINGW)
+		# mimalloc is incompatible with TSan unless built with MI_DEBUG_TSAN
+		# (clang-only); force it off so plain GCC/clang TSan builds just work.
+		set(USE_MIMALLOC OFF CACHE BOOL "disabled under TSan" FORCE)
+		# -fsanitize=thread: Enable ThreadSanitizer for detecting data races
+		# -fno-omit-frame-pointer / -g: keep usable stacks in race reports
+		add_compile_options("-fsanitize=thread" "-g" "-fno-omit-frame-pointer")
+		add_link_options("-fsanitize=thread")
+	endif (UNIX AND NOT MINGW)
+endif (USE_TSAN)
+
 ### Tracy related stuff
 option(RECOIL_DETAILED_TRACY_ZONING "Enable additional detailed tracy zones (only enable this for testing/debugging)" FALSE)
 if    (RECOIL_DETAILED_TRACY_ZONING)

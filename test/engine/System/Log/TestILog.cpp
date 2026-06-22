@@ -3,11 +3,15 @@
 #include "System/Log/FileSink.h"
 #include "System/Log/StreamSink.h"
 #include "System/Log/LogUtil.h"
+#include "System/Log/DefaultFilter.h"
 
 #include <catch_amalgamated.hpp>
 
 #include <cstdarg>
 #include <sstream>
+#include <atomic>
+#include <thread>
+#include <vector>
 
 
 
@@ -229,5 +233,208 @@ TEST_CASE("IsEnabled")
 		LOG_SL("other-one-time-section", L_DEBUG, "Testing LOG_IS_ENABLED_S");
 	}
 	TLOG_SL(   "other-one-time-section", L_DEBUG, "Testing LOG_IS_ENABLED_S");
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Multithreaded logging tests.
+//
+// These prove the logging machinery is race-free under ThreadSanitizer. On
+// Linux test_ILog is built with -fsanitize=thread by default.
+// They are tagged hidden ([.multithreaded]) so the normal `make check` run
+// skips them; run them explicitly by naming the tag:
+//     ./test/test_ILog "[multithreaded]"
+// Each case asserts only after join (Catch2 macros are not thread-safe) and
+// restores any global logging state it mutates so later cases are unaffected.
+
+namespace {
+	// barrier so all worker threads start hammering at once
+	void waitForStart(const std::atomic<bool>& startFlag) {
+		while (!startFlag.load())
+			std::this_thread::yield();
+	}
+}
+
+// N threads emit a flood of records at mixed levels/sections.
+TEST_CASE("ConcurrentRecordDispatch", "[.multithreaded]")
+{
+	constexpr int NUM_THREADS     = 8;
+	constexpr int MSGS_PER_THREAD = 2000;
+
+	std::atomic<bool> startFlag{false};
+	std::atomic<int>  completed{0};
+
+	auto worker = [&](int tid) {
+		waitForStart(startFlag);
+		for (int i = 0; i < MSGS_PER_THREAD; ++i) {
+			switch ((tid + i) % 5) {
+				case 0: LOG_L(L_DEBUG,   "[T%d] msg %d", tid, i); break;
+				case 1: LOG_L(L_INFO,    "[T%d] msg %d", tid, i); break;
+				case 2: LOG_L(L_WARNING, "[T%d] msg %d", tid, i); break;
+				case 3: LOG_L(L_ERROR,   "[T%d] msg %d", tid, i); break;
+				case 4: LOG_SL(LOG_SECTION_DEFINED, L_INFO, "[T%d] sec msg %d", tid, i); break;
+			}
+		}
+		completed.fetch_add(1);
+	};
+
+	std::vector<std::thread> threads;
+	for (int t = 0; t < NUM_THREADS; ++t)
+		threads.emplace_back(worker, t);
+
+	startFlag.store(true);
+	for (auto& th : threads)
+		th.join();
+
+	CHECK(completed.load() == NUM_THREADS);
+
+	ls.logStream.str(std::string()); // don't leak content into later exact-match cases
+}
+
+// Writer threads log continuously while a mutator thread churns the shared
+// logFiles container (add/remove of a separate file) that the record path
+// iterates.
+TEST_CASE("ConcurrentSinkRegistryChurn", "[.multithreaded]")
+{
+	constexpr int NUM_WRITERS = 6;
+	constexpr int WRITE_ITERS = 4000;
+	constexpr int CHURN_ITERS = 400;
+
+	char* tmp = tmpnam(nullptr);
+	REQUIRE(tmp != nullptr);
+	const std::string churnFile = tmp;
+
+	std::atomic<bool> startFlag{false};
+	std::atomic<int>  completed{0};
+
+	auto writer = [&](int tid) {
+		waitForStart(startFlag);
+		for (int i = 0; i < WRITE_ITERS; ++i)
+			LOG_L(L_INFO, "[W%d] churn-write %d", tid, i);
+		completed.fetch_add(1);
+	};
+
+	auto mutator = [&]() {
+		waitForStart(startFlag);
+		for (int i = 0; i < CHURN_ITERS; ++i) {
+			log_file_addLogFile(churnFile.c_str());
+			log_file_removeLogFile(churnFile.c_str());
+		}
+	};
+
+	std::vector<std::thread> threads;
+	for (int t = 0; t < NUM_WRITERS; ++t)
+		threads.emplace_back(writer, t);
+	threads.emplace_back(mutator);
+
+	startFlag.store(true);
+	for (auto& th : threads)
+		th.join();
+
+	CHECK(completed.load() == NUM_WRITERS);
+
+	// cleanup: deregister and delete the churn file
+	log_file_removeLogFile(churnFile.c_str());
+	remove(churnFile.c_str());
+	ls.logStream.str(std::string());
+}
+
+// Reader threads read a section's min level while one thread flips that level. 
+TEST_CASE("ConcurrentFilterChanges", "[.multithreaded]")
+{
+	constexpr int NUM_READERS = 6;
+	constexpr int READ_ITERS  = 200000;
+	constexpr int FLIP_ITERS  = 200000;
+
+	// the section's default level (it is not overridden at this point), used as
+	// the "erase" value below
+	const int savedLevel  = log_filter_section_getMinLevel(LOG_SECTION_DEFINED);
+	const int insertLevel = (savedLevel != LOG_LEVEL_WARNING) ? LOG_LEVEL_WARNING : LOG_LEVEL_ERROR;
+
+	std::atomic<bool> startFlag{false};
+	std::atomic<int>  completed{0};
+
+	auto reader = [&](int /*tid*/) {
+		waitForStart(startFlag);
+		int sink = 0;
+		for (int i = 0; i < READ_ITERS; ++i)
+			sink += log_filter_section_getMinLevel(LOG_SECTION_DEFINED);
+		completed.fetch_add(1);
+		(void) sink;
+	};
+
+	auto flipper = [&]() {
+		waitForStart(startFlag);
+		// Alternate a non-default level (inserts into sectionMinLevels) with the
+		// section default (erases it) so the shared array is mutated continuously.
+		// TODO: simplify to just any two log levels after #3052 merges
+		for (int i = 0; i < FLIP_ITERS; ++i)
+			log_filter_section_setMinLevel((i & 1) ? insertLevel : savedLevel, LOG_SECTION_DEFINED);
+	};
+
+	std::vector<std::thread> threads;
+	for (int t = 0; t < NUM_READERS; ++t)
+		threads.emplace_back(reader, t);
+	threads.emplace_back(flipper);
+
+	startFlag.store(true);
+	for (auto& th : threads)
+		th.join();
+
+	CHECK(completed.load() == NUM_READERS);
+
+	// restore the section level we churned so later cases see the original state
+	log_filter_section_setMinLevel(savedLevel, LOG_SECTION_DEFINED);
+	ls.logStream.str(std::string());
+}
+
+// Writer threads log while one thread flips the global min level and repeat
+// limit. Those are atomics specifically so the log_frontend_isEnabled() fast
+// path can read them without taking the log mutex; this exercises that
+// write-while-read (a non-atomic version would race here under TSan).
+TEST_CASE("ConcurrentGlobalFilterChanges", "[.multithreaded]")
+{
+	constexpr int NUM_WRITERS = 6;
+	constexpr int WRITE_ITERS = 4000;
+	constexpr int FLIP_ITERS  = 2000;
+
+	const int savedLevel  = log_filter_global_getMinLevel();
+	const int savedRepeat = log_filter_getRepeatLimit();
+
+	std::atomic<bool> startFlag{false};
+	std::atomic<int>  completed{0};
+
+	auto writer = [&](int tid) {
+		waitForStart(startFlag);
+		// every LOG_* reads the atomic global min level on the fast path; as the
+		// flipper toggles it, some records are rejected there and some pass on
+		for (int i = 0; i < WRITE_ITERS; ++i)
+			LOG_L(L_INFO, "[G%d] global %d", tid, i);
+		completed.fetch_add(1);
+	};
+
+	auto flipper = [&]() {
+		waitForStart(startFlag);
+		for (int i = 0; i < FLIP_ITERS; ++i) {
+			log_filter_global_setMinLevel((i & 1) ? LOG_LEVEL_DEBUG : LOG_LEVEL_WARNING);
+			log_filter_setRepeatLimit((i & 1) ? 1 : 5);
+		}
+	};
+
+	std::vector<std::thread> threads;
+	for (int t = 0; t < NUM_WRITERS; ++t)
+		threads.emplace_back(writer, t);
+	threads.emplace_back(flipper);
+
+	startFlag.store(true);
+	for (auto& th : threads)
+		th.join();
+
+	CHECK(completed.load() == NUM_WRITERS);
+
+	// restore the globals we churned so later cases see the original state
+	log_filter_global_setMinLevel(savedLevel);
+	log_filter_setRepeatLimit(savedRepeat);
+	ls.logStream.str(std::string());
 }
 
