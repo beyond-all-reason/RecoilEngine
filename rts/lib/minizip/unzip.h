@@ -61,11 +61,6 @@ extern "C" {
 
 #define Z_BZIP2ED 12
 
-/* Zstandard (PKWARE APPNOTE compression method 93). minizip itself does not
- * decode this; it is whitelisted so the entry can be opened in raw mode and
- * decompressed by the caller (see CZipArchive::GetFileImpl). */
-#define Z_ZSTDED 93
-
 #if defined(STRICTUNZIP) || defined(STRICTZIPUNZIP)
 /* like the STRICT of WIN32, we define a pointer that cannot be converted
     from (void*) without cast */

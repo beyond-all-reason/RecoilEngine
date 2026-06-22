@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <cassert>
+#include <fstream>
 
 #include <zstd.h>
 #include <zlib.h>
@@ -13,6 +14,19 @@
 #include "System/Log/ILog.h"
 #include "System/Threading/ThreadPool.h"
 #include "System/TimeUtil.h"
+
+namespace {
+	// PKWARE APPNOTE compression method for Zstandard entries.
+	constexpr uint16_t ZIP_METHOD_ZSTD = 93;
+
+	uint16_t rdLE16(const uint8_t* p) { return uint16_t(p[0]) | (uint16_t(p[1]) << 8); }
+	uint32_t rdLE32(const uint8_t* p) {
+		return uint32_t(p[0]) | (uint32_t(p[1]) << 8) | (uint32_t(p[2]) << 16) | (uint32_t(p[3]) << 24);
+	}
+	uint64_t rdLE64(const uint8_t* p) {
+		return uint64_t(rdLE32(p)) | (uint64_t(rdLE32(p + 4)) << 32);
+	}
+}
 
 IArchive* CZipArchiveFactory::DoCreateArchive(const std::string& filePath) const
 {
@@ -124,6 +138,93 @@ IArchive::SFileInfo CZipArchive::FileInfo(uint32_t fid) const
 	};
 }
 
+// Reads a zstd-compressed (method 93) entry. minizip cannot decode these and
+// rejects them in its open path, so we locate the raw frame directly from the
+// zip headers and decompress it with libzstd. The entry's central-directory
+// position is the unz_file_pos minizip already gave us when scanning.
+int CZipArchive::GetFileZstd(uint32_t fid, uint64_t compressedSize, uint64_t uncompressedSize, std::vector<std::uint8_t>& buffer)
+{
+	std::ifstream f(GetArchiveFile(), std::ios::binary);
+	if (!f)
+		return -4;
+
+	// Central directory file header (46-byte fixed part) for this entry.
+	const uint64_t cdOffset = fileEntries[fid].fp.pos_in_zip_directory;
+	uint8_t cd[46];
+	f.seekg(cdOffset);
+	f.read(reinterpret_cast<char*>(cd), sizeof(cd));
+	if (!f || rdLE32(cd) != 0x02014b50u)
+		return -3;
+
+	const uint16_t cdNameLen = rdLE16(cd + 28);
+	const uint16_t cdExtraLen = rdLE16(cd + 30);
+	uint64_t lhOffset = rdLE32(cd + 42); // relative offset of local header
+
+	// Zip64: a 0xFFFFFFFF offset lives in the Zip64 extended-info extra field.
+	if (lhOffset == 0xFFFFFFFFu) {
+		std::vector<uint8_t> extra(cdExtraLen);
+		f.seekg(cdOffset + 46 + cdNameLen);
+		if (cdExtraLen != 0)
+			f.read(reinterpret_cast<char*>(extra.data()), cdExtraLen);
+		if (!f)
+			return -3;
+
+		// Within tag 0x0001 the 8-byte fields appear only for the 32-bit fields
+		// that were set to 0xFFFFFFFF, in order: uncompressed, compressed, offset.
+		const size_t skip = (rdLE32(cd + 24) == 0xFFFFFFFFu ? 8 : 0)
+		                  + (rdLE32(cd + 20) == 0xFFFFFFFFu ? 8 : 0);
+		bool found = false;
+		for (size_t i = 0; i + 4 <= extra.size(); ) {
+			const uint16_t tag = rdLE16(&extra[i]);
+			const uint16_t sz = rdLE16(&extra[i + 2]);
+			if (tag == 0x0001 && i + 4 + skip + 8 <= extra.size()) {
+				lhOffset = rdLE64(&extra[i + 4 + skip]);
+				found = true;
+				break;
+			}
+			i += 4 + sz;
+		}
+		if (!found)
+			return -3;
+	}
+
+	// Local file header (30-byte fixed part); name/extra lengths can differ
+	// from the central-directory copy, so read them here.
+	uint8_t lh[30];
+	f.seekg(lhOffset);
+	f.read(reinterpret_cast<char*>(lh), sizeof(lh));
+	if (!f || rdLE32(lh) != 0x04034b50u)
+		return -3;
+
+	const uint64_t dataOffset = lhOffset + 30 + rdLE16(lh + 26) + rdLE16(lh + 28);
+
+	std::vector<std::uint8_t> compressed(compressedSize);
+	if (!compressed.empty()) {
+		f.seekg(dataOffset);
+		f.read(reinterpret_cast<char*>(compressed.data()), compressed.size());
+		if (!f)
+			return -1;
+	}
+
+	buffer.clear();
+	buffer.resize(uncompressedSize);
+
+	const size_t dSize = ZSTD_decompress(
+		buffer.empty() ? nullptr : buffer.data(), buffer.size(),
+		compressed.empty() ? nullptr : compressed.data(), compressed.size());
+	if (ZSTD_isError(dSize) || dSize != buffer.size()) {
+		buffer.clear();
+		return -1;
+	}
+
+	if (crc32(0, buffer.data(), buffer.size()) != fileEntries[fid].crc) {
+		buffer.clear();
+		return 0;
+	}
+
+	return 1;
+}
+
 // To simplify things, files are always read completely into memory from
 // the zip-file, since zlib does not provide any way of reading more
 // than one file at a time
@@ -154,40 +255,13 @@ int CZipArchive::GetFileImpl(uint32_t fid, std::vector<std::uint8_t>& buffer)
 	unz_file_info fi;
 	unzGetCurrentFileInfo(thisThreadZip, &fi, nullptr, 0, nullptr, 0, nullptr, 0);
 
-	// minizip cannot decode zstd entries (method 93). Read the raw compressed
-	// frame and decompress it here; CRC is verified manually since raw reads
-	// bypass minizip's CRC-on-close check (see unzip.h Z_ZSTDED note).
-	if (fi.compression_method == Z_ZSTDED) {
-		int method = 0;
-		int level = 0;
-		if (unzOpenCurrentFile2(thisThreadZip, &method, &level, 1 /*raw*/) != UNZ_OK)
-			return -3;
-
-		std::vector<std::uint8_t> compressed(fi.compressed_size);
-
-		const bool readOk = compressed.empty() ||
-			unzReadCurrentFile(thisThreadZip, compressed.data(), compressed.size()) == static_cast<int>(compressed.size());
-		unzCloseCurrentFile(thisThreadZip);
-
-		if (!readOk)
-			return -1;
-
-		buffer.clear();
-		buffer.resize(fi.uncompressed_size);
-
-		const size_t dSize = ZSTD_decompress(buffer.data(), buffer.size(), compressed.data(), compressed.size());
-		if (ZSTD_isError(dSize) || dSize != buffer.size()) {
-			buffer.clear();
-			return -1;
-		}
-
-		if (crc32(0, buffer.data(), buffer.size()) != fileEntries[fid].crc) {
-			buffer.clear();
-			return 0;
-		}
-
-		return 1;
-	}
+	// minizip can enumerate but not decode zstd entries (method 93). It also
+	// rejects method 93 in its open path, and the engine may link a prebuilt
+	// minizip we cannot patch. So for zstd entries we bypass minizip's decoder
+	// entirely: locate the raw frame via the zip headers and decompress it
+	// ourselves (see GetFileZstd).
+	if (fi.compression_method == ZIP_METHOD_ZSTD)
+		return GetFileZstd(fid, fi.compressed_size, fi.uncompressed_size, buffer);
 
 	if (unzOpenCurrentFile(thisThreadZip) != UNZ_OK)
 		return -3;

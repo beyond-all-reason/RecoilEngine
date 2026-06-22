@@ -1297,7 +1297,6 @@ local int unz64local_CheckCurrentFileCoherencyHeader(unz64_s* s, uInt* piSizeVar
 /* #ifdef HAVE_BZIP2 */
                          (s->cur_file_info.compression_method!=Z_BZIP2ED) &&
 /* #endif */
-                         (s->cur_file_info.compression_method!=Z_ZSTDED) &&
                          (s->cur_file_info.compression_method!=Z_DEFLATED))
         err=UNZ_BADZIPFILE;
 
@@ -1404,7 +1403,6 @@ extern int ZEXPORT unzOpenCurrentFile3(unzFile file, int* method,
 /* #ifdef HAVE_BZIP2 */
         (s->cur_file_info.compression_method!=Z_BZIP2ED) &&
 /* #endif */
-        (s->cur_file_info.compression_method!=Z_ZSTDED) &&
         (s->cur_file_info.compression_method!=Z_DEFLATED))
 
         err=UNZ_BADZIPFILE;
