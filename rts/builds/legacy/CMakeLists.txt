@@ -23,7 +23,7 @@ target_link_libraries(Game PRIVATE
 )
 
 ### Assemble libraries
-find_package(SDL2 REQUIRED)
+find_package(SDL2 MODULE REQUIRED)
 
 set(engineLibraries SDL2::SDL2)
 

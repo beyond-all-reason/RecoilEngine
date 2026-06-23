@@ -46,7 +46,7 @@ if    (NOT NO_SOUND)
 	find_package_static(OpenAL 1.18.2 REQUIRED)
 	find_package_static(OggVorbis 1.3.4 REQUIRED)
 
-	find_package(SDL2 REQUIRED)
+	find_package(SDL2 MODULE REQUIRED)
 
 	include_directories(${CMAKE_SOURCE_DIR}/include/)
 	include_directories(${CMAKE_SOURCE_DIR}/include/AL)
