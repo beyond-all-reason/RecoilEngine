@@ -17,7 +17,12 @@ class RecoilConan(ConanFile):
         self.requires("zstd/1.5.7", override=True)
         self.requires("ogg/1.3.5")
         self.requires("vorbis/1.3.7")
-        self.requires("sdl/2.32.10")
+        # On Linux we link against the system SDL2: the Conan recipe hard-links
+        # Wayland/EGL into the binary instead of dlopen-ing them at runtime (unlike
+        # X11), which breaks SDL's portable Linux model. On Windows there's no system
+        # SDL2 to rely on, so we take it from Conan.
+        if self.settings.os == "Windows":
+            self.requires("sdl/2.32.10")
         self.requires("libcurl/8.19.0")
         # There newer 3.5.* and 3.6.* branches fail to compile for us on mingw version
         # we use at the moment due to https://github.com/openssl/openssl/issues/29818
@@ -33,9 +38,10 @@ class RecoilConan(ConanFile):
         self.requires("openal-soft/1.23.1")
 
     def configure(self):
-        self.options["sdl"].shared = False
-        self.options["sdl"].vulkan = False
-        self.options["sdl"].opengles = False
+        if self.settings.os == "Windows":
+            self.options["sdl"].shared = False
+            self.options["sdl"].vulkan = False
+            self.options["sdl"].opengles = False
         self.options["zlib"].shared = False
         self.options["libcurl"].shared = False
         self.options["libcurl"].with_ssl = "openssl"  # Want openssl on all platforms
@@ -57,11 +63,6 @@ class RecoilConan(ConanFile):
         self.options["libcurl"].with_form_api = False
         self.options["libcurl"].with_websockets = False
 
-        if self.settings.os == "Linux":
-            self.options["sdl"].wayland = True
-            self.options["sdl"].pulse = False
-            self.options["sdl"].alsa = False
-            self.options["sdl"].hidapi = False
         if self.settings_build.os == "Windows":
             self.options["sdl"].directx = False
 

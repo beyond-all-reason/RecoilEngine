@@ -17,6 +17,7 @@ RUN apt-get update \
  && apt-get install --no-install-recommends --yes \
     file curl gcc-13 g++-13 git ninja-build curl p7zip-full \
     pkg-config python3.8 python3.8-distutils jq \
+    libsdl2-dev \
  && rm -rf /var/lib/apt/lists/*
 
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.8 10 \
