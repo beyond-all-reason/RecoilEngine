@@ -5,6 +5,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <cstring> // memset
 #include <cmath>
 #include <array>
@@ -431,7 +432,12 @@ inline size_t StablePosAllocator<T>::Allocate(size_t numElems)
 	if (positionToSize.empty()) {
 		size_t returnPos = data.size();
 		data.resize(data.size() + numElems);
-		myLog("StablePosAllocator<T>::Allocate(%u) = %u [thread_id = %u]", uint32_t(numElems), uint32_t(returnPos), static_cast<uint32_t>(Threading::GetCurrentThreadId()));
+		#ifdef __APPLE__
+		const uint32_t threadId = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(Threading::GetCurrentThreadId()));
+		#else
+		const uint32_t threadId = static_cast<uint32_t>(Threading::GetCurrentThreadId());
+		#endif
+		myLog("StablePosAllocator<T>::Allocate(%u) = %u [thread_id = %u]", uint32_t(numElems), uint32_t(returnPos), threadId);
 		return returnPos;
 	}
 
@@ -556,4 +562,3 @@ inline void StablePosAllocator<T>::Free(size_t firstElem, size_t numElems, const
 }
 
 #endif
-

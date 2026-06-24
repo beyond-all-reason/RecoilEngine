@@ -113,6 +113,7 @@ public:
 	static void InitFonts();
 	static void KillFonts();
 	static void Update();
+	static void UploadPendingGlyphAtlasTextures();
 	static bool AddFallbackFont(const std::string& fontfile);
 	static void ClearFallbackFonts();
 	static bool ClearAllGlyphs();

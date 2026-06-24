@@ -1000,6 +1000,20 @@ void CFontTexture::Update() {
 		eventHandler.FontsChanged();
 }
 
+void CFontTexture::UploadPendingGlyphAtlasTextures() {
+	assert(CFontTexture::sync.GetThreadSafety() || Threading::IsMainThread());
+	auto lock = CFontTexture::sync.GetScopedLock();
+
+	for (const auto& font : allFonts) {
+		auto lf = font.lock();
+		if (!lf)
+			continue;
+
+		if (lf->GlyphAtlasTextureNeedsUpload())
+			lf->UploadGlyphAtlasTexture();
+	}
+}
+
 const GlyphInfo& CFontTexture::GetGlyph(char32_t ch)
 {
 	RECOIL_DETAILED_TRACY_ZONE;

@@ -299,7 +299,7 @@ void CCamera::LoadMatrices() const
 void CCamera::LoadViewport() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+	globalRendering->LoadDefaultFramebufferViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 }
 
 

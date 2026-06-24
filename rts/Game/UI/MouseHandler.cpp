@@ -778,7 +778,11 @@ void CMouseHandler::ShowMouse()
 
 	hideCursor = false;
 
+#if defined(RECOIL_MACOS_SDL3_EGL)
+	SDL_SetWindowRelativeMouseMode(globalRendering->GetWindow(), false);
+#else
 	SDL_SetRelativeMouseMode(SDL_FALSE);
+#endif
 
 	// don't use SDL_ShowCursor here since it would cause flickering with hwCursor
 	// (by switching between default cursor and later the real one, e.g. `attack`)
@@ -802,7 +806,11 @@ void CMouseHandler::HideMouse()
 	// this way the mouse position will never change so it is also unnecessary to call
 	// SDL_WarpMouseInWindow and handle the associated wart of filtering motion events
 	// technically supersedes SDL_ShowCursor as well
+#if defined(RECOIL_MACOS_SDL3_EGL)
+	SDL_SetWindowRelativeMouseMode(globalRendering->GetWindow(), true);
+#else
 	SDL_SetRelativeMouseMode(SDL_TRUE);
+#endif
 
 	const int2 viewMouseCenter = GetViewMouseCenter();
 
