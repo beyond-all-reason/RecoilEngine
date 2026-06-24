@@ -3,6 +3,8 @@
 #ifndef ASS_IO_H
 #define ASS_IO_H
 
+#include <cmath>
+
 // assimp public headers modify #pragma pack across includes (clang -Wpragma-pack)
 #ifdef __clang__
 #pragma clang diagnostic push
