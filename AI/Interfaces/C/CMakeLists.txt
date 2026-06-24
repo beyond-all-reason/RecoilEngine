@@ -43,6 +43,13 @@ macro    (configure_native_skirmish_ai mySourceDirRel_var additionalSources_var 
 
 		# Create a list of all the AIs own source files
 		get_native_sources_recursive(mySources "${mySourceDir}" "${myDir}")
+		if    (APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES "arm64|aarch64")
+			set(appleArm64AngelScriptCallfunc "${mySourceDir}/lib/angelscript/source/as_callfunc_arm64_xcode.S")
+			if    (EXISTS "${appleArm64AngelScriptCallfunc}")
+				enable_language(ASM)
+				list(APPEND mySources "${appleArm64AngelScriptCallfunc}")
+			endif (EXISTS "${appleArm64AngelScriptCallfunc}")
+		endif (APPLE AND CMAKE_OSX_ARCHITECTURES MATCHES "arm64|aarch64")
 
 		# Compile the library
 		add_library(${myTarget} MODULE ${mySources} ${additionalSources} ${myVersionDepFile})

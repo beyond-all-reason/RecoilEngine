@@ -130,7 +130,9 @@ void CSound::Cleanup() {
 	if (hasAlcSoftLoopBack && sdlDeviceID != 0) {
 		LOG("[Sound::%s][SDL_CloseAudioDevice(%d)]", __func__, sdlDeviceID);
 		SDL_CloseAudioDevice(sdlDeviceID);
+#if !defined(RECOIL_MACOS_SDL3_EGL)
 		SDL_CloseAudio();
+#endif
 		SDL_QuitSubSystem(SDL_INIT_AUDIO);
 
 		sdlDeviceID = -1;
@@ -348,6 +350,10 @@ bool CSound::Mute()
 void CSound::DeviceChanged(uint32_t sdlDeviceIndex)
 {
 	// handles SDL_AUDIODEVICEREMOVED and SDL_AUDIODEVICEADDED
+#if defined(RECOIL_MACOS_SDL3_EGL)
+	LOG("[Sound::%s] SDL3 audio device change observed for device=%u; SDL audio stream migration is deferred for Thread 11+", __func__, sdlDeviceIndex);
+	return;
+#endif
 
 	if (!hasAlcSoftLoopBack || sdlDeviceIndex != sdlDeviceID)
 		return;
@@ -490,6 +496,12 @@ static const char* TypeName(ALCenum type)
 
 bool CSound::OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec)
 {
+#if defined(RECOIL_MACOS_SDL3_EGL)
+	(void)deviceName;
+	(void)obtainedSpec;
+	LOG("[Sound::%s] SDL3 audio stream migration deferred in Thread 10; falling back to openal-soft backends", __func__);
+	return false;
+#else
 	if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
 		LOG("[Sound::%s] failed to initialize SDL audio, error:  \"%s\"", __func__, SDL_GetError());
 		return false;
@@ -561,6 +573,7 @@ bool CSound::OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtaine
 	}
 
 	return true;
+#endif
 }
 
 void CSound::OpenLoopbackDevice(const std::string& deviceName)
@@ -614,13 +627,15 @@ void CSound::OpenLoopbackDevice(const std::string& deviceName)
 
 	attrs[2] = ALC_FORMAT_TYPE_SOFT;
 
-	switch (obtainedSpec.format) {
-		case AUDIO_U8    : { attrs[3] = ALC_UNSIGNED_BYTE_SOFT ; } break;
-		case AUDIO_S8    : { attrs[3] = ALC_BYTE_SOFT          ; } break;
-		case AUDIO_U16SYS: { attrs[3] = ALC_UNSIGNED_SHORT_SOFT; } break;
-		case AUDIO_S16SYS: { attrs[3] = ALC_SHORT_SOFT         ; } break;
-		case AUDIO_F32   : { attrs[3] = ALC_FLOAT_SOFT         ; } break;
-		default: {
+		switch (obtainedSpec.format) {
+			case AUDIO_U8    : { attrs[3] = ALC_UNSIGNED_BYTE_SOFT ; } break;
+			case AUDIO_S8    : { attrs[3] = ALC_BYTE_SOFT          ; } break;
+#ifdef AUDIO_U16SYS
+			case AUDIO_U16SYS: { attrs[3] = ALC_UNSIGNED_SHORT_SOFT; } break;
+#endif
+			case AUDIO_S16SYS: { attrs[3] = ALC_SHORT_SOFT         ; } break;
+			case AUDIO_F32   : { attrs[3] = ALC_FLOAT_SOFT         ; } break;
+			default: {
 			LOG("[Sound::%s] unhandled SDL format: 0x%04x", __func__, obtainedSpec.format);
 			Cleanup();
 			return;

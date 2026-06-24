@@ -79,7 +79,7 @@ namespace KeyInput {
 	void Update(int fakeMetaKey)
 	{
 		int numKeys = 0;
-		const uint8_t* kbState = SDL_GetKeyboardState(&numKeys);
+		const auto* kbState = SDL_GetKeyboardState(&numKeys);
 
 		keyMods = SDL_GetModState();
 
@@ -134,10 +134,17 @@ namespace KeyInput {
 
 			SDL_Event event;
 			event.type = event.key.type = SDL_KEYUP;
+#if defined(RECOIL_MACOS_SDL3_EGL)
+			event.key.down = false;
+			event.key.key = keycode;
+			event.key.mod = SDL_KMOD_NONE;
+			event.key.scancode = scancode;
+#else
 			event.key.state = SDL_RELEASED;
 			event.key.keysym.sym = keycode;
 			event.key.keysym.mod = 0;
 			event.key.keysym.scancode = scancode;
+#endif
 			SDL_PushEvent(&event);
 		}
 	}

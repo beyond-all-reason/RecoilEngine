@@ -73,7 +73,7 @@ static void TranslateStackTrace(StackTrace& stacktrace, const int logLevel)
 			stackFrame.path = "";
 		}
 
-		LOG_L(L_DEBUG, "\tsymbol = \"%s\", path = \"%s\", addr = 0x%lx", stackFrame.symbol.c_str(), path, stackFrame.ip);
+		LOG_L(L_DEBUG, "\tsymbol = \"%s\", path = \"%s\", addr = %p", stackFrame.symbol.c_str(), path, stackFrame.ip);
 	}
 
 	LOG_L(L_DEBUG, "[%s][2]", __func__);
@@ -116,7 +116,11 @@ static void TranslateStackTrace(StackTrace& stacktrace, const int logLevel)
 		execCommandString.clear();
 		stackFrameIndices.clear();
 
+	#if defined(__aarch64__) || defined(__arm64__)
+		execCommandBuffer << ADDR2LINE << " -o " << modulePath << " -arch arm64 -l " << std::hex << addrPathPair.first;
+	#else
 		execCommandBuffer << ADDR2LINE << " -o " << modulePath << " -arch x86_64 -l " << std::hex << addrPathPair.first;
+	#endif
 
 		// insert requested addresses that should be translated by atos
 		int i = 0;

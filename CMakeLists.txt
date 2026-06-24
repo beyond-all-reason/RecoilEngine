@@ -304,6 +304,8 @@ if    (USE_ASAN)
 	endif (MSVC)
 endif (USE_ASAN)
 
+option(RECOIL_MACOS_SDL3_EGL "Use project-local SDL3 Cocoa windowing and Mesa Cocoa EGL/Zink on macOS" ${APPLE})
+
 ### Tracy related stuff
 option(RECOIL_DETAILED_TRACY_ZONING "Enable additional detailed tracy zones (only enable this for testing/debugging)" FALSE)
 if    (RECOIL_DETAILED_TRACY_ZONING)
@@ -314,7 +316,12 @@ endif (RECOIL_DETAILED_TRACY_ZONING)
 
 # Note the missing REQUIRED, as headless & dedi may not depend on those.
 #  So req. checks are done in the build target's CMakeLists.txt.
-find_package(SDL2 MODULE)
+if (APPLE AND RECOIL_MACOS_SDL3_EGL)
+	find_package(SDL2 MODULE)
+	find_package(MesaEGL MODULE)
+else()
+	find_package(SDL2 MODULE)
+endif()
 
 find_package_static(DevIL 1.8.0 REQUIRED)
 
