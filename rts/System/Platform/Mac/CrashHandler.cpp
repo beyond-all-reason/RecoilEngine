@@ -116,11 +116,14 @@ static void TranslateStackTrace(StackTrace& stacktrace, const int logLevel)
 		execCommandString.clear();
 		stackFrameIndices.clear();
 
-	#if defined(__aarch64__) || defined(__arm64__)
-		execCommandBuffer << ADDR2LINE << " -o " << modulePath << " -arch arm64 -l " << std::hex << addrPathPair.first;
+	#if defined(__x86_64__) || defined(__amd64__) || defined(_M_X64) || defined(_M_AMD64)
+		constexpr const char* atosArch = "x86_64";
+	#elif defined(__aarch64__) || defined(_M_ARM64)
+		constexpr const char* atosArch = "arm64";
 	#else
-		execCommandBuffer << ADDR2LINE << " -o " << modulePath << " -arch x86_64 -l " << std::hex << addrPathPair.first;
+		#error "Unsupported architecture"
 	#endif
+		execCommandBuffer << ADDR2LINE << " -o " << modulePath << " -arch " << atosArch << " -l " << std::hex << addrPathPair.first;
 
 		// insert requested addresses that should be translated by atos
 		int i = 0;
