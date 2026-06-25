@@ -5589,6 +5589,11 @@ int LuaSyncedRead::GetUnitWeaponHaveFreeLineOfFire(lua_State* L)
  *
  * @function Spring.GetUnitWeaponCanFire
  * @param unitID integer
+ * @param weaponIndex integer
+ * @param ignoreAngle boolean?
+ * @param ignoreTargetType boolean?
+ * @param ignoreRequestedDir boolean?
+ * @return boolean canFire 
  */
 int LuaSyncedRead::GetUnitWeaponCanFire(lua_State* L)
 {
@@ -5749,6 +5754,7 @@ int LuaSyncedRead::GetUnitEstimatedPath(lua_State* L)
  *
  * @function Spring.GetUnitLastAttacker
  * @param unitID integer
+ * @return integer? attackerID
  */
 int LuaSyncedRead::GetUnitLastAttacker(lua_State* L)
 {
@@ -5769,6 +5775,7 @@ int LuaSyncedRead::GetUnitLastAttacker(lua_State* L)
  *
  * @function Spring.GetUnitLastAttackedPiece
  * @param unitID integer
+ * @return integer? pieceID
  */
 int LuaSyncedRead::GetUnitLastAttackedPiece(lua_State* L)
 {
@@ -5779,6 +5786,16 @@ int LuaSyncedRead::GetUnitLastAttackedPiece(lua_State* L)
  *
  * @function Spring.GetUnitCollisionVolumeData
  * @param unitID integer
+ * @return number scaleX
+ * @return number scaleY
+ * @return number scaleZ
+ * @return number offsetX
+ * @return number offsetY
+ * @return number offsetZ
+ * @return number volumeType (0 ellipsoid, 1 cylinder, 2 box, 3 sphere)
+ * @return number useContinuousCollision either 0 or 1
+ * @return number primaryAxis
+ * @return boolean ignoreHits
  */
 int LuaSyncedRead::GetUnitCollisionVolumeData(lua_State* L)
 {
@@ -5789,6 +5806,22 @@ int LuaSyncedRead::GetUnitCollisionVolumeData(lua_State* L)
 
 	return LuaUtils::PushColVolData(L, &unit->collisionVolume);
 }
+/***
+ *
+ * @function Spring.GetUnitPieceCollisionVolumeData
+ * @param unitID integer
+ * @param pieceID integer
+ * @return number scaleX
+ * @return number scaleY
+ * @return number scaleZ
+ * @return number offsetX
+ * @return number offsetY
+ * @return number offsetZ
+ * @return number volumeType (0 ellipsoid, 1 cylinder, 2 box, 3 sphere)
+ * @return number useContinuousCollision either 0 or 1
+ * @return number primaryAxis
+ * @return boolean ignoreHits
+ */
 
 int LuaSyncedRead::GetUnitPieceCollisionVolumeData(lua_State* L)
 {
@@ -5842,6 +5875,8 @@ int LuaSyncedRead::GetUnitSeparation(lua_State* L)
  *
  * @function Spring.GetUnitFeatureSeparation
  * @param unitID integer
+ * @param featureID integer
+ * @param only2D boolean?
  */
 int LuaSyncedRead::GetUnitFeatureSeparation(lua_State* L)
 {
@@ -5926,6 +5961,8 @@ int LuaSyncedRead::GetUnitDefDimensions(lua_State* L)
 /***
  *
  * @function Spring.GetCEGID
+ * @param cegName string
+ * @return integer cegID
  */
 int LuaSyncedRead::GetCEGID(lua_State* L)
 {
@@ -9039,6 +9076,7 @@ static int TraceRayGroundImpl(lua_State *const L, const float3 &pos, const float
  * @param dirX number
  * @param dirY number
  * @param dirZ number
+ * @param maxLength number? (Default: inf)
  * @param testWater boolean? (Default: `true`)
  * @return number rayLength
  * @return number posX
