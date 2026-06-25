@@ -6,8 +6,8 @@
 #include <cassert>
 #include <array>
 #include <utility>
-#include <cstdio>
 #include <string>
+#include "lib/fmt/include/fmt/format.h"
 
 #include "System/BranchPrediction.h"
 #include "System/creg/creg_cond.h"
@@ -840,9 +840,7 @@ public:
 	static constexpr float nrm_eps() { return 1e-12f; }
 
 	std::string str() const {
-		char buf[64];
-		std::snprintf(buf, sizeof(buf), "float3(%.3f, %.3f, %.3f)", x, y, z);
-		return buf;
+		return fmt::format("float3({:.3f}, {:.3f}, {:.3f})", x, y, z);
 	}
 
 	/**
