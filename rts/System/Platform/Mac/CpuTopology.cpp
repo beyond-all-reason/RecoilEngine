@@ -1,6 +1,7 @@
 /* This file is part of the Recoil engine (GPL v2 or later), see LICENSE.html */
 
 #include "System/Platform/CpuTopology.h"
+#include "System/BitUtils.h"
 #include <sys/sysctl.h>
 #include <thread>
 
@@ -16,12 +17,6 @@ unsigned int ReadSysctlUInt(const char* name) {
 	if (sysctlbyname(name, &value, &valueSize, nullptr, 0) != 0)
 		return 0;
 	return (value > 0) ? static_cast<unsigned int>(value) : 0;
-}
-
-unsigned int BitsForCount(unsigned int n) {
-	if (n == 0) return 0;
-	if (n >= 32) return 0xFFFFFFFFu;
-	return (1u << n) - 1u;
 }
 
 } // namespace
@@ -43,17 +38,17 @@ ProcessorMasks GetProcessorMasks() {
 	const unsigned int numECores = ReadSysctlUInt("hw.perflevel1.physicalcpu");
 
 	if (numPCores > 0) {
-		masks.performanceCoreMask = BitsForCount(numPCores);
+		masks.performanceCoreMask = spring::LowBitsMask(numPCores);
 		// E-cores occupy the bits above the P-cores in the combined mask.
 		const unsigned int totalCores = numPCores + numECores;
-		const unsigned int allMask = BitsForCount(totalCores);
+		const unsigned int allMask = spring::LowBitsMask(totalCores);
 		masks.efficiencyCoreMask = allMask & ~masks.performanceCoreMask;
 	} else {
 		// Intel Mac / unknown topology: treat the visible core count as
 		// homogeneous P-cores. Matches prior behavior on those targets.
 		unsigned int numCores = std::thread::hardware_concurrency();
 		if (numCores == 0) numCores = 4;
-		masks.performanceCoreMask = BitsForCount(numCores);
+		masks.performanceCoreMask = spring::LowBitsMask(numCores);
 		masks.efficiencyCoreMask = 0;
 	}
 
@@ -71,7 +66,7 @@ ProcessorCaches GetProcessorCache() {
 	ProcessorGroupCaches group;
 	unsigned int numCores = std::thread::hardware_concurrency();
 	if (numCores == 0) numCores = 4;
-	group.groupMask = BitsForCount(numCores);
+	group.groupMask = spring::LowBitsMask(numCores);
 
 	// Try to get cache sizes via sysctl
 	size_t size = sizeof(uint64_t);
