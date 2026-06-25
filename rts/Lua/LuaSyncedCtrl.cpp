@@ -3065,7 +3065,7 @@ int LuaSyncedCtrl::SetUnitSeismicSignature(lua_State* L)
  *
  * @function Spring.SetUnitLeavesGhost
  *
- * @number unitID
+ * @param unitID integer
  * @param leavesGhost boolean
  * @param leaveDeadGhost boolean? (Default: `false`) leave a dead ghost behind if disabling and the unit had a live static ghost.
  */
@@ -3196,6 +3196,7 @@ int LuaSyncedCtrl::SetUnitBuildParams(lua_State* L)
  * @param buildSpeed number
  * @param repairSpeed number?
  * @param reclaimSpeed number?
+ * @param resurrectSpeed number?
  * @param captureSpeed number?
  * @param terraformSpeed number?
  * @return nil
@@ -4015,6 +4016,7 @@ int LuaSyncedCtrl::SetUnitLandGoal(lua_State* L)
 /***
  * @function Spring.ClearUnitGoal
  * @param unitID integer
+ * @param cancelRawMovement boolean? whether raw movement is also cleared, default true
  * @return nil
  */
 int LuaSyncedCtrl::ClearUnitGoal(lua_State* L)
@@ -4603,6 +4605,7 @@ int LuaSyncedCtrl::RemoveObjectDecal(lua_State* L)
  * @function Spring.AddGrass
  * @param x number
  * @param z number
+ * @param grassLevel integer? 0-255, default 1
  * @return nil
  */
 int LuaSyncedCtrl::AddGrass(lua_State* L)
@@ -5705,6 +5708,7 @@ int LuaSyncedCtrl::SetProjectileTimeToLive(lua_State* L)
 /***
  * @function Spring.SetProjectileIsIntercepted
  * @param projectileID integer
+ * @param isIntercepted boolean
  */
 int LuaSyncedCtrl::SetProjectileIsIntercepted(lua_State* L)
 {
@@ -5846,8 +5850,8 @@ int LuaSyncedCtrl::SetPieceProjectileParams(lua_State* L)
 /***
  * @function Spring.SetProjectileCEG
  * @param projectileID integer
- * @param ceg_name string
- * @return nil
+ * @param ceg string|integer
+ * @return cegID integer
  */
 int LuaSyncedCtrl::SetProjectileCEG(lua_State* L)
 {
@@ -7635,7 +7639,7 @@ int LuaSyncedCtrl::SpawnExplosion(lua_State* L)
 
 /***
  * @function Spring.SpawnCEG
- * @param cegname string
+ * @param ceg string|integer
  * @param posX number? (Default: `0`)
  * @param posY number? (Default: `0`)
  * @param posZ number? (Default: `0`)
