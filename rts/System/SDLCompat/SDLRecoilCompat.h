@@ -5,6 +5,12 @@
 
 #if defined(RECOIL_MACOS_SDL3_EGL)
 
+/*
+ * The macOS SDL3/EGL runtime keeps Recoil's existing SDL2-shaped source
+ * contract at this include boundary. This is a source-compatibility facade:
+ * the linked runtime remains SDL3.
+ */
+
 #ifndef SDL_ENABLE_OLD_NAMES
 #define SDL_ENABLE_OLD_NAMES 1
 #endif

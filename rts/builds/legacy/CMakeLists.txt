@@ -16,10 +16,10 @@ target_link_libraries(Game PRIVATE
 	 SDL2::SDL2
 	 RmlUi::RmlUi
 	 ${sound-impl}
-		 prd::jsoncpp
-		 streflop
-		 fmt::fmt
-		 nowide::nowide
+	 prd::jsoncpp
+	 streflop
+	 fmt::fmt
+	 nowide::nowide
 	)
 
 ### Assemble libraries
@@ -87,8 +87,6 @@ add_executable(engine-legacy ${EXE_FLAGS} ${engineSources} ${ENGINE_ICON} ${engi
 target_link_libraries(engine-legacy ${engineLibraries} Game)
 
 if (APPLE AND RECOIL_MACOS_SDL3_EGL)
-	target_compile_definitions(engine-legacy PRIVATE RECOIL_MACOS_SDL3_EGL=1 SDL_ENABLE_OLD_NAMES=1)
-	target_include_directories(engine-legacy BEFORE PRIVATE "${ENGINE_SRC_ROOT_DIR}/System/SDLCompat")
 	target_link_options(engine-legacy PRIVATE
 		"SHELL:-framework Cocoa"
 		"SHELL:-framework Foundation"
