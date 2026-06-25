@@ -13,7 +13,9 @@
 #undef KeyRelease
 #else
 #include <unistd.h> // isatty
+#ifndef __APPLE__
 #include <X11/Xlib.h> // XInitThreads
+#endif
 
 #undef KeyPress
 #undef KeyRelease
