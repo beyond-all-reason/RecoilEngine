@@ -447,6 +447,9 @@ option(ENABLE_STREFLOP "build Spring with streflop support (REQUIRED FOR MULTIPL
 
 if (ENABLE_STREFLOP)
 	set(STREFLOP_AUTO ON CACHE BOOL "Enable STREFLOP autodetection" FORCE)
+	if (IS_ARM64_BUILD)
+		set(STREFLOP_NEON ON CACHE BOOL "Use ARM NEON for deterministic ARM64 streflop" FORCE)
+	endif ()
 else ()
 	add_definitions(-DNOT_USING_STREFLOP)
 endif ()

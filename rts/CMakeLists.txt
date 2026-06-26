@@ -34,6 +34,10 @@ if(DEBUG_GLSTATE)
 	add_definitions(-DDEBUG_GLSTATE)
 endif()
 
+if(ENABLE_STREFLOP AND STREFLOP_NEON)
+	add_definitions(-DSTREFLOP_NEON)
+endif()
+
 ### give error when not found
 find_package_static(DevIL REQUIRED)
 

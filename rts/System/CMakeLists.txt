@@ -1,4 +1,8 @@
 
+if(ENABLE_STREFLOP AND STREFLOP_NEON)
+	add_definitions(-DSTREFLOP_NEON)
+endif()
+
 # When USE_MIMALLOC is enabled, MemoryOverride.cpp handles operator new/delete with Tracy tracking.
 # Only compile TraceMemory.cpp when Tracy memory profiling is enabled but mimalloc is not used.
 if (TRACY_PROFILE_MEMORY AND NOT USE_MIMALLOC)
