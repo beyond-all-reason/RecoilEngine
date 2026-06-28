@@ -37,6 +37,8 @@
 #include "Sim/Units/Scripts/CobThread.h"
 #include "Sim/Units/Scripts/CobFile.h"
 #include "Sim/Units/Scripts/CobEngine.h"
+#include "Sim/Units/Scripts/RasFile.h"
+#include "Sim/Units/Scripts/RasEngine.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
@@ -193,6 +195,14 @@ namespace {
 		static_assert(false, "Not implemented <T>");
 		return cs;
 	}
+
+	inline uint32_t CheckSum(const RasInstr& instr, uint32_t cs = 0u) {
+		cs = spring::LiteHash(static_cast<uint32_t>(instr.op), cs);
+		cs = spring::LiteHash(static_cast<uint32_t>(instr.flags), cs);
+		cs = spring::LiteHash(instr.a, cs);
+		cs = spring::LiteHash(instr.b, cs);
+		return cs;
+	}
 }
 
 
@@ -248,6 +258,7 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 	#define DUMP_UNIT_MOVETYPE_DATA
 	#define DUMP_UNIT_BUILDER_DATA
 	#define DUMP_UNIT_SCRIPT_COB_DATA
+	#define DUMP_UNIT_SCRIPT_RAS_DATA
 	#define DUMP_UNIT_SCRIPT_ANIM
 	#define DUMP_FEATURE_DATA
 	#define DUMP_PROJECTILE_DATA
@@ -587,6 +598,59 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 		file << "\n";
 
 		auto zzzThreads = cobEngine->GetSleepingThreadIDs(); //copied on purpose
+		file << "\t\tSleepingThreads: " << zzzThreads.size();
+		file << "\t\t\twts|ids:";
+		while (!zzzThreads.empty()) {
+			const auto& zt = zzzThreads.top();
+			file << " " << zt.wt << "|" << zt.id;
+			zzzThreads.pop();
+		}
+		file << "\n";
+	}
+	#endif
+	#ifdef DUMP_UNIT_SCRIPT_RAS_DATA
+	{
+		file << "\tRasEngine:\n";
+		file << "\t\tcurrentTime: " << rasEngine->GetCurrTime();
+		file << "\t\tRasThreads: " << rasEngine->GetThreadInstances().size() << "\n";
+		for (const auto& [tid, thread] : rasEngine->GetThreadInstances()) {
+			auto ownerID = thread.rasInst ? thread.rasInst->GetUnit()->id : -1;
+			uint32_t offCs = 0;
+			uint32_t lenCs = 0;
+			uint32_t idxCs = 0;
+			uint32_t mapCs = 0;
+			if (thread.rasFile) {
+				offCs = CheckSum(thread.rasFile->scriptOffsets);
+				lenCs = CheckSum(thread.rasFile->scriptLengths);
+				idxCs = CheckSum(thread.rasFile->scriptIndex);
+				mapCs = CheckSum(thread.rasFile->scriptMap);
+			}
+			file
+				<< "\t\t\tid: " << tid << " t.id " << thread.GetID() << " t.wt " << thread.GetWakeTime()
+				<< " owner " << ownerID
+				<< " fn " << (thread.rasFile ? thread.rasFile->name : "(null)")
+				<< " format " << (thread.rasFile ? thread.rasFile->scriptFormat : -1)
+				<< " code cs " << CheckSum(thread.rasFile ? thread.rasFile->code : std::vector<int>{})
+				<< " decoded cs " << CheckSum(thread.rasFile ? thread.rasFile->decoded : std::vector<RasInstr>{})
+				<< " decodedOffsets cs " << CheckSum(thread.rasFile ? thread.rasFile->decodedOffsets : std::vector<int>{})
+				<< " scriptNames cs " << CheckSum(thread.rasFile ? thread.rasFile->scriptNames : std::vector<std::string>{})
+				<< " pieceNames cs " << CheckSum(thread.rasFile ? thread.rasFile->pieceNames : std::vector<std::string>{})
+				<< " scriptOffsets cs " << offCs
+				<< " scriptLengths cs " << lenCs
+				<< " scriptIndex cs " << idxCs
+				<< " scriptMap cs " << mapCs
+				<< " t.state " << +thread.GetState() << " t.sigmask " << thread.GetSignalMask()
+				<< " t.retc " << thread.GetRetCode()
+				<< " dead|garbage|waiting " << thread.IsDead() << "|" << thread.IsGarbage() << "|" << thread.IsWaiting() << "\n";
+		}
+		file << "\t\tWaitingThreads: " << rasEngine->GetWaitingThreadIDs().size();
+		file << "\t\t\tids:";
+		for (const auto id : rasEngine->GetWaitingThreadIDs()) {
+			file << " " << id;
+		}
+		file << "\n";
+
+		auto zzzThreads = rasEngine->GetSleepingThreadIDs();
 		file << "\t\tSleepingThreads: " << zzzThreads.size();
 		file << "\t\t\twts|ids:";
 		while (!zzzThreads.empty()) {

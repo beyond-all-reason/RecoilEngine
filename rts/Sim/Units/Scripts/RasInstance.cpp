@@ -24,6 +24,7 @@
 #include "Rendering/Env/Particles/Classes/SmokeProjectile.h"
 #include "Rendering/Env/Particles/Classes/WakeProjectile.h"
 #include "Rendering/Env/Particles/Classes/WreckProjectile.h"
+#include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Units/CommandAI/CommandAI.h"
 #include "Sim/Units/CommandAI/Command.h"
 #include "Sim/Units/UnitDef.h"
@@ -42,6 +43,12 @@
 /******************************************************************************/
 /******************************************************************************/
 
+CR_BIND(CRasRNG, )
+
+CR_REG_METADATA(CRasRNG, (
+	CR_MEMBER(state)
+))
+
 CR_BIND_DERIVED(CRasInstance, CUnitScript, )
 
 CR_REG_METADATA(CRasInstance, (
@@ -50,6 +57,7 @@ CR_REG_METADATA(CRasInstance, (
 
 	CR_MEMBER(staticVars),
 	CR_MEMBER(threadIDs),
+	CR_MEMBER(rng),
 
 	CR_POSTLOAD(PostLoad),
 	CR_PREALLOC(GetUnit)
@@ -71,6 +79,8 @@ void CRasInstance::Init()
 
 	staticVars.clear();
 	staticVars.resize(rasFile->numStaticVars, 0);
+
+	rng = CRasRNG(static_cast<uint32_t>(unit->id) + static_cast<uint32_t>(gs->frameNum));
 }
 
 void CRasInstance::PostLoad()

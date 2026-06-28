@@ -1,10 +1,10 @@
 ﻿/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef RAS_INSTANCE_H
-#define RAS_INSTANCE_H
+#pragma once
 
 #include "UnitScript.h"
 #include "Sim/Units/Unit.h"
+#include "RasRNG.h"
 
 
 #define PACKXZ(x,z) (((int)(x) << 16)+((int)(z) & 0xffff))
@@ -50,9 +50,11 @@ public:
 	std::vector<int> staticVars;
 	std::vector<int> threadIDs;
 
+	CRasRNG rng;
+
 public:
 	// creg only
-	CRasInstance(): CUnitScript(nullptr), rasFile(nullptr) {}
+	CRasInstance(): CUnitScript(nullptr), rasFile(nullptr), rng(0) {}
 	CRasInstance(CRasFile* cob, CUnit* unit): CUnitScript(unit), rasFile(cob) { Init(); }
 	~CRasInstance();
 
@@ -191,5 +193,3 @@ public:
 	float TargetWeight(int weaponNum, const CUnit* targetUnit) override;
 	void AnimFinished(AnimType type, int piece, int axis) override;
 };
-
-#endif // RAS_INSTANCE_H

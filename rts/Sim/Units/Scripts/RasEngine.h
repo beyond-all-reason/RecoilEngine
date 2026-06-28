@@ -1,7 +1,6 @@
 ﻿/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef RAS_ENGINE_H
-#define RAS_ENGINE_H
+#pragma once
 
 /*
  * Simple VM responsible for "scheduling" and running COB threads.
@@ -16,6 +15,7 @@
 #include "System/creg/STL_Queue.h"
 #include "System/creg/STL_Map.h"
 #include "System/Cpp11Compat.hpp"
+#include <mutex>
 
 class CRasThread;
 class CRasInstance;
@@ -107,6 +107,11 @@ public:
 
 	void AddDeferredCallin(CRasDeferredCallin&& deferredCallin);
 	void RunDeferredCallins();
+
+	/// Part VI: Merge per-thread deferred callins into the shared map.
+	void mergeThreadDeferredCallins(const std::vector<CRasDeferredCallin>& callins);
+
+
 private:
 	void TickThread(CRasThread* thread);
 
@@ -134,9 +139,13 @@ private:
 
 	int currentTime = 0;
 	int threadCounter = 0;
+
+
+#ifdef THREADPOOL
+	std::mutex scheduleMutex;
+#endif
 };
 
 
 extern CRasEngine* rasEngine;
 
-#endif // RAS_ENGINE_H

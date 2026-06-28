@@ -5,10 +5,20 @@
 
 #include <string>
 #include <array>
+#include <vector>
 
 #include "RasInstance.h"
 #include "Lua/LuaRules.h"
 
+// I.0 baseline harness: profiling-only opcode counter, see RasThread.cpp.
+// Zero-cost unless compiled with -DRAS_PROFILE_OPCODES.
+#ifdef RAS_PROFILE_OPCODES
+	#include <atomic>
+	#include <cstdint>
+	extern std::atomic<uint64_t> gRasOpcodeCount;
+#endif
+
+class CRasDeferredCallin;
 class CRasFile;
 class CRasInstance;
 
@@ -115,6 +125,16 @@ public:
 	bool IsGarbage() const { return (rasInst == nullptr); }
 	bool IsWaiting() const { return (waitAxis != -1); }
 
+	/// Part VII: Return the function ID at the bottom of the call stack (entry-point function).
+	int GetRootFunctionId() const {
+		return callStack.empty() ? -1 : callStack[0].functionId;
+	}
+
+	/// Part VI: Take ownership of this thread's deferred callins buffer (clears internal copy).
+	std::vector<CRasDeferredCallin> TakeDeferredCallins() {
+		return std::move(threadDeferredCallins);
+	}
+
 	// script instance that owns this thread
 	CRasInstance* rasInst = nullptr;
 	CRasFile* rasFile = nullptr;
@@ -177,6 +197,9 @@ protected:
 	// memory pool to speed up thread creation.
 	static std::vector<decltype(dataStack)> freeDataStacks;
 	static std::vector<decltype(callStack)> freeCallStacks;
+
+	/// Part VI: Collected deferred callins for this thread (merged into engine after Tick).
+	std::vector<CRasDeferredCallin> threadDeferredCallins;
 };
 
 #endif // RAS_THREAD_H

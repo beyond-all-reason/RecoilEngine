@@ -1,4 +1,4 @@
-﻿/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 
 #include "RasThread.h"
@@ -9,9 +9,46 @@
 #include "RasOpCodes.h"
 #include "RasEngine.h"
 #include "Sim/Misc/GlobalConstants.h"
-#include "Sim/Misc/GlobalSynced.h"
+
+#ifdef RAS_PROFILE_OPCODES
+	#include <atomic>
+	#include <cstdint>
+#endif
 
 #include "System/Misc/TracyDefs.h"
+
+// -----------------------------------------------------------------------------
+// I.0 Baseline & harness (RASC plan Part I.0)
+//
+// Compile-guarded opcode counter for the RAS* VM. This is a profiling-only
+// diagnostic and is ZERO-COST in normal/release builds: unless the translation
+// unit is compiled with -DRAS_PROFILE_OPCODES the RAS_COUNT_OPCODE() macro
+// expands to an empty statement and gRasOpcodeCount does not exist. The counter
+// is a relaxed atomic so it can be sampled from a headless bench harness without
+// data races; it NEVER feeds back into synced state, so determinism is preserved.
+//
+// Headless micro-bench (how to use this harness):
+//   1. Configure the build with the counter + detailed Tracy zones enabled, e.g.
+//        cmake -DCMAKE_CXX_FLAGS="-DRAS_PROFILE_OPCODES -DRECOIL_DETAILED_TRACY_ZONING" ...
+//      (MSVC: add /D RAS_PROFILE_OPCODES /D RECOIL_DETAILED_TRACY_ZONING).
+//   2. Run spring-headless on a minimal map/mod whose units use representative
+//      hot scripts (a constant-acceleration turret + a walker, e.g.
+//      constant_acceleration_turret_turning*.bos and a legged walker .bos),
+//      driving them every sim frame (aim/turn/walk).
+//   3. ns/tick: read the "CRasEngine::Tick" / "CRasThread::Tick" Tracy zones
+//      (connect tracy-profiler, or capture with tracy-capture for a CLI dump).
+//      opcodes/sec: the "RasOpcodes/tick" Tracy plot (sampled per sim Tick below)
+//      divided by the sim tick period, or sample gRasOpcodeCount before/after a
+//      fixed wall-clock window from a tiny harness.
+//   4. Record ns/tick and opcodes/sec on both GCC and MSVC as the I.0 baseline;
+//      every later Part I/VII change is measured against these numbers.
+// -----------------------------------------------------------------------------
+#ifdef RAS_PROFILE_OPCODES
+	std::atomic<uint64_t> gRasOpcodeCount{0};
+	#define RAS_COUNT_OPCODE() (gRasOpcodeCount.fetch_add(1, std::memory_order_relaxed))
+#else
+	#define RAS_COUNT_OPCODE() do {} while (0)
+#endif
 
 CR_BIND(CRasThread, )
 
@@ -38,7 +75,9 @@ CR_REG_METADATA(CRasThread, (
 
 	CR_MEMBER(luaArgs),
 	CR_MEMBER(callStack),
-	CR_MEMBER(dataStack)
+	CR_MEMBER(dataStack),
+
+	CR_IGNORED(threadDeferredCallins)
 ))
 
 CR_BIND(CRasThread::CallInfo,)
@@ -113,6 +152,7 @@ CRasThread& CRasThread::operator = (CRasThread&& t) {
 
 	rasInst = t.rasInst; t.rasInst = nullptr;
 	rasFile = t.rasFile; t.rasFile = nullptr;
+	threadDeferredCallins = std::move(t.threadDeferredCallins);
 	return *this;
 }
 
@@ -140,6 +180,7 @@ CRasThread& CRasThread::operator = (const CRasThread& t) {
 
 	rasInst = t.rasInst;
 	rasFile = t.rasFile;
+	threadDeferredCallins = t.threadDeferredCallins;
 	return *this;
 }
 
@@ -150,7 +191,14 @@ void CRasThread::Start(int functionId, int sigMask, const std::array<int, 1 + MA
 	assert(callStack.size() == 0);
 
 	state = Run;
-	pc = rasFile->scriptOffsets[functionId];
+	pc = rasFile->decodedOffsets[functionId];
+
+	// Part I.5: Pre-reserve data stack to avoid reallocations during Tick().
+	if (functionId >= 0 && functionId < static_cast<int>(rasFile->maxStackDepth.size())) {
+		const int mdepth = rasFile->maxStackDepth[functionId];
+		if (mdepth > static_cast<int>(dataStack.capacity()))
+			dataStack.reserve(mdepth);
+	}
 
 	paramCount = args[0];
 	signalMask = sigMask;
@@ -249,14 +297,16 @@ bool CRasThread::Tick()
 	int r1, r2, r3, r4, r5, r6;
 
 	while (state == Run) {
-		const int opcode = GET_LONG_PC();
+		const RasInstr& I = rasFile->decoded[pc];
+		pc++;
+		RAS_COUNT_OPCODE();
 
-		switch (opcode) {
-			case PUSH_CONSTANT: {
-				r1 = GET_LONG_PC();
+		switch (I.op) {
+			case static_cast<uint8_t>(RasOp::PushConstant): {
+				r1 = I.a;
 				PushDataStack(r1);
 			} break;
-			case SLEEP: {
+			case static_cast<uint8_t>(RasOp::Sleep): {
 				r1 = PopDataStack();
 				wakeTime = rasEngine->GetCurrTime() + r1;
 				state = Sleep;
@@ -264,32 +314,29 @@ bool CRasThread::Tick()
 				rasEngine->ScheduleThread(this);
 				return true;
 			} break;
-			case SPIN: {
-				r1 = GET_LONG_PC();
-				r2 = GET_LONG_PC();
-				r3 = PopDataStack();         // speed
-				r4 = PopDataStack();         // accel
+			case static_cast<uint8_t>(RasOp::Spin): {
+				r1 = I.a;
+				r2 = I.b;
+				r3 = PopDataStack();
+				r4 = PopDataStack();
 				rasInst->Spin(r1, r2, r3, r4);
 			} break;
-			case STOP_SPIN: {
-				r1 = GET_LONG_PC();
-				r2 = GET_LONG_PC();
-				r3 = PopDataStack();         // decel
+			case static_cast<uint8_t>(RasOp::StopSpin): {
+				r1 = I.a;
+				r2 = I.b;
+				r3 = PopDataStack();
 
 				rasInst->StopSpin(r1, r2, r3);
 			} break;
-			case RETURN: {
+			case static_cast<uint8_t>(RasOp::Return): {
 				retCode = PopDataStack();
 
 				if (LocalReturnAddr() == -1) {
 					state = Dead;
 
-					// leave values intact on stack in case caller wants to check them
-					// callStackSize -= 1;
 					return false;
 				}
 
-				// return to caller
 				pc = LocalReturnAddr();
 				if (dataStack.size() > LocalStackFrame())
 					dataStack.resize(LocalStackFrame());
@@ -297,48 +344,111 @@ bool CRasThread::Tick()
 				callStack.pop_back();
 			} break;
 
+			case static_cast<uint8_t>(RasOp::Shade): {
+				r1 = I.a;
+			} break;
+			case static_cast<uint8_t>(RasOp::DontShade): {
+				r1 = I.a;
+			} break;
+			case static_cast<uint8_t>(RasOp::Cache): {
+				r1 = I.a;
+			} break;
+			case static_cast<uint8_t>(RasOp::DontCache): {
+				r1 = I.a;
+			} break;
 
-			case SHADE: {
-				r1 = GET_LONG_PC();
-			} break;
-			case DONT_SHADE: {
-				r1 = GET_LONG_PC();
-			} break;
-			case CACHE: {
-				r1 = GET_LONG_PC();
-			} break;
-			case DONT_CACHE: {
-				r1 = GET_LONG_PC();
-			} break;
-
-			case SIGNATURE_LUA: {
+			case static_cast<uint8_t>(RasOp::SignatureLua): {
 				LOG_L(L_ERROR, "BAD ACCESS: Entered a lua method reference.");
 				state = Dead;
 				return false;
 			} break;
 
-			case BATCH_LUA: {
-				DeferredCall(false);
-			} break;
+			case static_cast<uint8_t>(RasOp::BatchLua): {
+				const int dr1 = I.a;
+				const int dr2 = I.b;
 
-			case CALL: {
-				r1 = GET_LONG_PC();
-				pc--;
-
-				if (rasFile->scriptNames[r1].find("lua_") == 0) {
-					rasFile->code[pc - 1] = LUA_CALL;
-					LuaCall();
+				if (!luaRules) {
+					retCode = 0;
 					break;
 				}
 
-				rasFile->code[pc - 1] = REAL_CALL;
+				if (static_cast<size_t>(dr1) >= rasFile->luaScripts.size()) {
+					retCode = 0;
+					break;
+				}
 
-			} [[fallthrough]];
-			case REAL_CALL: {
-				r1 = GET_LONG_PC();
-				r2 = GET_LONG_PC();
+				auto d = CRasDeferredCallin(rasInst->GetUnit(), rasFile->luaScripts[dr1], dataStack, dr2);
+				threadDeferredCallins.push_back(std::move(d));
+				retCode = 1;
+			} break;
 
-				// do not call zero-length functions
+			case static_cast<uint8_t>(RasOp::LuaUnsynced): {
+				const int dr1 = I.a;
+				const int dr2 = I.b;
+
+				if (!luaRules) {
+					break;
+				}
+
+				if (static_cast<size_t>(dr1) >= rasFile->luaScripts.size()) {
+					break;
+				}
+
+				auto d = CRasDeferredCallin(rasInst->GetUnit(), rasFile->luaScripts[dr1], dataStack, dr2);
+				threadDeferredCallins.push_back(std::move(d));
+			} break;
+
+			case static_cast<uint8_t>(RasOp::Call): {
+				r1 = I.a;
+
+				if (rasFile->scriptNames[r1].find("lua_") == 0) {
+					r2 = I.b;
+					CRasStackGuard guard{&dataStack, r2};
+
+					const int size = static_cast<int>(dataStack.size());
+					const int argCount = std::min(r2, MAX_LUA_COB_ARGS);
+					const int start = std::max(0, size - r2);
+					const int end = std::min(size, start + argCount);
+
+					for (int a = 0, i = start; i < end; i++) {
+						luaArgs[a++] = dataStack[i];
+					}
+
+					if (!luaRules) {
+						luaArgs[0] = 0;
+						retCode = 0;
+						break;
+					}
+
+					if (static_cast<size_t>(r1) >= rasFile->luaScripts.size()) {
+						luaArgs[0] = 0;
+						retCode = 0;
+						break;
+					}
+
+					int argsCount = argCount;
+					luaRules->syncedLuaHandle.Cob2Lua(rasFile->luaScripts[r1], rasInst->GetUnit(), argsCount, luaArgs);
+					retCode = luaArgs[0];
+				} else {
+					r2 = I.b;
+
+					if (rasFile->scriptLengths[r1] == 0)
+						break;
+
+					CallInfo& ci = PushCallStackRef();
+					ci.functionId = r1;
+					ci.returnAddr = pc;
+					ci.stackTop = dataStack.size() - r2;
+
+					paramCount = r2;
+
+					pc = rasFile->decodedOffsets[r1];
+				}
+			} break;
+			case static_cast<uint8_t>(RasOp::RealCall): {
+				r1 = I.a;
+				r2 = I.b;
+
 				if (rasFile->scriptLengths[r1] == 0)
 					break;
 
@@ -349,33 +459,56 @@ bool CRasThread::Tick()
 
 				paramCount = r2;
 
-				// call rasFile->scriptNames[r1]
-				pc = rasFile->scriptOffsets[r1];
+				pc = rasFile->decodedOffsets[r1];
 			} break;
-			case LUA_CALL: {
-				LuaCall();
+			case static_cast<uint8_t>(RasOp::LuaCall): {
+				r1 = I.a;
+				r2 = I.b;
+				CRasStackGuard guard{&dataStack, r2};
+
+				const int size = static_cast<int>(dataStack.size());
+				const int argCount = std::min(r2, MAX_LUA_COB_ARGS);
+				const int start = std::max(0, size - r2);
+				const int end = std::min(size, start + argCount);
+
+				for (int a = 0, i = start; i < end; i++) {
+					luaArgs[a++] = dataStack[i];
+				}
+
+				if (!luaRules) {
+					luaArgs[0] = 0;
+					retCode = 0;
+					break;
+				}
+
+				if (static_cast<size_t>(r1) >= rasFile->luaScripts.size()) {
+					luaArgs[0] = 0;
+					retCode = 0;
+					break;
+				}
+
+				int argsCount = argCount;
+				luaRules->syncedLuaHandle.Cob2Lua(rasFile->luaScripts[r1], rasInst->GetUnit(), argsCount, luaArgs);
+				retCode = luaArgs[0];
 			} break;
 
-
-			case POP_STATIC: {
-				r1 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::PopStatic): {
+				r1 = I.a;
 				r2 = PopDataStack();
 
 				if (static_cast<size_t>(r1) < rasInst->staticVars.size())
 					rasInst->staticVars[r1] = r2;
 			} break;
-			case POP_STACK: {
+			case static_cast<uint8_t>(RasOp::PopStack): {
 				PopDataStack();
 			} break;
 
-
-			case START: {
-				r1 = GET_LONG_PC();
-				r2 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::Start): {
+				r1 = I.a;
+				r2 = I.b;
 
 				if (rasFile->scriptLengths[r1] == 0)
 					break;
-
 
 				CRasThread t(rasInst);
 
@@ -383,18 +516,17 @@ bool CRasThread::Tick()
 				t.InitStack(r2, this);
 				t.Start(r1, signalMask, {{0}}, true);
 
-				// calling AddThread directly might move <this>, defer it
 				rasEngine->QueueAddThread(std::move(t));
 			} break;
 
-			case CREATE_LOCAL_VAR: {
+			case static_cast<uint8_t>(RasOp::CreateLocalVar): {
 				if (paramCount == 0) {
 					PushDataStack(0);
 				} else {
 					paramCount--;
 				}
 			} break;
-			case GET_UNIT_VALUE: {
+			case static_cast<uint8_t>(RasOp::GetUnitValue): {
 				r1 = PopDataStack();
 				if ((r1 >= LUA0) && (r1 <= LUA9)) {
 					PushDataStack(luaArgs[r1 - LUA0]);
@@ -404,150 +536,176 @@ bool CRasThread::Tick()
 				PushDataStack(r1);
 			} break;
 
-
-			case JUMP_NOT_EQUAL: {
-				r1 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::JumpNotEqual): {
+				r1 = I.a;
 				r2 = PopDataStack();
 
 				if (r2 == 0)
 					pc = r1;
-
 			} break;
-			case JUMP: {
-				r1 = GET_LONG_PC();
-				// this seem to be an error in the docs..
-				//r2 = rasFile->scriptOffsets[LocalFunctionID()] + r1;
-				pc = r1;
+			case static_cast<uint8_t>(RasOp::Jump): {
+				pc = I.a;
 			} break;
 
-
-			case POP_LOCAL_VAR: {
-				r1 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::PopLocalVar): {
+				r1 = I.a;
 				r2 = PopDataStack();
 				dataStack[LocalStackFrame() + r1] = r2;
 			} break;
-			case PUSH_LOCAL_VAR: {
-				r1 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::PushLocalVar): {
+				r1 = I.a;
 				r2 = dataStack[LocalStackFrame() + r1];
 				PushDataStack(r2);
 			} break;
 
-
-			case BITWISE_AND: {
+			case static_cast<uint8_t>(RasOp::BitwiseAnd): {
 				r1 = PopDataStack();
 				r2 = PopDataStack();
 				PushDataStack(r1 & r2);
 			} break;
-			case BITWISE_OR: {
+			case static_cast<uint8_t>(RasOp::BitwiseOr): {
 				r1 = PopDataStack();
 				r2 = PopDataStack();
 				PushDataStack(r1 | r2);
 			} break;
-			case BITWISE_XOR: {
+			case static_cast<uint8_t>(RasOp::BitwiseXor): {
 				r1 = PopDataStack();
 				r2 = PopDataStack();
 				PushDataStack(r1 ^ r2);
 			} break;
-			case BITWISE_NOT: {
+			case static_cast<uint8_t>(RasOp::BitwiseNot): {
 				r1 = PopDataStack();
 				PushDataStack(~r1);
 			} break;
 
-			case EXPLODE: {
-				r1 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::Explode): {
+				r1 = I.a;
 				r2 = PopDataStack();
 				rasInst->Explode(r1, r2);
 			} break;
 
-			case PLAY_SOUND: {
-				r1 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::PlaySound): {
+				r1 = I.a;
 				r2 = PopDataStack();
 				rasInst->PlayUnitSound(r1, r2);
 			} break;
 
-			case PUSH_STATIC: {
-				r1 = GET_LONG_PC();
+		case static_cast<uint8_t>(RasOp::PushStatic): {
+			r1 = I.a;
 
-				if (static_cast<size_t>(r1) < rasInst->staticVars.size())
-					PushDataStack(rasInst->staticVars[r1]);
-			} break;
+			if (static_cast<size_t>(r1) < rasInst->staticVars.size())
+				PushDataStack(rasInst->staticVars[r1]);
+		} break;
 
-			case SET_NOT_EQUAL: {
+		case static_cast<uint8_t>(RasOp::PushStaticIdx): {
+			r1 = I.a;
+			r2 = PopDataStack();
+			r3 = r1 + r2;
+
+			if (r3 < 0) {
+				r3 = 0;
+				ShowError("static array index out of range (low)");
+			}
+			if (static_cast<size_t>(r3) >= rasInst->staticVars.size()) {
+				r3 = static_cast<int>(rasInst->staticVars.size()) - 1;
+				ShowError("static array index out of range (high)");
+			}
+			if (r3 >= 0)
+				PushDataStack(rasInst->staticVars[r3]);
+		} break;
+
+		case static_cast<uint8_t>(RasOp::PopStaticIdx): {
+			r1 = I.a;
+			r2 = PopDataStack();
+			r3 = PopDataStack();
+			r4 = r1 + r3;
+
+			if (r4 < 0) {
+				r4 = 0;
+				ShowError("static array index out of range (low)");
+			}
+			if (static_cast<size_t>(r4) >= rasInst->staticVars.size()) {
+				r4 = static_cast<int>(rasInst->staticVars.size()) - 1;
+				ShowError("static array index out of range (high)");
+			}
+			if (r4 >= 0 && static_cast<size_t>(r4) < rasInst->staticVars.size())
+				rasInst->staticVars[r4] = r2;
+		} break;
+
+		case static_cast<uint8_t>(RasOp::SetNotEqual): {
 				r1 = PopDataStack();
 				r2 = PopDataStack();
 
 				PushDataStack(int(r1 != r2));
 			} break;
-			case SET_EQUAL: {
+			case static_cast<uint8_t>(RasOp::SetEqual): {
 				r1 = PopDataStack();
 				r2 = PopDataStack();
 
 				PushDataStack(int(r1 == r2));
 			} break;
 
-			case SET_LESS: {
+			case static_cast<uint8_t>(RasOp::SetLess): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
 
 				PushDataStack(int(r1 < r2));
 			} break;
-			case SET_LESS_OR_EQUAL: {
+			case static_cast<uint8_t>(RasOp::SetLessOrEqual): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
 
 				PushDataStack(int(r1 <= r2));
 			} break;
 
-			case SET_GREATER: {
+			case static_cast<uint8_t>(RasOp::SetGreater): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
 
 				PushDataStack(int(r1 > r2));
 			} break;
-			case SET_GREATER_OR_EQUAL: {
+			case static_cast<uint8_t>(RasOp::SetGreaterOrEq): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
 
 				PushDataStack(int(r1 >= r2));
 			} break;
 
-			case RAND: {
+			case static_cast<uint8_t>(RasOp::Rand): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
-				r3 = gsRNG.NextInt(r2 - r1 + 1) + r1;
+				r3 = rasInst->rng.NextInt(r2 - r1 + 1) + r1;
 				PushDataStack(r3);
 			} break;
-			case EMIT_SFX: {
+			case static_cast<uint8_t>(RasOp::EmitSfx): {
 				r1 = PopDataStack();
-				r2 = GET_LONG_PC();
+				r2 = I.a;
 				rasInst->EmitSfx(r1, r2);
 			} break;
-			case MUL: {
+			case static_cast<uint8_t>(RasOp::Mul): {
 				r1 = PopDataStack();
 				r2 = PopDataStack();
 				PushDataStack(r1 * r2);
 			} break;
 
-
-			case SIGNAL: {
+			case static_cast<uint8_t>(RasOp::Signal): {
 				r1 = PopDataStack();
 				rasInst->Signal(r1);
 			} break;
-			case SET_SIGNAL_MASK: {
+			case static_cast<uint8_t>(RasOp::SetSignalMask): {
 				r1 = PopDataStack();
 				signalMask = r1;
 			} break;
 
-
-			case TURN: {
+			case static_cast<uint8_t>(RasOp::Turn): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
-				r3 = GET_LONG_PC(); // piece
-				r4 = GET_LONG_PC(); // axis
+				r3 = I.a;
+				r4 = I.b;
 
 				rasInst->Turn(r3, r4, r1, r2);
 			} break;
-			case GET: {
+			case static_cast<uint8_t>(RasOp::Get): {
 				r5 = PopDataStack();
 				r4 = PopDataStack();
 				r3 = PopDataStack();
@@ -560,31 +718,31 @@ bool CRasThread::Tick()
 				r6 = rasInst->GetUnitVal(r1, r2, r3, r4, r5);
 				PushDataStack(r6);
 			} break;
-			case ADD: {
+			case static_cast<uint8_t>(RasOp::Add): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
 				PushDataStack(r1 + r2);
 			} break;
-			case SUB: {
+			case static_cast<uint8_t>(RasOp::Sub): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
 				r3 = r1 - r2;
 				PushDataStack(r3);
 			} break;
 
-			case DIV: {
+			case static_cast<uint8_t>(RasOp::Div): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
 
 				if (r2 != 0) {
 					r3 = r1 / r2;
 				} else {
-					r3 = 1000; // infinity!
+					r3 = 1000;
 					ShowError("division by zero");
 				}
 				PushDataStack(r3);
 			} break;
-			case MOD: {
+			case static_cast<uint8_t>(RasOp::Mod): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
 
@@ -596,41 +754,76 @@ bool CRasThread::Tick()
 				}
 			} break;
 
-
-			case MOVE: {
-				r1 = GET_LONG_PC();
-				r2 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::Move): {
+				r1 = I.a;
+				r2 = I.b;
 				r4 = PopDataStack();
 				r3 = PopDataStack();
 				rasInst->Move(r1, r2, r3, r4);
 			} break;
-			case MOVE_NOW: {
-				r1 = GET_LONG_PC();
-				r2 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::MoveNow): {
+				r1 = I.a;
+				r2 = I.b;
 				r3 = PopDataStack();
 				rasInst->MoveNow(r1, r2, r3);
 			} break;
-			case TURN_NOW: {
-				r1 = GET_LONG_PC();
-				r2 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::TurnNow): {
+				r1 = I.a;
+				r2 = I.b;
 				r3 = PopDataStack();
 				rasInst->TurnNow(r1, r2, r3);
 			} break;
-			case SCALE: {
-				r1 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::Scale): {
+				r1 = I.a;
 				r3 = PopDataStack();
 				r2 = PopDataStack();
 				rasInst->Scale(r1, r2, r3);
 			} break;
-			case SCALE_NOW: {
-				r1 = GET_LONG_PC();
-				r2 = PopDataStack();
-				rasInst->ScaleNow(r1, r2);
-			} break;
+		case static_cast<uint8_t>(RasOp::ScaleNow): {
+			r1 = I.a;
+			r2 = PopDataStack();
+			rasInst->ScaleNow(r1, r2);
+		} break;
 
-			case WAIT_TURN: {
-				r1 = GET_LONG_PC();
-				r2 = GET_LONG_PC();
+		case static_cast<uint8_t>(RasOp::TurnRel): {
+			r1 = PopDataStack();  // piece index
+			r2 = PopDataStack();  // angle
+			if (r1 < 0 || static_cast<size_t>(r1) >= rasFile->pieceNames.size()) {
+				ShowError("turn-rel: invalid piece");
+				break;
+			}
+			rasInst->TurnNow(r1, 2, r2);
+		} break;
+		case static_cast<uint8_t>(RasOp::MoveRel): {
+			r1 = PopDataStack();  // piece index
+			r2 = PopDataStack();  // delta
+			if (r1 < 0 || static_cast<size_t>(r1) >= rasFile->pieceNames.size()) {
+				ShowError("move-rel: invalid piece");
+				break;
+			}
+			rasInst->MoveNow(r1, 0, r2);
+		} break;
+		case static_cast<uint8_t>(RasOp::ExplodeRel): {
+			r1 = PopDataStack();  // piece index
+			if (r1 < 0 || static_cast<size_t>(r1) >= rasFile->pieceNames.size()) {
+				ShowError("explode-rel: invalid piece");
+				break;
+			}
+			rasInst->Explode(r1, 0);
+		} break;
+		case static_cast<uint8_t>(RasOp::ScaleRel): {
+			r1 = PopDataStack();  // piece index
+			r2 = PopDataStack();  // scale
+			if (r1 < 0 || static_cast<size_t>(r1) >= rasFile->pieceNames.size()) {
+				ShowError("scale-rel: invalid piece");
+				break;
+			}
+			rasInst->ScaleNow(r1, r2);
+		} break;
+
+		case static_cast<uint8_t>(RasOp::WaitTurn): {
+				r1 = I.a;
+				r2 = I.b;
 
 				if (rasInst->NeedsWait(CRasInstance::ATurn, r1, r2)) {
 					state = WaitTurn;
@@ -639,9 +832,9 @@ bool CRasThread::Tick()
 					return true;
 				}
 			} break;
-			case WAIT_MOVE: {
-				r1 = GET_LONG_PC();
-				r2 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::WaitMove): {
+				r1 = I.a;
+				r2 = I.b;
 
 				if (rasInst->NeedsWait(CRasInstance::AMove, r1, r2)) {
 					state = WaitMove;
@@ -650,8 +843,8 @@ bool CRasThread::Tick()
 					return true;
 				}
 			} break;
-			case WAIT_SCALE: {
-				r1 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::WaitScale): {
+				r1 = I.a;
 
 				if (rasInst->NeedsWait(CRasInstance::AScale, r1, -1)) {
 					state = WaitScale;
@@ -661,7 +854,7 @@ bool CRasThread::Tick()
 				}
 			} break;
 
-			case SET: {
+			case static_cast<uint8_t>(RasOp::Set): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
 
@@ -673,74 +866,92 @@ bool CRasThread::Tick()
 				rasInst->SetUnitVal(r1, r2);
 			} break;
 
-
-			case ATTACH: {
+			case static_cast<uint8_t>(RasOp::Attach): {
 				r3 = PopDataStack();
 				r2 = PopDataStack();
 				r1 = PopDataStack();
 				rasInst->AttachUnit(r2, r1);
 			} break;
-			case DROP: {
+			case static_cast<uint8_t>(RasOp::Drop): {
 				r1 = PopDataStack();
 				rasInst->DropUnit(r1);
 			} break;
 
-			// like bitwise ops, but only on values 1 and 0
-			case LOGICAL_NOT: {
+			case static_cast<uint8_t>(RasOp::LogicalNot): {
 				r1 = PopDataStack();
 				PushDataStack(int(r1 == 0));
 			} break;
-			case LOGICAL_AND: {
+			case static_cast<uint8_t>(RasOp::LogicalAnd): {
 				r1 = PopDataStack();
 				r2 = PopDataStack();
 				PushDataStack(int(r1 && r2));
 			} break;
-			case LOGICAL_OR: {
+			case static_cast<uint8_t>(RasOp::LogicalOr): {
 				r1 = PopDataStack();
 				r2 = PopDataStack();
 				PushDataStack(int(r1 || r2));
 			} break;
-			case LOGICAL_XOR: {
+			case static_cast<uint8_t>(RasOp::LogicalXor): {
 				r1 = PopDataStack();
 				r2 = PopDataStack();
 				PushDataStack(int((!!r1) ^ (!!r2)));
 			} break;
 
+			case static_cast<uint8_t>(RasOp::Absolute): {
+				r1 = PopDataStack();
+				PushDataStack(r1 < 0 ? -r1 : r1);
+			} break;
+			case static_cast<uint8_t>(RasOp::Minimum): {
+				r1 = PopDataStack();
+				r2 = PopDataStack();
+				PushDataStack(r1 < r2 ? r1 : r2);
+			} break;
+			case static_cast<uint8_t>(RasOp::Maximum): {
+				r1 = PopDataStack();
+				r2 = PopDataStack();
+				PushDataStack(r1 > r2 ? r1 : r2);
+			} break;
+			case static_cast<uint8_t>(RasOp::Sign): {
+				r1 = PopDataStack();
+				PushDataStack(r1 > 0 ? 1 : (r1 < 0 ? -1 : 0));
+			} break;
+			case static_cast<uint8_t>(RasOp::Clamp): {
+				r1 = PopDataStack();
+				r2 = PopDataStack();
+				r3 = PopDataStack();
+				if (r1 < r2) r1 = r2;
+				if (r1 > r3) r1 = r3;
+				PushDataStack(r1);
+			} break;
+			case static_cast<uint8_t>(RasOp::AddImm): {
+				r1 = PopDataStack();
+				PushDataStack(r1 + I.a);
+			} break;
+			case static_cast<uint8_t>(RasOp::MulImm): {
+				r1 = PopDataStack();
+				PushDataStack(r1 * I.a);
+			} break;
 
-			case HIDE: {
-				r1 = GET_LONG_PC();
+			case static_cast<uint8_t>(RasOp::Hide): {
+				r1 = I.a;
 				rasInst->SetVisibility(r1, false);
 			} break;
 
-			case SHOW: {
-				r1 = GET_LONG_PC();
+		case static_cast<uint8_t>(RasOp::Show): {
+			r1 = I.a;
 
-				int i;
-				for (i = 0; i < MAX_WEAPONS_PER_UNIT; ++i)
-					if (LocalFunctionID() == rasFile->scriptIndex[COBFN_FirePrimary + COBFN_Weapon_Funcs * i])
-						break;
-
-				// if true, we are in a Fire-script and should show a special flare effect
-				if (i < MAX_WEAPONS_PER_UNIT) {
-					rasInst->ShowFlare(r1);
-				} else {
-					rasInst->SetVisibility(r1, true);
-				}
-			} break;
+			if (I.flags & RAS_INSTR_IS_FIRE_FUNC) {
+				rasInst->ShowFlare(r1);
+			} else {
+				rasInst->SetVisibility(r1, true);
+			}
+		} break;
 
 			default: {
 				const char* name = rasFile->name.c_str();
 				const char* func = rasFile->scriptNames[LocalFunctionID()].c_str();
 
-				LOG_L(L_ERROR, "[COBThread::%s] unknown opcode %x (in %s:%s at %x)", __func__, opcode, name, func, pc - 1);
-
-				#if 0
-				auto ei = execTrace.begin();
-				while (ei != execTrace.end()) {
-					LOG_L(L_ERROR, "\tprogctr: %3x  opcode: %s", __func__, *ei, GetOpcodeName(rasFile->code[*ei]));
-					++ei;
-				}
-				#endif
+				LOG_L(L_ERROR, "[COBThread::%s] unknown opcode %x (in %s:%s at %x)", __func__, I.op, name, func, pc - 1);
 
 				state = Dead;
 				return false;
@@ -748,7 +959,6 @@ bool CRasThread::Tick()
 		}
 	}
 
-	// can arrive here as dead, through CRasInstance::Signal()
 	return (state != Dead);
 }
 

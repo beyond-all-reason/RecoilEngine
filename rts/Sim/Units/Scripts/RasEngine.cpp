@@ -1,14 +1,17 @@
-﻿/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 
 #include "RasEngine.h"
 
 #include "RasDeferredCallin.h"
+#include "RasInstance.h"
 #include "RasThread.h"
 #include "RasFile.h"
 
+#include <atomic>
 #include <cstdint>
 #include "System/Misc/TracyDefs.h"
+#include "System/Threading/ThreadPool.h"
 #include "Lua/LuaUI.h"
 
 CR_BIND(CRasEngine, )
@@ -26,7 +29,10 @@ CR_REG_METADATA(CRasEngine, (
 	CR_IGNORED(deferredCallins),
 
 	CR_MEMBER(currentTime),
-	CR_MEMBER(threadCounter)
+	CR_MEMBER(threadCounter),
+#ifdef THREADPOOL
+	CR_IGNORED(scheduleMutex),
+#endif
 ))
 
 CR_BIND(CRasEngine::SleepingThread, )
@@ -92,6 +98,9 @@ void CRasEngine::ProcessQueuedThreads() {
 void CRasEngine::ScheduleThread(const CRasThread* thread)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+#ifdef THREADPOOL
+	std::lock_guard<std::mutex> lock(scheduleMutex);
+#endif
 	switch (thread->GetState()) {
 		case CRasThread::Run: {
 			waitingThreadIDs.push_back(thread->GetID());
@@ -123,12 +132,19 @@ void CRasEngine::SanityCheckThreads(const CRasInstance* owner)
 void CRasEngine::TickThread(CRasThread* thread)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// for error messages originating in CUnitScript
 	curThread = thread;
 
-	// NB: threadID is still in <runningThreadIDs> here, TickRunningThreads clears it
-	if (thread != nullptr && !thread->Tick())
-		RemoveThread(thread->GetID());
+	if (thread != nullptr) {
+		thread->SetLastScriptError(false);
+		bool alive = thread->Tick();
+		auto callins = thread->TakeDeferredCallins();
+		if (!callins.empty()) {
+			mergeThreadDeferredCallins(callins);
+		}
+		if (!alive) {
+			RemoveThread(thread->GetID());
+		}
+	}
 
 	curThread = nullptr;
 }
@@ -173,18 +189,80 @@ void CRasEngine::WakeSleepingThreads()
 void CRasEngine::TickRunningThreads()
 {
 	ZoneScoped;
-	// advance all currently running threads
-	for (const int threadID: runningThreadIDs) {
-		TickThread(GetThread(threadID));
+
+	// Snapshot runningThreadIDs for this tick.  Threads scheduled during
+	// this tick are pushed to waitingThreadIDs/sleepingThreadIDs and will
+	// be picked up next frame.
+	std::vector<int> threadIDs;
+	threadIDs.swap(runningThreadIDs);
+
+	if (threadIDs.empty()) {
+		return;
 	}
 
-	// a thread can never go from running->running, so clear the list
-	// note: if preemption was to be added, this would no longer hold
-	// however, TA scripts can not run preemptively anyway since there
-	// aren't any synchronization methods available
-	runningThreadIDs.clear();
+	// Split into safe (parallel) and unsafe (serial) groups.
+	std::vector<int> safeIDs;
+	std::vector<int> unsafeIDs;
+	safeIDs.reserve(threadIDs.size());
 
-	// prepare threads that will run next frame
+	for (int tid : threadIDs) {
+		CRasThread* th = GetThread(tid);
+		if (th && th->rasFile && th->rasInst) {
+			const int funcId = th->GetRootFunctionId();
+			if (funcId >= 0 &&
+			    static_cast<size_t>(funcId) < th->rasFile->threadSafeFuncs.size() &&
+			    th->rasFile->threadSafeFuncs[funcId]) {
+				safeIDs.push_back(tid);
+				continue;
+			}
+		}
+		unsafeIDs.push_back(tid);
+	}
+
+	// Tick thread-safe scripts in parallel.
+	if (!safeIDs.empty()) {
+		std::vector<int> removedBuffer(safeIDs.size(), -1);
+		std::atomic<int> removedCount{0};
+
+		for_mt(0, static_cast<int>(safeIDs.size()), [&](int i) {
+			CRasThread* thread = GetThread(safeIDs[i]);
+			if (thread == nullptr) {
+				return;
+			}
+
+			thread->SetLastScriptError(false);
+
+			if (!thread->Tick()) {
+				int pos = removedCount.fetch_add(1);
+				removedBuffer[pos] = safeIDs[i];
+			}
+		});
+
+		// Drain deferred callins from all safe threads (alive and dead).
+		for (int i = 0; i < static_cast<int>(safeIDs.size()); ++i) {
+			CRasThread* th = GetThread(safeIDs[i]);
+			if (th) {
+				auto callins = th->TakeDeferredCallins();
+				if (!callins.empty()) {
+					mergeThreadDeferredCallins(callins);
+				}
+			}
+		}
+
+		// Remove dead threads after the parallel barrier.
+		for (int i = 0; i < removedCount.load(); ++i) {
+			if (removedBuffer[i] >= 0) {
+				RemoveThread(removedBuffer[i]);
+			}
+		}
+	}
+
+	// Tick unsafe scripts serially on the main thread.
+	for (int tid : unsafeIDs) {
+		TickThread(GetThread(tid));
+	}
+
+	// Prepare threads for next frame.
 	std::swap(runningThreadIDs, waitingThreadIDs);
 }
 
@@ -198,6 +276,16 @@ void CRasEngine::Tick(int deltaTime)
 
 	WakeSleepingThreads();
 	ProcessQueuedThreads();
+
+#ifdef RAS_PROFILE_OPCODES
+	// I.0 baseline harness: emit opcodes-executed-this-tick to Tracy so a
+	// headless capture yields opcodes/sec (divide by the sim tick period).
+	// Profiling-only; does not touch synced state.
+	static uint64_t prevOpcodeCount = 0;
+	const uint64_t curOpcodeCount = gRasOpcodeCount.load(std::memory_order_relaxed);
+	TracyPlot("RasOpcodes/tick", static_cast<int64_t>(curOpcodeCount - prevOpcodeCount));
+	prevOpcodeCount = curOpcodeCount;
+#endif
 }
 
 
@@ -236,5 +324,14 @@ void CRasEngine::RunDeferredCallins()
 		luaRules->unsyncedLuaHandle.Cob2LuaBatch(cmdStr, callins);
 		if (luaUI)
 			luaUI->Cob2LuaBatch(cmdStr, callins);
+	}
+}
+
+
+/// Part VI: Merge per-thread deferred callins into the shared map.
+void CRasEngine::mergeThreadDeferredCallins(const std::vector<CRasDeferredCallin>& callins)
+{
+	for (const auto& c : callins) {
+		deferredCallins[c.funcHash].push_back(c);
 	}
 }
