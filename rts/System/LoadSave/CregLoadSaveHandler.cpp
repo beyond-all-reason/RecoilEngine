@@ -36,6 +36,7 @@
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Units/CommandAI/CommandDescription.h"
 #include "Sim/Units/Scripts/CobEngine.h"
+#include "Sim/Units/Scripts/RasEngine.h"
 #include "Sim/Units/Scripts/UnitScriptEngine.h"
 #include "Sim/Units/Scripts/NullUnitScript.h"
 #include "Sim/Weapons/PlasmaRepulser.h"
@@ -86,6 +87,7 @@ void CGameStateCollector::Serialize(creg::ISerializer* s)
 	s->SerializeObjectInstance(&unitHandler, unitHandler.GetClass());
 	s->SerializeObjectInstance(&globalUnitParams, globalUnitParams.GetClass());
 	s->SerializeObjectInstance(cobEngine, cobEngine->GetClass());
+	s->SerializeObjectInstance(rasEngine, rasEngine->GetClass());
 	s->SerializeObjectInstance(unitScriptEngine, unitScriptEngine->GetClass());
 	s->SerializeObjectInstance(&CNullUnitScript::value, CNullUnitScript::value.GetClass());
 	s->SerializeObjectInstance(&featureHandler, featureHandler.GetClass());

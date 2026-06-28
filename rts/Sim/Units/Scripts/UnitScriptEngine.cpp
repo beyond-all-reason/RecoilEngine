@@ -6,6 +6,10 @@
 
 #include "CobEngine.h"
 #include "CobFileHandler.h"
+#include "CobInstance.h"
+#include "RasEngine.h"
+#include "RasFileHandler.h"
+#include "RasInstance.h"
 #include "UnitScript.h"
 #include "UnitScriptFactory.h"
 #include "Sim/Units/Unit.h"
@@ -15,6 +19,7 @@
 #include "System/HashSpec.h"
 #include "System/SafeUtil.h"
 #include "System/Config/ConfigHandler.h"
+#include "System/FileSystem/FileSystem.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -22,10 +27,14 @@ CONFIG(bool, AnimationMT).deprecated(true);
 
 static CCobEngine gCobEngine;
 static CCobFileHandler gCobFileHandler;
+static CRasEngine gRasEngine;
+static CRasFileHandler gRasFileHandler;
 static CUnitScriptEngine gUnitScriptEngine;
 
 CCobEngine* cobEngine = nullptr;
 CCobFileHandler* cobFileHandler = nullptr;
+CRasEngine* rasEngine = nullptr;
+CRasFileHandler* rasFileHandler = nullptr;
 CUnitScriptEngine* unitScriptEngine = nullptr;
 
 
@@ -43,10 +52,14 @@ void CUnitScriptEngine::InitStatic() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	cobEngine = &gCobEngine;
 	cobFileHandler = &gCobFileHandler;
+	rasEngine = &gRasEngine;
+	rasFileHandler = &gRasFileHandler;
 	unitScriptEngine = &gUnitScriptEngine;
 
 	cobEngine->Init();
 	cobFileHandler->Init();
+	rasEngine->Init();
+	rasFileHandler->Init();
 	unitScriptEngine->Init();
 }
 
@@ -54,10 +67,14 @@ void CUnitScriptEngine::KillStatic() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	cobEngine->Kill();
 	cobFileHandler->Kill();
+	rasEngine->Kill();
+	rasFileHandler->Kill();
 	unitScriptEngine->Kill();
 
 	cobEngine = nullptr;
 	cobFileHandler = nullptr;
+	rasEngine = nullptr;
+	rasFileHandler = nullptr;
 	unitScriptEngine = nullptr;
 }
 
@@ -66,6 +83,50 @@ void CUnitScriptEngine::KillStatic() {
 void CUnitScriptEngine::ReloadScripts(const UnitDef* udef)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	const std::string ext = FileSystem::GetExtensionLowerCase(udef->scriptName);
+
+	if (ext == "ras" || ext == "rasc") {
+		const CRasFile* oldScriptFile = rasFileHandler->GetScriptFile(udef->scriptName);
+
+		if (oldScriptFile == nullptr) {
+			LOG_L(L_WARNING, "[UnitScriptEngine::%s] unknown RAS script for unit \"%s\": %s", __func__, udef->name.c_str(), udef->scriptName.c_str());
+			return;
+		}
+
+		CRasFile* newScriptFile = rasFileHandler->ReloadRasFile(udef->scriptName);
+
+		if (newScriptFile == nullptr) {
+			LOG_L(L_WARNING, "[UnitScriptEngine::%s] could not load RAS script for unit \"%s\" from: %s", __func__, udef->name.c_str(), udef->scriptName.c_str());
+			return;
+		}
+
+		unsigned int count = 0;
+
+		for (unsigned int i = 0, n = unitHandler.MaxUnits(); i < n; i++) {
+			CUnit* unit = unitHandler.GetUnit(i);
+
+			if (unit == nullptr)
+				continue;
+
+			CUnitScript*& unitScript = unit->script;
+			CRasInstance* rasInstance = dynamic_cast<CRasInstance*>(unitScript);
+
+			if (rasInstance == nullptr || rasInstance->GetFile() != oldScriptFile)
+				continue;
+
+			count++;
+
+			spring::SafeDestruct(unitScript);
+
+			unitScript = CUnitScriptFactory::CreateRASScript(unit, newScriptFile);
+			unitScript->Create();
+		}
+
+		LOG("[UnitScriptEngine::%s] reloaded RAS scripts for %i units", __func__, count);
+		return;
+	}
+
 	const CCobFile* oldScriptFile = cobFileHandler->GetScriptFile(udef->scriptName);
 
 	if (oldScriptFile == nullptr) {
@@ -129,6 +190,7 @@ void CUnitScriptEngine::Tick(int deltaTime)
 	SCOPED_TIMER("CUnitScriptEngine::Tick");
 
 	cobEngine->Tick(deltaTime);
+	rasEngine->Tick(deltaTime);
 
 	// tick all (COB or LUS) script instances that have registered themselves as animating
 	{
@@ -161,4 +223,5 @@ void CUnitScriptEngine::Tick(int deltaTime)
 	}
 
 	cobEngine->RunDeferredCallins();
+	rasEngine->RunDeferredCallins();
 }

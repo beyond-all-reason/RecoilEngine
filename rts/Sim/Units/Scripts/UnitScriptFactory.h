@@ -7,6 +7,7 @@ struct UnitDef;
 
 struct lua_State;
 class CCobFile;
+class CRasFile;
 
 class CUnit;
 class CUnitScript;
@@ -19,6 +20,7 @@ public:
 	static CUnitScript* CreateScript(CUnit* unit, const UnitDef* udef);
 
 	static CUnitScript* CreateCOBScript(CUnit* unit, CCobFile* F);
+	static CUnitScript* CreateRASScript(CUnit* unit, CRasFile* F);
 	static CUnitScript* CreateLuaScript(CUnit* unit, lua_State* L);
 };
 
