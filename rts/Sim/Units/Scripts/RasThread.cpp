@@ -153,6 +153,8 @@ CRasThread& CRasThread::operator = (CRasThread&& t) {
 	rasInst = t.rasInst; t.rasInst = nullptr;
 	rasFile = t.rasFile; t.rasFile = nullptr;
 	threadDeferredCallins = std::move(t.threadDeferredCallins);
+	pendingSpawns = std::move(t.pendingSpawns);
+	parallelTick = t.parallelTick;
 	return *this;
 }
 
@@ -181,6 +183,8 @@ CRasThread& CRasThread::operator = (const CRasThread& t) {
 	rasInst = t.rasInst;
 	rasFile = t.rasFile;
 	threadDeferredCallins = t.threadDeferredCallins;
+	pendingSpawns = t.pendingSpawns;
+	parallelTick = t.parallelTick;
 	return *this;
 }
 
@@ -400,50 +404,25 @@ bool CRasThread::Tick()
 
 			case static_cast<uint8_t>(RasOp::Call): {
 				r1 = I.a;
+				r2 = I.b;
 
-				if (rasFile->scriptNames[r1].find("lua_") == 0) {
-					r2 = I.b;
-					CRasStackGuard guard{&dataStack, r2};
+				// lua_synced_*/lua_unsynced_* CALLs are pre-resolved to
+				// LuaCall/LuaUnsynced during decode, so here r1 is always a
+				// regular function index.
+				if (rasFile->scriptLengths[r1] == 0)
+					break;
+				// Never enter a Lua-signature (non-executable) body.
+				if (rasFile->luaScripts[r1].GetString()[0] != '\0')
+					break;
 
-					const int size = static_cast<int>(dataStack.size());
-					const int argCount = std::min(r2, MAX_LUA_COB_ARGS);
-					const int start = std::max(0, size - r2);
-					const int end = std::min(size, start + argCount);
+				CallInfo& ci = PushCallStackRef();
+				ci.functionId = r1;
+				ci.returnAddr = pc;
+				ci.stackTop = dataStack.size() - r2;
 
-					for (int a = 0, i = start; i < end; i++) {
-						luaArgs[a++] = dataStack[i];
-					}
+				paramCount = r2;
 
-					if (!luaRules) {
-						luaArgs[0] = 0;
-						retCode = 0;
-						break;
-					}
-
-					if (static_cast<size_t>(r1) >= rasFile->luaScripts.size()) {
-						luaArgs[0] = 0;
-						retCode = 0;
-						break;
-					}
-
-					int argsCount = argCount;
-					luaRules->syncedLuaHandle.Cob2Lua(rasFile->luaScripts[r1], rasInst->GetUnit(), argsCount, luaArgs);
-					retCode = luaArgs[0];
-				} else {
-					r2 = I.b;
-
-					if (rasFile->scriptLengths[r1] == 0)
-						break;
-
-					CallInfo& ci = PushCallStackRef();
-					ci.functionId = r1;
-					ci.returnAddr = pc;
-					ci.stackTop = dataStack.size() - r2;
-
-					paramCount = r2;
-
-					pc = rasFile->decodedOffsets[r1];
-				}
+				pc = rasFile->decodedOffsets[r1];
 			} break;
 			case static_cast<uint8_t>(RasOp::LuaCall): {
 				r1 = I.a;
@@ -493,14 +472,24 @@ bool CRasThread::Tick()
 
 				if (rasFile->scriptLengths[r1] == 0)
 					break;
+				// Never spawn a thread into a Lua-signature (non-executable) body.
+				if (rasFile->luaScripts[r1].GetString()[0] != '\0')
+					break;
 
 				CRasThread t(rasInst);
 
-				t.SetID(rasEngine->GenThreadID());
-				t.InitStack(r2, this);
-				t.Start(r1, signalMask, {{0}}, true);
-
-				rasEngine->QueueAddThread(std::move(t));
+				if (parallelTick) {
+					// Defer ID assignment + scheduling to after the parallel
+					// barrier so spawn order is deterministic (Part VII).
+					t.InitStack(r2, this);
+					t.Start(r1, signalMask, {{0}}, false);
+					AddPendingSpawn(std::move(t));
+				} else {
+					t.SetID(rasEngine->GenThreadID());
+					t.InitStack(r2, this);
+					t.Start(r1, signalMask, {{0}}, true);
+					rasEngine->QueueAddThread(std::move(t));
+				}
 			} break;
 
 			case static_cast<uint8_t>(RasOp::CreateLocalVar): {
@@ -658,7 +647,8 @@ bool CRasThread::Tick()
 			case static_cast<uint8_t>(RasOp::Rand): {
 				r2 = PopDataStack();
 				r1 = PopDataStack();
-				r3 = rasInst->rng.NextInt(r2 - r1 + 1) + r1;
+				const int range = r2 - r1 + 1;
+				r3 = (range > 0) ? (rasInst->rng.NextInt(range) + r1) : r1;
 				PushDataStack(r3);
 			} break;
 			case static_cast<uint8_t>(RasOp::EmitSfx): {
@@ -958,71 +948,6 @@ void CRasThread::ShowError(const char* msg)
 	LOG_L(L_ERROR, "[COBThread::%s] %s (in %s:%s at %x)", __func__, msg, name, func, pc - 1);
 }
 
-
-void CRasThread::DeferredCall(bool synced)
-{
-	const int r1 = GET_LONG_PC(); // script id
-	const int r2 = GET_LONG_PC(); // arg count
-
-	// Make sure to clean args from stack on exit
-	CRasStackGuard guard{&dataStack, r2};
-
-	// sanity checks
-	if (!luaRules) {
-		retCode = 0;
-		return;
-	}
-
-	// check script index validity
-	if (static_cast<size_t>(r1) >= rasFile->luaScripts.size()) {
-		retCode = 0;
-		return;
-	}
-
-	// setup the parameter array
-	auto d = CCobDeferredCallin(rasInst->GetUnit(), rasFile->luaScripts[r1], dataStack, r2);
-
-	rasEngine->AddDeferredCallin(std::move(d));
-
-	// always succeeds
-	retCode = 1;
-}
-
-
-void CRasThread::LuaCall()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	const int r1 = GET_LONG_PC(); // script id
-	const int r2 = GET_LONG_PC(); // arg count
-
-	// Make sure to clean args from stack on exit
-	CRasStackGuard guard{&dataStack, r2};
-
-	// setup the parameter array
-	const int size = static_cast<int>(dataStack.size());
-	const int argCount = std::min(r2, MAX_LUA_COB_ARGS);
-	const int start = std::max(0, size - r2);
-	const int end = std::min(size, start + argCount);
-
-	for (int a = 0, i = start; i < end; i++) {
-		luaArgs[a++] = dataStack[i];
-	}
-
-	if (!luaRules) {
-		luaArgs[0] = 0; // failure
-		return;
-	}
-
-	// check script index validity
-	if (static_cast<size_t>(r1) >= rasFile->luaScripts.size()) {
-		luaArgs[0] = 0; // failure
-		return;
-	}
-
-	int argsCount = argCount;
-	luaRules->syncedLuaHandle.Cob2Lua(rasFile->luaScripts[r1], rasInst->GetUnit(), argsCount, luaArgs);
-	retCode = luaArgs[0];
-}
 
 void CRasThread::AnimFinished(CUnitScript::AnimType type, int piece, int axis)
 {

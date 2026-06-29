@@ -9,6 +9,7 @@
 #include "RasFile.h"
 
 #include <atomic>
+#include <algorithm>
 #include <cstdint>
 #include "System/Misc/TracyDefs.h"
 #include "System/UnorderedSet.hpp"
@@ -236,11 +237,27 @@ void CRasEngine::TickRunningThreads()
 				return;
 			}
 
+			thread->SetParallel(true);
 			if (!thread->Tick()) {
 				int pos = removedCount.fetch_add(1);
 				removedBuffer[pos] = safeIDs[i];
 			}
+			thread->SetParallel(false);
 		});
+
+		// Assign IDs + schedule START spawns in deterministic safeIDs order
+		// (no GenThreadID/QueueAddThread races inside for_mt) -> sync-stable.
+		for (int i = 0; i < static_cast<int>(safeIDs.size()); ++i) {
+			CRasThread* th = GetThread(safeIDs[i]);
+			if (!th)
+				continue;
+			auto spawns = th->TakePendingSpawns();
+			for (auto& s : spawns) {
+				s.SetID(GenThreadID());
+				ScheduleThread(&s);
+				QueueAddThread(std::move(s));
+			}
+		}
 
 		// Drain deferred callins from all safe threads (alive and dead).
 		for (int i = 0; i < static_cast<int>(safeIDs.size()); ++i) {
@@ -318,11 +335,21 @@ void CRasEngine::RunDeferredCallins()
 	for(auto& it: deferredCallins)
 		funcHashes.push_back(it.first);
 
+	// Deterministic replay: dispatch buckets in funcHash order, and within
+	// each bucket order callins by unitID so unsynced callbacks reproduce
+	// identically regardless of MT worker scheduling (Part VI).
+	std::sort(funcHashes.begin(), funcHashes.end());
+
 	for(auto funcHash: funcHashes) {
 		auto it = deferredCallins.find(funcHash); // 'it' has to necessarily be present at this point
 
 		auto callins = std::move(it->second);
 		deferredCallins.erase(it);
+
+		std::stable_sort(callins.begin(), callins.end(),
+			[](const CCobDeferredCallin& a, const CCobDeferredCallin& b) {
+				return a.unit->id < b.unit->id;
+			});
 
 		const LuaHashString cmdStr = LuaHashString(callins[0].funcName.c_str());
 		luaRules->unsyncedLuaHandle.Cob2LuaBatch(cmdStr, callins);

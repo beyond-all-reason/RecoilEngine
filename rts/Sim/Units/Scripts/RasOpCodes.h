@@ -175,6 +175,14 @@ inline bool RasOpIsThreadSafe(RasOp op)
 		// Explicitly UNSAFE - touches global Lua state
 		case RasOp::LuaCall:
 		case RasOp::SignatureLua:
+		// UNSAFE - touch global gsRNG (Explode), shared sound/sfx state, or
+		// cross-unit references; must run on the serial path (Part V).
+		case RasOp::Explode:
+		case RasOp::ExplodeRel:
+		case RasOp::EmitSfx:
+		case RasOp::Attach:
+		case RasOp::Drop:
+		case RasOp::Set:
 			return false;
 		// Everything else is thread-safe
 		default:

@@ -48,7 +48,12 @@ CUnitScript* CUnitScriptFactory::CreateScript(CUnit* unit, const UnitDef* udef)
 		return script;
 	}
 
-	if (ext == "ras" || ext == "rasc") {
+	if (ext == "ras") {
+		LOG_L(L_WARNING, "[UnitScriptFactory::%s] \"%s\" is RAS source; only compiled .rasc is loadable (compile with rasc_compiler.py)", __func__, udef->scriptName.c_str());
+		return script;
+	}
+
+	if (ext == "rasc") {
 		CRasFile* file = rasFileHandler->GetRasFile(udef->scriptName);
 
 		if (file != nullptr)

@@ -63,6 +63,9 @@ private:
 	/// Part V: Determine which functions are thread-safe
 	void analyzeThreadSafety();
 
+	/// Validate decoded stream: opcodes, offsets, jump/call targets in range.
+	bool validateDecoded();
+
 public:
 	int numStaticVars = 0;
 	/// Script format: RasFmtCOB or RasFmtRASC

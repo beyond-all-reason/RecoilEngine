@@ -93,6 +93,10 @@ public:
 		rasFile = nullptr;
 	}
 
+	/// Part VII: while set, START defers spawns into pendingSpawns instead of
+	/// touching the shared scheduler (GenThreadID/QueueAddThread) concurrently.
+	void SetParallel(bool p) { parallelTick = p; }
+
 
 	/**
 	 * @brief Checks whether the stack has at least size items.
@@ -135,6 +139,13 @@ public:
 		return std::move(threadDeferredCallins);
 	}
 
+	/// Part VII: Take threads spawned (by START) during a parallel tick; the
+	/// engine assigns IDs + schedules them deterministically after the barrier.
+	std::vector<CRasThread> TakePendingSpawns() {
+		return std::move(pendingSpawns);
+	}
+	void AddPendingSpawn(CRasThread&& t) { pendingSpawns.push_back(std::move(t)); }
+
 	// script instance that owns this thread
 	CRasInstance* rasInst = nullptr;
 	CRasFile* rasFile = nullptr;
@@ -146,9 +157,6 @@ protected:
 		int returnAddr = -1;
 		int stackTop = -1;
 	};
-
-	void LuaCall();
-	void DeferredCall(bool synced);
 
 	void PushCallStack(CallInfo v) { callStack.push_back(v); }
 	void PushDataStack(int v) { dataStack.push_back(v); }
@@ -191,6 +199,9 @@ protected:
 
 	State state = Init;
 
+	/// Part VII: true while executing on the parallel (safe) path.
+	bool parallelTick = false;
+
 	CRasInstance::ThreadCallbackType cbType = CRasInstance::CBNone;
 
 	// Hold references to the stacks from destructed threads working as a
@@ -200,6 +211,9 @@ protected:
 
 	/// Part VI: Collected deferred callins for this thread (merged into engine after Tick).
 	std::vector<CCobDeferredCallin> threadDeferredCallins;
+
+	/// Part VII: Threads spawned by START while running on the parallel path.
+	std::vector<CRasThread> pendingSpawns;
 };
 
 #endif // RAS_THREAD_H

@@ -118,8 +118,12 @@ CRasFile::CRasFile(CFileHandler& in, const std::string& scriptName)
 		uint32_t magic = 0;
 		memcpy(&magic, rasFileData.data(), 4);
 		if (magic == 0x43534152) {  // "RASC"
-			if (loadRascFormat(rasFileData.data(), rasFileData.size()))
-				return;
+			// Fail closed: a corrupt RASC file must NOT be reinterpreted as COB.
+			if (!loadRascFormat(rasFileData.data(), rasFileData.size())) {
+				LOG_L(L_FATAL, "[%s] invalid RASC script \"%s\"", __func__, name.c_str());
+				scriptNames.clear();
+			}
+			return;
 		}
 	}
 
@@ -228,6 +232,9 @@ CRasFile::CRasFile(CFileHandler& in, const std::string& scriptName)
 		scriptIndex[pair.second] = fn;
 	}
 
+	// VERIFY: warn (don't reject) on malformed legacy COB control flow.
+	if (!validateDecoded())
+		LOG_L(L_WARNING, "[CRasFile] script \"%s\" decoded-stream validation warnings", name.c_str());
 }
 
 
@@ -404,7 +411,9 @@ struct RascHeader {
 static_assert(sizeof(RascHeader) == 48, "RascHeader size mismatch");
 
 /// Per-script metadata in the ScriptInfo block (16 bytes each).
-struct __attribute__((packed)) RascScriptInfo {
+/// Parsed field-by-field on load, so no packing attribute is needed (and
+/// __attribute__((packed)) is not portable to MSVC). Layout is 16 bytes.
+struct RascScriptInfo {
 	int32_t  decodedOffset;
 	int32_t  maxStackDepth;
 	uint8_t  threadSafe;
@@ -481,10 +490,17 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 				return false;
 			}
 			const char* s = reinterpret_cast<const char*>(data + pos);
+			const size_t maxLen = dataSize - pos;
+			const size_t slen = strnlen(s, maxLen);
+			if (slen == maxLen) {
+				LOG_L(L_ERROR, "[%s] unterminated script name at index %u", __func__, i);
+				return false;
+			}
 			scriptNames.emplace_back(s);
-			pos += strlen(s) + 1;  // +1 for null terminator
+			pos += slen + 1;  // +1 for null terminator
 
-			// Detect Lua scripts by name prefix
+			// Detect Lua scripts by name prefix; isLuaScript field (script-info
+			// pass below) is the authoritative override.
 			if (scriptNames.back().find("lua_synced_") == 0) {
 				luaScripts.emplace_back(scriptNames.back().c_str() + sizeof("lua_synced_") - 1);
 			} else if (scriptNames.back().find("lua_unsynced_") == 0) {
@@ -504,8 +520,14 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 				return false;
 			}
 			const char* s = reinterpret_cast<const char*>(data + pos);
+			const size_t maxLen = dataSize - pos;
+			const size_t slen = strnlen(s, maxLen);
+			if (slen == maxLen) {
+				LOG_L(L_ERROR, "[%s] unterminated piece name at index %u", __func__, i);
+				return false;
+			}
 			pieceNames.emplace_back(StringToLower(s));
-			pos += strlen(s) + 1;
+			pos += slen + 1;
 		}
 	}
 
@@ -527,7 +549,12 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 			decodedOffsets[i] = readLe32s(infoPtr, off + 0);
 			maxStackDepth[i]  = readLe32s(infoPtr, off + 4);
 			threadSafeFuncs[i] = infoPtr[off + 8];
-			// isLuaScript at off+9 is redundant with luaScripts vector
+			// isLuaScript at off+9 is authoritative: mark Lua signature
+			// functions as references so the lua-detection path matches the
+			// compiler even when the name lacks the lua_* prefix.
+			if (infoPtr[off + 9] && luaScripts[i].GetString()[0] == '\0') {
+				luaScripts[i] = LuaHashString(scriptNames[i].c_str());
+			}
 		}
 	}
 
@@ -597,8 +624,12 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 		size_t pos = offSoundNames;
 		for (uint32_t i = 0; i < numSounds; ++i) {
 			if (pos >= dataSize) break;
-			const std::string s = reinterpret_cast<const char*>(data + pos);
-			pos += s.size() + 1;
+			const char* sp = reinterpret_cast<const char*>(data + pos);
+			const size_t maxLen = dataSize - pos;
+			const size_t slen = strnlen(sp, maxLen);
+			if (slen == maxLen) break;
+			const std::string s = sp;
+			pos += slen + 1;
 
 			if (sound->HasSoundItem(s)) {
 				sounds.push_back(sound->GetSoundId(s));
@@ -625,6 +656,48 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 	// ---- Part V: Analyze thread-safety of each function ----
 	analyzeThreadSafety();
 
+	// ---- Part I VERIFY: fail closed on malformed control flow / opcodes ----
+	if (!validateDecoded()) {
+		LOG_L(L_ERROR, "[%s] RASC script \"%s\" failed decoded-stream validation", __func__, name.c_str());
+		return false;
+	}
+
+	return true;
+}
+
+
+// Validate the decoded stream so Tick() can index decoded[pc] without
+// per-instruction bounds checks: every funcId is in range, jump/call targets
+// land on real instructions, no BadOpcode remains, and stream is non-empty.
+bool CRasFile::validateDecoded()
+{
+	const int nInstr = static_cast<int>(decoded.size());
+	const int nFuncs = static_cast<int>(scriptNames.size());
+	if (nInstr == 0)
+		return false;
+
+	for (int fi = 0; fi < nFuncs; ++fi) {
+		const int off = decodedOffsets[fi];
+		if (off == -1)
+			continue;  // lua signature / non-executable
+		if (off < 0 || off >= nInstr)
+			return false;
+	}
+
+	for (int i = 0; i < nInstr; ++i) {
+		const RasInstr& I = decoded[i];
+		const RasOp op = static_cast<RasOp>(I.op);
+		if (op == RasOp::BadOpcode)
+			return false;
+		if (op == RasOp::Jump || op == RasOp::JumpNotEqual) {
+			if (I.a < 0 || I.a >= nInstr)
+				return false;
+		}
+		if (op == RasOp::Call || op == RasOp::Start) {
+			if (I.a < 0 || I.a >= nFuncs)
+				return false;
+		}
+	}
 	return true;
 }
 
@@ -643,54 +716,43 @@ void CRasFile::analyzeThreadSafety()
 	if (numFuncs == 0)
 		return;
 
-	// Initialize: assume all functions are unsafe
-	std::fill(threadSafeFuncs.begin(), threadSafeFuncs.end(), uint8_t(0));
+	// Recursion-safe: start every executable function SAFE, then propagate
+	// UNSAFE for any function containing an unsafe op or calling an unsafe
+	// (or non-executable) function. Pure recursive cycles stay safe, unlike
+	// growing safety from false (which deadlocks cycles at unsafe).
+	for (int fi = 0; fi < numFuncs; ++fi)
+		threadSafeFuncs[fi] = (decodedOffsets[fi] >= 0) ? 1 : 0;
 
 	bool changed = true;
 	while (changed) {
 		changed = false;
 		for (int fi = 0; fi < numFuncs; ++fi) {
-			// Skip Lua scripts (decodedOffsets < 1)
-			if (decodedOffsets[fi] < 0)
-				continue;
-			// Already marked safe
-			if (threadSafeFuncs[fi])
-				continue;
+			if (!threadSafeFuncs[fi])
+				continue;  // already unsafe or non-executable
 
 			const int instrStart = decodedOffsets[fi];
 			const int instrLen   = decodedLengths[fi];
 			const int instrEnd   = instrStart + instrLen;
 
-			bool allSafe = true;
-			for (int ii = instrStart; ii < instrEnd; ++ii) {
+			bool unsafe = false;
+			for (int ii = instrStart; ii < instrEnd && !unsafe; ++ii) {
 				const RasInstr& I = decoded[ii];
 				const RasOp op = static_cast<RasOp>(I.op);
 
-				// Check if the opcode itself is thread-safe
 				if (!RasOpIsThreadSafe(op)) {
-					allSafe = false;
+					unsafe = true;
 					break;
 				}
-
-				// Check Call targets: the called function must also be safe
 				if (op == RasOp::Call) {
-					const int targetFunc = I.a;
-					if (targetFunc >= 0 && targetFunc < numFuncs) {
-						if (!threadSafeFuncs[targetFunc]) {
-							allSafe = false;
-							break;
-						}
-					} else {
-						// Invalid call target - conservative: mark unsafe
-						allSafe = false;
-						break;
-					}
+					const int t = I.a;
+					if (t < 0 || t >= numFuncs || !threadSafeFuncs[t])
+						unsafe = true;
 				}
 			}
 
-			if (allSafe) {
-				threadSafeFuncs[fi] = 1;
-				changed = true;  // may unlock functions that call this one
+			if (unsafe) {
+				threadSafeFuncs[fi] = 0;
+				changed = true;  // callers of this one may now be unsafe
 			}
 		}
 	}
@@ -786,9 +848,10 @@ static int stackDelta(RasOp op)
 			return -2;
 		case RasOp::MoveNow:
 		case RasOp::TurnNow:
-		case RasOp::Scale:
 		case RasOp::ScaleNow:
 			return -1;
+		case RasOp::Scale:
+			return -2;
 		case RasOp::ExplodeRel:
 			return -1;
 		case RasOp::TurnRel:
