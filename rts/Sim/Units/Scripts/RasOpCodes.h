@@ -428,24 +428,95 @@ static constexpr int LUA7 = 117;
 static constexpr int LUA8 = 118;
 static constexpr int LUA9 = 119;
 
+// Legacy-only opcodes (have a non-zero 32-bit COB raw value).
+// RASC-only opcodes (Absolute, Minimum, Maximum, Sign, Clamp, AddImm,
+// MulImm, TurnRel, MoveRel, ExplodeRel, ScaleRel, DeltaHeading, Msine,
+// Mcosine, PushStaticIdx, PopStaticIdx, LuaUnsynced) are excluded — they
+// never appear in raw COB bytecode and have no RAW_ mapping.
+#define RAS_LEGACY_OPCODE_LIST(X) \
+	X(Move,          0x01) \
+	X(Turn,          0x02) \
+	X(Spin,          0x03) \
+	X(StopSpin,      0x04) \
+	X(Show,          0x05) \
+	X(Hide,          0x06) \
+	X(Cache,         0x28) \
+	X(DontCache,     0x29) \
+	X(MoveNow,       0x0B) \
+	X(TurnNow,       0x0C) \
+	X(Shade,         0x0D) \
+	X(DontShade,     0x0E) \
+	X(EmitSfx,       0x0F) \
+	X(Scale,         0x0A) \
+	X(ScaleNow,      0x10) \
+	X(WaitTurn,      0x11) \
+	X(WaitMove,      0x12) \
+	X(Sleep,         0x13) \
+	X(WaitScale,     0x14) \
+	X(PushConstant,  0x21) \
+	X(PushLocalVar,  0x22) \
+	X(PushStatic,    0x23) \
+	X(CreateLocalVar,0x24) \
+	X(PopLocalVar,   0x25) \
+	X(PopStatic,     0x26) \
+	X(PopStack,      0x27) \
+	X(Add,           0x31) \
+	X(Sub,           0x32) \
+	X(Mul,           0x33) \
+	X(Div,           0x34) \
+	X(Mod,           0x30) \
+	X(BitwiseAnd,    0x35) \
+	X(BitwiseOr,     0x36) \
+	X(BitwiseXor,    0x37) \
+	X(BitwiseNot,    0x38) \
+	X(Rand,          0x41) \
+	X(GetUnitValue,  0x42) \
+	X(Get,           0x43) \
+	X(SetLess,       0x51) \
+	X(SetLessOrEqual,0x52) \
+	X(SetGreater,    0x53) \
+	X(SetGreaterOrEq,0x54) \
+	X(SetEqual,      0x55) \
+	X(SetNotEqual,   0x56) \
+	X(LogicalAnd,    0x57) \
+	X(LogicalOr,     0x58) \
+	X(LogicalXor,    0x59) \
+	X(LogicalNot,    0x5A) \
+	X(Start,         0x61) \
+	X(Call,          0x62) \
+	X(Jump,          0x64) \
+	X(Return,        0x65) \
+	X(JumpNotEqual,  0x66) \
+	X(Signal,        0x67) \
+	X(SetSignalMask, 0x68) \
+	X(LuaCall,       0x69) \
+	X(BatchLua,      0x6A) \
+	X(Explode,       0x71) \
+	X(PlaySound,     0x72) \
+	X(Set,           0x82) \
+	X(Attach,        0x83) \
+	X(Drop,          0x84) \
+	X(SignatureLua,  0x90)
+
 // Map a raw 32-bit COB opcode to the dense byte enum.
 // Returns RasOp::BadOpcode for unrecognized values.
 inline RasOp RawToRasOp(int raw32)
 {
 	switch (raw32) {
 		#define X(name, val) case RAW_##name: return RasOp::name;
-		RAS_OPCODE_LIST(X)
+		RAS_LEGACY_OPCODE_LIST(X)
 		#undef X
 		default: return RasOp::BadOpcode;
 	}
 }
 
 // Inverse map: dense byte enum -> original 32-bit COB opcode value.
+// Returns 0 for RASC-only opcodes that have no legacy COB equivalent.
 inline constexpr int RasOpToRaw(RasOp op)
 {
 	switch (op) {
 		#define X(name, val) case RasOp::name: return RAW_##name;
-		RAS_OPCODE_LIST(X)
+		RAS_LEGACY_OPCODE_LIST(X)
 		#undef X
 		default: return 0;
 	}
