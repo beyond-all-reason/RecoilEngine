@@ -3,10 +3,13 @@
 #pragma once
 
 #include <cstdint>
+#include "System/creg/creg_cond.h"
 
 class CRasRNG
 {
+	CR_DECLARE_STRUCT(CRasRNG)
 public:
+	CRasRNG() : state(1u) {}
 	explicit CRasRNG(uint32_t seed)
 		: state(seed ? seed : 1u)
 	{}

@@ -530,17 +530,17 @@ inline constexpr int RasOpToRaw(RasOp op)
 // RasInstr flags (bitmask in flags byte, reserved for future use)
 
 // Decoded instruction structure (Part I internal representation).
-// In-memory: natural alignment, 8 bytes, fast random access for the hot
-// dispatch loop. The on-disk RASC layout is packed to 10 bytes (no padding
-// after op/flags) and is parsed field-by-field on load, so the runtime
-// struct must NOT be packed. Keep these two concepts separate.
+// In-memory: natural alignment, 12 bytes (op/flags + 2 pad + a + b), fast
+// random access for the hot dispatch loop. The on-disk RASC layout is packed
+// to 10 bytes (no padding after op/flags) and is parsed field-by-field on
+// load, so the runtime struct must NOT be packed. Keep these two separate.
 struct RasInstr {
 	uint8_t op;       // RasOp byte value
 	uint8_t flags;    // RAS_INSTR_* bitmask
 	int32_t a;        // first inline operand / jump target / funcId
 	int32_t b;        // second inline operand / argCount / immediate
 };
-static_assert(sizeof(RasInstr) == 8, "RasInstr must be 8 bytes (in memory)");
+static_assert(sizeof(RasInstr) == 12, "RasInstr must be 12 bytes (in memory)");
 
 // On-disk per-instruction stride in the RASC binary: op(1)+flags(1)+a(4)+b(4).
 static constexpr size_t RASC_DISK_INSTR_SIZE = 10;
