@@ -11,6 +11,7 @@
 #include <atomic>
 #include <cstdint>
 #include "System/Misc/TracyDefs.h"
+#include "System/UnorderedSet.hpp"
 #include "System/Threading/ThreadPool.h"
 #include "Lua/LuaUI.h"
 
@@ -201,9 +202,14 @@ void CRasEngine::TickRunningThreads()
 	}
 
 	// Split into safe (parallel) and unsafe (serial) groups.
+	// Per-unit exclusivity: at most one thread per CRasInstance runs on the
+	// parallel path, so threads that share a unit's staticVars/RNG never race.
+	// Surplus same-unit threads fall back to the serial group, preserving
+	// deterministic ordering.
 	std::vector<int> safeIDs;
 	std::vector<int> unsafeIDs;
 	safeIDs.reserve(threadIDs.size());
+	spring::unordered_set<const CRasInstance*> parallelInsts;
 
 	for (int tid : threadIDs) {
 		CRasThread* th = GetThread(tid);
@@ -211,7 +217,8 @@ void CRasEngine::TickRunningThreads()
 			const int funcId = th->GetRootFunctionId();
 			if (funcId >= 0 &&
 			    static_cast<size_t>(funcId) < th->rasFile->threadSafeFuncs.size() &&
-			    th->rasFile->threadSafeFuncs[funcId]) {
+			    th->rasFile->threadSafeFuncs[funcId] &&
+			    parallelInsts.insert(th->rasInst).second) {
 				safeIDs.push_back(tid);
 				continue;
 			}

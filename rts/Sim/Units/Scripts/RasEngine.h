@@ -86,10 +86,25 @@ public:
 
 	bool RemoveThread(int threadID);
 	int AddThread(CRasThread&& thread);
-	int GenThreadID() { return (threadCounter++); }
+	int GenThreadID() {
+#ifdef THREADPOOL
+		std::lock_guard<std::mutex> lock(scheduleMutex);
+#endif
+		return (threadCounter++);
+	}
 
-	void QueueAddThread(CRasThread&& thread) { tickAddedThreads.emplace_back(std::move(thread)); }
-	void QueueRemoveThread(int threadID) { tickRemovedThreads.emplace_back(threadID); }
+	void QueueAddThread(CRasThread&& thread) {
+#ifdef THREADPOOL
+		std::lock_guard<std::mutex> lock(scheduleMutex);
+#endif
+		tickAddedThreads.emplace_back(std::move(thread));
+	}
+	void QueueRemoveThread(int threadID) {
+#ifdef THREADPOOL
+		std::lock_guard<std::mutex> lock(scheduleMutex);
+#endif
+		tickRemovedThreads.emplace_back(threadID);
+	}
 	void ProcessQueuedThreads();
 
 	void ScheduleThread(const CRasThread* thread);

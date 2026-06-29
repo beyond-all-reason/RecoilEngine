@@ -567,7 +567,7 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 	// ---- Load decoded instruction stream ----
 	{
 		const size_t numInstr = numInstructions;
-		const size_t decSize = numInstr * sizeof(RasInstr);
+		const size_t decSize = numInstr * RASC_DISK_INSTR_SIZE;
 		if (offDecoded + decSize > dataSize) {
 			LOG_L(L_ERROR, "[%s] decoded stream overflow", __func__);
 			return false;
@@ -576,12 +576,11 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 		decoded.resize(numInstr);
 
 		// On-disk RasInstr: op(1) + flags(1) + a(4 LE) + b(4 LE) = 10 bytes packed.
-		// RasInstr in memory: same layout (__attribute__((packed))).
-		// On little-endian hosts, we can memcpy directly.
-		// On big-endian hosts, we'd need to byteswap a and b.
+		// In-memory RasInstr is natural 8 bytes; parse the disk stream field-by-
+		// field so the two layouts stay decoupled (endian-safe on all hosts).
 		const uint8_t* src = data + offDecoded;
 		for (size_t i = 0; i < numInstr; ++i) {
-			const size_t off = i * sizeof(RasInstr);
+			const size_t off = i * RASC_DISK_INSTR_SIZE;
 			decoded[i].op    = src[off + 0];
 			decoded[i].flags = src[off + 1];
 			decoded[i].a     = readLe32s(src, off + 2);
