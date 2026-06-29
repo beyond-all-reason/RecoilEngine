@@ -156,6 +156,14 @@ namespace {
 		return spring::LiteHash(n, cs);
 	}
 
+	inline uint32_t CheckSum(const RasInstr& instr, uint32_t cs = 0u) {
+		cs = spring::LiteHash(static_cast<uint32_t>(instr.op), cs);
+		cs = spring::LiteHash(static_cast<uint32_t>(instr.flags), cs);
+		cs = spring::LiteHash(instr.a, cs);
+		cs = spring::LiteHash(instr.b, cs);
+		return cs;
+	}
+
 	template<SequenceContainer C>
 	inline uint32_t CheckSum(C&& c, uint32_t cs = 0u) {
 		for (auto it = std::begin(c); it != std::end(c); ++it) {
@@ -193,14 +201,6 @@ namespace {
 	inline uint32_t CheckSum(T&&, uint32_t cs = 0u)
 	{
 		static_assert(false, "Not implemented <T>");
-		return cs;
-	}
-
-	inline uint32_t CheckSum(const RasInstr& instr, uint32_t cs = 0u) {
-		cs = spring::LiteHash(static_cast<uint32_t>(instr.op), cs);
-		cs = spring::LiteHash(static_cast<uint32_t>(instr.flags), cs);
-		cs = spring::LiteHash(instr.a, cs);
-		cs = spring::LiteHash(instr.b, cs);
 		return cs;
 	}
 }
@@ -618,12 +618,12 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 			uint32_t offCs = 0;
 			uint32_t lenCs = 0;
 			uint32_t idxCs = 0;
-			uint32_t mapCs = 0;
+			size_t mapSz = 0;
 			if (thread.rasFile) {
 				offCs = CheckSum(thread.rasFile->scriptOffsets);
 				lenCs = CheckSum(thread.rasFile->scriptLengths);
 				idxCs = CheckSum(thread.rasFile->scriptIndex);
-				mapCs = CheckSum(thread.rasFile->scriptMap);
+				mapSz = thread.rasFile->scriptMap.size();
 			}
 			file
 				<< "\t\t\tid: " << tid << " t.id " << thread.GetID() << " t.wt " << thread.GetWakeTime()
@@ -638,7 +638,7 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 				<< " scriptOffsets cs " << offCs
 				<< " scriptLengths cs " << lenCs
 				<< " scriptIndex cs " << idxCs
-				<< " scriptMap cs " << mapCs
+				<< " scriptMap size " << mapSz
 				<< " t.state " << +thread.GetState() << " t.sigmask " << thread.GetSignalMask()
 				<< " t.retc " << thread.GetRetCode()
 				<< " dead|garbage|waiting " << thread.IsDead() << "|" << thread.IsGarbage() << "|" << thread.IsWaiting() << "\n";
