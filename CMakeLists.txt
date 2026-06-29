@@ -102,6 +102,30 @@ else  (APPLE)
 	set(MACOSX_BUNDLE FALSE)
 endif (APPLE)
 
+# Objective-C / Objective-C++ are needed for some macOS platform integration
+# (e.g. Metal presentation glue in the renderer). GCC on macOS cannot target
+# Apple's Objective-C runtime, so when the engine is built with GCC we route
+# .m / .mm sources to clang while everything else keeps building with GCC.
+# CMake selects the compiler per source language (.m -> OBJC, .mm -> OBJCXX)
+# and links libc++ for such targets automatically, so no per-file or
+# per-target handling is required. Objective-C sources used this way must keep
+# an extern "C" boundary: clang compiles them against libc++, so no C++
+# standard-library types may cross to the libstdc++ side of the engine.
+if    (APPLE)
+	if    (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+		find_program(OBJC_CLANG   NAMES clang)
+		find_program(OBJCXX_CLANG NAMES clang++)
+		if    (NOT OBJC_CLANG OR NOT OBJCXX_CLANG)
+			message(FATAL_ERROR "Building on macOS with GCC requires clang/clang++ for Objective-C sources, but they were not found")
+		endif ()
+		set(CMAKE_OBJC_COMPILER   "${OBJC_CLANG}")
+		set(CMAKE_OBJCXX_COMPILER "${OBJCXX_CLANG}")
+		message(STATUS "macOS: compiling Objective-C/C++ with clang (${OBJCXX_CLANG}); C/C++ use ${CMAKE_CXX_COMPILER}")
+	endif ()
+	enable_language(OBJC)
+	enable_language(OBJCXX)
+endif (APPLE)
+
 ### Compiler flags and defines based on build type
 include(TestCXXFlags)
 
