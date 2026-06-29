@@ -1,4 +1,4 @@
-﻿/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 
 #include "Sim/Misc/GlobalConstants.h"
@@ -87,6 +87,9 @@ do {									\
 
 
 static std::vector<uint8_t> rasFileData;
+
+// Defined later in this file; used by decodeBytecode() for stack-depth tracking.
+static int stackDelta(RasOp op);
 
 
 CRasFile::CRasFile(CFileHandler& in, const std::string& scriptName)
@@ -261,7 +264,7 @@ void CRasFile::decodeBytecode()
 	// ---- Pass 1: Decode each function ----
 	for (int fi = 0; fi < numScripts; ++fi) {
 		// Skip Lua signature functions (references, not executable code)
-		if (!luaScripts[fi].empty()) {
+		if (luaScripts[fi].GetString()[0] != '\0') {
 			continue;
 		}
 
@@ -333,7 +336,7 @@ void CRasFile::decodeBytecode()
 
 	// ---- Pass 2: Retarget jump targets + finalize RealCall targets ----
 	for (int fi = 0; fi < numScripts; ++fi) {
-		if (!luaScripts[fi].empty())
+		if (luaScripts[fi].GetString()[0] != '\0')
 			continue;
 
 		const int instrStart = decodedOffsets[fi];
@@ -361,7 +364,7 @@ void CRasFile::decodeBytecode()
 				if (targetWord >= 0 && targetWord < static_cast<int>(code.size())) {
 					instr.a = wordToInstr[targetWord];
 					// If target wasn't an instruction start, it's a jump into
-					// the middle of an operand sequence — this shouldn't happen
+					// the middle of an operand sequence � this shouldn't happen
 					// in valid scripts, but clamp to the next instruction if so.
 					if (instr.a < 0) {
 						instr.a = instrIdx + 1;
@@ -429,7 +432,7 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 {
 	constexpr size_t HDR_SIZE = sizeof(RascHeader);
 	if (dataSize < HDR_SIZE) {
-		LOG_L(L_ERROR, "[%s] RASC file too small (%zu bytes)", __func__, dataSize);
+		LOG_L(L_ERROR, "[%s] RASC file too small (%d bytes)", __func__, (int)dataSize);
 		return false;
 	}
 
@@ -460,7 +463,7 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 	}
 
 	scriptFormat = RasFmtRASC;
-	numStaticVars = static_cast<int>(numStaticVars);
+	this->numStaticVars = static_cast<int>(numStaticVars);
 
 	// Reserve vectors
 	scriptNames.reserve(numScripts);
@@ -595,7 +598,7 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 		for (uint32_t i = 0; i < numSounds; ++i) {
 			if (pos >= dataSize) break;
 			const std::string s = reinterpret_cast<const char*>(data + pos);
-			pos += strlen(s) + 1;
+			pos += s.size() + 1;
 
 			if (sound->HasSoundItem(s)) {
 				sounds.push_back(sound->GetSoundId(s));
