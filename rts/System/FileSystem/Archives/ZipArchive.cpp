@@ -58,7 +58,7 @@ CZipArchive::CZipArchive(const std::string& archiveName)
 		unz_file_pos fp{};
 		unzGetFilePos(zip, &fp);
 
-		fileEntries.push_back(FileEntry{
+		const auto& fd = fileEntries.emplace_back(FileEntry{
 			std::move(fp), //fp
 			static_cast<int>(info.uncompressed_size), //size
 			fName, //origName
@@ -66,7 +66,7 @@ CZipArchive::CZipArchive(const std::string& archiveName)
 			static_cast<uint32_t>(CTimeUtil::DosTimeToTime64(info.dosDate)) //modTime
 		});
 
-		lcNameIndex.emplace(StringToLower(fileEntries.back().origName), fileEntries.size() - 1);
+		lcNameIndex.emplace(StringToLower(fd.origName), fileEntries.size() - 1);
 	}
 
 	zipPerThread[0] = zip;
