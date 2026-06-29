@@ -3,7 +3,7 @@
 
 #include "RasThread.h"
 
-#include "RasDeferredCallin.h"
+#include "CobDeferredCallin.h"
 #include "RasFile.h"
 #include "RasInstance.h"
 #include "RasOpCodes.h"
@@ -377,7 +377,7 @@ bool CRasThread::Tick()
 					break;
 				}
 
-				auto d = CRasDeferredCallin(rasInst->GetUnit(), rasFile->luaScripts[dr1], dataStack, dr2);
+				auto d = CCobDeferredCallin(rasInst->GetUnit(), rasFile->luaScripts[dr1], dataStack, dr2);
 				threadDeferredCallins.push_back(std::move(d));
 				retCode = 1;
 			} break;
@@ -394,7 +394,7 @@ bool CRasThread::Tick()
 					break;
 				}
 
-				auto d = CRasDeferredCallin(rasInst->GetUnit(), rasFile->luaScripts[dr1], dataStack, dr2);
+				auto d = CCobDeferredCallin(rasInst->GetUnit(), rasFile->luaScripts[dr1], dataStack, dr2);
 				threadDeferredCallins.push_back(std::move(d));
 			} break;
 
@@ -980,7 +980,7 @@ void CRasThread::DeferredCall(bool synced)
 	}
 
 	// setup the parameter array
-	auto d = CRasDeferredCallin(rasInst->GetUnit(), rasFile->luaScripts[r1], dataStack, r2);
+	auto d = CCobDeferredCallin(rasInst->GetUnit(), rasFile->luaScripts[r1], dataStack, r2);
 
 	rasEngine->AddDeferredCallin(std::move(d));
 

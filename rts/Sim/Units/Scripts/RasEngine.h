@@ -1,4 +1,4 @@
-﻿/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #pragma once
 
@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "RasThread.h"
-#include "RasDeferredCallin.h"
+#include "CobDeferredCallin.h"
 #include "System/creg/creg_cond.h"
 #include "System/creg/STL_Queue.h"
 #include "System/creg/STL_Map.h"
@@ -120,11 +120,11 @@ public:
 	const auto  GetThreadCounter() const { return threadCounter; }
 	const auto  GetCurrCounter() const { return threadCounter; }
 
-	void AddDeferredCallin(CRasDeferredCallin&& deferredCallin);
+	void AddDeferredCallin(CCobDeferredCallin&& deferredCallin);
 	void RunDeferredCallins();
 
 	/// Part VI: Merge per-thread deferred callins into the shared map.
-	void mergeThreadDeferredCallins(const std::vector<CRasDeferredCallin>& callins);
+	void mergeThreadDeferredCallins(const std::vector<CCobDeferredCallin>& callins);
 
 
 private:
@@ -144,7 +144,7 @@ private:
 	std::vector<int> runningThreadIDs;
 	std::vector<int> waitingThreadIDs;
 
-	spring::unordered_map<int, std::vector<CRasDeferredCallin> > deferredCallins;
+	spring::unordered_map<int, std::vector<CCobDeferredCallin> > deferredCallins;
 
 	// stores <id, waketime> pairs s.t. after waking up the ID can be checked
 	// for validity; thread owner might get removed while a thread is sleeping

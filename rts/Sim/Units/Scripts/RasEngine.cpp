@@ -3,7 +3,7 @@
 
 #include "RasEngine.h"
 
-#include "RasDeferredCallin.h"
+#include "CobDeferredCallin.h"
 #include "RasInstance.h"
 #include "RasThread.h"
 #include "RasFile.h"
@@ -28,12 +28,12 @@ CR_REG_METADATA(CRasEngine, (
 
 	CR_IGNORED(curThread),
 	CR_IGNORED(deferredCallins),
-
-	CR_MEMBER(currentTime),
-	CR_MEMBER(threadCounter),
 #ifdef THREADPOOL
 	CR_IGNORED(scheduleMutex),
 #endif
+
+	CR_MEMBER(currentTime),
+	CR_MEMBER(threadCounter)
 ))
 
 CR_BIND(CRasEngine::SleepingThread, )
@@ -136,7 +136,6 @@ void CRasEngine::TickThread(CRasThread* thread)
 	curThread = thread;
 
 	if (thread != nullptr) {
-		thread->SetLastScriptError(false);
 		bool alive = thread->Tick();
 		auto callins = thread->TakeDeferredCallins();
 		if (!callins.empty()) {
@@ -237,8 +236,6 @@ void CRasEngine::TickRunningThreads()
 				return;
 			}
 
-			thread->SetLastScriptError(false);
-
 			if (!thread->Tick()) {
 				int pos = removedCount.fetch_add(1);
 				removedBuffer[pos] = safeIDs[i];
@@ -308,7 +305,7 @@ void CRasEngine::ShowScriptError(const std::string& msg)
 }
 
 
-void CRasEngine::AddDeferredCallin(CRasDeferredCallin&& deferredCallin)
+void CRasEngine::AddDeferredCallin(CCobDeferredCallin&& deferredCallin)
 {
 	deferredCallins[deferredCallin.funcHash].push_back(deferredCallin);
 }
@@ -336,7 +333,7 @@ void CRasEngine::RunDeferredCallins()
 
 
 /// Part VI: Merge per-thread deferred callins into the shared map.
-void CRasEngine::mergeThreadDeferredCallins(const std::vector<CRasDeferredCallin>& callins)
+void CRasEngine::mergeThreadDeferredCallins(const std::vector<CCobDeferredCallin>& callins)
 {
 	for (const auto& c : callins) {
 		deferredCallins[c.funcHash].push_back(c);

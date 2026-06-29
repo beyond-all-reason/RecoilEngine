@@ -1,4 +1,4 @@
-﻿/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #ifndef RAS_THREAD_H
 #define RAS_THREAD_H
@@ -18,7 +18,7 @@
 	extern std::atomic<uint64_t> gRasOpcodeCount;
 #endif
 
-class CRasDeferredCallin;
+class CCobDeferredCallin;
 class CRasFile;
 class CRasInstance;
 
@@ -131,7 +131,7 @@ public:
 	}
 
 	/// Part VI: Take ownership of this thread's deferred callins buffer (clears internal copy).
-	std::vector<CRasDeferredCallin> TakeDeferredCallins() {
+	std::vector<CCobDeferredCallin> TakeDeferredCallins() {
 		return std::move(threadDeferredCallins);
 	}
 
@@ -199,7 +199,7 @@ protected:
 	static std::vector<decltype(callStack)> freeCallStacks;
 
 	/// Part VI: Collected deferred callins for this thread (merged into engine after Tick).
-	std::vector<CRasDeferredCallin> threadDeferredCallins;
+	std::vector<CCobDeferredCallin> threadDeferredCallins;
 };
 
 #endif // RAS_THREAD_H
