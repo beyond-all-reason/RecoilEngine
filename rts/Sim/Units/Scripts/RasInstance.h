@@ -4,25 +4,8 @@
 
 #include "UnitScript.h"
 #include "Sim/Units/Unit.h"
+#include "CobInstance.h"
 #include "RasRNG.h"
-
-
-#define PACKXZ(x,z) (((int)(x) << 16)+((int)(z) & 0xffff))
-#define UNPACKX(xz) ((signed short)((std::uint32_t)(xz) >> 16))
-#define UNPACKZ(xz) ((signed short)((std::uint32_t)(xz) & 0xffff))
-
-
-// most callins only need two args, some three or four
-// QueryLandingPads is unbounded (in principle) but 16
-// should generally be enough
-static constexpr unsigned int MAX_COB_ARGS = 16;
-
-static constexpr   int COBSCALE      = 65536;
-static constexpr   int COBSCALE_HALF = COBSCALE / 2;
-static constexpr float COBSCALE_INV  = 1.0f / COBSCALE;
-
-static const float RAD2TAANG = COBSCALE_HALF / math::PI;
-static const float TAANG2RAD = math::PI / COBSCALE_HALF;
 
 
 class CRasThread;
@@ -55,7 +38,7 @@ public:
 public:
 	// creg only
 	CRasInstance(): CUnitScript(nullptr), rasFile(nullptr), rng(0) {}
-	CRasInstance(CRasFile* cob, CUnit* unit): CUnitScript(unit), rasFile(cob) { Init(); }
+	CRasInstance(CRasFile* cob, CUnit* unit): CUnitScript(unit), rasFile(cob), rng(0) { Init(); }
 	~CRasInstance();
 
 	void Init();

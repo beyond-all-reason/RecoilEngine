@@ -165,29 +165,6 @@ inline constexpr int RasOpOperandWords(RasOp op)
 	}
 }
 
-// Map a raw 32-bit COB opcode to the dense byte enum.
-// Returns RasOp::BadOpcode for unrecognized values.
-inline RasOp RawToRasOp(int raw32)
-{
-	switch (raw32) {
-		#define X(name, val) case RAW_##name: return RasOp::name;
-		RAS_OPCODE_LIST(X)
-		#undef X
-		default: return RasOp::BadOpcode;
-	}
-}
-
-// Inverse map: dense byte enum -> original 32-bit COB opcode value.
-inline constexpr int RasOpToRaw(RasOp op)
-{
-	switch (op) {
-		#define X(name, val) case RasOp::name: return RAW_##name;
-		RAS_OPCODE_LIST(X)
-		#undef X
-		default: return 0;
-	}
-}
-
 // Total number of entries in the jump table (full byte space).
 static constexpr int RAS_OP_TABLE_SIZE = 256;
 
@@ -450,6 +427,29 @@ static constexpr int LUA6 = 116;
 static constexpr int LUA7 = 117;
 static constexpr int LUA8 = 118;
 static constexpr int LUA9 = 119;
+
+// Map a raw 32-bit COB opcode to the dense byte enum.
+// Returns RasOp::BadOpcode for unrecognized values.
+inline RasOp RawToRasOp(int raw32)
+{
+	switch (raw32) {
+		#define X(name, val) case RAW_##name: return RasOp::name;
+		RAS_OPCODE_LIST(X)
+		#undef X
+		default: return RasOp::BadOpcode;
+	}
+}
+
+// Inverse map: dense byte enum -> original 32-bit COB opcode value.
+inline constexpr int RasOpToRaw(RasOp op)
+{
+	switch (op) {
+		#define X(name, val) case RasOp::name: return RAW_##name;
+		RAS_OPCODE_LIST(X)
+		#undef X
+		default: return 0;
+	}
+}
 
 // RasInstr flags (bitmask in flags byte, reserved for future use)
 
