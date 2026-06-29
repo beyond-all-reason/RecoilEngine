@@ -237,7 +237,7 @@ void CCobInstance::WindChanged(float heading, float speed)
 {
 	ZoneScoped;
 	Call(COBFN_SetSpeed, int(speed * 3000.0f));
-	Call(COBFN_SetDirection, short(heading * RAD2TAANG));
+	Call(COBFN_SetDirection, short(int(heading * RAD2TAANG)));
 }
 
 
@@ -387,8 +387,8 @@ void CCobInstance::StartBuilding(float heading, float pitch)
 	std::array<int, 1 + MAX_COB_ARGS> callinArgs;
 
 	callinArgs[0] = 2;
-	callinArgs[1] = short(heading * RAD2TAANG);
-	callinArgs[2] = short(  pitch * RAD2TAANG);
+	callinArgs[1] = short(int(heading * RAD2TAANG));
+	callinArgs[2] = short(int(  pitch * RAD2TAANG));
 
 	Call(COBFN_StartBuilding, callinArgs);
 }
@@ -439,8 +439,8 @@ void CCobInstance::AimWeapon(int weaponNum, float heading, float pitch)
 	std::array<int, 1 + MAX_COB_ARGS> callinArgs;
 
 	callinArgs[0] = 2;
-	callinArgs[1] = short(heading * RAD2TAANG);
-	callinArgs[2] = short(  pitch * RAD2TAANG);
+	callinArgs[1] = short(int(heading * RAD2TAANG));
+	callinArgs[2] = short(int(  pitch * RAD2TAANG));
 
 	Call(COBFN_AimPrimary + COBFN_Weapon_Funcs * weaponNum, callinArgs, CBAimWeapon, weaponNum, nullptr);
 }
