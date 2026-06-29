@@ -79,7 +79,6 @@
 	X(LogicalNot,    0x5A) \
 	X(Start,         0x61) \
 	X(Call,          0x62) \
-	X(RealCall,      0x63) \
 	X(Jump,          0x64) \
 	X(Return,        0x65) \
 	X(JumpNotEqual,  0x66) \
@@ -127,7 +126,6 @@ inline constexpr int RasOpOperandWords(RasOp op)
 		case RasOp::Spin:
 		case RasOp::StopSpin:
 		case RasOp::Start:
-		case RasOp::RealCall:
 		case RasOp::Call:
 		case RasOp::LuaCall:
 		case RasOp::BatchLua:
@@ -285,7 +283,6 @@ inline bool RasOpIsThreadSafe(RasOp op)
 	X(LogicalNot,    0x5A, 0x1005A000) \
 	X(Start,         0x61, 0x10061000) \
 	X(Call,          0x62, 0x10062000) \
-	X(RealCall,      0x63, 0x10062001) \
 	X(Jump,          0x64, 0x10064000) \
 	X(Return,        0x65, 0x10065000) \
 	X(JumpNotEqual,  0x66, 0x10066000) \
@@ -356,7 +353,6 @@ static constexpr int RAW_LogicalXor    = 0x10059000;
 static constexpr int RAW_LogicalNot    = 0x1005A000;
 static constexpr int RAW_Start         = 0x10061000;
 static constexpr int RAW_Call          = 0x10062000;
-static constexpr int RAW_RealCall      = 0x10062001;
 static constexpr int RAW_LuaCall       = 0x10062002;
 static constexpr int RAW_BatchLua      = 0x10062004;
 static constexpr int RAW_LuaUnsynced   = 0x00000000;
@@ -428,7 +424,6 @@ static constexpr int LOGICAL_XOR          = RAW_LogicalXor;
 static constexpr int LOGICAL_NOT          = RAW_LogicalNot;
 static constexpr int START            = RAW_Start;
 static constexpr int CALL             = RAW_Call;
-static constexpr int REAL_CALL        = RAW_RealCall;
 static constexpr int LUA_CALL         = RAW_LuaCall;
 static constexpr int BATCH_LUA        = RAW_BatchLua;
 static constexpr int LUA_UNSYNCED     = RAW_LuaUnsynced;
@@ -456,16 +451,16 @@ static constexpr int LUA7 = 117;
 static constexpr int LUA8 = 118;
 static constexpr int LUA9 = 119;
 
-// RasInstr flags (bitmask in flags byte)
-static constexpr uint8_t RAS_INSTR_IS_FIRE_FUNC = 0x01;
+// RasInstr flags (bitmask in flags byte, reserved for future use)
 
 // Decoded instruction structure (Part I internal representation)
-struct RasInstr {
+// Packed: op(1) + flags(1) + a(4 LE) + b(4 LE) = 10 bytes
+struct __attribute__((packed)) RasInstr {
 	uint8_t op;       // RasOp byte value
 	uint8_t flags;    // RAS_INSTR_* bitmask
 	int32_t a;        // first inline operand / jump target / funcId
 	int32_t b;        // second inline operand / argCount / immediate
 };
-static_assert(sizeof(RasInstr) == 8, "RasInstr must be 8 bytes");
+static_assert(sizeof(RasInstr) == 10, "RasInstr must be 10 bytes (packed)");
 
 #endif // RAS_OPCODES_H

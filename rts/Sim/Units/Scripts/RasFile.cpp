@@ -147,8 +147,10 @@ CRasFile::CRasFile(CFileHandler& in, const std::string& scriptName)
 		ofs = *(int *) &rasFileData[ch.OffsetToScriptCodeIndexArray + i * 4];
 		swabDWordInPlace(ofs);
 
-		if (scriptNames[scriptNames.size() - 1].find("lua_") == 0) {
-			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str() + sizeof("lua_") - 1);
+		if (scriptNames.back().find("lua_synced_") == 0) {
+			luaScripts.emplace_back(scriptNames.back().c_str() + sizeof("lua_synced_") - 1);
+		} else if (scriptNames.back().find("lua_unsynced_") == 0) {
+			luaScripts.emplace_back(scriptNames.back().c_str() + sizeof("lua_unsynced_") - 1);
 		} else if (swabDWord(*(preCode + ofs)) == SIGNATURE_LUA) {
 			luaScripts.emplace_back(scriptNames[scriptNames.size() - 1].c_str());
 		} else {
@@ -223,41 +225,6 @@ CRasFile::CRasFile(CFileHandler& in, const std::string& scriptName)
 		scriptIndex[pair.second] = fn;
 	}
 
-	// Part I.5: Annotate SHOW instructions with fire-function flag.
-	// A SHOW instruction inside a fire function (FirePrimary + N*COBFN_Weapon_Funcs)
-	// triggers ShowFlare instead of SetVisibility.  Pre-compute this per-function
-	// so Tick() can skip the 32-iteration loop.
-	for (int fi = 0; fi < numScripts; ++fi) {
-		bool isFireFunc = false;
-		for (int w = 0; w < MAX_WEAPONS_PER_UNIT; ++w) {
-			const int fireIdx = scriptIndex[COBFN_FirePrimary + COBFN_Weapon_Funcs * w];
-			if (fireIdx >= 0 && fireIdx == fi) {
-				isFireFunc = true;
-				break;
-			}
-		}
-		if (!isFireFunc)
-			continue;
-
-		const int instrStart = decodedOffsets[fi];
-		if (instrStart < 0)
-			continue;
-
-		const int startWord = scriptOffsets[fi];
-		const int lenWords  = scriptLengths[fi];
-		const int endWord   = startWord + lenWords;
-
-		int instrIdx = instrStart;
-		for (int w = startWord; w < endWord; ) {
-			const RasInstr& instr = decoded[instrIdx];
-			if (instr.op == static_cast<uint8_t>(RasOp::Show)) {
-				decoded[instrIdx].flags |= RAS_INSTR_IS_FIRE_FUNC;
-			}
-			const int operands = RasOpOperandWords(static_cast<RasOp>(instr.op));
-			w += 1 + operands;
-			instrIdx++;
-		}
-	}
 }
 
 
@@ -329,14 +296,20 @@ void CRasFile::decodeBytecode()
 
 			// Part I.3: CALL pre-resolution.
 			// Raw CALL(0x10062000) carries funcId in operand a, argCount in b.
-			// Resolve to RealCall or LuaCall based on target function name.
+			// Resolve based on target function name prefix:
+			//   lua_synced_*   -> LuaCall
+			//   lua_unsynced_* -> LuaUnsynced
+			//   default        -> Call (regular function call)
 			if (op == RasOp::Call) {
 				const int funcId = instr.a;
-				if (funcId >= 0 && funcId < numScripts &&
-				    scriptNames[funcId].find("lua_") == 0) {
-					instr.op = static_cast<uint8_t>(RasOp::LuaCall);
-				} else {
-					instr.op = static_cast<uint8_t>(RasOp::RealCall);
+				if (funcId >= 0 && funcId < numScripts) {
+					const std::string& fn = scriptNames[funcId];
+					if (fn.find("lua_synced_") == 0) {
+						instr.op = static_cast<uint8_t>(RasOp::LuaCall);
+					} else if (fn.find("lua_unsynced_") == 0) {
+						instr.op = static_cast<uint8_t>(RasOp::LuaUnsynced);
+					}
+					// else: stays as Call (regular function call)
 				}
 			}
 
@@ -428,12 +401,12 @@ struct RascHeader {
 static_assert(sizeof(RascHeader) == 48, "RascHeader size mismatch");
 
 /// Per-script metadata in the ScriptInfo block (16 bytes each).
-struct RascScriptInfo {
+struct __attribute__((packed)) RascScriptInfo {
 	int32_t  decodedOffset;
 	int32_t  maxStackDepth;
 	uint8_t  threadSafe;
 	uint8_t  isLuaScript;
-	uint8_t  padding[8];
+	uint8_t  padding[6];
 };
 static_assert(sizeof(RascScriptInfo) == 16, "RascScriptInfo size mismatch");
 
@@ -509,8 +482,10 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 			pos += strlen(s) + 1;  // +1 for null terminator
 
 			// Detect Lua scripts by name prefix
-			if (scriptNames.back().find("lua_") == 0) {
-				luaScripts.emplace_back(scriptNames.back().c_str() + sizeof("lua_") - 1);
+			if (scriptNames.back().find("lua_synced_") == 0) {
+				luaScripts.emplace_back(scriptNames.back().c_str() + sizeof("lua_synced_") - 1);
+			} else if (scriptNames.back().find("lua_unsynced_") == 0) {
+				luaScripts.emplace_back(scriptNames.back().c_str() + sizeof("lua_unsynced_") - 1);
 			} else {
 				luaScripts.emplace_back("");
 			}
@@ -600,9 +575,10 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 
 		decoded.resize(numInstr);
 
-		// On-disk RasInstr: op(1) + flags(1) + a(4 LE) + b(4 LE) = 8 bytes packed.
-		// RasInstr in memory: same layout.  On little-endian hosts, we can memcpy
-		// directly.  On big-endian hosts, we'd need to byteswap a and b.
+		// On-disk RasInstr: op(1) + flags(1) + a(4 LE) + b(4 LE) = 10 bytes packed.
+		// RasInstr in memory: same layout (__attribute__((packed))).
+		// On little-endian hosts, we can memcpy directly.
+		// On big-endian hosts, we'd need to byteswap a and b.
 		const uint8_t* src = data + offDecoded;
 		for (size_t i = 0; i < numInstr; ++i) {
 			const size_t off = i * sizeof(RasInstr);
@@ -642,31 +618,6 @@ bool CRasFile::loadRascFormat(const uint8_t* data, size_t dataSize)
 		if (fn < 0)
 			continue;
 		scriptIndex[pair.second] = fn;
-	}
-
-	// Part I.5: Annotate SHOW instructions with fire-function flag.
-	for (uint32_t fi = 0; fi < numScripts; ++fi) {
-		bool isFireFunc = false;
-		for (int w = 0; w < MAX_WEAPONS_PER_UNIT; ++w) {
-			const int fireIdx = scriptIndex[COBFN_FirePrimary + COBFN_Weapon_Funcs * w];
-			if (fireIdx >= 0 && static_cast<uint32_t>(fireIdx) == fi) {
-				isFireFunc = true;
-				break;
-			}
-		}
-		if (!isFireFunc)
-			continue;
-
-		const int instrStart = decodedOffsets[fi];
-		if (instrStart < 0)
-			continue;
-
-		const int instrLen = scriptLengths[fi];
-		for (int ii = instrStart; ii < instrStart + instrLen; ++ii) {
-			if (decoded[ii].op == static_cast<uint8_t>(RasOp::Show)) {
-				decoded[ii].flags |= RAS_INSTR_IS_FIRE_FUNC;
-			}
-		}
 	}
 
 	// ---- Part V: Analyze thread-safety of each function ----
@@ -719,8 +670,8 @@ void CRasFile::analyzeThreadSafety()
 					break;
 				}
 
-				// Check RealCall targets: the called function must also be safe
-				if (op == RasOp::RealCall) {
+				// Check Call targets: the called function must also be safe
+				if (op == RasOp::Call) {
 					const int targetFunc = I.a;
 					if (targetFunc >= 0 && targetFunc < numFuncs) {
 						if (!threadSafeFuncs[targetFunc]) {
@@ -854,7 +805,6 @@ static int stackDelta(RasOp op)
 		case RasOp::WaitScale:
 		case RasOp::CreateLocalVar:
 		case RasOp::Return:
-		case RasOp::RealCall:
 		case RasOp::LuaCall:
 		case RasOp::BatchLua:
 		case RasOp::LuaUnsynced:

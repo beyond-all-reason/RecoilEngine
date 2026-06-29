@@ -445,22 +445,6 @@ bool CRasThread::Tick()
 					pc = rasFile->decodedOffsets[r1];
 				}
 			} break;
-			case static_cast<uint8_t>(RasOp::RealCall): {
-				r1 = I.a;
-				r2 = I.b;
-
-				if (rasFile->scriptLengths[r1] == 0)
-					break;
-
-				CallInfo& ci = PushCallStackRef();
-				ci.functionId = r1;
-				ci.returnAddr = pc;
-				ci.stackTop = dataStack.size() - r2;
-
-				paramCount = r2;
-
-				pc = rasFile->decodedOffsets[r1];
-			} break;
 			case static_cast<uint8_t>(RasOp::LuaCall): {
 				r1 = I.a;
 				r2 = I.b;
@@ -939,12 +923,7 @@ bool CRasThread::Tick()
 
 		case static_cast<uint8_t>(RasOp::Show): {
 			r1 = I.a;
-
-			if (I.flags & RAS_INSTR_IS_FIRE_FUNC) {
-				rasInst->ShowFlare(r1);
-			} else {
-				rasInst->SetVisibility(r1, true);
-			}
+			rasInst->SetVisibility(r1, true);
 		} break;
 
 			default: {
