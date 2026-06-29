@@ -688,6 +688,9 @@ add_dependencies(generateSources generateVersionFiles)
 # As the libs are required by all the other sub-projects, we add them first
 # Options that affect lib selection must be declared here, before rts/lib is processed
 option(USE_MIMALLOC "Use mimalloc memory allocator" TRUE)
+# float3.h (widely included, even by the lua glue in rts/lib) uses fmt::format,
+# so the vendored fmt headers must be on the include path everywhere.
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/rts/lib/fmt/include)
 add_subdirectory(rts/lib)
 
 # Fix for MinGW assembler limitations with large object files

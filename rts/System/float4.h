@@ -109,7 +109,7 @@ struct float4 : public float3
 	}
 
 	std::string str() const {
-		return std::format("float4({:.3f}, {:.3f}, {:.3f}, {:.3f})", x, y, z, w);
+		return fmt::format("float4({:.3f}, {:.3f}, {:.3f}, {:.3f})", x, y, z, w);
 	}
 
 
