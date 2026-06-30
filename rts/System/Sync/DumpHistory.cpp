@@ -3,6 +3,8 @@
 #include "DumpHistory.h"
 #include "SyncChecker.h"
 
+#include <fmt/format.h>
+
 #include "Game/Game.h"
 #include "Game/GlobalUnsynced.h"
 #include "Net/GameServer.h"
@@ -34,13 +36,13 @@ void DumpHistory(nowide::fstream& file, int frameNum, bool serverRequest)
 
 	LOG("[%s] dump history at %d (%d records)", __func__, frameNum, firstRangeSize + secondRangeSize);
 
-	file << std::format("internal frame checksums ({}):\n", frameNum);
+	file << fmt::format("internal frame checksums ({}):\n", frameNum);
 
 	for (int i = startIndex; i < startIndex + firstRangeSize; ++i) {
-		file << std::format("\t{:08x}\n", data[i]);
+		file << fmt::format("\t{:08x}\n", data[i]);
 	}
 	for (int i = 0; i < secondRangeSize; ++i) {
-		file << std::format("\t{:08x}\n", data[i]);
+		file << fmt::format("\t{:08x}\n", data[i]);
 	}
 #endif // SYNC_HISTORY
 }

@@ -3,6 +3,8 @@
 #include <functional>
 #include <tuple>
 
+#include <fmt/format.h>
+
 #include "UnsyncedGameCommands.h"
 
 #include "UnsyncedActionExecutor.h"
@@ -2262,7 +2264,7 @@ public:
 		if (infoTextureHandler->HasMode(mode))
 			return SetMode(action, mode, args.size() > 1 ? args[1] : "");
 		else
-			return CommandError(std::format("infotex mode does not exist '{}'", mode), false, true);
+			return CommandError(fmt::format("infotex mode does not exist '{}'", mode), false, true);
 	}
 };
 

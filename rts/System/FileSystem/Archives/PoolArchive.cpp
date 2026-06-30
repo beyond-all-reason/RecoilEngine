@@ -9,7 +9,7 @@
 #include <cassert>
 #include <cstring>
 #include <iostream>
-#include <format>
+#include <fmt/format.h>
 
 #include "System/FileSystem/DataDirsAccess.h"
 #include "System/FileSystem/FileSystem.h"
@@ -192,7 +192,7 @@ std::string CPoolArchive::GetPoolFileName(const std::array<uint8_t, 16>& md5Sum)
 
 	const std::string prefix(c_hex    ,  2);
 	const std::string pstfix(c_hex + 2, 30);
-	return std::format("{}/{}.gz", prefix, pstfix);
+	return fmt::format("{}/{}.gz", prefix, pstfix);
 }
 
 std::string CPoolArchive::GetPoolFilePath(const std::string& poolRootDir, const std::string& poolFile)

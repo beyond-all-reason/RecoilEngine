@@ -26,7 +26,7 @@
 #include "System/StringUtil.h"
 
 #include "System/Misc/TracyDefs.h"
-#include <format>
+#include <fmt/format.h>
 
 
 CONFIG(std::string, TooltipGeometry).defaultValue("0.0 0.125 0.41 0.1");
@@ -207,7 +207,7 @@ std::string CTooltipConsole::MakeUnitStatsString(const SUnitStats& stats)
 	string s;
 	s.reserve(512);
 
-	s += std::format
+	s += fmt::format
 		( "\nHealth {:.0f}/{:.0f}"
 		  "\nExperience {:.2f} Cost {:.0f} Range {:.0f}"
 		, stats.health, stats.maxHealth
@@ -215,11 +215,11 @@ std::string CTooltipConsole::MakeUnitStatsString(const SUnitStats& stats)
 	);
 
 	for (int i = 0; i < SResourcePack::MAX_RESOURCES; ++i) {
-		s += std::format("\n" BLUE "{}: " GREEN "+{:.1f}" GREY "/" RED "-{:.1f}"
+		s += fmt::format("\n" BLUE "{}: " GREEN "+{:.1f}" GREY "/" RED "-{:.1f}"
 			, resourceHandler->GetResource(i)->name, stats.resourceMake[i], stats.resourceUse[i]
 		);
 		if (stats.resourceHarvestMax[i] > 0.0f) {
-			s += std::format(GREY " (" GREEN "{:.1f}" GREY "/" BLUE "{:.1f}" GREY ")"
+			s += fmt::format(GREY " (" GREEN "{:.1f}" GREY "/" BLUE "{:.1f}" GREY ")"
 				, stats.resourceHarvest[i], stats.resourceHarvestMax[i]
 			);
 		}
