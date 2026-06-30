@@ -258,5 +258,10 @@ if    (BUILD_${myName}_AIWRAPPER)
 	list(APPEND myCompleteSources ${ai_common_SRC})
 	add_library(${myTarget} STATIC ${myCompleteSources})
 	add_dependencies(${myTarget} generateVersionFiles)
+	# AIFloat3.h derives from float3, whose str() helper now calls fmt::format,
+	# pulling in the non-inline fmt::vformat symbol. Skirmish AIs built on this
+	# wrapper (e.g. BARb) link neither the engine nor fmt, so propagate fmt::fmt
+	# to every consumer of the wrapper.
+	target_link_libraries(${myTarget} PUBLIC fmt::fmt)
 	set_target_properties(${myTarget} PROPERTIES OUTPUT_NAME "${myName}")
 endif (BUILD_${myName}_AIWRAPPER)
