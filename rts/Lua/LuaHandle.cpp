@@ -556,15 +556,9 @@ bool CLuaHandle::LoadCode(lua_State* L, std::string code, const string& debug)
 void CLuaHandle::InitLuaSocket(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	std::string code;
-	// socket.lua ships in springcontent.sdz under LuaSocket/; load it from
-	// the base VFS. A previous menu/lobby path ("socket.lua", default VFS)
-	// never resolved, so LuaSocket support failed to initialise ("Error
-	// loading socket.lua"), breaking multiplayer server connections from
-	// Chobby. Shared by CLuaUI and CLuaMenu so both use the same path/mode.
-	std::string filename = "LuaSocket/socket.lua";
-	CFileHandler f(filename, SPRING_VFS_BASE);
 
+	const std::string filename = "LuaSocket/socket.lua";
+	CFileHandler f(filename, SPRING_VFS_BASE);
 	if (!f.FileExists()) {
 		LOG_L(L_ERROR, "Error loading %s (file does not exist)", filename.c_str());
 		return;
@@ -572,6 +566,7 @@ void CLuaHandle::InitLuaSocket(lua_State* L)
 
 	LUA_OPEN_LIB(L, luaopen_socket_core);
 
+	std::string code;
 	if (f.LoadStringData(code)) {
 		LoadCode(L, std::move(code), filename);
 	} else {
