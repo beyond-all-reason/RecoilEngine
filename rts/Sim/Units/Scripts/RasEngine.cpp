@@ -227,22 +227,25 @@ void CRasEngine::TickRunningThreads()
 	safeIDs.reserve(threadIDs.size());
 	spring::unordered_set<const CRasInstance*> parallelInsts;
 
-	for (int tid : threadIDs) {
-		CRasThread* th = GetThread(tid);
-		bool safe = false;
-		if (th && th->rasFile && th->rasInst) {
-			const int funcId = th->GetRootFunctionId();
-			if (funcId >= 0 &&
-			    static_cast<size_t>(funcId) < th->rasFile->threadSafeFuncs.size() &&
-			    th->rasFile->threadSafeFuncs[funcId] &&
-			    parallelInsts.insert(th->rasInst).second) {
-				safe = true;
+	{
+		ZoneScopedN("RasSplit");
+		for (int tid : threadIDs) {
+			CRasThread* th = GetThread(tid);
+			bool safe = false;
+			if (th && th->rasFile && th->rasInst) {
+				const int funcId = th->GetRootFunctionId();
+				if (funcId >= 0 &&
+				    static_cast<size_t>(funcId) < th->rasFile->threadSafeFuncs.size() &&
+				    th->rasFile->threadSafeFuncs[funcId] &&
+				    parallelInsts.insert(th->rasInst).second) {
+					safe = true;
+				}
 			}
-		}
-		if (safe) {
-			safeIDs.push_back(tid);
-		} else {
-			unsafeIDs.push_back(tid);
+			if (safe) {
+				safeIDs.push_back(tid);
+			} else {
+				unsafeIDs.push_back(tid);
+			}
 		}
 	}
 
@@ -254,19 +257,22 @@ void CRasEngine::TickRunningThreads()
 		std::vector<int> removedBuffer(safeIDs.size(), -1);
 		std::atomic<int> removedCount{0};
 
-		for_mt(0, static_cast<int>(safeIDs.size()), [&](int i) {
-			CRasThread* thread = GetThread(safeIDs[i]);
-			if (thread == nullptr) {
-				return;
-			}
+		{
+			ZoneScopedN("RasParallelTick");
+			for_mt(0, static_cast<int>(safeIDs.size()), [&](int i) {
+				CRasThread* thread = GetThread(safeIDs[i]);
+				if (thread == nullptr) {
+					return;
+				}
 
-			thread->SetParallel(true);
-			if (!thread->Tick()) {
-				int pos = removedCount.fetch_add(1);
-				removedBuffer[pos] = safeIDs[i];
-			}
-			thread->SetParallel(false);
-		});
+				thread->SetParallel(true);
+				if (!thread->Tick()) {
+					int pos = removedCount.fetch_add(1);
+					removedBuffer[pos] = safeIDs[i];
+				}
+				thread->SetParallel(false);
+			});
+		}
 
 		// Assign IDs + schedule START spawns in deterministic safeIDs order
 		// (no GenThreadID/QueueAddThread races inside for_mt) -> sync-stable.
@@ -302,8 +308,11 @@ void CRasEngine::TickRunningThreads()
 	}
 
 	// Tick unsafe scripts serially on the main thread.
-	for (int tid : unsafeIDs) {
-		TickThread(GetThread(tid));
+	{
+		ZoneScopedN("RasSerialTick");
+		for (int tid : unsafeIDs) {
+			TickThread(GetThread(tid));
+		}
 	}
 
 	// Prepare threads for next frame.
@@ -315,6 +324,7 @@ void CRasEngine::TickRunningThreads()
 void CRasEngine::Tick(int deltaTime)
 {
 	ZoneScoped;
+	FrameMark;
 	TracyPlot("RasInstances", static_cast<int64_t>(threadInstances.size()));
 	currentTime += deltaTime;
 
