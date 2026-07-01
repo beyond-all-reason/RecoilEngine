@@ -44,6 +44,13 @@ CR_REG_METADATA(CRasEngine::SleepingThread, (
 ))
 
 static const char* const numCobThreadsPlot = "CobThreads";
+static const char* const rasRunningThreadsPlot = "RasRunningThreads";
+static const char* const rasWaitingThreadsPlot = "RasWaitingThreads";
+static const char* const rasSleepingThreadsPlot = "RasSleepingThreads";
+static const char* const rasSafeThreadsPlot = "RasSafeThreads";
+static const char* const rasUnsafeThreadsPlot = "RasUnsafeThreads";
+static const char* const rasTickAddedPlot = "RasTickAdded";
+static const char* const rasTickRemovedPlot = "RasTickRemoved";
 
 int CRasEngine::AddThread(CRasThread&& thread)
 {
@@ -79,6 +86,9 @@ bool CRasEngine::RemoveThread(int threadID) {
 void CRasEngine::ProcessQueuedThreads() {
 	ZoneScoped;
 
+	TracyPlot(rasTickRemovedPlot, static_cast<int64_t>(tickRemovedThreads.size()));
+	TracyPlot(rasTickAddedPlot, static_cast<int64_t>(tickAddedThreads.size()));
+
 	// Remove threads killed during Tick by other thread (SIGNAL), we do it
 	// here as nothing is actively referencing any thread's memory here.
 	for (int threadID: tickRemovedThreads) {
@@ -106,9 +116,11 @@ void CRasEngine::ScheduleThread(const CRasThread* thread)
 	switch (thread->GetState()) {
 		case CRasThread::Run: {
 			waitingThreadIDs.push_back(thread->GetID());
+			TracyPlot(rasWaitingThreadsPlot, static_cast<int64_t>(waitingThreadIDs.size()));
 		} break;
 		case CRasThread::Sleep: {
 			sleepingThreadIDs.push(SleepingThread{thread->GetID(), thread->GetWakeTime()});
+			TracyPlot(rasSleepingThreadsPlot, static_cast<int64_t>(sleepingThreadIDs.size()));
 		} break;
 		default: {
 			LOG_L(L_ERROR, "[RASEngine::%s] unknown state %d for thread %d", __func__, thread->GetState(), thread->GetID());
@@ -197,6 +209,10 @@ void CRasEngine::TickRunningThreads()
 	std::vector<int> threadIDs;
 	threadIDs.swap(runningThreadIDs);
 
+	TracyPlot(rasRunningThreadsPlot, static_cast<int64_t>(threadIDs.size()));
+	TracyPlot(rasWaitingThreadsPlot, static_cast<int64_t>(waitingThreadIDs.size()));
+	TracyPlot(rasSleepingThreadsPlot, static_cast<int64_t>(sleepingThreadIDs.size()));
+
 	if (threadIDs.empty()) {
 		return;
 	}
@@ -213,18 +229,25 @@ void CRasEngine::TickRunningThreads()
 
 	for (int tid : threadIDs) {
 		CRasThread* th = GetThread(tid);
+		bool safe = false;
 		if (th && th->rasFile && th->rasInst) {
 			const int funcId = th->GetRootFunctionId();
 			if (funcId >= 0 &&
 			    static_cast<size_t>(funcId) < th->rasFile->threadSafeFuncs.size() &&
 			    th->rasFile->threadSafeFuncs[funcId] &&
 			    parallelInsts.insert(th->rasInst).second) {
-				safeIDs.push_back(tid);
-				continue;
+				safe = true;
 			}
 		}
-		unsafeIDs.push_back(tid);
+		if (safe) {
+			safeIDs.push_back(tid);
+		} else {
+			unsafeIDs.push_back(tid);
+		}
 	}
+
+	TracyPlot(rasSafeThreadsPlot, static_cast<int64_t>(safeIDs.size()));
+	TracyPlot(rasUnsafeThreadsPlot, static_cast<int64_t>(unsafeIDs.size()));
 
 	// Tick thread-safe scripts in parallel.
 	if (!safeIDs.empty()) {
@@ -284,12 +307,15 @@ void CRasEngine::TickRunningThreads()
 	}
 
 	// Prepare threads for next frame.
+	TracyPlot(rasWaitingThreadsPlot, static_cast<int64_t>(waitingThreadIDs.size()));
 	std::swap(runningThreadIDs, waitingThreadIDs);
+	TracyPlot(rasRunningThreadsPlot, static_cast<int64_t>(runningThreadIDs.size()));
 }
 
 void CRasEngine::Tick(int deltaTime)
 {
 	ZoneScoped;
+	TracyPlot("RasInstances", static_cast<int64_t>(threadInstances.size()));
 	currentTime += deltaTime;
 
 	TickRunningThreads();
