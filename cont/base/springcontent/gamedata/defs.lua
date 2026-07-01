@@ -4,7 +4,7 @@
 --  file:    defs.lua
 --  brief:   entry point for unitdefs, featuredefs, and weapondefs parsing
 --  author:  Dave Rodgers
---  notes:   Spring.GetModOptions() is available
+--  notes:   Engine.Shared.GetModOptions() is available
 --
 --  Copyright (C) 2007.
 --  Licensed under the terms of the GNU GPL, v2 or later.
@@ -22,7 +22,7 @@ local function LoadDefs(name)
   local filename = 'gamedata/' .. name .. '.lua'
   local success, result = pcall(VFS.Include, filename)
   if (not success) then
-    Spring.Log(section, LOG.ERROR, 'Failed to load ' .. name)
+    Engine.Shared.Log(section, LOG.ERROR, 'Failed to load ' .. name)
     error(result)
   end
   if (result == nil) then
@@ -35,7 +35,7 @@ end
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
-Spring.TimeCheck('[defs.lua] loading all *Defs tables:', function()
+Engine.Shared.TimeCheck('[defs.lua] loading all *Defs tables:', function()
   DEFS.unitDefs    = LoadDefs('unitDefs')
   DEFS.featureDefs = LoadDefs('featureDefs')
   DEFS.weaponDefs  = LoadDefs('weaponDefs')

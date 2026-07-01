@@ -106,7 +106,7 @@ class Member < OpenStruct
     <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref) %>
 
     <% if not bases.empty? %>
-    Inherits <% bases.each do |base| %><code><%= base %></code> <% end %>
+    Inherits <% bases.each do |base| %><%= Member.refs.include?(base) ? a(base) : "<code>#{base}</code>" %> <% end %>
     <% end %>
 
 

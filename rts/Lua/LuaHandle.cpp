@@ -277,6 +277,27 @@ bool CLuaHandle::AddEntriesToTable(lua_State* L, const char* name,
 }
 
 
+bool CLuaHandle::AddEntriesToTable(lua_State* L, const char* outerName,
+                                   const char* innerName, bool (*entriesFunc)(lua_State*))
+{
+	const int top = lua_gettop(L);
+	// Env table is at `top`. Get-or-create env[outerName], leaving it on top.
+	lua_pushstring(L, outerName);
+	lua_rawget(L, top);
+	if (!lua_istable(L, -1)) {
+		lua_pop(L, 1);
+		lua_newtable(L);
+		lua_pushstring(L, outerName);
+		lua_pushvalue(L, -2);
+		lua_rawset(L, top);
+	}
+	// Outer table on top; populate its `innerName` sub-table.
+	const bool success = AddEntriesToTable(L, innerName, entriesFunc);
+	lua_settop(L, top);
+	return success;
+}
+
+
 /******************************************************************************/
 /******************************************************************************/
 

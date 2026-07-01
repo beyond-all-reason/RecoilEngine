@@ -23,6 +23,7 @@
 #include "LuaWeaponDefs.h"
 #include "LuaScream.h"
 #include "LuaOpenGL.h"
+#include "LuaSpringContext.h"
 #include "LuaUtils.h"
 #include "LuaVFS.h"
 #include "LuaVFSDownload.h"
@@ -125,10 +126,10 @@ CLuaUI::CLuaUI()
 	    !AddEntriesToTable(L, "FeatureDefs", LuaFeatureDefs::PushEntries)    ||
 	    !AddEntriesToTable(L, "Script",      LuaInterCall::PushEntriesLuaUI) ||
 	    !AddEntriesToTable(L, "Script",      LuaScream::PushEntries)         ||
-	    !AddEntriesToTable(L, "Spring",      LuaSyncedRead::PushEntries)     ||
-	    !AddEntriesToTable(L, "Spring",      LuaUnsyncedCtrl::PushEntries)   ||
-	    !AddEntriesToTable(L, "Spring",      LuaUnsyncedRead::PushEntries)   ||
-	    !AddEntriesToTable(L, "Spring",      LuaUICommand::PushEntries)      ||
+	    !AddEntriesToTable(L, "Engine", "Shared",   LuaSyncedRead::PushEntries)   ||
+	    !AddEntriesToTable(L, "Engine", "Unsynced", LuaUnsyncedCtrl::PushEntries) ||
+	    !AddEntriesToTable(L, "Engine", "Unsynced", LuaUnsyncedRead::PushEntries) ||
+	    !AddEntriesToTable(L, "Engine", "Shared",   LuaUICommand::PushEntries)    ||
 	    !AddEntriesToTable(L, "gl",          LuaOpenGL::PushEntries)         ||
 	    !AddEntriesToTable(L, "GL",          LuaConstGL::PushEntries)        ||
 	    !AddEntriesToTable(L, "Engine",      LuaConstEngine::PushEntries)    ||
@@ -142,6 +143,8 @@ CLuaUI::CLuaUI()
 		KillLua();
 		return;
 	}
+
+	LuaSpringContext::BuildSpringFromSplitTables(L, LuaSpringContext::Context::Unsynced);
 
 	lua_getglobal(L, "Script");
 		LuaPushNamedCFunc(L, "GetWatchExplosion",    GetWatchExplosionDef);
@@ -691,6 +694,12 @@ bool CLuaUI::GetLuaCmdDescList(lua_State* L, int index, vector<SCommandDescripti
 // Lua Callbacks
 //
 
+/***
+ * @function Engine.Shared.SetShockFrontFactors
+ * @param minArea number?
+ * @param minPower number?
+ * @param distAdj number?
+ */
 int CLuaUI::SetShockFrontFactors(lua_State* L)
 {
 	luaUI->haveShockFront = true;

@@ -21,7 +21,7 @@ require "table.lua"
 
 AddonRevs = {}
 
-local startTimer = Spring.GetTimer()
+local startTimer = Engine.Unsynced.GetTimer()
 
 local function GetDefaultKnownInfo(filepath, basename)
 	return {
@@ -151,7 +151,7 @@ FIXME???
 				if (handler.inCommandsChanged) then
 					table.insert(handler.customCommands, cmd)
 				else
-					Spring.Echo("AddLayoutCommand() can only be used in CommandsChanged()")
+					Engine.Shared.Echo("AddLayoutCommand() can only be used in CommandsChanged()")
 				end
 			end,
 			GetCommands  = function() return handler.commands end,
@@ -190,7 +190,7 @@ function AddonRevs.NewAddonRev1()
 	h.RemoveWidget = function() handler:Remove(addon, "auto") end
 	h.GetCommands  = function() return handler.commands end
 	h.GetViewSizes = function() return gl.GetViewSizes() end
-	h.GetHourTimer = function() return Spring.DiffTimers(Spring.GetTimer(), startTimer) % 3600 end
+	h.GetHourTimer = function() return Engine.Unsynced.DiffTimers(Engine.Unsynced.GetTimer(), startTimer) % 3600 end
 	h.IsMouseOwner = function() return (handler.mouseOwner == addon) end
 	h.DisownMouse  = function()
 		if (handler.mouseOwner == addon) then
@@ -209,7 +209,7 @@ function AddonRevs.NewAddonRev1()
 		if (handler.inCommandsChanged) then
 			table.insert(handler.customCommands, cmd)
 		else
-			Spring.Echo("AddLayoutCommand() can only be used in CommandsChanged()")
+			Engine.Shared.Echo("AddLayoutCommand() can only be used in CommandsChanged()")
 		end
 	end
 
@@ -229,7 +229,7 @@ function AddonRevs.ParseAddon(rev, filepath, _VFSMODE)
 	local addonEnv = handler:NewAddon(rev)
 	local success, err = pcall(VFS.Include, filepath, addonEnv, _VFSMODE)
 	if (not success) then
-		Spring.Log(LUA_NAME, "error", 'Failed to load: ' .. basename .. '  (' .. tostring(err) .. ')')
+		Engine.Shared.Log(LUA_NAME, "error", 'Failed to load: ' .. basename .. '  (' .. tostring(err) .. ')')
 		return nil
 	end
 	if (err == false) then
@@ -241,7 +241,7 @@ function AddonRevs.ParseAddon(rev, filepath, _VFSMODE)
 	--// Validate Callins
 	err = handler:ValidateAddon(addon)
 	if (err) then
-		Spring.Log(LUA_NAME, "error", 'Failed to load: ' .. basename .. '  (' .. tostring(err) .. ')')
+		Engine.Shared.Log(LUA_NAME, "error", 'Failed to load: ' .. basename .. '  (' .. tostring(err) .. ')')
 		return nil
 	end
 

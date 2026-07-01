@@ -78,6 +78,7 @@ local system = {
   Encoding = Encoding,
   VFS = VFS,
   Spring = Spring,
+  Engine = Engine,
 
   --  Custom functions
   lowerkeys = lowerkeys,

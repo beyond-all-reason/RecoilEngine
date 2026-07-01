@@ -7,7 +7,7 @@
 --
 --  Demonstrates:
 --    - Using the DrawBuildSquare callin to receive per-cell build placement data
---    - Using Spring.SetEngineBuildSquareRendering(false) to replace engine rendering
+--    - Using Engine.Unsynced.SetEngineBuildSquareRendering(false) to replace engine rendering
 --    - Using GL4 VAO/VBO/shader via raw engine API (gl.CreateShader, gl.GetVBO, gl.GetVAO)
 --
 --  License: GNU GPL, v2 or later
@@ -40,8 +40,8 @@ local glUniform = gl.Uniform
 local glGetVBO = gl.GetVBO
 local glGetVAO = gl.GetVAO
 local glGetEngineUniformBufferDef = gl.GetEngineUniformBufferDef
-local spGetGameFrame = Spring.GetGameFrame
-local spSetEngineBuildSquareRendering = Spring.SetEngineBuildSquareRendering
+local spGetGameFrame = Engine.Shared.GetGameFrame
+local spSetEngineBuildSquareRendering = Engine.Unsynced.SetEngineBuildSquareRendering
 		or function() end
 local GL_ARRAY_BUFFER = GL.ARRAY_BUFFER
 local GL_ELEMENT_ARRAY_BUFFER = GL.ELEMENT_ARRAY_BUFFER
@@ -158,7 +158,7 @@ void main() {
 -- Initialization / cleanup
 
 local function goodbye(reason)
-	Spring.Echo("BuildSquare GL4 Example widget exiting: " .. reason)
+	Engine.Shared.Echo("BuildSquare GL4 Example widget exiting: " .. reason)
 	widgetHandler:RemoveWidget()
 end
 

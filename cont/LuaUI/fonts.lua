@@ -18,7 +18,7 @@ end
 -- ":n:" sets it to nearest texture filtering
 local DefaultFontName = ":n:" .. LUAUI_DIRNAME .. "Fonts/FreeMonoBold_12"
 
-Spring.CreateDir(LUAUI_DIRNAME .. 'Fonts')
+Engine.Unsynced.CreateDir(LUAUI_DIRNAME .. 'Fonts')
 
 
 --------------------------------------------------------------------------------
@@ -106,7 +106,7 @@ local function CreateFontFiles(fontName)
   print('CreateFontFiles = ' .. fullName .. ', ' .. size)
 
   return
-    Spring.MakeFont(fullName, {
+    Engine.Unsynced.MakeFont(fullName, {
       inData = inData,
       height = tonumber(size),
       minChar = 0,
@@ -493,7 +493,7 @@ end
 
 
 local function Update(dt)
-  timeStamp = timeStamp + (dt or Spring.GetLastUpdateSeconds())
+  timeStamp = timeStamp + (dt or Engine.Unsynced.GetLastUpdateSeconds())
   if (timeStamp < (lastUpdate + 1.0)) then
     return  -- only update every 1.0 seconds
   end

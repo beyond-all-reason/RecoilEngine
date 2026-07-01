@@ -12,7 +12,7 @@ struct lua_State;
  * You use it like this (Lua):
  * <code>
  *   local myScream = Script.CreateScream()
- *   myScream.func  = function() Spring.Echo("AHHHHHH") end
+ *   myScream.func  = function() Engine.Shared.Echo("AHHHHHH") end
  * </code>
  */
 class LuaScream {

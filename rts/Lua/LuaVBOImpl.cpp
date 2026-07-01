@@ -673,7 +673,7 @@ size_t LuaVBOImpl::Upload(const sol::stack_table& luaTblData, sol::optional<int>
  * @param elementCount number? number of elements to download
  * @param forceGPURead boolean? (Default: `false`) force downloading the data from GPU buffer as opposed
  * to using shadow RAM buffer
- * @return [number, ...][] vboData
+ * @return number[] vboData
  */
 sol::as_table_t<std::vector<lua_Number>> LuaVBOImpl::Download(sol::optional<int> attribIdxOpt, sol::optional<int> elemOffsetOpt, sol::optional<int> elemCountOpt, sol::optional<bool> forceGPUReadOpt)
 {

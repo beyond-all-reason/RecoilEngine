@@ -153,7 +153,7 @@ end
 
 local function EchoLines(msg)
   for line in msg:gmatch('([^\n]+)\n?') do
-    Spring.Echo(line)
+    Engine.Shared.Echo(line)
   end
 end
 
@@ -170,7 +170,7 @@ local function Help(playerID, cmd)
     for _,name in ipairs(sorted) do
       str = str .. '  ' .. name
     end
-    Spring.Echo(str)
+    Engine.Shared.Echo(str)
     if (isSyncedCode) then
       SendToUnsynced(playerID, "help")
     end
@@ -178,7 +178,7 @@ local function Help(playerID, cmd)
     local callInfoList = chatActions[cmd]
     if (not callInfoList) then
       if (not isSyncedCode) then
-        Spring.Echo('unknown command:  ' .. cmd)
+        Engine.Shared.Echo('unknown command:  ' .. cmd)
       end
     else
       for i,callInfo in ipairs(callInfoList) do

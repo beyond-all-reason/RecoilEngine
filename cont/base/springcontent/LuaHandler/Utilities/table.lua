@@ -45,7 +45,7 @@ function tprinttable(t, columns)
 			formatstr = "  " .. string.rep("%-25s, ", #t - i - 1) .. "%-25s"
 		end
 		local s = formatstr:format(select(i,unpack(t)))
-		Spring.Echo("  " .. s)
+		Engine.Shared.Echo("  " .. s)
 	end
 end
 

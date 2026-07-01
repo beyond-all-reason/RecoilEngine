@@ -566,27 +566,37 @@ void CGame::LoadDefs(LuaParser* defsParser)
 		defsParser->SetupLua(true, true);
 		// customize the defs environment; LuaParser has no access to LuaSyncedRead
 		#define LSR_ADDFUNC(f) defsParser->AddFunc(#f, LuaSyncedRead::f)
+		// LuaSyncedRead reads -> Engine.Shared; also kept on Spring for back-compat
+		#define LSR_DEFS_FUNCS \
+			LSR_ADDFUNC(GetModOptions); \
+			LSR_ADDFUNC(GetModOption); \
+			LSR_ADDFUNC(GetMapOptions); \
+			LSR_ADDFUNC(GetMapOption); \
+			LSR_ADDFUNC(GetTeamLuaAI); \
+			LSR_ADDFUNC(GetTeamList); \
+			LSR_ADDFUNC(GetGaiaTeamID); \
+			LSR_ADDFUNC(GetPlayerList); \
+			LSR_ADDFUNC(GetAllyTeamList); \
+			LSR_ADDFUNC(GetTeamInfo); \
+			LSR_ADDFUNC(GetAllyTeamInfo); \
+			LSR_ADDFUNC(GetAIInfo); \
+			LSR_ADDFUNC(GetTeamAllyTeamID); \
+			LSR_ADDFUNC(AreTeamsAllied); \
+			LSR_ADDFUNC(ArePlayersAllied); \
+			LSR_ADDFUNC(GetSideData);
+
 		defsParser->GetTable("Spring");
-
-		LSR_ADDFUNC(GetModOptions);
-		LSR_ADDFUNC(GetModOption);
-		LSR_ADDFUNC(GetMapOptions);
-		LSR_ADDFUNC(GetMapOption);
-		LSR_ADDFUNC(GetTeamLuaAI);
-		LSR_ADDFUNC(GetTeamList);
-		LSR_ADDFUNC(GetGaiaTeamID);
-		LSR_ADDFUNC(GetPlayerList);
-		LSR_ADDFUNC(GetAllyTeamList);
-		LSR_ADDFUNC(GetTeamInfo);
-		LSR_ADDFUNC(GetAllyTeamInfo);
-		LSR_ADDFUNC(GetAIInfo);
-		LSR_ADDFUNC(GetTeamAllyTeamID);
-		LSR_ADDFUNC(AreTeamsAllied);
-		LSR_ADDFUNC(ArePlayersAllied);
-		LSR_ADDFUNC(GetSideData);
-
+		LSR_DEFS_FUNCS
 		defsParser->EndTable();
+
+		defsParser->GetTable("Engine");
+		defsParser->GetTable("Shared");
+		LSR_DEFS_FUNCS
+		defsParser->EndTable();
+		defsParser->EndTable();
+
 		#undef LSR_ADDFUNC
+		#undef LSR_DEFS_FUNCS
 
 		// run the parser
 		if (!defsParser->Execute())
@@ -629,6 +639,13 @@ void CGame::LoadDefs(LuaParser* defsParser)
 		soundDefsParser.GetTable("Spring");
 		soundDefsParser.AddFunc("GetModOptions", LuaSyncedRead::GetModOptions);
 		soundDefsParser.AddFunc("GetMapOptions", LuaSyncedRead::GetMapOptions);
+		soundDefsParser.EndTable();
+
+		soundDefsParser.GetTable("Engine");
+		soundDefsParser.GetTable("Shared");
+		soundDefsParser.AddFunc("GetModOptions", LuaSyncedRead::GetModOptions);
+		soundDefsParser.AddFunc("GetMapOptions", LuaSyncedRead::GetMapOptions);
+		soundDefsParser.EndTable();
 		soundDefsParser.EndTable();
 
 		sound->LoadSoundDefs(&soundDefsParser);

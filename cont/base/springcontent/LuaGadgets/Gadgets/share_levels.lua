@@ -45,11 +45,11 @@ local help    = " <on|off|list|toggle|<<e|m|*> [<on|off|%>]>]>"
 
 local function AllowAction(playerID)
   if (playerID ~= 0) then
-    Spring.SendMessageToPlayer(playerID, "Must be the host player")
+    Engine.Unsynced.SendMessageToPlayer(playerID, "Must be the host player")
     return false
   end
-  if (not Spring.IsCheatingEnabled()) then
-    Spring.SendMessageToPlayer(playerID, "Cheating must be enabled")
+  if (not Engine.Shared.IsCheatingEnabled()) then
+    Engine.Unsynced.SendMessageToPlayer(playerID, "Cheating must be enabled")
     return false
   end
   return true
@@ -58,24 +58,24 @@ end
 
 
 local function PrintHelp()
-  Spring.Echo(help)
+  Engine.Shared.Echo(help)
   return true
 end
 
 
 local function PrintState()
   if (not metalForce) then
-    Spring.Echo('forced metal sharing is disabled')
+    Engine.Shared.Echo('forced metal sharing is disabled')
   else
-    Spring.Echo(string.format(
+    Engine.Shared.Echo(string.format(
       'forced metal sharing level set to: %i%%',
       ((1 - metalLevel) * 100)
     ))
   end
   if (not energyForce) then
-    Spring.Echo('forced energy sharing is disabled')
+    Engine.Shared.Echo('forced energy sharing is disabled')
   else
-    Spring.Echo(string.format(
+    Engine.Shared.Echo(string.format(
       'forced energy sharing level set to: %i%%',
       ((1 - energyLevel) * 100)
     ))
@@ -162,7 +162,7 @@ local function ChatControl(cmd, line, words, playerID)
   local level = tonumber(w2)
   if (level == nil) then
     PrintHelp()
-    Spring.Echo("bad sharing level: " .. w2)
+    Engine.Shared.Echo("bad sharing level: " .. w2)
     return true
   end
   level = (100 - level) * 0.01
@@ -201,8 +201,8 @@ end
 
 --------------------------------------------------------------------------------
 
-local GetTeamList       = Spring.GetTeamList
-local SetTeamShareLevel = Spring.SetTeamShareLevel
+local GetTeamList       = Engine.Shared.GetTeamList
+local SetTeamShareLevel = Engine.Synced.SetTeamShareLevel
 
 
 function gadget:GameFrame()

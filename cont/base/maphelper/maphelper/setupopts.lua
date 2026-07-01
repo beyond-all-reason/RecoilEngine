@@ -253,19 +253,19 @@ local function SetupOpts(mapInfo)
 
   local wantedOpts = CreateWantedOpts(mapInfo.defaultoptions)
   if (not wantedOpts) then
-    Spring.Log(section, LOG.ERROR, 'could not parse default map options')
+    Engine.Shared.Log(section, LOG.ERROR, 'could not parse default map options')
     return {}
   end
 
   local defaultVals = VFS.Include('maphelper/mapdefaults.lua')
   if (not defaultVals) then
-    Spring.Log(section, LOG.ERROR, 'could not load default map values')
+    Engine.Shared.Log(section, LOG.ERROR, 'could not load default map values')
     return {}
   end
 
   local optionDefs = CreateOptionDefs(mapInfo, defaultVals)
   if (not optionDefs) then
-    Spring.Log(section, LOG.ERROR, 'could not create map options')
+    Engine.Shared.Log(section, LOG.ERROR, 'could not create map options')
     return {}
   end  
 
@@ -275,7 +275,7 @@ local function SetupOpts(mapInfo)
     local optDef = optionDefs[opt]
     if (optDef) then
       if (type(optDef[4]) ~= 'function') then
-        Spring.Log(section, LOG.ERROR, 'bad option definition in MapOptions.lua: ' .. opt)
+        Engine.Shared.Log(section, LOG.ERROR, 'bad option definition in MapOptions.lua: ' .. opt)
       else
         table.insert(options, optDef[4](optDef))
       end

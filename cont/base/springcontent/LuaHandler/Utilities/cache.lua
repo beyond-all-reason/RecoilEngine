@@ -9,11 +9,11 @@ local teamColor = {}
 local visibleUnits = {}
 
 -- original functions
-local GetTeamColor = Spring.GetTeamColor
-local SetTeamColor = Spring.SetTeamColor
-local GetVisibleUnits = Spring.GetVisibleUnits
+local GetTeamColor = Engine.Unsynced.GetTeamColor
+local SetTeamColor = Engine.Unsynced.SetTeamColor
+local GetVisibleUnits = Engine.Unsynced.GetVisibleUnits
 
-function Spring.GetTeamColor(teamid)
+function Engine.Unsynced.GetTeamColor(teamid)
   if teamColor[teamid] then
   else
     teamColor[teamid] = { GetTeamColor(teamid) }
@@ -21,13 +21,13 @@ function Spring.GetTeamColor(teamid)
   return unpack(teamColor[teamid])
 end
 
-function Spring.SetTeamColor(teamid, r, g, b)
+function Engine.Unsynced.SetTeamColor(teamid, r, g, b)
   -- set and cache
   SetTeamColor(teamid, r, g, b)
   teamColor[teamid] = { GetTeamColor(teamid) }
 end
 
-function Spring.GetVisibleUnits(teamID, radius, Icons)
+function Engine.Unsynced.GetVisibleUnits(teamID, radius, Icons)
   --local index = tostring(teamID)..":"..tostring(radius)..":"..tostring(Icons)
   local t = {}
   if teamID then t[#t+1] = teamID end
@@ -40,8 +40,8 @@ function Spring.GetVisibleUnits(teamID, radius, Icons)
   if visibleUnits[index] then
     local visible = visibleUnits[index]
     -- check time
-    local now = Spring.GetTimer()
-    local diff = Spring.DiffTimers(now, visible.time)
+    local now = Engine.Unsynced.GetTimer()
+    local diff = Engine.Unsynced.DiffTimers(now, visible.time)
     if diff > 1/25 then
       visible.time = now
       update = true
@@ -56,7 +56,7 @@ function Spring.GetVisibleUnits(teamID, radius, Icons)
     ret = GetVisibleUnits(teamID, radius, Icons)
     visibleUnits[index] = {}
     visibleUnits[index].units = ret
-    visibleUnits[index].time = Spring.GetTimer()
+    visibleUnits[index].time = Engine.Unsynced.GetTimer()
   end
   return ret
 end

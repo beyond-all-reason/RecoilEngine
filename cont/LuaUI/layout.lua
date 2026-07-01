@@ -26,7 +26,7 @@
 
 include("colors.h.lua")
 
-local langSuffix = Spring.GetConfigString('Language', 'fr')
+local langSuffix = Engine.Unsynced.GetConfigString('Language', 'fr')
 local l10nName = 'L10N/commands_' .. langSuffix .. '.lua'
 local success, translations = pcall(VFS.Include, l10nName)
 if (not success) then

@@ -17,7 +17,7 @@
 	lua_doc_gen_dest = "$RECOIL_LUA_LIBRARY_DIR/generated"
 	site_dir = 'doc/site'
 	site_temp_dir = "{{vars.site_dir}}/temp"
-	lua_doc_paths = 'rts/{Lua,Rml/SolLua}/**/*.cpp'
+	lua_doc_paths = 'rts/{Lua,Rml/SolLua,Sim/Units/Scripts}/**/*.cpp'
 	lua_pages_dir = "{{vars.site_dir}}/content/docs/lua-api"
 	emmylua_cli_template = "{{vars.site_dir}}/emmylua-doc-cli-template"
 	latest_release_data = 'data/latest_release.json'
@@ -46,6 +46,24 @@
 	depends = ["lua_library"]
 	dir = "../../"
 	run = "emmylua_doc_cli -f json -i $RECOIL_LUA_LIBRARY_DIR -o {{vars.site_dir}}/data"
+
+	[tasks.lua_json_only]
+	description = "Generate Lua JSON (assumes library already generated)"
+	tools."cargo:emmylua_doc_cli" = "{{env.EMMYLUA_DOC_CLI_VERSION}}"
+	dir = "../../"
+	run = "emmylua_doc_cli -f json -i $RECOIL_LUA_LIBRARY_DIR -o {{vars.site_dir}}/data"
+
+	[tasks.lua_pages_only]
+	description = "Generate Lua API pages (assumes library already generated)"
+	depends = ["lua_json_only"]
+	tools.ruby = "{{env.RUBY_VERSION}}"
+	run = "ruby docgen/generator.rb --out=content/docs/lua-api/_index.md --doc=data/doc.json"
+
+	[tasks.server_dev]
+	depends = ["lua_pages_only", "binary_pages"]
+	description = "Run site server with pre-generated lua library"
+	tools.hugo = "{{env.HUGO_VERSION}}"
+	run = "hugo server --navigateToChanged"
 
 	[tasks.binary_pages]
 	depends = ["latest_release_data"]
@@ -104,6 +122,7 @@
 	tools."npm:lua-doc-extractor" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
 	dir = "../../"
 	run = [
+		"rm -rf {{vars.lua_doc_gen_dest}}",
 		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_doc_gen_dest}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\""
 	]
 

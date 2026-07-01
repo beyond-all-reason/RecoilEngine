@@ -18,16 +18,16 @@ local luaMsgs = {}
 function widget:Initialize()
 	local TDF = VFS.Include('gamedata/parse_tdf.lua')
 	if (not VFS.FileExists(msgsfile)) then
-		Spring.Log(sec, LOG.INFO, "gamedata/messages.tdf doesn't exist.")
+		Engine.Shared.Log(sec, LOG.INFO, "gamedata/messages.tdf doesn't exist.")
 		return
 	end
 
 	local tdfMsgs, err = TDF.Parse(msgsfile)
 	if (tdfMsgs == nil) then
-		Spring.Log(sec, LOG.ERROR, 'Error parsing '.. msgsfile  .. err)
+		Engine.Shared.Log(sec, LOG.ERROR, 'Error parsing '.. msgsfile  .. err)
 	end
 	if (type(tdfMsgs.messages) ~= 'table') then
-		Spring.Log(sec, LOG.ERROR, 'Missing "messages" section in ' .. msgsfile )
+		Engine.Shared.Log(sec, LOG.ERROR, 'Missing "messages" section in ' .. msgsfile )
 	end
 
 	for label, msgs in pairs(tdfMsgs.messages) do
@@ -49,29 +49,29 @@ local function Translate(msg)
 		local msgs = luaMsgs[msg]
 		return msgs[ math.random( #msgs ) ]
 	end
-	Spring.Log(sec, LOG.DEBUG, string.format("Missing translation for %s", msg))
+	Engine.Shared.Log(sec, LOG.DEBUG, string.format("Missing translation for %s", msg))
 	return msg
 end
 
 function widget:TeamDied(teamID)
 	local playerNames
-	local _, leaderPlayerId, isDead, isAiTeam = Spring.GetTeamInfo(teamID)
+	local _, leaderPlayerId, isDead, isAiTeam = Engine.Shared.GetTeamInfo(teamID)
 	if isAiTeam then
-		local skirmishAIID, aiName, hostingPlayerID, shortName, version, options = Spring.GetAIInfo(teamID)
+		local skirmishAIID, aiName, hostingPlayerID, shortName, version, options = Engine.Shared.GetAIInfo(teamID)
 		if aiName~="UNKNOWN" and aiName:lower():sub(1,3)~="bot" and aiName:len()>1 then
 			playerNames=aiName
 		elseif shortName~="UNKNOWN" then
 			playerNames=shortName
-		elseif hostingPlayerID~=Spring.GetMyPlayerID() then
-			local ownerName=Spring.GetPlayerInfo(hostingPlayerID)
+		elseif hostingPlayerID~=Engine.Unsynced.GetMyPlayerID() then
+			local ownerName=Engine.Shared.GetPlayerInfo(hostingPlayerID)
 			if ownerName then
 				playerNames=ownerName.."'s bot"
 			end
 		end
 	end
-	for _,playerId in ipairs(Spring.GetPlayerList(teamID,true)) do
-		playerNames=(playerNames and playerNames..", " or "")..Spring.GetPlayerInfo(playerId)
+	for _,playerId in ipairs(Engine.Shared.GetPlayerList(teamID,true)) do
+		playerNames=(playerNames and playerNames..", " or "")..Engine.Shared.GetPlayerInfo(playerId)
 	end
 	msg = string.format(Translate("Team%i(%s) is no more"), teamID, playerNames or "")
-	Spring.Echo(msg)
+	Engine.Shared.Echo(msg)
 end

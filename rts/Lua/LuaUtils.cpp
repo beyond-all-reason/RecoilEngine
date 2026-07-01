@@ -1394,7 +1394,7 @@ static void LogMsg(lua_State* L, const char* logSection, int logLevel, int argIn
  * 
  * Hint: the default print() writes to STDOUT.
  *
- * @function Spring.Echo
+ * @function Engine.Shared.Echo
  * @param arg any
  * @param ... any
  *
@@ -1408,7 +1408,7 @@ int LuaUtils::Echo(lua_State* L)
 
 /***
  * @enum LOG
- * @see Spring.Log
+ * @see Engine.Shared.Log
  * @field DEBUG 20
  * @field INFO 30
  * @field NOTICE 35 Engine default.
@@ -1472,7 +1472,7 @@ int LuaUtils::ParseLogLevel(lua_State* L, int index)
 /***
  * Logs a message to the logfile/console.
  * 
- * @function Spring.Log
+ * @function Engine.Shared.Log
  * @param section string Sets an arbitrary section. Level filtering can be applied per-section
  * @param logLevel (LogLevel|LOG)? (Default: `"notice"`)
  * @param ... string messages

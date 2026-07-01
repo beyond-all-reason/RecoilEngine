@@ -113,25 +113,25 @@ local co_running = coroutine.running
 local bit_and = math.bit_and
 local floor = math.floor
 
-local sp_GetGameFrame = Spring.GetGameFrame
-local sp_GetUnitWeaponState = Spring.GetUnitWeaponState
-local sp_SetUnitWeaponState = Spring.SetUnitWeaponState
-local sp_SetUnitShieldState = Spring.SetUnitShieldState
+local sp_GetGameFrame = Engine.Shared.GetGameFrame
+local sp_GetUnitWeaponState = Engine.Shared.GetUnitWeaponState
+local sp_SetUnitWeaponState = Engine.Synced.SetUnitWeaponState
+local sp_SetUnitShieldState = Engine.Synced.SetUnitShieldState
 
 -- Keep local reference to engine's CallAsUnit/WaitForMove/WaitForTurn,
 -- as we overwrite them with (safer) framework version later on.
-local sp_CallAsUnit  = Spring.UnitScript.CallAsUnit
-local sp_WaitForMove = Spring.UnitScript.WaitForMove
-local sp_WaitForTurn = Spring.UnitScript.WaitForTurn
-local sp_SetPieceVisibility = Spring.UnitScript.SetPieceVisibility
-local sp_SetDeathScriptFinished = Spring.UnitScript.SetDeathScriptFinished
+local sp_CallAsUnit  = Engine.Synced.UnitScript.CallAsUnit
+local sp_WaitForMove = Engine.Synced.UnitScript.WaitForMove
+local sp_WaitForTurn = Engine.Synced.UnitScript.WaitForTurn
+local sp_SetPieceVisibility = Engine.Synced.UnitScript.SetPieceVisibility
+local sp_SetDeathScriptFinished = Engine.Synced.UnitScript.SetDeathScriptFinished
 
 local LUA_WEAPON_MIN_INDEX = 1
 local LUA_WEAPON_MAX_INDEX = LUA_WEAPON_MIN_INDEX + 31
 
 local UNITSCRIPT_DIR = (UNITSCRIPT_DIR or "scripts/"):lower()
 local VFSMODE = VFS.ZIP_ONLY
-if (Spring.IsDevLuaEnabled()) then
+if (Engine.Shared.IsDevLuaEnabled()) then
 	VFSMODE = VFS.RAW_ONLY
 end
 
@@ -243,7 +243,7 @@ local function RunOnError(thread)
 	if fun then
 		local good, err = pcall(fun, err)
 		if (not good) then
-			Spring.Log(section, LOG.ERROR, "error in error handler: " .. tostring(err))
+			Engine.Shared.Log(section, LOG.ERROR, "error in error handler: " .. tostring(err))
 		end
 	end
 end
@@ -255,8 +255,8 @@ local function WakeUp(thread, ...)
 	local co = thread.thread
 	local good, err = co_resume(co, ...)
 	if (not good) then
-		Spring.Log(section, LOG.ERROR, err)
-		Spring.Log(section, LOG.ERROR, debug.traceback(co))
+		Engine.Shared.Log(section, LOG.ERROR, err)
+		Engine.Shared.Log(section, LOG.ERROR, debug.traceback(co))
 		RunOnError(thread)
 	end
 end
@@ -303,7 +303,7 @@ end
 --------------------------------------------------------------------------------
 
 -- overwrites engine's CallAsUnit
-function Spring.UnitScript.CallAsUnit(unitID, fun, ...)
+function Engine.Synced.UnitScript.CallAsUnit(unitID, fun, ...)
 	PushActiveUnitID(unitID)
 	local ret = {sp_CallAsUnit(unitID, fun, ...)}
 	PopActiveUnitID()
@@ -335,7 +335,7 @@ local function WaitForAnim(threads, waitingForAnim, piece, axis)
 end
 
 -- overwrites engine's WaitForMove
-function Spring.UnitScript.WaitForMove(piece, axis)
+function Engine.Synced.UnitScript.WaitForMove(piece, axis)
 	if sp_WaitForMove(piece, axis) then
 		local activeUnit = GetActiveUnit()
 		return WaitForAnim(activeUnit.threads, activeUnit.waitingForMove, piece, axis)
@@ -343,7 +343,7 @@ function Spring.UnitScript.WaitForMove(piece, axis)
 end
 
 -- overwrites engine's WaitForTurn
-function Spring.UnitScript.WaitForTurn(piece, axis)
+function Engine.Synced.UnitScript.WaitForTurn(piece, axis)
 	if sp_WaitForTurn(piece, axis) then
 		local activeUnit = GetActiveUnit()
 		return WaitForAnim(activeUnit.threads, activeUnit.waitingForTurn, piece, axis)
@@ -351,7 +351,7 @@ function Spring.UnitScript.WaitForTurn(piece, axis)
 end
 
 -- overwrites engine's WaitForScale
-function Spring.UnitScript.WaitForScale(piece)
+function Engine.Synced.UnitScript.WaitForScale(piece)
 	if sp_WaitForScale(piece) then
 		local activeUnit = GetActiveUnit()
 		return WaitForAnim(activeUnit.threads, activeUnit.waitingForScale, piece)
@@ -359,7 +359,7 @@ function Spring.UnitScript.WaitForScale(piece)
 end
 
 
-function Spring.UnitScript.Sleep(milliseconds)
+function Engine.Synced.UnitScript.Sleep(milliseconds)
 	local n = floor(milliseconds / 33)
 	if (n <= 0) then n = 1 end
 	n = n + sp_GetGameFrame()
@@ -381,7 +381,7 @@ end
 
 
 
-function Spring.UnitScript.StartThread(fun, ...)
+function Engine.Synced.UnitScript.StartThread(fun, ...)
 	local activeUnit = GetActiveUnit()
 	local co = co_create(fun)
 	-- signal_mask is inherited from current thread, if any
@@ -412,13 +412,13 @@ local function SetOnError(fun)
 	end
 end
 
-function Spring.UnitScript.SetSignalMask(mask)
+function Engine.Synced.UnitScript.SetSignalMask(mask)
 	local activeUnit = GetActiveUnit()
 	local activeThread = activeUnit.threads[co_running() or error("[SetSignalMask] not in a thread", 2)]
 	activeThread.signal_mask = mask
 end
 
-function Spring.UnitScript.Signal(mask)
+function Engine.Synced.UnitScript.Signal(mask)
 	local activeUnit = GetActiveUnit()
 
 	-- beware, unsynced loop order
@@ -439,16 +439,16 @@ function Spring.UnitScript.Signal(mask)
 	end
 end
 
-function Spring.UnitScript.Hide(piece)
+function Engine.Synced.UnitScript.Hide(piece)
 	return sp_SetPieceVisibility(piece, false)
 end
 
-function Spring.UnitScript.Show(piece)
+function Engine.Synced.UnitScript.Show(piece)
 	return sp_SetPieceVisibility(piece, true)
 end
 
 -- may be useful to other gadgets
-function Spring.UnitScript.GetScriptEnv(unitID)
+function Engine.Synced.UnitScript.GetScriptEnv(unitID)
 	local unit = units[unitID]
 	if unit then
 		return unit.env
@@ -456,7 +456,7 @@ function Spring.UnitScript.GetScriptEnv(unitID)
 	return nil
 end
 
-function Spring.UnitScript.GetLongestReloadTime(unitID)
+function Engine.Synced.UnitScript.GetLongestReloadTime(unitID)
 	local longest = 0
 	for i = LUA_WEAPON_MIN_INDEX, LUA_WEAPON_MAX_INDEX do
 		local reloadTime = sp_GetUnitWeaponState(unitID, i, "reloadTime")
@@ -509,12 +509,12 @@ end
 local function LoadChunk(filename)
 	local text = VFS.LoadFile(filename, VFSMODE)
 	if (text == nil) then
-		Spring.Log(section, LOG.ERROR, "Failed to load: " .. filename)
+		Engine.Shared.Log(section, LOG.ERROR, "Failed to load: " .. filename)
 		return nil
 	end
 	local chunk, err = loadstring(scriptHeader .. text, filename)
 	if (chunk == nil) then
-		Spring.Log(section, LOG.ERROR, "Failed to load: " .. Basename(filename) .. "  (" .. err .. ")")
+		Engine.Shared.Log(section, LOG.ERROR, "Failed to load: " .. Basename(filename) .. "  (" .. err .. ")")
 		return nil
 	end
 	return chunk
@@ -529,7 +529,7 @@ end
 
 
 function gadget:Initialize()
-	Spring.Log(section, LOG.INFO, string.format("Loading gadget: %-18s  <%s>", ghInfo.name, ghInfo.basename))
+	Engine.Shared.Log(section, LOG.INFO, string.format("Loading gadget: %-18s  <%s>", ghInfo.name, ghInfo.basename))
 
 	-- This initialization code has following properties:
 	--  * all used scripts are loaded => early syntax error detection
@@ -563,23 +563,23 @@ function gadget:Initialize()
 			local filename = scriptFiles[fn] or scriptFiles[bn] or
 			                 scriptFiles[cfn] or scriptFiles[cbn]
 			if filename then
-				Spring.Log(section, LOG.INFO, "  Loading unit script: " .. filename)
+				Engine.Shared.Log(section, LOG.INFO, "  Loading unit script: " .. filename)
 				LoadScript(unitDef.scriptName, filename)
 			end
 		end
 	end
 
 	-- Fake UnitCreated events for existing units. (for '/luarules reload')
-	local allUnits = Spring.GetAllUnits()
+	local allUnits = Engine.Shared.GetAllUnits()
 	for i=1,#allUnits do
 		local unitID = allUnits[i]
-		gadget:UnitCreated(unitID, Spring.GetUnitDefID(unitID))
+		gadget:UnitCreated(unitID, Engine.Shared.GetUnitDefID(unitID))
 	end
 end
 
 --------------------------------------------------------------------------------
 
-local StartThread = Spring.UnitScript.StartThread
+local StartThread = Engine.Synced.UnitScript.StartThread
 
 
 local function Wrap_AimWeapon(unitID, callins)
@@ -665,7 +665,7 @@ local include_cache = {}
 
 -- core of include() function for unit scripts
 local function ScriptInclude(filename)
-	--Spring.Echo("  Loading include: " .. UNITSCRIPT_DIR .. filename)
+	--Engine.Shared.Echo("  Loading include: " .. UNITSCRIPT_DIR .. filename)
 	local chunk = LoadChunk(UNITSCRIPT_DIR .. filename)
 	if chunk then
 		include_cache[filename] = chunk
@@ -699,7 +699,7 @@ function gadget:UnitCreated(unitID, unitDefID)
 	-- expensive inside unit scripts, but this can be worked around easily
 	-- by localizing the necessary globals.
 
-	local pieces = Spring.GetUnitPieceMap(unitID)
+	local pieces = Engine.Shared.GetUnitPieceMap(unitID)
 	local env = {
 		unitID = unitID,
 		unitDefID = unitDefID,
@@ -789,7 +789,7 @@ function gadget:UnitCreated(unitID, unitDefID)
 	end
 
 	-- Register the callins with Spring.
-	Spring.UnitScript.CreateScript(unitID, callins)
+	Engine.Synced.UnitScript.CreateScript(unitID, callins)
 
 	-- Register (must be last: it shouldn't be done in case of error.)
 	units[unitID] = {

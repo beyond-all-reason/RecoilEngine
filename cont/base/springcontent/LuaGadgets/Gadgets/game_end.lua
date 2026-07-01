@@ -31,7 +31,7 @@ if (not gadgetHandler:IsSyncedCode()) then
 	return false
 end
 
-local modOptions = Spring.GetModOptions()
+local modOptions = Engine.Shared.GetModOptions()
 
 -- teamDeathMode possible values: "none", "teamzerounits" , "allyzerounits"
 local teamDeathMode = modOptions.teamdeathmode or "allyzerounits"
@@ -46,17 +46,17 @@ local ignoreGaia = tonumber(modOptions.ignoregaiawinner) or 1
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
-local KillTeam = Spring.KillTeam
-local GetAllyTeamList = Spring.GetAllyTeamList
-local GetTeamList = Spring.GetTeamList
-local GetPlayerInfo = Spring.GetPlayerInfo
-local GetPlayerList = Spring.GetPlayerList
-local GetTeamInfo = Spring.GetTeamInfo
-local GetTeamUnitCount = Spring.GetTeamUnitCount
-local GetAIInfo = Spring.GetAIInfo
-local GetTeamLuaAI = Spring.GetTeamLuaAI
-local GameOver = Spring.GameOver
-local AreTeamsAllied = Spring.AreTeamsAllied
+local KillTeam = Engine.Synced.KillTeam
+local GetAllyTeamList = Engine.Shared.GetAllyTeamList
+local GetTeamList = Engine.Shared.GetTeamList
+local GetPlayerInfo = Engine.Shared.GetPlayerInfo
+local GetPlayerList = Engine.Shared.GetPlayerList
+local GetTeamInfo = Engine.Shared.GetTeamInfo
+local GetTeamUnitCount = Engine.Shared.GetTeamUnitCount
+local GetAIInfo = Engine.Shared.GetAIInfo
+local GetTeamLuaAI = Engine.Shared.GetTeamLuaAI
+local GameOver = Engine.Synced.GameOver
+local AreTeamsAllied = Engine.Shared.AreTeamsAllied
 
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
@@ -99,7 +99,7 @@ function gadget:Initialize()
 		return
 	end
 	
-	local gaiaTeamID = Spring.GetGaiaTeamID()
+	local gaiaTeamID = Engine.Shared.GetGaiaTeamID()
 	local teamCount = 0
 	for _,teamID in ipairs(GetTeamList()) do
 		if ignoreGaia ~= 1 or teamID ~= gaiaTeamID then

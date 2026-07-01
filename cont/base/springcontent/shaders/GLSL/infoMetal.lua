@@ -1,6 +1,6 @@
 return {
 	definitions = {
-		Spring.GetConfigInt("HighResInfoTexture") and "#define HIGH_QUALITY" or "",
+		Engine.Unsynced.GetConfigInt("HighResInfoTexture") and "#define HIGH_QUALITY" or "",
 	},
 	vertex = [[
 	#version 130

@@ -127,7 +127,7 @@ LuaVBOs::~LuaVBOs()
  * 
  * ```lua
  * local myVBO = gl.GetVBO()
- * if myVBO == nil then Spring.Echo("Failed to get VBO") end
+ * if myVBO == nil then Engine.Shared.Echo("Failed to get VBO") end
  * ```
  *
  * @function gl.GetVBO

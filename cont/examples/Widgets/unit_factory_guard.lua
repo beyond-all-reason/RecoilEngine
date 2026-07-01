@@ -30,13 +30,13 @@ end
 
 local CMD_GUARD            = CMD.GUARD
 local CMD_MOVE             = CMD.MOVE
-local spGetMyTeamID        = Spring.GetMyTeamID
-local spGetUnitBuildFacing = Spring.GetUnitBuildFacing
-local spGetUnitGroup       = Spring.GetUnitGroup
-local spGetUnitPosition    = Spring.GetUnitPosition
-local spGetUnitRadius      = Spring.GetUnitRadius
-local spGiveOrderToUnit    = Spring.GiveOrderToUnit
-local spSetUnitGroup       = Spring.SetUnitGroup
+local spGetMyTeamID        = Engine.Unsynced.GetMyTeamID
+local spGetUnitBuildFacing = Engine.Shared.GetUnitBuildFacing
+local spGetUnitGroup       = Engine.Unsynced.GetUnitGroup
+local spGetUnitPosition    = Engine.Shared.GetUnitPosition
+local spGetUnitRadius      = Engine.Shared.GetUnitRadius
+local spGiveOrderToUnit    = Engine.Shared.GiveOrderToUnit
+local spSetUnitGroup       = Engine.Unsynced.SetUnitGroup
 
 
 --------------------------------------------------------------------------------

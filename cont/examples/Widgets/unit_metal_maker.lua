@@ -29,11 +29,11 @@ end
 -- Automatically generated local definitions
 
 local CMD_ONOFF            = CMD.ONOFF
-local spGetMyTeamID        = Spring.GetMyTeamID
-local spGetTeamResources   = Spring.GetTeamResources
-local spGetTeamUnits       = Spring.GetTeamUnits
-local spGetUnitDefID       = Spring.GetUnitDefID
-local spGiveOrderToUnitMap = Spring.GiveOrderToUnitMap
+local spGetMyTeamID        = Engine.Unsynced.GetMyTeamID
+local spGetTeamResources   = Engine.Shared.GetTeamResources
+local spGetTeamUnits       = Engine.Shared.GetTeamUnits
+local spGetUnitDefID       = Engine.Shared.GetUnitDefID
+local spGiveOrderToUnitMap = Engine.Shared.GiveOrderToUnitMap
 
 
 --------------------------------------------------------------------------------

@@ -48,7 +48,7 @@ if LUA_NAME == "LuaUI" then
 		LUA_DIRNAME .. 'chili/'; -- DEPRECATED: Scheduled for removal in 103
 	}
 	--// Create the "LuaUI/Config" directory
-	Spring.CreateDir(LUAUI_DIRNAME .. 'Config') --FIXME LuaRules!
+	Engine.Unsynced.CreateDir(LUAUI_DIRNAME .. 'Config') --FIXME LuaRules!
 
 	handler:Load(LUAUI_DIRNAME .. "SystemWidgets/BlockUserWidgets.lua" --[[, VFS.ZIP]])
 else

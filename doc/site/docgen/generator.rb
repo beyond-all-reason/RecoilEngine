@@ -17,7 +17,7 @@ class Member
 
   @@known_templates = Set.new(@@templates.keys)
 
-  @@top_level = Set.new(["Spring", "Callins", "SyncedCallins", "UnsyncedCallins", "gl", "GL", "RmlUi"])
+  @@top_level = Set.new(["Spring", "Engine", "Callins", "SyncedCallins", "UnsyncedCallins", "gl", "GL", "RmlUi"])
 
   def initialize(attributes, parent = nil)
     super(attributes)
@@ -239,7 +239,7 @@ class Member
 end
 
 class Generator
-  @@top_level = ["Spring", "Callins", "SyncedCallins", "UnsyncedCallins", "gl", "GL", "RmlUi"]
+  @@top_level = ["Spring", "Engine", "Callins", "SyncedCallins", "UnsyncedCallins", "gl", "GL", "RmlUi"]
     .each_with_index
     .reduce({}) {|acc, (el, i)| acc[el] = i + 1; acc }
 
@@ -274,9 +274,13 @@ class Generator
   end
 
   def initialize(data_file)
-    data = JSON.load_file(data_file)
+    data = JSON.parse(File.read(data_file))
 
-    aliases, non_aliases = (data["globals"] + data["types"])
+    type_names = data["types"].map { |t| t["name"] }.to_set
+    all_entries = (data["globals"] + data["types"])
+      .reject { |e| e["type"] == "field" && type_names.include?(e["name"]) }
+
+    aliases, non_aliases = all_entries
       .map {|g| Member.new(g) }
       .partition{|g| g.type == :alias }
 

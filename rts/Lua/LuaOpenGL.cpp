@@ -1369,7 +1369,7 @@ int LuaOpenGL::EndText(lua_State* L)
  * @param text string
  * @param x number
  * @param y number
- * @param size number
+ * @param size number?
  * @param options string? concatenated string of option characters.
  *
  *   - horizontal alignment:
@@ -2065,8 +2065,8 @@ int LuaOpenGL::DrawFuncAtUnit(lua_State* L)
  * @param radius number
  * @param resolution integer
  * @param slope number
- * @param gravity number
- * @param weaponDefID integer
+ * @param gravity number?
+ * @param weaponDefID integer?
  */
 int LuaOpenGL::DrawGroundCircle(lua_State* L)
 {
@@ -2901,7 +2901,7 @@ int LuaOpenGL::TexRect(lua_State* L)
 
 /***
  * @function gl.DispatchCompute
- * @param numGroupX integer
+ * @param numGroupX integer?
  * @param numGroupY integer
  * @param numGroupZ integer
  * @param barriers integer? (Default: `0`)
@@ -4538,7 +4538,7 @@ int LuaOpenGL::TexEnv(lua_State* L)
  * @param texNum integer
  * @param target GL
  * @param pname GL
- * @param value number
+ * @param value number?
  */
 /***
  * @function gl.MultiTexEnv
@@ -4609,7 +4609,7 @@ static void SetTexGenState(GLenum target, bool state)
  * @function gl.TexGen
  * @param target GL
  * @param pname GL
- * @param value number
+ * @param value number?
  */
 /***
  * @function gl.TexGen
@@ -4669,7 +4669,7 @@ int LuaOpenGL::TexGen(lua_State* L)
  * @param texNum integer
  * @param target GL
  * @param pname GL
- * @param value number
+ * @param value number?
  */
 /***
  * @function gl.MultiTexGen
@@ -5073,6 +5073,10 @@ int LuaOpenGL::GetEngineAtlasTextures(lua_State* L) {
 /******************************************************************************/
 
 
+/***
+ * @function gl.Clear
+ * @param bits GL any buffer bit mask (e.g. `GL.STENCIL_BUFFER_BIT`). Clears with current/default values.
+ */
 /***
  * @function gl.Clear
  * @param bits GL `GL.DEPTH_BUFFER_BIT` or `GL.STENCIL_BUFFER_BIT`.
@@ -6397,10 +6401,10 @@ int LuaOpenGL::ReadPixels(lua_State* L)
 /***
  * @class SaveImageOptions
  * @x_helper
- * @field alpha boolean (Default: `false`)
- * @field yflip boolean (Default: `true`)
- * @field grayscale16bit boolean (Default: `false`)
- * @field readbuffer GL (Default: current read buffer)
+ * @field alpha boolean? (Default: `false`)
+ * @field yflip boolean? (Default: `true`)
+ * @field grayscale16bit boolean? (Default: `false`)
+ * @field readbuffer GL? (Default: current read buffer)
  */
 
 /***
@@ -7081,7 +7085,7 @@ int LuaOpenGL::ObjectLabel(lua_State* L) {
  * @function gl.PushDebugGroup 
  * @param id integer A numeric identifier for the group, can be any unique number.
  * @param message string A human-readable string describing the debug group. Will be truncated if longer than driver-specific limit
- * @param sourceIsThirdParty boolean Set the source tag, true for GL_DEBUG_SOURCE_THIRD_PARTY, false for GL_DEBUG_SOURCE_APPLICATION. default false
+ * @param sourceIsThirdParty boolean? Set the source tag, true for GL_DEBUG_SOURCE_THIRD_PARTY, false for GL_DEBUG_SOURCE_APPLICATION. default false
  * @return nil
  */
 int LuaOpenGL::PushDebugGroup(lua_State* L) {

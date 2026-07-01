@@ -79,7 +79,7 @@ local function LoadTDFs(dir)
   for _, filename in ipairs(tdfFiles) do
     local eds, err = TDF.Parse(filename)
     if (eds == nil) then
-      Spring.Log(section, LOG.ERROR, 'Error parsing ' .. filename .. ': ' .. err)
+      Engine.Shared.Log(section, LOG.ERROR, 'Error parsing ' .. filename .. ': ' .. err)
     else
       for name, ed in pairs(eds) do
         ed.filename = filename
@@ -106,9 +106,9 @@ local function LoadLuas(dir)
     setmetatable(edEnv, { __index = system })
     local success, eds = pcall(VFS.Include, filename, edEnv)
     if (not success) then
-      Spring.Log(section, LOG.ERROR, 'Error parsing ' .. filename .. ': ' .. tostring(eds))
+      Engine.Shared.Log(section, LOG.ERROR, 'Error parsing ' .. filename .. ': ' .. tostring(eds))
     elseif (eds == nil) then
-      Spring.Log(section, LOG.ERROR, 'Missing return table from: ' .. filename)
+      Engine.Shared.Log(section, LOG.ERROR, 'Missing return table from: ' .. filename)
     else
       for edName, ed in pairs(eds) do
         if ((type(edName) == 'string') and (type(ed) == 'table')) then

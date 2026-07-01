@@ -211,6 +211,18 @@ static void CreatePathMetatable(lua_State* L)
 /******************************************************************************/
 /******************************************************************************/
 
+/***
+ * @function Engine.Shared.RequestPath
+ * @param moveID number|string
+ * @param startX number
+ * @param startY number
+ * @param startZ number
+ * @param endX number
+ * @param endY number
+ * @param endZ number
+ * @param radius number?
+ * @return userdata? path
+ */
 int LuaPathFinder::RequestPath(lua_State* L)
 {
 	const MoveDef* moveDef = nullptr;
@@ -250,6 +262,13 @@ int LuaPathFinder::RequestPath(lua_State* L)
 
 
 
+/***
+ * @function Engine.Shared.InitPathNodeCostsArray
+ * @param overlayIndex number
+ * @param sizeX number
+ * @param sizeZ number
+ * @return boolean success
+ */
 int LuaPathFinder::InitPathNodeCostsArray(lua_State* L)
 {
 	const unsigned int overlayIndex = luaL_checkint(L, 1);
@@ -282,6 +301,11 @@ int LuaPathFinder::InitPathNodeCostsArray(lua_State* L)
 	return 1;
 }
 
+/***
+ * @function Engine.Shared.FreePathNodeCostsArray
+ * @param overlayIndex number
+ * @return boolean success
+ */
 int LuaPathFinder::FreePathNodeCostsArray(lua_State* L)
 {
 	const unsigned int overlayIndex = luaL_checkint(L, 1);
@@ -315,6 +339,11 @@ int LuaPathFinder::FreePathNodeCostsArray(lua_State* L)
 
 
 
+/***
+ * @function Engine.Shared.SetPathNodeCosts
+ * @param overlayIndex number
+ * @return boolean success
+ */
 int LuaPathFinder::SetPathNodeCosts(lua_State* L)
 {
 	const unsigned int overlayIndex = luaL_checkint(L, 1);
@@ -339,6 +368,11 @@ int LuaPathFinder::SetPathNodeCosts(lua_State* L)
 	return 1;
 }
 
+/***
+ * @function Engine.Shared.GetPathNodeCosts
+ * @param overlayIndex number
+ * @return boolean|table costs
+ */
 int LuaPathFinder::GetPathNodeCosts(lua_State* L)
 {
 	const unsigned int overlayIndex = luaL_checkint(L, 1);
@@ -370,6 +404,14 @@ int LuaPathFinder::GetPathNodeCosts(lua_State* L)
 
 
 
+/***
+ * @function Engine.Shared.SetPathNodeCost
+ * @param overlayIndex number
+ * @param nodeX number
+ * @param nodeZ number
+ * @param cost number
+ * @return boolean success
+ */
 int LuaPathFinder::SetPathNodeCost(lua_State* L)
 {
 	const unsigned int overlayIndex = luaL_checkint(L, 1);
@@ -400,6 +442,12 @@ int LuaPathFinder::SetPathNodeCost(lua_State* L)
 	return 1;
 }
 
+/***
+ * @function Engine.Shared.GetPathNodeCost
+ * @param nodeX number
+ * @param nodeZ number
+ * @return number cost
+ */
 int LuaPathFinder::GetPathNodeCost(lua_State* L)
 {
 	const unsigned int hmx = luaL_checkint(L, 1);

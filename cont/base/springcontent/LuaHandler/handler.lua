@@ -245,7 +245,7 @@ function handler:UpdateAddonList()
 	handler:SearchForNew()
 
 	--// Create list all to load files
-	Spring.Log(LUA_NAME, "info", ("Loading %ss   <>=vfs  **=raw  ()=unknown"):format(handler.addonName))
+	Engine.Shared.Log(LUA_NAME, "info", ("Loading %ss   <>=vfs  **=raw  ()=unknown"):format(handler.addonName))
 
 	local loadList = {}
 	for name,order in pairs(handler.orderList) do
@@ -254,7 +254,7 @@ function handler:UpdateAddonList()
 			if ki then
 				loadList[#loadList+1] = name
 			else
-				if (handler.verbose) then Spring.Log(LUA_NAME, "warning", ("Couldn't find a %s named \"%s\""):format(handler.addonName, name)) end
+				if (handler.verbose) then Engine.Shared.Log(LUA_NAME, "warning", ("Couldn't find a %s named \"%s\""):format(handler.addonName, name)) end
 				handler.knownInfos[name] = nil
 				handler.orderList[name] = nil
 			end
@@ -304,7 +304,7 @@ end
 
 
 local function GetAllAddonFiles(quiet)
-	local spLog = ((quiet) and function() end) or Spring.Log
+	local spLog = ((quiet) and function() end) or Engine.Shared.Log
 	local addonFiles = {}
 	for i,dir in pairs(ADDON_DIRS) do
 		spLog(LUA_NAME, "info", "Scanning: " .. dir)
@@ -327,7 +327,7 @@ end
 
 
 function handler:SearchForNew(quiet)
-	local spLog = ((quiet) and function() end) or Spring.Log
+	local spLog = ((quiet) and function() end) or Engine.Shared.Log
 	spLog(LUA_NAME, "info", "Searching for new " .. handler.AddonName .. "s")
 
 	local addonFiles = GetAllAddonFiles(quiet)
@@ -443,7 +443,7 @@ function handler:LoadAddonInfo(filepath, _VFSMODE)
 
 	--// fail
 	if (not ki) then
-		if (err) then Spring.Log(LUA_NAME, "warning", err) end
+		if (err) then Engine.Shared.Log(LUA_NAME, "warning", err) end
 		return nil
 	end
 
@@ -466,7 +466,7 @@ function handler:LoadAddonInfo(filepath, _VFSMODE)
 	--// validate
 	err = AddonRevs.ValidateKnownInfo(ki, _VFSMODE)
 	if (err) then
-		Spring.Log(LUA_NAME, "warning", err)
+		Engine.Shared.Log(LUA_NAME, "warning", err)
 		return nil
 	end
 
@@ -528,7 +528,7 @@ local function InsertAddonCallIn(ciName, addon)
 		ret = handler.callInLists[ciName]:Insert(addon, swf)
 		assert(type(handler.callInLists[ciName]) == "table", "[InsertAddonCallIn][post]")
 	elseif (handler.verbose) then
-		Spring.Log(LUA_NAME, "warning", "::InsertAddonCallIn: Unknown CallIn \"" .. ciName.. "\"")
+		Engine.Shared.Log(LUA_NAME, "warning", "::InsertAddonCallIn: Unknown CallIn \"" .. ciName.. "\"")
 	end
 
 	return ret
@@ -546,7 +546,7 @@ local function RemoveAddonCallIn(ciName, addon)
 		ret = handler.callInLists[ciName]:Remove(addon)
 		assert(type(handler.callInLists[ciName]) == "table", "[RemoveAddonCallIn][post]")
 	elseif (handler.verbose) then
-		Spring.Log(LUA_NAME, "warning", "::RemoveAddonCallIn: Unknown CallIn \"" .. ciName.. "\"")
+		Engine.Shared.Log(LUA_NAME, "warning", "::RemoveAddonCallIn: Unknown CallIn \"" .. ciName.. "\"")
 	end
 
 	return ret
@@ -578,11 +578,11 @@ function handler:Load(filepath, _VFSMODE)
 
 	if (ki.blocked) then
 		--// blocked
-		Spring.Log(LUA_NAME, "warning", ("blocked %s \"%s\"."):format(handler.AddonName, ki.name))
+		Engine.Shared.Log(LUA_NAME, "warning", ("blocked %s \"%s\"."):format(handler.AddonName, ki.name))
 		return
 	elseif (ki.active) then
 		--// Already loaded?
-		Spring.Log(LUA_NAME, "warning", ("%s \"%s\" already loaded."):format(handler.AddonName, ki.name))
+		Engine.Shared.Log(LUA_NAME, "warning", ("%s \"%s\" already loaded."):format(handler.AddonName, ki.name))
 		return
 	end
 
@@ -590,7 +590,7 @@ function handler:Load(filepath, _VFSMODE)
 	for i=1,#ki.depend do
 		local dep = ki.depend[i]
 		if not (handler.knownInfos[dep] or {}).active then
-			Spring.Log(LUA_NAME, "warning", ("Missing/Unloaded dependency \"%s\" for \"%s\"."):format(dep, ki.name))
+			Engine.Shared.Log(LUA_NAME, "warning", ("Missing/Unloaded dependency \"%s\" for \"%s\"."):format(dep, ki.name))
 			return
 		end
 	end
@@ -616,7 +616,7 @@ function handler:Load(filepath, _VFSMODE)
 
 	if (handler.verbose or handler.initialized) then
 		local loadingstr = ((ki.api and "Loading API %s: ") or "Loading %s: "):format(handler.addonName)
-		Spring.Log(LUA_NAME, "info", ("%-20s %-21s  %s"):format(loadingstr, name, handler:GetFancyString(name,basename)))
+		Engine.Shared.Log(LUA_NAME, "info", ("%-20s %-21s  %s"):format(loadingstr, name, handler:GetFancyString(name,basename)))
 	end
 
 	--// Add to handler
@@ -625,7 +625,7 @@ function handler:Load(filepath, _VFSMODE)
 
 	--// Unsafe addon (don't use pcall for callins)
 	if (SAFEWRAP == 1)and(addon._info.unsafe) then
-		Spring.Log(LUA_NAME, "warning", ('loaded unsafe %s: %s'):format(handler.addonName, name))
+		Engine.Shared.Log(LUA_NAME, "warning", ('loaded unsafe %s: %s'):format(handler.addonName, name))
 	end
 
 	--// Link the CallIns
@@ -678,7 +678,7 @@ function handler:Remove(addon, _reason)
 	if (addon.Shutdown) then
 		local ok, err = pcall(addon.Shutdown, addon)
 		if not ok then
-			Spring.Log(LUA_NAME, "error", 'In Shutdown(): ' .. tostring(err))
+			Engine.Shared.Log(LUA_NAME, "error", 'In Shutdown(): ' .. tostring(err))
 		end
 	end
 
@@ -697,7 +697,7 @@ function handler:Remove(addon, _reason)
 	end
 	for i=1,#rem do
 		local ki2 = rem[i]._info
-		Spring.Log(LUA_NAME, "info", ("Removed %s:  %-21s  %s (dependent of \"%s\")"):format(handler.addonName, ki2.name, handler:GetFancyString(ki2.name,ki2.basename),name))
+		Engine.Shared.Log(LUA_NAME, "info", ("Removed %s:  %-21s  %s (dependent of \"%s\")"):format(handler.addonName, ki2.name, handler:GetFancyString(ki2.name,ki2.basename),name))
 		handler:Remove(rem[i], "dependency")
 	end
 
@@ -721,9 +721,9 @@ local function LoadConfigFile(filename, envParam)
 
 	local success, rvalue = pcall(VFS.Include, filename, envParam)
 	if (not success) then
-		Spring.Log(LUA_NAME, "warning", 'Failed to load: ' .. filename .. '  (' .. tostring(rvalue) .. ')')
+		Engine.Shared.Log(LUA_NAME, "warning", 'Failed to load: ' .. filename .. '  (' .. tostring(rvalue) .. ')')
 	elseif (type(rvalue) ~= "table") then
-		Spring.Log(LUA_NAME, "warning", 'Failed to load: ' .. filename .. '  (table data expected, got ' .. type(rvalue) .. ')')
+		Engine.Shared.Log(LUA_NAME, "warning", 'Failed to load: ' .. filename .. '  (table data expected, got ' .. type(rvalue) .. ')')
 	else
 		return rvalue
 	end
@@ -839,7 +839,7 @@ end
 function handler:Enable(name)
 	local ki = handler.knownInfos[name]
 	if (not ki) then
-		Spring.Log(LUA_NAME, "warning", "::Enable: Couldn\'t find \"" .. name .. "\".")
+		Engine.Shared.Log(LUA_NAME, "warning", "::Enable: Couldn\'t find \"" .. name .. "\".")
 		return false
 	end
 	if (ki.active) then
@@ -859,7 +859,7 @@ end
 function handler:Disable(name)
 	local ki = handler.knownInfos[name]
 	if (not ki) then
-		Spring.Log(LUA_NAME, "warning", "::Disable: Didn\'t find \"" .. name .. "\".")
+		Engine.Shared.Log(LUA_NAME, "warning", "::Disable: Didn\'t find \"" .. name .. "\".")
 		return false
 	end
 	if (not ki.active)and((order or 0) > 0) then
@@ -869,13 +869,13 @@ function handler:Disable(name)
 	local addon = handler:FindByName(name)
 	if (addon) then
 		local str = ((ki.api and "Removing API %s: ") or "Removing %s: "):format(handler.addonName)
-		Spring.Echo(("%-20s %-21s  %s"):format(str, name, handler:GetFancyString(name,ki.basename)))
+		Engine.Shared.Echo(("%-20s %-21s  %s"):format(str, name, handler:GetFancyString(name,ki.basename)))
 		handler:Remove(addon) --// deactivate
 		handler.orderList[name] = 0 --// disable
 		handler:SaveOrderList()
 		return true
 	else
-		Spring.Log(LUA_NAME, "warning", "::Disable: Didn\'t find \"" .. name .. "\".")
+		Engine.Shared.Log(LUA_NAME, "warning", "::Disable: Didn\'t find \"" .. name .. "\".")
 	end
 end
 
@@ -883,7 +883,7 @@ end
 function handler:Toggle(name)
 	local ki = handler.knownInfos[name]
 	if (not ki) then
-		Spring.Log(LUA_NAME, "warning", "::Toggle: Couldn\'t find \"" .. name .. "\".")
+		Engine.Shared.Log(LUA_NAME, "warning", "::Toggle: Couldn\'t find \"" .. name .. "\".")
 		return
 	end
 
@@ -900,7 +900,7 @@ function handler:Toggle(name)
 		end
 	end)
 	if not status then
-		Spring.Log(LUA_NAME, "warning", "::Toggle Error: \"" .. msg .. "\".")
+		Engine.Shared.Log(LUA_NAME, "warning", "::Toggle Error: \"" .. msg .. "\".")
 		return
 	end
 	return status

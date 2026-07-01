@@ -29,7 +29,7 @@ local LOG_SECTION = "" -- FIXME: "LuaRules" section is not registered anywhere
 
 
 local VFSMODE = VFS.ZIP_ONLY -- FIXME: ZIP_FIRST ?
-if (Spring.IsDevLuaEnabled()) then
+if (Engine.Shared.IsDevLuaEnabled()) then
   VFSMODE = VFS.RAW_ONLY
 end
 
@@ -45,7 +45,7 @@ local actionHandler = VFS.Include(HANDLER_DIR .. 'actions.lua', nil, VFSMODE)
 
 function pgl() -- (print gadget list)  FIXME: move this into a gadget
   for k,v in ipairs(gadgetHandler.gadgets) do
-    Spring.Log(LOG_SECTION, LOG.ERROR,
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR,
       string.format("%3i  %3i  %s", k, v.ghInfo.layer, v.ghInfo.name)
     )
   end
@@ -151,12 +151,12 @@ function gadgetHandler:Initialize()
 --  table.sort(gadgetFiles)
 
 --  for k,gf in ipairs(gadgetFiles) do
---    Spring.Echo('gf1 = ' .. gf) -- FIXME
+--    Engine.Shared.Echo('gf1 = ' .. gf) -- FIXME
 --  end
 
   -- stuff the gadgets into unsortedGadgets
   for k,gf in ipairs(gadgetFiles) do
---    Spring.Echo('gf2 = ' .. gf) -- FIXME
+--    Engine.Shared.Echo('gf2 = ' .. gf) -- FIXME
     local gadget = self:LoadGadget(gf)
     if (gadget) then
       table.insert(unsortedGadgets, gadget)
@@ -189,7 +189,7 @@ function gadgetHandler:Initialize()
     local gname = g.ghInfo.name
     local gbasename = g.ghInfo.basename
 
-    Spring.Log(LOG_SECTION, LOG.INFO, string.format("Loaded %s gadget:  %-18s  <%s>", gtype, gname, gbasename))
+    Engine.Shared.Log(LOG_SECTION, LOG.INFO, string.format("Loaded %s gadget:  %-18s  <%s>", gtype, gname, gbasename))
   end
 end
 
@@ -198,12 +198,12 @@ function gadgetHandler:LoadGadget(filename)
   local basename = Basename(filename)
   local text = VFS.LoadFile(filename, VFSMODE)
   if (text == nil) then
-    Spring.Log(LOG_SECTION, LOG.ERROR, 'Failed to load: ' .. filename)
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'Failed to load: ' .. filename)
     return nil
   end
   local chunk, err = loadstring(text, filename)
   if (chunk == nil) then
-    Spring.Log(LOG_SECTION, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. err .. ')')
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. err .. ')')
     return nil
   end
 
@@ -212,7 +212,7 @@ function gadgetHandler:LoadGadget(filename)
   setfenv(chunk, gadget)
   local success, err = pcall(chunk)
   if (not success) then
-    Spring.Log(LOG_SECTION, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. tostring(err) .. ')')
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. tostring(err) .. ')')
     return nil
   end
   if (err == false) then -- note that all "normal" gadgets return `nil` implicitly at EOF, so don't do "if not err"
@@ -229,14 +229,14 @@ function gadgetHandler:LoadGadget(filename)
 
   err = self:ValidateGadget(gadget)
   if (err) then
-    Spring.Log(LOG_SECTION, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. err .. ')')
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. err .. ')')
     return nil
   end
 
   local knownInfo = self.knownGadgets[name]
   if (knownInfo) then
     if (knownInfo.active) then
-      Spring.Log(LOG_SECTION, LOG.ERROR, 'Failed to load: ' .. basename .. '  (duplicate name)')
+      Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'Failed to load: ' .. basename .. '  (duplicate name)')
       return nil
     end
   else
@@ -402,11 +402,11 @@ local function SafeWrap(func, funcName)
       if (funcName ~= 'Shutdown') then
         gadgetHandler:RemoveGadget(g)
       else
-        Spring.Log(LOG_SECTION, LOG.ERROR, 'Error in Shutdown')
+        Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'Error in Shutdown')
       end
       local name = g.ghInfo.name
-      Spring.Log(LOG_SECTION, LOG.INFO, r[2])
-      Spring.Log(LOG_SECTION, LOG.INFO, 'Removed gadget: ' .. name)
+      Engine.Shared.Log(LOG_SECTION, LOG.INFO, r[2])
+      Engine.Shared.Log(LOG_SECTION, LOG.INFO, 'Removed gadget: ' .. name)
       return nil
     end
   end
@@ -418,7 +418,7 @@ local function SafeWrapGadget(gadget)
     return
   elseif (SAFEWRAP == 1) then
     if (gadget.GetInfo and gadget.GetInfo().unsafe) then
-      Spring.Log(LOG_SECTION, LOG.ERROR, 'LuaUI: loaded unsafe gadget: ' .. gadget.ghInfo.name)
+      Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'LuaUI: loaded unsafe gadget: ' .. gadget.ghInfo.name)
       return
     end
   end
@@ -532,7 +532,7 @@ function gadgetHandler:UpdateCallIn(name)
         return selffunc(self, ...)
       end
     else
-      Spring.Log(LOG_SECTION, LOG.ERROR, "UpdateCallIn: " .. name .. " is not implemented")
+      Engine.Shared.Log(LOG_SECTION, LOG.ERROR, "UpdateCallIn: " .. name .. " is not implemented")
     end
   end
 
@@ -552,7 +552,7 @@ function gadgetHandler:UpdateGadgetCallIn(name, g)
     end
     self:UpdateCallIn(name)
   else
-    Spring.Log(LOG_SECTION, LOG.ERROR, 'UpdateGadgetCallIn: bad name: ' .. name)
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'UpdateGadgetCallIn: bad name: ' .. name)
   end
 end
 
@@ -564,7 +564,7 @@ function gadgetHandler:RemoveGadgetCallIn(name, g)
     ArrayRemove(ciList, g)
     self:UpdateCallIn(name)
   else
-    Spring.Log(LOG_SECTION, LOG.ERROR, 'RemoveGadgetCallIn: bad name: ' .. name)
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'RemoveGadgetCallIn: bad name: ' .. name)
   end
 end
 
@@ -582,11 +582,11 @@ end
 function gadgetHandler:EnableGadget(name)
   local ki = self.knownGadgets[name]
   if (not ki) then
-    Spring.Log(LOG_SECTION, LOG.ERROR, "EnableGadget(), could not find gadget: " .. tostring(name))
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, "EnableGadget(), could not find gadget: " .. tostring(name))
     return false
   end
   if (not ki.active) then
-    Spring.Log(LOG_SECTION, LOG.INFO, 'Loading:  '..ki.filename)
+    Engine.Shared.Log(LOG_SECTION, LOG.INFO, 'Loading:  '..ki.filename)
     local order = gadgetHandler.orderList[name]
     if (not order or (order <= 0)) then
       self.orderList[name] = 1
@@ -602,13 +602,13 @@ end
 function gadgetHandler:DisableGadget(name)
   local ki = self.knownGadgets[name]
   if (not ki) then
-    Spring.Log(LOG_SECTION, LOG.ERROR, "DisableGadget(), could not find gadget: " .. tostring(name))
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, "DisableGadget(), could not find gadget: " .. tostring(name))
     return false
   end
   if (ki.active) then
     local w = self:FindGadget(name)
     if (not w) then return false end
-    Spring.Log(LOG_SECTION, LOG.INFO, 'Removed:  '..ki.filename)
+    Engine.Shared.Log(LOG_SECTION, LOG.INFO, 'Removed:  '..ki.filename)
     self:RemoveGadget(w)     -- deactivate
     self.orderList[name] = 0 -- disable
   end
@@ -619,7 +619,7 @@ end
 function gadgetHandler:ToggleGadget(name)
   local ki = self.knownGadgets[name]
   if (not ki) then
-    Spring.Log(LOG_SECTION, LOG.ERROR, "ToggleGadget(), could not find gadget: " .. tostring(name))
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, "ToggleGadget(), could not find gadget: " .. tostring(name))
     return
   end
   if (ki.active) then
@@ -819,13 +819,13 @@ end
 
 function gadgetHandler:RegisterCMDID(gadget, id)
   if (id <= 1000) then
-    Spring.Log(LOG_SECTION, LOG.ERROR, 'Gadget (' .. gadget.ghInfo.name .. ') ' ..
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'Gadget (' .. gadget.ghInfo.name .. ') ' ..
                 'tried to register a reserved CMD_ID')
     Script.Kill('Reserved CMD_ID code: ' .. id)
   end
 
   if (self.CMDIDs[id] ~= nil) then
-    Spring.Log(LOG_SECTION, LOG.ERROR, 'Gadget (' .. gadget.ghInfo.name .. ') ' ..
+    Engine.Shared.Log(LOG_SECTION, LOG.ERROR, 'Gadget (' .. gadget.ghInfo.name .. ') ' ..
                 'tried to register a duplicated CMD_ID')
     Script.Kill('Duplicate CMD_ID code: ' .. id)
   end
@@ -916,7 +916,7 @@ end
 
 
 function gadgetHandler:GotChatMsg(msg, player)
-  if ((player == 0) and Spring.IsCheatingEnabled()) then
+  if ((player == 0) and Engine.Shared.IsCheatingEnabled()) then
     local sp = '^%s*'    -- start pattern
     local ep = '%s+(.*)' -- end pattern
     local s, e, match
@@ -2120,7 +2120,7 @@ end
 
 function gadgetHandler:MouseRelease(x, y, button)
   local mo = self.mouseOwner
-  local mx, my, lmb, mmb, rmb = Spring.GetMouseState()
+  local mx, my, lmb, mmb, rmb = Engine.Unsynced.GetMouseState()
   if (not (lmb or mmb or rmb)) then
     self.mouseOwner = nil
   end

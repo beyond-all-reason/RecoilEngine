@@ -4,7 +4,7 @@
 --  file:    modrules.lua
 --  brief:   modrules.tdf and sensors.tdf lua parser
 --  author:  Dave Rodgers, Craig Lawrence
---  notes:   Spring.GetModOptions() is available
+--  notes:   Engine.Shared.GetModOptions() is available
 --
 --  Copyright (C) 2007.
 --  Licensed under the terms of the GNU GPL, v2 or later.
@@ -29,7 +29,7 @@ if (VFS.FileExists('gamedata/modrules.tdf')) then
 	local err
 	modRules, err = TDF.Parse('gamedata/modrules.tdf')
 	if (modRules == nil) then
-		Spring.Log(section, LOG.ERROR, 'Error parsing modrules.tdf: ' .. err)
+		Engine.Shared.Log(section, LOG.ERROR, 'Error parsing modrules.tdf: ' .. err)
 	end
 	haveRules = true
 end
@@ -38,7 +38,7 @@ end
 if (VFS.FileExists('gamedata/sensors.tdf')) then
 	local sensors, err = TDF.Parse('gamedata/sensors.tdf')
 	if (sensors == nil)  then
-		Spring.Log(section, LOG.ERROR, 'Error parsing sensors.tdf: ' .. err)
+		Engine.Shared.Log(section, LOG.ERROR, 'Error parsing sensors.tdf: ' .. err)
 	end
 	modRules.sensors = sensors
 	haveSensors = true

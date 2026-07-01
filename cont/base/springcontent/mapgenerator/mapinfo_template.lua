@@ -290,8 +290,8 @@ if (Spring) then
 	end
 
 	-- make code safe in unitsync
-	if (not Spring.GetMapOptions) then
-		Spring.GetMapOptions = function() return {} end
+	if (not Engine.Shared.GetMapOptions) then
+		Engine.Shared.GetMapOptions = function() return {} end
 	end
 	function tobool(val)
 		local t = type(val)

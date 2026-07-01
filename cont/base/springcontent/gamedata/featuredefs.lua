@@ -51,7 +51,7 @@ local tdfFiles = VFS.DirList('features/', '*.tdf', nil, true)
 for _, filename in ipairs(tdfFiles) do
   local fds, err = TDF.Parse(filename)
   if (fds == nil) then
-    Spring.Log(section, LOG.ERROR, 'Error parsing ' .. filename .. ': ' .. err)
+    Engine.Shared.Log(section, LOG.ERROR, 'Error parsing ' .. filename .. ': ' .. err)
   else
     for name, fd in pairs(fds) do
       featureDefs[name] = fd
@@ -77,9 +77,9 @@ for _, filename in ipairs(luaFiles) do
   setmetatable(fdEnv, { __index = system })
   local success, fds = pcall(VFS.Include, filename, fdEnv)
   if (not success) then
-    Spring.Log(section, LOG.ERROR, 'Error parsing ' .. filename .. ': ' .. tostring(fds))
+    Engine.Shared.Log(section, LOG.ERROR, 'Error parsing ' .. filename .. ': ' .. tostring(fds))
   elseif (fds == nil) then
-    Spring.Log(section, LOG.ERROR, 'Missing return table from: ' .. filename)
+    Engine.Shared.Log(section, LOG.ERROR, 'Missing return table from: ' .. filename)
   else
     for fdName, fd in pairs(fds) do
       if ((type(fdName) == 'string') and (type(fd) == 'table')) then

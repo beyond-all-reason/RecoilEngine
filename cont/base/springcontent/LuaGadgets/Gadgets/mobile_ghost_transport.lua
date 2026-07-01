@@ -18,16 +18,16 @@ if (gadgetHandler:IsSyncedCode()) then
 
   function gadget:UnitLoaded(unitID, unitDefID, unitTeam, transportID, transportTeam)
     if isTransportable[unitDefID] then
-      Spring.Echo("Pick up", unitID)
+      Engine.Shared.Echo("Pick up", unitID)
       -- remove leavesGhost, and leave dead ghost behind (if no radar and had a live ghost)
-      Spring.SetUnitLeavesGhost(unitID, false, true)
+      Engine.Synced.SetUnitLeavesGhost(unitID, false, true)
     end
   end
   function gadget:UnitUnloaded(unitID, unitDefID, unitTeam, transportID, transportTeam)
     if isTransportable[unitDefID] then
-      Spring.Echo("Drop", unitID)
+      Engine.Shared.Echo("Drop", unitID)
       -- reinstate leavesGhost
-      Spring.SetUnitLeavesGhost(unitID, true)
+      Engine.Synced.SetUnitLeavesGhost(unitID, true)
     end
   end
 end

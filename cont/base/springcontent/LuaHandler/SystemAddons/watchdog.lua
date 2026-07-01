@@ -22,8 +22,8 @@ local function hook(event)
 	i = i + 1
 	if ((i % (10^4)) < 1) then
 		i = 0
-		Spring.Echo(Spring.GetGameFrame(), event, debug.getinfo(2).name)
-		Spring.Echo(debug.traceback())
+		Engine.Shared.Echo(Engine.Shared.GetGameFrame(), event, debug.getinfo(2).name)
+		Engine.Shared.Echo(debug.traceback())
 	end
 end
 

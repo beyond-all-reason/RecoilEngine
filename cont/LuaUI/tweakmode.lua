@@ -100,7 +100,7 @@ function widget:TweakMousePress(x, y, button)
   if (not IsAbove(x, y)) then
     return false
   end
-  local alt,ctrl,meta,shift = Spring.GetModKeyState()
+  local alt,ctrl,meta,shift = Engine.Unsynced.GetModKeyState()
   if (ctrl) then
     if (button == 1) then
       widgetHandler:RaiseWidget()
@@ -221,7 +221,7 @@ end
 --------------------------------------------------------------------------------
 
 function widget:TweakDrawScreen()
-  local x,y = Spring.GetMouseState()
+  local x,y = Engine.Unsynced.GetMouseState()
   if (not widgetHandler:IsMouseOwner() and not IsAbove(x, y)) then
     return
   end

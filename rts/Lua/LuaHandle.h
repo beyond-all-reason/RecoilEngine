@@ -330,6 +330,10 @@ class CLuaHandle : public CEventClient
 		bool AddCommonModules(lua_State* L);
 		bool LoadCode(lua_State* L, std::string code, const std::string& debug);
 		static bool AddEntriesToTable(lua_State* L, const char* name, bool (*entriesFunc)(lua_State*));
+		// Populate `<outerName>.<innerName>` — get-or-creates the outer table on
+		// the env, then the inner sub-table within it. Used to nest the
+		// Engine.Synced / Engine.Unsynced / Engine.Shared API buckets.
+		static bool AddEntriesToTable(lua_State* L, const char* outerName, const char* innerName, bool (*entriesFunc)(lua_State*));
 
 		/// returns error code and sets traceback on error
 		int  RunCallInTraceback(lua_State* L, const LuaHashString* hs, std::string* ts, int inArgs, int outArgs, int errFuncIndex, bool popErrFunc);

@@ -1,4 +1,4 @@
-if (Spring.GetConfigInt('Headless', 0) == 0) then
+if (Engine.Unsynced.GetConfigInt('Headless', 0) == 0) then
    return false
 end
 
@@ -19,10 +19,10 @@ local timer
 local headless
 
 function widget:Initialize()
-   headless = (Spring.GetConfigInt('Headless', 0) ~= 0)
+   headless = (Engine.Unsynced.GetConfigInt('Headless', 0) ~= 0)
    if (headless) then
-      Spring.Echo('Prepping for headless...')
-      Spring.SendCommands(
+      Engine.Shared.Echo('Prepping for headless...')
+      Engine.Unsynced.SendCommands(
          string.format('setmaxspeed %i', startingSpeed),
          string.format('setminspeed %i', startingSpeed),
          'hideinterface'
@@ -31,12 +31,12 @@ function widget:Initialize()
 end
 
 function widget:GameStart()
-   Spring.Echo('Game started... starting timer.')
-   timer = Spring.GetTimer()
+   Engine.Shared.Echo('Game started... starting timer.')
+   timer = Engine.Unsynced.GetTimer()
 end
 
 function widget:GameOver()
-   local time = Spring.DiffTimers(Spring.GetTimer(), timer)
-   Spring.Echo(string.format('Game over, realtime: %i seconds, gametime: %i seconds', time, Spring.GetGameSeconds()))
+   local time = Engine.Unsynced.DiffTimers(Engine.Unsynced.GetTimer(), timer)
+   Engine.Shared.Echo(string.format('Game over, realtime: %i seconds, gametime: %i seconds', time, Engine.Shared.GetGameSeconds()))
 end
 

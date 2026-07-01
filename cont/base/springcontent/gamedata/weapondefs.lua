@@ -51,7 +51,7 @@ local tdfFiles = VFS.DirList('weapons/', '*.tdf', nil, true)
 for _, filename in ipairs(tdfFiles) do
   local wds, err = TDF.Parse(filename)
   if (wds == nil) then
-    Spring.Log(section, 'Error parsing ' .. filename .. ': ' .. err)
+    Engine.Shared.Log(section, 'Error parsing ' .. filename .. ': ' .. err)
   else
     for name, wd in pairs(wds) do
       weaponDefs[name] = wd
@@ -77,9 +77,9 @@ for _, filename in ipairs(luaFiles) do
   setmetatable(wdEnv, { __index = system })
   local success, wds = pcall(VFS.Include, filename, wdEnv)
   if (not success) then
-    Spring.Log(section, LOG.ERROR, 'Error parsing ' .. filename .. ': ' .. tostring(wds))
+    Engine.Shared.Log(section, LOG.ERROR, 'Error parsing ' .. filename .. ': ' .. tostring(wds))
   elseif (wds == nil) then
-    Spring.Log(section, LOG.ERROR, 'Missing return table from: ' .. filename)
+    Engine.Shared.Log(section, LOG.ERROR, 'Missing return table from: ' .. filename)
   else
     for wdName, wd in pairs(wds) do
       if ((type(wdName) == 'string') and (type(wd) == 'table')) then
@@ -119,7 +119,7 @@ for name, def in pairs(weaponDefs) do
         (not VFS.FileExists(modelFile .. '.3do')) and
         (not VFS.FileExists(modelFile .. '.s3o'))) then
       weaponDefs[name] = nil
-      Spring.Log(section, LOG.ERROR, 'removed ' .. name .. ' weaponDef, missing model')
+      Engine.Shared.Log(section, LOG.ERROR, 'removed ' .. name .. ' weaponDef, missing model')
     end
   end
 end

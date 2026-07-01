@@ -17,6 +17,7 @@
 #include "LuaEncoding.h"
 #include "LuaIO.h"
 #include "LuaLibs.h"
+#include "LuaSpringContext.h"
 #include "LuaVFS.h"
 #include "LuaUtils.h"
 #include "LuaMathExtra.h"
@@ -150,11 +151,21 @@ void LuaParser::SetupEnv(bool isSyncedCtxt, bool isDefsParser)
 
 	AddFunc("DontMessWithMyCase", DontMessWithMyCase);
 
-	GetTable("Spring");
+	// Echo/Log/TimeCheck are universal utilities — land them in Engine.Shared
+	// so they're visible regardless of whether this parser is synced- or
+	// unsynced-context. BuildSpringFromSplitTables then mirrors them into
+	// Spring for back-compat.
+	GetTable("Engine");
+	GetTable("Shared");
 	AddFunc("Echo", LuaUtils::Echo);
 	AddFunc("Log", LuaUtils::Log);
 	AddFunc("TimeCheck", TimeCheck);
 	EndTable();
+	EndTable();
+
+	LuaSpringContext::BuildSpringFromSplitTables(L,
+		isSyncedCtxt ? LuaSpringContext::Context::Synced
+		             : LuaSpringContext::Context::Unsynced);
 
 	GetTable("Encoding");
 	LuaEncoding::PushEntries(L);
@@ -499,6 +510,18 @@ void LuaParser::AddString(int key, const std::string& value)
 //  call-outs
 //
 
+/***
+ * Time a function call's execution and log the duration with a label.
+ *
+ * Registered into `Engine.Shared` from `LuaParser::AddEntries` (and therefore
+ * visible as `Spring.TimeCheck` via the back-compat merge).
+ *
+ * @function Engine.Shared.TimeCheck
+ * @param label string Label to prepend to the logged duration
+ * @param fn fun(...) Function to time
+ * @param ... any Forwarded to `fn`
+ * @return any ... Return values of `fn`
+ */
 int LuaParser::TimeCheck(lua_State* L)
 {
 	#if (!defined(UNITSYNC) && !defined(DEDICATED))

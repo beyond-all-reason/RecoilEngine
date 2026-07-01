@@ -47,7 +47,7 @@ local section = 'widgets.lua'
 
 -- install bindings for TweakMode and the Widget Selector
 
-Spring.SendCommands({
+Engine.Unsynced.SendCommands({
   "unbindkeyset  Any+f11",
   "unbindkeyset Ctrl+f11",
   "bind    f11  luaui selector",
@@ -273,7 +273,7 @@ function widgetHandler:LoadConfigData()
   local chunk, err = loadfile(CONFIG_FILENAME)
   if (chunk == nil) or (chunk() == nil) or (err) then
     if err then
-      Spring.Log(section, LOG.ERROR, err)
+      Engine.Shared.Log(section, LOG.ERROR, err)
     end
     return
   end
@@ -322,11 +322,11 @@ end
 function widgetHandler:Initialize()
   self:LoadConfigData()
 
-  local autoUserWidgets = Spring.GetConfigInt('LuaAutoEnableUserWidgets', 1)
+  local autoUserWidgets = Engine.Unsynced.GetConfigInt('LuaAutoEnableUserWidgets', 1)
   self.autoUserWidgets = (autoUserWidgets ~= 0)
 
   -- create the "LuaUI/Config" directory
-  Spring.CreateDir(LUAUI_DIRNAME .. 'Config')
+  Engine.Unsynced.CreateDir(LUAUI_DIRNAME .. 'Config')
 
   local unsortedWidgets = {}
 
@@ -371,7 +371,7 @@ function widgetHandler:Initialize()
     local name = w.whInfo.name
     local basename = w.whInfo.basename
     local source = self.knownWidgets[name].fromZip and "mod: " or "user:"
-    Spring.Log(section, LOG.INFO, string.format("Loading widget from %s  %-18s  <%s> ...", source, name, basename))
+    Engine.Shared.Log(section, LOG.INFO, string.format("Loading widget from %s  %-18s  <%s> ...", source, name, basename))
 
     widgetHandler:InsertWidget(w)
   end
@@ -385,12 +385,12 @@ function widgetHandler:LoadWidget(filename, fromZip)
   local basename = Basename(filename)
   local text = VFS.LoadFile(filename)
   if (text == nil) then
-    Spring.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (missing file: ' .. filename ..')')
+    Engine.Shared.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (missing file: ' .. filename ..')')
     return nil
   end
   local chunk, err = loadstring(text, filename)
   if (chunk == nil) then
-    Spring.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. err .. ')')
+    Engine.Shared.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. err .. ')')
     return nil
   end
 
@@ -398,7 +398,7 @@ function widgetHandler:LoadWidget(filename, fromZip)
   setfenv(chunk, widget)
   local success, err = pcall(chunk)
   if (not success) then
-    Spring.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. err .. ')')
+    Engine.Shared.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. err .. ')')
     return nil
   end
   if (err == false) then
@@ -418,14 +418,14 @@ function widgetHandler:LoadWidget(filename, fromZip)
 
   err = self:ValidateWidget(widget)
   if (err) then
-    Spring.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. err .. ')')
+    Engine.Shared.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (' .. err .. ')')
     return nil
   end
 
   local knownInfo = self.knownWidgets[name]
   if (knownInfo) then
     if (knownInfo.active) then
-      Spring.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (duplicate name)')
+      Engine.Shared.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (duplicate name)')
       return nil
     end
   else
@@ -444,7 +444,7 @@ function widgetHandler:LoadWidget(filename, fromZip)
   knownInfo.active = true
 
   if (widget.GetInfo == nil) then
-    Spring.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (no GetInfo() call)')
+    Engine.Shared.Log(section, LOG.ERROR, 'Failed to load: ' .. basename .. '  (no GetInfo() call)')
     return nil
   end
 
@@ -482,7 +482,7 @@ function widgetHandler:NewWidget()
     for k,v in pairs(System) do
       widget[k] = v
     end
-    widget["SendToUnsynced"] = Spring.SendToUnsynced
+    widget["SendToUnsynced"] = SendToUnsynced
   else
     -- use metatable redirection
     setmetatable(widget, {
@@ -539,7 +539,7 @@ function widgetHandler:NewWidget()
     if (self.inCommandsChanged) then
       table.insert(self.customCommands, cmd)
     else
-      Spring.Log(section, LOG.ERROR, "AddLayoutCommand() can only be used in CommandsChanged()")
+      Engine.Shared.Log(section, LOG.ERROR, "AddLayoutCommand() can only be used in CommandsChanged()")
     end
   end
 
@@ -624,12 +624,12 @@ local function SafeWrapFuncNoGL(func, funcName)
       if (funcName ~= 'Shutdown') then
         widgetHandler:RemoveWidget(w)
       else
-        Spring.Log(section, LOG.ERROR, 'Error in Shutdown()')
+        Engine.Shared.Log(section, LOG.ERROR, 'Error in Shutdown()')
       end
       local name = w.whInfo.name
-      Spring.Log(section, LOG.ERROR, r[1])
-      Spring.Log(section, LOG.ERROR, 'Error in ' .. funcName ..'(): ' .. tostring(r[2]))
-      Spring.Log(section, LOG.ERROR, 'Removed widget: ' .. name)
+      Engine.Shared.Log(section, LOG.ERROR, r[1])
+      Engine.Shared.Log(section, LOG.ERROR, 'Error in ' .. funcName ..'(): ' .. tostring(r[2]))
+      Engine.Shared.Log(section, LOG.ERROR, 'Removed widget: ' .. name)
       return nil
     end
   end
@@ -652,11 +652,11 @@ local function SafeWrapFuncGL(func, funcName)
       if (funcName ~= 'Shutdown') then
         widgetHandler:RemoveWidget(w)
       else
-        Spring.Log(section, LOG.ERROR, 'Error in Shutdown()')
+        Engine.Shared.Log(section, LOG.ERROR, 'Error in Shutdown()')
       end
       local name = w.whInfo.name
-      Spring.Log(section, LOG.ERROR, 'Error in ' .. funcName ..'(): ' .. tostring(r[2]))
-      Spring.Log(section, LOG.ERROR, 'Removed widget: ' .. name)
+      Engine.Shared.Log(section, LOG.ERROR, 'Error in ' .. funcName ..'(): ' .. tostring(r[2]))
+      Engine.Shared.Log(section, LOG.ERROR, 'Removed widget: ' .. name)
       return nil
     end
   end
@@ -681,7 +681,7 @@ local function SafeWrapWidget(widget)
     return
   elseif (SAFEWRAP == 1) then
     if (widget.GetInfo and widget.GetInfo().unsafe) then
-      Spring.LOG(section, LOG.INFO, 'LuaUI: loaded unsafe widget: ' .. widget.whInfo.name)
+      Engine.Shared.Log(section, LOG.INFO, 'LuaUI: loaded unsafe widget: ' .. widget.whInfo.name)
       return
     end
   end
@@ -771,7 +771,7 @@ function widgetHandler:RemoveWidget(widget)
   self:UpdateCallIns()
 
   if (widget.whInfo.basename == SELECTOR_BASENAME) then
-    Spring.SendCommands({"luaui update"})
+    Engine.Unsynced.SendCommands({"luaui update"})
   end
 end
 
@@ -813,7 +813,7 @@ function widgetHandler:UpdateWidgetCallIn(name, w)
     end
     self:UpdateCallIn(name)
   else
-    Spring.Log(section, LOG.ERROR, 'UpdateWidgetCallIn: bad name: ' .. name)
+    Engine.Shared.Log(section, LOG.ERROR, 'UpdateWidgetCallIn: bad name: ' .. name)
   end
 end
 
@@ -825,7 +825,7 @@ function widgetHandler:RemoveWidgetCallIn(name, w)
     ArrayRemove(ciList, w)
     self:UpdateCallIn(name)
   else
-    Spring.Log(section, LOG.ERROR, 'RemoveWidgetCallIn: bad name: ' .. name)
+    Engine.Shared.Log(section, LOG.ERROR, 'RemoveWidgetCallIn: bad name: ' .. name)
   end
 end
 
@@ -850,11 +850,11 @@ end
 function widgetHandler:EnableWidget(name)
   local ki = self.knownWidgets[name]
   if (not ki) then
-    Spring.Log(section, LOG.ERROR, "EnableWidget(), could not find widget: " .. tostring(name))
+    Engine.Shared.Log(section, LOG.ERROR, "EnableWidget(), could not find widget: " .. tostring(name))
     return false
   end
   if (not ki.active) then
-    Spring.Log(section, LOG.INFO, 'Loading:  '..ki.filename)
+    Engine.Shared.Log(section, LOG.INFO, 'Loading:  '..ki.filename)
     local order = widgetHandler.orderList[name]
     if (not order or (order <= 0)) then
       self.orderList[name] = 1
@@ -866,7 +866,7 @@ function widgetHandler:EnableWidget(name)
   end
 
   if (not self:SelectorActive()) then
-    Spring.SendCommands({"luaui update"})
+    Engine.Unsynced.SendCommands({"luaui update"})
   end
 
   return true
@@ -876,20 +876,20 @@ end
 function widgetHandler:DisableWidget(name)
   local ki = self.knownWidgets[name]
   if (not ki) then
-    Spring.Log(section, LOG.ERROR, "DisableWidget(), could not find widget: " .. tostring(name))
+    Engine.Shared.Log(section, LOG.ERROR, "DisableWidget(), could not find widget: " .. tostring(name))
     return false
   end
   if (ki.active) then
     local w = self:FindWidget(name)
     if (not w) then return false end
-    Spring.Log(section, LOG.INFO, 'Removed:  '..ki.filename)
+    Engine.Shared.Log(section, LOG.INFO, 'Removed:  '..ki.filename)
     self:RemoveWidget(w)     -- deactivate
     self.orderList[name] = 0 -- disable
     self:SaveConfigData()
   end
 
   if (not self:SelectorActive()) then
-    Spring.SendCommands({"luaui update"})
+    Engine.Unsynced.SendCommands({"luaui update"})
   end
 
   return true
@@ -899,7 +899,7 @@ end
 function widgetHandler:ToggleWidget(name)
   local ki = self.knownWidgets[name]
   if (not ki) then
-    Spring.Log(section, LOG.ERROR, "ToggleWidget(), could not find widget: " .. tostring(name))
+    Engine.Shared.Log(section, LOG.ERROR, "ToggleWidget(), could not find widget: " .. tostring(name))
     return
   end
   if (ki.active) then
@@ -1098,7 +1098,7 @@ function widgetHandler:Shutdown()
 end
 
 function widgetHandler:Update(dt)
-  dt = dt or Spring.GetLastUpdateSeconds()
+  dt = dt or Engine.Unsynced.GetLastUpdateSeconds()
 
   -- update the hour timer
   hourTimer = (hourTimer + dt) % 3600.0
@@ -1113,7 +1113,7 @@ function widgetHandler:ConfigureLayout(command)
   if (command == 'tweakgui') then
     self.tweakKeys = {}
     self.tweakMode = true
-    Spring.Log(section, LOG.INFO, "LuaUI TweakMode: ON")
+    Engine.Shared.Log(section, LOG.INFO, "LuaUI TweakMode: ON")
     return true
   elseif (command == 'reconf') then
     self:SendConfigData()
@@ -1453,7 +1453,7 @@ function widgetHandler:KeyRelease(key, mods, label, unicode, scanCode, actions)
     if (mo and mo.TweakKeyRelease) then
       mo:TweakKeyRelease(key, mods, label, unicode, scanCode, actions)
     elseif (key == KEYSYMS.ESCAPE) then
-      Spring.Log(section, LOG.INFO, "LuaUI TweakMode: OFF")
+      Engine.Shared.Log(section, LOG.INFO, "LuaUI TweakMode: OFF")
       self.tweakMode = false
     end
     return true
@@ -1570,7 +1570,7 @@ end
 
 function widgetHandler:MouseRelease(x, y, button)
   local mo = self.mouseOwner
-  local mx, my, lmb, mmb, rmb = Spring.GetMouseState()
+  local mx, my, lmb, mmb, rmb = Engine.Unsynced.GetMouseState()
   if (not (lmb or mmb or rmb)) then
     self.mouseOwner = nil
   end

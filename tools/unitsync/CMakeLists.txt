@@ -65,6 +65,7 @@ set(main_files
 	"${ENGINE_SRC_ROOT}/Lua/LuaMathExtra.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaMemPool.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaParser.cpp"
+	"${ENGINE_SRC_ROOT}/Lua/LuaSpringContext.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaUtils.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaIO.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaLibs.cpp"

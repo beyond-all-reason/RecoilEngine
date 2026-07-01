@@ -18,9 +18,9 @@
  *   list of engine command IDs.
  * - Also supports integer keys, and those perform reverse mapping of command IDs.
  *
- * @see Spring.GiveOrderToUnit
- * @see Spring.GiveOrderArrayToUnitArray
- * @see Spring.GetUnitCurrentCommand
+ * @see Engine.Synced.GiveOrderToUnit
+ * @see Engine.Synced.GiveOrderArrayToUnitArray
+ * @see Engine.Shared.GetUnitCurrentCommand
  * @see Callins:AllowCommand
  * @enum CMD
  */
@@ -121,25 +121,25 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 *
 	 * Delete all attack orders from unit, or factory rally queue if factory:
 	 * ```lua
-	 * Spring.GiveOrderToUnit(unitID, CMD.REMOVE, CMD.ATTACK)
+	 * Engine.Synced.GiveOrderToUnit(unitID, CMD.REMOVE, CMD.ATTACK)
 	 * ```
 	 *
 	 * Delete all attack and fight orders from unit, or factory rally queue if factory:
 	 * ```lua
-	 * Spring.GiveOrderToUnit(unitID, CMD.REMOVE, {CMD.ATTACK, CMD.FIGHT}, CMD.OPT_ALT)
+	 * Engine.Synced.GiveOrderToUnit(unitID, CMD.REMOVE, {CMD.ATTACK, CMD.FIGHT}, CMD.OPT_ALT)
 	 * ```
 	 *
 	 * Delete commands with specific tags:
 	 * ```lua
-	 * Spring.GiveOrderToUnit(unitID, CMD.REMOVE, {tag1, tag2, tag3})
+	 * Engine.Synced.GiveOrderToUnit(unitID, CMD.REMOVE, {tag1, tag2, tag3})
 	 * ```
 	 *
 	 * Delete all commands to build units with UnitDef ids unitDefId1 and unitDefId2 from factory queue:
 	 * ```lua
-	 * Spring.GiveOrderToUnit(unitID, CMD.REMOVE, {-unitDefId1, -unitDefId2}, CMD.OPT_ALT + CMD.OPT_CTRL)
+	 * Engine.Synced.GiveOrderToUnit(unitID, CMD.REMOVE, {-unitDefId1, -unitDefId2}, CMD.OPT_ALT + CMD.OPT_CTRL)
 	 * ```
 	 *
-	 * @see Spring.GiveOrderToUnit
+	 * @see Engine.Synced.GiveOrderToUnit
 	 */
 	PUSH_CMD(REMOVE);
 
@@ -271,21 +271,21 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 *
 	 * Attack unit with id `targetID`.
 	 * ```lua
-	 * Spring.GiveOrderToUnit(unitID, CMD.ATTACK, targetID)
+	 * Engine.Synced.GiveOrderToUnit(unitID, CMD.ATTACK, targetID)
 	 * ```
 	 *
 	 * Area attack of radius 50 at map position 1000,1000 with height 100:
 	 * ```lua
-	 * Spring.GiveOrderToUnit(unitID, CMD.ATTACK, {1000,100,1000,50})
+	 * Engine.Synced.GiveOrderToUnit(unitID, CMD.ATTACK, {1000,100,1000,50})
 	 * ```
 	 *
 	 * Ground attack at map position 1000,1000 with height 100:
 	 * ```lua
-	 * Spring.GiveOrderToUnit(unitID, CMD.ATTACK, {1000,100,1000})
+	 * Engine.Synced.GiveOrderToUnit(unitID, CMD.ATTACK, {1000,100,1000})
 	 * ```
 	 */
 	 // Fields can't @see
-	 // @see Spring.GiveOrderToUnit
+	 // @see Engine.Synced.GiveOrderToUnit
 	 // @see Callins:UnitCmdDone
 	PUSH_CMD(ATTACK);
 	/*** @field CMD.AREA_ATTACK 21 */

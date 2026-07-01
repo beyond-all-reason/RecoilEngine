@@ -42,8 +42,8 @@ function hHookFuncs.ConfigureLayout(command)
 		handler:Disable(string.sub(command, 15))
 		return true
 	elseif (command:find('callins') == 1) then
-		Spring.Log(LUA_NAME, "info", "known callins are:")
-		Spring.Log(LUA_NAME, "info", "  (NOTE: This list contains a few (e.g. cause of LOS checking) unhandled CallIns, too.)")
+		Engine.Shared.Log(LUA_NAME, "info", "known callins are:")
+		Engine.Shared.Log(LUA_NAME, "info", "  (NOTE: This list contains a few (e.g. cause of LOS checking) unhandled CallIns, too.)")
 		local o = {}
 		for i,v in pairs(handler.knownCallIns) do
 			local t = {}
@@ -54,7 +54,7 @@ function hHookFuncs.ConfigureLayout(command)
 		end
 		table.sort(o)
 		for i=1,#o do
-			Spring.Log(LUA_NAME, "info", o[i])
+			Engine.Shared.Log(LUA_NAME, "info", o[i])
 		end
 		return true
 	end
@@ -160,7 +160,7 @@ do
 	local lastx,lasty = 0,0
 	local lastWidget
 
-	local spGetDrawFrame = Spring.GetDrawFrame
+	local spGetDrawFrame = Engine.Unsynced.GetDrawFrame
 
 	--// local helper
 	function handler:WidgetAt(x, y)
@@ -215,7 +215,7 @@ end
 
 function hHookFuncs.MouseRelease(x, y, button)
 	local mo = handler.mouseOwner
-	local mx, my, lmb, mmb, rmb = Spring.GetMouseState()
+	local mx, my, lmb, mmb, rmb = Engine.Unsynced.GetMouseState()
 	if (not (lmb or mmb or rmb)) then
 		handler.mouseOwner = nil
 	end
@@ -348,7 +348,7 @@ end
 local oldSelection = {}
 function handler:UpdateSelection()
 	local changed = false
-	local newSelection = Spring.GetSelectedUnits()
+	local newSelection = Engine.Unsynced.GetSelectedUnits()
 	if (#newSelection == #oldSelection) then
 		for i=1, #newSelection do
 			if (newSelection[i] ~= oldSelection[i]) then --// it seems the order stays
@@ -370,7 +370,7 @@ function hHookFuncs.SelectionChanged(selectedUnits)
 	for _,f in hCallInLists.SelectionChanged:iter() do
 		local unitArray = f(selectedUnits)
 		if (unitArray) then
-			Spring.SelectUnitArray(unitArray)
+			Engine.Unsynced.SelectUnitArray(unitArray)
 			selectedUnits = unitArray
 		end
 	end

@@ -1,6 +1,13 @@
 name: Generate Lua library
 on:
   workflow_dispatch:
+    inputs:
+      lua_doc_extractor_repo:
+        description: "Override lua-doc-extractor repo (e.g. user/repo)"
+        required: false
+      lua_doc_extractor_branch:
+        description: "Override lua-doc-extractor branch"
+        required: false
   push:
     branches:
       - master
@@ -38,6 +45,25 @@ jobs:
           mise_toml: |
             [tools]
             "npm:lua-doc-extractor" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
+
+      - name: Override lua-doc-extractor from source
+        if: ${{ inputs.lua_doc_extractor_repo || vars.LUA_DOC_EXTRACTOR_REPO }}
+        env:
+          OVERRIDE_REPO: ${{ inputs.lua_doc_extractor_repo || vars.LUA_DOC_EXTRACTOR_REPO }}
+          OVERRIDE_BRANCH: ${{ inputs.lua_doc_extractor_branch || vars.LUA_DOC_EXTRACTOR_BRANCH || 'main' }}
+        run: |
+          echo "Cloning $OVERRIDE_REPO @ $OVERRIDE_BRANCH"
+          git clone --depth 1 \
+            --branch "$OVERRIDE_BRANCH" \
+            "https://github.com/$OVERRIDE_REPO.git" \
+            /tmp/lua-doc-extractor
+          cd /tmp/lua-doc-extractor
+          npm ci && npm run build
+          mkdir -p /tmp/override-bin
+          printf '#!/bin/bash\nexec node /tmp/lua-doc-extractor/dist/src/cli.js "$@"\n' \
+            > /tmp/override-bin/lua-doc-extractor
+          chmod +x /tmp/override-bin/lua-doc-extractor
+          echo "/tmp/override-bin" >> "$GITHUB_PATH"
 
       - name: Generate Lua library
         working-directory: ./recoil/doc/site

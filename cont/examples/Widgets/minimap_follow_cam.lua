@@ -13,8 +13,8 @@ end
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
-local spSetMiniMapRot     = Spring.SetMiniMapRotation
-local spGetMiniMapGeo     = Spring.GetMiniMapGeometry
+local spSetMiniMapRot     = Engine.Unsynced.SetMiniMapRotation
+local spGetMiniMapGeo     = Engine.Unsynced.GetMiniMapGeometry
 
 local mapAspect
 local prevSnappedRot = -1

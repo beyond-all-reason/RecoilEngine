@@ -10,7 +10,7 @@ local unitID = unitID
 local unitDefID = unitDefID
 local UnitDef = UnitDefs[unitDefID]
 
-local UnitScript = Spring.UnitScript
+local UnitScript = Engine.Synced.UnitScript
 
 local EmitSfx = UnitScript.EmitSfx
 local Explode = UnitScript.Explode

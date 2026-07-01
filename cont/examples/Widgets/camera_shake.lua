@@ -28,8 +28,8 @@ end
 
 -- Automatically generated local definitions
 
-local spSetCameraOffset      = Spring.SetCameraOffset
-local spSetShockFrontFactors = Spring.SetShockFrontFactors
+local spSetCameraOffset      = Engine.Unsynced.SetCameraOffset
+local spSetShockFrontFactors = Engine.Shared.SetShockFrontFactors
 
 
 --------------------------------------------------------------------------------

@@ -16,6 +16,7 @@
 #include "LuaLibs.h"
 #include "LuaUnsyncedRead.h"
 #include "LuaScream.h"
+#include "LuaSpringContext.h"
 #include "LuaSyncedRead.h"
 #include "LuaOpenGL.h"
 #include "LuaUtils.h"
@@ -75,9 +76,9 @@ CLuaIntro::CLuaIntro()
 	// load the spring libraries
 	if (
 	    !AddCommonModules(L)						    ||
-	    !AddEntriesToTable(L, "Spring",    LoadUnsyncedCtrlFunctions)           ||
-	    !AddEntriesToTable(L, "Spring",    LoadUnsyncedReadFunctions)           ||
-	    !AddEntriesToTable(L, "Spring",    LoadSyncedReadFunctions  )           ||
+	    !AddEntriesToTable(L, "Engine", "Unsynced", LoadUnsyncedCtrlFunctions)      ||
+	    !AddEntriesToTable(L, "Engine", "Unsynced", LoadUnsyncedReadFunctions)      ||
+	    !AddEntriesToTable(L, "Engine", "Shared",   LoadSyncedReadFunctions  )      ||
 
 	    !AddEntriesToTable(L, "VFS",       LuaVFS::PushUnsynced)                ||
 	    !AddEntriesToTable(L, "VFS",       LuaZipFileReader::PushUnsynced)      ||
@@ -97,6 +98,8 @@ CLuaIntro::CLuaIntro()
 		KillLua();
 		return;
 	}
+
+	LuaSpringContext::BuildSpringFromSplitTables(L, LuaSpringContext::Context::Unsynced);
 
 	RemoveSomeOpenGLFunctions(L);
 

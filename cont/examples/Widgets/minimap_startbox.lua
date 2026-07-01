@@ -30,7 +30,7 @@ if (Game.startPosType ~= 2) then
   return false
 end
 
-if (Spring.GetGameFrame() > 1) then
+if (Engine.Shared.GetGameFrame() > 1) then
   widgetHandler:RemoveWidget()
 end
 
@@ -61,7 +61,7 @@ local gaiaTeamID
 local gaiaAllyTeamID
 
 local teamStartPositions = {}
-local startTimer = Spring.GetTimer()
+local startTimer = Engine.Unsynced.GetTimer()
 
 local texName = LUAUI_DIRNAME .. 'Images/highlight_strip.png'
 local texScale = 512
@@ -114,15 +114,15 @@ end
 
 function widget:Initialize()
   -- only show at the beginning
-  if (Spring.GetGameFrame() > 1) then
+  if (Engine.Shared.GetGameFrame() > 1) then
     widgetHandler:RemoveWidget()
     return
   end
 
   -- get the gaia teamID and allyTeamID
-  gaiaTeamID = Spring.GetGaiaTeamID()
+  gaiaTeamID = Engine.Shared.GetGaiaTeamID()
   if (gaiaTeamID) then
-    local _,_,_,_,_,atid = Spring.GetTeamInfo(gaiaTeamID)
+    local _,_,_,_,_,atid = Engine.Shared.GetTeamInfo(gaiaTeamID)
     gaiaAllyTeamID = atid
   end
 
@@ -151,14 +151,14 @@ function widget:Initialize()
 
   if (drawGroundQuads) then
     startboxDListStencil = gl.CreateList(function()
-      local minY,maxY = Spring.GetGroundExtremes()
+      local minY,maxY = Engine.Shared.GetGroundExtremes()
       minY = minY - 200; maxY = maxY + 100;
-      for _,at in ipairs(Spring.GetAllyTeamList()) do
+      for _,at in ipairs(Engine.Shared.GetAllyTeamList()) do
         if (true or at ~= gaiaAllyTeamID) then
-          local xn, zn, xp, zp = Spring.GetAllyTeamStartBox(at)
+          local xn, zn, xp, zp = Engine.Shared.GetAllyTeamStartBox(at)
           if (xn and ((xn ~= 0) or (zn ~= 0) or (xp ~= msx) or (zp ~= msz))) then
 
-            if (at == Spring.GetMyAllyTeamID()) then
+            if (at == Engine.Unsynced.GetMyAllyTeamID()) then
               gl.StencilMask(stencilBit2);
               gl.StencilFunc(GL.ALWAYS, 0, stencilBit2);
             else
@@ -173,14 +173,14 @@ function widget:Initialize()
     end)
 
     startboxDListColor = gl.CreateList(function()
-      local minY,maxY = Spring.GetGroundExtremes()
+      local minY,maxY = Engine.Shared.GetGroundExtremes()
       minY = minY - 200; maxY = maxY + 100;
-      for _,at in ipairs(Spring.GetAllyTeamList()) do
+      for _,at in ipairs(Engine.Shared.GetAllyTeamList()) do
         if (true or at ~= gaiaAllyTeamID) then
-          local xn, zn, xp, zp = Spring.GetAllyTeamStartBox(at)
+          local xn, zn, xp, zp = Engine.Shared.GetAllyTeamStartBox(at)
           if (xn and ((xn ~= 0) or (zn ~= 0) or (xp ~= msx) or (zp ~= msz))) then
 
-            if (at == Spring.GetMyAllyTeamID()) then
+            if (at == Engine.Unsynced.GetMyAllyTeamID()) then
               gl.Color( 0, 1, 0, 0.3 )  --  green
               gl.StencilMask(stencilBit2);
               gl.StencilFunc(GL.NOTEQUAL, 0, stencilBit2);
@@ -217,7 +217,7 @@ local function GetTeamColor(teamID)
   if (color) then
     return color
   end
-  local r,g,b = Spring.GetTeamColor(teamID)
+  local r,g,b = Engine.Unsynced.GetTeamColor(teamID)
   
   color = { r, g, b }
   teamColors[teamID] = color
@@ -238,7 +238,7 @@ local function GetTeamColorStr(teamID)
   end
 
   local outlineChar = ''
-  local r,g,b = Spring.GetTeamColor(teamID)
+  local r,g,b = Engine.Unsynced.GetTeamColor(teamID)
   if (r and g and b) then
     local function ColorChar(x)
       local c = math.floor(x * 255)
@@ -292,17 +292,17 @@ end
 function widget:DrawWorld()
   gl.Fog(false)
 
-  local time = Spring.DiffTimers(Spring.GetTimer(), startTimer)
+  local time = Engine.Unsynced.DiffTimers(Engine.Unsynced.GetTimer(), startTimer)
 
   -- show the ally startboxes
   DrawStartboxes3dWithStencil()
 
   -- show the team start positions
-  for _, teamID in ipairs(Spring.GetTeamList()) do
-    local _,leader = Spring.GetTeamInfo(teamID)
-    local name,_,spec = Spring.GetPlayerInfo(leader)
+  for _, teamID in ipairs(Engine.Shared.GetTeamList()) do
+    local _,leader = Engine.Shared.GetTeamInfo(teamID)
+    local name,_,spec = Engine.Shared.GetPlayerInfo(leader)
     if ((not spec) and (teamID ~= gaiaTeamID)) then
-      local newx, newy, newz = Spring.GetTeamStartPosition(teamID)
+      local newx, newy, newz = Engine.Shared.GetTeamStartPosition(teamID)
 
       if (teamStartPositions[teamID] == nil) then
         teamStartPositions[teamID] = {newx, newy, newz}
@@ -314,9 +314,9 @@ function widget:DrawWorld()
         teamStartPositions[teamID][3]
 
       if (newx ~= oldx or newy ~= oldy or newz ~= oldz) then
-        Spring.PlaySoundFile("MapPoint")
-        Spring.MarkerErasePosition(oldx, oldy, oldz)
-        Spring.MarkerAddPoint(newx, newy, newz, "Start " .. teamID .. " (" .. name .. ")", 1)
+        Engine.Unsynced.PlaySoundFile("MapPoint")
+        Engine.Unsynced.MarkerErasePosition(oldx, oldy, oldz)
+        Engine.Unsynced.MarkerAddPoint(newx, newy, newz, "Start " .. teamID .. " (" .. name .. ")", 1)
         teamStartPositions[teamID][1] = newx
         teamStartPositions[teamID][2] = newy
         teamStartPositions[teamID][3] = newz
@@ -344,14 +344,14 @@ function widget:DrawScreenEffects()
   -- show the names over the team start positions
   gl.Fog(false)
   gl.BeginText()
-  for _, teamID in ipairs(Spring.GetTeamList()) do
-    local _,leader = Spring.GetTeamInfo(teamID)
-    local name,_,spec = Spring.GetPlayerInfo(leader)
+  for _, teamID in ipairs(Engine.Shared.GetTeamList()) do
+    local _,leader = Engine.Shared.GetTeamInfo(teamID)
+    local name,_,spec = Engine.Shared.GetPlayerInfo(leader)
     if ((not spec) and (teamID ~= gaiaTeamID)) then
       local colorStr, outlineStr = GetTeamColorStr(teamID)
-      local x, y, z = Spring.GetTeamStartPosition(teamID)
+      local x, y, z = Engine.Shared.GetTeamStartPosition(teamID)
       if (x ~= nil and x > 0 and z > 0 and y > -500) then
-        local sx, sy, sz = Spring.WorldToScreenCoords(x, y + 120, z)
+        local sx, sy, sz = Engine.Unsynced.WorldToScreenCoords(x, y + 120, z)
         if (sz < 1) then
           gl.Text(colorStr .. name, sx, sy, 18, 'cs')
         end
@@ -367,7 +367,7 @@ end
 
 function widget:DrawInMiniMap(sx, sz)
   -- only show at the beginning
-  if (Spring.GetGameFrame() > 1) then
+  if (Engine.Shared.GetGameFrame() > 1) then
     widgetHandler:RemoveWidget()
   end
 
@@ -377,19 +377,19 @@ function widget:DrawInMiniMap(sx, sz)
   gl.LineWidth(1.49)
 
   local gaiaAllyTeamID
-  local gaiaTeamID = Spring.GetGaiaTeamID()
+  local gaiaTeamID = Engine.Shared.GetGaiaTeamID()
   if (gaiaTeamID) then
-    local _,_,_,_,_,atid = Spring.GetTeamInfo(gaiaTeamID)
+    local _,_,_,_,_,atid = Engine.Shared.GetTeamInfo(gaiaTeamID)
     gaiaAllyTeamID = atid
   end
 
   -- show all start boxes
-  for _,at in ipairs(Spring.GetAllyTeamList()) do
+  for _,at in ipairs(Engine.Shared.GetAllyTeamList()) do
     if (at ~= gaiaAllyTeamID) then
-      local xn, zn, xp, zp = Spring.GetAllyTeamStartBox(at)
+      local xn, zn, xp, zp = Engine.Shared.GetAllyTeamStartBox(at)
       if (xn and ((xn ~= 0) or (zn ~= 0) or (xp ~= msx) or (zp ~= msz))) then
         local color
-        if (at == Spring.GetMyAllyTeamID()) then
+        if (at == Engine.Unsynced.GetMyAllyTeamID()) then
           color = { 0, 1, 0, 0.1 }  --  green
         else
           color = { 1, 0, 0, 0.1 }  --  red
@@ -409,15 +409,15 @@ function widget:DrawInMiniMap(sx, sz)
   gl.Smoothing(true) --enable point smoothing
 
   -- show the team start positions
-  for _, teamID in ipairs(Spring.GetTeamList()) do
-    local _,leader = Spring.GetTeamInfo(teamID)
-    local _,_,spec = Spring.GetPlayerInfo(leader)
+  for _, teamID in ipairs(Engine.Shared.GetTeamList()) do
+    local _,leader = Engine.Shared.GetTeamInfo(teamID)
+    local _,_,spec = Engine.Shared.GetPlayerInfo(leader)
     if ((not spec) and (teamID ~= gaiaTeamID)) then
-      local x, y, z = Spring.GetTeamStartPosition(teamID)
+      local x, y, z = Engine.Shared.GetTeamStartPosition(teamID)
       if (x ~= nil and x > 0 and z > 0 and y > -500) then
         local color = GetTeamColor(teamID)
         local r, g, b = color[1], color[2], color[3]
-        local time = Spring.DiffTimers(Spring.GetTimer(), startTimer)
+        local time = Engine.Unsynced.DiffTimers(Engine.Unsynced.GetTimer(), startTimer)
         local i = 2 * math.abs(((time * 3) % 1) - 0.5)
         gl.PointSize(11)
         gl.Color(i, i, i)

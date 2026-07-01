@@ -30,7 +30,7 @@ local soundTypes = {}
 local soundTypes, err = SND.Parse('gamedata/sound.tdf')
 if (soundTypes == nil) then
   if (false) then -- sound.tdf is no longer required, do not complain
-    Spring.Log(section, LOG.ERROR, 'could not load sound data: ' .. err)
+    Engine.Shared.Log(section, LOG.ERROR, 'could not load sound data: ' .. err)
   end
   soundTypes = {}
 end

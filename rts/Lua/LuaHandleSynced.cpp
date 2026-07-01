@@ -4,6 +4,7 @@
 
 #include "LuaInclude.h"
 
+#include "LuaSpringContext.h"
 #include "LuaUtils.h"
 #include "LuaArchive.h"
 #include "LuaCallInCheck.h"
@@ -126,10 +127,10 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 		if (!AddEntriesToTable(L, "FeatureDefs",   LuaFeatureDefs::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "Script",          LuaInterCall::PushEntriesUnsynced)) KILL
 		if (!AddEntriesToTable(L, "Script",             LuaScream::PushEntries        )) KILL
-		if (!AddEntriesToTable(L, "Spring",         LuaSyncedRead::PushEntries        )) KILL
-		if (!AddEntriesToTable(L, "Spring",       LuaUnsyncedCtrl::PushEntries        )) KILL
-		if (!AddEntriesToTable(L, "Spring",       LuaUnsyncedRead::PushEntries        )) KILL
-		if (!AddEntriesToTable(L, "Spring",          LuaUICommand::PushEntries        )) KILL
+		if (!AddEntriesToTable(L, "Engine", "Shared",   LuaSyncedRead::PushEntries        )) KILL
+		if (!AddEntriesToTable(L, "Engine", "Unsynced", LuaUnsyncedCtrl::PushEntries      )) KILL
+		if (!AddEntriesToTable(L, "Engine", "Unsynced", LuaUnsyncedRead::PushEntries      )) KILL
+		if (!AddEntriesToTable(L, "Engine", "Shared",   LuaUICommand::PushEntries         )) KILL
 		if (!AddEntriesToTable(L, "gl",                 LuaOpenGL::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "GL",                LuaConstGL::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "Engine",        LuaConstEngine::PushEntries        )) KILL
@@ -140,6 +141,8 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 		if (!AddEntriesToTable(L, "LOG",                 LuaUtils::PushLogEntries     )) KILL
 		#undef KILL
 	}
+
+	LuaSpringContext::BuildSpringFromSplitTables(L, LuaSpringContext::Context::Unsynced);
 
 	lua_settop(L, 0);
 
@@ -501,10 +504,10 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 		if (!AddEntriesToTable(L, "WeaponDefs",     LuaWeaponDefs::PushEntries      )) KILL
 		if (!AddEntriesToTable(L, "FeatureDefs",   LuaFeatureDefs::PushEntries      )) KILL
 		if (!AddEntriesToTable(L, "Script",          LuaInterCall::PushEntriesSynced)) KILL
-		if (!AddEntriesToTable(L, "Spring",       LuaUnsyncedCtrl::PushEntries      )) KILL
-		if (!AddEntriesToTable(L, "Spring",         LuaSyncedCtrl::PushEntries      )) KILL
-		if (!AddEntriesToTable(L, "Spring",         LuaSyncedRead::PushEntries      )) KILL
-		if (!AddEntriesToTable(L, "Spring",          LuaUICommand::PushEntries      )) KILL
+		if (!AddEntriesToTable(L, "Engine", "Unsynced", LuaUnsyncedCtrl::PushEntries    )) KILL
+		if (!AddEntriesToTable(L, "Engine", "Synced",   LuaSyncedCtrl::PushEntries      )) KILL
+		if (!AddEntriesToTable(L, "Engine", "Shared",   LuaSyncedRead::PushEntries      )) KILL
+		if (!AddEntriesToTable(L, "Engine", "Shared",   LuaUICommand::PushEntries       )) KILL
 		if (!AddEntriesToTable(L, "Engine",        LuaConstEngine::PushEntries      )) KILL
 		if (!AddEntriesToTable(L, "Game",            LuaConstGame::PushEntries      )) KILL
 		if (!AddEntriesToTable(L, "CMD",              LuaConstCMD::PushEntries      )) KILL
@@ -514,6 +517,11 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 		if (!AddEntriesToTable(L, "LOG",                 LuaUtils::PushLogEntries   )) KILL
 		#undef KILL
 	}
+
+	// Synced gadget half registers BOTH LuaSyncedCtrl AND LuaUnsyncedCtrl
+	// (see lines above), so all three split tables are populated here and
+	// merged into Spring.
+	LuaSpringContext::BuildSpringFromSplitTables(L, LuaSpringContext::Context::Both);
 
 	// add code from the sub-class
 	if (!base.AddSyncedCode(L)) {
@@ -2501,14 +2509,14 @@ string CSplitLuaHandle::LoadFile(const std::string& filename, const std::string&
 
 /*** Calls a function from given team's PoV. In particular this makes callouts obey that team's visibility rules.
  *
- * @function Spring.CallAsTeam
+ * @function Engine.Shared.CallAsTeam
  * @param teamID integer Team ID.
  * @param func fun(...) The function to call.
  * @param ... any Arguments to pass to the function.
  * @return any ... The return values of the function.
  */
 /***
- * @function Spring.CallAsTeam
+ * @function Engine.Shared.CallAsTeam
  * @param options CallAsTeamOptions Options.
  * @param func fun(...) The function to call.
  * @param ... any Arguments to pass to the function.

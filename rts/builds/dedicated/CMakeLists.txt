@@ -171,6 +171,7 @@ set(engineDedicatedSources
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMathExtra.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMemPool.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaParser.cpp
+	${ENGINE_SRC_ROOT_DIR}/Lua/LuaSpringContext.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaUtils.cpp
 	${ENGINE_SRC_ROOT_DIR}/Map/MapParser.cpp
 	)
