@@ -213,9 +213,9 @@ void CRasEngine::TickRunningThreads()
 	TracyPlot(rasWaitingThreadsPlot, static_cast<int64_t>(waitingThreadIDs.size()));
 	TracyPlot(rasSleepingThreadsPlot, static_cast<int64_t>(sleepingThreadIDs.size()));
 
-	if (threadIDs.empty()) {
-		return;
-	}
+	// NOTE: cannot early-return here. The swap at the end of this function
+	// moves waitingThreadIDs -> runningThreadIDs. Skipping it would permanently
+	// stall threads that were scheduled before the first tick (e.g. unit init).
 
 	// Split into safe (parallel) and unsafe (serial) groups.
 	// Per-unit exclusivity: at most one thread per CRasInstance runs on the
