@@ -283,6 +283,7 @@ Value of 1 does DWMFlush before SwapBuffers, value of 2 does DWMFlush after swap
 - `Spring.GetTeamList(allyTeamID?)` no longer crashes if it receives 2+ args (but still ignores them, you can't get the combined team list of multiple allyteams).
 - added `GL.TEXTURE_2D_ARRAY` Lua constant.
 - `Spring.SetProjectileTarget` now errors on invalid args.
+- add boolean `Platform.isHeadless`.
 - archive cache version 20 → 21.
 
 ## Fixes

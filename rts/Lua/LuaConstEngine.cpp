@@ -60,9 +60,6 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	LuaPushNamedString(L, "buildFlags"     , SpringVersion::GetAdditional());
 	LuaPushNamedNumber(L, "wordSize", (!CLuaHandle::GetHandleSynced(L))? Platform::NativeWordSize() * 8: 0);
 
-	if (!CLuaHandle::GetHandleSynced(L))
-		LuaPushNamedBool(L, "isHeadless", SpringVersion::IsHeadless());
-
 	LuaPushNamedNumber(L, "gameSpeed", GAME_SPEED);
 
 	/* If possible, entries should be bools that resolve to false in the "old" version
