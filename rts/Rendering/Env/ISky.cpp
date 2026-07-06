@@ -73,7 +73,13 @@ void ISky::SetSky()
 			sky = std::make_unique<CSkyBox>(debugCubeMapTexture.GetId(), dims.x, dims.y);
 		}
 		else if (!mapInfo->atmosphere.skyBox.empty()) {
-			sky = std::make_unique<CSkyBox>("maps/" + mapInfo->atmosphere.skyBox);
+			const std::string& skyBoxPath = mapInfo->atmosphere.skyBox;
+			sky = std::make_unique<CSkyBox>(skyBoxPath);
+
+			// Backward compatibility: historically mapinfo skyBox was often resolved under maps/.
+			if (!sky->IsValid() && (skyBoxPath.rfind("maps/", 0) != 0)) {
+				sky = std::make_unique<CSkyBox>("maps/" + skyBoxPath);
+			}
 		}
 		else {
 			sky = std::make_unique<CModernSky>();
