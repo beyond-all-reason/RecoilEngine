@@ -933,6 +933,15 @@ bool QTPFS::PathManager::InitializeSearch(QTPFS::entity searchEntity) {
 		assert((registry.any_of<IPath, UnsyncedIPath, ExternallyManagedSyncedIPath>(pathEntity)));
 		IPath* path = GetPath(pathEntity);
 		assert(path->GetPathType() == pathType);
+
+		// Somehow units can get wiped without triggering a delete. This is a catch for that until the
+		// cause can be found and resolved.
+		const CSolidObject* owner = path->GetOwner();
+		if (owner != nullptr) {
+			if (owner->objectUsable == false)
+				return false;
+		}
+
 		search->Initialize(&nodeLayer, path->GetSourcePoint(), path->GetGoalPosition(), path->GetOwner());
 		path->SetHash(search->GetHash());
 		path->SetVirtualHash(search->GetPartialSearchHash());
@@ -1122,19 +1131,12 @@ bool QTPFS::PathManager::ExecuteSearch(
 	int currentThread = ThreadPool::GetThreadNum();
 
 	assert(search != nullptr);
+	assert(search->initialized);
 
 	// temp-path might have been removed already via
 	// DeletePath before we got a chance to process it
 	if (path == nullptr)
 		return false;
-
-	// Somehow units can get wiped without triggering a delete. This is a catch for that until the
-	// cause can be found and resolved.
-	const CSolidObject* owner = path->GetOwner();
-	if (owner != nullptr) {
-		if (owner->objectUsable == false)
-			return false;
-	}
 
 	assert(path->GetID() == search->GetID());
 
