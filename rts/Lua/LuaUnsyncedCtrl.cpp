@@ -2150,8 +2150,7 @@ int LuaUnsyncedCtrl::SetSkyBoxTexture(lua_State* L)
 	if (CLuaHandle::GetHandleSynced(L))
 		return 0;
 
-	if (const auto& sky = ISky::GetSky(); sky != nullptr)
-		sky->SetLuaTexture(ParseLuaTextureData(L, false));
+	ISky::SetSkyLuaTexture(ParseLuaTextureData(L, false));
 
 	return 0;
 }
