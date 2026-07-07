@@ -5,9 +5,8 @@
 #include <cassert>
 #include <cctype>
 
-#include <SDL_keyboard.h>
-#include <SDL_events.h>
-#include <SDL_stdinc.h>
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_events.h>
 
 #include "KeyInput.h"
 
@@ -79,7 +78,7 @@ namespace KeyInput {
 	void Update(int fakeMetaKey)
 	{
 		int numKeys = 0;
-		const uint8_t* kbState = SDL_GetKeyboardState(&numKeys);
+		const bool* kbState = SDL_GetKeyboardState(&numKeys);
 
 		keyMods = SDL_GetModState();
 
@@ -90,24 +89,24 @@ namespace KeyInput {
 
 		for (int i = 0; i < numKeys; ++i) {
 			const auto scanCode = (SDL_Scancode)i;
-			const auto keyCode  = SDL_GetKeyFromScancode(scanCode);
+			const auto keyCode  = SDL_GetKeyFromScancode(scanCode, 0, true);
 
-			keyVec.emplace_back(keyCode, kbState[scanCode] != 0);
-			scanVec.emplace_back(scanCode, kbState[scanCode] != 0);
+			keyVec.emplace_back(keyCode, kbState[scanCode]);
+			scanVec.emplace_back(scanCode, kbState[scanCode]);
 		}
 
 		std::sort(keyVec.begin(), keyVec.end(), keyCmp);
 		std::sort(scanVec.begin(), scanVec.end(), keyCmp);
 
-		SetKeyModState(KMOD_GUI, IsKeyPressed(fakeMetaKey));
-		SetKeyPressed(SDLK_LALT  , GetKeyModState(KMOD_ALT  ));
-		SetKeyPressed(SDLK_LCTRL , GetKeyModState(KMOD_CTRL ));
-		SetKeyPressed(SDLK_LGUI  , GetKeyModState(KMOD_GUI  ));
-		SetKeyPressed(SDLK_LSHIFT, GetKeyModState(KMOD_SHIFT));
-		SetKeyPressed(SDL_SCANCODE_LALT  , GetKeyModState(KMOD_ALT  ));
-		SetKeyPressed(SDL_SCANCODE_LCTRL , GetKeyModState(KMOD_CTRL ));
-		SetKeyPressed(SDL_SCANCODE_LGUI  , GetKeyModState(KMOD_GUI  ));
-		SetKeyPressed(SDL_SCANCODE_LSHIFT, GetKeyModState(KMOD_SHIFT));
+		SetKeyModState(SDL_KMOD_GUI, IsKeyPressed(fakeMetaKey));
+		SetKeyPressed(SDLK_LALT  , GetKeyModState(SDL_KMOD_ALT  ));
+		SetKeyPressed(SDLK_LCTRL , GetKeyModState(SDL_KMOD_CTRL ));
+		SetKeyPressed(SDLK_LGUI  , GetKeyModState(SDL_KMOD_GUI  ));
+		SetKeyPressed(SDLK_LSHIFT, GetKeyModState(SDL_KMOD_SHIFT));
+		SetKeyPressed(SDL_SCANCODE_LALT  , GetKeyModState(SDL_KMOD_ALT  ));
+		SetKeyPressed(SDL_SCANCODE_LCTRL , GetKeyModState(SDL_KMOD_CTRL ));
+		SetKeyPressed(SDL_SCANCODE_LGUI  , GetKeyModState(SDL_KMOD_GUI  ));
+		SetKeyPressed(SDL_SCANCODE_LSHIFT, GetKeyModState(SDL_KMOD_SHIFT));
 	}
 
 	const std::vector<Key>& GetPressedKeys()
@@ -124,7 +123,7 @@ namespace KeyInput {
 	{
 		for (const auto& key: keyVec) {
 			auto keycode  = (SDL_Keycode)key.first;
-			auto scancode = SDL_GetScancodeFromKey(keycode);
+			auto scancode = SDL_GetScancodeFromKey(keycode, nullptr);
 
 			if (keycode == SDLK_NUMLOCKCLEAR || keycode == SDLK_CAPSLOCK || keycode == SDLK_SCROLLLOCK)
 				continue;
@@ -133,11 +132,11 @@ namespace KeyInput {
 				continue;
 
 			SDL_Event event;
-			event.type = event.key.type = SDL_KEYUP;
-			event.key.state = SDL_RELEASED;
-			event.key.keysym.sym = keycode;
-			event.key.keysym.mod = 0;
-			event.key.keysym.scancode = scancode;
+			event.type = event.key.type = SDL_EVENT_KEY_UP;
+			event.key.down = false;
+			event.key.key = keycode;
+			event.key.mod = 0;
+			event.key.scancode = scancode;
 			SDL_PushEvent(&event);
 		}
 	}

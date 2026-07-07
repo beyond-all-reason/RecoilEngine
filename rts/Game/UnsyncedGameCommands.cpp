@@ -109,8 +109,15 @@
 #include "System/Sound/ISoundChannels.h"
 #include "System/Sync/DumpState.h"
 
-#include <SDL_events.h>
-#include <SDL_video.h>
+#ifdef camera
+#undef camera
+#endif
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_video.h>
+#ifdef camera
+#undef camera
+#endif
+#define camera (CCamera::GetActive())
 
 namespace { // prevents linking problems in case of duplicate symbols
 
@@ -1389,7 +1396,7 @@ public:
 
 public:
 	bool Execute(const UnsyncedAction& action) const final {
-		SDL_StartTextInput();
+		SDL_StartTextInput(globalRendering->GetWindow());
 
 		gameTextInput.PromptInput(setUserInputPrefix? &userInputPrefix: nullptr);
 		gameConsoleHistory.ResetPosition();

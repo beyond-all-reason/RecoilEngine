@@ -72,7 +72,7 @@ void Window::DrawSelf()
 bool Window::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
-		case SDL_MOUSEBUTTONDOWN: {
+		case SDL_EVENT_MOUSE_BUTTON_DOWN: {
 			if (MouseOver(ev.button.x, ev.button.y))
 			{
 				float mouse[2] = {PixelToGlX(ev.button.x), PixelToGlY(ev.button.y)};
@@ -86,7 +86,7 @@ bool Window::HandleEventSelf(const SDL_Event& ev)
 			}
 			break;
 		}
-		case SDL_MOUSEBUTTONUP: {
+		case SDL_EVENT_MOUSE_BUTTON_UP: {
 			if (dragging)
 			{
 				dragging = false;
@@ -94,7 +94,7 @@ bool Window::HandleEventSelf(const SDL_Event& ev)
 			}
 			break;
 		}
-		case SDL_MOUSEMOTION: {
+		case SDL_EVENT_MOUSE_MOTION: {
 			if (dragging)
 			{
 				Move(PixelToGlX(ev.motion.xrel), PixelToGlY(ev.motion.yrel)-1);
@@ -102,8 +102,8 @@ bool Window::HandleEventSelf(const SDL_Event& ev)
 			}
 			break;
 		}
-		case SDL_KEYDOWN: {
-			if (ev.key.keysym.sym == SDLK_ESCAPE)
+		case SDL_EVENT_KEY_DOWN: {
+			if (ev.key.key == SDLK_ESCAPE)
 			{
 				WantClose();
 				return true;

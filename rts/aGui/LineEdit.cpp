@@ -84,7 +84,7 @@ void LineEdit::DrawSelf()
 bool LineEdit::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
-		case SDL_MOUSEBUTTONDOWN: {
+		case SDL_EVENT_MOUSE_BUTTON_DOWN: {
 			if (MouseOver(ev.button.x, ev.button.y)) {
 				hasFocus = true;
 			} else {
@@ -92,15 +92,15 @@ bool LineEdit::HandleEventSelf(const SDL_Event& ev)
 			}
 			break;
 		}
-		case SDL_TEXTINPUT: {
+		case SDL_EVENT_TEXT_INPUT: {
 			content.insert(cursorPos, ev.text.text);
 			cursorPos+=strlen(ev.text.text);
 		} break;
-		case SDL_KEYDOWN: {
+		case SDL_EVENT_KEY_DOWN: {
 			if (!hasFocus) {
 				break;
 			}
-			switch(ev.key.keysym.sym)
+			switch(ev.key.key)
 			{
 				case SDLK_BACKSPACE: {
 					if (cursorPos > 0) {
