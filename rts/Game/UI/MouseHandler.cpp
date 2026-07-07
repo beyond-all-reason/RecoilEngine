@@ -5,6 +5,7 @@
 #include "CommandColors.h"
 #include "InputReceiver.h"
 #include "GuiHandler.h"
+#undef camera
 #include "MiniMap.h"
 #include "MouseCursor.h"
 #include "TooltipConsole.h"
@@ -46,9 +47,12 @@
 #include <algorithm>
 
 // can't be up there since those contain conflicting definitions
-#include <SDL_mouse.h>
-#include <SDL_events.h>
-#include <SDL_keycode.h>
+#undef camera
+#include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_keycode.h>
+#undef camera
+#define camera (CCamera::GetActive())
 
 using namespace GL::State;
 
@@ -89,7 +93,7 @@ CMouseHandler::CMouseHandler()
 
 	UpdateCursorCameraDir();
 
-#ifndef __APPLE__
+#ifndef SDL_PLATFORM_APPLE
 	hardwareCursor = configHandler->GetBool("HardwareCursor");
 #endif
 
@@ -117,7 +121,7 @@ CMouseHandler::~CMouseHandler()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (hwHideCursor)
-		SDL_ShowCursor(SDL_ENABLE);
+		SDL_ShowCursor();
 
 	configHandler->RemoveObserver(this);
 }
@@ -259,7 +263,7 @@ void CMouseHandler::MouseMove(int x, int y, int dx, int dy)
 	// switching to MMB-mode while user is moving mouse can generate
 	// a spurious event in the opposite direction (if cursor happens
 	// to pass the center pixel) which would cause a camera position
-	// jump, so always ignore one SDL_MOUSEMOTION after entering it
+	// jump, so always ignore one SDL_EVENT_MOUSE_MOTION after entering it
 	dx *= (1 - ignoreMove);
 	dy *= (1 - ignoreMove);
 
@@ -597,7 +601,7 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 	if ((button == SDL_BUTTON_LEFT) && !buttons[button].chorded) {
 		ButtonPressEvt& bp = buttons[SDL_BUTTON_LEFT];
 
-		if (!KeyInput::GetKeyModState(KMOD_SHIFT) && !KeyInput::GetKeyModState(KMOD_CTRL) && selectedUnitsHandler.GetBoxSelectionHandledByEngine())
+		if (!KeyInput::GetKeyModState(SDL_KMOD_SHIFT) && !KeyInput::GetKeyModState(SDL_KMOD_CTRL) && selectedUnitsHandler.GetBoxSelectionHandledByEngine())
 			selectedUnitsHandler.ClearSelected();
 
 		if (bp.movement > dragSelectionThreshold && selectedUnitsHandler.GetBoxSelectionHandledByEngine()) {
@@ -839,7 +843,7 @@ void CMouseHandler::ShowMouse()
 
 	hideCursor = false;
 
-	SDL_SetRelativeMouseMode(SDL_FALSE);
+	SDL_SetWindowRelativeMouseMode(globalRendering->GetWindow(), false);
 
 	// don't use SDL_ShowCursor here since it would cause flickering with hwCursor
 	// (by switching between default cursor and later the real one, e.g. `attack`)
@@ -858,12 +862,12 @@ void CMouseHandler::HideMouse()
 	hideCursor = true;
 	hwHideCursor = true;
 
-	SDL_ShowCursor(SDL_DISABLE);
+	SDL_HideCursor();
 	// signal that we are only interested in relative motion events when MMB-scrolling
 	// this way the mouse position will never change so it is also unnecessary to call
 	// SDL_WarpMouseInWindow and handle the associated wart of filtering motion events
 	// technically supersedes SDL_ShowCursor as well
-	SDL_SetRelativeMouseMode(SDL_TRUE);
+	SDL_SetWindowRelativeMouseMode(globalRendering->GetWindow(), true);
 
 	const int2 viewMouseCenter = GetViewMouseCenter();
 
@@ -899,7 +903,7 @@ void CMouseHandler::ToggleHwCursor(bool enable)
 		hwHideCursor = true;
 	} else {
 		mouseInput->SetWMMouseCursor(nullptr);
-		SDL_ShowCursor(SDL_DISABLE);
+		SDL_HideCursor();
 	}
 
 	// force hardware cursor rebinding, otherwise we get a standard b&w cursor
@@ -935,10 +939,10 @@ void CMouseHandler::SetCursor(const std::string& cmdName, const bool forceRebind
 		return;
 
 	if ((hwHideCursor = !loadedCursors[activeCursorIdx].IsHWValid())) {
-		SDL_ShowCursor(SDL_DISABLE);
+		SDL_HideCursor();
 		mouseInput->SetWMMouseCursor(nullptr);
 	} else {
-		loadedCursors[activeCursorIdx].BindHwCursor(); // calls SDL_ShowCursor(SDL_ENABLE);
+		loadedCursors[activeCursorIdx].BindHwCursor(); // calls SDL_ShowCursor();
 	}
 }
 

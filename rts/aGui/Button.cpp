@@ -60,7 +60,7 @@ void Button::DrawSelf()
 bool Button::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
-		case SDL_MOUSEBUTTONDOWN: {
+		case SDL_EVENT_MOUSE_BUTTON_DOWN: {
 			if ((ev.button.button == SDL_BUTTON_LEFT)
 					&& MouseOver(ev.button.x, ev.button.y)
 					&& gui->MouseOverElement(GetRoot(), ev.button.x, ev.button.y))
@@ -69,7 +69,7 @@ bool Button::HandleEventSelf(const SDL_Event& ev)
 			}
 			break;
 		}
-		case SDL_MOUSEBUTTONUP: {
+		case SDL_EVENT_MOUSE_BUTTON_UP: {
 			if ((ev.button.button == SDL_BUTTON_LEFT)
 					&& MouseOver(ev.button.x, ev.button.y)
 					&& clicked)
@@ -84,7 +84,7 @@ bool Button::HandleEventSelf(const SDL_Event& ev)
 			}
 			break;
 		}
-		case SDL_MOUSEMOTION: {
+		case SDL_EVENT_MOUSE_MOTION: {
 			if (MouseOver(ev.motion.x, ev.motion.y)
 					&& gui->MouseOverElement(GetRoot(), ev.motion.x, ev.motion.y))
 			{

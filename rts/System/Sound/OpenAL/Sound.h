@@ -8,7 +8,7 @@
 #include <vector>
 #include <al.h>
 #include <alc.h>
-#include <SDL.h>
+#include <SDL3/SDL.h>
 
 #include "System/Sound/ISound.h"
 #include "System/float3.h"

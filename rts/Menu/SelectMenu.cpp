@@ -2,7 +2,7 @@
 
 #include "SelectMenu.h"
 
-#include <SDL_keycode.h>
+#include <SDL3/SDL_keycode.h>
 #include <functional>
 #include <sstream>
 #include <stack>
@@ -363,11 +363,11 @@ void SelectMenu::DirectConnect(const std::string& addr)
 bool SelectMenu::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
-		case SDL_KEYDOWN: {
-			if (ev.key.keysym.sym == SDLK_ESCAPE) {
+		case SDL_EVENT_KEY_DOWN: {
+			if (ev.key.key == SDLK_ESCAPE) {
 				LOG("[SelectMenu] user exited");
 				Quit();
-			} else if (ev.key.keysym.sym == SDLK_RETURN) {
+			} else if (ev.key.key == SDLK_RETURN) {
 				Single();
 				return true;
 			}

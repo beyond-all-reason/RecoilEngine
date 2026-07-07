@@ -105,9 +105,9 @@
 
 #include <nowide/fstream.hpp>
 
-#include <SDL_keyboard.h>
-#include <SDL_clipboard.h>
-#include <SDL_mouse.h>
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_clipboard.h>
+#include <SDL3/SDL_mouse.h>
 
 // MinGW defines this for a WINAPI function
 #undef SendMessage
@@ -5347,7 +5347,7 @@ int LuaUnsyncedCtrl::SDLSetTextInputRect(lua_State* L)
 	textWindow.y = luaL_checkint(L, 2);
 	textWindow.w = luaL_checkint(L, 3);
 	textWindow.h = luaL_checkint(L, 4);
-	SDL_SetTextInputRect(&textWindow);
+	SDL_SetTextInputArea(globalRendering->GetWindow(), &textWindow, -1);
 	return 0;
 }
 
@@ -5358,7 +5358,7 @@ int LuaUnsyncedCtrl::SDLSetTextInputRect(lua_State* L)
  */
 int LuaUnsyncedCtrl::SDLStartTextInput(lua_State* L)
 {
-	SDL_StartTextInput();
+	SDL_StartTextInput(globalRendering->GetWindow());
 	return 0;
 }
 
@@ -5369,7 +5369,7 @@ int LuaUnsyncedCtrl::SDLStartTextInput(lua_State* L)
  */
 int LuaUnsyncedCtrl::SDLStopTextInput(lua_State* L)
 {
-	SDL_StopTextInput();
+	SDL_StopTextInput(globalRendering->GetWindow());
 	return 0;
 }
 

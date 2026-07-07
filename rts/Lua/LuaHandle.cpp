@@ -60,9 +60,9 @@
 
 #include "lib/luasocket/src/luasocket.h"
 
-#include <SDL_keyboard.h>
-#include <SDL_keycode.h>
-#include <SDL_mouse.h>
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_keycode.h>
+#include <SDL3/SDL_mouse.h>
 
 #include "System/Misc/TracyDefs.h"
 #include <tracy/TracyLua.hpp>
@@ -3200,10 +3200,10 @@ bool CLuaHandle::KeyPress(int keyCode, int scanCode, bool isRepeat)
 	lua_pushinteger(L, SDL21_keysyms(keyCode));
 
 	lua_createtable(L, 0, 4);
-	LuaPushNamedBool(L, "alt",   !!KeyInput::GetKeyModState(KMOD_ALT));
-	LuaPushNamedBool(L, "ctrl",  !!KeyInput::GetKeyModState(KMOD_CTRL));
-	LuaPushNamedBool(L, "meta",  !!KeyInput::GetKeyModState(KMOD_GUI));
-	LuaPushNamedBool(L, "shift", !!KeyInput::GetKeyModState(KMOD_SHIFT));
+	LuaPushNamedBool(L, "alt",   !!KeyInput::GetKeyModState(SDL_KMOD_ALT));
+	LuaPushNamedBool(L, "ctrl",  !!KeyInput::GetKeyModState(SDL_KMOD_CTRL));
+	LuaPushNamedBool(L, "meta",  !!KeyInput::GetKeyModState(SDL_KMOD_GUI));
+	LuaPushNamedBool(L, "shift", !!KeyInput::GetKeyModState(SDL_KMOD_SHIFT));
 
 	lua_pushboolean(L, isRepeat);
 
@@ -3263,10 +3263,10 @@ bool CLuaHandle::KeyRelease(int keyCode, int scanCode)
 	lua_pushinteger(L, SDL21_keysyms(keyCode));
 
 	lua_createtable(L, 0, 4);
-	LuaPushNamedBool(L, "alt",   !!KeyInput::GetKeyModState(KMOD_ALT));
-	LuaPushNamedBool(L, "ctrl",  !!KeyInput::GetKeyModState(KMOD_CTRL));
-	LuaPushNamedBool(L, "meta",  !!KeyInput::GetKeyModState(KMOD_GUI));
-	LuaPushNamedBool(L, "shift", !!KeyInput::GetKeyModState(KMOD_SHIFT));
+	LuaPushNamedBool(L, "alt",   !!KeyInput::GetKeyModState(SDL_KMOD_ALT));
+	LuaPushNamedBool(L, "ctrl",  !!KeyInput::GetKeyModState(SDL_KMOD_CTRL));
+	LuaPushNamedBool(L, "meta",  !!KeyInput::GetKeyModState(SDL_KMOD_GUI));
+	LuaPushNamedBool(L, "shift", !!KeyInput::GetKeyModState(SDL_KMOD_SHIFT));
 
 	CKeySet ks(keyCode);
 	lua_pushsstring(L, ks.GetString(true));

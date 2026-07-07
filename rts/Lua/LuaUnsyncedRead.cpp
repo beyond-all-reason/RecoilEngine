@@ -88,10 +88,10 @@
 #include <cctype>
 #include <algorithm>
 
-#include <SDL_keyboard.h>
-#include <SDL_clipboard.h>
-#include <SDL_keycode.h>
-#include <SDL_mouse.h>
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_clipboard.h>
+#include <SDL3/SDL_keycode.h>
+#include <SDL3/SDL_mouse.h>
 
 
 
@@ -875,7 +875,9 @@ int LuaUnsyncedRead::DiffTimers(lua_State* L)
  */
 int LuaUnsyncedRead::GetNumDisplays(lua_State* L)
 {
-	lua_pushnumber(L, SDL_GetNumVideoDisplays());
+	int displayCount = 0;
+	SDL_GetDisplays(&displayCount);
+	lua_pushnumber(L, displayCount);
 	return 1;
 }
 
@@ -958,13 +960,14 @@ int LuaUnsyncedRead::GetWindowGeometry(lua_State* L)
  */
 int LuaUnsyncedRead::GetWindowDisplayMode(lua_State* L)
 {
-	SDL_DisplayMode dmode;
-	if (!SDL_GetWindowDisplayMode(globalRendering->GetWindow(), &dmode)) {
-		lua_pushnumber(L, dmode.w);
-		lua_pushnumber(L, dmode.h);
-		lua_pushnumber(L, SDL_BITSPERPIXEL(dmode.format));
-		lua_pushnumber(L, dmode.refresh_rate);
-		lua_pushstring(L, SDL_GetPixelFormatName(dmode.format));
+	const SDL_DisplayMode* dmode = SDL_GetWindowFullscreenMode(globalRendering->GetWindow());
+	if (!dmode) dmode = SDL_GetCurrentDisplayMode(SDL_GetDisplayForWindow(globalRendering->GetWindow()));
+	if (dmode) {
+		lua_pushnumber(L, dmode->w);
+		lua_pushnumber(L, dmode->h);
+		lua_pushnumber(L, SDL_BITSPERPIXEL(dmode->format));
+		lua_pushnumber(L, dmode->refresh_rate);
+		lua_pushstring(L, SDL_GetPixelFormatName(dmode->format));
 		return 5;
 	}
 	return 0;
@@ -4150,7 +4153,7 @@ int LuaUnsyncedRead::GetKeyFromScanSymbol(lua_State* L)
 		return 1;
 	}
 
-	SDL_Keycode keyCode = (SDL_Keycode)SDL_GetKeyFromScancode(scanCode);
+	SDL_Keycode keyCode = (SDL_Keycode)SDL_GetKeyFromScancode(scanCode, 0, true);
 	if (keyCode <= 0 || keyCode == 0x40000000) {
 		lua_pushstring(L, result.c_str());
 		return 1;
@@ -4187,10 +4190,10 @@ int LuaUnsyncedRead::GetKeyState(lua_State* L)
  */
 int LuaUnsyncedRead::GetModKeyState(lua_State* L)
 {
-	lua_pushboolean(L, KeyInput::GetKeyModState(KMOD_ALT));
-	lua_pushboolean(L, KeyInput::GetKeyModState(KMOD_CTRL));
-	lua_pushboolean(L, KeyInput::GetKeyModState(KMOD_GUI));
-	lua_pushboolean(L, KeyInput::GetKeyModState(KMOD_SHIFT));
+	lua_pushboolean(L, KeyInput::GetKeyModState(SDL_KMOD_ALT));
+	lua_pushboolean(L, KeyInput::GetKeyModState(SDL_KMOD_CTRL));
+	lua_pushboolean(L, KeyInput::GetKeyModState(SDL_KMOD_GUI));
+	lua_pushboolean(L, KeyInput::GetKeyModState(SDL_KMOD_SHIFT));
 	return 4;
 }
 
