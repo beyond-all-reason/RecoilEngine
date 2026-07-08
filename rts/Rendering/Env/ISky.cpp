@@ -109,6 +109,7 @@ void ISky::SetSkyLuaTexture(const MapTextureData& td)
 		}
 
 		LOG_L(L_WARNING, "[ISky::%s] failed to create SkyBox from Lua texture (%u), keeping current sky", __func__, td.id);
+		return;
 	}
 
 	sky->SetLuaTexture(td);
