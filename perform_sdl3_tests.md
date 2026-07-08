@@ -7,6 +7,10 @@
 # Found bugs needing fixing:
 - [ ] During the initial builtin game menu screen, there is no mouse available
 - [ ] | B3 | Toggle back to windowed from fullscreen | Returns to windowed mode at correct size | NO: switch to windowed from fullscreen needs to be toggled twice from options menu, to two different resolutions in order for it to take effect |
+- [ ] There is no audio at all
+- [ ] The upstream RMLUI module needs some changes for all this to work, better find a different solution than this one. 
+- [ ] Need to test RMLUI altogether anyway
+
 ---
 
 ## A. Window Creation and Display
@@ -212,25 +216,25 @@
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| N1 | `SDL_DisableScreenSaver()` | Screen saver disabled during gameplay | ☐ |
-| N2 | `SDL_EnableScreenSaver()` | Screen saver re-enabled on exit | ☐ |
-| N3 | `SDL_ScreenSaverEnabled()` | Returns correct state | ☐ |
+| N1 | `SDL_DisableScreenSaver()` | Screen saver disabled during gameplay | n/a |
+| N2 | `SDL_EnableScreenSaver()` | Screen saver re-enabled on exit | n/a |
+| N3 | `SDL_ScreenSaverEnabled()` | Returns correct state | n/a |
 
 ## O. RmlUi / GUI Rendering
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| O1 | Main menu renders | All UI elements visible, no missing textures | ☐ |
-| O2 | Menu navigation with keyboard | Arrow keys, Enter, Escape work | ☐ |
-| O3 | Menu navigation with mouse | Click, hover work | ☐ |
-| O4 | In-game HUD renders | Health bars, minimap, command panel visible | ☐ |
-| O5 | Chat box | Opens, accepts text, displays messages | ☐ |
-| O6 | In-game console | Opens, accepts commands, displays output | ☐ |
-| O7 | Unit selection UI | Selection box, unit info panel | ☐ |
-| O8 | Minimap | Renders, clickable for camera movement | ☐ |
-| O9 | Groups panel | Group assign/reveal works | ☐ |
-| O10 | Share box | Screenshot share dialog works | ☐ |
-| O11 | Quit box | Confirm quit dialog works | ☐ |
+| O1 | Main menu renders | All UI elements visible, no missing textures | ok |
+| O2 | Menu navigation with keyboard | Arrow keys, Enter, Escape work | dont know, enter only allows me to continue to main game loading |
+| O3 | Menu navigation with mouse | Click, hover work | no cursor, no click |
+| O4 | In-game HUD renders | Health bars, minimap, command panel visible | ok |
+| O5 | Chat box | Opens, accepts text, displays messages | ok |
+| O6 | In-game console | Opens, accepts commands, displays output | ok |
+| O7 | Unit selection UI | Selection box, unit info panel | ok |
+| O8 | Minimap | Renders, clickable for camera movement | ok |
+| O9 | Groups panel | Group assign/reveal works | ok |
+| O10 | Share box | Screenshot share dialog works | ok |
+| O11 | Quit box | Confirm quit dialog works | ok |
 | O12 | Start position selector | Map selection UI works | ☐ |
 | O13 | RmlUi text input | Text fields in RmlUi accept keyboard input | ☐ |
 | O14 | RmlUi clipboard | Copy/paste in RmlUi elements | ☐ |
@@ -252,7 +256,7 @@
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| Q1 | GL context creation | Context created, no errors | ☐ |
+| Q1 | GL context creation | Context created, no errors | ok |
 | Q2 | `SDL_GL_CreateContext` returns `SDL_GLContext` | Opaque pointer, non-NULL | ☐ |
 | Q3 | `SDL_GL_MakeCurrent` returns bool | Context made current successfully | ☐ |
 | Q4 | `SDL_GL_DestroyContext` | Context destroyed without crash | ☐ |
@@ -263,6 +267,8 @@
 | Q9 | GL rendering during gameplay | No artifacting, no crashes | ☐ |
 | Q10 | GL rendering after resize | No corrupted viewport | ☐ |
 | Q11 | GL rendering after fullscreen toggle | Context survives mode change | ☐ |
+| Q12 | Chobby -> Game -> Chobby -> Game | Context survives mode change | ☐ |
+
 
 ## R. Pixel Format and Surface
 
@@ -351,24 +357,24 @@
 | W4 | Pause/unpause | Game pauses and resumes | ☐ |
 | W5 | Quit from main menu | Clean exit | ☐ |
 | W6 | Quit from in-game (`QuitBox`) | Confirm dialog, clean exit | ☐ |
-| W7 | Pre-game lobby screen | Pre-game UI renders and functions | ☐ |
-| W8 | Load screen | Loading screen renders, progress shown | ☐ |
+| W7 | Pre-game lobby screen | Pre-game UI renders and functions | NO MOUSE |
+| W8 | Load screen | Loading screen renders, progress shown | ok |
 | W9 | Splash screen | Splash renders on startup | ☐ |
-| W10 | In-game screenshot | Screenshot saved correctly | ☐ |
+| W10 | In-game screenshot | Screenshot saved correctly | ok |
 | W11 | AVI video capture | Video capture works (if enabled) | ☐ |
-| W12 | Game info display | FPS, unit count, etc. shown correctly | ☐ |
-| W13 | Unit selection and command | Select units, issue commands | ☐ |
-| W14 | Group assignment | Assign/reveal groups | ☐ |
+| W12 | Game info display | FPS, unit count, etc. shown correctly | ok |
+| W13 | Unit selection and command | Select units, issue commands | ok |
+| W14 | Group assignment | Assign/reveal groups | ok |
 
 ## X. Edge Cases and Error Handling
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| X1 | Rapid fullscreen toggle | No crash, no rendering artifacts | ☐ |
+| X1 | Rapid fullscreen toggle | No crash, no rendering artifacts | ok |
 | X2 | Rapid window resize | No crash, viewport catches up | ☐ |
 | X3 | Disconnect display while fullscreen | Graceful handling, no crash | ☐ |
 | X4 | Audio device hot-plug during gameplay | No crash, audio recovers | ☐ |
-| X5 | Keyboard layout change during gameplay | Input continues working | ☐ |
+| X5 | Keyboard layout change during gameplay | Input continues working | ok |
 | X6 | Mouse disconnect/reconnect | No crash | ☐ |
 | X7 | Game runs with no audio device | Graceful degradation | ☐ |
 | X8 | `SDL_GetError()` after failed operation | Meaningful error message | ☐ |
