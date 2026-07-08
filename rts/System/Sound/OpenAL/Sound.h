@@ -70,6 +70,7 @@ public:
 	const float3& GetListenerPos() const override { return myPos; }
 
 	ALCdevice* GetCurrentDevice() { return curDevice; }
+	ALCcontext* GetCurrentContext() { return curContext; }
 	int GetFrameSize() const { return frameSize; }
 
 	std::vector<std::string> GetSoundDevices() override;
@@ -95,10 +96,11 @@ private:
 	size_t MakeItemFromDef(const SoundItemNameMap& itemDef);
 	size_t LoadSoundBuffer(const std::string& filename);
 
-private:
+	private:
 	ALCdevice* curDevice = nullptr;
 	ALCcontext* curContext = nullptr;
-	int sdlDeviceID = -1;
+	SDL_AudioDeviceID sdlDeviceID = 0;
+	SDL_AudioStream* sdlAudioStream = nullptr;
 	bool hasAlcSoftLoopBack = false;
 
 	std::string selectedDeviceName = "";
