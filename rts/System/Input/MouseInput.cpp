@@ -45,41 +45,41 @@ IMouseInput::~IMouseInput()
 }
 
 
-bool IMouseInput::HandleSDLMouseEvent(const SDL_Event& event)
-{
-	switch (event.type) {
-		case SDL_EVENT_MOUSE_MOTION: {
-			mousepos = int2(event.motion.x, event.motion.y);
+	bool IMouseInput::HandleSDLMouseEvent(const SDL_Event& event)
+	{
+		switch (event.type) {
+			case SDL_EVENT_MOUSE_MOTION: {
+				mousepos = int2(event.motion.x, event.motion.y);
 
-			if (mouse != nullptr)
-				mouse->MouseMove(mousepos.x, mousepos.y, event.motion.xrel, event.motion.yrel);
+				if (mouse != nullptr)
+					mouse->MouseMove(mousepos.x, mousepos.y, event.motion.xrel, event.motion.yrel);
 
-		} break;
-		case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-			mousepos = int2(event.button.x, event.button.y);
+			} break;
+			case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+				mousepos = int2(event.button.x, event.button.y);
 
-			// suppress if the button is already held via input emulation
-			if (mouse != nullptr && !mouse->IsButtonEmulated(event.button.button))
-				mouse->MousePress(mousepos.x, mousepos.y, event.button.button);
+				// suppress if the button is already held via input emulation
+				if (mouse != nullptr && !mouse->IsButtonEmulated(event.button.button))
+					mouse->MousePress(mousepos.x, mousepos.y, event.button.button);
 
-		} break;
-		case SDL_EVENT_MOUSE_BUTTON_UP: {
-			mousepos = int2(event.button.x, event.button.y);
+			} break;
+			case SDL_EVENT_MOUSE_BUTTON_UP: {
+				mousepos = int2(event.button.x, event.button.y);
 
-			if (mouse != nullptr && !mouse->IsButtonEmulated(event.button.button))
-				mouse->MouseRelease(mousepos.x, mousepos.y, event.button.button);
+				if (mouse != nullptr && !mouse->IsButtonEmulated(event.button.button))
+					mouse->MouseRelease(mousepos.x, mousepos.y, event.button.button);
 
-		} break;
-		case SDL_EVENT_MOUSE_WHEEL: {
-			if (mouse != nullptr)
-				mouse->MouseWheel(event.wheel.y);
+			} break;
+			case SDL_EVENT_MOUSE_WHEEL: {
+				if (mouse != nullptr)
+					mouse->MouseWheel(event.wheel.y);
 
-		} break;
-		case SDL_EVENT_WINDOW_MOUSE_ENTER: {
-			if (mouse != nullptr)
-				mouse->WindowEnter();
-		} break;
-		case SDL_EVENT_WINDOW_MOUSE_LEAVE: {
+			} break;
+			case SDL_EVENT_WINDOW_MOUSE_ENTER: {
+				if (mouse != nullptr)
+					mouse->WindowEnter();
+			} break;
+			case SDL_EVENT_WINDOW_MOUSE_LEAVE: {
 			// mouse left window; set pos internally to view center-pixel to prevent endless scrolling
 			mousepos = {
 				globalRendering->viewPosX          + (globalRendering->viewSizeX >> 1),

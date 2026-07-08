@@ -3,6 +3,7 @@
 #include "SelectMenu.h"
 
 #include <SDL3/SDL_keycode.h>
+#include <SDL3/SDL_mouse.h>
 #include <functional>
 #include <sstream>
 #include <stack>
@@ -17,7 +18,6 @@
 #include "Rendering/GL/myGL.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/Exceptions.h"
-#include "System/Log/ILog.h"
 #include "System/StringUtil.h"
 #include "System/Input/InputHandler.h"
 #include "System/FileSystem/ArchiveScanner.h"

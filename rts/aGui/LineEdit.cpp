@@ -85,7 +85,7 @@ bool LineEdit::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
 		case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-			if (MouseOver(ev.button.x, ev.button.y)) {
+			if (MouseOver(int(ev.button.x), int(ev.button.y))) {
 				hasFocus = true;
 			} else {
 				hasFocus = false;
