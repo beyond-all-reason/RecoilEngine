@@ -422,6 +422,35 @@ bool SDL_ResumeAudioDevice(SDL_AudioDeviceID devid) {
 	return true;
 }
 
+SDL_AudioDeviceID* SDL_GetAudioPlaybackDevices(int *count) {
+	if (count)
+		*count = 0;
+	return NULL;
+}
+
+const char* SDL_GetAudioDeviceName(SDL_AudioDeviceID devid) {
+	return NULL;
+}
+
+SDL_AudioStream* SDL_OpenAudioDeviceStream(SDL_AudioDeviceID devid, const SDL_AudioSpec* spec, SDL_AudioStreamCallback callback, void* userdata) {
+	return NULL;
+}
+
+void SDL_DestroyAudioStream(SDL_AudioStream *stream) {
+}
+
+SDL_AudioDeviceID SDL_GetAudioStreamDevice(SDL_AudioStream *stream) {
+	return 0;
+}
+
+bool SDL_GetAudioStreamFormat(SDL_AudioStream *stream, SDL_AudioSpec *src_spec, SDL_AudioSpec *dst_spec) {
+	return false;
+}
+
+bool SDL_PutAudioStreamData(SDL_AudioStream *stream, const void* buf, int len) {
+	return true;
+}
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
