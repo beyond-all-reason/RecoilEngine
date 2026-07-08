@@ -5,9 +5,7 @@
 
 --- 
 # Found bugs needing fixing:
-- [ ] | B3 | Toggle back to windowed from fullscreen | Returns to windowed mode at correct size | NO: switch to windowed from fullscreen needs to be toggled twice from options menu, to two different resolutions in order for it to take effect |
-- [ ] There is no audio at all
-- [ ] The upstream RMLUI module needs some changes for all this to work, better find a different solution than this one. 
+- [ ] | B3 | Toggle back to windowed from fullscreen | Returns to windowed mode at correct size | NO: switch to windowed from fullscreen needs to be toggled twice from options menu, to two different resolutions in order for it to take effect 
 - [ ] Need to test RMLUI altogether anyway
 
 ---
