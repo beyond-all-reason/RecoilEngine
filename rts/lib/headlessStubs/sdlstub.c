@@ -283,6 +283,64 @@ SDL_Joystick* SDL_OpenJoystick(SDL_JoystickID joystick) {
 void SDL_CloseJoystick(SDL_Joystick* joystick) {
 }
 
+SDL_JoystickID SDL_GetJoystickID(SDL_Joystick* joystick) {
+	return 0;
+}
+
+bool SDL_IsGamepad(SDL_JoystickID joystickId) {
+	return false;
+}
+
+SDL_Gamepad *SDL_OpenGamepad(SDL_JoystickID joystickId) {
+	return NULL;
+}
+
+void SDL_CloseGamepad(SDL_Gamepad *gamepad) {
+}
+
+const char *SDL_GetGamepadName(SDL_Gamepad *gamepad) {
+	return "";
+}
+
+SDL_Joystick *SDL_GetGamepadJoystick(SDL_Gamepad *gamepad) {
+	return NULL;
+}
+
+bool SDL_GamepadHasButton(SDL_Gamepad *gamepad,
+														 SDL_GamepadButton button) {
+	return false;
+}
+
+bool SDL_GamepadHasAxis(SDL_Gamepad *gamepad, SDL_GamepadAxis axis) {
+	return false;
+}
+
+bool SDL_GetGamepadButton(SDL_Gamepad *gamepad,
+															  SDL_GamepadButton button) {
+	return false;
+}
+
+Sint16 SDL_GetGamepadAxis(SDL_Gamepad *gamepad, SDL_GamepadAxis axis) {
+	return 0;
+}
+
+const char* SDL_GetGamepadStringForAxis(SDL_GamepadAxis axis) {
+	return "";
+}
+
+const char* SDL_GetGamepadStringForButton(SDL_GamepadButton button) {
+	return "";
+}
+
+char *SDL_GetGamepadMapping(SDL_Gamepad *gamepad) {
+	static char empty[] = "";
+	return empty;
+}
+
+SDL_Gamepad *SDL_GetGamepadFromID(SDL_JoystickID joyid) {
+	return NULL;
+}
+
 const SDL_DisplayMode* SDL_GetCurrentDisplayMode(SDL_DisplayID displayID) {
 	static SDL_DisplayMode stubMode = {0};
 	stubMode.format = SDL_PIXELFORMAT_RGB24;

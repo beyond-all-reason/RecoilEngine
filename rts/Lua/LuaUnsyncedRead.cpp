@@ -8,6 +8,16 @@
 #include "LuaHashString.h"
 #include "LuaUtils.h"
 #include "LuaRules.h"
+
+#ifdef camera
+#undef camera
+#endif
+#include <SDL3/SDL_clipboard.h>
+#include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_keycode.h>
+#include <SDL3/SDL_mouse.h>
+
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
 #include "Game/Game.h"
@@ -67,6 +77,13 @@
 #include "System/Config/ConfigHandler.h"
 #include "System/Config/ConfigVariable.h"
 #include "System/Input/KeyInput.h"
+
+#ifdef camera
+#undef camera
+#endif
+#include "System/Input/ControllerInput.h"
+#define camera (CCamera::GetActive())
+
 #include "System/LoadSave/DemoReader.h"
 #include "System/LoadSave/DemoRecorder.h"
 #include "System/Log/DefaultFilter.h"
@@ -86,11 +103,6 @@
 
 #include <cctype>
 #include <algorithm>
-
-#include <SDL3/SDL_keyboard.h>
-#include <SDL3/SDL_clipboard.h>
-#include <SDL3/SDL_keycode.h>
-#include <SDL3/SDL_mouse.h>
 
 
 /******************************************************************************
@@ -252,6 +264,9 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetMouseState);
 	REGISTER_LUA_CFUNC(GetMouseCursor);
 	REGISTER_LUA_CFUNC(GetMouseStartPosition);
+
+	REGISTER_LUA_CFUNC(GetControllerState);
+	REGISTER_LUA_CFUNC(GetAvailableControllers);
 
 	REGISTER_LUA_CFUNC(GetKeyFromScanSymbol);
 	REGISTER_LUA_CFUNC(GetKeyState);
@@ -3938,6 +3953,96 @@ int LuaUnsyncedRead::GetMouseStartPosition(lua_State* L)
 	lua_pushnumber(L, bp.dir.y);
 	lua_pushnumber(L, bp.dir.z);
 	return 8;
+}
+
+/*** Get the current state of a game controller
+ *
+ * @function Spring.GetControllerState
+ * @param instanceId number
+ * @return table? {axis={...}, buttons={...}}
+ */
+int LuaUnsyncedRead::GetControllerState(lua_State* L)
+{
+	const int instanceId = luaL_checkint(L, 1);
+
+	if (instanceId < 0) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	SDL_Gamepad* gamepad = SDL_GetGamepadFromID(instanceId);
+
+	if (gamepad == nullptr) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	lua_newtable(L);
+		// axis
+		lua_pushliteral(L, "axis");
+		lua_newtable(L);
+			for (int i = 0; i < SDL_GAMEPAD_AXIS_COUNT; ++i) {
+				SDL_GamepadAxis axis = (SDL_GamepadAxis)i;
+
+				if (!SDL_GamepadHasAxis(gamepad, axis))
+					continue;
+
+				LuaPushNamedNumber(L, std::string(SDL_GetGamepadStringForAxis(axis)), SDL_GetGamepadAxis(gamepad, axis));
+			}
+		lua_rawset(L, -3);
+
+		// buttons
+		lua_pushliteral(L, "buttons");
+		lua_newtable(L);
+			for (int i = 0; i < SDL_GAMEPAD_BUTTON_COUNT; ++i) {
+				SDL_GamepadButton button = (SDL_GamepadButton)i;
+
+				if (!SDL_GamepadHasButton(gamepad, button))
+					continue;
+
+				LuaPushNamedNumber(L, std::string(SDL_GetGamepadStringForButton(button)), SDL_GetGamepadButton(gamepad, button));
+			}
+		lua_rawset(L, -3);
+
+	return 1;
+}
+
+/*** Get the list of available game controllers
+ *
+ * @function Spring.GetAvailableControllers
+ * @return table {deviceIndex, {name=..., instanceId=...}}
+ */
+int LuaUnsyncedRead::GetAvailableControllers(lua_State* L)
+{
+	int joystickCount = 0;
+	SDL_JoystickID* joysticks = SDL_GetJoysticks(&joystickCount);
+
+	lua_newtable(L);
+	{
+		int idx = 1;
+		for (int j = 0; j < joystickCount; ++j) {
+			SDL_JoystickID joystickId = joysticks[j];
+
+			if (!SDL_IsGamepad(joystickId))
+				continue;
+
+			lua_pushnumber(L, idx++);
+			lua_newtable(L);
+			{
+				const char* name = "";
+				SDL_Joystick* joystick = SDL_OpenJoystick(joystickId);
+				if (joystick != nullptr) {
+					name = SDL_GetJoystickName(joystick);
+					SDL_CloseJoystick(joystick);
+				}
+				LuaPushNamedString(L, "name", std::string(name));
+				LuaPushNamedNumber(L, "instanceId", joystickId);
+			}
+			lua_rawset(L, -3);
+		}
+	}
+
+	return 1;
 }
 
 
