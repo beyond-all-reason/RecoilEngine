@@ -5,7 +5,6 @@
 
 --- 
 # Found bugs needing fixing:
-- [ ] During the initial builtin game menu screen, there is no mouse available
 - [ ] | B3 | Toggle back to windowed from fullscreen | Returns to windowed mode at correct size | NO: switch to windowed from fullscreen needs to be toggled twice from options menu, to two different resolutions in order for it to take effect |
 - [ ] There is no audio at all
 - [ ] The upstream RMLUI module needs some changes for all this to work, better find a different solution than this one. 
@@ -114,7 +113,7 @@
 | G8 | IME input (CJK, if available) | Composition window appears, characters commit correctly | ☐ |
 | G9 | Text input in chat box | Characters appear as typed | ☐ |
 | G10 | Text input in console | Characters appear, commands work | ☐ |
-| G11 | Text input in UI edit fields (aGui) | LineEdit widgets accept input | ☐ |
+| G11 | Text input in UI edit fields (aGui) | LineEdit widgets accept input | ok |
 | G12 | Text input in RmlUi elements | UI text fields accept input | ☐ |
 
 ## H. Mouse Input
@@ -244,12 +243,12 @@
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| P1 | aGui buttons | Clickable, hover state works | ☐ |
-| P2 | aGui windows | Draggable, resizable, closable | ☐ |
-| P3 | aGui line edits | Text input works | ☐ |
-| P4 | aGui list boxes | Scrollable, selectable | ☐ |
-| P5 | `SDL_GetMouseState` with `float*` | List mouse picking uses float coords | ☐ |
-| P6 | `ev.motion.buttons` | Button state in motion events | ☐ |
+| P1 | aGui buttons | Clickable, hover state works | ok |
+| P2 | aGui windows | Draggable, resizable, closable | ok  |
+| P3 | aGui line edits | Text input works | ok |
+| P4 | aGui list boxes | Scrollable, selectable | ok |
+| P5 | `SDL_GetMouseState` with `float*` | List mouse picking uses float coords | ok |
+| P6 | `ev.motion.buttons` | Button state in motion events | ok |
 | P7 | `SDL_BUTTON_MASK(x)` macro | Button masks work correctly | ☐ |
 
 ## Q. GL Context

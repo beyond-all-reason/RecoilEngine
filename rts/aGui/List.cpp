@@ -297,10 +297,12 @@ bool List::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
 		case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-			hasFocus = gui->MouseOverElement(GetRoot(), ev.button.x, ev.button.y);
-			if(MouseOver(ev.button.x, ev.button.y)) {
+			int mx = int(ev.button.x);
+			int my = int(ev.button.y);
+			hasFocus = gui->MouseOverElement(GetRoot(), mx, my);
+			if(MouseOver(mx, my)) {
 				if(hasFocus) {
-					MousePress(ev.button.x, ev.button.y, ev.button.button);
+					MousePress(mx, my, ev.button.button);
 					return true;
 				}
 			}
@@ -309,9 +311,9 @@ bool List::HandleEventSelf(const SDL_Event& ev)
 		case SDL_EVENT_MOUSE_BUTTON_UP: {
 			if (!hasFocus)
 				break;
-			if (MouseOver(ev.button.x, ev.button.y) || activeScrollbar)
+			if (MouseOver(int(ev.button.x), int(ev.button.y)) || activeScrollbar)
 			{
-				MouseRelease(ev.button.x, ev.button.y, ev.button.button);
+				MouseRelease(int(ev.button.x), int(ev.button.y), ev.button.button);
 				return true;
 			}
 			break;
@@ -319,7 +321,7 @@ bool List::HandleEventSelf(const SDL_Event& ev)
 		case SDL_EVENT_MOUSE_WHEEL: {
 			float mousex, mousey;
 			SDL_GetMouseState(&mousex, &mousey);
-			if(hasFocus && MouseOver(mousex, mousey)) {
+			if(hasFocus && MouseOver(int(mousex), int(mousey))) {
 				if (ev.wheel.y > 0) {
 					ScrollUpOne();
 				} else {
@@ -331,9 +333,11 @@ bool List::HandleEventSelf(const SDL_Event& ev)
 		case SDL_EVENT_MOUSE_MOTION: {
 			if (!hasFocus)
 				break;
-			if (MouseOver(ev.motion.x, ev.motion.y) || activeScrollbar)
+			int mx = int(ev.motion.x);
+			int my = int(ev.motion.y);
+			if (MouseOver(mx, my) || activeScrollbar)
 			{
-				MouseMove(ev.motion.x, ev.motion.y, ev.motion.xrel, ev.motion.yrel, 0);
+				MouseMove(mx, my, int(ev.motion.xrel), int(ev.motion.yrel), 0);
 				return true;
 			}
 			break;

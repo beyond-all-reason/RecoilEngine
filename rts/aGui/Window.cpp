@@ -73,9 +73,11 @@ bool Window::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
 		case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-			if (MouseOver(ev.button.x, ev.button.y))
+			int mx = int(ev.button.x);
+			int my = int(ev.button.y);
+			if (MouseOver(mx, my))
 			{
-				float mouse[2] = {PixelToGlX(ev.button.x), PixelToGlY(ev.button.y)};
+				float mouse[2] = {PixelToGlX(mx), PixelToGlY(my)};
 				if (mouse[1] > pos[1]+size[1]-titleHeight)
 				{
 					dragPos[0] = mouse[0] - pos[0];
@@ -97,7 +99,7 @@ bool Window::HandleEventSelf(const SDL_Event& ev)
 		case SDL_EVENT_MOUSE_MOTION: {
 			if (dragging)
 			{
-				Move(PixelToGlX(ev.motion.xrel), PixelToGlY(ev.motion.yrel)-1);
+				Move(PixelToGlX(int(ev.motion.xrel)), PixelToGlY(int(ev.motion.yrel))-1);
 				return true;
 			}
 			break;
