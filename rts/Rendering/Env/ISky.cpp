@@ -94,27 +94,6 @@ void ISky::SetSky()
 		sky = std::make_unique<CNullSky>();
 	}
 }
-
-void ISky::SetSkyLuaTexture(const MapTextureData& td)
-{
-	if (sky == nullptr)
-		return;
-
-	if (td.id != 0u && dynamic_cast<CSkyBox*>(sky.get()) == nullptr) {
-		auto luaSky = std::make_unique<CSkyBox>(td.id, td.size.x, td.size.y);
-
-		if (luaSky->IsValid()) {
-			sky = std::move(luaSky);
-			return;
-		}
-
-		LOG_L(L_WARNING, "[ISky::%s] failed to create SkyBox from Lua texture (%u), keeping current sky", __func__, td.id);
-		return;
-	}
-
-	sky->SetLuaTexture(td);
-}
-
 void ISky::SetSkyAxisAngle(const float4& skyAxisAngleRaw)
 {
 	auto axis = float3{ skyAxisAngleRaw.x, skyAxisAngleRaw.y, skyAxisAngleRaw.z };
