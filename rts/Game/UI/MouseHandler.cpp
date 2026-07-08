@@ -93,7 +93,7 @@ CMouseHandler::CMouseHandler()
 
 	UpdateCursorCameraDir();
 
-#ifndef SDL_PLATFORM_APPLE
+#ifndef __APPLE__
 	hardwareCursor = configHandler->GetBool("HardwareCursor");
 #endif
 

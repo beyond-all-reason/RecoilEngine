@@ -1,6 +1,6 @@
 #include "glxHandler.h"
 
-#if !defined(HEADLESS) && !defined(_WIN32) && !defined(SDL_PLATFORM_APPLE)
+#if !defined(HEADLESS) && !defined(_WIN32) && !defined(__APPLE__)
 
 #include <SDL3/SDL_video.h>
 #include <glad/glad_glx.h>

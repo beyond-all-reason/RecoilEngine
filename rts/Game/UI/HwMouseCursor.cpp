@@ -4,7 +4,7 @@
 #include "System/TypeToStr.h"
 #include "Rendering/GlobalRendering.h"
 
-#if defined(SDL_PLATFORM_APPLE) || defined(HEADLESS)
+#if defined(__APPLE__) || defined(HEADLESS)
 	// FIXME: no hardware cursor support for macs
 #elif defined(_WIN32)
 	#include <windows.h>
@@ -16,7 +16,7 @@
 
 #include "HwMouseCursor.h"
 
-#if !defined(SDL_PLATFORM_APPLE) && !defined(HEADLESS)
+#if !defined(__APPLE__) && !defined(HEADLESS)
 
 #include "System/Log/ILog.h"
 #include "System/SpringMath.h"
@@ -37,7 +37,7 @@
 // Platform dependent classes
 //////////////////////////////////////////////////////////////////////
 
-#if defined(SDL_PLATFORM_APPLE) || defined(HEADLESS)
+#if defined(__APPLE__) || defined(HEADLESS)
 class HardwareCursorApple: public IHardwareCursor {
 public:
 	void PushImage(int xsize, int ysize, const void* mem) override {}
@@ -200,7 +200,7 @@ private:
 #endif
 
 IHardwareCursor* IHardwareCursor::Alloc(void* mem) {
-#if defined(SDL_PLATFORM_APPLE) || defined(HEADLESS)
+#if defined(__APPLE__) || defined(HEADLESS)
 	static_assert(sizeof(HardwareCursorApple  ) <= CMouseCursor::HWC_MEM_SIZE, "");
 	return (new (mem) HardwareCursorApple());
 #elif defined (_WIN32)
@@ -237,7 +237,7 @@ void IHardwareCursor::Free(IHardwareCursor* hwc) {
 //////////////////////////////////////////////////////////////////////
 
 
-#if defined(SDL_PLATFORM_APPLE) || defined(HEADLESS)
+#if defined(__APPLE__) || defined(HEADLESS)
 
 
 #elif defined(_WIN32)
