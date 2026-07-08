@@ -26,7 +26,6 @@ CBlankMapGenerator::CBlankMapGenerator(const CGameSetup* setup)
 	: setup(setup)
 	, mapSize(1, 1)
 	, mapHeight(50)
-	, mapSkyBox("")
 	, mapColor{.r = 0x00, .g = 0xFF, .b = 0x00, .a = 0xFF }
 {
 	const auto& mapOpts = setup->GetMapOptionsCont();
@@ -80,9 +79,6 @@ CBlankMapGenerator::CBlankMapGenerator(const CGameSetup* setup)
 		} catch (...) { }
 	}
 
-	if (const auto blankMapSkyBox = Recoil::map_try_get(mapOpts, "blank_map_skybox"); blankMapSkyBox != nullptr) {
-		mapSkyBox = *blankMapSkyBox;
-	}
 }
 
 void CBlankMapGenerator::Generate()
@@ -216,12 +212,6 @@ void CBlankMapGenerator::GenerateSMF(CVirtualFile* fileSMF)
 void CBlankMapGenerator::GenerateMapInfo(CVirtualFile* fileMapInfo)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	auto EscapeLuaString = [](std::string str) {
-		str = StringReplace(str, "\\", "\\\\");
-		str = StringReplace(str, "\"", "\\\"");
-		return str;
-	};
-
 	//Open template mapinfo.lua
 	const std::string luaTemplate = "mapgenerator/mapinfo_template.lua";
 	CFileHandler fh(luaTemplate, SPRING_VFS_PWD_ALL);
@@ -243,7 +233,6 @@ void CBlankMapGenerator::GenerateMapInfo(CVirtualFile* fileMapInfo)
 	luaInfo = StringReplace(luaInfo, "${NAME}", setup->mapName);
 	luaInfo = StringReplace(luaInfo, "${DESCRIPTION}", mapDescription);
 	luaInfo = StringReplace(luaInfo, "${START_POSITIONS}", startPosString);
-	luaInfo = StringReplace(luaInfo, "${SKY_BOX}", EscapeLuaString(mapSkyBox));
 
 	//Copy to filebuffer
 	fileMapInfo->buffer.assign(luaInfo.begin(), luaInfo.end());

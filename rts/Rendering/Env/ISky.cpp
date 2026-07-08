@@ -73,13 +73,7 @@ void ISky::SetSky()
 			sky = std::make_unique<CSkyBox>(debugCubeMapTexture.GetId(), dims.x, dims.y);
 		}
 		else if (!mapInfo->atmosphere.skyBox.empty()) {
-			const std::string& skyBoxPath = mapInfo->atmosphere.skyBox;
-			sky = std::make_unique<CSkyBox>(skyBoxPath);
-
-			// Backward compatibility: historically mapinfo skyBox was often resolved under maps/.
-			if (!sky->IsValid() && (skyBoxPath.rfind("maps/", 0) != 0)) {
-				sky = std::make_unique<CSkyBox>("maps/" + skyBoxPath);
-			}
+			sky = std::make_unique<CSkyBox>("maps/" + mapInfo->atmosphere.skyBox);
 		}
 		else {
 			sky = std::make_unique<CModernSky>();
@@ -94,6 +88,27 @@ void ISky::SetSky()
 		sky = std::make_unique<CNullSky>();
 	}
 }
+
+void ISky::SetSkyLuaTexture(const MapTextureData& td)
+{
+	if (sky == nullptr)
+		return;
+
+	if (td.id != 0u && dynamic_cast<CSkyBox*>(sky.get()) == nullptr) {
+		auto luaSky = std::make_unique<CSkyBox>(td.id, td.size.x, td.size.y);
+
+		if (luaSky->IsValid()) {
+			sky = std::move(luaSky);
+			return;
+		}
+
+		LOG_L(L_WARNING, "[ISky::%s] failed to create SkyBox from Lua texture (%u), keeping current sky", __func__, td.id);
+		return;
+	}
+
+	sky->SetLuaTexture(td);
+}
+
 void ISky::SetSkyAxisAngle(const float4& skyAxisAngleRaw)
 {
 	auto axis = float3{ skyAxisAngleRaw.x, skyAxisAngleRaw.y, skyAxisAngleRaw.z };

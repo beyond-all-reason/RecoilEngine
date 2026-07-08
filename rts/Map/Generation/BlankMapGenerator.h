@@ -41,7 +41,6 @@ private:
 	int2 mapSize;
 	int mapHeight;
 	std::string mapDescription;
-	std::string mapSkyBox;
 	std::vector<int2> startPositions;
 
 	MapColor mapColor;
