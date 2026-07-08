@@ -3,50 +3,54 @@
 > Verify all engine features work correctly after the SDL2→SDL3 migration (131 files, +1224/-1148 lines).
 > Each section corresponds to a migration phase. Mark ☑ pass / ☒ fail / ☐ skipped. Document any failures.
 
+--- 
+# Found bugs needing fixing:
+- [ ] During the initial builtin game menu screen, there is no mouse available
+- [ ] | B3 | Toggle back to windowed from fullscreen | Returns to windowed mode at correct size | NO: switch to windowed from fullscreen needs to be toggled twice from options menu, to two different resolutions in order for it to take effect |
 ---
 
 ## A. Window Creation and Display
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| A1 | Launch engine to main menu | Window opens at configured resolution, no crash | ☐ |
-| A2 | Window appears centered on primary display | Window is centered, not at (0,0) | ☐ |
-| A3 | Window title bar shows correct game title | Title matches expected | ☐ |
-| A4 | Window is visible immediately on launch | No hidden window; `SDL_WINDOW_SHOWN` removed in SDL3 | ☐ |
-| A5 | Resize window manually (drag edges) | GL viewport resizes correctly, no black borders or stretching | ☐ |
-| A6 | Resize triggers `SDL_EVENT_WINDOW_RESIZED` | UI layout updates, no frozen rendering | ☐ |
+| A1 | Launch engine to main menu | Window opens at configured resolution, no crash | ok |
+| A2 | Window appears centered on primary display | Window is centered, not at (0,0) | ok |
+| A3 | Window title bar shows correct game title | Title matches expected | ok |
+| A4 | Window is visible immediately on launch | No hidden window; `SDL_WINDOW_SHOWN` removed in SDL3 | ok |
+| A5 | Resize window manually (drag edges) | GL viewport resizes correctly, no black borders or stretching | ok |
+| A6 | Resize triggers `SDL_EVENT_WINDOW_RESIZED` | UI layout updates, no frozen rendering | ok |
 | A7 | Resize triggers `SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED` | GL backbuffer matches pixel size (critical on HiDPI) | ☐ |
-| A8 | Minimize window | Game pauses or continues running without crash | ☐ |
-| A9 | Restore minimized window | Rendering resumes correctly, no black screen | ☐ |
-| A10 | Maximize window | Window fills screen, viewport updates | ☐ |
-| A11 | Restore from maximized | Returns to previous size/position | ☐ |
-| A12 | Close window (X button) | Game exits cleanly, no crash | ☐ |
+| A8 | Minimize window | Game pauses or continues running without crash | ok |
+| A9 | Restore minimized window | Rendering resumes correctly, no black screen | ok |
+| A10 | Maximize window | Window fills screen, viewport updates | ok |
+| A11 | Restore from maximized | Returns to previous size/position | ok |
+| A12 | Close window (X button) | Game exits cleanly, no crash | ok |
 | A13 | `SDL_EVENT_WINDOW_CLOSE_REQUESTED` fires | Graceful shutdown | ☐ |
 
 ## B. Fullscreen Modes
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| B1 | Toggle exclusive fullscreen | Resolution changes, fullscreen activates | ☐ |
-| B2 | Toggle borderless (desktop) fullscreen | Window fills screen, taskbar hidden | ☐ |
-| B3 | Toggle back to windowed from fullscreen | Returns to windowed mode at correct size | ☐ |
-| B4 | Fullscreen toggle via keyboard hotkey | Same as B1-B3 | ☐ |
-| B5 | Fullscreen toggle via Lua (if available) | No crash, mode changes | ☐ |
+| B1 | Toggle exclusive fullscreen | Resolution changes, fullscreen activates | ok |
+| B2 | Toggle borderless (desktop) fullscreen | Window fills screen, taskbar hidden | ok |
+| B3 | Toggle back to windowed from fullscreen | Returns to windowed mode at correct size | NO: switch to windowed needs to be toggled twice |
+| B4 | Fullscreen toggle via keyboard hotkey | Same as B1-B3 | n/a |
+| B5 | Fullscreen toggle via Lua (if available) | No crash, mode changes | ok |
 | B6 | `SDL_SetWindowFullscreen(bool)` async behavior | Mode change applies; no race with render loop | ☐ |
-| B7 | Window border toggle (`SDL_SetWindowBordered`) | Borderless windowed mode works | ☐ |
-| B8 | Fullscreen after window resize | Correct resolution applied | ☐ |
+| B7 | Window border toggle (`SDL_SetWindowBordered`) | Borderless windowed mode works | n/a, I dont think we have borderless windowed  |
+| B8 | Fullscreen after window resize | Correct resolution applied | ok |
 
 ## C. Multi-Monitor
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| C1 | Move window from one display to another | Window renders correctly on second display | ☐ |
-| C2 | `SDL_EVENT_WINDOW_DISPLAY_CHANGED` fires | Engine logs display change (check console/log) | ☐ |
-| C3 | Start fullscreen on secondary display | Fullscreen activates on correct monitor | ☐ |
-| C4 | Displays with different DPI | Each display renders at correct pixel density | ☐ |
-| C5 | `SDL_GetDisplays()` enumeration | All monitors detected (check log output) | ☐ |
-| C6 | `SDL_GetDisplayBounds()` per display | Correct bounds logged for each monitor | ☐ |
-| C7 | Window centered on secondary display | `SDL_WINDOWPOS_CENTERED_DISPLAY()` uses `SDL_DisplayID` | ☐ |
+| C1 | Move window from one display to another | Window renders correctly on second display | ok |
+| C2 | `SDL_EVENT_WINDOW_DISPLAY_CHANGED` fires | Engine logs display change (check console/log) | n/a |
+| C3 | Start fullscreen on secondary display | Fullscreen activates on correct monitor | ok |
+| C4 | Displays with different DPI | Each display renders at correct pixel density | ok |
+| C5 | `SDL_GetDisplays()` enumeration | All monitors detected (check log output) | ok |
+| C6 | `SDL_GetDisplayBounds()` per display | Correct bounds logged for each monitor | ok |
+| C7 | Window centered on secondary display | `SDL_WINDOWPOS_CENTERED_DISPLAY()` uses `SDL_DisplayID` | n/a |
 
 ## D. High-DPI / Retina
 
@@ -62,35 +66,35 @@
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| E1 | VSync ON | Frame rate capped to monitor refresh rate | ☐ |
-| E2 | VSync OFF | Frame rate uncapped, runs at max | ☐ |
-| E3 | Adaptive VSync (if available) | No tearing, graceful handling of missed frames | ☐ |
-| E4 | `SDL_GL_SetSwapInterval` returns bool | No crash on swap interval change | ☐ |
-| E5 | `SDL_GL_GetSwapInterval(int*)` out-param | Correct value reported in console/log | ☐ |
-| E6 | Toggle vsync in-game during gameplay | Smooth transition, no flicker or crash | ☐ |
+| E1 | VSync ON | Frame rate capped to monitor refresh rate | ok |
+| E2 | VSync OFF | Frame rate uncapped, runs at max | ok |
+| E3 | Adaptive VSync (if available) | No tearing, graceful handling of missed frames | cant test on win10, frames were already missing anyway (see jitter timer widget running cube) |
+| E4 | `SDL_GL_SetSwapInterval` returns bool | No crash on swap interval change | ok |
+| E5 | `SDL_GL_GetSwapInterval(int*)` out-param | Correct value reported in console/log | ok |
+| E6 | Toggle vsync in-game during gameplay | Smooth transition, no flicker or crash | ok |
 
 ## F. Keyboard Input
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| F1 | Basic WASD/movement keys | Unit movement responds correctly | ☐ |
-| F2 | Modifier keys (Shift, Ctrl, Alt) | Modifiers work in hotkey combinations | ☐ |
+| F1 | Basic WASD/movement keys | Unit movement responds correctly | ok |
+| F2 | Modifier keys (Shift, Ctrl, Alt) | Modifiers work in hotkey combinations | ok |
 | F3 | Num Lock, Caps Lock, Scroll Lock | State detected correctly (`SDL_KMOD_NUM`, etc.) | ☐ |
-| F4 | All on-screen hotkeys | Every UI hotkey resolves to the same action as pre-SDL3 | ☐ |
-| F5 | In-game console commands | Typing in console works, commands execute | ☐ |
-| F6 | Chat input | Text entry in chat works | ☐ |
-| F7 | Special characters and symbols | All keyboard layouts produce correct characters | ☐ |
+| F4 | All on-screen hotkeys | Every UI hotkey resolves to the same action as pre-SDL3 | ok |
+| F5 | In-game console commands | Typing in console works, commands execute | ok |
+| F6 | Chat input | Text entry in chat works | ok |
+| F7 | Special characters and symbols | All keyboard layouts produce correct characters | ok |
 | F8 | Non-US keyboard layout (if available) | Keys map correctly for non-US layouts | ☐ |
-| F9 | `SDL_GetKeyboardState()` returns `const bool*` | Key state queries work (e.g., edge scroll while holding key) | ☐ |
-| F10 | Key repeat (held keys) | Held keys repeat at expected rate | ☐ |
+| F9 | `SDL_GetKeyboardState()` returns `const bool*` | Key state queries work (e.g., edge scroll while holding key) | ok |
+| F10 | Key repeat (held keys) | Held keys repeat at expected rate | ok |
 | F11 | `SDL_SetKeyRepeat` works | Key repeat can be toggled on/off | ☐ |
-| F12 | Key up/down events | Both press and release detected | ☐ |
+| F12 | Key up/down events | Both press and release detected | ok |
 | F13 | `SDL_EVENT_KEY_DOWN` / `SDL_EVENT_KEY_UP` | Events fire in event loop | ☐ |
 | F14 | `SDL_EVENT_KEYMAP_CHANGED` | Keyboard layout change detected (if applicable) | ☐ |
-| F15 | Lua keycode compatibility | Widgets/gadgets receive same keycode values as SDL2 | ☐ |
+| F15 | Lua keycode compatibility | Widgets/gadgets receive same keycode values as SDL2 | ok |
 | F16 | `event.key.key` and `event.key.scancode` fields | Direct field access works (no `event.key.keysym`) | ☐ |
 | F17 | `event.key.down` (bool) | Button state is bool, not `SDL_PRESSED`/`SDL_RELEASED` | ☐ |
-| F18 | `SDL_GetModState()` / `SDL_SetModState()` | Modifier state preserved across focus loss | ☐ |
+| F18 | `SDL_GetModState()` / `SDL_SetModState()` | Modifier state preserved across focus loss | ok |
 
 ## G. Text Input and IME
 
@@ -113,9 +117,9 @@
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| H1 | Left mouse button | Unit selection, command issuance | ☐ |
-| H2 | Right mouse button | Movement commands, context menus | ☐ |
-| H3 | Middle mouse button (scroll) | Expected behavior (camera pan, zoom) | ☐ |
+| H1 | Left mouse button | Unit selection, command issuance | ok |
+| H2 | Right mouse button | Movement commands, context menus | ok |
+| H3 | Middle mouse button (scroll) | Expected behavior (camera pan, zoom) | ok |
 | H4 | Mouse button 4/5 (side buttons) | Bound actions execute | ☐ |
 | H5 | `SDL_EVENT_MOUSE_BUTTON_DOWN` / `UP` | Both events fire correctly | ☐ |
 | H6 | `event.button.down` (bool) | State is bool, not `SDL_PRESSED`/`SDL_RELEASED` | ☐ |
@@ -126,8 +130,8 @@
 | H11 | `event.wheel.x/y` (float) | Precise scroll amounts received | ☐ |
 | H12 | `SDL_GetMouseState()` returns `float*` | Mouse coordinates as float | ☐ |
 | H13 | `SDL_GetGlobalMouseState()` returns `float*` | Global coordinates as float | ☐ |
-| H14 | Mouse wheel zoom | Zoom in/out works smoothly | ☐ |
-| H15 | Edge scroll (hold key + move to edge) | Camera pans at screen edge | ☐ |
+| H14 | Mouse wheel zoom | Zoom in/out works smoothly | ok |
+| H15 | Edge scroll (hold key + move to edge) | Camera pans at screen edge | ok |
 | H16 | `SDL_PeepEvents` with `SDL_EVENT_MOUSE_MOTION` | Event flushing works | ☐ |
 | H17 | `SDL_FlushEvent(SDL_EVENT_MOUSE_MOTION)` | Pending motion events cleared | ☐ |
 
@@ -135,42 +139,42 @@
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| I1 | Hardware cursor visible in menu | Custom cursor renders | ☐ |
-| I2 | `SDL_ShowCursor()` / `SDL_HideCursor()` | Cursor can be shown/hidden | ☐ |
+| I1 | Hardware cursor visible in menu | Custom cursor renders | NOPE not in menu |
+| I2 | `SDL_ShowCursor()` / `SDL_HideCursor()` | Cursor can be shown/hidden | Does not hide on cinematic mode, but also does not show cursor on screenshot |
 | I3 | `SDL_CursorVisible()` | Returns correct visibility state | ☐ |
-| I4 | Cursor hidden during gameplay | No OS cursor visible | ☐ |
-| I5 | Custom cursor image loads | Cursor bitmap renders correctly | ☐ |
-| I6 | `SDL_CreateSurface` for cursor | Surface creation with `SDL_PIXELFORMAT_ABGR8888` works | ☐ |
-| I7 | `SDL_CreateColorCursor` | Color cursor created from surface | ☐ |
-| I8 | `SDL_DestroyCursor` | Cursor freed without crash | ☐ |
-| I9 | Mouse warp (`SDL_WarpMouseInWindow`) | Cursor repositioning works | ☐ |
-| I10 | Relative mouse mode (`SDL_SetWindowRelativeMouseMode`) | Cursor clamped to window, relative motion works | ☐ |
-| I11 | Exit relative mouse mode | Cursor free again | ☐ |
+| I4 | Cursor hidden during gameplay | No OS cursor visible | ok |
+| I5 | Custom cursor image loads | Cursor bitmap renders correctly | ok |
+| I6 | `SDL_CreateSurface` for cursor | Surface creation with `SDL_PIXELFORMAT_ABGR8888` works | i guess yeah |
+| I7 | `SDL_CreateColorCursor` | Color cursor created from surface | n/a |
+| I8 | `SDL_DestroyCursor` | Cursor freed without crash | probably ok because resizing cursor works |
+| I9 | Mouse warp (`SDL_WarpMouseInWindow`) | Cursor repositioning works | very interesting, needs confirmation/lua hooks |
+| I10 | Relative mouse mode (`SDL_SetWindowRelativeMouseMode`) | Cursor clamped to window, relative motion works | ok |
+| I11 | Exit relative mouse mode | Cursor free again | ok |
 | I12 | Cursor show/hide during video playback | `AviVideoCapturing` cursor toggle works | ☐ |
 
 ## J. Clipboard
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| J1 | Copy text in-game console | Text copied to system clipboard | ☐ |
-| J2 | Paste text into console | `SDL_GetClipboardText()` returns pasted text | ☐ |
+| J1 | Copy text in-game console | Text copied to system clipboard | ok |
+| J2 | Paste text into console | `SDL_GetClipboardText()` returns pasted text | ok |
 | J3 | `SDL_SetClipboardText` | Returns `bool`, text set on clipboard | ☐ |
 | J4 | `SDL_HasClipboardText` | Returns correct state | ☐ |
 | J5 | `SDL_free()` on clipboard text | No memory leak, no crash | ☐ |
-| J6 | Clipboard via Lua (`LuaUnsyncedCtrl`) | Lua copy/paste functions work | ☐ |
+| J6 | Clipboard via Lua (`LuaUnsyncedCtrl`) | Lua copy/paste functions work | probably yeah because chat widget works with copy/paste |
 | J7 | Copy/paste coordinates in chat | Full round-trip works | ☐ |
 
 ## K. Focus Handling
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| K1 | Click outside game window | `SDL_EVENT_WINDOW_FOCUS_LOST` fires | ☐ |
-| K2 | Click back into game window | `SDL_EVENT_WINDOW_FOCUS_GAINED` fires | ☐ |
-| K3 | Input stops when window unfocused | No phantom key presses | ☐ |
-| K4 | Input resumes when window focused | Input works immediately | ☐ |
+| K1 | Click outside game window | `SDL_EVENT_WINDOW_FOCUS_LOST` fires | probably needs a lua hook |
+| K2 | Click back into game window | `SDL_EVENT_WINDOW_FOCUS_GAINED` fires | probably needs a lua hook |
+| K3 | Input stops when window unfocused | No phantom key presses | ok |
+| K4 | Input resumes when window focused | Input works immediately | ok |
 | K5 | `SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS` | Window behavior on focus loss is correct | ☐ |
-| K6 | Alt-Tab away and back | Game restores correctly | ☐ |
-| K7 | Window grab (`SDL_SetWindowMouseGrab`) | Mouse confined to window when grabbed | ☐ |
+| K6 | Alt-Tab away and back | Game restores correctly | ok |
+| K7 | Window grab (`SDL_SetWindowMouseGrab`) | Mouse confined to window when grabbed | ok |
 | K8 | `SDL_GetWindowMouseGrab` | Returns correct grab state | ☐ |
 | K9 | Keyboard grab (`SDL_SetWindowKeyboardGrab`) | Keyboard confined when grabbed | ☐ |
 
@@ -178,20 +182,20 @@
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| L1 | Dolly camera | Zoom and pan work | ☐ |
-| L2 | Free camera | Free movement works | ☐ |
-| L3 | Overhead camera | Standard RTS camera controls | ☐ |
-| L4 | Spring camera | Spring-style camera behavior | ☐ |
-| L5 | FPS unit camera | First-person view works | ☐ |
-| L6 | Camera key bindings | All camera hotkeys resolve correctly | ☐ |
-| L7 | Mouse-based camera rotation | Smooth rotation, no jumps | ☐ |
+| L1 | Dolly camera | Zoom and pan work | ok |
+| L2 | Free camera | Free movement works | ok |
+| L3 | Overhead camera | Standard RTS camera controls | ok |
+| L4 | Spring camera | Spring-style camera behavior | ok |
+| L5 | FPS unit camera | First-person view works | ok |
+| L6 | Camera key bindings | All camera hotkeys resolve correctly | ok |
+| L7 | Mouse-based camera rotation | Smooth rotation, no jumps | ok |
 
 ## M. Audio
 
 | # | Test | Expected | Status |
 |---|------|----------|--------|
-| M1 | Audio device detected at startup | Sound system initializes, no errors in log | ☐ |
-| M2 | Game sounds play | Explosion, unit, and UI sounds audible | ☐ |
+| M1 | Audio device detected at startup | Sound system initializes, no errors in log | ok |
+| M2 | Game sounds play | Explosion, unit, and UI sounds audible | NOPE |
 | M3 | `SDL_OpenAudioDevice` with SDL3 signature | Device opens with `SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK` | ☐ |
 | M4 | `SDL_GetAudioDeviceFormat` | Format query succeeds | ☐ |
 | M5 | `SDL_PauseAudioDevice(deviceID)` single arg | Audio pauses without crash | ☐ |
