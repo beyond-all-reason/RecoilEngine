@@ -35,6 +35,8 @@ public:
 	static constexpr unsigned headerSize = 5;
 	std::int32_t chunkNumber;
 	std::uint8_t chunkSize;
+	spring_time lastSendTime;
+	unsigned int sendCount = 0;
 	std::vector<std::uint8_t> data;
 };
 typedef std::shared_ptr<Chunk> ChunkPtr;
@@ -150,6 +152,9 @@ private:
 	void AckChunks(int lastAck);
 
 	void RequestResend(ChunkPtr ptr, bool noSort);
+	spring_time GetResendTimeout() const;
+	void MarkPacketChunksSent(Packet& pkt, const spring_time& sendTime);
+	void UpdateRttEstimate(const Chunk& chunk, const spring_time& ackTime);
 	void SendPacket(Packet& pkt);
 
 	void UpdateWaitingPackets();
@@ -179,9 +184,12 @@ private:
 	bool resend;
 	bool sharedSocket;
 	bool logMessages;
+	bool hasRttEstimate;
 
 	int netLossFactor;
 	int reconnectTime;
+	float smoothedRttMs;
+	float rttVariationMs;
 
 	/// outgoing stuff (pure data without header) waiting to be sent
 	std::deque< std::shared_ptr<const RawPacket> > outgoingData;
@@ -261,9 +269,9 @@ private:
 	};
 
 	BandwidthUsage outgoing;
+	BandwidthUsage outgoingReliability;
 };
 
 } // namespace netcode
 
 #endif // _UDP_CONNECTION_H
-

@@ -12,6 +12,31 @@ CONFIG(int, NetworkLossFactor)
 	.minimumValue(netcode::UDPConnection::MIN_LOSS_FACTOR)
 	.maximumValue(netcode::UDPConnection::MAX_LOSS_FACTOR);
 
+CONFIG(int, NetworkChunkRate)
+	.defaultValue(30)
+	.minimumValue(1)
+	.maximumValue(1000)
+	.description("Maximum rate at which queued protocol messages are turned into reliable UDP chunks.");
+
+CONFIG(bool, NetworkLowLatency)
+	.defaultValue(true)
+	.description("Flush queued protocol messages as soon as the network chunk rate allows, instead of waiting for small-packet batching thresholds.");
+
+CONFIG(int, NetworkResendTimeoutMin)
+	.defaultValue(50)
+	.minimumValue(1)
+	.description("Minimum adaptive network retransmit timeout in milliseconds.");
+
+CONFIG(int, NetworkResendTimeoutMax)
+	.defaultValue(500)
+	.minimumValue(1)
+	.description("Maximum adaptive network retransmit timeout in milliseconds.");
+
+CONFIG(int, NetworkGapNakDelay)
+	.defaultValue(15)
+	.minimumValue(1)
+	.description("Minimum delay in milliseconds before explicitly requesting missing chunks after later chunks have arrived.");
+
 CONFIG(int, InitialNetworkTimeout)
 	.defaultValue(30)
 	.minimumValue(10).description("Time to wait for the initial connection to the game server.");
@@ -38,6 +63,11 @@ CONFIG(int, LinkOutgoingBandwidth)
 	.defaultValue(64 * 1024)
 	.minimumValue(0);
 
+CONFIG(int, LinkOutgoingReliabilityBandwidth)
+	.defaultValue(4 * 1024)
+	.minimumValue(0)
+	.description("Maximum outgoing bandwidth for ACK/NAK-only UDP packets in bytes, per user.");
+
 CONFIG(int, LinkIncomingSustainedBandwidth)
 	.defaultValue(2 * 1024)
 	.minimumValue(0);
@@ -63,6 +93,17 @@ CONFIG(int, TeamHighlight)
 
 CONFIG(bool, UseNetMessageSmoothingBuffer).defaultValue(true).description("Buffer network packets for a few frames in an attempt to reduce lag from packet time variance. Introduces a fixed lag.");
 
+CONFIG(int, NetMessageTargetBufferedFrames)
+	.defaultValue(2)
+	.minimumValue(0)
+	.description("Number of sim-frame messages the smoothing buffer tries to keep queued.");
+
+CONFIG(float, NetMessageCatchupAggression)
+	.defaultValue(0.1f)
+	.minimumValue(0.0f)
+	.maximumValue(1.0f)
+	.description("Fraction used to trust newly observed queue growth in the smoothing buffer.");
+
 CONFIG(bool, LuaWritableConfigFile).defaultValue(true);
 CONFIG(bool, VFSCacheArchiveFiles).defaultValue(true);
 
@@ -78,16 +119,25 @@ void GlobalConfig::Init()
 	// Recommended semantics for "expert" type config values:
 	// <0 = disable (if applicable)
 	networkLossFactor = configHandler->GetInt("NetworkLossFactor");
+	networkChunkRate = configHandler->GetInt("NetworkChunkRate");
+	networkLowLatency = configHandler->GetBool("NetworkLowLatency");
+	networkResendTimeoutMin = configHandler->GetInt("NetworkResendTimeoutMin");
+	networkResendTimeoutMax = configHandler->GetInt("NetworkResendTimeoutMax");
+	networkGapNakDelay = configHandler->GetInt("NetworkGapNakDelay");
 	initialNetworkTimeout = configHandler->GetInt("InitialNetworkTimeout");
 	networkTimeout = configHandler->GetInt("NetworkTimeout");
 	reconnectTimeout = configHandler->GetInt("ReconnectTimeout");
 	mtu = configHandler->GetInt("MaximumTransmissionUnit");
 
 	linkOutgoingBandwidth = configHandler->GetInt("LinkOutgoingBandwidth");
+	linkOutgoingReliabilityBandwidth = configHandler->GetInt("LinkOutgoingReliabilityBandwidth");
 	linkIncomingSustainedBandwidth = configHandler->GetInt("LinkIncomingSustainedBandwidth");
 	linkIncomingPeakBandwidth = configHandler->GetInt("LinkIncomingPeakBandwidth");
 	linkIncomingMaxPacketRate = configHandler->GetInt("LinkIncomingMaxPacketRate");
 	linkIncomingMaxWaitingPackets = configHandler->GetInt("LinkIncomingMaxWaitingPackets");
+
+	if (networkResendTimeoutMax < networkResendTimeoutMin)
+		networkResendTimeoutMax = networkResendTimeoutMin;
 
 	if (linkIncomingSustainedBandwidth > 0 && linkIncomingPeakBandwidth < linkIncomingSustainedBandwidth)
 		linkIncomingPeakBandwidth = linkIncomingSustainedBandwidth;
@@ -97,6 +147,8 @@ void GlobalConfig::Init()
 		linkIncomingSustainedBandwidth = linkIncomingPeakBandwidth = 1024 * 1024;
 
 	useNetMessageSmoothingBuffer = configHandler->GetBool("UseNetMessageSmoothingBuffer");
+	netMessageTargetBufferedFrames = configHandler->GetInt("NetMessageTargetBufferedFrames");
+	netMessageCatchupAggression = configHandler->GetFloat("NetMessageCatchupAggression");
 	luaWritableConfigFile = configHandler->GetBool("LuaWritableConfigFile");
 	vfsCacheArchiveFiles = configHandler->GetBool("VFSCacheArchiveFiles");
 
@@ -112,4 +164,3 @@ void GlobalConfig::Init()
 #endif
 
 GlobalConfig globalConfig;
-

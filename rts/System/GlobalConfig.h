@@ -18,6 +18,38 @@ public:
 	int networkLossFactor = 0;
 
 	/**
+	 * @brief network chunk rate
+	 *
+	 * Maximum rate at which queued protocol messages are turned into reliable
+	 * UDP chunks. Higher values reduce batching latency at the cost of overhead.
+	 */
+	int networkChunkRate = 30;
+
+	/**
+	 * @brief network low latency
+	 *
+	 * Whether queued protocol messages should be flushed as soon as the chunk
+	 * rate allows instead of waiting for small-packet batching thresholds.
+	 */
+	bool networkLowLatency = true;
+
+	/**
+	 * @brief network resend timeout bounds
+	 *
+	 * Minimum and maximum adaptive retransmit timeout in milliseconds.
+	 */
+	int networkResendTimeoutMin = 50;
+	int networkResendTimeoutMax = 500;
+
+	/**
+	 * @brief network gap NAK delay
+	 *
+	 * Minimum delay in milliseconds before explicitly requesting missing chunks
+	 * after later chunks have already arrived.
+	 */
+	int networkGapNakDelay = 15;
+
+	/**
 	 * @brief initial network timeout
 	 *
 	 * Network timeout in seconds, effective before the game has started
@@ -53,6 +85,14 @@ public:
 	 * Maximum outgoing bandwidth from server in bytes, per user
 	 */
 	int linkOutgoingBandwidth = 64 * 1024;
+
+	/**
+	 * @brief linkOutgoingReliabilityBandwidth
+	 *
+	 * Maximum outgoing bandwidth for ACK/NAK-only UDP packets in bytes, per
+	 * user. This keeps reliability metadata moving when payload traffic is throttled.
+	 */
+	int linkOutgoingReliabilityBandwidth = 4 * 1024;
 
 	/**
 	 * @brief linkIncomingSustainedBandwidth
@@ -91,6 +131,21 @@ public:
 	 * latency (running further behind the server)
 	 */
 	bool useNetMessageSmoothingBuffer = true;
+
+	/**
+	 * @brief netMessageTargetBufferedFrames
+	 *
+	 * Number of sim-frame messages the smoothing buffer tries to keep queued.
+	 */
+	int netMessageTargetBufferedFrames = 2;
+
+	/**
+	 * @brief netMessageCatchupAggression
+	 *
+	 * Fraction used to trust newly observed queue growth in the smoothing
+	 * buffer. Higher values catch up faster but expose more jitter.
+	 */
+	float netMessageCatchupAggression = 0.1f;
 
 	/**
 	 * @brief luaWritableConfigFile

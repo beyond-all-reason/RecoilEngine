@@ -2,6 +2,7 @@
 
 #include "UDPConnection.h"
 
+#include <cmath>
 #include <cinttypes>
 
 
@@ -26,7 +27,6 @@ using namespace asio;
 
 static constexpr unsigned udpMaxPacketSize = 4096;
 static constexpr int maxChunkSize = 254;
-static constexpr int chunksPerSec = 30;
 
 
 
@@ -313,6 +313,9 @@ void UDPConnection::Init()
 	muted = true;
 	closed = false;
 	resend = false;
+	hasRttEstimate = false;
+	smoothedRttMs = 0.0f;
+	rttVariationMs = 0.0f;
 
 	#ifndef UNIT_TEST
 	logMessages = configHandler->GetBool("UDPConnectionLogDebugMessages");
@@ -407,6 +410,7 @@ void UDPConnection::Update()
 {
 	spring_time curTime = spring_gettime();
 	outgoing.UpdateTime(spring_tomsecs(curTime));
+	outgoingReliability.UpdateTime(spring_tomsecs(curTime));
 
 	#ifdef ENABLE_DEBUG_STATS
 	{
@@ -700,8 +704,9 @@ void UDPConnection::Flush(const bool forced)
 
 	const spring_time curTime = spring_gettime();
 
-	// do not create chunks more than chunksPerSec times per second
-	const bool waitMore = (lastChunkCreatedTime >= (curTime - spring_msecs(1000 / chunksPerSec)));
+	// do not create chunks more than the configured rate
+	const int chunkIntervalMs = std::max(1, 1000 / std::max(1, globalConfig.networkChunkRate));
+	const bool waitMore = (lastChunkCreatedTime >= (curTime - spring_msecs(chunkIntervalMs)));
 	// if the packet is tiny, reduce the send frequency further
 	const int requiredLength = ((200 >> netLossFactor) - spring_tomsecs(curTime - lastChunkCreatedTime)) / 10;
 
@@ -713,7 +718,7 @@ void UDPConnection::Flush(const bool forced)
 		}
 	}
 
-	if (forced || (!waitMore && outgoingLength > requiredLength)) {
+	if (forced || (!waitMore && !outgoingData.empty() && (globalConfig.networkLowLatency || outgoingLength > requiredLength))) {
 		std::uint8_t buffer[udpMaxPacketSize];
 		unsigned pos = 0;
 
@@ -838,16 +843,60 @@ void UDPConnection::CreateChunk(const unsigned char* data, const unsigned length
 	ChunkPtr buf(new Chunk);
 	buf->chunkNumber = packetNum;
 	buf->chunkSize = length;
+	buf->sendCount = 0;
 	std::copy(data, data + length, std::back_inserter(buf->data));
 	newChunks.push_back(buf);
 	lastChunkCreatedTime = spring_gettime();
+}
+
+spring_time UDPConnection::GetResendTimeout() const
+{
+	int timeoutMs = (400 >> netLossFactor);
+
+	if (hasRttEstimate) {
+		const float lossFactorBias = 1.0f - (0.2f * netLossFactor);
+		timeoutMs = int((smoothedRttMs + 4.0f * rttVariationMs) * lossFactorBias);
+	}
+
+	timeoutMs = std::max(globalConfig.networkResendTimeoutMin, timeoutMs);
+	timeoutMs = std::min(globalConfig.networkResendTimeoutMax, timeoutMs);
+	return spring_msecs(timeoutMs);
+}
+
+void UDPConnection::MarkPacketChunksSent(Packet& pkt, const spring_time& sendTime)
+{
+	for (const ChunkPtr& chunk: pkt.chunks) {
+		chunk->lastSendTime = sendTime;
+		chunk->sendCount += 1;
+	}
+}
+
+void UDPConnection::UpdateRttEstimate(const Chunk& chunk, const spring_time& ackTime)
+{
+	if (chunk.sendCount != 1)
+		return;
+
+	const float sampleMs = (ackTime - chunk.lastSendTime).toMilliSecsf();
+
+	if (sampleMs <= 0.0f)
+		return;
+
+	if (!hasRttEstimate) {
+		smoothedRttMs = sampleMs;
+		rttVariationMs = sampleMs * 0.5f;
+		hasRttEstimate = true;
+		return;
+	}
+
+	rttVariationMs = (0.75f * rttVariationMs) + (0.25f * std::fabs(smoothedRttMs - sampleMs));
+	smoothedRttMs = (0.875f * smoothedRttMs) + (0.125f * sampleMs);
 }
 
 void UDPConnection::SendIfNecessary(bool flushed)
 {
 	const spring_time curTime = spring_gettime();
 	const spring_time difTime = curTime - lastPacketSendTime;
-	const spring_time unackTime = spring_msecs(400 >> netLossFactor);
+	const spring_time unackTime = GetResendTimeout();
 
 	int nak = 0;
 	int rev = 0;
@@ -881,7 +930,9 @@ void UDPConnection::SendIfNecessary(bool flushed)
 			numContinuous++;
 		}
 
-		if ((numContinuous < 8) && (curTime - lastNakTime) > (unackTime * 0.5f)) {
+		const int nakDelayMs = std::max(1, std::min(globalConfig.networkGapNakDelay, spring_tomsecs(unackTime * 0.5f)));
+
+		if ((numContinuous < 8) && (curTime - lastNakTime) > spring_msecs(nakDelayMs)) {
 			nak = std::min(droppedPackets.size(), (size_t)127);
 			// needs 1 byte per requested packet, so do not spam to often
 			lastNakTime = curTime;
@@ -909,6 +960,13 @@ void UDPConnection::SendIfNecessary(bool flushed)
 
 	if (!flushSend && !otherSend && !unackSend)
 		return;
+
+	const auto CanSendPayload = [&]() {
+		return ((globalConfig.linkOutgoingBandwidth <= 0) || (outgoing.GetAverage() <= globalConfig.linkOutgoingBandwidth));
+	};
+	const auto CanSendReliability = [&]() {
+		return ((globalConfig.linkOutgoingReliabilityBandwidth <= 0) || (outgoingReliability.GetAverage() <= globalConfig.linkOutgoingReliabilityBandwidth));
+	};
 
 	int maxResend = resendRequested.size();
 	int unackPrevSize = unackedChunks.size();
@@ -952,8 +1010,9 @@ void UDPConnection::SendIfNecessary(bool flushed)
 	}
 
 
-	while (((outgoing.GetAverage() <= globalConfig.linkOutgoingBandwidth) || (globalConfig.linkOutgoingBandwidth <= 0))) {
+	while (CanSendPayload() || CanSendReliability()) {
 		Packet buf(lastInOrder, nak);
+		const bool canSendPayload = CanSendPayload();
 
 		if (nak > 0) {
 			buf.naks.resize(nak);
@@ -971,8 +1030,8 @@ void UDPConnection::SendIfNecessary(bool flushed)
 
 		while (true) {
 			// NB: if maxResend equals 0, then resendRequested is empty and iterators will be invalid
-			const bool canResend = (maxResend > 0) && ((buf.GetSize() + CalcResendSize()) <= mtu);
-			const bool canSendNew = !newChunks.empty() && ((buf.GetSize() + newChunks[0]->GetSize()) <= mtu);
+			const bool canResend = canSendPayload && (maxResend > 0) && ((buf.GetSize() + CalcResendSize()) <= mtu);
+			const bool canSendNew = canSendPayload && !newChunks.empty() && ((buf.GetSize() + newChunks[0]->GetSize()) <= mtu);
 
 			if (!canResend && !canSendNew)
 				break;
@@ -1026,6 +1085,7 @@ void UDPConnection::SendIfNecessary(bool flushed)
 		buf.checksum = buf.GetChecksum();
 		EMULATE_PACKET_CORRUPTION(buf.checksum);
 
+		MarkPacketChunksSent(buf, curTime);
 		SendPacket(buf);
 
 		if (!sent || (maxResend == 0 && newChunks.empty()))
@@ -1048,9 +1108,15 @@ void UDPConnection::SendIfNecessary(bool flushed)
 
 void UDPConnection::SendPacket(Packet& pkt)
 {
+	const bool controlOnly = pkt.chunks.empty();
 	pkt.Serialize(sendBuffer);
 
-	outgoing.DataSent(sendBuffer.size());
+	if (controlOnly) {
+		outgoingReliability.DataSent(sendBuffer.size());
+	} else {
+		outgoing.DataSent(sendBuffer.size());
+	}
+
 	lastPacketSendTime = spring_gettime();
 
 	ip::udp::socket::message_flags flags = 0;
@@ -1069,7 +1135,10 @@ void UDPConnection::SendPacket(Packet& pkt)
 
 void UDPConnection::AckChunks(int lastAck)
 {
+	const spring_time ackTime = spring_gettime();
+
 	while (!unackedChunks.empty() && (lastAck >= (*unackedChunks.begin())->chunkNumber)) {
+		UpdateRttEstimate(**unackedChunks.begin(), ackTime);
 		unackedChunks.pop_front();
 	}
 

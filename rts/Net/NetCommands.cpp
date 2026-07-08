@@ -184,6 +184,7 @@ void CGame::UpdateNumQueuedSimFrames()
 	//   unnecessary to scan entire queue *unless* joining a running game
 	//   only reason in that case is to handle NETMSG_GAME_FRAME_PROGRESS
 	const uint32_t numQueuedFrames = GetNumQueuedSimFrameMessages(-1u);
+	const float targetBufferedFrames = globalConfig.netMessageTargetBufferedFrames * gs->speedFactor;
 
 	if (globalConfig.useNetMessageSmoothingBuffer) {
 		if (numQueuedFrames < lastNumQueuedSimFrames) {
@@ -195,17 +196,17 @@ void CGame::UpdateNumQueuedSimFrames()
 			lastNumQueuedSimFrames = numQueuedFrames;
 		} else {
 			// trust the past more than the future
-			lastNumQueuedSimFrames = mix(lastNumQueuedSimFrames * 1.0f, numQueuedFrames * 1.0f, 0.1f);
+			lastNumQueuedSimFrames = mix(lastNumQueuedSimFrames * 1.0f, numQueuedFrames * 1.0f, globalConfig.netMessageCatchupAggression);
 		}
 
 		// always stay a bit behind the actual server time
 		// at higher speeds we need to keep more distance!
 		// (because effect of network jitter is amplified)
-		consumeSpeedMult = GAME_SPEED * gs->speedFactor + lastNumQueuedSimFrames - (2 * gs->speedFactor);
+		consumeSpeedMult = GAME_SPEED * gs->speedFactor + lastNumQueuedSimFrames - targetBufferedFrames;
 	} else {
 		// Modified SPRING95 behaviour
-		// Aim at staying 2 sim frames behind.
-		consumeSpeedMult = GAME_SPEED * gs->speedFactor + (numQueuedFrames / 2) - 1;
+		// Aim at staying close to the configured smoothing target.
+		consumeSpeedMult = GAME_SPEED * gs->speedFactor + (numQueuedFrames / 2) - std::max(1.0f, targetBufferedFrames * 0.5f);
 	}
 
 	// await one sim frame if queue is dry
