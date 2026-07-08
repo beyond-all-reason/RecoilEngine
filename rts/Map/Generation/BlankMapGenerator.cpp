@@ -78,7 +78,6 @@ CBlankMapGenerator::CBlankMapGenerator(const CGameSetup* setup)
 			mapColor.b = std::stoi(*blankMapB);
 		} catch (...) { }
 	}
-
 }
 
 void CBlankMapGenerator::Generate()
