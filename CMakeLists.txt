@@ -168,12 +168,11 @@ else  (UNIX AND NOT MINGW)
 		endif()
 
 		# MinGW needs an additional library, mwindows
-		# It's total link flags should look like -lmingw32 -lSDL2main -lSDL2 -lmwindows
-		# (Actually on second look, I think it only needs one of the m* libraries.)
+		# SDL3 removed SDLmain library; it's now header-only via SDL3/SDL_main.h
 		if(NOT MSVC)
 			set(MINGW32_LIBRARY mingw32 CACHE STRING "mwindows for MinGW")
 		endif(NOT MSVC)
-		set(SDL2_INCLUDE_DIR "${MINGWLIBS}/include/SDL2")
+		set(SDL3_INCLUDE_DIR "${MINGWLIBS}/include/SDL3")
 		set(CMAKE_PREFIX_PATH ${MINGWLIBS})
 		include_directories(${MINGWLIBS}/include)
 		set(CMAKE_LIBRARY_PATH ${MINGWLIBS}/dll ${MINGWLIBS}/lib)
@@ -314,7 +313,7 @@ endif (RECOIL_DETAILED_TRACY_ZONING)
 
 # Note the missing REQUIRED, as headless & dedi may not depend on those.
 #  So req. checks are done in the build target's CMakeLists.txt.
-find_package(SDL2 MODULE)
+find_package(SDL3 REQUIRED CONFIG)
 
 find_package_static(DevIL 1.8.0 REQUIRED)
 
