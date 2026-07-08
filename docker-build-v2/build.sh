@@ -179,7 +179,12 @@ if [[ "$GIT_DIR" != "$GIT_COMMON_DIR" ]]; then
   WORKTREE_MOUNTS="-v $GIT_COMMON_DIR:$GIT_COMMON_DIR:ro"
 fi
 
-$RUNTIME run --platform=linux/$ARCH -it --rm \
+TTY_FLAG=("-i")
+if [[ -t 0 ]]; then
+  TTY_FLAG=("-it")
+fi
+
+$RUNTIME run --platform=linux/$ARCH "${TTY_FLAG[@]}" --rm \
     -v "$CWD${P}":/build/src:z,ro \
     -v "$CWD${P}.cache${P}ccache-$PLATFORM":/build/cache:z,rw \
     -v "$CWD${P}build-$PLATFORM":/build/out:z,rw \
