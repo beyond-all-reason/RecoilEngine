@@ -87,6 +87,7 @@
 #include "System/FileSystem/Misc.hpp"
 #include "System/Input/KeyInput.h"
 #include "System/Input/MouseInput.h"
+#include "System/Input/ControllerInput.h"
 #include "System/LoadSave/LoadSaveHandler.h"
 #include "System/Log/ConsoleSink.h"
 #include "System/Log/ILog.h"
@@ -287,6 +288,7 @@ bool SpringApp::Init()
 
 	CInfoConsole::InitStatic();
 	CMouseHandler::InitStatic();
+	ControllerInput::InitStatic();
 
 	inputToken = input.AddHandler([this](const SDL_Event& event) { return SpringApp::MainEventHandler(event); });
 
@@ -1045,6 +1047,7 @@ void SpringApp::Kill(bool fromRun)
 
 	CInfoConsole::KillStatic();
 	CMouseHandler::KillStatic();
+	ControllerInput::KillStatic();
 
 	LOG("[SpringApp::%s][6]", __func__);
 	gs->Kill();
