@@ -900,6 +900,12 @@ std::string CEventHandler::WorldTooltip(const CUnit* unit, const CFeature* featu
 	return ControlReverseIterateDefString(listWorldTooltip, &CEventClient::WorldTooltip, unit, feature, groundPos);
 }
 
+std::string CEventHandler::GetBuildShape(int unitDefID, int facing, const float3& startPos, const float3& endPos)
+{
+	ZoneScoped;
+	return ControlReverseIterateDefString(listGetBuildShape, &CEventClient::GetBuildShape, unitDefID, facing, startPos, endPos);
+}
+
 
 bool CEventHandler::AddConsoleLine(const std::string& msg, const std::string& section, int level)
 {

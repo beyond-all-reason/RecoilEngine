@@ -62,21 +62,8 @@
 CONFIG(bool, MiniMapMarker).defaultValue(true).headlessValue(false);
 CONFIG(bool, InvertQueueKey).defaultValue(false);
 
-// Which held key combination (any of "shift", "ctrl", "alt", joined however) draws which
-// build-drag shape. "shift" means the queue key must be held. See GetBuildPositions().
-// By default every shape requires the queue key ("shift"), drop "shift" from a shape to 
-// let it drag order without queueing.
-CONFIG(std::string, BuildShapeDiagonal    ).defaultValue("shift").description("Modifier keys that drag-build a free-angle line of buildings.");
-CONFIG(std::string, BuildShapeStraightLine).defaultValue("ctrl+shift").description("Modifier keys that drag-build a line locked to its dominant axis.");
-CONFIG(std::string, BuildShapeFlood       ).defaultValue("shift+alt").description("Modifier keys that fill the dragged rectangle solidly with buildings.");
-CONFIG(std::string, BuildShapeHollowBox   ).defaultValue("ctrl+shift+alt").description("Modifier keys that place buildings only along the dragged rectangle's perimeter.");
-CONFIG(std::string, BuildShapeSurround    ).defaultValue("ctrl+shift").description("Modifier keys that ring an existing building with buildings when pointed at it.");
-CONFIG(std::string, BuildShapeFallback    ).defaultValue("single").description("Shape used when the held keys match no configured build shape: one of single/straightline/diagonal/flood/hollowbox/surround.");
-
-// defined further down alongside the build-shape tables they operate on
-static void ReadBuildShapeConfig();
-static uint8_t GetBuildPosModifiers(bool primary, bool secondary);
-static bool BuildPosWantsDrag(uint8_t mods, bool queue);
+// defined further down alongside the build-shape machinery it queries
+static bool BuildPosWantsDrag(const BuildInfo& startInfo, const BuildInfo& endInfo, bool queue);
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -97,17 +84,6 @@ CGuiHandler::CGuiHandler()
 	miniMapMarker = configHandler->GetBool("MiniMapMarker");
 	invertQueueKey = configHandler->GetBool("InvertQueueKey");
 
-	ReadBuildShapeConfig();
-	configHandler->NotifyOnChange(this, {
-		"BuildShapeDiagonal",
-		"BuildShapeStraightLine",
-		"BuildShapeFlood",
-		"BuildShapeHollowBox",
-		"BuildShapeSurround",
-		"BuildShapeFallback",
-	});
-
-
 	autoShowMetal = mapInfo->gui.autoShowMetal;
 	useStencil = false;
 
@@ -118,20 +94,6 @@ CGuiHandler::CGuiHandler()
 	}
 
 	failedSound = sound->GetDefSoundId("FailedCommand");
-}
-
-
-CGuiHandler::~CGuiHandler()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	configHandler->RemoveObserver(this);
-}
-
-
-void CGuiHandler::ConfigNotify(const std::string& key, const std::string& value)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	ReadBuildShapeConfig();
 }
 
 
@@ -2276,18 +2238,22 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 
 			const BuildInfo bi(unitdef, cameraPos + mouseDir * dist, buildFacing);
 
-			// whether the held keys select a drag-spanning shape (vs a single building);
-			const uint8_t buildMods = GetBuildPosModifiers(KeyInput::GetKeyModState(KMOD_CTRL), KeyInput::GetKeyModState(KMOD_ALT));
-			const bool wantsDrag = (button == SDL_BUTTON_LEFT) && BuildPosWantsDrag(buildMods, GetQueueKeystate());
-
-			if (wantsDrag) {
+			// span of a potential drag: from the (ground-traced) initial left-press
+			// position to the current mouse position
+			BuildInfo dragStartInfo = bi;
+			if (button == SDL_BUTTON_LEFT) {
 				const float3 camTracePos = mouse->buttons[SDL_BUTTON_LEFT].camPos;
 				const float3 camTraceDir = mouse->buttons[SDL_BUTTON_LEFT].dir;
 
 				const float traceDist = camera->GetFarPlaneDist() * 1.4f;
 				const float isectDist = CGround::LineGroundWaterCol(camTracePos, camTraceDir, traceDist, unitdef->floatOnWater, false);
 
-				GetBuildPositions(BuildInfo(unitdef, camTracePos + camTraceDir * isectDist, buildFacing), bi, cameraPos, mouseDir);
+				dragStartInfo = BuildInfo(unitdef, camTracePos + camTraceDir * isectDist, buildFacing);
+			}
+
+			// whether the active shape spans the drag (vs a single building at the cursor)
+			if ((button == SDL_BUTTON_LEFT) && BuildPosWantsDrag(dragStartInfo, bi, GetQueueKeystate())) {
+				GetBuildPositions(dragStartInfo, bi, cameraPos, mouseDir);
 			} else {
 				GetBuildPositions(bi, bi, cameraPos, mouseDir);
 			}
@@ -2561,136 +2527,69 @@ enum class BuildPosShape {
 };
 
 
-// Build-shape modifier keys, as a bitmask, so shape bindings can be expressed as data.
-enum BuildPosModifier : uint8_t {
-	BUILD_MOD_NONE = 0,
-	BUILD_MOD_PRIMARY = 1 << 0, // generally Ctrl
-	BUILD_MOD_SECONDARY = 1 << 1, // generally Alt
-};
-
-// Maps a held key combination to the shape it draws. The key combos are loaded from
-// config (see ReadBuildShapeConfig), so games can rebind them; the constraints in
-// ResolveBuildPosShape (a Surround needs a target, a too-small drag is always Single)
-// are intrinsic and stay in code.
-struct BuildPosShapeBinding {
-	BuildPosShape shape;     // shape this binding selects
-	const char* configKey;   // config var holding the key combo that selects it
-	uint8_t modifiers;       // BuildPosModifier flags, parsed from config at load
-	bool requiresQueue;      // whether the queue key must be held, parsed from config at load
-};
-
-static BuildPosShapeBinding buildPosShapeBindings[] = {
-	{ BuildPosShape::Diagonal,     "BuildShapeDiagonal",     BUILD_MOD_NONE,                          true },
-	{ BuildPosShape::StraightLine, "BuildShapeStraightLine", BUILD_MOD_PRIMARY,                       true },
-	{ BuildPosShape::Flood,        "BuildShapeFlood",        BUILD_MOD_SECONDARY,                     true },
-	{ BuildPosShape::HollowBox,    "BuildShapeHollowBox",    BUILD_MOD_SECONDARY | BUILD_MOD_PRIMARY, true },
-};
-
-// Modifier(s) that arm the Surround shape when a building is under the cursor. Any extra
-// modifiers held alongside these are ignored, so Surround still wins over the line/rect
-// shapes that would otherwise match the same keys.
-static uint8_t buildPosSurroundModifier = BUILD_MOD_PRIMARY;
-// Whether the queue key must also be held for Surround to arm.
-static bool buildPosSurroundRequiresQueue = true;
-
-// Shape drawn for any modifier combination not listed in buildPosShapeBindings.
-static BuildPosShape buildPosFallbackShape = BuildPosShape::Single;
-
-
-// Parse a config key-combo string (e.g. "shift+ctrl") into modifier flags + queue requirement.
-// Token order and separators are irrelevant; unrecognised tokens are ignored.
-static void ParseBuildKeyCombo(const std::string& spec, uint8_t& modifiers, bool& requiresQueue)
-{
-	const std::string s = StringToLower(spec);
-
-	modifiers = BUILD_MOD_NONE;
-	modifiers |= (s.find("ctrl") != std::string::npos) ? BUILD_MOD_PRIMARY   : 0;
-	modifiers |= (s.find("alt")  != std::string::npos) ? BUILD_MOD_SECONDARY : 0;
-
-	requiresQueue = (s.find("shift") != std::string::npos);
-}
-
-static BuildPosShape ParseBuildPosShapeName(const std::string& name, BuildPosShape fallback)
+// Shape names accepted from the GetBuildShape callin. Returns false on an unknown
+// name, so a garbled reply degrades to the default behaviour instead of surprising.
+static bool ParseBuildPosShapeName(const std::string& name, BuildPosShape& shape)
 {
 	const std::string s = StringToLower(name);
 
-	if (s == "single")       return BuildPosShape::Single;
-	if (s == "straightline") return BuildPosShape::StraightLine;
-	if (s == "diagonal")     return BuildPosShape::Diagonal;
-	if (s == "flood")        return BuildPosShape::Flood;
-	if (s == "hollowbox")    return BuildPosShape::HollowBox;
-	if (s == "surround")     return BuildPosShape::Surround;
+	if (s == "single")       { shape = BuildPosShape::Single;       return true; }
+	if (s == "straightline") { shape = BuildPosShape::StraightLine; return true; }
+	if (s == "diagonal")     { shape = BuildPosShape::Diagonal;     return true; }
+	if (s == "flood")        { shape = BuildPosShape::Flood;        return true; }
+	if (s == "hollowbox")    { shape = BuildPosShape::HollowBox;    return true; }
+	if (s == "surround")     { shape = BuildPosShape::Surround;     return true; }
 
-	return fallback;
+	return false;
 }
 
-// (Re)load every build-shape key binding from config. Safe to call again on config change.
-static void ReadBuildShapeConfig()
+// Ask the game (GetBuildShape callin) which shape the current build drag should trace
+// out. Returns false when no handler answered with a known shape name, in which case
+// the default modifier-key behaviour applies.
+static bool QueryBuildShape(const BuildInfo& info, const float3& start, const float3& end, BuildPosShape& shape)
 {
-	for (BuildPosShapeBinding& binding: buildPosShapeBindings)
-		ParseBuildKeyCombo(configHandler->GetString(binding.configKey), binding.modifiers, binding.requiresQueue);
-
-	ParseBuildKeyCombo(configHandler->GetString("BuildShapeSurround"), buildPosSurroundModifier, buildPosSurroundRequiresQueue);
-
-	buildPosFallbackShape = ParseBuildPosShapeName(configHandler->GetString("BuildShapeFallback"), BuildPosShape::Single);
+	return ParseBuildPosShapeName(eventHandler.GetBuildShape(info.def->id, info.buildFacing, start, end), shape);
 }
 
-
-static uint8_t GetBuildPosModifiers(bool primary, bool secondary)
+// Default behaviour, used while the game leaves GetBuildShape unanswered: drag shapes
+// require the queue key, ctrl over a building surrounds it, alt fills the dragged
+// rectangle (only its perimeter with ctrl), ctrl locks a dragged line to its axis.
+static BuildPosShape ResolveDefaultBuildPosShape(bool queue, bool hasSurroundTarget, bool singleCell)
 {
-	return (primary ? BUILD_MOD_PRIMARY : BUILD_MOD_NONE) | (secondary ? BUILD_MOD_SECONDARY : BUILD_MOD_NONE);
-}
+	const bool ctrl = KeyInput::GetKeyModState(KMOD_CTRL);
+	const bool alt = KeyInput::GetKeyModState(KMOD_ALT);
 
-// Whether the queue key requirement is satisfied: a binding that does not require the
-// queue key matches regardless of its state, one that does only matches while it is held.
-static bool BuildPosQueueSatisfied(bool requiresQueue, bool queue)
-{
-	return !requiresQueue || queue;
-}
-
-static bool BuildPosModsArmSurround(uint8_t mods, bool queue)
-{
-	if (!BuildPosQueueSatisfied(buildPosSurroundRequiresQueue, queue))
-		return false;
-
-	return (mods & buildPosSurroundModifier) == buildPosSurroundModifier;
-}
-
-
-static BuildPosShape ResolveBuildPosShape(uint8_t mods, bool queue, bool hasSurroundTarget, bool singleCell)
-{
-	if (hasSurroundTarget)
+	if (queue && ctrl && hasSurroundTarget)
 		return BuildPosShape::Surround;
 
-	// no room for more than one building along either axis
-	if (singleCell)
+	// no drag without the queue key; no room for more than one building otherwise
+	if (!queue || singleCell)
 		return BuildPosShape::Single;
 
-	for (const BuildPosShapeBinding& binding: buildPosShapeBindings) {
-		if (binding.modifiers == mods && BuildPosQueueSatisfied(binding.requiresQueue, queue))
-			return binding.shape;
-	}
+	if (alt)
+		return ctrl ? BuildPosShape::HollowBox : BuildPosShape::Flood;
 
-	// no binding for this combination, use the configured fallback
-	return buildPosFallbackShape;
+	return ctrl ? BuildPosShape::StraightLine : BuildPosShape::Diagonal;
 }
 
-// Whether the current keys select a shape that spans a drag (rather than a single
-// building). Decides whether the caller feeds GetBuildPositions the drag span or a single
-// point, so the queue-key requirement of each shape governs drag-building. The surround
-// target is unknown here, but a surround-armed combo still resolves to a drag shape (its
-// line/box fallback when no building is targeted), so it is reported as wanting a drag.
-static bool BuildPosWantsDrag(uint8_t mods, bool queue)
+// Whether the active shape spans the drag from start to end (vs a single building).
+// Decides whether the caller feeds GetBuildPositions the drag span or a single point.
+static bool BuildPosWantsDrag(const BuildInfo& startInfo, const BuildInfo& endInfo, bool queue)
 {
-	return ResolveBuildPosShape(mods, queue, false, false) != BuildPosShape::Single;
+	BuildPosShape shape;
+	if (QueryBuildShape(startInfo, CGameHelper::Pos2BuildPos(startInfo, false), CGameHelper::Pos2BuildPos(endInfo, false), shape))
+		return (shape != BuildPosShape::Single);
+
+	// default: dragging out multiple buildings requires the queue key
+	return queue;
 }
 
 
-// Single: one building at the drag start.
-static void AddSingleBuildPos(const BuildInfo& startInfo, const float3& start, std::vector<BuildInfo>& buildInfos)
+// Single: one building under the cursor (the drag end).
+static void AddSingleBuildPos(const BuildInfo& startInfo, const float3& pos, std::vector<BuildInfo>& buildInfos)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	FillRowOfBuildPos(startInfo, start.x, start.z, 0.0f, 0.0f, 1, 0, false, buildInfos);
+	FillRowOfBuildPos(startInfo, pos.x, pos.z, 0.0f, 0.0f, 1, 0, false, buildInfos);
 }
 
 
@@ -2817,17 +2716,9 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 	const float3 delta = end - start;
 
 	const bool queue = GetQueueKeystate();
-	const uint8_t mods = GetBuildPosModifiers(KeyInput::GetKeyModState(KMOD_CTRL), KeyInput::GetKeyModState(KMOD_ALT));
 
 	buildInfos.clear();
 	buildInfos.reserve(16);
-
-	// surrounding is only offered while the surround keys are held and a building is targeted
-	const bool surroundMode = BuildPosModsArmSurround(mods, queue);
-
-	BuildInfo other; // the unit around which buildings can be circled
-	if (surroundMode)
-		other = FindSurroundTarget(startInfo, cameraPos, mouseDir);
 
 	// world-space size of one build-grid cell of the building being placed
 	const float xsize = SQUARE_SIZE * (startInfo.GetXSize() + buildSpacing * 2);
@@ -2840,11 +2731,35 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 	const float xstep = (int)((0 < delta.x) ? xsize : -xsize);
 	const float zstep = (int)((0 < delta.z) ? zsize : -zsize);
 
-	const bool hasSurroundTarget = surroundMode && (other.def != nullptr);
 	const bool singleCell = (xnum == 1 && znum == 1);
 
-	switch (ResolveBuildPosShape(mods, queue, hasSurroundTarget, singleCell)) {
-		case BuildPosShape::Single:       AddSingleBuildPos         (startInfo, start, buildInfos);                                          break;
+	// the game decides the shape via the GetBuildShape callin; unanswered queries
+	// resolve to the default modifier-key behaviour
+	BuildPosShape shape;
+	bool gameAnswered = QueryBuildShape(startInfo, start, end, shape);
+
+	// Surround rings an existing building (or queued build order) under the cursor;
+	// only trace for one while the resolved shape can actually use it.
+	BuildInfo other;
+	if ((gameAnswered && shape == BuildPosShape::Surround) || (!gameAnswered && queue && KeyInput::GetKeyModState(KMOD_CTRL)))
+		other = FindSurroundTarget(startInfo, cameraPos, mouseDir);
+
+	const bool hasSurroundTarget = (other.def != nullptr);
+
+	if (gameAnswered) {
+		// a surround with nothing to ring degrades to a straight line along the drag
+		if (shape == BuildPosShape::Surround && !hasSurroundTarget)
+			shape = BuildPosShape::StraightLine;
+
+		// a drag too small to fit a second building always degrades to a single one
+		if (shape != BuildPosShape::Surround && singleCell)
+			shape = BuildPosShape::Single;
+	} else {
+		shape = ResolveDefaultBuildPosShape(queue, hasSurroundTarget, singleCell);
+	}
+
+	switch (shape) {
+		case BuildPosShape::Single:       AddSingleBuildPos         (startInfo, end, buildInfos);                                           break;
 		case BuildPosShape::StraightLine: AddLineBuildPositions     (startInfo, start, delta, xnum, znum, xstep, zstep, true,  buildInfos); break;
 		case BuildPosShape::Diagonal:     AddLineBuildPositions     (startInfo, start, delta, xnum, znum, xstep, zstep, false, buildInfos); break;
 		case BuildPosShape::Flood:        AddFloodBuildPositions    (startInfo, start, xnum, znum, xstep, zstep, buildInfos);               break;
@@ -4061,20 +3976,22 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 				// get the build information
 				const float3 cPos = tracePos + traceDir * rayTraceDist;
 
-				// preview the dragged shape while the button is held; the queue-key
-				// requirement lives in the shape config (mirrors GetCommand's gate)
-				const uint8_t buildMods = GetBuildPosModifiers(KeyInput::GetKeyModState(KMOD_CTRL), KeyInput::GetKeyModState(KMOD_ALT));
+				const BuildInfo cInfo(buildeeDef, cPos, buildFacing);
 
+				// preview the dragged shape while the button is held; whether it spans
+				// the drag is up to the game via GetBuildShape (mirrors GetCommand)
 				const CMouseHandler::ButtonPressEvt& bp = mouse->buttons[SDL_BUTTON_LEFT];
-				if (bp.pressed && BuildPosWantsDrag(buildMods, GetQueueKeystate())) {
+
+				BuildInfo bInfo = cInfo;
+				if (bp.pressed) {
 					const float bpDist = CGround::LineGroundWaterCol(bp.camPos, bp.dir, maxTraceDist, buildeeDef->floatOnWater, false);
-					const float3 bPos = bp.camPos + bp.dir * bpDist;
-					const BuildInfo cInfo = BuildInfo(buildeeDef, cPos, buildFacing);
-					const BuildInfo bInfo = BuildInfo(buildeeDef, bPos, buildFacing);
+					bInfo = BuildInfo(buildeeDef, bp.camPos + bp.dir * bpDist, buildFacing);
+				}
+
+				if (bp.pressed && BuildPosWantsDrag(bInfo, cInfo, GetQueueKeystate())) {
 					GetBuildPositions(bInfo, cInfo, tracePos, traceDir);
 				} else {
-					const BuildInfo bi(buildeeDef, cPos, buildFacing);
-					GetBuildPositions(bi, bi, tracePos, traceDir);
+					GetBuildPositions(cInfo, cInfo, tracePos, traceDir);
 				}
 
 

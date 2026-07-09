@@ -263,6 +263,10 @@ class CEventHandler
 		                         const CFeature* feature,
 		                         const float3* groundPos);
 
+		std::string GetBuildShape(int unitDefID, int facing,
+		                          const float3& startPos,
+		                          const float3& endPos);
+
 		bool MapDrawCmd(int playerID, int type,
 		                const float3* pos0,
 		                const float3* pos1,

@@ -239,6 +239,13 @@ class CLuaHandle : public CEventClient
 			const float3* groundPos
 		) override;
 
+		std::string GetBuildShape(
+			int unitDefID,
+			int facing,
+			const float3& startPos,
+			const float3& endPos
+		) override;
+
 		bool MapDrawCmd(
 			int playerID,
 			int type,
