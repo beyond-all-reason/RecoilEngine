@@ -341,12 +341,18 @@ bool List::HandleEventSelf(const SDL_Event& ev)
 		case SDL_KEYDOWN: {
 			if (!hasFocus)
 				break;
-			if(ev.key.keysym.sym == SDLK_ESCAPE)
+			const int key =
+#if defined(RECOIL_MACOS_SDL3_EGL)
+				ev.key.key;
+#else
+				ev.key.keysym.sym;
+#endif
+			if(key == SDLK_ESCAPE)
 			{
 				hasFocus = false;
 				break;
 			}
-			return KeyPressed(ev.key.keysym.sym, false);
+			return KeyPressed(key, false);
 		}
 	}
 	return false;

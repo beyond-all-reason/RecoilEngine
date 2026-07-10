@@ -14,10 +14,22 @@
 #include "System/type2.h"
 
 class SharedLib;
+
 struct SDL_version;
 struct SDL_Rect;
 struct SDL_Window;
+#if !defined(SDL_video_h_)
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+struct SDL_GLContextState;
+typedef SDL_GLContextState* SDL_GLContext;
+#else
 typedef void* SDL_GLContext;
+#endif
+#endif
+
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+namespace MacSDL3EGL { class Bridge; }
+#endif
 
 /**
  * @brief Globally accessible unsynced, rendering related data
@@ -98,6 +110,8 @@ public:
 
 	void LoadViewport();
 	void LoadDualViewport();
+	void LoadDefaultFramebufferViewport(int px, int py, int sx, int sy) const;
+	void LoadDefaultFramebufferScissor(int px, int py, int sx, int sy) const;
 
 	void UpdateWindowBorders(SDL_Window* window) const;
 
@@ -329,6 +343,9 @@ public:
 	bool supportClipSpaceControl;
 	bool supportSeamlessCubeMaps;
 	bool supportFragDepthLayout;
+	bool zinkMoltenVKCustomBorderColorUnsafe;
+	bool zinkMoltenVKLogicOpUnsafe;
+	bool geometryShadersUnsupported;
 
 	/**
 	 * Shader capabilities
@@ -383,6 +400,9 @@ public:
 public:
 	SDL_Window* sdlWindow;
 	SDL_GLContext glContext;
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	std::unique_ptr<MacSDL3EGL::Bridge> macSDL3EGLBridge;
+#endif
 public:
 	/**
 	* @brief maximum texture unit number
@@ -425,4 +445,3 @@ private:
 extern CGlobalRendering* globalRendering;
 
 #endif /* _GLOBAL_RENDERING_H */
-

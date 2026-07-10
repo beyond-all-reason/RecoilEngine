@@ -1065,8 +1065,24 @@ void SpringApp::Kill(bool fromRun)
 bool SpringApp::MainEventHandler(const SDL_Event& event)
 {
 	switch (event.type) {
+#if defined(RECOIL_MACOS_SDL3_EGL)
+		case SDL_WINDOWEVENT_MOVED:
+		case SDL_WINDOWEVENT_SIZE_CHANGED:
+		case SDL_WINDOWEVENT_MAXIMIZED:
+		case SDL_WINDOWEVENT_RESTORED:
+		case SDL_WINDOWEVENT_SHOWN:
+		case SDL_WINDOWEVENT_MINIMIZED:
+		case SDL_WINDOWEVENT_HIDDEN:
+		case SDL_WINDOWEVENT_FOCUS_GAINED:
+		case SDL_WINDOWEVENT_FOCUS_LOST:
+		case SDL_WINDOWEVENT_DISPLAY_CHANGED:
+		case SDL_WINDOWEVENT_CLOSE: {
+			const auto recoilWindowEvent = event.type;
+#else
 		case SDL_WINDOWEVENT: {
-			switch (event.window.event) {
+			const auto recoilWindowEvent = event.window.event;
+#endif
+			switch (recoilWindowEvent) {
 				case SDL_WINDOWEVENT_MOVED: {
 					LOG("[SpringApp::%s][SDL_WINDOWEVENT_MOVED][1] di=%d, ssx=%d, ssy=%d, wsx=%d, wsy=%d, wpx=%d, wpy=%d"
 						, __func__
@@ -1189,7 +1205,11 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 
 							SDL_Event event;
 							event.type = event.button.type = SDL_MOUSEBUTTONUP;
+#if defined(RECOIL_MACOS_SDL3_EGL)
+							event.button.down = false;
+#else
 							event.button.state = SDL_RELEASED;
+#endif
 							event.button.which = 0;
 							event.button.button = i;
 							event.button.x = -1;
@@ -1205,8 +1225,12 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 					// and make sure to un-capture mouse
 					globalRendering->SetWindowInputGrabbing(false);
 				} break;
+#if defined(RECOIL_MACOS_SDL3_EGL)
+				case SDL_WINDOWEVENT_DISPLAY_CHANGED: {
+#else
 				// replace with normal SDL_WINDOWEVENT_DISPLAY_CHANGED when our Linux SDL2 is updated
 				case RECOIL_SDL_WINDOWEVENT_DISPLAY_CHANGED: {
+#endif
 					LOG("[SpringApp::%s][SDL_WINDOWEVENT_DISPLAY_CHANGED] to display %d\n", __func__, event.window.data1);
 					// try to reinit GL context
 					globalRendering->MakeCurrentContext(false);
@@ -1218,11 +1242,19 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 			};
 		} break;
 		case SDL_AUDIODEVICEREMOVED: {
+#if defined(RECOIL_MACOS_SDL3_EGL)
+			LOG("[SpringApp::%s][SDL_AUDIODEVICEREMOVED][1] type=%u, which=%u, recording=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.recording));
+#else
 			LOG("[SpringApp::%s][SDL_AUDIODEVICEREMOVED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.iscapture));
+#endif
 			sound->DeviceChanged(event.adevice.which);
 		} break;
 		case SDL_AUDIODEVICEADDED: {
+#if defined(RECOIL_MACOS_SDL3_EGL)
+			LOG("[SpringApp::%s][SDL_AUDIODEVICEADDED][1] type=%u, which=%u, recording=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.recording));
+#else
 			LOG("[SpringApp::%s][SDL_AUDIODEVICEADDED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.iscapture));
+#endif
 			sound->DeviceChanged(event.adevice.which);
 		} break;
 		case SDL_QUIT: {
@@ -1242,8 +1274,13 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 			KeyInput::Update(keyBindings.GetFakeMetaKey());
 
 			if (activeController != nullptr) {
+#if defined(RECOIL_MACOS_SDL3_EGL)
+				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.key);
+				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.scancode);
+#else
 				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.keysym.sym);
 				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.keysym.scancode);
+#endif
 				activeController->KeyPressed(keyCode, scanCode, event.key.repeat);
 			}
 
@@ -1253,8 +1290,13 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 
 			if (activeController != nullptr) {
 				gameTextInput.ignoreNextChar = false;
+#if defined(RECOIL_MACOS_SDL3_EGL)
+				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.key);
+				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.scancode);
+#else
 				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.keysym.sym);
 				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.keysym.scancode);
+#endif
 				activeController->KeyReleased(keyCode, scanCode);
 			}
 		} break;

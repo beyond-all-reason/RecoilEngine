@@ -1,8 +1,11 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <algorithm>
+#include <cstdint>
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <limits>
 
 #include <SDL.h>
 
@@ -33,6 +36,9 @@
 #include "System/Platform/SharedLib.h"
 #include "System/Platform/WindowManagerHelper.h"
 #include "System/Platform/errorhandler.h"
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+#include "System/Platform/Mac/MacSDL3EGLBridge.h"
+#endif
 #include "System/ScopedResource.h"
 #include "System/QueueToMain.h"
 #include "System/creg/creg_cond.h"
@@ -57,6 +63,9 @@ CONFIG(int, ForceDisableExplicitAttribLocs).defaultValue(0).minimumValue(0).maxi
 CONFIG(int, ForceDisableClipCtrl).defaultValue(0).minimumValue(0).maximumValue(1);
 //CONFIG(int, ForceDisableShaders).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceDisableGL4).defaultValue(0).safemodeValue(1).minimumValue(0).maximumValue(1);
+CONFIG(int, ZinkMoltenVKCustomBorderColorUnsafe).defaultValue(-1).minimumValue(-1).maximumValue(1).description("Central macOS/Zink/MoltenVK custom border color risk hook. -1 runtime detect, 0 force safe, 1 force unsafe.");
+CONFIG(int, ZinkMoltenVKLogicOpUnsafe).defaultValue(-1).minimumValue(-1).maximumValue(1).description("Central macOS/Zink/MoltenVK logic-op risk hook. -1 runtime detect, 0 force safe, 1 force unsafe.");
+CONFIG(int, GeometryShadersUnsupported).defaultValue(-1).minimumValue(-1).maximumValue(1).description("Central GS-free backend hook. -1 runtime detect, 0 force allowed, 1 force unsupported.");
 
 CONFIG(int, ForceCoreContext).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceSwapBuffers).defaultValue(1).minimumValue(0).maximumValue(1);
@@ -70,16 +79,16 @@ CONFIG(bool, TeamNanoSpray).defaultValue(true).headlessValue(false);
 
 CONFIG(int, MinimizeOnFocusLoss).defaultValue(0).minimumValue(0).maximumValue(1).description("When set to 1 minimize Window if it loses key focus when in fullscreen mode.");
 
-CONFIG(bool, Fullscreen).defaultValue(true).headlessValue(false).description("Sets whether the game will run in fullscreen, as opposed to a window. For Windowed Fullscreen of Borderless Window, set this to 0, WindowBorderless to 1, and WindowPosX and WindowPosY to 0.");
-CONFIG(bool, WindowBorderless).defaultValue(false).description("When set and Fullscreen is 0, will put the game in Borderless Window mode, also known as Windowed Fullscreen. When using this, it is generally best to also set WindowPosX and WindowPosY to 0");
+CONFIG(bool, Fullscreen).defaultValue(true).headlessValue(false).description("Logical-resolution-first fullscreen/windowed policy. Uses a logical-safe area by default; physical mode is kept as an advanced/explicit option.");
+CONFIG(bool, WindowBorderless).defaultValue(false).description("Windowed fullscreen on supported backends (logical-safe full-screen style). Pair with Fullscreen=0, WindowPosX=0, WindowPosY=0 for default borderless behavior.");
 CONFIG(bool, BlockCompositing).defaultValue(false).safemodeValue(true).description("Disables kwin compositing to fix tearing, possible fixes low FPS in windowed mode, too.");
 // setting this as default 0 for now is because if the frame were to be dropped for being late, DWMFlush will force the compositor to use the framebuffer. This can result in blocking until the framebuffer can be composited (up to 1 frame) and may not be desirable for all use cases (specifically with vsync set to off). However, only more widespread testing and investigation across various hardware/os configs would tell us what advantage DWMFlush would bring.
 CONFIG(int, DWMFlush).defaultValue(0).description("Force Windows Desktop Compositors DWMFlush before each SDL_GL_SwapWindow, preventing dropped frames (use nVidias FrameView to validate dropped frames, or BARs Jitter Timer widget). Value of 1 does DWMFlush before SwapBuffers, value of 2 does DWMFlush after swapbuffers.");
 
-CONFIG(int, XResolution).defaultValue(0).headlessValue(8).minimumValue(0).description("Sets the width of the game screen. If set to 0 Spring will autodetect the current resolution of your desktop.");
-CONFIG(int, YResolution).defaultValue(0).headlessValue(8).minimumValue(0).description("Sets the height of the game screen. If set to 0 Spring will autodetect the current resolution of your desktop.");
-CONFIG(int, XResolutionWindowed).defaultValue(0).headlessValue(8).minimumValue(0).description("See XResolution, just for windowed.");
-CONFIG(int, YResolutionWindowed).defaultValue(0).headlessValue(8).minimumValue(0).description("See YResolution, just for windowed.");
+CONFIG(int, XResolution).defaultValue(0).headlessValue(8).minimumValue(0).description("Sets logical fullscreen/windowed width. If 0, Spring auto-detects the current logical-safe display width.");
+CONFIG(int, YResolution).defaultValue(0).headlessValue(8).minimumValue(0).description("Sets logical fullscreen/windowed height. If 0, Spring auto-detects the current logical-safe display height.");
+CONFIG(int, XResolutionWindowed).defaultValue(0).headlessValue(8).minimumValue(0).description("See XResolution. Used when Fullscreen=0.");
+CONFIG(int, YResolutionWindowed).defaultValue(0).headlessValue(8).minimumValue(0).description("See YResolution. Used when Fullscreen=0.");
 CONFIG(int, WindowPosX).defaultValue(0 ).description("Sets the horizontal position of the game window, if Fullscreen is 0. When WindowBorderless is set, this should usually be 0.");
 CONFIG(int, WindowPosY).defaultValue(32).description("Sets the vertical position of the game window, if Fullscreen is 0. When WindowBorderless is set, this should usually be 0.");
 
@@ -194,6 +203,9 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(supportClipSpaceControl),
 	CR_IGNORED(supportSeamlessCubeMaps),
 	CR_IGNORED(supportFragDepthLayout),
+	CR_IGNORED(zinkMoltenVKCustomBorderColorUnsafe),
+	CR_IGNORED(zinkMoltenVKLogicOpUnsafe),
+	CR_IGNORED(geometryShadersUnsupported),
 	CR_IGNORED(haveGL4),
 	CR_IGNORED(glslMaxVaryings),
 	CR_IGNORED(glslMaxAttributes),
@@ -324,6 +336,9 @@ CGlobalRendering::CGlobalRendering()
 	, supportClipSpaceControl(false)
 	, supportSeamlessCubeMaps(false)
 	, supportFragDepthLayout(false)
+	, zinkMoltenVKCustomBorderColorUnsafe(false)
+	, zinkMoltenVKLogicOpUnsafe(false)
+	, geometryShadersUnsupported(false)
 	, haveGL4(false)
 
 	, glslMaxVaryings(0)
@@ -425,10 +440,34 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 	//   SDL_WINDOW_FULLSCREEN_DESKTOP for "fake" fullscreen that takes the size of the desktop;
 	//   and 0 for windowed mode.
 
-	uint32_t sdlFlags  = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-	         sdlFlags |= (borderless_ ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen_;
-	         sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
+	uint32_t sdlFlags = SDL_WINDOW_RESIZABLE;
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	sdlFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
+	sdlFlags |= (SDL_WINDOW_BORDERLESS * (borderless_ || fullScreen_));
+#else
+	sdlFlags |= SDL_WINDOW_OPENGL;
+	sdlFlags |= (borderless_ ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen_;
+	sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
+#endif
 
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	SDL_Rect safeBounds = {winPosX_, winPosY_, newRes.x, newRes.y};
+	if (fullScreen_ || borderless_) {
+		MacSDL3EGL::DisplayGeometry initialGeometry = MacSDL3EGL::QueryDisplayGeometry(nullptr);
+		safeBounds = initialGeometry.safeBounds;
+		winPosX_ = safeBounds.x;
+		winPosY_ = safeBounds.y;
+		newRes = {safeBounds.w, safeBounds.h};
+	}
+
+	if ((newWindow = SDL_CreateWindow(title, newRes.x, newRes.y, sdlFlags)) == nullptr) {
+		LOG_L(L_WARNING, frmts[0], __func__, SDL_GetError(), 0, 24);
+	} else {
+		SDL_SetWindowPosition(newWindow, winPosX_, winPosY_);
+		LOG(frmts[1], __func__, 0, 24, wpfName = SDL_GetPixelFormatName(SDL_GetWindowPixelFormat(newWindow)));
+		MacSDL3EGL::LogDisplayGeometry(newWindow, "after-sdl3-window-create");
+	}
+#else
 	for (size_t i = 0; i < (aaLvls.size()) && (newWindow == nullptr); i++) {
 		if (i > 0 && aaLvls[i] == aaLvls[i - 1])
 			break;
@@ -447,6 +486,7 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 			LOG(frmts[1], __func__, aaLvls[i], zbBits[j], wpfName = SDL_GetPixelFormatName(SDL_GetWindowPixelFormat(newWindow)));
 		}
 	}
+#endif
 
 	if (newWindow == nullptr) {
 		auto buf = fmt::sprintf("[GR::%s] could not create SDL-window\n", __func__);
@@ -461,6 +501,15 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 
 SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 {
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	if (macSDL3EGLBridge == nullptr)
+		macSDL3EGLBridge = std::make_unique<MacSDL3EGL::Bridge>();
+
+	if (!macSDL3EGLBridge->Initialize(sdlWindow, minCtx.x, minCtx.y, forceCoreContext != 0))
+		return nullptr;
+
+	return reinterpret_cast<SDL_GLContext>(macSDL3EGLBridge->GetContextOpaque());
+#else
 	SDL_GLContext newContext = nullptr;
 
 	constexpr int2 glCtxs[] = {{2, 0}, {2, 1},  {3, 0}, {3, 1}, {3, 2}, {3, 3},  {4, 0}, {4, 1}, {4, 2}, {4, 3}, {4, 4}, {4, 5}, {4, 6}};
@@ -513,11 +562,17 @@ SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 
 	// should never fail at this point
 	return (newContext = SDL_GL_CreateContext(sdlWindow));
+#endif
 }
 
 bool CGlobalRendering::CreateWindowAndContext(const char* title)
 {
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	SDL_SetHint(SDL_HINT_VIDEO_DRIVER, "cocoa");
+	if (!SDL_Init(SDL_INIT_VIDEO)) {
+#else
 	if (SDL_Init(SDL_INIT_VIDEO) == -1) {
+#endif
 		LOG_L(L_FATAL, "[GR::%s] error \"%s\" initializing SDL", __func__, SDL_GetError());
 		return false;
 	}
@@ -587,12 +642,28 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 	if ((glContext = CreateGLContext(minCtx)) == nullptr)
 		return false;
 
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	const int gladStatus = gladLoadGLLoader(MacSDL3EGL::GetGLProcAddress);
+	LOG("[GR::%s] gladLoadGLLoader via Mesa EGL returned %d", __func__, gladStatus);
+	if (gladStatus == 0) {
+		LOG_L(L_FATAL, "[GR::%s] gladLoadGLLoader via Mesa EGL failed", __func__);
+		return false;
+	}
+#else
 	gladLoadGL();
+#endif
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	macSDL3EGLBridge->LogContextDiagnostics("after-glad-load");
+#endif
 	GLX::Load(sdlWindow);
 
 	if (!CheckGLContextVersion(minCtx)) {
 		int ctxProfile = 0;
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+		ctxProfile = globalRenderingInfo.glContextIsCore ? SDL_GL_CONTEXT_PROFILE_CORE : SDL_GL_CONTEXT_PROFILE_COMPATIBILITY;
+#else
 		SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, &ctxProfile);
+#endif
 
 		const std::string errStr = fmt::format("current OpenGL version {}.{}(core={}) is less than required {}.{}(core={}), aborting",
 			globalRenderingInfo.glContextVersion.x, globalRenderingInfo.glContextVersion.y, globalRenderingInfo.glContextIsCore,
@@ -610,7 +681,12 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 
 
 void CGlobalRendering::MakeCurrentContext(bool clear) const {
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	if (macSDL3EGLBridge != nullptr)
+		macSDL3EGLBridge->MakeCurrent(clear);
+#else
 	SDL_GL_MakeCurrent(sdlWindow, clear ? nullptr : glContext);
+#endif
 }
 
 
@@ -621,12 +697,19 @@ void CGlobalRendering::DestroyWindowAndContext() {
 	WindowManagerHelper::SetIconSurface(sdlWindow, nullptr);
 	SetWindowInputGrabbing(false);
 
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	if (macSDL3EGLBridge != nullptr)
+		macSDL3EGLBridge->Destroy();
+#else
 	SDL_GL_MakeCurrent(sdlWindow, nullptr);
+#endif
 	SDL_DestroyWindow(sdlWindow);
 
 	#if !defined(HEADLESS)
+#if !defined(__APPLE__) || !defined(RECOIL_MACOS_SDL3_EGL)
 	if (glContext)
 		SDL_GL_DeleteContext(glContext);
+#endif
 	#endif
 
 	sdlWindow = nullptr;
@@ -700,7 +783,11 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 			}
 		#endif
 		
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+		macSDL3EGLBridge->SwapBuffers();
+#else
 		SDL_GL_SwapWindow(sdlWindow);
+#endif
 
 		#ifdef _WIN32
 			if (forceDWMFlush == 2){ 
@@ -828,6 +915,7 @@ void CGlobalRendering::SetGLSupportFlags()
 	haveIntel  = (  glVendor.find(  "intel") != std::string::npos);
 	haveNvidia = (  glVendor.find("nvidia ") != std::string::npos);
 	haveMesa   = (glRenderer.find("mesa ") != std::string::npos) || (glRenderer.find("gallium ") != std::string::npos) || (glVersion.find(" mesa ") != std::string::npos);
+	const bool haveZinkMoltenVK = haveMesa && glRenderer.find("zink") != std::string::npos && glRenderer.find("moltenvk") != std::string::npos;
 
 	if (haveAMD) {
 		globalRenderingInfo.gpuName   = globalRenderingInfo.glRenderer;
@@ -907,6 +995,13 @@ void CGlobalRendering::SetGLSupportFlags()
 
 	//supportFragDepthLayout = ((globalRenderingInfo.glContextVersion.x * 10 + globalRenderingInfo.glContextVersion.y) >= 42);
 	supportFragDepthLayout = GLAD_GL_ARB_conservative_depth; //stick to the theory that reported = exist
+
+	const int customBorderCfg = configHandler->GetInt("ZinkMoltenVKCustomBorderColorUnsafe");
+	const int logicOpCfg = configHandler->GetInt("ZinkMoltenVKLogicOpUnsafe");
+	const int geometryShaderCfg = configHandler->GetInt("GeometryShadersUnsupported");
+	zinkMoltenVKCustomBorderColorUnsafe = customBorderCfg > 0 || (customBorderCfg < 0 && haveZinkMoltenVK);
+	zinkMoltenVKLogicOpUnsafe = logicOpCfg > 0 || (logicOpCfg < 0 && haveZinkMoltenVK);
+	geometryShadersUnsupported = geometryShaderCfg > 0 || (geometryShaderCfg < 0 && haveZinkMoltenVK);
 
 	//stick to the theory that reported = exist
 	//supportMSAAFrameBuffer &= ((globalRenderingInfo.glContextVersion.x * 10 + globalRenderingInfo.glContextVersion.y) >= 32);
@@ -1002,7 +1097,26 @@ void CGlobalRendering::QueryVersionInfo(char (&sdlVersionStr)[64], char (&glVidM
 		sdlVC.major, sdlVC.minor, sdlVC.patch
 	);
 
-	if (!GetAvailableVideoRAM(&grInfo.gpuMemorySize.x, grInfo.glVendor))
+	bool haveVideoRAM = GetAvailableVideoRAM(&grInfo.gpuMemorySize.x, grInfo.glVendor);
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	if (!haveVideoRAM && macSDL3EGLBridge != nullptr) {
+		const uint64_t metalWorkingSetBytes = macSDL3EGLBridge->GetRecommendedMaxWorkingSetSizeBytes();
+		const uint64_t metalWorkingSetKiB = metalWorkingSetBytes / 1024;
+
+		if (metalWorkingSetKiB > 0) {
+			const uint64_t clampedWorkingSetKiB = std::min<uint64_t>(
+				metalWorkingSetKiB,
+				static_cast<uint64_t>(std::numeric_limits<GLint>::max())
+			);
+
+			grInfo.gpuMemorySize.x = static_cast<GLint>(clampedWorkingSetKiB);
+			grInfo.gpuMemorySize.y = grInfo.gpuMemorySize.x;
+			haveVideoRAM = true;
+		}
+	}
+#endif
+
+	if (!haveVideoRAM)
 		return;
 
 	const GLint totalMemMB = grInfo.gpuMemorySize.x / 1024;
@@ -1023,10 +1137,19 @@ void CGlobalRendering::LogVersionInfo(const char* sdlVersionStr, const char* glV
 	LOG("\tGPU memory  : %s", glVidMemStr);
 	LOG("\tSDL swap-int: %d", SDL_GL_GetSwapInterval());
 	LOG("\tSDL driver  : %s", globalRenderingInfo.sdlDriverName);
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	if (macSDL3EGLBridge != nullptr) {
+		macSDL3EGLBridge->LogRuntimeEnvironment();
+		macSDL3EGLBridge->LogGeometry("LogVersionInfo");
+	}
+#endif
 	LOG("\t");
 	LOG("\tInitialized OpenGL Context: %i.%i (%s)", globalRenderingInfo.glContextVersion.x, globalRenderingInfo.glContextVersion.y, globalRenderingInfo.glContextIsCore ? "Core" : "Compat");
 	LOG("\tGLSL shader support       : %i", true);
 	LOG("\tGL4 support               : %i", haveGL4);
+	LOG("\tZink/MoltenVK custom border unsafe: %i", zinkMoltenVKCustomBorderColorUnsafe);
+	LOG("\tZink/MoltenVK logic-op unsafe      : %i", zinkMoltenVKLogicOpUnsafe);
+	LOG("\tgeometry shaders unsupported       : %i", geometryShadersUnsupported);
 	LOG("\tFBO extension support     : %i", FBO::IsSupported());
 	LOG("\tNVX GPU mem-info support  : %i", IsExtensionSupported("GL_NVX_gpu_memory_info"));
 	LOG("\tATI GPU mem-info support  : %i", IsExtensionSupported("GL_ATI_meminfo"));
@@ -1232,6 +1355,15 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 	const int2 maxRes = GetMaxWinRes();
 	      int2 newRes = GetCfgWinRes();
 
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	SDL_Rect safeBounds = MacSDL3EGL::GetSafeDisplayBounds(window);
+	if (fullScreen || borderless) {
+		winPosX = safeBounds.x;
+		winPosY = safeBounds.y;
+		newRes = {safeBounds.w, safeBounds.h};
+	}
+#endif
+
 	LOG("[GR::%s][1] cfgFullScreen=%d numDisplays=%d winPos=<%d,%d> newRes=<%d,%d>", __func__, fullScreen, numDisplays, winPosX, winPosY, newRes.x, newRes.y);
 	GetWindowPosSizeBounded(winPosX, winPosY, newRes.x, newRes.y);
 	LOG("[GR::%s][2] cfgFullScreen=%d numDisplays=%d winPos=<%d,%d> newRes=<%d,%d>", __func__, fullScreen, numDisplays, winPosX, winPosY, newRes.x, newRes.y);
@@ -1245,12 +1377,23 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 	SDL_SetWindowPosition(window, winPosX, winPosY);
 	SDL_SetWindowSize(window, newRes.x, newRes.y);
 
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	if (SDL_SetWindowFullscreen(window, 0) != 0)
+		LOG("[GR::%s][4][SDL_SetWindowFullscreen] err=\"%s\"", __func__, SDL_GetError());
+	SDL_SetWindowBordered(window, (borderless || fullScreen) ? SDL_FALSE : SDL_TRUE);
+	MacSDL3EGL::LogDisplayGeometry(window, "SetWindowAttributes");
+#else
 	if (SDL_SetWindowFullscreen(window, (borderless ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen) != 0)
 		LOG("[GR::%s][4][SDL_SetWindowFullscreen] err=\"%s\"", __func__, SDL_GetError());
 
 	SDL_SetWindowBordered(window, borderless ? SDL_FALSE : SDL_TRUE);
+#endif
 
-	if (newRes == maxRes)
+	if (newRes == maxRes
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+		&& !fullScreen && !borderless
+#endif
+	)
 		SDL_MaximizeWindow(window);
 
 	WindowManagerHelper::SetWindowResizable(window, !borderless && !fullScreen);
@@ -1366,9 +1509,14 @@ bool CGlobalRendering::SetWindowPosHelper(int displayIdx, int winRPosX, int winR
 }
 
 int2 CGlobalRendering::GetMaxWinRes() const {
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	SDL_Rect safeBounds = MacSDL3EGL::GetSafeDisplayBounds(sdlWindow);
+	return {safeBounds.w, safeBounds.h};
+#else
 	SDL_DisplayMode dmode;
 	SDL_GetDesktopDisplayMode(GetCurrentDisplayIndex(), &dmode);
 	return {dmode.w, dmode.h};
+#endif
 }
 
 int2 CGlobalRendering::GetCfgWinRes() const
@@ -1399,6 +1547,12 @@ void CGlobalRendering::GetDisplayBounds(SDL_Rect& r, const int* di) const
 
 void CGlobalRendering::GetUsableDisplayBounds(SDL_Rect& r, const int* di) const
 {
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	if (di == nullptr) {
+		r = MacSDL3EGL::GetSafeDisplayBounds(sdlWindow);
+		return;
+	}
+#endif
 	const int displayIndex = di ? *di : GetCurrentDisplayIndex();
 	SDL_GetDisplayUsableBounds(displayIndex, &r);
 }
@@ -1570,6 +1724,11 @@ void CGlobalRendering::ReadWindowPosAndSize()
 
 	SDL_GetWindowSize(sdlWindow, &winSizeX, &winSizeY);
 	SDL_GetWindowPosition(sdlWindow, &winPosX, &winPosY);
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	if (macSDL3EGLBridge != nullptr)
+		macSDL3EGLBridge->UpdateDrawableSize("ReadWindowPosAndSize");
+	MacSDL3EGL::LogDisplayGeometry(sdlWindow, "ReadWindowPosAndSize");
+#endif
 
 	//enforce >=0 https://github.com/beyond-all-reason/spring/issues/23
 	//winPosX = std::max(winPosX, 0);
@@ -2015,12 +2174,84 @@ bool CGlobalRendering::ToggleGLDebugOutput(unsigned int msgSrceIdx, unsigned int
 	return true;
 }
 
+static GLint ScaleDefaultFramebufferCoord(int value, float scale)
+{
+	return static_cast<GLint>((static_cast<float>(value) * scale) + (value >= 0 ? 0.5f : -0.5f));
+}
+
+static GLsizei ScaleDefaultFramebufferSize(int value, float scale)
+{
+	return static_cast<GLsizei>((static_cast<float>(value) * scale) + 0.5f);
+}
+
+void CGlobalRendering::LoadDefaultFramebufferViewport(int px, int py, int sx, int sy) const
+{
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	if (sdlWindow != nullptr) {
+		GLint drawFramebuffer = 0;
+		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer);
+		if (drawFramebuffer != 0) {
+			glViewport(px, py, sx, sy);
+			return;
+		}
+
+		const MacSDL3EGL::DisplayGeometry displayGeometry = MacSDL3EGL::QueryDisplayGeometry(sdlWindow);
+		const float scaleX =
+			(displayGeometry.logicalWindowWidth > 0 && displayGeometry.drawableWidth > 0)?
+				(static_cast<float>(displayGeometry.drawableWidth) / static_cast<float>(displayGeometry.logicalWindowWidth)): 1.0f;
+		const float scaleY =
+			(displayGeometry.logicalWindowHeight > 0 && displayGeometry.drawableHeight > 0)?
+				(static_cast<float>(displayGeometry.drawableHeight) / static_cast<float>(displayGeometry.logicalWindowHeight)): 1.0f;
+
+		glViewport(
+			ScaleDefaultFramebufferCoord(px, scaleX),
+			ScaleDefaultFramebufferCoord(py, scaleY),
+			ScaleDefaultFramebufferSize(sx, scaleX),
+			ScaleDefaultFramebufferSize(sy, scaleY)
+		);
+		return;
+	}
+#endif
+	glViewport(px, py, sx, sy);
+}
+
+void CGlobalRendering::LoadDefaultFramebufferScissor(int px, int py, int sx, int sy) const
+{
+#if defined(__APPLE__) && defined(RECOIL_MACOS_SDL3_EGL)
+	if (sdlWindow != nullptr) {
+		GLint drawFramebuffer = 0;
+		glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFramebuffer);
+		if (drawFramebuffer != 0) {
+			glScissor(px, py, sx, sy);
+			return;
+		}
+
+		const MacSDL3EGL::DisplayGeometry displayGeometry = MacSDL3EGL::QueryDisplayGeometry(sdlWindow);
+		const float scaleX =
+			(displayGeometry.logicalWindowWidth > 0 && displayGeometry.drawableWidth > 0)?
+				(static_cast<float>(displayGeometry.drawableWidth) / static_cast<float>(displayGeometry.logicalWindowWidth)): 1.0f;
+		const float scaleY =
+			(displayGeometry.logicalWindowHeight > 0 && displayGeometry.drawableHeight > 0)?
+				(static_cast<float>(displayGeometry.drawableHeight) / static_cast<float>(displayGeometry.logicalWindowHeight)): 1.0f;
+
+		glScissor(
+			ScaleDefaultFramebufferCoord(px, scaleX),
+			ScaleDefaultFramebufferCoord(py, scaleY),
+			ScaleDefaultFramebufferSize(sx, scaleX),
+			ScaleDefaultFramebufferSize(sy, scaleY)
+		);
+		return;
+	}
+#endif
+	glScissor(px, py, sx, sy);
+}
+
 void CGlobalRendering::LoadViewport()
 {
-	glViewport(viewPosX, viewPosY, viewSizeX, viewSizeY);
+	LoadDefaultFramebufferViewport(viewPosX, viewPosY, viewSizeX, viewSizeY);
 }
 
 void CGlobalRendering::LoadDualViewport()
 {
-	glViewport(dualViewPosX, dualViewPosY, dualViewSizeX, dualViewSizeY);
+	LoadDefaultFramebufferViewport(dualViewPosX, dualViewPosY, dualViewSizeX, dualViewSizeY);
 }

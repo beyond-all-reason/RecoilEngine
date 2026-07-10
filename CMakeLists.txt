@@ -304,6 +304,8 @@ if    (USE_ASAN)
 	endif (MSVC)
 endif (USE_ASAN)
 
+option(RECOIL_MACOS_SDL3_EGL "Use project-local SDL3 Cocoa windowing and Mesa Cocoa EGL/Zink on macOS" ${APPLE})
+
 ### Tracy related stuff
 option(RECOIL_DETAILED_TRACY_ZONING "Enable additional detailed tracy zones (only enable this for testing/debugging)" FALSE)
 if    (RECOIL_DETAILED_TRACY_ZONING)
@@ -315,6 +317,9 @@ endif (RECOIL_DETAILED_TRACY_ZONING)
 # Note the missing REQUIRED, as headless & dedi may not depend on those.
 #  So req. checks are done in the build target's CMakeLists.txt.
 find_package(SDL2 MODULE)
+if (APPLE AND RECOIL_MACOS_SDL3_EGL)
+	find_package(MesaEGL MODULE)
+endif()
 
 find_package_static(DevIL 1.8.0 REQUIRED)
 
@@ -442,6 +447,9 @@ option(ENABLE_STREFLOP "build Spring with streflop support (REQUIRED FOR MULTIPL
 
 if (ENABLE_STREFLOP)
 	set(STREFLOP_AUTO ON CACHE BOOL "Enable STREFLOP autodetection" FORCE)
+	if (IS_ARM64_BUILD)
+		set(STREFLOP_NEON ON CACHE BOOL "Use ARM NEON for deterministic ARM64 streflop" FORCE)
+	endif ()
 else ()
 	add_definitions(-DNOT_USING_STREFLOP)
 endif ()

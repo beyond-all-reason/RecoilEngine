@@ -551,6 +551,16 @@ bool processContextEvent(Rml::Context* context, const SDL_Event& event)
 		case SDL_TEXTINPUT:
 			return true;  // handled elsewhere
 
+#if defined(RECOIL_MACOS_SDL3_EGL)
+		case SDL_WINDOWEVENT_SIZE_CHANGED: {
+			auto x = event.window.data1;
+			auto y = event.window.data2;
+
+			state->render_interface.SetViewport(x, y);
+			state->winX = x;
+			state->winY = y;
+		} break;
+#else
 		case SDL_WINDOWEVENT: {
 			if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED) {
 				auto x = event.window.data1;
@@ -561,6 +571,7 @@ bool processContextEvent(Rml::Context* context, const SDL_Event& event)
 				state->winY = y;
 			}
 		} break;
+#endif
 
 		default:
 			break;

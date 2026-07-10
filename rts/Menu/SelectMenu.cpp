@@ -364,10 +364,18 @@ bool SelectMenu::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
 		case SDL_KEYDOWN: {
+#if defined(RECOIL_MACOS_SDL3_EGL)
+			if (ev.key.key == SDLK_ESCAPE) {
+#else
 			if (ev.key.keysym.sym == SDLK_ESCAPE) {
+#endif
 				LOG("[SelectMenu] user exited");
 				Quit();
+#if defined(RECOIL_MACOS_SDL3_EGL)
+			} else if (ev.key.key == SDLK_RETURN) {
+#else
 			} else if (ev.key.keysym.sym == SDLK_RETURN) {
+#endif
 				Single();
 				return true;
 			}

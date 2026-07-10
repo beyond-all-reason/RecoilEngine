@@ -322,12 +322,12 @@ void CMiniMap::SetAspectRatioGeometry(const float& viewSizeX, const float& viewS
 
 void CMiniMap::LoadDualViewport() const {
 	glEnable(GL_SCISSOR_TEST);
-	glScissor(globalRendering->dualViewPosX, globalRendering->dualViewPosY, globalRendering->dualViewSizeX, globalRendering->dualViewSizeY);
+	globalRendering->LoadDefaultFramebufferScissor(globalRendering->dualViewPosX, globalRendering->dualViewPosY, globalRendering->dualViewSizeX, globalRendering->dualViewSizeY);
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glDisable(GL_SCISSOR_TEST);
 
-	glViewport(curPos.x, curPos.y, curDim.x, curDim.y);
+	globalRendering->LoadDefaultFramebufferViewport(curPos.x, curPos.y, curDim.x, curDim.y);
 }
 
 
@@ -2065,4 +2065,3 @@ void CMiniMap::SetClipPlanes(const bool lua) const
 
 
 /******************************************************************************/
-

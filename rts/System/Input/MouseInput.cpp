@@ -91,6 +91,21 @@ bool IMouseInput::HandleSDLMouseEvent(const SDL_Event& event)
 				mouse->MouseWheel(event.wheel.y);
 
 		} break;
+#if defined(RECOIL_MACOS_SDL3_EGL)
+		case SDL_WINDOWEVENT_ENTER: {
+			if (mouse != nullptr)
+				mouse->WindowEnter();
+		} break;
+		case SDL_WINDOWEVENT_LEAVE: {
+			mousepos = {
+				globalRendering->viewPosX          + (globalRendering->viewSizeX >> 1),
+				globalRendering->viewWindowOffsetY + (globalRendering->viewSizeY >> 1)
+			};
+
+			if (mouse != nullptr)
+				mouse->WindowLeave();
+		} break;
+#else
 		case SDL_WINDOWEVENT: {
 			switch (event.window.event) {
 				case SDL_WINDOWEVENT_ENTER: {
@@ -109,6 +124,7 @@ bool IMouseInput::HandleSDLMouseEvent(const SDL_Event& event)
 				} break;
 			}
 		} break;
+#endif
 	}
 
 	return false;
@@ -261,4 +277,3 @@ void IMouseInput::FreeInstance(IMouseInput* mouseInp) {
 	memset(mouseInputMem, 0, sizeof(mouseInputMem));
 	mouseInput = nullptr;
 }
-

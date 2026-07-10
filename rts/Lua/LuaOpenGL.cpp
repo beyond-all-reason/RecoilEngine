@@ -43,6 +43,7 @@
 #include "Map/BaseGroundDrawer.h"
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
+#include "Rendering/Fonts/CFontTexture.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/LineDrawer.h"
@@ -829,6 +830,8 @@ void LuaOpenGL::EnableDrawScreenCommon()
 	EnableCommon(DRAW_SCREEN);
 	resetMatrixFunc = ResetScreenMatrices;
 
+	glMatrixMode(GL_TEXTURE);
+	glLoadIdentity();
 	SetupScreenMatrices();
 	SetupScreenLighting();
 	ResetGLState();
@@ -2856,8 +2859,9 @@ int LuaOpenGL::TexRect(lua_State* L)
 	const float x2 = luaL_checkfloat(L, 3);
 	const float y2 = luaL_checkfloat(L, 4);
 
-	// Spring's textures get loaded with a vertical flip
-	// We change that for the default settings.
+	// Legacy Lua textured-quad helper, not GL_TEXTURE_RECTANGLE semantics:
+	// 4/6-arg calls use normalized coords with Spring's default vertical flip,
+	// while 8-arg calls pass explicit caller-provided coords through unchanged.
 
 	if (args <= 6) {
 		float s1 = 0.0f;
@@ -3184,7 +3188,7 @@ int LuaOpenGL::Scissor(lua_State* L)
 		const GLsizei h = (GLsizei)luaL_checkint(L, 4);
 		if (w < 0) luaL_argerror(L, 3, "<width> must be greater than or equal zero!");
 		if (h < 0) luaL_argerror(L, 4, "<height> must be greater than or equal zero!");
-		glScissor(x + globalRendering->viewPosX, y + globalRendering->viewPosY, w, h);
+		globalRendering->LoadDefaultFramebufferScissor(x + globalRendering->viewPosX, y + globalRendering->viewPosY, w, h);
 	}
 	else {
 		luaL_error(L, "Incorrect arguments to gl.Scissor()");
@@ -3212,7 +3216,7 @@ int LuaOpenGL::Viewport(lua_State* L)
 	if (w < 0) luaL_argerror(L, 3, "<width> must be greater than or equal zero!");
 	if (h < 0) luaL_argerror(L, 4, "<height> must be greater than or equal zero!");
 
-	glViewport(x, y, w, h);
+	globalRendering->LoadDefaultFramebufferViewport(x, y, w, h);
 	return 0;
 }
 
@@ -4355,9 +4359,6 @@ int LuaOpenGL::CopyToTexture(lua_State* L)
 	if (tex == nullptr)
 		return 0;
 
-	glBindTexture(tex->target, tex->id);
-	glEnable(tex->target); // leave it bound and enabled
-
 	const auto xoff = (GLint)luaL_checknumber(L, 2);
 	const auto yoff = (GLint)luaL_checknumber(L, 3);
 	const auto x = (GLint)luaL_checknumber(L, 4);
@@ -4367,9 +4368,8 @@ int LuaOpenGL::CopyToTexture(lua_State* L)
 	const auto target = (GLenum)luaL_optnumber(L, 8, tex->target);
 	const auto level  = (GLenum)luaL_optnumber(L, 9, 0);
 
+	const auto texBind = GL::TexBind(tex->target, tex->id);
 	glCopyTexSubImage2D(target, level, xoff, yoff, x, y, w, h);
-
-	if (tex->target != GL_TEXTURE_2D) {glDisable(tex->target);}
 
 	return 0;
 }
@@ -4401,9 +4401,7 @@ int LuaOpenGL::RenderToTexture(lua_State* L)
 		return 0;
 
 	GLint currentFBO = 0;
-	if (drawMode == DRAW_WORLD_SHADOW) {
-		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
-	}
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, tex->fbo);
 
@@ -6147,6 +6145,7 @@ int LuaOpenGL::CreateList(lua_State* L)
 	SMatrixStateData matData = GetLuaContextData(L)->glMatrixTracker.GetMatrixState();
 	GetLuaContextData(L)->glMatrixTracker.PopMatrixState(prevMSD, false);
 	glEndList();
+	CFontTexture::UploadPendingGlyphAtlasTextures();
 
 	if (error != 0) {
 		glDeleteLists(list, 1);

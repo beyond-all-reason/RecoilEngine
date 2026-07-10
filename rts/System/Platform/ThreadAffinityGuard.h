@@ -3,8 +3,9 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#else
+#elif defined(__linux__)
 #include <sched.h>
+#include <sys/types.h>
 #endif
 
 class ThreadAffinityGuard {
@@ -12,7 +13,7 @@ private:
 #ifdef _WIN32
 	DWORD_PTR savedAffinity;
 	HANDLE threadHandle;
-#else
+#elif defined(__linux__)
 	cpu_set_t savedAffinity;
 	pid_t tid;
 #endif

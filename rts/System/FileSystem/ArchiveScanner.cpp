@@ -1842,4 +1842,3 @@ int CArchiveScanner::GetMetaFileClass(const std::string& filePath)
 
 	return 0;
 }
-

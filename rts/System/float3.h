@@ -6,7 +6,8 @@
 #include <cassert>
 #include <array>
 #include <utility>
-#include <format>
+#include <string>
+#include "lib/fmt/include/fmt/format.h"
 
 #include "System/BranchPrediction.h"
 #include "System/creg/creg_cond.h"
@@ -839,7 +840,7 @@ public:
 	static constexpr float nrm_eps() { return 1e-12f; }
 
 	std::string str() const {
-		return std::format("float3({:.3f}, {:.3f}, {:.3f})", x, y, z);
+		return fmt::format("float3({:.3f}, {:.3f}, {:.3f})", x, y, z);
 	}
 
 	/**
@@ -902,4 +903,3 @@ static constexpr float3 XZVector(1.0f, 0.0f, 1.0f);
 static constexpr float3 YZVector(0.0f, 1.0f, 1.0f);
 
 #endif /* FLOAT3_H */
-

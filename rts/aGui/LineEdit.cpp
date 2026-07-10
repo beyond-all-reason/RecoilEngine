@@ -100,7 +100,13 @@ bool LineEdit::HandleEventSelf(const SDL_Event& ev)
 			if (!hasFocus) {
 				break;
 			}
-			switch(ev.key.keysym.sym)
+			const int key =
+#if defined(RECOIL_MACOS_SDL3_EGL)
+				ev.key.key;
+#else
+				ev.key.keysym.sym;
+#endif
+			switch(key)
 			{
 				case SDLK_BACKSPACE: {
 					if (cursorPos > 0) {

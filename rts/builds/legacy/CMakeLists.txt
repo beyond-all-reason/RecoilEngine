@@ -19,20 +19,22 @@ target_link_libraries(Game PRIVATE
 	 prd::jsoncpp
 	 streflop
 	 fmt::fmt
-)
+	 nowide::nowide
+	)
 
 ### Assemble libraries
 find_package(SDL2 MODULE REQUIRED)
 
-
-
-
-
 set(engineLibraries SDL2::SDL2)
 
-set(OpenGL_GL_PREFERENCE LEGACY)
-find_package_static(OpenGL 3.0 REQUIRED)
-list(APPEND engineLibraries OpenGL::GL)
+if (APPLE AND RECOIL_MACOS_SDL3_EGL)
+	find_package(MesaEGL MODULE REQUIRED)
+	list(APPEND engineLibraries MesaEGL::EGL)
+else()
+	set(OpenGL_GL_PREFERENCE LEGACY)
+	find_package_static(OpenGL 3.0 REQUIRED)
+	list(APPEND engineLibraries OpenGL::GL)
+endif()
 
 find_fontconfig_hack()
 find_package_static(Fontconfig 2.11 REQUIRED)
@@ -53,12 +55,12 @@ if    (UNIX AND NOT APPLE)
 	find_package(X11 REQUIRED)
 	target_link_libraries(Game PRIVATE X11::Xcursor)
 	list(APPEND engineLibraries ${X11_Xcursor_LIB} ${X11_X11_LIB})
-endif (UNIX)
+endif (UNIX AND NOT APPLE)
 
-if (APPLE)
+if (APPLE AND NOT RECOIL_MACOS_SDL3_EGL)
 	find_library(COREFOUNDATION_LIBRARY Foundation)
 	list(APPEND engineLibraries ${COREFOUNDATION_LIBRARY})
-endif (APPLE)
+endif()
 
 list(APPEND engineLibraries squish rgetc1)
 list(APPEND engineLibraries ${sound-impl})
@@ -83,6 +85,19 @@ include_directories(${engineIncludes})
 ### Build the executable
 add_executable(engine-legacy ${EXE_FLAGS} ${engineSources} ${ENGINE_ICON} ${engineHeaders})
 target_link_libraries(engine-legacy ${engineLibraries} Game)
+
+if (APPLE AND RECOIL_MACOS_SDL3_EGL)
+	target_link_options(engine-legacy PRIVATE
+		"SHELL:-framework Cocoa"
+		"SHELL:-framework Foundation"
+		"SHELL:-framework QuartzCore"
+		"SHELL:-framework Metal"
+	)
+	set_target_properties(engine-legacy PROPERTIES
+		BUILD_RPATH "@loader_path/../../artifacts/runtime/thread-03-sdl3/lib;@loader_path/../../artifacts/runtime/thread-06-mesa-zink/lib;@loader_path/../../artifacts/runtime/thread-05-continuation-vulkan-loader/lib;@loader_path/../../artifacts/runtime/thread-05-moltenvk-production-pr-2746-spirv-cross/lib"
+		INSTALL_RPATH "@loader_path/../lib"
+	)
+endif()
 
 # Export symbols for plugin access (replaces CMP0065 OLD behavior)
 set_target_properties(engine-legacy PROPERTIES ENABLE_EXPORTS TRUE)

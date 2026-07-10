@@ -52,8 +52,8 @@ bool CheckAvailableVideoModes()
 	// Get available fullscreen/hardware modes
 	const int numDisplays = SDL_GetNumVideoDisplays();
 
-	SDL_DisplayMode ddm = {0, 0, 0, 0, nullptr};
-	SDL_DisplayMode cdm = {0, 0, 0, 0, nullptr};
+	SDL_DisplayMode ddm = {};
+	SDL_DisplayMode cdm = {};
 
 	// ddm is virtual, contains all displays in multi-monitor setups
 	// for fullscreen windows with non-native resolutions, ddm holds
@@ -78,8 +78,8 @@ bool CheckAvailableVideoModes()
 			continue;
 		}
 
-		SDL_DisplayMode cm = {0, 0, 0, 0, nullptr};
-		SDL_DisplayMode pm = {0, 0, 0, 0, nullptr};
+		SDL_DisplayMode cm = {};
+		SDL_DisplayMode pm = {};
 		SDL_Rect db;
 		SDL_GetDisplayBounds(k, &db);
 		const std::string dn = SDL_GetDisplayName(k);
@@ -97,16 +97,16 @@ bool CheckAvailableVideoModes()
 			if (cm.w == pm.w && cm.h == pm.h && (SDL_BPP(cm.format) < SDL_BPP(pm.format) || cm.refresh_rate < pm.refresh_rate))
 				continue;
 
-			globalRenderingInfo.availableVideoModes.emplace_back(GlobalRenderingInfo::AvailableVideoMode{
-				dn,
-				k + 1,
-				cm.w,
-				cm.h,
-				static_cast<int32_t>(SDL_BPP(cm.format)),
-				cm.refresh_rate
-			});
+				globalRenderingInfo.availableVideoModes.emplace_back(GlobalRenderingInfo::AvailableVideoMode{
+					dn,
+					k + 1,
+					cm.w,
+					cm.h,
+					static_cast<int32_t>(SDL_BPP(cm.format)),
+					static_cast<int32_t>(cm.refresh_rate)
+				});
 
-			LOG("\t\t[%2i] %ix%ix%ibpp@%iHz", int(i + 1), cm.w, cm.h, SDL_BPP(cm.format), cm.refresh_rate);
+				LOG("\t\t[%2i] %ix%ix%ibpp@%iHz", int(i + 1), cm.w, cm.h, SDL_BPP(cm.format), static_cast<int>(cm.refresh_rate));
 			pm = cm;
 		}
 	}

@@ -103,7 +103,13 @@ bool Window::HandleEventSelf(const SDL_Event& ev)
 			break;
 		}
 		case SDL_KEYDOWN: {
-			if (ev.key.keysym.sym == SDLK_ESCAPE)
+			const int key =
+#if defined(RECOIL_MACOS_SDL3_EGL)
+				ev.key.key;
+#else
+				ev.key.keysym.sym;
+#endif
+			if (key == SDLK_ESCAPE)
 			{
 				WantClose();
 				return true;
