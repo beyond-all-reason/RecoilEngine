@@ -61,10 +61,15 @@ if    (BUILD_${myName}_AIWRAPPER)
 	add_library(${myTarget}     STATIC ${mySources})
 	set_target_properties(${myTarget} PROPERTIES OUTPUT_NAME "${myName}")
 	add_dependencies(${myTarget} generateVersionFiles)
+	# float3.cpp pulls in float3.h -> <fmt/format.h> and float3::str() routes
+	# through fmt::vformat, so the wrapper (and any Legacy AI that uses it) must
+	# link fmt. PUBLIC propagates both the include dir and the symbol downstream.
+	target_link_libraries(${myTarget} PUBLIC fmt::fmt)
 
 	# Compile the Legacy C++ AI wrapper static library with creg support
 	add_library(${myCregTarget} STATIC ${mySources} ${sources_engine_System_creg})
 	add_dependencies(${myCregTarget} generateVersionFiles)
+	target_link_libraries(${myCregTarget} PUBLIC fmt::fmt)
 	set_target_properties(${myCregTarget} PROPERTIES OUTPUT_NAME   "${myName}Creg")
 	set_target_properties(${myCregTarget} PROPERTIES COMPILE_FLAGS "-DUSING_CREG")
 endif (BUILD_${myName}_AIWRAPPER)
