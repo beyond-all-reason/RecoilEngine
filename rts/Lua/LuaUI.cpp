@@ -128,6 +128,7 @@ CLuaUI::CLuaUI()
 	    !AddEntriesToTable(L, "Spring",      LuaUnsyncedCtrl::PushEntries)   ||
 	    !AddEntriesToTable(L, "Spring",      LuaUnsyncedRead::PushEntries)   ||
 	    !AddEntriesToTable(L, "Spring",      LuaUICommand::PushEntries)      ||
+	    !AddEntriesToTable(L, "debug",       LuaUnsyncedCtrl::PushDebugEntries) ||
 	    !AddEntriesToTable(L, "gl",          LuaOpenGL::PushEntries)         ||
 	    !AddEntriesToTable(L, "GL",          LuaConstGL::PushEntries)        ||
 	    !AddEntriesToTable(L, "Engine",      LuaConstEngine::PushEntries)    ||

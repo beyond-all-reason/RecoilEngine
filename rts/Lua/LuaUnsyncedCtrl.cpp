@@ -33,10 +33,15 @@
 #include "Game/UI/GuiHandler.h"
 #include "Game/UI/InfoConsole.h"
 #include "Game/UI/KeyCodes.h"
+#include "Game/UI/ScanCodes.h"
 #include "Game/UI/KeySet.h"
 #include "Game/UI/KeyBindings.h"
 #include "Game/UI/MiniMap.h"
 #include "Game/UI/MouseHandler.h"
+#include "Game/GameController.h"
+#include "System/Input/KeyInput.h"
+#include "System/Input/MouseInput.h"
+#include "System/Platform/SDL1_keysym.h"
 #include "Game/UI/Groups/Group.h"
 #include "Game/UI/Groups/GroupHandler.h"
 #include "Map/MapInfo.h"
@@ -346,6 +351,23 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(RequestStartPosition);
 
 	REGISTER_LUA_CFUNC(Yield);
+
+	return true;
+}
+
+
+// no engine-side access gate on these: the only invariant that must hold is that
+// Lua never gets two Presses or two Releases in a row, which the emulate handlers
+// enforce structurally by edge-detecting the combined physical+emulated state. a
+// game that wants to restrict them (e.g. outside headless test runs) nils them out.
+bool LuaUnsyncedCtrl::PushDebugEntries(lua_State* L)
+{
+	REGISTER_NAMED_LUA_CFUNC("emulateKeyPress",     EmulateKeyPress);
+	REGISTER_NAMED_LUA_CFUNC("emulateKeyRelease",   EmulateKeyRelease);
+	REGISTER_NAMED_LUA_CFUNC("emulateMousePress",   EmulateMousePress);
+	REGISTER_NAMED_LUA_CFUNC("emulateMouseRelease", EmulateMouseRelease);
+	REGISTER_NAMED_LUA_CFUNC("emulateMouseMove",    EmulateMouseMove);
+	REGISTER_NAMED_LUA_CFUNC("clearEmulatedInput",  ClearEmulatedInputLua);
 
 	return true;
 }
@@ -3173,6 +3195,185 @@ int LuaUnsyncedCtrl::WarpMouse(lua_State* L)
 	const int y = globalRendering->viewSizeY - luaL_checkint(L, 2) - 1;
 	mouse->WarpMouse(x, y);
 	return 0;
+}
+
+
+/*** @function debug.emulateKeyPress
+ * @param keycode integer
+ * @return nil
+ */
+int LuaUnsyncedCtrl::EmulateKeyPress(lua_State* L)
+{
+	if (activeController == nullptr)
+		return 0;
+
+	// Lua passes SDL1.2 keysyms; the held-state side (keyVec/IsKeyPressed) works in
+	// raw SDL2, while the event side wants the normalized code like a real KEYDOWN
+	const int rawKey = SDL12_keysyms(luaL_checkint(L, 1));
+	const SDL_Scancode sc = SDL_GetScancodeFromKey((SDL_Keycode)rawKey);
+	const int eventKey = CKeyCodes::GetNormalizedSymbol(rawKey);
+	const int scanCode = CScanCodes::GetNormalizedSymbol(sc);
+
+	int numKeys = 0;
+	const uint8_t* kbState = SDL_GetKeyboardState(&numKeys);
+	const bool physicalDown = ((int)sc < numKeys && kbState[sc] != 0);
+
+	// only fire on an effective (physical-or-emulated) false->true edge
+	const bool wasDown = physicalDown || KeyInput::IsKeyEmulated(rawKey);
+
+	KeyInput::SetKeyEmulated(rawKey, true);
+	KeyInput::Update(keyBindings.GetFakeMetaKey());
+
+	if (!wasDown)
+		activeController->KeyPressed(eventKey, scanCode, false);
+
+	return 0;
+}
+
+
+/*** @function debug.emulateKeyRelease
+ * @param keycode integer
+ * @return nil
+ */
+int LuaUnsyncedCtrl::EmulateKeyRelease(lua_State* L)
+{
+	if (activeController == nullptr)
+		return 0;
+
+	const int rawKey = SDL12_keysyms(luaL_checkint(L, 1));
+	const SDL_Scancode sc = SDL_GetScancodeFromKey((SDL_Keycode)rawKey);
+	const int eventKey = CKeyCodes::GetNormalizedSymbol(rawKey);
+	const int scanCode = CScanCodes::GetNormalizedSymbol(sc);
+
+	int numKeys = 0;
+	const uint8_t* kbState = SDL_GetKeyboardState(&numKeys);
+	const bool physicalDown = ((int)sc < numKeys && kbState[sc] != 0);
+
+	const bool wasDown = physicalDown || KeyInput::IsKeyEmulated(rawKey);
+
+	KeyInput::SetKeyEmulated(rawKey, false);
+	KeyInput::Update(keyBindings.GetFakeMetaKey());
+
+	// effective after = physical; fire release only on a true->false edge
+	if (wasDown && !physicalDown)
+		activeController->KeyReleased(eventKey, scanCode);
+
+	return 0;
+}
+
+
+/*** @function debug.emulateMousePress
+ * @param button integer
+ * @return nil
+ */
+int LuaUnsyncedCtrl::EmulateMousePress(lua_State* L)
+{
+	if (mouse == nullptr)
+		return 0;
+
+	const int button = luaL_checkint(L, 1);
+	const bool physicalDown = (SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON(button)) != 0;
+	const bool wasDown = physicalDown || mouse->IsButtonEmulated(button);
+
+	mouse->SetButtonEmulated(button, true);
+
+	if (!wasDown)
+		mouse->MousePress(mouse->lastx, mouse->lasty, button);
+
+	return 0;
+}
+
+
+/*** @function debug.emulateMouseRelease
+ * @param button integer
+ * @return nil
+ */
+int LuaUnsyncedCtrl::EmulateMouseRelease(lua_State* L)
+{
+	if (mouse == nullptr)
+		return 0;
+
+	const int button = luaL_checkint(L, 1);
+	const bool physicalDown = (SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON(button)) != 0;
+	const bool wasDown = physicalDown || mouse->IsButtonEmulated(button);
+
+	mouse->SetButtonEmulated(button, false);
+
+	if (wasDown && !physicalDown)
+		mouse->MouseRelease(mouse->lastx, mouse->lasty, button);
+
+	return 0;
+}
+
+
+/*** @function debug.emulateMouseMove
+ * @param x integer
+ * @param y integer
+ * @return nil
+ */
+int LuaUnsyncedCtrl::EmulateMouseMove(lua_State* L)
+{
+	if (mouse == nullptr || mouseInput == nullptr)
+		return 0;
+
+	const int x = luaL_checkint(L, 1);
+	const int y = globalRendering->viewSizeY - luaL_checkint(L, 2) - 1;
+
+	const int2 prev = mouseInput->GetPos();
+	mouseInput->SetPos(int2(x, y));
+	mouse->MouseMove(x, y, x - prev.x, y - prev.y);
+
+	return 0;
+}
+
+
+/*** @function debug.clearEmulatedInput
+ * @return nil
+ */
+int LuaUnsyncedCtrl::ClearEmulatedInputLua(lua_State* L)
+{
+	ClearEmulatedInput();
+	return 0;
+}
+
+
+void LuaUnsyncedCtrl::ClearEmulatedInput()
+{
+	int numKeys = 0;
+	const uint8_t* kbState = SDL_GetKeyboardState(&numKeys);
+
+	// snapshot before clearing: the release calls below must not walk the store
+	// we are emptying
+	const std::vector<int> keyCodes = KeyInput::GetEmulatedKeys();
+
+	KeyInput::ClearEmulatedKeys();
+	KeyInput::Update(keyBindings.GetFakeMetaKey());
+
+	if (activeController != nullptr) {
+		// the store holds raw SDL2 keycodes; the event side wants the normalized code
+		for (const int rawKey: keyCodes) {
+			const SDL_Scancode sc = SDL_GetScancodeFromKey((SDL_Keycode)rawKey);
+
+			if ((int)sc < numKeys && kbState[sc] != 0)
+				continue;
+
+			activeController->KeyReleased(CKeyCodes::GetNormalizedSymbol(rawKey), CScanCodes::GetNormalizedSymbol(sc));
+		}
+	}
+
+	if (mouse != nullptr) {
+		const Uint32 buttonState = SDL_GetMouseState(nullptr, nullptr);
+
+		for (int button = 1; button <= NUM_BUTTONS; ++button) {
+			if (!mouse->IsButtonEmulated(button))
+				continue;
+
+			mouse->SetButtonEmulated(button, false);
+
+			if ((buttonState & SDL_BUTTON(button)) == 0)
+				mouse->MouseRelease(mouse->lastx, mouse->lasty, button);
+		}
+	}
 }
 
 
