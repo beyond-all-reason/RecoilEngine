@@ -3832,19 +3832,37 @@ string CLuaHandle::WorldTooltip(const CUnit* unit,
  * @param endX number World x of the drag end position (under the cursor).
  * @param endY number World y of the drag end position.
  * @param endZ number World z of the drag end position.
- * @return string? shape One of "single", "straightline", "diagonal", "flood", "hollowbox"
- * or "surround" ("surround" rings the building or queued build order under the cursor,
- * degrading to "straightline" without one). Return nil (or an unknown name) for the
- * default modifier-key behaviour.
+ * @return string? shape One of "single", "cardinalline", "freeangleline",
+ * "flood", "hollowbox" or "surround". The latter two both ring an existing
+ * building (or queued build order) under the cursor; without such a target a
+ * "hollowbox" keeps its shape while a "surround" degrades to a cardinal line.
+ * Return nil (or an unknown name) for the default modifier-key behaviour.
  */
-string CLuaHandle::GetBuildShape(int unitDefID, int facing, const float3& startPos, const float3& endPos)
+
+// Shape names accepted from the GetBuildShape callin. An unknown name parses to
+// nullopt, so a garbled reply degrades to the default behaviour instead of surprising.
+static std::optional<BuildPosShape> ParseBuildPosShapeName(const std::string& name)
+{
+	const std::string s = StringToLower(name);
+
+	if (s == "single")        return BuildPosShape::Single;
+	if (s == "cardinalline")  return BuildPosShape::CardinalLine;
+	if (s == "freeangleline") return BuildPosShape::FreeAngleLine;
+	if (s == "flood")         return BuildPosShape::Flood;
+	if (s == "hollowbox")     return BuildPosShape::HollowBox;
+	if (s == "surround")      return BuildPosShape::Surround;
+
+	return std::nullopt;
+}
+
+std::optional<BuildPosShape> CLuaHandle::GetBuildShape(int unitDefID, int facing, const float3& startPos, const float3& endPos)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	LUA_CALL_IN_CHECK(L, "");
+	LUA_CALL_IN_CHECK(L, std::nullopt);
 	luaL_checkstack(L, 10, __func__);
 	static const LuaHashString cmdStr(__func__);
 	if (!cmdStr.GetGlobalFunc(L))
-		return "";
+		return std::nullopt;
 
 	lua_pushnumber(L, unitDefID);
 	lua_pushnumber(L, facing);
@@ -3857,11 +3875,11 @@ string CLuaHandle::GetBuildShape(int unitDefID, int facing, const float3& startP
 
 	// call the routine
 	if (!RunCallIn(L, cmdStr, 8, 1))
-		return "";
+		return std::nullopt;
 
-	const string retval = luaL_optstring(L, -1, "");
+	const std::string retval = luaL_optstring(L, -1, "");
 	lua_pop(L, 1);
-	return retval;
+	return ParseBuildPosShapeName(retval);
 }
 
 /***

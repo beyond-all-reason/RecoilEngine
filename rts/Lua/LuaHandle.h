@@ -239,7 +239,7 @@ class CLuaHandle : public CEventClient
 			const float3* groundPos
 		) override;
 
-		std::string GetBuildShape(
+		std::optional<BuildPosShape> GetBuildShape(
 			int unitDefID,
 			int facing,
 			const float3& startPos,

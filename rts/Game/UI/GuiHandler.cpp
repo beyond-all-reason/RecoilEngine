@@ -2,6 +2,8 @@
 
 #include "GuiHandler.h"
 
+#include <optional>
+
 #include <Rml/Backends/RmlUi_Backend.h>
 #include "CommandColors.h"
 #include "KeyBindings.h"
@@ -2516,41 +2518,6 @@ static void FillRowOfBuildPos(const BuildInfo& startInfo, float x, float z, floa
 }
 
 
-// The distinct layouts a build-drag can produce. A shape is described purely by its geometry; 
-enum class BuildPosShape {
-	Single,        // a single building (drag too small to fit more)
-	StraightLine,  // a line locked to its dominant (x or z) axis
-	Diagonal,      // a free-angle line following the drag direction
-	Flood,         // a solid, filled rectangle
-	HollowBox,     // only the outline (perimeter) of a rectangle
-	Surround,      // a ring around an existing building under the cursor
-};
-
-
-// Shape names accepted from the GetBuildShape callin. Returns false on an unknown
-// name, so a garbled reply degrades to the default behaviour instead of surprising.
-static bool ParseBuildPosShapeName(const std::string& name, BuildPosShape& shape)
-{
-	const std::string s = StringToLower(name);
-
-	if (s == "single")       { shape = BuildPosShape::Single;       return true; }
-	if (s == "straightline") { shape = BuildPosShape::StraightLine; return true; }
-	if (s == "diagonal")     { shape = BuildPosShape::Diagonal;     return true; }
-	if (s == "flood")        { shape = BuildPosShape::Flood;        return true; }
-	if (s == "hollowbox")    { shape = BuildPosShape::HollowBox;    return true; }
-	if (s == "surround")     { shape = BuildPosShape::Surround;     return true; }
-
-	return false;
-}
-
-// Ask the game (GetBuildShape callin) which shape the current build drag should trace
-// out. Returns false when no handler answered with a known shape name, in which case
-// the default modifier-key behaviour applies.
-static bool QueryBuildShape(const BuildInfo& info, const float3& start, const float3& end, BuildPosShape& shape)
-{
-	return ParseBuildPosShapeName(eventHandler.GetBuildShape(info.def->id, info.buildFacing, start, end), shape);
-}
-
 // Default behaviour, used while the game leaves GetBuildShape unanswered: drag shapes
 // require the queue key, ctrl over a building surrounds it, alt fills the dragged
 // rectangle (only its perimeter with ctrl), ctrl locks a dragged line to its axis.
@@ -2569,15 +2536,16 @@ static BuildPosShape ResolveDefaultBuildPosShape(bool queue, bool hasSurroundTar
 	if (alt)
 		return ctrl ? BuildPosShape::HollowBox : BuildPosShape::Flood;
 
-	return ctrl ? BuildPosShape::StraightLine : BuildPosShape::Diagonal;
+	return ctrl ? BuildPosShape::CardinalLine : BuildPosShape::FreeAngleLine;
 }
 
 // Whether the active shape spans the drag from start to end (vs a single building).
 // Decides whether the caller feeds GetBuildPositions the drag span or a single point.
 static bool BuildPosWantsDrag(const BuildInfo& startInfo, const BuildInfo& endInfo, bool queue)
 {
-	BuildPosShape shape;
-	if (QueryBuildShape(startInfo, CGameHelper::Pos2BuildPos(startInfo, false), CGameHelper::Pos2BuildPos(endInfo, false), shape))
+	const auto shape = eventHandler.GetBuildShape(startInfo.def->id, startInfo.buildFacing, CGameHelper::Pos2BuildPos(startInfo, false), CGameHelper::Pos2BuildPos(endInfo, false));
+
+	if (shape.has_value())
 		return (shape != BuildPosShape::Single);
 
 	// default: dragging out multiple buildings requires the queue key
@@ -2593,9 +2561,9 @@ static void AddSingleBuildPos(const BuildInfo& startInfo, const float3& pos, std
 }
 
 
-// Straight line / Diagonal: a single row of buildings spanning the drag.
-// When axisLocked (CTRL) the row snaps to its dominant axis; otherwise it
-// follows the drag slope to form a diagonal.
+// Cardinal / free-angle line: a single row of buildings spanning the drag.
+// When axisLocked the row snaps to its dominant (cardinal) axis; otherwise
+// it follows the drag slope.
 static void AddLineBuildPositions(const BuildInfo& startInfo, const float3& start, const float3& delta, int xnum, int znum, float xstep, float zstep, bool axisLocked, std::vector<BuildInfo>& buildInfos)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -2735,21 +2703,30 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 
 	// the game decides the shape via the GetBuildShape callin; unanswered queries
 	// resolve to the default modifier-key behaviour
-	BuildPosShape shape;
-	bool gameAnswered = QueryBuildShape(startInfo, start, end, shape);
+	const std::optional<BuildPosShape> queried = eventHandler.GetBuildShape(startInfo.def->id, startInfo.buildFacing, start, end);
 
-	// Surround rings an existing building (or queued build order) under the cursor;
-	// only trace for one while the resolved shape can actually use it.
+	// "hollowbox" and "surround" both ring an existing building (or queued build
+	// order) under the cursor; they differ without one, where a hollow box keeps
+	// its shape and a surround degrades to a cardinal line. Only trace for a
+	// target while the resolved shape can actually use one.
+	const bool wantsSurround = queried.has_value()
+		? (queried == BuildPosShape::HollowBox || queried == BuildPosShape::Surround)
+		: (queue && KeyInput::GetKeyModState(KMOD_CTRL));
+
 	BuildInfo other;
-	if ((gameAnswered && shape == BuildPosShape::Surround) || (!gameAnswered && queue && KeyInput::GetKeyModState(KMOD_CTRL)))
+	if (wantsSurround)
 		other = FindSurroundTarget(startInfo, cameraPos, mouseDir);
 
 	const bool hasSurroundTarget = (other.def != nullptr);
 
-	if (gameAnswered) {
-		// a surround with nothing to ring degrades to a straight line along the drag
-		if (shape == BuildPosShape::Surround && !hasSurroundTarget)
-			shape = BuildPosShape::StraightLine;
+	BuildPosShape shape;
+	if (queried.has_value()) {
+		shape = *queried;
+
+		if (wantsSurround && hasSurroundTarget)
+			shape = BuildPosShape::Surround;
+		else if (shape == BuildPosShape::Surround)
+			shape = BuildPosShape::CardinalLine;
 
 		// a drag too small to fit a second building always degrades to a single one
 		if (shape != BuildPosShape::Surround && singleCell)
@@ -2759,12 +2736,12 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 	}
 
 	switch (shape) {
-		case BuildPosShape::Single:       AddSingleBuildPos         (startInfo, end, buildInfos);                                           break;
-		case BuildPosShape::StraightLine: AddLineBuildPositions     (startInfo, start, delta, xnum, znum, xstep, zstep, true,  buildInfos); break;
-		case BuildPosShape::Diagonal:     AddLineBuildPositions     (startInfo, start, delta, xnum, znum, xstep, zstep, false, buildInfos); break;
-		case BuildPosShape::Flood:        AddFloodBuildPositions    (startInfo, start, xnum, znum, xstep, zstep, buildInfos);               break;
-		case BuildPosShape::HollowBox:    AddHollowBoxBuildPositions(startInfo, start, xnum, znum, xstep, zstep, buildInfos);               break;
-		case BuildPosShape::Surround:     AddSurroundBuildPositions (startInfo, other, buildInfos);                                         break;
+		case BuildPosShape::Single:        AddSingleBuildPos         (startInfo, end, buildInfos);                                           break;
+		case BuildPosShape::CardinalLine:  AddLineBuildPositions     (startInfo, start, delta, xnum, znum, xstep, zstep, true,  buildInfos); break;
+		case BuildPosShape::FreeAngleLine: AddLineBuildPositions     (startInfo, start, delta, xnum, znum, xstep, zstep, false, buildInfos); break;
+		case BuildPosShape::Flood:         AddFloodBuildPositions    (startInfo, start, xnum, znum, xstep, zstep, buildInfos);               break;
+		case BuildPosShape::HollowBox:     AddHollowBoxBuildPositions(startInfo, start, xnum, znum, xstep, zstep, buildInfos);               break;
+		case BuildPosShape::Surround:      AddSurroundBuildPositions (startInfo, other, buildInfos);                                         break;
 	}
 
 	return (buildInfos.size());
