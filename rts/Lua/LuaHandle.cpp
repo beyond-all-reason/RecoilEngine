@@ -41,6 +41,8 @@
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Weapons/Weapon.h"
 #include "Sim/Weapons/WeaponDef.h"
+#include "System/FileSystem/FileHandler.h"
+#include "System/FileSystem/VFSModes.h"
 #include "System/creg/SerializeLuaState.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/EventHandler.h"
@@ -55,6 +57,8 @@
 
 
 #include "LuaInclude.h"
+
+#include "lib/luasocket/src/luasocket.h"
 
 #include <SDL_keyboard.h>
 #include <SDL_keycode.h>
@@ -546,6 +550,28 @@ bool CLuaHandle::LoadCode(lua_State* L, std::string code, const string& debug)
 
 	// call Initialize immediately after load
 	return (RunCallInTraceback(L, cmdStr, 0, 0, traceBack.GetErrFuncIdx(), false));
+}
+
+
+void CLuaHandle::InitLuaSocket(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	const std::string filename = "LuaSocket/socket.lua";
+	CFileHandler f(filename, SPRING_VFS_BASE);
+	if (!f.FileExists()) {
+		LOG_L(L_ERROR, "Error loading %s (file does not exist)", filename.c_str());
+		return;
+	}
+
+	LUA_OPEN_LIB(L, luaopen_socket_core);
+
+	std::string code;
+	if (f.LoadStringData(code)) {
+		LoadCode(L, std::move(code), filename);
+	} else {
+		LOG_L(L_ERROR, "Error loading %s", filename.c_str());
+	}
 }
 
 

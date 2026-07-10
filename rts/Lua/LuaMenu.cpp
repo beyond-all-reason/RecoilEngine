@@ -24,7 +24,6 @@
 #include "System/FileSystem/FileHandler.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/Threading/SpringThreading.h"
-#include "lib/luasocket/src/luasocket.h"
 #include "LuaUI.h"
 
 #include "System/Misc/TracyDefs.h"
@@ -131,22 +130,6 @@ string CLuaMenu::LoadFile(const string& name) const
 		code.clear();
 
 	return code;
-}
-
-
-void CLuaMenu::InitLuaSocket(lua_State* L) {
-	RECOIL_DETAILED_TRACY_ZONE;
-	std::string code;
-	std::string filename = "socket.lua";
-	CFileHandler f(filename);
-
-	LUA_OPEN_LIB(L, luaopen_socket_core);
-
-	if (f.LoadStringData(code)) {
-		LoadCode(L, std::move(code), filename);
-	} else {
-		LOG_L(L_ERROR, "Error loading %s", filename.c_str());
-	}
 }
 
 
