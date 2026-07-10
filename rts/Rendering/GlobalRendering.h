@@ -295,6 +295,7 @@ public:
 	bool haveMesa;
 	bool haveIntel;
 	bool haveNvidia;
+	bool haveApple;
 
 
 	/**

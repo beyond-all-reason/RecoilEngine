@@ -2,6 +2,7 @@
 
 
 #include <string>
+#include <cmath>
 #include "AssIO.h"
 
 #include "System/FileSystem/FileHandler.h"

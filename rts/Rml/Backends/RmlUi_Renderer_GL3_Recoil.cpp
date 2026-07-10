@@ -539,7 +539,8 @@ static bool CreateFramebuffer(
 {
 	auto tok = Gfx::CheckGLError("CreateFramebuffer");
 
-#ifdef RMLUI_PLATFORM_EMSCRIPTEN
+#if defined(RMLUI_PLATFORM_EMSCRIPTEN) || defined(__APPLE__)
+	// Apple's Metal GL wrapper does not reliably support GL_CLAMP_TO_BORDER
 	constexpr GLint wrap_mode = GL_CLAMP_TO_EDGE;
 #else
 	constexpr GLint wrap_mode = GL_CLAMP_TO_BORDER; // GL_REPEAT GL_MIRRORED_REPEAT GL_CLAMP_TO_EDGE
@@ -569,7 +570,8 @@ static bool CreateFramebuffer(
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, min_mag_filter);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, wrap_mode);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, wrap_mode);
-#ifndef RMLUI_PLATFORM_EMSCRIPTEN
+#if !defined(RMLUI_PLATFORM_EMSCRIPTEN) && !defined(__APPLE__)
+		// Skip on macOS: GL_CLAMP_TO_BORDER not reliably supported by Metal GL wrapper
 		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, &border_color[0]);
 #endif
 
@@ -1086,8 +1088,14 @@ RenderInterface_GL3_Recoil::GenerateTexture(Rml::Span<const Rml::byte> source_da
 
 	glBindTexture(GL_TEXTURE_2D, texture_id);
 
+	// Ensure correct pixel row alignment on macOS Metal GL wrapper
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, source_dimensions.x, source_dimensions.y, 0, GL_RGBA, GL_UNSIGNED_BYTE,
 				 source_data.data());
+
+	// Restore default alignment
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -1285,7 +1293,11 @@ void RenderInterface_GL3_Recoil::RenderBlur(float sigma, const Gfx::FramebufferD
 
 void RenderInterface_GL3_Recoil::ReleaseTexture(Rml::TextureHandle texture_handle)
 {
-	glDeleteTextures(1, (GLuint*) &texture_handle);
+	// Fix: texture_handle is passed by value (not an array), so &texture_handle
+	// is the address of a stack variable, not the texture ID itself.
+	// Cast directly to GLuint instead of taking address.
+	GLuint tex = (GLuint)(uintptr_t)texture_handle;
+	glDeleteTextures(1, &tex);
 }
 
 void RenderInterface_GL3_Recoil::SetTransform(const Rml::Matrix4f* new_transform)

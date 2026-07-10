@@ -183,6 +183,7 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(haveMesa),
 	CR_IGNORED(haveIntel),
 	CR_IGNORED(haveNvidia),
+	CR_IGNORED(haveApple),
 
 	CR_IGNORED(amdHacks),
 	CR_IGNORED(supportPersistentMapping),
@@ -313,6 +314,7 @@ CGlobalRendering::CGlobalRendering()
 	, haveMesa(false)
 	, haveIntel(false)
 	, haveNvidia(false)
+	, haveApple(false)
 	, amdHacks(false)
 
 	, supportPersistentMapping(false)
@@ -490,8 +492,8 @@ SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 			if ((newContext = SDL_GL_CreateContext(sdlWindow)) == nullptr) {
 				LOG_L(L_WARNING, frmts[false], __func__, SDL_GetError(), tmpCtx.x, tmpCtx.y, profs[mask == SDL_GL_CONTEXT_PROFILE_CORE]);
 			} else {
-				// save the lowest successfully created fallback compatibility-context
-				if (mask == SDL_GL_CONTEXT_PROFILE_COMPATIBILITY && cmpCtx.x == 0 && tmpCtx.x >= minCtx.x)
+				// save the lowest successfully created fallback context (either compatibility or core)
+				if (cmpCtx.x == 0 && tmpCtx.x >= minCtx.x)
 					cmpCtx = tmpCtx;
 
 				LOG_L(L_WARNING, frmts[true], __func__, tmpCtx.x, tmpCtx.y, profs[mask == SDL_GL_CONTEXT_PROFILE_CORE]);
@@ -509,9 +511,15 @@ SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, cmpCtx.x);
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, cmpCtx.y);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+	// Try core first, then compatibility
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 
 	// should never fail at this point
+	if ((newContext = SDL_GL_CreateContext(sdlWindow)) != nullptr)
+		return newContext;
+
+	// Fallback to compatibility if core didn't work
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
 	return (newContext = SDL_GL_CreateContext(sdlWindow));
 }
 
@@ -587,7 +595,52 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 	if ((glContext = CreateGLContext(minCtx)) == nullptr)
 		return false;
 
+	MakeCurrentContext(false);
+
 	gladLoadGL();
+
+#if defined(__APPLE__)
+	// Initialize MGL (OpenGL->Metal) and override GLAD function pointers
+	extern void MGL_InitWithSDLWindow(SDL_Window*);
+	extern void MGL_OverrideGLADPointers(void);
+	fprintf(stderr, "Calling MGL_InitWithSDLWindow...\n");
+	MGL_InitWithSDLWindow(sdlWindow);
+	fprintf(stderr, "Calling MGL_OverrideGLADPointers...\n");
+	// MGL_OverrideGLADPointers();  // Use Apple's GL for rendering
+	fprintf(stderr, "MGL layer active, Apple GL rendering\n");
+#endif
+
+	#if defined(__APPLE__)
+	{
+		// macOS GL 4.1 core: these extensions are core features not listed as extensions
+		// Only set flags that are needed for GL4+ code paths
+		if (GLAD_GL_VERSION_4_1) {
+			GLAD_GL_ARB_shading_language_420pack = 1; // core in GL 4.2 but available on macOS
+		}
+		if (GLAD_GL_VERSION_3_1) {
+			GLAD_GL_ARB_uniform_buffer_object = 1; // core in GL 3.1
+		}
+		if (GLAD_GL_VERSION_3_0) {
+			GLAD_GL_ARB_framebuffer_object = 1;
+			GLAD_GL_ARB_multitexture = 1;
+			GLAD_GL_ARB_texture_env_combine = 1;
+			GLAD_GL_ARB_texture_compression = 1;
+			GLAD_GL_ARB_texture_non_power_of_two = 1;
+			GLAD_GL_ARB_vertex_shader = 1;
+			GLAD_GL_ARB_fragment_shader = 1;
+			GLAD_GL_ARB_texture_float = 1;
+			GLAD_GL_ARB_vertex_buffer_object = 1;
+			GLAD_GL_ARB_map_buffer_range = 1;
+			GLAD_GL_ARB_draw_elements_base_vertex = 1;
+			GLAD_GL_ARB_occlusion_query = 1;
+			GLAD_GL_ARB_sync = 1;
+			GLAD_GL_ARB_texture_storage = 1;
+			GLAD_GL_ARB_copy_buffer = 1;
+			GLAD_GL_ARB_vertex_array_object = 1;
+		}
+	}
+	#endif
+
 	GLX::Load(sdlWindow);
 
 	if (!CheckGLContextVersion(minCtx)) {
@@ -786,12 +839,17 @@ void CGlobalRendering::CheckGLExtensions()
 	char errMsg[2048] = {0};
 	char* ptr = &extMsg[0];
 
-	if (!GLAD_GL_ARB_multitexture       ) ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " multitexture ");
-	if (!GLAD_GL_ARB_texture_env_combine) ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " texture_env_combine ");
-	if (!GLAD_GL_ARB_texture_compression) ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " texture_compression ");
-	if (!GLAD_GL_ARB_texture_float)       ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " texture_float ");
-	if (!GLAD_GL_ARB_texture_non_power_of_two) ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " texture_non_power_of_two ");
-	if (!GLAD_GL_ARB_framebuffer_object)       ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " framebuffer_object ");
+	// On macOS >= 4.1 core, these ARB extensions are part of the core spec
+	// and may not be listed as extensions. Check GL version as fallback.
+	const bool haveCoreGL = (GLAD_GL_VERSION_3_0 || GLAD_GL_VERSION_3_1 || GLAD_GL_VERSION_3_2 ||
+	                         GLAD_GL_VERSION_3_3 || GLAD_GL_VERSION_4_0 || GLAD_GL_VERSION_4_1);
+
+	if (!GLAD_GL_ARB_multitexture && !haveCoreGL) ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " multitexture ");
+	if (!GLAD_GL_ARB_texture_env_combine && !haveCoreGL) ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " texture_env_combine ");
+	if (!GLAD_GL_ARB_texture_compression && !haveCoreGL) ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " texture_compression ");
+	if (!GLAD_GL_ARB_texture_float && !haveCoreGL)       ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " texture_float ");
+	if (!GLAD_GL_ARB_texture_non_power_of_two && !haveCoreGL) ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " texture_non_power_of_two ");
+	if (!GLAD_GL_ARB_framebuffer_object && !haveCoreGL)       ptr += snprintf(ptr, sizeof(extMsg) - (ptr - extMsg), " framebuffer_object ");
 
 	if (extMsg[0] == 0)
 		return;
@@ -813,9 +871,12 @@ void CGlobalRendering::SetGLSupportFlags()
 	const std::string& glRenderer = StringToLower(globalRenderingInfo.glRenderer);
 	const std::string& glVersion = StringToLower(globalRenderingInfo.glVersion);
 
+	bool haveCoreGL = (GLAD_GL_VERSION_3_0 || GLAD_GL_VERSION_3_1 || GLAD_GL_VERSION_3_2 ||
+	                   GLAD_GL_VERSION_3_3 || GLAD_GL_VERSION_4_0 || GLAD_GL_VERSION_4_1);
+
 	bool haveGLSL  = (glGetString(GL_SHADING_LANGUAGE_VERSION) != nullptr);
-	haveGLSL &= static_cast<bool>(GLAD_GL_ARB_vertex_shader && GLAD_GL_ARB_fragment_shader);
-	haveGLSL &= static_cast<bool>(GLAD_GL_VERSION_2_0); // we want OpenGL 2.0 core functions
+	haveGLSL &= static_cast<bool>((GLAD_GL_ARB_vertex_shader && GLAD_GL_ARB_fragment_shader) || haveCoreGL);
+	haveGLSL &= static_cast<bool>(GLAD_GL_VERSION_2_0 || haveCoreGL); // we want OpenGL 2.0 core functions
 	haveGLSL |= underExternalDebug;
 
 	#ifndef HEADLESS
@@ -824,10 +885,11 @@ void CGlobalRendering::SetGLSupportFlags()
 	#endif
 
 	haveAMD    = (  glVendor.find(   "ati ") != std::string::npos) || (  glVendor.find("amd ") != std::string::npos) ||
-				 (glRenderer.find("radeon ") != std::string::npos) || (glRenderer.find("amd ") != std::string::npos); //it's amazing how inconsistent AMD detection can be
+				 (glRenderer.find("radeon ") != std::string::npos) || (glRenderer.find("amd ") != std::string::npos);
 	haveIntel  = (  glVendor.find(  "intel") != std::string::npos);
 	haveNvidia = (  glVendor.find("nvidia ") != std::string::npos);
 	haveMesa   = (glRenderer.find("mesa ") != std::string::npos) || (glRenderer.find("gallium ") != std::string::npos) || (glVersion.find(" mesa ") != std::string::npos);
+	haveApple  = (  glVendor.find(  "apple") != std::string::npos);
 
 	if (haveAMD) {
 		globalRenderingInfo.gpuName   = globalRenderingInfo.glRenderer;
@@ -841,6 +903,9 @@ void CGlobalRendering::SetGLSupportFlags()
 	} else if (haveMesa) {
 		globalRenderingInfo.gpuName   = globalRenderingInfo.glRenderer;
 		globalRenderingInfo.gpuVendor = globalRenderingInfo.glVendor;
+	} else if (haveApple) {
+		globalRenderingInfo.gpuName   = globalRenderingInfo.glRenderer;
+		globalRenderingInfo.gpuVendor = "Apple";
 	} else {
 		globalRenderingInfo.gpuName   = "Unknown";
 		globalRenderingInfo.gpuVendor = "Unknown";
@@ -1522,7 +1587,11 @@ void CGlobalRendering::UpdateViewPortGeometry()
 	dualViewSizeY = dualScreenRect.h;
 
 	// We store the offset in relation to window top border for sdl mouse translation
+#ifdef __APPLE__
+	viewWindowOffsetY = 0; // macOS borderless window - no menu bar offset needed
+#else
 	viewWindowOffsetY = first.y;
+#endif
 	dualWindowOffsetY = dualScreenRect.y;
 
 	// In-game and GL coords y orientation is inverse of SDL screen coords

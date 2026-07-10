@@ -410,11 +410,20 @@ void RecoilBuildMipmaps(const GLenum target, GLint internalFormat, const GLsizei
 
 	// cannot use glTexStorage2D/RecoilTexStorage2D as they don't support GL_COMPRESSED textures
 	glTexImage2D(target, 0, internalFormat, width, height, 0, format, type, data);
+
+#ifdef __APPLE__
+	// Apple Metal GL wrapper: skip pre-allocating empty mip levels.
+	// glGenerateMipmap will create them directly from level 0.
+	// Pre-allocating with NULL data confuses Metal's texture state tracking.
+	glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, levels - 1);
+#else
 	for (int level = 1; level < levels; ++level)
 		glTexImage2D(target, level, internalFormat, std::max(width >> level, 1), std::max(height >> level, 1), 0, format, type, nullptr);
 
 	glTexParameteri(target, GL_TEXTURE_BASE_LEVEL,          0);
 	glTexParameteri(target, GL_TEXTURE_MAX_LEVEL , levels - 1);
+#endif
 
 	if (globalRendering->amdHacks) {
 		glEnable(target);
@@ -548,7 +557,34 @@ bool glSpringBlitImages(
 void ClearScreen()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glClearColor(0, 0, 0, 1);
+	static int callCount = 0;
+	callCount++;
+
+	// Save framebuffer at frame 10 for debugging
+	if (callCount == 10) {
+		int vp[4];
+		glGetIntegerv(GL_VIEWPORT, vp);
+		int w = vp[2], h = vp[3];
+		fprintf(stderr, "[ClearScreen] Saving framebuffer %dx%d at frame %d\n", w, h, callCount);
+		unsigned char* pixels = new unsigned char[w * h * 3];
+		glReadPixels(vp[0], vp[1], w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels);
+		FILE* f = fopen("/tmp/bar_framebuffer.ppm", "wb");
+		if (f) {
+			fprintf(f, "P6\n%d %d\n255\n", w, h);
+			// Flip vertically (OpenGL has y=0 at bottom)
+			for (int y = h-1; y >= 0; y--)
+				fwrite(pixels + y * w * 3, 1, w * 3, f);
+			fclose(f);
+			fprintf(stderr, "[ClearScreen] Saved /tmp/bar_framebuffer.ppm\n");
+		}
+		delete[] pixels;
+	}
+
+	if (callCount < 2) {
+		glClearColor(1, 0, 0, 1); // RED SCREEN TEST
+	} else {
+		glClearColor(0, 0, 0, 1);
+	}
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glMatrixMode(GL_PROJECTION);

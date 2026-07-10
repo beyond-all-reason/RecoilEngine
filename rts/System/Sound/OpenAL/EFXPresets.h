@@ -6,7 +6,7 @@
 #include <string>
 
 #include <al.h>
-#include <efx.h>
+#include "efx.h"
 
 #include "System/float3.h"
 #include "System/UnorderedMap.hpp"

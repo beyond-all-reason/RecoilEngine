@@ -32,7 +32,25 @@ set(engineLibraries SDL2::SDL2)
 
 set(OpenGL_GL_PREFERENCE LEGACY)
 find_package_static(OpenGL 3.0 REQUIRED)
+# macOS: MGL replaces OpenGL - don't link Apple's framework directly
+if (NOT APPLE)
+	list(APPEND engineLibraries OpenGL::GL)
+endif()
+
+set(OpenGL_GL_PREFERENCE LEGACY)
+find_package_static(OpenGL 3.0 REQUIRED)
 list(APPEND engineLibraries OpenGL::GL)
+
+# MGL: OpenGL->Metal translation layer (Apple GL handles context, MGL renders)
+if (APPLE)
+	find_library(METAL_LIBRARY Metal)
+	find_library(QUARTZCORE_LIBRARY QuartzCore)
+	list(APPEND engineLibraries ${METAL_LIBRARY} ${QUARTZCORE_LIBRARY})
+	target_link_libraries(Game PRIVATE "${CMAKE_SOURCE_DIR}/../MGL/build_hb/libmgl.dylib")
+	target_include_directories(Game PRIVATE "${CMAKE_SOURCE_DIR}/../MGL/MGL/include")
+	target_compile_options(Game PRIVATE -fobjc-arc)
+	target_sources(Game PRIVATE "${CMAKE_SOURCE_DIR}/rts/Rendering/MGLIntegration.mm")
+endif()
 
 find_fontconfig_hack()
 find_package_static(Fontconfig 2.11 REQUIRED)

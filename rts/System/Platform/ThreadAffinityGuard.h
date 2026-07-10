@@ -3,16 +3,20 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#else
+#elif defined(__linux__)
 #include <sched.h>
 #endif
+// Note: sched.h is NOT included on macOS - thread affinity is not supported
 
 class ThreadAffinityGuard {
 private:
 #ifdef _WIN32
 	DWORD_PTR savedAffinity;
 	HANDLE threadHandle;
-#else
+#elif defined(__APPLE__)
+	// macOS thread affinity is not supported via POSIX API
+	int dummy;
+#elif defined(__linux__)
 	cpu_set_t savedAffinity;
 	pid_t tid;
 #endif
