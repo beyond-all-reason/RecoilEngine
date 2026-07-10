@@ -14,6 +14,12 @@ namespace KeyInput {
 	void SetKeyModState(int mod, bool pressed);
 	bool GetKeyModState(int mod);
 
+	// input emulation (debug.emulateKey*): keys forced down independent of hardware
+	bool IsKeyEmulated(int keyCode);
+	void SetKeyEmulated(int keyCode, bool pressed);
+	const std::vector<int>& GetEmulatedKeys();
+	void ClearEmulatedKeys();
+
 	typedef std::pair<int, bool> Key;
 
 	const std::vector<Key>& GetPressedKeys();

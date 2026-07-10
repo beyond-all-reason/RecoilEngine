@@ -52,6 +52,10 @@ public:
 	void MousePress(int x, int y, int button);
 	void MouseMove(int x, int y, int dx, int dy);
 	void MouseWheel(float delta);
+
+	// input emulation (debug.emulateMouse*): a button held independent of hardware
+	void SetButtonEmulated(int button, bool pressed) { buttons[button].emulated = pressed; }
+	bool IsButtonEmulated(int button) const { return buttons[button].emulated; }
 	void WindowLeave();
 	void WindowEnter();
 
@@ -153,6 +157,7 @@ public:
 
 	struct ButtonPressEvt {
 		bool pressed = false;
+		bool emulated = false;
 		bool chorded = false;
 		int x = 0;
 		int y = 0;
