@@ -3,7 +3,7 @@
 #include "System/Log/ILog.h"
 #ifdef _WIN32
 #include <windows.h>
-#else
+#elif defined(__linux__)
 #include <sched.h>
 #include <unistd.h>
 #include <syscall.h>
@@ -18,7 +18,7 @@ ThreadAffinityGuard::ThreadAffinityGuard() : affinitySaved(false) {
 	if (!affinitySaved) {
 		LOG_L(L_WARNING, "GetThreadAffinityMask failed with error code: %lu", GetLastError());
 	}
-#else
+#elif defined(__linux__)
 	tid = syscall(SYS_gettid);  // Get thread ID
 	CPU_ZERO(&savedAffinity);
 	if (sched_getaffinity(tid, sizeof(cpu_set_t), &savedAffinity) == 0) {
@@ -26,6 +26,9 @@ ThreadAffinityGuard::ThreadAffinityGuard() : affinitySaved(false) {
 	} else {
 		LOG_L(L_WARNING, "Failed to save thread affinity.");
 	}
+#elif defined(__APPLE__)
+	// No-op on macOS - thread affinity is not supported via POSIX API
+	affinitySaved = false;
 #endif
 }
 
@@ -36,10 +39,11 @@ ThreadAffinityGuard::~ThreadAffinityGuard() {
 		if (!SetThreadAffinityMask(threadHandle, savedAffinity)) {
 			LOG_L(L_WARNING, "SetThreadAffinityMask failed with error code: %lu", GetLastError());
 		}
-#else
+#elif defined(__linux__)
 		if (sched_setaffinity(tid, sizeof(cpu_set_t), &savedAffinity) != 0) {
 			LOG_L(L_WARNING, "Failed to restore thread affinity.");
 		}
 #endif
+		// No-op on macOS
 	}
 }

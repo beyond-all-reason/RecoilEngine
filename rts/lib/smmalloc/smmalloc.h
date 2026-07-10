@@ -28,6 +28,7 @@
 #include <initializer_list>
 #include <memory>
 #include <stdint.h>
+#include <type_traits>
 
 //#define SMMALLOC_STATS_SUPPORT
 

@@ -1,6 +1,6 @@
 #include "glFontRenderer.h"
-
 #include "glFont.h"
+#include "Rendering/GL/myGL.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Shaders/Shader.h"
 #include "System/Log/ILog.h"
@@ -9,11 +9,13 @@
 #include "System/Misc/TracyDefs.h"
 
 
-////////////////////////////////////////
-//can't be put in VFS due to initialization order
+
+// can't be put in VFS due to initialization order
 static constexpr const char* vsFont330 = R"(
-#version 150 compatibility
+#version 150 core
 #extension GL_ARB_explicit_attrib_location : enable
+
+uniform mat4 u_mvpMatrix;
 
 layout (location = 0) in vec3 pos;
 layout (location = 1) in vec2 uv;
@@ -27,7 +29,7 @@ out Data {
 void main() {
 	vCol = col;
 	vUV  = uv;
-	gl_Position = gl_ModelViewProjectionMatrix * vec4(pos, 1.0); // TODO: move to UBO
+	gl_Position = u_mvpMatrix * vec4(pos, 1.0); // TODO: move to UBO
 }
 )";
 
@@ -75,7 +77,9 @@ void main() {
 ////////////////////////////////////////////
 
 static constexpr const char* vsFont130 = R"(
-#version 130
+#version 150 core
+
+uniform mat4 u_mvpMatrix;
 
 in vec3 pos;
 in vec2 uv;
@@ -87,7 +91,7 @@ out vec2 vUV;
 void main() {
 	vCol = col;
 	vUV  = uv;
-	gl_Position = gl_ModelViewProjectionMatrix * vec4(pos, 1.0); // TODO: move to UBO
+	gl_Position = u_mvpMatrix * vec4(pos, 1.0); // TODO: move to UBO
 }
 )";
 
@@ -161,17 +165,25 @@ CglShaderFontRenderer::CglShaderFontRenderer()
 
 	}
 	fontShader->Link();
+	// Create temp VAO for validation (required on macOS core profile)
+	GLuint tempVAO = 0;
+	glGenVertexArrays(1, &tempVAO);
+	glBindVertexArray(tempVAO);
 	fontShader->Enable();
 	fontShader->SetUniform("tex", 0);
 	fontShader->Disable();
 	fontShader->Validate();
+	glDeleteVertexArrays(1, &tempVAO);
 	assert(fontShader->IsValid());
 
 	fontShaderColor->Link();
+	glGenVertexArrays(1, &tempVAO);
+	glBindVertexArray(tempVAO);
 	fontShaderColor->Enable();
 	fontShaderColor->SetUniform("tex", 0);
 	fontShaderColor->Disable();
 	fontShaderColor->Validate();
+	glDeleteVertexArrays(1, &tempVAO);
 	assert(fontShaderColor->IsValid());
 }
 
@@ -234,9 +246,44 @@ void CglShaderFontRenderer::PushGLState(const CglFont& fnt)
 
 	if (fnt.HasColor()) {
 		fontShaderColor->Enable();
+		{
+			float modelview[16], projection[16], mvp[16];
+			glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+			glGetFloatv(GL_PROJECTION_MATRIX, projection);
+			for (int i = 0; i < 4; i++) {
+				for (int j = 0; j < 4; j++) {
+					mvp[i*4+j] = 0.0f;
+					for (int k = 0; k < 4; k++)
+						mvp[i*4+j] += projection[i*4+k] * modelview[k*4+j];
+				}
+			}
+			GLint pId = fontShaderColor->GetObjID();
+			if (pId) glUniformMatrix4fv(glGetUniformLocation(pId, "u_mvpMatrix"), 1, GL_FALSE, mvp);
+			static int fontDbg = 0;
+			if (fontDbg < 3) {
+				fprintf(stderr, "[font] MVP=[%.3f %.3f %.3f %.3f; %.3f %.3f %.3f %.3f; %.3f %.3f %.3f %.3f; %.3f %.3f %.3f %.3f]\n",
+					mvp[0],mvp[4],mvp[8],mvp[12], mvp[1],mvp[5],mvp[9],mvp[13], mvp[2],mvp[6],mvp[10],mvp[14], mvp[3],mvp[7],mvp[11],mvp[15]);
+				fontDbg++;
+			}
+		}
 	}
-	else
+	else {
 		fontShader->Enable();
+		{
+			float modelview[16], projection[16], mvp[16];
+			glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+			glGetFloatv(GL_PROJECTION_MATRIX, projection);
+			for (int i = 0; i < 4; i++) {
+				for (int j = 0; j < 4; j++) {
+					mvp[i*4+j] = 0.0f;
+					for (int k = 0; k < 4; k++)
+						mvp[i*4+j] += projection[i*4+k] * modelview[k*4+j];
+				}
+			}
+			GLint pId = fontShader->GetObjID();
+			if (pId) glUniformMatrix4fv(glGetUniformLocation(pId, "u_mvpMatrix"), 1, GL_FALSE, mvp);
+		}
+	}
 }
 
 void CglShaderFontRenderer::PopGLState(const CglFont& fnt)

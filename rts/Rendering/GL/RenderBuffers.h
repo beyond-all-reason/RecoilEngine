@@ -4,7 +4,8 @@
 #include "StreamBuffer.h"
 #include "VertexArrayTypes.h"
 #include "VAO.h"
-
+#include "Rendering/GlobalRenderingInfo.h"
+#include "Rendering/GL/myGL.h"
 #include "System/TypeToStr.h"
 #include "System/ContainerUtil.h"
 #include "System/Log/ILog.h"
@@ -151,12 +152,18 @@ public:
 			}
 		}
 
+		// On macOS core profile, create a temporary VAO for shader validation
+		GLuint tempVAO = 0;
+		glGenVertexArrays(1, &tempVAO);
+		glBindVertexArray(tempVAO);
+
 		shader->Link();
 
 		shader->Enable();
 		shader->Disable();
 
 		shader->Validate();
+		glDeleteVertexArrays(1, &tempVAO);
 #ifndef HEADLESS
 		assert(shader->IsValid());
 #endif
@@ -193,13 +200,13 @@ private:
 	static const std::string GetFragOutput();
 
 	static void GetShaderHeaders(std::string& vsHeader, std::string& fsHeader) {
+		const bool isCoreProfile = globalRenderingInfo.glContextIsCore;
+		const char* profile = isCoreProfile ? "core" : "compatibility";
 		if (globalRendering->supportExplicitAttribLoc) {
-			vsHeader = fmt::format("{}{}{}", "#version 150 compatibility", nl, "#extension GL_ARB_explicit_attrib_location : require");
+			vsHeader = fmt::format("#version 150 {0}\n#extension GL_ARB_explicit_attrib_location : require", profile);
+		} else {
+			vsHeader = fmt::format("#version 150 {0}", profile);
 		}
-		else {
-			vsHeader = "#version 150 compatibility";
-		}
-
 		fsHeader = "#version 150";
 	}
 
@@ -897,6 +904,26 @@ inline void TypedRenderBuffer<T>::DrawElements(uint32_t mode, bool rewind)
 	assert(vao.GetIdRaw() > 0);
 #endif
 	vao.Bind();
+
+	// On core profile (macOS), set MVP matrix uniform since gl_ModelViewProjectionMatrix
+	// is not available in GLSL
+	if (globalRenderingInfo.glContextIsCore) {
+		float modelview[16], projection[16], mvp[16];
+		glGetFloatv(GL_MODELVIEW_MATRIX, modelview);
+		glGetFloatv(GL_PROJECTION_MATRIX, projection);
+		for (int i = 0; i < 4; i++) {
+			for (int j = 0; j < 4; j++) {
+				mvp[i*4+j] = 0.0f;
+				for (int k = 0; k < 4; k++)
+					mvp[i*4+j] += projection[i*4+k] * modelview[k*4+j];
+			}
+		}
+		GLint curProg = 0;
+		glGetIntegerv(GL_CURRENT_PROGRAM, &curProg);
+		if (curProg != 0)
+			glUniformMatrix4fv(glGetUniformLocation(curProg, "u_mvpMatrix"), 1, GL_FALSE, mvp);
+	}
+
 	glDrawElements(mode, static_cast<GLsizei>(indcsCount), GL_UNSIGNED_INT, BUFFER_OFFSET(uint32_t, ebo->BufferElemOffset() + eboStartIndex));
 	vao.Unbind();
 	#undef BUFFER_OFFSET

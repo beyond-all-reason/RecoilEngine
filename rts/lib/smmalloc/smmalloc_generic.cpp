@@ -50,7 +50,7 @@ void* sm::GenericAllocator::Alloc(sm::GenericAllocator::TInstance instance, size
     void* p;
     void** p2;
     size_t offset = alignment - 1 + sizeof(Header);
-    if ((p = (void*)std::malloc(bytesCount + offset)) == NULL)
+    if ((p = (void*)malloc(bytesCount + offset)) == NULL)
     {
         return NULL;
     }
@@ -70,7 +70,7 @@ void sm::GenericAllocator::Free(sm::GenericAllocator::TInstance instance, void* 
         return;
     }
     Header* h = reinterpret_cast<Header*>(reinterpret_cast<char*>(p) - sizeof(Header));
-    std::free(h->p);
+    free(h->p);
 }
 
 void* sm::GenericAllocator::Realloc(sm::GenericAllocator::TInstance instance, void* p, size_t bytesCount, size_t alignment)

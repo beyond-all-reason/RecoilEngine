@@ -35,7 +35,7 @@
 #include "System/LoadLock.h"
 
 #if !defined(HEADLESS) && !defined(NO_SOUND)
-#include "System/Sound/OpenAL/EFX.h"
+#include "System/Sound/OpenAL/SpringEFX.h"
 #include "System/Sound/OpenAL/EFXPresets.h"
 #endif
 
@@ -310,7 +310,8 @@ bool CLoadScreen::Draw()
 
 	if (luaIntro != nullptr) {
 		luaIntro->Update();
-		luaIntro->DrawGenesis();
+		// TEST: skip 3D genesis to isolate 2D
+		// luaIntro->DrawGenesis();
 		ClearScreen();
 		luaIntro->DrawLoadScreen();
 	}

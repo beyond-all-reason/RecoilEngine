@@ -6,7 +6,7 @@
 #include <alc.h>
 
 #include "ALShared.h"
-#include "EFX.h"
+#include "SpringEFX.h"
 #include "System/Sound/IAudioChannel.h"
 #include "MusicStream.h"
 #include "System/Sound/SoundLog.h"

@@ -47,7 +47,9 @@
 
 #include "System/Misc/TracyDefs.h"
 
+#if !defined(__APPLE__)
 #define SUPPORT_AMD_HACKS_HERE
+#endif
 
 #ifndef HEADLESS
 	#undef __FTERRORS_H__

@@ -1,6 +1,6 @@
-static constexpr const char* vsRenderBufferSrc = R"(
+static constexpr const char* vsRenderBufferSrc = R"(%s
+uniform mat4 u_mvpMatrix;
 // Version and extensions
-%s
 
 // VS input attributes
 %s
@@ -12,13 +12,12 @@ static constexpr const char* vsRenderBufferSrc = R"(
 
 void main() {
 %s
-	gl_Position = gl_ModelViewProjectionMatrix * %s;
+	gl_Position = u_mvpMatrix * %s;
 }
 )";
 
-static constexpr const char* fsRenderBufferSrc = R"(
+static constexpr const char* fsRenderBufferSrc = R"(%s
 // Version and extensions
-%s
 
 uniform sampler2D tex;
 uniform vec4 ucolor = vec4(1.0);
