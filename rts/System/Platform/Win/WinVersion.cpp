@@ -325,7 +325,7 @@ std::string windows::GetHardwareString()
 				WideCharToMultiByte(CP_UTF8, 0, regbuf.data(), -1, utf8str.data(), utf8Len, nullptr, nullptr);
 				oss << utf8str << "; ";
 			} else {
-				oss << "cannot read processor data; ";
+				oss << "cannot convert processor name to UTF-8; ";
 			}
 		} else {
 			oss << "cannot read processor data; ";
