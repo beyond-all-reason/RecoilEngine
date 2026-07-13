@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <array>
 #include <cassert>
 #include <sstream>
 #include <string>
@@ -307,21 +308,21 @@ std::string windows::GetHardwareString()
 {
 	std::ostringstream oss;
 
-	wchar_t regbuf[200] = {};
-	DWORD regLength = sizeof(regbuf); // in bytes, not wchar_t units
+	std::array<wchar_t, 200> regbuf{};
+	DWORD regLength = static_cast<DWORD>(regbuf.size() * sizeof(wchar_t)); // RegQueryValueExW wants bytes
 	DWORD regType = REG_SZ;
 	HKEY regkey;
 
 	if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"Hardware\\Description\\System\\CentralProcessor\\0", 0, KEY_READ, &regkey) == ERROR_SUCCESS) {
-		if (RegQueryValueExW(regkey, L"ProcessorNameString", 0, &regType, reinterpret_cast<LPBYTE>(regbuf), &regLength) == ERROR_SUCCESS) {
+		if (RegQueryValueExW(regkey, L"ProcessorNameString", 0, &regType, reinterpret_cast<LPBYTE>(regbuf.data()), &regLength) == ERROR_SUCCESS) {
 			// REG_SZ values aren't guaranteed to be null-terminated; force it
-			regbuf[(sizeof(regbuf) / sizeof(regbuf[0])) - 1] = L'\0';
+			regbuf.back() = L'\0';
 
-			const int utf8Len = WideCharToMultiByte(CP_UTF8, 0, regbuf, -1, nullptr, 0, nullptr, nullptr);
+			const int utf8Len = WideCharToMultiByte(CP_UTF8, 0, regbuf.data(), -1, nullptr, 0, nullptr, nullptr);
 
 			if (utf8Len > 1) {
-				std::string utf8str(utf8Len - 1, '\0'); // -1: exclude the null terminator WideCharToMultiByte counts
-				WideCharToMultiByte(CP_UTF8, 0, regbuf, -1, utf8str.data(), utf8Len, nullptr, nullptr);
+				std::string utf8str(utf8Len - 1, '\0');
+				WideCharToMultiByte(CP_UTF8, 0, regbuf.data(), -1, utf8str.data(), utf8Len, nullptr, nullptr);
 				oss << utf8str << "; ";
 			} else {
 				oss << "cannot read processor data; ";
