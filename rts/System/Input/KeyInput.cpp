@@ -4,6 +4,7 @@
 #include <functional>
 #include <cassert>
 #include <cctype>
+#include <set>
 
 #include <SDL_keyboard.h>
 #include <SDL_events.h>
@@ -26,7 +27,7 @@ namespace KeyInput {
 
 	// keycodes forced down by debug.emulateKey*; re-applied on top of the SDL
 	// poll at the end of every Update so they survive the re-poll
-	static std::vector<int> emulatedKeyCodes;
+	static std::set<int> emulatedKeyCodes;
 
 
 	bool IsKeyPressed(int keyCode) {
@@ -91,21 +92,18 @@ namespace KeyInput {
 	}
 
 	bool IsKeyEmulated(int keyCode) {
-		return (std::find(emulatedKeyCodes.begin(), emulatedKeyCodes.end(), keyCode) != emulatedKeyCodes.end());
+		return emulatedKeyCodes.contains(keyCode);
 	}
 
 	void SetKeyEmulated(int keyCode, bool pressed) {
-		const auto iter = std::find(emulatedKeyCodes.begin(), emulatedKeyCodes.end(), keyCode);
-
 		if (pressed) {
-			if (iter == emulatedKeyCodes.end())
-				emulatedKeyCodes.push_back(keyCode);
-		} else if (iter != emulatedKeyCodes.end()) {
-			emulatedKeyCodes.erase(iter);
+			emulatedKeyCodes.insert(keyCode);
+		} else {
+			emulatedKeyCodes.erase(keyCode);
 		}
 	}
 
-	const std::vector<int>& GetEmulatedKeys() {
+	const std::set<int>& GetEmulatedKeys() {
 		return emulatedKeyCodes;
 	}
 

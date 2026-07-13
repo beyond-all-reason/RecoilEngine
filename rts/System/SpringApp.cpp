@@ -43,7 +43,7 @@
 #include "Game/UI/InfoConsole.h"
 #include "Game/UI/MouseHandler.h"
 #include "Lua/LuaOpenGL.h"
-#include "Lua/LuaUnsyncedCtrl.h"
+#include "Lua/LuaDebugExtra.h"
 #include "Lua/LuaVFSDownload.h"
 #include "Menu/LuaMenuController.h"
 #include "Menu/SelectMenu.h"
@@ -1181,7 +1181,7 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 
 					// drop emulated input first: it fires its own releases directly,
 					// since the pushed SDL releases below get eaten by the emulation gate
-					LuaUnsyncedCtrl::ClearEmulatedInput();
+					LuaDebugExtra::ClearEmulatedInput();
 
 					// release all keyboard keys
 					KeyInput::ReleaseAllKeys();

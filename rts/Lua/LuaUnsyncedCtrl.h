@@ -14,12 +14,6 @@ class LuaUnsyncedCtrl {
 
 	public:
 		static bool PushEntries(lua_State* L);
-		// registers the debug.emulate* input-emulation callouts into the debug table
-		static bool PushDebugEntries(lua_State* L);
-
-		// drops all emulated key/button state, firing balancing releases; shared by
-		// debug.clearEmulatedInput and the window-focus-loss handler
-		static void ClearEmulatedInput();
 
 	public:
 		static int Ping(lua_State* L);
@@ -163,13 +157,6 @@ class LuaUnsyncedCtrl {
 		static int SetNanoProjectileParams(lua_State* L);
 
 		static int WarpMouse(lua_State* L);
-
-		static int EmulateKeyPress(lua_State* L);
-		static int EmulateKeyRelease(lua_State* L);
-		static int EmulateMousePress(lua_State* L);
-		static int EmulateMouseRelease(lua_State* L);
-		static int EmulateMouseMove(lua_State* L);
-		static int ClearEmulatedInputLua(lua_State* L);
 
 		static int SetMouseCursor(lua_State* L);
 		static int SetClipboard(lua_State* L);

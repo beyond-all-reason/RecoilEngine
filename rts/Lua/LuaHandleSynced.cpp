@@ -22,6 +22,7 @@
 #include "LuaSyncedTable.h"
 #include "LuaUICommand.h"
 #include "LuaUnsyncedCtrl.h"
+#include "LuaDebugExtra.h"
 #include "LuaUnsyncedRead.h"
 #include "LuaFeatureDefs.h"
 #include "LuaUnitDefs.h"
@@ -130,7 +131,7 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 		if (!AddEntriesToTable(L, "Spring",       LuaUnsyncedCtrl::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "Spring",       LuaUnsyncedRead::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "Spring",          LuaUICommand::PushEntries        )) KILL
-		if (!AddEntriesToTable(L, "debug",       LuaUnsyncedCtrl::PushDebugEntries    )) KILL
+		if (!AddEntriesToTable(L, "debug",           LuaDebugExtra::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "gl",                 LuaOpenGL::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "GL",                LuaConstGL::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "Engine",        LuaConstEngine::PushEntries        )) KILL
