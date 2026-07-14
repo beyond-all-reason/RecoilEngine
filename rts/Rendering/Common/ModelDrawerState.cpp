@@ -263,6 +263,9 @@ CModelDrawerStateGL4::CModelDrawerStateGL4()
 		modelShaders[n]->SetFlag("GBUFFER_MISCTEX_IDX", GL::GeometryBuffer::ATTACHMENT_MISCTEX);
 		modelShaders[n]->SetFlag("GBUFFER_ZVALTEX_IDX", GL::GeometryBuffer::ATTACHMENT_ZVALTEX);
 
+		// name the matrix-mode value the shader compares against, so it reads the mode by name
+		modelShaders[n]->SetFlag("MATMODE_STATIC", static_cast<int>(ShaderMatrixModes::STATIC_MATMODE));
+
 		modelShaders[n]->Link();
 		modelShaders[n]->Enable();
 		modelShaders[n]->Disable();
