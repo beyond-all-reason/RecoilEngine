@@ -71,6 +71,9 @@ public:
 	bool AddToSubmission(const CFeature* feature);
 
 	bool AddToSubmission(const UnitDef* unitDef, uint16_t paletteIndex);
+
+	bool AddStaticInstance(const S3DModel* model, uint32_t worldTransformOffset, uint16_t paletteIndex);
+
 	void Submit(GLenum mode = GL_TRIANGLES, bool bindUnbind = false);
 
 	bool SubmitImmediately(const S3DModel* model, uint16_t paletteIndex, GLenum mode = GL_TRIANGLES, bool bindUnbind = false);
