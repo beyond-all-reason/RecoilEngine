@@ -71,6 +71,12 @@ public:
 	bool AddToSubmission(const CFeature* feature);
 
 	bool AddToSubmission(const UnitDef* unitDef, uint16_t paletteIndex);
+
+	// static-instanced submission: the per-instance world transform is supplied explicitly
+	// (a 1-element slot in transformsMemStorage, read by the shader in ARRAY_MATMODE) rather than
+	// derived from an object's animated block; model pieces come from the bind pose. Used for ghosts.
+	bool AddStaticInstance(const S3DModel* model, uint32_t worldTransformOffset, uint16_t paletteIndex);
+
 	void Submit(GLenum mode = GL_TRIANGLES, bool bindUnbind = false);
 
 	bool SubmitImmediately(const S3DModel* model, uint16_t paletteIndex, GLenum mode = GL_TRIANGLES, bool bindUnbind = false);

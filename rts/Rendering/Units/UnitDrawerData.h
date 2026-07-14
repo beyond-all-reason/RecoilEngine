@@ -23,6 +23,8 @@ public:
 	bool DecRef() { return ((refCount--) > 1); }
 	const S3DModel* GetModel() const;
 	void PostLoad();
+	// (re)allocate and fill the batched-draw world transform slot from pos/facing
+	void InitWorldTransform();
 public:
 	std::string modelName;
 
@@ -42,6 +44,11 @@ public:
 	uint16_t paletteIndex;
 
 	size_t currentIconIndex;
+
+	// 1-element world transform slot in transformsMemStorage, used by the batched
+	// (ARRAY_MATMODE) ghost draw path. Filled once at creation; not serialized (rebuilt in PostLoad).
+	// RAII owns the slot: the allocation is released when the ghost is destroyed.
+	ScopedTransformMemAlloc worldTransformAlloc;
 private:
 	mutable const S3DModel* model;
 };
@@ -167,6 +174,12 @@ public:
 		return savedData.liveGhostBuildings[allyTeam][modelType];
 	}
 
+	// world transform slot (in transformsMemStorage) for a live ghost building; INVALID_INDEX if none
+	size_t GetLiveGhostTransform(const CUnit* unit) const {
+		const auto it = liveGhostTransforms.find(unit);
+		return (it != liveGhostTransforms.end()) ? it->second.first.GetOffset(false) : TransformsMemStorage::INVALID_INDEX;
+	}
+
 	auto*       GetSavedData()       { return &savedData; }
 	const auto* GetSavedData() const { return &savedData; }
 protected:
@@ -206,6 +219,13 @@ private:
 
 	S3DModel* GetUnitModel(const CUnit* unit) const;
 	void RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSolidObject*>& dgb, int index);
+
+	// rebuilds the per-unit world transform slots for live ghost buildings of the local allyTeam.
+	// scan-based so it self-heals across savegame load, allyTeam/spectator changes and leavesGhost toggles.
+	void UpdateLiveGhostTransforms();
+	// maps unit -> { RAII-owned world transform slot, last sweep stamp seen }
+	spring::unordered_map<const CUnit*, std::pair<ScopedTransformMemAlloc, int>> liveGhostTransforms;
+	int liveGhostSweepStamp = 0;
 
 	// icons
 	bool useDistToGroundForIcons;

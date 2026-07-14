@@ -372,6 +372,22 @@ bool S3DModelVAO::AddToSubmission(const UnitDef* unitDef, uint16_t paletteIndex)
 	return AddToSubmissionImpl(unitDef, model->indxStart, model->indxCount, paletteIndex);
 }
 
+bool S3DModelVAO::AddStaticInstance(const S3DModel* model, uint32_t worldTransformOffset, uint16_t paletteIndex)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	assert(model);
+
+	// the world transform is the caller-supplied slot; pieces are read from the model bind pose
+	return EmplaceInstance(
+		model->indxStart, model->indxCount,
+		worldTransformOffset,
+		paletteIndex,
+		static_cast<uint16_t>(model->numPieces),
+		static_cast<uint32_t>(modelUniformsStorage.GetObjOffset(model)),
+		static_cast<uint32_t>(transformsUploader.GetElemOffset(model))
+	);
+}
+
 
 void S3DModelVAO::Submit(GLenum mode, bool bindUnbind)
 {
