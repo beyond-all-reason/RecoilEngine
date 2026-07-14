@@ -199,6 +199,7 @@ class LuaSyncedRead {
 		static int GetUnitSeparation(lua_State* L);
 		static int GetUnitFeatureSeparation(lua_State* L);
 		static int GetUnitDefDimensions(lua_State* L);
+		static int GetUnitDefAnimationNames(lua_State* L);
 
 		static int GetCEGID(lua_State* L);
 

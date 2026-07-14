@@ -3,8 +3,6 @@
 #include <vector>
 #include <numeric>
 #include <algorithm>
-#include <unordered_set>
-#include <unordered_map>
 
 #include "GLTFParser.h"
 #include "3DModel.hpp"
@@ -17,6 +15,7 @@
 #include "System/FileSystem/FileSystem.h"
 #include "System/Misc/TracyDefs.h"
 #include "System/Exceptions.h"
+#include "System/Quaternion.h"
 #include "System/UnorderedSet.hpp"
 
 #include <fastgltf/core.hpp>
@@ -86,30 +85,30 @@ namespace Impl {
 					switch (hashString(primAttIt->name.c_str(), primAttIt->name.length()))
 					{
 					case hashString("POSITION"): {
-						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, accessor, [&](const auto& val, std::size_t idx) {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, accessor, [&](const auto& val, size_t idx) {
 							verts[prevVertSize + idx].pos = float3{ val.x(), val.y(), val.z() };
 						});
 					} break;
 					case hashString("NORMAL"): {
-						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, accessor, [&](const auto& val, std::size_t idx) {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, accessor, [&](const auto& val, size_t idx) {
 							verts[prevVertSize + idx].normal = float3{ val.x(), val.y(), val.z() }.ANormalize();
 						});
 						seenNormal = true;
 					} break;
 					// note the UV.y is inverted!!!
 					case hashString("TEXCOORD_0"): {
-						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset, accessor, [&](const auto& val, std::size_t idx) {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset, accessor, [&](const auto& val, size_t idx) {
 							verts[prevVertSize + idx].texCoords[0] = float2(val.x(), 1.0f - val.y());
 						});
 					} break;
 					case hashString("TEXCOORD_1"): {
-						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset, accessor, [&](const auto& val, std::size_t idx) {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(asset, accessor, [&](const auto& val, size_t idx) {
 							verts[prevVertSize + idx].texCoords[1] = float2(val.x(), 1.0f - val.y());
 						});
 						seenTex2 = true;
 					} break;
 					case hashString("TANGENT"): {
-						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, size_t idx) {
 							verts[prevVertSize + idx].sTangent = float3{ val.x(), val.y(), val.z() }.ANormalize();
 							verts[prevVertSize + idx].tTangent = val.w() * verts[prevVertSize + idx].normal.cross(verts[prevVertSize + idx].sTangent).ANormalize();
 						});
@@ -117,7 +116,7 @@ namespace Impl {
 					} break;
 					case hashString("JOINTS_0"): {
 						assert(skinPtr);
-						fastgltf::iterateAccessorWithIndex<fastgltf::math::uvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::uvec4>(asset, accessor, [&](const auto& val, size_t idx) {
 							auto& vertexWeight = vertexWeights[idx];
 							vertexWeight[0].first = static_cast<uint16_t>(skinPtr->joints[val.x()]);
 							vertexWeight[1].first = static_cast<uint16_t>(skinPtr->joints[val.y()]);
@@ -127,7 +126,7 @@ namespace Impl {
 					} break;
 					case hashString("JOINTS_1"): {
 						assert(skinPtr);
-						fastgltf::iterateAccessorWithIndex<fastgltf::math::uvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::uvec4>(asset, accessor, [&](const auto& val, size_t idx) {
 							auto& vertexWeight = vertexWeights[idx];
 							vertexWeight[4].first = static_cast<uint16_t>(skinPtr->joints[val.x()]);
 							vertexWeight[5].first = static_cast<uint16_t>(skinPtr->joints[val.y()]);
@@ -136,7 +135,7 @@ namespace Impl {
 						});
 					} break;
 					case hashString("WEIGHTS_0"): {
-						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, size_t idx) {
 							auto& vertexWeight = vertexWeights[idx];
 							vertexWeight[0].second = val.x();
 							vertexWeight[1].second = val.y();
@@ -145,7 +144,7 @@ namespace Impl {
 						});
 					} break;
 					case hashString("WEIGHTS_1"): {
-						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+						fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, size_t idx) {
 							auto& vertexWeight = vertexWeights[idx];
 							vertexWeight[4].second = val.x();
 							vertexWeight[5].second = val.y();
@@ -184,7 +183,7 @@ namespace Impl {
 			indcs.resize(prevIndcSize + accessor.count);
 
 			assert(accessor.bufferViewIndex.has_value());
-			fastgltf::iterateAccessorWithIndex<uint32_t>(asset, accessor, [&](std::uint32_t index, std::size_t idx) {
+			fastgltf::iterateAccessorWithIndex<uint32_t>(asset, accessor, [&](std::uint32_t index, size_t idx) {
 				indcs[idx] = index;
 			});
 
@@ -231,7 +230,7 @@ namespace Impl {
 		}
 	}
 
-	void ParseSceneExtra(simdjson::dom::object* extras, std::size_t objectIndex, fastgltf::Category objectType, void* userPointer) {
+	void ParseSceneExtra(simdjson::dom::object* extras, size_t objectIndex, fastgltf::Category objectType, void* userPointer) {
 		if (objectType != fastgltf::Category::Scenes)
 			return;
 
@@ -312,7 +311,7 @@ namespace Impl {
 		// TODO guess the texture?
 	}
 
-	auto GetModelTransforms(const fastgltf::Asset& asset, std::size_t sceneIndex, const Transform& sceneTransform = Transform{}) {
+	auto GetModelTransforms(const fastgltf::Asset& asset, size_t sceneIndex, const Transform& sceneTransform = Transform{}) {
 		auto& scene = asset.scenes[sceneIndex];
 
 		spring::unordered_map<size_t, Transform> transforms(asset.nodes.size());
@@ -518,6 +517,125 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 		else
 			Skinning::ReparentMeshesTrianglesToBones(&model, allSkinnedMeshes);
 	}
+
+	static auto AssignValues = [&asset]<typename T>(const auto& outputAccessor, auto& seq, size_t numKeyframes, bool isCubic) {
+		auto AssignCubicValues = [&seq](auto&& value, size_t n) {
+			const size_t ki = n / 3, kj = n % 3;
+
+			if      (kj == 0) seq.inTangents[ki]  = value;
+			else if (kj == 1) seq.values[ki]      = value;
+			else              seq.outTangents[ki] = value;
+		};
+
+		if (isCubic) {
+			seq.inTangents.resize(numKeyframes);
+			seq.values.resize(numKeyframes);
+			seq.outTangents.resize(numKeyframes);
+		}
+		else {
+			seq.values.reserve(numKeyframes);
+		}
+
+		if constexpr(std::is_same_v<T, float3>) {
+			if (isCubic) {
+				fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, outputAccessor, [&](const auto& v, size_t j) {
+					AssignCubicValues(float3(v.x(), v.y(), v.z()), j);
+				});
+			} else {
+				fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, outputAccessor, [&](const auto& v, size_t) {
+					seq.values.emplace_back(v.x(), v.y(), v.z());
+				});
+			}
+		}
+		else if constexpr(std::is_same_v<T, CQuaternion>) {
+			if (isCubic) {
+				fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, outputAccessor, [&](const auto& v, size_t j) {
+					AssignCubicValues(CQuaternion(v.x(), v.y(), v.z(), v.w()), j);
+				});
+			} else {
+				fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, outputAccessor, [&](const auto& v, size_t) {
+					seq.values.emplace_back(v.x(), v.y(), v.z(), v.w());
+				});
+			}
+		}
+		else if constexpr(std::is_same_v<T, float>) {
+			if (isCubic) {
+				// GLTF stores scale as vec3; we use only x (uniform scale)
+				fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, outputAccessor, [&](const auto& v, size_t j) {
+					AssignCubicValues(v.x(), j);
+				});
+			} else {
+				fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, outputAccessor, [&](const auto& v, size_t) {
+					seq.values.emplace_back(v.x());
+				});
+			}
+		}
+		else {
+			static_assert(false, "Unsupported animation type");
+		}
+	};
+
+	// load all animations
+	for (const auto& animation : asset.animations) {
+		const size_t animId = model.animationMap.GetOrAddAnimation(std::string(animation.name));
+		for (const auto& channel : animation.channels) {
+			if (!channel.nodeIndex.has_value())
+				continue;
+
+			const auto pieceIdxIt = nodeIdxToPieceIdx.find(channel.nodeIndex.value());
+
+			if (pieceIdxIt == nodeIdxToPieceIdx.end())
+				continue;
+
+			const auto& samplers = animation.samplers[channel.samplerIndex];
+			const auto& inputAccessor  = asset.accessors[samplers.inputAccessor];
+			const auto& outputAccessor = asset.accessors[samplers.outputAccessor];
+
+			ModelAnimation::Interpolation interpType;
+			switch (samplers.interpolation) {
+				case fastgltf::AnimationInterpolation::Step:        interpType = ModelAnimation::Interpolation::Step;        break;
+				case fastgltf::AnimationInterpolation::CubicSpline: interpType = ModelAnimation::Interpolation::CubicSpline; break;
+				default:                                            interpType = ModelAnimation::Interpolation::Linear;
+			}
+
+			const bool isCubic = (interpType == ModelAnimation::Interpolation::CubicSpline);
+			const size_t numKeyframes = inputAccessor.count;
+
+			switch (channel.path)
+			{
+			case fastgltf::AnimationPath::Translation: {
+				auto& seq = model.animationMap.GetPieceAnimationVectors<float3>(animId, pieceIdxIt->second);
+				seq.interpolation = interpType;
+				seq.timeFrames.reserve(numKeyframes);
+				fastgltf::iterateAccessorWithIndex<float>(asset, inputAccessor, [&](const auto& val, size_t) {
+					seq.timeFrames.push_back(val);
+				});
+				AssignValues.template operator()<float3>(outputAccessor, seq, numKeyframes, isCubic);
+			} break;
+			case fastgltf::AnimationPath::Rotation: {
+				auto& seq = model.animationMap.GetPieceAnimationVectors<CQuaternion>(animId, pieceIdxIt->second);
+				seq.interpolation = interpType;
+				seq.timeFrames.reserve(numKeyframes);
+				fastgltf::iterateAccessorWithIndex<float>(asset, inputAccessor, [&](const auto& val, size_t) {
+					seq.timeFrames.push_back(val);
+				});
+				AssignValues.template operator()<CQuaternion>(outputAccessor, seq, numKeyframes, isCubic);
+			} break;
+			case fastgltf::AnimationPath::Scale: {
+				auto& seq = model.animationMap.GetPieceAnimationVectors<float>(animId, pieceIdxIt->second);
+				seq.interpolation = interpType;
+				seq.timeFrames.reserve(numKeyframes);
+				fastgltf::iterateAccessorWithIndex<float>(asset, inputAccessor, [&](const auto& val, size_t) {
+					seq.timeFrames.push_back(val);
+				});
+				AssignValues.template operator()<float>(outputAccessor, seq, numKeyframes, isCubic);
+			} break;
+			default:
+				break;
+			}
+		}
+	}
+	model.animationMap.FinalizeAnimations();
 
 	// will also calculate pieces / model bounding box
 	ModelUtils::ApplyModelProperties(&model, optionalModelParams);

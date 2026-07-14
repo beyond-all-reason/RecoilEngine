@@ -41,6 +41,8 @@ S3DModel& S3DModel::operator= (S3DModel&& m) noexcept {
 	loadStatus = m.loadStatus;
 	uploaded = m.uploaded;
 
+	animationMap = std::move(m.animationMap);
+
 	std::swap(traAlloc, m.traAlloc);
 
 	return *this;

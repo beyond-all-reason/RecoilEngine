@@ -944,6 +944,23 @@ void CLuaUnitScript::AnimFinished(AnimType type, int piece, int axis)
 }
 
 
+void CLuaUnitScript::EmbeddedAnimFinished(size_t animId, const std::string& animName)
+{
+	ZoneScoped;
+	const int fn = scriptIndex[LUAFN_AnimationFinished];
+	if (fn < 0)
+		return;
+
+	LUA_CALL_IN_CHECK(L);
+	lua_checkstack(L, 4);
+
+	RawPushFunction(fn);
+	lua_pushnumber(L, static_cast<float>(animId));
+	lua_pushsstring(L, animName);
+	RawRunCallIn(fn, 2, 0);
+}
+
+
 void CLuaUnitScript::RawCall(int functionId)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -1053,6 +1070,9 @@ bool CLuaUnitScript::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(Turn);
 	REGISTER_LUA_CFUNC(Move);
 	REGISTER_LUA_CFUNC(Scale);
+	REGISTER_LUA_CFUNC(RestoreTurn);
+	REGISTER_LUA_CFUNC(RestoreMove);
+	REGISTER_LUA_CFUNC(RestoreScale);
 	REGISTER_LUA_CFUNC(MultiSetPieceVisibility);
 	REGISTER_LUA_CFUNC(MultiSpin);
 	REGISTER_LUA_CFUNC(MultiStopSpin);
@@ -1076,6 +1096,17 @@ bool CLuaUnitScript::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetPiecePosDir);
 
 	REGISTER_LUA_CFUNC(GetActiveUnitID);
+
+	REGISTER_LUA_CFUNC(PlayAnimation);
+	REGISTER_LUA_CFUNC(StopAnimation);
+	REGISTER_LUA_CFUNC(SetAnimationSpeed);
+	REGISTER_LUA_CFUNC(SetAnimationTime);
+	REGISTER_LUA_CFUNC(SetAnimationWeight);
+	REGISTER_LUA_CFUNC(SetAnimationPieceWeights);
+	REGISTER_LUA_CFUNC(GetAnimationTime);
+	REGISTER_LUA_CFUNC(GetAnimationDuration);
+	REGISTER_LUA_CFUNC(GetAnimationId);
+	REGISTER_LUA_CFUNC(IsAnimationPlaying);
 
 	lua_rawset(L, -3);
 
@@ -1501,6 +1532,54 @@ int CLuaUnitScript::Move(lua_State* L)
 	return 0;
 }
 
+
+int CLuaUnitScript::RestoreTurn(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// void RestoreTurn(int piece, int axis, int speed);
+	if (activeScript == nullptr)
+		return 0;
+
+	const int piece = luaL_checkint(L, 1) - 1;
+	const int axis = ParseAxis(L, __func__, 2);
+	const float speed = luaL_checkfloat(L, 3);
+
+	activeScript->RestorePieceTurn(piece, axis, speed);
+
+	return 0;
+}
+
+int CLuaUnitScript::RestoreMove(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// void RestoreMove(int piece, int axis, int speed);
+	if (activeScript == nullptr)
+		return 0;
+
+	const int piece = luaL_checkint(L, 1) - 1;
+	const int axis = ParseAxis(L, __func__, 2);
+	const float speed = luaL_checkfloat(L, 3);
+
+	activeScript->RestorePieceMove(piece, axis, speed);
+
+	return 0;
+}
+
+int CLuaUnitScript::RestoreScale(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// void RestoreScale(int piece, int speed);
+	if (activeScript == nullptr)
+		return 0;
+
+	const int piece = luaL_checkint(L, 1) - 1;
+	const float speed = luaL_checkfloat(L, 2);
+
+	activeScript->RestorePieceScale(piece, speed);
+
+	return 0;
+}
+
 int CLuaUnitScript::Scale(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -1523,6 +1602,218 @@ int CLuaUnitScript::Scale(lua_State* L)
 	return 0;
 }
 
+
+int CLuaUnitScript::PlayAnimation(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	const std::string name = luaL_checkstring(L, 1);
+	float  speed    = 1.0f;
+	int8_t loopMode = 0;
+	float  weight   = 1.0f;
+	bool   wait     = false;
+	bool   additive = false;
+
+	if (lua_istable(L, 2)) {
+		lua_getfield(L, 2, "speed");
+		speed = luaL_optfloat(L, -1, speed);
+		lua_pop(L, 1);
+
+		// loopMode: integer (0=no loop, >0=forward loop, <0=reverse loop)
+		// also accept legacy bool "loop" as loopMode=1
+		lua_getfield(L, 2, "loopMode");
+		if (!lua_isnil(L, -1))
+			loopMode = static_cast<int8_t>(luaL_optint(L, -1, 0));
+		lua_pop(L, 1);
+
+		if (loopMode == 0) {
+			lua_getfield(L, 2, "loop");
+			if (luaL_optboolean(L, -1, false))
+				loopMode = 1;
+			lua_pop(L, 1);
+		}
+
+		lua_getfield(L, 2, "weight");
+		weight = luaL_optfloat(L, -1, weight);
+		lua_pop(L, 1);
+
+		lua_getfield(L, 2, "wait");
+		wait = luaL_optboolean(L, -1, wait);
+		lua_pop(L, 1);
+
+		lua_getfield(L, 2, "additive");
+		additive = luaL_optboolean(L, -1, additive);
+		lua_pop(L, 1);
+	}
+
+	const size_t id = activeScript->PlayEmbeddedAnimation(name, speed, loopMode, weight, wait, additive);
+	lua_pushnumber(L, static_cast<float>(id));
+	return 1;
+}
+
+int CLuaUnitScript::StopAnimation(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	if (lua_gettop(L) == 0 || lua_isnoneornil(L, 1)) {
+		activeScript->StopEmbeddedAnimations();
+	} else {
+		const size_t clipId = ReadAnimationId(L);
+		activeScript->StopEmbeddedAnimation(clipId);
+	}
+	return 0;
+}
+
+int CLuaUnitScript::SetAnimationSpeed(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	const size_t clipId = ReadAnimationId(L);
+	activeScript->SetEmbeddedAnimSpeed(clipId, luaL_checkfloat(L, 2));
+	return 0;
+}
+
+int CLuaUnitScript::SetAnimationTime(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	const size_t clipId = ReadAnimationId(L);
+	activeScript->SetEmbeddedAnimTime(clipId, luaL_checkfloat(L, 2));
+	return 0;
+}
+
+int CLuaUnitScript::SetAnimationWeight(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	const size_t clipId = ReadAnimationId(L);
+	activeScript->SetEmbeddedAnimWeight(clipId, luaL_checkfloat(L, 2));
+	return 0;
+}
+
+int CLuaUnitScript::SetAnimationPieceWeights(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	const size_t clipId = ReadAnimationId(L);
+	if (!lua_istable(L, 2))
+		return 0;
+
+	std::vector<float> weights;
+
+	// Detect table type by checking if key 1 exists (array) vs string keys (named pieces)
+	lua_rawgeti(L, 2, 1);
+	const bool isArray = !lua_isnil(L, -1);
+	lua_pop(L, 1);
+
+	if (isArray) {
+		// Array form: {w0, w1, w2, ...} indexed by script piece order
+		const int n = lua_objlen(L, 2);
+		weights.reserve(n);
+		for (int i = 1; i <= n; i++) {
+			lua_rawgeti(L, 2, i);
+			weights.push_back(luaL_checkfloat(L, -1));
+			lua_pop(L, 1);
+		}
+	} else {
+		// Named form: {pieceName = weight, ...}
+		// Build a name->scriptIndex map from CUnitScript::pieces
+		const auto& pieces = activeScript->pieces;
+		const int numPieces = static_cast<int>(pieces.size());
+		weights.assign(numPieces, 1.0f); // default: unmentioned pieces pass through at full weight
+
+		lua_pushnil(L); // first key
+		while (lua_next(L, 2) != 0) {
+			// key at -2, value at -1
+			if (lua_isstring(L, -2)) {
+				const char* pieceName = lua_tostring(L, -2);
+				const float w = luaL_checkfloat(L, -1);
+				// Linear search over pieces by name
+				for (int si = 0; si < numPieces; si++) {
+					if (pieces[si] && pieces[si]->original->name == pieceName) {
+						weights[si] = w;
+						break;
+					}
+				}
+			}
+			lua_pop(L, 1); // pop value, keep key for next iteration
+		}
+	}
+
+	activeScript->SetEmbeddedAnimPieceWeights(clipId, weights);
+	return 0;
+}
+
+int CLuaUnitScript::GetAnimationTime(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	const size_t clipId = ReadAnimationId(L);
+	lua_pushnumber(L, activeScript->GetEmbeddedAnimTime(clipId));
+	return 1;
+}
+
+int CLuaUnitScript::GetAnimationDuration(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	const size_t clipId = ReadAnimationId(L);
+	lua_pushnumber(L, activeScript->GetEmbeddedAnimDuration(clipId));
+	return 1;
+}
+
+int CLuaUnitScript::GetAnimationId(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	const size_t clipId = activeScript->GetEmbeddedAnimId(luaL_checkstring(L, 1));
+	if (clipId == static_cast<size_t>(-1))
+		return 0;  // return nil for unknown names
+
+	lua_pushnumber(L, static_cast<float>(clipId));
+	return 1;
+}
+
+int CLuaUnitScript::IsAnimationPlaying(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (activeScript == nullptr)
+		return 0;
+
+	const size_t clipId = ReadAnimationId(L);
+	lua_pushboolean(L, activeScript->IsEmbeddedAnimPlaying(clipId));
+	return 1;
+}
+
+// Helper function to read animation id from lua state
+size_t CLuaUnitScript::ReadAnimationId(lua_State* L) {
+	size_t clipId = size_t(-1);
+
+	if (lua_isnumber(L, 1))
+		clipId = static_cast<size_t>(lua_toint(L, 1));
+	else if (activeScript && lua_isstring(L, 1))
+		clipId = activeScript->GetEmbeddedAnimId(luaL_checkstring(L, 1));
+
+	return clipId;
+}
 
 // Do not call with a function that returns values to lua
 int CLuaUnitScript::MultiExec(lua_State *L, int (*const func)(lua_State*), const int expectedArgs) {

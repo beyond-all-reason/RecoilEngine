@@ -10,6 +10,7 @@
 #include <cstdint>
 
 #include "Rendering/Models/LocalModelPiece.hpp"
+#include "Rendering/Models/3DModelAnimation.hpp"
 #include "System/creg/creg_cond.h"
 
 
@@ -46,13 +47,71 @@ protected:
 		bool hasWaiting = false;
 	};
 
-	using AnimContainerType = std::vector<AnimInfo>;
-	using AnimContainerTypeIt = AnimContainerType::iterator;
+	using AnimContainerTypeIt = std::vector<AnimInfo>::iterator;
 
 	using TickAnimFunc = bool(CUnitScript::*)(int, LocalModelPiece&, AnimInfo&);
 
-	AnimContainerType anims;
-	AnimContainerType doneAnims;
+	std::vector<AnimInfo> anims;
+	std::vector<AnimInfo> doneAnims;
+	std::vector<size_t> doneEmbeddedAnims;
+
+	struct EmbeddedPieceState {
+		float3 pos;
+		float3 rot;
+		float scale;
+	};
+	std::vector<EmbeddedPieceState> embeddedPieceStates;
+
+	struct EmbeddedAnimPlayer {
+		CR_DECLARE_STRUCT(EmbeddedAnimPlayer)
+		float currentTime           = 0.0f;
+		float playSpeed             = 1.0f;
+		float weight                = 1.0f;
+		bool  isActive              = false;
+		int8_t loopMode             = 0;      // 0=no loop, >0=forward loop, <0=reverse loop
+		bool  isAdditive            = false;  // if true, contribution is not normalized (delta on top of blend)
+		bool  hasWaiting            = false;  // opt-in to EmbeddedAnimFinished callback
+		bool  hasFiredCompletion    = false;  // guards re-fire on non-looping hold
+		std::vector<float> pieceWeights;      // per-piece weight multipliers; empty = all 1.0
+	};
+
+	std::vector<EmbeddedAnimPlayer> animPlayers;
+
+	// Per (clipId, scriptPieceIdx) cache of direct sequence pointers into the immutable model
+	// animation data. Avoids O(1)-but-costly unordered_map::find per (clip, piece, channel) in
+	// the hot TickEmbeddedAnim loop. Indexed as [clipId * pieces.size() + si].
+	// Not serialized — rebuilt lazily on first tick (or after save/load).
+	struct ClipPieceCache {
+		const ModelAnimation::TypedSequence<float3>*      posSeq   = nullptr;
+		const ModelAnimation::TypedSequence<CQuaternion>* rotSeq   = nullptr;
+		const ModelAnimation::TypedSequence<float>*       scaleSeq = nullptr;
+	};
+	std::vector<ClipPieceCache> channelCache;
+
+	// Per-piece record of which axes are currently driven by COB/Lua script animations.
+	// Rebuilt at the top of each TickEmbeddedAnim call from `anims`.
+	// Eliminates repeated O(n) FindAnim() scans in the piece apply loop.
+	struct PieceScriptClaim {
+		uint16_t move  : 3;  // axes 0,1,2 claimed by AMove
+		uint16_t turn  : 3;  // axes 0,1,2 claimed by ATurn
+		uint16_t spin  : 3;  // axes 0,1,2 claimed by ASpin
+		uint16_t scale : 1;  // claimed by AScale
+		uint16_t       : 6;  // padding
+
+		void SetMove(int axis)  { move  |= (1u << axis); }
+		void SetTurn(int axis)  { turn  |= (1u << axis); }
+		void SetSpin(int axis)  { spin  |= (1u << axis); }
+		void SetScale()         { scale  = 1; }
+
+		bool HasMove(int axis)       const { return (move  >> axis) & 1; }
+		bool HasTurn(int axis)       const { return (turn  >> axis) & 1; }
+		bool HasSpin(int axis)       const { return (spin  >> axis) & 1; }
+		bool HasTurnOrSpin(int axis) const { return HasTurn(axis) || HasSpin(axis); }
+		bool HasScale()              const { return scale != 0; }
+	};
+	std::vector<PieceScriptClaim> scriptClaimedAxesBuf;
+
+	void RebuildChannelCache();
 
 	bool busy;
 	bool hasSetSFXOccupy;
@@ -124,8 +183,30 @@ public:
 	bool TickTurnAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai);
 	bool TickSpinAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai);
 	bool TickScaleAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai);
+	bool TickRestoreAnim(int tickRate, LocalModelPiece& lmp, AnimInfo& ai);
+	void TickEmbeddedAnim(int tickRate);
+
+	// animation, used by Lua unit scripts
+	size_t PlayEmbeddedAnimation(const std::string& name, float speed, int8_t loopMode, float weight, bool wait = false, bool additive = false);
+	void StopEmbeddedAnimation(size_t clipId);
+	void StopEmbeddedAnimations();
+
+	void  SetEmbeddedAnimSpeed(size_t clipId, float speed);
+	void  SetEmbeddedAnimTime(size_t clipId, float time);
+	void  SetEmbeddedAnimWeight(size_t clipId, float weight);
+	void  SetEmbeddedAnimPieceWeights(size_t clipId, const std::vector<float>& weights);
+	float GetEmbeddedAnimTime(size_t clipId)  const;
+	float GetEmbeddedAnimDuration(const std::string& name) const;
+	float GetEmbeddedAnimDuration(size_t clipId)         const;
+	bool  IsEmbeddedAnimPlaying(const std::string& name)   const;
+	bool  IsEmbeddedAnimPlaying(size_t clipId)           const;
+	size_t GetEmbeddedAnimId(const std::string& name)    const;
 
 	// animation, used by CCobThread
+	void RestorePieceTurn(int piece, int axis, float speed);
+	void RestorePieceMove(int piece, int axis, float speed);
+	void RestorePieceScale(int piece, float speed);
+
 	void Spin(int piece, int axis, float speed, float accel);
 	void StopSpin(int piece, int axis, float decel);
 	void Turn(int piece, int axis, float speed, float destination);
@@ -155,9 +236,8 @@ public:
 	bool IsInAnimation(AnimType type, int piece, int axis) {
 		return (FindAnim(type, piece, axis) != anims.end());
 	}
-	bool HaveAnimations() const {
-		return (!anims.empty());
-	}
+
+	bool HaveAnimations() const;
 
 	// checks for callin existence
 	bool HasSetSFXOccupy () const { return hasSetSFXOccupy; }
@@ -217,10 +297,15 @@ public:
 	virtual void  Shot(int weaponNum) = 0;
 	virtual bool  BlockShot(int weaponNum, const CUnit* targetUnit, bool userTarget) = 0; // returns whether shot should be blocked
 	virtual float TargetWeight(int weaponNum, const CUnit* targetUnit) = 0; // returns target weight
+	// anim finished
 	virtual void AnimFinished(AnimType type, int piece, int axis) = 0;
+	virtual void EmbeddedAnimFinished(size_t animId, const std::string& animName) {}
 public:
 	const auto& GetLiveAnims() const { return anims; }
 	const auto& GetDoneAnims() const { return doneAnims; }
+
+	const auto& GetAnimPlayers() const { return animPlayers; }
+	const auto& GetDoneEmbeddedAnims() const { return doneEmbeddedAnims; }
 };
 
 #endif // UNIT_SCRIPT_H

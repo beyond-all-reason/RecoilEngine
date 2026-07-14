@@ -112,7 +112,7 @@ void CUnitScriptEngine::AddInstance(CUnitScript* instance)
 	if (instance == currentScript)
 		return;
 
-	spring::VectorInsertUnique(animating, instance/*, true*/);
+	spring::VectorInsertUnique(animating, instance, true);
 }
 
 void CUnitScriptEngine::RemoveInstance(CUnitScript* instance)

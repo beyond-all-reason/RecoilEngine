@@ -118,11 +118,12 @@ local sp_GetUnitWeaponState = Spring.GetUnitWeaponState
 local sp_SetUnitWeaponState = Spring.SetUnitWeaponState
 local sp_SetUnitShieldState = Spring.SetUnitShieldState
 
--- Keep local reference to engine's CallAsUnit/WaitForMove/WaitForTurn,
+-- Keep local reference to engine's CallAsUnit/WaitForMove/WaitForTurn/PlayAnimation,
 -- as we overwrite them with (safer) framework version later on.
-local sp_CallAsUnit  = Spring.UnitScript.CallAsUnit
-local sp_WaitForMove = Spring.UnitScript.WaitForMove
-local sp_WaitForTurn = Spring.UnitScript.WaitForTurn
+local sp_CallAsUnit    = Spring.UnitScript.CallAsUnit
+local sp_WaitForMove   = Spring.UnitScript.WaitForMove
+local sp_WaitForTurn   = Spring.UnitScript.WaitForTurn
+local sp_PlayAnimation = Spring.UnitScript.PlayAnimation
 local sp_SetPieceVisibility = Spring.UnitScript.SetPieceVisibility
 local sp_SetDeathScriptFinished = Spring.UnitScript.SetDeathScriptFinished
 
@@ -161,9 +162,10 @@ iteration of threads WILL cause desync!
 Format: {
 	[unitID] = {
 		env = {},  -- the unit's environment table
-		waitingForMove  = { [piece*3+axis] = thread, ... },
-		waitingForTurn  = { [piece*3+axis] = thread, ... },
-		waitingForScale = { [piece] = thread, ... },
+		waitingForMove      = { [piece*3+axis] = thread, ... },
+		waitingForTurn      = { [piece*3+axis] = thread, ... },
+		waitingForScale     = { [piece] = thread, ... },
+		waitingForAnimation = { [animId] = thread, ... },
 		threads = {
 			[thread] = {
 				thread = thread,      -- the coroutine object
@@ -299,6 +301,19 @@ local function ScaleFinished(piece)
 	return AnimFinished(activeAnim, piece)
 end
 
+local function AnimationFinished(animId, animName)
+	local activeUnit = GetActiveUnit()
+	local wthreads = activeUnit.waitingForAnimation[animId]
+	if wthreads then
+		activeUnit.waitingForAnimation[animId] = {}
+		while (#wthreads > 0) do
+			local wthread = wthreads[#wthreads]
+			wthreads[#wthreads] = nil
+			WakeUp(wthread)
+		end
+	end
+end
+
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
@@ -356,6 +371,25 @@ function Spring.UnitScript.WaitForScale(piece)
 		local activeUnit = GetActiveUnit()
 		return WaitForAnim(activeUnit.threads, activeUnit.waitingForScale, piece)
 	end
+end
+
+-- Wraps engine's PlayAnimation so wait=true blocks the calling thread
+-- until the non-looping animation finishes (engine fires AnimationFinished callin).
+function Spring.UnitScript.PlayAnimation(name, params)
+	local id = sp_PlayAnimation(name, params)
+	if params and params.wait and id ~= -1 then
+		local activeUnit = GetActiveUnit()
+		local wthreads = activeUnit.waitingForAnimation[id]
+		if not wthreads then
+			wthreads = {}
+			activeUnit.waitingForAnimation[id] = wthreads
+		end
+		local thread = activeUnit.threads[co_running() or error("PlayAnimation wait=true: not in a thread", 2)]
+		wthreads[#wthreads + 1] = thread
+		thread.container = wthreads
+		co_yield()
+	end
+	return id
 end
 
 
@@ -729,10 +763,11 @@ function gadget:UnitCreated(unitID, unitDefID)
 	local callins = env.script
 
 	-- Add framework callins.
-	callins.MoveFinished = MoveFinished
-	callins.TurnFinished = TurnFinished
-	callins.ScaleFinished = ScaleFinished
-	callins.Destroy = Destroy
+	callins.MoveFinished      = MoveFinished
+	callins.TurnFinished      = TurnFinished
+	callins.ScaleFinished     = ScaleFinished
+	callins.AnimationFinished = AnimationFinished
+	callins.Destroy           = Destroy
 
 	-- AimWeapon/AimShield is required for a functional weapon/shield,
 	-- so it doesn't hurt to not check other weapons.
@@ -795,9 +830,10 @@ function gadget:UnitCreated(unitID, unitDefID)
 	units[unitID] = {
 		env = env,
 		unitID = unitID,
-		waitingForMove = {},
-		waitingForTurn = {},
-		waitingForScale = {},
+		waitingForMove      = {},
+		waitingForTurn      = {},
+		waitingForScale     = {},
+		waitingForAnimation = {},
 		threads = setmetatable({}, {__mode = "kv"}), -- weak table
 	}
 

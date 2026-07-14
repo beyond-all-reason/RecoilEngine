@@ -47,9 +47,10 @@ void CLuaUnitScriptNames::InitScriptNames()
 	scriptNames[LUAFN_QueryNanoPiece]       = "QueryNanoPiece";
 	scriptNames[LUAFN_QueryBuildInfo]       = "QueryBuildInfo";
 
-	scriptNames[LUAFN_MoveFinished] = "MoveFinished";
-	scriptNames[LUAFN_TurnFinished] = "TurnFinished";
-	scriptNames[LUAFN_ScaleFinished] = "ScaleFinished";
+	scriptNames[LUAFN_MoveFinished]      = "MoveFinished";
+	scriptNames[LUAFN_TurnFinished]      = "TurnFinished";
+	scriptNames[LUAFN_ScaleFinished]     = "ScaleFinished";
+	scriptNames[LUAFN_AnimationFinished] = "AnimationFinished";
 
 	// Also add the weapon aiming stuff
 	scriptNames[LUAFN_QueryWeapon]   = "QueryWeapon";

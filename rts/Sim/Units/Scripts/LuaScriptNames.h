@@ -44,6 +44,7 @@ enum {
 	LUAFN_MoveFinished,         // ( piece, axis ) -> nil
 	LUAFN_TurnFinished,         // ( piece, axis ) -> nil
 	LUAFN_ScaleFinished,        // ( piece ) -> nil
+	LUAFN_AnimationFinished,    // ( animId, animName ) -> nil
 
 	// Weapon functions
 	LUAFN_QueryWeapon,   // ( ) -> number piece

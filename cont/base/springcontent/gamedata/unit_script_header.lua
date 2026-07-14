@@ -25,12 +25,25 @@ local Spin = UnitScript.Spin
 local StopSpin = UnitScript.StopSpin
 local Scale = UnitScript.Scale
 
+local RestoreTurn = UnitScript.RestoreTurn
+local RestoreMove = UnitScript.RestoreMove
+local RestoreScale = UnitScript.RestoreScale
+
 local MultiSetPieceVisibility = UnitScript.MultiSetPieceVisibility
 local MultiMove = UnitScript.MultiMove
 local MultiTurn = UnitScript.MultiTurn
 local MultiSpin = UnitScript.MultiSpin
 local MultiStopSpin = UnitScript.MultiStopSpin
 local MultiExplode = UnitScript.MultiExplode
+
+local PlayAnimation = UnitScript.PlayAnimation
+local StopAnimation = UnitScript.StopAnimation
+local SetAnimationSpeed = UnitScript.SetAnimationSpeed
+local SetAnimationTime = UnitScript.SetAnimationTime
+local SetAnimationWeight = UnitScript.SetAnimationWeight
+local GetAnimationTime = UnitScript.GetAnimationTime
+local GetAnimationDuration = UnitScript.GetAnimationDuration
+local IsAnimationPlaying = UnitScript.IsAnimationPlaying
 
 local StartThread = UnitScript.StartThread
 local Signal = UnitScript.Signal

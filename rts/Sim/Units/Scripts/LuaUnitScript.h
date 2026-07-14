@@ -134,6 +134,7 @@ public:
 
 	// special callin to allow Lua to resume threads blocking on this anim
 	void AnimFinished(AnimType type, int piece, int axis) override;
+	void EmbeddedAnimFinished(size_t animId, const std::string& animName) override;
 
 public:
 	static void HandleFreed(CLuaHandle* handle);
@@ -166,6 +167,9 @@ private:
 	static int Turn(lua_State* L);
 	static int Move(lua_State* L);
 	static int Scale(lua_State* L);
+	static int RestoreTurn(lua_State* L);
+	static int RestoreMove(lua_State* L);
+	static int RestoreScale(lua_State* L);
 	static int IsInAnimation(lua_State* L, const char* caller, AnimType type);
 	static int IsInTurn(lua_State* L);
 	static int IsInMove(lua_State* L);
@@ -194,6 +198,20 @@ private:
 	static int GetPiecePosDir(lua_State* L);      // EmitDirPos (in unit space)
 
 	static int GetActiveUnitID(lua_State* L);
+
+	// Embedded animation playback
+	static int PlayAnimation(lua_State* L);
+	static int StopAnimation(lua_State* L);
+	static int SetAnimationSpeed(lua_State* L);
+	static int SetAnimationTime(lua_State* L);
+	static int SetAnimationWeight(lua_State* L);
+	static int SetAnimationPieceWeights(lua_State* L);
+	static int GetAnimationTime(lua_State* L);
+	static int GetAnimationDuration(lua_State* L);
+	static int GetAnimationId(lua_State* L);
+	static int IsAnimationPlaying(lua_State* L);
+	// Helper function to read animation id from lua state
+	static size_t ReadAnimationId(lua_State* L);
 };
 
 #endif

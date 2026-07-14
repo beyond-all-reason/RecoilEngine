@@ -273,6 +273,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitSeparation);
 	REGISTER_LUA_CFUNC(GetUnitFeatureSeparation);
 	REGISTER_LUA_CFUNC(GetUnitDefDimensions);
+	REGISTER_LUA_CFUNC(GetUnitDefAnimationNames);
 	REGISTER_LUA_CFUNC(GetUnitCollisionVolumeData);
 	REGISTER_LUA_CFUNC(GetUnitPieceCollisionVolumeData);
 
@@ -5921,6 +5922,36 @@ int LuaSyncedRead::GetUnitDefDimensions(lua_State* L)
 	HSTR_PUSH_NUMBER(L, "midz",   mid.z);
 	HSTR_PUSH_NUMBER(L, "minz",   m.mins.z);
 	HSTR_PUSH_NUMBER(L, "maxz",   m.maxs.z);
+	return 1;
+}
+
+
+/***
+ *
+ * @function Spring.GetUnitDefAnimationNames
+ * @param unitDefID integer
+ * @return string[]? animationNames
+ */
+int LuaSyncedRead::GetUnitDefAnimationNames(lua_State* L)
+{
+	const int unitDefID = luaL_checkint(L, 1);
+	const UnitDef* ud = unitDefHandler->GetUnitDefByID(unitDefID);
+	if (ud == nullptr)
+		return 0;
+
+	const S3DModel* model = ud->LoadModel();
+	if (model == nullptr)
+		return 0;
+
+	const auto& animMap = model->animationMap;
+	lua_createtable(L, animMap.size(), 0);
+
+	size_t i = 0;
+	for (auto it = animMap.cbegin(); it != animMap.cend(); ++it, ++i) {
+		lua_pushsstring(L, it->name);
+		lua_rawseti(L, -2, i + 1);
+	}
+
 	return 1;
 }
 

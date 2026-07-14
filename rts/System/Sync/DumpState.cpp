@@ -637,6 +637,28 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 						<< "\n";
 				}
 			}
+			{
+				const auto& animVec = animScript->GetAnimPlayers();
+				file << "\t\tAnimPlayers count: " << animVec.size() << "\n";
+				for (const auto& a : animVec) {
+					file
+						<< "\t\t\tcurrentTime: " << a.currentTime
+						<< " playSpeed: " << a.playSpeed
+						<< " weight: " << a.weight
+						<< " isActive: " << a.isActive
+						<< " loopMode: " << static_cast<int>(a.loopMode)
+						<< " hasWaiting: " << a.hasWaiting
+						<< " hasFiredCompletion: " << a.hasFiredCompletion
+						<< "\n";
+				}
+			}
+			{
+				const auto& animVec = animScript->GetDoneEmbeddedAnims();
+				file << "\t\tDoneEmbeddedAnims count: " << animVec.size() << "\n";
+				for (const auto a : animVec) {
+					file << "\t\t\tclipId: " << a << "\n";
+				}
+			}
 		}
 	}
 	#endif

@@ -7,6 +7,7 @@
 #include <cstdint>
 
 #include "3DModelDefs.hpp"
+#include "3DModelAnimation.hpp"
 #include "ModelsMemStorage.h"
 #include "System/float3.h"
 
@@ -106,6 +107,8 @@ public:
 
 	LoadStatus loadStatus;
 	bool uploaded;
+
+	ModelAnimation::Map animationMap;
 private:
 	ScopedTransformMemAlloc traAlloc;
 };
