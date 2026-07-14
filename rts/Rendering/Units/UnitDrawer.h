@@ -167,7 +167,7 @@ protected:
 
 	void DrawOpaqueUnit(CUnit* unit, uint8_t thisPassMask) const;
 	void DrawUnitShadow(CUnit* unit) const;
-	void DrawAlphaUnit(CUnit* unit, int modelType, uint8_t thisPassMask, bool drawGhostBuildingsPass) const;
+	void DrawAlphaUnit(CUnit* unit, uint8_t thisPassMask) const;
 
 	void DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const;
 	void DrawAlphaAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const;
@@ -236,7 +236,7 @@ protected:
 	void DrawOpaqueObjectsAux(int modelType) const override;
 	void DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const;
 
-	void DrawGhostedBuildings(int modelType) const override {} //implemented in-line
+	void DrawGhostedBuildings(int modelType) const override;
 
 	void DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool noLuaCall) const;
 	void DrawUnitModelBeingBuiltOpaque(const CUnit* unit, bool noLuaCall) const;
