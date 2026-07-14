@@ -287,10 +287,14 @@ void S3DModelVAO::DrawElements(GLenum prim, uint32_t vboIndxStart, uint32_t vboI
 }
 
 template<typename TObj>
-bool S3DModelVAO::AddToSubmissionImpl(const TObj* obj, uint32_t indexStart, uint32_t indexCount, uint16_t paletteIndex)
+bool S3DModelVAO::AddToSubmissionImpl(const TObj* obj, uint32_t indexStart, uint32_t indexCount, uint16_t paletteIndex, uint32_t explicitMatOffset)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const auto traIndex = transformsUploader.GetElemOffset(obj);
+	// explicitMatOffset lets a caller supply a pre-allocated world-transform slot (static-instanced
+	// ARRAY_MATMODE, e.g. ghost buildings); otherwise the per-object animated block is used.
+	const auto traIndex = (explicitMatOffset != TransformsMemStorage::INVALID_INDEX)
+		? explicitMatOffset
+		: transformsUploader.GetElemOffset(obj);
 	if (traIndex == TransformsMemStorage::INVALID_INDEX)
 		return false;
 
@@ -327,7 +331,17 @@ bool S3DModelVAO::AddToSubmission(const S3DModel* model, uint16_t paletteIndex)
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(model);
 
-	return AddToSubmissionImpl(model, model->indxStart, model->indxCount, paletteIndex);
+	return AddToSubmissionImpl(model, model->indxStart, model->indxCount, paletteIndex, TransformsMemStorage::INVALID_INDEX);
+}
+
+bool S3DModelVAO::AddToSubmission(const S3DModel* model, uint32_t worldTransformOffset, uint16_t paletteIndex)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	assert(model);
+
+	// static-instanced: instData.x = the caller-supplied world transform, pieces read from the model
+	// bind pose (instData.w, resolved inside AddToSubmissionImpl via transformsUploader).
+	return AddToSubmissionImpl(model, model->indxStart, model->indxCount, paletteIndex, worldTransformOffset);
 }
 
 bool S3DModelVAO::AddToSubmission(const CUnit* unit)
@@ -338,7 +352,7 @@ bool S3DModelVAO::AddToSubmission(const CUnit* unit)
 	const S3DModel* model = unit->model;
 	assert(model);
 
-	return AddToSubmissionImpl(unit, model->indxStart, model->indxCount, unit->paletteIndex);
+	return AddToSubmissionImpl(unit, model->indxStart, model->indxCount, unit->paletteIndex, TransformsMemStorage::INVALID_INDEX);
 }
 
 bool S3DModelVAO::AddToSubmission(const CFeature* feature)
@@ -349,7 +363,7 @@ bool S3DModelVAO::AddToSubmission(const CFeature* feature)
 	const S3DModel* model = feature->model;
 	assert(model);
 
-	return AddToSubmissionImpl(feature, model->indxStart, model->indxCount, feature->paletteIndex);
+	return AddToSubmissionImpl(feature, model->indxStart, model->indxCount, feature->paletteIndex, TransformsMemStorage::INVALID_INDEX);
 }
 
 bool S3DModelVAO::AddToSubmission(const UnitDef* unitDef, uint16_t paletteIndex)
@@ -360,7 +374,7 @@ bool S3DModelVAO::AddToSubmission(const UnitDef* unitDef, uint16_t paletteIndex)
 	const S3DModel* model = unitDef->model;
 	assert(model);
 
-	return AddToSubmissionImpl(unitDef, model->indxStart, model->indxCount, paletteIndex);
+	return AddToSubmissionImpl(unitDef, model->indxStart, model->indxCount, paletteIndex, TransformsMemStorage::INVALID_INDEX);
 }
 
 

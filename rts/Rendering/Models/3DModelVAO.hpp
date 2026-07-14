@@ -66,6 +66,10 @@ public:
 	void DrawElements(GLenum prim, uint32_t vboIndxStart, uint32_t vboIndxCount) const;
 
 	bool AddToSubmission(const S3DModel* model, uint16_t paletteIndex);
+	// static-instanced submission: the per-instance world transform is supplied explicitly
+	// (a 1-element slot in transformsMemStorage) and read by the shader in ARRAY_MATMODE;
+	// model pieces are taken from the model's bind pose. Used for ghost buildings.
+	bool AddToSubmission(const S3DModel* model, uint32_t worldTransformOffset, uint16_t paletteIndex);
 
 	bool AddToSubmission(const CUnit* unit);
 	bool AddToSubmission(const CFeature* feature);
@@ -100,7 +104,8 @@ private:
 		const TObj* obj,
 		uint32_t indexStart,
 		uint32_t indexCount,
-		uint16_t paletteIndex
+		uint16_t paletteIndex,
+		uint32_t explicitMatOffset // static-instanced world transform; when the invalid sentinel, it is derived from obj
 	);
 	void EnableAttribs(bool inst) const;
 	void DisableAttribs() const;
