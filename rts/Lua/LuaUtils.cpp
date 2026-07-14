@@ -854,6 +854,14 @@ int LuaUtils::PushColVolTable(lua_State* L, const CollisionVolume* vol) {
 			break;
 		case CollisionVolume::COLVOL_TYPE_CYLINDER:
 			HSTR_PUSH_CSTRING(L, "type", "cylinder");
+
+			switch (vol->GetPrimaryAxis()) {
+				case CollisionVolume::COLVOL_AXIS_X: LuaPushNamedNumber(L, "primaryAxis", 1); break;
+				case CollisionVolume::COLVOL_AXIS_Y: LuaPushNamedNumber(L, "primaryAxis", 2); break;
+				case CollisionVolume::COLVOL_AXIS_Z: LuaPushNamedNumber(L, "primaryAxis", 3); break;
+				default: assert(false);
+			}
+
 			break;
 		case CollisionVolume::COLVOL_TYPE_BOX:
 			HSTR_PUSH_CSTRING(L, "type", "box");
@@ -885,7 +893,7 @@ int LuaUtils::PushColVolData(lua_State* L, const CollisionVolume* vol) {
 	lua_pushnumber(L, vol->GetOffsets().z);
 	lua_pushnumber(L, vol->GetVolumeType());
 	lua_pushnumber(L, int(vol->UseContHitTest()));
-	lua_pushnumber(L, vol->GetPrimaryAxis());
+	lua_pushnumber(L, vol->GetPrimaryAxis()); // FIXME: x = 0, should be 1
 	lua_pushboolean(L, vol->IgnoreHits());
 	return 10;
 }
