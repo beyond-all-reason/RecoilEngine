@@ -50,7 +50,9 @@ void CVerticalSync::ConfigNotify(const std::string& key, const std::string& valu
 void CVerticalSync::Toggle()
 {
 	// no-arg switch, select smallest interval
-	switch (std::clamp(SDL_GL_GetSwapInterval(), -1, 1)) {
+	int curInterval = 0;
+	SDL_GL_GetSwapInterval(&curInterval); // SDL3: interval returned via out-param
+	switch (std::clamp(curInterval, -1, 1)) {
 		case -1: { SetInterval( 0); } break;
 		case  0: { SetInterval(+1); } break;
 		case +1: { SetInterval(-1); } break;

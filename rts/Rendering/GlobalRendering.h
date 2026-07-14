@@ -17,7 +17,7 @@ class SharedLib;
 struct SDL_version;
 struct SDL_Rect;
 struct SDL_Window;
-typedef void* SDL_GLContext;
+typedef struct SDL_GLContextState* SDL_GLContext;
 
 /**
  * @brief Globally accessible unsynced, rendering related data

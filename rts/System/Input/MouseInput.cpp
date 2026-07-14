@@ -29,7 +29,7 @@
 
 #include <SDL_events.h>
 #include <SDL_hints.h>
-#include <SDL_syswm.h>
+#include "System/Platform/SDL2WMCompat.h"
 
 
 IMouseInput* mouseInput = nullptr;
@@ -50,14 +50,18 @@ IMouseInput::IMouseInput(bool relModeWarp)
 	// instead of raw input and gets toggled by SDL_SetRelativeMouseMode based
 	// on the hint given here); the alternative to RMW would be to *duplicate*
 	// the SDL patch in WarpPos
-	SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, relModeWarp? "1": "0");
+	//
+	// SDL3 removed SDL_HINT_MOUSE_RELATIVE_MODE_WARP: warp-based relative mode no
+	// longer exists, relative motion is handled internally per-window. Nothing to
+	// set here anymore.
+	(void)relModeWarp;
 	#endif
 }
 
 IMouseInput::~IMouseInput()
 {
 	#ifndef HEADLESS
-	SDL_SetHint(SDL_HINT_MOUSE_RELATIVE_MODE_WARP, "0");
+	// SDL3: SDL_HINT_MOUSE_RELATIVE_MODE_WARP no longer exists (see ctor).
 	#endif
 }
 
@@ -91,23 +95,20 @@ bool IMouseInput::HandleSDLMouseEvent(const SDL_Event& event)
 				mouse->MouseWheel(event.wheel.y);
 
 		} break;
-		case SDL_WINDOWEVENT: {
-			switch (event.window.event) {
-				case SDL_WINDOWEVENT_ENTER: {
-					if (mouse != nullptr)
-						mouse->WindowEnter();
-				} break;
-				case SDL_WINDOWEVENT_LEAVE: {
-					// mouse left window; set pos internally to view center-pixel to prevent endless scrolling
-					mousepos = {
-						globalRendering->viewPosX          + (globalRendering->viewSizeX >> 1),
-						globalRendering->viewWindowOffsetY + (globalRendering->viewSizeY >> 1)
-					};
+		// SDL3 promoted the former SDL_WINDOWEVENT sub-types to top-level events.
+		case SDL_EVENT_WINDOW_MOUSE_ENTER: {
+			if (mouse != nullptr)
+				mouse->WindowEnter();
+		} break;
+		case SDL_EVENT_WINDOW_MOUSE_LEAVE: {
+			// mouse left window; set pos internally to view center-pixel to prevent endless scrolling
+			mousepos = {
+				globalRendering->viewPosX          + (globalRendering->viewSizeX >> 1),
+				globalRendering->viewWindowOffsetY + (globalRendering->viewSizeY >> 1)
+			};
 
-					if (mouse != nullptr)
-						mouse->WindowLeave();
-				} break;
-			}
+			if (mouse != nullptr)
+				mouse->WindowLeave();
 		} break;
 	}
 
@@ -117,6 +118,10 @@ bool IMouseInput::HandleSDLMouseEvent(const SDL_Event& event)
 //////////////////////////////////////////////////////////////////////
 
 #if defined(_WIN32) && !defined(HEADLESS)
+
+// windows.h used to be pulled in transitively via SDL_syswm.h; the SDL3
+// WM-info compat shim does not include it, so do it explicitly here.
+#include <windows.h>
 
 class CWin32MouseInput : public IMouseInput
 {
@@ -152,11 +157,10 @@ public:
 	void InstallWndCallback()
 	{
 		SDL_SysWMinfo info;
-		SDL_VERSION(&info.version);
 		if (!SDL_GetWindowWMInfo(globalRendering->GetWindow(), &info))
 			return;
 
-		wnd = info.info.win.window;
+		wnd = (HWND)info.info.win.window;
 
 		LONG_PTR cur_wndproc = GetWindowLongPtr(wnd, GWLP_WNDPROC);
 
@@ -212,9 +216,9 @@ bool IMouseInput::WarpPos(int2 pos)
 {
 	#if __unix__
 		/* Needed for SDL2+Wayland where warping isn't allowed otherwise, works fine with X11.
-		 * One would think there should be a corresponding `SDL_ShowCursor(SDL_ENABLE);` below,
+		 * One would think there should be a corresponding `SDL_ShowCursor();` below,
 		 * but apparently this prevents this work-around from working (?!). */
-		SDL_ShowCursor(SDL_DISABLE);
+		SDL_HideCursor();
 	#endif
 
 	SDL_WarpMouseInWindow(globalRendering->GetWindow(), pos.x, pos.y);

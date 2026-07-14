@@ -3,21 +3,20 @@
 #if !defined(HEADLESS) && !defined(_WIN32) && !defined(__APPLE__)
 
 #include <glad/glad_glx.h>
-#include <SDL_syswm.h>
+#include "System/Platform/SDL2WMCompat.h"
 
 void GLX::Load(SDL_Window* window)
 {
 	supported = false;
 
 	SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
 	if (!SDL_GetWindowWMInfo(window, &info))
 		return;
 
 	switch (info.subsystem)
 	{
 	case SDL_SYSWM_X11: {
-		Display* display = info.info.x11.display;
+		Display* display = static_cast<Display*>(info.info.x11.display);
 		supported = static_cast<bool>(gladLoadGLX(display, DefaultScreen(display)));
 	} break;
 	case SDL_SYSWM_WAYLAND: {

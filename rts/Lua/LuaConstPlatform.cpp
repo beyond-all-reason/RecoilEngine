@@ -49,17 +49,17 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	LuaPushNamedString(L, "glewVersion", globalRenderingInfo.gladVersion);
 
 	/*** @field Platform.sdlVersionCompiledMajor number */
-	LuaPushNamedNumber(L, "sdlVersionCompiledMajor", globalRenderingInfo.sdlVersionCompiled.major);
+	LuaPushNamedNumber(L, "sdlVersionCompiledMajor", SDL_VERSIONNUM_MAJOR(globalRenderingInfo.sdlVersionCompiled));
 	/*** @field Platform.sdlVersionCompiledMinor number */
-	LuaPushNamedNumber(L, "sdlVersionCompiledMinor", globalRenderingInfo.sdlVersionCompiled.minor);
+	LuaPushNamedNumber(L, "sdlVersionCompiledMinor", SDL_VERSIONNUM_MINOR(globalRenderingInfo.sdlVersionCompiled));
 	/*** @field Platform.sdlVersionCompiledPatch number */
-	LuaPushNamedNumber(L, "sdlVersionCompiledPatch", globalRenderingInfo.sdlVersionCompiled.patch);
+	LuaPushNamedNumber(L, "sdlVersionCompiledPatch", SDL_VERSIONNUM_MICRO(globalRenderingInfo.sdlVersionCompiled));
 	/*** @field Platform.sdlVersionLinkedMajor number */
-	LuaPushNamedNumber(L, "sdlVersionLinkedMajor", globalRenderingInfo.sdlVersionLinked.major);
+	LuaPushNamedNumber(L, "sdlVersionLinkedMajor", SDL_VERSIONNUM_MAJOR(globalRenderingInfo.sdlVersionLinked));
 	/*** @field Platform.sdlVersionLinkedMinor number */
-	LuaPushNamedNumber(L, "sdlVersionLinkedMinor", globalRenderingInfo.sdlVersionLinked.minor);
+	LuaPushNamedNumber(L, "sdlVersionLinkedMinor", SDL_VERSIONNUM_MINOR(globalRenderingInfo.sdlVersionLinked));
 	/*** @field Platform.sdlVersionLinkedPatch number */
-	LuaPushNamedNumber(L, "sdlVersionLinkedPatch", globalRenderingInfo.sdlVersionLinked.patch);
+	LuaPushNamedNumber(L, "sdlVersionLinkedPatch", SDL_VERSIONNUM_MICRO(globalRenderingInfo.sdlVersionLinked));
 
 	/*** @field Platform.availableVideoModes PlatformVideoMode[] */
 	lua_pushstring(L, "availableVideoModes");

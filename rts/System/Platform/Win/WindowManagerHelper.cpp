@@ -1,7 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "System/Platform/WindowManagerHelper.h"
-#include <SDL_syswm.h>
+#include "System/Platform/SDL2WMCompat.h"
 #include <windows.h>
 
 
@@ -35,10 +35,9 @@ int GetWindowState(SDL_Window* window)
 	wp.length = sizeof(WINDOWPLACEMENT);
 
 	struct SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
 	SDL_GetWindowWMInfo(window, &info);
 
-	if (GetWindowPlacement(info.info.win.window, &wp)) {
+	if (GetWindowPlacement((HWND)info.info.win.window, &wp)) {
 		if (wp.showCmd == SW_SHOWMAXIMIZED)
 			state = SDL_WINDOW_MAXIMIZED;
 		if (wp.showCmd == SW_SHOWMINIMIZED)
@@ -54,10 +53,9 @@ void SetWindowResizable(SDL_Window* window, bool resizable)
 {
 #ifndef HEADLESS
 	SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
 	SDL_GetWindowWMInfo(window, &info);
 
-	HWND hwnd = info.info.win.window;
+	HWND hwnd = (HWND)info.info.win.window;
 	DWORD style = GetWindowLong(hwnd, GWL_STYLE);
 	if (resizable) {
 		style |= (WS_THICKFRAME | WS_MAXIMIZEBOX);

@@ -98,7 +98,10 @@ private:
 private:
 	ALCdevice* curDevice = nullptr;
 	ALCcontext* curContext = nullptr;
-	int sdlDeviceID = -1;
+	// SDL3 audio is stream-based: SDL_OpenAudioDeviceStream gives us a logical
+	// device (sdlDeviceID) bound to an SDL_AudioStream we feed from a callback.
+	SDL_AudioDeviceID sdlDeviceID = 0;
+	SDL_AudioStream* sdlStream = nullptr;
 	bool hasAlcSoftLoopBack = false;
 
 	std::string selectedDeviceName = "";

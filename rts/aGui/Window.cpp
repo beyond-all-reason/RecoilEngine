@@ -103,7 +103,7 @@ bool Window::HandleEventSelf(const SDL_Event& ev)
 			break;
 		}
 		case SDL_KEYDOWN: {
-			if (ev.key.keysym.sym == SDLK_ESCAPE)
+			if (ev.key.key == SDLK_ESCAPE)
 			{
 				WantClose();
 				return true;

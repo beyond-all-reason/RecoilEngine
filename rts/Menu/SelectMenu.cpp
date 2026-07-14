@@ -364,10 +364,10 @@ bool SelectMenu::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
 		case SDL_KEYDOWN: {
-			if (ev.key.keysym.sym == SDLK_ESCAPE) {
+			if (ev.key.key == SDLK_ESCAPE) {
 				LOG("[SelectMenu] user exited");
 				Quit();
-			} else if (ev.key.keysym.sym == SDLK_RETURN) {
+			} else if (ev.key.key == SDLK_RETURN) {
 				Single();
 				return true;
 			}

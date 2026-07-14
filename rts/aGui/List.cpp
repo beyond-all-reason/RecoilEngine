@@ -317,8 +317,10 @@ bool List::HandleEventSelf(const SDL_Event& ev)
 			break;
 		}
 		case SDL_MOUSEWHEEL: {
-			int mousex, mousey;
-			SDL_GetMouseState(&mousex, &mousey);
+			float fmousex, fmousey;
+			SDL_GetMouseState(&fmousex, &fmousey); // SDL3: float coords
+			const int mousex = int(fmousex);
+			const int mousey = int(fmousey);
 			if(hasFocus && MouseOver(mousex, mousey)) {
 				if (ev.wheel.y > 0) {
 					ScrollUpOne();
@@ -341,12 +343,12 @@ bool List::HandleEventSelf(const SDL_Event& ev)
 		case SDL_KEYDOWN: {
 			if (!hasFocus)
 				break;
-			if(ev.key.keysym.sym == SDLK_ESCAPE)
+			if(ev.key.key == SDLK_ESCAPE)
 			{
 				hasFocus = false;
 				break;
 			}
-			return KeyPressed(ev.key.keysym.sym, false);
+			return KeyPressed(ev.key.key, false);
 		}
 	}
 	return false;

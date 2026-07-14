@@ -79,7 +79,8 @@ namespace KeyInput {
 	void Update(int fakeMetaKey)
 	{
 		int numKeys = 0;
-		const uint8_t* kbState = SDL_GetKeyboardState(&numKeys);
+		// SDL3: keyboard state is an array of bool (was Uint8).
+		const bool* kbState = SDL_GetKeyboardState(&numKeys);
 
 		keyMods = SDL_GetModState();
 
@@ -90,7 +91,7 @@ namespace KeyInput {
 
 		for (int i = 0; i < numKeys; ++i) {
 			const auto scanCode = (SDL_Scancode)i;
-			const auto keyCode  = SDL_GetKeyFromScancode(scanCode);
+			const auto keyCode  = SDL_GetKeyFromScancode(scanCode, SDL_KMOD_NONE, false);
 
 			keyVec.emplace_back(keyCode, kbState[scanCode] != 0);
 			scanVec.emplace_back(scanCode, kbState[scanCode] != 0);
@@ -124,7 +125,7 @@ namespace KeyInput {
 	{
 		for (const auto& key: keyVec) {
 			auto keycode  = (SDL_Keycode)key.first;
-			auto scancode = SDL_GetScancodeFromKey(keycode);
+			auto scancode = SDL_GetScancodeFromKey(keycode, nullptr);
 
 			if (keycode == SDLK_NUMLOCKCLEAR || keycode == SDLK_CAPSLOCK || keycode == SDLK_SCROLLLOCK)
 				continue;
@@ -134,10 +135,10 @@ namespace KeyInput {
 
 			SDL_Event event;
 			event.type = event.key.type = SDL_KEYUP;
-			event.key.state = SDL_RELEASED;
-			event.key.keysym.sym = keycode;
-			event.key.keysym.mod = 0;
-			event.key.keysym.scancode = scancode;
+			event.key.down = false;
+			event.key.key = keycode;
+			event.key.mod = 0;
+			event.key.scancode = scancode;
 			SDL_PushEvent(&event);
 		}
 	}
