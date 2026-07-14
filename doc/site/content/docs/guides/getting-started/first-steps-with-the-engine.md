@@ -302,17 +302,17 @@ Two games are particularly suited for newcomers:
 4. Edit Lua files and retest
 
 Changes to Lua code take effect on the next game start. For workflow tips,
-see the [Lua Language Server guide](lua-language-server/) for setting up IDE
+see the [Lua Language Server guide](lua-language-server.md) for setting up IDE
 autocompletion.
 
 ## Next Steps
 
 Once you have the engine running with a game and map:
 
-- Learn about [VFS basics](vfs-basics/) to understand how the engine loads content
-- Read about [Widgets and Gadgets](widgets-and-gadgets/) to understand Lua scripting
-- Explore [basecontent](basecontent/) for the default scripts provided by the engine
-- Check out [Unit Types Basics](unit-types-basics/) to define your first units
+- Learn about [VFS basics](vfs-basics.md) to understand how the engine loads content
+- Read about [Widgets and Gadgets](widgets-and-gadgets.md) to understand Lua scripting
+- Explore [basecontent](basecontent.md) for the default scripts provided by the engine
+- Check out [Unit Types Basics](unit-types-basics.md) to define your first units
 
 For API reference while developing, see the [Lua API documentation](/docs/lua-api/).
 

@@ -59,9 +59,6 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	LuaPushNamedString(L, "buildFlags"     , SpringVersion::GetAdditional());
 	LuaPushNamedNumber(L, "wordSize", (!CLuaHandle::GetHandleSynced(L))? Platform::NativeWordSize() * 8: 0);
 
-	if (!CLuaHandle::GetHandleSynced(L))
-		LuaPushNamedBool(L, "isHeadless", SpringVersion::IsHeadless());
-
 	LuaPushNamedNumber(L, "gameSpeed", GAME_SPEED);
 	LuaPushNamedNumber(L, "maxCustomPaletteID", MAX_CUSTOM_COLORS - 1);
 

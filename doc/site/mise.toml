@@ -8,7 +8,7 @@
 	EMMYLUA_DOC_CLI_VERSION = "0.8.2" # lua_pages lua_library lua_check
 	LUA_LANGUAGE_SERVER_VERSION = "3.15.0" # lua_check
 	JQ_VERSION = "1.8.0" # binary_pages
-	7Z_VERSION = "24.09" # binary_pages
+	SEVENZIP_VERSION = "24.09" # binary_pages
 	RUBY_VERSION = "3.3" # lua_pages
 	LUA_DOC_EXTRACTOR_SOURCE_REF = "https://github.com/beyond-all-reason/RecoilEngine/blob/master"
 	RECOIL_LUA_LIBRARY_DIR = "rts/Lua/library"
@@ -51,7 +51,7 @@
 	depends = ["latest_release_data"]
 	description = "Generate Docs from Recoil binary"
 	tools."aqua:jqlang/jq" = "{{env.JQ_VERSION}}"
-	tools."aqua:ip7z/7zip" = "{{env.7Z_VERSION}}"
+	tools."aqua:ip7z/7zip" = "{{env.SEVENZIP_VERSION}}"
 	run = '''
 		download_url=$(jq -r '.assets[] | select(.name | contains("amd64-linux.7z")).browser_download_url' {{vars.latest_release_data}})
 

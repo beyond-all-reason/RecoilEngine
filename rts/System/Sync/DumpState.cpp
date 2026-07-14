@@ -687,14 +687,16 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 		const CTeam* t = teamHandler.Team(a);
 
 		file << "\t\tteamID: " << t->teamNum << " (controller: " << t->GetControllerName() << ")\n";
-		file << "\t\t\tmetal: " << TapFloats(t->res.metal);
-		file << "\t\t\tenergy: " << TapFloats(t->res.energy);
-		file << "\t\t\tmetalPull: " << TapFloats(t->resPull.metal);
-		file << "\t\t\tenergyPull: " << TapFloats(t->resPull.energy);
-		file << "\t\t\tmetalIncome: " << TapFloats(t->resIncome.metal);
-		file << "\t\t\tenergyIncome: " << TapFloats(t->resIncome.energy);
-		file << "\t\t\tmetalExpense: " << TapFloats(t->resExpense.metal);
-		file << "\t\t\tenergyExpense: " << TapFloats(t->resExpense.energy);
+		for (const auto &[resourceID, value] : std::views::enumerate(t->res))
+			file << "\t\t\tstored[" << resourceID << "]: " << TapFloats(value);
+		for (const auto &[resourceID, value] : std::views::enumerate(t->resStorage))
+			file << "\t\t\tmaxStorage[" << resourceID << "]: " << TapFloats(value);
+		for (const auto &[resourceID, value] : std::views::enumerate(t->resPull))
+			file << "\t\t\tpull[" << resourceID << "]: " << TapFloats(value);
+		for (const auto &[resourceID, value] : std::views::enumerate(t->resIncome))
+			file << "\t\t\tincome[" << resourceID << "]: " << TapFloats(value);
+		for (const auto &[resourceID, value] : std::views::enumerate(t->resExpense))
+			file << "\t\t\texpense[" << resourceID << "]: " << TapFloats(value);
 	}
 	#endif
 

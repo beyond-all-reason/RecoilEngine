@@ -329,6 +329,7 @@ class CLuaHandle : public CEventClient
 		bool AddBasicCalls(lua_State* L);
 		bool AddCommonModules(lua_State* L);
 		bool LoadCode(lua_State* L, std::string code, const std::string& debug);
+		void InitLuaSocket(lua_State* L);
 		static bool AddEntriesToTable(lua_State* L, const char* name, bool (*entriesFunc)(lua_State*));
 
 		/// returns error code and sets traceback on error
