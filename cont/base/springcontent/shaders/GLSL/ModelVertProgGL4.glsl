@@ -262,7 +262,7 @@ Transform Lerp(Transform t0, Transform t1, float a) {
 
 void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 {
-	bool staticModel = (matrixMode > 0);
+	bool staticModel = (matrixMode == MATMODE_STATIC);
 
 	vec4 piecePos = vec4(pos, 1.0);
 	vec4 normal4 = vec4(normal, 0.0);
@@ -327,7 +327,7 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 
 void main(void)
 {
-	bool staticModel = (matrixMode > 0);
+	bool staticModel = (matrixMode == MATMODE_STATIC);
 
 	vec4 modelPos;
 	vec3 modelNormal;
