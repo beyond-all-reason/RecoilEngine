@@ -155,12 +155,12 @@ public:
 	const auto* GetSavedData() const { return &savedData; }
 protected:
 	void UpdateObjectDrawFlags(CSolidObject* o) const override;
+	void UpdateDrawPos(CSolidObject* o) const override;
 private:
 	void UpdateTempDrawUnits(std::vector<TempDrawUnit>& tempDrawUnits);
 
 	void UpdateUnitIconState(CUnit* unit);
 	void UpdateUnitIconStateScreen(CUnit* unit);
-	static void UpdateDrawPos(CUnit* unit);
 
 	/// Returns true if the given unit should be drawn as icon in the current frame.
 	bool DrawAsIconByDistance(const CUnit* unit, const float sqUnitCamDist) const;

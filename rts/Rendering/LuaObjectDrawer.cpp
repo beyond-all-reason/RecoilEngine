@@ -164,9 +164,6 @@ static void SetupShadowUnitDrawState(unsigned int modelType, bool deferredPass) 
 	glColor3f(1.0f, 1.0f, 1.0f);
 	glDisable(GL_TEXTURE_2D);
 
-	glPolygonOffset(1.0f, 1.0f);
-	glEnable(GL_POLYGON_OFFSET_FILL);
-
 	Shader::IProgramObject* po = shadowHandler.GetShadowGenProg(CShadowHandler::SHADOWGEN_PROGRAM_MODEL);
 	po->Enable();
 }
@@ -175,7 +172,6 @@ static void ResetShadowUnitDrawState(unsigned int modelType, bool deferredPass) 
 	Shader::IProgramObject* po = shadowHandler.GetShadowGenProg(CShadowHandler::SHADOWGEN_PROGRAM_MODEL);
 
 	po->Disable();
-	glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
 // NOTE: incomplete (FeatureDrawer::DrawShadowPass sets more state)

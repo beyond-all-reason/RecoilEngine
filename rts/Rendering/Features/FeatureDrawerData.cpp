@@ -209,8 +209,10 @@ void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 	}
 }
 
-void CFeatureDrawerData::UpdateDrawPos(CFeature* f)
+void CFeatureDrawerData::UpdateDrawPos(CSolidObject* o) const
 {
+	auto* f = static_cast<CFeature*>(o);
+
 	RECOIL_DETAILED_TRACY_ZONE;
 	f->drawPos    = f->GetDrawPos(globalRendering->timeOffset);
 	f->drawMidPos = f->GetMdlDrawMidPos();

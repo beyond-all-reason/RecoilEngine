@@ -398,12 +398,6 @@ void CSMFGroundDrawer::DrawShadowPass()
 
 	shadowShader = shadowHandler.GetShadowGenProg(CShadowHandler::SHADOWGEN_PROGRAM_MAP);
 	assert(shadowShader);
-	glEnable(GL_POLYGON_OFFSET_FILL);
-
-	//#pragma message "REMOVE ME, WHEN NOT NEEDED"
-	//glDisable(GL_CULL_FACE);
-
-	glPolygonOffset(spPolygonOffsetScale, spPolygonOffsetUnits); // dz*s + r*u
 
 	glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, smfMap->GetHeightMapTexture());
 	shadowShader->Enable();
@@ -414,9 +408,6 @@ void CSMFGroundDrawer::DrawShadowPass()
 	shadowShader->Disable();
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE0);
-
-	glDisable(GL_POLYGON_OFFSET_FILL);
-	//glEnable(GL_CULL_FACE);
 }
 
 

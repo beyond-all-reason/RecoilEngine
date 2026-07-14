@@ -364,9 +364,10 @@ void CUnitDrawerData::UpdateUnitIconStateScreen(CUnit* unit)
 	unit->SetIsIcon(iconZoomDist / iconSizeMult > iconFadeStart && std::abs(pos.x - radiusPos.x) < limit * 0.9);
 }
 
-void CUnitDrawerData::UpdateDrawPos(CUnit* u)
+void CUnitDrawerData::UpdateDrawPos(CSolidObject* o) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	auto* u = static_cast<CUnit*>(o);
 
 	if (const CUnit* t = u->GetTransporter(); t != nullptr) {
 		u->drawPos = u->GetDrawPosOther(t->preFrameTra.t, t->pos, globalRendering->timeOffset);

@@ -100,23 +100,7 @@ out Data {
 };
 out float gl_ClipDistance[2];
 
-void TransformShadowCam(vec4 worldPos, vec3 worldNormal) {
-	vec4 lightVertexPos = shadowView * worldPos;
-	vec3 lightVertexNormal = normalize(mat3(shadowView) * worldNormal);
-
-	float NdotL = clamp(lightVertexNormal.z, 0.0, 1.0);
-
-	//use old bias formula from GetShadowPCFRandom(), but this time to write down shadow depth map values
-	const float cb = 1e-5;
-	float bias = cb * clamp(tan(acos(NdotL)), 0.0, 30.0);
-
-	lightVertexPos.xy += vec2(0.5);
-	lightVertexPos.z  += bias;
-
-	gl_Position = shadowProj * lightVertexPos;
-}
-
-#line 1119
+#line 1103
 
 uint GetUnpackedValue(uint packedValue, uint byteNum) {
 	return (packedValue >> (8u * byteNum)) & 0xFFu;
@@ -328,13 +312,11 @@ void main(void)
 	);
 
 	vec4 worldPos = ApplyTransform(tx, modelPos);
-	tx.trSc = vec4(0, 0, 0, 1); //nullify the transform part
-	vec3 worldNormal = ApplyTransform(tx, modelNormal);
 
 	gl_ClipDistance[0] = dot(modelPos, clipPlane0); //upper construction clip plane
 	gl_ClipDistance[1] = dot(modelPos, clipPlane1); //lower construction clip plane
 
 	uvCoord = uv;
 
-	TransformShadowCam(worldPos, worldNormal);
+	gl_Position = shadowViewProj * worldPos;
 }

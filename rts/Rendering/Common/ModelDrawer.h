@@ -106,6 +106,9 @@ public:
 	static bool SetTeamColor(int team, const float alpha = 1.0f) { return modelDrawerState->SetTeamColor(team, alpha); }
 	static void SetNanoColor(const float4& color) { modelDrawerState->SetNanoColor(color); }
 	static const ScopedTransformMemAlloc& GetTransformMemAlloc(const ObjType* o) { return const_cast<const TDrawerData*>(modelDrawerData)->GetObjectTransformMemAlloc(o); }
+
+	static const auto& GetObjectsBounds() { return modelDrawerData->GetObjectsBounds(); }
+	static void UpdateObjectsBounds() { modelDrawerData->UpdateObjectsBounds(); }
 public:
 	virtual void Update() const = 0;
 	// Draw*
