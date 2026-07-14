@@ -48,11 +48,19 @@ CR_REG_METADATA(GhostSolidObject, (
 
 	CR_MEMBER(facing),
 	CR_MEMBER(team),
+	CR_MEMBER(paletteIndex),
 	CR_IGNORED(currentIconIndex),
 
 	CR_IGNORED(model),
 
 	CR_POSTLOAD(PostLoad)
+))
+
+CR_BIND(CUnitDrawerData::LiveGhostBuilding, )
+CR_REG_METADATA(CUnitDrawerData::LiveGhostBuilding, (
+	CR_MEMBER(unit),
+	CR_MEMBER(paletteIndex),
+	CR_MEMBER(team)
 ))
 
 CR_BIND(CUnitDrawerData::TempDrawUnit, )
@@ -617,6 +625,7 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 				gso->facing = u->buildFacing;
 				gso->dir = u->frontdir;
 				gso->team = u->team;
+				gso->paletteIndex = u->paletteIndex;
 				gso->radius = u->radius;
 				gso->GetModel();
 
@@ -640,7 +649,8 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 
 		}
 
-		spring::VectorErase(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(u)], u);
+		spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(u)],
+			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
 	}
 	return addedOwnAllyTeam;
 }
@@ -674,7 +684,8 @@ void CUnitDrawerData::UnitEnteredLos(const CUnit* unit, int allyTeam)
 	CUnit* u = const_cast<CUnit*>(unit); //cleanup
 
 	if (unit->leavesGhost)
-		spring::VectorErase(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)], u);
+		spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)],
+			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
 
 	if (allyTeam != gu->myAllyTeam)
 		return;
@@ -687,8 +698,15 @@ void CUnitDrawerData::UnitLeftLos(const CUnit* unit, int allyTeam)
 	RECOIL_DETAILED_TRACY_ZONE;
 	CUnit* u = const_cast<CUnit*>(unit); //cleanup
 
-	if (unit->leavesGhost)
-		spring::VectorInsertUnique(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)], u, true);
+	if (unit->leavesGhost) {
+		// snapshot the color the unit is last seen under so a later team change (while out of LOS)
+		// does not recolor its ghost. keep the earliest snapshot if it re-fires without re-entering.
+		auto& lgbs = savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)];
+		const bool alreadyGhosted = std::any_of(lgbs.begin(), lgbs.end(),
+			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
+		if (!alreadyGhosted)
+			lgbs.push_back({ u, u->paletteIndex, static_cast<uint8_t>(u->team) });
+	}
 
 	if (allyTeam != gu->myAllyTeam)
 		return;

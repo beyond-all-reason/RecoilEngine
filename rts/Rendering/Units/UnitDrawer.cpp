@@ -886,7 +886,9 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 	}
 
 	// buildings that left LOS but are still alive
-	for (CUnit* unit : liveGhostedBuildings) {
+	for (const auto& lgb : liveGhostedBuildings) {
+		const CUnit* unit = lgb.unit;
+
 		// check for decoy models
 		const UnitDef* decoyDef = unit->unitDef->decoyDef;
 		const S3DModel* model = (decoyDef == nullptr) ? unit->model : decoyDef->LoadModel();
@@ -915,8 +917,9 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 		// not actually cloaked
 		CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType);
 
+		// color with the team the unit was last seen under, not the live unit's current team
 		const float ghostAlpha = (losStatus & LOS_CONTRADAR) ? IModelDrawerState::alphaValues.z : IModelDrawerState::alphaValues.y;
-		SetTeamColor(unit->team, ghostAlpha);
+		SetTeamColor(lgb.team, ghostAlpha);
 		model->DrawStatic();
 		glPopMatrix();
 
@@ -1772,7 +1775,7 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 			}
 
 			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
-			smv.SubmitImmediately(dgb->GetModel(), static_cast<uint16_t>(dgb->team)); //need to submit immediately every model because of static per-model matrix
+			smv.SubmitImmediately(dgb->GetModel(), dgb->paletteIndex); //need to submit immediately every model because of static per-model matrix
 		}
 	}
 
@@ -1782,20 +1785,14 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 
 		int prevModelType = -1;
 		int prevTexType = -1;
-		for (const auto* lgb : liveGhostedBuildings) {
-			if (!camera->InView(lgb->pos, lgb->model->GetDrawRadius()))
+		for (const auto& lgb : liveGhostedBuildings) {
+			const CUnit* u = lgb.unit;
+			if (!camera->InView(u->pos, u->model->GetDrawRadius()))
 				continue;
 
 			// check for decoy models
-			const UnitDef* decoyDef = lgb->unitDef->decoyDef;
-			const S3DModel* model = nullptr;
-
-			if (decoyDef == nullptr) {
-				model = lgb->model;
-			}
-			else {
-				model = decoyDef->LoadModel();
-			}
+			const UnitDef* decoyDef = u->unitDef->decoyDef;
+			const S3DModel* model = (decoyDef == nullptr) ? u->model : decoyDef->LoadModel();
 
 			// FIXME: needs a second pass
 			if (model->type != modelType)
@@ -1804,20 +1801,21 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 			static CMatrix44f staticWorldMat;
 
 			staticWorldMat.LoadIdentity();
-			staticWorldMat.Translate(lgb->pos);
+			staticWorldMat.Translate(u->pos);
 
-			staticWorldMat.RotateY(-lgb->buildFacing * math::DEG_TO_RAD * 90.0f);
+			staticWorldMat.RotateY(-u->buildFacing * math::DEG_TO_RAD * 90.0f);
 
-			const unsigned short losStatus = lgb->losStatus[gu->myAllyTeam];
+			const unsigned short losStatus = u->losStatus[gu->myAllyTeam];
 
-			// ghosted enemy units
+			// ghosted enemy units; SetTeamColor only gates the alpha here (the per-instance
+			// paletteIndex passed to SubmitImmediately drives the actual color)
 			if (losStatus & LOS_CONTRADAR) {
 				modelDrawerState->SetColorMultiplier(0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z);
-				modelDrawerState->SetTeamColor(lgb->team, IModelDrawerState::alphaValues.z);
+				modelDrawerState->SetTeamColor(lgb.team, IModelDrawerState::alphaValues.z);
 			}
 			else {
 				modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
-				modelDrawerState->SetTeamColor(lgb->team, IModelDrawerState::alphaValues.y);
+				modelDrawerState->SetTeamColor(lgb.team, IModelDrawerState::alphaValues.y);
 			}
 
 			if (prevModelType != modelType || prevTexType != model->textureType) {
@@ -1826,7 +1824,8 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 			}
 
 			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
-			smv.SubmitImmediately(model, static_cast<uint16_t>(lgb->team)); //need to submit immediately every model because of static per-model matrix
+			// draw with the palette the unit was last seen under, not the live unit's current one
+			smv.SubmitImmediately(model, lgb.paletteIndex); //need to submit immediately every model because of static per-model matrix
 		}
 	}
 

@@ -34,7 +34,13 @@ public:
 
 	int refCount;
 	int facing; //FIXME replaced with dir-vector just legacy decal drawer uses this
+
+	// color identity captured when the ghost was created; a ghost keeps the color it was last
+	// seen under. team drives the legacy (GLSL) team-color path, paletteIndex drives the GL4
+	// per-instance palette (equal to team unless a custom Lua color palette was assigned).
 	uint8_t team;
+	uint16_t paletteIndex;
+
 	size_t currentIconIndex;
 private:
 	mutable const S3DModel* model;
@@ -86,6 +92,16 @@ public:
 	private:
 		mutable const UnitDef* unitDef;
 	};
+	// a still-alive building that left an observer's LOS. The unit is drawn as a ghost using the
+	// color it was last seen under (snapshotted here), so it does not silently recolor if the live
+	// unit changes team while out of LOS. team feeds the legacy (GLSL) team-color path, paletteIndex
+	// feeds the GL4 per-instance palette (equal to team unless a custom Lua palette was assigned).
+	struct LiveGhostBuilding {
+		CR_DECLARE_STRUCT(LiveGhostBuilding)
+		CUnit* unit = nullptr;
+		uint16_t paletteIndex = 0;
+		uint8_t team = 0;
+	};
 	struct SavedData {
 		CR_DECLARE_STRUCT(SavedData)
 
@@ -97,7 +113,7 @@ public:
 		std::vector<std::array<std::vector<GhostSolidObject*>, MODELTYPE_CNT>> deadGhostBuildings;
 
 		/// buildings that left LOS but are still alive
-		std::vector<std::array<std::vector<CUnit*>, MODELTYPE_CNT>> liveGhostBuildings;
+		std::vector<std::array<std::vector<LiveGhostBuilding>, MODELTYPE_CNT>> liveGhostBuildings;
 	};
 public:
 	CUnitDrawerData(bool& mtModelDrawer_);
