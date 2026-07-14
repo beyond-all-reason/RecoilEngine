@@ -102,6 +102,17 @@ private:
 		uint32_t indexCount,
 		uint16_t paletteIndex
 	);
+	// build one SInstanceData from already-resolved offsets and queue it for the next Submit();
+	// returns false (drawing nothing) if the world transform or bind pose is unavailable.
+	bool EmplaceInstance(
+		uint32_t indexStart,
+		uint32_t indexCount,
+		uint32_t traIndex,
+		uint16_t paletteIndex,
+		uint16_t numPieces,
+		uint32_t uniIndex,
+		uint32_t bposeIndex
+	);
 	void EnableAttribs(bool inst) const;
 	void DisableAttribs() const;
 private:

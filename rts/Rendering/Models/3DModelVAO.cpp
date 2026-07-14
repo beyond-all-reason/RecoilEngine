@@ -286,14 +286,28 @@ void S3DModelVAO::DrawElements(GLenum prim, uint32_t vboIndxStart, uint32_t vboI
 	glDrawElements(prim, vboIndxCount, GL_UNSIGNED_INT, indxVBO.GetPtr(vboIndxStart * sizeof(uint32_t)));
 }
 
+bool S3DModelVAO::EmplaceInstance(uint32_t indexStart, uint32_t indexCount, uint32_t traIndex, uint16_t paletteIndex, uint16_t numPieces, uint32_t uniIndex, uint32_t bposeIndex)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (traIndex == TransformsMemStorage::INVALID_INDEX || bposeIndex == TransformsMemStorage::INVALID_INDEX)
+		return false;
+
+	modelDataToInstance[SIndexAndCount{ indexStart, indexCount }].emplace_back(SInstanceData(
+		traIndex,
+		paletteIndex,
+		numPieces,
+		uniIndex,
+		bposeIndex
+	));
+
+	return true;
+}
+
 template<typename TObj>
 bool S3DModelVAO::AddToSubmissionImpl(const TObj* obj, uint32_t indexStart, uint32_t indexCount, uint16_t paletteIndex)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const auto traIndex = transformsUploader.GetElemOffset(obj);
-	if (traIndex == TransformsMemStorage::INVALID_INDEX)
-		return false;
-
 	const auto uniIndex = modelUniformsStorage.GetObjOffset(obj); //doesn't need to exist for defs and models. Don't check for validity
 
 	uint16_t numPieces = 0;
@@ -307,19 +321,14 @@ bool S3DModelVAO::AddToSubmissionImpl(const TObj* obj, uint32_t indexStart, uint
 		bposeIndex = transformsUploader.GetElemOffset(obj->model);
 	}
 
-	if (bposeIndex == TransformsMemStorage::INVALID_INDEX)
-		return false;
-
-	auto& modelInstanceData = modelDataToInstance[SIndexAndCount{ indexStart, indexCount }];
-	modelInstanceData.emplace_back(SInstanceData(
+	return EmplaceInstance(
+		indexStart, indexCount,
 		static_cast<uint32_t>(traIndex),
 		paletteIndex,
 		numPieces,
 		static_cast<uint32_t>(uniIndex),
 		static_cast<uint32_t>(bposeIndex)
-	));
-
-	return true;
+	);
 }
 
 bool S3DModelVAO::AddToSubmission(const S3DModel* model, uint16_t paletteIndex)
