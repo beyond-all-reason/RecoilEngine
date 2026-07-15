@@ -628,6 +628,13 @@ void CMouseHandler::MouseWheel(float delta)
 		return;
 	}
 
+	// let a game binding claim the wheel; camera zoom is the fallback when unbound
+	if (activeController != nullptr) {
+		CInputReceiver* controllerReceiver = activeController->GetInputReceiver();
+		if (controllerReceiver != nullptr && controllerReceiver->MouseWheel(delta))
+			return;
+	}
+
 	camHandler->GetCurrentController().MouseWheelMove(delta * scrollWheelSpeed);
 }
 
