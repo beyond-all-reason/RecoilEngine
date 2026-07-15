@@ -635,6 +635,14 @@ void CMouseHandler::MouseWheel(float delta)
 			return;
 	}
 
+	ScrollZoom(delta);
+}
+
+
+void CMouseHandler::ScrollZoom(float delta)
+{
+	// one mouse-wheel step of camera zoom; shared by the wheel's fallback and the
+	// zoomin/zoomout actions so a key binding zooms identically to a wheel click
 	camHandler->GetCurrentController().MouseWheelMove(delta * scrollWheelSpeed);
 }
 
