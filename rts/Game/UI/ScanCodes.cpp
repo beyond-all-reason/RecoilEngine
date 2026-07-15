@@ -259,8 +259,9 @@ int CScanCodes::GetMouseButtonSymbol(int button)
 
 int CScanCodes::GetMouseWheelSymbol(bool up)
 {
-	// same private range, past the mouse-button symbols
-	return 0x100000 + NUM_BUTTONS + (up ? 1 : 2);
+	// wheel up/down as pseudo-buttons just past the real mouse buttons (reuses the
+	// same symbol scheme, so the private-range base is defined in one place)
+	return GetMouseButtonSymbol(NUM_BUTTONS + (up ? 1 : 2));
 }
 
 

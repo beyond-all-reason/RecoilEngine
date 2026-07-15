@@ -196,8 +196,9 @@ int CKeyCodes::GetMouseButtonSymbol(int button)
 
 int CKeyCodes::GetMouseWheelSymbol(bool up)
 {
-	// same private range, past the mouse-button symbols (buttons use 0xE000+1..NUM_BUTTONS)
-	return 0xE000 + NUM_BUTTONS + (up ? 1 : 2);
+	// wheel up/down as pseudo-buttons just past the real mouse buttons (reuses the
+	// same symbol scheme, so the private-range base is defined in one place)
+	return GetMouseButtonSymbol(NUM_BUTTONS + (up ? 1 : 2));
 }
 
 
