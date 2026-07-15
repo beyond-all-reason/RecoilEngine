@@ -45,6 +45,7 @@ bool LuaDebugExtra::PushEntries(lua_State* L)
 	LuaPushNamedCFunc(L, "emulateMousePress",   EmulateMousePress);
 	LuaPushNamedCFunc(L, "emulateMouseRelease", EmulateMouseRelease);
 	LuaPushNamedCFunc(L, "emulateMouseMove",    EmulateMouseMove);
+	LuaPushNamedCFunc(L, "emulateMouseWheel",   EmulateMouseWheel);
 	LuaPushNamedCFunc(L, "clearEmulatedInput",  ClearEmulatedInputLua);
 
 	return true;
@@ -135,6 +136,16 @@ int LuaDebugExtra::EmulateMousePress(lua_State* L)
 		return 0;
 
 	mouse->SetButtonEmulated(button, true);
+	return 0;
+}
+
+int LuaDebugExtra::EmulateMouseWheel(lua_State* L)
+{
+	if (mouse == nullptr)
+		return 0;
+
+	// momentary tick, no persistent state to track; fire directly like a real wheel event
+	mouse->MouseWheel((float)luaL_checknumber(L, 1));
 	return 0;
 }
 

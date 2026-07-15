@@ -21,6 +21,7 @@ class LuaDebugExtra {
 		static int EmulateMousePress(lua_State* L);
 		static int EmulateMouseRelease(lua_State* L);
 		static int EmulateMouseMove(lua_State* L);
+		static int EmulateMouseWheel(lua_State* L);
 		static int ClearEmulatedInputLua(lua_State* L);
 };
 
