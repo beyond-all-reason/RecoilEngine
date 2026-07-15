@@ -28,7 +28,7 @@ permissions:
   contents: read
 
 env:
-  MAP: "Jade Empress 1.3"
+  MAP: "Jade Empress 1.41"
   GAME: "Beyond All Reason test-30212-63c6ded"
   HASH_FILE: "synctest_synchash.json"
 
@@ -39,9 +39,26 @@ jobs:
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
       run_id: ${{ steps.engine-run.outputs.run_id }}
+      platforms: ${{ steps.platforms.outputs.json }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      - name: Define target platforms
+        id: platforms
+        # Single source of truth for the platform matrix: needed so we can check
+        # if we have all platforms even if a later setup step fails.
+        run: |
+          set -euo pipefail
+          # jq -c -n validates the JSON and emits it as one compact line for
+          # GITHUB_OUTPUT (a jq program, not a heredoc — no column-0 terminator to
+          # clash with the YAML block).
+          json=$(jq -c -n '[
+            {"platform": "amd64-linux",   "runs-on": "ubuntu-latest",    "bin-suffix": ""},
+            {"platform": "arm64-linux",   "runs-on": "ubuntu-24.04-arm",  "bin-suffix": ""},
+            {"platform": "amd64-windows", "runs-on": "windows-latest",    "bin-suffix": ".exe"}
+          ]')
+          echo "json=$json" >> "$GITHUB_OUTPUT"
+
       - name: Resolve target commit
         id: resolve
         run: |
@@ -80,20 +97,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform:
-          - amd64-linux
-          - arm64-linux
-          - amd64-windows
-        include:
-          - platform: amd64-linux
-            runs-on: ubuntu-latest
-            bin-suffix: ""
-          - platform: arm64-linux
-            runs-on: ubuntu-24.04-arm
-            bin-suffix: ""
-          - platform: amd64-windows
-            runs-on: windows-latest
-            bin-suffix: ".exe"
+        include: ${{ fromJSON(needs.setup.outputs.platforms) }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -123,7 +127,14 @@ jobs:
           #   install/spring-headless, install/pr-downloader, install/spring, ...
           # engine-build also uploads a -dbgsym.tar.zst alongside the 7z; the
           # glob below intentionally matches only the .7z.
-          7z x engine-artifact/recoil_*_${{ matrix.platform }}*.7z -oinstall
+          #
+          # Windows has 7z.exe, and ubuntu currently has 7z/7zz/7za but may later
+          # drop to just 7zz/7za.
+          sevenzip=$(command -v 7z || command -v 7zz || command -v 7za || true)
+          if [ -z "$sevenzip" ]; then
+            echo "::error::no 7-Zip binary (7z/7zz/7za) found on runner"; exit 1
+          fi
+          "$sevenzip" x engine-artifact/recoil_*_${{ matrix.platform }}*.7z -oinstall
 
       - name: Restore bar-data cache
         uses: actions/cache@v4
@@ -152,14 +163,16 @@ jobs:
           # Replace the literal "$VERSION" placeholder in gametype= with the
           # version suffix of the pinned GAME (everything after the last space,
           # e.g. "test-29932-21b3bb0").
-          game="${{ env.GAME }}"
-          version="${game##* }" # extract just the test-29932-21b3bb0 part
+          version="${GAME##* }" # extract just the test-29932-21b3bb0 part
           sed -i "s/\$VERSION/${version}/g" test/synctest/synctest-startscript.txt
           grep -n 'gametype=' test/synctest/synctest-startscript.txt
 
       - name: Run synctest
         run: |
           set -euo pipefail
+          # Make sure we clear any cached hashfile in case the run fails, so we don't
+          # use a stale one.
+          rm -f "bar-data/${{ env.HASH_FILE }}"
           ./install/spring-headless${{ matrix.bin-suffix }} --isolation --write-dir "$PWD/bar-data" test/synctest/synctest-startscript.txt \
               2>&1 | tee infolog.txt
 
@@ -195,7 +208,7 @@ jobs:
   # hashes diverge between architectures (cross-platform desync detection).
   # This job is intended to be a required/merge-blocking status check.
   cross-platform-check:
-    if: always()
+    if: ${{ !cancelled() }}
     needs: [setup, synctest]
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -206,23 +219,28 @@ jobs:
       - name: Download current run artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: synctest-*-${{ needs.setup.outputs.sha }}
+          pattern: synctest-*-${{ env.TESTED_SHA }}
           path: artifacts
 
       - name: Build combined hash manifest
         run: |
           set -euo pipefail
-          for dir in artifacts/synctest-*; do
-            # dir name format: synctest-{platform}-{sha}
-            platform=$(basename "$dir" | sed "s/^synctest-//; s/-${TESTED_SHA}$//")
-            hash_file="$dir/bar-data/${{ env.HASH_FILE }}"
+          # Check from the EXPECTED platform list, so if artifact uploadin fails
+          # we will be able to detect that its missing.
+          platforms_json='${{ needs.setup.outputs.platforms }}'
+          if [ -z "$platforms_json" ]; then
+            echo "::error::setup produced no platform list — it likely failed before it ran; check the setup job."
+            exit 1
+          fi
+          echo "$platforms_json" | jq -r '.[].platform' | while read -r platform; do
+            hash_file="artifacts/synctest-${platform}-${TESTED_SHA}/bar-data/${{ env.HASH_FILE }}"
             if [ -f "$hash_file" ]; then
               digest=$(jq -r .digest "$hash_file")
               echo "$platform ${digest:-MISSING}"
             else
               echo "$platform MISSING"
             fi
-          done | sort > synchashes.txt
+          done > synchashes.txt
           echo "Current hashes:"
           cat synchashes.txt
 
