@@ -160,7 +160,8 @@ void CKeyCodes::Reset()
 	//AddPair("euro", SDLK_EURO);       // Some european keyboards
 	//AddPair("undo", SDLK_UNDO);       // Atari keyboard has Undo
 
-	for (int i = ACTION_BUTTON_MIN; i <= NUM_BUTTONS; i++) {
+	// from mouse1 (LMB): it's bindable now, and a binding overrides the built-in
+	for (int i = 1; i <= NUM_BUTTONS; i++) {
 		AddPair("mouse" + IntToString(i), CKeyCodes::GetMouseButtonSymbol(i));
 	}
 

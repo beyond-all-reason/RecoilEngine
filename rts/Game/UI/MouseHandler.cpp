@@ -5,7 +5,10 @@
 #include "CommandColors.h"
 #include "InputReceiver.h"
 #include "GuiHandler.h"
+#include "KeyBindings.h"
+#include "KeyCodes.h"
 #include "MiniMap.h"
+#include "ScanCodes.h"
 #include "MouseCursor.h"
 #include "TooltipConsole.h"
 #include "Game/CameraHandler.h"
@@ -376,6 +379,22 @@ void CMouseHandler::MousePress(int x, int y, int button)
 		if (activeReceiver == nullptr)
 			activeReceiver = luaInputReceiver;
 		return;
+	}
+
+	// A binding on this button overrides the built-in select/command, but only over
+	// the world - clicks on UI (menu, minimap, widgets) keep their normal handling.
+	// The check is modifier-aware and doesn't disturb the chord chain, so an unbound
+	// click behaves exactly as before. A bound click is consumed either way, so the
+	// built-in never also fires.
+	if (game != nullptr && !game->hideInterface && CInputReceiver::GetReceiverAt(x, y) == nullptr) {
+		CInputReceiver* gameReceiver = (activeController == nullptr) ? nullptr : activeController->GetInputReceiver();
+
+		if (gameReceiver != nullptr &&
+		    !keyBindings.GetActionList(CKeyCodes::GetMouseButtonSymbol(button), CScanCodes::GetMouseButtonSymbol(button)).empty()) {
+			gameReceiver->MousePress(x, y, button);
+			activeReceiver = gameReceiver;
+			return;
+		}
 	}
 
 	if (game != nullptr && !game->hideInterface) {
