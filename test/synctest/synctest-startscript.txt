@@ -11,10 +11,8 @@
     [team0]
     {
         startposx=800;
-        handicap=0;
         allyteam=0;
         teamleader=0;
-        rgbcolor=0.99609375 0.546875 0;
         side=Armada;
         startposz=100;
     }
@@ -26,50 +24,34 @@
         numallies=0;
         startrecttop=0;
     }
-    [restrict]
-    {
-    }
     [modoptions]
     {
         debugcommands=2:cheat|3:globallos|15:luarules synctest 2000 0.33 0.33 0.1 0.5|20:setspeed 20|21:speedcontrol 0|2100:quitforce;
     }
     [player0]
     {
-        rank=0;
         team=0;
         name=Player;
-        isfromdemo=0;
     }
     [ai0]
     {
         team=1;
-        isfromdemo=0;
         host=0;
-        name=InactiveAI(1);
-        version=0.1;
         shortname=NullAI;
     }
     [team1]
     {
-        startposx=100;
-        handicap=0;
         allyteam=1;
         teamleader=0;
-        rgbcolor=0.99609375 0.546875 0;
         side=Cortex;
+        startposx=100;
         startposz=800;
         }
         ishost=1;
-        hostip=127.0.0.1;
-        numusers=2;
         startpostype=3;
         gametype=Beyond All Reason $VERSION;
-        mapname=Jade Empress 1.3;
+        mapname=Jade Empress 1.41;
         myplayername=Player;
-        numrestrictions=0;
         fixedrngseed=123123;
         numplayers=1;
-        gamestartdelay=5;
-        nohelperais=0;
-        hostport=0;
 }
