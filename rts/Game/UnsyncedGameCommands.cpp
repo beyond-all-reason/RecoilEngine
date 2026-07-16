@@ -254,6 +254,20 @@ public:
 
 
 
+class CancelCommandActionExecutor : public IUnsyncedActionExecutor {
+public:
+	CancelCommandActionExecutor() : IUnsyncedActionExecutor("CancelCommand", "Cancels the active command (build/order mode)") {
+	}
+
+	bool Execute(const UnsyncedAction& action) const final {
+		if (guihandler != nullptr)
+			guihandler->CancelActiveCommand();
+		return true;
+	}
+};
+
+
+
 class MapMeshDrawerActionExecutor : public IUnsyncedActionExecutor {
 public:
 	MapMeshDrawerActionExecutor() : IUnsyncedActionExecutor("mapmeshdrawer", "Switch map-mesh rendering modes: 0=GCM, 1=HLOD, 2=ROAM") {
@@ -4038,6 +4052,7 @@ void UnsyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<SelectUnitsActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<SelectCycleActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<DeselectActionExecutor>());
+	AddActionExecutor(AllocActionExecutor<CancelCommandActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<ShadowsActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<DumpShadowsActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<MapShadowPolyOffsetActionExecutor>());
