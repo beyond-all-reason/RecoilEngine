@@ -11,7 +11,7 @@ Build the engine, make sure `spring-headless` and `pr-downloader` are on your PA
 ```
 pr-downloader --filesystem-writepath ./bar-data \
     --download-game "<BAR pin from the workflow>" \
-    --download-map  "Jade Empress 1.3"
+    --download-map  "Jade Empress 1.41"
 
 spring-headless --isolation --write-dir ./bar-data test/synctest/synctest-startscript.txt
 ```

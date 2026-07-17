@@ -1,7 +1,7 @@
 # Runs the Beyond All Reason "synctest" (/luarules synctest) against an engine
 # commit on all supported platforms (amd64-linux, arm64-linux, amd64-windows).
 #
-# This workflow looks up the most recent successful "Build Engine v2" run for 
+# This workflow looks up the most recent successful "Build Engine v2" run for
 # the target commit and downloads platform-specific artifacts. If no such run 
 # exists, the workflow fails fast.
 # TODO: trigger after every engine build
@@ -225,7 +225,7 @@ jobs:
       - name: Build combined hash manifest
         run: |
           set -euo pipefail
-          # Check from the EXPECTED platform list, so if artifact uploadin fails
+          # Check from the EXPECTED platform list, so if artifact uploading fails
           # we will be able to detect that its missing.
           platforms_json='${{ needs.setup.outputs.platforms }}'
           if [ -z "$platforms_json" ]; then
@@ -235,7 +235,9 @@ jobs:
           echo "$platforms_json" | jq -r '.[].platform' | while read -r platform; do
             hash_file="artifacts/synctest-${platform}-${TESTED_SHA}/bar-data/${{ env.HASH_FILE }}"
             if [ -f "$hash_file" ]; then
-              digest=$(jq -r .digest "$hash_file")
+              # `// empty` so an absent/null .digest reports MISSING rather than
+              # the 4-char string "null".
+              digest=$(jq -r '.digest // empty' "$hash_file")
               echo "$platform ${digest:-MISSING}"
             else
               echo "$platform MISSING"
@@ -265,4 +267,13 @@ jobs:
           fi
           hash=$(awk 'NR==1 {print $2}' synchashes.txt)
           echo "OK across all platforms ($hash)"
+
+      # A platform can write the hash and then fail, but
+      # `!cancelled()` means we still run the comparison.
+      # So let's do a final check to make sure they all passed.
+      - name: Assert all synctest jobs succeeded
+        if: ${{ needs.synctest.result != 'success' }}
+        run: |
+          echo "::error::synctest matrix result is '${{ needs.synctest.result }}' — a platform leg did not succeed; see the per-platform jobs"
+          exit 1
 

@@ -46,12 +46,12 @@
         side=Cortex;
         startposx=100;
         startposz=800;
-        }
-        ishost=1;
-        startpostype=3;
-        gametype=Beyond All Reason $VERSION;
-        mapname=Jade Empress 1.41;
-        myplayername=Player;
-        fixedrngseed=123123;
-        numplayers=1;
+    }
+    ishost=1;
+    startpostype=3;
+    gametype=Beyond All Reason $VERSION;
+    mapname=Jade Empress 1.41;
+    myplayername=Player;
+    fixedrngseed=123123;
+    numplayers=1;
 }
