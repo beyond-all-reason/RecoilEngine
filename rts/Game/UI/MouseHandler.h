@@ -103,6 +103,10 @@ private:
 	int2 GetViewMouseCenter() const;
 	void SetCursor(const std::string& cmdName, const bool forceRebind = false);
 
+	bool ConsumeByLua(int x, int y, int button);
+	bool ConsumeByActionBindings(int x, int y, int button);
+	bool ConsumeByInputReceivers(int x, int y, int button);
+
 	void DrawScrollCursor(TypedRenderBuffer<VA_TYPE_C>& rb) const;
 	void DrawFPSCursor(TypedRenderBuffer<VA_TYPE_C>& rb) const;
 
