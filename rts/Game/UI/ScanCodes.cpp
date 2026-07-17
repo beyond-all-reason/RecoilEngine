@@ -214,7 +214,6 @@ void CScanCodes::Reset()
 	AddPair("sc_alt",   SDL_SCANCODE_LALT);
 	AddPair("sc_meta",  SDL_SCANCODE_LGUI);
 
-	// from mouse1 (LMB): it's bindable now, and a binding overrides the built-in
 	for (int i = 1; i <= NUM_BUTTONS; i++) {
 		AddPair("sc_mouse" + IntToString(i), CScanCodes::GetMouseButtonSymbol(i));
 	}
