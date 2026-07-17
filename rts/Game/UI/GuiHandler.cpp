@@ -1853,7 +1853,6 @@ int CGuiHandler::GetIconPosCommand(int slot) const // only called by SetActiveCo
 
 void CGuiHandler::CancelActiveCommand()
 {
-	RECOIL_DETAILED_TRACY_ZONE;
 	activeMousePress = false;
 	SetActiveCommandIndex(-1);
 }

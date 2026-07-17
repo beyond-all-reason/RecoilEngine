@@ -260,8 +260,10 @@ public:
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		if (guihandler != nullptr)
-			guihandler->CancelActiveCommand();
+		if (guihandler == nullptr)
+			return false;
+
+		guihandler->CancelActiveCommand();
 		return true;
 	}
 };
