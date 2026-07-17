@@ -65,7 +65,7 @@ CONFIG(bool, MiniMapMarker).defaultValue(true).headlessValue(false);
 CONFIG(bool, InvertQueueKey).defaultValue(false);
 
 // defined further down alongside the build-shape machinery it queries
-static bool BuildPosWantsDrag(const BuildInfo& startInfo, const BuildInfo& endInfo, bool queue);
+static bool BuildPosWantsDrag(std::optional<BuildPosShape> queriedShape, bool queue);
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
@@ -2255,11 +2255,17 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 				dragStartInfo = BuildInfo(unitdef, camTracePos + camTraceDir * isectDist, buildFacing);
 			}
 
+			// ask the game once which shape this drag traces out, then feed the
+			// answer to both the drag test and the position generator
+			const std::optional<BuildPosShape> buildShape = eventHandler.GetBuildShape(
+				dragStartInfo.def->id, dragStartInfo.buildFacing,
+				CGameHelper::Pos2BuildPos(dragStartInfo, false), CGameHelper::Pos2BuildPos(bi, false));
+
 			// whether the active shape spans the drag (vs a single building at the cursor)
-			if ((button == SDL_BUTTON_LEFT) && BuildPosWantsDrag(dragStartInfo, bi, GetQueueKeystate())) {
-				GetBuildPositions(dragStartInfo, bi, cameraPos, mouseDir);
+			if ((button == SDL_BUTTON_LEFT) && BuildPosWantsDrag(buildShape, GetQueueKeystate())) {
+				GetBuildPositions(dragStartInfo, bi, cameraPos, mouseDir, buildShape);
 			} else {
-				GetBuildPositions(bi, bi, cameraPos, mouseDir);
+				GetBuildPositions(bi, bi, cameraPos, mouseDir, buildShape);
 			}
 
 			if (buildInfos.empty())
@@ -2520,13 +2526,12 @@ static void FillRowOfBuildPos(const BuildInfo& startInfo, float x, float z, floa
 }
 
 
-// Default behaviour, used while the game leaves GetBuildShape unanswered: drag shapes
-// require the queue key, ctrl over a building surrounds it, alt fills the dragged
-// rectangle (only its perimeter with ctrl), ctrl locks a dragged line to its axis.
+// Default behaviour, used while the game leaves GetBuildShape unanswered.
+// The specific bindings are legacy, don't change them.
 static BuildPosShape ResolveDefaultBuildPosShape(bool queue, bool hasSurroundTarget, bool singleCell)
 {
 	const bool ctrl = KeyInput::GetKeyModState(KMOD_CTRL);
-	const bool alt = KeyInput::GetKeyModState(KMOD_ALT);
+	const bool alt  = KeyInput::GetKeyModState(KMOD_ALT);
 
 	if (queue && ctrl && hasSurroundTarget)
 		return BuildPosShape::Surround;
@@ -2543,12 +2548,11 @@ static BuildPosShape ResolveDefaultBuildPosShape(bool queue, bool hasSurroundTar
 
 // Whether the active shape spans the drag from start to end (vs a single building).
 // Decides whether the caller feeds GetBuildPositions the drag span or a single point.
-static bool BuildPosWantsDrag(const BuildInfo& startInfo, const BuildInfo& endInfo, bool queue)
+// Takes the already-resolved GetBuildShape reply so the callin runs only once per query.
+static bool BuildPosWantsDrag(std::optional<BuildPosShape> queriedShape, bool queue)
 {
-	const auto shape = eventHandler.GetBuildShape(startInfo.def->id, startInfo.buildFacing, CGameHelper::Pos2BuildPos(startInfo, false), CGameHelper::Pos2BuildPos(endInfo, false));
-
-	if (shape.has_value())
-		return (shape != BuildPosShape::Single);
+	if (queriedShape.has_value())
+		return (queriedShape != BuildPosShape::Single);
 
 	// default: dragging out multiple buildings requires the queue key
 	return queue;
@@ -2675,7 +2679,7 @@ static BuildInfo FindSurroundTarget(const BuildInfo& startInfo, const float3& ca
 }
 
 
-size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInfo& endInfo, const float3& cameraPos, const float3& mouseDir)
+size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInfo& endInfo, const float3& cameraPos, const float3& mouseDir, std::optional<BuildPosShape> queriedShape)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// both builds must have the same unitdef
@@ -2701,11 +2705,10 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 	const float xstep = (int)((0 < delta.x) ? xsize : -xsize);
 	const float zstep = (int)((0 < delta.z) ? zsize : -zsize);
 
-	const bool singleCell = (xnum == 1 && znum == 1);
-
-	// the game decides the shape via the GetBuildShape callin; unanswered queries
-	// resolve to the default modifier-key behaviour
-	const std::optional<BuildPosShape> queried = eventHandler.GetBuildShape(startInfo.def->id, startInfo.buildFacing, start, end);
+	// the game decides the shape via the GetBuildShape callin (resolved once by
+	// the caller and passed in); unanswered queries resolve to the default
+	// modifier-key behaviour
+	const std::optional<BuildPosShape> queried = queriedShape;
 
 	// "hollowbox" and "surround" both ring an existing building (or queued build
 	// order) under the cursor; they differ without one, where a hollow box keeps
@@ -2729,12 +2732,8 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 			shape = BuildPosShape::Surround;
 		else if (shape == BuildPosShape::Surround)
 			shape = BuildPosShape::CardinalLine;
-
-		// a drag too small to fit a second building always degrades to a single one
-		if (shape != BuildPosShape::Surround && singleCell)
-			shape = BuildPosShape::Single;
 	} else {
-		shape = ResolveDefaultBuildPosShape(queue, hasSurroundTarget, singleCell);
+		shape = ResolveDefaultBuildPosShape(queue, hasSurroundTarget, (xnum == 1 && znum == 1));
 	}
 
 	switch (shape) {
@@ -3967,10 +3966,16 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 					bInfo = BuildInfo(buildeeDef, bp.camPos + bp.dir * bpDist, buildFacing);
 				}
 
-				if (bp.pressed && BuildPosWantsDrag(bInfo, cInfo, GetQueueKeystate())) {
-					GetBuildPositions(bInfo, cInfo, tracePos, traceDir);
+				// ask the game once which shape this drag traces out, then feed the
+				// answer to both the drag test and the position generator
+				const std::optional<BuildPosShape> buildShape = eventHandler.GetBuildShape(
+					bInfo.def->id, bInfo.buildFacing,
+					CGameHelper::Pos2BuildPos(bInfo, false), CGameHelper::Pos2BuildPos(cInfo, false));
+
+				if (bp.pressed && BuildPosWantsDrag(buildShape, GetQueueKeystate())) {
+					GetBuildPositions(bInfo, cInfo, tracePos, traceDir, buildShape);
 				} else {
-					GetBuildPositions(cInfo, cInfo, tracePos, traceDir);
+					GetBuildPositions(cInfo, cInfo, tracePos, traceDir, buildShape);
 				}
 
 
