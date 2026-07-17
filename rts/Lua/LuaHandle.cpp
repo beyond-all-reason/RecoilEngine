@@ -25,6 +25,7 @@
 #include "Game/Players/PlayerHandler.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Net/Protocol/NetProtocol.h"
+#include "Game/UI/KeyBindings.h"
 #include "Game/UI/KeySet.h"
 #include "Game/UI/MiniMap.h"
 #include "Rendering/GlobalRendering.h"
@@ -3127,6 +3128,46 @@ void CLuaHandle::Pong(uint8_t pingTag, const spring_time pktSendTime, const spri
 
 	// call the routine
 	RunCallIn(L, cmdStr, 3, 0);
+}
+
+/*** Called when keybindings change.
+ *
+ * Called when:
+ *
+ * - An operation that changed current keybindings occurred, e.g. `bind k action`. If the operation operated on multiple keybindings, just a single event is called, at the end of it, e.g. `keyreload`.
+ * - Any operation that changes how actions are retrieved from input triggers happened, e.g. `fakemeta space`.
+ *
+ * @function Callins:KeyBindingsChanged
+ * @return KeyBinding[] currentKeybindings list of all actions and their bound keys
+ */
+
+void CLuaHandle::KeyBindingsChanged()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	static const LuaHashString cmdStr(__
+	luaL_checkstack(L, 1, __func__);
+
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	// This list imitates the format of LuaUnsyncedRead::GetKeyBindings
+	ActionList actions = keyBindings.GetActionList();
+
+	int i = 1;
+	lua_createtable(L, actions.size(), 0);
+	for (const Action& action: actions) {
+		lua_createtable(L, 0, 4);
+			lua_pushsstring(L, action.command);
+			lua_pushsstring(L, action.extra);
+			lua_rawset(L, -3);
+			LuaPushNamedString(L, "command",   action.command);
+			LuaPushNamedString(L, "extra",     action.
+			LuaPushNamedString(L, "boundWith", action.boundWith);
+		lua_rawseti(L, -2, i++);
+	}
+
+	RunCallIn(L, cmdStr, 1, 0);
 }
 
 
