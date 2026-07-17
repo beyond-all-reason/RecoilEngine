@@ -8,6 +8,9 @@
 #include "MiniMap.h"
 #include "MouseCursor.h"
 #include "TooltipConsole.h"
+#include "KeyBindings.h"
+#include "KeyCodes.h"
+#include "ScanCodes.h"
 #include "Game/CameraHandler.h"
 #include "Game/Camera.h"
 #include "Game/Game.h"
@@ -276,8 +279,10 @@ void CMouseHandler::MouseMove(int x, int y, int dx, int dy)
 	}
 
 	const int movedPixels = (int)fastmath::sqrt_sse(float(dx*dx + dy*dy));
-	buttons[SDL_BUTTON_LEFT ].movement += movedPixels;
-	buttons[SDL_BUTTON_RIGHT].movement += movedPixels;
+	for (int b = 1; b <= NUM_BUTTONS; ++b) {
+		if (buttons[b].pressed)
+			buttons[b].movement += movedPixels;
+	}
 
 	if (game != nullptr && !game->IsGameOver())
 		playerHandler.Player(gu->myPlayerNum)->currentStats.mousePixels += movedPixels;
@@ -332,6 +337,62 @@ void CMouseHandler::ClearEmulatedButtons()
 }
 
 
+bool CMouseHandler::IsButtonBoundToAction(int button, const std::string& action) const
+{
+	if (button < 1 || button > NUM_BUTTONS)
+		return false;
+
+	for (const Action& a: keyBindings.GetActionList(CKeyCodes::GetMouseButtonSymbol(button), CScanCodes::GetMouseButtonSymbol(button))) {
+		if (a.command == action)
+			return true;
+	}
+
+	return false;
+}
+
+
+int CMouseHandler::GetPressedActionButton(const std::string& action) const
+{
+	for (int b = 1; b <= NUM_BUTTONS; ++b) {
+		if (buttons[b].pressed && IsButtonBoundToAction(b, action))
+			return b;
+	}
+
+	return -1;
+}
+
+
+bool CMouseHandler::IsActionButtonPressed(const std::string& action) const
+{
+	return GetPressedActionButton(action) >= 0;
+}
+
+
+int CMouseHandler::GetActionButton(const std::string& action) const
+{
+	for (int b = 1; b <= NUM_BUTTONS; ++b) {
+		if (IsButtonBoundToAction(b, action))
+			return b;
+	}
+
+	return -1;
+}
+
+
+bool CMouseHandler::IsOtherActionButtonPressed(int button) const
+{
+	for (int b = 1; b <= NUM_BUTTONS; ++b) {
+		if (b == button || !buttons[b].pressed)
+			continue;
+
+		if (IsButtonBoundToAction(b, "mouseprimary") || IsButtonBoundToAction(b, "mousesecondary"))
+			return true;
+	}
+
+	return false;
+}
+
+
 void CMouseHandler::MousePress(int x, int y, int button)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -350,7 +411,7 @@ void CMouseHandler::MousePress(int x, int y, int button)
 
 	activeButtonIdx = button;
 	ButtonPressEvt& bp = buttons[activeButtonIdx];
-	bp.chorded  = (buttons[SDL_BUTTON_LEFT].pressed || buttons[SDL_BUTTON_RIGHT].pressed);
+	bp.chorded  = IsOtherActionButtonPressed(button);
 	bp.pressed  = true;
 	bp.time     = gu->gameTime;
 	bp.x        = x;
@@ -391,7 +452,8 @@ void CMouseHandler::MousePress(int x, int y, int button)
 	}
 
 	auto activeControllerReceiver = (activeController == nullptr) ? nullptr : activeController->GetInputReceiver();
-	if (button >= ACTION_BUTTON_MIN && activeControllerReceiver && activeControllerReceiver->MousePress(x, y, button)) {
+	const bool gestureRoleButton = IsButtonBoundToAction(button, "mouseprimary") || IsButtonBoundToAction(button, "mousesecondary");
+	if (!gestureRoleButton && activeControllerReceiver && activeControllerReceiver->MousePress(x, y, button)) {
 		activeReceiver = activeControllerReceiver;
 		return;
 	}
@@ -427,7 +489,12 @@ bool CMouseHandler::GetSelectionBoxVertices(float3& bl, float3& br, float3& tl, 
 	if (inMapDrawer != nullptr && inMapDrawer->IsDrawMode())
 		return false;
 
-	const ButtonPressEvt& bp = buttons[SDL_BUTTON_LEFT];
+	const int selectButton = GetPressedActionButton("mouseprimary");
+
+	if (selectButton < 0)
+		return false;
+
+	const ButtonPressEvt& bp = buttons[selectButton];
 
 	if (!bp.pressed)
 		return false;
@@ -539,7 +606,8 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 		return;
 	}
 
-	if (button >= ACTION_BUTTON_MIN && activeController != nullptr && activeController->MouseRelease(x, y, button)) {
+	const bool gestureRoleButton = IsButtonBoundToAction(button, "mouseprimary") || IsButtonBoundToAction(button, "mousesecondary");
+	if (!gestureRoleButton && activeController != nullptr && activeController->MouseRelease(x, y, button)) {
 		return;
 	}
 
@@ -560,8 +628,8 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 	if (guihandler == nullptr)
 		return;
 
-	if ((button == SDL_BUTTON_LEFT) && !buttons[button].chorded) {
-		ButtonPressEvt& bp = buttons[SDL_BUTTON_LEFT];
+	if (IsButtonBoundToAction(button, "mouseprimary") && !buttons[button].chorded) {
+		ButtonPressEvt& bp = buttons[button];
 
 		if (!KeyInput::GetKeyModState(KMOD_SHIFT) && !KeyInput::GetKeyModState(KMOD_CTRL) && selectedUnitsHandler.GetBoxSelectionHandledByEngine())
 			selectedUnitsHandler.ClearSelected();
