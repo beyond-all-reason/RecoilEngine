@@ -5,10 +5,7 @@
 #include "CommandColors.h"
 #include "InputReceiver.h"
 #include "GuiHandler.h"
-#include "KeyBindings.h"
-#include "KeyCodes.h"
 #include "MiniMap.h"
-#include "ScanCodes.h"
 #include "MouseCursor.h"
 #include "TooltipConsole.h"
 #include "Game/CameraHandler.h"
@@ -335,58 +332,6 @@ void CMouseHandler::ClearEmulatedButtons()
 }
 
 
-bool CMouseHandler::ConsumeByLua(int x, int y, int button)
-{
-	if (!luaInputReceiver->MousePress(x, y, button))
-		return false;
-
-	if (activeReceiver == nullptr)
-		activeReceiver = luaInputReceiver;
-
-	return true;
-}
-
-
-bool CMouseHandler::ConsumeByActionBindings(int x, int y, int button)
-{
-	if (game == nullptr || game->hideInterface)
-		return false;
-
-	if (CInputReceiver::GetReceiverAt(x, y) != nullptr)
-		return false;
-
-	CInputReceiver* gameReceiver = (activeController == nullptr) ? nullptr : activeController->GetInputReceiver();
-
-	if (gameReceiver == nullptr)
-		return false;
-
-	if (keyBindings.GetActionList(CKeyCodes::GetMouseButtonSymbol(button), CScanCodes::GetMouseButtonSymbol(button)).empty())
-		return false;
-
-	gameReceiver->MousePress(x, y, button);
-	activeReceiver = gameReceiver;
-	return true;
-}
-
-
-bool CMouseHandler::ConsumeByInputReceivers(int x, int y, int button)
-{
-	if (game == nullptr || game->hideInterface)
-		return false;
-
-	for (CInputReceiver* recv: CInputReceiver::GetReceivers()) {
-		if (recv != nullptr && recv->MousePress(x, y, button)) {
-			if (activeReceiver == nullptr)
-				activeReceiver = recv;
-
-			return true;
-		}
-	}
-
-	return false;
-}
-
-
 void CMouseHandler::MousePress(int x, int y, int button)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -427,18 +372,25 @@ void CMouseHandler::MousePress(int x, int y, int button)
 	if (button == SDL_BUTTON_MIDDLE && locked)
 		return;
 
-	if (ConsumeByLua(x, y, button))
+	if (luaInputReceiver->MousePress(x, y, button)) {
+		if (activeReceiver == nullptr)
+			activeReceiver = luaInputReceiver;
 		return;
+	}
 
-	if (ConsumeByActionBindings(x, y, button))
-		return;
+	if (game != nullptr && !game->hideInterface) {
+		for (CInputReceiver* recv: CInputReceiver::GetReceivers()) {
+			if (recv != nullptr && recv->MousePress(x, y, button)) {
+				if (activeReceiver == nullptr)
+					activeReceiver = recv;
 
-	if (ConsumeByInputReceivers(x, y, button))
-		return;
+				return;
+			}
+		}
+
+	}
 
 	auto activeControllerReceiver = (activeController == nullptr) ? nullptr : activeController->GetInputReceiver();
-
-	// mouse1 exclusively handled by consumers above
 	if (button >= ACTION_BUTTON_MIN && activeControllerReceiver && activeControllerReceiver->MousePress(x, y, button)) {
 		activeReceiver = activeControllerReceiver;
 		return;
