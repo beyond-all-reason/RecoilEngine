@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 #include <array>
+#include <format>
 #include <functional>
 #include <tuple>
 
@@ -247,6 +248,22 @@ public:
 
 	bool Execute(const UnsyncedAction& action) const final {
 		selectedUnitsHandler.ClearSelected();
+		return true;
+	}
+};
+
+
+
+class CancelCommandActionExecutor : public IUnsyncedActionExecutor {
+public:
+	CancelCommandActionExecutor() : IUnsyncedActionExecutor("CancelCommand", "Cancels the active command (build/order mode)") {
+	}
+
+	bool Execute(const UnsyncedAction& action) const final {
+		if (guihandler == nullptr)
+			return false;
+
+		guihandler->CancelActiveCommand();
 		return true;
 	}
 };
@@ -4037,6 +4054,7 @@ void UnsyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<SelectUnitsActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<SelectCycleActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<DeselectActionExecutor>());
+	AddActionExecutor(AllocActionExecutor<CancelCommandActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<ShadowsActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<DumpShadowsActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<MapShadowPolyOffsetActionExecutor>());

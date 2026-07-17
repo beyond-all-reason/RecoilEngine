@@ -43,6 +43,7 @@
 #include "Game/UI/InfoConsole.h"
 #include "Game/UI/MouseHandler.h"
 #include "Lua/LuaOpenGL.h"
+#include "Lua/LuaDebugExtra.h"
 #include "Lua/LuaVFSDownload.h"
 #include "Menu/LuaMenuController.h"
 #include "Menu/SelectMenu.h"
@@ -1178,6 +1179,10 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 					//FIXME check if still happens with SDL2 (2013)
 					SDL_SetModState((SDL_Keymod)(SDL_GetModState() & (KMOD_NUM | KMOD_CAPS | KMOD_MODE)));
 
+					// drop emulated input first: it fires its own releases directly,
+					// since the pushed SDL releases below get eaten by the emulation gate
+					LuaDebugExtra::ClearEmulatedInput();
+
 					// release all keyboard keys
 					KeyInput::ReleaseAllKeys();
 
@@ -1244,7 +1249,12 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 			if (activeController != nullptr) {
 				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.keysym.sym);
 				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.keysym.scancode);
-				activeController->KeyPressed(keyCode, scanCode, event.key.repeat);
+
+				// if the key is already held via input emulation the effective
+				// state is already down, so the real press is not a new edge
+				// (the emulated store is keyed by raw SDL2 keycode, like keyVec)
+				if (!KeyInput::IsKeyEmulated(event.key.keysym.sym))
+					activeController->KeyPressed(keyCode, scanCode, event.key.repeat);
 			}
 
 		} break;
@@ -1255,7 +1265,10 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 				gameTextInput.ignoreNextChar = false;
 				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.keysym.sym);
 				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.keysym.scancode);
-				activeController->KeyReleased(keyCode, scanCode);
+
+				// emulation still holds it down, so the real release is not an edge
+				if (!KeyInput::IsKeyEmulated(event.key.keysym.sym))
+					activeController->KeyReleased(keyCode, scanCode);
 			}
 		} break;
 		case SDL_KEYMAPCHANGED: {

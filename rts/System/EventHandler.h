@@ -60,6 +60,8 @@ class CEventHandler
 
 		void TeamDied(int teamID);
 		void TeamChanged(int teamID);
+		bool ResourceExcess(const std::map <int, SResourcePack>& excess);
+
 		void PlayerChanged(int playerID);
 		void PlayerAdded(int playerID);
 		void PlayerRemoved(int playerID, int reason);

@@ -305,6 +305,33 @@ void CMouseHandler::MouseMove(int x, int y, int dx, int dy)
 }
 
 
+void CMouseHandler::SetButtonEmulated(int button, bool pressed)
+{
+	if (button < 1 || button > NUM_BUTTONS)
+		return;
+
+	const bool physicalDown = (SDL_GetMouseState(nullptr, nullptr) & SDL_BUTTON(button)) != 0;
+	const bool wasDown = physicalDown || buttons[button].emulated;
+
+	buttons[button].emulated = pressed;
+
+	// fire only on an effective (physical-or-emulated) edge, so a real press
+	// underneath an emulated one doesn't produce a duplicate event
+	if (pressed && !wasDown) {
+		MousePress(lastx, lasty, button);
+	} else if (!pressed && wasDown && !physicalDown) {
+		MouseRelease(lastx, lasty, button);
+	}
+}
+
+
+void CMouseHandler::ClearEmulatedButtons()
+{
+	for (int button = 1; button <= NUM_BUTTONS; ++button)
+		buttons[button].emulated = false;
+}
+
+
 void CMouseHandler::MousePress(int x, int y, int button)
 {
 	RECOIL_DETAILED_TRACY_ZONE;

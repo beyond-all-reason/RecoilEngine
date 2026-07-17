@@ -501,12 +501,13 @@ void LuaParser::AddString(int key, const std::string& value)
 
 int LuaParser::TimeCheck(lua_State* L)
 {
-	#if (!defined(UNITSYNC) && !defined(DEDICATED))
 	if (!lua_isstring(L, 1) || !lua_isfunction(L, 2))
 		luaL_error(L, "Invalid arguments to TimeCheck('string', func, ...)");
 
 	{
+		#if (!defined(UNITSYNC) && !defined(DEDICATED))
 		ScopedOnceTimer timer(lua_tostring(L, 1));
+		#endif
 
 		lua_remove(L, 1);
 
@@ -519,9 +520,6 @@ int LuaParser::TimeCheck(lua_State* L)
 	}
 
 	return lua_gettop(L);
-	#else
-	return 0;
-	#endif
 }
 
 

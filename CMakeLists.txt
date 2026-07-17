@@ -73,11 +73,6 @@ else()
 	set(DEBUG_BUILD FALSE)
 endif()
 
-if(DEBUG_BUILD)
-	set(JAVA_COMPILE_FLAG_CONDITIONAL "-g:lines,source,vars")
-else()
-	set(JAVA_COMPILE_FLAG_CONDITIONAL "-g:lines,source")
-endif()
 
 # By default, the libraries that don't explicitly specify SHARED/STATIC are build statically.
 # See https://cmake.org/cmake/help/latest/variable/BUILD_SHARED_LIBS.html
@@ -211,7 +206,7 @@ endif (UNIX AND NOT MINGW)
 # (next two are relative to CMAKE_INSTALL_PREFIX)
 set(AI_LIBS_DIR "${DATADIR}"     CACHE STRING "Where to install Skirmish AI libraries")
 set(AI_DATA_DIR "${AI_LIBS_DIR}" CACHE STRING "Where to install Skirmish AI additional files (eg. configuration)")
-set(AI_TYPES    "NATIVE"            CACHE STRING "Which AI Interfaces (and Skirmish AIs using them) to build [ALL|NATIVE|JAVA|NONE]")
+set(AI_TYPES    "NATIVE"            CACHE STRING "Which AI Interfaces (and Skirmish AIs using them) to build [ALL|NATIVE|NONE]")
 
 ## DataDirs
 set(BUILTIN_DATADIRS "")

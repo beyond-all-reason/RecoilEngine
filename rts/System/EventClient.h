@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <map>
 #include <typeinfo>
 #include <string>
 #include <vector>
@@ -36,6 +37,7 @@ struct BuildInfo;
 struct FeatureDef;
 class LuaMaterial;
 struct WeaponDef;
+struct SResourcePack;
 
 // The distinct layouts a build-drag can produce, as answered to the GetBuildShape
 // event. A shape is described purely by its geometry; how one gets picked
@@ -135,6 +137,8 @@ class CEventClient
 
 		virtual void TeamDied(int teamID) {}
 		virtual void TeamChanged(int teamID) {}
+		virtual bool ResourceExcess(const std::map <int, SResourcePack>& excess) { return false; }
+
 		virtual void PlayerChanged(int playerID) {}
 		virtual void PlayerAdded(int playerID) {}
 		virtual void PlayerRemoved(int playerID, int reason) {}
