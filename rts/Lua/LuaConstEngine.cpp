@@ -28,6 +28,8 @@
  * @field noHandicapForReclaim boolean Whether handicap is applied to income from reclaim
  * @field groupAddDoesntSelect boolean Whether 'group add' also selects the group (does both if false)
  * @field deadTeamsKeepUnitLimit boolean Whether engine redistributes dead team unitlimit to allies (false) or keeps it as-is (true)
+ * @field armorAppliesToAllDamage boolean Whether armor applies to all damage, otherwise collisions deal full damage
+ * @field largeBeamlaserFlareTex3 boolean Whether beamlasers have flare as tex3 like all other weapons. Otherwise tex4, with directional muzzle at the opposite slot
  */
 
 /***
@@ -70,7 +72,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	 *
 	 * will be compatible even on engines that don't yet know about the entry at all. */
 	lua_pushliteral(L, "FeatureSupport");
-	lua_createtable(L, 0, 11);
+	lua_createtable(L, 0, 13);
 		LuaPushNamedBool(L, "NegativeGetUnitCurrentCommand", true);
 		LuaPushNamedBool(L, "hasExitOnlyYardmaps", true);
 		LuaPushNamedNumber(L, "rmlUiApiVersion", 1);
@@ -84,6 +86,8 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "noHandicapForReclaim", true);
 		LuaPushNamedBool(L, "groupAddDoesntSelect", true);
 		LuaPushNamedBool(L, "deadTeamsKeepUnitLimit", false);
+		LuaPushNamedBool(L, "armorAppliesToAllDamage", false);
+		LuaPushNamedBool(L, "largeBeamlaserFlareTex3", false);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");
