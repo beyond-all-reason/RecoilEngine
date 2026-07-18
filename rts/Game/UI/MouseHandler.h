@@ -109,6 +109,10 @@ private:
 
 	bool IsOtherActionButtonPressed(int button) const;
 
+	// the draw/command paths query the mouse-role binds every frame; cache which
+	// buttons carry each role so those queries are a bitmask test, not a keybind lookup
+	void RefreshRoleButtonMasks();
+
 	void DrawScrollCursor(TypedRenderBuffer<VA_TYPE_C>& rb) const;
 	void DrawFPSCursor(TypedRenderBuffer<VA_TYPE_C>& rb) const;
 
@@ -137,6 +141,9 @@ public:
 	uint32_t pressedBitMask = 0;
 
 private:
+	uint32_t primaryButtonMask = 0;
+	uint32_t secondaryButtonMask = 0;
+
 	bool hideCursor = true;
 	bool hwHideCursor = true;
 	bool hardwareCursor = false;

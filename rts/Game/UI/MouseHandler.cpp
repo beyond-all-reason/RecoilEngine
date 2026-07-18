@@ -342,12 +342,33 @@ bool CMouseHandler::IsButtonBoundToAction(int button, const std::string& action)
 	if (button < 1 || button > NUM_BUTTONS)
 		return false;
 
+	if (action == "mouseprimary")
+		return (primaryButtonMask >> button) & 1u;
+	if (action == "mousesecondary")
+		return (secondaryButtonMask >> button) & 1u;
+
 	for (const Action& a: keyBindings.GetActionList(CKeyCodes::GetMouseButtonSymbol(button), CScanCodes::GetMouseButtonSymbol(button))) {
 		if (a.command == action)
 			return true;
 	}
 
 	return false;
+}
+
+
+void CMouseHandler::RefreshRoleButtonMasks()
+{
+	primaryButtonMask = 0;
+	secondaryButtonMask = 0;
+
+	for (int button = 1; button <= NUM_BUTTONS; ++button) {
+		for (const Action& a: keyBindings.GetActionList(CKeyCodes::GetMouseButtonSymbol(button), CScanCodes::GetMouseButtonSymbol(button))) {
+			if (a.command == "mouseprimary")
+				primaryButtonMask |= (1u << button);
+			else if (a.command == "mousesecondary")
+				secondaryButtonMask |= (1u << button);
+		}
+	}
 }
 
 
@@ -600,7 +621,7 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 	if (activeReceiver != nullptr) {
 		activeReceiver->MouseRelease(x, y, button);
 
-		if (!buttons[SDL_BUTTON_LEFT].pressed && !buttons[SDL_BUTTON_MIDDLE].pressed && !buttons[SDL_BUTTON_RIGHT].pressed)
+		if (!ButtonPressed())
 			activeReceiver = nullptr;
 
 		return;
@@ -818,6 +839,8 @@ std::string CMouseHandler::GetCurrentTooltip() const
 void CMouseHandler::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	RefreshRoleButtonMasks();
+
 	// Rml is very polite about asking for changes to the cursor
 	// so let's make sure it's not ignored!
 	if (RmlGui::IsMouseInteractingWith())
