@@ -166,11 +166,19 @@ jobs:
 
       - name: Render startscript
         run: |
-          # The checked-in startscript is a template: $VERSION is the version
+          # The checked-in startscript is a template: @VERSION@ is the version
           # suffix of the pinned GAME (text after the last space, e.g.
-          # "test-29932-21b3bb0") and $MAPNAME is MAP.
-          sed -e "s/\$VERSION/${GAME##* }/g" -e "s/\$MAPNAME/$MAP/g" \
+          # "test-29932-21b3bb0") and @MAPNAME@ is MAP.
+          sed -e "s/@VERSION@/${GAME##* }/g" -e "s/@MAPNAME@/$MAP/g" \
               test/synctest/synctest-startscript.txt > startscript.txt
+
+          # Fail loudly here rather than letting the engine fail later with an
+          # opaque "can't find game/map" error.
+          if grep -qE '@VERSION@|@MAPNAME@' startscript.txt; then
+            echo "::error::startscript template was not fully rendered — leftover placeholders:"
+            grep -nE '@VERSION@|@MAPNAME@' startscript.txt
+            exit 1
+          fi
           grep -nE 'gametype=|mapname=' startscript.txt
 
       - name: Run synctest
@@ -210,7 +218,20 @@ jobs:
     env:
       TESTED_SHA: ${{ needs.setup.outputs.sha }}
     steps:
+      - name: Assert setup produced a platform list
+        env:
+          PLATFORMS_JSON: ${{ needs.setup.outputs.platforms }}
+        run: |
+          if [ -z "$PLATFORMS_JSON" ]; then
+            echo "::error::setup produced no platform list — it likely failed before it ran; check the setup job."
+            exit 1
+          fi
+
       - name: Download current run artifacts
+        # If every platform leg died before uploading, the pattern matches
+        # nothing and this step errors. That is not the failure we want to
+        # report, so swallow it and let the MISSING check below speak instead.
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
           pattern: synctest-*-${{ env.TESTED_SHA }}
@@ -222,11 +243,6 @@ jobs:
         run: |
           # Check from the EXPECTED platform list, so if artifact uploading fails
           # we will be able to detect that its missing.
-          if [ -z "$PLATFORMS_JSON" ]; then
-            echo "::error::setup produced no platform list — it likely failed before it ran; check the setup job."
-            exit 1
-          fi
-
           for platform in $(jq -r '.[].platform' <<<"$PLATFORMS_JSON"); do
             digest=$(jq -r '.digest // empty' \
               "artifacts/synctest-$platform-$TESTED_SHA/bar-data/$HASH_FILE" 2>/dev/null || true)

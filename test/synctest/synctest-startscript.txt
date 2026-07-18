@@ -49,8 +49,8 @@
     }
     ishost=1;
     startpostype=3;
-    gametype=Beyond All Reason $VERSION;
-    mapname=$MAPNAME;
+    gametype=Beyond All Reason @VERSION@;
+    mapname=@MAPNAME@;
     myplayername=Player;
     fixedrngseed=123123;
     numplayers=1;

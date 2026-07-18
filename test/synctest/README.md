@@ -22,7 +22,7 @@ pr-downloader --filesystem-writepath ./bar-data \
     --download-map  "$MAP"
 
 # synctest-startscript.txt is a template — render the pins into it first.
-sed -e "s/\$VERSION/${GAME##* }/g" -e "s/\$MAPNAME/$MAP/g" \
+sed -e "s/@VERSION@/${GAME##* }/g" -e "s/@MAPNAME@/$MAP/g" \
     test/synctest/synctest-startscript.txt > startscript.txt
 
 spring-headless --isolation --write-dir ./bar-data startscript.txt
@@ -32,7 +32,7 @@ A successful run exits 0 at game frame ~2100 (the startscript's trailing `quitfo
 
 ## Bumping the pinned BAR version
 
-BAR's rapid `test-<N>-<sha>` tags are content-addressed — once published they never change — which is why the CI doesn't need an external version manifest. The only place to bump is the `GAME:` env in `.github/workflows/synctest.yml` (and `MAP:` for the map): the workflow feeds them to `pr-downloader`, substitutes them into the startscript template's `gametype=Beyond All Reason $VERSION;` and `mapname=$MAPNAME;` lines, and uses both in the cache key.
+BAR's rapid `test-<N>-<sha>` tags are content-addressed — once published they never change — which is why the CI doesn't need an external version manifest. The only place to bump is the `GAME:` env in `.github/workflows/synctest.yml` (and `MAP:` for the map): the workflow feeds them to `pr-downloader`, substitutes them into the startscript template's `gametype=Beyond All Reason @VERSION@;` and `mapname=@MAPNAME@;` lines, and uses both in the cache key.
 
 
 ## Replacing the startscript
