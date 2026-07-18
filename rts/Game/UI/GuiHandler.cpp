@@ -1288,7 +1288,7 @@ void CGuiHandler::MouseRelease(int x, int y, int button, const float3& cameraPos
 	}
 
 	if (mouse->IsButtonBoundToAction(button, "mousesecondary") && (iconCmd == -1)) {
-		// right click -> set the default cmd
+		// command-role button -> set the default cmd
 		SetActiveCommandIndex(defaultCmdMemory);
 		defaultCmdMemory = -1;
 	}
@@ -1419,15 +1419,15 @@ bool CGuiHandler::SetActiveCommand(int cmdIndex, int button,
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// use the button value instead of rightMouseButton
-	const bool effectiveRMB = !mouse->IsButtonBoundToAction(button, "mouseprimary");
+	const bool effectiveSecondary = !mouse->IsButtonBoundToAction(button, "mouseprimary");
 
 	// spoof state on whichever buttons carry the select/command roles
 	const int selectButton  = mouse->GetActionButton("mouseprimary");
 	const int commandButton = mouse->GetActionButton("mousesecondary");
 
 	// setup the mouse and key states
-	const bool  prevLMB   = (selectButton  > 0) && mouse->buttons[selectButton ].pressed;
-	const bool  prevRMB   = (commandButton > 0) && mouse->buttons[commandButton].pressed;
+	const bool  prevPrimary   = (selectButton  > 0) && mouse->buttons[selectButton ].pressed;
+	const bool  prevSecondary   = (commandButton > 0) && mouse->buttons[commandButton].pressed;
 	const std::uint8_t prevAlt   = KeyInput::GetKeyModState(KMOD_ALT);
 	const std::uint8_t prevCtrl  = KeyInput::GetKeyModState(KMOD_CTRL);
 	const std::uint8_t prevMeta  = KeyInput::GetKeyModState(KMOD_GUI);
@@ -1441,7 +1441,7 @@ bool CGuiHandler::SetActiveCommand(int cmdIndex, int button,
 	KeyInput::SetKeyModState(KMOD_GUI,   meta);
 	KeyInput::SetKeyModState(KMOD_SHIFT, shift);
 
-	const bool retval = SetActiveCommand(cmdIndex, effectiveRMB);
+	const bool retval = SetActiveCommand(cmdIndex, effectiveSecondary);
 
 	// revert the mouse and key states
 	KeyInput::SetKeyModState(KMOD_SHIFT, prevShift);
@@ -1449,8 +1449,8 @@ bool CGuiHandler::SetActiveCommand(int cmdIndex, int button,
 	KeyInput::SetKeyModState(KMOD_CTRL,  prevCtrl);
 	KeyInput::SetKeyModState(KMOD_ALT,   prevAlt);
 
-	if (commandButton > 0) mouse->buttons[commandButton].pressed = prevRMB;
-	if (selectButton  > 0) mouse->buttons[selectButton ].pressed = prevLMB;
+	if (commandButton > 0) mouse->buttons[commandButton].pressed = prevSecondary;
+	if (selectButton  > 0) mouse->buttons[selectButton ].pressed = prevPrimary;
 
 	return retval;
 }
@@ -2193,7 +2193,7 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 	}
 
 	if (mouse->IsButtonBoundToAction(button, "mousesecondary") && preview) {
-		// right click -> default cmd
+		// command-role button -> default cmd
 		// (in preview we might not have default cmd memory set)
 		if (mouse->IsActionButtonPressed("mousesecondary")) {
 			tempInCommand = defaultCmdMemory;
@@ -2217,7 +2217,7 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 		case CMDTYPE_ICON: {
 			Command c(commands[tempInCommand].id, CreateOptions(button));
 			if (mouse->IsButtonBoundToAction(button, "mouseprimary") && !preview)
-				LOG_L(L_WARNING, "CMDTYPE_ICON left button press in incommand test? This should not happen.");
+				LOG_L(L_WARNING, "CMDTYPE_ICON primary-role button press in incommand test? This should not happen.");
 
 			return CheckCommand(c);
 		}
