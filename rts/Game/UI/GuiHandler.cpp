@@ -1418,7 +1418,7 @@ bool CGuiHandler::SetActiveCommand(int cmdIndex, int button,
                                    bool alt, bool ctrl, bool meta, bool shift)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// use the button value instead of rightMouseButton
+	// derive the command flag from the button's role, not the passed rightMouseButton
 	const bool effectiveSecondary = !mouse->IsButtonBoundToAction(button, "mouseprimary");
 
 	// spoof state on whichever buttons carry the select/command roles
@@ -1427,7 +1427,7 @@ bool CGuiHandler::SetActiveCommand(int cmdIndex, int button,
 
 	// setup the mouse and key states
 	const bool  prevPrimary   = (selectButton  > 0) && mouse->buttons[selectButton ].pressed;
-	const bool  prevSecondary   = (commandButton > 0) && mouse->buttons[commandButton].pressed;
+	const bool  prevSecondary = (commandButton > 0) && mouse->buttons[commandButton].pressed;
 	const std::uint8_t prevAlt   = KeyInput::GetKeyModState(KMOD_ALT);
 	const std::uint8_t prevCtrl  = KeyInput::GetKeyModState(KMOD_CTRL);
 	const std::uint8_t prevMeta  = KeyInput::GetKeyModState(KMOD_GUI);
