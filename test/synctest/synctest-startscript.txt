@@ -50,7 +50,7 @@
     ishost=1;
     startpostype=3;
     gametype=Beyond All Reason $VERSION;
-    mapname=Jade Empress 1.41;
+    mapname=$MAPNAME;
     myplayername=Player;
     fixedrngseed=123123;
     numplayers=1;
