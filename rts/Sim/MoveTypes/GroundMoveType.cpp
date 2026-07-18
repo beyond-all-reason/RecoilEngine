@@ -146,8 +146,11 @@ CR_REG_METADATA(CGroundMoveType, (
 	CR_MEMBER(forceFromStaticCollidees),
 
 	CR_MEMBER(pathID),
-	CR_MEMBER(nextPathId),
-	CR_MEMBER(deletePathId),
+	// The ECS registry is not persisted across save/load, so a saved entity ID will collide with
+	// a newly-allocated entity in the fresh registry, causing FollowPath to destroy the wrong path
+	// or swap to an invalid one.
+	CR_IGNORED(nextPathId),
+	CR_IGNORED(deletePathId),
 
 	CR_MEMBER(numIdlingUpdates),
 	CR_MEMBER(numIdlingSlowUpdates),
