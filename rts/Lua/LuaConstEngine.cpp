@@ -45,8 +45,6 @@
  * @field wordSize number Indicates the build type always 64 these days
  * @field gameSpeed number Number of simulation gameframes per second
  * @field textColorCodes TextColorCode Table containing keys that represent the color code operations during font rendering
- * @field isHeadless boolean? Whether this is a headless engine build. Not available in synced
- * @field hasSyncChecksums boolean? Whether the engine was built with sync-check support (i.e. Spring.GetPrevFrameSyncChecksum() returns a meaningful value). Not available in synced
  */
 
 bool LuaConstEngine::PushEntries(lua_State* L)

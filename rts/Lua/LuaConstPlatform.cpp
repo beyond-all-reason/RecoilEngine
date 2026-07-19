@@ -151,7 +151,7 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	/*** @field Platform.isHeadless boolean Is this a headless build which only simulates and doesnt offer interactive IO? */
 	LuaPushNamedBool(L, "isHeadless", SpringVersion::IsHeadless());
 
-	/*** @field Platform.hasSyncChecksums boolean */
+	/*** @field Platform.hasSyncChecksums boolean Whether the engine was built with sync-check support (i.e. Spring.GetPrevFrameSyncChecksum() returns a meaningful value). */
 	#ifdef SYNCCHECK
 		LuaPushNamedBool(L, "hasSyncChecksums", true);
 	#else

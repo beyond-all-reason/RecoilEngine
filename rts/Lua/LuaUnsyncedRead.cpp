@@ -1244,7 +1244,7 @@ int LuaUnsyncedRead::GetVideoCapturingMode(lua_State* L)
  * useful for testing. The returned string is NOT convertible to
  * a number within Lua.
  *
- * Returns a dummy value if `Engine.hasSyncChecksums` is false,
+ * Returns a dummy value if `Platform.hasSyncChecksums` is false,
  * or if no frames were processed yet.
  *
  * @function Spring.GetPrevFrameSyncChecksum
