@@ -2849,26 +2849,32 @@ int LuaUnsyncedCtrl::ViewDataFileOrDir(lua_State* L)
 	}
 
 #ifdef _WIN32
-	// Windows: convert forward slashes to backslashes
-	std::string winPath = (openFile ? filePath : writeDir);
-	std::replace(winPath.begin(), winPath.end(), '/', '\\');
-
-	HINSTANCE result = nullptr;
-
+	// Windows
+	HINSTANCE ret = nullptr;
+	
 	if (openFile)
 	{
+		// Convert forward slashes to backslashes
+		std::string winPath = filePath;
+		std::replace(winPath.begin(), winPath.end(), '/', '\\');
+
 		// Try opening the file with its associated app
-		result = ShellExecuteA(nullptr, "open", winPath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+		ret = ShellExecuteA(nullptr, "open", winPath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 	}
 
 	// ShellExecute returns >32 on success, an error code (≤32) on failure.
 	// See SE_ERR_* constants in shellapi.h.
-	bool shellExecuteSucceeded = reinterpret_cast<UINT_PTR>(result) > 32;
+	bool shellExecuteSucceeded = reinterpret_cast<UINT_PTR>(ret) > 32;
 	
 	if (!openFile || !shellExecuteSucceeded)
 	{
+		// Convert forward slashes to backslashes
+		std::string winDir = writeDir;
+		std::replace(winDir.begin(), winDir.end(), '/', '\\');
+
 		// No file specified or opening file failed, open the directory
-		result = ShellExecuteA(nullptr, "explorer.exe", winPath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+		ret = ShellExecuteA(nullptr, "open", winDir.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+		shellExecuteSucceeded = reinterpret_cast<UINT_PTR>(ret) > 32;
 	}
 
 	lua_pushboolean(L, shellExecuteSucceeded);
