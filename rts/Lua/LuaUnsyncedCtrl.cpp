@@ -99,6 +99,11 @@
 #include "System/Sound/OpenAL/EFXPresets.h"
 #endif
 
+#ifdef _WIN32
+#include <shellapi.h>
+#endif
+
+#include <algorithm>
 #include <cctype>
 #include <cfloat>
 #include <cinttypes>
@@ -241,6 +246,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetConfigString);
 
 	REGISTER_LUA_CFUNC(CreateDir);
+	REGISTER_LUA_CFUNC(ViewDataFileOrDir);
 
 	REGISTER_LUA_CFUNC(SendCommands);
 	REGISTER_LUA_CFUNC(GiveOrder);
@@ -2797,6 +2803,111 @@ int LuaUnsyncedCtrl::CreateDir(lua_State* L)
 		luaL_error(L, "[%s][4] invalid access: %s", __func__, dir.c_str());
 
 	lua_pushboolean(L, FileSystem::CreateDirectory(dir));
+	return 1;
+}
+
+
+/***
+ * Opens the Spring user data directory in the native file explorer.
+ * If filename is given, attempts to open the file with the default app.
+ *
+ * @function Spring.ViewDataFileOrDir
+ * @param filename string? (Default: `nil` — opens directory only)
+ * @return boolean success
+ * @return string? errorMessage Present only when `success` is `false`
+ */
+int LuaUnsyncedCtrl::ViewDataFileOrDir(lua_State* L)
+{
+	const std::string writeDir = dataDirLocater.GetWriteDirPath();
+	if (writeDir.empty())
+	{
+		LOG_L(L_WARNING, "[%s] write directory not available", __func__);
+		lua_pushboolean(L, false);
+		lua_pushstring(L, "write directory not available");
+		return 2;
+	}
+
+	std::string filePath;
+	const bool openFile = (lua_gettop(L) >= 1);
+
+	if (openFile)
+	{
+		const std::string filename = luaL_checkstring(L, 1);
+
+		// Security: reject path traversal, absolute paths, and shell metacharacters
+		if (filename.find("..") != std::string::npos ||
+			std::any_of(filename.begin(), filename.end(), [](unsigned char c) {
+				return strchr("/\\\"`$;|&<>()*?[]", c) != nullptr;
+			}))
+		{
+			lua_pushboolean(L, false);
+			lua_pushstring(L, "invalid filename");
+			return 2;
+		}
+
+		filePath = FileSystem::EnsurePathSepAtEnd(writeDir) + filename;
+	}
+
+#ifdef _WIN32
+	// Windows: convert forward slashes to backslashes
+	std::string winPath = (openFile ? filePath : writeDir);
+	std::replace(winPath.begin(), winPath.end(), '/', '\\');
+
+	HINSTANCE result = nullptr;
+
+	if (openFile)
+	{
+		// Try opening the file with its associated app
+		result = ShellExecuteA(nullptr, "open", winPath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+	}
+
+	// ShellExecute returns >32 on success, an error code (≤32) on failure.
+	// See SE_ERR_* constants in shellapi.h.
+	bool shellExecuteSucceeded = reinterpret_cast<UINT_PTR>(result) > 32;
+	
+	if (!openFile || !shellExecuteSucceeded)
+	{
+		// No file specified or opening file failed, open the directory
+		result = ShellExecuteA(nullptr, "explorer.exe", winPath.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+	}
+
+	lua_pushboolean(L, shellExecuteSucceeded);
+#elif defined(__APPLE__)
+	// macOS
+	int ret = -1;
+
+	if (openFile)
+	{
+		// Try opening the file with its associated app
+		ret = system(("open \"" + filePath + "\"").c_str());
+	}
+
+	if (!openFile || ret != 0)
+	{
+		// No file specified or opening file failed, open the directory
+		ret = system(("open -R \"" + writeDir + "\"").c_str());
+	}
+
+	lua_pushboolean(L, (ret == 0));
+#else
+	// Linux
+	int ret = -1;
+
+	if (openFile)
+	{
+		// Try opening the file with its associated app
+		ret = system(("xdg-open \"" + filePath + "\"").c_str());
+	}
+
+	if (!openFile || ret != 0)
+	{
+		// No file specified or opening file failed, open the directory
+		ret = system(("xdg-open \"" + writeDir + "\"").c_str());
+	}
+
+	lua_pushboolean(L, (ret == 0));
+#endif
+
 	return 1;
 }
 

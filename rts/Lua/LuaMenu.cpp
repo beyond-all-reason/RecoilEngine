@@ -189,6 +189,7 @@ bool CLuaMenu::LoadUnsyncedCtrlFunctions(lua_State* L)
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, SetConfigString);
 
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, CreateDir);
+	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, ViewDataFileOrDir);
 
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, SetWMIcon);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, SetWMCaption);

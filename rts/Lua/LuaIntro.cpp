@@ -180,6 +180,7 @@ bool CLuaIntro::LoadUnsyncedCtrlFunctions(lua_State* L)
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, SetConfigString);
 
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, CreateDir);
+	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, ViewDataFileOrDir);
 
 	//REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, SetMouseCursor);
 	//REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, WarpMouse);
