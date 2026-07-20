@@ -662,8 +662,8 @@ bool CKeyBindings::Bind(const std::string& keystr, const std::string& line)
 bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	CKeySet ks;
-	if (!ks.Parse(keystr)) {
+	CKeyChain kc;
+	if (!ParseKeyChain(keystr, &kc) || kc.empty()) {
 		LOG_L(L_WARNING, "UnBind: could not parse key: %s", keystr.c_str());
 		return false;
 	}
@@ -671,6 +671,7 @@ bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s] keystr=%s command=%s", __func__, keystr.c_str(), command.c_str());
 
+	const CKeySet& ks = kc.back();
 	KeyMap& bindings = ks.IsKeyCode() ? codeBindings : scanBindings;
 	const auto it = bindings.find(ks);
 
