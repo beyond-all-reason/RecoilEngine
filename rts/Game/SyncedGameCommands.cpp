@@ -510,6 +510,18 @@ public:
 	}
 
 	bool Execute(const SyncedAction& action) const final {
+		if (luaRules != nullptr) {
+			std::string line = action.GetCmd();
+			if (!action.GetArgs().empty())
+				line += " " + action.GetArgs();
+
+			if (luaRules->GotChatMsg(line, action.GetPlayerID()))
+				return true;
+		}
+
+		if (!modInfo.allowTake)
+			return false;
+
 		const CPlayer* actionPlayer = playerHandler.Player(action.GetPlayerID());
 
 		if (actionPlayer->spectator && !gs->cheatEnabled)
@@ -595,8 +607,7 @@ void SyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<LuaGaiaActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<DesyncActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<AtmActionExecutor>());
-	if (modInfo.allowTake)
-		AddActionExecutor(AllocActionExecutor<TakeActionExecutor>());
+	AddActionExecutor(AllocActionExecutor<TakeActionExecutor>());
 
 	AddActionExecutor(AllocActionExecutor<SkipActionExecutor>());
 }
