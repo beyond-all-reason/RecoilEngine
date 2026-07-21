@@ -28,6 +28,7 @@
  * @field noHandicapForReclaim boolean Whether handicap is applied to income from reclaim
  * @field groupAddDoesntSelect boolean Whether 'group add' also selects the group (does both if false)
  * @field deadTeamsKeepUnitLimit boolean Whether engine redistributes dead team unitlimit to allies (false) or keeps it as-is (true)
+ * @field reliableLuaMapShaders boolean Whether forward-only Lua map shaders activate without a deferred draw and Spring.SetMapShader program swaps refresh cached uniform locations
  */
 
 /***
@@ -83,6 +84,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "noHandicapForReclaim", true);
 		LuaPushNamedBool(L, "groupAddDoesntSelect", true);
 		LuaPushNamedBool(L, "deadTeamsKeepUnitLimit", false);
+		LuaPushNamedBool(L, "reliableLuaMapShaders", true);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");
