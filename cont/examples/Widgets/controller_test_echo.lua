@@ -89,9 +89,9 @@ function widget:Update()
 	statePollCounter = statePollCounter + 1
 	if statePollCounter >= statePollInterval then
 		statePollCounter = 0
-
 		for instanceId in pairs(connectedControllers) do
 			local state = Spring.GetControllerState(instanceId)
+			Spring.Echo(string.format("[ControllerTest] POLL %d: state=%s", instanceId, state and "valid" or "nil"))
 			if state then
 				local axisStr  = ""
 				local btnStr   = ""
