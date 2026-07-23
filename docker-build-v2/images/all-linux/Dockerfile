@@ -63,6 +63,25 @@ RUN mkdir src cache out artifacts && chmod a+rwx cache out artifacts
 
 # Fetch library dependencies and configure resolution
 RUN git clone --depth=1 https://github.com/beyond-all-reason/spring-static-libs.git -b ${STATIC_LIBS_BRANCH} spring-static-libs
+
+# Minimal LGPL FFmpeg used by the engine's custom-AVIO H.264/AAC player.
+# 68af2cc3 is the signed-upstream 7.1.1 release preparation revision.
+ARG FFMPEG_REVISION=68af2cc3feb8c78aec2722c728fd87f03515fa7c
+RUN git clone https://git.ffmpeg.org/ffmpeg.git /tmp/ffmpeg \
+ && cd /tmp/ffmpeg \
+ && git checkout --detach ${FFMPEG_REVISION} \
+ && test "$(git rev-parse HEAD)" = "${FFMPEG_REVISION}" \
+ && ./configure --prefix=/build/spring-static-libs --cc=gcc-13 --cxx=g++-13 \
+    --enable-static --disable-shared --enable-pic --disable-programs --disable-doc --disable-network \
+    --disable-avdevice --disable-avfilter --disable-postproc --disable-everything \
+    --enable-avcodec --enable-avformat --enable-avutil --enable-swscale --enable-swresample \
+    --enable-decoder=h264,aac --enable-demuxer=mov --enable-parser=h264,aac \
+ && make -j$(nproc) \
+ && make install \
+ && cp COPYING.LGPLv2.1 /build/spring-static-libs/FFMPEG-COPYING.LGPLv2.1 \
+ && printf '%s\n' "revision=${FFMPEG_REVISION}" > /build/spring-static-libs/FFMPEG-MANIFEST.txt \
+ && grep '^FFMPEG_CONFIGURATION=' ffbuild/config.mak >> /build/spring-static-libs/FFMPEG-MANIFEST.txt \
+ && rm -rf /tmp/ffmpeg
 ENV PKG_CONFIG_LIBDIR=/build/spring-static-libs/lib/pkgconfig
 ENV PKG_CONFIG="pkg-config --define-prefix --static"
 ENV CMAKE_PREFIX_PATH=/build/spring-static-libs/

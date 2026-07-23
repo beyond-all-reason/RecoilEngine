@@ -19,6 +19,25 @@ RUN mkdir src cache out artifacts && chmod a+rwx cache out artifacts
 RUN git clone --depth=1 https://github.com/beyond-all-reason/mingwlibs64.git
 ENV MINGWLIBS=/build/mingwlibs64
 
+# Keep the Windows feature set identical to Linux and avoid GPL/nonfree codecs.
+ARG FFMPEG_REVISION=68af2cc3feb8c78aec2722c728fd87f03515fa7c
+RUN git clone https://git.ffmpeg.org/ffmpeg.git /tmp/ffmpeg \
+ && cd /tmp/ffmpeg \
+ && git checkout --detach ${FFMPEG_REVISION} \
+ && test "$(git rev-parse HEAD)" = "${FFMPEG_REVISION}" \
+ && ./configure --prefix=/build/mingwlibs64 --target-os=mingw32 --arch=x86_64 \
+    --cross-prefix=x86_64-w64-mingw32- --enable-cross-compile \
+    --enable-static --disable-shared --enable-pic --disable-programs --disable-doc --disable-network \
+    --disable-avdevice --disable-avfilter --disable-postproc --disable-everything \
+    --enable-avcodec --enable-avformat --enable-avutil --enable-swscale --enable-swresample \
+    --enable-decoder=h264,aac --enable-demuxer=mov --enable-parser=h264,aac \
+ && make -j$(nproc) \
+ && make install \
+ && cp COPYING.LGPLv2.1 /build/mingwlibs64/FFMPEG-COPYING.LGPLv2.1 \
+ && printf '%s\n' "revision=${FFMPEG_REVISION}" > /build/mingwlibs64/FFMPEG-MANIFEST.txt \
+ && grep '^FFMPEG_CONFIGURATION=' ffbuild/config.mak >> /build/mingwlibs64/FFMPEG-MANIFEST.txt \
+ && rm -rf /tmp/ffmpeg
+
 # Copy toolchain early so SDL3 build can use it
 COPY amd64-windows/toolchain.cmake .
 

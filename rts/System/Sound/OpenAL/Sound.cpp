@@ -25,6 +25,7 @@
 #include "SoundSource.h"
 #include "SoundBuffer.h"
 #include "SoundItem.h"
+#include "PCMStream.h"
 #include "ALShared.h"
 #include "EFX.h"
 #include "EFXPresets.h"
@@ -122,6 +123,16 @@ void CSound::Kill()
 	}
 
 	SoundBuffer::Deinitialise();
+}
+
+std::shared_ptr<IPCMStream> CSound::CreatePCMStream()
+{
+	std::lock_guard<spring::recursive_mutex> lock(soundMutex);
+	if (soundThreadQuit)
+		return nullptr;
+	auto stream = std::make_shared<OpenALPCMStream>();
+	pcmStreams.emplace_back(stream);
+	return stream;
 }
 
 
@@ -830,6 +841,11 @@ void CSound::UpdateThread(int cfgMaxSounds)
 		LOG("[Sound::%s][3] #sources=%u #items=%u", __func__, uint32_t(soundSources.size()), uint32_t(soundItems.size()));
 
 		// destruct items before context cleanup
+		for (auto& stream: pcmStreams) {
+			stream->Close();
+			stream->DestroyAL();
+		}
+		pcmStreams.clear();
 		soundSources.clear();
 		soundItems.clear();
 
@@ -860,6 +876,10 @@ void CSound::Update()
 	for (CSoundSource& source: soundSources) {
 		source.Update();
 	}
+
+	for (auto& stream: pcmStreams)
+		stream->Update(appIsIconified);
+	std::erase_if(pcmStreams, [](const auto& stream) { return stream->CanRemove(); });
 
 	CheckError("[Sound::Update]");
 	UpdateListenerReal();

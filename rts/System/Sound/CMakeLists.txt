@@ -36,6 +36,7 @@ if    (NOT NO_SOUND)
 			OpenAL/OggDecoder.cpp
 			OpenAL/Mp3Decoder.cpp
 			OpenAL/MusicStream.cpp
+			OpenAL/PCMStream.cpp
 			OpenAL/Sound.cpp
 			OpenAL/SoundChannels.cpp
 			OpenAL/SoundBuffer.cpp
