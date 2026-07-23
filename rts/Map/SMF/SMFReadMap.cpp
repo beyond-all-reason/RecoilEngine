@@ -78,9 +78,6 @@ CSMFReadMap::CSMFReadMap(const std::string& mapName): CEventClient("[CSMFReadMap
 		haveSplatNormalDistribTexture |= !texName.empty();
 	}
 
-	// Detail Normal Splatting requires at least one splatDetailNormalTexture and a distribution texture
-	haveSplatNormalDistribTexture &= !mapInfo->smf.splatDistrTexName.empty();
-
 	ParseHeader();
 	LoadHeightMap();
 	CReadMap::Initialize();
@@ -252,17 +249,27 @@ void CSMFReadMap::CreateSpecularTex()
 void CSMFReadMap::CreateSplatDetailTextures()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!haveSplatDetailDistribTexture)
+	if (!haveSplatDetailDistribTexture && !haveSplatNormalDistribTexture)
 		return;
+
+	if (haveSplatNormalDistribTexture && !haveSplatDetailDistribTexture) {
+		LOG_L(L_DEBUG, "[CSMFReadMap::%s] DNTS active without complete classic splat pair; using fallback splatDetailTex/splatDistrTex", __func__);
+	}
 
 	{
 		CBitmap splatDetailTexBM;
+		const bool haveSplatDetailTexName = !mapInfo->smf.splatDetailTexName.empty();
 
 		// if a map supplies an intensity- AND a distribution-texture for
 		// detail-splat blending, the regular detail-texture is not used
 		// default detail-texture should be all-grey
-		if (!splatDetailTexBM.Load(mapInfo->smf.splatDetailTexName)) {
-			LOG_L(L_WARNING, "[CSMFReadMap::%s] Invalid SMF splatDetailTex %s. Creating fallback texture", __func__, mapInfo->smf.splatDetailTexName.c_str());
+		if (!haveSplatDetailTexName || !splatDetailTexBM.Load(mapInfo->smf.splatDetailTexName)) {
+			if (haveSplatDetailTexName) {
+				LOG_L(L_WARNING, "[CSMFReadMap::%s] Invalid SMF splatDetailTex %s. Creating fallback texture", __func__, mapInfo->smf.splatDetailTexName.c_str());
+			} else {
+				LOG_L(L_DEBUG, "[CSMFReadMap::%s] Missing SMF splatDetailTex. Creating fallback texture", __func__);
+			}
+
 			splatDetailTexBM.AllocDummy(SColor(127, 127, 127, 127));
 		}
 
@@ -272,9 +279,15 @@ void CSMFReadMap::CreateSplatDetailTextures()
 
 	{
 		CBitmap splatDistrTexBM;
+		const bool haveSplatDistrTexName = !mapInfo->smf.splatDistrTexName.empty();
 
-		if (!splatDistrTexBM.Load(mapInfo->smf.splatDistrTexName)) {
-			LOG_L(L_WARNING, "[CSMFReadMap::%s] Invalid SMF splatDistrTex %s. Creating fallback texture", __func__, mapInfo->smf.splatDistrTexName.c_str());
+		if (!haveSplatDistrTexName || !splatDistrTexBM.Load(mapInfo->smf.splatDistrTexName)) {
+			if (haveSplatDistrTexName) {
+				LOG_L(L_WARNING, "[CSMFReadMap::%s] Invalid SMF splatDistrTex %s. Creating fallback texture", __func__, mapInfo->smf.splatDistrTexName.c_str());
+			} else {
+				LOG_L(L_DEBUG, "[CSMFReadMap::%s] Missing SMF splatDistrTex. Creating fallback texture", __func__);
+			}
+
 			splatDistrTexBM.AllocDummy(SColor(255, 0, 0, 0));
 		}
 
