@@ -286,6 +286,8 @@ void CSMFReadMap::CreateSplatDetailTextures()
 	if (!haveSplatNormalDistribTexture)
 		return;
 
+	uint32_t loadedSplatNormals = 0;
+
 	for (size_t i = 0; i < mapInfo->smf.splatDetailNormalTexNames.size(); i++) {
 		if (i == NUM_SPLAT_DETAIL_NORMALS)
 			break;
@@ -302,7 +304,10 @@ void CSMFReadMap::CreateSplatDetailTextures()
 
 		splatNormalTextures[i].SetRawTexID(splatDetailNormalTextureBM.CreateMipMapTexture(texAnisotropyLevels[true], 0.0f, 0));
 		splatNormalTextures[i].SetRawSize(int2(splatDetailNormalTextureBM.xsize, splatDetailNormalTextureBM.ysize));
+		loadedSplatNormals += (splatNormalTextures[i].GetID() != 0);
 	}
+
+	LOG_L(L_DEBUG, "[CSMFReadMap::%s] Loaded %u DNTS splat normal textures", __func__, loadedSplatNormals);
 
 }
 
