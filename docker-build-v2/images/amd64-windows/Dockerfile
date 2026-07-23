@@ -4,7 +4,7 @@ ENV ENGINE_PLATFORM=amd64-windows
 RUN apt-get update \
  && apt-get upgrade --yes \
  && apt-get install --no-install-recommends --yes \
-    curl g++-mingw-w64-x86-64-posix git ninja-build make ccache pipx p7zip-full binutils zstd \
+    curl gcc g++ g++-mingw-w64-x86-64-posix git ninja-build make ccache pipx p7zip-full binutils zstd nasm \
     libasound2-dev libpulse-dev libudev-dev libdbus-1-dev libpci-dev \
     xorg-dev libgl1-mesa-dev libglu1-mesa-dev \
  && rm -rf /var/lib/apt/lists/*
@@ -30,7 +30,7 @@ RUN git clone https://git.ffmpeg.org/ffmpeg.git /tmp/ffmpeg \
     --enable-static --disable-shared --enable-pic --disable-programs --disable-doc --disable-network \
     --disable-avdevice --disable-avfilter --disable-postproc --disable-everything \
     --enable-avcodec --enable-avformat --enable-avutil --enable-swscale --enable-swresample \
-    --enable-decoder=h264,aac --enable-demuxer=mov --enable-parser=h264,aac \
+    --enable-decoder=h264,hevc,aac --enable-demuxer=mov --enable-parser=h264,hevc,aac \
  && make -j$(nproc) \
  && make install \
  && cp COPYING.LGPLv2.1 /build/mingwlibs64/FFMPEG-COPYING.LGPLv2.1 \

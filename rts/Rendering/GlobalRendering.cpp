@@ -1176,7 +1176,7 @@ void CGlobalRendering::LogDisplayMode(SDL_Window* window) const
 	const int fs = fullScreen;
 	const int bl = borderless;
 
-	LOG("[GR::%s] display-mode set to %ix%ix%ibpp@%iHz (%s)", __func__, viewSizeX, viewSizeY, SDL_BITSPERPIXEL(dmode->format), dmode->refresh_rate, names[fs * 2 + bl]);
+	LOG("[GR::%s] display-mode set to %ix%ix%ibpp@%fHz (%s)", __func__, viewSizeX, viewSizeY, SDL_BITSPERPIXEL(dmode->format), dmode->refresh_rate, names[fs * 2 + bl]);
 }
 
 void CGlobalRendering::GetAllDisplayBounds(SDL_Rect& r) const

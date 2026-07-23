@@ -8,6 +8,8 @@
 #include "System/Config/ConfigHandler.h"
 #include "System/Log/ILog.h"
 
+#include <tracy/Tracy.hpp>
+
 CONFIG(int, VideoPCMQueueMB).defaultValue(2).minimumValue(1).maximumValue(16);
 
 OpenALPCMStream::OpenALPCMStream()
@@ -53,6 +55,7 @@ void OpenALPCMStream::Flush(std::int64_t positionUs)
 
 void OpenALPCMStream::ApplyFlush()
 {
+	ZoneScopedNC("PCMStreamFlush", tracy::Color::Gold);
 	if (source != 0) {
 		alSourceStop(source);
 		ALint queued = 0;
@@ -71,6 +74,7 @@ void OpenALPCMStream::ApplyFlush()
 
 bool OpenALPCMStream::FillBuffer(ALuint buffer)
 {
+	ZoneScopedNC("PCMStreamFillBuffer", tracy::Color::DarkOrange);
 	PCMBlock block;
 	{
 		std::lock_guard<std::mutex> lock(mutex);
@@ -99,6 +103,7 @@ bool OpenALPCMStream::FillBuffer(ALuint buffer)
 
 void OpenALPCMStream::Update(bool suspended)
 {
+	ZoneScopedNC("PCMStreamUpdate", tracy::Color::Orange);
 	if (closed)
 		return;
 	if (closeRequested) {

@@ -24,6 +24,8 @@
 #include "System/StringUtil.h"
 #include "System/Threading/SpringThreading.h"
 
+#include <tracy/Tracy.hpp>
+
 #ifdef RECOIL_VIDEO
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -56,6 +58,25 @@ namespace {
 		return std::chrono::duration_cast<std::chrono::microseconds>(
 			std::chrono::steady_clock::now().time_since_epoch()).count();
 	}
+
+	// Tracy plot names
+	static const char* const videoFrameQueuePlot = "VideoFrameQueue";
+	static const char* const videoPCMQueueBytesPlot = "VideoPCMQueueBytes";
+	static const char* const videoDroppedFramesPlot = "VideoDroppedFrames";
+	static const char* const videoPositionPlot = "VideoPositionUs";
+	static const char* const videoActiveDecodersPlot = "VideoActiveDecoders";
+
+	// Register plot formats once at startup
+	struct TracyPlotRegistrar {
+		TracyPlotRegistrar()
+		{
+			TracyPlotConfig(videoFrameQueuePlot, tracy::PlotFormatType::Number, true, false, tracy::Color::MediumAquamarine);
+			TracyPlotConfig(videoPCMQueueBytesPlot, tracy::PlotFormatType::Memory, true, false, tracy::Color::MediumAquamarine);
+			TracyPlotConfig(videoDroppedFramesPlot, tracy::PlotFormatType::Number, true, false, tracy::Color::OrangeRed);
+			TracyPlotConfig(videoPositionPlot, tracy::PlotFormatType::Number, true, false, tracy::Color::CornflowerBlue);
+			TracyPlotConfig(videoActiveDecodersPlot, tracy::PlotFormatType::Number, true, false, tracy::Color::Gold);
+		}
+	} tracyPlotRegistrar;
 }
 
 const char* ToString(PlaybackState state)
@@ -93,6 +114,7 @@ struct VideoPlayer::Impl {
 			return;
 		}
 		countedDecoder = true;
+		TracyPlot(videoActiveDecodersPlot, static_cast<int64_t>(activeDecoders));
 		worker = spring::thread(&Impl::WorkerMain, this);
 	}
 
@@ -107,8 +129,10 @@ struct VideoPlayer::Impl {
 			worker.join();
 		if (pcmStream != nullptr)
 			pcmStream->Close();
-		if (countedDecoder)
+		if (countedDecoder) {
 			activeDecoders.fetch_sub(1);
+			TracyPlot(videoActiveDecodersPlot, static_cast<int64_t>(activeDecoders));
+		}
 	}
 
 	void SetError(const std::string& message)
@@ -215,7 +239,7 @@ namespace {
 		return (read == 0) ? AVERROR_EOF : read;
 	}
 
-	std::int64_t Seek(void* opaque, std::int64_t offset, int whence)
+	std::int64_t FFmpegSeekCB(void* opaque, std::int64_t offset, int whence)
 	{
 		auto* file = static_cast<CFileHandler*>(opaque);
 		if ((whence & AVSEEK_SIZE) != 0)
@@ -266,7 +290,7 @@ void VideoPlayer::Impl::WorkerMain()
 		return;
 	}
 
-	AVIOContext* io = avio_alloc_context(ioBuffer, ioBufferSize, 0, &file, ReadPacket, nullptr, Seek);
+	AVIOContext* io = avio_alloc_context(ioBuffer, ioBufferSize, 0, &file, ReadPacket, nullptr, FFmpegSeekCB);
 	if (io == nullptr) {
 		av_free(ioBuffer);
 		SetError("could not create FFmpeg VFS adapter");
@@ -430,6 +454,7 @@ void VideoPlayer::Impl::WorkerMain()
 			return true;
 		int audioResult = 0;
 		while ((audioResult = avcodec_receive_frame(audioCodecContext.get(), decodedAudio.get())) >= 0) {
+			ZoneNamedNC(tracyAudioDecodeFrame, "AudioDecodeFrame", tracy::Color::Orange, true);
 			const int outputSamples = av_rescale_rnd(
 				swr_get_delay(resampler, audioCodecContext->sample_rate) + decodedAudio->nb_samples,
 				48000, audioCodecContext->sample_rate, AV_ROUND_UP);
@@ -441,8 +466,12 @@ void VideoPlayer::Impl::WorkerMain()
 			const std::uint8_t* input[AV_NUM_DATA_POINTERS] = {};
 			for (std::size_t i = 0; i < std::size(input); ++i)
 				input[i] = decodedAudio->extended_data[i];
-			const int converted = swr_convert(resampler, output, outputSamples,
-				input, decodedAudio->nb_samples);
+			int converted = 0;
+			{
+				ZoneNamedNC(tracyAudioResample, "AudioResample", tracy::Color::DarkOrange, true);
+				converted = swr_convert(resampler, output, outputSamples,
+					input, decodedAudio->nb_samples);
+			}
 			if (converted < 0) {
 				SetError("AAC resampling failed: " + FFmpegError(converted));
 				return false;
@@ -486,9 +515,11 @@ void VideoPlayer::Impl::WorkerMain()
 
 	bool draining = false;
 	while (true) {
+		ZoneNamedNC(tracyDecodeLoop, "VideoDecodeLoop", tracy::Color::MediumAquamarine, true);
 		std::optional<std::int64_t> seekUs;
 		bool queueFull = false;
 		{
+			ZoneNamedNC(tracyVideoWait, "VideoWait", tracy::Color::DarkGoldenrod, true);
 			std::unique_lock<std::mutex> lock(mutex);
 			cv.wait_for(lock, std::chrono::milliseconds(10), [&] {
 				return shutdown || requestedSeekUs.has_value() || frames.size() < maxQueuedFrames;
@@ -503,11 +534,15 @@ void VideoPlayer::Impl::WorkerMain()
 			seekUs = requestedSeekUs;
 			requestedSeekUs.reset();
 			queueFull = !seekUs.has_value() && frames.size() >= maxQueuedFrames;
+			TracyPlot(videoFrameQueuePlot, static_cast<int64_t>(frames.size()));
+			TracyPlot(videoDroppedFramesPlot, static_cast<int64_t>(droppedFrames));
+			TracyPlot(videoPositionPlot, PositionUsLocked());
 		}
 		if (queueFull)
 			continue;
 
 		if (seekUs.has_value()) {
+			ZoneNamedNC(tracyVideoSeek, "VideoSeek", tracy::Color::Gold, true);
 			const std::int64_t clampedUs = std::clamp<std::int64_t>(*seekUs, 0, durationUs > 0 ? durationUs : *seekUs);
 			const std::int64_t target = av_rescale_q(clampedUs, AVRational{1, 1000000}, stream->time_base) + streamStart;
 			result = av_seek_frame(format.get(), videoStream, target, AVSEEK_FLAG_BACKWARD);
@@ -544,6 +579,7 @@ void VideoPlayer::Impl::WorkerMain()
 		}
 
 		if (!draining) {
+			ZoneNamedNC(tracyVideoDemux, "VideoDemux", tracy::Color::MediumPurple, true);
 			result = av_read_frame(format.get(), packet.get());
 			if (result == AVERROR_EOF) {
 				draining = true;
@@ -581,6 +617,7 @@ void VideoPlayer::Impl::WorkerMain()
 		}
 
 		while ((result = avcodec_receive_frame(codecContext.get(), decoded.get())) >= 0) {
+			ZoneNamedNC(tracyVideoDecodeFrame, "VideoDecodeFrame", tracy::Color::MediumAquamarine, true);
 			bool interlaced = false;
 #ifdef AV_FRAME_FLAG_INTERLACED
 			interlaced = (decoded->flags & AV_FRAME_FLAG_INTERLACED) != 0;
@@ -609,7 +646,10 @@ void VideoPlayer::Impl::WorkerMain()
 			output.bgra.resize(static_cast<std::size_t>(width) * height * 4);
 			std::uint8_t* destination[] = {output.bgra.data()};
 			int destinationStride[] = {width * 4};
-			sws_scale(scaler, decoded->data, decoded->linesize, 0, height, destination, destinationStride);
+			{
+				ZoneNamedNC(tracyVideoColorConvert, "VideoColorConvert", tracy::Color::DarkTurquoise, true);
+				sws_scale(scaler, decoded->data, decoded->linesize, 0, height, destination, destinationStride);
+			}
 			if (decoded->best_effort_timestamp == AV_NOPTS_VALUE) {
 				output.ptsUs = nextVideoPtsUs;
 			} else {
@@ -745,7 +785,7 @@ void VideoPlayer::Seek(double seconds)
 	if (impl->state == PlaybackState::Error || impl->state == PlaybackState::Opening)
 		return;
 	impl->seekTargetState = (impl->state == PlaybackState::Playing) ? PlaybackState::Playing : PlaybackState::Paused;
-	impl->requestedSeekUs = static_cast<std::int64_t>(std::max(0.0, seconds) * 1000000.0);
+	impl->requestedSeekUs = static_cast<std::int64_t>(std::max(0.0, static_cast<float>(seconds)) * 1000000.0f);
 	impl->state = PlaybackState::Seeking;
 	impl->cv.notify_all();
 }
