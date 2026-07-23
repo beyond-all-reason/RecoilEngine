@@ -9,6 +9,8 @@
 #include "System/FileSystem/FileHandler.h"
 #include "System/Log/ILog.h"
 
+#include <tracy/Tracy.hpp>
+
 namespace {
 	std::atomic<std::uint64_t> nextVideoHandle = 1;
 }
@@ -145,8 +147,9 @@ bool LuaVideoTextures::Exists(const std::string& name) const
 	return Get(GetHandle(name)) != nullptr;
 }
 
-GLuint LuaVideoTextures::GetTextureID(std::uint64_t handle)
+	GLuint LuaVideoTextures::GetTextureID(std::uint64_t handle)
 {
+	ZoneNamedNC(tracyGetTexID, "VideoGetTextureID", tracy::Color::MediumAquamarine, true);
 	auto* texture = Get(handle);
 	if (texture == nullptr)
 		return 0;
@@ -155,6 +158,7 @@ GLuint LuaVideoTextures::GetTextureID(std::uint64_t handle)
 	GLint previousTexture = 0;
 	glGetIntegerv(GL_TEXTURE_BINDING_2D, &previousTexture);
 	if (texture->id == 0 && info.width > 0 && info.height > 0) {
+		ZoneNamedNC(tracyGLCreate, "VideoGLCreate", tracy::Color::Gold, true);
 		texture->width = info.width;
 		texture->height = info.height;
 		glGenTextures(1, &texture->id);
@@ -180,6 +184,7 @@ GLuint LuaVideoTextures::GetTextureID(std::uint64_t handle)
 		return texture->id;
 	}
 
+	ZoneNamedNC(tracyGLUpload, "VideoGLUpload", tracy::Color::DarkTurquoise, true);
 	glBindTexture(GL_TEXTURE_2D, texture->id);
 	if (PBO::IsSupported(GL_PIXEL_UNPACK_BUFFER)) {
 		GLint previousPBO = 0;

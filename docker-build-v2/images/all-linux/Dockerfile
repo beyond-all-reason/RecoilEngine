@@ -11,7 +11,7 @@ RUN apt-get update \
  && add-apt-repository ppa:ubuntu-toolchain-r/test --yes \
  && apt-get update \
  && apt-get install --no-install-recommends --yes \
-    curl gcc-13 g++-13 git ninja-build curl p7zip-full python3-pip python3-setuptools \
+    curl gcc-13 g++-13 git ninja-build curl p7zip-full python3-pip python3-setuptools nasm \
     libopenal-dev libfreetype6-dev libfontconfig1-dev \
     libdevil-dev libdevil1c2 \
     zlib1g-dev libogg-dev libvorbis-dev libexpat1-dev \
@@ -75,7 +75,7 @@ RUN git clone https://git.ffmpeg.org/ffmpeg.git /tmp/ffmpeg \
     --enable-static --disable-shared --enable-pic --disable-programs --disable-doc --disable-network \
     --disable-avdevice --disable-avfilter --disable-postproc --disable-everything \
     --enable-avcodec --enable-avformat --enable-avutil --enable-swscale --enable-swresample \
-    --enable-decoder=h264,aac --enable-demuxer=mov --enable-parser=h264,aac \
+    --enable-decoder=h264,hevc,aac --enable-demuxer=mov --enable-parser=h264,hevc,aac \
  && make -j$(nproc) \
  && make install \
  && cp COPYING.LGPLv2.1 /build/spring-static-libs/FFMPEG-COPYING.LGPLv2.1 \
