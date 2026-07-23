@@ -84,6 +84,17 @@ include_directories(${engineIncludes})
 add_executable(engine-legacy ${EXE_FLAGS} ${engineSources} ${ENGINE_ICON} ${engineHeaders})
 target_link_libraries(engine-legacy ${engineLibraries} Game)
 
+if(ENABLE_VIDEO)
+	target_compile_definitions(engine-legacy PRIVATE RECOIL_VIDEO)
+	target_link_libraries(engine-legacy
+		FFmpeg::avformat
+		FFmpeg::avcodec
+		FFmpeg::swscale
+		FFmpeg::swresample
+		FFmpeg::avutil
+	)
+endif()
+
 # Export symbols for plugin access (replaces CMP0065 OLD behavior)
 set_target_properties(engine-legacy PROPERTIES ENABLE_EXPORTS TRUE)
 

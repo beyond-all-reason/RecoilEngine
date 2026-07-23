@@ -272,6 +272,24 @@ endif (NO_CREG)
 
 option(NO_SOUND "No sound output support" FALSE)
 
+# H.264/MP4 playback is deliberately opt-in until the release dependency
+# images and licensing artifacts contain the pinned minimal FFmpeg build.
+option(ENABLE_VIDEO "Enable H.264 video texture playback in the graphical client" FALSE)
+if(ENABLE_VIDEO)
+	# libavcodec 59 is the first supported API generation (FFmpeg 5.x).
+	find_package(FFmpeg 59 REQUIRED COMPONENTS avformat avcodec avutil swscale swresample)
+	install(FILES "${CMAKE_SOURCE_DIR}/doc/FFmpeg-video-playback.md" DESTINATION "${DOCDIR}")
+	if(FFmpeg_LICENSE_FILE AND FFmpeg_MANIFEST_FILE)
+		install(FILES
+			"${FFmpeg_LICENSE_FILE}"
+			"${FFmpeg_MANIFEST_FILE}"
+			DESTINATION "${DOCDIR}"
+		)
+	else()
+		message(WARNING "FFmpeg license/manifest not found; local builds may continue, but release packaging is incomplete")
+	endif()
+endif()
+
 if    (WIN32)
 	## internal AVI recorder (w/o sound atm)
 	option(NO_AVI "Disable in-game video recording" FALSE)

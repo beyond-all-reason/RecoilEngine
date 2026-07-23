@@ -41,6 +41,7 @@ class LuaFBOs;
 class LuaVBOs;
 class LuaVAOs;
 class LuaTextures;
+class LuaVideoTextures;
 class LuaShaders;
 class CLuaDisplayLists;
 class CLuaRules;
@@ -100,6 +101,7 @@ class CLuaHandle : public CEventClient
 #if (!defined(UNITSYNC) && !defined(DEDICATED))
 		LuaShaders& GetShaders(const lua_State* L = nullptr) { return GetLuaContextData(L)->shaders; }
 		LuaTextures& GetTextures(const lua_State* L = nullptr) { return GetLuaContextData(L)->textures; }
+		LuaVideoTextures& GetVideoTextures(const lua_State* L = nullptr) { return GetLuaContextData(L)->videoTextures; }
 		LuaFBOs& GetFBOs(const lua_State* L = nullptr) { return GetLuaContextData(L)->fbos; }
 		LuaRBOs& GetRBOs(const lua_State* L = nullptr) { return GetLuaContextData(L)->rbos; }
 		CLuaDisplayLists& GetDisplayLists(const lua_State* L = NULL) { return GetLuaContextData(L)->displayLists; }
@@ -402,6 +404,7 @@ class CLuaHandle : public CEventClient
 #if (!defined(UNITSYNC) && !defined(DEDICATED))
 		static inline LuaShaders& GetActiveShaders(lua_State* L) { return GetLuaContextData(L)->shaders; }
 		static inline LuaTextures& GetActiveTextures(lua_State* L) { return GetLuaContextData(L)->textures; }
+		static inline LuaVideoTextures& GetActiveVideoTextures(lua_State* L) { return GetLuaContextData(L)->videoTextures; }
 		static inline LuaAtlasTextures& GetActiveAtlasTextures(lua_State* L) { return GetLuaContextData(L)->atlasTextures; }
 		static inline LuaFBOs& GetActiveFBOs(lua_State* L) { return GetLuaContextData(L)->fbos; }
 		static inline LuaRBOs& GetActiveRBOs(lua_State* L) { return GetLuaContextData(L)->rbos; }

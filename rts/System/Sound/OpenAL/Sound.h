@@ -21,6 +21,7 @@
 class CSoundSource;
 class SoundBuffer;
 class SoundItem;
+class OpenALPCMStream;
 
 /// Default sound system implementation (OpenAL)
 class CSound : public ISound
@@ -41,6 +42,7 @@ public:
 	CSoundSource* GetNextBestSource(bool lock = true) override;
 
 	void NewFrame() override;
+	std::shared_ptr<IPCMStream> CreatePCMStream() override;
 	void UpdateListener(const float3& campos, const float3& camdir, const float3& camup) override {
 		myPos  = campos;
 		camDir = camdir;
@@ -112,6 +114,7 @@ private:
 
 	std::vector<SoundItem> soundItems;
 	std::vector<CSoundSource> soundSources; // fixed-size
+	std::vector<std::shared_ptr<OpenALPCMStream>> pcmStreams;
 
 	std::vector<std::uint8_t> loadBuffer;
 
