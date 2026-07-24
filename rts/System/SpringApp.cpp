@@ -1217,6 +1217,16 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 			LOG("[SpringApp::%s][SDL_EVENT_WINDOW_DISPLAY_CHANGED] to display %d\n", __func__, event.window.data1);
 			// try to reinit GL context
 			globalRendering->MakeCurrentContext(false);
+			globalRendering->RefreshHDRState(true);
+		} break;
+		case SDL_EVENT_WINDOW_HDR_STATE_CHANGED: {
+			LOG("[SpringApp::%s][SDL_EVENT_WINDOW_HDR_STATE_CHANGED]\n", __func__);
+			globalRendering->RefreshHDRState(false);
+		} break;
+		case SDL_EVENT_DISPLAY_ADDED:
+		case SDL_EVENT_DISPLAY_REMOVED: {
+			LOG("[SpringApp::%s][display hotplug] display=%u\n", __func__, event.display.displayID);
+			globalRendering->RefreshHDRState(true);
 		} break;
 
 		case SDL_EVENT_WINDOW_CLOSE_REQUESTED: {

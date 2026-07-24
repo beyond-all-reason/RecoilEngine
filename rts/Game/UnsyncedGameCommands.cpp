@@ -2515,6 +2515,18 @@ public:
 	}
 };
 
+class HDRScreenShotActionExecutor : public IUnsyncedActionExecutor {
+public:
+	HDRScreenShotActionExecutor()
+		: IUnsyncedActionExecutor("ScreenShotHDR", "Capture the scene-linear HDR render target as a Radiance .hdr image")
+	{}
+
+	bool Execute(const UnsyncedAction&) const final {
+		TakeHDRScreenshot();
+		return true;
+	}
+};
+
 
 
 class GrabInputActionExecutor : public IUnsyncedActionExecutor {
@@ -4186,6 +4198,7 @@ void UnsyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<IncreaseGUIOpacityActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<DecreaseGUIOpacityActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<ScreenShotActionExecutor>());
+	AddActionExecutor(AllocActionExecutor<HDRScreenShotActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<GrabInputActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<ClockActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<CrossActionExecutor>());

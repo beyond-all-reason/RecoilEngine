@@ -304,6 +304,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetPlayerStatistics);
 
 	REGISTER_LUA_CFUNC(GetDrawSelectionInfo);
+	REGISTER_LUA_CFUNC(GetHDRInfo);
 
 	REGISTER_LUA_CFUNC(GetConfigParams);
 	REGISTER_LUA_CFUNC(GetConfigInt);
@@ -1153,6 +1154,71 @@ int LuaUnsyncedRead::GetSelectionBox(lua_State* L)
 int LuaUnsyncedRead::GetDrawSelectionInfo(lua_State* L)
 {
 	lua_pushboolean(L, guihandler ? guihandler->GetDrawSelectionInfo() : 0);
+	return 1;
+}
+
+/**
+ * Returns versioned HDR capability, window, framebuffer, and pipeline state.
+ *
+ * This is intentionally unsynced. Older engines can be detected with
+ * `Engine.FeatureSupport.hdrOutputApiVersion`.
+ *
+ * @function Spring.GetHDRInfo
+ * @return table hdrInfo
+ */
+int LuaUnsyncedRead::GetHDRInfo(lua_State* L)
+{
+	const CGlobalRendering::HDRState& hdr = globalRendering->GetHDRState();
+
+	lua_createtable(L, 0, 22);
+	LuaPushNamedNumber(L, "apiVersion", 1);
+	LuaPushNamedNumber(L, "generation", hdr.generation);
+	LuaPushNamedString(L, "state", globalRendering->GetHDRUserState());
+	LuaPushNamedString(L, "capability", CGlobalRendering::HDRCapabilityToString(hdr.displayCapability));
+	LuaPushNamedString(L, "requestedMode", CGlobalRendering::HDRModeToString(hdr.requestedMode));
+	LuaPushNamedString(L, "effectiveMode", CGlobalRendering::HDROutputModeToString(hdr.effectiveMode));
+	LuaPushNamedString(L, "inactiveReason", CGlobalRendering::HDRInactiveReasonToString(hdr.inactiveReason));
+	LuaPushNamedNumber(L, "currentDisplay", hdr.currentDisplayIndex);
+	LuaPushNamedNumber(L, "currentDisplayID", hdr.currentDisplayID);
+	if (hdr.osHdrStateKnown)
+		LuaPushNamedBool(L, "osHdrEnabled", hdr.osHdrEnabled);
+	LuaPushNamedBool(L, "windowHdrEnabled", hdr.windowHdrEnabled);
+	LuaPushNamedNumber(L, "sdrWhiteLevel", hdr.sdrWhiteLevel);
+	LuaPushNamedNumber(L, "hdrHeadroom", hdr.hdrHeadroom);
+	LuaPushNamedBool(L, "floatFramebufferRequested", hdr.floatFramebufferRequested);
+	LuaPushNamedBool(L, "floatFramebufferActive", hdr.floatFramebufferActive);
+	LuaPushNamedBool(L, "pipelineHdrActive", hdr.pipelineHdrActive);
+	LuaPushNamedBool(L, "sceneTargetActive", globalRendering->IsSceneTargetActive());
+	LuaPushNamedString(L, "sceneColorTexture", "$scene_color");
+	LuaPushNamedString(L, "sceneDepthTexture", "$scene_depth");
+	LuaPushNamedString(L, "hdrScreenshotFormat", "radiance-hdr-linear-srgb");
+
+	lua_pushliteral(L, "framebuffer");
+	lua_createtable(L, 0, 8);
+		LuaPushNamedNumber(L, "redBits", hdr.framebufferBits[0]);
+		LuaPushNamedNumber(L, "greenBits", hdr.framebufferBits[1]);
+		LuaPushNamedNumber(L, "blueBits", hdr.framebufferBits[2]);
+		LuaPushNamedNumber(L, "alphaBits", hdr.framebufferBits[3]);
+		LuaPushNamedNumber(L, "depthBits", hdr.framebufferBits[4]);
+		LuaPushNamedNumber(L, "stencilBits", hdr.framebufferBits[5]);
+		LuaPushNamedNumber(L, "samples", hdr.framebufferBits[6]);
+		LuaPushNamedBool(L, "floatingPoint", hdr.framebufferBits[7] != 0);
+	lua_rawset(L, -3);
+
+	lua_pushliteral(L, "displays");
+	lua_createtable(L, hdr.displays.size(), 0);
+	for (const CGlobalRendering::HDRDisplayInfo& display : hdr.displays) {
+		lua_createtable(L, 0, 6);
+			LuaPushNamedNumber(L, "id", display.id);
+			LuaPushNamedNumber(L, "index", display.index);
+			LuaPushNamedString(L, "name", display.name);
+			LuaPushNamedString(L, "capability", CGlobalRendering::HDRCapabilityToString(display.capability));
+			if (display.osHdrStateKnown)
+				LuaPushNamedBool(L, "osHdrEnabled", display.osHdrEnabled);
+		lua_rawseti(L, -2, display.index + 1);
+	}
+	lua_rawset(L, -3);
+
 	return 1;
 }
 

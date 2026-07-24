@@ -91,6 +91,8 @@ LuaMatTexture::Type LuaOpenGLUtils::GetLuaMatTextureType(const std::string& name
 
 		case hashString("$info" ): { return LuaMatTexture::LUATEX_INFOTEX_ACTIVE; } break;
 		case hashString("$extra"): { return LuaMatTexture::LUATEX_INFOTEX_ACTIVE; } break;
+		case hashString("$scene_color"): { return LuaMatTexture::LUATEX_SCENE_COLOR; } break;
+		case hashString("$scene_depth"): { return LuaMatTexture::LUATEX_SCENE_DEPTH; } break;
 
 		case hashString("$map_gb_nt"): { return LuaMatTexture::LUATEX_MAP_GBUFFER_NORM; } break;
 		case hashString("$map_gb_dt"): { return LuaMatTexture::LUATEX_MAP_GBUFFER_DIFF; } break;
@@ -625,6 +627,12 @@ GLuint LuaMatTexture::GetTextureID() const
 			if (infoTextureHandler != nullptr)
 				texID = infoTextureHandler->GetCurrentInfoTexture();
 		} break;
+		case LUATEX_SCENE_COLOR: {
+			texID = globalRendering->GetSceneColorTexture();
+		} break;
+		case LUATEX_SCENE_DEPTH: {
+			texID = globalRendering->GetSceneDepthTexture();
+		} break;
 
 
 		// g-buffer textures
@@ -744,7 +752,9 @@ GLuint LuaMatTexture::GetTextureTarget() const
 
 
 		case LUATEX_INFOTEX_SUFFIX: [[fallthrough]];
-		case LUATEX_INFOTEX_ACTIVE: {
+		case LUATEX_INFOTEX_ACTIVE: [[fallthrough]];
+		case LUATEX_SCENE_COLOR: [[fallthrough]];
+		case LUATEX_SCENE_DEPTH: {
 			texType = GL_TEXTURE_2D;
 		} break;
 
@@ -991,6 +1001,10 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 				auto sz = infoTextureHandler->GetCurrentInfoTextureSize();
 				return ReturnHelper(sz.x, sz.y);
 			}
+		} break;
+		case LUATEX_SCENE_COLOR:
+		case LUATEX_SCENE_DEPTH: {
+			return ReturnHelper(globalRendering->winSizeX, globalRendering->winSizeY);
 		} break;
 
 
