@@ -180,7 +180,7 @@ void CModInfo::Init(const std::string& modFileName)
 	parser.Execute();
 
 	if (!parser.IsValid())
-		LOG_L(L_ERROR, "[ModInfo::%s] error \"%s\" loading mod-rules, using defaults", __func__, parser.GetErrorLog().c_str());
+		throw content_error(fmt::format("Failed to load gamedata/modrules.lua: {}", parser.GetErrorLog()));
 
 	const LuaTable& root = parser.GetRoot();
 
