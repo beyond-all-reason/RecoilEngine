@@ -1489,6 +1489,8 @@ bool CGame::Draw() {
 		lastGameFrame = gs->frameNum;
 	}
 
+	globalRendering->BeginSceneFrame();
+
 	//FIXME move both to UpdateUnsynced?
 	CTeamHighlight::Enable(spring_tomsecs(currentTimePreDraw));
 	{
@@ -1514,7 +1516,10 @@ bool CGame::Draw() {
 		if (CUnitDrawer::UseScreenIcons())
 			unitDrawer->DrawUnitIconsScreen();
 
+		globalRendering->ResolveSceneFrame();
 		eventHandler.DrawScreenEffects();
+		globalRendering->PresentScene();
+		globalRendering->BeginUIFrame();
 
 		hudDrawer->Draw((gu->GetMyPlayer())->fpsController.GetControllee());
 		debugDrawerAI->Draw();
@@ -1526,6 +1531,7 @@ bool CGame::Draw() {
 		mouse->DrawCursor();
 
 		eventHandler.DrawScreenPost();
+		globalRendering->PresentUI();
 	}
 
 	glEnable(GL_DEPTH_TEST);
@@ -2204,4 +2210,3 @@ const ActionList& CGame::GetLastActionList()
 {
 	return gameInputReceiver.lastActionList;
 }
-

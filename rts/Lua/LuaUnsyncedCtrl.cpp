@@ -55,6 +55,7 @@
 #include "Rendering/Env/Particles/Classes/NanoProjectile.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/CommandDrawer.h"
+#include "Rendering/Screenshot.h"
 #include "Rendering/IconHandler.h"
 #include "Rendering/Models/IModelParser.h"
 #include "Rendering/Features/FeatureDrawer.h"
@@ -134,6 +135,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(Ping);
 	REGISTER_LUA_CFUNC(Echo);
 	REGISTER_LUA_CFUNC(Log);
+	REGISTER_LUA_CFUNC(TakeScreenshot);
 
 	REGISTER_LUA_CFUNC(SendMessage);
 	REGISTER_LUA_CFUNC(SendMessageToPlayer);
@@ -507,6 +509,30 @@ int LuaUnsyncedCtrl::Echo(lua_State* L)
 int LuaUnsyncedCtrl::Log(lua_State* L)
 {
 	return LuaUtils::Log(L);
+}
+
+/**
+ * Captures either the final SDR presentation or the scene-linear HDR target.
+ *
+ * @function Spring.TakeScreenshot
+ * @param mode ("sdr"|"hdr")?
+ * @param format string? SDR image extension, defaults to "png"
+ * @param quality integer? SDR encoder quality from 1 through 99
+ */
+int LuaUnsyncedCtrl::TakeScreenshot(lua_State* L)
+{
+	const std::string mode = StringToLower(luaL_optstring(L, 1, "sdr"));
+	if (mode == "hdr") {
+		TakeHDRScreenshot();
+		return 0;
+	}
+	if (mode != "sdr")
+		return luaL_error(L, "TakeScreenshot mode must be \"sdr\" or \"hdr\"");
+
+	const std::string format = luaL_optstring(L, 2, "png");
+	const unsigned quality = std::clamp(luaL_optint(L, 3, 80), 1, 99);
+	::TakeScreenshot(format, quality);
+	return 0;
 }
 
 

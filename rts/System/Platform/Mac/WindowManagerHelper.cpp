@@ -6,6 +6,11 @@
 
 namespace WindowManagerHelper {
 
+AdvancedColorInfo GetAdvancedColorInfo(uint32_t)
+{
+	return {};
+}
+
 void BlockCompositing(SDL_Window* window)
 {
 	//FIXME implement?
