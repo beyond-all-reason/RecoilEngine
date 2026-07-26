@@ -33,7 +33,7 @@ defaults:
 
 env:
   MAP: "Jade Empress 1.41"
-  GAME: "Beyond All Reason test-30707-555e3a1"
+  GAME: "Beyond All Reason test-30770-4e0b241"
   HASH_FILE: "synctest_synchash.json"
 
 jobs:

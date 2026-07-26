@@ -28,7 +28,7 @@ sed -e "s/@VERSION@/${GAME##* }/g" -e "s/@MAPNAME@/$MAP/g" \
 spring-headless --isolation --write-dir ./bar-data startscript.txt
 ```
 
-A successful run exits 0 at game frame ~2100 (the startscript's trailing `quitforce`) and leaves `bar-data/synctest_synchash.json` — a JSON file whose `digest` field is what CI compares.
+A successful run exits 0 at game frame ~2200 (the startscript's trailing `quitforce`) and leaves `bar-data/synctest_synchash.json` — a JSON file whose `digest` field is what CI compares.
 
 ## Bumping the pinned BAR version
 
@@ -45,4 +45,4 @@ A trailing `quitforce` in the startscript's `debugcommands` is required so the e
 
 `debugcommands` disables LuaUI at frame 4, before any units are spawned. This is required for the test to be reproducible.
 
-BAR's LuaUI widgets are unsynced but issue orders into the simulation — for example `unit_bombers_default_hold_fire.lua` calls `Spring.GiveOrderToUnit` from `widget:UnitCreated` for every bomber produced. Orders issued from unsynced code become network commands, so the frame on which they take effect depends on wall-clock scheduling. Two runs with identical inputs then diverge: a bomber flips to Hold Fire on frame 53 in one run and frame 54 in the next, and everything downstream follows.
+BAR's LuaUI widgets are unsynced but issue orders into the simulation, so for example `unit_bombers_default_hold_fire.lua` calls `Spring.GiveOrderToUnit` for every bomber created. Orders issued from unsynced code become network commands, so the frame on which they take effect depends on wall-clock scheduling. Two runs with identical inputs then diverge: a bomber flips to Hold Fire on frame 53 in one run and frame 54 in the next, and everything downstream follows.

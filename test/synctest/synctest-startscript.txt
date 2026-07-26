@@ -26,7 +26,7 @@
     }
     [modoptions]
     {
-        debugcommands=2:cheat|3:globallos|4:luaui disable|15:luarules synctest 2000 0.33 0.33 0.1 0.5|20:setspeed 20|21:speedcontrol 0|2100:quitforce;
+        debugcommands=2:cheat|3:globallos|4:luaui disable|15:luarules synctest 2000 0.33 0.33 0.1 0.5 100|20:setspeed 20|21:speedcontrol 0|2200:quitforce;
     }
     [player0]
     {
