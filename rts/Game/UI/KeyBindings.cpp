@@ -681,7 +681,7 @@ bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 		return false;
 
 	ActionList& al = it->second;
-	const bool success = RemoveCommandFromList(al, command);
+	const bool success = RemoveCommandFromList(al, kc, command);
 
 	if (al.empty())
 		bindings.erase(it);
@@ -806,6 +806,30 @@ bool CKeyBindings::RemoveCommandFromList(ActionList& al, const std::string& comm
 
 	while (it != al.end()) {
 		if (it->command == command) {
+			it = al.erase(it);
+			success = true;
+		} else {
+			++it;
+		}
+	}
+
+	return success;
+}
+
+
+// Chains are stored under their last keyset, so a bucket holds every chain length
+// ending in that key. Requiring an equal length keeps unbinding one key from also
+// dropping longer chains that share it; fit() rather than == so a keyset that Bind
+// forced AnyMod onto still matches.
+bool CKeyBindings::RemoveCommandFromList(ActionList& al, const CKeyChain& kc, const std::string& command)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	bool success = false;
+
+	auto it = al.begin();
+
+	while (it != al.end()) {
+		if (it->command == command && it->keyChain.size() == kc.size() && it->keyChain.fit(kc)) {
 			it = al.erase(it);
 			success = true;
 		} else {
