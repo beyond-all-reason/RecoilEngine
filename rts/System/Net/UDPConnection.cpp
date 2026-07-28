@@ -301,6 +301,7 @@ void UDPConnection::Init()
 
 	lastNak = -1;
 	accumulatedStats = {};
+	highestCountedMissingChunk = -1;
 	mtu = globalConfig.mtu;
 	reconnectTime = globalConfig.reconnectTimeout;
 
@@ -556,7 +557,7 @@ void UDPConnection::ProcessRawPacket(Packet& incoming)
 
 					if (unAckPos >= 0 && unAckPos < unackedOutgoingChunks.size()) {
 						assert(unackedOutgoingChunks[unAckPos]->chunkNumber == nextCont + i);
-						RequestResend(unackedOutgoingChunks[unAckPos], true);
+						RequestResend(unackedOutgoingChunks[unAckPos], true, true);
 					}
 				}
 			} else if (incoming.nakType > 0) {
@@ -576,7 +577,7 @@ void UDPConnection::ProcessRawPacket(Packet& incoming)
 
 					if (unAckPos < unackedOutgoingChunks.size()) {
 						assert(unackedOutgoingChunks[unAckPos]->chunkNumber == (nextCont + incoming.naks[i]));
-						RequestResend(unackedOutgoingChunks[unAckPos], true);
+						RequestResend(unackedOutgoingChunks[unAckPos], true, true);
 					}
 
 					++unAckPos;
@@ -820,6 +821,7 @@ ConnectionStats UDPConnection::GetStats() const
 	stats.live.outgoingResendQueueDepth = resendRequested.size();
 	stats.live.incomingReorderQueueDepth = waitingPackets.size();
 	stats.live.outgoingQueueBytes = OutgoingQueuedBytes();
+	stats.live.lossFactor = netLossFactor;
 	return stats;
 }
 
@@ -874,6 +876,17 @@ void UDPConnection::SendIfNecessary(bool flushed)
 			droppedPackets.pop_back();
 		}
 
+		// droppedPackets still lists a gap on every pass until the gap is filled.
+		// Chunk numbers only ascend, so we can dedupe by only counting above the
+		// highest chunk we've seen so far.
+		if (StatsSampling()) {
+			for (const int missingChunkNum: droppedPackets) {
+				if (missingChunkNum <= highestCountedMissingChunk)
+					continue;
+				highestCountedMissingChunk = missingChunkNum;
+				accumulatedStats.missingIncomingChunks += 1;
+			}
+		}
 
 		unsigned int numContinuous = 0;
 
@@ -900,7 +913,7 @@ void UDPConnection::SendIfNecessary(bool flushed)
 		// resend last packet if we didn't get an ack within reasonable time
 		// and don't plan sending out a new chunk either
 		if (newChunks.empty())
-			RequestResend(*unackedOutgoingChunks.rbegin(), false);
+			RequestResend(*unackedOutgoingChunks.rbegin(), false, true);
 
 		lastUnackResentTime = curTime;
 	}
@@ -984,6 +997,9 @@ void UDPConnection::SendIfNecessary(bool flushed)
 			resend = !resend;
 
 			if (resend && canResend) {
+				// the branches below push at most one chunk
+				const size_t numChunksBefore = buf.chunks.size();
+
 				if (UseMinLossFactor()) {
 					if (erasedResendChunks.find(resFwdIter->first) == erasedResendChunks.end())
 						buf.chunks.push_back(resFwdIter->second);
@@ -1014,7 +1030,13 @@ void UDPConnection::SendIfNecessary(bool flushed)
 					rev = (rev + 1) % 4;
 				}
 
-				accumulatedStats.resentOutgoingChunks += 1;
+				// separate "loss" as specifically a link-quality signal, excluding our explicit duplication policy
+				if (buf.chunks.size() > numChunksBefore) {
+					if (buf.chunks.back()->lossSuspected)
+						accumulatedStats.resentOutgoingChunks += 1;
+					else
+						accumulatedStats.redundantOutgoingChunks += 1;
+				}
 				maxResend -= 1;
 
 				sent = true;
@@ -1043,7 +1065,7 @@ void UDPConnection::SendIfNecessary(bool flushed)
 
 	// on a lossy connection chunks can be sent multiple times, see switch above
 	for (int i = unackPrevSize; i < unackedOutgoingChunks.size(); ++i) {
-		RequestResend(unackedOutgoingChunks[i], true);
+		RequestResend(unackedOutgoingChunks[i], true, false);
 	}
 
 	UpdateResendRequests();
@@ -1085,8 +1107,10 @@ void UDPConnection::AckChunks(int lastAck)
 	}
 }
 
-void UDPConnection::RequestResend(ChunkPtr ptr, bool noSort)
+void UDPConnection::RequestResend(const ChunkPtr& ptr, bool noSort, bool lossSuspected)
 {
+	ptr->lossSuspected |= lossSuspected;
+
 	resendRequested.emplace_back(ptr->chunkNumber, ptr);
 
 	if (noSort)
