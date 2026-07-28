@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include <string>
+
+#include "ServerHealthMetrics.h"
 #include "System/Misc/SpringTime.h"
 
 class CGameServer;
@@ -22,7 +25,10 @@ class CGameServer;
 class ServerMetrics
 {
 public:
-	void Init();
+	/**
+	 * @param gameIDHex identity label for recoil_server_info.
+	 */
+	void Init(const std::string& gameIDHex);
 
 	/**
 	 * @brief stop the endpoint and drop the registry
@@ -37,7 +43,11 @@ public:
 	/// call per loop
 	void Update(const CGameServer& server);
 
+	void SetGameStartTime(double unixSecs);
+
 private:
+	ServerHealthMetrics healthMetrics;
+
 	/// while false (during startup or metrics disabled), Update() is a no-op
 	bool registered = false;
 
