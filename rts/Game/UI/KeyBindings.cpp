@@ -673,6 +673,11 @@ bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s] keystr=%s command=%s", __func__, keystr.c_str(), command.c_str());
 
+	/* Bind does the same to the stored chain, so mirror it
+	 * here or a stateful bind can never be named exactly. */
+	if (statefulCommands.find(command) != statefulCommands.end())
+		kc.back().SetAnyBit();
+
 	const CKeySet& ks = kc.back();
 	KeyMap& bindings = ks.IsKeyCode() ? codeBindings : scanBindings;
 	const auto it = bindings.find(ks);
@@ -817,27 +822,20 @@ bool CKeyBindings::RemoveCommandFromList(ActionList& al, const std::string& comm
 }
 
 
-// Chains are stored under their last keyset, so a bucket holds every chain length
-// ending in that key. Requiring an equal length keeps unbinding one key from also
-// dropping longer chains that share it; fit() rather than == so a keyset that Bind
-// forced AnyMod onto still matches.
+/* Chains are stored under their last keyset, so
+ * a bucket holds every chain ending in that key. */
 bool CKeyBindings::RemoveCommandFromList(ActionList& al, const CKeyChain& kc, const std::string& command)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	bool success = false;
 
-	auto it = al.begin();
+	const auto removedCount = std::erase_if(al, [&kc, &command] (const auto& x) {
+		/* exact compare, not .fit(): naming one modifier
+		 * combination must not remove a different one.
+		 * operator== also rejects differing chain lengths. */
+		return x.command == command && x.keyChain == kc;
+	});
 
-	while (it != al.end()) {
-		if (it->command == command && it->keyChain.size() == kc.size() && it->keyChain.fit(kc)) {
-			it = al.erase(it);
-			success = true;
-		} else {
-			++it;
-		}
-	}
-
-	return success;
+	return removedCount > 0;
 }
 
 
