@@ -107,7 +107,7 @@ public:
 
 	unsigned int GetPacketQueueSize() const override { return msgQueue.size(); }
 
-	std::string Statistics() const override;
+	ConnectionStats GetStats() const override;
 	std::string GetFullAddress() const override;
 
 	void Update() override;
@@ -193,7 +193,7 @@ private:
 	/// Newly created and not yet sent
 	std::deque<ChunkPtr> newChunks;
 	/// packets the other side did not ack'ed until now
-	std::deque<ChunkPtr> unackedChunks;
+	std::deque<ChunkPtr> unackedOutgoingChunks;
 
 	/// Packets the other side missed
 	std::vector< std::pair<std::int32_t, ChunkPtr> > resendRequested;
@@ -238,8 +238,8 @@ private:
 	unsigned int currentPacketChunkNum;
 
 	/// packets that are resent
-	unsigned int resentChunks;
-	unsigned int droppedChunks;
+	unsigned int resentOutgoingChunks;
+	unsigned int duplicateIncomingChunks;
 
 	unsigned int sentOverhead, recvOverhead;
 	unsigned int sentPackets, recvPackets;
