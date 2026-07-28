@@ -349,8 +349,12 @@ endif()
 			${test_Common_sources}
 		)
 
+	# plain `z` resolves to `-lz`, which the mingw cross-linker cannot find:
+	# on Windows zlib comes from mingwlibs64, so go through the imported target
+	find_package_static(ZLIB 1.2.7 REQUIRED)
+
 	set(test_libs
-			z
+			ZLIB::ZLIB
 		)
 
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
