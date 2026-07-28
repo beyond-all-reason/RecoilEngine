@@ -434,10 +434,17 @@ PacketType CBaseNetProtocol::SendLogMsg(uint8_t playerNum, uint8_t logMsgLvl, co
 	*packet << static_cast<uint16_t>(packetSize) << playerNum << logMsgLvl << strData;
 	return PacketType(packet);
 }
-
-PacketType CBaseNetProtocol::SendLuaMsg(uint8_t playerNum, uint16_t script, uint8_t mode, const std::vector<uint8_t>& rawData)
+/* 
+* @param playerNum     ID of player sending the message, 0-251. 
+* @param script        ScriptID as defined in LuaHandle.h, details what "type" of luamsg being sent (and how recipient(s) should handle)
+* @param recipientID   Who the message is intended for (e.g. all players ('\0', specific player (0-251), allies ('a'), spectators ('s'))
+* @param rawData       Raw byte data to be sent to recipient(s), interpretation behavior up to ScriptID
+*
+* Packs LuaMsgData into PackPacket object, wrapped in a PacketType (shared ptr)
+*/
+PacketType CBaseNetProtocol::SendLuaMsg(uint8_t playerNum, uint16_t script, uint8_t recipientId, const std::vector<uint8_t>& rawData)
 {
-	const uint32_t payloadSize = sizeof(playerNum) + sizeof(script) + sizeof(mode) + rawData.size();
+	const uint32_t payloadSize = sizeof(playerNum) + sizeof(script) + sizeof(recipientId) + rawData.size();
 	const uint32_t headerSize = sizeof(uint8_t) + sizeof(uint16_t);
 	const uint32_t packetSize = headerSize + payloadSize;
 
@@ -445,7 +452,7 @@ PacketType CBaseNetProtocol::SendLuaMsg(uint8_t playerNum, uint16_t script, uint
 		throw netcode::PackPacketException("[BaseNetProto::SendLuaMsg] maximum packet-size exceeded");
 
 	PackPacket* packet = new PackPacket(packetSize, NETMSG_LUAMSG);
-	*packet << static_cast<uint16_t>(packetSize) << playerNum << script << mode << rawData;
+	*packet << static_cast<uint16_t>(packetSize) << playerNum << script << recipientId << rawData;
 	return PacketType(packet);
 }
 

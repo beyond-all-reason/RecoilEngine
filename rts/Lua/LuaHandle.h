@@ -23,10 +23,17 @@
 #define LUA_HANDLE_ORDER_UNITS_UNSYNCED  1200
 #define LUA_HANDLE_ORDER_GAIA_UNSYNCED   1300
 #define LUA_HANDLE_ORDER_UI              2000
+#define LUA_HANDLE_ORDER_UI_SINGLE		 2100
 #define LUA_HANDLE_ORDER_INTRO           3000
 #define LUA_HANDLE_ORDER_MENU            4000
 
 #define MAX_LUA_COB_ARGS 10
+
+enum LUAMSG_TYPES: uint8_t {
+	EVERYONE = '\0',
+	ALLIES = 'a',
+	SPECTATORS = 's'
+};
 
 class CUnit;
 class CWeapon;
@@ -47,6 +54,7 @@ class CLuaRules;
 class CLuaUI;
 struct WeaponDef;
 class CCobDeferredCallin;
+
 
 
 class CLuaHandle : public CEventClient

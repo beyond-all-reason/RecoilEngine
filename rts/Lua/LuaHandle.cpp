@@ -23,6 +23,7 @@
 #include "Game/GlobalUnsynced.h"
 #include "Game/Players/Player.h"
 #include "Game/Players/PlayerHandler.h"
+#include "Game/ChatMessage.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Net/Protocol/NetProtocol.h"
 #include "Game/UI/KeySet.h"
@@ -2445,7 +2446,7 @@ void CLuaHandle::SwapEnableModule(lua_State* L, bool enabled, const char* module
 }
 
 
-void CLuaHandle::HandleLuaMsg(int playerID, int script, int mode, const std::vector<std::uint8_t>& data)
+void CLuaHandle::HandleLuaMsg(int playerID, int script, int recipientId, const std::vector<std::uint8_t>& data)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	std::string msg;
@@ -2453,14 +2454,18 @@ void CLuaHandle::HandleLuaMsg(int playerID, int script, int mode, const std::vec
 	std::copy(data.begin(), data.end(), msg.begin());
 
 	switch (script) {
-		case LUA_HANDLE_ORDER_UI: {
+		case LUA_HANDLE_ORDER_UI_SINGLE: { // expects a playerID between 0 to MAX_PLAYERS, check globalconstants.h for details
+			if (luaUI != nullptr && recipientId == gu->myPlayerNum) {
+				luaUI->RecvLuaMsg(msg, playerID);
+			}
+		} break;
+		case LUA_HANDLE_ORDER_UI: { // expecting '\0', 'a', 's', check luahandle.h for enum 
 			if (luaUI != nullptr) {
 				bool sendMsg = false;
-
-				switch (mode) {
-					case 0: { sendMsg = true; } break;
-					case 's': { sendMsg = gu->spectating; } break;
-					case 'a': {
+				switch (recipientId) {
+					case LUAMSG_TYPES::EVERYONE: { sendMsg = true; } break;
+					case LUAMSG_TYPES::SPECTATORS: { sendMsg = gu->spectating; } break; 
+					case LUAMSG_TYPES::ALLIES: {										 
 						const CPlayer* player = playerHandler.Player(playerID);
 
 						if (player == nullptr)

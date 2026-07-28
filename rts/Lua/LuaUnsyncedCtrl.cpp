@@ -3797,23 +3797,42 @@ int LuaUnsyncedCtrl::SetBuildFacing(lua_State* L)
 
 
 /*** @function Spring.SendLuaUIMsg
- * @param message string
- * @param mode string "s"/"specs" | "a"/"allies"
+ * @param message   string Lua Message to be sent. 
+ * @param mode      string/number, mode designator/recipient id. expects none (everyone) | "s"/"specs" | "a"/"allies" | playerID (0-255)
  * @return nil
+ * 
  */
 int LuaUnsyncedCtrl::SendLuaUIMsg(lua_State* L)
 {
 	const std::string msg = luaL_checksstring(L, 1);
 	const std::vector<std::uint8_t> data(msg.begin(), msg.end());
 
-	const char* mode = luaL_optstring(L, 2, "");
+	int recipientID = -1; 
+	int scriptID = -1;
 
-	if (mode[0] != 0 && mode[0] != 'a' && mode[0] != 's')
-		luaL_error(L, "Unknown SendLuaUIMsg() mode");
+	if (lua_israwstring(L, 2) || lua_isnoneornil(L, 2)) { // make none/nil valid, exists usage w/ no 2nd arg
+		const char* mode = luaL_optstring(L, 2, ""); // if no arg, outputs "" where mode[0] resolves to '\0'
+		if (mode[0] != 'a' && mode[0] != 's' && mode[0] != '\0') {
+			luaL_error(L, "Invalid recipient argument for SendLuaUIMsg received: %s", mode[0]);
+		}
+		recipientID = mode[0]; 
+		scriptID = LUA_HANDLE_ORDER_UI;
+
+	} else if (lua_israwnumber(L, 2)) {
+		recipientID = lua_tonumber(L, 2);
+		if (recipientID < 0 || recipientID > MAX_PLAYERS) {
+			luaL_error(L, "Invalid player ID sent (%d received, expecting between 0-%d): ", recipientID, (int) MAX_PLAYERS);
+		}
+		scriptID = LUA_HANDLE_ORDER_UI_SINGLE;
+
+	} else {
+		luaL_error(L, "SendLuaUIMsg() recipientID must raw integer or string: %s", luaL_typename(L, 2));
+	}
 
 	try {
-		clientNet->Send(CBaseNetProtocol::Get().SendLuaMsg(gu->myPlayerNum, LUA_HANDLE_ORDER_UI, mode[0], data));
-	} catch (const netcode::PackPacketException& ex) {
+		clientNet->Send(CBaseNetProtocol::Get().SendLuaMsg(gu->myPlayerNum, scriptID, recipientID, data));
+	}
+	catch (const netcode::PackPacketException& ex) {
 		luaL_error(L, "SendLuaUIMsg() packet error: %s", ex.what());
 	}
 
