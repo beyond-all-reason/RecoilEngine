@@ -18,15 +18,21 @@ target_link_libraries(Game PRIVATE
 	 ${sound-impl}
 	 prd::jsoncpp
 	 streflop
+	 fmt::fmt
 )
 
 ### Assemble libraries
 find_package(SDL2 MODULE REQUIRED)
+
+
+
+
+
 set(engineLibraries SDL2::SDL2)
 
 set(OpenGL_GL_PREFERENCE LEGACY)
 find_package_static(OpenGL 3.0 REQUIRED)
-list(APPEND engineLibraries OpenGL::GL OpenGL::GLU)
+list(APPEND engineLibraries OpenGL::GL)
 
 find_fontconfig_hack()
 find_package_static(Fontconfig 2.11 REQUIRED)
@@ -43,7 +49,7 @@ find_freetype_hack() # hack to find different named freetype.dll
 find_package_static(Freetype 2.8.1 REQUIRED)
 list(APPEND engineLibraries Freetype::Freetype)
 
-if    (UNIX)
+if    (UNIX AND NOT APPLE)
 	find_package(X11 REQUIRED)
 	target_link_libraries(Game PRIVATE X11::Xcursor)
 	list(APPEND engineLibraries ${X11_Xcursor_LIB} ${X11_X11_LIB})
@@ -77,6 +83,13 @@ include_directories(${engineIncludes})
 ### Build the executable
 add_executable(engine-legacy ${EXE_FLAGS} ${engineSources} ${ENGINE_ICON} ${engineHeaders})
 target_link_libraries(engine-legacy ${engineLibraries} Game)
+
+# Export symbols for plugin access (replaces CMP0065 OLD behavior)
+set_target_properties(engine-legacy PROPERTIES ENABLE_EXPORTS TRUE)
+
+if(MSVC)
+    target_link_libraries(engine-legacy engine-natvis)
+endif()
 
 
 ### Install the executable

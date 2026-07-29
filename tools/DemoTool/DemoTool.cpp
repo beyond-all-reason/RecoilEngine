@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <cstdint>
 #include <string>
 #include <map>
 #include <iostream>
@@ -25,7 +26,7 @@ no console output (you still could use this.exe > z.tzt though).
 */
 
 	DEFINE_string(demofile,     "",    "Path to demo file");
-	DEFINE_bool  (dump,         false, "Only dump networc traffic saved in demo");
+	DEFINE_bool  (dump,         false, "Only dump network traffic saved in demo");
 	DEFINE_bool  (stats,        false, "Print all game, player and team stats");
 	DEFINE_bool  (header,       false, "Print demoheader content");
 	DEFINE_bool  (playerstats,  false, "Print playerstats");
@@ -417,7 +418,7 @@ void TrafficDump(CDemoReader& reader, bool trafficStats)
 				//uchar myPlayerNum; int frameNum; uint checksum;
 				std::cout << "NETMSG_SYNCRESPONSE: Playernum: "<< (unsigned)buffer[1];
 				std::cout << " Framenum: " << *(int*)(buffer+2);
-				std::cout << " Checksum: " << (unsigned)buffer[6];
+				std::cout << " Checksum: " << *(uint32_t*)(buffer+6);
 				std::cout << std::endl;
 				break;
 			case NETMSG_DIRECT_CONTROL:

@@ -4,6 +4,7 @@
 #define EVENT_CLIENT_H
 
 #include <algorithm>
+#include <map>
 #include <typeinfo>
 #include <string>
 #include <vector>
@@ -35,6 +36,7 @@ struct BuildInfo;
 struct FeatureDef;
 class LuaMaterial;
 struct WeaponDef;
+struct SResourcePack;
 
 #ifndef zipFile
 	// might be defined through zip.h already
@@ -122,6 +124,8 @@ class CEventClient
 
 		virtual void TeamDied(int teamID) {}
 		virtual void TeamChanged(int teamID) {}
+		virtual bool ResourceExcess(const std::map <int, SResourcePack>& excess) { return false; }
+
 		virtual void PlayerChanged(int playerID) {}
 		virtual void PlayerAdded(int playerID) {}
 		virtual void PlayerRemoved(int playerID, int reason) {}
@@ -307,6 +311,9 @@ class CEventClient
 		virtual void ActiveCommandChanged(const SCommandDescription* cmdDesc);
 		virtual void CameraRotationChanged(const float3& rot);
 		virtual void CameraPositionChanged(const float3& pos);
+		virtual void MiniMapRotationChanged(const float newRot, const float oldRot);
+		virtual void MiniMapStateChanged(const bool isMinimized, const bool isMaximized, const bool isSlaved);
+		virtual void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim);
 		virtual bool CommandNotify(const Command& cmd);
 
 		virtual bool AddConsoleLine(const std::string& msg, const std::string& section, int level);
@@ -366,6 +373,8 @@ class CEventClient
 		virtual void DrawAlphaFeaturesLua(bool drawReflection, bool drawRefraction) {}
 		virtual void DrawShadowUnitsLua() {}
 		virtual void DrawShadowFeaturesLua() {}
+
+		virtual void DrawBuildSquare(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses) {}
 
 		virtual void FontsChanged() {}
 

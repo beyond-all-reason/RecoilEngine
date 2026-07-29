@@ -41,6 +41,8 @@
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Weapons/Weapon.h"
 #include "Sim/Weapons/WeaponDef.h"
+#include "System/FileSystem/FileHandler.h"
+#include "System/FileSystem/VFSModes.h"
 #include "System/creg/SerializeLuaState.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/EventHandler.h"
@@ -55,6 +57,8 @@
 
 
 #include "LuaInclude.h"
+
+#include "lib/luasocket/src/luasocket.h"
 
 #include <SDL_keyboard.h>
 #include <SDL_keycode.h>
@@ -116,7 +120,7 @@ void CLuaHandle::PushTracebackFuncToRegistry(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	SPRING_LUA_OPEN_LIB(L, luaopen_debug);
-		HSTR_PUSH(L, "traceback");
+		LuaPushString(L, "traceback");
 		LuaUtils::PushDebugTraceback(L);
 		lua_rawset(L, LUA_REGISTRYINDEX);
 	// We only need the debug.traceback function, the others are unsafe for syncing.
@@ -546,6 +550,28 @@ bool CLuaHandle::LoadCode(lua_State* L, std::string code, const string& debug)
 
 	// call Initialize immediately after load
 	return (RunCallInTraceback(L, cmdStr, 0, 0, traceBack.GetErrFuncIdx(), false));
+}
+
+
+void CLuaHandle::InitLuaSocket(lua_State* L)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	const std::string filename = "LuaSocket/socket.lua";
+	CFileHandler f(filename, SPRING_VFS_BASE);
+	if (!f.FileExists()) {
+		LOG_L(L_ERROR, "Error loading %s (file does not exist)", filename.c_str());
+		return;
+	}
+
+	LUA_OPEN_LIB(L, luaopen_socket_core);
+
+	std::string code;
+	if (f.LoadStringData(code)) {
+		LoadCode(L, std::move(code), filename);
+	} else {
+		LOG_L(L_ERROR, "Error loading %s", filename.c_str());
+	}
 }
 
 
@@ -1189,9 +1215,9 @@ void CLuaHandle::UnitConstructionDecayed(const CUnit* unit, float timeSinceLastB
  * @param unitID integer
  * @param unitDefID integer
  * @param unitTeam integer
- * @param attackerID integer
- * @param attackerDefID integer
- * @param attackerTeam number
+ * @param attackerID integer? Subject to visibility rules
+ * @param attackerDefID integer? Subject to visibility rules
+ * @param attackerTeam integer? Subject to visibility rules
  * @param weaponDefID integer
  */
 void CLuaHandle::UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID)
@@ -2536,8 +2562,10 @@ void CLuaHandle::Update()
 	if (!cmdStr.GetGlobalFunc(L))
 		return;
 
-	// call the routine
-	RunCallIn(L, cmdStr, 0, 0);
+	if (game) // null in LuaMenu
+		lua_pushnumber(L, game->updateDeltaSeconds);
+
+	RunCallIn(L, cmdStr, game ? 1 : 0, 0);
 }
 
 
@@ -2622,6 +2650,8 @@ void CLuaHandle::SunChanged()
  * @function Callins:DefaultCommand
  * @param type "unit"|"feature" The type of the object pointed at.
  * @param id integer The `unitID` or `featureID`.
+ * @param cmd integer The current command ID.
+ * @return integer The command ID to use as the default, or nil to keep the current ID.
  */
 bool CLuaHandle::DefaultCommand(const CUnit* unit,
                                 const CFeature* feature, int& cmd)
@@ -2634,11 +2664,11 @@ bool CLuaHandle::DefaultCommand(const CUnit* unit,
 		return false;
 
 	if (unit) {
-		HSTR_PUSH(L, "unit");
+		LuaPushString(L, "unit");
 		lua_pushnumber(L, unit->id);
 	}
 	else if (feature) {
-		HSTR_PUSH(L, "feature");
+		LuaPushString(L, "feature");
 		lua_pushnumber(L, feature->id);
 	}
 	else {
@@ -2649,14 +2679,14 @@ bool CLuaHandle::DefaultCommand(const CUnit* unit,
 
 /* FIXME
 	else if (groundPos) {
-		HSTR_PUSH(L, "ground");
+		LuaPushString(L, "ground");
 		lua_pushnumber(L, groundPos->x);
 		lua_pushnumber(L, groundPos->y);
 		lua_pushnumber(L, groundPos->z);
 		args = 4;
 	}
 	else {
-		HSTR_PUSH(L, "selection");
+		LuaPushString(L, "selection");
 		args = 1;
 	}
 */
@@ -2816,6 +2846,41 @@ DRAW_CALLIN(DrawShadowUnitsLua)
  *
  */
 DRAW_CALLIN(DrawShadowFeaturesLua)
+
+/*** @function Callins:DrawBuildSquare
+ * Called when build square data is computed, before engine rendering.
+ * Grid dimensions can be inferred from UnitDefs[unitDefID].xsize and UnitDefs[unitDefID].zsize.
+ * Grid origin in square coords: x - xsize/2, z - zsize/2 (accounting for facing).
+ * @param unitDefID number
+ * @param x number build position x
+ * @param z number build position z
+ * @param facing number build facing
+ * @param statuses table flat 1D row-major array of BuildSquareStatus values: BLOCKED=0, OCCUPIED=1, RECLAIMABLE=2, OPEN=3
+ */
+void CLuaHandle::DrawBuildSquare(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 8, __func__);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	lua_pushnumber(L, unitDefID);
+	lua_pushnumber(L, x);
+	lua_pushnumber(L, z);
+	lua_pushnumber(L, facing);
+
+	lua_createtable(L, statuses.size(), 0);
+	for (size_t i = 0; i < statuses.size(); ++i) {
+		lua_pushinteger(L, statuses[i]);
+		lua_rawseti(L, -2, i + 1);
+	}
+
+	LuaOpenGL::SetDrawingEnabled(L, true);
+	RunCallIn(L, cmdStr, 5, 0);
+	LuaOpenGL::SetDrawingEnabled(L, false);
+}
 
 /***
  * DrawWorldPreParticles is called multiples times per draw frame.
@@ -3140,10 +3205,10 @@ bool CLuaHandle::KeyPress(int keyCode, int scanCode, bool isRepeat)
 	lua_pushinteger(L, SDL21_keysyms(keyCode));
 
 	lua_createtable(L, 0, 4);
-	HSTR_PUSH_BOOL(L, "alt",   !!KeyInput::GetKeyModState(KMOD_ALT));
-	HSTR_PUSH_BOOL(L, "ctrl",  !!KeyInput::GetKeyModState(KMOD_CTRL));
-	HSTR_PUSH_BOOL(L, "meta",  !!KeyInput::GetKeyModState(KMOD_GUI));
-	HSTR_PUSH_BOOL(L, "shift", !!KeyInput::GetKeyModState(KMOD_SHIFT));
+	LuaPushNamedBool(L, "alt",   !!KeyInput::GetKeyModState(KMOD_ALT));
+	LuaPushNamedBool(L, "ctrl",  !!KeyInput::GetKeyModState(KMOD_CTRL));
+	LuaPushNamedBool(L, "meta",  !!KeyInput::GetKeyModState(KMOD_GUI));
+	LuaPushNamedBool(L, "shift", !!KeyInput::GetKeyModState(KMOD_SHIFT));
 
 	lua_pushboolean(L, isRepeat);
 
@@ -3203,10 +3268,10 @@ bool CLuaHandle::KeyRelease(int keyCode, int scanCode)
 	lua_pushinteger(L, SDL21_keysyms(keyCode));
 
 	lua_createtable(L, 0, 4);
-	HSTR_PUSH_BOOL(L, "alt",   !!KeyInput::GetKeyModState(KMOD_ALT));
-	HSTR_PUSH_BOOL(L, "ctrl",  !!KeyInput::GetKeyModState(KMOD_CTRL));
-	HSTR_PUSH_BOOL(L, "meta",  !!KeyInput::GetKeyModState(KMOD_GUI));
-	HSTR_PUSH_BOOL(L, "shift", !!KeyInput::GetKeyModState(KMOD_SHIFT));
+	LuaPushNamedBool(L, "alt",   !!KeyInput::GetKeyModState(KMOD_ALT));
+	LuaPushNamedBool(L, "ctrl",  !!KeyInput::GetKeyModState(KMOD_CTRL));
+	LuaPushNamedBool(L, "meta",  !!KeyInput::GetKeyModState(KMOD_GUI));
+	LuaPushNamedBool(L, "shift", !!KeyInput::GetKeyModState(KMOD_SHIFT));
 
 	CKeySet ks(keyCode);
 	lua_pushsstring(L, ks.GetString(true));
@@ -3550,6 +3615,89 @@ void CLuaHandle::CameraPositionChanged(const float3& pos)
 	RunCallIn(L, cmdStr, 3, 0);
 }
 
+/*** Called when the MiniMap rotation changes
+ * 
+ * @function Callins:MiniMapRotationChanged
+ * @param newRot number MiniMap rotation in radians
+ * @param oldRot number MiniMap old rotation in radians
+ */
+void CLuaHandle::MiniMapRotationChanged(const float newRot, const float oldRot)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L, false);
+	luaL_checkstack(L, 5, __func__);
+
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	lua_pushnumber(L, newRot);
+	lua_pushnumber(L, oldRot);
+
+	RunCallIn(L, cmdStr, 2, 0);
+}
+
+/*** Called when the MiniMap minimizes or maximizes changes
+ * 
+ * @function Callins:MiniMapStateChanged
+ * @param isMinimized boolean
+ * @param isMaximized boolean
+ */
+void CLuaHandle::MiniMapStateChanged(const bool isMinimized,
+									const bool isMaximized,
+									const bool isSlaved)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L, false);
+	luaL_checkstack(L, 5, __func__);
+
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	lua_pushboolean(L, isMinimized);
+	lua_pushboolean(L, isMaximized);
+	lua_pushboolean(L, isSlaved);
+
+
+	RunCallIn(L, cmdStr, 3, 0);
+}
+
+/*** Called when the MiniMap Geometry changes
+ * 
+ * @function Callins:MiniMapGeometryChanged
+ * @param newPosX number in pixels
+ * @param newPosY number in pixels
+ * @param newDimX number in pixels
+ * @param newDimY number in pixels
+ * @param oldPosX number in pixels
+ * @param oldPosY number in pixels
+ * @param oldDimX number in pixels
+ * @param oldDimY number in pixels
+ */
+void CLuaHandle::MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L, false);
+	luaL_checkstack(L, 11, __func__); // 3 + 8 args
+
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	lua_pushnumber(L, newPos.x);
+	lua_pushnumber(L, newPos.y);
+	lua_pushnumber(L, newDim.x);
+	lua_pushnumber(L, newDim.y);
+	
+	lua_pushnumber(L, oldPos.x);
+	lua_pushnumber(L, oldPos.y);
+	lua_pushnumber(L, oldDim.x);
+	lua_pushnumber(L, oldDim.y);
+
+	RunCallIn(L, cmdStr, 8, 0);
+}
+
 /*** Called when a command is issued.
  *
  * @function Callins:CommandNotify
@@ -3667,24 +3815,24 @@ string CLuaHandle::WorldTooltip(const CUnit* unit,
 
 	int args;
 	if (unit) {
-		HSTR_PUSH(L, "unit");
+		LuaPushString(L, "unit");
 		lua_pushnumber(L, unit->id);
 		args = 2;
 	}
 	else if (feature) {
-		HSTR_PUSH(L, "feature");
+		LuaPushString(L, "feature");
 		lua_pushnumber(L, feature->id);
 		args = 2;
 	}
 	else if (groundPos) {
-		HSTR_PUSH(L, "ground");
+		LuaPushString(L, "ground");
 		lua_pushnumber(L, groundPos->x);
 		lua_pushnumber(L, groundPos->y);
 		lua_pushnumber(L, groundPos->z);
 		args = 4;
 	}
 	else {
-		HSTR_PUSH(L, "selection");
+		LuaPushString(L, "selection");
 		args = 1;
 	}
 
@@ -3743,7 +3891,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 	lua_pushnumber(L, playerID);
 
 	if (type == MAPDRAW_POINT) {
-		HSTR_PUSH(L, "point");
+		LuaPushString (L, "point");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -3751,7 +3899,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 		args = 6;
 	}
 	else if (type == MAPDRAW_LINE) {
-		HSTR_PUSH(L, "line");
+		LuaPushString (L, "line");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -3761,7 +3909,7 @@ bool CLuaHandle::MapDrawCmd(int playerID, int type,
 		args = 8;
 	}
 	else if (type == MAPDRAW_ERASE) {
-		HSTR_PUSH(L, "erase");
+		LuaPushString (L, "erase");
 		lua_pushnumber(L, pos0->x);
 		lua_pushnumber(L, pos0->y);
 		lua_pushnumber(L, pos0->z);
@@ -4103,29 +4251,29 @@ void CLuaHandle::CollectGarbage(bool forced)
 bool CLuaHandle::AddBasicCalls(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	HSTR_PUSH(L, "Script");
+	LuaPushString(L, "Script");
 	lua_createtable(L, 0, 17); {
-		HSTR_PUSH_CFUNC(L, "Kill",            KillActiveHandle);
-		HSTR_PUSH_CFUNC(L, "UpdateCallIn",    CallOutUpdateCallIn);
-		HSTR_PUSH_CFUNC(L, "GetName",         CallOutGetName);
-		HSTR_PUSH_CFUNC(L, "GetSynced",       CallOutGetSynced);
-		HSTR_PUSH_CFUNC(L, "GetFullCtrl",     CallOutGetFullCtrl);
-		HSTR_PUSH_CFUNC(L, "GetFullRead",     CallOutGetFullRead);
-		HSTR_PUSH_CFUNC(L, "GetCtrlTeam",     CallOutGetCtrlTeam);
-		HSTR_PUSH_CFUNC(L, "GetReadTeam",     CallOutGetReadTeam);
-		HSTR_PUSH_CFUNC(L, "GetReadAllyTeam", CallOutGetReadAllyTeam);
-		HSTR_PUSH_CFUNC(L, "GetSelectTeam",   CallOutGetSelectTeam);
-		HSTR_PUSH_CFUNC(L, "GetGlobal",       CallOutGetGlobal);
-		HSTR_PUSH_CFUNC(L, "GetRegistry",     CallOutGetRegistry);
-		HSTR_PUSH_CFUNC(L, "GetCallInList",   CallOutGetCallInList);
-		HSTR_PUSH_CFUNC(L, "DelayByFrames",   CallOutDelayByFrames);
-		HSTR_PUSH_CFUNC(L, "IsEngineMinVersion", CallOutIsEngineMinVersion);
+		LuaPushNamedCFunc(L, "Kill",               KillActiveHandle);
+		LuaPushNamedCFunc(L, "UpdateCallIn",       CallOutUpdateCallIn);
+		LuaPushNamedCFunc(L, "GetName",            CallOutGetName);
+		LuaPushNamedCFunc(L, "GetSynced",          CallOutGetSynced);
+		LuaPushNamedCFunc(L, "GetFullCtrl",        CallOutGetFullCtrl);
+		LuaPushNamedCFunc(L, "GetFullRead",        CallOutGetFullRead);
+		LuaPushNamedCFunc(L, "GetCtrlTeam",        CallOutGetCtrlTeam);
+		LuaPushNamedCFunc(L, "GetReadTeam",        CallOutGetReadTeam);
+		LuaPushNamedCFunc(L, "GetReadAllyTeam",    CallOutGetReadAllyTeam);
+		LuaPushNamedCFunc(L, "GetSelectTeam",      CallOutGetSelectTeam);
+		LuaPushNamedCFunc(L, "GetGlobal",          CallOutGetGlobal);
+		LuaPushNamedCFunc(L, "GetRegistry",        CallOutGetRegistry);
+		LuaPushNamedCFunc(L, "GetCallInList",      CallOutGetCallInList);
+		LuaPushNamedCFunc(L, "DelayByFrames",      CallOutDelayByFrames);
+		LuaPushNamedCFunc(L, "IsEngineMinVersion", CallOutIsEngineMinVersion);
 		// special team constants
 
 		/*** @field Script.NO_ACCESS_TEAM -1 */
-		HSTR_PUSH_NUMBER(L, "NO_ACCESS_TEAM",  CEventClient::NoAccessTeam);
+		LuaPushNamedNumber(L, "NO_ACCESS_TEAM",  CEventClient::NoAccessTeam);
 		/*** @field Script.ALL_ACCESS_TEAM -2 */
-		HSTR_PUSH_NUMBER(L, "ALL_ACCESS_TEAM", CEventClient::AllAccessTeam);
+		LuaPushNamedNumber(L, "ALL_ACCESS_TEAM", CEventClient::AllAccessTeam);
 	}
 	lua_rawset(L, -3);
 

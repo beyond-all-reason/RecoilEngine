@@ -273,10 +273,10 @@ void CBeamLaser::FireImpl(const bool scriptCall)
 
 bool CBeamLaser::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
 {
-	const float targetDistSq = aimFromPos.SqDistance(tgtPos);
-	const float3 aimDir = (tgtPos - aimFromPos).SafeNormalize();
+	float3 aimDir = (tgtPos - aimFromPos);
+	const float targetDist = aimDir.LengthNormalize();
 
-	if (const auto shapedRange = GetShapedWeaponRange(aimDir, range); targetDistSq > Square(shapedRange))
+	if (const auto shapedRange = GetShapedWeaponRange(aimDir, range); targetDist > shapedRange)
 		return false;
 
 	// NOTE: mainDir is in unit-space

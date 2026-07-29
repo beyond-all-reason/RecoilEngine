@@ -64,7 +64,7 @@ static constexpr uint8_t LOS_ALL_MASK_BITS = \
 class CUnit : public CSolidObject
 {
 public:
-	CR_DECLARE(CUnit)
+	CR_DECLARE_DERIVED(CUnit)
 
 	CUnit();
 	virtual ~CUnit();
@@ -72,7 +72,6 @@ public:
 	static void InitStatic();
 
 	void SanityCheck() const;
-	void UpdatePrevFrameTransform() override;
 
 	virtual void PreInit(const UnitLoadParams& params);
 	virtual void PostInit(const CUnit* builder);
@@ -80,32 +79,32 @@ public:
 	virtual void Update();
 	virtual void SlowUpdate();
 
-	const SolidObjectDef* GetDef() const { return ((const SolidObjectDef*) unitDef); }
+	const SolidObjectDef* GetDef() const override { return ((const SolidObjectDef*) unitDef); }
 
-	virtual void DoDamage(const DamageArray& damages, const float3& impulse, CUnit* attacker, int weaponDefID, int projectileID);
+	void DoDamage(const DamageArray& damages, const float3& impulse, CUnit* attacker, int weaponDefID, int projectileID) override;
 	virtual void DoWaterDamage();
 	virtual void FinishedBuilding(bool postInit);
 
 	void ApplyDamage(CUnit* attacker, const DamageArray& damages, float& baseDamage, float& experienceMod);
-	void ApplyImpulse(const float3& impulse);
+	void ApplyImpulse(const float3& impulse) override;
 
 	bool AttackUnit(CUnit* unit, bool isUserTarget, bool wantManualFire, bool fpsMode = false);
 	bool AttackGround(const float3& pos, bool isUserTarget, bool wantManualFire, bool fpsMode = false);
 	void DropCurrentAttackTarget();
 
-	int GetBlockingMapID() const { return id; }
+	int GetBlockingMapID() const override { return id; }
 
 	void ChangeLos(int losRad, int airRad);
 
 	void TurnIntoNanoframe();
 
 	// negative amount=reclaim, return= true -> build power was successfully applied
-	bool AddBuildPower(CUnit* builder, float amount);
+	bool AddBuildPower(CUnit* builder, float amount) override;
 
 	virtual void Activate();
 	virtual void Deactivate();
 
-	void ForcedMove(const float3& newPos);
+	void ForcedMove(const float3& newPos) override;
 
 	void DeleteScript();
 	void EnableScriptMoveType();
@@ -113,7 +112,7 @@ public:
 
 	CMatrix44f GetTransformMatrix(bool synced = false, bool fullread = false) const override final;
 
-	void DependentDied(CObject* o);
+	void DependentDied(CObject* o) override;
 
 	bool AllowedReclaim(CUnit* builder) const;
 
@@ -138,13 +137,13 @@ public:
 
 	void AddExperience(float exp);
 
-	void SetMass(float newMass);
+	void SetMass(float newMass) override;
 
 	void DoSeismicPing(float pingSize);
 
 	void CalculateTerrainType();
 	void UpdateTerrainType();
-	void UpdatePhysicalState(float eps);
+	void UpdatePhysicalState(float eps) override;
 
 	float3 GetErrorVector(int allyteam) const;
 	float3 GetErrorPos(int allyteam, bool aiming = false) const { return (aiming? aimPos: midPos) + GetErrorVector(allyteam); }
@@ -543,6 +542,7 @@ public:
 
 	mutable std::string definedIconName;
 	mutable size_t currentIconIndex = size_t(-1); // icon::INVALID_ICON_INDEX;
+	mutable size_t customIconIndex = size_t(-1); // icon::INVALID_ICON_INDEX;
 
 	bool drawIcon = true;
 private:

@@ -40,7 +40,7 @@ static void log_sink_record_console(int level, const char* section, const char* 
 	char framePrefix[128] = {'\0'};
 	log_framePrefixer_createPrefix(framePrefix, sizeof(framePrefix));
 
-	FILE* outStream = (level >= LOG_LEVEL_WARNING)? stderr: stdout;
+	FILE* outStream = stdout;
 
 	const char* fstr = "%s%s\n";
 	if (colorizedOutput) {

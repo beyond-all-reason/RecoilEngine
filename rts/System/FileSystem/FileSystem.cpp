@@ -61,7 +61,7 @@ namespace Impl {
 		return std::string(reinterpret_cast<const char*>(utf8.c_str()));
 	}
 	RECOIL_FORCE_INLINE std::string StoreUTF8AsString(const std::u8string_view& utf8) {
-		return std::string(reinterpret_cast<const char*>(utf8.data()));
+		return std::string(reinterpret_cast<const char*>(utf8.data()), utf8.size());
 	}
 	RECOIL_FORCE_INLINE std::string StorePathAsString(const fs::path& path) {
 		return StoreUTF8AsString(path.u8string());
@@ -158,6 +158,11 @@ std::string FileSystem::GetParent(const std::string& pathStr)
 int32_t FileSystem::GetFileSize(const std::string& fileStr)
 {
 	const auto file = Recoil::filesystem::u8path(fileStr);
+	if (DirExists(file)) {
+		LOG_L(L_WARNING, "[FSA::%s] error '%s' reading file size '%s'", __func__, "the file is directory", fileStr.c_str());
+		return -1;
+	}
+
 	std::error_code ec;
 	auto size = static_cast<int32_t>(fs::file_size(file, ec));
 	if (ec) {
@@ -252,11 +257,6 @@ bool FileSystem::IsPathOnSpinningDisk(const std::string& path)
 	HANDLE volHandle = ::CreateFile(volumeName.data(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, nullptr);
 	if (volHandle == INVALID_HANDLE_VALUE) {
 		LOG_L(L_WARNING, "[%s] CreateFileA error: '%s'", __func__, Platform::GetLastErrorAsString().c_str());
-		return true;
-	}
-
-	if (volHandle == INVALID_HANDLE_VALUE) {
-		LOG_L(L_WARNING, "[%s] GetVolumeHandleForFile error: '%s'", __func__, Platform::GetLastErrorAsString().c_str());
 		return true;
 	}
 
@@ -641,17 +641,21 @@ namespace Impl {
 
 	void FindFilesStd(std::vector<std::string>& matches, const std::string& dataDir, const std::string& dirStr, const spring::regex& regexPattern, int flags)
 	{
-		const auto dirFullStr = FileSystem::ForwardSlashes(dataDir + dirStr);
+		const std::string dirFullStr = FileSystem::ForwardSlashes(dataDir + dirStr);
 
-		auto dir = Recoil::filesystem::u8path(dirFullStr);
-		if (!fs::exists(dir))
+		const fs::path dirFullPath = Recoil::filesystem::u8path(dirFullStr);
+		if (!fs::exists(dirFullPath))
 			return;
+
+		// Each match is `dirStr + <entry below dirStr>`; the dataDir prefix must not leak
+		// in, so prepend dirStr ourselves instead of emitting the iterated full path.
+		const std::string dirRelPrefix = FileSystem::ForwardSlashes(dirStr);
 
 		std::variant<fs::directory_iterator, fs::recursive_directory_iterator> dirIterator;
 		if ((flags & FileQueryFlags::RECURSE) != 0)
-			dirIterator = fs::recursive_directory_iterator(dir);
+			dirIterator = fs::recursive_directory_iterator(dirFullPath);
 		else
-			dirIterator = fs::directory_iterator(dir);
+			dirIterator = fs::directory_iterator(dirFullPath);
 
 		std::visit([&](auto&& dirIterator) {
 			for (const fs::directory_entry& entry : dirIterator) {
@@ -667,16 +671,17 @@ namespace Impl {
 
 				// hope std::regex_match will not trip up on UTF-8, if it does, will need to convert to std::wregex
 				// the previous implementation relied on checking the filename only
-				const auto entryPathFnStr = entry.path().filename().generic_u8string();
+				const std::u8string entryPathFnStr = entry.path().filename().generic_u8string();
 
 				if (spring::regex_match(StoreUTF8AsString(entryPathFnStr), regexPattern)) {
-					auto entryPathStr = entry.path().generic_u8string();
+					const std::u8string entryRelStr = entry.path().lexically_relative(dirFullPath).generic_u8string();
+					std::string entryPathStr = dirRelPrefix + Impl::StoreUTF8AsString(entryRelStr);
 
 					// the previous convention to add a trailing slash
-					if (isDir && !entryPathStr.empty() && entryPathStr.back() != u8'/') {
-						entryPathStr += u8'/';
+					if (isDir && !entryPathStr.empty() && entryPathStr.back() != '/') {
+						entryPathStr += '/';
 					}
-					matches.emplace_back(Impl::StoreUTF8AsString(entryPathStr));
+					matches.emplace_back(std::move(entryPathStr));
 				}
 			}
 		}, std::move(dirIterator));
@@ -895,7 +900,7 @@ std::string FileSystem::GetBasename(const std::string& pathStr)
 	return Impl::StorePathAsString(p.stem());
 }
 
-std::string FileSystem::GetExtension(const std::string& pathStr)
+std::string FileSystem::GetExtensionLowerCase(const std::string& pathStr)
 {
 	const auto p = Recoil::filesystem::u8path(pathStr);
 	auto ext = p.extension().generic_u8string();
@@ -903,11 +908,11 @@ std::string FileSystem::GetExtension(const std::string& pathStr)
 		return "";
 
 	assert(ext[0] == u8'.');
-	return Impl::StorePathAsString(ext.substr(1, ext.length() - 1));
+	return StringToLower(Impl::StorePathAsString(ext.substr(1, ext.length() - 1)));
 }
 
 std::string FileSystem::GetNormalizedPath(const std::string& path) {
-	return Impl::StoreUTF8AsString(std::filesystem::path(path).lexically_normal().generic_u8string());
+	return Impl::StoreUTF8AsString(std::filesystem::path(ForwardSlashes(path)).lexically_normal().generic_u8string());
 }
 
 bool FileSystem::CheckFile(const std::string& file)

@@ -755,13 +755,13 @@ void CHoverAirMoveType::UpdateVerticalSpeed(const float4& spd, float curRelHeigh
 	// first restore original vertical speed
 	owner->SetVelocity((spd * XZVector) + (UpVector * curVertSpeed));
 
-	if (collisionState == COLLISION_DIRECT) {
+	if (collisionState == COLLISION_DIRECT && aircraftState != AIRCRAFT_TAKEOFF) {
 		const float3 dir = lastCollidee->midPos - owner->midPos;
 		const float3 sdir = lastCollidee->speed - spd;
 
 		if (spd.dot(dir + sdir * 20.0f) < 0.0f) {
-			wh -= (30.0f * (lastCollidee->midPos.y >  owner->pos.y));
-			wh += (50.0f * (lastCollidee->midPos.y <= owner->pos.y));
+			wh -= (30.0f * (lastCollidee->midPos.y >  owner->midPos.y));
+			wh += (50.0f * (lastCollidee->midPos.y <= owner->midPos.y));
 		}
 	}
 
@@ -887,8 +887,23 @@ void CHoverAirMoveType::UpdateMoveRate()
 	int curMoveRate = 1;
 
 	// currentspeed is not used correctly for vertical movement, so compensate with this hax
-	if (aircraftState != AIRCRAFT_LANDING && aircraftState != AIRCRAFT_TAKEOFF)
-		curMoveRate = CalcScriptMoveRate(owner->speed.w, 3.0f);
+	if (aircraftState != AIRCRAFT_LANDING && aircraftState != AIRCRAFT_TAKEOFF) {
+		const auto res = CalcScriptMoveRate(owner->speed.w, maxSpeed, 3.0f);
+		if likely(!math::isnan(res)) {
+			curMoveRate = res;
+		} else {
+			LOG_L(L_WARNING, "[%s] Unit(id=%d, def=%s). Incorrect inputs to %s(%f, %f, %f), sanitized to %d",
+				__func__,
+				owner->id,
+				owner->unitDef->name.c_str(),
+				"CalcScriptMoveRate",
+				owner->speed.w,
+				maxSpeed,
+				3.0f,
+				lastMoveRate
+			);
+		}
+	}
 
 	if (curMoveRate == lastMoveRate)
 		return;

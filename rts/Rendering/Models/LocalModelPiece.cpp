@@ -19,11 +19,13 @@ CR_REG_METADATA(LocalModelPiece, (
 
 	CR_MEMBER(colvol),
 
-	CR_MEMBER(wasUpdated),
+	CR_IGNORED(wasUpdated),
 	CR_MEMBER(noInterpolation),
 	CR_MEMBER(dirty),
 
 	CR_MEMBER(scriptSetVisible),
+	CR_MEMBER(blockScriptAnims),
+
 	CR_MEMBER(lmodelPieceIndex),
 	CR_MEMBER(scriptPieceIndex),
 	CR_MEMBER(parent),
@@ -32,7 +34,9 @@ CR_REG_METADATA(LocalModelPiece, (
 
 	// reload
 	CR_IGNORED(original),
-	CR_IGNORED(lodDispLists) //FIXME GL idx!
+	CR_IGNORED(lodDispLists), //FIXME GL idx!
+
+	CR_POSTLOAD(PostLoad)
 ))
 
 /** ****************************************************************************************************
@@ -40,8 +44,7 @@ CR_REG_METADATA(LocalModelPiece, (
  */
 
 LocalModelPiece::LocalModelPiece(const S3DModelPiece* piece)
-	: colvol(piece->GetCollisionVolume())
-	, dirty(true)
+	: dirty(true)
 	, wasUpdated{ true }
 	, noInterpolation{ false }
 
@@ -64,6 +67,13 @@ LocalModelPiece::LocalModelPiece(const S3DModelPiece* piece)
 	prevModelSpaceTra = Transform{ };
 
 	children.reserve(piece->children.size());
+
+	colvol = new CollisionVolume(piece->GetCollisionVolume());
+}
+
+LocalModelPiece::~LocalModelPiece()
+{
+	spring::SafeDelete(colvol);
 }
 
 void LocalModelPiece::SetDirty() {
@@ -310,4 +320,9 @@ bool LocalModelPiece::GetEmitDirPos(float3& emitPos, float3& emitDir) const
 	emitPos = GetModelSpaceTransform() *        original->GetEmitPos()        * WORLD_TO_OBJECT_SPACE;
 	emitDir = GetModelSpaceTransform() * float4(original->GetEmitDir(), 0.0f) * WORLD_TO_OBJECT_SPACE;
 	return true;
+}
+
+void LocalModelPiece::PostLoad()
+{
+	wasUpdated = { true };
 }

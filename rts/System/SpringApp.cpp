@@ -13,7 +13,9 @@
 #undef KeyRelease
 #else
 #include <unistd.h> // isatty
+#ifndef __APPLE__
 #include <X11/Xlib.h> // XInitThreads
+#endif
 
 #undef KeyPress
 #undef KeyRelease
@@ -41,6 +43,7 @@
 #include "Game/UI/InfoConsole.h"
 #include "Game/UI/MouseHandler.h"
 #include "Lua/LuaOpenGL.h"
+#include "Lua/LuaDebugExtra.h"
 #include "Lua/LuaVFSDownload.h"
 #include "Menu/LuaMenuController.h"
 #include "Menu/SelectMenu.h"
@@ -97,6 +100,7 @@
 #include "System/Sound/ISound.h"
 #include "System/Sync/FPUCheck.h"
 #include "System/Threading/ThreadPool.h"
+#include "System/LoadSave/DemoFileExtension.h"
 
 #include "Game/UnsyncedGameCommands.h"
 #include "Game/SyncedGameCommands.h"
@@ -165,7 +169,7 @@ int spring::exitCode = spring::EXIT_CODE_SUCCESS;
 static unsigned int reloadCount = 0;
 static unsigned int killedCount = 0;
 
-
+static constexpr auto RECOIL_SDL_WINDOWEVENT_DISPLAY_CHANGED = 18;
 
 // initialize basic systems for command line help / output
 static void ConsolePrintInitialize(const std::string& configSource, bool safemode)
@@ -181,6 +185,7 @@ static void ConsolePrintInitialize(const std::string& configSource, bool safemod
 
 static void FlushExit()
 {
+	LOG_CLEANUP();
 	std::fflush(stdout);
 }
 
@@ -682,13 +687,21 @@ void SpringApp::LoadSpringMenu()
 	}
 }
 
+static bool IsReplay(const std::string& path)
+{
+	if (IsDemoExtension(FileSystem::GetExtensionLowerCase(path)))
+		return true;
+
+	return ContentsLookLikeAReplay(path);
+}
+
 /**
  * Initializes instance of GameSetup
  */
 void SpringApp::Startup()
 {
 	// bash input
-	const std::string& extension = FileSystem::GetExtension(inputFile);
+	const std::string& extension = FileSystem::GetExtensionLowerCase(inputFile);
 
 	// note: avoid any .get() leaks between here and GameServer!
 	clientSetup.reset(new ClientSetup());
@@ -728,7 +741,7 @@ void SpringApp::Startup()
 		pregame = new CPreGame(clientSetup);
 		return;
 	}
-	if (extension == "sdfz") {
+	if (IsReplay(inputFile)) {
 		LoadDemoFile(inputFile);
 		return;
 	}
@@ -1175,6 +1188,10 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 					//FIXME check if still happens with SDL2 (2013)
 					SDL_SetModState((SDL_Keymod)(SDL_GetModState() & (KMOD_NUM | KMOD_CAPS | KMOD_MODE)));
 
+					// drop emulated input first: it fires its own releases directly,
+					// since the pushed SDL releases below get eaten by the emulation gate
+					LuaDebugExtra::ClearEmulatedInput();
+
 					// release all keyboard keys
 					KeyInput::ReleaseAllKeys();
 
@@ -1201,6 +1218,12 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 
 					// and make sure to un-capture mouse
 					globalRendering->SetWindowInputGrabbing(false);
+				} break;
+				// replace with normal SDL_WINDOWEVENT_DISPLAY_CHANGED when our Linux SDL2 is updated
+				case RECOIL_SDL_WINDOWEVENT_DISPLAY_CHANGED: {
+					LOG("[SpringApp::%s][SDL_WINDOWEVENT_DISPLAY_CHANGED] to display %d\n", __func__, event.window.data1);
+					// try to reinit GL context
+					globalRendering->MakeCurrentContext(false);
 				} break;
 
 				case SDL_WINDOWEVENT_CLOSE: {
@@ -1235,7 +1258,12 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 			if (activeController != nullptr) {
 				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.keysym.sym);
 				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.keysym.scancode);
-				activeController->KeyPressed(keyCode, scanCode, event.key.repeat);
+
+				// if the key is already held via input emulation the effective
+				// state is already down, so the real press is not a new edge
+				// (the emulated store is keyed by raw SDL2 keycode, like keyVec)
+				if (!KeyInput::IsKeyEmulated(event.key.keysym.sym))
+					activeController->KeyPressed(keyCode, scanCode, event.key.repeat);
 			}
 
 		} break;
@@ -1246,7 +1274,10 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 				gameTextInput.ignoreNextChar = false;
 				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.keysym.sym);
 				int scanCode = CScanCodes::GetNormalizedSymbol(event.key.keysym.scancode);
-				activeController->KeyReleased(keyCode, scanCode);
+
+				// emulation still holds it down, so the real release is not an edge
+				if (!KeyInput::IsKeyEmulated(event.key.keysym.sym))
+					activeController->KeyReleased(keyCode, scanCode);
 			}
 		} break;
 		case SDL_KEYMAPCHANGED: {

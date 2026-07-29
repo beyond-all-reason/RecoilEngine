@@ -20,7 +20,7 @@ You might also want to produce more to counteract the reduced variety.
 * burst weapons can now be made to respect firing angle restrictions. See the burst section below.
 
 # Features
-* The `select` action now composes `IdMatches` filters as *OR* statements see [The select command]({{ site.baseurl }}{% link articles/select-command.markdown %}#idmatches_string) for further reference.
+* The `select` action now composes `IdMatches` filters as *OR* statements see [The select command]({{< base_url >}}/docs/guides/select-command/#idmatches_string) for further reference.
 * added a new optional boolean parameter to `Spring.GetUnitHeading`, default false. If true, the value returned is in radians instead of the TA 16-bit angular unit.
 * added a new callin, `GameFramePost(number frame)`. This is the last callin in a sim frame (regular `GameFrame` is the first).
 * added a new callin, `UnitArrivedAtGoal(unitID, unitDefID, teamID)`, for when a unit arrives at its movement goal (incl. raw move).

@@ -70,6 +70,8 @@ target_link_libraries(demotool
 		gflags_nothreads_static
 		7zip
 		${ZLIB_LIBRARY}
+		nowide::nowide
+		fmt::fmt
 		${PLATFORM_LIBS}
 		Tracy::TracyClient
 	)

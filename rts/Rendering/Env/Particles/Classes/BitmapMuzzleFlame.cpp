@@ -178,7 +178,9 @@ void CBitmapMuzzleFlame::Init(const CUnit* owner, const float3& offset)
 	length *= dirLen;
 
 	speed = (particleSpeed + guRNG.NextFloat() * particleSpeedSpread) * dir;
-	dir /= dirLen;
+
+	if likely(dirLen > float3::nrm_eps())
+		dir /= dirLen;
 
 	CProjectile::Init(owner, offset);
 

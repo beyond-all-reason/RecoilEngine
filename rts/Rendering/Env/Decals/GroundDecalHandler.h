@@ -42,7 +42,7 @@ public:
 	void PostLoad();
 public:
 	void ReloadTextures() override {}
-	void DumpAtlasTextures() override {}
+	void DumpAtlasTextures(const std::string& /*fileExt*/) override {}
 
 	void Draw() override {}
 
@@ -106,7 +106,6 @@ protected:
 	CSMFGroundDrawer* smfDrawer;
 
 	bool highQuality = false;
-	float ghostDimming = 1.0f;
 	ScopedDepthBufferCopy sdbc;
 };
 
@@ -169,7 +168,7 @@ public:
 
 	// IGroundDecalDrawer
 	void ReloadTextures() override;
-	void DumpAtlasTextures() override;
+	void DumpAtlasTextures(const std::string& fileExt) override;
 
 	void Draw() override;
 
@@ -195,15 +194,15 @@ public:
 
 	void SetUnitLeaveTracks(CUnit* unit, bool leaveTracks) override;
 private:
-	static void BindVertexAtrribs();
-	static void UnbindVertexAtrribs();
+	static void BindVertexAttributes();
+	static void UnbindVertexAttributes();
 
 	uint32_t GetDepthBufferTextureTarget() const;
 
 	void GenerateAtlasTexture();
 	bool ReloadDecalShaders();
 
-	void AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP, const std::string& errMsg);
+	void AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP, const std::string& errMsg, bool reportMissingFile);
 
 	void AddTrack(const CUnit* unit, const float3& newPos, bool forceEval = false);
 

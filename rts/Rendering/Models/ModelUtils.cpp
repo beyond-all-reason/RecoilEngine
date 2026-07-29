@@ -22,6 +22,8 @@ void Skinning::ReparentMeshesTrianglesToBones(S3DModel* model, const std::vector
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
+	std::vector<std::pair<size_t, size_t>> boneWeights;
+
 	for (const auto& mesh : meshes) {
 		const auto& verts = mesh.verts;
 		const auto& indcs = mesh.indcs;
@@ -166,6 +168,7 @@ void Skinning::ReparentMeshesTrianglesToBones(S3DModel* model, const std::vector
 void Skinning::ReparentCompleteMeshesToBones(S3DModel* model, const std::vector<SkinnedMesh>& meshes) {
 	RECOIL_DETAILED_TRACY_ZONE;
 
+	std::vector<std::pair<size_t, size_t>> boneWeights;
 
 	for (const auto& mesh : meshes) {
 		const auto& verts = mesh.verts;
@@ -403,7 +406,7 @@ void ModelUtils::CalculateTangents(std::vector<SVertexData>& verts, const std::v
 
 		if (v1idx == INVALID_INDEX || v2idx == INVALID_INDEX) {
 			// not a valid triangle, skip
-			i += 3; continue;
+			continue;
 		}
 
 		auto& v0 = verts[v0idx];
@@ -426,8 +429,10 @@ void ModelUtils::CalculateTangents(std::vector<SVertexData>& verts, const std::v
 
 		// if d is 0, texcoors are degenerate
 		const float d = (tc10.x * tc20.y - tc20.x * tc10.y);
-		const float r = (abs(d) < 1e-9f) ? 1.0f : 1.0f / d;
+		if (math::fabsf(d) < 1e-9)
+			continue; // garbage, skip it
 
+		const float r = 1.0f / d;
 		// note: not necessarily orthogonal to each other
 		// or to vertex normal, only to the triangle plane
 		const auto sdir = ( p10 * tc20.y - p20 * tc10.y) * r;
@@ -452,14 +457,15 @@ void ModelUtils::CalculateTangents(std::vector<SVertexData>& verts, const std::v
 		T.AssertNaNs();
 		B.AssertNaNs();
 
-		//const float bitangentAngle = B.dot(N.cross(T)); // dot(B,B')
-		//const float handednessSign = Sign(bitangentAngle);
-
-		T = (T - N * N.dot(T));// *handednessSign;
+		// Gram-Schmidt: orthogonalize T against N
+		T = (T - N * N.dot(T));
 		T.SafeANormalize();
 
-		B = (B - N * N.dot(B) - T * T.dot(N));
-		//B = N.cross(T); //probably better
+		const float handednessSign = Sign(B.dot(N.cross(T)));
+
+		// Can probably also do Gram-Schmidt: orthogonalize B against N and T
+		//B = (B - N * N.dot(B) - T * T.dot(B));
+		B = N.cross(T) * handednessSign;
 		B.SafeANormalize();
 	}
 }

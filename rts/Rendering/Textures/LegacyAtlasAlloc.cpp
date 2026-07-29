@@ -81,7 +81,7 @@ bool CLegacyAtlasAlloc::Allocate()
 	std::list<int2> nextSub;
 	std::list<int2> thisSub;
 
-	int padding = 1 << GetNumTexLevels();
+	int padding = GetPadding();
 
 	for (int a = 0; a < static_cast<int>(memtextures.size()); ++a) {
 		SAtlasEntry* curtex = memtextures[a];
@@ -118,7 +118,7 @@ bool CLegacyAtlasAlloc::Allocate()
 				thisSub.clear();
 				continue;
 			}
-			if (thisSub.front().y + curtex->size.y > max.y) {
+			if (thisSub.front().y + curtex->size.y + padding > max.y) {
 				thisSub.pop_front();
 				continue;
 			}
@@ -159,6 +159,7 @@ bool CLegacyAtlasAlloc::Allocate()
 	}
 
 	atlasSize = max;
+	SizeRoundUp();
 
 	return success;
 }

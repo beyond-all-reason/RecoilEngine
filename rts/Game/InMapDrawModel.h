@@ -10,7 +10,6 @@
 #include "System/creg/creg_cond.h"
 
 class CPlayer;
-class TeamController;
 
 /**
  * The M in MVC for InMapDraw.
@@ -42,10 +41,9 @@ public:
 
 	struct MapDrawPrimitive {
 	public:
-		MapDrawPrimitive(bool spectator, int teamID, const TeamController* teamController)
+		MapDrawPrimitive(bool spectator, int teamID)
 			: spectator(spectator)
 			, teamID(teamID)
-			, teamController(teamController)
 		{}
 
 		bool IsVisibleToPlayer(bool drawAllMarks) const;
@@ -53,31 +51,24 @@ public:
 		/**
 		 * Was the creator of this map-drawing spectator at the time it was
 		 * created?
-		 * @see #GetTeamController
 		 */
 		bool IsBySpectator() const { return spectator; }
 		/**
 		 * The team-id of the creator of this map-drawing at the time of
 		 * creation.
-		 * @see #GetTeamController
 		 */
 		int GetTeamID() const { return teamID; }
-		/**
-		 * The team-controller that created this map-drawing.
-		 */
-		const TeamController* GetTeamController() const { return teamController; }
 
 	private:
 		bool spectator;
 		int teamID;
-		const TeamController* teamController;
 	};
 
 	struct MapPoint : public MapDrawPrimitive {
 
 	public:
-		MapPoint(bool spectator, int teamID, const TeamController* teamController, const float3& pos, const std::string& label)
-			: MapDrawPrimitive(spectator, teamID, teamController)
+		MapPoint(bool spectator, int teamID, const float3& pos, const std::string& label)
+			: MapDrawPrimitive(spectator, teamID)
 			, pos(pos)
 			, label(label)
 		{}
@@ -93,8 +84,8 @@ public:
 	struct MapLine : public MapDrawPrimitive {
 
 	public:
-		MapLine(bool spectator, int teamID, const TeamController* teamController, const float3& pos1, const float3& pos2)
-			: MapDrawPrimitive(spectator, teamID, teamController)
+		MapLine(bool spectator, int teamID, const float3& pos1, const float3& pos2)
+			: MapDrawPrimitive(spectator, teamID)
 			, pos1(pos1)
 			, pos2(pos2)
 		{}

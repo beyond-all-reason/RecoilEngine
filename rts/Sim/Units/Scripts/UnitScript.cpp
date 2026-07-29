@@ -6,6 +6,7 @@
 #include "CobDefines.h"
 #include "CobFile.h"
 #include "CobInstance.h"
+#include "System/SafeUtil.h"
 #include "UnitScriptEngine.h"
 
 #ifndef _CONSOLE
@@ -56,6 +57,7 @@ CR_BIND_INTERFACE(CUnitScript)
 
 CR_REG_METADATA(CUnitScript, (
 	CR_MEMBER(unit),
+	CR_MEMBER(checksum),
 	CR_MEMBER(busy),
 	CR_MEMBER(anims),
 	CR_MEMBER(doneAnims),
@@ -84,6 +86,7 @@ CR_REG_METADATA_SUB(CUnitScript, AnimInfo,(
 
 CUnitScript::CUnitScript(CUnit* unit)
 	: unit(unit)
+	, checksum(0)
 	, busy(false)
 	, hasSetSFXOccupy(false)
 	, hasRockUnit(false)
@@ -207,16 +210,22 @@ void CUnitScript::TickAllAnims(int deltaTime)
 
 	const int tickRate = 1000 / deltaTime;
 
+	// clear doneAnims here to preserve them for DumpState
+	doneAnims.clear();
+
 	for (auto& ai : anims) {
 		LocalModelPiece& lmp = *pieces[ai.piece];
 		const auto& currFunc = TICK_ANIM_FUNCS[ai.animType];
-		if (ai.done |= std::invoke(currFunc, this, tickRate, lmp, ai)) {
+		if ((ai.done |= std::invoke(currFunc, this, tickRate, lmp, ai))) {
 			if (ai.hasWaiting)
 				doneAnims.emplace_back(ai);
 		}
-	}
-	spring::VectorEraseIf(anims, [](const auto& ai) { return ai.done; });
 
+		// checksum all anims (live + done)
+		checksum = spring::LiteHash(ai, checksum);
+	}
+
+	spring::VectorEraseIfAll(anims, [](const auto& ai) { return ai.done; });
 #if 1
 	// BFS pass
 	std::deque<std::pair<LocalModelPiece*, Transform>> q;
@@ -283,7 +292,8 @@ bool CUnitScript::TickAnimFinished()
 	for (const auto& ai : doneAnims)
 		AnimFinished(ai.animType, ai.piece, ai.axis);
 
-	doneAnims.clear();
+	// don't clear doneAnims for the purpose of capturing them in DumpState
+	//doneAnims.clear();
 
 	return HaveAnimations();
 }
@@ -970,7 +980,6 @@ void CUnitScript::ShowFlare(int piece)
 #endif
 }
 
-
 /******************************************************************************/
 int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 {
@@ -1029,7 +1038,25 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		const float3 absPos = unit->GetObjectSpacePos(relPos);
 		return int(absPos.y * COBSCALE);
 	} break;
-
+	case PIECE_HEADING: {
+		const LocalModelPiece* piece = SafeGetPiece(p1);
+		if (piece == nullptr) {
+			ShowUnitScriptError("[US::GetUnitVal::PIECE_HEADING] invalid script piece index");
+			break;
+		}
+		const float3 dir = piece->GetModelSpaceTransform() * float4(FwdVector);
+		return GetHeadingFromVector(dir.x, dir.z);
+	} break;
+	case PIECE_PITCH: {
+		const LocalModelPiece* piece = SafeGetPiece(p1);
+		if (piece == nullptr) {
+			ShowUnitScriptError("[US::GetUnitVal::PIECE_PITCH] invalid script piece index");
+			break;
+		}
+		const float3 dir = piece->GetModelSpaceTransform() * float4(FwdVector);
+		// returns pitch with same sign convention as the pitch given to AimWeaponX
+		return short(math::asin(std::clamp(dir.y, -1.0f, 1.0f)) * RAD2TAANG);
+	} break;
 	case UNIT_XZ: {
 		if (p1 <= 0)
 			return PACKXZ(unit->pos.x, unit->pos.z);
@@ -1131,8 +1158,14 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 		return !!unit->wantCloak;
 	case UPRIGHT:
 		return !!unit->upright;
-	case POW:
-		return int(math::pow((p1 * 1.0f) / COBSCALE, (p2 * 1.0f) / COBSCALE) * COBSCALE);
+	case POW: {
+		const auto res = math::pow(static_cast<float>(p1) / COBSCALE, static_cast<float>(p2) / COBSCALE) * COBSCALE;
+		if likely(!math::isnan(res)) {
+			return spring::SafeCast<int>(res);
+		}
+		LOG_L(L_WARNING, "[%s] Incorrect inputs to %s(%d, %d), the output is sanitized to %d", __func__, "POW", p1, p2, p1);
+		return 0;
+	}
 	case PRINT: {
 		const char*   unitName = unit->unitDef->name.c_str();
 		const char* scriptName = unit->unitDef->scriptName.c_str();
@@ -1331,13 +1364,25 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 	case ABS:
 		return std::abs(p1);
 	case KSIN:
-		return int(1024*math::sinf(TAANG2RAD*(float)p1));
+		return int(1024 * math::sinf(TAANG2RAD * static_cast<float>(p1)));
 	case KCOS:
-		return int(1024*math::cosf(TAANG2RAD*(float)p1));
-	case KTAN:
-		return int(1024*math::tanf(TAANG2RAD*(float)p1));
-	case SQRT:
-		return int(math::sqrt((float)p1));
+		return int(1024 * math::cosf(TAANG2RAD * static_cast<float>(p1)));
+	case KTAN: {
+		const auto res = 1024 * math::tanf(TAANG2RAD * static_cast<float>(p1));
+		if likely(!math::isnan(res)) {
+			return spring::SafeCast<int>(res);
+		}
+		LOG_L(L_WARNING, "[%s] Incorrect inputs to %s(%d), the output is sanitized to %d", __func__, "KTAN", p1, 0);
+		return 0;
+	}
+	case SQRT: {
+		const auto res = math::sqrt(static_cast<float>(p1));
+		if likely(!math::isnan(res)) {
+			return spring::SafeCast<int>(res);
+		}
+		LOG_L(L_WARNING, "[%s] Incorrect inputs to %s(%d), the output is sanitized to %d", __func__, "SQRT", p1, p1);
+		return 0;
+	}
 
 	case FLANK_B_MODE:
 		return unit->flankingBonusMode;

@@ -5,6 +5,7 @@
 #include "Rendering/Colors.h"
 #include "Rendering/Textures/TextureAtlas.h"
 #include "Rendering/GL/RenderBuffers.h"
+#include "Rendering/Env/Particles/ProjectileDrawer.h"
 #include "Sim/Projectiles/ExpGenSpawnableMemberInfo.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Misc/QuadField.h"
@@ -62,8 +63,7 @@ CR_REG_METADATA(CProjectile,
 	CR_MEMBER(quads)
 ))
 
-TypedRenderBuffer<VA_TYPE_C> CProjectile::mmLnsRB = { 1 << 12, 0 };
-TypedRenderBuffer<VA_TYPE_C> CProjectile::mmPtsRB = { 1 << 14, 0 };
+// Minimap render buffers moved to CProjectileDrawer for proper lifecycle management
 
 namespace Impl {
 	float3 GetNormalizedOrDefaultDir(const float3& dir) {
@@ -245,10 +245,20 @@ void CProjectile::AddMiniMapVertices(VA_TYPE_C&& v1, VA_TYPE_C&& v2)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (v1.pos.equals(v2.pos)) {
-		mmPtsRB.AddVertex(std::move(v1));
+		CProjectileDrawer::GetMiniMapPointsRB().AddVertex(std::move(v1));
 	}
 	else {
-		mmLnsRB.AddVertex(std::move(v1));
-		mmLnsRB.AddVertex(std::move(v2));
+		CProjectileDrawer::GetMiniMapLinesRB().AddVertex(std::move(v1));
+		CProjectileDrawer::GetMiniMapLinesRB().AddVertex(std::move(v2));
 	}
+}
+
+TypedRenderBuffer<VA_TYPE_C>& CProjectile::GetMiniMapLinesRB()
+{
+	return CProjectileDrawer::GetMiniMapLinesRB();
+}
+
+TypedRenderBuffer<VA_TYPE_C>& CProjectile::GetMiniMapPointsRB()
+{
+	return CProjectileDrawer::GetMiniMapPointsRB();
 }

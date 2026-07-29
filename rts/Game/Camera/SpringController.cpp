@@ -67,7 +67,7 @@ void CSpringController::ConfigUpdate()
 	RECOIL_DETAILED_TRACY_ZONE;
 	scrollSpeed = configHandler->GetFloat("CamSpringScrollSpeed") * 0.1f;
 	fov = configHandler->GetFloat("CamSpringFOV");
-	minDist = configHandler->GetFloat("CamSpringMinZoomDistance");
+	minDist = std::max(configHandler->GetFloat("CamSpringMinZoomDistance"), 0.1f);
 	cursorZoomIn = configHandler->GetBool("CamSpringZoomInToMousePos");
 	cursorZoomOut = configHandler->GetBool("CamSpringZoomOutFromMousePos");
 	fastScaleMove = configHandler->GetFloat("CamSpringFastScaleMouseMove");
@@ -253,8 +253,8 @@ float CSpringController::ZoomIn(const float3& curCamPos, const float3& newDir, c
 	const float zoomAmount = std::min(1.0f - scaledMode, (curDistPre - minDist) / curDistPre);
 	const float3 wantedPos = curCamPos + cursorVec * zoomAmount;
 
-	// figure out how far we will end up from the ground at new wanted point
-	curDist = DistanceToGround(wantedPos, dir, pos.y);
+	// figure out how far we will end up from the focus surface at new wanted point
+	curDist = DistanceToFocusSurface(wantedPos);
 	pos = wantedPos + dir * curDist;
 
 	return 0.25f;
@@ -293,7 +293,7 @@ float CSpringController::ZoomOut(const float3& curCamPos, const float3& newDir, 
 
 	auto extrapolate_position = [&] (float scale) {
 		const float3 wantedCamPos = curCamPos + cursorVec * (1.0f - scaledMode) * scale;
-		const float newDist = DistanceToGround(wantedCamPos, dir, pos.y);
+		const float newDist = DistanceToFocusSurface(wantedCamPos);
 		return std::pair{wantedCamPos, newDist};
 	};
 
@@ -318,13 +318,26 @@ float CSpringController::ZoomOut(const float3& curCamPos, const float3& newDir, 
 
 
 
+float CSpringController::GetFocusSurfaceHeight(float x, float z) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	return CGround::GetHeightReal(x, z, false);
+}
+
+float CSpringController::DistanceToFocusSurface(const float3& from) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	return DistanceToGround(from, dir, pos.y);
+}
+
+
 void CSpringController::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
 	pos.x = std::clamp(pos.x, 0.01f, mapDims.mapx * SQUARE_SIZE - 0.01f);
 	pos.z = std::clamp(pos.z, 0.01f, mapDims.mapy * SQUARE_SIZE - 0.01f);
-	pos.y = CGround::GetHeightReal(pos.x, pos.z, false); // always focus on the ground
+	pos.y = GetFocusSurfaceHeight(pos.x, pos.z); // always focus on the ground
 	rot.x = std::clamp(rot.x, math::PI * 0.51f, math::PI * 0.99f);
 
 	// camera->SetRot(float3(rot.x, GetAzimuth(), rot.z));

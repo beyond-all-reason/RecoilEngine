@@ -16,7 +16,7 @@
 #include <variant>
 #include <span>
 
-#include "lib/fmt/format.h"
+#include <fmt/format.h>
 
 #include "LuaOpenGL.h"
 
@@ -2904,7 +2904,7 @@ int LuaOpenGL::TexRect(lua_State* L)
  * @param numGroupX integer
  * @param numGroupY integer
  * @param numGroupZ integer
- * @param barriers integer? (Default: `4`)
+ * @param barriers integer? (Default: `0`)
  */
 int LuaOpenGL::DispatchCompute(lua_State* L)
 {
@@ -2922,14 +2922,14 @@ int LuaOpenGL::DispatchCompute(lua_State* L)
 
 	static std::array<GLint, 3> maxNumGroups = maxCompWGFunc();
 
-	if (numGroupX < 0 && numGroupX > maxNumGroups[0] ||
-		numGroupY < 0 && numGroupY > maxNumGroups[1] ||
-		numGroupZ < 0 && numGroupZ > maxNumGroups[2])
-		luaL_error(L, "%s Incorrect number of work groups specified x: 0 > %d < %d; y: 0 > %d < %d; z: 0 > %d < %d", __func__, numGroupX, maxNumGroups[0], numGroupY, maxNumGroups[1], numGroupZ, maxNumGroups[2]);
+	if (numGroupX > maxNumGroups[0] ||
+		numGroupY > maxNumGroups[1] ||
+		numGroupZ > maxNumGroups[2])
+		luaL_error(L, "%s: work groups count exceeds GL_MAX_COMPUTE_WORK_GROUP_COUNT. (x=%u > %d, y=%u > %d, z=%u > %d)", __func__, numGroupX, maxNumGroups[0], numGroupY, maxNumGroups[1], numGroupZ, maxNumGroups[2]);
 
 	glDispatchCompute(numGroupX, numGroupY, numGroupZ);
 
-	GLbitfield barriers = (GLbitfield)luaL_optint(L, 1, 4);
+	GLbitfield barriers = (GLbitfield)luaL_optint(L, 4, 0);
 	//skip checking the correctness of values :)
 
 	if (barriers > 0u)
@@ -4316,14 +4316,14 @@ int LuaOpenGL::TextureInfo(lua_State* L)
 
 	lua_createtable(L, 0, 5);
 	const auto [xsize, ysize, zsize] = tex.GetSize();
-	HSTR_PUSH_NUMBER(L, "xsize", xsize)
-	HSTR_PUSH_NUMBER(L, "ysize", ysize)
-	HSTR_PUSH_NUMBER(L, "zsize", zsize)
+	LuaPushNamedNumber(L, "xsize", xsize);
+	LuaPushNamedNumber(L, "ysize", ysize);
+	LuaPushNamedNumber(L, "zsize", zsize);
 
-	HSTR_PUSH_NUMBER(L, "id"    , tex.GetTextureID());
-	HSTR_PUSH_NUMBER(L, "target", tex.GetTextureTarget());
-	// HSTR_PUSH_BOOL(L,   "alpha", texInfo.alpha);  FIXME
-	// HSTR_PUSH_NUMBER(L, "type",  texInfo.type);
+	LuaPushNamedNumber(L, "id"    , tex.GetTextureID());
+	LuaPushNamedNumber(L, "target", tex.GetTextureTarget());
+	// LuaPushNamedBool  (L, "alpha", texInfo.alpha); // FIXME
+	// LuaPushNamedNumber(L, "type", texInfo.type);
 	return 1;
 }
 
@@ -5767,7 +5767,7 @@ int LuaOpenGL::GetMatrixData(lua_State* L)
 int LuaOpenGL::PushAttrib(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
-	int mask = luaL_optnumber(L, 1, GL_ALL_ATTRIB_BITS);
+	int mask = luaL_optnumber(L, 1, static_cast<lua_Number>(GL_ALL_ATTRIB_BITS));
 	if (mask < 0) {
 		mask = -mask;
 		mask |= GL_ALL_ATTRIB_BITS;
@@ -5845,9 +5845,9 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 		GLint val = 0; glGetIntegerv(key, &val); \
 		if (toStr) { \
 			auto strIter = fixedStateEnumToString.find(val); \
-			HSTR_PUSH_STRING(L, #key, strIter != fixedStateEnumToString.end() ? strIter->second : fixedStateEnumToStringUnk); \
+			LuaPushNamedString(L, #key, strIter != fixedStateEnumToString.end() ? strIter->second : fixedStateEnumToStringUnk); \
 		} else { \
-			HSTR_PUSH_NUMBER(L, #key, val); \
+			LuaPushNamedNumber(L, #key, val); \
 		}; \
 	}
 
@@ -5891,10 +5891,10 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 			glGetIntegerv(GL_SCISSOR_BOX, rect);
 
 			lua_createtable(L, 0, 4);
-			HSTR_PUSH_NUMBER(L, "GL_SCISSOR_BOX_X", rect[0]);
-			HSTR_PUSH_NUMBER(L, "GL_SCISSOR_BOX_Y", rect[1]);
-			HSTR_PUSH_NUMBER(L, "GL_SCISSOR_BOX_W", rect[2]);
-			HSTR_PUSH_NUMBER(L, "GL_SCISSOR_BOX_H", rect[3]);
+			LuaPushNamedNumber(L, "GL_SCISSOR_BOX_X", rect[0]);
+			LuaPushNamedNumber(L, "GL_SCISSOR_BOX_Y", rect[1]);
+			LuaPushNamedNumber(L, "GL_SCISSOR_BOX_W", rect[2]);
+			LuaPushNamedNumber(L, "GL_SCISSOR_BOX_H", rect[3]);
 
 			return 2;
 		} break;
@@ -5911,10 +5911,10 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 			glGetBooleanv(GL_COLOR_WRITEMASK, mask);
 
 			lua_createtable(L, 0, 4);
-			HSTR_PUSH_BOOL(L, "GL_COLOR_WRITEMASK_R", mask[0]);
-			HSTR_PUSH_BOOL(L, "GL_COLOR_WRITEMASK_G", mask[1]);
-			HSTR_PUSH_BOOL(L, "GL_COLOR_WRITEMASK_B", mask[2]);
-			HSTR_PUSH_BOOL(L, "GL_COLOR_WRITEMASK_A", mask[3]);
+			LuaPushNamedBool(L, "GL_COLOR_WRITEMASK_R", mask[0]);
+			LuaPushNamedBool(L, "GL_COLOR_WRITEMASK_G", mask[1]);
+			LuaPushNamedBool(L, "GL_COLOR_WRITEMASK_B", mask[2]);
+			LuaPushNamedBool(L, "GL_COLOR_WRITEMASK_A", mask[3]);
 
 			return 1;
 		} break;
@@ -5946,7 +5946,7 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 
 			lua_createtable(L, 0, 2);
 			PushFixedState(GL_ALPHA_TEST_FUNC);
-			HSTR_PUSH_NUMBER(L, "GL_ALPHA_TEST_REF", alphaRef);
+			LuaPushNamedNumber(L, "GL_ALPHA_TEST_REF", alphaRef);
 
 			return 2;
 		} break;
@@ -5966,14 +5966,14 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 			glGetFloatv(GL_FOG_END, &fogEnd);
 
 			lua_createtable(L, 0, 8);
-			HSTR_PUSH_NUMBER(L, "GL_FOG_COLOR_R", fogColor[0]);
-			HSTR_PUSH_NUMBER(L, "GL_FOG_COLOR_G", fogColor[1]);
-			HSTR_PUSH_NUMBER(L, "GL_FOG_COLOR_B", fogColor[2]);
-			HSTR_PUSH_NUMBER(L, "GL_FOG_COLOR_A", fogColor[3]);
+			LuaPushNamedNumber(L, "GL_FOG_COLOR_R", fogColor[0]);
+			LuaPushNamedNumber(L, "GL_FOG_COLOR_G", fogColor[1]);
+			LuaPushNamedNumber(L, "GL_FOG_COLOR_B", fogColor[2]);
+			LuaPushNamedNumber(L, "GL_FOG_COLOR_A", fogColor[3]);
 
-			HSTR_PUSH_NUMBER(L, "GL_FOG_DENSITY", fogDensity);
-			HSTR_PUSH_NUMBER(L, "GL_FOG_START", fogStart);
-			HSTR_PUSH_NUMBER(L, "GL_FOG_END", fogEnd);
+			LuaPushNamedNumber(L, "GL_FOG_DENSITY", fogDensity);
+			LuaPushNamedNumber(L, "GL_FOG_START",   fogStart);
+			LuaPushNamedNumber(L, "GL_FOG_END",     fogEnd);
 
 			PushFixedState(GL_FOG_MODE);
 
@@ -6003,8 +6003,8 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 			glGetIntegerv(GL_LINE_STIPPLE_REPEAT, &strippleRepeat);
 
 			lua_createtable(L, 0, 2);
-			HSTR_PUSH_NUMBER(L, "GL_LINE_STIPPLE_PATTERN", stripplePattern);
-			HSTR_PUSH_NUMBER(L, "GL_LINE_STIPPLE_REPEAT", strippleRepeat);
+			LuaPushNamedNumber(L, "GL_LINE_STIPPLE_PATTERN", stripplePattern);
+			LuaPushNamedNumber(L, "GL_LINE_STIPPLE_REPEAT",  strippleRepeat);
 
 			return 1;
 		} break;
@@ -6024,11 +6024,11 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 			glGetFloatv(GL_POLYGON_OFFSET_UNITS, &offsetDensity);
 
 			lua_createtable(L, 0, 5);
-			HSTR_PUSH_BOOL(L, "GL_POLYGON_OFFSET_FILL", glIsEnabled(GL_POLYGON_OFFSET_FILL));
-			HSTR_PUSH_BOOL(L, "GL_POLYGON_OFFSET_LINE", glIsEnabled(GL_POLYGON_OFFSET_LINE));
-			HSTR_PUSH_BOOL(L, "GL_POLYGON_OFFSET_POINT", glIsEnabled(GL_POLYGON_OFFSET_POINT));
-			HSTR_PUSH_NUMBER(L, "GL_POLYGON_OFFSET_FACTOR", offsetFactor);
-			HSTR_PUSH_NUMBER(L, "GL_POLYGON_OFFSET_UNITS", offsetDensity);
+			LuaPushNamedBool  (L, "GL_POLYGON_OFFSET_FILL",   glIsEnabled(GL_POLYGON_OFFSET_FILL));
+			LuaPushNamedBool  (L, "GL_POLYGON_OFFSET_LINE",   glIsEnabled(GL_POLYGON_OFFSET_LINE));
+			LuaPushNamedBool  (L, "GL_POLYGON_OFFSET_POINT",  glIsEnabled(GL_POLYGON_OFFSET_POINT));
+			LuaPushNamedNumber(L, "GL_POLYGON_OFFSET_FACTOR", offsetFactor);
+			LuaPushNamedNumber(L, "GL_POLYGON_OFFSET_UNITS",  offsetDensity);
 
 			return 2;
 		} break;
@@ -6045,12 +6045,12 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 			glGetIntegerv(GL_STENCIL_VALUE_MASK, &stencilValueMask);
 
 			lua_createtable(L, 0, 8);
-			HSTR_PUSH_NUMBER(L, "GL_STENCIL_WRITEMASK", stencilWriteMask);
+			LuaPushNamedNumber(L, "GL_STENCIL_WRITEMASK", stencilWriteMask);
 
-			HSTR_PUSH_NUMBER(L, "GL_STENCIL_BITS", stencilBits);
+			LuaPushNamedNumber(L, "GL_STENCIL_BITS", stencilBits);
 
-			HSTR_PUSH_NUMBER(L, "GL_STENCIL_VALUE_MASK", stencilValueMask);
-			HSTR_PUSH_NUMBER(L, "GL_STENCIL_REF", stencilValueMask);
+			LuaPushNamedNumber(L, "GL_STENCIL_VALUE_MASK", stencilValueMask);
+			LuaPushNamedNumber(L, "GL_STENCIL_REF", stencilValueMask);
 
 			PushFixedState(GL_STENCIL_FUNC);
 
@@ -6064,9 +6064,9 @@ int LuaOpenGL::GetFixedState(lua_State* L)
 				GLint stencilBackRef;
 				glGetIntegerv(GL_STENCIL_BACK_REF, &stencilBackRef);
 
-				HSTR_PUSH_NUMBER(L, "GL_STENCIL_BACK_WRITEMASK", stencilBackWriteMask);
-				HSTR_PUSH_NUMBER(L, "GL_STENCIL_BACK_VALUE_MASK", stencilBackValueMask);
-				HSTR_PUSH_NUMBER(L, "GL_STENCIL_BACK_REF", stencilBackRef);
+				LuaPushNamedNumber(L, "GL_STENCIL_BACK_WRITEMASK", stencilBackWriteMask);
+				LuaPushNamedNumber(L, "GL_STENCIL_BACK_VALUE_MASK", stencilBackValueMask);
+				LuaPushNamedNumber(L, "GL_STENCIL_BACK_REF", stencilBackRef);
 
 				PushFixedState(GL_STENCIL_BACK_FUNC);
 			}

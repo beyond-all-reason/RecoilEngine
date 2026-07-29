@@ -16,7 +16,7 @@ class CUnit;
 
 class CExpGenSpawnable : public CWorldObject
 {
-	CR_DECLARE(CExpGenSpawnable)
+	CR_DECLARE_DERIVED(CExpGenSpawnable)
 public:
 	using AllocFunc = CExpGenSpawnable*(*)();
 	using GetMemberInfoFunc = bool(*)(SExpGenSpawnableMemberInfo&);
@@ -69,7 +69,7 @@ protected:
 
 	int createFrame;
 
-	static std::array<SpawnableTuple, 14> spawnables;
+	static std::array<SpawnableTuple, 13> spawnables;
 };
 
 template <>

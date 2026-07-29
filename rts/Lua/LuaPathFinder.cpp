@@ -201,9 +201,9 @@ static int path_gc(lua_State* L)
 static void CreatePathMetatable(lua_State* L)
 {
 	luaL_newmetatable(L, "Path");
-	HSTR_PUSH_CFUNC(L, "__gc",       path_gc);
-	HSTR_PUSH_CFUNC(L, "__index",    path_index);
-	HSTR_PUSH_CFUNC(L, "__newindex", path_newindex);
+	LuaPushNamedCFunc(L, "__gc",       path_gc);
+	LuaPushNamedCFunc(L, "__index",    path_index);
+	LuaPushNamedCFunc(L, "__newindex", path_newindex);
 	lua_pop(L, 1);
 }
 

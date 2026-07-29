@@ -16,11 +16,13 @@
 #include "LuaConstGame.h"
 #include "LuaConstPlatform.h"
 #include "LuaInterCall.h"
+#include "LuaLibs.h"
 #include "LuaSyncedCtrl.h"
 #include "LuaSyncedRead.h"
 #include "LuaSyncedTable.h"
 #include "LuaUICommand.h"
 #include "LuaUnsyncedCtrl.h"
+#include "LuaDebugExtra.h"
 #include "LuaUnsyncedRead.h"
 #include "LuaFeatureDefs.h"
 #include "LuaUnitDefs.h"
@@ -53,6 +55,7 @@
 
 #include "System/Misc/TracyDefs.h"
 
+#include <ranges>
 
 LuaRulesParams::Params  CSplitLuaHandle::gameParams;
 
@@ -72,7 +75,6 @@ CUnsyncedLuaHandle::CUnsyncedLuaHandle(CSplitLuaHandle* _base, const std::string
 	: CLuaHandle(_name, _order, false, false)
 	, base(*_base)
 {
-	D.allowChanges = false;
 }
 
 
@@ -88,15 +90,7 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 	watchExplosionDefs.resize(weaponDefHandler->NumWeaponDefs(), false);
 
 	// load the standard libraries
-	LUA_OPEN_LIB(L, luaopen_base);
-	LUA_OPEN_LIB(L, luaopen_math);
-	LUA_OPEN_LIB(L, luaopen_table);
-	LUA_OPEN_LIB(L, luaopen_string);
-	//LUA_OPEN_LIB(L, luaopen_io);
-	//LUA_OPEN_LIB(L, luaopen_os);
-	//LUA_OPEN_LIB(L, luaopen_package);
-	//LUA_OPEN_LIB(L, luaopen_debug);
-	EnactDevMode();
+	LuaLibs::OpenUnsynced(L);
 
 	// delete some dangerous functions
 	lua_pushnil(L); lua_setglobal(L, "dofile");
@@ -138,6 +132,7 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 		if (!AddEntriesToTable(L, "Spring",       LuaUnsyncedCtrl::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "Spring",       LuaUnsyncedRead::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "Spring",          LuaUICommand::PushEntries        )) KILL
+		if (!AddEntriesToTable(L, "debug",          LuaDebugExtra::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "gl",                 LuaOpenGL::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "GL",                LuaConstGL::PushEntries        )) KILL
 		if (!AddEntriesToTable(L, "Engine",        LuaConstEngine::PushEntries        )) KILL
@@ -167,13 +162,6 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 	eventHandler.AddClient(this);
 	return true;
 }
-
-
-void CUnsyncedLuaHandle::EnactDevMode() const
-{
-	SwapEnableModule(L, devMode, LUA_DBLIBNAME, luaopen_debug);
-}
-
 
 /***
  * @class UnsyncedCallins
@@ -424,7 +412,6 @@ CSyncedLuaHandle::CSyncedLuaHandle(CSplitLuaHandle* _base, const std::string& _n
 	, base(*_base)
 	, origNextRef(-1)
 {
-	D.allowChanges = true;
 }
 
 
@@ -448,14 +435,7 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	watchAllowTargetDefs.resize(weaponDefHandler->NumWeaponDefs(), false);
 
 	// load the standard libraries
-	SPRING_LUA_OPEN_LIB(L, luaopen_base);
-	SPRING_LUA_OPEN_LIB(L, luaopen_math);
-	SPRING_LUA_OPEN_LIB(L, luaopen_table);
-	SPRING_LUA_OPEN_LIB(L, luaopen_string);
-	//SPRING_LUA_OPEN_LIB(L, luaopen_io);
-	//SPRING_LUA_OPEN_LIB(L, luaopen_os);
-	//SPRING_LUA_OPEN_LIB(L, luaopen_package);
-	//SPRING_LUA_OPEN_LIB(L, luaopen_debug);
+	LuaLibs::OpenSynced(L, true);
 	EnactDevMode();
 
 	lua_getglobal(L, "next");
@@ -1217,6 +1197,42 @@ bool CSyncedLuaHandle::AllowResourceTransfer(int oldTeam, int newTeam, const cha
 	const bool allow = luaL_optboolean(L, -1, true);
 	lua_pop(L, 1);
 	return allow;
+}
+
+/*** Called when excess resources are added.
+ * Accumulates all excesses within a single gameframe.
+ *
+ * @function SyncedCallins:ResourceExcess
+ * @param excesses table
+ * @return boolean whether or not Lua handled the event
+ */
+bool CSyncedLuaHandle::ResourceExcess(const std::map <int, SResourcePack>& excesses)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L, true);
+	luaL_checkstack(L, 3, __func__);
+
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return false;
+
+	lua_createtable(L, excesses.size(), 1);
+
+	for (const auto &[teamID, excess] : excesses) {
+		lua_createtable(L, excess.MAX_RESOURCES, 0);
+		for (const auto &[resourceID, resource] : std::views::enumerate(excess)) {
+			lua_pushnumber(L, resource);
+			lua_rawseti(L, -2, resourceID + 1);
+		}
+		lua_rawseti(L, -2, teamID);
+	}
+
+	if (!RunCallIn(L, cmdStr, 1, 1))
+		return false;
+
+	const bool handled = luaL_optboolean(L, -1, false);
+	lua_pop(L, 1);
+	return handled;
 }
 
 

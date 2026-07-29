@@ -12,7 +12,7 @@
 #include "System/Exceptions.h"
 #include "System/SpringMath.h"
 
-#include "lib/fmt/format.h"
+#include <fmt/format.h>
 
 #include <bit>
 
@@ -74,17 +74,17 @@ void CModInfo::ResetState()
 		multiReclaim                   = 0;
 		reclaimMethod                  = 1;
 		reclaimUnitMethod              = 1;
-		reclaimUnitEnergyCostFactor    = 0.0f;
-		reclaimUnitEfficiency          = 1.0f;
-		reclaimFeatureEnergyCostFactor = 0.0f;
+		reclaimUnitCostFactor          = 0.0f;
+		reclaimUnitEfficiency          = {1.0f, 0.0f};
+		reclaimFeatureCostFactor       = 0.0f;
 		reclaimUnitDrainHealth         = true;
 		reclaimAllowEnemies            = true;
 		reclaimAllowAllies             = true;
 	}
 	{
-		repairEnergyCostFactor    = 0.0f;
-		resurrectEnergyCostFactor = 0.5f;
-		captureEnergyCostFactor   = 0.0f;
+		repairCostFactor    = 0.0f;
+		resurrectCostFactor = {0.0f, 0.5f};
+		captureCostFactor   = 0.0f;
 	}
 	{
 		unitExpMultiplier  = 1.0f;
@@ -180,7 +180,7 @@ void CModInfo::Init(const std::string& modFileName)
 	parser.Execute();
 
 	if (!parser.IsValid())
-		LOG_L(L_ERROR, "[ModInfo::%s] error \"%s\" loading mod-rules, using defaults", __func__, parser.GetErrorLog().c_str());
+		throw content_error(fmt::format("Failed to load gamedata/modrules.lua: {}", parser.GetErrorLog()));
 
 	const LuaTable& root = parser.GetRoot();
 
@@ -268,9 +268,18 @@ void CModInfo::Init(const std::string& modFileName)
 		multiReclaim  = reclaimTbl.GetInt("multiReclaim",  multiReclaim);
 		reclaimMethod = reclaimTbl.GetInt("reclaimMethod", reclaimMethod);
 		reclaimUnitMethod = reclaimTbl.GetInt("unitMethod", reclaimUnitMethod);
-		reclaimUnitEnergyCostFactor = reclaimTbl.GetFloat("unitEnergyCostFactor", reclaimUnitEnergyCostFactor);
-		reclaimUnitEfficiency = reclaimTbl.GetFloat("unitEfficiency", reclaimUnitEfficiency);
-		reclaimFeatureEnergyCostFactor = reclaimTbl.GetFloat("featureEnergyCostFactor", reclaimFeatureEnergyCostFactor);
+		reclaimUnitCostFactor =
+			{                                             reclaimUnitCostFactor.metal
+			, reclaimTbl.GetFloat("unitEnergyCostFactor", reclaimUnitCostFactor.energy)
+		};
+		reclaimUnitEfficiency =
+			{ reclaimTbl.GetFloat("unitEfficiency", reclaimUnitEfficiency.metal)
+			,                                       reclaimUnitEfficiency.energy
+		};
+		reclaimFeatureCostFactor =
+			{                                                reclaimFeatureCostFactor.metal
+			, reclaimTbl.GetFloat("featureEnergyCostFactor", reclaimFeatureCostFactor.energy)
+		};
 		reclaimUnitDrainHealth = reclaimTbl.GetBool("unitDrainHealth", reclaimUnitDrainHealth);
 		reclaimAllowEnemies = reclaimTbl.GetBool("allowEnemies", reclaimAllowEnemies);
 		reclaimAllowAllies = reclaimTbl.GetBool("allowAllies", reclaimAllowAllies);
@@ -279,19 +288,28 @@ void CModInfo::Init(const std::string& modFileName)
 	{
 		// repair
 		const LuaTable& repairTbl = root.SubTable("repair");
-		repairEnergyCostFactor = repairTbl.GetFloat("energyCostFactor", repairEnergyCostFactor);
+		repairCostFactor =
+			{                                        repairCostFactor.metal
+			, repairTbl.GetFloat("energyCostFactor", repairCostFactor.energy)
+		};
 	}
 
 	{
 		// resurrect
 		const LuaTable& resurrectTbl = root.SubTable("resurrect");
-		resurrectEnergyCostFactor  = resurrectTbl.GetFloat("energyCostFactor", resurrectEnergyCostFactor);
+		resurrectCostFactor  =
+			{                                           resurrectCostFactor.metal
+			, resurrectTbl.GetFloat("energyCostFactor", resurrectCostFactor.energy)
+		};
 	}
 
 	{
 		// capture
 		const LuaTable& captureTbl = root.SubTable("capture");
-		captureEnergyCostFactor = captureTbl.GetFloat("energyCostFactor", captureEnergyCostFactor);
+		captureCostFactor =
+			{                                         captureCostFactor.metal
+			, captureTbl.GetFloat("energyCostFactor", captureCostFactor.energy)
+		};
 	}
 
 	{

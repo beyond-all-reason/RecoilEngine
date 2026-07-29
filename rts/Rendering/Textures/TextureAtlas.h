@@ -30,7 +30,7 @@ public:
 	};
 
 public:
-	CTextureAtlas(uint32_t allocType = ATLAS_ALLOC_LEGACY, int32_t atlasSizeX_ = 0, int32_t atlasSizeY_ = 0, const std::string& name_ = "", bool reloadable_ = false);
+	CTextureAtlas(uint32_t allocType = ATLAS_ALLOC_LEGACY, uint32_t atlasSizeX_ = 0, uint32_t atlasSizeY_ = 0, const std::string& name_ = "", bool reloadable_ = false);
 	CTextureAtlas(CTextureAtlas&& ta) noexcept { *this = std::move(ta); };
 	CTextureAtlas(const CTextureAtlas&) = delete;
 
@@ -96,7 +96,7 @@ public:
 	const spring::unordered_map<std::string, IAtlasAllocator::SAtlasEntry>& GetTextures() const;
 
 	void ReloadTextures();
-	void DumpTexture(const char* newFileName = nullptr) const;
+	void DumpTexture(const char* newFileName = nullptr, const std::string& fileExt = "png") const;
 
 
 	//! @return reference to the Texture struct of the specified texture
@@ -145,8 +145,8 @@ protected:
 
 protected:
 	uint32_t allocType;
-	int32_t atlasSizeX;
-	int32_t atlasSizeY;
+	uint32_t atlasSizeX;
+	uint32_t atlasSizeY;
 
 	bool reloadable;
 

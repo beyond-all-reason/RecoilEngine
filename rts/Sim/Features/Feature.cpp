@@ -155,14 +155,13 @@ void CFeature::Initialize(const FeatureLoadParams& params)
 	RECOIL_DETAILED_TRACY_ZONE;
 	const CSolidObject* po = params.parentObj;
 
-	prevFrameNeedsUpdate = true;
-
 	def = params.featureDef;
 	udef = params.unitDef;
 
 	id = params.featureID;
 
 	team = params.teamID;
+	paletteIndex = static_cast<uint16_t>(team);
 	allyteam = params.allyTeamID;
 
 	heading = params.heading;
@@ -196,6 +195,7 @@ void CFeature::Initialize(const FeatureLoadParams& params)
 
 	// set position before mid-position
 	Move(((po == nullptr)? params.pos: po->pos).cClampInMap(), false);
+
 	// use base-class version, AddFeature() below
 	// will already insert us in the update-queue
 	CWorldObject::SetVelocity((po == nullptr)? params.speed: po->speed);
@@ -337,13 +337,13 @@ bool CFeature::AddBuildPower(CUnit* builder, float amount)
 	const float reclaimLeftTemp = std::max(0.0f, reclaimLeft - step);
 	const float fractionReclaimed = oldReclaimLeft - reclaimLeftTemp;
 	const auto resourceFraction = (defResources * fractionReclaimed).cap_at(resources);
-	const float energyUseScaled = resourceFraction.metal * modInfo.reclaimFeatureEnergyCostFactor;
+	const auto resourceCost = resourceFraction.metal * modInfo.reclaimFeatureCostFactor;
 
 	SResourceOrder order;
 	order.quantum    = false;
 	order.overflow   = builder->harvestStorage.empty();
 	order.separate   = true;
-	order.use.energy = energyUseScaled;
+	order.use = resourceCost;
 	order.useIncomeMultiplier = false; // Dont apply income multiplier to reclaim
 
 	if (reclaimLeftTemp == 0.0f) {
@@ -463,6 +463,7 @@ void CFeature::DependentDied(CObject *o)
 void CFeature::SetVelocity(const float3& v)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
 	CWorldObject::SetVelocity(v * moveCtrl.velocityMask);
 	CWorldObject::SetSpeed(v * moveCtrl.velocityMask);
 
@@ -478,10 +479,12 @@ void CFeature::SetVelocity(const float3& v)
 void CFeature::ForcedMove(const float3& newPos)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	// shouldn't rely on preFrameTra.t here, as ForcedMove can be called multiple times a synced frame
+	// and we better convey each movement separately
+	const float3 oldPos = pos;
 	// remove from managers
 	quadField.RemoveFeature(this);
-
-	prevFrameNeedsUpdate = true;
 
 	UnBlock();
 	Move(newPos - pos, true);
@@ -491,7 +494,7 @@ void CFeature::ForcedMove(const float3& newPos)
 	// (features are only Update()'d when in the FH queue)
 	UpdateTransformAndPhysState();
 
-	eventHandler.FeatureMoved(this, preFrameTra.t);
+	eventHandler.FeatureMoved(this, oldPos);
 
 	// insert into managers
 	quadField.AddFeature(this);
@@ -504,8 +507,6 @@ void CFeature::ForcedSpin(const float3& newDir)
 	// update local direction-vectors
 	CSolidObject::ForcedSpin(newDir);
 	UpdateTransform(pos, true);
-
-	prevFrameNeedsUpdate = true;
 }
 
 void CFeature::ForcedSpin(const float3& newFrontDir, const float3& newRightDir)
@@ -514,18 +515,21 @@ void CFeature::ForcedSpin(const float3& newFrontDir, const float3& newRightDir)
 	// update local direction-vectors
 	CSolidObject::ForcedSpin(newFrontDir, newRightDir);
 	UpdateTransform(pos, true);
-
-	prevFrameNeedsUpdate = true;
 }
 
+void CFeature::UpdateTransform(const float3& p, bool synced)
+{
+	transMatrix[synced] = std::move(ComposeMatrix(p));
+
+	if (synced)
+		CondUpdatePrevTransform();
+}
 
 void CFeature::UpdateTransformAndPhysState()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	UpdateDirVectors(!def->upright && IsOnGround(), true, 0.0f);
 	UpdateTransform(pos, true);
-
-	prevFrameNeedsUpdate = true;
 
 	UpdatePhysicalStateBit(CSolidObject::PSTATE_BIT_MOVING, (SetSpeed(speed) != 0.0f));
 	UpdatePhysicalState(0.1f);
@@ -585,7 +589,9 @@ bool CFeature::UpdateVelocity(
 bool CFeature::UpdatePosition()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	prevFrameNeedsUpdate = true;
+
+	// can't rely on preFrameTra.t here, as it's getting updated with every change of the position on creationFrame
+	const float3 oldPos = pos;
 	// const float4 oldSpd = speed;
 
 	if (moveCtrl.enabled) {
@@ -594,13 +600,7 @@ bool CFeature::UpdatePosition()
 		if (speed.SqLength() != 0.0f)
 			UpdateQuadFieldPosition(speed);
 	} else {
-		const float3 dragAccel = GetDragAccelerationVec(
-			mapInfo->atmosphere.fluidDensity,
-			mapInfo->water.fluidDensity,
-			1.0f,
-			0.5f,
-			mapInfo->map.gravity
-		);
+		const float3 dragAccel = GetDragAccelerationVec(mapInfo->atmosphere.fluidDensity, mapInfo->water.fluidDensity, 1.0f, 0.1f);
 		const float3 gravAccel = UpVector * mapInfo->map.gravity;
 
 		// horizontal movement
@@ -625,8 +625,8 @@ bool CFeature::UpdatePosition()
 	Block(); // does the check if wanted itself
 
 	// use an exact comparison for the y-component (gravity is small)
-	if (!pos.equals(preFrameTra.t, float3(float3::cmp_eps(), 0.0f, float3::cmp_eps()))) {
-		eventHandler.FeatureMoved(this, preFrameTra.t);
+	if (!pos.equals(oldPos, float3(float3::cmp_eps(), 0.0f, float3::cmp_eps())) || gs->frameNum == creationFrame) {
+		eventHandler.FeatureMoved(this, oldPos);
 		return true;
 	}
 
@@ -635,16 +635,7 @@ bool CFeature::UpdatePosition()
 	// nullify the vector to prevent visual extrapolation jitter
 	SetVelocityAndSpeed(mix({ZeroVector, 0.0f}, speed * moveCtrl.velocityMask, moveCtrl.enabled));
 
-	return (moveCtrl.enabled);
-}
-
-void CFeature::UpdatePrevFrameTransform()
-{
-	if (!prevFrameNeedsUpdate)
-		return;
-
-	preFrameTra = Transform{ CQuaternion::MakeFrom(GetTransformMatrix(true)), pos };
-	prevFrameNeedsUpdate = false;
+	return moveCtrl.enabled;
 }
 
 bool CFeature::Update()

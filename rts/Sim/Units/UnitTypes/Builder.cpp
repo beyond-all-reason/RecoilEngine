@@ -417,7 +417,7 @@ bool CBuilder::UpdateResurrect(const Command& fCommand)
 	const float step = resurrectSpeed / resurrecteeDef->buildTime;
 
 	const bool resurrectAllowed = eventHandler.AllowFeatureBuildStep(this, curResurrectee, step);
-	const bool canExecResurrect = (resurrectAllowed && UseEnergy(resurrecteeDef->cost.energy * step * modInfo.resurrectEnergyCostFactor));
+	const bool canExecResurrect = (resurrectAllowed && UseResources(resurrecteeDef->cost * step * modInfo.resurrectCostFactor));
 
 	if (canExecResurrect) {
 		curResurrectee->resurrectProgress += step;
@@ -464,7 +464,13 @@ bool CBuilder::UpdateResurrect(const Command& fCommand)
 			// prevent FinishCommand from removing this command when the
 			// feature is deleted, since it is needed to start the repair
 			// (WTF!)
-			c.SetParam(0, INT_MAX / 2);
+			//
+			// The future lurker:
+			// if you were searching where the hell the huge floating point number
+			// in params[0] was coming from and traced it back to this WTF hack,
+			// increment the number of wasted hours below:
+			//   number_of_hours_wasted = 3;
+			c.SetParam(0, static_cast<float>(INT_MAX / 2));
 		}
 
 		// this takes one simframe to do the deletion
@@ -498,11 +504,11 @@ bool CBuilder::UpdateCapture(const Command& fCommand)
 	const float captureProgressTemp = std::min(curCapturee->captureProgress + captureProgressStep, 1.0f);
 
 	const float captureFraction = captureProgressTemp - curCapturee->captureProgress;
-	const float energyUseScaled = curCapturee->cost.energy * captureFraction * modInfo.captureEnergyCostFactor;
+	const auto resourceUseScaled = curCapturee->cost * captureFraction * modInfo.captureCostFactor;
 
 	const bool buildStepAllowed = (eventHandler.AllowUnitBuildStep(this, curCapturee, captureProgressStep));
 	const bool captureStepAllowed = (eventHandler.AllowUnitCaptureStep(this, curCapturee, captureProgressStep));
-	const bool canExecCapture = (buildStepAllowed && captureStepAllowed && UseEnergy(energyUseScaled));
+	const bool canExecCapture = (buildStepAllowed && captureStepAllowed && UseResources(resourceUseScaled));
 
 	if (!canExecCapture)
 		return true;
@@ -599,6 +605,15 @@ void CBuilder::SetRepairTarget(CUnit* target)
 void CBuilder::SetReclaimTarget(CSolidObject* target)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// A target already being destroyed (detached) cannot have a death dependence
+	// registered (AddDeathDependence no-ops on detached objects), which would leave
+	// curReclaim dangling. This happens when ~CObject's DependentDied cascade re-enters
+	// reclaim logic mid-deletion (e.g. CBuilderCAI::ExecuteGuard reading a guardee's
+	// stale curReclaim) on the very feature being freed. Refuse the dead target.
+	assert(target != nullptr);
+	if (target->detached)
+		return;
+
 	if (dynamic_cast<CFeature*>(target) != nullptr && !static_cast<CFeature*>(target)->def->reclaimable)
 		return;
 
@@ -624,6 +639,11 @@ void CBuilder::SetReclaimTarget(CSolidObject* target)
 void CBuilder::SetResurrectTarget(CFeature* target)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// see SetReclaimTarget: never depend on an object that is already being destroyed
+	assert(target != nullptr);
+	if (target->detached)
+		return;
+
 	if (curResurrect == target || target->udef == nullptr)
 		return;
 
@@ -640,6 +660,11 @@ void CBuilder::SetResurrectTarget(CFeature* target)
 void CBuilder::SetCaptureTarget(CUnit* target)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// see SetReclaimTarget: never depend on an object that is already being destroyed
+	assert(target != nullptr);
+	if (target->detached)
+		return;
+
 	if (target == curCapture)
 		return;
 
@@ -926,7 +951,7 @@ bool CBuilder::ScriptStartBuilding(float3 pos, bool silent)
 		// clamping p - pitch not needed, range of asin is -PI/2..PI/2,
 		// so max difference between two asin calls is PI.
 		// FIXME: convert CSolidObject::heading to radians too.
-		script->StartBuilding(ClampRad(h - heading * TAANG2RAD), p - pitch);
+		script->StartBuilding(ClampRadPi(h - heading * TAANG2RAD), p - pitch);
 	}
 
 	if ((!silent || inBuildStance) && IsInLosForAllyTeam(gu->myAllyTeam))

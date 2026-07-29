@@ -22,7 +22,7 @@ class DamageArray;
 
 class CFeature: public CSolidObject, public spring::noncopyable
 {
-	CR_DECLARE(CFeature)
+	CR_DECLARE_DERIVED(CFeature)
 
 public:
 	CFeature();
@@ -63,35 +63,34 @@ public:
 	 */
 	void Initialize(const FeatureLoadParams& params);
 
-	const SolidObjectDef* GetDef() const { return ((const SolidObjectDef*) def); }
+	const SolidObjectDef* GetDef() const override { return ((const SolidObjectDef*) def); }
 
-	int GetBlockingMapID() const;
+	int GetBlockingMapID() const override;
 
 	/**
 	 * Negative amount = reclaim
 	 * @return true if reclaimed
 	 */
-	bool AddBuildPower(CUnit* builder, float amount);
-	void DoDamage(const DamageArray& damages, const float3& impulse, CUnit* attacker, int weaponDefID, int projectileID);
-	void SetVelocity(const float3& v);
-	void ForcedMove(const float3& newPos);
+	bool AddBuildPower(CUnit* builder, float amount) override;
+	void DoDamage(const DamageArray& damages, const float3& impulse, CUnit* attacker, int weaponDefID, int projectileID) override;
+	void SetVelocity(const float3& v) override;
+	void ForcedMove(const float3& newPos) override;
 	void ForcedSpin(const float3& newDir) override;
 	void ForcedSpin(const float3& newFrontDir, const float3& newRightDir) override; 
-	void UpdatePrevFrameTransform() override;
 
 	bool Update();
 	bool UpdatePosition();
 	bool UpdateVelocity(const float3& dragAccel, const float3& gravAccel, const float3& movMask, const float3& velMask);
 
 	void SetTransform(const CMatrix44f& m, bool synced) { transMatrix[synced] = m; }
-	void UpdateTransform(const float3& p, bool synced) { transMatrix[synced] = std::move(ComposeMatrix(p)); }
+	void UpdateTransform(const float3& p, bool synced);
 	void UpdateTransformAndPhysState();
 	void UpdateQuadFieldPosition(const float3& moveVec);
 
 	void StartFire();
 	void EmitGeoSmoke();
 
-	void DependentDied(CObject *o);
+	void DependentDied(CObject *o) override;
 	void ChangeTeam(int newTeam);
 
 	bool IsInLosForAllyTeam(int argAllyTeam) const;

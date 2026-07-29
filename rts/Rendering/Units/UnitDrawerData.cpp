@@ -29,8 +29,21 @@
 #include "Map/ReadMap.h"
 
 #include "System/Misc/TracyDefs.h"
+#include "System/Matrix44f.h"
+#include "System/MathConstants.h"
+#include "System/Transform.hpp"
+#include "Rendering/Models/ModelsMemStorage.h"
 
 static FixedDynMemPoolT<MAX_UNITS / 1000, MAX_UNITS / 32, GhostSolidObject> ghostMemPool;
+
+// world transform of a (static) ghost building, matching the legacy staticModelMatrix construction
+static Transform MakeGhostWorldTransform(const float3& pos, int facing)
+{
+	CMatrix44f m;
+	m.Translate(pos);
+	m.RotateY(-facing * math::HALFPI);
+	return Transform::FromMatrix(m);
+}
 
 ///////////////////////////
 
@@ -48,11 +61,20 @@ CR_REG_METADATA(GhostSolidObject, (
 
 	CR_MEMBER(facing),
 	CR_MEMBER(team),
+	CR_MEMBER(paletteIndex),
 	CR_IGNORED(currentIconIndex),
 
+	CR_IGNORED(worldTransformAlloc),
 	CR_IGNORED(model),
 
 	CR_POSTLOAD(PostLoad)
+))
+
+CR_BIND(CUnitDrawerData::LiveGhostBuilding, )
+CR_REG_METADATA(CUnitDrawerData::LiveGhostBuilding, (
+	CR_MEMBER(unit),
+	CR_MEMBER(paletteIndex),
+	CR_MEMBER(team)
 ))
 
 CR_BIND(CUnitDrawerData::TempDrawUnit, )
@@ -88,6 +110,15 @@ void GhostSolidObject::PostLoad()
 	RECOIL_DETAILED_TRACY_ZONE;
 	model = nullptr;
 	GetModel();
+
+	// the GPU world transform slot is render-only state; re-create it from the saved pos/facing
+	InitWorldTransform();
+}
+
+void GhostSolidObject::InitWorldTransform()
+{
+	worldTransformAlloc = ScopedTransformMemAlloc(1);
+	worldTransformAlloc.UpdateForced(0, MakeGhostWorldTransform(pos, facing));
 }
 
 const S3DModel* GhostSolidObject::GetModel() const
@@ -157,6 +188,7 @@ CUnitDrawerData::~CUnitDrawerData()
 				if (tmpGso->DecRef())
 					continue;
 
+				// worldTransformAlloc frees its slot in ~GhostSolidObject (ghostMemPool.free below)
 				// <ghost> might be the gbOwner of a decal; groundDecals is deleted after us
 				groundDecals->GhostDestroyed(tmpGso);
 				ghostMemPool.free(tmpGso);
@@ -165,6 +197,7 @@ CUnitDrawerData::~CUnitDrawerData()
 			lgb.clear();
 		}
 	}
+	liveGhostTransforms.clear(); // each entry's ScopedTransformMemAlloc frees its slot on erase
 	assert(ghostMemPool.allocs() == 0);
 	ghostMemPool.clear();
 
@@ -216,6 +249,8 @@ void CUnitDrawerData::Update()
 			updateBody(unit);
 	}
 
+	UpdateLiveGhostTransforms();
+
 	if ((useDistToGroundForIcons = (camHandler->GetCurrentController()).GetUseDistToGroundForIcons())) {
 		const float3& camPos = camera->GetPos();
 		// use the height at the current camera position
@@ -264,29 +299,41 @@ void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
-	constexpr unsigned short inLosOrRad = (LOS_INLOS | LOS_INRADAR);
 	constexpr unsigned short prevMask = (LOS_PREVLOS | LOS_CONTRADAR);
 
 	// use the unit's custom icon if we can currently see it,
 	// or have seen it before and did not lose contact since
-	bool unitVisible =
-		(losStatus & inLosOrRad) != 0 &&
-		(losStatus & prevMask) == prevMask ||
-		gameSetup->ghostedBuildings && unit->unitDef->IsBuildingUnit() && (losStatus & LOS_PREVLOS) != 0;
+	bool isInLOS    = (losStatus & LOS_INLOS  ) == LOS_INLOS;
+	bool isInPrvLos = (losStatus & LOS_PREVLOS) == LOS_PREVLOS;
+	bool isInRadar  = (losStatus & LOS_INRADAR) == LOS_INRADAR;
+	bool seenUnit   = (losStatus & prevMask   ) == prevMask;
+	bool isGhostBuilding = gameSetup->ghostedBuildings && unit->leavesGhost && isInPrvLos;
 
-	const bool customIcon = (unitVisible || gu->spectatingFullView);
+	bool unitVisible = isInLOS || (isInRadar && seenUnit) || isGhostBuilding;
 
-	if (customIcon)
-		unit->currentIconIndex = icon::iconHandler.GetIconIdxOrDefault(unit->definedIconName);
-	else if ((losStatus & LOS_INRADAR) != 0)
+	const bool typedIcon = (unitVisible || gu->spectatingFullView);
+
+	if (typedIcon) {
+		unit->currentIconIndex =
+			(unit->customIconIndex != icon::INVALID_ICON_INDEX) ? unit->customIconIndex : icon::iconHandler.GetIconIdxOrDefault(unit->definedIconName);
+	}
+	else if ((losStatus & LOS_INRADAR) != 0) {
 		unit->currentIconIndex = icon::iconHandler.GetDefaultIconIdx();
-	else
+	}
+	else {
 		unit->currentIconIndex = icon::INVALID_ICON_INDEX;
+	}
 }
 
 void CUnitDrawerData::UpdateUnitIconState(CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
+	if unlikely(unit->currentIconIndex == icon::INVALID_ICON_INDEX) {
+		unit->SetIsIcon(false);
+		return;
+	}
+
 	const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
 
 	unit->SetIsIcon((losStatus & LOS_INRADAR) != 0);
@@ -295,12 +342,13 @@ void CUnitDrawerData::UpdateUnitIconState(CUnit* unit)
 	if ((losStatus & LOS_INLOS) != 0 || gu->spectatingFullView) {
 		bool asIcon = true;
 
-		asIcon &= (!unit->noDraw);
-		asIcon &= (!unit->IsInVoid());
+		asIcon = asIcon && !unit->noDraw;
+		asIcon = asIcon && !unit->IsInVoid();
 
-		asIcon &= DrawAsIconByDistance(unit, (unit->pos - camera->GetPos()).SqLength());
+		asIcon = asIcon && DrawAsIconByDistance(unit, (unit->pos - camera->GetPos()).SqLength());
 		// drawing icons is cheap but not free, avoid a perf-hit when many are offscreen
-		asIcon &= (camera->InView(unit->drawMidPos, unit->GetDrawRadius()));
+		asIcon = asIcon && camera->InView(unit->drawMidPos, unit->GetDrawRadius());
+
 		unit->SetIsIcon(asIcon);
 	}
 }
@@ -604,6 +652,7 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 				gso->facing = u->buildFacing;
 				gso->dir = u->frontdir;
 				gso->team = u->team;
+				gso->paletteIndex = u->paletteIndex;
 				gso->radius = u->radius;
 				gso->GetModel();
 
@@ -611,6 +660,8 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 				gso->currentIconIndex = icon::iconHandler.GetIconIdxOrDefault(unit->definedIconName);
 
 				gso->iconRadius = u->iconRadius;
+
+				gso->InitWorldTransform();
 
 				groundDecals->GhostCreated(u, gso);
 
@@ -627,7 +678,8 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 
 		}
 
-		spring::VectorErase(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(u)], u);
+		spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(u)],
+			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
 	}
 	return addedOwnAllyTeam;
 }
@@ -661,7 +713,8 @@ void CUnitDrawerData::UnitEnteredLos(const CUnit* unit, int allyTeam)
 	CUnit* u = const_cast<CUnit*>(unit); //cleanup
 
 	if (unit->leavesGhost)
-		spring::VectorErase(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)], u);
+		spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)],
+			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
 
 	if (allyTeam != gu->myAllyTeam)
 		return;
@@ -674,13 +727,51 @@ void CUnitDrawerData::UnitLeftLos(const CUnit* unit, int allyTeam)
 	RECOIL_DETAILED_TRACY_ZONE;
 	CUnit* u = const_cast<CUnit*>(unit); //cleanup
 
-	if (unit->leavesGhost)
-		spring::VectorInsertUnique(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)], u, true);
+	if (unit->leavesGhost) {
+		// snapshot the color the unit is last seen under so a later team change (while out of LOS)
+		// does not recolor its ghost. keep the earliest snapshot if it re-fires without re-entering.
+		auto& lgbs = savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)];
+		const bool alreadyGhosted = std::any_of(lgbs.begin(), lgbs.end(),
+			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
+		if (!alreadyGhosted)
+			lgbs.push_back({ u, u->paletteIndex, static_cast<uint8_t>(u->team) });
+	}
 
 	if (allyTeam != gu->myAllyTeam)
 		return;
 
 	UpdateCurrentUnitIcon(unit);
+}
+
+void CUnitDrawerData::UpdateLiveGhostTransforms()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// Maintain one world-transform slot per live ghost building drawn for the local allyTeam.
+	// Ghosts are static, so each slot is filled once on first sight; entries not seen this sweep
+	// (units that regained LOS, died, or belong to a different allyTeam now) are freed.
+	const int stamp = ++liveGhostSweepStamp;
+
+	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
+		for (const auto& lgb : savedData.liveGhostBuildings[gu->myAllyTeam][modelType]) {
+			const CUnit* u = lgb.unit;
+			const auto it = liveGhostTransforms.find(u);
+			if (it == liveGhostTransforms.end()) {
+				ScopedTransformMemAlloc alloc(1);
+				alloc.UpdateForced(0, MakeGhostWorldTransform(u->pos, u->buildFacing));
+				liveGhostTransforms.emplace(u, std::make_pair(std::move(alloc), stamp));
+			}
+			else {
+				it->second.second = stamp;
+			}
+		}
+	}
+
+	for (auto it = liveGhostTransforms.begin(); it != liveGhostTransforms.end(); ) {
+		if (it->second.second != stamp)
+			it = liveGhostTransforms.erase(it); // ScopedTransformMemAlloc frees the slot on erase
+		else
+			++it;
+	}
 }
 
 void CUnitDrawerData::UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost)
@@ -719,6 +810,7 @@ void CUnitDrawerData::PlayerChanged(int playerID)
 void CUnitDrawerData::RemoveDeadGhost(GhostSolidObject* gso, std::vector<GhostSolidObject*>& dgb, int index)
 {
 	if (!gso->DecRef()) {
+		// worldTransformAlloc frees its slot in ~GhostSolidObject (ghostMemPool.free)
 		groundDecals->GhostDestroyed(gso);
 		ghostMemPool.free(gso);
 	}

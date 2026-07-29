@@ -62,9 +62,8 @@ namespace creg {
 	class FakeType : public IType
 	{
 	public:
-		FakeType(const IType* orig_)
+		FakeType()
 			: IType(0)
-			, orig(orig_)
 		{}
 		~FakeType() {}
 
@@ -72,10 +71,10 @@ namespace creg {
 		{}
 		std::string GetName() const
 		{
-			return orig->GetName();
+			return "fake";
 		}
 	protected:
-		const IType* orig = nullptr;
+		const std::string name;
 	};
 
 	class BasicType : public IType

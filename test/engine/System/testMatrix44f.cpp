@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include <xmmintrin.h> //SSE1
-
+#include "System/simd_compat.h"
 #include "System/Matrix44f.h"
 #include "System/float4.h"
 #include "System/TimeProfiler.h"
@@ -287,11 +286,4 @@ TEST_CASE("Matrix44MatrixMultiply")
 			m[i] = 0.0f;
 		}
 	}
-}
-
-TEST_CASE("MatMult")
-{
-	BENCHMARK("MM")	{
-		return 0;
-	};
 }

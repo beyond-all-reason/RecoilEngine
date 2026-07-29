@@ -21,6 +21,8 @@
 #include "System/FileSystem/SimpleParser.h"
 #include "System/Log/ILog.h"
 
+#include <fmt/format.h>
+
 #include "System/Misc/TracyDefs.h"
 
 //////////////////////////////////////////////////////////////////////
@@ -35,7 +37,7 @@ struct TexFile {
 	std::string name;
 };
 
-
+static constexpr auto DEFAULT_NUM_OF_TEXTURE_LEVELS = 4;
 void C3DOTextureHandler::Init()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -49,6 +51,7 @@ void C3DOTextureHandler::Init()
 
 	// NOTE: most Intels report maxTextureSize=2048, some even 1024 (!)
 	atlasAlloc->SetMaxSize(std::min(globalRendering->maxTextureSize, 4096), std::min(globalRendering->maxTextureSize, 4096));
+	atlasAlloc->SetMaxTexLevel(DEFAULT_NUM_OF_TEXTURE_LEVELS);
 
 	// default for 3DO primitives that point to non-existing textures
 	textures["___dummy___"] = UnitTexture(0.0f, 0.0f, 1.0f, 1.0f);
@@ -58,14 +61,14 @@ void C3DOTextureHandler::Init()
 	}
 
 	const bool allocated = atlasAlloc->Allocate();
-	const int2 curAtlasSize = atlasAlloc->GetAtlasSize();
-	const int2 maxAtlasSize = atlasAlloc->GetMaxSize();
+	const auto& curAtlasSize = atlasAlloc->GetAtlasSize();
+	const auto& maxAtlasSize = atlasAlloc->GetMaxSize();
 
 	if (!allocated) {
 		// either the algorithm simply failed to fit all
 		// textures or the textures would really not fit
 		LOG_L(L_WARNING,
-			"[%s] failed to allocate 3DO texture-atlas memory (size=%dx%d max=%dx%d)",
+			"[%s] failed to allocate 3DO texture-atlas memory (size=%ux%u max=%ux%u)",
 			__func__,
 			curAtlasSize.x, curAtlasSize.y,
 			maxAtlasSize.x, maxAtlasSize.y
@@ -101,7 +104,7 @@ void C3DOTextureHandler::Init()
 
 		const size_t foundx = atlasAlloc->GetEntry(texFile.name).x;
 		const size_t foundy = atlasAlloc->GetEntry(texFile.name).y;
-		const auto texCoords = atlasAlloc->GetTexCoords(texFile.name);
+		const auto texCoords = atlasAlloc->GetTexCoordsCntr(texFile.name);
 
 		const uint8_t* rmem1 = curtex1.GetRawMem();
 		const uint8_t* rmem2 = curtex2.GetRawMem();
@@ -118,7 +121,7 @@ void C3DOTextureHandler::Init()
 		textures[texFile.name] = UnitTexture(texCoords);
 	}
 
-	const int numLevels = atlasAlloc->GetNumTexLevels();
+	numLevels = atlasAlloc->GetNumTexLevels();
 
 	{
 		glGenTextures(1, &atlas3do1);
@@ -170,6 +173,21 @@ void C3DOTextureHandler::Kill()
 	atlas3do2 = 0;
 
 	textures.clear();
+}
+
+void C3DOTextureHandler::DumpAtlasTextures(const std::string& fileExt) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (atlas3do1) {
+		for (int level = 0; level < numLevels; ++level) {
+			glSaveTexture(atlas3do1, fmt::format("3DOAtlas1-{}.{}", level, fileExt).c_str(), level);
+		}
+	}
+	if (atlas3do2) {
+		for (int level = 0; level < numLevels; ++level) {
+			glSaveTexture(atlas3do2, fmt::format("3DOAtlas2-{}.{}", level, fileExt).c_str(), level);
+		}
+	}
 }
 
 

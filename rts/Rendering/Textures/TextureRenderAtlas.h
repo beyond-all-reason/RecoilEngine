@@ -21,13 +21,14 @@ class CTextureRenderAtlas {
 public:
 	struct UniqueSubTexture {
 		uint32_t texID;
+		uint32_t stableIdx; // deterministic index for name generation (texID is non-deterministic)
 		float4 subTexCoords;
 		std::string GetName() const;
 
 		bool operator==(const UniqueSubTexture&) const = default;
 	};
 public:
-	CTextureRenderAtlas(CTextureAtlas::AllocatorType allocType, int atlasSizeX, int atlasSizeY, uint32_t glInternalType = /*GL_RGBA8*/0x8058, const std::string& atlasName = "");
+	CTextureRenderAtlas(CTextureAtlas::AllocatorType allocType, int atlasSizeX, int atlasSizeY, int maxLevels, uint32_t glInternalType = /*GL_RGBA8*/0x8058, const std::string& atlasName = "");
 	~CTextureRenderAtlas();
 	CTextureRenderAtlas(const CTextureRenderAtlas&) = delete;
 	CTextureRenderAtlas(CTextureRenderAtlas&&) noexcept = default;
@@ -51,24 +52,32 @@ public:
 
 	uint32_t GetTexTarget() const;
 	uint32_t GetTexID() const;
-	const int2& GetAtlasSize() const;
+	const uint2& GetAtlasSize() const;
 	int GetMinDim() const;
 	int GetNumTexLevels() const;
-	void SetMaxTexLevel(int maxLevels);
 
 	const IAtlasAllocator* GetAllocator() const { return atlasAllocator.get(); }
 	const std::string& GetAtlasName() const { return atlasName; }
 
-	bool Finalize();
+	bool Finalize() { return CalculateAtlas() && CreateAtlasTexture(); }
+	bool CalculateAtlas();
+	bool CreateAtlasTexture();
+
 	bool IsValid() const;
 
 	uint32_t DisownTexture();
 
-	bool DumpTexture() const;
+	bool DumpTexture(const std::string& fileExt = "png") const;
 private:
+
+
 	bool AddTexFromBitmapRaw(const std::string& name, const CBitmap& bm, const float4& subTexCoords, const std::string& refFileName);
 
-	spring::unordered_map<std::string, uint32_t> filenameToTexID;
+	struct FileTexEntry {
+		uint32_t texID;
+		uint32_t stableIdx;
+	};
+	spring::unordered_map<std::string, FileTexEntry> filenameToTexID;
 	spring::unordered_map<std::string, UniqueSubTexture> uniqueSubTextureMap;
 	spring::unordered_map<std::string, std::string> nameToUniqueSubTexStr;
 
@@ -81,7 +90,8 @@ private:
 	std::string atlasName;
 	static inline size_t shaderRef = 0;
 	static inline Shader::IProgramObject* shader = nullptr;
-	bool finalized;
+	bool atlasFinalized;
+	bool atlasRendered;
 public:
 	static inline AtlasedTexture dummy = AtlasedTexture{};
 };

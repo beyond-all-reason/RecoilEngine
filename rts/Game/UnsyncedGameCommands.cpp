@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 #include <array>
+#include <format>
 #include <functional>
 #include <tuple>
 
@@ -81,6 +82,7 @@
 #include "Rendering/Env/IWater.h"
 #include "Rendering/Env/GrassDrawer.h"
 #include "Rendering/Env/Particles/ProjectileDrawer.h"
+#include "Rendering/IconHandler.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Map/InfoTexture/Modern/Path.h"
@@ -252,6 +254,22 @@ public:
 
 
 
+class CancelCommandActionExecutor : public IUnsyncedActionExecutor {
+public:
+	CancelCommandActionExecutor() : IUnsyncedActionExecutor("CancelCommand", "Cancels the active command (build/order mode)") {
+	}
+
+	bool Execute(const UnsyncedAction& action) const final {
+		if (guihandler == nullptr)
+			return false;
+
+		guihandler->CancelActiveCommand();
+		return true;
+	}
+};
+
+
+
 class MapMeshDrawerActionExecutor : public IUnsyncedActionExecutor {
 public:
 	MapMeshDrawerActionExecutor() : IUnsyncedActionExecutor("mapmeshdrawer", "Switch map-mesh rendering modes: 0=GCM, 1=HLOD, 2=ROAM") {
@@ -269,7 +287,7 @@ public:
 		}
 
 		auto args = CSimpleParser::Tokenize(action.GetArgs());
-		bool parseFailure;
+		bool parseFailure = false;
 
 		int smfMeshDrawerArg = (!args.empty()) ? StringToInt(args[0], &parseFailure) : -1.0;
 		if (parseFailure) smfMeshDrawerArg = -1.0;
@@ -3816,28 +3834,51 @@ public:
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		auto projFunc = []() {
+		auto args = CSimpleParser::Tokenize(action.GetArgs(), 1);
+
+		// extract optional file extension (last arg if not a known atlas name)
+		std::string fileExt = "png";
+		if (!args.empty()) {
+			auto lastArg = StringToLower(args.back());
+			switch (hashString(lastArg.c_str())) {
+				case hashString("proj"):
+				case hashString("3do"):
+				case hashString("decal"):
+				case hashString("decals"):
+				case hashString("icons"):
+					break;
+				default:
+					fileExt = std::move(lastArg);
+					args.pop_back();
+					break;
+			}
+		}
+
+		auto projFunc = [&fileExt]() {
 			LOG("Dumping projectile textures");
-			projectileDrawer->textureAtlas->DumpTexture("TextureAtlas");
-			projectileDrawer->groundFXAtlas->DumpTexture("GroundFXAtlas");
+			projectileDrawer->textureAtlas->DumpTexture("TextureAtlas", fileExt);
+			projectileDrawer->groundFXAtlas->DumpTexture("GroundFXAtlas", fileExt);
 		};
-		auto threeDoFunc = []() {
+		auto threeDoFunc = [&fileExt]() {
 			LOG("Dumping 3do atlas textures");
-			glSaveTexture(textureHandler3DO.GetAtlasTex1ID(), "3doTex1.png");
-			glSaveTexture(textureHandler3DO.GetAtlasTex2ID(), "3doTex2.png");
+			textureHandler3DO.DumpAtlasTextures(fileExt);
 		};
-		auto decalsFunc = []() {
+		auto decalsFunc = [&fileExt]() {
 			LOG("Dumping decal atlas textures");
-			groundDecals->DumpAtlasTextures();
+			groundDecals->DumpAtlasTextures(fileExt);
+		};
+		auto iconsFunc = [&fileExt]() {
+			LOG("Dumping icon atlas textures");
+			icon::iconHandler.DumpAtlasTextures(fileExt);
 		};
 		std::array argsExec = {
 			ArgTuple(hashString("proj"), false, projFunc),
 			ArgTuple(hashString("3do"), false, threeDoFunc),
 			ArgTuple(hashString("decal"), false, decalsFunc),
-			ArgTuple(hashString("decals"), false, decalsFunc)
+			ArgTuple(hashString("decals"), false, decalsFunc),
+			ArgTuple(hashString("icons"), false, iconsFunc)
 		};
 
-		auto args = CSimpleParser::Tokenize(action.GetArgs(), 1);
 		return GenericArgsExecutor(args, argsExec);
 	}
 };
@@ -4013,6 +4054,7 @@ void UnsyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<SelectUnitsActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<SelectCycleActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<DeselectActionExecutor>());
+	AddActionExecutor(AllocActionExecutor<CancelCommandActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<ShadowsActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<DumpShadowsActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<MapShadowPolyOffsetActionExecutor>());

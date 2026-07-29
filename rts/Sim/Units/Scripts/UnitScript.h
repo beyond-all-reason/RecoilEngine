@@ -32,18 +32,18 @@ public:
 
 protected:
 	CUnit* unit;
-	bool busy;
+	uint32_t checksum;
 
 	struct AnimInfo {
 		CR_DECLARE_STRUCT(AnimInfo)
-		AnimType animType;
-		int axis;
-		int piece;
-		float speed;
-		float dest;     // means final position when turning or moving, final speed when spinning
-		float accel;    // used for spinning, can be negative
-		bool done;
-		bool hasWaiting;
+		AnimType animType = ANone;
+		int axis  = -1;
+		int piece = -1;
+		float speed = 0.0f;
+		float dest  = 0.0f;    // means final position when turning or moving, final speed when spinning
+		float accel = 0.0f;    // used for spinning, can be negative
+		bool done = false;
+		bool hasWaiting = false;
 	};
 
 	using AnimContainerType = std::vector<AnimInfo>;
@@ -54,6 +54,7 @@ protected:
 	AnimContainerType anims;
 	AnimContainerType doneAnims;
 
+	bool busy;
 	bool hasSetSFXOccupy;
 	bool hasRockUnit;
 	bool hasStartBuilding;
@@ -115,6 +116,7 @@ public:
 	      CUnit* GetUnit()       { return unit; }
 	const CUnit* GetUnit() const { return unit; }
 
+	auto GetAnimArrayChecksum() const { return checksum; }
 	void TickAllAnims(int tickRate);
 	bool TickAnimFinished();
 	// note: must copy-and-set here (LMP dirty flag, etc)
@@ -216,6 +218,9 @@ public:
 	virtual bool  BlockShot(int weaponNum, const CUnit* targetUnit, bool userTarget) = 0; // returns whether shot should be blocked
 	virtual float TargetWeight(int weaponNum, const CUnit* targetUnit) = 0; // returns target weight
 	virtual void AnimFinished(AnimType type, int piece, int axis) = 0;
+public:
+	const auto& GetLiveAnims() const { return anims; }
+	const auto& GetDoneAnims() const { return doneAnims; }
 };
 
 #endif // UNIT_SCRIPT_H

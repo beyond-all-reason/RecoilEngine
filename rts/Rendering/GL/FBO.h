@@ -25,6 +25,7 @@ public:
 	 * if FrameBuffers are supported by the current platform
 	 */
 	static bool IsSupported();
+	static bool IsReady();
 	static GLint GetCurrentBoundFBO();
 
 	FBO(         ) { Init(false); }
@@ -187,9 +188,9 @@ private:
 		}
 
 	public:
-		GLuint id;
-		GLsizei xsize, ysize, zsize;
-		GLenum target, format, type;
+		GLuint id = 0;
+		GLsizei xsize = 0, ysize = 0, zsize = 0;
+		GLenum target = 0, format = 0, type = 0;
 		std::vector<unsigned char> pixels;
 	};
 

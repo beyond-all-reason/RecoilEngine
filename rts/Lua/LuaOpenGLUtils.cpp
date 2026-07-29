@@ -636,7 +636,7 @@ GLuint LuaMatTexture::GetTextureID() const
 		case LUATEX_DECALS_ATLAS: { texID = groundDecals->GetTexID(); } break;
 
 		case LUATEX_ICONS_ATLAS0: { texID = icon::iconHandler.GetAtlasTextureID(0); } break;
-		case LUATEX_ICONS_ATLAS1: { texID = icon::iconHandler.GetAtlasTextureID(0); } break;
+		case LUATEX_ICONS_ATLAS1: { texID = icon::iconHandler.GetAtlasTextureID(1); } break;
 
 		default: {
 			assert(false);
@@ -1113,6 +1113,8 @@ void LuaMatTexture::Print(const string& indent) const
 
 		STRING_CASE(typeName, LUATEX_ICONS_ATLAS0);
 		STRING_CASE(typeName, LUATEX_ICONS_ATLAS1);
+
+		STRING_CASE(typeName, LUATEX_LUATEXTUREATLAS);
 
 		#undef STRING_CASE
 	}

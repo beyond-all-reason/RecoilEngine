@@ -104,7 +104,6 @@ CGroundDecalHandlerData::CGroundDecalHandlerData()
 	, decalsUpdateList{ }
 	, smfDrawer{ nullptr }
 	, highQuality{ configHandler->GetBool("HighQualityDecals") && (globalRendering->msaaLevel > 0) }
-	, ghostDimming{ configHandler->GetFloat("UnitGhostIconsDimming") }
 	, sdbc{ highQuality }
 {
 }
@@ -153,12 +152,18 @@ CGroundDecalHandler::~CGroundDecalHandler()
 }
 
 namespace Impl {
-	auto LoadTexture(const std::string& name, bool convertDecalBitmap, const std::string& errMsg)
+	enum class LoadResult {
+		SUCCESS = 0,
+		FILE_NOT_FOUND = 1,
+		BITMAP_ERROR = 2
+	};
+
+	std::tuple<LoadResult, CBitmap, std::string> LoadTexture(const std::string& name, bool convertDecalBitmap, const std::string& errMsg)
 	{
 		RECOIL_DETAILED_TRACY_ZONE;
 		std::string fileName = StringToLower(name);
 
-		if (FileSystem::GetExtension(fileName).empty())
+		if (FileSystem::GetExtensionLowerCase(fileName).empty())
 			fileName += ".bmp";
 
 		std::string fullName = fileName;
@@ -169,11 +174,15 @@ namespace Impl {
 		if (!CFileHandler::FileExists(fullName, SPRING_VFS_ALL))
 			fullName = std::string("unittextures/") + fileName;
 
+		if (!CFileHandler::FileExists(fullName, SPRING_VFS_ALL)) {
+			return std::make_tuple(LoadResult::FILE_NOT_FOUND, CBitmap(), fileName);
+		}
+
 		CBitmap bm;
 		if (!bm.Load(fullName))
-			throw content_error(fmt::format(", {} file: \"{}\"", errMsg, fileName));
+			return std::make_tuple(LoadResult::BITMAP_ERROR, CBitmap(), fullName);
 
-		if (convertDecalBitmap && FileSystem::GetExtension(fullName) == "bmp") {
+		if (convertDecalBitmap && FileSystem::GetExtensionLowerCase(fullName) == "bmp") {
 			// bitmaps don't have an alpha channel
 			// so use: red := brightness & green := alpha
 			auto* rmem = bm.GetRawMem();
@@ -194,7 +203,7 @@ namespace Impl {
 		}
 		// non BMP scar textures doesn't follow the above historic convention, so keep them as is
 
-		return std::make_tuple(bm, fullName);
+		return std::make_tuple(LoadResult::SUCCESS, bm, fullName);
 	}
 }
 
@@ -204,16 +213,20 @@ static inline std::string GetExtraTextureName(const std::string& mainTex) {
 	return mainTex.substr(0, dotPos) + "_normal" + (dotPos == string::npos ? "" : mainTex.substr(dotPos));
 }
 
-void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP, const std::string& errMsg) {
+void CGroundDecalHandler::AddTexToAtlas(const std::string& name, const std::string& filename, bool convertOldBMP, const std::string& errMsg, bool reportMissingFile) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	try {
-		const auto& [bm, fn] = Impl::LoadTexture(filename, convertOldBMP, errMsg);
+
+	const auto [res, bm, fn] = Impl::LoadTexture(filename, convertOldBMP, errMsg);
+	if (res == Impl::LoadResult::SUCCESS) {
 		if (atlasTex->AddTexFromBitmap(name, bm, filename)) {
 			texFileNames.emplace(name, fn);
 		}
 	}
-	catch (const content_error& err) {
-		LOG_L(L_WARNING, "%s", err.what());
+	else if (res == Impl::LoadResult::BITMAP_ERROR) {
+		LOG_L(L_WARNING, "%s", fmt::format("{}. Failed loading decal bitmap: \"{}\"", errMsg, fn).c_str());
+	}
+	else if (reportMissingFile) {
+		LOG_L(L_WARNING, "%s", fmt::format("{}. Decal file not found: \"{}\"", errMsg, fn).c_str());
 	}
 }
 
@@ -242,8 +255,8 @@ void CGroundDecalHandler::AddBuildingDecalTextures()
 
 			const std::string ERR_MSG = fmt::format("Error loading a ground decal texture from {}Defs, def.name = {}", defName, soDef.name);
 
-			AddTexToAtlas(mainTex, mainTex, false, ERR_MSG);
-			AddTexToAtlas(normTex, normTex, false, ERR_MSG);
+			AddTexToAtlas(mainTex, mainTex, false, ERR_MSG,  true);
+			AddTexToAtlas(normTex, normTex, false, ERR_MSG, false);
 		}
 	};
 
@@ -277,12 +290,11 @@ void CGroundDecalHandler::AddTexturesFromTable()
 		const auto mainName = IntToString(i, "mainscar_%i");
 		const auto normName = IntToString(i, "normscar_%i");
 
-		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_SCAR1);
-		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_SCAR1);
+		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_SCAR1,  true);
+		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_SCAR1, false);
 
 		// check if loaded for real
-		// can't use atlas->TextureExists() as it's only populated after Finalize()
-		maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
+		maxUniqueScars += atlasTex->TextureExists(mainName);
 	}
 
 	// fill the gaps in case the loop above failed to load some of the scar textures
@@ -303,8 +315,8 @@ void CGroundDecalHandler::AddTexturesFromTable()
 				const std::string mainTexFileName = scarMainTextures[extraTexNum++ % scarsExtraNum];
 				const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
 
-				AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_SCAR2);
-				AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_SCAR2);
+				AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_SCAR2,  true);
+				AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_SCAR2, false);
 
 				maxUniqueScars += atlasTex->GetAllocator()->contains(mainName);
 			}
@@ -325,8 +337,8 @@ void CGroundDecalHandler::AddTexturesFromTable()
 		const auto mainName = IntToString(i, "maindecal_%i");
 		const auto normName = IntToString(i, "normdecal_%i");
 
-		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_DECAL);
-		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_DECAL);
+		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG_DECAL,  true);
+		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG_DECAL, false);
 	}
 }
 
@@ -342,8 +354,8 @@ void CGroundDecalHandler::AddGroundTrackTextures()
 		const auto normName = mainName + "_norm";
 		const std::string normTexFileName = GetExtraTextureName(mainTexFileName);
 
-		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG);
-		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG);
+		AddTexToAtlas(mainName, mainTexFileName,  true, ERR_MSG,  true);
+		AddTexToAtlas(normName, normTexFileName, false, ERR_MSG, false);
 	}
 }
 
@@ -368,13 +380,8 @@ uint32_t CGroundDecalHandler::GetNextId()
 	return 0;
 }
 
-void CGroundDecalHandler::BindVertexAtrribs()
+void CGroundDecalHandler::BindVertexAttributes()
 {
-	for (int i = 0; i <= 8; ++i) {
-		glEnableVertexAttribArray(i);
-		glVertexAttribDivisor(i, 1);
-	}
-
 	for (const AttributeDef& ad : GroundDecal::attributeDefs) {
 		glEnableVertexAttribArray(ad.index);
 		glVertexAttribDivisor(ad.index, 1);
@@ -386,7 +393,7 @@ void CGroundDecalHandler::BindVertexAtrribs()
 	}
 }
 
-void CGroundDecalHandler::UnbindVertexAtrribs()
+void CGroundDecalHandler::UnbindVertexAttributes()
 {
 	for (const AttributeDef& ad : GroundDecal::attributeDefs) {
 		glDisableVertexAttribArray(ad.index);
@@ -400,12 +407,10 @@ uint32_t CGroundDecalHandler::GetDepthBufferTextureTarget() const
 	return highQuality ? GL_TEXTURE_2D_MULTISAMPLE : GL_TEXTURE_2D;
 }
 
-static constexpr CTextureAtlas::AllocatorType defAllocType = CTextureAtlas::ATLAS_ALLOC_MP_LEGACY;
-static constexpr int defNumLevels = 4;
+static constexpr auto DEFAULT_ALLOC_TYPE = CTextureAtlas::ATLAS_ALLOC_MP_LEGACY;
+static constexpr auto DEFAULT_NUM_OF_TEXTURE_LEVELS = 4;
 void CGroundDecalHandler::GenerateAtlasTexture() {
-	atlasTex = std::make_unique<CTextureRenderAtlas>(defAllocType, 0, 0, GL_RGBA8, "Decals");
-
-	atlasTex->SetMaxTexLevel(defNumLevels);
+	atlasTex = std::make_unique<CTextureRenderAtlas>(DEFAULT_ALLOC_TYPE, 0, 0, DEFAULT_NUM_OF_TEXTURE_LEVELS, GL_RGBA8, "Decals");
 
 	// often represented by compressed textures, cannot be added to the regular atlas
 	AddBuildingDecalTextures();
@@ -414,8 +419,8 @@ void CGroundDecalHandler::GenerateAtlasTexture() {
 	AddGroundTrackTextures();
 	AddFallbackTextures();
 
-	if (!atlasTex->Finalize()) {
-		LOG_L(L_ERROR, "Could not finalize %s texture atlas. Use fewer/smaller textures.", atlasTex->GetAtlasName().c_str());
+	if (!atlasTex->CalculateAtlas()) {
+		LOG_L(L_ERROR, "Could not calculate %s texture atlas. Use fewer/smaller textures.", atlasTex->GetAtlasName().c_str());
 	}
 }
 
@@ -625,7 +630,7 @@ void CGroundDecalHandler::AddExplosion(AddExplosionInfo&& ei)
 
 		validScarIndices.emplace_back(scarIdx);
 	}
-	
+
 	int scarIdx;
 	if (validScarIndices.empty())
 		scarIdx = 1 + guRNG.NextInt(maxUniqueScars); //not inclusive
@@ -732,10 +737,10 @@ void CGroundDecalHandler::ReloadTextures()
 	decalsUpdateList.SetNeedUpdateAll();
 }
 
-void CGroundDecalHandler::DumpAtlasTextures()
+void CGroundDecalHandler::DumpAtlasTextures(const std::string& fileExt)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	atlasTex->DumpTexture();
+	atlasTex->DumpTexture(fileExt);
 }
 
 void CGroundDecalHandler::Draw()
@@ -750,7 +755,7 @@ void CGroundDecalHandler::Draw()
 	if (decals.empty())
 		return;
 
-	if (!atlasTex->IsValid())
+	if (!atlasTex->CreateAtlasTexture())
 		return;
 
 	UpdateDecalsVisibility();
@@ -760,11 +765,11 @@ void CGroundDecalHandler::Draw()
 
 		instVBO.Bind();
 		instVBO.New(decals.capacity() * sizeof(GroundDecal), GL_STREAM_DRAW);
-		BindVertexAtrribs();
+		BindVertexAttributes();
 
 		vao.Unbind();
 
-		UnbindVertexAtrribs();
+		UnbindVertexAttributes();
 		instVBO.Unbind();
 		decalsUpdateList.SetNeedUpdateAll();
 	}
@@ -1416,7 +1421,7 @@ void CGroundDecalHandler::AddTrack(const CUnit* unit, const float3& newPos, bool
 	// replace the old entry
 	decalOwners[unit] = decals.size() - 1;
 
-	idToPos[newDecal.info.id], decals.size() - 1;
+	idToPos[newDecal.info.id] = decals.size() - 1;
 	decalsUpdateList.EmplaceBackUpdate();
 }
 
@@ -1555,18 +1560,22 @@ void CGroundDecalHandler::UpdateDecalsVisibility()
 			if (const CUnit* unit = dynamic_cast<const CUnit*>(so); unit != nullptr) {
 				const bool decalOwnerInCurLOS = ((unit->losStatus[gu->myAllyTeam] &   LOS_INLOS) != 0);
 				const bool decalOwnerInPrvLOS = ((unit->losStatus[gu->myAllyTeam] & LOS_PREVLOS) != 0);
-
-#if 0
-				if (unit->GetIsIcon())
-					wantedMult = 0.0f;
-#endif
 				const bool isGhostNow = gameSetup->ghostedBuildings && decalOwnerInPrvLOS && !decalOwnerInCurLOS;
+				const bool iconOnly = (unit->GetDrawFlag() == DrawFlags::SO_DRICON_FLAG);
 
-				if (!gu->spectatingFullView)
-					if (isGhostNow)
-						wantedMult = ghostDimming;
-					else if (!decalOwnerInCurLOS)
-						wantedMult = 0.0f;
+				if (!gu->spectatingFullView && isGhostNow) {
+					// don't show ground decals for ghosts, this not for long used to be ghostDimming
+					// borrowed from icons implementation, see https://github.com/beyond-all-reason/RecoilEngine/issues/2875
+					wantedMult = 0.0f;
+				}
+				else if (iconOnly) {
+					// icon -> hide decal (covers both spectating modes)
+					wantedMult = 0.0f;
+				}
+				else if (!gu->spectatingFullView && !decalOwnerInCurLOS) {
+					// out of LOS, !ghost, !spectatingFullView -> hide
+					wantedMult = 0.0f;
+				}
 
 				wantedMult *= std::clamp(unit->buildProgress, 0.0f, 1.0f);
 			}
@@ -1723,8 +1732,6 @@ void CGroundDecalHandler::ConfigNotify(const std::string& key, const std::string
 		highQuality = newHQ;
 		ReloadDecalShaders();
 	}
-
-	ghostDimming = configHandler->GetFloat("UnitGhostIconsDimming");
 }
 
 void CGroundDecalHandler::RenderUnitCreated(const CUnit* unit, int cloaked) { AddSolidObject(unit); }

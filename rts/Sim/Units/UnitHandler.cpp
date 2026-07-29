@@ -45,7 +45,6 @@ CR_REG_METADATA(CUnitHandler, (
 	CR_MEMBER(unitsByDefs),
 	CR_MEMBER(activeUnits),
 	CR_MEMBER(unitsToBeRemoved),
-	CR_MEMBER(unitsJustAdded),
 
 	CR_MEMBER(builderCAIs),
 
@@ -157,8 +156,6 @@ void CUnitHandler::Kill()
 
 		activeUnits.clear();
 		unitsToBeRemoved.clear();
-		// must be cleaned here in case the game didn't actually start and UpdatePostFrame() never happened
-		unitsJustAdded.clear();
 
 		// only iterated by unsynced code, GetBuilderCAIs has no synced callers
 		builderCAIs.clear();
@@ -224,7 +221,6 @@ bool CUnitHandler::AddUnit(CUnit* unit)
 
 	InsertActiveUnit(unit);
 	teamHandler.Team(unit->team)->AddUnit(unit, CTeam::AddBuilt);
-	unitsJustAdded.emplace_back(unit);
 
 	// 0 is not a valid UnitDef id, so just use unitsByDefs[team][0]
 	// as an unsorted bin to store all units belonging to unit->team
@@ -291,8 +287,6 @@ void CUnitHandler::DeleteUnit(CUnit* delUnit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(delUnit->isDead);
-
-	spring::VectorErase(unitsJustAdded, delUnit);
 
 	// we want to call RenderUnitDestroyed while the unit is still valid
 	eventHandler.RenderUnitDestroyed(delUnit);
@@ -441,19 +435,6 @@ void CUnitHandler::UpdatePreFrame()
 	for (CUnit* unit : activeUnits) {
 		unit->UpdatePrevFrameTransform();
 	}
-
-	inUpdateCall = false;
-}
-
-void CUnitHandler::UpdatePostFrame()
-{
-	SCOPED_TIMER("Sim::Unit::UpdatePostFrame");
-	inUpdateCall = true;
-
-	for (CUnit* unit : unitsJustAdded) {
-		unit->UpdatePrevFrameTransform();
-	}
-	unitsJustAdded.clear();
 
 	inUpdateCall = false;
 }

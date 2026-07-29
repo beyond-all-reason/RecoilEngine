@@ -4,10 +4,9 @@
 #include "LuaHandle.h"
 #include "LuaUtils.h"
 #include "Game/GameVersion.h"
-#include "System/Config/ConfigHandler.h"
 #include "System/Platform/Misc.h"
 #include "Rendering/Fonts/glFont.h"
-#include "Rendering/Fonts/FontHandler.h"
+#include "Sim/Misc/CustomColorPalette.h"
 
 /******************************************************************************
  * Engine constants
@@ -29,6 +28,7 @@
  * @field noHandicapForReclaim boolean Whether handicap is applied to income from reclaim
  * @field groupAddDoesntSelect boolean Whether 'group add' also selects the group (does both if false)
  * @field deadTeamsKeepUnitLimit boolean Whether engine redistributes dead team unitlimit to allies (false) or keeps it as-is (true)
+ * @field reliableLuaMapShaders boolean Whether forward-only Lua map shaders activate without a deferred draw and Spring.SetMapShader program swaps refresh cached uniform locations
  */
 
 /***
@@ -60,6 +60,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	LuaPushNamedNumber(L, "wordSize", (!CLuaHandle::GetHandleSynced(L))? Platform::NativeWordSize() * 8: 0);
 
 	LuaPushNamedNumber(L, "gameSpeed", GAME_SPEED);
+	LuaPushNamedNumber(L, "maxCustomPaletteID", MAX_CUSTOM_COLORS - 1);
 
 	/* If possible, entries should be bools that resolve to false in the "old" version
 	 * and to true in the "new" version; this is because any version beforehand has it
@@ -83,6 +84,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "noHandicapForReclaim", true);
 		LuaPushNamedBool(L, "groupAddDoesntSelect", true);
 		LuaPushNamedBool(L, "deadTeamsKeepUnitLimit", false);
+		LuaPushNamedBool(L, "reliableLuaMapShaders", true);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");

@@ -10,7 +10,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 find_package_static(ZLIB 1.2.7 REQUIRED)
 
 list(APPEND unitsync_libs ${CMAKE_DL_LIBS})
-list(APPEND unitsync_libs 7zip prd::jsoncpp lua headlessStubs archives_nothreadpool nowide::nowide)
+list(APPEND unitsync_libs 7zip prd::jsoncpp lua headlessStubs archives_nothreadpool nowide::nowide fmt::fmt)
 list(APPEND unitsync_libs ZLIB::ZLIB)
 list(APPEND unitsync_libs ${SPRING_MINIZIP_LIBRARY})
 
@@ -67,6 +67,7 @@ set(main_files
 	"${ENGINE_SRC_ROOT}/Lua/LuaParser.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaUtils.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaIO.cpp"
+	"${ENGINE_SRC_ROOT}/Lua/LuaLibs.cpp"
 	"${ENGINE_SRC_ROOT}/Map/MapParser.cpp"
 	"${ENGINE_SRC_ROOT}/Map/SMF/SMFMapFile.cpp"
 	"${ENGINE_SRC_ROOT}/Sim/Misc/SideParser.cpp"

@@ -12,7 +12,7 @@
 
 #include "System/Misc/TracyDefs.h"
 
-static int NODE_MIN_SIZE = 8;
+static constexpr uint32_t NODE_MIN_SIZE = 8;
 
 
 struct QuadTreeNode {

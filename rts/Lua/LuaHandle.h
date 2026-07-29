@@ -76,8 +76,6 @@ class CLuaHandle : public CEventClient
 
 		bool GetUserMode() const { return userMode; }
 
-		static int GetHandleAllowChanges(const lua_State* L) { return GetLuaContextData(L)->allowChanges; }
-
 		static CLuaHandle* GetHandle(lua_State* L) { return (GetLuaContextData(L)->owner); }
 
 		static void SetHandleRunning(lua_State* L, const bool _running) {
@@ -220,6 +218,10 @@ class CLuaHandle : public CEventClient
 		void CameraRotationChanged(const float3& rot) override;
 		void CameraPositionChanged(const float3& pos) override;
 
+		void MiniMapRotationChanged(const float newRot, const float oldRot) override;
+		void MiniMapStateChanged(const bool isMinimized, const bool isMaximized, const bool isSlaved) override;
+		void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim) override;
+
 		bool CommandNotify(const Command& cmd) override;
 
 		bool AddConsoleLine(const std::string& msg, const std::string& section, int level) override;
@@ -282,6 +284,8 @@ class CLuaHandle : public CEventClient
 		void DrawShadowUnitsLua() override;
 		void DrawShadowFeaturesLua() override;
 
+		void DrawBuildSquare(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses) override;
+
 		void GameProgress(int frameNum) override;
 		void Pong(uint8_t pingTag, const spring_time pktSendTime, const spring_time pktRecvTime) override;
 
@@ -325,6 +329,7 @@ class CLuaHandle : public CEventClient
 		bool AddBasicCalls(lua_State* L);
 		bool AddCommonModules(lua_State* L);
 		bool LoadCode(lua_State* L, std::string code, const std::string& debug);
+		void InitLuaSocket(lua_State* L);
 		static bool AddEntriesToTable(lua_State* L, const char* name, bool (*entriesFunc)(lua_State*));
 
 		/// returns error code and sets traceback on error

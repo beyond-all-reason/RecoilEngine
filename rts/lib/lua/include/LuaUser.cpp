@@ -280,14 +280,20 @@ void* spring_lua_alloc(void* ud, void* ptr, size_t osize, size_t nsize)
 	// ptr is NULL if and only if osize is zero
 	// behaves like realloc when nsize!=0 and osize!=0 (ptr != NULL)
 	// behaves like malloc when nsize!=0 and osize==0 (ptr == NULL)
+#if LUA_MEASURE_ALLOC_TIME == 1
 	const spring_time t0 = spring_gettime();
+#endif
 	void* mem = lmp->Realloc(ptr, nsize, osize);
+#if LUA_MEASURE_ALLOC_TIME == 1
 	const spring_time t1 = spring_gettime();
+#endif
 
 	gLuaAllocState.numLuaAllocs += 1;
+#if LUA_MEASURE_ALLOC_TIME == 1
 	gLuaAllocState.luaAllocTime += (t1 - t0).toMicroSecsi();
-	las->numLuaAllocs += 1;
 	las->luaAllocTime += (t1 - t0).toMicroSecsi();
+#endif
+	las->numLuaAllocs += 1;
 
 	return mem;
 }

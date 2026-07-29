@@ -333,8 +333,7 @@ bool CCobThread::Tick()
 
 				cobFile->code[pc - 1] = REAL_CALL;
 
-				// fall-through
-			}
+			} [[fallthrough]];
 			case REAL_CALL: {
 				r1 = GET_LONG_PC();
 				r2 = GET_LONG_PC();

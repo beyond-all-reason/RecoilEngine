@@ -15,6 +15,7 @@
 struct S3DModel;
 struct S3DModelPiece {
 	S3DModelPiece() = default;
+	virtual ~S3DModelPiece() = default;
 
 	virtual void Clear() {
 		name.clear();
@@ -95,6 +96,7 @@ public:
 	bool HasBackedTra() const { return bakedTransform.has_value(); }
 private:
 	void CreateShatterPiecesVariation(int num);
+	void DrawStaticLegacyRecImpl(const float3& rootT) const;
 public:
 	std::string name;
 	std::vector<S3DModelPiece*> children;

@@ -2,6 +2,7 @@
 
 #include "LuaConstPlatform.h"
 #include "LuaUtils.h"
+#include "Game/GameVersion.h"
 #include "System/Platform/Hardware.h"
 #include "System/Platform/Misc.h"
 #include "Rendering/GlobalRendering.h"
@@ -129,6 +130,8 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	LuaPushNamedString(L, "osVersion", Platform::GetOSVersionStr());
 	/*** @field Platform.osFamily "Windows"|"Linux"|"MacOSX"|"FreeBSD"|"Unknown" */
 	LuaPushNamedString(L, "osFamily", Platform::GetOSFamilyStr());
+	/*** @field Platform.architecture string CPU architecture (e.g., "x86_64", "arm64") */
+	LuaPushNamedString(L, "architecture", Platform::GetArchitectureStr());
 	/*** @field Platform.hwConfig string */
 	LuaPushNamedString(L, "hwConfig", Platform::GetHardwareStr());
 	/*** @field Platform.cpuLogicalCores integer */
@@ -144,6 +147,16 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	LuaPushNamedString(L, "sysInfoHash", Platform::GetSysInfoHash());
 	/*** @field Platform.macAddrHash string */
 	LuaPushNamedString(L, "macAddrHash", Platform::GetMacAddrHash());
+
+	/*** @field Platform.isHeadless boolean Is this a headless build which only simulates and doesnt offer interactive IO? */
+	LuaPushNamedBool(L, "isHeadless", SpringVersion::IsHeadless());
+
+	/*** @field Platform.hasSyncChecksums boolean Whether the engine was built with sync-check support (i.e. Spring.GetPrevFrameSyncChecksum() returns a meaningful value). */
+	#ifdef SYNCCHECK
+		LuaPushNamedBool(L, "hasSyncChecksums", true);
+	#else
+		LuaPushNamedBool(L, "hasSyncChecksums", false);
+	#endif
 
 	return true;
 }

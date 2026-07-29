@@ -55,6 +55,8 @@ public:
 
 	static void ClearPreviousDrawFlags() { modelDrawerData->ClearPreviousDrawFlags(); }
 	static void UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost) { modelDrawerData->UnitLeavesGhostChanged(unit, leaveDeadGhost); }
+
+	static void UpdateCurrentUnitIcon(const CUnit* unit) { modelDrawerData->UpdateCurrentUnitIcon(unit); }
 public:
 	// DrawUnit*
 	virtual void DrawUnitNoTrans(const CUnit* unit, uint32_t preList, uint32_t postList, bool lodCall, bool noLuaCall) const = 0;
@@ -90,7 +92,11 @@ protected:
 	inline static Shader::IProgramObject* icons3DShader = nullptr;
 private:
 	inline static std::array<CUnitDrawer*, ModelDrawerTypes::MODEL_DRAWER_CNT> unitDrawers = {};
+
+	inline static bool engineBuildSquareRendering = true;
 public:
+	static bool& EngineBuildSquareRendering() { return engineBuildSquareRendering; }
+
 	enum BuildStages {
 		BUILDSTAGE_WIRE = 0,
 		BUILDSTAGE_FLAT = 1,
@@ -151,7 +157,7 @@ public:
 	void DrawUnitIconsScreen() const override;
 protected:
 	void DrawObjectsShadow(int modelType) const override;
-	void DrawOpaqueObjects(int modelType, bool drawReflection, bool drawRefraction) const;
+	void DrawOpaqueObjects(int modelType, bool drawReflection, bool drawRefraction) const override;
 	void DrawOpaqueObjectsAux(int modelType) const override; //AI units
 
 	void DrawAlphaObjects(int modelType, bool drawReflection, bool drawRefraction) const override;
@@ -161,7 +167,7 @@ protected:
 
 	void DrawOpaqueUnit(CUnit* unit, uint8_t thisPassMask) const;
 	void DrawUnitShadow(CUnit* unit) const;
-	void DrawAlphaUnit(CUnit* unit, int modelType, uint8_t thisPassMask, bool drawGhostBuildingsPass) const;
+	void DrawAlphaUnit(CUnit* unit, uint8_t thisPassMask) const;
 
 	void DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const;
 	void DrawAlphaAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const;
@@ -230,7 +236,7 @@ protected:
 	void DrawOpaqueObjectsAux(int modelType) const override;
 	void DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit) const;
 
-	void DrawGhostedBuildings(int modelType) const override {} //implemented in-line
+	void DrawGhostedBuildings(int modelType) const override;
 
 	void DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool noLuaCall) const;
 	void DrawUnitModelBeingBuiltOpaque(const CUnit* unit, bool noLuaCall) const;

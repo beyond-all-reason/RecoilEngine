@@ -4,6 +4,7 @@
 #define MOD_INFO_H
 
 #include <string>
+#include "Sim/Misc/Resource.h"
 #include "Sim/Path/PFSTypes.h"
 
 class CModInfo
@@ -101,12 +102,12 @@ public:
 	int reclaimMethod;
 	/// 0 = Revert to wireframe and gradual reclaim, 1 = Subtract HP and give full metal at end, default 1
 	int reclaimUnitMethod;
-	/// How much energy should reclaiming a unit cost, default 0.0
-	float reclaimUnitEnergyCostFactor;
-	/// How much metal should reclaim return, default 1.0
-	float reclaimUnitEfficiency;
-	/// How much should energy should reclaiming a feature cost, default 0.0
-	float reclaimFeatureEnergyCostFactor;
+	/// How much resources should reclaiming a unit cost
+	SResourcePack reclaimUnitCostFactor;
+	/// How much resources should unit reclaim return
+	SResourcePack reclaimUnitEfficiency;
+	/// How much resources should reclaiming a feature cost
+	SResourcePack reclaimFeatureCostFactor;
 	/// Does wireframe reclaim drain health? default true
 	bool reclaimUnitDrainHealth;
 	/// Allow reclaiming enemies? default true
@@ -115,16 +116,16 @@ public:
 	bool reclaimAllowAllies;
 
 	// Repair behaviour
-	/// How much should energy should repair cost, default 0.0
-	float repairEnergyCostFactor;
+	/// How much resources should repair cost
+	SResourcePack repairCostFactor;
 
 	// Resurrect behaviour
-	/// How much should energy should resurrect cost, default 0.5
-	float resurrectEnergyCostFactor;
+	/// How much resources should resurrect cost
+	SResourcePack resurrectCostFactor;
 
 	// Capture behaviour
-	/// How much should energy should capture cost, default 0.0
-	float captureEnergyCostFactor;
+	/// How much resources should capture cost
+	SResourcePack captureCostFactor;
 
 
 	float unitExpMultiplier;

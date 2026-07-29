@@ -10,15 +10,22 @@
 #include <memory.h>
 #include <algorithm>
 #include <cstring>
+#include <format>
 
-#include <xmmintrin.h>
-#include <emmintrin.h>
+#include "System/simd_compat.h"
 
 CR_BIND(CMatrix44f, )
 
 CR_REG_METADATA(CMatrix44f, CR_MEMBER(m))
 
 static_assert(alignof(CMatrix44f) == 64);
+
+std::string CMatrix44f::str() const
+{
+	return std::format(
+		"m44(\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f})",
+		m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15]);
+}
 CMatrix44f::CMatrix44f(const CMatrix44f& mat)
 {
 	memcpy(&m[0], &mat.m[0], sizeof(CMatrix44f));
@@ -56,8 +63,8 @@ bool CMatrix44f::IsOrthoNormal() const
 	const float3 dots = {xdir.dot(ydir), ydir.dot(zdir), xdir.dot(zdir)};
 	const float3 lens = {xdir.SqLength(), ydir.SqLength(), zdir.SqLength()};
 
-	constexpr float3 epsd = {float3::cmp_eps() *  8.0f, float3::cmp_eps() *  8.0f, float3::cmp_eps() *  8.0f};
-	constexpr float3 epsl = {float3::cmp_eps() * 16.0f, float3::cmp_eps() * 16.0f, float3::cmp_eps() * 16.0f};
+	constexpr float3 epsd = {float3::cmp_eps() *  64.0f, float3::cmp_eps() *  64.0f, float3::cmp_eps() *  64.0f};
+	constexpr float3 epsl = {float3::cmp_eps() * 128.0f, float3::cmp_eps() * 128.0f, float3::cmp_eps() * 128.0f};
 
 	bool on  = dots.equals(ZeroVector, epsd);
 	     on &= lens.equals(OnesVector, epsl);
@@ -69,6 +76,16 @@ bool CMatrix44f::IsIdentity() const
 {
 	static constexpr CMatrix44f IDENTITY = CMatrix44f();
 	return (*this) == IDENTITY;
+}
+
+bool CMatrix44f::IsRotMatrix() const
+{
+	return IsOrthoNormal() && math::fabs(1.0f - Det4()) <= 64.0f * float3::cmp_eps();
+}
+
+bool CMatrix44f::IsRotOrRotTranMatrix() const
+{
+	return IsOrthoNormal() && math::fabs(1.0f - Det3()) <= 64.0f * float3::cmp_eps();
 }
 
 float CMatrix44f::Det3() const

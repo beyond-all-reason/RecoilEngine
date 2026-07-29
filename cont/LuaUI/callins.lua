@@ -18,6 +18,9 @@ CallInsList = {
 	"ActiveCommandChanged",
 	"CameraRotationChanged",
 	"CameraPositionChanged",
+	"MiniMapRotationChanged",
+	"MiniMapStateChanged",
+	"MiniMapGeometryChanged",
 	"CommandNotify",
 
 	"KeyMapChanged",
@@ -91,6 +94,8 @@ CallInsList = {
 	"DrawScreenPost",
 	"DrawScreen",
 	"DrawInMiniMap",
+
+	"DrawBuildSquare",
 
 	"FontsChanged",
 

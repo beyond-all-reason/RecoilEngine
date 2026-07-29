@@ -227,38 +227,6 @@ void CglFont::GetStats(std::array<size_t, 8>& stats) const {}
 #else
 
 
-
-// helper for GetText{Width,Height}
-static inline int SkipColorCodes(const spring::u8string& text, int idx)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	while (idx < text.size()) {
-		switch (text[idx])
-		{
-		case CglFont::OldColorCodeIndicator:
-			if (fontHandler.disableOldColorIndicators)
-				break;
-			[[fallthrough]];
-		case CglFont::ColorCodeIndicator: {
-			idx += 3 + 1; // RGB
-		} continue;
-		case CglFont::OldColorCodeIndicatorEx:
-			if (fontHandler.disableOldColorIndicators)
-				break;
-			[[fallthrough]];
-		case CglFont::ColorCodeIndicatorEx: {
-			idx += 2 * 4 + 1; // RGBA,RGBA
-		} continue;
-		default:
-			break; // cause next break to trigger and terminate the loop
-		}
-		break;
-	}
-
-	return (std::min(static_cast<int>(text.size()), idx));
-}
-
-
 bool CglFont::SkipColorCodesAndNewLines(const spring::u8string& text, int& curIndex, int& numLines)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -268,7 +236,7 @@ bool CglFont::SkipColorCodesAndNewLines(const spring::u8string& text, int& curIn
 	char32_t nextChar = 0;
 	for (int end = static_cast<int>(text.length()); idx < end; ) {
 		switch (nextChar = utf8::GetNextChar(text, idx, false/*do not advance*/)) {
-			case CglFont::OldColorCodeIndicator:
+			case OldColorCodeIndicator:
 				if (fontHandler.disableOldColorIndicators) {
 					// same as default case
 					curIndex = idx;
@@ -276,7 +244,7 @@ bool CglFont::SkipColorCodesAndNewLines(const spring::u8string& text, int& curIn
 					return false;
 				}
 				[[fallthrough]];
-			case CglFont::ColorCodeIndicator: {
+			case ColorCodeIndicator: {
 				if ((idx += 3 + 1) < end) {
 					const float4 newTextColor = { text[idx - 3] / 255.0f, text[idx - 2] / 255.0f, text[idx - 1] / 255.0f, 1.0f };
 					if (autoOutlineColor)
@@ -285,7 +253,7 @@ bool CglFont::SkipColorCodesAndNewLines(const spring::u8string& text, int& curIn
 						SetTextColor(&newTextColor);
 				}
 			} break;
-			case CglFont::OldColorCodeIndicatorEx:
+			case OldColorCodeIndicatorEx:
 				if (fontHandler.disableOldColorIndicators) {
 					// same as default case
 					curIndex = idx;
@@ -293,7 +261,7 @@ bool CglFont::SkipColorCodesAndNewLines(const spring::u8string& text, int& curIn
 					return false;
 				}
 				[[fallthrough]];
-			case CglFont::ColorCodeIndicatorEx: {
+			case ColorCodeIndicatorEx: {
 				if ((idx += 4 * 2 + 1) < end) {
 					const float4 newTextColor = { text[idx - 8] / 255.0f, text[idx - 7] / 255.0f, text[idx - 6] / 255.0f, text[idx - 5] / 255.0f };
 					const float4 newOutlColor = { text[idx - 4] / 255.0f, text[idx - 3] / 255.0f, text[idx - 2] / 255.0f, text[idx - 1] / 255.0f };
@@ -302,16 +270,16 @@ bool CglFont::SkipColorCodesAndNewLines(const spring::u8string& text, int& curIn
 				}
 			} break;
 
-			case CglFont::ColorResetIndicator: {
+			case ColorResetIndicator: {
 				idx += 1;
 				SetColors(&baseTextColor, &baseOutlineColor);
 			} break;
 
-			case 0x0D: {
-				idx += (idx < end && text[idx + 1] == 0x0A);
+			case CR: {
+				idx += (idx < end && text[idx + 1] == LF);
 				[[fallthrough]]; // CR; fall-through
 			}
-			case 0x0A: {
+			case LF: {
 				// LF
 				idx += 1;
 				nls += 1;
@@ -375,11 +343,11 @@ float CglFont::GetTextWidth_(const spring::u8string& text)
 			case ColorResetIndicator: {
 			} break;
 
-			case 0x0D: {
-				idx += (idx < end && text[idx] == 0x0A);
+			case CR: {
+				idx += (idx < end && text[idx] == LF);
 				[[fallthrough]]; // CR; fall-through
 			}
-			case 0x0A: {
+			case LF: {
 				// LF
 				if (prvGlyphPtr != nullptr)
 					curw += GetCharacterWidth(prvGlyphIdx);
@@ -419,7 +387,7 @@ float CglFont::GetTextWidth_(const spring::u8string& text)
 	if (prvGlyphPtr != nullptr)
 		curw += GetCharacterWidth(prvGlyphIdx);
 
-	return (std::max(curw, maxw));
+	return std::max(curw, maxw);
 }
 
 
@@ -455,11 +423,11 @@ float CglFont::GetTextHeight_(const spring::u8string& text, float* descender, in
 			case ColorResetIndicator: {
 			} break;
 
-			case 0x0D: {
-				idx += (idx < end && text[idx] == 0x0A);
+			case CR: {
+				idx += (idx < end && text[idx] == LF);
 				[[fallthrough]]; // CR; fall-through
 			}
-			case 0x0A: {
+			case LF: {
 				// LF
 				multiLine++;
 				d = GetLineHeight() + GetDescender();
@@ -513,11 +481,11 @@ void CglFont::ScanForWantedGlyphs(const spring::u8string& ustr)
 		case ColorResetIndicator: {
 		} break;
 
-		case 0x0D: {
-			idx += (idx < end&& ustr[idx] == 0x0A);
+		case CR: {
+			idx += (idx < end&& ustr[idx] == LF);
 			[[fallthrough]]; // CR; fall-through
 		}
-		case 0x0A: {
+		case LF: {
 			// LF
 		} break;
 
@@ -604,11 +572,11 @@ std::deque<std::string> CglFont::SplitIntoLines(const spring::u8string& text)
 				lines.back() += c;
 			} break;
 
-			case 0x0D: {
-				idx += ((idx + 1) < end && text[idx + 1] == 0x0A);
+			case CR: {
+				idx += ((idx + 1) < end && text[idx + 1] == LF);
 				[[fallthrough]]; // CR; fall-through
 			}
-			case 0x0A: {
+			case LF: {
 				lines.emplace_back("");
 
 				#if 0
@@ -1024,7 +992,7 @@ void CglFont::glPrintTable(float x, float y, float s, const int options, const s
 				if ((col += 1) >= colLines.size()) {
 					colLines.emplace_back("");
 					for (int i = 0; i < row; ++i)
-						colLines[col] += 0x0A;
+						colLines[col] += LF;
 					colColor.push_back(defColor);
 				}
 				if (colColor[col] != curColor) {
@@ -1034,14 +1002,14 @@ void CglFont::glPrintTable(float x, float y, float s, const int options, const s
 				}
 			} break;
 
-			case 0x0D: {
-				pos += ((pos + 1) < text.length() && text[pos + 1] == 0x0A);
+			case CR: {
+				pos += ((pos + 1) < text.length() && text[pos + 1] == LF);
 				[[fallthrough]]; // CR; fall-through
 			}
-			case 0x0A: {
+			case LF: {
 				// LF
 				for (auto& colLine: colLines)
-					colLine += 0x0A;
+					colLine += LF;
 
 				if (colColor[0] != curColor) {
 					for (int i = 0; i < 4; ++i)

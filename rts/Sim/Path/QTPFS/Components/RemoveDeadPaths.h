@@ -15,6 +15,7 @@ struct RemoveDeadPathsComponent {
 
 	int refreshRate = 15;
 	int refreshOffset = 1;
+	bool deleteAll = false;
 };
 
 }

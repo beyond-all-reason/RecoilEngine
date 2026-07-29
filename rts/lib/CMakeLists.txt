@@ -1,8 +1,47 @@
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/rts)
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/rts/lib)
 
+ADD_SUBDIRECTORY(fmt)
+set_target_properties(fmt PROPERTIES POSITION_INDEPENDENT_CODE ON)
 ADD_SUBDIRECTORY(glad)
 ADD_SUBDIRECTORY(smmalloc)
+
+# Mimalloc - only build if USE_MIMALLOC is enabled
+if (USE_MIMALLOC)
+	# Disable mimalloc's built-in override - we provide our own custom override
+	set(MI_OVERRIDE OFF CACHE BOOL "Disable mimalloc built-in override" FORCE)
+	# Disable mimalloc tests and shared library to speed up build
+	set(MI_BUILD_TESTS OFF CACHE BOOL "Disable mimalloc tests" FORCE)
+	set(MI_BUILD_SHARED OFF CACHE BOOL "Disable mimalloc shared library" FORCE)
+	set(MI_BUILD_STATIC ON CACHE BOOL "Enable mimalloc static library" FORCE)
+
+	# Integrate ASAN/Valgrind tracking with mimalloc
+	# When the engine is built with USE_ASAN, enable MI_TRACK_ASAN for mimalloc
+	# When the engine is built with USE_VALGRIND, enable MI_TRACK_VALGRIND for mimalloc
+	if (USE_ASAN)
+		set(MI_TRACK_ASAN ON CACHE BOOL "Enable mimalloc ASAN support" FORCE)
+	endif()
+	if (VALGRIND_FOUND)
+		set(MI_TRACK_VALGRIND ON CACHE BOOL "Enable mimalloc Valgrind support" FORCE)
+	endif()
+
+	if(MINGW)
+		# Temporarily remove _WIN32_WINNT to avoid redefinition warning with mimalloc
+		# mimalloc defines _WIN32_WINNT=0x600 for MinGW in its CMakeLists.txt
+		remove_definitions(-D_WIN32_WINNT=0x0601)
+
+		# Suppress visibility attribute warnings for ALL mimalloc targets.
+		add_compile_options(-Wno-attributes)
+	endif()
+
+	ADD_SUBDIRECTORY(mimalloc)
+
+	if(MINGW)
+		# Restore _WIN32_WINNT definition after mimalloc
+		add_definitions(-D_WIN32_WINNT=0x0601)
+	endif()
+endif()
+
 ADD_SUBDIRECTORY(lua)
 ADD_SUBDIRECTORY(luasocket)
 ADD_SUBDIRECTORY(minizip)
@@ -72,18 +111,42 @@ endforeach()
 ADD_SUBDIRECTORY(assimp)
 target_compile_definitions(assimp PRIVATE -DASSIMP_BUILD_NO_OWN_ZLIB)
 
+# Suppress warnings in vendored assimp (we're not going to modify the library code)
+# Vendored assimp 4.0.1 trips these warnings in its own code.
+# Recheck this list if assimp is upgraded; later releases fixed some of these.
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	set(_assimp_warns
+		-Wno-pragma-pack
+		-Wno-ordered-compare-function-pointers
+		-Wno-deprecated-declarations
+		-Wno-tautological-bitwise-compare
+		-Wno-unused-but-set-variable
+	)
+	target_compile_options(assimp PRIVATE ${_assimp_warns})
+	if (TARGET IrrXML)
+		target_compile_options(IrrXML PRIVATE -Wno-pragma-pack)
+	endif()
+elseif (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+	set(_assimp_warns
+		-Wno-class-memaccess
+		-Wno-deprecated-declarations
+		-Wno-tautological-compare
+		-Wno-maybe-uninitialized
+	)
+	target_compile_options(assimp PRIVATE ${_assimp_warns})
+endif()
+
 # simdjson, a fastgltf dependency (manually added to submodules to work around the build system limitations)
 set(SIMDJSON_AVX512_ALLOWED OFF CACHE BOOL "forced by Recoil build env" FORCE)
 set(SIMDJSON_BASH OFF CACHE BOOL "forced by Recoil build env" FORCE)
-set(SIMDJSON_IMPLEMENTATION_FALLBACK ON CACHE BOOL "forced by Recoil build env" FORCE)
-set(SIMDJSON_IMPLEMENTATION fallback CACHE STRING "forced by Recoil build env" FORCE)
-set(SIMDJSON_IMPLEMENTATION_ARM64    OFF CACHE BOOL "forced by Recoil build env" FORCE)
-set(SIMDJSON_IMPLEMENTATION_HASWELL  OFF CACHE BOOL "forced by Recoil build env" FORCE)
-set(SIMDJSON_IMPLEMENTATION_ICELAKE  OFF CACHE BOOL "forced by Recoil build env" FORCE)
-set(SIMDJSON_IMPLEMENTATION_PPC64    OFF CACHE BOOL "forced by Recoil build env" FORCE)
-set(SIMDJSON_IMPLEMENTATION_WESTMERE OFF CACHE BOOL "forced by Recoil build env" FORCE)
-set(SIMDJSON_IMPLEMENTATION_LSX      OFF CACHE BOOL "forced by Recoil build env" FORCE)
-set(SIMDJSON_IMPLEMENTATION_LASX     OFF CACHE BOOL "forced by Recoil build env" FORCE)
+
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
+	# ARM64: enable native NEON implementation (well-tested in simdjson)
+	set(SIMDJSON_IMPLEMENTATION "arm64" CACHE STRING "forced by Recoil build env" FORCE)
+else()
+	# x86: use fallback only (original behavior)
+	set(SIMDJSON_IMPLEMENTATION "fallback" CACHE STRING "forced by Recoil build env" FORCE)
+endif()
 
 set(SIMDJSON_ENABLE_THREADS     OFF CACHE BOOL "forced by Recoil build env" FORCE)
 set(SIMDJSON_EXCEPTIONS     ON CACHE BOOL "forced by Recoil build env" FORCE)
@@ -97,6 +160,12 @@ ADD_SUBDIRECTORY(fastgltf)
 
 ADD_SUBDIRECTORY(squish)
 ADD_SUBDIRECTORY(rg-etc1)
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+	# Benign clang-only warnings in vendored rg_etc1.cpp (no-op labs() on unsigned +
+	# bare mark-as-used statements).
+	# We're not going to touch the decades old impl, so suppress the warnings.
+	target_compile_options(rgetc1 PRIVATE -Wno-absolute-value -Wno-unused-value)
+endif()
 
 option(TRACY_ENABLE "Enable tracy profiling" OFF)
 
@@ -134,3 +203,8 @@ add_subdirectory(lunasvg)
 set(CMAKE_CXX_FLAGS ${SAVED_CMAKE_FLAGS})
 
 add_subdirectory(RmlUi)
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND TARGET rmlui_core)
+	# Known GCC-only -Warray-bounds false positive in vendored RmlUi at -O2+.
+	# Fixed in GCC 14 -- retest dropping this once CI is off GCC 13.
+	target_compile_options(rmlui_core PRIVATE -Wno-array-bounds)
+endif()

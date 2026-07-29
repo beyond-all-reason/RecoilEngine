@@ -94,6 +94,7 @@ class LuaSyncedRead {
 
 		static int GetUnitNearestAlly(lua_State* L);
 		static int GetUnitNearestEnemy(lua_State* L);
+		static int GetClosestEnemyUnit(lua_State* L);
 
 		static int GetFeaturesInRectangle(lua_State* L);
 		static int GetFeaturesInSphere(lua_State* L);
@@ -170,6 +171,7 @@ class LuaSyncedRead {
 		static int GetUnitLastAttackedPiece(lua_State* L);
 		static int GetUnitCollisionVolumeData(lua_State* L);
 		static int GetUnitPieceCollisionVolumeData(lua_State* L);
+		static int GetUnitMoveDefID(lua_State* L);
 
 		static int GetUnitBlocking(lua_State* L);
 		static int GetUnitMoveTypeData(lua_State* L);
@@ -300,9 +302,8 @@ class LuaSyncedRead {
 
 		static int GetRadarErrorParams(lua_State* L);
 
-		static int TraceRay(lua_State* L);           //TODO: not implemented
-		static int TraceRayUnits(lua_State* L);      //TODO: not implemented
-		static int TraceRayFeatures(lua_State* L);   //TODO: not implemented
+		static int TraceRayInDirection(lua_State* L);
+		static int TraceRayBetweenPositions(lua_State* L);
 		static int TraceRayGroundBetweenPositions(lua_State* L);
 		static int TraceRayGroundInDirection(lua_State* L);
 };

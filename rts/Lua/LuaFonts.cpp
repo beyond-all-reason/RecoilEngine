@@ -46,8 +46,8 @@ bool LuaFonts::CreateMetatable(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	luaL_newmetatable(L, "Font");
 
-	HSTR_PUSH_CFUNC(L, "__gc",        meta_gc);
-	HSTR_PUSH_CFUNC(L, "__index",     meta_index);
+	LuaPushNamedCFunc(L, "__gc",        meta_gc);
+	LuaPushNamedCFunc(L, "__index",     meta_index);
 	LuaPushNamedString(L, "__metatable", "protected metatable");
 
 		// push userdata callouts
@@ -200,9 +200,7 @@ int LuaFonts::LoadFont(lua_State* L)
 		return 0;
 
 	auto shPtrFontPtr = static_cast<decltype(f)*>(lua_newuserdata(L, sizeof(decltype(f))));
-	memset(shPtrFontPtr, 0, sizeof(decltype(f)));
-
-	*shPtrFontPtr = std::move(f);
+	new (shPtrFontPtr) decltype(f)(std::move(f));
 
 	luaL_getmetatable(L, "Font");
 	lua_setmetatable(L, -2);

@@ -34,7 +34,7 @@ CONFIG(bool, RotateLogFiles)
 
 CONFIG(std::string, LogSections)
 	.defaultValue("")
-	.description("Comma-separated list of enabled logsections, see infolog.txt / console output for possible values.");
+	.description("Comma-separated list of enabled logsections, use this for log filtering by setting log level for each sections. See infolog.txt / console output for possible values.");
 
 
 CONFIG(int, LogFlushLevel)

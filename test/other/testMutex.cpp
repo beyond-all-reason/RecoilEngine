@@ -14,6 +14,7 @@
 #ifndef _WIN32
 	#include <sys/syscall.h>
 	#include <linux/futex.h>
+	#include <unistd.h>
 #endif
 
 #ifdef _WIN32

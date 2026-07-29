@@ -953,11 +953,11 @@ int LuaShaders::GetActiveUniforms(lua_State* L)
 	GLint i = 0;
 	for (const auto& [name, au] : prog->activeUniforms) {
 		lua_createtable(L, 0, 5); {
-			HSTR_PUSH_STRING(L, "name"    , name);
-			HSTR_PUSH_STRING(L, "type"    , UniformTypeString(au.type));
-			HSTR_PUSH_NUMBER(L, "length"  , name.size());
-			HSTR_PUSH_NUMBER(L, "size"    , au.size);
-			HSTR_PUSH_NUMBER(L, "location", prog->activeUniformLocations.at(name).location);
+			LuaPushNamedString(L, "name"    , name);
+			LuaPushNamedString(L, "type"    , UniformTypeString(au.type));
+			LuaPushNamedNumber(L, "length"  , name.size());
+			LuaPushNamedNumber(L, "size"    , au.size);
+			LuaPushNamedNumber(L, "location", prog->activeUniformLocations.at(name).location);
 		}
 		lua_rawseti(L, -2, i + 1);
 		++i;

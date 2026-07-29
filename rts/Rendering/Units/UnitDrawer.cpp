@@ -2,6 +2,8 @@
 
 #include "UnitDrawer.h"
 
+#include <map>
+
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
 #include "Game/Game.h"
@@ -367,8 +369,10 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, 
 
 			std::swap(posX, posY);
 			break;
+		case CMiniMap::ROTATION_0:
+			break;
 	}
-	
+
 	float x0 = posX - iconSizeX;
 	float x1 = posX + iconSizeX;
 	float y0 = posY - iconSizeY;
@@ -820,7 +824,7 @@ void CUnitDrawerGLSL::DrawAlphaObjects(int modelType, bool drawReflection, bool 
 		CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
 
 		for (auto* o : mdlRenderer.GetObjectBin(i)) {
-			DrawAlphaUnit(o, modelType, thisPassMask, false);
+			DrawAlphaUnit(o, thisPassMask);
 		}
 	}
 
@@ -867,22 +871,61 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 	glColor4f(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
 
 	// buildings that died while ghosted
-	for (GhostSolidObject* dgb : deadGhostedBuildings) {
-		if (camera->InView(dgb->pos, dgb->GetModel()->GetDrawRadius())) {
-			glPushMatrix();
-			glTranslatef3(dgb->pos);
-			glRotatef(dgb->facing * 90.0f, 0, 1, 0);
+	for (const GhostSolidObject* dgb : deadGhostedBuildings) {
+		const S3DModel* model = dgb->GetModel();
+		if (!camera->InView(dgb->pos, model->GetDrawRadius()))
+			continue;
 
-			CModelDrawerHelper::BindModelTypeTexture(modelType, dgb->GetModel()->textureType);
-			SetTeamColor(dgb->team, IModelDrawerState::alphaValues.y);
+		glPushMatrix();
+		glTranslatef3(dgb->pos);
+		glRotatef(dgb->facing * 90.0f, 0, 1, 0);
 
-			dgb->GetModel()->DrawStatic();
-			glPopMatrix();
-		}
+		CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType);
+		SetTeamColor(dgb->team, IModelDrawerState::alphaValues.y);
+
+		model->DrawStatic();
+		glPopMatrix();
 	}
 
-	for (CUnit* lgb : liveGhostedBuildings) {
-		DrawAlphaUnit(lgb, modelType, DrawFlags::SO_ALPHAF_FLAG, true);
+	// buildings that left LOS but are still alive
+	for (const auto& lgb : liveGhostedBuildings) {
+		const CUnit* unit = lgb.unit;
+
+		// check for decoy models
+		const UnitDef* decoyDef = unit->unitDef->decoyDef;
+		const S3DModel* model = (decoyDef == nullptr) ? unit->model : decoyDef->LoadModel();
+
+		// FIXME: needs a second pass
+		if (model->type != modelType)
+			continue;
+
+		const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
+
+		// ghosted enemy units
+		if (losStatus & LOS_CONTRADAR) {
+			glColor4f(0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z);
+		}
+		else {
+			glColor4f(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
+		}
+
+		glPushMatrix();
+		glTranslatef3(unit->drawPos);
+		glRotatef(unit->buildFacing * 90.0f, 0, 1, 0);
+
+		// the units in liveGhostedBuildings[modelType] are not
+		// sorted by textureType, but we cannot merge them with
+		// alphaModelRenderers[modelType] either since they are
+		// not actually cloaked
+		CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType);
+
+		// color with the team the unit was last seen under, not the live unit's current team
+		const float ghostAlpha = (losStatus & LOS_CONTRADAR) ? IModelDrawerState::alphaValues.z : IModelDrawerState::alphaValues.y;
+		SetTeamColor(lgb.team, ghostAlpha);
+		model->DrawStatic();
+		glPopMatrix();
+
+		glColor4f(1.0f, 1.0f, 1.0f, IModelDrawerState::alphaValues.x);
 	}
 }
 
@@ -904,58 +947,16 @@ void CUnitDrawerGLSL::DrawUnitShadow(CUnit* unit) const
 		DrawUnitTrans(unit, 0, 0, false, false);
 }
 
-void CUnitDrawerGLSL::DrawAlphaUnit(CUnit* unit, int modelType, uint8_t thisPassMask, bool drawGhostBuildingsPass) const
+void CUnitDrawerGLSL::DrawAlphaUnit(CUnit* unit, uint8_t thisPassMask) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!drawGhostBuildingsPass && !ShouldDrawAlphaUnit(unit, thisPassMask))
+	if (!ShouldDrawAlphaUnit(unit, thisPassMask))
 		return;
-
-	const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
-
-	if (drawGhostBuildingsPass) {
-		// check for decoy models
-		const UnitDef* decoyDef = unit->unitDef->decoyDef;
-		const S3DModel* model = nullptr;
-
-		if (decoyDef == nullptr) {
-			model = unit->model;
-		}
-		else {
-			model = decoyDef->LoadModel();
-		}
-
-		// FIXME: needs a second pass
-		if (model->type != modelType)
-			return;
-
-		// ghosted enemy units
-		if (losStatus & LOS_CONTRADAR) {
-			glColor4f(0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z);
-		}
-		else {
-			glColor4f(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
-		}
-
-		glPushMatrix();
-		glTranslatef3(unit->drawPos);
-		glRotatef(unit->buildFacing * 90.0f, 0, 1, 0);
-
-		// the units in liveGhostedBuildings[modelType] are not
-		// sorted by textureType, but we cannot merge them with
-		// alphaModelRenderers[modelType] either since they are
-		// not actually cloaked
-		CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType);
-
-		SetTeamColor(unit->team, (losStatus & LOS_CONTRADAR) ? IModelDrawerState::alphaValues.z : IModelDrawerState::alphaValues.y);
-		model->DrawStatic();
-		glPopMatrix();
-
-		glColor4f(1.0f, 1.0f, 1.0f, IModelDrawerState::alphaValues.x);
-		return;
-	}
 
 	if (unit->GetIsIcon())
 		return;
+
+	const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
 
 	if ((losStatus & LOS_INLOS) || gu->spectatingFullView) {
 		SetTeamColor(unit->team, IModelDrawerState::alphaValues.x);
@@ -1367,26 +1368,16 @@ void CUnitDrawerGLSL::DrawIndividualDefAlpha(const SolidObjectDef* objectDef, in
 bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std::vector<Command>& commands) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	//TODO: make this a lua callin!
-	glDisable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glDisable(GL_TEXTURE_2D);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 	CFeature* feature = nullptr;
 
-	std::vector<float3> buildableSquares; // buildable squares
-	std::vector<float3> featureSquares; // occupied squares
-	std::vector<float3> illegalSquares; // non-buildable squares
+	std::vector<uint8_t> statuses;
 
 	struct BuildCache {
 		uint64_t key;
 		int createFrame;
 		bool canBuild;
-		std::vector<float3> buildableSquares; // buildable squares
-		std::vector<float3> featureSquares; // occupied squares
-		std::vector<float3> illegalSquares; // non-buildable squares
+		std::vector<uint8_t> statuses;
 	};
 
 	static std::vector<BuildCache> buildCache;
@@ -1395,14 +1386,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 	uint64_t hashKey = spring::LiteHash(pos);
 	hashKey = spring::hash_combine(spring::LiteHash(buildInfo.buildFacing), hashKey);
-	/*
-	for (const auto& cmd : commands) {
-		const BuildInfo bc(cmd);
-		spring::hash_combine(spring::LiteHash(bc), hash);
-	}
-	*/
 
-	// the chosen number here is arbitrary, feel free to fine balance.
 	static constexpr int CACHE_VALIDITY_PERIOD = GAME_SPEED / 5;
 	std::erase_if(buildCache, [](const BuildCache& bc) {
 		return gs->frameNum - bc.createFrame >= CACHE_VALIDITY_PERIOD;
@@ -1420,9 +1404,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 		return bc.key == hashKey;
 	});
 	if (it != buildCache.end()) {
-		buildableSquares.assign(it->buildableSquares.begin(), it->buildableSquares.end());
-		featureSquares.assign(it->featureSquares.begin(), it->featureSquares.end());
-		illegalSquares.assign(it->illegalSquares.begin(), it->illegalSquares.end());
+		statuses = it->statuses;
 		canBuild = it->canBuild;
 	}
 	else {
@@ -1431,9 +1413,7 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 			feature,
 			-1,
 			false,
-			&buildableSquares,
-			&featureSquares,
-			&illegalSquares,
+			&statuses,
 			&commands
 		);
 		buildCache.emplace_back();
@@ -1442,15 +1422,30 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 		buildCacheItem.key = hashKey;
 		buildCacheItem.canBuild = canBuild;
 		buildCacheItem.createFrame = gs->frameNum;
-		buildCacheItem.buildableSquares.assign(buildableSquares.begin(), buildableSquares.end());
-		buildCacheItem.featureSquares.assign(featureSquares.begin(), featureSquares.end());
-		buildCacheItem.illegalSquares.assign(illegalSquares.begin(), illegalSquares.end());
+		buildCacheItem.statuses = statuses;
 	}
 
-	static constexpr std::array<float, 4> buildColorT  = { 0.0f, 0.9f, 0.0f, 0.7f };
-	static constexpr std::array<float, 4> buildColorF  = { 0.9f, 0.8f, 0.0f, 0.7f };
-	static constexpr std::array<float, 4> featureColor = { 0.9f, 0.8f, 0.0f, 0.7f };
-	static constexpr std::array<float, 4> illegalColor = { 0.9f, 0.0f, 0.0f, 0.7f };
+	eventHandler.DrawBuildSquare(
+		buildInfo.def->id,
+		static_cast<int>(pos.x),
+		static_cast<int>(pos.z),
+		buildInfo.buildFacing,
+		statuses
+	);
+
+	if (!CUnitDrawer::EngineBuildSquareRendering()) {
+		return canBuild;
+	}
+
+	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glDisable(GL_TEXTURE_2D);
+
+	static constexpr SColor buildColorT  = { 0.0f, 0.9f, 0.0f, 0.7f };
+	static constexpr SColor buildColorF  = { 0.9f, 0.8f, 0.0f, 0.7f };
+	static constexpr SColor featureColor = { 0.9f, 0.8f, 0.0f, 0.7f };
+	static constexpr SColor illegalColor = { 0.9f, 0.0f, 0.0f, 0.7f };
 
 	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_C>();
 	rb.AssertSubmission();
@@ -1459,40 +1454,46 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 	sh.Enable();
 
-	const float* color = canBuild ? &buildColorT[0] : &buildColorF[0];
-	for (const auto& buildableSquare : buildableSquares) {
-		rb.AddQuadLines(
-			{ buildableSquare                                      , color },
-			{ buildableSquare + float3(SQUARE_SIZE, 0, 0          ), color },
-			{ buildableSquare + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
-			{ buildableSquare + float3(0          , 0, SQUARE_SIZE), color }
-		);
-	}
+	const auto* buildColor = canBuild ? &buildColorT : &buildColorF;
+	const int numX = buildInfo.GetXSize();
+	const int numZ = buildInfo.GetZSize();
+	const int sx1 = int(pos.x / SQUARE_SIZE) - (numX >> 1);
+	const int sz1 = int(pos.z / SQUARE_SIZE) - (numZ >> 1);
 
-	color = &featureColor[0];
-	for (const auto& featureSquare : featureSquares) {
-		rb.AddQuadLines(
-			{ featureSquare                                      , color },
-			{ featureSquare + float3(SQUARE_SIZE, 0, 0          ), color },
-			{ featureSquare + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
-			{ featureSquare + float3(0          , 0, SQUARE_SIZE), color }
-		);
-	}
-
-	color = &illegalColor[0];
-	for (const auto& illegalSquare : illegalSquares) {
-		rb.AddQuadLines(
-			{ illegalSquare                                      , color },
-			{ illegalSquare + float3(SQUARE_SIZE, 0, 0          ), color },
-			{ illegalSquare + float3(SQUARE_SIZE, 0, SQUARE_SIZE), color },
-			{ illegalSquare + float3(0          , 0, SQUARE_SIZE), color }
-		);
+	for (int zi = 0; zi < numZ; zi++) {
+		for (int xi = 0; xi < numX; xi++) {
+			const auto status = static_cast<CGameHelper::BuildSquareStatus>(statuses[zi * numX + xi]);
+			const float3 sqrPos = {
+				static_cast<float>((sx1 + xi) * SQUARE_SIZE),
+				h,
+				static_cast<float>((sz1 + zi) * SQUARE_SIZE)
+			};
+			const SColor* color = nullptr;
+			switch (status) {
+				case CGameHelper::BUILDSQUARE_OPEN:
+					color = buildColor;
+					break;
+				case CGameHelper::BUILDSQUARE_OCCUPIED:
+				case CGameHelper::BUILDSQUARE_RECLAIMABLE:
+					color = &featureColor;
+					break;
+				default:
+					color = &illegalColor;
+					break;
+			}
+			rb.AddQuadLines(
+				{ sqrPos                                      , *color },
+				{ sqrPos + float3(SQUARE_SIZE, 0, 0          ), *color },
+				{ sqrPos + float3(SQUARE_SIZE, 0, SQUARE_SIZE), *color },
+				{ sqrPos + float3(0          , 0, SQUARE_SIZE), *color }
+			);
+		}
 	}
 	rb.Submit(GL_LINES);
 
 	if (h < 0.0f) {
-		constexpr uint8_t s[] = { 0,   0, 255, 128 }; // start color
-		constexpr uint8_t e[] = { 0, 128, 255, 255 }; // end color
+		constexpr SColor s = { 0,   0, 255, 128 };
+		constexpr SColor e = { 0, 128, 255, 255 };
 
 		rb.AddVertex({ float3(x1, h, z1), s }); rb.AddVertex({ float3(x1, 0.f, z1), e });
 		rb.AddVertex({ float3(x1, h, z2), s }); rb.AddVertex({ float3(x1, 0.f, z2), e });
@@ -1511,8 +1512,6 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 
 	glEnable(GL_DEPTH_TEST);
-	//glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	// glDisable(GL_BLEND);
 
 	return canBuild;
 }
@@ -1598,7 +1597,7 @@ void CUnitDrawerGL4::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon>& 
 			CModelDrawerHelper::BindModelTypeTexture(model->type, model->textureType); //inefficient rendering, but w/e
 		}
 
-		smv.SubmitImmediately(model, buildIcon.team, DrawFlags::SO_ALPHAF_FLAG);
+		smv.SubmitImmediately(model, static_cast<uint16_t>(buildIcon.team));
 	}
 
 	if (prevModelType != -1)
@@ -1738,92 +1737,119 @@ void CUnitDrawerGL4::DrawAlphaObjects(int modelType, bool drawReflection, bool d
 		smv.Submit(GL_TRIANGLES, false);
 	}
 
-	// void CGLUnitDrawer::DrawGhostedBuildings(int modelType)
-	if (gu->spectatingFullView)
-		return;
+	smv.Unbind();
 
-	const auto& deadGhostBuildings = modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam, modelType);
+	// living and dead ghosted buildings
+	if (!gu->spectatingFullView)
+		DrawGhostedBuildings(modelType);
+}
 
-	const auto oldMM = modelDrawerState->SetMatrixMode(ShaderMatrixModes::STATIC_MATMODE);
-	// deadGhostedBuildings
+void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	auto& smv = S3DModelVAO::GetInstance();
+	smv.Bind();
+
+	// Ghost buildings are static (no animation, never move), so each gets a single world-transform
+	// slot in the transforms SSBO and is drawn batched through ARRAY_MATMODE - one multidraw per
+	// (color bucket x texture type) instead of one immediate draw per ghost.
+	const auto oldMM = modelDrawerState->SetMatrixMode(ShaderMatrixModes::ARRAY_MATMODE);
+
+	struct GhostInstance {
+		const S3DModel* model;
+		uint32_t worldTransformOffset;
+		uint16_t paletteIndex; // color the ghost was last seen under (see LiveGhostBuilding / GhostSolidObject)
+	};
+	// bind the texture once per group, accumulate, then one Submit (=one multidraw) per texture type.
+	// buckets are reused across frames (see clearBuckets) so a screen full of ghosts does not realloc
+	// its per-texture vectors every frame; empty buckets (a texture no longer on screen) are skipped.
+	const auto flushGhosts = [&](const std::map<int, std::vector<GhostInstance>>& byTex) {
+		for (const auto& [texType, instances] : byTex) {
+			if (instances.empty())
+				continue;
+			CModelDrawerHelper::BindModelTypeTexture(modelType, texType);
+			for (const auto& gi : instances)
+				smv.AddStaticInstance(gi.model, gi.worldTransformOffset, gi.paletteIndex);
+			smv.Submit(GL_TRIANGLES, false);
+		}
+	};
+	// clear the mapped vectors (keeping their capacity) instead of clearing the map (which would free them)
+	const auto clearBuckets = [](std::map<int, std::vector<GhostInstance>>& byTex) {
+		for (auto& [texType, instances] : byTex)
+			instances.clear();
+	};
+
+	// deadGhostedBuildings (single color state)
 	{
-		modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
-		modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.y); //teamID doesn't matter here
+		const auto& deadGhostBuildings = modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam, modelType);
 
-		int prevModelType = -1;
-		int prevTexType = -1;
+		static std::map<int, std::vector<GhostInstance>> byTex;
+		clearBuckets(byTex);
+		bool any = false;
 		for (const auto* dgb : deadGhostBuildings) {
-			if (!camera->InView(dgb->pos, dgb->GetModel()->GetDrawRadius()))
+			const S3DModel* model = dgb->GetModel();
+			if (!camera->InView(dgb->pos, model->GetDrawRadius()))
+				continue;
+			if (!dgb->worldTransformAlloc.Valid())
 				continue;
 
-			static CMatrix44f staticWorldMat;
+			byTex[model->textureType].push_back({ model, static_cast<uint32_t>(dgb->worldTransformAlloc.GetOffset()), dgb->paletteIndex });
+			any = true;
+		}
 
-			staticWorldMat.LoadIdentity();
-			staticWorldMat.Translate(dgb->pos);
-
-			staticWorldMat.RotateY(-dgb->facing * math::DEG_TO_RAD * 90.0f);
-
-			if (prevModelType != modelType || prevTexType != dgb->GetModel()->textureType) {
-				prevModelType = modelType; prevTexType = dgb->GetModel()->textureType;
-				CModelDrawerHelper::BindModelTypeTexture(modelType, dgb->GetModel()->textureType); //inefficient rendering, but w/e
-			}
-
-			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
-			smv.SubmitImmediately(dgb->GetModel(), dgb->team, DrawFlags::SO_ALPHAF_FLAG); //need to submit immediately every model because of static per-model matrix
+		if (any) {
+			modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
+			modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.y); //teamID is per-instance
+			flushGhosts(byTex);
 		}
 	}
 
-	// liveGhostedBuildings
+	// liveGhostedBuildings (two color states: normal and CONTRADAR)
 	{
 		const auto& liveGhostedBuildings = modelDrawerData->GetLiveGhostBuildings(gu->myAllyTeam, modelType);
 
-		int prevModelType = -1;
-		int prevTexType = -1;
-		for (const auto* lgb : liveGhostedBuildings) {
-			if (!camera->InView(lgb->pos, lgb->model->GetDrawRadius()))
+		static std::map<int, std::vector<GhostInstance>> byTexNormal;
+		static std::map<int, std::vector<GhostInstance>> byTexContradar;
+		clearBuckets(byTexNormal);
+		clearBuckets(byTexContradar);
+		bool anyNormal = false;
+		bool anyContradar = false;
+
+		for (const auto& lgb : liveGhostedBuildings) {
+			const CUnit* u = lgb.unit;
+			if (!camera->InView(u->pos, u->model->GetDrawRadius()))
 				continue;
 
 			// check for decoy models
-			const UnitDef* decoyDef = lgb->unitDef->decoyDef;
-			const S3DModel* model = nullptr;
-
-			if (decoyDef == nullptr) {
-				model = lgb->model;
-			}
-			else {
-				model = decoyDef->LoadModel();
-			}
+			const UnitDef* decoyDef = u->unitDef->decoyDef;
+			const S3DModel* model = (decoyDef == nullptr) ? u->model : decoyDef->LoadModel();
 
 			// FIXME: needs a second pass
 			if (model->type != modelType)
 				continue;
 
-			static CMatrix44f staticWorldMat;
+			const size_t xfOffset = modelDrawerData->GetLiveGhostTransform(u);
+			if (xfOffset == TransformsMemStorage::INVALID_INDEX)
+				continue;
 
-			staticWorldMat.LoadIdentity();
-			staticWorldMat.Translate(lgb->pos);
+			const unsigned short losStatus = u->losStatus[gu->myAllyTeam];
+			const bool contradar = (losStatus & LOS_CONTRADAR);
+			// bucket with the palette the unit was last seen under, not the live unit's current one
+			(contradar ? byTexContradar : byTexNormal)[model->textureType]
+				.push_back({ model, static_cast<uint32_t>(xfOffset), lgb.paletteIndex });
+			(contradar ? anyContradar : anyNormal) = true;
+		}
 
-			staticWorldMat.RotateY(-lgb->buildFacing * math::DEG_TO_RAD * 90.0f);
-
-			const unsigned short losStatus = lgb->losStatus[gu->myAllyTeam];
-
-			// ghosted enemy units
-			if (losStatus & LOS_CONTRADAR) {
-				modelDrawerState->SetColorMultiplier(0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z);
-				modelDrawerState->SetTeamColor(lgb->team, IModelDrawerState::alphaValues.z);
-			}
-			else {
-				modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
-				modelDrawerState->SetTeamColor(lgb->team, IModelDrawerState::alphaValues.y);
-			}
-
-			if (prevModelType != modelType || prevTexType != model->textureType) {
-				prevModelType = modelType; prevTexType = model->textureType;
-				CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType); //inefficient rendering, but w/e
-			}
-
-			modelDrawerState->SetStaticModelMatrix(staticWorldMat);
-			smv.SubmitImmediately(model, lgb->team, DrawFlags::SO_ALPHAF_FLAG); //need to submit immediately every model because of static per-model matrix
+		if (anyNormal) {
+			modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
+			modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.y);
+			flushGhosts(byTexNormal);
+		}
+		if (anyContradar) {
+			modelDrawerState->SetColorMultiplier(0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z);
+			modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.z);
+			flushGhosts(byTexContradar);
 		}
 	}
 
@@ -1876,7 +1902,7 @@ void CUnitDrawerGL4::DrawAlphaAIUnit(const CUnitDrawerData::TempDrawUnit& unit) 
 	SetTeamColor(unit.team, IModelDrawerState::alphaValues.x);
 	modelDrawerState->SetStaticModelMatrix(staticWorldMat);
 
-	smv.SubmitImmediately(mdl, unit.team, DrawFlags::SO_ALPHAF_FLAG);
+	smv.SubmitImmediately(mdl, static_cast<uint16_t>(unit.team));
 }
 
 void CUnitDrawerGL4::DrawOpaqueObjectsAux(int modelType) const
@@ -1923,7 +1949,7 @@ void CUnitDrawerGL4::DrawOpaqueAIUnit(const CUnitDrawerData::TempDrawUnit& unit)
 	SetTeamColor(unit.team);
 	modelDrawerState->SetStaticModelMatrix(staticWorldMat);
 
-	smv.SubmitImmediately(mdl, unit.team, DrawFlags::SO_OPAQUE_FLAG);
+	smv.SubmitImmediately(mdl, static_cast<uint16_t>(unit.team));
 }
 
 void CUnitDrawerGL4::DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool noLuaCall) const

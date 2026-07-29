@@ -52,6 +52,8 @@
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/TeamHandler.h"
+#include "Sim/Misc/GlobalConstants.h"
+#include "Sim/Misc/CustomColorPalette.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Projectiles/Projectile.h"
 #include "Sim/Units/Unit.h"
@@ -66,12 +68,14 @@
 #include "System/Config/ConfigVariable.h"
 #include "System/Input/KeyInput.h"
 #include "System/LoadSave/DemoReader.h"
+#include "System/LoadSave/DemoRecorder.h"
 #include "System/Log/DefaultFilter.h"
 #include "System/Platform/SDL1_keysym.h"
 #include "System/Platform/Misc.h"
 #include "System/Sound/ISound.h"
 #include "System/Sound/ISoundChannels.h"
 #include "System/StringUtil.h"
+#include "System/Sync/SyncChecker.h"
 #include "System/Misc/SpringTime.h"
 #include "System/ScopedResource.h"
 #include "System/Math/NURBS.h"
@@ -102,6 +106,8 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetReplayLength);
 
 	REGISTER_LUA_CFUNC(GetGameName);
+	REGISTER_LUA_CFUNC(GetReplayFilePath);
+	REGISTER_LUA_CFUNC(GetReplayRecordingFilePath);
 	REGISTER_LUA_CFUNC(GetMenuName);
 
 	REGISTER_LUA_CFUNC(GetProfilerTimeRecord);
@@ -115,6 +121,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetGameSecondsInterpolated);
 	REGISTER_LUA_CFUNC(GetLastUpdateSeconds);
 	REGISTER_LUA_CFUNC(GetVideoCapturingMode);
+	REGISTER_LUA_CFUNC(GetPrevFrameSyncChecksum);
 
 	REGISTER_LUA_CFUNC(GetNumDisplays);
 	REGISTER_LUA_CFUNC(GetViewGeometry);
@@ -177,6 +184,9 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetTeamColor);
 	REGISTER_LUA_CFUNC(GetTeamOrigColor);
 
+	REGISTER_LUA_CFUNC(GetCustomPaletteColor);
+	REGISTER_LUA_CFUNC(GetUnitPaletteIndex);
+	REGISTER_LUA_CFUNC(GetFeaturePaletteIndex);
 	REGISTER_LUA_CFUNC(GetLocalPlayerID);
 	REGISTER_LUA_CFUNC(GetLocalTeamID);
 	REGISTER_LUA_CFUNC(GetLocalAllyTeamID);
@@ -305,6 +315,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(UnitIconGetDraw);
 	REGISTER_LUA_CFUNC(GetUnitIconData);
+	REGISTER_LUA_CFUNC(GetUnitIcon);
 	REGISTER_LUA_CFUNC(GetIconData);
 	REGISTER_LUA_CFUNC(GetAllIconDataArray);
 
@@ -515,6 +526,58 @@ int LuaUnsyncedRead::GetGameName(lua_State* L)
 	return 1;
 }
 
+/*** If a replay is currently being watched, returns its file path.
+ *
+ * @function Spring.GetReplayFilePath
+ *
+ * @return string filePath
+ */
+int LuaUnsyncedRead::GetReplayFilePath(lua_State* L)
+{
+	if (gameServer != nullptr) {
+		if (gameServer->GetDemoReader()) {
+			lua_pushsstring(L, gameServer->GetDemoReader()->GetName());
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+/*** If a replay is being recorded, returns its projected file path.
+ * Note that replay contents are only written there at game exit.
+ * Note also that watching a replay also records a meta-replay
+ * if the DemoFromDemo springsetting is set.
+ *
+ * @function Spring.GetReplayRecordingFilePath
+ *
+ * @return string filePath
+ */
+int LuaUnsyncedRead::GetReplayRecordingFilePath(lua_State* L)
+{
+	/* TODO: why are there two places that keep a recording?
+	 * Check for logic duplication and perhaps remove one.
+	 * See https://github.com/beyond-all-reason/RecoilEngine/issues/2942 */
+
+	if (clientNet != nullptr) {
+		const CDemoRecorder* dr = clientNet->GetDemoRecorder();
+
+		if (dr != nullptr && dr->IsValid()) {
+			lua_pushsstring(L, dr->GetName());
+			return 1;
+		}
+	}
+
+	if (gameServer != nullptr) {
+		if (gameServer->GetDemoRecorder()) {
+			lua_pushsstring(L, gameServer->GetDemoRecorder()->GetName());
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 /***
  *
  * @function Spring.GetMenuName
@@ -626,8 +689,8 @@ int LuaUnsyncedRead::GetLuaMemUsage(lua_State* L)
 
 	// sum up the individual (unsynced and synced) state footprints
 	for (bool synced: {false, true}) {
-		lgs.allocedBytes = {0};
-		lgs.numLuaAllocs = {0};
+		lgs.allocedBytes = 0;
+		lgs.numLuaAllocs = 0;
 
 		for (const luaContextData* lcd: *LUAHANDLE_CONTEXTS[synced]) {
 			lhs = &lcd->allocState;
@@ -1175,6 +1238,35 @@ int LuaUnsyncedRead::GetVideoCapturingMode(lua_State* L)
 }
 
 
+/***
+ *
+ * Returns the engine's sync checksum for the previous simframe,
+ * useful for testing. The returned string is NOT convertible to
+ * a number within Lua.
+ *
+ * Returns a dummy value if `Platform.hasSyncChecksums` is false,
+ * or if no frames were processed yet.
+ *
+ * @function Spring.GetPrevFrameSyncChecksum
+ *
+ * @return string checksum
+ */
+int LuaUnsyncedRead::GetPrevFrameSyncChecksum(lua_State* L)
+{
+#ifdef SYNCCHECK
+	unsigned checksum = CSyncChecker::GetPrevChecksum();
+#else
+	unsigned checksum = 0;
+#endif
+
+	char buf[9];
+	snprintf(buf, sizeof(buf), "%08x", checksum);
+	lua_pushstring(L, buf);
+
+	return 1;
+}
+
+
 /******************************************************************************
  * Unit attributes
  * @section unitattributes
@@ -1444,7 +1536,7 @@ namespace Impl {
  */
 int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
 {
-	CUnit* unit = ParseUnit(L, __func__, 1);
+	const CUnit* unit = ParseUnit(L, __func__, 1);
 	const auto fullData = luaL_optboolean(L, 2, false);
 
 	if (unit == nullptr)
@@ -1454,6 +1546,28 @@ int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
 		return Impl::GetIconDataImpl<true >(L, unit->currentIconIndex);
 	else
 		return Impl::GetIconDataImpl<false>(L, unit->currentIconIndex);
+}
+
+/*** Get unit icon name
+ *
+ * @function Spring.GetUnitIcon
+ * @param unitID number
+ * @return string iconName
+ */
+int LuaUnsyncedRead::GetUnitIcon(lua_State* L)
+{
+	const CUnit* unit = ParseUnit(L, __func__, 1);
+	const auto iconIdx = unit->currentIconIndex;
+
+	if (iconIdx == icon::INVALID_ICON_INDEX) {
+		lua_pushstring(L, "");
+	}
+	else {
+		const auto& iconData = icon::iconHandler.GetIconData(iconIdx);
+		lua_pushstring(L, iconData.GetName().c_str());
+	}
+
+	return 1;
 }
 
 /*** Get icon data
@@ -2408,70 +2522,56 @@ int LuaUnsyncedRead::GetUnitsInScreenRectangle(lua_State* L)
 
 	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 5);
 
-	std::function<bool(const CUnit*)> disqualifierFunc;
-
-	switch (allegiance)
-	{
-	case LuaUtils::AllUnits:
-		disqualifierFunc = [L](const CUnit* unit) -> bool { return !LuaUtils::IsUnitVisible(L, unit); };
-		break;
-	case LuaUtils::MyUnits:
-		disqualifierFunc = [readTeam](const CUnit* unit) -> bool { return unit->team != readTeam; };
-		break;
-	case LuaUtils::AllyUnits:
-		disqualifierFunc = [readATeam](const CUnit* unit) -> bool { return unit->allyteam != readATeam; };
-		break;
-	case LuaUtils::EnemyUnits:
-		disqualifierFunc = [readATeam](const CUnit* unit) -> bool { return unit->allyteam == readATeam; };
-		break;
-	default: {
-		if (LuaUtils::IsAlliedTeam(L, allegiance)) {
-			disqualifierFunc = [allegiance](const CUnit* unit) -> bool { return unit->team != allegiance; };
-		}
-		else {
-			disqualifierFunc = [allegiance, L](const CUnit* unit) -> bool {
-				if (unit->team != allegiance)
-					return true;
-
-				if (!LuaUtils::IsUnitVisible(L, unit))
-					return true;
-
-				return false;
-			};
-		}
-	} break;
-	}
-
 	// Even though we're in unsynced it's ok to use gs->tempNum since its exact value
 	// doesn't matter
 	const int tempNum = gs->GetTempNum();
 	lua_createtable(L, unitQuadIter.GetObjectCount(), 0);
 
-	uint32_t count = 0;
-	for (auto visUnitList : unitQuadIter.GetObjectLists()) {
-		for (CUnit* unit : *visUnitList) {
-			if (disqualifierFunc(unit))
-				continue;
+	auto runLoop = [&](auto disqualifier) {
+		uint32_t count = 0;
+		for (auto visUnitList : unitQuadIter.GetObjectLists()) {
+			for (CUnit* unit : *visUnitList) {
+				if (disqualifier(unit))
+					continue;
 
-			if (unit->tempNum == tempNum)
-				continue;
+				if (unit->tempNum == tempNum)
+					continue;
 
-			unit->tempNum = tempNum;
+				unit->tempNum = tempNum;
 
-			const float3 vpPos = camera->CalcViewPortCoordinates(unit->drawPos);
+				const float3 vpPos = camera->CalcViewPortCoordinates(unit->drawPos);
 
-			if (vpPos.x > r || vpPos.x < l)
-				continue;
+				if (vpPos.x > r || vpPos.x < l)
+					continue;
 
-			if (vpPos.y > b || vpPos.y < t)
-				continue;
+				if (vpPos.y > b || vpPos.y < t)
+					continue;
 
-			if (vpPos.z > 1.0f || vpPos.z < 0.0f)
-				continue;
+				if (vpPos.z > 1.0f || vpPos.z < 0.0f)
+					continue;
 
-			lua_pushnumber(L, unit->id);
-			lua_rawseti(L, -2, ++count);
+				lua_pushnumber(L, unit->id);
+				lua_rawseti(L, -2, ++count);
+			}
 		}
+	};
+
+	switch (allegiance) {
+		case LuaUtils::AllUnits:
+			runLoop([L](const CUnit* u) { return !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::MyUnits:
+			runLoop([L, readTeam](const CUnit* u) { return u->team != readTeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::AllyUnits:
+			runLoop([L, readATeam](const CUnit* u) { return u->allyteam != readATeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::EnemyUnits:
+			runLoop([L, readATeam](const CUnit* u) { return u->allyteam == readATeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		default:
+			runLoop([L, allegiance](const CUnit* u) { return u->team != allegiance || !LuaUtils::IsUnitVisible(L, u); });
+			break;
 	}
 
 	return 1;
@@ -3023,7 +3123,7 @@ int LuaUnsyncedRead::GetCameraFOV(lua_State* L)
 int LuaUnsyncedRead::GetCameraVectors(lua_State* L)
 {
 #define PACK_CAMERA_VECTOR(s,n) \
-	HSTR_PUSH(L, #s);           \
+	lua_pushhstring(L, CompileTimeHash(#s), #s, sizeof(#s) - 1); \
 	lua_createtable(L, 3, 0);            \
 	lua_pushnumber(L, camera-> n .x); lua_rawseti(L, -2, 1); \
 	lua_pushnumber(L, camera-> n .y); lua_rawseti(L, -2, 2); \
@@ -3298,6 +3398,70 @@ int LuaUnsyncedRead::GetTeamOrigColor(lua_State* L)
 	lua_pushnumber(L, team->origColor[2] / 255.0f);
 	lua_pushnumber(L, team->origColor[3] / 255.0f);
 	return 4;
+}
+
+
+/***
+ *
+ * @function Spring.GetCustomPaletteColor
+ * @param index integer 0-based index into custom palette
+ * @return number? r factor from 0 to 1
+ * @return number? g factor from 0 to 1
+ * @return number? b factor from 0 to 1
+ */
+int LuaUnsyncedRead::GetCustomPaletteColor(lua_State* L)
+{
+	const auto customIndex = LuaUtils::ParsePalette(L, 1);
+	const float4 color = customColorPalette.GetColor(customIndex);
+
+	lua_pushnumber(L, color.x);
+	lua_pushnumber(L, color.y);
+	lua_pushnumber(L, color.z);
+	return 3;
+}
+
+
+/***
+ * Returns the custom palette index for a unit, or nil if using team color.
+ * @function Spring.GetUnitPaletteIndex
+ * @param unitID integer
+ * @return integer? customIndex [0..MAX_CUSTOM_COLORS) if unit uses a custom color, nil if using team color
+ */
+int LuaUnsyncedRead::GetUnitPaletteIndex(lua_State* L)
+{
+	const int unitID = luaL_checkint(L, 1);
+	const CUnit* unit = unitHandler.GetUnit(unitID);
+	if (unit == nullptr)
+		return 0;
+
+	if (CCustomColorPalette::IsCustomPaletteIndex(unit->paletteIndex)) {
+		lua_pushnumber(L, CCustomColorPalette::DecodePaletteIndex(unit->paletteIndex));
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+
+/***
+ * Returns the custom palette index for a feature, or nil if using team color.
+ * @function Spring.GetFeaturePaletteIndex
+ * @param featureID integer
+ * @return integer? customIndex [0..MAX_CUSTOM_COLORS) if feature uses a custom color, nil if using team color
+ */
+int LuaUnsyncedRead::GetFeaturePaletteIndex(lua_State* L)
+{
+	const int featureID = luaL_checkint(L, 1);
+	const CFeature* feature = featureHandler.GetFeature(featureID);
+	if (feature == nullptr)
+		return 0;
+
+	if (CCustomColorPalette::IsCustomPaletteIndex(feature->paletteIndex)) {
+		lua_pushnumber(L, CCustomColorPalette::DecodePaletteIndex(feature->paletteIndex));
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
 }
 
 

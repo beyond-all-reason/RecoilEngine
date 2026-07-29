@@ -8,6 +8,7 @@
 
 #include "PathDefines.h"
 #include "PathThreads.h"
+#include "Registry.h"
 
 #include "System/float3.h"
 
@@ -111,10 +112,10 @@ namespace QTPFS {
 			const float3& targetPoint,
 			const CSolidObject* owner
 		);
-		void InitializeThread(SearchThreadData* threadData);
+		void InitializeThread(SearchThreadData* threadData, IPath* pathToRepair);
 		void PreLoadNode(uint32_t dir, uint32_t nodeId, uint32_t prevNodeId, const float2& netPoint, uint32_t stepIndex);
 		void LoadPartialPath(IPath* path);
-		void LoadRepairPath();
+		void LoadRepairPath(IPath* pathToRepair);
 		bool Execute(unsigned int searchStateOffset = 0);
 		void Finalize(IPath* path);
 		bool SharedFinalize(const IPath* srcPath, IPath* dstPath);
@@ -183,7 +184,7 @@ namespace QTPFS {
 		bool ExecutePathSearch();
 		bool ExecuteRawSearch();
 
-		void SetForwardSearchLimit();
+		void SetNodeSearchLimit();
 
 		void GetRectangleCollisionVolume(const SearchNode& snode, CollisionVolume& v, float3& rm) const;
 
@@ -238,7 +239,7 @@ namespace QTPFS {
 		int fwdStepIndex = 0;
 		int bwdStepIndex = 0;
 
-		int fwdNodeSearchLimit = 0;
+		int nodeSearchLimit = 0;
 
 		size_t fwdNodesSearched = 0;
 		size_t bwdNodesSearched = 0;
@@ -264,6 +265,8 @@ public:
 		bool fwdPathConnected = false;
 		bool bwdPathConnected = false;
 		bool useFwdPathOnly = false;
+		QTPFS::entity fullSharedPathHead = entt::null;
+		QTPFS::entity partSharedPathHead = entt::null;
 
 		// int postLoadRepairPathIndexOverride = 0;
 
@@ -284,6 +287,20 @@ public:
 		UnsyncedPathSearch(unsigned int pathSearchType)
 			: PathSearch(pathSearchType)
 			{ synced = false; }
+	};
+
+	// Because some paths are managed externally to QTPFS (e.g. Lua paths), we need to be able to mark
+	// their searches as synced, but not have QTPFS manage their life-cycle (i.e. deletion after use).
+	// These paths are also not safe to have their data modified during path rebuilding after map changes because
+	// the rebuilding is order-sensitive and externally-managed paths could be destroyed at any time, which can
+	// change the order of path processing.
+	struct ExternallyManagedPathSearch : public PathSearch {
+		ExternallyManagedPathSearch() {
+			synced = true; // Mark this path as synced explicitly
+		}
+		ExternallyManagedPathSearch(unsigned int pathSearchType)
+			: PathSearch(pathSearchType)
+			{ synced = true; }
 	};
 }
 

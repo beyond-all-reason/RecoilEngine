@@ -106,9 +106,9 @@ void LuaObjectRenderingImpl::CreateMatRefMetatable(lua_State* L)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	luaL_newmetatable(L, "MatRef");
-	HSTR_PUSH_CFUNC(L, "__gc",       material_gc);
-	HSTR_PUSH_CFUNC(L, "__index",    material_index);
-	HSTR_PUSH_CFUNC(L, "__newindex", material_newindex);
+	LuaPushNamedCFunc(L, "__gc",       material_gc);
+	LuaPushNamedCFunc(L, "__index",    material_index);
+	LuaPushNamedCFunc(L, "__newindex", material_newindex);
 	lua_pop(L, 1);
 }
 

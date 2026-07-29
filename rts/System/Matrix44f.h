@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <cmath>
 #include <array>
 #include <tuple>
@@ -31,8 +32,8 @@ public:
 
 	bool IsOrthoNormal() const;
 	bool IsIdentity() const;
-	bool IsRotMatrix()          const { return IsOrthoNormal() && math::fabs(1.0f - Det4()) <= 8.0f * float3::cmp_eps(); }
-	bool IsRotOrRotTranMatrix() const { return IsOrthoNormal() && math::fabs(1.0f - Det3()) <= 8.0f * float3::cmp_eps(); }
+	bool IsRotMatrix() const;
+	bool IsRotOrRotTranMatrix() const;
 	float Det3() const;
 	float Det4() const;
 
@@ -175,11 +176,7 @@ public:
 		float4 col[4];
 	};
 
-	std::string str() const {
-		return std::format(
-			"m44(\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f}\n{:.3f} {:.3f} {:.3f} {:.3f})",
-			m[0], m[4], m[8], m[12], m[1], m[5], m[9], m[13], m[2], m[6], m[10], m[14], m[3], m[7], m[11], m[15]);
-	}
+	std::string str() const;
 };
 
 

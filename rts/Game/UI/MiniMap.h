@@ -25,14 +25,14 @@ public:
 	CMiniMap();
 	~CMiniMap() override;
 
-	bool MousePress(int x, int y, int button);
-	void MouseMove(int x, int y, int dx, int dy, int button);
-	void MouseRelease(int x, int y, int button);
+	bool MousePress(int x, int y, int button) override;
+	void MouseMove(int x, int y, int dx, int dy, int button) override;
+	void MouseRelease(int x, int y, int button) override;
 	void MouseWheel(bool up, float delta);
 	void MoveView(int x, int y) { MoveView(GetMapPosition(x, y)); }
-	bool IsAbove(int x, int y);
+	bool IsAbove(int x, int y) override;
 	bool IsInside(int x, int y);
-	std::string GetTooltip(int x, int y);
+	std::string GetTooltip(int x, int y) override;
 	void Draw() override;
 	void DrawForReal(bool useNormalizedCoors = true, bool updateTex = false, bool luaCall = false);
 	void Update();
@@ -52,7 +52,7 @@ public:
 	bool  ProxyMode()   const { return proxyMode; }
 	float CursorScale() const { return cursorScale; }
 
-	void SetMinimized(bool state) { minimized = state; }
+	void SetMinimized(bool state);
 	bool GetMinimized() const { return minimized; }
 	bool GetMaximized() const { return maximized; }
 
@@ -129,6 +129,8 @@ protected:
 	int2 tmpPos;
 	int2 oldPos;
 	int2 oldDim;
+	int2 lastPos;
+	int2 lastDim;
 
 	float minimapRefreshRate = 0.0f;
 

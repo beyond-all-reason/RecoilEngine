@@ -67,8 +67,8 @@ bool CBuilderCaches::IsUnitBeingReclaimed(const CUnit* unit, const CUnit* friend
 		}
 	}
 
-	for (auto it = removees.begin(); it != removees.end(); ++it)
-		RemoveUnitFromReclaimers(unitHandler.GetUnit(*it));
+	for (const auto removee : removees)
+		RemoveUnitFromReclaimers(unitHandler.GetUnit(removee));
 
 	return retval;
 }
@@ -103,8 +103,8 @@ bool CBuilderCaches::IsFeatureBeingReclaimed(int featureId, const CUnit* friendU
 		}
 	}
 
-	for (auto it = removees.begin(); it != removees.end(); ++it)
-		RemoveUnitFromFeatureReclaimers(unitHandler.GetUnit(*it));
+	for (const auto removee : removees)
+		RemoveUnitFromFeatureReclaimers(unitHandler.GetUnit(removee));
 
 	return retval;
 }
@@ -127,7 +127,7 @@ bool CBuilderCaches::IsFeatureBeingResurrected(int featureId, const CUnit* frien
 			continue;
 		}
 		const Command& c = cq.front();
-		if (c.GetID() != CMD_RESURRECT || c.GetNumParams() != 1) {
+		if (c.GetID() != CMD_RESURRECT || (c.GetNumParams() != 1 && c.GetNumParams() != 5)) {
 			removees.push_back(u->id);
 			continue;
 		}
@@ -138,8 +138,8 @@ bool CBuilderCaches::IsFeatureBeingResurrected(int featureId, const CUnit* frien
 		}
 	}
 
-	for (auto it = removees.begin(); it != removees.end(); ++it)
-		RemoveUnitFromResurrecters(unitHandler.GetUnit(*it));
+	for (const auto removee : removees)
+		RemoveUnitFromResurrecters(unitHandler.GetUnit(removee));
 
 	return retval;
 }

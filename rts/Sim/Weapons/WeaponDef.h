@@ -167,13 +167,13 @@ public:
 	bool visibleShield;              // if the shield should be graphically shown
 	bool visibleShieldRepulse;       // if a small graphic should be shown at each repulse
 	int  visibleShieldHitFrames;     // number of frames to draw the shield after it has been hit
-	float shieldEnergyUse;           // energy use per shot or per second depending on projectile
+	SResourcePack shieldResourceUse; // resource use per shot or per second depending on projectile
 	float shieldRadius;              // size of shielded area
 	float shieldForce;               // shield acceleration on plasma stuff
 	float shieldMaxSpeed;            // max speed shield can repulse plasma like weapons with
 	float shieldPower;               // how much damage the shield can reflect (0=infinite)
 	float shieldPowerRegen;          // how fast the power regenerates per second
-	float shieldPowerRegenEnergy;    // how much energy is needed to regenerate power per second
+	SResourcePack shieldPowerRegenCost; // how much resources are needed to regenerate power per second
 	float shieldStartingPower;       // how much power the shield has when first created
 	int   shieldRechargeDelay;       // number of frames to delay recharging by after each hit
 	float4 shieldGoodColor;          // color when shield at full power

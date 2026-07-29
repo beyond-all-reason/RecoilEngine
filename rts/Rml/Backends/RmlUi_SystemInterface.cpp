@@ -44,6 +44,11 @@ RmlSystemInterface::~RmlSystemInterface()
 {
 }
 
+void RmlSystemInterface::Reset()
+{
+    this->documentPathRequests.clear();
+}
+
 double RmlSystemInterface::GetElapsedTime()
 {
 	return spring_gettime().toSecs<double>();
@@ -110,6 +115,22 @@ void RmlSystemInterface::GetClipboardText(Rml::String& text)
 	char* raw_text = SDL_GetClipboardText();
 	text = Rml::String(raw_text);
 	SDL_free(raw_text);
+}
+
+void RmlSystemInterface::JoinPath(Rml::String& translated_path, const Rml::String& document_path, const Rml::String& path)
+{
+    Rml::SystemInterface::JoinPath(translated_path, document_path, path);
+    this->documentPathRequests[document_path].emplace_back(translated_path);
+}
+
+std::vector<std::string> RmlSystemInterface::GetDocumentPathRequests(const Rml::String& document_path)
+{
+    return this->documentPathRequests[document_path];
+}
+
+void RmlSystemInterface::ClearDocumentPathRequests(const Rml::String& document_path)
+{
+    this->documentPathRequests[document_path].clear();
 }
 
 bool RmlSDLRecoil::EventKeyDown(Rml::Context* context, Rml::Input::KeyIdentifier key)
@@ -362,3 +383,4 @@ int RmlSDLRecoil::GetKeyModifierState()
 
 	return retval;
 }
+

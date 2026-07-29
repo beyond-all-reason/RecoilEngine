@@ -43,7 +43,8 @@ CZipArchive::CZipArchive(const std::string& archiveName)
 		unz_file_info info;
 		char fName[512];
 
-		unzGetCurrentFileInfo(zip, &info, fName, sizeof(fName), nullptr, 0, nullptr, 0);
+		if (unzGetCurrentFileInfo(zip, &info, fName, sizeof(fName), nullptr, 0, nullptr, 0) != UNZ_OK)
+			continue;
 
 		if (fName[0] == 0)
 			continue;
@@ -57,13 +58,13 @@ CZipArchive::CZipArchive(const std::string& archiveName)
 		unz_file_pos fp{};
 		unzGetFilePos(zip, &fp);
 
-		const auto& fd = fileEntries.emplace_back(
+		const auto& fd = fileEntries.emplace_back(FileEntry{
 			std::move(fp), //fp
-			info.uncompressed_size, //size
+			static_cast<int>(info.uncompressed_size), //size
 			fName, //origName
-			info.crc, //crc
+			static_cast<uint32_t>(info.crc), //crc
 			static_cast<uint32_t>(CTimeUtil::DosTimeToTime64(info.dosDate)) //modTime
-		);
+		});
 
 		lcNameIndex.emplace(StringToLower(fd.origName), fileEntries.size() - 1);
 	}

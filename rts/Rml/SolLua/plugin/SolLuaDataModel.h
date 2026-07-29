@@ -45,6 +45,7 @@
 namespace Rml::SolLua
 {
 	class SolLuaObjectDef;
+	class DataVariableReference;
 
 	struct SolLuaDataModel
 	{
@@ -60,7 +61,7 @@ namespace Rml::SolLua
 
 		enum class BindingType { None = 0, Variable = 1, Function = 2 };
 		std::unordered_map<std::string, BindingType> BindingMap;
-		std::unordered_map<std::string, sol::object> ObjectMap;
+		std::unordered_map<std::string, DataVariableReference> ObjectMap;
 	};
 
 	class SolLuaObjectDef final : public Rml::VariableDefinition
@@ -73,6 +74,19 @@ namespace Rml::SolLua
 		DataVariable Child(void* ptr, const Rml::DataAddressEntry& address) override;
 	protected:
 		SolLuaDataModel* m_model;
+	};
+
+	class DataVariableReference
+	{
+	public:
+		DataVariableReference(sol::table parent, std::string key, std::string pkc, int arrayindex = -1);
+
+		sol::object getObject();
+
+		std::string keychain;
+		std::string key;
+		sol::table parent;
+		int arrayindex;
 	};
 
 } // end namespace Rml::SolLua

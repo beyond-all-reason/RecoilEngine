@@ -3,8 +3,6 @@
 #ifndef SYNCCHECKER_H
 #define SYNCCHECKER_H
 
-#ifdef SYNCCHECK
-
 #include "System/SpringHash.h"
 
 #include <cassert>
@@ -33,8 +31,11 @@ class CSyncChecker {
 		 * Keeps a running checksum over all assignments to synced variables.
 		 */
 		static unsigned GetChecksum() { return g_checksum; }
+		static unsigned GetPrevChecksum() { return g_prevChecksum; }
+		static void SetPrevChecksum(unsigned v) { g_prevChecksum = v; }
 		static void NewFrame();
 		static void debugSyncCheckThreading();
+		static void Sync(uint32_t val);
 		static void Sync(const void* p, unsigned size);
 		#ifdef SYNC_HISTORY
 		static std::tuple<unsigned, unsigned, unsigned*> GetFrameHistory(unsigned rewindFrames);
@@ -48,6 +49,11 @@ class CSyncChecker {
 		 * The sync checksum
 		 */
 		static unsigned g_checksum;
+
+		/**
+		 * Final checksum of the previous simulation frame.
+		 */
+		static unsigned g_prevChecksum;
 
 		/**
 		 * @brief in synced code
@@ -68,7 +74,5 @@ class CSyncChecker {
 		static std::array<unsigned, MAX_SYNC_HISTORY_FRAMES> logFrames;
 #endif // SYNC_HISTORY
 };
-
-#endif // SYNCDEBUG
 
 #endif // SYNCDEBUGGER_H

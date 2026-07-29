@@ -60,6 +60,8 @@ class CEventHandler
 
 		void TeamDied(int teamID);
 		void TeamChanged(int teamID);
+		bool ResourceExcess(const std::map <int, SResourcePack>& excess);
+
 		void PlayerChanged(int playerID);
 		void PlayerAdded(int playerID);
 		void PlayerRemoved(int playerID, int reason);
@@ -239,6 +241,9 @@ class CEventHandler
 		void ActiveCommandChanged(const SCommandDescription *cmdDesc);
 		void CameraRotationChanged(const float3& rot);
 		void CameraPositionChanged(const float3& pos);
+		void MiniMapRotationChanged(const float newRot, const float oldRot);
+		void MiniMapStateChanged(const bool isMinimized, const bool isMaximized, const bool isSlaved);
+		void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim);
 		bool CommandNotify(const Command& cmd);
 
 		bool AddConsoleLine(const std::string& msg, const std::string& section, int level);
@@ -305,6 +310,8 @@ class CEventHandler
 		void DrawAlphaFeaturesLua(bool drawReflection, bool drawRefraction);
 		void DrawShadowUnitsLua();
 		void DrawShadowFeaturesLua();
+
+		void DrawBuildSquare(int unitDefID, int x, int z, int facing, const std::vector<uint8_t>& statuses);
 
 		/// @brief this UNSYNCED event is generated every GameServer::gameProgressFrameInterval
 		/// it skips network queuing and caching and can be used to calculate the current catchup

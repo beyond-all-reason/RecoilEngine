@@ -28,6 +28,8 @@ public:
 	void Init() { animating.reserve(256); }
 	void Kill() { animating.clear(); }
 
+	const auto& GetAnimating() const { return animating; }
+
 	static void InitStatic();
 	static void KillStatic();
 private:

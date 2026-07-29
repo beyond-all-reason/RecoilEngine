@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <bit>
 
 #include "PathDefines.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
@@ -99,6 +100,7 @@ namespace QTPFS {
 			havePartialPath = other.havePartialPath;
 			boundingBoxOverride = other.boundingBoxOverride;
 			isRawPath = other.isRawPath;
+			repathTriggered = other.repathTriggered;
 			points = other.points;
 			nodes = other.nodes;
 
@@ -131,6 +133,7 @@ namespace QTPFS {
 			havePartialPath = other.havePartialPath;
 			boundingBoxOverride = other.boundingBoxOverride;
 			isRawPath = other.isRawPath;
+			repathTriggered = other.repathTriggered;
 			points = std::move(other.points);
 			nodes = std::move(other.nodes);
 
@@ -161,6 +164,8 @@ namespace QTPFS {
 		void SetSynced(bool synced) { this->synced = synced; }
 		void SetHasFullPath(bool fullPath) { this->haveFullPath = fullPath; }
 		void SetHasPartialPath(bool partialPath) { this->havePartialPath = partialPath; }
+		void SetRepathTriggered(bool triggered) { this->repathTriggered = triggered; }
+		bool IsRepathTriggered() const { return repathTriggered; }
 
 		float GetRadius() const { return radius; }
 		PathHashType GetHash() const { return hash; }
@@ -309,6 +314,27 @@ namespace QTPFS {
 			}
 		}
 
+		// Function is for debugging and logging purposes only
+		uint32_t CalculateHash() const {
+			// Use FNV-1a style mixing over the raw float bit-patterns so
+			// we don't lose any information when converting floats to ints.
+			// We copy the float bytes into a uint32_t to avoid strict-aliasing
+			// UB instead of reinterpreting pointers directly.
+
+			uint32_t h = 2166136261u; // FNV-1a 32-bit offset basis
+			constexpr uint32_t FNV_PRIME = 16777619u;
+
+			for (const float3& p: points) {
+				const uint32_t bx = std::bit_cast<uint32_t>(p.x);
+				const uint32_t bz = std::bit_cast<uint32_t>(p.z);
+
+				h ^= bx; h *= FNV_PRIME;
+				h ^= bz; h *= FNV_PRIME;
+			}
+
+			return h;
+		}
+
 		void SetPathType(int newPathType) { assert(pathType < moveDefHandler.GetNumMoveDefs()); pathType = newPathType; }
 		int GetPathType() const { return pathType; }
 
@@ -369,6 +395,7 @@ namespace QTPFS {
 		bool havePartialPath = false;
 		bool boundingBoxOverride = false;
 		bool isRawPath = false;
+		bool repathTriggered = false;
 
 		std::vector<float3> points;
 		std::vector<PathNodeData> nodes;
@@ -391,6 +418,15 @@ namespace QTPFS {
 			SetSynced(false); // Mark this path as unsynced explicitly
 		}
 	};
+
+	struct ExternallyManagedSyncedIPath : public IPath {
+		ExternallyManagedSyncedIPath() {
+			SetSynced(true); // Mark this path as synced explicitly
+		}
+	};
+
+	// Used by the search system to avoid clashes with other engine systems.
+	struct SearchModeIPath : public IPath {};
 }
 
 #endif

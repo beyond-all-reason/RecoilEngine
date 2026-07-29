@@ -10,7 +10,7 @@
 #include <chrono>
 #include <array>
 
-#include "lib/fmt/printf.h"
+#include <fmt/printf.h>
 
 std::string CTimeUtil::GetCurrentTimeStr(bool utc)
 {

@@ -13,7 +13,8 @@
 #include "Rendering/GL/RenderBuffersFwd.h"
 #include "Rendering/Textures/TextureAtlas.h"
 
-class UnitDef;
+struct UnitDef;
+class CTextureRenderAtlas;
 
 namespace icon {
 	static constexpr size_t INVALID_ICON_INDEX = size_t(-1);
@@ -106,7 +107,11 @@ namespace icon {
 			const auto& GetAtlasTextureIDs() const { return atlasTextureIDs; }
 			auto GetAtlasTextureID(size_t i) const { return atlasTextureIDs[i]; }
 			const auto& GetAtlasSize(size_t i) const { return atlasTextureSizes[i]; }
+
+			void DumpAtlasTextures(const std::string& fileExt = "png") const;
 		private:
+			bool UpdateAtlasData(size_t atlasIdx);
+			bool CreateAtlasTexture(size_t atlasIdx);
 			void LoadIcons(const std::string& filename);
 		private:
 			static constexpr int DEFAULT_NUM_OF_TEXTURE_LEVELS = 4;
@@ -118,6 +123,7 @@ namespace icon {
 
 			std::array<uint32_t, 2> atlasTextureIDs = {};
 			std::array<int2, 2> atlasTextureSizes = {};
+			std::array<std::unique_ptr<CTextureRenderAtlas>, 2> atlases;
 			std::bitset<2> atlasNeedsUpdate = { false };
 	};
 
