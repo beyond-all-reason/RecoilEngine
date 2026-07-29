@@ -57,9 +57,6 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Setup Mise
         uses: jdx/mise-action@v2
-        env:
-          MISE_VERBOSE: "1"
-          MISE_LOG_LEVEL: "trace"
         with:
           working_directory: doc/site # [default: .] directory to run mise in
       - name: Build with Hugo
