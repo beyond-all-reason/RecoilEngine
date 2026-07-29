@@ -386,7 +386,6 @@ endif()
 	set(test_name UnitSync)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/unitsync/testUnitSync.cpp"
-			"${ENGINE_SOURCE_DIR}/Lua/LuaMemPool.cpp"
 			## -DUNITSYNC is not passed onto VFS code, which references globalConfig
 			"${ENGINE_SOURCE_DIR}/System/GlobalConfig.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
@@ -530,7 +529,6 @@ endif()
 	set(test_name SerializeLuaState)
 	set(test_src
 			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testSerializeLuaState.cpp"
-			"${ENGINE_SOURCE_DIR}/Lua/LuaMemPool.cpp"
 			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
 			"${ENGINE_SOURCE_DIR}/System/creg/Serializer.cpp"
 			"${ENGINE_SOURCE_DIR}/System/creg/VarTypes.cpp"
@@ -542,7 +540,6 @@ endif()
 	set(test_libs
 			lua
 			headlessStubs
-			smmalloc
 		)
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
 	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
@@ -555,9 +552,6 @@ endif()
 			"${CMAKE_CURRENT_SOURCE_DIR}/other/testMemPoolTypes.cpp"
 			${test_Common_sources}
 		)
-	set(test_libs
-		smmalloc
-	)
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
 	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
 

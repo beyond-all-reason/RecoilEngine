@@ -242,7 +242,6 @@ SpringApp::~SpringApp()
 bool SpringApp::Init()
 {
 	SpringMath::Init();
-	LuaMemPool::InitStatic(configHandler->GetBool("UseLuaMemPools"));
 
 	CGlobalRendering::InitStatic();
 	globalRendering->SetFullScreen(FLAGS_window, FLAGS_fullscreen);
@@ -1026,7 +1025,6 @@ void SpringApp::Kill(bool fromRun)
 	spring::SafeDelete(pregame);
 	spring::SafeDelete(luaMenuController);
 
-	LuaMemPool::KillStatic();
 
 	LOG("[SpringApp::%s][3]", __func__);
 	spring::SafeDelete(clientNet);

@@ -38,9 +38,6 @@ list(APPEND engineDedicatedLibraries "fmt::fmt")
 ### base64 from pr-downloader
 list(APPEND engineDedicatedLibraries "prd::base64")
 
-### smmalloc
-list(APPEND engineDedicatedLibraries "smmalloc")
-
 ### mimalloc
 if (USE_MIMALLOC)
     list(APPEND engineDedicatedLibraries mimalloc-static)
@@ -170,7 +167,6 @@ set(engineDedicatedSources
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaIO.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaLibs.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMathExtra.cpp
-	${ENGINE_SRC_ROOT_DIR}/Lua/LuaMemPool.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaParser.cpp
 	${ENGINE_SRC_ROOT_DIR}/Lua/LuaUtils.cpp
 	${ENGINE_SRC_ROOT_DIR}/Map/MapParser.cpp

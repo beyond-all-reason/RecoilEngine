@@ -13,7 +13,6 @@
 #include <map>
 #include <memory>
 
-#include "System/recoil-smmalloc.h"
 
 #include "System/UnorderedMap.hpp"
 #include "System/ContainerUtil.h"
@@ -21,45 +20,6 @@
 #include "System/Platform/Threading.h"
 #include "System/Log/ILog.h"
 
-template<uint32_t NumBuckets, size_t BucketSize> struct PassThroughPool {
-public:
-	PassThroughPool() {
-		space = _sm_allocator_create(NumBuckets, BucketSize);
-	}
-	~PassThroughPool() {
-		_sm_allocator_destroy(space); //checks space != nullptr internally
-	}
-
-	template<typename T, typename... A> T* alloc(A&&... a) {
-		static_assert(BUCKET_STEP >= alignof(T), "Can't allocate memory with alignment greater than BUCKET_STEP");
-		return new (allocMem(sizeof(T))) T(std::forward<A>(a)...);
-	}
-	void* allocMem(size_t size) {
-		return _sm_malloc(space, size, BUCKET_STEP);
-	}
-
-	template<typename T> void free(T*& p) {
-		void* m = p;
-
-		spring::SafeDestruct(p);
-		freeMem(m);
-	}
-	void freeMem(void* p) {
-		_sm_free(space, p);
-	}
-
-	void* reAllocMem(void* p, size_t size) {
-		return _sm_realloc(space, p, size, BUCKET_STEP);
-	}
-
-	bool isAllocInternal(void* p) const {
-		return (space->GetBucketIndex(p) != -1);
-	}
-private:
-	static constexpr size_t BUCKET_STEP = 16;
-	static constexpr size_t INTERNAL_ALLOC_SIZE = BUCKET_STEP * NumBuckets;
-	sm_allocator space = nullptr;
-};
 
 // Helper to infer the memory alignment and size from a set of types.
 template <class ...T>

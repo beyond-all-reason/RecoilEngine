@@ -5,7 +5,6 @@
 
 #include "Lua/LuaAllocState.h"
 #include "Lua/LuaGarbageCollectCtrl.h"
-#include "LuaMemPool.h"
 #if (!defined(UNITSYNC) && !defined(DEDICATED))
 #include "LuaShaders.h"
 #include "LuaTextures.h"
@@ -22,7 +21,6 @@
 #include "System/Threading/SpringThreading.h"
 
 class CLuaHandle;
-class LuaMemPool;
 class LuaParser;
 
 struct luaContextData {
@@ -30,7 +28,6 @@ public:
 	luaContextData(bool sharedPool, bool stateOwned)
 	: owner(nullptr)
 	, luamutex(nullptr)
-	, memPool(LuaMemPool::AcquirePtr(sharedPool, stateOwned))
 	, parser(nullptr)
 
 	, synced(false)
@@ -50,12 +47,6 @@ public:
 	{}
 
 	~luaContextData() {
-		// raw cast; LuaHandle is not a known type here
-		// ownerless LCD's are common and uninteresting
-		if (owner != nullptr)
-			memPool->LogStats((((CEventClient*) owner)->GetName()).c_str(), synced? "synced": "unsynced");
-
-		LuaMemPool::ReleasePtr(memPool, owner);
 	}
 
 	luaContextData(const luaContextData& lcd) = delete;
@@ -78,8 +69,6 @@ public:
 public:
 	CLuaHandle* owner;
 	spring::recursive_mutex* luamutex;
-
-	LuaMemPool* memPool;
 	LuaParser* parser;
 
 	bool synced;

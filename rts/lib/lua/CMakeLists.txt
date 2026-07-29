@@ -48,6 +48,12 @@ else ()
 TARGET_LINK_LIBRARIES(lua)
 endif ()
 
+### mimalloc
+if (USE_MIMALLOC)
+	TARGET_LINK_LIBRARIES(lua mimalloc-static)
+	target_compile_definitions(lua PRIVATE USE_MIMALLOC)
+endif()
+
 target_include_directories(lua PUBLIC include)
 
 if (UNIX)

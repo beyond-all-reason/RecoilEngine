@@ -4,7 +4,6 @@ INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/rts/lib)
 ADD_SUBDIRECTORY(fmt)
 set_target_properties(fmt PROPERTIES POSITION_INDEPENDENT_CODE ON)
 ADD_SUBDIRECTORY(glad)
-ADD_SUBDIRECTORY(smmalloc)
 
 # Mimalloc - only build if USE_MIMALLOC is enabled
 if (USE_MIMALLOC)

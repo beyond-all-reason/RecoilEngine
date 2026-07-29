@@ -17,9 +17,6 @@ list(APPEND unitsync_libs ${SPRING_MINIZIP_LIBRARY})
 ### base64 from pr-downloader
 list(APPEND unitsync_libs "prd::base64")
 
-### smmalloc
-list(APPEND unitsync_libs "smmalloc")
-
 if (WIN32)
 	list(APPEND unitsync_libs ${IPHLPAPI_LIBRARY})
 	list(APPEND unitsync_libs ${WINMM_LIBRARY})
@@ -63,7 +60,6 @@ set(main_files
 	"${ENGINE_SRC_ROOT}/Lua/LuaConstEngine.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaEncoding.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaMathExtra.cpp"
-	"${ENGINE_SRC_ROOT}/Lua/LuaMemPool.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaParser.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaUtils.cpp"
 	"${ENGINE_SRC_ROOT}/Lua/LuaIO.cpp"

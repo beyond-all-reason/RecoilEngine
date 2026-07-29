@@ -3,12 +3,18 @@
 #include <array>
 #include <cinttypes>
 
+#ifdef USE_MIMALLOC
+#include <mimalloc.h>
+#else
+#include <cstdlib>
+#include <cstdint>
+#endif
+
 #include "lib/streflop/streflop_cond.h"
 
 #include "LuaInclude.h"
 #include "Lua/LuaAllocState.h"
 #include "Lua/LuaHandle.h"
-#include "Lua/LuaMemPool.h"
 
 #include "System/GlobalRNG.h"
 #include "System/SpringMath.h"
@@ -256,7 +262,6 @@ void* spring_lua_alloc(void* ud, void* ptr, size_t osize, size_t nsize)
 {
 	luaContextData* lcd = static_cast<luaContextData*>(ud);
 	SLuaAllocState* las = &lcd->allocState;
-	LuaMemPool* lmp = lcd->memPool;
 
 	gLuaAllocState.allocedBytes -= osize;
 	gLuaAllocState.allocedBytes += nsize;
@@ -265,7 +270,11 @@ void* spring_lua_alloc(void* ud, void* ptr, size_t osize, size_t nsize)
 
 	if (nsize == 0) {
 		// deallocation; must return NULL
-		lmp->Free(ptr, osize);
+#ifdef USE_MIMALLOC
+		mi_free(ptr);
+#else
+		std::free(ptr);
+#endif
 		return nullptr;
 	}
 
@@ -283,7 +292,20 @@ void* spring_lua_alloc(void* ud, void* ptr, size_t osize, size_t nsize)
 #if LUA_MEASURE_ALLOC_TIME == 1
 	const spring_time t0 = spring_gettime();
 #endif
-	void* mem = lmp->Realloc(ptr, nsize, osize);
+	void* mem = nullptr;
+	if (osize == 0) {
+#ifdef USE_MIMALLOC
+		mem = mi_malloc(nsize);
+#else
+		mem = std::malloc(nsize);
+#endif
+	} else {
+#ifdef USE_MIMALLOC
+		mem = mi_realloc(ptr, nsize);
+#else
+		mem = std::realloc(ptr, nsize);
+#endif
+	}
 #if LUA_MEASURE_ALLOC_TIME == 1
 	const spring_time t1 = spring_gettime();
 #endif
@@ -305,9 +327,7 @@ void spring_lua_alloc_get_stats(SLuaAllocState* state)
 	state->luaAllocTime.store(gLuaAllocState.luaAllocTime.load());
 
 #if (ENABLE_USERSTATE_LOCKS != 0)
-	state->numLuaStates.store(mutexes.size() - coroutines.size();
-#else
-	state->numLuaStates.store(LuaMemPool::GetPoolCount());
+	state->numLuaStates.store(mutexes.size() - coroutines.size(); 
 #endif
 }
 
