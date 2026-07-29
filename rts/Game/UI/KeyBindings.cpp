@@ -725,10 +725,18 @@ bool CKeyBindings::RemoveActionFromKeyMap(const std::string& command, KeyMap& bi
 
 	auto it = bindings.begin();
 
+	/* unbindaction takes no keyset, so it is not the inverse of a bind:
+	 * naming an action without arguments clears every variant of it */
+	const Action target(command);
+
 	while (it != bindings.end()) {
 		ActionList& al = it->second;
 
-		if (RemoveCommandFromList(al, command))
+		const auto removedCount = std::erase_if(al, [&target](const auto& x) {
+			return x.command == target.command && (target.extra.empty() || x.extra == target.extra);
+		});
+
+		if (removedCount > 0)
 			success = true;
 
 		if (al.empty()) {
@@ -805,12 +813,9 @@ bool CKeyBindings::RemoveCommandFromList(ActionList& al, const std::string& comm
 	const Action target(command);
 
 	const auto removedCount = std::erase_if(al, [&target](const auto& x) {
-		if (x.command != target.command)
-			return false;
-
-		/* naming arguments removes only that one variant, naming
-		 * the action on its own still removes all of them */
-		return target.extra.empty() || x.extra == target.extra;
+		/* unbind is the inverse of bind, so the arguments have to line up
+		 * too; naming none means the binding must not carry any either */
+		return x.command == target.command && x.extra == target.extra;
 	});
 
 	return removedCount > 0;
