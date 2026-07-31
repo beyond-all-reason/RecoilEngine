@@ -871,6 +871,12 @@ bool CGlobalRendering::BeginSceneFrame()
 	if (!HDRPipelineShouldBeActive()) {
 		if (screenTargetsValid)
 			KillScreenRenderTargets();
+		// Keep the Lua-visible state consistent on the same frame we drop to SDR.
+		if (hdrState.pipelineHdrActive || hdrState.effectiveMode != HDROutputMode::SDR) {
+			hdrState.pipelineHdrActive = false;
+			hdrState.effectiveMode = HDROutputMode::SDR;
+			++hdrState.generation;
+		}
 		FBO::SetDefaultFBO(0);
 		FBO::BindFramebufferZero();
 		return false;
