@@ -483,6 +483,10 @@ private:
 	bool SetWindowMinMaximized(bool maximize) const;
 	void SetGLFramebufferAttributes(bool hdr);
 	void VerifyHDRFramebuffer();
+	// True only when HDR output is actually being presented, i.e. an HDR path is
+	// requested, a float framebuffer is active, and the current window is HDR.
+	// SDR displays keep the legacy direct-to-backbuffer path.
+	bool HDRPipelineShouldBeActive() const;
 	bool InitScreenRenderTargets();
 	bool InitPresentationShader();
 	void DrawPresentationTexture(unsigned int texture, bool ui);
@@ -502,6 +506,11 @@ private:
 	unsigned int uiDepthBuffer = 0;
 	unsigned int presentationProgram = 0;
 	unsigned int presentationVAO = 0;
+	int presentationLocSource = -1;
+	int presentationLocUiPass = -1;
+	int presentationLocHdrOutput = -1;
+	int presentationLocSdrWhite = -1;
+	int presentationLocHeadroom = -1;
 	int screenTargetSizeX = 0;
 	int screenTargetSizeY = 0;
 	int screenTargetSamples = 0;

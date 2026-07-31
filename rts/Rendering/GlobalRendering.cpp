@@ -630,10 +630,23 @@ bool CGlobalRendering::InitPresentationShader()
 		in vec2 uv;
 		out vec4 fragColor;
 
+		const float SRGB_LINEAR_CUTOFF  = 0.0031308; // sRGB OETF linear-segment threshold (linear domain)
+		const float SRGB_DECODE_CUTOFF  = 0.04045;   // sRGB EOTF linear-segment threshold (encoded domain)
+		const float SRGB_LINEAR_SLOPE   = 12.92;
+		const float SRGB_GAMMA          = 2.4;
+		const float SRGB_OFFSET         = 0.055;
+		const float SRGB_SCALE          = 1.055;
+
 		vec3 linearToSRGB(vec3 value) {
-			vec3 lo = value * 12.92;
-			vec3 hi = 1.055 * pow(max(value, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055;
-			return mix(hi, lo, lessThanEqual(value, vec3(0.0031308)));
+			vec3 lo = value * SRGB_LINEAR_SLOPE;
+			vec3 hi = SRGB_SCALE * pow(max(value, vec3(0.0)), vec3(1.0 / SRGB_GAMMA)) - SRGB_OFFSET;
+			return mix(hi, lo, lessThanEqual(value, vec3(SRGB_LINEAR_CUTOFF)));
+		}
+
+		vec3 srgbToLinear(vec3 value) {
+			vec3 lo = value / SRGB_LINEAR_SLOPE;
+			vec3 hi = pow((value + SRGB_OFFSET) / SRGB_SCALE, vec3(SRGB_GAMMA));
+			return mix(hi, lo, lessThanEqual(value, vec3(SRGB_DECODE_CUTOFF)));
 		}
 
 		vec3 hdrRolloff(vec3 value) {
@@ -646,8 +659,10 @@ bool CGlobalRendering::InitPresentationShader()
 			vec4 sampleValue = texture(sourceTexture, uv);
 			vec3 value;
 			if (uiPass != 0) {
+				// UI is authored as sRGB; decode with the real EOTF before scaling to
+				// the HDR reference-white level, and pass through untouched in SDR.
 				value = hdrOutput != 0
-					? pow(max(sampleValue.rgb, vec3(0.0)), vec3(2.2)) * sdrWhite
+					? srgbToLinear(max(sampleValue.rgb, vec3(0.0))) * sdrWhite
 					: sampleValue.rgb;
 			} else if (hdrOutput != 0) {
 				value = hdrRolloff(max(sampleValue.rgb, vec3(0.0))) * sdrWhite;
@@ -704,8 +719,21 @@ bool CGlobalRendering::InitPresentationShader()
 		return false;
 	}
 
+	presentationLocSource    = glGetUniformLocation(presentationProgram, "sourceTexture");
+	presentationLocUiPass    = glGetUniformLocation(presentationProgram, "uiPass");
+	presentationLocHdrOutput = glGetUniformLocation(presentationProgram, "hdrOutput");
+	presentationLocSdrWhite  = glGetUniformLocation(presentationProgram, "sdrWhite");
+	presentationLocHeadroom  = glGetUniformLocation(presentationProgram, "headroom");
+
 	glGenVertexArrays(1, &presentationVAO);
 	return true;
+}
+
+bool CGlobalRendering::HDRPipelineShouldBeActive() const
+{
+	return hdrState.requestedMode != HDRMode::Off &&
+	       hdrState.floatFramebufferActive &&
+	       hdrState.windowHdrEnabled;
 }
 
 bool CGlobalRendering::InitScreenRenderTargets()
@@ -820,6 +848,8 @@ void CGlobalRendering::KillScreenRenderTargets()
 	sceneColorTexture = sceneDepthTexture = uiColorTexture = 0;
 	sceneMSAAColorBuffer = sceneMSAADepthBuffer = uiDepthBuffer = 0;
 	presentationProgram = presentationVAO = 0;
+	presentationLocSource = presentationLocUiPass = presentationLocHdrOutput = -1;
+	presentationLocSdrWhite = presentationLocHeadroom = -1;
 	screenTargetsValid = false;
 	if (wasValid)
 		++hdrState.generation;
@@ -833,9 +863,14 @@ void CGlobalRendering::ResizeScreenRenderTargets()
 
 bool CGlobalRendering::BeginSceneFrame()
 {
-	// Keep HDRMode=off and SDR fallback on the legacy framebuffer path. Besides
-	// avoiding the HDR target cost, this preserves existing SDR output exactly.
-	if (hdrState.requestedMode == HDRMode::Off || !hdrState.floatFramebufferActive) {
+	// Keep HDRMode=off, SDR fallback, and SDR displays on the legacy framebuffer
+	// path. Besides avoiding the HDR target cost, this preserves existing SDR
+	// output exactly: materials keep their own tone mapping and no extra
+	// offscreen/presentation pass runs. A float framebuffer that ends up on an
+	// SDR window still takes this path so its appearance matches HDRMode=off.
+	if (!HDRPipelineShouldBeActive()) {
+		if (screenTargetsValid)
+			KillScreenRenderTargets();
 		FBO::SetDefaultFBO(0);
 		FBO::BindFramebufferZero();
 		return false;
@@ -880,11 +915,11 @@ void CGlobalRendering::DrawPresentationTexture(unsigned int texture, bool ui)
 	glUseProgram(presentationProgram);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, texture);
-	glUniform1i(glGetUniformLocation(presentationProgram, "sourceTexture"), 0);
-	glUniform1i(glGetUniformLocation(presentationProgram, "uiPass"), ui);
-	glUniform1i(glGetUniformLocation(presentationProgram, "hdrOutput"), hdrState.pipelineHdrActive);
-	glUniform1f(glGetUniformLocation(presentationProgram, "sdrWhite"), hdrState.sdrWhiteLevel);
-	glUniform1f(glGetUniformLocation(presentationProgram, "headroom"), hdrState.hdrHeadroom);
+	glUniform1i(presentationLocSource, 0);
+	glUniform1i(presentationLocUiPass, ui);
+	glUniform1i(presentationLocHdrOutput, hdrState.pipelineHdrActive);
+	glUniform1f(presentationLocSdrWhite, hdrState.sdrWhiteLevel);
+	glUniform1f(presentationLocHeadroom, hdrState.hdrHeadroom);
 	glBindVertexArray(presentationVAO);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
@@ -923,11 +958,7 @@ void CGlobalRendering::PresentScene()
 	const bool oldPipelineActive = hdrState.pipelineHdrActive;
 	const HDROutputMode oldEffectiveMode = hdrState.effectiveMode;
 	const HDRInactiveReason oldInactiveReason = hdrState.inactiveReason;
-	hdrState.pipelineHdrActive =
-		hdrState.requestedMode != HDRMode::Off &&
-		hdrState.floatFramebufferActive &&
-		hdrState.windowHdrEnabled &&
-		screenTargetsValid;
+	hdrState.pipelineHdrActive = HDRPipelineShouldBeActive() && screenTargetsValid;
 	hdrState.effectiveMode = hdrState.pipelineHdrActive ? HDROutputMode::HDR : HDROutputMode::SDR;
 	if (hdrState.pipelineHdrActive)
 		hdrState.inactiveReason = HDRInactiveReason::None;
