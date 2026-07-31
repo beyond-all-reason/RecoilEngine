@@ -6,7 +6,7 @@ aliases = ['/changelogs/changelog-2026-07']
 This is the changelog since version 2025.07 until **version 2025.07.01**, which was released on 2026-07-29.
 
 ## Caveats
-- Barbarian AI updated to version 1.6.26
+- Barbarian AI updated to version 1.6.28
 
 ## Build
 - Fixes for MSVC build
