@@ -41,6 +41,13 @@
 #include <SDL_syswm.h>
 #include <SDL_rect.h>
 
+#if defined(__APPLE__) && !defined(HEADLESS)
+	// Apple's OpenGL.framework cannot give the engine the context it needs,
+	// Mesa's EGL can, see MacEGLContext.h
+	#define SPRING_USE_MAC_EGL 1
+	#include "System/Platform/Mac/MacEGLContext.h"
+#endif
+
 #include "System/Misc/TracyDefs.h"
 
 CONFIG(bool, DebugGL).defaultValue(false).description("Enables GL debug-context and output. (see GL_ARB_debug_output)");
@@ -378,7 +385,7 @@ CGlobalRendering::~CGlobalRendering()
 	verticalSync->WrapRemoveObserver();
 
 	// protect against aborted startup
-	if (glContext) {
+	if (HasGLContext()) {
 		glDeleteQueries(glTimerQueries.size(), glTimerQueries.data());
 	}
 
@@ -425,7 +432,14 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 	//   SDL_WINDOW_FULLSCREEN_DESKTOP for "fake" fullscreen that takes the size of the desktop;
 	//   and 0 for windowed mode.
 
-	uint32_t sdlFlags  = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	// SDL owns the GL context everywhere except macOS, where EGL does
+	#ifdef SPRING_USE_MAC_EGL
+	constexpr uint32_t glWindowFlag = 0;
+	#else
+	constexpr uint32_t glWindowFlag = SDL_WINDOW_OPENGL;
+	#endif
+
+	uint32_t sdlFlags  = (glWindowFlag | SDL_WINDOW_RESIZABLE);
 	         sdlFlags |= (borderless_ ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen_;
 	         sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
 
@@ -584,10 +598,23 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 		WindowManagerHelper::BlockCompositing(sdlWindow);
 #endif
 
+	#ifdef SPRING_USE_MAC_EGL
+	{
+		int2 winSize;
+		SDL_GetWindowSize(sdlWindow, &winSize.x, &winSize.y);
+
+		if (!MacEGL::CreateContext(minCtx, winSize))
+			return false;
+	}
+
+	gladLoadGLLoader(MacEGL::GetProcAddress);
+	#else
 	if ((glContext = CreateGLContext(minCtx)) == nullptr)
 		return false;
 
 	gladLoadGL();
+	#endif
+
 	GLX::Load(sdlWindow);
 
 	if (!CheckGLContextVersion(minCtx)) {
@@ -610,7 +637,20 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 
 
 void CGlobalRendering::MakeCurrentContext(bool clear) const {
+	#ifdef SPRING_USE_MAC_EGL
+	MacEGL::MakeCurrent(clear);
+	#else
 	SDL_GL_MakeCurrent(sdlWindow, clear ? nullptr : glContext);
+	#endif
+}
+
+
+bool CGlobalRendering::HasGLContext() const {
+	#ifdef SPRING_USE_MAC_EGL
+	return MacEGL::HasContext();
+	#else
+	return (glContext != nullptr);
+	#endif
 }
 
 
@@ -621,10 +661,12 @@ void CGlobalRendering::DestroyWindowAndContext() {
 	WindowManagerHelper::SetIconSurface(sdlWindow, nullptr);
 	SetWindowInputGrabbing(false);
 
-	SDL_GL_MakeCurrent(sdlWindow, nullptr);
+	MakeCurrentContext(true);
 	SDL_DestroyWindow(sdlWindow);
 
-	#if !defined(HEADLESS)
+	#if defined(SPRING_USE_MAC_EGL)
+	MacEGL::DestroyContext();
+	#elif !defined(HEADLESS)
 	if (glContext)
 		SDL_GL_DeleteContext(glContext);
 	#endif

@@ -58,6 +58,7 @@ public:
 	uint64_t CalcGLDeltaTime(uint32_t queryIdx0, uint32_t queryIdx1) const;
 
 	void MakeCurrentContext(bool clear) const;
+	bool HasGLContext() const;
 
 	void CheckGLExtensions();
 	void SetGLSupportFlags();
