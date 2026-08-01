@@ -21,3 +21,4 @@ brew "devil"        # image loading (DevIL / libIL)
 brew "minizip"
 brew "sevenzip"     # provides the 7zz archiver binary
 brew "freetype"
+brew "openal-soft"  # macOS ships a frozen OpenAL 1.1 without EFX
