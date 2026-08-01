@@ -2528,7 +2528,7 @@ static void FillRowOfBuildPos(const BuildInfo& startInfo, float x, float z, floa
 
 // Default behaviour, used while the game leaves GetBuildShape unanswered.
 // The specific bindings are legacy, don't change them.
-static BuildPosShape ResolveDefaultBuildPosShape(bool queue, bool hasSurroundTarget, bool singleCell)
+static BuildPosShape ResolveDefaultBuildPosShape(bool queue, bool hasSurroundTarget)
 {
 	const bool ctrl = KeyInput::GetKeyModState(KMOD_CTRL);
 	const bool alt  = KeyInput::GetKeyModState(KMOD_ALT);
@@ -2537,7 +2537,7 @@ static BuildPosShape ResolveDefaultBuildPosShape(bool queue, bool hasSurroundTar
 		return BuildPosShape::Surround;
 
 	// no drag without the queue key; no room for more than one building otherwise
-	if (!queue || singleCell)
+	if (!queue)
 		return BuildPosShape::Single;
 
 	if (alt)
@@ -2710,12 +2710,14 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 	// modifier-key behaviour
 	const std::optional<BuildPosShape> queried = queriedShape;
 
-	// "hollowbox" and "surround" both ring an existing building (or queued build
-	// order) under the cursor; they differ without one, where a hollow box keeps
-	// its shape and a surround degrades to a cardinal line. Only trace for a
-	// target while the resolved shape can actually use one.
+	// tracing for a target is only meaningful for "surround" itself, which rings
+	// an existing building (or queued build order) under the cursor and degrades
+	// to a single build position without one; an explicit "hollowbox" answer is
+	// honoured as-is and never degrades into a surround just because something
+	// happens to be under the cursor. The unanswered (legacy modifier-key) path
+	// still pairs ctrl+queue with a trace, matching pre-callin behaviour.
 	const bool wantsSurround = queried.has_value()
-		? (queried == BuildPosShape::HollowBox || queried == BuildPosShape::Surround)
+		? (queried == BuildPosShape::Surround)
 		: (queue && KeyInput::GetKeyModState(KMOD_CTRL));
 
 	BuildInfo other;
@@ -2731,9 +2733,9 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 		if (wantsSurround && hasSurroundTarget)
 			shape = BuildPosShape::Surround;
 		else if (shape == BuildPosShape::Surround)
-			shape = BuildPosShape::CardinalLine;
+			shape = BuildPosShape::Single;
 	} else {
-		shape = ResolveDefaultBuildPosShape(queue, hasSurroundTarget, (xnum == 1 && znum == 1));
+		shape = ResolveDefaultBuildPosShape(queue, hasSurroundTarget);
 	}
 
 	switch (shape) {
