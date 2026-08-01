@@ -6,111 +6,111 @@ aliases = ['/changelogs/changelog-2026-07']
 This is the changelog since version 2025.07 until **version 2025.07.01**, which was released on 2026-07-29.
 
 ## Caveats
-- Barbarian AI updated to version 1.6.28
+- removed Java bindings for Skirmish AI.
+- Lua environment sandboxing changes, each has a caveat. See below.
+- builders now perform an extra block check immediately when a build command reaches the front of the queue, in addition to the existing periodic check. This can result in an event spam e.g. if a builder is on repeat between multiple queued buildings and they're all blocked.
+- mouse4 and mouse5 ignore mouse ownership and produce MousePress/MouseRelease events even if another mouse button is already pressed. Make sure your wupget handlers handle this correctly if they manage wupget mouse ownership.
+- sonar jamming now jams sonar only; no longer blocks regular radar for units in water, i.e. surface ships. No easy replacement.
+- errors when loading modrules are no longer silently ignored, rather there's an error popup. Wrap everything in pcall if needed.
+- removed `LimitDgun` from being listed in `EngineOptions.lua`, add it to modoptions if you used it as such.
+- removed some basecontent gadgets that used `LimitDgun` and other long-removed engineoptions. Copypaste them from older basecontent if needed.
 
-## Build
-- Fixes for MSVC build
-- Added warning about unsynced git submodules [PR 2902](https://github.com/beyond-all-reason/RecoilEngine/pull/2902)
-- Fixed compilation warnings in CFrontTexture.cpp
-- Fixed many compiler warnings
-- Fixed sse2neon/streflop macro redefinition warning
-- Build/compile changes to lead to eventual support for MacOS
-- Added GetPrevFrameChecksum() to the Lua API
-- Add multi-platform sync testing (amd64-windows/linux + arm64-linux) [PR 2921](https://github.com/beyond-all-reason/RecoilEngine/pull/2921)
-- Optimize LuaPushNamedFoo using compile time key hashing [PR 2986](https://github.com/beyond-all-reason/RecoilEngine/pull/2986)
-- Fixed (synctest): workaround widget timing nondeterminism [PR 3124](https://github.com/beyond-all-reason/RecoilEngine/pull/3124)
-- Remove refrences to 32-bit support [PR 3033](https://github.com/beyond-all-reason/RecoilEngine/pull/3033)
-- Improved setup foir ASAN build [PR 2663](https://github.com/beyond-all-reason/RecoilEngine/pull/2663)
+## Features
 
-## Documentation
-- Added 'First Steps with the Engine' guide for game developers
-- Fixed spGetUnitNearestEnemy docs
-- UnitDestroyed attacker not always available [PR 2572](https://github.com/beyond-all-reason/RecoilEngine/pull/2572)
-- Fixed wupget:DefaultCommand missing cmdID [PR 2984](https://github.com/beyond-all-reason/RecoilEngine/pull/2984)
-- Fixed SplinterFaction card link format [PR 2999](https://github.com/beyond-all-reason/RecoilEngine/pull/2999)
-- Added ENGINE_PERFORMANCE.md with some notes on engine internals [PR 2919](https://github.com/beyond-all-reason/RecoilEngine/pull/2919)
-- Added BACKWARDS_COMPATIBILITY.md guidance doc for coding agents
-- Improved running/testing instructions in AGENTS.md [PR 2917](https://github.com/beyond-all-reason/RecoilEngine/pull/2917)
-- Spelling correction pass across site articles
+### Lua environment sandboxing
+- LuaSocket no longer inits before Lua sandboxing. Anything that relied on the previous order of execution won't work.
+- unsynced LuaRules (incl. unsynced LuaGaia) now has access to `io` and `os` libraries. Watch out when loading maps etc.
+- unsynced LuaRules (incl. unsynced LuaGaia) now has access to the `debug` library by default (no longer requires devmode).
 
-## Lua
-- LuaSocket no longer inits before sandboxing
-- Extracted synced lib loader to a helper function
-- Unsynced wrapper handles its sandboxing
-- VFS.GetAvailableAIs: add isLuaAI
-- Enabled IO, OS and debug libraries for unsynced gadgets [PR 2858](https://github.com/beyond-all-reason/RecoilEngine/pull/2858)
-- Added Lua API to get current replay file paths
-- Fixed memory barrier bitfield now pulls from correct parameter [PR 2557](https://github.com/beyond-all-reason/RecoilEngine/pull/2557)
-- Implement DrawBuildSquare callin and add example GL4 widget [PR 2938](https://github.com/beyond-all-reason/RecoilEngine/pull/2938)
-- Added Platform.architecture [PR 2825](https://github.com/beyond-all-reason/RecoilEngine/pull/2825)
-- SolLua: use sol::lua_nil instead of the sol::nil alias
-- LuaTextures: log glTexImage failures instead of returning nil silently
-- Added Lua trace ray functions [PR 1624](https://github.com/beyond-all-reason/RecoilEngine/pull/1624)
-- Added type checking to ADD_FOO Lua defs macros
-- Fixed LuaSocket VFS mode error in LuaMenu
-- Updated Spring.SetSkyBoxTexture to perform setup if needed
-- LuaParser: run Spring.TimeCheck's callback under unitsync/dedicated
-- Added debug.emulateFoo input emulation API [PR 3097](https://github.com/beyond-all-reason/RecoilEngine/pull/3097)
-- Added gadget:ResourceExcess(excessTable) -> bool
-- Added spAddTeamResourceExcessStats
-- Added debug.emulateMouseWheel input emulation
-- Added cancelcommand action
-- Added GetPrevFrameChecksum() to the Lua API [PR 2922](https://github.com/beyond-all-reason/RecoilEngine/pull/2922)
-- Fixes to Spring.SetMapShader [PR 3127](https://github.com/beyond-all-reason/RecoilEngine/pull/3127)
-- MouseHandler: route XButtons (Mouse4/5) as keybinds instead of mouse ownership [PR 2613](https://github.com/beyond-all-reason/RecoilEngine/pull/2613)
-- Fixed Lua EmmyLua type annotations [PR 2888](https://github.com/beyond-all-reason/RecoilEngine/pull/2888)
+### Replay path getters
+- add `Spring.GetReplayFilePath() → string?`, returns path of replay being watched.
+- add `Spring.GetReplayRecordingFilePath() → string?`, returns path of replay to be produced. Note that this is just a prospective file path (nothing is written until the match ends), and that it possible to record a replay of a replay.
 
-## Misc
-- Restored lowercasing in FileSystem::GetExtension
-- Demo handlers improvements: keep file paths absolute until needed and do not add a fake 'unnamed.sdfz' name to recordings
-- Fixed missing cstdint include in ChatMessage.h [PR 2968](https://github.com/beyond-all-reason/RecoilEngine/pull/2968)
-- Fixed the Nonus backlash scancode spelling mistake. [Issue 2978](https://github.com/beyond-all-reason/RecoilEngine/issues/2978)
-- Fixed FileSystem::FindFiles so it should return relative paths [PR 3007](https://github.com/beyond-all-reason/RecoilEngine/pull/3007)
-- float3: drop redundant direct streflop_cond.h include
-- SafeUtil: include <type_traits> and <memory> directly [PR 3025](https://github.com/beyond-all-reason/RecoilEngine/pull/3025)
-- Logging fix: updated section min-level in place instead of appending duplicates [PR 3052](https://github.com/beyond-all-reason/RecoilEngine/pull/3052)
-- Converted u8string_view to string using explicit size
-- Fixde inconsistent class/struct forward declarations
-- Fixed truncated sync checksum in demotool dump
-- Improve cross-platform portability in archive handlers
-- Removed legacy engine options
-- SpringMath: add Catmull-Rom bicubic interpolation helpers
-- Moved float3/float4/Matrix44f str() out of line
-- Fixed unbindaction not clearing scancode bindings
-- AIFloat3: Remove non-trivial copy constructor
-- Fix /unbind for keychains
-- Fix stale spGetActionHotKeys returns [PR 3082](https://github.com/beyond-all-reason/RecoilEngine/pull/3082)
-- Use a portable type cast in MemPoolTypes logging
-- Support alternate file extensions for replays [PR 2975](https://github.com/beyond-all-reason/RecoilEngine/pull/2975)
-- Throw error and stop processing if modrules parsing fails
+### Build commands
+- builders now perform an extra block check immediately when a build command reaches the front of the queue. This is in addition to the existing periodic (≈ 0.4 Hz) block check. A block check cancels a build command if the build site is hard-blocked ("red squares", as opposed to "yellow squares" with reclaimables/mobiles).
+- add `Spring.SetEngineBuildSquareRendering(bool) → nil`, for disabling the native rendering of the footprint grid when a build command is selected.
+- add `wupget:DrawBuildSquare(unitDefID, x, z, facing, statuses) → nil` unsynced callin, fires when a build command is selected. Statuses is a 1D array for the status of each tile: 0 blocked (red), 1 occupied (yellow), 2 reclaimable (yellow), 3 open (green). This fires even if native drawing is enabled.
 
-## Rendering
-- Added sorting icon names before adding to atlas so insertion order is consistent across runs.
-- Replaced non-deterministic GL texture IDs with stable insertion-order indices for UniqueSubTexture naming.
-- Fixed stableIdx assignment to be per-file at first insertion time.
-- Also sorted icon rendering to use deterministic ProjectileDrawer iteration.
-- Added specifying output format (e.g. "dumpatlas proj tga") instead of hardcoded .png.
-- Fixed icon sliding artifact and add edge-pixel padding to atlas
-- Disabled runniung atlas/iconhandler in headless
-- Fixed a rare crash in UnitDrawer / IconsDrawer caused by inconsistent LOS settings set from Lua.
-- Added Custom Color Palette [PR 2945](https://github.com/beyond-all-reason/RecoilEngine/pull/2945)
-- Fixed to icons bleeding: adjust CTextureRenderAtlas so it always works with the original/biggest lod
-- Removed Java AI bindings
-- Debug logs for loading splat normals
-- Fix SMF DNTS gating and fallback textures
-- Add mapoptions for blank map splats
-- Performance improvements with drawing ghosted buildings [PR 3110](https://github.com/beyond-all-reason/RecoilEngine/pull/3110)
-- Changed ghosted buildings are drawn based on the last team was seen with and so which team ownership doesn't show automatically on the ghost. [PR 3108](https://github.com/beyond-all-reason/RecoilEngine/pull/3108)
+### Lua trace ray
+- adds `Spring.TraceRayBetweenPositions(xA, yA, zA, xB, yB, zB, type) -> {{dist, objID, type}, ...}`
+- adds `Spring.TraceRayInDirection(x, y, z, dx, dy, dz, length, type) -> {{dist, objID, type}, ...}`
+- type is a string, "unit", "feature", or (for input only) "both"
+- the returned array is sorted by distance, starting from closest.
 
-## Simulation
-- Sanitize NaNs in CHoverAirMoveType::UpdateMoveRate()
-- Set a minimum camera controller height
-- Make invalid buildoption warning more verbose
-- Early block check for build commands [PR 2557](https://github.com/beyond-all-reason/RecoilEngine/pull/2557)
-- Fixed to guard against already-dead reclaim targets [PR 3020](https://github.com/beyond-all-reason/RecoilEngine/pull/3020)
-- Fixed edge scrolling threshold [Issue 2987](https://github.com/beyond-all-reason/RecoilEngine/issues/2987)
-- Dump state handles resource packs
-- Fix units having the wrong path id after loading a save game. [PR 3120](https://github.com/beyond-all-reason/RecoilEngine/pull/3120)
-- Avoid UB in float-to-short angle casts (fixes arm64/x86 desync) [PR 3075](https://github.com/beyond-all-reason/RecoilEngine/pull/3075)
-- Send gameprogress packet on connection initialization [PR 2872](https://github.com/beyond-all-reason/RecoilEngine/pull/2872)
-- Separate and make sonar and RADAR jamming function as they logicall should. [PR 2980](https://github.com/beyond-all-reason/RecoilEngine/pull/2980)
+### Blank map splats
+
+Blank map generator now interprets some mapoptions. These are for filling entries in the generated `mapinfo.lua` file.
+
+- `blank_map_splatdetailtex`, string with the path
+- `blank_map_splatdistr`, string with the path
+- `blank_map_splattexscale1 .. 4`, number
+- `blank_map_splattexmult1 .. 4`, number
+- `blank_map_splatdetailnormaltex1 .. 4`, string with the path
+- `blank_map_splatdetailnormaldiffusealpha`, bool
+
+### Other runtime map texturing stuff
+- fix `Spring.SetSkyBoxTexture` not working if the map didn't have a skybox from the start
+- fix map shaders having stale uniforms and being completely broken for forward rendering. This fix is signalled by the `Engine.FeatureSupport.reliableLuaMapShaders` flag.
+
+### Input emulation
+
+Added a bunch of `debug.emulateFoo` functions that emulate input. Useful for automated testing of UI. Buttons are considered pressed from any source for edge-based events (i.e. pressing a "real" button when it is already pressed via emulation, or vice versa, will not produce a KeyPressed event; ditto release if it is still pressed from the other source).
+
+- `debug.emulateKeyPress(keycode)`. The event will have a scancode based on the current keyboard layout (i.e. possibly "unknown" if no keyboard, such as a headless VM).
+- `debug.emulateKeyRelease(keycode)`
+- `debug.emulateMousePress(button)`
+- `debug.emulateMouseRelease(button)`
+- `debug.emulateMouseMove(dx, dy)`. Does not actually move the mouse, so getters won't reflect it, but you can `Spring.WarpMouse` alongside it.
+- `debug.emulateMouseWheel(number delta)`. Note that this accepts fractions, but most physical mice produce integer deltas (+1, -1).
+- `debug.clearEmulatedInput()`. Releases all emulated presses.
+
+### Keybind-related work
+- add `cancelcommand` action for binding, cancels the currently selected command. The hardcoded Escape key binding still works.
+- mouse4 and mouse5 ignore mouse ownership and produce MousePress/Release events even if another mouse button is already pressed.
+- fix `sc_nonusbackslash` scancode name (was `sc_nonusbacklash`)
+- fix `/unbindaction` not clearing scancode bindings
+- fix `/unbind` not working with keychains longer than 1 key
+- fix stale returns from `Spring.GetActionHotKeys`
+
+### Resourcing
+
+- add `gadget:ResourceExcess({[teamID] = {m, e, ...}}) -> bool handledGameside`. Runs every frame. If you return false, the engine will do the existing behaviour where the excess is accumulated until a slowupdate and shared to teammates if possible.
+- add `Spring.AddTeamResourceExcessStats(teamID, resourcetype, amount)`. Adjusts the stats for endgame graphs purposes (does not do anything to the actual resources). Useful for when you handle excess yourself with the callin above.
+
+### Custom teamcolor palette
+- add `Spring.SetCustomPaletteColor(paletteID, r, g, b) → nil`. Sets a palette color for shader use. See below.
+- add `Spring.GetCustomPaletteColor(paletteID) → r, g, b`.
+- add `Engine.maxCustomPaletteID`, the highest available palette ID.
+- add `Spring.SetUnitPaletteIndex(unitID, paletteID?) → nil`. Assigns a paletteID to a unit. Use nil to reset to the default palette.
+- add `Spring.GetUnitPaletteIndex(unitID) → paletteID?`.
+- add `Spring.SetFeaturePaletteIndex(featureID, paletteID?)`.
+- add `Spring.GetFeaturePaletteIndex(featureID) → paletteID?`.
+- the `teamColor` array in shaders now has much more room and contains both teamcolors and colors of the custom palette, as per above.
+- the actual teamID is now available as the fifth byte (first byte of the second 4-byte composite) in model uniform data.
+- note that the value of the palette index is different than what is seen from Lua. Units with no custom paletteID have the index point to an entry that contains their team color.
+- the basecontent teamcolor shader takes the above changes into account. Existing custom shaders that use `instData.z & 0xFF` for teamID should keep working as long as the palette feature isn't used, to support it properly the constant needs to be `0x7FF` instead.
+- ghosts of out-of-sight buildings now draw with the unit's last seen palette color. This also fixes the bug where the teamcolor updated to always reflect the unit's real team even if it changed out of sight.
+- projectiles and building ghosts in constructor queues unchanged, they still just draw teamcolor naively and cannot use a shader.
+
+### Building ghosts
+- building ghosts now use the custom palette teamcolor.
+- fix building ghosts always showing their "true" teamcolor, now they stick to their last known teamcolor (including custom palette).
+- fix full-view spectators seeing a ground decal wherever their spectated team sees a ghost with decal.
+
+### Misc
+- removed Java bindings for Skirmish AI.
+- entries returned by `VFS.GetAvailableAIs()` now have a new `isLuaAI` boolean (skirmish AI otherwise).
+- errors when loading modrules are no longer silently ignored, rather there's an error popup.
+- add `Spring.GetPrevFrameSyncChecksum() -> string` and `Platform.hasSyncChecksums`. Useful for correctness checks. Note that the checksum looks like a number but is NOT convertible to one in Lua (checksum is a 32-bit number but Lua numbers have 24-bit precision).
+- add string `Platform.architecture`. Usually "x86_64", with some ongoing work to support "arm64".
+- add `Spring.GetClosestEnemyUnit(x, y, z, range = inf) → unitID?` to LuaUI.
+- add `Spring.GetClosestEnemyUnit(x, y, z, range = inf, allyTeamID, bool useLoS = true, bool spherical = false, bool requireEnemyToSeePos = false) → unitID?` to LuaRules.
+- add `Engine.FeatureSupport.reliableLuaMapShaders` bool, means issues with map shaders having stale uniforms and being completely broken for forward rendering are fixed.
+- the `/dumpAtlas` command now accepts a file format (e.g. `/dumpatlas proj tga`), defaults to the existing `png`.
+- Barbarian AI bundled with the engine updated to version 1.6.28. Just maintenance, no new features.
+
+### Fixes
+- fix LuaSocket initialisation for LuaMenu.
+- fix unitsync not running functions passed to `Spring.TimeCheck`.
+- fix Skirmish AI API compilation issues due to `AIFloat3` having a non-trivial constructor.
+- attempt to fix the lack of `wupget:GameProgress` calls when initially catching up.
