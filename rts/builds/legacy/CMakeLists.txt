@@ -67,18 +67,23 @@ if (APPLE)
 	list(APPEND engineLibraries ${COREFOUNDATION_LIBRARY})
 
 	# for the present path that takes the EGL pbuffer to the screen
+	find_library(APPKIT_LIBRARY AppKit)
 	find_library(METAL_LIBRARY Metal)
 	find_library(QUARTZCORE_LIBRARY QuartzCore)
 	find_library(IOSURFACE_LIBRARY IOSurface)
 	find_library(OBJC_LIBRARY objc)
 	list(APPEND engineLibraries
+		${APPKIT_LIBRARY}
 		${METAL_LIBRARY}
 		${QUARTZCORE_LIBRARY}
 		${IOSURFACE_LIBRARY}
 		${OBJC_LIBRARY}
 	)
 
-	list(APPEND engineSources "${ENGINE_SRC_ROOT_DIR}/System/Platform/Mac/MacEGLContext.cpp")
+	list(APPEND engineSources
+		"${ENGINE_SRC_ROOT_DIR}/System/Platform/Mac/MacEGLContext.cpp"
+		"${ENGINE_SRC_ROOT_DIR}/System/Platform/Mac/MetalPresent.mm"
+	)
 endif (APPLE)
 
 list(APPEND engineLibraries squish rgetc1)
