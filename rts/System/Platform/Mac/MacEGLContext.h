@@ -23,6 +23,9 @@ namespace MacEGL {
 	/// size of the pbuffer acting as the default framebuffer, zero without one
 	int2 GetSurfaceSize();
 
+	/// swaps the pbuffer for one of @p size, keeping the context and its objects
+	bool ResizeSurface(const int2& size);
+
 	void MakeCurrent(bool clear);
 	bool HasContext();
 

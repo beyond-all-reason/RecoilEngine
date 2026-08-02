@@ -12,6 +12,23 @@ namespace {
 	EGLDisplay eglDisplay = EGL_NO_DISPLAY;
 	EGLSurface eglSurface = EGL_NO_SURFACE;
 	EGLContext eglContext = EGL_NO_CONTEXT;
+	EGLConfig eglConfig = nullptr;
+
+	EGLSurface CreatePbuffer(const int2& size)
+	{
+		const EGLint surfAttribs[] = {
+			EGL_WIDTH, std::max(size.x, 1),
+			EGL_HEIGHT, std::max(size.y, 1),
+			EGL_NONE
+		};
+
+		const EGLSurface surface = eglCreatePbufferSurface(eglDisplay, eglConfig, surfAttribs);
+
+		if (surface == EGL_NO_SURFACE)
+			LOG_L(L_ERROR, "[MacEGL::%s] error (0x%x) creating a %dx%d pbuffer surface", __func__, eglGetError(), size.x, size.y);
+
+		return surface;
+	}
 
 	// highest first, the sweep stops once it drops below the wanted version
 	constexpr int2 glCtxs[] = {{4, 6}, {4, 5}, {4, 4}, {4, 3}, {4, 2}, {4, 1}, {4, 0}, {3, 3}, {3, 2}, {3, 1}, {3, 0}};
@@ -81,30 +98,21 @@ namespace {
 			EGL_NONE
 		};
 
-		EGLConfig config = nullptr;
 		EGLint numConfigs = 0;
 
-		if (!eglChooseConfig(eglDisplay, configAttribs, &config, 1, &numConfigs) || numConfigs == 0) {
+		if (!eglChooseConfig(eglDisplay, configAttribs, &eglConfig, 1, &numConfigs) || numConfigs == 0) {
 			LOG_L(L_ERROR, "[MacEGL::%s] error (0x%x) choosing an EGL config", __func__, eglGetError());
 			return false;
 		}
 
-		const EGLint surfAttribs[] = {
-			EGL_WIDTH, std::max(size.x, 1),
-			EGL_HEIGHT, std::max(size.y, 1),
-			EGL_NONE
-		};
-
-		if ((eglSurface = eglCreatePbufferSurface(eglDisplay, config, surfAttribs)) == EGL_NO_SURFACE) {
-			LOG_L(L_ERROR, "[MacEGL::%s] error (0x%x) creating a %dx%d pbuffer surface", __func__, eglGetError(), size.x, size.y);
+		if ((eglSurface = CreatePbuffer(size)) == EGL_NO_SURFACE)
 			return false;
-		}
 
 		// compatibility is the profile the engine asks SDL for elsewhere, and
 		// core is a fallback so that a missing legacy path fails where it is
 		// used rather than leaving the engine with no context at all
-		if ((eglContext = CreateContextForProfile(config, EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT, minCtx)) == EGL_NO_CONTEXT)
-			eglContext = CreateContextForProfile(config, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, minCtx);
+		if ((eglContext = CreateContextForProfile(eglConfig, EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT, minCtx)) == EGL_NO_CONTEXT)
+			eglContext = CreateContextForProfile(eglConfig, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, minCtx);
 
 		if (eglContext == EGL_NO_CONTEXT) {
 			LOG_L(L_ERROR, "[MacEGL::%s] no context at GL%d.%d or later, set MESA_GL_VERSION_OVERRIDE if Mesa reports a lower version", __func__, minCtx.x, minCtx.y);
@@ -146,6 +154,33 @@ void MacEGL::DestroyContext()
 	eglDisplay = EGL_NO_DISPLAY;
 	eglSurface = EGL_NO_SURFACE;
 	eglContext = EGL_NO_CONTEXT;
+}
+
+bool MacEGL::ResizeSurface(const int2& size)
+{
+	if (eglContext == EGL_NO_CONTEXT)
+		return false;
+
+	const EGLSurface surface = CreatePbuffer(size);
+
+	if (surface == EGL_NO_SURFACE)
+		return false;
+
+	// a pbuffer cannot be resized, so the context moves to a new one and the
+	// old one goes only once nothing is drawing into it
+	const EGLSurface oldSurface = eglSurface;
+
+	if (!eglMakeCurrent(eglDisplay, surface, surface, eglContext)) {
+		LOG_L(L_ERROR, "[MacEGL::%s] error (0x%x) making the %dx%d surface current", __func__, eglGetError(), size.x, size.y);
+		eglDestroySurface(eglDisplay, surface);
+		return false;
+	}
+
+	eglSurface = surface;
+	eglDestroySurface(eglDisplay, oldSurface);
+
+	LOG("[MacEGL::%s] framebuffer is now %dx%d", __func__, size.x, size.y);
+	return true;
 }
 
 void MacEGL::MakeCurrent(bool clear)

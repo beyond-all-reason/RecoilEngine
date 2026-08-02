@@ -1667,9 +1667,16 @@ void CGlobalRendering::ReadWindowPosAndSize()
 
 	#ifdef SPRING_USE_MAC_EGL
 	// The pbuffer is the default framebuffer and nothing resizes it with the
-	// window, so its size, not the window's, is what the engine draws into.
-	// That is in backing pixels, unlike winPos and the resolution config,
-	// which stay in the points SDL reports.
+	// window, so match it to the layer, which AppKit has already resized, and
+	// then take the size from it: that is what the engine draws into. It is in
+	// backing pixels, unlike winPos and the resolution config, which stay in
+	// the points SDL reports.
+	int2 drawableSize;
+	MacMetalPresent_GetDrawableSize(&drawableSize.x, &drawableSize.y);
+
+	if (drawableSize.x > 0 && drawableSize.y > 0 && drawableSize != MacEGL::GetSurfaceSize())
+		MacEGL::ResizeSurface(drawableSize);
+
 	const int2 fbSize = MacEGL::GetSurfaceSize();
 
 	int2 pointSize;
