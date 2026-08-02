@@ -678,10 +678,11 @@ void CommandDrawer::DrawQuedBuildingSquares(
 		uwaterCommands += (bi.pos.y < CGround::GetWaterLevel(bi.pos.x, bi.pos.z));
 	}
 
-	// worst case - 2 squares per building (when underwater) - 8 vertices * 3 floats
-	std::vector<GLfloat>   quadVerts(buildCommands * 12);
-	std::vector<GLfloat> cancelledQuadVerts(buildCommands * 12);
-	std::vector<GLfloat> uwquadVerts(buildCommands * 12); // underwater
+	// worst case - 2 squares per building (when underwater), each square being
+	// 4 line segments - 8 vertices * 3 floats
+	std::vector<GLfloat>   quadVerts(buildCommands * 24);
+	std::vector<GLfloat> cancelledQuadVerts(buildCommands * 24);
+	std::vector<GLfloat> uwquadVerts(buildCommands * 24); // underwater
 	// 4 vertical lines
 	std::vector<GLfloat> lineVerts(uwaterCommands * 24);
 	// colors for lines
@@ -691,6 +692,28 @@ void CommandDrawer::DrawQuedBuildingSquares(
 	unsigned int cancelledQuadcounter = 0;
 	unsigned int uwquadcounter = 0;
 	unsigned int   linecounter = 0;
+
+	// the squares are outlines, and glPolygonMode(GL_LINE) is not honored by
+	// every driver, so emit them as line segments
+	const auto AddSquareLines = [](std::vector<GLfloat>& verts, unsigned int& counter, float x1, float x2, float z1, float z2, float y) {
+		constexpr int cornerX[4] = { 0, 0, 1, 1 };
+		constexpr int cornerZ[4] = { 0, 1, 1, 0 };
+
+		const float xs[2] = { x1, x2 };
+		const float zs[2] = { z1, z2 };
+
+		for (int i = 0; i < 4; ++i) {
+			const int j = (i + 1) % 4;
+
+			verts[counter++] = xs[cornerX[i]];
+			verts[counter++] = y;
+			verts[counter++] = zs[cornerZ[i]];
+
+			verts[counter++] = xs[cornerX[j]];
+			verts[counter++] = y;
+			verts[counter++] = zs[cornerZ[j]];
+		}
+	};
 
 	for (const Command& c: commandQue) {
 		if (buildOptions.find(c.GetID()) == buildOptions.end())
@@ -714,18 +737,7 @@ void CommandDrawer::DrawQuedBuildingSquares(
 		std::vector<GLfloat>& verts = cancelledCommandTags.contains(c.GetTag()) ? cancelledQuadVerts : quadVerts;
 		unsigned int& counter = cancelledCommandTags.contains(c.GetTag()) ? cancelledQuadcounter : quadcounter;
 
-		verts[counter++] = x1;
-		verts[counter++] = h + 1;
-		verts[counter++] = z1;
-		verts[counter++] = x1;
-		verts[counter++] = h + 1;
-		verts[counter++] = z2;
-		verts[counter++] = x2;
-		verts[counter++] = h + 1;
-		verts[counter++] = z2;
-		verts[counter++] = x2;
-		verts[counter++] = h + 1;
-		verts[counter++] = z1;
+		AddSquareLines(verts, counter, x1, x2, z1, z2, h + 1);
 
 		if (bi.pos.y >= 0.0f)
 			continue;
@@ -735,18 +747,7 @@ void CommandDrawer::DrawQuedBuildingSquares(
 			0.0f, 0.5f, 1.0f, 1.0f, // end color
 		};
 
-		uwquadVerts[uwquadcounter++] = x1;
-		uwquadVerts[uwquadcounter++] = 0.0f;
-		uwquadVerts[uwquadcounter++] = z1;
-		uwquadVerts[uwquadcounter++] = x1;
-		uwquadVerts[uwquadcounter++] = 0.0f;
-		uwquadVerts[uwquadcounter++] = z2;
-		uwquadVerts[uwquadcounter++] = x2;
-		uwquadVerts[uwquadcounter++] = 0.0f;
-		uwquadVerts[uwquadcounter++] = z2;
-		uwquadVerts[uwquadcounter++] = x2;
-		uwquadVerts[uwquadcounter++] = 0.0f;
-		uwquadVerts[uwquadcounter++] = z1;
+		AddSquareLines(uwquadVerts, uwquadcounter, x1, x2, z1, z2, 0.0f);
 
 		for (int i = 0; i < 4; ++i) {
 			std::copy(col, col + 8, lineColors.begin() + linecounter * 2 + i * 8);
@@ -783,24 +784,23 @@ void CommandDrawer::DrawQuedBuildingSquares(
 
 	if (quadcounter > 0 || cancelledQuadcounter > 0) {
 		glEnableClientState(GL_VERTEX_ARRAY);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
 		if (quadcounter > 0) {
 			glVertexPointer(3, GL_FLOAT, 0, &quadVerts[0]);
-			glDrawArrays(GL_QUADS, 0, quadcounter / 3);
+			glDrawArrays(GL_LINES, 0, quadcounter / 3);
 		}
 
 		if (cancelledQuadcounter > 0) {
 			glColor4fv(overlapColor);
 			glVertexPointer(3, GL_FLOAT, 0, &cancelledQuadVerts[0]);
-			glDrawArrays(GL_QUADS, 0, cancelledQuadcounter / 3);
+			glDrawArrays(GL_LINES, 0, cancelledQuadcounter / 3);
 		}
 
 		if (linecounter > 0) {
 			glPushAttrib(GL_CURRENT_BIT);
 			glColor4f(0.0f, 0.5f, 1.0f, 1.0f); // same as end color of lines
 			glVertexPointer(3, GL_FLOAT, 0, &uwquadVerts[0]);
-			glDrawArrays(GL_QUADS, 0, uwquadcounter / 3);
+			glDrawArrays(GL_LINES, 0, uwquadcounter / 3);
 			glPopAttrib();
 
 			glEnableClientState(GL_COLOR_ARRAY);
