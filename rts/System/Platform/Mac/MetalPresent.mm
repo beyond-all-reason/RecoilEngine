@@ -234,6 +234,16 @@ bool MacMetalPresent_Init(void* nsWindow, bool hiDPI)
 
 void MacMetalPresent_GetDrawableSize(int* outW, int* outH)
 {
+	// a CAMetalLayer sizes its drawable from its bounds only until something
+	// sets the drawable itself, which Init has to do before AppKit's first
+	// layout, so from then on it is ours to keep up to date
+	if (layer != nil && layer.bounds.size.width > 0.0 && layer.bounds.size.height > 0.0) {
+		const CGSize points = layer.bounds.size;
+		const CGFloat scale = layer.contentsScale;
+
+		layer.drawableSize = CGSizeMake(points.width * scale, points.height * scale);
+	}
+
 	const CGSize size = (layer != nil) ? layer.drawableSize : CGSizeZero;
 
 	if (outW != nullptr)
