@@ -1,9 +1,41 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "InputHandler.h"
+
+#include "Rendering/GlobalRendering.h"
 #include "System/TimeProfiler.h"
 
 InputHandler input;
+
+/**
+ * SDL reports the mouse in window points. Everything that handles these events
+ * tests the position against a viewport, and viewports are in the framebuffer's
+ * backing pixels, so the two have to be put in the same units once, here, where
+ * every event enters the engine.
+ *
+ * A point is a pixel everywhere except a macOS window on a Retina display.
+ */
+static void ToPixelCoords(SDL_Event& ev)
+{
+	switch (ev.type) {
+		case SDL_MOUSEMOTION: {
+			const int2 pos = globalRendering->PointToPixel({ev.motion.x, ev.motion.y});
+			const int2 rel = globalRendering->PointToPixel({ev.motion.xrel, ev.motion.yrel});
+
+			ev.motion.x = pos.x;
+			ev.motion.y = pos.y;
+			ev.motion.xrel = rel.x;
+			ev.motion.yrel = rel.y;
+		} break;
+		case SDL_MOUSEBUTTONDOWN:
+		case SDL_MOUSEBUTTONUP: {
+			const int2 pos = globalRendering->PointToPixel({ev.button.x, ev.button.y});
+
+			ev.button.x = pos.x;
+			ev.button.y = pos.y;
+		} break;
+	}
+}
 
 InputHandler::InputHandler() = default;
 
@@ -26,6 +58,7 @@ void InputHandler::PushEvents()
 	while (SDL_PollEvent(&event)) {
 		// SDL_PollEvent may modify FPU flags
 		streflop::streflop_init<streflop::Simple>();
+		ToPixelCoords(event);
 		PushEvent(event);
 	}
 }
