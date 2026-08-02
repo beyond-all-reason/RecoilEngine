@@ -27,8 +27,14 @@
 extern "C" {
 #endif
 
-/// attaches the layer, @p nsWindow is the SDL window's NSWindow
-bool MacMetalPresent_Init(void* nsWindow);
+/**
+ * Attaches the layer, @p nsWindow is the SDL window's NSWindow.
+ *
+ * @p hiDPI draws at the display's backing resolution. Without it the drawable is
+ * the window's size in points and the display scales it up, which is blurry on a
+ * Retina screen and a quarter of the pixels to draw and read back.
+ */
+bool MacMetalPresent_Init(void* nsWindow, bool hiDPI);
 
 /// backing-pixel size of the layer's drawable, the size a frame should be
 void MacMetalPresent_GetDrawableSize(int* outW, int* outH);

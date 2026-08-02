@@ -177,7 +177,7 @@ fragment float4 present_fs(Vertex v [[stage_in]], texture2d<float> image [[textu
 }
 
 
-bool MacMetalPresent_Init(void* nsWindow)
+bool MacMetalPresent_Init(void* nsWindow, bool hiDPI)
 {
 	if (device != nil)
 		return true;
@@ -205,7 +205,11 @@ bool MacMetalPresent_Init(void* nsWindow)
 		layer.framebufferOnly = YES;
 		layer.opaque = YES;
 		const CGSize points = view.bounds.size;
-		const CGFloat scale = window.backingScaleFactor;
+
+		// the knob is contentsScale rather than drawableSize, because AppKit
+		// derives the drawable from the scale when it lays a hosted layer out,
+		// so a drawable set behind its back would not survive a resize
+		const CGFloat scale = hiDPI ? window.backingScaleFactor : 1.0;
 
 		layer.contentsScale = scale;
 		layer.frame = view.bounds;

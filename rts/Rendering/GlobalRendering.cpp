@@ -83,6 +83,9 @@ CONFIG(int, MinimizeOnFocusLoss).defaultValue(0).minimumValue(0).maximumValue(1)
 CONFIG(bool, Fullscreen).defaultValue(true).headlessValue(false).description("Sets whether the game will run in fullscreen, as opposed to a window. For Windowed Fullscreen of Borderless Window, set this to 0, WindowBorderless to 1, and WindowPosX and WindowPosY to 0.");
 CONFIG(bool, WindowBorderless).defaultValue(false).description("When set and Fullscreen is 0, will put the game in Borderless Window mode, also known as Windowed Fullscreen. When using this, it is generally best to also set WindowPosX and WindowPosY to 0");
 CONFIG(bool, BlockCompositing).defaultValue(false).safemodeValue(true).description("Disables kwin compositing to fix tearing, possible fixes low FPS in windowed mode, too.");
+#ifdef SPRING_USE_MAC_EGL
+CONFIG(bool, MacHiDPIRendering).defaultValue(true).description("Draws at the display's backing resolution. Set to 0 to draw at the window's size in points and let the display scale it up, which is blurry on a Retina screen and a quarter of the pixels to draw and read back.");
+#endif
 // setting this as default 0 for now is because if the frame were to be dropped for being late, DWMFlush will force the compositor to use the framebuffer. This can result in blocking until the framebuffer can be composited (up to 1 frame) and may not be desirable for all use cases (specifically with vsync set to off). However, only more widespread testing and investigation across various hardware/os configs would tell us what advantage DWMFlush would bring.
 CONFIG(int, DWMFlush).defaultValue(0).description("Force Windows Desktop Compositors DWMFlush before each SDL_GL_SwapWindow, preventing dropped frames (use nVidias FrameView to validate dropped frames, or BARs Jitter Timer widget). Value of 1 does DWMFlush before SwapBuffers, value of 2 does DWMFlush after swapbuffers.");
 
@@ -555,7 +558,7 @@ static bool InitMacPresentLayer(SDL_Window* window, int2& drawableSize)
 		return false;
 	}
 
-	if (!MacMetalPresent_Init(static_cast<void*>(wmInfo.info.cocoa.window)))
+	if (!MacMetalPresent_Init(static_cast<void*>(wmInfo.info.cocoa.window), configHandler->GetBool("MacHiDPIRendering")))
 		return false;
 
 	MacMetalPresent_GetDrawableSize(&drawableSize.x, &drawableSize.y);
