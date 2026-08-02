@@ -18,7 +18,14 @@
 namespace MacEGL {
 	/// creates a context at @p minCtx or later and makes it current
 	bool CreateContext(const int2& minCtx, const int2& size);
-	void DestroyContext();
+
+	/**
+	 * @param terminateDisplay whether to call eglTerminate
+	 *
+	 * Pass false when the process is on its way out. eglTerminate deadlocks in
+	 * Zink's screen teardown, so the engine would never exit.
+	 */
+	void DestroyContext(bool terminateDisplay);
 
 	/// size of the pbuffer acting as the default framebuffer, zero without one
 	int2 GetSurfaceSize();

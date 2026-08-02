@@ -133,11 +133,11 @@ bool MacEGL::CreateContext(const int2& minCtx, const int2& size)
 	if (InitContext(minCtx, size))
 		return true;
 
-	DestroyContext();
+	DestroyContext(true);
 	return false;
 }
 
-void MacEGL::DestroyContext()
+void MacEGL::DestroyContext(bool terminateDisplay)
 {
 	if (eglDisplay == EGL_NO_DISPLAY)
 		return;
@@ -149,7 +149,11 @@ void MacEGL::DestroyContext()
 	if (eglSurface != EGL_NO_SURFACE)
 		eglDestroySurface(eglDisplay, eglSurface);
 
-	eglTerminate(eglDisplay);
+	// zink_destroy_screen waits on a barrier that every thread in its work queue
+	// must reach, and a thread created while that wait is already running never
+	// gets a barrier job, so the wait never ends. Observed on Mesa 26.2.0-rc3.
+	if (terminateDisplay)
+		eglTerminate(eglDisplay);
 
 	eglDisplay = EGL_NO_DISPLAY;
 	eglSurface = EGL_NO_SURFACE;

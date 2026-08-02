@@ -726,7 +726,8 @@ void CGlobalRendering::DestroyWindowAndContext() {
 	SDL_DestroyWindow(sdlWindow);
 
 	#if defined(SPRING_USE_MAC_EGL)
-	MacEGL::DestroyContext();
+	// only reached from ~CGlobalRendering, so the display goes with the process
+	MacEGL::DestroyContext(false);
 	#elif !defined(HEADLESS)
 	if (glContext)
 		SDL_GL_DeleteContext(glContext);
