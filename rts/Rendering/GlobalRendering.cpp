@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <cmath>
 
 #include <SDL.h>
 
@@ -149,6 +150,8 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(winPosY),
 	CR_IGNORED(winSizeX),
 	CR_IGNORED(winSizeY),
+	CR_IGNORED(pixelsPerPointX),
+	CR_IGNORED(pixelsPerPointY),
 	CR_IGNORED(viewPosX),
 	CR_IGNORED(viewPosY),
 	CR_IGNORED(viewSizeX),
@@ -253,6 +256,8 @@ CGlobalRendering::CGlobalRendering()
 	, winPosY(configHandler->GetInt("WindowPosY"))
 	, winSizeX(1)
 	, winSizeY(1)
+	, pixelsPerPointX(1.0f)
+	, pixelsPerPointY(1.0f)
 
 	// viewport geometry
 	, viewPosX(0)
@@ -1664,8 +1669,17 @@ void CGlobalRendering::ReadWindowPosAndSize()
 	// which stay in the points SDL reports.
 	const int2 fbSize = MacEGL::GetSurfaceSize();
 
+	int2 pointSize;
+	SDL_GetWindowSize(sdlWindow, &pointSize.x, &pointSize.y);
+
 	winSizeX = fbSize.x;
 	winSizeY = fbSize.y;
+
+	// SDL goes on reporting mouse input in the points it reports the window in
+	if (pointSize.x > 0 && pointSize.y > 0) {
+		pixelsPerPointX = fbSize.x / float(pointSize.x);
+		pixelsPerPointY = fbSize.y / float(pointSize.y);
+	}
 	#else
 	SDL_GetWindowSize(sdlWindow, &winSizeX, &winSizeY);
 	#endif
@@ -1679,6 +1693,16 @@ void CGlobalRendering::ReadWindowPosAndSize()
 
 	// should be done by caller
 	// UpdateViewPortGeometry();
+}
+
+int2 CGlobalRendering::PointToPixel(const int2 p) const
+{
+	return {int(std::lround(p.x * pixelsPerPointX)), int(std::lround(p.y * pixelsPerPointY))};
+}
+
+int2 CGlobalRendering::PixelToPoint(const int2 p) const
+{
+	return {int(std::lround(p.x / pixelsPerPointX)), int(std::lround(p.y / pixelsPerPointY))};
 }
 
 void CGlobalRendering::SaveWindowPosAndSize()

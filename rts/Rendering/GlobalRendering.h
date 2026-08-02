@@ -93,6 +93,12 @@ public:
 	void UpdatePixelGeometry();
 	void ReadWindowPosAndSize();
 	void SaveWindowPosAndSize();
+
+	/// takes a position or a motion from the points SDL speaks in to the pixels the engine draws in
+	int2 PointToPixel(const int2 p) const;
+	/// the inverse, for handing a position back to SDL
+	int2 PixelToPoint(const int2 p) const;
+
 	void UpdateGLConfigs();
 	void UpdateGLGeometry();
 	void UpdateScreenMatrices();
@@ -169,6 +175,16 @@ public:
 	/// the window size in pixels
 	int winSizeX;
 	int winSizeY;
+
+	/**
+	 * @brief backing pixels per window point
+	 *
+	 * 1 everywhere except a macOS window on a Retina display, where the
+	 * framebuffer is the Metal layer's drawable and the window SDL reports,
+	 * and reports mouse input in, is half its size.
+	 */
+	float pixelsPerPointX;
+	float pixelsPerPointY;
 
 	/// the viewport position relative to the window's top-left corner
 	int viewPosX;
