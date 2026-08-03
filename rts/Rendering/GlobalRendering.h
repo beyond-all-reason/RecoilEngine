@@ -125,6 +125,7 @@ public:
 
 	bool CheckShaderGL4() const;
 	bool ProbePolygonModeLine() const;
+	bool ProbeImmediateModeBatching() const;
 public:
 	//helper function
 	static int DepthBitsToFormat(int bits);
@@ -356,6 +357,20 @@ public:
 	 * it is measured by ProbePolygonModeLine().
 	 */
 	bool supportPolygonModeLine;
+
+	/**
+	 * @brief whether consecutive glBegin/glEnd batches render correctly
+	 *
+	 * Mesa accumulates immediate-mode batches into one buffer and issues them
+	 * together. Zink on KosmicKrisp renders the result wrongly once more than
+	 * one batch is in that buffer and a later batch widens its vertex format
+	 * part way through, which is what gl.Shape and gl.BeginEnd produce. No GL
+	 * query reports it and no GL error is raised, so it is measured by
+	 * ProbeImmediateModeBatching().
+	 *
+	 * When false, glBeginBatch() submits the pending work before each batch.
+	 */
+	bool supportImmediateModeBatching;
 
 	/**
 	 * Shader capabilities

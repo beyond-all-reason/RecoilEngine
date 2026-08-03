@@ -106,6 +106,15 @@ bool glSpringBlitImages(
 	GLsizei srcWidth, GLsizei srcHeight, GLsizei srcDepth
 );
 
+/**
+ * Starts an immediate-mode batch.
+ *
+ * Identical to glBegin() except where the driver mis-renders batches that
+ * accumulate in Mesa's begin/end buffer, in which case whatever is already
+ * queued is submitted first. See CGlobalRendering::ProbeImmediateModeBatching.
+ */
+void glBeginBatch(GLenum mode);
+
 void ClearScreen();
 
 bool ProgramStringIsNative(GLenum target, const char* filename);
