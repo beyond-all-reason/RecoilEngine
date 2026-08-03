@@ -100,7 +100,7 @@ void GL::GeometryBuffer::DrawDebug(const unsigned int texID, const float2 texMin
 	glActiveTexture(GL_TEXTURE0);
 	glEnable(GetTextureTarget());
 	glBindTexture(GetTextureTarget(), texID);
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 	glTexCoord2f(texMins.x, texMins.y); glNormal3fv(&UpVector.x); glVertex2f(texMins.x, texMins.y);
 	glTexCoord2f(texMaxs.x, texMins.y); glNormal3fv(&UpVector.x); glVertex2f(texMaxs.x, texMins.y);
 	glTexCoord2f(texMaxs.x, texMaxs.y); glNormal3fv(&UpVector.x); glVertex2f(texMaxs.x, texMaxs.y);

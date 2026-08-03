@@ -2707,7 +2707,7 @@ bool CGuiHandler::DrawUnitBuildIcon(const IconInfo& icon, int unitDefID)
 	glEnable(GL_TEXTURE_2D);
 	glColor4f(1.0f, 1.0f, 1.0f, textureAlpha);
 	glBindTexture(GL_TEXTURE_2D, CUnitDrawer::GetUnitDefImage(ud));
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 		glTexCoord2f(0.0f, 0.0f); glVertex2f(b.x1, b.y1);
 		glTexCoord2f(1.0f, 0.0f); glVertex2f(b.x2, b.y1);
 		glTexCoord2f(1.0f, 1.0f); glVertex2f(b.x2, b.y2);
@@ -2893,7 +2893,7 @@ bool CGuiHandler::DrawTexture(const IconInfo& icon, const std::string& texName)
 
 	// draw the full size quad
 	const Box& b = icon.visual;
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 	glTexCoord2f(0.0f, 0.0f); glVertex2f(b.x1, b.y1);
 	glTexCoord2f(1.0f, 0.0f); glVertex2f(b.x2, b.y1);
 	glTexCoord2f(1.0f, 1.0f); glVertex2f(b.x2, b.y2);
@@ -2917,7 +2917,7 @@ bool CGuiHandler::DrawTexture(const IconInfo& icon, const std::string& texName)
 	const float y2 = b.y2 + (yIconSize * yscale);
 
 	// draw the scaled quad
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 	glTexCoord2f(0.0f, 0.0f); glVertex2f(x1, y1);
 	glTexCoord2f(1.0f, 0.0f); glVertex2f(x2, y1);
 	glTexCoord2f(1.0f, 1.0f); glVertex2f(x2, y2);
@@ -2933,7 +2933,7 @@ void CGuiHandler::DrawIconFrame(const IconInfo& icon)
 	RECOIL_DETAILED_TRACY_ZONE;
 	const Box& b = icon.visual;
 	glDisable(GL_TEXTURE_2D);
-	glBegin(GL_LINE_LOOP);
+	glBeginBatch(GL_LINE_LOOP);
 	constexpr float fudge = 0.001f; // avoids getting creamed if iconBorder == 0.0
 	glVertex2f(b.x1 + fudge, b.y1 - fudge);
 	glVertex2f(b.x2 - fudge, b.y1 - fudge);
@@ -3045,7 +3045,7 @@ void CGuiHandler::DrawHilightQuad(const IconInfo& icon)
 	const Box& b = icon.visual;
 	glDisable(GL_TEXTURE_2D);
 	glBlendFunc(GL_ONE, GL_ONE); // additive blending
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 		glVertex2f(b.x1, b.y1);
 		glVertex2f(b.x2, b.y1);
 		glVertex2f(b.x2, b.y2);
@@ -3065,7 +3065,7 @@ void CGuiHandler::DrawButtons() // Only called by Draw
 	const float alpha = (frameAlpha < 0.0f) ? guiAlpha : frameAlpha;
 	if (alpha > 0.0f) {
 		glColor4f(0.2f, 0.2f, 0.2f, alpha);
-		glBegin(GL_QUADS);
+		glBeginBatch(GL_QUADS);
 			glVertex2f(buttonBox.x1, buttonBox.y1);
 			glVertex2f(buttonBox.x1, buttonBox.y2);
 			glVertex2f(buttonBox.x2, buttonBox.y2);
@@ -3299,7 +3299,7 @@ void CGuiHandler::DrawNumberInput() // Only called by drawbuttons
 			glRectf(0.75f, 0.45f, 0.765f, 0.55f);
 			glColor4f(0.0f, 0.0f, 1.0f, 0.8f);
 			glRectf(0.25f, 0.49f, 0.75f, 0.51f);
-			glBegin(GL_TRIANGLES);
+			glBeginBatch(GL_TRIANGLES);
 				glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
 				glVertex2f(slideX + 0.015f, 0.55f);
 				glVertex2f(slideX - 0.015f, 0.55f);
@@ -3324,7 +3324,7 @@ void CGuiHandler::DrawPrevArrow(const IconInfo& icon)
 	const float ySize = 0.125f * math::fabs(b.y2 - b.y1);
 	const float xSiz2 = 2.0f * xSize;
 	glDisable(GL_TEXTURE_2D);
-	glBegin(GL_POLYGON);
+	glBeginBatch(GL_POLYGON);
 		glVertex2f(b.x2 - xSize, yCenter - ySize);
 		glVertex2f(b.x1 + xSiz2, yCenter - ySize);
 		glVertex2f(b.x1 + xSize, yCenter);
@@ -3343,7 +3343,7 @@ void CGuiHandler::DrawNextArrow(const IconInfo& icon)
 	const float ySize = 0.125f * math::fabs(b.y2 - b.y1);
 	const float xSiz2 = 2.0f * xSize;
 	glDisable(GL_TEXTURE_2D);
-	glBegin(GL_POLYGON);
+	glBeginBatch(GL_POLYGON);
 		glVertex2f(b.x1 + xSize, yCenter - ySize);
 		glVertex2f(b.x2 - xSiz2, yCenter - ySize);
 		glVertex2f(b.x2 - xSize, yCenter);
@@ -3477,7 +3477,7 @@ static inline GLuint GetConeList()
 
 	list = glGenLists(1);
 	glNewList(list, GL_COMPILE); {
-		glBegin(GL_TRIANGLE_FAN);
+		glBeginBatch(GL_TRIANGLE_FAN);
 		const int divs = 64;
 		glVertex3f(0.0f, 0.0f, 0.0f);
 		for (int i = 0; i <= divs; i++) {
@@ -3663,7 +3663,7 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 							DrawArea(innerPos, radius, color);
 						} else {
 							glColor4f(color[0], color[1], color[2], 0.5f);
-							glBegin(GL_TRIANGLE_FAN);
+							glBeginBatch(GL_TRIANGLE_FAN);
 
 							constexpr int divs = 256;
 							for (int i = 0; i <= divs; ++i) {
@@ -3700,7 +3700,7 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 							DrawSelectBox(innerPos, outerPos, tracePos);
 						} else {
 							glColor4f(1.0f, 0.0f, 0.0f, 0.5f);
-							glBegin(GL_QUADS);
+							glBeginBatch(GL_QUADS);
 							glVertex3f(innerPos.x, 0.0f, innerPos.z);
 							glVertex3f(outerPos.x, 0.0f, innerPos.z);
 							glVertex3f(outerPos.x, 0.0f, outerPos.z);
@@ -3974,7 +3974,7 @@ void CGuiHandler::DrawMiniMapMarker(const float3& cameraPos)
 	glEnable(GL_BLEND);
 	glShadeModel(GL_FLAT);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-	glBegin(GL_TRIANGLE_FAN);
+	glBeginBatch(GL_TRIANGLE_FAN);
 		                       glVertex3f(0.0f, 0.0f, 0.0f);
 		                       glVertex3f(  +w,   +h, 0.0f);
 		glColor4fv(colors[4]); glVertex3f(0.0f,   +h,   +w);
@@ -3982,7 +3982,7 @@ void CGuiHandler::DrawMiniMapMarker(const float3& cameraPos)
 		glColor4fv(colors[6]); glVertex3f(0.0f,   +h,   -w);
 		glColor4fv(colors[7]); glVertex3f(  +w,   +h, 0.0f);
 	glEnd();
-	glBegin(GL_TRIANGLE_FAN);
+	glBeginBatch(GL_TRIANGLE_FAN);
 		                       glVertex3f(0.0f, h * 2.0f, 0.0f);
 		                       glVertex3f(  +w,   +h, 0.0f);
 		glColor4fv(colors[3]); glVertex3f(0.0f,   +h,   -w);
@@ -4065,7 +4065,7 @@ void CGuiHandler::DrawArea(float3 pos, float radius, const float* color)
 
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_FOG);
-	glBegin(GL_TRIANGLE_FAN);
+	glBeginBatch(GL_TRIANGLE_FAN);
 		glVertexf3(pos);
 		for(int a=0;a<=40;++a){
 			float3 p(fastmath::cos(a * math::TWOPI / 40.0f) * radius, 0.0f, fastmath::sin(a * math::TWOPI / 40.0f) * radius);
@@ -4118,7 +4118,7 @@ void CGuiHandler::DrawFormationFrontOrder(
 	if (onMinimap) {
 		pos1 += (pos1 - pos2);
 		glLineWidth(2.0f);
-		glBegin(GL_LINES);
+		glBeginBatch(GL_LINES);
 		glVertexf3(pos1);
 		glVertexf3(pos2);
 		glEnd();
@@ -4132,7 +4132,7 @@ void CGuiHandler::DrawFormationFrontOrder(
 	{
 		// direction arrow
 		glDisable(GL_DEPTH_TEST);
-		glBegin(GL_QUADS);
+		glBeginBatch(GL_QUADS);
 			glVertexf3(pos1 + side * 25.0f                   );
 			glVertexf3(pos1 - side * 25.0f                   );
 			glVertexf3(pos1 - side * 25.0f + forward *  50.0f);
@@ -4156,7 +4156,7 @@ void CGuiHandler::DrawFormationFrontOrder(
 	{
 		// vertical quad
 		glDisable(GL_FOG);
-		glBegin(GL_QUAD_STRIP);
+		glBeginBatch(GL_QUAD_STRIP);
 		const float3 delta = (pos2 - pos1) / (float)steps;
 		for (int i = 0; i <= steps; i++) {
 			float3 p;
@@ -4188,7 +4188,7 @@ static void DrawBoxShape(const void* data)
 	const BoxData* boxData = static_cast<const BoxData*>(data);
 	const float3& mins = boxData->mins;
 	const float3& maxs = boxData->maxs;
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 		// the top
 		glVertex3f(mins.x, maxs.y, mins.z);
 		glVertex3f(mins.x, maxs.y, maxs.z);
@@ -4200,7 +4200,7 @@ static void DrawBoxShape(const void* data)
 		glVertex3f(maxs.x, mins.y, maxs.z);
 		glVertex3f(mins.x, mins.y, maxs.z);
 	glEnd();
-	glBegin(GL_QUAD_STRIP);
+	glBeginBatch(GL_QUAD_STRIP);
 		// the sides
 		glVertex3f(mins.x, maxs.y, mins.z);
 		glVertex3f(mins.x, mins.y, mins.z);
@@ -4227,7 +4227,7 @@ static void DrawCornerPosts(const float3& pos0, const float3& pos1)
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glLineWidth(2.0f);
-	glBegin(GL_LINES);
+	glBeginBatch(GL_LINES);
 		glColor4f(1.0f, 1.0f, 0.0f, 0.9f);
 		glVertexf3(corner0); glVertexf3(corner0 + lineVector);
 		glColor4f(0.0f, 1.0f, 0.0f, 0.9f);
@@ -4288,14 +4288,14 @@ static void FullScreenDraw()
 static void DrawMinMaxBox(const float3& mins, const float3& maxs)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 		// the top
 		glVertex3f(mins.x, maxs.y, mins.z);
 		glVertex3f(maxs.x, maxs.y, mins.z);
 		glVertex3f(maxs.x, maxs.y, maxs.z);
 		glVertex3f(mins.x, maxs.y, maxs.z);
 	glEnd();
-	glBegin(GL_QUAD_STRIP);
+	glBeginBatch(GL_QUAD_STRIP);
 		// the sides
 		glVertex3f(mins.x, mins.y, mins.z);
 		glVertex3f(mins.x, maxs.y, mins.z);
@@ -4373,7 +4373,7 @@ static void DrawCylinderShape(const void* data)
 	const CylinderData& cyl = *static_cast<const CylinderData*>(data);
 	const float step = math::TWOPI / cyl.divs;
 	int i;
-	glBegin(GL_QUAD_STRIP); // the sides
+	glBeginBatch(GL_QUAD_STRIP); // the sides
 	for (i = 0; i <= cyl.divs; i++) {
 		const float radians = step * float(i % cyl.divs);
 		const float x = cyl.xc + (cyl.radius * fastmath::sin(radians));
@@ -4382,7 +4382,7 @@ static void DrawCylinderShape(const void* data)
 		glVertex3f(x, cyl.yn, z);
 	}
 	glEnd();
-	glBegin(GL_TRIANGLE_FAN); // the top
+	glBeginBatch(GL_TRIANGLE_FAN); // the top
 	for (i = 0; i < cyl.divs; i++) {
 		const float radians = step * float(i);
 		const float x = cyl.xc + (cyl.radius * fastmath::sin(radians));
@@ -4390,7 +4390,7 @@ static void DrawCylinderShape(const void* data)
 		glVertex3f(x, cyl.yp, z);
 	}
 	glEnd();
-	glBegin(GL_TRIANGLE_FAN); // the bottom
+	glBeginBatch(GL_TRIANGLE_FAN); // the bottom
 	for (i = (cyl.divs - 1); i >= 0; i--) {
 		const float radians = step * float(i);
 		const float x = cyl.xc + (cyl.radius * fastmath::sin(radians));
@@ -4426,7 +4426,7 @@ void CGuiHandler::DrawSelectCircle(const float3& pos, float radius,
 	glColor4f(color[0], color[1], color[2], 0.9f);
 	glLineWidth(2.0f);
 	const float3 base(pos.x, CGround::GetHeightAboveWater(pos.x, pos.z, false), pos.z);
-	glBegin(GL_LINES);
+	glBeginBatch(GL_LINES);
 		glVertexf3(base);
 		glVertexf3(base + float3(0.0f, 128.0f, 0.0f));
 	glEnd();

@@ -131,7 +131,7 @@ void CInfoTextureCombiner::Update()
 	const float isy = 2.0f * (mapDims.mapy / float(mapDims.pwr2mapy)) - 1.0f;
 
 	// need to keep this old nonsence intact to keep Lua shaders compatible
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 		glTexCoord2f(0.f, 0.f); glVertex2f(-1.f, -1.f);
 		glTexCoord2f(0.f, 1.f); glVertex2f(-1.f, +isy);
 		glTexCoord2f(1.f, 1.f); glVertex2f(+isx, +isy);

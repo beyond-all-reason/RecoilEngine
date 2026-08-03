@@ -86,7 +86,7 @@ void HUDDrawer::DrawUnitDirectionArrow(const CUnit* unit)
 			glRotatef(unit->heading * 180.0f / 32768 + 180, 0.0f, 0.0f, 1.0f);
 
 			glColor4f(0.3f, 0.9f, 0.3f, 0.4f);
-			glBegin(GL_TRIANGLE_FAN);
+			glBeginBatch(GL_TRIANGLE_FAN);
 				glVertex2f(-0.2f, -0.3f);
 				glVertex2f(-0.2f,  0.3f);
 				glVertex2f( 0.0f,  0.4f);
@@ -113,7 +113,7 @@ void HUDDrawer::DrawCameraDirectionArrow(const CUnit* unit)
 			glScalef(0.4f, 0.4f, 0.3f);
 
 			glColor4f(0.4f, 0.4f, 1.0f, 0.6f);
-			glBegin(GL_TRIANGLE_FAN);
+			glBeginBatch(GL_TRIANGLE_FAN);
 				glVertex2f(-0.2f, -0.3f);
 				glVertex2f(-0.2f,  0.3f);
 				glVertex2f( 0.0f,  0.5f);
@@ -229,7 +229,7 @@ void HUDDrawer::DrawTargetReticle(const CUnit* unit)
 					radius = w->GetCurrentTarget().unit->radius;
 
 				// draw the reticle
-				glBegin(GL_LINE_STRIP);
+				glBeginBatch(GL_LINE_STRIP);
 				for (int b = 0; b <= 80; ++b) {
 					glVertexf3(pos + (v2 * fastmath::sin(b * math::TWOPI / 80) + v3 * fastmath::cos(b * math::TWOPI / 80)) * radius);
 				}
@@ -246,14 +246,14 @@ void HUDDrawer::DrawTargetReticle(const CUnit* unit)
 					v3 = (v2.cross(v1)).ANormalize();
 					radius = dist / 100.0f;
 
-					glBegin(GL_LINE_STRIP);
+					glBeginBatch(GL_LINE_STRIP);
 					for (int b = 0; b <= 80; ++b) {
 						glVertexf3(pos + (v2 * fastmath::sin(b * math::TWOPI / 80) + v3 * fastmath::cos(b *math::TWOPI / 80)) * radius);
 					}
 					glEnd();
 				}
 
-				glBegin(GL_LINES);
+				glBeginBatch(GL_LINES);
 				if (!w->onlyForward) {
 					glVertexf3(pos);
 					glVertexf3(w->GetCurrentTargetPos());

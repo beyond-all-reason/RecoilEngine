@@ -678,7 +678,7 @@ void CDynWater::DrawWaves()
 	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,1, W_SIZE*2, 0, 0, 0);
 
 	//update normals pass
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 	glTexCoord2f(start, start); glVertexf3(ZeroVector);
 	glTexCoord2f(start, end);   glVertexf3(  UpVector);
 	glTexCoord2f(end,   end);   glVertexf3(  XYVector);
@@ -745,7 +745,7 @@ void CDynWater::DrawHeightTex()
 	float startv = 8.0f / 256;
 	float endv   = 248.0f / 256;
 	//update 32 bit height map
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 	glTexCoord2f(startx, startz); glVertex3f(startv, startv, 0);
 	glTexCoord2f(startx, endz);   glVertex3f(startv, endv,   0);
 	glTexCoord2f(endx,   endz);   glVertex3f(endv,   endv,   0);
@@ -999,7 +999,7 @@ void CDynWater::DrawDetailNormalTex()
 	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,7, 0.08f*swh, 0.2f*swh, 0.7f*lwh, 0);
 
 	//update detail normals
-	glBegin(GL_QUADS);
+	glBeginBatch(GL_QUADS);
 	glTexCoord2f(0, 0); glVertexf3(ZeroVector);
 	glTexCoord2f(0, 1); glVertexf3(  UpVector);
 	glTexCoord2f(1, 1); glVertexf3(  XYVector);
