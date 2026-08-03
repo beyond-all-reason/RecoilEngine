@@ -45,6 +45,19 @@ class CLuaDisplayLists {
 			return SMatrixStateData();
 		}
 
+		/**
+		 * Lua registry reference to the recording function and its arguments,
+		 * or 0 when this entry is a real GL display list. luaL_ref never
+		 * returns 0 for a live value, so 0 is unambiguous.
+		 */
+		int GetFuncRef(unsigned int index) const
+		{
+			if (index < active.size())
+				return active[index].funcRef;
+
+			return 0;
+		}
+
 		unsigned int NewDList(GLuint dlist, SMatrixStateData& m)
 		{
 			if (dlist == 0)
@@ -59,10 +72,34 @@ class CLuaDisplayLists {
 			active.push_back(DLdata(dlist, m));
 			return active.size() - 1;
 		}
+
+		/**
+		 * A list that is replayed by re-running its recording function rather
+		 * than by glCallList. Used where the driver mis-renders immediate-mode
+		 * batches: glFlush is executed during compilation and never recorded
+		 * into the list, so the corrupted batches are baked in and no flush at
+		 * replay time can reach them.
+		 */
+		unsigned int NewDeferredDList(int funcRef)
+		{
+			if (funcRef == 0)
+				return 0;
+
+			if (!unused.empty()) {
+				const unsigned int index = unused[unused.size() - 1];
+				active[index] = DLdata(0);
+				active[index].funcRef = funcRef;
+				unused.pop_back();
+				return index;
+			}
+			active.push_back(DLdata(0));
+			active.back().funcRef = funcRef;
+			return active.size() - 1;
+		}
 				
 		void FreeDList(unsigned int index)
 		{
-			if ((index < active.size()) && (active[index].id != 0)) {
+			if ((index < active.size()) && ((active[index].id != 0) || (active[index].funcRef != 0))) {
 				active[index] = DLdata(0);
 				unused.push_back(index);
 			}
@@ -74,6 +111,7 @@ class CLuaDisplayLists {
 			DLdata(int i, SMatrixStateData &m): id(i), matData(m) {}
 			GLuint id;
 			SMatrixStateData matData;
+			int funcRef = 0;
 		};
 		std::vector<DLdata> active;
 		std::vector<unsigned int> unused; // references slots in active
