@@ -6135,6 +6135,46 @@ int LuaOpenGL::CreateList(lua_State* L)
 			"Incorrect arguments to gl.CreateList(func [, arg1, arg2, etc ...])");
 	}
 
+	// Where the driver mis-renders immediate-mode batches, do not compile at
+	// all. glFlush is executed during compilation and is never recorded into
+	// the list, so glBeginBatch cannot help a batch that is baked into one, and
+	// neither can any flush at replay time. Keep the function instead and run it
+	// live on every gl.CallList, which is the path the mitigation does reach.
+	if (!globalRendering->supportImmediateModeBatching) {
+		CLuaDisplayLists& displayLists = CLuaHandle::GetActiveDisplayLists(L);
+
+		// A deferred list holds a Lua closure and its upvalues, not a GL name.
+		// A gl.CreateList reached from inside another list's recording function
+		// therefore allocates once per frame forever and retains everything the
+		// closure captured. Unguarded, that took a machine to 54 GB and froze it.
+		// Refuse rather than grow without bound.
+		static constexpr unsigned int MAX_DEFERRED_LISTS = 8192;
+
+		if (displayLists.GetCount() >= MAX_DEFERRED_LISTS) {
+			static bool loggedCap = false;
+			if (!loggedCap) {
+				loggedCap = true;
+				LOG_L(L_ERROR, "gl.CreateList: refusing to create more than %u lists. "
+					"Something is creating lists every frame without deleting them.",
+					MAX_DEFERRED_LISTS);
+			}
+			lua_pushnumber(L, 0);
+			return 1;
+		}
+
+		lua_createtable(L, args, 0);
+		for (int i = 1; i <= args; i++) {
+			lua_pushvalue(L, i);
+			lua_rawseti(L, -2, i);
+		}
+
+		const int funcRef = luaL_ref(L, LUA_REGISTRYINDEX);
+		const unsigned int index = displayLists.NewDeferredDList(funcRef);
+
+		lua_pushnumber(L, index);
+		return 1;
+	}
+
 	// generate the list id
 	const GLuint list = glGenLists(1);
 	if (list == 0) {
@@ -6182,7 +6222,36 @@ int LuaOpenGL::CallList(lua_State* L)
 	CheckDrawingEnabled(L, __func__);
 	CondWarnDeprecatedGL(L, __func__);
 	const unsigned int listIndex = luaL_checkint(L, 1);
-	const CLuaDisplayLists& displayLists = CLuaHandle::GetActiveDisplayLists(L);
+	CLuaDisplayLists& displayLists = CLuaHandle::GetActiveDisplayLists(L);
+
+	// a deferred list holds its recording function rather than a GL list, and
+	// is replayed by running it. Its own matrix calls execute live, so there is
+	// no captured matrix state to reapply.
+	if (const int funcRef = displayLists.GetFuncRef(listIndex); funcRef != 0) {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, funcRef);
+
+		const int tableIdx = lua_gettop(L);
+		const int numVals = lua_objlen(L, tableIdx);
+
+		for (int i = 1; i <= numVals; i++)
+			lua_rawgeti(L, tableIdx, i);
+
+		const int error = lua_pcall(L, numVals - 1, 0, 0);
+		lua_remove(L, tableIdx);
+
+		if (error != 0) {
+			// drop the list rather than repeat the error every frame. A list
+			// whose function fails at compile time is discarded the same way.
+			LOG_L(L_ERROR, "gl.CallList: error(%i) = %s", error, lua_tostring(L, -1));
+			lua_pop(L, 1);
+
+			displayLists.FreeDList(listIndex);
+			luaL_unref(L, LUA_REGISTRYINDEX, funcRef);
+		}
+
+		return 0;
+	}
+
 	const unsigned int dlist = displayLists.GetDList(listIndex);
 	if (dlist) {
 		SMatrixStateData matrixStateData = displayLists.GetMatrixState(listIndex);
@@ -6210,9 +6279,13 @@ int LuaOpenGL::DeleteList(lua_State* L)
 	const unsigned int listIndex = (unsigned int)luaL_checkint(L, 1);
 	CLuaDisplayLists& displayLists = CLuaHandle::GetActiveDisplayLists(L);
 	const unsigned int dlist = displayLists.GetDList(listIndex);
+	const int funcRef = displayLists.GetFuncRef(listIndex);
 	displayLists.FreeDList(listIndex);
 	if (dlist != 0) {
 		glDeleteLists(dlist, 1);
+	}
+	if (funcRef != 0) {
+		luaL_unref(L, LUA_REGISTRYINDEX, funcRef);
 	}
 	return 0;
 }
