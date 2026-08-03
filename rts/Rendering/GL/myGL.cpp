@@ -545,6 +545,18 @@ bool glSpringBlitImages(
 
 /******************************************************************************/
 
+void glBeginBatch(GLenum mode)
+{
+	// the pending batches have to reach the GPU before the next one starts
+	// writing into the same buffer. Issuing them without submitting, which any
+	// state change does, is not enough: measured on Zink over KosmicKrisp the
+	// draws Mesa emits are then byte for byte identical and still come out wrong.
+	if (!globalRendering->supportImmediateModeBatching)
+		glFlush();
+
+	glBegin(mode);
+}
+
 void ClearScreen()
 {
 	RECOIL_DETAILED_TRACY_ZONE;

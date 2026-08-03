@@ -55,6 +55,8 @@ CONFIG(float, MinSampleShadingRate).defaultValue(0.0f).minimumValue(0.0f).maximu
 CONFIG(int, ForceDisablePersistentMapping).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceDisableExplicitAttribLocs).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceDisableClipCtrl).defaultValue(0).minimumValue(0).maximumValue(1);
+CONFIG(int, ForceImmediateModeFlush).defaultValue(-1).minimumValue(-1).maximumValue(1)
+	.description("Overrides the immediate-mode batching probe. -1 measures the driver, 0 never submits before a batch, 1 always does.");
 //CONFIG(int, ForceDisableShaders).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceDisableGL4).defaultValue(0).safemodeValue(1).minimumValue(0).maximumValue(1);
 
@@ -194,6 +196,7 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(supportClipSpaceControl),
 	CR_IGNORED(supportSeamlessCubeMaps),
 	CR_IGNORED(supportFragDepthLayout),
+	CR_IGNORED(supportImmediateModeBatching),
 	CR_IGNORED(haveGL4),
 	CR_IGNORED(glslMaxVaryings),
 	CR_IGNORED(glslMaxAttributes),
@@ -324,6 +327,7 @@ CGlobalRendering::CGlobalRendering()
 	, supportClipSpaceControl(false)
 	, supportSeamlessCubeMaps(false)
 	, supportFragDepthLayout(false)
+	, supportImmediateModeBatching(true)
 	, haveGL4(false)
 
 	, glslMaxVaryings(0)
@@ -931,6 +935,11 @@ void CGlobalRendering::SetGLSupportFlags()
 	if (globalRendering->amdHacks) {
 		supportDepthBufferBitDepth = 24;
 	}
+
+	{
+		const int forceFlush = configHandler->GetInt("ForceImmediateModeFlush");
+		supportImmediateModeBatching = (forceFlush < 0) ? ProbeImmediateModeBatching() : (forceFlush == 0);
+	}
 }
 
 void CGlobalRendering::QueryGLMaxVals()
@@ -1039,6 +1048,7 @@ void CGlobalRendering::LogVersionInfo(const char* sdlVersionStr, const char* glV
 	LOG("\tclip-space control support: %i (%i)", supportClipSpaceControl, IsExtensionSupported("GL_ARB_clip_control"));
 	LOG("\tseamless cube-map support : %i (%i)", supportSeamlessCubeMaps, IsExtensionSupported("GL_ARB_seamless_cube_map"));
 	LOG("\tfrag-depth layout support : %i (%i)", supportFragDepthLayout, IsExtensionSupported("GL_ARB_conservative_depth"));
+	LOG("\timmediate-mode batching   : %i (-)" , supportImmediateModeBatching);
 	LOG("\tpersistent maps support   : %i (%i)", supportPersistentMapping, IsExtensionSupported("GL_ARB_buffer_storage"));
 	LOG("\texplicit attribs location : %i (%i)", supportExplicitAttribLoc, IsExtensionSupported("GL_ARB_explicit_attrib_location"));
 	LOG("\tmulti draw indirect       : %i (-)" , IsExtensionSupported("GL_ARB_multi_draw_indirect"));
@@ -1791,6 +1801,130 @@ void main()
 	return testShader.IsValid();
 #else
 	return false;
+#endif
+}
+
+
+bool CGlobalRendering::ProbeImmediateModeBatching() const
+{
+#ifndef HEADLESS
+	// Mesa accumulates consecutive glBegin/glEnd batches into one buffer and
+	// issues them as one draw. Zink on KosmicKrisp renders that wrongly, but
+	// only once the buffer already holds another batch and a later batch widens
+	// its vertex format part way through. Draw exactly that: two batches that
+	// cover nothing, then a grid of cells whose batches add a colour, then a
+	// texture coordinate, then a third vertex component as they go.
+	//
+	// Every cell should be lit inside its margin and nothing outside it.
+	if (!FBO::IsSupported())
+		return true;
+
+	constexpr int probeSize = 256;
+	constexpr int probeCells = 6;
+	constexpr int probeMargin = 6;
+	constexpr int cellSize = probeSize / probeCells;
+
+	FBO fbo;
+	fbo.Bind();
+	fbo.CreateRenderBuffer(GL_COLOR_ATTACHMENT0_EXT, GL_RGBA8, probeSize, probeSize);
+
+	bool wrong = false;
+
+	if (fbo.GetStatus() == GL_FRAMEBUFFER_COMPLETE_EXT) {
+		glUseProgram(0);
+
+		glViewport(0, 0, probeSize, probeSize);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_TEXTURE_2D);
+
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glLoadIdentity();
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+		glLoadIdentity();
+
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		// batches that write vertices but light nothing, so the begin/end buffer
+		// is not empty when the grid starts. One is not enough to trigger it.
+		for (int i = 0; i < 2; ++i) {
+			glColor3f(1.0f, 1.0f, 1.0f);
+			glBegin(GL_QUADS);
+			for (int v = 0; v < 4; ++v)
+				glVertex2f(-1.0f, -1.0f);
+			glEnd();
+		}
+
+		for (int cy = 0; cy < probeCells; ++cy) {
+			for (int cx = 0; cx < probeCells; ++cx) {
+				const float x0 = ((cx * cellSize + probeMargin) / float(probeSize)) * 2.0f - 1.0f;
+				const float y0 = ((cy * cellSize + probeMargin) / float(probeSize)) * 2.0f - 1.0f;
+				const float x1 = (((cx + 1) * cellSize - probeMargin) / float(probeSize)) * 2.0f - 1.0f;
+				const float y1 = (((cy + 1) * cellSize - probeMargin) / float(probeSize)) * 2.0f - 1.0f;
+
+				const float xs[4] = { x0, x1, x1, x0 };
+				const float ys[4] = { y0, y0, y1, y1 };
+
+				glColor3f(1.0f, 1.0f, 1.0f);
+				glBegin(GL_QUADS);
+
+				for (int v = 0; v < 4; ++v) {
+					if (v & 1)
+						glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+					if (v == 2)
+						glTexCoord2f(0.0f, 0.0f);
+
+					if (v == 3) {
+						glVertex3f(xs[v], ys[v], 0.0f);
+					} else {
+						glVertex2f(xs[v], ys[v]);
+					}
+				}
+
+				glEnd();
+			}
+		}
+
+		static std::vector<uint8_t> pixels;
+		pixels.resize(probeSize * probeSize * 4);
+		glReadPixels(0, 0, probeSize, probeSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPopMatrix();
+
+		size_t strayPixels = 0;
+		size_t unlitPixels = 0;
+
+		for (int y = 0; y < probeSize; ++y) {
+			for (int x = 0; x < probeSize; ++x) {
+				const bool lit = pixels[(y * probeSize + x) * 4] > 32;
+				const bool inCellX = (x % cellSize) >= probeMargin && (x % cellSize) < (cellSize - probeMargin);
+				const bool inCellY = (y % cellSize) >= probeMargin && (y % cellSize) < (cellSize - probeMargin);
+				const bool expected = inCellX && inCellY;
+
+				strayPixels += (lit && !expected);
+				unlitPixels += (!lit && expected);
+			}
+		}
+
+		// a driver that gets this right leaves no pixel of either kind
+		wrong = (strayPixels + unlitPixels) > 0;
+
+		if (wrong)
+			LOG_L(L_WARNING, "[GR::%s] immediate-mode batches render wrongly (%u stray, %u unlit of %u)", __func__, uint32_t(strayPixels), uint32_t(unlitPixels), uint32_t(probeSize * probeSize));
+	}
+
+	fbo.Unbind();
+
+	return !wrong;
+#else
+	return true;
 #endif
 }
 
