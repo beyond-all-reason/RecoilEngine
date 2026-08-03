@@ -5815,22 +5815,22 @@ int LuaOpenGL::PushPopMatrix(lua_State* L)
  * @function gl.GetMatrixData
  * @param type GL Matrix type (`GL.PROJECTION`, `GL.MODELVIEW`, `GL.TEXTURE`).
  * @param index integer Matrix index in range `[1, 16]`.
- * @return number The value.
+ * @return number value The value at the given index.
  */
 /***
  * @function gl.GetMatrixData
  * @param type GL Matrix type (`GL.PROJECTION`, `GL.MODELVIEW`, `GL.TEXTURE`).
- * @return Matrix4x4 The matrix.
+ * @return Matrix4x4
  */
 /***
  * @function gl.GetMatrixData
  * @param index integer Matrix index in range `[1, 16]`.
- * @return number The value.
+ * @return number value The value at the given index.
  */
 /***
  * @function gl.GetMatrixData
- * @param name MatrixName The matrix name.
- * @return Matrix4x4 The matrix.
+ * @param name MatrixName
+ * @return Matrix4x4
  */
 int LuaOpenGL::GetMatrixData(lua_State* L)
 {
@@ -6426,7 +6426,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param w 1
  * @param h 1
  * @param format GL? (Default: `GL.RGBA`)
- * @return number ... Color values (color size based on format).
+ * @return number ... Color value (color size based on format).
  */
 /***
  * Get column of pixels.
@@ -6436,7 +6436,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param w 1
  * @param h integer
  * @param format GL? (Default: `GL.RGBA`)
- * @return number[][] Column of color values (color size based on format).
+ * @return number[][] colors Column of color values (color size based on format).
  */
 /***
  * Get row of pixels.
@@ -6446,17 +6446,17 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param w integer
  * @param h 1
  * @param format GL? (Default: `GL.RGBA`)
- * @return number[][] Row of color values (color size based on format).
+ * @return number[][] colors Row of color values (color size based on format).
  */
 /***
- * Get row of pixels.
+ * Get columns of pixels.
  * @function gl.ReadPixels
  * @param x integer
  * @param y integer
  * @param w integer
  * @param h integer
  * @param format GL? (Default: `GL.RGBA`)
- * @return number[][][] Array of columns of color values (color size based on format).
+ * @return number[][][] colors Array of columns of color values (color size based on format).
  */
 int LuaOpenGL::ReadPixels(lua_State* L)
 {
@@ -6741,7 +6741,7 @@ int LuaOpenGL::GetQuery(lua_State* L)
 
 /***
  * @function gl.GetGlobalTexNames
- * @return string[] List of texture names.
+ * @return string[] texNames List of texture names.
  */
 int LuaOpenGL::GetGlobalTexNames(lua_State* L)
 {

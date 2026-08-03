@@ -1607,7 +1607,7 @@ int LuaSyncedRead::GetTeamStartPosition(lua_State* L)
 /***
  *
  * @function Spring.GetMapStartPositions
- * @return float3[] array of positions indexed by teamID
+ * @return float3[] startPositions array of positions indexed by teamID
  */
 int LuaSyncedRead::GetMapStartPositions(lua_State* L)
 {
@@ -1702,7 +1702,7 @@ int LuaSyncedRead::GetTeamList(lua_State* L)
  * @function Spring.GetPlayerList
  * @param teamID TeamID? (Default: `-1`) to filter by when >= 0
  * @param active boolean? (Default: `false`) whether to filter only active teams
- * @return PlayerID[]? list of playerIDs
+ * @return PlayerID[]? playerIDs List of playerIDs.
  */
 int LuaSyncedRead::GetPlayerList(lua_State* L)
 {
@@ -2034,7 +2034,7 @@ int LuaSyncedRead::GetTeamDamageStats(lua_State* L)
  * @param teamID TeamID
  * @param startIndex integer
  * @param endIndex integer? (Default: startIndex)
- * @return TeamStats[] The team stats history, or `nil` if unable to resolve team.
+ * @return TeamStats[] teamStatsHistory The team stats history, or `nil` if unable to resolve team.
  */
 int LuaSyncedRead::GetTeamStatsHistory(lua_State* L)
 {
@@ -4279,8 +4279,8 @@ int LuaSyncedRead::GetUnitResources(lua_State* L)
 /***
  * @function Spring.GetUnitStorage
  * @param unitID UnitID
- * @return number Unit's metal storage
- * @return number Unit's energy storage
+ * @return number metalStorage Unit's metal storage
+ * @return number energyStorage Unit's energy storage
  */
 int LuaSyncedRead::GetUnitStorage(lua_State* L)
 {
@@ -6413,7 +6413,7 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
  *
  * @param unitID UnitID
  * @param count 0 Returns the number of commands in the units queue.
- * @return integer The number of commands in the unit queue.
+ * @return integer cmdCount The number of commands in the unit queue.
  */
 int LuaSyncedRead::GetUnitCommands(lua_State* L)
 {
@@ -6461,7 +6461,7 @@ int LuaSyncedRead::GetUnitCommands(lua_State* L)
  *
  * @param unitID UnitID
  * @param count 0 Returns the number of commands in the factory queue.
- * @return integer The number of commands in the factory queue.
+ * @return integer cmdCount The number of commands in the factory queue.
  *
  * @see Spring.GetFactoryCommandCount for replacement function.
  */
@@ -6498,7 +6498,7 @@ int LuaSyncedRead::GetFactoryCommands(lua_State* L)
  *
  * @function Spring.GetUnitCommandCount
  * @param unitID UnitID
- * @return integer The number of commands in the unit's queue.
+ * @return integer cmdCount The number of commands in the unit's queue.
  */
 int LuaSyncedRead::GetUnitCommandCount(lua_State* L)
 {
@@ -6521,7 +6521,7 @@ int LuaSyncedRead::GetUnitCommandCount(lua_State* L)
  *
  * @function Spring.GetFactoryCommandCount
  * @param unitID UnitID
- * @return integer The number of commands in the factory queue.
+ * @return integer cmdCount The number of commands in the factory queue.
  *
  * @see Spring.GetFactoryCommands to get the factory commands.
  * @see Spring.GetFactoryCounts to get command counts grouped by cmdID.
@@ -7261,8 +7261,8 @@ int LuaSyncedRead::GetFeatureResurrect(lua_State* L)
  *
  * @function Spring.GetFeatureLastAttackedPiece
  * @param featureID FeatureID
- * @return string|""|nil Last hit piece name
- * @return integer? frame it was last hit on, nil when featureID is not valid
+ * @return string|""|nil pieceName Last hit piece name
+ * @return integer? frame frame it was last hit on, `nil` when featureID is not valid
  */
 int LuaSyncedRead::GetFeatureLastAttackedPiece(lua_State* L)
 {
@@ -9157,7 +9157,7 @@ int LuaSyncedRead::GetUnitScriptPiece(lua_State* L)
  *
  * @param unitID UnitID
  *
- * @return table<string,integer> where keys are piece names and values are piece indices
+ * @return table<string,integer> pieceInfos where keys are piece names and values are piece indices
  */
 int LuaSyncedRead::GetUnitScriptNames(lua_State* L)
 {
