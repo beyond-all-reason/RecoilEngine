@@ -1493,6 +1493,17 @@ bool LuaVBOImpl::CopyTo(const std::shared_ptr<LuaVBOImpl>& destVBO, int copySize
 
 	auto result = vbo->CopyTo(*destVBO->vbo, static_cast<GLsizeiptr>(copySizeInBytes));
 
+	// VBO::CopyTo only moves GPU->GPU. We need to also copy over the CPU-side bufferData.
+	if (result && bufferData != nullptr && destVBO->bufferData != nullptr && copySizeInBytes > 0) {
+		const auto n = std::min({
+			static_cast<uint32_t>(copySizeInBytes),
+			bufferSizeInBytes,
+			destVBO->bufferSizeInBytes
+		});
+		if (n > 0)
+			memcpy(destVBO->bufferData, bufferData, n);
+	}
+
 	if (!wasBound)
 		vbo->Unbind();
 
