@@ -2187,7 +2187,7 @@ int LuaOpenGL::DrawGroundQuad(lua_State* L)
 			const int xit = xib + 1;
 			const float xb = xib * SQUARE_SIZE;
 			const float xt = xb + SQUARE_SIZE;
-			glBegin(GL_TRIANGLE_STRIP);
+			glBeginBatch(GL_TRIANGLE_STRIP);
 			for (int zi = zis; zi <= zie; zi++) {
 				const int ziOff = zi * mapxi;
 				const float yb = heightmap[ziOff + xib];
@@ -2210,7 +2210,7 @@ int LuaOpenGL::DrawGroundQuad(lua_State* L)
 			const float xt = xb + SQUARE_SIZE;
 			const float tut = tub + tuStep;
 			float tv = tv0;
-			glBegin(GL_TRIANGLE_STRIP);
+			glBeginBatch(GL_TRIANGLE_STRIP);
 			for (int zi = zis; zi <= zie; zi++) {
 				const int ziOff = zi * mapxi;
 				const float yb = heightmap[ziOff + xib];
@@ -2335,7 +2335,7 @@ int LuaOpenGL::Shape(lua_State* L)
 
 	const GLuint type = (GLuint)luaL_checkint(L, 1);
 
-	glBegin(type);
+	glBeginBatch(type);
 
 	const int table = 2;
 	int i = 1;
@@ -2387,7 +2387,7 @@ int LuaOpenGL::BeginEnd(lua_State* L)
 	}
 
 	// call the function
-	glBegin(primMode);
+	glBeginBatch(primMode);
 	const int error = lua_pcall(L, (args - 2), 0, 0);
 	glEnd();
 
@@ -2875,7 +2875,7 @@ int LuaOpenGL::TexRect(lua_State* L)
 			t1 = 0.0f;
 			t2 = 1.0f;
 		}
-		glBegin(GL_QUADS); {
+		glBeginBatch(GL_QUADS); {
 			glTexCoord2f(s1, t1); glVertex2f(x1, y1);
 			glTexCoord2f(s2, t1); glVertex2f(x2, y1);
 			glTexCoord2f(s2, t2); glVertex2f(x2, y2);
@@ -2889,7 +2889,7 @@ int LuaOpenGL::TexRect(lua_State* L)
 	const float t1 = luaL_checkfloat(L, 6);
 	const float s2 = luaL_checkfloat(L, 7);
 	const float t2 = luaL_checkfloat(L, 8);
-	glBegin(GL_QUADS); {
+	glBeginBatch(GL_QUADS); {
 		glTexCoord2f(s1, t1); glVertex2f(x1, y1);
 		glTexCoord2f(s2, t1); glVertex2f(x2, y1);
 		glTexCoord2f(s2, t2); glVertex2f(x2, y2);

@@ -299,7 +299,7 @@ void HAPFSPathDrawer::Draw() const {
 	for (const auto& p: pm->GetPathMap()) {
 		const HAPFS::CPathManager::MultiPath& multiPath = p.second;
 
-		glBegin(GL_LINE_STRIP);
+		glBeginBatch(GL_LINE_STRIP);
 
 			// draw low-res segments of <path> (blue)
 			glColor4f(0.0f, 0.0f, 1.0f, 1.0f);
@@ -402,7 +402,7 @@ void HAPFSPathDrawer::Draw(const HAPFS::CPathEstimator* pe) const {
 	if (drawLowResPE || drawMedResPE) {
 
 		// Draw the block positions
-		glBegin(GL_LINES);
+		glBeginBatch(GL_LINES);
 
 		const int2 peNumBlocks = ps->GetNumBlocks();
 		const int vertexBaseNr = md->pathType * peNumBlocks.x * peNumBlocks.y * PATH_DIRECTION_VERTICES;
