@@ -114,3 +114,4 @@ Added a bunch of `debug.emulateFoo` functions that emulate input. Useful for aut
 - fix unitsync not running functions passed to `Spring.TimeCheck`.
 - fix Skirmish AI API compilation issues due to `AIFloat3` having a non-trivial constructor.
 - attempt to fix the lack of `wupget:GameProgress` calls when initially catching up.
+- fix Lua `VBO::CopyTo` to copy VBO data CPU side in additon to GPU side. Formerly it only copied data GPU side.
