@@ -10,6 +10,13 @@
 
 #include <SDL_video.h>
 
+#if defined(__APPLE__) && !defined(HEADLESS)
+	// SDL owns neither the GL context nor the present on macOS, so
+	// SDL_GL_SetSwapInterval below reaches nothing. The layer that actually
+	// shows the frame has its own switch, see MetalPresent.h.
+	#include "System/Platform/Mac/MetalPresent.h"
+#endif
+
 static constexpr int MAX_ADAPTIVE_INTERVAL = -6;
 static constexpr int MAX_STANDARD_INTERVAL = +6;
 
@@ -70,6 +77,12 @@ void CVerticalSync::SetInterval(int i)
 
 	#if defined HEADLESS
 	return;
+	#endif
+
+	#if defined(__APPLE__) && !defined(HEADLESS)
+	// Both adaptive and standard mean "wait for the blank" to a CAMetalLayer,
+	// which has one switch rather than an interval. Only 0 turns it off.
+	MacMetalPresent_SetVSync(interval != 0);
 	#endif
 
 	// adaptive (delay swap iff frame-rate > vblank-rate)

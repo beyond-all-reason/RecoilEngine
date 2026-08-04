@@ -35,6 +35,10 @@ namespace {
 	// to finish sampling the surface before the caller overwrites it
 	id<MTLCommandBuffer> lastPresent = nil;
 
+	// CAMetalLayer's own default, kept here so the setting can arrive before the
+	// layer does and still be applied
+	bool vsync = true;
+
 	constexpr uint32_t bgraPixelFormat = 0x42475241; // 'BGRA'
 
 	NSString* const presentShaderSrc = @R"(
@@ -212,6 +216,7 @@ bool MacMetalPresent_Init(void* nsWindow, bool hiDPI)
 		const CGFloat scale = hiDPI ? window.backingScaleFactor : 1.0;
 
 		layer.contentsScale = scale;
+		layer.displaySyncEnabled = vsync;
 		layer.frame = view.bounds;
 
 		// AppKit has not laid the layer out yet, and the caller needs the size
@@ -224,11 +229,31 @@ bool MacMetalPresent_Init(void* nsWindow, bool hiDPI)
 		view.layer = layer;
 		view.wantsLayer = YES;
 
-		LOG("[MetalPresent::%s] %s, %.0fx%.0f points at %.1fx, %.0fx%.0f drawable", __func__, device.name.UTF8String,
-			points.width, points.height, scale, layer.drawableSize.width, layer.drawableSize.height);
+		LOG("[MetalPresent::%s] %s, %.0fx%.0f points at %.1fx, %.0fx%.0f drawable, display sync %s", __func__, device.name.UTF8String,
+			points.width, points.height, scale, layer.drawableSize.width, layer.drawableSize.height, vsync ? "on" : "off");
 	}
 
 	return true;
+}
+
+
+void MacMetalPresent_SetVSync(bool enabled)
+{
+	vsync = enabled;
+
+	// Logged either way. VSync is applied at startup and the layer may not exist
+	// yet, and a setting that silently went nowhere is the failure this whole
+	// harness exists to catch.
+	if (layer == nil) {
+		LOG("[MetalPresent::%s] display sync %s, held until the layer exists", __func__, enabled ? "on" : "off");
+		return;
+	}
+
+	@autoreleasepool {
+		layer.displaySyncEnabled = enabled;
+	}
+
+	LOG("[MetalPresent::%s] display sync %s", __func__, enabled ? "on" : "off");
 }
 
 

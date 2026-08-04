@@ -40,6 +40,18 @@ bool MacMetalPresent_Init(void* nsWindow, bool hiDPI);
 void MacMetalPresent_GetDrawableSize(int* outW, int* outH);
 
 /**
+ * Waits for the vertical blank before showing a frame, or does not.
+ *
+ * A CAMetalLayer synchronises with the display by default, which caps the frame
+ * rate at the refresh rate whatever the engine's VSync setting says. Nothing
+ * else honours that setting on this path: it is applied through
+ * SDL_GL_SetSwapInterval, and SDL owns neither the context nor the present here.
+ *
+ * Safe to call before the layer exists. The value is kept and applied on Init.
+ */
+void MacMetalPresent_SetVSync(bool enabled);
+
+/**
  * Returns a writable BGRA8 image of @p w x @p h to fill, or null on failure.
  * Rows are @p outRowBytes apart, which is not necessarily @p w * 4. Every
  * successful call must be followed by MacMetalPresent_PresentIOSurface.
