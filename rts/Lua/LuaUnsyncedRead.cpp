@@ -616,8 +616,6 @@ int LuaUnsyncedRead::GetProfilerTimeRecord(lua_State* L)
 {
 	const CTimeProfiler::TimeRecord& record = CTimeProfiler::GetInstance().GetTimeRecord(lua_tostring(L, 1));
 
-	// read before pushing anything: the results land on indices 2 upwards, so
-	// reading the argument afterwards inspects record.total instead
 	const bool wantFrameData = luaL_optboolean(L, 2, false);
 
 	lua_pushnumber(L, record.total.toMilliSecsf());
