@@ -1686,13 +1686,16 @@ unsigned int QTPFS::PathManager::ExecuteImmediateSearch(unsigned int pathId){
 				registry.remove<PathIsTemp>(pathEntity);
 				registry.remove<PathIsDirty>(pathEntity);
 			} else {
-				DeletePathEntity(pathEntity);
 				pathId = 0;
 			}
 		}
 	}
 
-	RemovePathSearch(pathEntity);
+	// If successful, just remove the path search, otherwise delete the path entity and its search.
+	if (pathId > 0)
+		RemovePathSearch(pathEntity);
+	else
+		DeletePathEntity(pathEntity);
 
 	return pathId;
 }
