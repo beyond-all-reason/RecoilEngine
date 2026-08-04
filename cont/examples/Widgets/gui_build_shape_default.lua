@@ -1,29 +1,3 @@
---------------------------------------------------------------------------------
---------------------------------------------------------------------------------
---
---  file:    gui_build_shape_default.lua
---  brief:   GetBuildShape callin example reproducing the engine defaults
---  author:  RecoilEngine contributors
---
---  Demonstrates:
---    - Using the GetBuildShape callin to pick the shape a build-drag traces out
---
---  The engine asks GetBuildShape while a building placement is active. Return
---  one of "single", "cardinalline", "freeangleline", "flood", "hollowbox" or
---  "surround" to select the shape, or nil to keep the engine's default
---  modifier-key behaviour. "hollowbox" and "surround" both ring an existing
---  building (or queued build order) under the cursor; without such a target the
---  former stays a hollow box while the latter degrades to a cardinal line.
---
---  This example reproduces the engine's default modifier-key behaviour exactly,
---  so it can be used as a drop-in starting point for your own shape logic.
---  See gui_build_shape_showcase.lua for a taste of what else is possible.
---
---  License: GNU GPL, v2 or later
---
---------------------------------------------------------------------------------
---------------------------------------------------------------------------------
-
 function widget:GetInfo()
 	return {
 		name = "Build Shape: Engine Defaults",

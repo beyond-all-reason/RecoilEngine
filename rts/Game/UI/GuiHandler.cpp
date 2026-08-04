@@ -2730,9 +2730,7 @@ size_t CGuiHandler::GetBuildPositions(const BuildInfo& startInfo, const BuildInf
 	if (queried.has_value()) {
 		shape = *queried;
 
-		if (wantsSurround && hasSurroundTarget)
-			shape = BuildPosShape::Surround;
-		else if (shape == BuildPosShape::Surround)
+		if (shape == BuildPosShape::Surround && !hasSurroundTarget)
 			shape = BuildPosShape::Single;
 	} else {
 		shape = ResolveDefaultBuildPosShape(queue, hasSurroundTarget);

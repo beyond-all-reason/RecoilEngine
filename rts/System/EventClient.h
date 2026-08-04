@@ -43,12 +43,12 @@ struct SResourcePack;
 // event. A shape is described purely by its geometry; how one gets picked
 // (modifier keys, the callin) is up to whoever answers.
 enum class BuildPosShape {
-	Single,        // a single building (drag too small to fit more)
+	Single,        // a single building
 	CardinalLine,  // a line locked to its dominant (x or z) axis
 	FreeAngleLine, // a free-angle line following the drag direction
 	Flood,         // a solid, filled rectangle
 	HollowBox,     // only the outline (perimeter) of a rectangle
-	Surround,      // a ring around an existing building under the cursor
+	Surround,      // a ring around an existing building under the cursor, degenerates to Single if no target
 };
 
 #ifndef zipFile

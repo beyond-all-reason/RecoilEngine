@@ -1,10 +1,5 @@
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
---
---  file:    gui_build_shape_showcase.lua
---  brief:   GetBuildShape callin example going beyond the modifier keys
---  author:  RecoilEngine contributors
---
 --  Demonstrates:
 --    - Using the GetBuildShape callin to pick the shape a build-drag traces out
 --      from what is being built and how the drag looks, with no modifier keys
@@ -16,7 +11,6 @@
 --
 --    - metal extractors snap to spots, so they never paint: "single"
 --    - armed buildings ring whatever building the cursor points at ("surround"),
---      lining up along the drag when it points at nothing
 --    - a squarish drag covers an area: filled with buildings while small
 --      ("flood"), only fenced off along its perimeter once covering it solid
 --      would get silly ("hollowbox")
@@ -26,8 +20,6 @@
 --
 --  Holding meta hands the decision back to the engine, because returning nil
 --  (or any unknown name) keeps the default modifier-key behaviour.
---
---  License: GNU GPL, v2 or later
 --
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------

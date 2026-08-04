@@ -3859,9 +3859,9 @@ string CLuaHandle::WorldTooltip(const CUnit* unit,
  * @param endY number World y of the drag end position.
  * @param endZ number World z of the drag end position.
  * @return string? shape One of "single", "cardinalline", "freeangleline",
- * "flood", "hollowbox" or "surround". The latter two both ring an existing
- * building (or queued build order) under the cursor; without such a target a
- * "hollowbox" keeps its shape while a "surround" degrades to a cardinal line.
+ * "flood", "hollowbox" or "surround". The latter rings either an existing
+ * building or a queued build order under the cursor; without such a target
+ * it degrades to a single building.
  * Return nil (or an unknown name) for the default modifier-key behaviour.
  */
 
