@@ -11,9 +11,16 @@
 #include <cstdint>
 #include <functional>
 
-#ifndef _WIN32
+#ifdef __linux__
 	#include <sys/syscall.h>
 	#include <linux/futex.h>
+#endif
+
+#ifdef __OpenBSD__
+	#include <sys/futex.h>
+#endif
+
+#ifndef _WIN32
 	#include <unistd.h>
 #endif
 
@@ -27,6 +34,15 @@ InitSpringTime ist;
 
 #ifndef _WIN32
 	typedef uint32_t futex;
+
+	static inline long do_futex (uint32_t *mtx, int op, uint32_t value, const struct timespec *timeout)
+	{
+#ifdef __OpenBSD__
+		return futex(mtx, op, value, NULL, NULL);
+#else
+		return syscall(SYS_futex, mtx, op, value, NULL, NULL, 0);
+#endif
+	}
 
 	static void futex_init(futex* m)
 	{
@@ -44,7 +60,7 @@ InitSpringTime ist;
 		if ((c = __sync_val_compare_and_swap(m, 0, 1)) != 0)  {
 			do {
 				if ((c == 2) || __sync_val_compare_and_swap(m, 1, 2) != 0)
-					syscall(SYS_futex, m, FUTEX_WAIT_PRIVATE, 2, NULL, NULL, 0);
+					do_futex(m, FUTEX_WAIT_PRIVATE, 2, NULL);
 			} while((c = __sync_val_compare_and_swap(m, 0, 2)) != 0);
 		}
 	}
@@ -53,7 +69,7 @@ InitSpringTime ist;
 	{
 		if (__sync_fetch_and_sub(m, 1) != 1) {
 			*m = 0;
-			syscall(SYS_futex, m, FUTEX_WAKE_PRIVATE, 1, NULL, NULL, 0);
+			do_futex(m, FUTEX_WAKE_PRIVATE, 1, NULL);
 		}
 	}
 #endif
