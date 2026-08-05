@@ -3508,20 +3508,45 @@ static void ParseUnitArray(lua_State* L, const char* caller,
 
 /******************************************************************************/
 
+/* This function seems to have two goals:
+ *
+ * 1) as a pre-filter for commands that won't work anyway, e.g.
+ *    so that a spectator doesn't generate useless net traffic.
+ *
+ * 2) to facilitate something like sandboxed skirmish AI in Lua,
+ *    where an instance would be given its own handle with only
+ *    its team to control. This isn't actually implemented, but
+ *    the abstraction is nevertheless useful to keep.
+ *
+ * The big caveat is that most "give orders" functions work on
+ * arbitrary collections of units (whatever is selected or passed
+ * as args) and this can be units from many teams (e.g. godmode,
+ * but see also #567). Perhaps this should act as a per-unit filter
+ * instead. Compare `LuaUtils::CanControlUnit`. */
 static bool CanGiveOrders(const lua_State* L)
 {
+	/* FIXME: this should be up for a game to decide, figure out
+	 * if there is a technical reason and remove if not. */
 	if (gs->PreSimFrame())
 		return false;
 
+	// ditto, see #1800
 	if (gs->noHelperAIs)
 		return false;
 
 	const int ctrlTeam = CLuaHandle::GetHandleCtrlTeam(L);
 
+	/* FIXME: this is somewhat backwards. It should check whether
+	 * the handle can control whatever is being given the order,
+	 * not whether the local player can control the team that the
+	 * handle has control over.
+	 *
+	 * This happens to work for existing use cases, where the only
+	 * handle that really makes use of this is LuaUI, which happens
+	 * to always match the player. */
 	if (gu->GetMyPlayer()->CanControlTeam(ctrlTeam))
 		return true;
 
-	// FIXME ? (correct? warning / error?)
 	return (!gu->spectating && (ctrlTeam == gu->myTeam) && (ctrlTeam >= 0));
 }
 
