@@ -50,6 +50,7 @@ CNanoProjectile::CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor 
 	checkCol = false;
 	drawSorted = false;
 	drawRadius = 3;
+	useAirLos = true;
 
 	projectileHandler.currentNanoParticles += 1;
 

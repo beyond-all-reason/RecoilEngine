@@ -10,6 +10,7 @@
 #include "Game/CameraHandler.h"
 #include "Game/GlobalUnsynced.h"
 #include "Game/LoadScreen.h"
+#include "Map/Ground.h"
 #include "Lua/LuaParser.h"
 #include "Rendering/GroundFlash.h"
 #include "Rendering/GlobalRendering.h"
@@ -596,7 +597,14 @@ bool CProjectileDrawer::CanDrawProjectile(const CProjectile* pro, int allyTeam)
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto& th = teamHandler;
 	auto& lh = losHandler;
-	return (gu->spectatingFullView || (th.IsValidAllyTeam(allyTeam) && th.Ally(allyTeam, gu->myAllyTeam)) || lh->InLos(pro, gu->myAllyTeam));
+
+	if (gu->spectatingFullView || (th.IsValidAllyTeam(allyTeam) && th.Ally(allyTeam, gu->myAllyTeam)))
+		return true;
+
+	if (pro->pos.y <= CGround::GetWaterLevel(pro->pos.x, pro->pos.z))
+		return (lh->GetGlobalLOS(gu->myAllyTeam) || lh->sonar.InSight(pro->pos, gu->myAllyTeam));
+
+	return lh->InLos(pro, gu->myAllyTeam);
 }
 
 bool CProjectileDrawer::ShouldDrawProjectile(const CProjectile* p, uint8_t thisPassMask)
