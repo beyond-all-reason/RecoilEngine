@@ -598,13 +598,22 @@ bool CProjectileDrawer::CanDrawProjectile(const CProjectile* pro, int allyTeam)
 	auto& th = teamHandler;
 	auto& lh = losHandler;
 
-	if (gu->spectatingFullView || (th.IsValidAllyTeam(allyTeam) && th.Ally(allyTeam, gu->myAllyTeam)))
+	if (gu->spectatingFullView || lh->GetGlobalLOS(gu->myAllyTeam))
 		return true;
 
-	if (pro->pos.y <= CGround::GetWaterLevel(pro->pos.x, pro->pos.z))
-		return (lh->GetGlobalLOS(gu->myAllyTeam) || lh->sonar.InSight(pro->pos, gu->myAllyTeam));
+	if (th.IsValidAllyTeam(allyTeam) && th.Ally(allyTeam, gu->myAllyTeam))
+		return true;
 
-	return lh->InLos(pro, gu->myAllyTeam);
+	if (!lh->InLos(pro, gu->myAllyTeam))
+		return false;
+	
+	if (pro->pos.y > CGround::GetWaterLevel(pro->pos.x, pro->pos.z))
+		return true;
+
+	if (!modInfo.requireSonarUnderWater)
+		return true;
+
+	return lh->sonar.InSight(pro->pos, gu->myAllyTeam);
 }
 
 bool CProjectileDrawer::ShouldDrawProjectile(const CProjectile* p, uint8_t thisPassMask)
