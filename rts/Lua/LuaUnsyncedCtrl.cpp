@@ -3534,6 +3534,13 @@ static bool CanGiveOrders(const lua_State* L)
 	if (gs->noHelperAIs)
 		return false;
 
+	/* A bit of a hack. Unsynced LuaRules has AllAccessTeam ctrlTeam,
+	 * which should normally mean it can control everything, but since
+	 * the check below is backwards it fails because the local player
+	 * cannot control the AllAccessTeam. It's nontrivial to do properly. */
+	if (FullCtrl(L))
+		return true;
+
 	const int ctrlTeam = CLuaHandle::GetHandleCtrlTeam(L);
 
 	/* FIXME: this is somewhat backwards. It should check whether
