@@ -42,6 +42,8 @@ public:
 	void DrawProjectilesMiniMap();
 
 	void DrawGroundFlashes();
+	bool DrawNanoParticle(const float3& pos, const float3& velocity, int createFrame, int deathFrame, const SColor& color);
+	bool UseNanoParticleShader() const;
 
 	void DrawShadowOpaque();
 	void DrawShadowTransparent();
@@ -60,6 +62,7 @@ public:
 
 	void RenderProjectileCreated(const CProjectile* projectile);
 	void RenderProjectileDestroyed(const CProjectile* projectile);
+	void ConfigNotify(const std::string& key, const std::string& value);
 
 	unsigned int NumSmokeTextures() const { return (smokeTextures.size()); }
 
@@ -132,6 +135,7 @@ public:
 	static TypedRenderBuffer<VA_TYPE_C>& GetMiniMapPointsRB();
 private:
 	static void ParseAtlasTextures(const bool, const LuaTable&, spring::unordered_set<std::string>&, CTextureAtlas*);
+	bool InitNanoParticleShader();
 
 	void DrawProjectiles(int modelType, bool drawReflection, bool drawRefraction);
 	void DrawProjectilesShadow(int modelType);
@@ -174,6 +178,8 @@ private:
 
 	Shader::IProgramObject* fxShader = nullptr;
 	Shader::IProgramObject* fxShadowShader = nullptr;
+	Shader::IProgramObject* nanoShader = nullptr;
+	bool drawNanoParticlesGL4 = false;
 
 	constexpr static int WANT_SOFTEN_COUNT = 2;
 	int wantSoften = 0;
@@ -185,6 +191,7 @@ private:
 	// Instance members to ensure proper cleanup during Kill() before OpenGL context is destroyed
 	TypedRenderBuffer<VA_TYPE_C> minimapLinesRB{ 1 << 12, 0 };
 	TypedRenderBuffer<VA_TYPE_C> minimapPointsRB{ 1 << 14, 0 };
+	TypedRenderBuffer<VA_TYPE_PROJ> nanoRenderBuffer{ 1 << 12, 0 };
 };
 
 extern CProjectileDrawer* projectileDrawer;

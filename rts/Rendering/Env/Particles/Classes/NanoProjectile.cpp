@@ -79,6 +79,9 @@ void CNanoProjectile::Update()
 void CNanoProjectile::Draw()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (projectileDrawer->DrawNanoParticle(drawPos, speed, createFrame, deathFrame, color))
+		return;
+
 	{
 		const float t = (gs->frameNum - createFrame + globalRendering->timeOffset);
 		// rotParams.y is acceleration in angle per frame^2
@@ -113,6 +116,12 @@ void CNanoProjectile::DrawOnMinimap() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	AddMiniMapVertices({ pos        , color4::green }, { pos + speed, color4::green });
+}
+
+float CNanoProjectile::GetDrawRadius() const
+{
+	// The shader halo extends well beyond the 3-elmo legacy billboard.
+	return projectileDrawer != nullptr && projectileDrawer->UseNanoParticleShader() ? 22.0f : CProjectile::GetDrawRadius();
 }
 
 int CNanoProjectile::GetProjectilesCount() const

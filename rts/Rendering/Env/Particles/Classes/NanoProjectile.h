@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef NANO_PROJECTILE_H
-#define NANO_PROJECTILE_H
+#pragma once
 
 #include "Sim/Projectiles/Projectile.h"
 #include "System/Color.h"
@@ -18,6 +17,7 @@ public:
 	void Update() override;
 	void Draw() override;
 	void DrawOnMinimap() const override;
+	float GetDrawRadius() const override;
 
 	int GetProjectilesCount() const override;
 
@@ -40,6 +40,4 @@ public:
 	int deathFrame;
 	SColor color;
 };
-
-#endif /* NANO_PROJECTILE_H */
 

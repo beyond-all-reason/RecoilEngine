@@ -45,6 +45,7 @@
 #include "System/Misc/TracyDefs.h"
 
 CONFIG(int, SoftParticles).defaultValue(1).safemodeValue(0).description("Soften up CEG particles on clipping edges");
+CONFIG(bool, NanoParticlesGL4).defaultValue(false).safemodeValue(false).description("Render nano particles as shader-generated 3D shapes instead of textured billboards");
 
 static uint32_t sortCamType = 0;
 static bool CProjectileDrawOrderSortingPredicate(const CProjectile* p1, const CProjectile* p2) noexcept {
@@ -332,6 +333,11 @@ void CProjectileDrawer::Init() {
 
 	fxShader->Validate();
 
+	drawNanoParticlesGL4 = configHandler->GetBool("NanoParticlesGL4");
+	if (drawNanoParticlesGL4)
+		InitNanoParticleShader();
+	configHandler->NotifyOnChange(this, {"NanoParticlesGL4"});
+
 	sdbc = std::make_unique<ScopedDepthBufferCopy>(false);
 
 	EnableSoften(configHandler->GetInt("SoftParticles"));
@@ -340,6 +346,7 @@ void CProjectileDrawer::Init() {
 void CProjectileDrawer::Kill() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	eventHandler.RemoveClient(this);
+	configHandler->RemoveObserver(this);
 	autoLinkedEvents.clear();
 
 	glDeleteTextures(8, perlinBlendTex);
@@ -363,6 +370,7 @@ void CProjectileDrawer::Kill() {
 	shaderHandler->ReleaseProgramObjects("[ProjectileDrawer::VFS]");
 	fxShader = nullptr;
 	fxShadowShader = nullptr;
+	nanoShader = nullptr;
 	sdbc = nullptr;
 
 	configHandler->Set("SoftParticles", wantSoften);
@@ -611,6 +619,58 @@ bool CProjectileDrawer::ShouldDrawProjectile(const CProjectile* p, uint8_t thisP
 	return p->HasDrawFlag(static_cast<DrawFlags>(thisPassMask));
 }
 
+bool CProjectileDrawer::DrawNanoParticle(const float3& pos, const float3& velocity, int createFrame, int deathFrame, const SColor& color)
+{
+	if (!UseNanoParticleShader() || camera->GetCamType() == CCamera::CAMTYPE_SHADOW)
+		return false;
+
+	nanoRenderBuffer.AddVertex({
+		pos,
+		velocity,
+		{static_cast<float>(createFrame), static_cast<float>(deathFrame), 0.0f, 0.0f},
+		ZeroVector,
+		color,
+	});
+	return true;
+}
+
+bool CProjectileDrawer::UseNanoParticleShader() const
+{
+	return drawNanoParticlesGL4 && nanoShader != nullptr && nanoShader->IsValid();
+}
+
+bool CProjectileDrawer::InitNanoParticleShader()
+{
+	if (nanoShader != nullptr)
+		return nanoShader->IsValid();
+
+	nanoShader = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "Nano Particle Shader");
+	nanoShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleVertProg.glsl", "", GL_VERTEX_SHADER));
+	nanoShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleGeomProg.glsl", "", GL_GEOMETRY_SHADER));
+	nanoShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleFragProg.glsl", "", GL_FRAGMENT_SHADER));
+	nanoShader->BindAttribLocations<VA_TYPE_PROJ>();
+	nanoShader->Link();
+
+	if (!nanoShader->IsValid()) {
+		LOG_L(L_WARNING, "Nano particle shader is unavailable; using legacy textured billboards");
+		shaderHandler->ReleaseProgramObject("[ProjectileDrawer::VFS]", "Nano Particle Shader");
+		nanoShader = nullptr;
+		return false;
+	}
+
+	nanoShader->Enable();
+	nanoShader->Disable();
+	nanoShader->Validate();
+	return true;
+}
+
+void CProjectileDrawer::ConfigNotify(const std::string&, const std::string&)
+{
+	drawNanoParticlesGL4 = configHandler->GetBool("NanoParticlesGL4");
+	if (drawNanoParticlesGL4 && nanoShader == nullptr)
+		InitNanoParticleShader();
+}
+
 void CProjectileDrawer::DrawProjectilesMiniMap()
 {
 	ZoneScopedN("ProjectileDrawer::DrawMiniMap");
@@ -810,40 +870,60 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		eventHandler.DrawWorldPreParticles(drawAboveWater, drawBelowWater, drawReflection, drawRefraction);
 
 		auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
-		if (!rb.ShouldSubmit())
+		const bool drawEffects = rb.ShouldSubmit();
+		const bool drawNanos = UseNanoParticleShader() && nanoRenderBuffer.ShouldSubmit(false);
+		if (!drawEffects && !drawNanos)
 			return;
 
-		const bool needSoften = (wantSoften > 0) && !drawReflection && !drawRefraction;
+		if (drawEffects) {
+			const bool needSoften = (wantSoften > 0) && !drawReflection && !drawRefraction;
 
-		glActiveTexture(GL_TEXTURE0); textureAtlas->BindTexture();
+			glActiveTexture(GL_TEXTURE0); textureAtlas->BindTexture();
 
-		if (needSoften) {
-			glActiveTexture(GL_TEXTURE15); glBindTexture(GL_TEXTURE_2D, depthBufferCopy->GetDepthBufferTexture(false));
+			if (needSoften) {
+				glActiveTexture(GL_TEXTURE15); glBindTexture(GL_TEXTURE_2D, depthBufferCopy->GetDepthBufferTexture(false));
+			}
+
+			const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
+			const auto& sky = ISky::GetSky();
+
+			fxShader->Enable();
+			fxShader->SetFlag("SMOOTH_PARTICLES", needSoften);
+			fxShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
+			fxShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
+			fxShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
+			fxShader->SetUniform("softenThreshold", CProjectileDrawer::softenThreshold[0]);
+
+			fxShader->SetUniform("camPos", camPlayer->pos.x, camPlayer->pos.y, camPlayer->pos.z);
+			fxShader->SetUniform("fogColor", sky->fogColor.x, sky->fogColor.y, sky->fogColor.z);
+			fxShader->SetUniform("fogParams", sky->fogStart * camPlayer->GetFarPlaneDist(), sky->fogEnd * camPlayer->GetFarPlaneDist());
+
+			rb.DrawElements(GL_TRIANGLES);
+
+			fxShader->Disable();
+
+			if (needSoften) {
+				glBindTexture(GL_TEXTURE_2D, 0); //15th slot
+				glActiveTexture(GL_TEXTURE0);
+			}
+			textureAtlas->UnbindTexture();
 		}
 
-		const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
-		const auto& sky = ISky::GetSky();
+		if (drawNanos) {
+			auto nanoState = GL::SubState(Culling(GL_FALSE));
+			const float3& camPos = camera->GetPos();
+			const float3& camRight = camera->GetRight();
+			const float3& camUp = camera->GetUp();
 
-		fxShader->Enable();
-		fxShader->SetFlag("SMOOTH_PARTICLES", needSoften);
-		fxShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
-		fxShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
-		fxShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
-		fxShader->SetUniform("softenThreshold", CProjectileDrawer::softenThreshold[0]);
-
-		fxShader->SetUniform("camPos", camPlayer->pos.x, camPlayer->pos.y, camPlayer->pos.z);
-		fxShader->SetUniform("fogColor", sky->fogColor.x, sky->fogColor.y, sky->fogColor.z);
-		fxShader->SetUniform("fogParams", sky->fogStart * camPlayer->GetFarPlaneDist(), sky->fogEnd * camPlayer->GetFarPlaneDist());
-
-		rb.DrawElements(GL_TRIANGLES);
-
-		fxShader->Disable();
-
-		if (needSoften) {
-			glBindTexture(GL_TEXTURE_2D, 0); //15th slot
-			glActiveTexture(GL_TEXTURE0);
+			nanoShader->Enable();
+			nanoShader->SetUniform("animationFrame", gs->frameNum + globalRendering->timeOffset);
+			nanoShader->SetUniform("cameraPos", camPos.x, camPos.y, camPos.z);
+			nanoShader->SetUniform("cameraRight", camRight.x, camRight.y, camRight.z);
+			nanoShader->SetUniform("cameraUp", camUp.x, camUp.y, camUp.z);
+			nanoShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
+			nanoRenderBuffer.DrawArrays(GL_POINTS);
+			nanoShader->Disable();
 		}
-		textureAtlas->UnbindTexture();
 	}
 }
 
