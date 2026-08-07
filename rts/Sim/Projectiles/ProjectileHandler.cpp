@@ -42,6 +42,8 @@
 
 CONFIG(int, MaxParticles).defaultValue(10000).headlessValue(0).minimumValue(0);
 CONFIG(int, MaxNanoParticles).defaultValue(2000).headlessValue(0).minimumValue(0);
+CONFIG(bool, NanoParticlesHoming).defaultValue(false).safemodeValue(false).headlessValue(false).description("Allow nano particles to follow moving unit targets and builder nano pieces");
+CONFIG(bool, NanoParticlesGroundClamp).defaultValue(false).safemodeValue(false).headlessValue(false).description("Route nano particles above intervening terrain");
 
 
 CR_BIND(CProjectileHandler, )
@@ -79,6 +81,8 @@ void CProjectileHandler::Init()
 
 	maxParticles     = configHandler->GetInt("MaxParticles");
 	maxNanoParticles = configHandler->GetInt("MaxNanoParticles");
+	nanoParticlesHoming = configHandler->GetBool("NanoParticlesHoming");
+	nanoParticlesGroundClamp = configHandler->GetBool("NanoParticlesGroundClamp");
 
 	projMemPool.clear();
 	projMemPool.reserve(1024);
@@ -94,7 +98,7 @@ void CProjectileHandler::Init()
 	CExpGenSpawnable::InitSpawnables();
 
 	// register ConfigNotify()
-	configHandler->NotifyOnChange(this, {"MaxParticles", "MaxNanoParticles"});
+	configHandler->NotifyOnChange(this, {"MaxParticles", "MaxNanoParticles", "NanoParticlesHoming", "NanoParticlesGroundClamp"});
 }
 
 void CProjectileHandler::Kill()
@@ -139,6 +143,8 @@ void CProjectileHandler::ConfigNotify(const std::string& key, const std::string&
 	RECOIL_DETAILED_TRACY_ZONE;
 	maxParticles     = configHandler->GetInt("MaxParticles");
 	maxNanoParticles = configHandler->GetInt("MaxNanoParticles");
+	nanoParticlesHoming = configHandler->GetBool("NanoParticlesHoming");
+	nanoParticlesGroundClamp = configHandler->GetBool("NanoParticlesGroundClamp");
 
 	projectiles[false].reserve(static_cast<size_t>(maxParticles) * 2);
 }
@@ -710,7 +716,9 @@ void CProjectileHandler::AddNanoParticle(
 	int teamNum,
 	float radius,
 	bool inverse,
-	bool highPriority
+	bool highPriority,
+	const CUnit* homingTarget,
+	int homingTargetPiece
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const float priority = mix(NORMAL_NANO_PRIO, HIGH_NANO_PRIO, highPriority);
@@ -739,9 +747,9 @@ void CProjectileHandler::AddNanoParticle(
 	};
 
 	if (!inverse) {
-		projMemPool.alloc<CNanoProjectile>(startPos, dif * 3.0f, int(len / 3.0f), colors[globalRendering->teamNanospray]);
+		projMemPool.alloc<CNanoProjectile>(startPos, dif * 3.0f, int(len / 3.0f), colors[globalRendering->teamNanospray], homingTarget, homingTargetPiece, false);
 	} else {
-		projMemPool.alloc<CNanoProjectile>(startPos + dif * len, -dif * 3.0f, int(len / 3.0f), colors[globalRendering->teamNanospray]);
+		projMemPool.alloc<CNanoProjectile>(startPos + dif * len, -dif * 3.0f, int(len / 3.0f), colors[globalRendering->teamNanospray], homingTarget, homingTargetPiece, true);
 	}
 }
 

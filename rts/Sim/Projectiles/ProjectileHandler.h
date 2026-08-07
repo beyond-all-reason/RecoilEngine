@@ -77,12 +77,14 @@ public:
 		const int2 renderParams
 	);
 	void AddNanoParticle(const float3, const float3, const UnitDef*, int team, bool highPriority);
-	void AddNanoParticle(const float3, const float3, const UnitDef*, int team, float radius, bool inverse, bool highPriority);
+	void AddNanoParticle(const float3, const float3, const UnitDef*, int team, float radius, bool inverse, bool highPriority, const CUnit* homingTarget = nullptr, int homingTargetPiece = -1);
 
 public:
 	int maxParticles = 0;
 	int maxNanoParticles = 0;
 	int currentNanoParticles = 0;
+	bool nanoParticlesHoming = false;
+	bool nanoParticlesGroundClamp = false;
 
 	// these vars are used to precache parts of GetCurrentParticles() calculations
 	mutable int frameCurrentParticles = 0;

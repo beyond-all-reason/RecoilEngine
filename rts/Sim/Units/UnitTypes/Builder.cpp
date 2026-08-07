@@ -344,13 +344,14 @@ bool CBuilder::UpdateBuild(const Command& fCommand)
 	// adjusted build-speed: use repair-speed on units with
 	// progress >= 1 rather than raw build-speed on buildees
 	// with progress < 1
+	const bool wasBeingBuilt = curBuildee->beingBuilt;
 	float adjBuildSpeed = buildSpeed;
 
 	if (curBuildee->buildProgress >= 1.0f)
 		adjBuildSpeed = std::min(repairSpeed, unitDef->maxRepairSpeed * 0.5f - curBuildee->repairAmount); // repair
 
 	if (adjBuildSpeed > 0.0f && curBuildee->AddBuildPower(this, adjBuildSpeed)) {
-		CreateNanoParticle(curBuildee->midPos, curBuildee->radius * 0.5f, false);
+		CreateNanoParticle(curBuildee->midPos, curBuildee->radius * 0.5f, false, false, wasBeingBuilt ? nullptr : curBuildee);
 		return true;
 	}
 
@@ -516,7 +517,7 @@ bool CBuilder::UpdateCapture(const Command& fCommand)
 	curCapturee->captureProgress += captureProgressStep;
 	curCapturee->captureProgress = std::min(curCapturee->captureProgress, 1.0f);
 
-	CreateNanoParticle(curCapturee->midPos, curCapturee->radius * 0.7f, false, true);
+	CreateNanoParticle(curCapturee->midPos, curCapturee->radius * 0.7f, false, true, curCapturee);
 
 	if (curCapturee->captureProgress < 1.0f)
 		return true;
@@ -976,7 +977,7 @@ void CBuilder::HelpTerraform(CBuilder* unit)
 }
 
 
-void CBuilder::CreateNanoParticle(const float3& goal, float radius, bool inverse, bool highPriority)
+void CBuilder::CreateNanoParticle(const float3& goal, float radius, bool inverse, bool highPriority, const CUnit* targetUnit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int modelNanoPiece = nanoPieceCache.GetNanoPiece(script);
@@ -988,5 +989,15 @@ void CBuilder::CreateNanoParticle(const float3& goal, float radius, bool inverse
 	const float3 nanoPos = this->GetObjectSpacePos(relNanoFirePos);
 
 	// unsynced
-	projectileHandler.AddNanoParticle(nanoPos, goal, unitDef, team, radius, inverse, highPriority);
+	projectileHandler.AddNanoParticle(
+		nanoPos,
+		goal,
+		unitDef,
+		team,
+		radius,
+		inverse,
+		highPriority,
+		inverse ? this : targetUnit,
+		inverse ? modelNanoPiece : -1
+	);
 }
