@@ -28,6 +28,7 @@
 #include "Game/UI/KeySet.h"
 #include "Game/UI/MiniMap.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/GL/myGL.h" // for Tracy GPU zones around Lua draw call-ins
 #include "Rml/Backends/RmlUi_Backend.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/TeamHandler.h"
@@ -175,6 +176,7 @@ CLuaHandle::CLuaHandle(const string& _name, int _order, bool _userMode, bool _sy
 	#ifdef TRACY_ENABLE
 		lua_getglobal(L, "tracy");
 		LuaTracyExtra::PushEntries(L);
+		LuaTracyExtra::PushGpuProfile(L); // absent unless the TracyLuaGpuZones config is set
 		lua_pop(L, 1);
 	#endif
 }
@@ -2686,6 +2688,19 @@ void CLuaHandle::RunDrawCallIn(const LuaHashString& hs)
 	if (!hs.GetGlobalFunc(L))
 		return;
 
+	// Coarse per-phase GPU zone: one bar per phase per Lua state (e.g.
+	// "LuaUI::DrawWorld") summing all widgets/gadgets for that phase. Begin/end
+	// live entirely in C++ around the dispatch, so the LIFO query stream stays
+	// balanced. Transient zone because the name is built at runtime.
+	// NB: also fires if a Lua state draws during loading on the secondary
+	// context, but TRACY_ON_DEMAND early-returns when no server is attached and
+	// TracyGpuCollect runs only in the steady-state frame loop, so any stray
+	// load-time queries are self-limiting.
+	#if !defined(HEADLESS) && defined(TRACY_ENABLE)
+	const std::string gpuZoneName = GetName() + "::" + hs.GetString();
+	TracyGpuZoneTransient(__luaGpuZone, gpuZoneName.c_str(), true);
+	#endif
+
 	LuaOpenGL::SetDrawingEnabled(L, true);
 
 	// call the routine
@@ -2855,6 +2870,12 @@ inline void CLuaHandle::DrawScreenCommon(const LuaHashString& cmdStr)
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!cmdStr.GetGlobalFunc(L))
 		return;
+
+	// per-phase GPU zone (e.g. "LuaUI::DrawScreen"); see RunDrawCallIn
+	#if !defined(HEADLESS) && defined(TRACY_ENABLE)
+	const std::string gpuZoneName = GetName() + "::" + cmdStr.GetString();
+	TracyGpuZoneTransient(__luaGpuZone, gpuZoneName.c_str(), true);
+	#endif
 
 	lua_pushnumber(L, globalRendering->viewSizeX);
 	lua_pushnumber(L, globalRendering->viewSizeY);

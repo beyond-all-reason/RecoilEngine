@@ -863,6 +863,48 @@ void SpringApp::Reload(const std::string script)
 	LOG("[SpringApp::%s][13] reloadCount=%u\n\n\n", __func__, ++reloadCount);
 }
 
+#if !defined(HEADLESS) && defined(TRACY_ENABLE)
+namespace {
+	// Driver-reported VRAM, plotted to Tracy once per frame as a ground-truth total
+	// that complements the per-object named memory pools (GpuMemTracy.h). NVX (NVIDIA)
+	// reports dedicated total + current free; ATI (AMD) reports free only. Driver
+	// values are in KiB; scale to bytes for Tracy's Memory plot formatter.
+	void PlotDriverVRAM()
+	{
+		static constexpr const char* plotFree = "GPU VRAM free";
+		static constexpr const char* plotUsed = "GPU VRAM used";
+
+		[[maybe_unused]] static const bool configured = []() {
+			TracyPlotConfig(plotFree, tracy::PlotFormatType::Memory, false, true, tracy::Color::Green);
+			TracyPlotConfig(plotUsed, tracy::PlotFormatType::Memory, false, true, tracy::Color::Red);
+			// one-time report of which driver VRAM source (if any) feeds the plot, so a
+			// missing graph can be told apart from an unsupported GPU at a glance
+			if (GLAD_GL_NVX_gpu_memory_info)
+				LOG("[PlotDriverVRAM] driver VRAM source: NVX_gpu_memory_info (NVIDIA)");
+			else if (GLAD_GL_ATI_meminfo)
+				LOG("[PlotDriverVRAM] driver VRAM source: ATI_meminfo (AMD, free-only)");
+			else
+				LOG("[PlotDriverVRAM] no GPU VRAM extension (NVX/ATI) exposed; VRAM plot disabled");
+			return true;
+		}();
+
+		if (GLAD_GL_NVX_gpu_memory_info) {
+			GLint totalKB = 0, availKB = 0;
+			glGetIntegerv(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &totalKB);
+			glGetIntegerv(GL_GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX, &availKB);
+			const GLint usedKB = (totalKB > availKB) ? (totalKB - availKB) : 0;
+			TracyPlot(plotFree, static_cast<double>(availKB) * 1024.0);
+			TracyPlot(plotUsed, static_cast<double>(usedKB) * 1024.0);
+		}
+		else if (GLAD_GL_ATI_meminfo) {
+			GLint info[4] = {0}; // info[0] = total free texture memory, KiB
+			glGetIntegerv(GL_TEXTURE_FREE_MEMORY_ATI, info);
+			TracyPlot(plotFree, static_cast<double>(info[0]) * 1024.0);
+		}
+	}
+}
+#endif
+
 /**
  * @return return code of ActiveController::Update
  */
@@ -892,6 +934,15 @@ bool SpringApp::Update()
 
 	// always swap by default, not doing so can upset some drivers
 	globalRendering->SwapBuffers(swap, false);
+
+	// Collect Tracy GPU query results here, in the genuine frame loop on the
+	// primary context — NOT next to the FrameMark inside SwapBuffers, which is
+	// also driven by the load/splash screens and Lua gl.SwapBuffers.
+	#if !defined(HEADLESS) && defined(TRACY_ENABLE)
+	TracyGpuCollect;
+	PlotDriverVRAM();
+	#endif
+
 	return retc;
 }
 

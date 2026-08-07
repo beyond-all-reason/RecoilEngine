@@ -3,12 +3,16 @@
 
 #include "LuaRBOs.h"
 
+#include <algorithm>
+
 #include "LuaInclude.h"
 
 #include "LuaHandle.h"
 #include "LuaHashString.h"
 #include "LuaUtils.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/GL/GpuMemTracy.h"
+#include "Rendering/Textures/TextureFormat.h"
 
 
 /******************************************************************************
@@ -16,9 +20,23 @@
  * @see rts/Lua/LuaRBOs.cpp
 ******************************************************************************/
 
+#if defined(TRACY_ENABLE)
+// Estimate of the renderbuffer VRAM footprint for Tracy GPU memory tracking; the
+// data type is inferred from the internal format.
+static size_t EstimateRBOBytes(const LuaRBOs::RBO& rbo)
+{
+	const size_t texelBytes =
+		GL::GetNumChannelsFromInternalFormat(rbo.format) *
+		GL::GetDataTypeSize(GL::GetDataTypeFromInternalFormat(rbo.format));
+
+	return size_t(rbo.xsize) * rbo.ysize * std::max(rbo.samples, GLsizei(1)) * texelBytes;
+}
+#endif
+
 LuaRBOs::~LuaRBOs()
 {
 	for (const RBO* rbo: rbos) {
+		GPU_MEM_FREE(GL::GpuMemPoolLuaRBOs, rbo->id);
 		glDeleteRenderbuffersEXT(1, &rbo->id);
 	}
 }
@@ -80,6 +98,7 @@ void LuaRBOs::RBO::Free(lua_State* L)
 	if (id == 0)
 		return;
 
+	GPU_MEM_FREE(GL::GpuMemPoolLuaRBOs, id);
 	glDeleteRenderbuffersEXT(1, &id);
 	id = 0;
 
@@ -220,6 +239,8 @@ int LuaRBOs::CreateRBO(lua_State* L)
 	lua_setmetatable(L, -2);
 
 	if (rboPtr->id != 0) {
+		GPU_MEM_ALLOC(GL::GpuMemPoolLuaRBOs, rboPtr->id, EstimateRBOBytes(*rboPtr));
+
 		LuaRBOs& activeRBOs = CLuaHandle::GetActiveRBOs(L);
 		auto& rbos = activeRBOs.rbos;
 

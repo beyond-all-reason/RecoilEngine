@@ -247,7 +247,7 @@ void CWorldDrawer::GenerateIBLTextures() const
 
 	if (shadowHandler.ShadowsLoaded()) {
 		SCOPED_TIMER("Draw::World::CreateShadows");
-		SCOPED_GL_DEBUGGROUP("Draw::World::CreateShadows");
+		SCOPED_GL_GPU_ZONE("Draw::World::CreateShadows");
 
 		game->SetDrawMode(CGame::gameShadowDraw);
 		shadowHandler.CreateShadows();
@@ -256,7 +256,7 @@ void CWorldDrawer::GenerateIBLTextures() const
 
 	{
 		SCOPED_TIMER("Draw::World::UpdateReflTex");
-		SCOPED_GL_DEBUGGROUP("Draw::World::UpdateReflTex");
+		SCOPED_GL_GPU_ZONE("Draw::World::UpdateReflTex");
 		cubeMapHandler.UpdateReflectionTexture();
 	}
 
@@ -298,7 +298,7 @@ void CWorldDrawer::ResetMVPMatrices() const
 void CWorldDrawer::Draw() const
 {
 	SCOPED_TIMER("Draw::World");
-	SCOPED_GL_DEBUGGROUP("Draw::World");
+	SCOPED_GL_GPU_ZONE("Draw::World");
 
 	const auto& sky = ISky::GetSky();
 	glClearColor(sky->fogColor.x, sky->fogColor.y, sky->fogColor.z, 0.0f);
@@ -315,7 +315,7 @@ void CWorldDrawer::Draw() const
 	DrawAlphaObjects();
 	{
 		SCOPED_TIMER("Draw::World::DrawWorld");
-		SCOPED_GL_DEBUGGROUP("Draw::World::DrawWorld");
+		SCOPED_GL_GPU_ZONE("Draw::World::DrawWorld");
 		eventHandler.DrawWorld();
 	}
 
@@ -334,20 +334,20 @@ void CWorldDrawer::DrawOpaqueObjects() const
 	if (globalRendering->drawGround) {
 		{
 			SCOPED_TIMER("Draw::World::Terrain");
-			SCOPED_GL_DEBUGGROUP("Draw::World::Terrain");
+			SCOPED_GL_GPU_ZONE("Draw::World::Terrain");
 			gd->Draw(DrawPass::Normal);
 			depthBufferCopy->MakeDepthBufferCopy();
 		}
 		{
 			eventHandler.DrawPreDecals();
 			SCOPED_TIMER("Draw::World::Decals");
-			SCOPED_GL_DEBUGGROUP("Draw::World::Decals");
+			SCOPED_GL_GPU_ZONE("Draw::World::Decals");
 			groundDecals->Draw();
 			projectileDrawer->DrawGroundFlashes();
 		}
 		{
 			SCOPED_TIMER("Draw::World::Foliage");
-			SCOPED_GL_DEBUGGROUP("Draw::World::Foliage");
+			SCOPED_GL_GPU_ZONE("Draw::World::Foliage");
 			grassDrawer->Draw();
 		}
 		smoothHeightMeshDrawer->Draw(1.0f);
@@ -364,18 +364,18 @@ void CWorldDrawer::DrawOpaqueObjects() const
 
 	{
 		SCOPED_TIMER("Draw::World::Models::Opaque");
-		SCOPED_GL_DEBUGGROUP("Draw::World::Models::Opaque");
+		SCOPED_GL_GPU_ZONE("Draw::World::Models::Opaque");
 		unitDrawer->Draw(false);
 		featureDrawer->Draw(false);
 	}
 	{
 		SCOPED_TIMER("Draw::World::Models::Projectiles");
-		SCOPED_GL_DEBUGGROUP("Draw::World::Models::Projectiles");
+		SCOPED_GL_GPU_ZONE("Draw::World::Models::Projectiles");
 		projectileDrawer->DrawOpaque(false);
 	}
 	{
 		SCOPED_TIMER("Draw::OpaqueObjects::Debug");
-		SCOPED_GL_DEBUGGROUP("Draw::OpaqueObjects::Debug");
+		SCOPED_GL_GPU_ZONE("Draw::OpaqueObjects::Debug");
 		DebugColVolDrawer::Draw();
 		DebugVisibilityDrawer::DrawWorld();
 		pathDrawer->DrawAll();
@@ -395,7 +395,7 @@ void CWorldDrawer::DrawAlphaObjects() const
 
 	{
 		SCOPED_TIMER("Draw::World::Models::Alpha");
-		SCOPED_GL_DEBUGGROUP("Draw::World::Models::Alpha");
+		SCOPED_GL_GPU_ZONE("Draw::World::Models::Alpha");
 		// clip in model-space
 		if (hasWaterRendering) {
 			glPushMatrix();
@@ -411,7 +411,7 @@ void CWorldDrawer::DrawAlphaObjects() const
 	}
 	{
 		SCOPED_TIMER("Draw::World::Particles");
-		SCOPED_GL_DEBUGGROUP("Draw::World::Particles");
+		SCOPED_GL_GPU_ZONE("Draw::World::Particles");
 		projectileDrawer->DrawAlpha(!hasWaterRendering, true, false, false);
 
 		if (hasWaterRendering)
@@ -424,7 +424,7 @@ void CWorldDrawer::DrawAlphaObjects() const
 	// draw water (in-between)
 	{
 		SCOPED_TIMER("Draw::World::Water");
-		SCOPED_GL_DEBUGGROUP("Draw::World::Water");
+		SCOPED_GL_GPU_ZONE("Draw::World::Water");
 
 		const auto& water = IWater::GetWater();
 		{
@@ -437,7 +437,7 @@ void CWorldDrawer::DrawAlphaObjects() const
 
 	{
 		SCOPED_TIMER("Draw::World::Models::Alpha");
-		SCOPED_GL_DEBUGGROUP("Draw::World::Alpha");
+		SCOPED_GL_GPU_ZONE("Draw::World::Alpha");
 		glPushMatrix();
 		glLoadIdentity();
 		glClipPlane(GL_CLIP_PLANE3, abovePlaneEq);
@@ -450,7 +450,7 @@ void CWorldDrawer::DrawAlphaObjects() const
 	}
 	{
 		SCOPED_TIMER("Draw::World::Particles");
-		SCOPED_GL_DEBUGGROUP("Draw::World::Particles");
+		SCOPED_GL_GPU_ZONE("Draw::World::Particles");
 		projectileDrawer->DrawAlpha(true, false, false, false);
 
 		glDisable(GL_CLIP_PLANE3);

@@ -11,6 +11,7 @@
 
 #include "VBO.h"
 
+#include "Rendering/GL/GpuMemTracy.h"
 #include "Rendering/GlobalRendering.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/Log/ILog.h"
@@ -126,6 +127,9 @@ void VBO::Delete() {
 		glBindBufferRange(kv.first.target, kv.first.index, 0u, kv.second.offset, kv.second.size);
 	}
 	bbrItems.clear();
+
+	if (isSupported && bufSize != 0)
+		GPU_MEM_FREE(GL::GpuMemPoolBuffers, vboId);
 
 	if (GLAD_GL_ARB_vertex_buffer_object)
 		glDeleteBuffers(1, &vboId);
@@ -391,6 +395,10 @@ void VBO::New(GLsizeiptr newSize, GLenum newUsage, const void* newData)
 	if (isSupported) {
 		glClearErrors("VBO", __func__, globalRendering->glDebugErrors);
 
+		// drop the previous tracked allocation before recreating the store
+		if (bufSize != 0)
+			GPU_MEM_FREE(GL::GpuMemPoolBuffers, vboId);
+
 		if (immutableStorage) {
 			glBufferStorage(curBoundTarget, newSize, newData, /*newUsage =*/(GL_MAP_READ_BIT * readableStorage) | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT | GL_DYNAMIC_STORAGE_BIT);
 		} else {
@@ -402,12 +410,15 @@ void VBO::New(GLsizeiptr newSize, GLenum newUsage, const void* newData)
 			LOG_L(L_ERROR, "[VBO::%s(size=%lu,usage=0x%x,data=%p)] id=%u tgt=0x%x err=0x%x", __func__, (unsigned long) bufSize, usage, data, vboId, curBoundTarget, err);
 			Unbind();
 
-			// disable VBO and fallback to VA/sysmem
+			// disable VBO and fallback to VA/sysmem (no GPU alloc is recorded; the
+			// sysmem store is already accounted for by the global operator new)
 			isSupported = false;
 			immutableStorage = false;
 
 			Bind(curBoundTarget);
 			New(newSize, newUsage, newData);
+		} else {
+			GPU_MEM_ALLOC(GL::GpuMemPoolBuffers, vboId, newSize);
 		}
 
 		bufSize = newSize;

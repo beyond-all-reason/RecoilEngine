@@ -4,6 +4,7 @@
 #include "Rendering/Textures/TextureFormat.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/FBO.h"
+#include "Rendering/GL/GpuMemTracy.h"
 #include "Rendering/GL/TexBind.h"
 #include "System/SpringMath.h"
 #include "System/StringUtil.h"
@@ -33,6 +34,25 @@ namespace Impl {
 		return false;
 	}
 }
+
+#if defined(TRACY_ENABLE)
+// Estimate of the base-level VRAM footprint for Tracy GPU memory tracking. Ignores
+// mipmaps and compression; the data type is inferred from the internal format.
+static size_t EstimateTextureBytes(const LuaTextures::Texture& tex)
+{
+	const size_t texelBytes =
+		GL::GetNumChannelsFromInternalFormat(tex.format) *
+		GL::GetDataTypeSize(GL::GetDataTypeFromInternalFormat(tex.format));
+
+	size_t texels = std::max(tex.xsize, GLsizei(1));
+	if (tex.ysize > 0) texels *= tex.ysize;
+	if (tex.zsize > 0) texels *= tex.zsize;
+	if (tex.target == GL_TEXTURE_CUBE_MAP) texels *= 6;
+	if (tex.target == GL_TEXTURE_2D_MULTISAMPLE && tex.samples > 1) texels *= tex.samples;
+
+	return texels * texelBytes;
+}
+#endif
 
 /******************************************************************************/
 /******************************************************************************/
@@ -143,6 +163,10 @@ std::string LuaTextures::Create(const Texture& tex)
 		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, currentFBO);
 	}
 
+	// storage is fully allocated; attribute its VRAM to the Tracy pool. Reached only
+	// on success, so the early-return failure paths above need no matching free.
+	GPU_MEM_ALLOC(GL::GpuMemPoolLuaTextures, texID, EstimateTextureBytes(tex));
+
 	std::string str = fmt::format("{}{}", prefix, ++lastCode);
 
 	Texture newTex = tex;
@@ -184,6 +208,7 @@ bool LuaTextures::Free(const std::string& name)
 
 	if (it != textureMap.end()) {
 		const Texture& tex = textureVec[it->second];
+		GPU_MEM_FREE(GL::GpuMemPoolLuaTextures, tex.id);
 		glDeleteTextures(1, &tex.id);
 
 		if (FBO::IsSupported()) {
@@ -225,6 +250,7 @@ void LuaTextures::FreeAll()
 {
 	for (const auto& item: textureMap) {
 		const Texture& tex = textureVec[item.second];
+		GPU_MEM_FREE(GL::GpuMemPoolLuaTextures, tex.id);
 		glDeleteTextures(1, &tex.id);
 
 		if (FBO::IsSupported()) {

@@ -12,6 +12,7 @@
 #include "Rendering/GL/StreamBuffer.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/GL/myGL.h"
+#include "Rendering/GL/GpuMemTracyHooks.h"
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/glxHandler.h"
@@ -590,6 +591,10 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 	gladLoadGL();
 	GLX::Load(sdlWindow);
 
+	// redirect glad's texture/renderbuffer entry points through VRAM-tracking
+	// wrappers (no-op unless TRACY_ENABLE && !HEADLESS); must follow gladLoadGL
+	GL::InstallGpuMemHooks();
+
 	if (!CheckGLContextVersion(minCtx)) {
 		int ctxProfile = 0;
 		SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, &ctxProfile);
@@ -664,6 +669,15 @@ void CGlobalRendering::PostInit() {
 	glGenQueries(glTimerQueries.size(), glTimerQueries.data());
 	RenderBuffer::InitStatic();
 	GL::shapes.Init();
+
+	// Tracy GPU profiling context: one per primary context, on the main/render
+	// thread. Query objects are owned by the GL context, so they survive the
+	// later load-time thread/context migrations. Gate on the same extension the
+	// engine's own GL frame timer requires (see SetGLTimeStamp).
+	#if !defined(HEADLESS) && defined(TRACY_ENABLE)
+	if (GLAD_GL_ARB_timer_query)
+		TracyGpuContext;
+	#endif
 
 	UpdateTimer();
 }
