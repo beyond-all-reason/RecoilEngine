@@ -8,6 +8,7 @@
 #include "System/Color.h"
 
 class CUnit;
+enum class NanoParticleEventType : std::uint8_t;
 
 class CNanoProjectile : public CProjectile
 {
@@ -15,7 +16,7 @@ class CNanoProjectile : public CProjectile
 
 public:
 	CNanoProjectile();
-	CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor color, const CUnit* homingTarget = nullptr, int homingTargetPiece = -1, bool inverse = false);
+	CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor color, float builderBuildSpeed = 100.0f, const CUnit* homingTarget = nullptr, int homingTargetPiece = -1, bool inverse = false);
 	~CNanoProjectile();
 
 	void Update() override;
@@ -34,6 +35,7 @@ private:
 	bool UpdateGroundClamp(int frame);
 	void UpdateHoming(int frame);
 	void Reaim(const float3& targetPos, int remainingFrames);
+	void QueueNanoParticleUpdateEvent(NanoParticleEventType type);
 
 	float rotAcc = 0.0f;
 
@@ -52,8 +54,11 @@ private:
 	float3 groundClampWaypointPos;
 	int groundClampWaypointFrame = -1;
 	int groundClampNextFrame = -1;
+	std::uint32_t nanoParticleLightGeneration = 0;
+	float nanoParticleLightBuildSpeed = 0.0f;
 	uint8_t updatePhase = 0;
 	bool groundClampActive = false;
+	bool nanoParticleLightSpawned = false;
 public:
 	static inline float rotVal0 = 0.0f;
 	static inline float rotVel0 = 0.0f;

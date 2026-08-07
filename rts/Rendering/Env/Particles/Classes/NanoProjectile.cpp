@@ -44,8 +44,11 @@ CR_REG_METADATA(CNanoProjectile,
 	CR_MEMBER(groundClampWaypointPos),
 	CR_MEMBER(groundClampWaypointFrame),
 	CR_MEMBER(groundClampNextFrame),
+	CR_IGNORED(nanoParticleLightGeneration),
+	CR_MEMBER(nanoParticleLightBuildSpeed),
 	CR_MEMBER(updatePhase),
 	CR_MEMBER(groundClampActive),
+	CR_IGNORED(nanoParticleLightSpawned),
 	CR_MEMBER_BEGINFLAG(CM_Config),
 		CR_MEMBER(deathFrame),
 		CR_MEMBER(color),
@@ -56,6 +59,7 @@ namespace {
 	constexpr int HOMING_RUN_EVERY = 4;
 	constexpr int GROUND_CLAMP_RECHECK_HIT = 6;
 	constexpr int GROUND_CLAMP_RECHECK_MISS = 12;
+	constexpr float NANO_SPEED_VARIATION = 0.14f;
 	constexpr float GROUND_CLAMP_MARGIN = 11.0f;
 	constexpr float GROUND_CLAMP_SMART_DELTA = 4.0f;
 	constexpr float GROUND_CACHE_CELL_SIZE = 16.0f;
@@ -160,7 +164,7 @@ CNanoProjectile::CNanoProjectile()
 	drawSorted = false;
 }
 
-CNanoProjectile::CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor c, const CUnit* homingTarget, int targetPiece, bool inverse)
+CNanoProjectile::CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor c, float builderBuildSpeed, const CUnit* homingTarget, int targetPiece, bool inverse)
 	: CProjectile(pos, speed, nullptr, false, false, false)
 	, deathFrame(gs->frameNum + lifeTime)
 	, color(c)
@@ -180,6 +184,14 @@ CNanoProjectile::CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor 
 	rotVel = rotVel0 + rotVel0x;
 	rotAcc = rotAcc0 + rotAcc0x;
 
+	if (projectileDrawer != nullptr && projectileDrawer->UseNanoParticleShader() && lifeTime > 0 && this->speed.w > 0.0f) {
+		const float3 endPos = pos + static_cast<float3>(this->speed) * lifeTime;
+		const float speedMult = 1.0f + NANO_SPEED_VARIATION * (guRNG.NextFloat() * 2.0f - 1.0f);
+		lifeTime = std::max(1, static_cast<int>(std::ceil(lifeTime / speedMult)));
+		SetVelocityAndSpeed((endPos - pos) / lifeTime);
+		deathFrame = gs->frameNum + lifeTime;
+	}
+
 	updatePhase = static_cast<uint8_t>(id);
 
 	if (projectileHandler.nanoParticlesHoming && homingTarget != nullptr && (inverse || !homingTarget->beingBuilt))
@@ -187,6 +199,13 @@ CNanoProjectile::CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor 
 
 	if (projectileHandler.nanoParticlesGroundClamp)
 		InitGroundClamp(inverse, lifeTime);
+
+	nanoParticleLightBuildSpeed = builderBuildSpeed;
+	nanoParticleLightGeneration = projectileHandler.nanoParticleLightGeneration;
+	if (projectileHandler.NanoParticleUpdatesEnabled()) {
+		QueueNanoParticleUpdateEvent(NanoParticleEventType::Spawn);
+		nanoParticleLightSpawned = true;
+	}
 }
 
 CNanoProjectile::~CNanoProjectile()
@@ -197,8 +216,11 @@ CNanoProjectile::~CNanoProjectile()
 
 void CNanoProjectile::Update()
 {
+	ZoneScopedN("NanoParticles::Update");
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int frame = gs->frameNum;
+	const float3 oldPos = pos;
+	const float3 oldVelocity = speed;
 	bool reaimed = false;
 
 	if (groundClampActive)
@@ -207,13 +229,46 @@ void CNanoProjectile::Update()
 	if (!reaimed && groundClampWaypointFrame < 0 && homingTargetID >= 0 && projectileHandler.nanoParticlesHoming && ((frame + (updatePhase % HOMING_RUN_EVERY)) % HOMING_RUN_EVERY) == 0)
 		UpdateHoming(frame);
 
+	const bool trajectoryChanged =
+		pos.x != oldPos.x || pos.y != oldPos.y || pos.z != oldPos.z ||
+		speed.x != oldVelocity.x || speed.y != oldVelocity.y || speed.z != oldVelocity.z;
+
 	pos += speed;
+
+	if (nanoParticleLightGeneration != projectileHandler.nanoParticleLightGeneration) {
+		nanoParticleLightGeneration = projectileHandler.nanoParticleLightGeneration;
+		nanoParticleLightSpawned = false;
+	}
+	if (projectileHandler.NanoParticleUpdatesEnabled()) {
+		if (!nanoParticleLightSpawned) {
+			QueueNanoParticleUpdateEvent(NanoParticleEventType::Spawn);
+			nanoParticleLightSpawned = true;
+		} else if (trajectoryChanged) {
+			QueueNanoParticleUpdateEvent(NanoParticleEventType::Update);
+		}
+	}
 
 	deleteMe |= (frame >= deathFrame);
 }
 
+void CNanoProjectile::QueueNanoParticleUpdateEvent(NanoParticleEventType type)
+{
+	NanoParticleEvent event;
+	event.type = type;
+	event.lightID = id;
+	event.projectileID = id;
+	event.projectileSyncID = GetSyncID();
+	event.pos = pos;
+	event.velocity = speed;
+	event.remainingLife = std::max(deathFrame - gs->frameNum, 0);
+	event.color = float3(color[0], color[1], color[2]) * (1.0f / 255.0f);
+	event.builderBuildSpeed = nanoParticleLightBuildSpeed;
+	projectileHandler.QueueNanoParticleUpdateEvent(std::move(event));
+}
+
 void CNanoProjectile::InitHoming(const CUnit* target, int targetPiece, int lifeTime)
 {
+	ZoneScopedN("NanoParticles::Homing");
 	const float initialSpeed = speed.w;
 	homingTargetID = target->id;
 	homingTargetSyncID = target->GetSyncID();
@@ -245,6 +300,7 @@ void CNanoProjectile::InitHoming(const CUnit* target, int targetPiece, int lifeT
 
 void CNanoProjectile::InitGroundClamp(bool inverse, int lifeTime)
 {
+	ZoneScopedN("NanoParticles::GroundClamp");
 	if (lifeTime <= 1)
 		return;
 
@@ -312,6 +368,7 @@ bool CNanoProjectile::ResolveHomingTarget(float3& targetPos)
 
 bool CNanoProjectile::UpdateGroundClamp(int frame)
 {
+	ZoneScopedN("NanoParticles::GroundClamp");
 	bool reaimed = false;
 	const int remainingLife = deathFrame - frame;
 	if (remainingLife <= 0)
@@ -351,6 +408,7 @@ bool CNanoProjectile::UpdateGroundClamp(int frame)
 
 void CNanoProjectile::UpdateHoming(int frame)
 {
+	ZoneScopedN("NanoParticles::Homing");
 	float3 targetPos;
 	if (!ResolveHomingTarget(targetPos))
 		return;

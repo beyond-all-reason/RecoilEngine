@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include <algorithm>
+#include <cmath>
 
 #include "Projectile.h"
 #include "ProjectileHandler.h"
@@ -15,6 +16,7 @@
 #include "Sim/Misc/CollisionHandler.h"
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/GlobalSynced.h"
+#include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Rendering/Env/Particles/Classes/NanoProjectile.h"
@@ -39,11 +41,37 @@
 #define NORMAL_NANO_PRIO 0.95f
 #define HIGH_NANO_PRIO 1.0f
 
-
 CONFIG(int, MaxParticles).defaultValue(10000).headlessValue(0).minimumValue(0);
 CONFIG(int, MaxNanoParticles).defaultValue(2000).headlessValue(0).minimumValue(0);
 CONFIG(bool, NanoParticlesHoming).defaultValue(false).safemodeValue(false).headlessValue(false).description("Allow nano particles to follow moving unit targets and builder nano pieces");
 CONFIG(bool, NanoParticlesGroundClamp).defaultValue(false).safemodeValue(false).headlessValue(false).description("Route nano particles above intervening terrain");
+CONFIG(bool, NanoParticlesReclaimBurst).defaultValue(false).safemodeValue(false).headlessValue(false).description("Emit a nano burst when reclaiming a unit finishes");
+CONFIG(float, NanoParticleRate).defaultValue(0.32f).description("Global build-power-scaled nano particle emission multiplier");
+CONFIG(bool, NanoParticleLights).defaultValue(false).deprecated(true).description("Deprecated: use NanoParticleUpdateLuaUI");
+CONFIG(bool, NanoParticleUpdateLuaUI).defaultValue(false).safemodeValue(false).headlessValue(false).description("Send batched nano particle lifecycle updates to LuaUI");
+
+namespace {
+	constexpr float NANO_PARTICLE_SPEED = 4.0f;
+	constexpr float NANO_EMIT_REF_BUILDSPEED = 100.0f;
+	constexpr int NANO_FEEDBACK_EMIT_MIN_GAP = 60;
+	constexpr int RECLAIM_BURST_BASE = 1;
+	constexpr float RECLAIM_BURST_LOG_K = 40.0f;
+	constexpr float RECLAIM_BURST_LOG_NORM = 250.0f;
+	constexpr int RECLAIM_BURST_MAX = 1500;
+
+	void MigrateNanoParticleUpdateLuaUIConfig()
+	{
+		const auto configData = configHandler->GetDataWithoutDefaults();
+		const auto legacyValue = configData.find("NanoParticleLights");
+		if (legacyValue == configData.end())
+			return;
+
+		if (configData.find("NanoParticleUpdateLuaUI") == configData.end())
+			configHandler->SetString("NanoParticleUpdateLuaUI", legacyValue->second);
+
+		configHandler->Delete("NanoParticleLights");
+	}
+}
 
 
 CR_BIND(CProjectileHandler, )
@@ -79,10 +107,16 @@ void CProjectileHandler::Init()
 
 	resortFlyingPieces.fill(false);
 
+	MigrateNanoParticleUpdateLuaUIConfig();
+
 	maxParticles     = configHandler->GetInt("MaxParticles");
 	maxNanoParticles = configHandler->GetInt("MaxNanoParticles");
 	nanoParticlesHoming = configHandler->GetBool("NanoParticlesHoming");
 	nanoParticlesGroundClamp = configHandler->GetBool("NanoParticlesGroundClamp");
+	nanoParticlesReclaimBurst = configHandler->GetBool("NanoParticlesReclaimBurst");
+	nanoParticleRate = std::clamp(configHandler->GetFloat("NanoParticleRate"), 0.0f, 1.0f);
+	nanoParticleUpdateLuaUI = configHandler->GetBool("NanoParticleUpdateLuaUI");
+	nanoParticleUpdateClientActive = eventHandler.HasNanoParticleUpdateClients();
 
 	projMemPool.clear();
 	projMemPool.reserve(1024);
@@ -91,6 +125,12 @@ void CProjectileHandler::Init()
 		flyingPieces[modelType].clear();
 		flyingPieces[modelType].reserve(1000);
 	}
+	for (auto& events: nanoParticleUpdateThreadEvents) {
+		events.clear();
+		events.reserve(64);
+	}
+	nanoParticleUpdateEvents.clear();
+	nanoParticleUpdateEvents.reserve(maxNanoParticles);
 
 	projectiles[true ].SeedFreeKeys(0, 1 << 14, true); //seed only synced free ids.
 	projectiles[false].reserve(static_cast<size_t>(maxParticles) * 2);
@@ -98,7 +138,7 @@ void CProjectileHandler::Init()
 	CExpGenSpawnable::InitSpawnables();
 
 	// register ConfigNotify()
-	configHandler->NotifyOnChange(this, {"MaxParticles", "MaxNanoParticles", "NanoParticlesHoming", "NanoParticlesGroundClamp"});
+	configHandler->NotifyOnChange(this, {"MaxParticles", "MaxNanoParticles", "NanoParticlesHoming", "NanoParticlesGroundClamp", "NanoParticlesReclaimBurst", "NanoParticleRate", "NanoParticleUpdateLuaUI"});
 }
 
 void CProjectileHandler::Kill()
@@ -133,6 +173,10 @@ void CProjectileHandler::Kill()
 			fpc.clear();
 		}
 	}
+	for (auto& events: nanoParticleUpdateThreadEvents)
+		events.clear();
+	nanoParticleUpdateEvents.clear();
+	nanoParticleUpdateClientActive = false;
 
 	CCollisionHandler::PrintStats();
 }
@@ -141,10 +185,20 @@ void CProjectileHandler::Kill()
 void CProjectileHandler::ConfigNotify(const std::string& key, const std::string& value)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	const bool oldNanoParticleUpdateLuaUI = nanoParticleUpdateLuaUI;
 	maxParticles     = configHandler->GetInt("MaxParticles");
 	maxNanoParticles = configHandler->GetInt("MaxNanoParticles");
 	nanoParticlesHoming = configHandler->GetBool("NanoParticlesHoming");
 	nanoParticlesGroundClamp = configHandler->GetBool("NanoParticlesGroundClamp");
+	nanoParticlesReclaimBurst = configHandler->GetBool("NanoParticlesReclaimBurst");
+	nanoParticleRate = std::clamp(configHandler->GetFloat("NanoParticleRate"), 0.0f, 1.0f);
+	nanoParticleUpdateLuaUI = configHandler->GetBool("NanoParticleUpdateLuaUI");
+	if (nanoParticleUpdateLuaUI != oldNanoParticleUpdateLuaUI) {
+		++nanoParticleLightGeneration;
+		NanoParticleEvent event;
+		event.type = NanoParticleEventType::Reset;
+		QueueNanoParticleUpdateEvent(std::move(event));
+	}
 
 	projectiles[false].reserve(static_cast<size_t>(maxParticles) * 2);
 }
@@ -329,10 +383,19 @@ void CProjectileHandler::Update()
 {
 	{
 		SCOPED_TIMER("Sim::Projectiles");
+		const bool updateClientActive = eventHandler.HasNanoParticleUpdateClients();
+		if (updateClientActive != nanoParticleUpdateClientActive) {
+			nanoParticleUpdateClientActive = updateClientActive;
+			++nanoParticleLightGeneration;
+			NanoParticleEvent event;
+			event.type = NanoParticleEventType::Reset;
+			QueueNanoParticleUpdateEvent(std::move(event));
+		}
 
 		// check if any projectiles have collided since the previous update
 		CheckCollisions();
 		UpdateProjectiles();
+		DispatchNanoParticleUpdates();
 
 		UPDATE_PTR_CONTAINER(groundFlashes);
 
@@ -363,6 +426,56 @@ void CProjectileHandler::Update()
 		frameProjectileCounts[true] = projectiles[true].size();
 		frameProjectileCounts[false] = projectiles[false].size();
 	}
+}
+
+void CProjectileHandler::QueueNanoParticleUpdateEvent(NanoParticleEvent&& event)
+{
+	const int threadNum = ThreadPool::GetThreadNum();
+	assert(threadNum >= 0 && threadNum < ThreadPool::MAX_THREADS);
+	nanoParticleUpdateThreadEvents[threadNum].emplace_back(std::move(event));
+}
+
+void CProjectileHandler::DispatchNanoParticleUpdates()
+{
+	ZoneScopedN("NanoParticles::Updates");
+
+	size_t eventCount = 0;
+	for (const auto& events: nanoParticleUpdateThreadEvents)
+		eventCount += events.size();
+	if (eventCount == 0)
+		return;
+
+	nanoParticleUpdateEvents.clear();
+	if (nanoParticleUpdateEvents.capacity() < eventCount)
+		nanoParticleUpdateEvents.reserve(eventCount);
+
+	for (auto& events: nanoParticleUpdateThreadEvents) {
+		for (NanoParticleEvent& event: events) {
+			if (event.type == NanoParticleEventType::Reset) {
+			} else if (event.type == NanoParticleEventType::Remove) {
+				continue;
+			} else {
+				const CProjectile* projectile = GetProjectileByUnsyncedID(event.projectileID);
+				if (projectile == nullptr || projectile->GetSyncID() != event.projectileSyncID)
+					continue;
+
+				const bool visible = gu->spectatingFullView || (
+					teamHandler.IsValidAllyTeam(gu->myAllyTeam) &&
+					losHandler->InLos(projectile, gu->myAllyTeam)
+				);
+				if (!visible)
+					continue;
+				event.pos = projectile->pos;
+				event.velocity = projectile->speed;
+			}
+
+			nanoParticleUpdateEvents.emplace_back(std::move(event));
+		}
+		events.clear();
+	}
+
+	if (!nanoParticleUpdateEvents.empty())
+		eventHandler.NanoParticleUpdate(nanoParticleUpdateEvents);
 }
 
 void CProjectileHandler::AddProjectile(CProjectile* p)
@@ -691,6 +804,7 @@ void CProjectileHandler::AddNanoParticle(
 
 	float3 dif = endPos - startPos;
 	const float l = fastmath::apxsqrt2(dif.SqLength());
+	const int lifeTime = std::max(1, static_cast<int>(std::ceil(l / NANO_PARTICLE_SPEED)));
 
 	dif /= l;
 	dif += (guRNG.NextVector() * 0.15f);
@@ -706,7 +820,7 @@ void CProjectileHandler::AddNanoParticle(
 		{tColor[0], tColor[1], tColor[2],  tAlpha},
 	};
 
-	projMemPool.alloc<CNanoProjectile>(startPos, dif, int(l), colors[globalRendering->teamNanospray]);
+	projMemPool.alloc<CNanoProjectile>(startPos, dif * NANO_PARTICLE_SPEED, lifeTime, colors[globalRendering->teamNanospray], unitDef->buildSpeed);
 }
 
 void CProjectileHandler::AddNanoParticle(
@@ -731,6 +845,7 @@ void CProjectileHandler::AddNanoParticle(
 
 	float3 dif = endPos - startPos;
 	const float len = fastmath::apxsqrt2(dif.SqLength());
+	const int lifeTime = std::max(1, static_cast<int>(std::ceil(len / NANO_PARTICLE_SPEED)));
 
 	dif /= len;
 	dif += (guRNG.NextVector() * (radius / len));
@@ -747,10 +862,47 @@ void CProjectileHandler::AddNanoParticle(
 	};
 
 	if (!inverse) {
-		projMemPool.alloc<CNanoProjectile>(startPos, dif * 3.0f, int(len / 3.0f), colors[globalRendering->teamNanospray], homingTarget, homingTargetPiece, false);
+		projMemPool.alloc<CNanoProjectile>(startPos, dif * NANO_PARTICLE_SPEED, lifeTime, colors[globalRendering->teamNanospray], unitDef->buildSpeed, homingTarget, homingTargetPiece, false);
 	} else {
-		projMemPool.alloc<CNanoProjectile>(startPos + dif * len, -dif * 3.0f, int(len / 3.0f), colors[globalRendering->teamNanospray], homingTarget, homingTargetPiece, true);
+		projMemPool.alloc<CNanoProjectile>(startPos + dif * len, -dif * NANO_PARTICLE_SPEED, lifeTime, colors[globalRendering->teamNanospray], unitDef->buildSpeed, homingTarget, homingTargetPiece, true);
 	}
+}
+
+int CProjectileHandler::GetNanoParticleEmitCount(float builderBuildSpeed, float buildPower, float& accumulator, int& lastEmitFrame) const
+{
+	if (maxNanoParticles <= 0 || nanoParticleRate <= 0.0f) {
+		accumulator = 0.0f;
+		return 0;
+	}
+
+	const float rate = std::max(0.0f, builderBuildSpeed)
+		* std::clamp(buildPower, 0.0f, 1.0f)
+		* (nanoParticleRate / NANO_EMIT_REF_BUILDSPEED);
+	const float accumulated = accumulator + rate;
+	int emitCount = static_cast<int>(std::floor(accumulated));
+	accumulator = accumulated - emitCount;
+	if (emitCount == 0 && buildPower > 0.0f && (gs->frameNum - lastEmitFrame) >= NANO_FEEDBACK_EMIT_MIN_GAP) {
+		emitCount = 1;
+		accumulator -= 1.0f;
+	}
+	if (emitCount > 0)
+		lastEmitFrame = gs->frameNum;
+
+	return emitCount;
+}
+
+int CProjectileHandler::GetReclaimCompletionNanoBurstCount(float reclaimedMetal) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!nanoParticlesReclaimBurst)
+		return 0;
+
+	const float scaledMetal = std::max(0.0f, reclaimedMetal);
+	return std::clamp(
+		RECLAIM_BURST_BASE + static_cast<int>(std::floor(RECLAIM_BURST_LOG_K * std::log(1.0f + scaledMetal / RECLAIM_BURST_LOG_NORM) + 0.5f)),
+		1,
+		RECLAIM_BURST_MAX
+	);
 }
 
 float CProjectileHandler::GetParticleSaturation(bool randomized) const

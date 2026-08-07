@@ -45,7 +45,9 @@ CR_REG_METADATA(CFactory, (
 	CR_MEMBER(curBuildDef),
 	CR_MEMBER(curBuild),
 	CR_MEMBER(finishedBuildCommand),
-	CR_MEMBER(nanoPieceCache)
+	CR_MEMBER(nanoPieceCache),
+	CR_IGNORED(nanoParticleEmitAccumulator),
+	CR_IGNORED(nanoParticleLastEmitFrame)
 ))
 
 //////////////////////////////////////////////////////////////////////
@@ -531,14 +533,19 @@ bool CFactory::ChangeTeam(int newTeam, ChangeType type)
 void CFactory::CreateNanoParticle(bool highPriority)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const int modelNanoPiece = nanoPieceCache.GetNanoPiece(script);
-
-	if (!localModel.Initialized() || !localModel.HasPiece(modelNanoPiece))
+	nanoPieceCache.UpdateNanoPieces(script);
+	if (curBuild == nullptr || !localModel.Initialized() || nanoPieceCache.GetNanoPieces().empty())
 		return;
 
-	const float3 relNanoFirePos = localModel.GetRawPiecePos(modelNanoPiece);
-	const float3 nanoPos = this->GetObjectSpacePos(relNanoFirePos);
+	const int emitCount = projectileHandler.GetNanoParticleEmitCount(unitDef->buildSpeed, nanoPieceCache.GetBuildPower(), nanoParticleEmitAccumulator, nanoParticleLastEmitFrame);
+	for (int i = 0; i < emitCount; ++i) {
+		const int modelNanoPiece = nanoPieceCache.GetNextNanoPiece();
+		if (!localModel.HasPiece(modelNanoPiece))
+			continue;
 
-	// unsynced
-	projectileHandler.AddNanoParticle(nanoPos, curBuild->midPos, unitDef, team, highPriority);
+		const float3 relNanoFirePos = localModel.GetRawPiecePos(modelNanoPiece);
+		const float3 nanoPos = GetObjectSpacePos(relNanoFirePos);
+
+		projectileHandler.AddNanoParticle(nanoPos, curBuild->midPos, unitDef, team, highPriority);
+	}
 }

@@ -35,6 +35,11 @@
 using std::min;
 using std::max;
 
+namespace {
+	constexpr float RECLAIM_BURST_VOLUME_FRACTION = 0.55f;
+	constexpr float RECLAIM_BURST_DIRECTION_JITTER = 0.10f;
+}
+
 CR_BIND_DERIVED(CBuilder, CUnit, )
 CR_REG_METADATA(CBuilder, (
 	CR_MEMBER(range3D),
@@ -59,7 +64,9 @@ CR_REG_METADATA(CBuilder, (
 	CR_MEMBER(terraformCenter),
 	CR_MEMBER(terraformRadius),
 	CR_MEMBER(terraformType),
-	CR_MEMBER(nanoPieceCache)
+	CR_MEMBER(nanoPieceCache),
+	CR_IGNORED(nanoParticleEmitAccumulator),
+	CR_IGNORED(nanoParticleLastEmitFrame)
 ))
 
 
@@ -980,24 +987,63 @@ void CBuilder::HelpTerraform(CBuilder* unit)
 void CBuilder::CreateNanoParticle(const float3& goal, float radius, bool inverse, bool highPriority, const CUnit* targetUnit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const int modelNanoPiece = nanoPieceCache.GetNanoPiece(script);
-
-	if (!localModel.Initialized() || !localModel.HasPiece(modelNanoPiece))
+	nanoPieceCache.UpdateNanoPieces(script);
+	if (!localModel.Initialized() || nanoPieceCache.GetNanoPieces().empty())
 		return;
 
-	const float3 relNanoFirePos = localModel.GetRawPiecePos(modelNanoPiece);
-	const float3 nanoPos = this->GetObjectSpacePos(relNanoFirePos);
+	const int emitCount = projectileHandler.GetNanoParticleEmitCount(unitDef->buildSpeed, nanoPieceCache.GetBuildPower(), nanoParticleEmitAccumulator, nanoParticleLastEmitFrame);
+	for (int i = 0; i < emitCount; ++i) {
+		const int modelNanoPiece = nanoPieceCache.GetNextNanoPiece();
+		if (!localModel.HasPiece(modelNanoPiece))
+			continue;
 
-	// unsynced
-	projectileHandler.AddNanoParticle(
-		nanoPos,
-		goal,
-		unitDef,
-		team,
-		radius,
-		inverse,
-		highPriority,
-		inverse ? this : targetUnit,
-		inverse ? modelNanoPiece : -1
-	);
+		const float3 relNanoFirePos = localModel.GetRawPiecePos(modelNanoPiece);
+		const float3 nanoPos = GetObjectSpacePos(relNanoFirePos);
+
+		projectileHandler.AddNanoParticle(
+			nanoPos,
+			goal,
+			unitDef,
+			team,
+			radius,
+			inverse,
+			highPriority,
+			inverse ? this : targetUnit,
+			inverse ? modelNanoPiece : -1
+		);
+	}
+}
+
+void CBuilder::CreateReclaimCompletionNanoBurst(const CUnit* reclaimee, float reclaimedMetal)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (reclaimee == nullptr || !projectileHandler.NanoParticlesReclaimBurstEnabled())
+		return;
+
+	if (!localModel.Initialized())
+		return;
+
+	const int burstCount = projectileHandler.GetReclaimCompletionNanoBurstCount(reclaimedMetal);
+	const float3& collisionScales = reclaimee->collisionVolume.GetScales();
+	const float smallestCollisionScale = min(collisionScales.x, min(collisionScales.y, collisionScales.z));
+	const float burstRadius = smallestCollisionScale * 0.5f * RECLAIM_BURST_VOLUME_FRACTION;
+	const float3 burstCenter = reclaimee->midPos + reclaimee->collisionVolume.GetOffsets();
+	const auto& nanoPieces = nanoPieceCache.GetNanoPieces();
+	if (burstRadius <= 0.0f || nanoPieces.empty())
+		return;
+
+	const unsigned firstPiece = guRNG.NextInt(nanoPieces.size());
+	for (int i = 0; i < burstCount; ++i) {
+		const int modelNanoPiece = nanoPieces[(firstPiece + i) % nanoPieces.size()];
+		if (!localModel.HasPiece(modelNanoPiece))
+			continue;
+
+		const float3 nanoPos = GetObjectSpacePos(localModel.GetRawPiecePos(modelNanoPiece));
+		const float3 burstPos = burstCenter + guRNG.NextVector() * burstRadius;
+		const float burstLength = fastmath::apxsqrt2((burstPos - nanoPos).SqLength());
+		if (burstLength < 1.0f)
+			continue;
+
+		projectileHandler.AddNanoParticle(nanoPos, burstPos, unitDef, team, burstLength * RECLAIM_BURST_DIRECTION_JITTER, true, true, this, modelNanoPiece);
+	}
 }

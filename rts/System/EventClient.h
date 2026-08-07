@@ -37,6 +37,7 @@ struct FeatureDef;
 class LuaMaterial;
 struct WeaponDef;
 struct SResourcePack;
+struct NanoParticleEvent;
 
 #ifndef zipFile
 	// might be defined through zip.h already
@@ -286,6 +287,7 @@ class CEventClient
 
 		virtual void Update();
 		virtual void UnsyncedHeightMapUpdate(const SRectangle& rect);
+		virtual void NanoParticleUpdate(const std::vector<NanoParticleEvent>& events) {}
 
 		virtual bool KeyMapChanged();
 		virtual bool KeyPress(int keyCode, int scanCode, bool isRepeat);

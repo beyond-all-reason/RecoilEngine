@@ -8,6 +8,7 @@
 #include "UnitMemPool.h"
 #include "UnitToolTipMap.hpp"
 #include "UnitTypes/Building.h"
+#include "UnitTypes/Builder.h"
 #include "UnitTypes/ExtractorBuilding.h"
 #include "Scripts/NullUnitScript.h"
 #include "Scripts/UnitScriptFactory.h"
@@ -2097,12 +2098,17 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 		if (modInfo.reclaimUnitMethod == 0)
 			TurnIntoNanoframe();
 
+		const float reclaimBurstMetal = cost.metal * buildProgress;
+
 		// reduce health & resources
 		health = postHealth;
 		buildProgress = postBuildProgress;
 
 		// reclaim finished?
 		if (killMe || buildProgress <= 0.0f || health <= 0.0f) {
+			if (auto* reclaimBuilder = dynamic_cast<CBuilder*>(builder); reclaimBuilder != nullptr)
+				reclaimBuilder->CreateReclaimCompletionNanoBurst(this, reclaimBurstMetal);
+
 			health = 0.0f;
 			buildProgress = 0.0f;
 			KillUnit(builder, false, true, -CSolidObject::DAMAGE_RECLAIMED);

@@ -199,6 +199,7 @@ class CLuaHandle : public CEventClient
 
 		void UnsyncedHeightMapUpdate(const SRectangle& rect) override;
 		void Update() override;
+		void NanoParticleUpdate(const std::vector<NanoParticleEvent>& events) override;
 
 		bool KeyMapChanged() override;
 		bool KeyPress(int keyCode, int scanCode, bool isRepeat) override;

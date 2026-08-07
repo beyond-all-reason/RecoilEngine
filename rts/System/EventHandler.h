@@ -12,6 +12,7 @@
 #include "Sim/Projectiles/Projectile.h"
 
 struct CExplosionParams;
+struct NanoParticleEvent;
 class CWeapon;
 struct Command;
 struct BuildInfo;
@@ -41,6 +42,7 @@ class CEventHandler
 		bool IsManaged(const std::string& ciName) const;
 		bool IsUnsynced(const std::string& ciName) const;
 		bool IsController(const std::string& ciName) const;
+		bool HasNanoParticleUpdateClients() const { return !listNanoParticleUpdate.empty(); }
 
 
 	public:
@@ -222,6 +224,7 @@ class CEventHandler
 
 		void UnsyncedHeightMapUpdate(const SRectangle& rect);
 		void Update();
+		void NanoParticleUpdate(const std::vector<NanoParticleEvent>& events);
 
 		bool KeyMapChanged();
 		bool KeyPress(int keyCode, int scanCode, bool isRepeat);

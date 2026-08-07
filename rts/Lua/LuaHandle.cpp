@@ -33,6 +33,7 @@
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Projectiles/Projectile.h"
+#include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectile.h"
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Units/Scripts/CobDeferredCallin.h"
@@ -2643,6 +2644,50 @@ void CLuaHandle::SunChanged()
 
 	// call the routine
 	RunCallIn(L, cmdStr, 0, 0);
+}
+
+/*** Batched nano-particle lifecycle changes.
+ *
+ * Each event occupies 13 consecutive numeric entries:
+ * `{operation, lightID, px, py, pz, vx, vy, vz, remainingLife, r, g, b, builderBuildSpeed}`.
+ * Operations are 1=spawn, 2=update, 3=remove, and 4=reset.
+ *
+ * @function Callins:NanoParticleUpdate
+ * @param events number[] Flat event records.
+ * @param eventCount integer Number of records in `events`.
+ * @param gameFrame integer Current simulation frame.
+ */
+void CLuaHandle::NanoParticleUpdate(const std::vector<NanoParticleEvent>& events)
+{
+	ZoneScopedN("NanoParticles::LuaUpdate");
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 5, __func__);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	constexpr int EVENT_STRIDE = 13;
+	lua_createtable(L, static_cast<int>(events.size()) * EVENT_STRIDE, 0);
+	int tableIndex = 1;
+	for (const NanoParticleEvent& event: events) {
+		lua_pushinteger(L, static_cast<int>(event.type)); lua_rawseti(L, -2, tableIndex++);
+		lua_pushinteger(L, event.lightID);                 lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.pos.x);                    lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.pos.y);                    lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.pos.z);                    lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.velocity.x);               lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.velocity.y);               lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.velocity.z);               lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.remainingLife);            lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.color.x);                  lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.color.y);                  lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.color.z);                  lua_rawseti(L, -2, tableIndex++);
+		lua_pushnumber(L, event.builderBuildSpeed);        lua_rawseti(L, -2, tableIndex++);
+	}
+
+	lua_pushinteger(L, static_cast<int>(events.size()));
+	lua_pushinteger(L, gs->frameNum);
+	RunCallIn(L, cmdStr, 3, 0);
 }
 
 /*** Used to set the default command when a unit is selected.

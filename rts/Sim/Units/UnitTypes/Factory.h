@@ -72,6 +72,8 @@ private:
 	Command finishedBuildCommand;
 
 	NanoPieceCache nanoPieceCache;
+	float nanoParticleEmitAccumulator = 0.0f;
+	int nanoParticleLastEmitFrame = 0;
 };
 
 #endif // _FACTORY_H

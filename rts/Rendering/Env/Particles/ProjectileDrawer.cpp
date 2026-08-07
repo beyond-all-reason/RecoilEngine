@@ -910,6 +910,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		}
 
 		if (drawNanos) {
+			ZoneScopedN("NanoParticles::Draw");
 			auto nanoState = GL::SubState(Culling(GL_FALSE));
 			const float3& camPos = camera->GetPos();
 			const float3& camRight = camera->GetRight();

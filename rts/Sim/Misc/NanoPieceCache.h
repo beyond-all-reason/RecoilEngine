@@ -4,6 +4,7 @@
 #define _NANO_PIECE_CACHE_H
 
 #include <bit>
+#include <cstdint>
 #include <limits>
 #include <vector>
 
@@ -17,12 +18,15 @@ struct NanoPieceCache
 	CR_DECLARE_STRUCT(NanoPieceCache)
 
 public:
-	NanoPieceCache(): lastNanoPieceCnt(0), curBuildPowerMask(0) {
+	NanoPieceCache(): lastNanoPieceCnt(0), curBuildPowerMask(0), nanoPieceCursor(0) {
 	}
 
 	void Update() { curBuildPowerMask >>= 1; }
 
 	float GetBuildPower() const { return std::popcount(curBuildPowerMask) / static_cast <float> (MASK_BITS); }
+
+	void UpdateNanoPieces(CUnitScript* ownerScript);
+	int GetNextNanoPiece();
 
 	/// returns modelPiece (NOT scriptModelPiece)
 	int GetNanoPiece(CUnitScript* ownerScript);
@@ -40,6 +44,7 @@ private:
 
 	int lastNanoPieceCnt;
 	uint32_t curBuildPowerMask;
+	uint32_t nanoPieceCursor;
 
 	/* Mask length controls for how long each frame of pouring buildpower "saturates" the counter. In this case it takes
 	 * half a second of building to reach 100% buildpower after starting building, and to reach 0% after stopping.

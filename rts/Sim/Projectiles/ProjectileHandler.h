@@ -4,12 +4,15 @@
 #define PROJECTILE_HANDLER_H
 
 #include <array>
+#include <cstdint>
 #include <vector>
 
 #include "Rendering/Models/3DModelDefs.hpp"
 #include "Rendering/Env/Particles/Classes/FlyingPiece.h"
 #include "System/float3.h"
 #include "System/FreeListMap.h"
+#include "System/Threading/ThreadPool.h"
+#include "System/UnorderedMap.hpp"
 
 
 // bypass id and event handling for unsynced projectiles (faster)
@@ -24,6 +27,25 @@ struct UnitDef;
 
 typedef std::vector<CGroundFlash*> GroundFlashContainer;
 typedef std::vector<FlyingPiece> FlyingPieceContainer;
+
+enum class NanoParticleEventType : std::uint8_t {
+	Spawn = 1,
+	Update = 2,
+	Remove = 3,
+	Reset = 4,
+};
+
+struct NanoParticleEvent {
+	NanoParticleEventType type = NanoParticleEventType::Update;
+	int lightID = -1;
+	int projectileID = -1;
+	std::int64_t projectileSyncID = -1;
+	float3 pos = ZeroVector;
+	float3 velocity = ZeroVector;
+	float remainingLife = 0.0f;
+	float3 color = ZeroVector;
+	float builderBuildSpeed = 0.0f;
+};
 
 class CProjectileHandler
 {
@@ -78,6 +100,11 @@ public:
 	);
 	void AddNanoParticle(const float3, const float3, const UnitDef*, int team, bool highPriority);
 	void AddNanoParticle(const float3, const float3, const UnitDef*, int team, float radius, bool inverse, bool highPriority, const CUnit* homingTarget = nullptr, int homingTargetPiece = -1);
+	int GetNanoParticleEmitCount(float builderBuildSpeed, float buildPower, float& accumulator, int& lastEmitFrame) const;
+	int GetReclaimCompletionNanoBurstCount(float reclaimedMetal) const;
+	void QueueNanoParticleUpdateEvent(NanoParticleEvent&& event);
+	bool NanoParticleUpdatesEnabled() const { return nanoParticleUpdateLuaUI && nanoParticleUpdateClientActive; }
+	bool NanoParticlesReclaimBurstEnabled() const { return nanoParticlesReclaimBurst; }
 
 public:
 	int maxParticles = 0;
@@ -85,6 +112,10 @@ public:
 	int currentNanoParticles = 0;
 	bool nanoParticlesHoming = false;
 	bool nanoParticlesGroundClamp = false;
+	bool nanoParticlesReclaimBurst = false;
+	float nanoParticleRate = 0.32f;
+	bool nanoParticleUpdateLuaUI = false;
+	std::uint32_t nanoParticleLightGeneration = 1;
 
 	// these vars are used to precache parts of GetCurrentParticles() calculations
 	mutable int frameCurrentParticles = 0;
@@ -98,6 +129,8 @@ public:
 	GroundFlashContainer groundFlashes;
 
 private:
+	void DispatchNanoParticleUpdates();
+
 	// event-notifiers
 	void CreateProjectile(CProjectile*);
 	void DestroyProjectile(CProjectile*);
@@ -116,6 +149,9 @@ private:
 	// [0] contains only projectiles that can not change simulation state
 	// [1] contains only projectiles that can     change simulation state
 	spring::FreeListMapCompact<CProjectile*, int> projectiles[2];
+	std::array<std::vector<NanoParticleEvent>, ThreadPool::MAX_THREADS> nanoParticleUpdateThreadEvents;
+	std::vector<NanoParticleEvent> nanoParticleUpdateEvents;
+	bool nanoParticleUpdateClientActive = false;
 
 	static uint32_t UnsyncedRandInt(uint32_t N);
 	static uint32_t   SyncedRandInt(uint32_t N);
