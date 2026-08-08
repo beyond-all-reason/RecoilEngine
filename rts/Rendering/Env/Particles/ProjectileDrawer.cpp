@@ -5,6 +5,7 @@
 
 #include <tuple>
 #include <bit>
+#include <cmath>
 
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
@@ -56,6 +57,19 @@ static bool CProjectileDrawOrderSortingPredicate(const CProjectile* p1, const CP
 static bool CProjectileSortingPredicate(const CProjectile* p1, const CProjectile* p2) noexcept {
 	return std::forward_as_tuple(p1->GetSortDist(sortCamType), p1) > std::forward_as_tuple(p2->GetSortDist(sortCamType), p2);
 };
+
+static bool IsDirectNanoInView(const CCamera::Frustum& frustum, const float3& pos, float radius, uint8_t planeMask)
+{
+	for (std::size_t planeIndex = 0; planeIndex < CCamera::FRUSTUM_PLANE_CNT; ++planeIndex) {
+		if ((planeMask & (1 << planeIndex)) == 0)
+			continue;
+
+		const float4& plane = frustum.planes[planeIndex];
+		if (plane.dot(pos) + plane.w < -radius)
+			return false;
+	}
+	return true;
+}
 
 CProjectileDrawer* projectileDrawer = nullptr;
 
@@ -357,6 +371,21 @@ void CProjectileDrawer::Kill() {
 	smokeTextures.clear();
 
 	renderProjectiles.clear();
+	directNanoVBO.Release();
+	directNanoVAO.Delete();
+	directNanoVertices.clear();
+	directNanoEnemyParticles.clear();
+	directNanoEnemyCells.clear();
+	directNanoEnemyCellIndices.clear();
+	directNanoVisibleEnemyCellIndices.clear();
+	directNanoVisibleEnemyParticles.clear();
+	directNanoVBOCapacity = 0;
+	directNanoVertexCount = 0;
+	directNanoEnemyCellCount = 0;
+	directNanoUploadedGeneration = 0;
+	directNanoNextSyncFrame = 0;
+	directNanoRenderAllyTeam = -2;
+	directNanoRenderFullView = false;
 
 	for (auto& dp : drawParticles)
 		dp.clear();
@@ -622,6 +651,12 @@ bool CProjectileDrawer::DrawNanoParticle(const float3& pos, const float3& veloci
 	if (!UseNanoParticleShader() || camera->GetCamType() == CCamera::CAMTYPE_SHADOW)
 		return false;
 
+	AddNanoParticleVertex(pos, velocity, createFrame, deathFrame, color);
+	return true;
+}
+
+void CProjectileDrawer::AddNanoParticleVertex(const float3& pos, const float3& velocity, int createFrame, int deathFrame, const SColor& color)
+{
 	nanoRenderBuffer.AddVertex({
 		pos,
 		velocity,
@@ -629,7 +664,6 @@ bool CProjectileDrawer::DrawNanoParticle(const float3& pos, const float3& veloci
 		ZeroVector,
 		color,
 	});
-	return true;
 }
 
 bool CProjectileDrawer::UseNanoParticleShader() const
@@ -650,7 +684,7 @@ bool CProjectileDrawer::InitNanoParticleShader()
 	nanoShader->Link();
 
 	if (!nanoShader->IsValid()) {
-		LOG_L(L_WARNING, "Nano particle shader is unavailable; using legacy textured billboards");
+		LOG_L(L_WARNING, "Nano particle shader is unavailable; using legacy textured billboards. Log:\n%s", nanoShader->GetLog().c_str());
 		shaderHandler->ReleaseProgramObject("[ProjectileDrawer::VFS]", "Nano Particle Shader");
 		nanoShader = nullptr;
 		return false;
@@ -658,7 +692,13 @@ bool CProjectileDrawer::InitNanoParticleShader()
 
 	nanoShader->Enable();
 	nanoShader->Disable();
-	nanoShader->Validate();
+	if (!nanoShader->Validate()) {
+		LOG_L(L_WARNING, "Nano particle shader validation failed; using legacy textured billboards. Log:\n%s", nanoShader->GetLog().c_str());
+		shaderHandler->ReleaseProgramObject("[ProjectileDrawer::VFS]", "Nano Particle Shader");
+		nanoShader = nullptr;
+		return false;
+	}
+	LOG_L(L_INFO, "Nano particle GL4 shader initialized; direct batching enabled");
 	return true;
 }
 
@@ -667,6 +707,226 @@ void CProjectileDrawer::ConfigNotify(const std::string&, const std::string&)
 	drawNanoParticlesGL4 = configHandler->GetBool("NanoParticlesGL4");
 	if (drawNanoParticlesGL4 && nanoShader == nullptr)
 		InitNanoParticleShader();
+}
+
+bool CProjectileDrawer::ShouldPersistDirectNanoParticle(const DirectNanoParticle& particle) const
+{
+	if (directNanoRenderFullView)
+		return true;
+
+	if (!teamHandler.IsValidAllyTeam(directNanoRenderAllyTeam))
+		return false;
+
+	return losHandler->GetGlobalLOS(directNanoRenderAllyTeam) ||
+		(teamHandler.IsValidAllyTeam(particle.allyTeam) && teamHandler.Ally(particle.allyTeam, directNanoRenderAllyTeam));
+}
+
+VA_TYPE_PROJ CProjectileDrawer::MakeDirectNanoVertex(const DirectNanoParticle& particle) const
+{
+	return VA_TYPE_PROJ{
+		particle.startPos,
+		particle.velocity,
+		{static_cast<float>(particle.createFrame), static_cast<float>(particle.deathFrame), 0.0f, 0.0f},
+		{1.0f, 0.0f, 0.0f},
+		particle.color,
+	};
+}
+
+void CProjectileDrawer::EnsureDirectNanoBuffer()
+{
+	if (directNanoVertexCount == 0)
+		return;
+
+	const bool initVAO = (directNanoVAO.GetIdRaw() == 0);
+	if (directNanoVBOCapacity < directNanoVertexCount)
+		directNanoVBOCapacity = std::bit_ceil(directNanoVertexCount);
+
+	directNanoVAO.Bind();
+	directNanoVBO.Bind();
+	if (directNanoVBO.GetSize() < directNanoVBOCapacity * sizeof(VA_TYPE_PROJ))
+		directNanoVBO.New(directNanoVBOCapacity * sizeof(VA_TYPE_PROJ), GL_DYNAMIC_DRAW);
+
+	if (initVAO) {
+		for (const AttributeDef& attribute : VA_TYPE_PROJ::attributeDefs) {
+			glEnableVertexAttribArray(attribute.index);
+			glVertexAttribDivisor(attribute.index, 0);
+			glVertexAttribPointer(attribute.index, attribute.count, attribute.type, attribute.normalize, attribute.stride, attribute.data);
+		}
+	}
+
+	directNanoVBO.Unbind();
+	directNanoVAO.Unbind();
+	if (initVAO) {
+		for (const AttributeDef& attribute : VA_TYPE_PROJ::attributeDefs)
+			glDisableVertexAttribArray(attribute.index);
+	}
+}
+
+void CProjectileDrawer::UploadDirectNanoVertices()
+{
+	if (directNanoVertexCount == 0)
+		return;
+
+	EnsureDirectNanoBuffer();
+	directNanoVBO.Bind();
+	directNanoVBO.SetBufferSubData(0, directNanoVertexCount * sizeof(VA_TYPE_PROJ), directNanoVertices.data());
+	directNanoVBO.Unbind();
+}
+
+void CProjectileDrawer::SyncDirectNanoParticles()
+{
+	const auto& particles = projectileHandler.GetDirectNanoParticles();
+	const std::uint32_t generation = projectileHandler.GetDirectNanoParticleGeneration();
+	const int allyTeam = gu->myAllyTeam;
+	const bool fullView = gu->spectatingFullView;
+	const bool viewChanged = (directNanoRenderAllyTeam != allyTeam || directNanoRenderFullView != fullView);
+	if (!viewChanged && directNanoUploadedGeneration == generation)
+		return;
+
+	const int frame = gs->frameNum;
+	if (!viewChanged && frame < directNanoNextSyncFrame)
+		return;
+
+	directNanoRenderAllyTeam = allyTeam;
+	directNanoRenderFullView = fullView;
+	directNanoVertices.clear();
+	directNanoEnemyParticles.clear();
+
+	for (const DirectNanoParticle& particle : particles) {
+		if (ShouldPersistDirectNanoParticle(particle)) {
+			directNanoVertices.emplace_back(MakeDirectNanoVertex(particle));
+		} else {
+			directNanoEnemyParticles.emplace_back(particle);
+		}
+	}
+	directNanoVertexCount = directNanoVertices.size();
+	BuildDirectNanoEnemyCells(frame);
+	UploadDirectNanoVertices();
+
+	directNanoUploadedGeneration = generation;
+	directNanoNextSyncFrame = frame + directNanoUpdateIntervalFrames;
+	projectileHandler.ClearDirectNanoParticleChanges();
+}
+
+void CProjectileDrawer::BuildDirectNanoEnemyCells(int frame)
+{
+	directNanoEnemyCellIndices.clear();
+	directNanoEnemyCellCount = 0;
+	if (directNanoEnemyParticles.empty())
+		return;
+
+	directNanoEnemyCellIndices.reserve(directNanoEnemyParticles.size());
+
+	for (std::uint32_t particleIndex = 0; particleIndex < directNanoEnemyParticles.size(); ++particleIndex) {
+		const DirectNanoParticle& particle = directNanoEnemyParticles[particleIndex];
+		const float3 currentPos = particle.startPos + particle.velocity * (frame - particle.createFrame);
+		const int cellX = static_cast<int>(std::floor(currentPos.x / directNanoEnemyCellSize));
+		const int cellZ = static_cast<int>(std::floor(currentPos.z / directNanoEnemyCellSize));
+		const std::uint64_t cellKey = (static_cast<std::uint64_t>(static_cast<std::uint32_t>(cellX)) << 32u) | static_cast<std::uint32_t>(cellZ);
+		auto cellIt = directNanoEnemyCellIndices.find(cellKey);
+		std::size_t cellIndex;
+		if (cellIt == directNanoEnemyCellIndices.end()) {
+			cellIndex = directNanoEnemyCellCount++;
+			directNanoEnemyCellIndices[cellKey] = cellIndex;
+			if (cellIndex == directNanoEnemyCells.size())
+				directNanoEnemyCells.emplace_back();
+
+			DirectNanoEnemyCell& cell = directNanoEnemyCells[cellIndex];
+			cell.particleIndices.clear();
+			cell.minPos = currentPos;
+			cell.maxPos = currentPos;
+		} else {
+			cellIndex = cellIt->second;
+		}
+
+		DirectNanoEnemyCell& cell = directNanoEnemyCells[cellIndex];
+		const float3 nextPos = currentPos + particle.velocity * directNanoEnemyCellBoundsFrames;
+		cell.minPos.x = std::min(cell.minPos.x, std::min(currentPos.x, nextPos.x));
+		cell.minPos.y = std::min(cell.minPos.y, std::min(currentPos.y, nextPos.y));
+		cell.minPos.z = std::min(cell.minPos.z, std::min(currentPos.z, nextPos.z));
+		cell.maxPos.x = std::max(cell.maxPos.x, std::max(currentPos.x, nextPos.x));
+		cell.maxPos.y = std::max(cell.maxPos.y, std::max(currentPos.y, nextPos.y));
+		cell.maxPos.z = std::max(cell.maxPos.z, std::max(currentPos.z, nextPos.z));
+		cell.particleIndices.emplace_back(particleIndex);
+	}
+}
+
+void CProjectileDrawer::SubmitDirectEnemyNanoParticles()
+{
+	if (gu->spectatingFullView)
+		return;
+
+	if (directNanoEnemyParticles.empty())
+		return;
+
+	constexpr float drawRadius = 22.0f;
+	const int allyTeam = gu->myAllyTeam;
+	if (!teamHandler.IsValidAllyTeam(allyTeam))
+		return;
+
+	const int frame = gs->frameNum;
+	const float timeOffset = globalRendering->timeOffset;
+	const bool globalLos = losHandler->GetGlobalLOS(allyTeam);
+	const ILosType& los = losHandler->los;
+	const CLosMap& losMap = los.losMaps[allyTeam];
+	const CCamera::Frustum& frustum = camera->GetFrustum();
+	const uint8_t frustumPlaneMask = (camera->GetCamType() == CCamera::CAMTYPE_SHADOW) ? 0x0F : 0x3F;
+	directNanoVisibleEnemyCellIndices.clear();
+	if (directNanoVisibleEnemyCellIndices.capacity() < directNanoEnemyCellCount)
+		directNanoVisibleEnemyCellIndices.reserve(directNanoEnemyCellCount);
+	directNanoVisibleEnemyParticles.clear();
+	if (directNanoVisibleEnemyParticles.capacity() < directNanoEnemyParticles.size())
+		directNanoVisibleEnemyParticles.reserve(directNanoEnemyParticles.size());
+
+	{
+		for (std::uint32_t cellIndex = 0; cellIndex < directNanoEnemyCellCount; ++cellIndex) {
+			const DirectNanoEnemyCell& cell = directNanoEnemyCells[cellIndex];
+			const float3 cellCenter = (cell.minPos + cell.maxPos) * 0.5f;
+			const float cellRadius = (cell.maxPos - cell.minPos).Length() * 0.5f + drawRadius;
+			if (!IsDirectNanoInView(frustum, cellCenter, cellRadius, frustumPlaneMask))
+				continue;
+			directNanoVisibleEnemyCellIndices.emplace_back(cellIndex);
+		}
+	}
+
+	{
+		for (const std::uint32_t cellIndex : directNanoVisibleEnemyCellIndices) {
+			const DirectNanoEnemyCell& cell = directNanoEnemyCells[cellIndex];
+			for (const std::uint32_t particleIndex : cell.particleIndices) {
+				const DirectNanoParticle& particle = directNanoEnemyParticles[particleIndex];
+				if (frame >= particle.deathFrame)
+					continue;
+
+				const float simAge = frame - particle.createFrame;
+				const float3 simPos = particle.startPos + particle.velocity * simAge;
+				const float3 drawPos = simPos + particle.velocity * timeOffset;
+				if (!IsDirectNanoInView(frustum, drawPos, drawRadius, frustumPlaneMask))
+					continue;
+				if (!globalLos && losMap.At(los.PosToSquare(simPos)) == 0 && losMap.At(los.PosToSquare(simPos + particle.velocity)) == 0)
+					continue;
+
+				directNanoVisibleEnemyParticles.emplace_back(&particle);
+			}
+		}
+	}
+
+	{
+		for (const DirectNanoParticle* particle : directNanoVisibleEnemyParticles) {
+			const float simAge = frame - particle->createFrame;
+			const float3 drawPos = particle->startPos + particle->velocity * (simAge + timeOffset);
+			AddNanoParticleVertex(drawPos, particle->velocity, particle->createFrame, particle->deathFrame, particle->color);
+		}
+	}
+}
+
+void CProjectileDrawer::DrawDirectNanoParticles() const
+{
+	if (directNanoVertexCount == 0)
+		return;
+
+	directNanoVAO.Bind();
+	glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(directNanoVertexCount));
+	directNanoVAO.Unbind();
 }
 
 void CProjectileDrawer::DrawProjectilesMiniMap()
@@ -850,6 +1110,11 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			p->Draw();
 		}
 	}
+	if (UseDirectNanoParticles()) {
+		ZoneScopedN("NanoParticles::DirectRenderUpdate");
+		SyncDirectNanoParticles();
+		SubmitDirectEnemyNanoParticles();
+	}
 
 	{
 		ZoneScopedN("ProjectileDrawer::DrawAlpha(RR)");
@@ -868,7 +1133,8 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
 		const bool drawEffects = rb.ShouldSubmit();
 		const bool drawNanos = UseNanoParticleShader() && nanoRenderBuffer.ShouldSubmit(false);
-		if (!drawEffects && !drawNanos)
+		const bool drawDirectNanos = UseDirectNanoParticles() && (directNanoVertexCount > 0);
+		if (!drawEffects && !drawNanos && !drawDirectNanos)
 			return;
 
 		if (drawEffects) {
@@ -905,7 +1171,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			textureAtlas->UnbindTexture();
 		}
 
-		if (drawNanos) {
+		if (drawNanos || drawDirectNanos) {
 			ZoneScopedN("NanoParticles::Draw");
 			auto nanoState = GL::SubState(Culling(GL_FALSE));
 			const float3& camPos = camera->GetPos();
@@ -918,7 +1184,12 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			nanoShader->SetUniform("cameraRight", camRight.x, camRight.y, camRight.z);
 			nanoShader->SetUniform("cameraUp", camUp.x, camUp.y, camUp.z);
 			nanoShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
-			nanoRenderBuffer.DrawArrays(GL_POINTS);
+			if (drawNanos)
+				nanoRenderBuffer.DrawArrays(GL_POINTS);
+			if (drawDirectNanos) {
+				ZoneScopedN("NanoParticles::DirectSubmit");
+				DrawDirectNanoParticles();
+			}
 			nanoShader->Disable();
 		}
 	}

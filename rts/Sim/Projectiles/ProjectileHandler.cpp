@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 #include "Projectile.h"
 #include "ProjectileHandler.h"
@@ -19,6 +20,7 @@
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/TeamHandler.h"
+#include "Rendering/Env/Particles/ProjectileDrawer.h"
 #include "Rendering/Env/Particles/Classes/NanoProjectile.h"
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectile.h"
 #include "Sim/Units/Unit.h"
@@ -65,6 +67,11 @@ namespace {
 	constexpr int NANO_PARTICLE_LOS_CACHE_FRAMES = 7;
 	constexpr float NANO_PARTICLE_LOS_CACHE_CELL_SIZE = 64.0f;
 	constexpr std::size_t NANO_PARTICLE_LOS_CACHE_SLOTS = 1024;
+
+	bool DirectNanoParticleExpiryCompare(const DirectNanoParticleExpiry& lhs, const DirectNanoParticleExpiry& rhs)
+	{
+		return lhs.deathFrame > rhs.deathFrame;
+	}
 
 	struct NanoParticleLosCacheEntry {
 		int x = 0;
@@ -189,6 +196,17 @@ void CProjectileHandler::Init()
 	}
 	nanoParticleUpdateEvents.clear();
 	nanoParticleUpdateEvents.reserve(maxNanoParticles);
+	directNanoParticles.clear();
+	directNanoParticles.reserve(maxNanoParticles);
+	directNanoParticleChanges.clear();
+	directNanoParticleChanges.reserve(maxNanoParticles);
+	directNanoParticleExpiries.clear();
+	directNanoParticleExpiries.reserve(maxNanoParticles);
+	directNanoParticleIndices.clear();
+	directNanoParticleIndices.reserve(maxNanoParticles);
+	nextDirectNanoParticleLightID = -1;
+	directNanoParticleGeneration = 1;
+	directNanoParticleLightGeneration = nanoParticleLightGeneration;
 
 	projectiles[true ].SeedFreeKeys(0, 1 << 14, true); //seed only synced free ids.
 	projectiles[false].reserve(static_cast<size_t>(maxParticles) * 2);
@@ -234,6 +252,10 @@ void CProjectileHandler::Kill()
 	for (auto& events: nanoParticleUpdateThreadEvents)
 		events.clear();
 	nanoParticleUpdateEvents.clear();
+	directNanoParticles.clear();
+	directNanoParticleChanges.clear();
+	directNanoParticleExpiries.clear();
+	directNanoParticleIndices.clear();
 	nanoParticleUpdateClientActive = false;
 
 	CCollisionHandler::PrintStats();
@@ -455,6 +477,7 @@ void CProjectileHandler::Update()
 		// check if any projectiles have collided since the previous update
 		CheckCollisions();
 		UpdateProjectiles();
+		UpdateDirectNanoParticles();
 		DispatchNanoParticleUpdates();
 
 		UPDATE_PTR_CONTAINER(groundFlashes);
@@ -514,6 +537,14 @@ void CProjectileHandler::DispatchNanoParticleUpdates()
 			if (event.type == NanoParticleEventType::Reset) {
 			} else if (event.type == NanoParticleEventType::Remove) {
 				continue;
+			} else if (event.direct) {
+				const bool visible = gu->spectatingFullView ||
+					(teamHandler.IsValidAllyTeam(event.allyTeam) && teamHandler.Ally(event.allyTeam, gu->myAllyTeam)) ||
+					(teamHandler.IsValidAllyTeam(gu->myAllyTeam) &&
+						(losHandler->InLos(event.pos, gu->myAllyTeam) || losHandler->InLos(event.pos + event.velocity, gu->myAllyTeam))
+					);
+				if (!visible)
+					continue;
 			} else {
 				const CProjectile* projectile = GetProjectileByUnsyncedID(event.projectileID);
 				if (projectile == nullptr || projectile->GetSyncID() != event.projectileSyncID)
@@ -845,6 +876,112 @@ void CProjectileHandler::AddFlyingPiece(
 	resortFlyingPieces[modelType] = true;
 }
 
+bool CProjectileHandler::CanUseDirectNanoParticles(bool needsTrajectoryCorrection) const
+{
+	return !needsTrajectoryCorrection && projectileDrawer != nullptr && projectileDrawer->UseDirectNanoParticles();
+}
+
+void CProjectileHandler::AddDirectNanoParticle(const float3& startPos, const float3& initialVelocity, int lifeTime, const SColor& color, int allyTeam, float builderBuildSpeed)
+{
+	// Preserve the unsynced RNG consumption of CNanoProjectile's legacy rotation.
+	guRNG.NextFloat();
+	guRNG.NextFloat();
+	guRNG.NextFloat();
+
+	const float3 endPos = startPos + initialVelocity * lifeTime;
+	const float speedMultiplier = 1.0f + NanoParticle::GL4SpeedVariation * (guRNG.NextFloat() * 2.0f - 1.0f);
+	const int adjustedLifeTime = std::max(1, static_cast<int>(std::ceil(lifeTime / speedMultiplier)));
+	const float3 velocity = (endPos - startPos) / adjustedLifeTime;
+
+	if (nextDirectNanoParticleLightID == std::numeric_limits<int>::min())
+		nextDirectNanoParticleLightID = -1;
+
+	DirectNanoParticle particle;
+	particle.startPos = startPos;
+	particle.velocity = velocity;
+	particle.color = color;
+	particle.createFrame = gs->frameNum;
+	particle.deathFrame = gs->frameNum + adjustedLifeTime;
+	particle.lightID = nextDirectNanoParticleLightID--;
+	particle.allyTeam = allyTeam;
+	particle.builderBuildSpeed = builderBuildSpeed;
+	particle.lightSelected = ShouldSendNanoParticleUpdate(particle.lightID, builderBuildSpeed, velocity.Length());
+
+	directNanoParticleIndices[particle.lightID] = directNanoParticles.size();
+	directNanoParticles.emplace_back(particle);
+	directNanoParticleChanges.emplace_back(DirectNanoParticleChange{particle, DirectNanoParticleChangeType::Add});
+	directNanoParticleExpiries.emplace_back(DirectNanoParticleExpiry{particle.deathFrame, particle.lightID});
+	std::push_heap(directNanoParticleExpiries.begin(), directNanoParticleExpiries.end(), DirectNanoParticleExpiryCompare);
+	if (++directNanoParticleGeneration == 0)
+		directNanoParticleGeneration = 1;
+	currentNanoParticles += 1;
+
+	if (NanoParticleUpdatesEnabled() && particle.lightSelected)
+		QueueDirectNanoParticleUpdate(directNanoParticles.back());
+}
+
+void CProjectileHandler::QueueDirectNanoParticleUpdate(const DirectNanoParticle& particle)
+{
+	const int frame = gs->frameNum;
+	NanoParticleEvent event;
+	event.type = NanoParticleEventType::Spawn;
+	event.direct = true;
+	event.allyTeam = particle.allyTeam;
+	event.lightID = particle.lightID;
+	event.pos = particle.startPos + particle.velocity * (frame - particle.createFrame);
+	event.velocity = particle.velocity;
+	event.remainingLife = std::max(particle.deathFrame - frame, 0);
+	event.color = float3(particle.color[0], particle.color[1], particle.color[2]) * (1.0f / 255.0f);
+	event.builderBuildSpeed = particle.builderBuildSpeed;
+	QueueNanoParticleUpdateEvent(std::move(event));
+}
+
+void CProjectileHandler::RemoveDirectNanoParticle(std::size_t index)
+{
+	const DirectNanoParticle particle = directNanoParticles[index];
+	const int lightID = particle.lightID;
+	directNanoParticleIndices.erase(lightID);
+
+	const std::size_t lastIndex = directNanoParticles.size() - 1;
+	if (index != lastIndex) {
+		directNanoParticles[index] = directNanoParticles.back();
+		directNanoParticleIndices[directNanoParticles[index].lightID] = index;
+	}
+	directNanoParticles.pop_back();
+	directNanoParticleChanges.emplace_back(DirectNanoParticleChange{particle, DirectNanoParticleChangeType::Remove});
+	if (++directNanoParticleGeneration == 0)
+		directNanoParticleGeneration = 1;
+	currentNanoParticles -= 1;
+}
+
+void CProjectileHandler::UpdateDirectNanoParticles()
+{
+	ZoneScopedN("NanoParticles::DirectUpdate");
+	if (directNanoParticleLightGeneration != nanoParticleLightGeneration) {
+		for (DirectNanoParticle& particle : directNanoParticles) {
+			particle.lightSelected = ShouldSendNanoParticleUpdate(particle.lightID, particle.builderBuildSpeed, particle.velocity.Length());
+			if (NanoParticleUpdatesEnabled() && particle.lightSelected)
+				QueueDirectNanoParticleUpdate(particle);
+		}
+		directNanoParticleLightGeneration = nanoParticleLightGeneration;
+	}
+
+	const int frame = gs->frameNum;
+	while (!directNanoParticleExpiries.empty() && directNanoParticleExpiries.front().deathFrame <= frame) {
+		std::pop_heap(directNanoParticleExpiries.begin(), directNanoParticleExpiries.end(), DirectNanoParticleExpiryCompare);
+		const DirectNanoParticleExpiry expiry = directNanoParticleExpiries.back();
+		directNanoParticleExpiries.pop_back();
+
+		const auto indexIt = directNanoParticleIndices.find(expiry.lightID);
+		if (indexIt == directNanoParticleIndices.end())
+			continue;
+		if (directNanoParticles[indexIt->second].deathFrame != expiry.deathFrame)
+			continue;
+
+		RemoveDirectNanoParticle(indexIt->second);
+	}
+}
+
 
 void CProjectileHandler::AddNanoParticle(
 	const float3 startPos,
@@ -880,7 +1017,15 @@ void CProjectileHandler::AddNanoParticle(
 		{tColor[0], tColor[1], tColor[2],  tAlpha},
 	};
 
-	projMemPool.alloc<CNanoProjectile>(startPos, dif * NANO_PARTICLE_SPEED, lifeTime, colors[globalRendering->teamNanospray], unitDef->buildSpeed);
+	const float3 velocity = dif * NANO_PARTICLE_SPEED;
+	const int allyTeam = teamHandler.IsValidTeam(teamNum) ? teamHandler.AllyTeam(teamNum) : -1;
+	const bool needsGroundClamp = nanoParticlesGroundClamp && CNanoProjectile::NeedsGroundClamp(startPos, velocity, lifeTime);
+	if (CanUseDirectNanoParticles(needsGroundClamp)) {
+		AddDirectNanoParticle(startPos, velocity, lifeTime, colors[globalRendering->teamNanospray], allyTeam, unitDef->buildSpeed);
+		return;
+	}
+
+	projMemPool.alloc<CNanoProjectile>(startPos, velocity, lifeTime, colors[globalRendering->teamNanospray], unitDef->buildSpeed);
 }
 
 void CProjectileHandler::AddNanoParticle(
@@ -920,6 +1065,16 @@ void CProjectileHandler::AddNanoParticle(
 		{udColor.r, udColor.g, udColor.b, udAlpha},
 		{tColor[0], tColor[1], tColor[2],  tAlpha},
 	};
+	const bool needsHoming = nanoParticlesHoming && homingTarget != nullptr && (inverse || !homingTarget->beingBuilt);
+	const float3 directStartPos = inverse ? (startPos + dif * len) : startPos;
+	const float3 directVelocity = (inverse ? -dif : dif) * NANO_PARTICLE_SPEED;
+	const int allyTeam = teamHandler.IsValidTeam(teamNum) ? teamHandler.AllyTeam(teamNum) : -1;
+	const bool needsGroundClamp = nanoParticlesGroundClamp && CNanoProjectile::NeedsGroundClamp(directStartPos, directVelocity, lifeTime);
+
+	if (CanUseDirectNanoParticles(needsHoming || needsGroundClamp)) {
+		AddDirectNanoParticle(directStartPos, directVelocity, lifeTime, colors[globalRendering->teamNanospray], allyTeam, unitDef->buildSpeed);
+		return;
+	}
 
 	if (!inverse) {
 		projMemPool.alloc<CNanoProjectile>(startPos, dif * NANO_PARTICLE_SPEED, lifeTime, colors[globalRendering->teamNanospray], unitDef->buildSpeed, homingTarget, homingTargetPiece, false);

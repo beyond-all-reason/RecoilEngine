@@ -9,6 +9,8 @@
 
 #include "Rendering/Models/3DModelDefs.hpp"
 #include "Rendering/Env/Particles/Classes/FlyingPiece.h"
+#include "Sim/Projectiles/DirectNanoParticle.h"
+#include "System/Color.h"
 #include "System/float3.h"
 #include "System/FreeListMap.h"
 #include "System/Threading/ThreadPool.h"
@@ -37,6 +39,8 @@ enum class NanoParticleEventType : std::uint8_t {
 
 struct NanoParticleEvent {
 	NanoParticleEventType type = NanoParticleEventType::Update;
+	bool direct = false;
+	int allyTeam = -1;
 	int lightID = -1;
 	int projectileID = -1;
 	std::int64_t projectileSyncID = -1;
@@ -104,6 +108,10 @@ public:
 	int GetReclaimCompletionNanoBurstCount(float reclaimedMetal, int contributorCount) const;
 	bool ShouldSendNanoParticleUpdate(int particleID, float builderBuildSpeed, float particleSpeed) const;
 	void QueueNanoParticleUpdateEvent(NanoParticleEvent&& event);
+	const std::vector<DirectNanoParticle>& GetDirectNanoParticles() const { return directNanoParticles; }
+	const std::vector<DirectNanoParticleChange>& GetDirectNanoParticleChanges() const { return directNanoParticleChanges; }
+	void ClearDirectNanoParticleChanges() { directNanoParticleChanges.clear(); }
+	std::uint32_t GetDirectNanoParticleGeneration() const { return directNanoParticleGeneration; }
 	bool NanoParticleUpdatesEnabled() const { return nanoParticleUpdateLuaUI && nanoParticleUpdateClientActive; }
 	bool NanoParticlesReclaimBurstEnabled() const { return nanoParticlesReclaimBurst; }
 
@@ -132,6 +140,11 @@ public:
 
 private:
 	void DispatchNanoParticleUpdates();
+	bool CanUseDirectNanoParticles(bool needsHoming) const;
+	void AddDirectNanoParticle(const float3& startPos, const float3& velocity, int lifeTime, const SColor& color, int allyTeam, float builderBuildSpeed);
+	void UpdateDirectNanoParticles();
+	void QueueDirectNanoParticleUpdate(const DirectNanoParticle& particle);
+	void RemoveDirectNanoParticle(std::size_t index);
 
 	// event-notifiers
 	void CreateProjectile(CProjectile*);
@@ -153,6 +166,13 @@ private:
 	spring::FreeListMapCompact<CProjectile*, int> projectiles[2];
 	std::array<std::vector<NanoParticleEvent>, ThreadPool::MAX_THREADS> nanoParticleUpdateThreadEvents;
 	std::vector<NanoParticleEvent> nanoParticleUpdateEvents;
+	std::vector<DirectNanoParticle> directNanoParticles;
+	std::vector<DirectNanoParticleChange> directNanoParticleChanges;
+	std::vector<DirectNanoParticleExpiry> directNanoParticleExpiries;
+	spring::unordered_map<int, std::size_t> directNanoParticleIndices;
+	int nextDirectNanoParticleLightID = -1;
+	std::uint32_t directNanoParticleGeneration = 1;
+	std::uint32_t directNanoParticleLightGeneration = 0;
 	bool nanoParticleUpdateClientActive = false;
 
 	static uint32_t UnsyncedRandInt(uint32_t N);

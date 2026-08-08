@@ -126,6 +126,9 @@ void main()
 	vec3 center = gl_in[0].gl_Position.xyz;
 	float createFrame = v_lifetime[0].x;
 	float deathFrame = v_lifetime[0].y;
+	if (animationFrame >= deathFrame)
+		return;
+
 	float age = max(animationFrame - createFrame, 0.0);
 	float fade = clamp((deathFrame - animationFrame) / FADE_FRAMES, 0.0, 1.0);
 

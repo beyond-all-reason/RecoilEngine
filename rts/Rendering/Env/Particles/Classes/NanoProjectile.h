@@ -10,6 +10,10 @@
 class CUnit;
 enum class NanoParticleEventType : std::uint8_t;
 
+namespace NanoParticle {
+	inline constexpr float GL4SpeedVariation = 0.14f;
+}
+
 class CNanoProjectile : public CProjectile
 {
 	CR_DECLARE_DERIVED(CNanoProjectile)
@@ -28,6 +32,7 @@ public:
 	int GetProjectilesCount() const override;
 
 	static bool GetMemberInfo(SExpGenSpawnableMemberInfo& memberInfo);
+	static bool NeedsGroundClamp(const float3& startPos, const float3& velocity, int lifeTime);
 
 private:
 	void InitHoming(const CUnit* target, int targetPiece, int lifeTime);

@@ -60,7 +60,6 @@ namespace {
 	constexpr int HOMING_RUN_EVERY = 4;
 	constexpr int GROUND_CLAMP_RECHECK_HIT = 6;
 	constexpr int GROUND_CLAMP_RECHECK_MISS = 12;
-	constexpr float NANO_SPEED_VARIATION = 0.14f;
 	constexpr float GROUND_CLAMP_MARGIN = 11.0f;
 	constexpr float GROUND_CLAMP_SMART_DELTA = 4.0f;
 	constexpr float GROUND_CACHE_CELL_SIZE = 16.0f;
@@ -127,6 +126,85 @@ namespace {
 		cache.stamps[slot] = stamp;
 		cache.heights[slot] = height;
 		return height;
+	}
+
+	bool EvaluateGroundClampRoute(const float3& startPos, const float3& finalPos, float& guideY, float& peakT)
+	{
+		const int frame = gs->frameNum;
+		const float3 path = finalPos - startPos;
+		const auto quantize = [](float value) {
+			return static_cast<int>(std::floor(value / GROUND_CLAMP_GATE_CELL_SIZE + 0.5f));
+		};
+		const int startX = quantize(startPos.x);
+		const int startY = quantize(startPos.y);
+		const int startZ = quantize(startPos.z);
+		const int endX = quantize(finalPos.x);
+		const int endY = quantize(finalPos.y);
+		const int endZ = quantize(finalPos.z);
+		const std::size_t slot = (
+			static_cast<std::uint32_t>(startX) * 73856093u ^
+			static_cast<std::uint32_t>(startY) * 19349663u ^
+			static_cast<std::uint32_t>(startZ) * 83492791u ^
+			static_cast<std::uint32_t>(endX) * 2654435761u ^
+			static_cast<std::uint32_t>(endY) * 97531u ^
+			static_cast<std::uint32_t>(endZ) * 1099511627u
+		) & (GROUND_CLAMP_GATE_CACHE_SLOTS - 1);
+
+		thread_local GroundClampGateCache gateCache;
+		if (gateCache.map != readMap || frame < gateCache.lastFrame) {
+			for (GroundClampGateCacheEntry& entry : gateCache.entries)
+				entry.expiresFrame = -1;
+			gateCache.map = readMap;
+		}
+		gateCache.lastFrame = frame;
+
+		GroundClampGateCacheEntry& cacheEntry = gateCache.entries[slot];
+		const bool cacheHit = cacheEntry.expiresFrame > frame &&
+			cacheEntry.startX == startX && cacheEntry.startY == startY && cacheEntry.startZ == startZ &&
+			cacheEntry.endX == endX && cacheEntry.endY == endY && cacheEntry.endZ == endZ;
+		if (cacheHit) {
+			if (!cacheEntry.requiresClamp)
+				return false;
+
+			guideY = cacheEntry.guideY;
+			peakT = cacheEntry.peakT;
+			return true;
+		}
+
+		const float horizontalLengthSq = path.x * path.x + path.z * path.z;
+		const bool longPath = (horizontalLengthSq > 4096.0f);
+		const std::size_t sampleCount = longPath ? GROUND_CLAMP_LONG_SAMPLES.size() : GROUND_CLAMP_SHORT_SAMPLES.size();
+
+		guideY = -1.0e9f;
+		float maxPenetration = -1.0e9f;
+		peakT = 0.5f;
+		for (std::size_t sample = 0; sample < sampleCount; ++sample) {
+			const float t = longPath ? GROUND_CLAMP_LONG_SAMPLES[sample] : GROUND_CLAMP_SHORT_SAMPLES[sample];
+			const float3 samplePos = startPos + path * t;
+			const float groundY = GetGroundYMargin(samplePos.x, samplePos.z, frame);
+			guideY = std::max(guideY, groundY);
+
+			const float penetration = groundY - samplePos.y;
+			if (penetration > maxPenetration) {
+				maxPenetration = penetration;
+				peakT = t;
+			}
+		}
+
+		cacheEntry.startX = startX;
+		cacheEntry.startY = startY;
+		cacheEntry.startZ = startZ;
+		cacheEntry.endX = endX;
+		cacheEntry.endY = endY;
+		cacheEntry.endZ = endZ;
+		cacheEntry.expiresFrame = frame + GROUND_CLAMP_GATE_CACHE_FRAMES;
+		cacheEntry.requiresClamp = (maxPenetration > GROUND_CLAMP_SMART_DELTA);
+		if (!cacheEntry.requiresClamp)
+			return false;
+
+		cacheEntry.guideY = guideY;
+		cacheEntry.peakT = peakT;
+		return true;
 	}
 
 	struct HomingTargetCacheEntry {
@@ -209,7 +287,7 @@ CNanoProjectile::CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor 
 
 	if (projectileDrawer != nullptr && projectileDrawer->UseNanoParticleShader() && lifeTime > 0 && this->speed.w > 0.0f) {
 		const float3 endPos = pos + static_cast<float3>(this->speed) * lifeTime;
-		const float speedMult = 1.0f + NANO_SPEED_VARIATION * (guRNG.NextFloat() * 2.0f - 1.0f);
+		const float speedMult = 1.0f + NanoParticle::GL4SpeedVariation * (guRNG.NextFloat() * 2.0f - 1.0f);
 		lifeTime = std::max(1, static_cast<int>(std::ceil(lifeTime / speedMult)));
 		SetVelocityAndSpeed((endPos - pos) / lifeTime);
 		deathFrame = gs->frameNum + lifeTime;
@@ -349,83 +427,12 @@ void CNanoProjectile::InitGroundClamp(bool inverse, int lifeTime)
 		return;
 
 	groundClampFinalPos = pos + static_cast<float3>(speed) * lifeTime;
-	const int frame = gs->frameNum;
-	const float3 path = groundClampFinalPos - pos;
-	const auto quantize = [](float value) {
-		return static_cast<int>(std::floor(value / GROUND_CLAMP_GATE_CELL_SIZE + 0.5f));
-	};
-	const int startX = quantize(pos.x);
-	const int startY = quantize(pos.y);
-	const int startZ = quantize(pos.z);
-	const int endX = quantize(groundClampFinalPos.x);
-	const int endY = quantize(groundClampFinalPos.y);
-	const int endZ = quantize(groundClampFinalPos.z);
-	const std::size_t slot = (
-		static_cast<std::uint32_t>(startX) * 73856093u ^
-		static_cast<std::uint32_t>(startY) * 19349663u ^
-		static_cast<std::uint32_t>(startZ) * 83492791u ^
-		static_cast<std::uint32_t>(endX) * 2654435761u ^
-		static_cast<std::uint32_t>(endY) * 97531u ^
-		static_cast<std::uint32_t>(endZ) * 1099511627u
-	) & (GROUND_CLAMP_GATE_CACHE_SLOTS - 1);
-
-	thread_local GroundClampGateCache gateCache;
-	if (gateCache.map != readMap || frame < gateCache.lastFrame) {
-		for (GroundClampGateCacheEntry& entry : gateCache.entries)
-			entry.expiresFrame = -1;
-		gateCache.map = readMap;
-	}
-	gateCache.lastFrame = frame;
-
-	GroundClampGateCacheEntry& cacheEntry = gateCache.entries[slot];
 	float guideY;
 	float peakT;
-	const bool cacheHit = cacheEntry.expiresFrame > frame &&
-		cacheEntry.startX == startX && cacheEntry.startY == startY && cacheEntry.startZ == startZ &&
-		cacheEntry.endX == endX && cacheEntry.endY == endY && cacheEntry.endZ == endZ;
-	if (cacheHit) {
-		if (!cacheEntry.requiresClamp)
-			return;
+	if (!EvaluateGroundClampRoute(pos, groundClampFinalPos, guideY, peakT))
+		return;
 
-		guideY = cacheEntry.guideY;
-		peakT = cacheEntry.peakT;
-	} else {
-		const float horizontalLengthSq = path.x * path.x + path.z * path.z;
-		const bool longPath = (horizontalLengthSq > 4096.0f);
-		const std::size_t sampleCount = longPath ? GROUND_CLAMP_LONG_SAMPLES.size() : GROUND_CLAMP_SHORT_SAMPLES.size();
-
-		guideY = -1.0e9f;
-		float maxPenetration = -1.0e9f;
-		peakT = 0.5f;
-		for (std::size_t sample = 0; sample < sampleCount; ++sample) {
-			const float t = longPath ? GROUND_CLAMP_LONG_SAMPLES[sample] : GROUND_CLAMP_SHORT_SAMPLES[sample];
-			const float3 samplePos = pos + path * t;
-			const float groundY = GetGroundYMargin(samplePos.x, samplePos.z, frame);
-			guideY = std::max(guideY, groundY);
-
-			const float penetration = groundY - samplePos.y;
-			if (penetration > maxPenetration) {
-				maxPenetration = penetration;
-				peakT = t;
-			}
-		}
-
-		cacheEntry.startX = startX;
-		cacheEntry.startY = startY;
-		cacheEntry.startZ = startZ;
-		cacheEntry.endX = endX;
-		cacheEntry.endY = endY;
-		cacheEntry.endZ = endZ;
-		cacheEntry.expiresFrame = frame + GROUND_CLAMP_GATE_CACHE_FRAMES;
-		cacheEntry.requiresClamp = (maxPenetration > GROUND_CLAMP_SMART_DELTA);
-		if (!cacheEntry.requiresClamp)
-			return;
-
-		cacheEntry.guideY = guideY;
-		cacheEntry.peakT = peakT;
-	}
-
-	const float finalGroundY = GetGroundYMargin(groundClampFinalPos.x, groundClampFinalPos.z, frame);
+	const float finalGroundY = GetGroundYMargin(groundClampFinalPos.x, groundClampFinalPos.z, gs->frameNum);
 	groundClampActive = true;
 	groundClampNextFrame = createFrame + (updatePhase % GROUND_CLAMP_RECHECK_HIT);
 	groundClampFinalPos.y = std::max(groundClampFinalPos.y, finalGroundY);
@@ -439,6 +446,17 @@ void CNanoProjectile::InitGroundClamp(bool inverse, int lifeTime)
 	groundClampWaypointPos.y = std::max(groundClampWaypointPos.y, guideY);
 	groundClampWaypointFrame = createFrame + firstLegFrames;
 	Reaim(groundClampWaypointPos, firstLegFrames);
+}
+
+bool CNanoProjectile::NeedsGroundClamp(const float3& startPos, const float3& velocity, int lifeTime)
+{
+	ZoneScopedN("NanoParticles::GroundClampGate");
+	if (lifeTime <= 1)
+		return false;
+
+	float guideY;
+	float peakT;
+	return EvaluateGroundClampRoute(startPos, startPos + velocity * lifeTime, guideY, peakT);
 }
 
 bool CNanoProjectile::ResolveHomingTarget(float3& targetPos)
