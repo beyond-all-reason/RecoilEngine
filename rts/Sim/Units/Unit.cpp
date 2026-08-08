@@ -55,6 +55,7 @@
 #include "Sim/MoveTypes/MoveTypeFactory.h"
 #include "Sim/MoveTypes/ScriptMoveType.h"
 #include "Sim/Projectiles/FlareProjectile.h"
+#include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Projectiles/ProjectileMemPool.h"
 #include "Sim/Projectiles/WeaponProjectiles/MissileProjectile.h"
 #include "Sim/Weapons/Weapon.h"
@@ -74,6 +75,10 @@
 #include "System/Misc/TracyDefs.h"
 
 GlobalUnitParams globalUnitParams;
+
+namespace {
+	constexpr int RECLAIM_NANO_BURST_CONTRIBUTOR_MAX_AGE = 30;
+}
 
 // See end of source for member bindings
 //////////////////////////////////////////////////////////////////////
@@ -2094,6 +2099,9 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 			return false;
 		}
 
+		if (projectileHandler.NanoParticlesReclaimBurstEnabled())
+			RecordReclaimNanoBurstContributor(builder);
+
 		// turn reclaimee into nanoframe (even living units)
 		if (modInfo.reclaimUnitMethod == 0)
 			TurnIntoNanoframe();
@@ -2106,8 +2114,29 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 
 		// reclaim finished?
 		if (killMe || buildProgress <= 0.0f || health <= 0.0f) {
-			if (auto* reclaimBuilder = dynamic_cast<CBuilder*>(builder); reclaimBuilder != nullptr)
-				reclaimBuilder->CreateReclaimCompletionNanoBurst(this, reclaimBurstMetal);
+			if (auto* reclaimBuilder = dynamic_cast<CBuilder*>(builder); reclaimBuilder != nullptr) {
+				std::vector<CBuilder*> contributors;
+				for (const ReclaimNanoBurstContributor& contributor : reclaimNanoBurstContributors) {
+					if (contributor.lastFrame < gs->frameNum - RECLAIM_NANO_BURST_CONTRIBUTOR_MAX_AGE)
+						continue;
+
+					CUnit* unit = unitHandler.GetUnit(contributor.unitID);
+					if (unit == nullptr || unit->GetSyncID() != contributor.syncID || unit->isDead || unit->team != reclaimBuilder->team)
+						continue;
+
+					if (auto* contributorBuilder = dynamic_cast<CBuilder*>(unit); contributorBuilder != nullptr)
+						contributors.push_back(contributorBuilder);
+				}
+
+				if (contributors.empty())
+					contributors.push_back(reclaimBuilder);
+
+				const int burstCount = projectileHandler.GetReclaimCompletionNanoBurstCount(reclaimBurstMetal, contributors.size());
+				const int baseCount = burstCount / contributors.size();
+				const int remainder = burstCount - baseCount * contributors.size();
+				for (std::size_t i = 0; i < contributors.size(); ++i)
+					contributors[i]->CreateReclaimCompletionNanoBurst(this, baseCount + (i < remainder));
+			}
 
 			health = 0.0f;
 			buildProgress = 0.0f;
@@ -2119,6 +2148,27 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 	}
 
 	return false;
+}
+
+void CUnit::RecordReclaimNanoBurstContributor(const CUnit* builder)
+{
+	const int oldestFrame = gs->frameNum - RECLAIM_NANO_BURST_CONTRIBUTOR_MAX_AGE;
+	for (std::size_t i = 0; i < reclaimNanoBurstContributors.size();) {
+		ReclaimNanoBurstContributor& contributor = reclaimNanoBurstContributors[i];
+		if (contributor.lastFrame < oldestFrame) {
+			contributor = reclaimNanoBurstContributors.back();
+			reclaimNanoBurstContributors.pop_back();
+			continue;
+		}
+
+		if (contributor.unitID == builder->id && contributor.syncID == builder->GetSyncID()) {
+			contributor.lastFrame = gs->frameNum;
+			return;
+		}
+		++i;
+	}
+
+	reclaimNanoBurstContributors.push_back({builder->id, builder->GetSyncID(), gs->frameNum});
 }
 
 
@@ -2954,6 +3004,7 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(transportMassUsed),
 
 	CR_MEMBER(buildProgress),
+	CR_IGNORED(reclaimNanoBurstContributors),
 	CR_MEMBER(groundLevelled),
 	CR_MEMBER(terraformLeft),
 	CR_MEMBER(repairAmount),

@@ -19,6 +19,7 @@ public:
 	CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor color, float builderBuildSpeed = 100.0f, const CUnit* homingTarget = nullptr, int homingTargetPiece = -1, bool inverse = false);
 	~CNanoProjectile();
 
+	void PreUpdate() override;
 	void Update() override;
 	void Draw() override;
 	void DrawOnMinimap() const override;
@@ -58,6 +59,7 @@ private:
 	float nanoParticleLightBuildSpeed = 0.0f;
 	uint8_t updatePhase = 0;
 	bool groundClampActive = false;
+	bool nanoParticleLightSelected = false;
 	bool nanoParticleLightSpawned = false;
 public:
 	static inline float rotVal0 = 0.0f;

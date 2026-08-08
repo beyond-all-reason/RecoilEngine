@@ -101,7 +101,8 @@ public:
 	void AddNanoParticle(const float3, const float3, const UnitDef*, int team, bool highPriority);
 	void AddNanoParticle(const float3, const float3, const UnitDef*, int team, float radius, bool inverse, bool highPriority, const CUnit* homingTarget = nullptr, int homingTargetPiece = -1);
 	int GetNanoParticleEmitCount(float builderBuildSpeed, float buildPower, float& accumulator, int& lastEmitFrame) const;
-	int GetReclaimCompletionNanoBurstCount(float reclaimedMetal) const;
+	int GetReclaimCompletionNanoBurstCount(float reclaimedMetal, int contributorCount) const;
+	bool ShouldSendNanoParticleUpdate(int particleID, float builderBuildSpeed, float particleSpeed) const;
 	void QueueNanoParticleUpdateEvent(NanoParticleEvent&& event);
 	bool NanoParticleUpdatesEnabled() const { return nanoParticleUpdateLuaUI && nanoParticleUpdateClientActive; }
 	bool NanoParticlesReclaimBurstEnabled() const { return nanoParticlesReclaimBurst; }
@@ -114,6 +115,7 @@ public:
 	bool nanoParticlesGroundClamp = false;
 	bool nanoParticlesReclaimBurst = false;
 	float nanoParticleRate = 0.32f;
+	float nanoParticleUpdateLuaUISampleRate = 0.08f;
 	bool nanoParticleUpdateLuaUI = false;
 	std::uint32_t nanoParticleLightGeneration = 1;
 

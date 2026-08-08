@@ -1014,7 +1014,7 @@ void CBuilder::CreateNanoParticle(const float3& goal, float radius, bool inverse
 	}
 }
 
-void CBuilder::CreateReclaimCompletionNanoBurst(const CUnit* reclaimee, float reclaimedMetal)
+void CBuilder::CreateReclaimCompletionNanoBurst(const CUnit* reclaimee, int burstCount)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (reclaimee == nullptr || !projectileHandler.NanoParticlesReclaimBurstEnabled())
@@ -1023,7 +1023,6 @@ void CBuilder::CreateReclaimCompletionNanoBurst(const CUnit* reclaimee, float re
 	if (!localModel.Initialized())
 		return;
 
-	const int burstCount = projectileHandler.GetReclaimCompletionNanoBurstCount(reclaimedMetal);
 	const float3& collisionScales = reclaimee->collisionVolume.GetScales();
 	const float smallestCollisionScale = min(collisionScales.x, min(collisionScales.y, collisionScales.z));
 	const float burstRadius = smallestCollisionScale * 0.5f * RECLAIM_BURST_VOLUME_FRACTION;

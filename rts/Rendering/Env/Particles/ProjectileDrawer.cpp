@@ -31,6 +31,7 @@
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Projectiles/PieceProjectile.h"
 #include "Rendering/Env/Particles/Classes/FlyingPiece.h"
+#include "Rendering/Env/Particles/Classes/NanoProjectile.h"
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectile.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
 #include "Sim/Weapons/WeaponDef.h"
@@ -284,7 +285,7 @@ void CProjectileDrawer::Init() {
 	}
 
 
-	renderProjectiles.reserve(projectileHandler.maxParticles + projectileHandler.maxNanoParticles);
+	renderProjectiles.reserve(projectileHandler.maxParticles);
 	for (auto& mr : modelRenderers) { mr.Clear(); }
 
 	LoadWeaponTextures();
@@ -375,17 +376,13 @@ void CProjectileDrawer::Kill() {
 
 	configHandler->Set("SoftParticles", wantSoften);
 }
-
 void CProjectileDrawer::UpdateDrawFlags()
 {
 	ZoneScopedN("ProjectileDrawer::UpdateDrawFlags");
-
-	for_mt(0, renderProjectiles.size(), [this](int i) {
-		CProjectile* p = renderProjectiles[i];
+	const auto updateGenericDrawFlags = [this](CProjectile* p) {
 		const bool hasModel = (p->model != nullptr);
 
 		p->drawPos = p->GetDrawPos(globalRendering->timeOffset);
-
 		p->previousDrawFlag = p->drawFlag;
 		p->ResetDrawFlag();
 
@@ -421,7 +418,6 @@ void CProjectileDrawer::UpdateDrawFlags()
 					if (p->drawPos.y - p->GetDrawRadius() < 0.0f)
 						p->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
 
-					// Special case of piece projectile, since it has a model and fire particle
 					if (p->piece)
 						p->AddDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
 				} break;
@@ -435,14 +431,16 @@ void CProjectileDrawer::UpdateDrawFlags()
 					else
 						p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
 
-					// Special case of piece projectile, since it has a model and fire particle
 					if (p->piece)
 						p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
 				} break;
 			}
 		}
-	});
+	};
 
+	for_mt(0, renderProjectiles.size(), [this, updateGenericDrawFlags](int i) {
+		updateGenericDrawFlags(renderProjectiles[i]);
+	});
 }
 
 bool CProjectileDrawer::CheckSoftenExt()
@@ -696,7 +694,6 @@ void CProjectileDrawer::DrawProjectilesMiniMap()
 
 		p->DrawOnMinimap();
 	}
-
 	auto& sh = TypedRenderBuffer<VA_TYPE_C>::GetShader();
 
 	glLineWidth(1.0f);
@@ -830,7 +827,6 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			drawParticles[drawSorted && p->drawSorted].emplace_back(p);
 		}
 	}
-
 	// set static variable to facilite sorting
 	sortCamType = camera->GetCamType();
 
@@ -978,7 +974,6 @@ void CProjectileDrawer::DrawShadowTransparent()
 
 		p->Draw();
 	}
-
 	auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
 	if (!rb.ShouldSubmit())
 		return;

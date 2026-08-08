@@ -3,6 +3,7 @@
 #ifndef UNIT_H
 #define UNIT_H
 
+#include <cstdint>
 #include <vector>
 
 #include "Sim/Objects/SolidObject.h"
@@ -65,6 +66,11 @@ class CUnit : public CSolidObject
 {
 public:
 	CR_DECLARE_DERIVED(CUnit)
+	struct ReclaimNanoBurstContributor {
+		int unitID = -1;
+		std::int64_t syncID = -1;
+		int lastFrame = -1;
+	};
 
 	CUnit();
 	virtual ~CUnit();
@@ -100,6 +106,8 @@ public:
 
 	// negative amount=reclaim, return= true -> build power was successfully applied
 	bool AddBuildPower(CUnit* builder, float amount) override;
+	void RecordReclaimNanoBurstContributor(const CUnit* builder);
+	const std::vector<ReclaimNanoBurstContributor>& GetReclaimNanoBurstContributors() const { return reclaimNanoBurstContributors; }
 
 	virtual void Activate();
 	virtual void Deactivate();
@@ -345,6 +353,7 @@ public:
 
 	// 0.0-1.0
 	float buildProgress = 0.0f;
+	std::vector<ReclaimNanoBurstContributor> reclaimNanoBurstContributors;
 	// if (health - this) is negative the unit is stunned
 	float paralyzeDamage = 0.0f;
 	// how close this unit is to being captured

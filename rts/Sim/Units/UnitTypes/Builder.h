@@ -52,7 +52,7 @@ public:
 
 	void HelpTerraform(CBuilder* unit);
 	void CreateNanoParticle(const float3& goal, float radius, bool inverse, bool highPriority = false, const CUnit* targetUnit = nullptr);
-	void CreateReclaimCompletionNanoBurst(const CUnit* reclaimee, float reclaimedMetal);
+	void CreateReclaimCompletionNanoBurst(const CUnit* reclaimee, int burstCount);
 	void SetResurrectTarget(CFeature* feature);
 	void SetCaptureTarget(CUnit* unit);
 

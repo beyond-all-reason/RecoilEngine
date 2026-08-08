@@ -48,6 +48,7 @@ CR_REG_METADATA(CNanoProjectile,
 	CR_MEMBER(nanoParticleLightBuildSpeed),
 	CR_MEMBER(updatePhase),
 	CR_MEMBER(groundClampActive),
+	CR_IGNORED(nanoParticleLightSelected),
 	CR_IGNORED(nanoParticleLightSpawned),
 	CR_MEMBER_BEGINFLAG(CM_Config),
 		CR_MEMBER(deathFrame),
@@ -64,6 +65,9 @@ namespace {
 	constexpr float GROUND_CLAMP_SMART_DELTA = 4.0f;
 	constexpr float GROUND_CACHE_CELL_SIZE = 16.0f;
 	constexpr std::size_t GROUND_CACHE_SLOTS = 1024;
+	constexpr float GROUND_CLAMP_GATE_CELL_SIZE = 64.0f;
+	constexpr int GROUND_CLAMP_GATE_CACHE_FRAMES = 45;
+	constexpr std::size_t GROUND_CLAMP_GATE_CACHE_SLOTS = 1024;
 	constexpr std::size_t HOMING_CACHE_SLOTS = 256;
 	constexpr std::array<float, 3> GROUND_CLAMP_SHORT_SAMPLES = {0.35f, 0.50f, 0.65f};
 	constexpr std::array<float, 8> GROUND_CLAMP_LONG_SAMPLES = {0.12f, 0.22f, 0.35f, 0.50f, 0.65f, 0.78f, 0.90f, 0.96f};
@@ -79,6 +83,25 @@ namespace {
 		{
 			stamps.fill(std::numeric_limits<std::uint32_t>::max());
 		}
+	};
+
+	struct GroundClampGateCacheEntry {
+		int startX = 0;
+		int startY = 0;
+		int startZ = 0;
+		int endX = 0;
+		int endY = 0;
+		int endZ = 0;
+		int expiresFrame = -1;
+		float guideY = 0.0f;
+		float peakT = 0.5f;
+		bool requiresClamp = false;
+	};
+
+	struct GroundClampGateCache {
+		std::array<GroundClampGateCacheEntry, GROUND_CLAMP_GATE_CACHE_SLOTS> entries = {};
+		const CReadMap* map = nullptr;
+		int lastFrame = -1;
 	};
 
 	float GetGroundYMargin(float x, float z, int frame)
@@ -202,7 +225,8 @@ CNanoProjectile::CNanoProjectile(float3 pos, float3 speed, int lifeTime, SColor 
 
 	nanoParticleLightBuildSpeed = builderBuildSpeed;
 	nanoParticleLightGeneration = projectileHandler.nanoParticleLightGeneration;
-	if (projectileHandler.NanoParticleUpdatesEnabled()) {
+	nanoParticleLightSelected = projectileHandler.ShouldSendNanoParticleUpdate(id, nanoParticleLightBuildSpeed, this->speed.w);
+	if (projectileHandler.NanoParticleUpdatesEnabled() && nanoParticleLightSelected) {
 		QueueNanoParticleUpdateEvent(NanoParticleEventType::Spawn);
 		nanoParticleLightSpawned = true;
 	}
@@ -214,32 +238,52 @@ CNanoProjectile::~CNanoProjectile()
 	projectileHandler.currentNanoParticles -= 1;
 }
 
+void CNanoProjectile::PreUpdate()
+{
+	preFrameTra.t = pos;
+}
+
 void CNanoProjectile::Update()
 {
 	ZoneScopedN("NanoParticles::Update");
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int frame = gs->frameNum;
-	const float3 oldPos = pos;
-	const float3 oldVelocity = speed;
+	if (nanoParticleLightGeneration != projectileHandler.nanoParticleLightGeneration) {
+		nanoParticleLightGeneration = projectileHandler.nanoParticleLightGeneration;
+		nanoParticleLightSelected = projectileHandler.ShouldSendNanoParticleUpdate(id, nanoParticleLightBuildSpeed, speed.w);
+		nanoParticleLightSpawned = false;
+	}
+
+	const bool sendLuaUIUpdates = projectileHandler.NanoParticleUpdatesEnabled();
+	const bool groundClampDue = groundClampActive && (
+		(groundClampWaypointFrame >= 0 && frame >= groundClampWaypointFrame) ||
+		(projectileHandler.nanoParticlesGroundClamp && frame >= groundClampNextFrame)
+	);
+	const bool homingDue = groundClampWaypointFrame < 0 && homingTargetID >= 0 && projectileHandler.nanoParticlesHoming && ((frame + (updatePhase % HOMING_RUN_EVERY)) % HOMING_RUN_EVERY) == 0;
+	const bool trackTrajectory = sendLuaUIUpdates && nanoParticleLightSelected && nanoParticleLightSpawned && (groundClampDue || homingDue);
+	float3 oldPos;
+	float3 oldVelocity;
+	if (trackTrajectory) {
+		oldPos = pos;
+		oldVelocity = speed;
+	}
+
 	bool reaimed = false;
 
-	if (groundClampActive)
+	if (groundClampDue)
 		reaimed = UpdateGroundClamp(frame);
 
-	if (!reaimed && groundClampWaypointFrame < 0 && homingTargetID >= 0 && projectileHandler.nanoParticlesHoming && ((frame + (updatePhase % HOMING_RUN_EVERY)) % HOMING_RUN_EVERY) == 0)
+	if (!reaimed && homingDue)
 		UpdateHoming(frame);
 
-	const bool trajectoryChanged =
+	const bool trajectoryChanged = trackTrajectory && (
 		pos.x != oldPos.x || pos.y != oldPos.y || pos.z != oldPos.z ||
-		speed.x != oldVelocity.x || speed.y != oldVelocity.y || speed.z != oldVelocity.z;
+		speed.x != oldVelocity.x || speed.y != oldVelocity.y || speed.z != oldVelocity.z
+	);
 
 	pos += speed;
 
-	if (nanoParticleLightGeneration != projectileHandler.nanoParticleLightGeneration) {
-		nanoParticleLightGeneration = projectileHandler.nanoParticleLightGeneration;
-		nanoParticleLightSpawned = false;
-	}
-	if (projectileHandler.NanoParticleUpdatesEnabled()) {
+	if (sendLuaUIUpdates && nanoParticleLightSelected) {
 		if (!nanoParticleLightSpawned) {
 			QueueNanoParticleUpdateEvent(NanoParticleEventType::Spawn);
 			nanoParticleLightSpawned = true;
@@ -305,36 +349,86 @@ void CNanoProjectile::InitGroundClamp(bool inverse, int lifeTime)
 		return;
 
 	groundClampFinalPos = pos + static_cast<float3>(speed) * lifeTime;
+	const int frame = gs->frameNum;
 	const float3 path = groundClampFinalPos - pos;
-	const float horizontalLengthSq = path.x * path.x + path.z * path.z;
-	const bool longPath = (horizontalLengthSq > 4096.0f);
-	const std::size_t sampleCount = longPath ? GROUND_CLAMP_LONG_SAMPLES.size() : GROUND_CLAMP_SHORT_SAMPLES.size();
+	const auto quantize = [](float value) {
+		return static_cast<int>(std::floor(value / GROUND_CLAMP_GATE_CELL_SIZE + 0.5f));
+	};
+	const int startX = quantize(pos.x);
+	const int startY = quantize(pos.y);
+	const int startZ = quantize(pos.z);
+	const int endX = quantize(groundClampFinalPos.x);
+	const int endY = quantize(groundClampFinalPos.y);
+	const int endZ = quantize(groundClampFinalPos.z);
+	const std::size_t slot = (
+		static_cast<std::uint32_t>(startX) * 73856093u ^
+		static_cast<std::uint32_t>(startY) * 19349663u ^
+		static_cast<std::uint32_t>(startZ) * 83492791u ^
+		static_cast<std::uint32_t>(endX) * 2654435761u ^
+		static_cast<std::uint32_t>(endY) * 97531u ^
+		static_cast<std::uint32_t>(endZ) * 1099511627u
+	) & (GROUND_CLAMP_GATE_CACHE_SLOTS - 1);
 
-	float guideY = -1.0e9f;
-	float maxPenetration = -1.0e9f;
-	float peakT = 0.5f;
-	for (std::size_t sample = 0; sample < sampleCount; ++sample) {
-		const float t = longPath ? GROUND_CLAMP_LONG_SAMPLES[sample] : GROUND_CLAMP_SHORT_SAMPLES[sample];
-		const float3 samplePos = pos + path * t;
-		const float groundY = GetGroundYMargin(samplePos.x, samplePos.z, gs->frameNum);
-		guideY = std::max(guideY, groundY);
+	thread_local GroundClampGateCache gateCache;
+	if (gateCache.map != readMap || frame < gateCache.lastFrame) {
+		for (GroundClampGateCacheEntry& entry : gateCache.entries)
+			entry.expiresFrame = -1;
+		gateCache.map = readMap;
+	}
+	gateCache.lastFrame = frame;
 
-		const float penetration = groundY - samplePos.y;
-		if (penetration > maxPenetration) {
-			maxPenetration = penetration;
-			peakT = t;
+	GroundClampGateCacheEntry& cacheEntry = gateCache.entries[slot];
+	float guideY;
+	float peakT;
+	const bool cacheHit = cacheEntry.expiresFrame > frame &&
+		cacheEntry.startX == startX && cacheEntry.startY == startY && cacheEntry.startZ == startZ &&
+		cacheEntry.endX == endX && cacheEntry.endY == endY && cacheEntry.endZ == endZ;
+	if (cacheHit) {
+		if (!cacheEntry.requiresClamp)
+			return;
+
+		guideY = cacheEntry.guideY;
+		peakT = cacheEntry.peakT;
+	} else {
+		const float horizontalLengthSq = path.x * path.x + path.z * path.z;
+		const bool longPath = (horizontalLengthSq > 4096.0f);
+		const std::size_t sampleCount = longPath ? GROUND_CLAMP_LONG_SAMPLES.size() : GROUND_CLAMP_SHORT_SAMPLES.size();
+
+		guideY = -1.0e9f;
+		float maxPenetration = -1.0e9f;
+		peakT = 0.5f;
+		for (std::size_t sample = 0; sample < sampleCount; ++sample) {
+			const float t = longPath ? GROUND_CLAMP_LONG_SAMPLES[sample] : GROUND_CLAMP_SHORT_SAMPLES[sample];
+			const float3 samplePos = pos + path * t;
+			const float groundY = GetGroundYMargin(samplePos.x, samplePos.z, frame);
+			guideY = std::max(guideY, groundY);
+
+			const float penetration = groundY - samplePos.y;
+			if (penetration > maxPenetration) {
+				maxPenetration = penetration;
+				peakT = t;
+			}
 		}
+
+		cacheEntry.startX = startX;
+		cacheEntry.startY = startY;
+		cacheEntry.startZ = startZ;
+		cacheEntry.endX = endX;
+		cacheEntry.endY = endY;
+		cacheEntry.endZ = endZ;
+		cacheEntry.expiresFrame = frame + GROUND_CLAMP_GATE_CACHE_FRAMES;
+		cacheEntry.requiresClamp = (maxPenetration > GROUND_CLAMP_SMART_DELTA);
+		if (!cacheEntry.requiresClamp)
+			return;
+
+		cacheEntry.guideY = guideY;
+		cacheEntry.peakT = peakT;
 	}
 
-	if (maxPenetration <= GROUND_CLAMP_SMART_DELTA)
-		return;
-
+	const float finalGroundY = GetGroundYMargin(groundClampFinalPos.x, groundClampFinalPos.z, frame);
 	groundClampActive = true;
 	groundClampNextFrame = createFrame + (updatePhase % GROUND_CLAMP_RECHECK_HIT);
-	groundClampFinalPos.y = std::max(
-		groundClampFinalPos.y,
-		GetGroundYMargin(groundClampFinalPos.x, groundClampFinalPos.z, gs->frameNum)
-	);
+	groundClampFinalPos.y = std::max(groundClampFinalPos.y, finalGroundY);
 
 	if (inverse)
 		return;
