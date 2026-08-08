@@ -48,10 +48,10 @@ CONFIG(int, MaxNanoParticles).defaultValue(2000).headlessValue(0).minimumValue(0
 CONFIG(bool, NanoParticlesHoming).defaultValue(false).safemodeValue(false).headlessValue(false).description("Allow nano particles to follow moving unit targets and builder nano pieces");
 CONFIG(bool, NanoParticlesGroundClamp).defaultValue(false).safemodeValue(false).headlessValue(false).description("Route nano particles above intervening terrain");
 CONFIG(bool, NanoParticlesReclaimBurst).defaultValue(false).safemodeValue(false).headlessValue(false).description("Emit a nano burst when reclaiming a unit finishes");
-CONFIG(float, NanoParticleRate).defaultValue(0.32f).description("Global build-power-scaled nano particle emission multiplier");
-CONFIG(bool, NanoParticleLights).defaultValue(false).deprecated(true).description("Deprecated: use NanoParticleUpdateLuaUI");
-CONFIG(float, NanoParticleUpdateLuaUISampleRate).defaultValue(0.32f).minimumValue(0.0f).maximumValue(1.0f).description("Fraction multiplier for native nano particles sent to LuaUI (used for deferred lights)");
-CONFIG(bool, NanoParticleUpdateLuaUI).defaultValue(false).safemodeValue(false).headlessValue(false).description("Send batched nano particle lifecycle updates to LuaUI");
+CONFIG(float, NanoParticlesRate).defaultValue(0.32f).description("Global build-power-scaled nano particle emission multiplier");
+CONFIG(bool, NanoParticleLights).defaultValue(false).deprecated(true).description("Deprecated: use NanoParticlesUpdateLuaUI");
+CONFIG(float, NanoParticlesUpdateLuaUISampleRate).defaultValue(0.32f).minimumValue(0.0f).maximumValue(1.0f).description("Fraction multiplier for native nano particles sent to LuaUI (used for deferred lights)");
+CONFIG(bool, NanoParticlesUpdateLuaUI).defaultValue(false).safemodeValue(false).headlessValue(false).description("Send batched nano particle lifecycle updates to LuaUI");
 
 namespace {
 	constexpr float NANO_PARTICLE_SPEED = 4.0f;
@@ -123,17 +123,24 @@ namespace {
 		return entry.visible;
 	}
 
-	void MigrateNanoParticleUpdateLuaUIConfig()
+	void MigrateNanoParticleConfigNames()
 	{
 		const auto configData = configHandler->GetDataWithoutDefaults();
-		const auto legacyValue = configData.find("NanoParticleLights");
-		if (legacyValue == configData.end())
-			return;
+		const auto migrate = [&](const char* oldKey, const char* newKey) {
+			const auto oldValue = configData.find(oldKey);
+			if (oldValue == configData.end())
+				return;
 
-		if (configData.find("NanoParticleUpdateLuaUI") == configData.end())
-			configHandler->SetString("NanoParticleUpdateLuaUI", legacyValue->second);
+			if (configData.find(newKey) == configData.end())
+				configHandler->SetString(newKey, oldValue->second);
 
-		configHandler->Delete("NanoParticleLights");
+			configHandler->Delete(oldKey);
+		};
+
+		migrate("NanoParticleLights", "NanoParticlesUpdateLuaUI");
+		migrate("NanoParticleUpdateLuaUI", "NanoParticlesUpdateLuaUI");
+		migrate("NanoParticleRate", "NanoParticlesRate");
+		migrate("NanoParticleUpdateLuaUISampleRate", "NanoParticlesUpdateLuaUISampleRate");
 	}
 }
 
@@ -171,16 +178,16 @@ void CProjectileHandler::Init()
 
 	resortFlyingPieces.fill(false);
 
-	MigrateNanoParticleUpdateLuaUIConfig();
+	MigrateNanoParticleConfigNames();
 
 	maxParticles     = configHandler->GetInt("MaxParticles");
 	maxNanoParticles = configHandler->GetInt("MaxNanoParticles");
 	nanoParticlesHoming = configHandler->GetBool("NanoParticlesHoming");
 	nanoParticlesGroundClamp = configHandler->GetBool("NanoParticlesGroundClamp");
 	nanoParticlesReclaimBurst = configHandler->GetBool("NanoParticlesReclaimBurst");
-	nanoParticleRate = std::clamp(configHandler->GetFloat("NanoParticleRate"), 0.0f, 1.0f);
-	nanoParticleUpdateLuaUISampleRate = std::clamp(configHandler->GetFloat("NanoParticleUpdateLuaUISampleRate"), 0.0f, 1.0f);
-	nanoParticleUpdateLuaUI = configHandler->GetBool("NanoParticleUpdateLuaUI");
+	nanoParticlesRate = std::clamp(configHandler->GetFloat("NanoParticlesRate"), 0.0f, 1.0f);
+	nanoParticlesUpdateLuaUISampleRate = std::clamp(configHandler->GetFloat("NanoParticlesUpdateLuaUISampleRate"), 0.0f, 1.0f);
+	nanoParticleUpdateLuaUI = configHandler->GetBool("NanoParticlesUpdateLuaUI");
 	nanoParticleUpdateClientActive = eventHandler.HasNanoParticleUpdateClients();
 
 	projMemPool.clear();
@@ -214,7 +221,7 @@ void CProjectileHandler::Init()
 	CExpGenSpawnable::InitSpawnables();
 
 	// register ConfigNotify()
-	configHandler->NotifyOnChange(this, {"MaxParticles", "MaxNanoParticles", "NanoParticlesHoming", "NanoParticlesGroundClamp", "NanoParticlesReclaimBurst", "NanoParticleRate", "NanoParticleUpdateLuaUISampleRate", "NanoParticleUpdateLuaUI"});
+	configHandler->NotifyOnChange(this, {"MaxParticles", "MaxNanoParticles", "NanoParticlesHoming", "NanoParticlesGroundClamp", "NanoParticlesReclaimBurst", "NanoParticlesRate", "NanoParticlesUpdateLuaUISampleRate", "NanoParticlesUpdateLuaUI"});
 }
 
 void CProjectileHandler::Kill()
@@ -266,16 +273,16 @@ void CProjectileHandler::ConfigNotify(const std::string& key, const std::string&
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const bool oldNanoParticleUpdateLuaUI = nanoParticleUpdateLuaUI;
-	const float oldNanoParticleUpdateLuaUISampleRate = nanoParticleUpdateLuaUISampleRate;
+	const float oldNanoParticlesUpdateLuaUISampleRate = nanoParticlesUpdateLuaUISampleRate;
 	maxParticles     = configHandler->GetInt("MaxParticles");
 	maxNanoParticles = configHandler->GetInt("MaxNanoParticles");
 	nanoParticlesHoming = configHandler->GetBool("NanoParticlesHoming");
 	nanoParticlesGroundClamp = configHandler->GetBool("NanoParticlesGroundClamp");
 	nanoParticlesReclaimBurst = configHandler->GetBool("NanoParticlesReclaimBurst");
-	nanoParticleRate = std::clamp(configHandler->GetFloat("NanoParticleRate"), 0.0f, 1.0f);
-	nanoParticleUpdateLuaUISampleRate = std::clamp(configHandler->GetFloat("NanoParticleUpdateLuaUISampleRate"), 0.0f, 1.0f);
-	nanoParticleUpdateLuaUI = configHandler->GetBool("NanoParticleUpdateLuaUI");
-	if (nanoParticleUpdateLuaUI != oldNanoParticleUpdateLuaUI || nanoParticleUpdateLuaUISampleRate != oldNanoParticleUpdateLuaUISampleRate) {
+	nanoParticlesRate = std::clamp(configHandler->GetFloat("NanoParticlesRate"), 0.0f, 1.0f);
+	nanoParticlesUpdateLuaUISampleRate = std::clamp(configHandler->GetFloat("NanoParticlesUpdateLuaUISampleRate"), 0.0f, 1.0f);
+	nanoParticleUpdateLuaUI = configHandler->GetBool("NanoParticlesUpdateLuaUI");
+	if (nanoParticleUpdateLuaUI != oldNanoParticleUpdateLuaUI || nanoParticlesUpdateLuaUISampleRate != oldNanoParticlesUpdateLuaUISampleRate) {
 		++nanoParticleLightGeneration;
 		NanoParticleEvent event;
 		event.type = NanoParticleEventType::Reset;
@@ -1085,14 +1092,14 @@ void CProjectileHandler::AddNanoParticle(
 
 int CProjectileHandler::GetNanoParticleEmitCount(float builderBuildSpeed, float buildPower, float& accumulator, int& lastEmitFrame) const
 {
-	if (maxNanoParticles <= 0 || nanoParticleRate <= 0.0f) {
+	if (maxNanoParticles <= 0 || nanoParticlesRate <= 0.0f) {
 		accumulator = 0.0f;
 		return 0;
 	}
 
 	const float rate = std::max(0.0f, builderBuildSpeed)
 		* std::clamp(buildPower, 0.0f, 1.0f)
-		* (nanoParticleRate / NANO_EMIT_REF_BUILDSPEED);
+		* (nanoParticlesRate / NANO_EMIT_REF_BUILDSPEED);
 	const float accumulated = accumulator + rate;
 	int emitCount = static_cast<int>(std::floor(accumulated));
 	accumulator = accumulated - emitCount;
@@ -1124,8 +1131,8 @@ int CProjectileHandler::GetReclaimCompletionNanoBurstCount(float reclaimedMetal,
 
 bool CProjectileHandler::ShouldSendNanoParticleUpdate(int particleID, float builderBuildSpeed, float particleSpeed) const
 {
-	const float sampleFraction = nanoParticleRate
-		* nanoParticleUpdateLuaUISampleRate
+	const float sampleFraction = nanoParticlesRate
+		* nanoParticlesUpdateLuaUISampleRate
 		* (std::max(0.0f, builderBuildSpeed) / NANO_EMIT_REF_BUILDSPEED)
 		* (std::max(0.0f, particleSpeed) / NANO_PARTICLE_SPEED);
 	if (sampleFraction <= 0.0f)

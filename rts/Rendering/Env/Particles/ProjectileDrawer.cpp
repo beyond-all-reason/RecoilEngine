@@ -1187,7 +1187,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			if (drawNanos)
 				nanoRenderBuffer.DrawArrays(GL_POINTS);
 			if (drawDirectNanos) {
-				ZoneScopedN("NanoParticles::DirectSubmit");
+				ZoneScopedN("NanoParticles::Draw:DirectSubmit");
 				DrawDirectNanoParticles();
 			}
 			nanoShader->Disable();

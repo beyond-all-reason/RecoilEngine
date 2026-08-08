@@ -390,7 +390,7 @@ void CNanoProjectile::QueueNanoParticleUpdateEvent(NanoParticleEventType type)
 
 void CNanoProjectile::InitHoming(const CUnit* target, int targetPiece, int lifeTime)
 {
-	ZoneScopedN("NanoParticles::Homing");
+	ZoneScopedN("NanoParticles::Init:Homing");
 	const float initialSpeed = speed.w;
 	homingTargetID = target->id;
 	homingTargetSyncID = target->GetSyncID();
@@ -422,7 +422,7 @@ void CNanoProjectile::InitHoming(const CUnit* target, int targetPiece, int lifeT
 
 void CNanoProjectile::InitGroundClamp(bool inverse, int lifeTime)
 {
-	ZoneScopedN("NanoParticles::GroundClamp");
+	ZoneScopedN("NanoParticles::Init:GroundClamp");
 	if (lifeTime <= 1)
 		return;
 
@@ -450,7 +450,7 @@ void CNanoProjectile::InitGroundClamp(bool inverse, int lifeTime)
 
 bool CNanoProjectile::NeedsGroundClamp(const float3& startPos, const float3& velocity, int lifeTime)
 {
-	ZoneScopedN("NanoParticles::GroundClampGate");
+	ZoneScopedN("NanoParticles::GroundClamp:Gate");
 	if (lifeTime <= 1)
 		return false;
 
@@ -480,7 +480,7 @@ bool CNanoProjectile::ResolveHomingTarget(float3& targetPos)
 
 bool CNanoProjectile::UpdateGroundClamp(int frame)
 {
-	ZoneScopedN("NanoParticles::GroundClamp");
+	ZoneScopedN("NanoParticles::Update:GroundClamp");
 	bool reaimed = false;
 	const int remainingLife = deathFrame - frame;
 	if (remainingLife <= 0)
@@ -520,7 +520,7 @@ bool CNanoProjectile::UpdateGroundClamp(int frame)
 
 void CNanoProjectile::UpdateHoming(int frame)
 {
-	ZoneScopedN("NanoParticles::Homing");
+	ZoneScopedN("NanoParticles::Update:Homing");
 	float3 targetPos;
 	if (!ResolveHomingTarget(targetPos))
 		return;

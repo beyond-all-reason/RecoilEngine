@@ -122,8 +122,8 @@ public:
 	bool nanoParticlesHoming = false;
 	bool nanoParticlesGroundClamp = false;
 	bool nanoParticlesReclaimBurst = false;
-	float nanoParticleRate = 0.32f;
-	float nanoParticleUpdateLuaUISampleRate = 0.08f;
+	float nanoParticlesRate = 0.32f;
+	float nanoParticlesUpdateLuaUISampleRate = 0.08f;
 	bool nanoParticleUpdateLuaUI = false;
 	std::uint32_t nanoParticleLightGeneration = 1;
 

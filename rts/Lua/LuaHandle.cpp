@@ -2659,7 +2659,7 @@ void CLuaHandle::SunChanged()
  */
 void CLuaHandle::NanoParticleUpdate(const std::vector<NanoParticleEvent>& events)
 {
-	ZoneScopedN("NanoParticles::LuaUpdate");
+	ZoneScopedN("NanoParticles::Updates:LuaUpdate:CallIn");
 	LUA_CALL_IN_CHECK(L);
 	luaL_checkstack(L, 5, __func__);
 	static const LuaHashString cmdStr(__func__);
