@@ -189,3 +189,26 @@ TEST_CASE("Element:GetValue supports select controls")
 	auto result = fixture.lua.safe_script("assert(element:GetValue() == 'one')");
 	requireLuaSuccess(result);
 }
+
+TEST_CASE("Select options expose the option value field")
+{
+	BindingFixture fixture("sol-lua-select-options");
+	auto* document = fixture.context->CreateDocument();
+	REQUIRE(document != nullptr);
+	auto select = document->CreateElement("select");
+	REQUIRE(select != nullptr);
+	auto* selectElement = dynamic_cast<Rml::ElementFormControlSelect*>(select.get());
+	REQUIRE(selectElement != nullptr);
+	selectElement = dynamic_cast<Rml::ElementFormControlSelect*>(document->AppendChild(std::move(select)));
+	REQUIRE(selectElement != nullptr);
+
+	auto option = document->CreateElement("option");
+	REQUIRE(option != nullptr);
+	option->SetAttribute("value", "one");
+	selectElement->Add(std::move(option));
+	selectElement->SetSelection(0);
+	fixture.lua["element"] = selectElement;
+
+	auto result = fixture.lua.safe_script("assert(element.options[0].value == 'one')");
+	requireLuaSuccess(result);
+}
