@@ -82,6 +82,10 @@ endif()
 add_custom_target(check ${CMAKE_CTEST_COMMAND} --output-on-failure -V
 	DEPENDS engine-headless)
 add_custom_target(install-tests)
+add_test(NAME testASANLibraryPreference
+	COMMAND ${CMAKE_COMMAND}
+		"-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+		-P "${CMAKE_CURRENT_SOURCE_DIR}/build/TestASANLibraryPreference.cmake")
 
 macro (add_spring_test target sources libraries flags)
 	add_test(NAME test${target} COMMAND test_${target})
