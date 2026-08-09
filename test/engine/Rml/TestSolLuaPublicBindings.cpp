@@ -85,9 +85,15 @@ void requireLuaSuccess(const sol::protected_function_result& result)
 
 namespace RmlGui
 {
+Rml::Context* clearedDebugContext = nullptr;
+
 void MarkContextForRemoval(Rml::Context*) {}
 void SetDebugContext(Rml::Context*) {}
-bool ClearDebugContext(Rml::Context*) { return true; }
+bool ClearDebugContext(Rml::Context* context)
+{
+	clearedDebugContext = context;
+	return true;
+}
 Rml::Context* GetOrCreateContext(const std::string& name)
 {
 	if (auto* context = Rml::GetContext(name); context != nullptr)
@@ -152,6 +158,19 @@ TEST_CASE("Context:UnloadDocument accepts a Lua-created document")
 		"context:UnloadDocument(document)"
 	);
 	requireLuaSuccess(result);
+}
+
+TEST_CASE("Context:UnloadAllDocuments detaches the debugger context")
+{
+	BindingFixture fixture("sol-lua-unload-all-documents");
+	REQUIRE(fixture.context->CreateDocument() != nullptr);
+	RmlGui::clearedDebugContext = nullptr;
+
+	auto result = fixture.lua.safe_script("context:UnloadAllDocuments()");
+	requireLuaSuccess(result);
+
+	CHECK(fixture.context->GetNumDocuments() == 0);
+	CHECK(RmlGui::clearedDebugContext == fixture.context);
 }
 
 TEST_CASE("Element:DispatchEvent accepts Lua table parameters")

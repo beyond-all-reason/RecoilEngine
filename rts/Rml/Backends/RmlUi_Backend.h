@@ -61,6 +61,7 @@ namespace RmlGui
 	bool ProcessMouseWheel(float delta);
 
 	void SetDebugContext(Rml::Context* context);
+	bool ClearDebugContext(Rml::Context* context);
 
 	bool IsMouseInteractingWith();
 	const std::string& GetMouseCursor();

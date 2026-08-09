@@ -441,7 +441,10 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 		 * Closes all documents currently loaded with the context.
 		 * @function RmlUi.Context:UnloadAllDocuments
 		 */
-		"UnloadAllDocuments", &Rml::Context::UnloadAllDocuments,
+		"UnloadAllDocuments", [](Rml::Context& self) {
+			RmlGui::ClearDebugContext(&self);
+			self.UnloadAllDocuments();
+		},
 		/***
 		 * Unloads a specific document within the context.
 		 * @function RmlUi.Context:UnloadDocument
