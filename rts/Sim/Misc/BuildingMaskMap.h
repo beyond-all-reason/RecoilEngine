@@ -3,6 +3,7 @@
 #ifndef BUILDINGMASKMAP_H
 #define BUILDINGMASKMAP_H
 
+#include <cstdint>
 #include <vector>
 
 #include "System/creg/creg_cond.h"
@@ -34,4 +35,3 @@ private:
 extern BuildingMaskMap buildingMaskMap;
 
 #endif
-

@@ -75,8 +75,13 @@ namespace Sync {
 
 }
 
+#ifdef SYNCCHECK
 #  define ENTER_SYNCED_CODE() CSyncChecker::EnterSyncedCode()
 #  define LEAVE_SYNCED_CODE() CSyncChecker::LeaveSyncedCode()
+#else
+#  define ENTER_SYNCED_CODE()
+#  define LEAVE_SYNCED_CODE()
+#endif
 
 #ifdef SYNCDEBUG
 #  define ASSERT_SYNCED(x) Sync::AssertDebugger(x, "assert(" #x ")")

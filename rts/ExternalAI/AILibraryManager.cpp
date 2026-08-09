@@ -22,6 +22,7 @@
 #include "System/FileSystem/SimpleParser.h" // for Split()
 
 #include <climits>
+#include <cassert>
 #include <cstdio>
 #include <cstring>
 
@@ -37,6 +38,7 @@ AILibraryManager* AILibraryManager::GetInstance(bool init)
 
 	return &aiLibraryManager;
 }
+
 
 
 void AILibraryManager::Init()
@@ -500,4 +502,3 @@ int AILibraryManager::VersionCompare(const std::string& version1, const std::str
 	// compute the sign of diff -> 1, 0 or -1
 	return (diff != 0) | -(int)((unsigned int)((int)diff) >> (sizeof(int) * CHAR_BIT - 1));
 }
-

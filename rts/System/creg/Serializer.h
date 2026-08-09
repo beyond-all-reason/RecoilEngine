@@ -8,6 +8,7 @@
 
 #ifdef USING_CREG
 
+#include <cstdint>
 #include <map>
 #include <vector>
 #include <deque>

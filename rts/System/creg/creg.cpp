@@ -5,6 +5,7 @@
  * Classes for serialization of registered class instances
  */
 
+#include <cassert>
 #include <vector>
 #include <string>
 #include <cstring>
@@ -265,5 +266,4 @@ void System::AddClass(Class* c)
 // ------------------------------------------------------------------
 // creg::Class: Class description
 // ------------------------------------------------------------------
-
 
