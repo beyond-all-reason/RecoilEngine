@@ -399,7 +399,7 @@ void VBO::New(GLsizeiptr newSize, GLenum newUsage, const void* newData)
 
 		const GLenum err = glGetError();
 		if (err != GL_NO_ERROR) {
-			LOG_L(L_ERROR, "[VBO::%s(size=%lu,usage=0x%x,data=%p)] id=%u tgt=0x%x err=0x%x", __func__, (unsigned long) bufSize, usage, data, vboId, curBoundTarget, err);
+			LOG_L(L_ERROR, "[VBO::%s(size=%lu,usage=0x%x,data=%p)] id=%u tgt=0x%x err=0x%x", __func__, (unsigned long) newSize, newUsage, newData, vboId, curBoundTarget, err);
 			Unbind();
 
 			// disable VBO and fallback to VA/sysmem

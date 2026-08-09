@@ -48,8 +48,11 @@
 
 CONFIG(int, SoftParticles).defaultValue(1).safemodeValue(0).description("Soften up CEG particles on clipping edges");
 CONFIG(bool, NanoParticlesGL4).defaultValue(false).safemodeValue(false).description("Render nano particles as shader-generated 3D shapes instead of textured billboards");
+CONFIG(bool, NanoParticlesNoGeometryShader).defaultValue(false).safemodeValue(false).description("Force the instanced no-geometry-shader nano renderer");
 
 static uint32_t sortCamType = 0;
+static constexpr char nanoParticleGeometryProgramName[] = "Nano Particle Shader";
+static constexpr char nanoParticleNoGeomProgramName[] = "Nano Particle Shader (No Geometry)";
 static bool CProjectileDrawOrderSortingPredicate(const CProjectile* p1, const CProjectile* p2) noexcept {
 	return std::forward_as_tuple(p2->drawOrder, p1->GetSortDist(sortCamType), p1) > std::forward_as_tuple(p1->drawOrder, p2->GetSortDist(sortCamType), p2);
 }
@@ -57,6 +60,53 @@ static bool CProjectileDrawOrderSortingPredicate(const CProjectile* p1, const CP
 static bool CProjectileSortingPredicate(const CProjectile* p1, const CProjectile* p2) noexcept {
 	return std::forward_as_tuple(p1->GetSortDist(sortCamType), p1) > std::forward_as_tuple(p2->GetSortDist(sortCamType), p2);
 };
+
+namespace {
+	struct NanoNoGeomVertex {
+		float3 position;
+		float3 normal;
+		float2 glowUV;
+		float isGlow;
+	};
+
+	const std::vector<NanoNoGeomVertex>& GetNanoNoGeomTemplateVertices()
+	{
+		static const std::vector<NanoNoGeomVertex> vertices = [] {
+			std::vector<NanoNoGeomVertex> result;
+			result.reserve(42);
+
+			const auto addTriangle = [&result](const float3& position0, const float3& position1, const float3& position2, const float3& normal) {
+				result.emplace_back(NanoNoGeomVertex{position0, normal, {0.0f, 0.0f}, 0.0f});
+				result.emplace_back(NanoNoGeomVertex{position1, normal, {0.0f, 0.0f}, 0.0f});
+				result.emplace_back(NanoNoGeomVertex{position2, normal, {0.0f, 0.0f}, 0.0f});
+			};
+			const auto addQuad = [&addTriangle](const float3& position0, const float3& position1, const float3& position2, const float3& position3, const float3& normal) {
+				addTriangle(position0, position1, position2, normal);
+				addTriangle(position0, position2, position3, normal);
+			};
+			const auto addGlowVertex = [&result](float x, float y) {
+				result.emplace_back(NanoNoGeomVertex{ZeroVector, ZeroVector, {x, y}, 1.0f});
+			};
+
+			addQuad({ 1.0f, -1.0f, -1.0f}, { 1.0f,  1.0f, -1.0f}, { 1.0f,  1.0f,  1.0f}, { 1.0f, -1.0f,  1.0f}, { 1.0f,  0.0f,  0.0f});
+			addQuad({-1.0f, -1.0f, -1.0f}, {-1.0f, -1.0f,  1.0f}, {-1.0f,  1.0f,  1.0f}, {-1.0f,  1.0f, -1.0f}, {-1.0f,  0.0f,  0.0f});
+			addQuad({-1.0f,  1.0f, -1.0f}, {-1.0f,  1.0f,  1.0f}, { 1.0f,  1.0f,  1.0f}, { 1.0f,  1.0f, -1.0f}, { 0.0f,  1.0f,  0.0f});
+			addQuad({-1.0f, -1.0f, -1.0f}, { 1.0f, -1.0f, -1.0f}, { 1.0f, -1.0f,  1.0f}, {-1.0f, -1.0f,  1.0f}, { 0.0f, -1.0f,  0.0f});
+			addQuad({-1.0f, -1.0f,  1.0f}, { 1.0f, -1.0f,  1.0f}, { 1.0f,  1.0f,  1.0f}, {-1.0f,  1.0f,  1.0f}, { 0.0f,  0.0f,  1.0f});
+			addQuad({-1.0f, -1.0f, -1.0f}, {-1.0f,  1.0f, -1.0f}, { 1.0f,  1.0f, -1.0f}, { 1.0f, -1.0f, -1.0f}, { 0.0f,  0.0f, -1.0f});
+
+			addGlowVertex(-1.0f, -1.0f);
+			addGlowVertex( 1.0f, -1.0f);
+			addGlowVertex( 1.0f,  1.0f);
+			addGlowVertex(-1.0f, -1.0f);
+			addGlowVertex( 1.0f,  1.0f);
+			addGlowVertex(-1.0f,  1.0f);
+			return result;
+		}();
+
+		return vertices;
+	}
+}
 
 static bool IsDirectNanoInView(const CCamera::Frustum& frustum, const float3& pos, float radius, uint8_t planeMask)
 {
@@ -349,9 +399,10 @@ void CProjectileDrawer::Init() {
 	fxShader->Validate();
 
 	drawNanoParticlesGL4 = configHandler->GetBool("NanoParticlesGL4");
+	forceNanoParticleNoGeometryShader = configHandler->GetBool("NanoParticlesNoGeometryShader");
 	if (drawNanoParticlesGL4)
 		InitNanoParticleShader();
-	configHandler->NotifyOnChange(this, {"NanoParticlesGL4"});
+	configHandler->NotifyOnChange(this, {"NanoParticlesGL4", "NanoParticlesNoGeometryShader"});
 
 	sdbc = std::make_unique<ScopedDepthBufferCopy>(false);
 
@@ -373,13 +424,19 @@ void CProjectileDrawer::Kill() {
 	renderProjectiles.clear();
 	directNanoVBO.Release();
 	directNanoVAO.Delete();
+	directNanoNoGeomTemplateVBO.Release();
+	directNanoNoGeomVAO.Delete();
+	nanoNoGeomVBO.Release();
+	nanoNoGeomVAO.Delete();
 	directNanoVertices.clear();
+	nanoNoGeomVertices.clear();
 	directNanoEnemyParticles.clear();
 	directNanoEnemyCells.clear();
 	directNanoEnemyCellIndices.clear();
 	directNanoVisibleEnemyCellIndices.clear();
 	directNanoVisibleEnemyParticles.clear();
 	directNanoVBOCapacity = 0;
+	nanoNoGeomVBOCapacity = 0;
 	directNanoVertexCount = 0;
 	directNanoEnemyCellCount = 0;
 	directNanoUploadedGeneration = 0;
@@ -401,6 +458,7 @@ void CProjectileDrawer::Kill() {
 	fxShader = nullptr;
 	fxShadowShader = nullptr;
 	nanoShader = nullptr;
+	nanoShaderUsesGeometry = false;
 	sdbc = nullptr;
 
 	configHandler->Set("SoftParticles", wantSoften);
@@ -657,13 +715,18 @@ bool CProjectileDrawer::DrawNanoParticle(const float3& pos, const float3& veloci
 
 void CProjectileDrawer::AddNanoParticleVertex(const float3& pos, const float3& velocity, int createFrame, int deathFrame, const SColor& color)
 {
-	nanoRenderBuffer.AddVertex({
+	VA_TYPE_PROJ vertex = {
 		pos,
 		velocity,
 		{static_cast<float>(createFrame), static_cast<float>(deathFrame), 0.0f, 0.0f},
 		ZeroVector,
 		color,
-	});
+	};
+
+	if (nanoShaderUsesGeometry)
+		nanoRenderBuffer.AddVertex(std::move(vertex));
+	else
+		nanoNoGeomVertices.emplace_back(vertex);
 }
 
 bool CProjectileDrawer::UseNanoParticleShader() const
@@ -676,16 +739,49 @@ bool CProjectileDrawer::InitNanoParticleShader()
 	if (nanoShader != nullptr)
 		return nanoShader->IsValid();
 
-	nanoShader = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", "Nano Particle Shader");
-	nanoShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleVertProg.glsl", "", GL_VERTEX_SHADER));
-	nanoShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleGeomProg.glsl", "", GL_GEOMETRY_SHADER));
+	nanoShaderUsesGeometry = false;
+	std::string geometryLog;
+	if (!forceNanoParticleNoGeometryShader) {
+		nanoShader = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", nanoParticleGeometryProgramName);
+		nanoShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleVertProg.glsl", "", GL_VERTEX_SHADER));
+		nanoShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleGeomProg.glsl", "", GL_GEOMETRY_SHADER));
+		nanoShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleFragProg.glsl", "", GL_FRAGMENT_SHADER));
+		nanoShader->BindAttribLocations<VA_TYPE_PROJ>();
+		nanoShader->Link();
+
+		if (nanoShader->IsValid()) {
+			nanoShader->Enable();
+			nanoShader->Disable();
+			if (nanoShader->Validate()) {
+				nanoShaderUsesGeometry = true;
+				LOG_L(L_INFO, "Nano particle GL4 geometry shader initialized; direct batching enabled");
+				return true;
+			}
+		}
+
+		geometryLog = nanoShader->GetLog();
+		shaderHandler->ReleaseProgramObject("[ProjectileDrawer::VFS]", nanoParticleGeometryProgramName);
+	} else {
+		geometryLog = "Disabled by NanoParticlesNoGeometryShader";
+	}
+
+	nanoShader = shaderHandler->CreateProgramObject("[ProjectileDrawer::VFS]", nanoParticleNoGeomProgramName);
+	nanoShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleNoGeomVertProg.glsl", "", GL_VERTEX_SHADER));
 	nanoShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/NanoParticleFragProg.glsl", "", GL_FRAGMENT_SHADER));
-	nanoShader->BindAttribLocations<VA_TYPE_PROJ>();
+	nanoShader->BindAttribLocation("templatePosition", 0);
+	nanoShader->BindAttribLocation("templateNormal", 1);
+	nanoShader->BindAttribLocation("templateGlowUV", 2);
+	nanoShader->BindAttribLocation("templateIsGlow", 3);
+	nanoShader->BindAttribLocation("particlePos", 4);
+	nanoShader->BindAttribLocation("particleVelocity", 5);
+	nanoShader->BindAttribLocation("particleLifetime", 6);
+	nanoShader->BindAttribLocation("particleAparams", 7);
+	nanoShader->BindAttribLocation("particleColor", 8);
 	nanoShader->Link();
 
 	if (!nanoShader->IsValid()) {
-		LOG_L(L_WARNING, "Nano particle shader is unavailable; using legacy textured billboards. Log:\n%s", nanoShader->GetLog().c_str());
-		shaderHandler->ReleaseProgramObject("[ProjectileDrawer::VFS]", "Nano Particle Shader");
+		LOG_L(L_WARNING, "Nano particle geometry shader and no-geometry fallback are unavailable; using legacy textured billboards. Geometry log:\n%s\nFallback log:\n%s", geometryLog.c_str(), nanoShader->GetLog().c_str());
+		shaderHandler->ReleaseProgramObject("[ProjectileDrawer::VFS]", nanoParticleNoGeomProgramName);
 		nanoShader = nullptr;
 		return false;
 	}
@@ -693,17 +789,43 @@ bool CProjectileDrawer::InitNanoParticleShader()
 	nanoShader->Enable();
 	nanoShader->Disable();
 	if (!nanoShader->Validate()) {
-		LOG_L(L_WARNING, "Nano particle shader validation failed; using legacy textured billboards. Log:\n%s", nanoShader->GetLog().c_str());
-		shaderHandler->ReleaseProgramObject("[ProjectileDrawer::VFS]", "Nano Particle Shader");
+		LOG_L(L_WARNING, "Nano particle no-geometry fallback validation failed; using legacy textured billboards. Geometry log:\n%s\nFallback log:\n%s", geometryLog.c_str(), nanoShader->GetLog().c_str());
+		shaderHandler->ReleaseProgramObject("[ProjectileDrawer::VFS]", nanoParticleNoGeomProgramName);
 		nanoShader = nullptr;
 		return false;
 	}
-	LOG_L(L_INFO, "Nano particle GL4 shader initialized; direct batching enabled");
+
+	if (forceNanoParticleNoGeometryShader)
+		LOG_L(L_INFO, "Nano particle geometry shader disabled by NanoParticlesNoGeometryShader; using instanced no-geometry fallback");
+	else
+		LOG_L(L_WARNING, "Nano particle geometry shader is unavailable; using instanced no-geometry fallback. Geometry log:\n%s", geometryLog.c_str());
 	return true;
+}
+
+void CProjectileDrawer::ResetNanoParticleShader()
+{
+	if (nanoShader != nullptr) {
+		shaderHandler->ReleaseProgramObject("[ProjectileDrawer::VFS]", nanoShaderUsesGeometry ? nanoParticleGeometryProgramName : nanoParticleNoGeomProgramName);
+		nanoShader = nullptr;
+	}
+
+	nanoShaderUsesGeometry = false;
+	directNanoVAO.Delete();
+	directNanoNoGeomVAO.Delete();
+	nanoNoGeomVAO.Delete();
+	directNanoUploadedGeneration = 0;
+	directNanoVertexCount = 0;
+	nanoNoGeomVertices.clear();
 }
 
 void CProjectileDrawer::ConfigNotify(const std::string&, const std::string&)
 {
+	const bool newForceNoGeometryShader = configHandler->GetBool("NanoParticlesNoGeometryShader");
+	if (newForceNoGeometryShader != forceNanoParticleNoGeometryShader) {
+		forceNanoParticleNoGeometryShader = newForceNoGeometryShader;
+		ResetNanoParticleShader();
+	}
+
 	drawNanoParticlesGL4 = configHandler->GetBool("NanoParticlesGL4");
 	if (drawNanoParticlesGL4 && nanoShader == nullptr)
 		InitNanoParticleShader();
@@ -737,11 +859,12 @@ void CProjectileDrawer::EnsureDirectNanoBuffer()
 	if (directNanoVertexCount == 0)
 		return;
 
-	const bool initVAO = (directNanoVAO.GetIdRaw() == 0);
+	const bool initVAO = nanoShaderUsesGeometry && (directNanoVAO.GetIdRaw() == 0);
 	if (directNanoVBOCapacity < directNanoVertexCount)
 		directNanoVBOCapacity = std::bit_ceil(directNanoVertexCount);
 
-	directNanoVAO.Bind();
+	if (nanoShaderUsesGeometry)
+		directNanoVAO.Bind();
 	directNanoVBO.Bind();
 	if (directNanoVBO.GetSize() < directNanoVBOCapacity * sizeof(VA_TYPE_PROJ))
 		directNanoVBO.New(directNanoVBOCapacity * sizeof(VA_TYPE_PROJ), GL_DYNAMIC_DRAW);
@@ -755,10 +878,98 @@ void CProjectileDrawer::EnsureDirectNanoBuffer()
 	}
 
 	directNanoVBO.Unbind();
-	directNanoVAO.Unbind();
+	if (nanoShaderUsesGeometry)
+		directNanoVAO.Unbind();
 	if (initVAO) {
 		for (const AttributeDef& attribute : VA_TYPE_PROJ::attributeDefs)
 			glDisableVertexAttribArray(attribute.index);
+	}
+	if (!nanoShaderUsesGeometry)
+		EnsureDirectNanoNoGeomBuffer();
+}
+
+void CProjectileDrawer::EnsureNanoNoGeomTemplateBuffer()
+{
+	if (directNanoNoGeomTemplateVBO.GetIdRaw() != 0)
+		return;
+
+	directNanoNoGeomTemplateVBO.Bind();
+	directNanoNoGeomTemplateVBO.New(GetNanoNoGeomTemplateVertices(), GL_STATIC_DRAW);
+	directNanoNoGeomTemplateVBO.Unbind();
+}
+
+void CProjectileDrawer::EnsureDirectNanoNoGeomBuffer()
+{
+	if (directNanoNoGeomVAO.GetIdRaw() != 0)
+		return;
+
+	EnsureNanoNoGeomTemplateBuffer();
+	directNanoNoGeomVAO.Bind();
+	directNanoNoGeomTemplateVBO.Bind();
+	for (GLuint attributeIndex = 0; attributeIndex < 4; ++attributeIndex) {
+		glEnableVertexAttribArray(attributeIndex);
+		glVertexAttribDivisor(attributeIndex, 0);
+	}
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(NanoNoGeomVertex), VA_TYPE_OFFSET(NanoNoGeomVertex, position));
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(NanoNoGeomVertex), VA_TYPE_OFFSET(NanoNoGeomVertex, normal));
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(NanoNoGeomVertex), VA_TYPE_OFFSET(NanoNoGeomVertex, glowUV));
+	glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(NanoNoGeomVertex), VA_TYPE_OFFSET(NanoNoGeomVertex, isGlow));
+
+	directNanoVBO.Bind();
+	for (const AttributeDef& attribute : VA_TYPE_PROJ::attributeDefs) {
+		const GLuint attributeIndex = attribute.index + 4;
+		glEnableVertexAttribArray(attributeIndex);
+		glVertexAttribDivisor(attributeIndex, 1);
+		glVertexAttribPointer(attributeIndex, attribute.count, attribute.type, attribute.normalize, attribute.stride, attribute.data);
+	}
+
+	directNanoVBO.Unbind();
+	directNanoNoGeomTemplateVBO.Unbind();
+	directNanoNoGeomVAO.Unbind();
+	for (GLuint attributeIndex = 0; attributeIndex < 9; ++attributeIndex)
+		glDisableVertexAttribArray(attributeIndex);
+}
+
+void CProjectileDrawer::EnsureNanoNoGeomBuffer()
+{
+	if (nanoNoGeomVertices.empty())
+		return;
+
+	const bool initVAO = (nanoNoGeomVAO.GetIdRaw() == 0);
+	if (nanoNoGeomVBOCapacity < nanoNoGeomVertices.size())
+		nanoNoGeomVBOCapacity = std::bit_ceil(nanoNoGeomVertices.size());
+
+	EnsureNanoNoGeomTemplateBuffer();
+	nanoNoGeomVAO.Bind();
+	nanoNoGeomVBO.Bind();
+	if (nanoNoGeomVBO.GetSize() < nanoNoGeomVBOCapacity * sizeof(VA_TYPE_PROJ))
+		nanoNoGeomVBO.New(nanoNoGeomVBOCapacity * sizeof(VA_TYPE_PROJ), GL_DYNAMIC_DRAW);
+
+	if (initVAO) {
+		directNanoNoGeomTemplateVBO.Bind();
+		for (GLuint attributeIndex = 0; attributeIndex < 4; ++attributeIndex) {
+			glEnableVertexAttribArray(attributeIndex);
+			glVertexAttribDivisor(attributeIndex, 0);
+		}
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(NanoNoGeomVertex), VA_TYPE_OFFSET(NanoNoGeomVertex, position));
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(NanoNoGeomVertex), VA_TYPE_OFFSET(NanoNoGeomVertex, normal));
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(NanoNoGeomVertex), VA_TYPE_OFFSET(NanoNoGeomVertex, glowUV));
+		glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(NanoNoGeomVertex), VA_TYPE_OFFSET(NanoNoGeomVertex, isGlow));
+
+		nanoNoGeomVBO.Bind();
+		for (const AttributeDef& attribute : VA_TYPE_PROJ::attributeDefs) {
+			const GLuint attributeIndex = attribute.index + 4;
+			glEnableVertexAttribArray(attributeIndex);
+			glVertexAttribDivisor(attributeIndex, 1);
+			glVertexAttribPointer(attributeIndex, attribute.count, attribute.type, attribute.normalize, attribute.stride, attribute.data);
+		}
+	}
+
+	nanoNoGeomVBO.Unbind();
+	nanoNoGeomVAO.Unbind();
+	if (initVAO) {
+		for (GLuint attributeIndex = 0; attributeIndex < 9; ++attributeIndex)
+			glDisableVertexAttribArray(attributeIndex);
 	}
 }
 
@@ -771,6 +982,17 @@ void CProjectileDrawer::UploadDirectNanoVertices()
 	directNanoVBO.Bind();
 	directNanoVBO.SetBufferSubData(0, directNanoVertexCount * sizeof(VA_TYPE_PROJ), directNanoVertices.data());
 	directNanoVBO.Unbind();
+}
+
+void CProjectileDrawer::UploadNanoNoGeomVertices()
+{
+	if (nanoNoGeomVertices.empty())
+		return;
+
+	EnsureNanoNoGeomBuffer();
+	nanoNoGeomVBO.Bind();
+	nanoNoGeomVBO.SetBufferSubData(0, nanoNoGeomVertices.size() * sizeof(VA_TYPE_PROJ), nanoNoGeomVertices.data());
+	nanoNoGeomVBO.Unbind();
 }
 
 void CProjectileDrawer::SyncDirectNanoParticles()
@@ -924,9 +1146,25 @@ void CProjectileDrawer::DrawDirectNanoParticles() const
 	if (directNanoVertexCount == 0)
 		return;
 
-	directNanoVAO.Bind();
-	glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(directNanoVertexCount));
-	directNanoVAO.Unbind();
+	if (nanoShaderUsesGeometry) {
+		directNanoVAO.Bind();
+		glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(directNanoVertexCount));
+		directNanoVAO.Unbind();
+	} else {
+		directNanoNoGeomVAO.Bind();
+		glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(GetNanoNoGeomTemplateVertices().size()), static_cast<GLsizei>(directNanoVertexCount));
+		directNanoNoGeomVAO.Unbind();
+	}
+}
+
+void CProjectileDrawer::DrawNanoNoGeomParticles() const
+{
+	if (nanoNoGeomVertices.empty())
+		return;
+
+	nanoNoGeomVAO.Bind();
+	glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(GetNanoNoGeomTemplateVertices().size()), static_cast<GLsizei>(nanoNoGeomVertices.size()));
+	nanoNoGeomVAO.Unbind();
 }
 
 void CProjectileDrawer::DrawProjectilesMiniMap()
@@ -1077,6 +1315,8 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 
 	for (auto& dp : drawParticles)
 		dp.clear();
+	if (!UseNanoParticleGeometryShader())
+		nanoNoGeomVertices.clear();
 
 	{
 		ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
@@ -1115,6 +1355,8 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		SyncDirectNanoParticles();
 		SubmitDirectEnemyNanoParticles();
 	}
+	if (!UseNanoParticleGeometryShader())
+		UploadNanoNoGeomVertices();
 
 	{
 		ZoneScopedN("ProjectileDrawer::DrawAlpha(RR)");
@@ -1132,9 +1374,10 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 
 		auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
 		const bool drawEffects = rb.ShouldSubmit();
-		const bool drawNanos = UseNanoParticleShader() && nanoRenderBuffer.ShouldSubmit(false);
+		const bool drawNanos = UseNanoParticleGeometryShader() && nanoRenderBuffer.ShouldSubmit(false);
+		const bool drawNoGeomNanos = UseNanoParticleShader() && !nanoShaderUsesGeometry && !nanoNoGeomVertices.empty();
 		const bool drawDirectNanos = UseDirectNanoParticles() && (directNanoVertexCount > 0);
-		if (!drawEffects && !drawNanos && !drawDirectNanos)
+		if (!drawEffects && !drawNanos && !drawNoGeomNanos && !drawDirectNanos)
 			return;
 
 		if (drawEffects) {
@@ -1171,7 +1414,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			textureAtlas->UnbindTexture();
 		}
 
-		if (drawNanos || drawDirectNanos) {
+		if (drawNanos || drawNoGeomNanos || drawDirectNanos) {
 			ZoneScopedN("NanoParticles::Draw");
 			auto nanoState = GL::SubState(Culling(GL_FALSE));
 			const float3& camPos = camera->GetPos();
@@ -1186,6 +1429,8 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			nanoShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
 			if (drawNanos)
 				nanoRenderBuffer.DrawArrays(GL_POINTS);
+			if (drawNoGeomNanos)
+				DrawNanoNoGeomParticles();
 			if (drawDirectNanos) {
 				ZoneScopedN("NanoParticles::Draw:DirectSubmit");
 				DrawDirectNanoParticles();

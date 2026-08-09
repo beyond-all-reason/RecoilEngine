@@ -49,6 +49,7 @@ public:
 	void DrawGroundFlashes();
 	bool DrawNanoParticle(const float3& pos, const float3& velocity, int createFrame, int deathFrame, const SColor& color);
 	bool UseNanoParticleShader() const;
+	bool UseNanoParticleGeometryShader() const { return UseNanoParticleShader() && nanoShaderUsesGeometry; }
 	bool UseDirectNanoParticles() const { return UseNanoParticleShader(); }
 
 	void DrawShadowOpaque();
@@ -142,15 +143,21 @@ public:
 private:
 	static void ParseAtlasTextures(const bool, const LuaTable&, spring::unordered_set<std::string>&, CTextureAtlas*);
 	bool InitNanoParticleShader();
+	void ResetNanoParticleShader();
 	void SyncDirectNanoParticles();
 	void SubmitDirectEnemyNanoParticles();
 	void DrawDirectNanoParticles() const;
+	void DrawNanoNoGeomParticles() const;
 	bool ShouldPersistDirectNanoParticle(const DirectNanoParticle& particle) const;
 	void BuildDirectNanoEnemyCells(int frame);
 	void AddNanoParticleVertex(const float3& pos, const float3& velocity, int createFrame, int deathFrame, const SColor& color);
 	VA_TYPE_PROJ MakeDirectNanoVertex(const DirectNanoParticle& particle) const;
 	void EnsureDirectNanoBuffer();
+	void EnsureNanoNoGeomTemplateBuffer();
+	void EnsureDirectNanoNoGeomBuffer();
+	void EnsureNanoNoGeomBuffer();
 	void UploadDirectNanoVertices();
+	void UploadNanoNoGeomVertices();
 
 	void DrawProjectiles(int modelType, bool drawReflection, bool drawRefraction);
 	void DrawProjectilesShadow(int modelType);
@@ -195,6 +202,8 @@ private:
 	Shader::IProgramObject* fxShadowShader = nullptr;
 	Shader::IProgramObject* nanoShader = nullptr;
 	bool drawNanoParticlesGL4 = false;
+	bool forceNanoParticleNoGeometryShader = false;
+	bool nanoShaderUsesGeometry = false;
 	struct DirectNanoEnemyCell {
 		std::vector<std::uint32_t> particleIndices;
 		float3 minPos = ZeroVector;
@@ -206,13 +215,19 @@ private:
 	static constexpr float directNanoEnemyCellSize = 128.0f;
 	VBO directNanoVBO{GL_ARRAY_BUFFER};
 	VAO directNanoVAO;
+	VBO directNanoNoGeomTemplateVBO{GL_ARRAY_BUFFER};
+	VAO directNanoNoGeomVAO;
+	VBO nanoNoGeomVBO{GL_ARRAY_BUFFER};
+	VAO nanoNoGeomVAO;
 	std::vector<VA_TYPE_PROJ> directNanoVertices;
+	std::vector<VA_TYPE_PROJ> nanoNoGeomVertices;
 	std::vector<DirectNanoParticle> directNanoEnemyParticles;
 	std::vector<DirectNanoEnemyCell> directNanoEnemyCells;
 	spring::unordered_map<std::uint64_t, std::size_t> directNanoEnemyCellIndices;
 	std::vector<std::uint32_t> directNanoVisibleEnemyCellIndices;
 	std::vector<const DirectNanoParticle*> directNanoVisibleEnemyParticles;
 	std::size_t directNanoVBOCapacity = 0;
+	std::size_t nanoNoGeomVBOCapacity = 0;
 	std::size_t directNanoVertexCount = 0;
 	std::size_t directNanoEnemyCellCount = 0;
 	std::uint32_t directNanoUploadedGeneration = 0;

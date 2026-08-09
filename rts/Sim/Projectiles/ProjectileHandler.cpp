@@ -48,7 +48,7 @@ CONFIG(int, MaxNanoParticles).defaultValue(2000).headlessValue(0).minimumValue(0
 CONFIG(bool, NanoParticlesHoming).defaultValue(false).safemodeValue(false).headlessValue(false).description("Allow nano particles to follow moving unit targets and builder nano pieces");
 CONFIG(bool, NanoParticlesGroundClamp).defaultValue(false).safemodeValue(false).headlessValue(false).description("Route nano particles above intervening terrain");
 CONFIG(bool, NanoParticlesReclaimBurst).defaultValue(false).safemodeValue(false).headlessValue(false).description("Emit a nano burst when reclaiming a unit finishes");
-CONFIG(float, NanoParticlesRate).defaultValue(0.32f).description("Global build-power-scaled nano particle emission multiplier");
+CONFIG(float, NanoParticlesRate).defaultValue(0.32f).description("Per-emitter nano emission multiplier; also scales the minimum visual feedback cadence");
 CONFIG(bool, NanoParticleLights).defaultValue(false).deprecated(true).description("Deprecated: use NanoParticlesUpdateLuaUI");
 CONFIG(float, NanoParticlesUpdateLuaUISampleRate).defaultValue(0.32f).minimumValue(0.0f).maximumValue(1.0f).description("Fraction multiplier for native nano particles sent to LuaUI (used for deferred lights)");
 CONFIG(bool, NanoParticlesUpdateLuaUI).defaultValue(false).safemodeValue(false).headlessValue(false).description("Send batched nano particle lifecycle updates to LuaUI");
@@ -56,6 +56,7 @@ CONFIG(bool, NanoParticlesUpdateLuaUI).defaultValue(false).safemodeValue(false).
 namespace {
 	constexpr float NANO_PARTICLE_SPEED = 4.0f;
 	constexpr float NANO_EMIT_REF_BUILDSPEED = 100.0f;
+	constexpr float NANO_PARTICLE_RATE_DEFAULT = 0.32f;
 	constexpr int NANO_FEEDBACK_EMIT_MIN_GAP = 60;
 	constexpr int RECLAIM_BURST_BASE = 1;
 	constexpr float RECLAIM_BURST_LOG_K = 40.0f;
@@ -1103,9 +1104,10 @@ int CProjectileHandler::GetNanoParticleEmitCount(float builderBuildSpeed, float 
 	const float accumulated = accumulator + rate;
 	int emitCount = static_cast<int>(std::floor(accumulated));
 	accumulator = accumulated - emitCount;
-	if (emitCount == 0 && buildPower > 0.0f && (gs->frameNum - lastEmitFrame) >= NANO_FEEDBACK_EMIT_MIN_GAP) {
+	const int feedbackGap = std::max(1, static_cast<int>(std::ceil(NANO_FEEDBACK_EMIT_MIN_GAP * NANO_PARTICLE_RATE_DEFAULT / nanoParticlesRate)));
+	if (emitCount == 0 && buildPower > 0.0f && (gs->frameNum - lastEmitFrame) >= feedbackGap) {
 		emitCount = 1;
-		accumulator -= 1.0f;
+		accumulator = 0.0f;
 	}
 	if (emitCount > 0)
 		lastEmitFrame = gs->frameNum;
