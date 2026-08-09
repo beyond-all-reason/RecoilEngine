@@ -52,22 +52,25 @@ namespace Rml::SolLua
 			self.AddEventListener(event, e, in_capture_phase);
 		}
 
-		void setInnerRMLSafe(Rml::Element& self, const Rml::String& rml)
+		void setInnerRMLSafe(Rml::Element* self, const Rml::String& rml)
 		{
+			if (!Rml::SolLua::IsSolLuaElementAlive(self))
+				return;
+
 			// Manually remove all DOM children and defer their deletion
 			// This prevents use-after-free when Lua holds references to children
-			while (self.GetNumChildren())
+			while (self->GetNumChildren())
 			{
-				Rml::Element* child = self.GetChild(0);
+				Rml::Element* child = self->GetChild(0);
 				// RemoveChild returns an ElementPtr which owns the child
-				Rml::ElementPtr removed = self.RemoveChild(child);
+				Rml::ElementPtr removed = self->RemoveChild(child);
 				// Store it for deferred deletion
 				AddPendingDelete(std::move(removed));
 			}
 
 			// Now set the new content
 			if (!rml.empty())
-				self.SetInnerRML(rml);
+				self->SetInnerRML(rml);
 		}
 
 		void addEventListener(Rml::Element& self, const Rml::String& event, const Rml::String& code, sol::this_state s)
@@ -189,10 +192,21 @@ namespace Rml::SolLua
 			return self.IsVisible();
 		}
 
-		void setAttribute(Rml::Element& self, Rml::String name, Rml::String value)
+		void setAttribute(Rml::Element* self, Rml::String name, Rml::String value)
 		{
-			self.SetAttribute(name, value);
+			// See the SetClass binding: Lua may hold a stale element across a
+			// DOM rebuild, and mutating a freed element is a use-after-free.
+			if (Rml::SolLua::IsSolLuaElementAlive(self))
+				self->SetAttribute(name, value);
 		}
+
+		Rml::String getInnerRML(Rml::Element* self)
+		{
+			if (!Rml::SolLua::IsSolLuaElementAlive(self))
+				return Rml::String();
+			return self->GetInnerRML();
+		}
+
 	}
 
 	namespace child
@@ -583,7 +597,7 @@ namespace Rml::SolLua
 			/*** @field RmlUi.Element.id string ID of this element, in the context of `<span id="foo">`. */
 			"id", sol::property(&Rml::Element::GetId, &Rml::Element::SetId),
 			/*** @field RmlUi.Element.inner_rml string Gets or sets the inner RML (markup) content of the element. */
-			"inner_rml", sol::property(sol::resolve<Rml::String() const>(&Rml::Element::GetInnerRML), &functions::setInnerRMLSafe),
+			"inner_rml", sol::property(&functions::getInnerRML, &functions::setInnerRMLSafe),
 			/*** @field RmlUi.Element.scroll_left integer Gets or sets the number of pixels that the content of the element is scrolled from the left. */
 			"scroll_left", sol::property(&Rml::Element::GetScrollLeft, &Rml::Element::SetScrollLeft),
 			/*** @field RmlUi.Element.scroll_top integer Gets or sets the number of pixels that the content of the element is scrolled from the top. */
