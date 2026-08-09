@@ -156,6 +156,19 @@ An array type is expressed as `type[]`.
  */
 ````
 
+#### Aliases
+
+If a function is exported to two Lua functions, you can give it two `@function` tags:
+
+```cpp
+/***
+ * @function Spring.GetLocalPlayerID
+ * @function Spring.GetMyPlayerID
+ * @return integer playerID
+ */
+int LuaUnsyncedRead::GetLocalPlayerID(lua_State* L)
+```
+
 ### Class
 
 Structured data is expressed as a class. This represents a table with expected key/value pairs.
