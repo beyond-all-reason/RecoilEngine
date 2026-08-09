@@ -447,7 +447,9 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 		 * @function RmlUi.Context:UnloadDocument
 		 * @param document RmlUi.Document
 		 */
-		"UnloadDocument", &Rml::Context::UnloadDocument,
+		"UnloadDocument", [](Rml::Context& self, SolLuaDocument& document) {
+			self.UnloadDocument(&document);
+		},
 		/***
 		 * Updates the context.
 		 * @function RmlUi.Context:Update

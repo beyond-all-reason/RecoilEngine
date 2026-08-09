@@ -133,3 +133,17 @@ TEST_CASE("Context:CreateDocument returns a document userdata")
 	);
 	requireLuaSuccess(result);
 }
+
+TEST_CASE("Context:UnloadDocument accepts a Lua-created document")
+{
+	BindingFixture fixture("sol-lua-unload-document");
+
+	auto result = fixture.lua.safe_script(
+		"local document = context:CreateDocument()\n"
+		"assert(document ~= nil)\n"
+		"document.title = 'created from Lua'\n"
+		"assert(document.title == 'created from Lua')\n"
+		"context:UnloadDocument(document)"
+	);
+	requireLuaSuccess(result);
+}
