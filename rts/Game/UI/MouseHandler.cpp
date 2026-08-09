@@ -536,6 +536,11 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 
 	dir = GetCursorCameraDir(x, y);
 
+	// RmlUi must not steal the release of a map-owned gesture merely because
+	// the pointer crossed a panel. Keep the ownership bit from before clearing
+	// the button state below; RmlUi-owned presses return from MousePress before
+	// that state is set.
+	const bool button_was_pressed = buttons[button].pressed;
 	buttons[button].pressed = false;
 	pressedBitMask &= ~(1 << button);
 
@@ -544,7 +549,7 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 		return;
 	}
 
-	if (RmlGui::ProcessMouseRelease(x, y, button)) {
+	if (!button_was_pressed && RmlGui::ProcessMouseRelease(x, y, button)) {
 		return;
 	}
 
