@@ -2,6 +2,7 @@
 
 #include "System/creg/creg_cond.h"
 #include "System/creg/Serializer.h"
+#include <cstdint>
 #include <fstream>
 #include <sstream>
 #include <string>
@@ -18,6 +19,14 @@ struct EmbeddedObj {
 
 CR_BIND(EmbeddedObj, );
 CR_REG_METADATA(EmbeddedObj, CR_MEMBER(value));
+
+struct alignas(64) OverAlignedObj {
+	CR_DECLARE_STRUCT(OverAlignedObj);
+	int value = 0;
+};
+
+CR_BIND(OverAlignedObj, );
+CR_REG_METADATA(OverAlignedObj, CR_MEMBER(value));
 
 enum EnumClass {
 	A,
@@ -170,4 +179,19 @@ TEST_CASE("CregLoadSave")
 	CHECK(test_creg_pointers(root));
 
 	delete root;
+}
+
+TEST_CASE("Creg allocations honor registered alignment")
+{
+	void* defaultAligned = TestObj::StaticClass()->CreateInstance(sizeof(TestObj));
+	REQUIRE(defaultAligned != nullptr);
+	CHECK(reinterpret_cast<std::uintptr_t>(defaultAligned) % alignof(TestObj) == 0);
+	CHECK_FALSE(TestObj::StaticClass()->isAlignableAddress);
+	TestObj::StaticClass()->DeleteInstance(defaultAligned);
+
+	void* overAligned = OverAlignedObj::StaticClass()->CreateInstance(sizeof(OverAlignedObj));
+	REQUIRE(overAligned != nullptr);
+	CHECK(reinterpret_cast<std::uintptr_t>(overAligned) % alignof(OverAlignedObj) == 0);
+	CHECK(OverAlignedObj::StaticClass()->isAlignableAddress);
+	OverAlignedObj::StaticClass()->DeleteInstance(overAligned);
 }

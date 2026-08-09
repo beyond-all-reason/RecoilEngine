@@ -9,6 +9,7 @@
 #include <vector>
 #include <string>
 #include <cstring>
+#include <new>
 
 #include "creg_cond.h"
 #include "System/UnorderedMap.hpp"
@@ -190,8 +191,12 @@ void* Class::CreateInstance(size_t size)
 	if (poolAlloc != nullptr) {
 		inst = poolAlloc(size);
 	} else {
-		inst = ::operator new(size, std::align_val_t{(size_t)alignment});
-		isAlignableAddress = true;
+		if (static_cast<size_t>(alignment) > __STDCPP_DEFAULT_NEW_ALIGNMENT__) {
+			inst = ::operator new(size, std::align_val_t{(size_t)alignment});
+			isAlignableAddress = true;
+		} else {
+			inst = ::operator new(size);
+		}
 	}
 
 	if (constructor != nullptr)
@@ -266,4 +271,3 @@ void System::AddClass(Class* c)
 // ------------------------------------------------------------------
 // creg::Class: Class description
 // ------------------------------------------------------------------
-
