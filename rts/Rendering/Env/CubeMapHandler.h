@@ -43,7 +43,7 @@ private:
 	std::vector<unsigned char> specTexPartBuf;
 	std::vector<unsigned char> specTexFaceBuf;
 
-	FBO reflectionCubeFBO;
+	FBO reflectionCubeFBO{true};
 
 	/*
 	GL_TEXTURE_CUBE_MAP_POSITIVE_X

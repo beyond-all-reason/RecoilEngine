@@ -141,7 +141,7 @@ private:
 	uint32_t shadowDepthTexture;
 	uint32_t shadowColorTexture;
 
-	FBO smOpaqFBO;
+	FBO smOpaqFBO{true};
 
 	/// xmid, ymid, p17, p18
 	static constexpr float4 shadowTexProjCenter = {

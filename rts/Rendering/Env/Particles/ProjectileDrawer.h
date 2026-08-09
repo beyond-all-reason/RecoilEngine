@@ -157,7 +157,7 @@ private:
 	int perlinTexObjects = 0;
 	bool drawPerlinTex = false;
 
-	FBO perlinFB;
+	FBO perlinFB{true};
 
 	std::vector<const AtlasedTexture*> smokeTextures;
 
