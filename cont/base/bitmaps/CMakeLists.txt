@@ -90,7 +90,9 @@ set(FILES
 	bitmaps/caustics/caustic27.jpg
 	bitmaps/pane.bmp
 	bitmaps/tracks/ComTrack.bmp
+	bitmaps/tracks/ComTrack_normal.bmp
 	bitmaps/tracks/StdTank.bmp
+	bitmaps/tracks/StdTank_normal.bmp
 	bitmaps/gran.bmp
 	bitmaps/foam.jpg
 	bitmaps/gran2.bmp
