@@ -3602,7 +3602,7 @@ int LuaOpenGL::AlphaTest(lua_State* L)
 	}
 	else if (args == 2) {
 		glEnable(GL_ALPHA_TEST);
-		glAlphaFunc((GLenum)luaL_checkint(L, 1), (GLfloat)luaL_checkint(L, 2));
+		glAlphaFunc((GLenum)luaL_checkint(L, 1), (GLfloat)luaL_checkfloat(L, 2));
 	}
 	else {
 		luaL_error(L, "Incorrect arguments to gl.AlphaTest()");
