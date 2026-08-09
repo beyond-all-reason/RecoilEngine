@@ -406,6 +406,22 @@ endif()
 	add_dependencies(test_${test_name} springcontent.sdz)
 
 ################################################################################
+### ArchiveScanner
+	set(test_name ArchiveScanner)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/FileSystem/TestArchiveScanner.cpp"
+			${test_Common_sources}
+		)
+	set(test_libs
+			unitsync
+			${LZMA_LIBRARY}
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DUNITSYNC")
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	add_dependencies(test_${test_name} unitsync)
+	add_dependencies(test_${test_name} springcontent.sdz)
+
+################################################################################
 ### ThreadPool
 	set(test_name ThreadPool)
 	set(test_src

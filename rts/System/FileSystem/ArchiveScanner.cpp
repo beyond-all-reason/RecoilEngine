@@ -1115,7 +1115,6 @@ bool CArchiveScanner::GetArchiveChecksum(const std::string& archiveName, Archive
 			// should never happen: read error?
 			else if (const auto fi = ar->FileInfo(fid); fi.size == -1 || fi.modTime == 0) {
 				it = archiveInfo.filesInfo.erase(it);
-				assert(false);
 				return false;
 			}
 			else {
