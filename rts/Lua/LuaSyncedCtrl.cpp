@@ -5855,8 +5855,30 @@ int LuaSyncedCtrl::SetProjectileGravity(lua_State* L)
 }
 
 
+/***
+ *
+ * @function Spring.SetProjectileSpinAngle
+ * @param projectileID integer
+ * @param angle number
+ */
 int LuaSyncedCtrl::SetProjectileSpinAngle(lua_State* L) { return 0; } // FIXME: DELETE ME
+
+/***
+ *
+ * @function Spring.SetProjectileSpinSpeed
+ * @param projectileID integer
+ * @param speed number
+ */
 int LuaSyncedCtrl::SetProjectileSpinSpeed(lua_State* L) { return 0; } // FIXME: DELETE ME
+
+/***
+ *
+ * @function Spring.SetProjectileSpinVec
+ * @param projectileID integer
+ * @param x number
+ * @param y number
+ * @param z number
+ */
 int LuaSyncedCtrl::SetProjectileSpinVec(lua_State* L) { return 0; } // FIXME: DELETE ME
 
 

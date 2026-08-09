@@ -1203,6 +1203,8 @@ int LuaUnsyncedRead::GetFrameTimeOffset(lua_State* L)
 
 /*** Gets game time for drawing purposes
  *
+ * @function Spring.GetGameSecondsInterpolated
+ *
  * Returns the game time, taking the interpolated draw frame into account.
  *
  * @return number game time in seconds

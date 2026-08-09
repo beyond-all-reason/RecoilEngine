@@ -264,9 +264,9 @@ int LuaPathFinder::RequestPath(lua_State* L)
 
 /***
  * @function Spring.InitPathNodeCostsArray
- * @param overlayIndex number
- * @param sizeX number
- * @param sizeZ number
+ * @param overlayIndex integer
+ * @param sizeX integer
+ * @param sizeZ integer
  * @return boolean success
  */
 int LuaPathFinder::InitPathNodeCostsArray(lua_State* L)
@@ -406,9 +406,8 @@ int LuaPathFinder::GetPathNodeCosts(lua_State* L)
 
 /***
  * @function Spring.SetPathNodeCost
- * @param overlayIndex number
- * @param nodeX number
- * @param nodeZ number
+ * @param overlayIndex integer
+ * @param costIndex integer
  * @param cost number
  * @return boolean success
  */
@@ -444,8 +443,8 @@ int LuaPathFinder::SetPathNodeCost(lua_State* L)
 
 /***
  * @function Spring.GetPathNodeCost
- * @param nodeX number
- * @param nodeZ number
+ * @param nodeX integer
+ * @param nodeZ integer
  * @return number cost
  */
 int LuaPathFinder::GetPathNodeCost(lua_State* L)
