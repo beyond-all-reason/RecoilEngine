@@ -73,7 +73,12 @@ set(test_common_libraries
 	fmt::fmt
 )
 
-add_custom_target(tests)
+# Guard against a duplicate: a vendored lib (rts/lib/nowide/test) also defines a
+# `tests` target and may be configured first. Its own CMakeLists guards this the
+# same way; without matching it here, configure aborts on the second definition.
+if(NOT TARGET tests)
+	add_custom_target(tests)
+endif()
 add_custom_target(check ${CMAKE_CTEST_COMMAND} --output-on-failure -V
 	DEPENDS engine-headless)
 add_custom_target(install-tests)
