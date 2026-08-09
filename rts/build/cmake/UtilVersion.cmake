@@ -167,6 +167,18 @@ Macro    (fetch_spring_version dir prefix)
 			# We always want the long git-describe output on non-releases
 			# for example: 83.0.1-0-g1234567
 			git_util_describe(${prefix}_Describe ${dir} "[0-9]*" --long)
+			# A fork may intentionally have no numeric tags. Keep tagless builds
+			# deterministic and self-contained by deriving the base version from
+			# the commit date instead of depending on another repository's tags.
+			If     ("${${prefix}_Describe}" MATCHES "^[0-9a-f]+$")
+				git_util_command(${prefix}_CommitDate "${dir}" show -s --date=short --format=%ad HEAD)
+				git_util_command(${prefix}_ShortHash "${dir}" rev-parse --short=7 HEAD)
+				If     (NOT ${prefix}_CommitDate OR NOT ${prefix}_ShortHash)
+					Message(FATAL_ERROR "Failed to derive a tagless version for ${prefix}.")
+				EndIf  ()
+				String(REPLACE "-" "." ${prefix}_CommitDate "${${prefix}_CommitDate}")
+				Set(${prefix}_Describe "${${prefix}_CommitDate}-0-g${${prefix}_ShortHash}")
+			EndIf  ()
 		EndIf  (NOT ${prefix}_IsRelease)
 
 		Git_Util_Branch(${prefix}_Branch ${dir})
