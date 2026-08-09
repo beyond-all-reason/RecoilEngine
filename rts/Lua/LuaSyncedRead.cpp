@@ -3201,7 +3201,7 @@ int LuaSyncedRead::GetUnitsInPlanes(lua_State* L)
 
 	// parse the planes
 	vector<Plane> planes;
-	const int table = lua_gettop(L);
+	const int table = 1;
 	for (lua_pushnil(L); lua_next(L, table) != 0; lua_pop(L, 1)) {
 		if (lua_istable(L, -1)) {
 			float values[4];
@@ -5817,8 +5817,21 @@ int LuaSyncedRead::GetUnitWeaponTarget(lua_State* L)
  * @section misc
 ******************************************************************************/
 
-
+/***
+ *
+ * @function Spring.GetUnitTravel
+ * @param unitID integer
+ * @return number travelPeriod
+ * @return number travelTime
+ */
 int LuaSyncedRead::GetUnitTravel(lua_State* L) { lua_pushnumber(L, 0.0f); lua_pushnumber(L, 0.0f); return 2; } // FIXME: DELETE ME
+
+/***
+ *
+ * @function Spring.GetUnitFuel
+ * @param unitID integer
+ * @return number fuel
+ */
 int LuaSyncedRead::GetUnitFuel(lua_State* L) { lua_pushnumber(L, 0.0f); return 1; } // FIXME: DELETE ME
 
 
@@ -8507,6 +8520,17 @@ int LuaSyncedRead::IsUnitInJammer(lua_State* L)
 
 /******************************************************************************/
 
+/***
+ *
+ * @function Spring.GetClosestValidPosition
+ * @param unitDefID integer
+ * @param x number
+ * @param z number
+ * @param radius number
+ * @return number x
+ * @return number y
+ * @return number z
+ */
 int LuaSyncedRead::GetClosestValidPosition(lua_State* L)
 {
 	// FIXME -- finish this
