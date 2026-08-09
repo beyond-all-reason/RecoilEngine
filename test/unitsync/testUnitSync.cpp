@@ -350,4 +350,14 @@ TEST_CASE("UnitSync")
 	if ((errmsg = us::GetNextError()) == nullptr) {
 		FAIL_CHECK("No error on GetWritableDataDirectory before init"); // there's an error cause we called GetWritableDataDirectory() after UnInit()!
 	}
+
+	// A unitsync client may initialize and tear down more than once in its
+	// process lifetime. Keep this path under the test runner so static Lua pool
+	// state is checked by ASAN as well as by the functional assertions above.
+	for (int cycle = 0; cycle < 2; ++cycle) {
+		CHECK(us::Init(false, 0) != 0);
+		CHECK_ERROR_MESSAGE(errmsg);
+		us::UnInit();
+		CHECK_ERROR_MESSAGE(errmsg);
+	}
 }
