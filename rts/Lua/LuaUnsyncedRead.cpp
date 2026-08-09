@@ -2200,7 +2200,7 @@ int LuaUnsyncedRead::GetVisibleFeatures(lua_State* L)
 			if (noIcons && f->drawFlag == DrawFlags::SO_DRICON_FLAG)
 				continue;
 
-			if (noGeos && f->def->geoThermal)
+			if (noGeos && f->def != nullptr && f->def->geoThermal)
 				continue;
 
 			if (!gu->spectatingFullView && !f->IsInLosForAllyTeam(allyTeamID))
