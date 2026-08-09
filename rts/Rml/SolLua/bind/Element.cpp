@@ -34,6 +34,7 @@
 #include "../plugin/SolLuaDocument.h"
 #include "../plugin/SolLuaEventListener.h"
 
+#include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <unordered_map>
 
 // Forward declaration for deferred element deletion
@@ -549,13 +550,11 @@ namespace Rml::SolLua
 			/***
 			 * Get the value of this element.
 			 * @function RmlUi.Element:GetValue
-			 * @return number | string | "" value Returns number if it has the tag "input", a string if it has the tag "textarea", else an empty string.
+			 * @return number | string | "" value Returns the value for form controls, else an empty string.
 			 */
 			"GetValue",[](Rml::Element& self) {
-				if (self.GetTagName() == "input") {
-					return dynamic_cast<Rml::ElementFormControlInput*>(&self)->GetValue();
-				} else if (self.GetTagName() == "textarea") {
-					return dynamic_cast<Rml::ElementFormControlTextArea*>(&self)->GetValue();
+				if (auto* control = dynamic_cast<Rml::ElementFormControl*>(&self)) {
+					return control->GetValue();
 				}
 				return std::string();
 			},

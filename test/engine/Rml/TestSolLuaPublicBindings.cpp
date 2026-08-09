@@ -167,3 +167,25 @@ TEST_CASE("Element:DispatchEvent accepts Lua table parameters")
 	);
 	requireLuaSuccess(result);
 }
+
+TEST_CASE("Element:GetValue supports select controls")
+{
+	BindingFixture fixture("sol-lua-form-value");
+	auto* document = fixture.context->CreateDocument();
+	REQUIRE(document != nullptr);
+	auto select = document->CreateElement("select");
+	REQUIRE(select != nullptr);
+	auto* selectElement = dynamic_cast<Rml::ElementFormControlSelect*>(select.get());
+	REQUIRE(selectElement != nullptr);
+	selectElement = dynamic_cast<Rml::ElementFormControlSelect*>(document->AppendChild(std::move(select)));
+	REQUIRE(selectElement != nullptr);
+	auto option = document->CreateElement("option");
+	REQUIRE(option != nullptr);
+	option->SetAttribute("value", "one");
+	selectElement->Add(std::move(option));
+	selectElement->SetSelection(0);
+	fixture.lua["element"] = selectElement;
+
+	auto result = fixture.lua.safe_script("assert(element:GetValue() == 'one')");
+	requireLuaSuccess(result);
+}
