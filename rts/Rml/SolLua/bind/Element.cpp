@@ -33,6 +33,7 @@
 
 #include "../plugin/SolLuaDocument.h"
 #include "../plugin/SolLuaEventListener.h"
+#include "../plugin/SolLuaPlugin.h"
 
 #include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <unordered_map>
@@ -186,6 +187,11 @@ namespace Rml::SolLua
 		static auto getVisible(Rml::Element& self)
 		{
 			return self.IsVisible();
+		}
+
+		void setAttribute(Rml::Element& self, Rml::String name, Rml::String value)
+		{
+			self.SetAttribute(name, value);
 		}
 	}
 
@@ -479,14 +485,20 @@ namespace Rml::SolLua
 			 * @param name string
 			 * @param value string
 			 */
-			"SetAttribute", static_cast<void(Rml::Element::*)(const Rml::String&, const Rml::String&)>(&Rml::Element::SetAttribute),
+			"SetAttribute", &functions::setAttribute,
 			/***
 			 * Sets (if value is true) or clears (if value is false) the class name on the element.
 			 * @function RmlUi.Element:SetClass
 			 * @param name string
 			 * @param value boolean
 			 */
-			"SetClass", &Rml::Element::SetClass,
+			"SetClass", [](Rml::Element* self, const Rml::String& name, bool value) {
+				// Guard against Lua holding a stale element reference across a
+				// DOM rebuild: calling SetClass on a freed element is a
+				// use-after-free. The liveness check never dereferences self.
+				if (Rml::SolLua::IsSolLuaElementAlive(self))
+					self->SetClass(name, value);
+			},
 			//--
 			/***
 			 * @function RmlUi.Element:GetElementsByClassName

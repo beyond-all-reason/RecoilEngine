@@ -211,6 +211,10 @@ bool RmlGui::RemoveLua()
 
 	state->luaPlugin->RemoveLuaItems();
 
+	for (auto* context : state->contexts) {
+		MarkContextForRemoval(context);
+	}
+
 	// Update to allow clean up of removed items.
 	Update();
 

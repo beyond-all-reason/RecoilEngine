@@ -33,14 +33,32 @@
 
 #include "RmlUi/Core/Context.h"
 #include "SolLuaInstancer.h"
-#include "Rml/Backends/RmlUi_Backend.h"
 #include <RmlUi/Core.h>
 
 #include <algorithm>
+#include <unordered_set>
 
+namespace RmlGui
+{
+	void MarkContextForRemoval(Rml::Context* context);
+}
 
 namespace Rml::SolLua
 {
+	namespace
+	{
+		// Set of currently-live RmlUi elements. Maintained from the element
+		// create/destroy plugin hooks. The Lua bindings look pointers up here
+		// (a value comparison, never a dereference) so a stale element handle
+		// held by Lua across a DOM rebuild is a no-op instead of a crash.
+		std::unordered_set<const Rml::Element*> g_liveElements;
+	}
+
+	bool IsSolLuaElementAlive(const Element* element)
+	{
+		return element != nullptr && g_liveElements.find(element) != g_liveElements.end();
+	}
+
 	SolLuaPlugin::SolLuaPlugin(sol::state_view lua_state)
 		: m_lua_state{lua_state}
 	{
@@ -53,31 +71,60 @@ namespace Rml::SolLua
 
 	int SolLuaPlugin::GetEventClasses()
 	{
-		return EVT_BASIC | EVT_DOCUMENT;
+		return EVT_BASIC | EVT_DOCUMENT | EVT_ELEMENT;
 	}
 
-	void SolLuaPlugin::AddContextTracking(Context* context) {
+	void SolLuaPlugin::OnElementCreate(Element* element)
+	{
+		if (element != nullptr)
+			g_liveElements.insert(element);
+	}
+
+	void SolLuaPlugin::OnElementDestroy(Element* element)
+	{
+		g_liveElements.erase(element);
+	}
+
+	void SolLuaPlugin::AddContextTracking(Context* context)
+	{
+		if (std::find(luaContexts.begin(), luaContexts.end(), context) != luaContexts.end())
+			return;
+
 		luaContexts.emplace_back(context);
 	}
 
-	void SolLuaPlugin::OnContextDestroy(Context* context) {
+	void SolLuaPlugin::OnContextDestroy(Context* context)
+	{
 		luaContexts.erase(std::remove(luaContexts.begin(), luaContexts.end(), context), luaContexts.end());
 	}
 
-	void SolLuaPlugin::AddDocumentTracking(ElementDocument* document) {
+	void SolLuaPlugin::AddDocumentTracking(ElementDocument* document)
+	{
+		if (std::find(luaDocuments.begin(), luaDocuments.end(), document) != luaDocuments.end())
+			return;
+
 		luaDocuments.emplace_back(document);
 	}
 
-	void SolLuaPlugin::OnDocumentUnload(ElementDocument* document) {
+	void SolLuaPlugin::OnDocumentUnload(ElementDocument* document)
+	{
 		luaDocuments.erase(std::remove(luaDocuments.begin(), luaDocuments.end(), document), luaDocuments.end());
 	}
 
-	void SolLuaPlugin::RemoveLuaItems(){
-		for(auto d: luaDocuments) {
-			d->Close();
+	void SolLuaPlugin::RemoveLuaItems()
+	{
+		auto documents = luaDocuments;
+		luaDocuments.clear();
+		for (auto* d : documents) {
+			if (d != nullptr && d->GetContext() != nullptr)
+				d->Close();
 		}
-		for(auto c: luaContexts) {
-			RmlGui::MarkContextForRemoval(c);
+
+		auto contexts = luaContexts;
+		luaContexts.clear();
+		for (auto* c : contexts) {
+			if (c != nullptr)
+				RmlGui::MarkContextForRemoval(c);
 		}
 	}
 

@@ -32,6 +32,7 @@
  #include "bind.h"
  #include "../plugin//SolLuaPlugin.h"
  #include "Rml/Backends/RmlUi_Backend.h"
+ #include "Rml/Backends/RmlUi_SystemInterface.h"
 
 
  namespace Rml::SolLua
