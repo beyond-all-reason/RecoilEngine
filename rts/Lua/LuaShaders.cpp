@@ -115,7 +115,7 @@ GLuint LuaShaders::GetProgramName(uint32_t progIdx) const
 
 const LuaShaders::Program* LuaShaders::GetProgram(uint32_t progIdx) const
 {
-	if (progIdx < programs.size() && progIdx > 0)
+	if (progIdx < programs.size() && progIdx > 0 && programs[progIdx].id != 0)
 		return &programs[progIdx];
 
 	return nullptr;
@@ -123,7 +123,7 @@ const LuaShaders::Program* LuaShaders::GetProgram(uint32_t progIdx) const
 
 LuaShaders::Program* LuaShaders::GetProgram(uint32_t progIdx)
 {
-	if (progIdx < programs.size() && progIdx > 0)
+	if (progIdx < programs.size() && progIdx > 0 && programs[progIdx].id != 0)
 		return &programs[progIdx];
 
 	return nullptr;
