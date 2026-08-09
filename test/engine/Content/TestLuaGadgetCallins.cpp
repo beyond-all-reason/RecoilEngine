@@ -6,10 +6,10 @@
 #include <lua.h>
 #include <lualib.h>
 
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <string>
-#include <cstdlib>
 
 namespace
 {
@@ -23,9 +23,8 @@ std::string readFile(const char* path)
 	return contents.str();
 }
 
-std::string projectileDestroyedFunction(const std::string& source)
+std::string extractFunction(const std::string& source, const char* functionStart)
 {
-	constexpr const char* functionStart = "function gadgetHandler:ProjectileDestroyed(";
 	const auto start = source.find(functionStart);
 	REQUIRE(start != std::string::npos);
 
@@ -34,9 +33,16 @@ std::string projectileDestroyedFunction(const std::string& source)
 	return source.substr(start, end + 4 - start);
 }
 
-std::string makeTestChunk(const std::string& function)
+std::string makeTestChunk(
+	const std::string& function,
+	const char* callIn,
+	const char* arguments,
+	const char* expectedFirst,
+	const char* expectedSecond,
+	const char* expectedThird
+)
 {
-	return R"lua(
+	std::string chunk = R"lua(
 local function r_ipairs(tbl)
   local function r_iter(tbl, key)
     if (key <= 1) then
@@ -48,40 +54,45 @@ local function r_ipairs(tbl)
 end
 
 local gadgetHandler = {
-  ProjectileDestroyedList = {},
+  )lua";
+	chunk += callIn;
+	chunk += R"lua(List = {},
 }
 
-)lua" + function + R"lua(
-
-local received
-table.insert(gadgetHandler.ProjectileDestroyedList, {
-  ProjectileDestroyed = function(_, ...)
+)lua";
+	chunk += function;
+	chunk += "\n\nlocal received\ntable.insert(gadgetHandler.";
+	chunk += callIn;
+	chunk += R"lua(List, {
+  )lua";
+	chunk += callIn;
+	chunk += R"lua( = function(_, ...)
     received = {...}
   end,
 })
 
-gadgetHandler:ProjectileDestroyed(101, 202, 303)
-assert(received ~= nil)
-assert(#received == 3)
-assert(received[1] == 101)
-assert(received[2] == 202)
-assert(received[3] == 303)
 )lua";
+	chunk += "gadgetHandler:";
+	chunk += callIn;
+	chunk += "(";
+	chunk += arguments;
+	chunk += ")\nassert(received ~= nil)\nassert(#received == 3)\nassert(received[1] == ";
+	chunk += expectedFirst;
+	chunk += ")\nassert(received[2] == ";
+	chunk += expectedSecond;
+	chunk += ")\nassert(received[3] == ";
+	chunk += expectedThird;
+	chunk += ")\n";
+	return chunk;
 }
 
-} // namespace
-
-TEST_CASE("LuaGadgets forwards ProjectileDestroyed arguments")
+void runChunk(const std::string& chunk, const char* name)
 {
-	const char* sourcePath = std::getenv("SPRING_TEST_LUA_GADGETS_FILE");
-	const auto source = readFile(sourcePath != nullptr ? sourcePath : LUA_GADGETS_SOURCE_FILE);
-	const auto chunk = makeTestChunk(projectileDestroyedFunction(source));
-
 	lua_State* lua = luaL_newstate();
 	REQUIRE(lua != nullptr);
 	luaL_openlibs(lua);
 
-	const auto loadResult = luaL_loadbuffer(lua, chunk.data(), chunk.size(), "ProjectileDestroyed test");
+	const auto loadResult = luaL_loadbuffer(lua, chunk.data(), chunk.size(), name);
 	REQUIRE(loadResult == 0);
 
 	const auto callResult = lua_pcall(lua, 0, 0, 0);
@@ -90,4 +101,40 @@ TEST_CASE("LuaGadgets forwards ProjectileDestroyed arguments")
 	CHECK(callResult == 0);
 
 	lua_close(lua);
+}
+
+const std::string& gadgetSource()
+{
+	static const std::string source = [] {
+		const char* sourcePath = std::getenv("SPRING_TEST_LUA_GADGETS_FILE");
+		return readFile(sourcePath != nullptr ? sourcePath : LUA_GADGETS_SOURCE_FILE);
+	}();
+	return source;
+}
+} // namespace
+
+TEST_CASE("LuaGadgets forwards ProjectileDestroyed arguments")
+{
+	const auto chunk = makeTestChunk(
+		extractFunction(gadgetSource(), "function gadgetHandler:ProjectileDestroyed("),
+		"ProjectileDestroyed",
+		"101, 202, 303",
+		"101",
+		"202",
+		"303"
+	);
+	runChunk(chunk, "ProjectileDestroyed test");
+}
+
+TEST_CASE("LuaGadgets dispatches UnitMoveFailed arguments")
+{
+	const auto chunk = makeTestChunk(
+		extractFunction(gadgetSource(), "function gadgetHandler:UnitMoveFailed("),
+		"UnitMoveFailed",
+		"401, 402, 403",
+		"401",
+		"402",
+		"403"
+	);
+	runChunk(chunk, "UnitMoveFailed test");
 }

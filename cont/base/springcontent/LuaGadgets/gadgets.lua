@@ -1455,6 +1455,13 @@ function gadgetHandler:UnitIdle(unitID, unitDefID, unitTeam)
 end
 
 
+function gadgetHandler:UnitMoveFailed(unitID, unitDefID, unitTeam)
+  for _,g in r_ipairs(self.UnitMoveFailedList) do
+    g:UnitMoveFailed(unitID, unitDefID, unitTeam)
+  end
+end
+
+
 function gadgetHandler:UnitCmdDone(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag)
   for _,g in r_ipairs(self.UnitCmdDoneList) do
     g:UnitCmdDone(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag)
