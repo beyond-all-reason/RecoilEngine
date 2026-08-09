@@ -166,6 +166,7 @@ private:
 		[[nodiscard]] const Gfx::FramebufferData& GetLayer(Rml::LayerHandle layer) const;
 		[[nodiscard]] const Gfx::FramebufferData& GetTopLayer() const;
 		[[nodiscard]] Rml::LayerHandle GetTopLayerHandle() const;
+		[[nodiscard]] bool HasActiveLayer() const { return layers_size > 0; }
 
 		const Gfx::FramebufferData& GetPostprocessPrimary() { return EnsureFramebufferPostprocess(0); }
 		const Gfx::FramebufferData& GetPostprocessSecondary() { return EnsureFramebufferPostprocess(1); }

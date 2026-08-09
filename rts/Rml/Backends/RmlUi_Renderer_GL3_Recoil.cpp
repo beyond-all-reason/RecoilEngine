@@ -1726,7 +1726,7 @@ void RenderInterface_GL3_Recoil::CompositeLayers(Rml::LayerHandle source_handle,
 void RenderInterface_GL3_Recoil::PopLayer()
 {
 	render_layers.PopLayer();
-	glBindFramebuffer(GL_FRAMEBUFFER, render_layers.GetTopLayer().framebuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, render_layers.HasActiveLayer() ? render_layers.GetTopLayer().framebuffer : 0);
 }
 
 Rml::TextureHandle RenderInterface_GL3_Recoil::SaveLayerAsTexture()
