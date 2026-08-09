@@ -4,6 +4,7 @@
 
 #include "Rml/SolLua/bind/bind.h"
 #include "Rml/Backends/RmlUi_SystemInterface.h"
+#include "Rml/SolLua/plugin/SolLuaDocument.h"
 #include "Rml/SolLua/plugin/SolLuaPlugin.h"
 
 #include <RmlUi/Core.h>
@@ -98,6 +99,11 @@ void BeginFrame() {}
 void PresentFrame() {}
 void SetMouseCursorAlias(std::string, std::string) {}
 } // namespace RmlGui
+
+namespace Rml::SolLua::document
+{
+void appendToStyleSheet(SolLuaDocument&, const Rml::String&);
+}
 
 void AddPendingDelete(Rml::ElementPtr) {}
 
@@ -211,4 +217,16 @@ TEST_CASE("Select options expose the option value field")
 
 	auto result = fixture.lua.safe_script("assert(element.options[0].value == 'one')");
 	requireLuaSuccess(result);
+}
+
+TEST_CASE("Document:AppendToStyleSheet handles a new and malformed document")
+{
+	BindingFixture fixture("sol-lua-append-stylesheet");
+	auto* document = dynamic_cast<Rml::SolLua::SolLuaDocument*>(fixture.context->CreateDocument());
+	REQUIRE(document != nullptr);
+	REQUIRE(document->GetStyleSheetContainer() == nullptr);
+
+	Rml::SolLua::document::appendToStyleSheet(*document, "body { color: rgb(255, 0, 0); }");
+	REQUIRE(document->GetStyleSheetContainer() != nullptr);
+	Rml::SolLua::document::appendToStyleSheet(*document, "body { color: ");
 }
