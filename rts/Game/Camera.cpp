@@ -733,6 +733,12 @@ float3 CCamera::GetMoveVectorFromState(bool fromKeyState) const
 		return v;
 	}
 
+	// A pointer outside the window is not map input. WindowLeave() keeps the
+	// cached coordinates centred, but this guard also covers the interval
+	// before the corresponding SDL window event is processed.
+	if (mouse->offscreen)
+		return v;
+
 	const int windowW = globalRendering->winSizeX;
 	int mouseY = mouse->lasty;
 	int viewH;
@@ -744,6 +750,12 @@ float3 CCamera::GetMoveVectorFromState(bool fromKeyState) const
 	} else {
 		viewH = globalRendering->viewSizeY;
 	}
+
+	// Mouse coordinates can still be reported below the active map viewport.
+	// Do not clamp those coordinates to viewH: doing so turns a UI/status area
+	// into a permanent bottom-edge scroll zone.
+	if (mouseY < 0 || mouseY >= viewH)
+		return v;
 
 	int2 border;
 	border.x = std::max<int>(1, static_cast <int> (windowW * edgeMoveWidth));
