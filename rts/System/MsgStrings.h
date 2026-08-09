@@ -18,7 +18,6 @@ const std::string NoClientsExit = "No clients connected, shutting down server";
 
 const std::string NoSyncResponse = "Error: Player %s did not send sync checksum for frame %d";
 const std::string SyncError = "Sync error for %s in frame %d (got %x, correct is %x)";
-const std::string NoSyncCheck = "Warning: Sync checking disabled!";
 
 const std::string ConnectionReject = "Connection attempt rejected from %s: %s";
 const std::string WrongPlayer = "Got message %d from %d claiming to be from %d";
@@ -41,4 +40,3 @@ const std::string UncontrolledPlayerName = "Uncontrolled";
 const std::string UnnamedPlayerName = "UnnamedPlayer";
 
 #endif // _SERVER_MSG_STRINGS_H_
-
