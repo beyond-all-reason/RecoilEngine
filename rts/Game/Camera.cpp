@@ -733,6 +733,12 @@ float3 CCamera::GetMoveVectorFromState(bool fromKeyState) const
 		return v;
 	}
 
+	// The mouse coordinates are still useful to UI consumers, but they are not
+	// map input while an engine UI context owns the pointer. Keep edge scrolling
+	// in the camera path independent of any particular UI implementation.
+	if (mouse->IsMouseOverUI())
+		return v;
+
 	// A pointer outside the window is not map input. WindowLeave() keeps the
 	// cached coordinates centred, but this guard also covers the interval
 	// before the corresponding SDL window event is processed.

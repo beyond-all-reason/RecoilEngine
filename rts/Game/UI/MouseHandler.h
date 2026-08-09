@@ -98,6 +98,9 @@ public:
 	bool GetSelectionBoxVertices(float3& bl, float3& br, float3& tl, float3& tr) const;
 
 	bool ButtonPressed();
+	/// True while the last motion was consumed by an engine UI context.
+	/// Camera edge scrolling must not treat UI coordinates as map input.
+	bool IsMouseOverUI() const { return mouseOverUI; }
 
 private:
 	int2 GetViewMouseCenter() const;
@@ -127,6 +130,7 @@ public:
 	/// so we can restore it when we return to normal control
 	bool wasLocked = false;
 	bool offscreen = false;
+	bool mouseOverUI = false;
 	bool mmbScroll = false;
 	uint32_t pressedBitMask = 0;
 
