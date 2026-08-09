@@ -649,6 +649,8 @@ namespace Platform
 			if (!CreateProcess(nullptr, flatArgs.str().data(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &pi))
 				LOG("[%s] error %lu creating subprocess with arguments \"%s\"", __func__, GetLastError(), nowide::narrow(flatArgs.str()).c_str());
 
+			return execError;
+
 			#else
 
 			int pid;
@@ -656,10 +658,9 @@ namespace Platform
 				LOG("[%s] error forking process", __func__);
 			} else if (pid != 0) {
 				// TODO: Maybe useful to return the subprocess ID (pid)?
+				return execError;
 			}
 			#endif
-
-			return execError;
 		}
 
 		#ifdef UNICODE
