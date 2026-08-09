@@ -281,7 +281,7 @@ bool CUnsyncedLuaHandle::DrawFeature(const CFeature* feature)
 /*** For custom rendering of shields.
  *
  * @function UnsyncedCallins:DrawShield
- * @param featureID integer
+ * @param unitID integer
  * @param weaponID integer
  * @param drawMode number
  * @return boolean suppressEngineDraw
@@ -978,7 +978,7 @@ bool CSyncedLuaHandle::AllowUnitCloak(const CUnit* unit, const CUnit* enemy)
 
 /***
  *
- * @function SyncedCallins:AllowUnitCloak
+ * @function SyncedCallins:AllowUnitDecloak
  * @param unitID integer
  * @param objectID integer?
  * @param weaponNum number?
