@@ -86,6 +86,10 @@ add_test(NAME testASANLibraryPreference
 	COMMAND ${CMAKE_COMMAND}
 		"-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
 		-P "${CMAKE_CURRENT_SOURCE_DIR}/build/TestASANLibraryPreference.cmake")
+add_test(NAME testReleaseWorkflowTargets
+	COMMAND ${CMAKE_COMMAND}
+		"-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+		-P "${CMAKE_CURRENT_SOURCE_DIR}/build/TestReleaseWorkflowTargets.cmake")
 
 macro (add_spring_test target sources libraries flags)
 	add_test(NAME test${target} COMMAND test_${target})
