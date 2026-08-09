@@ -4,6 +4,7 @@
 
 #include "Rml/SolLua/bind/bind.h"
 #include "Rml/Backends/RmlUi_SystemInterface.h"
+#include "Rml/SolLua/plugin/SolLuaDataModel.h"
 #include "Rml/SolLua/plugin/SolLuaDocument.h"
 #include "Rml/SolLua/plugin/SolLuaPlugin.h"
 
@@ -271,4 +272,43 @@ TEST_CASE("Lua data-model arrays expose their size child")
 	REQUIRE(size.Get(value));
 	REQUIRE(value.GetType() == Rml::Variant::INT);
 	REQUIRE(value.Get<int>() == 2);
+}
+
+TEST_CASE("RmlUi element collections use Lua tables")
+{
+	BindingFixture fixture("sol-lua-element-collections");
+
+	auto result = fixture.lua.safe_script(R"(
+		local document = context:CreateDocument()
+		document.inner_rml = [[
+			<div id="root">
+				<span class="item"></span>
+				<span class="item"></span>
+			</div>
+		]]
+		document:UpdateDocument()
+
+		local root = document:GetElementById('root')
+		assert(root ~= nil)
+
+		local byTag = root:GetElementsByTagName('span')
+		assert(type(byTag) == 'table')
+		assert(#byTag == 2)
+		assert(byTag[1] ~= nil)
+		assert(byTag[1].tag_name == 'span')
+
+		local byClass = root:GetElementsByClassName('item')
+		assert(type(byClass) == 'table')
+		assert(#byClass == 2)
+		assert(byClass[2] ~= nil)
+		assert(byClass[2].class_name == 'item')
+
+		local selected = root:QuerySelectorAll('.item')
+		assert(type(selected) == 'table')
+		assert(#selected == 2)
+		assert(selected[1] ~= nil)
+		assert(selected[1].tag_name == 'span')
+
+	)");
+	requireLuaSuccess(result);
 }

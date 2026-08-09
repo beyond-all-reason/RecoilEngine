@@ -95,18 +95,18 @@ namespace Rml::SolLua
 			return makeObjectFromVariant(attr, s);
 		}
 
-		auto getElementsByTagName(Rml::Element& self, const Rml::String& tag)
+		sol::as_table_t<Rml::ElementList> getElementsByTagName(Rml::Element& self, const Rml::String& tag)
 		{
 			Rml::ElementList result;
 			self.GetElementsByTagName(result, tag);
-			return result;
+			return sol::as_table(result);
 		}
 
-		auto getElementsByClassName(Rml::Element& self, const Rml::String& class_name)
+		sol::as_table_t<Rml::ElementList> getElementsByClassName(Rml::Element& self, const Rml::String& class_name)
 		{
 			Rml::ElementList result;
 			self.GetElementsByClassName(result, class_name);
-			return result;
+			return sol::as_table(result);
 		}
 
 		auto getAttributes(Rml::Element& self, sol::this_state s)
@@ -130,11 +130,11 @@ namespace Rml::SolLua
 			return soldocument;
 		}
 
-		auto getQuerySelectorAll(Rml::Element& self, const Rml::String& selector)
+		sol::as_table_t<Rml::ElementList> getQuerySelectorAll(Rml::Element& self, const Rml::String& selector)
 		{
 			Rml::ElementList result;
 			self.QuerySelectorAll(result, selector);
-			return result;
+			return sol::as_table(result);
 		}
 
 		Rml::Dictionary makeDictionaryFromTable(const sol::table& table)
