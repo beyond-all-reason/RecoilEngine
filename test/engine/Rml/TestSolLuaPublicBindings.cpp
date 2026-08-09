@@ -147,3 +147,23 @@ TEST_CASE("Context:UnloadDocument accepts a Lua-created document")
 	);
 	requireLuaSuccess(result);
 }
+
+TEST_CASE("Element:DispatchEvent accepts Lua table parameters")
+{
+	BindingFixture fixture("sol-lua-dispatch-event");
+	auto* document = fixture.context->CreateDocument();
+	REQUIRE(document != nullptr);
+	auto* element = document->AppendChild(document->CreateElement("button"));
+	REQUIRE(element != nullptr);
+	fixture.lua["element"] = element;
+
+	auto result = fixture.lua.safe_script(
+		"local received = false\n"
+		"element:AddEventListener('custom', function(event)\n"
+		"  received = event.parameters.kind == 'synthetic' and event.parameters.count == 3 and event.parameters.flag == true\n"
+		"end)\n"
+		"assert(element:DispatchEvent('custom', {kind = 'synthetic', count = 3, flag = true}))\n"
+		"assert(received)"
+	);
+	requireLuaSuccess(result);
+}

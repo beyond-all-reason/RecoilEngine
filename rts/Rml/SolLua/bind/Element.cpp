@@ -132,6 +132,56 @@ namespace Rml::SolLua
 			return result;
 		}
 
+		Rml::Dictionary makeDictionaryFromTable(const sol::table& table)
+		{
+			Rml::Dictionary result;
+
+			for (const auto& [key, value] : table) {
+				if (key.get_type() != sol::type::string)
+					continue;
+
+				const auto keyString = key.as<Rml::String>();
+				switch (value.get_type()) {
+					case sol::type::number:
+						result[keyString] = static_cast<float>(value.as<lua_Number>());
+						break;
+					case sol::type::boolean:
+						result[keyString] = value.as<bool>();
+						break;
+					case sol::type::string:
+						result[keyString] = value.as<Rml::String>();
+						break;
+					case sol::type::lightuserdata:
+						result[keyString] = value.as<void*>();
+						break;
+					default:
+						break;
+				}
+			}
+
+			return result;
+		}
+
+		bool dispatchEvent(Rml::Element& self, const Rml::String& event)
+		{
+			return self.DispatchEvent(event, Rml::Dictionary());
+		}
+
+		bool dispatchEvent(Rml::Element& self, const Rml::String& event, const sol::table& parameters)
+		{
+			return self.DispatchEvent(event, makeDictionaryFromTable(parameters));
+		}
+
+		bool dispatchEvent(Rml::Element& self, const Rml::String& event, const sol::table& parameters, bool interruptible)
+		{
+			return self.DispatchEvent(event, makeDictionaryFromTable(parameters), interruptible);
+		}
+
+		bool dispatchEvent(Rml::Element& self, const Rml::String& event, const sol::table& parameters, bool interruptible, bool bubbles)
+		{
+			return self.DispatchEvent(event, makeDictionaryFromTable(parameters), interruptible, bubbles);
+		}
+
 		static auto getVisible(Rml::Element& self)
 		{
 			return self.IsVisible();
@@ -302,7 +352,12 @@ namespace Rml::SolLua
 			 * @param interruptible string
 			 * @return boolean
 			 */
-			"DispatchEvent", sol::resolve<bool(const Rml::String&, const Rml::Dictionary&)>(&Rml::Element::DispatchEvent),
+			"DispatchEvent", sol::overload(
+				sol::resolve<bool(Rml::Element&, const Rml::String&)>(&functions::dispatchEvent),
+				sol::resolve<bool(Rml::Element&, const Rml::String&, const sol::table&)>(&functions::dispatchEvent),
+				sol::resolve<bool(Rml::Element&, const Rml::String&, const sol::table&, bool)>(&functions::dispatchEvent),
+				sol::resolve<bool(Rml::Element&, const Rml::String&, const sol::table&, bool, bool)>(&functions::dispatchEvent)
+			),
 			/***
 			 * Gives input focus to this element.
 			 * @function RmlUi.Element:Focus
