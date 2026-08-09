@@ -120,3 +120,16 @@ TEST_CASE("RmlUi.version is exposed as a string")
 	);
 	requireLuaSuccess(result);
 }
+
+TEST_CASE("Context:CreateDocument returns a document userdata")
+{
+	BindingFixture fixture("sol-lua-create-document");
+
+	auto result = fixture.lua.safe_script(
+		"local document = context:CreateDocument()\n"
+		"assert(document ~= nil)\n"
+		"document.title = 'created from Lua'\n"
+		"assert(document.title == 'created from Lua')"
+	);
+	requireLuaSuccess(result);
+}
