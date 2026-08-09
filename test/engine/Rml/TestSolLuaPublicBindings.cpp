@@ -249,3 +249,26 @@ TEST_CASE("Document:AppendToStyleSheet handles a new and malformed document")
 	REQUIRE(document->GetStyleSheetContainer() != nullptr);
 	Rml::SolLua::document::appendToStyleSheet(*document, "body { color: ");
 }
+
+TEST_CASE("Lua data-model arrays expose their size child")
+{
+	sol::state lua;
+	lua.open_libraries(sol::lib::base);
+
+	Rml::SolLua::SolLuaDataModel model(lua);
+	model.Table = lua.create_table();
+	auto items = lua.create_table();
+	items[1] = "One";
+	items[2] = "Two";
+	model.Table["items"] = items;
+	model.ObjectDef = std::make_unique<Rml::SolLua::SolLuaObjectDef>(&model);
+
+	Rml::SolLua::DataVariableReference root(model.Table, "items", "");
+	auto size = model.ObjectDef->Child(&root, Rml::DataAddressEntry("size"));
+	REQUIRE(size);
+
+	Rml::Variant value;
+	REQUIRE(size.Get(value));
+	REQUIRE(value.GetType() == Rml::Variant::INT);
+	REQUIRE(value.Get<int>() == 2);
+}

@@ -142,6 +142,10 @@ namespace Rml::SolLua
 		// Accessing by name.
 		if (address.index == -1)
 		{
+			if (address.name == "size") {
+				return Rml::MakeLiteralIntVariable(Size(ptr));
+			}
+
 			// Try to get the object.
 			auto e = table.raw_get<sol::object>(address.name);
 			if (e.get_type() == sol::type::lua_nil) {
