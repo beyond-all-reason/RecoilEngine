@@ -1768,9 +1768,9 @@ function gadgetHandler:ProjectileCreated(proID, proOwnerID, proWeaponDefID)
   end
 end
 
-function gadgetHandler:ProjectileDestroyed(proID)
+function gadgetHandler:ProjectileDestroyed(proID, ownerID, proWeaponDefID)
   for _,g in r_ipairs(self.ProjectileDestroyedList) do
-    g:ProjectileDestroyed(proID)
+    g:ProjectileDestroyed(proID, ownerID, proWeaponDefID)
   end
 end
 

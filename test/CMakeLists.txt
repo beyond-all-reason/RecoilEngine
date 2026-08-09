@@ -547,6 +547,26 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
 
 ################################################################################
+### LuaGadgetCallins
+	set(test_name LuaGadgetCallins)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Content/TestLuaGadgetCallins.cpp"
+			"${ENGINE_SOURCE_DIR}/Lua/LuaMemPool.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+	set(test_libs
+			lua
+			smmalloc
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+	target_compile_definitions(test_${test_name} PRIVATE
+		LUA_GADGETS_SOURCE_FILE="${CMAKE_SOURCE_DIR}/cont/base/springcontent/LuaGadgets/gadgets.lua"
+		)
+	target_include_directories(test_${test_name} PRIVATE "${ENGINE_SOURCE_DIR}/lib/lua/include")
+
+################################################################################
 ### RmlSolLuaPublicBindings
 	find_package(PNG QUIET)
 
