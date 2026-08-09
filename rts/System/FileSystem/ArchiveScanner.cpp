@@ -1155,7 +1155,10 @@ bool CArchiveScanner::ReadCacheData(const std::string& filename, bool loadOldVer
 			if (fn.empty())
 				continue;
 
-			assert(!filesInfoMap.contains(fn));
+			if (filesInfoMap.contains(fn)) {
+				LOG_L(L_WARNING, "[AS::ReadCacheData] duplicate ArchiveCache file entry \"%s\", overwriting", fn.c_str());
+			}
+
 			auto& val = filesInfoMap[fn];
 
 			val.size = static_cast<decltype(val.size)>(std::stoll(fileInfoTbl.GetString("size", "-1")));
@@ -1185,6 +1188,7 @@ bool CArchiveScanner::ReadCacheData(const std::string& filename, bool loadOldVer
 		ai.modified = static_cast<decltype(ai.modified)>(std::stoll(curArchiveTbl.GetString("modified", "0")));
 		ai.modifiedArchiveData = static_cast<decltype(ai.modified)>(std::stoll(curArchiveTbl.GetString("modifiedArchiveData", "0")));
 
+		ai.filesInfo.clear();
 		const LuaTable filesInfoTbl = curArchiveTbl.SubTable("filesInfo");
 		ReadFileInfoMap(filesInfoTbl, ai.filesInfo);
 
@@ -1841,4 +1845,3 @@ int CArchiveScanner::GetMetaFileClass(const std::string& filePath)
 
 	return 0;
 }
-

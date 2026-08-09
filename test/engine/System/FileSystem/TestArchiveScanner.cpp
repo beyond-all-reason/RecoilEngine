@@ -145,3 +145,30 @@ TEST_CASE("ArchiveScanner accepts unreadable cached archive files")
 	const std::string archivePathString = archivePath.string();
 	CHECK(us::GetArchiveChecksum(archivePathString.c_str()) != 0);
 }
+
+TEST_CASE("ArchiveScanner overwrites duplicate cached file entries")
+{
+	TestDataDir dataDir;
+	const auto archivePath = dataDir.GetPath() / "duplicate.sdd";
+	std::filesystem::create_directories(archivePath / "data");
+	{
+		std::ofstream file(archivePath / "data" / "test.txt");
+		file << "archive cache regression";
+	}
+
+	const auto cachePath = dataDir.GetPath() / "cache" / "ArchiveCache22.lua";
+	std::filesystem::create_directories(cachePath.parent_path());
+	const auto archiveDirectory = DirectoryOf(archivePath);
+	const auto cache = ArchiveCache(
+		archivePath.filename().string(),
+		archiveDirectory,
+		ModificationTimeOf(archivePath),
+		"\t\t\t\t{ fileName = \"data/test.txt\", size = \"1\", modTime = \"1\", checksum = \"\" },\n"
+		"\t\t\t\t{ fileName = \"data/test.txt\", size = \"2\", modTime = \"2\", checksum = \"\" },\n"
+	);
+	TemporaryFile cacheFile(cachePath, cache);
+
+	REQUIRE(InitializeUnitsync() != 0);
+	const std::string archivePathString = archivePath.string();
+	CHECK(us::GetArchiveChecksum(archivePathString.c_str()) != 0);
+}
