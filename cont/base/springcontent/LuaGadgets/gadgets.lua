@@ -1908,18 +1908,6 @@ function gadgetHandler:DrawWorldPreUnit()
   end
 end
 
-function gadgetHandler:DrawWorldPreProjectiles()
-  for _,g in r_ipairs(self.DrawWorldPreProjectilesList) do
-    g:DrawWorldPreProjectiles()
-  end
-end
-
-function gadgetHandler:DrawWorldPreAlpha()
-  for _,g in r_ipairs(self.DrawWorldPreAlphaList) do
-    g:DrawWorldPreAlpha()
-  end
-end
-
 function gadgetHandler:DrawPreDecals()
   for _,g in r_ipairs(self.DrawPreDecalsList) do
     g:DrawPreDecals()
