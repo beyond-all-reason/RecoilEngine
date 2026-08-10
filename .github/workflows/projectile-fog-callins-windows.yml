@@ -1,0 +1,61 @@
+name: Projectile Fog Callins Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/projectile-fog-callins
+    paths:
+      - "projectile-fog-callins/**"
+      - ".github/workflows/projectile-fog-callins-windows.yml"
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  build-windows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          submodules: recursive
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Apply projectile fog callins patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 projectile-fog-callins/apply_patch.py
+          git diff --check
+          git diff --stat
+
+      - name: Build Windows amd64 engine
+        shell: bash
+        env:
+          CI: "true"
+        run: |
+          set -euo pipefail
+          chmod +x docker-build-v2/build.sh
+          ./docker-build-v2/build.sh --arch amd64 --jobs 4 windows
+
+      - name: Package ready-to-use engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d build-amd64-windows/install
+          cd build-amd64-windows/install
+          zip -r9 "${GITHUB_WORKSPACE}/RecoilEngine-ProjectileFog-Callins-Windows.zip" .
+
+      - name: Upload Windows engine ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: RecoilEngine-ProjectileFog-Callins-Windows
+          path: RecoilEngine-ProjectileFog-Callins-Windows.zip
+          if-no-files-found: error
+          retention-days: 14
