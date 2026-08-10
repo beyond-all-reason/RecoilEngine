@@ -1,4 +1,4 @@
-name: Materialize Projectile Fog Callins
+name: Complete Projectile Fog Callin Routing
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 jobs:
-  materialize:
+  complete-routing:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout branch
@@ -22,27 +22,105 @@ jobs:
           fetch-depth: 0
           submodules: false
 
-      - name: Apply validated callin patch to sources
+      - name: Patch stock LuaUI and LuaRules handlers
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              s = p.read_text(encoding="utf-8")
+              count = s.count(old)
+              if count != 1:
+                  raise RuntimeError(f"{path}: expected 1 anchor, found {count}")
+              p.write_text(s.replace(old, new, 1), encoding="utf-8", newline="\n")
+              print(f"patched {path}")
+
+          replace_once(
+              "cont/LuaUI/widgets.lua",
+              "function widgetHandler:DrawWorldPreUnit()\n"
+              "  for _,w in ripairs(self.DrawWorldPreUnitList) do\n"
+              "    w:DrawWorldPreUnit()\n"
+              "  end\n"
+              "  return\n"
+              "end\n\n"
+              "function widgetHandler:DrawWorldPreParticles()\n",
+              "function widgetHandler:DrawWorldPreUnit()\n"
+              "  for _,w in ripairs(self.DrawWorldPreUnitList) do\n"
+              "    w:DrawWorldPreUnit()\n"
+              "  end\n"
+              "  return\n"
+              "end\n\n"
+              "function widgetHandler:DrawWorldPreProjectiles()\n"
+              "  for _,w in ripairs(self.DrawWorldPreProjectilesList) do\n"
+              "    w:DrawWorldPreProjectiles()\n"
+              "  end\n"
+              "  return\n"
+              "end\n\n"
+              "function widgetHandler:DrawWorldPreAlpha()\n"
+              "  for _,w in ripairs(self.DrawWorldPreAlphaList) do\n"
+              "    w:DrawWorldPreAlpha()\n"
+              "  end\n"
+              "  return\n"
+              "end\n\n"
+              "function widgetHandler:DrawWorldPreParticles()\n"
+          )
+
+          replace_once(
+              "cont/base/springcontent/LuaGadgets/callins.lua",
+              "\t\"DrawWorld\",\n"
+              "\t\"DrawWorldPreUnit\",\n"
+              "\t\"DrawOpaqueUnitsLua\",\n",
+              "\t\"DrawWorld\",\n"
+              "\t\"DrawWorldPreUnit\",\n"
+              "\t\"DrawWorldPreProjectiles\",\n"
+              "\t\"DrawWorldPreAlpha\",\n"
+              "\t\"DrawOpaqueUnitsLua\",\n"
+          )
+
+          replace_once(
+              "cont/base/springcontent/LuaGadgets/gadgets.lua",
+              "function gadgetHandler:DrawWorldPreUnit()\n"
+              "  for _,g in r_ipairs(self.DrawWorldPreUnitList) do\n"
+              "    g:DrawWorldPreUnit()\n"
+              "  end\n"
+              "end\n\n"
+              "function gadgetHandler:DrawPreDecals()\n",
+              "function gadgetHandler:DrawWorldPreUnit()\n"
+              "  for _,g in r_ipairs(self.DrawWorldPreUnitList) do\n"
+              "    g:DrawWorldPreUnit()\n"
+              "  end\n"
+              "end\n\n"
+              "function gadgetHandler:DrawWorldPreProjectiles()\n"
+              "  for _,g in r_ipairs(self.DrawWorldPreProjectilesList) do\n"
+              "    g:DrawWorldPreProjectiles()\n"
+              "  end\n"
+              "end\n\n"
+              "function gadgetHandler:DrawWorldPreAlpha()\n"
+              "  for _,g in r_ipairs(self.DrawWorldPreAlphaList) do\n"
+              "    g:DrawWorldPreAlpha()\n"
+              "  end\n"
+              "end\n\n"
+              "function gadgetHandler:DrawPreDecals()\n"
+          )
+
+      - name: Validate changes
         shell: bash
         run: |
           set -euo pipefail
-          python3 projectile-fog-callins/apply_patch.py
           git diff --check
+          git diff --stat
+          grep -n "function widgetHandler:DrawWorldPreProjectiles" cont/LuaUI/widgets.lua
+          grep -n "function widgetHandler:DrawWorldPreAlpha" cont/LuaUI/widgets.lua
+          grep -n "DrawWorldPreProjectiles" cont/base/springcontent/LuaGadgets/callins.lua
+          grep -n "function gadgetHandler:DrawWorldPreProjectiles" cont/base/springcontent/LuaGadgets/gadgets.lua
 
-      - name: Remove temporary patch machinery
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf projectile-fog-callins
-          git diff --check
-          git status --short
-
-      - name: Commit materialized sources
+      - name: Commit completed routing
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "add pre-projectile and pre-alpha draw callins"
+          git add cont/LuaUI/widgets.lua cont/base/springcontent/LuaGadgets/callins.lua cont/base/springcontent/LuaGadgets/gadgets.lua
+          git commit -m "route new draw callins through Lua handlers"
           git push origin HEAD:agent/projectile-fog-callins
