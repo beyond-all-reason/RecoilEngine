@@ -1,0 +1,62 @@
+name: Materialize Projectile Fog Callins
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/projectile-fog-callins
+    paths:
+      - ".github/workflows/materialize-projectile-fog-callins.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/projectile-fog-callins
+          fetch-depth: 0
+          submodules: false
+
+      - name: Apply validated callin patch to sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 projectile-fog-callins/apply_patch.py
+          git diff --check
+
+      - name: Convert Windows workflow to build committed sources
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('.github/workflows/projectile-fog-callins-windows.yml')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('      - "projectile-fog-callins/**"\n', '')
+          s = s.replace('      - ".github/workflows/projectile-fog-callins-windows.yml"\n', '''      - "rts/Rendering/WorldDrawer.cpp"\n      - "rts/System/Events.def"\n      - "rts/System/EventClient.h"\n      - "rts/System/EventHandler.h"\n      - "rts/System/EventHandler.cpp"\n      - "rts/Lua/LuaHandle.h"\n      - "rts/Lua/LuaHandle.cpp"\n      - "rts/Lua/LuaOpenGL.h"\n      - "cont/LuaUI/callins.lua"\n      - "cont/LuaUI/widgets.lua"\n      - ".github/workflows/projectile-fog-callins-windows.yml"\n''')
+          start = s.index('      - name: Apply projectile fog callins patch\n')
+          end = s.index('      - name: Build Windows amd64 engine\n', start)
+          s = s[:start] + s[end:]
+          p.write_text(s, encoding='utf-8', newline='\n')
+
+      - name: Remove temporary patch machinery
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf projectile-fog-callins
+          rm -f .github/workflows/materialize-projectile-fog-callins.yml
+          git diff --check
+          git status --short
+
+      - name: Commit materialized sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "add pre-projectile and pre-alpha draw callins"
+          git push origin HEAD:agent/projectile-fog-callins
