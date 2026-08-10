@@ -49,3 +49,5 @@ falls back to them if no shader path is usable.
   Operations are 1 = spawn, 2 = update, 3 = remove, 4 = reset. Only fires while both
   `NanoParticlesGL4` and `NanoParticlesUpdateLuaUI` are on.
 * added `Engine.FeatureSupport.nanoParticleUpdateCallin` boolean, to detect the above.
+* added `Engine.FeatureSupport.nanoParticlesGL4` boolean, so games can detect that the engine has
+  the standalone nano particle effect and retire their own Lua implementation of it.

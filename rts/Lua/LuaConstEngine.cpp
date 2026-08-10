@@ -30,6 +30,7 @@
  * @field deadTeamsKeepUnitLimit boolean Whether engine redistributes dead team unitlimit to allies (false) or keeps it as-is (true)
  * @field reliableLuaMapShaders boolean Whether forward-only Lua map shaders activate without a deferred draw and Spring.SetMapShader program swaps refresh cached uniform locations
  * @field nanoParticleUpdateCallin boolean Whether LuaUI receives batched `NanoParticleUpdate` lifecycle events
+ * @field nanoParticlesGL4 boolean Whether the engine has the standalone shader-based nano particle effect (the `NanoParticles*` springsettings)
  */
 
 /***
@@ -87,6 +88,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "deadTeamsKeepUnitLimit", false);
 		LuaPushNamedBool(L, "reliableLuaMapShaders", true);
 		LuaPushNamedBool(L, "nanoParticleUpdateCallin", true);
+		LuaPushNamedBool(L, "nanoParticlesGL4", true);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");
