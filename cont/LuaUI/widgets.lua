@@ -1300,6 +1300,20 @@ function widgetHandler:DrawWorldPreUnit()
   return
 end
 
+function widgetHandler:DrawWorldPreProjectiles()
+  for _,w in ripairs(self.DrawWorldPreProjectilesList) do
+    w:DrawWorldPreProjectiles()
+  end
+  return
+end
+
+function widgetHandler:DrawWorldPreAlpha()
+  for _,w in ripairs(self.DrawWorldPreAlphaList) do
+    w:DrawWorldPreAlpha()
+  end
+  return
+end
+
 function widgetHandler:DrawWorldPreParticles()
   for _,w in ripairs(self.DrawWorldPreParticlesList) do
     w:DrawWorldPreParticles()
