@@ -6,7 +6,16 @@ on:
     branches:
       - agent/projectile-fog-callins
     paths:
-      - "projectile-fog-callins/**"
+      - "rts/Rendering/WorldDrawer.cpp"
+      - "rts/System/Events.def"
+      - "rts/System/EventClient.h"
+      - "rts/System/EventHandler.h"
+      - "rts/System/EventHandler.cpp"
+      - "rts/Lua/LuaHandle.h"
+      - "rts/Lua/LuaHandle.cpp"
+      - "rts/Lua/LuaOpenGL.h"
+      - "cont/LuaUI/callins.lua"
+      - "cont/LuaUI/widgets.lua"
       - ".github/workflows/projectile-fog-callins-windows.yml"
 
 permissions:
@@ -27,13 +36,12 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Apply projectile fog callins patch
+      - name: Validate committed source diff
         shell: bash
         run: |
           set -euo pipefail
-          python3 projectile-fog-callins/apply_patch.py
-          git diff --check
-          git diff --stat
+          git diff --check HEAD^ HEAD
+          git status --short
 
       - name: Build Windows amd64 engine
         shell: bash
