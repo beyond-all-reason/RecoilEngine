@@ -155,6 +155,8 @@ local flexCallIns = {
   'DrawGenesis',
   'DrawWorld',
   'DrawWorldPreUnit',
+  'DrawWorldPreProjectiles',
+  'DrawWorldPreAlpha',
   'DrawWorldPreParticles',
   'DrawWorldShadow',
   'DrawWorldReflection',
