@@ -122,7 +122,6 @@ bool CLuaRules::AddUnsyncedCode(lua_State* L)
  * @function Script.PermitHelperAIs
  * @param permit boolean
  */
-
 int CLuaRules::PermitHelperAIs(lua_State* L)
 {
 	if (!lua_isboolean(L, 1)) {
