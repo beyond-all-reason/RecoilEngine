@@ -3201,7 +3201,7 @@ int LuaSyncedRead::GetUnitsInPlanes(lua_State* L)
 
 	// parse the planes
 	vector<Plane> planes;
-	const int table = lua_gettop(L);
+	const int table = 1;
 	for (lua_pushnil(L); lua_next(L, table) != 0; lua_pop(L, 1)) {
 		if (lua_istable(L, -1)) {
 			float values[4];
@@ -4835,6 +4835,7 @@ int LuaSyncedRead::GetUnitHarvestStorage(lua_State* L)
  *
  * @function Spring.GetUnitBuildParams
  * @param unitID integer
+ * @param paramName string
  */
 int LuaSyncedRead::GetUnitBuildParams(lua_State* L)
 {
@@ -5817,8 +5818,21 @@ int LuaSyncedRead::GetUnitWeaponTarget(lua_State* L)
  * @section misc
 ******************************************************************************/
 
-
+/***
+ *
+ * @function Spring.GetUnitTravel
+ * @param unitID integer
+ * @return number travelPeriod
+ * @return number travelTime
+ */
 int LuaSyncedRead::GetUnitTravel(lua_State* L) { lua_pushnumber(L, 0.0f); lua_pushnumber(L, 0.0f); return 2; } // FIXME: DELETE ME
+
+/***
+ *
+ * @function Spring.GetUnitFuel
+ * @param unitID integer
+ * @return number fuel
+ */
 int LuaSyncedRead::GetUnitFuel(lua_State* L) { lua_pushnumber(L, 0.0f); return 1; } // FIXME: DELETE ME
 
 
@@ -5887,6 +5901,22 @@ int LuaSyncedRead::GetUnitCollisionVolumeData(lua_State* L)
 	return LuaUtils::PushColVolData(L, &unit->collisionVolume);
 }
 
+/***
+ *
+ * @function Spring.GetUnitPieceCollisionVolumeData
+ * @param unitID integer
+ * @param pieceNum integer
+ * @return number scaleX
+ * @return number scaleY
+ * @return number scaleZ
+ * @return number offsetX
+ * @return number offsetY
+ * @return number offsetZ
+ * @return integer volumeType
+ * @return integer testType
+ * @return integer primaryAxis
+ * @return boolean disabled
+ */
 int LuaSyncedRead::GetUnitPieceCollisionVolumeData(lua_State* L)
 {
 	return (PushPieceCollisionVolumeData(L, ParseInLosUnit(L, __func__, 1)));
@@ -8507,6 +8537,17 @@ int LuaSyncedRead::IsUnitInJammer(lua_State* L)
 
 /******************************************************************************/
 
+/***
+ *
+ * @function Spring.GetClosestValidPosition
+ * @param unitDefID integer
+ * @param x number
+ * @param z number
+ * @param radius number
+ * @return number x
+ * @return number y
+ * @return number z
+ */
 int LuaSyncedRead::GetClosestValidPosition(lua_State* L)
 {
 	// FIXME -- finish this
@@ -9279,6 +9320,7 @@ static int TraceRayGroundImpl(lua_State *const L, const float3 &pos, const float
  * @param dirX number
  * @param dirY number
  * @param dirZ number
+ * @param maxLength number? (Default: `999999`)
  * @param testWater boolean? (Default: `true`)
  * @return number rayLength
  * @return number posX

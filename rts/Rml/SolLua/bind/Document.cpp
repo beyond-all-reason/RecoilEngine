@@ -33,6 +33,8 @@
 
 #include "../plugin/SolLuaDocument.h"
 
+#include <RmlUi/Core/StyleSheetContainer.h>
+
 
 namespace Rml::SolLua
 {
@@ -87,8 +89,19 @@ namespace Rml::SolLua
 		auto appendToStyleSheet(SolLuaDocument& self, const Rml::String& content)
 		{
 			auto styleSheet = Rml::Factory::InstanceStyleSheetString(content);
-			auto combined = styleSheet->CombineStyleSheetContainer(*self.GetStyleSheetContainer());
-			self.SetStyleSheetContainer(std::move(combined));
+			if (styleSheet == nullptr) {
+				return;
+			}
+
+			const Rml::StyleSheetContainer* existingStyleSheet = self.GetStyleSheetContainer();
+			if (existingStyleSheet != nullptr) {
+				styleSheet = styleSheet->CombineStyleSheetContainer(*existingStyleSheet);
+				if (styleSheet == nullptr) {
+					return;
+				}
+			}
+
+			self.SetStyleSheetContainer(std::move(styleSheet));
 		}
 
 		auto getWidget(SolLuaDocument& self)

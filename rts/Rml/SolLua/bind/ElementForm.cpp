@@ -286,7 +286,7 @@ namespace Rml::SolLua
 
 			// G
 			/*** @field RmlUi.ElementsFormControlSelect.options RmlUi.SelectOptionsProxy */
-			"options", &options::getOptionsProxy,
+			"options", sol::readonly_property(&options::getOptionsProxy),
 
 			// B
 			sol::base_classes, sol::bases<Rml::ElementFormControl, Rml::Element>()

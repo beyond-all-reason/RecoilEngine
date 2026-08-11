@@ -397,10 +397,13 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 		 * @param tag string
 		 * @return RmlUi.Document
 		 */
-		"CreateDocument", [slp](Rml::Context& self) {
-			auto doc = self.CreateDocument();
-			slp->AddDocumentTracking(doc);
-			return doc;
+		"CreateDocument", [slp](Rml::Context& self) -> SolLuaDocument* {
+			auto* doc = self.CreateDocument();
+			auto* solDoc = dynamic_cast<SolLuaDocument*>(doc);
+			if (solDoc != nullptr) {
+				slp->AddDocumentTracking(solDoc);
+			}
+			return solDoc;
 		},
 		/***
 		 * Attempts to load a document from the RML file found at document_path. If successful, the document will be returned with a reference count of one.
@@ -438,13 +441,18 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 		 * Closes all documents currently loaded with the context.
 		 * @function RmlUi.Context:UnloadAllDocuments
 		 */
-		"UnloadAllDocuments", &Rml::Context::UnloadAllDocuments,
+		"UnloadAllDocuments", [](Rml::Context& self) {
+			RmlGui::ClearDebugContext(&self);
+			self.UnloadAllDocuments();
+		},
 		/***
 		 * Unloads a specific document within the context.
 		 * @function RmlUi.Context:UnloadDocument
 		 * @param document RmlUi.Document
 		 */
-		"UnloadDocument", &Rml::Context::UnloadDocument,
+		"UnloadDocument", [](Rml::Context& self, SolLuaDocument& document) {
+			self.UnloadDocument(&document);
+		},
 		/***
 		 * Updates the context.
 		 * @function RmlUi.Context:Update

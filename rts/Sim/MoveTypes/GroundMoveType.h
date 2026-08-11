@@ -130,9 +130,9 @@ public:
 	void SyncWaypoints() override {
 		// Synced vars trigger a checksum update on change, which is expensive so we should check
 		// that there has been a change before triggering an update to the checksum.
-		if (!currWayPoint.bitExactEquals(earlyCurrWayPoint))
+		if (!WayPointBitExactEquals(currWayPoint, earlyCurrWayPoint))
 			currWayPoint = earlyCurrWayPoint;
-		if (!nextWayPoint.bitExactEquals(earlyNextWayPoint))
+		if (!WayPointBitExactEquals(nextWayPoint, earlyNextWayPoint))
 			nextWayPoint = earlyNextWayPoint;
 	}
 	unsigned int GetPathId() override { return pathID; }
@@ -148,6 +148,15 @@ public:
 	void SetMtJobId(int _jobId) { jobId = _jobId; }
 
 private:
+	static bool WayPointBitExactEquals(const SyncedFloat3& a, const float3& b)
+	{
+	#if defined(SYNCDEBUG) || defined(SYNCCHECK)
+		return a.bitExactEquals(b);
+	#else
+		return a.same(b);
+	#endif
+	}
+
 	float3 GetObstacleAvoidanceDir(const float3& desiredDir);
 	float3 Here() const;
 
@@ -309,4 +318,3 @@ private:
 };
 
 #endif // GROUNDMOVETYPE_H
-

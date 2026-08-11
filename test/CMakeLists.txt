@@ -73,10 +73,23 @@ set(test_common_libraries
 	fmt::fmt
 )
 
-add_custom_target(tests)
+# Guard against a duplicate: a vendored lib (rts/lib/nowide/test) also defines a
+# `tests` target and may be configured first. Its own CMakeLists guards this the
+# same way; without matching it here, configure aborts on the second definition.
+if(NOT TARGET tests)
+	add_custom_target(tests)
+endif()
 add_custom_target(check ${CMAKE_CTEST_COMMAND} --output-on-failure -V
 	DEPENDS engine-headless)
 add_custom_target(install-tests)
+add_test(NAME testASANLibraryPreference
+	COMMAND ${CMAKE_COMMAND}
+		"-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+		-P "${CMAKE_CURRENT_SOURCE_DIR}/build/TestASANLibraryPreference.cmake")
+add_test(NAME testReleaseWorkflowTargets
+	COMMAND ${CMAKE_COMMAND}
+		"-DSOURCE_DIR=${CMAKE_SOURCE_DIR}"
+		-P "${CMAKE_CURRENT_SOURCE_DIR}/build/TestReleaseWorkflowTargets.cmake")
 
 macro (add_spring_test target sources libraries flags)
 	add_test(NAME test${target} COMMAND test_${target})
@@ -406,6 +419,22 @@ endif()
 	add_dependencies(test_${test_name} springcontent.sdz)
 
 ################################################################################
+### ArchiveScanner
+	set(test_name ArchiveScanner)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/FileSystem/TestArchiveScanner.cpp"
+			${test_Common_sources}
+		)
+	set(test_libs
+			unitsync
+			${LZMA_LIBRARY}
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DUNITSYNC")
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	add_dependencies(test_${test_name} unitsync)
+	add_dependencies(test_${test_name} springcontent.sdz)
+
+################################################################################
 ### ThreadPool
 	set(test_name ThreadPool)
 	set(test_src
@@ -524,6 +553,102 @@ endif()
 			""
 		)
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+
+################################################################################
+### LuaGadgetCallins
+	set(test_name LuaGadgetCallins)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Content/TestLuaGadgetCallins.cpp"
+			"${ENGINE_SOURCE_DIR}/Lua/LuaMemPool.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+	set(test_libs
+			lua
+			smmalloc
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+	target_compile_definitions(test_${test_name} PRIVATE
+		LUA_GADGETS_SOURCE_FILE="${CMAKE_SOURCE_DIR}/cont/base/springcontent/LuaGadgets/gadgets.lua"
+		)
+	target_include_directories(test_${test_name} PRIVATE "${ENGINE_SOURCE_DIR}/lib/lua/include")
+
+################################################################################
+### RmlSolLuaPublicBindings
+	find_package(PNG QUIET)
+
+	set(test_name RmlSolLuaPublicBindings)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rml/TestSolLuaPublicBindings.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/bind.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Colour.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Convert.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Context.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/DataModel.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Document.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Element.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/ElementDerived.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/ElementForm.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Event.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Global.cpp"
+			"${ENGINE_SOURCE_DIR}/Lua/LuaMemPool.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaDocument.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaEventListener.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaInstancer.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaDataModel.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaPlugin.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+	set(test_libs
+			rmlui_core
+			lua
+			smmalloc
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DBUILDING_AI")
+	target_link_libraries(test_${test_name} ${FREETYPE_LIBRARY_RELEASE} ZLIB::ZLIB SDL2::SDL2)
+	if (TARGET PNG::PNG)
+		target_link_libraries(test_${test_name} PNG::PNG)
+	endif ()
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/lua/include)
+	target_include_directories(test_${test_name} PRIVATE ${SDL2_INCLUDE_DIRS})
+
+################################################################################
+### RmlSolLuaPluginShutdown
+	find_package(PNG QUIET)
+
+	set(test_name RmlSolLuaPluginShutdown)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rml/TestSolLuaPluginShutdown.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/bind.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Convert.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Document.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Element.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/ElementForm.cpp"
+			"${ENGINE_SOURCE_DIR}/Lua/LuaMemPool.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaDocument.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaEventListener.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaInstancer.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaPlugin.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+	set(test_libs
+			rmlui_core
+			lua
+			smmalloc
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DBUILDING_AI")
+	target_link_libraries(test_${test_name} ${FREETYPE_LIBRARY_RELEASE} ZLIB::ZLIB)
+	if (TARGET PNG::PNG)
+		target_link_libraries(test_${test_name} PNG::PNG)
+	endif ()
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/lua/include)
 
 ################################################################################
 ### SerializeLuaState

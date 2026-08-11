@@ -1203,6 +1203,8 @@ int LuaUnsyncedRead::GetFrameTimeOffset(lua_State* L)
 
 /*** Gets game time for drawing purposes
  *
+ * @function Spring.GetGameSecondsInterpolated
+ *
  * Returns the game time, taking the interpolated draw frame into account.
  *
  * @return number game time in seconds
@@ -2200,7 +2202,7 @@ int LuaUnsyncedRead::GetVisibleFeatures(lua_State* L)
 			if (noIcons && f->drawFlag == DrawFlags::SO_DRICON_FLAG)
 				continue;
 
-			if (noGeos && f->def->geoThermal)
+			if (noGeos && f->def != nullptr && f->def->geoThermal)
 				continue;
 
 			if (!gu->spectatingFullView && !f->IsInLosForAllyTeam(allyTeamID))

@@ -153,7 +153,7 @@ static bool DoTask(int tid, bool async)
 		auto& queue_background = taskQueuesSyncBackground[async][idx];
 
 		auto tryDequeue = [&](ITaskGroup*& tg){
-		#ifndef UNIT_TEST
+		#if !defined(UNIT_TEST) && defined(SYNCCHECK)
 			if (CSyncChecker::InSyncedCode()) {
 				return ( queue.try_dequeue(tg) || queue_background.try_dequeue(tg) );
 			}
@@ -738,4 +738,3 @@ void ClearExtJobs() {
 }
 
 #endif
-

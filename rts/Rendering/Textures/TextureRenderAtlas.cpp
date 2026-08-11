@@ -400,7 +400,7 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 			DepthMask(GL_FALSE)
 		);
 
-		FBO fbo;
+		FBO fbo(true);
 		fbo.Init(false);
 		fbo.Bind();
 		if (numPages > 1)

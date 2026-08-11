@@ -174,3 +174,5 @@ build-*
 # IDE
 /.idea
 .kilo
+
+out/

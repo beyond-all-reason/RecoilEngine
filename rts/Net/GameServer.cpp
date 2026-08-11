@@ -776,13 +776,6 @@ void CGameServer::CheckSync()
 		++outstandingSyncFrameIt;
 	}
 
-#else
-
-	// Make it clear this build isn't suitable for release.
-	if (!syncErrorFrame || (serverFrameNum - syncErrorFrame > SYNCCHECK_MSG_TIMEOUT)) {
-		syncErrorFrame = serverFrameNum;
-		Message(NoSyncCheck);
-	}
 #endif
 }
 
@@ -3160,4 +3153,3 @@ uint8_t CGameServer::ReserveSkirmishAIId()
 	freeSkirmishAIs.pop_back();
 	return id;
 }
-

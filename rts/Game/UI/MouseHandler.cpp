@@ -230,12 +230,14 @@ void CMouseHandler::WindowEnter()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	offscreen = false;
+	mouseOverUI = false;
 }
 
 void CMouseHandler::WindowLeave()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	offscreen = true;
+	mouseOverUI = false;
 
 	const int2 viewMouseCenter = GetViewMouseCenter();
 
@@ -285,8 +287,12 @@ void CMouseHandler::MouseMove(int x, int y, int dx, int dy)
 	/* Only want to give a mouse event to RmlUI if the mouse isn't currently performing a drag.
 	 * Otherwise box selections get stuck when the mouse goes over an Rml element.
 	 * Flags that ButtonPressed() checks are not set when clicking on Rml element. */
-	if (!ButtonPressed() && RmlGui::ProcessMouseMove(x, lasty, dx, dy, activeButtonIdx)) {
-		return;
+	if (!ButtonPressed()) {
+		mouseOverUI = RmlGui::ProcessMouseMove(x, lasty, dx, dy, activeButtonIdx);
+		if (mouseOverUI)
+			return;
+	} else {
+		mouseOverUI = false;
 	}
 
 	if (activeReceiver != nullptr)
@@ -345,8 +351,10 @@ void CMouseHandler::MousePress(int x, int y, int button)
 		playerHandler.Player(gu->myPlayerNum)->currentStats.mouseClicks++;
 
 	if (RmlGui::ProcessMousePress(x, y, button)) {
+		mouseOverUI = true;
 		return;
 	}
+	mouseOverUI = false;
 
 	activeButtonIdx = button;
 	ButtonPressEvt& bp = buttons[activeButtonIdx];
@@ -536,6 +544,11 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 
 	dir = GetCursorCameraDir(x, y);
 
+	// RmlUi must not steal the release of a map-owned gesture merely because
+	// the pointer crossed a panel. Keep the ownership bit from before clearing
+	// the button state below; RmlUi-owned presses return from MousePress before
+	// that state is set.
+	const bool button_was_pressed = buttons[button].pressed;
 	buttons[button].pressed = false;
 	pressedBitMask &= ~(1 << button);
 
@@ -544,7 +557,7 @@ void CMouseHandler::MouseRelease(int x, int y, int button)
 		return;
 	}
 
-	if (RmlGui::ProcessMouseRelease(x, y, button)) {
+	if (!button_was_pressed && RmlGui::ProcessMouseRelease(x, y, button)) {
 		return;
 	}
 

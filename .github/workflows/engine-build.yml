@@ -30,6 +30,10 @@ on:
         description: 'Split debug info'
         type: boolean
         default: true
+      targets:
+        description: 'JSON array of engine targets to build'
+        type: string
+        default: '["amd64-linux","arm64-linux","amd64-windows"]'
   workflow_call:
     inputs:
       cmake-options:
@@ -46,6 +50,10 @@ on:
         description: 'Use build-image-* docker image artifacts for build'
         type: boolean
         default: false
+      targets:
+        description: 'JSON array of engine targets to build'
+        type: string
+        default: '["amd64-linux","arm64-linux","amd64-windows"]'
   pull_request:
     paths-ignore:
       - 'doc/**'
@@ -60,32 +68,12 @@ jobs:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
     strategy:
       matrix:
-        system:
-          - target: amd64-linux
-            runs-on-arch: amd64
-            bazel-remote-sha256: 025d53aeb03a7fdd4a0e76262a5ae9eeee9f64d53ca510deff1c84cf3f276784
-          - target: arm64-linux
-            runs-on-arch: arm64
-            bazel-remote-sha256: b8b9456d669d45bb8c5480ce0529ca4fa9d445e0c33b3aeed779df802d8164db
-          - target: amd64-windows
-            runs-on-arch: amd64
-            bazel-remote-sha256: 025d53aeb03a7fdd4a0e76262a5ae9eeee9f64d53ca510deff1c84cf3f276784
-    name: Build ${{ matrix.system.target }} engine
-    runs-on:
-      # Run on 8 core, 16GiB ubuntu 24.04 machine.
-      - nscloud-ubuntu-24.04-${{ matrix.system.runs-on-arch }}-8x16-with-cache
-      # Mount named cache volume `engine-${{ matrix.system.target }}`.
-      - nscloud-cache-tag-engine-${{ matrix.system.target }}
-      # The cache volume should be 20GiB (minimal size).
-      - nscloud-cache-size-20gb
-      # Also cache the git checkouts in datacenter local namespace git mirror
-      # to speed them up.
-      - nscloud-git-mirror-5gb
-      # Also cache docker pulls in volume so images don't have to be pulled
-      # and unpacked every time.
-      - nscloud-exp-container-image-cache
+        target: ${{ fromJSON(inputs.targets || '["amd64-linux","arm64-linux","amd64-windows"]') }}
+    name: Build ${{ matrix.target }} engine
+    runs-on: ${{ github.repository == 'beyond-all-reason/RecoilEngine' && fromJSON(format('["nscloud-ubuntu-24.04-{0}-8x16-with-cache","nscloud-cache-tag-engine-{1}","nscloud-cache-size-20gb","nscloud-git-mirror-5gb","nscloud-exp-container-image-cache"]', matrix.target == 'arm64-linux' && 'arm64' || 'amd64', matrix.target)) || 'ubuntu-24.04' }}
     steps:
       - name: Checkout code
+        if: github.repository == 'beyond-all-reason/RecoilEngine'
         uses: namespacelabs/nscloud-checkout-action@v8
         with:
           # We fetch full history because engine automatic version naming uses
@@ -94,7 +82,15 @@ jobs:
           submodules: recursive
           dissociate: true
           path: src
+      - name: Checkout code on GitHub-hosted runner
+        if: github.repository != 'beyond-all-reason/RecoilEngine'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          path: src
       - name: Setup ccache cache
+        if: github.repository == 'beyond-all-reason/RecoilEngine'
         uses: namespacelabs/nscloud-cache-action@v1
         with:
           path: |
@@ -102,15 +98,15 @@ jobs:
             tools
       - name: Restore pull request's bazel remote cache overlay
         id: pr-cache-restore
-        if: github.event_name == 'pull_request'
+        if: github.repository == 'beyond-all-reason/RecoilEngine' && github.event_name == 'pull_request'
         uses: actions/cache/restore@v4
         with:
           path: bazel-remote-data-overlay.tar
-          key: pr-bazel-remote-data-${{ matrix.system.target }}-${{ github.run_id }}
-          restore-keys: pr-bazel-remote-data-${{ matrix.system.target }}-
+          key: pr-bazel-remote-data-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: pr-bazel-remote-data-${{ matrix.target }}-
       - name: Mount bazel remote overlay
         id: mount-overlay
-        if: github.event_name == 'pull_request'
+        if: github.repository == 'beyond-all-reason/RecoilEngine' && github.event_name == 'pull_request'
         run: |
           sudo apt-get update
           sudo apt-get install --yes fuse-overlayfs
@@ -118,6 +114,7 @@ jobs:
           mkdir -p overlay-workdir bazel-remote-data-merged
           sudo fuse-overlayfs -o lowerdir=bazel-remote-data,upperdir=bazel-remote-data-overlay,workdir=overlay-workdir bazel-remote-data-merged
       - name: Start remote ccache fetcher
+        if: github.repository == 'beyond-all-reason/RecoilEngine'
         uses: JarvusInnovations/background-action@2428e7b970a846423095c79d43f759abf979a635  # v1.0.7
         env:
           BAZEL_REMOTE_S3_ENDPOINT: ${{ vars.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
@@ -126,8 +123,8 @@ jobs:
           BAZEL_REMOTE_S3_SECRET_ACCESS_KEY: ${{ github.event_name == 'pull_request' && vars.R2_RO_ACCESS_KEY_SECRET || secrets.R2_ACCESS_KEY_SECRET }}
         with:
           run: |
-            if ! sha256sum --status -c <<< "${{ matrix.system.bazel-remote-sha256 }} tools/bazel-remote"; then
-              curl -L "https://github.com/buchgr/bazel-remote/releases/download/v2.6.1/bazel-remote-2.6.1-linux-${{ matrix.system.runs-on-arch }}" -o bazel-remote
+            if ! sha256sum --status -c <<< "${{ matrix.target == 'arm64-linux' && 'b8b9456d669d45bb8c5480ce0529ca4fa9d445e0c33b3aeed779df802d8164db' || '025d53aeb03a7fdd4a0e76262a5ae9eeee9f64d53ca510deff1c84cf3f276784' }} tools/bazel-remote"; then
+              curl -L "https://github.com/buchgr/bazel-remote/releases/download/v2.6.1/bazel-remote-2.6.1-linux-${{ matrix.target == 'arm64-linux' && 'arm64' || 'amd64' }}" -o bazel-remote
               chmod +x bazel-remote
               mv bazel-remote tools/bazel-remote
             fi
@@ -154,28 +151,36 @@ jobs:
           wait-on: |
             http-get://127.0.0.1:8085/cas/e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
           wait-for: 3m
+      - name: Configure local ccache
+        if: github.repository != 'beyond-all-reason/RecoilEngine'
+        run: |
+          mkdir -p bazel-remote-data tools
+          cat > remote_ccache.conf <<'EOF'
+          max_size = 5G
+          cache_dir = /build/cache
+          EOF
       - name: Download docker image artifact
         if: inputs.image-artifacts
         uses: actions/download-artifact@v8
         with:
-          name: build-image-${{ matrix.system.target }}
+          name: build-image-${{ matrix.target }}
           path: ${{ runner.temp }}
       - name: Pull builder image
         id: resolve-image
         run: |
           if [[ -f ${{ runner.temp }}/image.tar ]]; then
             docker load --input ${{ runner.temp }}/image.tar
-            echo "image=recoil-build-${{ matrix.system.target }}:latest" >> "$GITHUB_OUTPUT"
+            echo "image=recoil-build-${{ matrix.target }}:latest" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           source src/docker-build-v2/images_versions.sh
 
-          digest=${image_version[${{ matrix.system.target }}]}
-          ghcr_image=ghcr.io/${{ github.repository_owner }}/recoil-build-${{ matrix.system.target }}
+          digest=${image_version[${{ matrix.target }}]}
+          ghcr_image=ghcr.io/beyond-all-reason/recoil-build-${{ matrix.target }}
 
           docker version
-          docker pull $ghcr_image@$digest
+          docker pull "$ghcr_image@$digest"
           echo "image=$ghcr_image@$digest" >> "$GITHUB_OUTPUT"
       - name: Build
         # Instead of manually running docker, it would be cool to just run whole GitHub actions
@@ -187,12 +192,12 @@ jobs:
             -v /etc/passwd:/etc/passwd:ro \
             -v /etc/group:/etc/group:ro \
             --user="$(id -u):$(id -g)" \
-            -v $(pwd)/src:/build/src:ro \
-            -v $(pwd)/remote_ccache.conf:/build/ccache.conf:ro \
-            -v $(pwd)/artifacts:/build/artifacts:rw \
+            -v "$(pwd)/src:/build/src:ro" \
+            -v "$(pwd)/remote_ccache.conf:/build/ccache.conf:ro" \
+            -v "$(pwd)/artifacts:/build/artifacts:rw" \
             -e CCACHE_${{ inputs.recache && 'RECACHE' || 'NORECACHE' }}=1 \
             --network host \
-            ${{ steps.resolve-image.outputs.image }} \
+            "${{ steps.resolve-image.outputs.image }}" \
             bash <<EOF
           set -e
           cd /build/src/docker-build-v2/scripts
@@ -207,7 +212,7 @@ jobs:
         uses: actions/upload-artifact@v4
         id: save-artifact
         with:
-          name: engine-artifacts-${{ matrix.system.target }}-${{ inputs.package-suffix }}
+          name: engine-artifacts-${{ matrix.target }}-${{ inputs.package-suffix }}
           path: ./artifacts
           compression-level: 0  # already compressed
       - name: Unmount bazel remote overlay

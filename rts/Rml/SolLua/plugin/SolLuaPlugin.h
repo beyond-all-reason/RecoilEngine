@@ -31,7 +31,6 @@
 
 #pragma once
 
-#include "Rml/Backends/RmlUi_SystemInterface.h"
 #include "Rml/SolLua/TranslationTable.h"
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Platform.h>
@@ -43,11 +42,20 @@
 #include <memory>
 
 
+class RmlSystemInterface;
+
 namespace Rml::SolLua
 {
 
 	class SolLuaDocumentElementInstancer;
 	class SolLuaEventListenerInstancer;
+
+	// True if the pointer currently refers to a live RmlUi element. The Lua
+	// bindings use this to avoid use-after-free when Lua keeps a stale element
+	// reference across a DOM rebuild and then calls a method on it.
+	// Looking the pointer up in the live set never dereferences it, so it is
+	// safe to call with a dangling pointer.
+	RMLUILUA_API bool IsSolLuaElementAlive(const Element* element);
 
 	class RMLUILUA_API SolLuaPlugin : public Plugin
 	{
@@ -69,6 +77,9 @@ namespace Rml::SolLua
 
 		void OnContextDestroy(Context* context) override;
 		void OnDocumentUnload(ElementDocument* document) override;
+
+		void OnElementCreate(Element* element) override;
+		void OnElementDestroy(Element* element) override;
 
 		std::unique_ptr<SolLuaDocumentElementInstancer> document_element_instancer;
 		std::unique_ptr<SolLuaEventListenerInstancer> event_listener_instancer;

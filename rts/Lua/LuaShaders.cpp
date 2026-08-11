@@ -115,7 +115,7 @@ GLuint LuaShaders::GetProgramName(uint32_t progIdx) const
 
 const LuaShaders::Program* LuaShaders::GetProgram(uint32_t progIdx) const
 {
-	if (progIdx < programs.size() && progIdx > 0)
+	if (progIdx < programs.size() && progIdx > 0 && programs[progIdx].id != 0)
 		return &programs[progIdx];
 
 	return nullptr;
@@ -123,7 +123,7 @@ const LuaShaders::Program* LuaShaders::GetProgram(uint32_t progIdx) const
 
 LuaShaders::Program* LuaShaders::GetProgram(uint32_t progIdx)
 {
-	if (progIdx < programs.size() && progIdx > 0)
+	if (progIdx < programs.size() && progIdx > 0 && programs[progIdx].id != 0)
 		return &programs[progIdx];
 
 	return nullptr;
@@ -990,6 +990,15 @@ int LuaShaders::GetUniformLocation(lua_State* L)
 	return 1;
 }
 
+/***
+ * Returns the subroutine index for a shader program.
+ *
+ * @function gl.GetSubroutineIndex
+ * @param shaderID integer
+ * @param shaderType integer
+ * @param name string
+ * @return GL locationID
+ */
 int LuaShaders::GetSubroutineIndex(lua_State* L)
 {
 	if (!IS_GL_FUNCTION_AVAILABLE(glGetSubroutineIndex))
@@ -1038,7 +1047,25 @@ namespace {
 	}
 }
 
+/***
+ * Writes user-defined model uniforms for a unit.
+ *
+ * @function gl.SetUnitBufferUniforms
+ * @param unitID integer
+ * @param values number[]
+ * @param offset integer?
+ * @return integer count
+ */
 int LuaShaders::SetUnitBufferUniforms(lua_State* L) { return SetObjectBufferUniforms<CUnit>(L, __func__); }
+/***
+ * Writes user-defined model uniforms for a feature.
+ *
+ * @function gl.SetFeatureBufferUniforms
+ * @param featureID integer
+ * @param values number[]
+ * @param offset integer?
+ * @return integer count
+ */
 int LuaShaders::SetFeatureBufferUniforms(lua_State* L) { return SetObjectBufferUniforms<CFeature>(L, __func__); }
 
 
@@ -1292,6 +1319,13 @@ int LuaShaders::UniformMatrix(lua_State* L)
 	return 0;
 }
 
+/***
+ * Selects a subroutine for the active shader program.
+ *
+ * @function gl.UniformSubroutine
+ * @param shaderType integer
+ * @param index integer
+ */
 int LuaShaders::UniformSubroutine(lua_State* L)
 {
 	if (!IS_GL_FUNCTION_AVAILABLE(glUniformSubroutinesuiv))

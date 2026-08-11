@@ -63,12 +63,17 @@ endif (NO_SOUND)
 
 ### Find include directories and add platform specific libraries
 if    (UNIX AND NOT MINGW)
+	option(ASAN_PREFER_SHARED_LIBS "Prefer shared libraries when USE_ASAN is enabled" ${USE_ASAN})
 	if    (PREFER_STATIC_LIBS)
-		prefer_static_libs()
+		if    (NOT USE_ASAN OR NOT ASAN_PREFER_SHARED_LIBS)
+			prefer_static_libs()
+		endif (NOT USE_ASAN OR NOT ASAN_PREFER_SHARED_LIBS)
 		find_library(MATH_LIBRARY m)
 		#FIND_LIBRARY(PTHREAD_LIBRARY pthread)
 		#FIND_LIBRARY(OMP_LIBRARY gomp) FIXME it's hidden in some subfolders
-		unprefer_static_libs()
+		if    (NOT USE_ASAN OR NOT ASAN_PREFER_SHARED_LIBS)
+			unprefer_static_libs()
+		endif (NOT USE_ASAN OR NOT ASAN_PREFER_SHARED_LIBS)
 
 		list(APPEND engineCommonLibraries ${MATH_LIBRARY})
 		#list(APPEND engineCommonLibraries ${PTHREAD_LIBRARY} ${OMP_LIBRARY})

@@ -33,7 +33,9 @@
 
 #include "../plugin/SolLuaDocument.h"
 #include "../plugin/SolLuaEventListener.h"
+#include "../plugin/SolLuaPlugin.h"
 
+#include <RmlUi/Core/Elements/ElementFormControl.h>
 #include <unordered_map>
 
 // Forward declaration for deferred element deletion
@@ -50,22 +52,25 @@ namespace Rml::SolLua
 			self.AddEventListener(event, e, in_capture_phase);
 		}
 
-		void setInnerRMLSafe(Rml::Element& self, const Rml::String& rml)
+		void setInnerRMLSafe(Rml::Element* self, const Rml::String& rml)
 		{
+			if (!Rml::SolLua::IsSolLuaElementAlive(self))
+				return;
+
 			// Manually remove all DOM children and defer their deletion
 			// This prevents use-after-free when Lua holds references to children
-			while (self.GetNumChildren())
+			while (self->GetNumChildren())
 			{
-				Rml::Element* child = self.GetChild(0);
+				Rml::Element* child = self->GetChild(0);
 				// RemoveChild returns an ElementPtr which owns the child
-				Rml::ElementPtr removed = self.RemoveChild(child);
+				Rml::ElementPtr removed = self->RemoveChild(child);
 				// Store it for deferred deletion
 				AddPendingDelete(std::move(removed));
 			}
 
 			// Now set the new content
 			if (!rml.empty())
-				self.SetInnerRML(rml);
+				self->SetInnerRML(rml);
 		}
 
 		void addEventListener(Rml::Element& self, const Rml::String& event, const Rml::String& code, sol::this_state s)
@@ -90,18 +95,18 @@ namespace Rml::SolLua
 			return makeObjectFromVariant(attr, s);
 		}
 
-		auto getElementsByTagName(Rml::Element& self, const Rml::String& tag)
+		sol::as_table_t<Rml::ElementList> getElementsByTagName(Rml::Element& self, const Rml::String& tag)
 		{
 			Rml::ElementList result;
 			self.GetElementsByTagName(result, tag);
-			return result;
+			return sol::as_table(result);
 		}
 
-		auto getElementsByClassName(Rml::Element& self, const Rml::String& class_name)
+		sol::as_table_t<Rml::ElementList> getElementsByClassName(Rml::Element& self, const Rml::String& class_name)
 		{
 			Rml::ElementList result;
 			self.GetElementsByClassName(result, class_name);
-			return result;
+			return sol::as_table(result);
 		}
 
 		auto getAttributes(Rml::Element& self, sol::this_state s)
@@ -125,17 +130,83 @@ namespace Rml::SolLua
 			return soldocument;
 		}
 
-		auto getQuerySelectorAll(Rml::Element& self, const Rml::String& selector)
+		sol::as_table_t<Rml::ElementList> getQuerySelectorAll(Rml::Element& self, const Rml::String& selector)
 		{
 			Rml::ElementList result;
 			self.QuerySelectorAll(result, selector);
+			return sol::as_table(result);
+		}
+
+		Rml::Dictionary makeDictionaryFromTable(const sol::table& table)
+		{
+			Rml::Dictionary result;
+
+			for (const auto& [key, value] : table) {
+				if (key.get_type() != sol::type::string)
+					continue;
+
+				const auto keyString = key.as<Rml::String>();
+				switch (value.get_type()) {
+					case sol::type::number:
+						result[keyString] = static_cast<float>(value.as<lua_Number>());
+						break;
+					case sol::type::boolean:
+						result[keyString] = value.as<bool>();
+						break;
+					case sol::type::string:
+						result[keyString] = value.as<Rml::String>();
+						break;
+					case sol::type::lightuserdata:
+						result[keyString] = value.as<void*>();
+						break;
+					default:
+						break;
+				}
+			}
+
 			return result;
+		}
+
+		bool dispatchEvent(Rml::Element& self, const Rml::String& event)
+		{
+			return self.DispatchEvent(event, Rml::Dictionary());
+		}
+
+		bool dispatchEvent(Rml::Element& self, const Rml::String& event, const sol::table& parameters)
+		{
+			return self.DispatchEvent(event, makeDictionaryFromTable(parameters));
+		}
+
+		bool dispatchEvent(Rml::Element& self, const Rml::String& event, const sol::table& parameters, bool interruptible)
+		{
+			return self.DispatchEvent(event, makeDictionaryFromTable(parameters), interruptible);
+		}
+
+		bool dispatchEvent(Rml::Element& self, const Rml::String& event, const sol::table& parameters, bool interruptible, bool bubbles)
+		{
+			return self.DispatchEvent(event, makeDictionaryFromTable(parameters), interruptible, bubbles);
 		}
 
 		static auto getVisible(Rml::Element& self)
 		{
 			return self.IsVisible();
 		}
+
+		void setAttribute(Rml::Element* self, Rml::String name, Rml::String value)
+		{
+			// See the SetClass binding: Lua may hold a stale element across a
+			// DOM rebuild, and mutating a freed element is a use-after-free.
+			if (Rml::SolLua::IsSolLuaElementAlive(self))
+				self->SetAttribute(name, value);
+		}
+
+		Rml::String getInnerRML(Rml::Element* self)
+		{
+			if (!Rml::SolLua::IsSolLuaElementAlive(self))
+				return Rml::String();
+			return self->GetInnerRML();
+		}
+
 	}
 
 	namespace child
@@ -302,7 +373,12 @@ namespace Rml::SolLua
 			 * @param interruptible string
 			 * @return boolean
 			 */
-			"DispatchEvent", sol::resolve<bool(const Rml::String&, const Rml::Dictionary&)>(&Rml::Element::DispatchEvent),
+			"DispatchEvent", sol::overload(
+				sol::resolve<bool(Rml::Element&, const Rml::String&)>(&functions::dispatchEvent),
+				sol::resolve<bool(Rml::Element&, const Rml::String&, const sol::table&)>(&functions::dispatchEvent),
+				sol::resolve<bool(Rml::Element&, const Rml::String&, const sol::table&, bool)>(&functions::dispatchEvent),
+				sol::resolve<bool(Rml::Element&, const Rml::String&, const sol::table&, bool, bool)>(&functions::dispatchEvent)
+			),
 			/***
 			 * Gives input focus to this element.
 			 * @function RmlUi.Element:Focus
@@ -423,14 +499,20 @@ namespace Rml::SolLua
 			 * @param name string
 			 * @param value string
 			 */
-			"SetAttribute", static_cast<void(Rml::Element::*)(const Rml::String&, const Rml::String&)>(&Rml::Element::SetAttribute),
+			"SetAttribute", &functions::setAttribute,
 			/***
 			 * Sets (if value is true) or clears (if value is false) the class name on the element.
 			 * @function RmlUi.Element:SetClass
 			 * @param name string
 			 * @param value boolean
 			 */
-			"SetClass", &Rml::Element::SetClass,
+			"SetClass", [](Rml::Element* self, const Rml::String& name, bool value) {
+				// Guard against Lua holding a stale element reference across a
+				// DOM rebuild: calling SetClass on a freed element is a
+				// use-after-free. The liveness check never dereferences self.
+				if (Rml::SolLua::IsSolLuaElementAlive(self))
+					self->SetClass(name, value);
+			},
 			//--
 			/***
 			 * @function RmlUi.Element:GetElementsByClassName
@@ -473,7 +555,7 @@ namespace Rml::SolLua
 			/***
 			 * Is a screen-space point within this element?
 			 * @function RmlUi.Element:IsPointWithinElement
-			 * @param point RmlUi.Vector2i
+			 * @param point RmlUi.Vector2f
 			 * @return boolean
 			 */
 			"IsPointWithinElement", &Rml::Element::IsPointWithinElement,
@@ -494,13 +576,11 @@ namespace Rml::SolLua
 			/***
 			 * Get the value of this element.
 			 * @function RmlUi.Element:GetValue
-			 * @return number | string | "" value Returns number if it has the tag "input", a string if it has the tag "textarea", else an empty string.
+			 * @return number | string | "" value Returns the value for form controls, else an empty string.
 			 */
 			"GetValue",[](Rml::Element& self) {
-				if (self.GetTagName() == "input") {
-					return dynamic_cast<Rml::ElementFormControlInput*>(&self)->GetValue();
-				} else if (self.GetTagName() == "textarea") {
-					return dynamic_cast<Rml::ElementFormControlTextArea*>(&self)->GetValue();
+				if (auto* control = dynamic_cast<Rml::ElementFormControl*>(&self)) {
+					return control->GetValue();
 				}
 				return std::string();
 			},
@@ -517,7 +597,7 @@ namespace Rml::SolLua
 			/*** @field RmlUi.Element.id string ID of this element, in the context of `<span id="foo">`. */
 			"id", sol::property(&Rml::Element::GetId, &Rml::Element::SetId),
 			/*** @field RmlUi.Element.inner_rml string Gets or sets the inner RML (markup) content of the element. */
-			"inner_rml", sol::property(sol::resolve<Rml::String() const>(&Rml::Element::GetInnerRML), &functions::setInnerRMLSafe),
+			"inner_rml", sol::property(&functions::getInnerRML, &functions::setInnerRMLSafe),
 			/*** @field RmlUi.Element.scroll_left integer Gets or sets the number of pixels that the content of the element is scrolled from the left. */
 			"scroll_left", sol::property(&Rml::Element::GetScrollLeft, &Rml::Element::SetScrollLeft),
 			/*** @field RmlUi.Element.scroll_top integer Gets or sets the number of pixels that the content of the element is scrolled from the top. */

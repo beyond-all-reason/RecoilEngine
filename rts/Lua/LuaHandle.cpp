@@ -707,7 +707,7 @@ bool CLuaHandle::HasCallIn(lua_State* L, const string& name) const
 
 
 /***
- * @function Script.UpdateCallin
+ * @function Script.UpdateCallIn
  * @param name string
  */
 bool CLuaHandle::UpdateCallIn(lua_State* L, const string& name)
@@ -1036,7 +1036,7 @@ void CLuaHandle::PlayerAdded(int playerID)
  *
  * @function Callins:PlayerRemoved
  * @param playerID integer
- * @param reason string
+ * @param reason integer
  */
 void CLuaHandle::PlayerRemoved(int playerID, int reason)
 {
@@ -3181,7 +3181,7 @@ bool CLuaHandle::KeyMapChanged()
  * @param keyCode number
  * @param mods KeyModifiers
  * @param isRepeat boolean If you want an action to occur only once check for isRepeat == false.
- * @param label boolean the name of the key
+ * @param label string the name of the key
  * @param utf32char number (deprecated) always 0
  * @param scanCode number
  * @param actionList table the list of actions for this keypress
@@ -3246,7 +3246,7 @@ bool CLuaHandle::KeyPress(int keyCode, int scanCode, bool isRepeat)
  *
  * @param keyCode number
  * @param mods KeyModifiers
- * @param label boolean the name of the key
+ * @param label string the name of the key
  * @param utf32char number (deprecated) always 0
  * @param scanCode number
  * @param actionList table the list of actions for this keyrelease
@@ -3642,6 +3642,7 @@ void CLuaHandle::MiniMapRotationChanged(const float newRot, const float oldRot)
  * @function Callins:MiniMapStateChanged
  * @param isMinimized boolean
  * @param isMaximized boolean
+ * @param isSlaved boolean
  */
 void CLuaHandle::MiniMapStateChanged(const bool isMinimized,
 									const bool isMaximized,

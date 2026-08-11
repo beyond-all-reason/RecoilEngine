@@ -350,6 +350,9 @@ void CGroundDecalHandler::AddGroundTrackTextures()
 
 	const auto fileNames = CFileHandler::FindFiles("bitmaps/tracks/", "");
 	for (const auto& mainTexFileName : fileNames) {
+		if (mainTexFileName.find("_normal") != std::string::npos)
+			continue;
+
 		const auto mainName = FileSystem::GetBasename(StringToLower(mainTexFileName));
 		const auto normName = mainName + "_norm";
 		const std::string normTexFileName = GetExtraTextureName(mainTexFileName);

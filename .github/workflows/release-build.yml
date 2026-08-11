@@ -5,6 +5,14 @@ on:
       new-tag:
         description: 'Set to create a new annotated release tag, e.g. 2025.01.10.'
         type: string
+      targets:
+        description: 'JSON array of engine targets to build for each release artifact'
+        type: string
+        default: '["amd64-linux","arm64-linux","amd64-windows"]'
+      build_tracy:
+        description: 'Build the additional Tracy-instrumented release artifact'
+        type: boolean
+        default: true
 jobs:
   get-tag:
     runs-on: ubuntu-latest
@@ -38,18 +46,24 @@ jobs:
     needs: get-tag
     uses: ./.github/workflows/engine-build.yml
     with:
+      targets: ${{ inputs.targets }}
       cmake-options: '-DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O3 -g -DNDEBUG" -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O3 -g -DNDEBUG"'
     secrets: inherit
   build-engine-tracy:
+    if: ${{ inputs.build_tracy }}
     needs: get-tag
     uses: ./.github/workflows/engine-build.yml
     with:
+      targets: ${{ inputs.targets }}
       cmake-options: '-DTRACY_ENABLE=ON -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O3 -g1 -DNDEBUG -fno-omit-frame-pointer" -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O3 -g1 -DNDEBUG -fno-omit-frame-pointer"'
       package-suffix: '-tracy'
       split-debug-info: false
     secrets: inherit
   create-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: ${{ always() && needs.get-tag.result == 'success' && needs.build-engine.result == 'success' && (needs.build-engine-tracy.result == 'success' || needs.build-engine-tracy.result == 'skipped') }}
     needs: [build-engine, build-engine-tracy, get-tag]
     steps:
       - name: Download All Artifacts

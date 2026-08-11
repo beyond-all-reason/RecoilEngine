@@ -1,5 +1,7 @@
 #include "UpdateList.h"
 
+#include <cassert>
+
 CR_BIND(UpdateList, )
 CR_REG_METADATA(UpdateList, (
 	CR_MEMBER(TypedTrue),

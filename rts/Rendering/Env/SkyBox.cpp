@@ -69,7 +69,7 @@ void CSkyBox::Init(uint32_t textureID, uint32_t xsize, uint32_t ysize, bool conv
 
 		glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 
-		FBO fbo;
+		FBO fbo(true);
 		fbo.Init(false);
 
 		if (!fbo.IsValid())

@@ -1254,6 +1254,19 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 		} break;
 		case SDL_KEYDOWN: {
 			KeyInput::Update(keyBindings.GetFakeMetaKey());
+			// SDL's keyboard-state poll can lag behind a synthetic X11 key
+			// event.  The event modifier mask is authoritative for the key
+			// being pressed; preserve any modifier bits it reports before
+			// dispatching the callin.
+			const SDL_Keymod eventMods = static_cast<SDL_Keymod>(event.key.keysym.mod);
+			if (eventMods & KMOD_ALT)
+				KeyInput::SetKeyModState(KMOD_ALT, true);
+			if (eventMods & KMOD_CTRL)
+				KeyInput::SetKeyModState(KMOD_CTRL, true);
+			if (eventMods & KMOD_GUI)
+				KeyInput::SetKeyModState(KMOD_GUI, true);
+			if (eventMods & KMOD_SHIFT)
+				KeyInput::SetKeyModState(KMOD_SHIFT, true);
 
 			if (activeController != nullptr) {
 				int keyCode = CKeyCodes::GetNormalizedSymbol(event.key.keysym.sym);
