@@ -705,11 +705,6 @@ bool CLuaHandle::HasCallIn(lua_State* L, const string& name) const
 	return found;
 }
 
-
-/***
- * @function Script.UpdateCallIn
- * @param name string
- */
 bool CLuaHandle::UpdateCallIn(lua_State* L, const string& name)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -3165,9 +3160,9 @@ bool CLuaHandle::KeyMapChanged()
  * @class KeyModifiers
  * @x_helper
  *
- * @field right boolean Right mouse key pressed
  * @field alt boolean Alt key pressed
  * @field ctrl boolean Ctrl key pressed
+ * @field meta boolean Meta/GUI key pressed
  * @field shift boolean Shift key pressed
  */
 
@@ -3184,7 +3179,7 @@ bool CLuaHandle::KeyMapChanged()
  * @param label string the name of the key
  * @param utf32char number (deprecated) always 0
  * @param scanCode number
- * @param actionList table the list of actions for this keypress
+ * @param actionList table? the list of actions for this keypress, when available
  * @return boolean halt whether to halt the chain for consumers of the keypress
  */
 bool CLuaHandle::KeyPress(int keyCode, int scanCode, bool isRepeat)
@@ -3249,7 +3244,7 @@ bool CLuaHandle::KeyPress(int keyCode, int scanCode, bool isRepeat)
  * @param label string the name of the key
  * @param utf32char number (deprecated) always 0
  * @param scanCode number
- * @param actionList table the list of actions for this keyrelease
+ * @param actionList table? the list of actions for this keyrelease, when available
  *
  * @return boolean
  */
@@ -4466,6 +4461,11 @@ int CLuaHandle::CallOutGetCallInList(lua_State* L)
 }
 
 
+/***
+ * @function Script.UpdateCallIn
+ * @param name string
+ * @return nil
+ */
 int CLuaHandle::CallOutUpdateCallIn(lua_State* L)
 {
 

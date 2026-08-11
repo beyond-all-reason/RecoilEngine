@@ -347,7 +347,7 @@ int LuaVFSDownload::DownloadArchive(lua_State* L)
  * Abort a queued or active archive download.
  * @function VFS.AbortDownload
  * @param id integer Download queue identifier.
- * @return boolean removed Whether a queued download was removed.
+ * @return boolean removed Whether a matching queued or active download was removed.
  */
 int LuaVFSDownload::AbortDownload(lua_State* L)
 {

@@ -407,7 +407,7 @@ int LuaPathFinder::GetPathNodeCosts(lua_State* L)
 /***
  * @function Spring.SetPathNodeCost
  * @param overlayIndex integer
- * @param costIndex integer
+ * @param costIndex integer 0-based index in the overlay
  * @param cost number
  * @return boolean success
  */
@@ -443,8 +443,8 @@ int LuaPathFinder::SetPathNodeCost(lua_State* L)
 
 /***
  * @function Spring.GetPathNodeCost
- * @param nodeX integer
- * @param nodeZ integer
+ * @param nodeX integer Heightmap node X coordinate
+ * @param nodeZ integer Heightmap node Z coordinate
  * @return number cost
  */
 int LuaPathFinder::GetPathNodeCost(lua_State* L)

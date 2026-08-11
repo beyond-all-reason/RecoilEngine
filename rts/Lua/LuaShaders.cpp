@@ -997,7 +997,9 @@ int LuaShaders::GetUniformLocation(lua_State* L)
  * @param shaderID integer
  * @param shaderType integer
  * @param name string
- * @return GL locationID
+ * @return integer? index
+ *
+ * Returns no value when shader support is unavailable or `shaderID` is invalid.
  */
 int LuaShaders::GetSubroutineIndex(lua_State* L)
 {
