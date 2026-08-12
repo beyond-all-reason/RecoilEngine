@@ -198,6 +198,7 @@ public:
 
 	//icons
 	bool iconHideWithUI = true;
+	bool sortUnitIcons = false;
 	float ghostIconDimming = 0.5f;
 
 	// IconsAsUI
