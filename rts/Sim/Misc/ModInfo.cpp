@@ -66,6 +66,7 @@ void CModInfo::ResetState()
 		constructionDecayTime  = int(6.66 * GAME_SPEED);
 		constructionDecaySpeed = 0.03f;
 		insertBuiltUnitMoveCommand = true;
+		useYardmapsForQueuedBuildOverlap = false;
 	}
 	{
 		debrisDamage = 50.0f;
@@ -254,6 +255,7 @@ void CModInfo::Init(const std::string& modFileName)
 		constructionDecayTime = (int)(constructionTbl.GetFloat("constructionDecayTime", (float)constructionDecayTime / GAME_SPEED) * GAME_SPEED);
 		constructionDecaySpeed = constructionTbl.GetFloat("constructionDecaySpeed", constructionDecaySpeed);
 		insertBuiltUnitMoveCommand = constructionTbl.GetBool("insertBuiltUnitMoveCommand", insertBuiltUnitMoveCommand);
+		useYardmapsForQueuedBuildOverlap = constructionTbl.GetBool("useYardmapsForQueuedBuildOverlap", useYardmapsForQueuedBuildOverlap);
 	}
 
 	{
@@ -420,4 +422,3 @@ void CModInfo::Init(const std::string& modFileName)
 	smoothMeshSmoothRadius                   = std::max  (smoothMeshSmoothRadius                  ,    1          );
 	unitQuadPositionUpdateRate               = std::clamp(unitQuadPositionUpdateRate              ,    1    ,   15);
 }
-

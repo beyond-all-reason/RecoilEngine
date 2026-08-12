@@ -86,6 +86,8 @@ public:
 	float constructionDecaySpeed;
 	/// When units are created, issue a move command off of the factory pad.
 	bool insertBuiltUnitMoveCommand;
+	/// Whether queued build overlap checks use yardmaps after their rectangular broad phase.
+	bool useYardmapsForQueuedBuildOverlap;
 
 	// Damage behaviour
 	/// unit pieces flying off (usually on death)
