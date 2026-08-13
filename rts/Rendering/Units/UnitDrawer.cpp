@@ -38,6 +38,7 @@
 #include "Rendering/Models/ModelsMemStorage.h"
 
 #include "Sim/Features/Feature.h"
+#include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"
@@ -361,8 +362,10 @@ namespace {
 		return b ^ (uint32_t(int32_t(b) >> 31) | 0x80000000u);
 	}
 
-	// 64k icons per path; the sim caps units far below this
+	// 64k icons per path: covers MAX_UNITS with room to spare for dead ghost buildings
+	// (which draw in the same pass); the runtime assert below guards the combined count
 	constexpr uint32_t ICON_SORT_IDX_MASK = (1u << 16) - 1;
+	static_assert(ICON_SORT_IDX_MASK >= uint32_t(MAX_UNITS), "icon sort records cannot index all units");
 
 	inline uint64_t MakeIconSortRec(float drawOrder, float depth, size_t entryIdx) {
 		assert(entryIdx <= ICON_SORT_IDX_MASK);
@@ -374,8 +377,14 @@ namespace {
 		     | (uint32_t(entryIdx) & ICON_SORT_IDX_MASK);
 	}
 
-	// the minimap can be drawn rotated in 90° steps; sort by the post-rotation screen
-	// vertical so icons lower on the rotated minimap draw on top
+	// the minimap can be drawn rotated in 90° steps. Overlaps read naturally when the
+	// icon nearer the viewer's screen bottom draws on top — the same convention the
+	// world view gets from back-to-front depth ordering. Raw pos.z implements that only
+	// for the unrotated minimap: flipped 180° it would stack exactly backwards (icons
+	// visually behind covering the ones in front of them) and sideways at 90°/270°, so
+	// sort by the post-rotation screen vertical instead. A minimap that auto-rotates to
+	// follow the camera thereby also matches the world view's stacking for free, while
+	// a fixed minimap keeps a stable order instead of reshuffling as the camera turns
 	inline float MiniMapIconSortDepth(const float3& pos, CMiniMap::RotationOptions rotation) {
 		switch (rotation) {
 			case CMiniMap::ROTATION_90:  return -pos.x;
