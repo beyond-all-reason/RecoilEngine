@@ -29,6 +29,10 @@
  */
 
 #include "RmlUi_Renderer_GL3_Recoil.h"
+
+// Keep the established implementation in this file while compiling it as the
+// shared renderer base used by both compile-time backends.
+#define RenderInterface_GL3_Recoil RenderInterface_GL_Recoil_Common
 #include <RmlUi/Core/Log.h>
 
 #include "Rendering/GL/VAO.h"
@@ -1054,7 +1058,7 @@ RenderInterface_GL3_Recoil::RenderToClipMask(Rml::ClipMaskOperation operation, R
 	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 	glStencilFunc(GL_ALWAYS, stencil_write_value, GLuint(-1));
 
-	RenderGeometry(geometry, translation, {});
+	RenderInterface_GL3_Recoil::RenderGeometry(geometry, translation, {});
 
 	// Restore state
 	// @performance Cache state so we don't toggle it unnecessarily.
@@ -1101,7 +1105,7 @@ RenderInterface_GL3_Recoil::GenerateTexture(Rml::Span<const Rml::byte> source_da
 
 void RenderInterface_GL3_Recoil::DrawFullscreenQuad()
 {
-	RenderGeometry(fullscreen_quad_geometry, {}, RenderInterface_GL3_Recoil::TexturePostprocess);
+	RenderInterface_GL3_Recoil::RenderGeometry(fullscreen_quad_geometry, {}, RenderInterface_GL3_Recoil::TexturePostprocess);
 }
 
 void RenderInterface_GL3_Recoil::DrawFullscreenQuad(Rml::Vector2f uv_offset, Rml::Vector2f uv_scaling)
@@ -1112,9 +1116,9 @@ void RenderInterface_GL3_Recoil::DrawFullscreenQuad(Rml::Vector2f uv_offset, Rml
 		for (Rml::Vertex& vertex: mesh.vertices)
 			vertex.tex_coord = (vertex.tex_coord * uv_scaling) + uv_offset;
 	}
-	const Rml::CompiledGeometryHandle geometry = CompileGeometry(mesh.vertices, mesh.indices);
-	RenderGeometry(geometry, {}, RenderInterface_GL3_Recoil::TexturePostprocess);
-	ReleaseGeometry(geometry);
+	const Rml::CompiledGeometryHandle geometry = RenderInterface_GL3_Recoil::CompileGeometry(mesh.vertices, mesh.indices);
+	RenderInterface_GL3_Recoil::RenderGeometry(geometry, {}, RenderInterface_GL3_Recoil::TexturePostprocess);
+	RenderInterface_GL3_Recoil::ReleaseGeometry(geometry);
 }
 
 static Rml::Colourf ConvertToColorf(Rml::ColourbPremultiplied c0)
@@ -1736,13 +1740,13 @@ Rml::TextureHandle RenderInterface_GL3_Recoil::SaveLayerAsTexture()
 	RMLUI_ASSERT(scissor_state.Valid());
 	const Rml::Rectanglei bounds = scissor_state;
 
-	Rml::TextureHandle render_texture = GenerateTexture({}, bounds.Size());
+	Rml::TextureHandle render_texture = RenderInterface_GL3_Recoil::GenerateTexture({}, bounds.Size());
 	if (!render_texture)
 		return {};
 
 	BlitLayerToPostprocessPrimary(render_layers.GetTopLayerHandle());
 
-	EnableScissorRegion(false);
+	RenderInterface_GL3_Recoil::EnableScissorRegion(false);
 
 	const Gfx::FramebufferData& source = render_layers.GetPostprocessPrimary();
 	const Gfx::FramebufferData& destination = render_layers.GetPostprocessSecondary();
@@ -1811,6 +1815,11 @@ Shader::IProgramObject* RenderInterface_GL3_Recoil::UseProgram(ProgramId program
 int RenderInterface_GL3_Recoil::GetUniformLocation(const char* name) const
 {
 	return glGetUniformLocation(program_data->programs[active_program_id]->GetObjID(), name);
+}
+
+void RenderInterface_GL3_Recoil::ResetCompatibilityProgram()
+{
+	UseProgram(ProgramId::None);
 }
 
 void RenderInterface_GL3_Recoil::SubmitTransformUniform(Rml::Vector2f translation)

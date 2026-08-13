@@ -318,6 +318,82 @@
 				return sol::as_table(slp->systemInterface->GetDocumentPathRequests(document_path));
 		 	}
 		);
+		namespace_table.set_function(
+			/***
+			* Register one canonical file texture for deterministic atlas construction.
+			* @function RmlUi.RegisterAtlasTexture
+			* @param path string
+			* @return boolean success
+			*/
+			"RegisterAtlasTexture", &RmlGui::RegisterAtlasTexture
+		);
+		namespace_table.set_function(
+			/***
+			* Register a list of file textures for deterministic atlas construction.
+			* @function RmlUi.RegisterAtlasTextures
+			* @param paths string[]
+			* @return boolean success
+			*/
+			"RegisterAtlasTextures", &RmlGui::RegisterAtlasTextures
+		);
+		namespace_table.set_function(
+			/*** @function RmlUi.FinalizeTextureAtlas @return boolean success */
+			"FinalizeTextureAtlas", &RmlGui::FinalizeTextureAtlas
+		);
+		namespace_table.set_function("GetTextureAtlasStats", [](sol::this_state state) {
+			const RmlGui::TextureAtlasStats stats = RmlGui::GetTextureAtlasStats();
+			sol::state_view lua(state);
+			sol::table result = lua.create_table();
+			result["finalized"] = stats.finalized;
+			result["gpu_atlas_created"] = stats.gpu_atlas_created;
+			result["manifest_hash"] = stats.manifest_hash;
+			result["failure_reason"] = stats.failure_reason;
+			result["source_count"] = stats.source_count;
+			result["duplicate_count"] = stats.duplicate_count;
+			result["total_source_pixels"] = stats.total_source_pixels;
+			result["allocated_gpu_bytes"] = stats.allocated_gpu_bytes;
+			result["page_width"] = stats.page_width;
+			result["page_height"] = stats.page_height;
+			result["page_count"] = stats.page_count;
+			result["mip_count"] = stats.mip_count;
+			result["build_duration_ms"] = stats.build_duration_ms;
+			result["page_occupancy"] = sol::as_table(stats.page_occupancy);
+			result["largest_sources"] = sol::as_table(stats.largest_sources);
+			return result;
+		});
+		namespace_table.set_function("GetRendererStats", [](sol::this_state state) {
+			const RmlGui::RendererStats stats = RmlGui::GetRendererStats();
+			sol::state_view lua(state);
+			sol::table result = lua.create_table();
+			result["renderer"] = stats.renderer;
+			result["manifest_hash"] = stats.manifest_hash;
+#define RMLUI_RENDERER_STAT(name) result[#name] = stats.name
+			RMLUI_RENDERER_STAT(patch_instances);
+			RMLUI_RENDERER_STAT(glyph_instances);
+			RMLUI_RENDERER_STAT(patch_batches);
+			RMLUI_RENDERER_STAT(generic_batches);
+			RMLUI_RENDERER_STAT(external_texture_batches);
+			RMLUI_RENDERER_STAT(static_atlas_draws);
+			RMLUI_RENDERER_STAT(generated_atlas_draws);
+			RMLUI_RENDERER_STAT(late_file_textures);
+			RMLUI_RENDERER_STAT(lua_external_textures);
+			RMLUI_RENDERER_STAT(unsupported_geometry);
+			RMLUI_RENDERER_STAT(unsupported_gradients);
+			RMLUI_RENDERER_STAT(unsupported_clip_masks);
+			RMLUI_RENDERER_STAT(box_shadow_operations);
+			RMLUI_RENDERER_STAT(backdrop_filter_operations);
+			RMLUI_RENDERER_STAT(offscreen_layer_operations);
+			RMLUI_RENDERER_STAT(shader_brightness_operations);
+			RMLUI_RENDERER_STAT(document_batch_boundaries);
+			RMLUI_RENDERER_STAT(instance_buffer_bytes);
+			RMLUI_RENDERER_STAT(material_buffer_bytes);
+			RMLUI_RENDERER_STAT(clip_buffer_bytes);
+			RMLUI_RENDERER_STAT(text_run_cache_hits);
+			RMLUI_RENDERER_STAT(text_run_cache_misses);
+			RMLUI_RENDERER_STAT(text_run_disabled_submissions);
+#undef RMLUI_RENDERER_STAT
+			return result;
+		});
 		/***
 		 * @enum RmlUi.key_identifier
 		 * @field ["0"] integer

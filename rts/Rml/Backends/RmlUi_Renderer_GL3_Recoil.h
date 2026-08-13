@@ -51,11 +51,13 @@ namespace Shader
 	struct IProgramObject;
 }
 
-class RenderInterface_GL3_Recoil : public Rml::RenderInterface
+// Shared OpenGL renderer infrastructure. The GL3 wrapper below preserves the
+// reference renderer, while GL4 reuses only its state/layer compatibility paths.
+class RenderInterface_GL_Recoil_Common : public Rml::RenderInterface
 {
 public:
-	RenderInterface_GL3_Recoil();
-	~RenderInterface_GL3_Recoil() override;
+	RenderInterface_GL_Recoil_Common();
+	~RenderInterface_GL_Recoil_Common() override;
 
 	// Returns true if the renderer was successfully constructed.
 	explicit operator bool() const;
@@ -109,6 +111,12 @@ public:
 	static constexpr Rml::TextureHandle TextureEnableWithoutBinding = Rml::TextureHandle(-1);
 	// Can be passed to RenderGeometry() to leave the bound texture and used program unchanged.
 	static constexpr Rml::TextureHandle TexturePostprocess = Rml::TextureHandle(-2);
+
+protected:
+	// Shared compatibility paths need the current logical region even when a derived renderer performs clipping in shaders.
+	void TrackScissorRegion(Rml::Rectanglei region) { scissor_state = region; }
+	// Keeps the compatibility shader cache coherent after a derived renderer binds its own program.
+	void ResetCompatibilityProgram();
 
 private:
 	Shader::IProgramObject* UseProgram(ProgramId program_id);
@@ -228,6 +236,13 @@ private:
 		Stencil stencil_back;
 	};
 	GLStateBackup glstate_backup = {};
+};
+
+class RenderInterface_GL3_Recoil final : public RenderInterface_GL_Recoil_Common
+{
+public:
+	RenderInterface_GL3_Recoil() = default;
+	~RenderInterface_GL3_Recoil() override = default;
 };
 
 #endif

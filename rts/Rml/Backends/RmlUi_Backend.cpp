@@ -40,14 +40,21 @@
 #include "System/Log/ILog.h"
 #include "Lua/LuaUI.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/GL/myGL.h"
 #include "Rml/Components/ElementLuaTexture.h"
 #include "Rml/RmlInputReceiver.h"
 #include "Rml/SolLua/RmlSolLua.h"
 #include "RmlUi_Backend.h"
+#include "RmlUi_Renderer_Config.h"
+#include "RmlUi_TextureAtlas_GL4.h"
 #include "Rml/SVG/SVGPlugin.h"
 
 #ifndef HEADLESS
-#include "RmlUi_Renderer_GL3_Recoil.h"
+	#if defined(RECOIL_RMLUI_RENDERER_GL4)
+		#include "RmlUi_Renderer_GL4_BAR.h"
+	#else
+		#include "RmlUi_Renderer_GL3_Recoil.h"
+	#endif
 #else
 #include "RmlUi_Renderer_Headless.h"
 #endif
@@ -91,11 +98,16 @@ public:
 
 	RmlSystemInterface system_interface;
 #ifndef HEADLESS
-	RenderInterface_GL3_Recoil render_interface;
+	#if defined(RECOIL_RMLUI_RENDERER_GL4)
+		RenderInterface_GL4_BAR render_interface;
+	#else
+		RenderInterface_GL3_Recoil render_interface;
+	#endif
 #else
 	RenderInterface_Headless render_interface;
 #endif
 	VFSFileInterface file_interface;
+	RmlGui::TextureAtlasManifest atlas_manifest;
 
 	std::vector<Rml::Context*> contexts;
 	std::unordered_set<Rml::Context*> contexts_to_remove;
@@ -138,6 +150,10 @@ void AddPendingDelete(Rml::ElementPtr element)
 bool RmlGui::Initialize()
 {
 	LOG_L(L_INFO, "[RmlUi::%s] Beginning RmlUi Initialization", __func__);
+	if (state) {
+		LOG_L(L_ERROR, "[RmlGui::%s] RmlUi is already initialized.", __func__);
+		return state->initialized;
+	}
 	state = Rml::MakeUnique<BackendState>();
 
 	if (!((bool) state->render_interface)) {
@@ -158,7 +174,11 @@ bool RmlGui::Initialize()
 	state->winX = winX;
 	state->winY = winY;
 
-	Rml::Initialise();
+	if (!Rml::Initialise()) {
+		LOG_L(L_ERROR, "[RmlGui::%s] RmlUi core initialization failed.", __func__);
+		state.reset();
+		return false;
+	}
 
 	Rml::LoadFontFace("fonts/FreeSansBold.otf", true);
 	state->inputCon = input.AddHandler(&RmlGui::ProcessEvent);
@@ -177,7 +197,8 @@ bool RmlGui::Initialize()
 bool RmlGui::InitializeLua(lua_State* lua_state)
 {
 	if (!RmlInitialized()) {
-		RmlGui::Initialize();
+		if (!RmlGui::Initialize())
+			return false;
 	} else if (state->ls != nullptr) {
 		return false;
 	}
@@ -425,6 +446,78 @@ void RmlGui::PresentFrame()
 {
 	state->render_interface.EndFrame();
 	RMLUI_FrameMark;
+}
+
+bool RmlGui::RegisterAtlasTexture(const std::string& path)
+{
+	return RmlInitialized() && state->atlas_manifest.Register(path);
+}
+
+bool RmlGui::RegisterAtlasTextures(const std::vector<std::string>& paths)
+{
+	return RmlInitialized() && state->atlas_manifest.Register(paths);
+}
+
+bool RmlGui::FinalizeTextureAtlas()
+{
+	if (!RmlInitialized() || !state->atlas_manifest.Finalize())
+		return false;
+#if !defined(HEADLESS) && defined(RECOIL_RMLUI_RENDERER_GL4)
+	return state->render_interface.FinalizeTextureAtlas(state->atlas_manifest);
+#else
+	const TextureAtlasStats& stats = state->atlas_manifest.GetStats();
+	#ifdef HEADLESS
+		constexpr const char* renderer_name = "Headless";
+	#else
+		constexpr const char* renderer_name = "GL3_Recoil";
+	#endif
+	LOG_L(L_INFO, "[RmlUi atlas manifest] renderer=%s hash=%s sources=%llu duplicates=%llu", renderer_name,
+		stats.manifest_hash.c_str(), static_cast<unsigned long long>(stats.source_count),
+		static_cast<unsigned long long>(stats.duplicate_count));
+	return true;
+#endif
+}
+
+RmlGui::TextureAtlasStats RmlGui::GetTextureAtlasStats()
+{
+	if (!RmlInitialized())
+		return {};
+#if !defined(HEADLESS) && defined(RECOIL_RMLUI_RENDERER_GL4)
+	return state->render_interface.GetTextureAtlasStats();
+#else
+	return state->atlas_manifest.GetStats();
+#endif
+}
+
+RmlGui::RendererStats RmlGui::GetRendererStats()
+{
+	if (!RmlInitialized())
+		return {};
+#if !defined(HEADLESS) && defined(RECOIL_RMLUI_RENDERER_GL4)
+	return state->render_interface.GetRendererStats();
+#else
+	RendererStats result;
+	#ifdef HEADLESS
+		result.renderer = "Headless";
+	#else
+		result.renderer = "GL3_Recoil";
+	#endif
+	result.manifest_hash = state->atlas_manifest.GetStats().manifest_hash;
+	return result;
+#endif
+}
+
+void RmlGui::RenderExternalTexture(Rml::CompiledGeometryHandle geometry, Rml::Vector2f translation, uint32_t gl_texture,
+	Rml::Vector2i dimensions, const std::string& source)
+{
+	if (!RmlInitialized())
+		return;
+#if !defined(HEADLESS) && defined(RECOIL_RMLUI_RENDERER_GL4)
+	state->render_interface.RenderExternalTexture(geometry, translation, gl_texture, dimensions, source);
+#elif !defined(HEADLESS)
+	glBindTexture(GL_TEXTURE_2D, gl_texture);
+	state->render_interface.RenderGeometry(geometry, translation, RenderInterface_GL3_Recoil::TextureEnableWithoutBinding);
+#endif
 }
 
 /*

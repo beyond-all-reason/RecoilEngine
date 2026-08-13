@@ -299,6 +299,32 @@ endif (USE_ASAN)
 
 ### Tracy related stuff
 option(RECOIL_DETAILED_TRACY_ZONING "Enable additional detailed tracy zones (only enable this for testing/debugging)" FALSE)
+
+option(RECOIL_RMLUI_RENDERER_GL4 "Use the BAR-specific OpenGL 4 RmlUi renderer" FALSE)
+if(RECOIL_RMLUI_RENDERER_GL4)
+	add_compile_definitions(RECOIL_RMLUI_RENDERER_GL4=1)
+else()
+	add_compile_definitions(RECOIL_RMLUI_RENDERER_GL3=1)
+endif()
+
+set(RECOIL_RMLUI_GL4_TEXT_RUN_ATLAS 0 CACHE STRING "Enable experimental whole-text-run atlasing")
+set(RECOIL_RMLUI_GL4_STRICT_VALIDATION 0 CACHE STRING "Fail on unexpected production RmlUi GL4 fallbacks")
+set(RECOIL_RMLUI_GL4_DOCUMENT_BATCH_BARRIERS 1 CACHE STRING "Flush GL4 batches at RmlUi document boundaries")
+foreach(rmlui_gl4_switch
+	RECOIL_RMLUI_GL4_TEXT_RUN_ATLAS
+	RECOIL_RMLUI_GL4_STRICT_VALIDATION
+	RECOIL_RMLUI_GL4_DOCUMENT_BATCH_BARRIERS
+)
+	set_property(CACHE ${rmlui_gl4_switch} PROPERTY STRINGS 0 1)
+	if(NOT "${${rmlui_gl4_switch}}" MATCHES "^[01]$")
+		message(FATAL_ERROR "${rmlui_gl4_switch} must be 0 or 1")
+	endif()
+endforeach()
+add_compile_definitions(
+	RECOIL_RMLUI_GL4_TEXT_RUN_ATLAS=${RECOIL_RMLUI_GL4_TEXT_RUN_ATLAS}
+	RECOIL_RMLUI_GL4_STRICT_VALIDATION=${RECOIL_RMLUI_GL4_STRICT_VALIDATION}
+	RECOIL_RMLUI_GL4_DOCUMENT_BATCH_BARRIERS=${RECOIL_RMLUI_GL4_DOCUMENT_BATCH_BARRIERS}
+)
 if    (RECOIL_DETAILED_TRACY_ZONING)
 	add_definitions(-DRECOIL_DETAILED_TRACY_ZONING)
 else  (RECOIL_DETAILED_TRACY_ZONING)

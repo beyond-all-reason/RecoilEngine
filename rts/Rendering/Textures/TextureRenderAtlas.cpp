@@ -66,13 +66,17 @@ CTextureRenderAtlas::CTextureRenderAtlas(
 	int atlasSizeY,
 	int maxLevels,
 	uint32_t glInternalType_,
-	const std::string& atlasName_
+	const std::string& atlasName_,
+	bool forceTextureArray_,
+	int entryPadding_
 	)
 	: allocType(allocType_)
 	, glInternalType(glInternalType_)
 	, atlasName(atlasName_)
 	, atlasFinalized(false)
 	, atlasRendered(false)
+	, forceTextureArray(forceTextureArray_)
+	, entryPadding(std::max(entryPadding_, 0))
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
@@ -192,15 +196,16 @@ bool CTextureRenderAtlas::AddTexFromBitmapRaw(const std::string& name, const CBi
 	const auto uniqueSubTex = UniqueSubTexture(
 		it->second.texID,
 		it->second.stableIdx,
-		subTexCoords
+		subTexCoords,
+		{
+			static_cast<int>(bm.xsize * (subTexCoords.z - subTexCoords.x)),
+			static_cast<int>(bm.ysize * (subTexCoords.w - subTexCoords.y))
+		}
 	);
 	const auto uniqueSubTexStr = uniqueSubTex.GetName();
 
 	if (!atlasAllocator->contains(uniqueSubTexStr)) {
-		int2 subTexSize = {
-			static_cast<int>(bm.xsize * (subTexCoords.z - subTexCoords.x)),
-			static_cast<int>(bm.ysize * (subTexCoords.w - subTexCoords.y))
-		};
+		const int2 subTexSize = uniqueSubTex.contentSize + int2(entryPadding, entryPadding);
 		atlasAllocator->AddEntry(uniqueSubTexStr, subTexSize);
 		uniqueSubTextureMap[uniqueSubTexStr] = uniqueSubTex;
 	}
@@ -235,7 +240,18 @@ AtlasedTexture CTextureRenderAtlas::GetTexture(const std::string& texName)
 	if (it == nameToUniqueSubTexStr.end())
 		return AtlasedTexture::DefaultAtlasTexture;
 
-	return AtlasedTexture(atlasAllocator->GetTexCoordsEdge(it->second));
+	AtlasedTexture result(atlasAllocator->GetTexCoordsEdge(it->second));
+	if (entryPadding > 0) {
+		const UniqueSubTexture& source = uniqueSubTextureMap.at(it->second);
+		const float inv_width = 1.f / atlasAllocator->GetAtlasSize().x;
+		const float inv_height = 1.f / atlasAllocator->GetAtlasSize().y;
+		const int inset = entryPadding / 2;
+		result.x1 += inset * inv_width;
+		result.y1 += inset * inv_height;
+		result.x2 = result.x1 + source.contentSize.x * inv_width;
+		result.y2 = result.y1 + source.contentSize.y * inv_height;
+	}
+	return result;
 }
 
 AtlasedTexture CTextureRenderAtlas::GetTexture(const std::string& texName, const std::string& texBackupName)
@@ -246,7 +262,7 @@ AtlasedTexture CTextureRenderAtlas::GetTexture(const std::string& texName, const
 
 	auto it = nameToUniqueSubTexStr.find(texName);
 	if (it != nameToUniqueSubTexStr.end())
-		return AtlasedTexture(atlasAllocator->GetTexCoordsEdge(it->second));
+		return GetTexture(texName);
 
 	if (texBackupName.empty())
 		return AtlasedTexture::DefaultAtlasTexture;
@@ -267,7 +283,7 @@ std::vector<std::string> CTextureRenderAtlas::GetAllFileNames() const
 
 uint32_t CTextureRenderAtlas::GetTexTarget() const
 {
-	return (atlasAllocator->GetNumPages() > 1) ?
+	return (forceTextureArray || atlasAllocator->GetNumPages() > 1) ?
 		GL_TEXTURE_2D_ARRAY :
 		GL_TEXTURE_2D;
 }
@@ -298,6 +314,11 @@ int CTextureRenderAtlas::GetNumTexLevels() const
 	return atlasAllocator->GetNumTexLevels();
 }
 
+uint32_t CTextureRenderAtlas::GetNumPages() const
+{
+	return atlasAllocator->GetNumPages();
+}
+
 bool CTextureRenderAtlas::IsValid() const
 {
 	return atlasFinalized && atlasRendered;
@@ -321,8 +342,9 @@ bool CTextureRenderAtlas::DumpTexture(const std::string& fileExt) const
 	}
 	const auto numLevels = atlasAllocator->GetNumTexLevels();
 	const auto numPages = atlasAllocator->GetNumPages();
+	const bool useTextureArray = forceTextureArray || numPages > 1;
 
-	if (numPages > 1) {
+	if (useTextureArray) {
 		for (uint32_t page = 0; page < numPages; ++page) {
 			for (uint32_t level = 0; level < numLevels; ++level) {
 				glSaveTextureArray(atlasTex->GetId(), fmt::format("{}_{}_{}.{}", atlasName, page, level, fileExt).c_str(), level, page);
@@ -363,6 +385,7 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 
 	const auto numLevels = atlasAllocator->GetNumTexLevels();
 	const auto numPages = atlasAllocator->GetNumPages();
+	const bool useTextureArray = forceTextureArray || numPages > 1;
 
 	const auto& atlasSize = atlasAllocator->GetAtlasSize();
 
@@ -378,7 +401,7 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 
 		atlasTex = nullptr;
 
-		if (numPages > 1) {
+		if (useTextureArray) {
 			atlasTex = std::make_unique<GL::Texture2DArray>(atlasSize, numPages, glInternalType, tcp, true);
 		}
 		else {
@@ -403,7 +426,7 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 		FBO fbo;
 		fbo.Init(false);
 		fbo.Bind();
-		if (numPages > 1)
+		if (useTextureArray)
 			fbo.AttachTextureLayer(atlasTex->GetId(), GL_COLOR_ATTACHMENT0, 0, 0);
 		else
 			fbo.AttachTexture(atlasTex->GetId(), GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0, 0);
@@ -418,7 +441,7 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 				for (uint32_t level = 0; level < numLevels; ++level) {
 					glViewport(0, 0, std::max(atlasSize.x >> level, 1u), std::max(atlasSize.y >> level, 1u));
 
-					if (numPages > 1)
+					if (useTextureArray)
 						fbo.AttachTextureLayer(atlasTex->GetId(), GL_COLOR_ATTACHMENT0, level, page);
 					else
 						fbo.AttachTexture(atlasTex->GetId(), GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0, level);
@@ -455,16 +478,17 @@ bool CTextureRenderAtlas::CreateAtlasTexture()
 						if (entry.texCoords.pageNum != page)
 							continue;
 
-						const auto& [srcTexID, _stableIdx, srcSubTC] = uniqueSubTextureMap[uniqTexName];
+						const auto& [srcTexID, _stableIdx, srcSubTC, contentSize] = uniqueSubTextureMap[uniqTexName];
 
 						if (srcTexID == 0)
 							continue;
 
 						// Raw inclusive pixel coords from allocator (level-0 space)
-						const int px1 = static_cast<int>(entry.texCoords.x1);
-						const int py1 = static_cast<int>(entry.texCoords.y1);
-						const int px2 = static_cast<int>(entry.texCoords.x2); // inclusive
-						const int py2 = static_cast<int>(entry.texCoords.y2); // inclusive
+						const int contentInset = entryPadding / 2;
+						const int px1 = static_cast<int>(entry.texCoords.x1) + contentInset;
+						const int py1 = static_cast<int>(entry.texCoords.y1) + contentInset;
+						const int px2 = px1 + contentSize.x - 1; // inclusive
+						const int py2 = py1 + contentSize.y - 1; // inclusive
 
 						// Entry size in level-0 pixels (exclusive width = inclusive + 1)
 						const float entryW = static_cast<float>(px2 - px1 + 1);

@@ -36,9 +36,7 @@
 #include "ElementLuaTexture.h"
 
 #include "Lua/LuaOpenGLUtils.h"
-#include "Rendering/GL/myGL.h"
 #include "Rml/Backends/RmlUi_Backend.h"
-#include "Rml/Backends/RmlUi_Renderer_GL3_Recoil.h"
 
 #include "RmlUi/Core/ComputedValues.h"
 #include "RmlUi/Core/ElementUtilities.h"
@@ -110,11 +108,12 @@ void ElementLuaTexture::OnRender()
 	if (geometry_dirty)
 		GenerateGeometry();
 
-	glBindTexture(GL_TEXTURE_2D, luaTexture.GetTextureID());
-	GetRenderInterface()->RenderGeometry(
+	RmlGui::RenderExternalTexture(
 		geometry_handle,
 		GetAbsoluteOffset(Rml::BoxArea::Content).Round(),
-		RenderInterface_GL3_Recoil::TextureEnableWithoutBinding
+		luaTexture.GetTextureID(),
+		GetTextureDimensions(),
+		GetAttribute<Rml::String>("src", "")
 	);
 }
 
@@ -266,7 +265,9 @@ void ElementLuaTexture::GenerateGeometry()
 		);
 	}
 
-	geometry_handle = render_interface->CompileGeometry(mesh.vertices, mesh.indices);
+	mesh.metadata.source_identifier = GetAddress();
+	mesh.metadata.element_address = reinterpret_cast<uintptr_t>(this);
+	geometry_handle = render_interface->CompileGeometryWithMetadata(mesh.vertices, mesh.indices, &mesh.metadata);
 	geometry_dirty = false;
 }
 

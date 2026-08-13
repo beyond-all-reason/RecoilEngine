@@ -843,7 +843,8 @@ void CGame::LoadInterface()
 		GameSetupDrawer::Enable();
 	}
 
-	RmlGui::Initialize();
+	if (!RmlGui::Initialize())
+		throw opengl_error("Fatal RmlUi renderer initialization failure. See the engine log for the missing capability or resource.");
 }
 
 void CGame::LoadLua(bool dryRun, bool onlyUnsynced)
@@ -2208,4 +2209,3 @@ const ActionList& CGame::GetLastActionList()
 {
 	return gameInputReceiver.lastActionList;
 }
-

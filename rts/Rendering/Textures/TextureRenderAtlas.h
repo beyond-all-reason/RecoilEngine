@@ -23,12 +23,15 @@ public:
 		uint32_t texID;
 		uint32_t stableIdx; // deterministic index for name generation (texID is non-deterministic)
 		float4 subTexCoords;
+		int2 contentSize;
 		std::string GetName() const;
 
 		bool operator==(const UniqueSubTexture&) const = default;
 	};
 public:
-	CTextureRenderAtlas(CTextureAtlas::AllocatorType allocType, int atlasSizeX, int atlasSizeY, int maxLevels, uint32_t glInternalType = /*GL_RGBA8*/0x8058, const std::string& atlasName = "");
+	CTextureRenderAtlas(CTextureAtlas::AllocatorType allocType, int atlasSizeX, int atlasSizeY, int maxLevels,
+		uint32_t glInternalType = /*GL_RGBA8*/0x8058, const std::string& atlasName = "", bool forceTextureArray = false,
+		int entryPadding = 0);
 	~CTextureRenderAtlas();
 	CTextureRenderAtlas(const CTextureRenderAtlas&) = delete;
 	CTextureRenderAtlas(CTextureRenderAtlas&&) noexcept = default;
@@ -55,6 +58,7 @@ public:
 	const uint2& GetAtlasSize() const;
 	int GetMinDim() const;
 	int GetNumTexLevels() const;
+	uint32_t GetNumPages() const;
 
 	const IAtlasAllocator* GetAllocator() const { return atlasAllocator.get(); }
 	const std::string& GetAtlasName() const { return atlasName; }
@@ -92,6 +96,8 @@ private:
 	static inline Shader::IProgramObject* shader = nullptr;
 	bool atlasFinalized;
 	bool atlasRendered;
+	bool forceTextureArray;
+	int entryPadding;
 public:
 	static inline AtlasedTexture dummy = AtlasedTexture{};
 };
