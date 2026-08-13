@@ -625,6 +625,7 @@ void RenderInterface_GL4_BAR::SetViewport(int width, int height, int offset_x, i
 
 void RenderInterface_GL4_BAR::BeginFrame()
 {
+	ZoneScopedN("RmlUi_GL4::BeginFrame");
 	RenderInterface_GL3_Recoil::BeginFrame();
 	instances.clear();
 	materials.clear();
@@ -645,11 +646,12 @@ void RenderInterface_GL4_BAR::BeginFrame()
 
 void RenderInterface_GL4_BAR::EndFrame()
 {
+	ZoneScopedN("RmlUi_GL4::EndFrame");
 	FlushPatchBatch();
-	TracyPlot("RmlUi GL4 patch instances", int64_t(frame_patch_instances));
-	TracyPlot("RmlUi GL4 glyph instances", int64_t(frame_glyph_instances));
-	TracyPlot("RmlUi GL4 patch batches", int64_t(frame_patch_batches));
-	TracyPlot("RmlUi GL4 generic batches", int64_t(frame_generic_batches));
+	TracyPlot("RmlUi_GL4::PatchInstances", int64_t(frame_patch_instances));
+	TracyPlot("RmlUi_GL4::GlyphInstances", int64_t(frame_glyph_instances));
+	TracyPlot("RmlUi_GL4::PatchBatches", int64_t(frame_patch_batches));
+	TracyPlot("RmlUi_GL4::GenericBatches", int64_t(frame_generic_batches));
 	RenderInterface_GL3_Recoil::EndFrame();
 }
 
@@ -661,6 +663,7 @@ Rml::CompiledGeometryHandle RenderInterface_GL4_BAR::CompileGeometry(Rml::Span<c
 Rml::CompiledGeometryHandle RenderInterface_GL4_BAR::CompileGeometryWithMetadata(Rml::Span<const Rml::Vertex> vertices,
 	Rml::Span<const int> indices, const Rml::RenderGeometryMetadata* metadata)
 {
+	ZoneScopedN("RmlUi_GL4::CompileGeometry");
 	auto geometry = std::make_unique<GeometryGL4>();
 	if (metadata)
 		geometry->metadata = *metadata;
@@ -785,6 +788,7 @@ void RenderInterface_GL4_BAR::ReleaseGeometry(Rml::CompiledGeometryHandle handle
 void RenderInterface_GL4_BAR::RenderGeometry(Rml::CompiledGeometryHandle handle, Rml::Vector2f translation,
 	Rml::TextureHandle texture_handle)
 {
+	ZoneScopedN("RmlUi_GL4::RenderGeometry");
 	if (texture_handle == TexturePostprocess || texture_handle == TextureEnableWithoutBinding) {
 		FlushPatchBatch();
 		RenderInterface_GL3_Recoil::RenderGeometry(handle, translation, texture_handle);
@@ -1158,6 +1162,7 @@ Rml::CompiledShaderHandle RenderInterface_GL4_BAR::CompileShader(const Rml::Stri
 void RenderInterface_GL4_BAR::RenderShader(Rml::CompiledShaderHandle handle, Rml::CompiledGeometryHandle geometry_handle,
 	Rml::Vector2f translation, Rml::TextureHandle texture_handle)
 {
+	ZoneScopedN("RmlUi_GL4::RenderShader");
 	auto* shader = reinterpret_cast<ShaderGL4*>(handle);
 	const auto* geometry = reinterpret_cast<const GeometryGL4*>(geometry_handle);
 	if (shader->type == ShaderGL4::Type::Fallback) {
@@ -1322,7 +1327,7 @@ void RenderInterface_GL4_BAR::FlushPatchBatch()
 {
 	if (instances.empty())
 		return;
-	RECOIL_DETAILED_TRACY_ZONE;
+	ZoneScopedN("RmlUi_GL4::FlushPatchBatch");
 
 	auto Upload = [](GLenum target, GLuint buffer, const void* data, size_t size) {
 		glBindBuffer(target, buffer);
@@ -1388,6 +1393,7 @@ void RenderInterface_GL4_BAR::FlushPatchBatch()
 void RenderInterface_GL4_BAR::DrawGeneric(const GeometryGL4& geometry, Rml::Vector2f translation,
 	const TextureHandleGL4* texture, const MaterialGPU* material_override)
 {
+	ZoneScopedN("RmlUi_GL4::DrawGeneric");
 	FlushPatchBatch();
 	const size_t ring_index = stream_ring_cursor++ % STREAM_RING_SIZE;
 	const GLuint material_buffer = material_buffers[ring_index];
@@ -1454,6 +1460,7 @@ void RenderInterface_GL4_BAR::DrawGeneric(const GeometryGL4& geometry, Rml::Vect
 
 bool RenderInterface_GL4_BAR::FinalizeTextureAtlas(TextureAtlasManifest& manifest)
 {
+	ZoneScopedN("RmlUi_GL4::FinalizeTextureAtlas");
 	if (!manifest.Finalize())
 		return false;
 	stats.manifest_hash = manifest.GetStats().manifest_hash;
