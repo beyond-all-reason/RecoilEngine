@@ -1336,13 +1336,13 @@ int LuaOpenGL::DrawMiniMap(lua_State* L)
  * scissor and viewport state are left to the caller.
  *
  * @function gl.DrawMiniMapIcons
- * @param left number map-space rectangle edges in elmos (top/bottom = smaller/larger z)
+ * @param left number map-space rectangle edges in elmos; left < right and top < bottom (top = smaller z) are required, mirror via your own transform instead
  * @param top number
  * @param right number
  * @param bottom number
  * @param iconSize number base icon half-size in elmos, scaled per icon by its icontypes.lua size
- * @param allyTeam integer? (Default: your allyTeam) perspective to render; other perspectives require a full-read handle
- * @param fullView boolean? (Default: whether you spectate in full view) draw every unit at its true position; requires a full-read handle
+ * @param allyTeam integer? (Default: your allyTeam) perspective to render; other allyteams require a full-read handle
+ * @param fullView boolean? (Default: true when spectating in full view with a full-read handle) draw every unit at its true position; true requires a full-read handle, false is always allowed
  */
 int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 {
@@ -1354,17 +1354,19 @@ int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 	const float bottom   = luaL_checkfloat(L, 4);
 	const float iconSize = luaL_checkfloat(L, 5);
 
-	if (left == right || top == bottom)
-		luaL_error(L, "gl.DrawMiniMapIcons(): degenerate map rectangle");
+	// callers wanting a mirrored result can flip it via their own transform
+	if (!((right - left) > float3::cmp_eps()) || !((bottom - top) > float3::cmp_eps()))
+		luaL_error(L, "gl.DrawMiniMapIcons(): map rectangle must have left < right and top < bottom");
 
 	const int allyTeam = luaL_optint(L, 6, gu->myAllyTeam);
-	const bool fullView = luaL_optboolean(L, 7, gu->spectatingFullView);
+	const bool fullView = luaL_optboolean(L, 7, gu->spectatingFullView && CLuaHandle::GetHandleFullRead(L));
 
 	if (!teamHandler.IsValidAllyTeam(allyTeam))
 		luaL_error(L, "gl.DrawMiniMapIcons(): invalid allyTeam %d", allyTeam);
 
-	// info-leak gate: other perspectives expose units the local player cannot see
-	if ((allyTeam != gu->myAllyTeam || fullView != gu->spectatingFullView) && !CLuaHandle::GetHandleFullRead(L))
+	// info-leak gate: other allyteams' perspectives and the fullview (godmode) view
+	// expose units this handle may not see; requesting less visibility is always fine
+	if ((allyTeam != gu->myAllyTeam || fullView) && !CLuaHandle::GetHandleFullRead(L))
 		luaL_error(L, "gl.DrawMiniMapIcons(): rendering another perspective requires a full-read handle");
 
 	MiniMapIconDrawParams params;
@@ -1376,12 +1378,16 @@ int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 	params.useIcons = true;
 	params.useSimpleColors = false;
 
-	// cull to the rect, with margin so partially visible icons at the edges still draw
-	const float cullMargin = iconSize * 8.0f;
-	params.cullMinX = std::min(left, right) - cullMargin;
-	params.cullMaxX = std::max(left, right) + cullMargin;
-	params.cullMinZ = std::min(top, bottom) - cullMargin;
-	params.cullMaxZ = std::max(top, bottom) + cullMargin;
+	// cull to the rect, with margin so partially visible icons at the edges still draw.
+	// the bound covers the per-icon scale multiplier the drawer applies (icontypes.lua
+	// size, times radius/30 for radiusAdjust icons); icons scaled beyond it can pop at
+	// the rect edge, callers that care can pad their rectangle
+	constexpr float MAX_ICON_SCALE_MULT = 8.0f;
+	const float cullMargin = iconSize * MAX_ICON_SCALE_MULT;
+	params.cullMinX = left - cullMargin;
+	params.cullMaxX = right + cullMargin;
+	params.cullMinZ = top - cullMargin;
+	params.cullMaxZ = bottom + cullMargin;
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
