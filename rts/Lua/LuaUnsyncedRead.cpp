@@ -1483,7 +1483,7 @@ namespace Impl {
 			LuaPushNamedNumber(L, "size", iconData.GetSize());
 			/*** @field IconData.distance number? When squared used as a icon length multiplier */
 			LuaPushNamedNumber(L, "distance", iconData.GetDistance());
-			/*** @field IconData.drawOrder number? Sort priority used when icon sorting is enabled; higher values are drawn on top */
+			/*** @field IconData.drawOrder number? Sort priority for icon drawing; icons with higher values are drawn on top of lower ones */
 			LuaPushNamedNumber(L, "drawOrder", iconData.GetDrawOrder());
 			/*** @field IconData.radiusAdjust boolean? Controls whether the unit radius affects the icon size */
 			LuaPushNamedBool(L, "radiusAdjust", iconData.GetRadiusAdjust());

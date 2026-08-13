@@ -69,7 +69,7 @@ CONFIG(float, UnitTransparency).defaultValue(0.7f);
 CONFIG(bool, UnitIconsAsUI).defaultValue(false).description("Draw unit icons like it is an UI element and not like unit's LOD.");
 CONFIG(bool, UnitIconsHideWithUI).defaultValue(false).description("Hide unit icons when UI is hidden.");
 CONFIG(float, UnitGhostIconsDimming).defaultValue(0.8).minimumValue(0.0f).maximumValue(1.0f).description("Dimming multiplier for out of radar ghost icons. Setting to 0 disables them.");
-CONFIG(bool, UnitIconsSorted).defaultValue(false).description("Sort unit icons (world, screen and minimap) by the drawOrder of their icontypes.lua entry, then back-to-front, so overlapping icons resolve in a deterministic, prioritized order instead of unit creation order.");
+CONFIG(bool, UnitIconsSortedByDepth).defaultValue(false).description("Additionally order overlapping unit icons (world, screen and minimap) back-to-front by view depth. Icons always sort by the drawOrder of their icontypes.lua entry when the game defines one; depth ordering on top of that makes overlap stacking change as units and the camera move, hence optional.");
 
 CONFIG(int, MaxDynamicModelLights)
 	.defaultValue(1)
@@ -345,12 +345,16 @@ void CUnitDrawerGLSL::DrawUnitTrans(const CUnit* unit, uint32_t preList, uint32_
 }
 
 namespace {
-	// icon draw ordering (gated by UnitIconsSorted). The sort runs over flat 8-byte
-	// records instead of the payload entries: the icon's icontypes.lua drawOrder
-	// (higher drawn on top) packs above a path-specific back-to-front depth quantized
-	// to 16 bits, with the payload index in the low 16 bits. Both floats are remapped
-	// to order-preserving unsigned bits, so the whole sort is comparator-free integer
-	// sorting; icons that tie on drawOrder and quantized depth draw in gather order.
+	// icon draw ordering: active whenever the game defines icontypes.lua drawOrder
+	// values (games without them skip sorting entirely). The sort runs over flat 8-byte
+	// records instead of the payload entries: the icon's drawOrder (higher drawn on
+	// top, 16 bits) packs above a path-specific back-to-front depth (full 32 bits),
+	// with the payload index in the low 16 bits. Both floats are remapped to
+	// order-preserving unsigned bits, so the whole sort is comparator-free integer
+	// sorting. The depth field only participates when UnitIconsSortedByDepth is
+	// enabled — it makes overlap stacking change as units and the camera move, so by
+	// default icons that share a drawOrder keep their stable gather (creation) order
+	// via the index tiebreak.
 	inline uint32_t SortableFloatBits(float f) {
 		uint32_t b;
 		std::memcpy(&b, &f, sizeof(b));
@@ -362,9 +366,23 @@ namespace {
 
 	inline uint64_t MakeIconSortRec(float drawOrder, float depth, size_t entryIdx) {
 		assert(entryIdx <= ICON_SORT_IDX_MASK);
-		return (uint64_t{SortableFloatBits(drawOrder)} << 32)
-		     | (SortableFloatBits(depth) & ~ICON_SORT_IDX_MASK)
+		// drawOrder gets 16 bits of float precision (plenty for layer indices); depth
+		// keeps all 32 so overlap order only changes at true depth crossings instead
+		// of jittering at quantization-bucket boundaries as units or the camera move
+		return (uint64_t{SortableFloatBits(drawOrder) >> 16} << 48)
+		     | (uint64_t{SortableFloatBits(depth)} << 16)
 		     | (uint32_t(entryIdx) & ICON_SORT_IDX_MASK);
+	}
+
+	// the minimap can be drawn rotated in 90° steps; sort by the post-rotation screen
+	// vertical so icons lower on the rotated minimap draw on top
+	inline float MiniMapIconSortDepth(const float3& pos, CMiniMap::RotationOptions rotation) {
+		switch (rotation) {
+			case CMiniMap::ROTATION_90:  return -pos.x;
+			case CMiniMap::ROTATION_180: return -pos.z;
+			case CMiniMap::ROTATION_270: return  pos.x;
+			default:                     return  pos.z;
+		}
 	}
 
 	void SortIconRecs(std::vector<uint64_t>& recs) {
@@ -486,7 +504,9 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 	const float ghostIconDimming = modelDrawerData->ghostIconDimming;
 	const auto defIconIdx = icon::iconHandler.GetDefaultIconIdx();
 
-	const bool sortIcons = modelDrawerData->sortUnitIcons;
+	const bool sortDepth = modelDrawerData->sortUnitIconsByDepth;
+	const bool sortIcons = sortDepth || icon::iconHandler.HasDrawOrders();
+	const auto mmRotation = minimap->GetRotationOption();
 
 	struct IconDrawEntry {
 		size_t iconIdx;
@@ -556,7 +576,7 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 			DrawUnitMiniMapIcon(rb, iconIndex, iconScale, pos, currentColor);
 		} else {
 			entries.push_back({ iconIndex, iconScale, pos, currentColor });
-			sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(iconIndex).GetDrawOrder(), pos.z, entries.size() - 1));
+			sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(iconIndex).GetDrawOrder(), sortDepth ? MiniMapIconSortDepth(pos, mmRotation) : 0.0f, entries.size() - 1));
 		}
 	}
 
@@ -586,7 +606,7 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons() const
 				DrawUnitMiniMapIcon(rb, iconIndex, iconScale, pos, currentColor);
 			} else {
 				entries.push_back({ iconIndex, iconScale, pos, currentColor });
-				sortRecs.push_back(MakeIconSortRec(iconData.GetDrawOrder(), pos.z, entries.size() - 1));
+				sortRecs.push_back(MakeIconSortRec(iconData.GetDrawOrder(), sortDepth ? MiniMapIconSortDepth(pos, mmRotation) : 0.0f, entries.size() - 1));
 			}
 		}
 	}
@@ -686,7 +706,8 @@ void CUnitDrawerGLSL::DrawUnitIcons() const
 	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_TC3>();
 	rb.AssertSubmission();
 
-	const bool sortIcons = modelDrawerData->sortUnitIcons;
+	const bool sortDepth = modelDrawerData->sortUnitIconsByDepth;
+	const bool sortIcons = sortDepth || icon::iconHandler.HasDrawOrders();
 
 	struct IconDrawEntry {
 		CUnit* unit;
@@ -725,7 +746,7 @@ void CUnitDrawerGLSL::DrawUnitIcons() const
 			unit->iconRadius = DrawUnitIcon(rb, unit->currentIconIndex, unit->iconRadius, unit->radius, pos, iconColor);
 		} else {
 			entries.push_back({ unit, pos, iconColor });
-			sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(unit->currentIconIndex).GetDrawOrder(), -camera->GetPos().SqDistance(pos), entries.size() - 1));
+			sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(unit->currentIconIndex).GetDrawOrder(), sortDepth ? -camera->GetPos().SqDistance(pos) : 0.0f, entries.size() - 1));
 		}
 	}
 
@@ -831,7 +852,8 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 	const auto isFullView = gu->spectatingFullView;
 	const float ghostIconDimming = modelDrawerData->ghostIconDimming;
 
-	const bool sortIcons = modelDrawerData->sortUnitIcons;
+	const bool sortDepth = modelDrawerData->sortUnitIconsByDepth;
+	const bool sortIcons = sortDepth || icon::iconHandler.HasDrawOrders();
 
 	struct IconDrawEntry {
 		size_t iconIdx;
@@ -865,11 +887,11 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 
 
 		// drawMidPos is auto-calculated now; can wobble on its own as pieces move
-		float3 pos = (!isFullView) ?
+		const float3 worldPos = (!isFullView) ?
 			unit->GetObjDrawErrorPos(myAllyTeam) :
 			unit->GetObjDrawMidPos();
 
-		pos = camera->CalcViewPortCoordinates(pos);
+		float3 pos = camera->CalcViewPortCoordinates(worldPos);
 		if (pos.z > 1.0f || pos.z < 0.0f)
 			continue;
 
@@ -888,20 +910,20 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 			}
 		}
 
-		// negated depth: within equal drawOrder farther icons are drawn first (back-to-front)
 		if (!sortIcons) {
 			DrawUnitIconScreen(rb, unit->currentIconIndex, pos, currentColor, unit->radius, unit->GetIsIcon());
 		} else {
 			entries.push_back({ unit->currentIconIndex, pos, currentColor, unit->radius, unit->GetIsIcon() });
-			sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(unit->currentIconIndex).GetDrawOrder(), -pos.z, entries.size() - 1));
+			// negated camera distance: farther icons draw first (back-to-front). The
+			// post-projection viewport z is unusable here — it compresses everything
+			// toward 1.0, which the 16-bit key quantization collapses into one value
+			sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(unit->currentIconIndex).GetDrawOrder(), sortDepth ? -camera->GetPos().SqDistance(worldPos) : 0.0f, entries.size() - 1));
 		}
 	}
 
 	if (!isFullView && ghostIconDimming > 0.0f) {
 		for (auto* ghost : modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam)) {
-			float3 pos = ghost->midPos;
-
-			pos = camera->CalcViewPortCoordinates(pos);
+			float3 pos = camera->CalcViewPortCoordinates(ghost->midPos);
 			if (pos.z > 1.0f || pos.z < 0.0f)
 				continue;
 
@@ -920,7 +942,7 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 				DrawUnitIconScreen(rb, iconIndex, pos, currentColor, ghost->radius, false);
 			} else {
 				entries.push_back({ iconIndex, pos, currentColor, ghost->radius, false });
-				sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(iconIndex).GetDrawOrder(), -pos.z, entries.size() - 1));
+				sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(iconIndex).GetDrawOrder(), sortDepth ? -camera->GetPos().SqDistance(ghost->midPos) : 0.0f, entries.size() - 1));
 			}
 		}
 	}

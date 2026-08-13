@@ -108,6 +108,8 @@ namespace icon {
 			size_t GetIconIdxOrDefault(const std::string& iconName) const;
 			std::pair<bool, spring::unordered_map<std::string, size_t>::const_iterator> FindIconIdx(const std::string& iconName) const;
 			size_t GetDefaultIconIdx() const { return defaultIconIdx; }
+			/// true when any icon defines a nonzero drawOrder; sorting is skipped entirely otherwise
+			bool HasDrawOrders() const { return (drawOrderIconCount > 0); }
 
 			const auto& GetAtlasTextureIDs() const { return atlasTextureIDs; }
 			auto GetAtlasTextureID(size_t i) const { return atlasTextureIDs[i]; }
@@ -125,6 +127,7 @@ namespace icon {
 			std::vector<IconData> iconsData;
 
 			size_t defaultIconIdx = INVALID_ICON_INDEX;
+			size_t drawOrderIconCount = 0;
 
 			std::array<uint32_t, 2> atlasTextureIDs = {};
 			std::array<int2, 2> atlasTextureSizes = {};

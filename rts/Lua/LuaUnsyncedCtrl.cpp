@@ -2498,7 +2498,7 @@ int LuaUnsyncedCtrl::SetFeatureSelectionVolumeData(lua_State* L)
  * @param v0 number?
  * @param u1 number?
  * @param v1 number?
- * @param drawOrder number? (Default: 0) Sort priority used when icon sorting is enabled; higher values are drawn on top.
+ * @param drawOrder number? (Default: 0) Sort priority for icon drawing; icons with higher values are drawn on top of lower ones.
  *
  * @return boolean added
  */
