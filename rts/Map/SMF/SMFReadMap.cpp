@@ -189,6 +189,19 @@ void CSMFReadMap::LoadMinimap()
 	}
 }
 
+// dedupe because reading the same file twice isn't thread safe (i think)
+static bool HasDuplicateNames(const std::vector<const std::string*>& names)
+{
+	for (size_t i = 0; i < names.size(); i++) {
+		for (size_t j = i + 1; j < names.size(); j++) {
+			if (!names[i]->empty() && *names[i] == *names[j])
+				return true;
+		}
+	}
+
+	return false;
+}
+
 void CSMFReadMap::CreateSpecularTex()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -216,12 +229,21 @@ void CSMFReadMap::CreateSpecularTex()
 	std::vector<CBitmap> texBitmaps(numTextures);
 	std::vector<uint8_t> texLoaded(numTextures, 0); // uint8 over bool for concurrency
 
-	for_mt(0, numTextures, [&texNames, &texBitmaps, &texLoaded](const int i) {
+	const auto loadTex = [&texNames, &texBitmaps, &texLoaded](const int i) {
 		if (texNames[i]->empty())
 			return;
 
 		texLoaded[i] = texBitmaps[i].Load(*texNames[i]);
-	});
+	};
+
+	if (!HasDuplicateNames(texNames)) {
+		for_mt(0, numTextures, loadTex);
+	} else {
+		// fallback to sequential load
+		for (int i = 0; i < numTextures; i++) {
+			loadTex(i);
+		}
+	}
 
 	// maps wants specular lighting, but no moderation
 	if (!texLoaded[SPECULAR_TEX]) {
