@@ -791,7 +791,8 @@ void CMouseHandler::Update()
 		if (auto& rmlCursor = RmlGui::GetMouseCursor(); !rmlCursor.empty())
 			queuedCursorName = rmlCursor;
 
-	SetCursor(queuedCursorName);
+	SetCursor(queuedCursorName, rebindCursorAfterWarp);
+	rebindCursorAfterWarp = false;
 
 	if (!hideCursor) {
 		mouse->UpdateCursorCameraDir();
@@ -827,7 +828,9 @@ void CMouseHandler::WarpMouse(int x, int y)
 	lastx = x + globalRendering->viewPosX;
 	lasty = y;
 
-	mouseInput->SetWarpPos({lastx, lasty});
+	// WarpPos temporarily hides the SDL cursor on Wayland. Rebind the hardware
+	// cursor during the next update, after SDL has processed the warp.
+	rebindCursorAfterWarp |= mouseInput->SetWarpPos({lastx, lasty});
 }
 
 
