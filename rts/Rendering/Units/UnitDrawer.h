@@ -30,6 +30,10 @@ struct MiniMapIconDrawParams {
 	bool fullView = false;                   // godmode: true positions, everything visible
 	bool useIcons = true;                    // false = draw every unit as the default radar dot
 	bool useSimpleColors = false;            // use the three fixed colors instead of team colors
+	// draw the LOCAL player's selected units white; other players' selections are not
+	// known engine-side, so callers rendering another perspective disable this and
+	// overlay that viewer's selection themselves
+	bool highlightSelected = true;
 	SColor myColor = SColor(0, 255, 0, 255);
 	SColor allyColor = SColor(0, 255, 255, 255);
 	SColor enemyColor = SColor(255, 0, 0, 255);

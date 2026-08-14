@@ -1343,6 +1343,7 @@ int LuaOpenGL::DrawMiniMap(lua_State* L)
  * @param iconSize number base icon half-size in elmos, scaled per icon by its icontypes.lua size
  * @param allyTeam integer? (Default: your allyTeam) perspective to render; other allyteams require a full-read handle
  * @param fullView boolean? (Default: true when spectating in full view with a full-read handle) draw every unit at its true position; true requires a full-read handle, false is always allowed
+ * @param highlightSelected boolean? (Default: true) draw the local player's selected units white. Other players' selections are unknown to the engine — when rendering another perspective, pass false and overlay that viewer's selection yourself
  */
 int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 {
@@ -1378,6 +1379,7 @@ int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 	params.useIcons = true;
 	// no simplecolors by design, a game can set teamcolors manually before this call if it wants to
 	params.useSimpleColors = false;
+	params.highlightSelected = luaL_optboolean(L, 8, true);
 
 	// cull to the rect, with margin so partially visible icons at the edges still draw.
 	// the bound covers the per-icon scale multiplier the drawer applies (icontypes.lua

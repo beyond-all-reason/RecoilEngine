@@ -433,7 +433,7 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons(const MiniMapIconDrawParams& params) 
 		if (iconIndex == icon::INVALID_ICON_INDEX)
 			continue;
 
-		if (unit->isSelected) {
+		if (params.highlightSelected && unit->isSelected) {
 			currentColor = color4::white; // selected color
 		}
 		else {
