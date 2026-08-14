@@ -7,8 +7,4 @@ title = "Running changelog"
 
 This is the bleeding-edge changelog since version 2026.07, for **pre-release 2026.08**.
 
-## Features
-
-### Minimap-style icon rendering for arbitrary map areas
-- add `gl.DrawMiniMapIcons(left, top, right, bottom, iconSize[, allyTeam[, fullView]])`, which draws all unit icons visible to the given perspective (team colors, radar dots, LOS rules, ghost dimming — exactly as on the minimap) for a map-space rectangle, mapped onto the unit square under the current transform. Composes with `gl.RenderToTexture`/FBOs, so widgets (e.g. picture-in-picture views) can render icon layers for any camera rect and zoom without maintaining their own icon pipeline.
-- `allyTeam` and `fullView` default to the local view; other perspectives (e.g. for casting) require a full-read Lua handle.
+No changes as of yet.
