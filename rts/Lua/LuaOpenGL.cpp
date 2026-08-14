@@ -1376,6 +1376,7 @@ int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 	params.viewAllyTeam = allyTeam;
 	params.fullView = fullView;
 	params.useIcons = true;
+	// no simplecolors by design, a game can set teamcolors manually before this call if it wants to
 	params.useSimpleColors = false;
 
 	// cull to the rect, with margin so partially visible icons at the edges still draw.
