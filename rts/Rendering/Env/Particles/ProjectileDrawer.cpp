@@ -1044,12 +1044,22 @@ void CProjectileDrawer::DrawShadowTransparent()
 
 	// 1) Render opaque objects into depth stencil texture from light's point of view - done elsewhere
 
-	// draw the model-less projectiles
+	// draw the model-less projectiles; the multiplicative shadow blend is
+	// order-independent, so the list needs no sorting. unsortedParticles is
+	// only otherwise used inside DrawAlpha, which runs later in the frame and
+	// clears it first.
+	unsortedParticles.clear();
 	for (CProjectile* p : renderProjectiles) {
 		if (!ShouldDrawProjectile(p, DrawFlags::SO_SHTRAN_FLAG))
 			continue;
 
-		p->Draw();
+		unsortedParticles.emplace_back(p);
+	}
+
+	{
+		ZoneScopedN("ProjectileDrawer::DrawShadowTransparent(Fill)");
+		const bool threadedFill = (configHandler->GetInt("ProjectileDrawThreadedFill") != 0) && ThreadPool::HasThreads();
+		FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill, [this](size_t j) { return unsortedParticles[j]; });
 	}
 
 	auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
