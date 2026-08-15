@@ -448,7 +448,7 @@ void CMapInfo::ReadTerrainTypes()
 		terrType.shipSpeed  = moveTable.GetFloat("ship",  1.0f);
 
 		// clamps
-		terrType.hardness   = std::max(0.001f, terrType.hardness);
+		terrType.hardness   = std::max(0.001f, std::abs(terrType.hardness)) * std::copysign(1.0f, terrType.hardness);
 		terrType.tankSpeed  = std::max(0.000f, terrType.tankSpeed);
 		terrType.kbotSpeed  = std::max(0.000f, terrType.kbotSpeed);
 		terrType.hoverSpeed = std::max(0.000f, terrType.hoverSpeed);
