@@ -4783,8 +4783,9 @@ int LuaUnsyncedRead::GetConfigParams(lua_State* L)
  *
  * @function Spring.GetConfigInt
  * @param name string
- * @param default number? (Default: `0`)
- * @return number? configInt
+ * @param default integer Default value if `name` is not found
+ * @return integer
+ * @overload fun(name: string): integer?
  */
 int LuaUnsyncedRead::GetConfigInt(lua_State* L)
 {
@@ -4804,8 +4805,9 @@ int LuaUnsyncedRead::GetConfigInt(lua_State* L)
  *
  * @function Spring.GetConfigFloat
  * @param name string
- * @param default number? (Default: `0`)
- * @return number? configFloat
+ * @param default number Default value if `name` is not found
+ * @return number
+ * @overload fun(name: string): number?
  */
 int LuaUnsyncedRead::GetConfigFloat(lua_State* L)
 {
@@ -4825,8 +4827,9 @@ int LuaUnsyncedRead::GetConfigFloat(lua_State* L)
  *
  * @function Spring.GetConfigString
  * @param name string
- * @param default string? (Default: `""`)
- * @return number? configString
+ * @param default string Default value if `name` is not found
+ * @return string
+ * @overload fun(name: string): string?
  */
 int LuaUnsyncedRead::GetConfigString(lua_State* L)
 {
