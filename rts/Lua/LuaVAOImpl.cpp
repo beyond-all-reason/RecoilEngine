@@ -517,13 +517,15 @@ void LuaVAOImpl::RemoveFromSubmission(int idx)
 		return;
 	}
 
-	if (idx != submitCmds.size() - 1)
+	// swap-remove; every remaining command already satisfies baseInstance == index,
+	// so only the moved command needs its baseInstance fixed up
+	if (idx != submitCmds.size() - 1) {
 		submitCmds[idx] = submitCmds.back();
+		submitCmds[idx].baseInstance = static_cast<uint32_t>(idx);
+	}
 
 	submitCmds.pop_back();
-	for (baseInstance = 0; baseInstance < submitCmds.size(); ++baseInstance) {
-		submitCmds[baseInstance].baseInstance = baseInstance;
-	}
+	baseInstance = static_cast<uint32_t>(submitCmds.size());
 }
 
 
