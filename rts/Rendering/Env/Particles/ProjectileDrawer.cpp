@@ -36,6 +36,7 @@
 #include "Sim/Weapons/WeaponDef.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/EventHandler.h"
+#include "System/RadixSort.h"
 #include "System/Exceptions.h"
 #include "System/Log/ILog.h"
 #include "System/SafeUtil.h"
@@ -71,54 +72,10 @@ static inline uint64_t ParticleSortKey(const CProjectile* p, uint32_t camType, b
 	return (orderKey << 32) | DistanceSortKey(p->GetSortDist(camType));
 }
 
-// Stable LSD radix sort on sortKey; O(n) with a deterministic per-frame cost,
-// unlike a comparison sort whose runtime varies with the input distribution.
-// Passes whose key byte is identical across all elements (e.g. the drawOrder
-// half when no particle uses it) are skipped. Stability means equal-key
+// The actual ordering is done by RadixSortByKey (System/RadixSort.h) on the
+// packed key: linear, input-independent cost, and stable, so equal-key
 // particles (exactly coincident ones) keep their fill order, which is frame
-// coherent; the previous comparison sort tiebroke them by pointer address.
-static void SortParticles(std::vector<SortableParticle>& elems, std::vector<SortableParticle>& scratch)
-{
-	const size_t n = elems.size();
-
-	// below this the O(n log n) sort wins over 8x histogram+scatter passes
-	if (n < 1024) {
-		std::sort(elems.begin(), elems.end(), [](const SortableParticle& a, const SortableParticle& b) noexcept { return a.sortKey < b.sortKey; });
-		return;
-	}
-
-	scratch.resize(n);
-
-	SortableParticle* src = elems.data();
-	SortableParticle* dst = scratch.data();
-
-	for (uint32_t shift = 0; shift < 64; shift += 8) {
-		size_t bucketOffsets[256] = { 0 };
-
-		for (size_t i = 0; i < n; ++i)
-			bucketOffsets[(src[i].sortKey >> shift) & 0xFF] += 1;
-
-		// this byte is identical across all keys; nothing to reorder
-		if (std::any_of(std::begin(bucketOffsets), std::end(bucketOffsets), [n](size_t c) { return c == n; }))
-			continue;
-
-		// exclusive prefix sum: counts -> output offsets
-		size_t sum = 0;
-		for (size_t b = 0; b < 256; ++b) {
-			const size_t count = bucketOffsets[b];
-			bucketOffsets[b] = sum;
-			sum += count;
-		}
-
-		for (size_t i = 0; i < n; ++i)
-			dst[bucketOffsets[(src[i].sortKey >> shift) & 0xFF]++] = src[i];
-
-		std::swap(src, dst);
-	}
-
-	if (src != elems.data())
-		std::copy(src, src + n, elems.data());
-}
+// coherent. The previous comparison sort tiebroke them by pointer address.
 
 // with fewer particles per chunk the for_mt dispatch overhead exceeds the
 // quad-generation work being distributed
@@ -957,7 +914,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
-			SortParticles(sortedParticles, sortScratch);
+			RadixSortByKey(sortedParticles, sortScratch, [](const SortableParticle& sp) noexcept { return sp.sortKey; });
 		}
 
 		const bool threadedFill = (configHandler->GetInt("ProjectileDrawThreadedFill") != 0) && ThreadPool::HasThreads();
