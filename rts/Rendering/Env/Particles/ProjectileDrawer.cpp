@@ -45,15 +45,93 @@
 #include "System/Misc/TracyDefs.h"
 
 CONFIG(int, SoftParticles).defaultValue(1).safemodeValue(0).description("Soften up CEG particles on clipping edges");
+CONFIG(float, ProjectileReflectionMinRadius).defaultValue(0.0f).minimumValue(0.0f).description("Alpha particles with a draw radius (in elmos) smaller than this are skipped in water reflection passes; 0 draws all of them. Small particles are barely visible in reflections, so culling them there is cheap visually and saves a large part of the reflection pass on effect-heavy frames.");
+CONFIG(int, ProjectileDrawThreadedFill).defaultValue(1).safemodeValue(0).description("Generate alpha-particle geometry on the ThreadPool workers instead of the render thread. Draw order is preserved; the few particle types whose Draw is not thread-safe stay on the render thread.");
 
-static uint32_t sortCamType = 0;
-static bool CProjectileDrawOrderSortingPredicate(const CProjectile* p1, const CProjectile* p2) noexcept {
-	return std::forward_as_tuple(p2->drawOrder, p1->GetSortDist(sortCamType), p1) > std::forward_as_tuple(p1->drawOrder, p2->GetSortDist(sortCamType), p2);
+// sort keys are snapshotted into SortableParticle at fill time, so the
+// comparators run on a contiguous array instead of dereferencing two
+// CProjectile pointers (= two likely cache misses) per comparison
+using SortableParticle = CProjectileDrawer::SortableParticle;
+
+static bool CProjectileDrawOrderSortingPredicate(const SortableParticle& a, const SortableParticle& b) noexcept {
+	return std::forward_as_tuple(b.drawOrder, a.sortDist, a.proj) > std::forward_as_tuple(a.drawOrder, b.sortDist, b.proj);
 }
 
-static bool CProjectileSortingPredicate(const CProjectile* p1, const CProjectile* p2) noexcept {
-	return std::forward_as_tuple(p1->GetSortDist(sortCamType), p1) > std::forward_as_tuple(p2->GetSortDist(sortCamType), p2);
+static bool CProjectileSortingPredicate(const SortableParticle& a, const SortableParticle& b) noexcept {
+	return std::forward_as_tuple(a.sortDist, a.proj) > std::forward_as_tuple(b.sortDist, b.proj);
 };
+
+// with fewer particles per chunk the for_mt dispatch overhead exceeds the
+// quad-generation work being distributed
+static constexpr size_t MT_FILL_MIN_CHUNK_SIZE = 96;
+
+// Runs p->Draw() over a particle list, generating quads on the ThreadPool
+// workers: the list is split into contiguous chunks, each chunk fills its own
+// scratch buffer, and the scratch buffers are merged into the primary buffer
+// in chunk order, so the emitted geometry is byte-identical to a serial fill.
+// Particles with mtDrawSafe == false (immediate GL calls, Lua callins) split
+// the list into segments and are drawn serially, in their exact position.
+template<typename GetParticle>
+static void FillParticleGeometry(std::vector<TypedRenderBuffer<VA_TYPE_PROJ>>& scratchBufs, size_t count, bool threaded, GetParticle&& getParticle)
+{
+	auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
+
+	size_t segStart = 0;
+	for (size_t i = 0; i <= count; ++i) {
+		CProjectile* boundaryProj = (i < count) ? getParticle(i) : nullptr;
+		if (boundaryProj != nullptr && boundaryProj->mtDrawSafe)
+			continue;
+
+		// [segStart, i) is a contiguous run of MT-safe particles
+		const size_t segLen = i - segStart;
+		const size_t numChunks = threaded ? std::min<size_t>(ThreadPool::GetNumThreads(), segLen / MT_FILL_MIN_CHUNK_SIZE) : 1;
+
+		if (numChunks < 2) {
+			for (size_t j = segStart; j < i; ++j)
+				getParticle(j)->Draw();
+		} else {
+			// main thread only: buffer (de)registration is not thread-safe
+			if (scratchBufs.size() < numChunks)
+				scratchBufs.resize(numChunks);
+
+			const size_t chunkSize = (segLen + numChunks - 1) / numChunks;
+			const size_t segEnd = i;
+
+			for_mt(0, static_cast<int>(numChunks), [&scratchBufs, &getParticle, segStart, segEnd, chunkSize](int ci) {
+				auto& scratch = scratchBufs[ci];
+				scratch.Clear();
+
+				CExpGenSpawnable::SetGeomFillTarget(&scratch);
+				const size_t jb = segStart + ci * chunkSize;
+				const size_t je = std::min(jb + chunkSize, segEnd);
+				for (size_t j = jb; j < je; ++j)
+					getParticle(j)->Draw();
+				CExpGenSpawnable::SetGeomFillTarget(nullptr);
+			});
+
+			// merge in chunk order to preserve the back-to-front particle order
+			for (size_t ci = 0; ci < numChunks; ++ci) {
+				auto& scratch = scratchBufs[ci];
+				const auto& verts = scratch.GetElems();
+				const auto& indcs = scratch.GetIndcs();
+
+				if (verts.empty())
+					continue;
+
+				const auto vertBias = static_cast<int32_t>(rb.GetBaseVertex());
+				rb.AddVertices(verts.begin(), verts.end());
+				rb.AddIndices(indcs.begin(), indcs.end(), vertBias);
+			}
+		}
+
+		// the boundary particle itself is not MT-safe; draw it serially in its
+		// exact sorted position
+		if (boundaryProj != nullptr)
+			boundaryProj->Draw();
+
+		segStart = i + 1;
+	}
+}
 
 CProjectileDrawer* projectileDrawer = nullptr;
 
@@ -350,8 +428,9 @@ void CProjectileDrawer::Kill() {
 
 	renderProjectiles.clear();
 
-	for (auto& dp : drawParticles)
-		dp.clear();
+	sortedParticles.clear();
+	unsortedParticles.clear();
+	mtFillBuffers.clear();
 
 	perlinFB.Kill();
 
@@ -372,7 +451,12 @@ void CProjectileDrawer::UpdateDrawFlags()
 {
 	ZoneScopedN("ProjectileDrawer::UpdateDrawFlags");
 
-	for_mt(0, renderProjectiles.size(), [this](int i) {
+	// water reflections are distorted enough that small particles contribute
+	// next to nothing visually; skipping them avoids most of the reflection
+	// pass' fill/sort/quad-generation cost on effect-heavy frames
+	const float reflMinRadius = configHandler->GetFloat("ProjectileReflectionMinRadius");
+
+	for_mt(0, renderProjectiles.size(), [this, reflMinRadius](int i) {
 		CProjectile* p = renderProjectiles[i];
 		const bool hasModel = (p->model != nullptr);
 
@@ -388,6 +472,9 @@ void CProjectileDrawer::UpdateDrawFlags()
 
 		for (uint32_t camType = CCamera::CAMTYPE_PLAYER; camType < CCamera::CAMTYPE_ENVMAP; ++camType) {
 			if (camType == CCamera::CAMTYPE_UWREFL && !IWater::GetWater()->CanDrawReflectionPass())
+				continue;
+
+			if (camType == CCamera::CAMTYPE_UWREFL && !hasModel && p->GetDrawRadius() < reflMinRadius)
 				continue;
 
 			if (camType == CCamera::CAMTYPE_SHADOW && !p->castShadow)
@@ -770,8 +857,10 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			(drawReflection * DrawFlags::SO_REFLEC_FLAG) +
 			(drawRefraction * DrawFlags::SO_REFRAC_FLAG);
 
-		for (auto& dp : drawParticles)
-			dp.clear();
+		sortedParticles.clear();
+		unsortedParticles.clear();
+
+		const uint32_t sortCamType = camera->GetCamType();
 
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
@@ -779,32 +868,30 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 				if (!ShouldDrawProjectile(p, thisPassMask))
 					continue;
 
-				drawParticles[drawSorted && p->drawSorted].emplace_back(p);
+				if (drawSorted && p->drawSorted)
+					sortedParticles.emplace_back(SortableParticle{ p->drawOrder, p->GetSortDist(sortCamType), p });
+				else
+					unsortedParticles.emplace_back(p);
 			}
 		}
-
-		// set static variable to facilite sorting
-		sortCamType = camera->GetCamType();
 
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
 			if (wantDrawOrder)
-				std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileDrawOrderSortingPredicate);
+				std::sort(sortedParticles.begin(), sortedParticles.end(), CProjectileDrawOrderSortingPredicate);
 			else
-				std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileSortingPredicate);
+				std::sort(sortedParticles.begin(), sortedParticles.end(), CProjectileSortingPredicate);
 		}
+
+		const bool threadedFill = (configHandler->GetInt("ProjectileDrawThreadedFill") != 0) && ThreadPool::HasThreads();
 
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
-			for (auto p : drawParticles[ true]) {
-				p->Draw();
-			}
+			FillParticleGeometry(mtFillBuffers, sortedParticles.size(), threadedFill, [this](size_t j) { return sortedParticles[j].proj; });
 		}
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DU)");
-			for (auto p : drawParticles[false]) {
-				p->Draw();
-			}
+			FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill, [this](size_t j) { return unsortedParticles[j]; });
 		}
 	}
 
