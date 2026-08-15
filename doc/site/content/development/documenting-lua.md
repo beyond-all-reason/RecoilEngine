@@ -97,8 +97,7 @@ All files under `/rts/Lua/Library/` are directly copied into the library when th
 - `integer`
 - `table<,>`
 
-{: .note }
-
+> [!NOTE]
 > Literals (e.g. `true`, `false`, `5`) are also available as types. `true` is useful in the case where a table is being used as a set, e.g.
 >
 > ```
