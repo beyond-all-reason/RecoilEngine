@@ -141,9 +141,13 @@ static void FillParticleGeometry(std::vector<TypedRenderBuffer<VA_TYPE_PROJ>>& s
 		if (boundaryProj != nullptr && boundaryProj->mtDrawSafe)
 			continue;
 
-		// [segStart, i) is a contiguous run of MT-safe particles
+		// [segStart, i) is a contiguous run of MT-safe particles.
+		// Per-particle draw cost varies wildly (a smoke trail emits dozens of
+		// quads, a small flash one), so oversubscribe chunks 4x relative to
+		// the worker count; the pool load-balances them and no single heavy
+		// chunk gates the whole dispatch.
 		const size_t segLen = i - segStart;
-		const size_t numChunks = threaded ? std::min<size_t>(ThreadPool::GetNumThreads(), segLen / MT_FILL_MIN_CHUNK_SIZE) : 1;
+		const size_t numChunks = threaded ? std::min<size_t>(ThreadPool::GetNumThreads() * 4, segLen / MT_FILL_MIN_CHUNK_SIZE) : 1;
 
 		if (numChunks < 2) {
 			for (size_t j = segStart; j < i; ++j)
@@ -914,7 +918,17 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 	// own ranges, so the saved range stays valid for the whole frame.
 	const bool mainPass = !drawReflection && !drawRefraction;
 	const bool reuseWanted = (configHandler->GetInt("ProjectileDrawReuseWaterPasses") != 0);
-	const bool reusePass = reuseWanted && mainPass && drawAboveWater && !drawBelowWater && (alphaRangeDrawFrame == globalRendering->drawFrame);
+
+	// the above-water main pass and the water refraction pass both view the
+	// same particles from the player camera; both can re-submit the geometry
+	// saved by the below-water pass with their own clip plane instead of
+	// refilling. (Refraction previously filled only the underwater-flagged
+	// subset; submitting the full range is visually equivalent because the
+	// clip plane discards everything above the surface.) The reflection pass
+	// uses the mirrored camera and must keep building its own billboards.
+	const bool reuseAbove = mainPass && drawAboveWater && !drawBelowWater;
+	const bool reuseRefraction = drawRefraction && !drawReflection;
+	const bool reusePass = reuseWanted && (reuseAbove || reuseRefraction) && (alphaRangeDrawFrame == globalRendering->drawFrame);
 
 	if (!reusePass) {
 		const uint8_t thisPassMask =
