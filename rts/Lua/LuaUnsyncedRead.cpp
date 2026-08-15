@@ -5334,8 +5334,11 @@ int LuaUnsyncedRead::GetSyncedGCInfo(lua_State* L) {
 /***
  *
  * @function Spring.SolveNURBSCurve
- * @param groupID integer
- * @return number[]? unitIDs
+ * @param degree integer Degree of the curve.
+ * @param controlPoints number[] Flat array of `x, y, z, weight` quadruples; its length must be a multiple of 4.
+ * @param knots number[] Knot vector.
+ * @param segments integer Number of segments to evaluate.
+ * @return number[] points Flat array of `x, y, z` triples along the curve.
  */
 int LuaUnsyncedRead::SolveNURBSCurve(lua_State* L)
 {
