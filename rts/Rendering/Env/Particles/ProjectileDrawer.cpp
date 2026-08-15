@@ -45,6 +45,7 @@
 #include "System/Misc/TracyDefs.h"
 
 CONFIG(int, SoftParticles).defaultValue(1).safemodeValue(0).description("Soften up CEG particles on clipping edges");
+CONFIG(int, ProjectileDrawReuseWaterPasses).defaultValue(1).safemodeValue(0).description("When water is visible, reuse the below-water pass' alpha particle geometry for the above-water pass instead of regenerating and re-uploading it. The two passes contain identical geometry by construction; disable to force a full refill per pass.");
 
 static uint32_t sortCamType = 0;
 static bool CProjectileDrawOrderSortingPredicate(const CProjectile* p1, const CProjectile* p2) noexcept {
@@ -753,45 +754,59 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 	};
 	const auto& clipPlane = clipPlanes[1U * drawBelowWater + 2U * drawAboveWater];
 
-	const uint8_t thisPassMask =
-		(1 - (drawReflection || drawRefraction)) * DrawFlags::SO_ALPHAF_FLAG +
-		(drawReflection * DrawFlags::SO_REFLEC_FLAG) +
-		(drawRefraction * DrawFlags::SO_REFRAC_FLAG);
+	// The main view draws alpha particles twice per frame when water is
+	// visible: a below-water pass, then an above-water pass once the water
+	// surface has been drawn. Both passes contain the same particles viewed
+	// from the same camera; only the clip plane differs. Fill and upload the
+	// geometry once in the below-water pass and re-submit the saved range in
+	// the above-water pass. The water reflection/refraction passes that run
+	// in between fill the buffer for their own camera/mask and consume their
+	// own ranges, so the saved range stays valid for the whole frame.
+	const bool mainPass = !drawReflection && !drawRefraction;
+	const bool reuseWanted = (configHandler->GetInt("ProjectileDrawReuseWaterPasses") != 0);
+	const bool reusePass = reuseWanted && mainPass && drawAboveWater && !drawBelowWater && (alphaRangeDrawFrame == globalRendering->drawFrame);
 
-	for (auto& dp : drawParticles)
-		dp.clear();
+	if (!reusePass) {
+		const uint8_t thisPassMask =
+			(1 - (drawReflection || drawRefraction)) * DrawFlags::SO_ALPHAF_FLAG +
+			(drawReflection * DrawFlags::SO_REFLEC_FLAG) +
+			(drawRefraction * DrawFlags::SO_REFRAC_FLAG);
 
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
-		for (CProjectile* p : renderProjectiles) {
-			if (!ShouldDrawProjectile(p, thisPassMask))
-				continue;
+		for (auto& dp : drawParticles)
+			dp.clear();
 
-			drawParticles[drawSorted && p->drawSorted].emplace_back(p);
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
+			for (CProjectile* p : renderProjectiles) {
+				if (!ShouldDrawProjectile(p, thisPassMask))
+					continue;
+
+				drawParticles[drawSorted && p->drawSorted].emplace_back(p);
+			}
 		}
-	}
 
-	// set static variable to facilite sorting
-	sortCamType = camera->GetCamType();
+		// set static variable to facilite sorting
+		sortCamType = camera->GetCamType();
 
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
-		if (wantDrawOrder)
-			std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileDrawOrderSortingPredicate);
-		else
-			std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileSortingPredicate);
-	}
-
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
-		for (auto p : drawParticles[ true]) {
-			p->Draw();
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
+			if (wantDrawOrder)
+				std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileDrawOrderSortingPredicate);
+			else
+				std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileSortingPredicate);
 		}
-	}
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(DU)");
-		for (auto p : drawParticles[false]) {
-			p->Draw();
+
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
+			for (auto p : drawParticles[ true]) {
+				p->Draw();
+			}
+		}
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DU)");
+			for (auto p : drawParticles[false]) {
+				p->Draw();
+			}
 		}
 	}
 
@@ -810,7 +825,18 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		eventHandler.DrawWorldPreParticles(drawAboveWater, drawBelowWater, drawReflection, drawRefraction);
 
 		auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
-		if (!rb.ShouldSubmit())
+
+		if (reuseWanted && mainPass && drawBelowWater && !drawAboveWater) {
+			// an above-water pass will follow this frame; remember what to re-draw
+			const auto pendingRange = rb.GetPendingElemsRange();
+			alphaRangeStart = pendingRange.first;
+			alphaRangeCount = pendingRange.second;
+			alphaRangeDrawFrame = globalRendering->drawFrame;
+		}
+
+		const bool haveRangeToRedraw = (reusePass && alphaRangeCount > 0);
+
+		if (!haveRangeToRedraw && !rb.ShouldSubmit())
 			return;
 
 		const bool needSoften = (wantSoften > 0) && !drawReflection && !drawRefraction;
@@ -835,7 +861,16 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		fxShader->SetUniform("fogColor", sky->fogColor.x, sky->fogColor.y, sky->fogColor.z);
 		fxShader->SetUniform("fogParams", sky->fogStart * camPlayer->GetFarPlaneDist(), sky->fogEnd * camPlayer->GetFarPlaneDist());
 
-		rb.DrawElements(GL_TRIANGLES);
+		if (reusePass) {
+			rb.DrawElementsRange(GL_TRIANGLES, alphaRangeStart, alphaRangeCount);
+			// consume anything appended since the range was saved (e.g. by the
+			// DrawWorldPreParticles handlers above), so it cannot leak into a
+			// later submit running a different shader
+			if (rb.ShouldSubmit())
+				rb.DrawElements(GL_TRIANGLES);
+		} else {
+			rb.DrawElements(GL_TRIANGLES);
+		}
 
 		fxShader->Disable();
 

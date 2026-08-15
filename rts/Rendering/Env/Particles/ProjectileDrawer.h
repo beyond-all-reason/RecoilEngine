@@ -170,6 +170,12 @@ private:
 	/// used to render particle effects in back-to-front order. {unsorted, sorted}
 	std::array<std::vector<CProjectile*>, 2> drawParticles;
 
+	/// geometry range submitted by the below-water alpha pass, re-drawn by the
+	/// above-water pass of the same frame instead of refilling the buffer
+	size_t alphaRangeStart = 0;
+	size_t alphaRangeCount = 0;
+	unsigned int alphaRangeDrawFrame = 0;
+
 	bool drawSorted = true;
 
 	Shader::IProgramObject* fxShader = nullptr;
