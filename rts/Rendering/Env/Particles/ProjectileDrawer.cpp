@@ -49,18 +49,76 @@ CONFIG(float, ProjectileReflectionMinRadius).defaultValue(0.0f).minimumValue(0.0
 CONFIG(int, ProjectileDrawThreadedFill).defaultValue(1).safemodeValue(0).description("Generate alpha-particle geometry on the ThreadPool workers instead of the render thread. Draw order is preserved; the few particle types whose Draw is not thread-safe stay on the render thread.");
 CONFIG(int, ProjectileDrawReuseWaterPasses).defaultValue(1).safemodeValue(0).description("When water is visible, reuse the below-water pass' alpha particle geometry for the above-water pass instead of regenerating and re-uploading it. The two passes contain identical geometry by construction; disable to force a full refill per pass.");
 
-// sort keys are snapshotted into SortableParticle at fill time, so the
-// comparators run on a contiguous array instead of dereferencing two
-// CProjectile pointers (= two likely cache misses) per comparison
+// sort keys are snapshotted into SortableParticle at fill time, so sorting
+// works on a contiguous array instead of dereferencing two CProjectile
+// pointers (= two likely cache misses) per comparison
 using SortableParticle = CProjectileDrawer::SortableParticle;
 
-static bool CProjectileDrawOrderSortingPredicate(const SortableParticle& a, const SortableParticle& b) noexcept {
-	return std::forward_as_tuple(b.drawOrder, a.sortDist, a.proj) > std::forward_as_tuple(a.drawOrder, b.sortDist, b.proj);
+// maps a float to an unsigned int with the same ordering (for non-NaN),
+// inverted so that LARGER distances get SMALLER keys (back-to-front when
+// sorting ascending)
+static inline uint32_t DistanceSortKey(float dist) noexcept
+{
+	uint32_t u = std::bit_cast<uint32_t>(dist);
+	u ^= static_cast<uint32_t>(static_cast<int32_t>(u) >> 31) | 0x80000000u;
+	return ~u;
 }
 
-static bool CProjectileSortingPredicate(const SortableParticle& a, const SortableParticle& b) noexcept {
-	return std::forward_as_tuple(a.sortDist, a.proj) > std::forward_as_tuple(b.sortDist, b.proj);
-};
+// ascending == draw order: drawOrder asc (high 32 bits), distance desc
+static inline uint64_t ParticleSortKey(const CProjectile* p, uint32_t camType, bool useDrawOrder) noexcept
+{
+	const uint64_t orderKey = useDrawOrder ? (static_cast<uint32_t>(p->drawOrder) ^ 0x80000000u) : 0u;
+	return (orderKey << 32) | DistanceSortKey(p->GetSortDist(camType));
+}
+
+// Stable LSD radix sort on sortKey; O(n) with a deterministic per-frame cost,
+// unlike a comparison sort whose runtime varies with the input distribution.
+// Passes whose key byte is identical across all elements (e.g. the drawOrder
+// half when no particle uses it) are skipped. Stability means equal-key
+// particles (exactly coincident ones) keep their fill order, which is frame
+// coherent; the previous comparison sort tiebroke them by pointer address.
+static void SortParticles(std::vector<SortableParticle>& elems, std::vector<SortableParticle>& scratch)
+{
+	const size_t n = elems.size();
+
+	// below this the O(n log n) sort wins over 8x histogram+scatter passes
+	if (n < 1024) {
+		std::sort(elems.begin(), elems.end(), [](const SortableParticle& a, const SortableParticle& b) noexcept { return a.sortKey < b.sortKey; });
+		return;
+	}
+
+	scratch.resize(n);
+
+	SortableParticle* src = elems.data();
+	SortableParticle* dst = scratch.data();
+
+	for (uint32_t shift = 0; shift < 64; shift += 8) {
+		size_t bucketOffsets[256] = { 0 };
+
+		for (size_t i = 0; i < n; ++i)
+			bucketOffsets[(src[i].sortKey >> shift) & 0xFF] += 1;
+
+		// this byte is identical across all keys; nothing to reorder
+		if (std::any_of(std::begin(bucketOffsets), std::end(bucketOffsets), [n](size_t c) { return c == n; }))
+			continue;
+
+		// exclusive prefix sum: counts -> output offsets
+		size_t sum = 0;
+		for (size_t b = 0; b < 256; ++b) {
+			const size_t count = bucketOffsets[b];
+			bucketOffsets[b] = sum;
+			sum += count;
+		}
+
+		for (size_t i = 0; i < n; ++i)
+			dst[bucketOffsets[(src[i].sortKey >> shift) & 0xFF]++] = src[i];
+
+		std::swap(src, dst);
+	}
+
+	if (src != elems.data())
+		std::copy(src, src + n, elems.data());
+}
 
 // with fewer particles per chunk the for_mt dispatch overhead exceeds the
 // quad-generation work being distributed
@@ -434,6 +492,7 @@ void CProjectileDrawer::Kill() {
 	renderProjectiles.clear();
 
 	sortedParticles.clear();
+	sortScratch.clear();
 	unsortedParticles.clear();
 	mtFillBuffers.clear();
 
@@ -867,6 +926,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		unsortedParticles.clear();
 
 		const uint32_t sortCamType = camera->GetCamType();
+		const bool useDrawOrder = wantDrawOrder;
 
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
@@ -875,7 +935,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 					continue;
 
 				if (drawSorted && p->drawSorted)
-					sortedParticles.emplace_back(SortableParticle{ p->drawOrder, p->GetSortDist(sortCamType), p });
+					sortedParticles.emplace_back(SortableParticle{ ParticleSortKey(p, sortCamType, useDrawOrder), p });
 				else
 					unsortedParticles.emplace_back(p);
 			}
@@ -883,10 +943,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
-			if (wantDrawOrder)
-				std::sort(sortedParticles.begin(), sortedParticles.end(), CProjectileDrawOrderSortingPredicate);
-			else
-				std::sort(sortedParticles.begin(), sortedParticles.end(), CProjectileSortingPredicate);
+			SortParticles(sortedParticles, sortScratch);
 		}
 
 		const bool threadedFill = (configHandler->GetInt("ProjectileDrawThreadedFill") != 0) && ThreadPool::HasThreads();

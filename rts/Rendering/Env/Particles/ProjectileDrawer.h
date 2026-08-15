@@ -169,16 +169,19 @@ private:
 
 public:
 	struct SortableParticle {
-		int drawOrder;
-		float sortDist;
+		// drawOrder and view distance packed into one integer so that an
+		// ascending sort yields the draw order (drawOrder asc, distance desc)
+		uint64_t sortKey;
 		CProjectile* proj;
 	};
 
 private:
 	/// alpha particles drawn back-to-front; sort keys are snapshotted at fill
-	/// time so sorting compares a contiguous 16-byte array instead of chasing
+	/// time so sorting works on a contiguous 16-byte array instead of chasing
 	/// projectile pointers
 	std::vector<SortableParticle> sortedParticles;
+	/// ping-pong buffer for the radix sort passes
+	std::vector<SortableParticle> sortScratch;
 	/// alpha particles that opt out of sorting, drawn after the sorted ones
 	std::vector<CProjectile*> unsortedParticles;
 
