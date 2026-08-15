@@ -134,8 +134,7 @@ An array type is expressed as `type[]`.
 - Specify return type with `@return type name Description...`
 - For multiple returns use one per line.
 
-{: .warning }
-
+> [!WARNING]
 > `@return` must specify the type _before_ the name, whereas `@param` takes the name before the type.
 
 ````cpp
