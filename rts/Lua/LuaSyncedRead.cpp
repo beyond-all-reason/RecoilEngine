@@ -3345,6 +3345,7 @@ int LuaSyncedRead::GetUnitNearestAlly(lua_State* L)
  * @param useLOS boolean? (Default: `true`) requires LOS/radar visibility of allied team.
  * @param sphereDistTest boolean? (Default: `false`) determines if using spherical(3D, includes target radius) or cylindrical(2D) search.
  * @param checkSightDist boolean? (Default: `false`) determine if during filter process, if candidate distance to be within candidate LOS radius.
+ * @return integer? unitID
  */
 int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 {
@@ -4583,6 +4584,7 @@ int LuaSyncedRead::GetUnitVelocity(lua_State* L)
  *
  * @function Spring.GetUnitBuildFacing
  * @param unitID integer
+ * @return FacingInteger? buildFacing facing of footprint, `0` - `3`
  */
 int LuaSyncedRead::GetUnitBuildFacing(lua_State* L)
 {
@@ -4777,6 +4779,7 @@ int LuaSyncedRead::GetUnitEffectiveBuildRange(lua_State* L)
  *
  * @function Spring.GetUnitCurrentBuildPower
  * @param unitID integer
+ * @return number? buildPower `nil` if the unit is neither a builder nor a factory.
  */
 int LuaSyncedRead::GetUnitCurrentBuildPower(lua_State* L)
 {
@@ -4835,11 +4838,10 @@ int LuaSyncedRead::GetUnitHarvestStorage(lua_State* L)
  *
  * @function Spring.GetUnitBuildParams
  * @param unitID integer
- * @param paramName string One of `buildRange`, `buildDistance`, or `buildRange3D`.
- * @return number|boolean|nil value
- *
- * Returns no value when the unit is not an allied builder or when `paramName`
- * is not recognized.
+ * @param paramName "buildRange"|"buildDistance"|"buildRange3D" The build param to get
+ * @return number|boolean|nil value number for `"buildRange"` or `"buildDistance"`,
+ * boolean for `"buildRange3D"`, otherwise `nil` for unrecognized paramName or not
+ * allied builder unit.
  */
 int LuaSyncedRead::GetUnitBuildParams(lua_State* L)
 {
@@ -5038,7 +5040,22 @@ int LuaSyncedRead::GetUnitShieldState(lua_State* L)
 /***
  *
  * @function Spring.GetUnitFlanking
+ *
+ * When called without a key, returns every value. When called with one of
+ * `"mode"`, `"moveFactor"`, `"minDamage"` or `"maxDamage"` returns just that
+ * single number, and with `"dir"` returns just `dirX`, `dirY`, `dirZ`.
+ *
  * @param unitID integer
+ * @return number mode
+ * @return number moveFactor
+ * @return number minDamage
+ * @return number maxDamage
+ * @return number dirX
+ * @return number dirY
+ * @return number dirZ
+ * @return number mobility The amount of mobility the unit has collected up to now.
+ * @overload fun(unitID: integer, param: "mode"|"moveFactor"|"minDamage"|"maxDamage"): number
+ * @overload fun(unitID: integer, param: "dir"): number, number, number
  */
 int LuaSyncedRead::GetUnitFlanking(lua_State* L)
 {
@@ -5851,6 +5868,7 @@ int LuaSyncedRead::GetUnitEstimatedPath(lua_State* L)
  *
  * @function Spring.GetUnitLastAttacker
  * @param unitID integer
+ * @return integer? attackerUnitID `nil` if the unit has no last attacker or the attacker is not visible.
  */
 int LuaSyncedRead::GetUnitLastAttacker(lua_State* L)
 {
@@ -6050,6 +6068,7 @@ int LuaSyncedRead::GetUnitDefDimensions(lua_State* L)
 /***
  *
  * @function Spring.GetCEGID
+ * @return integer cegID
  */
 int LuaSyncedRead::GetCEGID(lua_State* L)
 {
@@ -6518,6 +6537,12 @@ int LuaSyncedRead::GetFactoryCommandCount(lua_State* L)
  *
  * @function Spring.GetFactoryBuggerOff
  * @param unitID integer
+ * @return boolean? boPerform `nil` if the unit does not exist or is not a factory.
+ * @return number boOffset
+ * @return number boRadius
+ * @return number boRelHeading
+ * @return boolean boSherical
+ * @return boolean boForced
  */
 int LuaSyncedRead::GetFactoryBuggerOff(lua_State* L)
 {
@@ -7116,6 +7141,7 @@ int LuaSyncedRead::GetFeatureVelocity(lua_State* L)
  *
  * @function Spring.GetFeatureHeading
  * @param featureID integer
+ * @return number? heading
  */
 int LuaSyncedRead::GetFeatureHeading(lua_State* L)
 {

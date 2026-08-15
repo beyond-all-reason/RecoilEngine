@@ -793,6 +793,7 @@ int LuaShaders::CreateShader(lua_State* L)
  *
  * @function gl.DeleteShader
  * @param shaderID integer
+ * @return boolean? deleted `nil` if `shaderID` is `nil`.
  */
 int LuaShaders::DeleteShader(lua_State* L)
 {

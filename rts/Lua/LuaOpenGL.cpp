@@ -1187,6 +1187,7 @@ int LuaOpenGL::GetNumber(lua_State* L)
  * Get a string describing the current OpenGL connection.
  * @function gl.GetString
  * @param pname GL
+ * @return string value `"[NULL]"` if the driver returns no string for `pname`.
  */
 int LuaOpenGL::GetString(lua_State* L)
 {
@@ -6123,6 +6124,7 @@ int LuaOpenGL::GetFixedState(lua_State* L)
  * @function gl.CreateList
  * @param func fun()
  * @param ... any Arguments to the function.
+ * @return integer listID `0` if the list could not be generated or `func` errored.
  */
 int LuaOpenGL::CreateList(lua_State* L)
 {

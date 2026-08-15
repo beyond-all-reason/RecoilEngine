@@ -3530,6 +3530,7 @@ int LuaUnsyncedRead::GetSoundStreamTime(lua_State* L)
 /***
  *
  * @function Spring.GetSoundEffectParams
+ * @return table? soundEffectParams `nil` on headless/no-sound builds or when EFX is unsupported.
  */
 int LuaUnsyncedRead::GetSoundEffectParams(lua_State* L)
 {

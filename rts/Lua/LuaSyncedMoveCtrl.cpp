@@ -208,6 +208,7 @@ int LuaSyncedMoveCtrl::SetTag(lua_State* L)
 /***
  * @function MoveCtrl.GetTag
  * @param tag integer?
+ * @return integer? tag `nil` if the unit is not using a script move type.
  */
 int LuaSyncedMoveCtrl::GetTag(lua_State* L)
 {
