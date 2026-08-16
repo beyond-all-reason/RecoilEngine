@@ -40,6 +40,9 @@
 #include "System/Sound/ISound.h"
 #include "System/Sound/ISoundChannels.h"
 
+#include <cstdlib>
+#include <set>
+
 #include <SDL_mouse.h>
 #include <SDL_keycode.h>
 
@@ -108,6 +111,9 @@ CSelectedUnitsHandler::AvailableCommandsStruct CSelectedUnitsHandler::GetAvailab
 				states[cmdDesc->id] = 0;
 			else
 				states[cmdDesc->id] = cmdDesc->disabled ? 2 : 1;
+
+			if (cmdDesc->type == CMDTYPE_ICON_MODE && !cmdDesc->params.empty())
+				ac.presentModes[cmdDesc->id].insert(atoi(cmdDesc->params[0].c_str()));
 		}
 
 		if (cai->lastSelectedCommandPage < ac.commandPage)
