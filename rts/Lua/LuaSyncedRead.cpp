@@ -3673,10 +3673,10 @@ int LuaSyncedRead::ValidUnitID(lua_State* L)
  * @x_helper
  * @field firestate number
  * @field movestate number
- * @field repeat boolean
- * @field cloak boolean
- * @field active boolean
- * @field trajectory boolean
+ * @field repeat boolean?
+ * @field cloak boolean?
+ * @field active boolean?
+ * @field trajectory boolean?
  * @field autoland boolean?
  * @field autorepairlevel number?
  * @field loopbackattack boolean?
@@ -3685,12 +3685,26 @@ int LuaSyncedRead::ValidUnitID(lua_State* L)
 
 /***
  *
+ * Gets various states for the given unit.
+ *
  * @function Spring.GetUnitStates
  * @param unitID integer
- * @param retTable boolean?
- * @param binState boolean?
- * @param amtState boolean?
- * @return UnitState
+ * @param retTable false Return a table instead of multiple values. Defaults to `true`
+ * @param binState true Include binary state (activated, etc)? Defaults to `retTable`
+ * @param amtState true Include Air/Hover MoveType state if available? Defaults to `retTable`
+ * @return number fireState
+ * @return number moveState
+ * @return number autorepairlevel `-1` if not set
+ * @return boolean repeat
+ * @return boolean cloak
+ * @return boolean active
+ * @return boolean trajectory
+ * @return boolean? autoLand
+ * @return boolean? loopbackAttack
+ * @overload fun(unitID: integer, retTable: false, binState: false?, amtState: false?): number, number, number
+ * @overload fun(unitID: integer, retTable: false, binState: true, amtState: false?): number, number, number, boolean, boolean, boolean, boolean
+ * @overload fun(unitID: integer, retTable: false, binState: false?, amtState: true): number, number, number, boolean?, boolean?
+ * @overload fun(unitID: integer, retTable: true?, binState: boolean?, amtState: boolean?): UnitState
  */
 int LuaSyncedRead::GetUnitStates(lua_State* L)
 {
