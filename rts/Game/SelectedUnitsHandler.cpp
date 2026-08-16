@@ -93,10 +93,10 @@ CSelectedUnitsHandler::AvailableCommandsStruct CSelectedUnitsHandler::GetAvailab
 	RECOIL_DETAILED_TRACY_ZONE;
 	possibleCommandsChanged = false;
 
-	int commandPage = 1000;
+	AvailableCommandsStruct ac;
+	ac.commandPage = 1000;
 
 	spring::unordered_map<int, int> states;
-	std::vector<SCommandDescription> commands;
 
 	for (const int unitID: selectedUnits) {
 		const CUnit* u = unitHandler.GetUnit(unitID);
@@ -110,8 +110,8 @@ CSelectedUnitsHandler::AvailableCommandsStruct CSelectedUnitsHandler::GetAvailab
 				states[cmdDesc->id] = cmdDesc->disabled ? 2 : 1;
 		}
 
-		if (cai->lastSelectedCommandPage < commandPage)
-			commandPage = cai->lastSelectedCommandPage;
+		if (cai->lastSelectedCommandPage < ac.commandPage)
+			ac.commandPage = cai->lastSelectedCommandPage;
 	}
 
 	// load the first set (separating build and non-build commands)
@@ -126,7 +126,7 @@ CSelectedUnitsHandler::AvailableCommandsStruct CSelectedUnitsHandler::GetAvailab
 
 			// Prevent duplicates across different units.
 			if (states[cmdDesc->id] > 0) {
-				commands.push_back(*cmdDesc);
+				ac.commands.push_back(*cmdDesc);
 				states[cmdDesc->id] = 0;
 			}
 		}
@@ -142,15 +142,12 @@ CSelectedUnitsHandler::AvailableCommandsStruct CSelectedUnitsHandler::GetAvailab
 				continue;
 
 			if (states[cmdDesc->id] > 0) {
-				commands.push_back(*cmdDesc);
+				ac.commands.push_back(*cmdDesc);
 				states[cmdDesc->id] = 0;
 			}
 		}
 	}
 
-	AvailableCommandsStruct ac;
-	ac.commandPage = commandPage;
-	ac.commands = commands;
 	return ac;
 }
 
