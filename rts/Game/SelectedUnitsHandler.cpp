@@ -120,6 +120,25 @@ CSelectedUnitsHandler::AvailableCommandsStruct CSelectedUnitsHandler::GetAvailab
 			ac.commandPage = cai->lastSelectedCommandPage;
 	}
 
+	/* selectedUnits is unordered, so taking any one unit's value would let the
+	 * same selection answer differently between rebuilds; the lowest is stable */
+	const auto PushCommand = [&](const SCommandDescription* cmdDesc) {
+		ac.commands.push_back(*cmdDesc);
+		states[cmdDesc->id] = 0;
+
+		const auto it = ac.presentModes.find(cmdDesc->id);
+
+		if (it == ac.presentModes.end() || it->second.empty())
+			return;
+
+		SCommandDescription& cd = ac.commands.back();
+
+		if (cd.type != CMDTYPE_ICON_MODE || cd.params.empty())
+			return;
+
+		cd.params[0] = IntToString(*it->second.begin());
+	};
+
 	// load the first set (separating build and non-build commands)
 	for (const int unitID: selectedUnits) {
 		const CUnit* u = unitHandler.GetUnit(unitID);
@@ -131,10 +150,8 @@ CSelectedUnitsHandler::AvailableCommandsStruct CSelectedUnitsHandler::GetAvailab
 				continue;
 
 			// Prevent duplicates across different units.
-			if (states[cmdDesc->id] > 0) {
-				ac.commands.push_back(*cmdDesc);
-				states[cmdDesc->id] = 0;
-			}
+			if (states[cmdDesc->id] > 0)
+				PushCommand(cmdDesc);
 		}
 	}
 
@@ -147,10 +164,8 @@ CSelectedUnitsHandler::AvailableCommandsStruct CSelectedUnitsHandler::GetAvailab
 			if (buildIconsFirst != (cmdDesc->id >= 0))
 				continue;
 
-			if (states[cmdDesc->id] > 0) {
-				ac.commands.push_back(*cmdDesc);
-				states[cmdDesc->id] = 0;
-			}
+			if (states[cmdDesc->id] > 0)
+				PushCommand(cmdDesc);
 		}
 	}
 
