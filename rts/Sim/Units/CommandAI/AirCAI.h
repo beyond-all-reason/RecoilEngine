@@ -29,6 +29,7 @@ public:
 	void ExecuteGuard(Command& c) override;
 	void ExecuteAreaAttack(Command& c);
 	void ExecuteAttack(Command& c) override;
+	bool ExecuteAttackTargets(Command& c) override;
 	void ExecuteFight(Command& c) override;
 	void ExecuteMove(Command& c) override;
 

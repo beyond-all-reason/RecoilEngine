@@ -34,6 +34,16 @@ static const CUnit* GetTrackableUnit(const CUnit* caiOwner, const CUnit* cmdUnit
 	return cmdUnit;
 }
 
+static void DrawAttackTargets(const Command& command, const CUnit* owner, unsigned int firstTargetIndex = 0)
+{
+	for (unsigned int p = firstTargetIndex; p < command.GetNumParams(); ++p) {
+		const CUnit* unit = GetTrackableUnit(owner, unitHandler.GetUnit(command.GetParam(p)));
+
+		if (unit != nullptr)
+			lineDrawer.DrawLineAndIcon(CMD_ATTACK_TARGETS, unit->GetObjDrawErrorPos(owner->allyteam), cmdColors.attack);
+	}
+}
+
 CommandDrawer* CommandDrawer::GetInstance() {
 	// luaQueuedUnitSet gets cleared each frame, so this is fine wrt. reloading
 	static CommandDrawer drawer;
@@ -112,6 +122,10 @@ void CommandDrawer::DrawCommands(const CCommandAI* cai, int queueDrawDepth) cons
 		const int cmdID = ci->GetID();
 
 		switch (cmdID) {
+			case CMD_ATTACK_TARGETS: {
+				const unsigned int firstTargetIndex = (ci == commandQue.begin()) ? cai->GetAttackTargetDrawIndex() : 0;
+				DrawAttackTargets(*ci, owner, firstTargetIndex);
+			} break;
 			case CMD_ATTACK:
 			case CMD_MANUALFIRE: {
 				if (ci->GetNumParams() == 1) {
@@ -169,6 +183,10 @@ void CommandDrawer::DrawAirCAICommands(const CAirCAI* cai, int queueDrawDepth) c
 		const int cmdID = ci->GetID();
 
 		switch (cmdID) {
+			case CMD_ATTACK_TARGETS: {
+				const unsigned int firstTargetIndex = (ci == commandQue.begin()) ? cai->GetAttackTargetDrawIndex() : 0;
+				DrawAttackTargets(*ci, owner, firstTargetIndex);
+			} break;
 			case CMD_MOVE: {
 				lineDrawer.DrawLineAndIcon(cmdID, ci->GetPos(0), cmdColors.move);
 			} break;
@@ -274,6 +292,10 @@ void CommandDrawer::DrawBuilderCAICommands(const CBuilderCAI* cai, int queueDraw
 		}
 
 		switch (cmdID) {
+			case CMD_ATTACK_TARGETS: {
+				const unsigned int firstTargetIndex = (ci == commandQue.begin()) ? cai->GetAttackTargetDrawIndex() : 0;
+				DrawAttackTargets(*ci, owner, firstTargetIndex);
+			} break;
 			case CMD_MOVE: {
 				lineDrawer.DrawLineAndIcon(cmdID, ci->GetPos(0), cmdColors.move);
 			} break;
@@ -426,6 +448,9 @@ void CommandDrawer::DrawFactoryCAICommands(const CFactoryCAI* cai, int queueDraw
 		const int cmdID = ci->GetID();
 
 		switch (cmdID) {
+			case CMD_ATTACK_TARGETS: {
+				DrawAttackTargets(*ci, owner);
+			} break;
 			case CMD_MOVE: {
 				lineDrawer.DrawLineAndIcon(cmdID, ci->GetPos(0) + UpVector * 3.0f, cmdColors.move);
 			} break;
@@ -514,6 +539,10 @@ void CommandDrawer::DrawMobileCAICommands(const CMobileCAI* cai, int queueDrawDe
 		const int cmdID = ci->GetID();
 
 		switch (cmdID) {
+			case CMD_ATTACK_TARGETS: {
+				const unsigned int firstTargetIndex = (ci == commandQue.begin()) ? cai->GetAttackTargetDrawIndex() : 0;
+				DrawAttackTargets(*ci, owner, firstTargetIndex);
+			} break;
 			case CMD_MOVE: {
 				lineDrawer.DrawLineAndIcon(cmdID, ci->GetPos(0), cmdColors.move);
 			} break;
@@ -797,4 +826,3 @@ void CommandDrawer::DrawQuedBuildingSquares(const CBuilderCAI* cai) const
 		glDisableClientState(GL_VERTEX_ARRAY);
 	}
 }
-

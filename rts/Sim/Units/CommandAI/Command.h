@@ -24,6 +24,7 @@ static constexpr int CMD_PATROL              =  15;
 static constexpr int CMD_FIGHT               =  16;
 static constexpr int CMD_ATTACK              =  20;
 static constexpr int CMD_AREA_ATTACK         =  21;
+static constexpr int CMD_ATTACK_TARGETS      =  22;
 static constexpr int CMD_GUARD               =  25;
 static constexpr int CMD_GROUPSELECT         =  35;
 static constexpr int CMD_GROUPADD            =  36;
@@ -310,6 +311,7 @@ public:
 		switch (GetID()) {
 			case CMD_AREA_ATTACK:
 			case CMD_ATTACK:
+			case CMD_ATTACK_TARGETS:
 			case CMD_CAPTURE:
 			case CMD_FIGHT:
 			case CMD_GUARD:
@@ -344,7 +346,7 @@ public:
 	}
 
 	bool IsAttackCommand() const {
-		return (GetID() == CMD_ATTACK || GetID() == CMD_AREA_ATTACK || GetID() == CMD_FIGHT);
+		return (GetID() == CMD_ATTACK || GetID() == CMD_AREA_ATTACK || GetID() == CMD_ATTACK_TARGETS || GetID() == CMD_FIGHT);
 	}
 
 	bool IsAreaCommand() const {
@@ -454,4 +456,3 @@ private:
 };
 
 #endif // COMMAND_H
-

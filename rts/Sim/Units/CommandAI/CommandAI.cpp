@@ -4,6 +4,7 @@
 #include "CommandAI.h"
 
 #include "BuilderCAI.h"
+#include "CommandTargetList.h"
 #include "FactoryCAI.h"
 #include "ExternalAI/EngineOutHandler.h"
 #include "ExternalAI/SkirmishAIHandler.h"
@@ -76,6 +77,7 @@ CR_REG_METADATA(CCommandAI, (
 	CR_MEMBER(repeatOrders),
 	CR_MEMBER(lastSelectedCommandPage),
 	CR_MEMBER(inCommand),
+	CR_MEMBER(attackTargetIndex),
 	CR_MEMBER(commandDeathDependences),
 	CR_MEMBER(targetLostTimer),
 
@@ -93,7 +95,8 @@ CCommandAI::CCommandAI():
 	inCommand(CMD_STOP),
 	repeatOrders(false),
 	lastSelectedCommandPage(0),
-	targetLostTimer(TARGET_LOST_TIMER)
+	targetLostTimer(TARGET_LOST_TIMER),
+	attackTargetIndex(0)
 {}
 
 CCommandAI::CCommandAI(CUnit* owner):
@@ -107,7 +110,8 @@ CCommandAI::CCommandAI(CUnit* owner):
 	inCommand(CMD_STOP),
 	repeatOrders(false),
 	lastSelectedCommandPage(0),
-	targetLostTimer(TARGET_LOST_TIMER)
+	targetLostTimer(TARGET_LOST_TIMER),
+	attackTargetIndex(0)
 {
 	{
 		SCommandDescription c;
@@ -710,6 +714,20 @@ bool CCommandAI::AllowedCommand(const Command& c, bool fromSynced)
 			}
 		} break;
 
+		case CMD_ATTACK_TARGETS: {
+			if (!IsAttackCapable() || c.IsEmptyCommand())
+				return false;
+
+			for (unsigned int p = 0; p < c.GetNumParams(); ++p) {
+				const CUnit* attackee = GetCommandUnit(c, p);
+
+				if (attackee != nullptr && attackee != owner)
+					return true;
+			}
+
+			return false;
+		} break;
+
 		case CMD_MOVE: {
 			if (!ud->canmove)
 				return false;
@@ -821,11 +839,69 @@ void CCommandAI::GiveCommand(const Command& c, bool fromSynced)
 void CCommandAI::GiveCommand(const Command& c, int playerNum, bool fromSynced, bool fromLua)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!eventHandler.AllowCommand(owner, c, playerNum, fromSynced, fromLua))
+
+	const bool directTargetList = (c.GetID() == CMD_ATTACK_TARGETS);
+	const bool insertedTargetList = (
+		c.GetID() == CMD_INSERT &&
+		c.GetNumParams() >= 3 &&
+		static_cast<int>(c.GetParam(1)) == CMD_ATTACK_TARGETS
+	);
+
+	if (!directTargetList && !insertedTargetList) {
+		if (!eventHandler.AllowCommand(owner, c, playerNum, fromSynced, fromLua))
+			return;
+
+		eventHandler.UnitCommand(owner, c, playerNum, fromSynced, fromLua);
+		GiveCommandReal(c, fromSynced); // send to the sub-classes
+		return;
+	}
+
+	// Preserve the AllowCommand behavior of the equivalent series of ordinary
+	// unit-target attack commands. This lets games reject or transform targets
+	// individually while retaining one command in the engine queue.
+	Command filteredCommand(c.GetID(), c.GetOpts());
+	filteredCommand.SetAICmdID(c.GetID(true));
+	filteredCommand.SetFlags(c.GetTimeOut(), c.GetTag(), c.GetOpts());
+
+	const unsigned int firstTargetParam = insertedTargetList ? 3 : 0;
+	if (insertedTargetList) {
+		filteredCommand.PushParam(c.GetParam(0));
+		filteredCommand.PushParam(c.GetParam(1));
+		filteredCommand.PushParam(c.GetParam(2));
+	}
+
+	for (unsigned int p = firstTargetParam; p < c.GetNumParams(); ++p) {
+		Command attackCommand(CMD_ATTACK, c.GetOpts(), c.GetParam(p));
+
+		if (insertedTargetList) {
+			Command insertCommand(CMD_INSERT, c.GetOpts());
+			insertCommand.PushParam(c.GetParam(0));
+			insertCommand.PushParam(CMD_ATTACK);
+			insertCommand.PushParam(c.GetParam(2));
+			insertCommand.PushParam(c.GetParam(p));
+
+			if (!eventHandler.AllowCommand(owner, insertCommand, playerNum, fromSynced, fromLua))
+				continue;
+		} else {
+			// A non-queued list represents an immediate first attack followed by
+			// queued attacks, matching how area-attack widgets issued the series.
+			if (p != firstTargetParam)
+				attackCommand.SetOpts(attackCommand.GetOpts() | SHIFT_KEY);
+
+			if (!eventHandler.AllowCommand(owner, attackCommand, playerNum, fromSynced, fromLua))
+				continue;
+		}
+
+		filteredCommand.PushParam(c.GetParam(p));
+	}
+
+	if (filteredCommand.GetNumParams() == firstTargetParam)
+		return;
+	if (!eventHandler.AllowCommand(owner, filteredCommand, playerNum, fromSynced, fromLua))
 		return;
 
-	eventHandler.UnitCommand(owner, c, playerNum, fromSynced, fromLua);
-	GiveCommandReal(c, fromSynced); // send to the sub-classes
+	eventHandler.UnitCommand(owner, filteredCommand, playerNum, fromSynced, fromLua);
+	GiveCommandReal(filteredCommand, fromSynced); // send to the sub-classes
 }
 
 
@@ -950,7 +1026,7 @@ bool CCommandAI::ExecuteStateCommand(const Command& c)
 void CCommandAI::ClearTargetLock(const Command &c) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// if no meta-bit attack lock, clear the order
-	if (((c.GetID() == CMD_ATTACK) || (c.GetID() == CMD_MANUALFIRE)) && (c.GetOpts() & META_KEY) == 0)
+	if (((c.GetID() == CMD_ATTACK) || (c.GetID() == CMD_ATTACK_TARGETS) || (c.GetID() == CMD_MANUALFIRE)) && (c.GetOpts() & META_KEY) == 0)
 		owner->DropCurrentAttackTarget();
 }
 
@@ -1053,7 +1129,7 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 	if (!GetOverlapQueued(c).empty())
 		return;
 
-	if (c.GetID() == CMD_ATTACK) {
+	if (c.GetID() == CMD_ATTACK || c.GetID() == CMD_ATTACK_TARGETS) {
 		// avoid weaponless units moving to 0 distance when given attack order
 		if (owner->weapons.empty() && (!owner->unitDef->canKamikaze)) {
 			commandQue.push_back(Command(CMD_STOP));
@@ -1324,6 +1400,12 @@ CCommandQueue::const_iterator CCommandAI::GetCancelQueued(const Command& c, cons
 
 		if (c2.GetNumParams() != c.GetNumParams())
 			continue;
+		if (cmdID == CMD_ATTACK_TARGETS && cmd2ID == CMD_ATTACK_TARGETS) {
+			if (CommandTargetList::HaveSameTargets(c, c2))
+				return ci;
+
+			continue;
+		}
 
 		if ((cmdID == cmd2ID) || (cmdID < 0 && cmd2ID < 0) || attackAndFight) {
 			if (c.GetNumParams() == 1) {
@@ -1422,6 +1504,8 @@ std::vector<Command> CCommandAI::GetOverlapQueued(const Command& c, const CComma
 			const Command& t = *ci;
 
 			if (t.GetNumParams() != c.GetNumParams())
+				continue;
+			if (c.GetID() == CMD_ATTACK_TARGETS)
 				continue;
 
 			if (t.GetID() == c.GetID() || (c.GetID() < 0 && t.GetID() < 0)) {
@@ -1528,6 +1612,51 @@ void CCommandAI::ExecuteAttack(Command& c)
 }
 
 
+bool CCommandAI::ExecuteAttackTargets(Command& c)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	assert(owner->unitDef->canAttack);
+	assert(c.GetID() == CMD_ATTACK_TARGETS);
+
+	if (inCommand != CMD_ATTACK_TARGETS) {
+		attackTargetIndex = 0;
+	} else if (!targetDied && orderTarget != nullptr) {
+		const bool targetLost = (UpdateTargetLostTimer(orderTarget->id) == 0);
+		const bool skipParalyzed = !(c.GetOpts() & ALT_KEY) && IsParalyzeTargetSkippable(orderTarget)
+			&& (attackTargetIndex < c.GetNumParams() || HasMoreMoveCommands());
+
+		if (!targetLost && !skipParalyzed)
+			return true;
+	}
+
+	SetOrderTarget(nullptr);
+	owner->DropCurrentAttackTarget();
+	targetDied = false;
+
+	while (const std::optional<int> targetID = CommandTargetList::NextTargetID(c, attackTargetIndex)) {
+		CUnit* targetUnit = unitHandler.GetUnit(*targetID);
+
+		if (targetUnit == nullptr || targetUnit == owner)
+			continue;
+		if (targetUnit->GetTransporter() != nullptr && !modInfo.targetableTransportedUnits)
+			continue;
+		if (!(c.GetOpts() & ALT_KEY) && IsParalyzeTargetSkippable(targetUnit)
+		    && (attackTargetIndex < c.GetNumParams() || HasMoreMoveCommands()))
+			continue;
+
+		SetOrderTarget(targetUnit);
+		owner->AttackUnit(targetUnit, !c.IsInternalOrder(), false);
+		inCommand = CMD_ATTACK_TARGETS;
+		targetLostTimer = TARGET_LOST_TIMER;
+		return true;
+	}
+
+	StopMove();
+	FinishCommand();
+	return false;
+}
+
+
 void CCommandAI::ExecuteStop(Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -1571,6 +1700,10 @@ void CCommandAI::SlowUpdate()
 		}
 		case CMD_ATTACK: {
 			ExecuteAttack(c);
+			return;
+		}
+		case CMD_ATTACK_TARGETS: {
+			ExecuteAttackTargets(c);
 			return;
 		}
 		case CMD_MANUALFIRE: {
@@ -1674,6 +1807,7 @@ void CCommandAI::FinishCommand()
 
 	inCommand = CMD_STOP;
 	targetDied = false;
+	attackTargetIndex = 0;
 
 	SetOrderTarget(nullptr);
 	eoh->CommandFinished(*owner, cmd);
@@ -1743,7 +1877,7 @@ void CCommandAI::UpdateStockpileIcon()
 void CCommandAI::WeaponFired(CWeapon* weapon, const bool searchForNewTarget, bool raiseEvent)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (inCommand != CMD_ATTACK || commandQue.empty())
+	if ((inCommand != CMD_ATTACK && inCommand != CMD_ATTACK_TARGETS) || commandQue.empty())
 		return;
 
 	const Command& c = commandQue.front();
@@ -1830,8 +1964,19 @@ bool CCommandAI::HasMoreMoveCommands(bool skipFirstCmd) const
 }
 
 
+bool CCommandAI::CanWeaponAutoTargetUnit(const CWeapon*, const CUnit* target) const
+{
+	if (!modInfo.attackTargetListPreferListedTargets || inCommand != CMD_ATTACK_TARGETS)
+		return true;
+	if (commandQue.empty() || commandQue.front().GetID() != CMD_ATTACK_TARGETS)
+		return true;
+
+	return CommandTargetList::ContainsTarget(commandQue.front(), target->id);
+}
+
+
 bool CCommandAI::CanChangeFireState() const { return (owner->unitDef->CanChangeFireState()); }
-bool CCommandAI::SkipParalyzeTarget(const CUnit* target) const
+bool CCommandAI::IsParalyzeTargetSkippable(const CUnit* target) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if ((target == nullptr) || (owner->weapons.empty()))
@@ -1843,7 +1988,12 @@ bool CCommandAI::SkipParalyzeTarget(const CUnit* target) const
 		return false;
 
 	// skip units that are visible and already stunned
-	return ((target->losStatus[owner->allyteam] & LOS_INLOS) && target->IsStunned() && HasMoreMoveCommands());
+	return ((target->losStatus[owner->allyteam] & LOS_INLOS) && target->IsStunned());
+}
+
+bool CCommandAI::SkipParalyzeTarget(const CUnit* target) const
+{
+	return (IsParalyzeTargetSkippable(target) && HasMoreMoveCommands());
 }
 
 
@@ -1854,6 +2004,19 @@ void CCommandAI::StopAttackingTargetIf(const std::function<bool(const CUnit*)>& 
 	const auto removeCmd = [&](const Command& c) { return (hasTarget(c) && pred(unitHandler.GetUnit(c.GetParam(0)))); };
 
 	commandQue.erase(std::remove_if(commandQue.begin(), commandQue.end(), removeCmd), commandQue.end());
+
+	for (Command& c: commandQue) {
+		if (c.GetID() != CMD_ATTACK_TARGETS)
+			continue;
+
+		for (unsigned int p = 0; p < c.GetNumParams(); ++p) {
+			if (pred(unitHandler.GetUnit(c.GetParam(p))))
+				c.SetParam(p, -1.0f);
+		}
+	}
+
+	if (inCommand == CMD_ATTACK_TARGETS && pred(orderTarget))
+		targetDied = true;
 }
 
 void CCommandAI::StopAttackingAllyTeam(int ally)
@@ -1861,4 +2024,3 @@ void CCommandAI::StopAttackingAllyTeam(int ally)
 	RECOIL_DETAILED_TRACY_ZONE;
 	StopAttackingTargetIf([&](const CUnit* t) { return (t != nullptr && t->allyteam == ally); });
 }
-

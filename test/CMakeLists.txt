@@ -90,6 +90,21 @@ macro (add_spring_test target sources libraries flags)
 endmacro()
 
 ################################################################################
+### CommandTargetList
+	set(test_name CommandTargetList)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/Units/CommandAI/TestCommandTargetList.cpp"
+			"${ENGINE_SOURCE_DIR}/Sim/Units/CommandAI/Command.cpp"
+			${test_Common_sources}
+		)
+
+	set(test_libs
+			""
+		)
+
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
+
+################################################################################
 ### UDPListener
 # disabled for travis: https://springrts.com/mantis/view.php?id=5014
 if(NOT DEFINED ENV{CI})

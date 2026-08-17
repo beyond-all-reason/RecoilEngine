@@ -969,6 +969,23 @@ void CMobileCAI::ExecuteAttack(Command& c)
 }
 
 
+bool CMobileCAI::ExecuteAttackTargets(Command& c)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const CUnit* previousTarget = orderTarget;
+
+	if (!CCommandAI::ExecuteAttackTargets(c))
+		return false;
+
+	if (orderTarget != previousTarget) {
+		const float3 targetErrorPos = orderTarget->GetErrorPos(owner->allyteam, false);
+		const float3 targetDirection = (targetErrorPos - owner->pos).Normalize();
+		SetGoal(targetErrorPos - targetDirection * CalcTargetRadius(orderTarget, orderTarget->radius, 1.0f), owner->pos);
+	}
+
+	ExecuteObjectAttack(c);
+	return true;
+}
 
 
 int CMobileCAI::GetDefaultCmd(const CUnit* pointed, const CFeature*)

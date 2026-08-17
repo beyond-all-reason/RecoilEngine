@@ -739,6 +739,8 @@ bool CWeapon::AutoTarget()
 	//   end, but Lua can mess with the ordering arbitrarily
 	for (size_t i = 0, n = CGameHelper::GenerateWeaponTargets(this, avoidUnit, targetPairs); i < n; i++, assert(n == targetPairs.size())) {
 		CUnit* unit = targetPairs[i].second;
+		if (!owner->commandAI->CanWeaponAutoTargetUnit(this, unit))
+			continue;
 
 		// save the "best" bad target in case we have no other
 		// good targets (of higher priority) left in <targets>

@@ -105,6 +105,9 @@ void CModInfo::ResetState()
 		targetableTransportedUnits = 0;
 	}
 	{
+		attackTargetListPreferListedTargets = false;
+	}
+	{
 		fireAtKilled   = false;
 		fireAtCrashing = false;
 	}
@@ -320,6 +323,13 @@ void CModInfo::Init(const std::string& modFileName)
 	}
 
 	{
+		// targeting
+		const LuaTable& targetingTbl = root.SubTable("targeting");
+
+		attackTargetListPreferListedTargets = targetingTbl.GetBool("attackTargetListPreferListedTargets", attackTargetListPreferListedTargets);
+	}
+
+	{
 		// fire-at-dead-units
 		const LuaTable& fireAtDeadTbl = root.SubTable("fireAtDead");
 
@@ -420,4 +430,3 @@ void CModInfo::Init(const std::string& modFileName)
 	smoothMeshSmoothRadius                   = std::max  (smoothMeshSmoothRadius                  ,    1          );
 	unitQuadPositionUpdateRate               = std::clamp(unitQuadPositionUpdateRate              ,    1    ,   15);
 }
-

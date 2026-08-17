@@ -155,6 +155,10 @@ public:
 	/// If false, transported units cannot be manually or automatically targeted
 	bool targetableTransportedUnits;
 
+	// Targeting behaviour
+	/// Restrict opportunity targets to units named by an active CMD_ATTACK_TARGETS command.
+	bool attackTargetListPreferListedTargets;
+
 	// Fire-on-dying-units behaviour
 	/// Do units fire at enemies running Killed() script?
 	bool fireAtKilled;

@@ -290,6 +290,12 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	PUSH_CMD(ATTACK);
 	/*** @field CMD.AREA_ATTACK 21 */
 	PUSH_CMD(AREA_ATTACK);
+	/***
+	 * @field CMD.ATTACK_TARGETS 22
+	 * Sequentially attacks each unit ID in the command parameters. Each receiving
+	 * unit keeps an independent cursor and skips targets that are no longer valid.
+	 */
+	PUSH_CMD(ATTACK_TARGETS);
 	/*** @field CMD.GUARD 25 */
 	PUSH_CMD(GUARD);
 	/*** @field CMD.GROUPSELECT 35 */

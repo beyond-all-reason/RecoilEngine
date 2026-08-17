@@ -446,6 +446,29 @@ void CAirCAI::ExecuteAttack(Command& c)
 	}
 }
 
+bool CAirCAI::ExecuteAttackTargets(Command& c)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const CUnit* previousTarget = orderTarget;
+
+	if (!CCommandAI::ExecuteAttackTargets(c))
+		return false;
+	targetAge = (orderTarget == previousTarget) ? targetAge + 1 : 0;
+
+	if (orderTarget->unitDef->canfly && orderTarget->IsCrashing()) {
+		targetDied = true;
+		previousTarget = orderTarget;
+
+		if (!CCommandAI::ExecuteAttackTargets(c))
+			return false;
+		targetAge = (orderTarget == previousTarget) ? targetAge + 1 : 0;
+	}
+
+	SetGoal(orderTarget->pos, owner->pos, cancelDistance);
+	return true;
+}
+
+
 void CAirCAI::ExecuteAreaAttack(Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -596,4 +619,3 @@ bool CAirCAI::SelectNewAreaAttackTargetOrPos(const Command& ac)
 
 	return true;
 }
-

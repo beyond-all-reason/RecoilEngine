@@ -200,6 +200,7 @@ const CMouseCursor* CCursorIcons::GetCursor(int cmd) const
 		case CMD_FIGHT:           cursorName = "Fight";        break;
 		case CMD_ATTACK:          cursorName = "Attack";       break;
 		case CMD_AREA_ATTACK:     cursorName = "Area attack";  break;
+		case CMD_ATTACK_TARGETS:  cursorName = "Attack";       break;
 		case CMD_GUARD:           cursorName = "Guard";        break;
 		case CMD_REPAIR:          cursorName = "Repair";       break;
 		case CMD_LOAD_ONTO:       cursorName = "Load units";   break;

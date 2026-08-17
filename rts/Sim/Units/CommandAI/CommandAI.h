@@ -48,6 +48,7 @@ public:
 	void WeaponFired(CWeapon* weapon, const bool searchForNewTarget, bool raiseEvent = true);
 
 	virtual bool CanWeaponAutoTarget(const CWeapon* weapon) const { return true; }
+	virtual bool CanWeaponAutoTargetUnit(const CWeapon* weapon, const CUnit* target) const;
 	virtual int GetDefaultCmd(const CUnit* pointed, const CFeature* feature);
 	virtual void SlowUpdate();
 	virtual void GiveCommandReal(const Command& c, bool fromSynced = true);
@@ -88,6 +89,13 @@ public:
 	 * @brief Causes this CommandAI to execute the attack order c
 	 */
 	virtual void ExecuteAttack(Command& c);
+	virtual bool ExecuteAttackTargets(Command& c);
+	unsigned int GetAttackTargetDrawIndex() const {
+		if (inCommand != CMD_ATTACK_TARGETS || attackTargetIndex == 0)
+			return 0;
+
+		return attackTargetIndex - 1;
+	}
 
 	/**
 	 * @brief executes the stop command c
@@ -139,6 +147,7 @@ protected:
 	virtual bool SelectNewAreaAttackTargetOrPos(const Command& ac) { return true; }
 
 	bool IsAttackCapable() const;
+	bool IsParalyzeTargetSkippable(const CUnit* target) const;
 	bool SkipParalyzeTarget(const CUnit* target) const;
 
 	void GiveAllowedCommand(const Command& c, bool fromSynced = true);
@@ -162,6 +171,7 @@ private:
 	 * timer reaches 0
 	 */
 	int targetLostTimer;
+	unsigned int attackTargetIndex;
 };
 
 inline void CCommandAI::SetOrderTarget(CUnit* o) {
