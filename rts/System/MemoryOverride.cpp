@@ -71,7 +71,8 @@ void* aligned_alloc(size_t alignment, size_t size)
 		// std::aligned_alloc requires size to be a multiple of alignment (C11/C++17);
 		// unlike posix_memalign, passing a non-multiple is undefined behaviour
 		size = (size + alignment - 1) & ~(alignment - 1);  // bitwise round-up
-		assert(size % alignment == 0);
+		assert(std::has_single_bit(alignment)); // assumption
+		assert(size % alignment == 0); // intention
 		return std::aligned_alloc(alignment, size);
 	#endif
 #endif
