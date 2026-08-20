@@ -17,8 +17,6 @@
 
 #include "LuaUtils.h"
 
-static_assert(sizeof(SDrawElementsIndirectCommand) == 5 * sizeof(uint32_t));
-
 /***
  * Vertex Array Object
  * 
