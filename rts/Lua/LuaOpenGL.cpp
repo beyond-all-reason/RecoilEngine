@@ -1187,6 +1187,7 @@ int LuaOpenGL::GetNumber(lua_State* L)
  * Get a string describing the current OpenGL connection.
  * @function gl.GetString
  * @param pname GL
+ * @return string value `"[NULL]"` if the driver returns no string for `pname`.
  */
 int LuaOpenGL::GetString(lua_State* L)
 {
@@ -2109,7 +2110,7 @@ int LuaOpenGL::DrawGroundCircle(lua_State* L)
 
 
 /***
- * @function gl.DrawGroundCircle
+ * @function gl.DrawGroundQuad
  * @param x0 number
  * @param z0 number
  * @param x1 number
@@ -2118,7 +2119,7 @@ int LuaOpenGL::DrawGroundCircle(lua_State* L)
  * @param useTxcd boolean? (Default: `false`)
  */
 /***
- * @function gl.DrawGroundCircle
+ * @function gl.DrawGroundQuad
  * @param x0 number
  * @param z0 number
  * @param x1 number
@@ -2825,7 +2826,7 @@ int LuaOpenGL::Rect(lua_State* L)
 
 
 /***
- * @function gl.Rect
+ * @function gl.TexRect
  * @param x1 number
  * @param y1 number
  * @param x2 number
@@ -2834,7 +2835,7 @@ int LuaOpenGL::Rect(lua_State* L)
  * @param flipTCoords boolean?
  */
 /***
- * @function gl.Rect
+ * @function gl.TexRect
  * @param x1 number
  * @param y1 number
  * @param x2 number
@@ -4490,13 +4491,13 @@ int LuaOpenGL::ActiveTexture(lua_State* L)
 
 
 /***
- * @function gl.TextEnv
+ * @function gl.TexEnv
  * @param target GL
  * @param pname GL
  * @param value number
  */
 /***
- * @function gl.TextEnv
+ * @function gl.TexEnv
  * @param target GL
  * @param pname GL
  * @param r number? (Default: `0.0`)
@@ -6123,6 +6124,7 @@ int LuaOpenGL::GetFixedState(lua_State* L)
  * @function gl.CreateList
  * @param func fun()
  * @param ... any Arguments to the function.
+ * @return integer listID `0` if the list could not be generated or `func` errored.
  */
 int LuaOpenGL::CreateList(lua_State* L)
 {

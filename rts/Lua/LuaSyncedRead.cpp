@@ -3345,6 +3345,7 @@ int LuaSyncedRead::GetUnitNearestAlly(lua_State* L)
  * @param useLOS boolean? (Default: `true`) requires LOS/radar visibility of allied team.
  * @param sphereDistTest boolean? (Default: `false`) determines if using spherical(3D, includes target radius) or cylindrical(2D) search.
  * @param checkSightDist boolean? (Default: `false`) determine if during filter process, if candidate distance to be within candidate LOS radius.
+ * @return integer? unitID
  */
 int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 {
@@ -3673,10 +3674,10 @@ int LuaSyncedRead::ValidUnitID(lua_State* L)
  * @x_helper
  * @field firestate number
  * @field movestate number
- * @field repeat boolean
- * @field cloak boolean
- * @field active boolean
- * @field trajectory boolean
+ * @field repeat boolean?
+ * @field cloak boolean?
+ * @field active boolean?
+ * @field trajectory boolean?
  * @field autoland boolean?
  * @field autorepairlevel number?
  * @field loopbackattack boolean?
@@ -3685,12 +3686,26 @@ int LuaSyncedRead::ValidUnitID(lua_State* L)
 
 /***
  *
+ * Gets various states for the given unit.
+ *
  * @function Spring.GetUnitStates
  * @param unitID integer
- * @param retTable boolean?
- * @param binState boolean?
- * @param amtState boolean?
- * @return UnitState
+ * @param retTable false Return a table instead of multiple values. Defaults to `true`
+ * @param binState true Include binary state (activated, etc)? Defaults to `retTable`
+ * @param amtState true Include Air/Hover MoveType state if available? Defaults to `retTable`
+ * @return number fireState
+ * @return number moveState
+ * @return number autorepairlevel `-1` if not set
+ * @return boolean repeat
+ * @return boolean cloak
+ * @return boolean active
+ * @return boolean trajectory
+ * @return boolean? autoLand
+ * @return boolean? loopbackAttack
+ * @overload fun(unitID: integer, retTable: false, binState: false?, amtState: false?): number, number, number
+ * @overload fun(unitID: integer, retTable: false, binState: true, amtState: false?): number, number, number, boolean, boolean, boolean, boolean
+ * @overload fun(unitID: integer, retTable: false, binState: false?, amtState: true): number, number, number, boolean?, boolean?
+ * @overload fun(unitID: integer, retTable: true?, binState: boolean?, amtState: boolean?): UnitState
  */
 int LuaSyncedRead::GetUnitStates(lua_State* L)
 {
@@ -4583,6 +4598,7 @@ int LuaSyncedRead::GetUnitVelocity(lua_State* L)
  *
  * @function Spring.GetUnitBuildFacing
  * @param unitID integer
+ * @return FacingInteger? buildFacing facing of footprint, `0` - `3`
  */
 int LuaSyncedRead::GetUnitBuildFacing(lua_State* L)
 {
@@ -4777,6 +4793,7 @@ int LuaSyncedRead::GetUnitEffectiveBuildRange(lua_State* L)
  *
  * @function Spring.GetUnitCurrentBuildPower
  * @param unitID integer
+ * @return number? buildPower `nil` if the unit is neither a builder nor a factory.
  */
 int LuaSyncedRead::GetUnitCurrentBuildPower(lua_State* L)
 {
@@ -4835,6 +4852,10 @@ int LuaSyncedRead::GetUnitHarvestStorage(lua_State* L)
  *
  * @function Spring.GetUnitBuildParams
  * @param unitID integer
+ * @param paramName "buildRange"|"buildDistance"|"buildRange3D" The build param to get
+ * @return number|boolean|nil value number for `"buildRange"` or `"buildDistance"`,
+ * boolean for `"buildRange3D"`, otherwise `nil` for unrecognized paramName or not
+ * allied builder unit.
  */
 int LuaSyncedRead::GetUnitBuildParams(lua_State* L)
 {
@@ -5033,7 +5054,22 @@ int LuaSyncedRead::GetUnitShieldState(lua_State* L)
 /***
  *
  * @function Spring.GetUnitFlanking
+ *
+ * When called without a key, returns every value. When called with one of
+ * `"mode"`, `"moveFactor"`, `"minDamage"` or `"maxDamage"` returns just that
+ * single number, and with `"dir"` returns just `dirX`, `dirY`, `dirZ`.
+ *
  * @param unitID integer
+ * @return number mode
+ * @return number moveFactor
+ * @return number minDamage
+ * @return number maxDamage
+ * @return number dirX
+ * @return number dirY
+ * @return number dirZ
+ * @return number mobility The amount of mobility the unit has collected up to now.
+ * @overload fun(unitID: integer, param: "mode"|"moveFactor"|"minDamage"|"maxDamage"): number
+ * @overload fun(unitID: integer, param: "dir"): number, number, number
  */
 int LuaSyncedRead::GetUnitFlanking(lua_State* L)
 {
@@ -5846,6 +5882,7 @@ int LuaSyncedRead::GetUnitEstimatedPath(lua_State* L)
  *
  * @function Spring.GetUnitLastAttacker
  * @param unitID integer
+ * @return integer? attackerUnitID `nil` if the unit has no last attacker or the attacker is not visible.
  */
 int LuaSyncedRead::GetUnitLastAttacker(lua_State* L)
 {
@@ -5887,6 +5924,25 @@ int LuaSyncedRead::GetUnitCollisionVolumeData(lua_State* L)
 	return LuaUtils::PushColVolData(L, &unit->collisionVolume);
 }
 
+/***
+ *
+ * @function Spring.GetUnitPieceCollisionVolumeData
+ * @param unitID integer
+ * @param pieceIndex integer 1-based local-model piece index
+ * @return number? scaleX
+ * @return number? scaleY
+ * @return number? scaleZ
+ * @return number? offsetX
+ * @return number? offsetY
+ * @return number? offsetZ
+ * @return integer? volumeType
+ * @return integer? testType
+ * @return integer? primaryAxis
+ * @return boolean? disabled
+ *
+ * Returns no values when `unitID` is invalid or not in line of sight, or when
+ * `pieceIndex` is invalid.
+ */
 int LuaSyncedRead::GetUnitPieceCollisionVolumeData(lua_State* L)
 {
 	return (PushPieceCollisionVolumeData(L, ParseInLosUnit(L, __func__, 1)));
@@ -6026,6 +6082,7 @@ int LuaSyncedRead::GetUnitDefDimensions(lua_State* L)
 /***
  *
  * @function Spring.GetCEGID
+ * @return integer cegID
  */
 int LuaSyncedRead::GetCEGID(lua_State* L)
 {
@@ -6494,6 +6551,12 @@ int LuaSyncedRead::GetFactoryCommandCount(lua_State* L)
  *
  * @function Spring.GetFactoryBuggerOff
  * @param unitID integer
+ * @return boolean? boPerform `nil` if the unit does not exist or is not a factory.
+ * @return number boOffset
+ * @return number boRadius
+ * @return number boRelHeading
+ * @return boolean boSherical
+ * @return boolean boForced
  */
 int LuaSyncedRead::GetFactoryBuggerOff(lua_State* L)
 {
@@ -7092,6 +7155,7 @@ int LuaSyncedRead::GetFeatureVelocity(lua_State* L)
  *
  * @function Spring.GetFeatureHeading
  * @param featureID integer
+ * @return number? heading
  */
 int LuaSyncedRead::GetFeatureHeading(lua_State* L)
 {
@@ -9279,11 +9343,12 @@ static int TraceRayGroundImpl(lua_State *const L, const float3 &pos, const float
  * @param dirX number
  * @param dirY number
  * @param dirZ number
+ * @param maxLength number? (Default: `999999`)
  * @param testWater boolean? (Default: `true`)
- * @return number rayLength
- * @return number posX
- * @return number posY
- * @return number posZ
+ * @return number? rayLength
+ * @return number? posX
+ * @return number? posY
+ * @return number? posZ
  */
 int LuaSyncedRead::TraceRayGroundInDirection(lua_State* L)
 {

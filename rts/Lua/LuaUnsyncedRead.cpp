@@ -1203,6 +1203,8 @@ int LuaUnsyncedRead::GetFrameTimeOffset(lua_State* L)
 
 /*** Gets game time for drawing purposes
  *
+ * @function Spring.GetGameSecondsInterpolated
+ *
  * Returns the game time, taking the interpolated draw frame into account.
  *
  * @return number game time in seconds
@@ -3528,6 +3530,7 @@ int LuaUnsyncedRead::GetSoundStreamTime(lua_State* L)
 /***
  *
  * @function Spring.GetSoundEffectParams
+ * @return table? soundEffectParams `nil` on headless/no-sound builds or when EFX is unsupported.
  */
 int LuaUnsyncedRead::GetSoundEffectParams(lua_State* L)
 {
@@ -4781,8 +4784,9 @@ int LuaUnsyncedRead::GetConfigParams(lua_State* L)
  *
  * @function Spring.GetConfigInt
  * @param name string
- * @param default number? (Default: `0`)
- * @return number? configInt
+ * @param default integer Default value if `name` is not found
+ * @return integer
+ * @overload fun(name: string): integer?
  */
 int LuaUnsyncedRead::GetConfigInt(lua_State* L)
 {
@@ -4802,8 +4806,9 @@ int LuaUnsyncedRead::GetConfigInt(lua_State* L)
  *
  * @function Spring.GetConfigFloat
  * @param name string
- * @param default number? (Default: `0`)
- * @return number? configFloat
+ * @param default number Default value if `name` is not found
+ * @return number
+ * @overload fun(name: string): number?
  */
 int LuaUnsyncedRead::GetConfigFloat(lua_State* L)
 {
@@ -4823,8 +4828,9 @@ int LuaUnsyncedRead::GetConfigFloat(lua_State* L)
  *
  * @function Spring.GetConfigString
  * @param name string
- * @param default string? (Default: `""`)
- * @return number? configString
+ * @param default string Default value if `name` is not found
+ * @return string
+ * @overload fun(name: string): string?
  */
 int LuaUnsyncedRead::GetConfigString(lua_State* L)
 {
@@ -5332,8 +5338,11 @@ int LuaUnsyncedRead::GetSyncedGCInfo(lua_State* L) {
 /***
  *
  * @function Spring.SolveNURBSCurve
- * @param groupID integer
- * @return number[]? unitIDs
+ * @param degree integer Degree of the curve.
+ * @param controlPoints number[] Flat array of `x, y, z, weight` quadruples; its length must be a multiple of 4.
+ * @param knots number[] Knot vector.
+ * @param segments integer Number of segments to evaluate.
+ * @return number[] points Flat array of `x, y, z` triples along the curve.
  */
 int LuaUnsyncedRead::SolveNURBSCurve(lua_State* L)
 {
