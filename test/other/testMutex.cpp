@@ -37,10 +37,10 @@ InitSpringTime ist;
 
 	static inline long do_futex (uint32_t *mtx, int op, uint32_t value, const struct timespec *timeout)
 	{
-#ifdef __OpenBSD__
-		return futex(mtx, op, value, NULL, NULL);
+#ifndef __OpenBSD__
+		return syscall(SYS_futex, mtx, op, value, timeout, NULL, 0);
 #else
-		return syscall(SYS_futex, mtx, op, value, NULL, NULL, 0);
+		return futex(mtx, op, value, timeout, NULL);
 #endif
 	}
 
