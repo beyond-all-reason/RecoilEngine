@@ -28,15 +28,19 @@ function widget:GetBuildShape(unitDefID, facing, startX, startY, startZ, endX, e
 	-- a drag too small to fit a second building degrades to "single" engine-side,
 	-- so the drag shapes below need no size checks of their own
 
-	if ctrl then
-		-- ring the building under the cursor; without one, ctrl+alt traces the
-		-- dragged box's perimeter and plain ctrl an axis-locked cardinal line
-		return alt and "hollowbox" or "surround"
+	if ctrl and alt then
+		return "hollowbox"
 	end
 
 	if alt then
 		-- fill the dragged box with buildings
 		return "flood"
+	end
+
+	if ctrl then
+		local mx, my = Spring.GetMouseState()
+		local thingType = Spring.TraceScreenRay(mx, my)
+		return thingType == "unit" and "surround" or "cardinalline"
 	end
 
 	-- queue key alone: a free-angle line following the drag
