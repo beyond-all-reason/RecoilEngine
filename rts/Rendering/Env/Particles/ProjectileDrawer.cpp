@@ -47,8 +47,8 @@
 
 CONFIG(int, SoftParticles).defaultValue(1).safemodeValue(0).description("Soften up CEG particles on clipping edges");
 CONFIG(float, ProjectileReflectionMinRadius).defaultValue(0.0f).minimumValue(0.0f).description("Alpha particles with a draw radius (in elmos) smaller than this are skipped in water reflection passes; 0 draws all of them. Small particles are barely visible in reflections, so culling them there is cheap visually and saves a large part of the reflection pass on effect-heavy frames.");
-CONFIG(int, ProjectileDrawThreadedFill).defaultValue(1).safemodeValue(0).description("Generate alpha-particle geometry on the ThreadPool workers instead of the render thread. Draw order is preserved; the few particle types whose Draw is not thread-safe stay on the render thread.");
-CONFIG(int, ProjectileDrawReuseWaterPasses).defaultValue(1).safemodeValue(0).description("When water is visible, reuse the below-water pass' alpha particle geometry for the above-water pass instead of regenerating and re-uploading it. The two passes contain identical geometry by construction; disable to force a full refill per pass.");
+CONFIG(bool, ProjectileDrawThreadedFill).defaultValue(true).safemodeValue(false).description("Generate alpha-particle geometry on the ThreadPool workers instead of the render thread. Draw order is preserved; the few particle types whose Draw is not thread-safe stay on the render thread.");
+CONFIG(bool, ProjectileDrawReuseWaterPasses).defaultValue(true).safemodeValue(false).description("When water is visible, reuse the below-water pass' alpha particle geometry for the above-water pass instead of regenerating and re-uploading it. The two passes contain identical geometry by construction; disable to force a full refill per pass.");
 
 // sort keys are snapshotted into SortableParticle at fill time, so sorting
 // works on a contiguous array instead of dereferencing two CProjectile
@@ -872,7 +872,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 	// in between fill the buffer for their own camera/mask and consume their
 	// own ranges, so the saved range stays valid for the whole frame.
 	const bool mainPass = !drawReflection && !drawRefraction;
-	const bool reuseWanted = (configHandler->GetInt("ProjectileDrawReuseWaterPasses") != 0);
+	const bool reuseWanted = configHandler->GetBool("ProjectileDrawReuseWaterPasses");
 
 	// the above-water main pass and the water refraction pass both view the
 	// same particles from the player camera; both can re-submit the geometry
@@ -915,7 +915,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			RadixSortByKey(sortedParticles, sortScratch, [](const SortableParticle& sp) noexcept { return sp.sortKey; });
 		}
 
-		const bool threadedFill = (configHandler->GetInt("ProjectileDrawThreadedFill") != 0) && ThreadPool::HasThreads();
+		const bool threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill") && ThreadPool::HasThreads();
 
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
@@ -1056,7 +1056,7 @@ void CProjectileDrawer::DrawShadowTransparent()
 
 	{
 		ZoneScopedN("ProjectileDrawer::DrawShadowTransparent(Fill)");
-		const bool threadedFill = (configHandler->GetInt("ProjectileDrawThreadedFill") != 0) && ThreadPool::HasThreads();
+		const bool threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill") && ThreadPool::HasThreads();
 		FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill, [this](size_t j) { return unsortedParticles[j]; });
 	}
 
