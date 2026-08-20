@@ -26,21 +26,21 @@
 InitSpringTime ist;
 
 #ifndef _WIN32
-	typedef uint32_t futex;
+	typedef uint32_t lock;
 
-	static void futex_init(futex* m)
+	static void futex_init(lock* m)
 	{
 		*m = 0;
 	}
 
-	static void futex_destroy(futex* m)
+	static void futex_destroy(lock* m)
 	{
 		*m = 0;
 	}
 
-	static void futex_lock(futex* m)
+	static void futex_lock(lock* m)
 	{
-		futex c;
+		lock c;
 		if ((c = __sync_val_compare_and_swap(m, 0, 1)) != 0)  {
 			do {
 				if ((c == 2) || __sync_val_compare_and_swap(m, 1, 2) != 0)
@@ -49,7 +49,7 @@ InitSpringTime ist;
 		}
 	}
 
-	static void futex_unlock(futex* m)
+	static void futex_unlock(lock* m)
 	{
 		if (__sync_fetch_and_sub(m, 1) != 1) {
 			*m = 0;
@@ -98,7 +98,7 @@ TEST_CASE("Mutex")
 #endif
 
 #ifndef _WIN32
-	futex ftx;
+	lock ftx;
 	futex_init(&ftx);
 	spring_time tCrit = Test("futex", [&]{ futex_lock(&ftx); }, [&]{ futex_unlock(&ftx); });
 	futex_init(&ftx);
