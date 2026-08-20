@@ -76,7 +76,9 @@ set(test_common_libraries
 	fmt::fmt
 )
 
-add_custom_target(tests)
+if(NOT TARGET tests)
+	add_custom_target(tests)
+endif()
 add_custom_target(check ${CMAKE_CTEST_COMMAND} --output-on-failure -V
 	DEPENDS engine-headless)
 add_custom_target(install-tests)
