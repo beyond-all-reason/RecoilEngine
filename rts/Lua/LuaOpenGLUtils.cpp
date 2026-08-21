@@ -299,7 +299,9 @@ bool ParseUnitTexture(LuaMatTexture& texUnit, const std::string& texture)
 
 
 
-// "$info:los:2", "$extra_airlos_0", etc; an info-texture tracking a specific allyteam
+// "$info:los:2", "$info_airlos_0", etc; an info-texture tracking a specific
+// allyteam; the caller matches the prefix, accepting "$extra" as an alias of
+// "$info" like the pre-existing single-separator form does
 static bool ParseAllyTeamInfoTexture(LuaMatTexture& texUnit, const std::string& texName, size_t firstSepIdx, size_t lastSepIdx)
 {
 	if (infoTextureHandler == nullptr)
@@ -314,12 +316,11 @@ static bool ParseAllyTeamInfoTexture(LuaMatTexture& texUnit, const std::string& 
 	if (!teamHandler.IsValidAllyTeam(allyTeam))
 		return false;
 
-	// non-spectators can only request textures tracking their own
-	// allyteam, unless the handle has full read access (global-LOS)
+	// a handle can always request the allyteam it is viewing; any other
+	// allyteam requires full read access (fullview spectators, global-LOS)
 	lua_State* L = reinterpret_cast<lua_State*>(texUnit.state);
-	const bool fullRead = (L != nullptr && CLuaHandle::GetHandleFullRead(L));
 
-	if (allyTeam != gu->myAllyTeam && !gu->spectating && !fullRead)
+	if (allyTeam != gu->myAllyTeam && !(L != nullptr && CLuaHandle::GetHandleFullRead(L)))
 		return false;
 
 	CInfoTexture* itex = infoTextureHandler->GetInfoTexture(texName.substr(firstSepIdx + 1, lastSepIdx - firstSepIdx - 1), allyTeam);

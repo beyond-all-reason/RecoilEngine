@@ -54,15 +54,13 @@ protected:
 
 	// lazily created per-allyteam variants, keyed by "<name>_<allyTeam>";
 	// kept separate from infoTextures so they do not show up as modes, and
-	// only updated while actively being requested (they are rarely used)
+	// updated on-demand when requested (at most once per draw-frame)
+	// rather than in the per-frame update loop, so they cost nothing
+	// while not in use
 	struct AllyTeamInfoTexture {
 		CModernInfoTexture* tex = nullptr;
-		unsigned int lastRequestFrame = 0;
+		unsigned int lastUpdateFrame = 0;
 	};
-
-	// draw-frames without requests after which a per-allyteam texture
-	// stops updating; it refreshes inline again on the next request
-	static constexpr unsigned int ALLYTEAM_TEX_UPDATE_TIMEOUT = 120;
 
 	void UpdateAllyTeamInfoTexture(CModernInfoTexture* itex) const;
 

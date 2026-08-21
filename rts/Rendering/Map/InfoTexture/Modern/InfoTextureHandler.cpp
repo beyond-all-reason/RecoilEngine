@@ -90,12 +90,13 @@ CInfoTexture* CInfoTextureHandler::GetInfoTexture(const std::string& name, int a
 	if (it != allyTeamInfoTextures.end()) {
 		AllyTeamInfoTexture& entry = it->second;
 
-		// if updates were paused for lack of requests, refresh inline
-		// so the requester does not sample stale data this frame
-		if (entry.tex != nullptr && (globalRendering->drawFrame - entry.lastRequestFrame) > ALLYTEAM_TEX_UPDATE_TIMEOUT)
+		// updated on-demand instead of in the per-frame update loop,
+		// so unrequested textures cost nothing
+		if (entry.tex != nullptr && entry.lastUpdateFrame != globalRendering->drawFrame) {
+			entry.lastUpdateFrame = globalRendering->drawFrame;
 			UpdateAllyTeamInfoTexture(entry.tex);
+		}
 
-		entry.lastRequestFrame = globalRendering->drawFrame;
 		return entry.tex;
 	}
 
@@ -124,8 +125,6 @@ CInfoTexture* CInfoTextureHandler::GetInfoTexture(const std::string& name, int a
 			} break;
 		}
 
-		if (itex != nullptr)
-			itex->Update(); // avoids one frame of uninitialized texture data
 	} catch (const opengl_error&) {
 		LOG_L(L_ERROR, "[CInfoTextureHandler::%s] could not create info-texture \"%s\"", __func__, key.c_str());
 		itex = nullptr;
@@ -133,6 +132,9 @@ CInfoTexture* CInfoTextureHandler::GetInfoTexture(const std::string& name, int a
 
 	glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
 	glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+
+	if (itex != nullptr)
+		UpdateAllyTeamInfoTexture(itex); // avoids one frame of uninitialized texture data
 
 	// also insert nullptr on failure, prevents retrying every request
 	allyTeamInfoTextures[key] = { itex, globalRendering->drawFrame };
@@ -143,15 +145,21 @@ CInfoTexture* CInfoTextureHandler::GetInfoTexture(const std::string& name, int a
 void CInfoTextureHandler::UpdateAllyTeamInfoTexture(CModernInfoTexture* itex) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// updating binds FBO's and changes the viewport; save and restore both
-	// since this can be triggered by a Lua texture-parse mid draw-pass
+	// updating binds FBO's, changes the viewport and binds textures on
+	// the active unit; save and restore the state around it since this
+	// can be triggered by a Lua texture-parse mid draw-pass, or nested
+	// inside another texture's update (radar samples its los-texture)
 	GLint prevFBO = 0;
 	GLint prevViewport[4];
+	GLint prevActiveTex = 0;
 	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFBO);
 	glGetIntegerv(GL_VIEWPORT, prevViewport);
+	glGetIntegerv(GL_ACTIVE_TEXTURE, &prevActiveTex);
 
+	glActiveTexture(GL_TEXTURE0);
 	itex->Update();
 
+	glActiveTexture(prevActiveTex);
 	glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
 	glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
 }
@@ -245,18 +253,6 @@ void CInfoTextureHandler::Update()
 		// force first update except for combiner; hides visible uninitialized texmem
 		if ((firstUpdate && tex != infoTex) || tex->IsUpdateNeeded())
 			tex->Update();
-	}
-
-	for (auto& [name, entry] : allyTeamInfoTextures) {
-		// can hold nullptr entries for textures that failed to create
-		if (entry.tex == nullptr)
-			continue;
-		// pause textures nothing has requested recently; the request
-		// path refreshes them inline again when they come back in use
-		if ((globalRendering->drawFrame - entry.lastRequestFrame) > ALLYTEAM_TEX_UPDATE_TIMEOUT)
-			continue;
-		if (entry.tex->IsUpdateNeeded())
-			entry.tex->Update();
 	}
 
 	firstUpdate = false;
