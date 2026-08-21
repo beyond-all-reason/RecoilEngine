@@ -9,6 +9,11 @@
 #include "MetalExtraction.h"
 #include "Path.h"
 #include "Radar.h"
+#include "Rendering/GlobalRendering.h"
+#include "Sim/Misc/TeamHandler.h"
+#include "System/Exceptions.h"
+#include "System/Log/ILog.h"
+#include "System/StringHash.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -38,6 +43,9 @@ CInfoTextureHandler::~CInfoTextureHandler()
 	for (auto& pitex: infoTextures) {
 		delete pitex.second;
 	}
+	for (auto& pitex: allyTeamInfoTextures) {
+		delete pitex.second.tex;
+	}
 	infoTextureHandler = nullptr;
 }
 
@@ -66,6 +74,86 @@ CInfoTexture* CInfoTextureHandler::GetInfoTexture(const std::string& name)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return (const_cast<CInfoTexture*>(GetInfoTextureConst(name)));
+}
+
+
+CInfoTexture* CInfoTextureHandler::GetInfoTexture(const std::string& name, int allyTeam)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!teamHandler.IsValidAllyTeam(allyTeam))
+		return nullptr;
+
+	const std::string key = name + "_" + std::to_string(allyTeam);
+
+	const auto it = allyTeamInfoTextures.find(key);
+
+	if (it != allyTeamInfoTextures.end()) {
+		AllyTeamInfoTexture& entry = it->second;
+
+		// if updates were paused for lack of requests, refresh inline
+		// so the requester does not sample stale data this frame
+		if (entry.tex != nullptr && (globalRendering->drawFrame - entry.lastRequestFrame) > ALLYTEAM_TEX_UPDATE_TIMEOUT)
+			UpdateAllyTeamInfoTexture(entry.tex);
+
+		entry.lastRequestFrame = globalRendering->drawFrame;
+		return entry.tex;
+	}
+
+	// constructing (and initially updating) these binds FBO's and changes
+	// the viewport; save and restore both since creation can be triggered
+	// by a Lua texture-parse in the middle of a draw pass
+	GLint prevFBO = 0;
+	GLint prevViewport[4];
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFBO);
+	glGetIntegerv(GL_VIEWPORT, prevViewport);
+
+	CModernInfoTexture* itex = nullptr;
+
+	try {
+		switch (hashString(name.c_str())) {
+			case hashString("los"   ): { itex = new CLosTexture(allyTeam);    } break;
+			case hashString("airlos"): { itex = new CAirLosTexture(allyTeam); } break;
+			case hashString("radar" ): {
+				// the radar texture samples its allyteam's los-texture, create that first
+				if (GetInfoTexture("los", allyTeam) != nullptr)
+					itex = new CRadarTexture(allyTeam);
+			} break;
+			default: {
+				// per-allyteam variants exist only for the LOS-derived textures
+				return nullptr;
+			} break;
+		}
+
+		if (itex != nullptr)
+			itex->Update(); // avoids one frame of uninitialized texture data
+	} catch (const opengl_error&) {
+		LOG_L(L_ERROR, "[CInfoTextureHandler::%s] could not create info-texture \"%s\"", __func__, key.c_str());
+		itex = nullptr;
+	}
+
+	glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
+	glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+
+	// also insert nullptr on failure, prevents retrying every request
+	allyTeamInfoTextures[key] = { itex, globalRendering->drawFrame };
+	return itex;
+}
+
+
+void CInfoTextureHandler::UpdateAllyTeamInfoTexture(CModernInfoTexture* itex) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// updating binds FBO's and changes the viewport; save and restore both
+	// since this can be triggered by a Lua texture-parse mid draw-pass
+	GLint prevFBO = 0;
+	GLint prevViewport[4];
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING, &prevFBO);
+	glGetIntegerv(GL_VIEWPORT, prevViewport);
+
+	itex->Update();
+
+	glBindFramebuffer(GL_FRAMEBUFFER, prevFBO);
+	glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
 }
 
 
@@ -157,6 +245,18 @@ void CInfoTextureHandler::Update()
 		// force first update except for combiner; hides visible uninitialized texmem
 		if ((firstUpdate && tex != infoTex) || tex->IsUpdateNeeded())
 			tex->Update();
+	}
+
+	for (auto& [name, entry] : allyTeamInfoTextures) {
+		// can hold nullptr entries for textures that failed to create
+		if (entry.tex == nullptr)
+			continue;
+		// pause textures nothing has requested recently; the request
+		// path refreshes them inline again when they come back in use
+		if ((globalRendering->drawFrame - entry.lastRequestFrame) > ALLYTEAM_TEX_UPDATE_TIMEOUT)
+			continue;
+		if (entry.tex->IsUpdateNeeded())
+			entry.tex->Update();
 	}
 
 	firstUpdate = false;
