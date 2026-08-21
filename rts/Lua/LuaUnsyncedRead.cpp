@@ -1534,7 +1534,7 @@ namespace Impl {
  * @function Spring.GetUnitIconData
  * @param unitID number
  * @param fullData boolean? (Default: false) Whether additional information about the icon is returned, otherwise only `name` and `atlasTexCoords` are returned
- * @return IconData iconData
+ * @return IconData? `nil` if unit is not found or unit currentIconIndex is invalid
  * @see Spring.GetIconData
  */
 int LuaUnsyncedRead::GetUnitIconData(lua_State* L)
@@ -1578,7 +1578,7 @@ int LuaUnsyncedRead::GetUnitIcon(lua_State* L)
  * @function Spring.GetIconData
  * @param iconName string
  * @param fullData boolean? (Default: false) Whether additional information about the icon is returned, otherwise only `name` and `atlasTexCoords` are returned
- * @return IconData iconData
+ * @return IconData? `nil` if iconName lookup fails
  * @see Spring.GetUnitIconData
  */
 int LuaUnsyncedRead::GetIconData(lua_State* L)
