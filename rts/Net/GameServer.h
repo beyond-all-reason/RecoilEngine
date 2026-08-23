@@ -68,6 +68,7 @@ class CGameServer
 	friend class CCregLoadSaveHandler; // For initializing server state after load
 	// the metrics classes only ever *read* server state to publish, never write
 	friend class ServerMetrics;
+	friend class NetworkMetrics;
 	friend class ServerHealthMetrics;
 public:
 	CGameServer(
