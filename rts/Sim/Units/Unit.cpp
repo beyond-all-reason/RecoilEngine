@@ -1560,6 +1560,9 @@ bool CUnit::ChangeTeam(int newteam, ChangeType type)
 		teamHandler.Team(newteam)->resStorage += storage;
 	}
 
+	// Deactivate pinpointers before team change to remove any bonuses applied to current team.
+	if (activated && unitDef->targfac && !teamHandler.AlliedTeams(oldteam, newteam))
+		Deactivate();
 
 	team = newteam;
 	if (paletteIndex == static_cast<uint16_t>(oldteam))
