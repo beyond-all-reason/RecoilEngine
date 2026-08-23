@@ -141,7 +141,7 @@ void Emitter::PruneEmitterStates(int frame)
 }
 
 
-void Emitter::EmitBuilderSpray(CBuilder* builder, const float3& goal, float radius, bool inverse, bool highPriority, const CUnit* targetUnit)
+void Emitter::EmitBuilderSpray(CBuilder* builder, const float3& goal, float radius, bool inverse, bool highPriority, const CUnit* targetUnit, bool fadeWhenTargetComplete)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	NanoPieceCache& nanoPieceCache = builder->GetNanoPieceCache();
@@ -161,13 +161,14 @@ void Emitter::EmitBuilderSpray(CBuilder* builder, const float3& goal, float radi
 
 	ForEachEmission(builder, nanoPieceCache.GetNanoPieces(), firstNanoPiece, emitCount,
 		[&](int modelNanoPiece, const float3& nanoPos) {
-			/* Outbound particles chase the target unit; inbound (reclaim, capture)
-			 * ones chase the builder's own nano piece, since that is what they are
-			 * converging on. */
+			/* Outbound particles are bound to the target unit; inbound (reclaim)
+			 * ones to the builder's own nano piece, since that is what they are
+			 * converging on. Losing either fades the spray out. */
 			const SpawnParams spawnParams = {
 				inverse ? static_cast<const CUnit*>(builder) : targetUnit,
 				inverse ? modelNanoPiece : -1,
 				inverse,
+				!inverse && fadeWhenTargetComplete,
 			};
 
 			projectileHandler.AddNanoParticle(nanoPos, goal, builder->unitDef, builder->team, radius, inverse, highPriority, spawnParams);
@@ -316,7 +317,7 @@ void Emitter::EmitBuilderBurst(CBuilder* builder, const CUnit* reclaimee, int bu
 		if (burstLength < BURST_MIN_LENGTH)
 			continue;
 
-		const SpawnParams spawnParams = {builder, modelNanoPiece, true};
+		const SpawnParams spawnParams = {builder, modelNanoPiece, true, false};
 
 		projectileHandler.AddNanoParticle(
 			nanoPos,

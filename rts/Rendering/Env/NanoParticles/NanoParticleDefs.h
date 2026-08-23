@@ -34,6 +34,13 @@ struct Particle {
 	int baseFrame = 0;
 	int createFrame = 0;
 	int deathFrame = 0;
+	/*
+	 * Frame the spray would land on its target. Homing and ground clamp pace
+	 * their re-aims against this rather than deathFrame: a target-lost fade
+	 * pulls deathFrame earlier, and pacing against that would make every
+	 * subsequent re-aim speed the particle up to arrive before it dies.
+	 */
+	int arriveFrame = 0;
 
 	/// Unique and negative, so it cannot be confused with a projectile id. Also the LuaUI light id.
 	int id = -1;
@@ -41,10 +48,24 @@ struct Particle {
 	/// buildSpeed of the emitting builder; passed through to LuaUI for light sizing.
 	float builderBuildSpeed = 0.0f;
 
+	/*
+	 * Frames the shader ramps alpha and size down over before `deathFrame`.
+	 * Starts at the appearance default; a target-lost fade shortens the
+	 * particle's life and widens this so the whole remainder is the ramp.
+	 */
+	float fadeFrames = 0.0f;
+
+	// --- target (the unit this particle is bound to) -----------------------
+	/*
+	 * The workpiece for a forward spray, the builder for an inverse one. Homing
+	 * re-aims at it when enabled; the target-lost fade watches it either way.
+	 */
+	int targetID = -1;
+	std::int64_t targetSyncID = -1;
+	/// Nano piece on the target to follow, or -1 for its midpos.
+	int targetPiece = -1;
+
 	// --- homing (only meaningful while `homing` is set) ------------------
-	int homingTargetID = -1;
-	std::int64_t homingTargetSyncID = -1;
-	int homingTargetPiece = -1;
 	float homingSpeedLimitSq = 0.0f;
 	float3 homingOffset;
 
@@ -66,16 +87,30 @@ struct Particle {
 	std::uint8_t updatePhase = 0;
 	bool homing = false;
 	bool groundClamp = false;
+	/// Also fade when the target is finished and at full health, i.e. the work is done.
+	bool fadeWhenTargetComplete = false;
+	/// Set once the target-lost fade has shortened this particle's life.
+	bool fading = false;
 };
 
 /// Extra spawn context the emitter hands to the system; empty for plain sprays.
 struct SpawnParams {
-	/// Unit the particle should curve toward (or emanate from, when inverse).
-	const CUnit* homingTarget = nullptr;
-	/// Nano piece on `homingTarget` to track, or -1 for its midpos.
-	int homingTargetPiece = -1;
+	/*
+	 * Unit the spray is bound to: the workpiece for a forward spray, the
+	 * builder for an inverse one. Homing follows it when enabled; losing it
+	 * fades the particle out.
+	 */
+	const CUnit* target = nullptr;
+	/// Nano piece on `target` to track, or -1 for its midpos.
+	int targetPiece = -1;
 	/// Reclaim-style particle: it travels from the target back to the builder.
 	bool inverse = false;
+	/*
+	 * The spray represents work that ends when the target is finished and at
+	 * full health - build and repair, but not capture, whose target is usually
+	 * healthy from the start. Fades the particle out when that point is reached.
+	 */
+	bool fadeWhenTargetComplete = false;
 };
 
 /*

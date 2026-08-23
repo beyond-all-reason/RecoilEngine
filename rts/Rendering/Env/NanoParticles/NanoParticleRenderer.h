@@ -67,8 +67,8 @@ private:
 	struct InstanceVertex {
 		float3 startPos;
 		float3 velocity;
-		/// x = createFrame (hash seed), y = deathFrame (fade), z = baseFrame (motion origin).
-		float3 frames;
+		/// x = createFrame (hash seed), y = deathFrame, z = baseFrame (motion origin), w = fadeFrames (ramp before death).
+		float4 frames;
 		SColor color;
 	};
 

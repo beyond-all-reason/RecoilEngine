@@ -299,7 +299,6 @@ void Renderer::SetShaderConfigUniforms()
 	shader->SetUniform("sizeVariation",         ap.sizeVariation);
 	shader->SetUniform("baseAlpha",             ap.baseAlpha);
 	shader->SetUniform("alphaVariation",        ap.alphaVariation);
-	shader->SetUniform("fadeFrames",            ap.fadeFrames);
 	shader->SetUniform("glowScale",             ap.glowScale);
 	shader->SetUniform("glowIntensity",         ap.glowIntensity);
 	shader->SetUniform("glowFalloff",           ap.glowFalloff);
@@ -366,7 +365,7 @@ void Renderer::SetupInstanceVAO()
 
 	glVertexAttribPointer (instanceBase + 0, 3, GL_FLOAT,         GL_FALSE, sizeof(InstanceVertex), VA_TYPE_OFFSET(InstanceVertex, startPos));
 	glVertexAttribPointer (instanceBase + 1, 3, GL_FLOAT,         GL_FALSE, sizeof(InstanceVertex), VA_TYPE_OFFSET(InstanceVertex, velocity));
-	glVertexAttribPointer (instanceBase + 2, 3, GL_FLOAT,         GL_FALSE, sizeof(InstanceVertex), VA_TYPE_OFFSET(InstanceVertex, frames));
+	glVertexAttribPointer (instanceBase + 2, 4, GL_FLOAT,         GL_FALSE, sizeof(InstanceVertex), VA_TYPE_OFFSET(InstanceVertex, frames));
 	glVertexAttribPointer (instanceBase + 3, 4, GL_UNSIGNED_BYTE, GL_TRUE,  sizeof(InstanceVertex), VA_TYPE_OFFSET(InstanceVertex, color));
 
 	instanceBuffer.vbo.Unbind();
@@ -484,6 +483,7 @@ Renderer::InstanceVertex Renderer::MakeVertex(const Particle& particle)
 			static_cast<float>(particle.createFrame),
 			static_cast<float>(particle.deathFrame),
 			static_cast<float>(particle.baseFrame),
+			particle.fadeFrames,
 		},
 		particle.color,
 	};

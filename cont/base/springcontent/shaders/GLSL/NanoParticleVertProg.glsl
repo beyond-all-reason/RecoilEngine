@@ -14,13 +14,13 @@
 
 in vec3 particleStartPos;
 in vec3 particleVelocity;
-in vec3 particleFrames;  // x = createFrame, y = deathFrame, z = baseFrame
+in vec4 particleFrames;  // x = createFrame, y = deathFrame, z = baseFrame, w = fadeFrames
 in vec4 particleColor;
 
 uniform float animationFrame;
 
 out vec3 v_velocity;
-out vec2 v_lifetime;
+out vec3 v_lifetime;  // x = createFrame, y = deathFrame, z = fadeFrames
 out vec4 v_color;
 
 void main()
@@ -29,6 +29,6 @@ void main()
 
 	gl_Position = vec4(particleStartPos + particleVelocity * motionAge, 1.0);
 	v_velocity = particleVelocity;
-	v_lifetime = particleFrames.xy;
+	v_lifetime = particleFrames.xyw;
 	v_color = particleColor;
 }

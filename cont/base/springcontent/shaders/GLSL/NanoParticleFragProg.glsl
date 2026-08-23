@@ -32,6 +32,7 @@ in vec3 g_noiseSeed;
 in vec2 g_glowUV;
 in float g_isGlow;
 in float g_seed;
+in float g_fade;
 
 out vec4 fragColor;
 
@@ -87,7 +88,9 @@ void main()
 		float glowLuma = dot(glowTint, LUMA_WEIGHTS);
 		float glowBoost = min(GLOW_TARGET_LUMA / max(glowLuma, 0.001), GLOW_MAX_BOOST);
 
-		fragColor = vec4(glowTint * tint * (glow * glowBoost), g_color.a * glow);
+		/* Output is premultiplied (blend is ONE, ONE_MINUS_SRC_ALPHA), so the
+		 * fade has to scale colour as well as alpha or the light never dims. */
+		fragColor = vec4(glowTint * tint * (glow * glowBoost), g_color.a * glow) * g_fade;
 		return;
 	}
 
@@ -121,5 +124,5 @@ void main()
 	float hotspot = smoothstep(whiteHotspotThreshold, 1.0, noiseValue) * whiteHotspot;
 	baseColor = mix(baseColor, vec3(1.0) * max(shade, 0.6), hotspot);
 
-	fragColor = vec4(baseColor, g_color.a * alphaMultiplier);
+	fragColor = vec4(baseColor, g_color.a * alphaMultiplier) * g_fade;
 }

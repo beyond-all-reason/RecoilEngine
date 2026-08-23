@@ -272,6 +272,49 @@ namespace {
 	}
 
 	/*
+	 * Whether a bound target has been lost, or has had its work finished. Every
+	 * particle in a stream asks about the same unit, so the unit lookup and the
+	 * health read are done once per target per frame and the particles share it.
+	 */
+	struct TargetStateCacheEntry {
+		int frame = -1;
+		int targetID = -1;
+		std::int64_t targetSyncID = -1;
+		/// Destroyed, cancelled, recycled, or crashing: nothing left to spray at.
+		bool lost = false;
+		/// Finished and at full health: the work this spray represents is done.
+		bool complete = false;
+	};
+
+	std::vector<TargetStateCacheEntry> targetStateCache;
+
+	const TargetStateCacheEntry& GetTargetState(int targetID, std::int64_t targetSyncID)
+	{
+		RECOIL_DETAILED_TRACY_ZONE;
+		const TargetLostFadeConfig& fc = GetConfig().targetLostFadeParams;
+
+		if (targetStateCache.size() != fc.cacheSlots)
+			targetStateCache.assign(fc.cacheSlots, TargetStateCacheEntry{});
+
+		const std::size_t slot = (static_cast<std::uint32_t>(targetID) * HASH_X) & (fc.cacheSlots - 1);
+		TargetStateCacheEntry& entry = targetStateCache[slot];
+		const int frame = gs->frameNum;
+
+		if (entry.frame == frame && entry.targetID == targetID && entry.targetSyncID == targetSyncID)
+			return entry;
+
+		entry.frame = frame;
+		entry.targetID = targetID;
+		entry.targetSyncID = targetSyncID;
+
+		const CUnit* target = unitHandler.GetUnit(targetID);
+
+		entry.lost = (target == nullptr || target->GetSyncID() != targetSyncID || target->isDead || target->IsCrashing());
+		entry.complete = !entry.lost && !target->beingBuilt && (target->health >= target->maxHealth);
+		return entry;
+	}
+
+	/*
 	 * LOS for particles belonging to another allyteam, cached per quantised
 	 * position. Only used to decide what LuaUI is told about; the renderer does
 	 * its own, tighter test against the LOS map.
@@ -362,6 +405,7 @@ void System::Init()
 	groundHeightCache = {};
 	routeCache = {};
 	homingTargetCache.clear();
+	targetStateCache.clear();
 	losCache = {};
 }
 
@@ -373,6 +417,7 @@ void System::Kill()
 	particles.clear();
 	events.clear();
 	homingTargetCache.clear();
+	targetStateCache.clear();
 	groundHeightCache = {};
 	routeCache = {};
 	losCache = {};
@@ -467,13 +512,30 @@ void System::Add(
 	particle.baseFrame = frame;
 	particle.createFrame = frame;
 	particle.deathFrame = frame + adjustedLifeTime;
+	particle.arriveFrame = particle.deathFrame;
 	particle.id = nextParticleID--;
 	particle.allyTeam = allyTeam;
 	particle.builderBuildSpeed = builderBuildSpeed;
 	particle.updatePhase = static_cast<std::uint8_t>(static_cast<std::uint32_t>(-particle.id));
 
-	if (cfg.homing && params.homingTarget != nullptr && (params.inverse || !params.homingTarget->beingBuilt))
-		InitHoming(particle, params.homingTarget, params.homingTargetPiece, adjustedLifeTime);
+	if (params.target != nullptr) {
+		/* Bound regardless of homing, so the target-lost fade can watch it. A
+		 * piece that does not exist on the model falls back to the midpos. */
+		particle.targetID = params.target->id;
+		particle.targetSyncID = params.target->GetSyncID();
+		particle.targetPiece = params.targetPiece;
+		particle.fadeWhenTargetComplete = params.fadeWhenTargetComplete;
+
+		if (particle.targetPiece >= 0 && (!params.target->localModel.Initialized() || !params.target->localModel.HasPiece(particle.targetPiece)))
+			particle.targetPiece = -1;
+
+		/* A unit still under construction has not left the factory pad yet;
+		 * homing onto it would make the spray chase it as it rolls out. */
+		if (cfg.homing && (params.inverse || !params.target->beingBuilt))
+			InitHoming(particle, params.target, adjustedLifeTime);
+	}
+
+	particle.fadeFrames = cfg.appearance.fadeFrames;
 
 	if (cfg.groundClamp)
 		InitGroundClamp(particle, params.inverse, adjustedLifeTime);
@@ -489,20 +551,16 @@ void System::Add(
 }
 
 
-void System::InitHoming(Particle& particle, const CUnit* target, int targetPiece, int lifeTime)
+void System::InitHoming(Particle& particle, const CUnit* target, int lifeTime)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (targetPiece >= 0 && (!target->localModel.Initialized() || !target->localModel.HasPiece(targetPiece)))
-		return;
+	const int targetPiece = particle.targetPiece;
 
 	float3 targetPos = (targetPiece >= 0)
 		? target->GetObjectSpacePos(target->localModel.GetRawPiecePos(targetPiece))
 		: static_cast<float3>(target->midPos);
 
 	particle.homing = true;
-	particle.homingTargetID = target->id;
-	particle.homingTargetSyncID = target->GetSyncID();
-	particle.homingTargetPiece = targetPiece;
 
 	if (targetPiece < 0) {
 		/* Aiming at the midpos would funnel every particle of a stream into one
@@ -576,12 +634,12 @@ bool System::ResolveHomingTarget(Particle& particle, float3& targetPos) const
 	if (!particle.homing)
 		return false;
 
-	if (!GetHomingTargetPos(particle.homingTargetID, particle.homingTargetSyncID, particle.homingTargetPiece, targetPos)) {
+	if (!GetHomingTargetPos(particle.targetID, particle.targetSyncID, particle.targetPiece, targetPos)) {
 		particle.homing = false;
 		return false;
 	}
 
-	if (particle.homingTargetPiece < 0)
+	if (particle.targetPiece < 0)
 		targetPos += particle.homingOffset;
 
 	return true;
@@ -592,7 +650,10 @@ bool System::UpdateGroundClamp(Particle& particle, const float3& currentPos, int
 	RECOIL_DETAILED_TRACY_ZONE;
 	const Config& cfg = GetConfig();
 	const GroundClampConfig& gc = cfg.groundClampParams;
-	const int remainingLife = particle.deathFrame - frame;
+	/* Paced against the arrival schedule: a fade may have pulled deathFrame
+	 * earlier, and dividing the remaining path by that shortened window would
+	 * accelerate the particle toward a target it is meant to dissolve short of. */
+	const int remainingLife = particle.arriveFrame - frame;
 
 	if (remainingLife <= 0)
 		return false;
@@ -638,6 +699,35 @@ bool System::UpdateGroundClamp(Particle& particle, const float3& currentPos, int
 	return true;
 }
 
+bool System::UpdateTargetLostFade(Particle& particle, int frame)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const Config& cfg = GetConfig();
+	const TargetStateCacheEntry& state = GetTargetState(particle.targetID, particle.targetSyncID);
+
+	if (!state.lost && !(particle.fadeWhenTargetComplete && state.complete))
+		return false;
+
+	const int remaining = particle.deathFrame - frame;
+	if (remaining <= 0)
+		return false;
+
+	/* Each particle gets its own window so a stream dissolves unevenly instead
+	 * of winking out on one frame. The window never extends a life, only
+	 * shortens one, and the whole remainder becomes the ramp. */
+	const TargetLostFadeConfig& fc = cfg.targetLostFadeParams;
+	const float jitter = fc.jitterMin + (fc.jitterMax - fc.jitterMin) * guRNG.NextFloat();
+	const int fadeFrames = std::clamp(static_cast<int>(fc.durationFrames * jitter), 1, remaining);
+
+	particle.deathFrame = frame + fadeFrames;
+	particle.fadeFrames = static_cast<float>(fadeFrames);
+	particle.fading = true;
+	/* Homing is left alone: a finished unit is still there to curve toward
+	 * while the spray dissolves, and a destroyed one makes it give up on its
+	 * own the next time it looks. */
+	return true;
+}
+
 bool System::UpdateHoming(Particle& particle, const float3& currentPos, int frame)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -645,7 +735,8 @@ bool System::UpdateHoming(Particle& particle, const float3& currentPos, int fram
 	if (!ResolveHomingTarget(particle, targetPos))
 		return false;
 
-	const int remainingFrames = particle.deathFrame - frame;
+	// arriveFrame, not deathFrame: see UpdateGroundClamp
+	const int remainingFrames = particle.arriveFrame - frame;
 	if (remainingFrames <= 1)
 		return false;
 
@@ -730,7 +821,19 @@ void System::Update()
 		if (!reaimed && homingDue)
 			reaimed = UpdateHoming(particle, currentPos, frame);
 
-		if (reaimed && ++generation == 0)
+		/* Staggered the same way as homing. Once a particle is fading there is
+		 * nothing further to decide, so it drops out of the check entirely. */
+		const bool fadeCheckDue = !particle.fading
+			&& particle.targetID >= 0
+			&& cfg.targetLostFade
+			&& ((frame + (particle.updatePhase % cfg.targetLostFadeParams.checkEveryFrames)) % cfg.targetLostFadeParams.checkEveryFrames) == 0;
+
+		bool faded = false;
+
+		if (fadeCheckDue)
+			faded = UpdateTargetLostFade(particle, frame);
+
+		if ((reaimed || faded) && ++generation == 0)
 			generation = 1;
 
 		if (reportToLua) {
@@ -745,7 +848,7 @@ void System::Update()
 				if (!particle.luaSpawnReported) {
 					QueueEvent(particle, currentPos, EventType::Spawn);
 					particle.luaSpawnReported = true;
-				} else if (reaimed) {
+				} else if (reaimed || faded) {
 					QueueEvent(particle, currentPos, EventType::Update);
 				}
 			}

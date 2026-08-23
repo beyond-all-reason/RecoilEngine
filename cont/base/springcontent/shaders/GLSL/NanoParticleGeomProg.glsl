@@ -25,7 +25,6 @@ uniform float drawRadius;
 uniform float sizeVariation;
 uniform float baseAlpha;
 uniform float alphaVariation;
-uniform float fadeFrames;
 uniform float glowScale;
 uniform float colorEqualize;
 uniform float colorTargetLuma;
@@ -35,7 +34,7 @@ uniform float rotationRatePerFrame;
 uniform vec4 frustumPlanes[6];
 
 in vec3 v_velocity[];
-in vec2 v_lifetime[];
+in vec3 v_lifetime[];  // x = createFrame, y = deathFrame, z = fadeFrames
 in vec4 v_color[];
 
 out vec4 g_color;
@@ -46,7 +45,13 @@ out vec3 g_noiseSeed;
 out vec2 g_glowUV;
 out float g_isGlow;
 out float g_seed;
+/// 1 = full strength, 0 = gone. Applied to the whole fragment, so the halo fades with the shape.
+out float g_fade;
 out float gl_ClipDistance[1];
+
+/* Output variables are undefined after EmitVertex(), so per-particle values
+ * the emit helpers need have to live outside them. */
+float particleFade = 1.0;
 
 const float TAU = 6.2831853;
 const vec3 LUMA_WEIGHTS = vec3(0.2126, 0.7152, 0.0722);
@@ -116,6 +121,7 @@ void emitShapeVertex(
 	g_glowUV = glowUV;
 	g_isGlow = isGlow;
 	g_seed = seed;
+	g_fade = particleFade;
 	gl_Position = gl_ModelViewProjectionMatrix * vec4(g_worldPos, 1.0);
 	gl_ClipDistance[0] = dot(vec4(g_worldPos, 1.0), clipPlane);
 	EmitVertex();
@@ -158,12 +164,16 @@ void main()
 	vec3 center = gl_in[0].gl_Position.xyz;
 	float createFrame = v_lifetime[0].x;
 	float deathFrame = v_lifetime[0].y;
+	float fadeFrames = v_lifetime[0].z;
 
 	if (animationFrame >= deathFrame)
 		return;
 
 	float age = max(animationFrame - createFrame, 0.0);
-	float fade = clamp((deathFrame - animationFrame) / fadeFrames, 0.0, 1.0);
+	/* Per particle: the appearance default normally, or the whole remaining
+	 * life once the target is lost, so the spray dissolves as it coasts. */
+	float fade = clamp((deathFrame - animationFrame) / max(fadeFrames, 0.01), 0.0, 1.0);
+	particleFade = fade;
 
 	/* One hash per particle drives every random-looking property. Seeded from
 	 * velocity and spawn frame so it survives a re-aim unchanged. */
@@ -175,9 +185,10 @@ void main()
 	);
 
 	float sizeMultiplier = 1.0 + sizeVariation * (hash11(particleHash + 7.1) * 2.0 - 1.0);
-	float size = drawRadius * sizeMultiplier * (0.5 + 0.5 * fade);
+	// shrinks all the way to nothing, so the end of a fade is never a pop
+	float size = drawRadius * sizeMultiplier * fade;
 	float alpha = baseAlpha * (1.0 + alphaVariation * (hash11(particleHash + 11.3) * 2.0 - 1.0));
-	vec4 color = vec4(equalizeColor(v_color[0].rgb), max(alpha, 0.0) * fade);
+	vec4 color = vec4(equalizeColor(v_color[0].rgb), max(alpha, 0.0));
 
 	float haloSize = size * glowScale;
 

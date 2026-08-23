@@ -40,7 +40,7 @@ public:
 	void Kill();
 
 	/// Builder emission for one work tick. Mirrors CBuilder::CreateNanoParticle's contract.
-	void EmitBuilderSpray(CBuilder* builder, const float3& goal, float radius, bool inverse, bool highPriority, const CUnit* targetUnit);
+	void EmitBuilderSpray(CBuilder* builder, const float3& goal, float radius, bool inverse, bool highPriority, const CUnit* targetUnit, bool fadeWhenTargetComplete);
 
 	/// Factory emission for one work tick. Mirrors CFactory::CreateNanoParticle's contract.
 	void EmitFactorySpray(CFactory* factory, bool highPriority);

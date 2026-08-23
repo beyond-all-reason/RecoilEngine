@@ -73,11 +73,12 @@ public:
 
 private:
 	void Add(const float3& startPos, const float3& velocity, int lifeTime, const SColor& color, int allyTeam, float builderBuildSpeed, const SpawnParams& params);
-	void InitHoming(Particle& particle, const CUnit* target, int targetPiece, int lifeTime);
+	void InitHoming(Particle& particle, const CUnit* target, int lifeTime);
 	void InitGroundClamp(Particle& particle, bool inverse, int lifeTime);
 	bool ResolveHomingTarget(Particle& particle, float3& targetPos) const;
 	bool UpdateGroundClamp(Particle& particle, const float3& currentPos, int frame);
 	bool UpdateHoming(Particle& particle, const float3& currentPos, int frame);
+	bool UpdateTargetLostFade(Particle& particle, int frame);
 	static void Reaim(Particle& particle, const float3& fromPos, const float3& targetPos, int frame, int remainingFrames);
 
 	bool ShouldReportToLua(const Particle& particle) const;

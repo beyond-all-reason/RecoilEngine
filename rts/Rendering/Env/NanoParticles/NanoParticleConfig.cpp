@@ -40,6 +40,9 @@ CONFIG(float, NanoParticlesRate)
 	.minimumValue(0.0f)
 	.maximumValue(1.0f)
 	.description("Per-emitter nano emission multiplier; also scales the minimum visual feedback cadence");
+CONFIG(bool, NanoParticlesTargetLostFade)
+	.defaultValue(true)
+	.description("Nano particles fade out and shrink when the unit they were aimed at is destroyed, cancelled, or finished, instead of flying on into nothing");
 CONFIG(bool, NanoParticlesUpdateLuaUI)
 	.defaultValue(false)
 	.safemodeValue(false)
@@ -63,6 +66,7 @@ namespace {
 		"NanoParticlesGroundClamp",
 		"NanoParticlesReclaimBurst",
 		"NanoParticlesRate",
+		"NanoParticlesTargetLostFade",
 		"NanoParticlesUpdateLuaUI",
 		"NanoParticlesUpdateLuaUISampleRate",
 	};
@@ -82,6 +86,7 @@ void InitConfig()
 	config.reclaimBurst          = configHandler->GetBool("NanoParticlesReclaimBurst");
 	config.luaUpdates            = configHandler->GetBool("NanoParticlesUpdateLuaUI");
 	config.rate                  = std::clamp(configHandler->GetFloat("NanoParticlesRate"), 0.0f, 1.0f);
+	config.targetLostFade        = configHandler->GetBool("NanoParticlesTargetLostFade");
 	config.luaUpdate.sampleRate  = std::clamp(configHandler->GetFloat("NanoParticlesUpdateLuaUISampleRate"), 0.0f, 1.0f);
 
 	++config.generation;
@@ -103,6 +108,7 @@ bool ReloadConfigSetting(const std::string& key)
 		|| previous.reclaimBurst != config.reclaimBurst
 		|| previous.luaUpdates != config.luaUpdates
 		|| previous.rate != config.rate
+		|| previous.targetLostFade != config.targetLostFade
 		|| previous.luaUpdate.sampleRate != config.luaUpdate.sampleRate;
 }
 

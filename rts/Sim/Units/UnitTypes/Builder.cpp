@@ -351,12 +351,8 @@ bool CBuilder::UpdateBuild(const Command& fCommand)
 	if (curBuildee->buildProgress >= 1.0f)
 		adjBuildSpeed = std::min(repairSpeed, unitDef->maxRepairSpeed * 0.5f - curBuildee->repairAmount); // repair
 
-	const bool wasBeingBuilt = curBuildee->beingBuilt;
-
 	if (adjBuildSpeed > 0.0f && curBuildee->AddBuildPower(this, adjBuildSpeed)) {
-		/* A unit still under construction has not left the factory pad yet;
-		 * tracking it would make the spray chase it as it rolls out. */
-		CreateNanoParticle(curBuildee->midPos, curBuildee->radius * 0.5f, false, false, wasBeingBuilt ? nullptr : curBuildee);
+		CreateNanoParticle(curBuildee->midPos, curBuildee->radius * 0.5f, false, false, curBuildee, true);
 		return true;
 	}
 
@@ -982,11 +978,11 @@ void CBuilder::HelpTerraform(CBuilder* unit)
 }
 
 
-void CBuilder::CreateNanoParticle(const float3& goal, float radius, bool inverse, bool highPriority, const CUnit* targetUnit)
+void CBuilder::CreateNanoParticle(const float3& goal, float radius, bool inverse, bool highPriority, const CUnit* targetUnit, bool fadeWhenTargetComplete)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (NanoParticles::system.Enabled()) {
-		NanoParticles::emitter.EmitBuilderSpray(this, goal, radius, inverse, highPriority, targetUnit);
+		NanoParticles::emitter.EmitBuilderSpray(this, goal, radius, inverse, highPriority, targetUnit, fadeWhenTargetComplete);
 		return;
 	}
 

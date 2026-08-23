@@ -118,6 +118,29 @@ struct GroundClampConfig {
 	std::array<float, 8> longSamples = {0.12f, 0.22f, 0.35f, 0.50f, 0.65f, 0.78f, 0.90f, 0.96f};
 };
 
+/*
+ * Fading a particle out when the unit it was bound to is lost - destroyed,
+ * cancelled mid-build, crashing - or, for build and repair spray, when the work
+ * is done. Rather than vanishing or flying on into nothing, the trailing spray
+ * keeps its course and dissolves: alpha and size ramp down over a per-particle
+ * window, and the particle dies when the window closes.
+ */
+struct TargetLostFadeConfig {
+	/// Base fade duration, in frames.
+	float durationFrames = 30.0f;
+	/// Check each particle's target every Nth frame, staggered per particle.
+	int checkEveryFrames = 4;
+	/*
+	 * Per-particle fade duration is durationFrames scaled by a random factor in
+	 * [jitterMin, jitterMax), so a stream dissolves unevenly rather than
+	 * winking out on one frame.
+	 */
+	float jitterMin = 0.75f;
+	float jitterMax = 1.25f;
+	/// Slots in the per-frame target-state cache. Power of two.
+	std::uint32_t cacheSlots = 256;
+};
+
 /// Line-of-sight filtering of particles belonging to other allyteams.
 struct VisibilityConfig {
 	/// An LOS answer is reused for this many frames.
@@ -233,12 +256,15 @@ struct Config {
 	bool luaUpdates = false;
 	/// Global emission multiplier, 0-1.
 	float rate = 0.32f;
+	/// Dissolve particles whose target is lost; see TargetLostFadeConfig.
+	bool targetLostFade = true;
 
 	// --- compiled-in defaults, tuned here ---------------------------------
 	EmissionConfig emission;
 	ReclaimBurstConfig reclaimBurstParams;
 	HomingConfig homingParams;
 	GroundClampConfig groundClampParams;
+	TargetLostFadeConfig targetLostFadeParams;
 	VisibilityConfig visibility;
 	RenderConfig render;
 	AppearanceConfig appearance;

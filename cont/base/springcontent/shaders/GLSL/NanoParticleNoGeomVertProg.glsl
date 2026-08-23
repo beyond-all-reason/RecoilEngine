@@ -21,7 +21,7 @@ in float templateIsGlow;
 // particle (per instance)
 in vec3 particleStartPos;
 in vec3 particleVelocity;
-in vec3 particleFrames;  // x = createFrame, y = deathFrame, z = baseFrame
+in vec4 particleFrames;  // x = createFrame, y = deathFrame, z = baseFrame, w = fadeFrames
 in vec4 particleColor;
 
 uniform float animationFrame;
@@ -33,7 +33,6 @@ uniform float drawRadius;
 uniform float sizeVariation;
 uniform float baseAlpha;
 uniform float alphaVariation;
-uniform float fadeFrames;
 uniform float glowScale;
 uniform float colorEqualize;
 uniform float colorTargetLuma;
@@ -50,6 +49,8 @@ out vec3 g_noiseSeed;
 out vec2 g_glowUV;
 out float g_isGlow;
 out float g_seed;
+/// 1 = full strength, 0 = gone. Applied to the whole fragment, so the halo fades with the shape.
+out float g_fade;
 out float gl_ClipDistance[1];
 
 const float TAU = 6.2831853;
@@ -77,6 +78,7 @@ void discardVertex()
 	g_glowUV = vec2(0.0);
 	g_isGlow = 0.0;
 	g_seed = 0.0;
+	g_fade = 0.0;
 	gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
 	gl_ClipDistance[0] = 1.0;
 }
@@ -117,6 +119,7 @@ void main()
 	float createFrame = particleFrames.x;
 	float deathFrame = particleFrames.y;
 	float baseFrame = particleFrames.z;
+	float fadeFrames = particleFrames.w;
 
 	// the buffer is rebuilt on a cadence, so a particle can outlive its last upload
 	if (animationFrame >= deathFrame) {
@@ -126,7 +129,7 @@ void main()
 
 	float age = max(animationFrame - createFrame, 0.0);
 	float motionAge = max(animationFrame - baseFrame, 0.0);
-	float fade = clamp((deathFrame - animationFrame) / fadeFrames, 0.0, 1.0);
+	float fade = clamp((deathFrame - animationFrame) / max(fadeFrames, 0.01), 0.0, 1.0);
 	vec3 center = particleStartPos + particleVelocity * motionAge;
 
 	float particleHash = dot(particleVelocity, vec3(12.9898, 78.233, 37.719)) + createFrame * 0.6180339;
@@ -137,7 +140,8 @@ void main()
 	);
 
 	float sizeMultiplier = 1.0 + sizeVariation * (hash11(particleHash + 7.1) * 2.0 - 1.0);
-	float size = drawRadius * sizeMultiplier * (0.5 + 0.5 * fade);
+	// shrinks all the way to nothing, so the end of a fade is never a pop
+	float size = drawRadius * sizeMultiplier * fade;
 	float alpha = baseAlpha * (1.0 + alphaVariation * (hash11(particleHash + 11.3) * 2.0 - 1.0));
 
 	float haloSize = size * glowScale;
@@ -147,8 +151,9 @@ void main()
 		return;
 	}
 
-	g_color = vec4(equalizeColor(particleColor.rgb), max(alpha, 0.0) * fade);
+	g_color = vec4(equalizeColor(particleColor.rgb), max(alpha, 0.0));
 	g_seed = randomValues.x * TAU;
+	g_fade = fade;
 
 	vec3 worldOffset;
 	if (templateIsGlow > 0.5) {
