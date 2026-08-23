@@ -267,6 +267,10 @@ endif (NO_CREG)
 
 option(NO_SOUND "No sound output support" FALSE)
 
+# Pulls in prometheus-cpp and the civetweb HTTP server it vendors. Applies to
+# every target that can host a game, ie. both normal client and dedicated.
+option(ENABLE_METRICS "Build the Prometheus /metrics endpoint" TRUE)
+
 if    (WIN32)
 	## internal AVI recorder (w/o sound atm)
 	option(NO_AVI "Disable in-game video recording" FALSE)

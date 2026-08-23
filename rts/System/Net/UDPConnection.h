@@ -237,12 +237,7 @@ private:
 	#endif
 	unsigned int currentPacketChunkNum;
 
-	/// packets that are resent
-	unsigned int resentOutgoingChunks;
-	unsigned int duplicateIncomingChunks;
-
-	unsigned int sentOverhead, recvOverhead;
-	unsigned int sentPackets, recvPackets;
+	UdpStats::Accumulated accumulatedStats;
 
 	class BandwidthUsage {
 	public:
