@@ -1560,9 +1560,11 @@ bool CUnit::ChangeTeam(int newteam, ChangeType type)
 		teamHandler.Team(newteam)->resStorage += storage;
 	}
 
-	// Deactivate pinpointers before team change to remove any bonuses applied to current team.
-	if (activated && unitDef->targfac && !teamHandler.AlliedTeams(oldteam, newteam))
-		Deactivate();
+	// Move targeting-upgrade radar error between allyteams before allyteam is reassigned.
+	if (!beingBuilt && activated && unitDef->targfac) {
+		losHandler->IncreaseAllyTeamRadarErrorSize(allyteam);
+		losHandler->DecreaseAllyTeamRadarErrorSize(teamHandler.AllyTeam(newteam));
+	}
 
 	team = newteam;
 	if (paletteIndex == static_cast<uint16_t>(oldteam))
