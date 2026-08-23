@@ -1560,7 +1560,6 @@ bool CUnit::ChangeTeam(int newteam, ChangeType type)
 		teamHandler.Team(newteam)->resStorage += storage;
 	}
 
-	// Move targeting-upgrade radar error between allyteams before allyteam is reassigned.
 	if (!beingBuilt && activated && unitDef->targfac) {
 		losHandler->IncreaseAllyTeamRadarErrorSize(allyteam);
 		losHandler->DecreaseAllyTeamRadarErrorSize(teamHandler.AllyTeam(newteam));
