@@ -47,8 +47,12 @@ PID=$!
 echo "engine pid $PID, ceiling $((MAX_RSS_KB / 1024)) MiB, limit ${LIMIT_SECONDS}s"
 
 KILLED_FOR_MEMORY=0
-ELAPSED=0
 PEAK_KB=0
+
+# wall clock, not iterations: the sampling commands in the loop cost about as
+# much time as the sleep, so counting iterations ran a 180s limit for 300s
+SECONDS=0
+ELAPSED=0
 
 while kill -0 "$PID" 2>/dev/null; do
 	# Cap on ps RSS, which is known to behave. Log the others beside it: RSS
@@ -90,7 +94,7 @@ while kill -0 "$PID" 2>/dev/null; do
 	fi
 
 	sleep "$POLL_SECONDS"
-	ELAPSED=$((ELAPSED + POLL_SECONDS))
+	ELAPSED=$SECONDS
 done
 
 sleep 3
