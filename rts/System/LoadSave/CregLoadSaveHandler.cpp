@@ -219,6 +219,8 @@ static void PrintSize(const char* txt, int size)
 static void ReadString(std::istream& s, std::string& str)
 {
 	std::getline(s, str, '\0');
+	if (str.length() > MAX_STRING_SIZE)
+		throw content_error("[creg::ReadString] string too long");
 }
 
 
