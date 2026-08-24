@@ -8,6 +8,7 @@
 #include <SDL.h>
 
 #include "GlobalRendering.h"
+#include "Rendering/GL/FramePhaseDump.h"
 #include "GlobalRenderingInfo.h"
 #include "Rendering/VerticalSync.h"
 #include "Rendering/GL/StreamBuffer.h"
@@ -798,6 +799,11 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 
 		//https://stackoverflow.com/questions/68480028/supporting-opengl-screen-capture-by-third-party-applications
 		glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, 0);
+
+		// TEMP diagnostic, not for merge. The last dump inside CGame::Draw is
+		// 6-screenpost. Anything visible on screen but absent from this dump is
+		// introduced by the present path rather than by any draw phase.
+		DumpFramePhase("7-presented");
 		
 		#ifdef _WIN32
 			using DwmFlushT = HRESULT(WINAPI*)();

@@ -41,6 +41,7 @@
 #include "Rendering/CommandDrawer.h"
 #include "Rendering/LineDrawer.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/GL/FramePhaseDump.h"
 #include "Rendering/DebugDrawerAI.h"
 #include "Rendering/HUDDrawer.h"
 #include "Rendering/IconHandler.h"
@@ -1512,6 +1513,8 @@ bool CGame::Draw() {
 		worldDrawer.ResetMVPMatrices();
 	}
 
+	DumpFramePhase("1-world");
+
 	{
 		SCOPED_TIMER("Draw::Screen");
 		SCOPED_GL_DEBUGGROUP("Draw::Screen");
@@ -1525,11 +1528,19 @@ bool CGame::Draw() {
 
 		DrawInputReceivers();
 		DrawInputText();
+		DumpFramePhase("2-receivers");
+
 		DrawInterfaceWidgets();
+		DumpFramePhase("3-widgets");
+
 		RmlGui::RenderFrame();
+		DumpFramePhase("4-rml");
+
 		mouse->DrawCursor();
+		DumpFramePhase("5-cursor");
 
 		eventHandler.DrawScreenPost();
+		DumpFramePhase("6-screenpost");
 	}
 
 	glEnable(GL_DEPTH_TEST);
@@ -1567,6 +1578,7 @@ void CGame::DrawInputReceivers()
 			SCOPED_TIMER("Draw::Screen::InputReceivers");
 			CInputReceiver::DrawReceivers();
 		}
+		DumpFramePhase("2a-engine-receivers");
 		{
 			// this has MANUAL ordering, draw it last (front-most)
 			SCOPED_TIMER("Draw::Screen::DrawScreen");
