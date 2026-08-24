@@ -76,6 +76,7 @@ CR_REG_METADATA(CCommandAI, (
 	CR_MEMBER(repeatOrders),
 	CR_MEMBER(lastSelectedCommandPage),
 	CR_MEMBER(inCommand),
+	CR_MEMBER(groundAttackSalvosFired),
 	CR_MEMBER(commandDeathDependences),
 	CR_MEMBER(targetLostTimer),
 
@@ -93,6 +94,7 @@ CCommandAI::CCommandAI():
 	inCommand(CMD_STOP),
 	repeatOrders(false),
 	lastSelectedCommandPage(0),
+	groundAttackSalvosFired(0),
 	targetLostTimer(TARGET_LOST_TIMER)
 {}
 
@@ -107,6 +109,7 @@ CCommandAI::CCommandAI(CUnit* owner):
 	inCommand(CMD_STOP),
 	repeatOrders(false),
 	lastSelectedCommandPage(0),
+	groundAttackSalvosFired(0),
 	targetLostTimer(TARGET_LOST_TIMER)
 {
 	{
@@ -131,6 +134,19 @@ CCommandAI::CCommandAI(CUnit* owner):
 		c.action    = "attack";
 		c.name      = "Attack";
 		c.tooltip   = c.name + ": Attacks a unit or a position on the ground";
+		c.mouseicon = c.name;
+		possibleCommands.push_back(commandDescriptionCache.GetPtr(std::move(c)));
+	}
+
+	if (owner->unitDef->canAreaAttack && IsAttackCapable()) {
+		SCommandDescription c;
+
+		c.id   = CMD_AREA_ATTACK;
+		c.type = CMDTYPE_ICON_AREA;
+
+		c.action    = "areaattack";
+		c.name      = "Area attack";
+		c.tooltip   = c.name + ": Attacks positions within a circle";
 		c.mouseicon = c.name;
 		possibleCommands.push_back(commandDescriptionCache.GetPtr(std::move(c)));
 	}
@@ -686,6 +702,11 @@ bool CCommandAI::AllowedCommand(const Command& c, bool fromSynced)
 	const bool aiOrder = !teamAIs.empty(); // assume no sharing with AI
 
 	switch (cmdID) {
+		case CMD_AREA_ATTACK: {
+			if (!ud->canAreaAttack || !IsAttackCapable())
+				return false;
+		} break;
+
 		case CMD_MANUALFIRE: {
 			if (!ud->canManualFire)
 				return false;
@@ -958,6 +979,13 @@ void CCommandAI::ClearTargetLock(const Command &c) {
 void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (c.GetID() == CMD_AREA_ATTACK && c.GetNumParams() < 4) {
+		Command attackCmd(CMD_ATTACK, c.GetOpts());
+		attackCmd.CopyParams(c);
+		GiveAllowedCommand(attackCmd, fromSynced);
+		return;
+	}
+
 	if (ExecuteStateCommand(c))
 		return;
 
@@ -1501,6 +1529,8 @@ void CCommandAI::ExecuteAttack(Command& c)
 			return;
 		}
 	} else {
+		groundAttackSalvosFired = 0;
+
 		if (c.GetNumParams() == 1) {
 			CUnit* targetUnit = unitHandler.GetUnit(c.GetParam(0));
 
@@ -1525,6 +1555,39 @@ void CCommandAI::ExecuteAttack(Command& c)
 			inCommand = CMD_ATTACK;
 		}
 	}
+}
+
+
+void CCommandAI::ExecuteAreaAttack(Command& c)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	assert(owner->unitDef->canAreaAttack);
+
+	if (inCommand == CMD_ATTACK)
+		return;
+
+	groundAttackSalvosFired = 0;
+	inCommand = CMD_ATTACK;
+	SelectNewAreaAttackTargetOrPos(c);
+}
+
+
+bool CCommandAI::SelectNewAreaAttackTargetOrPos(const Command& ac)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	assert(ac.GetID() == CMD_AREA_ATTACK);
+
+	if (ac.GetID() != CMD_AREA_ATTACK || ac.GetNumParams() < 4)
+		return false;
+
+	const float3& pos = ac.GetPos(0);
+	const float radius = ac.GetParam(3);
+
+	float3 attackPos = pos + (gsRNG.NextVector() * radius);
+	attackPos.y = CGround::GetHeightAboveWater(attackPos.x, attackPos.z);
+
+	owner->AttackGround(attackPos, !ac.IsInternalOrder(), false);
+	return true;
 }
 
 
@@ -1571,6 +1634,10 @@ void CCommandAI::SlowUpdate()
 		}
 		case CMD_ATTACK: {
 			ExecuteAttack(c);
+			return;
+		}
+		case CMD_AREA_ATTACK: {
+			ExecuteAreaAttack(c);
 			return;
 		}
 		case CMD_MANUALFIRE: {
@@ -1674,6 +1741,7 @@ void CCommandAI::FinishCommand()
 
 	inCommand = CMD_STOP;
 	targetDied = false;
+	groundAttackSalvosFired = 0;
 
 	SetOrderTarget(nullptr);
 	eoh->CommandFinished(*owner, cmd);
@@ -1754,27 +1822,36 @@ void CCommandAI::WeaponFired(CWeapon* weapon, const bool searchForNewTarget, boo
 	bool orderFinished = false;
 
 	if (searchForNewTarget) {
+		bool groundAttackSalvoComplete = false;
+
+		if (haveGroundAttackCmd || haveAreaAttackCmd) {
+			groundAttackSalvosFired += 1;
+			groundAttackSalvoComplete = (groundAttackSalvosFired >= owner->unitDef->groundAttackSalvoSize);
+
+			if (groundAttackSalvoComplete)
+				groundAttackSalvosFired = 0;
+		}
+
 		// manual fire or attack commands with meta will only fire a single salvo
-		// noAutoTarget weapons finish an attack commands after a
-		// salvo if they have more orders queued
+		// Ground-attack commands finish after a salvo if they have more
+		// movement orders queued. The last ground attack remains active.
 		if (weapon->weaponDef->manualfire && !(c.GetOpts() & META_KEY))
 			orderFinished = true;
 
-		if (weapon->noAutoTarget && !(c.GetOpts() & META_KEY) && haveGroundAttackCmd && HasMoreMoveCommands())
+		const bool advanceQueuedGroundAttack =
+			!(c.GetOpts() & META_KEY) &&
+			(haveGroundAttackCmd || haveAreaAttackCmd) &&
+			groundAttackSalvoComplete &&
+			HasMoreMoveCommands();
+
+		if (advanceQueuedGroundAttack)
 			orderFinished = true;
 
-		// if we have an area-attack command and this was the
-		// last salvo of our main weapon, assume we completed an attack
-		// (run) on one position and move to the next
-		//
-		// if we have >= 2 consecutive CMD_ATTACK's, then
-		//   SelectNAATP --> FinishCommand (inCommand=false) -->
-		//   SlowUpdate --> ExecuteAttack (inCommand=true) -->
-		//   queue has advanced
-		//
-		// @SelectNewAreaAttackTargetOrPos
-		// return argument says if a new area attack target was chosen, else finish current command
-		if (haveAreaAttackCmd) {
+		// A queued area attack advances after one configured salvo at its
+		// current random position. The final area attack keeps choosing new
+		// positions in its circle; Repeat rotates completed queued circles.
+		// The return value says whether a new target was chosen.
+		if (haveAreaAttackCmd && groundAttackSalvoComplete && !orderFinished) {
 			orderFinished = !SelectNewAreaAttackTargetOrPos(c);
 		}
 	}
@@ -1861,4 +1938,3 @@ void CCommandAI::StopAttackingAllyTeam(int ally)
 	RECOIL_DETAILED_TRACY_ZONE;
 	StopAttackingTargetIf([&](const CUnit* t) { return (t != nullptr && t->allyteam == ally); });
 }
-

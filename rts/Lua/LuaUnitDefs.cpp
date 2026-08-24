@@ -785,6 +785,8 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_BOOL("canSelfRepair",         ud.canSelfRepair);
 	ADD_BOOL("canReclaim",            ud.canReclaim);
 	ADD_BOOL("canAttack",             ud.canAttack);
+	ADD_BOOL("canAreaAttack",         ud.canAreaAttack);
+	ADD_INT( "groundAttackSalvoSize", ud.groundAttackSalvoSize);
 	ADD_BOOL("canPatrol",             ud.canPatrol);
 	ADD_BOOL("canFight",              ud.canFight);
 	ADD_BOOL("canGuard",              ud.canGuard);

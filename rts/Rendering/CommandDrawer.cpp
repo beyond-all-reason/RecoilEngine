@@ -34,6 +34,32 @@ static const CUnit* GetTrackableUnit(const CUnit* caiOwner, const CUnit* cmdUnit
 	return cmdUnit;
 }
 
+void CommandDrawer::DrawAreaAttackCommand(const CCommandAI* cai, const Command& cmd) const
+{
+	const CUnit* owner = cai->owner;
+
+	if (
+		cai->inCommand == CMD_ATTACK &&
+		!cai->commandQue.empty() &&
+		&cmd == &cai->commandQue.front() &&
+		owner->curTarget.type == Target_Pos
+	) {
+		glSurfaceCircle(
+			owner->curTarget.groundPos,
+			13.0f,
+			{ cmdColors.attack },
+			64
+		);
+	}
+
+	const float3& endPos = cmd.GetPos(0);
+
+	lineDrawer.DrawLineAndIcon(CMD_AREA_ATTACK, endPos, cmdColors.attack);
+	lineDrawer.Break(endPos, cmdColors.attack);
+	glSurfaceCircle(endPos, cmd.GetParam(3), { cmdColors.attack }, cmdCircleResolution);
+	lineDrawer.RestartWithColor(cmdColors.attack);
+}
+
 CommandDrawer* CommandDrawer::GetInstance() {
 	// luaQueuedUnitSet gets cleared each frame, so this is fine wrt. reloading
 	static CommandDrawer drawer;
@@ -130,6 +156,9 @@ void CommandDrawer::DrawCommands(const CCommandAI* cai, int queueDrawDepth) cons
 					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
 				}
 			} break;
+			case CMD_AREA_ATTACK: {
+				DrawAreaAttackCommand(cai, *ci);
+			} break;
 
 			case CMD_WAIT: {
 				DrawWaitIcon(*ci);
@@ -198,14 +227,7 @@ void CommandDrawer::DrawAirCAICommands(const CAirCAI* cai, int queueDrawDepth) c
 			} break;
 
 			case CMD_AREA_ATTACK: {
-				const float3& endPos = ci->GetPos(0);
-
-				lineDrawer.DrawLineAndIcon(cmdID, endPos, cmdColors.attack);
-				lineDrawer.Break(endPos, cmdColors.attack);
-
-				glSurfaceCircle(endPos, ci->GetParam(3), { cmdColors.attack }, cmdCircleResolution);
-
-				lineDrawer.RestartWithColor(cmdColors.attack);
+				DrawAreaAttackCommand(cai, *ci);
 			} break;
 
 			case CMD_GUARD: {
@@ -453,6 +475,9 @@ void CommandDrawer::DrawFactoryCAICommands(const CFactoryCAI* cai, int queueDraw
 					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
 				}
 			} break;
+			case CMD_AREA_ATTACK: {
+				DrawAreaAttackCommand(cai, *ci);
+			} break;
 
 			case CMD_GUARD: {
 				const CUnit* unit = GetTrackableUnit(owner, unitHandler.GetUnit(ci->GetParam(0)));
@@ -543,6 +568,9 @@ void CommandDrawer::DrawMobileCAICommands(const CMobileCAI* cai, int queueDrawDe
 
 					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
 				}
+			} break;
+			case CMD_AREA_ATTACK: {
+				DrawAreaAttackCommand(cai, *ci);
 			} break;
 
 			case CMD_GUARD: {
@@ -797,4 +825,3 @@ void CommandDrawer::DrawQuedBuildingSquares(const CBuilderCAI* cai) const
 		glDisableClientState(GL_VERTEX_ARRAY);
 	}
 }
-

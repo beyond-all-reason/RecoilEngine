@@ -27,7 +27,7 @@ public:
 //	void StopMove();
 
 	void ExecuteGuard(Command& c) override;
-	void ExecuteAreaAttack(Command& c);
+	void ExecuteAreaAttack(Command& c) override;
 	void ExecuteAttack(Command& c) override;
 	void ExecuteFight(Command& c) override;
 	void ExecuteMove(Command& c) override;

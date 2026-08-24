@@ -279,6 +279,8 @@ public:
 	// order-capabilities for CommandAI
 	bool canmove;
 	bool canAttack;
+	bool canAreaAttack;
+	int groundAttackSalvoSize;
 	bool canFight;
 	bool canPatrol;
 	bool canGuard;

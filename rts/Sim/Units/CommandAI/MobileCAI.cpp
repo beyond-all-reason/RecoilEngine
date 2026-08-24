@@ -366,11 +366,12 @@ void CMobileCAI::Execute()
 	Command& c = commandQue.front();
 
 	switch (c.GetID()) {
-		case CMD_MOVE:      { ExecuteMove(c);     return; }
-		case CMD_PATROL:    { ExecutePatrol(c);   return; }
-		case CMD_FIGHT:     { ExecuteFight(c);    return; }
-		case CMD_GUARD:     { ExecuteGuard(c);    return; }
-		case CMD_LOAD_ONTO: { ExecuteLoadOnto(c); return; }
+		case CMD_MOVE:        { ExecuteMove(c);       return; }
+		case CMD_PATROL:      { ExecutePatrol(c);     return; }
+		case CMD_FIGHT:       { ExecuteFight(c);      return; }
+		case CMD_GUARD:       { ExecuteGuard(c);      return; }
+		case CMD_AREA_ATTACK: { ExecuteAreaAttack(c); return; }
+		case CMD_LOAD_ONTO:   { ExecuteLoadOnto(c);   return; }
 	}
 
 	if (owner->unitDef->IsTransportUnit()) {
@@ -966,6 +967,30 @@ void CMobileCAI::ExecuteAttack(Command& c)
 		ExecuteGroundAttack(c);
 		return;
 	}
+}
+
+
+void CMobileCAI::ExecuteAreaAttack(Command& c)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	assert(owner->unitDef->canAreaAttack);
+
+	const float3& pos = c.GetPos(0);
+	const float radius = c.GetParam(3);
+	const float goalRadius = std::max(owner->maxRange - radius, static_cast<float>(SQUARE_SIZE));
+
+	if (owner->pos.SqDistance2D(pos) > Square(goalRadius)) {
+		if (inCommand == CMD_ATTACK) {
+			owner->DropCurrentAttackTarget();
+			inCommand = CMD_STOP;
+		}
+
+		SetGoal(pos, owner->pos, goalRadius);
+		return;
+	}
+
+	StopMove();
+	CCommandAI::ExecuteAreaAttack(c);
 }
 
 

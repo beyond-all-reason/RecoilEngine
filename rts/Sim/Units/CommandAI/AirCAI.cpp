@@ -69,19 +69,6 @@ CAirCAI::CAirCAI(CUnit* owner)
 {
 	cancelDistance = 16000;
 
-	if (owner->unitDef->canAttack) {
-		SCommandDescription c;
-
-		c.id   = CMD_AREA_ATTACK;
-		c.type = CMDTYPE_ICON_AREA;
-
-		c.action    = "areaattack";
-		c.name      = "Area attack";
-		c.tooltip   = c.name + ": Sets the aircraft to attack enemy units within a circle";
-		c.mouseicon = c.name;
-		possibleCommands.push_back(commandDescriptionCache.GetPtr(std::move(c)));
-	}
-
 	basePos = owner->pos;
 }
 
@@ -153,13 +140,6 @@ void CAirCAI::GiveCommandReal(const Command& c, bool fromSynced)
 	if (!(c.GetOpts() & SHIFT_KEY) && nonQueingCommands.find(c.GetID()) == nonQueingCommands.end()) {
 		activeCommand = 0;
 		tempOrder = false;
-	}
-
-	if (c.GetID() == CMD_AREA_ATTACK && c.GetNumParams() < 4) {
-		Command c2(CMD_ATTACK, c.GetOpts());
-		c2.CopyParams(c);
-		CCommandAI::GiveAllowedCommand(c2);
-		return;
 	}
 
 	CCommandAI::GiveAllowedCommand(c);
@@ -596,4 +576,3 @@ bool CAirCAI::SelectNewAreaAttackTargetOrPos(const Command& ac)
 
 	return true;
 }
-

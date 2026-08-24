@@ -33,6 +33,7 @@ private:
 	void DrawFactoryCAICommands(const CFactoryCAI*, int queueDrawDepth) const;
 	void DrawMobileCAICommands(const CMobileCAI*, int queueDrawDepth) const;
 
+	void DrawAreaAttackCommand(const CCommandAI*, const Command&) const;
 	void DrawWaitIcon(const Command&) const;
 	void DrawDefaultCommand(const Command&, const CUnit*) const;
 

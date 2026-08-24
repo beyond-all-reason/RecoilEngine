@@ -166,6 +166,8 @@ UnitDef::UnitDef()
 
 	, canmove(false)
 	, canAttack(false)
+	, canAreaAttack(false)
+	, groundAttackSalvoSize(1)
 	, canFight(false)
 	, canPatrol(false)
 	, canGuard(false)
@@ -383,6 +385,7 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	canPatrol    = udTable.GetBool("canPatrol",       true);
 	canGuard     = udTable.GetBool("canGuard",        true);
 	canRepeat    = udTable.GetBool("canRepeat",       true);
+	groundAttackSalvoSize = std::max(udTable.GetInt("groundAttackSalvoSize", 1), 1);
 	canCloak     = udTable.GetBool("canCloak",        (udTable.GetFloat("cloakCost", 0.0f) != 0.0f));
 	canSelfD     = udTable.GetBool("canSelfDestruct", true);
 	canKamikaze  = udTable.GetBool("kamikaze",        false);
@@ -633,6 +636,10 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 			}
 		}
 	}
+
+	// Preserve the historical default for strafing aircraft while allowing
+	// games to opt other unit types into the native area-attack command.
+	canAreaAttack = udTable.GetBool("canAreaAttack", IsStrafingAirUnit());
 
 	if (IsAirUnit()) {
 		if (IsFighterAirUnit() || IsBomberAirUnit()) {
@@ -908,4 +915,3 @@ bool UnitDef::HasBomberWeapon(unsigned int idx) const {
 	assert(HasWeapon(idx));
 	return (weapons[idx].def->IsAircraftWeapon());
 }
-
