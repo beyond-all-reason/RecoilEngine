@@ -1568,11 +1568,11 @@ void CCommandAI::ExecuteAreaAttack(Command& c)
 
 	groundAttackSalvosFired = 0;
 	inCommand = CMD_ATTACK;
-	SelectNewAreaAttackTargetOrPos(c);
+	SelectNewAreaAttackPos(c);
 }
 
 
-bool CCommandAI::SelectNewAreaAttackTargetOrPos(const Command& ac)
+bool CCommandAI::SelectNewAreaAttackPos(const Command& ac)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(ac.GetID() == CMD_AREA_ATTACK);
@@ -1852,7 +1852,7 @@ void CCommandAI::WeaponFired(CWeapon* weapon, const bool searchForNewTarget, boo
 		// positions in its circle; Repeat rotates completed queued circles.
 		// The return value says whether a new target was chosen.
 		if (haveAreaAttackCmd && groundAttackSalvoComplete && !orderFinished) {
-			orderFinished = !SelectNewAreaAttackTargetOrPos(c);
+			orderFinished = !SelectNewAreaAttackPos(c);
 		}
 	}
 

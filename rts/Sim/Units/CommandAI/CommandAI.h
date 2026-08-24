@@ -137,7 +137,7 @@ public:
 protected:
 	bool HandleBuildOptionInsertion(int cmdId);
 	bool HandleBuildOptionRemoval(int cmdId);
-	virtual bool SelectNewAreaAttackTargetOrPos(const Command& ac);
+	virtual bool SelectNewAreaAttackPos(const Command& ac);
 
 	bool IsAttackCapable() const;
 	bool SkipParalyzeTarget(const CUnit* target) const;

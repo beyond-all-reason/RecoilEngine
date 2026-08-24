@@ -449,13 +449,13 @@ void CAirCAI::ExecuteAreaAttack(Command& c)
 		if (orderTarget && orderTarget->pos.SqDistance2D(pos) > Square(radius)) {
 			// target wandered out of the attack-area
 			SetOrderTarget(nullptr);
-			SelectNewAreaAttackTargetOrPos(c);
+			SelectNewAreaAttackPos(c);
 		}
 	} else {
 		if (myPlane->aircraftState != AAirMoveType::AIRCRAFT_LANDED) {
 			inCommand = CMD_ATTACK;
 
-			SelectNewAreaAttackTargetOrPos(c);
+			SelectNewAreaAttackPos(c);
 		}
 	}
 }
@@ -544,7 +544,7 @@ void CAirCAI::BuggerOff(const float3& pos, float radius)
 }
 
 
-bool CAirCAI::SelectNewAreaAttackTargetOrPos(const Command& ac)
+bool CAirCAI::SelectNewAreaAttackPos(const Command& ac)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(ac.GetID() == CMD_AREA_ATTACK);
