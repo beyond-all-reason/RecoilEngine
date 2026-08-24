@@ -30,6 +30,9 @@ extern "C" {
 /// attaches the layer, @p nsWindow is the SDL window's NSWindow
 bool MacMetalPresent_Init(void* nsWindow);
 
+/// backing-pixel size of the layer's drawable, the size a frame should be
+void MacMetalPresent_GetDrawableSize(int* outW, int* outH);
+
 /**
  * Returns a writable BGRA8 image of @p w x @p h to fill, or null on failure.
  * Rows are @p outRowBytes apart, which is not necessarily @p w * 4. Every

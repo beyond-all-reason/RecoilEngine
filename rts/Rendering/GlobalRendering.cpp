@@ -46,6 +46,8 @@
 	// Mesa's EGL can, see MacEGLContext.h
 	#define SPRING_USE_MAC_EGL 1
 	#include "System/Platform/Mac/MacEGLContext.h"
+	#include "System/Platform/Mac/MacGLPresent.h"
+	#include "System/Platform/Mac/MetalPresent.h"
 #endif
 
 #include "System/Misc/TracyDefs.h"
@@ -529,6 +531,39 @@ SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 	return (newContext = SDL_GL_CreateContext(sdlWindow));
 }
 
+#ifdef SPRING_USE_MAC_EGL
+/**
+ * Attaches the Metal layer and reports the size of its drawable in backing
+ * pixels, which is what the pbuffer behind the default framebuffer has to be.
+ *
+ * This runs before the context is created because the layer is the only thing
+ * that knows the backing scale. SDL reports the window in points, and does not
+ * report a HiDPI drawable for a window it does not own a GL context for.
+ */
+static bool InitMacPresentLayer(SDL_Window* window, int2& drawableSize)
+{
+	SDL_SysWMinfo wmInfo;
+	SDL_VERSION(&wmInfo.version);
+
+	if (!SDL_GetWindowWMInfo(window, &wmInfo)) {
+		LOG_L(L_ERROR, "[GR::%s] error \"%s\" getting the window info", __func__, SDL_GetError());
+		return false;
+	}
+
+	if (!MacMetalPresent_Init(static_cast<void*>(wmInfo.info.cocoa.window)))
+		return false;
+
+	MacMetalPresent_GetDrawableSize(&drawableSize.x, &drawableSize.y);
+
+	if (drawableSize.x <= 0 || drawableSize.y <= 0) {
+		LOG_L(L_ERROR, "[GR::%s] the Metal layer has no drawable", __func__);
+		return false;
+	}
+
+	return true;
+}
+#endif
+
 bool CGlobalRendering::CreateWindowAndContext(const char* title)
 {
 	if (SDL_Init(SDL_INIT_VIDEO) == -1) {
@@ -600,10 +635,12 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 
 	#ifdef SPRING_USE_MAC_EGL
 	{
-		int2 winSize;
-		SDL_GetWindowSize(sdlWindow, &winSize.x, &winSize.y);
+		int2 drawableSize;
 
-		if (!MacEGL::CreateContext(minCtx, winSize))
+		if (!InitMacPresentLayer(sdlWindow, drawableSize))
+			return false;
+
+		if (!MacEGL::CreateContext(minCtx, drawableSize))
 			return false;
 	}
 
@@ -742,10 +779,14 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 			}
 		#endif
 		
-		SDL_GL_SwapWindow(sdlWindow);
+		#ifdef SPRING_USE_MAC_EGL
+			MacGLPresent::SwapBuffers();
+		#else
+			SDL_GL_SwapWindow(sdlWindow);
+		#endif
 
 		#ifdef _WIN32
-			if (forceDWMFlush == 2){ 
+			if (forceDWMFlush == 2){
 				ZoneScopedN("CGlobalRendering::SwapBuffers::DWMFlushPost");
 				if (DwmFlush)
 					reinterpret_cast<DwmFlushT>(DwmFlush)();
@@ -1616,7 +1657,19 @@ void CGlobalRendering::ReadWindowPosAndSize()
 	if (!borderless)
 		UpdateWindowBorders(sdlWindow);
 
+	#ifdef SPRING_USE_MAC_EGL
+	// The pbuffer is the default framebuffer and nothing resizes it with the
+	// window, so its size, not the window's, is what the engine draws into.
+	// That is in backing pixels, unlike winPos and the resolution config,
+	// which stay in the points SDL reports.
+	const int2 fbSize = MacEGL::GetSurfaceSize();
+
+	winSizeX = fbSize.x;
+	winSizeY = fbSize.y;
+	#else
 	SDL_GetWindowSize(sdlWindow, &winSizeX, &winSizeY);
+	#endif
+
 	SDL_GetWindowPosition(sdlWindow, &winPosX, &winPosY);
 
 	//enforce >=0 https://github.com/beyond-all-reason/spring/issues/23
@@ -1644,11 +1697,16 @@ void CGlobalRendering::SaveWindowPosAndSize()
 	if ((SDL_GetWindowFlags(sdlWindow) & SDL_WINDOW_MINIMIZED) != 0)
 		return;
 
+	// the resolution config is in the points SDL takes back in SetWindowAttributes,
+	// which winSize is no longer in everywhere, so ask rather than reuse it
+	int2 winSize;
+	SDL_GetWindowSize(sdlWindow, &winSize.x, &winSize.y);
+
 	// do not notify about changes to block update loop
 	configHandler->Set("WindowPosX", winPosX, false, false);
 	configHandler->Set("WindowPosY", winPosY, false, false);
-	configHandler->Set("XResolutionWindowed", winSizeX, false, false);
-	configHandler->Set("YResolutionWindowed", winSizeY, false, false);
+	configHandler->Set("XResolutionWindowed", winSize.x, false, false);
+	configHandler->Set("YResolutionWindowed", winSize.y, false, false);
 }
 
 

@@ -82,6 +82,7 @@ if (APPLE)
 
 	list(APPEND engineSources
 		"${ENGINE_SRC_ROOT_DIR}/System/Platform/Mac/MacEGLContext.cpp"
+		"${ENGINE_SRC_ROOT_DIR}/System/Platform/Mac/MacGLPresent.cpp"
 		"${ENGINE_SRC_ROOT_DIR}/System/Platform/Mac/MetalPresent.mm"
 	)
 endif (APPLE)

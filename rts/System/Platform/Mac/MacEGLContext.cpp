@@ -159,6 +159,20 @@ void MacEGL::MakeCurrent(bool clear)
 		eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext);
 }
 
+int2 MacEGL::GetSurfaceSize()
+{
+	if (eglSurface == EGL_NO_SURFACE)
+		return {0, 0};
+
+	EGLint w = 0;
+	EGLint h = 0;
+
+	eglQuerySurface(eglDisplay, eglSurface, EGL_WIDTH, &w);
+	eglQuerySurface(eglDisplay, eglSurface, EGL_HEIGHT, &h);
+
+	return {w, h};
+}
+
 bool MacEGL::HasContext()
 {
 	return (eglContext != EGL_NO_CONTEXT);

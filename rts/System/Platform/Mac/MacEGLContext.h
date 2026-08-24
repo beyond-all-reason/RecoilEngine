@@ -20,6 +20,9 @@ namespace MacEGL {
 	bool CreateContext(const int2& minCtx, const int2& size);
 	void DestroyContext();
 
+	/// size of the pbuffer acting as the default framebuffer, zero without one
+	int2 GetSurfaceSize();
+
 	void MakeCurrent(bool clear);
 	bool HasContext();
 

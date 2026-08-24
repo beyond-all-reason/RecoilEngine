@@ -204,19 +204,38 @@ bool MacMetalPresent_Init(void* nsWindow)
 		layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
 		layer.framebufferOnly = YES;
 		layer.opaque = YES;
-		layer.contentsScale = window.backingScaleFactor;
+		const CGSize points = view.bounds.size;
+		const CGFloat scale = window.backingScaleFactor;
+
+		layer.contentsScale = scale;
 		layer.frame = view.bounds;
+
+		// AppKit has not laid the layer out yet, and the caller needs the size
+		// now to match its framebuffer to it, so say what it is rather than
+		// waiting to be told
+		layer.drawableSize = CGSizeMake(points.width * scale, points.height * scale);
 
 		// hosting rather than adding a sublayer, so AppKit resizes the layer
 		// with the view and keeps its drawable size in step
 		view.layer = layer;
 		view.wantsLayer = YES;
 
-		LOG("[MetalPresent::%s] %s, %.0fx%.0f points at %.1fx", __func__, device.name.UTF8String,
-			view.bounds.size.width, view.bounds.size.height, layer.contentsScale);
+		LOG("[MetalPresent::%s] %s, %.0fx%.0f points at %.1fx, %.0fx%.0f drawable", __func__, device.name.UTF8String,
+			points.width, points.height, scale, layer.drawableSize.width, layer.drawableSize.height);
 	}
 
 	return true;
+}
+
+
+void MacMetalPresent_GetDrawableSize(int* outW, int* outH)
+{
+	const CGSize size = (layer != nil) ? layer.drawableSize : CGSizeZero;
+
+	if (outW != nullptr)
+		*outW = (int) size.width;
+	if (outH != nullptr)
+		*outH = (int) size.height;
 }
 
 
