@@ -17,35 +17,44 @@ The engine builds with Homebrew GCC, not Apple Clang, to keep floating point beh
 
 ## 2. Mesa
 
-No released Mesa works. Build it from source, pinned:
+No released Mesa works. Build it from source, pinned, in two passes. The second pass is what you keep, and it needs no LLVM at runtime, which is worth 180 MB in the packaged engine.
 
 ```bash
 git clone --filter=blob:none https://gitlab.freedesktop.org/mesa/mesa.git
 cd mesa && git checkout 56588ef0665
-python3 -m venv .venv && .venv/bin/pip install mako packaging setuptools
+python3 -m venv .venv && .venv/bin/pip install mako packaging setuptools 'meson==1.11.2'
 
-PATH="$PWD/.venv/bin:/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/llvm/bin:$PATH" \
-PKG_CONFIG_PATH="/opt/homebrew/opt/libclc/share/pkgconfig:/opt/homebrew/opt/spirv-llvm-translator/lib/pkgconfig" \
-meson setup build-zink \
-  --buildtype=release --prefix="$HOME/dev/mesa-install-premtl4" \
-  -Dplatforms=macos -Degl=enabled -Degl-native-platform=surfaceless \
-  -Dgallium-drivers=zink -Dvulkan-drivers=kosmickrisp \
-  -Dmoltenvk-dir=/opt/homebrew/opt/molten-vk \
-  -Dgallium-rusticl=false -Dtools= -Dglx=disabled -Dgbm=disabled \
-  -Dllvm=enabled -Dvideo-codecs= -Dopengl=true -Dgles1=disabled -Dgles2=disabled
+export PATH="$PWD/.venv/bin:/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/llvm/bin:$PATH"
+export PKG_CONFIG_PATH="/opt/homebrew/opt/libclc/share/pkgconfig:/opt/homebrew/opt/spirv-llvm-translator/lib/pkgconfig"
 
-PATH="$PWD/.venv/bin:/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/llvm/bin:$PATH" \
-  ninja -C build-zink install
+COMMON="-Dplatforms=macos -Degl=enabled -Degl-native-platform=surfaceless
+  -Dgallium-drivers=zink -Dvulkan-drivers=kosmickrisp
+  -Dmoltenvk-dir=/opt/homebrew/opt/molten-vk
+  -Dgallium-rusticl=false -Dtools= -Dglx=disabled -Dgbm=disabled
+  -Dvideo-codecs= -Dopengl=true -Dgles1=disabled -Dgles2=disabled"
+
+# Pass 1: build only the two CLC tools. Nothing from this build ships.
+meson setup build-clc --buildtype=release $COMMON -Dllvm=enabled
+ninja -C build-clc src/compiler/clc/mesa_clc src/compiler/spirv/vtn_bindgen2
+
+# Pass 2: the real build, with those tools on PATH and no LLVM.
+export PATH="$PWD/build-clc/src/compiler/clc:$PWD/build-clc/src/compiler/spirv:$PATH"
+meson setup build-zink --buildtype=release --prefix="$HOME/dev/mesa-install-premtl4" \
+  $COMMON -Dllvm=disabled -Dmesa-clc=system
+ninja -C build-zink install
 ```
 
 The pin matters. `56588ef0665` is the commit before `kk: Move to Metal4 command encoding`, which gives every render pass its own MTL4 command buffer and never returns the memory. Anything after it leaks about 5 GiB a second under the engine and is unplayable. That is filed upstream as <https://gitlab.freedesktop.org/mesa/mesa/-/work_items/15998>.
 
-Four things that will otherwise waste your afternoon:
+Why two passes. Mesa forces LLVM on whenever CLC is enabled, and KosmicKrisp needs CLC, so `-Dllvm=disabled` on its own fails at configure with "CLC requires LLVM". Under `-Dmesa-clc=system` that requirement collapses to rusticl alone, which is off, and CLC becomes a build-time tool. The shipped `libgallium` then has zero LLVM symbols. LLVM was only ever serving gallivm, the JIT behind the `draw` module's geometry and tessellation fallback, which Zink over a real Vulkan driver does not need.
 
-- Mesa needs Python `mako`, and no Homebrew formula provides it. Use the venv above rather than touching Homebrew's Python.
+Five things that will otherwise waste your afternoon:
+
+- Mesa needs Python `mako` and `meson`, and no Homebrew formula provides `mako`. Use the venv above rather than touching Homebrew's Python.
 - Homebrew's `llvm` and `bison` are both keg-only, so they need to be on `PATH` explicitly. Apple's bison is 2.3 and cannot parse Mesa's grammars.
-- Meson bakes the bison path into `build.ninja` at configure time, so putting it on `PATH` only for the build step does nothing.
+- Meson bakes the bison path into `build.ninja` at configure time, so putting it on `PATH` only for the build step does nothing. If Homebrew's bison is missing, configure silently picks Apple's and the failure only appears later as a syntax error in a `.y` file.
 - Zink on macOS wants `-Dmoltenvk-dir` at configure time even though the target is KosmicKrisp.
+- Pass 1 still needs Homebrew's `llvm` installed, even though nothing from it ships.
 
 ## 3. The engine
 
@@ -88,6 +97,8 @@ coding-agents/test-scripts/package-macos.sh
 ```
 
 Produces `dist/recoil_<version>_arm64-macos/`, laid out like a Recoil release and carrying every non-system dylib including Mesa, so it runs on a machine with no Homebrew. `spring` in that archive is a launcher that sets the variables above and calls `spring-bin`.
+
+About 143 MB unpacked and 28 MB as a `.7z`. If yours is roughly double that, the Mesa it bundled was built with LLVM: `libLLVM.dylib` is 164 MB on its own and drags in `libz3` at another 16 MB. `MESA_PREFIX=<prefix>` picks which Mesa gets bundled.
 
 ## What works
 
