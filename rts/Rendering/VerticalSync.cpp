@@ -82,7 +82,10 @@ void CVerticalSync::SetInterval(int i)
 	#if defined(__APPLE__) && !defined(HEADLESS)
 	// Both adaptive and standard mean "wait for the blank" to a CAMetalLayer,
 	// which has one switch rather than an interval. Only 0 turns it off.
+	// Return here: the SDL calls below reach no context on this path, and their
+	// failure branch would log a swap interval that was never applied.
 	MacMetalPresent_SetVSync(interval != 0);
+	return;
 	#endif
 
 	// adaptive (delay swap iff frame-rate > vblank-rate)
