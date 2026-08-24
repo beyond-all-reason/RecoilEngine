@@ -637,8 +637,6 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 		}
 	}
 
-	// Preserve the historical default for strafing aircraft while allowing
-	// games to opt other unit types into the native area-attack command.
 	canAreaAttack = udTable.GetBool("canAreaAttack", IsStrafingAirUnit());
 
 	if (IsAirUnit()) {
