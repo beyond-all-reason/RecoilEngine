@@ -38,6 +38,10 @@ ProcessorMasks GetProcessorMasks() {
 	const unsigned int numECores = ReadSysctlUInt("hw.perflevel1.physicalcpu");
 
 	if (numPCores > 0) {
+		// The bit positions are synthetic. The kernel numbers the E-cores first
+		// on Apple Silicon, but nothing here can pin a thread to a numbered core
+		// (see GetThreadPinPolicy), so the masks only carry the counts. Do not
+		// map these bits onto real CPU ids.
 		masks.performanceCoreMask = spring::LowBitsMask(numPCores);
 		// E-cores occupy the bits above the P-cores in the combined mask.
 		const unsigned int totalCores = numPCores + numECores;
