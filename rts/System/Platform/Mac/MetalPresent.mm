@@ -197,6 +197,11 @@ bool MacMetalPresent_Init(void* nsWindow, bool hiDPI)
 
 		if ((queue = [device newCommandQueue]) == nil) {
 			LOG_L(L_ERROR, "[MetalPresent::%s] no Metal command queue", __func__);
+			// leave nothing behind: a surviving device would make the next Init
+			// return true with no queue and no layer, and every present after
+			// that would silently do nothing
+			[device release];
+			device = nil;
 			return false;
 		}
 
