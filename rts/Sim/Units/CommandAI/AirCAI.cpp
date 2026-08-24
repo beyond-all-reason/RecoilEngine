@@ -142,6 +142,13 @@ void CAirCAI::GiveCommandReal(const Command& c, bool fromSynced)
 		tempOrder = false;
 	}
 
+	if (c.GetID() == CMD_AREA_ATTACK && c.GetNumParams() < 4) {
+		Command attackCmd(CMD_ATTACK, c.GetOpts());
+		attackCmd.CopyParams(c);
+		CCommandAI::GiveAllowedCommand(attackCmd);
+		return;
+	}
+
 	CCommandAI::GiveAllowedCommand(c);
 }
 

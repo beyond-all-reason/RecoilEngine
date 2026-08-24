@@ -979,13 +979,6 @@ void CCommandAI::ClearTargetLock(const Command &c) {
 void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (c.GetID() == CMD_AREA_ATTACK && c.GetNumParams() < 4) {
-		Command attackCmd(CMD_ATTACK, c.GetOpts());
-		attackCmd.CopyParams(c);
-		GiveAllowedCommand(attackCmd, fromSynced);
-		return;
-	}
-
 	if (ExecuteStateCommand(c))
 		return;
 
