@@ -51,8 +51,8 @@
 # released Mesa works, so this is built from source and the pin is deliberate.
 set -euo pipefail
 
-REPO=/Users/tomjn/dev/RecoilEngine
-BUILD=$REPO/build-macos-legacy
+REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+BUILD=${BUILD_DIR:-$REPO/build-macos-legacy}
 PLATFORM=arm64-macos
 VERSION=$(cd "$REPO" && git describe --abbrev=7)
 OUT=${1:-$REPO/dist/recoil_${VERSION}_${PLATFORM}}
