@@ -2085,6 +2085,9 @@ void main()
 		VAO vao;
 		vao.Bind();
 
+		// the viewport, enables and clear colour go back the way they were found
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+
 		glViewport(0, 0, probeSize, probeSize);
 		glDisable(GL_DEPTH_TEST);
 		glDisable(GL_BLEND);
@@ -2101,6 +2104,7 @@ void main()
 		std::array<uint8_t, probeSize * probeSize * 4> pixels;
 		glReadPixels(0, 0, probeSize, probeSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 
+		glPopAttrib();
 		vao.Unbind();
 
 		size_t litPixels = 0;
@@ -2146,6 +2150,10 @@ bool CGlobalRendering::ProbeImmediateModeBatching() const
 
 	if (fbo.GetStatus() == GL_FRAMEBUFFER_COMPLETE_EXT) {
 		glUseProgram(0);
+
+		// the viewport, enables, clear colour and the current colour and texture
+		// coordinate this draws with all go back the way they were found
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
 
 		glViewport(0, 0, probeSize, probeSize);
 		glDisable(GL_DEPTH_TEST);
@@ -2203,14 +2211,15 @@ bool CGlobalRendering::ProbeImmediateModeBatching() const
 			}
 		}
 
-		static std::vector<uint8_t> pixels;
-		pixels.resize(probeSize * probeSize * 4);
+		std::vector<uint8_t> pixels(probeSize * probeSize * 4);
 		glReadPixels(0, 0, probeSize, probeSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 
 		glMatrixMode(GL_PROJECTION);
 		glPopMatrix();
 		glMatrixMode(GL_MODELVIEW);
 		glPopMatrix();
+
+		glPopAttrib();
 
 		size_t strayPixels = 0;
 		size_t unlitPixels = 0;
