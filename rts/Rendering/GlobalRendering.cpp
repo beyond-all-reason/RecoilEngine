@@ -209,6 +209,7 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(supportClipSpaceControl),
 	CR_IGNORED(supportSeamlessCubeMaps),
 	CR_IGNORED(supportFragDepthLayout),
+	CR_IGNORED(supportPolygonModeLine),
 	CR_IGNORED(haveGL4),
 	CR_IGNORED(glslMaxVaryings),
 	CR_IGNORED(glslMaxAttributes),
@@ -341,6 +342,7 @@ CGlobalRendering::CGlobalRendering()
 	, supportClipSpaceControl(false)
 	, supportSeamlessCubeMaps(false)
 	, supportFragDepthLayout(false)
+	, supportPolygonModeLine(true)
 	, haveGL4(false)
 
 	, glslMaxVaryings(0)
@@ -1042,6 +1044,8 @@ void CGlobalRendering::SetGLSupportFlags()
 	if (globalRendering->amdHacks) {
 		supportDepthBufferBitDepth = 24;
 	}
+
+	supportPolygonModeLine = ProbePolygonModeLine();
 }
 
 void CGlobalRendering::QueryGLMaxVals()
@@ -1150,6 +1154,7 @@ void CGlobalRendering::LogVersionInfo(const char* sdlVersionStr, const char* glV
 	LOG("\tclip-space control support: %i (%i)", supportClipSpaceControl, IsExtensionSupported("GL_ARB_clip_control"));
 	LOG("\tseamless cube-map support : %i (%i)", supportSeamlessCubeMaps, IsExtensionSupported("GL_ARB_seamless_cube_map"));
 	LOG("\tfrag-depth layout support : %i (%i)", supportFragDepthLayout, IsExtensionSupported("GL_ARB_conservative_depth"));
+	LOG("\twireframe polygon mode    : %i (-)" , supportPolygonModeLine);
 	LOG("\tpersistent maps support   : %i (%i)", supportPersistentMapping, IsExtensionSupported("GL_ARB_buffer_storage"));
 	LOG("\texplicit attribs location : %i (%i)", supportExplicitAttribLoc, IsExtensionSupported("GL_ARB_explicit_attrib_location"));
 	LOG("\tmulti draw indirect       : %i (-)" , IsExtensionSupported("GL_ARB_multi_draw_indirect"));
@@ -1947,6 +1952,91 @@ void main()
 	return testShader.IsValid();
 #else
 	return false;
+#endif
+}
+
+bool CGlobalRendering::ProbePolygonModeLine() const
+{
+#ifndef HEADLESS
+	// there is no query for this, so rasterize a triangle in GL_LINE mode and
+	// look at the result: only its edges should be lit, a mostly lit probe means
+	// the driver quietly filled it instead
+	constexpr static const char* vsSrc = R"(
+#version 150
+
+void main()
+{
+	const vec2 verts[3] = vec2[3](vec2(-0.9, -0.9), vec2(0.9, -0.9), vec2(0.0, 0.9));
+	gl_Position = vec4(verts[gl_VertexID], 0.0, 1.0);
+}
+)";
+
+	constexpr static const char* fsSrc = R"(
+#version 150
+
+out vec4 fragColor;
+void main()
+{
+	fragColor = vec4(1.0);
+}
+)";
+
+	if (!FBO::IsSupported() || !VAO::IsSupported())
+		return true;
+
+	auto probeShader = Shader::GLSLProgramObject("[GL-PolygonModeProbe]");
+	probeShader.AttachShaderObject(new Shader::GLSLShaderObject(GL_VERTEX_SHADER  , vsSrc));
+	probeShader.AttachShaderObject(new Shader::GLSLShaderObject(GL_FRAGMENT_SHADER, fsSrc));
+
+	probeShader.SetLogReporting(false);
+	probeShader.Link();
+
+	if (!probeShader.IsValid())
+		return true;
+
+	constexpr int probeSize = 32;
+
+	FBO fbo;
+	fbo.Bind();
+	fbo.CreateRenderBuffer(GL_COLOR_ATTACHMENT0_EXT, GL_RGBA8, probeSize, probeSize);
+
+	bool filled = false;
+
+	if (fbo.GetStatus() == GL_FRAMEBUFFER_COMPLETE_EXT) {
+		VAO vao;
+		vao.Bind();
+
+		glViewport(0, 0, probeSize, probeSize);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
+		glDisable(GL_CULL_FACE);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		probeShader.Enable();
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		probeShader.Disable();
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+		std::array<uint8_t, probeSize * probeSize * 4> pixels;
+		glReadPixels(0, 0, probeSize, probeSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+		vao.Unbind();
+
+		size_t litPixels = 0;
+		for (size_t i = 0; i < pixels.size(); i += 4)
+			litPixels += (pixels[i] > 0);
+
+		// the triangle covers about 40% of the probe filled and about 10% as edges
+		filled = (litPixels * 4 > probeSize * probeSize);
+	}
+
+	fbo.Unbind();
+
+	return !filled;
+#else
+	return true;
 #endif
 }
 
