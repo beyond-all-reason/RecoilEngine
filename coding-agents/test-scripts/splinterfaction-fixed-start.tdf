@@ -1,0 +1,41 @@
+// SplinterFaction on Valles Marineris, replacing splinterfaction-fixed-start.txt.
+//
+// side= is the reason this is a .tdf. Without it the game picks a faction at
+// random per run, and two runs then differ in commander model, unit set and
+// selection overlays. That silently confounded a compiled-versus-deferred
+// display list comparison on 2026-08-04: one run drew a Federation of Kala
+// commander and the other a Loz Alliance one, so the scene crop that was meant
+// to be an A/B was two different units.
+//
+// The name is the sidedata.lua "name" field, not the startunit
+// (gamedata/sidedata.lua:34).
+[game]
+{
+[player0]
+{
+team=0;
+spectator=0;
+name=probe;
+}
+[team0]
+{
+allyteam=0;
+teamleader=0;
+rgbcolor=1 0 0;
+handicap=0;
+side=Federation of Kala;
+}
+[allyteam0]
+{
+numallies=0;
+}
+ishost=1;
+numallyteams=1;
+numusers=1;
+numteams=1;
+startpostype=0;
+gametype=SplinterFaction 0.1.78;
+mapname=Valles Marineris 2.6.1;
+myplayername=probe;
+numplayers=1;
+}
