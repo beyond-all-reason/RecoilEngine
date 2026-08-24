@@ -424,7 +424,6 @@ void RecoilBuildMipmaps(const GLenum target, GLint internalFormat, const GLsizei
 	} else {
 		glGenerateMipmap(target);
 	}
-
 }
 
 bool glSpringBlitImages(

@@ -6332,7 +6332,6 @@ int LuaOpenGL::CallList(lua_State* L)
 		int error = GetLuaContextData(L)->glMatrixTracker.ApplyMatrixState(matrixStateData);
 		if (error == 0) {
 			glCallList(dlist);
-
 			return 0;
 		}
 		luaL_error(L, "Matrix stack %sflow in gl.CallList", (error > 0) ? "over" : "under");

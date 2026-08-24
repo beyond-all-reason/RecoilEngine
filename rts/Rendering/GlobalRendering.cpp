@@ -929,7 +929,6 @@ uint64_t CGlobalRendering::CalcGLDeltaTime(uint32_t queryIdx0, uint32_t queryIdx
 }
 
 
-
 void CGlobalRendering::CheckGLExtensions()
 {
 	#ifndef HEADLESS
