@@ -211,8 +211,12 @@ void CglShaderFontRenderer::HandleTextureUpdate(CFontTexture& fnt, bool onlyUplo
 	if (!onlyUpload)
 		fnt.UpdateGlyphAtlasTexture();
 
+	// Checked on Zink over KosmicKrisp: GL_LIST_INDEX does read back the list
+	// being compiled, so this guard works and the atlas is not the reason the
+	// resource bar loses its research readout under compiled lists.
 	GLint dl = 0;
 	glGetIntegerv(GL_LIST_INDEX, &dl);
+
 	if (dl == 0) {
 		fnt.UploadGlyphAtlasTextureImpl();
 	}

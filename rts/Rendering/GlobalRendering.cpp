@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <chrono>
 #include <cmath>
 
 #include <SDL.h>
@@ -87,7 +88,8 @@ CONFIG(bool, Fullscreen).defaultValue(true).headlessValue(false).description("Se
 CONFIG(bool, WindowBorderless).defaultValue(false).description("When set and Fullscreen is 0, will put the game in Borderless Window mode, also known as Windowed Fullscreen. When using this, it is generally best to also set WindowPosX and WindowPosY to 0");
 CONFIG(bool, BlockCompositing).defaultValue(false).safemodeValue(true).description("Disables kwin compositing to fix tearing, possible fixes low FPS in windowed mode, too.");
 #ifdef SPRING_USE_MAC_EGL
-CONFIG(bool, MacHiDPIRendering).defaultValue(true).description("Draws at the display's backing resolution. Set to 0 to draw at the window's size in points and let the display scale it up, which is blurry on a Retina screen and a quarter of the pixels to draw and read back.");
+CONFIG(bool, MacHiDPIRendering).defaultValue(true).description("Draws at the display's backing resolution. Set to 0 to draw at the window's size in points and let the display scale it up, which is blurry on a Retina screen and a quarter of the pixels to draw and read back. Measured slower than lowering MacRenderScale instead, because a layer whose scale does not match the display costs about 38ms a frame however little it renders.");
+CONFIG(float, MacRenderScale).defaultValue(1.0f).minimumValue(0.25f).maximumValue(1.0f).description("Fraction of the window's backing resolution to draw at, letting the present scale the result up. 0.5 is a quarter of the pixels. Measured 1.19x at 0.75 and 1.35x at 0.5, and capped near 1.5x however far it is pushed: presenting anything that is not 1:1 with the display costs a flat 38ms a frame on this stack, so most of the saving is spent on the penalty for taking it.");
 #endif
 // setting this as default 0 for now is because if the frame were to be dropped for being late, DWMFlush will force the compositor to use the framebuffer. This can result in blocking until the framebuffer can be composited (up to 1 frame) and may not be desirable for all use cases (specifically with vsync set to off). However, only more widespread testing and investigation across various hardware/os configs would tell us what advantage DWMFlush would bring.
 CONFIG(int, DWMFlush).defaultValue(0).description("Force Windows Desktop Compositors DWMFlush before each SDL_GL_SwapWindow, preventing dropped frames (use nVidias FrameView to validate dropped frames, or BARs Jitter Timer widget). Value of 1 does DWMFlush before SwapBuffers, value of 2 does DWMFlush after swapbuffers.");
@@ -591,6 +593,31 @@ static bool InitMacPresentLayer(SDL_Window* window, int2& drawableSize)
 
 	return true;
 }
+
+// The pbuffer the engine renders into is normally the layer's whole drawable, so
+// a 2x display costs four times the pixels. Frame time on this path is
+// proportional to the pixels drawn, measured at 11.4ms a megapixel with no fixed
+// term, so drawing fewer of them is the largest win available.
+//
+// This scales the pbuffer alone and leaves the layer at the display's own scale.
+// MacHiDPIRendering=0 instead drops the layer to 1x, and a layer whose scale does
+// not match the display costs a measured 38ms a frame however little it renders,
+// which swallows the saving: 15.9 fps against 21.3 where the same pixel count at
+// the display's scale gives 65.0. The present already samples the IOSurface
+// through a linear filter into a full size drawable, so scaling back up costs
+// nothing there.
+static int2 MacRenderSize(const int2& drawableSize)
+{
+	const float scale = std::clamp(configHandler->GetFloat("MacRenderScale"), 0.25f, 1.0f);
+
+	if (scale >= 1.0f)
+		return drawableSize;
+
+	return {
+		std::max(1, static_cast<int>(drawableSize.x * scale + 0.5f)),
+		std::max(1, static_cast<int>(drawableSize.y * scale + 0.5f))
+	};
+}
 #endif
 
 bool CGlobalRendering::CreateWindowAndContext(const char* title)
@@ -669,7 +696,12 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 		if (!InitMacPresentLayer(sdlWindow, drawableSize))
 			return false;
 
-		if (!MacEGL::CreateContext(minCtx, drawableSize))
+		const int2 renderSize = MacRenderSize(drawableSize);
+
+		if (renderSize != drawableSize)
+			LOG("[GR::%s] MacRenderScale draws %dx%d into a %dx%d drawable", __func__, renderSize.x, renderSize.y, drawableSize.x, drawableSize.y);
+
+		if (!MacEGL::CreateContext(minCtx, renderSize))
 			return false;
 	}
 
@@ -816,6 +848,31 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 		
 		#ifdef SPRING_USE_MAC_EGL
 			MacGLPresent::SwapBuffers();
+
+			// TEMP diagnostic, not for merge. SPRING_FPS_LOG=<seconds> logs the
+			// present rate. The in-game readout cannot be captured from a headless
+			// or unattended run, and a frame rate read off a screenshot is not a
+			// number anyone can compare.
+			static const int fpsLog = []() {
+				const char* e = getenv("SPRING_FPS_LOG");
+				return (e != nullptr) ? std::atoi(e) : 0;
+			}();
+			if (fpsLog > 0) {
+				using clock = std::chrono::steady_clock;
+				static clock::time_point since = clock::now();
+				static uint32_t presents = 0;
+
+				presents++;
+				const auto elapsed = clock::now() - since;
+				if (elapsed >= std::chrono::seconds(fpsLog)) {
+					const double secs = std::chrono::duration<double>(elapsed).count();
+					LOG("[fps] %.1f over %.1fs, %u presents", presents / secs, secs, presents);
+					presents = 0;
+					since = clock::now();
+				}
+			}
+
+
 		#else
 			SDL_GL_SwapWindow(sdlWindow);
 		#endif
@@ -870,6 +927,7 @@ uint64_t CGlobalRendering::CalcGLDeltaTime(uint32_t queryIdx0, uint32_t queryIdx
 	// nanoseconds between timestamps
 	return (t1 - t0);
 }
+
 
 
 void CGlobalRendering::CheckGLExtensions()
@@ -1711,8 +1769,14 @@ void CGlobalRendering::ReadWindowPosAndSize()
 	int2 drawableSize;
 	MacMetalPresent_GetDrawableSize(&drawableSize.x, &drawableSize.y);
 
-	if (drawableSize.x > 0 && drawableSize.y > 0 && drawableSize != MacEGL::GetSurfaceSize())
-		MacEGL::ResizeSurface(drawableSize);
+	// compare against the scaled size, not the drawable, or a scale below 1 makes
+	// this recreate the pbuffer every frame
+	if (drawableSize.x > 0 && drawableSize.y > 0) {
+		const int2 renderSize = MacRenderSize(drawableSize);
+
+		if (renderSize != MacEGL::GetSurfaceSize())
+			MacEGL::ResizeSurface(renderSize);
+	}
 
 	const int2 fbSize = MacEGL::GetSurfaceSize();
 

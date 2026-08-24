@@ -312,6 +312,7 @@ bool FBO::IsValid() const
 void FBO::Bind()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fboId);
 }
 
