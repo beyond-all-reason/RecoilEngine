@@ -6224,7 +6224,7 @@ int LuaOpenGL::CreateList(lua_State* L)
 		// Refuse rather than grow without bound.
 		static constexpr unsigned int MAX_DEFERRED_LISTS = 8192;
 
-		if (displayLists.GetCount() >= MAX_DEFERRED_LISTS) {
+		if (displayLists.GetInUseCount() >= MAX_DEFERRED_LISTS) {
 			static bool loggedCap = false;
 			if (!loggedCap) {
 				loggedCap = true;

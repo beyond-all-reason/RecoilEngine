@@ -28,6 +28,10 @@ class CLuaDisplayLists {
 		}
 
 		unsigned int GetCount() const { return active.size(); }
+
+		/// slots holding a live list. Freed slots stay in active awaiting
+		/// reuse, so GetCount() never falls and cannot measure growth.
+		unsigned int GetInUseCount() const { return active.size() - unused.size(); }
 		
 		GLuint GetDList(unsigned int index) const
 		{
