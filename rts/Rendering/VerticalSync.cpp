@@ -56,8 +56,16 @@ void CVerticalSync::ConfigNotify(const std::string& key, const std::string& valu
 
 void CVerticalSync::Toggle()
 {
+	#if defined(__APPLE__) && !defined(HEADLESS)
+	// SDL owns no swap interval on this path and always answers 0, which would
+	// pin the toggle at +1. The engine's own interval is the truth here.
+	const int curInterval = interval;
+	#else
+	const int curInterval = SDL_GL_GetSwapInterval();
+	#endif
+
 	// no-arg switch, select smallest interval
-	switch (std::clamp(SDL_GL_GetSwapInterval(), -1, 1)) {
+	switch (std::clamp(curInterval, -1, 1)) {
 		case -1: { SetInterval( 0); } break;
 		case  0: { SetInterval(+1); } break;
 		case +1: { SetInterval(-1); } break;
