@@ -1,0 +1,347 @@
+From 337c87ae0878ba61af7dcd1b292d0d022cae6abd Mon Sep 17 00:00:00 2001
+From: Tom J Nowell <contact@tomjn.com>
+Date: Mon, 3 Aug 2026 19:37:40 +0100
+Subject: [PATCH] macOS leak diagnostics: zink memory and blit counters, kk
+ command buffer counters, vbo trace
+
+Origin:      ours, branch macos-diagnostics
+Status:      debug-only, NEVER SHIPS
+Applies-to:  mesa 29b9c04a0da854e166d46adbf5feb3af7bfb7a3c (where it was written)
+             Does NOT apply to our pin 56588ef0665. It was written against a
+             main roughly 1900 commits later and needs rebasing to be used.
+Expires:     never. This is a tool, not a fix.
+Evidence:    n/a, it is instrumentation. All counters are env-gated, so an
+             unset run is unaffected.
+Note:        this is the instrument for "count render passes for real".
+             kk_dbg_count_cmdbuf_new(render) splits render from non-render
+             command buffers. It has only ever been run during loading,
+             because the base it was written against carries the Metal 4 leak
+             and dies at about 12s. Rebase onto mesa-candidates/0001 to reach
+             gameplay. coding-agents/MACOS_PERFORMANCE.md, open item 4.
+
+All gated behind environment variables so an unset run is unaffected.
+See RecoilEngine/coding-agents/MACOS_RENDERER_PLAN.md for what each one is for.
+---
+ src/gallium/drivers/zink/zink_batch.c  | 28 +++++++++++++--
+ src/gallium/drivers/zink/zink_blit.c   | 48 ++++++++++++++++++++++++++
+ src/gallium/drivers/zink/zink_bo.c     | 45 ++++++++++++++++++++++++
+ src/gallium/drivers/zink/zink_types.h  |  1 +
+ src/kosmickrisp/vulkan/kk_cmd_buffer.c | 44 +++++++++++++++++++++++
+ src/mesa/vbo/vbo_exec_draw.c           | 27 +++++++++++++++
+ 6 files changed, 191 insertions(+), 2 deletions(-)
+
+diff --git a/src/gallium/drivers/zink/zink_batch.c b/src/gallium/drivers/zink/zink_batch.c
+index c615d47e3e4..b7deb729593 100644
+--- a/src/gallium/drivers/zink/zink_batch.c
++++ b/src/gallium/drivers/zink/zink_batch.c
+@@ -608,11 +608,34 @@ zink_start_batch(struct zink_context *ctx)
+ }
+ 
+ /* common operations to run post submit; split out for clarity */
++/* On kosmickrisp a batch state is far more expensive than this heuristic
++ * assumes. Every render pass inside it takes a Metal command buffer and render
++ * command encoder holding megabytes of IOAccelerator memory until the work
++ * retires, so 5000 outstanding batches is tens of GiB. Make the ceiling
++ * settable so the right value can be measured rather than guessed. */
++static unsigned
++zink_max_batches(void)
++{
++   static int max = -1;
++   if (max < 0) {
++      const char *e = getenv("ZINK_MAX_BATCHES");
++      max = e ? atoi(e) : 5000;
++   }
++   return (unsigned)max;
++}
++
+ static void
+ post_submit(struct zink_batch_state *bs, struct zink_screen *screen)
+ {
+    MESA_TRACE_FUNC();
+ 
++   if (unlikely(getenv("ZINK_BATCH_STATS") != NULL)) {
++      static uint64_t submits;
++      if ((++submits % 2000) == 0)
++         fprintf(stderr, "zinkbatch: submits=%llu live_batch_states=%u\n",
++                 (unsigned long long)submits, bs->ctx->batch_states_count);
++   }
++
+    if (bs->is_device_lost) {
+       if (bs->ctx->reset.reset)
+          bs->ctx->reset.reset(bs->ctx->reset.data, PIPE_GUILTY_CONTEXT_RESET);
+@@ -620,9 +643,10 @@ post_submit(struct zink_batch_state *bs, struct zink_screen *screen)
+          /* if nothing can save us, abort */
+          abort();
+       screen->device_lost = true;
+-   } else if (bs->ctx->batch_states_count > 5000) {
++   } else if (bs->ctx->batch_states_count > zink_max_batches()) {
+       /* throttle in case something crazy is happening */
+-      zink_screen_timeline_wait(screen, bs->fence.batch_id - 2500, OS_TIMEOUT_INFINITE);
++      zink_screen_timeline_wait(screen, bs->fence.batch_id - zink_max_batches() / 2,
++                                OS_TIMEOUT_INFINITE);
+    } else if (screen->curr_batch - screen->last_finished > 5) {
+       /* try to avoid ooming by regularly checking for batch completion */
+       zink_screen_timeline_wait(screen, screen->last_finished + 1, 0);
+diff --git a/src/gallium/drivers/zink/zink_blit.c b/src/gallium/drivers/zink/zink_blit.c
+index 758dbe13a92..42cc54cdc6a 100644
+--- a/src/gallium/drivers/zink/zink_blit.c
++++ b/src/gallium/drivers/zink/zink_blit.c
+@@ -613,6 +613,54 @@ end:
+       zink_resource_disable_unordered(dst, true);
+       zink_kopper_present_readback(ctx, src);
+    }
++
++   /* On kosmickrisp every render pass takes a fresh MTL4 command buffer and
++    * render command encoder, and they are all held until the vk command buffer
++    * is reset, so a long run of blits with no draws between them grows without
++    * bound. Generating mipmaps for a level's worth of textures does exactly
++    * that. Blits never touch work_count, so none of the existing heuristics
++    * flush here. */
++   static int interval = -1;
++   static int sync_interval = -1;
++   static int stats;
++   if (interval < 0) {
++      const char *e = getenv("ZINK_BLIT_FLUSH");
++      interval = e ? atoi(e) : 0;
++      e = getenv("ZINK_BLIT_SYNC");
++      sync_interval = e ? atoi(e) : 0;
++      stats = getenv("ZINK_BLIT_STATS") != NULL;
++   }
++
++   static uint64_t n_blits, n_eligible, n_flushes;
++   const bool eligible = !ctx->unordered_blitting && !ctx->in_rp;
++   if (stats) {
++      n_blits++;
++      if (eligible)
++         n_eligible++;
++      if ((n_blits % 2000) == 0)
++         fprintf(stderr, "zinkblit: %llu blits, %llu eligible, %llu flushes\n",
++                 (unsigned long long)n_blits, (unsigned long long)n_eligible,
++                 (unsigned long long)n_flushes);
++   }
++
++   const int n = sync_interval ? sync_interval : interval;
++   if (n > 0 && eligible && ++ctx->blit_count >= (unsigned)n) {
++      n_flushes++;
++      ctx->blit_count = 0;
++      pctx->flush(pctx, NULL, 0);
++
++      /* A flush on its own is not enough: zink hands out a brand new batch
++       * state whenever none has completed, so flushing more often just spreads
++       * the held command buffers over more command pools. Only waiting lets
++       * them be reset, which is what releases them. */
++      if (sync_interval > 0 && ctx->last_batch_state) {
++         struct zink_screen *screen = zink_screen(pctx->screen);
++         if (screen->threaded_submit)
++            util_queue_fence_wait(&ctx->last_batch_state->flush_completed);
++         zink_screen_timeline_wait(screen, ctx->last_batch_state->fence.batch_id,
++                                   OS_TIMEOUT_INFINITE);
++      }
++   }
+ }
+ 
+ /* similar to radeonsi */
+diff --git a/src/gallium/drivers/zink/zink_bo.c b/src/gallium/drivers/zink/zink_bo.c
+index 0e98a209db9..ea93e79cc7e 100644
+--- a/src/gallium/drivers/zink/zink_bo.c
++++ b/src/gallium/drivers/zink/zink_bo.c
+@@ -42,6 +42,45 @@
+ 
+ struct zink_bo;
+ 
++/* macOS leak hunt: the engine grows gigabytes per second of phys_footprint on
++ * this driver, and the existing ZINK_DEBUG=mem stats only print when an
++ * allocation fails, which never happens here because KosmicKrisp aborts first.
++ * Track the device memory zink itself holds and dump the per-shape stats every
++ * time that total climbs another step, so the growth can be attributed. */
++static simple_mtx_t debug_vkmem_lock = SIMPLE_MTX_INITIALIZER;
++static uint64_t debug_vkmem_live;
++static uint64_t debug_vkmem_high;
++static uint32_t debug_vkmem_allocs;
++
++static void
++zink_debug_vkmem_track(struct zink_screen *screen, int64_t delta)
++{
++   static uint64_t step;
++   if (!step) {
++      const char *mb = getenv("ZINK_MEM_STEP_MB");
++      step = (mb ? (uint64_t)atoi(mb) : 128ull) << 20;
++   }
++
++   simple_mtx_lock(&debug_vkmem_lock);
++   debug_vkmem_live += delta;
++   if (delta > 0)
++      debug_vkmem_allocs++;
++   const uint64_t live = debug_vkmem_live;
++   const uint32_t allocs = debug_vkmem_allocs;
++   const bool report = live > debug_vkmem_high + step;
++   if (report)
++      debug_vkmem_high = live;
++   simple_mtx_unlock(&debug_vkmem_lock);
++
++   if (!report)
++      return;
++
++   fprintf(stderr, "zinkmem: vkmem live %" PRIu64 " MiB after %u allocations\n",
++           live >> 20, allocs);
++   zink_debug_mem_print_stats(screen);
++   fflush(stderr);
++}
++
+ struct zink_sparse_backing_chunk {
+    uint32_t begin, end;
+ };
+@@ -124,6 +163,9 @@ bo_destroy(struct zink_screen *screen, struct zink_bo *bo)
+       zink_bo_unmap(screen, bo);
+    }
+ 
++   if (unlikely(zink_debug & ZINK_DEBUG_MEM))
++      zink_debug_vkmem_track(screen, -(int64_t)bo->base.size);
++
+    VKSCR(FreeMemory)(screen->dev, bo->mem, NULL);
+ 
+    simple_mtx_destroy(&bo->lock);
+@@ -275,6 +317,9 @@ bo_create_internal(struct zink_screen *screen,
+       goto fail;
+    }
+ 
++   if (unlikely(zink_debug & ZINK_DEBUG_MEM))
++      zink_debug_vkmem_track(screen, (int64_t)mai.allocationSize);
++
+    VkImportMemoryHostPointerInfoEXT *hpi = vk_find_struct(&mai, IMPORT_MEMORY_HOST_POINTER_INFO_EXT);
+    bo->u.real.is_user_ptr = hpi && hpi->pHostPointer;
+ 
+diff --git a/src/gallium/drivers/zink/zink_types.h b/src/gallium/drivers/zink/zink_types.h
+index 34bcaf61d29..b6e419b285f 100644
+--- a/src/gallium/drivers/zink/zink_types.h
++++ b/src/gallium/drivers/zink/zink_types.h
+@@ -1975,6 +1975,7 @@ struct zink_context {
+ 
+    uint32_t ds3_states;
+    unsigned work_count;
++   unsigned blit_count;
+ 
+    struct pipe_resource *index_buffer; //last index buffer
+    unsigned index_size;
+diff --git a/src/kosmickrisp/vulkan/kk_cmd_buffer.c b/src/kosmickrisp/vulkan/kk_cmd_buffer.c
+index 5360ef0d896..af19b8fad43 100644
+--- a/src/kosmickrisp/vulkan/kk_cmd_buffer.c
++++ b/src/kosmickrisp/vulkan/kk_cmd_buffer.c
+@@ -32,11 +32,53 @@ kk_descriptor_state_fini(struct kk_cmd_buffer *cmd,
+    }
+ }
+ 
++/* Leak hunt: a level load on this driver reaches tens of GiB of phys_footprint,
++ * and the live allocations are dominated by the render command encoders started
++ * per render pass. Count the command buffers created against those released so
++ * it is clear whether they are simply never released, or released too late. */
++static uint64_t kk_dbg_cmdbuf_new, kk_dbg_cmdbuf_rel, kk_dbg_resets;
++static uint64_t kk_dbg_render, kk_dbg_compute;
++
++static bool
++kk_dbg_enabled(void)
++{
++   static int on = -1;
++   if (on < 0)
++      on = getenv("KK_CMD_STATS") != NULL;
++   return on;
++}
++
++static void
++kk_dbg_count_cmdbuf_new(bool render)
++{
++   if (!kk_dbg_enabled())
++      return;
++   if (render)
++      kk_dbg_render++;
++   else
++      kk_dbg_compute++;
++   if ((++kk_dbg_cmdbuf_new % 2000) == 0)
++      fprintf(stderr,
++              "kkcmd: new=%llu render=%llu compute=%llu released=%llu resets=%llu live=%lld\n",
++              (unsigned long long)kk_dbg_cmdbuf_new,
++              (unsigned long long)kk_dbg_render,
++              (unsigned long long)kk_dbg_compute,
++              (unsigned long long)kk_dbg_cmdbuf_rel,
++              (unsigned long long)kk_dbg_resets,
++              (long long)(kk_dbg_cmdbuf_new - kk_dbg_cmdbuf_rel));
++}
++
+ static void
+ kk_cmd_release_resources(struct kk_device *dev, struct kk_cmd_buffer *cmd)
+ {
+    struct kk_cmd_pool *pool = kk_cmd_buffer_pool(cmd);
+ 
++   if (kk_dbg_enabled()) {
++      kk_dbg_resets++;
++      kk_dbg_cmdbuf_rel +=
++         util_dynarray_num_elements(&cmd->submit_cmd_bufs, mtl_command_buffer *);
++   }
++
+    kk_cmd_release_dynamic_ds_state(cmd);
+    kk_descriptor_state_fini(cmd, &cmd->state.gfx.descriptors);
+    kk_descriptor_state_fini(cmd, &cmd->state.cs.descriptors);
+@@ -262,6 +304,7 @@ cs_start_render(struct kk_cmd_buffer *cmd)
+    assert(state->render_pass_descriptor);
+ 
+    cmd->gfx.cmd_buf = mtl_new_command_buffer(dev->mtl_handle);
++   kk_dbg_count_cmdbuf_new(true);
+    mtl_begin_command_buffer(cmd->gfx.cmd_buf, cmd->gfx.allocator);
+    cmd->gfx.encoder = mtl_new_render_command_encoder_with_descriptor(
+       cmd->gfx.cmd_buf, state->render_pass_descriptor);
+@@ -304,6 +347,7 @@ kk_start_compute_encoder(struct kk_encoder_state *es, mtl_device *handle,
+                          mtl_argument_table *argument_table)
+ {
+    es->cmd_buf = mtl_new_command_buffer(handle);
++   kk_dbg_count_cmdbuf_new(false);
+    mtl_begin_command_buffer(es->cmd_buf, es->allocator);
+    es->encoder = mtl_new_compute_command_encoder(es->cmd_buf);
+ 
+diff --git a/src/mesa/vbo/vbo_exec_draw.c b/src/mesa/vbo/vbo_exec_draw.c
+index 34ef4b70512..ce2678807a9 100644
+--- a/src/mesa/vbo/vbo_exec_draw.c
++++ b/src/mesa/vbo/vbo_exec_draw.c
+@@ -27,6 +27,7 @@
+ 
+ #include <stdbool.h>
+ #include <stdio.h>
++#include <stdlib.h>
+ #include "main/arrayobj.h"
+ #include "util/glheader.h"
+ #include "main/bufferobj.h"
+@@ -145,6 +146,32 @@ vbo_exec_bind_arrays(struct gl_context *ctx,
+       /* The vao is initially created with all bindings set to 0. */
+       assert(vao->VertexAttrib[vao_attr].BufferBindingIndex == 0);
+    }
++
++   /* TEMP diagnostic for the macOS zink/kosmickrisp immediate-mode bug. */
++   {
++      static int vbo_trace = -1;
++      if (vbo_trace < 0)
++         vbo_trace = getenv("VBO_TRACE") ? 1 : 0;
++
++      if (vbo_trace) {
++         fprintf(stderr, "[vbo] off=%ld stride=%u vsize=%u prims=%u verts=%u",
++                 (long)buffer_offset, stride, exec->vtx.vertex_size,
++                 exec->vtx.prim_count, exec->vtx.vert_count);
++
++         GLbitfield trace_mask = vao_enabled;
++         while (trace_mask) {
++            const int vao_attr = u_bit_scan(&trace_mask);
++            const GLubyte vbo_attr = vao_to_vbo_map[vao_attr];
++            fprintf(stderr, " a%d(sz=%u,rel=%u)", vao_attr,
++                    exec->vtx.attr[vbo_attr].size,
++                    (unsigned)((GLbyte *)exec->vtx.attrptr[vbo_attr] -
++                               (GLbyte *)exec->vtx.vertex));
++         }
++         fprintf(stderr, " misaligned=%d\n",
++                 stride ? (int)(buffer_offset % stride) : -1);
++      }
++   }
++
+    _mesa_enable_vertex_array_attribs(ctx, vao, vao_enabled);
+    assert(vao_enabled == vao->Enabled);
+    assert(!exec->vtx.bufferobj ||
+-- 
+2.55.0
+

@@ -1,0 +1,2 @@
+# Intentionally empty. See ../README.md: we ship stock upstream Mesa at a
+# pinned commit and carry no functional patches. Adding a file here changes that.
