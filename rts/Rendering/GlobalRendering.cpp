@@ -68,7 +68,7 @@ CONFIG(int, ForceDisablePersistentMapping).defaultValue(0).minimumValue(0).maxim
 CONFIG(int, ForceDisableExplicitAttribLocs).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceDisableClipCtrl).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceImmediateModeFlush).defaultValue(-1).minimumValue(-1).maximumValue(1)
-	.description("Overrides the immediate-mode batching probe. -1 measures the driver, 0 never submits before a batch, 1 always does.");
+	.description("Overrides the immediate-mode batching probe, which decides whether this driver renders consecutive glBegin/glEnd batches correctly. -1 measures it and is correct on every driver tested. 1 forces the workarounds on. 0 asserts the driver is unaffected and turns off uniform vertex and texture coordinate arity, the per-batch flush and display list deferral together. On a driver that does have the defect, 0 is worth about 1.9x and corrupts the load screen, the resource bar and the build menu.");
 //CONFIG(int, ForceDisableShaders).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceDisableGL4).defaultValue(0).safemodeValue(1).minimumValue(0).maximumValue(1);
 
