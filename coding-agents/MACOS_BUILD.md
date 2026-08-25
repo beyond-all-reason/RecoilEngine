@@ -20,29 +20,12 @@ The engine builds with Homebrew GCC, not Apple Clang, to keep floating point beh
 No released Mesa works. Build it from source, pinned, in two passes. The second pass is what you keep, and it needs no LLVM at runtime, which is worth 180 MB in the packaged engine.
 
 ```bash
-git clone --filter=blob:none https://gitlab.freedesktop.org/mesa/mesa.git
-cd mesa && git checkout 56588ef0665
-python3 -m venv .venv && .venv/bin/pip install mako packaging setuptools 'meson==1.11.2'
-
-export PATH="$PWD/.venv/bin:/opt/homebrew/opt/bison/bin:/opt/homebrew/opt/llvm/bin:$PATH"
-export PKG_CONFIG_PATH="/opt/homebrew/opt/libclc/share/pkgconfig:/opt/homebrew/opt/spirv-llvm-translator/lib/pkgconfig"
-
-COMMON="-Dplatforms=macos -Degl=enabled -Degl-native-platform=surfaceless
-  -Dgallium-drivers=zink -Dvulkan-drivers=kosmickrisp
-  -Dmoltenvk-dir=/opt/homebrew/opt/molten-vk
-  -Dgallium-rusticl=false -Dtools= -Dglx=disabled -Dgbm=disabled
-  -Dvideo-codecs= -Dopengl=true -Dgles1=disabled -Dgles2=disabled"
-
-# Pass 1: build only the two CLC tools. Nothing from this build ships.
-meson setup build-clc --buildtype=release $COMMON -Dllvm=enabled
-ninja -C build-clc src/compiler/clc/mesa_clc src/compiler/spirv/vtn_bindgen2
-
-# Pass 2: the real build, with those tools on PATH and no LLVM.
-export PATH="$PWD/build-clc/src/compiler/clc:$PWD/build-clc/src/compiler/spirv:$PATH"
-meson setup build-zink --buildtype=release --prefix="$HOME/dev/mesa-install-premtl4" \
-  $COMMON -Dllvm=disabled -Dmesa-clc=system
-ninja -C build-zink install
+scripts/build-mesa.sh
 ```
+
+That is the whole procedure. The script owns the pin, applies `patches/mesa/*.patch`, runs both passes, and installs to `~/dev/mesa-install-premtl4`. It writes a provenance stamp of the pin plus the sha256 of every patch, so running it again when nothing has changed is a no-op. Nothing else in the repo should name a Mesa commit, and the meson flags live in one place so this document cannot drift from what actually builds.
+
+See `patches/README.md` for what we carry and how to add or retire a patch.
 
 The pin matters. `56588ef0665` is the commit before `kk: Move to Metal4 command encoding`, which gives every render pass its own MTL4 command buffer and never returns the memory. Anything after it leaks about 5 GiB a second under the engine and is unplayable. That is filed upstream as <https://gitlab.freedesktop.org/mesa/mesa/-/work_items/15998>.
 
