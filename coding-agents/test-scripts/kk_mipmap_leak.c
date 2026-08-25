@@ -7,12 +7,25 @@
 // deletes the texture again. It never draws anything and never presents.
 // glGenerateMipmap is one blit, so one render pass, per mip level.
 //
-// 100 textures of 512x512, measured on an M1 Pro:
+// 100 textures of 512x512, measured on an M1 Pro, 2026-08-25. Always record the
+// Mesa commit beside a figure. The first round of numbers here did not, and it
+// then took a rebuild of the pinned commit to work out which side of the
+// regression they came from.
 //
-//   zink/kosmickrisp, no sync      2626mb
-//   zink/kosmickrisp, NO_GENMIP=1   224mb
-//   zink/kosmickrisp, SYNC=1        161mb
-//   llvmpipe, no sync                36mb
+//   Mesa                              no sync  NO_GENMIP    SYNC
+//   56588ef0665, the pin, pre Metal4    481mb      232mb    42mb
+//   73a03c61101, MR 43697 merge base   2625mb      224mb   161mb
+//   a0c05f0da7f, MR 43697               474mb      223mb    58mb
+//   73a03c61101 + zink RELEASE_RES     2627mb      224mb   160mb
+//   a0c05f0da7f + zink RELEASE_RES      474mb      222mb    43mb
+//   llvmpipe, no sync                    36mb
+//
+// The no sync column is the one that matters. 2625mb against 481mb is the
+// regression, and MR 43697 puts it back at 474mb. The middle column has no
+// render passes in it at all, so it is flat across every build and serves as
+// the control. Passing VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT from zink
+// changes nothing without the MR, because KosmicKrisp declares the flag UNUSED
+// in kk_reset_cmd_buffer until the MR adds kk_ResetCommandPool.
 //
 // SYNC=1 does a glFinish per iteration, which holds the high-water mark at one
 // texture's worth. Without it, all 100 are in flight at once and the footprint
