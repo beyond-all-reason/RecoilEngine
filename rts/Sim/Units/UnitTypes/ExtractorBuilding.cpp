@@ -37,7 +37,9 @@ float CExtractorBuilding::maxExtractionRange = 0.0f;
 
 CExtractorBuilding::~CExtractorBuilding()
 {
-	ResetExtraction();
+	// creg
+	if (script != nullptr)
+		ResetExtraction();
 }
 
 void CExtractorBuilding::PreInit(const UnitLoadParams& params)

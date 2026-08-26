@@ -100,7 +100,8 @@ CPlasmaRepulser::~CPlasmaRepulser()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	quadField.RemoveRepulser(this);
-	sscPool.RemoveCollection(this);
+	if (weaponDef != nullptr)
+		sscPool.RemoveCollection(this);
 }
 
 

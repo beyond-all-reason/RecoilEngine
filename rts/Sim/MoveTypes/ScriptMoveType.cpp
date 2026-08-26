@@ -71,6 +71,10 @@ CScriptMoveType::CScriptMoveType(CUnit* unit): AMoveType(unit)
 CScriptMoveType::~CScriptMoveType()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// creg
+	if (owner == nullptr)
+		return;
+
 	// clean up if noBlocking was made true at
 	// some point during this script's lifetime
 	// and not reset

@@ -537,6 +537,23 @@ void CallPostLoad(creg::Class* c, creg::Class* oc, void* obj)
 	}
 }
 
+void CInputStreamSerializer::UnwindConstructedObjects()
+{
+	// preallocated objects must be destructed before their containers are freed
+	for (auto it = constructionOrder.rbegin(); it != constructionOrder.rend(); ++it) {
+		StoredObject& o = objects[*it];
+		Class* c = classRefs[o.classRef];
+
+		if (o.isPrealloced) {
+			c->DestructInstance(o.obj);
+		} else {
+			c->DeleteInstance(o.obj);
+		}
+	}
+	constructionOrder.clear();
+	objects.clear();
+}
+
 void CInputStreamSerializer::LoadPackage(std::istream* s, void*& root, creg::Class*& rootCls)
 {
 	PackageHeader ph;
@@ -546,6 +563,10 @@ void CInputStreamSerializer::LoadPackage(std::istream* s, void*& root, creg::Cla
 
 	if (memcmp(ph.magic, CREG_PACKAGE_FILE_ID, 4) != 0)
 		throw content_error("Incorrect object package file ID");
+
+	// the table always holds the dummy and the root object
+	if (ph.numObjects < 2)
+		throw content_error("Save corrupted: object table too small");
 
 	// Load references
 	classRefs.resize(ph.numObjClassRefs);
@@ -572,67 +593,97 @@ void CInputStreamSerializer::LoadPackage(std::istream* s, void*& root, creg::Cla
 	}
 
 	// Create all non-embedded objects
+	s->seekg(0, std::ios::end);
+	const size_t streamSize = s->tellg();
 	s->seekg(ph.objTableOffset);
 	objects.resize(ph.numObjects);
 
-	struct PreallocObj {
-		size_t size;
-		int contID;
-		size_t offset;
-	};
-	std::map<int, PreallocObj> preallocObjs;  // objID -> PreallocObj
+	try {
+		struct PreallocObj {
+			size_t size;
+			int contID;
+			size_t offset;
+		};
+		std::map<int, PreallocObj> preallocObjs;  // objID -> PreallocObj
 
-	for (int a = 0; a < ph.numObjects; a++) {
-		unsigned int classRefIndex;
-		char isEmbedded;
+		for (int a = 0; a < ph.numObjects; a++) {
+			unsigned int classRefIndex;
+			char isEmbedded;
 
-		ReadVarSizeUInt(stream, &classRefIndex);
-		stream->read((char*)&isEmbedded, sizeof(char));
-		Class* c = classRefs[classRefIndex];
+			ReadVarSizeUInt(stream, &classRefIndex);
+			stream->read((char*)&isEmbedded, sizeof(char));
+			if (stream->fail())
+				throw content_error("Save corrupted: object table truncated");
+			if (classRefIndex >= classRefs.size())
+				throw content_error("Save corrupted: invalid class reference " + IntToString(classRefIndex));
+			Class* c = classRefs[classRefIndex];
 
-		objects[a].obj = nullptr;
+			objects[a].obj = nullptr;
+			objects[a].size = 0;
+			objects[a].isPrealloced = false;
 
-		if (!isEmbedded) {
-			size_t size = c->size;
+			if (!isEmbedded) {
+				if (c->constructor == nullptr)
+					throw content_error("Save corrupted: object of abstract class " + std::string(c->name));
 
-			if (c->HasGetSize())
-				ReadVarSizeUInt(stream, &size);
+				size_t size = c->size;
 
-			if (c->HasPrealloc()) {
-				PreallocObj po;
-				po.size = size;
-				ReadVarSizeUInt(stream, &po.contID);
-				ReadVarSizeUInt(stream, &po.offset);
-				// Postpone objects with placement-new
-				preallocObjs[a] = po;
-			} else {
-				// Allocate and construct
-				objects[a].obj = c->CreateInstance(size);
+				if (c->HasGetSize()) {
+					ReadVarSizeUInt(stream, &size);
+					if (size > streamSize)
+						throw content_error("Save corrupted: oversized object of class " + std::string(c->name));
+				}
+
+				objects[a].size = size;
+
+				if (c->HasPrealloc()) {
+					PreallocObj po;
+					po.size = size;
+					ReadVarSizeUInt(stream, &po.contID);
+					ReadVarSizeUInt(stream, &po.offset);
+					if (po.contID < 0 || po.contID >= ph.numObjects)
+						throw content_error("Save corrupted: prealloc container reference out of range");
+					// Postpone objects with placement-new
+					preallocObjs[a] = po;
+				} else {
+					// Allocate and construct
+					objects[a].obj = c->CreateInstance(size);
+					constructionOrder.push_back(a);
+				}
+			}
+
+			objects[a].isEmbedded = !!isEmbedded;
+			objects[a].classRef = classRefIndex;
+		}
+
+		size_t numPreallocs = 0;  // in case of nested preallocation containers
+		while (numPreallocs != preallocObjs.size()) {
+			numPreallocs = preallocObjs.size();
+			const auto pro = preallocObjs;
+			for (const auto& kv : pro) {
+				const PreallocObj& po = kv.second;
+				void* container = objects[po.contID].obj;
+				if (container == nullptr)  // parent container wasn't created yet
+					continue;
+				StoredObject& so = objects[kv.first];
+				Class* c = classRefs[so.classRef];
+				const size_t contSize = objects[po.contID].size;
+				if (po.offset > contSize || po.size > contSize - po.offset)
+					throw content_error("Save corrupted: prealloc object outside container");
+				// Allocate with placement-new and construct
+				so.obj = c->CreateInstance(po.size, (char*)container + po.offset);
+				so.isPrealloced = true;
+				constructionOrder.push_back(kv.first);
+				preallocObjs.erase(kv.first);
 			}
 		}
-
-		objects[a].isEmbedded = !!isEmbedded;
-		objects[a].classRef = classRefIndex;
+		if (!preallocObjs.empty())
+			throw std::string("Placement-new error: Referencing non-serialized container");
+	} catch (...) {
+		// every created object is still default constructed
+		UnwindConstructedObjects();
+		throw;
 	}
-
-	size_t numPreallocs = 0;  // in case of nested preallocation containers
-	while (numPreallocs != preallocObjs.size()) {
-		numPreallocs = preallocObjs.size();
-		const auto pro = preallocObjs;
-		for (const auto& kv : pro) {
-			const PreallocObj& po = kv.second;
-			void* container = objects[po.contID].obj;
-			if (container == nullptr)  // parent container wasn't created yet
-				continue;
-			StoredObject& so = objects[kv.first];
-			Class* c = classRefs[so.classRef];
-			// Allocate with placement-new and construct
-			so.obj = c->CreateInstance(po.size, (char*)container + po.offset);
-			preallocObjs.erase(kv.first);
-		}
-	}
-	if (!preallocObjs.empty())
-		throw std::string("Placement-new error: Referencing non-serialized container");
 
 	const int endOffset = s->tellg();
 
@@ -678,6 +729,7 @@ void CInputStreamSerializer::LoadPackage(std::istream* s, void*& root, creg::Cla
 	s->seekg(endOffset);
 
 	unfixedPointers.clear();
+	constructionOrder.clear();
 	objects.clear();
 }
 

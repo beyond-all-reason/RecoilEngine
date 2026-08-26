@@ -100,6 +100,7 @@ namespace creg {
 		void* CreateInstance(size_t size);
 		void* CreateInstance(size_t size, void* addr);
 		void DeleteInstance(void* inst);
+		void DestructInstance(void* inst);
 
 		/// Calculate a checksum from the class metadata
 		void CalculateChecksum(unsigned int& checksum);

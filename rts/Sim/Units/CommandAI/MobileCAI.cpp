@@ -256,7 +256,9 @@ CMobileCAI::CMobileCAI(CUnit* owner):
 
 CMobileCAI::~CMobileCAI()
 {
-	SetTransportee(nullptr);
+	// creg
+	if (owner != nullptr)
+		SetTransportee(nullptr);
 }
 
 

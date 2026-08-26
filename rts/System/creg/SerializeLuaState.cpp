@@ -48,12 +48,11 @@ private:
 	lua_State* mainthread;
 };
 
+// the target lua_State owns these allocations
 void freeProtector(void *m) {
-	assert(false);
 }
 
 void* allocProtector(size_t size) {
-	assert(false);
 	return nullptr;
 }
 

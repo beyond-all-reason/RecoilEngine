@@ -94,7 +94,7 @@ CFeature::~CFeature()
 	UnBlock();
 	quadField.RemoveFeature(this);
 
-	if (!def->geoThermal)
+	if (def == nullptr || !def->geoThermal)
 		return;
 
 	CGeoThermSmokeProjectile::GeoThermDestroyed(this);

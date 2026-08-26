@@ -146,9 +146,14 @@ namespace creg {
 		{
 			void* obj;
 			int classRef;
+			size_t size;
 			bool isEmbedded;
+			bool isPrealloced;
 		};
 		std::vector<StoredObject> objects;
+		std::vector<unsigned> constructionOrder; // ids of loader created objects
+
+		void UnwindConstructedObjects();
 
 		struct PostLoadCallback
 		{
