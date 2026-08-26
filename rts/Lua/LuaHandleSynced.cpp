@@ -2309,7 +2309,7 @@ SetWatchDef(Synced, Feature)
  * Script.SetWatchAllowTarget(weaponDefID)
  * ```
  *
- * Generally it's better to use those methods to avoid registering uneeded callins.
+ * Generally it's better to use those methods to avoid registering unneeded callins.
  *
  * @param weaponDefID integer
  * @param watch boolean Whether to register or deregister.

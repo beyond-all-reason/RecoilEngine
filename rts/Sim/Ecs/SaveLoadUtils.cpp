@@ -74,7 +74,7 @@ void SaveLoadUtils::SaveComponents(std::stringstream &oss) {
     auto archive = cereal::BinaryOutputArchive{oss};
     LOG_L(L_DEBUG, "%s: Entities before save is %d (%d)", __func__, (int)registry.alive(), (int)oss.tellp());
     {ProcessComponents<entt::snapshot>(archive, entt::snapshot{registry});}
-    LOG_L(L_DEBUG, "%s: Save bytes writen %d", __func__, (int)oss.tellp());
+    LOG_L(L_DEBUG, "%s: Save bytes written %d", __func__, (int)oss.tellp());
 
     {
         archive(systemGlobals);
