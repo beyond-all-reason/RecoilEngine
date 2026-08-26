@@ -715,6 +715,14 @@ void CUnit::UpdateWeapons()
 	}
 }
 
+
+void CUnit::EndBurst(const CWeapon* weapon)
+{
+	script->EndBurst(weapon->weaponNum);
+	eventHandler.UnitWeaponBurstEnd(this, weapon);
+}
+
+
 void CUnit::UpdateTransportees()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
