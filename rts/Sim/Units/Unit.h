@@ -190,6 +190,7 @@ public:
 
 	void UpdateWeapons();
 	void UpdateWeaponVectors();
+	void StartBurst(const CWeapon* weapon);
 	void EndBurst(const CWeapon* weapon);
 
 	void SlowUpdateWeapons();

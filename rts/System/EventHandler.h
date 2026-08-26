@@ -143,6 +143,7 @@ class CEventHandler
 
 		void StockpileChanged(const CUnit* unit,
 		                      const CWeapon* weapon, int oldCount);
+		void UnitWeaponBurstStart(const CUnit* unit, const CWeapon* weapon);
 		void UnitWeaponBurstEnd(const CUnit* unit, const CWeapon* weapon);
 
 		bool CommandFallback(const CUnit* unit, const Command& cmd);
@@ -738,6 +739,12 @@ inline void CEventHandler::StockpileChanged(const CUnit* unit,
                                                 int oldCount)
 {
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(StockpileChanged, unit, weapon, oldCount)
+}
+
+
+inline void CEventHandler::UnitWeaponBurstStart(const CUnit* unit, const CWeapon* weapon)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitWeaponBurstStart, unit, weapon)
 }
 
 
