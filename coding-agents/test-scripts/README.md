@@ -97,10 +97,15 @@ These need no engine run, so use them first where they can answer the question.
 |---|---|
 | `fill_probe.c` | the driver's fill rate, and the cost of a render pass break. A break is a full attachment store and reload at memory bandwidth, 0.266ms at 3024x1832 |
 | `kk_mipmap_leak.c` | the KosmicKrisp memory leak, attached to the upstream issue |
+| `batch_merge_probe.c` | whether a defect that affects `glBegin` batches also affects `glDrawArrays`. Carries a positive control, so a run that fails to reproduce the known artefact says so instead of reading as a clean result |
 
 GL timer queries do not work here, so do not reach for them. Zink on KosmicKrisp does not advertise `GL_ARB_timer_query` and `glQueryCounter` silently returns zeros.
 
-Build and run them against the same Mesa the engine uses. Each carries its own command in a comment at the top. `DYLD_LIBRARY_PATH=/opt/homebrew/lib` is needed or Zink cannot find `libvulkan.1.dylib`.
+Build and run them against the same Mesa the engine uses. Each carries its own command in a comment at the top.
+
+**Put the Mesa prefix ahead of Homebrew in `DYLD_LIBRARY_PATH`.** Zink needs `/opt/homebrew/lib` to find `libvulkan.1.dylib`, but Homebrew also ships its own `libEGL.dylib` and `libGL.dylib`, currently Mesa 26.2.1. On macOS `DYLD_LIBRARY_PATH` beats the path recorded in the binary, so a bare `DYLD_LIBRARY_PATH=/opt/homebrew/lib` silently runs Homebrew's Mesa however carefully the probe was linked. Use `DYLD_LIBRARY_PATH=$PREFIX/lib:/opt/homebrew/lib` and check the `GL_VERSION` a probe prints before believing its numbers. The pinned prefix reports `26.2.0-devel (git-56588ef066)` on Vulkan 1.3, Homebrew reports `26.2.1` on Vulkan 1.4.
+
+Engine runs are not affected. `run-macos-premtl4.sh` rewrites the recorded path with `install_name_tool` and sets no `DYLD_LIBRARY_PATH` at all.
 
 ## Capturing what happened
 
