@@ -1081,6 +1081,7 @@ int LuaShaders::SetFeatureBufferUniforms(lua_State* L) { return SetObjectBufferU
  * shader. Shader must be activated before setting uniforms.
  *
  * @function gl.Uniform
+ * @function gl.UniformFloat Alias of Uniform
  * @param locationID GL|string uniformName
  * @param f1 number
  * @param f2 number?

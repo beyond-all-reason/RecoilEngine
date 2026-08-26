@@ -2639,6 +2639,7 @@ int LuaUnsyncedRead::GetFeaturesInScreenRectangle(lua_State* L)
 /***
  *
  * @function Spring.GetLocalPlayerID
+ * @function Spring.GetMyPlayerID Alias of GetLocalPlayerID
  * @return integer playerID
  */
 int LuaUnsyncedRead::GetLocalPlayerID(lua_State* L)
@@ -2651,6 +2652,7 @@ int LuaUnsyncedRead::GetLocalPlayerID(lua_State* L)
 /***
  *
  * @function Spring.GetLocalTeamID
+ * @function Spring.GetMyTeamID Alias of GetLocalTeamID
  * @return integer teamID
  */
 int LuaUnsyncedRead::GetLocalTeamID(lua_State* L)
@@ -2663,6 +2665,7 @@ int LuaUnsyncedRead::GetLocalTeamID(lua_State* L)
 /***
  *
  * @function Spring.GetLocalAllyTeamID
+ * @function Spring.GetMyAllyTeamID Alias of GetLocalAllyTeamID
  * @return integer allyTeamID
  */
 int LuaUnsyncedRead::GetLocalAllyTeamID(lua_State* L)
