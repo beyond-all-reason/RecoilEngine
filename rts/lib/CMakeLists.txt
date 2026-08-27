@@ -144,8 +144,9 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|armv8")
 	# ARM64: enable native NEON implementation (well-tested in simdjson)
 	set(SIMDJSON_IMPLEMENTATION "arm64" CACHE STRING "forced by Recoil build env" FORCE)
 else()
-	# x86: use fallback only (original behavior)
-	set(SIMDJSON_IMPLEMENTATION "fallback" CACHE STRING "forced by Recoil build env" FORCE)
+	# x86: SSE4.2 is the engine baseline (see CMakeLists.txt FALLBACK_SSE_FLAGS),
+	# so use simdjson's "westmere" implementation (SSE4.2 + CLMUL).
+	set(SIMDJSON_IMPLEMENTATION "westmere" CACHE STRING "forced by Recoil build env" FORCE)
 endif()
 
 set(SIMDJSON_ENABLE_THREADS     OFF CACHE BOOL "forced by Recoil build env" FORCE)
