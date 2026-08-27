@@ -59,7 +59,8 @@ CR_REG_METADATA(CBuilder, (
 	CR_MEMBER(terraformCenter),
 	CR_MEMBER(terraformRadius),
 	CR_MEMBER(terraformType),
-	CR_MEMBER(nanoPieceCache)
+	CR_MEMBER(nanoPieceCache),
+	CR_MEMBER(lastNanoPieceOrientationUpdate)
 ))
 
 
@@ -93,7 +94,8 @@ CBuilder::CBuilder():
 	tz1(0),
 	tz2(0),
 	terraformCenter(ZeroVector),
-	terraformRadius(0)
+	terraformRadius(0),
+	lastNanoPieceOrientationUpdate(0)
 {
 }
 
@@ -547,6 +549,19 @@ void CBuilder::Update()
 	bool updated = false;
 
 	nanoPieceCache.Update();
+
+	// [MOBILE BUILD] Re-orient the nano-piece toward the current work target
+	if (unitDef->canBuildWhileMoving && (gs->frameNum >= lastNanoPieceOrientationUpdate)) {
+		lastNanoPieceOrientationUpdate = gs->frameNum + (unitDef->nanoAimRate * GAME_SPEED);
+
+		const bool CalledScriptStartBuilding =
+			(curBuild != nullptr) ? ScriptStartBuilding(curBuild->pos, /*silent=*/true) :
+			(curReclaim != nullptr) ? ScriptStartBuilding(curReclaim->pos, /*silent=*/true) :
+			(curResurrect != nullptr) ? ScriptStartBuilding(curResurrect->pos, /*silent=*/true) :
+			(curCapture != nullptr) ? ScriptStartBuilding(curCapture->pos, /*silent=*/true) :
+			(helpTerraform != nullptr) ? ScriptStartBuilding(helpTerraform->terraformCenter, /*silent=*/true) : false;
+
+	}
 
 	if (!beingBuilt && !IsStunned()) {
 		updated = updated || UpdateTerraform(fCommand);

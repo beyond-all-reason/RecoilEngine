@@ -113,6 +113,7 @@ class LuaSyncedCtrl
 		static int SetUnitBuildSpeed(lua_State* L);
 		static int SetUnitBuildParams(lua_State* L);
 		static int SetUnitNanoPieces(lua_State* L);
+		static int SetUnitBuilderTarget(lua_State* L);
 		static int SetUnitBlocking(lua_State* L);
 		static int SetUnitCrashing(lua_State* L);
 		static int SetUnitShieldState(lua_State* L);

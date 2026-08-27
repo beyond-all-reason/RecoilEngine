@@ -171,6 +171,7 @@ public:
 	bool leavesGhost;
 
 	bool  buildRange3D;
+	bool  canBuildWhileMoving;
 	float buildDistance;
 	float buildSpeed;
 	float reclaimSpeed;
@@ -179,6 +180,7 @@ public:
 	float resurrectSpeed;
 	float captureSpeed;
 	float terraformSpeed;
+	float nanoAimRate;
 
 	bool canSubmerge;
 	bool canfly;
