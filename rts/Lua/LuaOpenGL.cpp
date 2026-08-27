@@ -38,6 +38,7 @@
 
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
+#include "Game/Game.h"
 #include "Game/UI/CommandColors.h"
 #include "Game/UI/MiniMap.h"
 #include "Map/BaseGroundDrawer.h"
@@ -371,6 +372,8 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetAtlasTexture);
 
 	REGISTER_LUA_CFUNC(GetEngineAtlasTextures);
+
+	REGISTER_LUA_CFUNC(DrawWaterReflections);
 
 	REGISTER_LUA_CFUNC(Shape);
 	REGISTER_LUA_CFUNC(BeginEnd);
@@ -5068,6 +5071,91 @@ int LuaOpenGL::GetEngineAtlasTextures(lua_State* L) {
 		luaL_error(L, "[%s] Invalid engine atlas (%s) is specified (only $explosions and $groundfx are supported)", __func__, atlasName.c_str());
 		return 0;
 	}
+}
+
+
+/******************************************************************************/
+
+
+/***
+ * @function gl.DrawWaterReflections
+ * @param drawSky boolean?
+ * @param drawGround boolean?
+ * @param drawUnits boolean?
+ * @param drawFeatures boolean?
+ * @param drawProjectiles boolean?
+ * @param viewportX number?
+ * @param viewportY number?
+ */
+int LuaOpenGL::DrawWaterReflections(lua_State* L) {
+	const bool drawSky = luaL_optboolean(L, 1, true);
+	const bool drawGround = luaL_optboolean(L, 2, true);
+	const bool drawUnits = luaL_optboolean(L, 3, true);
+	const bool drawFeatures = luaL_optboolean(L, 4, true);
+	const bool drawProjectiles = luaL_optboolean(L, 5, true);
+	const int viewportX = luaL_optinteger(L, 6, globalRendering->viewSizeX);
+	const int viewportY = luaL_optinteger(L, 7, globalRendering->viewSizeY);
+
+	const auto& sky = ISky::GetSky();
+	glClearColor(sky->fogColor.x, sky->fogColor.y, sky->fogColor.z, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glPushAttrib(GL_FOG_BIT);
+
+	CCamera* prvCam = CCameraHandler::GetSetActiveCamera(CCamera::CAMTYPE_UWREFL);
+	CCamera* curCam = CCameraHandler::GetActiveCamera();
+
+	curCam->CopyStateReflect(prvCam);
+	curCam->UpdateLoadViewport(0, 0, viewportX, viewportY);
+
+	const auto draw_mode = game->GetDrawMode();
+	game->SetDrawMode(CGame::gameReflectionDraw);
+	{
+		// opaque; do not clip skydome (is drawn in camera space)
+		if (drawSky)
+			ISky::GetSky()->Draw();
+
+		const double clipPlaneEqs[2 * 4] = {
+			0.0, 1.0, 0.0, 0.1, // ground; use d>0 to hide shoreline cracks
+			0.0, 1.0, 0.0, 0.0, // models
+		};
+
+		glEnable(GL_CLIP_PLANE2);
+		glClipPlane(GL_CLIP_PLANE2, &clipPlaneEqs[0]);
+
+		if (drawGround)
+			readMap->GetGroundDrawer()->Draw(DrawPass::WaterReflection);
+
+		// rest needs the plane in model-space; V is combined with P
+		glPushMatrix();
+		glLoadIdentity();
+		glClipPlane(GL_CLIP_PLANE2, &clipPlaneEqs[4]);
+		glPopMatrix();
+
+		if (drawUnits)
+			unitDrawer->Draw(true);
+		if (drawFeatures)
+			featureDrawer->Draw(true);
+		if (drawProjectiles)
+			projectileDrawer->DrawOpaque(true);
+
+		// transparent
+		// unitDrawer->DrawAlphaPass(true);
+		// featureDrawer->DrawAlphaPass(true);
+		// projectileDrawer->DrawAlpha(true, false, true, false);
+		// sun-disc does not blend well with water
+
+		glDisable(GL_CLIP_PLANE2);
+	}
+	game->SetDrawMode(draw_mode);
+
+	CCameraHandler::SetActiveCamera(prvCam->GetCamType());
+	prvCam->Update();
+	prvCam->LoadViewport();
+
+	glPopAttrib(); // GL_FOG_BIT
+
+	return 0;
 }
 
 
