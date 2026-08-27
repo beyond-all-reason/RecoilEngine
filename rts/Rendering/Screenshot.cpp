@@ -2,6 +2,7 @@
 
 #include "Screenshot.h"
 
+#include <future>
 #include <vector>
 
 #include "Rendering/GL/myGL.h"
@@ -9,10 +10,8 @@
 #include "Rendering/Textures/Bitmap.h"
 #include "System/StringUtil.h"
 #include "System/Config/ConfigHandler.h"
-#include "System/Log/ILog.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/FileSystem/FileHandler.h"
-#include "System/Threading/ThreadPool.h"
 #include "System/TimeUtil.h"
 
 #undef CreateDirectory
@@ -28,38 +27,57 @@ struct FunctionArgs
 	int y;
 };
 
-static std::shared_future<void> fut = {};
+static std::future<void> fut = {};
+
+static std::string pendingType = {};
+static unsigned pendingQuality = 0;
 
 void TakeScreenshot(std::string type, unsigned quality)
 {
-	if (type.empty())
-		type = "png";
+	pendingType    = type.empty() ? "png" : type;
+	pendingQuality = quality;
+}
+
+void ScreenshotReadbackBegin() {}
+
+// Called at the END of CGame::Draw(), after all rendering, before SwapBuffers.
+// glReadPixels must happen here: the back buffer contains the finished frame at
+// this point on all platforms. After SwapBuffers its contents are undefined
+// (on Linux/Wayland drivers correctly treat it as such, producing a black image).
+// Compression and disk write are offloaded to a dedicated thread via std::async.
+void ScreenshotReadbackEnd()
+{
+	if (pendingType.empty())
+		return;
 
 	if (!FileSystem::CreateDirectory("screenshots"))
 		return;
 
-	if (fut.valid()) {
-		fut.get();
-		fut = {};
-	}
+	const std::string type = std::move(pendingType);
+	pendingType = {};
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glReadBuffer(GL_BACK);
+
+	int x = globalRendering->winSizeX;
+	int y = globalRendering->winSizeY;
+	x += ((4 - (x % 4)) * int((x % 4) != 0));
 
 	FunctionArgs args;
-	args.x  = globalRendering->winSizeX;
-	args.y  = globalRendering->winSizeY;
-	args.x += ((4 - (args.x % 4)) * int((args.x % 4) != 0));
+	args.x        = x;
+	args.y        = y;
+	args.quality  = pendingQuality;
+	args.filename = "screenshots/screen_" + CTimeUtil::GetCurrentTimeStr(true) + "." + type;
+	args.pixelbuf.resize(static_cast<size_t>(x) * static_cast<size_t>(y) * 4u);
 
-	// note: we no longer increment the counter until a "file not found" occurs
-	// since that stalls the thread and might run concurrently with an IL write
-	const std::string curTime = CTimeUtil::GetCurrentTimeStr(true);
-	args.filename.assign("screenshots/screen_" + curTime + "." + type);
-	args.quality = quality;
-	args.pixelbuf.resize(args.x * args.y * 4);
+	glReadPixels(0, 0, x, y, GL_RGBA, GL_UNSIGNED_BYTE, args.pixelbuf.data());
 
-	glReadPixels(0, 0, args.x, args.y, GL_RGBA, GL_UNSIGNED_BYTE, &args.pixelbuf[0]);
+	if (fut.valid())
+		fut.get();
 
-	fut = ThreadPool::Enqueue([](const FunctionArgs& args) {
+	fut = std::async(std::launch::async, [](FunctionArgs&& args) {
 		CBitmap bmp(&args.pixelbuf[0], args.x, args.y);
 		bmp.ReverseYAxis();
 		bmp.Save(args.filename, true, true, args.quality);
-	}, args);
+	}, std::move(args));
 }
