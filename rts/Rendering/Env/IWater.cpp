@@ -59,9 +59,9 @@ void IWater::SetWater(int rendererMode)
 	RECOIL_DETAILED_TRACY_ZONE;
 	static std::array<bool, NUM_WATER_RENDERERS> allowedModes = {
 		true,
-		GLAD_GL_ARB_fragment_program && ProgramStringIsNative(GL_FRAGMENT_PROGRAM_ARB, "ARB/water.fp"),
-		GLAD_GL_ARB_fragment_program && ProgramStringIsNative(GL_FRAGMENT_PROGRAM_ARB, "ARB/waterDyn.fp"),
-		GLAD_GL_ARB_fragment_program && GLAD_GL_ARB_texture_rectangle,
+		GLAD_GL_ARB_shading_language_100 && GLAD_GL_ARB_fragment_shader && GLAD_GL_ARB_vertex_shader,
+		GLAD_GL_ARB_shading_language_100 && GLAD_GL_ARB_fragment_shader && GLAD_GL_ARB_vertex_shader,
+		GLAD_GL_ARB_shading_language_100 && GLAD_GL_ARB_fragment_shader && GLAD_GL_ARB_vertex_shader,
 		GLAD_GL_ARB_shading_language_100 && GLAD_GL_ARB_fragment_shader && GLAD_GL_ARB_vertex_shader,
 	};
 
