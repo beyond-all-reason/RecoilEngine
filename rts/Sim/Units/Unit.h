@@ -527,6 +527,17 @@ public:
 	bool isCloaked = false;
 	// true if the unit currently wants to be cloaked
 	bool wantCloak = false;
+	// true if the unit's UnitDef footprint is significantly non-square (stretch factor > 0.1);
+	// gates elongated-footprint collision logic (OBB scan expansion, projected radii, etc.)
+	bool hasElongatedFootprint = false;
+
+	// Pre-computed collision geometry derived from the UnitDef footprint (int2).
+	// Mobile units have xsize/zsize overridden by MoveDef, so these cache the true
+	// physical shape for use in collision detection / OBB tests.
+	// Half-extents in world units: ((footprint - 1) * 0.5 * SQUARE_SIZE) per axis.
+	float2 footprintHalfExtents;
+	// Max half-extent (bounding circle radius): max(footprint.x, footprint.y) - 1) * 0.5 * SQUARE_SIZE.
+	float footprintMaxRadius = 0.0f;
 	// true if the unit leaves static ghosts
 	bool leavesGhost = false;
 

@@ -266,6 +266,7 @@ private:
 
 	float3 forceFromMovingCollidees;
 	float3 forceFromStaticCollidees;
+	bool hasOBBCollision = false;       /// true if elongated-footprint nose/tail overlaps a blocked square
 	float3 resultantForces;
 
 	unsigned int pathID = 0;
@@ -309,4 +310,3 @@ private:
 };
 
 #endif // GROUNDMOVETYPE_H
-

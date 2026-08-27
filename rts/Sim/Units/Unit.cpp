@@ -262,6 +262,9 @@ void CUnit::PreInit(const UnitLoadParams& params)
 	ASSERT_SYNCED(pos);
 
 	footprint = int2(unitDef->xsize, unitDef->zsize);
+	hasElongatedFootprint = modInfo.allowSepAxisCollisionTest && (static_cast<float>(std::abs(footprint.x - footprint.y)) / (footprint.x + footprint.y)) > 0.1f;
+	footprintHalfExtents = float2(footprint.x - 1, footprint.y - 1) * (0.5f * SQUARE_SIZE);
+	footprintMaxRadius = (std::max(footprint.x, footprint.y) - 1) * 0.5f * SQUARE_SIZE;
 
 	beingBuilt = params.beingBuilt;
 	mass = (beingBuilt)? mass: unitDef->mass;
@@ -399,6 +402,11 @@ void CUnit::PostInit(const CUnit* builder)
 void CUnit::PostLoad()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// Recompute derived footprint geometry (not serialized, derived from footprint int2).
+	hasElongatedFootprint = modInfo.allowSepAxisCollisionTest && (static_cast<float>(std::abs(footprint.x - footprint.y)) / (footprint.x + footprint.y)) > 0.1f;
+	footprintHalfExtents = float2(footprint.x - 1, footprint.y - 1) * (0.5f * SQUARE_SIZE);
+	footprintMaxRadius = (std::max(footprint.x, footprint.y) - 1) * 0.5f * SQUARE_SIZE;
+
 	UpdateRenderParams();
 	eventHandler.RenderUnitPreCreated(this);
 	eventHandler.RenderUnitCreated(this, isCloaked);
