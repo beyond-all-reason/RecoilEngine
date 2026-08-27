@@ -122,7 +122,6 @@ public:
 	CCommandQueue commandQue;
 
 	int lastUserCommand;
-	int selfDCountdown;
 	int lastFinishCommand;
 
 	CUnit* owner;

@@ -173,6 +173,9 @@ class CLuaHandle : public CEventClient
 		bool UnitFeatureCollision(const CUnit* collider, const CFeature* collidee) override;
 		void UnitMoveFailed(const CUnit* unit) override;
 		void UnitArrivedAtGoal(const CUnit* unit) override;
+		
+		void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) override;
+		void UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds) override;
 
 		void RenderUnitDestroyed(const CUnit* unit) override;
 
@@ -343,6 +346,7 @@ class CLuaHandle : public CEventClient
 
 		void LosCallIn(const LuaHashString& hs, const CUnit* unit, int allyTeam);
 		void UnitCallIn(const LuaHashString& hs, const CUnit* unit);
+		void UnitSelfDestructCallin(const LuaHashString& hs, const CUnit* unit, float remainingSeconds);
 
 		void RunDrawCallIn(const LuaHashString& hs);
 

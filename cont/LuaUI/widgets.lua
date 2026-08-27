@@ -150,6 +150,8 @@ local flexCallIns = {
   'UnitDecloaked',
   'UnitMoveFailed',
   'UnitHarvestStorageFull',
+  "UnitSelfDestructStarted",
+  "UnitSelfDestructCancelled",
   'RecvLuaMsg',
   'StockpileChanged',
   'DrawGenesis',
@@ -2087,6 +2089,18 @@ function widgetHandler:UnitHarvestStorageFull(unitID, unitDefID, unitTeam)
     w:UnitHarvestStorageFull(unitID, unitDefID, unitTeam)
   end
   return
+end
+
+function widgetHandler:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
+  for _,w in ipairs(self.UnitSelfDestructStartedList) do
+    w:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
+  end
+end
+
+function widgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
+  for _,w in ipairs(self.UnitSelfDestructCancelledList) do
+    w:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
+  end
 end
 
 
