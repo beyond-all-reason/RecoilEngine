@@ -109,6 +109,24 @@
 ---@field height number? Camera distance from the ground. (ta)
 ---@field oldHeight number? Camera distance from the ground, cannot be changed. (rot)
 
+---Contains modoption information
+---
+---The files `ModOptions.lua` and `EngineOptions.lua` must return a table of type `ModOption[]`
+---
+---@class ModOption
+---@field key string The key that will be returned as the index for the option via `Spring.GetModOptions()`. The actual value is lowercased, recommended to use lowercased keys.
+---@field name string? (Default: `key`)
+---@field desc string? (Default: `name`)
+---@field section string? (Default: `""`)
+---@field style string? (Default: `""`)
+---@field scope string (Default: `"scope"`)
+---@field type "bool"|"string"|"number"|"list"|"section"
+---@field def any The default value. When not passed: boolean: `false`, string: `""`, number: `0`, list: `items[1]`
+---@field min number? The minimum value allowed, only valid when type: "number". (Default: `-1.0e30f`)
+---@field max number? The maximum value allowed, only valid when type: "number". (Default: `1.0e30f`)
+---@field maxlen number? The maximum number of characters allowed, only valid when type: "string". (Default: `0`)
+---@field items {key: string, name: string?, desc: string?}[] The list of items. Only valid when type: "list". Name defaults to key and desc defaults to name.
+
 --------------------------------------------------------------------------------
 -- Resources
 --------------------------------------------------------------------------------
