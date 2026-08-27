@@ -1461,11 +1461,6 @@ void CGameServer::ProcessPacket(const unsigned playerNum, std::shared_ptr<const 
 				Broadcast(CBaseNetProtocol::Get().SendDirectControlUpdate(inbuf[1], inbuf[2], *((short*)&inbuf[3]), *((short*)&inbuf[5])));
 			break;
 
-		case NETMSG_STARTPLAYING: {
-			if (players[a].isLocal && gameHasStarted)
-				CheckForGameStart(true);
-			break;
-		}
 		case NETMSG_TEAM: {
 			//TODO update players[] and teams[] and send all to hostif
 			const unsigned player = (unsigned)inbuf[1];
