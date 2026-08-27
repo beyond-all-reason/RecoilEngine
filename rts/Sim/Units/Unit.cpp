@@ -462,16 +462,16 @@ void CUnit::FinishedBuilding(bool postInit)
 }
 
 
-void CUnit::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID)
+void CUnit::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID, bool forced)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (IsCrashing() && !beingBuilt)
+	if (!forced && IsCrashing() && !beingBuilt)
 		return;
 
-	ForcedKillUnit(attacker, selfDestruct, reclaimed, weaponDefID);
+	KillUnitImpl(attacker, selfDestruct, reclaimed, weaponDefID);
 }
 
-void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID)
+void CUnit::KillUnitImpl(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (isDead)

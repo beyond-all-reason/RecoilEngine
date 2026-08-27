@@ -66,7 +66,7 @@ CFactory::CFactory()
 	, lastBuildUpdateFrame(-1)
 { }
 
-void CFactory::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID)
+void CFactory::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID, bool forced)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (curBuild != nullptr) {
@@ -74,7 +74,7 @@ void CFactory::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int 
 		curBuild = nullptr;
 	}
 
-	CUnit::KillUnit(attacker, selfDestruct, reclaimed, weaponDefID);
+	CUnit::KillUnit(attacker, selfDestruct, reclaimed, weaponDefID, forced);
 }
 
 void CFactory::PreInit(const UnitLoadParams& params)

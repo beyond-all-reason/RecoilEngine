@@ -1983,7 +1983,7 @@ int LuaSyncedCtrl::DestroyUnit(lua_State* L)
 	inDestroyUnit++;
 
 	ASSERT_SYNCED(unit->id);
-	unit->ForcedKillUnit(attacker, selfDestr, reclaimed, -CSolidObject::DAMAGE_KILLED_LUA);
+	unit->KillUnit(attacker, selfDestr, reclaimed, -CSolidObject::DAMAGE_KILLED_LUA, true);
 
 	if (recycleID)
 		unitHandler.GarbageCollectUnit(unit->id);

@@ -522,7 +522,7 @@ bool CStrafeAirMoveType::Update()
 			// NOTE: the crashing-state can only be set (and unset) by scripts
 			if (UpdateAirPhysics({crashRudder, crashElevator, crashAileron, 0.0f}, owner->frontdir)
 					|| (CGround::GetHeightAboveWater(owner->pos.x, owner->pos.z) + 5.0f + owner->radius) > owner->pos.y){
-				owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
+				owner->KillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED, true);
 			}
 
 			amtEmitCrashTrailFuncs[crashExpGenID != -1u](owner, crashExpGenID);
@@ -650,7 +650,7 @@ bool CStrafeAirMoveType::HandleCollisions(bool checkCollisions) {
 			// if crashing and we hit a building, die right now
 			// rather than waiting until we are close enough to
 			// the ground
-			owner->ForcedKillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED);
+			owner->KillUnit(nullptr, true, false, -CSolidObject::DAMAGE_AIRCRAFT_CRASHED, true);
 			return true;
 		}
 
