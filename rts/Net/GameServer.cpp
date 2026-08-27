@@ -540,6 +540,7 @@ bool CGameServer::SendDemoData(int targetFrameNum)
 	if (demoReader->ReachedEnd()) {
 		demoReader.reset();
 		Message(DemoEnd);
+		Broadcast(CBaseNetProtocol::Get().SendQuit(DemoEnd));
 
 		ret = false;
 	}
