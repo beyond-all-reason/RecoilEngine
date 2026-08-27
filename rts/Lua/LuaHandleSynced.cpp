@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include "System/RangesCompat.h"
 #include "LuaHandleSynced.h"
 
 #include "LuaInclude.h"
@@ -1220,7 +1221,7 @@ bool CSyncedLuaHandle::ResourceExcess(const std::map <int, SResourcePack>& exces
 
 	for (const auto &[teamID, excess] : excesses) {
 		lua_createtable(L, excess.MAX_RESOURCES, 0);
-		for (const auto &[resourceID, resource] : std::views::enumerate(excess)) {
+		for (const auto &[resourceID, resource] : spring::views::enumerate(excess)) {
 			lua_pushnumber(L, resource);
 			lua_rawseti(L, -2, resourceID + 1);
 		}
