@@ -84,7 +84,7 @@ add_custom_target(check ${CMAKE_CTEST_COMMAND} --output-on-failure -V
 add_custom_target(install-tests)
 
 macro (add_spring_test target sources libraries flags)
-	add_test(NAME test${target} COMMAND test_${target})
+	add_test(NAME test${target} COMMAND test_${target} --allow-running-no-tests)
 	add_dependencies(tests test_${target})
 	add_dependencies(check test_${target})
 	add_dependencies(install-tests test_${target})
