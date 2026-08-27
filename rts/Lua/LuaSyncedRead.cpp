@@ -1697,12 +1697,12 @@ int LuaSyncedRead::GetTeamList(lua_State* L)
 }
 
 
-/***
+/*** Get player IDs
  *
  * @function Spring.GetPlayerList
- * @param teamID integer? (Default: `-1`) to filter by when >= 0
- * @param active boolean? (Default: `false`) whether to filter only active teams
- * @return number[]? list of playerIDs
+ * @param teamID integer? (Default: `-1`) when >= 0 filters by teamID and filters non-spectator players if `active` is true
+ * @param active boolean? (Default: `false`) whether to filter by active players
+ * @return number[]? list of playerIDs. Returns: nil when `teamID` is invalid, empty when player is spectating a replay in unsynced environment
  */
 int LuaSyncedRead::GetPlayerList(lua_State* L)
 {
