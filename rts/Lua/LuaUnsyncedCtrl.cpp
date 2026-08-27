@@ -2,6 +2,8 @@
 
 #include "LuaUnsyncedCtrl.h"
 
+#include <cstdint>
+
 #include "Game/Camera/DollyController.h"
 #include "LuaConfig.h"
 #include "LuaInclude.h"
@@ -256,6 +258,8 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SendLuaGaiaMsg);
 	REGISTER_LUA_CFUNC(SendLuaRulesMsg);
 	REGISTER_LUA_CFUNC(SendLuaMenuMsg);
+
+	REGISTER_LUA_CFUNC(SendDediMsg);
 
 	REGISTER_LUA_CFUNC(LoadCmdColorsConfig);
 	REGISTER_LUA_CFUNC(LoadCtrlPanelConfig);
@@ -3872,6 +3876,65 @@ int LuaUnsyncedCtrl::SendLuaMenuMsg(lua_State* L)
 	if (luaMenu != nullptr)
 		luaMenu->RecvLuaMsg(luaL_checksstring(L, 1), gu->myPlayerNum);
 
+	return 0;
+}
+
+
+/******************************************************************************
+ * Spring.SendDediMsg — opaque server-bound channel.
+ *
+ * Payloads cross the wire as NETMSG_DEDIMSG and terminate in the dedicated
+ * server. They are never broadcast to peers, never written to the demo stream.
+ *
+ * Every message carries a uint16 record-type header (engine-encoded
+ * little-endian) followed by an opaque payload. Headers 0x0001..0x0FFF are
+ * reserved for future engine use. Game code must use 0x1000..0xFFFF.
+******************************************************************************/
+
+namespace {
+
+// On-wire frame: u8 cmd, u16 size, u8 playerNum, u16 header, u8[] payload.
+constexpr size_t   kDediMsgWireOverhead     = sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint8_t);
+constexpr size_t   kDediMsgHeaderSize       = sizeof(uint16_t);
+constexpr size_t   kDediMsgMaxPayload       = (size_t(1) << 16) - 1 - kDediMsgWireOverhead - kDediMsgHeaderSize;
+constexpr uint16_t kDediMsgGameRangeMin   = 0x1000;
+
+} // namespace
+
+
+/***
+ *
+ * @function Spring.SendDediMsg
+ *
+ * Send an opaque payload to the dedicated server, tagged with a uint16
+ * record-type header. The header is engine-encoded little-endian and must be
+ * in the game-private range 0x1000..0xFFFF; values below 0x1000 are reserved
+ * for engine use.
+ *
+ * @param header  integer  record-type tag in [0x1000, 0xFFFF]
+ * @param payload string   raw bytes, up to 65529 bytes
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SendDediMsg(lua_State* L)
+{
+	const lua_Integer headerArg = luaL_checkinteger(L, 1);
+	if (headerArg < kDediMsgGameRangeMin || headerArg > 0xFFFF)
+		luaL_error(L, "SendDediMsg() header 0x%x must be in the game-private range 0x%04x..0xFFFF", (unsigned)headerArg, (unsigned)kDediMsgGameRangeMin);
+
+	size_t payloadLen = 0;
+	const char* payload = luaL_optlstring(L, 2, "", &payloadLen);
+
+	if (payloadLen > kDediMsgMaxPayload)
+		luaL_error(L, "SendDediMsg() payload too large: %d > %d", (int)payloadLen, (int)kDediMsgMaxPayload);
+
+	const auto* bytes = reinterpret_cast<const uint8_t*>(payload);
+	std::vector<uint8_t> payloadBytes(bytes, bytes + payloadLen);
+
+	try {
+		clientNet->Send(CBaseNetProtocol::Get().SendDediMsg(gu->myPlayerNum, static_cast<uint16_t>(headerArg), payloadBytes));
+	} catch (const netcode::PackPacketException& ex) {
+		luaL_error(L, "SendDediMsg() packet error: %s", ex.what());
+	}
 	return 0;
 }
 

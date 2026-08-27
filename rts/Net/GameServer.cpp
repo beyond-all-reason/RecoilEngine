@@ -49,6 +49,7 @@
 #include "System/FileSystem/SimpleParser.h"
 #include "System/Net/Connection.h"
 #include "System/Net/LocalConnection.h"
+#include "System/Net/PackPacket.h"
 #include "System/Net/UnpackPacket.h"
 #include "System/LoadSave/DemoRecorder.h"
 #include "System/LoadSave/DemoReader.h"
@@ -191,6 +192,7 @@ void CGameServer::Initialize()
 	{
 		netPingTimings.fill(spring_notime);
 		mapDrawTimings.fill({spring_notime, 0});
+		dediMsgTimings.fill({spring_notime, 0});
 		chatMutedFlags.fill({false, false});
 		aiControlFlags.fill(true);
 
@@ -1347,6 +1349,56 @@ void CGameServer::ProcessPacket(const unsigned playerNum, std::shared_ptr<const 
 
 			} catch (const netcode::UnpackPacketException& ex) {
 				Message(spring::format("[GameServer::%s][NETMSG_LUAMSG] exception \"%s\" from player \"%s\"", ex.what(), players[a].name.c_str()));
+			}
+		} break;
+
+		case NETMSG_DEDIMSG: {
+			// Private channel for clients to talk to the server/autohost without
+			// leaving a replay trace. Never broadcast, never demoed.
+			try {
+				// wire: <u8 cmd><u16 size><u8 playerNum><u16 header><u8[] payload>
+				netcode::UnpackPacket pckt(packet, sizeof(uint8_t) + sizeof(uint16_t));
+				uint8_t  playerNum;
+				uint16_t header;
+
+				pckt >> playerNum;
+				pckt >> header;
+
+				if (playerNum != a) {
+					Message(spring::format(WrongPlayer, msgCode, a, (unsigned)playerNum));
+					break;
+				}
+
+				// these packets shouldn't even exist in a demo
+				// but lets skip parsing them anyways if so
+				if (demoReader != nullptr)
+					break;
+
+				// per-player rate limit: 64 KiB/sec window.
+				constexpr uint32_t kBytesPerSecond = 64 * 1024;
+				constexpr int      kWindowMs       = 1000;
+
+				constexpr size_t kFrameOverhead =
+					sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint8_t);
+				const size_t payloadLen = packet->length - kFrameOverhead;
+
+				const spring_time now = spring_gettime();
+				auto& [windowStart, bytesInWindow] = dediMsgTimings[a];
+
+				if (!windowStart.isTime() || spring_diffmsecs(now, windowStart) >= kWindowMs) {
+					windowStart = now;
+					bytesInWindow = 0;
+				}
+
+				if (bytesInWindow + payloadLen > kBytesPerSecond) {
+					LOG_L(L_WARNING, "[GameServer::NETMSG_DEDIMSG] dropped payload from player %u (rate limit)", (unsigned)playerNum);
+					break;
+				}
+				bytesInWindow += static_cast<uint32_t>(payloadLen);
+
+				// DO SOMETHING in future PR
+			} catch (const netcode::UnpackPacketException& ex) {
+				Message(spring::format("[GameServer::%s][NETMSG_DEDIMSG] exception \"%s\" from player \"%s\"", __func__, ex.what(), players[a].name.c_str()));
 			}
 		} break;
 
