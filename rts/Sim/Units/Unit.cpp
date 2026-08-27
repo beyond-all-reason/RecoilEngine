@@ -1768,6 +1768,20 @@ bool CUnit::AttackGround(const float3& pos, bool isUserTarget, bool wantManualFi
 	return ret;
 }
 
+void CUnit::DropCurrentAutoTarget()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (curTarget.type == Target_Unit)
+		DeleteDeathDependence(curTarget.unit, DEPENDENCE_TARGET);
+	
+	if (!curTarget.isUserTarget)
+		curTarget = SWeaponTarget();
+	
+	for (CWeapon* w: weapons) {
+		if (!w->GetCurrentTarget().isUserTarget)
+			w->DropCurrentTarget();
+	}
+}
 
 void CUnit::DropCurrentAttackTarget()
 {
