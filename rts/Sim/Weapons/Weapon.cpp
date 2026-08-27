@@ -114,8 +114,9 @@ CR_REG_METADATA(CWeapon, (
 	CR_MEMBER(weaponAimAdjustPriority),
 	CR_MEMBER(fastAutoRetargeting),
 	CR_MEMBER(fastQueryPointUpdate),
+	CR_MEMBER(burstControlWhenOutOfArc),
 	CR_MEMBER(accurateLeading),
-	CR_MEMBER(burstControlWhenOutOfArc)
+	CR_MEMBER(rangeFromBase)
 ))
 
 
@@ -197,8 +198,9 @@ CWeapon::CWeapon(CUnit* owner, const WeaponDef* def):
 	weaponAimAdjustPriority(1.f),
 	fastAutoRetargeting(false),
 	fastQueryPointUpdate(false),
+	burstControlWhenOutOfArc(0),
 	accurateLeading(0),
-	burstControlWhenOutOfArc(0)
+	rangeFromBase(0)
 {
 	assert(weaponMemPool.alloced(this));
 }
@@ -1087,8 +1089,11 @@ bool CWeapon::TestTarget(const float3& tgtPos, const SWeaponTarget& trg) const
 bool CWeapon::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+
 	const float heightDiff = tgtPos.y - aimFromPos.y;
-	const float targetDist = aimFromPos.SqDistance2D(tgtPos);
+	const float targetDist = (rangeFromBase == 1) ? tgtPos.SqDistance2D(owner->pos + (UpVector * heightDiff)) :
+							 (rangeFromBase == 2) ? tgtPos.SqDistance2D(owner->aimPos) :
+												    tgtPos.SqDistance2D(aimFromPos); // default case
 
 	float weaponRange = 0.0f; // range modified by heightDiff and cylinderTargeting
 

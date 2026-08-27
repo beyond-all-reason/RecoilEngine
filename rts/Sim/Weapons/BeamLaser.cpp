@@ -273,7 +273,12 @@ void CBeamLaser::FireImpl(const bool scriptCall)
 
 bool CBeamLaser::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
 {
-	float3 aimDir = (tgtPos - aimFromPos);
+
+	float3 aimDir = (rangeFromBase == 1) ? tgtPos - float3(owner->pos.x, aimFromPos.y, owner->pos.z) :
+					(rangeFromBase == 2) ? tgtPos - owner->aimPos :
+										   tgtPos - aimFromPos; // default case
+
+	//float3 aimDir = (tgtPos - aimFromPos);
 	const float targetDist = aimDir.LengthNormalize();
 
 	if (const auto shapedRange = GetShapedWeaponRange(aimDir, range); targetDist > shapedRange)
@@ -305,13 +310,34 @@ void CBeamLaser::FireInternal(float3 curDir)
 
 	bool tryAgain = true;
 	bool doDamage = true;
-
+	
 	float maxLength = range * rangeMod;
 	float curLength = 0.0f;
 
 	float3 curPos = weaponMuzzlePos;
 	float3 hitPos;
 	float3 newDir;
+
+
+	if (rangeFromBase == 1) {
+		// need to keep the laser from shooting past range as defined by rangeFromBase
+		// and also need to stretch it if the muzzle is behind the rangefrom point
+		// figure out the length of a ray that starts at weaponMuzzlePos, 
+		// and terminates on a sphere centered on the rangefrom point with radius range * rangeMod
+		const float3 weaponMuzzlePosOffset = weaponMuzzlePos - float3(owner->pos.x, aimFromPos.y, owner->pos.z);
+		const float b = weaponMuzzlePosOffset.dot(curDir);
+		const float c = weaponMuzzlePosOffset.dot(weaponMuzzlePosOffset) - maxLength * maxLength;
+		if ( (b * b - c) > 0) {
+			maxLength = (-b + math::sqrt(b * b - c));
+		}
+	} else if (rangeFromBase == 2) {
+		const float3 weaponMuzzlePosOffset = weaponMuzzlePos - owner->aimPos;
+		const float b = weaponMuzzlePosOffset.dot(curDir);
+		const float c = weaponMuzzlePosOffset.dot(weaponMuzzlePosOffset) - maxLength * maxLength;
+		if ( (b * b - c) > 0) {
+			maxLength = (-b + math::sqrt(b * b - c));
+		}
+	}
 
 	// objects at the end of the beam
 	CUnit* hitUnit = nullptr;
