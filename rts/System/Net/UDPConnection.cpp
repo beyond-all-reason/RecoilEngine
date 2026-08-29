@@ -269,7 +269,7 @@ void UDPConnection::Init()
 	// make sure protocoldef is initialized
 	CBaseNetProtocol::Get();
 
-	// a blocking send_to wedges the main thread when the send buffer fills up
+	// make sure we don't block the main thread with send_to if the send buffer is full
 	if (mySocket != nullptr) {
 		asio::error_code nbErr;
 		mySocket->non_blocking(true, nbErr);
