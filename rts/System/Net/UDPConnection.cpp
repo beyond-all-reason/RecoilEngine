@@ -820,8 +820,8 @@ std::string UDPConnection::Statistics() const
 		"\t%u bytes recv'd in %u packets (%.3f bytes/packet)\n",
 		"\t{%.3fx, %.3fx} relative protocol overhead {up, down}\n",
 		"\t%u incoming chunks dropped, %u outgoing chunks resent\n",
-		"\t%u outgoing packets dropped on a full send buffer\n",
 		"\t%u incoming chunks processed\n",
+		"\t%u outgoing packets dropped on a full send buffer\n",
 	};
 
 	std::string msg = "[UDPConnection::Statistics]\n";
@@ -829,8 +829,8 @@ std::string UDPConnection::Statistics() const
 	msg += spring::format(fmts[1], dataRecv, recvPackets, spring::SafeDivide(dataRecv * 1.0f, recvPackets * 1.0f));
 	msg += spring::format(fmts[2], spring::SafeDivide(sentOverhead * 1.0f, dataSent * 1.0f), spring::SafeDivide(recvOverhead * 1.0f, dataRecv * 1.0f));
 	msg += spring::format(fmts[3], droppedChunks, resentChunks);
-	msg += spring::format(fmts[4], droppedSends);
-	msg += spring::format(fmts[5], lastInOrder + 1);
+	msg += spring::format(fmts[4], lastInOrder + 1);
+	msg += spring::format(fmts[5], droppedSends);
 	return msg;
 }
 
