@@ -243,6 +243,7 @@ private:
 
 	unsigned int sentOverhead, recvOverhead;
 	unsigned int sentPackets, recvPackets;
+	unsigned int droppedSends = 0;
 
 	class BandwidthUsage {
 	public:
