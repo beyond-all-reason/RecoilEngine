@@ -313,6 +313,9 @@ void TextureAtlasManifestLoader::ValidateManifest(const TextureAtlasManifest& ma
 {
 	if (manifest.name.empty() || manifest.target != "2d" || manifest.width <= 0 || manifest.height <= 0 || manifest.mipLevels == 0 || manifest.pages.empty())
 		throw content_error("Texture atlas manifest has invalid identity, target, dimensions, mip count, or pages");
+	const uint32_t maxMipLevels = 1 + static_cast<uint32_t>(std::floor(std::log2(std::max(manifest.width, manifest.height))));
+	if (manifest.mipLevels > maxMipLevels)
+		throw content_error("Texture atlas manifest declares more mip levels than its dimensions allow: " + manifest.name);
 	std::unordered_set<std::string> ids;
 	std::vector<std::vector<AtlasPixelRect>> occupied(manifest.pages.size());
 	for (const auto& entry: manifest.entries) {

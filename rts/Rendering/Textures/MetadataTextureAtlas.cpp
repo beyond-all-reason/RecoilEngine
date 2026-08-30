@@ -27,8 +27,42 @@ namespace {
 		}
 	}
 
-	void CopyPatchPixels(std::vector<uint8_t>& destination, int atlasWidth, const CBitmap& source, const ReservedAtlasPlacement& placement, const AtlasPadding& padding)
+	int2 GetMipSize(const int2 baseSize, uint32_t level)
 	{
+		return int2(std::max(1, baseSize.x >> level), std::max(1, baseSize.y >> level));
+	}
+
+	// destination texels whose level-0 footprint lies entirely inside 'rect'; partially covered
+	// texels keep their authored value because their footprint also samples neighbouring entries
+	bool GetMipRect(const AtlasPixelRect& rect, const int2 levelSize, uint32_t level, int2& first, int2& last)
+	{
+		const int32_t scale = 1 << level;
+		first = int2((rect.x + scale - 1) / scale, (rect.y + scale - 1) / scale);
+		last = int2(
+			std::min(static_cast<int32_t>(rect.Right64() / scale), levelSize.x),
+			std::min(static_cast<int32_t>(rect.Bottom64() / scale), levelSize.y)
+		);
+		return first.x < last.x && first.y < last.y;
+	}
+
+	void ClearAtlasRect(std::vector<uint8_t>& destination, const int2 levelSize, uint32_t level, const AtlasPixelRect& rect)
+	{
+		int2 first;
+		int2 last;
+		if (!GetMipRect(rect, levelSize, level, first, last))
+			return;
+
+		for (int y = first.y; y < last.y; ++y)
+			std::memset(destination.data() + (static_cast<size_t>(y) * levelSize.x + first.x) * 4, 0, static_cast<size_t>(last.x - first.x) * 4);
+	}
+
+	void CopyPatchPixels(std::vector<uint8_t>& destination, const int2 levelSize, uint32_t level, const CBitmap& source, const ReservedAtlasPlacement& placement, const AtlasPadding& padding)
+	{
+		int2 first;
+		int2 last;
+		if (!GetMipRect(placement.allocation, levelSize, level, first, last))
+			return;
+
 		const auto* pixels = source.GetRawMem();
 		const auto Sample = [&](int x, int y) -> const uint8_t* {
 			if (padding.mode == AtlasPaddingMode::CLAMP) {
@@ -40,13 +74,22 @@ namespace {
 			}
 			return pixels + (y * source.xsize + x) * 4;
 		};
-		const int originX = placement.content.x - placement.allocation.x;
-		const int originY = placement.content.y - placement.allocation.y;
-		for (int y = 0; y < placement.allocation.height; ++y) {
-			for (int x = 0; x < placement.allocation.width; ++x) {
-				const auto* src = Sample(x - originX, y - originY);
-				auto* dst = destination.data() + ((placement.allocation.y + y) * atlasWidth + placement.allocation.x + x) * 4;
-				std::memcpy(dst, src, 4);
+
+		const int32_t scale = 1 << level;
+		const uint64_t footprint = uint64_t{static_cast<uint32_t>(scale)} * scale;
+		for (int y = first.y; y < last.y; ++y) {
+			for (int x = first.x; x < last.x; ++x) {
+				uint64_t accumulated[4] = {0, 0, 0, 0};
+				for (int32_t subY = 0; subY < scale; ++subY) {
+					for (int32_t subX = 0; subX < scale; ++subX) {
+						const auto* src = Sample(x * scale + subX - placement.content.x, y * scale + subY - placement.content.y);
+						for (int channel = 0; channel < 4; ++channel)
+							accumulated[channel] += src[channel];
+					}
+				}
+				auto* dst = destination.data() + (static_cast<size_t>(y) * levelSize.x + x) * 4;
+				for (int channel = 0; channel < 4; ++channel)
+					dst[channel] = static_cast<uint8_t>(accumulated[channel] / footprint);
 			}
 		}
 	}
@@ -185,6 +228,19 @@ void CMetadataTextureAtlas::DeleteTexture()
 	textureID = 0;
 }
 
+void CMetadataTextureAtlas::SetSamplerState() const
+{
+#ifndef HEADLESS
+	const uint32_t target = GetTexTarget();
+	glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, manifest.mipLevels - 1);
+	glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, manifest.mipLevels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
+	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+#endif
+}
+
 void CMetadataTextureAtlas::UploadDirect()
 {
 #ifdef HEADLESS
@@ -200,6 +256,8 @@ void CMetadataTextureAtlas::UploadDirect()
 	compressed = images.front().is_compressed();
 	glGenTextures(1, &textureID);
 	glBindTexture(GetTexTarget(), textureID);
+	// upload_texture2D() uses mutable storage, so the level range must be declared before uploading
+	SetSamplerState();
 	if (images.size() == 1) {
 		if (!images.front().upload_texture2D(0, GL_TEXTURE_2D))
 			throw content_error("Could not upload atlas " + manifest.name);
@@ -216,10 +274,6 @@ void CMetadataTextureAtlas::UploadDirect()
 			}
 		}
 	}
-	glTexParameteri(GetTexTarget(), GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GetTexTarget(), GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GetTexTarget(), GL_TEXTURE_MIN_FILTER, manifest.mipLevels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
-	glTexParameteri(GetTexTarget(), GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 #endif
 }
 
@@ -228,7 +282,8 @@ void CMetadataTextureAtlas::BuildModifiedPixels()
 #ifdef HEADLESS
 	return;
 #else
-	committedPixels.assign(manifest.pages.size(), std::vector<uint8_t>(static_cast<size_t>(manifest.width) * manifest.height * 4));
+	const int2 atlasSize = GetSize();
+	committedPixels.assign(manifest.pages.size(), std::vector<std::vector<uint8_t>>{});
 	for (size_t page = 0; page < variant.files.size(); ++page) {
 		nv_dds::CDDSImage image;
 		if (!image.load(variant.files[page], nv_dds::DDSOrientation::Preserve))
@@ -236,27 +291,36 @@ void CMetadataTextureAtlas::BuildModifiedPixels()
 		uint32_t temporary = 0;
 		glGenTextures(1, &temporary);
 		glBindTexture(GL_TEXTURE_2D, temporary);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, manifest.mipLevels - 1);
 		if (!image.upload_texture2D(0, GL_TEXTURE_2D)) {
 			glDeleteTextures(1, &temporary);
 			throw content_error("Could not upload base DDS page " + variant.files[page]);
 		}
-		glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, committedPixels[page].data());
+		// retain every authored mip level; only patched rectangles are recomputed below
+		committedPixels[page].resize(manifest.mipLevels);
+		for (uint32_t level = 0; level < manifest.mipLevels; ++level) {
+			const int2 levelSize = GetMipSize(atlasSize, level);
+			committedPixels[page][level].resize(static_cast<size_t>(levelSize.x) * levelSize.y * 4);
+			glGetTexImage(GL_TEXTURE_2D, level, GL_RGBA, GL_UNSIGNED_BYTE, committedPixels[page][level].data());
+		}
 		glDeleteTextures(1, &temporary);
 	}
 	std::unordered_map<std::string, const AtlasEntryDefinition*> originals;
 	for (const auto& entry: manifest.entries)
 		originals.emplace(entry.id, &entry);
 	for (const auto& patch: committedPatches) {
-		const auto old = originals.find(patch.definition.id);
-		if (old != originals.end() && !patch.placement.reusedExisting) {
-			const auto& rect = old->second->allocation;
-			for (int y = rect.y; y < rect.Bottom64(); ++y)
-				std::memset(committedPixels[old->second->page].data() + (static_cast<size_t>(y) * manifest.width + rect.x) * 4, 0, static_cast<size_t>(rect.width) * 4);
-		}
 		CBitmap bitmap;
 		if (!bitmap.Load(patch.definition.source) || bitmap.compressed || bitmap.channels != 4 || bitmap.xsize != patch.size.x || bitmap.ysize != patch.size.y)
 			throw content_error("Patch changed or failed to reload during finalization: " + patch.definition.source);
-		CopyPatchPixels(committedPixels[patch.placement.page], manifest.width, bitmap, patch.placement, patch.padding);
+		const auto old = originals.find(patch.definition.id);
+		const bool abandoned = old != originals.end() && !patch.placement.reusedExisting;
+		for (uint32_t level = 0; level < manifest.mipLevels; ++level) {
+			const int2 levelSize = GetMipSize(atlasSize, level);
+			if (abandoned)
+				ClearAtlasRect(committedPixels[old->second->page][level], levelSize, level, old->second->allocation);
+			CopyPatchPixels(committedPixels[patch.placement.page][level], levelSize, level, bitmap, patch.placement, patch.padding);
+		}
 	}
 #endif
 }
@@ -265,30 +329,39 @@ void CMetadataTextureAtlas::UploadModified()
 {
 	compressed = false;
 #ifndef HEADLESS
+	const int2 atlasSize = GetSize();
 	DeleteTexture();
 	glGenTextures(1, &textureID);
 	glBindTexture(GetTexTarget(), textureID);
 	if (committedPixels.size() == 1) {
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, manifest.width, manifest.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, committedPixels.front().data());
+		glTexStorage2D(GL_TEXTURE_2D, manifest.mipLevels, GL_RGBA8, manifest.width, manifest.height);
+		for (uint32_t level = 0; level < manifest.mipLevels; ++level) {
+			const int2 levelSize = GetMipSize(atlasSize, level);
+			glTexSubImage2D(GL_TEXTURE_2D, level, 0, 0, levelSize.x, levelSize.y, GL_RGBA, GL_UNSIGNED_BYTE, committedPixels[0][level].data());
+		}
 	} else {
-		glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, GL_RGBA8, manifest.width, manifest.height, committedPixels.size(), 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-		for (size_t page = 0; page < committedPixels.size(); ++page)
-			glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, page, manifest.width, manifest.height, 1, GL_RGBA, GL_UNSIGNED_BYTE, committedPixels[page].data());
+		glTexStorage3D(GL_TEXTURE_2D_ARRAY, manifest.mipLevels, GL_RGBA8, manifest.width, manifest.height, committedPixels.size());
+		for (size_t page = 0; page < committedPixels.size(); ++page) {
+			for (uint32_t level = 0; level < manifest.mipLevels; ++level) {
+				const int2 levelSize = GetMipSize(atlasSize, level);
+				glTexSubImage3D(GL_TEXTURE_2D_ARRAY, level, 0, 0, page, levelSize.x, levelSize.y, 1, GL_RGBA, GL_UNSIGNED_BYTE, committedPixels[page][level].data());
+			}
+		}
 	}
-	glGenerateMipmap(GetTexTarget());
-	glTexParameteri(GetTexTarget(), GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GetTexTarget(), GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GetTexTarget(), GL_TEXTURE_MIN_FILTER, manifest.mipLevels > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
-	glTexParameteri(GetTexTarget(), GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	SetSamplerState();
 #endif
+	committedPixels.clear();
+	committedPixels.shrink_to_fit();
 }
 
 void CMetadataTextureAtlas::ReloadTexture()
 {
 	if (state != State::FINALIZED)
 		throw content_error("Cannot reload an atlas before finalization: " + manifest.name);
-	if (patches.empty())
+	if (patches.empty()) {
 		UploadDirect();
-	else
+	} else {
+		BuildModifiedPixels();
 		UploadModified();
+	}
 }

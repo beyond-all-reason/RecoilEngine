@@ -58,6 +58,7 @@ private:
 	void UploadDirect();
 	void BuildModifiedPixels();
 	void UploadModified();
+	void SetSamplerState() const;
 	void DeleteTexture();
 
 	TextureAtlasManifest manifest;
@@ -67,7 +68,8 @@ private:
 	bool compressed = false;
 	std::vector<AtlasPatchDefinition> patches;
 	std::vector<CommittedPatch> committedPatches;
-	std::vector<std::vector<uint8_t>> committedPixels;
+	// [page][mip level], released once uploaded
+	std::vector<std::vector<std::vector<uint8_t>>> committedPixels;
 	spring::unordered_map<std::string, AtlasedTexture> textures;
 	mutable spring::unordered_map<const AtlasedTexture*, std::string> textureNames;
 };

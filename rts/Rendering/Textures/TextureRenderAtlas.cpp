@@ -20,7 +20,6 @@
 #include "System/Config/ConfigHandler.h"
 #include "System/StringUtil.h"
 #include "System/Log/ILog.h"
-#include "System/StringUtil.h"
 #include "fmt/format.h"
 
 #include "System/Misc/TracyDefs.h"
@@ -390,7 +389,31 @@ std::string CTextureRenderAtlas::GetTextureName(const AtlasedTexture* texture) c
 
 void CTextureRenderAtlas::ReloadTexture()
 {
-	// Source textures and the committed allocator layout remain available.
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!atlasFinalized)
+		return;
+
+	// CreateAtlasTexture() releases the source textures, so file-backed ones must be recreated first
+	for (const auto& [fileName, entry]: filenameToTexID) {
+		if (entry.texID == 0 && !CFileHandler::FileExists(fileName, SPRING_VFS_ALL)) {
+			LOG_L(L_WARNING, "CTextureRenderAtlas::%s() atlas=%s cannot restore memory-backed source \"%s\"; keeping the existing texture", __func__, atlasName.c_str(), fileName.c_str());
+			return;
+		}
+	}
+
+	for (auto& [fileName, entry]: filenameToTexID) {
+		if (entry.texID != 0)
+			continue;
+
+		CBitmap bm;
+		if (!bm.Load(fileName)) {
+			LOG_L(L_WARNING, "CTextureRenderAtlas::%s() atlas=%s cannot reload source \"%s\"; keeping the existing texture", __func__, atlasName.c_str(), fileName.c_str());
+			return;
+		}
+
+		entry.texID = bm.CreateMipMapTexture();
+	}
+
 	atlasRendered = false;
 	CreateAtlasTexture();
 }
