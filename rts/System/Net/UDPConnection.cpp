@@ -710,6 +710,8 @@ void UDPConnection::Flush(const bool forced)
 	if (muted)
 		return;
 
+	drainWaited = false;
+
 	const spring_time curTime = spring_gettime();
 
 	// do not create chunks more than chunksPerSec times per second
@@ -1072,8 +1074,10 @@ void UDPConnection::SendPacket(Packet& pkt)
 
 	EMULATE_LATENCY( !EMULATE_PACKET_LOSS( LOSS_COUNTER ) ) {
 		mySocket->send_to(buffer(sendBuffer), addr, flags, err);
-		// a full send buffer surfaces as try_again, give it a moment to drain
-		if (err && err.value() == asio::error::try_again) {
+		// a full send buffer surfaces as try_again, give it a moment to drain.
+		// once per flush pass: NetProtocol.cpp holds a spinlock over this
+		if (err && err.value() == asio::error::try_again && !drainWaited) {
+			drainWaited = true;
 			/* Balance between too many resends (lower)
 			 * and main thread stalls (higher) */ 
 			constexpr int drainWaitMs = 5;
