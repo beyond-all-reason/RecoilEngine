@@ -1386,6 +1386,14 @@ bool CUnitDrawerGLSL::ShowUnitBuildSquare(const BuildInfo& buildInfo, const std:
 
 	uint64_t hashKey = spring::LiteHash(pos);
 	hashKey = spring::hash_combine(spring::LiteHash(buildInfo.buildFacing), hashKey);
+	// TestUnitBuildSquare statuses also depend on the definition and queued
+	// commands. Both the world and minimap passes share this cache.
+	hashKey = spring::hash_combine(spring::LiteHash(buildInfo.def->id), hashKey);
+	for (const Command& command: commands) {
+		hashKey = spring::hash_combine(spring::LiteHash(command.GetID()), hashKey);
+		for (unsigned int i = 0; i < command.GetNumParams(); ++i)
+			hashKey = spring::hash_combine(spring::LiteHash(command.GetParam(i)), hashKey);
+	}
 
 	static constexpr int CACHE_VALIDITY_PERIOD = GAME_SPEED / 5;
 	std::erase_if(buildCache, [](const BuildCache& bc) {
@@ -2111,4 +2119,3 @@ void CUnitDrawerGL4::DrawUnitModelBeingBuiltOpaque(const CUnit* unit, bool noLua
 
 	glPopAttrib();
 }
-
