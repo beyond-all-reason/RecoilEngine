@@ -51,6 +51,17 @@ namespace nv_dds
     const unsigned int FOURCC_DXT1 = 0x31545844; //(MAKEFOURCC('D','X','T','1'))
     const unsigned int FOURCC_DXT3 = 0x33545844; //(MAKEFOURCC('D','X','T','3'))
     const unsigned int FOURCC_DXT5 = 0x35545844; //(MAKEFOURCC('D','X','T','5'))
+    const unsigned int FOURCC_DX10 = 0x30315844; //(MAKEFOURCC('D','X','1','0'))
+
+    // Supported DXGI formats
+    const unsigned int DXGI_FORMAT_BC1_UNORM = 71;
+    const unsigned int DXGI_FORMAT_BC2_UNORM = 74;
+    const unsigned int DXGI_FORMAT_BC3_UNORM = 77;
+
+    // DDS_HEADER_DXT10 values
+    const unsigned int DX10_DIMENSION_TEXTURE2D = 3;
+    const unsigned int DX10_DIMENSION_TEXTURE3D = 4;
+    const unsigned int DX10_MISC_TEXTURECUBE = 0x00000004;
 
     struct DXTColBlock
     {
@@ -83,6 +94,15 @@ namespace nv_dds
         unsigned int dwGBitMask;
         unsigned int dwBBitMask;
         unsigned int dwABitMask;
+    };
+
+    struct DDS_HEADER_DXT10
+    {
+        unsigned int dxgiFormat;
+        unsigned int resourceDimension;
+        unsigned int miscFlag;
+        unsigned int arraySize;
+        unsigned int miscFlags2;
     };
 
     struct DDS_HEADER
