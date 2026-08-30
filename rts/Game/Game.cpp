@@ -51,6 +51,7 @@
 #include "Rendering/UniformConstants.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Textures/NamedTextures.h"
+#include "Rendering/Textures/TextureAtlasRegistry.h"
 #include "Lua/LuaGaia.h"
 #include "Lua/LuaHandle.h"
 #include "Lua/LuaDebugExtra.h"
@@ -377,6 +378,9 @@ void CGame::Load(const std::string& mapFileName)
 
 		LoadMap(mapFileName);
 		Watchdog::ClearTimer(WDT_LOAD);
+		if (textureAtlasRegistry == nullptr)
+			textureAtlasRegistry = new CTextureAtlasRegistry();
+		textureAtlasRegistry->LoadDefinitions();
 		LoadDefs(defsParser);
 		Watchdog::ClearTimer(WDT_LOAD);
 	} catch (const content_error& e) {
@@ -911,6 +915,8 @@ void CGame::LoadSkirmishAIs()
 void CGame::LoadFinalize()
 {
 	ZoneScoped;
+	if (textureAtlasRegistry != nullptr)
+		textureAtlasRegistry->FinalizeRemainingAtlases();
 	{
 		loadscreen->SetLoadMessage("[" + std::string(__func__) + "] finalizing PFS");
 
@@ -1009,6 +1015,10 @@ void CGame::KillRendering()
 
 	transformsUploader.Kill();
 	modelUniformsUploader.Kill();
+	if (textureAtlasRegistry != nullptr) {
+		textureAtlasRegistry->Kill();
+		spring::SafeDelete(textureAtlasRegistry);
+	}
 }
 
 void CGame::KillInterface()
@@ -2208,4 +2218,3 @@ const ActionList& CGame::GetLastActionList()
 {
 	return gameInputReceiver.lastActionList;
 }
-

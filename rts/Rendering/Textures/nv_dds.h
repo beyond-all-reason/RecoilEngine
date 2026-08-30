@@ -10,6 +10,7 @@
 
 #include <string>
 #include <vector>
+#include <utility>
 #include <cstdio>
 #include <assert.h>
 
@@ -51,6 +52,34 @@ namespace nv_dds
     const unsigned int FOURCC_DXT1 = 0x31545844; //(MAKEFOURCC('D','X','T','1'))
     const unsigned int FOURCC_DXT3 = 0x33545844; //(MAKEFOURCC('D','X','T','3'))
     const unsigned int FOURCC_DXT5 = 0x35545844; //(MAKEFOURCC('D','X','T','5'))
+    const unsigned int FOURCC_ATI1 = 0x31495441;
+    const unsigned int FOURCC_ATI2 = 0x32495441;
+    const unsigned int FOURCC_DX10 = 0x30315844;
+
+    struct DDS_HEADER_DXT10
+    {
+        unsigned int dxgiFormat;
+        unsigned int resourceDimension;
+        unsigned int miscFlag;
+        unsigned int arraySize;
+        unsigned int miscFlags2;
+    };
+
+    enum class DDSFormat { UNKNOWN, BC1, BC2, BC3, BC4, BC5, BC7, RGB8, RGBA8, L8 };
+    enum class DDSOrientation { LegacyFlip, Preserve };
+
+    struct DDSHeaderInfo {
+        unsigned int width = 0;
+        unsigned int height = 0;
+        unsigned int depth = 1;
+        unsigned int mipLevels = 0;
+        unsigned int arraySize = 1;
+        DDSFormat format = DDSFormat::UNKNOWN;
+        bool compressed = false;
+        bool srgb = false;
+    };
+
+    bool InspectDDSHeader(const std::string& filename, DDSHeaderInfo& info);
 
     struct DXTColBlock
     {
@@ -100,6 +129,10 @@ namespace nv_dds
         unsigned int dwCaps2;
         unsigned int dwReserved2[3];
     };
+
+    static_assert(sizeof(DDS_PIXELFORMAT) == 32);
+    static_assert(sizeof(DDS_HEADER) == 124);
+    static_assert(sizeof(DDS_HEADER_DXT10) == 20);
 
     enum TextureType
     {
@@ -191,6 +224,11 @@ namespace nv_dds
 
 			CDDSImage& operator = (const CDDSImage& img) {
 				m_format = img.m_format;
+				m_internalFormat = img.m_internalFormat;
+				m_externalFormat = img.m_externalFormat;
+				m_blockSize = img.m_blockSize;
+				m_srgb = img.m_srgb;
+				m_ddsFormat = img.m_ddsFormat;
 				m_components = img.m_components;
 				m_type = img.m_type;
 				m_valid = img.m_valid;
@@ -200,6 +238,11 @@ namespace nv_dds
 			}
 			CDDSImage& operator = (CDDSImage&& img) {
 				m_format = img.m_format;
+				m_internalFormat = img.m_internalFormat;
+				m_externalFormat = img.m_externalFormat;
+				m_blockSize = img.m_blockSize;
+				m_srgb = img.m_srgb;
+				m_ddsFormat = img.m_ddsFormat;
 				m_components = img.m_components;
 				m_type = img.m_type;
 				m_valid = img.m_valid;
@@ -219,6 +262,7 @@ namespace nv_dds
 
             void clear();
             bool load(std::string filename, bool flipImage = true);
+            bool load(std::string filename, DDSOrientation orientation) { return load(std::move(filename), orientation == DDSOrientation::LegacyFlip); }
             bool save(std::string filename, bool flipImage = true) const;
 
             bool upload_texture1D() const;
@@ -295,8 +339,20 @@ namespace nv_dds
                 return m_images[face];
             }
 
+			inline const CTexture& get_image(unsigned int index = 0) const
+			{
+				assert(m_valid);
+				assert(index < m_images.size());
+				return m_images[index];
+			}
+
             inline unsigned int get_components() const { return m_components; }
             inline unsigned int get_format() const { return m_format; }
+            inline unsigned int get_internal_format() const { return m_internalFormat; }
+            inline unsigned int get_external_format() const { return m_externalFormat; }
+            inline unsigned int get_block_size() const { return m_blockSize; }
+            inline DDSFormat get_dds_format() const { return m_ddsFormat; }
+            inline bool is_srgb() const { return m_srgb; }
             inline TextureType get_type() const { return m_type; }
 
             bool is_compressed() const;
@@ -338,8 +394,13 @@ namespace nv_dds
             bool write_texture(const CTexture &texture, FILE *fp) const;
 
             unsigned int m_format;
+            unsigned int m_internalFormat;
+            unsigned int m_externalFormat;
+            unsigned int m_blockSize;
             unsigned int m_components;
+            DDSFormat m_ddsFormat;
             TextureType m_type;
+            bool m_srgb;
             bool m_valid;
 
             std::vector<CTexture> m_images;

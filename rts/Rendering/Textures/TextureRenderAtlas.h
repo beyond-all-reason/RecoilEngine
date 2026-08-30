@@ -6,6 +6,7 @@
 #include <tuple>
 
 #include "TextureAtlas.h"
+#include "ITextureAtlas.h"
 #include "IAtlasAllocator.h"
 #include "System/type2.h"
 #include "System/float4.h"
@@ -17,7 +18,7 @@ namespace Shader {
 	struct IProgramObject;
 }
 
-class CTextureRenderAtlas {
+class CTextureRenderAtlas : public ITextureAtlas {
 public:
 	struct UniqueSubTexture {
 		uint32_t texID;
@@ -50,14 +51,21 @@ public:
 	const auto& GetNameToUniqueSubTexMap() const { return nameToUniqueSubTexStr; }
 	const auto& GetUniqueSubTexMap() const { return uniqueSubTextureMap; }
 
-	uint32_t GetTexTarget() const;
-	uint32_t GetTexID() const;
+	uint32_t GetTexTarget() const override;
+	uint32_t GetTexID() const override;
 	const uint2& GetAtlasSize() const;
+	int2 GetSize() const override;
+	uint32_t GetNumPages() const override;
 	int GetMinDim() const;
-	int GetNumTexLevels() const;
+	int GetNumTexLevels() const override;
 
 	const IAtlasAllocator* GetAllocator() const { return atlasAllocator.get(); }
 	const std::string& GetAtlasName() const { return atlasName; }
+	const std::string& GetName() const override { return atlasName; }
+	const AtlasedTexture* FindTexture(const std::string& name) const override;
+	AtlasedTexture* GetTexturePtr(const std::string& name) override;
+	std::string GetTextureName(const AtlasedTexture* texture) const override;
+	void ReloadTexture() override;
 
 	bool Finalize() { return CalculateAtlas() && CreateAtlasTexture(); }
 	bool CalculateAtlas();
@@ -80,6 +88,8 @@ private:
 	spring::unordered_map<std::string, FileTexEntry> filenameToTexID;
 	spring::unordered_map<std::string, UniqueSubTexture> uniqueSubTextureMap;
 	spring::unordered_map<std::string, std::string> nameToUniqueSubTexStr;
+	spring::unordered_map<std::string, AtlasedTexture> stableTextures;
+	mutable spring::unordered_map<const AtlasedTexture*, std::string> stableTextureNames;
 
 	CTextureAtlas::AllocatorType allocType;
 	uint32_t glInternalType;

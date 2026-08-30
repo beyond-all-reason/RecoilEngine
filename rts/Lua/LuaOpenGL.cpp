@@ -15,6 +15,7 @@
 #include <optional>
 #include <variant>
 #include <span>
+#include <cmath>
 
 #include <fmt/format.h>
 
@@ -63,6 +64,7 @@
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Textures/Bitmap.h"
 #include "Rendering/Textures/TextureAtlas.h"
+#include "Rendering/Textures/TextureAtlasRegistry.h"
 #include "Rendering/Textures/NamedTextures.h"
 #include "Rendering/Textures/3DOTextureHandler.h"
 #include "Rendering/Textures/S3OTextureHandler.h"
@@ -371,6 +373,9 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetAtlasTexture);
 
 	REGISTER_LUA_CFUNC(GetEngineAtlasTextures);
+	REGISTER_LUA_CFUNC(GetEngineAtlasInfo);
+	REGISTER_LUA_CFUNC(GetEngineAtlasTexture);
+	REGISTER_LUA_CFUNC(GetEngineAtlasTexturesV2);
 
 	REGISTER_LUA_CFUNC(Shape);
 	REGISTER_LUA_CFUNC(BeginEnd);
@@ -5067,6 +5072,95 @@ int LuaOpenGL::GetEngineAtlasTextures(lua_State* L) {
 		luaL_error(L, "[%s] Invalid engine atlas (%s) is specified (only $explosions and $groundfx are supported)", __func__, atlasName.c_str());
 		return 0;
 	}
+}
+
+namespace {
+	CMetadataTextureAtlas* GetMetadataAtlas(lua_State* L, int index)
+	{
+		if (textureAtlasRegistry == nullptr)
+			luaL_error(L, "Engine texture atlas registry is not initialized");
+		const std::string name = luaL_checksstring(L, index);
+		ITextureAtlas* atlas = textureAtlasRegistry->GetAtlas(name);
+		auto* metadata = dynamic_cast<CMetadataTextureAtlas*>(atlas);
+		if (metadata == nullptr || metadata->GetState() != CMetadataTextureAtlas::State::FINALIZED)
+			luaL_error(L, "Unknown or non-finalized metadata atlas %s", name.c_str());
+		return metadata;
+	}
+
+	void PushAtlasTuple(lua_State* L, const AtlasedTexture& texture, const int2 atlasSize)
+	{
+		lua_pushnumber(L, texture.x1);
+		lua_pushnumber(L, texture.x2);
+		lua_pushnumber(L, texture.y1);
+		lua_pushnumber(L, texture.y2);
+		lua_pushinteger(L, texture.pageNum);
+		lua_pushinteger(L, std::lround((texture.x2 - texture.x1) * atlasSize.x));
+		lua_pushinteger(L, std::lround((texture.y2 - texture.y1) * atlasSize.y));
+	}
+}
+
+/***
+ * @function gl.GetEngineAtlasInfo
+ * @param atlasName string Atlas registry ID or `$atlas:<id>`.
+ * @return table info Atlas dimensions, pages, mip levels, selected variant, modification, and compression state.
+ */
+int LuaOpenGL::GetEngineAtlasInfo(lua_State* L)
+{
+	const auto* atlas = GetMetadataAtlas(L, 1);
+	const int2 size = atlas->GetSize();
+	lua_createtable(L, 0, 7);
+	LuaPushNamedNumber(L, "width", size.x);
+	LuaPushNamedNumber(L, "height", size.y);
+	LuaPushNamedNumber(L, "pages", atlas->GetNumPages());
+	LuaPushNamedNumber(L, "mipLevels", atlas->GetNumTexLevels());
+	LuaPushNamedString(L, "variant", atlas->GetVariant().format);
+	LuaPushNamedBool(L, "modified", atlas->IsModified());
+	LuaPushNamedBool(L, "compressed", atlas->IsCompressed());
+	return 1;
+}
+
+/***
+ * @function gl.GetEngineAtlasTexture
+ * @param atlasName string Atlas registry ID or `$atlas:<id>`.
+ * @param entryName string Case-insensitive entry ID.
+ * @return number u0
+ * @return number u1
+ * @return number v0
+ * @return number v1
+ * @return integer page
+ * @return integer pixelWidth
+ * @return integer pixelHeight
+ */
+int LuaOpenGL::GetEngineAtlasTexture(lua_State* L)
+{
+	const auto* atlas = GetMetadataAtlas(L, 1);
+	const std::string entryName = luaL_checksstring(L, 2);
+	const AtlasedTexture* texture = atlas->FindTexture(entryName);
+	if (texture == nullptr)
+		return 0;
+	PushAtlasTuple(L, *texture, atlas->GetSize());
+	return 7;
+}
+
+/***
+ * @function gl.GetEngineAtlasTexturesV2
+ * @param atlasName string Atlas registry ID or `$atlas:<id>`.
+ * @return table<string, table> entries Finalized `{u0,u1,v0,v1,page,pixelWidth,pixelHeight}` tuples.
+ */
+int LuaOpenGL::GetEngineAtlasTexturesV2(lua_State* L)
+{
+	const auto* atlas = GetMetadataAtlas(L, 1);
+	const auto& textures = atlas->GetTextures();
+	lua_createtable(L, 0, textures.size());
+	for (const auto& [name, texture]: textures) {
+		lua_pushsstring(L, name);
+		lua_createtable(L, 7, 0);
+		PushAtlasTuple(L, texture, atlas->GetSize());
+		for (int index = 7; index >= 1; --index)
+			lua_rawseti(L, -index - 1, index);
+		lua_rawset(L, -3);
+	}
+	return 1;
 }
 
 

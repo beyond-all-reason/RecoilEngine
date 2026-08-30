@@ -109,6 +109,9 @@ public:
 	void GetUsableDisplayBounds(SDL_Rect& r, const int* di = nullptr) const;
 
 	bool IsExtensionSupported(const char* ext) const;
+	bool SupportsS3TC() const;
+	bool SupportsRGTC() const;
+	bool SupportsBPTC() const;
 
 	bool CheckGLMultiSampling() const;
 	bool CheckGLContextVersion(const int2& minCtx) const;
@@ -425,4 +428,3 @@ private:
 extern CGlobalRendering* globalRendering;
 
 #endif /* _GLOBAL_RENDERING_H */
-

@@ -162,6 +162,8 @@
 
 #include <cstring>
 #include <cassert>
+#include <algorithm>
+#include <cmath>
 
 #include <nowide/cstdio.hpp>
 
@@ -177,6 +179,88 @@
 using namespace std;
 using namespace nv_dds;
 
+bool nv_dds::InspectDDSHeader(const std::string& filename, DDSHeaderInfo& info)
+{
+	CFileHandler file(filename);
+	if (!file.FileExists() || file.FileSize() < 128)
+		return false;
+	char magic[4];
+	DDS_HEADER header = {};
+	if (file.Read(magic, sizeof(magic)) != sizeof(magic) || std::memcmp(magic, "DDS ", 4) != 0 || file.Read(&header, sizeof(header)) != sizeof(header))
+		return false;
+	header.dwSize = swabDWord(header.dwSize);
+	header.dwWidth = swabDWord(header.dwWidth);
+	header.dwHeight = swabDWord(header.dwHeight);
+	header.dwDepth = swabDWord(header.dwDepth);
+	header.dwMipMapCount = swabDWord(header.dwMipMapCount);
+	header.ddspf.dwSize = swabDWord(header.ddspf.dwSize);
+	header.ddspf.dwFlags = swabDWord(header.ddspf.dwFlags);
+	header.ddspf.dwFourCC = swabDWord(header.ddspf.dwFourCC);
+	header.ddspf.dwRGBBitCount = swabDWord(header.ddspf.dwRGBBitCount);
+	if (header.dwSize != 124 || header.ddspf.dwSize != 32 || header.dwWidth == 0 || header.dwHeight == 0)
+		return false;
+
+	info = {};
+	info.width = header.dwWidth;
+	info.height = header.dwHeight;
+	info.depth = std::max(header.dwDepth, 1u);
+	info.mipLevels = std::max(header.dwMipMapCount, 1u);
+	unsigned int blockSize = 0;
+	unsigned int components = 0;
+	if (header.ddspf.dwFourCC == FOURCC_DX10) {
+		DDS_HEADER_DXT10 dx10 = {};
+		if (file.Read(&dx10, sizeof(dx10)) != sizeof(dx10))
+			return false;
+		dx10.dxgiFormat = swabDWord(dx10.dxgiFormat);
+		dx10.resourceDimension = swabDWord(dx10.resourceDimension);
+		dx10.arraySize = swabDWord(dx10.arraySize);
+		if (dx10.resourceDimension != 3 || dx10.arraySize == 0)
+			return false;
+		info.arraySize = dx10.arraySize;
+		switch (dx10.dxgiFormat) {
+			case 71: case 72: info.format = DDSFormat::BC1; blockSize = 8; info.srgb = dx10.dxgiFormat == 72; break;
+			case 74: case 75: info.format = DDSFormat::BC2; blockSize = 16; info.srgb = dx10.dxgiFormat == 75; break;
+			case 77: case 78: info.format = DDSFormat::BC3; blockSize = 16; info.srgb = dx10.dxgiFormat == 78; break;
+			case 80: info.format = DDSFormat::BC4; blockSize = 8; break;
+			case 83: info.format = DDSFormat::BC5; blockSize = 16; break;
+			case 98: case 99: info.format = DDSFormat::BC7; blockSize = 16; info.srgb = dx10.dxgiFormat == 99; break;
+			case 28: case 29: info.format = DDSFormat::RGBA8; components = 4; info.srgb = dx10.dxgiFormat == 29; break;
+			default: return false;
+		}
+	} else if (header.ddspf.dwFlags & DDSF_FOURCC) {
+		switch (header.ddspf.dwFourCC) {
+			case FOURCC_DXT1: info.format = DDSFormat::BC1; blockSize = 8; break;
+			case FOURCC_DXT3: info.format = DDSFormat::BC2; blockSize = 16; break;
+			case FOURCC_DXT5: info.format = DDSFormat::BC3; blockSize = 16; break;
+			case FOURCC_ATI1: info.format = DDSFormat::BC4; blockSize = 8; break;
+			case FOURCC_ATI2: info.format = DDSFormat::BC5; blockSize = 16; break;
+			default: return false;
+		}
+	} else if (header.ddspf.dwRGBBitCount == 32) {
+		info.format = DDSFormat::RGBA8;
+		components = 4;
+	} else if (header.ddspf.dwRGBBitCount == 24) {
+		info.format = DDSFormat::RGB8;
+		components = 3;
+	} else if (header.ddspf.dwRGBBitCount == 8) {
+		info.format = DDSFormat::L8;
+		components = 1;
+	} else {
+		return false;
+	}
+	info.compressed = blockSize != 0;
+	uint64_t expectedBytes = 0;
+	unsigned int width = info.width;
+	unsigned int height = info.height;
+	for (unsigned int level = 0; level < info.mipLevels; ++level) {
+		expectedBytes += blockSize ? uint64_t{(width + 3) / 4} * ((height + 3) / 4) * blockSize : uint64_t{width} * height * components;
+		width = std::max(width >> 1, 1u);
+		height = std::max(height >> 1, 1u);
+	}
+	expectedBytes *= info.arraySize * info.depth;
+	return expectedBytes <= static_cast<uint64_t>(file.FileSize() - file.GetPos());
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // CDDSImage public functions
 
@@ -184,8 +268,13 @@ using namespace nv_dds;
 // default constructor
 CDDSImage::CDDSImage()
   : m_format(0),
+	m_internalFormat(0),
+	m_externalFormat(0),
+	m_blockSize(0),
     m_components(0),
+	m_ddsFormat(DDSFormat::UNKNOWN),
     m_type(TextureNone),
+	m_srgb(false),
     m_valid(false)
 {
 }
@@ -325,6 +414,8 @@ bool CDDSImage::load(string filename, bool flipImage)
 
 	// read in DDS header
 	DDS_HEADER ddsh;
+	DDS_HEADER_DXT10 dds10 = {};
+	bool hasDX10Header = false;
 #if 0
 	fread(&ddsh, sizeof(DDS_HEADER), 1, fp);
 #else
@@ -348,6 +439,10 @@ bool CDDSImage::load(string filename, bool flipImage)
 	file.Read(&ddsh.dwCaps1, tmp);
 	file.Read(&ddsh.dwCaps2, tmp);
 	file.Read(&ddsh.dwReserved2, tmp*3);
+
+	hasDX10Header = (swabDWord(ddsh.ddspf.dwFourCC) == FOURCC_DX10);
+	if (hasDX10Header && file.Read(&dds10, sizeof(dds10)) != sizeof(dds10))
+		return false;
 
 	// if in VFS, read post-header data directly from buffer
 	if (file.IsBuffered()) {
@@ -373,6 +468,21 @@ bool CDDSImage::load(string filename, bool flipImage)
 	ddsh.ddspf.dwABitMask = swabDWord(ddsh.ddspf.dwABitMask);
 	ddsh.dwCaps1 = swabDWord(ddsh.dwCaps1);
 	ddsh.dwCaps2 = swabDWord(ddsh.dwCaps2);
+	if (hasDX10Header) {
+		dds10.dxgiFormat = swabDWord(dds10.dxgiFormat);
+		dds10.resourceDimension = swabDWord(dds10.resourceDimension);
+		dds10.miscFlag = swabDWord(dds10.miscFlag);
+		dds10.arraySize = swabDWord(dds10.arraySize);
+		dds10.miscFlags2 = swabDWord(dds10.miscFlags2);
+	}
+
+	if (ddsh.dwSize != 124 || ddsh.ddspf.dwSize != 32 || ddsh.dwWidth == 0 || ddsh.dwHeight == 0)
+		return false;
+	const unsigned int maxMipLevels = 1 + static_cast<unsigned int>(std::floor(std::log2(std::max(ddsh.dwWidth, ddsh.dwHeight))));
+	if (ddsh.dwMipMapCount > maxMipLevels)
+		return false;
+	if (hasDX10Header && (dds10.resourceDimension != 3 || dds10.arraySize != 1))
+		return false;
 
 	// default to flat texture type (1D, 2D, or rectangle)
 	m_type = TextureFlat;
@@ -388,19 +498,58 @@ bool CDDSImage::load(string filename, bool flipImage)
 	// figure out what the image format is
 	if (ddsh.ddspf.dwFlags & DDSF_FOURCC)
 	{
-		switch(ddsh.ddspf.dwFourCC)
+		const unsigned int format = hasDX10Header ? dds10.dxgiFormat : ddsh.ddspf.dwFourCC;
+		switch(format)
 		{
 			case FOURCC_DXT1:
-				m_format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
+			case 71: case 72:
+				m_internalFormat = (format == 72) ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT : GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
 				m_components = 3;
+				m_blockSize = 8;
+				m_ddsFormat = DDSFormat::BC1;
+				m_srgb = (format == 72);
 				break;
 			case FOURCC_DXT3:
-				m_format = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+			case 74: case 75:
+				m_internalFormat = (format == 75) ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT : GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
 				m_components = 4;
+				m_blockSize = 16;
+				m_ddsFormat = DDSFormat::BC2;
+				m_srgb = (format == 75);
 				break;
 			case FOURCC_DXT5:
-				m_format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+			case 77: case 78:
+				m_internalFormat = (format == 78) ? GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT : GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
 				m_components = 4;
+				m_blockSize = 16;
+				m_ddsFormat = DDSFormat::BC3;
+				m_srgb = (format == 78);
+				break;
+			case FOURCC_ATI1: case 80:
+				m_internalFormat = GL_COMPRESSED_RED_RGTC1;
+				m_components = 1;
+				m_blockSize = 8;
+				m_ddsFormat = DDSFormat::BC4;
+				break;
+			case FOURCC_ATI2: case 83:
+				m_internalFormat = GL_COMPRESSED_RG_RGTC2;
+				m_components = 2;
+				m_blockSize = 16;
+				m_ddsFormat = DDSFormat::BC5;
+				break;
+			case 98: case 99:
+				m_internalFormat = (format == 99) ? GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM : GL_COMPRESSED_RGBA_BPTC_UNORM;
+				m_components = 4;
+				m_blockSize = 16;
+				m_ddsFormat = DDSFormat::BC7;
+				m_srgb = (format == 99);
+				break;
+			case 28: case 29:
+				m_internalFormat = (format == 29) ? GL_SRGB8_ALPHA8 : GL_RGBA8;
+				m_externalFormat = GL_RGBA;
+				m_components = 4;
+				m_ddsFormat = DDSFormat::RGBA8;
+				m_srgb = (format == 29);
 				break;
 			default:
 				//fclose(fp);
@@ -410,22 +559,34 @@ bool CDDSImage::load(string filename, bool flipImage)
 	else if (ddsh.ddspf.dwFlags == DDSF_RGBA && ddsh.ddspf.dwRGBBitCount == 32)
 	{
 		m_format = GL_BGRA;
+		m_externalFormat = GL_BGRA;
+		m_internalFormat = GL_RGBA8;
 		m_components = 4;
+		m_ddsFormat = DDSFormat::RGBA8;
 	}
 	else if (ddsh.ddspf.dwFlags == DDSF_RGB  && ddsh.ddspf.dwRGBBitCount == 32)
 	{
 		m_format = GL_BGRA;
+		m_externalFormat = GL_BGRA;
+		m_internalFormat = GL_RGB8;
 		m_components = 4;
+		m_ddsFormat = DDSFormat::RGB8;
 	}
 	else if (ddsh.ddspf.dwFlags == DDSF_RGB  && ddsh.ddspf.dwRGBBitCount == 24)
 	{
 		m_format = GL_BGR;
+		m_externalFormat = GL_BGR;
+		m_internalFormat = GL_RGB8;
 		m_components = 3;
+		m_ddsFormat = DDSFormat::RGB8;
 	}
 	else if (ddsh.ddspf.dwRGBBitCount == 8)
 	{
 		m_format = GL_LUMINANCE;
+		m_externalFormat = GL_LUMINANCE;
+		m_internalFormat = GL_R8;
 		m_components = 1;
+		m_ddsFormat = DDSFormat::L8;
 	}
 	else
 	{
@@ -434,6 +595,14 @@ bool CDDSImage::load(string filename, bool flipImage)
 		#endif
 		return false;
 	}
+
+	if (is_compressed())
+		m_format = m_internalFormat;
+	else if (m_externalFormat == 0)
+		m_format = m_externalFormat = GL_RGBA;
+
+	if (flipImage && is_compressed() && m_ddsFormat != DDSFormat::BC1 && m_ddsFormat != DDSFormat::BC2 && m_ddsFormat != DDSFormat::BC3)
+		return false;
 
 	// store primary surface width/height/depth
 	unsigned int width = ddsh.dwWidth;
@@ -468,11 +637,14 @@ bool CDDSImage::load(string filename, bool flipImage)
 		if (fileBuf.empty()) {
 			fileBuf.resize(size);
 
-			file.Read(fileBuf.data(), size);
+			if (file.Read(fileBuf.data(), size) != size)
+				return false;
 			img.create(width, height, depth, size, fileBuf.data());
 
 			fileBuf.clear();
 		} else {
+			if (filePos < 0 || static_cast<size_t>(filePos) + size > fileBuf.size())
+				return false;
 			img.create(width, height, depth, size, fileBuf.data() + filePos);
 			filePos += size;
 		}
@@ -515,11 +687,14 @@ bool CDDSImage::load(string filename, bool flipImage)
 			if (fileBuf.empty()) {
 				fileBuf.resize(size);
 
-				file.Read(fileBuf.data(), size);
+				if (file.Read(fileBuf.data(), size) != size)
+					return false;
 				mipmap.create(w, h, d, size, fileBuf.data());
 
 				fileBuf.clear();
 			} else {
+				if (filePos < 0 || static_cast<size_t>(filePos) + size > fileBuf.size())
+					return false;
 				mipmap.create(w, h, d, size, fileBuf.data() + filePos);
 				filePos += size;
 			}
@@ -577,6 +752,8 @@ bool CDDSImage::save(std::string filename, bool flipImage) const
 	RECOIL_DETAILED_TRACY_ZONE;
     assert(m_valid);
     assert(m_type != TextureNone);
+	if (is_compressed() && (m_srgb || (m_ddsFormat != DDSFormat::BC1 && m_ddsFormat != DDSFormat::BC2 && m_ddsFormat != DDSFormat::BC3)))
+		return false; // legacy writer cannot emit DX10 headers or flip these block formats safely
 
     DDS_HEADER ddsh;
     unsigned int headerSize = sizeof(DDS_HEADER);
@@ -716,7 +893,12 @@ void CDDSImage::clear()
 	RECOIL_DETAILED_TRACY_ZONE;
     m_components = 0;
     m_format = 0;
+	m_internalFormat = 0;
+	m_externalFormat = 0;
+	m_blockSize = 0;
+	m_ddsFormat = DDSFormat::UNKNOWN;
     m_type = TextureNone;
+	m_srgb = false;
     m_valid = false;
 
     m_images.clear();
@@ -725,9 +907,7 @@ void CDDSImage::clear()
 bool CDDSImage::is_compressed() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	return ((m_format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) ||
-		   (m_format == GL_COMPRESSED_RGBA_S3TC_DXT3_EXT) ||
-		   (m_format == GL_COMPRESSED_RGBA_S3TC_DXT5_EXT));
+	return (m_blockSize != 0);
 }
 
 #ifndef HEADLESS
@@ -747,14 +927,14 @@ bool CDDSImage::upload_texture1D() const
 
     if (is_compressed())
     {
-        glCompressedTexImage1DARB(GL_TEXTURE_1D, 0, m_format,
+        glCompressedTexImage1DARB(GL_TEXTURE_1D, 0, m_internalFormat,
             baseImage.get_width(), 0, baseImage.get_size(), baseImage);
 
         // load all mipmaps
         for (unsigned int i = 0; i < baseImage.get_num_mipmaps(); i++)
         {
             const CSurface &mipmap = baseImage.get_mipmap(i);
-            glCompressedTexImage1DARB(GL_TEXTURE_1D, i+1, m_format,
+            glCompressedTexImage1DARB(GL_TEXTURE_1D, i+1, m_internalFormat,
                 mipmap.get_width(), 0, mipmap.get_size(), mipmap);
         }
     }
@@ -767,16 +947,16 @@ bool CDDSImage::upload_texture1D() const
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         }
 
-        glTexImage1D(GL_TEXTURE_1D, 0, m_components, baseImage.get_width(), 0,
-            m_format, GL_UNSIGNED_BYTE, baseImage);
+        glTexImage1D(GL_TEXTURE_1D, 0, m_internalFormat, baseImage.get_width(), 0,
+            m_externalFormat, GL_UNSIGNED_BYTE, baseImage);
 
         // load all mipmaps
         for (unsigned int i = 0; i < baseImage.get_num_mipmaps(); i++)
         {
             const CSurface &mipmap = baseImage.get_mipmap(i);
 
-            glTexImage1D(GL_TEXTURE_1D, i+1, m_components,
-                mipmap.get_width(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
+            glTexImage1D(GL_TEXTURE_1D, i+1, m_internalFormat,
+                mipmap.get_width(), 0, m_externalFormat, GL_UNSIGNED_BYTE, mipmap);
         }
 
         if (alignment != -1)
@@ -817,14 +997,14 @@ bool CDDSImage::upload_texture2D(unsigned int imageIndex, int target) const
 
     if (is_compressed())
     {
-        glCompressedTexImage2DARB(target, 0, m_format, image.get_width(),
+        glCompressedTexImage2DARB(target, 0, m_internalFormat, image.get_width(),
             image.get_height(), 0, image.get_size(), image);
 
         // load all mipmaps
         for (unsigned int i = 0; i < image.get_num_mipmaps(); i++)
         {
             const CSurface &mipmap = image.get_mipmap(i);
-            glCompressedTexImage2DARB(target, i+1, m_format,
+            glCompressedTexImage2DARB(target, i+1, m_internalFormat,
                 mipmap.get_width(), mipmap.get_height(), 0,
                 mipmap.get_size(), mipmap);
         }
@@ -838,8 +1018,8 @@ bool CDDSImage::upload_texture2D(unsigned int imageIndex, int target) const
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         }
 
-        glTexImage2D(target, 0, m_components, image.get_width(),
-            image.get_height(), 0, m_format, GL_UNSIGNED_BYTE,
+        glTexImage2D(target, 0, m_internalFormat, image.get_width(),
+            image.get_height(), 0, m_externalFormat, GL_UNSIGNED_BYTE,
             image);
 
         // load all mipmaps
@@ -847,8 +1027,8 @@ bool CDDSImage::upload_texture2D(unsigned int imageIndex, int target) const
         {
             const CSurface &mipmap = image.get_mipmap(i);
 
-            glTexImage2D(target, i+1, m_components, mipmap.get_width(),
-                mipmap.get_height(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
+            glTexImage2D(target, i+1, m_internalFormat, mipmap.get_width(),
+                mipmap.get_height(), 0, m_externalFormat, GL_UNSIGNED_BYTE, mipmap);
         }
 
         if (alignment != -1)
@@ -873,7 +1053,7 @@ bool CDDSImage::upload_texture3D() const
 
     if (is_compressed())
     {
-        glCompressedTexImage3DARB(GL_TEXTURE_3D, 0, m_format,
+        glCompressedTexImage3DARB(GL_TEXTURE_3D, 0, m_internalFormat,
             baseImage.get_width(), baseImage.get_height(), baseImage.get_depth(),
             0, baseImage.get_size(), baseImage);
 
@@ -881,7 +1061,7 @@ bool CDDSImage::upload_texture3D() const
         for (unsigned int i = 0; i < baseImage.get_num_mipmaps(); i++)
         {
             const CSurface &mipmap = baseImage.get_mipmap(i);
-            glCompressedTexImage3DARB(GL_TEXTURE_3D, i+1, m_format,
+            glCompressedTexImage3DARB(GL_TEXTURE_3D, i+1, m_internalFormat,
                 mipmap.get_width(), mipmap.get_height(), mipmap.get_depth(),
                 0, mipmap.get_size(), mipmap);
         }
@@ -895,8 +1075,8 @@ bool CDDSImage::upload_texture3D() const
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         }
 
-        glTexImage3D(GL_TEXTURE_3D, 0, m_components, baseImage.get_width(),
-            baseImage.get_height(), baseImage.get_depth(), 0, m_format,
+        glTexImage3D(GL_TEXTURE_3D, 0, m_internalFormat, baseImage.get_width(),
+            baseImage.get_height(), baseImage.get_depth(), 0, m_externalFormat,
             GL_UNSIGNED_BYTE, baseImage);
 
         // load all mipmap volumes
@@ -904,9 +1084,9 @@ bool CDDSImage::upload_texture3D() const
         {
             const CSurface &mipmap = baseImage.get_mipmap(i);
 
-            glTexImage3D(GL_TEXTURE_3D, i+1, m_components,
+            glTexImage3D(GL_TEXTURE_3D, i+1, m_internalFormat,
                 mipmap.get_width(), mipmap.get_height(), mipmap.get_depth(), 0,
-                m_format, GL_UNSIGNED_BYTE,  mipmap);
+                m_externalFormat, GL_UNSIGNED_BYTE,  mipmap);
         }
 
         if (alignment != -1)
@@ -968,8 +1148,7 @@ inline unsigned int CDDSImage::clamp_size(unsigned int size) const
 inline unsigned int CDDSImage::size_dxtc(unsigned int width, unsigned int height) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-    return ((width+3)/4)*((height+3)/4)*
-        (m_format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT ? 8 : 16);
+	return ((width+3)/4)*((height+3)/4)*m_blockSize;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1381,4 +1560,3 @@ void CSurface::clear()
 	delete [] m_pixels;
 	m_pixels = nullptr;
 }
-

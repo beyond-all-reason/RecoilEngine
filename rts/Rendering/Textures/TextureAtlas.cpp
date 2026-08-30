@@ -269,10 +269,17 @@ void CTextureAtlas::UnbindTexture()
 	atlasTex->Unbind();
 }
 
-bool CTextureAtlas::TextureExists(const std::string& name)
+bool CTextureAtlas::TextureExists(const std::string& name) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return (textures.find(StringToLower(name)) != textures.end());
+}
+
+const AtlasedTexture* CTextureAtlas::FindTexture(const std::string& name) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const auto it = textures.find(StringToLower(name));
+	return (it != textures.end()) ? &it->second : nullptr;
 }
 
 const spring::unordered_map<std::string, IAtlasAllocator::SAtlasEntry>& CTextureAtlas::GetTextures() const
@@ -373,7 +380,7 @@ AtlasedTexture& CTextureAtlas::GetTextureWithBackup(const std::string& name, con
 	return const_cast<AtlasedTexture&>(AtlasedTexture::DefaultAtlasTexture);
 }
 
-std::string CTextureAtlas::GetTextureName(AtlasedTexture* tex)
+std::string CTextureAtlas::GetTextureName(const AtlasedTexture* tex) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (texToName.empty()) {
@@ -388,4 +395,3 @@ int2 CTextureAtlas::GetSize() const {
 	RECOIL_DETAILED_TRACY_ZONE;
 	return (atlasAllocator->GetAtlasSize());
 }
-

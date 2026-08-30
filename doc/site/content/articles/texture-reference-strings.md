@@ -29,6 +29,11 @@ The above reference for unit textures can also be used for features (e.g trees).
 
 `*<atlasId#int>` -- Atlas/sprite (added by LUA CreateTextureAtlas)
 
+`$atlas:<registry-id>` -- An immutable engine-owned atlas declared by the game
+in `gamedata/textureatlases.lua`. The texture may be 2D or a 2D array; query its
+finalized entry coordinates with `gl.GetEngineAtlasTexture` or
+`gl.GetEngineAtlasTexturesV2`.
+
 `$<textureName>` -- There are also named textures, with ssmf_splat_normals, extra and info also have subtextures beneath, below is a table of many named textures available.
 
 **FIXME: This table is a work in progress**

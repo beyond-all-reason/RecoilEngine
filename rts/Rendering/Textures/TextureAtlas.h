@@ -7,6 +7,7 @@
 #include <memory>
 
 #include "IAtlasAllocator.h"
+#include "ITextureAtlas.h"
 #include "AtlasedTexture.hpp"
 #include "Texture.hpp"
 #include "System/float4.h"
@@ -14,7 +15,7 @@
 #include "System/UnorderedMap.hpp"
 
 /** @brief Class for combining multiple bitmaps into one large single bitmap. */
-class CTextureAtlas
+class CTextureAtlas : public ITextureAtlas
 {
 public:
 	enum TextureType {
@@ -91,11 +92,12 @@ public:
 	 * @return a boolean true if the texture exists within
 	 *         the "textures" map and false if it does not.
 	 */
-	bool TextureExists(const std::string& name);
+	bool TextureExists(const std::string& name) const;
 
 	const spring::unordered_map<std::string, IAtlasAllocator::SAtlasEntry>& GetTextures() const;
 
 	void ReloadTextures();
+	void ReloadTexture() override { ReloadTextures(); }
 	void DumpTexture(const char* newFileName = nullptr, const std::string& fileExt = "png") const;
 
 
@@ -103,7 +105,8 @@ public:
 	AtlasedTexture& GetTexture(const std::string& name);
 
 	// NOTE: safe with unordered_map after atlas has been finalized
-	AtlasedTexture* GetTexturePtr(const std::string& name) { return &GetTexture(name); }
+	AtlasedTexture* GetTexturePtr(const std::string& name) override { return &GetTexture(name); }
+	const AtlasedTexture* FindTexture(const std::string& name) const override;
 
 	/**
 	 * @return a Texture struct of the specified texture if it exists,
@@ -111,19 +114,19 @@ public:
 	 */
 	AtlasedTexture& GetTextureWithBackup(const std::string& name, const std::string& backupName);
 
-	std::string GetTextureName(AtlasedTexture* tex);
+	std::string GetTextureName(const AtlasedTexture* tex) const override;
 
 
 	IAtlasAllocator* GetAllocator() { return atlasAllocator; }
 
-	int2 GetSize() const;
-	std::string GetName() const { return name; }
+	int2 GetSize() const override;
+	const std::string& GetName() const override { return name; }
 
-	uint32_t GetTexID() const { return atlasTex->GetId(); }
-	uint32_t GetTexTarget() const;
-	uint32_t GetNumPages() const;
+	uint32_t GetTexID() const override { return atlasTex ? atlasTex->GetId() : 0; }
+	uint32_t GetTexTarget() const override;
+	uint32_t GetNumPages() const override;
 
-	int GetNumTexLevels() const;
+	int GetNumTexLevels() const override;
 	void SetMaxTexLevel(int maxLevels);
 
 	void BindTexture();
@@ -187,7 +190,7 @@ protected:
 
 	spring::unordered_map<std::string, size_t> files;
 	spring::unordered_map<std::string, AtlasedTexture> textures;
-	spring::unordered_map<AtlasedTexture*, std::string> texToName;  // non-creg serialization
+	mutable spring::unordered_map<const AtlasedTexture*, std::string> texToName;  // non-creg serialization
 
 	std::unique_ptr<GL::TextureBase> atlasTex;
 

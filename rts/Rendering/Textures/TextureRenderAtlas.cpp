@@ -20,6 +20,7 @@
 #include "System/Config/ConfigHandler.h"
 #include "System/StringUtil.h"
 #include "System/Log/ILog.h"
+#include "System/StringUtil.h"
 #include "fmt/format.h"
 
 #include "System/Misc/TracyDefs.h"
@@ -292,6 +293,17 @@ const uint2& CTextureRenderAtlas::GetAtlasSize() const
 	return atlasAllocator->GetAtlasSize();
 }
 
+int2 CTextureRenderAtlas::GetSize() const
+{
+	const uint2& size = GetAtlasSize();
+	return int2(size.x, size.y);
+}
+
+uint32_t CTextureRenderAtlas::GetNumPages() const
+{
+	return atlasAllocator->GetNumPages();
+}
+
 int CTextureRenderAtlas::GetNumTexLevels() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -344,8 +356,43 @@ bool CTextureRenderAtlas::CalculateAtlas()
 		return true;
 
 	atlasFinalized = atlasAllocator->Allocate();
+	if (atlasFinalized) {
+		stableTextures.clear();
+		stableTextureNames.clear();
+		stableTextures.reserve(nameToUniqueSubTexStr.size());
+		for (const auto& [name, uniqueName]: nameToUniqueSubTexStr)
+			stableTextures.emplace(StringToLower(name), AtlasedTexture(atlasAllocator->GetTexCoordsEdge(uniqueName)));
+	}
 	LOG_L(L_INFO, "CTextureRenderAtlas::%s() atlas=%s atlasFinalized=%d", __func__, atlasName.c_str(), atlasFinalized);
 	return atlasFinalized;
+}
+
+const AtlasedTexture* CTextureRenderAtlas::FindTexture(const std::string& name) const
+{
+	const auto it = stableTextures.find(StringToLower(name));
+	return (it != stableTextures.end()) ? &it->second : nullptr;
+}
+
+AtlasedTexture* CTextureRenderAtlas::GetTexturePtr(const std::string& name)
+{
+	return const_cast<AtlasedTexture*>(FindTexture(name));
+}
+
+std::string CTextureRenderAtlas::GetTextureName(const AtlasedTexture* texture) const
+{
+	if (stableTextureNames.empty()) {
+		for (const auto& [name, value]: stableTextures)
+			stableTextureNames.emplace(&value, name);
+	}
+	const auto it = stableTextureNames.find(texture);
+	return (it != stableTextureNames.end()) ? it->second : "";
+}
+
+void CTextureRenderAtlas::ReloadTexture()
+{
+	// Source textures and the committed allocator layout remain available.
+	atlasRendered = false;
+	CreateAtlasTexture();
 }
 
 bool CTextureRenderAtlas::CreateAtlasTexture()

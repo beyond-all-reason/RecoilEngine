@@ -1408,6 +1408,21 @@ bool CGlobalRendering::IsExtensionSupported(const char* ext) const
 	return glExtensions.contains(ext);
 }
 
+bool CGlobalRendering::SupportsS3TC() const
+{
+	return IsExtensionSupported("GL_EXT_texture_compression_s3tc") || IsExtensionSupported("GL_EXT_texture_compression_dxt1");
+}
+
+bool CGlobalRendering::SupportsRGTC() const
+{
+	return IsExtensionSupported("GL_ARB_texture_compression_rgtc") || IsExtensionSupported("GL_EXT_texture_compression_rgtc");
+}
+
+bool CGlobalRendering::SupportsBPTC() const
+{
+	return IsExtensionSupported("GL_ARB_texture_compression_bptc");
+}
+
 
 // only called on startup; change the config based on command-line args
 void CGlobalRendering::SetFullScreen(bool cliWindowed, bool cliFullScreen)

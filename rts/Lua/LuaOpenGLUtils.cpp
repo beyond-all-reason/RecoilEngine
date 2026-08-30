@@ -22,6 +22,7 @@
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Map/InfoTexture/InfoTexture.h"
 #include "Rendering/Textures/NamedTextures.h"
+#include "Rendering/Textures/TextureAtlasRegistry.h"
 #include "Rendering/Textures/TextureAtlas.h"
 #include "Rendering/Textures/3DOTextureHandler.h"
 #include "Rendering/Textures/S3OTextureHandler.h"
@@ -430,6 +431,16 @@ bool LuaOpenGLUtils::ParseTextureImage(lua_State* L, LuaMatTexture& texUnit, con
 		} break;
 
 		case '$': {
+			if (image.starts_with("$atlas:")) {
+				if (textureAtlasRegistry == nullptr)
+					return false;
+				ITextureAtlas* atlas = textureAtlasRegistry->GetAtlas(image);
+				if (atlas == nullptr || atlas->GetTexID() == 0)
+					return false;
+				texUnit.type = LuaMatTexture::LUATEX_ENGINEATLAS;
+				texUnit.data = atlas;
+				break;
+			}
 			switch ((texUnit.type = GetLuaMatTextureType(image))) {
 				case LuaMatTexture::LUATEX_NONE: {
 					// name not found in table, check for special case overrides
@@ -465,6 +476,23 @@ bool LuaOpenGLUtils::ParseTextureImage(lua_State* L, LuaMatTexture& texUnit, con
 
 				default: {
 				} break;
+			}
+
+			if (textureAtlasRegistry != nullptr) {
+				const char* role = nullptr;
+				switch (texUnit.type) {
+					case LuaMatTexture::LUATEX_EXPLOSIONS_ATLAS: role = "explosions"; break;
+					case LuaMatTexture::LUATEX_GROUNDFX_ATLAS: role = "groundfx"; break;
+					case LuaMatTexture::LUATEX_DECALS_ATLAS: role = "decals"; break;
+					case LuaMatTexture::LUATEX_ICONS_ATLAS0: role = "icons0"; break;
+					default: break;
+				}
+				if (role != nullptr) {
+					if (ITextureAtlas* atlas = textureAtlasRegistry->GetAtlasByRole(role); atlas != nullptr) {
+						texUnit.type = LuaMatTexture::LUATEX_ENGINEATLAS;
+						texUnit.data = atlas;
+					}
+				}
 			}
 		} break;
 
@@ -518,6 +546,9 @@ GLuint LuaMatTexture::GetTextureID() const
 			const CTextureAtlas* atlas = luaAtlasTextures.GetAtlasByIndex(*reinterpret_cast<const size_t*>(&data));
 
 			texID = atlas->GetTexID();
+		} break;
+		case LUATEX_ENGINEATLAS: {
+			texID = static_cast<const ITextureAtlas*>(data)->GetTexID();
 		} break;
 
 		// object model-textures
@@ -683,6 +714,9 @@ GLuint LuaMatTexture::GetTextureTarget() const
 			const CTextureAtlas* atlas = luaAtlasTextures.GetAtlasByIndex(*reinterpret_cast<const size_t*>(&data));
 
 			texType = atlas->GetTexTarget();
+		} break;
+		case LUATEX_ENGINEATLAS: {
+			texType = static_cast<const ITextureAtlas*>(data)->GetTexTarget();
 		} break;
 
 		case LUATEX_MAP_REFLECTION: [[fallthrough]];
@@ -872,6 +906,11 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 			const CTextureAtlas* atlas = luaAtlasTextures.GetAtlasByIndex(*reinterpret_cast<const size_t*>(&data));
 
 			return ReturnHelper(atlas->GetSize().x, atlas->GetSize().y);
+		} break;
+		case LUATEX_ENGINEATLAS: {
+			const ITextureAtlas* atlas = static_cast<const ITextureAtlas*>(data);
+			const int2 size = atlas->GetSize();
+			return ReturnHelper(size.x, size.y, atlas->GetNumPages());
 		} break;
 
 
@@ -1115,6 +1154,7 @@ void LuaMatTexture::Print(const string& indent) const
 		STRING_CASE(typeName, LUATEX_ICONS_ATLAS1);
 
 		STRING_CASE(typeName, LUATEX_LUATEXTUREATLAS);
+		STRING_CASE(typeName, LUATEX_ENGINEATLAS);
 
 		#undef STRING_CASE
 	}

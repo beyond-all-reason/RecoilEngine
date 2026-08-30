@@ -17,6 +17,11 @@ This is the changelog since version 2025.07 until **version 2025.07.04**, which 
 
 ## Features
 
+### Metadata texture atlases
+- games can declare immutable engine-owned DDS atlases in `gamedata/textureatlases.lua`, including ordered runtime-format variants and transactional reserve-only patch sidecars.
+- add `$atlas:<id>`, `gl.GetEngineAtlasInfo`, `gl.GetEngineAtlasTexture`, and `gl.GetEngineAtlasTexturesV2` while preserving existing Lua-owned atlas APIs and legacy role texture strings.
+- add DX10 DDS header support for BC1 through BC5, BC7, and RGBA8, including an authored-orientation upload path.
+
 ### Lua environment sandboxing
 - LuaSocket no longer inits before Lua sandboxing. Anything that relied on the previous order of execution won't work.
 - unsynced LuaRules (incl. unsynced LuaGaia) now has access to `io` and `os` libraries. Watch out when loading maps etc.

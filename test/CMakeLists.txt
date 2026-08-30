@@ -90,6 +90,26 @@ macro (add_spring_test target sources libraries flags)
 endmacro()
 
 ################################################################################
+### Texture atlas metadata geometry and reserve allocation
+	set(test_name TextureAtlasTypes)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/Textures/TestTextureAtlasTypes.cpp"
+			"${ENGINE_SOURCE_DIR}/Rendering/Textures/AtlasedTexture.cpp"
+			${test_Common_sources}
+		)
+	set(test_flags "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
+	add_spring_test(${test_name} "${test_src}" "" "${test_flags}")
+
+	set(test_name ReservedAtlasAlloc)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/Textures/TestReservedAtlasAlloc.cpp"
+			"${ENGINE_SOURCE_DIR}/Rendering/Textures/ReservedAtlasAlloc.cpp"
+			"${ENGINE_SOURCE_DIR}/Rendering/Textures/AtlasedTexture.cpp"
+			${test_Common_sources}
+		)
+	add_spring_test(${test_name} "${test_src}" "" "${test_flags}")
+
+################################################################################
 ### UDPListener
 # disabled for travis: https://springrts.com/mantis/view.php?id=5014
 if(NOT DEFINED ENV{CI})
