@@ -1075,7 +1075,7 @@ void UDPConnection::SendPacket(Packet& pkt)
 	EMULATE_LATENCY( !EMULATE_PACKET_LOSS( LOSS_COUNTER ) ) {
 		mySocket->send_to(buffer(sendBuffer), addr, flags, err);
 		// a full send buffer surfaces as try_again, give it a moment to drain.
-		// once per flush pass: NetProtocol.cpp holds a spinlock over this
+		// once per flush pass, so a flush with multiple packets doesn't wait multiple times
 		if (err && err.value() == asio::error::try_again && !drainWaited) {
 			drainWaited = true;
 			/* Balance between too many resends (lower)
