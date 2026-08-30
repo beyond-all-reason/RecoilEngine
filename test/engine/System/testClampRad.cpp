@@ -89,8 +89,8 @@ TEST_CASE("ClampRadPi")
 	CHECK_FALSE(std::signbit(ClampRadPi(0.0f)));
 
 	// Test TAANG2RAD conversion to short for [-pi, pi)
-	CHECK(static_cast<short>(ClampRadPi(-(math::PI)) * RAD2TAANG) == short(-32768));
-	CHECK(static_cast<short>(ClampRadPi(+std::nextafterf(math::PI, -std::numeric_limits<float>::infinity())) * RAD2TAANG) == short(32767));
-	CHECK(static_cast<short>(ClampRadPi((math::PI)) * RAD2TAANG) == short(-32768));
+	CHECK(RadAngleToCobShort(ClampRadPi(-(math::PI))) == short(-32768));
+	CHECK(RadAngleToCobShort(ClampRadPi(+std::nextafterf(math::PI, -std::numeric_limits<float>::infinity()))) == short(32767));
+	CHECK(RadAngleToCobShort(ClampRadPi((math::PI))) == short(-32768));
 }
 
