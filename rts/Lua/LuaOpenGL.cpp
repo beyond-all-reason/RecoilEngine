@@ -10,6 +10,8 @@
 
 #include "Rendering/GL/myGL.h"
 
+#include <cmath>
+#include <limits>
 #include <vector>
 #include <algorithm>
 #include <optional>
@@ -350,6 +352,8 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(DeleteTexture);
 	REGISTER_LUA_CFUNC(TextureInfo);
 	REGISTER_LUA_CFUNC(CopyToTexture);
+	if (GLAD_GL_ARB_copy_image)
+		REGISTER_LUA_CFUNC(CopyImageSubData);
 	if (FBO::IsSupported()) {
 		// FIXME: obsolete
 		REGISTER_LUA_CFUNC(DeleteTextureFBO);
@@ -4371,6 +4375,131 @@ int LuaOpenGL::CopyToTexture(lua_State* L)
 	glCopyTexSubImage2D(target, level, xoff, yoff, x, y, w, h);
 
 	if (tex->target != GL_TEXTURE_2D) {glDisable(tex->target);}
+
+	return 0;
+}
+
+
+/***
+ * @function gl.CopyImageSubData
+ * @param srcName string
+ * @param srcLevel integer
+ * @param srcX integer
+ * @param srcY integer
+ * @param srcZ integer
+ * @param dstName string
+ * @param dstLevel integer
+ * @param dstX integer
+ * @param dstY integer
+ * @param dstZ integer
+ * @param width integer
+ * @param height integer
+ * @param depth integer
+ */
+int LuaOpenGL::CopyImageSubData(lua_State* L)
+{
+	CheckDrawingEnabled(L, __func__);
+
+	const auto CheckInteger = [L](int index) {
+		const lua_Number value = luaL_checknumber(L, index);
+
+		if (!std::isfinite(value) || value != std::trunc(value) || value < std::numeric_limits<GLint>::min() || value > std::numeric_limits<GLint>::max())
+			luaL_argerror(L, index, "integer out of range");
+
+		return static_cast<GLint>(value);
+	};
+
+	LuaMatTexture srcTex;
+
+	if (!LuaOpenGLUtils::ParseTextureImage(L, srcTex, luaL_checkstring(L, 1)))
+		luaL_error(L, "gl.CopyImageSubData() invalid source texture");
+
+	// ParseTextureImage accepts unresolved named textures.
+	if (srcTex.GetTextureID() == 0)
+		luaL_error(L, "gl.CopyImageSubData() source texture does not exist");
+
+	const std::string& dstName = luaL_checkstring(L, 6);
+
+	if (dstName[0] != LuaTextures::prefix) // '!'
+		luaL_error(L, "gl.CopyImageSubData() can only write to lua textures");
+
+	const LuaTextures& textures = CLuaHandle::GetActiveTextures(L);
+	const LuaTextures::Texture* dstTex = textures.GetInfo(dstName);
+
+	if (dstTex == nullptr)
+		luaL_error(L, "gl.CopyImageSubData() unknown destination texture");
+
+	const GLint srcLevel = CheckInteger(2);
+	const GLint srcX = CheckInteger(3);
+	const GLint srcY = CheckInteger(4);
+	const GLint srcZ = CheckInteger(5);
+	const GLint dstLevel = CheckInteger(7);
+	const GLint dstX = CheckInteger(8);
+	const GLint dstY = CheckInteger(9);
+	const GLint dstZ = CheckInteger(10);
+	const GLsizei width  = CheckInteger(11);
+	const GLsizei height = CheckInteger(12);
+	const GLsizei depth  = CheckInteger(13);
+
+	if (srcLevel < 0 || dstLevel < 0 || srcX < 0 || srcY < 0 || srcZ < 0 || dstX < 0 || dstY < 0 || dstZ < 0 || width <= 0 || height <= 0 || depth <= 0)
+		luaL_error(L, "gl.CopyImageSubData() negative offset or non-positive size");
+
+	const auto LevelSize = [](int size, GLint level) {
+		return (level < std::numeric_limits<unsigned int>::digits)? std::max(1, size >> level): 1;
+	};
+	const auto ImageSize = [&LevelSize](GLenum target, int x, int y, int z, GLint level) {
+		switch (target) {
+			case GL_TEXTURE_1D:             return std::tuple(LevelSize(x, level), 1, 1);
+			case GL_TEXTURE_2D:             return std::tuple(LevelSize(x, level), LevelSize(y, level), 1);
+			case GL_TEXTURE_2D_ARRAY:       return std::tuple(LevelSize(x, level), LevelSize(y, level), z);
+			case GL_TEXTURE_3D:             return std::tuple(LevelSize(x, level), LevelSize(y, level), LevelSize(z, level));
+			case GL_TEXTURE_CUBE_MAP:       return std::tuple(LevelSize(x, level), LevelSize(y, level), 6);
+			case GL_TEXTURE_2D_MULTISAMPLE: return std::tuple(x, y, 1);
+			default:                        return std::tuple(0, 0, 0);
+		}
+	};
+	const auto RegionFits = [](GLint offset, GLsizei extent, int size) {
+		return (size <= 0 || (offset <= size && extent <= size - offset));
+	};
+	const auto MaxMipLevel = [](GLenum target, int x, int y, int z) {
+		int size = x;
+
+		if (target != GL_TEXTURE_1D)
+			size = std::max(size, y);
+		if (target == GL_TEXTURE_3D)
+			size = std::max(size, z);
+
+		GLint level = 0;
+		while (size > 1) {
+			size >>= 1;
+			++level;
+		}
+
+		return level;
+	};
+
+	const auto [srcXSize, srcYSize, srcZSize] = srcTex.GetSize();
+	const GLenum srcTarget = srcTex.GetTextureTarget();
+	const auto [srcLevelX, srcLevelY, srcLevelZ] = ImageSize(srcTarget, srcXSize, srcYSize, srcZSize, srcLevel);
+	const auto [dstLevelX, dstLevelY, dstLevelZ] = ImageSize(dstTex->target, dstTex->xsize, dstTex->ysize, dstTex->zsize, dstLevel);
+
+	if ((srcXSize > 0 && srcLevel > MaxMipLevel(srcTarget, srcXSize, srcYSize, srcZSize)) || dstLevel > MaxMipLevel(dstTex->target, dstTex->xsize, dstTex->ysize, dstTex->zsize))
+		luaL_error(L, "gl.CopyImageSubData() mip level out of bounds");
+
+	if ((srcTarget == GL_TEXTURE_2D_MULTISAMPLE && srcLevel != 0) || (dstTex->target == GL_TEXTURE_2D_MULTISAMPLE && dstLevel != 0))
+		luaL_error(L, "gl.CopyImageSubData() invalid multisample mip level");
+
+	if (!RegionFits(srcX, width, srcLevelX) || !RegionFits(srcY, height, srcLevelY) || !RegionFits(srcZ, depth, srcLevelZ))
+		luaL_error(L, "gl.CopyImageSubData() source region out of bounds");
+
+	if (!RegionFits(dstX, width, dstLevelX) || !RegionFits(dstY, height, dstLevelY) || !RegionFits(dstZ, depth, dstLevelZ))
+		luaL_error(L, "gl.CopyImageSubData() destination region out of bounds");
+
+	glCopyImageSubData(
+		srcTex.GetTextureID(), srcTarget, srcLevel, srcX, srcY, srcZ,
+		dstTex->id, dstTex->target, dstLevel, dstX, dstY, dstZ,
+		width, height, depth
+	);
 
 	return 0;
 }
