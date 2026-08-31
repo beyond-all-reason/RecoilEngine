@@ -725,10 +725,18 @@ bool CKeyBindings::RemoveActionFromKeyMap(const std::string& command, KeyMap& bi
 
 	auto it = bindings.begin();
 
+	/* unbindaction takes no keyset, so it is not the inverse of a bind:
+	 * naming an action without arguments clears every variant of it */
+	const Action target(command);
+
 	while (it != bindings.end()) {
 		ActionList& al = it->second;
 
-		if (RemoveCommandFromList(al, command))
+		const auto removedCount = std::erase_if(al, [&target](const auto& x) {
+			return x.command == target.command && (target.extra.empty() || x.extra == target.extra);
+		});
+
+		if (removedCount > 0)
 			success = true;
 
 		if (al.empty()) {
@@ -800,20 +808,17 @@ bool CKeyBindings::AddKeySymbol(const std::string& keysym, const std::string& co
 bool CKeyBindings::RemoveCommandFromList(ActionList& al, const std::string& command)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	bool success = false;
+	/* parse through Action so the name and the arguments get split and
+	 * normalized the same way Bind did when it stored them */
+	const Action target(command);
 
-	auto it = al.begin();
+	const auto removedCount = std::erase_if(al, [&target](const auto& x) {
+		/* unbind is the inverse of bind, so the arguments have to line up
+		 * too; naming none means the binding must not carry any either */
+		return x.command == target.command && x.extra == target.extra;
+	});
 
-	while (it != al.end()) {
-		if (it->command == command) {
-			it = al.erase(it);
-			success = true;
-		} else {
-			++it;
-		}
-	}
-
-	return success;
+	return removedCount > 0;
 }
 
 
@@ -931,7 +936,9 @@ bool CKeyBindings::ExecuteCommandInternal(const std::string& line)
 		if (!UnBind(words[1], words[2])) { return false; }
 	}
 	else if ((command == "unbindaction") && (words.size() > 1)) {
-		if (!UnBindAction(words[1])) { return false; }
+		/* the action name lands in words[1] and its arguments in
+		 * words[2], so rejoin them to keep the arguments addressable */
+		if (!UnBindAction(words.size() > 2 ? (words[1] + " " + words[2]) : words[1])) { return false; }
 	}
 	else if ((command == "unbindkeyset") && (words.size() > 1)) {
 		if (!UnBindKeyset(words[1])) { return false; }
