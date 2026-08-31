@@ -673,6 +673,11 @@ bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s] keystr=%s command=%s", __func__, keystr.c_str(), command.c_str());
 
+	/* Bind does the same to the stored chain, so mirror it
+	 * here or a stateful bind can never be named exactly. */
+	if (statefulCommands.find(command) != statefulCommands.end())
+		kc.back().SetAnyBit();
+
 	const CKeySet& ks = kc.back();
 	KeyMap& bindings = ks.IsKeyCode() ? codeBindings : scanBindings;
 	const auto it = bindings.find(ks);
@@ -681,7 +686,7 @@ bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 		return false;
 
 	ActionList& al = it->second;
-	const bool success = RemoveCommandFromList(al, command);
+	const bool success = RemoveCommandFromList(al, kc, command);
 
 	if (al.empty())
 		bindings.erase(it);
@@ -814,6 +819,23 @@ bool CKeyBindings::RemoveCommandFromList(ActionList& al, const std::string& comm
 	}
 
 	return success;
+}
+
+
+/* Chains are stored under their last keyset, so
+ * a bucket holds every chain ending in that key. */
+bool CKeyBindings::RemoveCommandFromList(ActionList& al, const CKeyChain& kc, const std::string& command)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	const auto removedCount = std::erase_if(al, [&kc, &command] (const auto& x) {
+		/* exact compare, not .fit(): naming one modifier
+		 * combination must not remove a different one.
+		 * operator== also rejects differing chain lengths. */
+		return x.command == command && x.keyChain == kc;
+	});
+
+	return removedCount > 0;
 }
 
 
