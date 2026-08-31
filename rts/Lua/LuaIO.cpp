@@ -27,29 +27,6 @@
 /******************************************************************************/
 /******************************************************************************/
 
-static bool IsSafePath(const std::string& path)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	// keep searches within the Spring directory
-	if ((path[0] == '/') || (path[0] == '\\') ||
-	    ((path.size() >= 2) && (path[1] == ':'))) {
-		return false;
-	}
-	if ((path.find("..") != std::string::npos) ||
-		(path.find("springsettings.cfg") != std::string::npos) || //don't allow to change config file
-		(path.find(".springrc") != std::string::npos) ||
-		(path.find("springrc") != std::string::npos)
-	) {
-		return false;
-	}
-
-	return true;
-}
-
-
-/******************************************************************************/
-/******************************************************************************/
-
 bool LuaIO::IsSimplePath(const std::string& path)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -84,6 +61,13 @@ bool LuaIO::SafeWritePath(const std::string& path)
 	if (std::find(std::begin(exeFiles), std::end(exeFiles), ext) != exeFiles.end())
 		return false;
 
+	// don't allow touching the config files; springsettings can redirect
+	// the write-dir, which would defeat every other path check here
+	const std::string lowerPath = StringToLower(path);
+	if ((lowerPath.find("springsettings.cfg") != std::string::npos) ||
+	    (lowerPath.find("springrc") != std::string::npos))
+		return false;
+
 	return dataDirsAccess.InWriteDir(path);
 }
 
@@ -100,7 +84,7 @@ FILE* LuaIO::fopen(lua_State* L, const char* path, const char* mode)
 		errno = EINVAL;
 		return nullptr;
 	}
-	if (!IsSafePath(path)) {
+	if (!SafeWritePath(path)) {
 		errno = EPERM; //EACCESS?
 		return nullptr;
 	}
@@ -141,8 +125,7 @@ int LuaIO::system(lua_State* L, const char* command)
 int LuaIO::remove(lua_State* L, const char* pathname)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!SafeWritePath(pathname)
-		|| !IsSafePath(pathname)) {
+	if (!SafeWritePath(pathname)) {
 		errno = EPERM; //EACCESS?
 		return -1;
 	}
@@ -153,8 +136,7 @@ int LuaIO::remove(lua_State* L, const char* pathname)
 int LuaIO::rename(lua_State* L, const char* oldpath, const char* newpath)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!SafeWritePath(oldpath) || !SafeWritePath(newpath)
-		|| !IsSafePath(oldpath) || !IsSafePath(newpath)) {
+	if (!SafeWritePath(oldpath) || !SafeWritePath(newpath)) {
 		errno = EPERM; //EACCESS?
 		return -1;
 	}
