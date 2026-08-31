@@ -5774,7 +5774,7 @@ int LuaSyncedCtrl::SetProjectileIsIntercepted(lua_State* L)
 
 /***
  * @function Spring.SetProjectileDamages
- * @param unitID integer
+ * @param projectileID ProjectileID
  * @param weaponNum integer
  * @param key string
  * @param value number
