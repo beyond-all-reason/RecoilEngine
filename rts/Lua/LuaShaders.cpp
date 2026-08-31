@@ -1054,7 +1054,7 @@ namespace {
  * Writes user-defined model uniforms for a unit.
  *
  * @function gl.SetUnitBufferUniforms
- * @param unitID integer
+ * @param unitID UnitID
  * @param values number[]
  * @param offset integer?
  * @return integer count
@@ -1064,7 +1064,7 @@ int LuaShaders::SetUnitBufferUniforms(lua_State* L) { return SetObjectBufferUnif
  * Writes user-defined model uniforms for a feature.
  *
  * @function gl.SetFeatureBufferUniforms
- * @param featureID integer
+ * @param featureID FeatureID
  * @param values number[]
  * @param offset integer?
  * @return integer count
@@ -1351,7 +1351,7 @@ int LuaShaders::UniformSubroutine(lua_State* L)
  *
  * Return the GLSL compliant definition of UniformMatricesBuffer(idx=0) or UniformParamsBuffer(idx=1) structure.
  *
- * @param index number
+ * @param index integer
  * @return string glslDefinition
  */
 int LuaShaders::GetEngineUniformBufferDef(lua_State* L)
@@ -1373,7 +1373,7 @@ int LuaShaders::GetEngineUniformBufferDef(lua_State* L)
  *
  * Return the GLSL compliant definition of ModelUniformData structure (per Unit/Feature buffer available on GPU)
  *
- * @param index number
+ * @param index integer
  * @return string glslDefinition
  */
 int LuaShaders::GetEngineModelUniformDataDef(lua_State* L)
@@ -1391,9 +1391,9 @@ int LuaShaders::GetEngineModelUniformDataDef(lua_State* L)
  *
  * Return the current size values of ModelUniformData structure (per Unit/Feature buffer available on GPU)
  *
- * @param index number
- * @return number sizeInElements
- * @return number sizeInBytesOnCPU
+ * @param index integer
+ * @return integer sizeInElements
+ * @return integer sizeInBytesOnCPU
 
  */
 int LuaShaders::GetEngineModelUniformDataSize(lua_State* L)
@@ -1412,8 +1412,8 @@ int LuaShaders::GetEngineModelUniformDataSize(lua_State* L)
  *
  * @function gl.SetGeometryShaderParameter
  * @param shaderID integer
- * @param key number
- * @param value number
+ * @param key GL
+ * @param value integer
  * @return nil
  */
 int LuaShaders::SetGeometryShaderParameter(lua_State* L)

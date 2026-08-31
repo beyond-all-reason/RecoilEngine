@@ -1221,8 +1221,8 @@ int LuaOpenGL::GetScreenViewTrans(lua_State* L)
 
 /***
  * @function gl.GetViewSizes
- * @return number x
- * @return number y
+ * @return integer x
+ * @return integer y
  */
 int LuaOpenGL::GetViewSizes(lua_State* L)
 {
@@ -1541,7 +1541,7 @@ static bool GLObjectDrawWithLuaMat(lua_State* L, CSolidObject* obj, LuaObjType o
  * Pushes or pops the model render state for the given object.
  * 
  * Parses params, starting at param 2:
- * @param teamID integer
+ * @param teamID TeamID
  * @param rawState boolean? (Default: `true`)
  * @param toScreen boolean? (Default: `false`)
  * @param opaque boolean? (Default: `true`) If `true`, draw opaque; if `false`, draw alpha.
@@ -1666,7 +1666,7 @@ int LuaOpenGL::UnitCommon(lua_State* L, bool applyTransform, bool callDrawUnit)
  * Draw the unit, applying transform.
  * 
  * @function gl.Unit
- * @param unitID integer
+ * @param unitID UnitID
  * @param doRawDraw boolean? (Default: `false`)
  * @param useLuaMat integer?
  * @param noLuaCall boolean? (Default: `false`) Skip the `DrawUnit` callin.
@@ -1681,7 +1681,7 @@ int LuaOpenGL::Unit(lua_State* L) { return (UnitCommon(L, true, true)); }
  * recursion is blocked.
  * 
  * @function gl.UnitRaw
- * @param unitID integer
+ * @param unitID UnitID
  * @param doRawDraw boolean? (Default: `false`)
  * @param useLuaMat integer?
  * @param noLuaCall boolean? (Default: `true`) Skip the `DrawUnit` callin.
@@ -1691,7 +1691,7 @@ int LuaOpenGL::UnitRaw(lua_State* L) { return (UnitCommon(L, false, false)); }
 
 /***
  * @function gl.UnitTextures
- * @param unitID integer
+ * @param unitID UnitID
  * @param push boolean If `true`, push the render state; if `false`, pop it.
  */
 int LuaOpenGL::UnitTextures(lua_State* L)
@@ -1703,8 +1703,8 @@ int LuaOpenGL::UnitTextures(lua_State* L)
 
 /***
  * @function gl.UnitShape
- * @param unitDefID integer
- * @param teamID integer
+ * @param unitDefID UnitDefID
+ * @param teamID TeamID
  * @param rawState boolean? (Default: `true`)
  * @param toScreen boolean? (Default: `false`)
  * @param opaque boolean? (Default: `true`) If `true`, draw opaque; if `false`, draw alpha.
@@ -1718,7 +1718,7 @@ int LuaOpenGL::UnitShape(lua_State* L)
 
 /***
  * @function gl.UnitShapeTextures
- * @param unitDefID integer
+ * @param unitDefID UnitDefID
  * @param push boolean If `true`, push the render state; if `false`, pop it.
  */
 int LuaOpenGL::UnitShapeTextures(lua_State* L)
@@ -1731,7 +1731,7 @@ int LuaOpenGL::UnitShapeTextures(lua_State* L)
 
 /***
  * @function gl.UnitMultMatrix
- * @param unitID integer
+ * @param unitID UnitID
  */
 int LuaOpenGL::UnitMultMatrix(lua_State* L)
 {
@@ -1749,7 +1749,7 @@ int LuaOpenGL::UnitMultMatrix(lua_State* L)
 
 /***
  * @function gl.UnitPiece
- * @param unitID integer
+ * @param unitID UnitID
  * @param pieceID integer
  */ 
 int LuaOpenGL::UnitPiece(lua_State* L)
@@ -1760,14 +1760,14 @@ int LuaOpenGL::UnitPiece(lua_State* L)
 
 /***
  * @function gl.UnitPieceMatrix
- * @param unitID integer
+ * @param unitID UnitID
  * @param pieceID integer
  */ 
 int LuaOpenGL::UnitPieceMatrix(lua_State* L) {return (UnitPieceMultMatrix(L)); }
 
 /***
  * @function gl.UnitPieceMultMatrix
- * @param unitID integer
+ * @param unitID UnitID
  * @param pieceID integer
  */ 
 int LuaOpenGL::UnitPieceMultMatrix(lua_State* L)
@@ -1834,7 +1834,7 @@ int LuaOpenGL::FeatureCommon(lua_State* L, bool applyTransform, bool callDrawFea
  * Draw the feature, applying transform.
  * 
  * @function gl.Feature
- * @param featureID integer
+ * @param featureID FeatureID
  * @param doRawDraw boolean? (Default: `false`)
  * @param useLuaMat integer?
  * @param noLuaCall boolean? (Default: `false`) Skip the `DrawFeature` callin.
@@ -1848,7 +1848,7 @@ int LuaOpenGL::Feature(lua_State* L) { return (FeatureCommon(L, true, true)); }
  * recursion is blocked.
  
  * @function gl.FeatureRaw
- * @param featureID integer
+ * @param featureID FeatureID
  * @param doRawDraw boolean? (Default: `false`)
  * @param useLuaMat integer?
  * @param noLuaCall boolean? (Default: `true`) Skip the `DrawFeature` callin.
@@ -1857,7 +1857,7 @@ int LuaOpenGL::FeatureRaw(lua_State* L) { return (FeatureCommon(L, false, false)
 
 /***
  * @function gl.FeatureTextures
- * @param featureID integer
+ * @param featureID FeatureID
  * @param push boolean If `true`, push the render state; if `false`, pop it.
  */
 int LuaOpenGL::FeatureTextures(lua_State* L)
@@ -1869,8 +1869,8 @@ int LuaOpenGL::FeatureTextures(lua_State* L)
 
 /***
  * @function gl.FeatureShape
- * @param featureDefID integer
- * @param teamID integer
+ * @param featureDefID FeatureDefID
+ * @param teamID TeamID
  * @param rawState boolean? (Default: `true`)
  * @param toScreen boolean? (Default: `false`)
  * @param opaque boolean? (Default: `true`) If `true`, draw opaque; if `false`, draw alpha.
@@ -1884,7 +1884,7 @@ int LuaOpenGL::FeatureShape(lua_State* L)
 
 /***
  * @function gl.FeatureShapeTextures
- * @param featureDefID integer
+ * @param featureDefID FeatureDefID
  * @param push boolean If `true`, push the render state; if `false`, pop it.
  */
 int LuaOpenGL::FeatureShapeTextures(lua_State* L)
@@ -1897,7 +1897,7 @@ int LuaOpenGL::FeatureShapeTextures(lua_State* L)
 
 /***
  * @function gl.FeatureMultMatrix
- * @param featureID integer
+ * @param featureID FeatureID
  */
 int LuaOpenGL::FeatureMultMatrix(lua_State* L)
 {
@@ -1915,7 +1915,7 @@ int LuaOpenGL::FeatureMultMatrix(lua_State* L)
 
 /***
  * @function gl.FeaturePiece
- * @param featureID integer
+ * @param featureID FeatureID
  * @param pieceID integer
  */
 int LuaOpenGL::FeaturePiece(lua_State* L)
@@ -1927,7 +1927,7 @@ int LuaOpenGL::FeaturePiece(lua_State* L)
 
 /***
  * @function gl.FeaturePieceMatrix
- * @param featureID integer
+ * @param featureID FeatureID
  * @param pieceID integer
  */
 int LuaOpenGL::FeaturePieceMatrix(lua_State* L) { return (FeaturePieceMultMatrix(L)); }
@@ -1935,7 +1935,7 @@ int LuaOpenGL::FeaturePieceMatrix(lua_State* L) { return (FeaturePieceMultMatrix
 
 /***
  * @function gl.FeaturePieceMultMatrix
- * @param featureID integer
+ * @param featureID FeatureID
  * @param pieceID integer
  */
 int LuaOpenGL::FeaturePieceMultMatrix(lua_State* L)
@@ -1952,7 +1952,7 @@ int LuaOpenGL::FeaturePieceMultMatrix(lua_State* L)
 
 /***
  * @function gl.DrawListAtUnit
- * @param unitID integer
+ * @param unitID UnitID
  * @param listIndex integer
  * @param useMidPos boolean? (Default: `true`)
  * @param scaleX number? (Default: `1.0`)
@@ -2009,7 +2009,7 @@ int LuaOpenGL::DrawListAtUnit(lua_State* L)
 
 /***
  * @function gl.DrawFuncAtUnit
- * @param unitID integer
+ * @param unitID UnitID
  * @param useMidPos boolean? (Default: `true`)
  * @param fun(...) func Function to call.
  * @param ... any Arguments passed to function.
@@ -2067,7 +2067,7 @@ int LuaOpenGL::DrawFuncAtUnit(lua_State* L)
  * @param resolution integer
  * @param slope number
  * @param gravity number?
- * @param weaponDefID integer?
+ * @param weaponDefID WeaponDefID?
  */
 int LuaOpenGL::DrawGroundCircle(lua_State* L)
 {
