@@ -160,7 +160,7 @@ void CKeyCodes::Reset()
 	//AddPair("euro", SDLK_EURO);       // Some european keyboards
 	//AddPair("undo", SDLK_UNDO);       // Atari keyboard has Undo
 
-	for (int i = ACTION_BUTTON_MIN; i <= NUM_BUTTONS; i++) {
+	for (int i = 1; i <= NUM_BUTTONS; i++) {
 		AddPair("mouse" + IntToString(i), CKeyCodes::GetMouseButtonSymbol(i));
 	}
 
