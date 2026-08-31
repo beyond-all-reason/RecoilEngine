@@ -3345,7 +3345,7 @@ int LuaSyncedRead::GetUnitNearestAlly(lua_State* L)
  * @param useLOS boolean? (Default: `true`) requires LOS/radar visibility of allied team.
  * @param sphereDistTest boolean? (Default: `false`) determines if using spherical(3D, includes target radius) or cylindrical(2D) search.
  * @param checkSightDist boolean? (Default: `false`) determine if during filter process, if candidate distance to be within candidate LOS radius.
- * @return integer? unitID
+ * @return UnitID? unitID
  */
 int LuaSyncedRead::GetUnitNearestEnemy(lua_State* L)
 {
@@ -4618,7 +4618,7 @@ int LuaSyncedRead::GetUnitBuildFacing(lua_State* L)
  * Works for both mobile builders and factories.
  *
  * @param unitID UnitID
- * @return integer buildeeUnitID or nil
+ * @return UnitID? buildeeUnitID
  */
 int LuaSyncedRead::GetUnitIsBuilding(lua_State* L)
 {
@@ -4738,7 +4738,7 @@ int LuaSyncedRead::GetUnitWorkerTask(lua_State* L)
  * @function Spring.GetUnitEffectiveBuildRange
  * Useful for setting move goals manually.
  * @param unitID UnitID
- * @param buildeeDefID integer or nil
+ * @param buildeeDefID UnitDefID?
  * @return number effectiveBuildRange counted to the center of prospective buildee; buildRange if buildee nil
  */
 int LuaSyncedRead::GetUnitEffectiveBuildRange(lua_State* L)
@@ -5882,7 +5882,7 @@ int LuaSyncedRead::GetUnitEstimatedPath(lua_State* L)
  *
  * @function Spring.GetUnitLastAttacker
  * @param unitID UnitID
- * @return integer? attackerUnitID `nil` if the unit has no last attacker or the attacker is not visible.
+ * @return UnitID? attackerUnitID `nil` if the unit has no last attacker or the attacker is not visible.
  */
 int LuaSyncedRead::GetUnitLastAttacker(lua_State* L)
 {
@@ -6778,7 +6778,7 @@ static int PackBuildQueue(lua_State* L, bool canBuild, const char* caller)
  *
  * @function Spring.GetFullBuildQueue
  * @param unitID UnitID
- * @return table<number,number>? buildqueue indexed by unitDefID with count values
+ * @return table<UnitDefID,integer>? buildqueue indexed by unitDefID with count values
  */
 int LuaSyncedRead::GetFullBuildQueue(lua_State* L)
 {
@@ -6790,7 +6790,7 @@ int LuaSyncedRead::GetFullBuildQueue(lua_State* L)
  *
  * @function Spring.GetRealBuildQueue
  * @param unitID UnitID
- * @return table<number,number>? buildqueue indexed by unitDefID with count values
+ * @return table<UnitDefID,integer>? buildqueue indexed by unitDefID with count values
  */
 int LuaSyncedRead::GetRealBuildQueue(lua_State* L)
 {

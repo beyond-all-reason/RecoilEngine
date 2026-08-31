@@ -2534,9 +2534,9 @@ string CSplitLuaHandle::LoadFile(const std::string& filename, const std::string&
 /***
  * @class CallAsTeamOptions
  * @x_helper
- * @field ctrl integer Ctrl team ID.
- * @field read integer Read team ID.
- * @field select integer Select team ID.
+ * @field ctrl TeamID
+ * @field read TeamID
+ * @field select TeamID
  */
 
 /*** Calls a function from given team's PoV. In particular this makes callouts obey that team's visibility rules.

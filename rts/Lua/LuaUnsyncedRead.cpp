@@ -2403,7 +2403,7 @@ namespace {
  * @function Spring.GetRenderUnits
  * @param drawMask DrawMask (Default: `0`) Filter objects by their draw flags.
  * @param sendMask true Whether to send objects draw flags as second return
- * @return integer[] featureIDs
+ * @return UnitID[] unitIDs
  * @return DrawFlag[] drawFlags
  */
 
@@ -2412,7 +2412,7 @@ namespace {
  * @function Spring.GetRenderUnits
  * @param drawMask DrawMask (Default: `0`) Filter objects by their draw flags.
  * @param sendMask false? Whether to send objects draw flags as second return
- * @return integer[] featureIDs
+ * @return UnitID[] unitIDs
  */
 int LuaUnsyncedRead::GetRenderUnits(lua_State* L)
 {
