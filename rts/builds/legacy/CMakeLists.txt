@@ -30,9 +30,16 @@ find_package(SDL2 MODULE REQUIRED)
 
 set(engineLibraries SDL2::SDL2)
 
-set(OpenGL_GL_PREFERENCE LEGACY)
-find_package_static(OpenGL 3.0 REQUIRED)
-list(APPEND engineLibraries OpenGL::GL)
+if    (APPLE)
+	# Apple's OpenGL.framework has no compatibility profile past 2.1, so the
+	# context comes from Mesa through EGL instead, see MacEGLContext.h
+	find_package(MesaEGL MODULE REQUIRED)
+	list(APPEND engineLibraries MesaEGL::EGL)
+else  (APPLE)
+	set(OpenGL_GL_PREFERENCE LEGACY)
+	find_package_static(OpenGL 3.0 REQUIRED)
+	list(APPEND engineLibraries OpenGL::GL)
+endif (APPLE)
 
 find_fontconfig_hack()
 find_package_static(Fontconfig 2.11 REQUIRED)
@@ -58,6 +65,26 @@ endif (UNIX)
 if (APPLE)
 	find_library(COREFOUNDATION_LIBRARY Foundation)
 	list(APPEND engineLibraries ${COREFOUNDATION_LIBRARY})
+
+	# for the present path that takes the EGL pbuffer to the screen
+	find_library(APPKIT_LIBRARY AppKit)
+	find_library(METAL_LIBRARY Metal)
+	find_library(QUARTZCORE_LIBRARY QuartzCore)
+	find_library(IOSURFACE_LIBRARY IOSurface)
+	find_library(OBJC_LIBRARY objc)
+	list(APPEND engineLibraries
+		${APPKIT_LIBRARY}
+		${METAL_LIBRARY}
+		${QUARTZCORE_LIBRARY}
+		${IOSURFACE_LIBRARY}
+		${OBJC_LIBRARY}
+	)
+
+	list(APPEND engineSources
+		"${ENGINE_SRC_ROOT_DIR}/System/Platform/Mac/MacEGLContext.cpp"
+		"${ENGINE_SRC_ROOT_DIR}/System/Platform/Mac/MacGLPresent.cpp"
+		"${ENGINE_SRC_ROOT_DIR}/System/Platform/Mac/MetalPresent.mm"
+	)
 endif (APPLE)
 
 list(APPEND engineLibraries squish rgetc1)
@@ -86,6 +113,28 @@ target_link_libraries(engine-legacy ${engineLibraries} Game)
 
 # Export symbols for plugin access (replaces CMP0065 OLD behavior)
 set_target_properties(engine-legacy PROPERTIES ENABLE_EXPORTS TRUE)
+
+if (APPLE)
+	# Mesa's Zink driver loads the Vulkan loader as @rpath/libvulkan.1.dylib,
+	# which dyld resolves against the rpaths of the running executable. This
+	# covers the build tree only, a bundled build has to relocate the dylibs.
+	find_library(VULKAN_LOADER_LIBRARY
+	             NAMES
+	              vulkan
+	             PATHS
+	              /opt/homebrew
+	              /usr/local
+	             PATH_SUFFIXES
+	              lib
+	)
+
+	if (VULKAN_LOADER_LIBRARY)
+		get_filename_component(vulkanLoaderDir "${VULKAN_LOADER_LIBRARY}" DIRECTORY)
+		set_property(TARGET engine-legacy APPEND PROPERTY BUILD_RPATH "${vulkanLoaderDir}")
+	else()
+		message(WARNING "no Vulkan loader found, engine-legacy will not get a GL context unless Mesa was built without Zink")
+	endif()
+endif (APPLE)
 
 if(MSVC)
     target_link_libraries(engine-legacy engine-natvis)

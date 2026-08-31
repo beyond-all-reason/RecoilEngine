@@ -1,0 +1,58 @@
+From e2e8bef570bbe5882a66375ed241eda2fdc1a411 Mon Sep 17 00:00:00 2001
+From: Tom J Nowell <contact@tomjn.com>
+Date: Tue, 25 Aug 2026 17:20:36 +0100
+Subject: [PATCH] zink: release command pool resources on reset
+
+Origin:      ours
+Status:      candidate
+Applies-to:  mesa 56588ef0665ab81fa16248489542c1747fdf99ef
+Expires:     when proposed upstream and merged, or when KosmicKrisp stops
+             retaining allocator memory across a pool reset
+Evidence:    engine peak 12288 MiB -> 7049 MiB over a 120s run, combined with
+             MR 43697. No effect on its own. Reproducer unchanged at 474mb,
+             which is expected: it resets the pool about once.
+             coding-agents/MACOS_PERFORMANCE.md, "Mesa pin and issue 15998"
+
+Zink resets its command pools with flags = 0, which permits an
+implementation to retain the memory for reuse. Every driver Zink runs on
+pools that memory and hands it to the next recording, so this is normally
+the right default.
+
+KosmicKrisp retains it per MTL4CommandAllocator instead, where nothing
+else can reach it, and an allocator only returns memory to the system when
+it is destroyed. The result is growth that never plateaus under a steady
+workload, because Zink never asks for the memory back.
+
+Passing VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT asks for it. On its
+own this changes nothing, because KosmicKrisp declares the flag UNUSED in
+kk_reset_cmd_buffer and has no kk_ResetCommandPool at all. Combined with
+MR 43697, which adds one that honours the bit, engine peak footprint on a
+120s run falls from 12288 MiB to 7049 MiB.
+
+Not proposed upstream yet: this changes behaviour for every driver Zink
+targets, and the cost to drivers that already reuse the memory well has
+not been measured.
+---
+ src/gallium/drivers/zink/zink_batch.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/gallium/drivers/zink/zink_batch.c b/src/gallium/drivers/zink/zink_batch.c
+index e7cdc69a920..1a38fef228e 100644
+--- a/src/gallium/drivers/zink/zink_batch.c
++++ b/src/gallium/drivers/zink/zink_batch.c
+@@ -56,10 +56,10 @@ static void
+ reset_batch_state_internal(struct zink_screen *screen, struct zink_batch_state *bs)
+ {
+    MESA_TRACE_FUNC();
+-   VkResult result = VKSCR(ResetCommandPool)(screen->dev, bs->cmdpool, 0);
++   VkResult result = VKSCR(ResetCommandPool)(screen->dev, bs->cmdpool, VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT);
+    if (result != VK_SUCCESS)
+       mesa_loge("ZINK: vkResetCommandPool failed (%s)", vk_Result_to_str(result));
+-   result = VKSCR(ResetCommandPool)(screen->dev, bs->unsynchronized_cmdpool, 0);
++   result = VKSCR(ResetCommandPool)(screen->dev, bs->unsynchronized_cmdpool, VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT);
+    if (result != VK_SUCCESS)
+       mesa_loge("ZINK: vkResetCommandPool failed (%s)", vk_Result_to_str(result));
+ 
+-- 
+2.55.0
+

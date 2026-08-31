@@ -218,7 +218,10 @@ bool IMouseInput::WarpPos(int2 pos)
 		SDL_ShowCursor(SDL_DISABLE);
 	#endif
 
-	SDL_WarpMouseInWindow(globalRendering->GetWindow(), pos.x, pos.y);
+	// mousepos is in the pixels the engine draws in, SDL wants window points
+	const int2 sdlPos = globalRendering->PixelToPoint(pos);
+
+	SDL_WarpMouseInWindow(globalRendering->GetWindow(), sdlPos.x, sdlPos.y);
 
 	// SDL_WarpMouse generates SDL_MOUSEMOTION events
 	// in `middle click scrolling` those SDL generated ones would point into

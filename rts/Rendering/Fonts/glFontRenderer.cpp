@@ -211,6 +211,8 @@ void CglShaderFontRenderer::HandleTextureUpdate(CFontTexture& fnt, bool onlyUplo
 	if (!onlyUpload)
 		fnt.UpdateGlyphAtlasTexture();
 
+	// GL_LIST_INDEX reads back the list being compiled, verified under Zink,
+	// so this guard also holds there
 	GLint dl = 0;
 	glGetIntegerv(GL_LIST_INDEX, &dl);
 	if (dl == 0) {

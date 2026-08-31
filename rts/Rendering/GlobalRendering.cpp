@@ -3,10 +3,13 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <chrono>
+#include <cmath>
 
 #include <SDL.h>
 
 #include "GlobalRendering.h"
+#include "Rendering/GL/FramePhaseDump.h"
 #include "GlobalRenderingInfo.h"
 #include "Rendering/VerticalSync.h"
 #include "Rendering/GL/StreamBuffer.h"
@@ -41,6 +44,15 @@
 #include <SDL_syswm.h>
 #include <SDL_rect.h>
 
+#if defined(__APPLE__) && !defined(HEADLESS)
+	// Apple's OpenGL.framework cannot give the engine the context it needs,
+	// Mesa's EGL can, see MacEGLContext.h
+	#define SPRING_USE_MAC_EGL 1
+	#include "System/Platform/Mac/MacEGLContext.h"
+	#include "System/Platform/Mac/MacGLPresent.h"
+	#include "System/Platform/Mac/MetalPresent.h"
+#endif
+
 #include "System/Misc/TracyDefs.h"
 
 CONFIG(bool, DebugGL).defaultValue(false).description("Enables GL debug-context and output. (see GL_ARB_debug_output)");
@@ -55,6 +67,8 @@ CONFIG(float, MinSampleShadingRate).defaultValue(0.0f).minimumValue(0.0f).maximu
 CONFIG(int, ForceDisablePersistentMapping).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceDisableExplicitAttribLocs).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceDisableClipCtrl).defaultValue(0).minimumValue(0).maximumValue(1);
+CONFIG(int, ForceImmediateModeFlush).defaultValue(-1).minimumValue(-1).maximumValue(1)
+	.description("Overrides the immediate-mode batching probe, which decides whether this driver renders consecutive glBegin/glEnd batches correctly. -1 measures it and is correct on every driver tested. 1 forces the workarounds on. 0 asserts the driver is unaffected and turns off uniform vertex and texture coordinate arity, the per-batch flush and display list deferral together. On a driver that does have the defect, 0 is worth about 1.9x and corrupts the load screen, the resource bar and the build menu.");
 //CONFIG(int, ForceDisableShaders).defaultValue(0).minimumValue(0).maximumValue(1);
 CONFIG(int, ForceDisableGL4).defaultValue(0).safemodeValue(1).minimumValue(0).maximumValue(1);
 
@@ -73,6 +87,10 @@ CONFIG(int, MinimizeOnFocusLoss).defaultValue(0).minimumValue(0).maximumValue(1)
 CONFIG(bool, Fullscreen).defaultValue(true).headlessValue(false).description("Sets whether the game will run in fullscreen, as opposed to a window. For Windowed Fullscreen of Borderless Window, set this to 0, WindowBorderless to 1, and WindowPosX and WindowPosY to 0.");
 CONFIG(bool, WindowBorderless).defaultValue(false).description("When set and Fullscreen is 0, will put the game in Borderless Window mode, also known as Windowed Fullscreen. When using this, it is generally best to also set WindowPosX and WindowPosY to 0");
 CONFIG(bool, BlockCompositing).defaultValue(false).safemodeValue(true).description("Disables kwin compositing to fix tearing, possible fixes low FPS in windowed mode, too.");
+#ifdef SPRING_USE_MAC_EGL
+CONFIG(bool, MacHiDPIRendering).defaultValue(true).description("Draws at the display's backing resolution. Set to 0 to draw at the window's size in points and let the display scale it up, which is blurry on a Retina screen and a quarter of the pixels to draw and read back. Measured slower than lowering MacRenderScale instead, because a layer whose scale does not match the display costs about 38ms a frame however little it renders.");
+CONFIG(float, MacRenderScale).defaultValue(1.0f).minimumValue(0.25f).maximumValue(1.0f).description("Fraction of the window's backing resolution to draw at, letting the present scale the result up. 0.5 is a quarter of the pixels. Measured 1.19x at 0.75 and 1.35x at 0.5, and capped near 1.5x however far it is pushed: presenting anything that is not 1:1 with the display costs a flat 38ms a frame on this stack, so most of the saving is spent on the penalty for taking it.");
+#endif
 // setting this as default 0 for now is because if the frame were to be dropped for being late, DWMFlush will force the compositor to use the framebuffer. This can result in blocking until the framebuffer can be composited (up to 1 frame) and may not be desirable for all use cases (specifically with vsync set to off). However, only more widespread testing and investigation across various hardware/os configs would tell us what advantage DWMFlush would bring.
 CONFIG(int, DWMFlush).defaultValue(0).description("Force Windows Desktop Compositors DWMFlush before each SDL_GL_SwapWindow, preventing dropped frames (use nVidias FrameView to validate dropped frames, or BARs Jitter Timer widget). Value of 1 does DWMFlush before SwapBuffers, value of 2 does DWMFlush after swapbuffers.");
 
@@ -140,6 +158,8 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(winPosY),
 	CR_IGNORED(winSizeX),
 	CR_IGNORED(winSizeY),
+	CR_IGNORED(pixelsPerPointX),
+	CR_IGNORED(pixelsPerPointY),
 	CR_IGNORED(viewPosX),
 	CR_IGNORED(viewPosY),
 	CR_IGNORED(viewSizeX),
@@ -194,6 +214,8 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(supportClipSpaceControl),
 	CR_IGNORED(supportSeamlessCubeMaps),
 	CR_IGNORED(supportFragDepthLayout),
+	CR_IGNORED(supportPolygonModeLine),
+	CR_IGNORED(supportImmediateModeBatching),
 	CR_IGNORED(haveGL4),
 	CR_IGNORED(glslMaxVaryings),
 	CR_IGNORED(glslMaxAttributes),
@@ -244,6 +266,8 @@ CGlobalRendering::CGlobalRendering()
 	, winPosY(configHandler->GetInt("WindowPosY"))
 	, winSizeX(1)
 	, winSizeY(1)
+	, pixelsPerPointX(1.0f)
+	, pixelsPerPointY(1.0f)
 
 	// viewport geometry
 	, viewPosX(0)
@@ -324,6 +348,8 @@ CGlobalRendering::CGlobalRendering()
 	, supportClipSpaceControl(false)
 	, supportSeamlessCubeMaps(false)
 	, supportFragDepthLayout(false)
+	, supportPolygonModeLine(true)
+	, supportImmediateModeBatching(true)
 	, haveGL4(false)
 
 	, glslMaxVaryings(0)
@@ -378,7 +404,7 @@ CGlobalRendering::~CGlobalRendering()
 	verticalSync->WrapRemoveObserver();
 
 	// protect against aborted startup
-	if (glContext) {
+	if (HasGLContext()) {
 		glDeleteQueries(glTimerQueries.size(), glTimerQueries.data());
 	}
 
@@ -394,6 +420,20 @@ void CGlobalRendering::PreKill()
 	CShaderHandler::FreeInstance();
 }
 
+
+// macOS has no exclusive fullscreen worth asking for. It is a display mode
+// change, which takes the desktop out of its 2x scale, so the pointer covers
+// twice the distance for the same hand movement and every other window on the
+// screen is laid out again. Nothing on the Metal present path needs the mode,
+// and the non-exclusive kind already draws at the full backing resolution.
+static uint32_t GetFullScreenFlag(bool borderless)
+{
+#ifdef __APPLE__
+	return SDL_WINDOW_FULLSCREEN_DESKTOP;
+#else
+	return borderless ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN;
+#endif
+}
 
 SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 {
@@ -425,8 +465,15 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 	//   SDL_WINDOW_FULLSCREEN_DESKTOP for "fake" fullscreen that takes the size of the desktop;
 	//   and 0 for windowed mode.
 
-	uint32_t sdlFlags  = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-	         sdlFlags |= (borderless_ ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen_;
+	// SDL owns the GL context everywhere except macOS, where EGL does
+	#ifdef SPRING_USE_MAC_EGL
+	constexpr uint32_t glWindowFlag = 0;
+	#else
+	constexpr uint32_t glWindowFlag = SDL_WINDOW_OPENGL;
+	#endif
+
+	uint32_t sdlFlags  = (glWindowFlag | SDL_WINDOW_RESIZABLE);
+	         sdlFlags |= GetFullScreenFlag(borderless_) * fullScreen_;
 	         sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
 
 	for (size_t i = 0; i < (aaLvls.size()) && (newWindow == nullptr); i++) {
@@ -515,6 +562,64 @@ SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 	return (newContext = SDL_GL_CreateContext(sdlWindow));
 }
 
+#ifdef SPRING_USE_MAC_EGL
+/**
+ * Attaches the Metal layer and reports the size of its drawable in backing
+ * pixels, which is what the pbuffer behind the default framebuffer has to be.
+ *
+ * This runs before the context is created because the layer is the only thing
+ * that knows the backing scale. SDL reports the window in points, and does not
+ * report a HiDPI drawable for a window it does not own a GL context for.
+ */
+static bool InitMacPresentLayer(SDL_Window* window, int2& drawableSize)
+{
+	SDL_SysWMinfo wmInfo;
+	SDL_VERSION(&wmInfo.version);
+
+	if (!SDL_GetWindowWMInfo(window, &wmInfo)) {
+		LOG_L(L_ERROR, "[GR::%s] error \"%s\" getting the window info", __func__, SDL_GetError());
+		return false;
+	}
+
+	if (!MacMetalPresent_Init(static_cast<void*>(wmInfo.info.cocoa.window), configHandler->GetBool("MacHiDPIRendering")))
+		return false;
+
+	MacMetalPresent_GetDrawableSize(&drawableSize.x, &drawableSize.y);
+
+	if (drawableSize.x <= 0 || drawableSize.y <= 0) {
+		LOG_L(L_ERROR, "[GR::%s] the Metal layer has no drawable", __func__);
+		return false;
+	}
+
+	return true;
+}
+
+// The pbuffer the engine renders into is normally the layer's whole drawable, so
+// a 2x display costs four times the pixels. Frame time on this path is
+// proportional to the pixels drawn, measured at 11.4ms a megapixel with no fixed
+// term, so drawing fewer of them is the largest win available.
+//
+// This scales the pbuffer alone and leaves the layer at the display's own scale.
+// MacHiDPIRendering=0 instead drops the layer to 1x, and a layer whose scale does
+// not match the display costs a measured 38ms a frame however little it renders,
+// which swallows the saving: 15.9 fps against 21.3 where the same pixel count at
+// the display's scale gives 65.0. The present already samples the IOSurface
+// through a linear filter into a full size drawable, so scaling back up costs
+// nothing there.
+static int2 MacRenderSize(const int2& drawableSize)
+{
+	const float scale = std::clamp(configHandler->GetFloat("MacRenderScale"), 0.25f, 1.0f);
+
+	if (scale >= 1.0f)
+		return drawableSize;
+
+	return {
+		std::max(1, static_cast<int>(drawableSize.x * scale + 0.5f)),
+		std::max(1, static_cast<int>(drawableSize.y * scale + 0.5f))
+	};
+}
+#endif
+
 bool CGlobalRendering::CreateWindowAndContext(const char* title)
 {
 	if (SDL_Init(SDL_INIT_VIDEO) == -1) {
@@ -584,10 +689,30 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 		WindowManagerHelper::BlockCompositing(sdlWindow);
 #endif
 
+	#ifdef SPRING_USE_MAC_EGL
+	{
+		int2 drawableSize;
+
+		if (!InitMacPresentLayer(sdlWindow, drawableSize))
+			return false;
+
+		const int2 renderSize = MacRenderSize(drawableSize);
+
+		if (renderSize != drawableSize)
+			LOG("[GR::%s] MacRenderScale draws %dx%d into a %dx%d drawable", __func__, renderSize.x, renderSize.y, drawableSize.x, drawableSize.y);
+
+		if (!MacEGL::CreateContext(minCtx, renderSize))
+			return false;
+	}
+
+	gladLoadGLLoader(MacEGL::GetProcAddress);
+	#else
 	if ((glContext = CreateGLContext(minCtx)) == nullptr)
 		return false;
 
 	gladLoadGL();
+	#endif
+
 	GLX::Load(sdlWindow);
 
 	if (!CheckGLContextVersion(minCtx)) {
@@ -610,7 +735,20 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 
 
 void CGlobalRendering::MakeCurrentContext(bool clear) const {
+	#ifdef SPRING_USE_MAC_EGL
+	MacEGL::MakeCurrent(clear);
+	#else
 	SDL_GL_MakeCurrent(sdlWindow, clear ? nullptr : glContext);
+	#endif
+}
+
+
+bool CGlobalRendering::HasGLContext() const {
+	#ifdef SPRING_USE_MAC_EGL
+	return MacEGL::HasContext();
+	#else
+	return (glContext != nullptr);
+	#endif
 }
 
 
@@ -621,10 +759,13 @@ void CGlobalRendering::DestroyWindowAndContext() {
 	WindowManagerHelper::SetIconSurface(sdlWindow, nullptr);
 	SetWindowInputGrabbing(false);
 
-	SDL_GL_MakeCurrent(sdlWindow, nullptr);
+	MakeCurrentContext(true);
 	SDL_DestroyWindow(sdlWindow);
 
-	#if !defined(HEADLESS)
+	#if defined(SPRING_USE_MAC_EGL)
+	// only reached from ~CGlobalRendering, so the display goes with the process
+	MacEGL::DestroyContext(false);
+	#elif !defined(HEADLESS)
 	if (glContext)
 		SDL_GL_DeleteContext(glContext);
 	#endif
@@ -690,6 +831,11 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 
 		//https://stackoverflow.com/questions/68480028/supporting-opengl-screen-capture-by-third-party-applications
 		glBindFramebuffer(GL_READ_FRAMEBUFFER_EXT, 0);
+
+		// TEMP diagnostic, not for merge. The last dump inside CGame::Draw is
+		// 6-screenpost. Anything visible on screen but absent from this dump is
+		// introduced by the present path rather than by any draw phase.
+		DumpFramePhase("7-presented");
 		
 		#ifdef _WIN32
 			using DwmFlushT = HRESULT(WINAPI*)();
@@ -700,10 +846,39 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 			}
 		#endif
 		
-		SDL_GL_SwapWindow(sdlWindow);
+		#ifdef SPRING_USE_MAC_EGL
+			MacGLPresent::SwapBuffers();
+
+			// TEMP diagnostic, not for merge. SPRING_FPS_LOG=<seconds> logs the
+			// present rate. The in-game readout cannot be captured from a headless
+			// or unattended run, and a frame rate read off a screenshot is not a
+			// number anyone can compare.
+			static const int fpsLog = []() {
+				const char* e = getenv("SPRING_FPS_LOG");
+				return (e != nullptr) ? std::atoi(e) : 0;
+			}();
+			if (fpsLog > 0) {
+				using clock = std::chrono::steady_clock;
+				static clock::time_point since = clock::now();
+				static uint32_t presents = 0;
+
+				presents++;
+				const auto elapsed = clock::now() - since;
+				if (elapsed >= std::chrono::seconds(fpsLog)) {
+					const double secs = std::chrono::duration<double>(elapsed).count();
+					LOG("[fps] %.1f over %.1fs, %u presents", presents / secs, secs, presents);
+					presents = 0;
+					since = clock::now();
+				}
+			}
+
+
+		#else
+			SDL_GL_SwapWindow(sdlWindow);
+		#endif
 
 		#ifdef _WIN32
-			if (forceDWMFlush == 2){ 
+			if (forceDWMFlush == 2){
 				ZoneScopedN("CGlobalRendering::SwapBuffers::DWMFlushPost");
 				if (DwmFlush)
 					reinterpret_cast<DwmFlushT>(DwmFlush)();
@@ -780,6 +955,12 @@ void CGlobalRendering::CheckGLExtensions()
 	#endif
 
 	if (underExternalDebug)
+		return;
+
+	// In an OpenGL CORE profile context these ARB extensions are not advertised
+	// by name (they were folded into GL 1.3/2.0/3.0 long ago) but their
+	// functionality is guaranteed by the spec. Skip the legacy-extension check.
+	if (globalRenderingInfo.glContextIsCore)
 		return;
 
 	char extMsg[ 128] = {0};
@@ -931,6 +1112,12 @@ void CGlobalRendering::SetGLSupportFlags()
 	if (globalRendering->amdHacks) {
 		supportDepthBufferBitDepth = 24;
 	}
+
+	supportPolygonModeLine = ProbePolygonModeLine();
+	{
+		const int forceFlush = configHandler->GetInt("ForceImmediateModeFlush");
+		supportImmediateModeBatching = (forceFlush < 0) ? ProbeImmediateModeBatching() : (forceFlush == 0);
+	}
 }
 
 void CGlobalRendering::QueryGLMaxVals()
@@ -1039,6 +1226,8 @@ void CGlobalRendering::LogVersionInfo(const char* sdlVersionStr, const char* glV
 	LOG("\tclip-space control support: %i (%i)", supportClipSpaceControl, IsExtensionSupported("GL_ARB_clip_control"));
 	LOG("\tseamless cube-map support : %i (%i)", supportSeamlessCubeMaps, IsExtensionSupported("GL_ARB_seamless_cube_map"));
 	LOG("\tfrag-depth layout support : %i (%i)", supportFragDepthLayout, IsExtensionSupported("GL_ARB_conservative_depth"));
+	LOG("\twireframe polygon mode    : %i (-)" , supportPolygonModeLine);
+	LOG("\timmediate-mode batching   : %i (-)" , supportImmediateModeBatching);
 	LOG("\tpersistent maps support   : %i (%i)", supportPersistentMapping, IsExtensionSupported("GL_ARB_buffer_storage"));
 	LOG("\texplicit attribs location : %i (%i)", supportExplicitAttribLoc, IsExtensionSupported("GL_ARB_explicit_attrib_location"));
 	LOG("\tmulti draw indirect       : %i (-)" , IsExtensionSupported("GL_ARB_multi_draw_indirect"));
@@ -1162,7 +1351,9 @@ void CGlobalRendering::LogDisplayMode(SDL_Window* window) const
 	};
 
 	const int fs = fullScreen;
-	const int bl = borderless;
+	// the second half of the fullscreen names is exclusive against not, which is
+	// the flag asked for rather than the borderless config
+	const int bl = fullScreen ? (GetFullScreenFlag(borderless) == SDL_WINDOW_FULLSCREEN_DESKTOP) : borderless;
 
 	LOG("[GR::%s] display-mode set to %ix%ix%ibpp@%iHz (%s)", __func__, viewSizeX, viewSizeY, SDL_BITSPERPIXEL(dmode.format), dmode.refresh_rate, names[fs * 2 + bl]);
 }
@@ -1245,7 +1436,7 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 	SDL_SetWindowPosition(window, winPosX, winPosY);
 	SDL_SetWindowSize(window, newRes.x, newRes.y);
 
-	if (SDL_SetWindowFullscreen(window, (borderless ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen) != 0)
+	if (SDL_SetWindowFullscreen(window, GetFullScreenFlag(borderless) * fullScreen) != 0)
 		LOG("[GR::%s][4][SDL_SetWindowFullscreen] err=\"%s\"", __func__, SDL_GetError());
 
 	SDL_SetWindowBordered(window, borderless ? SDL_FALSE : SDL_TRUE);
@@ -1414,8 +1605,8 @@ void CGlobalRendering::SetFullScreen(bool cliWindowed, bool cliFullScreen)
 {
 	const bool cfgFullScreen = configHandler->GetBool("Fullscreen");
 
-	fullScreen = (cfgFullScreen && !cliWindowed  );
-	fullScreen = (cfgFullScreen ||  cliFullScreen);
+	// --window beats --fullscreen, either beats the config
+	fullScreen = (cfgFullScreen || cliFullScreen) && !cliWindowed;
 
 	configHandler->Set("Fullscreen", fullScreen);
 }
@@ -1568,7 +1759,41 @@ void CGlobalRendering::ReadWindowPosAndSize()
 	if (!borderless)
 		UpdateWindowBorders(sdlWindow);
 
+	#ifdef SPRING_USE_MAC_EGL
+	// The pbuffer is the default framebuffer and nothing resizes it with the
+	// window, so match it to the layer, which AppKit has already resized, and
+	// then take the size from it: that is what the engine draws into. It is in
+	// backing pixels, unlike winPos and the resolution config, which stay in
+	// the points SDL reports.
+	int2 drawableSize;
+	MacMetalPresent_GetDrawableSize(&drawableSize.x, &drawableSize.y);
+
+	// compare against the scaled size, not the drawable, or a scale below 1 makes
+	// this recreate the pbuffer every frame
+	if (drawableSize.x > 0 && drawableSize.y > 0) {
+		const int2 renderSize = MacRenderSize(drawableSize);
+
+		if (renderSize != MacEGL::GetSurfaceSize())
+			MacEGL::ResizeSurface(renderSize);
+	}
+
+	const int2 fbSize = MacEGL::GetSurfaceSize();
+
+	int2 pointSize;
+	SDL_GetWindowSize(sdlWindow, &pointSize.x, &pointSize.y);
+
+	winSizeX = fbSize.x;
+	winSizeY = fbSize.y;
+
+	// SDL goes on reporting mouse input in the points it reports the window in
+	if (pointSize.x > 0 && pointSize.y > 0) {
+		pixelsPerPointX = fbSize.x / float(pointSize.x);
+		pixelsPerPointY = fbSize.y / float(pointSize.y);
+	}
+	#else
 	SDL_GetWindowSize(sdlWindow, &winSizeX, &winSizeY);
+	#endif
+
 	SDL_GetWindowPosition(sdlWindow, &winPosX, &winPosY);
 
 	//enforce >=0 https://github.com/beyond-all-reason/spring/issues/23
@@ -1578,6 +1803,16 @@ void CGlobalRendering::ReadWindowPosAndSize()
 
 	// should be done by caller
 	// UpdateViewPortGeometry();
+}
+
+int2 CGlobalRendering::PointToPixel(const int2 p) const
+{
+	return {int(std::lround(p.x * pixelsPerPointX)), int(std::lround(p.y * pixelsPerPointY))};
+}
+
+int2 CGlobalRendering::PixelToPoint(const int2 p) const
+{
+	return {int(std::lround(p.x / pixelsPerPointX)), int(std::lround(p.y / pixelsPerPointY))};
 }
 
 void CGlobalRendering::SaveWindowPosAndSize()
@@ -1596,11 +1831,16 @@ void CGlobalRendering::SaveWindowPosAndSize()
 	if ((SDL_GetWindowFlags(sdlWindow) & SDL_WINDOW_MINIMIZED) != 0)
 		return;
 
+	// the resolution config is in the points SDL takes back in SetWindowAttributes,
+	// which winSize is no longer in everywhere, so ask rather than reuse it
+	int2 winSize;
+	SDL_GetWindowSize(sdlWindow, &winSize.x, &winSize.y);
+
 	// do not notify about changes to block update loop
 	configHandler->Set("WindowPosX", winPosX, false, false);
 	configHandler->Set("WindowPosY", winPosY, false, false);
-	configHandler->Set("XResolutionWindowed", winSizeX, false, false);
-	configHandler->Set("YResolutionWindowed", winSizeY, false, false);
+	configHandler->Set("XResolutionWindowed", winSize.x, false, false);
+	configHandler->Set("YResolutionWindowed", winSize.y, false, false);
 }
 
 
@@ -1791,6 +2031,223 @@ void main()
 	return testShader.IsValid();
 #else
 	return false;
+#endif
+}
+
+bool CGlobalRendering::ProbePolygonModeLine() const
+{
+#ifndef HEADLESS
+	// there is no query for this, so rasterize a triangle in GL_LINE mode and
+	// look at the result: only its edges should be lit, a mostly lit probe means
+	// the driver quietly filled it instead
+	constexpr static const char* vsSrc = R"(
+#version 150
+
+void main()
+{
+	const vec2 verts[3] = vec2[3](vec2(-0.9, -0.9), vec2(0.9, -0.9), vec2(0.0, 0.9));
+	gl_Position = vec4(verts[gl_VertexID], 0.0, 1.0);
+}
+)";
+
+	constexpr static const char* fsSrc = R"(
+#version 150
+
+out vec4 fragColor;
+void main()
+{
+	fragColor = vec4(1.0);
+}
+)";
+
+	if (!FBO::IsSupported() || !VAO::IsSupported())
+		return true;
+
+	auto probeShader = Shader::GLSLProgramObject("[GL-PolygonModeProbe]");
+	probeShader.AttachShaderObject(new Shader::GLSLShaderObject(GL_VERTEX_SHADER  , vsSrc));
+	probeShader.AttachShaderObject(new Shader::GLSLShaderObject(GL_FRAGMENT_SHADER, fsSrc));
+
+	probeShader.SetLogReporting(false);
+	probeShader.Link();
+
+	if (!probeShader.IsValid())
+		return true;
+
+	constexpr int probeSize = 32;
+
+	FBO fbo;
+	fbo.Bind();
+	fbo.CreateRenderBuffer(GL_COLOR_ATTACHMENT0_EXT, GL_RGBA8, probeSize, probeSize);
+
+	bool filled = false;
+
+	if (fbo.GetStatus() == GL_FRAMEBUFFER_COMPLETE_EXT) {
+		VAO vao;
+		vao.Bind();
+
+		// the viewport, enables and clear colour go back the way they were found
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+		glViewport(0, 0, probeSize, probeSize);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
+		glDisable(GL_CULL_FACE);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		probeShader.Enable();
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		probeShader.Disable();
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+		std::array<uint8_t, probeSize * probeSize * 4> pixels;
+		glReadPixels(0, 0, probeSize, probeSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+		glPopAttrib();
+		vao.Unbind();
+
+		size_t litPixels = 0;
+		for (size_t i = 0; i < pixels.size(); i += 4)
+			litPixels += (pixels[i] > 0);
+
+		// the triangle covers about 40% of the probe filled and about 10% as edges
+		filled = (litPixels * 4 > probeSize * probeSize);
+	}
+
+	fbo.Unbind();
+
+	return !filled;
+#else
+	return true;
+#endif
+}
+
+bool CGlobalRendering::ProbeImmediateModeBatching() const
+{
+#ifndef HEADLESS
+	// Mesa accumulates consecutive glBegin/glEnd batches into one buffer and
+	// issues them as one draw. Zink on KosmicKrisp renders that wrongly, but
+	// only once the buffer already holds another batch and a later batch widens
+	// its vertex format part way through. Draw exactly that: two batches that
+	// cover nothing, then a grid of cells whose batches add a colour, then a
+	// texture coordinate, then a third vertex component as they go.
+	//
+	// Every cell should be lit inside its margin and nothing outside it.
+	if (!FBO::IsSupported())
+		return true;
+
+	constexpr int probeSize = 256;
+	constexpr int probeCells = 6;
+	constexpr int probeMargin = 6;
+	constexpr int cellSize = probeSize / probeCells;
+
+	FBO fbo;
+	fbo.Bind();
+	fbo.CreateRenderBuffer(GL_COLOR_ATTACHMENT0_EXT, GL_RGBA8, probeSize, probeSize);
+
+	bool wrong = false;
+
+	if (fbo.GetStatus() == GL_FRAMEBUFFER_COMPLETE_EXT) {
+		glUseProgram(0);
+
+		// the viewport, enables, clear colour and the current colour and texture
+		// coordinate this draws with all go back the way they were found
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+		glViewport(0, 0, probeSize, probeSize);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_TEXTURE_2D);
+
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glLoadIdentity();
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+		glLoadIdentity();
+
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		// batches that write vertices but light nothing, so the begin/end buffer
+		// is not empty when the grid starts. One is not enough to trigger it.
+		for (int i = 0; i < 2; ++i) {
+			glColor3f(1.0f, 1.0f, 1.0f);
+			glBegin(GL_QUADS);
+			for (int v = 0; v < 4; ++v)
+				glVertex2f(-1.0f, -1.0f);
+			glEnd();
+		}
+
+		for (int cy = 0; cy < probeCells; ++cy) {
+			for (int cx = 0; cx < probeCells; ++cx) {
+				const float x0 = ((cx * cellSize + probeMargin) / float(probeSize)) * 2.0f - 1.0f;
+				const float y0 = ((cy * cellSize + probeMargin) / float(probeSize)) * 2.0f - 1.0f;
+				const float x1 = (((cx + 1) * cellSize - probeMargin) / float(probeSize)) * 2.0f - 1.0f;
+				const float y1 = (((cy + 1) * cellSize - probeMargin) / float(probeSize)) * 2.0f - 1.0f;
+
+				const float xs[4] = { x0, x1, x1, x0 };
+				const float ys[4] = { y0, y0, y1, y1 };
+
+				glColor3f(1.0f, 1.0f, 1.0f);
+				glBegin(GL_QUADS);
+
+				for (int v = 0; v < 4; ++v) {
+					if (v & 1)
+						glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+					if (v == 2)
+						glTexCoord2f(0.0f, 0.0f);
+
+					if (v == 3) {
+						glVertex3f(xs[v], ys[v], 0.0f);
+					} else {
+						glVertex2f(xs[v], ys[v]);
+					}
+				}
+
+				glEnd();
+			}
+		}
+
+		std::vector<uint8_t> pixels(probeSize * probeSize * 4);
+		glReadPixels(0, 0, probeSize, probeSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPopMatrix();
+
+		glPopAttrib();
+
+		size_t strayPixels = 0;
+		size_t unlitPixels = 0;
+
+		for (int y = 0; y < probeSize; ++y) {
+			for (int x = 0; x < probeSize; ++x) {
+				const bool lit = pixels[(y * probeSize + x) * 4] > 32;
+				const bool inCellX = (x % cellSize) >= probeMargin && (x % cellSize) < (cellSize - probeMargin);
+				const bool inCellY = (y % cellSize) >= probeMargin && (y % cellSize) < (cellSize - probeMargin);
+				const bool expected = inCellX && inCellY;
+
+				strayPixels += (lit && !expected);
+				unlitPixels += (!lit && expected);
+			}
+		}
+
+		// a driver that gets this right leaves no pixel of either kind
+		wrong = (strayPixels + unlitPixels) > 0;
+
+		if (wrong)
+			LOG_L(L_WARNING, "[GR::%s] immediate-mode batches render wrongly (%u stray, %u unlit of %u)", __func__, uint32_t(strayPixels), uint32_t(unlitPixels), uint32_t(probeSize * probeSize));
+	}
+
+	fbo.Unbind();
+
+	return !wrong;
+#else
+	return true;
 #endif
 }
 

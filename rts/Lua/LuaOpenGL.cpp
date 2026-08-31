@@ -10,6 +10,7 @@
 
 #include "Rendering/GL/myGL.h"
 
+#include <cstdlib>
 #include <vector>
 #include <algorithm>
 #include <optional>
@@ -247,6 +248,79 @@ static CFeature* ParseFeature(lua_State* L, const char* caller, int index)
 
 
 
+
+
+static inline void glTexCoordNarrow(float x, float y, float z, float w, int arity)
+{
+	switch (arity) {
+		case  1: glTexCoord1f(x);          break;
+		case  2: glTexCoord2f(x, y);       break;
+		case  3: glTexCoord3f(x, y, z);    break;
+		default: glTexCoord4f(x, y, z, w); break;
+	}
+}
+
+// The arity half of the mitigation applies to texture coordinates as well as
+// vertices, because gl.TexCoord varies the same way: it emits 1f, 2f, 3f or 4f
+// depending on how it was called. That fits what the resource bar showed, where
+// untextured gl.Rect always rendered and the textured draws beside it did not.
+//
+// Widening is semantics-preserving. glTexCoord1f(x) is defined as (x, 0, 0, 1),
+// 2f as (x, y, 0, 1) and 3f as (x, y, z, 1), so this changes the call and not the
+// coordinate, the same as widening a vertex.
+static inline void LuaTexCoordN(float x, float y, float z, float w, int arity)
+{
+	if (globalRendering->supportImmediateModeBatching)
+		return glTexCoordNarrow(x, y, z, w, arity);
+
+	glTexCoord4f(x, y, z, w);
+}
+
+static inline void glMultiTexCoordNarrow(GLenum unit, float x, float y, float z, float w, int arity)
+{
+	switch (arity) {
+		case  1: glMultiTexCoord1f(unit, x);          break;
+		case  2: glMultiTexCoord2f(unit, x, y);       break;
+		case  3: glMultiTexCoord3f(unit, x, y, z);    break;
+		default: glMultiTexCoord4f(unit, x, y, z, w); break;
+	}
+}
+
+// gl.MultiTexCoord varies its arity the same way gl.TexCoord does, and is the
+// only other per-vertex attribute that can. Colour is always emitted as 4f,
+// normals and secondary colour have no form other than 3f, a fog coordinate is a
+// single float and an edge flag is a boolean, so none of those can vary.
+static inline void LuaMultiTexCoordN(GLenum unit, float x, float y, float z, float w, int arity)
+{
+	if (globalRendering->supportImmediateModeBatching)
+		return glMultiTexCoordNarrow(unit, x, y, z, w, arity);
+
+	glMultiTexCoord4f(unit, x, y, z, w);
+}
+
+static inline void glVertexNarrow(float x, float y, float z, float w, int arity)
+{
+	switch (arity) {
+		case  2: glVertex2f(x, y);       break;
+		case  3: glVertex3f(x, y, z);    break;
+		default: glVertex4f(x, y, z, w); break;
+	}
+}
+
+// The batching defect needs a vertex arity that never varies. This is that half,
+// measured 3 of 3 clean against 3 of 3 corrupt for the unwidened baseline,
+// interleaved, watching the load screen.
+static inline void LuaVertexN(float x, float y, float z, float w, int arity)
+{
+	// Gated on the measured capability, the same way the flush is, so a driver
+	// that renders batches correctly pays nothing. Widening every vertex to four
+	// floats is cheap but it is on the hot path for all Lua drawing, and no other
+	// platform should carry it for a defect it does not have.
+	if (globalRendering->supportImmediateModeBatching)
+		return glVertexNarrow(x, y, z, w, arity);
+
+	glVertex4f(x, y, z, w);
+}
 
 /******************************************************************************/
 /******************************************************************************/
@@ -2187,14 +2261,14 @@ int LuaOpenGL::DrawGroundQuad(lua_State* L)
 			const int xit = xib + 1;
 			const float xb = xib * SQUARE_SIZE;
 			const float xt = xb + SQUARE_SIZE;
-			glBegin(GL_TRIANGLE_STRIP);
+			glBeginBatch(GL_TRIANGLE_STRIP);
 			for (int zi = zis; zi <= zie; zi++) {
 				const int ziOff = zi * mapxi;
 				const float yb = heightmap[ziOff + xib];
 				const float yt = heightmap[ziOff + xit];
 				const float z = zi * SQUARE_SIZE;
-				glVertex3f(xt, yt, z);
-				glVertex3f(xb, yb, z);
+				LuaVertexN(xt, yt, z, 1.0f, 3);
+				LuaVertexN(xb, yb, z, 1.0f, 3);
 			}
 			glEnd();
 		}
@@ -2210,16 +2284,16 @@ int LuaOpenGL::DrawGroundQuad(lua_State* L)
 			const float xt = xb + SQUARE_SIZE;
 			const float tut = tub + tuStep;
 			float tv = tv0;
-			glBegin(GL_TRIANGLE_STRIP);
+			glBeginBatch(GL_TRIANGLE_STRIP);
 			for (int zi = zis; zi <= zie; zi++) {
 				const int ziOff = zi * mapxi;
 				const float yb = heightmap[ziOff + xib];
 				const float yt = heightmap[ziOff + xit];
 				const float z = zi * SQUARE_SIZE;
-				glTexCoord2f(tut, tv);
-				glVertex3f(xt, yt, z);
-				glTexCoord2f(tub, tv);
-				glVertex3f(xb, yb, z);
+				LuaTexCoordN(tut, tv, 0.0f, 1.0f, 2);
+				LuaVertexN(xt, yt, z, 1.0f, 3);
+				LuaTexCoordN(tub, tv, 0.0f, 1.0f, 2);
+				LuaVertexN(xb, yb, z, 1.0f, 3);
 				tv += tvStep;
 			}
 			glEnd();
@@ -2335,7 +2409,7 @@ int LuaOpenGL::Shape(lua_State* L)
 
 	const GLuint type = (GLuint)luaL_checkint(L, 1);
 
-	glBegin(type);
+	glBeginBatch(type);
 
 	const int table = 2;
 	int i = 1;
@@ -2348,9 +2422,9 @@ int LuaOpenGL::Shape(lua_State* L)
 			break;
 		}
 		if (vd.hasColor) { glColor4fv(vd.color);   }
-		if (vd.hasTxcd)  { glTexCoord2fv(vd.txcd); }
-		if (vd.hasNorm)  { glNormal3fv(vd.norm);   }
-		if (vd.hasVert)  { glVertex3fv(vd.vert);   } // always last
+		if (vd.hasTxcd)  { LuaTexCoordN(vd.txcd[0], vd.txcd[1], 0.0f, 1.0f, 2); }
+		if (vd.hasNorm)  { glNormal3fv(vd.norm); }
+		if (vd.hasVert)  { LuaVertexN(vd.vert[0], vd.vert[1], vd.vert[2], 1.0f, 3); } // always last
 	}
 	if (!lua_isnil(L, -1)) {
 		luaL_error(L, "Shape: bad vertex data, not a table");
@@ -2387,7 +2461,7 @@ int LuaOpenGL::BeginEnd(lua_State* L)
 	}
 
 	// call the function
-	glBegin(primMode);
+	glBeginBatch(primMode);
 	const int error = lua_pcall(L, (args - 2), 0, 0);
 	glEnd();
 
@@ -2444,17 +2518,17 @@ int LuaOpenGL::Vertex(lua_State* L)
 		const float y = lua_tofloat(L, -1);
 		lua_rawgeti(L, 1, 3);
 		if (!lua_isnumber(L, -1)) {
-			glVertex2f(x, y);
+			LuaVertexN(x, y, 0.0f, 1.0f, 2);
 			return 0;
 		}
 		const float z = lua_tofloat(L, -1);
 		lua_rawgeti(L, 1, 4);
 		if (!lua_isnumber(L, -1)) {
-			glVertex3f(x, y, z);
+			LuaVertexN(x, y, z, 1.0f, 3);
 			return 0;
 		}
 		const float w = lua_tofloat(L, -1);
-		glVertex4f(x, y, z, w);
+		LuaVertexN(x, y, z, w, 4);
 		return 0;
 	}
 
@@ -2462,19 +2536,19 @@ int LuaOpenGL::Vertex(lua_State* L)
 		const float x = luaL_checkfloat(L, 1);
 		const float y = luaL_checkfloat(L, 2);
 		const float z = luaL_checkfloat(L, 3);
-		glVertex3f(x, y, z);
+		LuaVertexN(x, y, z, 1.0f, 3);
 	}
 	else if (args == 2) {
 		const float x = luaL_checkfloat(L, 1);
 		const float y = luaL_checkfloat(L, 2);
-		glVertex2f(x, y);
+		LuaVertexN(x, y, 0.0f, 1.0f, 2);
 	}
 	else if (args == 4) {
 		const float x = luaL_checkfloat(L, 1);
 		const float y = luaL_checkfloat(L, 2);
 		const float z = luaL_checkfloat(L, 3);
 		const float w = luaL_checkfloat(L, 4);
-		glVertex4f(x, y, z, w);
+		LuaVertexN(x, y, z, w, 4);
 	}
 	else {
 		luaL_error(L, "Incorrect arguments to gl.Vertex()");
@@ -2565,7 +2639,7 @@ int LuaOpenGL::TexCoord(lua_State* L)
 	if (args == 1) {
 		if (lua_isnumber(L, 1)) {
 			const float x = lua_tofloat(L, 1);
-			glTexCoord1f(x);
+			LuaTexCoordN(x, 0.0f, 0.0f, 1.0f, 1);
 			return 0;
 		}
 		if (!lua_istable(L, 1)) {
@@ -2578,43 +2652,43 @@ int LuaOpenGL::TexCoord(lua_State* L)
 		const float x = lua_tofloat(L, -1);
 		lua_rawgeti(L, 1, 2);
 		if (!lua_isnumber(L, -1)) {
-			glTexCoord1f(x);
+			LuaTexCoordN(x, 0.0f, 0.0f, 1.0f, 1);
 			return 0;
 		}
 		const float y = lua_tofloat(L, -1);
 		lua_rawgeti(L, 1, 3);
 		if (!lua_isnumber(L, -1)) {
-			glTexCoord2f(x, y);
+			LuaTexCoordN(x, y, 0.0f, 1.0f, 2);
 			return 0;
 		}
 		const float z = lua_tofloat(L, -1);
 		lua_rawgeti(L, 1, 4);
 		if (!lua_isnumber(L, -1)) {
-			glTexCoord3f(x, y, z);
+			LuaTexCoordN(x, y, z, 1.0f, 3);
 			return 0;
 		}
 		const float w = lua_tofloat(L, -1);
-		glTexCoord4f(x, y, z, w);
+		LuaTexCoordN(x, y, z, w, 4);
 		return 0;
 	}
 
 	if (args == 2) {
 		const float x = luaL_checkfloat(L, 1);
 		const float y = luaL_checkfloat(L, 2);
-		glTexCoord2f(x, y);
+		LuaTexCoordN(x, y, 0.0f, 1.0f, 2);
 	}
 	else if (args == 3) {
 		const float x = luaL_checkfloat(L, 1);
 		const float y = luaL_checkfloat(L, 2);
 		const float z = luaL_checkfloat(L, 3);
-		glTexCoord3f(x, y, z);
+		LuaTexCoordN(x, y, z, 1.0f, 3);
 	}
 	else if (args == 4) {
 		const float x = luaL_checkfloat(L, 1);
 		const float y = luaL_checkfloat(L, 2);
 		const float z = luaL_checkfloat(L, 3);
 		const float w = luaL_checkfloat(L, 4);
-		glTexCoord4f(x, y, z, w);
+		LuaTexCoordN(x, y, z, w, 4);
 	}
 	else {
 		luaL_error(L, "Incorrect arguments to gl.TexCoord()");
@@ -2667,7 +2741,7 @@ int LuaOpenGL::MultiTexCoord(lua_State* L)
 	if (args == 1) {
 		if (lua_isnumber(L, 2)) {
 			const float x = lua_tofloat(L, 2);
-			glMultiTexCoord1f(texUnit, x);
+			LuaMultiTexCoordN(texUnit, x, 0.0f, 0.0f, 1.0f, 1);
 			return 0;
 		}
 		if (!lua_istable(L, 2)) {
@@ -2680,43 +2754,43 @@ int LuaOpenGL::MultiTexCoord(lua_State* L)
 		const float x = lua_tofloat(L, -1);
 		lua_rawgeti(L, 2, 2);
 		if (!lua_isnumber(L, -1)) {
-			glMultiTexCoord1f(texUnit, x);
+			LuaMultiTexCoordN(texUnit, x, 0.0f, 0.0f, 1.0f, 1);
 			return 0;
 		}
 		const float y = lua_tofloat(L, -1);
 		lua_rawgeti(L, 2, 3);
 		if (!lua_isnumber(L, -1)) {
-			glMultiTexCoord2f(texUnit, x, y);
+			LuaMultiTexCoordN(texUnit, x, y, 0.0f, 1.0f, 2);
 			return 0;
 		}
 		const float z = lua_tofloat(L, -1);
 		lua_rawgeti(L, 2, 4);
 		if (!lua_isnumber(L, -1)) {
-			glMultiTexCoord3f(texUnit, x, y, z);
+			LuaMultiTexCoordN(texUnit, x, y, z, 1.0f, 3);
 			return 0;
 		}
 		const float w = lua_tofloat(L, -1);
-		glMultiTexCoord4f(texUnit, x, y, z, w);
+		LuaMultiTexCoordN(texUnit, x, y, z, w, 4);
 		return 0;
 	}
 
 	if (args == 2) {
 		const float x = luaL_checkfloat(L, 2);
 		const float y = luaL_checkfloat(L, 3);
-		glMultiTexCoord2f(texUnit, x, y);
+		LuaMultiTexCoordN(texUnit, x, y, 0.0f, 1.0f, 2);
 	}
 	else if (args == 3) {
 		const float x = luaL_checkfloat(L, 2);
 		const float y = luaL_checkfloat(L, 3);
 		const float z = luaL_checkfloat(L, 4);
-		glMultiTexCoord3f(texUnit, x, y, z);
+		LuaMultiTexCoordN(texUnit, x, y, z, 1.0f, 3);
 	}
 	else if (args == 4) {
 		const float x = luaL_checkfloat(L, 2);
 		const float y = luaL_checkfloat(L, 3);
 		const float z = luaL_checkfloat(L, 4);
 		const float w = luaL_checkfloat(L, 5);
-		glMultiTexCoord4f(texUnit, x, y, z, w);
+		LuaMultiTexCoordN(texUnit, x, y, z, w, 4);
 	}
 	else {
 		luaL_error(L, "Incorrect arguments to gl.MultiTexCoord()");
@@ -2875,11 +2949,11 @@ int LuaOpenGL::TexRect(lua_State* L)
 			t1 = 0.0f;
 			t2 = 1.0f;
 		}
-		glBegin(GL_QUADS); {
-			glTexCoord2f(s1, t1); glVertex2f(x1, y1);
-			glTexCoord2f(s2, t1); glVertex2f(x2, y1);
-			glTexCoord2f(s2, t2); glVertex2f(x2, y2);
-			glTexCoord2f(s1, t2); glVertex2f(x1, y2);
+		glBeginBatch(GL_QUADS); {
+			LuaTexCoordN(s1, t1, 0.0f, 1.0f, 2); LuaVertexN(x1, y1, 0.0f, 1.0f, 2);
+			LuaTexCoordN(s2, t1, 0.0f, 1.0f, 2); LuaVertexN(x2, y1, 0.0f, 1.0f, 2);
+			LuaTexCoordN(s2, t2, 0.0f, 1.0f, 2); LuaVertexN(x2, y2, 0.0f, 1.0f, 2);
+			LuaTexCoordN(s1, t2, 0.0f, 1.0f, 2); LuaVertexN(x1, y2, 0.0f, 1.0f, 2);
 		}
 		glEnd();
 		return 0;
@@ -2889,11 +2963,11 @@ int LuaOpenGL::TexRect(lua_State* L)
 	const float t1 = luaL_checkfloat(L, 6);
 	const float s2 = luaL_checkfloat(L, 7);
 	const float t2 = luaL_checkfloat(L, 8);
-	glBegin(GL_QUADS); {
-		glTexCoord2f(s1, t1); glVertex2f(x1, y1);
-		glTexCoord2f(s2, t1); glVertex2f(x2, y1);
-		glTexCoord2f(s2, t2); glVertex2f(x2, y2);
-		glTexCoord2f(s1, t2); glVertex2f(x1, y2);
+	glBeginBatch(GL_QUADS); {
+		LuaTexCoordN(s1, t1, 0.0f, 1.0f, 2); LuaVertexN(x1, y1, 0.0f, 1.0f, 2);
+		LuaTexCoordN(s2, t1, 0.0f, 1.0f, 2); LuaVertexN(x2, y1, 0.0f, 1.0f, 2);
+		LuaTexCoordN(s2, t2, 0.0f, 1.0f, 2); LuaVertexN(x2, y2, 0.0f, 1.0f, 2);
+		LuaTexCoordN(s1, t2, 0.0f, 1.0f, 2); LuaVertexN(x1, y2, 0.0f, 1.0f, 2);
 	}
 	glEnd();
 
@@ -6135,6 +6209,46 @@ int LuaOpenGL::CreateList(lua_State* L)
 			"Incorrect arguments to gl.CreateList(func [, arg1, arg2, etc ...])");
 	}
 
+	// Where the driver mis-renders immediate-mode batches, do not compile at
+	// all. glFlush is executed during compilation and is never recorded into
+	// the list, so glBeginBatch cannot help a batch that is baked into one, and
+	// neither can any flush at replay time. Keep the function instead and run it
+	// live on every gl.CallList, which is the path the mitigation does reach.
+	if (!globalRendering->supportImmediateModeBatching) {
+		CLuaDisplayLists& displayLists = CLuaHandle::GetActiveDisplayLists(L);
+
+		// A deferred list holds a Lua closure and its upvalues, not a GL name.
+		// A gl.CreateList reached from inside another list's recording function
+		// therefore allocates once per frame forever and retains everything the
+		// closure captured. Unguarded, that took a machine to 54 GB and froze it.
+		// Refuse rather than grow without bound.
+		static constexpr unsigned int MAX_DEFERRED_LISTS = 8192;
+
+		if (displayLists.GetInUseCount() >= MAX_DEFERRED_LISTS) {
+			static bool loggedCap = false;
+			if (!loggedCap) {
+				loggedCap = true;
+				LOG_L(L_ERROR, "gl.CreateList: refusing to create more than %u lists. "
+					"Something is creating lists every frame without deleting them.",
+					MAX_DEFERRED_LISTS);
+			}
+			lua_pushnumber(L, 0);
+			return 1;
+		}
+
+		lua_createtable(L, args, 0);
+		for (int i = 1; i <= args; i++) {
+			lua_pushvalue(L, i);
+			lua_rawseti(L, -2, i);
+		}
+
+		const int funcRef = luaL_ref(L, LUA_REGISTRYINDEX);
+		const unsigned int index = displayLists.NewDeferredDList(funcRef);
+
+		lua_pushnumber(L, index);
+		return 1;
+	}
+
 	// generate the list id
 	const GLuint list = glGenLists(1);
 	if (list == 0) {
@@ -6182,7 +6296,36 @@ int LuaOpenGL::CallList(lua_State* L)
 	CheckDrawingEnabled(L, __func__);
 	CondWarnDeprecatedGL(L, __func__);
 	const unsigned int listIndex = luaL_checkint(L, 1);
-	const CLuaDisplayLists& displayLists = CLuaHandle::GetActiveDisplayLists(L);
+	CLuaDisplayLists& displayLists = CLuaHandle::GetActiveDisplayLists(L);
+
+	// a deferred list holds its recording function rather than a GL list, and
+	// is replayed by running it. Its own matrix calls execute live, so there is
+	// no captured matrix state to reapply.
+	if (const int funcRef = displayLists.GetFuncRef(listIndex); funcRef != 0) {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, funcRef);
+
+		const int tableIdx = lua_gettop(L);
+		const int numVals = lua_objlen(L, tableIdx);
+
+		for (int i = 1; i <= numVals; i++)
+			lua_rawgeti(L, tableIdx, i);
+
+		const int error = lua_pcall(L, numVals - 1, 0, 0);
+		lua_remove(L, tableIdx);
+
+		if (error != 0) {
+			// drop the list rather than repeat the error every frame. A list
+			// whose function fails at compile time is discarded the same way.
+			LOG_L(L_ERROR, "gl.CallList: error(%i) = %s", error, lua_tostring(L, -1));
+			lua_pop(L, 1);
+
+			displayLists.FreeDList(listIndex);
+			luaL_unref(L, LUA_REGISTRYINDEX, funcRef);
+		}
+
+		return 0;
+	}
+
 	const unsigned int dlist = displayLists.GetDList(listIndex);
 	if (dlist) {
 		SMatrixStateData matrixStateData = displayLists.GetMatrixState(listIndex);
@@ -6210,9 +6353,13 @@ int LuaOpenGL::DeleteList(lua_State* L)
 	const unsigned int listIndex = (unsigned int)luaL_checkint(L, 1);
 	CLuaDisplayLists& displayLists = CLuaHandle::GetActiveDisplayLists(L);
 	const unsigned int dlist = displayLists.GetDList(listIndex);
+	const int funcRef = displayLists.GetFuncRef(listIndex);
 	displayLists.FreeDList(listIndex);
 	if (dlist != 0) {
 		glDeleteLists(dlist, 1);
+	}
+	if (funcRef != 0) {
+		luaL_unref(L, LUA_REGISTRYINDEX, funcRef);
 	}
 	return 0;
 }

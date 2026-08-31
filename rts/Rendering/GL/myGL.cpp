@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include <array>
+#include <cstdlib>
 #include <vector>
 #include <string>
 #include <bit>
@@ -544,6 +545,33 @@ bool glSpringBlitImages(
 }
 
 /******************************************************************************/
+
+void glBeginBatch(GLenum mode)
+{
+	// Where the driver does not batch immediate mode correctly, separate every
+	// batch with a flush. Two consecutive batches otherwise merge, and the second
+	// primitive is drawn joined to the first: a LINE_LOOP per map marker comes out
+	// with a line running between two of the markers.
+	//
+	// This is not the same defect as varying vertex arity, and the uniform arity
+	// in LuaOpenGL does not cover it. Measured interleaved in one run against two
+	// thousand identical LINE_LOOP batches a frame, with arity on throughout:
+	//
+	//     no flush            stray in 31 of 31 frames, median 28 stray pixels
+	//     attribute set only  stray in 27 of 29 frames, median 42
+	//     flush               stray in  0 of 30 frames, median  0
+	//
+	// It costs about 7.5% of the frame, measured on SplinterFaction. That is worth
+	// paying: the artefact is visible in ordinary play, and games that stopped
+	// being updated years ago cannot be asked to stop using immediate mode. Better
+	// still is LuaOpenGL not using glBegin at all, which would retire this along
+	// with the arity fix and the attribute set.
+	//
+	if (!globalRendering->supportImmediateModeBatching)
+		glFlush();
+
+	glBegin(mode);
+}
 
 void ClearScreen()
 {

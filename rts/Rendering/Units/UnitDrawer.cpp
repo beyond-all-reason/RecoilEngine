@@ -1108,9 +1108,13 @@ void CUnitDrawerGLSL::DrawModelWireBuildStageShadow(const CUnit* unit, const dou
 		glPopMatrix();
 	}
 
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	DrawUnitModel(unit, noLuaCall);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	// a driver without a wireframe fill mode would draw the model solid, which
+	// reads as a finished unit rather than a nanoframe
+	if (globalRendering->supportPolygonModeLine) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		DrawUnitModel(unit, noLuaCall);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
 
 	if (globalRendering->amdHacks) {
 		glEnable(GL_CLIP_PLANE0);
@@ -1210,9 +1214,13 @@ void CUnitDrawerGLSL::DrawModelWireBuildStageOpaque(const CUnit* unit, const dou
 		glClipPlane(GL_CLIP_PLANE1, lowerPlane);
 	}
 
-	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	DrawUnitModel(unit, noLuaCall);
-	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	// a driver without a wireframe fill mode would draw the model solid, which
+	// reads as a finished unit rather than a nanoframe
+	if (globalRendering->supportPolygonModeLine) {
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		DrawUnitModel(unit, noLuaCall);
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	}
 
 	if (globalRendering->amdHacks) {
 		glEnable(GL_CLIP_PLANE0);
@@ -2001,9 +2009,15 @@ void CUnitDrawerGL4::DrawUnitModelBeingBuiltShadow(const CUnit* unit, bool noLua
 		SetClipPlane(0, upperPlanes[BUILDSTAGE_WIRE]);
 		SetClipPlane(1, lowerPlanes[BUILDSTAGE_WIRE]);
 
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		smv.SubmitImmediately(unit, GL_TRIANGLES);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		// a driver without a wireframe fill mode would draw the model solid, so
+		// fall back to drawing its index list as lines
+		if (globalRendering->supportPolygonModeLine) {
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			smv.SubmitImmediately(unit, GL_TRIANGLES);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		} else {
+			smv.SubmitImmediately(unit, GL_LINES);
+		}
 	}
 
 	if (stageBounds.z > 1.0f / 3.0f) {
@@ -2076,9 +2090,15 @@ void CUnitDrawerGL4::DrawUnitModelBeingBuiltOpaque(const CUnit* unit, bool noLua
 		modelDrawerState->SetClipPlane(0, upperPlanes[BUILDSTAGE_WIRE]);
 		modelDrawerState->SetClipPlane(1, lowerPlanes[BUILDSTAGE_WIRE]);
 
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		smv.SubmitImmediately(unit, GL_TRIANGLES);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		// a driver without a wireframe fill mode would draw the model solid, so
+		// fall back to drawing its index list as lines
+		if (globalRendering->supportPolygonModeLine) {
+			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			smv.SubmitImmediately(unit, GL_TRIANGLES);
+			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		} else {
+			smv.SubmitImmediately(unit, GL_LINES);
+		}
 	}
 
 	if (stageBounds.z > 1.0f / 3.0f) {

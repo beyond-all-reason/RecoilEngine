@@ -16,6 +16,7 @@
 #include "Map/MapInfo.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/GL/FramePhaseDump.h"
 #include "Rendering/Textures/NamedTextures.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Path/IPathManager.h"
@@ -311,8 +312,11 @@ bool CLoadScreen::Draw()
 	if (luaIntro != nullptr) {
 		luaIntro->Update();
 		luaIntro->DrawGenesis();
+		DumpFramePhase("L1-genesis", 20);
 		ClearScreen();
+		DumpFramePhase("L2-cleared", 20);
 		luaIntro->DrawLoadScreen();
+		DumpFramePhase("L3-loadscreen", 20);
 	}
 
 	if (!mtLoading)

@@ -1,0 +1,29 @@
+[game]
+{
+[player0]
+{
+team=0;
+spectator=0;
+name=probe;
+}
+[team0]
+{
+allyteam=0;
+teamleader=0;
+rgbcolor=1 0 0;
+handicap=0;
+}
+[allyteam0]
+{
+numallies=0;
+}
+ishost=1;
+numallyteams=1;
+numusers=1;
+numteams=1;
+startpostype=0;
+gametype=Empty Mod;
+mapname=AcidicQuarry 5.17;
+myplayername=probe;
+numplayers=1;
+}

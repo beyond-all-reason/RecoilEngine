@@ -58,6 +58,7 @@ public:
 	uint64_t CalcGLDeltaTime(uint32_t queryIdx0, uint32_t queryIdx1) const;
 
 	void MakeCurrentContext(bool clear) const;
+	bool HasGLContext() const;
 
 	void CheckGLExtensions();
 	void SetGLSupportFlags();
@@ -92,6 +93,12 @@ public:
 	void UpdatePixelGeometry();
 	void ReadWindowPosAndSize();
 	void SaveWindowPosAndSize();
+
+	/// takes a position or a motion from the points SDL speaks in to the pixels the engine draws in
+	int2 PointToPixel(const int2 p) const;
+	/// the inverse, for handing a position back to SDL
+	int2 PixelToPoint(const int2 p) const;
+
 	void UpdateGLConfigs();
 	void UpdateGLGeometry();
 	void UpdateScreenMatrices();
@@ -117,6 +124,8 @@ public:
 	void ToggleMultisampling() const;
 
 	bool CheckShaderGL4() const;
+	bool ProbePolygonModeLine() const;
+	bool ProbeImmediateModeBatching() const;
 public:
 	//helper function
 	static int DepthBitsToFormat(int bits);
@@ -168,6 +177,16 @@ public:
 	/// the window size in pixels
 	int winSizeX;
 	int winSizeY;
+
+	/**
+	 * @brief backing pixels per window point
+	 *
+	 * 1 everywhere except a macOS window on a Retina display, where the
+	 * framebuffer is the Metal layer's drawable and the window SDL reports,
+	 * and reports mouse input in, is half its size.
+	 */
+	float pixelsPerPointX;
+	float pixelsPerPointY;
 
 	/// the viewport position relative to the window's top-left corner
 	int viewPosX;
@@ -329,6 +348,29 @@ public:
 	bool supportClipSpaceControl;
 	bool supportSeamlessCubeMaps;
 	bool supportFragDepthLayout;
+
+	/**
+	 * @brief whether glPolygonMode(*, GL_LINE) actually rasterizes outlines
+	 *
+	 * No GL query reports this. Drivers layered over an API without a wireframe
+	 * fill mode (Zink on Metal) silently rasterize filled polygons instead, so
+	 * it is measured by ProbePolygonModeLine().
+	 */
+	bool supportPolygonModeLine;
+
+	/**
+	 * @brief whether consecutive glBegin/glEnd batches render correctly
+	 *
+	 * Mesa accumulates immediate-mode batches into one buffer and issues them
+	 * together. Zink on KosmicKrisp renders the result wrongly once more than
+	 * one batch is in that buffer and a later batch widens its vertex format
+	 * part way through, which is what gl.Shape and gl.BeginEnd produce. No GL
+	 * query reports it and no GL error is raised, so it is measured by
+	 * ProbeImmediateModeBatching().
+	 *
+	 * When false, glBeginBatch() submits the pending work before each batch.
+	 */
+	bool supportImmediateModeBatching;
 
 	/**
 	 * Shader capabilities

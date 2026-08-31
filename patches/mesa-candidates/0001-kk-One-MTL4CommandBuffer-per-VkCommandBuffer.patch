@@ -1,0 +1,1025 @@
+From a0c05f0da7f6e0e7f1ea8882c04c315e42d7944b Mon Sep 17 00:00:00 2001
+From: Aitor Camacho <aitor@lunarg.com>
+Date: Wed, 12 Aug 2026 16:33:16 +0900
+Subject: [PATCH] kk: One MTL4CommandBuffer per VkCommandBuffer
+
+Origin:      https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/43697
+             branch kk-encoding-rework, upstream commit a0c05f0da7f
+Author:      Aitor Camacho <aitor@lunarg.com>, not ours. Do not re-author.
+Status:      candidate, NOT APPLIED
+Applies-to:  mesa 73a03c611018d842bf3da0b5c3084a5f949540e8 (its own merge base)
+             Does NOT apply to our pin 56588ef0665: that predates Metal 4
+             encoding, so there is nothing here to fix.
+Expires:     when the MR merges upstream, or is abandoned
+Evidence:    fixes issue 15998. Control 73a03c61101 dies at the 20 GiB ceiling
+             in 43s. With this, engine peak holds flat at 11-12 GiB for 120s.
+             coding-agents/MACOS_PERFORMANCE.md, "Mesa pin and issue 15998"
+Note:        staged so the leak fix does not depend on an unmerged MR branch
+             surviving on GitLab. Needed only when the pin moves past Metal 4.
+
+Removes pre and post graphics approach with a streamlined command buffer.
+The downside is that unroll, tessellation and any compute work required
+mid render will split the render pass. Writes are correctly pushed to the
+render pass end. Long term, we need to move unroll and tessellation to
+mesh shader, and indirect draw count to a vertex dispatch that encodes
+the ICB for the draw. This change also allows for simplification of
+synchronization to allow overlap.
+
+We don't need to call reset on the allocators since command buffers will
+return the allocator memory on completion
+
+Signed-off-by: Aitor Camacho <aitor@lunarg.com>
+---
+ src/kosmickrisp/vulkan/kk_cmd_buffer.c   | 245 ++++++++++-------------
+ src/kosmickrisp/vulkan/kk_cmd_buffer.h   |  29 +--
+ src/kosmickrisp/vulkan/kk_cmd_copy.c     |  10 +-
+ src/kosmickrisp/vulkan/kk_cmd_dispatch.c |   6 +-
+ src/kosmickrisp/vulkan/kk_cmd_draw.c     |  10 +-
+ src/kosmickrisp/vulkan/kk_cmd_meta.c     |   4 +-
+ src/kosmickrisp/vulkan/kk_cmd_pool.c     |  81 ++++++++
+ src/kosmickrisp/vulkan/kk_cmd_pool.h     |  14 ++
+ src/kosmickrisp/vulkan/kk_query_pool.c   |  66 +++---
+ src/kosmickrisp/vulkan/kk_queue.c        |  14 +-
+ 10 files changed, 260 insertions(+), 219 deletions(-)
+
+diff --git a/src/kosmickrisp/vulkan/kk_cmd_buffer.c b/src/kosmickrisp/vulkan/kk_cmd_buffer.c
+index f6b59ab31b7..950ebd14326 100644
+--- a/src/kosmickrisp/vulkan/kk_cmd_buffer.c
++++ b/src/kosmickrisp/vulkan/kk_cmd_buffer.c
+@@ -44,29 +44,26 @@ kk_cmd_release_resources(struct kk_device *dev, struct kk_cmd_buffer *cmd)
+ 
+    kk_cmd_pool_free_bo_list(pool, &cmd->uploader.bos);
+ 
+-   /* Release all command buffers used */
+-   util_dynarray_foreach(&cmd->submit_cmd_bufs, mtl_command_buffer *, cmd_buf) {
+-      mtl_release(*cmd_buf);
+-   }
+-   util_dynarray_clear(&cmd->submit_cmd_bufs);
+-
+    /* Release all BOs used as descriptor buffers for submissions */
+    util_dynarray_foreach(&cmd->large_bos, struct kk_bo *, bo) {
+       kk_destroy_bo(dev, *bo);
+    }
+    util_dynarray_clear(&cmd->large_bos);
++   util_dynarray_clear(&cmd->post_render_writes);
++   util_dynarray_clear(&cmd->ts_resolves);
+ }
+ 
++/* Ends Metal command buffer recording and returns allocator to pool for reuse */
+ static void
+-kk_destroy_encoder_state(struct kk_encoder_state *es)
++end_recording(struct kk_cmd_buffer *cmd)
+ {
+-   assert(es->encoder == NULL);
+-   assert(es->cmd_buf == NULL);
++   if (cmd->vk.state != MESA_VK_COMMAND_BUFFER_STATE_RECORDING)
++      return;
+ 
+-   mtl_release(es->allocator);
+-   es->allocator = NULL;
+-
+-   util_dynarray_fini(&es->ts_resolves);
++   cs_end(cmd);
++   mtl_end_command_buffer(cmd->metal.cmd_buf);
++   kk_cmd_pool_return_allocator(kk_cmd_buffer_pool(cmd), cmd->metal.allocator);
++   cmd->metal.allocator = NULL;
+ }
+ 
+ static void
+@@ -79,29 +76,23 @@ kk_destroy_cmd_buffer(struct vk_command_buffer *vk_cmd_buffer)
+    if (cmd->drawable)
+       mtl_release(cmd->drawable);
+ 
++   /* Ensure closed command buffer for safe returns to pool */
++   end_recording(cmd);
++   if (cmd->metal.cmd_buf)
++      kk_cmd_pool_return_cmd_buf(pool, cmd->metal.cmd_buf);
++   cmd->metal.cmd_buf = NULL;
++
+    mtl_release(cmd->argument_table);
+-   kk_destroy_encoder_state(&cmd->cmp[0]);
+-   kk_destroy_encoder_state(&cmd->cmp[1]);
+-   kk_destroy_encoder_state(&cmd->gfx);
+ 
+    vk_command_buffer_finish(&cmd->vk);
+    struct kk_device *dev = kk_cmd_buffer_device(cmd);
+ 
+    kk_cmd_release_resources(dev, cmd);
+-   util_dynarray_fini(&cmd->submit_cmd_bufs);
+    util_dynarray_fini(&cmd->large_bos);
+ 
+    vk_free(&pool->vk.alloc, cmd);
+ }
+ 
+-static bool
+-kk_init_encoder_state(struct kk_encoder_state *es, mtl_device *handle)
+-{
+-   es->allocator = mtl_new_command_allocator(handle);
+-   es->ts_resolves = UTIL_DYNARRAY_INIT;
+-   return es->allocator != NULL;
+-}
+-
+ static VkResult
+ kk_create_cmd_buffer(struct vk_command_pool *vk_pool,
+                      VkCommandBufferLevel level,
+@@ -127,16 +118,8 @@ kk_create_cmd_buffer(struct vk_command_pool *vk_pool,
+    if (result != VK_SUCCESS)
+       goto alloc_fail;
+ 
+-   cmd->pre_gfx = &cmd->cmp[0];
+-   cmd->post_gfx = &cmd->cmp[1];
+-   if (!kk_init_encoder_state(cmd->pre_gfx, dev->mtl_handle))
+-      goto pre_gfx_allocator_fail;
+-
+-   if (!kk_init_encoder_state(&cmd->gfx, dev->mtl_handle))
+-      goto gfx_allocator_fail;
+-
+-   if (!kk_init_encoder_state(cmd->post_gfx, dev->mtl_handle))
+-      goto post_gfx_allocator_fail;
++   cmd->ts_resolves = UTIL_DYNARRAY_INIT;
++   cmd->post_render_writes = UTIL_DYNARRAY_INIT;
+ 
+    {
+       mtl_argument_table_descriptor *desc = mtl_new_argument_table_descriptor();
+@@ -147,7 +130,6 @@ kk_create_cmd_buffer(struct vk_command_pool *vk_pool,
+       mtl_release(desc);
+    }
+ 
+-   cmd->submit_cmd_bufs = UTIL_DYNARRAY_INIT;
+    cmd->large_bos = UTIL_DYNARRAY_INIT;
+ 
+    cmd->vk.dynamic_graphics_state.vi = &cmd->state.gfx._dynamic_vi;
+@@ -160,39 +142,20 @@ kk_create_cmd_buffer(struct vk_command_pool *vk_pool,
+ 
+    return VK_SUCCESS;
+ 
+-post_gfx_allocator_fail:
+-   kk_destroy_encoder_state(&cmd->gfx);
+-gfx_allocator_fail:
+-   kk_destroy_encoder_state(cmd->pre_gfx);
+-pre_gfx_allocator_fail:
+-   vk_command_buffer_finish(&cmd->vk);
+-   result = VK_ERROR_OUT_OF_DEVICE_MEMORY;
+ alloc_fail:
+    vk_free(&pool->vk.alloc, cmd);
+    return result;
+ }
+ 
+ static void
+-kk_reset_encoder_state(struct kk_encoder_state *es)
+-{
+-   mtl_command_allocator_reset(es->allocator);
+-}
+-
+-void
+ kk_reset_cmd_buffer_internal(struct kk_cmd_buffer *cmd)
+ {
+    struct kk_device *dev = kk_cmd_buffer_device(cmd);
+ 
+-   /* If the command buffer was not ended, we may have lingering encoders.
+-    * Call twice since post_gfx will be moved to pre_gfx but not ended. */
+-   cs_end(cmd);
+-   cs_end(cmd);
++   /* Ensure closed command buffer so we can start it again */
++   end_recording(cmd);
+    kk_cmd_release_resources(dev, cmd);
+ 
+-   kk_reset_encoder_state(cmd->pre_gfx);
+-   kk_reset_encoder_state(&cmd->gfx);
+-   kk_reset_encoder_state(cmd->post_gfx);
+-
+    cmd->uploader.bo = NULL;
+    cmd->uploader.offset = 0;
+ 
+@@ -207,8 +170,8 @@ kk_reset_cmd_buffer(struct vk_command_buffer *vk_cmd_buffer,
+    struct kk_cmd_buffer *cmd =
+       container_of(vk_cmd_buffer, struct kk_cmd_buffer, vk);
+ 
+-   vk_command_buffer_reset(&cmd->vk);
+    kk_reset_cmd_buffer_internal(cmd);
++   vk_command_buffer_reset(&cmd->vk);
+    cmd->submitted = false;
+    cmd->one_time_submit = false;
+ }
+@@ -224,12 +187,21 @@ kk_BeginCommandBuffer(VkCommandBuffer commandBuffer,
+                       const VkCommandBufferBeginInfo *pBeginInfo)
+ {
+    VK_FROM_HANDLE(kk_cmd_buffer, cmd, commandBuffer);
++   struct kk_cmd_pool *pool = kk_cmd_buffer_pool(cmd);
+ 
+    kk_reset_cmd_buffer(&cmd->vk, 0u);
+    vk_command_buffer_begin(&cmd->vk, pBeginInfo);
+    cmd->one_time_submit =
+       pBeginInfo->flags & VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+ 
++   /* If this is the first time starting the command buffer allocate Metal
++    * resources */
++   if (cmd->metal.cmd_buf == NULL)
++      cmd->metal.cmd_buf = kk_cmd_pool_get_cmd_buf(pool);
++   if (cmd->metal.allocator == NULL)
++      cmd->metal.allocator = kk_cmd_pool_get_allocator(pool);
++   mtl_begin_command_buffer(cmd->metal.cmd_buf, cmd->metal.allocator);
++
+    return VK_SUCCESS;
+ }
+ 
+@@ -238,9 +210,7 @@ kk_EndCommandBuffer(VkCommandBuffer commandBuffer)
+ {
+    VK_FROM_HANDLE(kk_cmd_buffer, cmd, commandBuffer);
+ 
+-   /* Call twice since post_gfx will be moved to pre_gfx but not ended. */
+-   cs_end(cmd);
+-   cs_end(cmd);
++   end_recording(cmd);
+ 
+    return vk_command_buffer_end(&cmd->vk);
+ }
+@@ -260,15 +230,15 @@ kk_can_ignore_barrier(VkAccessFlags2 access, VkPipelineStageFlags2 stage)
+ void
+ cs_start_render(struct kk_cmd_buffer *cmd)
+ {
+-   struct kk_device *dev = kk_cmd_buffer_device(cmd);
+    struct kk_graphics_state *state = &cmd->state.gfx;
+    uint32_t view_mask = state->render.view_mask;
+    assert(state->render_pass_descriptor);
+ 
+-   cmd->gfx.cmd_buf = mtl_new_command_buffer(dev->mtl_handle);
+-   mtl_begin_command_buffer(cmd->gfx.cmd_buf, cmd->gfx.allocator);
+-   cmd->gfx.encoder = mtl_new_render_command_encoder_with_descriptor(
+-      cmd->gfx.cmd_buf, state->render_pass_descriptor);
++   /* Ensure no other active encoder, aka compute */
++   cs_end(cmd);
++
++   cmd->metal.render = mtl_new_render_command_encoder_with_descriptor(
++      cmd->metal.cmd_buf, state->render_pass_descriptor);
+ 
+    uint32_t layer_ids[KK_MAX_MULTIVIEW_VIEW_COUNT] = {};
+    uint32_t count = 0u;
+@@ -277,11 +247,11 @@ cs_start_render(struct kk_cmd_buffer *cmd)
+    if (view_mask == 0u) {
+       layer_ids[count++] = 0;
+    }
+-   mtl_set_vertex_amplification_count(cmd->gfx.encoder, layer_ids, count);
++   mtl_set_vertex_amplification_count(cmd->metal.render, layer_ids, count);
+ 
+    /* Argument table won't ever change */
+    mtl_render_set_argument_table(
+-      cmd->gfx.encoder, cmd->argument_table,
++      cmd->metal.render, cmd->argument_table,
+       MTL_RENDER_STAGE_VERTEX | MTL_RENDER_STAGE_FRAGMENT);
+ 
+    kk_cmd_buffer_dirty_all_gfx(cmd);
+@@ -300,65 +270,62 @@ cs_get_render(struct kk_cmd_buffer *cmd)
+       cs_start_render(cmd);
+    }
+ 
+-   return cmd->gfx.encoder;
+-}
+-
+-static void
+-kk_start_compute_encoder(struct kk_encoder_state *es, mtl_device *handle,
+-                         mtl_argument_table *argument_table)
+-{
+-   es->cmd_buf = mtl_new_command_buffer(handle);
+-   mtl_begin_command_buffer(es->cmd_buf, es->allocator);
+-   es->encoder = mtl_new_compute_command_encoder(es->cmd_buf);
+-
+-   /* Argument table won't ever change */
+-   mtl_compute_set_argument_table(es->encoder, argument_table);
++   return cmd->metal.render;
+ }
+ 
+ mtl_compute_encoder *
+-cs_get_compute(struct kk_cmd_buffer *cmd, bool pre_gfx)
++cs_get_compute(struct kk_cmd_buffer *cmd)
+ {
+-   struct kk_device *dev = kk_cmd_buffer_device(cmd);
+-   mtl_compute_encoder *encoder;
+-   /* If we are not inside a render, we can just take pre_gfx. */
+-   if (!cmd->gfx.encoder || pre_gfx) {
+-      if (!cmd->pre_gfx->encoder) {
+-         kk_start_compute_encoder(cmd->pre_gfx, dev->mtl_handle,
+-                                  cmd->argument_table);
+-      }
+-      encoder = cmd->pre_gfx->encoder;
+-   } else {
+-      if (!cmd->post_gfx->encoder) {
+-         kk_start_compute_encoder(cmd->post_gfx, dev->mtl_handle,
+-                                  cmd->argument_table);
+-      }
+-      encoder = cmd->post_gfx->encoder;
++   /* If we are inside render, we need to force a restart later */
++   if (cmd->metal.render) {
++      kk_apply_attachment_store_ops(cmd, true);
++      cs_end(cmd);
++      kk_cmd_buffer_dirty_all_gfx(cmd);
++      cmd->state.gfx.need_to_start_render_pass = true;
+    }
+ 
+-   return encoder;
++   if (cmd->metal.compute == NULL) {
++      cmd->metal.compute = mtl_new_compute_command_encoder(cmd->metal.cmd_buf);
++      mtl_compute_set_argument_table(cmd->metal.compute, cmd->argument_table);
++   }
++
++   return cmd->metal.compute;
+ }
+ 
+ static void
+-kk_stop_encoder(struct kk_cmd_buffer *cmd, struct kk_encoder_state *es)
++end_encoder(struct kk_cmd_buffer *cmd, mtl_command_encoder *encoder)
+ {
+    /* TODO_KOSMICKRISP This is probably overkill */
+-   mtl_barrier_after_stages(es->encoder, MTL_STAGE_ALL, MTL_STAGE_ALL);
+-   mtl_end_encoding(es->encoder);
+-   mtl_release(es->encoder);
+-   es->encoder = NULL;
++   mtl_barrier_after_stages(encoder, MTL_STAGE_ALL, MTL_STAGE_ALL);
++   mtl_end_encoding(encoder);
++   mtl_release(encoder);
+ 
+    /* Fold the pending timestamp counter-heap resolves into `cmd_buf` */
+-   util_dynarray_foreach(&es->ts_resolves, struct kk_ts_resolve, r) {
+-      mtl_command_resolve_counter_heap(es->cmd_buf, r->heap, r->index, 1u,
+-                                       r->dst_addr);
++   util_dynarray_foreach(&cmd->ts_resolves, struct kk_ts_resolve, r) {
++      mtl_command_resolve_counter_heap(cmd->metal.cmd_buf, r->heap, r->index,
++                                       1u, r->dst_addr);
+    }
+ 
+-   util_dynarray_clear(&es->ts_resolves);
++   util_dynarray_clear(&cmd->ts_resolves);
++}
+ 
+-   mtl_end_command_buffer(es->cmd_buf);
++static void
++flush_post_render_writes(struct kk_cmd_buffer *cmd)
++{
++   assert(cmd->metal.render == NULL);
+ 
+-   util_dynarray_append(&cmd->submit_cmd_bufs, es->cmd_buf);
+-   es->cmd_buf = NULL;
++   if (!util_dynarray_num_elements(&cmd->post_render_writes,
++                                   struct libkk_imm_write))
++      return;
++
++   /* This calls create a compute encoder, close it at the end */
++   util_dynarray_foreach(&cmd->post_render_writes, struct libkk_imm_write, w) {
++      libkk_write_u32(cmd, kk_grid_1d(1), true, (uint64_t)w->address, w->value);
++   }
++
++   util_dynarray_clear(&cmd->post_render_writes);
++   end_encoder(cmd, cmd->metal.compute);
++   cmd->metal.compute = NULL;
+ }
+ 
+ void
+@@ -366,25 +333,13 @@ cs_end(struct kk_cmd_buffer *cmd)
+ {
+    assert(cmd);
+ 
+-   if (cmd->pre_gfx->encoder) {
+-      /* Submit pre_gfx now that its encoder is closed. Command buffers are
+-       * appended here (rather than at creation) so submit_cmd_bufs stays in
+-       * encode order: pre_gfx first, then gfx below. post_gfx is promoted into
+-       * the pre_gfx slot with its encoder still open, so it is submitted by a
+-       * later cs_end() and therefore always ends up after gfx. This is why
+-       * every flush site calls cs_end() twice. */
+-      kk_stop_encoder(cmd, cmd->pre_gfx);
+-
+-      SWAP(cmd->pre_gfx, cmd->post_gfx);
+-   } else if (cmd->post_gfx->encoder) {
+-      /* No pre_gfx, but a post_gfx exists (e.g. compute issued during a render
+-       * pass). Promote it so a later cs_end() closes and submits it after the
+-       * gfx command buffer appended below. */
+-      SWAP(cmd->pre_gfx, cmd->post_gfx);
+-   }
+-
+-   if (cmd->gfx.encoder) {
+-      kk_stop_encoder(cmd, &cmd->gfx);
++   if (cmd->metal.compute) {
++      end_encoder(cmd, cmd->metal.compute);
++      cmd->metal.compute = NULL;
++   } else if (cmd->metal.render) {
++      end_encoder(cmd, cmd->metal.render);
++      cmd->metal.render = NULL;
++      flush_post_render_writes(cmd);
+    }
+ }
+ 
+@@ -405,15 +360,15 @@ kk_CmdPipelineBarrier2(VkCommandBuffer commandBuffer,
+     * barrier. This requires to read directly from the framebuffer which
+     * requires not reading input attachments as textures.
+     */
+-   if (cmd->gfx.encoder) {
++   if (cmd->metal.render) {
+       kk_apply_attachment_store_ops(cmd, true);
+       cs_end(cmd);
+       cs_start_render(cmd);
+-   } else if (cmd->pre_gfx->encoder) {
++   } else if (cmd->metal.compute) {
+       /* We chain encoders, so an intra-encoder barrier is enough here:
+        * no need to tear down and recreate the encoder.
+        */
+-      mtl_barrier_after_encoder_stages(cmd->pre_gfx->encoder,
++      mtl_barrier_after_encoder_stages(cmd->metal.compute,
+                                        MTL_STAGE_DISPATCH | MTL_STAGE_BLIT,
+                                        MTL_STAGE_DISPATCH | MTL_STAGE_BLIT);
+    }
+@@ -738,7 +693,7 @@ kk_dispatch_precomp(struct kk_cmd_buffer *cmd, struct kk_grid grid,
+    struct kk_device *dev = kk_cmd_buffer_device(cmd);
+    struct kk_precompiled_shader *prog = &dev->precompiled_cache.shaders[idx];
+ 
+-   mtl_compute_encoder *encoder = cs_get_compute(cmd, pre_gfx);
++   mtl_compute_encoder *encoder = cs_get_compute(cmd);
+    mtl_barrier_after_encoder_stages(encoder, MTL_STAGE_DISPATCH,
+                                     MTL_STAGE_DISPATCH);
+ 
+@@ -763,16 +718,18 @@ kk_dispatch_precomp(struct kk_cmd_buffer *cmd, struct kk_grid grid,
+    mtl_barrier_after_encoder_stages(encoder, MTL_STAGE_DISPATCH,
+                                     MTL_STAGE_DISPATCH);
+ 
+-   /* Rebind the exiting root. */
++   /* Rebind the existing root. */
+    mtl_set_address(cmd->argument_table, cmd->state.root_addr, 0u);
+ }
+ 
+ void
+ kk_cmd_write(struct kk_cmd_buffer *cmd, struct libkk_imm_write write)
+ {
+-   /* If we are mid render, it must go to post_gfx */
+-   libkk_write_u32(cmd, kk_grid_1d(1), !cmd->gfx.encoder, write.address,
+-                   write.value);
++   /* If we are mid render, queue the write for when we are done */
++   if (cmd->metal.render)
++      util_dynarray_append(&cmd->post_render_writes, write);
++   else
++      libkk_write_u32(cmd, kk_grid_1d(1), true, write.address, write.value);
+ }
+ 
+ VKAPI_ATTR void VKAPI_CALL
+@@ -825,7 +782,7 @@ kk_CmdEndConditionalRenderingEXT(VkCommandBuffer commandBuffer)
+ void
+ kk_apply_attachment_store_ops(struct kk_cmd_buffer *cmd, bool force_store)
+ {
+-   if (!cmd->gfx.encoder)
++   if (!cmd->metal.render)
+       return;
+ 
+    struct kk_rendering_state *render = &cmd->state.gfx.render;
+@@ -884,7 +841,6 @@ kk_apply_attachment_store_ops(struct kk_cmd_buffer *cmd, bool force_store)
+ }
+ 
+ /* VK_AMD_buffer_marker */
+-
+ VKAPI_ATTR void VKAPI_CALL
+ kk_CmdWriteMarkerToMemoryAMD(VkCommandBuffer commandBuffer,
+                              const VkMemoryMarkerInfoAMD *pInfo)
+@@ -892,13 +848,14 @@ kk_CmdWriteMarkerToMemoryAMD(VkCommandBuffer commandBuffer,
+    VK_FROM_HANDLE(kk_cmd_buffer, cmd_buffer, commandBuffer);
+    struct libkk_imm_write write;
+ 
+-   /* If we are not in a render, we can just insert a cheap barrier */
+-   if (!cmd_buffer->gfx.encoder) {
+-      mtl_barrier_after_encoder_stages(cs_get_compute(cmd_buffer, true),
++   /* If we are inside a compute encoder, we can directly encode the write but
++    * we need the barrier. If we are mid render, we will queue it for when it is
++    * closed. */
++   if (cmd_buffer->metal.compute) {
++      mtl_barrier_after_encoder_stages(cmd_buffer->metal.compute,
+                                        MTL_STAGE_DISPATCH | MTL_STAGE_BLIT,
+                                        MTL_STAGE_DISPATCH | MTL_STAGE_BLIT);
+-   } else
+-      cs_end(cmd_buffer);
++   }
+ 
+    write.value = pInfo->marker;
+    write.address = pInfo->dstRange.address;
+diff --git a/src/kosmickrisp/vulkan/kk_cmd_buffer.h b/src/kosmickrisp/vulkan/kk_cmd_buffer.h
+index 61dc6054e22..e1e2fc86ed9 100644
+--- a/src/kosmickrisp/vulkan/kk_cmd_buffer.h
++++ b/src/kosmickrisp/vulkan/kk_cmd_buffer.h
+@@ -210,23 +210,19 @@ struct kk_ts_resolve {
+    uint64_t dst_addr;
+ };
+ 
+-struct kk_encoder_state {
+-   /* either a mtl_compute_encoder or a mtl_render_encoder */
+-   mtl_command_encoder *encoder;
+-   mtl_command_allocator *allocator;
+-   mtl_command_buffer *cmd_buf;
+-   /* Pending timestamp resolves (struct kk_ts_resolve), flushed at cs_end. */
+-   struct util_dynarray ts_resolves;
+-};
+-
+ struct kk_cmd_buffer {
+    struct vk_command_buffer vk;
+ 
+-   struct kk_encoder_state gfx;
+-   /* pre and post gfx encoder states swap after every gfx encoder is committed */
+-   struct kk_encoder_state cmp[2];
+-   struct kk_encoder_state *pre_gfx;
+-   struct kk_encoder_state *post_gfx;
++   struct {
++      mtl_command_allocator *allocator;
++      mtl_command_buffer *cmd_buf;
++      mtl_render_encoder *render;
++      mtl_compute_encoder *compute;
++   } metal;
++   /* Pending timestamp resolves (struct kk_ts_resolve), flushed at cs_end. */
++   struct util_dynarray ts_resolves;
++   /* Deferred writes due to being mid render encoder */
++   struct util_dynarray post_render_writes;
+ 
+    void *drawable;
+    mtl_argument_table *argument_table;
+@@ -245,8 +241,6 @@ struct kk_cmd_buffer {
+ 
+    struct kk_uploader uploader;
+ 
+-   struct util_dynarray submit_cmd_bufs;
+-
+    /* Owned large BOs */
+    struct util_dynarray large_bos;
+ 
+@@ -291,10 +285,9 @@ kk_get_descriptors_state(struct kk_cmd_buffer *cmd,
+    }
+ };
+ 
+-void kk_reset_cmd_buffer_internal(struct kk_cmd_buffer *cmd);
+ void cs_start_render(struct kk_cmd_buffer *cmd);
+ mtl_render_encoder *cs_get_render(struct kk_cmd_buffer *cmd);
+-mtl_compute_encoder *cs_get_compute(struct kk_cmd_buffer *cmd, bool pre_gfx);
++mtl_compute_encoder *cs_get_compute(struct kk_cmd_buffer *cmd);
+ void cs_end(struct kk_cmd_buffer *cmd);
+ void kk_cmd_bind_root_to_argument_table(struct kk_cmd_buffer *cmd,
+                                         uint64_t addr);
+diff --git a/src/kosmickrisp/vulkan/kk_cmd_copy.c b/src/kosmickrisp/vulkan/kk_cmd_copy.c
+index fd815bcf398..67bb33ffbd3 100644
+--- a/src/kosmickrisp/vulkan/kk_cmd_copy.c
++++ b/src/kosmickrisp/vulkan/kk_cmd_copy.c
+@@ -26,7 +26,7 @@ kk_CmdCopyBuffer2(VkCommandBuffer commandBuffer,
+    VK_FROM_HANDLE(kk_buffer, src, pCopyBufferInfo->srcBuffer);
+    VK_FROM_HANDLE(kk_buffer, dst, pCopyBufferInfo->dstBuffer);
+ 
+-   mtl_compute_encoder *encoder = cs_get_compute(cmd, true);
++   mtl_compute_encoder *encoder = cs_get_compute(cmd);
+    for (uint32_t i = 0; i < pCopyBufferInfo->regionCount; i++) {
+       const VkBufferCopy2 *region = &pCopyBufferInfo->pRegions[i];
+       mtl_copy_from_buffer_to_buffer(
+@@ -91,7 +91,7 @@ kk_CmdCopyBufferToImage2(VkCommandBuffer commandBuffer,
+    VK_FROM_HANDLE(kk_buffer, buffer, pCopyBufferToImageInfo->srcBuffer);
+    VK_FROM_HANDLE(kk_image, image, pCopyBufferToImageInfo->dstImage);
+ 
+-   mtl_compute_encoder *encoder = cs_get_compute(cmd, true);
++   mtl_compute_encoder *encoder = cs_get_compute(cmd);
+    for (int r = 0; r < pCopyBufferToImageInfo->regionCount; r++) {
+       const VkBufferImageCopy2 *region = &pCopyBufferToImageInfo->pRegions[r];
+       const uint8_t plane_index = kk_image_memory_aspects_to_plane(
+@@ -121,7 +121,7 @@ kk_CmdCopyImageToBuffer2(VkCommandBuffer commandBuffer,
+    VK_FROM_HANDLE(kk_image, image, pCopyImageToBufferInfo->srcImage);
+    VK_FROM_HANDLE(kk_buffer, buffer, pCopyImageToBufferInfo->dstBuffer);
+ 
+-   mtl_compute_encoder *encoder = cs_get_compute(cmd, true);
++   mtl_compute_encoder *encoder = cs_get_compute(cmd);
+    for (unsigned r = 0; r < pCopyImageToBufferInfo->regionCount; r++) {
+       const VkBufferImageCopy2 *region = &pCopyImageToBufferInfo->pRegions[r];
+       const uint8_t plane_index = kk_image_memory_aspects_to_plane(
+@@ -180,7 +180,7 @@ copy_through_buffer(struct kk_cmd_buffer *cmd, struct kk_image *src,
+    bool is_src_compressed = util_format_is_compressed(src_format);
+    bool is_dst_compressed = util_format_is_compressed(dst_format);
+ 
+-   mtl_compute_encoder *encoder = cs_get_compute(cmd, true);
++   mtl_compute_encoder *encoder = cs_get_compute(cmd);
+ 
+    const uint32_t buffer_stride_B =
+       util_format_get_stride(src_format, region->extent.width);
+@@ -297,7 +297,7 @@ static void
+ copy_image(struct kk_cmd_buffer *cmd, struct kk_image *src, uint32_t src_index,
+            struct kk_image *dst, uint32_t dst_index, const VkImageCopy2 *region)
+ {
+-   mtl_compute_encoder *encoder = cs_get_compute(cmd, true);
++   mtl_compute_encoder *encoder = cs_get_compute(cmd);
+    struct kk_image_plane *src_plane = &src->planes[src_index];
+    struct kk_image_plane *dst_plane = &dst->planes[dst_index];
+ 
+diff --git a/src/kosmickrisp/vulkan/kk_cmd_dispatch.c b/src/kosmickrisp/vulkan/kk_cmd_dispatch.c
+index 4bd81afa1db..4df22e7d188 100644
+--- a/src/kosmickrisp/vulkan/kk_cmd_dispatch.c
++++ b/src/kosmickrisp/vulkan/kk_cmd_dispatch.c
+@@ -20,7 +20,7 @@
+ static void
+ kk_flush_compute_state(struct kk_cmd_buffer *cmd)
+ {
+-   mtl_compute_encoder *encoder = cs_get_compute(cmd, true);
++   mtl_compute_encoder *encoder = cs_get_compute(cmd);
+ 
+    // Fill Metal argument buffer with descriptor set addresses
+    struct kk_descriptor_state *desc = &cmd->state.cs.descriptors;
+@@ -80,7 +80,7 @@ kk_CmdDispatchBase(VkCommandBuffer commandBuffer, uint32_t baseGroupX,
+    struct kk_shader *cs = cmd->state.shaders[MESA_SHADER_COMPUTE];
+    struct mtl_size local_size = cs->info.cs.local_size;
+ 
+-   mtl_compute_encoder *encoder = cs_get_compute(cmd, true);
++   mtl_compute_encoder *encoder = cs_get_compute(cmd);
+    if (cmd->state.cond_render.enabled) {
+       /* Convert to indirect for predication */
+       VkDispatchIndirectCommand indirect = {
+@@ -129,7 +129,7 @@ kk_CmdDispatchIndirect2KHR(VkCommandBuffer commandBuffer,
+    struct kk_shader *cs = cmd->state.shaders[MESA_SHADER_COMPUTE];
+    struct mtl_size local_size = cs->info.cs.local_size;
+ 
+-   mtl_compute_encoder *encoder = cs_get_compute(cmd, true);
++   mtl_compute_encoder *encoder = cs_get_compute(cmd);
+    if (cmd->state.cond_render.enabled) {
+       struct kk_ptr patched =
+          kk_pool_alloc(cmd, sizeof(VkDispatchIndirectCommand), 4u);
+diff --git a/src/kosmickrisp/vulkan/kk_cmd_draw.c b/src/kosmickrisp/vulkan/kk_cmd_draw.c
+index 2659321c57f..9cccf41b963 100644
+--- a/src/kosmickrisp/vulkan/kk_cmd_draw.c
++++ b/src/kosmickrisp/vulkan/kk_cmd_draw.c
+@@ -897,7 +897,7 @@ kk_flush_render_pass(struct kk_cmd_buffer *cmd)
+    }
+    /* If render pass state changes and the pass is currently active, end the
+     * current encoder and prepare to restart it */
+-   bool active_render = cmd->gfx.encoder != NULL;
++   bool active_render = cmd->metal.render != NULL;
+    if (needs_restart && active_render) {
+       if (!color_attachment_map_changed) {
+          /* Sample locations changed and color attachment map didn't. */
+@@ -1889,7 +1889,7 @@ kk_launch_tess(struct kk_cmd_buffer *cmd, struct kk_draw_data draw)
+ 
+    /* First launch the VS and TCS */
+ 
+-   mtl_compute_encoder *enc = cs_get_compute(cmd, true);
++   mtl_compute_encoder *enc = cs_get_compute(cmd);
+    {
+       mtl_compute_pipeline_state *pipeline = vs->pipeline.gfx.pre_render[0];
+       struct mtl_size local_size = {64, 1, 1};
+@@ -1997,6 +1997,12 @@ kk_draw(struct kk_cmd_buffer *cmd, struct kk_draw_command *data)
+ 
+       if (tess)
+          draw_data = kk_launch_tess(cmd, draw_data);
++
++      /* TODO_KOSMICKRISP Remove this once unroll, tess and any compute does not
++       * split render pass */
++      if (cmd->state.gfx.need_to_start_render_pass)
++         kk_flush_gfx_state(cmd);
++
+       kk_dispatch_draw(cmd, draw_data);
+    }
+ }
+diff --git a/src/kosmickrisp/vulkan/kk_cmd_meta.c b/src/kosmickrisp/vulkan/kk_cmd_meta.c
+index d1f4641c8b7..40c22e97631 100644
+--- a/src/kosmickrisp/vulkan/kk_cmd_meta.c
++++ b/src/kosmickrisp/vulkan/kk_cmd_meta.c
+@@ -277,7 +277,7 @@ kk_CmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
+ 
+    uint32_t view_mask = cmd->state.gfx.render.view_mask;
+    uint32_t layer_ids[KK_MAX_MULTIVIEW_VIEW_COUNT] = {};
+-   mtl_set_vertex_amplification_count(cmd->gfx.encoder, layer_ids, 1u);
++   mtl_set_vertex_amplification_count(cmd->metal.render, layer_ids, 1u);
+ 
+    /* Preserve conditional rendering state for clearing attachments */
+    struct kk_conditional_rendering_state cond_render = cmd->state.cond_render;
+@@ -295,7 +295,7 @@ kk_CmdClearAttachments(VkCommandBuffer commandBuffer, uint32_t attachmentCount,
+    if (view_mask == 0u) {
+       layer_ids[count++] = 0;
+    }
+-   mtl_set_vertex_amplification_count(cmd->gfx.encoder, layer_ids, count);
++   mtl_set_vertex_amplification_count(cmd->metal.render, layer_ids, count);
+ }
+ 
+ void
+diff --git a/src/kosmickrisp/vulkan/kk_cmd_pool.c b/src/kosmickrisp/vulkan/kk_cmd_pool.c
+index 9962c952d96..c318623cb3f 100644
+--- a/src/kosmickrisp/vulkan/kk_cmd_pool.c
++++ b/src/kosmickrisp/vulkan/kk_cmd_pool.c
+@@ -11,6 +11,10 @@
+ #include "kk_entrypoints.h"
+ #include "kk_physical_device.h"
+ 
++#include "kosmickrisp/bridge/mtl_bridge.h"
++
++#include "vk_common_entrypoints.h"
++
+ static VkResult
+ kk_cmd_bo_create(struct kk_cmd_pool *pool, struct kk_cmd_bo **bo_out)
+ {
+@@ -81,6 +85,44 @@ kk_cmd_pool_free_bo_list(struct kk_cmd_pool *pool, struct list_head *bos)
+    }
+ }
+ 
++mtl_command_allocator *
++kk_cmd_pool_get_allocator(struct kk_cmd_pool *pool)
++{
++   if (util_dynarray_num_elements(&pool->metal.free_allocators,
++                                  mtl_command_allocator *) > 0u)
++      return util_dynarray_pop(&pool->metal.free_allocators,
++                               mtl_command_allocator *);
++
++   struct kk_device *dev = kk_cmd_pool_device(pool);
++   return mtl_new_command_allocator(dev->mtl_handle);
++}
++
++void
++kk_cmd_pool_return_allocator(struct kk_cmd_pool *pool,
++                             mtl_command_allocator *allocator)
++{
++   util_dynarray_append(&pool->metal.free_allocators, allocator);
++}
++
++mtl_command_buffer *
++kk_cmd_pool_get_cmd_buf(struct kk_cmd_pool *pool)
++{
++   if (util_dynarray_num_elements(&pool->metal.free_cmd_bufs,
++                                  mtl_command_buffer *) > 0u)
++      return util_dynarray_pop(&pool->metal.free_cmd_bufs,
++                               mtl_command_buffer *);
++
++   struct kk_device *dev = kk_cmd_pool_device(pool);
++   return mtl_new_command_buffer(dev->mtl_handle);
++}
++
++void
++kk_cmd_pool_return_cmd_buf(struct kk_cmd_pool *pool,
++                           mtl_command_buffer *cmd_buf)
++{
++   util_dynarray_append(&pool->metal.free_cmd_bufs, cmd_buf);
++}
++
+ VKAPI_ATTR VkResult VKAPI_CALL
+ kk_CreateCommandPool(VkDevice _device,
+                      const VkCommandPoolCreateInfo *pCreateInfo,
+@@ -102,6 +144,9 @@ kk_CreateCommandPool(VkDevice _device,
+       return result;
+    }
+ 
++   pool->metal.free_allocators = UTIL_DYNARRAY_INIT;
++   pool->metal.free_cmd_bufs = UTIL_DYNARRAY_INIT;
++
+    list_inithead(&pool->free_bos);
+ 
+    *pCmdPool = kk_cmd_pool_to_handle(pool);
+@@ -109,6 +154,22 @@ kk_CreateCommandPool(VkDevice _device,
+    return VK_SUCCESS;
+ }
+ 
++static void
++kk_cmd_pool_release_mtl_objects(struct kk_cmd_pool *pool)
++{
++   util_dynarray_foreach(&pool->metal.free_allocators, mtl_command_allocator *,
++                         allocator) {
++      mtl_release(*allocator);
++   }
++   util_dynarray_clear(&pool->metal.free_allocators);
++
++   util_dynarray_foreach(&pool->metal.free_cmd_bufs, mtl_command_buffer *,
++                         cmd_buf) {
++      mtl_release(*cmd_buf);
++   }
++   util_dynarray_clear(&pool->metal.free_cmd_bufs);
++}
++
+ VKAPI_ATTR void VKAPI_CALL
+ kk_DestroyCommandPool(VkDevice _device, VkCommandPool commandPool,
+                       const VkAllocationCallbacks *pAllocator)
+@@ -121,9 +182,29 @@ kk_DestroyCommandPool(VkDevice _device, VkCommandPool commandPool,
+ 
+    vk_command_pool_finish(&pool->vk);
+    kk_cmd_pool_destroy_bos(pool);
++   kk_cmd_pool_release_mtl_objects(pool);
++   util_dynarray_fini(&pool->metal.free_allocators);
++   util_dynarray_fini(&pool->metal.free_cmd_bufs);
+    vk_free2(&device->vk.alloc, pAllocator, pool);
+ }
+ 
++VKAPI_ATTR VkResult VKAPI_CALL
++kk_ResetCommandPool(VkDevice _device, VkCommandPool commandPool,
++                    VkCommandPoolResetFlags flags)
++{
++   VK_FROM_HANDLE(kk_cmd_pool, pool, commandPool);
++
++   VkResult result = vk_common_ResetCommandPool(_device, commandPool, flags);
++   if (result != VK_SUCCESS)
++      return result;
++
++   if (flags & VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT) {
++      kk_cmd_pool_release_mtl_objects(pool);
++   }
++
++   return VK_SUCCESS;
++}
++
+ VKAPI_ATTR void VKAPI_CALL
+ kk_TrimCommandPool(VkDevice device, VkCommandPool commandPool,
+                    VkCommandPoolTrimFlags flags)
+diff --git a/src/kosmickrisp/vulkan/kk_cmd_pool.h b/src/kosmickrisp/vulkan/kk_cmd_pool.h
+index e24e5a24693..17ce4f3d459 100644
+--- a/src/kosmickrisp/vulkan/kk_cmd_pool.h
++++ b/src/kosmickrisp/vulkan/kk_cmd_pool.h
+@@ -12,6 +12,8 @@
+ 
+ #include "vk_command_pool.h"
+ 
++#include "util/u_dynarray.h"
++
+ #define KK_CMD_BO_SIZE     (1024 * 128)
+ #define KK_CMD_POOL_BO_MAX 32
+ 
+@@ -29,6 +31,11 @@ struct kk_cmd_pool {
+    /** List of kk_cmd_bo */
+    struct list_head free_bos;
+    uint32_t num_free_bos;
++
++   struct {
++      struct util_dynarray free_allocators;
++      struct util_dynarray free_cmd_bufs;
++   } metal;
+ };
+ 
+ VK_DEFINE_NONDISP_HANDLE_CASTS(kk_cmd_pool, vk.base, VkCommandPool,
+@@ -45,4 +52,11 @@ VkResult kk_cmd_pool_alloc_bo(struct kk_cmd_pool *pool,
+ 
+ void kk_cmd_pool_free_bo_list(struct kk_cmd_pool *pool, struct list_head *bos);
+ 
++mtl_command_allocator *kk_cmd_pool_get_allocator(struct kk_cmd_pool *pool);
++void kk_cmd_pool_return_allocator(struct kk_cmd_pool *pool,
++                                  mtl_command_allocator *allocator);
++mtl_command_buffer *kk_cmd_pool_get_cmd_buf(struct kk_cmd_pool *pool);
++void kk_cmd_pool_return_cmd_buf(struct kk_cmd_pool *pool,
++                                mtl_command_buffer *cmd_buf);
++
+ #endif /* KK_CMD_POOL_H */
+diff --git a/src/kosmickrisp/vulkan/kk_query_pool.c b/src/kosmickrisp/vulkan/kk_query_pool.c
+index f8c35afdd8d..c38a4386be1 100644
+--- a/src/kosmickrisp/vulkan/kk_query_pool.c
++++ b/src/kosmickrisp/vulkan/kk_query_pool.c
+@@ -263,7 +263,7 @@ static uint32_t
+ kk_mv_query_count(struct kk_cmd_buffer *cmd)
+ {
+    struct kk_rendering_state *render = &cmd->state.gfx.render;
+-   return cmd->gfx.encoder && render->view_mask
++   return cmd->metal.render && render->view_mask
+              ? util_bitcount(render->view_mask)
+              : 1;
+ }
+@@ -275,13 +275,12 @@ kk_CmdResetQueryPool(VkCommandBuffer commandBuffer, VkQueryPool queryPool,
+    VK_FROM_HANDLE(kk_cmd_buffer, cmd, commandBuffer);
+    VK_FROM_HANDLE(kk_query_pool, pool, queryPool);
+ 
+-   assert(cmd->gfx.encoder == NULL);
++   assert(cmd->metal.render == NULL);
+ 
+    /* A prior timestamp write may have a resolve still pending. Land it before
+     * the reset zeroes the pool BO, otherwise the deferred resolve would clobber
+     * the reset and leave the query spuriously available. */
+-   if (util_dynarray_num_elements(&cmd->pre_gfx->ts_resolves,
+-                                  struct kk_ts_resolve) > 0)
++   if (util_dynarray_num_elements(&cmd->ts_resolves, struct kk_ts_resolve) > 0)
+       cs_end(cmd);
+ 
+    emit_zero_queries(cmd, pool, firstQuery, queryCount, false);
+@@ -355,54 +354,50 @@ kk_CmdWriteTimestamp2(VkCommandBuffer commandBuffer,
+       .dst_addr = kk_query_report_addr(dev, pool, query),
+    };
+ 
+-   /* non-gfx or not found*/
+-   if (cmd->gfx.encoder && mtl_stage) {
+-      uint64_t addr = kk_query_available_addr(pool, query);
+-      for (uint32_t i = 0; i < count; i++) {
+-         libkk_write_u32(cmd, kk_grid_1d(1), false, addr, true);
+-         addr += sizeof(uint32_t);
+-      }
++   uint64_t available_addr = kk_query_available_addr(pool, query);
+ 
++   /* non-gfx or not found*/
++   if (cmd->metal.render && mtl_stage) {
+       /* If we've already issued a timestamp write for a render stage, reuse it
+        * because reissuing might return a 0 timestamp
+        */
++      bool reused = false;
+       util_dynarray_foreach(&pool->ts.stage_map, struct kk_ts_stage_entry,
+                             entry) {
+-         if (entry->stage == mtl_stage && entry->pass == cmd->gfx.encoder) {
++         if (entry->stage == mtl_stage && entry->pass == cmd->metal.render) {
+             uint16_t *remap_index = kk_pool_index_ptr(pool);
+             remap_index[query] = entry->index;
+-            return;
++            reused = true;
++            break;
+          }
+       }
+-      struct kk_ts_stage_entry entry = {.stage = mtl_stage,
+-                                        .pass = cmd->gfx.encoder,
+-                                        .index = query};
+-      util_dynarray_append(&pool->ts.stage_map, entry);
+ 
+-      mtl_render_write_timestamp(cmd->gfx.encoder, mtl_stage, pool->ts.heap,
+-                                 query);
+-      util_dynarray_append(&cmd->gfx.ts_resolves, resolve);
+-   } else {
+-      bool top = true;
+-      struct kk_encoder_state *es;
++      if (!reused) {
++         struct kk_ts_stage_entry entry = {.stage = mtl_stage,
++                                           .pass = cmd->metal.render,
++                                           .index = query};
++         util_dynarray_append(&pool->ts.stage_map, entry);
+ 
+-      const VkPipelineStageFlagBits2 bottom_mask =
+-         VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT;
+-      if (cmd->gfx.encoder && ((stage & bottom_mask) != 0)) {
+-         top = false;
++         mtl_render_write_timestamp(cmd->metal.render, mtl_stage, pool->ts.heap,
++                                    query);
++         util_dynarray_append(&cmd->ts_resolves, resolve);
+       }
+-      es = top ? cmd->pre_gfx : cmd->post_gfx;
+ 
++      for (uint32_t i = 0; i < count; i++) {
++         kk_cmd_write(cmd, (struct libkk_imm_write){available_addr, true});
++         available_addr += sizeof(uint32_t);
++      }
++   } else {
+       /* write the availability markers. For compute, this must happen before the
+        * timestamp write to ensure that there is compute work to trigger it. */
+-      uint64_t addr = kk_query_available_addr(pool, query);
+       for (uint32_t i = 0; i < count; i++) {
+-         libkk_write_u32(cmd, kk_grid_1d(1), top, addr, true);
+-         addr += sizeof(uint32_t);
++         libkk_write_u32(cmd, kk_grid_1d(1), true, available_addr, true);
++         available_addr += sizeof(uint32_t);
+       }
+ 
+-      mtl_compute_write_timestamp(es->encoder, pool->ts.heap, query);
+-      util_dynarray_append(&es->ts_resolves, resolve);
++      mtl_compute_encoder *encoder = cs_get_compute(cmd);
++      mtl_compute_write_timestamp(encoder, pool->ts.heap, query);
++      util_dynarray_append(&cmd->ts_resolves, resolve);
+    }
+ }
+ 
+@@ -552,11 +547,10 @@ kk_CmdCopyQueryPoolResults(VkCommandBuffer commandBuffer, VkQueryPool queryPool,
+    /* Timestamp results are resolved into the pool BO on a deferred command
+     * buffer; make sure any pending resolve lands before this copy reads it.
+     * This also gives VK_QUERY_RESULT_WAIT_BIT its meaning for timestamps. */
+-   if (util_dynarray_num_elements(&cmd->pre_gfx->ts_resolves,
+-                                  struct kk_ts_resolve) > 0)
++   if (util_dynarray_num_elements(&cmd->ts_resolves, struct kk_ts_resolve) > 0)
+       cs_end(cmd);
+ 
+-   mtl_compute_encoder *encoder = cs_get_compute(cmd, true);
++   mtl_compute_encoder *encoder = cs_get_compute(cmd);
+    /* The resolveCounterHeap runs on the blit stage and it needs to be available
+     * for the compute job to copy results to the bo. */
+    mtl_barrier_after_queue_stages(encoder, MTL_STAGE_BLIT, MTL_STAGE_DISPATCH);
+diff --git a/src/kosmickrisp/vulkan/kk_queue.c b/src/kosmickrisp/vulkan/kk_queue.c
+index c3e11e2e2cb..5509318ffa0 100644
+--- a/src/kosmickrisp/vulkan/kk_queue.c
++++ b/src/kosmickrisp/vulkan/kk_queue.c
+@@ -17,7 +17,6 @@
+ #include "kosmickrisp/bridge/vk_to_mtl_map.h"
+ 
+ #include "vk_cmd_queue.h"
+-#include "vk_common_entrypoints.h"
+ 
+ struct kk_commit_data {
+    struct kk_queue *queue;
+@@ -74,8 +73,8 @@ rerecord_commit_callback(struct mtl_feedback_data *data)
+ 
+    assert(queue->commits_in_flight > 0u);
+    if (--queue->commits_in_flight == 0u) {
+-      vk_common_ResetCommandPool(kk_device_to_handle(dev),
+-                                 kk_cmd_pool_to_handle(queue->cmd_pool), 0u);
++      kk_ResetCommandPool(kk_device_to_handle(dev),
++                          kk_cmd_pool_to_handle(queue->cmd_pool), 0u);
+       cnd_broadcast(&queue->cond);
+    }
+ 
+@@ -87,8 +86,7 @@ rerecord_commit_callback(struct mtl_feedback_data *data)
+ static bool
+ kk_cmd_buffer_has_work(struct kk_cmd_buffer *cmd)
+ {
+-   return util_dynarray_num_elements(&cmd->submit_cmd_bufs,
+-                                     mtl_command_buffer *) > 0u;
++   return cmd->metal.cmd_buf;
+ }
+ 
+ static void
+@@ -100,10 +98,8 @@ kk_queue_commit(struct kk_queue *queue, struct kk_cmd_buffer *cmd,
+    mtl_commit_options *options = mtl_new_commit_options();
+    mtl_commit_options_add_feedback_handler(options, callback, user_data);
+ 
+-   mtl_command_queue_commit(
+-      queue->mtl_handle, util_dynarray_begin(&cmd->submit_cmd_bufs),
+-      util_dynarray_num_elements(&cmd->submit_cmd_bufs, mtl_command_buffer *),
+-      options);
++   mtl_command_queue_commit(queue->mtl_handle, &cmd->metal.cmd_buf, 1u,
++                            options);
+    mtl_release(options);
+ }
+ 
+-- 
+2.55.0
+

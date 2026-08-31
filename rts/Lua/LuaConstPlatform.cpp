@@ -123,6 +123,8 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	LuaPushNamedBool(L, "glSupportFragDepthLayout" , globalRendering->supportFragDepthLayout);
 	/*** @field Platform.glSupportSeamlessCubeMaps boolean */
 	LuaPushNamedBool(L, "glSupportSeamlessCubeMaps", globalRendering->supportSeamlessCubeMaps);
+	/*** @field Platform.glSupportPolygonModeLine boolean whether gl.PolygonMode with GL.LINE draws outlines rather than filled polygons */
+	LuaPushNamedBool(L, "glSupportPolygonModeLine", globalRendering->supportPolygonModeLine);
 
 	/*** @field Platform.osName string full name of the OS */
 	LuaPushNamedString(L, "osName", Platform::GetOSNameStr());
