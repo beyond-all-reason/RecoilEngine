@@ -376,7 +376,7 @@ void CUnitHandler::SlowUpdateUnits()
 			unit->SlowUpdateWeapons();
 			unit->SanityCheck();
 
-			if (!unit->isDead && unit->localModel.GetBoundariesNeedsRecalc())
+			if (unit->IsSimulating() && unit->localModel.GetBoundariesNeedsRecalc())
 				updateBoundingVolumeList.emplace_back(unit);
 		}
 	}
