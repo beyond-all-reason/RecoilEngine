@@ -1186,6 +1186,10 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 			//FIXME check if still happens with SDL3 (2013)
 			SDL_SetModState((SDL_Keymod)(SDL_GetModState() & (SDL_KMOD_NUM | SDL_KMOD_CAPS | SDL_KMOD_MODE)));
 
+			// drop emulated input first: it fires its own releases directly,
+			// since the pushed SDL releases below get eaten by the emulation gate
+			LuaDebugExtra::ClearEmulatedInput();
+
 			// release all keyboard keys
 			KeyInput::ReleaseAllKeys();
 

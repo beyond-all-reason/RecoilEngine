@@ -3,9 +3,9 @@
 > Verify all engine features work correctly after the SDL2→SDL3 migration (131 files, +1224/-1148 lines).
 > Each section corresponds to a migration phase. Mark ☑ pass / ☒ fail / ☐ skipped. Document any failures.
 
---- 
+---
 # Found bugs needing fixing:
-- [ ] | B3 | Toggle back to windowed from fullscreen | Returns to windowed mode at correct size | NO: switch to windowed from fullscreen needs to be toggled twice from options menu, to two different resolutions in order for it to take effect 
+- [ ] | B3 | Toggle back to windowed from fullscreen | Returns to windowed mode at correct size | NO: switch to windowed from fullscreen needs to be toggled twice from options menu, to two different resolutions in order for it to take effect
 - [ ] Need to test RMLUI altogether anyway
 
 ---
