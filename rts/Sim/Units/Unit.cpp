@@ -111,7 +111,7 @@ CUnit::~CUnit()
 	//   we nevertheless want the sim-frame latency between CUnitKilledCB()
 	//   and the CreateWreckage() call to be as low as possible to prevent
 	//   position discontinuities
-	if (delayedWreckLevel >= 0)
+	if (delayedWreckLevel >= 0 && !blockWreck)
 		CreateWreck(delayedWreckLevel - 1, 1);
 
 	if (deathExpDamages != nullptr)
@@ -472,7 +472,7 @@ void CUnit::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int wea
 	ForcedKillUnit(attacker, selfDestruct, reclaimed, weaponDefID);
 }
 
-void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID)
+void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID, bool noDeathExplosion)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (isDead)
@@ -499,9 +499,9 @@ void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, i
 	const WeaponDef* wd = selfDestruct? unitDef->selfdExpWeaponDef: unitDef->deathExpWeaponDef;
 	const DynDamageArray* da = selfDestruct? selfdExpDamages: deathExpDamages;
 
-	if (wd != nullptr) {
+	if (wd != nullptr && !noDeathExplosion) {
 		assert(da != nullptr);
-		const CExplosionParams params = {
+		const CExplosionParams expParams = {
 			.pos                  = pos,
 			.dir                  = ZeroVector,
 			.damages              = *da,
@@ -520,7 +520,7 @@ void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, i
 			.projectileID         = static_cast<uint32_t>(-1u)
 		};
 
-		helper->Explosion(params);
+		helper->Explosion(expParams);
 	}
 
 	recentDamage += (maxHealth * 2.0f * selfDestruct);
@@ -2962,6 +2962,7 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(allowUseWeapons),
 
 	CR_MEMBER(deathScriptFinished),
+	CR_MEMBER(blockWreck),
 	CR_MEMBER(delayedWreckLevel),
 
 	CR_MEMBER(restTime),
