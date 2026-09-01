@@ -442,6 +442,13 @@ void CSMFGroundDrawer::SetLuaShader(const LuaMapShaderData* luaMapShaderData)
 	smfRenderStates[RENDER_STATE_LUA]->Update(this, luaMapShaderData);
 }
 
+bool CSMFGroundDrawer::SetGroundShadingRateElmos(float elmosPerPixel)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	shadingRate.SetElmosPerPixel(elmosPerPixel);
+	return globalRendering->supportShadingRateImage;
+}
+
 void CSMFGroundDrawer::SetupBigSquare(const DrawPass::e& drawPass, const int bigSquareX, const int bigSquareY)
 {
 	RECOIL_DETAILED_TRACY_ZONE;

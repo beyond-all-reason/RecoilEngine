@@ -51,6 +51,7 @@ public:
 	void SunChanged();
 
 	void SetLuaShader(const LuaMapShaderData*);
+	bool SetGroundShadingRateElmos(float elmosPerPixel) override;
 	void SetDrawDeferredPass(bool b) {
 		if ((drawDeferred = b)) {
 			drawDeferred &= UpdateGeometryBuffer(false);
