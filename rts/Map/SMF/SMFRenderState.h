@@ -117,4 +117,6 @@ private:
 
 	// if true, shader programs for this state are Lua-defined
 	bool useLuaShaders;
+	// if true, the Lua deferred program also writes the forward color
+	bool luaCombinedShader = false;
 };

@@ -99,6 +99,8 @@ void SMFRenderStateGLSL::Update(
 			glslShaders[n]->LoadFromID(luaMapShaderData->shaderIDs[n - 1]);
 		}
 
+		luaCombinedShader = luaMapShaderData->combinedShader;
+
 		// currShader is null from Init() (GLSL_SHADER_FWD_STD is never created for
 		// the Lua state), so re-evaluate it now that program IDs changed; otherwise
 		// HasValidShader(Normal) stays false and a forward-only Lua map shader is
@@ -222,7 +224,7 @@ bool SMFRenderStateGLSL::CanDrawCombined(const CSMFGroundDrawer* smfGroundDrawer
 	RECOIL_DETAILED_TRACY_ZONE;
 	// Lua shaders have to declare combined support (Spring.SetMapShader)
 	if (useLuaShaders)
-		return false;
+		return (luaCombinedShader && CanUseAdvShading(smfGroundDrawer, GLSL_SHADER_DFR_ADV));
 
 	return CanUseAdvShading(smfGroundDrawer, GLSL_SHADER_CMB_ADV);
 }
