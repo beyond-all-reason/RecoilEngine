@@ -24,6 +24,7 @@ int GLAD_GL_VERSION_4_5 = 0;
 int GLAD_GL_VERSION_4_6 = 0;
 
 int GLAD_GL_NV_primitive_restart = 0;
+int GLAD_GL_NV_shading_rate_image = 0;
 int GLAD_GL_EXT_texture_filter_anisotropic = 0;
 int GLAD_GL_EXT_texture_array = 0;
 int GLAD_GL_EXT_stencil_two_side = 0;
