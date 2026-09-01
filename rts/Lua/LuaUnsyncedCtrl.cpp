@@ -4206,6 +4206,25 @@ int LuaUnsyncedCtrl::SetSunDirection(lua_State* L)
 	return 0;
 }
 
+/***
+ * @class SunLightingParams
+ *
+ * The parameter table for sun lighting
+ * @see Spring.SetSunLighting
+ *
+ * @field specularExponent number?
+ * @field groundShadowDensity number?
+ * @field modelShadowDensity number?
+ * @field groundAmbientColor rgba?
+ * @field groundDiffuseColor rgba?
+ * @field groundSpecularColor rgba?
+ * @field unitAmbientColor rgba?
+ * @field modelAmbientColor rgba?
+ * @field unitDiffuseColor rgba?
+ * @field modelDiffuseColor rgba?
+ * @field unitSpecularColor rgba?
+ * @field modelSpecularColor rgba?
+ */
 
 /***
  * Modify sun lighting parameters.
@@ -4215,7 +4234,7 @@ int LuaUnsyncedCtrl::SetSunDirection(lua_State* L)
  * ```
  *
  * @function Spring.SetSunLighting
- * @param params { groundAmbientColor: rgb, groundDiffuseColor: rgb }
+ * @param params SunLightingParams
  */
 int LuaUnsyncedCtrl::SetSunLighting(lua_State* L)
 {
