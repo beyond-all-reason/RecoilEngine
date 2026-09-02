@@ -114,6 +114,7 @@ CR_REG_METADATA(CWeapon, (
 	CR_MEMBER(weaponAimAdjustPriority),
 	CR_MEMBER(fastAutoRetargeting),
 	CR_MEMBER(fastQueryPointUpdate),
+	CR_MEMBER(preaimAtBlockedTargets),
 	CR_MEMBER(accurateLeading),
 	CR_MEMBER(burstControlWhenOutOfArc)
 ))
@@ -197,6 +198,7 @@ CWeapon::CWeapon(CUnit* owner, const WeaponDef* def):
 	weaponAimAdjustPriority(1.f),
 	fastAutoRetargeting(false),
 	fastQueryPointUpdate(false),
+	preaimAtBlockedTargets(false),
 	accurateLeading(0),
 	burstControlWhenOutOfArc(0)
 {
@@ -730,6 +732,7 @@ bool CWeapon::AutoTarget()
 
 	CUnit* goodTargetUnit = nullptr;
 	CUnit*  badTargetUnit = nullptr;
+	CUnit*  blockedTargetUnit = nullptr;
 
 	auto& targetPairs = helper->targetPairs;
 
@@ -744,16 +747,23 @@ bool CWeapon::AutoTarget()
 		// good targets (of higher priority) left in <targets>
 		const bool isBadTarget = (unit->category & badTargetCategory);
 
+		// skip target if it is a bad target and we already have a better bad target category
 		if (isBadTarget && (badTargetUnit != nullptr))
 			continue;
 
-		// set isAutoTarget s.t. TestRange result is ignored
-		// (which enables pre-aiming at targets out of range)
-		if (!TryTarget(SWeaponTarget(unit, false, autoTargetRangeBoost > 0.0f)))
-			continue;
-
+		// skip target if it is neutral and we are not allowed to fire at neutral
 		if (unit->IsNeutral() && (owner->fireState < FIRESTATE_FIREATNEUTRAL))
 			continue;
+
+		// Checks to see if target is shootable, has free line of fire.
+		if (!TryTarget(SWeaponTarget(unit, false, true))) {
+			if (preaimAtBlockedTargets) {
+				if (blockedTargetUnit == nullptr) {
+					blockedTargetUnit = unit;
+				}
+			}
+			continue;
+		}
 
 		if (isBadTarget) {
 			badTargetUnit = unit;
@@ -767,9 +777,13 @@ bool CWeapon::AutoTarget()
 	if (goodTargetUnit == nullptr)
 		goodTargetUnit = badTargetUnit;
 
+	// if there is no badTargetUnit, use a blocked unit
+	if (goodTargetUnit == nullptr)
+		goodTargetUnit = blockedTargetUnit;
+
 	if (goodTargetUnit != nullptr) {
 		// pick our new target
-		SetAttackTarget(SWeaponTarget(goodTargetUnit));
+		SetAttackTarget(SWeaponTarget(goodTargetUnit, false, true));
 		return true;
 	}
 
@@ -962,12 +976,11 @@ bool CWeapon::TryTarget(const float3& tgtPos, const SWeaponTarget& trg, bool pre
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(GetLeadTargetPos(trg).SqDistance(tgtPos) < Square(250.0f));
 
-	if (!TestTarget(tgtPos, trg))
+	// auto-targeted units already passed a TestTarget check
+	if (!trg.isAutoTarget && !TestTarget(tgtPos, trg))
 		return false;
 
-	// auto-targeted units are allowed to be out of range
-	// (UpdateFire will still block firing at such units)
-	if (!trg.isAutoTarget && !TestRange(tgtPos, trg))
+	if (!TestRange(tgtPos, trg))
 		return false;
 
 	// no LOF if aim-position is below ground (not in HFLOF, is overridden)
