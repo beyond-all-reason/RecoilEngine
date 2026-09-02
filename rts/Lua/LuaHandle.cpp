@@ -2646,7 +2646,7 @@ void CLuaHandle::SunChanged()
  * @param type "unit"|"feature" The type of the object pointed at.
  * @param id ObjectID The `unitID` or `featureID`.
  * @param cmd integer The current command ID.
- * @return integer The command ID to use as the default, or nil to keep the current ID.
+ * @return integer cmdID The command ID to use as the default, or nil to keep the current ID.
  */
 bool CLuaHandle::DefaultCommand(const CUnit* unit,
                                 const CFeature* feature, int& cmd)
@@ -3700,7 +3700,7 @@ void CLuaHandle::MiniMapGeometryChanged(const int2 newPos, const int2 newDim, co
  * @param cmdID integer
  * @param cmdParams table
  * @param options CommandOptions
- * @return boolean Returning true deletes the command and does not send it through the network.
+ * @return boolean delete Returning true deletes the command and does not send it through the network.
  */
 bool CLuaHandle::CommandNotify(const Command& cmd)
 {

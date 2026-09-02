@@ -1176,7 +1176,7 @@ size_t LuaVBOImpl::UploadImpl(const std::vector<TIn>& dataVec, uint32_t elemOffs
  *
  * Also fills in VBO definition data as they're set for engine models (no need to do VBO:Define()).
  *
- * @return integer? buffer size in bytes
+ * @return integer? size buffer size in bytes
  */
 size_t LuaVBOImpl::ModelsVBO()
 {
@@ -1340,7 +1340,7 @@ size_t LuaVBOImpl::InstanceDataFromFeatureIDs(const sol::stack_table& ids, int a
  * @param attrID integer
  * @param teamIdOpt integer?
  * @param elementOffset integer?
- * @return number[] matDataVec 4x4 matrix
+ * @return number[] matDataVec Flattened 4x4 matrix(es)
  * @return integer elemOffset
  * @return integer|[integer,integer,integer,integer] attrID
  */

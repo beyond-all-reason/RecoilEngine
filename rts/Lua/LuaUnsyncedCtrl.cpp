@@ -5579,7 +5579,7 @@ int LuaUnsyncedCtrl::SetClipboard(lua_State* L)
  *   wantYield = wantYield and Spring.Yield()
  * end
  *
- * @return boolean when true caller should continue calling `Spring.Yield` during the widgets/gadgets load, when false it shouldn't call it any longer.
+ * @return boolean continueYielding when true caller should continue calling `Spring.Yield` during the widgets/gadgets load, when false it shouldn't call it any longer.
  */
 int LuaUnsyncedCtrl::Yield(lua_State* L)
 {

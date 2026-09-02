@@ -975,7 +975,7 @@ int LuaSyncedCtrl::AssignPlayerToTeam(lua_State* L)
  * @param x number left position (elmos)
  * @param y number vertical position (elmos)
  * @param z number top position (elmos)
- * @return boolean true if the position was set, false if the teamID is invalid
+ * @return boolean success true if the position was set, false if the teamID is invalid
  */
 int LuaSyncedCtrl::SetTeamStartPosition(lua_State* L)
 {
@@ -1006,7 +1006,7 @@ int LuaSyncedCtrl::SetTeamStartPosition(lua_State* L)
  * @function Spring.SetPlayerReadyState
  * @param playerID PlayerID
  * @param ready boolean
- * @return boolean true if the state was set, false if the playerID was invalid
+ * @return boolean success true if the state was set, false if the playerID was invalid
  */
 int LuaSyncedCtrl::SetPlayerReadyState(lua_State* L)
 {
@@ -1121,7 +1121,7 @@ int LuaSyncedCtrl::KillTeam(lua_State* L)
  * Pass multiple winners to declare a draw.
  * Pass no arguments if undecided (e.g. when dropped from the host).
  *
- * @return integer Number of accepted (valid) ally teams.
+ * @return integer teams Number of accepted (valid) ally teams.
  */
 int LuaSyncedCtrl::GameOver(lua_State* L)
 {
@@ -3546,7 +3546,7 @@ int LuaSyncedCtrl::SetUnitPhysicalStateBit(lua_State* L)
 /***
  * @function Spring.GetUnitPhysicalState
  * @param unitID UnitID
- * @return integer Unit's PhysicalState bitmask
+ * @return integer physicalState Unit's PhysicalState bitmask
  */
 int LuaSyncedCtrl::GetUnitPhysicalState(lua_State* L)
 {
@@ -3822,7 +3822,7 @@ int LuaSyncedCtrl::SetUnitPieceParent(lua_State* L)
  * @param unitID UnitID
  * @param pieceNum integer
  * @param matrix number[] an array of 16 floats
- * @return boolean? valid - if the matrix can be used for the purpose of defining the piece spatial transformation. Blocks the piece animation, if true.
+ * @return boolean? valid whether the matrix can be used for the purpose of defining the piece spatial transformation. Blocks the piece animation, if true.
  */
 int LuaSyncedCtrl::SetUnitPieceMatrix(lua_State* L)
 {
@@ -3911,7 +3911,7 @@ int LuaSyncedCtrl::SetUnitPieceVisible(lua_State* L)
  * @param unitID UnitID
  * @param type "los"|"airLos"|"radar"|"sonar"|"seismic"|"radarJammer"|"sonarJammer"
  * @param radius integer
- * @return integer? New radius, or `nil` if unit is invalid.
+ * @return integer? newRadius New radius, or `nil` if unit is invalid.
  */
 int LuaSyncedCtrl::SetUnitSensorRadius(lua_State* L)
 {
@@ -5377,7 +5377,7 @@ int LuaSyncedCtrl::SetFeaturePieceVisible(lua_State* L)
  * @param featureID FeatureID
  * @param pieceIndex integer
  * @param matrix number[] an array of 16 floats
- * @return boolean? valid - if the matrix can be used for the purpose of defining the piece spatial transformation
+ * @return boolean? valid whether the matrix can be used for the purpose of defining the piece spatial transformation
  */
 int LuaSyncedCtrl::SetFeaturePieceMatrix(lua_State* L)
 {
@@ -7031,7 +7031,7 @@ int LuaSyncedCtrl::AddSmoothMesh(lua_State* L)
  * @param z number
  * @param height number
  * @param terraform number? (Default: `1`)
- * @return number? The absolute height difference, or `nil` if coordinates are invalid.
+ * @return number? heightDifference The absolute height difference, or `nil` if coordinates are invalid.
  */
 int LuaSyncedCtrl::SetSmoothMesh(lua_State* L)
 {

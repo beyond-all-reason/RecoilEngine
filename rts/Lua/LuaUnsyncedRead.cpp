@@ -1058,7 +1058,7 @@ int LuaUnsyncedRead::GetMiniMapGeometry(lua_State* L)
 /*** Get minimap rotation
  *
  * @function Spring.GetMiniMapRotation
- * @return number amount in radians
+ * @return number rotation in radians
  */
 int LuaUnsyncedRead::GetMiniMapRotation(lua_State* L)
 {
@@ -1210,7 +1210,7 @@ int LuaUnsyncedRead::GetFrameTimeOffset(lua_State* L)
  *
  * Returns the game time, taking the interpolated draw frame into account.
  *
- * @return number game time in seconds
+ * @return number time in seconds
  */
 int LuaUnsyncedRead::GetGameSecondsInterpolated(lua_State* L)
 {
@@ -1336,7 +1336,7 @@ int LuaUnsyncedRead::GetUnitLuaDraw(lua_State* L)
  *
  * @function Spring.GetUnitNoDraw
  * @param unitID UnitID
- * @return boolean? nil when unitID cannot be parsed
+ * @return boolean? noDraw `nil` when unitID cannot be parsed
  */
 int LuaUnsyncedRead::GetUnitNoDraw(lua_State* L)
 {
@@ -1347,7 +1347,7 @@ int LuaUnsyncedRead::GetUnitNoDraw(lua_State* L)
  *
  * @function Spring.GetUnitEngineDrawMask
  * @param unitID UnitID
- * @return boolean? nil when unitID cannot be parsed
+ * @return boolean? drawMask `nil` when unitID cannot be parsed
  */
 int LuaUnsyncedRead::GetUnitEngineDrawMask(lua_State* L)
 {
@@ -1358,7 +1358,7 @@ int LuaUnsyncedRead::GetUnitEngineDrawMask(lua_State* L)
  *
  * @function Spring.GetUnitAlwaysUpdateMatrix
  * @param unitID UnitID
- * @return boolean? nil when unitID cannot be parsed
+ * @return boolean? alwaysUpdateMatrix `nil` when unitID cannot be parsed
  */
 int LuaUnsyncedRead::GetUnitAlwaysUpdateMatrix(lua_State* L)
 {
@@ -1375,7 +1375,7 @@ int LuaUnsyncedRead::GetUnitAlwaysUpdateMatrix(lua_State* L)
  *
  * @function Spring.GetUnitDrawFlag
  * @param unitID UnitID
- * @return number? nil when unitID cannot be parsed
+ * @return number? drawFlag `nil` when unitID cannot be parsed
  */
 int LuaUnsyncedRead::GetUnitDrawFlag(lua_State* L)
 {
@@ -1392,7 +1392,7 @@ int LuaUnsyncedRead::GetUnitDrawFlag(lua_State* L)
  *
  * @function Spring.GetUnitNoMinimap
  * @param unitID UnitID
- * @return boolean? nil when unitID cannot be parsed
+ * @return boolean? noMinimap `nil` when unitID cannot be parsed
  */
 int LuaUnsyncedRead::GetUnitNoMinimap(lua_State* L)
 {
@@ -1656,7 +1656,7 @@ int LuaUnsyncedRead::GetUnitSelectionVolumeData(lua_State* L)
  *
  * @function Spring.GetFeatureLuaDraw
  * @param featureID FeatureID
- * @return boolean? nil when featureID cannot be parsed
+ * @return boolean? luaDraw `nil` when featureID cannot be parsed
  */
 int LuaUnsyncedRead::GetFeatureLuaDraw(lua_State* L)
 {
@@ -1667,7 +1667,7 @@ int LuaUnsyncedRead::GetFeatureLuaDraw(lua_State* L)
  *
  * @function Spring.GetFeatureNoDraw
  * @param featureID FeatureID
- * @return boolean? nil when featureID cannot be parsed
+ * @return boolean? noDraw `nil` when featureID cannot be parsed
  */
 int LuaUnsyncedRead::GetFeatureNoDraw(lua_State* L)
 {
@@ -1678,7 +1678,7 @@ int LuaUnsyncedRead::GetFeatureNoDraw(lua_State* L)
  *
  * @function Spring.GetFeatureEngineDrawMask
  * @param featureID FeatureID
- * @return boolean? nil when featureID cannot be parsed
+ * @return boolean? drawMask `nil` when featureID cannot be parsed
  */
 int LuaUnsyncedRead::GetFeatureEngineDrawMask(lua_State* L)
 {
@@ -1689,7 +1689,7 @@ int LuaUnsyncedRead::GetFeatureEngineDrawMask(lua_State* L)
  *
  * @function Spring.GetFeatureAlwaysUpdateMatrix
  * @param featureID FeatureID
- * @return boolean? nil when featureID cannot be parsed
+ * @return boolean? alwaysUpdateMatrix `nil` when featureID cannot be parsed
  */
 int LuaUnsyncedRead::GetFeatureAlwaysUpdateMatrix(lua_State* L)
 {
@@ -1706,7 +1706,7 @@ int LuaUnsyncedRead::GetFeatureAlwaysUpdateMatrix(lua_State* L)
  *
  * @function Spring.GetFeatureDrawFlag
  * @param featureID FeatureID
- * @return number? nil when featureID cannot be parsed
+ * @return number? drawFlag `nil` when featureID cannot be parsed
  */
 int LuaUnsyncedRead::GetFeatureDrawFlag(lua_State* L)
 {
@@ -1772,7 +1772,13 @@ static int GetObjectTransformMatrix(const CSolidObject* o, lua_State* L)
  *
  * @function Spring.GetUnitTransformMatrix
  * @param unitID UnitID
- * @return number? m11 nil when unitID cannot be parsed
+ * @return nil # when unitID cannot be parsed
+ */
+/***
+ *
+ * @function Spring.GetUnitTransformMatrix
+ * @param unitID UnitID
+ * @return number m11
  * @return number m12
  * @return number m13
  * @return number m14
@@ -1796,7 +1802,13 @@ int LuaUnsyncedRead::GetUnitTransformMatrix(lua_State* L) { return (GetObjectTra
  *
  * @function Spring.GetFeatureTransformMatrix
  * @param featureID FeatureID
- * @return number? m11 nil when featureID cannot be parsed
+ * @return nil # when featureID cannot be parsed
+ */
+/***
+ *
+ * @function Spring.GetFeatureTransformMatrix
+ * @param featureID FeatureID
+ * @return number m11
  * @return number m12
  * @return number m13
  * @return number m14
@@ -2711,8 +2723,8 @@ int LuaUnsyncedRead::GetSelectedUnits(lua_State* L)
 /*** Get selected units aggregated by unitDefID
  *
  * @function Spring.GetSelectedUnitsSorted
- * @return table<UnitDefID,UnitID[]> where keys are unitDefIDs and values are unitIDs
- * @return integer the number of unitDefIDs
+ * @return table<UnitDefID,UnitID[]> unitsIDs
+ * @return integer countDefs the number of unitDefIDs
  */
 int LuaUnsyncedRead::GetSelectedUnitsSorted(lua_State* L)
 {
@@ -2727,8 +2739,8 @@ int LuaUnsyncedRead::GetSelectedUnitsSorted(lua_State* L)
  *
  * @function Spring.GetSelectedUnitsCounts
  *
- * @return table<UnitDefID,integer> unitsCounts where keys are unitDefIDs and values are counts
- * @return integer the number of unitDefIDs
+ * @return table<UnitDefID,integer> unitsCounts
+ * @return integer countDefs the number of unitDefIDs
  */
 int LuaUnsyncedRead::GetSelectedUnitsCounts(lua_State* L)
 {
@@ -4198,7 +4210,7 @@ int LuaUnsyncedRead::GetModKeyState(lua_State* L)
 /***
  *
  * @function Spring.GetPressedKeys
- * @return table<integer|string,true> where keys are keyCodes or key names
+ * @return table<integer|string,true> keys where keys are keyCodes or key names
  */
 int LuaUnsyncedRead::GetPressedKeys(lua_State* L)
 {
@@ -4229,7 +4241,7 @@ int LuaUnsyncedRead::GetPressedKeys(lua_State* L)
 /***
  *
  * @function Spring.GetPressedScans
- * @return table<integer|string,true> where keys are scanCodes or scan names
+ * @return table<integer|string,true> scans where keys are scanCodes or scan names
  */
 int LuaUnsyncedRead::GetPressedScans(lua_State* L)
 {
@@ -4409,7 +4421,7 @@ int LuaUnsyncedRead::GetActionHotKeys(lua_State* L)
 /***
  *
  * @function Spring.GetGroupList
- * @return table<GroupID,integer>? where keys are groupIDs and values are counts
+ * @return table<GroupID,integer>? groupCounts
  */
 int LuaUnsyncedRead::GetGroupList(lua_State* L)
 {
@@ -4502,7 +4514,7 @@ int LuaUnsyncedRead::GetGroupUnits(lua_State* L)
  *
  * @function Spring.GetGroupUnitsSorted
  * @param groupID GroupID
- * @return table<UnitDefID,UnitID[]>? where keys are unitDefIDs and values are unitIDs
+ * @return table<UnitDefID,UnitID[]>? unitsIDs
  */
 int LuaUnsyncedRead::GetGroupUnitsSorted(lua_State* L)
 {
@@ -4519,7 +4531,7 @@ int LuaUnsyncedRead::GetGroupUnitsSorted(lua_State* L)
  *
  * @function Spring.GetGroupUnitsCounts
  * @param groupID GroupID
- * @return table<UnitDefID,integer>? where keys are unitDefIDs and values are counts
+ * @return table<UnitDefID,integer>? unitsCounts
  */
 int LuaUnsyncedRead::GetGroupUnitsCounts(lua_State* L)
 {
