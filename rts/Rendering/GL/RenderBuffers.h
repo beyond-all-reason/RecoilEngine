@@ -587,6 +587,9 @@ public:
 	void AssertBoundShader() const;
 	void DrawArrays(uint32_t mode, bool rewind = true);
 	void DrawElements(uint32_t mode, bool rewind = true);
+	// draw an explicit, already-uploaded index sub-range without advancing or
+	// rewinding any start/upload index (for re-submitting cached geometry)
+	void DrawElementsRange(uint32_t mode, size_t eboOffset, size_t eboCount);
 	void DropCurrent();
 
 	TypedRenderBuffer<T> CopyCurrent(bool readOnly) const;
@@ -908,6 +911,33 @@ inline void TypedRenderBuffer<T>::DrawElements(uint32_t mode, bool rewind)
 
 	vboStartIndex = verts.size();
 
+	numSubmits[1] += 1;
+}
+
+template<typename T>
+inline void TypedRenderBuffer<T>::DrawElementsRange(uint32_t mode, size_t eboOffset, size_t eboCount)
+{
+	AssertBoundShader();
+
+	// the requested range was uploaded by the build that produced it; these are
+	// idempotent for already-resident data and pick up any later appends.
+	UploadVBO();
+	UploadEBO();
+
+	if (eboCount == 0)
+		return;
+
+	#define BUFFER_OFFSET(T, n) (reinterpret_cast<void*>(sizeof(T) * (n)))
+#ifndef HEADLESS
+	assert(vao.GetIdRaw() > 0);
+#endif
+	vao.Bind();
+	glDrawElements(mode, static_cast<GLsizei>(eboCount), GL_UNSIGNED_INT, BUFFER_OFFSET(uint32_t, ebo->BufferElemOffset() + eboOffset));
+	vao.Unbind();
+	#undef BUFFER_OFFSET
+
+	// deliberately do NOT touch eboStartIndex/vboStartIndex/upload indices: this is a
+	// re-submit of cached geometry, not a consume of newly appended data.
 	numSubmits[1] += 1;
 }
 

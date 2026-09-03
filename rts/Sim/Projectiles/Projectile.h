@@ -116,6 +116,9 @@ public:
 
 	bool castShadow = false;
 	bool drawSorted = true;
+	// false => Draw() must run on the render thread (calls GL directly, touches shared
+	// aggregator state, or invokes eventHandler/Lua); excluded from the parallel fill.
+	bool drawThreaded = true;
 
 	bool blockPreciseCol = false;
 

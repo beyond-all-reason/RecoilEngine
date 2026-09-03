@@ -144,6 +144,19 @@ TypedRenderBuffer<VA_TYPE_PROJ>& CExpGenSpawnable::GetPrimaryRenderBuffer()
 	return RenderBuffer::GetTypedRenderBuffer<VA_TYPE_PROJ>();
 }
 
+// per-thread redirect target for the parallel billboard fill (see DrawAlpha)
+static thread_local TypedRenderBuffer<VA_TYPE_PROJ>* tlsRenderBuffer = nullptr;
+
+void CExpGenSpawnable::SetThreadRenderBuffer(TypedRenderBuffer<VA_TYPE_PROJ>* rb)
+{
+	tlsRenderBuffer = rb;
+}
+
+TypedRenderBuffer<VA_TYPE_PROJ>& CExpGenSpawnable::GetRenderBuffer()
+{
+	return (tlsRenderBuffer != nullptr) ? *tlsRenderBuffer : GetPrimaryRenderBuffer();
+}
+
 template<typename Spawnable>
 CExpGenSpawnable::SpawnableTuple GetSpawnableEntryImpl()
 {
@@ -237,7 +250,7 @@ void CExpGenSpawnable::AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl
 		((maxT = std::max(maxT, arg.t)), ...);
 	}, tl, tr, br, bl);
 
-	auto& rb = GetPrimaryRenderBuffer();
+	auto& rb = GetRenderBuffer();
 
 	const auto uvInfo = float4{ minS, minT, maxS - minS, maxT - minT };
 	const auto animInfo = float3{ ap.x, ap.y, p };
@@ -264,7 +277,7 @@ void CExpGenSpawnable::AddEffectsQuadImpl(uint32_t pageNum, const VA_TYPE_TC& tl
 		((maxT = std::max(maxT, arg.t)), ...);
 	}, tl, tr, br, bl);
 
-	auto& rb = GetPrimaryRenderBuffer();
+	auto& rb = GetRenderBuffer();
 
 	const auto uvInfo = float4{ minS, minT, maxS - minS, maxT - minT };
 	static constexpr auto animInfo = float3{ 1.0f, 1.0f , 0.0f };

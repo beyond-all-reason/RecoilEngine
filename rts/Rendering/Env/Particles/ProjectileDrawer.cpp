@@ -55,6 +55,47 @@ static bool CProjectileSortingPredicate(const CProjectile* p1, const CProjectile
 	return std::forward_as_tuple(p1->GetSortDist(sortCamType), p1) > std::forward_as_tuple(p2->GetSortDist(sortCamType), p2);
 };
 
+// below this bucket size std::sort with the tuple comparator beats the radix overhead
+static constexpr size_t PROJECTILE_RADIX_SORT_MIN = 256;
+
+// Map a float to a uint32 whose unsigned order matches the float's ordering, for all
+// floats incl. negatives (sortDist can carry a negative sortDistOffset).
+static inline uint32_t FloatToSortableU32(float f) noexcept {
+	const uint32_t u = std::bit_cast<uint32_t>(f);
+	return u ^ ((static_cast<uint32_t>(-static_cast<int32_t>(u >> 31))) | 0x80000000u);
+}
+
+// Stable LSD radix sort (8-bit passes) of (key, ptr) pairs by ascending key, using
+// `aux` as ping-pong scratch. `passes` low bytes; 4 and 8 are both even so the sorted
+// result lands back in `keys`. Stability gives deterministic ties (replacing the
+// pointer tiebreak the tuple comparator used).
+static void RadixSortByKey(std::vector<std::pair<uint64_t, CProjectile*>>& keys,
+                           std::vector<std::pair<uint64_t, CProjectile*>>& aux, int passes) noexcept
+{
+	const size_t n = keys.size();
+	aux.resize(n);
+
+	auto* src = keys.data();
+	auto* dst = aux.data();
+
+	for (int pass = 0; pass < passes; ++pass) {
+		const int shift = pass * 8;
+		size_t count[256] = {};
+		for (size_t i = 0; i < n; ++i)
+			++count[(src[i].first >> shift) & 0xFFu];
+
+		size_t offset[256];
+		for (size_t k = 0, sum = 0; k < 256; ++k) { offset[k] = sum; sum += count[k]; }
+
+		for (size_t i = 0; i < n; ++i)
+			dst[offset[(src[i].first >> shift) & 0xFFu]++] = src[i];
+
+		std::swap(src, dst);
+	}
+
+	assert(src == keys.data()); // passes is even (4 or 8)
+}
+
 CProjectileDrawer* projectileDrawer = nullptr;
 
 // can not be a CProjectileDrawer; destruction in global
@@ -371,6 +412,10 @@ void CProjectileDrawer::Kill() {
 void CProjectileDrawer::UpdateDrawFlags()
 {
 	ZoneScopedN("ProjectileDrawer::UpdateDrawFlags");
+
+	// invalidate the per-camera alpha-particle geometry cache for the new frame
+	for (auto& build : alphaBuilds)
+		build.valid = false;
 
 	for_mt(0, renderProjectiles.size(), [this](int i) {
 		CProjectile* p = renderProjectiles[i];
@@ -753,46 +798,147 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 	};
 	const auto& clipPlane = clipPlanes[1U * drawBelowWater + 2U * drawAboveWater];
 
-	const uint8_t thisPassMask =
-		(1 - (drawReflection || drawRefraction)) * DrawFlags::SO_ALPHAF_FLAG +
-		(drawReflection * DrawFlags::SO_REFLEC_FLAG) +
-		(drawRefraction * DrawFlags::SO_REFRAC_FLAG);
+	// Only the player and underwater-reflection cameras reach DrawAlpha. All three
+	// player passes (below-water, above-water, refraction) produce identical billboard
+	// geometry and sort order; they differ only in the clip-plane uniform, soften state
+	// and target FBO. So build the geometry once per camera and re-submit the cached
+	// vertex/index range for the remaining passes. SO_REFRAC_FLAG ⊆ SO_ALPHAF_FLAG, so
+	// the player build uses the ALPHAF superset; above-water quads in the refraction pass
+	// are clipped in hardware (gl_ClipDistance) just as the REFRAC subset would be.
+	const uint32_t camType = camera->GetCamType();
+	assert(camType == CCamera::CAMTYPE_PLAYER || camType == CCamera::CAMTYPE_UWREFL);
 
-	for (auto& dp : drawParticles)
-		dp.clear();
+	auto& build = alphaBuilds[camType];
+	const bool doBuild = !build.valid;
 
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
-		for (CProjectile* p : renderProjectiles) {
-			if (!ShouldDrawProjectile(p, thisPassMask))
-				continue;
+	const uint8_t buildMask = (camType == CCamera::CAMTYPE_UWREFL)
+		? DrawFlags::SO_REFLEC_FLAG
+		: DrawFlags::SO_ALPHAF_FLAG;
 
-			drawParticles[drawSorted && p->drawSorted].emplace_back(p);
+	auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
+
+	if (doBuild) {
+		for (auto& dp : drawParticles)
+			dp.clear();
+		serialParticles.clear();
+
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DP)");
+			for (CProjectile* p : renderProjectiles) {
+				if (!ShouldDrawProjectile(p, buildMask))
+					continue;
+
+				// particles that can't be filled off-thread (GL / shared state / Lua)
+				// are collected separately and drawn serially below.
+				if (!p->drawThreaded) {
+					serialParticles.emplace_back(p);
+					continue;
+				}
+
+				drawParticles[drawSorted && p->drawSorted].emplace_back(p);
+			}
 		}
-	}
 
-	// set static variable to facilite sorting
-	sortCamType = camera->GetCamType();
+		// set static variable to facilite sorting
+		sortCamType = camType;
 
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
-		if (wantDrawOrder)
-			std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileDrawOrderSortingPredicate);
-		else
-			std::sort(drawParticles[true].begin(), drawParticles[true].end(), CProjectileSortingPredicate);
-	}
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(SO)");
+			auto& sorted = drawParticles[true];
 
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
-		for (auto p : drawParticles[ true]) {
-			p->Draw();
+			if (sorted.size() < PROJECTILE_RADIX_SORT_MIN) {
+				if (wantDrawOrder)
+					std::sort(sorted.begin(), sorted.end(), CProjectileDrawOrderSortingPredicate);
+				else
+					std::sort(sorted.begin(), sorted.end(), CProjectileSortingPredicate);
+			} else {
+				// O(n) radix on a composite key: ascending drawOrder (primary), then
+				// descending sortDist (back-to-front). When drawOrder is uniform (the
+				// common case / !wantDrawOrder) the high 32 bits don't vary, so 4 byte
+				// passes over the low word suffice instead of 8.
+				sortKeys.clear();
+				sortKeys.reserve(sorted.size());
+
+				uint32_t hi0 = 0;
+				bool hiUniform = true;
+				for (CProjectile* p : sorted) {
+					const uint32_t distDesc = ~FloatToSortableU32(p->GetSortDist(camType));
+					const uint32_t hi = wantDrawOrder ? (static_cast<uint32_t>(p->drawOrder) ^ 0x80000000u) : 0u;
+
+					if (sortKeys.empty())
+						hi0 = hi;
+					hiUniform &= (hi == hi0);
+
+					sortKeys.emplace_back((static_cast<uint64_t>(hi) << 32) | distDesc, p);
+				}
+
+				RadixSortByKey(sortKeys, sortKeysAux, hiUniform ? 4 : 8);
+
+				for (size_t i = 0, n = sorted.size(); i < n; ++i)
+					sorted[i] = sortKeys[i].second;
+			}
 		}
-	}
-	{
-		ZoneScopedN("ProjectileDrawer::DrawAlpha(DU)");
-		for (auto p : drawParticles[false]) {
-			p->Draw();
+
+		// record the index range this build appends so reuse passes can re-submit it
+		build.eboStart = rb.GetIndcs().size();
+
+		// flat draw list: sorted bucket (back-to-front) followed by unsorted; both are
+		// parallel-safe. Chunks are contiguous slices, so an in-order concat of the
+		// per-chunk accumulators reproduces the exact serial vertex/index order.
+		drawList.clear();
+		drawList.insert(drawList.end(), drawParticles[ true].begin(), drawParticles[ true].end());
+		drawList.insert(drawList.end(), drawParticles[false].begin(), drawParticles[false].end());
+
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DS+DU)");
+
+			const int listSize = static_cast<int>(drawList.size());
+			const int numChunks = (listSize > 0)
+				? std::clamp(4 * ThreadPool::GetNumThreads(), 1, std::min(ThreadPool::MAX_THREADS, listSize))
+				: 0;
+
+			if (numChunks <= 1) {
+				// inline fast path (also the empty case): fill the primary directly (tls null)
+				for (CProjectile* p : drawList)
+					p->Draw();
+			} else {
+				const int chunkSize = (listSize + numChunks - 1) / numChunks;
+
+				for_mt(0, numChunks, [this, chunkSize, listSize](int c) {
+					auto& acc = fillBuffers[c];
+					acc.GetElems().clear();
+					acc.GetIndcs().clear();
+
+					CExpGenSpawnable::SetThreadRenderBuffer(&acc);
+
+					const int bb = c * chunkSize;
+					const int ee = std::min(bb + chunkSize, listSize);
+					for (int i = bb; i < ee; ++i)
+						drawList[i]->Draw();
+
+					CExpGenSpawnable::SetThreadRenderBuffer(nullptr);
+				});
+
+				// serial in-order concat => byte-identical to the serial fill
+				for (int c = 0; c < numChunks; ++c) {
+					const auto& acc = fillBuffers[c];
+					const auto base = static_cast<int32_t>(rb.GetElems().size());
+					rb.AddVertices(acc.GetElems());
+					rb.AddIndices(acc.GetIndcs(), base);
+				}
+			}
 		}
+
+		// serial bucket (render thread, tls null): shields append to the primary buffer
+		// (inside the cached range), tracers self-draw GL (append nothing). Once per build.
+		{
+			ZoneScopedN("ProjectileDrawer::DrawAlpha(DSerial)");
+			for (CProjectile* p : serialParticles)
+				p->Draw();
+		}
+
+		build.eboCount = rb.GetIndcs().size() - build.eboStart;
+		build.valid = true;
 	}
 
 	{
@@ -809,8 +955,9 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 
 		eventHandler.DrawWorldPreParticles(drawAboveWater, drawBelowWater, drawReflection, drawRefraction);
 
-		auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
-		if (!rb.ShouldSubmit())
+		// gate on the cached count, not ShouldSubmit(): a reuse pass appends nothing,
+		// so ShouldSubmit() would be false and wrongly skip the re-submit.
+		if (build.eboCount == 0)
 			return;
 
 		const bool needSoften = (wantSoften > 0) && !drawReflection && !drawRefraction;
@@ -835,7 +982,13 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		fxShader->SetUniform("fogColor", sky->fogColor.x, sky->fogColor.y, sky->fogColor.z);
 		fxShader->SetUniform("fogParams", sky->fogStart * camPlayer->GetFarPlaneDist(), sky->fogEnd * camPlayer->GetFarPlaneDist());
 
-		rb.DrawElements(GL_TRIANGLES);
+		// build pass: rewinding draw of the just-appended range (also advances the
+		// buffer's start indices so a later build / consumer appends cleanly).
+		// reuse pass: non-advancing draw of the cached range.
+		if (doBuild)
+			rb.DrawElements(GL_TRIANGLES);
+		else
+			rb.DrawElementsRange(GL_TRIANGLES, build.eboStart, build.eboCount);
 
 		fxShader->Disable();
 

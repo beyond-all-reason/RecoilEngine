@@ -35,6 +35,12 @@ public:
 	//Memory handled in projectileHandler
 	static CExpGenSpawnable* CreateSpawnable(int spawnableID);
 	static TypedRenderBuffer<VA_TYPE_PROJ>& GetPrimaryRenderBuffer();
+
+	// Redirect target for the per-particle billboard fill. When set (during the
+	// parallel DS+DU fill in ProjectileDrawer::DrawAlpha), AddEffectsQuad appends to
+	// this thread-local buffer instead of the shared primary buffer. Null otherwise.
+	static void SetThreadRenderBuffer(TypedRenderBuffer<VA_TYPE_PROJ>* rb);
+	static TypedRenderBuffer<VA_TYPE_PROJ>& GetRenderBuffer();
 protected:
 	CExpGenSpawnable();
 

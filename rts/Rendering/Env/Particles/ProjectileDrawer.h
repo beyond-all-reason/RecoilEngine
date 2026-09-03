@@ -170,6 +170,24 @@ private:
 	/// used to render particle effects in back-to-front order. {unsorted, sorted}
 	std::array<std::vector<CProjectile*>, 2> drawParticles;
 
+	/// flat draw list (sorted then unsorted) consumed by the parallel billboard fill
+	std::vector<CProjectile*> drawList;
+	/// particles whose Draw() must run on the render thread (GL / shared state / Lua)
+	std::vector<CProjectile*> serialParticles;
+	/// per-chunk CPU-only accumulators for the parallel fill; concatenated in order.
+	/// Default-constructed => no GL objects; persistent so capacity is reused.
+	std::array<TypedRenderBuffer<VA_TYPE_PROJ>, ThreadPool::MAX_THREADS> fillBuffers;
+
+	/// reusable scratch for the radix sort of the sorted alpha bucket ({sortKey, ptr})
+	std::vector<std::pair<uint64_t, CProjectile*>> sortKeys;
+	std::vector<std::pair<uint64_t, CProjectile*>> sortKeysAux;
+
+	/// per-frame cache of the alpha-particle geometry built per camera, so the
+	/// DP+SO+DS+DU pipeline runs once per camera instead of once per pass. Only
+	/// CAMTYPE_PLAYER and CAMTYPE_UWREFL reach DrawAlpha. Reset in UpdateDrawFlags.
+	struct AlphaBuild { bool valid = false; size_t eboStart = 0; size_t eboCount = 0; };
+	std::array<AlphaBuild, 2> alphaBuilds;
+
 	bool drawSorted = true;
 
 	Shader::IProgramObject* fxShader = nullptr;
