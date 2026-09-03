@@ -118,6 +118,7 @@ void S3DModel::FlattenPieceTree(S3DModelPiece* root)
 		for (size_t n = 0; n < p->children.size(); n++) {
 			auto* child = p->children[p->children.size() - n - 1];
 			stack.push_back(child);
+			child->rank = p->rank + 1;
 		}
 	}
 }

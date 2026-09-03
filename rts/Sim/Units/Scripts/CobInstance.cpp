@@ -151,10 +151,8 @@ void CCobInstance::MapScriptToModelPieces(LocalModel* lmodel)
 	// clear the default assumed 1:1 mapping
 	for (size_t lmodelPieceNum = 0; lmodelPieceNum < lmodelPieces.size(); lmodelPieceNum++) {
 		lmodelPieces[lmodelPieceNum].SetScriptPieceIndex(-1);
-		if (!lmodelPieces[lmodelPieceNum].parent)
-			rootPiece = &lmodelPieces[lmodelPieceNum];
 	}
-	assert(rootPiece);
+
 	for (size_t scriptPieceNum = 0; scriptPieceNum < pieceNames.size(); scriptPieceNum++) {
 		unsigned int lmodelPieceNum;
 
