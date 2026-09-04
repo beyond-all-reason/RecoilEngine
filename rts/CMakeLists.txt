@@ -42,6 +42,7 @@ include_directories(BEFORE lib)
 include_directories(BEFORE lib/lua/include)
 include_directories(${CMAKE_SOURCE_DIR}/include/AL)
 include_directories(${SPRING_MINIZIP_INCLUDE_DIR})
+include_directories(${SPRING_ZSTD_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/cereal/include)
 
@@ -85,7 +86,7 @@ endif (UNIX AND NOT MINGW)
 
 find_package_static(ZLIB 1.2.7 REQUIRED)
 list(APPEND engineCommonLibraries DevIL::IL)
-list(APPEND engineCommonLibraries 7zip prd::jsoncpp ${SPRING_MINIZIP_LIBRARY} ZLIB::ZLIB Tracy::TracyClient)
+list(APPEND engineCommonLibraries 7zip prd::jsoncpp ${SPRING_MINIZIP_LIBRARY} ${SPRING_ZSTD_LIBRARY} ZLIB::ZLIB Tracy::TracyClient)
 list(APPEND engineCommonLibraries lua luasocket archives assimp simdjson::simdjson fastgltf
 	gflags_nothreads_static)
 if(CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
