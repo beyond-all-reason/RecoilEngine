@@ -14,6 +14,7 @@
 #ifdef __linux__
 	#include <sys/syscall.h>
 	#include <linux/futex.h>
+	#include <unistd.h>
 #endif
 
 #ifdef __OpenBSD__
