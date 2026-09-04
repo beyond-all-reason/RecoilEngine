@@ -177,6 +177,7 @@ class LuaOpenGL {
 		static int GetViewRange(lua_State* L);
 
 		static int DrawMiniMap(lua_State* L);
+		static int DrawMiniMapIcons(lua_State* L);
 		static int SlaveMiniMap(lua_State* L);
 		static int ConfigMiniMap(lua_State* L);
 

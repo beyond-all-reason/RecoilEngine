@@ -293,6 +293,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetViewRange);
 
 	REGISTER_LUA_CFUNC(DrawMiniMap);
+	REGISTER_LUA_CFUNC(DrawMiniMapIcons);
 	REGISTER_LUA_CFUNC(SlaveMiniMap);
 	REGISTER_LUA_CFUNC(ConfigMiniMap);
 
@@ -1325,6 +1326,85 @@ int LuaOpenGL::DrawMiniMap(lua_State* L)
 		minimap->DrawForReal(false, false, true);
 	}
 
+	return 0;
+}
+
+
+/***
+ * Draws all unit icons visible to the given perspective (as on the minimap: team
+ * colors, radar dots, LOS rules, ghost dimming) for a map-space rectangle, without
+ * involving the actual minimap.
+ *
+ * The rectangle is mapped onto the unit square under the current transform:
+ * (left,top) -> (0,0), (right,bottom) -> (1,1). Callers position, scale, rotate or
+ * flip the result via their own matrices, e.g. inside gl.RenderToTexture. Blending,
+ * scissor and viewport state are left to the caller.
+ *
+ * @function gl.DrawMiniMapIcons
+ * @param left number map-space rectangle edges in elmos; left < right and top < bottom (top = smaller z) are required, mirror via your own transform instead
+ * @param top number
+ * @param right number
+ * @param bottom number
+ * @param iconSize number base icon half-size in elmos, scaled per icon by its icontypes.lua size
+ * @param allyTeam integer? (Default: your allyTeam) perspective to render; other allyteams require a full-read handle
+ * @param fullView boolean? (Default: true when spectating in full view with a full-read handle) draw every unit at its true position; true requires a full-read handle, false is always allowed
+ * @param highlightSelected boolean? (Default: true) draw the local player's selected units white. Other players' selections are unknown to the engine — when rendering another perspective, pass false and overlay that viewer's selection yourself
+ */
+int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
+{
+	CheckDrawingEnabled(L, __func__);
+
+	const float left     = luaL_checkfloat(L, 1);
+	const float top      = luaL_checkfloat(L, 2);
+	const float right    = luaL_checkfloat(L, 3);
+	const float bottom   = luaL_checkfloat(L, 4);
+	const float iconSize = luaL_checkfloat(L, 5);
+
+	// callers wanting a mirrored result can flip it via their own transform
+	if (!((right - left) > float3::cmp_eps()) || !((bottom - top) > float3::cmp_eps()))
+		luaL_error(L, "gl.DrawMiniMapIcons(): map rectangle must have left < right and top < bottom");
+
+	const int allyTeam = luaL_optint(L, 6, gu->myAllyTeam);
+	const bool fullView = luaL_optboolean(L, 7, gu->spectatingFullView && CLuaHandle::GetHandleFullRead(L));
+
+	if (!teamHandler.IsValidAllyTeam(allyTeam))
+		luaL_error(L, "gl.DrawMiniMapIcons(): invalid allyTeam %d", allyTeam);
+
+	// info-leak gate: other allyteams' perspectives and the fullview (godmode) view
+	// expose units this handle may not see; requesting less visibility is always fine
+	if ((allyTeam != gu->myAllyTeam || fullView) && !CLuaHandle::GetHandleFullRead(L))
+		luaL_error(L, "gl.DrawMiniMapIcons(): rendering another perspective requires a full-read handle");
+
+	MiniMapIconDrawParams params;
+	params.iconSizeX = iconSize;
+	params.iconSizeY = iconSize;
+	params.rotation = CMiniMap::ROTATION_0;
+	params.viewAllyTeam = allyTeam;
+	params.fullView = fullView;
+	params.useIcons = true;
+	// no simplecolors by design, a game can set teamcolors manually before this call if it wants to
+	params.useSimpleColors = false;
+	params.highlightSelected = luaL_optboolean(L, 8, true);
+
+	// cull to the rect, with margin so partially visible icons at the edges still draw.
+	// the bound covers the per-icon scale multiplier the drawer applies (icontypes.lua
+	// size, times radius/30 for radiusAdjust icons); icons scaled beyond it can pop at
+	// the rect edge, callers that care can pad their rectangle
+	constexpr float MAX_ICON_SCALE_MULT = 8.0f;
+	const float cullMargin = iconSize * MAX_ICON_SCALE_MULT;
+	params.cullMinX = left - cullMargin;
+	params.cullMaxX = right + cullMargin;
+	params.cullMinZ = top - cullMargin;
+	params.cullMaxZ = bottom + cullMargin;
+
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glScalef(1.0f / (right - left), 1.0f / (bottom - top), 1.0f);
+	glTranslatef(-left, -top, 0.0f);
+
+	unitDrawer->DrawUnitMiniMapIcons(params);
+
+	glPopMatrix();
 	return 0;
 }
 
