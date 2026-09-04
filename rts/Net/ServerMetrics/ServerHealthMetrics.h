@@ -34,6 +34,7 @@ private:
 		prometheus::Gauge* lagSeconds = nullptr;
 		prometheus::Gauge* lagFrames = nullptr;
 		prometheus::Gauge* cpuUsage = nullptr;
+		prometheus::Gauge* info = nullptr;
 	};
 
 	/// get this player's metric slot, created on first use
@@ -58,4 +59,5 @@ private:
 	prometheus::Family<prometheus::Gauge>* metricPlayerLag = nullptr;
 	prometheus::Family<prometheus::Gauge>* metricPlayerLagFrames = nullptr;
 	prometheus::Family<prometheus::Gauge>* metricPlayerCpu = nullptr;
+	prometheus::Family<prometheus::Gauge>* metricPlayerInfo = nullptr;
 };

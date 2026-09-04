@@ -21,6 +21,7 @@ void ServerMetrics::Init(const std::string& gameIDHex)
 
 	auto& registry = metrics::GetRegistry();
 
+	networkMetrics.Init(registry);
 	healthMetrics.Init(registry, gameIDHex);
 	registered = true;
 }
@@ -50,9 +51,13 @@ void ServerMetrics::Update(const CGameServer& server)
 	// code to publish metrics goes here
 	lastPublishTime = server.lastUpdate;
 
+	networkMetrics.Update(server);
 	healthMetrics.Update(server);
 }
 
 void ServerMetrics::SetGameStartTime(double unixSecs) {
 	healthMetrics.SetGameStartTime(unixSecs);
+}
+void ServerMetrics::ResetConnectionDeltas(int playerId) {
+	networkMetrics.ResetConnectionDeltas(playerId);
 }

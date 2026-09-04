@@ -2,6 +2,7 @@
 if    (ENABLE_METRICS)
 	make_global_var(sources_engine_ServerMetrics
 			"${CMAKE_CURRENT_SOURCE_DIR}/ServerMetrics/GameServerMetrics.cpp"
+			"${CMAKE_CURRENT_SOURCE_DIR}/ServerMetrics/NetworkMetrics.cpp"
 			"${CMAKE_CURRENT_SOURCE_DIR}/ServerMetrics/ServerHealthMetrics.cpp"
 		)
 else  (ENABLE_METRICS)
