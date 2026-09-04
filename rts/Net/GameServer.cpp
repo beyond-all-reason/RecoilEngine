@@ -12,6 +12,7 @@
 #include "GameServer.h"
 
 #include "GameParticipant.h"
+#include "ServerMetrics/GameServerMetrics.h"
 #include "GameSkirmishAI.h"
 #include "AutohostInterface.h"
 
@@ -135,6 +136,8 @@ CGameServer::CGameServer(
 	lastPlayerInfo = serverStartTime;
 	lastUpdate = serverStartTime;
 
+	serverMetrics = std::make_unique<ServerMetrics>();
+
 	myClientSetup = newClientSetup;
 	myGameData = newGameData;
 	myGameSetup = newGameSetup;
@@ -149,6 +152,10 @@ CGameServer::~CGameServer()
 	LOG_L(L_INFO, "[%s][1]", __func__);
 	thread.join();
 	LOG_L(L_INFO, "[%s][2]", __func__);
+
+	// Shutdown() invalidates every metric pointer, so this is only safe once the netcode thread is gone
+	// ie. this must come after thread.join() above
+	serverMetrics->Shutdown();
 
 	// after this, demoRecorder goes out of scope and its dtor is called
 	WriteDemoData();
@@ -259,6 +266,9 @@ void CGameServer::Initialize()
 
 	lastNewFrameTick = spring_gettime();
 	lastBandwidthUpdate = spring_gettime();
+
+	// this should come before `thread` is started, as netcode thread would otherwise use metrics uninitialized
+	serverMetrics->Init();
 
 	thread = spring::thread(std::bind(&CGameServer::UpdateLoop, this));
 
@@ -876,6 +886,8 @@ void CGameServer::Update()
 		if ((quitServer = (quitServer || !hasPlayers)))
 			Message(NoClientsExit);
 	}
+
+	serverMetrics->Update(*this);
 }
 
 

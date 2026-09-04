@@ -17,15 +17,15 @@ std::string FormatConnectionStats(const UdpStats& s)
 {
 	std::string msg = spring::format("\t%u bytes sent\n\t%u bytes recv'd\n", s.sentBytes, s.receivedBytes);
 	msg += spring::format("\t%u packets sent   (%.3f bytes/packet)\n",
-		s.sentPackets, spring::SafeDivide(s.sentBytes * 1.0f, s.sentPackets * 1.0f));
+		s.accumulated.sentPackets, spring::SafeDivide(s.sentBytes * 1.0f, s.accumulated.sentPackets * 1.0f));
 	msg += spring::format("\t%u packets recv'd (%.3f bytes/packet)\n",
-		s.receivedPackets, spring::SafeDivide(s.receivedBytes * 1.0f, s.receivedPackets * 1.0f));
+		s.accumulated.receivedPackets, spring::SafeDivide(s.receivedBytes * 1.0f, s.accumulated.receivedPackets * 1.0f));
 	msg += spring::format("\t{%.3fx, %.3fx} relative protocol overhead {up, down}\n",
-		spring::SafeDivide(s.sentOverheadBytes * 1.0f, s.sentBytes * 1.0f),
-		spring::SafeDivide(s.receivedOverheadBytes * 1.0f, s.receivedBytes * 1.0f));
+		spring::SafeDivide(s.accumulated.sentOverheadBytes * 1.0f, s.sentBytes * 1.0f),
+		spring::SafeDivide(s.accumulated.receivedOverheadBytes * 1.0f, s.receivedBytes * 1.0f));
 	msg += spring::format("\t%u incoming chunks dropped, %u outgoing chunks resent\n",
-		s.duplicateIncomingChunks, s.resentOutgoingChunks);
-	msg += spring::format("\t%u incoming chunks processed\n", s.processedIncomingChunks);
+		s.accumulated.duplicateIncomingChunks, s.accumulated.resentOutgoingChunks);
+	msg += spring::format("\t%u incoming chunks processed\n", s.live.processedIncomingChunks);
 	return msg;
 }
 
