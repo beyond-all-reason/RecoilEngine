@@ -36,6 +36,10 @@ public:
 	std::int32_t chunkNumber;
 	std::uint8_t chunkSize;
 	std::vector<std::uint8_t> data;
+
+	/// retransmission was requested because the chunk looks lost (nak or ack
+	/// timeout), but explicitly *not* because of the link duplication policy
+	bool lossSuspected = false;
 };
 typedef std::shared_ptr<Chunk> ChunkPtr;
 
@@ -149,7 +153,7 @@ private:
 	void SendIfNecessary(bool flushed);
 	void AckChunks(int lastAck);
 
-	void RequestResend(ChunkPtr ptr, bool noSort);
+	void RequestResend(const ChunkPtr& ptr, bool noSort, bool lossSuspected);
 	void SendPacket(Packet& pkt);
 
 	/// application bytes queued for this link but not yet transmitted
@@ -241,6 +245,8 @@ private:
 	unsigned int currentPacketChunkNum;
 
 	UdpStats::Accumulated accumulatedStats;
+
+	int highestCountedMissingChunk;
 
 	class BandwidthUsage {
 	public:
