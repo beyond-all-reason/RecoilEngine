@@ -6080,13 +6080,20 @@ int LuaSyncedRead::GetUnitDefDimensions(lua_State* L)
 
 
 /***
- *
+ * Returns the ID of a custom explosion generator by its name.
  * @function Spring.GetCEGID
- * @return integer cegID
+ * @param cegName string
+ * @return integer? cegID
  */
 int LuaSyncedRead::GetCEGID(lua_State* L)
 {
-	lua_pushnumber(L, explGenHandler.LoadCustomGeneratorID(luaL_checkstring(L, 1)));
+
+	const char* cegName = luaL_checkstring(L, 1);
+	if (explGenHandler.IsCustomGeneratorDefined(cegName)) {
+		lua_pushnumber(L, explGenHandler.LoadCustomGeneratorID(cegName));
+	} else {
+		lua_pushnil(L);
+	}
 	return 1;
 }
 
