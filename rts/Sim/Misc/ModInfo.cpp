@@ -138,6 +138,8 @@ void CModInfo::ResetState()
 		qtMaxNodesSearchedRelativeToMapOpenNodes = 0.25;
 
 		enableSmoothMesh = true;
+		overrideMapGravity = false;
+		forcedMapGravityStrength = CModInfo::DEFAULT_MAP_GRAVITY;
 		smoothMeshResDivider = 2;
 		smoothMeshSmoothRadius = 40;
 		quadFieldQuadSizeInElmos = 128;
@@ -199,6 +201,8 @@ void CModInfo::Init(const std::string& modFileName)
 		qtMaxNodesSearchedRelativeToMapOpenNodes = system.GetFloat("qtMaxNodesSearchedRelativeToMapOpenNodes", qtMaxNodesSearchedRelativeToMapOpenNodes);
 
 		enableSmoothMesh = system.GetBool("enableSmoothMesh", enableSmoothMesh);
+		overrideMapGravity = system.GetBool("overrideMapGravity", overrideMapGravity);
+		forcedMapGravityStrength = system.GetFloat("forcedMapGravityStrength", forcedMapGravityStrength);
 		smoothMeshResDivider = system.GetInt("smoothMeshResDivider", smoothMeshResDivider);
 		smoothMeshSmoothRadius = system.GetInt("smoothMeshSmoothRadius", smoothMeshSmoothRadius);
 

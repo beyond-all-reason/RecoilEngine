@@ -234,6 +234,9 @@ public:
 
 	bool enableSmoothMesh;
 
+	bool overrideMapGravity; // Enable to override the map gravity, with the value in forcedMapGravityStrength.
+	float forcedMapGravityStrength; // If overrideMapGravity is true, then use this value for the gravity strength. Otherwise, use the map's gravity. Default's to 130.0f, which is the default map gravity.
+
 	/// Reduce the resolution of the smooth mesh by the divider value. Increasing the value reduces
 	/// the accuracy of the smooth mesh, but improves performance. Minimum 1, default 2.
 	int smoothMeshResDivider;
@@ -254,6 +257,8 @@ public:
 
 	// If true, players can select their start position by clicking the map
 	bool useStartPositionSelecter;
+
+	static constexpr float DEFAULT_MAP_GRAVITY = 130.0f;
 };
 
 extern CModInfo modInfo;
