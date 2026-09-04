@@ -44,6 +44,7 @@
 #include "System/SpringExitCode.h"
 #include "System/SpringFormat.h"
 #include "System/TdfParser.h"
+#include "System/TimeUtil.h"
 #include "System/StringHash.h"
 #include "System/StringUtil.h"
 #include "System/Config/ConfigHandler.h"
@@ -267,8 +268,11 @@ void CGameServer::Initialize()
 	lastNewFrameTick = spring_gettime();
 	lastBandwidthUpdate = spring_gettime();
 
+	if (!demoReader)
+		ComputeGameID();
+
 	// this should come before `thread` is started, as netcode thread would otherwise use metrics uninitialized
-	serverMetrics->Init();
+	serverMetrics->Init(GetGameIDHex());
 
 	thread = spring::thread(std::bind(&CGameServer::UpdateLoop, this));
 
@@ -280,7 +284,8 @@ void CGameServer::Initialize()
 	streflop::streflop_init<streflop::Simple>();
 
 	if (!demoReader) {
-		GenerateAndSendGameID();
+		ComputeGameID();
+		SendGameID();
 		if (myGameSetup->fixedRNGSeed == 0) {
 			rng.Seed(gameID.intArray[0] ^ gameID.intArray[1] ^ gameID.intArray[2] ^ gameID.intArray[3]);
 			Broadcast(CBaseNetProtocol::Get().SendRandSeed(rng()));
@@ -2151,7 +2156,7 @@ void CGameServer::ServerReadNet()
 }
 
 
-void CGameServer::GenerateAndSendGameID()
+void CGameServer::ComputeGameID()
 {
 	// First and second dword are time based (current time and load time).
 	gameID.intArray[0] = (unsigned) time(nullptr);
@@ -2170,25 +2175,42 @@ void CGameServer::GenerateAndSendGameID()
 	// fixed gameID?
 	if (!myGameSetup->gameID.empty()) {
 		unsigned char p[16];
+	bool parsedFixedID = false;
 	#if defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR)
 		// workaround missing C99 support in a msvc lib with %2hhx
-		generatedGameID = (sscanf(myGameSetup->gameID.c_str(),
+		parsedFixedID = (sscanf(myGameSetup->gameID.c_str(),
 		      "%02hc%02hc%02hc%02hc%02hc%02hc%02hc%02hc"
 		      "%02hc%02hc%02hc%02hc%02hc%02hc%02hc%02hc",
 		      &p[ 0], &p[ 1], &p[ 2], &p[ 3], &p[ 4], &p[ 5], &p[ 6], &p[ 7],
 		      &p[ 8], &p[ 9], &p[10], &p[11], &p[12], &p[13], &p[14], &p[15]) == 16);
 	#else
-		generatedGameID = (sscanf(myGameSetup->gameID.c_str(),
+		parsedFixedID = (sscanf(myGameSetup->gameID.c_str(),
 		       "%hhx%hhx%hhx%hhx%hhx%hhx%hhx%hhx"
 		       "%hhx%hhx%hhx%hhx%hhx%hhx%hhx%hhx",
 		       &p[ 0], &p[ 1], &p[ 2], &p[ 3], &p[ 4], &p[ 5], &p[ 6], &p[ 7],
 		       &p[ 8], &p[ 9], &p[10], &p[11], &p[12], &p[13], &p[14], &p[15]) == 16);
 	#endif
-		if (generatedGameID)
+		if (parsedFixedID)
 			for (int i = 0; i<16; ++i)
 				gameID.charArray[i] = p[i];
 	}
 
+}
+
+
+std::string CGameServer::GetGameIDHex() const
+{
+	std::string hex;
+
+	for (const unsigned char b: gameID.charArray)
+		hex += spring::format("%02x", b);
+
+	return hex;
+}
+
+
+void CGameServer::SendGameID()
+{
 	Broadcast(CBaseNetProtocol::Get().SendGameID(gameID.charArray));
 
 	if (demoRecorder != nullptr) {
@@ -2248,6 +2270,8 @@ void CGameServer::StartGame(bool forced)
 	assert(!gameHasStarted);
 	gameHasStarted = true;
 	startTime = gameTime;
+
+	serverMetrics->SetGameStartTime(CTimeUtil::GetCurrentTime());
 
 	if (!canReconnect && !allowSpecJoin)
 		packetCache.clear(); // free memory

@@ -22,6 +22,11 @@ namespace metrics {
 	/// true iff the /metrics endpoint is being served
 	bool Enabled();
 
+	/// true iff per-player metrics should be exported alongside the
+	/// server-wide aggregates. These multiply the series count by the
+	/// number of participants
+	bool PerPlayerEnabled();
+
 	/// registry to Register() metric families in, only valid when Enabled()
 	prometheus::Registry& GetRegistry();
 }
