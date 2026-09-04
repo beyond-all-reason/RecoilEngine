@@ -177,10 +177,13 @@ ctest -N
 - Line endings: platform-appropriate (LF on Linux, CRLF on Windows)
 
 ### File Headers
-All source files must begin with the GPL license header:
+New source files must begin with the GPL license header:
 ```cpp
-/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+/* This file is part of the Recoil engine (GPL v2 or later), see LICENSE.html */
 ```
+Many existing files carry the older `Spring engine` header (Recoil is a fork of
+the Spring RTS engine); those do not need to be changed en masse, but new files
+should use the `Recoil engine` header above.
 
 ### Include Guards
 Use `#pragma once` for new headers, migrate ifdef guards to `#pragma once` whenever you edit a header file.
