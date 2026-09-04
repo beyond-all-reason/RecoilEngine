@@ -6,7 +6,7 @@
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Misc/TeamHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Map/ReadMap.h"
 #include "System/Log/ILog.h"
 #include "System/SpringHash.h"
@@ -209,7 +209,7 @@ inline void ILosType::UpdateUnit(CUnit* unit, bool ignore)
 
 	// jammers share all the same map independent of the allyTeam
 	if (type == LOS_TYPE_JAMMER || type == LOS_TYPE_SONAR_JAMMER)
-		allyteam *= modInfo.separateJammers;
+		allyteam *= modRules.separateJammers;
 
 	if (radius <= 0.0f) {
 		if (uli != nullptr) {
@@ -713,13 +713,13 @@ void CLosHandler::Init()
 	baseRadarErrorSize = defBaseRadarErrorSize;
 	baseRadarErrorMult = defBaseRadarErrorMult;
 
-	los.Init(modInfo.losMipLevel, ILosType::LOS_TYPE_LOS);
-	airLos.Init(modInfo.airMipLevel, ILosType::LOS_TYPE_AIRLOS);
-	radar.Init(modInfo.radarMipLevel, ILosType::LOS_TYPE_RADAR);
-	sonar.Init(modInfo.radarMipLevel, ILosType::LOS_TYPE_SONAR);
-	seismic.Init(modInfo.radarMipLevel, ILosType::LOS_TYPE_SEISMIC);
-	jammer.Init(modInfo.radarMipLevel, ILosType::LOS_TYPE_JAMMER);
-	sonarJammer.Init(modInfo.radarMipLevel, ILosType::LOS_TYPE_SONAR_JAMMER);
+	        los.Init(modRules.  losMipLevel, ILosType::LOS_TYPE_LOS         );
+	     airLos.Init(modRules.  airMipLevel, ILosType::LOS_TYPE_AIRLOS      );
+	      radar.Init(modRules.radarMipLevel, ILosType::LOS_TYPE_RADAR       );
+	      sonar.Init(modRules.radarMipLevel, ILosType::LOS_TYPE_SONAR       );
+	    seismic.Init(modRules.radarMipLevel, ILosType::LOS_TYPE_SEISMIC     );
+	     jammer.Init(modRules.radarMipLevel, ILosType::LOS_TYPE_JAMMER      );
+	sonarJammer.Init(modRules.radarMipLevel, ILosType::LOS_TYPE_SONAR_JAMMER);
 
 	radarErrorSizes.clear();
 	radarErrorSizes.resize(teamHandler.ActiveAllyTeams(), defBaseRadarErrorSize);
@@ -873,7 +873,7 @@ bool CLosHandler::InLos(const CUnit* unit, int allyTeam) const
 	//      are also in radar ("sonar") coverage if requireSonarUnderWater
 	//      is enabled --> underwater units can NOT BE SEEN AT ALL without
 	//      active radar!
-	if (modInfo.alwaysVisibleOverridesCloaked) {
+	if (modRules.alwaysVisibleOverridesCloaked) {
 		if (unit->alwaysVisible)
 			return true;
 		if (unit->isCloaked && unit->allyteam != allyTeam)
@@ -892,7 +892,7 @@ bool CLosHandler::InLos(const CUnit* unit, int allyTeam) const
 	if (unit->useAirLos)
 		return (InAirLos(unit->pos, allyTeam) || InAirLos(unit->pos + unit->speed, allyTeam));
 
-	if (modInfo.requireSonarUnderWater) {
+	if (modRules.requireSonarUnderWater) {
 		if (unit->IsUnderWater() && !InRadar(unit, allyTeam)) {
 			return false;
 		}
@@ -911,7 +911,7 @@ bool CLosHandler::InAirLos(const CUnit* unit, int allyTeam) const
 	//      are also in radar ("sonar") coverage if requireSonarUnderWater
 	//      is enabled --> underwater units can NOT BE SEEN AT ALL without
 	//      active radar!
-	if (modInfo.alwaysVisibleOverridesCloaked) {
+	if (modRules.alwaysVisibleOverridesCloaked) {
 		if (unit->alwaysVisible)
 			return true;
 		if (unit->isCloaked && unit->allyteam != allyTeam)
@@ -927,7 +927,7 @@ bool CLosHandler::InAirLos(const CUnit* unit, int allyTeam) const
 	if (globalLOS[allyTeam])
 		return true;
 
-	if (modInfo.requireSonarUnderWater) {
+	if (modRules.requireSonarUnderWater) {
 		if (unit->IsUnderWater() && !InRadar(unit, allyTeam))
 			return false;
 	}
@@ -942,9 +942,9 @@ bool CLosHandler::InRadar(const float3 pos, int allyTeam) const
 	// position is underwater, only sonar can see it
 	// note: only check jammers when we have a common jammer map, else jammers only apply to objects!
 	if (pos.y < 0.0f)
-		return (sonar.InSight(pos, allyTeam) && !(!modInfo.separateJammers && sonarJammer.InSight(pos, 0)));
+		return (sonar.InSight(pos, allyTeam) && !(!modRules.separateJammers && sonarJammer.InSight(pos, 0)));
 
-	return (radar.InSight(pos, allyTeam) && !(!modInfo.separateJammers && jammer.InSight(pos, 0)));
+	return (radar.InSight(pos, allyTeam) && !(!modRules.separateJammers && jammer.InSight(pos, 0)));
 }
 
 
@@ -976,7 +976,7 @@ bool CLosHandler::InRadar(const CUnit* unit, int allyTeam) const
 bool CLosHandler::InJammer(const float3 pos, int allyTeam) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const int jammerAlly = modInfo.separateJammers ? allyTeam : 0;
+	const int jammerAlly = modRules.separateJammers ? allyTeam : 0;
 
 	return jammer.InSight(pos, jammerAlly);
 }
@@ -988,15 +988,15 @@ bool CLosHandler::InJammer(const CUnit* unit, int allyTeam) const
 		return false;
 
 	//TODO handle ingame alliances
-	const int jammerAlly = modInfo.separateJammers ? unit->allyteam : 0;
-	
+	const int jammerAlly = modRules.separateJammers ? unit->allyteam : 0;
+
 	return jammer.InSight(unit->pos, jammerAlly);
 }
 
 bool CLosHandler::InSonarJammer(const float3 pos, int allyTeam) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const int jammerAlly = modInfo.separateJammers ? allyTeam : 0;
+	const int jammerAlly = modRules.separateJammers ? allyTeam : 0;
 
 	return sonarJammer.InSight(pos, jammerAlly);
 }
@@ -1008,7 +1008,7 @@ bool CLosHandler::InSonarJammer(const CUnit* unit, int allyTeam) const
 		return false;
 	
 	//TODO handle ingame alliances
-	const int jammerAlly = modInfo.separateJammers ? unit->allyteam : 0;
+	const int jammerAlly = modRules.separateJammers ? unit->allyteam : 0;
 
 	return sonarJammer.InSight(unit->pos, jammerAlly);
 }

@@ -30,7 +30,7 @@
 #include "Sim/Misc/GeometricObjects.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/QuadField.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/Wind.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
@@ -982,7 +982,7 @@ const unsigned short* CAICallback::GetRadarMap()
 
 const unsigned short* CAICallback::GetJammerMap()
 {
-	const int jammerAllyTeam = modInfo.separateJammers ? teamHandler.AllyTeam(team) : 0;
+	const int jammerAllyTeam = modRules.separateJammers ? teamHandler.AllyTeam(team) : 0;
 	return &losHandler->jammer.losMaps[jammerAllyTeam].front();
 }
 

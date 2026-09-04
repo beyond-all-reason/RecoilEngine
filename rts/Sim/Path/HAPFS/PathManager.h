@@ -5,7 +5,7 @@
 
 #include <cinttypes>
 
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Path/IPathManager.h"
 #include "IPath.h"
 #include "IPathFinder.h"

@@ -7,7 +7,7 @@
 #include "Sim/Misc/YardmapStatusEffectsMap.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Path/IPathManager.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Units/Unit.h"
 #include "System/creg/STL_Map.h"
 #include "System/Exceptions.h"
@@ -380,7 +380,7 @@ bool MoveDef::DoRawSearch(
 		, std::clamp(int((endPos.z + upDir) / SQUARE_SIZE), 0, mapDims.mapym1)
 		);
 	const int2 diffBlk = {std::abs(endBlock.x - startBlock.x), std::abs(endBlock.y - startBlock.y)};
-	const float speedModThreshold = modInfo.pfRawMoveSpeedThreshold;
+	const float speedModThreshold = modRules.pfRawMoveSpeedThreshold;
 
 	const/*expr*/ auto StepFunc = [](const int2& dir, const int2& dif, int2& pos, int2& err) {
 		pos.x += (dir.x * (err.y >= 0));

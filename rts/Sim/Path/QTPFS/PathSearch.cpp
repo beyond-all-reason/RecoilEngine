@@ -12,7 +12,7 @@
 #include "NodeLayer.h"
 #include "Sim/Misc/CollisionHandler.h"
 #include "Sim/Misc/GlobalConstants.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "System/Log/ILog.h"
 #include "Game/SelectedUnitsHandler.h"
 #include "Sim/Objects/SolidObject.h"
@@ -172,7 +172,7 @@ void QTPFS::PathSearch::InitializeThread(SearchThreadData* threadData, IPath* pa
 		for (auto i = firstCleanPointId + 1; i < pointCount; ++i) {
 			const float3& nextPoint = pathToRepair->GetPoint(i);
 			pathLength += nextPoint.distance2D(prevPoint);
-			if (pathLength >= modInfo.qtRefreshPathMinDist)
+			if (pathLength >= modRules.qtRefreshPathMinDist)
 				return true;
 		}
 		return false;
@@ -561,9 +561,9 @@ void QTPFS::PathSearch::InitStartingSearchNodes() {
 
 	// max nodes is split between forward and reverse search.
 	if (pathOwner != nullptr){
-		float relativeModifier = std::max(MAP_RELATIVE_MAX_NODES_SEARCHED, modInfo.qtMaxNodesSearchedRelativeToMapOpenNodes);
+		float relativeModifier = std::max(MAP_RELATIVE_MAX_NODES_SEARCHED, modRules.qtMaxNodesSearchedRelativeToMapOpenNodes);
 		int relativeLimit = nodeLayer->GetNumOpenNodes() * relativeModifier;
-		int absoluteLimit = std::max(MAP_MAX_NODES_SEARCHED, modInfo.qtMaxNodesSearched);
+		int absoluteLimit = std::max(MAP_MAX_NODES_SEARCHED, modRules.qtMaxNodesSearched);
 
 		nodeSearchLimit = std::max(absoluteLimit, relativeLimit) >> 1;
 	} else {
@@ -675,16 +675,16 @@ void QTPFS::PathSearch::SetNodeSearchLimit() {
 
 	// Approximate the distance the pathing system can search out to. The calculation takes into account that we use
 	// bi-directional path finding.
-	const float maxDist = math::sqrt(modInfo.qtMaxNodesSearched>>1) * 2 * avgNodeLength;
+	const float maxDist = math::sqrt(modRules.qtMaxNodesSearched>>1) * 2 * avgNodeLength;
 
 	constexpr int minNodesSearched = 256;
-	const int limit = modInfo.qtMaxNodesSearched>>1;
+	const int limit = modRules.qtMaxNodesSearched>>1;
 
 	const float interp = std::clamp(dist / maxDist, 0.f, 1.f);
 	nodeSearchLimit = std::max(minNodesSearched, int(limit * CircularEaseOut(interp)));
 
 	// LOG("%s: Pathing ease out for layer %d is (srchMax: %d, sqrs: %d, nodes: %d, dist: %f, avg: %f, max: %f) %d", __func__, nodeLayer->GetNodelayer(),
-	// 	modInfo.qtMaxNodesSearched, mapDims.mapSquares, nodeLayer->GetNumLeafNodes(), dist, avgNodeLength, maxDist, nodeSearchLimit);
+	// 	modRules.qtMaxNodesSearched, mapDims.mapSquares, nodeLayer->GetNumLeafNodes(), dist, avgNodeLength, maxDist, nodeSearchLimit);
 }
 
 // #pragma GCC push_options
@@ -2152,7 +2152,7 @@ void QTPFS::PathSearch::TracePath(IPath* path) {
 	uint32_t repathIndex = 0;
 	// Unowned paths do not allow repaths - they always perform a full path search.
 	if (!haveFullPath && pathOwner != nullptr) {
-		const float minRepathLength = modInfo.qtRefreshPathMinDist;
+		const float minRepathLength = modRules.qtRefreshPathMinDist;
 		bool pathIsBigEnoughForRepath = (pathDist >= minRepathLength);
 
 		// This may result in a short path still not finding an index, but that's fine:

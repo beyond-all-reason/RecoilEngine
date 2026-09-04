@@ -78,7 +78,7 @@
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/BuildingMaskMap.h"
 #include "Sim/Misc/LosHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/InterceptHandler.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/SideParser.h"
@@ -262,7 +262,7 @@ CGame::CGame(const std::string& mapFileName, const std::string& modFileName, ILo
 
 	envResHandler.ResetState();
 
-	modInfo.Init(modFileName);
+	modRules.Init(modFileName);
 
 	// needed for LuaIntro (pushes LuaConstGame)
 	assert(mapInfo == nullptr);
@@ -646,11 +646,11 @@ void CGame::PreLoadSimulation(LuaParser* defsParser)
 	ENTER_SYNCED_CODE();
 
 	loadscreen->SetLoadMessage("Creating Smooth Height Mesh");
-	smoothGround.Init(int2(mapDims.mapx, mapDims.mapy), modInfo.smoothMeshResDivider, modInfo.smoothMeshSmoothRadius);
+	smoothGround.Init(int2(mapDims.mapx, mapDims.mapy), modRules.smoothMeshResDivider, modRules.smoothMeshSmoothRadius);
 
 	loadscreen->SetLoadMessage("Creating QuadField & CEGs");
 	moveDefHandler.Init(defsParser);
-	quadField.Init(int2(mapDims.mapx, mapDims.mapy), modInfo.quadFieldQuadSizeInElmos);
+	quadField.Init(int2(mapDims.mapx, mapDims.mapy), modRules.quadFieldQuadSizeInElmos);
 	damageArrayHandler.Init(defsParser);
 	explGenHandler.Init();
 }
@@ -708,7 +708,7 @@ void CGame::PostLoadSimulation(LuaParser* defsParser)
 	//   --> need a way to let Lua flush it or re-calculate map
 	//   checksum (over heightmap + blockmap, not raw archive)
 	mapDamage = IMapDamage::InitMapDamage();
-	pathManager = IPathManager::GetInstance(modInfo.pathFinderSystem);
+	pathManager = IPathManager::GetInstance(modRules.pathFinderSystem);
 	moveDefHandler.PostSimInit();
 
 	// load map-specific features

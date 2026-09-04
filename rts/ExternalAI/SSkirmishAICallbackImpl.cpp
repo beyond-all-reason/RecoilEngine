@@ -41,7 +41,7 @@
 #include "Sim/Misc/ResourceMapAnalyzer.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/TeamHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/QuadField.h" // for quadField.GetFeaturesExact(pos, radius)
 #include "System/SafeCStrings.h"
 #include "System/SpringMath.h"
@@ -1626,134 +1626,134 @@ EXPORT(const char*) skirmishAiCallback_Game_getRulesParamString(int skirmishAIId
 //########### BEGIN Mod
 
 EXPORT(const char*) skirmishAiCallback_Mod_getFileName(int skirmishAIId) {
-	return modInfo.filename.c_str();
+	return modRules.filename.c_str();
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getHash(int skirmishAIId) {
-	return archiveScanner->GetArchiveCompleteChecksum(modInfo.humanNameVersioned);
+	return archiveScanner->GetArchiveCompleteChecksum(modRules.humanNameVersioned);
 }
 EXPORT(const char*) skirmishAiCallback_Mod_getHumanName(int skirmishAIId) {
-	return modInfo.humanNameVersioned.c_str();
+	return modRules.humanNameVersioned.c_str();
 }
 
 EXPORT(const char*) skirmishAiCallback_Mod_getShortName(int skirmishAIId) {
-	return modInfo.shortName.c_str();
+	return modRules.shortName.c_str();
 }
 
 EXPORT(const char*) skirmishAiCallback_Mod_getVersion(int skirmishAIId) {
-	return modInfo.version.c_str();
+	return modRules.version.c_str();
 }
 
 EXPORT(const char*) skirmishAiCallback_Mod_getMutator(int skirmishAIId) {
-	return modInfo.mutator.c_str();
+	return modRules.mutator.c_str();
 }
 
 EXPORT(const char*) skirmishAiCallback_Mod_getDescription(int skirmishAIId) {
-	return modInfo.description.c_str();
+	return modRules.description.c_str();
 }
 
 EXPORT(bool) skirmishAiCallback_Mod_getConstructionDecay(int skirmishAIId) {
-	return modInfo.constructionDecay;
+	return modRules.constructionDecay;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getConstructionDecayTime(int skirmishAIId) {
-	return modInfo.constructionDecayTime;
+	return modRules.constructionDecayTime;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getConstructionDecaySpeed(int skirmishAIId) {
-	return modInfo.constructionDecaySpeed;
+	return modRules.constructionDecaySpeed;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getMultiReclaim(int skirmishAIId) {
-	return modInfo.multiReclaim;
+	return modRules.multiReclaim;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getReclaimMethod(int skirmishAIId) {
-	return modInfo.reclaimMethod;
+	return modRules.reclaimMethod;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getReclaimUnitMethod(int skirmishAIId) {
-	return modInfo.reclaimUnitMethod;
+	return modRules.reclaimUnitMethod;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getReclaimUnitEnergyCostFactor(int skirmishAIId) {
-	return modInfo.reclaimUnitCostFactor.energy;
+	return modRules.reclaimUnitCostFactor.energy;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getReclaimUnitEfficiency(int skirmishAIId) {
-	return modInfo.reclaimUnitEfficiency.metal;
+	return modRules.reclaimUnitEfficiency.metal;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getReclaimFeatureEnergyCostFactor(int skirmishAIId) {
-	return modInfo.reclaimFeatureCostFactor.energy;
+	return modRules.reclaimFeatureCostFactor.energy;
 }
 
 EXPORT(bool) skirmishAiCallback_Mod_getReclaimUnitDrainHealth(int skirmishAIId) {
-	return modInfo.reclaimUnitDrainHealth;
+	return modRules.reclaimUnitDrainHealth;
 }
 
 EXPORT(bool) skirmishAiCallback_Mod_getReclaimAllowEnemies(int skirmishAIId) {
-	return modInfo.reclaimAllowEnemies;
+	return modRules.reclaimAllowEnemies;
 }
 
 EXPORT(bool) skirmishAiCallback_Mod_getReclaimAllowAllies(int skirmishAIId) {
-	return modInfo.reclaimAllowAllies;
+	return modRules.reclaimAllowAllies;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getRepairEnergyCostFactor(int skirmishAIId) {
-	return modInfo.repairCostFactor.energy;
+	return modRules.repairCostFactor.energy;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getResurrectEnergyCostFactor(int skirmishAIId) {
-	return modInfo.resurrectCostFactor.energy;
+	return modRules.resurrectCostFactor.energy;
 }
 
 EXPORT(float) skirmishAiCallback_Mod_getCaptureEnergyCostFactor(int skirmishAIId) {
-	return modInfo.captureCostFactor.energy;
+	return modRules.captureCostFactor.energy;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getTransportGround(int skirmishAIId) {
-	return modInfo.transportGround;
+	return modRules.transportGround;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getTransportHover(int skirmishAIId) {
-	return modInfo.transportHover;
+	return modRules.transportHover;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getTransportShip(int skirmishAIId) {
-	return modInfo.transportShip;
+	return modRules.transportShip;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getTransportAir(int skirmishAIId) {
-	return modInfo.transportAir;
+	return modRules.transportAir;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getFireAtKilled(int skirmishAIId) {
-	return modInfo.fireAtKilled;
+	return modRules.fireAtKilled;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getFireAtCrashing(int skirmishAIId) {
-	return modInfo.fireAtCrashing;
+	return modRules.fireAtCrashing;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getFlankingBonusModeDefault(int skirmishAIId) {
-	return modInfo.flankingBonusModeDefault;
+	return modRules.flankingBonusModeDefault;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getLosMipLevel(int skirmishAIId) {
-	return modInfo.losMipLevel;
+	return modRules.losMipLevel;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getAirMipLevel(int skirmishAIId) {
-	return modInfo.airMipLevel;
+	return modRules.airMipLevel;
 }
 
 EXPORT(int) skirmishAiCallback_Mod_getRadarMipLevel(int skirmishAIId) {
-	return modInfo.radarMipLevel;
+	return modRules.radarMipLevel;
 }
 
 EXPORT(bool) skirmishAiCallback_Mod_getRequireSonarUnderWater(int skirmishAIId) {
-	return modInfo.requireSonarUnderWater;
+	return modRules.requireSonarUnderWater;
 }
 
 //########### END Mod

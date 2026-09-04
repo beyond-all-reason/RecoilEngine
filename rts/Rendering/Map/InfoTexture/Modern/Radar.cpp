@@ -8,7 +8,7 @@
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/GL/SubState.h"
 #include "Sim/Misc/LosHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "System/Exceptions.h"
 #include "System/Log/ILog.h"
 
@@ -114,7 +114,7 @@ void CRadarTexture::Update()
 		return;
 	}
 
-	const int jammerAllyTeam = modInfo.separateJammers ? gu->myAllyTeam : 0;
+	const int jammerAllyTeam = modRules.separateJammers ? gu->myAllyTeam : 0;
 
 	const auto& myRadar  = losHandler->radar.losMaps[gu->myAllyTeam].GetLosMap();
 	const auto& myJammer = losHandler->jammer.losMaps[jammerAllyTeam].GetLosMap();

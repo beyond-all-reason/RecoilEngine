@@ -25,7 +25,7 @@ add_library(engineSim STATIC
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/InterceptHandler.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/LosHandler.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/LosMap.cpp"
-		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/ModInfo.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/ModRules.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/NanoPieceCache.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/QuadField.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/Resource.cpp"

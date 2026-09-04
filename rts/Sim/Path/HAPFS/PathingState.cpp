@@ -9,7 +9,7 @@
 #include "Game/LoadScreen.h"
 #include "Net/Protocol/NetProtocol.h"
 
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/MoveTypes/MoveMath/MoveMath.h"
 #include "PathFinder.h"
@@ -631,14 +631,14 @@ void PathingState::Update()
 	// determine how many blocks we should update
 	int blocksToUpdate = 0;
 	{
-		const int progressiveUpdates = std::ceil(updatedBlocks.size() * (1.f / (BLOCKS_TO_UPDATE<<2)) * modInfo.pfUpdateRateScale);
+		const int progressiveUpdates = std::ceil(updatedBlocks.size() * (1.f / (BLOCKS_TO_UPDATE<<2)) * modRules.pfUpdateRateScale);
 		const int MIN_BLOCKS_TO_UPDATE = 1;
 		const int MAX_BLOCKS_TO_UPDATE = std::max<int>(BLOCKS_TO_UPDATE >> 1, MIN_BLOCKS_TO_UPDATE);
 
 		blocksToUpdate = std::clamp(progressiveUpdates, MIN_BLOCKS_TO_UPDATE, MAX_BLOCKS_TO_UPDATE) * numMoveDefs;
 	
 		// LOG("[%d] blocksToUpdate=%d progressiveUpdates=%d [%f]"
-		// 		, BLOCK_SIZE, blocksToUpdate, progressiveUpdates, modInfo.pfUpdateRateScale);
+		// 		, BLOCK_SIZE, blocksToUpdate, progressiveUpdates, modRules.pfUpdateRateScale);
 	}
 
 	//LOG("PathingState::Update blocksToUpdate %d", blocksToUpdate);

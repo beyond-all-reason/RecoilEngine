@@ -20,7 +20,7 @@
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/TeamHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/UnitHandler.h"
@@ -595,7 +595,7 @@ void SyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<LuaGaiaActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<DesyncActionExecutor>());
 	AddActionExecutor(AllocActionExecutor<AtmActionExecutor>());
-	if (modInfo.allowTake)
+	if (modRules.allowTake)
 		AddActionExecutor(AllocActionExecutor<TakeActionExecutor>());
 
 	AddActionExecutor(AllocActionExecutor<SkipActionExecutor>());

@@ -19,7 +19,7 @@
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Misc/GeometricObjects.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Path/IPathManager.h"
@@ -411,7 +411,7 @@ static float3 CalcSpeedVectorInclGravity(const CUnit* owner, const CGroundMoveTy
 	const float3 horSpeed = ownerSpd * XZVector * dirSign * revSign;
 	const float3 verSpeed = UpVector * ownerSpd.y;
 
-	if (!modInfo.allowHoverUnitStrafing || owner->moveDef->speedModClass != MoveDef::Hover) {
+	if (!modRules.allowHoverUnitStrafing || owner->moveDef->speedModClass != MoveDef::Hover) {
 		const float3 accelVec = (gndTangVec * hAcc) + (UpVector * vAcc);
 		const float3 speedVec = (horSpeed + verSpeed) + accelVec;
 
@@ -706,7 +706,7 @@ void CGroundMoveType::UpdateUnitPosition() {
  	if (owner->UnderFirstPersonControl())
  		UpdateDirectControl();
 
-	UpdateOwnerPos(owner->speed, calcSpeedVectorFuncs[modInfo.allowGroundUnitGravity](owner, this, deltaSpeed, myGravity));
+	UpdateOwnerPos(owner->speed, calcSpeedVectorFuncs[modRules.allowGroundUnitGravity](owner, this, deltaSpeed, myGravity));
 }
 
 void CGroundMoveType::UpdateCollisionDetections() {
@@ -858,8 +858,8 @@ void CGroundMoveType::SlowUpdate()
 				// in this case, don't wait around making the unit try to run into an obstacle for
 				// longer than absolutely necessary.
 				bool timeForRepath = fallenOutOfExitOnly
-				                   || (    gs->frameNum >= wantRepathFrame + modInfo.pfRepathDelayInFrames
-				                       && (gs->frameNum >= lastRepathFrame + modInfo.pfRepathMaxRateInFrames || lastWaypoint) );
+				                   || (    gs->frameNum >= wantRepathFrame + modRules.pfRepathDelayInFrames
+				                       && (gs->frameNum >= lastRepathFrame + modRules.pfRepathMaxRateInFrames || lastWaypoint) );
 
 				// can't request a new path while the unit is stuck in terrain/static objects
 				if (timeForRepath){
@@ -1541,7 +1541,7 @@ void CGroundMoveType::UpdateSkid()
 			// TODO:
 			//   bouncing behaves too much like a rubber-ball,
 			//   most impact energy needs to go into the ground
-			if (modInfo.allowUnitCollisionDamage && collImpactSpeed > minCollSpeed && minCollSpeed >= 0.0f)
+			if (modRules.allowUnitCollisionDamage && collImpactSpeed > minCollSpeed && minCollSpeed >= 0.0f)
 				owner->DoDamage(DamageArray(impactDamageMul), ZeroVector, nullptr, -CSolidObject::DAMAGE_COLLISION_GROUND, -1);
 
 			skidRotSpeed = 0.0f;
@@ -1718,11 +1718,11 @@ void CGroundMoveType::CheckCollisionSkid()
 				continue;
 
 			// damage the collider, no added impulse
-			if (modInfo.allowUnitCollisionDamage && collImpactSpeed > colliderMinCollSpeed && colliderMinCollSpeed >= 0.0f)
+			if (modRules.allowUnitCollisionDamage && collImpactSpeed > colliderMinCollSpeed && colliderMinCollSpeed >= 0.0f)
 				collider->DoDamage(DamageArray(impactDamageMul), ZeroVector, collidee, -CSolidObject::DAMAGE_COLLISION_OBJECT, -1);
 
 			// damage the (static) collidee based on collider's mass, no added impulse
-			if (modInfo.allowUnitCollisionDamage && collImpactSpeed > (collideeMinCollSpeed = collideeUD->minCollisionSpeed) && collideeMinCollSpeed >= 0.0f)
+			if (modRules.allowUnitCollisionDamage && collImpactSpeed > (collideeMinCollSpeed = collideeUD->minCollisionSpeed) && collideeMinCollSpeed >= 0.0f)
 				collidee->DoDamage(DamageArray(impactDamageMul), ZeroVector, collider, -CSolidObject::DAMAGE_COLLISION_OBJECT, -1);
 
 			collider->Move(collSeparationDir * collImpactSpeed, true);
@@ -1748,11 +1748,11 @@ void CGroundMoveType::CheckCollisionSkid()
 				continue;
 
 			// damage the collider
-			if (modInfo.allowUnitCollisionDamage && collImpactSpeed > colliderMinCollSpeed && colliderMinCollSpeed >= 0.0f)
+			if (modRules.allowUnitCollisionDamage && collImpactSpeed > colliderMinCollSpeed && colliderMinCollSpeed >= 0.0f)
 				collider->DoDamage(DamageArray(colliderImpactDmgMult), collSeparationDir * colliderImpactDmgMult, collidee, -CSolidObject::DAMAGE_COLLISION_OBJECT, -1);
 
 			// damage the collidee
-			if (modInfo.allowUnitCollisionDamage && collImpactSpeed > (collideeMinCollSpeed = collideeUD->minCollisionSpeed) && collideeMinCollSpeed >= 0.0f)
+			if (modRules.allowUnitCollisionDamage && collImpactSpeed > (collideeMinCollSpeed = collideeUD->minCollisionSpeed) && collideeMinCollSpeed >= 0.0f)
 				collidee->DoDamage(DamageArray(collideeImpactDmgMult), collSeparationDir * -collideeImpactDmgMult, collider, -CSolidObject::DAMAGE_COLLISION_OBJECT, -1);
 
 			collider->Move( colliderImpactImpulse, true);
@@ -1783,7 +1783,7 @@ void CGroundMoveType::CheckCollisionSkid()
 		// damage the collider, no added impulse (!)
 		// the collidee feature can not be passed along to the collider as attacker
 		// yet, keep symmetry and do not pass collider along to the collidee either
-		if (modInfo.allowUnitCollisionDamage && collImpactSpeed > colliderMinCollSpeed && colliderMinCollSpeed >= 0.0f)
+		if (modRules.allowUnitCollisionDamage && collImpactSpeed > colliderMinCollSpeed && colliderMinCollSpeed >= 0.0f)
 			collider->DoDamage(DamageArray(impactDamageMul), ZeroVector, nullptr, -CSolidObject::DAMAGE_COLLISION_OBJECT, -1);
 
 		// damage the collidee feature based on collider's mass
@@ -1847,7 +1847,7 @@ float3 CGroundMoveType::GetObstacleAvoidanceDir(const float3& desiredDir) {
 		return lastAvoidanceDir = flatFrontDir;
 
 	// Speed-optimizer. Reduces the times this system is run.
-	if ((gs->frameNum + owner->id) % modInfo.groundUnitCollisionAvoidanceUpdateRate) {
+	if ((gs->frameNum + owner->id) % modRules.groundUnitCollisionAvoidanceUpdateRate) {
 		if (!avoidingUnits)
 			lastAvoidanceDir = desiredDir;
 
@@ -2557,7 +2557,7 @@ void CGroundMoveType::HandleObjectCollisions()
 	// then only apply forces from static objects/terrain. This prevent units from pushing each
 	// other into buildings far enough that the pathing systems can't get them out again.
 	float3 tryForce = forceFromStaticCollidees + forceFromMovingCollidees;
-	float maxPushForceSq = maxSpeed*maxSpeed*modInfo.maxCollisionPushMultiplier;
+	float maxPushForceSq = maxSpeed*maxSpeed*modRules.maxCollisionPushMultiplier;
 	if (tryForce.SqLength() > maxPushForceSq)
 		(tryForce.Normalize()) *= maxSpeed;
 
@@ -2792,10 +2792,10 @@ void CGroundMoveType::HandleUnitCollisions(
 	// NOTE: probably too large for most units (eg. causes tree falling animations to be skipped)
 	// const float3 crushImpulse = collider->speed * collider->mass * Sign(int(!reversing));
 
-	const bool allowUCO = modInfo.allowUnitCollisionOverlap;
-	const bool allowCAU = modInfo.allowCrushingAlliedUnits;
-	const bool allowPEU = modInfo.allowPushingEnemyUnits;
-	const bool allowSAT = modInfo.allowSepAxisCollisionTest;
+	const bool allowUCO = modRules.allowUnitCollisionOverlap;
+	const bool allowCAU = modRules.allowCrushingAlliedUnits;
+	const bool allowPEU = modRules.allowPushingEnemyUnits;
+	const bool allowSAT = modRules.allowSepAxisCollisionTest;
 	const bool forceSAT = (colliderParams.z > 0.1f);
 
 	const float3 crushImpulse = owner->speed * owner->mass * Sign(int(!reversing));
@@ -3012,7 +3012,7 @@ void CGroundMoveType::HandleFeatureCollisions(
 	int curThread
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const bool allowSAT = modInfo.allowSepAxisCollisionTest;
+	const bool allowSAT = modRules.allowSepAxisCollisionTest;
 	const bool forceSAT = (colliderParams.z > 0.1f);
 
 	const float3 crushImpulse = owner->speed * owner->mass * Sign(int(!reversing));
@@ -3287,7 +3287,7 @@ void CGroundMoveType::AdjustPosToWaterLine()
 	if (owner->IsFlying())
 		return;
 
-	if (modInfo.allowGroundUnitGravity) {
+	if (modRules.allowGroundUnitGravity) {
 		if (owner->FloatOnWater()) {
 			MoveDef *md = owner->moveDef;
 			owner->Move(UpVector * (std::max(CGround::GetHeightReal(owner->pos.x, owner->pos.z), -md->waterline) - owner->pos.y), true);

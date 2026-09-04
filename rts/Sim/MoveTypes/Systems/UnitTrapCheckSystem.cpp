@@ -7,7 +7,7 @@
 #include "Sim/Ecs/Registry.h"
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/MoveTypes/Components/MoveTypesComponents.h"
 #include "Sim/MoveTypes/GroundMoveType.h"
@@ -45,7 +45,7 @@ void UnitTrapCheckSystem::Init() {
 void TagUnitsThatMayBeStuck(std::vector<CUnit*> &curList, const CSolidObject* collidee, int curThread) {
     RECOIL_DETAILED_TRACY_ZONE;
     const int largestMoveTypSizeH = moveDefHandler.GetLargestFootPrintSizeH() + 1;
-    const int bufferSize = SQUARE_SIZE * modInfo.unitQuadPositionUpdateRate * 2 + largestMoveTypSizeH + 1;
+    const int bufferSize = SQUARE_SIZE * modRules.unitQuadPositionUpdateRate * 2 + largestMoveTypSizeH + 1;
 
     const int2& pos = collidee->mapPos;
     const int xmin = pos.x;

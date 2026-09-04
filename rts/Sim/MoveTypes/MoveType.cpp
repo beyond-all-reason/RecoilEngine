@@ -8,7 +8,7 @@
 #include "Components/MoveTypesComponents.h"
 #include "Sim/Ecs/Registry.h"
 #include "Sim/Misc/GlobalSynced.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
@@ -87,7 +87,7 @@ void AMoveType::SlowUpdate()
 void AMoveType::UpdateCollisionMap(bool force)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!force && ((gs->frameNum + owner->id) % modInfo.unitQuadPositionUpdateRate))
+	if (!force && ((gs->frameNum + owner->id) % modRules.unitQuadPositionUpdateRate))
 		return;
 
 	if (owner->pos != oldCollisionUpdatePos){

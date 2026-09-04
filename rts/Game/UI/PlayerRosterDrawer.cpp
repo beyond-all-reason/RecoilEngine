@@ -12,7 +12,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/GlobalSynced.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "System/GlobalConfig.h"
 #include "System/Misc/SpringTime.h"
@@ -29,7 +29,7 @@ void CPlayerRosterDrawer::Draw()
 	if (playerRoster.GetSortType() == PlayerRoster::Disabled)
 		return;
 
-	if (!modInfo.allowEnginePlayerlist)
+	if (!modRules.allowEnginePlayerlist)
 		return;
 
 	const unsigned currentTime = spring_now().toSecsi();

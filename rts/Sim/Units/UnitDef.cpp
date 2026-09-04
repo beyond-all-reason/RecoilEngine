@@ -8,7 +8,7 @@
 #include "Sim/Misc/CategoryHandler.h"
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/DamageArrayHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
 #include "Sim/Units/CommandAI/Command.h"
@@ -465,9 +465,9 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	moveState = udTable.GetInt("moveState", (canmove && speed > 0.0f)? MOVESTATE_NONE: MOVESTATE_MANEUVER);
 	moveState = std::min(moveState, int(MOVESTATE_ROAM));
 
-	flankingBonusMode = udTable.GetInt("flankingBonusMode", modInfo.flankingBonusModeDefault);
-	flankingBonusMax  = udTable.GetFloat("flankingBonusMax", modInfo.flankingBonusMaxDefault);
-	flankingBonusMin  = udTable.GetFloat("flankingBonusMin", modInfo.flankingBonusMinDefault);
+	flankingBonusMode = udTable.GetInt("flankingBonusMode", modRules.flankingBonusModeDefault);
+	flankingBonusMax  = udTable.GetFloat("flankingBonusMax", modRules.flankingBonusMaxDefault);
+	flankingBonusMin  = udTable.GetFloat("flankingBonusMin", modRules.flankingBonusMinDefault);
 	flankingBonusDir  = udTable.GetFloat3("flankingBonusDir", FwdVector);
 	flankingBonusMobilityAdd = udTable.GetFloat("flankingBonusMobilityAdd", 0.01f);
 
@@ -609,16 +609,16 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 			floatOnWater      |= udTable.GetBool("floater", udTable.KeyExists("WaterLine"));
 
 			// we have no MoveDef, so pathType == -1 and IsAirUnit() MIGHT be true
-			cantBeTransported |= (!modInfo.transportAir && canfly);
+			cantBeTransported |= (!modRules.transportAir && canfly);
 		} else {
 			//upright           |= (moveDef->speedModClass == MoveDef::Hover);
 			//upright           |= (moveDef->speedModClass == MoveDef::Ship );
 
 			// we have a MoveDef, so pathType != -1 and IsGroundUnit() MUST be true
-			cantBeTransported |= (!modInfo.transportGround && moveDef->speedModClass == MoveDef::Tank );
-			cantBeTransported |= (!modInfo.transportGround && moveDef->speedModClass == MoveDef::KBot );
-			cantBeTransported |= (!modInfo.transportShip   && moveDef->speedModClass == MoveDef::Ship );
-			cantBeTransported |= (!modInfo.transportHover  && moveDef->speedModClass == MoveDef::Hover);
+			cantBeTransported |= (!modRules.transportGround && moveDef->speedModClass == MoveDef::Tank );
+			cantBeTransported |= (!modRules.transportGround && moveDef->speedModClass == MoveDef::KBot );
+			cantBeTransported |= (!modRules.transportShip   && moveDef->speedModClass == MoveDef::Ship );
+			cantBeTransported |= (!modRules.transportHover  && moveDef->speedModClass == MoveDef::Hover);
 		}
 
 		if (seismicSignature == -1.0f) {

@@ -5,7 +5,7 @@
 #include "GlobalSynced.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "System/ContainerUtil.h"
 #include "System/SpringMath.h"
 
@@ -125,8 +125,8 @@ void EnvResourceHandler::Update()
 	curWindDir = curWindVec;
 	curWindVec = curWindDir * curWindStrength;
 
-	if (const auto& wcrp = modInfo.windChangeReportPeriod; wcrp > 0 && gs->frameNum % wcrp == 0) {
-		// update generators every modInfo.windChangeReportPeriod frames
+	if (const auto& wcrp = modRules.windChangeReportPeriod; wcrp > 0 && gs->frameNum % wcrp == 0) {
+		// update generators every modRules.windChangeReportPeriod frames
 		for (auto unitID : allGeneratorIDs) {
 			unitHandler.GetUnit(unitID)->UpdateWind(curWindDir.x, curWindDir.z, curWindStrength);
 		}

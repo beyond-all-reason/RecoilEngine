@@ -9,7 +9,7 @@
 #include "Map/Ground.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/LosHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/MoveTypes/AAirMoveType.h"
@@ -639,12 +639,12 @@ void CMobileCAI::ExecuteGuard(Command& c)
 	}
 
 	constexpr float epsilonish = 1.0f * INV_GAME_SPEED;
-	const float sqrRecalculateThreshold = modInfo.guardRecalculateThreshold;
-	const float sqrStoppedProximityGoal = modInfo.guardStoppedProximityGoal;
-	const float stoppedExtraDistanceOffset = modInfo.guardStoppedExtraDistance;
-	const float sqrMovingProximityGoal = modInfo.guardMovingProximityGoal;
-	const float movingIntervalMultiplier = modInfo.guardMovingIntervalMultiplier;
-	const float maxTimeToIntercept = modInfo.guardInterceptionLimit;
+	const float sqrRecalculateThreshold    = modRules.guardRecalculateThreshold;
+	const float sqrStoppedProximityGoal    = modRules.guardStoppedProximityGoal;
+	const float stoppedExtraDistanceOffset = modRules.guardStoppedExtraDistance;
+	const float sqrMovingProximityGoal     = modRules.guardMovingProximityGoal;
+	const float movingIntervalMultiplier   = modRules.guardMovingIntervalMultiplier;
+	const float maxTimeToIntercept         = modRules.guardInterceptionLimit;
 
 	float3 goalPos = owner->pos;
 	float3 deltaPos = guardee->pos - owner->pos;
@@ -918,7 +918,7 @@ void CMobileCAI::ExecuteAttack(Command& c)
 					StopMoveAndFinishCommand();
 					return;
 				}
-				if (targetUnit->GetTransporter() != nullptr && !modInfo.targetableTransportedUnits) {
+				if (targetUnit->GetTransporter() != nullptr && !modRules.targetableTransportedUnits) {
 					StopMoveAndFinishCommand();
 					return;
 				}

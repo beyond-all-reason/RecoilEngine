@@ -12,7 +12,7 @@
 #include "Map/MetalMap.h"
 #include "Map/ReadMap.h"
 #include "Rendering/Fonts/glFont.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/CategoryHandler.h"
 #include "Sim/Misc/DamageArrayHandler.h"
 #include "Sim/Misc/Wind.h"
@@ -31,7 +31,7 @@
 
 /* TODO:
  * - Inline these declarations (place each above the specific line they are pushed into the constant.
- * - There are many missing (for example modInfo related ones)
+ * - There are many missing (for example modRules related ones)
  */
 /*** Game specific information
  *
@@ -176,52 +176,52 @@ bool LuaConstGame::PushEntries(lua_State* L)
 		LuaPushNamedNumber(L, "gravity"        , -mapInfo->map.gravity * GAME_SPEED * GAME_SPEED);
 	}
 
-	if (!modInfo.filename.empty()) {
+	if (!modRules.filename.empty()) {
 		// mod-info; values are meaningless prior to Game::Load
-		LuaPushNamedString(L, "gameName"     , modInfo.humanName);
-		LuaPushNamedString(L, "gameShortName", modInfo.shortName);
-		LuaPushNamedString(L, "gameVersion"  , modInfo.version);
-		LuaPushNamedString(L, "gameMutator"  , modInfo.mutator);
-		LuaPushNamedString(L, "gameDesc"     , modInfo.description);
+		LuaPushNamedString(L, "gameName"     , modRules.humanName);
+		LuaPushNamedString(L, "gameShortName", modRules.shortName);
+		LuaPushNamedString(L, "gameVersion"  , modRules.version);
+		LuaPushNamedString(L, "gameMutator"  , modRules.mutator);
+		LuaPushNamedString(L, "gameDesc"     , modRules.description);
 
-		LuaPushNamedString(L, "modName"      , modInfo.humanNameVersioned);
-		LuaPushNamedString(L, "modShortName" , modInfo.shortName);
-		LuaPushNamedString(L, "modVersion"   , modInfo.version);
-		LuaPushNamedString(L, "modMutator"   , modInfo.mutator);
-		LuaPushNamedString(L, "modDesc"      , modInfo.description);
+		LuaPushNamedString(L, "modName"      , modRules.humanNameVersioned);
+		LuaPushNamedString(L, "modShortName" , modRules.shortName);
+		LuaPushNamedString(L, "modVersion"   , modRules.version);
+		LuaPushNamedString(L, "modMutator"   , modRules.mutator);
+		LuaPushNamedString(L, "modDesc"      , modRules.description);
 
-		LuaPushNamedBool  (L, "constructionDecay"     , modInfo.constructionDecay);
-		LuaPushNamedNumber(L, "constructionDecayTime" , modInfo.constructionDecayTime);
-		LuaPushNamedNumber(L, "constructionDecaySpeed", modInfo.constructionDecaySpeed);
+		LuaPushNamedBool  (L, "constructionDecay"     , modRules.constructionDecay);
+		LuaPushNamedNumber(L, "constructionDecayTime" , modRules.constructionDecayTime);
+		LuaPushNamedNumber(L, "constructionDecaySpeed", modRules.constructionDecaySpeed);
 
-		LuaPushNamedNumber(L, "multiReclaim"                  , modInfo.multiReclaim);
-		LuaPushNamedNumber(L, "reclaimMethod"                 , modInfo.reclaimMethod);
-		LuaPushNamedNumber(L, "reclaimUnitMethod"             , modInfo.reclaimUnitMethod);
-		LuaPushNamedNumber(L, "reclaimUnitEnergyCostFactor"   , modInfo.reclaimUnitCostFactor.energy);
-		LuaPushNamedNumber(L, "reclaimUnitEfficiency"         , modInfo.reclaimUnitEfficiency.metal);
-		LuaPushNamedNumber(L, "reclaimFeatureEnergyCostFactor", modInfo.reclaimFeatureCostFactor.energy);
-		LuaPushNamedBool  (L, "reclaimUnitDrainHealth"        , modInfo.reclaimUnitDrainHealth);
-		LuaPushNamedBool  (L, "reclaimAllowEnemies"           , modInfo.reclaimAllowEnemies);
-		LuaPushNamedBool  (L, "reclaimAllowAllies"            , modInfo.reclaimAllowAllies);
-		LuaPushNamedNumber(L, "repairEnergyCostFactor"        , modInfo.repairCostFactor.energy);
-		LuaPushNamedNumber(L, "resurrectEnergyCostFactor"     , modInfo.resurrectCostFactor.energy);
-		LuaPushNamedNumber(L, "captureEnergyCostFactor"       , modInfo.captureCostFactor.energy);
+		LuaPushNamedNumber(L, "multiReclaim"                  , modRules.multiReclaim);
+		LuaPushNamedNumber(L, "reclaimMethod"                 , modRules.reclaimMethod);
+		LuaPushNamedNumber(L, "reclaimUnitMethod"             , modRules.reclaimUnitMethod);
+		LuaPushNamedNumber(L, "reclaimUnitEnergyCostFactor"   , modRules.reclaimUnitCostFactor.energy);
+		LuaPushNamedNumber(L, "reclaimUnitEfficiency"         , modRules.reclaimUnitEfficiency.metal);
+		LuaPushNamedNumber(L, "reclaimFeatureEnergyCostFactor", modRules.reclaimFeatureCostFactor.energy);
+		LuaPushNamedBool  (L, "reclaimUnitDrainHealth"        , modRules.reclaimUnitDrainHealth);
+		LuaPushNamedBool  (L, "reclaimAllowEnemies"           , modRules.reclaimAllowEnemies);
+		LuaPushNamedBool  (L, "reclaimAllowAllies"            , modRules.reclaimAllowAllies);
+		LuaPushNamedNumber(L, "repairEnergyCostFactor"        , modRules.repairCostFactor.energy);
+		LuaPushNamedNumber(L, "resurrectEnergyCostFactor"     , modRules.resurrectCostFactor.energy);
+		LuaPushNamedNumber(L, "captureEnergyCostFactor"       , modRules.captureCostFactor.energy);
 
 		// Despite being bools, these are exposed to Lua as 0/1 for legacy reasons
-		LuaPushNamedNumber(L, "transportAir"   , modInfo.transportAir);
-		LuaPushNamedNumber(L, "transportShip"  , modInfo.transportShip);
-		LuaPushNamedNumber(L, "transportHover" , modInfo.transportHover);
-		LuaPushNamedNumber(L, "transportGround", modInfo.transportGround);
-		LuaPushNamedNumber(L, "fireAtKilled"   , modInfo.fireAtKilled);
-		LuaPushNamedNumber(L, "fireAtCrashing" , modInfo.fireAtCrashing);
-		LuaPushNamedNumber(L, "requireSonarUnderWater", modInfo.requireSonarUnderWater);
+		LuaPushNamedNumber(L, "transportAir"   , modRules.transportAir);
+		LuaPushNamedNumber(L, "transportShip"  , modRules.transportShip);
+		LuaPushNamedNumber(L, "transportHover" , modRules.transportHover);
+		LuaPushNamedNumber(L, "transportGround", modRules.transportGround);
+		LuaPushNamedNumber(L, "fireAtKilled"   , modRules.fireAtKilled);
+		LuaPushNamedNumber(L, "fireAtCrashing" , modRules.fireAtCrashing);
+		LuaPushNamedNumber(L, "requireSonarUnderWater", modRules.requireSonarUnderWater);
 
-		LuaPushNamedBool  (L, "paralyzeOnMaxHealth", modInfo.paralyzeOnMaxHealth);
-		LuaPushNamedNumber(L, "paralyzeDeclineRate", modInfo.paralyzeDeclineRate);
+		LuaPushNamedBool  (L, "paralyzeOnMaxHealth", modRules.paralyzeOnMaxHealth);
+		LuaPushNamedNumber(L, "paralyzeDeclineRate", modRules.paralyzeDeclineRate);
 
-		LuaPushNamedBool  (L, "allowEnginePlayerlist", modInfo.allowEnginePlayerlist);
+		LuaPushNamedBool  (L, "allowEnginePlayerlist", modRules.allowEnginePlayerlist);
 		/*** @field Game.nativeExcessSharing boolean whether the engine handles excess resources overflow */
-		LuaPushNamedBool  (L, "nativeExcessSharing", modInfo.nativeExcessSharing);
+		LuaPushNamedBool  (L, "nativeExcessSharing", modRules.nativeExcessSharing);
 	}
 
 	if (archiveScanner != nullptr && mapInfo != nullptr) {
@@ -229,7 +229,7 @@ bool LuaConstGame::PushEntries(lua_State* L)
 		sha512::hex_digest mapHexDigest;
 		sha512::hex_digest modHexDigest;
 		sha512::dump_digest(archiveScanner->GetArchiveCompleteChecksumBytes(mapInfo->map.name), mapHexDigest);
-		sha512::dump_digest(archiveScanner->GetArchiveCompleteChecksumBytes(modInfo.filename), modHexDigest);
+		sha512::dump_digest(archiveScanner->GetArchiveCompleteChecksumBytes(modRules.filename), modHexDigest);
 
 		LuaPushNamedString(L, "mapChecksum", mapHexDigest.data());
 		LuaPushNamedString(L, "modChecksum", modHexDigest.data());

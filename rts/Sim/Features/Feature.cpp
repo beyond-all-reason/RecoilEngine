@@ -17,7 +17,7 @@
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/LosHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/MoveTypes/Utils/UnitTrapCheckUtils.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
@@ -133,18 +133,18 @@ bool CFeature::IsInLosForAllyTeam(int argAllyTeam) const
 
 	const bool isGaia = allyteam == std::max(0, teamHandler.GaiaAllyTeamID());
 
-	switch (modInfo.featureVisibility) {
-		case CModInfo::FEATURELOS_NONE:
+	switch (modRules.featureVisibility) {
+		case CModRules::FEATURELOS_NONE:
 		default:
 			return losHandler->InLos(pos, argAllyTeam);
 
 		// these next two only make sense when Gaia is enabled
-		case CModInfo::FEATURELOS_GAIAONLY:
+		case CModRules::FEATURELOS_GAIAONLY:
 			return (isGaia || losHandler->InLos(pos, argAllyTeam));
-		case CModInfo::FEATURELOS_GAIAALLIED:
+		case CModRules::FEATURELOS_GAIAALLIED:
 			return (isGaia || allyteam == argAllyTeam || losHandler->InLos(pos, argAllyTeam));
 
-		case CModInfo::FEATURELOS_ALL:
+		case CModRules::FEATURELOS_ALL:
 			return true;
 	}
 }
@@ -321,11 +321,11 @@ bool CFeature::AddBuildPower(CUnit* builder, float amount)
 		return false;
 
 	// don't let them exploit chunk reclaim
-	if (isRepairingBeforeResurrect && (modInfo.reclaimMethod > 1))
+	if (isRepairingBeforeResurrect && (modRules.reclaimMethod > 1))
 		return false;
 
 	// make sure several units cant reclaim at once on a single feature
-	if ((modInfo.multiReclaim == 0) && (lastReclaimFrame == gs->frameNum))
+	if ((modRules.multiReclaim == 0) && (lastReclaimFrame == gs->frameNum))
 		return true;
 
 	const float step = -amount / reclaimTime;
@@ -337,7 +337,7 @@ bool CFeature::AddBuildPower(CUnit* builder, float amount)
 	const float reclaimLeftTemp = std::max(0.0f, reclaimLeft - step);
 	const float fractionReclaimed = oldReclaimLeft - reclaimLeftTemp;
 	const auto resourceFraction = (defResources * fractionReclaimed).cap_at(resources);
-	const auto resourceCost = resourceFraction.metal * modInfo.reclaimFeatureCostFactor;
+	const auto resourceCost = resourceFraction.metal * modRules.reclaimFeatureCostFactor;
 
 	SResourceOrder order;
 	order.quantum    = false;
@@ -350,17 +350,17 @@ bool CFeature::AddBuildPower(CUnit* builder, float amount)
 		// always give remaining resources at the end
 		order.add = resources;
 	}
-	else if (modInfo.reclaimMethod == 0) {
+	else if (modRules.reclaimMethod == 0) {
 		// Gradual reclaim
 		order.add = resourceFraction;
 	}
-	else if (modInfo.reclaimMethod == 1) {
+	else if (modRules.reclaimMethod == 1) {
 		// All-at-end method
 		// see `reclaimLeftTemp == 0.0f` case
 	}
 	else {
 		// Chunky reclaiming, work out how many chunk boundaries we crossed
-		const float chunkSize = 1.0f / modInfo.reclaimMethod;
+		const float chunkSize = 1.0f / modRules.reclaimMethod;
 
 		const int oldChunk  = ChunkNumber(oldReclaimLeft);
 		const int newChunk  = ChunkNumber(reclaimLeft);
@@ -732,7 +732,7 @@ void CFeature::EmitGeoSmoke()
 }
 
 
-int CFeature::ChunkNumber(float f) { return int(math::ceil(f * modInfo.reclaimMethod)); }
+int CFeature::ChunkNumber(float f) { return int(math::ceil(f * modRules.reclaimMethod)); }
 
 // note: this is not actually used by GroundBlockingObjectMap anymore, just
 // to distinguish unit and feature ID's (values >= MaxUnits() correspond to

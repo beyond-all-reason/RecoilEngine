@@ -7,7 +7,7 @@
 #include "Game/SelectedUnitsHandler.h"
 #include "Map/Ground.h"
 #include "Map/ReadMap.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/MoveTypes/StrafeAirMoveType.h"
 #include "Sim/Units/Unit.h"
@@ -427,7 +427,7 @@ void CAirCAI::ExecuteAttack(Command& c)
 				StopMoveAndFinishCommand();
 				return;
 			}
-			if (targetUnit->GetTransporter() != nullptr && !modInfo.targetableTransportedUnits) {
+			if (targetUnit->GetTransporter() != nullptr && !modRules.targetableTransportedUnits) {
 				StopMoveAndFinishCommand();
 				return;
 			}

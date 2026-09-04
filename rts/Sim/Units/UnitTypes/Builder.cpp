@@ -14,7 +14,7 @@
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/MoveTypes/MoveType.h"
@@ -404,7 +404,7 @@ bool CBuilder::UpdateResurrect(const Command& fCommand)
 		return true;
 	}
 
-	if ((modInfo.reclaimMethod != 1) && (curResurrectee->reclaimLeft < 1)) {
+	if ((modRules.reclaimMethod != 1) && (curResurrectee->reclaimLeft < 1)) {
 		// this corpse has been reclaimed a little, need to restore
 		// its resources before we can let the player resurrect it
 		curResurrectee->AddBuildPower(this, resurrectSpeed);
@@ -417,7 +417,7 @@ bool CBuilder::UpdateResurrect(const Command& fCommand)
 	const float step = resurrectSpeed / resurrecteeDef->buildTime;
 
 	const bool resurrectAllowed = eventHandler.AllowFeatureBuildStep(this, curResurrectee, step);
-	const bool canExecResurrect = (resurrectAllowed && UseResources(resurrecteeDef->cost * step * modInfo.resurrectCostFactor));
+	const bool canExecResurrect = (resurrectAllowed && UseResources(resurrecteeDef->cost * step * modRules.resurrectCostFactor));
 
 	if (canExecResurrect) {
 		curResurrectee->resurrectProgress += step;
@@ -504,7 +504,7 @@ bool CBuilder::UpdateCapture(const Command& fCommand)
 	const float captureProgressTemp = std::min(curCapturee->captureProgress + captureProgressStep, 1.0f);
 
 	const float captureFraction = captureProgressTemp - curCapturee->captureProgress;
-	const auto resourceUseScaled = curCapturee->cost * captureFraction * modInfo.captureCostFactor;
+	const auto resourceUseScaled = curCapturee->cost * captureFraction * modRules.captureCostFactor;
 
 	const bool buildStepAllowed = (eventHandler.AllowUnitBuildStep(this, curCapturee, captureProgressStep));
 	const bool captureStepAllowed = (eventHandler.AllowUnitCaptureStep(this, curCapturee, captureProgressStep));

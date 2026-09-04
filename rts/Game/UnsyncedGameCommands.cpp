@@ -92,7 +92,7 @@
 
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/Misc/TeamHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitDefHandler.h"
@@ -4254,7 +4254,7 @@ void UnsyncedGameCommands::AddDefaultActionExecutors()
 	AddActionExecutor(AllocActionExecutor<RedirectToSyncedActionExecutor>("Desync"));
 #endif
 	AddActionExecutor(AllocActionExecutor<RedirectToSyncedActionExecutor>("Resync"));
-	if (modInfo.allowTake)
+	if (modRules.allowTake)
 		AddActionExecutor(AllocActionExecutor<RedirectToSyncedActionExecutor>("Take"));
 
 	AddActionExecutor(AllocActionExecutor<RedirectToSyncedActionExecutor>("LuaRules"));

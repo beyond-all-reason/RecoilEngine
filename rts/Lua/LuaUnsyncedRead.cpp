@@ -50,7 +50,7 @@
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Misc/LosHandler.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/CustomColorPalette.h"
@@ -523,7 +523,7 @@ int LuaUnsyncedRead::GetReplayLength(lua_State* L)
  */
 int LuaUnsyncedRead::GetGameName(lua_State* L)
 {
-	lua_pushstring(L, modInfo.humanNameVersioned.c_str());
+	lua_pushstring(L, modRules.humanNameVersioned.c_str());
 	return 1;
 }
 

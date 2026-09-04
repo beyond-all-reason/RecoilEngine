@@ -13,7 +13,7 @@
 #include "CommandAI/BuilderCAI.h"
 #include "Sim/Ecs/Registry.h"
 #include "Sim/Misc/GlobalSynced.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/MoveTypes/MoveType.h"
 #include "Sim/MoveTypes/Systems/GeneralMoveSystem.h"

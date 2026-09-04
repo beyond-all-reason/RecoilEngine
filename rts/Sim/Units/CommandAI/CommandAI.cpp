@@ -16,7 +16,7 @@
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Misc/GlobalSynced.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/MoveTypes/MoveType.h"
 #include "Sim/Units/BuildInfo.h"
@@ -1512,7 +1512,7 @@ void CCommandAI::ExecuteAttack(Command& c)
 				FinishCommand();
 				return;
 			}
-			if (targetUnit->GetTransporter() != nullptr && !modInfo.targetableTransportedUnits) {
+			if (targetUnit->GetTransporter() != nullptr && !modRules.targetableTransportedUnits) {
 				FinishCommand();
 				return;
 			}

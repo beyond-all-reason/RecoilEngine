@@ -14,7 +14,7 @@
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/glExtra.h"
 #include "Sim/Misc/GlobalSynced.h"
-#include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/ModRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "System/Log/ILog.h"
 #include "Net/Protocol/NetProtocol.h"
@@ -333,7 +333,7 @@ void CQuitBox::MouseRelease(int x, int y, int button)
 		// save current game state
 		if (save) {
 			const std::string currTimeStr = CTimeUtil::GetCurrentTimeStr();
-			const std::string saveFileName = currTimeStr + "_" + modInfo.filename + "_" + gameSetup->mapName;
+			const std::string saveFileName = currTimeStr + "_" + modRules.filename + "_" + gameSetup->mapName;
 
 			game->Save("Saves/" + saveFileName + ".ssf", "");
 		}
