@@ -143,6 +143,8 @@ class CEventHandler
 
 		void StockpileChanged(const CUnit* unit,
 		                      const CWeapon* weapon, int oldCount);
+		void UnitWeaponBurstStart(const CUnit* unit, const CWeapon* weapon);
+		void UnitWeaponBurstEnd(const CUnit* unit, const CWeapon* weapon);
 
 		bool CommandFallback(const CUnit* unit, const Command& cmd);
 		bool AllowCommand(const CUnit* unit, const Command& cmd, int playerNum, bool fromSynced, bool fromLua);
@@ -359,7 +361,6 @@ class CEventHandler
 		                EventClientList* list, int props);
 		void ListInsert(EventClientList& ciList, CEventClient* ec);
 		void ListRemove(EventClientList& ciList, CEventClient* ec);
-
 	private:
 		CEventClient* mouseOwner;
 
@@ -738,6 +739,18 @@ inline void CEventHandler::StockpileChanged(const CUnit* unit,
                                                 int oldCount)
 {
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(StockpileChanged, unit, weapon, oldCount)
+}
+
+
+inline void CEventHandler::UnitWeaponBurstStart(const CUnit* unit, const CWeapon* weapon)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitWeaponBurstStart, unit, weapon)
+}
+
+
+inline void CEventHandler::UnitWeaponBurstEnd(const CUnit* unit, const CWeapon* weapon)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitWeaponBurstEnd, unit, weapon)
 }
 
 
