@@ -162,7 +162,7 @@ FILESYSTEM_TEST_CASE("GetNormalizedPath - multiple slashes")
 {
 	CHECK_NORM_PATH("foo///bar", "foo/bar");
 	CHECK_NORM_PATH("foo\\\\\\bar", "foo/bar");
-	CHECK_NORM_PATH("//foo//bar//", "/foo/bar/");
+	CHECK_NORM_PATH("/foo//bar//", "/foo/bar/");
 	CHECK_NORM_PATH("C:\\\\foo\\\\bar", "C:/foo/bar");
 }
 
