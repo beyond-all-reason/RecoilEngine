@@ -747,6 +747,15 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 
 		edgeFactor = math::fabs(w->weaponDef->targetBorder);
 
+		// the target tests know nothing about restrictions the unit script
+		// imposes: they pass for e.g. a submerged-only weapon while the unit
+		// is on land, whose AimWeapon then refuses the target; such a weapon
+		// has no firing solution and must not stop us out of range of the
+		// weapons that do (the script is asked again every re-aim, so the
+		// weapon counts again as soon as it accepts)
+		if (tryTargetRotate && w->AimRefusedFor(orderTgtInfo))
+			tryTargetRotate = false;
+
 		if (tryTargetRotate)
 			break;
 
@@ -861,6 +870,11 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 		if (!w->TryTargetHeading(attackHeading, attackTgtInfo))
 			continue;
 
+		// the script declined to aim this weapon at the position, so it has
+		// no firing solution (see ExecuteObjectAttack)
+		if (w->AimRefusedFor(attackTgtInfo))
+			continue;
+
 		if (owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, false)) {
 			StopMoveAndKeepPointing(attackTgtInfo.groundPos, owner->maxRange * 0.9f, true);
 			return;
@@ -876,8 +890,14 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 		owner->moveType->KeepPointingTo(attackTgtInfo.groundPos, owner->maxRange * 0.9f, true);
 	}
 
-	if (attackVec.SqLength2D() >= Square(owner->maxRange * 0.9f))
+	if (attackVec.SqLength2D() >= Square(owner->maxRange * 0.9f)) {
+		// we may have been stopped above by a weapon whose script has since
+		// declined to aim at the position; resume the approach for the others
+		if (owner->moveType->progressState == AMoveType::Done)
+			SetGoal(attackPos, owner->pos);
+
 		return;
+	}
 
 	owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, false);
 	StopMoveAndKeepPointing(attackPos, owner->maxRange * 0.9f, true);
