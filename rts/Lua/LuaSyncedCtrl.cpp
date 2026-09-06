@@ -2478,6 +2478,10 @@ int LuaSyncedCtrl::SetUnitStockpile(lua_State* L)
  * @field nextSalvo integer?
  * @field aimReady number?
  * Set to `true` if a non-zero value is passed, `false` is zero is passed.
+ * Replaces the return value of COB's `AimWeapon`: zero tells the engine that the
+ * script declines to aim this weapon at its current target, so the unit's
+ * command AI does not count the weapon as having a firing solution and keeps
+ * closing in for its other weapons.
  * @field forceAim integer?
  * @field avoidFlags integer?
  * @field collisionFlags integer?
@@ -2540,7 +2544,8 @@ static bool SetSingleUnitWeaponState(lua_State* L, CWeapon* weapon, int index)
 		} break;
 
 		case hashString("aimReady"): {
-			weapon->angleGood = (lua_tofloat(L, index + 1) != 0.0f);
+			// the LUS replacement for the return value of COB's AimWeapon
+			weapon->AimScriptFinished((lua_tofloat(L, index + 1) != 0.0f) ? 1 : 0);
 		} break;
 
 		case hashString("forceAim"): {

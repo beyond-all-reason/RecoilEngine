@@ -42,7 +42,14 @@ public:
 	bool Attack(const SWeaponTarget& newTarget);
 	void SetAttackTarget(const SWeaponTarget& newTarget); //< does no validity checks!
 	void DropCurrentTarget();
-	void AimScriptFinished(bool retCode) { angleGood = retCode; }
+	// takes the return value of the script's AimWeapon (COB) or the value
+	// passed to the "aimReady" weapon state (LUS): 1 means the weapon is
+	// aimed, 0 that the script declines to aim it at the current target;
+	// anything else (an aiming thread killed by a signal) leaves the
+	// refusal state alone
+	void AimScriptFinished(int retCode);
+	// whether the script declined to aim at <target>, see AimScriptFinished
+	bool AimRefusedFor(const SWeaponTarget& target) const;
 
 	bool HaveTarget() const { return (currentTarget.type != Target_None); }
 	bool HaveUnitTarget() const { return (currentTarget.type == Target_Unit); }
@@ -174,6 +181,7 @@ public:
 	bool hasBlockShot;                      // set when the script has a BlockShot() function for this weapon
 	bool hasTargetWeight;                   // set when there's a TargetWeight() function for this weapon
 	bool angleGood;                         // set when script indicated ready to fire
+	bool aimRefused;                        // set when the script declined to aim at currentTarget (AimWeapon returned 0)
 	bool avoidTarget;                       // set when the script wants the weapon to pick a new target, reset once one has been chosen
 	bool onlyForward;                       // can only fire in the forward direction of the unit (for aircraft mostly?)
 	bool doTargetGroundPos;                 // (used for bombers) target the ground pos under the unit instead of the center aimPos

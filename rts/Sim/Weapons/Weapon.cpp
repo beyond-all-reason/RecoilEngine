@@ -67,6 +67,7 @@ CR_REG_METADATA(CWeapon, (
 	CR_MEMBER(hasBlockShot),
 	CR_MEMBER(hasTargetWeight),
 	CR_MEMBER(angleGood),
+	CR_MEMBER(aimRefused),
 	CR_MEMBER(avoidTarget),
 	CR_MEMBER(onlyForward),
 	CR_MEMBER(muzzleFlareSize),
@@ -155,6 +156,7 @@ CWeapon::CWeapon(CUnit* owner, const WeaponDef* def):
 	hasBlockShot(false),
 	hasTargetWeight(false),
 	angleGood(false),
+	aimRefused(false),
 	avoidTarget(false),
 	onlyForward(false),
 	doTargetGroundPos(false),
@@ -660,6 +662,39 @@ void CWeapon::DropCurrentTarget()
 		DeleteDeathDependence(currentTarget.unit, DEPENDENCE_TARGETUNIT);
 
 	currentTarget = SWeaponTarget();
+	aimRefused = false;
+}
+
+
+void CWeapon::AimScriptFinished(int retCode)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	angleGood = (retCode == 1);
+
+	// a script that returns 0 (LUS: sets aimReady to 0) says it can not
+	// aim at the current target, e.g. a submerged-only weapon while the
+	// unit is on land or a turret whose arc the target is outside of; the
+	// CAI uses this to not treat such a weapon as having a firing solution
+	// (the target tests do not know about script-side restrictions)
+	if (retCode == 0)
+		aimRefused = true;
+	if (retCode == 1)
+		aimRefused = false;
+}
+
+
+bool CWeapon::AimRefusedFor(const SWeaponTarget& target) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!aimRefused || currentTarget.type != target.type)
+		return false;
+
+	switch (target.type) {
+		case Target_Unit:      return (currentTarget.unit == target.unit);
+		case Target_Pos:       return (currentTarget.groundPos == target.groundPos);
+		case Target_Intercept: return (currentTarget.intercept == target.intercept);
+		default:               return false;
+	}
 }
 
 

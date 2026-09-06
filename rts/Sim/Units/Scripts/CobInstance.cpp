@@ -726,7 +726,7 @@ void CCobInstance::ThreadCallback(ThreadCallbackType type, int retCode, int cbPa
 			unit->KilledScriptFinished(retCode);
 		} break;
 		case CBAimWeapon: {
-			unit->weapons[cbParam]->AimScriptFinished(retCode == 1);
+			unit->weapons[cbParam]->AimScriptFinished(retCode);
 		} break;
 		case CBAimShield: {
 			static_cast<CPlasmaRepulser*>(unit->weapons[cbParam])->SetEnabled(retCode != 0);
