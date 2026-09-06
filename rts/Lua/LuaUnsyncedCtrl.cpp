@@ -348,6 +348,8 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(Yield);
 
+	REGISTER_LUA_CFUNC(UnbindAll);
+
 	return true;
 }
 
@@ -3283,6 +3285,19 @@ int LuaUnsyncedCtrl::SetNanoProjectileParams(lua_State* L)
 
 static constexpr const char* ConfigReadOnlyAdjectives[] = { "read-only", "deprecated" };
 
+
+/***
+ * Completely unbinds all key bindings without setting fallback bootstrap keys.
+ *
+ * @function Spring.UnbindAll
+ * @return nil
+ */
+int LuaUnsyncedCtrl::UnbindAll(lua_State* L)
+{
+	keyBindings.Clear();
+	return 0;
+}
+
 /***
  *
  * @function Spring.SetConfigInt
@@ -5597,3 +5612,4 @@ int LuaUnsyncedCtrl::Yield(lua_State* L)
 	lua_pushboolean(L, true); //hint Lua should keep calling Yield
 	return 1;
 }
+
