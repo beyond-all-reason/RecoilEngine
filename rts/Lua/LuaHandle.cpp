@@ -61,9 +61,13 @@
 
 #include "lib/luasocket/src/luasocket.h"
 
+#ifdef camera
+#undef camera
+#endif
 #include <SDL3/SDL_keyboard.h>
 #include <SDL3/SDL_keycode.h>
 #include <SDL3/SDL_mouse.h>
+#include <SDL3/SDL_gamepad.h>
 
 #include "System/Misc/TracyDefs.h"
 #include <tracy/TracyLua.hpp>
@@ -3565,6 +3569,52 @@ bool CLuaHandle::MouseWheel(bool up, float value)
 
 	// call the function
 	if (!RunCallIn(L, cmdStr, 2, 1))
+		return false;
+
+	const bool retval = luaL_optboolean(L, -1, false);
+	lua_pop(L, 1);
+	return retval;
+}
+
+void CLuaHandle::ControllerDevice(const std::string& eventName, int instanceId)
+{
+	LUA_CALL_IN_CHECK(L, );
+	luaL_checkstack(L, 4, __func__);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	lua_pushsstring(L, eventName);
+	lua_pushinteger(L, instanceId);
+
+	// call the function
+	RunCallIn(L, cmdStr, 2, 0);
+}
+
+bool CLuaHandle::ControllerState(const std::string& eventName, int instanceId, int statefulId, int value)
+{
+	LUA_CALL_IN_CHECK(L, false);
+	luaL_checkstack(L, 7, __func__);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return false;
+
+	lua_pushsstring(L, eventName);
+	lua_pushinteger(L, instanceId);
+	lua_pushinteger(L, statefulId);
+	lua_pushinteger(L, value);
+
+	std::string statefulName;
+	if (eventName.substr(0, 6) == "Button") {
+		statefulName = SDL_GetGamepadStringForButton((SDL_GamepadButton)statefulId);
+	} else {
+		statefulName = SDL_GetGamepadStringForAxis((SDL_GamepadAxis)statefulId);
+	}
+
+	lua_pushsstring(L, statefulName);
+
+	// call the function
+	if (!RunCallIn(L, cmdStr, 5, 1))
 		return false;
 
 	const bool retval = luaL_optboolean(L, -1, false);
