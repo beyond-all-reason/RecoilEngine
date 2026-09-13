@@ -1522,8 +1522,6 @@ void CCommandAI::ExecuteAttack(Command& c)
 				FinishCommand();
 				return;
 			}
-			// a crashing flyer is not an available target (weapons refuse it
-			// unless fireAtCrashing); skip the order instead of holding it
 			if (targetUnit->unitDef->canfly && targetUnit->IsCrashing()) {
 				FinishCommand();
 				return;
