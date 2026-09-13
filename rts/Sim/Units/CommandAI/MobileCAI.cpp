@@ -922,8 +922,6 @@ void CMobileCAI::ExecuteAttack(Command& c)
 					StopMoveAndFinishCommand();
 					return;
 				}
-				// a crashing flyer cannot be attacked (weapons refuse it unless
-				// fireAtCrashing); skip the order like AirCAI does
 				if (targetUnit->unitDef->canfly && targetUnit->IsCrashing()) {
 					StopMoveAndFinishCommand();
 					return;
