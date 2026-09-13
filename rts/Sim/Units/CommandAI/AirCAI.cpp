@@ -402,7 +402,7 @@ void CAirCAI::ExecuteAttack(Command& c)
 			return;
 		}
 		if (orderTarget != nullptr) {
-			if (orderTarget->unitDef->canfly && orderTarget->IsCrashing()) {
+			if (SkipCrashingTarget(orderTarget)) {
 				owner->DropCurrentAttackTarget();
 				StopMoveAndFinishCommand();
 				return;
@@ -431,9 +431,7 @@ void CAirCAI::ExecuteAttack(Command& c)
 				StopMoveAndFinishCommand();
 				return;
 			}
-			// a queued attack on a flyer that is already crashing cannot be carried
-			// out; skip it now instead of waiting for the next SlowUpdate to notice
-			if (targetUnit->unitDef->canfly && targetUnit->IsCrashing()) {
+			if (SkipCrashingTarget(targetUnit)) {
 				StopMoveAndFinishCommand();
 				return;
 			}
@@ -545,7 +543,7 @@ int CAirCAI::GetDefaultCmd(const CUnit* pointed, const CFeature* feature)
 bool CAirCAI::IsValidTarget(const CUnit* enemy, CWeapon* weapon) const {
 	if (!CMobileCAI::IsValidTarget(enemy, weapon))
 		return false;
-	if (enemy->IsCrashing())
+	if (SkipCrashingTarget(enemy))
 		return false;
 	return (GetStrafeAirMoveType(owner)->isFighter || !enemy->unitDef->canfly);
 }

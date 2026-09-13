@@ -922,7 +922,7 @@ void CMobileCAI::ExecuteAttack(Command& c)
 					StopMoveAndFinishCommand();
 					return;
 				}
-				if (targetUnit->unitDef->canfly && targetUnit->IsCrashing()) {
+				if (SkipCrashingTarget(targetUnit)) {
 					StopMoveAndFinishCommand();
 					return;
 				}
@@ -957,8 +957,7 @@ void CMobileCAI::ExecuteAttack(Command& c)
 		StopMoveAndFinishCommand();
 		return;
 	}
-	// the flyer we were attacking started crashing; nothing left to do for this order
-	if (orderTarget != nullptr && orderTarget->unitDef->canfly && orderTarget->IsCrashing()) {
+	if (SkipCrashingTarget(orderTarget)) {
 		owner->DropCurrentAttackTarget();
 		StopMoveAndFinishCommand();
 		return;

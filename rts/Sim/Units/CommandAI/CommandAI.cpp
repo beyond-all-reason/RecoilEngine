@@ -1496,8 +1496,7 @@ void CCommandAI::ExecuteAttack(Command& c)
 			FinishCommand();
 			return;
 		}
-		// the flyer we were attacking started crashing; nothing left to do for this order
-		if (orderTarget != nullptr && orderTarget->unitDef->canfly && orderTarget->IsCrashing()) {
+		if (SkipCrashingTarget(orderTarget)) {
 			owner->DropCurrentAttackTarget();
 			FinishCommand();
 			return;
@@ -1522,7 +1521,7 @@ void CCommandAI::ExecuteAttack(Command& c)
 				FinishCommand();
 				return;
 			}
-			if (targetUnit->unitDef->canfly && targetUnit->IsCrashing()) {
+			if (SkipCrashingTarget(targetUnit)) {
 				FinishCommand();
 				return;
 			}
@@ -1841,6 +1840,11 @@ bool CCommandAI::HasMoreMoveCommands(bool skipFirstCmd) const
 
 
 bool CCommandAI::CanChangeFireState() const { return (owner->unitDef->CanChangeFireState()); }
+bool CCommandAI::SkipCrashingTarget(const CUnit* target) const
+{
+	return (target != nullptr && !modInfo.fireAtCrashing && target->IsCrashing());
+}
+
 bool CCommandAI::SkipParalyzeTarget(const CUnit* target) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
