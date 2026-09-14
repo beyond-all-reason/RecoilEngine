@@ -361,6 +361,9 @@ void CTeam::SlowUpdate()
 		currentStats.frame = gs->frameNum;
 		statHistory.push_back(currentStats);
 
+		if(! gaia)
+			clientNet->Send(CBaseNetProtocol::Get().SendTeamStat(teamNum, currentStats));
+
 		nextHistoryEntry = gs->frameNum + (TeamStatistics::statsPeriod * GAME_SPEED);
 		GetCurrentStats().frame = nextHistoryEntry;
 	}
