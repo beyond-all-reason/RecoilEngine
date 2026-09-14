@@ -398,13 +398,13 @@ void CAirCAI::ExecuteAttack(Command& c)
 
 	if (inCommand == CMD_ATTACK) {
 		if (targetDied || (c.GetNumParams() == 1 && UpdateTargetLostTimer(int(c.GetParam(0))) == 0)) {
-			StopMoveAndFinishCommand();
+			StopMoveAndFinishCommand(targetDied);
 			return;
 		}
 		if (orderTarget != nullptr) {
 			if (SkipCrashingTarget(orderTarget)) {
 				owner->DropCurrentAttackTarget();
-				StopMoveAndFinishCommand();
+				StopMoveAndFinishCommand(true);
 				return;
 			}
 			if (!(c.GetOpts() & ALT_KEY) && SkipParalyzeTarget(orderTarget)) {
@@ -420,11 +420,11 @@ void CAirCAI::ExecuteAttack(Command& c)
 			CUnit* targetUnit = unitHandler.GetUnit(c.GetParam(0));
 
 			if (targetUnit == nullptr) {
-				StopMoveAndFinishCommand();
+				StopMoveAndFinishCommand(true);
 				return;
 			}
 			if (targetUnit == owner) {
-				StopMoveAndFinishCommand();
+				StopMoveAndFinishCommand(true);
 				return;
 			}
 			if (targetUnit->GetTransporter() != nullptr && !modInfo.targetableTransportedUnits) {
@@ -432,7 +432,7 @@ void CAirCAI::ExecuteAttack(Command& c)
 				return;
 			}
 			if (SkipCrashingTarget(targetUnit)) {
-				StopMoveAndFinishCommand();
+				StopMoveAndFinishCommand(true);
 				return;
 			}
 
@@ -550,11 +550,11 @@ bool CAirCAI::IsValidTarget(const CUnit* enemy, CWeapon* weapon) const {
 
 
 
-void CAirCAI::FinishCommand()
+void CAirCAI::FinishCommand(bool dontRepeat)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	targetAge = 0;
-	CCommandAI::FinishCommand();
+	CCommandAI::FinishCommand(dontRepeat);
 }
 
 void CAirCAI::BuggerOff(const float3& pos, float radius)
