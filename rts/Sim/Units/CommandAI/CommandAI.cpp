@@ -1600,7 +1600,7 @@ void CCommandAI::CheckForAndAttemptNewCommand() {
 		return;
 
 	// If we don't have a command and there's one in the queue then try and start it.
-	if (inCommand == CMD_STOP) {
+	if (inCommand == CMD_STOP && !commandQue.empty()) {
 		// Only try to process a new command once per frame. Letting this get set by FinishCommand() will cause
 		// SlowUpdate() to trigger twice in a single frame.
 		lastFinishCommand = gs->frameNum;
