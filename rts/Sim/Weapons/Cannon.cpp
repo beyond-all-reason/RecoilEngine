@@ -57,27 +57,29 @@ void CCannon::UpdateRange(const float val)
 }
 
 
-bool CCannon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
+TargetCheckResult CCannon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg, int avoidFlagsOverride) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	const int traceFlags = (avoidFlagsOverride < 0) ? (avoidFlags & 255) : avoidFlagsOverride;
 	// Use real terrain height: the trajectory scan's approximate height can be above a clear source.
-	if ((avoidFlags & Collision::NOGROUND) == 0 && srcPos.y < CGround::GetHeightReal(srcPos))
-		return false;
+	if ((traceFlags & Collision::NOGROUND) == 0 && srcPos.y < CGround::GetHeightReal(srcPos))
+		return TargetCheckResult::Terrain;
+
 
 	// assume we can still fire at partially submerged targets
 	if (!weaponDef->waterweapon && TargetUnderWater(tgtPos, trg))
-		return false;
+		return TargetCheckResult::InvalidTarget;
 
 	if (projectileSpeed == 0.0f)
-		return true;
+		return TargetCheckResult::Clear;
 
 	float3 launchDir = CalcWantedDir(tgtPos - srcPos);
 	float3 targetVec = (tgtPos - srcPos) * XZVector;
 
 	if (launchDir.SqLength() == 0.0f)
-		return false;
+		return TargetCheckResult::Range;
 	if (targetVec.SqLength2D() == 0.0f)
-		return true;
+		return TargetCheckResult::Clear;
 
 	const float xzTargetDist = targetVec.LengthNormalize();
 
@@ -93,7 +95,7 @@ bool CCannon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, con
 	// as sometimes the approximate ground height calculation can create false positive ground collisions, 
 	// and the prior 10.0f buffer is no longer good enough with the accurate coefficients
 	// TODO: allow this ignore distance to be set on a per-unit basis
-	const float groundDist = ((avoidFlags & Collision::NOGROUND) == 0)?
+	const float groundDist = ((traceFlags & Collision::NOGROUND) == 0)?
 		CGround::TrajectoryGroundCol(srcPos, targetVec, groundColCheckDistance, linCoeff, qdrCoeff):
 		-1.0f;
 	const float angleSpread = (AccuracyExperience() + SprayAngleExperience()) * 0.6f * 0.9f;
@@ -102,10 +104,10 @@ bool CCannon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, con
 	// can report an above-ground source as blocked. Keep > 0; the GetHeightReal check
 	// above rejects sources that are actually underground.
 	if (groundDist > 0.0f)
-		return false;
+		return TargetCheckResult::Terrain;
 
 	// TODO: add a forcedUserTarget mode (enabled with meta key e.g.) and skip this test accordingly
-	return (!TraceRay::TestTrajectoryCone(srcPos, targetVec, xzTargetDist, linCoeff, qdrCoeff, angleSpread, owner->allyteam, avoidFlags, owner));
+	return (TraceRay::TestTrajectoryCone(srcPos, targetVec, xzTargetDist, linCoeff, qdrCoeff, angleSpread, owner->allyteam, traceFlags, owner));
 }
 
 void CCannon::FireImpl(const bool scriptCall)
