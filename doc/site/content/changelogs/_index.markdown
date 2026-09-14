@@ -8,6 +8,10 @@ title = "Running changelog"
 This is the bleeding-edge changelog since version 2026.07, for **pre-release 2026.08**.
 
 # Fixes
+* Repeat no longer requeues attacks rejected because the target is missing or
+is the attacking unit itself, or attacks ended because the target died. Aircraft
+also discard attacks they end because the target is crashing. Temporary loss of
+sensor contact and other repeatable commands retain their existing behavior.
 * Line-of-fire and other synced ground traces (`TraceRay`, `CWeapon::HaveFreeLineOfFire`,
 `Spring.GetUnitWeaponHaveFreeLineOfFire`) no longer report a free line when the ray starts
 below the terrain. `LineGroundCol` returns a hit distance of 0 for such a ray and `TraceRay`

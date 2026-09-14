@@ -911,11 +911,11 @@ void CMobileCAI::ExecuteAttack(Command& c)
 
 				// check if we have valid target parameter and that we aren't attacking ourselves
 				if (targetUnit == nullptr) {
-					StopMoveAndFinishCommand();
+					StopMoveAndFinishCommand(true);
 					return;
 				}
 				if (targetUnit == owner) {
-					StopMoveAndFinishCommand();
+					StopMoveAndFinishCommand(true);
 					return;
 				}
 				if (targetUnit->GetTransporter() != nullptr && !modInfo.targetableTransportedUnits) {
@@ -950,7 +950,7 @@ void CMobileCAI::ExecuteAttack(Command& c)
 	// NOTE: unit should actually just continue to target area!
 	if (targetDied || (c.GetNumParams() == 1 && UpdateTargetLostTimer(int(c.GetParam(0))) == 0)) {
 		// cancel keeppointingto
-		StopMoveAndFinishCommand();
+		StopMoveAndFinishCommand(targetDied);
 		return;
 	}
 
@@ -1136,7 +1136,7 @@ void CMobileCAI::NonMoving()
 	buggerOffAttempts++;
 }
 
-void CMobileCAI::FinishCommand()
+void CMobileCAI::FinishCommand(bool dontRepeat)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	SetTransportee(nullptr);
@@ -1147,7 +1147,7 @@ void CMobileCAI::FinishCommand()
 	tempOrder = false;
 
 	StopSlowGuard();
-	CCommandAI::FinishCommand();
+	CCommandAI::FinishCommand(dontRepeat);
 
 	if (owner->unitDef->IsTransportUnit()) {
 		CHoverAirMoveType* am = dynamic_cast<CHoverAirMoveType*>(owner->moveType);
