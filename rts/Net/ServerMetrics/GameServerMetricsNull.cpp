@@ -7,10 +7,14 @@
  * a missing one breaks this build at link time.
  */
 
+#include <string>
+
 #include "GameServerMetrics.h"
 
-void ServerMetrics::Init() {}
+void ServerMetrics::Init(const std::string&) {}
 
 void ServerMetrics::Shutdown() {}
 
 void ServerMetrics::Update(const CGameServer&) {}
+
+void ServerMetrics::SetGameStartTime(double) {}
