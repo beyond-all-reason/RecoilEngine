@@ -74,7 +74,6 @@ protected:
 
 public:
 	// subclass is responsible for populating this with script pieces
-	LocalModelPiece* rootPiece = nullptr;
 	std::vector<LocalModelPiece*> pieces;
 
 	auto* SafeGetPiece(uint32_t scriptPieceNum) const {
