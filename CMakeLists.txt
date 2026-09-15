@@ -481,9 +481,12 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 		# worth to test if sync
 		#set(FALLBACK_SSE_FLAGS "${FALLBACK_SSE_FLAGS} -mpopcnt -mlzcnt -mabm")
 
-		# disable rest
+		# SSE4.2 baseline. Requires Nehalem (2008) / Bulldozer (2011).
+		set(FALLBACK_SSE_FLAGS "${FALLBACK_SSE_FLAGS} -msse3 -mssse3 -msse4 -msse4.1 -msse4.2")
+
+		# disable rest — AVX/FMA remain banned: FMA contraction changes FP bit patterns and desyncs.
 		#set(FALLBACK_SSE_FLAGS "${FALLBACK_SSE_FLAGS} -mno-3dnow") tests showed it might sync
-		set(FALLBACK_SSE_FLAGS "${FALLBACK_SSE_FLAGS} -mno-sse3 -mno-ssse3 -mno-sse4.1 -mno-sse4.2 -mno-sse4 -mno-sse4a")
+		set(FALLBACK_SSE_FLAGS "${FALLBACK_SSE_FLAGS} -mno-sse4a")
 		set(FALLBACK_SSE_FLAGS "${FALLBACK_SSE_FLAGS} -mno-avx -mno-fma -mno-fma4 -mno-xop -mno-lwp")
 		set(FALLBACK_SSE_FLAGS "${FALLBACK_SSE_FLAGS} -mno-avx2")
 
@@ -495,6 +498,14 @@ if (CMAKE_COMPILER_IS_GNUCXX)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SSE_FLAGS} -mfpmath=sse") #SSE_FLAGS are now user input only
 	endif ()
 elseif (MSVC)
+	# MSVC stays on /arch:SSE2 even though GCC/Clang baseline is SSE4.2:
+	# MSVC has no SSE4-only switch — next step up is /arch:AVX which would
+	# enable AVX/FMA autovectorization and violate the sync-parity ban on
+	# FMA contraction. SSE4 intrinsics are still available on MSVC under
+	# /arch:SSE2 (unlike GCC), so source code can opt in explicitly. The
+	# practical cost is that MSVC builds don't autovectorize to SSE4.
+	# Note: shipped Windows artifacts use MinGW GCC, not MSVC; this branch
+	# is for local MSVC developer configures only.
 	set(MSVC_CXX_FLAGS "/arch:SSE2") #default, but still set explicitly
 	# silence warnings
 	add_definitions(-D_SILENCE_STDEXT_HASH_DEPRECATION_WARNINGS)
@@ -505,7 +516,7 @@ elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}
 	else()
 		# Clang on x86_64: use SSE like GCC
 		if (NOT MARCH_FLAG OR MARCH_FLAG STREQUAL "" OR MARCH_FLAG STREQUAL "generic")
-			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse -mfpmath=sse")
+			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse -msse3 -mssse3 -msse4 -msse4.1 -msse4.2 -mfpmath=sse")
 		else()
 			set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${MARCH_FLAG} -mtune=${MARCH_FLAG}")
 		endif()
