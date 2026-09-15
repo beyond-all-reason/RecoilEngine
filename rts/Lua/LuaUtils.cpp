@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <cctype>
+#include <ranges>
 
 #include "LuaUtils.h"
 #include "LuaConfig.h"
@@ -20,6 +21,7 @@
 #include "Sim/Units/CommandAI/CommandDescription.h"
 #include "Sim/Misc/CustomColorPalette.h"
 #include "Sim/Misc/LosHandler.h"
+#include "Sim/Misc/ResourceHandler.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/Log/ILog.h"
 #include "System/UnorderedMap.hpp"
@@ -695,6 +697,46 @@ int LuaUtils::ParseFloat4Vector(lua_State* L, int index, vector<float4>& vec)
 		return i;
 	}
 }
+
+
+bool LuaUtils::ParseResourcePack(lua_State* L, int index, SResourcePack& pack)
+{
+	if (!lua_istable(L, index))
+		return false;
+
+	for (auto [i, resource] : std::views::enumerate(pack)) {
+		// Parse by resource index, like `{ 1.23, 45.6, 789 }`
+		lua_rawgeti(L, index, i+1);
+		resource = luaL_optnumber(L, -1, resource);
+		lua_pop(L, 1);
+
+/* TODO: unitsync could also have a resource handler instance, and
+ * read modrules when trying to read stuff that could be defined as
+ * resource packs. Dedi is out of luck though. No idea about AI. */
+#if !defined UNITSYNC && !defined DEDICATED && !defined BUILDING_AI
+
+		/* Parse by name, like `{ energy = 45.6, blood_mana = 789, metal = 1.23 }`.
+		 * This takes precedence over index-based since it's more explicit. */
+		const auto resourceDef = CResourceHandler::GetInstance()->GetResource(i);
+		if (!resourceDef)
+			continue;
+
+		/* TODO. The resource handler calls the resources Metal and Energy,
+		 * uppercase, but essentially everywhere else they're lowercase so
+		 * here I also adjust to the effective standard. Once resources can
+		 * be customized this will stop being a problem and the name can be
+		 * passed raw, without making a lowercase copy. */
+		const auto resourceNameLower = StringToLower(resourceDef->name);
+
+		lua_getfield(L, index, resourceNameLower.c_str());
+		resource = luaL_optnumber(L, -1, resource);
+		lua_pop(L, 1);
+#endif
+	}
+
+	return true;
+}
+
 
 #if !defined UNITSYNC && !defined DEDICATED && !defined BUILDING_AI
 
