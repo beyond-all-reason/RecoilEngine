@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _COMMAND_AI_H
-#define _COMMAND_AI_H
+#pragma once
 
 #include <functional>
 #include <vector>
@@ -51,7 +50,8 @@ public:
 	virtual int GetDefaultCmd(const CUnit* pointed, const CFeature* feature);
 	virtual void SlowUpdate();
 	virtual void GiveCommandReal(const Command& c, bool fromSynced = true);
-	virtual void FinishCommand();
+	// Complete normally, but optionally suppress requeueing when Repeat is enabled.
+	virtual void FinishCommand(bool dontRepeat = false);
 
 	virtual void BuggerOff(const float3& pos, float radius) {}
 	virtual void StopMove() {}
@@ -176,5 +176,3 @@ inline void CCommandAI::SetOrderTarget(CUnit* o) {
 		AddDeathDependence(reinterpret_cast<CObject*>(orderTarget), DEPENDENCE_ORDERTARGET);
 	}
 }
-
-#endif // _COMMAND_AI_H
