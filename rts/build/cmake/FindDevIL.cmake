@@ -66,9 +66,13 @@ This module sets:
 
 include(FindPackageHandleStandardArgs)
 
-find_path(IL_INCLUDE_DIR il.h
-          PATH_SUFFIXES include IL
-          DOC "The path to the directory that contains il.h"
+# Search for IL/il.h (not bare il.h) so IL_INCLUDE_DIR is the directory that
+# makes the code's #include <IL/il.h> resolve. Searching for il.h directly
+# returned the IL/ subdirectory itself on some layouts (e.g. Homebrew's
+# <prefix>/include/IL), which broke the angle-bracket include.
+find_path(IL_INCLUDE_DIR IL/il.h
+          PATH_SUFFIXES include
+          DOC "The path to the directory that contains IL/il.h"
 )
 
 #message("IL_INCLUDE_DIR is ${IL_INCLUDE_DIR}")
