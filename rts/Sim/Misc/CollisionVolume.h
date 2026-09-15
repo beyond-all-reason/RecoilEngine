@@ -128,12 +128,27 @@ public:
 	float GetPointSurfaceDistance(const CUnit* u, const LocalModelPiece* lmp, const float3& pos) const;
 	float GetPointSurfaceDistance(const CFeature* u, const LocalModelPiece* lmp, const float3& pos) const;
 
+	float3 GetClosestSurfacePoint(const CUnit* u, const LocalModelPiece* lmp, const float3& pos) const;
+	float3 GetClosestSurfacePoint(const CFeature* f, const LocalModelPiece* lmp, const float3& pos) const;
+
+	float3 GetClosestSurfacePointFromLineSegment(const CUnit* u, const LocalModelPiece* lmp, const float3& p1, const float3& p2) const;
+	float3 GetClosestSurfacePointFromLineSegment(const CFeature* f, const LocalModelPiece* lmp, const float3& p1, const float3& p2) const;
+
 private:
 	float GetPointSurfaceDistance(const CSolidObject* obj, const LocalModelPiece* lmp, const CMatrix44f& mat, const float3& pos) const;
 	float GetPointSurfaceDistance(const CMatrix44f& mv, const float3& p) const;
 
 	float GetCylinderDistance(const float3& pv, size_t axisA = 0, size_t axisB = 1, size_t axisC = 2) const;
 	float GetEllipsoidDistance(const float3& pv) const;
+
+	float3 GetClosestSurfacePoint(const CSolidObject* obj, const LocalModelPiece* lmp, const CMatrix44f& mat, const float3& pos) const;
+	float3 GetClosestSurfacePoint(const CMatrix44f& mv, const CMatrix44f& vm, const float3& p) const;
+
+	float3 GetClosestSurfacePointFromLineSegment(const CSolidObject* obj, const LocalModelPiece* lmp, const CMatrix44f& mat, const float3& p1, const float3& p2) const;
+	float3 GetClosestSurfacePointFromLineSegment(const CMatrix44f& mv, const CMatrix44f& vm, const float3& p1, const float3& p2) const;
+
+	float3 GetCylinderClosestPoint(const float3& pv, size_t axisA, size_t axisB, size_t axisC) const;
+	float3 GetEllipsoidClosestPoint(const float3& pv) const;
 
 private:
 	float3 fullAxisScales    = OnesVector * 2.0f;  ///< full-length axis scales
