@@ -142,6 +142,29 @@ end
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 
+function gadgetHandler:UnitCommandEnded(...)
+	for _, g in r_ipairs(self.UnitCommandEndedList) do
+		g:UnitCommandEnded(...)
+	end
+end
+
+function gadgetHandler:AttackCommandMovement(unitID, cmdTag, cmdID, cmdOptions, targetID, x, y, z)
+	local targetDead = targetID and Spring.GetUnitIsDead(targetID)
+	for _, g in r_ipairs(self.AttackCommandMovementList) do
+		if g:AttackCommandMovement(unitID, cmdTag, cmdID, cmdOptions, targetID, x, y, z) == true then
+			return true
+		end
+		-- A false return can still replace the command or destroy its units.
+		-- Do not offer that invalidated callback to another gadget in this handle.
+		local currentID, _, currentTag = Spring.GetUnitCurrentCommand(unitID)
+		if Spring.GetUnitIsDead(unitID) ~= false or currentID ~= cmdID or currentTag ~= cmdTag
+			or (targetID and Spring.GetUnitIsDead(targetID) ~= targetDead) then
+			return true
+		end
+	end
+	return false
+end
+
 function gadgetHandler:Initialize()
   local syncedHandler = Script.GetSynced()
 
