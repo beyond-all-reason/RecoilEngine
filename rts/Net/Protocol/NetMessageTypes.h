@@ -96,6 +96,8 @@ enum NETMSG {
 
 	NETMSG_PING = 78, // uint8_t playerNum, uint8_t pingTag, float localTime
 
+	NETMSG_DEDIMSG = 79, // /* uint16_t messageSize */, uint8_t playerNum, uint16_t header, std::vector<uint8_t> payload
+
 	NETMSG_LAST //max types of netmessages, internal only
 };
 
