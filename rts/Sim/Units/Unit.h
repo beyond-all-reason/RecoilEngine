@@ -38,6 +38,7 @@ class DamageArray;
 class DynDamageArray;
 struct SolidObjectDef;
 struct UnitDef;
+class CUnitExtractor;
 struct UnitLoadParams;
 struct SLosInstance;
 
@@ -289,6 +290,7 @@ public:
 
 	CCommandAI* commandAI = nullptr;
 	CUnitScript* script = nullptr;
+	CUnitExtractor* extractor = nullptr;
 
 	// current attackee
 	SWeaponTarget curTarget;

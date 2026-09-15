@@ -8,7 +8,7 @@
 #include "UnitLoader.h"
 #include "UnitMemPool.h"
 #include "UnitToolTipMap.hpp"
-#include "UnitTypes/ExtractorBuilding.h"
+#include "UnitExtractor.h"
 #include "Scripts/NullUnitScript.h"
 #include "Scripts/UnitScriptFactory.h"
 #include "Scripts/CobInstance.h" // for TAANG2RAD
@@ -112,6 +112,10 @@ CUnit::~CUnit()
 	if (unitDef != nullptr && unitDef->IsBuildingUnit())
 		UnBlock();
 
+	// releases the metal squares and notifies neighbours, which the wreck below must not see;
+	// the script it calls into is still alive at this point
+	spring::SafeDelete(extractor);
+
 	// NOTE:
 	//   could also do this in Update() or even in CUnitKilledCB(), but not
 	//   in KillUnit() since we have to wait for deathScriptFinished there
@@ -210,6 +214,9 @@ void CUnit::PreInit(const UnitLoadParams& params)
 	unitDef = params.unitDef;
 	immobile = unitDef->IsImmobileUnit();
 	blockHeightChanges = unitDef->IsBuildingUnit() && unitDef->levelGround;
+
+	if (unitDef->IsExtractorUnit())
+		extractor = new CUnitExtractor(this);
 
 	{
 		const FeatureDef* wreckFeatureDef = featureDefHandler->GetFeatureDef(unitDef->wreckName);
@@ -2008,7 +2015,6 @@ void CUnit::TurnIntoNanoframe()
 	SetStorage(0.0f);
 
 	// make sure neighbor extractors update
-	const auto extractor = dynamic_cast <CExtractorBuilding*> (this);
 	if (extractor != nullptr)
 		extractor->ResetExtraction();
 
@@ -2342,6 +2348,9 @@ void CUnit::Activate()
 
 	if (IsInLosForAllyTeam(gu->myAllyTeam))
 		Channels::General->PlayRandomSample(unitDef->sounds.activate, this);
+
+	if (extractor != nullptr)
+		extractor->OnActivate();
 }
 
 
@@ -2359,6 +2368,9 @@ void CUnit::Deactivate()
 
 	if (IsInLosForAllyTeam(gu->myAllyTeam))
 		Channels::General->PlayRandomSample(unitDef->sounds.deactivate, this);
+
+	if (extractor != nullptr)
+		extractor->OnDeactivate();
 }
 
 
@@ -2874,6 +2886,7 @@ CR_REG_METADATA(CUnit, (
 
 	CR_MEMBER(commandAI),
 	CR_MEMBER(script),
+	CR_MEMBER(extractor),
 
 	CR_IGNORED( usMemBuffer),
 	CR_IGNORED(amtMemBuffer),

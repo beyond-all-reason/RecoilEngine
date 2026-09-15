@@ -3,12 +3,11 @@
 // Used for all metal-extractors.
 // Handles the metal-make-process.
 
-#include <typeinfo>
-#include "ExtractorBuilding.h"
-#include "Sim/Units/Scripts/UnitScript.h"
-#include "Sim/Units/UnitHandler.h"
-#include "Map/ReadMap.h"
+#include "UnitExtractor.h"
+#include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
+#include "Sim/Units/Scripts/UnitScript.h"
+#include "Map/ReadMap.h"
 #include "Map/MetalMap.h"
 #include "Sim/Misc/QuadField.h"
 #include "System/ContainerUtil.h"
@@ -16,45 +15,45 @@
 #include "System/Misc/TracyDefs.h"
 
 
-CR_BIND_DERIVED(CExtractorBuilding, CUnit, )
-CR_REG_METADATA(CExtractorBuilding, (
+CR_BIND(CUnitExtractor, )
+CR_REG_METADATA(CUnitExtractor, (
+	CR_MEMBER(owner),
 	CR_MEMBER(extractionRange),
 	CR_MEMBER(extractionDepth),
 	CR_MEMBER(metalAreaOfControl),
 	CR_MEMBER(neighbours)
 ))
 
-CR_BIND(CExtractorBuilding::MetalSquareOfControl, )
+CR_BIND(CUnitExtractor::MetalSquareOfControl, )
 
-CR_REG_METADATA_SUB(CExtractorBuilding,MetalSquareOfControl, (
+CR_REG_METADATA_SUB(CUnitExtractor,MetalSquareOfControl, (
 	CR_MEMBER(x),
 	CR_MEMBER(z),
 	CR_MEMBER(extractionDepth)
 ))
 
-// TODO: How are class statics incorporated into creg?
-float CExtractorBuilding::maxExtractionRange = 0.0f;
+float CUnitExtractor::maxExtractionRange = 0.0f;
 
-CExtractorBuilding::~CExtractorBuilding()
+
+CUnitExtractor::CUnitExtractor(CUnit* owner)
+	: owner(owner)
+	, extractionRange(owner->unitDef->extractRange)
+	, extractionDepth(owner->unitDef->extractsMetal)
+{
+}
+
+CUnitExtractor::~CUnitExtractor()
 {
 	ResetExtraction();
 }
 
-void CExtractorBuilding::PreInit(const UnitLoadParams& params)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	CUnit::PreInit(params);
-
-	extractionRange = unitDef->extractRange;
-	extractionDepth = unitDef->extractsMetal;
-}
 
 /* resets the metalMap and notifies the neighbours */
-void CExtractorBuilding::ResetExtraction()
+void CUnitExtractor::ResetExtraction()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	metalExtract = 0;
-	script->ExtractionRateChanged(metalExtract);
+	owner->metalExtract = 0;
+	owner->script->ExtractionRateChanged(owner->metalExtract);
 
 	// undo the extraction-area
 	for (auto si = metalAreaOfControl.begin(); si != metalAreaOfControl.end(); ++si) {
@@ -64,7 +63,7 @@ void CExtractorBuilding::ResetExtraction()
 	metalAreaOfControl.clear();
 
 	// tell the neighbours (if any) to take it over
-	for (CExtractorBuilding* ngb: neighbours) {
+	for (CUnitExtractor* ngb: neighbours) {
 		ngb->RemoveNeighbour(this);
 		ngb->ReCalculateMetalExtraction();
 	}
@@ -74,15 +73,15 @@ void CExtractorBuilding::ResetExtraction()
 
 
 /* determine if two extraction areas overlap */
-bool CExtractorBuilding::IsNeighbour(CExtractorBuilding* other)
+bool CUnitExtractor::IsNeighbour(const CUnitExtractor* other) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// circle vs. circle
-	return (this->pos.SqDistance2D(other->pos) < Square(this->extractionRange + other->extractionRange));
+	return (owner->pos.SqDistance2D(other->owner->pos) < Square(this->extractionRange + other->extractionRange));
 }
 
 /* sets the range of extraction for this extractor, also finds overlapping neighbours. */
-void CExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
+void CUnitExtractor::SetExtractionRangeAndDepth(float range, float depth)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	extractionRange = std::max(range, 0.001f);
@@ -91,15 +90,15 @@ void CExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
 
 	// find any neighbouring extractors
 	QuadFieldQuery qfQuery;
-	quadField.GetUnits(qfQuery, pos, extractionRange + maxExtractionRange);
+	quadField.GetUnits(qfQuery, owner->pos, extractionRange + maxExtractionRange);
 
 	for (CUnit* u: *qfQuery.units) {
-		if (u == this)
+		if (u == owner)
 			continue;
-		if (typeid(*u) != typeid(CExtractorBuilding))
+		if (u->extractor == nullptr)
 			continue;
 
-		CExtractorBuilding* eb = static_cast<CExtractorBuilding*>(u);
+		CUnitExtractor* eb = u->extractor;
 
 		if (!IsNeighbour(eb))
 			continue;
@@ -108,14 +107,16 @@ void CExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
 		eb->AddNeighbour(this);
 	}
 
-	if (!activated) {
-		assert(metalExtract == 0); // when deactivated metalExtract should always be 0
+	if (!owner->activated) {
+		assert(owner->metalExtract == 0); // when deactivated metalExtract should always be 0
 
 		return;
 	}
 
 	// calculate this extractor's area of control and metalExtract amount
-	metalExtract = 0;
+	owner->metalExtract = 0;
+
+	const float3& pos = owner->pos;
 
 	const int xBegin = std::max(                   0, (int) ((pos.x - extractionRange) / METAL_MAP_SQUARE_SIZE));
 	const int xEnd   = std::min(mapDims.mapx / 2 - 1, (int) ((pos.x + extractionRange) / METAL_MAP_SQUARE_SIZE));
@@ -130,7 +131,7 @@ void CExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
 			// center of metalsquare at (x, z)
 			const float3 msqrPos((x + 0.5f) * METAL_MAP_SQUARE_SIZE, pos.y,
 													 (z + 0.5f) * METAL_MAP_SQUARE_SIZE);
-			const float sqrCenterDistance = msqrPos.SqDistance2D(this->pos);
+			const float sqrCenterDistance = msqrPos.SqDistance2D(pos);
 
 			if (sqrCenterDistance < Square(extractionRange)) {
 				MetalSquareOfControl msqr;
@@ -139,18 +140,18 @@ void CExtractorBuilding::SetExtractionRangeAndDepth(float range, float depth)
 				// extraction is done in a cylinder of height <depth>
 				msqr.extractionDepth = metalMap.RequestExtraction(x, z, depth);
 				metalAreaOfControl.push_back(msqr);
-				metalExtract += msqr.extractionDepth * metalMap.GetMetalAmount(msqr.x, msqr.z);
+				owner->metalExtract += msqr.extractionDepth * metalMap.GetMetalAmount(msqr.x, msqr.z);
 			}
 		}
 	}
 
 	// set the COB animation speed
-	script->ExtractionRateChanged(metalExtract);
+	owner->script->ExtractionRateChanged(owner->metalExtract);
 }
 
 
 /* adds a neighbour for this extractor */
-void CExtractorBuilding::AddNeighbour(CExtractorBuilding* neighbour)
+void CUnitExtractor::AddNeighbour(CUnitExtractor* neighbour)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(neighbour != this);
@@ -158,7 +159,7 @@ void CExtractorBuilding::AddNeighbour(CExtractorBuilding* neighbour)
 }
 
 /* removes a neighbour for this extractor */
-void CExtractorBuilding::RemoveNeighbour(CExtractorBuilding* neighbour)
+void CUnitExtractor::RemoveNeighbour(CUnitExtractor* neighbour)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(neighbour != this);
@@ -167,46 +168,36 @@ void CExtractorBuilding::RemoveNeighbour(CExtractorBuilding* neighbour)
 
 
 /* recalculate metalExtract for this extractor (eg. when a neighbour dies) */
-void CExtractorBuilding::ReCalculateMetalExtraction()
+void CUnitExtractor::ReCalculateMetalExtraction()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	metalExtract = 0;
+	owner->metalExtract = 0;
 
 	for (MetalSquareOfControl& msqr: metalAreaOfControl) {
 		metalMap.RemoveExtraction(msqr.x, msqr.z, msqr.extractionDepth);
 
-		if (activated) {
+		if (owner->activated) {
 			// extraction is done in a cylinder
 			msqr.extractionDepth = metalMap.RequestExtraction(msqr.x, msqr.z, extractionDepth);
-			metalExtract += (msqr.extractionDepth * metalMap.GetMetalAmount(msqr.x, msqr.z));
+			owner->metalExtract += (msqr.extractionDepth * metalMap.GetMetalAmount(msqr.x, msqr.z));
 		}
 	}
 
 	// set the new rotation-speed
-	script->ExtractionRateChanged(metalExtract);
+	owner->script->ExtractionRateChanged(owner->metalExtract);
 }
 
 
-void CExtractorBuilding::Activate()
+void CUnitExtractor::OnActivate()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (activated)
-		return;
-
-	CUnit::Activate();
-
 	/* Finds the amount of metal to extract and sets the rotationspeed when the extractor is built. */
 	SetExtractionRangeAndDepth(extractionRange, extractionDepth);
 }
 
 
-void CExtractorBuilding::Deactivate()
+void CUnitExtractor::OnDeactivate()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!activated)
-		return;
-
-	CUnit::Deactivate();
-
 	ResetExtraction();
 }
