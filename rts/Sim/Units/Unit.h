@@ -90,6 +90,9 @@ public:
 
 	bool AttackUnit(CUnit* unit, bool isUserTarget, bool wantManualFire, bool fpsMode = false);
 	bool AttackGround(const float3& pos, bool isUserTarget, bool wantManualFire, bool fpsMode = false);
+	
+	void DropCurrentAutoTarget();
+
 	void DropCurrentAttackTarget();
 
 	int GetBlockingMapID() const override { return id; }
