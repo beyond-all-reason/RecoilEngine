@@ -228,8 +228,7 @@ public:
 
 public:
 	void KilledScriptFinished(int wreckLevel) { deathScriptFinished = true; delayedWreckLevel = wreckLevel; }
-	void ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
-	virtual void KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
+	virtual void KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0, bool forced = false);
 	virtual void IncomingMissile(CMissileProjectile* missile);
 	CFeature* CreateWreck(int wreckLevel, int smokeTime);
 
@@ -240,6 +239,7 @@ public:
 	void Drop(const float3& parentPos, const float3& parentDir, CUnit* parent);
 	void PostLoad();
 protected:
+	void KillUnitImpl(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
 	void ChangeTeamReset();
 	void UpdateResources();
 	float GetFlankingDamageBonus(const float3& attackDir);
