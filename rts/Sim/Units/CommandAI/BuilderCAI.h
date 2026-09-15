@@ -6,6 +6,7 @@
 #include "MobileCAI.h"
 #include "Sim/Units/BuildInfo.h"
 #include "System/Misc/BitwiseEnum.h"
+#include "System/SpringMath.h"
 #include "System/UnorderedSet.hpp"
 
 #include <vector>
@@ -115,6 +116,15 @@ private:
 	}
 	inline float f3SqDist(const float3& a, const float3& b) const {
 		return range3D ? a.SqDistance(b) : a.SqDistance2D(b);
+	}
+	inline float f3LinePointDist(const float3& l1, const float3& l2, const float3& p) const {
+		if (range3D)
+			return LinePointDist(l1, l2, p);
+
+		return LinePointDist(
+			float3{l1.x, 0.0f, l1.z},
+			float3{l2.x, 0.0f, l2.z},
+			float3{p.x, 0.0f, p.z});
 	}
 	//inline float f3Len(const float3& a) const {
 	//	return range3D ? a.Length() : a.Length2D();
