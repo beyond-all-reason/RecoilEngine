@@ -15,6 +15,8 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/ShadowHandler.h"
+#include "Rendering/Shaders/ShaderHandler.h"
+#include "Rendering/Shaders/Shader.h"
 #include "Rendering/Env/ISky.h"
 #include "Rendering/Env/SunLighting.h"
 #include "Rendering/GL/VertexArray.h"
@@ -105,25 +107,79 @@ void CDynWater::InitResources(bool loadShader)
 	foamTex = foam.CreateMipMapTexture(0.0f, 0.0f, 0);
 
 
-	if (ProgramStringIsNative(GL_VERTEX_PROGRAM_ARB, "ARB/waterDyn.vp")) {
-		waterVP = LoadVertexProgram("ARB/waterDyn.vp");
-	} else {
-		waterVP = LoadVertexProgram("ARB/waterDynNT.vp");
-	}
+	const auto LoadShaderPair = [](const char* name, const char* vs, const char* fs) {
+		auto* prog = shaderHandler->CreateProgramObject("[DynWater]", name);
+		prog->AttachShaderObject(shaderHandler->CreateShaderObject(vs, "", GL_VERTEX_SHADER));
+		prog->AttachShaderObject(shaderHandler->CreateShaderObject(fs, "", GL_FRAGMENT_SHADER));
+		prog->Link();
+		return prog;
+	};
 
-	waterFP          = LoadFragmentProgram("ARB/waterDyn.fp");
-	waveFP           = LoadFragmentProgram("ARB/waterDynWave.fp");
-	waveVP           = LoadVertexProgram(  "ARB/waterDynWave.vp");
-	waveFP2          = LoadFragmentProgram("ARB/waterDynWave2.fp");
-	waveVP2          = LoadVertexProgram(  "ARB/waterDynWave2.vp");
-	waveNormalFP     = LoadFragmentProgram("ARB/waterDynNormal.fp");
-	waveNormalVP     = LoadVertexProgram(  "ARB/waterDynNormal.vp");
-	waveCopyHeightFP = LoadFragmentProgram("ARB/waterDynWave3.fp");
-	waveCopyHeightVP = LoadVertexProgram(  "ARB/waterDynWave3.vp");
-	dwDetailNormalFP = LoadFragmentProgram("ARB/dwDetailNormal.fp");
-	dwDetailNormalVP = LoadVertexProgram(  "ARB/dwDetailNormal.vp");
-	dwAddSplashFP    = LoadFragmentProgram("ARB/dwAddSplash.fp");
-	dwAddSplashVP    = LoadVertexProgram(  "ARB/dwAddSplash.vp");
+	waterShader           = LoadShaderPair("DynWater",           "GLSL/DynWaterVS.glsl",           "GLSL/DynWaterFS.glsl");
+	waveShader            = LoadShaderPair("DynWaterWave",        "GLSL/DynWaterWaveVS.glsl",        "GLSL/DynWaterWaveFS.glsl");
+	waveShader2           = LoadShaderPair("DynWaterWave2",       "GLSL/DynWaterWave2VS.glsl",       "GLSL/DynWaterWave2FS.glsl");
+	waveNormalShader      = LoadShaderPair("DynWaterNormal",      "GLSL/DynWaterNormalVS.glsl",      "GLSL/DynWaterNormalFS.glsl");
+	waveCopyHeightShader  = LoadShaderPair("DynWaterWave3",       "GLSL/DynWaterWave3VS.glsl",       "GLSL/DynWaterWave3FS.glsl");
+	dwDetailNormalShader  = LoadShaderPair("DynWaterDetailNormal","GLSL/DynWaterDetailNormalVS.glsl","GLSL/DynWaterDetailNormalFS.glsl");
+	dwAddSplashShader     = LoadShaderPair("DynWaterAddSplash",   "GLSL/DynWaterAddSplashVS.glsl",   "GLSL/DynWaterAddSplashFS.glsl");
+
+	// Bind texture units (done once after link)
+	waterShader->Enable();
+	waterShader->SetUniform("waterNormalTex", 0);
+	waterShader->SetUniform("reflectTex",     1);
+	waterShader->SetUniform("waveHeightTex",  2);
+	waterShader->SetUniform("refractTex",     3);
+	waterShader->SetUniform("shadingTex",     4);
+	waterShader->SetUniform("foamTex",        5);
+	waterShader->SetUniform("detailNormalTex",6);
+	waterShader->SetUniform("shadowTex",      7);
+	waterShader->Disable();
+
+	waveShader->Enable();
+	waveShader->SetUniform("tex0", 0);
+	waveShader->SetUniform("tex1", 1);
+	waveShader->SetUniform("tex2", 2);
+	waveShader->SetUniform("tex3", 3);
+	waveShader->SetUniform("tex4", 4);
+	waveShader->SetUniform("tex5", 5);
+	waveShader->SetUniform("tex6", 6);
+	waveShader->Disable();
+
+	waveShader2->Enable();
+	waveShader2->SetUniform("tex0", 0);
+	waveShader2->SetUniform("tex1", 1);
+	waveShader2->SetUniform("tex2", 2);
+	waveShader2->SetUniform("tex3", 3);
+	waveShader2->SetUniform("tex4", 4);
+	waveShader2->SetUniform("tex5", 5);
+	waveShader2->SetUniform("tex6", 6);
+	waveShader2->Disable();
+
+	waveNormalShader->Enable();
+	waveNormalShader->SetUniform("tex0", 0);
+	waveNormalShader->SetUniform("tex1", 1);
+	waveNormalShader->SetUniform("tex2", 2);
+	waveNormalShader->SetUniform("tex3", 3);
+	waveNormalShader->Disable();
+
+	waveCopyHeightShader->Enable();
+	waveCopyHeightShader->SetUniform("tex0", 0);
+	waveCopyHeightShader->Disable();
+
+	dwDetailNormalShader->Enable();
+	dwDetailNormalShader->SetUniform("tex0", 0);
+	dwDetailNormalShader->SetUniform("tex1", 1);
+	dwDetailNormalShader->SetUniform("tex2", 2);
+	dwDetailNormalShader->SetUniform("tex3", 3);
+	dwDetailNormalShader->SetUniform("tex4", 4);
+	dwDetailNormalShader->SetUniform("tex5", 5);
+	dwDetailNormalShader->SetUniform("tex6", 6);
+	dwDetailNormalShader->SetUniform("tex7", 7);
+	dwDetailNormalShader->Disable();
+
+	dwAddSplashShader->Enable();
+	dwAddSplashShader->SetUniform("tex0", 0);
+	dwAddSplashShader->Disable();
 
 	waterSurfaceColor = waterRendering->surfaceColor;
 
@@ -257,7 +313,6 @@ void CDynWater::FreeResources()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const auto DeleteTexture = [](GLuint& texID) { if (texID > 0) { glDeleteTextures(1, &texID); texID = 0; } };
-	const auto DeleteProgram = [](GLuint& proID) { if (proID > 0) { glSafeDeleteProgram(proID); proID = 0; } };
 
 	DeleteTexture(reflectTexture);
 	DeleteTexture(refractTexture);
@@ -276,20 +331,7 @@ void CDynWater::FreeResources()
 	DeleteTexture(zeroTex);
 	DeleteTexture(fixedUpTex);
 
-	DeleteProgram(waterFP);
-	DeleteProgram(waterVP);
-	DeleteProgram(waveFP);
-	DeleteProgram(waveVP);
-	DeleteProgram(waveFP2);
-	DeleteProgram(waveVP2);
-	DeleteProgram(waveNormalFP);
-	DeleteProgram(waveNormalVP);
-	DeleteProgram(waveCopyHeightFP);
-	DeleteProgram(waveCopyHeightVP);
-	DeleteProgram(dwDetailNormalVP);
-	DeleteProgram(dwDetailNormalFP);
-	DeleteProgram(dwAddSplashVP);
-	DeleteProgram(dwAddSplashFP);
+	shaderHandler->ReleaseProgramObjects("[DynWater]");
 
 	if (frameBuffer) {
 		glDeleteFramebuffersEXT(1, &frameBuffer);
@@ -308,32 +350,27 @@ void CDynWater::Draw()
 	glDisable(GL_ALPHA_TEST);
 	glEnable(GL_FOG);
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, waveTex3);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glActiveTextureARB(GL_TEXTURE1_ARB);
+	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, reflectTexture);
-	glActiveTextureARB(GL_TEXTURE2_ARB);
+	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, waveHeight32);
-	glActiveTextureARB(GL_TEXTURE3_ARB);
+	glActiveTexture(GL_TEXTURE3);
 	glBindTexture(GL_TEXTURE_2D, refractTexture);
-	glActiveTextureARB(GL_TEXTURE4_ARB);
+	glActiveTexture(GL_TEXTURE4);
 	glBindTexture(GL_TEXTURE_2D, readMap->GetShadingTexture());
-	glActiveTextureARB(GL_TEXTURE5_ARB);
+	glActiveTexture(GL_TEXTURE5);
 	glBindTexture(GL_TEXTURE_2D, foamTex);
-	glActiveTextureARB(GL_TEXTURE6_ARB);
+	glActiveTexture(GL_TEXTURE6);
 	glBindTexture(GL_TEXTURE_2D, detailNormalTex);
 
 	shadowHandler.SetupShadowTexSampler(GL_TEXTURE7);
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 
 	glColor4f(1, 1, 1, 0.5f);
-
-	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, waterFP);
-	glEnable(GL_FRAGMENT_PROGRAM_ARB);
-	glBindProgramARB(GL_VERTEX_PROGRAM_ARB, waterVP);
-	glEnable(GL_VERTEX_PROGRAM_ARB);
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE * wireFrameMode + GL_FILL * (1 - wireFrameMode));
 
@@ -342,29 +379,30 @@ void CDynWater::Draw()
 	const auto& sky = ISky::GetSky();
 	const float3& L = sky->GetLight()->GetLightDir();
 
-
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 10, 1.0f/(W_SIZE*256), 1.0f/(W_SIZE*256), 0, 0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 11, -camPosX/256.0f + 0.5f, -camPosZ/256.0f + 0.5f, 0, 0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 12, 1.0f/WF_SIZE, 1.0f/WF_SIZE, 0, 0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 13, -(camPosBig.x - WH_SIZE)/WF_SIZE, -(camPosBig.z - WH_SIZE)/WF_SIZE, 0, 0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 14, 1.0f/(mapDims.mapxp1 * SQUARE_SIZE), 1.0f/(mapDims.mapyp1 * SQUARE_SIZE), 0, 0);
-	//glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 0, 1.0f/4096.0f, 1.0f/4096.0f, 0, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 1, camera->GetPos().x, camera->GetPos().y, camera->GetPos().z, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 2, reflectRight.x, reflectRight.y, reflectRight.z, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 3, reflectUp.x, reflectUp.y, reflectUp.z, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 4, 0.5f/dx, 0.5f/dy, 1, 1);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 5, reflectForward.x, reflectForward.y, reflectForward.z, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 6, 0.05f, 1 - 0.05f, 0, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 7, 0.2f, 0, 0, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 8, 0.5f, 0.6f, 0.8f, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 9, L.x, L.y, L.z, 0.0f);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 10, sunLighting->groundDiffuseColor.x, sunLighting->groundDiffuseColor.y, sunLighting->groundDiffuseColor.z, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 11, sunLighting->groundAmbientColor.x, sunLighting->groundAmbientColor.y, sunLighting->groundAmbientColor.z, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 12, refractRight.x, refractRight.y, refractRight.z, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 13, refractUp.x,refractUp.y, refractUp.z, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 14, 0.5f/dx, 0.5f/dy, 1, 1);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 15, refractForward.x, refractForward.y, refractForward.z, 0);
-
+	waterShader->Enable();
+	// VS uniforms (renamed to avoid clash with FS uniforms at same ARB env slot index)
+	waterShader->SetUniform("waveHeightScale", 1.0f/(W_SIZE*256), 1.0f/(W_SIZE*256), 0.0f, 0.0f);
+	waterShader->SetUniform("waveHeightOfs",   -camPosX/256.0f + 0.5f, -camPosZ/256.0f + 0.5f, 0.0f, 0.0f);
+	waterShader->SetUniform("waveNormalScale", 1.0f/WF_SIZE, 1.0f/WF_SIZE, 0.0f, 0.0f);
+	waterShader->SetUniform("waveNormalOfs",   -(camPosBig.x - WH_SIZE)/WF_SIZE, -(camPosBig.z - WH_SIZE)/WF_SIZE, 0.0f, 0.0f);
+	waterShader->SetUniform("mapUVScale",      1.0f/(mapDims.mapxp1 * SQUARE_SIZE), 1.0f/(mapDims.mapyp1 * SQUARE_SIZE), 0.0f, 0.0f);
+	// FS uniforms
+	waterShader->SetUniform("env1",  camera->GetPos().x, camera->GetPos().y, camera->GetPos().z, 0.0f);
+	waterShader->SetUniform("env2",  reflectRight.x, reflectRight.y, reflectRight.z, 0.0f);
+	waterShader->SetUniform("env3",  reflectUp.x, reflectUp.y, reflectUp.z, 0.0f);
+	waterShader->SetUniform("env4",  0.5f/dx, 0.5f/dy, 1.0f, 1.0f);
+	waterShader->SetUniform("env5",  reflectForward.x, reflectForward.y, reflectForward.z, 0.0f);
+	waterShader->SetUniform("env6",  0.05f, 1.0f - 0.05f, 0.0f, 0.0f);
+	waterShader->SetUniform("env7",  0.2f, 0.0f, 0.0f, 0.0f);
+	waterShader->SetUniform("env8",  0.5f, 0.6f, 0.8f, 0.0f);
+	waterShader->SetUniform("env9",  L.x, L.y, L.z, 0.0f);
+	waterShader->SetUniform("env10", sunLighting->groundDiffuseColor.x, sunLighting->groundDiffuseColor.y, sunLighting->groundDiffuseColor.z, 0.0f);
+	waterShader->SetUniform("env11", sunLighting->groundAmbientColor.x, sunLighting->groundAmbientColor.y, sunLighting->groundAmbientColor.z, 0.0f);
+	waterShader->SetUniform("env12", refractRight.x, refractRight.y, refractRight.z, 0.0f);
+	waterShader->SetUniform("env13", refractUp.x, refractUp.y, refractUp.z, 0.0f);
+	waterShader->SetUniform("env14", 0.5f/dx, 0.5f/dy, 1.0f, 1.0f);
+	waterShader->SetUniform("env15", refractForward.x, refractForward.y, refractForward.z, 0.0f);
+	waterShader->SetUniformMatrix4x4("shadowMatrix", false, shadowHandler.GetShadowMatrixRaw());
 
 	DrawWaterSurface();
 
@@ -372,28 +410,9 @@ void CDynWater::Draw()
 
 	DrawOuterSurface();
 
+	waterShader->Disable();
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	glDisable(GL_FRAGMENT_PROGRAM_ARB);
-	glDisable(GL_VERTEX_PROGRAM_ARB);
 	glPopAttrib();
-/*
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE1_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE2_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE3_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE4_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE5_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE6_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE7_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE0_ARB);
-	*/
 }
 
 void CDynWater::UpdateWater(const CGame* game)
@@ -535,38 +554,33 @@ void CDynWater::DrawWaves()
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, waveTex3);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	/*glActiveTextureARB(GL_TEXTURE0_ARB);
+	/*glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE1_ARB);
+	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE2_ARB);
+	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE3_ARB);
+	glActiveTexture(GL_TEXTURE3);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE4_ARB);
+	glActiveTexture(GL_TEXTURE4);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE5_ARB);
+	glActiveTexture(GL_TEXTURE5);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE0_ARB);*/
+	glActiveTexture(GL_TEXTURE0);*/
 
 
-	float start = 0.1f / 1024;
-	float end = 1023.9f / 1024;
+	const float start = 0.1f / 1024;
+	const float end   = 1023.9f / 1024;
 
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 8,  -1.0f/1024, 1.0f/1024, 0,0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 9,  0,          1.0f/1024, 0,0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 10, 1.0f/1024,  1.0f/1024, 0,0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 11, 1.0f/1024,  0, 0,0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 12, float(WF_SIZE)/(mapDims.mapxp1*SQUARE_SIZE), float(WF_SIZE)/(mapDims.mapyp1*SQUARE_SIZE), 0, 0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 13, (camPosBig.x-WH_SIZE)/(mapDims.pwr2mapx*SQUARE_SIZE), (camPosBig.z-WH_SIZE)/(mapDims.pwr2mapy*SQUARE_SIZE), 0, 0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 14, dx/WF_SIZE, dy/WF_SIZE, 0, 0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 15, (camPosBig.x-WH_SIZE)/WF_SIZE*4, (camPosBig.x-WH_SIZE)/WF_SIZE*4, 0, 0);
+	// Shared neighbour offsets (1 texel in each direction at 1024x1024)
+	const float off = 1.0f / 1024;
 
 	//////////////////////////////////////
+	// Pass 1: flow update (waveShader2)
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, frameBuffer);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, waveTex3, 0);
@@ -576,40 +590,37 @@ void CDynWater::DrawWaves()
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s][1] FBO not ready", __func__);
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex2);
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, waveTex2);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glActiveTextureARB(GL_TEXTURE1_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex1);
+	glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, waveTex1);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glActiveTextureARB(GL_TEXTURE2_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex1);
-	glActiveTextureARB(GL_TEXTURE3_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex1);
-	glActiveTextureARB(GL_TEXTURE4_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex1);
-	glActiveTextureARB(GL_TEXTURE5_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex1);
-	glActiveTextureARB(GL_TEXTURE6_ARB);
-	glBindTexture(GL_TEXTURE_2D, readMap->GetShadingTexture ());
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, waveTex1);
+	glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, waveTex1);
+	glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, waveTex1);
+	glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, waveTex1);
+	glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, readMap->GetShadingTexture());
+	glActiveTexture(GL_TEXTURE0);
 
-	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, waveFP2);
-	glEnable(GL_FRAGMENT_PROGRAM_ARB);
-	glBindProgramARB(GL_VERTEX_PROGRAM_ARB, waveVP2);
-	glEnable(GL_VERTEX_PROGRAM_ARB);
+	waveShader2->Enable();
+	waveShader2->SetUniform("env8",  -off,  off, 0.0f, 0.0f);
+	waveShader2->SetUniform("env9",   0.0f, off, 0.0f, 0.0f);
+	waveShader2->SetUniform("env10",  off,  off, 0.0f, 0.0f);
+	waveShader2->SetUniform("env11",  off,  0.0f, 0.0f, 0.0f);
+	waveShader2->SetUniform("env12", float(WF_SIZE) / (mapDims.mapxp1 * SQUARE_SIZE), float(WF_SIZE) / (mapDims.mapyp1 * SQUARE_SIZE), 0.0f, 0.0f);
+	waveShader2->SetUniform("env13", (camPosBig.x - WH_SIZE) / (mapDims.pwr2mapx * SQUARE_SIZE), (camPosBig.z - WH_SIZE) / (mapDims.pwr2mapy * SQUARE_SIZE), 0.0f, 0.0f);
+	waveShader2->SetUniform("env14", dx / WF_SIZE, dy / WF_SIZE, 0.0f, 0.0f);
 
-	//update flows pass
 	int resetTexs[] = { 0, 1, 2, 3, 4, 5, -1 };
 	DrawUpdateSquare(dx, dy, resetTexs);
+	waveShader2->Disable();
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glFlush();
 
-
 	///////////////////////////////////////
+	// Pass 2: height update (waveShader)
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, frameBuffer);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, waveTex2, 0);
@@ -617,53 +628,43 @@ void CDynWater::DrawWaves()
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s][2] FBO not ready", __func__);
 
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, waveTex1);
+	glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, waveTex3);
+	glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, waveTex3);
+	glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, waveTex3);
+	glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, waveTex3);
+	glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, waveTex3);
+	glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, detailNormalTex);
+	glActiveTexture(GL_TEXTURE0);
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex1);
-	glActiveTextureARB(GL_TEXTURE1_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex3);
-	glActiveTextureARB(GL_TEXTURE2_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex3);
-	glActiveTextureARB(GL_TEXTURE3_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex3);
-	glActiveTextureARB(GL_TEXTURE4_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex3);
-	glActiveTextureARB(GL_TEXTURE5_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex3);
-	glActiveTextureARB(GL_TEXTURE6_ARB);
-	glBindTexture(GL_TEXTURE_2D, detailNormalTex);
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	waveShader->Enable();
+	waveShader->SetUniform("env8",  -off,  off, 0.0f, 0.0f);
+	waveShader->SetUniform("env9",   0.0f, off, 0.0f, 0.0f);
+	waveShader->SetUniform("env10",  off,  off, 0.0f, 0.0f);
+	waveShader->SetUniform("env11",  off,  0.0f, 0.0f, 0.0f);
+	waveShader->SetUniform("env14", dx / WF_SIZE, dy / WF_SIZE, 0.0f, 0.0f);
+	waveShader->SetUniform("env15", (camPosBig.x - WH_SIZE) / WF_SIZE * 4.0f, (camPosBig.x - WH_SIZE) / WF_SIZE * 4.0f, 0.0f, 0.0f);
 
-	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, waveFP);
-	glBindProgramARB(GL_VERTEX_PROGRAM_ARB, waveVP);
-
-	// update height pass
-	int resetTexs2[] = {0, -1};
+	int resetTexs2[] = { 0, -1 };
 	DrawUpdateSquare(dx, dy, resetTexs2);
+	waveShader->Disable();
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-
 	glFlush();
 
 	////////////////////////////////
+	// Pass 3: normal update (waveNormalShader)
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex2);
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, waveTex2);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glActiveTextureARB(GL_TEXTURE1_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex2);
-	glActiveTextureARB(GL_TEXTURE2_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex2);
-	glActiveTextureARB(GL_TEXTURE3_ARB);
-	glBindTexture(GL_TEXTURE_2D, waveTex2);
-	glActiveTextureARB(GL_TEXTURE4_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE5_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE6_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, waveTex2);
+	glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, waveTex2);
+	glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, waveTex2);
+	glActiveTexture(GL_TEXTURE4); glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, frameBuffer);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, waveTex1, 0);
@@ -671,13 +672,12 @@ void CDynWater::DrawWaves()
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s][3] FBO not ready", __func__);
 
-	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, waveNormalFP);
-	glBindProgramARB(GL_VERTEX_PROGRAM_ARB, waveNormalVP);
+	waveNormalShader->Enable();
+	waveNormalShader->SetUniform("env9",  0.0f, off, 0.0f, 0.0f);
+	waveNormalShader->SetUniform("env11", off,  0.0f, 0.0f, 0.0f);
+	waveNormalShader->SetUniform("env0",  0.0f, 0.0f, float(W_SIZE) * 2.0f, 0.0f);
+	waveNormalShader->SetUniform("env1",  float(W_SIZE) * 2.0f, 0.0f, 0.0f, 0.0f);
 
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,0, 0, 0, W_SIZE*2, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,1, W_SIZE*2, 0, 0, 0);
-
-	//update normals pass
 	glBegin(GL_QUADS);
 	glTexCoord2f(start, start); glVertexf3(ZeroVector);
 	glTexCoord2f(start, end);   glVertexf3(  UpVector);
@@ -685,22 +685,16 @@ void CDynWater::DrawWaves()
 	glTexCoord2f(end,   start); glVertexf3( RgtVector);
 	glEnd();
 
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+	waveNormalShader->Disable();
 
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glFlush();
 
-	glDisable(GL_VERTEX_PROGRAM_ARB);
-	glDisable(GL_FRAGMENT_PROGRAM_ARB);
-
-	glActiveTextureARB(GL_TEXTURE0_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE1_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE2_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE3_ARB);
-	glBindTexture(GL_TEXTURE_2D, 0);
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE3); glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
 
 	unsigned int temp = waveTex1;
 	waveTex1 = waveTex2;
@@ -717,7 +711,7 @@ void CDynWater::DrawHeightTex()
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, waveTex1);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -730,18 +724,15 @@ void CDynWater::DrawHeightTex()
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s] FBO not ready", __func__);
 
-	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, waveCopyHeightFP);
-	glEnable(GL_FRAGMENT_PROGRAM_ARB);
-	glBindProgramARB(GL_VERTEX_PROGRAM_ARB, waveCopyHeightVP);
-	glEnable(GL_VERTEX_PROGRAM_ARB);
+	waveCopyHeightShader->Enable();
 
 	camPosX = int(camera->GetPos().x / W_SIZE);
 	camPosZ = int(camera->GetPos().z / W_SIZE);
 
-	float startx = (camPosX - 120)/1024.0f - (camPosBig.x - WH_SIZE)/WF_SIZE;
-	float startz = (camPosZ - 120)/1024.0f - (camPosBig.z - WH_SIZE)/WF_SIZE;
-	float endx   = (camPosX + 120)/1024.0f - (camPosBig.x - WH_SIZE)/WF_SIZE;
-	float endz   = (camPosZ + 120)/1024.0f - (camPosBig.z - WH_SIZE)/WF_SIZE;
+	float startx = (camPosX - 120) / 1024.0f - (camPosBig.x - WH_SIZE) / WF_SIZE;
+	float startz = (camPosZ - 120) / 1024.0f - (camPosBig.z - WH_SIZE) / WF_SIZE;
+	float endx   = (camPosX + 120) / 1024.0f - (camPosBig.x - WH_SIZE) / WF_SIZE;
+	float endz   = (camPosZ + 120) / 1024.0f - (camPosBig.z - WH_SIZE) / WF_SIZE;
 	float startv = 8.0f / 256;
 	float endv   = 248.0f / 256;
 	//update 32 bit height map
@@ -756,8 +747,7 @@ void CDynWater::DrawHeightTex()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
-	glDisable(GL_FRAGMENT_PROGRAM_ARB);
-	glDisable(GL_VERTEX_PROGRAM_ARB);
+	waveCopyHeightShader->Disable();
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
 	glFlush();
@@ -959,10 +949,10 @@ void CDynWater::DrawDetailNormalTex()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	for (int a = 0; a < 8; ++a) {
-		glActiveTextureARB(GL_TEXTURE0_ARB + a);
+		glActiveTexture(GL_TEXTURE0 + a);
 		glBindTexture(GL_TEXTURE_2D, rawBumpTexture[0]);
 	}
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, frameBuffer);
 	glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, detailNormalTex, 0);
@@ -972,33 +962,28 @@ void CDynWater::DrawDetailNormalTex()
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s] FBO not ready", __func__);
 
-	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, dwDetailNormalFP);
-	glEnable(GL_FRAGMENT_PROGRAM_ARB);
-	glBindProgramARB(GL_VERTEX_PROGRAM_ARB, dwDetailNormalVP);
-	glEnable(GL_VERTEX_PROGRAM_ARB);
+	const float swh = 0.05f; // height of detail normal waves
+	const float lwh = 1.0f;  // height of larger ambient waves
 
-	float swh = 0.05f; // height of detail normal waves
-	float lwh = 1.0f;  // height of larger ambient waves
+	dwDetailNormalShader->Enable();
+	dwDetailNormalShader->SetUniform("frame",  float(gs->frameNum));
+	dwDetailNormalShader->SetUniform("env10",   5.0f,  0.0f,  0.0f, 1.0f/120); //controls the position and speed of the waves
+	dwDetailNormalShader->SetUniform("env11",  14.0f,  0.0f,  0.0f, 1.0f/90);
+	dwDetailNormalShader->SetUniform("env12",  29.0f,  0.0f,  0.0f, 1.0f/55);
+	dwDetailNormalShader->SetUniform("env13",   9.0f,  4.0f,  0.0f, 1.0f/100);
+	dwDetailNormalShader->SetUniform("env14",  -5.0f, 14.0f,  0.0f, 1.0f/90);
+	dwDetailNormalShader->SetUniform("env15",  27.0f, 27.0f,  0.0f, 1.0f/75);
+	dwDetailNormalShader->SetUniform("env16",  -3.0f, -5.0f,  0.0f, 1.0f/100);
+	dwDetailNormalShader->SetUniform("env17", -10.0f, 24.0f,  0.0f, 1.0f/60);
+	dwDetailNormalShader->SetUniform("env0",  0.2f*swh,  0.0f*swh, 0.7f*lwh, 0.0f); //controls the height of the waves
+	dwDetailNormalShader->SetUniform("env1",  0.2f*swh,  0.0f*swh, 0.7f*lwh, 0.0f);
+	dwDetailNormalShader->SetUniform("env2",  0.2f*swh,  0.0f*swh, 0.7f*lwh, 0.0f);
+	dwDetailNormalShader->SetUniform("env3",  0.2f*swh, 0.01f*swh, 0.4f*lwh, 0.0f);
+	dwDetailNormalShader->SetUniform("env4", 0.07f*swh,  0.2f*swh, 0.7f*lwh, 0.0f);
+	dwDetailNormalShader->SetUniform("env5",  0.2f*swh,  0.2f*swh, 0.7f*lwh, 0.0f);
+	dwDetailNormalShader->SetUniform("env6", 0.12f*swh,  0.2f*swh, 0.7f*lwh, 0.0f);
+	dwDetailNormalShader->SetUniform("env7", 0.08f*swh,  0.2f*swh, 0.7f*lwh, 0.0f);
 
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 9, gs->frameNum, 0, 0, 0);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 10, 5, 0, 0, 1.0f/120);			//controls the position and speed of the waves
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 11, 14, 0, 0, 1.0f/90);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 12, 29, 0, 0, 1.0f/55);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 13, 9, 4, 0, 1.0f/100);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 14, -5, 14, 0, 1.0f/90);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 15, 27, 27, 0, 1.0f/75);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 16, -3, -5, 0, 1.0f/100);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 17, -10, 24, 0, 1.0f/60);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,0, 0.2f*swh, 0.0f*swh, 0.7f*lwh, 0);		//controls the height of the waves
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,1, 0.2f*swh, 0.0f*swh, 0.7f*lwh, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,2, 0.2f*swh, 0.0f*swh, 0.7f*lwh, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,3, 0.2f*swh, 0.01f*swh, 0.4f*lwh, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,4, 0.07f*swh, 0.2f*swh, 0.7f*lwh, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,5, 0.2f*swh, 0.2f*swh, 0.7f*lwh, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,6, 0.12f*swh, 0.2f*swh, 0.7f*lwh, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,7, 0.08f*swh, 0.2f*swh, 0.7f*lwh, 0);
-
-	//update detail normals
 	glBegin(GL_QUADS);
 	glTexCoord2f(0, 0); glVertexf3(ZeroVector);
 	glTexCoord2f(0, 1); glVertexf3(  UpVector);
@@ -1006,11 +991,9 @@ void CDynWater::DrawDetailNormalTex()
 	glTexCoord2f(1, 0); glVertexf3( RgtVector);
 	glEnd();
 
-
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 
-	glDisable(GL_FRAGMENT_PROGRAM_ARB);
-	glDisable(GL_VERTEX_PROGRAM_ARB);
+	dwDetailNormalShader->Disable();
 
 	glFlush();
 
@@ -1038,14 +1021,10 @@ void CDynWater::AddShipWakes()
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
 		LOG_L(L_WARNING, "[DynWater::%s] FBO not ready", __func__);
 
-	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, dwAddSplashFP);
-	glEnable(GL_FRAGMENT_PROGRAM_ARB);
-	glBindProgramARB(GL_VERTEX_PROGRAM_ARB, dwAddSplashVP);
-	glEnable(GL_VERTEX_PROGRAM_ARB);
+	dwAddSplashShader->Enable();
+	dwAddSplashShader->SetUniform("env10", 1.0f/WF_SIZE, 1.0f/WF_SIZE, 0.0f, 1.0f);
+	dwAddSplashShader->SetUniform("env11", -(oldCamPosBig.x - WH_SIZE)/WF_SIZE, -(oldCamPosBig.z - WH_SIZE)/WF_SIZE, 0.0f, 0.0f);
 	glDisable(GL_CULL_FACE);
-
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 10, 1.0f/WF_SIZE, 1.0f/WF_SIZE, 0, 1);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 11, -(oldCamPosBig.x - WH_SIZE)/WF_SIZE, -(oldCamPosBig.z - WH_SIZE)/WF_SIZE, 0, 0);
 
 	CVertexArray* va = GetVertexArray();
 	va->Initialize();
@@ -1117,23 +1096,17 @@ void CDynWater::AddShipWakes()
 		}
 	}
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, boatShape);
-
 	va->DrawArrayTN(GL_QUADS);
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
 	glBindTexture(GL_TEXTURE_2D, hoverShape);
-
 	va2->DrawArrayTN(GL_QUADS);
 
+	dwAddSplashShader->Disable();
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glDisable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	glDisable(GL_FRAGMENT_PROGRAM_ARB);
-	glDisable(GL_VERTEX_PROGRAM_ARB);
-
 	glFlush();
 }
 
@@ -1157,20 +1130,16 @@ void CDynWater::AddExplosions()
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, splashTex);
 
 	if (glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
 		LOG_L(L_WARNING, "[DynWater::%s][1] FBO not ready", __func__);
 
-	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, dwAddSplashFP);
-	glEnable(GL_FRAGMENT_PROGRAM_ARB);
-	glBindProgramARB(GL_VERTEX_PROGRAM_ARB, dwAddSplashVP);
-	glEnable(GL_VERTEX_PROGRAM_ARB);
+	dwAddSplashShader->Enable();
+	dwAddSplashShader->SetUniform("env10", 1.0f/WF_SIZE, 1.0f/WF_SIZE, 0.0f, 1.0f);
+	dwAddSplashShader->SetUniform("env11", -(oldCamPosBig.x - WH_SIZE)/WF_SIZE, -(oldCamPosBig.z - WH_SIZE)/WF_SIZE, 0.0f, 0.0f);
 	glDisable(GL_CULL_FACE);
-
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 10, 1.0f/WF_SIZE, 1.0f/WF_SIZE, 0, 1);
-	glProgramEnvParameter4fARB(GL_VERTEX_PROGRAM_ARB, 11, -(oldCamPosBig.x - WH_SIZE)/WF_SIZE, -(oldCamPosBig.z - WH_SIZE)/WF_SIZE, 0, 0);
 
 	CVertexArray* va = GetVertexArray();
 	va->Initialize();
@@ -1211,13 +1180,10 @@ void CDynWater::AddExplosions()
 
 	va->DrawArrayTN(GL_QUADS);
 
+	dwAddSplashShader->Disable();
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
 	glDisable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	glDisable(GL_FRAGMENT_PROGRAM_ARB);
-	glDisable(GL_VERTEX_PROGRAM_ARB);
-
 	glFlush();
 }
 
@@ -1243,11 +1209,11 @@ void CDynWater::DrawUpdateSquare(float dx, float dy, int* resetTexs)
 
 	int a = 0;
 	while (resetTexs[a] >= 0) {
-		glActiveTextureARB(GL_TEXTURE0_ARB + resetTexs[a]);
+		glActiveTexture(GL_TEXTURE0 + resetTexs[a]);
 		glBindTexture(GL_TEXTURE_2D, zeroTex);
 		++a;
 	}
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 
 	if (startx > 0) {
 		DrawSingleUpdateSquare(0, 0, startx, 1);

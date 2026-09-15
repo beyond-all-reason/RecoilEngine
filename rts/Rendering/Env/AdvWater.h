@@ -4,7 +4,7 @@
 #define ADV_WATER_H
 
 #include "Rendering/GL/FBO.h"
-#include "Rendering/GL/myGL.h"
+#include "Rendering/Shaders/Shader.h"
 #include "IWater.h"
 
 class CAdvWater : public IWater
@@ -30,7 +30,7 @@ protected:
 	GLuint rawBumpTexture[4];
 	float3 waterSurfaceColor;
 
-	unsigned int waterFP;
+	Shader::IProgramObject* waterShader = nullptr;
 };
 
 #endif // ADV_WATER_H
