@@ -922,6 +922,10 @@ void CMobileCAI::ExecuteAttack(Command& c)
 					StopMoveAndFinishCommand();
 					return;
 				}
+				if (SkipCrashingTarget(targetUnit)) {
+					StopMoveAndFinishCommand();
+					return;
+				}
 
 				const float3 tgtErrPos = targetUnit->GetErrorPos(owner->allyteam, false);
 				const float3 tgtPosDir = (tgtErrPos - owner->pos).Normalize();
@@ -950,6 +954,11 @@ void CMobileCAI::ExecuteAttack(Command& c)
 	// NOTE: unit should actually just continue to target area!
 	if (targetDied || (c.GetNumParams() == 1 && UpdateTargetLostTimer(int(c.GetParam(0))) == 0)) {
 		// cancel keeppointingto
+		StopMoveAndFinishCommand();
+		return;
+	}
+	if (SkipCrashingTarget(orderTarget)) {
+		owner->DropCurrentAttackTarget();
 		StopMoveAndFinishCommand();
 		return;
 	}

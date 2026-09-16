@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _COMMAND_AI_H
-#define _COMMAND_AI_H
+#pragma once
 
 #include <functional>
 #include <vector>
@@ -139,6 +138,7 @@ protected:
 	virtual bool SelectNewAreaAttackTargetOrPos(const Command& ac) { return true; }
 
 	bool IsAttackCapable() const;
+	bool SkipCrashingTarget(const CUnit* target) const;
 	bool SkipParalyzeTarget(const CUnit* target) const;
 
 	void GiveAllowedCommand(const Command& c, bool fromSynced = true);
@@ -176,5 +176,3 @@ inline void CCommandAI::SetOrderTarget(CUnit* o) {
 		AddDeathDependence(reinterpret_cast<CObject*>(orderTarget), DEPENDENCE_ORDERTARGET);
 	}
 }
-
-#endif // _COMMAND_AI_H
