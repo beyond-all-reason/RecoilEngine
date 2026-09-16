@@ -950,8 +950,8 @@ bool CKeyBindings::ExecuteCommandInternal(const std::string& line)
 	else if (command == "unbindall") {
 		Clear();
 
-		Bind("enter", "chat");
-		Bind("enter", "edit_return");
+		Bind("enter", "chat"); // opens chat window
+		Bind("enter", "edit_return"); // confirms the input in chat window
 		Bind("escape", "edit_escape");
 		Bind("backspace", "edit_backspace");
 		Bind("delete", "edit_delete");
