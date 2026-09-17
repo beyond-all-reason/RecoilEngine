@@ -1384,6 +1384,22 @@ void CLuaHandle::UnitCmdDone(const CUnit* unit, const Command& command)
 }
 
 
+/***
+ * Every unit but a factory has a single order queue, `CMD.QUEUETYPE_ORDER`.
+ * This is an execution queue of commands that the unit attempts to perform.
+ *
+ * A factory instead has a rally queue and a build queue:
+ * `CMD.QUEUETYPE_BUILD` contains the factory's queue of units to produce.
+ * `CMD.QUEUETYPE_RALLY` contains orders given to factory-produced units.
+ * Fetched with `Spring.GetFactoryCommands` and `Spring.GetUnitCommands`.
+ *
+ * @alias CommandQueueType
+ * | 0 # Order queue.
+ * | 1 # Rally queue, on factories only.
+ * | 2 # Build queue, on factories only.
+ */
+
+
 /*** Called when a unit is damaged (after UnitPreDamaged).
  *
  * @function Callins:UnitDamaged

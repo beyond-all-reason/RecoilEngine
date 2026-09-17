@@ -17,8 +17,8 @@ class CCommandQueue {
 
 	public:
 		enum QueueType {
-			CommandQueueType,
-			NewUnitQueueType,
+			OrderQueueType,
+			RallyQueueType,
 			BuildQueueType
 		};
 
@@ -98,7 +98,7 @@ class CCommandQueue {
 		inline const Command& operator[](size_type i) const { return queue[i]; }
 
 	private:
-		CCommandQueue() : queueType(CommandQueueType), tagCounter(0) {};
+		CCommandQueue() : queueType(OrderQueueType), tagCounter(0) {};
 		CCommandQueue(const CCommandQueue&);
 		CCommandQueue& operator=(const CCommandQueue&);
 

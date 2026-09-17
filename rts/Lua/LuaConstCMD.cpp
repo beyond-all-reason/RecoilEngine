@@ -7,6 +7,7 @@
 
 #include "LuaUtils.h"
 #include "Sim/Units/CommandAI/Command.h"
+#include "Sim/Units/CommandAI/CommandQueue.h"
 
 
 /***
@@ -39,6 +40,13 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	LuaPushNamedNumber(L, "OPT_INTERNAL", INTERNAL_ORDER);
 	/*** @field CMD.OPT_META 4 */
 	LuaPushNamedNumber(L, "OPT_META",     META_KEY);
+
+	/*** @field CMD.QUEUETYPE_ORDER 0 */
+	LuaPushNamedNumber(L, "QUEUETYPE_ORDER", CCommandQueue::OrderQueueType);
+	/*** @field CMD.QUEUETYPE_RALLY 1 */
+	LuaPushNamedNumber(L, "QUEUETYPE_RALLY", CCommandQueue::RallyQueueType);
+	/*** @field CMD.QUEUETYPE_BUILD 2 */
+	LuaPushNamedNumber(L, "QUEUETYPE_BUILD", CCommandQueue::BuildQueueType);
 
 	/*** @field CMD.MOVESTATE_NONE -1 */
 	LuaPushNamedNumber(L, "MOVESTATE_NONE"    , MOVESTATE_NONE    );

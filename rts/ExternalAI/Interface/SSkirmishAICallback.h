@@ -1149,7 +1149,7 @@ struct SSkirmishAICallback {
 	int               (CALLING_CONV *Unit_getCurrentCommands)(int skirmishAIId, int unitId); //$ FETCHER:MULTI:NUM:CurrentCommand-Command
 
 	/**
-	 * For the type of the command queue, see CCommandQueue::CommandQueueType
+	 * For the type of the command queue, see CCommandQueue::QueueType
 	 * in Sim/Unit/CommandAI/CommandQueue.h
 	 */
 	int               (CALLING_CONV *Unit_CurrentCommand_getType)(int skirmishAIId, int unitId); //$ STATIC
