@@ -5,14 +5,14 @@
 
 #include <vector>
 
-#include "Building.h"
+#include "Sim/Units/Unit.h"
 
-class CExtractorBuilding : public CBuilding {
+class CExtractorBuilding : public CUnit {
 public:
 	CR_DECLARE_DERIVED(CExtractorBuilding)
 	CR_DECLARE_SUB(MetalSquareOfControl)
 
-	CExtractorBuilding(): CBuilding() {
+	CExtractorBuilding(): CUnit() {
 		extractionRange = 0.0f;
 		extractionDepth = 0.0f;
 	}
