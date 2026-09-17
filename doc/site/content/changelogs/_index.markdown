@@ -121,6 +121,20 @@ everywhere the engine uses it, including `Game.gravity`. Unset (nil) keeps the m
  * fixed `unitsync` leaking memory and possibly other resources on shutdown (Lua state was not cleaned up).
  * fixed `VAO:RemoveFromSubmission` having a huge overhead, no longer dependent on how many indices there are in the submission.
  * fixed atlas-related log spam with a minimized window.
+ * fixed Line-of-fire and other synced ground traces (`TraceRay`, `CWeapon::HaveFreeLineOfFire`,
+`Spring.GetUnitWeaponHaveFreeLineOfFire`) no longer report a free line when the ray starts
+below the terrain. `LineGroundCol` returns a hit distance of 0 for such a ray and `TraceRay`
+discarded that as "no hit", so a weapon whose muzzle or aim-from piece was inside a cliff
+believed it could shoot through it, stopped, and never fired. Both the base weapon and cannon
+line-of-fire checks now reject a source below the interpolated terrain height when ground
+avoidance is enabled, even if the target is within explosion range. This matches the existing
+pre-fire muzzle check; the base weapon's explosion-range exception remains for surface sources
+and ground hits farther along the shot.
+* Fixed the underground test of `LineGroundCol` (also behind `Spring.TraceRayGround*`) compares the
+ray origin against the interpolated terrain height instead of the corner vertex of its
+heightmap square. Next to a steep cliff that vertex could sit far above an origin that was
+well clear of the ground, so the whole ground trace was skipped. A ray that starts exactly
+on the surface is no longer treated as underground.
 
 ### Internals relevant for engine devs
  * enforce power-of-2 memory alignment for analyzing the engine with Address Sanitizer.

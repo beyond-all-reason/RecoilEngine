@@ -463,7 +463,7 @@ namespace {
 		{
 			EnemyAircraft(const CUnit* exclUnit, int allyTeam) : Enemy_InLos(exclUnit, allyTeam) {}
 			bool Unit(const CUnit* u) {
-				return (u->unitDef->canfly && !u->IsCrashing() && Enemy_InLos::Unit(u));
+				return (u->unitDef->canfly && (modInfo.fireAtCrashing || !u->IsCrashing()) && Enemy_InLos::Unit(u));
 			}
 		};
 

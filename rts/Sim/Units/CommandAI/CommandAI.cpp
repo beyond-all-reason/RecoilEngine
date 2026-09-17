@@ -1000,6 +1000,7 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 		ClearTargetLock((commandQue.empty())? Command(CMD_STOP): commandQue.front());
 		ClearCommandDependencies();
 		SetOrderTarget(nullptr);
+		targetDied = false;
 
 		// if c is an attack command, the actual order-target
 		// gets set via ExecuteAttack (called from SlowUpdate
@@ -1496,6 +1497,11 @@ void CCommandAI::ExecuteAttack(Command& c)
 			FinishCommand();
 			return;
 		}
+		if (SkipCrashingTarget(orderTarget)) {
+			owner->DropCurrentAttackTarget();
+			FinishCommand();
+			return;
+		}
 		if (!(c.GetOpts() & ALT_KEY) && SkipParalyzeTarget(orderTarget)) {
 			FinishCommand();
 			return;
@@ -1513,6 +1519,10 @@ void CCommandAI::ExecuteAttack(Command& c)
 				return;
 			}
 			if (targetUnit->GetTransporter() != nullptr && !modInfo.targetableTransportedUnits) {
+				FinishCommand();
+				return;
+			}
+			if (SkipCrashingTarget(targetUnit)) {
 				FinishCommand();
 				return;
 			}
@@ -1831,6 +1841,11 @@ bool CCommandAI::HasMoreMoveCommands(bool skipFirstCmd) const
 
 
 bool CCommandAI::CanChangeFireState() const { return (owner->unitDef->CanChangeFireState()); }
+bool CCommandAI::SkipCrashingTarget(const CUnit* target) const
+{
+	return (target != nullptr && !modInfo.fireAtCrashing && target->IsCrashing());
+}
+
 bool CCommandAI::SkipParalyzeTarget(const CUnit* target) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -1853,7 +1868,18 @@ void CCommandAI::StopAttackingTargetIf(const std::function<bool(const CUnit*)>& 
 	const auto hasTarget = [&](const Command& c) { return (c.GetNumParams() == 1 && (c.GetID() == CMD_FIGHT || c.GetID() == CMD_ATTACK)); };
 	const auto removeCmd = [&](const Command& c) { return (hasTarget(c) && pred(unitHandler.GetUnit(c.GetParam(0)))); };
 
+	const bool frontRemoved = (!commandQue.empty() && removeCmd(commandQue.front()));
+
 	commandQue.erase(std::remove_if(commandQue.begin(), commandQue.end(), removeCmd), commandQue.end());
+
+	// the order being executed was erased without FinishCommand; clear its
+	// execution state so the next queued order starts fresh instead of being
+	// judged against the old target (or never initialised at all)
+	if (frontRemoved) {
+		inCommand = CMD_STOP;
+		targetDied = false;
+		SetOrderTarget(nullptr);
+	}
 }
 
 void CCommandAI::StopAttackingAllyTeam(int ally)
