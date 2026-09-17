@@ -6,6 +6,8 @@
 #include <deque>
 #include "Command.h"
 
+class CUnit;
+
 /// A wrapper class for std::deque<Command> to keep track of commands
 class CCommandQueue {
 
@@ -98,18 +100,20 @@ class CCommandQueue {
 		inline const Command& operator[](size_type i) const { return queue[i]; }
 
 	private:
-		CCommandQueue() : queueType(OrderQueueType), tagCounter(0) {};
+		CCommandQueue() : queueType(OrderQueueType), tagCounter(0), owner(nullptr) {};
 		CCommandQueue(const CCommandQueue&);
 		CCommandQueue& operator=(const CCommandQueue&);
 
 	private:
 		inline int GetNextTag();
 		inline void SetQueueType(QueueType type) { queueType = type; }
+		inline void SetOwner(CUnit* unit) { owner = unit; }
 
 	private:
 		std::deque<Command> queue;
 		QueueType queueType;
 		int tagCounter;
+		CUnit* owner;
 };
 
 

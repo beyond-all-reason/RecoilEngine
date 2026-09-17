@@ -55,7 +55,8 @@ CR_BIND(CCommandQueue, )
 CR_REG_METADATA(CCommandQueue, (
 	CR_MEMBER(queue),
 	CR_MEMBER(queueType),
-	CR_MEMBER(tagCounter)
+	CR_MEMBER(tagCounter),
+	CR_MEMBER(owner)
 ))
 
 CR_BIND_DERIVED(CCommandAI, CObject, )
@@ -109,6 +110,8 @@ CCommandAI::CCommandAI(CUnit* owner):
 	lastSelectedCommandPage(0),
 	targetLostTimer(TARGET_LOST_TIMER)
 {
+	commandQue.SetOwner(owner);
+
 	{
 		SCommandDescription c;
 
@@ -1853,7 +1856,15 @@ void CCommandAI::StopAttackingTargetIf(const std::function<bool(const CUnit*)>& 
 	const auto hasTarget = [&](const Command& c) { return (c.GetNumParams() == 1 && (c.GetID() == CMD_FIGHT || c.GetID() == CMD_ATTACK)); };
 	const auto removeCmd = [&](const Command& c) { return (hasTarget(c) && pred(unitHandler.GetUnit(c.GetParam(0)))); };
 
-	commandQue.erase(std::remove_if(commandQue.begin(), commandQue.end(), removeCmd), commandQue.end());
+	// erase one at a time: a remove_if pass leaves the survivors at the front
+	// and the tail holding copies of them, so the range handed to erase() would
+	// not be the commands actually being dropped
+	for (size_t i = 0; i < commandQue.size(); /*NOOP*/) {
+		if (removeCmd(commandQue[i]))
+			commandQue.erase(commandQue.begin() + i);
+		else
+			++i;
+	}
 }
 
 void CCommandAI::StopAttackingAllyTeam(int ally)

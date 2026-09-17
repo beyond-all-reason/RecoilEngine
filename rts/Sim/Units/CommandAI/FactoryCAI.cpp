@@ -58,6 +58,7 @@ CFactoryCAI::CFactoryCAI(CUnit* owner): CCommandAI(owner)
 {
 	commandQue.SetQueueType(CCommandQueue::BuildQueueType);
 	newUnitCommands.SetQueueType(CCommandQueue::RallyQueueType);
+	newUnitCommands.SetOwner(owner);
 
 	if (owner->unitDef->canmove) {
 		SCommandDescription c;
