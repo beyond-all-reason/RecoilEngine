@@ -44,6 +44,9 @@ class CEventHandler
 		bool IsController(const std::string& ciName) const;
 		/// Lets the nano particle effect skip building batches nobody listens to.
 		bool HasNanoParticleUpdateClients() const { return !listNanoParticleUpdate.empty(); }
+		/// Let command queues skip making copies of commands nobody listens to.
+		bool HasCommandAddedClients() const { return !listUnitCommandAdded.empty(); }
+		bool HasCommandRemovedClients() const { return !listUnitCommandRemoved.empty(); }
 
 
 	public:
@@ -92,6 +95,8 @@ class CEventHandler
 		void UnitIdle(const CUnit* unit);
 		void UnitCommand(const CUnit* unit, const Command& command, int playerNum, bool fromSynced, bool fromLua);
 		void UnitCmdDone(const CUnit* unit, const Command& command                                              );
+		void UnitCommandAdded(const CUnit* unit, const Command& command, int queueType);
+		void UnitCommandRemoved(const CUnit* unit, const Command& command, int queueType);
 		void UnitDamaged(
 			const CUnit* unit,
 			const CUnit* attacker,
@@ -553,6 +558,16 @@ inline void CEventHandler::UnitCommand(const CUnit* unit, const Command& command
 inline void CEventHandler::UnitCmdDone(const CUnit* unit, const Command& command)
 {
 	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitCmdDone, unit, command)
+}
+
+inline void CEventHandler::UnitCommandAdded(const CUnit* unit, const Command& command, int queueType)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitCommandAdded, unit, command, queueType)
+}
+
+inline void CEventHandler::UnitCommandRemoved(const CUnit* unit, const Command& command, int queueType)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitCommandRemoved, unit, command, queueType)
 }
 
 

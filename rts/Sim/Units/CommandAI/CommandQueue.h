@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _COMMAND_QUEUE_H
-#define _COMMAND_QUEUE_H
+#pragma once
 
 #include <deque>
 #include "Command.h"
@@ -42,41 +41,25 @@ class CCommandQueue {
 
 		inline size_type size() const { return queue.size(); }
 
-		inline void push_back(const Command& cmd);
-		inline void push_front(const Command& cmd);
+		// All mutators report to Lua via UnitCommandAdded, UnitCommandRemoved.
+		// A callin can run before these return and can modify the same queue.
+		// So leave the queue in a consistent state and keep a valid iterator.
+		void push_back(const Command& cmd);
+		void push_front(const Command& cmd);
 
-		void emplace_back(Command&& cmd) {
-			queue.emplace_back(cmd);
-			queue.back().SetTag(GetNextTag());
-		}
-		void emplace_front(Command&& cmd) {
-			queue.emplace_front(cmd);
-			queue.front().SetTag(GetNextTag());
-		}
+		void emplace_back(Command&& cmd);
+		void emplace_front(Command&& cmd);
 
-		inline iterator insert(iterator pos, const Command& cmd);
+		iterator insert(iterator pos, const Command& cmd);
 
-		inline void pop_back()
-		{
-			queue.pop_back();
-		}
-		inline void pop_front()
-		{
-			queue.pop_front();
-		}
+		void pop_back();
+		void pop_front();
 
-		inline iterator erase(iterator pos)
-		{
-			return queue.erase(pos);
-		}
-		inline iterator erase(iterator first, iterator last)
-		{
-			return queue.erase(first, last);
-		}
-		inline void clear()
-		{
-			queue.clear();
-		}
+		iterator erase(iterator pos);
+		/// @param first,last are the commands being dropped
+		iterator erase(iterator first, iterator last);
+
+		void clear();
 
 		inline iterator       end()         { return queue.end(); }
 		inline const_iterator end()   const { return queue.end(); }
@@ -109,6 +92,14 @@ class CCommandQueue {
 		inline void SetQueueType(QueueType type) { queueType = type; }
 		inline void SetOwner(CUnit* unit) { owner = unit; }
 
+		bool WantsAddedEvents() const;
+		bool WantsRemovedEvents() const;
+		void NotifyAdded(const Command& cmd) const;
+		void NotifyRemoved(const Command& cmd) const;
+
+		/// clamped so that it still addresses this queue after a call-in modifies it
+		iterator ClampedIterator(size_type idx);
+
 	private:
 		std::deque<Command> queue;
 		QueueType queueType;
@@ -125,28 +116,3 @@ inline int CCommandQueue::GetNextTag()
 
 	return tagCounter;
 }
-
-
-inline void CCommandQueue::push_back(const Command& cmd)
-{
-	queue.push_back(cmd);
-	queue.back().SetTag(GetNextTag());
-}
-
-
-inline void CCommandQueue::push_front(const Command& cmd)
-{
-	queue.push_front(cmd);
-	queue.front().SetTag(GetNextTag());
-}
-
-
-inline CCommandQueue::iterator CCommandQueue::insert(iterator pos, const Command& cmd)
-{
-	Command tmpCmd = cmd;
-	tmpCmd.SetTag(GetNextTag());
-	return queue.insert(pos, tmpCmd);
-}
-
-
-#endif // _COMMAND_QUEUE_H

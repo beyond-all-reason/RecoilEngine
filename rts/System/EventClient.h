@@ -143,6 +143,8 @@ class CEventClient
 		virtual void UnitIdle(const CUnit* unit) {}
 		virtual void UnitCommand(const CUnit* unit, const Command& command, int playerNum, bool fromSynced, bool fromLua) {}
 		virtual void UnitCmdDone(const CUnit* unit, const Command& command                                              ) {}
+		virtual void UnitCommandAdded(const CUnit* unit, const Command& command, int queueType) {}
+		virtual void UnitCommandRemoved(const CUnit* unit, const Command& command, int queueType) {}
 		virtual void UnitDamaged(
 			const CUnit* unit,
 			const CUnit* attacker,

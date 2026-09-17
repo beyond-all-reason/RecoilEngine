@@ -53,8 +53,6 @@ CALLIN_LIST = {
 	"UnitDestroyed",
 	"RenderUnitDestroyed",
 	"UnitExperience",
-	"UnitIdle",
-	"UnitCmdDone",
 	"UnitPreDamaged",
 	"UnitDamaged",
 	"UnitStunned",
@@ -80,6 +78,10 @@ CALLIN_LIST = {
 	"UnitEnteredUnderwater",
 	"UnitLeftUnderwater",
 	"UnitCommand",
+	"UnitCmdDone",
+	"UnitIdle",
+	"UnitCommandAdded",
+	"UnitCommandRemoved",
 	"UnitHarvestStorageFull",
 
 	-- weapon callins

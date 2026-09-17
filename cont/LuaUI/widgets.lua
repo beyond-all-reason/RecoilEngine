@@ -131,6 +131,8 @@ local flexCallIns = {
   'UnitIdle',
   'UnitCommand',
   'UnitCmdDone',
+  'UnitCommandAdded',
+  'UnitCommandRemoved',
   'UnitDamaged',
   'UnitStunned',
   'UnitEnteredRadar',
@@ -1936,10 +1938,25 @@ function widgetHandler:UnitCommand(
   return
 end
 
-
 function widgetHandler:UnitCmdDone(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag)
   for _,w in ipairs(self.UnitCmdDoneList) do
     w:UnitCmdDone(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag)
+  end
+  return
+end
+
+
+function widgetHandler:UnitCommandAdded(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag, queueType)
+  for _,w in ipairs(self.UnitCommandAddedList) do
+    w:UnitCommandAdded(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag, queueType)
+  end
+  return
+end
+
+
+function widgetHandler:UnitCommandRemoved(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag, queueType)
+  for _,w in ipairs(self.UnitCommandRemovedList) do
+    w:UnitCommandRemoved(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag, queueType)
   end
   return
 end

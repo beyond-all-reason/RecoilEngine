@@ -1448,19 +1448,6 @@ function gadgetHandler:UnitExperience(unitID, unitDefID, unitTeam,
 end
 
 
-function gadgetHandler:UnitIdle(unitID, unitDefID, unitTeam)
-  for _,g in r_ipairs(self.UnitIdleList) do
-    g:UnitIdle(unitID, unitDefID, unitTeam)
-  end
-end
-
-
-function gadgetHandler:UnitCmdDone(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag)
-  for _,g in r_ipairs(self.UnitCmdDoneList) do
-    g:UnitCmdDone(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag)
-  end
-end
-
 function gadgetHandler:UnitCommand(
 	unitID, unitDefID, unitTeam,
 	cmdID, cmdParams, cmdOpts, cmdTag,
@@ -1474,6 +1461,33 @@ function gadgetHandler:UnitCommand(
 	)
   end
 end
+
+function gadgetHandler:UnitCmdDone(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag)
+  for _,g in r_ipairs(self.UnitCmdDoneList) do
+    g:UnitCmdDone(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag)
+  end
+end
+
+function gadgetHandler:UnitIdle(unitID, unitDefID, unitTeam)
+  for _,g in r_ipairs(self.UnitIdleList) do
+    g:UnitIdle(unitID, unitDefID, unitTeam)
+  end
+end
+
+
+function gadgetHandler:UnitCommandAdded(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag, queueType)
+  for _,g in r_ipairs(self.UnitCommandAddedList) do
+    g:UnitCommandAdded(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag, queueType)
+  end
+end
+
+
+function gadgetHandler:UnitCommandRemoved(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag, queueType)
+  for _,g in r_ipairs(self.UnitCommandRemovedList) do
+    g:UnitCommandRemoved(unitID, unitDefID, unitTeam, cmdID, cmdParams, cmdOpts, cmdTag, queueType)
+  end
+end
+
 
 function gadgetHandler:UnitPreDamaged(
   unitID,

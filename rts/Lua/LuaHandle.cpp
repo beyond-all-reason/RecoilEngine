@@ -1400,6 +1400,89 @@ void CLuaHandle::UnitCmdDone(const CUnit* unit, const Command& command)
  */
 
 
+/*** Called when any command is added to any unit's command queue.
+ *
+ * Unlike `UnitCommand`, this fires for every insertion into the queue.
+ * It tracks engine-internal orders, builders queuing repairs, factories
+ * copying their rally orders to a finished unit, and any command queue
+ * re-insertions from `CMD_INSERT`, repeat mode, and wait commands.
+ *
+ * Reissuing orders within this event from lua reenters this code, which does
+ * not have well-known effects at this time. The queue itself holds up okay,
+ * but the engine can be holding a reference into the queue across the call.
+ *
+ * @function Callins:UnitCommandAdded
+ * @param unitID UnitID
+ * @param unitDefID UnitDefID
+ * @param unitTeam TeamID
+ * @param cmdID integer
+ * @param cmdParams table
+ * @param options CommandOptions
+ * @param cmdTag integer
+ * @param queueType CommandQueueType
+ */
+void CLuaHandle::UnitCommandAdded(const CUnit* unit, const Command& command, int queueType)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 9, __func__);
+
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	const int argc = LuaUtils::PushUnitAndCommand(L, unit, command);
+
+	lua_pushnumber(L, queueType);
+
+	// call the routine
+	RunCallInTraceback(L, cmdStr, argc + 1, 0, traceBack.GetErrFuncIdx(), false);
+}
+
+
+/*** Called when any command is removed from any unit's command queue.
+ *
+ * Counterpart to `UnitCommandAdded`. All changes to all command queues are
+ * covered, including all popped queues, `CMD_REMOVE`, `CMD_STOP`, etc.
+ *
+ * Unlike `UnitCmdDone`, this does not imply the command succeeded, and it
+ * calls from anywhere in the queue, not only from the front. Commands with
+ * a death dependence, enqueued duplicates that are removed, and so on, all
+ * commands always reach this event. It is extremely noisy to monitor.
+ *
+ * @function Callins:UnitCommandRemoved
+ * @param unitID UnitID
+ * @param unitDefID UnitDefID
+ * @param unitTeam TeamID
+ * @param cmdID integer
+ * @param cmdParams table
+ * @param options CommandOptions
+ * @param cmdTag integer
+ * @param queueType CommandQueueType
+ */
+void CLuaHandle::UnitCommandRemoved(const CUnit* unit, const Command& command, int queueType)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 9, __func__);
+
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	const int argc = LuaUtils::PushUnitAndCommand(L, unit, command);
+
+	lua_pushnumber(L, queueType);
+
+	// call the routine
+	RunCallInTraceback(L, cmdStr, argc + 1, 0, traceBack.GetErrFuncIdx(), false);
+}
+
+
 /*** Called when a unit is damaged (after UnitPreDamaged).
  *
  * @function Callins:UnitDamaged
