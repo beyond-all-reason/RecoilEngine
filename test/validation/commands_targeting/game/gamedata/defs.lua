@@ -1,6 +1,6 @@
 -- This file is part of the Spring engine (GPL v2 or later), see LICENSE.html.
 local units = {}
-for _, name in ipairs({ "static", "mobile", "fighter", "target" }) do
+for _, name in ipairs({ "static", "mobile", "fighter", "target", "nano", "factory" }) do
 	units[name] = {
 		name = name,
 		category = "TEST",
@@ -13,19 +13,24 @@ for _, name in ipairs({ "static", "mobile", "fighter", "target" }) do
 		footprintX = 1,
 		footprintZ = 1,
 		maxWaterDepth = 10000,
-		canAttack = name ~= "target",
+		canAttack = name ~= "target" and name ~= "nano" and name ~= "factory",
 		canManualFire = true,
 		canMove = name == "mobile" or name == "fighter",
 		canFly = name == "fighter",
 		isFighter = name == "fighter",
 		movementClass = name == "mobile" and "TESTBOT" or nil,
-		maxVelocity = 3,
+		maxVelocity = name ~= "factory" and 3 or 0, -- Factories must be immobile.
 		acceleration = 0.1,
 		brakeRate = 0.1,
 		turnRate = 1000,
 		cruiseAlt = 100,
 		sightDistance = 2000,
-		weapons = name ~= "target" and { { name = "test" }, { name = "test" } } or {},
+		weapons = (name ~= "target" and name ~= "nano" and name ~= "factory") and { { name = "test" }, { name = "test" } } or {},
+		builder = name == "nano" or name == "factory",
+		workerTime = 1,
+		buildDistance = 500,
+		yardmap = name == "factory" and "o" or nil,
+		buildoptions = name == "factory" and { "mobile" } or nil,
 	}
 end
 return {

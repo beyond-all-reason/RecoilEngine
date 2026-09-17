@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # This file is part of the Spring engine (GPL v2 or later), see LICENSE.html.
-"""Validate ClearUnitAttackers in an isolated minimal game."""
+"""Validate the commands-targeting Lua API in an isolated minimal game."""
 import argparse
 import os
 from pathlib import Path
@@ -17,12 +17,12 @@ engine = args.engine.resolve(strict=True)
 map_archive = args.map_archive.resolve(strict=True)
 if any(c in args.map_name for c in ";{}\r\n"):
     parser.error("invalid map name")
-data = Path(tempfile.mkdtemp(prefix="recoil-clear-attackers-"))
+data = Path(tempfile.mkdtemp(prefix="recoil-commands-targeting-"))
 (data / "games").mkdir()
 (data / "maps").mkdir()
 (data / "maps" / map_archive.name).symlink_to(map_archive)
 game = Path(__file__).parent / "game"
-with zipfile.ZipFile(data / "games" / "clear-attackers.sdz", "w") as archive:
+with zipfile.ZipFile(data / "games" / "commands-targeting.sdz", "w") as archive:
     for source in sorted(game.rglob("*")):
         if source.is_file():
             archive.write(source, source.relative_to(game))
@@ -33,7 +33,7 @@ script = data / "startscript.txt"
 script.write_text(f"""[GAME]
 {{
     MapName={args.map_name};
-    GameType=Clear attackers validation 1;
+    GameType=Commands targeting validation 1;
     GameStartDelay=0;
     StartPosType=0;
     RecordDemo=0;
@@ -61,9 +61,9 @@ with (data / "console.log").open("w") as log:
     )
 output = (data / "console.log").read_text(errors="replace")
 for line in output.splitlines():
-    if "CLEAR_ATTACKERS" in line:
+    if "COMMANDS_TARGETING" in line:
         print(line)
-if (result.returncode or "CLEAR_ATTACKERS PASS" not in output
-        or "CLEAR_ATTACKERS UNSYNCED PASS" not in output
-        or "CLEAR_ATTACKERS FAIL" in output or "RunCallInTraceback" in output):
+if (result.returncode or "COMMANDS_TARGETING PASS" not in output
+        or "COMMANDS_TARGETING UNSYNCED PASS" not in output
+        or "COMMANDS_TARGETING FAIL" in output or "RunCallInTraceback" in output):
     raise SystemExit(f"Validation failed (engine exit {result.returncode}); see {data / 'console.log'}")
