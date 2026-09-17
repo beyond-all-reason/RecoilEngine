@@ -131,6 +131,18 @@ namespace Impl {
 						});
 						seenTangents = true;
 					} break;
+					case hashString("COLOR_0"): {
+						const auto ToByte = [](float v) { return static_cast<uint8_t>(std::clamp(v, 0.0f, 1.0f) * 255.0f + 0.5f); };
+						if (accessor.type == fastgltf::AccessorType::Vec3) {
+							fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, accessor, [&](const auto& val, std::size_t idx) {
+								verts[prevVertSize + idx].color = { ToByte(val.x()), ToByte(val.y()), ToByte(val.z()), 255 };
+							});
+						} else if (accessor.type == fastgltf::AccessorType::Vec4) {
+							fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
+								verts[prevVertSize + idx].color = { ToByte(val.x()), ToByte(val.y()), ToByte(val.z()), ToByte(val.w()) };
+							});
+						}
+					} break;
 					case hashString("JOINTS_0"): {
 						assert(skinPtr);
 						fastgltf::iterateAccessorWithIndex<fastgltf::math::uvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
