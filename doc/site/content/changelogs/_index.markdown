@@ -11,10 +11,11 @@ This is the bleeding-edge changelog since version 2026.07, for **pre-release 202
 
  * LuaGaia entry points (`LuaGaia/main.lua`, `LuaGaia/draw.lua`) are now loaded by the engine with `VFS.GAME .. VFS.MAP` load mode, from `VFS.MAP`.
 If you have these files in your game archive they will start being loaded, possibly breaking maps that ship some LuaGaia logic (but also giving you control).
+ * existing scripts for GLTF/GLB models using the `s3ocompat = true` flag will see the Y and Z axes swapped for animations, adjust them or set the flag to false.
 
 ### Deprecation notices
 
- * basecontent's `LuaHandler/Utilities/keysym.lua` and the loose `LuaUI/Headers/keysym.h.lua‎` distributed with engine installs are deprecated and will be removed.
+ * basecontent's `LuaHandler/Utilities/keysym.lua` and the loose `LuaUI/Headers/keysym.h.lua` distributed with engine installs are deprecated and will be removed.
 For now they work unchanged, but print lots of helpful migration suggestions when the `KEYSYMS` table is used.
 
 ## Features
@@ -99,6 +100,7 @@ from textures into a Lua texture.
  * add `system.forcedMapGravityStrength` modrule. If set, it overrides the map's `gravity` (same units, elmo/s²)
 everywhere the engine uses it, including `Game.gravity`. Unset (nil) keeps the map value.
  * Barbarian AI shipped with the engine updated to v1.6.29, contains a fix for island maps.
+ * added the unsynced `AllowQuit` callin; returning false keeps the game running when the window close button or Alt+F4 is used (`Spring.Quit` and `/quitforce` still quit unconditionally)
 
 ### Fixes
  * fixed that attempting loading a save would overflow MacOS' default stack size.
@@ -130,16 +132,27 @@ line-of-fire checks now reject a source below the interpolated terrain height wh
 avoidance is enabled, even if the target is within explosion range. This matches the existing
 pre-fire muzzle check; the base weapon's explosion-range exception remains for surface sources
 and ground hits farther along the shot.
-* Fixed the underground test of `LineGroundCol` (also behind `Spring.TraceRayGround*`) compares the
+ * Fixed the underground test of `LineGroundCol` (also behind `Spring.TraceRayGround*`) compares the
 ray origin against the interpolated terrain height instead of the corner vertex of its
 heightmap square. Next to a steep cliff that vertex could sit far above an origin that was
 well clear of the ground, so the whole ground trace was skipped. A ray that starts exactly
 on the surface is no longer treated as underground.
+ * fixed the alignment during an early "is-building-blocked" check with buildings featuring a odd-numbered footprint. This fixes an issue with carefully placing buildings featuring a odd-numbered footprint (like 5x5.)
+ * fixed issue where attack orders can disappear immediately after an automatically selected target dies.
+ * fixed incorrect line of fire check, when the weapon's muzzle goes below the terrain. This was incorrectly reporting an open line of fire when it should be blocked. This addresses a particular case where units stop trying to get closer to an enemy target when behind terrain because they incorrectly think they have a direct shot.
+ * fixed crash when game loading fails. Now it fails gracefally.
+ * fixed issue so when a new audio device is added, a connection is only attempted if no audio input is already in use.
+ * fixed mouse position to go back to the centre of the screen after a middle-mouse camera pan.
+ * fixed attack queues stalling or skipping the next target when the current target is made neutral.
+ * fixed attack orders to now skip crashing aircraft when the `fireAtDead.fireAtCrashing` modrule is disabled. Fighters also respect this modrule when selecting targets automatically.
 
 ### Internals relevant for engine devs
  * enforce power-of-2 memory alignment for analyzing the engine with Address Sanitizer.
  * CMake: make engine test setup optional via new `BUILD_TESTING` option, default enabled.
  * `DemoTool` now builds again.
- * fix various build issues on OpenBSD and Windows.
- * fix some failing unit tests on aarch64. Involves a creg change for loading yielded Lua coroutines.
+ * fixed various build issues on OpenBSD and Windows.
+ * fixed some failing unit tests on aarch64. Involves a creg change for loading yielded Lua coroutines.
  * updated EnTT library from v3.10.2 to v3.16.0
+ * added `FloatToHeading()` function to SpringMath.inl to convert `float` to `short int` and if assets are enabled then a UB conversion will trigger an assert failure. This is intended to help catch potential desync issues between x86 and arm64.
+ * fixed endianness of game stats in demos produced on Linux
+ * clear shader log each time gl.CreateShader is called. It is a single string.
