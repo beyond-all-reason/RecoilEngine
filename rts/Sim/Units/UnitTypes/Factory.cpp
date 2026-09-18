@@ -174,7 +174,7 @@ void CFactory::Update()
 
 void CFactory::StartBuild(const UnitDef* buildeeDef) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (isDead)
+	if (IsDead())
 		return;
 
 	const float3& buildPos = CalcBuildPos(script->QueryBuildInfo());
