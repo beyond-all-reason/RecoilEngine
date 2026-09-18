@@ -764,6 +764,7 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FLOAT("resurrectSpeed", ud.resurrectSpeed);
 	ADD_FLOAT("captureSpeed",   ud.captureSpeed);
 	ADD_FLOAT("terraformSpeed", ud.terraformSpeed);
+	ADD_FLOAT("nanoAimRate",    ud.nanoAimRate);
 
 	ADD_FLOAT("upDirSmoothing", ud.upDirSmoothing);
 
@@ -793,6 +794,7 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_BOOL("canRepeat",             ud.canRepeat);
 	ADD_BOOL("canCapture",            ud.canCapture);
 	ADD_BOOL("canResurrect",          ud.canResurrect);
+	ADD_BOOL("canBuildWhileMoving",	  ud.canBuildWhileMoving);
 	ADD_BOOL("canLoopbackAttack",     ud.canLoopbackAttack);
 	ADD_BOOL("canFireControl",        ud.canFireControl);
 	ADD_INT( "fireState",             ud.fireState);
