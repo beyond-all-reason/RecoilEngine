@@ -814,6 +814,7 @@ void LuaVBOImpl::UpdateModelsVBOElementCount()
 	//   support an arbitrary number of channels, would be easy but overkill (for now)
 	float2 texCoords[NUM_MODEL_UVCHANNS];
 	uvec3 in uvec3 bonesInfo;
+	u8vec4 color;
 */
 size_t LuaVBOImpl::ModelsVBOImpl()
 {
@@ -884,7 +885,18 @@ size_t LuaVBOImpl::ModelsVBOImpl()
 			3 * sizeof(uint32_t) //strideSizeInBytes
 		};
 
-		this->attributesCount = 6;
+		// uint8_t color[4]
+		this->bufferAttribDefs[15] = {
+			GL_UNSIGNED_BYTE, //type
+			4, //size
+			GL_TRUE, //normalized
+			"color", //name
+			offsetof(SVertexData, color), //pointer
+			sizeof(uint8_t), //typeSizeInBytes
+			4 * sizeof(uint8_t) //strideSizeInBytes
+		};
+
+		this->attributesCount = 7;
 		this->elemSizeInBytes = sizeof(SVertexData);
 		this->bufferSizeInBytes = vbo->GetSize();
 		this->elementsCount = S3DModelVAO::GetInstance().GetVertElemCount();
