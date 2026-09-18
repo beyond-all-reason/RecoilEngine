@@ -46,7 +46,12 @@ private:
 		DeltaCounter recvBytes;
 		DeltaCounter sentPackets;
 		DeltaCounter recvPackets;
+		DeltaCounter resentOutgoingChunks;
+		DeltaCounter redundantOutgoingChunks;
+		DeltaCounter duplicateIncomingChunks;
+		DeltaCounter missingIncomingChunks;
 
+		prometheus::Gauge* lossFactor = nullptr;
 		prometheus::Gauge* outgoingBw = nullptr;
 		prometheus::Gauge* unackedOutgoingChunks = nullptr;
 		prometheus::Gauge* outgoingResendQueueDepth = nullptr;
@@ -69,6 +74,11 @@ private:
 	// per-player metrics, null unless perPlayerEnabled
 	prometheus::Family<prometheus::Counter>* metricBytes = nullptr;
 	prometheus::Family<prometheus::Counter>* metricPackets = nullptr;
+	prometheus::Family<prometheus::Counter>* metricResentOutgoingChunks = nullptr;
+	prometheus::Family<prometheus::Counter>* metricRedundantOutgoingChunks = nullptr;
+	prometheus::Family<prometheus::Counter>* metricDuplicateIncomingChunks = nullptr;
+	prometheus::Family<prometheus::Counter>* metricMissingIncomingChunks = nullptr;
+	prometheus::Family<prometheus::Gauge>* metricLossFactor = nullptr;
 	prometheus::Family<prometheus::Gauge>* metricOutgoingBw = nullptr;
 	prometheus::Family<prometheus::Gauge>* metricUnackedOutgoingChunks = nullptr;
 	prometheus::Family<prometheus::Gauge>* metricOutgoingResendQueueDepth = nullptr;
@@ -80,6 +90,11 @@ private:
 	prometheus::Counter* metricTotalRecvBytes = nullptr;
 	prometheus::Counter* metricTotalSentPackets = nullptr;
 	prometheus::Counter* metricTotalRecvPackets = nullptr;
+	prometheus::Counter* metricTotalResentOutgoingChunks = nullptr;
+	prometheus::Counter* metricTotalRedundantOutgoingChunks = nullptr;
+	prometheus::Counter* metricTotalDuplicateIncomingChunks = nullptr;
+	prometheus::Counter* metricTotalMissingIncomingChunks = nullptr;
+	prometheus::Gauge* metricRedundancyLinks = nullptr;
 	prometheus::Gauge* metricTotalOutgoingBw = nullptr;
 	prometheus::Gauge* metricTotalUnackedOutgoingChunks = nullptr;
 	prometheus::Gauge* metricTotalOutgoingResendQueueDepth = nullptr;
