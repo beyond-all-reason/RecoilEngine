@@ -8,6 +8,7 @@ namespace prometheus
 {
 	template<typename T> class Family;
 	class Counter;
+	class Gauge;
 	class Registry;
 }
 
@@ -45,10 +46,20 @@ private:
 		DeltaCounter recvBytes;
 		DeltaCounter sentPackets;
 		DeltaCounter recvPackets;
+
+		prometheus::Gauge* outgoingBw = nullptr;
+		prometheus::Gauge* unackedOutgoingChunks = nullptr;
+		prometheus::Gauge* outgoingResendQueueDepth = nullptr;
+		prometheus::Gauge* incomingReorderQueueDepth = nullptr;
+		prometheus::Gauge* outgoingQueueBytes = nullptr;
 	};
 
 	/// this player's metric slot, created on first use
 	ConnectionMetrics& ConnectionSlot(int playerId);
+
+	/// drop a connection's gauges from the registry rather than leave them
+	/// reporting a connection that is gone. Counters are cumulative and stay.
+	void ReleaseConnectionGauges(ConnectionMetrics& cm);
 
 	std::vector<ConnectionMetrics> connectionMetrics;
 
@@ -58,10 +69,20 @@ private:
 	// per-player metrics, null unless perPlayerEnabled
 	prometheus::Family<prometheus::Counter>* metricBytes = nullptr;
 	prometheus::Family<prometheus::Counter>* metricPackets = nullptr;
+	prometheus::Family<prometheus::Gauge>* metricOutgoingBw = nullptr;
+	prometheus::Family<prometheus::Gauge>* metricUnackedOutgoingChunks = nullptr;
+	prometheus::Family<prometheus::Gauge>* metricOutgoingResendQueueDepth = nullptr;
+	prometheus::Family<prometheus::Gauge>* metricIncomingReorderQueueDepth = nullptr;
+	prometheus::Family<prometheus::Gauge>* metricOutgoingQueueBytes = nullptr;
 
 	// server-wide aggregates, exported whether or not per-player metrics are on
 	prometheus::Counter* metricTotalSentBytes = nullptr;
 	prometheus::Counter* metricTotalRecvBytes = nullptr;
 	prometheus::Counter* metricTotalSentPackets = nullptr;
 	prometheus::Counter* metricTotalRecvPackets = nullptr;
+	prometheus::Gauge* metricTotalOutgoingBw = nullptr;
+	prometheus::Gauge* metricTotalUnackedOutgoingChunks = nullptr;
+	prometheus::Gauge* metricTotalOutgoingResendQueueDepth = nullptr;
+	prometheus::Gauge* metricTotalIncomingReorderQueueDepth = nullptr;
+	prometheus::Gauge* metricTotalOutgoingQueueBytes = nullptr;
 };
