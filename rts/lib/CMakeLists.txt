@@ -45,6 +45,14 @@ endif()
 ADD_SUBDIRECTORY(lua)
 ADD_SUBDIRECTORY(luasocket)
 ADD_SUBDIRECTORY(minizip)
+
+# zstd: required to read .sdzst archives (zip containers with zstd / method-93
+# entries). Sourced like the other third-party libs from the prebuilt
+# static-libs / mingwlibs bundle.
+find_package_static(Zstd REQUIRED)
+set_global(SPRING_ZSTD_INCLUDE_DIR "${ZSTD_INCLUDE_DIR}")
+set_global(SPRING_ZSTD_LIBRARY "${ZSTD_LIBRARY}")
+
 ADD_SUBDIRECTORY(nowide)
 ADD_SUBDIRECTORY(headlessStubs)
 if (ENABLE_STREFLOP)
