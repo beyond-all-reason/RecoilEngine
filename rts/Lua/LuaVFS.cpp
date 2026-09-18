@@ -15,6 +15,7 @@
 #include "System/FileSystem/ArchiveScanner.h"
 #include "System/FileSystem/VFSHandler.h"
 #include "System/FileSystem/FileSystem.h"
+#include "System/Crypto/Ed25519.h"
 #include "System/Log/ILog.h"
 #include "System/StringUtil.h"
 #include "System/TimeProfiler.h"
@@ -200,6 +201,7 @@ bool LuaVFS::PushCommon(lua_State* L)
 	LuaPushNamedCFunc(L, "ZlibCompress", ZlibCompress);
 	LuaPushNamedCFunc(L, "ZlibDecompress", ZlibDecompress);
 	LuaPushNamedCFunc(L, "CalculateHash", CalculateHash);
+	LuaPushNamedCFunc(L, "VerifyEd25519", VerifyEd25519);
 
 	return true;
 }
@@ -952,6 +954,36 @@ int LuaVFS::CalculateHash(lua_State* L)
 		} break;
 	}
 
+	return 1;
+}
+
+/***
+ * Verifies an Ed25519 signature.
+ *
+ * All arguments are binary strings. The signature must be 64 bytes and the
+ * public key must be 32 bytes.
+ *
+ * @function VFS.VerifyEd25519
+ * @param message string
+ * @param signature string
+ * @param publicKey string
+ * @return boolean valid
+ */
+int LuaVFS::VerifyEd25519(lua_State* L)
+{
+	size_t messageSize = 0;
+	size_t signatureSize = 0;
+	size_t publicKeySize = 0;
+	const auto* message = reinterpret_cast<const std::uint8_t*>(luaL_checklstring(L, 1, &messageSize));
+	const auto* signature = reinterpret_cast<const std::uint8_t*>(luaL_checklstring(L, 2, &signatureSize));
+	const auto* publicKey = reinterpret_cast<const std::uint8_t*>(luaL_checklstring(L, 3, &publicKeySize));
+
+	if (signatureSize != ed25519::SIGNATURE_SIZE || publicKeySize != ed25519::PUBLIC_KEY_SIZE) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	lua_pushboolean(L, ed25519::Verify(message, messageSize, signature, publicKey));
 	return 1;
 }
 

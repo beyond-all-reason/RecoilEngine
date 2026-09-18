@@ -17,6 +17,7 @@ make_global_var(sources_engine_System_common
 		"${CMAKE_CURRENT_SOURCE_DIR}/Config/ConfigLocater.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Config/ConfigSource.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Config/ConfigVariable.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Crypto/Ed25519.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/CRC.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/EventClient.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/EventHandler.cpp"
