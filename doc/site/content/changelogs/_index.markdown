@@ -12,6 +12,7 @@ This is the bleeding-edge changelog since version 2026.07, for **pre-release 202
  * LuaGaia entry points (`LuaGaia/main.lua`, `LuaGaia/draw.lua`) are now loaded by the engine with `VFS.GAME .. VFS.MAP` load mode, from `VFS.MAP`.
 If you have these files in your game archive they will start being loaded, possibly breaking maps that ship some LuaGaia logic (but also giving you control).
  * existing scripts for GLTF/GLB models using the `s3ocompat = true` flag will see the Y and Z axes swapped for animations, adjust them or set the flag to false.
+ * one element of `VBO:ModelsVBO()` is now 80 bytes instead of 76; Lua code that hardcoded the old stride needs updating.
 
 ### Deprecation notices
 
@@ -101,6 +102,7 @@ from textures into a Lua texture.
 everywhere the engine uses it, including `Game.gravity`. Unset (nil) keeps the map value.
  * Barbarian AI shipped with the engine updated to v1.6.29, contains a fix for island maps.
  * added the unsynced `AllowQuit` callin; returning false keeps the game running when the window close button or Alt+F4 is used (`Spring.Quit` and `/quitforce` still quit unconditionally)
+ * glTF models now load the `COLOR_0` vertex attribute. Model shaders can read it as `layout (location = 15) in vec4 color`, and Lua as the `color` attribute of `VBO:ModelsVBO()`. Models without it (including all S3O, 3DO and assimp models) read opaque white. `Engine.FeatureSupport.modelVertexColor` is `true` on engines that have it.
 
 ### Fixes
  * fixed that attempting loading a save would overflow MacOS' default stack size.
