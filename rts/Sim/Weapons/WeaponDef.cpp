@@ -15,6 +15,7 @@
 #include "System/Log/ILog.h"
 #include "System/StringHash.h"
 #include "System/StringUtil.h"
+#include "System/Sound/SoundUtils.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -572,40 +573,12 @@ WeaponDef::WeaponDef(const LuaTable& wdTable, const std::string& name_, int id_)
 	onlyForward = !turret && (projectileType != WEAPON_STARBURST_PROJECTILE);
 }
 
-
-
 void WeaponDef::ParseWeaponSounds(const LuaTable& wdTable) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	LoadSound(wdTable, "soundStart" , fireSound);
-	LoadSound(wdTable, "soundHitDry",  hitSound);
-	LoadSound(wdTable, "soundHitWet",  hitSound);
+	SoundUtils::LoadSound(wdTable, "soundStart" , fireSound);
+	SoundUtils::LoadSound(wdTable, "soundHitDry", hitSound );
+	SoundUtils::LoadSound(wdTable, "soundHitWet", hitSound );
 }
-
-
-
-void WeaponDef::LoadSound(
-	const LuaTable& wdTable,
-	const std::string& soundKey,
-	GuiSoundSet& soundData
-) {
-	RECOIL_DETAILED_TRACY_ZONE;
-	switch (hashString(soundKey.c_str())) {
-		case hashString("soundStart"): {
-			CommonDefHandler::AddSoundSetData(soundData, wdTable.GetString(soundKey, ""), wdTable.GetFloat(soundKey + "Volume", 1.0f));
-		} break;
-
-		case hashString("soundHitDry"): {
-			CommonDefHandler::AddSoundSetData(soundData, wdTable.GetString(soundKey, wdTable.GetString("soundHit", "")), wdTable.GetFloat(soundKey + "Volume", wdTable.GetFloat("soundHitVolume", 1.0f)));
-		} break;
-		case hashString("soundHitWet"): {
-			CommonDefHandler::AddSoundSetData(soundData, wdTable.GetString(soundKey, wdTable.GetString("soundHit", "")), wdTable.GetFloat(soundKey + "Volume", wdTable.GetFloat("soundHitVolume", 1.0f)));
-		} break;
-
-		default: {
-		} break;
-	}
-}
-
 
 S3DModel* WeaponDef::LoadModel()
 {
@@ -643,3 +616,4 @@ void WeaponDef::PreloadModel() const
 	//not very sweet, but still better than replacing "const WeaponDef" _everywhere_
 	const_cast<WeaponDef*>(this)->PreloadModel();
 }
+
