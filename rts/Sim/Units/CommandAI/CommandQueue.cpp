@@ -3,6 +3,7 @@
 #include "CommandQueue.h"
 
 #include <algorithm>
+#include <cassert>
 #include <vector>
 
 #include "Sim/Units/Unit.h"
@@ -11,12 +12,14 @@
 
 bool CCommandQueue::WantsAddedEvents() const
 {
-	return (owner != nullptr && eventHandler.HasCommandAddedClients());
+	assert(owner != nullptr);
+	return eventHandler.HasCommandAddedClients();
 }
 
 bool CCommandQueue::WantsRemovedEvents() const
 {
-	return (owner != nullptr && eventHandler.HasCommandRemovedClients());
+	assert(owner != nullptr);
+	return eventHandler.HasCommandRemovedClients();
 }
 
 
