@@ -1393,6 +1393,9 @@ void CLuaHandle::UnitCmdDone(const CUnit* unit, const Command& command)
  * `CMD.QUEUETYPE_RALLY` contains orders given to factory-produced units.
  * Fetched with `Spring.GetFactoryCommands` and `Spring.GetUnitCommands`.
  *
+ * These queues do not neatly map `CMD_WAIT` and `CMD_SELFD` onto factories:
+ * WAIT is a BUILD, SELFD is an ORDER, and `OPT_SHIFT` pushes both to RALLY.
+ *
  * @alias CommandQueueType
  * | 0 # Order queue.
  * | 1 # Rally queue, on factories only.
@@ -1406,6 +1409,12 @@ void CLuaHandle::UnitCmdDone(const CUnit* unit, const Command& command)
  * It tracks engine-internal orders, builders queuing repairs, factories
  * copying their rally orders to a finished unit, and any command queue
  * re-insertions from `CMD_INSERT`, repeat mode, and wait commands.
+ *
+ * Not every order reaches a queue. Engine state commands (`CMD_FIRE_STATE`,
+ * `CMD_MOVE_STATE`, `CMD_REPEAT`, `CMD_TRAJECTORY`, `CMD_ONOFF`, `CMD_CLOAK`,
+ * `CMD_STOCKPILE`) apply directly and never fire, unless malformed parameters
+ * drop them through to the queue as ordinary commands. `CMD_INSERT` and
+ * `CMD_REMOVE` never fire for themselves, only for what they add or drop.
  *
  * Reissuing orders within this event from lua reenters this code, which does
  * not have well-known effects at this time. The queue itself holds up okay,
@@ -1451,6 +1460,8 @@ void CLuaHandle::UnitCommandAdded(const CUnit* unit, const Command& command, int
  * calls from anywhere in the queue, not only from the front. Commands with
  * a death dependence, enqueued duplicates that are removed, and so on, all
  * commands always reach this event. It is extremely noisy to monitor.
+ *
+ * A queue that is cleared or replaced reports all its commands, front to back.
  *
  * @function Callins:UnitCommandRemoved
  * @param unitID UnitID
