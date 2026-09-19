@@ -815,6 +815,8 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_BOOL("hoverAttack",   ud.hoverAttack);
 	ADD_BOOL("airStrafe",     ud.airStrafe);
 	ADD_BOOL("bankingAllowed",ud.bankingAllowed);
+	ADD_FLOAT("terrainLookahead",        ud.terrainLookahead);
+	ADD_FLOAT("terrainLookaheadDescent", ud.terrainLookaheadDescent);
 	ADD_BOOL("useSmoothMesh", ud.useSmoothMesh);
 
 	// < 0 means it can land,

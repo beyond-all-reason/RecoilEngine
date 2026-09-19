@@ -55,6 +55,10 @@ CR_REG_METADATA(CStrafeAirMoveType, (
 	CR_MEMBER(lastElevatorPos),
 	CR_MEMBER(lastAileronPos),
 
+	CR_MEMBER(terrainLookahead),
+	CR_MEMBER(terrainLookaheadDescent),
+	CR_MEMBER(lookaheadGroundHeight),
+
 	CR_PREALLOC(GetPreallocContainer)
 ))
 
@@ -87,10 +91,15 @@ static const unsigned int FLOAT_MEMBER_HASHES[] = {
 	MEMBER_LITERAL_HASH(           "maxRudder"),
 	MEMBER_LITERAL_HASH("attackSafetyDistance"),
 	MEMBER_LITERAL_HASH(           "myGravity"),
+	MEMBER_LITERAL_HASH(    "terrainLookahead"),
+	MEMBER_LITERAL_HASH("terrainLookaheadDescent"),
 };
 
 #undef MEMBER_CHARPTR_HASH
 #undef MEMBER_LITERAL_HASH
+
+// terrainLookahead: in how many steps an aircraft samples the ground along its flight path
+static constexpr int TERRAIN_LOOKAHEAD_SAMPLES = 5;
 
 extern AAirMoveType::GetGroundHeightFunc amtGetGroundHeightFuncs[6];
 extern AAirMoveType::EmitCrashTrailFunc amtEmitCrashTrailFuncs[2];
@@ -226,7 +235,8 @@ static float GetElevatorDeflection(
 	float goalDotRight,
 	float goalDotFront,
 	bool avoidCollision,
-	bool isAttacking
+	bool isAttacking,
+	float terrainAheadHeight
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	float elevator = 0.0f;
@@ -289,7 +299,8 @@ static float GetElevatorDeflection(
 		{
 			const float maxElevatorSpeedf = std::max(0.001f, maxElevator * 20.0f * spd.w * spd.w);
 
-			const float posHeight = CGround::GetHeightAboveWater(pos.x + spd.x * 40.0f, pos.z + spd.z * 40.0f);
+			// without a terrain reference from the caller, look at a single point 40 frames ahead
+			const float posHeight = (terrainAheadHeight >= 0.0f)? terrainAheadHeight: CGround::GetHeightAboveWater(pos.x + spd.x * 40.0f, pos.z + spd.z * 40.0f);
 			const float difHeight = std::max(groundHeight, posHeight) + wantedHeight - pos.y - (frontdir.y * spd.w * 20.0f);
 
 			const float absFrontDirY = math::fabs(frontdir.y);
@@ -329,14 +340,15 @@ static float3 GetControlSurfaceAngles(
 	float goalDotRight,
 	float goalDotFront,
 	bool avoidCollision,
-	bool isAttacking
+	bool isAttacking,
+	float terrainAheadHeight = -1.0f
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	float3 ctrlAngles;
 
 	// yaw (rudder), pitch (elevator), roll (aileron)
 	ctrlAngles.x = (yprInputLocks.x != 0.0f)? GetRudderDeflection  (owner, collidee,  pos, spd,  rightdir, updir, frontdir, goalDir,  groundHeight, wantedHeight,  maxCtrlAngles.x, maxBodyAngles.x,  goalDotRight, goalDotFront,  avoidCollision, isAttacking): 0.0f;
-	ctrlAngles.y = (yprInputLocks.y != 0.0f)? GetElevatorDeflection(owner, collidee,  pos, spd,  rightdir, updir, frontdir, goalDir,  groundHeight, wantedHeight,  maxCtrlAngles.y, maxBodyAngles.y,  goalDotRight, goalDotFront,  avoidCollision, isAttacking): 0.0f;
+	ctrlAngles.y = (yprInputLocks.y != 0.0f)? GetElevatorDeflection(owner, collidee,  pos, spd,  rightdir, updir, frontdir, goalDir,  groundHeight, wantedHeight,  maxCtrlAngles.y, maxBodyAngles.y,  goalDotRight, goalDotFront,  avoidCollision, isAttacking, terrainAheadHeight): 0.0f;
 	ctrlAngles.z = (yprInputLocks.z != 0.0f)? GetAileronDeflection (owner, collidee,  pos, spd,  rightdir, updir, frontdir, goalDir,  groundHeight, wantedHeight,  maxCtrlAngles.z, maxBodyAngles.z,  goalDotRight, goalDotFront,  avoidCollision, isAttacking): 0.0f;
 
 	// let the previous control angles have some authority
@@ -419,6 +431,9 @@ CStrafeAirMoveType::CStrafeAirMoveType(CUnit* owner): AAirMoveType(owner)
 	crashRudder    = gsRNG.NextFloat() - 0.5f;
 
 	SetMaxSpeed(maxSpeedDef);
+
+	terrainLookahead = owner->unitDef->terrainLookahead;
+	terrainLookaheadDescent = owner->unitDef->terrainLookaheadDescent;
 }
 
 
@@ -878,11 +893,28 @@ bool CStrafeAirMoveType::UpdateFlying(float wantedHeight, float wantedThrottle)
 	}
 	#endif
 
+	float terrainAheadHeight = -1.0f;
+
+	if (terrainLookahead > 0.0f) {
+		// the highest ground along the next stretch of flight, not just one point of it: a
+		// cliff is climbed for before it is below us. Rises at once, comes down gradually, so
+		// flying off a plateau is a descent rather than a dive.
+		float aheadHeight = groundHeight;
+
+		for (int i = 1; i <= TERRAIN_LOOKAHEAD_SAMPLES; i++) {
+			const float frames = (terrainLookahead * GAME_SPEED) * i / TERRAIN_LOOKAHEAD_SAMPLES;
+
+			aheadHeight = std::max(aheadHeight, amtGetGroundHeightFuncs[5 * UseSmoothMesh()](pos.x + spd.x * frames, pos.z + spd.z * frames));
+		}
+
+		terrainAheadHeight = lookaheadGroundHeight = std::max(aheadHeight, lookaheadGroundHeight - altitudeRate * terrainLookaheadDescent);
+	}
+
 	const float3  yprInputLocks    = (XZVector * float(allowUnlockYawRoll || forceUnlockYawRoll)) + UpVector;
 	const float3  maxBodyAngles    = {0.0f, maxPitch, maxBank};
 	const float3  maxCtrlAngles    = {maxRudder, maxElevator, maxAileron};
 	const float3  prvCtrlAngles[2] = {{lastRudderPos[0], lastElevatorPos[0], lastAileronPos[0]}, {lastRudderPos[1], lastElevatorPos[1], lastAileronPos[1]}};
-	const float3& curCtrlAngles    = GetControlSurfaceAngles(owner, lastCollidee,  pos, spd,  rightdir, updir, frontdir, goalDir2D,  yprInputLocks, maxBodyAngles, maxCtrlAngles, prvCtrlAngles,  groundHeight, wantedHeight,  goalDotRight, goalDotFront,  false && collisionState == COLLISION_DIRECT, false);
+	const float3& curCtrlAngles    = GetControlSurfaceAngles(owner, lastCollidee,  pos, spd,  rightdir, updir, frontdir, goalDir2D,  yprInputLocks, maxBodyAngles, maxCtrlAngles, prvCtrlAngles,  groundHeight, wantedHeight,  goalDotRight, goalDotFront,  false && collisionState == COLLISION_DIRECT, false, terrainAheadHeight);
 
 	UpdateAirPhysics({curCtrlAngles, wantedThrottle}, owner->frontdir);
 
@@ -1413,6 +1445,8 @@ bool CStrafeAirMoveType::SetMemberValue(unsigned int memberHash, void* memberVal
 		&attackSafetyDistance,
 
 		&myGravity,
+		&terrainLookahead,
+		&terrainLookaheadDescent,
 	};
 
 	// special cases
