@@ -1425,7 +1425,7 @@ void CLuaHandle::UnitCommandAdded(const CUnit* unit, const Command& command, int
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
-	luaL_checkstack(L, 9, __func__);
+	luaL_checkstack(L, 11, __func__);
 
 	const LuaUtils::ScopedDebugTraceBack traceBack(L);
 
@@ -1466,7 +1466,7 @@ void CLuaHandle::UnitCommandRemoved(const CUnit* unit, const Command& command, i
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
-	luaL_checkstack(L, 9, __func__);
+	luaL_checkstack(L, 11, __func__);
 
 	const LuaUtils::ScopedDebugTraceBack traceBack(L);
 
