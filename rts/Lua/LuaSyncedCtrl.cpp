@@ -6222,7 +6222,7 @@ int LuaSyncedCtrl::GiveOrderArrayToUnitArray(lua_State* L)
  * @function Spring.SetUnitCommandTimeout
  *
  * @param unitID UnitID
- * @param timeout integer Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
+ * @param timeout integer Absolute frame number. The command will be discarded after this frame. Only respected by mobile units. `math.huge` clears the timeout.
  * @param cmdIndex integer? (Default: `1`) Command index to set. If negative will count from the end of the queue, e.g. `-1` will be the last command.
  * @return boolean set `false` when the index is out of range.
  */
@@ -6232,7 +6232,7 @@ int LuaSyncedCtrl::SetUnitCommandTimeout(lua_State* L)
 	if (unit == nullptr)
 		luaL_error(L, "[%s] invalid unitID", __func__);
 
-	const int cmdTimeOut = luaL_checkint(L, 2);
+	const int cmdTimeOut = LuaUtils::ParseTimeOut(L, 2);
 
 	CCommandAI* commandAI = unit->commandAI;
 	CFactoryCAI* factoryCAI = dynamic_cast<CFactoryCAI*>(commandAI);
