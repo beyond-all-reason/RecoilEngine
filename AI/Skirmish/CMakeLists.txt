@@ -18,12 +18,6 @@ endmacro (skirmish_ai_message typemsg)
 
 # Add all Skirmish AI submodules
 get_list_of_submodules(SKIRMISH_AI_DIRS)
-if (MSVC)
-	# CircuitAI does not compile on MSVC without local, unmerged fixes to the
-	# submodule itself; skip it here rather than requiring a dirty submodule
-	# checkout to build on Windows.
-	list(REMOVE_ITEM SKIRMISH_AI_DIRS CircuitAI)
-endif (MSVC)
 set(DEPS_AI_SKIRMISH "")
 set(_skirmish_ai_clang_warns
 	-Wno-implicit-const-int-float-conversion
