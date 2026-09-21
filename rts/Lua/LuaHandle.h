@@ -226,6 +226,7 @@ class CLuaHandle : public CEventClient
 		void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim) override;
 
 		bool CommandNotify(const Command& cmd) override;
+		bool AllowQuit() override;
 
 		bool AddConsoleLine(const std::string& msg, const std::string& section, int level) override;
 
