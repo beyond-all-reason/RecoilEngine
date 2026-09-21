@@ -31,6 +31,7 @@
  * @field reliableLuaMapShaders boolean Whether forward-only Lua map shaders activate without a deferred draw and Spring.SetMapShader program swaps refresh cached uniform locations
  * @field nanoParticleUpdateCallin boolean Whether LuaUI receives batched `NanoParticleUpdate` lifecycle events
  * @field nanoParticlesGL4 boolean Whether the engine has the standalone shader-based nano particle effect (the `NanoParticles*` springsettings)
+ * @field commandInsertPassesTimeout boolean Whether `CMD.INSERT` passes its own timeout to the command it inserts
  */
 
 /***
@@ -72,7 +73,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	 *
 	 * will be compatible even on engines that don't yet know about the entry at all. */
 	lua_pushliteral(L, "FeatureSupport");
-	lua_createtable(L, 0, 16);
+	lua_createtable(L, 0, 17);
 		LuaPushNamedBool(L, "NegativeGetUnitCurrentCommand", true);
 		LuaPushNamedBool(L, "hasExitOnlyYardmaps", true);
 		LuaPushNamedNumber(L, "rmlUiApiVersion", 1);
@@ -89,6 +90,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "reliableLuaMapShaders", true);
 		LuaPushNamedBool(L, "nanoParticleUpdateCallin", true);
 		LuaPushNamedBool(L, "nanoParticlesGL4", true);
+		LuaPushNamedBool(L, "commandInsertPassesTimeout", true);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");

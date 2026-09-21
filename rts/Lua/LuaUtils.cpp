@@ -1111,7 +1111,7 @@ static bool ParseCommandTimeOut(
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units. `CMD_INSERT` passes its timeout to its inserted command.
  */
 Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
 {
@@ -1159,7 +1159,7 @@ Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
  * @field [1] CMD|integer Command ID.
  * @field [2] CreateCommandParams? Parameters for the given command.
  * @field [3] CreateCommandOptions? Command options.
- * @field [4] integer? Timeout.
+ * @field [4] integer? Timeout as an absolute frame number.
  */
 
 Command LuaUtils::ParseCommandTable(lua_State* L, const char* caller, int tableIdx)
