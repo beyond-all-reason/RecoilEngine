@@ -63,6 +63,8 @@ CR_REG_METADATA(CStrafeAirMoveType, (
 	CR_MEMBER(agileAccRate),
 	CR_MEMBER(cruiseDistance),
 	CR_MEMBER(agileAltitude),
+	CR_MEMBER(landGoalPos),
+	CR_MEMBER(spotSearchFrames),
 
 	CR_PREALLOC(GetPreallocContainer)
 ))
@@ -449,6 +451,10 @@ bool CStrafeAirMoveType::Update()
 
 	AAirMoveType::Update();
 
+	// Lua can switch agileFlight off in mid-flight, and a crash is not flown in any regime
+	if (!agileFlight || aircraftState == AIRCRAFT_CRASHING)
+		SetFlightRegime(REGIME_CRUISE);
+
 	// need to additionally check that we are not crashing,
 	// otherwise we might fall through the map when stunned
 	// (the kill-on-impact code is not reached in that case)
@@ -497,7 +503,14 @@ bool CStrafeAirMoveType::Update()
 			} else
 			*/
 			{
-				if (isAttacking && keepAttacking) {
+				if (isAttacking && keepAttacking && InAgileRegime()) {
+					// attack runs are flown fixed-wing; the agile regime may have us low and slow,
+					// so get there the way a landed aircraft does: climb and accelerate first
+					SetFlightRegime(REGIME_CRUISE);
+
+					SetState(AIRCRAFT_TAKEOFF);
+					UpdateTakeOff();
+				} else if (isAttacking && keepAttacking) {
 					switch (owner->curTarget.type) {
 						case Target_None: { } break;
 						case Target_Unit: { SetGoal(owner->curTarget.unit->pos); } break;
@@ -525,6 +538,8 @@ bool CStrafeAirMoveType::Update()
 								maneuverSubState = 0;
 						}
 					}
+				} else if (agileFlight) {
+					UpdateAgileRegime();
 				} else {
 					UpdateFlying(wantedHeight, 1.0f);
 				}
@@ -546,7 +561,11 @@ bool CStrafeAirMoveType::Update()
 			amtEmitCrashTrailFuncs[crashExpGenID != -1u](owner, crashExpGenID);
 		} break;
 		case AIRCRAFT_TAKEOFF:
-			UpdateTakeOff();
+			if (agileFlight) {
+				UpdateAgileTakeOff();
+			} else {
+				UpdateTakeOff();
+			}
 			break;
 		default:
 			break;
@@ -961,6 +980,11 @@ void CStrafeAirMoveType::UpdateTakeOff()
 void CStrafeAirMoveType::UpdateLanding()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (agileFlight) {
+		UpdateAgileLanding();
+		return;
+	}
+
 	const float3 pos = owner->pos;
 
 	SyncedFloat3& rightdir = owner->rightdir;
@@ -1359,11 +1383,15 @@ void CStrafeAirMoveType::StartMoving(float3 pos, float goalRadius, float speed)
 		SetState(AIRCRAFT_TAKEOFF);
 
 	SetGoal(pos);
+	AgileStartMoving();
 }
 
 void CStrafeAirMoveType::StopMoving(bool callScript, bool hardStop, bool)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (AgileStopMoving())
+		return;
+
 	SetGoal(owner->pos);
 	ClearLandingPos();
 	SetWantedMaxSpeed(0.0f);

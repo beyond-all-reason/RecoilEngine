@@ -42,6 +42,9 @@ public:
 	void SetState(AircraftState state) override;
 	void UpdateTakeOff();
 
+	void UpdateAgileRegime();
+	void UpdateAgileTakeOff();
+	void UpdateAgileLanding();
 	/// hover-like control: fly to <targetPos> at <targetHeight> above ground while turning to face <facePos>
 	void UpdateAgileFlight(const float3& targetPos, const float3& facePos, float targetHeight, bool landing);
 
@@ -50,6 +53,8 @@ public:
 	float GetAgileGoalRadius() const;
 	/// altitude flown in the agile regime
 	float GetAgileHeight() const;
+	/// the only place the regime changes
+	void SetFlightRegime(int regime);
 
 	void SetAgileSpeed(float speed);
 	void SetAgileTurnRate(float rate);
@@ -57,9 +62,18 @@ public:
 	float GetAgileSpeed() const;
 	float GetCruiseDistance() const;
 	float GetTurnDiameter() const;
+	float GetAgileApproachHeight(float goalDist2D, bool finalGoal) const;
+	float GetCruiseBrakingDistance(float speed) const;
+	/// distance needed to come to rest from <speed>, across both regimes
+	float GetAgileStopDistance(float speed) const;
 
 	float3 FindLandingPos(float3 landPos);
-	/// the agile regime's share of SetMemberValue
+	/// nearest spot to <wantedPos> that no other aircraft has claimed, -OnesVector if there is none
+	float3 FindAgileSpot(const float3& wantedPos, bool landable);
+	bool CanSetDownAt(const float3& spot) const;
+	/// the agile regime's share of StopMoving, StartMoving and SetMemberValue
+	bool AgileStopMoving();
+	void AgileStartMoving();
 	bool SetAgileMemberValue(unsigned int memberHash, void* memberValue);
 
 	void SetMaxSpeed(float speed) override;
@@ -126,4 +140,10 @@ public:
 
 	/// altitude of the agile regime; 0 uses the cruise altitude (wantedHeight)
 	float agileAltitude = 0.0f;
+
+	/// where an agile aircraft sets down: the goal StopMoving was about to discard
+	float3 landGoalPos = -OnesVector;
+
+	/// frames between two searches for a landing spot, grows while they find nothing
+	int spotSearchFrames = 1;
 };
