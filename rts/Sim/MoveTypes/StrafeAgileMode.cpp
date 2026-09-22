@@ -91,10 +91,16 @@ static constexpr int SPOT_SEARCH_MAX_FRAMES = 8 * GAME_SPEED;
 static constexpr float TOUCHDOWN_RADIUS_SHARE = 0.25f;
 static constexpr float TOUCHDOWN_MAX_SPEED_SHARE = 0.5f;
 // distance between neighboring holding and landing spots, in unit radii
-static constexpr float SPOT_SPACING_RADII = 2.2f;
-// how far out the spot search goes. A handful of rings serves nearly every call, only the stragglers
+static constexpr float SPOT_SPACING_RADII = 2.5f;
+// the spots form a sunflower head: the goal itself, then seed n at n times the golden angle and
+// sqrt(n + offset) steps out. Filled from the middle that is a compact disc for any number of
+// aircraft; with this offset no two seeds are nearer than the given number of steps
+static constexpr float SUNFLOWER_GOLDEN_ANGLE = 2.39996323f; // radians, pi * (3 - sqrt(5))
+static constexpr float SUNFLOWER_SEED_OFFSET = 2.0f;
+static constexpr float SUNFLOWER_MIN_SEED_STEPS = 1.65f;
+// how far out the spot search goes. A few dozen seeds serve nearly every call, only the stragglers
 // of a very large group or a goal deep inside a base search far out
-static constexpr int SPOT_SEARCH_MAX_RINGS = 64;
+static constexpr int SPOT_SEARCH_MAX_SEEDS = 4096;
 
 // altitude is held against the terrain this much travel time ahead
 static constexpr float AGILE_TERRAIN_LOOKAHEAD_SECONDS = 2.0f / 3.0f;
@@ -531,18 +537,18 @@ bool CStrafeAirMoveType::CanSetDownAt(const float3& spot) const
 float3 CStrafeAirMoveType::FindAgileSpot(const float3& wantedPos, bool landable)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// aircraft that stop on a goal would all stop on the same one, so each takes
-	// the free spot nearest to it: not where another aircraft sits, holds or will land
-	const float ringStep = owner->radius * SPOT_SPACING_RADII;
+	// aircraft that stop on a goal would all stop on the same one, so each takes the first free
+	// spot of a pattern around it: not where another aircraft sits, holds or will land
+	const float spotStep = owner->radius * (SPOT_SPACING_RADII / SUNFLOWER_MIN_SEED_STEPS);
 
 	struct Claim { float3 pos; float radius; };
 	std::vector<Claim> claims;
 
 	{
 		// an aircraft can be as far from the spot it claimed as the search reaches (it reserves
-		// on arriving at the goal, the spot may be rings away), so look twice that far for claimants.
+		// on arriving at the goal, the spot may be far out in the pattern), so look twice that far for claimants.
 		// Scoped: queries are pooled, and the spot tests need not hold on to this one
-		const float searchReach = ringStep * (SPOT_SEARCH_MAX_RINGS + 2);
+		const float searchReach = spotStep * math::sqrt(SPOT_SEARCH_MAX_SEEDS + SUNFLOWER_SEED_OFFSET);
 
 		QuadFieldQuery qfQuery;
 		quadField.GetUnitsExact(qfQuery, wantedPos, searchReach * 2.0f, false);
@@ -587,15 +593,13 @@ float3 CStrafeAirMoveType::FindAgileSpot(const float3& wantedPos, bool landable)
 		return (CanSetDownAt(spot)? float3(spot.x, CGround::GetHeightReal(spot.x, spot.z), spot.z): -OnesVector);
 	};
 
-	// hexagonal rings, neighboring spots are just over two radii apart
 	float3 foundPos = TestSpot(wantedPos);
 
-	for (int ring = 1; ring <= SPOT_SEARCH_MAX_RINGS && foundPos.x == -1.0f; ring++) {
-		for (int n = 0; n < (6 * ring) && foundPos.x == -1.0f; n++) {
-			const float angle = n * (math::TWOPI / (6 * ring));
+	for (int n = 1; n < SPOT_SEARCH_MAX_SEEDS && foundPos.x == -1.0f; n++) {
+		const float angle = n * SUNFLOWER_GOLDEN_ANGLE;
+		const float dist = spotStep * math::sqrt(n + SUNFLOWER_SEED_OFFSET);
 
-			foundPos = TestSpot(wantedPos + float3(math::sin(angle), 0.0f, math::cos(angle)) * (ring * ringStep));
-		}
+		foundPos = TestSpot(wantedPos + float3(math::sin(angle), 0.0f, math::cos(angle)) * dist);
 	}
 
 	// touchdown is exact
@@ -619,7 +623,9 @@ bool CStrafeAirMoveType::AgileStopMoving()
 	const float flatSpeed = flatVel.Length();
 
 	if (goalPos.SqDistance2D(owner->pos) < Square(GetAgileGoalRadius() * ARRIVED_GOAL_RADII)) {
-		landGoalPos = FindAgileSpot(goalPos, false);
+		// (one it can set down on if that is what comes next, or it would have to look
+		// again from there and end up off the pattern the others are filling)
+		landGoalPos = FindAgileSpot(goalPos, autoLand && !dontLand);
 
 		if (landGoalPos.x == -1.0f)
 			landGoalPos = goalPos;
