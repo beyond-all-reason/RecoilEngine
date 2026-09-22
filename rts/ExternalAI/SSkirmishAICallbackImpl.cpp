@@ -3485,11 +3485,6 @@ EXPORT(int) skirmishAiCallback_Unit_getCurrentCommands(int skirmishAIId, int uni
 	return ((q != nullptr)? q->size(): 0);
 }
 
-EXPORT(int) skirmishAiCallback_Unit_CurrentCommand_getType(int skirmishAIId, int unitId) {
-	const CCommandQueue* q = _intern_Unit_getCurrentCommandQueue(skirmishAIId, unitId);
-	return ((q != nullptr)? q->GetType(): -1);
-}
-
 EXPORT(int) skirmishAiCallback_Unit_CurrentCommand_getId(int skirmishAIId, int unitId, int commandId) {
 	const CCommandQueue* q = _intern_Unit_getCurrentCommandQueue(skirmishAIId, unitId);
 	return (CHECK_COMMAND_ID(q, commandId) ? q->at(commandId).GetID() : 0);
