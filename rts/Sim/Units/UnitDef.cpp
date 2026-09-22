@@ -211,6 +211,7 @@ UnitDef::UnitDef()
 	, maxRudder(0.0f)
 	, crashDrag(0.0f)
 	, agileFlight(false)
+	, agileLandOnly(false)
 	, agileSpeed(0.0f)
 	, agileTurnRate(0.0f)
 	, agileAccRate(0.0f)
@@ -572,6 +573,7 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	maxRudder   = udTable.GetFloat("maxRudder",   0.004f); // turn speed around yaw axis
 
 	agileFlight    = udTable.GetBool("agileFlight", false);
+	agileLandOnly  = udTable.GetBool("agileLandOnly", false);
 	agileSpeed     = std::max(0.0f, udTable.GetFloat("agileSpeed",     0.0f));
 	agileTurnRate  = std::max(0.0f, udTable.GetFloat("agileTurnRate",  0.0f));
 	agileAccRate   = std::max(0.0f, udTable.GetFloat("agileAccRate",   0.0f));

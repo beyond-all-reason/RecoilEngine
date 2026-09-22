@@ -566,7 +566,7 @@ float3 CStrafeAirMoveType::FindAgileSpot(const float3& wantedPos, bool landable)
 				claims.push_back({mt->reservedLandingPos, unit->radius});
 			} else if (mt->aircraftState == AIRCRAFT_LANDED) {
 				claims.push_back({unit->pos, unit->radius});
-			} else if (mt->agileFlight && mt->landGoalPos.x != -1.0f) {
+			} else if (mt->UseAgileFlight() && mt->landGoalPos.x != -1.0f) {
 				claims.push_back({mt->landGoalPos, unit->radius});
 			}
 		}
@@ -610,7 +610,7 @@ float3 CStrafeAirMoveType::FindAgileSpot(const float3& wantedPos, bool landable)
 // true when it took care of the stop
 bool CStrafeAirMoveType::AgileStopMoving()
 {
-	if (!agileFlight || aircraftState == AIRCRAFT_LANDED || aircraftState == AIRCRAFT_CRASHING)
+	if (!UseAgileFlight() || aircraftState == AIRCRAFT_LANDED || aircraftState == AIRCRAFT_CRASHING)
 		return false;
 
 	// when told to stop right after arriving, the goal about to be discarded is the

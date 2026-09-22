@@ -57,6 +57,7 @@ CR_REG_METADATA(CStrafeAirMoveType, (
 	CR_MEMBER(lastAileronPos),
 
 	CR_MEMBER(agileFlight),
+	CR_MEMBER(agileLandOnly),
 	CR_MEMBER(flightRegime),
 	CR_MEMBER(agileSpeed),
 	CR_MEMBER(agileTurnRate),
@@ -79,6 +80,7 @@ static const unsigned int BOOL_MEMBER_HASHES[] = {
 	MEMBER_LITERAL_HASH( "useSmoothMesh"),
 	MEMBER_LITERAL_HASH("loopbackAttack"),
 	MEMBER_LITERAL_HASH(   "agileFlight"),
+	MEMBER_LITERAL_HASH( "agileLandOnly"),
 };
 
 static const unsigned int INT_MEMBER_HASHES[] = {
@@ -434,6 +436,7 @@ CStrafeAirMoveType::CStrafeAirMoveType(CUnit* owner): AAirMoveType(owner)
 	const UnitDef* ud = owner->unitDef;
 
 	agileFlight = ud->agileFlight;
+	agileLandOnly = ud->agileLandOnly;
 
 	SetAgileSpeed(ud->agileSpeed / GAME_SPEED);
 	SetAgileTurnRate(ud->agileTurnRate);
@@ -451,9 +454,15 @@ bool CStrafeAirMoveType::Update()
 
 	AAirMoveType::Update();
 
-	// Lua can switch agileFlight off in mid-flight, and a crash is not flown in any regime
-	if (!agileFlight || aircraftState == AIRCRAFT_CRASHING)
+	// agile flight can end in mid-flight (through Lua, or the idle mode set to fly with agileLandOnly),
+	// and a crash is not flown in any regime
+	if (!UseAgileFlight() || aircraftState == AIRCRAFT_CRASHING) {
+		// too low and too slow for fixed-wing flight: get back up to it the way a stock takeoff does
+		if (flightRegime == REGIME_AGILE && aircraftState == AIRCRAFT_FLYING)
+			SetState(AIRCRAFT_TAKEOFF);
+
 		SetFlightRegime(REGIME_CRUISE);
+	}
 
 	// need to additionally check that we are not crashing,
 	// otherwise we might fall through the map when stunned
@@ -538,7 +547,7 @@ bool CStrafeAirMoveType::Update()
 								maneuverSubState = 0;
 						}
 					}
-				} else if (agileFlight) {
+				} else if (UseAgileFlight()) {
 					UpdateAgileRegime();
 				} else {
 					UpdateFlying(wantedHeight, 1.0f);
@@ -561,7 +570,7 @@ bool CStrafeAirMoveType::Update()
 			amtEmitCrashTrailFuncs[crashExpGenID != -1u](owner, crashExpGenID);
 		} break;
 		case AIRCRAFT_TAKEOFF:
-			if (agileFlight) {
+			if (UseAgileFlight()) {
 				UpdateAgileTakeOff();
 			} else {
 				UpdateTakeOff();
@@ -980,7 +989,7 @@ void CStrafeAirMoveType::UpdateTakeOff()
 void CStrafeAirMoveType::UpdateLanding()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (agileFlight) {
+	if (UseAgileFlight()) {
 		UpdateAgileLanding();
 		return;
 	}
@@ -1438,6 +1447,7 @@ bool CStrafeAirMoveType::SetMemberValue(unsigned int memberHash, void* memberVal
 		&useSmoothMesh,
 		&loopbackAttack,
 		&agileFlight,
+		&agileLandOnly,
 	};
 	int* intMemberPtrs[] = {
 		&maneuverBlockTime,

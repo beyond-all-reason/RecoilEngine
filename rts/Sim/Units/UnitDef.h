@@ -330,6 +330,7 @@ public:
 
 	/// strafing aircraft only: fly short legs, final approaches, takeoffs and landings with hover-like control
 	bool agileFlight;
+	bool agileLandOnly;   ///< agileFlight only while the idle mode is to land
 	float agileSpeed;     ///< elmos/s, 0 derives it from speed
 	float agileTurnRate;  ///< heading units per frame at agileSpeed (65536 is a full circle), 0 for the default
 	float agileAccRate;   ///< elmos/frame^2, 0 derives it from maxAcc

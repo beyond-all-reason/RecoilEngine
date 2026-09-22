@@ -48,7 +48,9 @@ public:
 	/// hover-like control: fly to <targetPos> at <targetHeight> above ground while turning to face <facePos>
 	void UpdateAgileFlight(const float3& targetPos, const float3& facePos, float targetHeight, bool landing);
 
-	bool InAgileRegime() const { return (agileFlight && flightRegime == REGIME_AGILE); }
+	/// agileFlight, unless it is restricted to the idle mode "land" and the aircraft is set to fly
+	bool UseAgileFlight() const { return (agileFlight && (!agileLandOnly || (autoLand && !dontLand))); }
+	bool InAgileRegime() const { return (UseAgileFlight() && flightRegime == REGIME_AGILE); }
 	/// how close an agile aircraft gets to a goal before its move order counts as finished
 	float GetAgileGoalRadius() const;
 	/// altitude flown in the agile regime
@@ -127,6 +129,7 @@ public:
 	float lastAileronPos[2] = {0.0f, 0.0f};
 
 	bool agileFlight = false;
+	bool agileLandOnly = false;
 	int flightRegime = REGIME_CRUISE;
 
 	/// elmos/frame; top speed of the agile regime and the speed at which it hands over to cruise flight

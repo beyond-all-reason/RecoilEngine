@@ -816,6 +816,7 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_BOOL("airStrafe",     ud.airStrafe);
 	ADD_BOOL("bankingAllowed",ud.bankingAllowed);
 	ADD_BOOL("agileFlight",   ud.agileFlight);
+	ADD_BOOL("agileLandOnly", ud.agileLandOnly);
 	ADD_FLOAT("agileSpeed",    ud.agileSpeed);
 	ADD_FLOAT("agileTurnRate", ud.agileTurnRate);
 	ADD_FLOAT("agileAccRate",  ud.agileAccRate);
