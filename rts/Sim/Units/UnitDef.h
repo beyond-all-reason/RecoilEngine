@@ -335,6 +335,9 @@ public:
 	float agileAccRate;   ///< elmos/frame^2, 0 derives it from maxAcc
 	float cruiseDistance; ///< elmos, 0 derives it from the turn radius
 	float agileAltitude;  ///< elmos above ground in the agile regime, 0 uses cruiseAltitude
+	float agileHoverBob;  ///< elmos an agile aircraft bobs up and down on the point it holds on, 0 for none
+	float agileHoverSway; ///< elmos it sways to its left and right there, 0 for none
+	float agileHoverTilt; ///< how far it leans against the gusts meanwhile, 1 is what gravity dictates
 
 	float loadingRadius;							///< for transports
 	float unloadSpread;

@@ -63,6 +63,12 @@ CR_REG_METADATA(CStrafeAirMoveType, (
 	CR_MEMBER(agileAccRate),
 	CR_MEMBER(cruiseDistance),
 	CR_MEMBER(agileAltitude),
+	CR_MEMBER(agileHoverBob),
+	CR_MEMBER(agileHoverSway),
+	CR_MEMBER(agileHoverTilt),
+	CR_MEMBER(hoverSwayPos),
+	CR_MEMBER(hoverSwayVel),
+	CR_MEMBER(hoverSwayFade),
 	CR_MEMBER(landGoalPos),
 	CR_MEMBER(spotSearchFrames),
 
@@ -441,6 +447,10 @@ CStrafeAirMoveType::CStrafeAirMoveType(CUnit* owner): AAirMoveType(owner)
 
 	cruiseDistance = ud->cruiseDistance;
 	agileAltitude = ud->agileAltitude;
+
+	agileHoverBob = ud->agileHoverBob;
+	agileHoverSway = ud->agileHoverSway;
+	agileHoverTilt = ud->agileHoverTilt;
 }
 
 bool CStrafeAirMoveType::Update()
