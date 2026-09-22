@@ -78,6 +78,18 @@ static constexpr float STOP_MARGIN_SECONDS = 1.0f / 15.0f;
 // a goal closer than a turn diameter and further off the nose than this (60 degrees) is not turned onto at speed
 static constexpr float MUST_TURN_MAX_GOAL_DOT = 0.5f;
 
+// cruise is sticky above this multiple of the agile speed: a goal that can not be stopped on from here is flown
+// past and come round onto, this many times at most. It can be stopped on when it is within 45 degrees
+// of the nose and no nearer than this share of the stop distance
+static constexpr float STICKY_CRUISE_MIN_SPEED_MULT = 1.25f;
+static constexpr int STICKY_CRUISE_MAX_PASSES = 2;
+static constexpr float CAN_STOP_MIN_GOAL_DOT = 0.7f;
+static constexpr float CAN_STOP_MIN_DIST_SHARE = 0.8f;
+// flying past, the aircraft steers at a point this many turn diameters straight ahead
+static constexpr float FLY_PAST_GOAL_TURN_DIAMETERS = 4.0f;
+// two goals nearer than this (squared, elmos) are the same goal
+static constexpr float SAME_GOAL_SQ_DIST = 1.0f;
+
 // takeoff climbs straight up until clear of the ground by the lesser of these
 static constexpr float TAKEOFF_CLEARANCE_HEIGHT_SHARE = 0.5f; // of the agile altitude
 static constexpr float TAKEOFF_CLEARANCE_RADII = 2.0f;
@@ -247,10 +259,16 @@ void CStrafeAirMoveType::UpdateAgileRegime()
 	// but not ahead (a fixed-wing turn onto it would be wider than flying there agile)
 	const float3 goalDir2D = ((goalPos - pos) * XZVector).SafeNormalize();
 
-	const bool mustStop = (goalDist2D < (GetAgileStopDistance(speed2D) + speed2D * (STOP_MARGIN_SECONDS * GAME_SPEED)));
+	const float stopDist = GetAgileStopDistance(speed2D);
+	const float stopMargin = speed2D * (STOP_MARGIN_SECONDS * GAME_SPEED);
+	const float turnDiameter = GetTurnDiameter();
+	const float goalDotFront = owner->frontdir.dot(goalDir2D);
+
+	const bool mustStop = (goalDist2D < (stopDist + stopMargin));
 	// (never less than a turn diameter, or a small cruiseDistance has us orbit the goal)
-	const bool mustTurn = (goalDist2D < std::max(cruiseDist, GetTurnDiameter()) && owner->frontdir.dot(goalDir2D) < MUST_TURN_MAX_GOAL_DOT);
-	const bool brake = (finalGoal && (mustStop || mustTurn));
+	const bool mustTurn = (goalDist2D < std::max(cruiseDist, turnDiameter) && goalDotFront < MUST_TURN_MAX_GOAL_DOT);
+
+	bool brake = (finalGoal && (mustStop || mustTurn));
 
 	if (flightRegime == REGIME_AGILE) {
 		const float curHeight = pos.y - amtGetGroundHeightFuncs[5 * UseSmoothMesh()](pos.x, pos.z);
@@ -260,7 +278,7 @@ void CStrafeAirMoveType::UpdateAgileRegime()
 		// (measured against the ground passing below, following a slope is level flight too)
 		const float groundClimbRate = amtGetGroundHeightFuncs[5 * UseSmoothMesh()](pos.x + owner->speed.x, pos.z + owner->speed.z) - (pos.y - curHeight);
 		const bool levelFlight = (curHeight > GetAgileHeight() * HANDOVER_MIN_HEIGHT_SHARE && math::fabs(owner->speed.y - groundClimbRate) < agileAccRate * (HANDOVER_MAX_CLIMB_SECONDS * GAME_SPEED));
-		const bool canHandOver = (levelFlight && speed2D >= agileSpd * HANDOVER_MIN_SPEED_SHARE && owner->frontdir.dot(goalDir2D) > HANDOVER_MIN_GOAL_DOT);
+		const bool canHandOver = (levelFlight && speed2D >= agileSpd * HANDOVER_MIN_SPEED_SHARE && goalDotFront > HANDOVER_MIN_GOAL_DOT);
 
 		// (not into a cruise leg that would brake straight back into this regime)
 		if (farGoal && canHandOver && !brake && agileSpd < maxSpeed) {
@@ -271,9 +289,50 @@ void CStrafeAirMoveType::UpdateAgileRegime()
 		}
 	}
 
+	// cruise is sticky: at speed, a goal we can not stop on from here (behind us, off to the side, or
+	// ahead but too close) is no reason to fall back to the agile regime. Fly past, get far enough away
+	// to come round onto it with room to stop, and brake on that pass. Once braking for a goal we stay
+	// with that, and a goal is only ever passed a few times, so this can not become an orbit
+	const bool braking = (cruiseBrakeGoal.SqDistance2D(goalPos) < SAME_GOAL_SQ_DIST);
+
+	bool flyPast = false;
+
+	if (cruisePassGoal.SqDistance2D(goalPos) >= SAME_GOAL_SQ_DIST) {
+		cruisePassGoal = goalPos;
+		cruisePasses = 0;
+	}
+
+	if (brake && !braking && speed2D > agileSpd * STICKY_CRUISE_MIN_SPEED_MULT && cruisePasses < STICKY_CRUISE_MAX_PASSES) {
+		const bool canStopOnIt = (goalDotFront > CAN_STOP_MIN_GOAL_DOT && goalDist2D >= stopDist * CAN_STOP_MIN_DIST_SHARE);
+
+		if (!canStopOnIt) {
+			brake = false;
+			// straight on until there is room for the turn and the stop after it
+			flyPast = (goalDotFront < CAN_STOP_MIN_GOAL_DOT && goalDist2D < (turnDiameter + stopDist + stopMargin));
+
+			// (count a pass when the goal goes from ahead of us to behind us)
+			if (goalDotFront < 0.0f && cruiseGoalAhead)
+				cruisePasses += 1;
+		}
+	}
+
+	cruiseGoalAhead = (goalDotFront >= 0.0f);
+
+	if (brake)
+		cruiseBrakeGoal = goalPos;
+
 	if (brake && speed2D <= agileSpd) {
 		SetFlightRegime(REGIME_AGILE);
 		UpdateAgileFlight(goalPos, goalPos, GetAgileApproachHeight(goalDist2D, finalGoal), false);
+		return;
+	}
+
+	if (flyPast) {
+		const float3 realGoalPos = goalPos;
+
+		goalPos = pos + (owner->frontdir * XZVector).SafeNormalize() * (turnDiameter * FLY_PAST_GOAL_TURN_DIAMETERS);
+		UpdateFlying(wantedHeight, 1.0f);
+		goalPos = realGoalPos;
 		return;
 	}
 

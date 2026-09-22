@@ -146,4 +146,10 @@ public:
 
 	/// frames between two searches for a landing spot, grows while they find nothing
 	int spotSearchFrames = 1;
+
+	/// sticky cruise: the goal we have started braking for, and how often we flew past the current one
+	float3 cruiseBrakeGoal = -OnesVector;
+	float3 cruisePassGoal = -OnesVector;
+	int cruisePasses = 0;
+	bool cruiseGoalAhead = false;
 };
