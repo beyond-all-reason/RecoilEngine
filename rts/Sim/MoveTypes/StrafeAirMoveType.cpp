@@ -2,6 +2,7 @@
 
 
 #include "StrafeAirMoveType.h"
+
 #include "Game/Players/Player.h"
 #include "Map/Ground.h"
 #include "Map/MapInfo.h"
@@ -55,6 +56,14 @@ CR_REG_METADATA(CStrafeAirMoveType, (
 	CR_MEMBER(lastElevatorPos),
 	CR_MEMBER(lastAileronPos),
 
+	CR_MEMBER(agileFlight),
+	CR_MEMBER(flightRegime),
+	CR_MEMBER(agileSpeed),
+	CR_MEMBER(agileTurnRate),
+	CR_MEMBER(agileAccRate),
+	CR_MEMBER(cruiseDistance),
+	CR_MEMBER(agileAltitude),
+
 	CR_PREALLOC(GetPreallocContainer)
 ))
 
@@ -67,6 +76,7 @@ static const unsigned int BOOL_MEMBER_HASHES[] = {
 	MEMBER_LITERAL_HASH(       "collide"),
 	MEMBER_LITERAL_HASH( "useSmoothMesh"),
 	MEMBER_LITERAL_HASH("loopbackAttack"),
+	MEMBER_LITERAL_HASH(   "agileFlight"),
 };
 
 static const unsigned int INT_MEMBER_HASHES[] = {
@@ -94,7 +104,6 @@ static const unsigned int FLOAT_MEMBER_HASHES[] = {
 
 extern AAirMoveType::GetGroundHeightFunc amtGetGroundHeightFuncs[6];
 extern AAirMoveType::EmitCrashTrailFunc amtEmitCrashTrailFuncs[2];
-
 
 
 static float TurnRadius(const float rawRadius, const float rawSpeed) {
@@ -419,9 +428,18 @@ CStrafeAirMoveType::CStrafeAirMoveType(CUnit* owner): AAirMoveType(owner)
 	crashRudder    = gsRNG.NextFloat() - 0.5f;
 
 	SetMaxSpeed(maxSpeedDef);
+
+	const UnitDef* ud = owner->unitDef;
+
+	agileFlight = ud->agileFlight;
+
+	SetAgileSpeed(ud->agileSpeed / GAME_SPEED);
+	SetAgileTurnRate(ud->agileTurnRate);
+	SetAgileAccRate(ud->agileAccRate);
+
+	cruiseDistance = ud->cruiseDistance;
+	agileAltitude = ud->agileAltitude;
 }
-
-
 
 bool CStrafeAirMoveType::Update()
 {
@@ -1391,6 +1409,7 @@ bool CStrafeAirMoveType::SetMemberValue(unsigned int memberHash, void* memberVal
 		&collide,
 		&useSmoothMesh,
 		&loopbackAttack,
+		&agileFlight,
 	};
 	int* intMemberPtrs[] = {
 		&maneuverBlockTime,
@@ -1416,6 +1435,8 @@ bool CStrafeAirMoveType::SetMemberValue(unsigned int memberHash, void* memberVal
 	};
 
 	// special cases
+	if (SetAgileMemberValue(memberHash, memberValue))
+		return true;
 	if (memberHash == FLOAT_MEMBER_HASHES[WANTEDHEIGHT_MEMBER_IDX]) {
 		SetDefaultAltitude(*(reinterpret_cast<float*>(memberValue)));
 		return true;

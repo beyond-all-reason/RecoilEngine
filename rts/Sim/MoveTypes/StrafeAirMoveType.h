@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef STRAFE_AIR_MOVE_TYPE_H_
-#define STRAFE_AIR_MOVE_TYPE_H_
+#pragma once
 
 #include "AAirMoveType.h"
 
@@ -21,6 +20,10 @@ public:
 		MANEUVER_IMMELMAN     = 1,
 		MANEUVER_IMMELMAN_INV = 2,
 	};
+	enum {
+		REGIME_CRUISE = 0, ///< fixed-wing flight model
+		REGIME_AGILE  = 1, ///< hover-like control, only entered when agileFlight is set
+	};
 
 	CStrafeAirMoveType(CUnit* owner);
 
@@ -39,7 +42,19 @@ public:
 	void SetState(AircraftState state) override;
 	void UpdateTakeOff();
 
+	bool InAgileRegime() const { return (agileFlight && flightRegime == REGIME_AGILE); }
+	/// altitude flown in the agile regime
+	float GetAgileHeight() const;
+
+	void SetAgileSpeed(float speed);
+	void SetAgileTurnRate(float rate);
+	void SetAgileAccRate(float rate);
+	float GetCruiseDistance() const;
+	float GetTurnDiameter() const;
+
 	float3 FindLandingPos(float3 landPos);
+	/// the agile regime's share of SetMemberValue
+	bool SetAgileMemberValue(unsigned int memberHash, void* memberValue);
 
 	void SetMaxSpeed(float speed) override;
 	float BrakingDistance(float speed, float rate) const override;
@@ -90,6 +105,19 @@ public:
 	float lastRudderPos[2] = {0.0f, 0.0f};
 	float lastElevatorPos[2] = {0.0f, 0.0f};
 	float lastAileronPos[2] = {0.0f, 0.0f};
-};
 
-#endif // _AIR_MOVE_TYPE_H_
+	bool agileFlight = false;
+	int flightRegime = REGIME_CRUISE;
+
+	/// elmos/frame; top speed of the agile regime and the speed at which it hands over to cruise flight
+	float agileSpeed = 0.0f;
+	/// heading change per frame in the agile regime at its top speed (65536 is a full circle), scaled down with speed
+	float agileTurnRate = 0.0f;
+	/// acceleration and deceleration limit of the agile regime
+	float agileAccRate = 0.0f;
+	/// goals nearer than this are flown entirely in the agile regime; 0 derives it from the turn radius
+	float cruiseDistance = 0.0f;
+
+	/// altitude of the agile regime; 0 uses the cruise altitude (wantedHeight)
+	float agileAltitude = 0.0f;
+};
