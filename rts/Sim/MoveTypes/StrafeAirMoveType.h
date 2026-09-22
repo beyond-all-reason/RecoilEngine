@@ -42,13 +42,19 @@ public:
 	void SetState(AircraftState state) override;
 	void UpdateTakeOff();
 
+	/// hover-like control: fly to <targetPos> at <targetHeight> above ground while turning to face <facePos>
+	void UpdateAgileFlight(const float3& targetPos, const float3& facePos, float targetHeight, bool landing);
+
 	bool InAgileRegime() const { return (agileFlight && flightRegime == REGIME_AGILE); }
+	/// how close an agile aircraft gets to a goal before its move order counts as finished
+	float GetAgileGoalRadius() const;
 	/// altitude flown in the agile regime
 	float GetAgileHeight() const;
 
 	void SetAgileSpeed(float speed);
 	void SetAgileTurnRate(float rate);
 	void SetAgileAccRate(float rate);
+	float GetAgileSpeed() const;
 	float GetCruiseDistance() const;
 	float GetTurnDiameter() const;
 
