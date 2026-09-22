@@ -821,6 +821,9 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FLOAT("agileAccRate",  ud.agileAccRate);
 	ADD_FLOAT("cruiseDistance",ud.cruiseDistance);
 	ADD_FLOAT("agileAltitude", ud.agileAltitude);
+	ADD_FLOAT("cruiseEntryAngle",     ud.cruiseEntryAngle);
+	ADD_FLOAT("cruiseEntrySpeed",     ud.cruiseEntrySpeed);
+	ADD_FLOAT("cruiseEntryTurnBoost", ud.cruiseEntryTurnBoost);
 	ADD_BOOL("useSmoothMesh", ud.useSmoothMesh);
 
 	// < 0 means it can land,

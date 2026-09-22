@@ -62,6 +62,10 @@ public:
 	float GetAgileSpeed() const;
 	float GetCruiseDistance() const;
 	float GetTurnDiameter() const;
+	/// the handover to cruise flight as applied (zero members ask for the defaults)
+	float GetCruiseEntryAngle() const;
+	float GetCruiseEntrySpeed() const;
+	float GetCruiseEntryTurnBoost() const;
 	float GetAgileApproachHeight(float goalDist2D, bool finalGoal) const;
 	float GetCruiseBrakingDistance(float speed) const;
 	/// distance needed to come to rest from <speed>, across both regimes
@@ -146,6 +150,13 @@ public:
 
 	/// frames between two searches for a landing spot, grows while they find nothing
 	int spotSearchFrames = 1;
+
+	/// the handover to cruise flight: how far off the goal the nose may still point (degrees), the share of
+	/// agileSpeed it takes, and how much faster the nose comes round on the way to a cruise leg; 0 for the defaults
+	float cruiseEntryAngle = 0.0f;
+	float cruiseEntrySpeed = 0.0f;
+	float cruiseEntryTurnBoost = 0.0f;
+	bool cruiseEntryBoosting = false;
 
 	/// sticky cruise: the goal we have started braking for, and how often we flew past the current one
 	float3 cruiseBrakeGoal = -OnesVector;

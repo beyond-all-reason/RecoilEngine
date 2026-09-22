@@ -34,6 +34,13 @@ static const unsigned int AGILE_MEMBER_HASHES[] = {
 	MEMBER_LITERAL_HASH( "agileAltitude"),
 };
 
+// how readily the agile regime hands over to cruise flight; zero asks for the default
+static const unsigned int CRUISE_ENTRY_MEMBER_HASHES[] = {
+	MEMBER_LITERAL_HASH(    "cruiseEntryAngle"),
+	MEMBER_LITERAL_HASH(    "cruiseEntrySpeed"),
+	MEMBER_LITERAL_HASH("cruiseEntryTurnBoost"),
+};
+
 
 #undef MEMBER_LITERAL_HASH
 
@@ -67,12 +74,15 @@ static constexpr float APPROACH_MIN_HEIGHT_SHARE = 0.3f;
 // cruise flight is worth it for goals further than cruiseDistance times this
 static constexpr float CRUISE_DIST_FINAL_GOAL_MULT = 1.2f; // goal we stop on
 static constexpr float CRUISE_DIST_WAYPOINT_MULT = 0.5f; // goal we fly through
-// handover to cruise flight wants this share of the agile altitude and of the agile speed,
-// a climb rate the regime levels off within this time, and the nose this close to the goal
+// handover to cruise flight wants this share of the agile altitude
+// and a climb rate the regime levels off within this time
 static constexpr float HANDOVER_MIN_HEIGHT_SHARE = 0.8f;
-static constexpr float HANDOVER_MIN_SPEED_SHARE = 0.9f;
 static constexpr float HANDOVER_MAX_CLIMB_SECONDS = 1.0f / 15.0f;
-static constexpr float HANDOVER_MIN_GOAL_DOT = 0.95f;
+// defaults and limits of the cruise entry tunables
+static constexpr float CRUISE_ENTRY_ANGLE_DEFAULT = 30.0f; // degrees
+static constexpr float CRUISE_ENTRY_ANGLE_MAX = 170.0f;
+static constexpr float CRUISE_ENTRY_SPEED_DEFAULT = 0.6f; // share of the agile speed
+static constexpr float CRUISE_ENTRY_TURN_BOOST_DEFAULT = 3.0f;
 // braking starts this much travel time before the stop distance
 static constexpr float STOP_MARGIN_SECONDS = 1.0f / 15.0f;
 // a goal closer than a turn diameter and further off the nose than this (60 degrees) is not turned onto at speed
@@ -278,7 +288,12 @@ void CStrafeAirMoveType::UpdateAgileRegime()
 		// (measured against the ground passing below, following a slope is level flight too)
 		const float groundClimbRate = amtGetGroundHeightFuncs[5 * UseSmoothMesh()](pos.x + owner->speed.x, pos.z + owner->speed.z) - (pos.y - curHeight);
 		const bool levelFlight = (curHeight > GetAgileHeight() * HANDOVER_MIN_HEIGHT_SHARE && math::fabs(owner->speed.y - groundClimbRate) < agileAccRate * (HANDOVER_MAX_CLIMB_SECONDS * GAME_SPEED));
-		const bool canHandOver = (levelFlight && speed2D >= agileSpd * HANDOVER_MIN_SPEED_SHARE && goalDotFront > HANDOVER_MIN_GOAL_DOT);
+		// (the nose only has to be roughly on the goal: the fixed-wing model flies out the rest as a
+		// skid, and an aircraft turned round on its way in to land should be off again without delay)
+		const bool canHandOver = (levelFlight && speed2D >= agileSpd * GetCruiseEntrySpeed() && goalDotFront > math::cos(GetCruiseEntryAngle() * math::DEG_TO_RAD));
+
+		// on its way to a cruise leg the nose comes round faster than it does while maneuvering
+		cruiseEntryBoosting = (farGoal && agileSpd < maxSpeed);
 
 		// (not into a cruise leg that would brake straight back into this regime)
 		if (farGoal && canHandOver && !brake && agileSpd < maxSpeed) {
@@ -343,6 +358,7 @@ void CStrafeAirMoveType::UpdateAgileRegime()
 void CStrafeAirMoveType::UpdateAgileTakeOff()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	cruiseEntryBoosting = false;
 	const float3& pos = owner->pos;
 
 	const CCommandQueue& cmdQue = owner->commandAI->commandQue;
@@ -376,6 +392,7 @@ void CStrafeAirMoveType::UpdateAgileTakeOff()
 void CStrafeAirMoveType::UpdateAgileLanding()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	cruiseEntryBoosting = false;
 	const float3& pos = owner->pos;
 
 	// LandAt (Spring.SetUnitLandGoal) can hand us a spot, possibly raised above the ground
@@ -476,7 +493,7 @@ void CStrafeAirMoveType::UpdateAgileFlight(const float3& targetPos, const float3
 		const float3 faceDir = faceVec / faceDist;
 		const float3 flatRight = frontDir2D.cross(UpVector);
 
-		const float maxYaw = std::max(agileTurnRate, 0.0f) * (math::TWOPI / SPRING_CIRCLE_DIVS) * speedFraction;
+		const float maxYaw = std::max(agileTurnRate, 0.0f) * (math::TWOPI / SPRING_CIRCLE_DIVS) * speedFraction * (cruiseEntryBoosting? GetCruiseEntryTurnBoost(): 1.0f);
 		const float faceAngle = math::acos(std::clamp(frontDir2D.dot(faceDir), -1.0f, 1.0f));
 		const float turnSign = (flatRight.dot(faceDir) >= 0.0f)? 1.0f: -1.0f;
 
@@ -665,6 +682,24 @@ float3 CStrafeAirMoveType::FindAgileSpot(const float3& wantedPos, bool landable)
 }
 
 
+float CStrafeAirMoveType::GetCruiseEntryAngle() const
+{
+	return ((cruiseEntryAngle > 0.0f)? std::min(cruiseEntryAngle, CRUISE_ENTRY_ANGLE_MAX): CRUISE_ENTRY_ANGLE_DEFAULT);
+}
+
+
+float CStrafeAirMoveType::GetCruiseEntrySpeed() const
+{
+	return ((cruiseEntrySpeed > 0.0f)? std::min(cruiseEntrySpeed, 1.0f): CRUISE_ENTRY_SPEED_DEFAULT);
+}
+
+
+float CStrafeAirMoveType::GetCruiseEntryTurnBoost() const
+{
+	return ((cruiseEntryTurnBoost > 0.0f)? cruiseEntryTurnBoost: CRUISE_ENTRY_TURN_BOOST_DEFAULT);
+}
+
+
 // an agile aircraft told to stop holds or sets down on the goal it was about to discard;
 // true when it took care of the stop
 bool CStrafeAirMoveType::AgileStopMoving()
@@ -737,6 +772,18 @@ bool CStrafeAirMoveType::SetAgileMemberValue(unsigned int memberHash, void* memb
 	}
 	if (memberHash == AGILE_MEMBER_HASHES[4]) {
 		agileAltitude = std::max(0.0f, *(reinterpret_cast<float*>(memberValue)));
+		return true;
+	}
+	if (memberHash == CRUISE_ENTRY_MEMBER_HASHES[0]) {
+		cruiseEntryAngle = std::max(0.0f, *(reinterpret_cast<float*>(memberValue)));
+		return true;
+	}
+	if (memberHash == CRUISE_ENTRY_MEMBER_HASHES[1]) {
+		cruiseEntrySpeed = std::max(0.0f, *(reinterpret_cast<float*>(memberValue)));
+		return true;
+	}
+	if (memberHash == CRUISE_ENTRY_MEMBER_HASHES[2]) {
+		cruiseEntryTurnBoost = std::max(0.0f, *(reinterpret_cast<float*>(memberValue)));
 		return true;
 	}
 

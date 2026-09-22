@@ -69,6 +69,10 @@ CR_REG_METADATA(CStrafeAirMoveType, (
 	CR_MEMBER(cruisePassGoal),
 	CR_MEMBER(cruisePasses),
 	CR_MEMBER(cruiseGoalAhead),
+	CR_MEMBER(cruiseEntryAngle),
+	CR_MEMBER(cruiseEntrySpeed),
+	CR_MEMBER(cruiseEntryTurnBoost),
+	CR_MEMBER(cruiseEntryBoosting),
 
 	CR_PREALLOC(GetPreallocContainer)
 ))
@@ -445,6 +449,10 @@ CStrafeAirMoveType::CStrafeAirMoveType(CUnit* owner): AAirMoveType(owner)
 
 	cruiseDistance = ud->cruiseDistance;
 	agileAltitude = ud->agileAltitude;
+
+	cruiseEntryAngle = ud->cruiseEntryAngle;
+	cruiseEntrySpeed = ud->cruiseEntrySpeed;
+	cruiseEntryTurnBoost = ud->cruiseEntryTurnBoost;
 }
 
 bool CStrafeAirMoveType::Update()
