@@ -570,6 +570,7 @@ WeaponDef::WeaponDef(const LuaTable& wdTable, const std::string& name_, int id_)
 	isShield = (type == "Shield");
 	noAutoTarget = (manualfire || interceptor || isShield);
 	onlyForward = !turret && (projectileType != WEAPON_STARBURST_PROJECTILE);
+	submissile &= (projectileType == WEAPON_TORPEDO_PROJECTILE);
 }
 
 
