@@ -168,6 +168,7 @@ namespace Platform
 	// Mac OS X:        _NSGetExecutablePath() (man 3 dyld)
 	// Linux:           readlink /proc/self/exe
 	// Solaris:         getexecname()
+	// OpenBSD:         getexecpath()
 	// FreeBSD:         sysctl CTL_KERN KERN_PROC KERN_PROC_PATHNAME -1
 	// BSD with procfs: readlink /proc/curproc/file
 	// Windows:         GetModuleFileName() with hModule = NULL
@@ -210,6 +211,16 @@ namespace Platform
 
 		if (_NSGetExecutablePath(path, &pathlen) == 0)
 			procExeFilePath = path;
+
+
+		#elif defined(__OpenBSD__) && defined(HAVE_GETEXECPATH)
+		char path[PATH_MAX];
+
+		if (getexecpath(path, sizeof(path)) == 0) {
+			procExeFilePath = path;
+		} else {
+			error = "[openbsd] execve(2) could not determine the executable pathname";
+		}
 
 
 		#elif defined(__FreeBSD__)
