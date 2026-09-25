@@ -46,7 +46,7 @@ remove_definitions(-DTHREADPOOL)
 
 set(ENGINE_SRC_ROOT "../../rts")
 
-include_directories(${SPRING_MINIZIP_INCLUDE_DIR})
+include_directories(SYSTEM ${SPRING_MINIZIP_INCLUDE_DIR})
 include_directories(${ENGINE_SRC_ROOT}/lib)
 include_directories(${ENGINE_SRC_ROOT}/lib/lua/include)
 include_directories(${ENGINE_SRC_ROOT}/lib/7zip)
