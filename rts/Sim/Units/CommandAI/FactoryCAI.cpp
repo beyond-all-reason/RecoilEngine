@@ -25,7 +25,6 @@
 CR_BIND_DERIVED(CFactoryCAI ,CCommandAI , )
 
 CR_REG_METADATA(CFactoryCAI , (
-	CR_MEMBER(newUnitCommands),
 	CR_MEMBER(buildOptions),
 	CR_PREALLOC(GetPreallocContainer)
 ))
@@ -57,7 +56,7 @@ CFactoryCAI::CFactoryCAI(): CCommandAI()
 CFactoryCAI::CFactoryCAI(CUnit* owner): CCommandAI(owner)
 {
 	GetOwnQueue().SetQueueType(CCommandQueue::BuildQueueType); // TODO, give factory a proper build queue rather than hijacking order queue
-	GetNewUnitQueue().SetQueueType(CCommandQueue::NewUnitQueueType);
+	queues.emplace_back(CCommandQueue::NewUnitQueueType);
 
 	if (owner->unitDef->canmove) {
 		SCommandDescription c;
@@ -164,15 +163,19 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int cmdID = c.GetID();
 
+	if (!AllowedQueue(c))
+		return;
+
 	// move is always allowed for factories (passed to units it produces)
 	if ((cmdID != CMD_MOVE) && !AllowedCommand(c, fromSynced))
 		return;
 
 	auto boi = buildOptions.find(cmdID);
+	const CCommandQueue* target = GetQueue(c.GetQueue());
 
 	// not a build order (or a build order we do not support, eg. if multiple
 	// factories of different types were selected) so queue it to built units
-	if (boi == buildOptions.end()) {
+	if (boi == buildOptions.end() || (target != nullptr && target->GetType() != CCommandQueue::BuildQueueType)) {
 		if (cmdID < 0)
 			return;
 
@@ -190,6 +193,9 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 			CCommandAI::GiveAllowedCommand(c);
 			return;
 		}
+
+		if (target != nullptr && target->GetType() != CCommandQueue::NewUnitQueueType)
+			return;
 
 		if (!(c.GetOpts() & SHIFT_KEY)) {
 			waitCommandsAI.ClearUnitQueue(owner, GetNewUnitQueue());
@@ -269,7 +275,7 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 			Command nc(c);
 			nc.SetOpts(nc.GetOpts() | INTERNAL_ORDER);
 			for (int a = 0; a < numItems; ++a) {
-				if (repeatOrders) {
+				if (GetOwnQueue().GetRepeat()) {
 					if (GetOwnQueue().empty()) {
 						GetOwnQueue().push_front(nc);
 					} else {
@@ -341,7 +347,7 @@ void CFactoryCAI::DecreaseQueueCount(const Command& buildCommand, int& numQueued
 	// NOTE: the queue should not be empty at this point!
 	const Command frontCommand = GetOwnQueue().empty()? Command(CMD_STOP): GetOwnQueue().front();
 
-	if (!repeatOrders || buildCommand.IsInternalOrder())
+	if (!GetOwnQueue().GetRepeat() || buildCommand.IsInternalOrder())
 		numQueued--;
 
 	UpdateIconName(buildCommand.GetID(), numQueued);

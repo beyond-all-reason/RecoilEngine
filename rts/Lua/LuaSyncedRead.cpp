@@ -6524,7 +6524,7 @@ int LuaSyncedRead::GetUnitQueues(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
-	const std::vector<CCommandQueue>& queues = unit->commandAI->queues;
+	const std::vector<CCommandQueue>& queues = unit->commandAI->GetQueues();
 
 	lua_createtable(L, queues.size(), 0);
 

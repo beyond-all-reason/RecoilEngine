@@ -512,7 +512,7 @@ CWaitCommandsAI::TimeWait::TimeWait(const Command& cmd, CUnit* _unit)
 	enabled = false;
 	endFrame = 0;
 	duration = GAME_SPEED * (int)cmd.GetParam(0);
-	factory = (dynamic_cast<CFactory*>(unit) != nullptr);
+	factory = (unit->commandAI->FindQueue(CCommandQueue::NewUnitQueueType) != nullptr);
 
 	Command waitCmd(CMD_WAIT, cmd.GetOpts(), code);
 	waitCmd.PushParam(GetFloatFromKey(key));

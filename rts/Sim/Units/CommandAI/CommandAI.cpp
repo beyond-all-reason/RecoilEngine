@@ -64,7 +64,7 @@ CR_REG_METADATA(CCommandAI, (
 
 	CR_MEMBER(possibleCommands),
 	CR_MEMBER(nonQueingCommands),
-	CR_MEMBER(commandQue),
+	CR_MEMBER(queues),
 	CR_MEMBER(lastUserCommand),
 	CR_MEMBER(selfDCountdown),
 	CR_MEMBER(lastFinishCommand),
@@ -73,7 +73,6 @@ CR_REG_METADATA(CCommandAI, (
 
 	CR_MEMBER(orderTarget),
 	CR_MEMBER(targetDied),
-	CR_MEMBER(repeatOrders),
 	CR_MEMBER(lastSelectedCommandPage),
 	CR_MEMBER(inCommand),
 	CR_MEMBER(commandDeathDependences),
@@ -91,7 +90,6 @@ CCommandAI::CCommandAI():
 	orderTarget(0),
 	targetDied(false),
 	inCommand(CMD_STOP),
-	repeatOrders(false),
 	lastSelectedCommandPage(0),
 	targetLostTimer(TARGET_LOST_TIMER)
 {}
@@ -105,10 +103,11 @@ CCommandAI::CCommandAI(CUnit* owner):
 	orderTarget(0),
 	targetDied(false),
 	inCommand(CMD_STOP),
-	repeatOrders(false),
 	lastSelectedCommandPage(0),
 	targetLostTimer(TARGET_LOST_TIMER)
 {
+	queues.emplace_back(CCommandQueue::CommandQueueType);
+
 	{
 		SCommandDescription c;
 
@@ -632,10 +631,57 @@ static inline bool AdjustGroundAttackCommand(const Command& c, bool fromSynced, 
 
 
 
+CCommandQueue* CCommandAI::FindQueue(CCommandQueue::QueueType type)
+{
+	for (CCommandQueue& q: queues) {
+		if (q.GetType() == type)
+			return &q;
+	}
+
+	return nullptr;
+}
+
+const CCommandQueue* CCommandAI::FindQueue(CCommandQueue::QueueType type) const
+{
+	for (const CCommandQueue& q: queues) {
+		if (q.GetType() == type)
+			return &q;
+	}
+
+	return nullptr;
+}
+
+bool CCommandAI::AllowedQueue(const Command& c) const
+{
+	if (c.GetQueue() == 0)
+		return true;
+
+	const CCommandQueue* q = GetQueue(c.GetQueue());
+
+	if (q == nullptr)
+		return false;
+	if (q == &GetOwnQueue())
+		return true;
+
+	switch (c.GetID()) {
+		case CMD_MOVE_STATE:
+		case CMD_TRAJECTORY:
+		case CMD_ONOFF:
+		case CMD_CLOAK:
+		case CMD_STOCKPILE:
+			return false;
+	}
+
+	return true;
+}
+
 bool CCommandAI::AllowedCommand(const Command& c, bool fromSynced)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int cmdID = c.GetID();
+
+	if (!AllowedQueue(c))
+		return false;
 
 	// TODO check if the command is in the map first, for more commands
 	switch (cmdID) {
@@ -857,6 +903,11 @@ bool CCommandAI::ExecuteStateCommand(const Command& c)
 	RECOIL_DETAILED_TRACY_ZONE;
 	switch (c.GetID()) {
 		case CMD_FIRE_STATE: {
+			if (CCommandQueue* q = GetQueue(c.GetQueue()); q != nullptr && q != &GetOwnQueue()) {
+				q->SetFireState((int)c.GetParam(0));
+				return true;
+			}
+
 			owner->fireState = (int)c.GetParam(0);
 
 			SetCommandDescParam0(c);
@@ -871,15 +922,17 @@ bool CCommandAI::ExecuteStateCommand(const Command& c)
 			return true;
 		}
 		case CMD_REPEAT: {
-			if (c.GetParam(0) == 1) {
-				repeatOrders = true;
-			} else if (c.GetParam(0) == 0) {
-				repeatOrders = false;
-			} else {
-				// cause some code parts need it to be either 0 or 1,
-				// we can not accept any other values as valid
+			// cause some code parts need it to be either 0 or 1,
+			// we can not accept any other values as valid
+			if (c.GetParam(0) != 0 && c.GetParam(0) != 1)
 				return false;
+
+			if (CCommandQueue* q = GetQueue(c.GetQueue()); q != nullptr && q != &GetOwnQueue()) {
+				q->SetRepeat(c.GetParam(0) == 1);
+				return true;
 			}
+
+			GetOwnQueue().SetRepeat(c.GetParam(0) == 1);
 
 			SetCommandDescParam0(c);
 			selectedUnitsHandler.PossibleCommandChange(owner);
@@ -1114,6 +1167,18 @@ void CCommandAI::GiveWaitCommand(const Command& c)
 }
 
 
+CCommandQueue* CCommandAI::PickMetaCommandQueue(const Command& c)
+{
+	if (CCommandQueue* q = GetQueue(c.GetQueue()); q != nullptr)
+		return q;
+
+	// without an explicit queue, ctrl picks a factory's build queue over its new-unit queue
+	if (CCommandQueue* q = FindQueue(CCommandQueue::NewUnitQueueType); q != nullptr && !(c.GetOpts() & CONTROL_KEY))
+		return q;
+
+	return &GetOwnQueue();
+}
+
 void CCommandAI::ExecuteInsert(const Command& c, bool fromSynced)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -1130,22 +1195,17 @@ void CCommandAI::ExecuteInsert(const Command& c, bool fromSynced)
 	if (!AllowedCommand(newCmd, fromSynced))
 		return;
 
-	CCommandQueue* queue = &GetOwnQueue();
-
-	bool facBuildQueue = false;
 	CFactoryCAI* facCAI = dynamic_cast<CFactoryCAI*>(this);
-	if (facCAI != nullptr) {
-		if (c.GetOpts() & CONTROL_KEY) {
-			// check the build order
-			const auto& bOpts = facCAI->buildOptions;
-			if ((newCmd.GetID() != CMD_STOP) && (newCmd.GetID() != CMD_WAIT) &&
-			    ((newCmd.GetID() >= 0) || (bOpts.find(newCmd.GetID()) == bOpts.end()))) {
-				return;
-			}
-			facBuildQueue = true;
-		} else {
-			// use the new commands
-			queue = &facCAI->GetNewUnitQueue();
+	CCommandQueue* queue = PickMetaCommandQueue(c);
+
+	const bool facBuildQueue = (queue->GetType() == CCommandQueue::BuildQueueType);
+
+	if (facBuildQueue) {
+		// check the build order
+		const auto& bOpts = facCAI->buildOptions;
+		if ((newCmd.GetID() != CMD_STOP) && (newCmd.GetID() != CMD_WAIT) &&
+		    ((newCmd.GetID() >= 0) || (bOpts.find(newCmd.GetID()) == bOpts.end()))) {
+			return;
 		}
 	}
 
@@ -1217,32 +1277,22 @@ void CCommandAI::ExecuteInsert(const Command& c, bool fromSynced)
 void CCommandAI::ExecuteRemove(const Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	CCommandQueue* queue = &GetOwnQueue();
 	CFactoryCAI* facCAI = dynamic_cast<CFactoryCAI*>(this);
+	CCommandQueue* queue = PickMetaCommandQueue(c);
 
 	// if false, remove commands by tag
 	const bool removeByID = (c.GetOpts() & ALT_KEY);
 	// disable repeating during the removals
-	const bool prevRepeat = repeatOrders;
+	const bool prevRepeat = GetOwnQueue().GetRepeat();
 
 	// erase commands by a list of command types
 	bool active = false;
-	bool facBuildQueue = false;
-
-	if (facCAI) {
-		if (c.GetOpts() & CONTROL_KEY) {
-			// keep using the build-order queue
-			facBuildQueue = true;
-		} else {
-			// use the command-queue for new units
-			queue = &facCAI->GetNewUnitQueue();
-		}
-	}
+	const bool facBuildQueue = (queue->GetType() == CCommandQueue::BuildQueueType);
 
 	if ((c.GetNumParams() <= 0) || (queue->size() <= 0))
 		return;
 
-	repeatOrders = false;
+	GetOwnQueue().SetRepeat(false);
 
 	for (unsigned int p = 0; p < c.GetNumParams(); p++) {
 		const int removeValue = c.GetParam(p); // tag or id
@@ -1280,7 +1330,7 @@ void CCommandAI::ExecuteRemove(const Command& c)
 					}
 				}
 
-				if (!facCAI && (ci == queue->begin())) {
+				if (!facBuildQueue && queue == &GetOwnQueue() && (ci == queue->begin())) {
 					if (!active) {
 						active = true;
 						FinishCommand();
@@ -1299,7 +1349,7 @@ void CCommandAI::ExecuteRemove(const Command& c)
 		} while (ci != queue->end());
 	}
 
-	repeatOrders = prevRepeat;
+	GetOwnQueue().SetRepeat(prevRepeat);
 }
 
 
@@ -1647,21 +1697,25 @@ void CCommandAI::DependentDied(CObject* o)
 	}
 
 	if (commandDeathDependences.erase(o) && o != owner) {
-		CFactoryCAI* facCAI = dynamic_cast<CFactoryCAI*>(this);
-		CCommandQueue& dq = facCAI ? facCAI->GetNewUnitQueue() : GetOwnQueue();
-		int lastTag;
-		int curTag = -1;
-		do {
-			lastTag = curTag;
-			for (CCommandQueue::iterator qit = dq.begin(); qit != dq.end(); ++qit) {
-				Command &c = *qit;
-				int cpos;
-				if (c.IsObjectCommand(cpos) && (c.GetParam(cpos) == CSolidObject::GetDeletingRefID())) {
-					ExecuteRemove(Command(CMD_REMOVE, 0, curTag = c.GetTag()));
-					break;
+		for (unsigned int qi = 0; qi < queues.size(); qi++) {
+			CCommandQueue& dq = queues[qi];
+			int lastTag;
+			int curTag = -1;
+			do {
+				lastTag = curTag;
+				for (CCommandQueue::iterator qit = dq.begin(); qit != dq.end(); ++qit) {
+					Command &c = *qit;
+					int cpos;
+					if (c.IsObjectCommand(cpos) && (c.GetParam(cpos) == CSolidObject::GetDeletingRefID())) {
+						// tags are only unique within one queue
+						Command rc(CMD_REMOVE, 0, curTag = c.GetTag());
+						rc.SetQueue(qi + 1);
+						ExecuteRemove(rc);
+						break;
+					}
 				}
-			}
-		} while(curTag != lastTag);
+			} while(curTag != lastTag);
+		}
 	}
 }
 
@@ -1677,7 +1731,7 @@ void CCommandAI::FinishCommand()
 	const bool dontRepeat = (cmd.IsInternalOrder());
 	const bool pushCommand = (cmd.GetID() != CMD_STOP && cmd.GetID() != CMD_PATROL);
 
-	if (repeatOrders && !dontRepeat && pushCommand)
+	if (GetOwnQueue().GetRepeat() && !dontRepeat && pushCommand)
 		GetOwnQueue().push_back(cmd);
 
 	GetOwnQueue().pop_front();

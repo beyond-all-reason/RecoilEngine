@@ -368,10 +368,12 @@ void CUnit::PostInit(const CUnit* builder)
 
 	if (commandAI->CanChangeFireState()) {
 		if (unitDef->fireState <= FIRESTATE_NONE) {
-			// inherit our builder's firestate (if it is a factory)
-			// if no builder, CUnit's default (fire-at-will) is set
-			if (builder != nullptr && dynamic_cast<CFactoryCAI*>(builder->commandAI) != nullptr)
-				fireState = builder->fireState;
+			// inherit from a builder that hands orders to what it builds, preferring
+			// the state set on that queue; if no builder, CUnit's default (fire-at-will) is set
+			if (builder != nullptr) {
+				if (const CCommandQueue* q = builder->commandAI->FindQueue(CCommandQueue::NewUnitQueueType); q != nullptr)
+					fireState = (q->GetFireState() >= 0)? q->GetFireState(): builder->fireState;
+			}
 
 		} else {
 			// use our predefined firestate
