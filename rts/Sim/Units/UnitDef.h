@@ -328,6 +328,8 @@ public:
 	float maxElevator;
 	float maxRudder;
 	float crashDrag;
+	float terrainLookahead;        ///< strafing aircraft only, seconds, see CStrafeAirMoveType::terrainLookahead
+	float terrainLookaheadDescent; ///< share of altitudeRate, in (0; 1]
 
 	float loadingRadius;							///< for transports
 	float unloadSpread;
