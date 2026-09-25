@@ -57,6 +57,13 @@ public:
 
 	void StopAttackingTargetIf(const std::function<bool(const CUnit*)>& pred);
 	void StopAttackingAllyTeam(int ally);
+	/**
+	 * Removes every queued command whose ID is in cmdIDs and whose single
+	 * parameter is targetID, one CMD_REMOVE at a time; for factories this
+	 * also covers the orders passed on to newly built units. Returns the
+	 * number of removed commands.
+	 */
+	int RemoveCommandsTargeting(int targetID, const std::vector<int>& cmdIDs);
 
 	/**
 	 * @brief Determines if c will cancel a queued command

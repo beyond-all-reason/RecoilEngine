@@ -3,6 +3,8 @@
 
 #include "CommandAI.h"
 
+#include <algorithm>
+
 #include "BuilderCAI.h"
 #include "FactoryCAI.h"
 #include "ExternalAI/EngineOutHandler.h"
@@ -1886,5 +1888,52 @@ void CCommandAI::StopAttackingAllyTeam(int ally)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	StopAttackingTargetIf([&](const CUnit* t) { return (t != nullptr && t->allyteam == ally); });
+}
+
+int CCommandAI::RemoveCommandsTargeting(int targetID, const std::vector<int>& cmdIDs)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const auto matches = [&](const Command& c) {
+		if (c.GetNumParams() != 1 || static_cast<int>(c.GetParam(0)) != targetID)
+			return false;
+
+		return (std::find(cmdIDs.begin(), cmdIDs.end(), c.GetID()) != cmdIDs.end());
+	};
+	const auto hasTag = [](const CCommandQueue& queue, unsigned int tag) {
+		return (std::find_if(queue.begin(), queue.end(), [&](const Command& c) { return (c.GetTag() == tag); }) != queue.end());
+	};
+
+	int removed = 0;
+
+	// remove one order at a time through the regular CMD_REMOVE path so every
+	// command AI applies the same handling as for a player-issued removal
+	// (finishing an executing order, stopping construction, ...); finishing
+	// the front order can start the next one, which may match as well
+	const auto removeMatches = [&](const CCommandQueue& queue, unsigned char opts) {
+		for (auto it = std::find_if(queue.begin(), queue.end(), matches); it != queue.end(); it = std::find_if(queue.begin(), queue.end(), matches)) {
+			const unsigned int tag = it->GetTag();
+
+			GiveCommandReal(Command(CMD_REMOVE, opts, tag), true);
+
+			// nothing was removed, do not loop forever
+			if (hasTag(queue, tag))
+				return;
+
+			removed++;
+		}
+	};
+
+	const CFactoryCAI* facCAI = dynamic_cast<const CFactoryCAI*>(this);
+
+	if (facCAI != nullptr) {
+		// for factories, CMD_REMOVE edits the orders passed on to new units
+		// unless CONTROL_KEY selects the factory's own queue
+		removeMatches(facCAI->newUnitCommands, 0);
+		removeMatches(commandQue, CONTROL_KEY);
+	} else {
+		removeMatches(commandQue, 0);
+	}
+
+	return removed;
 }
 
