@@ -210,6 +210,15 @@ UnitDef::UnitDef()
 	, maxElevator(0.0f)
 	, maxRudder(0.0f)
 	, crashDrag(0.0f)
+	, agileFlight(false)
+	, agileSpeed(0.0f)
+	, agileTurnRate(0.0f)
+	, agileAccRate(0.0f)
+	, cruiseDistance(0.0f)
+	, agileAltitude(0.0f)
+	, cruiseEntryAngle(0.0f)
+	, cruiseEntrySpeed(0.0f)
+	, cruiseEntryTurnBoost(0.0f)
 	, loadingRadius(0.0f)
 	, unloadSpread(0.0f)
 	, transportCapacity(0)
@@ -564,6 +573,16 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	maxAileron  = udTable.GetFloat("maxAileron",  0.015f); // turn speed around roll axis
 	maxElevator = udTable.GetFloat("maxElevator", 0.01f);  // turn speed around pitch axis
 	maxRudder   = udTable.GetFloat("maxRudder",   0.004f); // turn speed around yaw axis
+
+	agileFlight    = udTable.GetBool("agileFlight", false);
+	agileSpeed     = std::max(0.0f, udTable.GetFloat("agileSpeed",     0.0f));
+	agileTurnRate  = std::max(0.0f, udTable.GetFloat("agileTurnRate",  0.0f));
+	agileAccRate   = std::max(0.0f, udTable.GetFloat("agileAccRate",   0.0f));
+	cruiseDistance = std::max(0.0f, udTable.GetFloat("cruiseDistance", 0.0f));
+	agileAltitude  = std::max(0.0f, udTable.GetFloat("agileAltitude",  0.0f));
+	cruiseEntryAngle     = std::max(0.0f, udTable.GetFloat("cruiseEntryAngle",     0.0f));
+	cruiseEntrySpeed     = std::max(0.0f, udTable.GetFloat("cruiseEntrySpeed",     0.0f));
+	cruiseEntryTurnBoost = std::max(0.0f, udTable.GetFloat("cruiseEntryTurnBoost", 0.0f));
 
 	maxThisUnit = udTable.GetInt("maxThisUnit", udTable.GetInt("unitRestricted", MAX_UNITS));
 	maxThisUnit = std::min(maxThisUnit, gameSetup->GetRestrictedUnitLimit(name, MAX_UNITS));

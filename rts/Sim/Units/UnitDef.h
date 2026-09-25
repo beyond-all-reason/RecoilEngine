@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef UNITDEF_H
-#define UNITDEF_H
+#pragma once
 
 #include <vector>
 
@@ -329,6 +328,17 @@ public:
 	float maxRudder;
 	float crashDrag;
 
+	/// strafing aircraft only: fly short legs, final approaches, takeoffs and landings with hover-like control
+	bool agileFlight;
+	float agileSpeed;     ///< elmos/s, 0 derives it from speed
+	float agileTurnRate;  ///< heading units per frame at agileSpeed (65536 is a full circle), 0 for the default
+	float agileAccRate;   ///< elmos/frame^2, 0 derives it from maxAcc
+	float cruiseDistance; ///< elmos, 0 derives it from the turn radius
+	float agileAltitude;  ///< elmos above ground in the agile regime, 0 uses cruiseAltitude
+	float cruiseEntryAngle;     ///< degrees the nose may be off the goal at the handover to cruise, 0 for the default
+	float cruiseEntrySpeed;     ///< share of agileSpeed needed for it, 0 for the default
+	float cruiseEntryTurnBoost; ///< agileTurnRate multiplier on the way to a cruise leg, 0 for the default
+
 	float loadingRadius;							///< for transports
 	float unloadSpread;
 	int transportCapacity;
@@ -405,5 +415,3 @@ private:
 	SResourcePack realUpkeep;
 	float realBuildTime;
 };
-
-#endif /* UNITDEF_H */
