@@ -795,6 +795,19 @@ bool UDPConnection::CanReconnect() const {
 	return (globalConfig.reconnectTimeout > 0);
 }
 
+unsigned int UDPConnection::OutgoingQueuedBytes() const
+{
+	unsigned int bytes = 0;
+
+	for (const std::shared_ptr<const RawPacket>& pkt: outgoingData)
+		bytes += pkt->length;
+
+	for (const ChunkPtr& chunk: newChunks)
+		bytes += chunk->data.size();
+
+	return bytes;
+}
+
 ConnectionStats UDPConnection::GetStats() const
 {
 	UdpStats stats;
@@ -802,6 +815,11 @@ ConnectionStats UDPConnection::GetStats() const
 	stats.receivedBytes = dataRecv;
 	stats.accumulated = accumulatedStats;
 	stats.live.processedIncomingChunks = lastInOrder + 1;
+	stats.live.outgoingBandwidthBytesPerSec = outgoing.GetAverage();
+	stats.live.unackedOutgoingChunks = unackedOutgoingChunks.size();
+	stats.live.outgoingResendQueueDepth = resendRequested.size();
+	stats.live.incomingReorderQueueDepth = waitingPackets.size();
+	stats.live.outgoingQueueBytes = OutgoingQueuedBytes();
 	return stats;
 }
 

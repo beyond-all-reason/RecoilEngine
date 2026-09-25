@@ -52,6 +52,13 @@ struct UdpStats {
 	struct Live {
 		/// inbound chunks delivered in order so far
 		unsigned int processedIncomingChunks = 0;
+		/// received but undeliverable until an earlier chunk arrives
+		unsigned int incomingReorderQueueDepth = 0;
+		/// handed to the link and not yet on the wire
+		unsigned int outgoingQueueBytes = 0;
+		float outgoingBandwidthBytesPerSec = 0.0f;
+		unsigned int unackedOutgoingChunks = 0;
+		unsigned int outgoingResendQueueDepth = 0;
 	} live;
 };
 
