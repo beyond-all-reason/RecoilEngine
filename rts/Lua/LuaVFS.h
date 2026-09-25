@@ -75,6 +75,7 @@ class LuaVFS {
 		static int UnpackF32(lua_State* L);
 		
 		static int CalculateHash(lua_State* L);
+		static int VerifyEd25519(lua_State* L);
 };
 
 
