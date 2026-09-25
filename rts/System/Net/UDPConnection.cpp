@@ -300,13 +300,7 @@ void UDPConnection::Init()
 	currentPacketChunkNum = 0;
 
 	lastNak = -1;
-	sentOverhead = 0;
-	recvOverhead = 0;
-
-	resentOutgoingChunks = 0;
-	sentPackets = 0;
-	recvPackets = 0;
-	duplicateIncomingChunks = 0;
+	accumulatedStats = {};
 	mtu = globalConfig.mtu;
 	reconnectTime = globalConfig.reconnectTimeout;
 
@@ -530,8 +524,8 @@ void UDPConnection::ProcessRawPacket(Packet& incoming)
 
 	lastPacketRecvTime = spring_gettime();
 	dataRecv += incoming.GetSize();
-	recvOverhead += Packet::headerSize;
-	recvPackets += 1;
+	accumulatedStats.receivedOverheadBytes += Packet::headerSize;
+	accumulatedStats.receivedPackets += 1;
 
 //	if (EMULATE_PACKET_LOSS(lossCounter))
 //		return;
@@ -596,7 +590,7 @@ void UDPConnection::ProcessRawPacket(Packet& incoming)
 
 	for (const std::shared_ptr<netcode::Chunk>& c: incoming.chunks) {
 		if ((lastInOrder >= c->chunkNumber) || incomingChunkNums.find(c->chunkNumber) != incomingChunkNums.end()) {
-			++duplicateIncomingChunks;
+			++accumulatedStats.duplicateIncomingChunks;
 			continue;
 		}
 
@@ -743,7 +737,7 @@ void UDPConnection::Flush(const bool forced)
 					memcpy(buffer + pos, packet->data, numBytes);
 
 					pos += numBytes;
-					sentOverhead += Packet::headerSize;
+					accumulatedStats.sentOverheadBytes += Packet::headerSize;
 
 					outgoing.DataSent(numBytes, true);
 
@@ -806,13 +800,8 @@ ConnectionStats UDPConnection::GetStats() const
 	UdpStats stats;
 	stats.sentBytes = dataSent;
 	stats.receivedBytes = dataRecv;
-	stats.sentPackets = sentPackets;
-	stats.receivedPackets = recvPackets;
-	stats.resentOutgoingChunks = resentOutgoingChunks;
-	stats.duplicateIncomingChunks = duplicateIncomingChunks;
-	stats.sentOverheadBytes = sentOverhead;
-	stats.receivedOverheadBytes = recvOverhead;
-	stats.processedIncomingChunks = lastInOrder + 1;
+	stats.accumulated = accumulatedStats;
+	stats.live.processedIncomingChunks = lastInOrder + 1;
 	return stats;
 }
 
@@ -1007,7 +996,7 @@ void UDPConnection::SendIfNecessary(bool flushed)
 					rev = (rev + 1) % 4;
 				}
 
-				resentOutgoingChunks += 1;
+				accumulatedStats.resentOutgoingChunks += 1;
 				maxResend -= 1;
 
 				sent = true;
@@ -1060,7 +1049,7 @@ void UDPConnection::SendPacket(Packet& pkt)
 		return;
 
 	dataSent += sendBuffer.size();
-	sentPackets += 1;
+	accumulatedStats.sentPackets += 1;
 }
 
 void UDPConnection::AckChunks(int lastAck)
