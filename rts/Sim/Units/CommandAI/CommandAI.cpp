@@ -55,7 +55,9 @@ CR_BIND(CCommandQueue, )
 CR_REG_METADATA(CCommandQueue, (
 	CR_MEMBER(queue),
 	CR_MEMBER(queueType),
-	CR_MEMBER(tagCounter)
+	CR_MEMBER(tagCounter),
+	CR_MEMBER(repeat),
+	CR_MEMBER(fireState)
 ))
 
 CR_BIND_DERIVED(CCommandAI, CObject, )
