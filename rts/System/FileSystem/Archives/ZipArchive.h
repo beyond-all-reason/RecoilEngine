@@ -25,6 +25,19 @@ private:
 
 
 /**
+ * Creates archives stored as a zip with zstd-compressed (method 93) entries.
+ * Backed by the same CZipArchive as .sdz; only the extension differs.
+ */
+class CZipStdArchiveFactory : public IArchiveFactory {
+public:
+	CZipStdArchiveFactory(): IArchiveFactory("sdzst") {}
+
+private:
+	IArchive* DoCreateArchive(const std::string& filePath) const;
+};
+
+
+/**
  * A zip compressed, single-file archive.
  */
 class CZipArchive : public CBufferedArchive
@@ -51,6 +64,8 @@ public:
 protected:
 	int GetFileImpl(uint32_t fid, std::vector<std::uint8_t>& buffer) override;
 private:
+	int GetFileZstd(uint32_t fid, uint64_t compressedSize, uint64_t uncompressedSize, std::vector<std::uint8_t>& buffer);
+
 	static constexpr int MAX_THREADS = 32;
 
 	Recoil::AtomicFirstIndex<uint32_t> afi;
