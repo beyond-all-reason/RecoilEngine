@@ -52,6 +52,44 @@ int Run(int argc, char* argv[])
 }
 
 
+#if defined(_WIN32) && !defined(HEADLESS)
+// Declare per-monitor DPI awareness before any window exists. Without it Windows treats
+// the process as DPI-unaware (the bundled SDL predates SDL_HINT_WINDOWS_DPI_AWARENESS)
+// and DWM bitmap-stretches the window on every monitor whose scale factor differs from
+// the primary's. A DualScreenMode window spanning mixed-DPI displays then shows up as a
+// magnified crop on the secondary screen. Resolved dynamically, same pattern as the
+// RmlUi Win32 backend: the context API needs Win10 1703, the shcore fallback Win8.1,
+// the last resort Vista.
+#ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((HANDLE) -4)
+#endif
+
+static void SetDpiAwareness()
+{
+	using SetCtxFn = BOOL (WINAPI*)(HANDLE);
+	if (const auto setCtx = (SetCtxFn) (void*) GetProcAddress(GetModuleHandle(TEXT("user32.dll")), "SetProcessDpiAwarenessContext"); setCtx != nullptr) {
+		if (setCtx(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+			return;
+	}
+
+	// PROCESS_PER_MONITOR_DPI_AWARE from shellscalingapi.h, spelled locally so the
+	// header (Win8.1+) is not required at build time.
+	constexpr int processPerMonitorDpiAware = 2;
+
+	using SetPmFn = HRESULT (WINAPI*)(int);
+	if (HMODULE shcore = LoadLibrary(TEXT("shcore.dll")); shcore != nullptr) {
+		if (const auto setPm = (SetPmFn) (void*) GetProcAddress(shcore, "SetProcessDpiAwareness"); setPm != nullptr) {
+			if (SUCCEEDED(setPm(processPerMonitorDpiAware)))
+				return;
+		}
+		FreeLibrary(shcore);
+	}
+
+	SetProcessDPIAware();
+}
+#endif
+
+
 /**
  * Always run on dedicated GPU
  * @return true when restart is required with new env vars
@@ -83,6 +121,11 @@ static bool SetNvOptimusProfile(const std::string& processFileName)
 int main(int argc, char* argv[])
 {
 	nowide::args a(argc, argv); // Fix arguments - make them UTF-8
+
+#if defined(_WIN32) && !defined(HEADLESS)
+	// Before the first window; the process DPI awareness can only be set once.
+	SetDpiAwareness();
+#endif
 
 // PROFILE builds exit on execv, HEADLESS does not use the GPU
 #if !defined(PROFILE) && !defined(HEADLESS)
