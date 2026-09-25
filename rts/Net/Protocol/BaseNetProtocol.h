@@ -28,6 +28,9 @@ struct TeamStatistics;
 
 static const uint16_t NETWORK_VERSION = atoi(SpringVersion::GetMajor().c_str());
 
+// set on a command's options byte only while on the wire, meaning a queue byte follows it
+static constexpr uint8_t NET_CMD_QUEUE_FOLLOWS = (1 << 0);
+
 
 /**
  * @brief A factory used to make often-used network messages.
@@ -54,8 +57,8 @@ public:
 	PacketType SendSelect(uint8_t playerNum, const std::vector<int16_t>& selectedUnitIDs);
 	PacketType SendPause(uint8_t playerNum, uint8_t bPaused);
 
-	PacketType SendCommand(uint8_t playerNum, int32_t commandID, int32_t timeout, uint8_t options, uint32_t numParams, const float* params);
-	PacketType SendAICommand(uint8_t playerNum, uint8_t aiInstID, uint8_t aiTeamID, int16_t unitID, int32_t commandID, int32_t aiCommandID, int32_t timeout, uint8_t options, uint32_t numParams, const float* params);
+	PacketType SendCommand(uint8_t playerNum, int32_t commandID, int32_t timeout, uint8_t options, uint32_t numParams, const float* params, uint8_t queue = 0);
+	PacketType SendAICommand(uint8_t playerNum, uint8_t aiInstID, uint8_t aiTeamID, int16_t unitID, int32_t commandID, int32_t aiCommandID, int32_t timeout, uint8_t options, uint32_t numParams, const float* params, uint8_t queue = 0);
 	PacketType SendAIShare(uint8_t playerNum, uint8_t aiID, uint8_t sourceTeam, uint8_t destTeam, float metal, float energy, const std::vector<int16_t>& unitIDs);
 
 	PacketType SendUserSpeed(uint8_t playerNum, float userSpeed);

@@ -1033,7 +1033,7 @@ void CSelectedUnitsHandler::SendCommand(const Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	SendSelect();
-	clientNet->Send(CBaseNetProtocol::Get().SendCommand(gu->myPlayerNum, c.GetID(), c.GetTimeOut(), c.GetOpts(), c.GetNumParams(), c.GetParams()));
+	clientNet->Send(CBaseNetProtocol::Get().SendCommand(gu->myPlayerNum, c.GetID(), c.GetTimeOut(), c.GetOpts(), c.GetNumParams(), c.GetParams(), c.GetQueue()));
 }
 
 void CSelectedUnitsHandler::SendSelect()
@@ -1069,19 +1069,25 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 		return;
 
 	uint32_t totalParams = 0;
+	uint32_t totalQueues = 0;
+
+	const auto wireOpts = [](const Command& c) -> uint8_t {
+		return (c.GetOpts() & ~NET_CMD_QUEUE_FOLLOWS) | (NET_CMD_QUEUE_FOLLOWS * (c.GetQueue() != 0));
+	};
 
 	// if all commands share the same ID / options / number of parameters,
 	// insert only these values into the packet to save a bit of bandwidth
 	int32_t refCmdID = commands[0].GetID();
-	uint8_t refCmdOpts = commands[0].GetOpts();
+	uint8_t refCmdOpts = wireOpts(commands[0]);
 	int32_t refCmdSize = commands[0].GetNumParams();
 
 	for (unsigned int c = 0; c < commandCount; c++) {
 		totalParams += commands[c].GetNumParams();
+		totalQueues += (commands[c].GetQueue() != 0);
 
 		if (refCmdID != 0 && refCmdID != commands[c].GetID())
 			refCmdID = 0;
-		if (refCmdOpts != 0xFF && refCmdOpts != commands[c].GetOpts())
+		if (refCmdOpts != 0xFF && refCmdOpts != wireOpts(commands[c]))
 			refCmdOpts = 0xFF;
 		if (refCmdSize != 0xFFFF && refCmdSize != commands[c].GetNumParams())
 			refCmdSize = 0xFFFF;
@@ -1111,6 +1117,7 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 	totalPacketLen += sizeof(static_cast<uint16_t>(commandCount));
 	totalPacketLen += (commandCount * optBytesPerCmd);
 	totalPacketLen += (totalParams * sizeof(float)); // params are floats
+	totalPacketLen += (totalQueues * sizeof(uint8_t));
 
 	if (totalPacketLen > 8192) {
 		LOG_L(L_WARNING, "[%s] discarded oversized (len=%i) NETMSG_AICOMMANDS packet", __func__, totalPacketLen);
@@ -1144,9 +1151,11 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 		if (refCmdID == 0)
 			*packet << static_cast<uint32_t>(cmd.GetID());
 		if (refCmdOpts == 0xFF)
-			*packet << static_cast<uint8_t>(cmd.GetOpts());
+			*packet << wireOpts(cmd);
 		if (refCmdSize == 0xFFFF)
 			*packet << static_cast<uint16_t>(cmd.GetNumParams());
+		if (cmd.GetQueue() != 0)
+			*packet << cmd.GetQueue();
 
 		for (unsigned int j = 0, n = cmd.GetNumParams(); j < n; j++) {
 			*packet << cmd.GetParam(j);

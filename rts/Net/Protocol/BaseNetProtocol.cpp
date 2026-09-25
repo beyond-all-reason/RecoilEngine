@@ -121,14 +121,21 @@ PacketType CBaseNetProtocol::SendCommand(
 	int32_t timeout,
 	uint8_t options,
 	uint32_t numParams,
-	const float* params
+	const float* params,
+	uint8_t queue
 ) {
-	const uint32_t payloadSize = sizeof(playerNum) + sizeof(commandID) + sizeof(timeout) + sizeof(options) + sizeof(numParams) + (numParams * sizeof(float));
+	const uint8_t wireOptions = (options & ~NET_CMD_QUEUE_FOLLOWS) | (NET_CMD_QUEUE_FOLLOWS * (queue != 0));
+	const uint32_t payloadSize = sizeof(playerNum) + sizeof(commandID) + sizeof(timeout) + sizeof(options) + (sizeof(queue) * (queue != 0)) + sizeof(numParams) + (numParams * sizeof(float));
 	const uint32_t headerSize = sizeof(uint8_t) + sizeof(uint16_t);
 	const uint32_t packetSize = headerSize + payloadSize;
 
 	PackPacket* packet = new PackPacket(packetSize, NETMSG_COMMAND);
-	*packet << static_cast<uint16_t>(packetSize) << playerNum << commandID << timeout << options << numParams;
+	*packet << static_cast<uint16_t>(packetSize) << playerNum << commandID << timeout << wireOptions;
+
+	if (queue != 0)
+		*packet << queue;
+
+	*packet << numParams;
 
 	for (uint32_t i = 0; i < numParams; i++) {
 		*packet << params[i];
@@ -147,13 +154,15 @@ PacketType CBaseNetProtocol::SendAICommand(
 	int32_t timeout,
 	uint8_t options,
 	uint32_t numParams,
-	const float* params
+	const float* params,
+	uint8_t queue
 ) {
 	const int32_t commandTypeID = (aiCommandID != -1)? NETMSG_AICOMMAND_TRACKED: NETMSG_AICOMMAND;
+	const uint8_t wireOptions = (options & ~NET_CMD_QUEUE_FOLLOWS) | (NET_CMD_QUEUE_FOLLOWS * (queue != 0));
 
 	const uint32_t payloadSize =
 		sizeof(playerNum) + sizeof(aiInstID) + sizeof(aiTeamID) + sizeof(unitID) +
-		sizeof(commandID) + sizeof(timeout) + sizeof(options) + sizeof(numParams) +
+		sizeof(commandID) + sizeof(timeout) + sizeof(options) + (sizeof(queue) * (queue != 0)) + sizeof(numParams) +
 		(sizeof(commandTypeID) * (commandTypeID == NETMSG_AICOMMAND_TRACKED)) + (numParams * sizeof(float));
 	const uint32_t headerSize = sizeof(uint8_t) + sizeof(uint16_t);
 	const uint32_t packetSize = headerSize + payloadSize;
@@ -164,7 +173,12 @@ PacketType CBaseNetProtocol::SendAICommand(
 
 	PackPacket* packet = new PackPacket(packetSize, commandTypeID);
 	*packet << static_cast<uint16_t>(packetSize) << playerNum << aiInstID << aiTeamID << unitID;
-	*packet << commandID << timeout << options << numParams;
+	*packet << commandID << timeout << wireOptions;
+
+	if (queue != 0)
+		*packet << queue;
+
+	*packet << numParams;
 
 	if (commandTypeID == NETMSG_AICOMMAND_TRACKED)
 		*packet << aiCommandID;

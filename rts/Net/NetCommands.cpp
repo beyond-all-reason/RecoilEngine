@@ -695,10 +695,18 @@ void CGame::ClientReadNet()
 					pckt >> cmdID;
 					pckt >> cmdTimeOut;
 					pckt >> cmdOptions;
+
+					uint8_t cmdQueue = 0;
+					if (cmdOptions & NET_CMD_QUEUE_FOLLOWS) {
+						pckt >> cmdQueue;
+						cmdOptions &= ~NET_CMD_QUEUE_FOLLOWS;
+					}
+
 					pckt >> numParams;
 
 					Command c(cmdID, cmdOptions);
 					c.SetTimeOut(cmdTimeOut);
+					c.SetQueue(cmdQueue);
 
 					for (uint32_t a = 0; a < numParams; ++a) {
 						float param; pckt >> param;
@@ -780,10 +788,18 @@ void CGame::ClientReadNet()
 					pckt >> cmdID;
 					pckt >> cmdTimeOut;
 					pckt >> cmdOptions;
+
+					uint8_t cmdQueue = 0;
+					if (cmdOptions & NET_CMD_QUEUE_FOLLOWS) {
+						pckt >> cmdQueue;
+						cmdOptions &= ~NET_CMD_QUEUE_FOLLOWS;
+					}
+
 					pckt >> numParams;
 
 					Command c(cmdID, cmdOptions);
 					c.SetTimeOut(cmdTimeOut);
+					c.SetQueue(cmdQueue);
 
 					if (packetCode == NETMSG_AICOMMAND_TRACKED) {
 						pckt >> cmdID;
@@ -860,7 +876,14 @@ void CGame::ClientReadNet()
 						if ((paramCount = sameCmdParamSize) == 0xFFFF)
 							pckt >> paramCount;
 
+						uint8_t cmdQueue = 0;
+						if (cmdOpt & NET_CMD_QUEUE_FOLLOWS) {
+							pckt >> cmdQueue;
+							cmdOpt &= ~NET_CMD_QUEUE_FOLLOWS;
+						}
+
 						Command cmd(cmdID, cmdOpt);
+						cmd.SetQueue(cmdQueue);
 
 						for (uint16_t p = 0; p < paramCount; p++) {
 							float param;
