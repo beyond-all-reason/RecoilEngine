@@ -1462,6 +1462,40 @@ void CLuaHandle::UnitStunned(
 	RunCallInTraceback(L, cmdStr, 4, 0, traceBack.GetErrFuncIdx(), false);
 }
 
+/*** Called when a strafing aircraft with `agileFlight` goes from one flight regime to the other.
+ *
+ * The agile regime is hover-like maneuvering (short legs, final approach, takeoff, landing),
+ * the cruise regime is fixed-wing flight. `Spring.GetUnitMoveTypeData` reports the current
+ * one as `flightRegime`.
+ *
+ * @function Callins:UnitFlightRegimeChanged
+ * @param unitID UnitID
+ * @param unitDefID UnitDefID
+ * @param unitTeam TeamID
+ * @param regime "agile"|"cruise"
+ */
+void CLuaHandle::UnitFlightRegimeChanged(
+	const CUnit* unit,
+	bool agile)
+{
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 5, __func__);
+
+	static const LuaHashString cmdStr(__func__);
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	lua_pushnumber(L, unit->id);
+	lua_pushnumber(L, unit->unitDef->id);
+	lua_pushnumber(L, unit->team);
+	lua_pushstring(L, agile? "agile": "cruise");
+
+	// call the routine
+	RunCallInTraceback(L, cmdStr, 4, 0, traceBack.GetErrFuncIdx(), false);
+}
+
 
 /***
  * Called when a unit gains experience greater or equal to the minimum limit set by calling `Spring.SetExperienceGrade`.
