@@ -449,6 +449,20 @@ PacketType CBaseNetProtocol::SendLuaMsg(uint8_t playerNum, uint16_t script, uint
 	return PacketType(packet);
 }
 
+PacketType CBaseNetProtocol::SendDediMsg(uint8_t playerNum, uint16_t header, const std::vector<uint8_t>& payload)
+{
+	const uint32_t payloadSize = sizeof(playerNum) + sizeof(header) + payload.size();
+	const uint32_t frameSize   = sizeof(uint8_t) + sizeof(uint16_t);
+	const uint32_t packetSize  = frameSize + payloadSize;
+
+	if (packetSize >= (1 << (sizeof(uint16_t) * 8)))
+		throw netcode::PackPacketException("[BaseNetProto::SendDediMsg] maximum packet-size exceeded");
+
+	PackPacket* packet = new PackPacket(packetSize, NETMSG_DEDIMSG);
+	*packet << static_cast<uint16_t>(packetSize) << playerNum << header << payload;
+	return PacketType(packet);
+}
+
 
 PacketType CBaseNetProtocol::SendGiveAwayEverything(uint8_t playerNum, uint8_t giveToTeam, uint8_t takeFromTeam)
 {
@@ -672,6 +686,7 @@ CBaseNetProtocol::CBaseNetProtocol()
 	proto->AddType(NETMSG_AI_STATE_CHANGED, 4);
 	proto->AddType(NETMSG_GAME_FRAME_PROGRESS, 5);
 	proto->AddType(NETMSG_PING, 1 + (1 + 1 + 4));
+	proto->AddType(NETMSG_DEDIMSG, -2);
 
 #ifdef SYNCDEBUG
 	proto->AddType(NETMSG_SD_CHKREQUEST, 5);
