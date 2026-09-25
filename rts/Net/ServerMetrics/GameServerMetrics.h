@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include "NetworkMetrics.h"
 #include "ServerHealthMetrics.h"
 #include "System/Misc/SpringTime.h"
 
@@ -45,7 +46,10 @@ public:
 
 	void SetGameStartTime(double unixSecs);
 
+	void ResetConnectionDeltas(int playerId);
+
 private:
+	NetworkMetrics networkMetrics;
 	ServerHealthMetrics healthMetrics;
 
 	/// while false (during startup or metrics disabled), Update() is a no-op
