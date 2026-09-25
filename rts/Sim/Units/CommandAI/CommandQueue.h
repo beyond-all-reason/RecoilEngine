@@ -53,10 +53,12 @@ class CCommandQueue {
 		void emplace_back(Command&& cmd) {
 			queue.emplace_back(cmd);
 			queue.back().SetTag(GetNextTag());
+			queue.back().SetQueue(0);
 		}
 		void emplace_front(Command&& cmd) {
 			queue.emplace_front(cmd);
 			queue.front().SetTag(GetNextTag());
+			queue.front().SetQueue(0);
 		}
 
 		inline iterator insert(iterator pos, const Command& cmd);
@@ -139,6 +141,7 @@ inline void CCommandQueue::push_back(const Command& cmd)
 {
 	queue.push_back(cmd);
 	queue.back().SetTag(GetNextTag());
+	queue.back().SetQueue(0);
 }
 
 
@@ -146,6 +149,7 @@ inline void CCommandQueue::push_front(const Command& cmd)
 {
 	queue.push_front(cmd);
 	queue.front().SetTag(GetNextTag());
+	queue.front().SetQueue(0);
 }
 
 
@@ -153,6 +157,8 @@ inline CCommandQueue::iterator CCommandQueue::insert(iterator pos, const Command
 {
 	Command tmpCmd = cmd;
 	tmpCmd.SetTag(GetNextTag());
+	// the target only means something to the owner that routed it here
+	tmpCmd.SetQueue(0);
 	return queue.insert(pos, tmpCmd);
 }
 
