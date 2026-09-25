@@ -11,6 +11,8 @@
 #include "Map/ReadMap.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/VertexArray.h"
+#include "Rendering/Shaders/ShaderHandler.h"
+#include "Rendering/Shaders/Shader.h"
 #include "System/Exceptions.h"
 
 #include "System/Misc/TracyDefs.h"
@@ -87,8 +89,14 @@ void CAdvWater::InitResources(bool loadShader)
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 64, 64, 0, GL_RGBA, GL_UNSIGNED_BYTE, &scrap[0]);
 
 	if (loadShader) {
-		// NOTE: needs a VP with OPTION ARB_position_invariant for clipping if !haveGLSL
-		waterFP = LoadFragmentProgram("ARB/water.fp");
+		waterShader = shaderHandler->CreateProgramObject("[AdvWater]", "AdvWater");
+		waterShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/AdvWaterVS.glsl", "", GL_VERTEX_SHADER));
+		waterShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/AdvWaterFS.glsl", "", GL_FRAGMENT_SHADER));
+		waterShader->Link();
+		waterShader->Enable();
+		waterShader->SetUniform("reflectTex", 0);
+		waterShader->SetUniform("bumpTex", 1);
+		waterShader->Disable();
 	}
 
 	waterSurfaceColor = waterRendering->surfaceColor;
@@ -115,8 +123,8 @@ void CAdvWater::FreeResources()
 	for (auto& rbt : rawBumpTexture)
 		DeleteTexture(rbt);
 
-	glSafeDeleteProgram(waterFP);
-	waterFP = 0;
+	shaderHandler->ReleaseProgramObjects("[AdvWater]");
+	waterShader = nullptr;
 }
 
 void CAdvWater::Draw()
@@ -159,28 +167,18 @@ void CAdvWater::Draw(bool useBlending)
 		glDisable(GL_BLEND);
 	}
 	glDepthMask(0);
-	glActiveTextureARB(GL_TEXTURE1_ARB);
+	glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, bumpTexture);
-		GLfloat plan[] = {0.02f, 0, 0, 0};
-		glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
-		glTexGenfv(GL_S, GL_EYE_PLANE, plan);
-		glEnable(GL_TEXTURE_GEN_S);
-
-		GLfloat plan2[] = {0, 0, 0.02f, 0};
-		glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_EYE_LINEAR);
-		glTexGenfv(GL_T, GL_EYE_PLANE, plan2);
-		glEnable(GL_TEXTURE_GEN_T);
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, reflectTexture);
 
-	glBindProgramARB(GL_FRAGMENT_PROGRAM_ARB, waterFP);
-	glEnable(GL_FRAGMENT_PROGRAM_ARB);
+	waterShader->Enable();
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE * wireFrameMode + GL_FILL * (1 - wireFrameMode));
 
 	forward.ANormalize2D();
 
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 0,  forward.z, forward.x, 0.0f, 0.0f);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB, 1, -forward.x, forward.z, 0.0f, 0.0f);
+	waterShader->SetUniform("env0",  forward.z, forward.x, 0.0f, 0.0f);
+	waterShader->SetUniform("env1", -forward.x, forward.z, 0.0f, 0.0f);
 
 	CVertexArray* va = GetVertexArray();
 	va->Initialize();
@@ -237,12 +235,11 @@ void CAdvWater::Draw(bool useBlending)
 
 	glDepthMask(1);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-	glDisable(GL_FRAGMENT_PROGRAM_ARB);
+	waterShader->Disable();
 
-	glActiveTextureARB(GL_TEXTURE1_ARB);
-		glDisable(GL_TEXTURE_GEN_S);
-		glDisable(GL_TEXTURE_GEN_T);
-	glActiveTextureARB(GL_TEXTURE0_ARB);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
 
 	// for translucent stuff like water, the default mode is blending and alpha testing enabled
 	if (!useBlending)
