@@ -674,9 +674,18 @@ void CUnit::Update()
 	UpdatePhysicalState(0.1f);
 	UpdatePosErrorParams(true, false);
 
-	if (beingBuilt)
-		return;
 	if (isDead)
+		return;
+
+	if unlikely(selfDTargetFrame > 0) {
+		const int currentFrameNum = gs->frameNum;
+		if (currentFrameNum >= selfDTargetFrame) {
+			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
+			return; // Skip rest of update if killed
+		}
+	}
+
+	if (beingBuilt)
 		return;
 
 	recentDamage *= 0.9f;
@@ -690,7 +699,7 @@ void CUnit::Update()
 
 		return;
 	}
-
+	
 	restTime += 1;
 }
 
@@ -1019,17 +1028,6 @@ void CUnit::SlowUpdate()
 
 		SlowUpdateCloak(true);
 		return;
-	}
-
-	if (selfDCountdown > 0) {
-		if ((selfDCountdown -= 1) == 0) {
-			// avoid unfinished buildings making an explosion
-			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
-			return;
-		}
-
-		if ((selfDCountdown & 1) && (team == gu->myTeam) && !gu->spectating)
-			LOG("%s: self-destruct in %is", unitDef->humanName.c_str(), (selfDCountdown >> 1) + 1);
 	}
 
 	if (beingBuilt) {
@@ -2969,7 +2967,7 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(lastTerrainType),
 	CR_MEMBER(curTerrainType),
 
-	CR_MEMBER(selfDCountdown),
+	CR_MEMBER(selfDTargetFrame),
 
 	CR_MEMBER(definedIconName),
 	CR_MEMBER_UN(currentIconIndex),
