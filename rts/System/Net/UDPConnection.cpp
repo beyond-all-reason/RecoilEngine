@@ -303,10 +303,10 @@ void UDPConnection::Init()
 	sentOverhead = 0;
 	recvOverhead = 0;
 
-	resentChunks = 0;
+	resentOutgoingChunks = 0;
 	sentPackets = 0;
 	recvPackets = 0;
-	droppedChunks = 0;
+	duplicateIncomingChunks = 0;
 	mtu = globalConfig.mtu;
 	reconnectTime = globalConfig.reconnectTimeout;
 
@@ -542,7 +542,7 @@ void UDPConnection::ProcessRawPacket(Packet& incoming)
 	}
 
 	if (incoming.lastContinuous < 0 && lastInOrder >= 0 &&
-		(unackedChunks.empty() || unackedChunks[0]->chunkNumber > 0)) {
+		(unackedOutgoingChunks.empty() || unackedOutgoingChunks[0]->chunkNumber > 0)) {
 		LOG_L(L_WARNING, "\t[%s] discarding superfluous reconnection attempt", __func__);
 		return;
 	}
@@ -551,18 +551,18 @@ void UDPConnection::ProcessRawPacket(Packet& incoming)
 	AckChunks(incoming.lastContinuous);
 	UpdateResendRequests();
 
-	if (!unackedChunks.empty()) {
+	if (!unackedOutgoingChunks.empty()) {
 		const int nextCont = incoming.lastContinuous + 1;
-		const int unAckDiff = unackedChunks[0]->chunkNumber - nextCont;
+		const int unAckDiff = unackedOutgoingChunks[0]->chunkNumber - nextCont;
 
 		if (-256 <= unAckDiff && unAckDiff <= 256) {
 			if (incoming.nakType < 0) {
 				for (int i = 0; i != -incoming.nakType; ++i) {
 					const int unAckPos = i + unAckDiff;
 
-					if (unAckPos >= 0 && unAckPos < unackedChunks.size()) {
-						assert(unackedChunks[unAckPos]->chunkNumber == nextCont + i);
-						RequestResend(unackedChunks[unAckPos], true);
+					if (unAckPos >= 0 && unAckPos < unackedOutgoingChunks.size()) {
+						assert(unackedOutgoingChunks[unAckPos]->chunkNumber == nextCont + i);
+						RequestResend(unackedOutgoingChunks[unAckPos], true);
 					}
 				}
 			} else if (incoming.nakType > 0) {
@@ -574,15 +574,15 @@ void UDPConnection::ProcessRawPacket(Packet& incoming)
 
 					while (unAckPos < (unAckDiff + incoming.naks[i])) {
 						// if there are gaps in the array, assume that further resends are not needed
-						if (unAckPos < unackedChunks.size())
-							erasedResendChunks.insert(unackedChunks[unAckPos]->chunkNumber);
+						if (unAckPos < unackedOutgoingChunks.size())
+							erasedResendChunks.insert(unackedOutgoingChunks[unAckPos]->chunkNumber);
 
 						++unAckPos;
 					}
 
-					if (unAckPos < unackedChunks.size()) {
-						assert(unackedChunks[unAckPos]->chunkNumber == (nextCont + incoming.naks[i]));
-						RequestResend(unackedChunks[unAckPos], true);
+					if (unAckPos < unackedOutgoingChunks.size()) {
+						assert(unackedOutgoingChunks[unAckPos]->chunkNumber == (nextCont + incoming.naks[i]));
+						RequestResend(unackedOutgoingChunks[unAckPos], true);
 					}
 
 					++unAckPos;
@@ -596,7 +596,7 @@ void UDPConnection::ProcessRawPacket(Packet& incoming)
 
 	for (const std::shared_ptr<netcode::Chunk>& c: incoming.chunks) {
 		if ((lastInOrder >= c->chunkNumber) || incomingChunkNums.find(c->chunkNumber) != incomingChunkNums.end()) {
-			++droppedChunks;
+			++duplicateIncomingChunks;
 			continue;
 		}
 
@@ -801,23 +801,19 @@ bool UDPConnection::CanReconnect() const {
 	return (globalConfig.reconnectTimeout > 0);
 }
 
-std::string UDPConnection::Statistics() const
+ConnectionStats UDPConnection::GetStats() const
 {
-	const char* fmts[] = {
-		"\t%u bytes sent   in %u packets (%.3f bytes/packet)\n",
-		"\t%u bytes recv'd in %u packets (%.3f bytes/packet)\n",
-		"\t{%.3fx, %.3fx} relative protocol overhead {up, down}\n",
-		"\t%u incoming chunks dropped, %u outgoing chunks resent\n",
-		"\t%u incoming chunks processed\n",
-	};
-
-	std::string msg = "[UDPConnection::Statistics]\n";
-	msg += spring::format(fmts[0], dataSent, sentPackets, spring::SafeDivide(dataSent * 1.0f, sentPackets * 1.0f));
-	msg += spring::format(fmts[1], dataRecv, recvPackets, spring::SafeDivide(dataRecv * 1.0f, recvPackets * 1.0f));
-	msg += spring::format(fmts[2], spring::SafeDivide(sentOverhead * 1.0f, dataSent * 1.0f), spring::SafeDivide(recvOverhead * 1.0f, dataRecv * 1.0f));
-	msg += spring::format(fmts[3], droppedChunks, resentChunks);
-	msg += spring::format(fmts[4], lastInOrder + 1);
-	return msg;
+	UdpStats stats;
+	stats.sentBytes = dataSent;
+	stats.receivedBytes = dataRecv;
+	stats.sentPackets = sentPackets;
+	stats.receivedPackets = recvPackets;
+	stats.resentOutgoingChunks = resentOutgoingChunks;
+	stats.duplicateIncomingChunks = duplicateIncomingChunks;
+	stats.sentOverheadBytes = sentOverhead;
+	stats.receivedOverheadBytes = recvOverhead;
+	stats.processedIncomingChunks = lastInOrder + 1;
+	return stats;
 }
 
 std::string UDPConnection::GetFullAddress() const
@@ -890,14 +886,14 @@ void UDPConnection::SendIfNecessary(bool flushed)
 		}
 	}
 
-	if (!unackedChunks.empty() &&
+	if (!unackedOutgoingChunks.empty() &&
 		(curTime - lastChunkCreatedTime) > unackTime &&
 		(curTime - lastUnackResentTime) > unackTime) {
 
 		// resend last packet if we didn't get an ack within reasonable time
 		// and don't plan sending out a new chunk either
 		if (newChunks.empty())
-			RequestResend(*unackedChunks.rbegin(), false);
+			RequestResend(*unackedOutgoingChunks.rbegin(), false);
 
 		lastUnackResentTime = curTime;
 	}
@@ -911,7 +907,7 @@ void UDPConnection::SendIfNecessary(bool flushed)
 		return;
 
 	int maxResend = resendRequested.size();
-	int unackPrevSize = unackedChunks.size();
+	int unackPrevSize = unackedOutgoingChunks.size();
 
 	decltype(resendRequested)::iterator resFwdIter = resendRequested.begin();
 	decltype(resendRequested)::iterator resMidIter;
@@ -1011,13 +1007,13 @@ void UDPConnection::SendIfNecessary(bool flushed)
 					rev = (rev + 1) % 4;
 				}
 
-				resentChunks += 1;
+				resentOutgoingChunks += 1;
 				maxResend -= 1;
 
 				sent = true;
 			} else if (!resend && canSendNew) {
 				buf.chunks.push_back(newChunks[0]);
-				unackedChunks.push_back(newChunks[0]);
+				unackedOutgoingChunks.push_back(newChunks[0]);
 				newChunks.pop_front();
 				sent = true;
 			}
@@ -1039,8 +1035,8 @@ void UDPConnection::SendIfNecessary(bool flushed)
 	}
 
 	// on a lossy connection chunks can be sent multiple times, see switch above
-	for (int i = unackPrevSize; i < unackedChunks.size(); ++i) {
-		RequestResend(unackedChunks[i], true);
+	for (int i = unackPrevSize; i < unackedOutgoingChunks.size(); ++i) {
+		RequestResend(unackedOutgoingChunks[i], true);
 	}
 
 	UpdateResendRequests();
@@ -1069,8 +1065,8 @@ void UDPConnection::SendPacket(Packet& pkt)
 
 void UDPConnection::AckChunks(int lastAck)
 {
-	while (!unackedChunks.empty() && (lastAck >= (*unackedChunks.begin())->chunkNumber)) {
-		unackedChunks.pop_front();
+	while (!unackedOutgoingChunks.empty() && (lastAck >= (*unackedOutgoingChunks.begin())->chunkNumber)) {
+		unackedOutgoingChunks.pop_front();
 	}
 
 	// resend requested and later acked, happens every now and then
