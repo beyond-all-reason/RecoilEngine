@@ -8,8 +8,7 @@
 #include "UnitLoader.h"
 #include "UnitMemPool.h"
 #include "UnitToolTipMap.hpp"
-#include "UnitTypes/Building.h"
-#include "UnitTypes/ExtractorBuilding.h"
+#include "UnitExtractor.h"
 #include "Scripts/NullUnitScript.h"
 #include "Scripts/UnitScriptFactory.h"
 #include "Scripts/CobInstance.h" // for TAANG2RAD
@@ -108,6 +107,15 @@ CUnit::~CUnit()
 	// clean up if we are still under MoveCtrl here
 	DisableScriptMoveType();
 
+	// structures drop their blocking claim before the wreck is placed, mobiles after it;
+	// gadgets watching AllowFeatureCreation can tell the difference
+	if (unitDef != nullptr && unitDef->IsBuildingUnit())
+		UnBlock();
+
+	// releases the metal squares and notifies neighbours, which the wreck below must not see;
+	// the script it calls into is still alive at this point
+	spring::SafeDelete(extractor);
+
 	// NOTE:
 	//   could also do this in Update() or even in CUnitKilledCB(), but not
 	//   in KillUnit() since we have to wait for deathScriptFinished there
@@ -204,6 +212,11 @@ void CUnit::PreInit(const UnitLoadParams& params)
 	featureDefID = -1;
 
 	unitDef = params.unitDef;
+	immobile = unitDef->IsImmobileUnit();
+	blockHeightChanges = unitDef->IsBuildingUnit() && unitDef->levelGround;
+
+	if (unitDef->IsExtractorUnit())
+		extractor = new CUnitExtractor(this);
 
 	{
 		const FeatureDef* wreckFeatureDef = featureDefHandler->GetFeatureDef(unitDef->wreckName);
@@ -334,7 +347,8 @@ void CUnit::PostInit(const CUnit* builder)
 	// does nothing for LUS, calls Create+SetMaxReloadTime for COB
 	script->Create();
 
-	immobile = unitDef->IsImmobileUnit();
+	if (unitDef->IsBuildingUnit() && unitDef->cantBeTransported)
+		mass = CSolidObject::DEFAULT_MASS;
 
 	UpdateCollidableStateBit(CSolidObject::CSTATE_BIT_SOLIDOBJECTS, unitDef->collidable);
 	Block();
@@ -533,15 +547,35 @@ void CUnit::ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, i
 }
 
 
+const YardMapStatus* CUnit::GetBlockMap() const
+{
+	return unitDef->GetYardMapPtr();
+}
+
+
 void CUnit::ForcedMove(const float3& newPos)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	const bool structure = unitDef->IsBuildingUnit();
+	float3 movePos = newPos;
+
+	if (structure) {
+		// yardmaps are not rotated, so a structure dropped by a transport snaps back to a cardinal heading
+		heading = GetHeadingFromFacing(buildFacing);
+		UpdateDirVectors(false, false, 0.0f);
+		SetVelocity(ZeroVector);
+		movePos = CGameHelper::Pos2BuildPos(BuildInfo(unitDef, newPos, buildFacing), true);
+	}
+
 	UnBlock();
-	Move(newPos - pos, true);
+	Move(movePos - pos, true);
 	Block();
 
 	eventHandler.UnitMoved(this);
 	quadField.MovedUnit(this);
+
+	if (structure)
+		unitLoader->FlattenGround(this);
 }
 
 
@@ -1981,7 +2015,6 @@ void CUnit::TurnIntoNanoframe()
 	SetStorage(0.0f);
 
 	// make sure neighbor extractors update
-	const auto extractor = dynamic_cast <CExtractorBuilding*> (this);
 	if (extractor != nullptr)
 		extractor->ResetExtraction();
 
@@ -2315,6 +2348,9 @@ void CUnit::Activate()
 
 	if (IsInLosForAllyTeam(gu->myAllyTeam))
 		Channels::General->PlayRandomSample(unitDef->sounds.activate, this);
+
+	if (extractor != nullptr)
+		extractor->OnActivate();
 }
 
 
@@ -2332,6 +2368,9 @@ void CUnit::Deactivate()
 
 	if (IsInLosForAllyTeam(gu->myAllyTeam))
 		Channels::General->PlayRandomSample(unitDef->sounds.deactivate, this);
+
+	if (extractor != nullptr)
+		extractor->OnDeactivate();
 }
 
 
@@ -2605,7 +2644,7 @@ bool CUnit::AttachUnit(CUnit* unit, int piece, bool force)
 	//
 	// quadField.RemoveUnit(unit);
 
-	if (dynamic_cast<CBuilding*>(unit) != nullptr)
+	if (unit->unitDef->IsBuildingUnit())
 		unitLoader->RestoreGround(unit);
 
 	if (dynamic_cast<CHoverAirMoveType*>(moveType) != nullptr)
@@ -2658,8 +2697,8 @@ bool CUnit::DetachUnitCore(CUnit* unit)
 		unit->moveType->SlowUpdate();
 		unit->moveType->LeaveTransport();
 
-		if (CBuilding* building = dynamic_cast<CBuilding*>(unit))
-			building->ForcedMove(building->pos);
+		if (unit->unitDef->IsBuildingUnit())
+			unit->ForcedMove(unit->pos);
 
 		transportCapacityUsed -= unit->xsize / SPRING_FOOTPRINT_SCALE;
 		transportMassUsed -= unit->mass;
@@ -2765,7 +2804,7 @@ float CUnit::GetTransporteeWantedHeight(const float3& wantedPos, const CUnit* un
 			}
 		}
 
-		if (dynamic_cast<const CBuilding*>(unit) != nullptr) {
+		if (transporteeUnitDef->IsBuildingUnit()) {
 			// for transported structures, <wantedPos> must be free/buildable
 			// (note: TestUnitBuildSquare calls CheckTerrainConstraints again)
 			BuildInfo bi(transporteeUnitDef, wantedPos, unit->buildFacing);
@@ -2800,7 +2839,7 @@ short CUnit::GetTransporteeWantedHeading(const CUnit* unit) const {
 		return unit->heading;
 	if (dynamic_cast<CHoverAirMoveType*>(moveType) == nullptr)
 		return unit->heading;
-	if (dynamic_cast<const CBuilding*>(unit) == nullptr)
+	if (!unit->unitDef->IsBuildingUnit())
 		return unit->heading;
 
 	// transported structures want to face a cardinal direction
@@ -2847,6 +2886,7 @@ CR_REG_METADATA(CUnit, (
 
 	CR_MEMBER(commandAI),
 	CR_MEMBER(script),
+	CR_MEMBER(extractor),
 
 	CR_IGNORED( usMemBuffer),
 	CR_IGNORED(amtMemBuffer),
