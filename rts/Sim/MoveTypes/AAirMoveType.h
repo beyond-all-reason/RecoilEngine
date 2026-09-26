@@ -37,6 +37,10 @@ public:
 
 	virtual bool Update();
 	virtual void UpdateLanded();
+
+	/// one axis of the filtered noise an aircraft hovering on a spot drifts with; call it once per
+	/// frame and axis (CHoverAirMoveType drifts with it, the agile regime of CStrafeAirMoveType leans on it)
+	static void UpdateRandomWind(float& windAxis);
 	virtual void Takeoff() {}
 	virtual void Land() {}
 	virtual void SetState(AircraftState state) {}
