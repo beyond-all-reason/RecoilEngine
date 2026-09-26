@@ -216,6 +216,9 @@ UnitDef::UnitDef()
 	, agileAccRate(0.0f)
 	, cruiseDistance(0.0f)
 	, agileAltitude(0.0f)
+	, agileHoverBob(0.0f)
+	, agileHoverSway(0.0f)
+	, agileHoverTilt(0.0f)
 	, loadingRadius(0.0f)
 	, unloadSpread(0.0f)
 	, transportCapacity(0)
@@ -577,6 +580,9 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	agileAccRate   = std::max(0.0f, udTable.GetFloat("agileAccRate",   0.0f));
 	cruiseDistance = std::max(0.0f, udTable.GetFloat("cruiseDistance", 0.0f));
 	agileAltitude  = std::max(0.0f, udTable.GetFloat("agileAltitude",  0.0f));
+	agileHoverBob  = std::max(0.0f, udTable.GetFloat("agileHoverBob",  0.0f));
+	agileHoverSway = std::max(0.0f, udTable.GetFloat("agileHoverSway", 0.0f));
+	agileHoverTilt = std::max(0.0f, udTable.GetFloat("agileHoverTilt", 1.0f));
 
 	maxThisUnit = udTable.GetInt("maxThisUnit", udTable.GetInt("unitRestricted", MAX_UNITS));
 	maxThisUnit = std::min(maxThisUnit, gameSetup->GetRestrictedUnitLimit(name, MAX_UNITS));

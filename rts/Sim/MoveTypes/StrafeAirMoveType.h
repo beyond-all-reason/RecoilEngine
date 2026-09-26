@@ -62,6 +62,12 @@ public:
 	float GetAgileSpeed() const;
 	float GetCruiseDistance() const;
 	float GetTurnDiameter() const;
+	/// advances the idle hover of an aircraft that holds on a point; returns the offset to its right (x) and
+	/// up (y), <leanAcc> is the acceleration to lean with, to its right (x) and front (z)
+	float3 UpdateHoverSway(bool holding, float3& leanAcc);
+	/// agileHoverBob and agileHoverSway as applied
+	float GetHoverBob() const;
+	float GetHoverSway() const;
 	float GetAgileApproachHeight(float goalDist2D, bool finalGoal) const;
 	float GetCruiseBrakingDistance(float speed) const;
 	/// distance needed to come to rest from <speed>, across both regimes
@@ -140,6 +146,19 @@ public:
 
 	/// altitude of the agile regime; 0 uses the cruise altitude (wantedHeight)
 	float agileAltitude = 0.0f;
+
+	/// elmos an aircraft holding on a point bobs up and down, and sways to its left and right; 0 for none
+	float agileHoverBob = 0.0f;
+	float agileHoverSway = 0.0f;
+	/// scales the lean that goes with it, 1 is the angle gravity dictates for the acceleration flown
+	float agileHoverTilt = 0.0f;
+	/// the hover itself: a damped oscillator around the hold point that gusts push on (in units of
+	/// agileHoverBob and agileHoverSway, fore and aft it only shows as lean), and how far it has been faded in
+	float3 hoverSwayPos;
+	float3 hoverSwayVel;
+	float3 hoverWind;
+	float3 hoverGust;
+	float hoverSwayFade = 0.0f;
 
 	/// where an agile aircraft sets down: the goal StopMoving was about to discard
 	float3 landGoalPos = -OnesVector;

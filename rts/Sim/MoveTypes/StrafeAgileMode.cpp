@@ -32,6 +32,9 @@ static const unsigned int AGILE_MEMBER_HASHES[] = {
 	MEMBER_LITERAL_HASH(  "agileAccRate"),
 	MEMBER_LITERAL_HASH("cruiseDistance"),
 	MEMBER_LITERAL_HASH( "agileAltitude"),
+	MEMBER_LITERAL_HASH( "agileHoverBob"),
+	MEMBER_LITERAL_HASH("agileHoverSway"),
+	MEMBER_LITERAL_HASH("agileHoverTilt"),
 };
 
 
@@ -105,6 +108,35 @@ static constexpr float AGILE_MAX_BANK = 0.9f;
 static constexpr float BANK_STRAFE_SHARE = 0.7f; // of the bank comes from strafing sideways, the rest from turning
 static constexpr float BANK_FULL_TURN_SECONDS = 4.0f / 15.0f; // full turn bank while the nose has this much turning left
 
+// idle hover of an aircraft that holds on a point: a damped oscillator around the hold point that gusts push on.
+// Faded in once the aircraft holds, and out again quicker than any descent takes, so setting down stays exact
+static constexpr float HOVER_FADE_IN_SECONDS = 2.0f;
+static constexpr float HOVER_FADE_OUT_SECONDS = 0.5f;
+// period of the oscillator for an aircraft of the reference radius; it grows with the square root
+// of the radius (bigger aircraft swing slower), between these shares of the reference radius
+static constexpr float HOVER_PERIOD_SECONDS = 3.0f;
+static constexpr float HOVER_PERIOD_REF_RADIUS = 2.0f * SQUARE_SIZE;
+static constexpr float HOVER_PERIOD_MIN_RADIUS_SHARE = 0.5f;
+static constexpr float HOVER_PERIOD_MAX_RADIUS_SHARE = 7.0f;
+static constexpr float HOVER_DAMPING = 0.8f; // twice the damping ratio
+// the drift noise is smoothed once more before it pushes the oscillator (a gust is a breath of
+// wind, not a rattle): the share of a gust still left after a second, and how hard it pushes
+static constexpr float HOVER_GUST_KEPT_PER_SECOND = 0.45f;
+static constexpr float HOVER_GUST_GAIN = 3.8f;
+// the bob stays a small part of the height it happens at, the sway well inside the goal radius
+// (beyond it the nose would start to turn back at the point)
+static constexpr float HOVER_MAX_BOB_HEIGHT_SHARE = 0.25f;
+static constexpr float HOVER_MAX_SWAY_RADIUS_SHARE = 0.5f;
+// an aircraft holds when it is within its sway and this many elmos of the point,
+// no faster than this share of that distance per frame
+static constexpr float HOVER_HOLD_SLACK = 1.0f;
+static constexpr float HOVER_HOLD_MAX_SPEED_SHARE = 0.25f;
+// a swinging target is followed all the way in, coming to rest next to it would stutter
+static constexpr float HOVER_FOLLOW_EPSILON = 0.0001f;
+// most the hover leans the aircraft (as frontdir.y and rightdir.y), and the bank all leans together may reach
+static constexpr float HOVER_MAX_LEAN = 0.25f;
+static constexpr float AGILE_MAX_TOTAL_BANK = 0.95f;
+
 
 // for all three, a value that is not positive asks for the default derived from the stock tags
 void CStrafeAirMoveType::SetAgileSpeed(float speed)
@@ -141,6 +173,7 @@ void CStrafeAirMoveType::SetFlightRegime(int regime)
 		return;
 
 	flightRegime = regime;
+	hoverSwayFade = 0.0f;
 	eventHandler.UnitFlightRegimeChanged(owner, regime == REGIME_AGILE);
 }
 
@@ -372,7 +405,7 @@ void CStrafeAirMoveType::UpdateAgileLanding()
 	const float localAltitude = pos.y - amtGetGroundHeightFuncs[canSubmerge](pos.x, pos.z);
 
 	// wait for the governor to bleed off the sink rate, touchdown should not be a velocity step
-	if (pos.distance2D(reservedLandingPos) <= touchRadius && localAltitude <= (wantedHeight + agileAccRate) && owner->speed.SqLength() <= Square(agileAccRate * TOUCHDOWN_MAX_SPEED_SHARE)) {
+	if (pos.distance2D(reservedLandingPos) <= touchRadius && localAltitude <= (wantedHeight + agileAccRate) && owner->speed.SqLength() <= Square(agileAccRate * TOUCHDOWN_MAX_SPEED_SHARE) && hoverSwayFade <= 0.0f) {
 		SetState(AIRCRAFT_LANDED);
 		owner->SetVelocityAndSpeed(ZeroVector);
 		return;
@@ -430,13 +463,29 @@ void CStrafeAirMoveType::UpdateAgileFlight(const float3& targetPos, const float3
 		turnFraction = turnSign * std::min(1.0f, faceAngle / std::max(maxYaw * (BANK_FULL_TURN_SECONDS * GAME_SPEED), AGILE_MIN_RATE));
 	}
 
+	// to our right and up, and the acceleration to lean with (right, front)
+	float3 hoverSway;
+	float3 hoverLeanAcc;
+
+	if (agileHoverBob > 0.0f || agileHoverSway > 0.0f || hoverSwayFade > 0.0f) {
+		// an aircraft holding on a point hovers on it: next to the point and no faster than the
+		// hover is (takeoff climbs over its own position, waypoints are flown through)
+		const float holdSlack = std::max(GetHoverBob(), GetHoverSway()) + HOVER_HOLD_SLACK;
+
+		const bool wantsHover = (agileHoverBob > 0.0f || agileHoverSway > 0.0f);
+		const bool holding = (wantsHover && !landing && aircraftState != AIRCRAFT_TAKEOFF && pos.SqDistance2D(targetPos) <= Square(GetHoverSway() + HOVER_HOLD_SLACK) && spd.SqLength() <= Square(holdSlack * HOVER_HOLD_MAX_SPEED_SHARE));
+
+		hoverSway = UpdateHoverSway(holding, hoverLeanAcc);
+		targetHeight += hoverSway.y;
+	}
+
 	// horizontal: steer the velocity vector at the target, slowing down in time to stop on it
-	const float3 goalVec = (targetPos - pos) * XZVector;
+	const float3 goalVec = (targetPos + frontDir2D.cross(UpVector) * hoverSway.x - pos) * XZVector;
 	const float goalDist = goalVec.Length();
 
 	float3 wantedVel;
 
-	if (goalDist > AGILE_EPSILON) {
+	if (goalDist > ((hoverSwayFade > 0.0f)? HOVER_FOLLOW_EPSILON: AGILE_EPSILON)) {
 		const float3 goalDir = goalVec / goalDist;
 
 		// straight at the target whichever way the nose points: strafing, not turn-then-fly
@@ -483,8 +532,19 @@ void CStrafeAirMoveType::UpdateAgileFlight(const float3& targetPos, const float3
 
 	static const float attitudeBlend = 1.0f - math::pow(ATTITUDE_KEPT_PER_SECOND, INV_GAME_SPEED);
 
-	const float frontY = mix(float(frontdir.y), -AGILE_NOSE_DIP * frontFraction, attitudeBlend);
-	const float bankY = -(BANK_STRAFE_SHARE * sideFraction + (1.0f - BANK_STRAFE_SHARE) * turnFraction * speedFraction) * std::clamp(maxBank, 0.0f, AGILE_MAX_BANK);
+	float frontLean = -AGILE_NOSE_DIP * frontFraction;
+	float bankLean = -(BANK_STRAFE_SHARE * sideFraction + (1.0f - BANK_STRAFE_SHARE) * turnFraction * speedFraction) * std::clamp(maxBank, 0.0f, AGILE_MAX_BANK);
+
+	if (hoverSwayFade > 0.0f) {
+		// holding: a hovering aircraft accelerates by leaning, so lean by what holding still takes
+		const float leanScale = agileHoverTilt / std::max(math::fabs(mapInfo->map.gravity), AGILE_EPSILON);
+
+		frontLean -= std::clamp(hoverLeanAcc.z * leanScale, -HOVER_MAX_LEAN, HOVER_MAX_LEAN);
+		bankLean -= std::clamp(hoverLeanAcc.x * leanScale, -HOVER_MAX_LEAN, HOVER_MAX_LEAN);
+	}
+
+	const float frontY = mix(float(frontdir.y), frontLean, attitudeBlend);
+	const float bankY = std::clamp(bankLean, -AGILE_MAX_TOTAL_BANK, AGILE_MAX_TOTAL_BANK);
 
 	const float3 wantedRight = flatRight * math::sqrt(1.0f - bankY * bankY) + UpVector * bankY;
 
@@ -533,7 +593,9 @@ float3 CStrafeAirMoveType::FindAgileSpot(const float3& wantedPos, bool landable)
 	RECOIL_DETAILED_TRACY_ZONE;
 	// aircraft that stop on a goal would all stop on the same one, so each takes
 	// the free spot nearest to it: not where another aircraft sits, holds or will land
-	const float ringStep = owner->radius * SPOT_SPACING_RADII;
+	// (those that hold in the air sway by their agileHoverSway, which takes room)
+	const float swayRoom = landable? 0.0f: GetHoverSway();
+	const float ringStep = owner->radius * SPOT_SPACING_RADII + swayRoom * 2.0f;
 
 	struct Claim { float3 pos; float radius; };
 	std::vector<Claim> claims;
@@ -567,7 +629,7 @@ float3 CStrafeAirMoveType::FindAgileSpot(const float3& wantedPos, bool landable)
 			} else if (mt->aircraftState == AIRCRAFT_LANDED) {
 				claims.push_back({unit->pos, unit->radius});
 			} else if (mt->agileFlight && mt->landGoalPos.x != -1.0f) {
-				claims.push_back({mt->landGoalPos, unit->radius});
+				claims.push_back({mt->landGoalPos, unit->radius + (landable? 0.0f: mt->GetHoverSway())});
 			}
 		}
 	}
@@ -577,7 +639,7 @@ float3 CStrafeAirMoveType::FindAgileSpot(const float3& wantedPos, bool landable)
 			return -OnesVector;
 
 		for (const Claim& claim: claims) {
-			if (spot.SqDistance2D(claim.pos) < Square(owner->radius + claim.radius))
+			if (spot.SqDistance2D(claim.pos) < Square(owner->radius + swayRoom + claim.radius))
 				return -OnesVector;
 		}
 
@@ -603,6 +665,61 @@ float3 CStrafeAirMoveType::FindAgileSpot(const float3& wantedPos, bool landable)
 		landRadiusSq = Square(GetAgileGoalRadius());
 
 	return foundPos;
+}
+
+
+
+float CStrafeAirMoveType::GetHoverBob() const
+{
+	return (std::min(agileHoverBob, GetAgileHeight() * HOVER_MAX_BOB_HEIGHT_SHARE));
+}
+
+
+float CStrafeAirMoveType::GetHoverSway() const
+{
+	return (std::min(agileHoverSway, GetAgileGoalRadius() * HOVER_MAX_SWAY_RADIUS_SHARE));
+}
+
+
+float3 CStrafeAirMoveType::UpdateHoverSway(bool holding, float3& leanAcc)
+{
+	const float fadeStep = holding? (INV_GAME_SPEED / HOVER_FADE_IN_SECONDS): -(INV_GAME_SPEED / HOVER_FADE_OUT_SECONDS);
+
+	hoverSwayFade = std::clamp(hoverSwayFade + fadeStep, 0.0f, 1.0f);
+
+	if (hoverSwayFade <= 0.0f)
+		return ZeroVector;
+
+	const float radiusShare = std::clamp(owner->radius / HOVER_PERIOD_REF_RADIUS, HOVER_PERIOD_MIN_RADIUS_SHARE, HOVER_PERIOD_MAX_RADIUS_SHARE);
+
+	const int period = int(HOVER_PERIOD_SECONDS * GAME_SPEED * math::sqrt(radiusShare));
+
+	const float omega = math::TWOPI / period;
+
+	// the gusts are what a gunship hovering on a spot drifts with, one value per axis, smoothed
+	UpdateRandomWind(hoverWind.x);
+	UpdateRandomWind(hoverWind.y);
+	UpdateRandomWind(hoverWind.z);
+
+	hoverGust += (hoverWind - hoverGust) * (1.0f - math::pow(HOVER_GUST_KEPT_PER_SECOND, INV_GAME_SPEED));
+
+	const float3 gust = hoverGust * HOVER_GUST_GAIN;
+
+	const float3 swayAcc = (gust - hoverSwayPos) * (omega * omega) - hoverSwayVel * (HOVER_DAMPING * omega);
+
+	hoverSwayVel += swayAcc;
+	hoverSwayPos += hoverSwayVel;
+
+	// in the aircraft's own frame: it bobs (y) and sways to its left and right (x), fore and aft
+	// it holds its place. Soft limits, never further than asked for. It leans with the acceleration
+	// all of this takes, the sway's is the real one
+	const float fade = smoothstep(0.0f, 1.0f, hoverSwayFade);
+	const float bobScale = GetHoverBob() * fade;
+	const float swayScale = GetHoverSway() * fade;
+
+	leanAcc = float3(swayAcc.x * swayScale, 0.0f, swayAcc.z * std::max(bobScale, swayScale));
+
+	return (float3(hoverSwayPos.x * swayScale, hoverSwayPos.y * bobScale, 0.0f) / float3(math::sqrt(1.0f + Square(hoverSwayPos.x)), math::sqrt(1.0f + Square(hoverSwayPos.y)), 1.0f));
 }
 
 
@@ -678,6 +795,18 @@ bool CStrafeAirMoveType::SetAgileMemberValue(unsigned int memberHash, void* memb
 	}
 	if (memberHash == AGILE_MEMBER_HASHES[4]) {
 		agileAltitude = std::max(0.0f, *(reinterpret_cast<float*>(memberValue)));
+		return true;
+	}
+	if (memberHash == AGILE_MEMBER_HASHES[5]) {
+		agileHoverBob = std::max(0.0f, *(reinterpret_cast<float*>(memberValue)));
+		return true;
+	}
+	if (memberHash == AGILE_MEMBER_HASHES[6]) {
+		agileHoverSway = std::max(0.0f, *(reinterpret_cast<float*>(memberValue)));
+		return true;
+	}
+	if (memberHash == AGILE_MEMBER_HASHES[7]) {
+		agileHoverTilt = std::max(0.0f, *(reinterpret_cast<float*>(memberValue)));
 		return true;
 	}
 
