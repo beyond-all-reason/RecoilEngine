@@ -4,7 +4,6 @@
 #define UNIT_MEMPOOL_H
 
 #include "UnitTypes/Builder.h"
-#include "UnitTypes/Building.h"
 #include "UnitTypes/ExtractorBuilding.h"
 #include "UnitTypes/Factory.h"
 
@@ -16,7 +15,6 @@
 union LargestDerivedFromCUnit {
 	CBuilder builder;
 	CFactory factory;
-	CBuilding building;
 	CExtractorBuilding extractorBuilding;
 };
 
