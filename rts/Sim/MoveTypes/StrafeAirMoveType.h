@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef STRAFE_AIR_MOVE_TYPE_H_
-#define STRAFE_AIR_MOVE_TYPE_H_
+#pragma once
 
 #include "AAirMoveType.h"
 
@@ -21,6 +20,10 @@ public:
 		MANEUVER_IMMELMAN     = 1,
 		MANEUVER_IMMELMAN_INV = 2,
 	};
+	enum {
+		REGIME_CRUISE = 0, ///< fixed-wing flight model
+		REGIME_AGILE  = 1, ///< hover-like control, only entered when agileFlight is set
+	};
 
 	CStrafeAirMoveType(CUnit* owner);
 
@@ -39,7 +42,45 @@ public:
 	void SetState(AircraftState state) override;
 	void UpdateTakeOff();
 
+	void UpdateAgileRegime();
+	void UpdateAgileTakeOff();
+	void UpdateAgileLanding();
+	/// hover-like control: fly to <targetPos> at <targetHeight> above ground while turning to face <facePos>
+	void UpdateAgileFlight(const float3& targetPos, const float3& facePos, float targetHeight, bool landing);
+
+	bool InAgileRegime() const { return (agileFlight && flightRegime == REGIME_AGILE); }
+	/// how close an agile aircraft gets to a goal before its move order counts as finished
+	float GetAgileGoalRadius() const;
+	/// altitude flown in the agile regime
+	float GetAgileHeight() const;
+	/// the only place the regime changes, so that Lua hears about every change
+	void SetFlightRegime(int regime);
+
+	void SetAgileSpeed(float speed);
+	void SetAgileTurnRate(float rate);
+	void SetAgileAccRate(float rate);
+	float GetAgileSpeed() const;
+	float GetCruiseDistance() const;
+	float GetTurnDiameter() const;
+	/// advances the idle hover of an aircraft that holds on a point; returns the offset to its right (x) and
+	/// up (y), <leanAcc> is the acceleration to lean with, to its right (x) and front (z)
+	float3 UpdateHoverSway(bool holding, float3& leanAcc);
+	/// agileHoverBob and agileHoverSway as applied
+	float GetHoverBob() const;
+	float GetHoverSway() const;
+	float GetAgileApproachHeight(float goalDist2D, bool finalGoal) const;
+	float GetCruiseBrakingDistance(float speed) const;
+	/// distance needed to come to rest from <speed>, across both regimes
+	float GetAgileStopDistance(float speed) const;
+
 	float3 FindLandingPos(float3 landPos);
+	/// nearest spot to <wantedPos> that no other aircraft has claimed, -OnesVector if there is none
+	float3 FindAgileSpot(const float3& wantedPos, bool landable);
+	bool CanSetDownAt(const float3& spot) const;
+	/// the agile regime's share of StopMoving, StartMoving and SetMemberValue
+	bool AgileStopMoving();
+	void AgileStartMoving();
+	bool SetAgileMemberValue(unsigned int memberHash, void* memberValue);
 
 	void SetMaxSpeed(float speed) override;
 	float BrakingDistance(float speed, float rate) const override;
@@ -90,6 +131,38 @@ public:
 	float lastRudderPos[2] = {0.0f, 0.0f};
 	float lastElevatorPos[2] = {0.0f, 0.0f};
 	float lastAileronPos[2] = {0.0f, 0.0f};
-};
 
-#endif // _AIR_MOVE_TYPE_H_
+	bool agileFlight = false;
+	int flightRegime = REGIME_CRUISE;
+
+	/// elmos/frame; top speed of the agile regime and the speed at which it hands over to cruise flight
+	float agileSpeed = 0.0f;
+	/// heading change per frame in the agile regime at its top speed (65536 is a full circle), scaled down with speed
+	float agileTurnRate = 0.0f;
+	/// acceleration and deceleration limit of the agile regime
+	float agileAccRate = 0.0f;
+	/// goals nearer than this are flown entirely in the agile regime; 0 derives it from the turn radius
+	float cruiseDistance = 0.0f;
+
+	/// altitude of the agile regime; 0 uses the cruise altitude (wantedHeight)
+	float agileAltitude = 0.0f;
+
+	/// elmos an aircraft holding on a point bobs up and down, and sways to its left and right; 0 for none
+	float agileHoverBob = 0.0f;
+	float agileHoverSway = 0.0f;
+	/// scales the lean that goes with it, 1 is the angle gravity dictates for the acceleration flown
+	float agileHoverTilt = 0.0f;
+	/// the hover itself: a damped oscillator around the hold point that gusts push on (in units of
+	/// agileHoverBob and agileHoverSway, fore and aft it only shows as lean), and how far it has been faded in
+	float3 hoverSwayPos;
+	float3 hoverSwayVel;
+	float3 hoverWind;
+	float3 hoverGust;
+	float hoverSwayFade = 0.0f;
+
+	/// where an agile aircraft sets down: the goal StopMoving was about to discard
+	float3 landGoalPos = -OnesVector;
+
+	/// frames between two searches for a landing spot, grows while they find nothing
+	int spotSearchFrames = 1;
+};

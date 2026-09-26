@@ -855,6 +855,15 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * @field maxRudder number?
  * @field attackSafetyDistance number?
  * @field myGravity number?
+ * @field agileFlight boolean? Fly short legs, final approaches, takeoffs and landings with hover-like control, so the aircraft arrives and sets down exactly on its goal. Longer legs are still flown fixed-wing.
+ * @field agileSpeed number? Top speed of the agile regime in elmos per second, also the speed at which it hands over to fixed-wing flight. Zero restores the default (a share of the top speed).
+ * @field agileTurnRate number? How fast the nose comes round in the agile regime at its top speed (65536 is a full circle per frame); scaled down with speed, so a stationary aircraft does not turn. Independent of the fixed-wing turn rate (`maxRudder`) and of the `turnRate` tag. Zero restores the default.
+ * @field agileAccRate number? Acceleration and deceleration limit of the agile regime, in elmos per frame squared. Zero restores the default (`maxAcc`).
+ * @field agileAltitude number? Altitude flown in the agile regime, in elmos above ground. Zero uses the cruise altitude; never above it.
+ * @field agileHoverBob number? How far, in elmos, an agile aircraft bobs up and down while it holds on a point, as if it kept its place against gusts. Zero for none. At most a quarter of the agile altitude, never applied while setting down.
+ * @field agileHoverSway number? How far, in elmos, it sways to its own left and right meanwhile, banking with the motion; aircraft holding together keep that much more distance. Zero for none. At most half the goal radius.
+ * @field agileHoverTilt number? Scales the lean that goes with both; 1 is the angle gravity dictates, which is the default of the `agileHoverTilt` tag.
+ * @field cruiseDistance number? Goals nearer than this many elmos are flown entirely in the agile regime. Zero derives it from the turn radius (one turn diameter).
  */
 
 /***
@@ -871,6 +880,7 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * | "collide"
  * | "useSmoothMesh"
  * | "loopbackAttack"
+ * | "agileFlight"
   * @param value boolean
  * @return integer numAssignedValues
  */
@@ -892,6 +902,14 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * | "maxRudder" 
  * | "attackSafetyDistance" 
  * | "myGravity" 
+ * | "agileSpeed"
+ * | "agileTurnRate"
+ * | "agileAccRate"
+ * | "cruiseDistance"
+ * | "agileAltitude"
+ * | "agileHoverBob"
+ * | "agileHoverSway"
+ * | "agileHoverTilt"
  * @param value number
  * @return integer numAssignedValues
  */

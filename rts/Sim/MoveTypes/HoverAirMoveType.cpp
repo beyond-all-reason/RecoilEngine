@@ -420,8 +420,8 @@ void CHoverAirMoveType::UpdateHovering()
 	const float  maxSqGoalDist = Square(GetGoalRadius());
 	const float absHoverFactor = math::fabs(owner->unitDef->dlHoverFactor) * 0.5f;
 
-	randomWind.x = (randomWind.x * 0.9f + (gsRNG.NextFloat() - 0.5f) * 0.5f);
-	randomWind.z = (randomWind.z * 0.9f + (gsRNG.NextFloat() - 0.5f) * 0.5f);
+	UpdateRandomWind(randomWind.x);
+	UpdateRandomWind(randomWind.z);
 
 	// randomly drift (but not too far from goal-position; a larger
 	// deviation causes a larger wantedSpeed back in its direction)

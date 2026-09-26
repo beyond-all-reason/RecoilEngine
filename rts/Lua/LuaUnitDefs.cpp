@@ -815,6 +815,15 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_BOOL("hoverAttack",   ud.hoverAttack);
 	ADD_BOOL("airStrafe",     ud.airStrafe);
 	ADD_BOOL("bankingAllowed",ud.bankingAllowed);
+	ADD_BOOL("agileFlight",   ud.agileFlight);
+	ADD_FLOAT("agileSpeed",    ud.agileSpeed);
+	ADD_FLOAT("agileTurnRate", ud.agileTurnRate);
+	ADD_FLOAT("agileAccRate",  ud.agileAccRate);
+	ADD_FLOAT("cruiseDistance",ud.cruiseDistance);
+	ADD_FLOAT("agileAltitude", ud.agileAltitude);
+	ADD_FLOAT("agileHoverBob", ud.agileHoverBob);
+	ADD_FLOAT("agileHoverSway",ud.agileHoverSway);
+	ADD_FLOAT("agileHoverTilt",ud.agileHoverTilt);
 	ADD_BOOL("useSmoothMesh", ud.useSmoothMesh);
 
 	// < 0 means it can land,
