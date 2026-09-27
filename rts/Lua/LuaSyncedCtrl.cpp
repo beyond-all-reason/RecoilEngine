@@ -2525,7 +2525,7 @@ static bool SetSingleUnitWeaponState(lua_State* L, CWeapon* weapon, int index)
 			weapon->salvoDelay = (int) (lua_tofloat(L, index + 1) * GAME_SPEED);
 		} break;
 		case hashString("windup"): {
-			weapon->salvoWindup = (int) (lua_tofloat(L, index + 1) * GAME_SPEED);
+			weapon->salvoWindup = std::max(0, (int) (lua_tofloat(L, index + 1) * GAME_SPEED));
 		} break;
 
 		case hashString("projectiles"): {
