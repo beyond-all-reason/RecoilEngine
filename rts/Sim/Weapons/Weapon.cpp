@@ -1674,6 +1674,17 @@ float CWeapon::GetAccuratePredictedImpactTime(const float3& targetPos, const flo
 }
 
 
+int CWeapon::GetShotDelay() const
+{
+	if (salvoLeft <= 0)
+		return salvoWindup;
+
+	// limit a nextSalvo set from lua to hold fire
+	// so that predictions cannot be over-inflated
+	return std::clamp(nextSalvo - gs->frameNum, 0, std::max(salvoWindup, salvoDelay));
+}
+
+
 float3 CWeapon::GetLeadVec(const CUnit* unit) const
 {
 	const float predictMult = mix(predictSpeedMod, 1.0f, weaponDef->predictBoost);
