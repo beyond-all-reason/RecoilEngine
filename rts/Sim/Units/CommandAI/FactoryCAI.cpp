@@ -186,12 +186,14 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 			return;
 		}
 
-		if (!(c.GetOpts() & SHIFT_KEY) && (cmdID == CMD_WAIT || cmdID == CMD_SELFD)) {
+		const bool toNewUnitQueue = (target != nullptr && target->GetType() == CCommandQueue::NewUnitQueueType);
+
+		if (!toNewUnitQueue && !(c.GetOpts() & SHIFT_KEY) && (cmdID == CMD_WAIT || cmdID == CMD_SELFD)) {
 			CCommandAI::GiveAllowedCommand(c);
 			return;
 		}
 
-		if (target != nullptr && target->GetType() != CCommandQueue::NewUnitQueueType)
+		if (target != nullptr && !toNewUnitQueue)
 			return;
 
 		if (!(c.GetOpts() & SHIFT_KEY)) {
