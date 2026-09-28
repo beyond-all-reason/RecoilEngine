@@ -666,6 +666,7 @@ bool CCommandAI::AllowedQueue(const Command& c) const
 		return true;
 
 	switch (c.GetID()) {
+		case CMD_REPEAT:
 		case CMD_MOVE_STATE:
 		case CMD_TRAJECTORY:
 		case CMD_ONOFF:
@@ -928,11 +929,6 @@ bool CCommandAI::ExecuteStateCommand(const Command& c)
 			// we can not accept any other values as valid
 			if (c.GetParam(0) != 0 && c.GetParam(0) != 1)
 				return false;
-
-			if (CCommandQueue* q = GetQueue(c.GetQueue()); q != nullptr && q != &GetOwnQueue()) {
-				q->SetRepeat(c.GetParam(0) == 1);
-				return true;
-			}
 
 			GetOwnQueue().SetRepeat(c.GetParam(0) == 1);
 
