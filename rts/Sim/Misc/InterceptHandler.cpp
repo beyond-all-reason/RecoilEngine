@@ -44,6 +44,8 @@ void CInterceptHandler::Update(bool forced) {
 		for (CWeaponProjectile* p: interceptables) {
 			if (!p->CanBeInterceptedBy(wDef))
 				continue;
+			if (wDef->interceptSolo && p->IsBeingIntercepted())
+				continue;
 			if (w->HasIncomingProjectile(p->id))
 				continue;
 

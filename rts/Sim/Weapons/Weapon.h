@@ -47,6 +47,7 @@ public:
 	bool HaveTarget() const { return (currentTarget.type != Target_None); }
 	bool HaveUnitTarget() const { return (currentTarget.type == Target_Unit); }
 	bool HavePosTarget() const { return (currentTarget.type == Target_Pos); }
+	bool HaveDeniedInterceptTarget() const;
 
 	const SWeaponTarget& GetCurrentTarget() const { return currentTarget; }
 	const float3& GetCurrentTargetPos() const { return currentTargetPos; }
