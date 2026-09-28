@@ -28,9 +28,6 @@ struct TeamStatistics;
 
 static const uint16_t NETWORK_VERSION = atoi(SpringVersion::GetMajor().c_str());
 
-// set on a command's options byte only while on the wire, meaning a queue byte follows it
-static constexpr uint8_t NET_CMD_QUEUE_FOLLOWS = (1 << 0);
-
 
 /**
  * @brief A factory used to make often-used network messages.

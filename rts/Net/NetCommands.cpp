@@ -690,18 +690,13 @@ void CGame::ClientReadNet()
 					int32_t cmdID;
 					int32_t cmdTimeOut;
 					uint8_t cmdOptions;
+					uint8_t cmdQueue;
 					uint32_t numParams;
 
 					pckt >> cmdID;
 					pckt >> cmdTimeOut;
 					pckt >> cmdOptions;
-
-					uint8_t cmdQueue = 0;
-					if (cmdOptions & NET_CMD_QUEUE_FOLLOWS) {
-						pckt >> cmdQueue;
-						cmdOptions &= ~NET_CMD_QUEUE_FOLLOWS;
-					}
-
+					pckt >> cmdQueue;
 					pckt >> numParams;
 
 					Command c(cmdID, cmdOptions);
@@ -783,18 +778,13 @@ void CGame::ClientReadNet()
 					int32_t cmdID;
 					int32_t cmdTimeOut;
 					uint8_t cmdOptions;
+					uint8_t cmdQueue;
 					uint32_t numParams;
 
 					pckt >> cmdID;
 					pckt >> cmdTimeOut;
 					pckt >> cmdOptions;
-
-					uint8_t cmdQueue = 0;
-					if (cmdOptions & NET_CMD_QUEUE_FOLLOWS) {
-						pckt >> cmdQueue;
-						cmdOptions &= ~NET_CMD_QUEUE_FOLLOWS;
-					}
-
+					pckt >> cmdQueue;
 					pckt >> numParams;
 
 					Command c(cmdID, cmdOptions);
@@ -832,6 +822,7 @@ void CGame::ClientReadNet()
 					uint32_t sameCmdID;
 					uint8_t sameCmdOpt;
 					uint16_t sameCmdParamSize;
+					uint8_t sameCmdQueue;
 
 					int16_t unitCount;
 					int16_t commandCount;
@@ -846,6 +837,7 @@ void CGame::ClientReadNet()
 					pckt >> sameCmdID;
 					pckt >> sameCmdOpt;
 					pckt >> sameCmdParamSize;
+					pckt >> sameCmdQueue;
 
 					std::vector<int32_t> unitIDs;
 					std::vector<Command> commands;
@@ -876,11 +868,9 @@ void CGame::ClientReadNet()
 						if ((paramCount = sameCmdParamSize) == 0xFFFF)
 							pckt >> paramCount;
 
-						uint8_t cmdQueue = 0;
-						if (cmdOpt & NET_CMD_QUEUE_FOLLOWS) {
+						uint8_t cmdQueue;
+						if ((cmdQueue = sameCmdQueue) == 0xFF)
 							pckt >> cmdQueue;
-							cmdOpt &= ~NET_CMD_QUEUE_FOLLOWS;
-						}
 
 						Command cmd(cmdID, cmdOpt);
 						cmd.SetQueue(cmdQueue);

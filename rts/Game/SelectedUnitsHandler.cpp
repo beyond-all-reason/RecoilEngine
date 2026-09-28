@@ -1069,37 +1069,35 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 		return;
 
 	uint32_t totalParams = 0;
-	uint32_t totalQueues = 0;
 
-	const auto wireOpts = [](const Command& c) -> uint8_t {
-		return (c.GetOpts() & ~NET_CMD_QUEUE_FOLLOWS) | (NET_CMD_QUEUE_FOLLOWS * (c.GetQueue() != 0));
-	};
-
-	// if all commands share the same ID / options / number of parameters,
+	// if all commands share the same ID / options / number of parameters / queue,
 	// insert only these values into the packet to save a bit of bandwidth
 	int32_t refCmdID = commands[0].GetID();
-	uint8_t refCmdOpts = wireOpts(commands[0]);
+	uint8_t refCmdOpts = commands[0].GetOpts();
 	int32_t refCmdSize = commands[0].GetNumParams();
+	uint8_t refCmdQueue = commands[0].GetQueue();
 
 	for (unsigned int c = 0; c < commandCount; c++) {
 		totalParams += commands[c].GetNumParams();
-		totalQueues += (commands[c].GetQueue() != 0);
 
 		if (refCmdID != 0 && refCmdID != commands[c].GetID())
 			refCmdID = 0;
-		if (refCmdOpts != 0xFF && refCmdOpts != wireOpts(commands[c]))
+		if (refCmdOpts != 0xFF && refCmdOpts != commands[c].GetOpts())
 			refCmdOpts = 0xFF;
 		if (refCmdSize != 0xFFFF && refCmdSize != commands[c].GetNumParams())
 			refCmdSize = 0xFFFF;
+		if (refCmdQueue != 0xFF && refCmdQueue != commands[c].GetQueue())
+			refCmdQueue = 0xFF;
 	}
 
 	unsigned int optBytesPerCmd = 0;
 	unsigned int totalPacketLen = 0;
 
-	// optional data per command (cmdID, cmdOpts, #cmdParams)
+	// optional data per command (cmdID, cmdOpts, #cmdParams, cmdQueue)
 	optBytesPerCmd += (sizeof(uint32_t) * (refCmdID   == 0     ));
 	optBytesPerCmd += (sizeof(uint8_t ) * (refCmdOpts == 0xFF  ));
 	optBytesPerCmd += (sizeof(uint16_t) * (refCmdSize == 0xFFFF));
+	optBytesPerCmd += (sizeof(uint8_t ) * (refCmdQueue == 0xFF  ));
 
 	// msg type, msg size
 	totalPacketLen += (sizeof(uint8_t) + sizeof(static_cast<uint16_t>(totalPacketLen)));
@@ -1108,7 +1106,8 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 	totalPacketLen += (
 		sizeof(static_cast<uint32_t>(refCmdID  )) +
 		sizeof(static_cast<uint8_t >(refCmdOpts)) +
-		sizeof(static_cast<uint16_t>(refCmdSize))
+		sizeof(static_cast<uint16_t>(refCmdSize)) +
+		sizeof(static_cast<uint8_t >(refCmdQueue))
 	);
 
 	totalPacketLen += sizeof(static_cast<uint16_t>(unitIDCount));
@@ -1117,7 +1116,6 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 	totalPacketLen += sizeof(static_cast<uint16_t>(commandCount));
 	totalPacketLen += (commandCount * optBytesPerCmd);
 	totalPacketLen += (totalParams * sizeof(float)); // params are floats
-	totalPacketLen += (totalQueues * sizeof(uint8_t));
 
 	if (totalPacketLen > 8192) {
 		LOG_L(L_WARNING, "[%s] discarded oversized (len=%i) NETMSG_AICOMMANDS packet", __func__, totalPacketLen);
@@ -1135,7 +1133,8 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 	        << static_cast<uint8_t >(pairwise)
 	        << static_cast<uint32_t>(refCmdID)
 	        << static_cast<uint8_t >(refCmdOpts)
-	        << static_cast<uint16_t>(refCmdSize);
+	        << static_cast<uint16_t>(refCmdSize)
+	        << static_cast<uint8_t >(refCmdQueue);
 
 	// NOTE: does not check for invalid unitIDs
 	*packet << static_cast<uint16_t>(unitIDCount);
@@ -1151,10 +1150,10 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 		if (refCmdID == 0)
 			*packet << static_cast<uint32_t>(cmd.GetID());
 		if (refCmdOpts == 0xFF)
-			*packet << wireOpts(cmd);
+			*packet << static_cast<uint8_t>(cmd.GetOpts());
 		if (refCmdSize == 0xFFFF)
 			*packet << static_cast<uint16_t>(cmd.GetNumParams());
-		if (cmd.GetQueue() != 0)
+		if (refCmdQueue == 0xFF)
 			*packet << cmd.GetQueue();
 
 		for (unsigned int j = 0, n = cmd.GetNumParams(); j < n; j++) {
