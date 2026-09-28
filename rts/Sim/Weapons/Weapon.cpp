@@ -1666,10 +1666,12 @@ int CWeapon::GetShotDelay() const
 float3 CWeapon::GetLeadVec(const CUnit* unit) const
 {
 	const float predictMult = mix(predictSpeedMod, 1.0f, weaponDef->predictBoost);
-	const float predictTime = (accurateLeading > 0)
-		? GetAccuratePredictedImpactTime(unit, unit->pos)
-		: GetPredictedImpactTime(unit->pos)
-	;
+	const float shotDelay = GetShotDelay();
+	const float3 shotPos = unit->pos + unit->speed * predictMult * shotDelay;
+	const float predictTime = shotDelay + ((accurateLeading > 0)
+		? GetAccuratePredictedImpactTime(unit, shotPos)
+		: GetPredictedImpactTime(shotPos)
+	);
 	float3 lead = unit->speed * predictTime * predictMult;
 
 	if (weaponDef->leadLimit < 0.0f)
@@ -1719,7 +1721,7 @@ float3 CWeapon::GetLeadTargetPos(const SWeaponTarget& target) const
 			AdjustTargetPosToWater(p, true);
 			return p;
 		} break;
-		case Target_Intercept: return target.intercept->pos + target.intercept->speed;
+		case Target_Intercept: return target.intercept->pos + target.intercept->speed * (1.0f + GetShotDelay());
 	}
 
 	return currentTargetPos;
