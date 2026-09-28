@@ -163,9 +163,6 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int cmdID = c.GetID();
 
-	if (!AllowedQueue(c))
-		return;
-
 	// move is always allowed for factories (passed to units it produces)
 	if ((cmdID != CMD_MOVE) && !AllowedCommand(c, fromSynced))
 		return;

@@ -682,9 +682,6 @@ bool CCommandAI::AllowedCommand(const Command& c, bool fromSynced)
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int cmdID = c.GetID();
 
-	if (!AllowedQueue(c))
-		return false;
-
 	// TODO check if the command is in the map first, for more commands
 	switch (cmdID) {
 		case CMD_MOVE:
@@ -869,6 +866,9 @@ void CCommandAI::GiveCommand(const Command& c, bool fromSynced)
 void CCommandAI::GiveCommand(const Command& c, int playerNum, bool fromSynced, bool fromLua)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (!AllowedQueue(c))
+		return;
+
 	if (!eventHandler.AllowCommand(owner, c, playerNum, fromSynced, fromLua))
 		return;
 
