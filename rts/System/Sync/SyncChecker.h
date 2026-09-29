@@ -44,6 +44,7 @@ class CSyncChecker {
 		 * work item, store it after, and Sync() the stored values in a fixed order.
 		 */
 		static void SetDeferred(bool b) { deferred = b; }
+		static bool IsDeferred() { return deferred; }
 #ifdef SYNCCHECK
 		static void ResetThreadChecksum();
 		static unsigned GetThreadChecksum();

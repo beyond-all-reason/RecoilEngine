@@ -17,16 +17,12 @@
 #include "System/Sync/SyncChecker.h"
 #include "System/Sync/SyncedPrimitiveBase.h"
 
-#include <limits>
-
 using namespace MoveTypes;
 
-#ifdef SYNCDEBUG
-// the sync debugger logs every synced write in call order, keep such sections serial
-static constexpr int MT_SYNCED_CHUNK_SIZE = std::numeric_limits<int>::max();
-#else
-static constexpr int MT_SYNCED_CHUNK_SIZE = 32;
-#endif
+// Units per ThreadPool task: one unit per task costs an atomic per unit and false sharing between
+// neighbouring components. The heavier steps get smaller chunks to balance their uneven cost.
+static constexpr int MT_UNITS_PER_TASK = 32;
+static constexpr int MT_UNITS_PER_TASK_HEAVY = 16;
 
 void GroundMoveSystem::Init() {}
 
@@ -59,7 +55,7 @@ void GroundMoveSystem::Update() {
             #endif
 
 			moveType->UpdateTraversalPlan();
-		}, 16, 16);
+		}, MT_UNITS_PER_TASK_HEAVY, MT_UNITS_PER_TASK_HEAVY);
 	}
 	{
 		SCOPED_TIMER("Sim::Unit::MoveType::2::ChangeHeading");
@@ -96,7 +92,7 @@ void GroundMoveSystem::Update() {
                 mainHeadingEvent.syncChecksumPending = true;
                 mainHeadingEvent.changed = false;
             }
-        }, MT_SYNCED_CHUNK_SIZE, MT_SYNCED_CHUNK_SIZE);
+        }, MT_UNITS_PER_TASK, MT_UNITS_PER_TASK);
         CSyncChecker::SetDeferred(false);
 
         Sim::registry.view<ChangeHeadingEvent>().each([](ChangeHeadingEvent& event){
@@ -134,7 +130,7 @@ void GroundMoveSystem::Update() {
             assert(moveType != nullptr);
 
 			moveType->UpdateUnitPosition();
-		}, 32, 32);
+		}, MT_UNITS_PER_TASK, MT_UNITS_PER_TASK);
 	}
 	{
         SCOPED_TIMER("Sim::Unit::MoveType::2::UpdatePreCollisions");
@@ -155,7 +151,7 @@ void GroundMoveSystem::Update() {
             if ((state.done = moveType->CanUpdatePreCollisionsMT()))
                 moveType->UpdatePreCollisions();
             state.syncChecksum = CSyncChecker::GetThreadChecksum();
-        }, MT_SYNCED_CHUNK_SIZE, MT_SYNCED_CHUNK_SIZE);
+        }, MT_UNITS_PER_TASK, MT_UNITS_PER_TASK);
         CSyncChecker::SetDeferred(false);
 
         view.each([](GroundMoveType& unitId, PreCollisionsMtState& state){
@@ -189,7 +185,7 @@ void GroundMoveSystem::Update() {
 
             moveType->SetMtJobId(i);
             moveType->UpdateCollisionDetections();
-        }, 16, 16);
+        }, MT_UNITS_PER_TASK_HEAVY, MT_UNITS_PER_TASK_HEAVY);
     }
 	{
         SCOPED_TIMER("Sim::Unit::MoveType::4::ProcessCollisionEvents");
@@ -229,7 +225,7 @@ void GroundMoveSystem::Update() {
             CSyncChecker::ResetThreadChecksum();
             movedEvent.moved = moveType->Update();
             movedEvent.syncChecksum = CSyncChecker::GetThreadChecksum();
-        }, MT_SYNCED_CHUNK_SIZE, MT_SYNCED_CHUNK_SIZE);
+        }, MT_UNITS_PER_TASK, MT_UNITS_PER_TASK);
         CSyncChecker::SetDeferred(false);
 
         view.each([](GroundMoveType& unitId, UnitMovedEvent& movedEvent){

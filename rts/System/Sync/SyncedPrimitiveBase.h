@@ -19,7 +19,9 @@ namespace Sync {
 
 	static inline void AssertDebugger(const void* p, unsigned size, const char* msg) {
 	#ifdef SYNCDEBUG
-		CSyncDebugger::GetInstance()->Sync(p, size, msg);
+		// writes in deferred (MT) sections are recorded per work item when their checksums are folded in
+		if (!CSyncChecker::IsDeferred())
+			CSyncDebugger::GetInstance()->Sync(p, size, msg);
 	#endif
 	}
 
