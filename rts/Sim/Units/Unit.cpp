@@ -2838,6 +2838,7 @@ CR_REG_METADATA(CUnit, (
 
 	CR_MEMBER(soloBuilder),
 	CR_MEMBER(lastAttacker),
+	CR_MEMBER(producingFactory),
 	CR_MEMBER(transporter),
 
 	CR_MEMBER(fpsControlPlayer),
