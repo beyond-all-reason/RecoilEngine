@@ -27,8 +27,19 @@ void CSyncChecker::debugSyncCheckThreading()
 	assert(ThreadPool::GetThreadNum() == 0);
 }
 
+struct alignas(64) ThreadChecksum { unsigned value; };
+static std::array<ThreadChecksum, ThreadPool::MAX_THREADS> threadChecksums;
+
+void CSyncChecker::ResetThreadChecksum() { threadChecksums[ThreadPool::GetThreadNum()].value = 0xfade1eaf; }
+unsigned CSyncChecker::GetThreadChecksum() { return threadChecksums[ThreadPool::GetThreadNum()].value; }
+
 void CSyncChecker::Sync(uint32_t val)
 {
+	if (deferred) {
+		unsigned& checksum = threadChecksums[ThreadPool::GetThreadNum()].value;
+		checksum = spring::hash_combine(val, checksum);
+		return;
+	}
 #ifdef DEBUG_SYNC_MT_CHECK
 	// Sync calls should not be occurring in multi-threaded sections
 	debugSyncCheckThreading();
@@ -43,6 +54,11 @@ void CSyncChecker::Sync(uint32_t val)
 
 void CSyncChecker::Sync(const void* p, unsigned size)
 {
+	if (deferred) {
+		unsigned& checksum = threadChecksums[ThreadPool::GetThreadNum()].value;
+		checksum = spring::LiteHash(p, size, checksum);
+		return;
+	}
 #ifdef DEBUG_SYNC_MT_CHECK
 	// Sync calls should not be occurring in multi-threaded sections
 	debugSyncCheckThreading();

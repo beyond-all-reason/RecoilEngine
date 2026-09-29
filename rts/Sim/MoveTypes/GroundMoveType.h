@@ -49,9 +49,13 @@ public:
 	// This is should be MT safe.
 	void UpdateUnitPosition();
 
+	// Applies the movement from UpdateUnitPosition(). This is MT safe (with deferred sync checks).
+	void ApplyResultantForces();
+
 	// Resolves post UpdateTraversalPlan() and UpdateUnitPosition() tasks that must be carried out in a single
-	// thread.
+	// thread, unless CanUpdatePreCollisionsMT() says there are none this frame.
 	void UpdatePreCollisions();
+	bool CanUpdatePreCollisionsMT();
 
 	// Carry out unit collision detections and resolution. Actual movement will be carried in Update() later because
 	// moving units will impact further collisions during these checks. All collision events have to be recorded in the
@@ -204,6 +208,8 @@ public:
     void SetMainHeading();
     void ChangeSpeed(float, bool, bool = false);
 	void ChangeHeading(short newHeading);
+	// false if ChangeHeading or SetMainHeading can call the unit script or test weapon ranges
+	bool CanChangeHeadingMT() const { return minScriptChangeHeading > turnRate && !useMainHeading; }
 private:
 	void UpdateSkid();
 	void UpdateControlledDrop();
