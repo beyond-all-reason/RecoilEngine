@@ -534,10 +534,20 @@ bool CStrafeAirMoveType::Update()
 			break;
 	}
 
-	if (lastSpd == ZeroVector && owner->speed != ZeroVector) { owner->script->StartMoving(false); }
-	if (lastSpd != ZeroVector && owner->speed == ZeroVector) { owner->script->StopMoving(); }
+	UpdateMovingScript(lastSpd);
 
 	return (HandleCollisions(collide && !owner->beingBuilt && (aircraftState != AIRCRAFT_TAKEOFF)));
+}
+
+bool CStrafeAirMoveType::CanUpdateMT() const
+{
+	if (!AAirMoveType::CanUpdateMT())
+		return false;
+	if (aircraftState != AIRCRAFT_FLYING || owner->curTarget.type == Target_None)
+		return true;
+
+	// attacking: loopback maneuvers use gsRNG, and an aircraft target may be updated concurrently
+	return (!loopbackAttack && (owner->curTarget.type != Target_Unit || !owner->curTarget.unit->unitDef->canfly));
 }
 
 
