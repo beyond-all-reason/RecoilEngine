@@ -66,7 +66,7 @@ SWeaponTarget::SWeaponTarget(const CUnit* u, float3 p, bool userTarget, bool aut
 , isManualFire(false)
 , unit(const_cast<CUnit*>(u))
 , intercept(nullptr)
-, groundPos((u != nullptr)? p : ZeroVector)
+, groundPos(p)
 {}
 
 
