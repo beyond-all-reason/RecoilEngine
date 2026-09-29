@@ -1636,9 +1636,9 @@ void CUnit::ChangeTeamReset()
 
 		if (facAI != nullptr) {
 			std::vector<Command> clearCommands;
-			clearCommands.reserve(facAI->commandQue.size());
+			clearCommands.reserve(facAI->GetOwnQueue().size());
 
-			for (auto& cmd: facAI->commandQue) {
+			for (auto& cmd: facAI->GetOwnQueue()) {
 				clearCommands.emplace_back(cmd.GetID(), RIGHT_MOUSE_KEY);
 			}
 			for (auto& cmd: clearCommands) {
@@ -1722,7 +1722,7 @@ bool CUnit::IsIdle() const
 	if (beingBuilt)
 		return false;
 
-	return (commandAI->commandQue.empty());
+	return (commandAI->GetOwnQueue().empty());
 }
 
 
@@ -2687,7 +2687,7 @@ bool CUnit::DetachUnit(CUnit* unit)
 		unit->Block();
 
 		// erase command queue unless it's a wait command
-		const CCommandQueue& queue = unit->commandAI->commandQue;
+		const CCommandQueue& queue = unit->commandAI->GetOwnQueue();
 
 		if (unitDef->IsTransportUnit() && (queue.empty() || (queue.front().GetID() != CMD_WAIT)))
 			unit->commandAI->GiveCommand(Command(CMD_STOP));

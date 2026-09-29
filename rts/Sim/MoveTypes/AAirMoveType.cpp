@@ -132,7 +132,7 @@ bool AAirMoveType::UseSmoothMesh() const {
 		return false;
 
 	const CCommandAI* cai = owner->commandAI;
-	const CCommandQueue& cq = cai->commandQue;
+	const CCommandQueue& cq = cai->GetOwnQueue();
 	const Command& fc = (cq.empty())? Command(CMD_STOP): cq.front();
 
 	const bool closeGoalPos = (goalPos.SqDistance2D(owner->pos) < Square(landRadiusSq * 2.0f));

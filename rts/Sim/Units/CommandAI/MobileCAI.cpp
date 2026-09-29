@@ -340,16 +340,16 @@ void CMobileCAI::SlowUpdate()
 	if (gs->paused) // Commands issued may invoke SlowUpdate when paused
 		return;
 
-	if (!commandQue.empty() && commandQue.front().GetTimeOut() < gs->frameNum) {
+	if (!GetOwnQueue().empty() && GetOwnQueue().front().GetTimeOut() < gs->frameNum) {
 		StopMoveAndFinishCommand();
 		return;
 	}
 
-	if (commandQue.empty()) {
+	if (GetOwnQueue().empty()) {
 		MobileAutoGenerateTarget();
 
 		// the attack order could terminate directly and thus cause a loop
-		if (commandQue.empty() || (commandQue.front()).GetID() == CMD_ATTACK)
+		if (GetOwnQueue().empty() || (GetOwnQueue().front()).GetID() == CMD_ATTACK)
 			return;
 	}
 
@@ -358,12 +358,12 @@ void CMobileCAI::SlowUpdate()
 }
 
 /**
-* @brief Executes the first command in the commandQue
+* @brief Executes the first command in the GetOwnQueue()
 */
 void CMobileCAI::Execute()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	Command& c = commandQue.front();
+	Command& c = GetOwnQueue().front();
 
 	switch (c.GetID()) {
 		case CMD_MOVE:      { ExecuteMove(c);     return; }
@@ -444,12 +444,12 @@ void CMobileCAI::ExecuteLoadOnto(Command& c) {
 	if (inCommand == CMD_STOP) {
 		inCommand = CMD_LOAD_UNITS;
 		// order transport to load <owner> before resuming its own queue
-		transport->commandAI->commandQue.push_front(Command(CMD_LOAD_UNITS, INTERNAL_ORDER | SHIFT_KEY, owner->id));
+		transport->commandAI->GetOwnQueue().push_front(Command(CMD_LOAD_UNITS, INTERNAL_ORDER | SHIFT_KEY, owner->id));
 	}
 
 	if (owner->GetTransporter() == transport) {
 		// owner already loaded; <c> should still be in front of queue
-		assert(!commandQue.empty());
+		assert(!GetOwnQueue().empty());
 		StopMoveAndFinishCommand();
 		return;
 	}
@@ -475,9 +475,9 @@ void CMobileCAI::ExecutePatrol(Command& c)
 
 	Command temp(CMD_FIGHT, c.GetOpts() | INTERNAL_ORDER, c.GetPos(0));
 
-	commandQue.push_back(c);
-	commandQue.pop_front();
-	commandQue.push_front(temp);
+	GetOwnQueue().push_back(c);
+	GetOwnQueue().pop_front();
+	GetOwnQueue().push_front(temp);
 
 	eoh->CommandFinished(*owner, Command(CMD_PATROL));
 	ExecuteFight(temp);
@@ -555,7 +555,7 @@ void CMobileCAI::ExecuteFight(Command& c)
 
 			// make the attack-command inherit <c>'s options
 			// NOTE: see AirCAI::ExecuteFight why we do not set INTERNAL_ORDER
-			commandQue.push_front(Command(CMD_ATTACK, c.GetOpts(), enemy->id));
+			GetOwnQueue().push_front(Command(CMD_ATTACK, c.GetOpts(), enemy->id));
 
 			inCommand = CMD_STOP;
 			tempOrder = true;
@@ -631,7 +631,7 @@ void CMobileCAI::ExecuteGuard(Command& c)
 		IsValidTarget(guardee->lastAttacker, nullptr);
 
 	if (pushAttackCommand) {
-		commandQue.push_front(Command(CMD_ATTACK, c.GetOpts(), guardee->lastAttacker->id));
+		GetOwnQueue().push_front(Command(CMD_ATTACK, c.GetOpts(), guardee->lastAttacker->id));
 
 		StopSlowGuard();
 		SlowUpdate();
@@ -1030,12 +1030,12 @@ void CMobileCAI::SetGoal(const float3& pos, const float3& /*curPos*/, float goal
 bool CMobileCAI::SetFrontMoveCommandPos(const float3& pos)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (commandQue.empty())
+	if (GetOwnQueue().empty())
 		return false;
-	if ((commandQue.front()).GetID() != CMD_MOVE)
+	if ((GetOwnQueue().front()).GetID() != CMD_MOVE)
 		return false;
 
-	(commandQue.front()).SetPos(0, pos);
+	(GetOwnQueue().front()).SetPos(0, pos);
 	return true;
 }
 
@@ -1140,7 +1140,7 @@ void CMobileCAI::NonMoving()
 	Command c(CMD_MOVE, buggerPos);
 	c.SetOpts(INTERNAL_ORDER);
 	c.SetTimeOut(gs->frameNum + BUGGER_OFF_TTL);
-	commandQue.push_front(c);
+	GetOwnQueue().push_front(c);
 
 	buggerOffAttempts++;
 }
@@ -1150,7 +1150,7 @@ void CMobileCAI::FinishCommand()
 	RECOIL_DETAILED_TRACY_ZONE;
 	SetTransportee(nullptr);
 
-	if (!commandQue[0].IsInternalOrder())
+	if (!GetOwnQueue()[0].IsInternalOrder())
 		lastUserGoal = owner->pos;
 
 	tempOrder = false;
@@ -1161,7 +1161,7 @@ void CMobileCAI::FinishCommand()
 	if (owner->unitDef->IsTransportUnit()) {
 		CHoverAirMoveType* am = dynamic_cast<CHoverAirMoveType*>(owner->moveType);
 
-		if (am == nullptr || !commandQue.empty())
+		if (am == nullptr || !GetOwnQueue().empty())
 			return;
 
 		am->SetWantedAltitude(0.0f);
@@ -1173,7 +1173,7 @@ bool CMobileCAI::MobileAutoGenerateTarget()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	//FIXME merge with CWeapon::AutoTarget()
-	assert(commandQue.empty());
+	assert(GetOwnQueue().empty());
 
 	#if (AUTO_GENERATE_ATTACK_ORDERS == 1)
 	if (GenerateAttackCmd())
@@ -1270,7 +1270,7 @@ bool CMobileCAI::GenerateAttackCmd()
 
 	Command c(CMD_ATTACK, INTERNAL_ORDER, newAttackTargetId);
 	c.SetTimeOut(gs->frameNum + GAME_SPEED * 5);
-	commandQue.push_front(c);
+	GetOwnQueue().push_front(c);
 
 	commandPos1 = owner->pos;
 	commandPos2 = owner->pos;
@@ -1305,7 +1305,7 @@ void CMobileCAI::StartSlowGuard(float speed) {
 
 	if (speed <= 0.0f)
 		return;
-	if (commandQue.empty())
+	if (GetOwnQueue().empty())
 		return;
 	if (owner->moveType->GetMaxSpeed() < speed)
 		return;
@@ -1378,13 +1378,13 @@ void CMobileCAI::ExecuteLoadUnits(Command& c)
 
 			if (c.IsInternalOrder()) {
 				// internally issued by MobileCAI
-				if (unit->commandAI->commandQue.empty()) {
+				if (unit->commandAI->GetOwnQueue().empty()) {
 					if (!LoadStillValid(unit)) {
 						StopMoveAndFinishCommand();
 						return;
 					}
 				} else {
-					const Command& currentUnitCommand = unit->commandAI->commandQue[0];
+					const Command& currentUnitCommand = unit->commandAI->GetOwnQueue()[0];
 
 					if ((currentUnitCommand.GetID() == CMD_LOAD_ONTO) && (currentUnitCommand.GetNumParams() == 1) && (int(currentUnitCommand.GetParam(0)) == owner->id)) {
 						if ((unit->moveType->progressState == AMoveType::Failed) && (owner->moveType->progressState == AMoveType::Failed)) {
@@ -1498,7 +1498,7 @@ void CMobileCAI::ExecuteLoadUnits(Command& c)
 			CUnit* unit = FindUnitToTransport(pos, radius);
 
 			if (unit != nullptr && owner->CanTransport(unit)) {
-				commandQue.push_front(Command(CMD_LOAD_UNITS, c.GetOpts() | INTERNAL_ORDER, unit->id));
+				GetOwnQueue().push_front(Command(CMD_LOAD_UNITS, c.GetOpts() | INTERNAL_ORDER, unit->id));
 				inCommand = CMD_STOP;
 
 				SlowUpdate();
@@ -1739,13 +1739,13 @@ CUnit* CMobileCAI::FindUnitToTransport(float3 center, float radius)
 bool CMobileCAI::LoadStillValid(CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (commandQue.size() < 2)
+	if (GetOwnQueue().size() < 2)
 		return false;
 
-	const Command& cmd = commandQue[1];
+	const Command& cmd = GetOwnQueue()[1];
 
 	// we are called from ExecuteLoadUnits only in the case that
-	// that commandQue[0].id == CMD_LOAD_UNITS, so if the second
+	// that GetOwnQueue()[0].id == CMD_LOAD_UNITS, so if the second
 	// command is NOT an area- but a single-unit-loading command
 	// (which has one parameter) then the first one will be valid
 	// (ELU keeps pushing CMD_LOAD_UNITS as long as there are any
@@ -1864,7 +1864,7 @@ void CMobileCAI::UnloadUnits_Land(Command& c)
 	if (transportee != nullptr) {
 		Command c2(CMD_UNLOAD_UNIT, c.GetOpts() | INTERNAL_ORDER, unloadPos);
 		c2.PushParam(transportee->id);
-		commandQue.push_front(c2);
+		GetOwnQueue().push_front(c2);
 		SlowUpdate();
 		return;
 	}
@@ -1892,7 +1892,7 @@ void CMobileCAI::UnloadUnits_Drop(Command& c)
 		auto di = dropSpots.rbegin();
 
 		for (; ti != transportees.end() && di != dropSpots.rend(); ++ti, ++di) {
-			commandQue.push_front(Command(CMD_UNLOAD_UNIT, c.GetOpts() | INTERNAL_ORDER, *di));
+			GetOwnQueue().push_front(Command(CMD_UNLOAD_UNIT, c.GetOpts() | INTERNAL_ORDER, *di));
 		}
 
 		SlowUpdate();
@@ -1921,7 +1921,7 @@ void CMobileCAI::UnloadUnits_LandFlood(Command& c)
 	const CUnit* transportee = transportees[0].unit;
 
 	if (FindEmptySpot(transportee, pos, radius, transportee->radius * owner->unitDef->unloadSpread, found)) {
-		commandQue.push_front(Command(CMD_UNLOAD_UNIT, c.GetOpts() | INTERNAL_ORDER, found));
+		GetOwnQueue().push_front(Command(CMD_UNLOAD_UNIT, c.GetOpts() | INTERNAL_ORDER, found));
 		SlowUpdate();
 		return;
 	}

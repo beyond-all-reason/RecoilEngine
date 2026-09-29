@@ -172,7 +172,7 @@ void CAirCAI::SlowUpdate()
 	if (gs->paused)
 		return;
 
-	if (!commandQue.empty() && (commandQue.front().GetTimeOut() < gs->frameNum)) {
+	if (!GetOwnQueue().empty() && (GetOwnQueue().front().GetTimeOut() < gs->frameNum)) {
 		StopMoveAndFinishCommand();
 		return;
 	}
@@ -183,7 +183,7 @@ void CAirCAI::SlowUpdate()
 
 
 	#if (AUTO_GENERATE_ATTACK_ORDERS == 1)
-	if (commandQue.empty()) {
+	if (GetOwnQueue().empty()) {
 		// queue remains empty if no target, can bail early
 		if (!AirAutoGenerateTarget(GetStrafeAirMoveType(owner)))
 			return;
@@ -192,7 +192,7 @@ void CAirCAI::SlowUpdate()
 
 	// FIXME: check owner->UsingScriptMoveType() and skip rest if true?
 	AAirMoveType* myPlane = GetStrafeAirMoveType(owner);
-	Command& c = commandQue.front();
+	Command& c = GetOwnQueue().front();
 
 	switch (c.GetID()) {
 		case CMD_WAIT: {
@@ -212,7 +212,7 @@ void CAirCAI::SlowUpdate()
 
 bool CAirCAI::AirAutoGenerateTarget(AAirMoveType* myPlane) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	assert(commandQue.empty());
+	assert(GetOwnQueue().empty());
 	assert(myPlane->owner == owner);
 
 	if (owner->weapons.empty())
@@ -251,7 +251,7 @@ bool CAirCAI::AirAutoGenerateTarget(AAirMoveType* myPlane) {
 	if (!eventHandler.AllowWeaponTarget(owner->id, tgt->id, wpn->weaponNum, wpn->weaponDef->id, nullptr))
 		return false;
 
-	commandQue.push_front(Command(CMD_ATTACK, INTERNAL_ORDER, tgt->id));
+	GetOwnQueue().push_front(Command(CMD_ATTACK, INTERNAL_ORDER, tgt->id));
 	inCommand = CMD_STOP;
 	return true;
 }
@@ -342,7 +342,7 @@ void CAirCAI::ExecuteFight(Command& c)
 			// noAutoTarget set (although the <enemy> CUnit*
 			// is technically not a user-target, we treat it
 			// as such) even when explicitly told to fight
-			commandQue.push_front(Command(CMD_ATTACK, c.GetOpts(), enemy->id));
+			GetOwnQueue().push_front(Command(CMD_ATTACK, c.GetOpts(), enemy->id));
 
 			tempOrder = true;
 			inCommand = CMD_STOP;
@@ -363,7 +363,7 @@ void CAirCAI::ExecuteFight(Command& c)
 				PushOrUpdateReturnFight();
 
 				// make the attack-command inherit <c>'s options
-				commandQue.push_front(Command(CMD_ATTACK, c.GetOpts(), enemy->id));
+				GetOwnQueue().push_front(Command(CMD_ATTACK, c.GetOpts(), enemy->id));
 
 				tempOrder = true;
 				inCommand = CMD_STOP;
@@ -507,7 +507,7 @@ void CAirCAI::ExecuteGuard(Command& c)
 		IsValidTarget(guardee->lastAttacker, nullptr);
 
 	if (pushAttackCommand) {
-		commandQue.push_front(Command(CMD_ATTACK, c.GetOpts() | INTERNAL_ORDER, guardee->lastAttacker->id));
+		GetOwnQueue().push_front(Command(CMD_ATTACK, c.GetOpts() | INTERNAL_ORDER, guardee->lastAttacker->id));
 		SlowUpdate();
 	} else {
 		Command c2(CMD_MOVE, c.GetOpts() | INTERNAL_ORDER);
@@ -519,7 +519,7 @@ void CAirCAI::ExecuteGuard(Command& c)
 			c2.PushPos(guardee->pos.cClampInBounds());
 		}
 
-		commandQue.push_front(c2);
+		GetOwnQueue().push_front(c2);
 	}
 }
 

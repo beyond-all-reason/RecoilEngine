@@ -241,7 +241,7 @@ void CFactory::UpdateBuild(CUnit* buildee) {
 	buildee->Move(buildeePos, false);
 	buildee->SetHeading((-buildPieceHeading + buildFaceHeading) & (SPRING_CIRCLE_DIVS - 1), false, false, 0.0f);
 
-	const CCommandQueue& queue = commandAI->commandQue;
+	const CCommandQueue& queue = commandAI->GetOwnQueue();
 
 	if (!queue.empty() && (queue.front().GetID() == CMD_WAIT)) {
 		buildee->AddBuildPower(this, 0.0f);
@@ -267,7 +267,7 @@ void CFactory::FinishBuild(CUnit* buildee) {
 
 	const CCommandAI* bcai = buildee->commandAI;
 	// if not idle, the buildee already has user orders
-	const bool buildeeIdle = (bcai->commandQue.empty());
+	const bool buildeeIdle = (bcai->GetOwnQueue().empty());
 	const bool buildeeMobile = (dynamic_cast<const CMobileCAI*>(bcai) != nullptr);
 
 	if (buildeeIdle || buildeeMobile) {
@@ -445,10 +445,10 @@ void CFactory::SendToEmptySpot(CUnit* unit)
 void CFactory::AssignBuildeeOrders(CUnit* unit) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	CCommandAI* unitCAI = unit->commandAI;
-	CCommandQueue& unitCmdQue = unitCAI->commandQue;
+	CCommandQueue& unitCmdQue = unitCAI->GetOwnQueue();
 
 	const CFactoryCAI* factoryCAI = static_cast<CFactoryCAI*>(commandAI);
-	const CCommandQueue& factoryCmdQue = factoryCAI->newUnitCommands;
+	const CCommandQueue& factoryCmdQue = factoryCAI->GetNewUnitQueue();
 
 	if (factoryCmdQue.empty() && unitCmdQue.empty()) {
 		SendToEmptySpot(unit);

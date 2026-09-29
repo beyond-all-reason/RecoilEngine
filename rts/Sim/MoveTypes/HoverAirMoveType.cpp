@@ -88,7 +88,7 @@ static bool UnitIsBusy(const CCommandAI* cai) {
 }
 
 static bool UnitHasLoadCmd(const CCommandAI* cai) {
-	const auto& que = cai->commandQue;
+	const auto& que = cai->GetOwnQueue();
 	const auto& cmd = (que.empty())? Command(CMD_STOP): que.front();
 
 	// NOTE:
