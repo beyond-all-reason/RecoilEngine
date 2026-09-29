@@ -208,7 +208,8 @@ public:
     void SetMainHeading();
     void ChangeSpeed(float, bool, bool = false);
 	void ChangeHeading(short newHeading);
-	// false if ChangeHeading or SetMainHeading can call the unit script or test weapon ranges
+	// ChangeHeading turns at most turnRate per frame and only calls script->ChangeHeading for turns of at least
+	// minScriptChangeHeading; SetMainHeading only tests weapon ranges with useMainHeading. Otherwise both are MT safe.
 	bool CanChangeHeadingMT() const { return minScriptChangeHeading > turnRate && !useMainHeading; }
 private:
 	void UpdateSkid();

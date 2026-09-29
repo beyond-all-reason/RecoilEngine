@@ -141,13 +141,16 @@ namespace ThreadPool {
 
 
 struct MultithreadedSection {
-	MultithreadedSection() {
+	MultithreadedSection(): wasInSection(ThreadPool::IsInMultiThreadedSection()) {
 		ThreadPool::SetInMultiThreadedSection(true);
 	}
 
+	// restore instead of clearing, a nested for_mt on a worker would otherwise clear the worker's flag for good
 	~MultithreadedSection() {
-		ThreadPool::SetInMultiThreadedSection(false);
+		ThreadPool::SetInMultiThreadedSection(wasInSection);
 	}
+
+	const bool wasInSection;
 };
 
 
