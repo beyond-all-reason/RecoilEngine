@@ -24,6 +24,9 @@ class CCommandQueue {
 
 		inline QueueType GetType() const { return queueType; }
 
+		inline bool GetRepeat() const { return repeat; }
+		inline void SetRepeat(bool b) { repeat = b; }
+
 	public:
 		/// limit to a float's integer range
 		static const int maxTagValue = (1 << 24); // 16777216
@@ -110,6 +113,8 @@ class CCommandQueue {
 		std::deque<Command> queue;
 		QueueType queueType;
 		int tagCounter;
+
+		bool repeat = false;
 };
 
 
