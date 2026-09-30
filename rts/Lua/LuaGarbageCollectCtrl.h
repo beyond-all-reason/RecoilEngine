@@ -3,6 +3,7 @@
 #ifndef SPRING_LUA_GARBAGE_COLLECT_CTRL_H
 #define SPRING_LUA_GARBAGE_COLLECT_CTRL_H
 
+#include <cstdint>
 #include <limits>
 
 struct SLuaGarbageCollectCtrl {
@@ -20,6 +21,15 @@ struct SLuaGarbageCollectCtrl {
 
 	float baseRunTimeMult = 0.0f;
 	float baseMemLoadMult = 0.0f;
+	// KB of collector stepping owed per KB the state allocates
+	float baseWorkMult = 0.0f;
+	// debt (in KB) below which a call does nothing, so calls do meaningful batches
+	int minStepDebtKB = 0;
+
+	// state footprint at the end of the previous CollectGarbage call
+	uint64_t allocedBytesAtLastGC = 0;
+	// stepping (in KB) owed to the collector but not yet performed
+	int64_t stepDebtKB = 0;
 };
 
 #endif
