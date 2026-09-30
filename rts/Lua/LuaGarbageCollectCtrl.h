@@ -23,8 +23,9 @@ struct SLuaGarbageCollectCtrl {
 	float baseMemLoadMult = 0.0f;
 	// KB of collector stepping owed per KB the state allocates
 	float baseWorkMult = 0.0f;
-	// debt (in KB) below which a call does nothing, so calls do meaningful batches
-	int minStepDebtKB = 0;
+	// debt (in KB) below which a call does nothing, so a near-idle state is not
+	// visited every frame for a few KB (the call has a fixed cost of a few us)
+	static constexpr int MIN_STEP_DEBT_KB = 16;
 
 	// state footprint at the end of the previous CollectGarbage call
 	uint64_t allocedBytesAtLastGC = 0;

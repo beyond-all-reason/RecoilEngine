@@ -75,7 +75,6 @@
 CONFIG(float, LuaGarbageCollectionMemLoadMult).defaultValue(1.33f).minimumValue(0.0f).maximumValue(100.0f).description("How much the global Lua memory load (footprint as a fraction of LuaAllocLimit) increases the rate of garbage collection.");
 CONFIG(float, LuaGarbageCollectionRunTimeMult).defaultValue(5.0f).minimumValue(1.0f).description("How many milliseconds the garbage collector may run for per Lua state in each GC cycle; work it could not fit carries over to the next cycle");
 CONFIG(float, LuaGarbageCollectionWorkMult).defaultValue(1.5f).minimumValue(0.1f).maximumValue(100.0f).description("Kilobytes of garbage-collector stepping requested per kilobyte a Lua state allocates; higher frees garbage sooner at more CPU cost");
-CONFIG(int, LuaGarbageCollectionMinDebt).defaultValue(16).minimumValue(0).maximumValue(65536).description("Kilobytes of owed garbage-collector stepping a Lua state accumulates before a GC cycle runs for it");
 
 
 static spring::unsynced_set<const luaContextData*>    SYNCED_LUAHANDLE_CONTEXTS;
@@ -162,7 +161,6 @@ CLuaHandle::CLuaHandle(const string& _name, int _order, bool _userMode, bool _sy
 	D.gcCtrl.baseMemLoadMult = configHandler->GetFloat("LuaGarbageCollectionMemLoadMult");
 	D.gcCtrl.baseRunTimeMult = configHandler->GetFloat("LuaGarbageCollectionRunTimeMult");
 	D.gcCtrl.baseWorkMult = configHandler->GetFloat("LuaGarbageCollectionWorkMult");
-	D.gcCtrl.minStepDebtKB = configHandler->GetInt("LuaGarbageCollectionMinDebt");
 
 	currentCobArgs = nullptr;
 
@@ -4318,7 +4316,7 @@ void CLuaHandle::CollectGarbage(bool forced)
 		gcCtrl.stepDebtKB = 0;
 	}
 
-	if (!forced && gcCtrl.stepDebtKB < gcCtrl.minStepDebtKB) {
+	if (!forced && gcCtrl.stepDebtKB < SLuaGarbageCollectCtrl::MIN_STEP_DEBT_KB) {
 		gcCtrl.allocedBytesAtLastGC = allocedBytes;
 		return;
 	}
