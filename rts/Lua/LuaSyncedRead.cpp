@@ -6261,6 +6261,8 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 		LuaPushNamedNumber(L, "wantedHeight",  sAMT->wantedHeight);
 		LuaPushNamedBool  (L, "collide",       sAMT->collide);
 		LuaPushNamedBool  (L, "useSmoothMesh", sAMT->useSmoothMesh);
+		LuaPushNamedNumber(L, "terrainLookahead",        sAMT->terrainLookahead);
+		LuaPushNamedNumber(L, "terrainLookaheadDescent", sAMT->terrainLookaheadDescent);
 
 		LuaPushNamedNumber(L, "myGravity", sAMT->myGravity);
 
