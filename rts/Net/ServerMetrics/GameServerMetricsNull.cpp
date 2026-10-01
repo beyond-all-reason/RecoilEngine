@@ -18,3 +18,5 @@ void ServerMetrics::Shutdown() {}
 void ServerMetrics::Update(const CGameServer&) {}
 
 void ServerMetrics::SetGameStartTime(double) {}
+
+void ServerMetrics::ResetConnectionDeltas(int) {}

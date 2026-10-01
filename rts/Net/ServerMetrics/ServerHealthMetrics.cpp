@@ -69,6 +69,11 @@ void ServerHealthMetrics::Init(prometheus::Registry& registry, const std::string
 		"How far the player's last acked sim frame is behind the server, in sim frames");
 	metricPlayerCpu = gaugeFamily("recoil_server_per_player_cpu_usage",
 		"Client-reported cpu usage in [0,1]");
+	// The name is here rather than on every per-player series for the same
+	// reason the game id is: it keeps the series themselves stable/reduces
+	// churn.
+	metricPlayerInfo = gaugeFamily("recoil_server_per_player_info",
+		"Constant 1, labels map a player slot to their name");
 }
 
 
@@ -106,6 +111,13 @@ void ServerHealthMetrics::Update(const CGameServer& server)
 			numPlayers++;
 
 		PlayerMetrics& pm = GetPlayerSlot(p.id);
+
+		// player info metric is kept for the entire game once published, unlike
+		// the other gauges which disappear on player disconnects.
+		if (metrics::PerPlayerEnabled() && pm.info == nullptr) {
+			pm.info = &metricPlayerInfo->Add({{"playerid", std::to_string(p.id)}, {"player", p.name}});
+			pm.info->Set(1);
+		}
 
 		if (server.gameHasStarted && p.myState == GameParticipant::INGAME) {
 			const int lagFrames = std::max(0, server.serverFrameNum - p.lastFrameResponse);
