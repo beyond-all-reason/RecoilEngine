@@ -180,6 +180,23 @@ option(TRACY_PROFILE_MEMORY "Profile memory allocations" OFF)
 
 add_subdirectory(tracy)
 
+# prometheus-cpp: metrics registry + embedded /metrics HTTP endpoint (pull mode).
+# civetweb is vendored inside it as a submodule. "push" (-gateway) support would
+# require libcurl, so it stays off.
+if (ENABLE_METRICS)
+	# block() so none of this leaks, given that ENABLE_TESTING, etc. are generic names
+	block()
+		set(ENABLE_PULL ON)
+		set(ENABLE_PUSH OFF)
+		set(ENABLE_COMPRESSION OFF)
+		set(ENABLE_TESTING OFF)
+		set(GENERATE_PKGCONFIG OFF)
+		# Metric values are doubles, so keep its FP constants double-precision
+		string(REPLACE "-fsingle-precision-constant" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+		add_subdirectory(prometheus-cpp)
+	endblock()
+endif()
+
 if (TRACY_ENABLE)
 	option(RMLUI_TRACY_PROFILING "Enable RmlUi profiling with Tracy." ON)
 	# We have our own memory profiling, never enable RmlUi one.

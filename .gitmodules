@@ -52,3 +52,6 @@
 [submodule "rts/lib/streflop"]
 	path = rts/lib/streflop
 	url = https://github.com/RecoilEngine/streflop.git
+[submodule "rts/lib/prometheus-cpp"]
+	path = rts/lib/prometheus-cpp
+	url = https://github.com/jupp0r/prometheus-cpp.git

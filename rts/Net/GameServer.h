@@ -42,6 +42,7 @@ class CGameSetup;
 class ChatMessage;
 class GameParticipant;
 class GameSkirmishAI;
+class ServerMetrics;
 
 class GameTeam : public TeamBase
 {
@@ -65,6 +66,8 @@ private:
 class CGameServer
 {
 	friend class CCregLoadSaveHandler; // For initializing server state after load
+	// the metrics classes only ever *read* server state to publish, never write
+	friend class ServerMetrics;
 public:
 	CGameServer(
 		const std::shared_ptr<const ClientSetup> newClientSetup,
@@ -223,6 +226,8 @@ private:
 	std::pair<std::string, std::string> refClientVersion;
 
 	std::deque< std::shared_ptr<const netcode::RawPacket> > packetCache;
+
+	std::unique_ptr<ServerMetrics> serverMetrics;
 
 	/////////////////// sync stuff ///////////////////
 #ifdef SYNCCHECK
