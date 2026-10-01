@@ -152,6 +152,9 @@ private:
 	void RequestResend(ChunkPtr ptr, bool noSort);
 	void SendPacket(Packet& pkt);
 
+	/// application bytes queued for this link but not yet transmitted
+	unsigned int OutgoingQueuedBytes() const;
+
 	void UpdateWaitingPackets();
 	void UpdateResendRequests();
 
