@@ -344,6 +344,12 @@ if (NOT HAVE_STRNLEN)
 	message(FATAL_ERROR "this compiler/environment isn't supported, the function strnlen is missing!")
 endif()
 
+include (CheckFunctionExists)
+check_symbol_exists(getexecpath unistd.h HAVE_GETEXECPATH)
+if (HAVE_GETEXECPATH)
+	add_definitions(-DHAVE_GETEXECPATH)
+endif()
+
 ### Add Link-Time-Optimization flags, if supported (GCC >= 4.5) and enabled
 option(LTO "Link Time Optimizations (LTO)" FALSE)
 if    (LTO)

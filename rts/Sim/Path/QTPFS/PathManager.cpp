@@ -177,7 +177,7 @@ QTPFS::PathManager::PathManager() {
 	UnsyncedPathSearch::InitStatic();
 	ExternallyManagedPathSearch::InitStatic();
 
-	assert(registry.storage<entt::entity>().free_list() == 0);
+	assert(registry.storage<decltype(registry)::entity_type>().free_list() == 0);
 
 	// reserve entity 0 so it can't be used picked up by a path by accident.
 	systemEntity = registry.create();
@@ -267,9 +267,9 @@ QTPFS::PathManager::~PathManager() {
 	// make sure this is destroyed last to ensure entity 0 will be first picked up next time.
 	registry.destroy(systemEntity);
 
-	LOG("%s: %d entities still active!", __func__, int(registry.storage<entt::entity>().free_list()));
+	LOG("%s: %d entities still active!", __func__, int(registry.storage<decltype(registry)::entity_type>().free_list()));
 
-	assert(registry.storage<entt::entity>().free_list() == 0);
+	assert(registry.storage<decltype(registry)::entity_type>().free_list() == 0);
 
 	registry.clear();
 }

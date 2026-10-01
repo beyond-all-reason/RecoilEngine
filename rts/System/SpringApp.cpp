@@ -1070,6 +1070,26 @@ void SpringApp::Kill(bool fromRun)
 }
 
 
+// close button, Alt+F4, SDL_QUIT; quitforce and Spring.Quit set globalQuit directly and skip this
+static void RequestQuit()
+{
+	if (gu->globalQuit)
+		return;
+
+	// don't call into Lua while loading, events are pumped from the load thread and handles are still registering
+	if (game != nullptr && !game->IsDoneLoading()) {
+		gu->globalQuit = true;
+		return;
+	}
+
+	if (!eventHandler.AllowQuit()) {
+		LOG("[SpringApp::%s] quit vetoed by Lua (AllowQuit), use /quitforce to override", __func__);
+		return;
+	}
+
+	gu->globalQuit = true;
+}
+
 bool SpringApp::MainEventHandler(const SDL_Event& event)
 {
 	switch (event.type) {
@@ -1221,7 +1241,7 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 		} break;
 
 		case SDL_EVENT_WINDOW_CLOSE_REQUESTED: {
-			gu->globalQuit = true;
+			RequestQuit();
 		} break;
 		case SDL_EVENT_AUDIO_DEVICE_REMOVED: {
 			LOG("[SpringApp::%s][SDL_EVENT_AUDIO_DEVICE_REMOVED][1] which=%u, recording=%u", __func__, (unsigned)event.adevice.which, (unsigned)event.adevice.recording);
@@ -1232,7 +1252,7 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 			sound->DeviceChanged(event.adevice.which);
 		} break;
 		case SDL_EVENT_QUIT: {
-			gu->globalQuit = true;
+			RequestQuit();
 		} break;
 		case SDL_EVENT_TEXT_EDITING: {
 			if (activeController != nullptr)

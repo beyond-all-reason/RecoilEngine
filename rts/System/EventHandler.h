@@ -250,6 +250,7 @@ class CEventHandler
 		void MiniMapStateChanged(const bool isMinimized, const bool isMaximized, const bool isSlaved);
 		void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim);
 		bool CommandNotify(const Command& cmd);
+		bool AllowQuit();
 
 		bool AddConsoleLine(const std::string& msg, const std::string& section, int level);
 

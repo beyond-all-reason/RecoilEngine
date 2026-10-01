@@ -3824,6 +3824,32 @@ bool CLuaHandle::CommandNotify(const Command& cmd)
 }
 
 
+/*** Called when the window is about to be closed (close button, Alt+F4, or a quit request from the OS).
+ *
+ * Every unsynced handle is asked and one `false` is enough to keep the game running. `Spring.Quit` and `/quitforce` do not ask, so a game that vetoed can still quit later and the user can always force an exit. One click can trigger this twice, once per SDL event. Not asked while the game is still loading, so LuaIntro never receives it.
+ *
+ * @function Callins:AllowQuit
+ * @return boolean allow false keeps the game running
+ */
+bool CLuaHandle::AllowQuit()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L, true);
+	luaL_checkstack(L, 2, __func__);
+	static const LuaHashString cmdStr(__func__);
+
+	if (!cmdStr.GetGlobalFunc(L))
+		return true;
+
+	if (!RunCallIn(L, cmdStr, 0, 1))
+		return true;
+
+	const bool retval = luaL_optboolean(L, -1, true);
+	lua_pop(L, 1);
+	return retval;
+}
+
+
 /*** Called when text is entered into the console (e.g. `Spring.Echo`).
  *
  * @function Callins:AddConsoleLine

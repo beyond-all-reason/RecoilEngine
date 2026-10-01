@@ -31,6 +31,11 @@ void S3DModelVAO::EnableAttribs(bool inst) const
 		glVertexAttribPointer (3, 3, GL_FLOAT       , false, sizeof(SVertexData), (const void*)offsetof(SVertexData, tTangent    ));
 		glVertexAttribPointer (4, 4, GL_FLOAT       , false, sizeof(SVertexData), (const void*)offsetof(SVertexData, texCoords[0]));
 		glVertexAttribIPointer(5, 3, GL_UNSIGNED_INT,        sizeof(SVertexData), (const void*)offsetof(SVertexData, boneIDsLow  ));
+
+		// last guaranteed slot, Lua VAOs on this buffer put their instance attribs from 6 up
+		glEnableVertexAttribArray(15);
+		glVertexAttribDivisor(15, 0);
+		glVertexAttribPointer (15, 4, GL_UNSIGNED_BYTE, true , sizeof(SVertexData), (const void*)offsetof(SVertexData, color       ));
 	}
 	else {
 		for (int i = 6; i <= 6; ++i) {
@@ -50,6 +55,8 @@ void S3DModelVAO::DisableAttribs() const
 		glDisableVertexAttribArray(i);
 		glVertexAttribDivisor(i, 0);
 	}
+
+	glDisableVertexAttribArray(15);
 }
 
 S3DModelVAO::S3DModelVAO()

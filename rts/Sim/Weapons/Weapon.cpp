@@ -338,6 +338,9 @@ void CWeapon::Update()
 	if (!HaveTarget() && owner->curTarget.type != Target_None)
 		Attack(owner->curTarget);
 
+	if (salvoLeft == 0 && HaveDeniedInterceptTarget())
+		UpdateInterceptTarget();
+
 	currentTargetPos = GetLeadTargetPos(currentTarget);
 
 	if (!UpdateStockpile())
@@ -660,6 +663,12 @@ void CWeapon::DropCurrentTarget()
 		DeleteDeathDependence(currentTarget.unit, DEPENDENCE_TARGETUNIT);
 
 	currentTarget = SWeaponTarget();
+}
+
+
+bool CWeapon::HaveDeniedInterceptTarget() const
+{
+	return (currentTarget.type == Target_Intercept && weaponDef->interceptSolo && currentTarget.intercept->IsBeingIntercepted());
 }
 
 
@@ -1288,6 +1297,21 @@ void CWeapon::UpdateInterceptTarget()
 	CWeaponProjectile* newTarget = nullptr;
 	float minInterceptTargetDistSq = std::numeric_limits<float>::max();
 
+	if (weaponDef->interceptSolo) {
+		if (HaveDeniedInterceptTarget())
+			DropCurrentTarget();
+
+		spring::VectorEraseIfAll(incomingProjectileIDs, [this](const int projID) {
+			CWeaponProjectile* wp = static_cast<CWeaponProjectile*>(projectileHandler.GetProjectileBySyncedID(projID));
+
+			if (!wp->IsBeingIntercepted())
+				return false;
+
+			DeleteDeathDependence(wp, DEPENDENCE_INTERCEPT);
+			return true;
+		});
+	}
+
 	if (currentTarget.type == Target_Intercept)
 		minInterceptTargetDistSq = aimFromPos.SqDistance(currentTarget.intercept->pos);
 
@@ -1296,10 +1320,6 @@ void CWeapon::UpdateInterceptTarget()
 		CWeaponProjectile* wp = static_cast<CWeaponProjectile*>(p);
 
 		const float curInterceptTargetDistSq = aimFromPos.SqDistance(wp->pos);
-
-		// set by CWeaponProjectile's ctor when the interceptor fires
-		if (weaponDef->interceptSolo && wp->IsBeingIntercepted()) //FIXME add bad target?
-			continue;
 
 		if (curInterceptTargetDistSq >= minInterceptTargetDistSq)
 			continue;

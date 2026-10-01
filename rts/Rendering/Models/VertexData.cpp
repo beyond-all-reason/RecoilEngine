@@ -1,6 +1,6 @@
 #include "VertexData.hpp"
 
-static_assert(sizeof(SVertexData) == (3 + 3 + 3 + 3 + 4 + 2 + 1) * 4);
+static_assert(sizeof(SVertexData) == (3 + 3 + 3 + 3 + 4 + 2 + 1 + 1) * 4);
 
 void SVertexData::TransformBy(const Transform& transform)
 {
