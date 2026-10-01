@@ -68,6 +68,7 @@ class CGameServer
 	friend class CCregLoadSaveHandler; // For initializing server state after load
 	// the metrics classes only ever *read* server state to publish, never write
 	friend class ServerMetrics;
+	friend class ServerHealthMetrics;
 public:
 	CGameServer(
 		const std::shared_ptr<const ClientSetup> newClientSetup,
@@ -170,8 +171,12 @@ private:
 
 	void LagProtection();
 
-	/** @brief Generate a unique game identifier and send it to all clients. */
-	void GenerateAndSendGameID();
+	/// derive this game's unique identifier
+	void ComputeGameID();
+	/// the game id as 32 lowercase hex chars
+	std::string GetGameIDHex() const;
+	/// send the game identifier to all clients
+	void SendGameID();
 
 	void WriteDemoData();
 	/// read data from demo and send it to clients
@@ -309,7 +314,7 @@ private:
 	union {
 		unsigned char charArray[16];
 		unsigned int intArray[4];
-	} gameID;
+	} gameID = {};
 };
 
 extern CGameServer* gameServer;

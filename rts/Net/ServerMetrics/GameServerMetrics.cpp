@@ -10,7 +10,7 @@
 static const spring_time metricsPublishInterval = spring_secs(1);
 
 
-void ServerMetrics::Init()
+void ServerMetrics::Init(const std::string& gameIDHex)
 {
 	metrics::Init();
 
@@ -19,6 +19,9 @@ void ServerMetrics::Init()
 	if (!metrics::Enabled())
 		return;
 
+	auto& registry = metrics::GetRegistry();
+
+	healthMetrics.Init(registry, gameIDHex);
 	registered = true;
 }
 
@@ -46,4 +49,10 @@ void ServerMetrics::Update(const CGameServer& server)
 
 	// code to publish metrics goes here
 	lastPublishTime = server.lastUpdate;
+
+	healthMetrics.Update(server);
+}
+
+void ServerMetrics::SetGameStartTime(double unixSecs) {
+	healthMetrics.SetGameStartTime(unixSecs);
 }
