@@ -34,6 +34,7 @@ CR_REG_METADATA(CProjectile,
 	CR_MEMBER(deleteMe),
 
 	CR_MEMBER(drawSorted),
+	CR_MEMBER(mtDrawSafe),
 	CR_MEMBER(blockPreciseCol),
 
 	CR_MEMBER_BEGINFLAG(CM_Config),
