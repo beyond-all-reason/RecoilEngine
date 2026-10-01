@@ -6608,14 +6608,11 @@ static void PackFactoryCounts(lua_State* L,
 		}
 		else {
 			entry++;
-			// Here and below, negative integer keys in lua tables are stored in the
-			// hash part of the table, hence we set nrec to 1 instead of narr.
-			// Lua Gems Chapter 2: About tables.
 			lua_createtable(L, 0, 1); {
 				lua_pushnumber(L, currentCount);
 				lua_rawseti(L, -2, -currentCmd);
 			}
-			lua_rawseti(L, -2, entry);
+			lua_rawseti(L, -2, entry - 1);
 			currentCmd = cmdID;
 			currentCount = 1;
 		}
@@ -6626,7 +6623,7 @@ static void PackFactoryCounts(lua_State* L,
 			lua_pushnumber(L, currentCount);
 			lua_rawseti(L, -2, -currentCmd);
 		}
-		lua_rawseti(L, -2, entry);
+		lua_rawseti(L, -2, entry - 1);
 	}
 
 	hs_n.PushNumber(L, entry);
