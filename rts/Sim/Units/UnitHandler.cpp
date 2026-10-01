@@ -432,9 +432,10 @@ void CUnitHandler::UpdatePreFrame()
 	SCOPED_TIMER("Sim::Unit::UpdatePreFrame");
 	inUpdateCall = true;
 
-	for (CUnit* unit : activeUnits) {
-		unit->UpdatePrevFrameTransform();
-	}
+	// only touches the unit's own state
+	for_mt_chunk(0, activeUnits.size(), [this](const int idx) {
+		activeUnits[idx]->UpdatePrevFrameTransform();
+	}, 64);
 
 	inUpdateCall = false;
 }
