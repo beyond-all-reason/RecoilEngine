@@ -39,8 +39,13 @@ struct UdpStats {
 		unsigned int receivedPackets = 0;
 		/// chunks put back on the wire after having been sent once
 		unsigned int resentOutgoingChunks = 0;
+		/// retransmitted purely because the link duplicates by policy
+		unsigned int redundantOutgoingChunks = 0;
 		/// chunks discarded on arrival because the same chunk had already been received
 		unsigned int duplicateIncomingChunks = 0;
+		/// chunks seen missing at a send pass, i.e. a gap in the received sequence
+		/// NOTE: long-lived reordering is indistinguishable from loss
+		unsigned int missingIncomingChunks = 0;
 		/// cumulative protocol header bytes
 		unsigned int sentOverheadBytes = 0;
 		unsigned int receivedOverheadBytes = 0;
@@ -59,6 +64,8 @@ struct UdpStats {
 		float outgoingBandwidthBytesPerSec = 0.0f;
 		unsigned int unackedOutgoingChunks = 0;
 		unsigned int outgoingResendQueueDepth = 0;
+		/// loss factor the UDP link is running with. See UDPConnection::SetLossFactor()
+		unsigned int lossFactor = 0;
 	} live;
 };
 
