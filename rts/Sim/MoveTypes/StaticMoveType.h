@@ -21,6 +21,9 @@ public:
 	void SetMaxSpeed(float speed) override { /* override AMoveType (our maxSpeed IS allowed to be 0) */ }
 	void KeepPointingTo(float3 pos, float distance, bool aggressive) override {}
 
+	// Update() does nothing, so stay out of GeneralMoveSystem's per-frame loop
+	void Connect() override {}
+
 	bool Update() override { return false; }
 	void SlowUpdate() override;
 };

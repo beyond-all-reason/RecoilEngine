@@ -630,7 +630,7 @@ bool CGroundMoveType::OwnerMoved(const short oldHeading, const float3& posDif, c
 	return true;
 }
 
-void CGroundMoveType::UpdatePreCollisions()
+void CGroundMoveType::ApplyResultantForces()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
  	ASSERT_SYNCED(owner->pos);
@@ -642,6 +642,28 @@ void CGroundMoveType::UpdatePreCollisions()
 		owner->Move(resultantForces, true);
 
 	SyncWaypoints();
+}
+
+bool CGroundMoveType::CanUpdatePreCollisionsMT()
+{
+	// these can delete paths, notify the CAI, call scripts or change the path heatmap
+	if (deletePathId != 0 || pathingArrived || pathingFailed)
+		return false;
+	if (pathManager->GetPathFinderType() == HAPFS_TYPE)
+		return false;
+
+	if (owner->GetTransporter() != nullptr)
+		return true;
+	if (owner->IsSkidding() || owner->IsFalling() || OnSlope(1.0f))
+		return false;
+
+	// UpdateOwnerSpeed only calls scripts and changes blocking when the unit starts or stops moving
+	return ((math::fabs(oldSpeed) > 0.01f) == (math::fabs(newSpeed) > 0.01f));
+}
+
+void CGroundMoveType::UpdatePreCollisions()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	// The mt section may have noticed the new path was ready and switched over to it. If so then
 	// delete the old path, which has to be done in an ST section.
@@ -3113,6 +3135,7 @@ void CGroundMoveType::Connect() {
 	Sim::registry.emplace_or_replace<UnitCrushEvents>(owner->entityReference);
 	Sim::registry.emplace_or_replace<FeatureMoveEvents>(owner->entityReference);
 	Sim::registry.emplace_or_replace<UnitMovedEvent>(owner->entityReference);
+	Sim::registry.emplace_or_replace<PreCollisionsMtState>(owner->entityReference);
 	Sim::registry.emplace_or_replace<ChangeHeadingEvent>(owner->entityReference, owner->id);
 	Sim::registry.emplace_or_replace<ChangeMainHeadingEvent>(owner->entityReference, owner->id);
 	// LOG("%s: loading %s as %d", __func__, owner->unitDef->name.c_str(), entt::to_integral(owner->entityReference));
@@ -3127,6 +3150,7 @@ void CGroundMoveType::Disconnect() {
 	Sim::registry.remove<UnitCrushEvents>(owner->entityReference);
 	Sim::registry.remove<FeatureMoveEvents>(owner->entityReference);
 	Sim::registry.remove<UnitMovedEvent>(owner->entityReference);
+	Sim::registry.remove<PreCollisionsMtState>(owner->entityReference);
 	Sim::registry.remove<ChangeHeadingEvent>(owner->entityReference);
 	Sim::registry.remove<ChangeMainHeadingEvent>(owner->entityReference);
 }
@@ -3340,6 +3364,19 @@ void CGroundMoveType::UpdatePos(const CUnit* unit, const float3& moveDir, float3
 	const float3 newPos = unit->pos + moveDir;
 	resultantMove = moveDir;
 
+	auto toMapSquare = [](float3 pos) {
+		return int2({int(pos.x / SQUARE_SIZE), int(pos.z / SQUARE_SIZE)});
+	};
+
+	auto toSquareId = [](int2 square) {
+		return (square.y * mapDims.mapx) + square.x;
+	};
+
+	const int2 prevSquare = toMapSquare(prevPos);
+	const int2 newSquare = toMapSquare(newPos);
+	const int newPosStartSquare = toSquareId(newSquare);
+	if (!positionStuck && toSquareId(prevSquare) == newPosStartSquare) { return; }
+
 	// The series of tests done here will benefit from using the same cached results.
 	MoveDef* md = unit->moveDef;
 	int tempNum = gs->GetMtTempNum(thread);
@@ -3350,14 +3387,6 @@ void CGroundMoveType::UpdatePos(const CUnit* unit, const float3& moveDir, float3
 	const bool isSubmersible = md->IsComplexSubmersible();
 	if (!isSubmersible)
 		virtualObject.DisableHeightChecks();
-
-	auto toMapSquare = [](float3 pos) {
-		return int2({int(pos.x / SQUARE_SIZE), int(pos.z / SQUARE_SIZE)});
-	};
-
-	auto toSquareId = [](int2 square) {
-		return (square.y * mapDims.mapx) + square.x;
-	};
 
 	auto isSquareOpen = [this, md, unit, &tempNum, thread, &toMapSquare, &virtualObject, &queryState, &isSubmersible](float3 pos) {
 		int2 checkSquare = toMapSquare(pos);
@@ -3387,11 +3416,6 @@ void CGroundMoveType::UpdatePos(const CUnit* unit, const float3& moveDir, float3
 	auto toPosition = [](int2 square) {
 		return float3({float(square.x * SQUARE_SIZE + 1), 0.f, float(square.y * SQUARE_SIZE + 1)});
 	};
-
-	const int2 prevSquare = toMapSquare(prevPos);
-	const int2 newSquare = toMapSquare(newPos);
-	const int newPosStartSquare = toSquareId(newSquare);
-	if (!positionStuck && toSquareId(prevSquare) == newPosStartSquare) { return; }
 
 	bool isSquareBlocked = !isSquareOpen(newPos);
 	if (!isSquareBlocked) {

@@ -53,6 +53,10 @@ public:
 
 	virtual bool Update() = 0;
 	virtual void SlowUpdate();
+	/// whether this frame's Update() only touches this unit, so it can run on a worker thread
+	virtual bool CanUpdateMT() const { return false; }
+	/// unit script calls that an Update() on a worker thread had to leave out
+	virtual void CallDeferredScripts() {}
 	void UpdateCollisionMap(bool force = false);
 	void UpdateGroundBlockMap();
 
