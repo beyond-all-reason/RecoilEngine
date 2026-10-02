@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef EVENT_HANDLER_H
-#define EVENT_HANDLER_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -100,6 +99,7 @@ class CEventHandler
 			int projectileID,
 			bool paralyzer);
 		void UnitStunned(const CUnit* unit, bool stunned);
+		void UnitFlightRegimeChanged(const CUnit* unit, bool agile);
 		void UnitExperience(const CUnit* unit, float oldExperience);
 		void UnitHarvestStorageFull(const CUnit* unit);
 
@@ -576,6 +576,14 @@ inline void CEventHandler::UnitStunned(
 }
 
 
+inline void CEventHandler::UnitFlightRegimeChanged(
+	const CUnit* unit,
+	bool agile)
+{
+	ITERATE_UNIT_ALLYTEAM_EVENTCLIENTLIST(UnitFlightRegimeChanged, unit, agile)
+}
+
+
 inline void CEventHandler::UnitExperience(const CUnit* unit,
                                               float oldExperience)
 {
@@ -801,5 +809,3 @@ inline void CEventHandler::RenderProjectileDestroyed(const CProjectile* proj)
 #undef UNIT_CALLIN_NO_PARAM
 #undef UNIT_CALLIN_INT_PARAMS
 #undef UNIT_CALLIN_LOS_PARAM
-
-#endif /* EVENT_HANDLER_H */
