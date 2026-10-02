@@ -337,9 +337,33 @@ void CUnitHandler::UpdateUnitMoveTypes()
 void CUnitHandler::UpdateUnitLosStates()
 {
 	ZoneScopedC(tracy::Color::Goldenrod);
-	for (CUnit* unit: activeUnits) {
-		for (int at = 0; at < teamHandler.ActiveAllyTeams(); ++at) {
-			unit->UpdateLosStatus(at);
+	static std::vector<uint8_t> losStatusChanged;
+
+	const int numAllyTeams = teamHandler.ActiveAllyTeams();
+	const size_t numUnits = activeUnits.size();
+
+	losStatusChanged.resize(numUnits);
+
+	// few units change state in a frame; finding them only reads sim state
+	for_mt_chunk(0, numUnits, [&](const int idx) {
+		CUnit* unit = activeUnits[idx];
+		bool changed = false;
+
+		for (int at = 0; at < numAllyTeams && !changed; ++at) {
+			const unsigned short currStatus = unit->losStatus[at];
+			changed = ((currStatus & LOS_ALL_MASK_BITS) != LOS_ALL_MASK_BITS) && (unit->CalcLosStatus(at) != currStatus);
+		}
+
+		losStatusChanged[idx] = changed;
+	}, 256);
+
+	// the callins have to run in unit order
+	for (size_t i = 0; i < numUnits; ++i) {
+		if (!losStatusChanged[i])
+			continue;
+
+		for (int at = 0; at < numAllyTeams; ++at) {
+			activeUnits[i]->UpdateLosStatus(at);
 		}
 	}
 }
