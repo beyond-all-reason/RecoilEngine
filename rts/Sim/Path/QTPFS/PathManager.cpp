@@ -911,6 +911,9 @@ void QTPFS::PathManager::Update() {
 	{
 		ThreadUpdate();
 	}
+
+	// the node layers do not change again until the next frame's map updates
+	PathSpeedModInfoSystem::StartNextScan();
 }
 
 __FORCE_ALIGN_STACK__
