@@ -337,12 +337,10 @@ void CUnitHandler::UpdateUnitMoveTypes()
 void CUnitHandler::UpdateUnitLosStates()
 {
 	ZoneScopedC(tracy::Color::Goldenrod);
-	static std::vector<uint8_t> losStatusChanged;
+	static std::array<uint8_t, MAX_UNITS> losStatusChanged;
 
 	const int numAllyTeams = teamHandler.ActiveAllyTeams();
 	const size_t numUnits = activeUnits.size();
-
-	losStatusChanged.resize(numUnits);
 
 	// few units change state in a frame; finding them only reads sim state
 	for_mt_chunk(0, numUnits, [&](const int idx) {
