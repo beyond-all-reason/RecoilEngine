@@ -2966,8 +2966,8 @@ unsigned CGameServer::BindConnection(
 	if (myGameDataPacket == nullptr) {
 		errMsg = spring::format(GameDataTooLarge, unsigned(myGameData->GetPackedSize()), unsigned(GameData::MAX_PACKED_SIZE));
 
-		if (!reconnect)
-			clientLink->Unmute();
+	if (!reconnect)
+		clientLink->Unmute();
 	} else if (clientVersion != refClientVersion.second) {
 		errMsg = "client version '" + clientVersion + "' mismatch, reference is '" + refClientVersion.second + "' set by '" + refClientVersion.first + "'";
 	} else {
