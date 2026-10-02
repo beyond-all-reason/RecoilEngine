@@ -400,7 +400,11 @@ void CUnitHandler::UpdateUnits()
 
 		unit->SanityCheck();
 		unit->Update();
-		unit->moveType->UpdateCollisionMap();
+
+		// rate checked here, most units are not due and their move type stays untouched
+		if (((gs->frameNum + unit->id) % modInfo.unitQuadPositionUpdateRate) == 0)
+			unit->moveType->UpdateCollisionMap();
+
 		// unsynced; done on-demand when drawing unit
 		// unit->UpdateLocalModel();
 		unit->SanityCheck();
