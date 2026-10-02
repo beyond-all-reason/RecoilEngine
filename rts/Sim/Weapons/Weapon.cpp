@@ -319,6 +319,10 @@ void CWeapon::Update()
 {
 	ZoneScoped;
 
+	// nothing to aim at, fire or stockpile
+	if (!HaveTarget() && !owner->HaveTarget() && salvoLeft == 0 && !weaponDef->stockpile)
+		return;
+
 	// Fast auto targeting needs to trigger an immediate retarget once the target is dead.
 	bool fastAutoRetargetRequired = fastAutoRetargeting && HaveTarget()
 									&& currentTarget.unit != nullptr && currentTarget.unit->isDead;
