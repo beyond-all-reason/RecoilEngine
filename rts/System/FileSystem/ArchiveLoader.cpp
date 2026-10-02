@@ -19,6 +19,7 @@
 static CPoolArchiveFactory sdpArchiveFactory;
 static CDirArchiveFactory sddArchiveFactory;
 static CZipArchiveFactory sdzArchiveFactory;
+static CZipStdArchiveFactory sdzstArchiveFactory;
 static CSevenZipArchiveFactory sd7ArchiveFactory;
 static CVirtualArchiveFactory sdvArchiveFactory;
 
@@ -30,6 +31,7 @@ CArchiveLoader::CArchiveLoader()
 	AddFactory(ARCHIVE_TYPE_SDP, sdpArchiveFactory);
 	AddFactory(ARCHIVE_TYPE_SDD, sddArchiveFactory);
 	AddFactory(ARCHIVE_TYPE_SDZ, sdzArchiveFactory);
+	AddFactory(ARCHIVE_TYPE_SDZST, sdzstArchiveFactory);
 	AddFactory(ARCHIVE_TYPE_SD7, sd7ArchiveFactory);
 	AddFactory(ARCHIVE_TYPE_SDV, sdvArchiveFactory);
 

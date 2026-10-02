@@ -9,8 +9,9 @@ enum {
 	ARCHIVE_TYPE_SDZ = 2, // zip
 	ARCHIVE_TYPE_SD7 = 3, // 7zip
 	ARCHIVE_TYPE_SDV = 4, // virtual
-	ARCHIVE_TYPE_CNT = 5,
-	ARCHIVE_TYPE_BUF = 6, // buffered, not created directly
+	ARCHIVE_TYPE_SDZST = 5, // zip with zstd entries (.sdzst files)
+	ARCHIVE_TYPE_CNT = 6,
+	ARCHIVE_TYPE_BUF = 7, // buffered, not created directly
 };
 
 #endif

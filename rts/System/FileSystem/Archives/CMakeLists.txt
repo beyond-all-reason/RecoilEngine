@@ -40,13 +40,13 @@ if (THREADPOOL)
 	target_compile_definitions(archives PRIVATE -DTHREADPOOL)
 endif()
 target_include_directories(archives
-	PRIVATE ${SOURCE_ROOT} ${SPRING_MINIZIP_INCLUDE_DIR} ${NOWIDE_INCLUDE_DIR})
+	PRIVATE ${SOURCE_ROOT} ${SPRING_MINIZIP_INCLUDE_DIR} ${SPRING_ZSTD_INCLUDE_DIR} ${NOWIDE_INCLUDE_DIR})
 target_link_libraries(archives
-	PRIVATE 7zip ${SPRING_MINIZIP_LIBRARY} Tracy::TracyClient nowide::nowide fmt::fmt)
+	PRIVATE 7zip ${SPRING_MINIZIP_LIBRARY} ${SPRING_ZSTD_LIBRARY} Tracy::TracyClient nowide::nowide fmt::fmt)
 
 add_library(archives_nothreadpool STATIC ${archives_sources})
 target_compile_options(archives_nothreadpool PRIVATE ${PIC_FLAG})
 target_include_directories(archives_nothreadpool
-	PRIVATE ${SOURCE_ROOT} ${SPRING_MINIZIP_INCLUDE_DIR} ${NOWIDE_INCLUDE_DIR})
+	PRIVATE ${SOURCE_ROOT} ${SPRING_MINIZIP_INCLUDE_DIR} ${SPRING_ZSTD_INCLUDE_DIR} ${NOWIDE_INCLUDE_DIR})
 target_link_libraries(archives_nothreadpool
-	PRIVATE 7zip ${SPRING_MINIZIP_LIBRARY} nowide::nowide fmt::fmt)
+	PRIVATE 7zip ${SPRING_MINIZIP_LIBRARY} ${SPRING_ZSTD_LIBRARY} nowide::nowide fmt::fmt)
