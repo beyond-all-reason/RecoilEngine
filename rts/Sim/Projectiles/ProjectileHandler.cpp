@@ -61,8 +61,15 @@ CR_REG_METADATA(CProjectileHandler, (
 	CR_MEMBER(maxNanoParticles),
 	CR_MEMBER(currentNanoParticles),
 	CR_MEMBER_UN(frameCurrentParticles),
-	CR_MEMBER_UN(frameProjectileCounts)
+	CR_MEMBER_UN(frameProjectileCounts),
+
+	CR_MEMBER_UN(unsyncedChunkSums),
+	CR_MEMBER_UN(numUpdatedUnsynced),
+	CR_MEMBER_UN(numUpdatedUnsyncedParticles)
 ))
+
+// unsynced projectiles per task of the update pass
+static constexpr int UNSYNCED_UPDATE_CHUNK_SIZE = 128;
 
 
 
@@ -80,6 +87,9 @@ void CProjectileHandler::Init()
 	frameCurrentParticles = 0;
 	frameProjectileCounts[false] = 0;
 	frameProjectileCounts[ true] = 0;
+
+	numUpdatedUnsynced = 0;
+	numUpdatedUnsyncedParticles = 0;
 
 	resortFlyingPieces.fill(false);
 
@@ -213,15 +223,38 @@ void CProjectileHandler::UpdateProjectilesImpl()
 	}
 	else {
 		SCOPED_TIMER("Sim::Projectiles::UpdateUnsyncedMT");
-		for_mt_chunk(0, pc.size(), [&pc](int i) {
-			CProjectile* p = pc[i];
-			assert(p != nullptr);
 
-			MAPPOS_SANITY_CHECK(p->pos);
-			p->PreUpdate();
-			p->Update();
-			MAPPOS_SANITY_CHECK(p->pos);
+		// projectiles spawned during the pass (CExpGenSpawner) are appended past numProjectiles
+		const int numProjectiles = pc.size();
+		const int numChunks = (numProjectiles + UNSYNCED_UPDATE_CHUNK_SIZE - 1) / UNSYNCED_UPDATE_CHUNK_SIZE;
+
+		unsyncedChunkSums.resize(numChunks);
+
+		for_mt(0, numChunks, [&](int chunk) {
+			UnsyncedChunkSums sums;
+
+			for (int i = chunk * UNSYNCED_UPDATE_CHUNK_SIZE, e = std::min(i + UNSYNCED_UPDATE_CHUNK_SIZE, numProjectiles); i < e; ++i) {
+				CProjectile* p = pc[i];
+				assert(p != nullptr);
+
+				MAPPOS_SANITY_CHECK(p->pos);
+				p->PreUpdate();
+				p->Update();
+				MAPPOS_SANITY_CHECK(p->pos);
+
+				sums.numParticles += p->GetProjectilesCount();
+				sums.numCollidable += p->checkCol;
+			}
+
+			unsyncedChunkSums[chunk] = sums;
 		});
+
+		numUpdatedUnsynced = numProjectiles;
+		numUpdatedUnsyncedParticles = 0;
+
+		for (const UnsyncedChunkSums& sums: unsyncedChunkSums) {
+			numUpdatedUnsyncedParticles += sums.numParticles;
+		}
 	}
 }
 
@@ -351,13 +384,14 @@ void CProjectileHandler::Update()
 	// precache part of particles count calculation that else becomes very heavy
 	{
 		ZoneScopedNC("ProjectileHandler::CountParticles", tracy::Color::Goldenrod);
-		frameCurrentParticles = 0;
+		// the unsynced update pass already counted the projectiles it updated
+		frameCurrentParticles = numUpdatedUnsyncedParticles;
 
 		for (const CProjectile* p : projectiles[true]) {
 			frameCurrentParticles += p->GetProjectilesCount();
 		}
-		for (const CProjectile* p : projectiles[false]) {
-			frameCurrentParticles += p->GetProjectilesCount();
+		for (size_t i = numUpdatedUnsynced, e = projectiles[false].size(); i < e; ++i) {
+			frameCurrentParticles += projectiles[false][i]->GetProjectilesCount();
 		}
 
 		frameProjectileCounts[true] = projectiles[true].size();
@@ -574,7 +608,7 @@ void CProjectileHandler::CheckUnitFeatureCollisions(bool synced)
 	static std::vector<CPlasmaRepulser*> tempRepulsers;
 
 	//can't use iterators here, because instructions inside the loop modify projectiles[synced]
-	for (size_t i = 0; i < projectiles[synced].size(); ++i) {
+	for (size_t i = NextCollisionCandidate(synced, 0); i < projectiles[synced].size(); i = NextCollisionCandidate(synced, i + 1)) {
 		CProjectile* p = projectiles[synced][i];
 
 		if (!p->checkCol) continue;
@@ -596,7 +630,7 @@ void CProjectileHandler::CheckGroundCollisions(bool synced)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	//can't use iterators here, because instructions inside the loop modify projectiles[synced]
-	for (size_t i = 0; i < projectiles[synced].size(); ++i) {
+	for (size_t i = NextCollisionCandidate(synced, 0); i < projectiles[synced].size(); i = NextCollisionCandidate(synced, i + 1)) {
 		CProjectile* p = projectiles[synced][i];
 
 		if (!p->checkCol)
@@ -643,6 +677,20 @@ void CProjectileHandler::CheckGroundCollisions(bool synced)
 
 		p->Collision();
 	}
+}
+
+size_t CProjectileHandler::NextCollisionCandidate(bool synced, size_t i) const
+{
+	if (synced)
+		return i;
+
+	// unsynced projectiles get checkCol only from their constructors and nothing removes them
+	// between update passes, so chunks of the last pass that had none left can be skipped
+	while (i < numUpdatedUnsynced && unsyncedChunkSums[i / UNSYNCED_UPDATE_CHUNK_SIZE].numCollidable == 0) {
+		i = std::min((i / UNSYNCED_UPDATE_CHUNK_SIZE + 1) * UNSYNCED_UPDATE_CHUNK_SIZE, numUpdatedUnsynced);
+	}
+
+	return i;
 }
 
 void CProjectileHandler::CheckCollisions()
