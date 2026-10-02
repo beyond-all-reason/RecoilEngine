@@ -855,6 +855,15 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * @field maxRudder number?
  * @field attackSafetyDistance number?
  * @field myGravity number?
+ * @field agileFlight boolean? Fly short legs, final approaches, takeoffs and landings with hover-like control, so the aircraft arrives and sets down exactly on its goal. Longer legs are still flown fixed-wing.
+ * @field agileSpeed number? Top speed of the agile regime in elmos per second, also the speed at which it hands over to fixed-wing flight. Zero restores the default (a share of the top speed).
+ * @field agileTurnRate number? How fast the nose comes round in the agile regime at its top speed (65536 is a full circle per frame); scaled down with speed, so a stationary aircraft does not turn. Independent of the fixed-wing turn rate (`maxRudder`) and of the `turnRate` tag. Zero restores the default.
+ * @field agileAccRate number? Acceleration and deceleration limit of the agile regime, in elmos per frame squared. Zero restores the default (`maxAcc`).
+ * @field agileAltitude number? Altitude flown in the agile regime, in elmos above ground. Zero uses the cruise altitude; never above it.
+ * @field cruiseDistance number? Goals nearer than this many elmos are flown entirely in the agile regime. Zero derives it from the turn radius (one turn diameter).
+ * @field cruiseEntryAngle number? How far off the goal, in degrees, the nose may still point when the agile regime hands over to cruise flight. Zero for the default (30).
+ * @field cruiseEntrySpeed number? The share of `agileSpeed` the aircraft must have reached for that. Zero for the default (0.6).
+ * @field cruiseEntryTurnBoost number? Multiplies `agileTurnRate` while the aircraft is on its way to a leg it will fly in cruise. Zero for the default (3).
  */
 
 /***
@@ -871,6 +880,7 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * | "collide"
  * | "useSmoothMesh"
  * | "loopbackAttack"
+ * | "agileFlight"
   * @param value boolean
  * @return integer numAssignedValues
  */
@@ -892,6 +902,14 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * | "maxRudder" 
  * | "attackSafetyDistance" 
  * | "myGravity" 
+ * | "agileSpeed"
+ * | "agileTurnRate"
+ * | "agileAccRate"
+ * | "cruiseDistance"
+ * | "agileAltitude"
+ * | "cruiseEntryAngle"
+ * | "cruiseEntrySpeed"
+ * | "cruiseEntryTurnBoost"
  * @param value number
  * @return integer numAssignedValues
  */
