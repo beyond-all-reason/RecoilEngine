@@ -281,7 +281,7 @@ void CWeapon::UpdateWeaponErrorVector()
 
 void CWeapon::UpdateWeaponVectors()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	relAimFromPos = owner->script->GetPiecePos(aimFromPiece);
 	owner->script->GetEmitDirPos(muzzlePiece, relWeaponMuzzlePos, weaponDir);
@@ -317,7 +317,7 @@ float CWeapon::GetPredictedImpactTime(const float3& p) const
 
 void CWeapon::Update()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	// nothing to aim at, fire or stockpile
 	if (!HaveTarget() && !owner->HaveTarget() && salvoLeft == 0 && !weaponDef->stockpile)
@@ -358,7 +358,7 @@ void CWeapon::Update()
 
 void CWeapon::UpdateAim()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!HaveTarget())
 		return;
 
@@ -470,7 +470,7 @@ bool CWeapon::CanFire(bool ignoreAngleGood, bool ignoreTargetType, bool ignoreRe
 
 void CWeapon::UpdateFire()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!CanFire(false, false, false))
 		return;
 
@@ -521,7 +521,7 @@ void CWeapon::UpdateFire()
 
 bool CWeapon::UpdateStockpile()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!weaponDef->stockpile)
 		return true;
 
@@ -547,7 +547,7 @@ bool CWeapon::UpdateStockpile()
 
 void CWeapon::UpdateSalvo()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!salvoLeft || nextSalvo > gs->frameNum)
 		return;
 
@@ -617,7 +617,7 @@ void CWeapon::UpdateSalvo()
 
 bool CWeapon::Attack(const SWeaponTarget& newTarget)
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (newTarget == currentTarget)
 		return true;
 

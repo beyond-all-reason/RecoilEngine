@@ -696,7 +696,7 @@ void CUnit::Update()
 
 void CUnit::UpdateWeaponVectors()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (!CanUpdateWeapons())
 		return;
@@ -709,7 +709,7 @@ void CUnit::UpdateWeaponVectors()
 
 void CUnit::UpdateWeapons()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (!CanUpdateWeapons())
 			return;
