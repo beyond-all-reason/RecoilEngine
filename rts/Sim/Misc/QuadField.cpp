@@ -29,11 +29,17 @@ CR_REG_METADATA(CQuadField, (
 	CR_MEMBER(quadSizeZ),
 	CR_MEMBER(invQuadSize),
 
+	CR_IGNORED(allyTeamCellUnits),
+	CR_IGNORED(numCellsX),
+	CR_IGNORED(numAllyTeams),
+
 	CR_IGNORED(tempUnits),
 	CR_IGNORED(tempFeatures),
 	CR_IGNORED(tempProjectiles),
 	CR_IGNORED(tempSolids),
-	CR_IGNORED(tempQuads)
+	CR_IGNORED(tempQuads),
+
+	CR_POSTLOAD(PostLoad)
 ))
 
 CR_BIND(CQuadField::Quad, )
@@ -92,6 +98,8 @@ void CQuadField::Init(int2 mapDims, int quadSize)
 	for (Quad& quad: baseQuads) {
 		quad.Resize(teamHandler.ActiveAllyTeams());
 	}
+
+	CountTeamUnits();
 #endif
 }
 
@@ -103,6 +111,8 @@ void CQuadField::Kill()
 	for (Quad& quad: baseQuads) {
 		quad.Clear();
 	}
+
+	std::fill(allyTeamCellUnits.begin(), allyTeamCellUnits.end(), 0);
 
 	for (auto cache : tempUnits)
 		cache.ReleaseAll();
@@ -392,7 +402,7 @@ bool CQuadField::InsertUnitIf(CUnit* unit, const float3& wpos)
 		return false;
 
 	spring::VectorInsertUnique(baseQuads[wposQuadIdx].units, unit, false);
-	spring::VectorInsertUnique(baseQuads[wposQuadIdx].teamUnits[unit->allyteam], unit, false);
+	AddTeamUnit(wposQuadIdx, unit);
 	return true;
 }
 
@@ -423,7 +433,7 @@ bool CQuadField::RemoveUnitIf(CUnit* unit, const float3& wpos)
 		return false;
 
 	spring::VectorErase(baseQuads[wposQuadIdx].units, unit);
-	spring::VectorErase(baseQuads[wposQuadIdx].teamUnits[unit->allyteam], unit);
+	EraseTeamUnit(wposQuadIdx, unit);
 	return true;
 }
 #endif
@@ -431,6 +441,68 @@ bool CQuadField::RemoveUnitIf(CUnit* unit, const float3& wpos)
 
 
 #ifndef UNIT_TEST
+int CQuadField::CellUnitsIndex(int quadIdx, int allyTeam) const
+{
+	const int cellX = (quadIdx % numQuadsX) / CELL_QUADS;
+	const int cellZ = (quadIdx / numQuadsX) / CELL_QUADS;
+
+	return (cellZ * numCellsX + cellX) * numAllyTeams + allyTeam;
+}
+
+void CQuadField::AddTeamUnit(int quadIdx, CUnit* unit)
+{
+	spring::VectorInsertUnique(baseQuads[quadIdx].teamUnits[unit->allyteam], unit, false);
+	allyTeamCellUnits[CellUnitsIndex(quadIdx, unit->allyteam)] += 1;
+}
+
+void CQuadField::EraseTeamUnit(int quadIdx, CUnit* unit)
+{
+	if (spring::VectorErase(baseQuads[quadIdx].teamUnits[unit->allyteam], unit))
+		allyTeamCellUnits[CellUnitsIndex(quadIdx, unit->allyteam)] -= 1;
+}
+
+void CQuadField::CountTeamUnits()
+{
+	numCellsX = (numQuadsX + CELL_QUADS - 1) / CELL_QUADS;
+	numAllyTeams = teamHandler.ActiveAllyTeams();
+	allyTeamCellUnits.assign(numCellsX * ((numQuadsZ + CELL_QUADS - 1) / CELL_QUADS) * numAllyTeams, 0);
+
+	// from Quad::units, which unlike Quad::teamUnits is saved
+	for (size_t qi = 0; qi < baseQuads.size(); ++qi) {
+		for (const CUnit* unit: baseQuads[qi].units) {
+			allyTeamCellUnits[CellUnitsIndex(qi, unit->allyteam)] += 1;
+		}
+	}
+}
+
+void CQuadField::PostLoad()
+{
+	CountTeamUnits();
+}
+
+bool CQuadField::MayHaveEnemyUnits(float3 pos, float radius, int allyTeam) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// same quad range as GetQuads
+	pos.ClampInBounds();
+
+	const int2 min = WorldPosToQuadField(pos - radius);
+	const int2 max = WorldPosToQuadField(pos + radius);
+
+	for (int z = min.y / CELL_QUADS; z <= max.y / CELL_QUADS; ++z) {
+		for (int x = min.x / CELL_QUADS; x <= max.x / CELL_QUADS; ++x) {
+			const int* cellUnits = &allyTeamCellUnits[(z * numCellsX + x) * numAllyTeams];
+
+			for (int t = 0; t < numAllyTeams; ++t) {
+				if (cellUnits[t] > 0 && !teamHandler.Ally(allyTeam, t))
+					return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 void CQuadField::MovedUnit(CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -445,12 +517,12 @@ void CQuadField::MovedUnit(CUnit* unit)
 
 	for (const int qi: unit->quads) {
 		spring::VectorErase(baseQuads[qi].units, unit);
-		spring::VectorErase(baseQuads[qi].teamUnits[unit->allyteam], unit);
+		EraseTeamUnit(qi, unit);
 	}
 
 	for (const int qi: *qfQuery.quads) {
 		spring::VectorInsertUnique(baseQuads[qi].units, unit, false);
-		spring::VectorInsertUnique(baseQuads[qi].teamUnits[unit->allyteam], unit, false);
+		AddTeamUnit(qi, unit);
 	}
 
 	unit->quads = std::move(*qfQuery.quads);
@@ -461,7 +533,7 @@ void CQuadField::RemoveUnit(CUnit* unit)
 	RECOIL_DETAILED_TRACY_ZONE;
 	for (const int qi: unit->quads) {
 		spring::VectorErase(baseQuads[qi].units, unit);
-		spring::VectorErase(baseQuads[qi].teamUnits[unit->allyteam], unit);
+		EraseTeamUnit(qi, unit);
 	}
 
 	unit->quads.clear();
