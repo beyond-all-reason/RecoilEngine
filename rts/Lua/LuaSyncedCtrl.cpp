@@ -7289,7 +7289,7 @@ int LuaSyncedCtrl::ForceUnitCollisionUpdate(lua_State* L)
 	if (!unit->moveType)
 		return 0;
 
-	unit->moveType->UpdateCollisionMap(true);
+	unit->moveType->UpdateCollisionMap();
 	return 0;
 }
 
