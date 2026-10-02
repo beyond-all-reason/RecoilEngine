@@ -2,6 +2,7 @@
 
 
 #include "StrafeAirMoveType.h"
+
 #include "Game/Players/Player.h"
 #include "Map/Ground.h"
 #include "Map/MapInfo.h"
@@ -55,6 +56,16 @@ CR_REG_METADATA(CStrafeAirMoveType, (
 	CR_MEMBER(lastElevatorPos),
 	CR_MEMBER(lastAileronPos),
 
+	CR_MEMBER(agileFlight),
+	CR_MEMBER(flightRegime),
+	CR_MEMBER(agileSpeed),
+	CR_MEMBER(agileTurnRate),
+	CR_MEMBER(agileAccRate),
+	CR_MEMBER(cruiseDistance),
+	CR_MEMBER(agileAltitude),
+	CR_MEMBER(landGoalPos),
+	CR_MEMBER(spotSearchFrames),
+
 	CR_PREALLOC(GetPreallocContainer)
 ))
 
@@ -67,6 +78,7 @@ static const unsigned int BOOL_MEMBER_HASHES[] = {
 	MEMBER_LITERAL_HASH(       "collide"),
 	MEMBER_LITERAL_HASH( "useSmoothMesh"),
 	MEMBER_LITERAL_HASH("loopbackAttack"),
+	MEMBER_LITERAL_HASH(   "agileFlight"),
 };
 
 static const unsigned int INT_MEMBER_HASHES[] = {
@@ -94,7 +106,6 @@ static const unsigned int FLOAT_MEMBER_HASHES[] = {
 
 extern AAirMoveType::GetGroundHeightFunc amtGetGroundHeightFuncs[6];
 extern AAirMoveType::EmitCrashTrailFunc amtEmitCrashTrailFuncs[2];
-
 
 
 static float TurnRadius(const float rawRadius, const float rawSpeed) {
@@ -419,9 +430,18 @@ CStrafeAirMoveType::CStrafeAirMoveType(CUnit* owner): AAirMoveType(owner)
 	crashRudder    = gsRNG.NextFloat() - 0.5f;
 
 	SetMaxSpeed(maxSpeedDef);
+
+	const UnitDef* ud = owner->unitDef;
+
+	agileFlight = ud->agileFlight;
+
+	SetAgileSpeed(ud->agileSpeed / GAME_SPEED);
+	SetAgileTurnRate(ud->agileTurnRate);
+	SetAgileAccRate(ud->agileAccRate);
+
+	cruiseDistance = ud->cruiseDistance;
+	agileAltitude = ud->agileAltitude;
 }
-
-
 
 bool CStrafeAirMoveType::Update()
 {
@@ -430,6 +450,10 @@ bool CStrafeAirMoveType::Update()
 	const float4 lastSpd = owner->speed;
 
 	AAirMoveType::Update();
+
+	// Lua can switch agileFlight off in mid-flight, and a crash is not flown in any regime
+	if (!agileFlight || aircraftState == AIRCRAFT_CRASHING)
+		SetFlightRegime(REGIME_CRUISE);
 
 	// need to additionally check that we are not crashing,
 	// otherwise we might fall through the map when stunned
@@ -479,7 +503,14 @@ bool CStrafeAirMoveType::Update()
 			} else
 			*/
 			{
-				if (isAttacking && keepAttacking) {
+				if (isAttacking && keepAttacking && InAgileRegime()) {
+					// attack runs are flown fixed-wing; the agile regime may have us low and slow,
+					// so get there the way a landed aircraft does: climb and accelerate first
+					SetFlightRegime(REGIME_CRUISE);
+
+					SetState(AIRCRAFT_TAKEOFF);
+					UpdateTakeOff();
+				} else if (isAttacking && keepAttacking) {
 					switch (owner->curTarget.type) {
 						case Target_None: { } break;
 						case Target_Unit: { SetGoal(owner->curTarget.unit->pos); } break;
@@ -507,6 +538,8 @@ bool CStrafeAirMoveType::Update()
 								maneuverSubState = 0;
 						}
 					}
+				} else if (agileFlight) {
+					UpdateAgileRegime();
 				} else {
 					UpdateFlying(wantedHeight, 1.0f);
 				}
@@ -528,7 +561,11 @@ bool CStrafeAirMoveType::Update()
 			amtEmitCrashTrailFuncs[crashExpGenID != -1u](owner, crashExpGenID);
 		} break;
 		case AIRCRAFT_TAKEOFF:
-			UpdateTakeOff();
+			if (agileFlight) {
+				UpdateAgileTakeOff();
+			} else {
+				UpdateTakeOff();
+			}
 			break;
 		default:
 			break;
@@ -943,6 +980,11 @@ void CStrafeAirMoveType::UpdateTakeOff()
 void CStrafeAirMoveType::UpdateLanding()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (agileFlight) {
+		UpdateAgileLanding();
+		return;
+	}
+
 	const float3 pos = owner->pos;
 
 	SyncedFloat3& rightdir = owner->rightdir;
@@ -1341,11 +1383,15 @@ void CStrafeAirMoveType::StartMoving(float3 pos, float goalRadius, float speed)
 		SetState(AIRCRAFT_TAKEOFF);
 
 	SetGoal(pos);
+	AgileStartMoving();
 }
 
 void CStrafeAirMoveType::StopMoving(bool callScript, bool hardStop, bool)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (AgileStopMoving())
+		return;
+
 	SetGoal(owner->pos);
 	ClearLandingPos();
 	SetWantedMaxSpeed(0.0f);
@@ -1391,6 +1437,7 @@ bool CStrafeAirMoveType::SetMemberValue(unsigned int memberHash, void* memberVal
 		&collide,
 		&useSmoothMesh,
 		&loopbackAttack,
+		&agileFlight,
 	};
 	int* intMemberPtrs[] = {
 		&maneuverBlockTime,
@@ -1416,6 +1463,8 @@ bool CStrafeAirMoveType::SetMemberValue(unsigned int memberHash, void* memberVal
 	};
 
 	// special cases
+	if (SetAgileMemberValue(memberHash, memberValue))
+		return true;
 	if (memberHash == FLOAT_MEMBER_HASHES[WANTEDHEIGHT_MEMBER_IDX]) {
 		SetDefaultAltitude(*(reinterpret_cast<float*>(memberValue)));
 		return true;
