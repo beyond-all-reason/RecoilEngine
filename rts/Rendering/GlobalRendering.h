@@ -14,10 +14,13 @@
 #include "System/type2.h"
 
 class SharedLib;
-struct SDL_version;
+struct SDLVersionInfo;
 struct SDL_Rect;
 struct SDL_Window;
-typedef void* SDL_GLContext;
+#ifndef SDL_h_
+struct SDL_GLContextState;
+typedef struct SDL_GLContextState *SDL_GLContext;
+#endif
 
 /**
  * @brief Globally accessible unsynced, rendering related data

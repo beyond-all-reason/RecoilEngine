@@ -5,7 +5,6 @@
 #include "Gui.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/GL/myGL.h"
-#include "System/Log/ILog.h"
 
 namespace agui
 {
@@ -60,33 +59,31 @@ void Button::DrawSelf()
 bool Button::HandleEventSelf(const SDL_Event& ev)
 {
 	switch (ev.type) {
-		case SDL_MOUSEBUTTONDOWN: {
+		case SDL_EVENT_MOUSE_BUTTON_DOWN: {
 			if ((ev.button.button == SDL_BUTTON_LEFT)
-					&& MouseOver(ev.button.x, ev.button.y)
-					&& gui->MouseOverElement(GetRoot(), ev.button.x, ev.button.y))
+					&& MouseOver(int(ev.button.x), int(ev.button.y))
+					&& gui->MouseOverElement(GetRoot(), int(ev.button.x), int(ev.button.y)))
 			{
 				clicked = true;
 			}
 			break;
 		}
-		case SDL_MOUSEBUTTONUP: {
+		case SDL_EVENT_MOUSE_BUTTON_UP: {
 			if ((ev.button.button == SDL_BUTTON_LEFT)
-					&& MouseOver(ev.button.x, ev.button.y)
+					&& MouseOver(int(ev.button.x), int(ev.button.y))
 					&& clicked)
 			{
 				if (Clicked) {
 					Clicked();
-				} else {
-					LOG_L(L_WARNING, "Button %s clicked without callback", label.c_str());
 				}
 				clicked = false;
 				return true;
 			}
 			break;
 		}
-		case SDL_MOUSEMOTION: {
-			if (MouseOver(ev.motion.x, ev.motion.y)
-					&& gui->MouseOverElement(GetRoot(), ev.motion.x, ev.motion.y))
+		case SDL_EVENT_MOUSE_MOTION: {
+			if (MouseOver(int(ev.motion.x), int(ev.motion.y))
+					&& gui->MouseOverElement(GetRoot(), int(ev.motion.x), int(ev.motion.y)))
 			{
 				hovered = true;
 			} else {
