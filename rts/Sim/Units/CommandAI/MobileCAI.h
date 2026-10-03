@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef MOBILE_CAI_H
-#define MOBILE_CAI_H
+#pragma once
 
 #include "CommandAI.h"
 #include "Sim/Misc/GlobalConstants.h" // for SQUARE_SIZE
@@ -30,9 +29,9 @@ public:
 
 	void StopMove() override;
 	void StopMoveAndKeepPointing(const float3& p, const float r, bool b);
-	void StopMoveAndFinishCommand() {
+	void StopMoveAndFinishCommand(bool dontRepeat = false) {
 		StopMove();
-		FinishCommand();
+		FinishCommand(dontRepeat);
 	}
 
 	bool AllowedCommand(const Command& c, bool fromSynced) override;
@@ -40,7 +39,7 @@ public:
 	void SlowUpdate() override;
 	void GiveCommandReal(const Command& c, bool fromSynced = true) override;
 	void NonMoving();
-	void FinishCommand() override;
+	void FinishCommand(bool dontRepeat = false) override;
 	void StopSlowGuard();
 	void StartSlowGuard(float speed);
 	void ExecuteAttack(Command& c) override;
@@ -131,5 +130,3 @@ private:
 	bool MobileAutoGenerateTarget();
 	bool GenerateAttackCmd();
 };
-
-#endif /* MOBILE_CAI_H */
