@@ -64,6 +64,7 @@ public:
 	void LoadFeaturesFromMap();
 
 	void SetFeatureUpdateable(CFeature* feature);
+	void SetFeaturePrevTransformStale(CFeature* feature);
 	void TerrainChanged(int x1, int y1, int x2, int y2);
 
 	const spring::unordered_set<int>& GetActiveFeatureIDs() const { return activeFeatureIDs; }
@@ -89,6 +90,7 @@ private:
 	std::vector<int> deletedFeatureIDs;
 	std::vector<CFeature*> features;
 	std::vector<CFeature*> updateFeatures;
+	std::vector<CFeature*> stalePrevTransformFeatures;
 };
 
 extern CFeatureHandler featureHandler;
