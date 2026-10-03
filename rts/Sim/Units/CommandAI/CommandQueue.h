@@ -24,6 +24,13 @@ class CCommandQueue {
 
 		inline QueueType GetType() const { return queueType; }
 
+		inline bool GetRepeat() const { return repeat; }
+		inline void SetRepeat(bool b) { repeat = b; }
+
+		// state handed to the units this queue's commands are given to, -1 inherits the owner's
+		inline int GetFireState() const { return fireState; }
+		inline void SetFireState(int s) { fireState = s; }
+
 	public:
 		/// limit to a float's integer range
 		static const int maxTagValue = (1 << 24); // 16777216
@@ -46,10 +53,12 @@ class CCommandQueue {
 		void emplace_back(Command&& cmd) {
 			queue.emplace_back(cmd);
 			queue.back().SetTag(GetNextTag());
+			queue.back().SetQueue(0);
 		}
 		void emplace_front(Command&& cmd) {
 			queue.emplace_front(cmd);
 			queue.front().SetTag(GetNextTag());
+			queue.front().SetQueue(0);
 		}
 
 		inline iterator insert(iterator pos, const Command& cmd);
@@ -97,10 +106,12 @@ class CCommandQueue {
 		inline       Command& operator[](size_type i)       { return queue[i]; }
 		inline const Command& operator[](size_type i) const { return queue[i]; }
 
-	private:
-		CCommandQueue() : queueType(CommandQueueType), tagCounter(0) {};
-		CCommandQueue(const CCommandQueue&);
-		CCommandQueue& operator=(const CCommandQueue&);
+	public:
+		explicit CCommandQueue(QueueType type = CommandQueueType) : queueType(type), tagCounter(0) {};
+		CCommandQueue(const CCommandQueue&) = delete;
+		CCommandQueue(CCommandQueue&&) = default;
+		CCommandQueue& operator=(const CCommandQueue&) = delete;
+		CCommandQueue& operator=(CCommandQueue&&) = default;
 
 	private:
 		inline int GetNextTag();
@@ -110,6 +121,9 @@ class CCommandQueue {
 		std::deque<Command> queue;
 		QueueType queueType;
 		int tagCounter;
+
+		bool repeat = false;
+		int fireState = -1;
 };
 
 
@@ -127,6 +141,7 @@ inline void CCommandQueue::push_back(const Command& cmd)
 {
 	queue.push_back(cmd);
 	queue.back().SetTag(GetNextTag());
+	queue.back().SetQueue(0);
 }
 
 
@@ -134,6 +149,7 @@ inline void CCommandQueue::push_front(const Command& cmd)
 {
 	queue.push_front(cmd);
 	queue.front().SetTag(GetNextTag());
+	queue.front().SetQueue(0);
 }
 
 
@@ -141,6 +157,8 @@ inline CCommandQueue::iterator CCommandQueue::insert(iterator pos, const Command
 {
 	Command tmpCmd = cmd;
 	tmpCmd.SetTag(GetNextTag());
+	// the target only means something to the owner that routed it here
+	tmpCmd.SetQueue(0);
 	return queue.insert(pos, tmpCmd);
 }
 

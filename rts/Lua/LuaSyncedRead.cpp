@@ -289,6 +289,8 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetFactoryCounts);
 	REGISTER_LUA_CFUNC(GetFactoryCommandCount);
 	REGISTER_LUA_CFUNC(GetFactoryCommands);
+	REGISTER_LUA_CFUNC(GetUnitQueues);
+	REGISTER_LUA_CFUNC(GetUnitQueueCommands);
 
 	REGISTER_LUA_CFUNC(GetFactoryBuggerOff);
 
@@ -3729,7 +3731,7 @@ int LuaSyncedRead::GetUnitStates(lua_State* L)
 		}
 
 		if (binState) {
-			lua_pushboolean(L, unit->commandAI->repeatOrders);
+			lua_pushboolean(L, unit->commandAI->GetOwnQueue().GetRepeat());
 			lua_pushboolean(L, unit->wantCloak);
 			lua_pushboolean(L, unit->activated);
 			lua_pushboolean(L, unit->useHighTrajectory);
@@ -3766,7 +3768,7 @@ int LuaSyncedRead::GetUnitStates(lua_State* L)
 		}
 
 		if (binState) {
-			LuaPushNamedBool(L, "repeat",     unit->commandAI->repeatOrders);
+			LuaPushNamedBool(L, "repeat",     unit->commandAI->GetOwnQueue().GetRepeat());
 			LuaPushNamedBool(L, "cloak",      unit->wantCloak);
 			LuaPushNamedBool(L, "active",     unit->activated);
 			LuaPushNamedBool(L, "trajectory", unit->useHighTrajectory);
@@ -6367,7 +6369,7 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
 
 	const CCommandAI* commandAI = unit->commandAI; // never null
 	const CFactoryCAI* factoryCAI = dynamic_cast<const CFactoryCAI*>(commandAI);
-	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->commandQue : &factoryCAI->newUnitCommands;
+	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->GetOwnQueue() : &factoryCAI->GetNewUnitQueue();
 
 	int cmdIndex = luaL_optint(L, 2, 1);
 	if (cmdIndex > 0) {
@@ -6425,7 +6427,7 @@ int LuaSyncedRead::GetUnitCommands(lua_State* L)
 	const CCommandAI* commandAI = unit->commandAI;
 	// send the new unit commands for factories, otherwise the normal commands
 	const CFactoryCAI* factoryCAI = dynamic_cast<const CFactoryCAI*>(commandAI);
-	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->commandQue : &factoryCAI->newUnitCommands;
+	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->GetOwnQueue() : &factoryCAI->GetNewUnitQueue();
 
 	const int  numCmds   = luaL_checkint(L, 2); // must always be given, -1 is a performance pitfall
 	const bool cmdsTable = luaL_optboolean(L, 3, true); // deprecated, prefer to set 2nd arg to 0
@@ -6479,7 +6481,7 @@ int LuaSyncedRead::GetFactoryCommands(lua_State* L)
 	if (factoryCAI == nullptr)
 		return 0;
 
-	const CCommandQueue& commandQue = factoryCAI->commandQue;
+	const CCommandQueue& commandQue = factoryCAI->GetOwnQueue();
 
 	const int  numCmds   = luaL_checkint(L, 2);
 	const bool cmdsTable = luaL_optboolean(L, 3, true); // deprecated, prefer to set 2nd arg to 0
@@ -6490,6 +6492,82 @@ int LuaSyncedRead::GetFactoryCommands(lua_State* L)
 		LOG_DEPRECATED("This game is issuing `Spring.GetFactoryCommands(unitId, 0)`, or passing a third argument. This usage is deprecated, please use `Spring.GetFactoryCommandCount(unitId)` instead or fix some underlying bug.");
 		lua_pushnumber(L, commandQue.size());
 	}
+
+	return 1;
+}
+
+static const char* GetQueueTypeName(CCommandQueue::QueueType type)
+{
+	switch (type) {
+		case CCommandQueue::CommandQueueType: return "command";
+		case CCommandQueue::NewUnitQueueType: return "newunit";
+		case CCommandQueue::BuildQueueType:   return "build";
+	}
+
+	return "unknown";
+}
+
+/***
+ * Get the command queues a unit owns.
+ *
+ * @function Spring.GetUnitQueues
+ *
+ * @param unitID UnitID
+ * @return table[]? queues Indexed by queue ID, each `{ type = "command"|"newunit"|"build", size = integer, repeat = boolean, fireState = integer? }`.
+ *
+ * @see Spring.GetUnitQueueCommands
+ */
+int LuaSyncedRead::GetUnitQueues(lua_State* L)
+{
+	const CUnit* unit = ParseAllyUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	const std::vector<CCommandQueue>& queues = unit->commandAI->GetQueues();
+
+	lua_createtable(L, queues.size(), 0);
+
+	for (size_t i = 0; i < queues.size(); ++i) {
+		const CCommandQueue& q = queues[i];
+
+		lua_createtable(L, 0, 4);
+		LuaPushNamedString(L, "type", std::string(GetQueueTypeName(q.GetType())));
+		LuaPushNamedNumber(L, "size", q.size());
+		LuaPushNamedBool(L, "repeat", q.GetRepeat());
+
+		if (q.GetFireState() >= 0)
+			LuaPushNamedNumber(L, "fireState", q.GetFireState());
+
+		lua_rawseti(L, -2, i + 1);
+	}
+
+	return 1;
+}
+
+/***
+ * Get the commands in one of a unit's queues.
+ *
+ * @function Spring.GetUnitQueueCommands
+ *
+ * @param unitID UnitID
+ * @param queueID integer As indexed by `Spring.GetUnitQueues`.
+ * @param count integer Maximum amount of commands to return, `-1` returns all commands.
+ * @return Command[]? commands
+ */
+int LuaSyncedRead::GetUnitQueueCommands(lua_State* L)
+{
+	const CUnit* unit = ParseAllyUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	const CCommandQueue* queue = unit->commandAI->GetQueue(luaL_checkint(L, 2));
+
+	if (queue == nullptr)
+		return 0;
+
+	PackCommandQueue(L, *queue, luaL_checkint(L, 3));
 
 	return 1;
 }
@@ -6510,7 +6588,7 @@ int LuaSyncedRead::GetUnitCommandCount(lua_State* L)
 	const CCommandAI* commandAI = unit->commandAI;
 
 	const CFactoryCAI* factoryCAI = dynamic_cast<const CFactoryCAI*>(commandAI);
-	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->commandQue : &factoryCAI->newUnitCommands;
+	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->GetOwnQueue() : &factoryCAI->GetNewUnitQueue();
 
 	lua_pushnumber(L, queue->size());
 
@@ -6540,7 +6618,7 @@ int LuaSyncedRead::GetFactoryCommandCount(lua_State* L)
 	if (factoryCAI == nullptr)
 		return 0;
 
-	const CCommandQueue& queue = commandAI->commandQue;
+	const CCommandQueue& queue = commandAI->GetOwnQueue();
 
 	lua_pushnumber(L, queue.size());
 
@@ -6654,7 +6732,7 @@ int LuaSyncedRead::GetFactoryCounts(lua_State* L)
 	if (factoryCAI == nullptr)
 		return 0; // not a factory, bail
 
-	const CCommandQueue& commandQue = factoryCAI->commandQue;
+	const CCommandQueue& commandQue = factoryCAI->GetOwnQueue();
 
 	// get the desired number of commands to return
 	int count = luaL_optint(L, 2, -1);
@@ -6709,7 +6787,7 @@ static int PackBuildQueue(lua_State* L, bool canBuild, const char* caller)
 		return 0;
 
 	const CCommandAI* commandAI = unit->commandAI;
-	const CCommandQueue& commandQue = commandAI->commandQue;
+	const CCommandQueue& commandQue = commandAI->GetOwnQueue();
 
 	lua_createtable(L, commandQue.size(), 0);
 

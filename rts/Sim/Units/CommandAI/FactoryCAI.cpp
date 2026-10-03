@@ -25,7 +25,6 @@
 CR_BIND_DERIVED(CFactoryCAI ,CCommandAI , )
 
 CR_REG_METADATA(CFactoryCAI , (
-	CR_MEMBER(newUnitCommands),
 	CR_MEMBER(buildOptions),
 	CR_PREALLOC(GetPreallocContainer)
 ))
@@ -56,8 +55,8 @@ CFactoryCAI::CFactoryCAI(): CCommandAI()
 
 CFactoryCAI::CFactoryCAI(CUnit* owner): CCommandAI(owner)
 {
-	commandQue.SetQueueType(CCommandQueue::BuildQueueType);
-	newUnitCommands.SetQueueType(CCommandQueue::NewUnitQueueType);
+	GetOwnQueue().SetQueueType(CCommandQueue::BuildQueueType); // TODO, give factory a proper build queue rather than hijacking order queue
+	queues.emplace_back(CCommandQueue::NewUnitQueueType);
 
 	if (owner->unitDef->canmove) {
 		SCommandDescription c;
@@ -155,7 +154,7 @@ static constexpr int GetCountMultiplierFromOptions(int opts)
 void CFactoryCAI::BuildeeChangeCheck()
 {
 	const auto fac = static_cast <CFactory *> (owner);
-	if (!fac->IsCurrentBuildeeMatchingBuildQueueFront(commandQue))
+	if (!fac->IsCurrentBuildeeMatchingBuildQueueFront(GetOwnQueue()))
 		fac->StopBuild();
 }
 
@@ -169,10 +168,11 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 		return;
 
 	auto boi = buildOptions.find(cmdID);
+	const CCommandQueue* target = GetQueue(c.GetQueue());
 
 	// not a build order (or a build order we do not support, eg. if multiple
 	// factories of different types were selected) so queue it to built units
-	if (boi == buildOptions.end()) {
+	if (boi == buildOptions.end() || (target != nullptr && target->GetType() != CCommandQueue::BuildQueueType)) {
 		if (cmdID < 0)
 			return;
 
@@ -186,36 +186,41 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 			return;
 		}
 
-		if (!(c.GetOpts() & SHIFT_KEY) && (cmdID == CMD_WAIT || cmdID == CMD_SELFD)) {
+		const bool toNewUnitQueue = (target != nullptr && target->GetType() == CCommandQueue::NewUnitQueueType);
+
+		if (!toNewUnitQueue && !(c.GetOpts() & SHIFT_KEY) && (cmdID == CMD_WAIT || cmdID == CMD_SELFD)) {
 			CCommandAI::GiveAllowedCommand(c);
 			return;
 		}
 
+		if (target != nullptr && !toNewUnitQueue)
+			return;
+
 		if (!(c.GetOpts() & SHIFT_KEY)) {
- 			waitCommandsAI.ClearUnitQueue(owner, newUnitCommands);
+			waitCommandsAI.ClearUnitQueue(owner, GetNewUnitQueue());
 			CCommandAI::ClearCommandDependencies();
-			newUnitCommands.clear();
+			GetNewUnitQueue().clear();
 		}
 
 		CCommandAI::AddCommandDependency(c);
 
 		if (cmdID != CMD_STOP) {
 			if ((cmdID == CMD_WAIT) || (cmdID == CMD_SELFD)) {
-				if (!newUnitCommands.empty() && (newUnitCommands.back().GetID() == cmdID)) {
+				if (!GetNewUnitQueue().empty() && (GetNewUnitQueue().back().GetID() == cmdID)) {
 					if (cmdID == CMD_WAIT) {
 						waitCommandsAI.RemoveWaitCommand(owner, c);
 					}
-					newUnitCommands.pop_back();
+					GetNewUnitQueue().pop_back();
 				} else {
-					newUnitCommands.push_back(c);
+					GetNewUnitQueue().push_back(c);
 				}
 			} else {
 				bool dummy;
-				if (CancelCommands(c, newUnitCommands, dummy) > 0) {
+				if (CancelCommands(c, GetNewUnitQueue(), dummy) > 0) {
 					return;
 				} else {
-					if (GetOverlapQueued(c, newUnitCommands).empty()) {
-						newUnitCommands.push_back(c);
+					if (GetOverlapQueued(c, GetNewUnitQueue()).empty()) {
+						GetNewUnitQueue().push_back(c);
 					} else {
 						return;
 					}
@@ -224,15 +229,15 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 		}
 
 		// the first new-unit build order can not be WAIT or SELFD
-		while (!newUnitCommands.empty()) {
-			const Command& newUnitCommand = newUnitCommands.front();
+		while (!GetNewUnitQueue().empty()) {
+			const Command& newUnitCommand = GetNewUnitQueue().front();
 			const int id = newUnitCommand.GetID();
 
 			if ((id == CMD_WAIT) || (id == CMD_SELFD)) {
 				if (cmdID == CMD_WAIT) {
 					waitCommandsAI.RemoveWaitCommand(owner, c);
 				}
-				newUnitCommands.pop_front();
+				GetNewUnitQueue().pop_front();
 			} else {
 				break;
 			}
@@ -250,16 +255,16 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 
 		int numToErase = numItems;
 		if (c.GetOpts() & ALT_KEY) {
-			for (unsigned int cmdNum = 0; cmdNum < commandQue.size() && numToErase; ++cmdNum) {
-				if (commandQue[cmdNum].GetID() == cmdID) {
-					commandQue[cmdNum] = Command(CMD_STOP);
+			for (unsigned int cmdNum = 0; cmdNum < GetOwnQueue().size() && numToErase; ++cmdNum) {
+				if (GetOwnQueue()[cmdNum].GetID() == cmdID) {
+					GetOwnQueue()[cmdNum] = Command(CMD_STOP);
 					numToErase--;
 				}
 			}
 		} else {
-			for (int cmdNum = commandQue.size() - 1; cmdNum != -1 && numToErase; --cmdNum) {
-				if (commandQue[cmdNum].GetID() == cmdID) {
-					commandQue[cmdNum] = Command(CMD_STOP);
+			for (int cmdNum = GetOwnQueue().size() - 1; cmdNum != -1 && numToErase; --cmdNum) {
+				if (GetOwnQueue()[cmdNum].GetID() == cmdID) {
+					GetOwnQueue()[cmdNum] = Command(CMD_STOP);
 					numToErase--;
 				}
 			}
@@ -269,21 +274,21 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 			Command nc(c);
 			nc.SetOpts(nc.GetOpts() | INTERNAL_ORDER);
 			for (int a = 0; a < numItems; ++a) {
-				if (repeatOrders) {
-					if (commandQue.empty()) {
-						commandQue.push_front(nc);
+				if (GetOwnQueue().GetRepeat()) {
+					if (GetOwnQueue().empty()) {
+						GetOwnQueue().push_front(nc);
 					} else {
-						commandQue.insert(commandQue.begin() + 1, nc);
+						GetOwnQueue().insert(GetOwnQueue().begin() + 1, nc);
 					}
 				} else {
-					commandQue.push_front(c);
+					GetOwnQueue().push_front(c);
 				}
 			}
 
 			BuildeeChangeCheck();
 		} else {
 			for (int a = 0; a < numItems; ++a) {
-				commandQue.push_back(c);
+				GetOwnQueue().push_back(c);
 			}
 		}
 		numQueued += numItems;
@@ -305,7 +310,7 @@ void CFactoryCAI::InsertBuildCommand(CCommandQueue::iterator& it,
 		UpdateIconName(newCmd.GetID(), boi->second);
 	}
 	while (buildCount--)
-		it = commandQue.insert(it, newCmd);
+		it = GetOwnQueue().insert(it, newCmd);
 
 	BuildeeChangeCheck();
 }
@@ -320,7 +325,7 @@ bool CFactoryCAI::RemoveBuildCommand(CCommandQueue::iterator& it)
 		boi->second--;
 		UpdateIconName(cmd.GetID(), boi->second);
 	}
-	if (!commandQue.empty() && (it == commandQue.begin())) {
+	if (!GetOwnQueue().empty() && (it == GetOwnQueue().begin())) {
 		ExecuteStop(cmd);
 		return true;
 	}
@@ -339,9 +344,9 @@ void CFactoryCAI::DecreaseQueueCount(const Command& buildCommand, int& numQueued
 	RECOIL_DETAILED_TRACY_ZONE;
 	// copy in case we get pop'ed
 	// NOTE: the queue should not be empty at this point!
-	const Command frontCommand = commandQue.empty()? Command(CMD_STOP): commandQue.front();
+	const Command frontCommand = GetOwnQueue().empty()? Command(CMD_STOP): GetOwnQueue().front();
 
-	if (!repeatOrders || buildCommand.IsInternalOrder())
+	if (!GetOwnQueue().GetRepeat() || buildCommand.IsInternalOrder())
 		numQueued--;
 
 	UpdateIconName(buildCommand.GetID(), numQueued);
@@ -350,16 +355,16 @@ void CFactoryCAI::DecreaseQueueCount(const Command& buildCommand, int& numQueued
 	// could only have been finished by assisting units
 	// --> make sure not to cancel the wait-order
 	if (frontCommand.GetID() == CMD_WAIT)
-		commandQue.pop_front();
+		GetOwnQueue().pop_front();
 
 	// can only finish the real build-command command if
 	// we still have it in our queue (FinishCommand also
 	// asserts this)
-	if (!commandQue.empty())
+	if (!GetOwnQueue().empty())
 		FinishCommand();
 
 	if (frontCommand.GetID() == CMD_WAIT)
-		commandQue.push_front(frontCommand);
+		GetOwnQueue().push_front(frontCommand);
 }
 
 
@@ -377,15 +382,15 @@ void CFactoryCAI::SlowUpdate()
 	// Commands issued may invoke SlowUpdate when paused
 	if (gs->paused)
 		return;
-	if (commandQue.empty() || owner->beingBuilt)
+	if (GetOwnQueue().empty() || owner->beingBuilt)
 		return;
 
 	CFactory* fac = static_cast<CFactory*>(owner);
 
-	while (!commandQue.empty()) {
-		Command& c = commandQue.front();
+	while (!GetOwnQueue().empty()) {
+		Command& c = GetOwnQueue().front();
 
-		const size_t oldQueueSize = commandQue.size();
+		const size_t oldQueueSize = GetOwnQueue().size();
 
 		if (buildOptions.find(c.GetID()) != buildOptions.end()) {
 			// build-order
@@ -408,10 +413,10 @@ void CFactoryCAI::SlowUpdate()
 					 * when the engine tries to process them all in one frame.
 					 * Just execute the last in each series to ensure last build is cancelled
 					 * otherwise last unit stays being built. */
-					if (oldQueueSize == 1 || commandQue[1].GetID() != CMD_STOP) {
+					if (oldQueueSize == 1 || GetOwnQueue()[1].GetID() != CMD_STOP) {
 						ExecuteStop(c);
 					} else {
-						commandQue.pop_front();
+						GetOwnQueue().pop_front();
 					}
 
 				} break;
@@ -422,7 +427,7 @@ void CFactoryCAI::SlowUpdate()
 		}
 
 		// exit if no command was consumed
-		if (oldQueueSize == commandQue.size())
+		if (oldQueueSize == GetOwnQueue().size())
 			break;
 	}
 }
@@ -434,7 +439,7 @@ void CFactoryCAI::ExecuteStop(Command& c)
 	CFactory* fac = static_cast<CFactory*>(owner);
 	fac->StopBuild();
 
-	commandQue.pop_front();
+	GetOwnQueue().pop_front();
 }
 
 

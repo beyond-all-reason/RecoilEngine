@@ -103,6 +103,7 @@ public:
 	void SetCommandDescParam0(const Command& c);
 	bool ExecuteStateCommand(const Command& c);
 
+	CCommandQueue* PickMetaCommandQueue(const Command& c);
 	void ExecuteInsert(const Command& c, bool fromSynced = true);
 	void ExecuteRemove(const Command& c);
 
@@ -112,13 +113,28 @@ public:
 	bool CanChangeFireState() const;
 
 	virtual bool AllowedCommand(const Command& c, bool fromSynced);
+	bool AllowedQueue(const Command& c) const;
 
 	CWeapon* stockpileWeapon;
 
 	std::vector<const SCommandDescription*> possibleCommands;
 	spring::unordered_set<int> nonQueingCommands;
 
-	CCommandQueue commandQue;
+protected:
+	std::vector<CCommandQueue> queues;
+
+public:
+	      CCommandQueue& GetOwnQueue()       { return queues[0]; }
+	const CCommandQueue& GetOwnQueue() const { return queues[0]; }
+
+	// ids are 1-based, as carried by Command::GetQueue
+	      CCommandQueue* GetQueue(unsigned int id)       { return (id >= 1 && id <= queues.size())? &queues[id - 1]: nullptr; }
+	const CCommandQueue* GetQueue(unsigned int id) const { return (id >= 1 && id <= queues.size())? &queues[id - 1]: nullptr; }
+
+	      CCommandQueue* FindQueue(CCommandQueue::QueueType type);
+	const CCommandQueue* FindQueue(CCommandQueue::QueueType type) const;
+
+	const std::vector<CCommandQueue>& GetQueues() const { return queues; }
 
 	int lastUserCommand;
 	int selfDCountdown;
@@ -128,7 +144,6 @@ public:
 	CUnit* orderTarget;
 
 	bool targetDied;
-	bool repeatOrders;
 	int lastSelectedCommandPage;
 	int inCommand;
 protected:

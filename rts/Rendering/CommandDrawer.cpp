@@ -95,7 +95,7 @@ void CommandDrawer::DrawLuaQueuedUnitSetCommands() const
 void CommandDrawer::DrawCommands(const CCommandAI* cai, int queueDrawDepth) const
 {
 	const CUnit* owner = cai->owner;
-	const CCommandQueue& commandQue = cai->commandQue;
+	const CCommandQueue& commandQue = cai->GetOwnQueue();
 
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
@@ -152,7 +152,7 @@ void CommandDrawer::DrawCommands(const CCommandAI* cai, int queueDrawDepth) cons
 void CommandDrawer::DrawAirCAICommands(const CAirCAI* cai, int queueDrawDepth) const
 {
 	const CUnit* owner = cai->owner;
-	const CCommandQueue& commandQue = cai->commandQue;
+	const CCommandQueue& commandQue = cai->GetOwnQueue();
 
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
@@ -237,7 +237,7 @@ void CommandDrawer::DrawAirCAICommands(const CAirCAI* cai, int queueDrawDepth) c
 void CommandDrawer::DrawBuilderCAICommands(const CBuilderCAI* cai, int queueDrawDepth) const
 {
 	const CUnit* owner = cai->owner;
-	const CCommandQueue& commandQue = cai->commandQue;
+	const CCommandQueue& commandQue = cai->GetOwnQueue();
 
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
@@ -405,8 +405,8 @@ void CommandDrawer::DrawBuilderCAICommands(const CBuilderCAI* cai, int queueDraw
 void CommandDrawer::DrawFactoryCAICommands(const CFactoryCAI* cai, int queueDrawDepth) const
 {
 	const CUnit* owner = cai->owner;
-	const CCommandQueue& commandQue = cai->commandQue;
-	const CCommandQueue& newUnitCommands = cai->newUnitCommands;
+	const CCommandQueue& commandQue = cai->GetOwnQueue();
+	const CCommandQueue& newUnitCommands = cai->GetNewUnitQueue();
 
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = newUnitCommands.size();
@@ -500,7 +500,7 @@ void CommandDrawer::DrawFactoryCAICommands(const CFactoryCAI* cai, int queueDraw
 void CommandDrawer::DrawMobileCAICommands(const CMobileCAI* cai, int queueDrawDepth) const
 {
 	const CUnit* owner = cai->owner;
-	const CCommandQueue& commandQue = cai->commandQue;
+	const CCommandQueue& commandQue = cai->GetOwnQueue();
 
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
@@ -654,7 +654,7 @@ void CommandDrawer::DrawDefaultCommand(const Command& c, const CUnit* owner) con
 
 void CommandDrawer::DrawQuedBuildingSquares(const CBuilderCAI* cai) const
 {
-	const CCommandQueue& commandQue = cai->commandQue;
+	const CCommandQueue& commandQue = cai->GetOwnQueue();
 	const auto& buildOptions = cai->buildOptions;
 
 	unsigned int  buildCommands = 0;

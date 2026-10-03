@@ -296,7 +296,7 @@ const CCommandQueue* CAICheats::GetCurrentUnitCommands(int unitId) const
 	const CUnit* unit = GetUnit(unitId);
 
 	if (unit != nullptr)
-		return &unit->commandAI->commandQue;
+		return &unit->commandAI->GetOwnQueue();
 
 	return nullptr;
 }

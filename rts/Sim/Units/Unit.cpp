@@ -368,10 +368,12 @@ void CUnit::PostInit(const CUnit* builder)
 
 	if (commandAI->CanChangeFireState()) {
 		if (unitDef->fireState <= FIRESTATE_NONE) {
-			// inherit our builder's firestate (if it is a factory)
-			// if no builder, CUnit's default (fire-at-will) is set
-			if (builder != nullptr && dynamic_cast<CFactoryCAI*>(builder->commandAI) != nullptr)
-				fireState = builder->fireState;
+			// inherit from a builder that hands orders to what it builds, preferring
+			// the state set on that queue; if no builder, CUnit's default (fire-at-will) is set
+			if (builder != nullptr) {
+				if (const CCommandQueue* q = builder->commandAI->FindQueue(CCommandQueue::NewUnitQueueType); q != nullptr)
+					fireState = (q->GetFireState() >= 0)? q->GetFireState(): builder->fireState;
+			}
 
 		} else {
 			// use our predefined firestate
@@ -1636,9 +1638,9 @@ void CUnit::ChangeTeamReset()
 
 		if (facAI != nullptr) {
 			std::vector<Command> clearCommands;
-			clearCommands.reserve(facAI->commandQue.size());
+			clearCommands.reserve(facAI->GetOwnQueue().size());
 
-			for (auto& cmd: facAI->commandQue) {
+			for (auto& cmd: facAI->GetOwnQueue()) {
 				clearCommands.emplace_back(cmd.GetID(), RIGHT_MOUSE_KEY);
 			}
 			for (auto& cmd: clearCommands) {
@@ -1722,7 +1724,7 @@ bool CUnit::IsIdle() const
 	if (beingBuilt)
 		return false;
 
-	return (commandAI->commandQue.empty());
+	return (commandAI->GetOwnQueue().empty());
 }
 
 
@@ -2687,7 +2689,7 @@ bool CUnit::DetachUnit(CUnit* unit)
 		unit->Block();
 
 		// erase command queue unless it's a wait command
-		const CCommandQueue& queue = unit->commandAI->commandQue;
+		const CCommandQueue& queue = unit->commandAI->GetOwnQueue();
 
 		if (unitDef->IsTransportUnit() && (queue.empty() || (queue.front().GetID() != CMD_WAIT)))
 			unit->commandAI->GiveCommand(Command(CMD_STOP));

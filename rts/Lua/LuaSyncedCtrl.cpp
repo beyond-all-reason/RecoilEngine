@@ -5944,7 +5944,7 @@ int LuaSyncedCtrl::UnitFinishCommand(lua_State* L)
 		luaL_error(L, "[%s] invalid unitID", __func__);
 
 	CCommandAI* cai = unit->commandAI;
-	if (!cai->commandQue.empty())
+	if (!cai->GetOwnQueue().empty())
 		cai->FinishCommand();
 
 	return 0;
