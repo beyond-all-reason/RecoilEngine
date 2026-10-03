@@ -2,7 +2,10 @@
 
 
 #include <cmath>
+#include <cstdint>
 #include <string_view>
+
+#include <monocypher-ed25519.h>
 
 #include "LuaVFS.h"
 #include "LuaInclude.h"
@@ -15,7 +18,6 @@
 #include "System/FileSystem/ArchiveScanner.h"
 #include "System/FileSystem/VFSHandler.h"
 #include "System/FileSystem/FileSystem.h"
-#include "System/Crypto/Ed25519.h"
 #include "System/Log/ILog.h"
 #include "System/StringUtil.h"
 #include "System/TimeProfiler.h"
@@ -971,6 +973,9 @@ int LuaVFS::CalculateHash(lua_State* L)
  */
 int LuaVFS::VerifyEd25519(lua_State* L)
 {
+	static constexpr size_t ED25519_SIGNATURE_SIZE = 64;
+	static constexpr size_t ED25519_PUBLIC_KEY_SIZE = 32;
+
 	size_t messageSize = 0;
 	size_t signatureSize = 0;
 	size_t publicKeySize = 0;
@@ -978,12 +983,12 @@ int LuaVFS::VerifyEd25519(lua_State* L)
 	const auto* signature = reinterpret_cast<const std::uint8_t*>(luaL_checklstring(L, 2, &signatureSize));
 	const auto* publicKey = reinterpret_cast<const std::uint8_t*>(luaL_checklstring(L, 3, &publicKeySize));
 
-	if (signatureSize != ed25519::SIGNATURE_SIZE || publicKeySize != ed25519::PUBLIC_KEY_SIZE) {
+	if (signatureSize != ED25519_SIGNATURE_SIZE || publicKeySize != ED25519_PUBLIC_KEY_SIZE) {
 		lua_pushboolean(L, false);
 		return 1;
 	}
 
-	lua_pushboolean(L, ed25519::Verify(message, messageSize, signature, publicKey));
+	lua_pushboolean(L, crypto_ed25519_check(signature, publicKey, message, messageSize) == 0);
 	return 1;
 }
 
