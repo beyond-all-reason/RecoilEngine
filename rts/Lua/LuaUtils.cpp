@@ -609,6 +609,17 @@ int LuaUtils::ParseStringArray(lua_State* L, int index, string* array, int size)
 	return size;
 }
 
+bool LuaUtils::ParseIntOrIntVector(lua_State* L, int index, vector<int>& vec)
+{
+	if (lua_isnumber(L, index)) {
+		vec.clear();
+		vec.push_back(lua_toint(L, index));
+		return true;
+	}
+
+	return (ParseIntVector(L, index, vec) >= 0);
+}
+
 int LuaUtils::ParseIntVector(lua_State* L, int index, vector<int>& vec)
 {
 	if (!lua_istable(L, index))

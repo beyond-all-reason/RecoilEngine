@@ -167,6 +167,9 @@ class LuaUtils {
 
 		static int ParseIntVector(lua_State* L, int tableIndex,
 		                          vector<int>& vec);
+		/// accepts a single number or an array of numbers, returns false for anything else
+		static bool ParseIntOrIntVector(lua_State* L, int index,
+		                                vector<int>& vec);
 		static int ParseFloatVector(lua_State* L, int tableIndex,
 		                            vector<float>& vec);
 		static int ParseStringVector(lua_State* L, int tableIndex,
