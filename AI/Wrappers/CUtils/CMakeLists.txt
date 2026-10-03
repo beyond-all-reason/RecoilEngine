@@ -17,6 +17,6 @@ set(mySources
 	"${mySourceDir}/TimeUtil.cpp"
 	)
 add_library(CUtils STATIC ${mySources})
-target_link_libraries(CUtils ${CMAKE_DL_LIBS})
+target_link_libraries(CUtils ${CMAKE_DL_LIBS} ${ZLIB_LIBRARIES})
 
 ai_message(STATUS "Found AI Wrapper: ${myName} (sources only wrapper)")

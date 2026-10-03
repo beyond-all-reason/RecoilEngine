@@ -4,7 +4,6 @@
 
 #include "ALShared.h"
 #include "EFXPresets.h"
-#include "EFXfuncs.h"
 
 #include "System/Sound/SoundLog.h"
 #include "System/Config/ConfigHandler.h"
