@@ -623,7 +623,7 @@ bool QTPFS::QTNode::UpdateMoveCost(
 
 
 bool QTPFS::QTNode::UpdateExitOnly(NodeLayer& nl, bool& needSplit) {
-    ZoneScoped;
+    RECOIL_DETAILED_TRACY_ZONE;
 
 	bool hasExitOnly = false;
 	auto checkRangeForSplit = [this, &nl, &hasExitOnly]() -> bool {
