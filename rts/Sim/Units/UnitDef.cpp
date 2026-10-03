@@ -157,6 +157,7 @@ UnitDef::UnitDef()
 	, buildPic(nullptr)
 	, selfDCountdown(0)
 	, builder(false)
+	, isFactory(false)
 	, activateWhenBuilt(false)
 	, onoffable(false)
 	, fullHealthFactory(false)
@@ -674,6 +675,15 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	buildingMask = (std::uint16_t)udTable.GetInt("buildingMask", 1); //1st bit set to 1 constitutes for "normal building"
 	if (IsImmobileUnit())
 		CreateYardMap(udTable.GetString("yardMap", ""));
+
+	const bool canBeFactory = IsBuilderUnit() && IsBuildingUnit();
+
+	isFactory = udTable.GetBool("isFactory", canBeFactory);
+
+	if (isFactory && !canBeFactory) {
+		LOG_L(L_WARNING, "%s sets isFactory but is not an immobile builder with a yardMap", unitName.c_str());
+		isFactory = false;
+	}
 
 	leavesGhost   = udTable.GetBool("leavesGhost", IsBuildingUnit());
 

@@ -93,6 +93,7 @@ public:
 	void DropCurrentAttackTarget();
 
 	int GetBlockingMapID() const override { return id; }
+	const YardMapStatus* GetBlockMap() const override;
 
 	void ChangeLos(int losRad, int airRad);
 

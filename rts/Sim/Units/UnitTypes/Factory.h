@@ -3,7 +3,7 @@
 #ifndef _FACTORY_H
 #define _FACTORY_H
 
-#include "Building.h"
+#include "Sim/Units/Unit.h"
 #include "Sim/Misc/NanoPieceCache.h"
 #include "Sim/Units/CommandAI/Command.h"
 #include "System/float3.h"
@@ -12,7 +12,7 @@ struct UnitDef;
 struct Command;
 class CFactory;
 
-class CFactory : public CBuilding
+class CFactory : public CUnit
 {
 public:
 	CR_DECLARE(CFactory)
