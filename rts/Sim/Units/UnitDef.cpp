@@ -671,6 +671,12 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	xsize = std::max(1 * SPRING_FOOTPRINT_SCALE, (udTable.GetInt("footprintX", 1) * SPRING_FOOTPRINT_SCALE));
 	zsize = std::max(1 * SPRING_FOOTPRINT_SCALE, (udTable.GetInt("footprintZ", 1) * SPRING_FOOTPRINT_SCALE));
 
+	if (extractsMetal > 0.0f && !IsImmobileUnit()) {
+		LOG_L(L_WARNING, "%s extracts metal but is mobile; the extraction is ignored", unitName.c_str());
+		extractsMetal = 0.0f;
+		extractRange = 0.0f;
+	}
+
 	buildingMask = (std::uint16_t)udTable.GetInt("buildingMask", 1); //1st bit set to 1 constitutes for "normal building"
 	if (IsImmobileUnit())
 		CreateYardMap(udTable.GetString("yardMap", ""));
