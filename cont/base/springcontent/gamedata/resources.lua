@@ -71,10 +71,8 @@ if (resources == nil) then
 				'smoke/smoke11.tga',
 			},
 			scars = {
-				'scars/scar1.bmp',
-				'scars/scar2.bmp',
-				'scars/scar3.bmp',
-				'scars/scar4.bmp',
+				'scars/scar1.tga',
+				'scars/scar2.tga',
 			},
 			trees = {
 				bark		=	'Bark.bmp',
