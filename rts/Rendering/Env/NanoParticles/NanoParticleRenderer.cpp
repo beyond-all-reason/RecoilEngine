@@ -12,6 +12,7 @@
 
 #include "Game/Camera.h"
 #include "Game/GlobalUnsynced.h"
+#include "Map/Ground.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/GL/SubState.h"
@@ -20,6 +21,7 @@
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/LosHandler.h"
+#include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Projectiles/Projectile.h"
 #include "Rendering/Colors.h"
@@ -611,6 +613,7 @@ void Renderer::GatherVisibleEnemies(int frame)
 
 	const float cullRadius = GetConfig().render.cullRadius;
 	const bool globalLos = losHandler->GetGlobalLOS(allyTeam);
+	const bool requireSonar = !globalLos && modInfo.requireSonarUnderWaterForProjectiles;
 	const ILosType& los = losHandler->los;
 	const CLosMap& losMap = los.losMaps[allyTeam];
 	const CCamera::Frustum& frustum = camera->GetFrustum();
@@ -634,6 +637,9 @@ void Renderer::GatherVisibleEnemies(int frame)
 				continue;
 
 			if (!globalLos && losMap.At(los.PosToSquare(simPos)) == 0 && losMap.At(los.PosToSquare(simPos + particle.velocity)) == 0)
+				continue;
+
+			if (requireSonar && simPos.y <= CGround::GetWaterLevel(simPos.x, simPos.z) && !losHandler->sonar.InSight(simPos, allyTeam))
 				continue;
 
 			transientVertices.emplace_back(MakeVertex(particle));
