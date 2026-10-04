@@ -29,6 +29,9 @@
  * @field groupAddDoesntSelect boolean Whether 'group add' also selects the group (does both if false)
  * @field deadTeamsKeepUnitLimit boolean Whether engine redistributes dead team unitlimit to allies (false) or keeps it as-is (true)
  * @field reliableLuaMapShaders boolean Whether forward-only Lua map shaders activate without a deferred draw and Spring.SetMapShader program swaps refresh cached uniform locations
+ * @field nanoParticleUpdateCallin boolean Whether LuaUI receives batched `NanoParticleUpdate` lifecycle events
+ * @field nanoParticlesGL4 boolean Whether the engine has the standalone shader-based nano particle effect (the `NanoParticles*` springsettings)
+ * @field modelVertexColor boolean Whether glTF `COLOR_0` is loaded into the models VBO (`color`, attribute 15; opaque white when absent)
  */
 
 /***
@@ -43,8 +46,8 @@
  * @field commitsNumber string Number of commits after the latest named release, non-zero indicates a "dev" build
  * @field buildFlags string Gets additional engine buildflags, e.g. "Debug" or "Sync-Debug"
  * @field featureSupport FeatureSupport Table containing various engine features as keys; use for cross-version compat
- * @field wordSize number Indicates the build type always 64 these days
- * @field gameSpeed number Number of simulation gameframes per second
+ * @field wordSize integer Indicates the build type always 64 these days
+ * @field gameSpeed integer Number of simulation gameframes per second
  * @field textColorCodes TextColorCode Table containing keys that represent the color code operations during font rendering
  */
 
@@ -70,7 +73,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	 *
 	 * will be compatible even on engines that don't yet know about the entry at all. */
 	lua_pushliteral(L, "FeatureSupport");
-	lua_createtable(L, 0, 11);
+	lua_createtable(L, 0, 16);
 		LuaPushNamedBool(L, "NegativeGetUnitCurrentCommand", true);
 		LuaPushNamedBool(L, "hasExitOnlyYardmaps", true);
 		LuaPushNamedNumber(L, "rmlUiApiVersion", 1);
@@ -85,6 +88,9 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "groupAddDoesntSelect", true);
 		LuaPushNamedBool(L, "deadTeamsKeepUnitLimit", false);
 		LuaPushNamedBool(L, "reliableLuaMapShaders", true);
+		LuaPushNamedBool(L, "nanoParticleUpdateCallin", true);
+		LuaPushNamedBool(L, "nanoParticlesGL4", true);
+		LuaPushNamedBool(L, "modelVertexColor", true);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");

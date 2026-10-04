@@ -30,6 +30,7 @@
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/DebugVisibilityDrawer.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
+#include "Rendering/Env/NanoParticles/NanoParticleRenderer.h"
 #include "Rendering/Env/Particles/ProjectileDrawer.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/GL/myGL.h"
@@ -1905,7 +1906,19 @@ void CMiniMap::DrawUnitIcons() const
 	glTranslatef(0.0f, +1.0f, 0.0f);
 	glScalef(+1.0f / (mapDims.mapx * SQUARE_SIZE), -1.0f / (mapDims.mapy * SQUARE_SIZE), 1.0f);
 
-	unitDrawer->DrawUnitMiniMapIcons();
+	MiniMapIconDrawParams params;
+	params.iconSizeX = unitSizeX;
+	params.iconSizeY = unitSizeY;
+	params.rotation = rotation;
+	params.viewAllyTeam = gu->myAllyTeam;
+	params.fullView = gu->spectatingFullView;
+	params.useIcons = useIcons;
+	params.useSimpleColors = simpleColors;
+	params.myColor = SColor(myColor[0], myColor[1], myColor[2], myColor[3]);
+	params.allyColor = SColor(allyColor[0], allyColor[1], allyColor[2], allyColor[3]);
+	params.enemyColor = SColor(enemyColor[0], enemyColor[1], enemyColor[2], enemyColor[3]);
+
+	unitDrawer->DrawUnitMiniMapIcons(params);
 
 	glDisable(GL_TEXTURE_2D); //maybe later stages need it
 
@@ -1988,6 +2001,8 @@ void CMiniMap::DrawWorldStuff() const
 
 	// draw the projectiles
 	if (drawProjectiles) {
+		// shares the projectile minimap buffer, so it has to fill before the submit
+		NanoParticles::DrawOnMinimap();
 		projectileDrawer->DrawProjectilesMiniMap();
 	}
 

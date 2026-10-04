@@ -127,6 +127,7 @@ class CLuaHandle : public CEventClient
 
 		void UnitCreated(const CUnit* unit, const CUnit* builder) override;
 		void UnitFinished(const CUnit* unit) override;
+		void UnitResurrected(const CUnit* unit); // fake call-in, doesn't exist in CEventClient
 		void UnitFromFactory(const CUnit* unit, const CUnit* factory, bool userOrders) override;
 		void UnitReverseBuilt(const CUnit* unit) override;
 		void UnitConstructionDecayed(const CUnit* unit, float timeSinceLastBuild, float iterationPeriod, float part) override;
@@ -199,7 +200,9 @@ class CLuaHandle : public CEventClient
 
 		void UnsyncedHeightMapUpdate(const SRectangle& rect) override;
 		void Update() override;
+		void NanoParticleUpdate(const std::vector<NanoParticles::Event>& events) override;
 
+		void KeyBindingsChanged() override;
 		bool KeyMapChanged() override;
 		bool KeyPress(int keyCode, int scanCode, bool isRepeat) override;
 		bool KeyRelease(int keyCode, int scanCode) override;
@@ -223,6 +226,7 @@ class CLuaHandle : public CEventClient
 		void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim) override;
 
 		bool CommandNotify(const Command& cmd) override;
+		bool AllowQuit() override;
 
 		bool AddConsoleLine(const std::string& msg, const std::string& section, int level) override;
 

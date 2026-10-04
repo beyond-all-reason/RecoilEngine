@@ -9,6 +9,7 @@
 #include "KeySet.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitDefHandler.h"
+#include "System/EventHandler.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/FileSystem/SimpleParser.h"
 #include "System/Log/ILog.h"
@@ -545,6 +546,17 @@ const CKeyBindings::HotkeyList& CKeyBindings::GetHotkeys(const std::string& acti
 	return it->second;
 }
 
+void CKeyBindings::Clear()
+{
+	codeBindings.clear();
+	scanBindings.clear();
+	keyCodes.Reset();
+	scanCodes.Reset();
+	bindingsCount = 0;
+	buildHotkeyMap = true;
+
+}
+
 
 /******************************************************************************/
 
@@ -673,23 +685,26 @@ bool CKeyBindings::UnBind(const std::string& keystr, const std::string& command)
 	if (debugEnabled)
 		LOG("[CKeyBindings::%s] keystr=%s command=%s", __func__, keystr.c_str(), command.c_str());
 
+	/* Bind does the same to the stored chain, so mirror it
+	 * here or a stateful bind can never be named exactly. */
+	if (statefulCommands.find(command) != statefulCommands.end())
+		kc.back().SetAnyBit();
+
 	const CKeySet& ks = kc.back();
 	KeyMap& bindings = ks.IsKeyCode() ? codeBindings : scanBindings;
 	const auto it = bindings.find(ks);
 
-	if (it == bindings.end())
-		return false;
+	if (it != bindings.end()) {
+		ActionList& al = it->second;
 
-	ActionList& al = it->second;
-	const bool success = RemoveCommandFromList(al, command);
+		if (RemoveCommandFromList(al, kc, command))
+			buildHotkeyMap = true;
 
-	if (al.empty())
-		bindings.erase(it);
+		if (al.empty())
+			bindings.erase(it);
+	}
 
-	if (success)
-		buildHotkeyMap = true;
-
-	return success;
+	return true;
 }
 
 
@@ -709,11 +724,11 @@ bool CKeyBindings::UnBindKeyset(const std::string& keystr)
 
 	const auto it = bindings.find(ks);
 
-	if (it == bindings.end())
-		return false;
+	if (it != bindings.end()) {
+		bindings.erase(it);
+		buildHotkeyMap = true;
+	}
 
-	bindings.erase(it);
-	buildHotkeyMap = true;
 	return true;
 }
 
@@ -756,7 +771,7 @@ bool CKeyBindings::UnBindAction(const std::string& command)
 	if (changed)
 		buildHotkeyMap = true;
 
-	return changed;
+	return true;
 }
 
 
@@ -814,6 +829,23 @@ bool CKeyBindings::RemoveCommandFromList(ActionList& al, const std::string& comm
 	}
 
 	return success;
+}
+
+
+/* Chains are stored under their last keyset, so
+ * a bucket holds every chain ending in that key. */
+bool CKeyBindings::RemoveCommandFromList(ActionList& al, const CKeyChain& kc, const std::string& command)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	const auto removedCount = std::erase_if(al, [&kc, &command] (const auto& x) {
+		/* exact compare, not .fit(): naming one modifier
+		 * combination must not remove a different one.
+		 * operator== also rejects differing chain lengths. */
+		return x.command == command && x.keyChain == kc;
+	});
+
+	return removedCount > 0;
 }
 
 
@@ -880,6 +912,9 @@ bool CKeyBindings::ExecuteCommandInternal(const std::string& line)
 
 	const std::string command = StringToLower(words[0]);
 
+	// emit even on a no-op command so clients can tell it ran; keydebug is logging-only, so skip it
+	bool emitEvent = true;
+
 	if (command == "keydebug") {
 		if (words.size() == 1) {
 			// toggle
@@ -888,6 +923,7 @@ bool CKeyBindings::ExecuteCommandInternal(const std::string& line)
 			// set
 			debugEnabled = atoi(words[1].c_str());
 		}
+		emitEvent = false;
 	}
 	else if (command == "keyload") {
 		const std::string& filename = words.size() > 1 ? words[1] : DEFAULT_FILENAME;
@@ -937,13 +973,15 @@ bool CKeyBindings::ExecuteCommandInternal(const std::string& line)
 		if (!UnBindKeyset(words[1])) { return false; }
 	}
 	else if (command == "unbindall") {
-		codeBindings.clear();
-		scanBindings.clear();
-		keyCodes.Reset();
-		scanCodes.Reset();
-		bindingsCount = 0;
-		buildHotkeyMap = true;
-		Bind("enter", "chat"); // bare minimum
+		Clear();
+
+		Bind("enter", "chat"); // opens chat window
+		Bind("enter", "edit_return"); // confirms the input in chat window
+		Bind("escape", "edit_escape");
+		Bind("backspace", "edit_backspace");
+		Bind("delete", "edit_delete");
+		Bind("left", "edit_prev_char");
+		Bind("right", "edit_next_char");
 
 		if (debugEnabled)
 			LOG("[CKeyBindings::%s] line=%s", __func__, line.c_str());
@@ -952,15 +990,19 @@ bool CKeyBindings::ExecuteCommandInternal(const std::string& line)
 		return false;
 	}
 
-	return false;
+	return emitEvent;
 }
 
 
 bool CKeyBindings::ExecuteCommand(const std::string& line)
 {
-	const bool ret = ExecuteCommandInternal(line);
+	const bool emitEvent = ExecuteCommandInternal(line);
 	MaybeBuildHotkeyMap();
-	return ret;
+
+	if (emitEvent)
+		eventHandler.KeyBindingsChanged();
+
+	return emitEvent;
 }
 
 
@@ -1001,6 +1043,10 @@ bool CKeyBindings::Load(const std::string& filename)
 {
 	const bool ret = LoadInternal(filename);
 	MaybeBuildHotkeyMap();
+
+	if (ret)
+		eventHandler.KeyBindingsChanged();
+
 	return ret;
 }
 

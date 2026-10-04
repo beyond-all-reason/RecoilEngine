@@ -132,8 +132,7 @@ void CBeamLaser::UpdatePosAndMuzzlePos()
 
 		sweepFireState.SetSweepTempDir(newWeaponDir);
 	} else {
-		UpdateWeaponVectors();
-
+		// weapon vectors are current, see CUnit::UpdateWeaponVectors
 		if (weaponDef->sweepFire) {
 			// needed for first call to GetFireDir() when new sweep starts after inactivity
 			sweepFireState.SetSweepTempDir((weaponMuzzlePos - aimFromPos).SafeNormalize());

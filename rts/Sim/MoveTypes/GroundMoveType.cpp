@@ -131,6 +131,7 @@ CR_REG_METADATA(CGroundMoveType, (
 	CR_MEMBER(wantedSpeed),
 	CR_MEMBER(currentSpeed),
 	CR_MEMBER(deltaSpeed),
+	CR_MEMBER(terrainSpeedMod),
 
 	CR_MEMBER(currWayPointDist),
 	CR_MEMBER(prevWayPointDist),
@@ -449,11 +450,12 @@ static float3 CalcSpeedVectorExclGravity(const CUnit* owner, const CGroundMoveTy
 	else {
 		float vel = owner->speed.w;
 		float maxSpeed = owner->moveType->GetMaxSpeed();
-		if (vel > maxSpeed) {
+		const float effectiveMaxSpeed = maxSpeed * mt->GetTerrainSpeedMod();
+		if (vel > effectiveMaxSpeed) {
 			// Once a unit is travelling faster than their maximum speed, their engine power is no longer sufficient to counteract
 			// the drag from air and rolling resistance. So reduce their velocity by these forces until a return to maximum speed.
 			float rollingResistanceCoeff = owner->unitDef->rollingResistanceCoefficient;
-			vel = std::max(maxSpeed,
+			vel = std::max(effectiveMaxSpeed,
 				(owner->speed +
 				owner->GetDragAccelerationVec(
 					mapInfo->atmosphere.fluidDensity,
@@ -1316,6 +1318,8 @@ void CGroundMoveType::ChangeSpeed(float newWantedSpeed, bool wantReverse, bool f
 			if (groundSpeedMod == 0.0f)
 				groundSpeedMod = CMoveMath::GetPosSpeedMod(*md, owner->pos + flatFrontDir * SQUARE_SIZE, flatFrontDir);
 
+			terrainSpeedMod = groundSpeedMod;
+
 			const float curGoalDistSq = (owner->pos - goalPos).SqLength2D();
 			const float minGoalDistSq = Square(BrakingDistance(currentSpeed, decRate));
 
@@ -1622,6 +1626,11 @@ void CGroundMoveType::UpdateSkid()
 		}
 	}
 
+	// always update <oldPos> here so that <speed> does not make
+	// extreme jumps when the unit transitions from skidding back
+	// to non-skidding
+	oldPos = owner->pos;
+
 	// finally update speed.w
 	owner->SetSpeed(spd);
 	// translate before rotate, match terrain normal if not in air
@@ -1637,12 +1646,6 @@ void CGroundMoveType::UpdateSkid()
 	}
 
 	AdjustPosToWaterLine();
-
-	// always update <oldPos> here so that <speed> does not make
-	// extreme jumps when the unit transitions from skidding back
-	// to non-skidding
-	oldPos = owner->pos;
-
 	ASSERT_SANE_OWNER_SPEED(spd);
 	ASSERT_SYNCED(owner->midPos);
 }
@@ -3319,8 +3322,9 @@ bool CGroundMoveType::UpdateDirectControl()
 		ChangeSpeed(0.0f, false, true);
 	}
 
-	if (unitCon.left ) { ChangeHeading(owner->heading + turnRate); turnSign =  1.0f; }
-	if (unitCon.right) { ChangeHeading(owner->heading - turnRate); turnSign = -1.0f; }
+	const short unitTurnRate = FloatToHeading(turnRate);
+	if (unitCon.left ) { ChangeHeading(owner->heading + unitTurnRate); turnSign =  1.0f; }
+	if (unitCon.right) { ChangeHeading(owner->heading - unitTurnRate); turnSign = -1.0f; }
 
 	// local client is controlling us
 	if (selfCon.GetControllee() == owner)

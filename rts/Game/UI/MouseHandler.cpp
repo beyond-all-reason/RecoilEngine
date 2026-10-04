@@ -791,7 +791,8 @@ void CMouseHandler::Update()
 		if (auto& rmlCursor = RmlGui::GetMouseCursor(); !rmlCursor.empty())
 			queuedCursorName = rmlCursor;
 
-	SetCursor(queuedCursorName);
+	SetCursor(queuedCursorName, rebindCursorAfterWarp);
+	rebindCursorAfterWarp = false;
 
 	if (!hideCursor) {
 		mouse->UpdateCursorCameraDir();
@@ -827,7 +828,9 @@ void CMouseHandler::WarpMouse(int x, int y)
 	lastx = x + globalRendering->viewPosX;
 	lasty = y;
 
-	mouseInput->SetWarpPos({lastx, lasty});
+	// WarpPos temporarily hides the SDL cursor on Wayland. Rebind the hardware
+	// cursor during the next update, after SDL has processed the warp.
+	rebindCursorAfterWarp |= mouseInput->SetWarpPos({lastx, lasty});
 }
 
 
@@ -880,15 +883,21 @@ void CMouseHandler::HideMouse()
 void CMouseHandler::ToggleMiddleClickScroll()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (locked) {
-		ShowMouse();
-	} else {
-		HideMouse();
-	}
-
 	locked = !locked;
 	mmbScroll = !mmbScroll;
 	ignoreMove = mmbScroll;
+
+	if (locked) {
+		HideMouse();
+	} else {
+		ShowMouse();
+
+		const int2 cursorPos = GetViewMouseCenter();
+		lastx = cursorPos.x;
+		lasty = cursorPos.y;
+		mouseInput->SetWarpPos(cursorPos);
+		UpdateCursorCameraDir();
+	}
 }
 
 
@@ -1167,6 +1176,12 @@ bool CMouseHandler::ReplaceMouseCursor(
 		return true;
 
 	CMouseCursor newCursor = CMouseCursor(newName, hotSpot);
+
+	// a replacement that loaded no frames draws nothing, so this silently turns
+	// a working cursor invisible. Whether the engine should refuse it is a
+	// behaviour question, since content may rely on it to hide the cursor.
+	if (!newCursor.IsValid())
+		LOG_L(L_WARNING, "[MouseHandler::%s] replacement \"%s\" for \"%s\" has no frames, the cursor will draw nothing", __func__, newName.c_str(), oldName.c_str());
 
 	// replace here so SetCursor() operates with new CMouseCursor() object
 	// hold on the destruction of old CMouseCursor() in this place. Otherwise bad things will happen.

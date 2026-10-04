@@ -133,13 +133,6 @@ Transform Transform::operator*(const Transform& childTra) const
 	};
 }
 
-float3 Transform::operator*(const float3& v) const
-{
-	// Scale, Rotate, Translate
-	// the same order as CMatrix44f's vTra = T * R * S * v;
-	return r.Rotate(v * s) + t;
-}
-
 float4 Transform::operator*(const float4& v) const
 {
 	// roughly the same as above

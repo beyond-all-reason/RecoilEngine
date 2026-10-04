@@ -213,7 +213,7 @@ static void CreatePathMetatable(lua_State* L)
 
 /***
  * @function Spring.RequestPath
- * @param moveID number|string
+ * @param moveID integer|string
  * @param startX number
  * @param startY number
  * @param startZ number
@@ -264,9 +264,9 @@ int LuaPathFinder::RequestPath(lua_State* L)
 
 /***
  * @function Spring.InitPathNodeCostsArray
- * @param overlayIndex number
- * @param sizeX number
- * @param sizeZ number
+ * @param overlayIndex integer
+ * @param sizeX integer
+ * @param sizeZ integer
  * @return boolean success
  */
 int LuaPathFinder::InitPathNodeCostsArray(lua_State* L)
@@ -303,7 +303,7 @@ int LuaPathFinder::InitPathNodeCostsArray(lua_State* L)
 
 /***
  * @function Spring.FreePathNodeCostsArray
- * @param overlayIndex number
+ * @param overlayIndex integer
  * @return boolean success
  */
 int LuaPathFinder::FreePathNodeCostsArray(lua_State* L)
@@ -341,7 +341,7 @@ int LuaPathFinder::FreePathNodeCostsArray(lua_State* L)
 
 /***
  * @function Spring.SetPathNodeCosts
- * @param overlayIndex number
+ * @param overlayIndex integer
  * @return boolean success
  */
 int LuaPathFinder::SetPathNodeCosts(lua_State* L)
@@ -370,7 +370,7 @@ int LuaPathFinder::SetPathNodeCosts(lua_State* L)
 
 /***
  * @function Spring.GetPathNodeCosts
- * @param overlayIndex number
+ * @param overlayIndex integer
  * @return boolean|table costs
  */
 int LuaPathFinder::GetPathNodeCosts(lua_State* L)
@@ -406,9 +406,8 @@ int LuaPathFinder::GetPathNodeCosts(lua_State* L)
 
 /***
  * @function Spring.SetPathNodeCost
- * @param overlayIndex number
- * @param nodeX number
- * @param nodeZ number
+ * @param overlayIndex integer
+ * @param costIndex integer 0-based index in the overlay
  * @param cost number
  * @return boolean success
  */
@@ -444,8 +443,8 @@ int LuaPathFinder::SetPathNodeCost(lua_State* L)
 
 /***
  * @function Spring.GetPathNodeCost
- * @param nodeX number
- * @param nodeZ number
+ * @param nodeX integer Heightmap node X coordinate
+ * @param nodeZ integer Heightmap node Z coordinate
  * @return number cost
  */
 int LuaPathFinder::GetPathNodeCost(lua_State* L)

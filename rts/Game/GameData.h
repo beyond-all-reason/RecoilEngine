@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <cinttypes>
+#include <limits>
 #include <memory>
 
 namespace netcode {
@@ -19,6 +20,10 @@ public:
 	GameData(const std::string& setup);
 	GameData(std::shared_ptr<const netcode::RawPacket> pckt);
 
+	static constexpr size_t MAX_PACKED_SIZE = std::numeric_limits<uint16_t>::max();
+
+	size_t GetPackedSize() const;
+	// returns nullptr if GetPackedSize() exceeds MAX_PACKED_SIZE
 	const netcode::RawPacket* Pack() const;
 
 	void SetSetupText(const std::string& newSetup);

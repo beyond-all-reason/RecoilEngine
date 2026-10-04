@@ -473,7 +473,7 @@ namespace Rml::SolLua
 			/***
 			 * Is a screen-space point within this element?
 			 * @function RmlUi.Element:IsPointWithinElement
-			 * @param point RmlUi.Vector2i
+			 * @param point RmlUi.Vector2f
 			 * @return boolean
 			 */
 			"IsPointWithinElement", &Rml::Element::IsPointWithinElement,
