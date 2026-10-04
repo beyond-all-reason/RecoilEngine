@@ -414,10 +414,11 @@ void CUnitHandler::UpdateUnitWeapons()
 	{
 		SCOPED_TIMER("Sim::Unit::UpdateWeaponVectors");
 
+		// small chunks: costly units sit together in the creation-ordered list, one chunk per thread leaves most threads idle
 		for_mt_chunk(0, activeUnits.size(), [&](const int idx) {
 			auto unit = activeUnits[idx];
 			unit->UpdateWeaponVectors();
-		});
+		}, 1, 64);
 	}
 	{
 		SCOPED_TIMER("Sim::Unit::Weapon");
