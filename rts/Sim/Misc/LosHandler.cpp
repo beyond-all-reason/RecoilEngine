@@ -582,6 +582,10 @@ void ILosType::Update()
 
 	// raycast terrain
 	if (algoType == LOS_ALGO_RAYCAST)  {
+		// nested in CLosHandler::Update's for_mt, where a plain notify only wakes workers if all of them sleep
+		if (losRecalc.size() > 1)
+			ThreadPool::NotifyWorkerThreads(true, false);
+
 		for_mt(0, losRecalc.size(), [&](const int idx) {
 			auto li = losRecalc[idx];
 			assert(li->refCount > 0);
