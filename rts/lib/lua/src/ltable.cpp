@@ -366,7 +366,9 @@ Table *luaH_new (lua_State *L, int narray, int nhash) {
   t->sizearray = 0;
   t->lsizenode = 0;
   t->node = lua_cast(Node *, dummynode);
-  setarrayvector(L, t, narray);
+  /* SPRING: an empty array part needs no (allocator) call */
+  if (narray > 0)
+    setarrayvector(L, t, narray);
   setnodevector(L, t, nhash);
   return t;
 }
