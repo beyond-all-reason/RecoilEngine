@@ -414,7 +414,9 @@ void CUnitHandler::UpdateUnitWeapons()
 	{
 		SCOPED_TIMER("Sim::Unit::UpdateWeaponVectors");
 
-		// small chunks: costly units sit together in the creation-ordered list, one chunk per thread leaves most threads idle
+		/* Unit list is ordered by creation, so stuff like windgens (which cost very
+		 * little to process) tends to accumulate at the front and would all be taken
+		 * by the same thread with large chunks. Cap chunk size to even things out */
 		for_mt_chunk(0, activeUnits.size(), [&](const int idx) {
 			auto unit = activeUnits[idx];
 			unit->UpdateWeaponVectors();
