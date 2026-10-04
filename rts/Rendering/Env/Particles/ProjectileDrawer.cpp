@@ -607,11 +607,11 @@ bool CProjectileDrawer::CanDrawProjectile(const CProjectile* pro, int allyTeam)
 
 	if (!lh->InLos(pro, gu->myAllyTeam))
 		return false;
-	
+
 	if (pro->pos.y > CGround::GetWaterLevel(pro->pos.x, pro->pos.z))
 		return true;
 
-	if (!modInfo.requireSonarUnderWater || (pro->weapon && !static_cast<const CWeaponProjectile*>(pro)->GetWeaponDef()->requireSonarUnderWater))
+	if (!modInfo.requireSonarUnderWaterForProjectiles || (pro->weapon && !static_cast<const CWeaponProjectile*>(pro)->GetWeaponDef()->requireSonarUnderWater))
 		return true;
 
 	return lh->sonar.InSight(pro->pos, gu->myAllyTeam);

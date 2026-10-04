@@ -180,6 +180,8 @@ public:
 
 	/// when underwater, units are not in LOS unless also in sonar
 	bool requireSonarUnderWater;
+	/// when underwater, non-allied projectiles are not drawn unless also in sonar
+	bool requireSonarUnderWaterForProjectiles;
 	/// when unit->alwaysVisible is true, it is visible even when cloaked
 	bool alwaysVisibleOverridesCloaked;
 	/// ignore enemies when checking decloak if they are further than their spherical sight range
