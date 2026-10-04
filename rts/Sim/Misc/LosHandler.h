@@ -79,6 +79,9 @@ public:
 	bool isCached;
 	bool isQueuedForUpdate;
 	bool isQueuedForTerraform;
+
+	// tag of this instance's entry in ILosType::losCache while isCached
+	unsigned cacheTag = 0;
 };
 
 
@@ -185,7 +188,18 @@ private:
 	std::deque<DelayedInstance> delayedDeleteQue;
 	std::deque<DelayedInstance> delayedTerraQue;
 	std::deque<SLosInstance*> losUpdate;
-	std::deque<SLosInstance*> losCache;
+
+	// FIFO of unused instances; a reactivated instance leaves its entry behind, which is then stale
+	struct CacheEntry {
+		SLosInstance* instance;
+		unsigned tag;
+
+		bool IsValid() const { return (instance->isCached && instance->cacheTag == tag); }
+	};
+
+	std::deque<CacheEntry> losCache;
+	size_t numCached = 0;
+	unsigned lastCacheTag = 0;
 
 	std::vector<SLosInstance*> losRemove;
 	std::vector<SLosInstance*> losAdd;

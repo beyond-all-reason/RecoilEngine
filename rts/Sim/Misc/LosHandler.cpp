@@ -121,6 +121,7 @@ void ILosType::Kill()
 	delayedTerraQue.clear();
 	losUpdate.clear();
 	losCache.clear();
+	numCached = 0;
 
 	losRemove.clear();
 	losAdd.clear();
@@ -158,8 +159,8 @@ float ILosType::GetHeight(const CUnit* unit) const
 
 	const float emitHeight = (type == LOS_TYPE_LOS || type == LOS_TYPE_AIRLOS) ? unit->unitDef->losHeight : unit->unitDef->radarHeight;
 	const float losHeight  = std::max(unit->midPos.y + emitHeight, 0.0f);
-	const int bucketSize   = 1 << (mipLevel + 2);
-	const float iLosHeight = (int(losHeight) / bucketSize + 0.5f) * bucketSize; // save losHeight in buckets
+	const int bucketShift  = mipLevel + 2;
+	const float iLosHeight = ((int(losHeight) >> bucketShift) + 0.5f) * (1 << bucketShift); // save losHeight in buckets; shift == division, losHeight >= 0
 	return iLosHeight;
 }
 
@@ -311,11 +312,10 @@ inline void ILosType::RefInstance(SLosInstance* li)
 		return;
 
 	if (li->isCached) {
-		// reactivate cached instance
+		// reactivate cached instance, its losCache entry becomes stale
 		cacheRefs += (algoType == LOS_ALGO_RAYCAST);
-		auto it = std::find(losCache.begin(), losCache.end(), li);
 		li->isCached = false;
-		losCache.erase(it);
+		numCached--;
 	}
 
 	UpdateInstanceStatus(li, SLosInstance::TLosStatus::REACTIVATE);
@@ -354,7 +354,9 @@ inline void ILosType::AddInstanceToCache(SLosInstance* li)
 	}
 
 	li->isCached = true;
-	losCache.push_back(li);
+	li->cacheTag = ++lastCacheTag;
+	losCache.push_back({li, li->cacheTag});
+	numCached++;
 }
 
 
@@ -383,6 +385,10 @@ inline void ILosType::DeleteInstance(SLosInstance* li)
 
 	*vit = vec.back();
 	vec.pop_back();
+
+	// otherwise a key per square ever seen piles up, and UpdateHeightMapSynced iterates them all
+	if (vec.empty())
+		instanceHashes.erase(pit);
 
 	// caller has to do that
 	assert(!li->isCached);
@@ -592,10 +598,16 @@ void ILosType::Update()
 
 	// delete / move to cache unused instances
 	if (algoType == LOS_ALGO_RAYCAST) {
-		while (!losCache.empty() && ((losCache.size() + losDeleted.size()) > CACHE_SIZE)) {
-			SLosInstance* li = losCache.front();
+		while (numCached > 0 && ((numCached + losDeleted.size()) > CACHE_SIZE)) {
+			const CacheEntry entry = losCache.front();
 			losCache.pop_front();
+
+			if (!entry.IsValid())
+				continue;
+
+			SLosInstance* li = entry.instance;
 			li->isCached = false;
+			numCached--;
 			DeleteInstance(li);
 		}
 
@@ -603,6 +615,10 @@ void ILosType::Update()
 			assert(li->refCount == 0);
 			AddInstanceToCache(li);
 		}
+
+		// stale entries pile up behind long-cached ones
+		if (losCache.size() > 2 * CACHE_SIZE)
+			std::erase_if(losCache, [](const CacheEntry& entry) { return !entry.IsValid(); });
 	} else {
 		assert(losCache.empty());
 		for (SLosInstance* li: losDeleted) {
@@ -640,15 +656,14 @@ void ILosType::UpdateHeightMapSynced(SRectangle rect)
 	};
 
 	// delete unused instances that overlap with the changed rectangle
-	for (auto it = losCache.begin(); it != losCache.end();) {
-		SLosInstance* li = *it;
-		if (li->refCount > 0 || !CheckOverlap(li, rect)) {
-			++it;
+	for (const CacheEntry& entry: losCache) {
+		SLosInstance* li = entry.instance;
+		if (!entry.IsValid() || !CheckOverlap(li, rect))
 			continue;
-		}
 
-		it = losCache.erase(it);
+		// leaves a stale entry
 		li->isCached = false;
+		numCached--;
 		DeleteInstance(li);
 	}
 
