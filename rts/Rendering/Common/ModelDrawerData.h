@@ -2,7 +2,6 @@
 
 #include <vector>
 #include <array>
-#include <cstring>
 #include <functional>
 
 #include <unordered_map>
@@ -10,6 +9,7 @@
 #include "System/EventClient.h"
 #include "System/EventHandler.h"
 #include "System/ContainerUtil.h"
+#include "System/SafeUtil.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/Threading/ThreadPool.h"
 #include "Rendering/GlobalRendering.h"
@@ -35,17 +35,6 @@ public:
 public:
 	bool GetFullRead() const override { return true; }
 	int  GetReadAllyTeam() const override { return AllAccessTeam; }
-protected:
-	// the per-frame passes mostly recompute unchanged values; storing them anyway moves
-	// the cache line to the storing core, a different one each frame in MT passes
-	template<typename V>
-	static bool StoreIfChanged(V& dst, const V& src) {
-		if (std::memcmp(&dst, &src, sizeof(V)) == 0)
-			return false;
-
-		dst = src;
-		return true;
-	}
 protected:
 	static constexpr int MT_CHUNK_OR_MIN_CHUNK_SIZE_SMMA = 128;
 	static constexpr int MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT = 256;
@@ -225,16 +214,16 @@ inline void CModelDrawerDataBase<T>::UpdateObjectUniforms(const T* o)
 	const size_t offset = modelUniformsStorage.GetObjOffset(o);
 	auto& uni = modelUniformsStorage.GetUniformsAt(offset);
 
-	bool changed = StoreIfChanged(uni.drawFlag, o->drawFlag);
+	bool changed = spring::StoreIfChanged(uni.drawFlag, o->drawFlag);
 
 	if (gu->spectatingFullView || o->IsInLosForAllyTeam(gu->myAllyTeam)) {
-		changed |= StoreIfChanged(uni.id, static_cast<uint16_t>(o->id));
-		changed |= StoreIfChanged(uni.teamID, static_cast<uint8_t>(o->team));
+		changed |= spring::StoreIfChanged(uni.id, static_cast<uint16_t>(o->id));
+		changed |= spring::StoreIfChanged(uni.teamID, static_cast<uint8_t>(o->team));
 		// TODO remove drawPos, replace with pos
-		changed |= StoreIfChanged(uni.drawPos, float4{ o->drawPos, o->heading * math::PI / SPRING_MAX_HEADING });
-		changed |= StoreIfChanged(uni.speed, o->speed);
-		changed |= StoreIfChanged(uni.maxHealth, o->maxHealth);
-		changed |= StoreIfChanged(uni.health, o->health);
+		changed |= spring::StoreIfChanged(uni.drawPos, float4{ o->drawPos, o->heading * math::PI / SPRING_MAX_HEADING });
+		changed |= spring::StoreIfChanged(uni.speed, o->speed);
+		changed |= spring::StoreIfChanged(uni.maxHealth, o->maxHealth);
+		changed |= spring::StoreIfChanged(uni.health, o->health);
 	}
 
 	if (changed)
@@ -253,7 +242,7 @@ template<typename T>
 inline void CModelDrawerDataBase<T>::UpdateCommon(T* o)
 {
 	assert(o);
-	StoreIfChanged(o->previousDrawFlag, o->drawFlag);
+	spring::StoreIfChanged(o->previousDrawFlag, o->drawFlag);
 	UpdateObjectDrawFlags(o);
 
 	if (o->alwaysUpdateMat || (o->drawFlag > DrawFlags::SO_NODRAW_FLAG && o->drawFlag < DrawFlags::SO_DRICON_FLAG))

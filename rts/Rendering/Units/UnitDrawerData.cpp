@@ -331,7 +331,7 @@ void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 
 void CUnitDrawerData::SetUnitIsIcon(CUnit* unit, bool isIcon)
 {
-	// see StoreIfChanged
+	// see spring::StoreIfChanged
 	if (unit->GetIsIcon() != isIcon)
 		unit->SetIsIcon(isIcon);
 }
@@ -397,7 +397,7 @@ void CUnitDrawerData::UpdateUnitIconStateScreen(CUnit* unit)
 	pos = camera->CalcViewPortCoordinates(pos);
 	radiusPos = camera->CalcViewPortCoordinates(radiusPos);
 
-	StoreIfChanged(unit->iconRadius, float(unit->radius * ((limit * 0.9) / std::abs(pos.x - radiusPos.x)))); // used for clicking on iconified units (world space!!!)
+	spring::StoreIfChanged(unit->iconRadius, float(unit->radius * ((limit * 0.9) / std::abs(pos.x - radiusPos.x)))); // used for clicking on iconified units (world space!!!)
 
 	if (!(losStatus & LOS_INLOS) && !gu->spectatingFullView) // no LOS on unit
 	{
@@ -415,13 +415,13 @@ void CUnitDrawerData::UpdateDrawPos(CUnit* u)
 	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (const CUnit* t = u->GetTransporter(); t != nullptr) {
-		StoreIfChanged(u->drawPos, u->GetDrawPosOther(t->preFrameTra.t, t->pos, globalRendering->timeOffset));
+		spring::StoreIfChanged(u->drawPos, u->GetDrawPosOther(t->preFrameTra.t, t->pos, globalRendering->timeOffset));
 	}
 	else {
-		StoreIfChanged(u->drawPos, u->GetDrawPos(globalRendering->timeOffset));
+		spring::StoreIfChanged(u->drawPos, u->GetDrawPos(globalRendering->timeOffset));
 	}
 
-	StoreIfChanged(u->drawMidPos, u->GetMdlDrawMidPos());
+	spring::StoreIfChanged(u->drawMidPos, u->GetMdlDrawMidPos());
 }
 
 void CUnitDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
@@ -451,7 +451,7 @@ void CUnitDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 			drawFlag |= (IsAlpha(u) ? DrawFlags::SO_SHTRAN_FLAG : DrawFlags::SO_SHOPAQ_FLAG);
 	}
 
-	StoreIfChanged(u->drawFlag, drawFlag);
+	spring::StoreIfChanged(u->drawFlag, drawFlag);
 }
 
 bool CUnitDrawerData::DrawAsIconByDistance(const CUnit* unit, const float sqUnitCamDist) const

@@ -164,8 +164,8 @@ void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 			drawFlag |= ((drawAlpha < 1.0f) ? DrawFlags::SO_SHTRAN_FLAG : DrawFlags::SO_SHOPAQ_FLAG);
 	}
 
-	StoreIfChanged(f->drawAlpha, drawAlpha);
-	StoreIfChanged(f->drawFlag, drawFlag);
+	spring::StoreIfChanged(f->drawAlpha, drawAlpha);
+	spring::StoreIfChanged(f->drawFlag, drawFlag);
 
 	if (f->alwaysUpdateMat || (drawFlag > DrawFlags::SO_NODRAW_FLAG && drawFlag < DrawFlags::SO_DRICON_FLAG)) {
 		const CMatrix44f drawMat = f->ComposeMatrix(f->drawPos);
@@ -178,6 +178,6 @@ void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 void CFeatureDrawerData::UpdateDrawPos(CFeature* f)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	StoreIfChanged(f->drawPos, f->GetDrawPos(globalRendering->timeOffset));
-	StoreIfChanged(f->drawMidPos, f->GetMdlDrawMidPos());
+	spring::StoreIfChanged(f->drawPos, f->GetDrawPos(globalRendering->timeOffset));
+	spring::StoreIfChanged(f->drawMidPos, f->GetMdlDrawMidPos());
 }
