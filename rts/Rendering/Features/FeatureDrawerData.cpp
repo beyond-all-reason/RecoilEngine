@@ -98,7 +98,7 @@ void CFeatureDrawerData::Update()
 	};
 
 	if (mtModelDrawer) {
-		for_mt_chunk(0, unsortedObjects.size(), updateBody, CModelDrawerDataConcept::MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT);
+		for_mt_chunk(0, unsortedObjects.size(), updateBody, MT_CHUNK_SIZE_UPDT_MIN, MT_CHUNK_SIZE_UPDT_MAX);
 	}
 	else {
 		for (size_t k = 0; k < unsortedObjects.size(); ++k)
