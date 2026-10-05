@@ -1847,7 +1847,7 @@ bool CCommandAI::HasMoreMoveCommands(bool skipFirstCmd) const
 	// Descriptions are synced and specific to this unit. Read their current
 	// values so editing or removing a description also affects queued commands.
 	return std::any_of(possibleCommands.begin(), possibleCommands.end(), [&](const SCommandDescription* cd) {
-		return cd->isMoveCommand && std::any_of(begin, end, [cd](const Command& c) { return c.GetID() == cd->id; });
+		return cd->moveCommand && std::any_of(begin, end, [cd](const Command& c) { return c.GetID() == cd->id; });
 	});
 }
 

@@ -23,7 +23,7 @@ public:
 		refCount = cd.refCount;
 
 		queueing = cd.queueing;
-		isMoveCommand = cd.isMoveCommand;
+		moveCommand = cd.moveCommand;
 		hidden = cd.hidden;
 		disabled = cd.disabled;
 		showUnique = cd.showUnique;
@@ -51,7 +51,7 @@ public:
 
 	bool queueing = true;
 	/// additionally count this command as movement in command-queue lookahead
-	bool isMoveCommand = false;
+	bool moveCommand = false;
 	/// if true dont show a button for the command
 	bool hidden = false;
 	/// for greying-out commands

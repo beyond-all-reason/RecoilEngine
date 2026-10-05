@@ -14,7 +14,7 @@ another unit tests per-unit scope and cache separation. Edit, clear, remove and
 ID-change cases exercise descriptor lifetime. All cases run serially.
 
 Manual reproduction: queue Move followed by a custom movement controller. Set
-isMoveCommand=true in its Spring.InsertUnitCmdDesc table; its predecessor should
+moveCommand=true in its Spring.InsertUnitCmdDesc table; its predecessor should
 finish like Move followed by a native Move, without the custom-command delay.
 The controller still implements its action in CommandFallback.
 """

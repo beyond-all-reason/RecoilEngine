@@ -12,14 +12,14 @@ if gadgetHandler:IsSyncedCode() then
 	local descriptionIndex
 	local x, z = 2400, 2000
 	local function description(marked)
-		return { id = customID, type = CMDTYPE.ICON_MAP, name = "Controller", hidden = true, isMoveCommand = marked }
+		return { id = customID, type = CMDTYPE.ICON_MAP, name = "Controller", hidden = true, moveCommand = marked }
 	end
 	local function insertDescription(unitID, marked)
 		Spring.InsertUnitCmdDesc(unitID, description(marked))
 		return Spring.FindUnitCmdDesc(unitID, customID)
 	end
 	local function readFlag(unitID, index)
-		return Spring.GetUnitCmdDescs(unitID, index, index)[1].isMoveCommand
+		return Spring.GetUnitCmdDescs(unitID, index, index)[1].moveCommand
 	end
 	function gadget:Initialize()
 		gadgetHandler:RegisterCMDID(customID)
@@ -56,11 +56,11 @@ if gadgetHandler:IsSyncedCode() then
 			-- Change descriptions while the controller is already queued.
 			local index = descriptionIndex
 			if config.mode == "edited" then
-				Spring.EditUnitCmdDesc(source, index, { isMoveCommand = true })
+				Spring.EditUnitCmdDesc(source, index, { moveCommand = true })
 				assert(readFlag(source, index) == true)
 			elseif config.mode == "cleared" or config.mode == "removed" or config.mode == "renamed" then
 				if config.mode == "cleared" then
-					Spring.EditUnitCmdDesc(source, index, { isMoveCommand = false })
+					Spring.EditUnitCmdDesc(source, index, { moveCommand = false })
 					assert(readFlag(source, index) == false)
 				elseif config.mode == "removed" then
 					Spring.RemoveUnitCmdDesc(source, index)
