@@ -231,7 +231,9 @@ void CUnitDrawerData::Update()
 
 	UpdateDrawFlagsCameras();
 
-	const auto updateBody = [this](CUnit* u) {
+	const auto updateBody = [this](size_t k) {
+		CUnit* u = unsortedObjects[k];
+
 		UpdateDrawPos(u);
 
 		if (useScreenIcons)
@@ -239,18 +241,15 @@ void CUnitDrawerData::Update()
 		else
 			UpdateUnitIconState(u);
 
-		UpdateCommon(u);
+		UpdateCommon(k);
 	};
 
 	if (mtModelDrawer) {
-		for_mt_chunk(0, unsortedObjects.size(), [this, &updateBody](const int k) {
-			CUnit* unit = unsortedObjects[k];
-			updateBody(unit);
-		}, CModelDrawerDataConcept::MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT);
+		for_mt_chunk(0, unsortedObjects.size(), updateBody, CModelDrawerDataConcept::MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT);
 	}
 	else {
-		for (CUnit* unit : unsortedObjects)
-			updateBody(unit);
+		for (size_t k = 0; k < unsortedObjects.size(); ++k)
+			updateBody(k);
 	}
 
 	UpdateLiveGhostTransforms();
