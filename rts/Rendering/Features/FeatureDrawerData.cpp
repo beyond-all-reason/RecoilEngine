@@ -92,18 +92,17 @@ void CFeatureDrawerData::Update()
 	RECOIL_DETAILED_TRACY_ZONE;
 	UpdateDrawFlagsCameras();
 
+	const auto updateBody = [this](size_t k) {
+		UpdateDrawPos(unsortedObjects[k]);
+		UpdateCommon(k);
+	};
+
 	if (mtModelDrawer) {
-		for_mt_chunk(0, unsortedObjects.size(), [this](const int k) {
-			CFeature* f = unsortedObjects[k];
-			UpdateDrawPos(f);
-			UpdateCommon(f);
-		}, CModelDrawerDataConcept::MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT);
+		for_mt_chunk(0, unsortedObjects.size(), updateBody, CModelDrawerDataConcept::MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT);
 	}
 	else {
-		for (CFeature* f : unsortedObjects) {
-			UpdateDrawPos(f);
-			UpdateCommon(f);
-		}
+		for (size_t k = 0; k < unsortedObjects.size(); ++k)
+			updateBody(k);
 	}
 }
 
