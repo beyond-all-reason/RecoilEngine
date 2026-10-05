@@ -7930,6 +7930,7 @@ static bool ParseCommandDescription(lua_State* L, int table,
 		    ParseNamedString(L, key, "texture",     cd.iconname)   ||
 		    ParseNamedString(L, key, "cursor",      cd.mouseicon)  ||
 		    ParseNamedBool(L,   key, "queueing",    cd.queueing)   ||
+		    ParseNamedBool(L,   key, "isMoveCommand", cd.isMoveCommand) ||
 		    ParseNamedBool(L,   key, "hidden",      cd.hidden)     ||
 		    ParseNamedBool(L,   key, "disabled",    cd.disabled)   ||
 		    ParseNamedBool(L,   key, "showUnique",  cd.showUnique) ||

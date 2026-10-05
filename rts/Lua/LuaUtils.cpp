@@ -1583,6 +1583,7 @@ void LuaUtils::PushStringVector(lua_State* L, const vector<string>& vec)
  * @field texture string?
  * @field cursor string?
  * @field queueing boolean?
+ * @field isMoveCommand boolean? Additionally count this command as movement in queue lookahead (default false). Does not execute movement or override built-in movement classification. Applies per unit and can be changed with Spring.EditUnitCmdDesc.
  * @field hidden boolean?
  * @field disabled boolean?
  * @field showUnique boolean?
@@ -1593,7 +1594,7 @@ void LuaUtils::PushStringVector(lua_State* L, const vector<string>& vec)
 void LuaUtils::PushCommandDesc(lua_State* L, const SCommandDescription& cd)
 {
 	const int numParams = cd.params.size();
-	const int numTblKeys = 12;
+	const int numTblKeys = 14;
 
 	lua_checkstack(L, 1 + 1 + 1 + 1);
 	lua_createtable(L, 0, numTblKeys);
@@ -1606,6 +1607,7 @@ void LuaUtils::PushCommandDesc(lua_State* L, const SCommandDescription& cd)
 	LuaPushNamedString(L, "texture",     cd.iconname);
 	LuaPushNamedString(L, "cursor",      cd.mouseicon);
 	LuaPushNamedBool  (L, "queueing",    cd.queueing);
+	LuaPushNamedBool  (L, "isMoveCommand", cd.isMoveCommand);
 	LuaPushNamedBool  (L, "hidden",      cd.hidden);
 	LuaPushNamedBool  (L, "disabled",    cd.disabled);
 	LuaPushNamedBool  (L, "showUnique",  cd.showUnique);

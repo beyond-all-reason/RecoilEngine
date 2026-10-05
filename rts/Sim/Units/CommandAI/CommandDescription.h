@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef COMMAND_DESCRIPTION_H
-#define COMMAND_DESCRIPTION_H
+#pragma once
 
 #include "Command.h"
 
@@ -24,6 +23,7 @@ public:
 		refCount = cd.refCount;
 
 		queueing = cd.queueing;
+		isMoveCommand = cd.isMoveCommand;
 		hidden = cd.hidden;
 		disabled = cd.disabled;
 		showUnique = cd.showUnique;
@@ -50,6 +50,8 @@ public:
 	mutable int refCount = 1;
 
 	bool queueing = true;
+	/// additionally count this command as movement in command-queue lookahead
+	bool isMoveCommand = false;
 	/// if true dont show a button for the command
 	bool hidden = false;
 	/// for greying-out commands
@@ -106,6 +108,4 @@ private:
 };
 
 extern CCommandDescriptionCache commandDescriptionCache;
-
-#endif // COMMAND_DESCRIPTION_H
 

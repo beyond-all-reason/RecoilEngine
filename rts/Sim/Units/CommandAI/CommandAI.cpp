@@ -1835,10 +1835,20 @@ bool CCommandAI::HasCommand(int cmdID) const {
 bool CCommandAI::HasMoreMoveCommands(bool skipFirstCmd) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const auto pred = [](const Command& c) { return (c.IsMoveCommand()); };
-	const auto iter = std::find_if(commandQue.begin() + int(skipFirstCmd && !commandQue.empty()), commandQue.end(), pred);
+	const auto begin = commandQue.begin() + int(skipFirstCmd && !commandQue.empty());
+	const auto end = commandQue.end();
+	if (begin == end)
+		return false;
 
-	return (iter != commandQue.end());
+	const auto pred = [](const Command& c) { return (c.IsMoveCommand()); };
+	if (std::any_of(begin, end, pred))
+		return true;
+
+	// Descriptions are synced and specific to this unit. Read their current
+	// values so editing or removing a description also affects queued commands.
+	return std::any_of(possibleCommands.begin(), possibleCommands.end(), [&](const SCommandDescription* cd) {
+		return cd->isMoveCommand && std::any_of(begin, end, [cd](const Command& c) { return c.GetID() == cd->id; });
+	});
 }
 
 
