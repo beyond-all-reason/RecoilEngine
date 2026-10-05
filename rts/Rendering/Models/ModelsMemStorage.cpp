@@ -121,7 +121,17 @@ size_t TransformsMemStorage::Allocate(size_t numElems)
 	auto lock = CModelsLock::GetScopedLock();
 
 	auto res = storage.Allocate(numElems);
-	updateList.Resize(storage.GetSize());
+
+	// only the new block needs an upload; UpdateList::Resize would flag every
+	// transform, i.e. re-upload all of them whenever an object is created
+	if (updateList.Size() > storage.GetSize())
+		updateList.Trim(storage.GetSize());
+
+	while (updateList.Size() < storage.GetSize())
+		updateList.EmplaceBackUpdate();
+
+	if (res != INVALID_INDEX)
+		updateList.SetUpdate(res, numElems);
 
 	return res;
 }
