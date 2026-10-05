@@ -68,7 +68,10 @@ CR_REG_METADATA(CProjectileHandler, (
 	CR_MEMBER_UN(numUpdatedUnsyncedParticles)
 ))
 
-// unsynced projectiles per task of the update pass
+// Smaller chunks balance the workers better (they join the pass at different times) and make the
+// collision skip finer (one collidable projectile gets its whole chunk checked); larger ones mean fewer
+// tasks and chunk sums to walk. In a 5000-particle fight 32-128 measured within 1 us, 16 and 256 were
+// 2-4 us slower, 512 8 us and one chunk per thread 3.5 us.
 static constexpr int UNSYNCED_UPDATE_CHUNK_SIZE = 128;
 
 
@@ -242,6 +245,8 @@ void CProjectileHandler::UpdateProjectilesImpl()
 				p->Update();
 				MAPPOS_SANITY_CHECK(p->pos);
 
+				// counted here, not on creation: AddProjectile often runs inside a base class constructor,
+				// before the derived class sets checkCol or can answer GetProjectilesCount()
 				sums.numParticles += p->GetProjectilesCount();
 				sums.numCollidable += p->checkCol;
 			}
