@@ -48,7 +48,9 @@ protected:
 	}
 protected:
 	static constexpr int MT_CHUNK_OR_MIN_CHUNK_SIZE_SMMA = 128;
-	static constexpr int MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT = 256;
+	// objects in view cost several times more than the rest, small chunks keep the workers balanced
+	static constexpr int MT_CHUNK_SIZE_UPDT_MIN = 64;
+	static constexpr int MT_CHUNK_SIZE_UPDT_MAX = 128;
 };
 
 
