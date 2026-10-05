@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <array>
+#include <cstring>
 #include <functional>
 
 #include <unordered_map>
@@ -35,6 +36,17 @@ public:
 	bool GetFullRead() const override { return true; }
 	int  GetReadAllyTeam() const override { return AllAccessTeam; }
 protected:
+	// the per-frame passes mostly recompute unchanged values; storing them anyway moves
+	// the cache line to the storing core, a different one each frame in MT passes
+	template<typename V>
+	static bool StoreIfChanged(V& dst, const V& src) {
+		if (std::memcmp(&dst, &src, sizeof(V)) == 0)
+			return false;
+
+		dst = src;
+		return true;
+	}
+protected:
 	static constexpr int MT_CHUNK_OR_MIN_CHUNK_SIZE_SMMA = 128;
 	static constexpr int MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT = 256;
 };
@@ -60,6 +72,13 @@ protected:
 protected:
 	void UpdateCommon(T* o);
 	virtual void UpdateObjectDrawFlags(CSolidObject* o) const = 0;
+
+	// per-frame inputs of UpdateObjectDrawFlags, set before the per-object pass
+	void UpdateDrawFlagsCameras();
+
+	const CCamera* camPlayer = nullptr;
+	const CCamera* camUWRefl = nullptr; // nullptr if there is no reflection pass
+	const CCamera* camShadow = nullptr; // nullptr if models cast no shadows
 private:
 	void UpdateObjectTrasform(const T* o);
 	void UpdateObjectUniforms(const T* o);
@@ -203,25 +222,38 @@ inline void CModelDrawerDataBase<T>::UpdateObjectTrasform(const T* o)
 template<typename T>
 inline void CModelDrawerDataBase<T>::UpdateObjectUniforms(const T* o)
 {
-	auto& uni = modelUniformsStorage.GetObjUniformsArray(o);
-	uni.drawFlag = o->drawFlag;
+	const size_t offset = modelUniformsStorage.GetObjOffset(o);
+	auto& uni = modelUniformsStorage.GetUniformsAt(offset);
+
+	bool changed = StoreIfChanged(uni.drawFlag, o->drawFlag);
 
 	if (gu->spectatingFullView || o->IsInLosForAllyTeam(gu->myAllyTeam)) {
-		uni.id = o->id;
-		uni.teamID = o->team;
+		changed |= StoreIfChanged(uni.id, static_cast<uint16_t>(o->id));
+		changed |= StoreIfChanged(uni.teamID, static_cast<uint8_t>(o->team));
 		// TODO remove drawPos, replace with pos
-		uni.drawPos = float4{ o->drawPos, o->heading * math::PI / SPRING_MAX_HEADING };
-		uni.speed = o->speed;
-		uni.maxHealth = o->maxHealth;
-		uni.health = o->health;
+		changed |= StoreIfChanged(uni.drawPos, float4{ o->drawPos, o->heading * math::PI / SPRING_MAX_HEADING });
+		changed |= StoreIfChanged(uni.speed, o->speed);
+		changed |= StoreIfChanged(uni.maxHealth, o->maxHealth);
+		changed |= StoreIfChanged(uni.health, o->health);
 	}
+
+	if (changed)
+		modelUniformsStorage.SetUpdate(offset);
+}
+
+template<typename T>
+inline void CModelDrawerDataBase<T>::UpdateDrawFlagsCameras()
+{
+	camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
+	camUWRefl = IWater::GetWater()->CanDrawReflectionPass() ? CCameraHandler::GetCamera(CCamera::CAMTYPE_UWREFL) : nullptr;
+	camShadow = ((shadowHandler.shadowGenBits & CShadowHandler::SHADOWGEN_BIT_MODEL) != 0) ? CCameraHandler::GetCamera(CCamera::CAMTYPE_SHADOW) : nullptr;
 }
 
 template<typename T>
 inline void CModelDrawerDataBase<T>::UpdateCommon(T* o)
 {
 	assert(o);
-	o->previousDrawFlag = o->drawFlag;
+	StoreIfChanged(o->previousDrawFlag, o->drawFlag);
 	UpdateObjectDrawFlags(o);
 
 	if (o->alwaysUpdateMat || (o->drawFlag > DrawFlags::SO_NODRAW_FLAG && o->drawFlag < DrawFlags::SO_DRICON_FLAG))
