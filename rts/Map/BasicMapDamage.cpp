@@ -116,8 +116,38 @@ void CBasicMapDamage::Explosion(const float3& pos, float strength, float radius,
 
 	float2 minMax = { std::numeric_limits<float>::max(), std::numeric_limits<float>::lowest() };
 
+	// a typemap cell spans 2x2 squares, so its hardness is good for two rows
+	const int ttx1 = e.x1 >> 1;
+	const int ttx2 = e.x2 >> 1;
+	int hardnessRowZ = -1;
+
+	invHardnessRow.resize(ttx2 - ttx1 + 1);
+
 	// figure out how much height to add to each square
 	for (int y = e.y1; y <= e.y2; ++y) {
+		if ((y >> 1) != hardnessRowZ) {
+			hardnessRowZ = (y >> 1);
+
+			for (int ttx = ttx1; ttx <= ttx2; ++ttx) {
+				// prevent formation of spikes from isolated "soft spots"
+				// (one or two random squares with extremely low hardness
+				// surrounded by high-strength terrain)
+				float sumRawHardness = 0.0f;
+
+				for (int j = -1; j <= 1; j++) {
+					for (int i = -1; i <= 1; i++) {
+						const int tmz = std::clamp(hardnessRowZ + j, 0, mapDims.hmapy - 1);
+						const int tmx = std::clamp(ttx + i, 0, mapDims.hmapx - 1);
+						const int tti = typeMap[tmz * mapDims.hmapx + tmx];
+
+						sumRawHardness += (rawHardness[tti] * weightTable[(j + 1) * 3 + (i + 1)]);
+					}
+				}
+
+				invHardnessRow[ttx - ttx1] = 1.0f / sumRawHardness;
+			}
+		}
+
 		for (int x = e.x1; x <= e.x2; ++x) {
 			const CSolidObject* so = groundBlockingObjectMap.GroundBlockedUnsafe(y * mapDims.mapx + x);
 
@@ -134,24 +164,7 @@ void CBasicMapDamage::Explosion(const float3& pos, float strength, float radius,
 			const unsigned int tableIdx = relDist * CRATER_TABLE_SIZE;
 			// const unsigned int ttypeIdx = typeMap[(y >> 1) * mapDims.hmapx + (x >> 1)];
 
-
-			// prevent formation of spikes from isolated "soft spots"
-			// (one or two random squares with extremely low hardness
-			// surrounded by high-strength terrain)
-			float sumRawHardness = 0.0f;
-			float avgInvHardness = 0.0f;
-
-			for (int j = -1; j <= 1; j++) {
-				for (int i = -1; i <= 1; i++) {
-					const int tmz = std::clamp((y >> 1) + j, 0, mapDims.hmapy - 1);
-					const int tmx = std::clamp((x >> 1) + i, 0, mapDims.hmapx - 1);
-					const int tti = typeMap[tmz * mapDims.hmapx + tmx];
-
-					sumRawHardness += (rawHardness[tti] * weightTable[(j + 1) * 3 + (i + 1)]);
-				}
-			}
-
-			avgInvHardness = 1.0f / sumRawHardness;
+			const float avgInvHardness = invHardnessRow[(x >> 1) - ttx1];
 
 
 			// FIXME: compensate for flattened ground under dead buildings
