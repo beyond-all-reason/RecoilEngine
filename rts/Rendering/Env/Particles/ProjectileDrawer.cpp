@@ -3,6 +3,7 @@
 
 #include "ProjectileDrawer.h"
 
+#include <cstring>
 #include <tuple>
 #include <bit>
 
@@ -495,59 +496,61 @@ void CProjectileDrawer::UpdateDrawFlags()
 	const CCamera* camUWRefl = CCameraHandler::GetCamera(CCamera::CAMTYPE_UWREFL);
 	const CCamera* camShadow = CCameraHandler::GetCamera(CCamera::CAMTYPE_SHADOW);
 
-	for_mt(0, renderProjectiles.size(), [this, reflMinRadius, drawReflPass, drawShadowPass, timeOffset, camPlayer, camUWRefl, camShadow](int i) {
+	// most values are unchanged, and storing them anyway moves the cache line to this core
+	const auto storeIfChanged = [](auto& dst, const auto& src) {
+		if (std::memcmp(&dst, &src, sizeof(dst)) != 0)
+			dst = src;
+	};
+
+	// chunks instead of single projectiles: for_mt hands out each item through
+	// two shared atomic counters, which costs more than the item's own work
+	for_mt_chunk(0, renderProjectiles.size(), [this, reflMinRadius, drawReflPass, drawShadowPass, timeOffset, camPlayer, camUWRefl, camShadow, &storeIfChanged](int i) {
 		CProjectile* p = renderProjectiles[i];
 		const bool hasModel = (p->model != nullptr);
 
-		p->drawPos = p->GetDrawPos(timeOffset);
+		storeIfChanged(p->drawPos, p->GetDrawPos(timeOffset));
+		storeIfChanged(p->previousDrawFlag, p->drawFlag);
 
-		p->previousDrawFlag = p->drawFlag;
-		p->ResetDrawFlag();
+		uint8_t drawFlag = DrawFlags::SO_NODRAW_FLAG;
 
-		if (!CanDrawProjectile(p, p->GetAllyteamID()))
-			return;
+		if (CanDrawProjectile(p, p->GetAllyteamID())) {
+			drawFlag = DrawFlags::SO_DRICON_FLAG; //reuse as a minimap draw indication
 
-		p->SetDrawFlag(DrawFlags::SO_DRICON_FLAG); //reuse as a minimap draw indication
+			const float drawRadius = p->GetDrawRadius();
 
-		const float drawRadius = p->GetDrawRadius();
+			if (camPlayer->InView(p->drawPos, drawRadius)) {
+				p->SetSortDist(CCamera::CAMTYPE_PLAYER, camPlayer->ProjectedDistance(p->drawPos));
 
-		if (camPlayer->InView(p->drawPos, drawRadius)) {
-			p->SetSortDist(CCamera::CAMTYPE_PLAYER, camPlayer->ProjectedDistance(p->drawPos));
+				drawFlag |= (hasModel ? DrawFlags::SO_OPAQUE_FLAG : DrawFlags::SO_ALPHAF_FLAG);
 
-			if (hasModel)
-				p->AddDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
-			else
-				p->AddDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
+				if (p->drawPos.y - drawRadius < 0.0f)
+					drawFlag |= DrawFlags::SO_REFRAC_FLAG;
 
-			if (p->drawPos.y - drawRadius < 0.0f)
-				p->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
+				// Special case of piece projectile, since it has a model and fire particle
+				if (p->piece)
+					drawFlag |= DrawFlags::SO_ALPHAF_FLAG;
+			}
 
-			// Special case of piece projectile, since it has a model and fire particle
-			if (p->piece)
-				p->AddDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
+			if (drawReflPass && (hasModel || drawRadius >= reflMinRadius) && camUWRefl->InView(p->drawPos, drawRadius)) {
+				p->SetSortDist(CCamera::CAMTYPE_UWREFL, camUWRefl->ProjectedDistance(p->drawPos));
+
+				if (CModelDrawerHelper::ObjectVisibleReflection(p->drawPos, camUWRefl->GetPos(), drawRadius))
+					drawFlag |= DrawFlags::SO_REFLEC_FLAG;
+			}
+
+			if (drawShadowPass && p->castShadow && camShadow->InView(p->drawPos, drawRadius)) {
+				p->SetSortDist(CCamera::CAMTYPE_SHADOW, camShadow->ProjectedDistance(p->drawPos));
+
+				drawFlag |= (hasModel ? DrawFlags::SO_SHOPAQ_FLAG : DrawFlags::SO_SHTRAN_FLAG);
+
+				// Special case of piece projectile, since it has a model and fire particle
+				if (p->piece)
+					drawFlag |= DrawFlags::SO_SHTRAN_FLAG;
+			}
 		}
 
-		if (drawReflPass && (hasModel || drawRadius >= reflMinRadius) && camUWRefl->InView(p->drawPos, drawRadius)) {
-			p->SetSortDist(CCamera::CAMTYPE_UWREFL, camUWRefl->ProjectedDistance(p->drawPos));
-
-			if (CModelDrawerHelper::ObjectVisibleReflection(p->drawPos, camUWRefl->GetPos(), drawRadius))
-				p->AddDrawFlag(DrawFlags::SO_REFLEC_FLAG);
-		}
-
-		if (drawShadowPass && p->castShadow && camShadow->InView(p->drawPos, drawRadius)) {
-			p->SetSortDist(CCamera::CAMTYPE_SHADOW, camShadow->ProjectedDistance(p->drawPos));
-
-			if unlikely(hasModel)
-				p->AddDrawFlag(DrawFlags::SO_SHOPAQ_FLAG);
-			else
-				p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
-
-			// Special case of piece projectile, since it has a model and fire particle
-			if (p->piece)
-				p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
-		}
-	});
-
+		storeIfChanged(p->drawFlag, drawFlag);
+	}, 64, 256);
 }
 
 bool CProjectileDrawer::CheckSoftenExt()
