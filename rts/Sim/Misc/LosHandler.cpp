@@ -2,6 +2,8 @@
 
 #include "LosHandler.h"
 
+#include <bit>
+
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
@@ -15,6 +17,7 @@
 #include "System/SafeUtil.h"
 #include "System/TimeProfiler.h"
 #include "System/Threading/ThreadPool.h"
+#include "System/simd_compat.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -115,6 +118,9 @@ void ILosType::Kill()
 	}
 
 	instances.clear();
+	boundsPosX.clear();
+	boundsPosY.clear();
+	boundsRadius.clear();
 	freeIDs.clear();
 
 	delayedDeleteQue.clear();
@@ -258,6 +264,9 @@ inline void ILosType::UpdateUnit(CUnit* unit, bool ignore)
 	cacheFails += (algoType == LOS_ALGO_RAYCAST);
 	SLosInstance* li = CreateInstance();
 	li->Init(radius, allyteam, baseLos, height, hash);
+	boundsPosX[li->id] = li->basePos.x * mipDiv;
+	boundsPosY[li->id] = li->basePos.y * mipDiv;
+	boundsRadius[li->id] = li->radius * mipDiv;
 	li->refCount++;
 	unit->los[type] = li;
 	instanceHashes[hash].push_back(li);
@@ -370,6 +379,9 @@ inline SLosInstance* ILosType::CreateInstance()
 	}
 
 	instances.emplace_back(instances.size());
+	boundsPosX.push_back(0);
+	boundsPosY.push_back(0);
+	boundsRadius.push_back(UNUSED_SLOT_RADIUS);
 	return &instances.back();
 }
 
@@ -408,6 +420,7 @@ inline void ILosType::DeleteInstance(SLosInstance* li)
 	}
 
 	li->squares.clear();
+	boundsRadius[li->id] = UNUSED_SLOT_RADIUS;
 	freeIDs.push_back(li->id);
 }
 
@@ -640,47 +653,63 @@ void ILosType::UpdateHeightMapSynced(SRectangle rect)
 	if (algoType == LOS_ALGO_CIRCLE)
 		return;
 
-	auto CheckOverlap = [&](SLosInstance* li, SRectangle rect) -> bool {
-		int2 pos = li->basePos * mipDiv;
-		const int radius = li->radius * mipDiv;
+	const int2 rectPos = {rect.x1 * SQUARE_SIZE, rect.y1 * SQUARE_SIZE};
+	const int hw = rect.GetWidth() * (SQUARE_SIZE / 2);
+	const int hh = rect.GetHeight() * (SQUARE_SIZE / 2);
 
-		const int hw = rect.GetWidth() * (SQUARE_SIZE / 2);
-		const int hh = rect.GetHeight() * (SQUARE_SIZE / 2);
+	const auto UpdateSlot = [&](const size_t id) {
+		const int radius = boundsRadius[id];
+		const int2 circleDistance = {std::abs(boundsPosX[id] - rectPos.x) - hw, std::abs(boundsPosY[id] - rectPos.y) - hh};
 
-		int2 circleDistance;
-		circleDistance.x = std::abs(pos.x - rect.x1 * SQUARE_SIZE) - hw;
-		circleDistance.y = std::abs(pos.y - rect.y1 * SQUARE_SIZE) - hh;
+		if (circleDistance.x > radius || circleDistance.y > radius)
+			return;
+		if (circleDistance.x > 0 && circleDistance.y > 0 && (Square(circleDistance.x) + Square(circleDistance.y)) > Square(radius))
+			return;
 
-		if (circleDistance.x > radius) { return false; }
-		if (circleDistance.y > radius) { return false; }
-		if (circleDistance.x <= 0) { return true; }
-		if (circleDistance.y <= 0) { return true; }
+		SLosInstance* li = &instances[id];
 
-		return (Square(circleDistance.x) + Square(circleDistance.y)) <= Square(radius);
+		if (li->isCached) {
+			// unused instance, delete it; leaves a stale losCache entry
+			li->isCached = false;
+			numCached--;
+			DeleteInstance(li);
+			return;
+		}
+
+		// relos used instances
+		if ((li->status & SLosInstance::TLosStatus::RECALC) == 0)
+			UpdateInstanceStatus(li, SLosInstance::TLosStatus::RECALC);
 	};
 
-	// delete unused instances that overlap with the changed rectangle
-	for (const CacheEntry& entry: losCache) {
-		SLosInstance* li = entry.instance;
-		if (!entry.IsValid() || !CheckOverlap(li, rect))
-			continue;
+	// a few craters can land in one frame and each has to look at every instance,
+	// so slots are first rejected four at a time by the box around their reach
+	const size_t numSlots = boundsRadius.size();
+	      size_t id = 0;
 
-		// leaves a stale entry
-		li->isCached = false;
-		numCached--;
-		DeleteInstance(li);
+	const __m128i rectX = _mm_set1_epi32(rectPos.x);
+	const __m128i rectY = _mm_set1_epi32(rectPos.y);
+	const __m128i halfW = _mm_set1_epi32(hw);
+	const __m128i halfH = _mm_set1_epi32(hh);
+
+	const auto AbsDiff = [](const __m128i a, const __m128i b) {
+		const __m128i diff = _mm_sub_epi32(a, b);
+		const __m128i sign = _mm_srai_epi32(diff, 31);
+		return _mm_sub_epi32(_mm_xor_si128(diff, sign), sign);
+	};
+
+	for (; (id + 4) <= numSlots; id += 4) {
+		const __m128i radius = _mm_loadu_si128(reinterpret_cast<const __m128i*>(&boundsRadius[id]));
+		const __m128i distX = _mm_sub_epi32(AbsDiff(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&boundsPosX[id])), rectX), halfW);
+		const __m128i distY = _mm_sub_epi32(AbsDiff(_mm_loadu_si128(reinterpret_cast<const __m128i*>(&boundsPosY[id])), rectY), halfH);
+		const __m128i outside = _mm_or_si128(_mm_cmpgt_epi32(distX, radius), _mm_cmpgt_epi32(distY, radius));
+
+		for (int inside = (~_mm_movemask_ps(_mm_castsi128_ps(outside))) & 0xF; inside != 0; inside &= (inside - 1)) {
+			UpdateSlot(id + std::countr_zero(static_cast<unsigned>(inside)));
+		}
 	}
 
-	// relos used instances
-	for (auto& p: instanceHashes) {
-		for (SLosInstance* li: p.second) {
-			if (li->status & SLosInstance::TLosStatus::RECALC)
-				continue;
-			if (!CheckOverlap(li, rect))
-				continue;
-
-			UpdateInstanceStatus(li, SLosInstance::TLosStatus::RECALC);
-		}
+	for (; id < numSlots; ++id) {
+		UpdateSlot(id);
 	}
 }
 

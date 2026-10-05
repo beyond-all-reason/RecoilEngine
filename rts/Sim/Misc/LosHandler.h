@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <deque>
+#include <limits>
 
 #include "Map/Ground.h"
 #include "Sim/Misc/LosMap.h"
@@ -178,6 +179,13 @@ public:
 	std::vector<CLosMap> losMaps;
 	std::deque<SLosInstance> instances;
 	std::vector<int> freeIDs;
+
+	// centre and reach of every instance slot in elmos, scanned by UpdateHeightMapSynced
+	std::vector<int> boundsPosX;
+	std::vector<int> boundsPosY;
+	std::vector<int> boundsRadius;
+	// no rectangle is ever within reach of an unused slot
+	static constexpr int UNUSED_SLOT_RADIUS = std::numeric_limits<int>::min();
 
 private:
 	struct DelayedInstance {
