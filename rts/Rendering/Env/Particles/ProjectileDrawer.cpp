@@ -196,6 +196,9 @@ void CProjectileDrawer::Init() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	eventHandler.AddClient(this);
 
+	ConfigNotify({}, {});
+	configHandler->NotifyOnChange(this, {"ProjectileReflectionMinRadius", "ProjectileDrawReuseWaterPasses", "ProjectileDrawThreadedFill"});
+
 	loadscreen->SetLoadMessage("Creating Projectile Textures");
 
 	textureAtlas  = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_MP_LEGACY, 0, 0, "ExplosFXAtlas", true);
@@ -447,6 +450,7 @@ void CProjectileDrawer::Kill() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	eventHandler.RemoveClient(this);
 	autoLinkedEvents.clear();
+	configHandler->RemoveObserver(this);
 
 	glDeleteTextures(8, perlinBlendTex);
 	spring::SafeDelete(textureAtlas);
@@ -476,14 +480,16 @@ void CProjectileDrawer::Kill() {
 	configHandler->Set("SoftParticles", wantSoften);
 }
 
+void CProjectileDrawer::ConfigNotify(const std::string& key, const std::string& value)
+{
+	reflMinRadius = configHandler->GetFloat("ProjectileReflectionMinRadius");
+	reuseWaterPasses = configHandler->GetBool("ProjectileDrawReuseWaterPasses");
+	threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill");
+}
+
 void CProjectileDrawer::UpdateDrawFlags()
 {
 	ZoneScopedN("ProjectileDrawer::UpdateDrawFlags");
-
-	// water reflections are distorted enough that small particles contribute
-	// next to nothing visually; skipping them avoids most of the reflection
-	// pass' fill/sort/quad-generation cost on effect-heavy frames
-	const float reflMinRadius = configHandler->GetFloat("ProjectileReflectionMinRadius");
 
 	// per-frame invariants, hoisted out of the per-particle loop (notably
 	// IWater::GetWater()->CanDrawReflectionPass(), a virtual call that was
@@ -504,7 +510,7 @@ void CProjectileDrawer::UpdateDrawFlags()
 
 	// chunks instead of single projectiles: for_mt hands out each item through
 	// two shared atomic counters, which costs more than the item's own work
-	for_mt_chunk(0, renderProjectiles.size(), [this, reflMinRadius, drawReflPass, drawShadowPass, timeOffset, camPlayer, camUWRefl, camShadow, &storeIfChanged](int i) {
+	for_mt_chunk(0, renderProjectiles.size(), [this, drawReflPass, drawShadowPass, timeOffset, camPlayer, camUWRefl, camShadow, &storeIfChanged](int i) {
 		CProjectile* p = renderProjectiles[i];
 		const bool hasModel = (p->model != nullptr);
 
@@ -878,7 +884,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 	// in between fill the buffer for their own camera/mask and consume their
 	// own ranges, so the saved range stays valid for the whole frame.
 	const bool mainPass = !drawReflection && !drawRefraction;
-	const bool reuseWanted = configHandler->GetBool("ProjectileDrawReuseWaterPasses");
+	const bool reuseWanted = reuseWaterPasses;
 
 	// the above-water main pass and the water refraction pass both view the
 	// same particles from the player camera; both can re-submit the geometry
@@ -921,15 +927,13 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			RadixSortByKey(sortedParticles, sortScratch, [](const SortableParticle& sp) noexcept { return sp.sortKey; });
 		}
 
-		const bool threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill") && ThreadPool::HasThreads();
-
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
-			FillParticleGeometry(mtFillBuffers, sortedParticles.size(), threadedFill, [this](size_t j) { return sortedParticles[j].proj; });
+			FillParticleGeometry(mtFillBuffers, sortedParticles.size(), threadedFill && ThreadPool::HasThreads(), [this](size_t j) { return sortedParticles[j].proj; });
 		}
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DU)");
-			FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill, [this](size_t j) { return unsortedParticles[j]; });
+			FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill && ThreadPool::HasThreads(), [this](size_t j) { return unsortedParticles[j]; });
 		}
 	}
 
@@ -1062,8 +1066,7 @@ void CProjectileDrawer::DrawShadowTransparent()
 
 	{
 		ZoneScopedN("ProjectileDrawer::DrawShadowTransparent(Fill)");
-		const bool threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill") && ThreadPool::HasThreads();
-		FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill, [this](size_t j) { return unsortedParticles[j]; });
+		FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill && ThreadPool::HasThreads(), [this](size_t j) { return unsortedParticles[j]; });
 	}
 
 	auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
