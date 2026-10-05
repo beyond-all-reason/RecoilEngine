@@ -24,8 +24,8 @@ private:
 	void SetExplosionSquare(float v) {
 		explosionSquaresPool[explSquaresPoolIdx] = v;
 
-		explSquaresPoolIdx += 1;
-		explSquaresPoolIdx %= explosionSquaresPool.size();
+		if ((++explSquaresPoolIdx) == explosionSquaresPool.size())
+			explSquaresPoolIdx = 0;
 	}
 
 	struct ExploBuilding {

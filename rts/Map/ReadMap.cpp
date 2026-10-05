@@ -5,6 +5,7 @@
 #include <cstring> // memcpy
 
 #include "xsimd/xsimd.hpp"
+#include "System/simd_compat.h"
 #include "ReadMap.h"
 #include "MapDamage.h"
 #include "MapInfo.h"
@@ -559,6 +560,28 @@ void CReadMap::UpdateHeightMapSynced(const SRectangle& hgtMapRect)
 		#endif
 
 		HeightMapUpdateLOSCheck(cornerRect);
+	}
+}
+
+
+void CReadMap::AddHeights(const int idx, const float* values, const int count)
+{
+	float* heights = heightMapSyncedPtr->data() + idx;
+	__m128 updated = _mm_setzero_ps();
+	int i = 0;
+
+	for (; (i + 4) <= count; i += 4) {
+		const __m128 oldHeights = _mm_loadu_ps(heights + i);
+		const __m128 newHeights = _mm_add_ps(oldHeights, _mm_loadu_ps(values + i));
+
+		updated = _mm_or_ps(updated, _mm_cmpneq_ps(newHeights, oldHeights));
+		_mm_storeu_ps(heights + i, newHeights);
+	}
+
+	hmUpdated |= (_mm_movemask_ps(updated) != 0);
+
+	for (; i < count; ++i) {
+		AddHeight(idx + i, values[i]);
 	}
 }
 

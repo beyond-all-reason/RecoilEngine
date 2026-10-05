@@ -264,11 +264,21 @@ void CBasicMapDamage::Update()
 			continue;
 
 
-		unsigned int expSquarePoolIdx = e.idx;
+		const unsigned int poolSize = explosionSquaresPool.size();
+		      unsigned int poolIdx = e.idx;
 
 		for (int y = e.y1; y <= e.y2; ++y) {
-			for (int x = e.x1; x <= e.x2; ++x) {
-				readMap->AddHeight(y * mapDims.mapxp1 + x, explosionSquaresPool[ (expSquarePoolIdx++) % explosionSquaresPool.size() ]);
+			// the squares of a row sit next to each other in the pool, unless the pool wraps around inside it
+			for (int x = e.x1; x <= e.x2; ) {
+				const int count = std::min <unsigned int> (e.x2 - x + 1, poolSize - poolIdx);
+
+				readMap->AddHeights(y * mapDims.mapxp1 + x, &explosionSquaresPool[poolIdx], count);
+
+				x += count;
+				poolIdx += count;
+
+				if (poolIdx == poolSize)
+					poolIdx = 0;
 			}
 		}
 
