@@ -3,7 +3,6 @@
 
 #include "ProjectileDrawer.h"
 
-#include <cstring>
 #include <tuple>
 #include <bit>
 
@@ -502,20 +501,14 @@ void CProjectileDrawer::UpdateDrawFlags()
 	const CCamera* camUWRefl = CCameraHandler::GetCamera(CCamera::CAMTYPE_UWREFL);
 	const CCamera* camShadow = CCameraHandler::GetCamera(CCamera::CAMTYPE_SHADOW);
 
-	// most values are unchanged, and storing them anyway moves the cache line to this core
-	const auto storeIfChanged = [](auto& dst, const auto& src) {
-		if (std::memcmp(&dst, &src, sizeof(dst)) != 0)
-			dst = src;
-	};
-
 	// chunks instead of single projectiles: for_mt hands out each item through
 	// two shared atomic counters, which costs more than the item's own work
-	for_mt_chunk(0, renderProjectiles.size(), [this, drawReflPass, drawShadowPass, timeOffset, camPlayer, camUWRefl, camShadow, &storeIfChanged](int i) {
+	for_mt_chunk(0, renderProjectiles.size(), [this, drawReflPass, drawShadowPass, timeOffset, camPlayer, camUWRefl, camShadow](int i) {
 		CProjectile* p = renderProjectiles[i];
 		const bool hasModel = (p->model != nullptr);
 
-		storeIfChanged(p->drawPos, p->GetDrawPos(timeOffset));
-		storeIfChanged(p->previousDrawFlag, p->drawFlag);
+		spring::StoreIfChanged(p->drawPos, p->GetDrawPos(timeOffset));
+		spring::StoreIfChanged(p->previousDrawFlag, p->drawFlag);
 
 		uint8_t drawFlag = DrawFlags::SO_NODRAW_FLAG;
 
@@ -555,7 +548,7 @@ void CProjectileDrawer::UpdateDrawFlags()
 			}
 		}
 
-		storeIfChanged(p->drawFlag, drawFlag);
+		spring::StoreIfChanged(p->drawFlag, drawFlag);
 	}, 64, 256);
 }
 
