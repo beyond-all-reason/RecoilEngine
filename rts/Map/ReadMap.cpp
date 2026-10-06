@@ -692,43 +692,6 @@ void CReadMap::UpdateMipHeightmaps(const SRectangle& rect, bool initialize)
 }
 
 
-namespace {
-	// four float3's, for UpdateFaceNormals
-	struct Float3x4 {
-		__m128 x;
-		__m128 y;
-		__m128 z;
-	};
-
-	inline __m128 Select(const __m128 mask, const __m128 a, const __m128 b) {
-		return _mm_or_ps(_mm_and_ps(mask, a), _mm_andnot_ps(mask, b));
-	}
-
-	// math::isqrt
-	inline __m128 InvSqrt(__m128 x) {
-		const __m128 xh = _mm_mul_ps(_mm_set1_ps(0.5f), x);
-
-		x = _mm_castsi128_ps(_mm_sub_epi32(_mm_set1_epi32(0x5f375a86), _mm_srai_epi32(_mm_castps_si128(x), 1)));
-		x = _mm_mul_ps(x, _mm_sub_ps(_mm_set1_ps(1.5f), _mm_mul_ps(xh, _mm_mul_ps(x, x))));
-		x = _mm_mul_ps(x, _mm_sub_ps(_mm_set1_ps(1.5f), _mm_mul_ps(xh, _mm_mul_ps(x, x))));
-		return x;
-	}
-
-	// float3::SafeNormalize
-	inline void SafeNormalize(Float3x4& v) {
-		const __m128 sql = _mm_add_ps(_mm_add_ps(_mm_mul_ps(v.x, v.x), _mm_mul_ps(v.y, v.y)), _mm_mul_ps(v.z, v.z));
-		const __m128 one = _mm_set1_ps(1.0f);
-		const __m128 valid = _mm_cmpgt_ps(sql, _mm_set1_ps(float3::nrm_eps()));
-		// vectors that are too short stay as they are (and out of InvSqrt)
-		const __m128 scale = Select(valid, InvSqrt(Select(valid, sql, one)), one);
-
-		v.x = _mm_mul_ps(v.x, scale);
-		v.y = _mm_mul_ps(v.y, scale);
-		v.z = _mm_mul_ps(v.z, scale);
-	}
-}
-
-
 void CReadMap::UpdateFaceNormals(const SRectangle& rect, bool initialize)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -758,32 +721,41 @@ void CReadMap::UpdateFaceNormals(const SRectangle& rect, bool initialize)
 			const __m128 signBit = _mm_set1_ps(-0.0f);
 			const __m128 squareSize = _mm_set1_ps(SQUARE_SIZE);
 
-			Float3x4 tl = {_mm_xor_ps(_mm_sub_ps(hTR, hTL), signBit), squareSize, _mm_xor_ps(_mm_sub_ps(hBL, hTL), signBit)};
-			Float3x4 br = {_mm_sub_ps(hBL, hBR), squareSize, _mm_sub_ps(hTR, hBR)};
+			// four normals each, one register per component
+			__m128 tlX = _mm_xor_ps(_mm_sub_ps(hTR, hTL), signBit);
+			__m128 tlY = squareSize;
+			__m128 tlZ = _mm_xor_ps(_mm_sub_ps(hBL, hTL), signBit);
+			__m128 brX = _mm_sub_ps(hBL, hBR);
+			__m128 brY = squareSize;
+			__m128 brZ = _mm_sub_ps(hTR, hBR);
 
-			SafeNormalize(tl);
-			SafeNormalize(br);
+			math::i128_safe_normalize(tlX, tlY, tlZ);
+			math::i128_safe_normalize(brX, brY, brZ);
 
-			Float3x4 center = {_mm_add_ps(tl.x, br.x), _mm_add_ps(tl.y, br.y), _mm_add_ps(tl.z, br.z)};
-			Float3x4 center2D = {center.x, _mm_setzero_ps(), center.z};
+			__m128 centerX = _mm_add_ps(tlX, brX);
+			__m128 centerY = _mm_add_ps(tlY, brY);
+			__m128 centerZ = _mm_add_ps(tlZ, brZ);
+			__m128 center2DX = centerX;
+			__m128 center2DY = _mm_setzero_ps();
+			__m128 center2DZ = centerZ;
 
-			SafeNormalize(center);
-			SafeNormalize(center2D);
+			math::i128_safe_normalize(centerX, centerY, centerZ);
+			math::i128_safe_normalize(center2DX, center2DY, center2DZ);
 
 			alignas(16) float out[12][4];
 
-			_mm_store_ps(out[ 0], tl.x);
-			_mm_store_ps(out[ 1], tl.y);
-			_mm_store_ps(out[ 2], tl.z);
-			_mm_store_ps(out[ 3], br.x);
-			_mm_store_ps(out[ 4], br.y);
-			_mm_store_ps(out[ 5], br.z);
-			_mm_store_ps(out[ 6], center.x);
-			_mm_store_ps(out[ 7], center.y);
-			_mm_store_ps(out[ 8], center.z);
-			_mm_store_ps(out[ 9], center2D.x);
-			_mm_store_ps(out[10], center2D.y);
-			_mm_store_ps(out[11], center2D.z);
+			_mm_store_ps(out[ 0], tlX);
+			_mm_store_ps(out[ 1], tlY);
+			_mm_store_ps(out[ 2], tlZ);
+			_mm_store_ps(out[ 3], brX);
+			_mm_store_ps(out[ 4], brY);
+			_mm_store_ps(out[ 5], brZ);
+			_mm_store_ps(out[ 6], centerX);
+			_mm_store_ps(out[ 7], centerY);
+			_mm_store_ps(out[ 8], centerZ);
+			_mm_store_ps(out[ 9], center2DX);
+			_mm_store_ps(out[10], center2DY);
+			_mm_store_ps(out[11], center2DZ);
 
 			for (int i = 0; i < 4; i++) {
 				const int sqr = y * mapDims.mapx + x + i;
