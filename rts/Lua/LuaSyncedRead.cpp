@@ -228,6 +228,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitStates);
 	REGISTER_LUA_CFUNC(GetUnitArmored);
 	REGISTER_LUA_CFUNC(GetUnitIsActive);
+	REGISTER_LUA_CFUNC(GetUnitIsUpkeepPaid);
 	REGISTER_LUA_CFUNC(GetUnitIsCloaked);
 	REGISTER_LUA_CFUNC(GetUnitSeismicSignature);
 	REGISTER_LUA_CFUNC(GetUnitLeavesGhost);
@@ -3826,6 +3827,25 @@ int LuaSyncedRead::GetUnitIsActive(lua_State* L)
 		return 0;
 
 	lua_pushboolean(L, unit->activated);
+	return 1;
+}
+
+
+/***
+ * Whether the unit paid its upkeep at its last slow update while switched on.
+ * With the `sensors.requireUpkeep` modrule its radar, sonar, seismic and jammer coverage need this.
+ *
+ * @function Spring.GetUnitIsUpkeepPaid
+ * @param unitID UnitID
+ * @return boolean? upkeepPaid true for units without an upkeep
+ */
+int LuaSyncedRead::GetUnitIsUpkeepPaid(lua_State* L)
+{
+	const CUnit* unit = ParseAllyUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
+
+	lua_pushboolean(L, unit->upkeepPaid);
 	return 1;
 }
 

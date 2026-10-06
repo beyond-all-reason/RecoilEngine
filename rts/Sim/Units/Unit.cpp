@@ -1084,7 +1084,9 @@ void CUnit::SlowUpdate()
 		const auto [positiveUpkeep, negativeUpkeep] = SplitResourcePackIntoPositiveNegative(unitDef->upkeep);
 		AddResources(negativeUpkeep * 0.5f);
 
-		if (UseResources(positiveUpkeep * 0.5f)) {
+		upkeepPaid = UseResources(positiveUpkeep * 0.5f);
+
+		if (upkeepPaid) {
 			AddResources(unitDef->makesResources * 0.5f);
 
 			if (unitDef->extractsMetal > 0.0f)
@@ -2941,6 +2943,7 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(moveState),
 
 	CR_MEMBER(activated),
+	CR_MEMBER(upkeepPaid),
 
 	CR_MEMBER(isDead),
 	CR_MEMBER(fallSpeed),

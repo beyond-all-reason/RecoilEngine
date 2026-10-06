@@ -484,6 +484,8 @@ public:
 
 	// if the unit is in it's 'on'-state
 	bool activated = false;
+	// if the unit paid its upkeep at its last SlowUpdate while on
+	bool upkeepPaid = true;
 	// prevent damage from hitting an already dead unit (causing multi wreck etc)
 	bool isDead = false;
 

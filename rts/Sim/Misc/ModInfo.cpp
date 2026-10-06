@@ -122,6 +122,7 @@ void CModInfo::ResetState()
 		alwaysVisibleOverridesCloaked = false;
 		decloakRequiresLineOfSight = false;
 		separateJammers = true;
+		sensorsRequireUpkeep = false;
 	}
 	{
 		featureVisibility = FEATURELOS_ALL;
@@ -377,6 +378,7 @@ void CModInfo::Init(const std::string& modFileName)
 		alwaysVisibleOverridesCloaked = sensors.GetBool("alwaysVisibleOverridesCloaked", alwaysVisibleOverridesCloaked);
 		decloakRequiresLineOfSight = sensors.GetBool("decloakRequiresLineOfSight", decloakRequiresLineOfSight);
 		separateJammers = sensors.GetBool("separateJammers", separateJammers);
+		sensorsRequireUpkeep = sensors.GetBool("requireUpkeep", sensorsRequireUpkeep);
 
 		losMipLevel = los.GetInt("losMipLevel", losMipLevel);
 		airMipLevel = los.GetInt("airMipLevel", airMipLevel);

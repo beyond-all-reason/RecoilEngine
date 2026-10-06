@@ -179,9 +179,10 @@ inline void ILosType::UpdateUnit(CUnit* unit, bool ignore)
 	//   transported radar/jammer (it would leave a detached sensor coverage
 	//   zone behind at its old position)
 	const bool sightOnly = (type == LOS_TYPE_LOS) || (type == LOS_TYPE_AIRLOS);
-	const bool noSensors = (!unit->activated || unit->IsStunned());
+	const bool unpaid = (modInfo.sensorsRequireUpkeep && !unit->upkeepPaid);
+	const bool noSensors = (!unit->activated || unit->IsStunned() || unpaid);
 	if (!sightOnly && noSensors) {
-		// block any type of radar/jammer coverage when deactivated
+		// block any type of radar/jammer coverage when deactivated, stunned or (sensors.requireUpkeep) unpaid
 		RemoveUnit(unit);
 		return;
 	}
