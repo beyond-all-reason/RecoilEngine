@@ -6,23 +6,27 @@ end
 
 local config = VFS.Include("custom_move_config.lua")
 local customID = 34567
+local otherID = customID + 1
 if gadgetHandler:IsSyncedCode() then
-	local source
-	local firstMoveFinished
+	local units = {}
+	local targets = {}
+	local attackMode = config.mode == "attack_native" or config.mode == "attack_controller"
+	local finished = {}
+	local positions = { { 2400, 2000 }, { 2100, 1600 } }
 	local descriptionIndex
-	local x, z = 2400, 2000
-	local function description(marked)
-		return { id = customID, type = CMDTYPE.ICON_MAP, name = "Controller", hidden = true, moveCommand = marked }
-	end
-	local function insertDescription(unitID, marked)
-		Spring.InsertUnitCmdDesc(unitID, description(marked))
-		return Spring.FindUnitCmdDesc(unitID, customID)
-	end
-	local function readFlag(unitID, index)
-		return Spring.GetUnitCmdDescs(unitID, index, index)[1].moveCommand
-	end
 	function gadget:Initialize()
 		gadgetHandler:RegisterCMDID(customID)
+		gadgetHandler:RegisterCMDID(otherID)
+		for _, id in ipairs({ CMD.STOP, CMD.WAIT, CMD.MOVE, -1, 1000, customID + 0.5, 2 ^ 40, math.huge, 0 / 0 }) do
+			local ok, err = pcall(Spring.RegisterMoveCommand, id)
+			assert(not ok, "Accepted invalid command ID: " .. tostring(id) .. ": " .. tostring(err))
+		end
+		if config.mode ~= "native" and config.mode ~= "unregistered" then
+			Spring.RegisterMoveCommand(customID)
+		end
+		if config.mode == "duplicate" then
+			Spring.RegisterMoveCommand(customID)
+		end
 	end
 	function gadget:GameFrame(frame)
 		if frame == 1 then
@@ -30,50 +34,61 @@ if gadgetHandler:IsSyncedCode() then
 				Spring.DestroyUnit(id, false, true)
 			end
 		elseif frame == 5 then
-			source = assert(Spring.CreateUnit("armfav", x, Spring.GetGroundHeight(x, z), z, 1, 0))
-			local other = assert(Spring.CreateUnit("armfav", x - 300, Spring.GetGroundHeight(x - 300, z), z, 1, 0))
-			-- A marked descriptor on another unit must not affect this unit.
-			local otherIndex = insertDescription(other, true)
-			assert(readFlag(other, otherIndex) == true)
-			local marked = config.mode == "marked"
-				or config.mode == "cleared"
-				or config.mode == "removed"
-				or config.mode == "renamed"
-			descriptionIndex = insertDescription(source, marked)
-			assert(readFlag(source, descriptionIndex) == marked)
-			Spring.GiveOrderToUnit(source, CMD.FIRE_STATE, { 0 }, 0)
-			Spring.GiveOrderToUnit(other, CMD.FIRE_STATE, { 0 }, 0)
-		elseif frame == 10 then
-			Spring.GiveOrderToUnit(source, CMD.MOVE, { x + 225, Spring.GetGroundHeight(x + 225, z), z }, 0)
-			local command = config.mode == "native" and CMD.MOVE or customID
-			Spring.GiveOrderToUnit(
-				source,
-				command,
-				{ x + 600, Spring.GetGroundHeight(x + 600, z + 200), z + 200 },
-				CMD.OPT_SHIFT
-			)
-		elseif frame == 11 then
-			-- Change descriptions while the controller is already queued.
-			local index = descriptionIndex
-			if config.mode == "edited" then
-				Spring.EditUnitCmdDesc(source, index, { moveCommand = true })
-				assert(readFlag(source, index) == true)
-			elseif config.mode == "cleared" or config.mode == "removed" or config.mode == "renamed" then
-				if config.mode == "cleared" then
-					Spring.EditUnitCmdDesc(source, index, { moveCommand = false })
-					assert(readFlag(source, index) == false)
-				elseif config.mode == "removed" then
-					Spring.RemoveUnitCmdDesc(source, index)
-					assert(Spring.FindUnitCmdDesc(source, customID) == nil)
-				else
-					Spring.EditUnitCmdDesc(source, index, { id = customID + 1 })
-					assert(Spring.FindUnitCmdDesc(source, customID) == nil)
+			for index, pos in ipairs(positions) do
+				local x, z = pos[1], pos[2]
+				units[index] = assert(Spring.CreateUnit("armfav", x, Spring.GetGroundHeight(x, z), z, 1, 0))
+				Spring.GiveOrderToUnit(units[index], CMD.FIRE_STATE, { 0 }, 0)
+				assert(Spring.FindUnitCmdDesc(units[index], customID) == nil)
+				if attackMode then
+					targets[index] = {}
+					for target = 1, 2 do
+						local tx, tz = x + 1200, z + target * 200
+						local id = assert(Spring.CreateUnit("corak", tx, Spring.GetGroundHeight(tx, tz), tz, 1, 1))
+						targets[index][target] = id
+						Spring.GiveOrderToUnit(id, CMD.FIRE_STATE, { 0 }, 0)
+					end
 				end
+			end
+			if config.mode == "removed" or config.mode == "renamed" then
+				Spring.InsertUnitCmdDesc(
+					units[1],
+					{ id = customID, type = CMDTYPE.ICON_MAP, name = "Controller", hidden = true }
+				)
+				descriptionIndex = assert(Spring.FindUnitCmdDesc(units[1], customID))
+			end
+		elseif frame == 10 then
+			local command = config.mode == "native" and CMD.MOVE or customID
+			if config.mode == "other_id" then
+				command = otherID
+			end
+			for index, pos in ipairs(positions) do
+				local x, z = pos[1], pos[2]
+				Spring.GiveOrderToUnit(units[index], CMD.MOVE, { x + 225, Spring.GetGroundHeight(x + 225, z), z }, 0)
+				if config.mode == "attack_native" then
+					for _, target in ipairs(targets[index]) do
+						Spring.GiveOrderToUnit(units[index], CMD.ATTACK, { target }, CMD.OPT_SHIFT)
+					end
+				elseif config.mode == "attack_controller" then
+					Spring.GiveOrderToUnit(units[index], assert(GameCMD.ATTACK_TARGETS), targets[index], CMD.OPT_SHIFT)
+				else
+					Spring.GiveOrderToUnit(
+						units[index],
+						command,
+						{ x + 600, Spring.GetGroundHeight(x + 600, z + 200), z + 200 },
+						CMD.OPT_SHIFT
+					)
+				end
+			end
+		elseif frame == 11 then
+			if config.mode == "removed" then
+				Spring.RemoveUnitCmdDesc(units[1], descriptionIndex)
+			elseif config.mode == "renamed" then
+				Spring.EditUnitCmdDesc(units[1], descriptionIndex, { id = otherID })
 			end
 		end
 	end
 	function gadget:CommandFallback(unitID, unitDefID, team, command, params, options, tag)
-		if command ~= customID then
+		if command ~= customID and command ~= otherID then
 			return false
 		end
 		Spring.GiveOrderToUnit(unitID, CMD.INSERT, { 0, CMD.MOVE, 0, params[1], params[2], params[3] }, CMD.OPT_ALT)
@@ -81,19 +96,20 @@ if gadgetHandler:IsSyncedCode() then
 		return true, false
 	end
 	function gadget:UnitCmdDone(unitID, unitDefID, team, command)
-		if unitID == source and command == CMD.MOVE and not firstMoveFinished then
-			firstMoveFinished = Spring.GetGameFrame()
-			SendToUnsynced("move_finished", firstMoveFinished)
+		for index, id in ipairs(units) do
+			if unitID == id and command == CMD.MOVE and not finished[index] then
+				finished[index] = Spring.GetGameFrame()
+				SendToUnsynced("move_finished", index, finished[index])
+			end
 		end
 	end
 	function gadget:GameFramePost(frame)
-		if source then
-			local px, py, pz = Spring.GetUnitPosition(source)
-			local vx, vy, vz = Spring.GetUnitVelocity(source)
-			SendToUnsynced(
-				"move_state",
-				frame,
-				string.format(
+		if #units > 0 then
+			local states = {}
+			for _, id in ipairs(units) do
+				local px, py, pz = Spring.GetUnitPosition(id)
+				local vx, vy, vz = Spring.GetUnitVelocity(id)
+				states[#states + 1] = string.format(
 					"%.17g\t%.17g\t%.17g\t%.17g\t%.17g\t%.17g\t%d",
 					px,
 					py,
@@ -101,12 +117,13 @@ if gadgetHandler:IsSyncedCode() then
 					vx,
 					vy,
 					vz,
-					Spring.GetUnitHeading(source)
+					Spring.GetUnitHeading(id)
 				)
-			)
+			end
+			SendToUnsynced("move_state", frame, table.concat(states, "\t"))
 		end
 		if frame == config.finish then
-			assert(firstMoveFinished, "First Move never finished")
+			assert(finished[1] and finished[2], "First Move never finished")
 			SendToUnsynced("move_complete", frame)
 		end
 	end
@@ -117,9 +134,9 @@ else
 		gadgetHandler:AddSyncAction("move_state", function(_, frame, state)
 			trace:write(frame, "\t", state, "\n")
 		end)
-		gadgetHandler:AddSyncAction("move_finished", function(_, frame)
-			local file = assert(io.open("first-move.txt", "w"))
-			file:write(frame, "\n")
+		gadgetHandler:AddSyncAction("move_finished", function(_, index, frame)
+			local file = assert(io.open("first-move.txt", "a"))
+			file:write(index, "\t", frame, "\n")
 			file:close()
 		end)
 		gadgetHandler:AddSyncAction("move_complete", function(_, frame)

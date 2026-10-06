@@ -18,7 +18,6 @@ CR_REG_METADATA(SCommandDescription, (
 	CR_MEMBER(refCount),
 
 	CR_MEMBER(queueing),
-	CR_MEMBER(moveCommand),
 	CR_MEMBER(hidden),
 	CR_MEMBER(disabled),
 	CR_MEMBER(showUnique),
@@ -52,7 +51,6 @@ bool SCommandDescription::operator != (const SCommandDescription& cd) const
 	       type        != cd.type        ||
 
 	       queueing    != cd.queueing    ||
-	       moveCommand != cd.moveCommand ||
 	       hidden      != cd.hidden      ||
 	       disabled    != cd.disabled    ||
 	       showUnique  != cd.showUnique  ||
@@ -105,7 +103,6 @@ void CCommandDescriptionCache::Dump(bool forced)
 		LOG_L(L_INFO, "\t\thash       =%d", CalcHash(cache[i]));
 		LOG_L(L_INFO, "\t\t");
 		LOG_L(L_INFO, "\t\tqueueing   =%d", cache[i].queueing);
-		LOG_L(L_INFO, "\t\tmoveCommand=%d", cache[i].moveCommand);
 		LOG_L(L_INFO, "\t\thidden     =%d", cache[i].hidden);
 		LOG_L(L_INFO, "\t\tdisabled   =%d", cache[i].disabled);
 		LOG_L(L_INFO, "\t\tshowUnique =%d", cache[i].showUnique);
@@ -136,7 +133,6 @@ int CCommandDescriptionCache::CalcHash(const SCommandDescription& cd) const
 	hash = spring::LiteHash(&cd.id             , sizeof(cd.id)         , hash);
 	hash = spring::LiteHash(&cd.type           , sizeof(cd.type)       , hash);
 	hash = spring::LiteHash(&cd.queueing       , sizeof(cd.queueing)   , hash);
-	hash = spring::LiteHash(&cd.moveCommand  , sizeof(cd.moveCommand), hash);
 	hash = spring::LiteHash(&cd.hidden         , sizeof(cd.hidden)     , hash);
 	hash = spring::LiteHash(&cd.disabled       , sizeof(cd.disabled)   , hash);
 	hash = spring::LiteHash(&cd.showUnique     , sizeof(cd.showUnique) , hash);

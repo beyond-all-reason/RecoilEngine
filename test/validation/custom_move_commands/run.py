@@ -8,15 +8,16 @@ Example (use development assets, never the production write directory):
     --maps /path/to/development/maps --output /tmp/custom-move-validation
 
 The default map is Red Comet Remake 1.8. Requires BAR's armfav unit. Checks exact
-per-frame position, velocity and heading, plus the preceding Move's finish frame.
-The unmarked case is a required negative control. The same marked descriptor on
-another unit tests per-unit scope and cache separation. Edit, clear, remove and
-ID-change cases exercise descriptor lifetime. All cases run serially.
+per-frame position, velocity and heading for two units, plus their preceding Move
+finish frames. The unregistered case is a required negative control. Registration
+must work globally without descriptions, survive description removal/ID changes,
+be idempotent, and leave other command IDs unclassified. All cases run serially. With --attack-controller, also checks the real BAR
+ATTACK_TARGETS controller against native attacks (requires a game with that gadget).
 
-Manual reproduction: queue Move followed by a custom movement controller. Set
-moveCommand=true in its Spring.InsertUnitCmdDesc table; its predecessor should
-finish like Move followed by a native Move, without the custom-command delay.
-The controller still implements its action in CommandFallback.
+Manual reproduction: call Spring.RegisterMoveCommand(customID) from synced gadget
+initialization, then queue Move followed by that custom controller on any unit.
+The preceding Move should finish like Move followed by a native Move. The gadget
+still implements its controller in CommandFallback; no command description needed.
 """
 
 import argparse
@@ -38,6 +39,7 @@ def main():
     parser.add_argument("--map", default="Red Comet Remake 1.8")
     parser.add_argument("--game-name", default="Beyond All Reason $VERSION")
     parser.add_argument("--port", type=int, default=50900)
+    parser.add_argument("--attack-controller", action="store_true", help="Also compare BAR ATTACK_TARGETS with native attacks")
     args = parser.parse_args()
     engine, game, maps, output = [p.resolve() for p in (args.engine, args.game, args.maps, args.output)]
     assert engine.is_file() and game.is_dir() and maps.is_dir()
@@ -48,8 +50,11 @@ def main():
     traces = {}
     observer = (HERE / "observer.lua").read_bytes()
     result["observer_sha256"] = hashlib.sha256(observer).hexdigest()
+    modes = ["native", "unregistered", "registered", "duplicate", "removed", "renamed", "other_id"]
+    if args.attack_controller:
+        modes += ["attack_native", "attack_controller"]
     try:
-        for index, mode in enumerate(("native", "unmarked", "marked", "edited", "cleared", "removed", "renamed")):
+        for index, mode in enumerate(modes):
             root = output / mode
             overlay = root / "games/validation.sdd"
             (overlay / "luarules/gadgets").mkdir(parents=True)
@@ -70,6 +75,8 @@ def main():
  [PLAYER0] {{ Name=Validation; Team=0; }}
  [TEAM0] {{ TeamLeader=0; AllyTeam=0; }}
  [ALLYTEAM0] {{ }}
+ [TEAM1] {{ TeamLeader=0; AllyTeam=1; }}
+ [ALLYTEAM1] {{ }}
 }}
 """)
             command = [str(engine), "--isolation", "--write-dir", str(root), str(root / "startscript.txt")]
@@ -84,17 +91,23 @@ def main():
             rows = trace.decode().splitlines()
             assert [int(row.split("\t")[0]) for row in rows] == list(range(5, 181)), "Incomplete trace"
             traces[mode] = trace
-            result["cases"][mode] = dict(first_move_frame=int((root / "first-move.txt").read_text()),
+            finish_frames = dict(map(int, row.split()) for row in (root / "first-move.txt").read_text().splitlines())
+            assert set(finish_frames) == {1, 2}, "Missing unit completion"
+            result["cases"][mode] = dict(first_move_frames=finish_frames,
                                          trace_sha256=hashlib.sha256(trace).hexdigest(), seconds=time.monotonic() - started)
             print("DONE", mode, result["cases"][mode], flush=True)
-            if mode == "unmarked":
-                assert traces["unmarked"] != traces["native"], "Negative control did not reproduce the distinction"
-                assert result["cases"]["unmarked"]["first_move_frame"] > result["cases"]["native"]["first_move_frame"]
-        for mode in ("marked", "edited"):
+            if mode == "unregistered":
+                assert traces[mode] != traces["native"], "Negative control did not reproduce the distinction"
+                native_frames = result["cases"]["native"]["first_move_frames"]
+                assert all(finish_frames[unit] >= native_frames[unit] for unit in (1, 2))
+                assert any(finish_frames[unit] > native_frames[unit] for unit in (1, 2))
+        for mode in ("registered", "duplicate", "removed", "renamed"):
             assert traces[mode] == traces["native"], f"Movement differs: {mode}"
-            assert result["cases"][mode]["first_move_frame"] == result["cases"]["native"]["first_move_frame"]
-        for mode in ("cleared", "removed", "renamed"):
-            assert traces[mode] == traces["unmarked"], f"Stale classification after {mode}"
+            assert result["cases"][mode]["first_move_frames"] == result["cases"]["native"]["first_move_frames"]
+        assert traces["other_id"] == traces["unregistered"], "Registration affected another command ID"
+        if args.attack_controller:
+            assert traces["attack_controller"] == traces["attack_native"], "BAR attack controller differs from native attacks"
+            assert result["cases"]["attack_controller"]["first_move_frames"] == result["cases"]["attack_native"]["first_move_frames"]
         result["passed"] = True
     except BaseException as error:
         result["error"] = repr(error)

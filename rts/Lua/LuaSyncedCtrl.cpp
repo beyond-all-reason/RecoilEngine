@@ -2,6 +2,8 @@
 
 #include <vector>
 #include <cctype>
+#include <climits>
+#include <cmath>
 
 #include "LuaSyncedCtrl.h"
 
@@ -38,6 +40,7 @@
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/DamageArray.h"
 #include "Sim/Misc/DamageArrayHandler.h"
+#include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/SmoothHeightMesh.h"
@@ -377,6 +380,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SpawnCEG);
 	REGISTER_LUA_CFUNC(SpawnSFX);
 
+	REGISTER_LUA_CFUNC(RegisterMoveCommand);
 	REGISTER_LUA_CFUNC(EditUnitCmdDesc);
 	REGISTER_LUA_CFUNC(InsertUnitCmdDesc);
 	REGISTER_LUA_CFUNC(RemoveUnitCmdDesc);
@@ -7908,6 +7912,30 @@ static int ParseStringVector(lua_State* L, int index, vector<string>& strvec)
  * Doesn't work in unsynced code!
 ******************************************************************************/
 
+/***
+ * Register a custom command ID as movement for command-queue lookahead on all units.
+ * Call from synced gadget initialization. Registration lasts for the game and is
+ * idempotent; command descriptions are not required. This uses the same lookahead
+ * as native movement commands, including attack completion and aircraft decisions.
+ * The gadget still implements the command's execution through CommandFallback.
+ *
+ * @function Spring.RegisterMoveCommand
+ * @param cmdID integer Custom command ID greater than 1000 (lower IDs are reserved).
+ */
+int LuaSyncedCtrl::RegisterMoveCommand(lua_State* L)
+{
+	if (!FullCtrl(L))
+		return 0;
+
+	const lua_Number cmdID = luaL_checknumber(L, 1);
+	if (cmdID <= 1000 || cmdID > INT_MAX || std::floor(cmdID) != cmdID)
+		return luaL_error(L, "RegisterMoveCommand requires an integer command ID greater than 1000");
+
+	gs->customMoveCommands.insert(static_cast<int>(cmdID));
+	return 0;
+}
+
+
 static bool ParseCommandDescription(lua_State* L, int table,
                                     SCommandDescription& cd)
 {
@@ -7930,7 +7958,6 @@ static bool ParseCommandDescription(lua_State* L, int table,
 		    ParseNamedString(L, key, "texture",     cd.iconname)   ||
 		    ParseNamedString(L, key, "cursor",      cd.mouseicon)  ||
 		    ParseNamedBool(L,   key, "queueing",    cd.queueing)   ||
-		    ParseNamedBool(L,   key, "moveCommand", cd.moveCommand) ||
 		    ParseNamedBool(L,   key, "hidden",      cd.hidden)     ||
 		    ParseNamedBool(L,   key, "disabled",    cd.disabled)   ||
 		    ParseNamedBool(L,   key, "showUnique",  cd.showUnique) ||

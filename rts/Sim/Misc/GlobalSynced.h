@@ -1,10 +1,10 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _GLOBAL_SYNCED_H
-#define _GLOBAL_SYNCED_H
+#pragma once
 
 #include "System/creg/creg_cond.h"
 #include "System/GlobalRNG.h"
+#include "System/UnorderedSet.hpp"
 #include "System/Threading/ThreadPool.h"
 
 
@@ -130,11 +130,11 @@ public:
 	* Whether or not LuaGaia is enabled
 	*/
 	bool useLuaGaia = true;
+
+	// Additional command IDs that count as movement in queue lookahead.
+	spring::unordered_set<int> customMoveCommands;
 };
 
 
 extern CGlobalSynced* gs;
 extern CGlobalSyncedRNG gsRNG;
-
-#endif // _GLOBAL_SYNCED_H
-
