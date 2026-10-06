@@ -260,7 +260,7 @@ class LuaSyncedCtrl
 		static int SpawnSFX(lua_State* L);
 
 		// LuaRules  (fullCtrl)
-		static int RegisterMoveCommand(lua_State* L);
+		static int RegisterCommand(lua_State* L);
 		static int EditUnitCmdDesc(lua_State* L);
 		static int InsertUnitCmdDesc(lua_State* L);
 		static int RemoveUnitCmdDesc(lua_State* L);

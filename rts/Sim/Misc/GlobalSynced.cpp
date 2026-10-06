@@ -12,7 +12,7 @@
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "System/SafeUtil.h"
-#include "System/creg/STL_Set.h"
+#include "System/creg/STL_Map.h"
 #include "System/Log/FramePrefixer.h"
 
 #ifdef SYNCCHECK
@@ -36,6 +36,11 @@ CGlobalSynced* gs = &gsOBJ;
 
 CR_BIND(CGlobalSynced, )
 
+CR_BIND(CustomCommandProperties, ())
+CR_REG_METADATA(CustomCommandProperties, (
+	CR_MEMBER(movement)
+))
+
 CR_REG_METADATA(CGlobalSynced, (
 	CR_MEMBER(frameNum),
 	CR_MEMBER(tempNum),
@@ -50,7 +55,7 @@ CR_REG_METADATA(CGlobalSynced, (
 	CR_MEMBER(noHelperAIs),
 	CR_MEMBER(editDefsEnabled),
 	CR_MEMBER(useLuaGaia),
-	CR_MEMBER(customMoveCommands)
+	CR_MEMBER(customCommands)
 ))
 
 
@@ -62,7 +67,7 @@ void CGlobalSynced::Kill()
 
 void CGlobalSynced::ResetState() {
 	frameNum = -1; // first real frame is 0
-	spring::clear_unordered_set(customMoveCommands);
+	spring::clear_unordered_map(customCommands);
 	tempNum  =  1;
 	godMode  =  0;
 

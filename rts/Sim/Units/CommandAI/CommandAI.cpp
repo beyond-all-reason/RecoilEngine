@@ -1836,7 +1836,10 @@ bool CCommandAI::HasMoreMoveCommands(bool skipFirstCmd) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const auto pred = [](const Command& c) {
-		return c.IsMoveCommand() || gs->customMoveCommands.find(c.GetID()) != gs->customMoveCommands.end();
+		if (c.IsMoveCommand())
+			return true;
+		const auto it = gs->customCommands.find(c.GetID());
+		return it != gs->customCommands.end() && it->second.movement;
 	};
 	const auto iter = std::find_if(commandQue.begin() + int(skipFirstCmd && !commandQue.empty()), commandQue.end(), pred);
 

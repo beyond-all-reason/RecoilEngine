@@ -4,9 +4,18 @@
 
 #include "System/creg/creg_cond.h"
 #include "System/GlobalRNG.h"
-#include "System/UnorderedSet.hpp"
+#include "System/UnorderedMap.hpp"
 #include "System/Threading/ThreadPool.h"
 
+
+struct CustomCommandProperties
+{
+	CR_DECLARE_STRUCT(CustomCommandProperties)
+
+	bool movement = false;
+
+	bool operator==(const CustomCommandProperties&) const = default;
+};
 
 class CGameSetup;
 class CTeam;
@@ -131,8 +140,8 @@ public:
 	*/
 	bool useLuaGaia = true;
 
-	// Additional command IDs that count as movement in queue lookahead.
-	spring::unordered_set<int> customMoveCommands;
+	// Immutable properties of registered custom command IDs, shared by all units.
+	spring::unordered_map<int, CustomCommandProperties> customCommands;
 };
 
 

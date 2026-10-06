@@ -17,15 +17,44 @@ if gadgetHandler:IsSyncedCode() then
 	function gadget:Initialize()
 		gadgetHandler:RegisterCMDID(customID)
 		gadgetHandler:RegisterCMDID(otherID)
+		if not Spring.RegisterCommand then
+			assert(attackMode, "Command registration unavailable")
+			return
+		end
 		for _, id in ipairs({ CMD.STOP, CMD.WAIT, CMD.MOVE, -1, 1000, customID + 0.5, 2 ^ 40, math.huge, 0 / 0 }) do
-			local ok, err = pcall(Spring.RegisterMoveCommand, id)
+			local ok, err = pcall(Spring.RegisterCommand, id, { movement = true })
 			assert(not ok, "Accepted invalid command ID: " .. tostring(id) .. ": " .. tostring(err))
 		end
-		if config.mode ~= "native" and config.mode ~= "unregistered" then
-			Spring.RegisterMoveCommand(customID)
+		local function rejects(id, properties)
+			assert(not pcall(Spring.RegisterCommand, id, properties), "Accepted invalid registration")
+		end
+		local defaultsID = customID + 2
+		Spring.RegisterCommand(defaultsID, {})
+		Spring.RegisterCommand(defaultsID, { movement = false })
+		rejects(defaultsID, { movement = true })
+		-- Rejected mutations must leave the original registration intact.
+		Spring.RegisterCommand(defaultsID, {})
+		for _, properties in ipairs({
+			{ movement = 1 },
+			{ movement = "true" },
+			{ moving = true },
+			{ ["movement\0extra"] = true },
+			{ [1] = true },
+			false,
+		}) do
+			rejects(customID, properties)
+		end
+		rejects(customID, nil)
+		if config.mode == "default" then
+			Spring.RegisterCommand(customID, {})
+		elseif config.mode ~= "native" and config.mode ~= "unregistered" then
+			Spring.RegisterCommand(customID, { movement = true })
 		end
 		if config.mode == "duplicate" then
-			Spring.RegisterMoveCommand(customID)
+			rejects(customID, { movement = false })
+			rejects(customID, {})
+			rejects(customID, { movement = true, unknown = true })
+			Spring.RegisterCommand(customID, { movement = true })
 		end
 	end
 	function gadget:GameFrame(frame)
@@ -80,6 +109,10 @@ if gadgetHandler:IsSyncedCode() then
 				end
 			end
 		elseif frame == 11 then
+			if config.mode == "duplicate" then
+				assert(not pcall(Spring.RegisterCommand, customID, {}))
+				Spring.RegisterCommand(customID, { movement = true })
+			end
 			if config.mode == "removed" then
 				Spring.RemoveUnitCmdDesc(units[1], descriptionIndex)
 			elseif config.mode == "renamed" then

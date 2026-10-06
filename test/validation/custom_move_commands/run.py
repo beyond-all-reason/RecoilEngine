@@ -14,7 +14,7 @@ must work globally without descriptions, survive description removal/ID changes,
 be idempotent, and leave other command IDs unclassified. All cases run serially. With --attack-controller, also checks the real BAR
 ATTACK_TARGETS controller against native attacks (requires a game with that gadget).
 
-Manual reproduction: call Spring.RegisterMoveCommand(customID) from synced gadget
+Manual reproduction: call Spring.RegisterCommand(customID, { movement = true }) from synced gadget
 initialization, then queue Move followed by that custom controller on any unit.
 The preceding Move should finish like Move followed by a native Move. The gadget
 still implements its controller in CommandFallback; no command description needed.
@@ -40,6 +40,7 @@ def main():
     parser.add_argument("--game-name", default="Beyond All Reason $VERSION")
     parser.add_argument("--port", type=int, default=50900)
     parser.add_argument("--attack-controller", action="store_true", help="Also compare BAR ATTACK_TARGETS with native attacks")
+    parser.add_argument("--attack-only", action="store_true", help="Only compare BAR attacks; also supports engines without RegisterCommand")
     args = parser.parse_args()
     engine, game, maps, output = [p.resolve() for p in (args.engine, args.game, args.maps, args.output)]
     assert engine.is_file() and game.is_dir() and maps.is_dir()
@@ -50,8 +51,10 @@ def main():
     traces = {}
     observer = (HERE / "observer.lua").read_bytes()
     result["observer_sha256"] = hashlib.sha256(observer).hexdigest()
-    modes = ["native", "unregistered", "registered", "duplicate", "removed", "renamed", "other_id"]
-    if args.attack_controller:
+    modes = ["native", "unregistered", "registered", "duplicate", "removed", "renamed", "other_id", "default"]
+    if args.attack_only:
+        modes = []
+    if args.attack_controller or args.attack_only:
         modes += ["attack_native", "attack_controller"]
     try:
         for index, mode in enumerate(modes):
@@ -101,11 +104,13 @@ def main():
                 native_frames = result["cases"]["native"]["first_move_frames"]
                 assert all(finish_frames[unit] >= native_frames[unit] for unit in (1, 2))
                 assert any(finish_frames[unit] > native_frames[unit] for unit in (1, 2))
-        for mode in ("registered", "duplicate", "removed", "renamed"):
-            assert traces[mode] == traces["native"], f"Movement differs: {mode}"
-            assert result["cases"][mode]["first_move_frames"] == result["cases"]["native"]["first_move_frames"]
-        assert traces["other_id"] == traces["unregistered"], "Registration affected another command ID"
-        if args.attack_controller:
+        if not args.attack_only:
+            for mode in ("registered", "duplicate", "removed", "renamed"):
+                assert traces[mode] == traces["native"], f"Movement differs: {mode}"
+                assert result["cases"][mode]["first_move_frames"] == result["cases"]["native"]["first_move_frames"]
+            assert traces["other_id"] == traces["unregistered"], "Registration affected another command ID"
+            assert traces["default"] == traces["unregistered"], "Default registration enabled movement"
+        if args.attack_controller or args.attack_only:
             assert traces["attack_controller"] == traces["attack_native"], "BAR attack controller differs from native attacks"
             assert result["cases"]["attack_controller"]["first_move_frames"] == result["cases"]["attack_native"]["first_move_frames"]
         result["passed"] = True
