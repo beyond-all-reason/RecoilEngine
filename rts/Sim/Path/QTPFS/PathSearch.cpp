@@ -1412,7 +1412,7 @@ void QTPFS::PathSearch::UpdateNode(SearchNode* nextNode, SearchNode* prevNode, u
 }
 
 void QTPFS::PathSearch::IterateNodes(unsigned int searchDir) {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	DirectionalSearchData& searchData = directionalSearchData[searchDir];
 
 	SearchQueueNode curOpenNode = (*searchData.openNodes).top();
