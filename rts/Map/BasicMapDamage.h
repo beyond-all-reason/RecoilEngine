@@ -24,8 +24,8 @@ private:
 	void SetExplosionSquare(float v) {
 		explosionSquaresPool[explSquaresPoolIdx] = v;
 
-		explSquaresPoolIdx += 1;
-		explSquaresPoolIdx %= explosionSquaresPool.size();
+		if ((++explSquaresPoolIdx) == explosionSquaresPool.size())
+			explSquaresPoolIdx = 0;
 	}
 
 	struct ExploBuilding {
@@ -60,6 +60,8 @@ private:
 
 	std::vector<float> explosionSquaresPool;
 	std::vector<Explo> explosionUpdateQueue;
+	// smoothed inverse hardness of one row of typemap cells, see Explosion
+	std::vector<float> invHardnessRow;
 
 	static constexpr unsigned int CRATER_TABLE_SIZE = 200;
 	static constexpr unsigned int EXPLOSION_LIFETIME = 10;
