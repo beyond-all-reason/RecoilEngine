@@ -103,6 +103,8 @@ public:
 
 	/// Proxy interface for modelDrawerState
 	static bool CanDrawDeferred() { return modelDrawerState->CanDrawDeferred(); }
+	static bool IsLegacyImpl() { return modelDrawerState->IsLegacy(); }
+	static ShaderMatrixModes SetMatrixMode(ShaderMatrixModes smm) { return modelDrawerState->SetMatrixMode(smm); }
 	static bool SetTeamColor(int team, const float alpha = 1.0f) { return modelDrawerState->SetTeamColor(team, alpha); }
 	static void SetNanoColor(const float4& color) { modelDrawerState->SetNanoColor(color); }
 	static const ScopedTransformMemAlloc& GetTransformMemAlloc(const ObjType* o) { return const_cast<const TDrawerData*>(modelDrawerData)->GetObjectTransformMemAlloc(o); }
