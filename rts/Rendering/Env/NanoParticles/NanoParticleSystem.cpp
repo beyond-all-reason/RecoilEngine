@@ -17,6 +17,7 @@
 #include "Map/ReadMap.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/LosHandler.h"
+#include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Units/Unit.h"
@@ -909,7 +910,16 @@ bool System::IsEventVisible(const Particle& particle, const float3& pos) const
 	if (!teamHandler.IsValidAllyTeam(gu->myAllyTeam))
 		return false;
 
-	return IsPosInLos(pos, gu->myAllyTeam) || IsPosInLos(pos + particle.velocity, gu->myAllyTeam);
+	if (losHandler->GetGlobalLOS(gu->myAllyTeam))
+		return true;
+
+	if (!IsPosInLos(pos, gu->myAllyTeam) && !IsPosInLos(pos + particle.velocity, gu->myAllyTeam))
+		return false;
+
+	if (!modInfo.requireSonarUnderWaterForProjectiles || pos.y > CGround::GetWaterLevel(pos.x, pos.z))
+		return true;
+
+	return losHandler->sonar.InSight(pos, gu->myAllyTeam);
 }
 
 void System::QueueEvent(const Particle& particle, const float3& pos, EventType type)
