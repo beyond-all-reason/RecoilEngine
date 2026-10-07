@@ -230,9 +230,13 @@ void CSMFGroundDrawer::DrawDeferredPass(const DrawPass::e& drawPass, bool alphaT
 	GL::GeometryBuffer::LoadViewport();
 
 	{
+		SCOPED_GL_DEBUGGROUP("Draw::World::Terrain::Deferred");
 		geomBuffer.Bind();
 		geomBuffer.SetDepthRange(1.0f, 0.0f);
-		geomBuffer.Clear();
+		{
+			SCOPED_GL_DEBUGGROUP("Draw::World::Terrain::Deferred::Clear");
+			geomBuffer.Clear();
+		}
 
 		smfRenderStates[RENDER_STATE_SEL]->SetCurrentShader(this, DrawPass::TerrainDeferred);
 		smfRenderStates[RENDER_STATE_SEL]->Enable(this, DrawPass::TerrainDeferred);
@@ -278,6 +282,7 @@ void CSMFGroundDrawer::DrawForwardPass(const DrawPass::e& drawPass, bool alphaTe
 	if (!SelectRenderState(drawPass)->CanDrawForward(this))
 		return;
 
+	SCOPED_GL_DEBUGGROUP("Draw::World::Terrain::Forward");
 	smfRenderStates[RENDER_STATE_SEL]->SetCurrentShader(this, drawPass);
 	smfRenderStates[RENDER_STATE_SEL]->Enable(this, drawPass);
 

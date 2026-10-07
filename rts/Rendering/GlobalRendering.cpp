@@ -12,6 +12,7 @@
 #include "Rendering/GL/StreamBuffer.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/GL/myGL.h"
+#include "Rendering/GL/glDebugGroupTimers.h"
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/glxHandler.h"
@@ -622,6 +623,7 @@ void CGlobalRendering::DestroyWindowAndContext() {
 	WindowManagerHelper::SetIconSurface(sdlWindow, nullptr);
 	SetWindowInputGrabbing(false);
 
+	GL::DebugGroupTimers::Kill(); // frees its GL queries, needs the context still current
 	SDL_GL_MakeCurrent(sdlWindow, nullptr);
 	SDL_DestroyWindow(sdlWindow);
 
@@ -714,6 +716,7 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 
 		FrameMark;
 		CollectTracyGpuZones();
+		GL::DebugGroupTimers::EndFrame();
 	}
 	// exclude debug from SCOPED_TIMER("Misc::SwapBuffers");
 	eventHandler.DbgTimingInfo(TIMING_SWAP, pre, spring_now());
