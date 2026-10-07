@@ -4,6 +4,7 @@
 #include <cctype>
 
 #include "LuaSyncedCtrl.h"
+#include "Sim/Units/CommandAI/SharedAttackBatch.h"
 
 #include "LuaInclude.h"
 #include "LuaConfig.h"
@@ -6136,6 +6137,7 @@ int LuaSyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 
 	inGiveOrder++;
 
+	SharedAttackBatch batch(commands);
 	int count = 0;
 	for (CUnit* unit: units) {
 		if (CanControlUnit(L, unit)) {
@@ -6196,6 +6198,7 @@ int LuaSyncedCtrl::GiveOrderArrayToUnitArray(lua_State* L)
 			}
 		}
 	} else {
+		SharedAttackBatch batch(commands);
 		for (CUnit* unit: units) {
 			if (CanControlUnit(L, unit)) {
 				for (const Command& c: commands) {
