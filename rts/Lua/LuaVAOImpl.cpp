@@ -224,11 +224,13 @@ void LuaVAOImpl::CheckDrawPrimitiveType(GLenum mode) const
 
 void LuaVAOImpl::CondInitVAO()
 {
+	// keep the VAO while every attached buffer still has the ID it was set up with; a buffer that is
+	// not attached does not force a rebuild (a buffer attached later has a new ID and does)
 	if (vao &&
-		(vertLuaVBO && vertLuaVBO->GetId() == oldVertVBOId) &&
-		(indxLuaVBO && indxLuaVBO->GetId() == oldIndxVBOId) &&
-		(instLuaVBO && instLuaVBO->GetId() == oldInstVBOId))
-		return; //already init and all VBOs still have same IDs
+		(!vertLuaVBO || vertLuaVBO->GetId() == oldVertVBOId) &&
+		(!indxLuaVBO || indxLuaVBO->GetId() == oldIndxVBOId) &&
+		(!instLuaVBO || instLuaVBO->GetId() == oldInstVBOId))
+		return;
 
 	vao = nullptr;
 	vao = std::make_unique<VAO>();
