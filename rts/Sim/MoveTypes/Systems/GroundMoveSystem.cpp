@@ -97,7 +97,7 @@ void GroundMoveSystem::Update() {
 
         Sim::registry.view<ChangeHeadingEvent>().each([](ChangeHeadingEvent& event){
             if (event.syncChecksumPending) {
-                Sync::Assert(event.syncChecksum, "ChangeHeading");
+                Sync::FoldDeferred(event.syncChecksum, "ChangeHeading");
                 event.syncChecksumPending = false;
             } else if (event.changed) {
                 CUnit* unit = unitHandler.GetUnit(event.unitId);
@@ -108,7 +108,7 @@ void GroundMoveSystem::Update() {
         });
         Sim::registry.view<ChangeMainHeadingEvent>().each([](ChangeMainHeadingEvent& event){
             if (event.syncChecksumPending) {
-                Sync::Assert(event.syncChecksum, "SetMainHeading");
+                Sync::FoldDeferred(event.syncChecksum, "SetMainHeading");
                 event.syncChecksumPending = false;
             } else if (event.changed) {
                 CUnit* unit = unitHandler.GetUnit(event.unitId);
@@ -134,6 +134,20 @@ void GroundMoveSystem::Update() {
 	}
 	{
         SCOPED_TIMER("Sim::Unit::MoveType::2::UpdatePreCollisions");
+
+        // perf-pr-stack master compat: master's serial order
+        if (CSyncChecker::MasterCompat()) {
+            Sim::registry.view<GroundMoveType>().each([](GroundMoveType& unitId){
+                CUnit* unit = unitHandler.GetUnit(unitId.value);
+                CGroundMoveType* moveType = static_cast<CGroundMoveType*>(unit->moveType);
+
+                moveType->ApplyResultantForces();
+                moveType->UpdatePreCollisions();
+
+                if (!unit->pos.IsInBounds() && (unit->speed.w > MAX_UNIT_SPEED))
+                    unit->ForcedKillUnit(nullptr, false, true, -CSolidObject::DAMAGE_KILLED_OOB);
+            });
+        } else {
         auto view = Sim::registry.view<GroundMoveType, PreCollisionsMtState>();
         auto& units = *view.storage<GroundMoveType>();
 
@@ -157,7 +171,7 @@ void GroundMoveSystem::Update() {
         view.each([](GroundMoveType& unitId, PreCollisionsMtState& state){
             CUnit* unit = unitHandler.GetUnit(unitId.value);
 
-            Sync::Assert(state.syncChecksum, "UpdatePreCollisions");
+            Sync::FoldDeferred(state.syncChecksum, "UpdatePreCollisions");
             if (!state.done)
                 static_cast<CGroundMoveType*>(unit->moveType)->UpdatePreCollisions();
 
@@ -166,6 +180,7 @@ void GroundMoveSystem::Update() {
             if (!unit->pos.IsInBounds() && (unit->speed.w > MAX_UNIT_SPEED))
                 unit->ForcedKillUnit(nullptr, false, true, -CSolidObject::DAMAGE_KILLED_OOB);
         });
+        }
 	}
     {
         SCOPED_TIMER("Sim::Unit::MoveType::3::CollisionDetection");
@@ -231,7 +246,7 @@ void GroundMoveSystem::Update() {
         view.each([](GroundMoveType& unitId, UnitMovedEvent& movedEvent){
             CUnit* unit = unitHandler.GetUnit(unitId.value);
 
-            Sync::Assert(movedEvent.syncChecksum, "GroundMoveType::Update");
+            Sync::FoldDeferred(movedEvent.syncChecksum, "GroundMoveType::Update");
             if (movedEvent.moved)
                 eventHandler.UnitMoved(unit);
 

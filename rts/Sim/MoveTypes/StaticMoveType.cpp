@@ -2,6 +2,9 @@
 
 
 #include "StaticMoveType.h"
+#include "Components/MoveTypesComponents.h"
+#include "Sim/Ecs/Registry.h"
+#include "System/Sync/SyncChecker.h"
 #include "Map/Ground.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
@@ -17,6 +20,11 @@ CStaticMoveType::CStaticMoveType(CUnit* unit) : AMoveType(unit) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	useWantedSpeed[false] = false;
 	useWantedSpeed[ true] = false;
+
+	// perf-pr-stack master compat: master keeps static units in GeneralMoveSystem's list, whose
+	// order is the aircraft update order once one of them is removed
+	if (unit != nullptr && CSyncChecker::MasterCompat())
+		Sim::registry.emplace_or_replace<MoveTypes::GeneralMoveType>(unit->entityReference, unit->id);
 }
 
 void CStaticMoveType::SlowUpdate()

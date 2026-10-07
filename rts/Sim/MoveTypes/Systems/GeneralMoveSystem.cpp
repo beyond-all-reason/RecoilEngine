@@ -58,7 +58,8 @@ void GeneralMoveSystem::Update() {
             MtUpdateState& state = mtUpdateStates[i];
 
             state.entity = units[i];
-            if (!(state.done = unit->moveType->CanUpdateMT()))
+            // perf-pr-stack master compat: no MT updates, master's order
+            if (!(state.done = !CSyncChecker::MasterCompat() && unit->moveType->CanUpdateMT()))
                 return;
 
             CSyncChecker::ResetThreadChecksum();
@@ -78,7 +79,7 @@ void GeneralMoveSystem::Update() {
 
             bool moved;
             if (state.done && state.entity == entity) {
-                Sync::Assert(state.syncChecksum, "GeneralMoveType::Update");
+                Sync::FoldDeferred(state.syncChecksum, "GeneralMoveType::Update");
                 moveType->CallDeferredScripts();
                 moved = state.moved;
             } else {

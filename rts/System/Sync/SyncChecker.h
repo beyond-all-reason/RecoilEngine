@@ -43,15 +43,26 @@ class CSyncChecker {
 		 * hashes into its own checksum instead of the running one. Reset it before a
 		 * work item, store it after, and Sync() the stored values in a fixed order.
 		 */
-		static void SetDeferred(bool b) { deferred = b; }
 		static bool IsDeferred() { return deferred; }
 #ifdef SYNCCHECK
+		static void SetDeferred(bool b);
 		static void ResetThreadChecksum();
 		static unsigned GetThreadChecksum();
+		static void ReplayDeferred(unsigned item);
 #else
+		static void SetDeferred(bool b) { deferred = b; }
 		static void ResetThreadChecksum() {}
 		static unsigned GetThreadChecksum() { return 0; }
+		static void ReplayDeferred(unsigned item) {}
 #endif
+
+		/**
+		 * perf-pr-stack test switch, never part of a PR: MoveType passes in master's order, and
+		 * deferred work items log their synced writes so the ordered fold can replay them, which
+		 * gives master's running checksum.
+		 */
+		static bool MasterCompat() { return masterCompat; }
+		static void SetMasterCompat(bool b) { masterCompat = b; }
 		#ifdef SYNC_HISTORY
 		static std::tuple<unsigned, unsigned, unsigned*> GetFrameHistory(unsigned rewindFrames);
 		static std::pair<unsigned, unsigned*> GetHistory() { return std::make_pair(nextHistoryIndex, logs.data()); };
@@ -71,6 +82,7 @@ class CSyncChecker {
 		static unsigned g_prevChecksum;
 
 		static inline bool deferred = false;
+		static inline bool masterCompat = false;
 
 		/**
 		 * @brief in synced code

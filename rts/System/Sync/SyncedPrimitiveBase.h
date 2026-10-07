@@ -75,6 +75,19 @@ namespace Sync {
 		Assert(&x, sizeof(T), msg);
 	}
 
+	/**
+	 * @brief Folds a deferred work item (see CSyncChecker::SetDeferred) into the running checksum.
+	 */
+	static inline void FoldDeferred(uint32_t item, const char* msg) {
+#ifdef SYNCCHECK
+		if (CSyncChecker::MasterCompat()) {
+			CSyncChecker::ReplayDeferred(item);
+			return;
+		}
+#endif
+		Assert(item, msg);
+	}
+
 }
 
 #  define ENTER_SYNCED_CODE() CSyncChecker::EnterSyncedCode()

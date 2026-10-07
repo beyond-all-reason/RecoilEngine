@@ -13,10 +13,11 @@
 #include "Sim/Misc/GlobalConstants.h"
 #include "System/SafeUtil.h"
 #include "System/Log/FramePrefixer.h"
+#include "System/Log/ILog.h"
+#include "System/Config/ConfigHandler.h"
+#include "System/Sync/SyncChecker.h"
 
-#ifdef SYNCCHECK
-	#include "System/Sync/SyncChecker.h"
-#endif
+CONFIG(bool, PrStackMasterCompat).defaultValue(false).description("perf-pr-stack TEST ONLY: master's MoveType order and checksums. Changes the simulation, so every player and replay must use the same value.");
 
 const char* const tracingSpeedFactor = "SpeedFactor";
 const char* const tracingWantedSpeedFactor = "WantedSpeedFactor";
@@ -91,6 +92,9 @@ void CGlobalSynced::LoadFromSetup(const CGameSetup* setup)
 {
 	noHelperAIs = setup->noHelperAIs;
 	useLuaGaia  = setup->useLuaGaia;
+
+	CSyncChecker::SetMasterCompat(configHandler->GetBool("PrStackMasterCompat"));
+	LOG("[perf-pr-stack] master compat mode %s", CSyncChecker::MasterCompat()? "ON": "off");
 
 	teamHandler.ResetState();
 	teamHandler.LoadFromSetup(setup);
