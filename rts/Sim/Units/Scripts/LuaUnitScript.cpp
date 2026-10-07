@@ -975,6 +975,8 @@ std::string CLuaUnitScript::GetScriptName(int functionId) const
 bool CLuaUnitScript::RawRunCallIn(int functionId, int inArgs, int outArgs)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// unit scripts are not thread safe, MT sections (e.g. in GroundMoveSystem) must never reach them
+	assert(!ThreadPool::IsInMultiThreadedSection());
 	CUnit* oldActiveUnit = activeUnit;
 	CUnitScript* oldActiveScript = activeScript;
 

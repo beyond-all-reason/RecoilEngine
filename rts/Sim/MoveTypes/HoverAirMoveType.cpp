@@ -89,12 +89,11 @@ static bool UnitIsBusy(const CCommandAI* cai) {
 
 static bool UnitHasLoadCmd(const CCommandAI* cai) {
 	const auto& que = cai->commandQue;
-	const auto& cmd = (que.empty())? Command(CMD_STOP): que.front();
 
 	// NOTE:
 	//   CMD_LOAD_ONTO is not tested here, HAMT is rarely a transport*ee*
 	//   and only transport*er*s can be given the CMD_LOAD_UNITS command
-	return (cmd.GetID() == CMD_LOAD_UNITS);
+	return (!que.empty() && que.front().GetID() == CMD_LOAD_UNITS);
 }
 
 static bool UnitIsBusy(const CUnit* u) { return (UnitIsBusy(u->commandAI)); }
@@ -993,8 +992,7 @@ bool CHoverAirMoveType::Update()
 		} break;
 	}
 
-	if (lastSpd == ZeroVector && owner->speed != ZeroVector) { owner->script->StartMoving(false); }
-	if (lastSpd != ZeroVector && owner->speed == ZeroVector) { owner->script->StopMoving(); }
+	UpdateMovingScript(lastSpd);
 
 	// Banking requires deltaSpeed.y = 0
 	deltaSpeed = owner->speed - lastSpd;
@@ -1005,6 +1003,12 @@ bool CHoverAirMoveType::Update()
 	UpdateBanking(aircraftState == AIRCRAFT_HOVERING || aircraftState == AIRCRAFT_LANDING);
 
 	return (HandleCollisions(collide && !owner->beingBuilt && (aircraftState != AIRCRAFT_TAKEOFF)));
+}
+
+bool CHoverAirMoveType::CanUpdateMT() const
+{
+	// ExecuteStop can switch to landing or hovering, circling and attacking with airStrafe use gsRNG
+	return (AAirMoveType::CanUpdateMT() && !wantToStop && (flyState == FLY_CRUISING || !airStrafe));
 }
 
 void CHoverAirMoveType::SlowUpdate()

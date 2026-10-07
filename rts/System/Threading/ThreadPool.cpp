@@ -17,6 +17,9 @@
 #include "System/Platform/CpuTopology.h"
 #include "System/Platform/Threading.h"
 #include "System/Threading/SpringThreading.h"
+#ifdef __MINGW32__
+	#include "System/Platform/Win/win32.h"
+#endif
 
 #ifdef   likely
 #undef   likely
@@ -79,7 +82,9 @@ static std::array<bool, ThreadPool::MAX_THREADS> exitFlags;
 static std::array<ThreadStats, ThreadPool::MAX_THREADS> threadStats[2];
 static spring::signal newTasksSignal[2];
 
+#ifndef __MINGW32__
 static _threadlocal int threadnum(0);
+#endif
 
 #ifndef UNITSYNC
 // if enabled, allows OpenGL calls from ThreadPool tasks
@@ -97,8 +102,16 @@ std::atomic_uint ITaskGroup::lastId(0);
 
 namespace ThreadPool {
 
+#ifdef __MINGW32__
+// MinGW emulates thread_local (~9 ns per access), the Win32 TLS API takes ~2 ns; this is
+// called per synced write and per quadfield query in MT sections. Unset slots read as 0.
+static DWORD GetThreadNumSlot() { static const DWORD slot = TlsAlloc(); return slot; }
+int GetThreadNum() { return static_cast<int>(reinterpret_cast<intptr_t>(TlsGetValue(GetThreadNumSlot()))); }
+static void SetThreadNum(const int idx) { TlsSetValue(GetThreadNumSlot(), reinterpret_cast<void*>(static_cast<intptr_t>(idx))); }
+#else
 int GetThreadNum() { return threadnum; }
 static void SetThreadNum(const int idx) { threadnum = idx; }
+#endif
 
 
 int IsInMultiThreadedSection() { return inMultiThreadedSection; }

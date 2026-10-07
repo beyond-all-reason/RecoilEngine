@@ -564,6 +564,8 @@ void CCobInstance::EndBurst(int weaponNum) { ZoneScoped; Call(COBFN_EndBurst + C
 int CCobInstance::RealCall(int functionId, std::array<int, 1 + MAX_COB_ARGS>& args, ThreadCallbackType cb, int cbParam, int* retCode)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// unit scripts are not thread safe, MT sections (e.g. in GroundMoveSystem) must never reach them
+	assert(!ThreadPool::IsInMultiThreadedSection());
 	int ret = -1;
 
 	if (size_t(functionId) >= cobFile->scriptNames.size()) {

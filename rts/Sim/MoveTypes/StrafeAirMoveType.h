@@ -28,6 +28,7 @@ public:
 
 	bool Update() override;
 	void SlowUpdate() override;
+	bool CanUpdateMT() const override;
 
 	bool SetMemberValue(unsigned int memberHash, void* memberValue) override;
 
