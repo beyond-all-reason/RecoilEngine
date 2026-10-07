@@ -40,7 +40,8 @@ public:
 	bool Empty() const { return updateList.empty(); }
 
 	void Trim(size_t newLessThanOrEqualSize);
-	void Resize(size_t newSize) { updateList.resize(newSize); SetNeedUpdateAll(); }
+	// added elements are flagged, the others keep their state
+	void Resize(size_t newSize) { changed |= (newSize > updateList.size()); updateList.resize(newSize, TypedTrue); }
 	void Reserve(size_t reservedSize) { updateList.reserve(reservedSize); }
 	void Clear() { *this = std::move(UpdateList()); }
 
