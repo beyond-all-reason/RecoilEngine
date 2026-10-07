@@ -46,7 +46,8 @@ public:
 	void DrawGroundFlashes();
 
 	void DrawShadowOpaque();
-	void DrawShadowTransparent();
+	// returns whether anything was written to the shadow color buffer
+	bool DrawShadowTransparent();
 
 	void LoadWeaponTextures();
 	void UpdateTextures();
@@ -163,6 +164,7 @@ private:
 	float reflMinRadius = 0.0f; // alpha particles smaller than this skip the water reflection pass
 	bool reuseWaterPasses = true;
 	bool threadedFill = true;
+	float shadowMinPixels = 0.0f; // model-less particles smaller than this many pixels cast no transparent shadow
 
 	FBO perlinFB;
 
@@ -191,6 +193,12 @@ private:
 	std::vector<SortableParticle> sortScratch;
 	/// alpha particles that opt out of sorting, drawn after the sorted ones
 	std::vector<CProjectile*> unsortedParticles;
+
+	/// model-less particles casting transparent shadows this frame; collected
+	/// per worker thread while the draw flags are computed (UpdateDrawFlags),
+	/// so the shadow pass does not need its own scan of all projectiles
+	std::vector<std::vector<CProjectile*>> shadowParticleBuckets;
+	std::vector<CProjectile*> shadowParticles;
 
 	/// per-chunk scratch buffers for the multithreaded alpha-pass geometry
 	/// fill; only their CPU-side arrays are ever used (no GL objects). Grown

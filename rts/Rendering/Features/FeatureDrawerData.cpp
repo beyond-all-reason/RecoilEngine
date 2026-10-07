@@ -104,6 +104,9 @@ void CFeatureDrawerData::Update()
 		for (size_t k = 0; k < unsortedObjects.size(); ++k)
 			updateBody(k);
 	}
+
+	for (auto& mr : modelRenderers)
+		mr.UpdateDrawBins();
 }
 
 bool CFeatureDrawerData::IsAlpha(const CFeature* co) const
