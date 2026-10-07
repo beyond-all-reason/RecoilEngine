@@ -670,14 +670,23 @@ void CUnit::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	ASSERT_SYNCED(pos);
+}
 
-	UpdatePhysicalState(0.1f);
+unsigned int CUnit::UpdateState()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const unsigned int prevState = physicalState;
+
+	// no events here, CUnitHandler::UpdateUnits sends them in unit order
+	CSolidObject::UpdatePhysicalState(0.1f);
 	UpdatePosErrorParams(true, false);
 
+	const unsigned int eventBits = (prevState ^ physicalState) & (PSTATE_BIT_INAIR | PSTATE_BIT_INWATER | PSTATE_BIT_UNDERWATER);
+
 	if (beingBuilt)
-		return;
+		return eventBits;
 	if (isDead)
-		return;
+		return eventBits;
 
 	recentDamage *= 0.9f;
 	flankingBonusMobility += flankingBonusMobilityAdd;
@@ -688,10 +697,11 @@ void CUnit::Update()
 			++(w->reloadStatus);
 		}
 
-		return;
+		return eventBits;
 	}
 
 	restTime += 1;
+	return eventBits;
 }
 
 void CUnit::UpdateWeaponVectors()
@@ -1844,11 +1854,18 @@ void CUnit::DependentDied(CObject* o)
 void CUnit::UpdatePhysicalState(float eps)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const bool inAir      = IsInAir();
-	const bool inWater    = IsInWater();
-	const bool underWater = IsUnderWater();
+	const unsigned int prevState = physicalState;
 
 	CSolidObject::UpdatePhysicalState(eps);
+	SendPhysicalStateEvents(prevState);
+}
+
+void CUnit::SendPhysicalStateEvents(unsigned int prevState)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const bool inAir      = ((prevState & PSTATE_BIT_INAIR     ) != 0);
+	const bool inWater    = ((prevState & PSTATE_BIT_INWATER   ) != 0);
+	const bool underWater = ((prevState & PSTATE_BIT_UNDERWATER) != 0);
 
 	if (IsInAir() != inAir) {
 		if (IsInAir()) {

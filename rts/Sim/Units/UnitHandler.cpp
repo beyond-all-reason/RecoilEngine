@@ -394,39 +394,59 @@ void CUnitHandler::UpdateUnits()
 {
 	SCOPED_TIMER("Sim::Unit::Update");
 
-	size_t activeUnitCount = activeUnits.size();
+	// units created during the loop get their first update next frame
+	const size_t activeUnitCount = activeUnits.size();
 	for (size_t i = 0; i < activeUnitCount; ++i) {
 		CUnit* unit = activeUnits[i];
 
 		unit->SanityCheck();
 		unit->Update();
-		unit->moveType->UpdateCollisionMap();
+
+		// rate checked here, most units are not due and their move type stays untouched
+		if (((gs->frameNum + unit->id) % modInfo.unitQuadPositionUpdateRate) == 0)
+			unit->moveType->UpdateCollisionMap();
+
 		// unsynced; done on-demand when drawing unit
 		// unit->UpdateLocalModel();
 		unit->SanityCheck();
 
 		assert(activeUnits[i] == unit);
 	}
+
+	static std::array<unsigned int, MAX_UNITS> physicalStateChanges;
+
+	{
+		SCOPED_TIMER("Sim::Unit::UpdateWeaponVectors");
+
+		// one parallel pass for both, so the worker threads are woken only once
+		/* Unit list is ordered by creation, so stuff like windgens (which cost very
+		 * little to process) tends to accumulate at the front and would all be taken
+		 * by the same thread with large chunks. Cap chunk size to even things out */
+		for_mt_chunk(0, activeUnits.size(), [this, activeUnitCount](const int idx) {
+			CUnit* unit = activeUnits[idx];
+
+			if (static_cast<size_t>(idx) < activeUnitCount)
+				physicalStateChanges[idx] = unit->UpdateState();
+
+			unit->UpdateWeaponVectors();
+		}, 1, 64);
+	}
+
+	// sent in unit order; flipping the changed bits back gives the previous state
+	for (size_t i = 0; i < activeUnitCount; ++i) {
+		if (physicalStateChanges[i] == 0)
+			continue;
+
+		CUnit* unit = activeUnits[i];
+		unit->SendPhysicalStateEvents(unit->physicalState ^ physicalStateChanges[i]);
+	}
 }
 
 void CUnitHandler::UpdateUnitWeapons()
 {
-	{
-		SCOPED_TIMER("Sim::Unit::UpdateWeaponVectors");
-
-		/* Unit list is ordered by creation, so stuff like windgens (which cost very
-		 * little to process) tends to accumulate at the front and would all be taken
-		 * by the same thread with large chunks. Cap chunk size to even things out */
-		for_mt_chunk(0, activeUnits.size(), [&](const int idx) {
-			auto unit = activeUnits[idx];
-			unit->UpdateWeaponVectors();
-		}, 1, 64);
-	}
-	{
-		SCOPED_TIMER("Sim::Unit::Weapon");
-		for (activeUpdateUnit = 0; activeUpdateUnit < activeUnits.size(); ++activeUpdateUnit) {
-			activeUnits[activeUpdateUnit]->UpdateWeapons();
-		}
+	SCOPED_TIMER("Sim::Unit::Weapon");
+	for (activeUpdateUnit = 0; activeUpdateUnit < activeUnits.size(); ++activeUpdateUnit) {
+		activeUnits[activeUpdateUnit]->UpdateWeapons();
 	}
 }
 
