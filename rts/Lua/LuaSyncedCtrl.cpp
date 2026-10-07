@@ -7914,15 +7914,15 @@ static int ParseStringVector(lua_State* L, int index, vector<string>& strvec)
 ******************************************************************************/
 
 /***
- * Register global properties of a custom command ID from synced gadget initialization.
- * Properties last for the game, including save/load, and do not require a per-unit
- * command description. Repeating an identical registration is allowed; changing
- * properties is an error. Omitted properties use their defaults, not previous values.
- * Unknown properties and invalid types are errors. Native command IDs are reserved.
- * The gadget still implements command execution through CommandFallback.
+ * Register global properties of a custom command ID. This works off
+ * a numerical ID and not a per-unit command description, so the game
+ * has to make sure this doesn't result in inconsistency. This also
+ * only affects native parts of behaviour, implementing the command
+ * fully is still up to the game.
+ * Registrations are removed when the registering synced Lua environment is destroyed.
  *
  * @function Spring.RegisterCommand
- * @param cmdID integer Custom command ID greater than 1000 (lower IDs are reserved).
+ * @param cmdID integer Custom command ID, at least Engine.minCustomCmdID.
  * @param properties table Command properties.
  * @param properties.movement boolean? (Default: false) Include in movement lookahead,
  * including attack completion and aircraft decisions, like native movement commands.
@@ -7933,28 +7933,32 @@ int LuaSyncedCtrl::RegisterCommand(lua_State* L)
 		return 0;
 
 	const lua_Number cmdID = luaL_checknumber(L, 1);
-	if (cmdID <= 1000 || cmdID > INT_MAX || std::floor(cmdID) != cmdID)
-		return luaL_error(L, "RegisterCommand requires an integer command ID greater than 1000");
+	if (!(cmdID >= MIN_CUSTOM_CMD_ID && static_cast<double>(cmdID) <= INT_MAX))
+		return luaL_error(L, "RegisterCommand requires an integer command ID from %d to %d", MIN_CUSTOM_CMD_ID, INT_MAX);
+
+	const int id = luaL_checkinteger(L, 1);
 
 	luaL_checktype(L, 2, LUA_TTABLE);
 	CustomCommandProperties properties;
-	lua_pushnil(L);
-	while (lua_next(L, 2) != 0) {
-		if (lua_type(L, -2) != LUA_TSTRING || lua_objlen(L, -2) != sizeof("movement") - 1 || std::strcmp(lua_tostring(L, -2), "movement") != 0)
-			return luaL_error(L, "RegisterCommand: unknown property (expected movement)");
-		if (lua_type(L, -1) != LUA_TBOOLEAN)
-			return luaL_error(L, "RegisterCommand: movement must be a boolean");
-		properties.movement = lua_toboolean(L, -1);
-		lua_pop(L, 1);
+	for (lua_pushnil(L); lua_next(L, 2) != 0; lua_pop(L, 1)) {
+		if (!lua_israwstring(L, LUA_TABLE_KEY_INDEX))
+			continue;
+
+		const char* key = lua_tostring(L, LUA_TABLE_KEY_INDEX);
+
+		if (lua_isboolean(L, LUA_TABLE_VALUE_INDEX)) {
+			switch (hashString(key)) {
+				case hashString("movement"): { properties.movement = lua_toboolean(L, LUA_TABLE_VALUE_INDEX); } break;
+			}
+
+			continue;
+		}
 	}
 
-	const int id = static_cast<int>(cmdID);
-	const auto it = gs->customCommands.find(id);
-	if (it != gs->customCommands.end()) {
-		if (it->second != properties)
-			return luaL_error(L, "RegisterCommand: properties of command %d are immutable", id);
-		return 0;
-	}
+	if (gs->customCommands.find(id) != gs->customCommands.end())
+		return luaL_error(L, "RegisterCommand: command %d is already registered", id);
+
+	properties.luaHandleName = CLuaHandle::GetHandle(L)->GetName();
 	gs->customCommands[id] = properties;
 	return 0;
 }

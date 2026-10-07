@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "System/creg/creg_cond.h"
 #include "System/GlobalRNG.h"
 #include "System/UnorderedMap.hpp"
@@ -13,8 +15,7 @@ struct CustomCommandProperties
 	CR_DECLARE_STRUCT(CustomCommandProperties)
 
 	bool movement = false;
-
-	bool operator==(const CustomCommandProperties&) const = default;
+	std::string luaHandleName; // either "LuaRules" or "LuaGaia"
 };
 
 class CGameSetup;
@@ -140,7 +141,7 @@ public:
 	*/
 	bool useLuaGaia = true;
 
-	// Immutable properties of registered custom command IDs, shared by all units.
+	// Properties shared by all units for the lifetime of the registering Lua handle.
 	spring::unordered_map<int, CustomCommandProperties> customCommands;
 };
 

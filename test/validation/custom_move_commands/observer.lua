@@ -21,32 +21,44 @@ if gadgetHandler:IsSyncedCode() then
 			assert(attackMode, "Command registration unavailable")
 			return
 		end
-		for _, id in ipairs({ CMD.STOP, CMD.WAIT, CMD.MOVE, -1, 1000, customID + 0.5, 2 ^ 40, math.huge, 0 / 0 }) do
+		for _, id in ipairs({
+			CMD.STOP,
+			CMD.WAIT,
+			CMD.MOVE,
+			-1,
+			Engine.minCustomCmdID - 1,
+			2 ^ 31,
+			2 ^ 40,
+			math.huge,
+			0 / 0,
+		}) do
 			local ok, err = pcall(Spring.RegisterCommand, id, { movement = true })
 			assert(not ok, "Accepted invalid command ID: " .. tostring(id) .. ": " .. tostring(err))
 		end
 		local function rejects(id, properties)
 			assert(not pcall(Spring.RegisterCommand, id, properties), "Accepted invalid registration")
 		end
+		assert(Engine.minCustomCmdID == 1001)
+		Spring.RegisterCommand(Engine.minCustomCmdID, {})
+		-- Largest float-representable command ID below INT_MAX.
+		Spring.RegisterCommand(2147483520, {})
 		local defaultsID = customID + 2
 		Spring.RegisterCommand(defaultsID, {})
-		Spring.RegisterCommand(defaultsID, { movement = false })
+		rejects(defaultsID, { movement = false })
 		rejects(defaultsID, { movement = true })
-		-- Rejected mutations must leave the original registration intact.
-		Spring.RegisterCommand(defaultsID, {})
-		for _, properties in ipairs({
-			{ movement = 1 },
-			{ movement = "true" },
-			{ moving = true },
-			{ ["movement\0extra"] = true },
-			{ [1] = true },
-			false,
-		}) do
-			rejects(customID, properties)
-		end
+		-- Even identical registrations are rejected.
+		rejects(defaultsID, {})
+		rejects(customID, false)
 		rejects(customID, nil)
+		-- Match Lua 5.1 integer conversion, including truncation.
+		Spring.RegisterCommand(customID + 3.5, {})
+		rejects(customID + 3, {})
 		if config.mode == "default" then
 			Spring.RegisterCommand(customID, {})
+		elseif config.mode == "wrong_type" then
+			Spring.RegisterCommand(customID, { movement = "true", unknown = true, [1] = true })
+		elseif config.mode == "ignored_entries" then
+			Spring.RegisterCommand(customID, { movement = true, unknown = true, number = 1, text = "x", [1] = true })
 		elseif config.mode ~= "native" and config.mode ~= "unregistered" then
 			Spring.RegisterCommand(customID, { movement = true })
 		end
@@ -54,7 +66,7 @@ if gadgetHandler:IsSyncedCode() then
 			rejects(customID, { movement = false })
 			rejects(customID, {})
 			rejects(customID, { movement = true, unknown = true })
-			Spring.RegisterCommand(customID, { movement = true })
+			rejects(customID, { movement = true })
 		end
 	end
 	function gadget:GameFrame(frame)
@@ -111,7 +123,7 @@ if gadgetHandler:IsSyncedCode() then
 		elseif frame == 11 then
 			if config.mode == "duplicate" then
 				assert(not pcall(Spring.RegisterCommand, customID, {}))
-				Spring.RegisterCommand(customID, { movement = true })
+				assert(not pcall(Spring.RegisterCommand, customID, { movement = true }))
 			end
 			if config.mode == "removed" then
 				Spring.RemoveUnitCmdDesc(units[1], descriptionIndex)

@@ -38,7 +38,8 @@ CR_BIND(CGlobalSynced, )
 
 CR_BIND(CustomCommandProperties, ())
 CR_REG_METADATA(CustomCommandProperties, (
-	CR_MEMBER(movement)
+	CR_MEMBER(movement),
+	CR_MEMBER(luaHandleName)
 ))
 
 CR_REG_METADATA(CGlobalSynced, (
@@ -105,4 +106,3 @@ void CGlobalSynced::LoadFromSetup(const CGameSetup* setup)
 	skirmishAIHandler.ResetState();
 	skirmishAIHandler.LoadFromSetup(*setup);
 }
-
