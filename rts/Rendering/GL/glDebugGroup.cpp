@@ -3,6 +3,7 @@
 #include <cstring>
 
 #include "myGL.h"
+#include "glDebugGroupTimers.h"
 #include "System/Misc/TracyGpu.h"
 
 GL::DebugGroupImpl::DebugGroupImpl(uint32_t id, const char* messsage)
@@ -13,6 +14,28 @@ GL::DebugGroupImpl::DebugGroupImpl(uint32_t id, const char* messsage)
 GL::DebugGroupImpl::~DebugGroupImpl()
 {
 	glPopDebugGroup();
+}
+
+namespace GL {
+	// A debug group that is also GPU-timed (GLDebugGroupTimers config), see glDebugGroupTimers.h
+	class DebugGroupTimedImpl final : public DebugGroup {
+	public:
+		DebugGroupTimedImpl(uint32_t id, const char* message, bool glGroup)
+			: glGroup(glGroup)
+		{
+			DebugGroupTimers::Begin(message);
+			if (glGroup)
+				glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, id, -1, message);
+		}
+		~DebugGroupTimedImpl() override final
+		{
+			if (glGroup)
+				glPopDebugGroup();
+			DebugGroupTimers::End();
+		}
+	private:
+		bool glGroup;
+	};
 }
 
 #ifdef TRACY_ENABLE
@@ -42,6 +65,9 @@ namespace GL {
 
 std::unique_ptr<GL::DebugGroup> GL::DebugGroup::GetScoped(uint32_t id, const char* messsage)
 {
+	if (DebugGroupTimers::Enabled())
+		return std::make_unique<GL::DebugGroupTimedImpl>(id, messsage, GLAD_GL_KHR_debug);
+
 #ifdef TRACY_ENABLE
 	if (TracyGpu::ready)
 		return std::make_unique<GL::DebugGroupTracyImpl>(id, messsage, GLAD_GL_KHR_debug);
