@@ -4339,7 +4339,10 @@ void CLuaHandle::CollectGarbage(bool forced)
 	// the debt sets how much work a call does, the runtime bound only caps
 	// it so a burst of allocations is spread over several calls; when
 	// catching up calls come more often so each may take less time
-	const float gcSpeedFactor = std::clamp(gs->speedFactor * (1 - gs->PreSimFrame()) * (1 - gs->paused), 1.0f, 50.0f);
+	// Relax the speed reduction between 25% and 50% of the shared Lua limit.
+	// Allocation debt still controls how much work the collector requests.
+	const float gcRawSpeedFactor = std::clamp(gs->speedFactor * (1 - gs->PreSimFrame()) * (1 - gs->paused), 1.0f, 50.0f);
+	const float gcSpeedFactor = mix(gcRawSpeedFactor, 1.0f, smoothstep(0.25f, 0.5f, spring_lua_alloc_get_mem_load()));
 	const float gcLoopRunTime = std::clamp(gcRunTimeMult / gcSpeedFactor, gcCtrl.minLoopRunTime, gcCtrl.maxLoopRunTime);
 
 	const spring_time startTime = spring_gettime();
