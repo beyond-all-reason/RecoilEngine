@@ -419,6 +419,9 @@ void CUnitHandler::UpdateUnits()
 		SCOPED_TIMER("Sim::Unit::UpdateWeaponVectors");
 
 		// one parallel pass for both, so the worker threads are woken only once
+		/* Unit list is ordered by creation, so stuff like windgens (which cost very
+		 * little to process) tends to accumulate at the front and would all be taken
+		 * by the same thread with large chunks. Cap chunk size to even things out */
 		for_mt_chunk(0, activeUnits.size(), [this, activeUnitCount](const int idx) {
 			CUnit* unit = activeUnits[idx];
 
@@ -426,7 +429,7 @@ void CUnitHandler::UpdateUnits()
 				physicalStateChanges[idx] = unit->UpdateState();
 
 			unit->UpdateWeaponVectors();
-		});
+		}, 1, 64);
 	}
 
 	// sent in unit order; flipping the changed bits back gives the previous state
