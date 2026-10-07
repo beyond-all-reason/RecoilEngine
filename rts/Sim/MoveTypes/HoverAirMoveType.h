@@ -18,6 +18,7 @@ public:
 	// MoveType interface
 	bool Update() override;
 	void SlowUpdate() override;
+	bool CanUpdateMT() const override;
 
 	void StartMoving(float3 pos, float goalRadius) override;
 	void StartMoving(float3 pos, float goalRadius, float speed) override;
