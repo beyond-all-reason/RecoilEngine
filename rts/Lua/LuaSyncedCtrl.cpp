@@ -7932,11 +7932,9 @@ int LuaSyncedCtrl::RegisterCommand(lua_State* L)
 	if (!FullCtrl(L))
 		return 0;
 
-	const lua_Number cmdID = luaL_checknumber(L, 1);
-	if (!(cmdID >= MIN_CUSTOM_CMD_ID && static_cast<double>(cmdID) <= INT_MAX))
-		return luaL_error(L, "RegisterCommand requires an integer command ID from %d to %d", MIN_CUSTOM_CMD_ID, INT_MAX);
-
 	const int id = luaL_checkinteger(L, 1);
+	if (id < MIN_CUSTOM_CMD_ID)
+		return luaL_error(L, "RegisterCommand requires a command ID of at least %d", MIN_CUSTOM_CMD_ID);
 
 	luaL_checktype(L, 2, LUA_TTABLE);
 	CustomCommandProperties properties;

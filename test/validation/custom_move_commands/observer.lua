@@ -27,10 +27,10 @@ if gadgetHandler:IsSyncedCode() then
 			CMD.MOVE,
 			-1,
 			Engine.minCustomCmdID - 1,
-			2 ^ 31,
-			2 ^ 40,
-			math.huge,
-			0 / 0,
+			Engine.minCustomCmdID - 0.5,
+			"not a command ID",
+			true,
+			{},
 		}) do
 			local ok, err = pcall(Spring.RegisterCommand, id, { movement = true })
 			assert(not ok, "Accepted invalid command ID: " .. tostring(id) .. ": " .. tostring(err))
