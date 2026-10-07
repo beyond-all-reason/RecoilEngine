@@ -181,23 +181,47 @@ static float3 screenViewTrans;
 
 std::vector<LuaOpenGL::OcclusionQuery*> LuaOpenGL::occlusionQueries;
 
-#ifdef TRACY_ENABLE
 // gl.PushDebugGroup / gl.PopDebugGroup also open and close a Tracy GPU zone of
 // the group's name, so Lua draw passes annotated for graphics debuggers get
 // their GPU time in Tracy captures too. One scope per open group. Raw pointers
 // on purpose: a scope's destructor issues a GL query, which must not happen
 // from static destruction after the GL context is gone (a group left open by a
 // Lua error would do exactly that), so the leftovers are freed in Free() only.
+// The helpers exist in every build and are no-ops without TRACY_ENABLE.
+#ifdef TRACY_ENABLE
 static std::vector<tracy::GpuCtxScope*> luaDebugGroupGpuZones;
+#endif
+
+static void PushLuaDebugGroupGpuZone(const std::string& message)
+{
+#ifdef TRACY_ENABLE
+	luaDebugGroupGpuZones.push_back(new tracy::GpuCtxScope(
+		static_cast<uint32_t>(__LINE__), __FILE__, strlen(__FILE__), __func__, strlen(__func__),
+		message.c_str(), message.size(), TracyGpu::ready
+	));
+#endif
+}
+
+static void PopLuaDebugGroupGpuZone()
+{
+#ifdef TRACY_ENABLE
+	if (luaDebugGroupGpuZones.empty())
+		return;
+
+	delete luaDebugGroupGpuZones.back();
+	luaDebugGroupGpuZones.pop_back();
+#endif
+}
 
 static void ClearLuaDebugGroupGpuZones()
 {
+#ifdef TRACY_ENABLE
 	for (tracy::GpuCtxScope* zone: luaDebugGroupGpuZones) {
 		delete zone;
 	}
 	luaDebugGroupGpuZones.clear();
-}
 #endif
+}
 
 
 
@@ -298,9 +322,7 @@ void LuaOpenGL::Free()
 
 	occlusionQueries.clear();
 
-#ifdef TRACY_ENABLE
 	ClearLuaDebugGroupGpuZones();
-#endif
 }
 
 /******************************************************************************/
@@ -7492,13 +7514,7 @@ int LuaOpenGL::PushDebugGroup(lua_State* L) {
 	}
 
 	glPushDebugGroup((sourceIsThirdParty ? GL_DEBUG_SOURCE_THIRD_PARTY : GL_DEBUG_SOURCE_APPLICATION), id, -1, message.c_str());
-
-#ifdef TRACY_ENABLE
-	luaDebugGroupGpuZones.push_back(new tracy::GpuCtxScope(
-		static_cast<uint32_t>(__LINE__), __FILE__, strlen(__FILE__), __func__, strlen(__func__),
-		message.c_str(), message.size(), TracyGpu::ready
-	));
-#endif
+	PushLuaDebugGroupGpuZone(message);
 	return 0;
 }
 
@@ -7512,13 +7528,7 @@ int LuaOpenGL::PushDebugGroup(lua_State* L) {
  */
 int LuaOpenGL::PopDebugGroup(lua_State* L) {
 	glPopDebugGroup();
-
-#ifdef TRACY_ENABLE
-	if (!luaDebugGroupGpuZones.empty()) {
-		delete luaDebugGroupGpuZones.back();
-		luaDebugGroupGpuZones.pop_back();
-	}
-#endif
+	PopLuaDebugGroupGpuZone();
 	return 0;
 }
 
