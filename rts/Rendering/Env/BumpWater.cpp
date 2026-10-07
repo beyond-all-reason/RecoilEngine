@@ -53,6 +53,7 @@ CONFIG(bool, BumpWaterEndlessOcean).defaultValue(true).description("Sets whether
 CONFIG(bool, BumpWaterDynamicWaves).defaultValue(true);
 CONFIG(bool, BumpWaterUseUniforms).deprecated(true);
 CONFIG(bool, BumpWaterOcclusionQuery).deprecated(true);
+CONFIG(bool, BumpWaterSkipInvisible).defaultValue(true).description("Skip the water screen copies, reflection pass and surface draw on frames where no water is visible (occlusion query from the previous frame).");
 
 #define LOG_SECTION_BUMP_WATER "BumpWater"
 LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_BUMP_WATER)
@@ -216,6 +217,13 @@ void CBumpWater::InitResources(bool loadShader)
 	endlessOcean = (configHandler->GetBool("BumpWaterEndlessOcean")) && waterRendering->hasWaterPlane
 	               && ((readMap->HasVisibleWater()) || (waterRendering->forceRendering));
 	dynWaves     = (configHandler->GetBool("BumpWaterDynamicWaves")) && (waterRendering->numTiles > 1);
+	skipInvisible = configHandler->GetBool("BumpWaterSkipInvisible");
+	visQueryTarget = GLAD_GL_ARB_occlusion_query2 ? GL_ANY_SAMPLES_PASSED : GL_SAMPLES_PASSED;
+	if (skipInvisible) {
+		glGenQueries(2, visQueries);
+		visQueryIssued[0] = visQueryIssued[1] = false;
+		waterVisible = true;
+	}
 
 	shoreWaves = shoreWaves && (FBO::IsSupported());
 	dynWaves   = dynWaves && (FBO::IsSupported() && GLAD_GL_ARB_imaging);
@@ -533,6 +541,11 @@ void CBumpWater::FreeResources()
 
 	tileOffsets.clear();
 	shaderHandler->ReleaseProgramObjects("[BumpWater]");
+
+	if (visQueries[0] != 0) {
+		glDeleteQueries(2, visQueries);
+		visQueries[0] = visQueries[1] = 0;
+	}
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -563,6 +576,12 @@ void CBumpWater::UpdateWater(const CGame* game)
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
+
+	if (skipInvisible) {
+		ReadVisibilityQuery();
+		if (!waterVisible)
+			return;
+	}
 
 	glPushAttrib(GL_FOG_BIT);
 	if (refraction > 1) DrawRefraction(game);
@@ -894,23 +913,83 @@ void CBumpWater::UpdateDynWaves(const bool initialize)
 ///  DRAW FUNCTIONS
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void CBumpWater::ReadVisibilityQuery()
+{
+	// the camera moved a lot since the last probe: the old answer says nothing about this view
+	const float3 camPos = camera->GetPos();
+	const bool camJumped = (camPos.SqDistance(lastCamPos) > Square(1000.0f));
+	lastCamPos = camPos;
+
+	const int prevIdx = visQueryIdx ^ 1;
+	if (visQueryIssued[prevIdx]) {
+		GLuint available = 0;
+		glGetQueryObjectuiv(visQueries[prevIdx], GL_QUERY_RESULT_AVAILABLE, &available);
+		if (available != 0) {
+			GLuint samples = 0;
+			glGetQueryObjectuiv(visQueries[prevIdx], GL_QUERY_RESULT, &samples);
+			waterVisible = (samples != 0);
+			visQueryIssued[prevIdx] = false;
+		}
+	}
+	waterVisible |= camJumped;
+}
+
+void CBumpWater::DrawVisibilityProbe()
+{
+	SCOPED_GL_DEBUGGROUP("Draw::Water::VisibilityProbe");
+
+	// same mesh, depth test and polygon offset as the real surface draw, but no color or depth writes
+	glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+	glDepthMask(GL_FALSE);
+	glEnable(GL_POLYGON_OFFSET_FILL);
+	glPolygonOffset(0.0f, 2.0f);
+
+	auto& sh = rb.GetShader();
+	sh.Enable();
+	glBeginQuery(visQueryTarget, visQueries[visQueryIdx]);
+	rb.DrawArrays(endlessOcean ? GL_TRIANGLE_STRIP : GL_TRIANGLES);
+	glEndQuery(visQueryTarget);
+	sh.Disable();
+
+	glDisable(GL_POLYGON_OFFSET_FILL);
+	glDepthMask(GL_TRUE);
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+
+	visQueryIssued[visQueryIdx] = true;
+	visQueryIdx ^= 1;
+}
+
 void CBumpWater::Draw()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 
-	if (refraction == 1) {
-		// _SCREENCOPY_ REFRACT TEXTURE
-		glBindTexture(target, refractTexture);
-		glCopyTexSubImage2D(target, 0, 0, 0, globalRendering->viewPosX, globalRendering->viewPosY, globalRendering->viewSizeX, globalRendering->viewSizeY);
+	if (skipInvisible) {
+		// UpdateWater() already read the query this frame; it runs right before Draw()
+		if (!waterVisible) {
+			DrawVisibilityProbe();
+			return;
+		}
+		// the real draw doubles as next frame's probe
+		glBeginQuery(visQueryTarget, visQueries[visQueryIdx]);
 	}
 
-	if (depthCopy) {
-		// _SCREENCOPY_ DEPTH TEXTURE
-		glBindTexture(target, depthTexture);
-		glCopyTexSubImage2D(target, 0, 0, 0, globalRendering->viewPosX, globalRendering->viewPosY, globalRendering->viewSizeX, globalRendering->viewSizeY);
+	{
+		SCOPED_GL_DEBUGGROUP("Draw::Water::ScreenCopy");
+		if (refraction == 1) {
+			// _SCREENCOPY_ REFRACT TEXTURE
+			glBindTexture(target, refractTexture);
+			glCopyTexSubImage2D(target, 0, 0, 0, globalRendering->viewPosX, globalRendering->viewPosY, globalRendering->viewSizeX, globalRendering->viewSizeY);
+		}
+
+		if (depthCopy) {
+			// _SCREENCOPY_ DEPTH TEXTURE
+			glBindTexture(target, depthTexture);
+			glCopyTexSubImage2D(target, 0, 0, 0, globalRendering->viewPosX, globalRendering->viewPosY, globalRendering->viewSizeX, globalRendering->viewSizeY);
+		}
 	}
+	SCOPED_GL_DEBUGGROUP("Draw::Water::Surface");
 
 	glDisable(GL_ALPHA_TEST);
 
@@ -973,6 +1052,12 @@ void CBumpWater::Draw()
 
 	if (refraction > 0)
 		glEnable(GL_BLEND);
+
+	if (skipInvisible) {
+		glEndQuery(visQueryTarget);
+		visQueryIssued[visQueryIdx] = true;
+		visQueryIdx ^= 1;
+	}
 }
 
 void CBumpWater::DrawRefraction(const CGame* game)
