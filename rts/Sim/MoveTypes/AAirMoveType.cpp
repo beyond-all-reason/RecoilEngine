@@ -234,11 +234,11 @@ void AAirMoveType::UpdateLanding()
 	const float radius = std::max(owner->radius, 10.0f);
 	const float radiusSq = radius * radius;
 	const float distSq = reservedLandingPos.SqDistance(pos);
-
+	const float distSq2D = reservedLandingPos.SqDistance2D(pos);
 
 	const float localAltitude = pos.y - amtGetGroundHeightFuncs[owner->unitDef->canSubmerge](owner->pos.x, owner->pos.z);
 
-	if (distSq <= radiusSq || (distSq < landRadiusSq && localAltitude < wantedHeight + radius)) {
+	if (distSq <= radiusSq || (distSq2D < landRadiusSq && localAltitude < wantedHeight + radius)) {
 		SetState(AIRCRAFT_LANDED);
 		owner->SetVelocityAndSpeed(UpVector * owner->speed);
 	}
