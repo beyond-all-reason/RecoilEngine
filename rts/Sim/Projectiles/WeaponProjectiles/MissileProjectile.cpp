@@ -162,26 +162,12 @@ void CMissileProjectile::Update()
 
 				if (dir.y <= 0.0f) {
 					// missile has reached apex, smoothly transition
-					// to targetDir (can still overshoot when target
-					// is too close or height difference too large)
+					// to targetDir without overshooting it
 					const float horDiff = (targetPos - pos).Length2D() + 0.01f;
 					const float verDiff = (targetPos.y - pos.y) + 0.01f;
-					const float dirDiff = math::fabs(targetDir.y - dir.y);
 					const float ratio = math::fabs(verDiff / horDiff);
 
-					// tilt missile up if
-					// 1. missile is pointing below target
-					// 2. AND missile height is below target
-					// This compensates for high wobble zero turnrate missiles aiming at high elevations
-					// Prevents these missiles from quickly turing directly downwards if wobble 
-					// causes them to undershoot their elevated target 
-					if (((targetDir.y - dir.y) > 0.0f) && ((targetPos.y - extraHeight - pos.y) > 0.0f)) {
-						dir.y += (dirDiff * ratio);
-					}
-					else {
-						dir.y -= (dirDiff * ratio);
-					}
-
+					dir.y = mix(dir.y, targetDir.y, std::min(ratio, 1.0f));
 				} else {
 					// missile is still ascending
 					
