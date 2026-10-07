@@ -646,7 +646,7 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 
 		}
 
-		spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(u)],
+		liveGhostsChanged |= spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(u)],
 			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
 	}
 	return addedOwnAllyTeam;
@@ -681,7 +681,7 @@ void CUnitDrawerData::UnitEnteredLos(const CUnit* unit, int allyTeam)
 	CUnit* u = const_cast<CUnit*>(unit); //cleanup
 
 	if (unit->leavesGhost)
-		spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)],
+		liveGhostsChanged |= spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)],
 			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
 
 	if (allyTeam != gu->myAllyTeam)
@@ -701,8 +701,10 @@ void CUnitDrawerData::UnitLeftLos(const CUnit* unit, int allyTeam)
 		auto& lgbs = savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)];
 		const bool alreadyGhosted = std::any_of(lgbs.begin(), lgbs.end(),
 			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
-		if (!alreadyGhosted)
+		if (!alreadyGhosted) {
 			lgbs.push_back({ u, u->paletteIndex, static_cast<uint8_t>(u->team) });
+			liveGhostsChanged = true;
+		}
 	}
 
 	if (allyTeam != gu->myAllyTeam)
@@ -717,6 +719,13 @@ void CUnitDrawerData::UpdateLiveGhostTransforms()
 	// Maintain one world-transform slot per live ghost building drawn for the local allyTeam.
 	// Ghosts are static, so each slot is filled once on first sight; entries not seen this sweep
 	// (units that regained LOS, died, or belong to a different allyTeam now) are freed.
+	// the slots only change with the ghost lists or the viewing allyTeam
+	if (!liveGhostsChanged && liveGhostsAllyTeam == gu->myAllyTeam)
+		return;
+
+	liveGhostsChanged = false;
+	liveGhostsAllyTeam = gu->myAllyTeam;
+
 	const int stamp = ++liveGhostSweepStamp;
 
 	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
