@@ -158,9 +158,12 @@ class LuaOpenGL {
 		struct OcclusionQuery {
 			unsigned int index; // into LuaOpenGL::occlusionQueries
 			unsigned int id;
+			unsigned int target; // GL_SAMPLES_PASSED, GL_TIME_ELAPSED, GL_TIMESTAMP, ...
 		};
 
 		static std::vector<OcclusionQuery*> occlusionQueries;
+
+		static OcclusionQuery* ParseQuery(lua_State* L, const char* caller);
 
 	private:
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);
@@ -341,7 +344,9 @@ class LuaOpenGL {
 		static int CreateQuery(lua_State* L);
 		static int DeleteQuery(lua_State* L);
 		static int RunQuery(lua_State* L);
+		static int QueryCounter(lua_State* L);
 		static int GetQuery(lua_State* L);
+		static int GetQueryDelta(lua_State* L);
 
 		static int GetGlobalTexNames(lua_State* L);
 		static int GetGlobalTexCoords(lua_State* L);
