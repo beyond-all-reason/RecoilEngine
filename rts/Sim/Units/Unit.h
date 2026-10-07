@@ -486,6 +486,8 @@ public:
 	bool activated = false;
 	// if the unit paid its upkeep at its last SlowUpdate while on
 	bool upkeepPaid = true;
+	// if the unit tried to pay its upkeep at its most recent SlowUpdate (it was on, not stunned and finished)
+	bool upkeepAttempted = false;
 	// prevent damage from hitting an already dead unit (causing multi wreck etc)
 	bool isDead = false;
 

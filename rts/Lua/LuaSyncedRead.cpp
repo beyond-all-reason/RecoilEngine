@@ -3838,6 +3838,7 @@ int LuaSyncedRead::GetUnitIsActive(lua_State* L)
  * @function Spring.GetUnitIsUpkeepPaid
  * @param unitID UnitID
  * @return boolean? upkeepPaid true for units without an upkeep
+ * @return boolean? attempted whether the unit tried to pay at its most recent slow update. False while it is off, stunned or being built, upkeepPaid then holds the result of its last attempt.
  */
 int LuaSyncedRead::GetUnitIsUpkeepPaid(lua_State* L)
 {
@@ -3846,7 +3847,8 @@ int LuaSyncedRead::GetUnitIsUpkeepPaid(lua_State* L)
 		return 0;
 
 	lua_pushboolean(L, unit->upkeepPaid);
-	return 1;
+	lua_pushboolean(L, unit->upkeepAttempted);
+	return 2;
 }
 
 
