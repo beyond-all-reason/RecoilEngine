@@ -78,6 +78,9 @@ struct LocalModel
 
 	void SetBoundariesNeedsRecalc()       { needsBoundariesRecalc = true; }
 	bool GetBoundariesNeedsRecalc() const { return needsBoundariesRecalc; }
+
+	void SetPrevTransformsStale() { prevTransformsStale = true; }
+	void SavePrevModelSpaceTransforms();
 private:
 	LocalModelPiece* CreateLocalModelPieces(const S3DModelPiece* mpParent);
 
@@ -95,4 +98,6 @@ private:
 	LuaObjectMaterialData luaMaterialData;
 
 	bool needsBoundariesRecalc = true;
+	// a piece was dirtied since the last SavePrevModelSpaceTransforms
+	bool prevTransformsStale = true;
 };
