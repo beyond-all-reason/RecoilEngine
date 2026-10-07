@@ -13,6 +13,8 @@
 #include <cmath>
 #include <limits>
 #include <vector>
+#include <memory>
+#include <cstring>
 #include <algorithm>
 #include <optional>
 #include <variant>
@@ -60,6 +62,7 @@
 #include "Rendering/Env/MapRendering.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/TexBind.h"
+#include "System/Misc/TracyGpu.h"
 #include "Rendering/Models/3DModelMisc.hpp"
 #include "Rendering/Models/3DModelPiece.hpp"
 #include "Rendering/Shaders/Shader.h"
@@ -178,6 +181,24 @@ static float3 screenViewTrans;
 
 std::vector<LuaOpenGL::OcclusionQuery*> LuaOpenGL::occlusionQueries;
 
+#ifdef TRACY_ENABLE
+// gl.PushDebugGroup / gl.PopDebugGroup also open and close a Tracy GPU zone of
+// the group's name, so Lua draw passes annotated for graphics debuggers get
+// their GPU time in Tracy captures too. One scope per open group. Raw pointers
+// on purpose: a scope's destructor issues a GL query, which must not happen
+// from static destruction after the GL context is gone (a group left open by a
+// Lua error would do exactly that), so the leftovers are freed in Free() only.
+static std::vector<tracy::GpuCtxScope*> luaDebugGroupGpuZones;
+
+static void ClearLuaDebugGroupGpuZones()
+{
+	for (tracy::GpuCtxScope* zone: luaDebugGroupGpuZones) {
+		delete zone;
+	}
+	luaDebugGroupGpuZones.clear();
+}
+#endif
+
 
 
 
@@ -272,9 +293,14 @@ void LuaOpenGL::Free()
 
 	for (const OcclusionQuery* q: occlusionQueries) {
 		glDeleteQueries(1, &q->id);
+		delete q;
 	}
 
 	occlusionQueries.clear();
+
+#ifdef TRACY_ENABLE
+	ClearLuaDebugGroupGpuZones();
+#endif
 }
 
 /******************************************************************************/
@@ -463,6 +489,10 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 		REGISTER_LUA_CFUNC(DeleteQuery);
 		REGISTER_LUA_CFUNC(RunQuery);
 		REGISTER_LUA_CFUNC(GetQuery);
+	}
+	if (GLAD_GL_ARB_timer_query) {
+		REGISTER_LUA_CFUNC(QueryCounter);
+		REGISTER_LUA_CFUNC(GetQueryDelta);
 	}
 
 	REGISTER_LUA_CFUNC(GetGlobalTexNames);
@@ -6701,24 +6731,64 @@ int LuaOpenGL::SaveImage(lua_State* L)
 
 /******************************************************************************/
 
+LuaOpenGL::OcclusionQuery* LuaOpenGL::ParseQuery(lua_State* L, const char* caller)
+{
+	if (!lua_islightuserdata(L, 1))
+		luaL_error(L, "%s expects a userdata query", caller);
+
+	OcclusionQuery* qry = static_cast<OcclusionQuery*>(lua_touserdata(L, 1));
+
+	if (qry == nullptr)
+		return nullptr;
+	// a deleted query's handle must not be dereferenced any further than this check
+	if (qry->index >= occlusionQueries.size() || occlusionQueries[qry->index] != qry)
+		return nullptr;
+
+	return qry;
+}
+
 /***
+ * Creates a GL query object.
+ *
+ * Timer targets (`GL.TIME_ELAPSED`, `GL.TIMESTAMP`) need `ARB_timer_query`; without it
+ * `nil` is returned. A `GL.TIMESTAMP` query is written with `gl.QueryCounter`, the other
+ * targets are measured over a function with `gl.RunQuery`.
+ *
  * @function gl.CreateQuery
- * @return any query
+ * @param target integer? (Default: `GL.SAMPLES_PASSED`) One of `GL.SAMPLES_PASSED`, `GL.ANY_SAMPLES_PASSED`, `GL.ANY_SAMPLES_PASSED_CONSERVATIVE`, `GL.PRIMITIVES_GENERATED`, `GL.TIME_ELAPSED`, `GL.TIMESTAMP`.
+ * @return any? query
  */
 int LuaOpenGL::CreateQuery(lua_State* L)
 {
+	const GLenum target = static_cast<GLenum>(luaL_optint(L, 1, GL_SAMPLES_PASSED));
+
+	switch (target) {
+		case GL_SAMPLES_PASSED:
+		case GL_ANY_SAMPLES_PASSED:
+		case GL_ANY_SAMPLES_PASSED_CONSERVATIVE:
+		case GL_PRIMITIVES_GENERATED:
+			break;
+		case GL_TIME_ELAPSED:
+		case GL_TIMESTAMP: {
+			if (!GLAD_GL_ARB_timer_query)
+				return 0;
+		} break;
+		default: {
+			luaL_error(L, "gl.CreateQuery: unsupported query target %d", static_cast<int>(target));
+		} break;
+	}
+
 	GLuint id;
 	glGenQueries(1, &id);
 
 	if (id == 0)
 		return 0;
 
-	OcclusionQuery* qry = static_cast<OcclusionQuery*>(lua_newuserdata(L, sizeof(OcclusionQuery)));
-
-	if (qry == nullptr)
-		return 0;
-
-	*qry = {static_cast<unsigned int>(occlusionQueries.size()), id};
+	// Engine-owned: the handle given to Lua is a light userdata, which Lua does not
+	// collect (a full userdata here would be freed by the GC as soon as it is not
+	// referenced, leaving this vector with dangling pointers). Freed by gl.DeleteQuery
+	// or Free().
+	OcclusionQuery* qry = new OcclusionQuery{static_cast<unsigned int>(occlusionQueries.size()), id, target};
 	occlusionQueries.push_back(qry);
 
 	lua_pushlightuserdata(L, reinterpret_cast<void*>(qry));
@@ -6734,14 +6804,9 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
 	if (lua_isnil(L, 1))
 		return 0;
 
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.DeleteQuery(q) expects a userdata query");
-
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
+	const OcclusionQuery* qry = ParseQuery(L, "gl.DeleteQuery(q)");
 
 	if (qry == nullptr)
-		return 0;
-	if (qry->index >= occlusionQueries.size())
 		return 0;
 
 	glDeleteQueries(1, &qry->id);
@@ -6749,12 +6814,23 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
 	occlusionQueries[qry->index] = occlusionQueries.back();
 	occlusionQueries[qry->index]->index = qry->index;
 	occlusionQueries.pop_back();
+	delete qry;
 	return 0;
 }
 
 /***
+ * Runs the query over the GL calls made by `func`.
+ *
+ * The query's target decides what is counted: samples that passed the depth test
+ * (`GL.SAMPLES_PASSED`, `GL.ANY_SAMPLES_PASSED*`), primitives emitted
+ * (`GL.PRIMITIVES_GENERATED`) or GPU nanoseconds spent (`GL.TIME_ELAPSED`).
+ * Queries of the same target cannot be nested, and `GL.TIMESTAMP` queries use
+ * `gl.QueryCounter` instead.
+ *
  * @function gl.RunQuery
  * @param query any
+ * @param func fun(...)
+ * @param ... any Arguments passed to `func`.
  */
 int LuaOpenGL::RunQuery(lua_State* L)
 {
@@ -6763,15 +6839,13 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	if (running)
 		luaL_error(L, "gl.RunQuery(q,f) can not be called recursively");
 
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.RunQuery(q,f) expects a userdata query");
-
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
+	const OcclusionQuery* qry = ParseQuery(L, "gl.RunQuery(q,f)");
 
 	if (qry == nullptr)
 		return 0;
-	if (qry->index >= occlusionQueries.size())
-		return 0;
+
+	if (qry->target == GL_TIMESTAMP)
+		luaL_error(L, "gl.RunQuery(q,f): GL.TIMESTAMP queries are recorded with gl.QueryCounter(q)");
 
 	if (!lua_isfunction(L, 2))
 		luaL_error(L, "gl.RunQuery(q,f) expects a function");
@@ -6779,9 +6853,9 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	const int args = lua_gettop(L); // number of arguments
 
 	running = true;
-	glBeginQuery(GL_SAMPLES_PASSED, qry->id);
+	glBeginQuery(qry->target, qry->id);
 	const int error = lua_pcall(L, (args - 2), 0, 0);
-	glEndQuery(GL_SAMPLES_PASSED);
+	glEndQuery(qry->target);
 	running = false;
 
 	if (error != 0) {
@@ -6793,26 +6867,127 @@ int LuaOpenGL::RunQuery(lua_State* L)
 }
 
 /***
- * @function gl.GetQuery
- * @param query any
- * @return integer count
+ * Records the GPU timestamp (nanoseconds) into a `GL.TIMESTAMP` query once the GPU
+ * reaches this point of the command stream. The difference between two timestamps is
+ * the GPU time spent between them; unlike `GL.TIME_ELAPSED` ranges these nest freely.
+ *
+ * May be unavailable and `nil` if the platform doesn't support `ARB_timer_query`.
+ *
+ * @function gl.QueryCounter
+ * @param query any A query created with `gl.CreateQuery(GL.TIMESTAMP)`.
  */
-int LuaOpenGL::GetQuery(lua_State* L)
+int LuaOpenGL::QueryCounter(lua_State* L)
 {
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.GetQuery(q) expects a userdata query");
-
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
+	const OcclusionQuery* qry = ParseQuery(L, "gl.QueryCounter(q)");
 
 	if (qry == nullptr)
 		return 0;
-	if (qry->index >= occlusionQueries.size())
+
+	if (qry->target != GL_TIMESTAMP)
+		luaL_error(L, "gl.QueryCounter(q) expects a GL.TIMESTAMP query");
+
+	glQueryCounter(qry->id, GL_TIMESTAMP);
+	return 0;
+}
+
+/***
+ * Reads the result of a query.
+ *
+ * Results become available only after the GPU has executed the queried commands,
+ * usually a frame or two later. With `blocking` the call stalls until then; without
+ * it `nil` is returned while the result is still pending, so queries from the previous
+ * frame can be read without a GPU sync.
+ *
+ * @function gl.GetQuery
+ * @param query any
+ * @param blocking boolean? (Default: `true`) Wait for the result.
+ * Note that a `GL.TIMESTAMP` value is a 64-bit nanosecond counter that Lua's single
+ * precision numbers cannot hold exactly; use `gl.GetQueryDelta` to measure between two.
+ *
+ * @return number? result Sample count, primitive count, or nanoseconds for timer queries; `nil` if not yet available and `blocking` is false.
+ */
+int LuaOpenGL::GetQuery(lua_State* L)
+{
+	const OcclusionQuery* qry = ParseQuery(L, "gl.GetQuery(q)");
+
+	if (qry == nullptr)
 		return 0;
 
-	GLuint count;
-	glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT, &count);
+	const bool blocking = luaL_optboolean(L, 2, true);
 
-	lua_pushnumber(L, count);
+	if (!blocking) {
+		GLint available = 0;
+		glGetQueryObjectiv(qry->id, GL_QUERY_RESULT_AVAILABLE, &available);
+
+		if (available == 0) {
+			lua_pushnil(L);
+			return 1;
+		}
+	}
+
+	if (GLAD_GL_ARB_timer_query) {
+		// 64 bits, timestamps and long elapsed times would overflow a GLuint
+		GLuint64 result = 0;
+		glGetQueryObjectui64v(qry->id, GL_QUERY_RESULT, &result);
+		lua_pushnumber(L, static_cast<lua_Number>(result));
+	} else {
+		GLuint result = 0;
+		glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT, &result);
+		lua_pushnumber(L, result);
+	}
+
+	return 1;
+}
+
+/***
+ * Returns the GPU nanoseconds between two `GL.TIMESTAMP` queries recorded with `gl.QueryCounter`.
+ *
+ * The subtraction happens on the 64-bit values, so the result stays exact where the raw
+ * timestamps would not survive the trip into Lua's single precision numbers.
+ *
+ * May be unavailable and `nil` if the platform doesn't support `ARB_timer_query`.
+ *
+ * @function gl.GetQueryDelta
+ * @param startQuery any
+ * @param endQuery any
+ * @param blocking boolean? (Default: `true`) Wait for both results.
+ * @return number? nanoseconds `nil` if a result is not yet available and `blocking` is false.
+ */
+int LuaOpenGL::GetQueryDelta(lua_State* L)
+{
+	if (!lua_islightuserdata(L, 1) || !lua_islightuserdata(L, 2))
+		luaL_error(L, "gl.GetQueryDelta(q0, q1) expects two userdata queries");
+
+	const OcclusionQuery* q0 = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
+	const OcclusionQuery* q1 = static_cast<const OcclusionQuery*>(lua_touserdata(L, 2));
+
+	if (q0 == nullptr || q1 == nullptr)
+		return 0;
+	if (q0->index >= occlusionQueries.size() || occlusionQueries[q0->index] != q0)
+		return 0;
+	if (q1->index >= occlusionQueries.size() || occlusionQueries[q1->index] != q1)
+		return 0;
+
+	const bool blocking = luaL_optboolean(L, 3, true);
+
+	if (!blocking) {
+		GLint available0 = 0;
+		GLint available1 = 0;
+		glGetQueryObjectiv(q0->id, GL_QUERY_RESULT_AVAILABLE, &available0);
+		glGetQueryObjectiv(q1->id, GL_QUERY_RESULT_AVAILABLE, &available1);
+
+		if (available0 == 0 || available1 == 0) {
+			lua_pushnil(L);
+			return 1;
+		}
+	}
+
+	GLuint64 t0 = 0;
+	GLuint64 t1 = 0;
+	glGetQueryObjectui64v(q0->id, GL_QUERY_RESULT, &t0);
+	glGetQueryObjectui64v(q1->id, GL_QUERY_RESULT, &t1);
+
+	lua_pushnumber(L, static_cast<lua_Number>(static_cast<int64_t>(t1 - t0)));
 	return 1;
 }
 
@@ -7317,6 +7492,13 @@ int LuaOpenGL::PushDebugGroup(lua_State* L) {
 	}
 
 	glPushDebugGroup((sourceIsThirdParty ? GL_DEBUG_SOURCE_THIRD_PARTY : GL_DEBUG_SOURCE_APPLICATION), id, -1, message.c_str());
+
+#ifdef TRACY_ENABLE
+	luaDebugGroupGpuZones.push_back(new tracy::GpuCtxScope(
+		static_cast<uint32_t>(__LINE__), __FILE__, strlen(__FILE__), __func__, strlen(__func__),
+		message.c_str(), message.size(), TracyGpu::ready
+	));
+#endif
 	return 0;
 }
 
@@ -7330,6 +7512,13 @@ int LuaOpenGL::PushDebugGroup(lua_State* L) {
  */
 int LuaOpenGL::PopDebugGroup(lua_State* L) {
 	glPopDebugGroup();
+
+#ifdef TRACY_ENABLE
+	if (!luaDebugGroupGpuZones.empty()) {
+		delete luaDebugGroupGpuZones.back();
+		luaDebugGroupGpuZones.pop_back();
+	}
+#endif
 	return 0;
 }
 

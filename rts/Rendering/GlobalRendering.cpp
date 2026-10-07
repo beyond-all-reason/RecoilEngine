@@ -42,6 +42,7 @@
 #include <SDL_rect.h>
 
 #include "System/Misc/TracyDefs.h"
+#include "System/Misc/TracyGpu.h"
 
 CONFIG(bool, DebugGL).defaultValue(false).description("Enables GL debug-context and output. (see GL_ARB_debug_output)");
 CONFIG(bool, DebugGLStacktraces).defaultValue(false).description("Create a stacktrace when an OpenGL error occurs");
@@ -662,6 +663,7 @@ void CGlobalRendering::PostInit() {
 	UniformConstants::GetInstance().Init();
 	ModelUniformData::Init();
 	glGenQueries(glTimerQueries.size(), glTimerQueries.data());
+	CreateTracyGpuContext();
 	RenderBuffer::InitStatic();
 	GL::shapes.Init();
 
@@ -711,10 +713,39 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 		#endif
 
 		FrameMark;
+		CollectTracyGpuZones();
 	}
 	// exclude debug from SCOPED_TIMER("Misc::SwapBuffers");
 	eventHandler.DbgTimingInfo(TIMING_SWAP, pre, spring_now());
 	globalRendering->lastSwapBuffersEnd = spring_now();
+}
+
+bool TracyGpu::ready = false;
+
+// Tracy GPU zones (System/Misc/TracyGpu.h) time GL work with GL_TIMESTAMP queries,
+// which need ARB_timer_query. One context per GL context, created once; zones
+// issued before this stay inactive (TracyGpu::ready).
+void CGlobalRendering::CreateTracyGpuContext() const
+{
+#ifdef TRACY_ENABLE
+	if (TracyGpu::ready || !GLAD_GL_ARB_timer_query)
+		return;
+
+	TracyGpuContext;
+	TracyGpuContextName("OpenGL", 6);
+	TracyGpu::ready = true;
+#endif
+}
+
+// reads back the finished GPU zone timestamps; once per frame, after the swap
+void CGlobalRendering::CollectTracyGpuZones() const
+{
+#ifdef TRACY_ENABLE
+	if (!TracyGpu::ready)
+		return;
+
+	TracyGpuCollect;
+#endif
 }
 
 void CGlobalRendering::SetGLTimeStamp(uint32_t queryIdx) const
