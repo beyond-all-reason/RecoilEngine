@@ -67,6 +67,7 @@
  * @field gameMutator string
  * @field gameDesc string
  * @field requireSonarUnderWater boolean
+ * @field sensorsRequireUpkeep boolean Units only get radar, sonar, seismic and jammer coverage while they pay their upkeep
  * @field transportAir integer
  * @field transportShip integer
  * @field transportHover integer
@@ -215,6 +216,7 @@ bool LuaConstGame::PushEntries(lua_State* L)
 		LuaPushNamedNumber(L, "fireAtKilled"   , modInfo.fireAtKilled);
 		LuaPushNamedNumber(L, "fireAtCrashing" , modInfo.fireAtCrashing);
 		LuaPushNamedNumber(L, "requireSonarUnderWater", modInfo.requireSonarUnderWater);
+		LuaPushNamedBool  (L, "sensorsRequireUpkeep", modInfo.sensorsRequireUpkeep);
 
 		LuaPushNamedBool  (L, "paralyzeOnMaxHealth", modInfo.paralyzeOnMaxHealth);
 		LuaPushNamedNumber(L, "paralyzeDeclineRate", modInfo.paralyzeDeclineRate);
