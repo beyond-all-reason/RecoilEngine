@@ -654,9 +654,9 @@ void ILosType::UpdateHeightMapSynced(SRectangle rect)
 	if (algoType == LOS_ALGO_CIRCLE)
 		return;
 
+	const int2 rectPos = {rect.x1 * SQUARE_SIZE, rect.y1 * SQUARE_SIZE};
 	const int hw = rect.GetWidth() * (SQUARE_SIZE / 2);
 	const int hh = rect.GetHeight() * (SQUARE_SIZE / 2);
-	const int2 rectPos = {rect.x1 * SQUARE_SIZE + hw, rect.y1 * SQUARE_SIZE + hh};
 
 	const auto UpdateSlot = [&](const size_t id) {
 		const int radius = boundsRadius[id];
