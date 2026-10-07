@@ -12,8 +12,10 @@
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Models/ModelRenderContainer.h"
+#include "Rendering/Models/ModelsMemStorage.h"
 #include "Rendering/DepthBufferCopy.h"
 #include "System/EventClient.h"
+#include "System/UnorderedMap.hpp"
 #include "System/UnorderedSet.hpp"
 
 class CSolidObject;
@@ -166,6 +168,36 @@ private:
 
 	/// projectiles with a model, binned by model type and textures
 	std::array<ModelRenderContainer<CProjectile>, MODELTYPE_CNT> modelRenderers;
+
+	/// projectiles with a model (weapon and piece projectiles) own one world-transform slot in the
+	/// transforms SSBO (filled in UpdateDrawFlags) and are drawn as static instances, one multidraw
+	/// per texture bin, by DrawOpaqueModelsInstanced; Lua-drawn projectiles and flying pieces keep
+	/// the legacy per-piece draws. The slots are pooled in chunks so the per-frame updates form a
+	/// few contiguous upload ranges instead of one per projectile.
+	struct ProjTransformSlots {
+		static constexpr uint32_t CHUNK_SIZE = 256;
+		std::vector<ScopedTransformMemAlloc> chunks;
+		std::vector<uint32_t> freeSlots;
+
+		uint32_t Acquire();
+		void Release(uint32_t slot) { freeSlots.push_back(slot); }
+		void Clear() { chunks.clear(); freeSlots.clear(); }
+		bool Valid(uint32_t slot) const { return chunks[slot / CHUNK_SIZE].Valid(); }
+		uint32_t Offset(uint32_t slot) const { return static_cast<uint32_t>(chunks[slot / CHUNK_SIZE].GetOffset()) + (slot % CHUNK_SIZE); }
+		template<typename T> void Update(uint32_t slot, T&& tf) { chunks[slot / CHUNK_SIZE].UpdateForced(slot % CHUNK_SIZE, std::forward<T>(tf)); }
+	} projTransformSlots;
+	spring::unordered_map<const CProjectile*, uint32_t> instancedProjSlots;
+
+	static bool IsInstancedModelProjectile(const CProjectile* p) {
+		return (p->model != nullptr && !p->luaDraw);
+	}
+	/// returns the number of projectiles that passed the draw test but were not drawn here (they need
+	/// the legacy path), or -1 when the GL4 drawer is not available and nothing was drawn
+	int DrawOpaqueModelsInstanced(uint8_t thisPassMask);
+	/// same for the shadow pass, through the GL4 shadow-gen program
+	int DrawShadowOpaqueModelsInstanced();
+	/// whether any model type has flying pieces to draw (legacy path only)
+	bool HaveFlyingPieces() const;
 
 public:
 	struct SortableParticle {
