@@ -429,6 +429,65 @@ static inline int poscall_nohook (lua_State *L, StkId firstResult) {
 
 
 /*
+** Recoil: true when luaD_precall would call a C function at L->top
+** without growing the CallInfo array or the stack and without a call
+** hook; its C branch is then exactly precall_C below.
+*/
+#define canprecallC(L) \
+  (!((L)->hookmask & LUA_MASKCALL) && (L)->ci != (L)->end_ci && \
+   (char *)(L)->stack_last - (char *)(L)->top > LUA_MINSTACK*(int)sizeof(TValue))
+
+
+/*
+** Recoil: luaD_precall's C-function branch for that case, followed by
+** its luaD_poscall. Returns the C function's result count; n < 0 means
+** it yielded (PCRYIELD: no poscall).
+*/
+static inline int precall_C (lua_State *L, StkId func, lua_CFunction f,
+                             int nresults) {
+  CallInfo *ci;
+  int n;
+  L->ci->savedpc = L->savedpc;
+  ci = ++L->ci;  /* now `enter' new function */
+  ci->func = func;
+  L->base = ci->base = func + 1;
+  ci->top = L->top + LUA_MINSTACK;
+  ci->nresults = nresults;
+  lua_unlock(L);
+  n = (*f)(L);  /* do the actual call */
+  lua_lock(L);
+  if (n >= 0) {
+    if (L->hookmask & LUA_MASKRET)
+      luaD_poscall(L, L->top - n);
+    else
+      poscall_nohook(L, L->top - n);
+  }
+  return n;
+}
+
+
+/*
+** Recoil: luaD_call with the C-function case done by precall_C (generic
+** `for' iterators such as next and ipairs); same C-stack checks, same
+** order of steps, same GC step afterwards.
+*/
+static void vm_call (lua_State *L, StkId func, int nResults) {
+  if (++L->nCcalls >= LUAI_MAXCCALLS) {
+    if (L->nCcalls == LUAI_MAXCCALLS)
+      luaG_runerror(L, "C stack overflow");
+    else if (L->nCcalls >= (LUAI_MAXCCALLS + (LUAI_MAXCCALLS>>3)))
+      luaD_throw(L, LUA_ERRERR);  /* error while handing stack error */
+  }
+  if (iscfunction(func) && canprecallC(L))
+    (void)precall_C(L, func, clvalue(func)->c.f, nResults);
+  else if (luaD_precall(L, func, nResults) == PCRLUA)  /* is a Lua function? */
+    luaV_execute(L, 1);  /* call it */
+  L->nCcalls--;
+  luaC_checkGC(L);
+}
+
+
+/*
 ** some macros for common tasks in `luaV_execute'
 */
 
@@ -865,23 +924,8 @@ void luaV_execute (lua_State *L, int nexeccalls) {
           }
           else if ((char *)L->stack_last - (char *)L->top >
                    LUA_MINSTACK*(int)sizeof(TValue)) {  /* C function */
-            CallInfo *ci;
-            int n;
-            L->ci->savedpc = pc;
-            ci = ++L->ci;  /* now `enter' new function */
-            ci->func = ra;
-            L->base = ci->base = ra + 1;
-            ci->top = L->top + LUA_MINSTACK;
-            ci->nresults = nresults;
-            lua_unlock(L);
-            n = (*ncl->c.f)(L);  /* do the actual call */
-            lua_lock(L);
-            if (n < 0)  /* yielding? */
-              return;
-            if (L->hookmask & LUA_MASKRET)
-              luaD_poscall(L, L->top - n);
-            else
-              poscall_nohook(L, L->top - n);
+            if (precall_C(L, ra, ncl->c.f, nresults) < 0)
+              return;  /* yield */
             /* adjust results */
             if (nresults >= 0) L->top = L->ci->top;
             base = L->base;
@@ -985,7 +1029,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         setobjs2s(L, cb+1, ra+1);
         setobjs2s(L, cb, ra);
         L->top = cb+3;  /* func. + 2 args (state and index) */
-        Protect(luaD_call(L, cb, GETARG_C(i)));
+        Protect(vm_call(L, cb, GETARG_C(i)));
         L->top = L->ci->top;
         cb = RA(i) + 3;  /* previous call may change the stack */
         if (!ttisnil(cb)) {  /* continue loop? */
