@@ -350,15 +350,22 @@ if (HAVE_GETEXECPATH)
 	add_definitions(-DHAVE_GETEXECPATH)
 endif()
 
-### Add Link-Time-Optimization flags, if supported (GCC >= 4.5) and enabled
+### Link-Time-Optimization (opt-in)
+# Uses CMake's IPO support: every target is compiled with -flto=auto -fno-fat-lto-objects (GCC >= 11)
+# and static libraries are archived with gcc-ar/gcc-ranlib, which (unlike plain ar/ranlib) index the
+# symbols of LTO objects. See the MINGW block below for the Windows cross-build specifics.
+# Note for PGO (-fprofile-use) on top of LTO: GCC 13 can ICE in ipa_merge_profiles during the IPA ICF
+# pass ("internal compiler error: in speculative_call_target_ref, at cgraph.h:1803"); add -fno-ipa-icf
+# to the compile and link flags in that case. Plain LTO does not need it.
 option(LTO "Link Time Optimizations (LTO)" FALSE)
 if    (LTO)
-	if    (NOT LTO_FLAGS)
-		message(WARNING "Tried to enable LTO, but compiler doesn't support it!")
-	endif (NOT LTO_FLAGS)
-	set(CMAKE_CXX_FLAGS           "${CMAKE_CXX_FLAGS}           ${LTO_FLAGS}")
-	set(CMAKE_EXE_LINKER_FLAGS    "${CMAKE_EXE_LINKER_FLAGS}    ${LTO_FLAGS}")
-	set(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${LTO_FLAGS}")
+	include(CheckIPOSupported)
+	check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT LTO_UNSUPPORTED_REASON LANGUAGES C CXX)
+	if    (LTO_SUPPORTED)
+		set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+	else  (LTO_SUPPORTED)
+		message(WARNING "Tried to enable LTO, but it is not supported: ${LTO_UNSUPPORTED_REASON}")
+	endif (LTO_SUPPORTED)
 endif (LTO)
 
 
@@ -674,7 +681,20 @@ add_subdirectory(rts/lib)
 
 # Fix for MinGW assembler limitations with large object files
 if(MINGW)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wa,-mbig-obj")
+	if(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
+		# With LTO the compile step only writes GCC's IR, and BFD does not hand pe-bigobj IR objects to
+		# the LTO plugin ("plugin needed to handle lto object"). Keep the IR objects in the regular
+		# format and apply big-obj where the machine code is generated: the LTRANS step of the link.
+		# --allow-multiple-definition: with LTO, mingw ld (GCC 13, binutils 2.41) reports multiple
+		# definitions of the identical inline nowide::basic_fstream destructor thunks emitted by
+		# several TUs (e.g. DumpState.cpp and LuaUnsyncedCtrl.cpp; "symbol from plugin",
+		# .gnu.linkonce.t sections keyed by different thunk names). Without LTO they are merged.
+		foreach(_linkType EXE SHARED MODULE)
+			set(CMAKE_${_linkType}_LINKER_FLAGS "${CMAKE_${_linkType}_LINKER_FLAGS} -Wa,-mbig-obj -Wl,--allow-multiple-definition")
+		endforeach()
+	else()
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wa,-mbig-obj")
+	endif()
 endif()
 
 if    (NOT "${AI_TYPES}" STREQUAL "NONE")
