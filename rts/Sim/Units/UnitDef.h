@@ -335,6 +335,9 @@ public:
 	float agileAccRate;   ///< elmos/frame^2, 0 derives it from maxAcc
 	float cruiseDistance; ///< elmos, 0 derives it from the turn radius
 	float agileAltitude;  ///< elmos above ground in the agile regime, 0 uses cruiseAltitude
+	float cruiseEntryAngle;     ///< degrees the nose may be off the goal at the handover to cruise, 0 for the default
+	float cruiseEntrySpeed;     ///< share of agileSpeed needed for it, 0 for the default
+	float cruiseEntryTurnBoost; ///< agileTurnRate multiplier on the way to a cruise leg, 0 for the default
 
 	float loadingRadius;							///< for transports
 	float unloadSpread;

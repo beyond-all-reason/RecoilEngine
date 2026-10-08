@@ -6280,6 +6280,9 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 		LuaPushNamedNumber(L, "agileAccRate",   sAMT->agileAccRate);
 		LuaPushNamedNumber(L, "cruiseDistance", sAMT->GetCruiseDistance());
 		LuaPushNamedNumber(L, "agileAltitude",  sAMT->GetAgileHeight());
+		LuaPushNamedNumber(L, "cruiseEntryAngle",     sAMT->GetCruiseEntryAngle());
+		LuaPushNamedNumber(L, "cruiseEntrySpeed",     sAMT->GetCruiseEntrySpeed());
+		LuaPushNamedNumber(L, "cruiseEntryTurnBoost", sAMT->GetCruiseEntryTurnBoost());
 
 		return 1;
 	}

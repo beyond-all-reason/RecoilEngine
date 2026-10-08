@@ -861,6 +861,9 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * @field agileAccRate number? Acceleration and deceleration limit of the agile regime, in elmos per frame squared. Zero restores the default (`maxAcc`).
  * @field agileAltitude number? Altitude flown in the agile regime, in elmos above ground. Zero uses the cruise altitude; never above it.
  * @field cruiseDistance number? Goals nearer than this many elmos are flown entirely in the agile regime. Zero derives it from the turn radius (one turn diameter).
+ * @field cruiseEntryAngle number? How far off the goal, in degrees, the nose may still point when the agile regime hands over to cruise flight. Zero for the default (30).
+ * @field cruiseEntrySpeed number? The share of `agileSpeed` the aircraft must have reached for that. Zero for the default (0.6).
+ * @field cruiseEntryTurnBoost number? Multiplies `agileTurnRate` while the aircraft is on its way to a leg it will fly in cruise. Zero for the default (3).
  */
 
 /***
@@ -904,6 +907,9 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * | "agileAccRate"
  * | "cruiseDistance"
  * | "agileAltitude"
+ * | "cruiseEntryAngle"
+ * | "cruiseEntrySpeed"
+ * | "cruiseEntryTurnBoost"
  * @param value number
  * @return integer numAssignedValues
  */
