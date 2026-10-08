@@ -699,27 +699,62 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         dojump(L, pc, GETARG_sBx(i));
         continue;
       }
+      /*
+      ** Recoil: EQ/LT/LE decide the cases that cannot involve metamethods
+      ** inline, with the same expressions as luaV_equalval/luaV_lessthan/
+      ** lessequal (different types are never equal; nil, booleans, numbers,
+      ** light userdata and the pointer-compared types; number ordering).
+      ** Everything else calls the generic functions as before.
+      */
       case OP_EQ: {
         TValue *rb = RKB(i);
         TValue *rc = RKC(i);
-        Protect(
-          if (equalobj(L, rb, rc) == GETARG_A(i))
-            dojump(L, pc, GETARG_sBx(*pc));
-        )
+        int res;
+        if (ttype(rb) != ttype(rc))
+          res = 0;
+        else {
+          switch (ttype(rb)) {
+            case LUA_TNIL: res = 1; break;
+            case LUA_TNUMBER: res = luai_numeq(nvalue(rb), nvalue(rc)); break;
+            case LUA_TBOOLEAN: res = bvalue(rb) == bvalue(rc); break;
+            case LUA_TLIGHTUSERDATA: res = pvalue(rb) == pvalue(rc); break;
+            case LUA_TUSERDATA:
+            case LUA_TTABLE: {
+              if (gcvalue(rb) == gcvalue(rc)) { res = 1; break; }
+              Protect(res = luaV_equalval(L, rb, rc));  /* may try __eq */
+              break;
+            }
+            default: res = gcvalue(rb) == gcvalue(rc); break;
+          }
+        }
+        if (res == GETARG_A(i))
+          dojump(L, pc, GETARG_sBx(*pc));
         pc++;
         continue;
       }
       case OP_LT: {
-        Protect(
-          if (luaV_lessthan(L, RKB(i), RKC(i)) == GETARG_A(i))
+        TValue *rb = RKB(i);
+        TValue *rc = RKC(i);
+        if (ttisnumber(rb) && ttisnumber(rc)) {
+          if (luai_numlt(nvalue(rb), nvalue(rc)) == GETARG_A(i))
+            dojump(L, pc, GETARG_sBx(*pc));
+        }
+        else Protect(
+          if (luaV_lessthan(L, rb, rc) == GETARG_A(i))
             dojump(L, pc, GETARG_sBx(*pc));
         )
         pc++;
         continue;
       }
       case OP_LE: {
-        Protect(
-          if (lessequal(L, RKB(i), RKC(i)) == GETARG_A(i))
+        TValue *rb = RKB(i);
+        TValue *rc = RKC(i);
+        if (ttisnumber(rb) && ttisnumber(rc)) {
+          if (luai_numle(nvalue(rb), nvalue(rc)) == GETARG_A(i))
+            dojump(L, pc, GETARG_sBx(*pc));
+        }
+        else Protect(
+          if (lessequal(L, rb, rc) == GETARG_A(i))
             dojump(L, pc, GETARG_sBx(*pc));
         )
         pc++;
