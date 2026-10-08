@@ -128,9 +128,13 @@ static void callTM (lua_State *L, const TValue *f, const TValue *p1,
 }
 
 
-void luaV_gettable (lua_State *L, const TValue *t, TValue *key, StkId val) {
-  int loop;
-  for (loop = 0; loop < MAXTAGLOOP; loop++) {
+/*
+** the `gettable' loop, starting at iteration `loop' (luaV_gettable starts
+** at 0; luaV_gettable_tm continues at 1 after the VM did iteration 0)
+*/
+static void gettable_loop (lua_State *L, const TValue *t, TValue *key,
+                           StkId val, int loop) {
+  for (; loop < MAXTAGLOOP; loop++) {
     const TValue *tm;
     if (ttistable(t)) {  /* `t' is a table? */
       Table *h = hvalue(t);
@@ -148,9 +152,29 @@ void luaV_gettable (lua_State *L, const TValue *t, TValue *key, StkId val) {
       callTMres(L, val, tm, t, key);
       return;
     }
-    t = tm;  /* else repeat with `tm' */ 
+    t = tm;  /* else repeat with `tm' */
   }
   luaG_runerror(L, "loop in gettable");
+}
+
+
+void luaV_gettable (lua_State *L, const TValue *t, TValue *key, StkId val) {
+  gettable_loop(L, t, key, val, 0);
+}
+
+
+/*
+** Recoil: rest of luaV_gettable's first iteration for a table `t' whose
+** primitive get returned nil and whose metatable has the __index entry
+** `tm' (as found by fasttm); used by the VM's inline fast paths.
+*/
+static void luaV_gettable_tm (lua_State *L, const TValue *t, TValue *key,
+                              StkId val, const TValue *tm) {
+  if (ttisfunction(tm)) {
+    callTMres(L, val, tm, t, key);
+    return;
+  }
+  gettable_loop(L, tm, key, val, 1);  /* else repeat with `tm' */
 }
 
 
@@ -473,23 +497,64 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         setobj2s(L, ra, cl->upvals[b]->v);
         continue;
       }
+      /*
+      ** Recoil: GETGLOBAL/GETTABLE/SELF/SETGLOBAL/SETTABLE do the first
+      ** iteration of luaV_gettable/luaV_settable inline when the indexed
+      ** object is a table (same lookup, same fasttm calls in the same
+      ** order); metamethods, new keys and non-tables take the generic path.
+      */
       case OP_GETGLOBAL: {
-        TValue g;
         TValue *rb = KBx(i);
-        sethvalue(L, &g, cl->env);
+        Table *h = cl->env;
+        const TValue *res, *tm;
         lua_assert(ttisstring(rb));
-        Protect(luaV_gettable(L, &g, rb, ra));
+        res = luaH_getstr_inl(h, rawtsvalue(rb));
+        if (!ttisnil(res) || (tm = fasttm(L, h->metatable, TM_INDEX)) == NULL) {
+          setobj2s(L, ra, res);
+        }
+        else {
+          TValue g;
+          sethvalue(L, &g, h);
+          Protect(luaV_gettable_tm(L, &g, rb, ra, tm));
+        }
         continue;
       }
       case OP_GETTABLE: {
-        Protect(luaV_gettable(L, RB(i), RKC(i), ra));
+        TValue *rb = RB(i);
+        TValue *rc = RKC(i);
+        if (ttistable(rb)) {
+          Table *h = hvalue(rb);
+          const TValue *res = luaH_get_inl(h, rc);
+          const TValue *tm;
+          if (!ttisnil(res) || (tm = fasttm(L, h->metatable, TM_INDEX)) == NULL) {
+            setobj2s(L, ra, res);
+          }
+          else Protect(luaV_gettable_tm(L, rb, rc, ra, tm));
+        }
+        else Protect(luaV_gettable(L, rb, rc, ra));
         continue;
       }
       case OP_SETGLOBAL: {
-        TValue g;
-        sethvalue(L, &g, cl->env);
-        lua_assert(ttisstring(KBx(i)));
-        Protect(luaV_settable(L, &g, KBx(i), ra));
+        TValue *rb = KBx(i);
+        Table *h = cl->env;
+        TValue *slot;
+        lua_assert(ttisstring(rb));
+        slot = lua_cast(TValue *, luaH_getstr_inl(h, rawtsvalue(rb)));
+        if (slot != luaO_nilobject) {  /* existing key: luaH_set's result */
+          const TValue *tm;
+          h->flags = 0;  /* as luaH_set */
+          if (!ttisnil(slot) || (tm = fasttm(L, h->metatable, TM_NEWINDEX)) == NULL) {
+            setobj2t(L, slot, ra);
+            h->flags = 0;
+            luaC_barriert(L, h, ra);
+            continue;
+          }
+        }
+        {
+          TValue g;
+          sethvalue(L, &g, h);
+          Protect(luaV_settable(L, &g, rb, ra));
+        }
         continue;
       }
       case OP_SETUPVAL: {
@@ -499,7 +564,23 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         continue;
       }
       case OP_SETTABLE: {
-        Protect(luaV_settable(L, ra, RKB(i), RKC(i)));
+        TValue *rb = RKB(i);
+        TValue *rc = RKC(i);
+        if (ttistable(ra)) {
+          Table *h = hvalue(ra);
+          TValue *slot = lua_cast(TValue *, luaH_get_inl(h, rb));
+          if (slot != luaO_nilobject) {  /* existing key: luaH_set's result */
+            const TValue *tm;
+            h->flags = 0;  /* as luaH_set */
+            if (!ttisnil(slot) || (tm = fasttm(L, h->metatable, TM_NEWINDEX)) == NULL) {
+              setobj2t(L, slot, rc);
+              h->flags = 0;
+              luaC_barriert(L, h, rc);
+              continue;
+            }
+          }
+        }
+        Protect(luaV_settable(L, ra, rb, rc));
         continue;
       }
       case OP_NEWTABLE: {
@@ -511,8 +592,18 @@ void luaV_execute (lua_State *L, int nexeccalls) {
       }
       case OP_SELF: {
         StkId rb = RB(i);
+        TValue *rc = RKC(i);
         setobjs2s(L, ra+1, rb);
-        Protect(luaV_gettable(L, rb, RKC(i), ra));
+        if (ttistable(rb)) {
+          Table *h = hvalue(rb);
+          const TValue *res = luaH_get_inl(h, rc);
+          const TValue *tm;
+          if (!ttisnil(res) || (tm = fasttm(L, h->metatable, TM_INDEX)) == NULL) {
+            setobj2s(L, ra, res);
+          }
+          else Protect(luaV_gettable_tm(L, rb, rc, ra, tm));
+        }
+        else Protect(luaV_gettable(L, rb, rc, ra));
         continue;
       }
       case OP_ADD: {
