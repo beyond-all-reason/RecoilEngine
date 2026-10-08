@@ -17,6 +17,7 @@
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/CommandAI/CommandAI.h"
+#include "System/EventHandler.h"
 #include "System/SpringMath.h"
 #include "System/SpringHash.h"
 
@@ -140,6 +141,7 @@ void CStrafeAirMoveType::SetFlightRegime(int regime)
 		return;
 
 	flightRegime = regime;
+	eventHandler.UnitFlightRegimeChanged(owner, regime == REGIME_AGILE);
 }
 
 

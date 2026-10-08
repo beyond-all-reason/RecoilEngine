@@ -53,7 +53,7 @@ public:
 	float GetAgileGoalRadius() const;
 	/// altitude flown in the agile regime
 	float GetAgileHeight() const;
-	/// the only place the regime changes
+	/// the only place the regime changes, so that Lua hears about every change
 	void SetFlightRegime(int regime);
 
 	void SetAgileSpeed(float speed);
