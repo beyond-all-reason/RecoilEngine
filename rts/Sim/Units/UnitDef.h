@@ -339,6 +339,9 @@ public:
 	float cruiseEntryAngle;     ///< degrees the nose may be off the goal at the handover to cruise, 0 for the default
 	float cruiseEntrySpeed;     ///< share of agileSpeed needed for it, 0 for the default
 	float cruiseEntryTurnBoost; ///< agileTurnRate multiplier on the way to a cruise leg, 0 for the default
+	float agileHoverBob;  ///< elmos an agile aircraft bobs up and down on the point it holds on, 0 for none
+	float agileHoverSway; ///< elmos it sways to its left and right there, 0 for none
+	float agileHoverTilt; ///< how far it leans against the gusts meanwhile, 1 is what gravity dictates
 
 	float loadingRadius;							///< for transports
 	float unloadSpread;
