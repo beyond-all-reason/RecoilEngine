@@ -134,7 +134,7 @@ void luaV_gettable (lua_State *L, const TValue *t, TValue *key, StkId val) {
     const TValue *tm;
     if (ttistable(t)) {  /* `t' is a table? */
       Table *h = hvalue(t);
-      const TValue *res = luaH_get(h, key); /* do a primitive get */
+      const TValue *res = luaH_get_inl(h, key); /* do a primitive get */
       if (!ttisnil(res) ||  /* result is no nil? */
           (tm = fasttm(L, h->metatable, TM_INDEX)) == NULL) { /* or no TM? */
         setobj2s(L, val, res);
@@ -154,6 +154,21 @@ void luaV_gettable (lua_State *L, const TValue *t, TValue *key, StkId val) {
 }
 
 
+/*
+** Recoil: luaH_set with the inline lookup. luaH_set clears the flags and
+** returns the existing slot, or inserts the key; the insertion (and its
+** checks) is left to luaH_set itself, which repeats the (pure) lookup.
+*/
+static inline TValue *luaH_set_inl (lua_State *L, Table *h, const TValue *key) {
+  const TValue *p = luaH_get_inl(h, key);
+  if (p != luaO_nilobject) {
+    h->flags = 0;
+    return lua_cast(TValue *, p);
+  }
+  return luaH_set(L, h, key);
+}
+
+
 void luaV_settable (lua_State *L, const TValue *t, TValue *key, StkId val) {
   int loop;
   TValue temp;
@@ -161,7 +176,7 @@ void luaV_settable (lua_State *L, const TValue *t, TValue *key, StkId val) {
     const TValue *tm;
     if (ttistable(t)) {  /* `t' is a table? */
       Table *h = hvalue(t);
-      TValue *oldval = luaH_set(L, h, key); /* do a primitive set */
+      TValue *oldval = luaH_set_inl(L, h, key); /* do a primitive set */
       if (!ttisnil(oldval) ||  /* result is no nil? */
           (tm = fasttm(L, h->metatable, TM_NEWINDEX)) == NULL) { /* or no TM? */
         setobj2t(L, oldval, val);
