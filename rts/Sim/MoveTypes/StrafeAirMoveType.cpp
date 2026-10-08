@@ -65,6 +65,10 @@ CR_REG_METADATA(CStrafeAirMoveType, (
 	CR_MEMBER(agileAltitude),
 	CR_MEMBER(landGoalPos),
 	CR_MEMBER(spotSearchFrames),
+	CR_MEMBER(cruiseBrakeGoal),
+	CR_MEMBER(cruisePassGoal),
+	CR_MEMBER(cruisePasses),
+	CR_MEMBER(cruiseGoalAhead),
 
 	CR_PREALLOC(GetPreallocContainer)
 ))
