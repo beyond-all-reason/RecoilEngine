@@ -407,6 +407,28 @@ static void Arith (lua_State *L, StkId ra, const TValue *rb,
 
 
 /*
+** Recoil: luaD_poscall for the case without a return hook (the callers
+** test L->hookmask & LUA_MASKRET and use luaD_poscall otherwise).
+*/
+static inline int poscall_nohook (lua_State *L, StkId firstResult) {
+  StkId res;
+  int wanted, i;
+  CallInfo *ci = L->ci--;
+  res = ci->func;  /* res == final position of 1st result */
+  wanted = ci->nresults;
+  L->base = (ci - 1)->base;  /* restore base */
+  L->savedpc = (ci - 1)->savedpc;  /* restore savedpc */
+  /* move results to correct place */
+  for (i = wanted; i != 0 && firstResult < L->top; i--)
+    setobjs2s(L, res++, firstResult++);
+  while (i-- > 0)
+    setnilvalue(res++);
+  L->top = res;
+  return (wanted - LUA_MULTRET);  /* 0 iff wanted == LUA_MULTRET */
+}
+
+
+/*
 ** some macros for common tasks in `luaV_execute'
 */
 
@@ -723,6 +745,65 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         int nresults = GETARG_C(i) - 1;
         if (b != 0) L->top = ra+b;  /* else previous instruction set top */
         L->savedpc = pc;
+        /*
+        ** Recoil: luaD_precall (and for C functions luaD_poscall) inline
+        ** for the common cases: a function value, no call hook, and enough
+        ** stack and CallInfo space so that luaD_precall would not reallocate
+        ** anything (luaD_checkstack/inc_ci). Same steps in the same order;
+        ** everything else (vararg functions, __call, hooks, growth) goes
+        ** through luaD_precall.
+        */
+        if (ttisfunction(ra) && !(L->hookmask & LUA_MASKCALL) &&
+            L->ci != L->end_ci) {
+          Closure *ncl = clvalue(ra);
+          if (!ncl->c.isC) {  /* Lua function */
+            Proto *p = ncl->l.p;
+            if (!p->is_vararg && (char *)L->stack_last - (char *)L->top >
+                                 p->maxstacksize*(int)sizeof(TValue)) {
+              CallInfo *ci;
+              StkId st, nbase = ra + 1;
+              L->ci->savedpc = pc;
+              if (L->top > nbase + p->numparams)
+                L->top = nbase + p->numparams;
+              ci = ++L->ci;  /* now `enter' new function */
+              ci->func = ra;
+              L->base = ci->base = nbase;
+              ci->top = nbase + p->maxstacksize;
+              L->savedpc = p->code;  /* starting point */
+              ci->tailcalls = 0;
+              ci->nresults = nresults;
+              for (st = L->top; st < ci->top; st++)
+                setnilvalue(st);
+              L->top = ci->top;
+              nexeccalls++;
+              goto reentry;  /* restart luaV_execute over new Lua function */
+            }
+          }
+          else if ((char *)L->stack_last - (char *)L->top >
+                   LUA_MINSTACK*(int)sizeof(TValue)) {  /* C function */
+            CallInfo *ci;
+            int n;
+            L->ci->savedpc = pc;
+            ci = ++L->ci;  /* now `enter' new function */
+            ci->func = ra;
+            L->base = ci->base = ra + 1;
+            ci->top = L->top + LUA_MINSTACK;
+            ci->nresults = nresults;
+            lua_unlock(L);
+            n = (*ncl->c.f)(L);  /* do the actual call */
+            lua_lock(L);
+            if (n < 0)  /* yielding? */
+              return;
+            if (L->hookmask & LUA_MASKRET)
+              luaD_poscall(L, L->top - n);
+            else
+              poscall_nohook(L, L->top - n);
+            /* adjust results */
+            if (nresults >= 0) L->top = L->ci->top;
+            base = L->base;
+            continue;
+          }
+        }
         switch (luaD_precall(L, ra, nresults)) {
           case PCRLUA: {
             nexeccalls++;
@@ -776,7 +857,8 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         if (b != 0) L->top = ra+b-1;
         if (L->openupval) luaF_close(L, base);
         L->savedpc = pc;
-        b = luaD_poscall(L, ra);
+        b = (L->hookmask & LUA_MASKRET) ? luaD_poscall(L, ra) :
+                                          poscall_nohook(L, ra);
         if (--nexeccalls == 0)  /* was previous function running `here'? */
           return;  /* no: return */
         else {  /* yes: continue its execution */
