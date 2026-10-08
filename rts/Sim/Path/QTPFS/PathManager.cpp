@@ -1320,6 +1320,16 @@ void QTPFS::PathManager::QueueDeadPathSearches() {
 // #pragma GCC push_options
 // #pragma GCC optimize ("O0")
 
+// the background searches read the registry until the next Update, so changing it before then waits for them
+static void WaitForBackgroundSearches() {
+	auto& comp = QTPFS::systemGlobals.GetSystemComponent<QTPFS::SyncUpdatedPathsComponent>();
+	if (comp.backgroundTask) {
+		SCOPED_TIMER("Sim::Path::WaitForBackgroundSearches");
+		wait_for_mt_background(comp.backgroundTask);
+		comp.backgroundTask.reset();
+	}
+}
+
 unsigned int QTPFS::PathManager::QueueSearch(
 	const CSolidObject* object,
 	const MoveDef* moveDef,
@@ -1332,6 +1342,7 @@ unsigned int QTPFS::PathManager::QueueSearch(
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(!ThreadPool::IsInMultiThreadedSection());
+	WaitForBackgroundSearches();
 
 	// NOTE:
 	//     all paths get deleted by the cache they are in;
@@ -1525,6 +1536,7 @@ void QTPFS::PathManager::UpdatePath(const CSolidObject* owner, unsigned int path
 void QTPFS::PathManager::DeletePath(unsigned int pathID, bool force) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(!ThreadPool::IsInMultiThreadedSection());
+	WaitForBackgroundSearches();
 
 	QTPFS::entity pathEntity = QTPFS::entity(pathID);
 
