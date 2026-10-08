@@ -78,6 +78,9 @@ public:
 
 	virtual void Update();
 	virtual void SlowUpdate();
+	// per-frame state that only depends on the unit itself, safe to run in parallel;
+	// returns the physical state bits whose events still have to be sent
+	unsigned int UpdateState();
 
 	const SolidObjectDef* GetDef() const override { return ((const SolidObjectDef*) unitDef); }
 
@@ -138,6 +141,7 @@ public:
 	void CalculateTerrainType();
 	void UpdateTerrainType();
 	void UpdatePhysicalState(float eps) override;
+	void SendPhysicalStateEvents(unsigned int prevState);
 
 	float3 GetErrorVector(int allyteam) const;
 	float3 GetErrorPos(int allyteam, bool aiming = false) const { return (aiming? aimPos: midPos) + GetErrorVector(allyteam); }
@@ -484,6 +488,10 @@ public:
 
 	// if the unit is in it's 'on'-state
 	bool activated = false;
+	// if the unit paid its upkeep at its last SlowUpdate while on
+	bool upkeepPaid = true;
+	// if the unit tried to pay its upkeep at its most recent SlowUpdate (it was on, not stunned and finished)
+	bool upkeepAttempted = false;
 	// prevent damage from hitting an already dead unit (causing multi wreck etc)
 	bool isDead = false;
 

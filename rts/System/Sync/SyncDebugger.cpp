@@ -15,7 +15,6 @@
 #include "System/UnorderedMap.hpp"
 #include "System/Log/ILog.h"
 
-#include "HsiehHash.h"
 #include "Logger.h"
 
 

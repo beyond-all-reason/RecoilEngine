@@ -100,9 +100,7 @@ public:
 	 */
 	bool RemoveSkirmishAI(const size_t skirmishAIId);
 
-	bool HasSkirmishAIsInTeam(const int teamId, const int hostPlayerId = -1) const {
-		return (GetSkirmishAIsInTeam(teamId, hostPlayerId) != std::vector<uint8_t>{});
-	}
+	bool HasSkirmishAIsInTeam(const int teamId, const int hostPlayerId = -1) const;
 
 	size_t GetNumSkirmishAIs() const { return numSkirmishAIs; }
 	// size_t GetNumSkirmishAIsInTeam(const int teamId, const int hostPlayerId = -1) const { ... }

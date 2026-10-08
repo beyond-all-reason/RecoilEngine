@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <deque>
+#include <limits>
 
 #include "Map/Ground.h"
 #include "Sim/Misc/LosMap.h"
@@ -79,6 +80,9 @@ public:
 	bool isCached;
 	bool isQueuedForUpdate;
 	bool isQueuedForTerraform;
+
+	// tag of this instance's entry in ILosType::losCache while isCached
+	unsigned cacheTag = 0;
 };
 
 
@@ -176,6 +180,13 @@ public:
 	std::deque<SLosInstance> instances;
 	std::vector<int> freeIDs;
 
+	// centre and reach of every instance slot in elmos, scanned by UpdateHeightMapSynced
+	std::vector<int> boundsPosX;
+	std::vector<int> boundsPosY;
+	std::vector<int> boundsRadius;
+	// no rectangle is ever within reach of an unused slot
+	static constexpr int UNUSED_SLOT_RADIUS = std::numeric_limits<int>::min();
+
 private:
 	struct DelayedInstance {
 		SLosInstance* instance;
@@ -185,7 +196,18 @@ private:
 	std::deque<DelayedInstance> delayedDeleteQue;
 	std::deque<DelayedInstance> delayedTerraQue;
 	std::deque<SLosInstance*> losUpdate;
-	std::deque<SLosInstance*> losCache;
+
+	// FIFO of unused instances; a reactivated instance leaves its entry behind, which is then stale
+	struct CacheEntry {
+		SLosInstance* instance;
+		unsigned tag;
+
+		bool IsValid() const { return (instance->isCached && instance->cacheTag == tag); }
+	};
+
+	std::deque<CacheEntry> losCache;
+	size_t numCached = 0;
+	unsigned lastCacheTag = 0;
 
 	std::vector<SLosInstance*> losRemove;
 	std::vector<SLosInstance*> losAdd;

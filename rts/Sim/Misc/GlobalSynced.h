@@ -42,8 +42,8 @@ public:
 	int GetLuaSimFrame() { return (frameNum * (frameNum > 0)); }
 	int GetTempNum() { return tempNum++; }
 
-	int GetMtTempNum() { return mtTempNum[ThreadPool::GetThreadNum()]++; }
-	int GetMtTempNum(int tid) { return mtTempNum[tid]++; }
+	int GetMtTempNum() { return GetMtTempNum(ThreadPool::GetThreadNum()); }
+	int GetMtTempNum(int tid) { return mtTempNum[tid * MT_TEMP_NUM_STRIDE]++; }
 
 	// remains true until first SimFrame call
 	bool PreSimFrame() const { return (frameNum == -1); }
@@ -56,7 +56,10 @@ private:
 	* (increase after each use)
 	*/
 	int tempNum = 1;
-	std::array<int, ThreadPool::MAX_THREADS> mtTempNum = {};
+
+	// one cache line per thread, these are incremented by every MT quadfield query
+	static constexpr int MT_TEMP_NUM_STRIDE = 64 / sizeof(int);
+	alignas(64) std::array<int, ThreadPool::MAX_THREADS * MT_TEMP_NUM_STRIDE> mtTempNum = {};
 
 public:
 	/**

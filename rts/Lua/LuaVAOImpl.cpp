@@ -9,6 +9,7 @@
 #include "lib/sol2/sol.hpp"
 
 #include "System/SafeUtil.h"
+#include "System/TimeProfiler.h"
 #include "Rendering/GL/VBO.h"
 #include "Rendering/GL/VAO.h"
 #include "Rendering/Models/3DModel.hpp"
@@ -223,11 +224,13 @@ void LuaVAOImpl::CheckDrawPrimitiveType(GLenum mode) const
 
 void LuaVAOImpl::CondInitVAO()
 {
+	// keep the VAO while every attached buffer still has the ID it was set up with; a buffer that is
+	// not attached does not force a rebuild (a buffer attached later has a new ID and does)
 	if (vao &&
-		(vertLuaVBO && vertLuaVBO->GetId() == oldVertVBOId) &&
-		(indxLuaVBO && indxLuaVBO->GetId() == oldIndxVBOId) &&
-		(instLuaVBO && instLuaVBO->GetId() == oldInstVBOId))
-		return; //already init and all VBOs still have same IDs
+		(!vertLuaVBO || vertLuaVBO->GetId() == oldVertVBOId) &&
+		(!indxLuaVBO || indxLuaVBO->GetId() == oldIndxVBOId) &&
+		(!instLuaVBO || instLuaVBO->GetId() == oldInstVBOId))
+		return;
 
 	vao = nullptr;
 	vao = std::make_unique<VAO>();
@@ -536,6 +539,14 @@ void LuaVAOImpl::RemoveFromSubmission(int idx)
  */
 void LuaVAOImpl::Submit()
 {
+	// NB: the multi-draw below costs a fixed ~2.5us per call on NVIDIA drivers
+	// regardless of the command count, VAO, buffers or restart-index state (it
+	// is the first draw after returning from Lua); only fewer calls reduce it
+	SCOPED_TIMER("Lua::VAO::Submit");
+
+	if (submitCmds.empty())
+		return;
+
 	glEnable(GL_PRIMITIVE_RESTART);
 	glPrimitiveRestartIndex(indxLuaVBO->primitiveRestartIndex);
 

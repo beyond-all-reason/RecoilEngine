@@ -58,10 +58,14 @@ public:
 	bool CanApplyImpulse(const float3&) { return true; }
 	bool UseSmoothMesh() const;
 
+	bool CanUpdateMT() const override;
+	void CallDeferredScripts() override;
+
 	void DependentDied(CObject* o);
 
 protected:
 	void CheckForCollision();
+	void UpdateMovingScript(const float4& lastSpd);
 
 public:
 	AircraftState aircraftState = AIRCRAFT_LANDED;
@@ -94,6 +98,9 @@ protected:
 	CUnit* lastCollidee = nullptr;
 
 	unsigned int crashExpGenID = -1u;
+
+	/// StartMoving (1) or StopMoving (-1) script call left for CallDeferredScripts
+	int deferredScriptCall = 0;
 };
 
 #endif // A_AIR_MOVE_TYPE_H_

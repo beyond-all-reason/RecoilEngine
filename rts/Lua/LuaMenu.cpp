@@ -185,6 +185,7 @@ bool CLuaMenu::LoadUnsyncedCtrlFunctions(lua_State* L)
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, ExtractModArchiveFile);
 
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, SetConfigInt);
+	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, GarbageCollectCtrl);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, SetConfigFloat);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, SetConfigString);
 

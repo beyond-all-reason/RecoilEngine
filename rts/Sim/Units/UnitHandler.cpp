@@ -337,9 +337,31 @@ void CUnitHandler::UpdateUnitMoveTypes()
 void CUnitHandler::UpdateUnitLosStates()
 {
 	ZoneScopedC(tracy::Color::Goldenrod);
-	for (CUnit* unit: activeUnits) {
-		for (int at = 0; at < teamHandler.ActiveAllyTeams(); ++at) {
-			unit->UpdateLosStatus(at);
+	static std::array<uint8_t, MAX_UNITS> losStatusChanged;
+
+	const int numAllyTeams = teamHandler.ActiveAllyTeams();
+	const size_t numUnits = activeUnits.size();
+
+	// few units change state in a frame; finding them only reads sim state
+	for_mt_chunk(0, numUnits, [&](const int idx) {
+		CUnit* unit = activeUnits[idx];
+		bool changed = false;
+
+		for (int at = 0; at < numAllyTeams && !changed; ++at) {
+			const unsigned short currStatus = unit->losStatus[at];
+			changed = ((currStatus & LOS_ALL_MASK_BITS) != LOS_ALL_MASK_BITS) && (unit->CalcLosStatus(at) != currStatus);
+		}
+
+		losStatusChanged[idx] = changed;
+	}, 256);
+
+	// the callins have to run in unit order
+	for (size_t i = 0; i < numUnits; ++i) {
+		if (!losStatusChanged[i])
+			continue;
+
+		for (int at = 0; at < numAllyTeams; ++at) {
+			activeUnits[i]->UpdateLosStatus(at);
 		}
 	}
 }
@@ -394,39 +416,59 @@ void CUnitHandler::UpdateUnits()
 {
 	SCOPED_TIMER("Sim::Unit::Update");
 
-	size_t activeUnitCount = activeUnits.size();
+	// units created during the loop get their first update next frame
+	const size_t activeUnitCount = activeUnits.size();
 	for (size_t i = 0; i < activeUnitCount; ++i) {
 		CUnit* unit = activeUnits[i];
 
 		unit->SanityCheck();
 		unit->Update();
-		unit->moveType->UpdateCollisionMap();
+
+		// rate checked here, most units are not due and their move type stays untouched
+		if (((gs->frameNum + unit->id) % modInfo.unitQuadPositionUpdateRate) == 0)
+			unit->moveType->UpdateCollisionMap();
+
 		// unsynced; done on-demand when drawing unit
 		// unit->UpdateLocalModel();
 		unit->SanityCheck();
 
 		assert(activeUnits[i] == unit);
 	}
+
+	static std::array<unsigned int, MAX_UNITS> physicalStateChanges;
+
+	{
+		SCOPED_TIMER("Sim::Unit::UpdateWeaponVectors");
+
+		// one parallel pass for both, so the worker threads are woken only once
+		/* Unit list is ordered by creation, so stuff like windgens (which cost very
+		 * little to process) tends to accumulate at the front and would all be taken
+		 * by the same thread with large chunks. Cap chunk size to even things out */
+		for_mt_chunk(0, activeUnits.size(), [this, activeUnitCount](const int idx) {
+			CUnit* unit = activeUnits[idx];
+
+			if (static_cast<size_t>(idx) < activeUnitCount)
+				physicalStateChanges[idx] = unit->UpdateState();
+
+			unit->UpdateWeaponVectors();
+		}, 1, 64);
+	}
+
+	// sent in unit order; flipping the changed bits back gives the previous state
+	for (size_t i = 0; i < activeUnitCount; ++i) {
+		if (physicalStateChanges[i] == 0)
+			continue;
+
+		CUnit* unit = activeUnits[i];
+		unit->SendPhysicalStateEvents(unit->physicalState ^ physicalStateChanges[i]);
+	}
 }
 
 void CUnitHandler::UpdateUnitWeapons()
 {
-	{
-		SCOPED_TIMER("Sim::Unit::UpdateWeaponVectors");
-
-		/* Unit list is ordered by creation, so stuff like windgens (which cost very
-		 * little to process) tends to accumulate at the front and would all be taken
-		 * by the same thread with large chunks. Cap chunk size to even things out */
-		for_mt_chunk(0, activeUnits.size(), [&](const int idx) {
-			auto unit = activeUnits[idx];
-			unit->UpdateWeaponVectors();
-		}, 1, 64);
-	}
-	{
-		SCOPED_TIMER("Sim::Unit::Weapon");
-		for (activeUpdateUnit = 0; activeUpdateUnit < activeUnits.size(); ++activeUpdateUnit) {
-			activeUnits[activeUpdateUnit]->UpdateWeapons();
-		}
+	SCOPED_TIMER("Sim::Unit::Weapon");
+	for (activeUpdateUnit = 0; activeUpdateUnit < activeUnits.size(); ++activeUpdateUnit) {
+		activeUnits[activeUpdateUnit]->UpdateWeapons();
 	}
 }
 
@@ -435,9 +477,10 @@ void CUnitHandler::UpdatePreFrame()
 	SCOPED_TIMER("Sim::Unit::UpdatePreFrame");
 	inUpdateCall = true;
 
-	for (CUnit* unit : activeUnits) {
-		unit->UpdatePrevFrameTransform();
-	}
+	// only touches the unit's own state
+	for_mt_chunk(0, activeUnits.size(), [this](const int idx) {
+		activeUnits[idx]->UpdatePrevFrameTransform();
+	}, 64);
 
 	inUpdateCall = false;
 }

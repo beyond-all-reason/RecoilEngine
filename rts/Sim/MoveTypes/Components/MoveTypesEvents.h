@@ -67,15 +67,23 @@ struct UnitCrushEvent {
     {}
 };
 
+struct PreCollisionsMtState {
+    unsigned syncChecksum = 0;
+    bool done = false;
+};
+
 struct UnitMovedEvent {
     CUnit* unit = nullptr;
+    unsigned syncChecksum = 0;
     bool moved = false;
 };
 
 struct ChangeHeadingEvent {
     int unitId;
+    unsigned syncChecksum = 0;
     short deltaHeading = 0;
     bool changed = false;
+    bool syncChecksumPending = false;
 
     ChangeHeadingEvent(int _unitId)
     : unitId(_unitId)
@@ -84,7 +92,9 @@ struct ChangeHeadingEvent {
 
 struct ChangeMainHeadingEvent {
     int unitId;
+    unsigned syncChecksum = 0;
     bool changed = false;
+    bool syncChecksumPending = false;
 
     ChangeMainHeadingEvent(int _unitId)
     : unitId(_unitId)

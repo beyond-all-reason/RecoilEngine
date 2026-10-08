@@ -119,9 +119,11 @@ void CModInfo::ResetState()
 		radarMipLevel = 2;
 
 		requireSonarUnderWater = true;
+		requireSonarUnderWaterForProjectiles = true;
 		alwaysVisibleOverridesCloaked = false;
 		decloakRequiresLineOfSight = false;
 		separateJammers = true;
+		sensorsRequireUpkeep = false;
 	}
 	{
 		featureVisibility = FEATURELOS_ALL;
@@ -374,9 +376,11 @@ void CModInfo::Init(const std::string& modFileName)
 		const LuaTable& los = sensors.SubTable("los");
 
 		requireSonarUnderWater = sensors.GetBool("requireSonarUnderWater", requireSonarUnderWater);
+		requireSonarUnderWaterForProjectiles = sensors.GetBool("requireSonarUnderWaterForProjectiles", requireSonarUnderWater);
 		alwaysVisibleOverridesCloaked = sensors.GetBool("alwaysVisibleOverridesCloaked", alwaysVisibleOverridesCloaked);
 		decloakRequiresLineOfSight = sensors.GetBool("decloakRequiresLineOfSight", decloakRequiresLineOfSight);
 		separateJammers = sensors.GetBool("separateJammers", separateJammers);
+		sensorsRequireUpkeep = sensors.GetBool("requireUpkeep", sensorsRequireUpkeep);
 
 		losMipLevel = los.GetInt("losMipLevel", losMipLevel);
 		airMipLevel = los.GetInt("airMipLevel", airMipLevel);

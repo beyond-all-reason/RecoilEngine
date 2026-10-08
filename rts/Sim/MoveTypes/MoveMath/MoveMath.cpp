@@ -104,6 +104,40 @@ float CMoveMath::GetPosSpeedMod(const MoveDef& moveDef, unsigned xSquare, unsign
 	return 0.0f;
 }
 
+// NOTE: must produce exactly what GetPosSpeedMod produces per square (same
+// lookups, same class functions, same final multiply), keep the two in sync
+void CMoveMath::GetPosSpeedMod2x2(const MoveDef& moveDef, unsigned xSquare, unsigned zSquare, float speedMods[4])
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	assert((xSquare & 1) == 0 && (zSquare & 1) == 0);
+
+	if ((xSquare + 1) >= mapDims.mapx || (zSquare + 1) >= mapDims.mapy) {
+		for (unsigned int i = 0; i < 4; i++) {
+			speedMods[i] = GetPosSpeedMod(moveDef, xSquare + (i & 1), zSquare + (i >> 1));
+		}
+
+		return;
+	}
+
+	const int square = (xSquare >> 1) + ((zSquare >> 1) * mapDims.hmapx);
+	const int squareTerrType = readMap->GetTypeMapSynced()[square];
+
+	const float* heights = readMap->GetMaxHeightMapSynced() + (xSquare + (zSquare * mapDims.mapx));
+	const float  slope   = readMap->GetSlopeMapSynced()[square];
+
+	const CMapInfo::TerrainType& tt = mapInfo->terrainTypes[squareTerrType];
+
+	const float height[4] = {heights[0], heights[1], heights[mapDims.mapx], heights[mapDims.mapx + 1]};
+
+	switch (moveDef.speedModClass) {
+		case MoveDef::Tank:  { for (int i = 0; i < 4; i++) { speedMods[i] = (GroundSpeedMod(moveDef, height[i], slope) * tt.tankSpeed ); } } break;
+		case MoveDef::KBot:  { for (int i = 0; i < 4; i++) { speedMods[i] = (GroundSpeedMod(moveDef, height[i], slope) * tt.kbotSpeed ); } } break;
+		case MoveDef::Hover: { for (int i = 0; i < 4; i++) { speedMods[i] = ( HoverSpeedMod(moveDef, height[i], slope) * tt.hoverSpeed); } } break;
+		case MoveDef::Ship:  { for (int i = 0; i < 4; i++) { speedMods[i] = (  ShipSpeedMod(moveDef, height[i], slope) * tt.shipSpeed ); } } break;
+		default:             { for (int i = 0; i < 4; i++) { speedMods[i] = 0.0f; } } break;
+	}
+}
+
 float CMoveMath::GetPosSpeedMod(const MoveDef& moveDef, unsigned xSquare, unsigned zSquare, float3 moveDir)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -449,16 +483,21 @@ CMoveMath::BlockType CMoveMath::RangeIsBlockedHashedMt(int xmin, int xmax, int z
 
 void CMoveMath::FloodFillRangeIsBlocked(const MoveDef& moveDef, const CSolidObject* collider, const SRectangle& areaToSample, std::vector<std::uint8_t>& results, int thread)
 {
+	const MoveTypes::CheckCollisionQuery colliderInfo = (collider != nullptr)
+			? MoveTypes::CheckCollisionQuery(collider)
+			: MoveTypes::CheckCollisionQuery(&moveDef, {float(areaToSample.x1*SQUARE_SIZE), 0.f, float(areaToSample.z1*SQUARE_SIZE)});
+
+	FloodFillRangeIsBlocked(colliderInfo, areaToSample, results, thread);
+}
+
+void CMoveMath::FloodFillRangeIsBlocked(const MoveTypes::CheckCollisionQuery& colliderInfo, const SRectangle& areaToSample, std::vector<std::uint8_t>& results, int thread)
+{
 	RECOIL_DETAILED_TRACY_ZONE;
 	spring::unordered_map<CSolidObject*, CMoveMath::BlockType>& blockMap = blockMaps[thread];
 	blockMap.clear();
 
 	results.clear();
 	results.reserve(areaToSample.GetArea());
-
-	MoveTypes::CheckCollisionQuery colliderInfo = (collider != nullptr)
-			? MoveTypes::CheckCollisionQuery(collider)
-			: MoveTypes::CheckCollisionQuery(&moveDef, {float(areaToSample.x1*SQUARE_SIZE), 0.f, float(areaToSample.z1*SQUARE_SIZE)});
 
 	for (int z = areaToSample.z1; z < areaToSample.z2; ++z) {
 		const int zOffset = z * mapDims.mapx;

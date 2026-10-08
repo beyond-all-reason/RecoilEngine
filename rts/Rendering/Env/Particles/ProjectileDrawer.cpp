@@ -10,6 +10,7 @@
 #include "Game/CameraHandler.h"
 #include "Game/GlobalUnsynced.h"
 #include "Game/LoadScreen.h"
+#include "Map/Ground.h"
 #include "Lua/LuaParser.h"
 #include "Rendering/GroundFlash.h"
 #include "Rendering/GlobalRendering.h"
@@ -20,12 +21,15 @@
 #include "Rendering/GL/SubState.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/Models/3DModelPiece.hpp"
+#include "Rendering/Models/3DModelVAO.hpp"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Textures/ColorMap.h"
 #include "Rendering/Textures/TextureAtlas.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
+#include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/LosHandler.h"
+#include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
@@ -42,11 +46,13 @@
 #include "System/SafeUtil.h"
 #include "System/StringUtil.h"
 #include "System/ScopedResource.h"
+#include "System/Transform.hpp"
 
 #include "System/Misc/TracyDefs.h"
 
 CONFIG(int, SoftParticles).defaultValue(1).safemodeValue(0).description("Soften up CEG particles on clipping edges");
 CONFIG(float, ProjectileReflectionMinRadius).defaultValue(0.0f).minimumValue(0.0f).description("Alpha particles with a draw radius (in elmos) smaller than this are skipped in water reflection passes; 0 draws all of them. Small particles are barely visible in reflections, so culling them there is cheap visually and saves a large part of the reflection pass on effect-heavy frames.");
+CONFIG(float, ProjectileShadowMinPixels).defaultValue(2.0f).minimumValue(0.0f).description("Model-less particles whose draw radius covers fewer than this many screen pixels (at their distance from the camera) do not cast transparent shadows; 0 lets every shadow-casting particle cast one. Such shadows are invisible anyway but each costs quad generation and a draw in the shadow pass.");
 CONFIG(bool, ProjectileDrawThreadedFill).defaultValue(true).safemodeValue(false).description("Generate alpha-particle geometry on the ThreadPool workers instead of the render thread. Draw order is preserved; the few particle types whose Draw is not thread-safe stay on the render thread.");
 CONFIG(bool, ProjectileDrawReuseWaterPasses).defaultValue(true).safemodeValue(false).description("When water is visible, reuse the below-water pass' alpha particle geometry for the above-water pass instead of regenerating and re-uploading it. The two passes contain identical geometry by construction; disable to force a full refill per pass.");
 
@@ -194,6 +200,9 @@ TypedRenderBuffer<VA_TYPE_C>& CProjectileDrawer::GetMiniMapPointsRB() { return p
 void CProjectileDrawer::Init() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	eventHandler.AddClient(this);
+
+	ConfigNotify({}, {});
+	configHandler->NotifyOnChange(this, {"ProjectileReflectionMinRadius", "ProjectileDrawReuseWaterPasses", "ProjectileDrawThreadedFill", "ProjectileShadowMinPixels"});
 
 	loadscreen->SetLoadMessage("Creating Projectile Textures");
 
@@ -446,6 +455,7 @@ void CProjectileDrawer::Kill() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	eventHandler.RemoveClient(this);
 	autoLinkedEvents.clear();
+	configHandler->RemoveObserver(this);
 
 	glDeleteTextures(8, perlinBlendTex);
 	spring::SafeDelete(textureAtlas);
@@ -454,10 +464,14 @@ void CProjectileDrawer::Kill() {
 	smokeTextures.clear();
 
 	renderProjectiles.clear();
+	instancedProjSlots.clear();
+	projTransformSlots.Clear();
 
 	sortedParticles.clear();
 	sortScratch.clear();
 	unsortedParticles.clear();
+	shadowParticleBuckets.clear();
+	shadowParticles.clear();
 	mtFillBuffers.clear();
 
 	perlinFB.Kill();
@@ -475,14 +489,60 @@ void CProjectileDrawer::Kill() {
 	configHandler->Set("SoftParticles", wantSoften);
 }
 
+void CProjectileDrawer::ConfigNotify(const std::string& key, const std::string& value)
+{
+	reflMinRadius = configHandler->GetFloat("ProjectileReflectionMinRadius");
+	reuseWaterPasses = configHandler->GetBool("ProjectileDrawReuseWaterPasses");
+	threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill");
+	shadowMinPixels = configHandler->GetFloat("ProjectileShadowMinPixels");
+}
+
+// world transform slot of an instanced projectile. The GL4 shaders multiply it with the piece's
+// bind-pose transform; for piece projectiles the trailing translation undoes the bind-pose
+// translation so the result is the legacy DrawStaticLegacy(Rec) composition: bind-pose rotation
+// and scale, translation relative to the root piece, then the projectile's spin and position
+static Transform GetInstancedProjectileTransform(const CProjectile* p)
+{
+	if (p->piece) {
+		const auto* pp = static_cast<const CPieceProjectile*>(p);
+		return Transform(pp->drawPos) * Transform(CQuaternion::MakeFrom(pp->GetDrawAngle() * math::DEG_TO_RAD, pp->spinVec)) * Transform(-pp->omp->bposeTransform.t);
+	}
+
+	const auto* wp = static_cast<const CWeaponProjectile*>(p);
+	return Transform::FromMatrix(wp->GetTransformMatrix(wp->GetProjectileType() == WEAPON_MISSILE_PROJECTILE));
+}
+
+static void AddPieceSubtreeInstances(S3DModelVAO& smv, const S3DModelPiece* piece, uint32_t transformOffset, uint16_t paletteIndex)
+{
+	smv.AddStaticInstance(piece, transformOffset, paletteIndex);
+
+	for (const S3DModelPiece* child : piece->children) {
+		AddPieceSubtreeInstances(smv, child, transformOffset, paletteIndex);
+	}
+}
+
+static void AddInstancedProjectile(S3DModelVAO& smv, const CProjectile* p, uint32_t transformOffset)
+{
+	const uint32_t teamID = p->GetTeamID();
+	const uint16_t paletteIndex = static_cast<uint16_t>((teamID < MAX_TEAMS) ? teamID : 0);
+
+	if (!p->piece) {
+		smv.AddStaticInstance(p->model, transformOffset, paletteIndex);
+		return;
+	}
+
+	const auto* pp = static_cast<const CPieceProjectile*>(p);
+
+	if ((pp->explFlags & PF_Recursive) != 0) {
+		AddPieceSubtreeInstances(smv, pp->omp, transformOffset, paletteIndex);
+	} else {
+		smv.AddStaticInstance(pp->omp, transformOffset, paletteIndex);
+	}
+}
+
 void CProjectileDrawer::UpdateDrawFlags()
 {
 	ZoneScopedN("ProjectileDrawer::UpdateDrawFlags");
-
-	// water reflections are distorted enough that small particles contribute
-	// next to nothing visually; skipping them avoids most of the reflection
-	// pass' fill/sort/quad-generation cost on effect-heavy frames
-	const float reflMinRadius = configHandler->GetFloat("ProjectileReflectionMinRadius");
 
 	// per-frame invariants, hoisted out of the per-particle loop (notably
 	// IWater::GetWater()->CanDrawReflectionPass(), a virtual call that was
@@ -495,59 +555,96 @@ void CProjectileDrawer::UpdateDrawFlags()
 	const CCamera* camUWRefl = CCameraHandler::GetCamera(CCamera::CAMTYPE_UWREFL);
 	const CCamera* camShadow = CCameraHandler::GetCamera(CCamera::CAMTYPE_SHADOW);
 
-	for_mt(0, renderProjectiles.size(), [this, reflMinRadius, drawReflPass, drawShadowPass, timeOffset, camPlayer, camUWRefl, camShadow](int i) {
+	// world length covered by one screen pixel at distance 1 from the player camera
+	const float playerLPPScale = std::max(camPlayer->GetLPPScale(), 1e-6f);
+
+	// transparent shadow casters are gathered here, per worker, while the
+	// projectiles are being visited anyway; merged below (order is irrelevant,
+	// the shadow blend is multiplicative)
+	if (shadowParticleBuckets.size() < static_cast<size_t>(ThreadPool::GetNumThreads()))
+		shadowParticleBuckets.resize(ThreadPool::GetNumThreads());
+
+	for (auto& bucket : shadowParticleBuckets)
+		bucket.clear();
+
+	// chunks instead of single projectiles: for_mt hands out each item through
+	// two shared atomic counters, which costs more than the item's own work
+	for_mt_chunk(0, renderProjectiles.size(), [this, drawReflPass, drawShadowPass, timeOffset, camPlayer, camUWRefl, camShadow, playerLPPScale](int i) {
 		CProjectile* p = renderProjectiles[i];
 		const bool hasModel = (p->model != nullptr);
 
-		p->drawPos = p->GetDrawPos(timeOffset);
+		spring::StoreIfChanged(p->drawPos, p->GetDrawPos(timeOffset));
+		spring::StoreIfChanged(p->previousDrawFlag, p->drawFlag);
 
-		p->previousDrawFlag = p->drawFlag;
-		p->ResetDrawFlag();
+		uint8_t drawFlag = DrawFlags::SO_NODRAW_FLAG;
 
-		if (!CanDrawProjectile(p, p->GetAllyteamID()))
-			return;
+		if (CanDrawProjectile(p, p->GetAllyteamID())) {
+			drawFlag = DrawFlags::SO_DRICON_FLAG; //reuse as a minimap draw indication
 
-		p->SetDrawFlag(DrawFlags::SO_DRICON_FLAG); //reuse as a minimap draw indication
+			const float drawRadius = p->GetDrawRadius();
 
-		const float drawRadius = p->GetDrawRadius();
+			if (camPlayer->InView(p->drawPos, drawRadius)) {
+				p->SetSortDist(CCamera::CAMTYPE_PLAYER, camPlayer->ProjectedDistance(p->drawPos));
 
-		if (camPlayer->InView(p->drawPos, drawRadius)) {
-			p->SetSortDist(CCamera::CAMTYPE_PLAYER, camPlayer->ProjectedDistance(p->drawPos));
+				drawFlag |= (hasModel ? DrawFlags::SO_OPAQUE_FLAG : DrawFlags::SO_ALPHAF_FLAG);
 
-			if (hasModel)
-				p->AddDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
-			else
-				p->AddDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
+				if (p->drawPos.y - drawRadius < 0.0f)
+					drawFlag |= DrawFlags::SO_REFRAC_FLAG;
 
-			if (p->drawPos.y - drawRadius < 0.0f)
-				p->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
+				// Special case of piece projectile, since it has a model and fire particle
+				if (p->piece)
+					drawFlag |= DrawFlags::SO_ALPHAF_FLAG;
+			}
 
-			// Special case of piece projectile, since it has a model and fire particle
-			if (p->piece)
-				p->AddDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
+			if (drawReflPass && (hasModel || drawRadius >= reflMinRadius) && camUWRefl->InView(p->drawPos, drawRadius)) {
+				p->SetSortDist(CCamera::CAMTYPE_UWREFL, camUWRefl->ProjectedDistance(p->drawPos));
+
+				if (CModelDrawerHelper::ObjectVisibleReflection(p->drawPos, camUWRefl->GetPos(), drawRadius))
+					drawFlag |= DrawFlags::SO_REFLEC_FLAG;
+			}
+
+			if (drawShadowPass && p->castShadow && camShadow->InView(p->drawPos, drawRadius)) {
+				p->SetSortDist(CCamera::CAMTYPE_SHADOW, camShadow->ProjectedDistance(p->drawPos));
+
+				// a particle's shadow can only be as large on screen as the particle
+				// itself would be at its distance from the viewer; below a few pixels
+				// it is invisible but still costs a full quad-generation + draw
+				const bool shadowVisible = hasModel || (shadowMinPixels <= 0.0f) ||
+					(drawRadius >= shadowMinPixels * std::max(1.0f, camPlayer->ProjectedDistance(p->drawPos)) * playerLPPScale);
+
+				if unlikely(hasModel)
+					drawFlag |= DrawFlags::SO_SHOPAQ_FLAG;
+				else if (shadowVisible)
+					drawFlag |= DrawFlags::SO_SHTRAN_FLAG;
+
+				// Special case of piece projectile, since it has a model and fire particle
+				if (p->piece && shadowVisible)
+					drawFlag |= DrawFlags::SO_SHTRAN_FLAG;
+
+				if (drawFlag & DrawFlags::SO_SHTRAN_FLAG)
+					shadowParticleBuckets[ThreadPool::GetThreadNum()].push_back(p);
+			}
 		}
 
-		if (drawReflPass && (hasModel || drawRadius >= reflMinRadius) && camUWRefl->InView(p->drawPos, drawRadius)) {
-			p->SetSortDist(CCamera::CAMTYPE_UWREFL, camUWRefl->ProjectedDistance(p->drawPos));
+		spring::StoreIfChanged(p->drawFlag, drawFlag);
+	}, 64, 256);
 
-			if (CModelDrawerHelper::ObjectVisibleReflection(p->drawPos, camUWRefl->GetPos(), drawRadius))
-				p->AddDrawFlag(DrawFlags::SO_REFLEC_FLAG);
-		}
+	shadowParticles.clear();
 
-		if (drawShadowPass && p->castShadow && camShadow->InView(p->drawPos, drawRadius)) {
-			p->SetSortDist(CCamera::CAMTYPE_SHADOW, camShadow->ProjectedDistance(p->drawPos));
+	for (auto& bucket : shadowParticleBuckets) {
+		shadowParticles.insert(shadowParticles.end(), bucket.begin(), bucket.end());
+		bucket.clear();
+	}
 
-			if unlikely(hasModel)
-				p->AddDrawFlag(DrawFlags::SO_SHOPAQ_FLAG);
-			else
-				p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
+	// world transforms of the instanced projectile models; TransformsUploader::Update runs right
+	// after this (CGame), so they reach the GPU for this frame's draw passes
+	constexpr uint8_t instancedPassFlags = DrawFlags::SO_OPAQUE_FLAG | DrawFlags::SO_REFLEC_FLAG | DrawFlags::SO_REFRAC_FLAG | DrawFlags::SO_SHOPAQ_FLAG;
+	for (const auto& [p, slot] : instancedProjSlots) {
+		if ((p->drawFlag & instancedPassFlags) == 0 || !projTransformSlots.Valid(slot))
+			continue;
 
-			// Special case of piece projectile, since it has a model and fire particle
-			if (p->piece)
-				p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
-		}
-	});
-
+		projTransformSlots.Update(slot, GetInstancedProjectileTransform(p));
+	}
 }
 
 bool CProjectileDrawer::CheckSoftenExt()
@@ -709,7 +806,23 @@ bool CProjectileDrawer::CanDrawProjectile(const CProjectile* pro, int allyTeam)
 	RECOIL_DETAILED_TRACY_ZONE;
 	auto& th = teamHandler;
 	auto& lh = losHandler;
-	return (gu->spectatingFullView || (th.IsValidAllyTeam(allyTeam) && th.Ally(allyTeam, gu->myAllyTeam)) || lh->InLos(pro, gu->myAllyTeam));
+
+	if (gu->spectatingFullView || lh->GetGlobalLOS(gu->myAllyTeam))
+		return true;
+
+	if (th.IsValidAllyTeam(allyTeam) && th.Ally(allyTeam, gu->myAllyTeam))
+		return true;
+
+	if (!lh->InLos(pro, gu->myAllyTeam))
+		return false;
+
+	if (pro->pos.y > CGround::GetWaterLevel(pro->pos.x, pro->pos.z))
+		return true;
+
+	if (!modInfo.requireSonarUnderWaterForProjectiles || (pro->weapon && !static_cast<const CWeaponProjectile*>(pro)->GetWeaponDef()->requireSonarUnderWater))
+		return true;
+
+	return lh->sonar.InSight(pro->pos, gu->myAllyTeam);
 }
 
 bool CProjectileDrawer::ShouldDrawProjectile(const CProjectile* p, uint8_t thisPassMask)
@@ -821,37 +934,153 @@ void CProjectileDrawer::DrawOpaque(bool drawReflection, bool drawRefraction)
 		(drawRefraction * DrawFlags::SO_REFRAC_FLAG);
 
 	ISky::GetSky()->SetupFog();
-	ScopedModelDrawerImpl<CUnitDrawer> legacy(true, false);
+
+	// projectile models: one static instance each through the GL4 model VAO
+	const int leftover = DrawOpaqueModelsInstanced(thisPassMask);
+
+	// legacy per-piece path for whatever the instanced pass could not take (Lua-drawn projectiles,
+	// every projectile without the GL4 drawer) and for the flying pieces; skipped entirely when
+	// there is nothing for it, which is the usual case
+	if (leftover != 0 || HaveFlyingPieces()) {
+		ZoneScopedN("ProjectileDrawer::DrawOpaque(Legacy)");
+		ScopedModelDrawerImpl<CUnitDrawer> legacy(true, false);
+		unitDrawer->SetupOpaqueDrawing(false);
+
+		for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
+			CModelDrawerHelper::PushModelRenderState(modelType);
+
+			const auto& mdlRenderer = modelRenderers[modelType];
+
+			for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n && leftover != 0; i++) {
+				if (mdlRenderer.GetObjectBin(i).empty())
+					continue;
+
+				bool texBound = false;
+
+				for (CProjectile* p : mdlRenderer.GetObjectBin(i)) {
+					if (!ShouldDrawProjectile(p, thisPassMask))
+						continue;
+					if (leftover > 0 && IsInstancedModelProjectile(p) && instancedProjSlots.find(p) != instancedProjSlots.end())
+						continue; // drawn by the instanced pass
+
+					if (!texBound) {
+						CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+						texBound = true;
+					}
+
+					DrawProjectileModel(p);
+				}
+
+				if (texBound)
+					CModelDrawerHelper::UnbindModelTypeTexture(modelType);
+			}
+
+			DrawFlyingPieces(modelType);
+
+			CModelDrawerHelper::PopModelRenderState(modelType);
+		}
+
+		unitDrawer->ResetOpaqueDrawing(false);
+	}
+
+	glDisable(GL_FOG);
+}
+
+uint32_t CProjectileDrawer::ProjTransformSlots::Acquire()
+{
+	if (freeSlots.empty()) {
+		const uint32_t base = static_cast<uint32_t>(chunks.size()) * CHUNK_SIZE;
+		chunks.emplace_back(CHUNK_SIZE);
+
+		freeSlots.reserve(CHUNK_SIZE);
+		for (uint32_t i = CHUNK_SIZE; i > 0; i--) {
+			freeSlots.push_back(base + i - 1);
+		}
+	}
+
+	const uint32_t slot = freeSlots.back();
+	freeSlots.pop_back();
+	return slot;
+}
+
+bool CProjectileDrawer::HaveFlyingPieces() const
+{
+	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
+		if (!projectileHandler.flyingPieces[modelType].empty())
+			return true;
+	}
+	return false;
+}
+
+int CProjectileDrawer::DrawOpaqueModelsInstanced(uint8_t thisPassMask)
+{
+	ZoneScopedN("ProjectileDrawer::DrawOpaqueModelsInstanced");
+
+	if (instancedProjSlots.empty())
+		return 0;
+
+	// ask for the GL4 drawer; without it the legacy pass draws everything
+	ScopedModelDrawerImpl<CUnitDrawer> modern(false, true);
+	if (CUnitDrawer::IsLegacyImpl())
+		return -1;
+
 	unitDrawer->SetupOpaqueDrawing(false);
 
-	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
-		CModelDrawerHelper::PushModelRenderState(modelType);
+	auto& smv = S3DModelVAO::GetInstance();
+	smv.Bind();
 
+	// each instance carries its own world transform slot and team palette index
+	const auto oldMM = CUnitDrawer::SetMatrixMode(ShaderMatrixModes::ARRAY_MATMODE);
+	CUnitDrawer::SetTeamColor(0, 1.0f);
+
+	int leftover = 0;
+
+	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
 		const auto& mdlRenderer = modelRenderers[modelType];
+
+		if (mdlRenderer.empty())
+			continue;
+
+		CModelDrawerHelper::PushModelRenderState(modelType);
 
 		for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
 			if (mdlRenderer.GetObjectBin(i).empty())
 				continue;
 
-			CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+			bool texBound = false;
 
-			for (CProjectile* p : mdlRenderer.GetObjectBin(i)) {
+			for (const CProjectile* p : mdlRenderer.GetObjectBin(i)) {
 				if (!ShouldDrawProjectile(p, thisPassMask))
 					continue;
 
-				DrawProjectileModel(p);
+				const auto it = IsInstancedModelProjectile(p) ? instancedProjSlots.find(p) : instancedProjSlots.end();
+				if (it == instancedProjSlots.end() || !projTransformSlots.Valid(it->second)) {
+					leftover += 1;
+					continue;
+				}
+
+				if (!texBound) {
+					CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+					texBound = true;
+				}
+
+				AddInstancedProjectile(smv, p, projTransformSlots.Offset(it->second));
 			}
 
-			CModelDrawerHelper::UnbindModelTypeTexture(modelType);
+			if (texBound) {
+				smv.Submit(GL_TRIANGLES, false);
+				CModelDrawerHelper::UnbindModelTypeTexture(modelType);
+			}
 		}
-
-		DrawFlyingPieces(modelType);
 
 		CModelDrawerHelper::PopModelRenderState(modelType);
 	}
 
+	CUnitDrawer::SetMatrixMode(oldMM);
+	smv.Unbind();
 	unitDrawer->ResetOpaqueDrawing(false);
-	glDisable(GL_FOG);
+
+	return leftover;
 }
 
 void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool drawReflection, bool drawRefraction)
@@ -875,7 +1104,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 	// in between fill the buffer for their own camera/mask and consume their
 	// own ranges, so the saved range stays valid for the whole frame.
 	const bool mainPass = !drawReflection && !drawRefraction;
-	const bool reuseWanted = configHandler->GetBool("ProjectileDrawReuseWaterPasses");
+	const bool reuseWanted = reuseWaterPasses;
 
 	// the above-water main pass and the water refraction pass both view the
 	// same particles from the player camera; both can re-submit the geometry
@@ -918,15 +1147,13 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			RadixSortByKey(sortedParticles, sortScratch, [](const SortableParticle& sp) noexcept { return sp.sortKey; });
 		}
 
-		const bool threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill") && ThreadPool::HasThreads();
-
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
-			FillParticleGeometry(mtFillBuffers, sortedParticles.size(), threadedFill, [this](size_t j) { return sortedParticles[j].proj; });
+			FillParticleGeometry(mtFillBuffers, sortedParticles.size(), threadedFill && ThreadPool::HasThreads(), [this](size_t j) { return sortedParticles[j].proj; });
 		}
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DU)");
-			FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill, [this](size_t j) { return unsortedParticles[j]; });
+			FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill && ThreadPool::HasThreads(), [this](size_t j) { return unsortedParticles[j]; });
 		}
 	}
 
@@ -1005,6 +1232,15 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 void CProjectileDrawer::DrawShadowOpaque()
 {
 	ZoneScopedN("ProjectileDrawer::DrawShadowOpaque");
+
+	// projectile models as static instances through the GL4 shadow-gen program
+	const int leftover = DrawShadowOpaqueModelsInstanced();
+
+	// legacy per-piece path for the rest and for the flying pieces, skipped when there is nothing for it
+	if (leftover == 0 && !HaveFlyingPieces())
+		return;
+
+	ZoneNamedN(legacyZone, "ProjectileDrawer::DrawShadowOpaque(Legacy)", true);
 	Shader::IProgramObject* po = shadowHandler.GetShadowGenProg(CShadowHandler::SHADOWGEN_PROGRAM_PROJECTILE);
 
 	po->Enable();
@@ -1014,20 +1250,28 @@ void CProjectileDrawer::DrawShadowOpaque()
 
 		const auto& mdlRenderer = modelRenderers[modelType];
 
-		for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
+		for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n && leftover != 0; i++) {
 			if (mdlRenderer.GetObjectBin(i).empty())
 				continue;
 
-			CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+			bool texBound = false;
 
 			for (CProjectile* p : mdlRenderer.GetObjectBin(i)) {
 				if (!ShouldDrawProjectile(p, DrawFlags::SO_SHOPAQ_FLAG))
 					continue;
+				if (leftover > 0 && IsInstancedModelProjectile(p) && instancedProjSlots.find(p) != instancedProjSlots.end())
+					continue; // drawn by the instanced pass
+
+				if (!texBound) {
+					CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+					texBound = true;
+				}
 
 				DrawProjectileModel(p);
 			}
 
-			CModelDrawerHelper::UnbindModelTypeTexture(modelType);
+			if (texBound)
+				CModelDrawerHelper::UnbindModelTypeTexture(modelType);
 		}
 
 		DrawFlyingPieces(modelType);
@@ -1038,34 +1282,92 @@ void CProjectileDrawer::DrawShadowOpaque()
 	po->Disable();
 }
 
-void CProjectileDrawer::DrawShadowTransparent()
+int CProjectileDrawer::DrawShadowOpaqueModelsInstanced()
 {
-	ZoneScopedN("ProjectileDrawer::DrawShadowTransparent");
+	ZoneScopedN("ProjectileDrawer::DrawShadowOpaqueModelsInstanced");
+
+	if (instancedProjSlots.empty())
+		return 0;
+
+	Shader::IProgramObject* po = shadowHandler.GetShadowGenProg(CShadowHandler::SHADOWGEN_PROGRAM_MODEL_GL4);
+	if (po == nullptr || !po->IsValid() || !S3DModelVAO::IsValid())
+		return -1;
+
+	po->Enable();
+	po->SetUniform("staticInstances", 1);
+
+	auto& smv = S3DModelVAO::GetInstance();
+	smv.Bind();
+
+	int leftover = 0;
+
+	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
+		const auto& mdlRenderer = modelRenderers[modelType];
+
+		if (mdlRenderer.empty())
+			continue;
+
+		CModelDrawerHelper::PushModelRenderState(modelType);
+
+		for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
+			if (mdlRenderer.GetObjectBin(i).empty())
+				continue;
+
+			bool texBound = false;
+
+			for (const CProjectile* p : mdlRenderer.GetObjectBin(i)) {
+				if (!ShouldDrawProjectile(p, DrawFlags::SO_SHOPAQ_FLAG))
+					continue;
+
+				const auto it = IsInstancedModelProjectile(p) ? instancedProjSlots.find(p) : instancedProjSlots.end();
+				if (it == instancedProjSlots.end() || !projTransformSlots.Valid(it->second)) {
+					leftover += 1;
+					continue;
+				}
+
+				if (!texBound) {
+					CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+					texBound = true;
+				}
+
+				AddInstancedProjectile(smv, p, projTransformSlots.Offset(it->second));
+			}
+
+			if (texBound) {
+				smv.Submit(GL_TRIANGLES, false);
+				CModelDrawerHelper::UnbindModelTypeTexture(modelType);
+			}
+		}
+
+		CModelDrawerHelper::PopModelRenderState(modelType);
+	}
+
+	smv.Unbind();
+	po->SetUniform("staticInstances", 0);
+	po->Disable();
+
+	return leftover;
+}
+
+bool CProjectileDrawer::DrawShadowTransparent()
+{
+	SCOPED_TIMER("Draw::World::CreateShadows::Particles");
 	// Method #1 here: https://wickedengine.net/2018/01/18/easy-transparent-shadow-maps/
 
 	// 1) Render opaque objects into depth stencil texture from light's point of view - done elsewhere
 
 	// draw the model-less projectiles; the multiplicative shadow blend is
-	// order-independent, so the list needs no sorting. unsortedParticles is
-	// only otherwise used inside DrawAlpha, which runs later in the frame and
-	// clears it first.
-	unsortedParticles.clear();
-	for (CProjectile* p : renderProjectiles) {
-		if (!ShouldDrawProjectile(p, DrawFlags::SO_SHTRAN_FLAG))
-			continue;
-
-		unsortedParticles.emplace_back(p);
-	}
-
+	// order-independent, so the list needs no sorting. shadowParticles was
+	// collected by UpdateDrawFlags earlier this frame (no sim frame runs in
+	// between, so the pointers are still valid).
 	{
-		ZoneScopedN("ProjectileDrawer::DrawShadowTransparent(Fill)");
-		const bool threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill") && ThreadPool::HasThreads();
-		FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill, [this](size_t j) { return unsortedParticles[j]; });
+		SCOPED_TIMER("Draw::World::CreateShadows::Particles::Fill");
+		FillParticleGeometry(mtFillBuffers, shadowParticles.size(), threadedFill && ThreadPool::HasThreads(), [this](size_t j) { return shadowParticles[j]; });
 	}
 
 	auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
 	if (!rb.ShouldSubmit())
-		return;
+		return false;
 
 	// 2) Bind render target for shadow color filter: R11G11B10 works good
 	shadowHandler.EnableColorOutput(true);
@@ -1103,6 +1405,7 @@ void CProjectileDrawer::DrawShadowTransparent()
 	glBindTexture(GL_TEXTURE_2D, 0);
 
 	//shadowHandler.EnableColorOutput(false);
+	return true;
 }
 
 
@@ -1397,8 +1700,11 @@ void CProjectileDrawer::RenderProjectileCreated(const CProjectile* p)
 		renderProjectiles.push_back(const_cast<CProjectile*>(p));
 	}
 
-	if (p->model != nullptr)
+	if (p->model != nullptr) {
 		modelRenderers[MDL_TYPE(p)].AddObject(p);
+
+		instancedProjSlots.emplace(p, projTransformSlots.Acquire());
+	}
 }
 
 void CProjectileDrawer::RenderProjectileDestroyed(const CProjectile* p)
@@ -1414,7 +1720,13 @@ void CProjectileDrawer::RenderProjectileDestroyed(const CProjectile* p)
 	renderProjectiles[ri]->SetRenderIndex(ri);
 	renderProjectiles.pop_back();
 
-	if (p->model != nullptr)
+	if (p->model != nullptr) {
 		modelRenderers[MDL_TYPE(p)].DelObject(p);
+
+		if (const auto it = instancedProjSlots.find(p); it != instancedProjSlots.end()) {
+			projTransformSlots.Release(it->second);
+			instancedProjSlots.erase(it);
+		}
+	}
 }
 

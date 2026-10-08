@@ -230,9 +230,13 @@ void CSMFGroundDrawer::DrawDeferredPass(const DrawPass::e& drawPass, bool alphaT
 	GL::GeometryBuffer::LoadViewport();
 
 	{
+		SCOPED_GL_DEBUGGROUP("Draw::World::Terrain::Deferred");
 		geomBuffer.Bind();
 		geomBuffer.SetDepthRange(1.0f, 0.0f);
-		geomBuffer.Clear();
+		{
+			SCOPED_GL_DEBUGGROUP("Draw::World::Terrain::Deferred::Clear");
+			geomBuffer.Clear();
+		}
 
 		smfRenderStates[RENDER_STATE_SEL]->SetCurrentShader(this, DrawPass::TerrainDeferred);
 		smfRenderStates[RENDER_STATE_SEL]->Enable(this, DrawPass::TerrainDeferred);
@@ -278,6 +282,7 @@ void CSMFGroundDrawer::DrawForwardPass(const DrawPass::e& drawPass, bool alphaTe
 	if (!SelectRenderState(drawPass)->CanDrawForward(this))
 		return;
 
+	SCOPED_GL_DEBUGGROUP("Draw::World::Terrain::Forward");
 	smfRenderStates[RENDER_STATE_SEL]->SetCurrentShader(this, drawPass);
 	smfRenderStates[RENDER_STATE_SEL]->Enable(this, drawPass);
 
@@ -439,9 +444,10 @@ void CSMFGroundDrawer::SetupBigSquare(const DrawPass::e& drawPass, const int big
 		}
 	}
 	else {
-		if (shadowShader && shadowShader->IsBound()) {
-			shadowShader->SetUniform("texSquare", bigSquareX, bigSquareY);
-		}
+		// the shadow-gen map shader reads the square from a generic vertex
+		// attribute (no uniform lookup); this sets its constant value for
+		// draws whose VAO has no array enabled at that index
+		glVertexAttribI2i(CShadowHandler::SHADOWGEN_MAP_PATCH_SQUARE_ATTRIB, bigSquareX, bigSquareY);
 	}
 }
 

@@ -118,6 +118,7 @@ public:
 	 */
 	bool isRepairingBeforeResurrect = false;
 	bool inUpdateQue = false;
+	bool prevTransformStale = false;
 	bool deleteMe = false;
 	bool alphaFade = true; // unsynced
 

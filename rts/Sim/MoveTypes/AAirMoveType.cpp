@@ -15,7 +15,9 @@
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/CommandAI/CommandAI.h"
+#include "Sim/Units/Scripts/UnitScript.h"
 #include "System/SpringMath.h"
+#include "System/Threading/ThreadPool.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -60,7 +62,7 @@ static inline float HAMTGetMaxGroundHeight(float x, float z) { return std::max(s
 static inline float SAMTGetMaxGroundHeight(float x, float z) { return std::max(smoothGround.GetHeight(x, z), CGround::GetHeightAboveWater(x, z)); }
 
 static inline void AAMTEmitEngineTrail(CUnit* owner, unsigned int) {
-	projMemPool.alloc<CSmokeProjectile>(owner, owner->midPos, guRNG.NextVector() * 0.08f, (100.0f + guRNG.NextFloat() * 50.0f), 5.0f, 0.2f, 0.4f);
+	projMemPool.alloc<CSmokeProjectile>(owner, owner->midPos, guRNG.NextVector() * 0.08f, (100.0f + guRNG.NextFloat() * 50.0f), 5.0f, 0.2f, 0.4f)->castShadow = false;
 }
 static inline void AAMTEmitCustomTrail(CUnit* owner, unsigned int id) {
 	explGenHandler.GenExplosion(
@@ -133,10 +135,11 @@ bool AAirMoveType::UseSmoothMesh() const {
 
 	const CCommandAI* cai = owner->commandAI;
 	const CCommandQueue& cq = cai->commandQue;
-	const Command& fc = (cq.empty())? Command(CMD_STOP): cq.front();
+	// no Command copy: commands with many params use a shared pool, and this can run on worker threads
+	const int fcID = (cq.empty())? CMD_STOP: cq.front().GetID();
 
 	const bool closeGoalPos = (goalPos.SqDistance2D(owner->pos) < Square(landRadiusSq * 2.0f));
-	const bool transportCmd = ((fc.GetID() == CMD_LOAD_UNITS) || (fc.GetID() == CMD_UNLOAD_UNIT));
+	const bool transportCmd = ((fcID == CMD_LOAD_UNITS) || (fcID == CMD_UNLOAD_UNIT));
 	const bool forceDisable = ((transportCmd && closeGoalPos) || (aircraftState != AIRCRAFT_FLYING && aircraftState != AIRCRAFT_HOVERING));
 
 	return !forceDisable;
@@ -162,6 +165,39 @@ bool AAirMoveType::Update() {
 
 	// prevent UnitMoved event spam
 	return false;
+}
+
+bool AAirMoveType::CanUpdateMT() const
+{
+	// excluded: collisions (read and push other units), take-off from UseHeading and landing
+	// (scripts, CAI, blocking map), crashing (kills, projectiles), hovering (gsRNG)
+	if (collide || lastCollidee != nullptr || UseHeading() || owner->UnderFirstPersonControl())
+		return false;
+
+	return (aircraftState == AIRCRAFT_FLYING || aircraftState == AIRCRAFT_TAKEOFF || aircraftState == AIRCRAFT_LANDED);
+}
+
+void AAirMoveType::UpdateMovingScript(const float4& lastSpd)
+{
+	const bool startMoving = (lastSpd == ZeroVector && owner->speed != ZeroVector);
+	const bool stopMoving = (lastSpd != ZeroVector && owner->speed == ZeroVector);
+
+	// scripts are not thread safe, an MT update leaves the call to CallDeferredScripts
+	if (ThreadPool::IsInMultiThreadedSection()) {
+		deferredScriptCall = int(startMoving) - int(stopMoving);
+		return;
+	}
+
+	if (startMoving) { owner->script->StartMoving(false); }
+	if (stopMoving) { owner->script->StopMoving(); }
+}
+
+void AAirMoveType::CallDeferredScripts()
+{
+	if (deferredScriptCall > 0) { owner->script->StartMoving(false); }
+	if (deferredScriptCall < 0) { owner->script->StopMoving(); }
+
+	deferredScriptCall = 0;
 }
 
 void AAirMoveType::UpdateLanded()

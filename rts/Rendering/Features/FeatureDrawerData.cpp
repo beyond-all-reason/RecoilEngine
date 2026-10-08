@@ -90,19 +90,23 @@ void CFeatureDrawerData::ConfigNotify(const std::string& key, const std::string&
 void CFeatureDrawerData::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	UpdateDrawFlagsCameras();
+
+	const auto updateBody = [this](size_t k) {
+		UpdateDrawPos(unsortedObjects[k]);
+		UpdateCommon(k);
+	};
+
 	if (mtModelDrawer) {
-		for_mt_chunk(0, unsortedObjects.size(), [this](const int k) {
-			CFeature* f = unsortedObjects[k];
-			UpdateDrawPos(f);
-			UpdateCommon(f);
-		}, CModelDrawerDataConcept::MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT);
+		for_mt_chunk(0, unsortedObjects.size(), updateBody, MT_CHUNK_SIZE_UPDT_MIN, MT_CHUNK_SIZE_UPDT_MAX);
 	}
 	else {
-		for (CFeature* f : unsortedObjects) {
-			UpdateDrawPos(f);
-			UpdateCommon(f);
-		}
+		for (size_t k = 0; k < unsortedObjects.size(); ++k)
+			updateBody(k);
 	}
+
+	for (auto& mr : modelRenderers)
+		mr.UpdateDrawBins();
 }
 
 bool CFeatureDrawerData::IsAlpha(const CFeature* co) const
@@ -116,102 +120,66 @@ void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 	RECOIL_DETAILED_TRACY_ZONE;
 
 	CFeature* f = static_cast<CFeature*>(o);
-	f->ResetDrawFlag();
 
-	for (uint32_t camType = CCamera::CAMTYPE_PLAYER; camType < CCamera::CAMTYPE_ENVMAP; ++camType) {
-		if (camType == CCamera::CAMTYPE_UWREFL && !IWater::GetWater()->CanDrawReflectionPass())
-			continue;
+	// drawAlpha keeps its value while the player camera does not see the feature
+	uint8_t drawFlag = DrawFlags::SO_NODRAW_FLAG;
+	float drawAlpha = f->drawAlpha;
 
-		if (camType == CCamera::CAMTYPE_SHADOW && ((shadowHandler.shadowGenBits & CShadowHandler::SHADOWGEN_BIT_MODEL) == 0))
-			continue;
+	if (!f->noDraw && !f->IsInVoid() && (f->IsInLosForAllyTeam(gu->myAllyTeam) || gu->spectatingFullView)) {
+		const float drawRadius = f->GetDrawRadius();
 
-		const CCamera* cam = CCameraHandler::GetCamera(camType);
+		if (camPlayer->InView(f->drawMidPos, drawRadius)) {
+			const float camDist = (f->drawPos - camPlayer->GetPos()).Length();
 
-		if (f->noDraw)
-			continue;
-
-		if (f->IsInVoid())
-			continue;
-
-		if (!f->IsInLosForAllyTeam(gu->myAllyTeam) && !gu->spectatingFullView)
-			continue;
-
-		if (!cam->InView(f->drawMidPos, f->GetDrawRadius()))
-			continue;
-
-		switch (camType)
-			{
-			case CCamera::CAMTYPE_PLAYER: {
-				const float camDist = (f->drawPos - cam->GetPos()).Length();
-
+			if (!f->alphaFade) {
 				// special case for non-fading features
-				if (!f->alphaFade) {
-					f->SetDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
-					f->drawAlpha = 1.0f;
-					continue;
-				}
-
+				drawFlag = DrawFlags::SO_OPAQUE_FLAG;
+				drawAlpha = 1.0f;
+			} else if (camDist > featureDrawDistance) {
 				// too far, don't draw at all
-				if (camDist > featureDrawDistance) {
-					f->drawAlpha = 0.0f;
-					continue;
-				}
-
+				drawAlpha = 0.0f;
+			} else if (camDist < featureFadeDistance) {
 				// close enough to draw solid
-				if (camDist < featureFadeDistance) {
-					f->drawAlpha = 1.0f;
-					f->SetDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
-					if (f->IsInWater())
-						f->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
+				drawAlpha = 1.0f;
+				drawFlag = DrawFlags::SO_OPAQUE_FLAG;
 
-					continue;
-				}
-
-				// fading is disabled, just don't draw
-				if (featureDrawDistance == featureFadeDistance) {
-					f->drawAlpha = 0.0f;
-					continue;
-				}
-
-				f->drawAlpha = std::max(0.0f, 1.0f - (camDist - featureFadeDistance) / (featureDrawDistance - featureFadeDistance));
-				f->SetDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
 				if (f->IsInWater())
-					f->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
-			} break;
+					drawFlag |= DrawFlags::SO_REFRAC_FLAG;
+			} else if (featureDrawDistance == featureFadeDistance) {
+				// fading is disabled, just don't draw
+				drawAlpha = 0.0f;
+			} else {
+				drawAlpha = std::max(0.0f, 1.0f - (camDist - featureFadeDistance) / (featureDrawDistance - featureFadeDistance));
+				drawFlag = DrawFlags::SO_ALPHAF_FLAG;
 
-			case CCamera::CAMTYPE_UWREFL: {
-				if (f->drawAlpha <= 0.0f)
-					continue;
-
-				if (!f->HasDrawFlag(DrawFlags::SO_OPAQUE_FLAG) && !f->HasDrawFlag(DrawFlags::SO_ALPHAF_FLAG))
-					continue;
-
-				if (CModelDrawerHelper::ObjectVisibleReflection(f->drawMidPos, cam->GetPos(), f->GetDrawRadius()))
-					f->AddDrawFlag(DrawFlags::SO_REFLEC_FLAG);
-			} break;
-
-			case CCamera::CAMTYPE_SHADOW: {
-				if (f->drawAlpha <= 0.0f)
-					continue;
-
-				if unlikely(IsAlpha(f))
-					f->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
-				else
-					f->AddDrawFlag(DrawFlags::SO_SHOPAQ_FLAG);
-			} break;
-
-			default: { assert(false); } break;
+				if (f->IsInWater())
+					drawFlag |= DrawFlags::SO_REFRAC_FLAG;
+			}
 		}
+
+		if (camUWRefl != nullptr && drawAlpha > 0.0f && (drawFlag & (DrawFlags::SO_OPAQUE_FLAG | DrawFlags::SO_ALPHAF_FLAG)) != 0) {
+			if (camUWRefl->InView(f->drawMidPos, drawRadius) && CModelDrawerHelper::ObjectVisibleReflection(f->drawMidPos, camUWRefl->GetPos(), drawRadius))
+				drawFlag |= DrawFlags::SO_REFLEC_FLAG;
+		}
+
+		if (camShadow != nullptr && drawAlpha > 0.0f && camShadow->InView(f->drawMidPos, drawRadius))
+			drawFlag |= ((drawAlpha < 1.0f) ? DrawFlags::SO_SHTRAN_FLAG : DrawFlags::SO_SHOPAQ_FLAG);
 	}
 
-	if (f->alwaysUpdateMat || (f->drawFlag > DrawFlags::SO_NODRAW_FLAG && f->drawFlag < DrawFlags::SO_DRICON_FLAG)) {
-		f->UpdateTransform(f->drawPos, false);
+	spring::StoreIfChanged(f->drawAlpha, drawAlpha);
+	spring::StoreIfChanged(f->drawFlag, drawFlag);
+
+	if (f->alwaysUpdateMat || (drawFlag > DrawFlags::SO_NODRAW_FLAG && drawFlag < DrawFlags::SO_DRICON_FLAG)) {
+		const CMatrix44f drawMat = f->ComposeMatrix(f->drawPos);
+
+		if (std::memcmp(&drawMat, &f->GetTransformMatrixRef(false), sizeof(drawMat)) != 0)
+			f->SetTransform(drawMat, false);
 	}
 }
 
 void CFeatureDrawerData::UpdateDrawPos(CFeature* f)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	f->drawPos    = f->GetDrawPos(globalRendering->timeOffset);
-	f->drawMidPos = f->GetMdlDrawMidPos();
+	spring::StoreIfChanged(f->drawPos, f->GetDrawPos(globalRendering->timeOffset));
+	spring::StoreIfChanged(f->drawMidPos, f->GetMdlDrawMidPos());
 }

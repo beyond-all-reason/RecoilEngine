@@ -229,7 +229,11 @@ void CUnitDrawerData::Update()
 
 	iconZoomDist = dist;
 
-	const auto updateBody = [this](CUnit* u) {
+	UpdateDrawFlagsCameras();
+
+	const auto updateBody = [this](size_t k) {
+		CUnit* u = unsortedObjects[k];
+
 		UpdateDrawPos(u);
 
 		if (useScreenIcons)
@@ -237,19 +241,19 @@ void CUnitDrawerData::Update()
 		else
 			UpdateUnitIconState(u);
 
-		UpdateCommon(u);
+		UpdateCommon(k);
 	};
 
 	if (mtModelDrawer) {
-		for_mt_chunk(0, unsortedObjects.size(), [this, &updateBody](const int k) {
-			CUnit* unit = unsortedObjects[k];
-			updateBody(unit);
-		}, CModelDrawerDataConcept::MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT);
+		for_mt_chunk(0, unsortedObjects.size(), updateBody, MT_CHUNK_SIZE_UPDT_MIN, MT_CHUNK_SIZE_UPDT_MAX);
 	}
 	else {
-		for (CUnit* unit : unsortedObjects)
-			updateBody(unit);
+		for (size_t k = 0; k < unsortedObjects.size(); ++k)
+			updateBody(k);
 	}
+
+	for (auto& mr : modelRenderers)
+		mr.UpdateDrawBins();
 
 	UpdateLiveGhostTransforms();
 
@@ -327,22 +331,29 @@ void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 	unit->currentIconIndex = GetUnitIconIndex(unit, gu->myAllyTeam, gu->spectatingFullView);
 }
 
+void CUnitDrawerData::SetUnitIsIcon(CUnit* unit, bool isIcon)
+{
+	// see spring::StoreIfChanged
+	if (unit->GetIsIcon() != isIcon)
+		unit->SetIsIcon(isIcon);
+}
+
 void CUnitDrawerData::UpdateUnitIconState(CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
 	if unlikely(unit->currentIconIndex == icon::INVALID_ICON_INDEX) {
-		unit->SetIsIcon(false);
+		SetUnitIsIcon(unit, false);
 		return;
 	}
 
 	const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
 
-	unit->SetIsIcon((losStatus & LOS_INRADAR) != 0);
+	bool asIcon = ((losStatus & LOS_INRADAR) != 0);
 
 	//further refinement if visible
 	if ((losStatus & LOS_INLOS) != 0 || gu->spectatingFullView) {
-		bool asIcon = true;
+		asIcon = true;
 
 		asIcon = asIcon && !unit->noDraw;
 		asIcon = asIcon && !unit->IsInVoid();
@@ -350,9 +361,9 @@ void CUnitDrawerData::UpdateUnitIconState(CUnit* unit)
 		asIcon = asIcon && DrawAsIconByDistance(unit, (unit->pos - camera->GetPos()).SqLength());
 		// drawing icons is cheap but not free, avoid a perf-hit when many are offscreen
 		asIcon = asIcon && camera->InView(unit->drawMidPos, unit->GetDrawRadius());
-
-		unit->SetIsIcon(asIcon);
 	}
+
+	SetUnitIsIcon(unit, asIcon);
 }
 
 void CUnitDrawerData::UpdateUnitIconStateScreen(CUnit* unit)
@@ -360,13 +371,13 @@ void CUnitDrawerData::UpdateUnitIconStateScreen(CUnit* unit)
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (game->hideInterface && iconHideWithUI) // icons are hidden with UI
 	{
-		unit->SetIsIcon(false); // draw unit model always
+		SetUnitIsIcon(unit, false); // draw unit model always
 		return;
 	}
 
 	if (unit->currentIconIndex == icon::INVALID_ICON_INDEX || unit->health <= 0 || unit->beingBuilt || unit->noDraw || unit->IsInVoid())
 	{
-		unit->SetIsIcon(false);
+		SetUnitIsIcon(unit, false);
 		return;
 	}
 
@@ -388,17 +399,17 @@ void CUnitDrawerData::UpdateUnitIconStateScreen(CUnit* unit)
 	pos = camera->CalcViewPortCoordinates(pos);
 	radiusPos = camera->CalcViewPortCoordinates(radiusPos);
 
-	unit->iconRadius = unit->radius * ((limit * 0.9) / std::abs(pos.x - radiusPos.x)); // used for clicking on iconified units (world space!!!)
+	spring::StoreIfChanged(unit->iconRadius, float(unit->radius * ((limit * 0.9) / std::abs(pos.x - radiusPos.x)))); // used for clicking on iconified units (world space!!!)
 
 	if (!(losStatus & LOS_INLOS) && !gu->spectatingFullView) // no LOS on unit
 	{
-		unit->SetIsIcon(losStatus & LOS_INRADAR); // draw icon if unit is on radar
+		SetUnitIsIcon(unit, losStatus & LOS_INRADAR); // draw icon if unit is on radar
 		return;
 	}
 
 	// don't render unit's model if it is smaller than icon by 10% in screen space
 	// render it anyway in case icon isn't completely opaque (below FadeStart distance)
-	unit->SetIsIcon(iconZoomDist / iconSizeMult > iconFadeStart && std::abs(pos.x - radiusPos.x) < limit * 0.9);
+	SetUnitIsIcon(unit, iconZoomDist / iconSizeMult > iconFadeStart && std::abs(pos.x - radiusPos.x) < limit * 0.9);
 }
 
 void CUnitDrawerData::UpdateDrawPos(CUnit* u)
@@ -406,13 +417,13 @@ void CUnitDrawerData::UpdateDrawPos(CUnit* u)
 	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (const CUnit* t = u->GetTransporter(); t != nullptr) {
-		u->drawPos = u->GetDrawPosOther(t->preFrameTra.t, t->pos, globalRendering->timeOffset);
+		spring::StoreIfChanged(u->drawPos, u->GetDrawPosOther(t->preFrameTra.t, t->pos, globalRendering->timeOffset));
 	}
 	else {
-		u->drawPos = u->GetDrawPos(globalRendering->timeOffset);
+		spring::StoreIfChanged(u->drawPos, u->GetDrawPos(globalRendering->timeOffset));
 	}
 
-	u->drawMidPos = u->GetMdlDrawMidPos();
+	spring::StoreIfChanged(u->drawMidPos, u->GetMdlDrawMidPos());
 }
 
 void CUnitDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
@@ -420,71 +431,29 @@ void CUnitDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 	RECOIL_DETAILED_TRACY_ZONE;
 	CUnit* u = static_cast<CUnit*>(o);
 
-	{
-		//icons flag is set before UpdateObjectDrawFlags() is called
-		const bool isIcon = u->HasDrawFlag(DrawFlags::SO_DRICON_FLAG);
-		u->ResetDrawFlag();
-		u->SetIsIcon(isIcon);
-	}
+	//icons flag is set before UpdateObjectDrawFlags() is called
+	const bool isIcon = u->HasDrawFlag(DrawFlags::SO_DRICON_FLAG);
+	uint8_t drawFlag = isIcon ? DrawFlags::SO_DRICON_FLAG : DrawFlags::SO_NODRAW_FLAG;
 
-	for (uint32_t camType = CCamera::CAMTYPE_PLAYER; camType < CCamera::CAMTYPE_ENVMAP; ++camType) {
-		if (camType == CCamera::CAMTYPE_UWREFL && !IWater::GetWater()->CanDrawReflectionPass())
-			continue;
+	// icons are drawn instead of the model
+	if (!u->noDraw && !isIcon && !u->IsInVoid() && ((u->losStatus[gu->myAllyTeam] & LOS_INLOS) || gu->spectatingFullView)) {
+		const float drawRadius = u->GetDrawRadius();
 
-		if (camType == CCamera::CAMTYPE_SHADOW && ((shadowHandler.shadowGenBits & CShadowHandler::SHADOWGEN_BIT_MODEL) == 0))
-			continue;
+		if (camPlayer->InView(u->drawMidPos, drawRadius)) {
+			drawFlag = IsAlpha(u) ? DrawFlags::SO_ALPHAF_FLAG : DrawFlags::SO_OPAQUE_FLAG;
 
-		const CCamera* cam = CCameraHandler::GetCamera(camType);
-
-		if (u->noDraw)
-			continue;
-
-		// unit will be drawn as icon instead
-		if (u->GetIsIcon())
-			continue;
-
-		if (u->IsInVoid())
-			continue;
-
-		if (!(u->losStatus[gu->myAllyTeam] & LOS_INLOS) && !gu->spectatingFullView)
-			continue;
-
-		if (!cam->InView(u->drawMidPos, u->GetDrawRadius()))
-			continue;
-
-		switch (camType)
-		{
-			case CCamera::CAMTYPE_PLAYER: {
-				const float sqrCamDist = (u->drawPos - cam->GetPos()).SqLength();
-
-				if (!IsAlpha(u)) {
-					u->SetDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
-				}
-				else {
-					u->SetDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
-				}
-
-				if (u->IsInWater())
-					u->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
-			} break;
-
-			case CCamera::CAMTYPE_UWREFL: {
-				if (CModelDrawerHelper::ObjectVisibleReflection(u->drawMidPos, cam->GetPos(), u->GetDrawRadius()))
-					u->AddDrawFlag(DrawFlags::SO_REFLEC_FLAG);
-			} break;
-
-			case CCamera::CAMTYPE_SHADOW: {
-				if unlikely(IsAlpha(u))
-					u->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
-				else
-					u->AddDrawFlag(DrawFlags::SO_SHOPAQ_FLAG);
-			} break;
-
-			default: { assert(false); } break;
-
+			if (u->IsInWater())
+				drawFlag |= DrawFlags::SO_REFRAC_FLAG;
 		}
 
+		if (camUWRefl != nullptr && camUWRefl->InView(u->drawMidPos, drawRadius) && CModelDrawerHelper::ObjectVisibleReflection(u->drawMidPos, camUWRefl->GetPos(), drawRadius))
+			drawFlag |= DrawFlags::SO_REFLEC_FLAG;
+
+		if (camShadow != nullptr && camShadow->InView(u->drawMidPos, drawRadius))
+			drawFlag |= (IsAlpha(u) ? DrawFlags::SO_SHTRAN_FLAG : DrawFlags::SO_SHOPAQ_FLAG);
 	}
+
+	spring::StoreIfChanged(u->drawFlag, drawFlag);
 }
 
 bool CUnitDrawerData::DrawAsIconByDistance(const CUnit* unit, const float sqUnitCamDist) const
@@ -680,7 +649,7 @@ bool CUnitDrawerData::UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost
 
 		}
 
-		spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(u)],
+		liveGhostsChanged |= spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(u)],
 			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
 	}
 	return addedOwnAllyTeam;
@@ -715,7 +684,7 @@ void CUnitDrawerData::UnitEnteredLos(const CUnit* unit, int allyTeam)
 	CUnit* u = const_cast<CUnit*>(unit); //cleanup
 
 	if (unit->leavesGhost)
-		spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)],
+		liveGhostsChanged |= spring::VectorEraseIf(savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)],
 			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
 
 	if (allyTeam != gu->myAllyTeam)
@@ -735,8 +704,10 @@ void CUnitDrawerData::UnitLeftLos(const CUnit* unit, int allyTeam)
 		auto& lgbs = savedData.liveGhostBuildings[allyTeam][MDL_TYPE(unit)];
 		const bool alreadyGhosted = std::any_of(lgbs.begin(), lgbs.end(),
 			[u](const LiveGhostBuilding& lgb) { return lgb.unit == u; });
-		if (!alreadyGhosted)
+		if (!alreadyGhosted) {
 			lgbs.push_back({ u, u->paletteIndex, static_cast<uint8_t>(u->team) });
+			liveGhostsChanged = true;
+		}
 	}
 
 	if (allyTeam != gu->myAllyTeam)
@@ -751,6 +722,13 @@ void CUnitDrawerData::UpdateLiveGhostTransforms()
 	// Maintain one world-transform slot per live ghost building drawn for the local allyTeam.
 	// Ghosts are static, so each slot is filled once on first sight; entries not seen this sweep
 	// (units that regained LOS, died, or belong to a different allyTeam now) are freed.
+	// the slots only change with the ghost lists or the viewing allyTeam
+	if (!liveGhostsChanged && liveGhostsAllyTeam == gu->myAllyTeam)
+		return;
+
+	liveGhostsChanged = false;
+	liveGhostsAllyTeam = gu->myAllyTeam;
+
 	const int stamp = ++liveGhostSweepStamp;
 
 	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {

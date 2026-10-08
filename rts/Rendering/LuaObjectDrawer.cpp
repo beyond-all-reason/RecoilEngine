@@ -282,9 +282,11 @@ void LuaObjectDrawer::Update(bool init)
 	if ((drawDeferredEnabled = geomBuffer->Valid())) {
 		drawDeferredEnabled &= (geomBuffer->Update(init));
 
-		notifyEventFlags[LUAOBJ_UNIT   ] = !unitDrawer->DrawForward() || configHandler->GetBool("AllowDrawModelPostDeferredEvents");
+		const bool postDeferredEvents = configHandler->GetBool("AllowDrawModelPostDeferredEvents");
+
+		notifyEventFlags[LUAOBJ_UNIT   ] = !unitDrawer->DrawForward() || postDeferredEvents;
 		bufferClearFlags[LUAOBJ_UNIT   ] =  unitDrawer->DrawDeferred();
-		notifyEventFlags[LUAOBJ_FEATURE] = !featureDrawer->DrawForward() || configHandler->GetBool("AllowDrawModelPostDeferredEvents");
+		notifyEventFlags[LUAOBJ_FEATURE] = !featureDrawer->DrawForward() || postDeferredEvents;
 		bufferClearFlags[LUAOBJ_FEATURE] =  featureDrawer->DrawDeferred();
 
 		// if both object types are going to be drawn deferred, only
@@ -629,6 +631,10 @@ bool LuaObjectDrawer::AddOpaqueMaterialObject(CSolidObject* obj, LuaObjType objT
 {
 	LuaObjectMaterialData* matData = obj->GetLuaMaterialData();
 
+	// the common case (no Lua material on this object) needs no LOD distance
+	if (!matData->Enabled())
+		return false;
+
 	const LuaMatType matType = GetDrawPassOpaqueMat();
 	const float      lodDist = camera->ProjectedDistance(obj->pos);
 
@@ -639,6 +645,10 @@ bool LuaObjectDrawer::AddAlphaMaterialObject(CSolidObject* obj, LuaObjType objTy
 {
 	LuaObjectMaterialData* matData = obj->GetLuaMaterialData();
 
+	// the common case (no Lua material on this object) needs no LOD distance
+	if (!matData->Enabled())
+		return false;
+
 	const LuaMatType matType = GetDrawPassAlphaMat();
 	const float      lodDist = camera->ProjectedDistance(obj->pos);
 
@@ -648,6 +658,10 @@ bool LuaObjectDrawer::AddAlphaMaterialObject(CSolidObject* obj, LuaObjType objTy
 bool LuaObjectDrawer::AddShadowMaterialObject(CSolidObject* obj, LuaObjType objType)
 {
 	LuaObjectMaterialData* matData = obj->GetLuaMaterialData();
+
+	// the common case (no Lua material on this object) needs no LOD distance
+	if (!matData->Enabled())
+		return false;
 
 	const LuaMatType matType = GetDrawPassShadowMat();
 	const float      lodDist = camera->ProjectedDistance(obj->pos);

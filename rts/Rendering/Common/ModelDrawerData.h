@@ -9,6 +9,7 @@
 #include "System/EventClient.h"
 #include "System/EventHandler.h"
 #include "System/ContainerUtil.h"
+#include "System/SafeUtil.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/Threading/ThreadPool.h"
 #include "Rendering/GlobalRendering.h"
@@ -36,7 +37,9 @@ public:
 	int  GetReadAllyTeam() const override { return AllAccessTeam; }
 protected:
 	static constexpr int MT_CHUNK_OR_MIN_CHUNK_SIZE_SMMA = 128;
-	static constexpr int MT_CHUNK_OR_MIN_CHUNK_SIZE_UPDT = 256;
+	// objects in view cost several times more than the rest, small chunks keep the workers balanced
+	static constexpr int MT_CHUNK_SIZE_UPDT_MIN = 64;
+	static constexpr int MT_CHUNK_SIZE_UPDT_MAX = 128;
 };
 
 
@@ -58,31 +61,44 @@ protected:
 	void DelObject(const T* co, bool del);
 	void UpdateObject(const T* co, bool init);
 protected:
-	void UpdateCommon(T* o);
+	// k is the object's index into unsortedObjects
+	void UpdateCommon(size_t k);
 	virtual void UpdateObjectDrawFlags(CSolidObject* o) const = 0;
+
+	// per-frame inputs of UpdateObjectDrawFlags, set before the per-object pass
+	void UpdateDrawFlagsCameras();
+
+	const CCamera* camPlayer = nullptr;
+	const CCamera* camUWRefl = nullptr; // nullptr if there is no reflection pass
+	const CCamera* camShadow = nullptr; // nullptr if models cast no shadows
 private:
-	void UpdateObjectTrasform(const T* o);
-	void UpdateObjectUniforms(const T* o);
+	// render data of unsortedObjects[k], so the per-frame passes need no lookups
+	struct ObjectData {
+		ScopedTransformMemAlloc transformAlloc;
+		size_t uniformsOffset = 0;
+		int32_t lastSyncedFrameUpload = std::numeric_limits<int32_t>::lowest(); // update at least once before the sim starts
+	};
+
+	void UpdateObjectTrasform(const T* o, ObjectData& od);
+	void UpdateObjectUniforms(const T* o, const ObjectData& od);
 public:
 	const std::vector<T*>& GetUnsortedObjects() const { return unsortedObjects; }
 	const ModelRenderContainer<T>& GetModelRenderer(int modelType) const { return modelRenderers[modelType]; }
 
 	void ClearPreviousDrawFlags() { for (auto object : unsortedObjects) object->previousDrawFlag = 0; }
 
-	const auto& GetObjectTransformMemAlloc(const T* o) const {
-		const auto it = scTransMemAllocMap.find(const_cast<T*>(o));
-		return (it != scTransMemAllocMap.end()) ? it->second : ScopedTransformMemAlloc::Dummy();
+	const ScopedTransformMemAlloc& GetObjectTransformMemAlloc(const T* o) const {
+		const auto it = objectIndices.find(o);
+		return (it != objectIndices.end()) ? objectsData[it->second].transformAlloc : ScopedTransformMemAlloc::Dummy();
 	}
-	auto& GetObjectTransformMemAlloc(const T* o) { return scTransMemAllocMap[const_cast<T*>(o)]; }
-private:
-	static constexpr int MMA_SIZE0 = 2 << 17;
 protected:
 	std::array<ModelRenderContainer<T>, MODELTYPE_CNT> modelRenderers;
 
 	std::vector<T*> unsortedObjects;
-	spring::unordered_map<const T*, ScopedTransformMemAlloc> scTransMemAllocMap;
-	spring::unordered_map<const T*, int32_t> lastSyncedFrameUpload;
-
+private:
+	std::vector<ObjectData> objectsData;
+	spring::unordered_map<const T*, size_t> objectIndices;
+protected:
 	bool& mtModelDrawer;
 };
 
@@ -101,7 +117,6 @@ inline CModelDrawerDataBase<T>::CModelDrawerDataBase(const std::string& ecName, 
 	: CModelDrawerDataConcept(ecName, ecOrder)
 	, mtModelDrawer(mtModelDrawer_)
 {
-	scTransMemAllocMap.reserve(MMA_SIZE0);
 	for (auto& mr : modelRenderers) { mr.Clear(); }
 }
 
@@ -109,7 +124,8 @@ template<typename T>
 inline CModelDrawerDataBase<T>::~CModelDrawerDataBase()
 {
 	unsortedObjects.clear();
-	scTransMemAllocMap.clear();
+	objectsData.clear();
+	objectIndices.clear();
 }
 
 template<typename T>
@@ -124,14 +140,11 @@ inline void CModelDrawerDataBase<T>::AddObject(const T* co, bool add)
 	if (!add)
 		return;
 
+	objectIndices.emplace(o, unsortedObjects.size());
 	unsortedObjects.emplace_back(o);
 
 	const uint32_t numMatrices = ((o->model ? o->model->numPieces : 0) + 1u) * 2;
-	scTransMemAllocMap.emplace(o, ScopedTransformMemAlloc(numMatrices));
-	static constexpr auto INITIAL_FRAME_NUM = std::numeric_limits<typename decltype(lastSyncedFrameUpload)::mapped_type>::lowest();
-	lastSyncedFrameUpload.emplace(o, INITIAL_FRAME_NUM); //set to INITIAL_FRAME_NUM to update at least once before the sim starts
-
-	modelUniformsStorage.AddObject(co);
+	objectsData.push_back({ ScopedTransformMemAlloc(numMatrices), modelUniformsStorage.AddObject(co) });
 }
 
 template<typename T>
@@ -143,11 +156,27 @@ inline void CModelDrawerDataBase<T>::DelObject(const T* co, bool del)
 		modelRenderers[MDL_TYPE(o)].DelObject(o);
 	}
 
-	if (del && spring::VectorErase(unsortedObjects, o)) {
-		scTransMemAllocMap.erase(o);
-		lastSyncedFrameUpload.erase(o);
-		modelUniformsStorage.DelObject(co);
+	if (!del)
+		return;
+
+	const auto it = objectIndices.find(o);
+	if (it == objectIndices.end())
+		return;
+
+	// move the last object into the hole, like spring::VectorErase
+	const size_t k = it->second;
+	objectIndices.erase(it);
+
+	if (k + 1 != unsortedObjects.size()) {
+		unsortedObjects[k] = unsortedObjects.back();
+		objectsData[k] = std::move(objectsData.back()); // swaps the transform allocs, pop_back frees o's
+		objectIndices[unsortedObjects[k]] = k;
 	}
+
+	unsortedObjects.pop_back();
+	objectsData.pop_back();
+
+	modelUniformsStorage.DelObject(co);
 }
 
 template<typename T>
@@ -159,15 +188,13 @@ inline void CModelDrawerDataBase<T>::UpdateObject(const T* co, bool init)
 
 
 template<typename T>
-inline void CModelDrawerDataBase<T>::UpdateObjectTrasform(const T* o)
+inline void CModelDrawerDataBase<T>::UpdateObjectTrasform(const T* o, ObjectData& od)
 {
 	// check if already uploaded
-	auto lastUploadFrameIt = lastSyncedFrameUpload.find(o);
-	assert(lastUploadFrameIt != lastSyncedFrameUpload.end());
-	if (lastUploadFrameIt->second >= gs->frameNum)
+	if (od.lastSyncedFrameUpload >= gs->frameNum)
 		return;
 
-	ScopedTransformMemAlloc& stma = GetObjectTransformMemAlloc(o);
+	ScopedTransformMemAlloc& stma = od.transformAlloc;
 
 	const auto& tmPrev = o->preFrameTra;
 	const auto  tmCurr = Transform::FromMatrix(o->GetTransformMatrix(true)); //synced transform
@@ -197,35 +224,50 @@ inline void CModelDrawerDataBase<T>::UpdateObjectTrasform(const T* o)
 		lmp.ResetWasUpdated();
 	}
 
-	lastUploadFrameIt->second = gs->frameNum;
+	od.lastSyncedFrameUpload = gs->frameNum;
 }
 
 template<typename T>
-inline void CModelDrawerDataBase<T>::UpdateObjectUniforms(const T* o)
+inline void CModelDrawerDataBase<T>::UpdateObjectUniforms(const T* o, const ObjectData& od)
 {
-	auto& uni = modelUniformsStorage.GetObjUniformsArray(o);
-	uni.drawFlag = o->drawFlag;
+	auto& uni = modelUniformsStorage.GetUniformsAt(od.uniformsOffset);
+
+	bool changed = spring::StoreIfChanged(uni.drawFlag, o->drawFlag);
 
 	if (gu->spectatingFullView || o->IsInLosForAllyTeam(gu->myAllyTeam)) {
-		uni.id = o->id;
-		uni.teamID = o->team;
+		changed |= spring::StoreIfChanged(uni.id, static_cast<uint16_t>(o->id));
+		changed |= spring::StoreIfChanged(uni.teamID, static_cast<uint8_t>(o->team));
 		// TODO remove drawPos, replace with pos
-		uni.drawPos = float4{ o->drawPos, o->heading * math::PI / SPRING_MAX_HEADING };
-		uni.speed = o->speed;
-		uni.maxHealth = o->maxHealth;
-		uni.health = o->health;
+		changed |= spring::StoreIfChanged(uni.drawPos, float4{ o->drawPos, o->heading * math::PI / SPRING_MAX_HEADING });
+		changed |= spring::StoreIfChanged(uni.speed, o->speed);
+		changed |= spring::StoreIfChanged(uni.maxHealth, o->maxHealth);
+		changed |= spring::StoreIfChanged(uni.health, o->health);
 	}
+
+	if (changed)
+		modelUniformsStorage.SetUpdate(od.uniformsOffset);
 }
 
 template<typename T>
-inline void CModelDrawerDataBase<T>::UpdateCommon(T* o)
+inline void CModelDrawerDataBase<T>::UpdateDrawFlagsCameras()
 {
+	camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
+	camUWRefl = IWater::GetWater()->CanDrawReflectionPass() ? CCameraHandler::GetCamera(CCamera::CAMTYPE_UWREFL) : nullptr;
+	camShadow = ((shadowHandler.shadowGenBits & CShadowHandler::SHADOWGEN_BIT_MODEL) != 0) ? CCameraHandler::GetCamera(CCamera::CAMTYPE_SHADOW) : nullptr;
+}
+
+template<typename T>
+inline void CModelDrawerDataBase<T>::UpdateCommon(size_t k)
+{
+	T* o = unsortedObjects[k];
+	ObjectData& od = objectsData[k];
+
 	assert(o);
-	o->previousDrawFlag = o->drawFlag;
+	spring::StoreIfChanged(o->previousDrawFlag, o->drawFlag);
 	UpdateObjectDrawFlags(o);
 
 	if (o->alwaysUpdateMat || (o->drawFlag > DrawFlags::SO_NODRAW_FLAG && o->drawFlag < DrawFlags::SO_DRICON_FLAG))
-		UpdateObjectTrasform(o);
+		UpdateObjectTrasform(o, od);
 
-	UpdateObjectUniforms(o);
+	UpdateObjectUniforms(o, od);
 }

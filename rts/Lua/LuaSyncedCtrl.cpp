@@ -5382,6 +5382,10 @@ int LuaSyncedCtrl::SetFeaturePieceVisible(lua_State* L)
 int LuaSyncedCtrl::SetFeaturePieceMatrix(lua_State* L)
 {
 	CFeature* feature = ParseFeature(L, __func__, 1);
+
+	if (feature != nullptr)
+		featureHandler.SetFeaturePrevTransformStale(feature);
+
 	return Impl::SetObjectPieceMatrix(L, feature);
 }
 
@@ -7289,7 +7293,7 @@ int LuaSyncedCtrl::ForceUnitCollisionUpdate(lua_State* L)
 	if (!unit->moveType)
 		return 0;
 
-	unit->moveType->UpdateCollisionMap(true);
+	unit->moveType->UpdateCollisionMap();
 	return 0;
 }
 

@@ -94,6 +94,9 @@ layout(std140, binding = 0) readonly buffer TransformBuffer {
 
 uniform vec4 clipPlane0 = vec4(0.0, 0.0, 0.0, 1.0); //upper construction clip plane
 uniform vec4 clipPlane1 = vec4(0.0, 0.0, 0.0, 1.0); //lower construction clip plane
+// 1: static instances (projectile models): instData.x is a single world transform and the pieces
+// come from the bind pose, like the model shader's MATMODE_ARRAY
+uniform int staticInstances = 0;
 
 out Data {
 	vec4 uvCoord;
@@ -259,20 +262,24 @@ void GetModelSpaceVertex(out vec4 msPosition, out vec3 msNormal)
 
 	uint bID0 = GetUnpackedValue(bonesInfo.x, 0u) + (GetUnpackedValue(bonesInfo.z, 0u) << 8u); //first boneID
 	
-	// do interpolation
-	Transform tx = Lerp(
-		transforms[instData.x + 2u * (1u + bID0) + 0u],
-		transforms[instData.x + 2u * (1u + bID0) + 1u],
-		timeInfo.w
-	);
-
-	//tx = transforms[instData.x + 2u + 2u * bID0 + 1u];
+	Transform tx;
+	if (staticInstances != 0) {
+		tx = transforms[instData.w + bID0];
+	} else {
+		// do interpolation
+		tx = Lerp(
+			transforms[instData.x + 2u * (1u + bID0) + 0u],
+			transforms[instData.x + 2u * (1u + bID0) + 1u],
+			timeInfo.w
+		);
+		//tx = transforms[instData.x + 2u + 2u * bID0 + 1u];
+	}
 
 	weights[0] *= float(tx.trSc.w > 0.0);
 	msPosition = ApplyTransform(tx, piecePos);
 	msNormal = ApplyTransform(tx, normal4).xyz;
 
-	if (weights[0] == 1.0)
+	if (staticInstances != 0 || weights[0] == 1.0)
 		return;
 
 	float wSum = 0.0;
@@ -320,12 +327,17 @@ void main(void)
 	vec3 modelNormal;
 	GetModelSpaceVertex(modelPos, modelNormal);
 
-	// do interpolation
-	Transform tx = Lerp(
-		transforms[instData.x + 0u],
-		transforms[instData.x + 1u],
-		timeInfo.w
-	);
+	Transform tx;
+	if (staticInstances != 0) {
+		tx = transforms[instData.x + 0u];
+	} else {
+		// do interpolation
+		tx = Lerp(
+			transforms[instData.x + 0u],
+			transforms[instData.x + 1u],
+			timeInfo.w
+		);
+	}
 
 	vec4 worldPos = ApplyTransform(tx, modelPos);
 	tx.trSc = vec4(0, 0, 0, 1); //nullify the transform part

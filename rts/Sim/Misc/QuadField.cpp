@@ -544,7 +544,8 @@ void CQuadField::MovedUnit(CUnit* unit)
 		AddTeamUnit(qi, unit);
 	}
 
-	unit->quads = std::move(*qfQuery.quads);
+	// copy, moving would take the pooled vector's buffer and make the next query reallocate it
+	unit->quads.assign(qfQuery.quads->begin(), qfQuery.quads->end());
 }
 
 void CQuadField::RemoveUnit(CUnit* unit)
@@ -591,7 +592,7 @@ void CQuadField::MovedRepulser(CPlasmaRepulser* repulser)
 		spring::VectorInsertUnique(baseQuads[qi].repulsers, repulser, false);
 	}
 
-	repulser->SetQuads(std::move(*qfQuery.quads));
+	repulser->SetQuads(std::vector<int>(qfQuery.quads->begin(), qfQuery.quads->end()));
 }
 
 void CQuadField::RemoveRepulser(CPlasmaRepulser* repulser)
@@ -674,7 +675,7 @@ void CQuadField::AddProjectile(CProjectile* p)
 			spring::VectorInsertUnique(baseQuads[qi].projectiles, p, false);
 		}
 
-		p->quads = std::move(*qfQuery.quads);
+		p->quads.assign(qfQuery.quads->begin(), qfQuery.quads->end());
 	} else {
 		int newQuad = WorldPosToQuadFieldIdx(p->pos);
 		spring::VectorInsertUnique(baseQuads[newQuad].projectiles, p, false);
