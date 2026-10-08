@@ -6274,6 +6274,7 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 		LuaPushNamedNumber(L, "maxRudder",   sAMT->maxRudder);
 
 		LuaPushNamedBool  (L, "agileFlight",    sAMT->agileFlight);
+		LuaPushNamedBool  (L, "agileLandOnly",  sAMT->agileLandOnly);
 		LuaPushNamedString(L, "flightRegime",   sAMT->InAgileRegime()? "agile": "cruise");
 		LuaPushNamedNumber(L, "agileSpeed",     sAMT->agileSpeed * GAME_SPEED);
 		LuaPushNamedNumber(L, "agileTurnRate",  sAMT->agileTurnRate);

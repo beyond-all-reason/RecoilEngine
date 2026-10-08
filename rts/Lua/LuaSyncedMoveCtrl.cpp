@@ -856,6 +856,7 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * @field attackSafetyDistance number?
  * @field myGravity number?
  * @field agileFlight boolean? Fly take-offs, landings, final approaches and short distance flight with gunship-like control, so the plane arrives and sets down exactly on its goal. Longer flights keep the normal fixed-wing movement.
+ * @field agileLandOnly boolean? Use agile flight only while the idle mode of the aircraft is to land. Set to fly, it behaves like a stock aircraft, and goes back up to fixed-wing flight if it was in the agile regime.
  * @field agileSpeed number? Top speed of the agile regime in elmos per second, also the speed at which it hands over to fixed-wing flight. Zero restores the default (a share of the top speed).
  * @field agileTurnRate number? How fast the nose comes round in the agile regime at its top speed (65536 is a full circle per frame); scaled down with speed, so a stationary aircraft does not turn. Independent of the fixed-wing turn rate (`maxRudder`) and of the `turnRate` tag. Zero restores the default.
  * @field agileAccRate number? Acceleration and deceleration limit of the agile regime, in elmos per frame squared. Zero restores the default (`maxAcc`).
@@ -881,6 +882,7 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * | "useSmoothMesh"
  * | "loopbackAttack"
  * | "agileFlight"
+ * | "agileLandOnly"
   * @param value boolean
  * @return integer numAssignedValues
  */
