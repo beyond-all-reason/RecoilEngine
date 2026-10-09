@@ -1433,6 +1433,13 @@ function gadgetHandler:UnitDestroyed(
 end
 
 
+function gadgetHandler:UnitDeleted(unitID, unitDefID, unitTeam)
+  for _,g in r_ipairs(self.UnitDeletedList) do
+    g:UnitDeleted(unitID, unitDefID, unitTeam)
+  end
+end
+
+
 function gadgetHandler:RenderUnitDestroyed(unitID, unitDefID, unitTeam)
   for _,g in r_ipairs(self.RenderUnitDestroyedList) do
     g:RenderUnitDestroyed(unitID, unitDefID, unitTeam)
