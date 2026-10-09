@@ -6536,7 +6536,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param w integer
  * @param h integer
  * @param format GL? (Default: `GL.RGBA`)
- * @return number[][][] colors Array of rows of color values (color size based on format), bottom row first: `colors[row][column]`.
+ * @return number[][][] colors Array of rows of color values (color size based on format), bottom row first: `colors[y][x]`.
  */
 int LuaOpenGL::ReadPixels(lua_State* L)
 {
