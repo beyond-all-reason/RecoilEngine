@@ -11,22 +11,22 @@ if Script.GetSynced() then
 
 	function Initialize()
 		if phase == 0 then
-			Spring.RegisterCommand(commandID, { movement = true })
+			Spring.RegisterCommand(commandID, { movement = true, attack = true })
 			Spring.RegisterCommand(abandonedID, {})
 		else
 			-- Both true and false registrations must be removed on full reload.
-			Spring.RegisterCommand(commandID, { movement = false })
-			Spring.RegisterCommand(abandonedID, { movement = true })
+			Spring.RegisterCommand(commandID, { movement = false, attack = false })
+			Spring.RegisterCommand(abandonedID, { movement = true, attack = true })
 			Spring.RegisterCommand(shutdownID, {})
 			assert(not pcall(Spring.RegisterCommand, commandID, {}), "Accepted duplicate ID")
-			assert(not pcall(Spring.RegisterCommand, commandID, { movement = true }), "Changed registered ID")
+			assert(not pcall(Spring.RegisterCommand, commandID, { movement = true, attack = true }), "Changed registered ID")
 		end
 	end
 
 	function Shutdown()
 		if phase == 0 then
 			-- Cleanup must include registrations made during Shutdown.
-			Spring.RegisterCommand(shutdownID, { movement = true })
+			Spring.RegisterCommand(shutdownID, { movement = true, attack = true })
 		end
 	end
 
@@ -52,7 +52,7 @@ if Script.GetSynced() then
 		assert(phase == 1)
 		-- Reloading only the unsynced half must preserve synced registrations.
 		assert(not pcall(Spring.RegisterCommand, commandID, {}))
-		assert(not pcall(Spring.RegisterCommand, abandonedID, { movement = true }))
+		assert(not pcall(Spring.RegisterCommand, abandonedID, { movement = true, attack = true }))
 		assert(not pcall(Spring.RegisterCommand, shutdownID, {}))
 		SendToUnsynced("registration_complete")
 	end

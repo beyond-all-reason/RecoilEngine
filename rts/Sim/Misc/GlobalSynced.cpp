@@ -39,6 +39,7 @@ CR_BIND(CGlobalSynced, )
 CR_BIND(CustomCommandProperties, ())
 CR_REG_METADATA(CustomCommandProperties, (
 	CR_MEMBER(movement),
+	CR_MEMBER(attack),
 	CR_MEMBER(luaHandleName)
 ))
 

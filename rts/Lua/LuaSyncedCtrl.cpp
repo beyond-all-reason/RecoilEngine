@@ -7926,6 +7926,9 @@ static int ParseStringVector(lua_State* L, int index, vector<string>& strvec)
  * @param properties table Command properties.
  * @param properties.movement boolean? (Default: false) Include in movement lookahead,
  * including attack completion and aircraft decisions, like native movement commands.
+ * @param properties.attack boolean? (Default: false) Use aircraft attack movement while
+ * this command is at the front and the unit has a target. Does not imply movement,
+ * interpret command parameters, acquire a target, or execute a native Attack.
  */
 int LuaSyncedCtrl::RegisterCommand(lua_State* L)
 {
@@ -7947,6 +7950,7 @@ int LuaSyncedCtrl::RegisterCommand(lua_State* L)
 		if (lua_isboolean(L, LUA_TABLE_VALUE_INDEX)) {
 			switch (hashString(key)) {
 				case hashString("movement"): { properties.movement = lua_toboolean(L, LUA_TABLE_VALUE_INDEX); } break;
+				case hashString("attack"): { properties.attack = lua_toboolean(L, LUA_TABLE_VALUE_INDEX); } break;
 			}
 
 			continue;

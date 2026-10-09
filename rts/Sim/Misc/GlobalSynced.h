@@ -15,6 +15,7 @@ struct CustomCommandProperties
 	CR_DECLARE_STRUCT(CustomCommandProperties)
 
 	bool movement = false;
+	bool attack = false;
 	std::string luaHandleName; // either "LuaRules" or "LuaGaia"
 };
 
