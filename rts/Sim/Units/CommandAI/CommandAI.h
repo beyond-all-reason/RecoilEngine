@@ -16,6 +16,8 @@ class CFeature;
 class CWeapon;
 struct Command;
 
+enum class CommandEndReason { Completed, Removed, TargetLost, Interrupted };
+
 class CCommandAI : public CObject
 {
 	CR_DECLARE(CCommandAI)
@@ -50,7 +52,8 @@ public:
 	virtual int GetDefaultCmd(const CUnit* pointed, const CFeature* feature);
 	virtual void SlowUpdate();
 	virtual void GiveCommandReal(const Command& c, bool fromSynced = true);
-	virtual void FinishCommand();
+	virtual void FinishCommand(CommandEndReason reason = CommandEndReason::Completed);
+	void NotifyCommandEnded(const Command& cmd, CommandEndReason reason);
 
 	virtual void BuggerOff(const float3& pos, float radius) {}
 	virtual void StopMove() {}
@@ -104,7 +107,7 @@ public:
 	bool ExecuteStateCommand(const Command& c);
 
 	void ExecuteInsert(const Command& c, bool fromSynced = true);
-	void ExecuteRemove(const Command& c);
+	void ExecuteRemove(const Command& c, CommandEndReason reason = CommandEndReason::Removed);
 
 	void AddStockpileWeapon(CWeapon* weapon);
 	void StockpileChanged(CWeapon* weapon);
