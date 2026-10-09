@@ -73,6 +73,9 @@ public:
 	bool AddToSubmission(const UnitDef* unitDef, uint16_t paletteIndex);
 
 	bool AddStaticInstance(const S3DModel* model, uint32_t worldTransformOffset, uint16_t paletteIndex);
+	/// one piece (its own index range) as a static instance; the shader still applies the piece's
+	/// bind-pose transform, the caller's world transform has to account for that
+	bool AddStaticInstance(const S3DModelPiece* piece, uint32_t worldTransformOffset, uint16_t paletteIndex);
 
 	void Submit(GLenum mode = GL_TRIANGLES, bool bindUnbind = false);
 
