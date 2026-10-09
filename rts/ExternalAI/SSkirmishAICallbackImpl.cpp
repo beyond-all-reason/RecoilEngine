@@ -3527,7 +3527,8 @@ EXPORT(int) skirmishAiCallback_Unit_CurrentCommand_getParams(
 	int retNumParams = cqNumParams;
 
 	if (params != nullptr) {
-		const float* cmdParams = q->at(commandId).GetParams();
+		const Command command = q->at(commandId);
+		const float* cmdParams = command.GetParams();
 
 		for (int i = 0, n = (retNumParams = std::min(cqNumParams, maxNumParams)); i < n; i++) {
 			params[i] = cmdParams[i];
