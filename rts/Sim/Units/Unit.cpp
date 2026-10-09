@@ -1753,6 +1753,8 @@ void CUnit::SetNeutral(bool b) {
 
 		unit->DropCurrentAttackTarget();
 		cai->StopAttackingTargetIf([&](const CUnit* t) { return (t == this); });
+		const auto removedTags = eventHandler.UnitAttackTargetRemoved(unit->id, unit->unitDef->id, unit->team, id);
+		cai->RemoveCommandsByTag(removedTags);
 	}
 }
 

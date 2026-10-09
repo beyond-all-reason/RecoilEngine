@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 # This file is part of the Spring engine (GPL v2 or later), see LICENSE.html
-"""Validate UnitDeleted ordering in an isolated BAR game, using development assets.
+"""Validate deletion and per-unit neutral-target removal ordering in an isolated BAR game, using development assets.
 
 Manual check: destroy a target with a native Attack queue. UnitDestroyed still
 sees a valid unit. UnitDeleted sees an invalid ID and the next native Attack,
 with the original unit definition/team; the unsynced callin must never run.
+Neutralization must notify only affected units after native queue pruning, including
+virtual targets without a materialized order. Returned tags must be erased without
+UnitCmdDone or immediate successor execution. Neither callin may run unsynced.
 AI assistance: OpenAI Codex authored the fixture and runner.
 """
 import argparse
@@ -28,8 +31,9 @@ overlay = root/'games/validation.sdd'
 (overlay/'modinfo.lua').write_text('return {name="Unit Deletion Validation",version="1",modtype=1,depend={"Beyond All Reason $VERSION"}}\n')
 handler = (a.game/'luarules/gadgets.lua').read_text()
 assert '"UnitDeleted"' not in handler, 'Use an unmodified BAR game for this engine fixture'
-handler = handler.replace('"UnitDestroyed",', '"UnitDestroyed",\n\t"UnitDeleted",', 1)
+handler = handler.replace('"UnitDestroyed",', '"UnitDestroyed",\n\t"UnitDeleted",\n\t"UnitAttackTargetRemoved",', 1)
 handler = handler.replace('function gadgetHandler:UnitDestroyed(', 'function gadgetHandler:UnitDeleted(...)\n for _,g in ipairs(self.UnitDeletedList) do g:UnitDeleted(...) end\nend\n\nfunction gadgetHandler:UnitDestroyed(', 1)
+handler = handler.replace('function gadgetHandler:UnitDestroyed(', 'function gadgetHandler:UnitAttackTargetRemoved(...)\n local tags = {}\n for _,g in ipairs(self.UnitAttackTargetRemovedList) do\n local removed = g:UnitAttackTargetRemoved(...)\n for _,tag in ipairs(removed or {}) do tags[#tags+1] = tag end\n end\n return tags\nend\n\nfunction gadgetHandler:UnitDestroyed(', 1)
 (overlay/'luarules/gadgets.lua').write_text(handler)
 (overlay/'luarules/gadgets/dbg_unit_deleted.lua').write_bytes(Path(__file__).with_name('observer.lua').read_bytes())
 (root/'springsettings.cfg').write_text('HostPortDefault=51320\nNoSound=1\nLuaUI=0\nWorkerThreadCount=1\nHardwareThreadCount=1\n')
