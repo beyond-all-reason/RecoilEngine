@@ -1248,6 +1248,33 @@ void CLuaHandle::UnitDestroyed(const CUnit* unit, const CUnit* attacker, int wea
 }
 
 
+/*** Called after a unit has been deleted and its native death dependences processed.
+ * Unlike UnitDestroyed, this runs after the death script completes and before the
+ * next unit movement update. The ID is no longer valid. Only synced handles with
+ * full read access receive this callin; it is suitable for removing virtual queued
+ * targets at the same simulation phase as native queued commands.
+ *
+ * @function Callins:UnitDeleted
+ * @param unitID UnitID
+ * @param unitDefID UnitDefID
+ * @param unitTeam TeamID
+ */
+void CLuaHandle::UnitDeleted(int unitID, int unitDefID, int unitTeam)
+{
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 5, __func__);
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	lua_pushnumber(L, unitID);
+	lua_pushnumber(L, unitDefID);
+	lua_pushnumber(L, unitTeam);
+	RunCallInTraceback(L, cmdStr, 3, 0, traceBack.GetErrFuncIdx(), false);
+}
+
+
 /*** Called when a unit is transferred between teams. This is called before `UnitGiven` and in that moment unit is still assigned to the oldTeam.
  *
  * @function Callins:UnitTaken

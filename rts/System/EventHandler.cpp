@@ -562,6 +562,18 @@ void CEventHandler::GameFramePost(int gameFrame)
 	ITERATE_EVENTCLIENTLIST(GameFramePost, gameFrame);
 }
 
+void CEventHandler::UnitDeleted(int unitID, int unitDefID, int unitTeam)
+{
+	// There is no live unit left for visibility queries. Only synced clients
+	// with full read access receive this lifecycle notification.
+	for (size_t i = 0; i < listUnitDeleted.size(); ) {
+		CEventClient* ec = listUnitDeleted[i];
+		if (ec->GetSynced() && ec->GetFullRead())
+			ec->UnitDeleted(unitID, unitDefID, unitTeam);
+		i += (i < listUnitDeleted.size() && ec == listUnitDeleted[i]);
+	}
+}
+
 void CEventHandler::GameProgress(int gameFrame)
 {
 	ZoneScoped;

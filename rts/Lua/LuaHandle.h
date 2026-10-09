@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_HANDLE_H
-#define LUA_HANDLE_H
+#pragma once
 #include <cinttypes>
 
 #include "System/EventClient.h"
@@ -132,6 +131,7 @@ class CLuaHandle : public CEventClient
 		void UnitReverseBuilt(const CUnit* unit) override;
 		void UnitConstructionDecayed(const CUnit* unit, float timeSinceLastBuild, float iterationPeriod, float part) override;
 		void UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID) override;
+		void UnitDeleted(int unitID, int unitDefID, int unitTeam) override;
 		void UnitTaken(const CUnit* unit, int oldTeam, int newTeam) override;
 		void UnitGiven(const CUnit* unit, int oldTeam, int newTeam) override;
 
@@ -442,6 +442,3 @@ inline bool CLuaHandle::RunCallInLUS(lua_State* L, std::string* ts, int inArgs, 
 
 /******************************************************************************/
 /******************************************************************************/
-
-
-#endif /* LUA_HANDLE_H */
