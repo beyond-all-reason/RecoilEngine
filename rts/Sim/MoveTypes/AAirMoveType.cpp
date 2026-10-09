@@ -12,6 +12,7 @@
 #include "Sim/Misc/SmoothHeightMesh.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Projectiles/ProjectileMemPool.h"
+#include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/CommandAI/CommandAI.h"
@@ -163,6 +164,16 @@ bool AAirMoveType::Update() {
 	// prevent UnitMoved event spam
 	return false;
 }
+
+// how much of the noise is kept from one frame to the next, and how wide each new draw is
+static constexpr float RANDOM_WIND_KEPT_PER_FRAME = 0.9f;
+static constexpr float RANDOM_WIND_DRAW_WIDTH = 0.5f;
+
+void AAirMoveType::UpdateRandomWind(float& windAxis)
+{
+	windAxis = windAxis * RANDOM_WIND_KEPT_PER_FRAME + (gsRNG.NextFloat() - 0.5f) * RANDOM_WIND_DRAW_WIDTH;
+}
+
 
 void AAirMoveType::UpdateLanded()
 {
