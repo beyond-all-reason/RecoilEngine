@@ -72,6 +72,8 @@ public:
 	const GL::GeometryBuffer* GetGeometryBuffer() const { return &geomBuffer; }
 	      GL::GeometryBuffer* GetGeometryBuffer()       { return &geomBuffer; }
 
+	uint32_t GetDeferredDepthTexture() const override;
+
 	IMeshDrawer* GetMeshDrawer() { return meshDrawer; }
 	IMeshDrawer* SwitchMeshDrawer(int wantedMode = -1);
 
@@ -87,6 +89,7 @@ private:
 	bool UpdateGeometryBuffer(bool init);
 
 	bool alwaysDispatchEvents = false;
+	uint32_t deferredDrawFrame = ~0u; ///< draw frame of the last deferred pass that drew the mesh
 	bool combinedAllowed = false;
 protected:
 	CSMFReadMap* smfMap;

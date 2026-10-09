@@ -269,6 +269,7 @@ void CSMFGroundDrawer::DrawDeferredPass(const DrawPass::e& drawPass, bool alphaT
 			eventHandler.DrawGroundPreDeferred();
 
 		meshDrawer->DrawMesh(drawPass);
+		deferredDrawFrame = globalRendering->drawFrame;
 
 		if (alphaTest) {
 			glDisable(GL_ALPHA_TEST);
@@ -311,6 +312,14 @@ void CSMFGroundDrawer::DrawDeferredPass(const DrawPass::e& drawPass, bool alphaT
 
 	if (alwaysDispatchEvents || HaveLuaRenderState())
 		eventHandler.DrawGroundPostForward();
+}
+
+uint32_t CSMFGroundDrawer::GetDeferredDepthTexture() const
+{
+	if (deferredDrawFrame != globalRendering->drawFrame || geomBuffer.GetTextureTarget() != GL_TEXTURE_2D)
+		return 0;
+
+	return geomBuffer.GetBufferTexture(GL::GeometryBuffer::ATTACHMENT_ZVALTEX);
 }
 
 void CSMFGroundDrawer::DrawForwardPass(const DrawPass::e& drawPass, bool alphaTest)
