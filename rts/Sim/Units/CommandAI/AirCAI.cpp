@@ -267,6 +267,15 @@ void CAirCAI::ExecuteMove(Command& c)
 
 	const CStrafeAirMoveType* airMT = (!owner->UsingScriptMoveType())? static_cast<const CStrafeAirMoveType*>(myPlane): nullptr;
 
+	// agile aircraft can stop on a goal, so the last one of a queue is captured exactly
+	if (airMT != nullptr && airMT->UseAgileFlight() && !HasMoreMoveCommands()) {
+		// (flying over it in cruise flight is not arriving, the aircraft comes round and stops on it)
+		if (airMT->InAgileRegime() && (owner->pos + owner->speed - cmdPos).SqLength2D() < Square(airMT->GetAgileGoalRadius()))
+			StopMoveAndFinishCommand();
+
+		return;
+	}
+
 	const float mtRadius    = (airMT != nullptr)? std::max(airMT->turnRadius + 2 * SQUARE_SIZE, 128.0f) : 127.0f;
 	const float sqRadius    = Square(mtRadius);
 
