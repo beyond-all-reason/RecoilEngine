@@ -13,6 +13,7 @@
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/glDebugGroupTimers.h"
+#include "Rendering/GL/glVRAMTracker.h"
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/glxHandler.h"
@@ -590,6 +591,7 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 		return false;
 
 	gladLoadGL();
+	GL::VRAMTracker::Init(); // before anything allocates
 	GLX::Load(sdlWindow);
 
 	if (!CheckGLContextVersion(minCtx)) {
@@ -624,6 +626,7 @@ void CGlobalRendering::DestroyWindowAndContext() {
 	SetWindowInputGrabbing(false);
 
 	GL::DebugGroupTimers::Kill(); // frees its GL queries, needs the context still current
+	GL::VRAMTracker::Kill();
 	SDL_GL_MakeCurrent(sdlWindow, nullptr);
 	SDL_DestroyWindow(sdlWindow);
 
@@ -717,6 +720,7 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 		FrameMark;
 		CollectTracyGpuZones();
 		GL::DebugGroupTimers::EndFrame();
+		GL::VRAMTracker::Update();
 	}
 	// exclude debug from SCOPED_TIMER("Misc::SwapBuffers");
 	eventHandler.DbgTimingInfo(TIMING_SWAP, pre, spring_now());
