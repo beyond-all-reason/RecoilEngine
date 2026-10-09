@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_SYNCED_CTRL_H
-#define LUA_SYNCED_CTRL_H
+#pragma once
 
 struct lua_State;
 class CFeature;
@@ -261,6 +260,7 @@ class LuaSyncedCtrl
 		static int SpawnSFX(lua_State* L);
 
 		// LuaRules  (fullCtrl)
+		static int RegisterCommand(lua_State* L);
 		static int EditUnitCmdDesc(lua_State* L);
 		static int InsertUnitCmdDesc(lua_State* L);
 		static int RemoveUnitCmdDesc(lua_State* L);
@@ -270,6 +270,3 @@ class LuaSyncedCtrl
 
 		static int SetRadarErrorParams(lua_State* L);
 };
-
-
-#endif /* LUA_SYNCED_CTRL_H */
