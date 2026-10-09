@@ -1,7 +1,11 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "System/Platform/WindowManagerHelper.h"
-#include <SDL_syswm.h>
+
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_properties.h>
+#include <SDL3/SDL_video.h>
+
 #include <windows.h>
 
 
@@ -34,11 +38,12 @@ int GetWindowState(SDL_Window* window)
 	WINDOWPLACEMENT wp;
 	wp.length = sizeof(WINDOWPLACEMENT);
 
-	struct SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
-	SDL_GetWindowWMInfo(window, &info);
+	const SDL_PropertiesID props = SDL_GetWindowProperties(window);
+	HWND hwnd = (HWND)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+	if (!hwnd)
+		return 0;
 
-	if (GetWindowPlacement(info.info.win.window, &wp)) {
+	if (GetWindowPlacement(hwnd, &wp)) {
 		if (wp.showCmd == SW_SHOWMAXIMIZED)
 			state = SDL_WINDOW_MAXIMIZED;
 		if (wp.showCmd == SW_SHOWMINIMIZED)
@@ -53,11 +58,11 @@ int GetWindowState(SDL_Window* window)
 void SetWindowResizable(SDL_Window* window, bool resizable)
 {
 #ifndef HEADLESS
-	SDL_SysWMinfo info;
-	SDL_VERSION(&info.version);
-	SDL_GetWindowWMInfo(window, &info);
+	const SDL_PropertiesID props = SDL_GetWindowProperties(window);
+	HWND hwnd = (HWND)SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+	if (!hwnd)
+		return;
 
-	HWND hwnd = info.info.win.window;
 	DWORD style = GetWindowLong(hwnd, GWL_STYLE);
 	if (resizable) {
 		style |= (WS_THICKFRAME | WS_MAXIMIZEBOX);
