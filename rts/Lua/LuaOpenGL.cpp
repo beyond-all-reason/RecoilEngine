@@ -6529,14 +6529,14 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @return number[][] colors Row of color values (color size based on format).
  */
 /***
- * Get columns of pixels.
+ * Get rows of pixels.
  * @function gl.ReadPixels
  * @param x integer
  * @param y integer
  * @param w integer
  * @param h integer
  * @param format GL? (Default: `GL.RGBA`)
- * @return number[][][] colors Array of columns of color values (color size based on format).
+ * @return number[][][] colors Array of rows of color values (color size based on format), bottom row first: `colors[y][x]`.
  */
 int LuaOpenGL::ReadPixels(lua_State* L)
 {
@@ -6593,12 +6593,13 @@ int LuaOpenGL::ReadPixels(lua_State* L)
 		return 1;
 	}
 
-	lua_createtable(L, w, 0);
-	for (int x = 1; x <= w; x++) {
-		lua_pushnumber(L, x);
-		lua_createtable(L, h, 0);
-		for (int y = 1; y <= h; y++) {
-			lua_pushnumber(L, y);
+	// glReadPixels returns rows bottom to top, so the pixel data is walked as colors[row][column]
+	lua_createtable(L, h, 0);
+	for (int row = 1; row <= h; row++) {
+		lua_pushnumber(L, row);
+		lua_createtable(L, w, 0);
+		for (int col = 1; col <= w; col++) {
+			lua_pushnumber(L, col);
 			PushPixelData(L, fSize, d);
 			lua_rawset(L, -3);
 		}
