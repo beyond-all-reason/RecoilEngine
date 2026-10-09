@@ -132,6 +132,7 @@ class CLuaHandle : public CEventClient
 		void UnitConstructionDecayed(const CUnit* unit, float timeSinceLastBuild, float iterationPeriod, float part) override;
 		void UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID) override;
 		void UnitDeleted(int unitID, int unitDefID, int unitTeam) override;
+		std::vector<int> UnitAttackTargetRemoved(int unitID, int unitDefID, int unitTeam, int targetID) override;
 		void UnitTaken(const CUnit* unit, int oldTeam, int newTeam) override;
 		void UnitGiven(const CUnit* unit, int oldTeam, int newTeam) override;
 

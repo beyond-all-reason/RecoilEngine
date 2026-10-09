@@ -56,6 +56,7 @@ public:
 	virtual void StopMove() {}
 
 	void StopAttackingTargetIf(const std::function<bool(const CUnit*)>& pred);
+	void RemoveCommandsByTag(const std::vector<int>& tags);
 	void StopAttackingAllyTeam(int ally);
 
 	/**
@@ -132,6 +133,7 @@ public:
 	int lastSelectedCommandPage;
 	int inCommand;
 protected:
+	void EraseCommandsIf(const std::function<bool(const Command&)>& pred);
 	bool HandleBuildOptionInsertion(int cmdId);
 	bool HandleBuildOptionRemoval(int cmdId);
 	// return true by default so non-AirCAI's trigger FinishCommand

@@ -1275,6 +1275,52 @@ void CLuaHandle::UnitDeleted(int unitID, int unitDefID, int unitTeam)
 }
 
 
+/*** Called after SetUnitNeutral(true) removes a target from one unit's Attack/Fight queue.
+ * Only units whose current attack target matches the neutralized unit receive it,
+ * even when no materialized queued command matched. Virtual queues must remove
+ * that target for this unit only, without advancing execution or stopping movement.
+ * This is not a general notification of command cancellation or target deletion.
+ * Only synced handles with full read access receive this callin.
+ *
+ * @function Callins:UnitAttackTargetRemoved
+ * @param unitID UnitID
+ * @param unitDefID UnitDefID
+ * @param unitTeam TeamID
+ * @param targetID UnitID
+ * @return integer[]? removeTags Tags of exhausted virtual queue commands to erase.
+ * Erasure occurs after callbacks, without UnitCmdDone, StopMove, repeat or immediate
+ * successor execution, matching the native target-removal operation. Do not use
+ * CMD.REMOVE for these references: it invokes FinishCommand instead.
+ */
+std::vector<int> CLuaHandle::UnitAttackTargetRemoved(int unitID, int unitDefID, int unitTeam, int targetID)
+{
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 6, __func__);
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return {};
+
+	lua_pushnumber(L, unitID);
+	lua_pushnumber(L, unitDefID);
+	lua_pushnumber(L, unitTeam);
+	lua_pushnumber(L, targetID);
+	if (!RunCallInTraceback(L, cmdStr, 4, 1, traceBack.GetErrFuncIdx(), false))
+		return {};
+	std::vector<int> tags;
+	if (lua_istable(L, -1)) {
+		for (int i = 1, count = lua_objlen(L, -1); i <= count; ++i) {
+			lua_rawgeti(L, -1, i);
+			if (lua_isnumber(L, -1))
+				tags.push_back(lua_toint(L, -1));
+			lua_pop(L, 1);
+		}
+	}
+	lua_pop(L, 1);
+	return tags;
+}
+
+
 /*** Called when a unit is transferred between teams. This is called before `UnitGiven` and in that moment unit is still assigned to the oldTeam.
  *
  * @function Callins:UnitTaken

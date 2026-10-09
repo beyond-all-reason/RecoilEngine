@@ -137,6 +137,7 @@ class CEventClient
 		virtual void UnitFromFactory(const CUnit* unit, const CUnit* factory, bool userOrders) {}
 		virtual void UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID) {}
 		virtual void UnitDeleted(int unitID, int unitDefID, int unitTeam) {}
+		virtual std::vector<int> UnitAttackTargetRemoved(int unitID, int unitDefID, int unitTeam, int targetID) { return {}; }
 		virtual void UnitTaken(const CUnit* unit, int oldTeam, int newTeam) {}
 		virtual void UnitGiven(const CUnit* unit, int oldTeam, int newTeam) {}
 

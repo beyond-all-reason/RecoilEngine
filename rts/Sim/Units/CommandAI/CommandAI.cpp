@@ -1870,6 +1870,18 @@ void CCommandAI::StopAttackingTargetIf(const std::function<bool(const CUnit*)>& 
 	const auto hasTarget = [&](const Command& c) { return (c.GetNumParams() == 1 && (c.GetID() == CMD_FIGHT || c.GetID() == CMD_ATTACK)); };
 	const auto removeCmd = [&](const Command& c) { return (hasTarget(c) && pred(unitHandler.GetUnit(c.GetParam(0)))); };
 
+	EraseCommandsIf(removeCmd);
+}
+
+void CCommandAI::RemoveCommandsByTag(const std::vector<int>& tags)
+{
+	if (tags.empty())
+		return;
+	EraseCommandsIf([&](const Command& c) { return std::find(tags.begin(), tags.end(), c.GetTag()) != tags.end(); });
+}
+
+void CCommandAI::EraseCommandsIf(const std::function<bool(const Command&)>& removeCmd)
+{
 	const bool frontRemoved = (!commandQue.empty() && removeCmd(commandQue.front()));
 
 	commandQue.erase(std::remove_if(commandQue.begin(), commandQue.end(), removeCmd), commandQue.end());
