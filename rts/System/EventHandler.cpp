@@ -562,6 +562,33 @@ void CEventHandler::GameFramePost(int gameFrame)
 	ITERATE_EVENTCLIENTLIST(GameFramePost, gameFrame);
 }
 
+void CEventHandler::UnitDeleted(int unitID, int unitDefID, int unitTeam)
+{
+	// There is no live unit left for visibility queries. Only synced clients
+	// with full read access receive this lifecycle notification.
+	for (size_t i = 0; i < listUnitDeleted.size(); ) {
+		CEventClient* ec = listUnitDeleted[i];
+		if (ec->GetSynced() && ec->GetFullRead())
+			ec->UnitDeleted(unitID, unitDefID, unitTeam);
+		i += (i < listUnitDeleted.size() && ec == listUnitDeleted[i]);
+	}
+}
+
+std::vector<int> CEventHandler::UnitAttackTargetRemoved(int unitID, int unitDefID, int unitTeam, int targetID)
+{
+	// Exposes native command-target state; restrict it to full-read synced clients.
+	std::vector<int> removedTags;
+	for (size_t i = 0; i < listUnitAttackTargetRemoved.size(); ) {
+		CEventClient* ec = listUnitAttackTargetRemoved[i];
+		if (ec->GetSynced() && ec->GetFullRead()) {
+			const auto tags = ec->UnitAttackTargetRemoved(unitID, unitDefID, unitTeam, targetID);
+			removedTags.insert(removedTags.end(), tags.begin(), tags.end());
+		}
+		i += (i < listUnitAttackTargetRemoved.size() && ec == listUnitAttackTargetRemoved[i]);
+	}
+	return removedTags;
+}
+
 void CEventHandler::GameProgress(int gameFrame)
 {
 	ZoneScoped;

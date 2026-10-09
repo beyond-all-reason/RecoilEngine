@@ -47,6 +47,8 @@
 	SETUP_EVENT(UnitReverseBuilt,        MANAGED_BIT)
 	SETUP_EVENT(UnitConstructionDecayed, MANAGED_BIT)
 	SETUP_EVENT(UnitDestroyed,           MANAGED_BIT)
+	SETUP_EVENT(UnitDeleted,             MANAGED_BIT)
+	SETUP_EVENT(UnitAttackTargetRemoved,             MANAGED_BIT)
 	SETUP_EVENT(UnitTaken,               MANAGED_BIT)
 	SETUP_EVENT(UnitGiven,               MANAGED_BIT)
 

@@ -298,6 +298,7 @@ void CUnitHandler::DeleteUnit(CUnit* delUnit)
 		return;
 	}
 
+	const int delUnitID = delUnit->id;
 	const int delUnitTeam = delUnit->team;
 	const int delUnitType = delUnit->unitDef->id;
 
@@ -323,6 +324,8 @@ void CUnitHandler::DeleteUnit(CUnit* delUnit)
 
 	assert( Sim::registry.valid(delUnitEntity) );
 	Sim::registry.destroy(delUnitEntity);
+
+	eventHandler.UnitDeleted(delUnitID, delUnitType, delUnitTeam);
 }
 
 void CUnitHandler::UpdateUnitMoveTypes()
