@@ -28,8 +28,9 @@ public:
 
 	bool IsValid(bool ms) const;
 
-	void MakeDepthBufferCopy() const;
-	uint32_t GetDepthBufferTexture(bool ms) const { return depthTextures[ms]; }
+	// a non-zero terrainDepthTex (single-sampled, this frame's terrain depth) is handed out instead of a copy
+	void MakeDepthBufferCopy(uint32_t terrainDepthTex = 0);
+	uint32_t GetDepthBufferTexture(bool ms) const { return (!ms && terrainDepthTex != 0)? terrainDepthTex: depthTextures[ms]; }
 private:
 	// to be accessed with ScopedDepthBufferCopy
 	void AddConsumer(bool ms);
@@ -45,6 +46,8 @@ private:
 	std::array<uint32_t, 2> consumersCount = {};
 	std::array<uint32_t, 2> depthTextures = {};
 	std::array<std::unique_ptr<FBO>, 2> depthFBOs = {};
+
+	uint32_t terrainDepthTex = 0;
 };
 
 extern std::unique_ptr<DepthBufferCopy> depthBufferCopy;

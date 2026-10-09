@@ -3,6 +3,8 @@
 #ifndef _BASE_GROUND_DRAWER_H
 #define _BASE_GROUND_DRAWER_H
 
+#include <cstdint>
+
 #include "MapDrawPassTypes.h"
 
 
@@ -51,6 +53,9 @@ public:
 	virtual       GL::LightHandler* GetLightHandler()       { return nullptr; }
 	virtual const GL::GeometryBuffer* GetGeometryBuffer() const { return nullptr; }
 	virtual       GL::GeometryBuffer* GetGeometryBuffer()       { return nullptr; }
+
+	// single-sampled depth texture of the terrain the deferred pass drew for the main view this frame, or 0
+	virtual uint32_t GetDeferredDepthTexture() const { return 0; }
 
 	bool DrawForward() const { return drawForward; }
 	bool DrawDeferred() const { return drawDeferred; }

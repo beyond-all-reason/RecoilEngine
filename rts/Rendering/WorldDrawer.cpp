@@ -340,7 +340,7 @@ void CWorldDrawer::DrawOpaqueObjects() const
 			SCOPED_TIMER("Draw::World::Terrain");
 			SCOPED_GL_DEBUGGROUP("Draw::World::Terrain");
 			gd->Draw(DrawPass::Normal);
-			depthBufferCopy->MakeDepthBufferCopy();
+			depthBufferCopy->MakeDepthBufferCopy(gd->GetDeferredDepthTexture());
 		}
 		{
 			eventHandler.DrawPreDecals();
