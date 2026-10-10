@@ -5,7 +5,7 @@
 
 #include "IWater.h"
 #include "Rendering/GL/FBO.h"
-#include "Rendering/GL/myGL.h"
+#include "Rendering/Shaders/Shader.h"
 
 #include <vector>
 
@@ -53,18 +53,12 @@ private:
 	GLuint zeroTex;
 	GLuint fixedUpTex;
 
-	unsigned int waveFP;
-	unsigned int waveVP;
-	unsigned int waveFP2;
-	unsigned int waveVP2;
-	unsigned int waveNormalFP;
-	unsigned int waveNormalVP;
-	unsigned int waveCopyHeightFP;
-	unsigned int waveCopyHeightVP;
-	unsigned int dwDetailNormalVP;
-	unsigned int dwDetailNormalFP;
-	unsigned int dwAddSplashVP;
-	unsigned int dwAddSplashFP;
+	Shader::IProgramObject* waveShader        = nullptr; // waterDynWave  (height update)
+	Shader::IProgramObject* waveShader2       = nullptr; // waterDynWave2 (flow update)
+	Shader::IProgramObject* waveNormalShader  = nullptr; // waterDynNormal
+	Shader::IProgramObject* waveCopyHeightShader = nullptr; // waterDynWave3
+	Shader::IProgramObject* dwDetailNormalShader = nullptr; // dwDetailNormal
+	Shader::IProgramObject* dwAddSplashShader    = nullptr; // dwAddSplash
 
 	GLuint splashTex;
 	GLuint boatShape;
@@ -73,8 +67,7 @@ private:
 	int lastWaveFrame = 0;
 	bool firstDraw = true;
 
-	unsigned int waterFP;
-	unsigned int waterVP;
+	Shader::IProgramObject* waterShader = nullptr; // waterDyn (main water surface)
 
 	FBO reflectFBO;
 	FBO refractFBO;

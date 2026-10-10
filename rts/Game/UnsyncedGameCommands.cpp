@@ -3489,8 +3489,6 @@ public:
 	}
 };
 
-
-
 class DebugColVolDrawerActionExecutor : public IUnsyncedActionExecutor {
 public:
 	DebugColVolDrawerActionExecutor(): IUnsyncedActionExecutor("DebugColVol", "Enable/Disable drawing of collision volumes") {
