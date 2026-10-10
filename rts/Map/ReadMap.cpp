@@ -5,6 +5,7 @@
 #include <cstring> // memcpy
 
 #include "xsimd/xsimd.hpp"
+#include "System/simd_compat.h"
 #include "ReadMap.h"
 #include "MapDamage.h"
 #include "MapInfo.h"
@@ -563,6 +564,28 @@ void CReadMap::UpdateHeightMapSynced(const SRectangle& hgtMapRect)
 }
 
 
+void CReadMap::AddHeights(const int idx, const float* values, const int count)
+{
+	float* heights = heightMapSyncedPtr->data() + idx;
+	__m128 updated = _mm_setzero_ps();
+	int i = 0;
+
+	for (; (i + 4) <= count; i += 4) {
+		const __m128 oldHeights = _mm_loadu_ps(heights + i);
+		const __m128 newHeights = _mm_add_ps(oldHeights, _mm_loadu_ps(values + i));
+
+		updated = _mm_or_ps(updated, _mm_cmpneq_ps(newHeights, oldHeights));
+		_mm_storeu_ps(heights + i, newHeights);
+	}
+
+	hmUpdated |= (_mm_movemask_ps(updated) != 0);
+
+	for (; i < count; ++i) {
+		AddHeight(idx + i, values[i]);
+	}
+}
+
+
 void CReadMap::UpdateHeightBounds(int syncFrame)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -683,7 +706,74 @@ void CReadMap::UpdateFaceNormals(const SRectangle& rect, bool initialize)
 		float3 fnTL;
 		float3 fnBR;
 
-		for (int x = x1; x <= x2; x++) {
+		int x = x1;
+
+		// four squares at a time, with the operations of the loop below in the same order
+		for (; (x + 3) <= x2; x += 4) {
+			const float* hmT = heightmapSynced + (y    ) * mapDims.mapxp1 + x;
+			const float* hmB = heightmapSynced + (y + 1) * mapDims.mapxp1 + x;
+
+			const __m128 hTL = _mm_loadu_ps(hmT    );
+			const __m128 hTR = _mm_loadu_ps(hmT + 1);
+			const __m128 hBL = _mm_loadu_ps(hmB    );
+			const __m128 hBR = _mm_loadu_ps(hmB + 1);
+
+			const __m128 signBit = _mm_set1_ps(-0.0f);
+			const __m128 squareSize = _mm_set1_ps(SQUARE_SIZE);
+
+			// four normals each, one register per component
+			__m128 tlX = _mm_xor_ps(_mm_sub_ps(hTR, hTL), signBit);
+			__m128 tlY = squareSize;
+			__m128 tlZ = _mm_xor_ps(_mm_sub_ps(hBL, hTL), signBit);
+			__m128 brX = _mm_sub_ps(hBL, hBR);
+			__m128 brY = squareSize;
+			__m128 brZ = _mm_sub_ps(hTR, hBR);
+
+			math::i128_safe_normalize(tlX, tlY, tlZ);
+			math::i128_safe_normalize(brX, brY, brZ);
+
+			__m128 centerX = _mm_add_ps(tlX, brX);
+			__m128 centerY = _mm_add_ps(tlY, brY);
+			__m128 centerZ = _mm_add_ps(tlZ, brZ);
+			__m128 center2DX = centerX;
+			__m128 center2DY = _mm_setzero_ps();
+			__m128 center2DZ = centerZ;
+
+			math::i128_safe_normalize(centerX, centerY, centerZ);
+			math::i128_safe_normalize(center2DX, center2DY, center2DZ);
+
+			alignas(16) float out[12][4];
+
+			_mm_store_ps(out[ 0], tlX);
+			_mm_store_ps(out[ 1], tlY);
+			_mm_store_ps(out[ 2], tlZ);
+			_mm_store_ps(out[ 3], brX);
+			_mm_store_ps(out[ 4], brY);
+			_mm_store_ps(out[ 5], brZ);
+			_mm_store_ps(out[ 6], centerX);
+			_mm_store_ps(out[ 7], centerY);
+			_mm_store_ps(out[ 8], centerZ);
+			_mm_store_ps(out[ 9], center2DX);
+			_mm_store_ps(out[10], center2DY);
+			_mm_store_ps(out[11], center2DZ);
+
+			for (int i = 0; i < 4; i++) {
+				const int sqr = y * mapDims.mapx + x + i;
+
+				faceNormalsSynced[sqr * 2    ] = float3(out[0][i], out[ 1][i], out[ 2][i]);
+				faceNormalsSynced[sqr * 2 + 1] = float3(out[3][i], out[ 4][i], out[ 5][i]);
+				centerNormalsSynced[sqr]       = float3(out[6][i], out[ 7][i], out[ 8][i]);
+				centerNormals2D[sqr]           = float3(out[9][i], out[10][i], out[11][i]);
+
+				if (initialize) {
+					faceNormalsUnsynced[sqr * 2    ] = faceNormalsSynced[sqr * 2    ];
+					faceNormalsUnsynced[sqr * 2 + 1] = faceNormalsSynced[sqr * 2 + 1];
+					centerNormalsUnsynced[sqr] = centerNormalsSynced[sqr];
+				}
+			}
+		}
+
+		for (; x <= x2; x++) {
 			const int idxTL = (y    ) * mapDims.mapxp1 + x; // TL
 			const int idxBL = (y + 1) * mapDims.mapxp1 + x; // BL
 
