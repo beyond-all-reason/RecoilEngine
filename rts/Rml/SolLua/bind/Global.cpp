@@ -290,7 +290,7 @@
 			 "contexts", sol::readonly_property(&getIndexedTable<Rml::Context, &functions::getContext, &functions::getMaxContexts>),
 			 //--
 			 /*** @field RmlUi.version string RmlUi version */
-			 "version", sol::readonly_property(&Rml::GetVersion)
+			 "version", Rml::GetVersion()
 		 );
 		namespace_table.set_function(
 			/***

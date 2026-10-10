@@ -533,6 +533,48 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
 
 ################################################################################
+### RmlSolLuaPublicBindings
+	find_package(PNG QUIET)
+
+	set(test_name RmlSolLuaPublicBindings)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rml/TestSolLuaPublicBindings.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/bind.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Colour.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Convert.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Context.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/DataModel.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Document.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Element.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/ElementDerived.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/ElementForm.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Event.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/bind/Global.cpp"
+			"${ENGINE_SOURCE_DIR}/Lua/LuaMemPool.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaDocument.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaEventListener.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaInstancer.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaDataModel.cpp"
+			"${ENGINE_SOURCE_DIR}/Rml/SolLua/plugin/SolLuaPlugin.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+	set(test_libs
+			rmlui_core
+			lua
+			smmalloc
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DBUILDING_AI")
+	target_link_libraries(test_${test_name} ${FREETYPE_LIBRARY_RELEASE} ZLIB::ZLIB SDL2::SDL2)
+	if (TARGET PNG::PNG)
+		target_link_libraries(test_${test_name} PNG::PNG)
+	endif ()
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/lua/include)
+	target_include_directories(test_${test_name} PRIVATE ${SDL2_INCLUDE_DIRS})
+
+################################################################################
 ### SerializeLuaState
 	set(test_name SerializeLuaState)
 	set(test_src
