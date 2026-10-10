@@ -62,8 +62,13 @@ void UpdateList::SetUpdate(size_t offset)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(offset < updateList.size());
-	updateList[offset] = TypedTrue;
-	changed = true;
+	// skip redundant stores, multithreaded passes call this for many objects
+	// and every store would pull the shared cache line to the calling core
+	if (updateList[offset] != TypedTrue)
+		updateList[offset] = TypedTrue;
+
+	if (!changed)
+		changed = true;
 }
 
 void UpdateList::DecrementUpdate(size_t first, size_t count)
