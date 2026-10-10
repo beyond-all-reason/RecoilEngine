@@ -218,6 +218,7 @@ public:
 	float weaponAimAdjustPriority;
 	bool fastAutoRetargeting;
 	bool fastQueryPointUpdate;
+	bool preaimAtBlockedTargets;
 	unsigned int accurateLeading;
 	unsigned int burstControlWhenOutOfArc;
 
