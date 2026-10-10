@@ -1110,7 +1110,7 @@ function widgetHandler:Update(dt)
 end
 
 
-function widgetHandler:ConfigureLayout(command)
+function widgetHandler:GotChatMsg(command)
   if (command == 'tweakgui') then
     self.tweakKeys = {}
     self.tweakMode = true
