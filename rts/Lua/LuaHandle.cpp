@@ -4307,9 +4307,10 @@ void CLuaHandle::CollectGarbage(bool forced)
 	// global memory load (fraction of the allocation limit) scales the
 	// requested work up when memory is tight
 	const uint64_t allocedBytes = D.allocState.allocedBytes.load();
+	const float gcMemLoad = spring_lua_alloc_get_mem_load();
 
 	if (allocedBytes >= gcCtrl.allocedBytesAtLastGC) {
-		const float gcWorkMult = gcCtrl.baseWorkMult * (1.0f + gcCtrl.baseMemLoadMult * spring_lua_alloc_get_mem_load());
+		const float gcWorkMult = gcCtrl.baseWorkMult * (1.0f + gcCtrl.baseMemLoadMult * gcMemLoad);
 		gcCtrl.stepDebtKB += int64_t(((allocedBytes - gcCtrl.allocedBytesAtLastGC) >> 10) * gcWorkMult);
 	} else {
 		// memory was released outside of here (collectgarbage("collect") from Lua), start over
@@ -4337,12 +4338,11 @@ void CLuaHandle::CollectGarbage(bool forced)
 	int& gcStepsPerIter = gcCtrl.numStepsPerIter;
 
 	// the debt sets how much work a call does, the runtime bound only caps
-	// it so a burst of allocations is spread over several calls; when
-	// catching up calls come more often so each may take less time
-	// Relax the speed reduction between 25% and 50% of the shared Lua limit.
-	// Allocation debt still controls how much work the collector requests.
+	// it so a burst of allocations is spread over several calls; at higher
+	// game speed calls come more often so each may take less time, unless
+	// memory is tight: from 25% to 50% load the bound returns to its 1x value
 	const float gcRawSpeedFactor = std::clamp(gs->speedFactor * (1 - gs->PreSimFrame()) * (1 - gs->paused), 1.0f, 50.0f);
-	const float gcSpeedFactor = mix(gcRawSpeedFactor, 1.0f, smoothstep(0.25f, 0.5f, spring_lua_alloc_get_mem_load()));
+	const float gcSpeedFactor = mix(gcRawSpeedFactor, 1.0f, smoothstep(0.25f, 0.5f, gcMemLoad));
 	const float gcLoopRunTime = std::clamp(gcRunTimeMult / gcSpeedFactor, gcCtrl.minLoopRunTime, gcCtrl.maxLoopRunTime);
 
 	const spring_time startTime = spring_gettime();
