@@ -21,13 +21,6 @@ static std::array<std::vector<float>, ThreadPool::MAX_THREADS> RAYCAST_ANGLE_TAB
 static std::array<std::vector< char>, ThreadPool::MAX_THREADS> LOSRAY_SQUARE_TABLES; // visible squares per instance
 
 
-static float isqrtTableLookup(unsigned r, int threadNum)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	assert(r < RADIUS_ISQRT_TABLES[threadNum].size());
-	return RADIUS_ISQRT_TABLES[threadNum][r];
-}
-
 static void isqrtTableExpand(unsigned r, int threadNum)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -120,16 +113,8 @@ public:
 	// only generates table if not in cache
 	void GenerateForLosSize(size_t losSize);
 
-	const int2 GetLosTableRaySquare(size_t losSize, size_t rayIndex, size_t squareIdx) {
-		return losTables[losSize][rayIndex][squareIdx];
-	}
-
-	size_t GetLosTableRaySize(size_t losSize, size_t rayIndex) {
-		return losTables[losSize][rayIndex].size();
-	}
-
-	size_t GetLosTableSize(size_t losSize) {
-		return losTables[losSize].size();
+	const LosTable& GetLosTable(size_t losSize) const {
+		return losTables[losSize];
 	}
 
 private:
@@ -412,15 +397,20 @@ void CLosTableHelper::Debug(const LosTable& losRays, const std::vector<int2>& po
 void CLosMap::AddCircle(SLosInstance* instance, int amount)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	MidpointCircleAlgoPerLine(instance->radius, [&](int width, int y) {
-		const unsigned y_ = instance->basePos.y + y;
+	// locals, see AddRaycast
+	unsigned short* map = losmap.data();
+	const int2 pos = instance->basePos;
+	const int2 dims = size;
 
-		if (y_ < size.y) {
-			const unsigned sx = std::clamp(instance->basePos.x - width,     0, size.x);
-			const unsigned ex = std::clamp(instance->basePos.x + width + 1, 0, size.x);
+	MidpointCircleAlgoPerLine(instance->radius, [&](int width, int y) {
+		const unsigned y_ = pos.y + y;
+
+		if (y_ < dims.y) {
+			const unsigned sx = std::clamp(pos.x - width,     0, dims.x);
+			const unsigned ex = std::clamp(pos.x + width + 1, 0, dims.x);
 
 			for (unsigned x_ = sx; x_ < ex; ++x_) {
-				losmap[(y_ * size.x) + x_] += amount;
+				map[(y_ * dims.x) + x_] += amount;
 			}
 		}
 	});
@@ -439,13 +429,16 @@ void CLosMap::AddRaycast(SLosInstance* instance, int amount)
 	const bool visibleInstanceSquares = (instance->allyteam >= 0 && (instance->allyteam == gu->myAllyTeam || gu->spectatingFullView));
 	const bool updateUnsyncedHeightMap = sendReadmapEvents && visibleInstanceSquares;
 
+	// local pointer: with -fno-strict-aliasing every store would reload losmap.data(), which also blocks vectorizing
+	unsigned short* map = losmap.data();
+
 	if ((amount > 0) && updateUnsyncedHeightMap) {
 		for (const SLosInstance::RLE rle: losSquares) {
 			for (int idx = rle.start, len = rle.length; len > 0; --len, ++idx) {
-				losmap[idx] += amount;
+				map[idx] += amount;
 
 				// skip if this los-square did not *enter* LOS
-				if (losmap[idx] != amount)
+				if (map[idx] != amount)
 					continue;
 
 				const int2 lm = IdxToCoord(idx, size.x);
@@ -462,7 +455,7 @@ void CLosMap::AddRaycast(SLosInstance* instance, int amount)
 
 	for (const SLosInstance::RLE rle: losSquares) {
 		for (int idx = rle.start, len = rle.length; len > 0; --len, ++idx) {
-			losmap[idx] += amount;
+			map[idx] += amount;
 		}
 	}
 }
@@ -522,35 +515,37 @@ inline static constexpr size_t ToAngleMapIdx(const int2 p, const int radius)
 }
 
 
+// raw pointers, see CLosMap::AddRaycast
 inline void CastLos(
 	float* prvAngle,
 	float* maxAngle,
 	const int2& off,
-	std::vector<char>& losRaySquares,
-	std::vector<float>& raycastAngles,
-	int losRadius,
-	int threadNum
+	char* losRaySquares,
+	const float* raycastAngles,
+	const float* isqrtTable,
+	int losRadius
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const size_t oidx = ToAngleMapIdx(off, losRadius);
+	const float rayAngle = raycastAngles[oidx];
 
 	// angle to square is smaller than current max-angle, so not visible
-	if (raycastAngles[oidx] < *maxAngle) {
+	if (rayAngle < *maxAngle) {
 		losRaySquares[oidx] = false;
 		return;
 	}
 
-	if (raycastAngles[oidx] < *prvAngle) {
-		const float invR = isqrtTableLookup(off.x * off.x + off.y * off.y, threadNum);
+	if (rayAngle < *prvAngle) {
+		const float invR = isqrtTable[off.x * off.x + off.y * off.y];
 		const float angle = *prvAngle - LOS_BONUS_HEIGHT * invR;
 
-		if (raycastAngles[oidx] < (*maxAngle = angle)) {
+		if (rayAngle < (*maxAngle = angle)) {
 			losRaySquares[oidx] = false;
 			return;
 		}
 	}
 
-	*prvAngle = raycastAngles[oidx];
+	*prvAngle = rayAngle;
 }
 
 
@@ -621,6 +616,12 @@ void CLosMap::UnsafeLosAdd(SLosInstance* li) const
 
 	isqrtTableExpand((radius + 1) * (radius + 1), threadNum);
 
+	// raw pointers, see AddRaycast
+	char* raySquares = losRaySquares.data();
+	float* rayAngles = raycastAngles.data();
+	const float* isqrtTable = RADIUS_ISQRT_TABLES[threadNum].data();
+	const float* heightMap = mipHeightMap;
+
 	// Optimization: precalculate all angles
 	// 1. Center squares are accessed much more often by more rays than those on the border.
 	// 2. The heightmap is much bigger than the circle, and won't fit into the L2/L3. So
@@ -633,8 +634,8 @@ void CLosMap::UnsafeLosAdd(SLosInstance* li) const
 
 		const size_t oidx = ToAngleMapIdx(int2(sx - pos.x, y), radius);
 
-		float* raycastAnglesPtr = &raycastAngles[oidx];
-		char* losRaySquaresPtr = &losRaySquares[oidx];
+		float* raycastAnglesPtr = &rayAngles[oidx];
+		char* losRaySquaresPtr = &raySquares[oidx];
 
 		int idx = MAP_SQUARE(int2(sx, y_));
 
@@ -648,8 +649,8 @@ void CLosMap::UnsafeLosAdd(SLosInstance* li) const
 				continue;
 			}
 
-			const float invR = isqrtTableLookup(off.x*off.x + off.y*off.y, threadNum);
-			const float dh = std::max(0.0f, mipHeightMap[idx++]) - losHeight;
+			const float invR = isqrtTable[off.x*off.x + off.y*off.y];
+			const float dh = std::max(0.0f, heightMap[idx++]) - losHeight;
 
 			*(raycastAnglesPtr++) = (dh + LOS_BONUS_HEIGHT) * invR;
 			*(losRaySquaresPtr++) = true;
@@ -657,23 +658,17 @@ void CLosMap::UnsafeLosAdd(SLosInstance* li) const
 	});
 
 	// cast the rays
-	losRaySquares[ToAngleMapIdx(int2(0, 0), radius)] = true;
+	raySquares[ToAngleMapIdx(int2(0, 0), radius)] = true;
 
-	const size_t numRays = helper.GetLosTableSize(radius);
-
-	for (size_t i = 0; i < numRays; ++i) {
+	for (const auto& ray: helper.GetLosTable(radius)) {
 		float maxAngles[4] = {-1e7, -1e7, -1e7, -1e7};
 		float prvAngles[4] = {-1e7, -1e7, -1e7, -1e7};
 
-		const size_t numSquares = helper.GetLosTableRaySize(radius, i);
-
-		for (size_t n = 0; n < numSquares; n++) {
-			const int2 square = helper.GetLosTableRaySquare(radius, i, n);
-
-			CastLos(&prvAngles[0], &maxAngles[0],       square              , losRaySquares, raycastAngles, radius, threadNum);
-			CastLos(&prvAngles[1], &maxAngles[1],      -square              , losRaySquares, raycastAngles, radius, threadNum);
-			CastLos(&prvAngles[2], &maxAngles[2], int2( square.y, -square.x), losRaySquares, raycastAngles, radius, threadNum);
-			CastLos(&prvAngles[3], &maxAngles[3], int2(-square.y,  square.x), losRaySquares, raycastAngles, radius, threadNum);
+		for (const int2 square: ray) {
+			CastLos(&prvAngles[0], &maxAngles[0],       square              , raySquares, rayAngles, isqrtTable, radius);
+			CastLos(&prvAngles[1], &maxAngles[1],      -square              , raySquares, rayAngles, isqrtTable, radius);
+			CastLos(&prvAngles[2], &maxAngles[2], int2( square.y, -square.x), raySquares, rayAngles, isqrtTable, radius);
+			CastLos(&prvAngles[3], &maxAngles[3], int2(-square.y,  square.x), raySquares, rayAngles, isqrtTable, radius);
 		}
 	}
 
@@ -710,6 +705,12 @@ void CLosMap::SafeLosAdd(SLosInstance* li) const
 
 	isqrtTableExpand((radius + 1) * (radius + 1), threadNum);
 
+	// raw pointers, see AddRaycast
+	char* raySquares = losRaySquares.data();
+	float* rayAngles = raycastAngles.data();
+	const float* isqrtTable = RADIUS_ISQRT_TABLES[threadNum].data();
+	const float* heightMap = mipHeightMap;
+
 	// Optimization: precalc all angles
 	MidpointCircleAlgoPerLine(radius, [&](int width, int y) {
 		const unsigned y_ = pos.y + y;
@@ -722,8 +723,8 @@ void CLosMap::SafeLosAdd(SLosInstance* li) const
 
 			const size_t oidx = ToAngleMapIdx(int2(sx - pos.x, y), radius);
 
-			float* raycastAnglesPtr = &raycastAngles[oidx];
-			char* losRaySquaresPtr = &losRaySquares[oidx];
+			float* raycastAnglesPtr = &rayAngles[oidx];
+			char* losRaySquaresPtr = &raySquares[oidx];
 
 			int idx = MAP_SQUARE(int2(sx, y_));
 
@@ -737,8 +738,8 @@ void CLosMap::SafeLosAdd(SLosInstance* li) const
 					continue;
 				}
 
-				const float invR = isqrtTableLookup(off.x*off.x + off.y*off.y, threadNum);
-				const float dh = std::max(0.0f, mipHeightMap[idx++]) - losHeight;
+				const float invR = isqrtTable[off.x*off.x + off.y*off.y];
+				const float dh = std::max(0.0f, heightMap[idx++]) - losHeight;
 
 				*(raycastAnglesPtr++) = (dh + LOS_BONUS_HEIGHT) * invR;
 				*(losRaySquaresPtr++) = true;
@@ -748,72 +749,58 @@ void CLosMap::SafeLosAdd(SLosInstance* li) const
 
 
 	// Cast the Rays
-	const size_t numRays = helper.GetLosTableSize(radius);
+	const auto& rays = helper.GetLosTable(radius);
 
 	if (safeRect.Inside(pos)) {
-		losRaySquares[ToAngleMapIdx(int2(0, 0), radius)] = true;
+		raySquares[ToAngleMapIdx(int2(0, 0), radius)] = true;
 
-		for (size_t i = 0; i < numRays; ++i) {
+		for (const auto& ray: rays) {
 			float maxAngles[4] = {-1e7, -1e7, -1e7, -1e7};
 			float prvAngles[4] = {-1e7, -1e7, -1e7, -1e7};
 
-			const size_t numSquares = helper.GetLosTableRaySize(radius, i);
-
-			for (size_t n = 0; n < numSquares; n++) {
-				const int2 square = helper.GetLosTableRaySquare(radius, i, n);
-
+			for (const int2 square: ray) {
 				if (!safeRect.Inside(pos + square))
 					break;
 
-				CastLos(&prvAngles[0], &maxAngles[0],  square,                   losRaySquares, raycastAngles, radius, threadNum);
+				CastLos(&prvAngles[0], &maxAngles[0],  square,                   raySquares, rayAngles, isqrtTable, radius);
 			}
-			for (size_t n = 0; n < numSquares; n++) {
-				const int2 square = helper.GetLosTableRaySquare(radius, i, n);
-
+			for (const int2 square: ray) {
 				if (!safeRect.Inside(pos - square))
 					break;
 
-				CastLos(&prvAngles[1], &maxAngles[1], -square,                   losRaySquares, raycastAngles, radius, threadNum);
+				CastLos(&prvAngles[1], &maxAngles[1], -square,                   raySquares, rayAngles, isqrtTable, radius);
 			}
-			for (size_t n = 0; n < numSquares; n++) {
-				const int2 square = helper.GetLosTableRaySquare(radius, i, n);
-
+			for (const int2 square: ray) {
 				if (!safeRect.Inside(pos + int2(square.y, -square.x)))
 					break;
 
-				CastLos(&prvAngles[2], &maxAngles[2], int2(square.y, -square.x), losRaySquares, raycastAngles, radius, threadNum);
+				CastLos(&prvAngles[2], &maxAngles[2], int2(square.y, -square.x), raySquares, rayAngles, isqrtTable, radius);
 			}
-			for (size_t n = 0; n < numSquares; n++) {
-				const int2 square = helper.GetLosTableRaySquare(radius, i, n);
-
+			for (const int2 square: ray) {
 				if (!safeRect.Inside(pos + int2(-square.y, square.x)))
 					break;
 
-				CastLos(&prvAngles[3], &maxAngles[3], int2(-square.y, square.x), losRaySquares, raycastAngles, radius, threadNum);
+				CastLos(&prvAngles[3], &maxAngles[3], int2(-square.y, square.x), raySquares, rayAngles, isqrtTable, radius);
 			}
 		}
 	} else {
 		// emit position outside the map
-		for (size_t i = 0; i < numRays; ++i) {
+		for (const auto& ray: rays) {
 			float maxAngles[4] = {-1e7, -1e7, -1e7, -1e7};
 			float prvAngles[4] = {-1e7, -1e7, -1e7, -1e7};
 
-			const size_t numSquares = helper.GetLosTableRaySize(radius, i);
-
-			for (size_t n = 0; n < numSquares; n++) {
-				const int2 square = helper.GetLosTableRaySquare(radius, i, n);
-
+			for (const int2 square: ray) {
 				if (safeRect.Inside(pos + square))
-					CastLos(&prvAngles[0], &maxAngles[0],  square,                   losRaySquares, raycastAngles, radius, threadNum);
+					CastLos(&prvAngles[0], &maxAngles[0],  square,                   raySquares, rayAngles, isqrtTable, radius);
 
 				if (safeRect.Inside(pos - square))
-					CastLos(&prvAngles[1], &maxAngles[1], -square,                   losRaySquares, raycastAngles, radius, threadNum);
+					CastLos(&prvAngles[1], &maxAngles[1], -square,                   raySquares, rayAngles, isqrtTable, radius);
 
 				if (safeRect.Inside(pos + int2(square.y, -square.x)))
-					CastLos(&prvAngles[2], &maxAngles[2], int2(square.y, -square.x), losRaySquares, raycastAngles, radius, threadNum);
+					CastLos(&prvAngles[2], &maxAngles[2], int2(square.y, -square.x), raySquares, rayAngles, isqrtTable, radius);
 
 				if (safeRect.Inside(pos + int2(-square.y, square.x)))
-					CastLos(&prvAngles[3], &maxAngles[3], int2(-square.y, square.x), losRaySquares, raycastAngles, radius, threadNum);
+					CastLos(&prvAngles[3], &maxAngles[3], int2(-square.y, square.x), raySquares, rayAngles, isqrtTable, radius);
 			}
 		}
 	}
