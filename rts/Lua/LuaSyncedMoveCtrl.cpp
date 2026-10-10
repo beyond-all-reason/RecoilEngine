@@ -841,6 +841,8 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * @field collide boolean?
  * @field useSmoothMesh boolean?
  * @field loopbackAttack boolean?
+ * @field terrainLookahead number? Seconds of flight path along which the altitude hold looks for high ground instead of at a single point ahead: climbs for a cliff before reaching it, descends gradually after a plateau. Zero (the default) keeps the stock behavior.
+ * @field terrainLookaheadDescent number? Share of `altitudeRate` at which that terrain reference comes down again after a plateau, in (0, 1]. The unit tag defaults to 0.5.
  * @field maneuverBlockTime integer?
  * @field wantedHeight number?
  * @field turnRadius number?
@@ -871,6 +873,8 @@ int LuaSyncedMoveCtrl::SetGunshipMoveTypeData(lua_State* L)
  * | "collide"
  * | "useSmoothMesh"
  * | "loopbackAttack"
+ * | "terrainLookahead"
+ * | "terrainLookaheadDescent"
   * @param value boolean
  * @return integer numAssignedValues
  */
