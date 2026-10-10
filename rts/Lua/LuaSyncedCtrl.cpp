@@ -326,6 +326,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GiveOrderArrayToUnit);
 	REGISTER_LUA_CFUNC(GiveOrderArrayToUnitMap);
 	REGISTER_LUA_CFUNC(GiveOrderArrayToUnitArray);
+	REGISTER_LUA_CFUNC(SetUnitCommandTimeout);
 
 	REGISTER_LUA_CFUNC(LevelHeightMap);
 	REGISTER_LUA_CFUNC(AdjustHeightMap);
@@ -6211,6 +6212,50 @@ int LuaSyncedCtrl::GiveOrderArrayToUnitArray(lua_State* L)
 	return 1;
 }
 
+/***
+ * Set the timeout of a command in a unit's queue.
+ *
+ * For factories, this function uses the command queue automatically assigned to new units.
+ *
+ * @see Spring.GetUnitCurrentCommand for locating the command to set.
+ *
+ * @function Spring.SetUnitCommandTimeout
+ *
+ * @param unitID UnitID
+ * @param timeout integer Absolute frame number. The command will be discarded after this frame. Only respected by mobile units. `math.huge` clears the timeout.
+ * @param cmdIndex integer? (Default: `1`) Command index to set. If negative will count from the end of the queue, e.g. `-1` will be the last command.
+ * @return boolean set `false` when the index is out of range.
+ */
+int LuaSyncedCtrl::SetUnitCommandTimeout(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+	if (unit == nullptr)
+		luaL_error(L, "[%s] invalid unitID", __func__);
+
+	const int cmdTimeOut = LuaUtils::ParseTimeOut(L, 2);
+
+	CCommandAI* commandAI = unit->commandAI;
+	CFactoryCAI* factoryCAI = dynamic_cast<CFactoryCAI*>(commandAI);
+	CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->commandQue: &factoryCAI->newUnitCommands;
+
+	int cmdIndex = luaL_optint(L, 3, 1);
+	if (cmdIndex > 0) {
+		// - 1 to convert from lua index to C index
+		cmdIndex -= 1;
+	} else {
+		cmdIndex += static_cast<int>(queue->size());
+	}
+
+	if (cmdIndex < 0 || static_cast<size_t>(cmdIndex) >= queue->size()) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	queue->at(cmdIndex).SetTimeOut(cmdTimeOut);
+
+	lua_pushboolean(L, true);
+	return 1;
+}
 
 /******************************************************************************/
 /******************************************************************************/
