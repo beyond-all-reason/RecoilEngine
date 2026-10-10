@@ -115,10 +115,22 @@ private:
 		UpdateProjectilesImpl<false>();
 	}
 
+	size_t NextCollisionCandidate(bool synced, size_t i) const;
+
 private:
 	// [0] contains only projectiles that can not change simulation state
 	// [1] contains only projectiles that can     change simulation state
 	spring::FreeListMapCompact<CProjectile*, int> projectiles[2];
+
+	struct UnsyncedChunkSums {
+		int numParticles = 0;
+		int numCollidable = 0;
+	};
+
+	// filled by the last unsynced update pass, which covered projectiles[false][0, numUpdatedUnsynced)
+	std::vector<UnsyncedChunkSums> unsyncedChunkSums;
+	size_t numUpdatedUnsynced = 0;
+	int numUpdatedUnsyncedParticles = 0;
 
 	static uint32_t UnsyncedRandInt(uint32_t N);
 	static uint32_t   SyncedRandInt(uint32_t N);
