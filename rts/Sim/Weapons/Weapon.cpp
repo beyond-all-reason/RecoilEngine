@@ -1477,10 +1477,10 @@ float3 CWeapon::GetUnitLeadTargetPos(const CUnit* unit) const
 	return aimPos;
 }
 
-float CWeapon::GetSafeInterceptTime(const CUnit* unit, float predictMult) const
+float CWeapon::GetSafeInterceptTime(const CUnit* unit, const float3& unitPos, float predictMult) const
 {
 	float3 unitSpeed = unit->speed * predictMult;
-	float3 dist = unit->pos - weaponMuzzlePos;
+	float3 dist = unitPos - weaponMuzzlePos;
 	float aa = unitSpeed.dot(unitSpeed) - (weaponDef->projectilespeed) * (weaponDef->projectilespeed);
 	float bb = 2 * (dist.dot(unitSpeed));
 	float cc = dist.dot(dist);
@@ -1546,10 +1546,10 @@ float CWeapon::GetSafeInterceptTime(const CUnit* unit, float predictMult) const
 
 }
 
-float CWeapon::GetAccuratePredictedImpactTime(const CUnit* unit) const
+float CWeapon::GetAccuratePredictedImpactTime(const CUnit* unit, const float3& unitPos) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	float predictTime = GetPredictedImpactTime(unit->pos);
+	float predictTime = GetPredictedImpactTime(unitPos);
 	const float predictMult = mix(predictSpeedMod, 1.0f, weaponDef->predictBoost);
 	const float gravity = mix(mapInfo->map.gravity, -weaponDef->myGravity, weaponDef->myGravity != 0.0f);
 
@@ -1615,7 +1615,7 @@ float CWeapon::GetAccuratePredictedImpactTime(const CUnit* unit) const
 			highTrajectorySwitch = 1.0f;
 		}
 
-		float3 dist = unit->pos + unit->speed * predictMult * predictTime - weaponMuzzlePos;
+		float3 dist = unitPos + unit->speed * predictMult * predictTime - weaponMuzzlePos;
 		const float gg = (gravity) * (gravity);
 		const float ps2 = (weaponDef->projectilespeed) * (weaponDef->projectilespeed);
 		float t1 = 1.0f;
@@ -1660,13 +1660,13 @@ float CWeapon::GetAccuratePredictedImpactTime(const CUnit* unit) const
 			deltatime = t1 - predictTime;
 			predictTime = t1;
 			// use new time estimate to get new estimate target location
-			dist = unit->pos + unit->speed * predictMult * predictTime - weaponMuzzlePos;
+			dist = unitPos + unit->speed * predictMult * predictTime - weaponMuzzlePos;
 		}
 	} else {
 		// weapon has no gravity (either zero map gravity, or myGravity set to zero)
 		// non-parabolic projectiles can be directly calculated
 		// just need to solve the quadratic equation, in a numerically safe way
-		const float interceptTime = GetSafeInterceptTime(unit, predictMult);
+		const float interceptTime = GetSafeInterceptTime(unit, unitPos, predictMult);
 		if (interceptTime > 0) {
 			predictTime = interceptTime;
 		}
@@ -1676,13 +1676,26 @@ float CWeapon::GetAccuratePredictedImpactTime(const CUnit* unit) const
 }
 
 
+int CWeapon::GetShotDelay() const
+{
+	if (salvoLeft <= 0)
+		return salvoWindup;
+
+	// limit a nextSalvo set from lua to hold fire
+	// so that predictions cannot be over-inflated
+	return std::clamp(nextSalvo - gs->frameNum, 0, std::max(salvoWindup, salvoDelay));
+}
+
+
 float3 CWeapon::GetLeadVec(const CUnit* unit) const
 {
 	const float predictMult = mix(predictSpeedMod, 1.0f, weaponDef->predictBoost);
-	const float predictTime = (accurateLeading > 0)
-		? GetAccuratePredictedImpactTime(unit)
-		: GetPredictedImpactTime(unit->pos)
-	;
+	const float shotDelay = GetShotDelay();
+	const float3 shotPos = unit->pos + unit->speed * predictMult * shotDelay;
+	const float predictTime = shotDelay + ((accurateLeading > 0)
+		? GetAccuratePredictedImpactTime(unit, shotPos)
+		: GetPredictedImpactTime(shotPos)
+	);
 	float3 lead = unit->speed * predictTime * predictMult;
 
 	if (weaponDef->leadLimit < 0.0f)
@@ -1732,7 +1745,7 @@ float3 CWeapon::GetLeadTargetPos(const SWeaponTarget& target) const
 			AdjustTargetPosToWater(p, true);
 			return p;
 		} break;
-		case Target_Intercept: return target.intercept->pos + target.intercept->speed;
+		case Target_Intercept: return target.intercept->pos + target.intercept->speed * (1.0f + GetShotDelay());
 	}
 
 	return currentTargetPos;
