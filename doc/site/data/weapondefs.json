@@ -282,6 +282,19 @@
       "maximumValue": 1,
       "type": "float"
     },
+    "controlAreaMode": {
+      "description": "Missile/Torpedo only. Control area mode: 0 disables the control area, 1 uses the launch position, and 2 uses the current weapon position. Projectiles that leave the area stop being guided, as if their fuel ran out.",
+      "defaultValue": 0,
+      "minimumValue": 0,
+      "maximumValue": 2,
+      "type": "int"
+    },
+    "controlAreaRangeMult": {
+      "description": "Missile/Torpedo only. Multiplier for the weapon range when checking whether a projectile is within its control area (honors `heightmod` and `cylinderTargeting`).",
+      "defaultValue": 1,
+      "minimumValue": 0,
+      "type": "float"
+    },
     "cylinderTargeting": {
       "fallbackName": "cylinderTargetting",
       "description": "Makes targeting happen in a cylinder. The height is range times this value. Zero means use the usual range (spherical or ballistic)",
