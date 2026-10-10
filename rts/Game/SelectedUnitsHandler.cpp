@@ -1033,7 +1033,7 @@ void CSelectedUnitsHandler::SendCommand(const Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	SendSelect();
-	clientNet->Send(CBaseNetProtocol::Get().SendCommand(gu->myPlayerNum, c.GetID(), c.GetTimeOut(), c.GetOpts(), c.GetNumParams(), c.GetParams()));
+	clientNet->Send(CBaseNetProtocol::Get().SendCommand(gu->myPlayerNum, c.GetID(), c.GetTimeOut(), c.GetOpts(), c.GetNumParams(), c.GetParams(), c.GetQueue()));
 }
 
 void CSelectedUnitsHandler::SendSelect()
@@ -1070,11 +1070,12 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 
 	uint32_t totalParams = 0;
 
-	// if all commands share the same ID / options / number of parameters,
+	// if all commands share the same ID / options / number of parameters / queue,
 	// insert only these values into the packet to save a bit of bandwidth
 	int32_t refCmdID = commands[0].GetID();
 	uint8_t refCmdOpts = commands[0].GetOpts();
 	int32_t refCmdSize = commands[0].GetNumParams();
+	uint8_t refCmdQueue = commands[0].GetQueue();
 
 	for (unsigned int c = 0; c < commandCount; c++) {
 		totalParams += commands[c].GetNumParams();
@@ -1085,15 +1086,18 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 			refCmdOpts = 0xFF;
 		if (refCmdSize != 0xFFFF && refCmdSize != commands[c].GetNumParams())
 			refCmdSize = 0xFFFF;
+		if (refCmdQueue != 0xFF && refCmdQueue != commands[c].GetQueue())
+			refCmdQueue = 0xFF;
 	}
 
 	unsigned int optBytesPerCmd = 0;
 	unsigned int totalPacketLen = 0;
 
-	// optional data per command (cmdID, cmdOpts, #cmdParams)
+	// optional data per command (cmdID, cmdOpts, #cmdParams, cmdQueue)
 	optBytesPerCmd += (sizeof(uint32_t) * (refCmdID   == 0     ));
 	optBytesPerCmd += (sizeof(uint8_t ) * (refCmdOpts == 0xFF  ));
 	optBytesPerCmd += (sizeof(uint16_t) * (refCmdSize == 0xFFFF));
+	optBytesPerCmd += (sizeof(uint8_t ) * (refCmdQueue == 0xFF  ));
 
 	// msg type, msg size
 	totalPacketLen += (sizeof(uint8_t) + sizeof(static_cast<uint16_t>(totalPacketLen)));
@@ -1102,7 +1106,8 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 	totalPacketLen += (
 		sizeof(static_cast<uint32_t>(refCmdID  )) +
 		sizeof(static_cast<uint8_t >(refCmdOpts)) +
-		sizeof(static_cast<uint16_t>(refCmdSize))
+		sizeof(static_cast<uint16_t>(refCmdSize)) +
+		sizeof(static_cast<uint8_t >(refCmdQueue))
 	);
 
 	totalPacketLen += sizeof(static_cast<uint16_t>(unitIDCount));
@@ -1128,7 +1133,8 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 	        << static_cast<uint8_t >(pairwise)
 	        << static_cast<uint32_t>(refCmdID)
 	        << static_cast<uint8_t >(refCmdOpts)
-	        << static_cast<uint16_t>(refCmdSize);
+	        << static_cast<uint16_t>(refCmdSize)
+	        << static_cast<uint8_t >(refCmdQueue);
 
 	// NOTE: does not check for invalid unitIDs
 	*packet << static_cast<uint16_t>(unitIDCount);
@@ -1147,6 +1153,8 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 			*packet << static_cast<uint8_t>(cmd.GetOpts());
 		if (refCmdSize == 0xFFFF)
 			*packet << static_cast<uint16_t>(cmd.GetNumParams());
+		if (refCmdQueue == 0xFF)
+			*packet << cmd.GetQueue();
 
 		for (unsigned int j = 0, n = cmd.GetNumParams(); j < n; j++) {
 			*packet << cmd.GetParam(j);

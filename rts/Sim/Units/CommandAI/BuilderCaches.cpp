@@ -49,7 +49,7 @@ bool CBuilderCaches::IsUnitBeingReclaimed(const CUnit* unit, const CUnit* friend
 	for (auto it = reclaimers.begin(); it != reclaimers.end(); ++it) {
 		const CUnit* u = unitHandler.GetUnit(*it);
 		const CCommandAI* cai = u->commandAI;
-		const CCommandQueue& cq = cai->commandQue;
+		const CCommandQueue& cq = cai->GetOwnQueue();
 
 		if (cq.empty()) {
 			removees.push_back(u->id);
@@ -85,7 +85,7 @@ bool CBuilderCaches::IsFeatureBeingReclaimed(int featureId, const CUnit* friendU
 	for (auto it = featureReclaimers.begin(); it != featureReclaimers.end(); ++it) {
 		const CUnit* u = unitHandler.GetUnit(*it);
 		const CCommandAI* cai = u->commandAI;
-		const CCommandQueue& cq = cai->commandQue;
+		const CCommandQueue& cq = cai->GetOwnQueue();
 
 		if (cq.empty()) {
 			removees.push_back(u->id);
@@ -120,7 +120,7 @@ bool CBuilderCaches::IsFeatureBeingResurrected(int featureId, const CUnit* frien
 	for (auto it = resurrecters.begin(); it != resurrecters.end(); ++it) {
 		const CUnit* u = unitHandler.GetUnit(*it);
 		const CCommandAI* cai = u->commandAI;
-		const CCommandQueue& cq = cai->commandQue;
+		const CCommandQueue& cq = cai->GetOwnQueue();
 
 		if (cq.empty()) {
 			removees.push_back(u->id);

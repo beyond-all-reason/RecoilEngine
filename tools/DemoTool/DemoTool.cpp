@@ -241,13 +241,15 @@ void TrafficDump(CDemoReader& reader, bool trafficStats)
 				std::cout << " SameOpt: " << sameopt;
 				unsigned short samesize = *((unsigned short*)(buffer + 11));
 				std::cout << " SameSize: " << samesize;
-				short uidc = *((short*)(buffer + 13));
+				unsigned int samequeue = (unsigned)buffer[13];
+				std::cout << " SameQueue: " << samequeue;
+				short uidc = *((short*)(buffer + 14));
 				std::cout << " UnitIDCount: " << uidc;
 				for (unsigned int i = 0; i < uidc; ++i) {
-					std::cout << " " << *((short*)(buffer + 15 + i * 2));
+					std::cout << " " << *((short*)(buffer + 16 + i * 2));
 				}
-				short cidc = *((short*)(buffer + 15 + uidc * 2));
-				int startp = 15 + uidc * 2 + 2;
+				short cidc = *((short*)(buffer + 16 + uidc * 2));
+				int startp = 16 + uidc * 2 + 2;
 				std::cout << " CmdIDCount: " << cidc;
 				for (unsigned int i = 0; i < cidc; ++i) {
 					if (sameid == 0) {
@@ -261,6 +263,10 @@ void TrafficDump(CDemoReader& reader, bool trafficStats)
 					if (sameopt == 0xFFFF) {
 						std::cout << " " << *((unsigned short*)(buffer + startp));
 						startp += 2;
+					}
+					if (samequeue == 0xFF) {
+						std::cout << " " << (unsigned)buffer[startp];
+						startp += 1;
 					}
 				}
 				std::cout << std::endl;
