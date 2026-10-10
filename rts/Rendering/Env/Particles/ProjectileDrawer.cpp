@@ -195,6 +195,9 @@ void CProjectileDrawer::Init() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	eventHandler.AddClient(this);
 
+	ConfigNotify({}, {});
+	configHandler->NotifyOnChange(this, {"ProjectileReflectionMinRadius", "ProjectileDrawReuseWaterPasses", "ProjectileDrawThreadedFill"});
+
 	loadscreen->SetLoadMessage("Creating Projectile Textures");
 
 	textureAtlas  = new CTextureAtlas(CTextureAtlas::ATLAS_ALLOC_MP_LEGACY, 0, 0, "ExplosFXAtlas", true);
@@ -446,6 +449,7 @@ void CProjectileDrawer::Kill() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	eventHandler.RemoveClient(this);
 	autoLinkedEvents.clear();
+	configHandler->RemoveObserver(this);
 
 	glDeleteTextures(8, perlinBlendTex);
 	spring::SafeDelete(textureAtlas);
@@ -475,14 +479,16 @@ void CProjectileDrawer::Kill() {
 	configHandler->Set("SoftParticles", wantSoften);
 }
 
+void CProjectileDrawer::ConfigNotify(const std::string& key, const std::string& value)
+{
+	reflMinRadius = configHandler->GetFloat("ProjectileReflectionMinRadius");
+	reuseWaterPasses = configHandler->GetBool("ProjectileDrawReuseWaterPasses");
+	threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill");
+}
+
 void CProjectileDrawer::UpdateDrawFlags()
 {
 	ZoneScopedN("ProjectileDrawer::UpdateDrawFlags");
-
-	// water reflections are distorted enough that small particles contribute
-	// next to nothing visually; skipping them avoids most of the reflection
-	// pass' fill/sort/quad-generation cost on effect-heavy frames
-	const float reflMinRadius = configHandler->GetFloat("ProjectileReflectionMinRadius");
 
 	// per-frame invariants, hoisted out of the per-particle loop (notably
 	// IWater::GetWater()->CanDrawReflectionPass(), a virtual call that was
@@ -495,59 +501,55 @@ void CProjectileDrawer::UpdateDrawFlags()
 	const CCamera* camUWRefl = CCameraHandler::GetCamera(CCamera::CAMTYPE_UWREFL);
 	const CCamera* camShadow = CCameraHandler::GetCamera(CCamera::CAMTYPE_SHADOW);
 
-	for_mt(0, renderProjectiles.size(), [this, reflMinRadius, drawReflPass, drawShadowPass, timeOffset, camPlayer, camUWRefl, camShadow](int i) {
+	// chunks instead of single projectiles: for_mt hands out each item through
+	// two shared atomic counters, which costs more than the item's own work
+	for_mt_chunk(0, renderProjectiles.size(), [this, drawReflPass, drawShadowPass, timeOffset, camPlayer, camUWRefl, camShadow](int i) {
 		CProjectile* p = renderProjectiles[i];
 		const bool hasModel = (p->model != nullptr);
 
-		p->drawPos = p->GetDrawPos(timeOffset);
+		spring::StoreIfChanged(p->drawPos, p->GetDrawPos(timeOffset));
+		spring::StoreIfChanged(p->previousDrawFlag, p->drawFlag);
 
-		p->previousDrawFlag = p->drawFlag;
-		p->ResetDrawFlag();
+		uint8_t drawFlag = DrawFlags::SO_NODRAW_FLAG;
 
-		if (!CanDrawProjectile(p, p->GetAllyteamID()))
-			return;
+		if (CanDrawProjectile(p, p->GetAllyteamID())) {
+			drawFlag = DrawFlags::SO_DRICON_FLAG; //reuse as a minimap draw indication
 
-		p->SetDrawFlag(DrawFlags::SO_DRICON_FLAG); //reuse as a minimap draw indication
+			const float drawRadius = p->GetDrawRadius();
 
-		const float drawRadius = p->GetDrawRadius();
+			if (camPlayer->InView(p->drawPos, drawRadius)) {
+				p->SetSortDist(CCamera::CAMTYPE_PLAYER, camPlayer->ProjectedDistance(p->drawPos));
 
-		if (camPlayer->InView(p->drawPos, drawRadius)) {
-			p->SetSortDist(CCamera::CAMTYPE_PLAYER, camPlayer->ProjectedDistance(p->drawPos));
+				drawFlag |= (hasModel ? DrawFlags::SO_OPAQUE_FLAG : DrawFlags::SO_ALPHAF_FLAG);
 
-			if (hasModel)
-				p->AddDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
-			else
-				p->AddDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
+				if (p->drawPos.y - drawRadius < 0.0f)
+					drawFlag |= DrawFlags::SO_REFRAC_FLAG;
 
-			if (p->drawPos.y - drawRadius < 0.0f)
-				p->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
+				// Special case of piece projectile, since it has a model and fire particle
+				if (p->piece)
+					drawFlag |= DrawFlags::SO_ALPHAF_FLAG;
+			}
 
-			// Special case of piece projectile, since it has a model and fire particle
-			if (p->piece)
-				p->AddDrawFlag(DrawFlags::SO_ALPHAF_FLAG);
+			if (drawReflPass && (hasModel || drawRadius >= reflMinRadius) && camUWRefl->InView(p->drawPos, drawRadius)) {
+				p->SetSortDist(CCamera::CAMTYPE_UWREFL, camUWRefl->ProjectedDistance(p->drawPos));
+
+				if (CModelDrawerHelper::ObjectVisibleReflection(p->drawPos, camUWRefl->GetPos(), drawRadius))
+					drawFlag |= DrawFlags::SO_REFLEC_FLAG;
+			}
+
+			if (drawShadowPass && p->castShadow && camShadow->InView(p->drawPos, drawRadius)) {
+				p->SetSortDist(CCamera::CAMTYPE_SHADOW, camShadow->ProjectedDistance(p->drawPos));
+
+				drawFlag |= (hasModel ? DrawFlags::SO_SHOPAQ_FLAG : DrawFlags::SO_SHTRAN_FLAG);
+
+				// Special case of piece projectile, since it has a model and fire particle
+				if (p->piece)
+					drawFlag |= DrawFlags::SO_SHTRAN_FLAG;
+			}
 		}
 
-		if (drawReflPass && (hasModel || drawRadius >= reflMinRadius) && camUWRefl->InView(p->drawPos, drawRadius)) {
-			p->SetSortDist(CCamera::CAMTYPE_UWREFL, camUWRefl->ProjectedDistance(p->drawPos));
-
-			if (CModelDrawerHelper::ObjectVisibleReflection(p->drawPos, camUWRefl->GetPos(), drawRadius))
-				p->AddDrawFlag(DrawFlags::SO_REFLEC_FLAG);
-		}
-
-		if (drawShadowPass && p->castShadow && camShadow->InView(p->drawPos, drawRadius)) {
-			p->SetSortDist(CCamera::CAMTYPE_SHADOW, camShadow->ProjectedDistance(p->drawPos));
-
-			if unlikely(hasModel)
-				p->AddDrawFlag(DrawFlags::SO_SHOPAQ_FLAG);
-			else
-				p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
-
-			// Special case of piece projectile, since it has a model and fire particle
-			if (p->piece)
-				p->AddDrawFlag(DrawFlags::SO_SHTRAN_FLAG);
-		}
-	});
-
+		spring::StoreIfChanged(p->drawFlag, drawFlag);
+	}, 64, 256);
 }
 
 bool CProjectileDrawer::CheckSoftenExt()
@@ -875,7 +877,7 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 	// in between fill the buffer for their own camera/mask and consume their
 	// own ranges, so the saved range stays valid for the whole frame.
 	const bool mainPass = !drawReflection && !drawRefraction;
-	const bool reuseWanted = configHandler->GetBool("ProjectileDrawReuseWaterPasses");
+	const bool reuseWanted = reuseWaterPasses;
 
 	// the above-water main pass and the water refraction pass both view the
 	// same particles from the player camera; both can re-submit the geometry
@@ -918,15 +920,13 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 			RadixSortByKey(sortedParticles, sortScratch, [](const SortableParticle& sp) noexcept { return sp.sortKey; });
 		}
 
-		const bool threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill") && ThreadPool::HasThreads();
-
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DS)");
-			FillParticleGeometry(mtFillBuffers, sortedParticles.size(), threadedFill, [this](size_t j) { return sortedParticles[j].proj; });
+			FillParticleGeometry(mtFillBuffers, sortedParticles.size(), threadedFill && ThreadPool::HasThreads(), [this](size_t j) { return sortedParticles[j].proj; });
 		}
 		{
 			ZoneScopedN("ProjectileDrawer::DrawAlpha(DU)");
-			FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill, [this](size_t j) { return unsortedParticles[j]; });
+			FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill && ThreadPool::HasThreads(), [this](size_t j) { return unsortedParticles[j]; });
 		}
 	}
 
@@ -1059,8 +1059,7 @@ void CProjectileDrawer::DrawShadowTransparent()
 
 	{
 		ZoneScopedN("ProjectileDrawer::DrawShadowTransparent(Fill)");
-		const bool threadedFill = configHandler->GetBool("ProjectileDrawThreadedFill") && ThreadPool::HasThreads();
-		FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill, [this](size_t j) { return unsortedParticles[j]; });
+		FillParticleGeometry(mtFillBuffers, unsortedParticles.size(), threadedFill && ThreadPool::HasThreads(), [this](size_t j) { return unsortedParticles[j]; });
 	}
 
 	auto& rb = CExpGenSpawnable::GetPrimaryRenderBuffer();
