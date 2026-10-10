@@ -223,13 +223,28 @@ void LuaVAOImpl::CheckDrawPrimitiveType(GLenum mode) const
 
 void LuaVAOImpl::CondInitVAO()
 {
-	// keep the VAO while every attached buffer still has the ID it was set up with; a buffer that is
-	// not attached does not force a rebuild (a buffer attached later has a new ID and does)
-	if (vao &&
-		(!vertLuaVBO || vertLuaVBO->GetId() == oldVertVBOId) &&
-		(!indxLuaVBO || indxLuaVBO->GetId() == oldIndxVBOId) &&
-		(!instLuaVBO || instLuaVBO->GetId() == oldInstVBOId))
+	const auto getBufferState = [](const LuaVBOImplSP& luaVBO) -> BufferState {
+		if (!luaVBO)
+			return {};
+
+		if (!luaVBO->vbo)
+			LuaUtils::SolLuaError("[LuaVAOImpl::CondInitVAO] Attached LuaVBO has been deleted. Did you call vbo:Define() after vbo:Delete()?");
+
+		return {luaVBO->GetId(), luaVBO->definitionRevision, luaVBO->vbo->GetSize()};
+	};
+
+	// keep the VAO while every attached buffer is the one it was set up with; the GL name alone is not
+	// enough, VBO:Delete + VBO:Define and a growing engine model buffer can get the old name back
+	const BufferState vertState = getBufferState(vertLuaVBO);
+	const BufferState indxState = getBufferState(indxLuaVBO);
+	const BufferState instState = getBufferState(instLuaVBO);
+
+	if (vao && vertState == oldVertState && indxState == oldIndxState && instState == oldInstState)
 		return;
+
+	oldVertState = vertState;
+	oldIndxState = indxState;
+	oldInstState = instState;
 
 	vao = nullptr;
 	vao = std::make_unique<VAO>();
@@ -237,12 +252,10 @@ void LuaVAOImpl::CondInitVAO()
 
 	if (vertLuaVBO) {
 		vertLuaVBO->vbo->Bind(GL_ARRAY_BUFFER); //type is needed cause same buffer could have been rebounded as something else using LuaVBOs functions
-		oldVertVBOId = vertLuaVBO->GetId();
 	}
 
 	if (indxLuaVBO) {
 		indxLuaVBO->vbo->Bind(GL_ELEMENT_ARRAY_BUFFER);
-		oldIndxVBOId = indxLuaVBO->GetId();
 	}
 
 	#define INT2PTR(x) (reinterpret_cast<void*>(static_cast<intptr_t>(x)))
@@ -272,7 +285,6 @@ void LuaVAOImpl::CondInitVAO()
 			vertLuaVBO->vbo->Unbind();
 
 		instLuaVBO->vbo->Bind(GL_ARRAY_BUFFER);
-		oldInstVBOId = instLuaVBO->GetId();
 
 		for (const auto& va : instLuaVBO->bufferAttribDefsVec) {
 			const auto& attr = va.second;
