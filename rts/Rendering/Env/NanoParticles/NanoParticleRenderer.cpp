@@ -382,7 +382,6 @@ void Renderer::SetupInstanceVAO()
 void Renderer::Upload(bool persistentChanged)
 {
 	ZoneScopedN("NanoParticles::Draw:Upload");
-	RECOIL_DETAILED_TRACY_ZONE;
 	const std::size_t persistentCount = persistentVertices.size();
 	const std::size_t transientCount = transientVertices.size();
 
@@ -423,7 +422,6 @@ void Renderer::Upload(bool persistentChanged)
 void Renderer::DrawOnMinimap() const
 {
 	ZoneScopedN("NanoParticles::DrawOnMinimap");
-	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (!Available())
 		return;
@@ -507,7 +505,6 @@ void Renderer::RebuildAllyVisibility()
 void Renderer::SyncPersistentBuffer()
 {
 	ZoneScopedN("NanoParticles::Draw:Sync");
-	RECOIL_DETAILED_TRACY_ZONE;
 	const std::uint32_t generation = system.GetGeneration();
 	const int allyTeam = gu->myAllyTeam;
 	const bool fullView = gu->spectatingFullView;
@@ -645,7 +642,6 @@ void Renderer::GatherVisibleEnemies(int frame)
 void Renderer::Draw(bool drawAboveWater, bool drawBelowWater, bool drawReflection, bool drawRefraction)
 {
 	ZoneScopedN("NanoParticles::Draw");
-	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (!Available())
 		return;
