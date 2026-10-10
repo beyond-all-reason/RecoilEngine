@@ -828,10 +828,17 @@ void QTPFS::PathManager::Update() {
 			return blocksToUpdate;
 		};
 
+		// Only hand the layers with damaged blocks to the thread pool, still largest footprints first.
+		nodeLayersToUpdate.clear();
+		for (int layerNum : nodeLayerUpdatePriorityOrder) {
+			if (numBlocksToUpdate(layerNum) > 0)
+				nodeLayersToUpdate.push_back(layerNum);
+		}
+
 		SRectangle rect(0,0,0,0);
-		for_mt(0, nodeLayers.size(), [this, &rect, &numBlocksToUpdate](const int index) {
+		for_mt(0, nodeLayersToUpdate.size(), [this, &rect, &numBlocksToUpdate](const int index) {
 			int curThread = ThreadPool::GetThreadNum();
-			int layerNum = nodeLayerUpdatePriorityOrder[index];
+			int layerNum = nodeLayersToUpdate[index];
 			int blocksToUpdate = numBlocksToUpdate(layerNum);
 			for (int i = 0; i < blocksToUpdate; ++i) { UpdateNodeLayer(layerNum, rect, curThread); }
 		});
@@ -904,6 +911,9 @@ void QTPFS::PathManager::Update() {
 	{
 		ThreadUpdate();
 	}
+
+	// the node layers do not change again until the next frame's map updates
+	PathSpeedModInfoSystem::StartNextScan();
 }
 
 __FORCE_ALIGN_STACK__
