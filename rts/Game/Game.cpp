@@ -1877,6 +1877,7 @@ void CGame::GameEnd(const std::vector<unsigned char>& winningAllyTeams, bool tim
 	CEndGameBox::Create(winningAllyTeams);
 #ifdef    HEADLESS
 	CTimeProfiler::GetInstance().PrintProfilingInfo();
+	gu->globalQuit = true;
 #endif // HEADLESS
 
 	CDemoRecorder* record = clientNet->GetDemoRecorder();
