@@ -6367,7 +6367,7 @@ int LuaSyncedRead::GetUnitCurrentCommand(lua_State* L)
 
 	const CCommandAI* commandAI = unit->commandAI; // never null
 	const CFactoryCAI* factoryCAI = dynamic_cast<const CFactoryCAI*>(commandAI);
-	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->commandQue : &factoryCAI->newUnitCommands;
+	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->GetOwnQueue() : &factoryCAI->GetNewUnitQueue();
 
 	int cmdIndex = luaL_optint(L, 2, 1);
 	if (cmdIndex > 0) {
@@ -6425,7 +6425,7 @@ int LuaSyncedRead::GetUnitCommands(lua_State* L)
 	const CCommandAI* commandAI = unit->commandAI;
 	// send the new unit commands for factories, otherwise the normal commands
 	const CFactoryCAI* factoryCAI = dynamic_cast<const CFactoryCAI*>(commandAI);
-	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->commandQue : &factoryCAI->newUnitCommands;
+	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->GetOwnQueue() : &factoryCAI->GetNewUnitQueue();
 
 	const int  numCmds   = luaL_checkint(L, 2); // must always be given, -1 is a performance pitfall
 	const bool cmdsTable = luaL_optboolean(L, 3, true); // deprecated, prefer to set 2nd arg to 0
@@ -6479,7 +6479,7 @@ int LuaSyncedRead::GetFactoryCommands(lua_State* L)
 	if (factoryCAI == nullptr)
 		return 0;
 
-	const CCommandQueue& commandQue = factoryCAI->commandQue;
+	const CCommandQueue& commandQue = factoryCAI->GetOwnQueue();
 
 	const int  numCmds   = luaL_checkint(L, 2);
 	const bool cmdsTable = luaL_optboolean(L, 3, true); // deprecated, prefer to set 2nd arg to 0
@@ -6510,7 +6510,7 @@ int LuaSyncedRead::GetUnitCommandCount(lua_State* L)
 	const CCommandAI* commandAI = unit->commandAI;
 
 	const CFactoryCAI* factoryCAI = dynamic_cast<const CFactoryCAI*>(commandAI);
-	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->commandQue : &factoryCAI->newUnitCommands;
+	const CCommandQueue* queue = (factoryCAI == nullptr)? &commandAI->GetOwnQueue() : &factoryCAI->GetNewUnitQueue();
 
 	lua_pushnumber(L, queue->size());
 
@@ -6540,7 +6540,7 @@ int LuaSyncedRead::GetFactoryCommandCount(lua_State* L)
 	if (factoryCAI == nullptr)
 		return 0;
 
-	const CCommandQueue& queue = commandAI->commandQue;
+	const CCommandQueue& queue = commandAI->GetOwnQueue();
 
 	lua_pushnumber(L, queue.size());
 
@@ -6654,7 +6654,7 @@ int LuaSyncedRead::GetFactoryCounts(lua_State* L)
 	if (factoryCAI == nullptr)
 		return 0; // not a factory, bail
 
-	const CCommandQueue& commandQue = factoryCAI->commandQue;
+	const CCommandQueue& commandQue = factoryCAI->GetOwnQueue();
 
 	// get the desired number of commands to return
 	int count = luaL_optint(L, 2, -1);
@@ -6709,7 +6709,7 @@ static int PackBuildQueue(lua_State* L, bool canBuild, const char* caller)
 		return 0;
 
 	const CCommandAI* commandAI = unit->commandAI;
-	const CCommandQueue& commandQue = commandAI->commandQue;
+	const CCommandQueue& commandQue = commandAI->GetOwnQueue();
 
 	lua_createtable(L, commandQue.size(), 0);
 

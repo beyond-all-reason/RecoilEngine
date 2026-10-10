@@ -206,7 +206,7 @@ void CWaitCommandsAI::AddLocalUnit(CUnit* unit, const CUnit* builder)
 	if ((unit->team != gu->myTeam) || waitMap.empty())
 		return;
 
-	const CCommandQueue& dq = unit->commandAI->commandQue;
+	const CCommandQueue& dq = unit->commandAI->GetOwnQueue();
 
 	for (const Command& cmd: dq) {
 		if ((cmd.GetID() != CMD_WAIT) || (cmd.GetNumParams() != 2))
@@ -393,7 +393,7 @@ CWaitCommandsAI::Wait::~Wait()
 CWaitCommandsAI::Wait::WaitState
 	CWaitCommandsAI::Wait::GetWaitState(const CUnit* unit) const
 {
-	const CCommandQueue& dq = unit->commandAI->commandQue;
+	const CCommandQueue& dq = unit->commandAI->GetOwnQueue();
 
 	if (dq.empty())
 		return Missing;
@@ -421,7 +421,7 @@ CWaitCommandsAI::Wait::WaitState
 
 bool CWaitCommandsAI::Wait::IsWaitingOn(const CUnit* unit) const
 {
-	const CCommandQueue& dq = unit->commandAI->commandQue;
+	const CCommandQueue& dq = unit->commandAI->GetOwnQueue();
 	if (dq.empty())
 		return false;
 
