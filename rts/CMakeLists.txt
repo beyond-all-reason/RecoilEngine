@@ -35,8 +35,9 @@ if(DEBUG_GLSTATE)
 endif()
 
 ### give error when not found
-find_package_static(DevIL REQUIRED)
-
+find_package(DevIL REQUIRED)
+find_package(ZLIB REQUIRED)
+find_package(Fontconfig REQUIRED)
 ### Assemble common include dirs
 include_directories(BEFORE lib)
 include_directories(BEFORE lib/lua/include)
@@ -63,17 +64,6 @@ endif (NO_SOUND)
 
 ### Find include directories and add platform specific libraries
 if    (UNIX AND NOT MINGW)
-	if    (PREFER_STATIC_LIBS)
-		prefer_static_libs()
-		find_library(MATH_LIBRARY m)
-		#FIND_LIBRARY(PTHREAD_LIBRARY pthread)
-		#FIND_LIBRARY(OMP_LIBRARY gomp) FIXME it's hidden in some subfolders
-		unprefer_static_libs()
-
-		list(APPEND engineCommonLibraries ${MATH_LIBRARY})
-		#list(APPEND engineCommonLibraries ${PTHREAD_LIBRARY} ${OMP_LIBRARY})
-	endif (PREFER_STATIC_LIBS)
-
 	# Needed for dynamically loading shared libraries (on some OS)
 	list(APPEND engineCommonLibraries ${CMAKE_DL_LIBS})
 
@@ -83,9 +73,8 @@ if    (UNIX AND NOT MINGW)
 	endif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD" OR CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
 endif (UNIX AND NOT MINGW)
 
-find_package_static(ZLIB 1.2.7 REQUIRED)
-list(APPEND engineCommonLibraries DevIL::IL)
-list(APPEND engineCommonLibraries 7zip prd::jsoncpp ${SPRING_MINIZIP_LIBRARY} ZLIB::ZLIB Tracy::TracyClient)
+list(APPEND engineCommonLibraries DevIL::IL Fontconfig::Fontconfig)
+list(APPEND engineCommonLibraries 7zip prd::jsoncpp ${SPRING_MINIZIP_LIBRARY} ${ZLIB_LIBRARIES} Tracy::TracyClient)
 list(APPEND engineCommonLibraries lua luasocket archives assimp simdjson::simdjson fastgltf
 	gflags_nothreads_static)
 if(CMAKE_SYSTEM_NAME MATCHES "OpenBSD")
@@ -104,7 +93,6 @@ if    (USE_MIMALLOC)
     list(APPEND engineCommonLibraries mimalloc-static)
     add_compile_definitions(USE_MIMALLOC)
 endif (USE_MIMALLOC)
-
 
 if(UNIX AND NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
 	find_package_static(Libunwind 1.4.0 REQUIRED)

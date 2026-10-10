@@ -56,13 +56,14 @@ After installing requirements, you can execute the build locally using the `buil
 
 ```console
 $ docker-build-v2/build.sh --help
-Usage: docker-build-v2/build.sh [-h|--help] [--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] {windows|linux} [cmake_flag...]
+Usage: docker-build-v2/build.sh [--help] [--configure|--configure|--compile] [-j|--jobs {number_of_jobs}] [--arch {arm64|amd64}] [--local-conan] {windows|linux} [cmake_flag...]
 Options:
-  -h, --help   print this help message
-  --configure  only configure, don't compile
-  --compile    only compile, don't configure
-  -j, --jobs   number of concurrent processes to use when building
-  --arch       arm64 or amd64, defaults to host
+  -h, --help     print this help message
+  --configure    only configure, don't compile
+  --compile      only compile, don't configure
+  -j, --jobs     number of concurrent processes to use when building
+  --arch         arm64 or amd64, defaults to host
+  --local-conan  compile dependencies instead of using precompiled ones
 
 Some behaviors can be changed by setting environment variables. Consult the script source for those more advanced use cases.
 ```
