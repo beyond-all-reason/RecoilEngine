@@ -50,22 +50,6 @@ namespace spring {
 		typedef std::remove_cv_t<std::remove_reference_t<T>> type;
 	};
 
-	// https://stackoverflow.com/questions/8194227/how-to-get-the-i-th-element-from-an-stdtuple-when-i-isnt-know-at-compile-time
-	template<std::size_t I = 0, typename FuncT, typename... Tp>
-	inline typename std::enable_if<I == sizeof...(Tp), void>::type
-		tuple_exec_at(int, std::tuple<Tp...>&, FuncT)
-	{}
-
-	template<std::size_t I = 0, typename FuncT, typename... Tp>
-	inline typename std::enable_if < I < sizeof...(Tp), void>::type
-		tuple_exec_at(int index, std::tuple<Tp...>& t, FuncT f)
-	{
-		if (index == 0)
-			f(std::get<I>(t));
-
-		tuple_exec_at<I + 1, FuncT, Tp...>(index - 1, t, f);
-	}
-
 	// https://blog.tartanllama.xyz/exploding-tuples-fold-expressions/
 	template <std::size_t... Idx>
 	auto make_index_dispatcher(std::index_sequence<Idx...>) {
@@ -77,72 +61,260 @@ namespace spring {
 		return make_index_dispatcher(std::make_index_sequence<N>{});
 	}
 
+	template<typename... Type>
+	struct type_list_t {
+		using type = type_list_t;
+		static constexpr auto size = sizeof...(Type);
+	};
+
+	template<typename... Type>
+	static constexpr type_list_t<Type...> type_list{};
+
+	template<std::size_t, typename>
+	struct type_list_element;
+
+	template<std::size_t Index, typename Type, typename... Other>
+	struct type_list_element<Index, type_list_t<Type, Other...>>
+		: type_list_element<Index - 1u, type_list_t<Other...>> {
+	};
+
+	template<typename Type, typename... Other>
+	struct type_list_element<0u, type_list_t<Type, Other...>> {
+		using type = Type;
+	};
+
+	template<std::size_t Index, typename List>
+	using type_list_element_t = typename type_list_element<Index, List>::type;
+
+	template<typename... Lists>
+	struct type_list_concat;
+
+	template<>
+	struct type_list_concat<> {
+		using type = type_list_t<>;
+	};
+
+	template<typename... Ts>
+	struct type_list_concat<type_list_t<Ts...>> {
+		using type = type_list_t<Ts...>;
+	};
+
+	template<typename... Ts, typename... Us, typename... Rest>
+	struct type_list_concat<type_list_t<Ts...>, type_list_t<Us...>, Rest...> {
+		using type = typename type_list_concat<type_list_t<Ts..., Us...>, Rest...>::type;
+	};
+
+	template<typename... Lists>
+	using type_list_concat_t = typename type_list_concat<Lists...>::type;
+
+	template<template<class> class Pred, typename List>
+	struct type_list_filter;
+
+	template<template<class> class Pred, typename... Ts>
+	struct type_list_filter<Pred, type_list_t<Ts...>> {
+		using type = type_list_concat_t<
+			std::conditional_t<Pred<Ts>::value, type_list_t<Ts>, type_list_t<>>...
+		>;
+	};
+
+	template<template<class> class Pred, typename List>
+	using type_list_filter_t = typename type_list_filter<Pred, List>::type;
+
+	template<typename T, typename TypeList>
+	struct type_in_list;
+
+	template<typename T, typename... Types>
+	struct type_in_list<T, type_list_t<Types...>> {
+		static constexpr bool value = (std::is_same_v<T, Types> || ...);
+	};
+
+	template<typename T, typename TypeList>
+	constexpr bool type_in_list_v = type_in_list<T, TypeList>::value;
+
 	template<typename T>
-	struct return_type { using type = T; };
+	struct function_traits {
+		using return_type = T;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename... Ts>
-	struct return_type<std::function<R(Ts...)>> { using type = R; };
+	struct function_traits<std::function<R(Ts...)>> {
+		using return_type = R;
+		using arg_types = type_list_t<Ts...>;
+	};
 
 	template<typename R, typename... Ts>
-	struct return_type<std::function<R(Ts...)> const> { using type = R; };
+	struct function_traits<std::function<R(Ts...)> const> {
+		using return_type = R;
+		using arg_types = type_list_t<Ts...>;
+	};
 
 	template<typename R, typename T, typename... Ts>
-	struct return_type<std::function<R(Ts...)> T::*> { using type = R; };
+	struct function_traits<std::function<R(Ts...)> T::*> {
+		using return_type = R;
+		using arg_types = type_list_t<Ts...>;
+	};
 
 	template<typename R, typename T, typename... Ts>
-	struct return_type<std::function<R(Ts...)> const T::*> { using type = R; };
+	struct function_traits<std::function<R(Ts...)> const T::*> {
+		using return_type = R;
+		using arg_types = type_list_t<Ts...>;
+	};
 
 	template<typename R, typename T, typename... Ts>
-	struct return_type<std::function<R(Ts...)> T::* const&> { using type = R; };
+	struct function_traits<std::function<R(Ts...)> T::* const&> {
+		using return_type = R;
+		using arg_types = type_list_t<Ts...>;
+	};
 
 	template<typename R, typename T, typename... Ts>
-	struct return_type<std::function<R(Ts...)> const T::* const> { using type = R; };
+	struct function_traits<std::function<R(Ts...)> const T::* const> {
+		using return_type = R;
+		using arg_types = type_list_t<Ts...>;
+	};
 
 	template<typename R, typename... Ts>
-	struct return_type<R(*)(Ts...)> { using type = R; };
+	struct function_traits<R(*)(Ts...)> {
+		using return_type = R;
+		using arg_types = type_list_t<Ts...>;
+	};
 
 	template<typename R, typename... Ts>
-	struct return_type<R& (*)(Ts...)> { using type = R; };
+	struct function_traits<R& (*)(Ts...)> {
+		using return_type = R;
+		using arg_types = type_list_t<Ts...>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<R(T::*)() const> { using type = R; };
+	struct function_traits<R(T::*)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<R& (T::*)() const> { using type = R; };
+	struct function_traits<R& (T::*)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>(T::*)() const> { using type = R; };
+	struct function_traits<std::shared_ptr<R>(T::*)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>& (T::*)() const> { using type = R; };
+	struct function_traits<std::shared_ptr<R>& (T::*)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<R(T::* const)() const> { using type = R; };
+	struct function_traits<R(T::* const)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<R& (T::* const)() const> { using type = R; };
+	struct function_traits<R& (T::* const)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>(T::* const)() const> { using type = R; };
+	struct function_traits<std::shared_ptr<R>(T::* const)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>& (T::* const)() const> { using type = R; };
+	struct function_traits<std::shared_ptr<R>& (T::* const)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<R(T::* const&)() const> { using type = R; };
+	struct function_traits<R(T::* const&)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<R& (T::* const&)() const> { using type = R; };
+	struct function_traits<R& (T::* const&)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>(T::* const&)() const> { using type = R; };
+	struct function_traits<std::shared_ptr<R>(T::* const&)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename R, typename T>
-	struct return_type<std::shared_ptr<R>& (T::* const&)() const> { using type = R; };
+	struct function_traits<std::shared_ptr<R>& (T::* const&)() const> {
+		using return_type = R;
+		using arg_types = type_list_t<>;
+	};
 
 	template<typename T>
-	using return_type_t = typename return_type<T>::type;
-	
+	using return_type_t = typename function_traits<T>::return_type;
+
+	template<typename T>
+	using arg_types_t = typename function_traits<T>::arg_types;
+
+	template<typename TypeList, typename Func, std::size_t... Is>
+	inline void type_list_exec_at_impl(size_t index, TypeList&& t, Func&& f, std::index_sequence<Is...>)
+	{
+		using FnType = void(*)(TypeList&&, Func&&);
+		static constexpr FnType table[] = {
+			[](TypeList&&, Func&& func) { func(type_list_element_t<Is, std::decay_t<TypeList>> {}); }...
+		};
+		if (index < sizeof...(Is))
+			table[index](std::forward<TypeList>(t), std::forward<Func>(f));
+		else
+			throw std::out_of_range("type list index out of range");
+	}
+
+	template<typename TypeList, typename Func>
+	inline void type_list_exec_at(size_t index, TypeList&& typeList, Func&& f)
+	{
+		using TypeListDecayed = std::decay_t<TypeList>;
+		type_list_exec_at_impl(index, std::forward<TypeList>(typeList), std::forward<Func>(f), std::make_index_sequence<TypeListDecayed::size>{});
+	}
+
+	// Executes f with each type in the type list, returns tuple of results (void return returns nothing)
+	template<typename... T, typename F>
+	constexpr decltype(auto) type_list_exec_all(type_list_t<T...>, F&& f) {
+		if constexpr (std::is_void_v<return_type_t<F>>) {
+			(f(T{}), ...);
+		}
+		else {
+			return std::forward_as_tuple(f(T{})...);
+		}
+	}
+
+	// same as type_list_exec_at...
+	template<typename Tuple, typename Func, std::size_t... Is>
+	inline void tuple_exec_at_impl(size_t index, Tuple& t, Func&& f, std::index_sequence<Is...>)
+	{
+		using FnType = void(*)(Tuple&, Func&&);
+		static constexpr FnType table[] = {
+			[](Tuple& t, Func&& func) { func(std::get<Is>(t)); }...
+		};
+		if (index < sizeof...(Is))
+			table[index](t, std::forward<Func>(f));
+		else
+			throw std::out_of_range("tuple index out of range");
+	}
+
+	// Executes function f with the tuple element at the given index.
+	// throws std::out_of_range if index >= tuple size
+	template<typename Tuple, typename Func>
+	inline void tuple_exec_at(size_t index, Tuple& t, Func&& f)
+	{
+		tuple_exec_at_impl(index, t, std::forward<Func>(f), std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+	}
 
 	template<typename TupleType, typename Type>
 	struct tuple_contains_type;
