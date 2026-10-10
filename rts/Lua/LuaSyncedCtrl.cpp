@@ -170,6 +170,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(SetGameRulesParam);
 	REGISTER_LUA_CFUNC(SetTeamRulesParam);
+	REGISTER_LUA_CFUNC(SetAllyTeamRulesParam);
 	REGISTER_LUA_CFUNC(SetPlayerRulesParam);
 	REGISTER_LUA_CFUNC(SetUnitRulesParam);
 	REGISTER_LUA_CFUNC(SetFeatureRulesParam);
@@ -1640,6 +1641,25 @@ int LuaSyncedCtrl::SetTeamRulesParam(lua_State* L)
 		return 0;
 
 	SetRulesParam(L, __func__, 1, team->modParams);
+	return 0;
+}
+
+/***
+ * @function Spring.SetAllyTeamRulesParam
+ * @param allyTeamID integer
+ * @param paramName string
+ * @param paramValue ?number|string numeric paramValues in quotes will be converted to number.
+ * @param losAccess losAccess?
+ * @return nil
+ */
+int LuaSyncedCtrl::SetAllyTeamRulesParam(lua_State* L)
+{
+	const int allyTeamID = luaL_checkint(L, 1);
+	if (!teamHandler.IsValidAllyTeam(allyTeamID))
+		return 0;
+
+	AllyTeam& allyTeam = teamHandler.GetAllyTeam(allyTeamID);
+	SetRulesParam(L, __func__, 1, allyTeam.modParams);
 	return 0;
 }
 
