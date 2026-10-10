@@ -392,6 +392,11 @@ void CUnit::PostInit(const CUnit* builder)
 	eventHandler.UnitCreated(this, builder);
 	eoh->UnitCreated(*this, builder);
 
+	if (builder != nullptr)
+	{
+		mainBuilder = builder;
+	}
+
 	// skip past the gradual build-progression
 	if (!preBeingBuilt && !beingBuilt)
 		FinishedBuilding(true);
@@ -2854,6 +2859,7 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(lastNanoAdd),
 
 	CR_MEMBER(soloBuilder),
+	CR_MEMBER(mainBuilder),
 	CR_MEMBER(lastAttacker),
 	CR_MEMBER(transporter),
 
