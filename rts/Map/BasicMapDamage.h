@@ -6,12 +6,15 @@
 #include "MapDamage.h"
 
 #include <vector>
+#include "System/Rectangle.h"
 
 class CBasicMapDamage : public IMapDamage
 {
 public:
 	void Explosion(const float3& pos, float strength, float radius, float& maxHeightDiff) override;
 	void RecalcArea(int x1, int x2, int y1, int y2) override;
+	virtual void PushRecalcArea(int x1, int x2, int y1, int y2) override;
+	virtual void ProcessRecalcs() override;
 	void TerrainTypeHardnessChanged(int ttIndex) override;
 	void TerrainTypeSpeedModChanged(int ttIndex) override;
 
@@ -60,6 +63,7 @@ private:
 
 	std::vector<float> explosionSquaresPool;
 	std::vector<Explo> explosionUpdateQueue;
+	std::vector<SRectangle> damageRects;
 
 	static constexpr unsigned int CRATER_TABLE_SIZE = 200;
 	static constexpr unsigned int EXPLOSION_LIFETIME = 10;
