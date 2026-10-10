@@ -228,6 +228,8 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitLandGoal);
 	REGISTER_LUA_CFUNC(ClearUnitGoal);
 	REGISTER_LUA_CFUNC(SetUnitNeutral);
+	REGISTER_LUA_CFUNC(ClearCommandsTargeting);
+	REGISTER_LUA_CFUNC(ClearTargetingFromUnit);
 	REGISTER_LUA_CFUNC(SetUnitTarget);
 	REGISTER_LUA_CFUNC(SetUnitMidAndAimPos);
 	REGISTER_LUA_CFUNC(SetUnitRadiusAndHeight);
@@ -3583,6 +3585,97 @@ int LuaSyncedCtrl::SetUnitNeutral(lua_State* L)
 
 	unit->SetNeutral(luaL_checkboolean(L, 2));
 	return 0;
+}
+
+
+/*** Remove commands that target a unit from all command queues.
+ *
+ * Requires full control because this changes other teams' command queues.
+ * Removes every command whose ID is in `cmdIDs` and whose single parameter is
+ * `unitID` from the queues of all units, including the orders that factories
+ * pass on to newly built units. Each order is removed the way `CMD.REMOVE`
+ * removes it: an executing order is finished so the next queued order starts
+ * normally, and a builder stops its current work as it does for any new
+ * unqueued order. Other commands are preserved.
+ *
+ * Current unit and weapon targets are left alone; use
+ * `Spring.ClearTargetingFromUnit` for those. This is a one-time cleanup:
+ * a later order can target the unit again.
+ *
+ * @function Spring.ClearCommandsTargeting
+ * @param unitID UnitID The targeted unit.
+ * @param cmdIDs CMD|CMD[] A command ID or a list of command IDs, for example `CMD.ATTACK` or `{ CMD.ATTACK, CMD.FIGHT, CMD.MANUALFIRE }`.
+ * @return integer? removed The number of removed commands; nil for an invalid unit or without full control.
+ * @see Spring.GetCommandsTargeting
+ */
+int LuaSyncedCtrl::ClearCommandsTargeting(lua_State* L)
+{
+	if (!FullCtrl(L))
+		return 0;
+
+	const CUnit* target = ParseUnit(L, __func__, 1);
+
+	if (target == nullptr)
+		return 0;
+
+	std::vector<int> cmdIDs;
+
+	if (!LuaUtils::ParseIntOrIntVector(L, 2, cmdIDs))
+		luaL_error(L, "Incorrect arguments to ClearCommandsTargeting(unitID, cmdIDs)");
+
+	const int targetID = target->id;
+	int removed = 0;
+
+	// finishing an executing order can start the next one, which may create
+	// units (e.g. a builder starting construction), so do not hold iterators
+	const auto& activeUnits = unitHandler.GetActiveUnits();
+
+	for (size_t i = 0; i < activeUnits.size(); i++) {
+		removed += activeUnits[i]->commandAI->RemoveCommandsTargeting(targetID, cmdIDs);
+	}
+
+	lua_pushnumber(L, removed);
+	return 1;
+}
+
+
+/*** Drop the current unit and weapon targets that point at a unit.
+ *
+ * Requires full control because this changes other teams' targets.
+ * Clears the unit-level attack target and every weapon target that points at
+ * `unitID`, whether it was chosen automatically, by an order or via
+ * `Spring.SetUnitTarget`, without changing the unit's neutral state.
+ *
+ * Command queues are left alone; use `Spring.ClearCommandsTargeting` for
+ * those. An order that is still executing, or automatic targeting, may select
+ * the unit again. Projectiles already in flight are unaffected.
+ *
+ * @function Spring.ClearTargetingFromUnit
+ * @param unitID UnitID The targeted unit.
+ * @return boolean? success True on success; nil for an invalid unit or without full control.
+ */
+int LuaSyncedCtrl::ClearTargetingFromUnit(lua_State* L)
+{
+	if (!FullCtrl(L))
+		return 0;
+
+	const CUnit* target = ParseUnit(L, __func__, 1);
+
+	if (target == nullptr)
+		return 0;
+
+	const auto targetsUnit = [target](const SWeaponTarget& t) { return (t.type == Target_Unit && t.unit == target); };
+
+	for (CUnit* unit: unitHandler.GetActiveUnits()) {
+		if (targetsUnit(unit->curTarget))
+			unit->DropCurrentAttackTarget();
+
+		for (CWeapon* weapon: unit->weapons)
+			weapon->StopAttackingTargetIf(targetsUnit);
+	}
+
+	lua_pushboolean(L, true);
+	return 1;
 }
 
 

@@ -289,6 +289,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetFactoryCounts);
 	REGISTER_LUA_CFUNC(GetFactoryCommandCount);
 	REGISTER_LUA_CFUNC(GetFactoryCommands);
+	REGISTER_LUA_CFUNC(GetCommandsTargeting);
 
 	REGISTER_LUA_CFUNC(GetFactoryBuggerOff);
 
@@ -6489,6 +6490,89 @@ int LuaSyncedRead::GetFactoryCommands(lua_State* L)
 	} else {
 		LOG_DEPRECATED("This game is issuing `Spring.GetFactoryCommands(unitId, 0)`, or passing a third argument. This usage is deprecated, please use `Spring.GetFactoryCommandCount(unitId)` instead or fix some underlying bug.");
 		lua_pushnumber(L, commandQue.size());
+	}
+
+	return 1;
+}
+
+/*** Find the commands that target a unit.
+ *
+ * Scans the command queues of all units the caller may read (only allied
+ * units without full read access). A command matches when its ID is in
+ * `cmdIDs` and its single parameter is `unitID`. By default only the order
+ * at the front of each queue counts; with `queued` every queued order counts,
+ * including the orders that factories pass on to newly built units.
+ *
+ * @function Spring.GetCommandsTargeting
+ * @param unitID UnitID The targeted unit.
+ * @param cmdIDs CMD|CMD[] A command ID or a list of command IDs.
+ * @param queued boolean? (Default: `false`) Also report orders that are not at the front of their queue.
+ * @return table<UnitID, integer[]>? commands The tags of the matching commands per unit, in queue order, usable with `CMD.REMOVE`; nil for an invalid or invisible unit.
+ * @see Spring.ClearCommandsTargeting
+ */
+int LuaSyncedRead::GetCommandsTargeting(lua_State* L)
+{
+	const CUnit* target = ParseUnit(L, __func__, 1);
+
+	if (target == nullptr)
+		return 0;
+
+	std::vector<int> cmdIDs;
+
+	if (!LuaUtils::ParseIntOrIntVector(L, 2, cmdIDs))
+		luaL_error(L, "Incorrect arguments to GetCommandsTargeting(unitID, cmdIDs[, queued])");
+
+	const bool queued = luaL_optboolean(L, 3, false);
+	const int targetID = target->id;
+
+	const auto matches = [&](const Command& c) {
+		if (c.GetNumParams() != 1 || static_cast<int>(c.GetParam(0)) != targetID)
+			return false;
+
+		return (std::find(cmdIDs.begin(), cmdIDs.end(), c.GetID()) != cmdIDs.end());
+	};
+
+	lua_createtable(L, 0, 0);
+
+	for (const CUnit* unit: unitHandler.GetActiveUnits()) {
+		if (!LuaUtils::IsAllyUnit(L, unit))
+			continue;
+
+		const CCommandAI* commandAI = unit->commandAI;
+		const CFactoryCAI* factoryCAI = dynamic_cast<const CFactoryCAI*>(commandAI);
+
+		// the orders a factory passes on are never executing
+		if (factoryCAI != nullptr && !queued)
+			continue;
+
+		const CCommandQueue& queue = (factoryCAI == nullptr)? commandAI->commandQue : factoryCAI->newUnitCommands;
+
+		if (queue.empty())
+			continue;
+
+		int count = 0;
+
+		const auto pushTag = [&](const Command& c) {
+			if (!matches(c))
+				return;
+
+			if (count == 0)
+				lua_createtable(L, 1, 0);
+
+			lua_pushnumber(L, c.GetTag());
+			lua_rawseti(L, -2, ++count);
+		};
+
+		if (queued) {
+			for (const Command& c: queue) {
+				pushTag(c);
+			}
+		} else {
+			pushTag(queue.front());
+		}
+
+		if (count > 0)
+			lua_rawseti(L, -2, unit->id);
 	}
 
 	return 1;
