@@ -56,6 +56,13 @@ else (UNIX)
 	SET_TARGET_PROPERTIES(lua PROPERTIES COMPILE_FLAGS "${PIC_FLAG}")
 endif (UNIX)
 
+# lvm.cpp dispatches opcodes with computed gotos; without this GCC's
+# cross-jumping merges the per-opcode fetch+dispatch tails back into a single
+# indirect jump. Only affects code layout (no effect on FP or semantics).
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+	set_source_files_properties(src/lvm.cpp PROPERTIES COMPILE_OPTIONS "-fno-crossjumping")
+endif()
+
 # Vendored lua has an intentional empty-body loop (lauxlib.cpp shebang skip).
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 	target_compile_options(lua PRIVATE

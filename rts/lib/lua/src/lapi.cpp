@@ -571,7 +571,7 @@ LUA_API void lua_rawget (lua_State *L, int idx) {
   lua_lock(L);
   t = index2adr(L, idx);
   api_check(L, ttistable(t));
-  setobj2s(L, L->top - 1, luaH_get(hvalue(t), L->top - 1));
+  setobj2s(L, L->top - 1, luaH_get_inl(hvalue(t), L->top - 1));
   lua_unlock(L);
 }
 
@@ -581,7 +581,7 @@ LUA_API void lua_rawgeti (lua_State *L, int idx, int n) {
   lua_lock(L);
   o = index2adr(L, idx);
   api_check(L, ttistable(o));
-  setobj2s(L, L->top, luaH_getnum(hvalue(o), n));
+  setobj2s(L, L->top, luaH_getnum_inl(hvalue(o), n));
   api_incr_top(L);
   lua_unlock(L);
 }
