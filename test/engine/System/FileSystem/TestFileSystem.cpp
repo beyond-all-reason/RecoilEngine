@@ -1,4 +1,7 @@
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <thread>
 #include <string>
 #include <vector>
 #include <nowide/cstdio.hpp>
@@ -10,6 +13,7 @@
 // needs to be included after catch
 #include "System/FileSystem/FileSystem.h"
 #include "System/FileSystem/FileQueryFlags.h"
+#include "System/Platform/Misc.h"
 
 namespace {
 	struct PrepareFileSystem {
@@ -76,6 +80,31 @@ TEST_CASE("FileExists")
 	CHECK_FALSE(FileSystem::FileExists(u8"testFile99.txt"));
 	CHECK_FALSE(FileSystem::FileExists(u8"testDir"));
 	CHECK_FALSE(FileSystem::FileExists(u8"testDir99"));
+}
+
+
+TEST_CASE("ExecuteProcess executes the subprocess child")
+{
+	const std::string marker = pfs.testCwd + "/execute-process-marker";
+	FileSystem::DeleteFile(marker);
+
+	std::array<std::string, 32> args;
+	#ifdef _WIN32
+	args[0] = "cmd.exe";
+	args[1] = "/C";
+	args[2] = "type nul > \"" + marker + "\"";
+	#else
+	args[0] = "/bin/touch";
+	args[1] = marker;
+	#endif
+
+	CHECK(std::string(Platform::ExecuteProcess(args, true)) == "ExecuteProcess failure");
+
+	for (int i = 0; i < 100 && !FileSystem::FileExists(marker); ++i)
+		std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+	CHECK(FileSystem::FileExists(marker));
+	FileSystem::DeleteFile(marker);
 }
 
 
