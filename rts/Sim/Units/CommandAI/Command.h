@@ -166,6 +166,7 @@ public:
 		memcpy(&id[0], &c.id[0], sizeof(id));
 
 		SetFlags(c.timeOut, c.tag, c.options);
+		queue = c.queue;
 		CopyParams(c);
 		return *this;
 	}
@@ -378,6 +379,7 @@ public:
 	unsigned int GetNumParams() const { return numParams; }
 	unsigned int GetTag() const { return tag; }
 	unsigned char GetOpts() const { return options; }
+	uint8_t GetQueue() const { return queue; }
 
 	const float* GetParams(unsigned int idx = 0) const;
 	      float  GetParam (unsigned int idx    ) const;
@@ -413,6 +415,7 @@ public:
 	void SetTimeOut(int cmdTimeOut) { timeOut = cmdTimeOut; }
 	void SetTag(unsigned int cmdTag) { tag = cmdTag; }
 	void SetOpts(unsigned char cmdOpts) { options = cmdOpts; }
+	void SetQueue(uint8_t cmdQueue) { queue = cmdQueue; }
 	void SetFlags(int cmdTimeOut, unsigned int cmdTag, unsigned char cmdOpts) {
 		SetTimeOut(cmdTimeOut);
 		SetTag(cmdTag);
@@ -448,6 +451,9 @@ private:
 
 	/// option bits (RIGHT_MOUSE_KEY, ...)
 	unsigned char options = 0;
+
+	/// 1-based index into the CommandAI's queues, 0 lets the CommandAI pick
+	uint8_t queue = 0;
 
 	/// inline command parameters, used if numParams <= MAX_COMMAND_PARAMS
 	float params[MAX_COMMAND_PARAMS];

@@ -3599,7 +3599,7 @@ int LuaUnsyncedCtrl::GiveOrderToUnit(lua_State* L)
 
 	const Command cmd = LuaUtils::ParseCommand(L, __func__, 2);
 
-	clientNet->Send(CBaseNetProtocol::Get().SendAICommand(gu->myPlayerNum, MAX_AIS, MAX_TEAMS, unit->id, cmd.GetID(false), cmd.GetID(true), cmd.GetTimeOut(), cmd.GetOpts(), cmd.GetNumParams(), cmd.GetParams()));
+	clientNet->Send(CBaseNetProtocol::Get().SendAICommand(gu->myPlayerNum, MAX_AIS, MAX_TEAMS, unit->id, cmd.GetID(false), cmd.GetID(true), cmd.GetTimeOut(), cmd.GetOpts(), cmd.GetNumParams(), cmd.GetParams(), cmd.GetQueue()));
 
 	lua_pushboolean(L, true);
 	return 1;

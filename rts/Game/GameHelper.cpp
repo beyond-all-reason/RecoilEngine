@@ -1566,7 +1566,7 @@ Command CGameHelper::GetBuildCommand(const float3& pos, const float3& dir) {
 		if (unit->team != gu->myTeam)
 			continue;
 
-		for (const Command& cmd: unit->commandAI->commandQue) {
+		for (const Command& cmd: unit->commandAI->GetOwnQueue()) {
 			if (!cmd.IsBuildCommand())
 				continue;
 			if (cmd.GetNumParams() < 3)
