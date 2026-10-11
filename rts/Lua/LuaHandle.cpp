@@ -72,8 +72,9 @@
 #include <string>
 
 
-CONFIG(float, LuaGarbageCollectionMemLoadMult).defaultValue(1.33f).minimumValue(1.0f).maximumValue(100.0f).description("How much the amount of Lua memory in use increases the rate of garbage collection.");
-CONFIG(float, LuaGarbageCollectionRunTimeMult).defaultValue(5.0f).minimumValue(1.0f).description("How many milliseconds the garbage collected can run for in each GC cycle");
+CONFIG(float, LuaGarbageCollectionMemLoadMult).defaultValue(1.33f).minimumValue(0.0f).maximumValue(100.0f).description("How much the global Lua memory load (footprint as a fraction of LuaAllocLimit) increases the rate of garbage collection.");
+CONFIG(float, LuaGarbageCollectionRunTimeMult).defaultValue(5.0f).minimumValue(1.0f).description("How many milliseconds the garbage collector may run for per Lua state in each GC cycle; work it could not fit carries over to the next cycle");
+CONFIG(float, LuaGarbageCollectionWorkMult).defaultValue(1.5f).minimumValue(0.1f).maximumValue(100.0f).description("Kilobytes of garbage-collector stepping requested per kilobyte a Lua state allocates; higher frees garbage sooner at more CPU cost");
 
 
 static spring::unsynced_set<const luaContextData*>    SYNCED_LUAHANDLE_CONTEXTS;
@@ -159,6 +160,7 @@ CLuaHandle::CLuaHandle(const string& _name, int _order, bool _userMode, bool _sy
 
 	D.gcCtrl.baseMemLoadMult = configHandler->GetFloat("LuaGarbageCollectionMemLoadMult");
 	D.gcCtrl.baseRunTimeMult = configHandler->GetFloat("LuaGarbageCollectionRunTimeMult");
+	D.gcCtrl.baseWorkMult = configHandler->GetFloat("LuaGarbageCollectionWorkMult");
 
 	currentCobArgs = nullptr;
 
@@ -4295,11 +4297,33 @@ void CLuaHandle::DownloadProgress(int ID, long downloaded, long total)
 void CLuaHandle::CollectGarbage(bool forced)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const float gcMemLoadMult = D.gcCtrl.baseMemLoadMult;
-	const float gcRunTimeMult = D.gcCtrl.baseRunTimeMult;
+	SLuaGarbageCollectCtrl& gcCtrl = D.gcCtrl;
 
-	if (!forced && spring_lua_alloc_skip_gc(gcMemLoadMult))
+	const float gcRunTimeMult = gcCtrl.baseRunTimeMult;
+
+	// pace the collector by this state's own allocations: the automatic
+	// collector is stopped, so between calls the footprint only grows and
+	// its growth is what the state allocated since the previous call; the
+	// global memory load (fraction of the allocation limit) scales the
+	// requested work up when memory is tight
+	const uint64_t allocedBytes = D.allocState.allocedBytes.load();
+	const float gcMemLoad = spring_lua_alloc_get_mem_load();
+
+	if (allocedBytes >= gcCtrl.allocedBytesAtLastGC) {
+		const float gcWorkMult = gcCtrl.baseWorkMult * (1.0f + gcCtrl.baseMemLoadMult * gcMemLoad);
+		gcCtrl.stepDebtKB += int64_t(((allocedBytes - gcCtrl.allocedBytesAtLastGC) >> 10) * gcWorkMult);
+	} else {
+		// memory was released outside of here (collectgarbage("collect") from Lua), start over
+		gcCtrl.stepDebtKB = 0;
+	}
+
+	if (!forced && gcCtrl.stepDebtKB < SLuaGarbageCollectCtrl::MIN_STEP_DEBT_KB) {
+		gcCtrl.allocedBytesAtLastGC = allocedBytes;
 		return;
+	}
+
+	ZoneScoped;
+	ZoneNameF("%s::CollectGarbage(%s)", GetName().c_str(), GetLuaContextData(L)->synced ? "synced" : "unsynced");
 
 	LUA_CALL_IN_CHECK_NAMED(L, (GetLuaContextData(L)->synced)? "Lua::CollectGarbage::Synced": "Lua::CollectGarbage::Unsynced");
 
@@ -4308,26 +4332,31 @@ void CLuaHandle::CollectGarbage(bool forced)
 
 	// note: total footprint INCLUDING garbage, in KB
 	int  gcMemFootPrint = lua_gc(L_GC, LUA_GCCOUNT, 0);
+	ZoneValue(uint64_t(gcMemFootPrint >> 10)); // MB before collection
 	int  gcItersInBatch = 0;
-	int& gcStepsPerIter = D.gcCtrl.numStepsPerIter;
+	int  gcStepsDone = 0;
+	int& gcStepsPerIter = gcCtrl.numStepsPerIter;
 
-	// if gc runs at a fixed rate, the upper limit to base runtime will
-	// quickly be reached since Lua's footprint can easily exceed 100MB
-	// and OOM exceptions become a concern when catching up
-	// OTOH if gc is tied to sim-speed the increased number of calls can
-	// mean too much time is spent on it, must weigh the per-call period
-	const float gcSpeedFactor = std::clamp(gs->speedFactor * (1 - gs->PreSimFrame()) * (1 - gs->paused), 1.0f, 50.0f);
-	const float gcBaseRunTime = smoothstep(10.0f, 100.0f, gcMemFootPrint / 1024);
-	const float gcLoopRunTime = std::clamp((gcBaseRunTime * gcRunTimeMult) / gcSpeedFactor, D.gcCtrl.minLoopRunTime, D.gcCtrl.maxLoopRunTime);
+	// the debt sets how much work a call does, the runtime bound only caps
+	// it so a burst of allocations is spread over several calls; at higher
+	// game speed calls come more often so each may take less time, unless
+	// memory is tight: from 25% to 50% load the bound returns to its 1x value
+	const float gcRawSpeedFactor = std::clamp(gs->speedFactor * (1 - gs->PreSimFrame()) * (1 - gs->paused), 1.0f, 50.0f);
+	const float gcSpeedFactor = mix(gcRawSpeedFactor, 1.0f, smoothstep(0.25f, 0.5f, gcMemLoad));
+	const float gcLoopRunTime = std::clamp(gcRunTimeMult / gcSpeedFactor, gcCtrl.minLoopRunTime, gcCtrl.maxLoopRunTime);
 
 	const spring_time startTime = spring_gettime();
 	const spring_time   endTime = startTime + spring_msecs(gcLoopRunTime);
 
-	// perform GC cycles until time runs out or iteration-limit is reached
-	while (forced || (gcItersInBatch < D.gcCtrl.itersPerBatch && spring_gettime() < endTime)) {
+	// perform GC steps until the debt is paid, time runs out or the iteration-limit is reached
+	while (forced || (gcItersInBatch < gcCtrl.itersPerBatch && gcCtrl.stepDebtKB > 0 && spring_gettime() < endTime)) {
 		gcItersInBatch++;
 
-		if (!lua_gc(L_GC, LUA_GCSTEP, gcStepsPerIter))
+		const int gcSteps = forced ? gcStepsPerIter : int(std::min<int64_t>(gcCtrl.stepDebtKB, gcStepsPerIter));
+		gcCtrl.stepDebtKB -= gcSteps;
+		gcStepsDone += gcSteps;
+
+		if (!lua_gc(L_GC, LUA_GCSTEP, gcSteps))
 			continue;
 
 		// garbage-collection cycle finished
@@ -4335,6 +4364,13 @@ void CLuaHandle::CollectGarbage(bool forced)
 		const int gcMemFootPrintDif = gcMemFootPrintNow - gcMemFootPrint;
 
 		gcMemFootPrint = gcMemFootPrintNow;
+
+		// a finished cycle dealt with everything allocated before it started;
+		// what was allocated during it is paid for by the next call's debt
+		if (!forced) {
+			gcCtrl.stepDebtKB = 0;
+			break;
+		}
 
 		// early-exit if cycle didn't free any memory
 		if (gcMemFootPrintDif == 0)
@@ -4345,17 +4381,25 @@ void CLuaHandle::CollectGarbage(bool forced)
 	lua_gc(L_GC, LUA_GCSTOP, 0);
 	SetHandleRunning(L_GC, false);
 	lua_unlock(L_GC);
+	ZoneTextF("%d MB after, %d iters x %d steps, %lld KB debt left", gcMemFootPrint >> 10, gcItersInBatch, gcStepsPerIter, static_cast<long long>(gcCtrl.stepDebtKB));
 
+	// the footprint after collection is the baseline for the next call's allocation delta
+	gcCtrl.allocedBytesAtLastGC = D.allocState.allocedBytes.load();
+
+	if (forced)
+		gcCtrl.stepDebtKB = 0;
 
 	const spring_time finishTime = spring_gettime();
 
-	if (gcStepsPerIter > 1 && gcItersInBatch > 0) {
-		// runtime optimize number of steps to process in a batch
-		const float avgLoopIterTime = (finishTime - startTime).toMilliSecsf() / gcItersInBatch;
+	if (gcStepsDone > 0) {
+		// size the lua_gc calls to ~0.1 * gcRunTimeMult ms each so the runtime
+		// bound is met at a fine granularity; calls are debt-limited, so the
+		// estimate is per step rather than per call, and smoothed since the
+		// cost of a step varies with the collector's phase
+		const float msPerStep = (finishTime - startTime).toMilliSecsf() / gcStepsDone;
+		const float wantedSteps = std::min((gcRunTimeMult * 0.1f) / std::max(msPerStep, 1e-6f), 1e7f);
 
-		gcStepsPerIter -= (avgLoopIterTime > (gcRunTimeMult * 0.150f));
-		gcStepsPerIter += (avgLoopIterTime < (gcRunTimeMult * 0.075f));
-		gcStepsPerIter  = std::clamp(gcStepsPerIter, D.gcCtrl.minStepsPerIter, D.gcCtrl.maxStepsPerIter);
+		gcStepsPerIter = std::clamp(int(gcStepsPerIter * 0.75f + wantedSteps * 0.25f), gcCtrl.minStepsPerIter, gcCtrl.maxStepsPerIter);
 	}
 
 	eventHandler.DbgTimingInfo(TIMING_GC, startTime, finishTime);

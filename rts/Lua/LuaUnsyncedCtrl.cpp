@@ -4469,6 +4469,7 @@ int LuaUnsyncedCtrl::SetLogSectionFilterLevel(lua_State* L) {
  * @param maxLoopRunTime number?
  * @param baseRunTimeMult number?
  * @param baseMemLoadMult number?
+ * @param baseWorkMult number?
  * @return nil
  */
 int LuaUnsyncedCtrl::GarbageCollectCtrl(lua_State* L) {
@@ -4486,6 +4487,7 @@ int LuaUnsyncedCtrl::GarbageCollectCtrl(lua_State* L) {
 
 	gcCtrl.baseRunTimeMult = std::max(0.0f, luaL_optfloat(L, 7, gcCtrl.baseRunTimeMult));
 	gcCtrl.baseMemLoadMult = std::max(0.0f, luaL_optfloat(L, 8, gcCtrl.baseMemLoadMult));
+	gcCtrl.baseWorkMult = std::max(0.0f, luaL_optfloat(L, 9, gcCtrl.baseWorkMult));
 
 	return 0;
 }
