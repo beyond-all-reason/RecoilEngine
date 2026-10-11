@@ -67,8 +67,10 @@ bool DepthBufferCopy::IsValid(bool ms) const {
 	return depthFBO && depthFBO->IsValid() && depthTextures[ms] > 0;
 }
 
-void DepthBufferCopy::MakeDepthBufferCopy() const
+void DepthBufferCopy::MakeDepthBufferCopy(uint32_t terrainDepthTex_)
 {
+	terrainDepthTex = terrainDepthTex_;
+
 	const std::array<int, 4> srcScreenRect = { globalRendering->viewPosX, globalRendering->viewPosY, globalRendering->viewPosX + globalRendering->viewSizeX, globalRendering->viewPosY + globalRendering->viewSizeY };
 	const std::array<int, 4> dstScreenRect = { 0, 0, globalRendering->viewSizeX, globalRendering->viewSizeY };
 
@@ -83,7 +85,7 @@ void DepthBufferCopy::MakeDepthBufferCopy() const
 	if (consumersCount[true ] > 0)
 		FBO::Blit(      -1, depthFBOs[true ]->GetId(), srcScreenRect, dstScreenRect, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
-	if (consumersCount[false] > 0) {
+	if (consumersCount[false] > 0 && terrainDepthTex == 0) {
 		const auto srcFboID = depthFBOs[true] ? depthFBOs[true]->GetId() : -1;
 		FBO::Blit(srcFboID, depthFBOs[false]->GetId(), srcScreenRect, dstScreenRect, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 	}
