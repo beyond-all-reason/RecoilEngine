@@ -49,6 +49,7 @@
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/TeamHighlight.h"
 #include "Rendering/Units/UnitDrawer.h"
+#include "Rendering/RenderViews.h"
 #include "Rendering/UniformConstants.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Textures/NamedTextures.h"
@@ -1524,6 +1525,7 @@ bool CGame::Draw() {
 		camera->LoadViewport();
 
 		worldDrawer.Draw();
+		CRenderViews::GetInstance().DrawSecondaryViews(worldDrawer);
 		worldDrawer.ResetMVPMatrices();
 	}
 

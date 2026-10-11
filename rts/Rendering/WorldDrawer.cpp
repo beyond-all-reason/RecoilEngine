@@ -50,6 +50,8 @@
 #include "System/TimeProfiler.h"
 #include "System/SafeUtil.h"
 #include "System/Log/ILog.h"
+#include "Rendering/GL/FBO.h"
+#include "Rendering/RenderViews.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/LoadLock.h"
 
@@ -214,17 +216,7 @@ void CWorldDrawer::Update(bool newSimFrame)
 	LuaObjectDrawer::Update(numUpdates == 0);
 	readMap->UpdateDraw(numUpdates == 0);
 
-	if (globalRendering->drawGround) {
-		ZoneScopedN("GroundDrawer::Update");
-		(readMap->GetGroundDrawer())->Update();
-	}
-	// XXX: done in CGame, needs to get updated even when !doDrawWorld
-	// (it updates unitdrawpos which is used for maximized minimap too)
-	// unitDrawer->Update();
-	// lineDrawer.UpdateLineStipple();
-	CUnitDrawer::UpdateStatic();
-	CFeatureDrawer::UpdateStatic();
-	projectileDrawer->UpdateDrawFlags();
+	UpdateViewDependent();
 
 	if (newSimFrame) {
 		projectileDrawer->UpdateTextures();
@@ -244,6 +236,22 @@ void CWorldDrawer::Update(bool newSimFrame)
 	numUpdates += 1;
 }
 
+
+
+void CWorldDrawer::UpdateViewDependent() const
+{
+	if (globalRendering->drawGround) {
+		ZoneScopedN("GroundDrawer::Update");
+		(readMap->GetGroundDrawer())->Update();
+	}
+	// XXX: done in CGame, needs to get updated even when !doDrawWorld
+	// (it updates unitdrawpos which is used for maximized minimap too)
+	// unitDrawer->Update();
+	// lineDrawer.UpdateLineStipple();
+	CUnitDrawer::UpdateStatic();
+	CFeatureDrawer::UpdateStatic();
+	projectileDrawer->UpdateDrawFlags();
+}
 
 
 void CWorldDrawer::GenerateIBLTextures() const
@@ -315,17 +323,33 @@ void CWorldDrawer::Draw() const
 
 	camera->Update();
 
+	// TEMP-MRT-DEBUG
+	static int mrtDbgFrames = 0;
+	const bool mrtDbg = (FBO::GetDefaultTarget() != 0) && (mrtDbgFrames < 3);
+	const auto mrtLog = [&](const char* stage) {
+		if (mrtDbg)
+			LOG("[MRT] %s: boundFBO=%d expected=%u err=0x%x", stage, FBO::GetCurrentBoundFBO(), FBO::GetDefaultTarget(), glGetError());
+	};
+	mrtLog("start");
+
 	DrawOpaqueObjects();
+	mrtLog("opaque");
 	DrawAlphaObjects();
+	mrtLog("alpha");
 	{
 		SCOPED_TIMER("Draw::World::DrawWorld");
 		SCOPED_GL_DEBUGGROUP("Draw::World::DrawWorld");
-		eventHandler.DrawWorld();
+		if (!CRenderViews::InSecondaryView())
+			eventHandler.DrawWorld();
 	}
+	mrtLog("luaDrawWorld");
 
 
 	DrawMiscObjects();
 	DrawBelowWaterOverlay();
+	mrtLog("end");
+	if (mrtDbg)
+		mrtDbgFrames++;
 
 	glDisable(GL_FOG);
 }
@@ -343,7 +367,8 @@ void CWorldDrawer::DrawOpaqueObjects() const
 			depthBufferCopy->MakeDepthBufferCopy();
 		}
 		{
-			eventHandler.DrawPreDecals();
+			if (!CRenderViews::InSecondaryView())
+				eventHandler.DrawPreDecals();
 			SCOPED_TIMER("Draw::World::Decals");
 			SCOPED_GL_DEBUGGROUP("Draw::World::Decals");
 			groundDecals->Draw();
@@ -364,7 +389,8 @@ void CWorldDrawer::DrawOpaqueObjects() const
 	}
 
 	selectedUnitsHandler.Draw();
-	eventHandler.DrawWorldPreUnit();
+	if (!CRenderViews::InSecondaryView())
+		eventHandler.DrawWorldPreUnit();
 
 	{
 		SCOPED_TIMER("Draw::World::Models::Opaque");
@@ -437,7 +463,8 @@ void CWorldDrawer::DrawAlphaObjects() const
 			water->UpdateWater(game);
 		}
 		water->Draw();
-		eventHandler.DrawWaterPost();
+		if (!CRenderViews::InSecondaryView())
+			eventHandler.DrawWaterPost();
 	}
 
 	{
