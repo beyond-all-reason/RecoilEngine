@@ -7,6 +7,7 @@
 #include "System/Platform/Misc.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Sim/Misc/CustomColorPalette.h"
+#include "Sim/Units/CommandAI/Command.h"
 
 /******************************************************************************
  * Engine constants
@@ -47,6 +48,7 @@
  * @field buildFlags string Gets additional engine buildflags, e.g. "Debug" or "Sync-Debug"
  * @field featureSupport FeatureSupport Table containing various engine features as keys; use for cross-version compat
  * @field wordSize integer Indicates the build type always 64 these days
+ * @field minCustomCmdID integer Lowest ID accepted by Spring.RegisterCommand
  * @field gameSpeed integer Number of simulation gameframes per second
  * @field textColorCodes TextColorCode Table containing keys that represent the color code operations during font rendering
  */
@@ -63,6 +65,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	LuaPushNamedNumber(L, "wordSize", (!CLuaHandle::GetHandleSynced(L))? Platform::NativeWordSize() * 8: 0);
 
 	LuaPushNamedNumber(L, "gameSpeed", GAME_SPEED);
+	LuaPushNamedNumber(L, "minCustomCmdID", MIN_CUSTOM_CMD_ID);
 	LuaPushNamedNumber(L, "maxCustomPaletteID", MAX_CUSTOM_COLORS - 1);
 
 	/* If possible, entries should be bools that resolve to false in the "old" version

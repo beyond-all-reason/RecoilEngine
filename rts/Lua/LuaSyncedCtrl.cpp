@@ -2,6 +2,9 @@
 
 #include <vector>
 #include <cctype>
+#include <climits>
+#include <cmath>
+#include <cstring>
 
 #include "LuaSyncedCtrl.h"
 
@@ -38,6 +41,7 @@
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/DamageArray.h"
 #include "Sim/Misc/DamageArrayHandler.h"
+#include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/SmoothHeightMesh.h"
@@ -377,6 +381,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SpawnCEG);
 	REGISTER_LUA_CFUNC(SpawnSFX);
 
+	REGISTER_LUA_CFUNC(RegisterCommand);
 	REGISTER_LUA_CFUNC(EditUnitCmdDesc);
 	REGISTER_LUA_CFUNC(InsertUnitCmdDesc);
 	REGISTER_LUA_CFUNC(RemoveUnitCmdDesc);
@@ -7907,6 +7912,59 @@ static int ParseStringVector(lua_State* L, int index, vector<string>& strvec)
  * @section commanddescriptions
  * Doesn't work in unsynced code!
 ******************************************************************************/
+
+/***
+ * Register global properties of a custom command ID. This works off
+ * a numerical ID and not a per-unit command description, so the game
+ * has to make sure this doesn't result in inconsistency. This also
+ * only affects native parts of behaviour, implementing the command
+ * fully is still up to the game.
+ * Registrations are removed when the registering synced Lua environment is destroyed.
+ *
+ * @function Spring.RegisterCommand
+ * @param cmdID integer Custom command ID, at least Engine.minCustomCmdID.
+ * @param properties table Command properties.
+ * @param properties.movement boolean? (Default: false) Include in movement lookahead,
+ * including attack completion and aircraft decisions, like native movement commands.
+ * @param properties.attack boolean? (Default: false) Use aircraft attack movement while
+ * this command is at the front and the unit has a target. Does not imply movement,
+ * interpret command parameters, acquire a target, or execute a native Attack.
+ */
+int LuaSyncedCtrl::RegisterCommand(lua_State* L)
+{
+	if (!FullCtrl(L))
+		return 0;
+
+	const int id = luaL_checkinteger(L, 1);
+	if (id < MIN_CUSTOM_CMD_ID)
+		return luaL_error(L, "RegisterCommand requires a command ID of at least %d", MIN_CUSTOM_CMD_ID);
+
+	luaL_checktype(L, 2, LUA_TTABLE);
+	CustomCommandProperties properties;
+	for (lua_pushnil(L); lua_next(L, 2) != 0; lua_pop(L, 1)) {
+		if (!lua_israwstring(L, LUA_TABLE_KEY_INDEX))
+			continue;
+
+		const char* key = lua_tostring(L, LUA_TABLE_KEY_INDEX);
+
+		if (lua_isboolean(L, LUA_TABLE_VALUE_INDEX)) {
+			switch (hashString(key)) {
+				case hashString("movement"): { properties.movement = lua_toboolean(L, LUA_TABLE_VALUE_INDEX); } break;
+				case hashString("attack"): { properties.attack = lua_toboolean(L, LUA_TABLE_VALUE_INDEX); } break;
+			}
+
+			continue;
+		}
+	}
+
+	if (gs->customCommands.find(id) != gs->customCommands.end())
+		return luaL_error(L, "RegisterCommand: command %d is already registered", id);
+
+	properties.luaHandleName = CLuaHandle::GetHandle(L)->GetName();
+	gs->customCommands[id] = properties;
+	return 0;
+}
+
 
 static bool ParseCommandDescription(lua_State* L, int table,
                                     SCommandDescription& cd)
