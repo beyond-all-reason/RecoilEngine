@@ -3,9 +3,11 @@
 #pragma once
 
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "Game/Camera.h"
+#include "Rendering/GL/myGL.h"
 #include "Rendering/GL/FBO.h"
 
 class CWorldDrawer;
@@ -24,7 +26,52 @@ struct RenderView {
 	int sizeX = 0;
 	int sizeY = 0;
 
+	// the target is texture backed, so that it can be handed to something
+	// else afterwards (a compositor submit, a shader sampling it)
+	GLuint colorTex = 0;
+	GLuint depthTex = 0;
 	std::unique_ptr<FBO> target;
+
+	// downscaled copy of the target for showing it in the window: blitting
+	// with scaling into the (possibly multisampled) window framebuffer is
+	// not allowed
+	std::unique_ptr<FBO> inset;
+	int insetSizeX = 0;
+	int insetSizeY = 0;
+
+	RenderView() = default;
+	RenderView(const RenderView&) = delete;
+	RenderView& operator = (const RenderView&) = delete;
+	RenderView(RenderView&& o) noexcept { *this = std::move(o); }
+	RenderView& operator = (RenderView&& o) noexcept
+	{
+		if (this != &o) {
+			FreeTarget();
+			viewCam = o.viewCam;
+			sizeX = o.sizeX;
+			sizeY = o.sizeY;
+			colorTex = std::exchange(o.colorTex, 0);
+			depthTex = std::exchange(o.depthTex, 0);
+			target = std::move(o.target);
+			inset = std::move(o.inset);
+			insetSizeX = o.insetSizeX;
+			insetSizeY = o.insetSizeY;
+		}
+		return *this;
+	}
+	~RenderView() { FreeTarget(); }
+
+	void FreeTarget()
+	{
+		// the inset is sized separately and re-checked by EnsureInset
+		target = nullptr;
+		if (colorTex != 0)
+			glDeleteTextures(1, &colorTex);
+		if (depthTex != 0)
+			glDeleteTextures(1, &depthTex);
+		colorTex = 0;
+		depthTex = 0;
+	}
 };
 
 /**
@@ -67,17 +114,10 @@ public:
 
 private:
 	bool EnsureTarget(RenderView& view);
-	bool EnsureInset();
+	bool EnsureInset(RenderView& view);
 
 private:
 	inline static bool inSecondaryView = false;
 
 	std::vector<RenderView> views;
-
-	// downscaled copy of a view target: blitting with scaling into the
-	// (possibly multisampled) window framebuffer is not allowed
-	std::unique_ptr<FBO> inset;
-
-	int insetSizeX = 0;
-	int insetSizeY = 0;
 };
