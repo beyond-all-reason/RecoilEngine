@@ -1531,6 +1531,12 @@ function gadgetHandler:UnitStunned(unitID, unitDefID, unitTeam, stunned)
   end
 end
 
+function gadgetHandler:UnitFlightRegimeChanged(unitID, unitDefID, unitTeam, regime)
+  for _,g in r_ipairs(self.UnitFlightRegimeChangedList) do
+    g:UnitFlightRegimeChanged(unitID, unitDefID, unitTeam, regime)
+  end
+end
+
 
 function gadgetHandler:UnitTaken(unitID, unitDefID, unitTeam, newTeam)
   for _,g in r_ipairs(self.UnitTakenList) do

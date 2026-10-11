@@ -58,6 +58,7 @@ CALLIN_LIST = {
 	"UnitPreDamaged",
 	"UnitDamaged",
 	"UnitStunned",
+	"UnitFlightRegimeChanged",
 	"UnitTaken",
 	"UnitGiven",
 	"UnitEnteredRadar",
