@@ -51,7 +51,6 @@
 #include "System/SafeUtil.h"
 #include "System/Log/ILog.h"
 #include "Rendering/GL/FBO.h"
-#include "Rendering/RenderViews.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/LoadLock.h"
 
@@ -339,8 +338,7 @@ void CWorldDrawer::Draw() const
 	{
 		SCOPED_TIMER("Draw::World::DrawWorld");
 		SCOPED_GL_DEBUGGROUP("Draw::World::DrawWorld");
-		if (!CRenderViews::InSecondaryView())
-			eventHandler.DrawWorld();
+		eventHandler.DrawWorld();
 	}
 	mrtLog("luaDrawWorld");
 
@@ -367,8 +365,7 @@ void CWorldDrawer::DrawOpaqueObjects() const
 			depthBufferCopy->MakeDepthBufferCopy();
 		}
 		{
-			if (!CRenderViews::InSecondaryView())
-				eventHandler.DrawPreDecals();
+			eventHandler.DrawPreDecals();
 			SCOPED_TIMER("Draw::World::Decals");
 			SCOPED_GL_DEBUGGROUP("Draw::World::Decals");
 			groundDecals->Draw();
@@ -389,8 +386,7 @@ void CWorldDrawer::DrawOpaqueObjects() const
 	}
 
 	selectedUnitsHandler.Draw();
-	if (!CRenderViews::InSecondaryView())
-		eventHandler.DrawWorldPreUnit();
+	eventHandler.DrawWorldPreUnit();
 
 	{
 		SCOPED_TIMER("Draw::World::Models::Opaque");
@@ -463,8 +459,7 @@ void CWorldDrawer::DrawAlphaObjects() const
 			water->UpdateWater(game);
 		}
 		water->Draw();
-		if (!CRenderViews::InSecondaryView())
-			eventHandler.DrawWaterPost();
+		eventHandler.DrawWaterPost();
 	}
 
 	{

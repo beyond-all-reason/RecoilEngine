@@ -681,7 +681,7 @@ void CEventHandler::ViewResize()
 	void CEventHandler:: Draw ## name ()                                    \
 	{                                                                       \
 		ZoneScoped;                                                         \
-		if (listDraw ## name.empty())                                       \
+		if (drawCallinsSuppressed || listDraw ## name.empty())              \
 			return;                                                         \
                                                                             \
 		LuaOpenGL::EnableDraw ## name ();                                   \
@@ -1016,31 +1016,33 @@ void CEventHandler::MetalMapChanged(const int x, const int z)
 void CEventHandler::DrawWorldPreParticles(bool drawAboveWater, bool drawBelowWater, bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
+	if (drawCallinsSuppressed)
+		return;
 	ITERATE_EVENTCLIENTLIST(DrawWorldPreParticles, drawAboveWater, drawBelowWater, drawReflection, drawRefraction);
 }
 
 void CEventHandler::DrawOpaqueUnitsLua(bool deferredPass, bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
-	ITERATE_EVENTCLIENTLIST(DrawOpaqueUnitsLua, deferredPass, drawReflection, drawRefraction);
+	ITERATE_EVENTCLIENTLIST(DrawOpaqueUnitsLua,deferredPass, drawReflection, drawRefraction);
 }
 
 void CEventHandler::DrawOpaqueFeaturesLua(bool deferredPass, bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
-	ITERATE_EVENTCLIENTLIST(DrawOpaqueFeaturesLua, deferredPass, drawReflection, drawRefraction);
+	ITERATE_EVENTCLIENTLIST(DrawOpaqueFeaturesLua,deferredPass, drawReflection, drawRefraction);
 }
 
 void CEventHandler::DrawAlphaUnitsLua(bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
-	ITERATE_EVENTCLIENTLIST(DrawAlphaUnitsLua, drawReflection, drawRefraction);
+	ITERATE_EVENTCLIENTLIST(DrawAlphaUnitsLua,drawReflection, drawRefraction);
 }
 
 void CEventHandler::DrawAlphaFeaturesLua(bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
-	ITERATE_EVENTCLIENTLIST(DrawAlphaFeaturesLua, drawReflection, drawRefraction);
+	ITERATE_EVENTCLIENTLIST(DrawAlphaFeaturesLua,drawReflection, drawRefraction);
 }
 
 void CEventHandler::DrawShadowUnitsLua()

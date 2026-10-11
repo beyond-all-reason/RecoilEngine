@@ -280,6 +280,16 @@ class CEventHandler
 
 		void ViewResize();
 
+		// While set, the Lua callins that draw view effects (world, ground, water,
+		// particles) are not called: widgets assume the window is the render target
+		// and the view size is the window size, which does not hold while an extra
+		// view is drawn (see CRenderViews). The callins that draw the objects
+		// themselves (units, features, projectiles, materials) still run, as e.g.
+		// Beyond All Reason draws its units from Lua.
+		static void SetDrawCallinsSuppressed(bool b) { drawCallinsSuppressed = b; }
+
+		inline static bool drawCallinsSuppressed = false;
+
 		// see the DRAW_CALLIN macro for implementations
 		void DrawGenesis();
 		void DrawWorld();

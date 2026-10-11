@@ -1430,6 +1430,7 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 
 	camera->Update();
 	shadowHandler.Update();
+	CRenderViews::GetInstance().Update();
 	{
 		worldDrawer.Update(newSimFrame);
 		transformsUploader.Update();
