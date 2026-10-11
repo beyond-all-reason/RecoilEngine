@@ -80,7 +80,7 @@ private:
 private:
 	void Cleanup();
 	void OpenOpenALDevice(const std::string& deviceName);
-	bool OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec);
+	bool OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec, const SDL_AudioSpec* requiredSpec = nullptr);
 	void OpenLoopbackDevice(const std::string& deviceName);
 
 	void InitThread(int cfgMaxSounds);
@@ -126,6 +126,8 @@ private:
 
 	int pitchAdjustMode = 0;
 	int frameSize = -1;
+	// format of the OpenAL loopback device; a reopened SDL device must deliver exactly this
+	SDL_AudioSpec loopbackSpec = {};
 
 	bool mute = false;
 
