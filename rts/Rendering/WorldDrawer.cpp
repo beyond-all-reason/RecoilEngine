@@ -322,32 +322,17 @@ void CWorldDrawer::Draw() const
 
 	camera->Update();
 
-	// TEMP-MRT-DEBUG
-	static int mrtDbgFrames = 0;
-	const bool mrtDbg = (FBO::GetDefaultTarget() != 0) && (mrtDbgFrames < 3);
-	const auto mrtLog = [&](const char* stage) {
-		if (mrtDbg)
-			LOG("[MRT] %s: boundFBO=%d expected=%u err=0x%x", stage, FBO::GetCurrentBoundFBO(), FBO::GetDefaultTarget(), glGetError());
-	};
-	mrtLog("start");
-
 	DrawOpaqueObjects();
-	mrtLog("opaque");
 	DrawAlphaObjects();
-	mrtLog("alpha");
 	{
 		SCOPED_TIMER("Draw::World::DrawWorld");
 		SCOPED_GL_DEBUGGROUP("Draw::World::DrawWorld");
 		eventHandler.DrawWorld();
 	}
-	mrtLog("luaDrawWorld");
 
 
 	DrawMiscObjects();
 	DrawBelowWaterOverlay();
-	mrtLog("end");
-	if (mrtDbg)
-		mrtDbgFrames++;
 
 	glDisable(GL_FOG);
 }

@@ -16,7 +16,6 @@
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
 #include "Rendering/GlobalRendering.h"
-#include "Rendering/RenderViews.h"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Shaders/ShaderHandler.h"
@@ -423,9 +422,7 @@ void CBumpWater::InitResources(bool loadShader)
 	if (endlessOcean) definitions += "#define opt_endlessocean\n";
 
 	GLSLDefineConstf3(definitions, "MapMid",                    float3(mapDims.mapx * SQUARE_SIZE * 0.5f, 0.0f, mapDims.mapy * SQUARE_SIZE * 0.5f));
-	GLSLDefineConstf2(definitions, "ScreenInverse",             1.0f / globalRendering->viewSizeX, 1.0f / globalRendering->viewSizeY);
-	GLSLDefineConstf2(definitions, "ScreenTextureSizeInverse",  1.0f / screenTextureX, 1.0f / screenTextureY);
-	GLSLDefineConstf2(definitions, "ViewPos",                   globalRendering->viewPosX, globalRendering->viewPosY);
+	// ScreenInverse, ScreenTextureSizeInverse and ViewPos are uniforms set per draw: the extra views have other sizes
 
 	GLSLDefineConstf4(definitions, "SurfaceColor",   waterRendering->surfaceColor*0.4, waterRendering->surfaceAlpha );
 	GLSLDefineConstf4(definitions, "PlaneColor",     waterRendering->planeColor*0.4, waterRendering->surfaceAlpha );
@@ -564,27 +561,6 @@ void CBumpWater::UpdateWater(const CGame* game)
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
-
-	if (CRenderViews::InSecondaryView()) {
-		// the reflection and refraction textures are made from the window camera and are
-		// sampled by window pixel; an eye has another pose, projection and viewport, so
-		// they would be wrong and flicker. Show the sky color instead.
-		const auto& sky = ISky::GetSky();
-		glClearColor(sky->fogColor.x, sky->fogColor.y, sky->fogColor.z, 0.0f);
-		if (reflection > 0) {
-			reflectFBO.Bind();
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		}
-		if (refraction > 1) {
-			refractFBO.Bind();
-			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		}
-		if (reflection || refraction) {
-			FBO::Unbind();
-			globalRendering->LoadViewport();
-		}
-		return;
-	}
 
 	glPushAttrib(GL_FOG_BIT);
 	if (refraction > 1) DrawRefraction(game);
@@ -922,6 +898,21 @@ void CBumpWater::Draw()
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
 
+	// the screen copies must hold the view being drawn, which an extra view can make larger than the window
+	if ((refraction == 1 || depthCopy) && (globalRendering->viewSizeX > screenTextureX || globalRendering->viewSizeY > screenTextureY)) {
+		screenTextureX = std::max(screenTextureX, globalRendering->viewSizeX);
+		screenTextureY = std::max(screenTextureY, globalRendering->viewSizeY);
+
+		if (refraction > 0) {
+			glBindTexture(target, refractTexture);
+			glTexImage2D(target, 0, GL_RGBA8, screenTextureX, screenTextureY, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		}
+		if (depthCopy) {
+			glBindTexture(target, depthTexture);
+			glTexImage2D(target, 0, CGlobalRendering::DepthBitsToFormat(globalRendering->supportDepthBufferBitDepth), screenTextureX, screenTextureY, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+		}
+	}
+
 	if (refraction == 1) {
 		// _SCREENCOPY_ REFRACT TEXTURE
 		glBindTexture(target, refractTexture);
@@ -951,6 +942,9 @@ void CBumpWater::Draw()
 	waterShader->SetFlag("opt_infotex", infoTextureHandler->IsEnabled());
 
 	waterShader->Enable();
+	waterShader->SetUniform("ScreenInverse", 1.0f / globalRendering->viewSizeX, 1.0f / globalRendering->viewSizeY);
+	waterShader->SetUniform("ScreenTextureSizeInverse", 1.0f / screenTextureX, 1.0f / screenTextureY);
+	waterShader->SetUniform("ViewPos", float(globalRendering->viewPosX), float(globalRendering->viewPosY));
 	waterShader->SetUniform("eyePos", camera->GetPos().x, camera->GetPos().y, camera->GetPos().z);
 	waterShader->SetUniform("frame", (gs->frameNum + globalRendering->timeOffset) / 15000.0f);
 

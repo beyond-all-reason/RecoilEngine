@@ -28,6 +28,10 @@ uniform sampler2D depthmap;
 uniform sampler2D waverand;
 uniform float frame;
 uniform vec3 eyePos;
+// the size and place of the view being drawn (they differ between the window and the extra views)
+uniform vec2 ScreenInverse;
+uniform vec2 ScreenTextureSizeInverse;
+uniform vec2 ViewPos;
 
 in float eyeVertexZ;
 in vec3 eyeVec;

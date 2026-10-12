@@ -130,10 +130,26 @@ void CCamera::CopyStateReflect(const CCamera* cam)
 	assert(cam->GetCamType() != CAMTYPE_UWREFL);
 	assert(     GetCamType() == CAMTYPE_UWREFL);
 
-	SetDir(cam->GetDir() * float3(1.0f, -1.0f, 1.0f));
-	SetPos(cam->GetPos() * float3(1.0f, -1.0f, 1.0f));
-	SetRotZ(-cam->GetRot().z);
-	SetVFOV(cam->GetVFOV());
+	if (cam->externalPose) {
+		// an extra view (headset eye): its pose is explicit, and its frustum may be asymmetric.
+		// The mirrored camera sees upside down, as the one made from the angles below does
+		// (its basis is the mirrored one with the up vector negated, which keeps it a rotation),
+		// so the frustum is turned over as well
+		const float3 mirror(1.0f, -1.0f, 1.0f);
+		SetExternalPose(cam->GetPos() * mirror, cam->GetDir() * mirror, -(cam->GetUp() * mirror));
+		if (cam->useTangents) {
+			SetFrustumTangents(cam->tangents.x, cam->tangents.y, -cam->tangents.w, -cam->tangents.z);
+		} else {
+			useTangents = false;
+			SetVFOV(cam->GetVFOV());
+		}
+	} else {
+		ClearExternalState();
+		SetDir(cam->GetDir() * float3(1.0f, -1.0f, 1.0f));
+		SetPos(cam->GetPos() * float3(1.0f, -1.0f, 1.0f));
+		SetRotZ(-cam->GetRot().z);
+		SetVFOV(cam->GetVFOV());
+	}
 
 	Update(false, true, false);
 }
