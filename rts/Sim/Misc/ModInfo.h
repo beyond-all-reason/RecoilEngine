@@ -187,6 +187,8 @@ public:
 	bool decloakRequiresLineOfSight;
 	/// should _all_ allyteams share the same jammermap
 	bool separateJammers;
+	/// units only get radar, sonar, seismic and jammer coverage while they pay their upkeep
+	bool sensorsRequireUpkeep;
 
 
 	enum {

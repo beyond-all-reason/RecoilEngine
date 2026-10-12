@@ -123,6 +123,7 @@ class LuaSyncedRead {
 		static int GetUnitStates(lua_State* L);
 		static int GetUnitArmored(lua_State* L);
 		static int GetUnitIsActive(lua_State* L);
+		static int GetUnitIsUpkeepPaid(lua_State* L);
 		static int GetUnitIsCloaked(lua_State* L);
 		static int GetUnitSeismicSignature(lua_State* L);
 		static int GetUnitLeavesGhost(lua_State* L);
