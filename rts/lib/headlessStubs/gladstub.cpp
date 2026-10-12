@@ -52,6 +52,7 @@ int GLAD_GL_ARB_shading_language_100 = 0;
 int GLAD_GL_ARB_shader_storage_buffer_object = 0;
 int GLAD_GL_ARB_seamless_cube_map = 0;
 int GLAD_GL_ARB_occlusion_query = 0;
+int GLAD_GL_ARB_occlusion_query2 = 0;
 int GLAD_GL_ARB_multi_draw_indirect = 0;
 int GLAD_GL_ARB_multitexture = 1;
 int GLAD_GL_ARB_multisample = 0;
