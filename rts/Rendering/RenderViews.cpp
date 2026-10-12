@@ -9,6 +9,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/UniformConstants.h"
 #include "Rendering/WorldDrawer.h"
+#include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/Textures/Bitmap.h"
 #include "Game/UI/MouseHandler.h"
 #include "Map/Ground.h"
@@ -550,6 +551,25 @@ void CRenderViews::DrawSecondaryViews(const CWorldDrawer& worldDrawer)
 			worldDrawer.Draw();
 			CEventHandler::SetDrawCallinsSuppressed(false);
 			inSecondaryView = false;
+
+			if (CUnitDrawer::UseScreenIcons()) {
+				// the strategic icons are a screen pass, which the extra views do not have:
+				// draw them over this view the same way, in its own pixel coordinates
+				glMatrixMode(GL_PROJECTION);
+				glPushMatrix();
+				glLoadIdentity();
+				glOrtho(0.0, 1.0, 0.0, 1.0, -1.0, 1.0);
+				glMatrixMode(GL_MODELVIEW);
+				glPushMatrix();
+				glLoadIdentity();
+
+				unitDrawer->DrawUnitIconsScreen();
+
+				glMatrixMode(GL_PROJECTION);
+				glPopMatrix();
+				glMatrixMode(GL_MODELVIEW);
+				glPopMatrix();
+			}
 
 			if (view.xrDriven && reticleValid) {
 				slot->LoadMatrices();
