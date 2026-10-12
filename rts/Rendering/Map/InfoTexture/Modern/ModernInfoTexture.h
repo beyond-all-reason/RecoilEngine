@@ -24,6 +24,7 @@ public:
 protected:
 	bool CreateFBO(const char* fboName);
 	void RunFullScreenPass();
+	void UploadThroughPBO(const GL::Texture2D& tex, PBO& pbo, const void* data, size_t size) const;
 protected:
 	FBO fbo;
 	VAO vao;
