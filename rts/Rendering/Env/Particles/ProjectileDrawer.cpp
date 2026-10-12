@@ -20,10 +20,12 @@
 #include "Rendering/GL/SubState.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/Models/3DModelPiece.hpp"
+#include "Rendering/Models/3DModelVAO.hpp"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Textures/ColorMap.h"
 #include "Rendering/Textures/TextureAtlas.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
+#include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/LosHandler.h"
 #include "Sim/Misc/TeamHandler.h"
@@ -42,6 +44,7 @@
 #include "System/SafeUtil.h"
 #include "System/StringUtil.h"
 #include "System/ScopedResource.h"
+#include "System/Transform.hpp"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -454,6 +457,8 @@ void CProjectileDrawer::Kill() {
 	smokeTextures.clear();
 
 	renderProjectiles.clear();
+	instancedProjSlots.clear();
+	projTransformSlots.Clear();
 
 	sortedParticles.clear();
 	sortScratch.clear();
@@ -473,6 +478,49 @@ void CProjectileDrawer::Kill() {
 	sdbc = nullptr;
 
 	configHandler->Set("SoftParticles", wantSoften);
+}
+
+// world transform slot of an instanced projectile. The GL4 shaders multiply it with the piece's
+// bind-pose transform; for piece projectiles the trailing translation undoes the bind-pose
+// translation so the result is the legacy DrawStaticLegacy(Rec) composition: bind-pose rotation
+// and scale, translation relative to the root piece, then the projectile's spin and position
+static Transform GetInstancedProjectileTransform(const CProjectile* p)
+{
+	if (p->piece) {
+		const auto* pp = static_cast<const CPieceProjectile*>(p);
+		return Transform(pp->drawPos) * Transform(CQuaternion::MakeFrom(pp->GetDrawAngle() * math::DEG_TO_RAD, pp->spinVec)) * Transform(-pp->omp->bposeTransform.t);
+	}
+
+	const auto* wp = static_cast<const CWeaponProjectile*>(p);
+	return Transform::FromMatrix(wp->GetTransformMatrix(wp->GetProjectileType() == WEAPON_MISSILE_PROJECTILE));
+}
+
+static void AddPieceSubtreeInstances(S3DModelVAO& smv, const S3DModelPiece* piece, uint32_t transformOffset, uint16_t paletteIndex)
+{
+	smv.AddStaticInstance(piece, transformOffset, paletteIndex);
+
+	for (const S3DModelPiece* child : piece->children) {
+		AddPieceSubtreeInstances(smv, child, transformOffset, paletteIndex);
+	}
+}
+
+static void AddInstancedProjectile(S3DModelVAO& smv, const CProjectile* p, uint32_t transformOffset)
+{
+	const uint32_t teamID = p->GetTeamID();
+	const uint16_t paletteIndex = static_cast<uint16_t>((teamID < MAX_TEAMS) ? teamID : 0);
+
+	if (!p->piece) {
+		smv.AddStaticInstance(p->model, transformOffset, paletteIndex);
+		return;
+	}
+
+	const auto* pp = static_cast<const CPieceProjectile*>(p);
+
+	if ((pp->explFlags & PF_Recursive) != 0) {
+		AddPieceSubtreeInstances(smv, pp->omp, transformOffset, paletteIndex);
+	} else {
+		smv.AddStaticInstance(pp->omp, transformOffset, paletteIndex);
+	}
 }
 
 void CProjectileDrawer::UpdateDrawFlags()
@@ -548,6 +596,15 @@ void CProjectileDrawer::UpdateDrawFlags()
 		}
 	});
 
+	// world transforms of the instanced projectile models; TransformsUploader::Update runs right
+	// after this (CGame), so they reach the GPU for this frame's draw passes
+	constexpr uint8_t instancedPassFlags = DrawFlags::SO_OPAQUE_FLAG | DrawFlags::SO_REFLEC_FLAG | DrawFlags::SO_REFRAC_FLAG | DrawFlags::SO_SHOPAQ_FLAG;
+	for (const auto& [p, slot] : instancedProjSlots) {
+		if ((p->drawFlag & instancedPassFlags) == 0 || !projTransformSlots.Valid(slot))
+			continue;
+
+		projTransformSlots.Update(slot, GetInstancedProjectileTransform(p));
+	}
 }
 
 bool CProjectileDrawer::CheckSoftenExt()
@@ -821,37 +878,153 @@ void CProjectileDrawer::DrawOpaque(bool drawReflection, bool drawRefraction)
 		(drawRefraction * DrawFlags::SO_REFRAC_FLAG);
 
 	ISky::GetSky()->SetupFog();
-	ScopedModelDrawerImpl<CUnitDrawer> legacy(true, false);
+
+	// projectile models: one static instance each through the GL4 model VAO
+	const int leftover = DrawOpaqueModelsInstanced(thisPassMask);
+
+	// legacy per-piece path for whatever the instanced pass could not take (Lua-drawn projectiles,
+	// every projectile without the GL4 drawer) and for the flying pieces; skipped entirely when
+	// there is nothing for it, which is the usual case
+	if (leftover != 0 || HaveFlyingPieces()) {
+		ZoneScopedN("ProjectileDrawer::DrawOpaque(Legacy)");
+		ScopedModelDrawerImpl<CUnitDrawer> legacy(true, false);
+		unitDrawer->SetupOpaqueDrawing(false);
+
+		for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
+			CModelDrawerHelper::PushModelRenderState(modelType);
+
+			const auto& mdlRenderer = modelRenderers[modelType];
+
+			for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n && leftover != 0; i++) {
+				if (mdlRenderer.GetObjectBin(i).empty())
+					continue;
+
+				bool texBound = false;
+
+				for (CProjectile* p : mdlRenderer.GetObjectBin(i)) {
+					if (!ShouldDrawProjectile(p, thisPassMask))
+						continue;
+					if (leftover > 0 && IsInstancedModelProjectile(p) && instancedProjSlots.find(p) != instancedProjSlots.end())
+						continue; // drawn by the instanced pass
+
+					if (!texBound) {
+						CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+						texBound = true;
+					}
+
+					DrawProjectileModel(p);
+				}
+
+				if (texBound)
+					CModelDrawerHelper::UnbindModelTypeTexture(modelType);
+			}
+
+			DrawFlyingPieces(modelType);
+
+			CModelDrawerHelper::PopModelRenderState(modelType);
+		}
+
+		unitDrawer->ResetOpaqueDrawing(false);
+	}
+
+	glDisable(GL_FOG);
+}
+
+uint32_t CProjectileDrawer::ProjTransformSlots::Acquire()
+{
+	if (freeSlots.empty()) {
+		const uint32_t base = static_cast<uint32_t>(chunks.size()) * CHUNK_SIZE;
+		chunks.emplace_back(CHUNK_SIZE);
+
+		freeSlots.reserve(CHUNK_SIZE);
+		for (uint32_t i = CHUNK_SIZE; i > 0; i--) {
+			freeSlots.push_back(base + i - 1);
+		}
+	}
+
+	const uint32_t slot = freeSlots.back();
+	freeSlots.pop_back();
+	return slot;
+}
+
+bool CProjectileDrawer::HaveFlyingPieces() const
+{
+	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
+		if (!projectileHandler.flyingPieces[modelType].empty())
+			return true;
+	}
+	return false;
+}
+
+int CProjectileDrawer::DrawOpaqueModelsInstanced(uint8_t thisPassMask)
+{
+	ZoneScopedN("ProjectileDrawer::DrawOpaqueModelsInstanced");
+
+	if (instancedProjSlots.empty())
+		return 0;
+
+	// ask for the GL4 drawer; without it the legacy pass draws everything
+	ScopedModelDrawerImpl<CUnitDrawer> modern(false, true);
+	if (CUnitDrawer::IsLegacyImpl())
+		return -1;
+
 	unitDrawer->SetupOpaqueDrawing(false);
 
-	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
-		CModelDrawerHelper::PushModelRenderState(modelType);
+	auto& smv = S3DModelVAO::GetInstance();
+	smv.Bind();
 
+	// each instance carries its own world transform slot and team palette index
+	const auto oldMM = CUnitDrawer::SetMatrixMode(ShaderMatrixModes::ARRAY_MATMODE);
+	CUnitDrawer::SetTeamColor(0, 1.0f);
+
+	int leftover = 0;
+
+	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
 		const auto& mdlRenderer = modelRenderers[modelType];
+
+		if (mdlRenderer.empty())
+			continue;
+
+		CModelDrawerHelper::PushModelRenderState(modelType);
 
 		for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
 			if (mdlRenderer.GetObjectBin(i).empty())
 				continue;
 
-			CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+			bool texBound = false;
 
-			for (CProjectile* p : mdlRenderer.GetObjectBin(i)) {
+			for (const CProjectile* p : mdlRenderer.GetObjectBin(i)) {
 				if (!ShouldDrawProjectile(p, thisPassMask))
 					continue;
 
-				DrawProjectileModel(p);
+				const auto it = IsInstancedModelProjectile(p) ? instancedProjSlots.find(p) : instancedProjSlots.end();
+				if (it == instancedProjSlots.end() || !projTransformSlots.Valid(it->second)) {
+					leftover += 1;
+					continue;
+				}
+
+				if (!texBound) {
+					CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+					texBound = true;
+				}
+
+				AddInstancedProjectile(smv, p, projTransformSlots.Offset(it->second));
 			}
 
-			CModelDrawerHelper::UnbindModelTypeTexture(modelType);
+			if (texBound) {
+				smv.Submit(GL_TRIANGLES, false);
+				CModelDrawerHelper::UnbindModelTypeTexture(modelType);
+			}
 		}
-
-		DrawFlyingPieces(modelType);
 
 		CModelDrawerHelper::PopModelRenderState(modelType);
 	}
 
+	CUnitDrawer::SetMatrixMode(oldMM);
+	smv.Unbind();
 	unitDrawer->ResetOpaqueDrawing(false);
-	glDisable(GL_FOG);
+
+	return leftover;
 }
 
 void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool drawReflection, bool drawRefraction)
@@ -1005,6 +1178,15 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 void CProjectileDrawer::DrawShadowOpaque()
 {
 	ZoneScopedN("ProjectileDrawer::DrawShadowOpaque");
+
+	// projectile models as static instances through the GL4 shadow-gen program
+	const int leftover = DrawShadowOpaqueModelsInstanced();
+
+	// legacy per-piece path for the rest and for the flying pieces, skipped when there is nothing for it
+	if (leftover == 0 && !HaveFlyingPieces())
+		return;
+
+	ZoneNamedN(legacyZone, "ProjectileDrawer::DrawShadowOpaque(Legacy)", true);
 	Shader::IProgramObject* po = shadowHandler.GetShadowGenProg(CShadowHandler::SHADOWGEN_PROGRAM_PROJECTILE);
 
 	po->Enable();
@@ -1014,20 +1196,28 @@ void CProjectileDrawer::DrawShadowOpaque()
 
 		const auto& mdlRenderer = modelRenderers[modelType];
 
-		for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
+		for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n && leftover != 0; i++) {
 			if (mdlRenderer.GetObjectBin(i).empty())
 				continue;
 
-			CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+			bool texBound = false;
 
 			for (CProjectile* p : mdlRenderer.GetObjectBin(i)) {
 				if (!ShouldDrawProjectile(p, DrawFlags::SO_SHOPAQ_FLAG))
 					continue;
+				if (leftover > 0 && IsInstancedModelProjectile(p) && instancedProjSlots.find(p) != instancedProjSlots.end())
+					continue; // drawn by the instanced pass
+
+				if (!texBound) {
+					CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+					texBound = true;
+				}
 
 				DrawProjectileModel(p);
 			}
 
-			CModelDrawerHelper::UnbindModelTypeTexture(modelType);
+			if (texBound)
+				CModelDrawerHelper::UnbindModelTypeTexture(modelType);
 		}
 
 		DrawFlyingPieces(modelType);
@@ -1036,6 +1226,73 @@ void CProjectileDrawer::DrawShadowOpaque()
 	}
 
 	po->Disable();
+}
+
+int CProjectileDrawer::DrawShadowOpaqueModelsInstanced()
+{
+	ZoneScopedN("ProjectileDrawer::DrawShadowOpaqueModelsInstanced");
+
+	if (instancedProjSlots.empty())
+		return 0;
+
+	Shader::IProgramObject* po = shadowHandler.GetShadowGenProg(CShadowHandler::SHADOWGEN_PROGRAM_MODEL_GL4);
+	if (po == nullptr || !po->IsValid() || !S3DModelVAO::IsValid())
+		return -1;
+
+	po->Enable();
+	po->SetUniform("staticInstances", 1);
+
+	auto& smv = S3DModelVAO::GetInstance();
+	smv.Bind();
+
+	int leftover = 0;
+
+	for (int modelType = MODELTYPE_3DO; modelType < MODELTYPE_CNT; modelType++) {
+		const auto& mdlRenderer = modelRenderers[modelType];
+
+		if (mdlRenderer.empty())
+			continue;
+
+		CModelDrawerHelper::PushModelRenderState(modelType);
+
+		for (uint32_t i = 0, n = mdlRenderer.GetNumObjectBins(); i < n; i++) {
+			if (mdlRenderer.GetObjectBin(i).empty())
+				continue;
+
+			bool texBound = false;
+
+			for (const CProjectile* p : mdlRenderer.GetObjectBin(i)) {
+				if (!ShouldDrawProjectile(p, DrawFlags::SO_SHOPAQ_FLAG))
+					continue;
+
+				const auto it = IsInstancedModelProjectile(p) ? instancedProjSlots.find(p) : instancedProjSlots.end();
+				if (it == instancedProjSlots.end() || !projTransformSlots.Valid(it->second)) {
+					leftover += 1;
+					continue;
+				}
+
+				if (!texBound) {
+					CModelDrawerHelper::BindModelTypeTexture(modelType, mdlRenderer.GetObjectBinKey(i));
+					texBound = true;
+				}
+
+				AddInstancedProjectile(smv, p, projTransformSlots.Offset(it->second));
+			}
+
+			if (texBound) {
+				smv.Submit(GL_TRIANGLES, false);
+				CModelDrawerHelper::UnbindModelTypeTexture(modelType);
+			}
+		}
+
+		CModelDrawerHelper::PopModelRenderState(modelType);
+	}
+
+	smv.Unbind();
+	po->SetUniform("staticInstances", 0);
+	po->Disable();
+
+	return leftover;
 }
 
 void CProjectileDrawer::DrawShadowTransparent()
@@ -1397,8 +1654,11 @@ void CProjectileDrawer::RenderProjectileCreated(const CProjectile* p)
 		renderProjectiles.push_back(const_cast<CProjectile*>(p));
 	}
 
-	if (p->model != nullptr)
+	if (p->model != nullptr) {
 		modelRenderers[MDL_TYPE(p)].AddObject(p);
+
+		instancedProjSlots.emplace(p, projTransformSlots.Acquire());
+	}
 }
 
 void CProjectileDrawer::RenderProjectileDestroyed(const CProjectile* p)
@@ -1414,7 +1674,13 @@ void CProjectileDrawer::RenderProjectileDestroyed(const CProjectile* p)
 	renderProjectiles[ri]->SetRenderIndex(ri);
 	renderProjectiles.pop_back();
 
-	if (p->model != nullptr)
+	if (p->model != nullptr) {
 		modelRenderers[MDL_TYPE(p)].DelObject(p);
+
+		if (const auto it = instancedProjSlots.find(p); it != instancedProjSlots.end()) {
+			projTransformSlots.Release(it->second);
+			instancedProjSlots.erase(it);
+		}
+	}
 }
 
