@@ -253,7 +253,7 @@ void CUnitScript::TickAllAnims(int deltaTime)
 			lmp->SetWasUpdated(true);
 		}
 
-		const Transform& modelTra = lmp->GetModelSpaceTransform();
+		const Transform& modelTra = lmp->GetModelSpaceTransformRaw();
 
 		for (auto* child : lmp->children) {
 			q.push_back({ child, modelTra });
@@ -278,7 +278,7 @@ void CUnitScript::TickAllAnims(int deltaTime)
 			lmp->SetWasUpdated(true);
 		}
 
-		const Transform& modelTra = lmp->GetModelSpaceTransform();
+		const Transform& modelTra = lmp->GetModelSpaceTransformRaw();
 
 		for (auto* p : lmp->children)
 			self(p, modelTra);
@@ -286,6 +286,9 @@ void CUnitScript::TickAllAnims(int deltaTime)
 
 	WalkDFS(rootPiece, Transform{});
 #endif
+	// all dirty pieces were processed above
+	unit->localModel.SetPieceTransformsDirty(false);
+
 #ifdef _DEBUG
 	for (auto* p : pieces) {
 		// NOTE: p can actually be nullptr when the cob script mentions pieces that don't exist in the model!

@@ -78,6 +78,16 @@ LocalModelPiece::~LocalModelPiece()
 	spring::SafeDelete(colvol);
 }
 
+void LocalModelPiece::SetDirty(bool state)
+{
+	dirty = state;
+
+	if (state) {
+		assert(localModel);
+		localModel->SetPieceTransformsDirty();
+	}
+}
+
 void LocalModelPiece::AddChild(LocalModelPiece* c)
 {
 	c->parent = this;
@@ -142,6 +152,18 @@ bool LocalModelPiece::SetPieceSpaceMatrix(const CMatrix44f& mat)
 	return blockScriptAnims = mat.IsRotOrRotTranMatrix();
 }
 
+const Transform& LocalModelPiece::GetModelSpaceTransform() const
+{
+	localModel->UpdatePieceTransforms();
+	return modelSpaceTra;
+}
+
+const CMatrix44f& LocalModelPiece::GetModelSpaceMatrix() const
+{
+	localModel->UpdatePieceTransforms();
+	return modelSpaceMat;
+}
+
 void LocalModelPiece::SetScriptVisible(bool b)
 {
 	scriptSetVisible = b;
@@ -192,13 +214,14 @@ void LocalModelPiece::UpdateChildTransformRec(bool updateChildTransform) const
 
 	if (dirty) {
 		dirty = false;
-		wasUpdated[0] = true;  //update for current frame
 		updateChildTransform = true;
 
 		pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, scale);
 	}
 
 	if (updateChildTransform) {
+		wasUpdated[0] = true;  //update for current frame
+
 		if (parent != nullptr)
 			modelSpaceTra = parent->modelSpaceTra * pieceSpaceTra;
 		else
@@ -305,8 +328,8 @@ bool LocalModelPiece::GetEmitDirPos(float3& emitPos, float3& emitDir) const
 		return false;
 
 	// note: actually OBJECT_TO_WORLD but transform is the same
-	emitPos = modelSpaceTra *        original->GetEmitPos()        * WORLD_TO_OBJECT_SPACE;
-	emitDir = modelSpaceTra * float4(original->GetEmitDir(), 0.0f) * WORLD_TO_OBJECT_SPACE;
+	emitPos = GetModelSpaceTransform() *        original->GetEmitPos()        * WORLD_TO_OBJECT_SPACE;
+	emitDir = GetModelSpaceTransform() * float4(original->GetEmitDir(), 0.0f) * WORLD_TO_OBJECT_SPACE;
 	return true;
 }
 

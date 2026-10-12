@@ -72,6 +72,18 @@ struct LocalModel
 
 	void SetBoundariesNeedsRecalc()       { needsBoundariesRecalc = true; }
 	bool GetBoundariesNeedsRecalc() const { return needsBoundariesRecalc; }
+
+	// set when any piece becomes dirty, cleared by CUnitScript::TickAllAnims
+	// or by UpdatePieceTransforms; lets readers outside of TickAllAnims (e.g.
+	// after MoveNow/TurnNow on a non-animating unit) see up-to-date transforms
+	void SetPieceTransformsDirty(bool b = true) const { pieceTransformsDirty = b; }
+	void UpdatePieceTransforms() const {
+		if (!pieceTransformsDirty)
+			return;
+
+		pieceTransformsDirty = false;
+		pieces[0].UpdateChildTransformRec(false);
+	}
 private:
 	LocalModelPiece* CreateLocalModelPieces(const S3DModelPiece* mpParent);
 
@@ -89,4 +101,5 @@ private:
 	LuaObjectMaterialData* luaMaterialData = nullptr;
 
 	bool needsBoundariesRecalc = true;
+	mutable bool pieceTransformsDirty = false;
 };
