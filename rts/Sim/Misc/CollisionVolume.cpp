@@ -1,6 +1,8 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "CollisionVolume.h"
+#include "Rendering/Models/3DModelPiece.hpp"
+#include "Rendering/Models/LocalModelPiece.hpp"
 #include "Sim/Units/Unit.h"
 #include "Sim/Features/Feature.h"
 #include "System/Matrix44f.h"
@@ -116,8 +118,16 @@ void CollisionVolume::InitShape(
 
 	// assign these here, since we can be
 	// called from outside the constructor
-	volumeType    = std::max(vType, 0) % (COLVOL_TYPE_SPHERE + 1);
+	volumeType    = std::max(vType, 0) % (COLVOL_TYPE_POLYGON + 1);
 	volumeAxes[0] = std::max(pAxis, 0) % (COLVOL_AXIS_Z + 1);
+
+	// POLYGON takes its shape AND its placement straight from the piece
+	// geometry, so any caller-supplied offset would double-shift it away
+	// from the mesh it is supposed to trace. Zero it so that the matrix
+	// built in IntersectPiecesHelper (which translates by GetOffsets())
+	// leaves the ray exactly in vertex space.
+	if (volumeType == COLVOL_TYPE_POLYGON)
+		axisOffsets = ZeroVector;
 
 	///< [0] is primary axis, [1] and [2] are secondary (all COLVOL_AXIS_*)
 	switch (volumeAxes[0]) {
@@ -172,6 +182,10 @@ void CollisionVolume::SetBoundingRadius() {
 		case COLVOL_TYPE_ELLIPSOID: {
 			volumeBoundingRadius = std::max(halfAxisScales.x, std::max(halfAxisScales.y, halfAxisScales.z));
 			volumeBoundingRadiusSq = volumeBoundingRadius * volumeBoundingRadius;
+		} break;
+		case COLVOL_TYPE_POLYGON: {
+			// not used: the broad-phase radius for this type is derived
+			// from the piece's own mins/maxs at test time (see Intersect)
 		} break;
 	}
 }
@@ -271,12 +285,12 @@ float CollisionVolume::GetPointSurfaceDistance(
 	vm.Translate(GetOffsets());
 	vm.InvertAffineInPlace();
 
-	return (GetPointSurfaceDistance(vm, pos));
+	return (GetPointSurfaceDistance(vm, pos, lmp));
 }
 
 
 
-float CollisionVolume::GetPointSurfaceDistance(const CMatrix44f& mv, const float3& p) const {
+float CollisionVolume::GetPointSurfaceDistance(const CMatrix44f& mv, const float3& p, const LocalModelPiece* lmp) const {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// transform <p> from world- to volume-space
 	float3 pv = mv.Mul(p);
@@ -323,6 +337,13 @@ float CollisionVolume::GetPointSurfaceDistance(const CMatrix44f& mv, const float
 			d = GetEllipsoidDistance(pv);
 		} break;
 
+		case COLVOL_TYPE_POLYGON: {
+			// distance to the closest point on the closest triangle; the
+			// same triangles IntersectPolygon() traces, in the same space,
+			// so the two never disagree about where the volume is
+			d = GetPolygonDistance(pv, lmp);
+		} break;
+
 		default: {
 			assert(false);
 		} break;
@@ -332,6 +353,139 @@ float CollisionVolume::GetPointSurfaceDistance(const CMatrix44f& mv, const float
 }
 
 
+
+// closest point on a triangle to p (standard barycentric region test)
+static float3 ClosestPointOnTriangle(const float3& p, const float3& a, const float3& b, const float3& c)
+{
+	const float3 ab = b - a;
+	const float3 ac = c - a;
+	const float3 ap = p - a;
+
+	const float d1 = ab.dot(ap);
+	const float d2 = ac.dot(ap);
+	if (d1 <= 0.0f && d2 <= 0.0f) return a;
+
+	const float3 bp = p - b;
+	const float d3 = ab.dot(bp);
+	const float d4 = ac.dot(bp);
+	if (d3 >= 0.0f && d4 <= d3) return b;
+
+	const float vc = d1 * d4 - d3 * d2;
+	if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
+		return a + ab * (d1 / (d1 - d3));
+
+	const float3 cp = p - c;
+	const float d5 = ab.dot(cp);
+	const float d6 = ac.dot(cp);
+	if (d6 >= 0.0f && d5 <= d6) return c;
+
+	const float vb = d5 * d2 - d1 * d6;
+	if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
+		return a + ac * (d2 / (d2 - d6));
+
+	const float va = d3 * d6 - d5 * d4;
+	if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
+		return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
+
+	const float denom = 1.0f / (va + vb + vc);
+	return a + ab * (vb * denom) + ac * (vc * denom);
+}
+
+// Crossing parity along an arbitrary ray: odd means the point is enclosed.
+// The direction is deliberately skew, so that it is very unlikely to graze an
+// edge or a vertex, where a crossing could be counted twice or not at all.
+static bool PointInsidePolygonMesh(const float3& p, const std::vector<float3>& verts, const std::vector<uint32_t>& indcs)
+{
+	constexpr float EPS = 1e-6f;
+	const float3 dir = float3(0.5773503f, 0.6981317f, 0.4240113f).SafeNormalize();
+
+	int crossings = 0;
+
+	for (size_t i = 0; i + 2 < indcs.size(); i += 3) {
+		const uint32_t ia = indcs[i + 0];
+		const uint32_t ib = indcs[i + 1];
+		const uint32_t ic = indcs[i + 2];
+
+		if (ia >= verts.size() || ib >= verts.size() || ic >= verts.size())
+			continue;
+
+		const float3& v0 = verts[ia];
+		const float3 e1 = verts[ib] - v0;
+		const float3 e2 = verts[ic] - v0;
+		const float3 pv = dir.cross(e2);
+		const float det = e1.dot(pv);
+
+		if (math::fabs(det) <= EPS)
+			continue;
+
+		const float invDet = 1.0f / det;
+		const float3 tv = p - v0;
+
+		const float u = tv.dot(pv) * invDet;
+
+		if (u < 0.0f || u > 1.0f)
+			continue;
+
+		const float3 qv = tv.cross(e1);
+		const float w = dir.dot(qv) * invDet;
+
+		if (w < 0.0f || (u + w) > 1.0f)
+			continue;
+
+		if ((e2.dot(qv) * invDet) > EPS)
+			crossings++;
+	}
+
+	return ((crossings & 1) == 1);
+}
+
+float CollisionVolume::GetPolygonDistance(const float3& pv, const LocalModelPiece* lmp) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	// same triangles IntersectPolygon() traces, reached the same way, so
+	// the two can never disagree about where the volume actually is
+	const S3DModelPiece* piece = (lmp != nullptr) ? lmp->original : nullptr;
+
+	if (piece == nullptr || !piece->HasGeometryData())
+		return 0.0f;
+
+	const auto& verts = piece->GetCollisionVertsVec();
+	const auto& indcs = piece->GetIndicesVec();
+
+	if (verts.empty())
+		return 0.0f;
+
+	float minDistSq = std::numeric_limits<float>::max();
+
+	for (size_t i = 0; i + 2 < indcs.size(); i += 3) {
+		const uint32_t ia = indcs[i + 0];
+		const uint32_t ib = indcs[i + 1];
+		const uint32_t ic = indcs[i + 2];
+
+		if (ia >= verts.size() || ib >= verts.size() || ic >= verts.size())
+			continue;
+
+		const float3 q = ClosestPointOnTriangle(pv, verts[ia], verts[ib], verts[ic]);
+		minDistSq = std::min(minDistSq, (q - pv).SqLength());
+	}
+
+	if (minDistSq == std::numeric_limits<float>::max())
+		return 0.0f;
+
+	// Every other volume type reports 0 for a point inside itself, and the
+	// callers rely on it: explosion damage falls off with this distance and
+	// stops applying entirely past the blast radius. Without this a charge
+	// going off inside a hull would be treated as sitting a hull-width away.
+	//
+	// Only asked of a closed surface, since "inside" means nothing for an
+	// open one, and answering it anyway would put distant points on the far
+	// side of a single plate "inside" it.
+	if (piece->HasClosedCollisionMesh() && PointInsidePolygonMesh(pv, verts, indcs))
+		return 0.0f;
+
+	return math::sqrt(minDistSq);
+}
 
 float CollisionVolume::GetCylinderDistance(const float3& pv, size_t axisA, size_t axisB, size_t axisC) const
 {

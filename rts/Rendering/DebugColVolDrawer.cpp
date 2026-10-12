@@ -10,6 +10,9 @@
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/SubState.h"
+#include "Rendering/GL/RenderBuffers.h"
+#include "Rendering/Models/3DModelPiece.hpp"
+#include "Rendering/Models/LocalModelPiece.hpp"
 #include "Sim/Features/Feature.h"
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/QuadField.h"
@@ -30,7 +33,7 @@ static constexpr float4 DEFAULT_SHIELD_COLOR = float4(0.00f, 0.00f, 0.60f, 0.35f
 static constexpr float4 DEFAULT_CUSTCV_COLOR = float4(0.50f, 0.50f, 0.50f, 0.35f); // grey
 static constexpr float4 DEFAULT_BUGOFF_COLOR = float4(0.00f, 1.00f, 1.00f, 0.35f); // cyan
 
-static inline void DrawCollisionVolume(const CollisionVolume* vol, const CMatrix44f& mSrc, const float4& color)
+static inline void DrawCollisionVolume(const CollisionVolume* vol, const CMatrix44f& mSrc, const float4& color, const LocalModelPiece* lmp = nullptr)
 {
 	CMatrix44f m = mSrc;
 	switch (vol->GetVolumeType()) {
@@ -74,6 +77,44 @@ static inline void DrawCollisionVolume(const CollisionVolume* vol, const CMatrix
 			m.Scale(vol->GetScale(0), vol->GetScale(1), vol->GetScale(2));
 			GL::shapes.DrawWireBox(m, color);
 		} break;
+		case CollisionVolume::COLVOL_TYPE_POLYGON: {
+			// wireframe of the exact triangles IntersectPolygon() traces,
+			// through the exact same matrix -- if the outline does not sit
+			// on the mesh in-game, the collision does not either
+			const S3DModelPiece* piece = (lmp != nullptr) ? lmp->original : nullptr;
+
+			if (piece == nullptr || !piece->HasGeometryData())
+				break;
+
+			const auto& verts = piece->GetVerticesVec();
+			const auto& indcs = piece->GetIndicesVec();
+
+			const SColor sc = {color.x, color.y, color.z, color.w};
+
+			auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_C>();
+			auto& sh = rb.GetShader();
+
+			for (size_t i = 0; i + 2 < indcs.size(); i += 3) {
+				const uint32_t ia = indcs[i + 0];
+				const uint32_t ib = indcs[i + 1];
+				const uint32_t ic = indcs[i + 2];
+
+				if (ia >= verts.size() || ib >= verts.size() || ic >= verts.size())
+					continue;
+
+				const float3 a = m * verts[ia].pos;
+				const float3 b = m * verts[ib].pos;
+				const float3 c = m * verts[ic].pos;
+
+				rb.AddVertex({a, sc}); rb.AddVertex({b, sc});
+				rb.AddVertex({b, sc}); rb.AddVertex({c, sc});
+				rb.AddVertex({c, sc}); rb.AddVertex({a, sc});
+			}
+
+			sh.Enable();
+			rb.Submit(GL_LINES);
+			sh.Disable();
+		} break;
 	}
 }
 
@@ -97,7 +138,7 @@ static void DrawObjectDebugPieces(const CSolidObject* o, const float4& defColor)
 
 		const CMatrix44f mp = mo * lmp->GetModelSpaceMatrix();
 		// factors in the volume offsets
-		DrawCollisionVolume(lmpVol, mp, curColor);
+		DrawCollisionVolume(lmpVol, mp, curColor, lmp);
 	}
 }
 

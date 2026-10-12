@@ -213,6 +213,7 @@ void CFeature::Initialize(const FeatureLoadParams& params)
 				// (this is still never animated but allows for
 				// custom piece display-lists, etc)
 				localModel.SetModel(model);
+				ApplyPolygonPieceVolumes();
 			} else {
 				LOG_L(L_ERROR, "[%s] couldn't load model for %s", __FUNCTION__, def->name.c_str());
 			}

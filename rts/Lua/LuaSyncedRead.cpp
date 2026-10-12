@@ -7274,7 +7274,7 @@ int LuaSyncedRead::GetFeatureLastAttackedPiece(lua_State* L)
  * @class CollisionVolumeData
  * @x_helper
  *
- * @field type "ellipsoid"|"cylinder"|"box"|"sphere" type
+ * @field type "ellipsoid"|"cylinder"|"box"|"sphere"|"polygon" type
  * @field scaleX number
  * @field scaleY number
  * @field scaleZ number
