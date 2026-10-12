@@ -23,6 +23,7 @@ public:
 	bool IsUpdateNeeded() override { return true; }
 private:
 	GL::Texture2D uploadTex;
+	PBO uploadPBO;
 };
 
 #endif // _LOS_TEXTURE_H
