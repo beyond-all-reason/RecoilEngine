@@ -31,6 +31,7 @@ struct LocalModelPiece
 
 	void AddChild(LocalModelPiece* c);
 	void RemoveChild(LocalModelPiece* c);
+	void SetRank(uint32_t r);
 	void SetLocalModel(LocalModel* lm) { localModel = lm; }
 
 	void SetLModelPieceIndex(uint32_t idx) { lmodelPieceIndex = idx; }

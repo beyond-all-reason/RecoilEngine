@@ -92,7 +92,20 @@ void LocalModelPiece::AddChild(LocalModelPiece* c)
 {
 	c->parent = this;
 	children.push_back(c);
-	c->rank = rank + 1;
+	c->SetRank(rank + 1);
+}
+
+void LocalModelPiece::SetRank(uint32_t r)
+{
+	// TickAllAnims needs rank == depth for every piece; after
+	// Spring.SetUnitPieceParent the children of c move with it
+	if (rank == r)
+		return;
+
+	rank = r;
+
+	for (auto* c : children)
+		c->SetRank(r + 1);
 }
 
 void LocalModelPiece::RemoveChild(LocalModelPiece* c)
