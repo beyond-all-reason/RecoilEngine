@@ -741,6 +741,24 @@ bool LuaConstGL::PushEntries(lua_State* L)
 	/*** @field GL.FRAMEBUFFER integer */
 	PUSH_GL(FRAMEBUFFER);
 
+	/***
+	 * Query targets (for gl.CreateQuery)
+	 * @section query_targets
+	 */
+
+	/*** @field GL.SAMPLES_PASSED integer */
+	PUSH_GL(SAMPLES_PASSED);
+	/*** @field GL.ANY_SAMPLES_PASSED integer */
+	PUSH_GL(ANY_SAMPLES_PASSED);
+	/*** @field GL.ANY_SAMPLES_PASSED_CONSERVATIVE integer */
+	PUSH_GL(ANY_SAMPLES_PASSED_CONSERVATIVE);
+	/*** @field GL.PRIMITIVES_GENERATED integer */
+	PUSH_GL(PRIMITIVES_GENERATED);
+	/*** @field GL.TIME_ELAPSED integer */
+	PUSH_GL(TIME_ELAPSED);
+	/*** @field GL.TIMESTAMP integer */
+	PUSH_GL(TIMESTAMP);
+
 	return true;
 
 #undef PUSH_GL

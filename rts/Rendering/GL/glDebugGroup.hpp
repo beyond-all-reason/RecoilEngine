@@ -22,4 +22,6 @@ namespace GL {
 	};
 }
 
+// Named GL debug group for graphics debuggers. In Tracy builds it is also a Tracy GPU
+// zone of the same name (see glDebugGroup.cpp), so GPU time shows up next to the CPU zones.
 #define SCOPED_GL_DEBUGGROUP(name) const auto _UTIL_CONCAT(__scopedGLDebugGroup, __LINE__) = GL::DebugGroup::GetScoped(0x824A/*GL_DEBUG_SOURCE_APPLICATION*/ ,name)
