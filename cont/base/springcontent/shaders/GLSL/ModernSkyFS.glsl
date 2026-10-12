@@ -91,27 +91,30 @@ void main()
     vec3 night_extinction = vec3(1.0 - exp(sunDir.y)) * 0.2;
     vec3 extinction = mix(day_extinction, night_extinction, -sunDir.y * 0.2 + 0.5);
 
-	// Cirrus Clouds
-	float density = smoothstep(1.0 - cirrus, 1.0, fbm(pos.xyz / pos.y * 2.0 + time * 0.05)) * 0.3;
-	fragColor.rgb = mix(fragColor.rgb, cloudInfo.rgb * extinction * 4.0, density * max(pos.y, 0.0));
+	// Clouds: their weight is max(pos.y, 0.0), and below the horizon cpos.xz /= cpos.y divides by zero (NaN)
+	if (pos.y > 0.0) {
+		// Cirrus Clouds
+		float density = smoothstep(1.0 - cirrus, 1.0, fbm(pos.xyz / pos.y * 2.0 + time * 0.05)) * 0.3;
+		fragColor.rgb = mix(fragColor.rgb, cloudInfo.rgb * extinction * 4.0, density * max(pos.y, 0.0));
 
-	// Cumulus Clouds
-	#if SIMPLIFIED_RENDERING == 0
-	for (int i = 0; i < 2; i++)
-	{
-		//vec3 cpos = pos; cpos.y = smoothstep(-0.5, 1.5, pos.y); cpos.xz /= cpos.y; cpos *= 2.0;
-		vec3 cpos = pos; cpos.y = smoothstep(-0.5, 1.5, pos.y); cpos.xz /= cpos.y;
-		float density = smoothstep(1.0 - cumulus, 1.0, fbm((0.7 + float(i) * 0.01) * cpos + time * 0.3));
-		fragColor.rgb = mix(fragColor.rgb, cloudInfo.rgb * extinction * density * 5.0, min(density, 1.0) * (max(pos.y, 0.0)));
+		// Cumulus Clouds
+		#if SIMPLIFIED_RENDERING == 0
+		for (int i = 0; i < 2; i++)
+		{
+			//vec3 cpos = pos; cpos.y = smoothstep(-0.5, 1.5, pos.y); cpos.xz /= cpos.y; cpos *= 2.0;
+			vec3 cpos = pos; cpos.y = smoothstep(-0.5, 1.5, pos.y); cpos.xz /= cpos.y;
+			float density = smoothstep(1.0 - cumulus, 1.0, fbm((0.7 + float(i) * 0.01) * cpos + time * 0.3));
+			fragColor.rgb = mix(fragColor.rgb, cloudInfo.rgb * extinction * density * 5.0, min(density, 1.0) * (max(pos.y, 0.0)));
+		}
+		#else
+		{
+			//vec3 cpos = pos; cpos.y = smoothstep(-0.5, 1.5, pos.y); cpos.xz /= cpos.y; cpos *= 2.0;
+			vec3 cpos = pos; cpos.y = smoothstep(-0.5, 1.5, pos.y); cpos.xz /= cpos.y;
+			float density = smoothstep(1.0 - cumulus, 1.0, fbm((0.7) * cpos + time * 0.3));
+			fragColor.rgb = mix(fragColor.rgb, cloudInfo.rgb * extinction * density * 5.0, min(density, 1.0) * (max(pos.y, 0.0)));
+		}
+		#endif
 	}
-	#else
-	{
-		//vec3 cpos = pos; cpos.y = smoothstep(-0.5, 1.5, pos.y); cpos.xz /= cpos.y; cpos *= 2.0;
-		vec3 cpos = pos; cpos.y = smoothstep(-0.5, 1.5, pos.y); cpos.xz /= cpos.y;
-		float density = smoothstep(1.0 - cumulus, 1.0, fbm((0.7) * cpos + time * 0.3));
-		fragColor.rgb = mix(fragColor.rgb, cloudInfo.rgb * extinction * density * 5.0, min(density, 1.0) * (max(pos.y, 0.0)));
-	}
-	#endif
 
 	fragColor.a = (0.5 - csstep(-0.8, -0.0, -0.5, 0.3, pos.y));
 }

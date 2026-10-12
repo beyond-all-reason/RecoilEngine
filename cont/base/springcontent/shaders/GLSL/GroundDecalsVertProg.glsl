@@ -165,7 +165,7 @@ float HeightAtWorldPos(vec2 wxz) {
 vec3 GetFragmentNormal(vec2 wxz) {
 	vec3 normal;
 	normal.xz = textureLod(groundNormalTex, wxz * mapDims.zw, 0.0).ra;
-	normal.y  = sqrt(1.0 - dot(normal.xz, normal.xz));
+	normal.y  = sqrt(max(1.0 - dot(normal.xz, normal.xz), 0.0));
 	return normal;
 }
 
