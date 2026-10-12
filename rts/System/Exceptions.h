@@ -62,5 +62,15 @@ public:
 	network_error(const std::string& msg) : std::runtime_error(msg) {};
 };
 
+/**
+ * port_in_use_error
+ *   thrown when udp socket can't be bound because the port is in use
+ */
+class port_in_use_error : public network_error
+{
+public:
+	port_in_use_error(const std::string& msg) : network_error(msg) {};
+};
+
 
 #endif

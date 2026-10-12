@@ -167,22 +167,26 @@ void CGameServer::Initialize()
 	rng.Seed((myGameData->GetSetupText()).length());
 
 	// start network
+	int serverPort = myClientSetup->hostPort;
+
 	if (!myGameSetup->onlyLocal) {
 		try {
 			udpListener.reset(new netcode::UDPListener(myClientSetup->hostPort, myClientSetup->hostIP));
-		} catch (const std::runtime_error& e) {
+		} catch (const port_in_use_error&) {
 			// a replay is watched through a local connection; only remote spectators need the
 			// configured port, so a port in use (e.g. by a running game) must not stop playback
 			if (!myGameSetup->hostDemo)
 				throw;
 
-			LOG_L(L_WARNING, "[GameServer] %s; the replay server uses a free port instead", e.what());
 			udpListener.reset(new netcode::UDPListener(0, myClientSetup->hostIP));
+			serverPort = udpListener->GetSocket()->local_endpoint().port();
+
+			LOG_L(L_WARNING, "port %d is in use; the replay server uses port %d instead", myClientSetup->hostPort, serverPort);
 		}
 	}
 
 	AddAutohostInterface(StringToLower(configHandler->GetString("AutohostIP")), configHandler->GetInt("AutohostPort"));
-	Message(spring::format(ServerStart, myClientSetup->hostPort), false);
+	Message(spring::format(ServerStart, serverPort), false);
 
 	// start script
 	maxUserSpeed = myGameSetup->maxSpeed;
