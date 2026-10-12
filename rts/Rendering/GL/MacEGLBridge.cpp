@@ -173,6 +173,126 @@ namespace {
 }
 
 
+// KosmicKrisp has neither wideLines nor geometry shaders, so Zink clamps every line to one pixel.
+// Wide lines are approximated by repeating the draw with the viewport shifted by whole pixels.
+namespace WideLines {
+	thread_local float lineWidth = 1.0f;
+
+	PFNGLLINEWIDTHPROC realLineWidth = nullptr;
+	PFNGLDRAWARRAYSPROC realDrawArrays = nullptr;
+	PFNGLDRAWELEMENTSPROC realDrawElements = nullptr;
+	PFNGLDRAWRANGEELEMENTSPROC realDrawRangeElements = nullptr;
+	PFNGLDRAWARRAYSINSTANCEDPROC realDrawArraysInstanced = nullptr;
+	PFNGLDRAWELEMENTSINSTANCEDPROC realDrawElementsInstanced = nullptr;
+	PFNGLDRAWARRAYSINSTANCEDBASEINSTANCEPROC realDrawArraysInstancedBaseInstance = nullptr;
+	PFNGLDRAWELEMENTSINSTANCEDBASEINSTANCEPROC realDrawElementsInstancedBaseInstance = nullptr;
+	PFNGLDRAWELEMENTSBASEVERTEXPROC realDrawElementsBaseVertex = nullptr;
+	PFNGLDRAWELEMENTSINSTANCEDBASEVERTEXPROC realDrawElementsInstancedBaseVertex = nullptr;
+	PFNGLDRAWELEMENTSINSTANCEDBASEVERTEXBASEINSTANCEPROC realDrawElementsInstancedBaseVertexBaseInstance = nullptr;
+
+	bool IsLineMode(GLenum mode) {
+		switch (mode) {
+			case GL_LINES:
+			case GL_LINE_STRIP:
+			case GL_LINE_LOOP:
+			case GL_LINES_ADJACENCY:
+			case GL_LINE_STRIP_ADJACENCY:
+				return true;
+			default:
+				return false;
+		}
+	}
+
+	template<typename F>
+	void Draw(GLenum mode, F&& draw) {
+		draw();
+
+		if (lineWidth < 1.5f || !IsLineMode(mode))
+			return;
+
+		// glPopAttrib restores width and viewport behind our back, so query both before redrawing
+		GLfloat width = 1.0f;
+		glGetFloatv(GL_LINE_WIDTH, &width);
+		if (width < 1.5f)
+			return;
+
+		GLint viewport[4] = {};
+		glGetIntegerv(GL_VIEWPORT, viewport);
+
+		const int radius = static_cast<int>((width - 1.0f) * 0.5f + 0.5f);
+		for (int i = 1; i <= radius; ++i) {
+			const int offsets[4][2] = {{i, 0}, {-i, 0}, {0, i}, {0, -i}};
+			for (const auto& o: offsets) {
+				glViewport(viewport[0] + o[0], viewport[1] + o[1], viewport[2], viewport[3]);
+				draw();
+			}
+		}
+		glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+	}
+
+	void APIENTRY LineWidth(GLfloat width) {
+		lineWidth = width;
+		realLineWidth(width);
+	}
+	void APIENTRY DrawArrays(GLenum mode, GLint first, GLsizei count) {
+		Draw(mode, [&]() { realDrawArrays(mode, first, count); });
+	}
+	void APIENTRY DrawElements(GLenum mode, GLsizei count, GLenum type, const void* indices) {
+		Draw(mode, [&]() { realDrawElements(mode, count, type, indices); });
+	}
+	void APIENTRY DrawRangeElements(GLenum mode, GLuint start, GLuint end, GLsizei count, GLenum type, const void* indices) {
+		Draw(mode, [&]() { realDrawRangeElements(mode, start, end, count, type, indices); });
+	}
+	void APIENTRY DrawArraysInstanced(GLenum mode, GLint first, GLsizei count, GLsizei instances) {
+		Draw(mode, [&]() { realDrawArraysInstanced(mode, first, count, instances); });
+	}
+	void APIENTRY DrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void* indices, GLsizei instances) {
+		Draw(mode, [&]() { realDrawElementsInstanced(mode, count, type, indices, instances); });
+	}
+	void APIENTRY DrawArraysInstancedBaseInstance(GLenum mode, GLint first, GLsizei count, GLsizei instances, GLuint baseInstance) {
+		Draw(mode, [&]() { realDrawArraysInstancedBaseInstance(mode, first, count, instances, baseInstance); });
+	}
+	void APIENTRY DrawElementsInstancedBaseInstance(GLenum mode, GLsizei count, GLenum type, const void* indices, GLsizei instances, GLuint baseInstance) {
+		Draw(mode, [&]() { realDrawElementsInstancedBaseInstance(mode, count, type, indices, instances, baseInstance); });
+	}
+	void APIENTRY DrawElementsBaseVertex(GLenum mode, GLsizei count, GLenum type, const void* indices, GLint baseVertex) {
+		Draw(mode, [&]() { realDrawElementsBaseVertex(mode, count, type, indices, baseVertex); });
+	}
+	void APIENTRY DrawElementsInstancedBaseVertex(GLenum mode, GLsizei count, GLenum type, const void* indices, GLsizei instances, GLint baseVertex) {
+		Draw(mode, [&]() { realDrawElementsInstancedBaseVertex(mode, count, type, indices, instances, baseVertex); });
+	}
+	void APIENTRY DrawElementsInstancedBaseVertexBaseInstance(GLenum mode, GLsizei count, GLenum type, const void* indices, GLsizei instances, GLint baseVertex, GLuint baseInstance) {
+		Draw(mode, [&]() { realDrawElementsInstancedBaseVertexBaseInstance(mode, count, type, indices, instances, baseVertex, baseInstance); });
+	}
+
+	template<typename T>
+	void* Wrap(void* real, T& realPtr, T wrapper) {
+		if (real == nullptr)
+			return nullptr;
+
+		realPtr = reinterpret_cast<T>(real);
+		return reinterpret_cast<void*>(wrapper);
+	}
+
+	void* GetProcAddress(const char* name, void* real) {
+		#define WRAP(fn) if (strcmp(name, "gl" #fn) == 0) return Wrap(real, real##fn, &fn)
+		WRAP(LineWidth);
+		WRAP(DrawArrays);
+		WRAP(DrawElements);
+		WRAP(DrawRangeElements);
+		WRAP(DrawArraysInstanced);
+		WRAP(DrawElementsInstanced);
+		WRAP(DrawArraysInstancedBaseInstance);
+		WRAP(DrawElementsInstancedBaseInstance);
+		WRAP(DrawElementsBaseVertex);
+		WRAP(DrawElementsInstancedBaseVertex);
+		WRAP(DrawElementsInstancedBaseVertexBaseInstance);
+		#undef WRAP
+		return real;
+	}
+}
+
+
 bool MacEGLBridge::Active() { return (context != nullptr); }
 
 
@@ -285,7 +405,7 @@ void* MacEGLBridge::GetProcAddress(const char* name)
 	if (!LoadEGL())
 		return nullptr;
 
-	return egl.GetProcAddress(name);
+	return WideLines::GetProcAddress(name, egl.GetProcAddress(name));
 }
 
 void MacEGLBridge::SetSwapInterval(int interval)
