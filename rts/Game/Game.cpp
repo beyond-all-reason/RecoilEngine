@@ -1550,6 +1550,8 @@ bool CGame::Draw() {
 		eventHandler.DrawScreenPost();
 	}
 
+	CRenderViews::GetInstance().EndXRFrame();
+
 	glEnable(GL_DEPTH_TEST);
 	glLoadIdentity();
 

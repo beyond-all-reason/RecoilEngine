@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 
 /**
  * Pose and projection of one eye, as located by the OpenXR runtime
@@ -63,6 +64,21 @@ public:
 	// GL texture the eye should be rendered into, or 0 on failure
 	uint32_t AcquireEyeImage(int eye);
 	void ReleaseEyeImage(int eye);
+
+	// a frame was begun and the eyes are to be rendered
+	bool IsFrameActive() const;
+
+	// Flat panels (2D UI) drawn over the eyes by the compositor, one swapchain
+	// each, identified by name. The image is premultiplied RGBA; recreated when
+	// the size changes. Used between BeginFrame and EndFrame, like the eyes: the
+	// panels that had an image released this frame are submitted in EndFrame.
+	bool EnsurePanel(const std::string& id, int width, int height);
+	uint32_t AcquirePanelImage(const std::string& id);
+	void ReleasePanelImage(const std::string& id);
+	void RemovePanel(const std::string& id);
+	// Pose in metres: relative to the head (headLocked) or in the "local" space
+	// of the eyes; the panel faces +z of its own frame. The height follows the image aspect.
+	void SetPanelPlacement(const std::string& id, bool headLocked, const float pos[3], const float rot[4], float widthMetres);
 
 private:
 	CXRSession();

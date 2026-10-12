@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <map>
+#include <string>
 #include <vector>
 
 #include "System/Log/ILog.h"
@@ -50,17 +52,35 @@ struct CXRSession::Impl {
 	};
 
 	bool Start(int resolutionScalePercent);
+	bool CreateSwapchain(Eye& eye, int width, int height);
+	bool EnsurePanel(const std::string& id, int width, int height);
+	void DestroyPanels();
 	void Stop();
 	bool PollEvents();
 	bool BeginFrame();
 	void EndFrame();
-	uint32_t AcquireEyeImage(int eye);
-	void ReleaseEyeImage(int eye);
+	uint32_t AcquireImage(Eye& eye);
+	void ReleaseImage(Eye& eye);
 
 	XrInstance instance = XR_NULL_HANDLE;
 	XrSystemId systemId = XR_NULL_SYSTEM_ID;
 	XrSession session = XR_NULL_HANDLE;
 	XrSpace space = XR_NULL_HANDLE;
+	XrSpace viewSpace = XR_NULL_HANDLE;
+	int64_t swapchainFormat = XR_GL_RGBA8;
+
+	// flat quads showing 2D UI, by name
+	struct Panel {
+		Eye eye;
+		int width = 0;
+		int height = 0;
+		bool headLocked = true;
+		float pos[3] = {0.0f, 0.0f, -1.5f};
+		float rot[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+		float widthMetres = 1.5f;
+	};
+	std::map<std::string, Panel> panels;
+
 	XrSessionState state = XR_SESSION_STATE_UNKNOWN;
 
 	bool running = false;
@@ -157,36 +177,49 @@ bool CXRSession::Impl::Start(int resolutionScalePercent)
 	std::vector<int64_t> formats(formatCount);
 	XR_CHECK(xrEnumerateSwapchainFormats(session, formatCount, &formatCount, formats.data()));
 
-	int64_t format = formats.empty() ? XR_GL_RGBA8 : formats[0];
+	swapchainFormat = formats.empty() ? XR_GL_RGBA8 : formats[0];
 	for (const int64_t candidate: {XR_GL_SRGB8_ALPHA8, XR_GL_RGBA8}) {
 		if (std::find(formats.begin(), formats.end(), candidate) != formats.end()) {
-			format = candidate;
+			swapchainFormat = candidate;
 			break;
 		}
 	}
 
 	for (Eye& eye: eyes) {
-		XrSwapchainCreateInfo swapchainInfo{XR_TYPE_SWAPCHAIN_CREATE_INFO};
-		swapchainInfo.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
-		swapchainInfo.format = format;
-		swapchainInfo.sampleCount = 1;
-		swapchainInfo.width = eyeWidth;
-		swapchainInfo.height = eyeHeight;
-		swapchainInfo.faceCount = 1;
-		swapchainInfo.arraySize = 1;
-		swapchainInfo.mipCount = 1;
-		XR_CHECK(xrCreateSwapchain(session, &swapchainInfo, &eye.swapchain));
-
-		uint32_t imageCount = 0;
-		XR_CHECK(xrEnumerateSwapchainImages(eye.swapchain, 0, &imageCount, nullptr));
-		eye.images.assign(imageCount, XrSwapchainImageOpenGLKHR{XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR});
-		XR_CHECK(xrEnumerateSwapchainImages(eye.swapchain, imageCount, &imageCount, reinterpret_cast<XrSwapchainImageBaseHeader*>(eye.images.data())));
+		if (!CreateSwapchain(eye, eyeWidth, eyeHeight))
+			return false;
 	}
+
+	// for the head-locked GUI panel
+	XrReferenceSpaceCreateInfo viewSpaceInfo{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
+	viewSpaceInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
+	viewSpaceInfo.poseInReferenceSpace.orientation.w = 1.0f;
+	XR_CHECK(xrCreateReferenceSpace(session, &viewSpaceInfo, &viewSpace));
 
 	for (XrView& view: views)
 		view = XrView{XR_TYPE_VIEW};
 
-	LOG("[XRSession] started: %dx%d per eye, swapchain format 0x%llx", eyeWidth, eyeHeight, static_cast<unsigned long long>(format));
+	LOG("[XRSession] started: %dx%d per eye, swapchain format 0x%llx", eyeWidth, eyeHeight, static_cast<unsigned long long>(swapchainFormat));
+	return true;
+}
+
+bool CXRSession::Impl::CreateSwapchain(Eye& eye, int width, int height)
+{
+	XrSwapchainCreateInfo swapchainInfo{XR_TYPE_SWAPCHAIN_CREATE_INFO};
+	swapchainInfo.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
+	swapchainInfo.format = swapchainFormat;
+	swapchainInfo.sampleCount = 1;
+	swapchainInfo.width = width;
+	swapchainInfo.height = height;
+	swapchainInfo.faceCount = 1;
+	swapchainInfo.arraySize = 1;
+	swapchainInfo.mipCount = 1;
+	XR_CHECK(xrCreateSwapchain(session, &swapchainInfo, &eye.swapchain));
+
+	uint32_t imageCount = 0;
+	XR_CHECK(xrEnumerateSwapchainImages(eye.swapchain, 0, &imageCount, nullptr));
+	eye.images.assign(imageCount, XrSwapchainImageOpenGLKHR{XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR});
+	XR_CHECK(xrEnumerateSwapchainImages(eye.swapchain, imageCount, &imageCount, reinterpret_cast<XrSwapchainImageBaseHeader*>(eye.images.data())));
 	return true;
 }
 
@@ -197,6 +230,10 @@ void CXRSession::Impl::Stop()
 			xrDestroySwapchain(eye.swapchain);
 		eye = Eye{};
 	}
+	DestroyPanels();
+	if (viewSpace != XR_NULL_HANDLE)
+		xrDestroySpace(viewSpace);
+	viewSpace = XR_NULL_HANDLE;
 	if (space != XR_NULL_HANDLE)
 		xrDestroySpace(space);
 	if (session != XR_NULL_HANDLE)
@@ -276,6 +313,10 @@ bool CXRSession::Impl::BeginFrame()
 		eye.imageAcquired = false;
 		eye.submitted = false;
 	}
+	for (auto& [id, panel]: panels) {
+		panel.eye.imageAcquired = false;
+		panel.eye.submitted = false;
+	}
 
 	if (!frameState.shouldRender)
 		return false;
@@ -323,11 +364,15 @@ void CXRSession::Impl::EndFrame()
 	frameBegun = false;
 
 	// the swapchain images may still be held if rendering was cut short
-	for (Eye& eye: eyes) {
-		if (eye.imageAcquired) {
+	std::vector<Eye*> held = {&eyes[0], &eyes[1]};
+	for (auto& [id, panel]: panels)
+		held.push_back(&panel.eye);
+
+	for (Eye* eye: held) {
+		if (eye->imageAcquired) {
 			XrSwapchainImageReleaseInfo releaseInfo{XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO};
-			xrReleaseSwapchainImage(eye.swapchain, &releaseInfo);
-			eye.imageAcquired = false;
+			xrReleaseSwapchainImage(eye->swapchain, &releaseInfo);
+			eye->imageAcquired = false;
 		}
 	}
 
@@ -348,21 +393,81 @@ void CXRSession::Impl::EndFrame()
 	layer.views = projViews;
 
 	const bool submitLayer = shouldRender && eyes[0].submitted && eyes[1].submitted;
-	const XrCompositionLayerBaseHeader* layers[1] = {reinterpret_cast<const XrCompositionLayerBaseHeader*>(&layer)};
+
+	// the panels, over the world in the order of their names
+	std::vector<XrCompositionLayerQuad> quads;
+	quads.reserve(panels.size());
+	for (const auto& [id, panel]: panels) {
+		if (!panel.eye.submitted || panel.eye.swapchain == XR_NULL_HANDLE)
+			continue;
+
+		XrCompositionLayerQuad quad{XR_TYPE_COMPOSITION_LAYER_QUAD};
+		quad.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+		quad.space = panel.headLocked ? viewSpace : space;
+		quad.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+		quad.subImage.swapchain = panel.eye.swapchain;
+		quad.subImage.imageRect.offset = {0, 0};
+		quad.subImage.imageRect.extent = {panel.width, panel.height};
+		quad.subImage.imageArrayIndex = 0;
+		quad.pose.position = {panel.pos[0], panel.pos[1], panel.pos[2]};
+		quad.pose.orientation = {panel.rot[0], panel.rot[1], panel.rot[2], panel.rot[3]};
+		quad.size.width = panel.widthMetres;
+		quad.size.height = panel.widthMetres * float(panel.height) / float(panel.width);
+		quads.push_back(quad);
+	}
+
+	std::vector<const XrCompositionLayerBaseHeader*> layers;
+	layers.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&layer));
+	for (const XrCompositionLayerQuad& quad: quads)
+		layers.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad));
 
 	XrFrameEndInfo endInfo{XR_TYPE_FRAME_END_INFO};
 	endInfo.displayTime = frameState.predictedDisplayTime;
 	endInfo.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
-	endInfo.layerCount = submitLayer ? 1 : 0;
-	endInfo.layers = submitLayer ? layers : nullptr;
+	endInfo.layerCount = submitLayer ? uint32_t(layers.size()) : 0;
+	endInfo.layers = submitLayer ? layers.data() : nullptr;
 
 	if (XR_FAILED(xrEndFrame(session, &endInfo)))
 		lost = true;
 }
 
-uint32_t CXRSession::Impl::AcquireEyeImage(int eye)
+bool CXRSession::Impl::EnsurePanel(const std::string& id, int width, int height)
 {
-	Eye& e = eyes[eye];
+	if (session == XR_NULL_HANDLE || width <= 0 || height <= 0)
+		return false;
+
+	Panel& panel = panels[id];
+	if (panel.eye.swapchain != XR_NULL_HANDLE && panel.width == width && panel.height == height)
+		return true;
+
+	if (panel.eye.swapchain != XR_NULL_HANDLE)
+		xrDestroySwapchain(panel.eye.swapchain);
+	panel.eye = Eye{};
+	panel.width = 0;
+	panel.height = 0;
+
+	if (!CreateSwapchain(panel.eye, width, height)) {
+		if (panel.eye.swapchain != XR_NULL_HANDLE)
+			xrDestroySwapchain(panel.eye.swapchain);
+		panels.erase(id);
+		return false;
+	}
+	panel.width = width;
+	panel.height = height;
+	return true;
+}
+
+void CXRSession::Impl::DestroyPanels()
+{
+	for (auto& [id, panel]: panels) {
+		if (panel.eye.swapchain != XR_NULL_HANDLE)
+			xrDestroySwapchain(panel.eye.swapchain);
+	}
+	panels.clear();
+}
+
+uint32_t CXRSession::Impl::AcquireImage(Eye& e)
+{
 	if (!frameBegun || !shouldRender || e.swapchain == XR_NULL_HANDLE || e.imageAcquired)
 		return 0;
 
@@ -380,9 +485,8 @@ uint32_t CXRSession::Impl::AcquireEyeImage(int eye)
 	return e.images[index].image;
 }
 
-void CXRSession::Impl::ReleaseEyeImage(int eye)
+void CXRSession::Impl::ReleaseImage(Eye& e)
 {
-	Eye& e = eyes[eye];
 	if (!e.imageAcquired)
 		return;
 
@@ -410,8 +514,46 @@ void CXRSession::EndFrame() { impl->EndFrame(); }
 int CXRSession::GetEyeWidth() const { return impl->eyeWidth; }
 int CXRSession::GetEyeHeight() const { return impl->eyeHeight; }
 const XREye& CXRSession::GetEye(int eye) const { return impl->eyePoses[eye]; }
-uint32_t CXRSession::AcquireEyeImage(int eye) { return impl->AcquireEyeImage(eye); }
-void CXRSession::ReleaseEyeImage(int eye) { impl->ReleaseEyeImage(eye); }
+uint32_t CXRSession::AcquireEyeImage(int eye) { return impl->AcquireImage(impl->eyes[eye]); }
+void CXRSession::ReleaseEyeImage(int eye) { impl->ReleaseImage(impl->eyes[eye]); }
+bool CXRSession::IsFrameActive() const { return impl->frameBegun && impl->shouldRender; }
+bool CXRSession::EnsurePanel(const std::string& id, int width, int height) { return impl->EnsurePanel(id, width, height); }
+
+uint32_t CXRSession::AcquirePanelImage(const std::string& id)
+{
+	const auto it = impl->panels.find(id);
+	return (it == impl->panels.end()) ? 0 : impl->AcquireImage(it->second.eye);
+}
+
+void CXRSession::ReleasePanelImage(const std::string& id)
+{
+	const auto it = impl->panels.find(id);
+	if (it != impl->panels.end())
+		impl->ReleaseImage(it->second.eye);
+}
+
+void CXRSession::RemovePanel(const std::string& id)
+{
+	const auto it = impl->panels.find(id);
+	if (it == impl->panels.end())
+		return;
+	if (it->second.eye.swapchain != XR_NULL_HANDLE)
+		xrDestroySwapchain(it->second.eye.swapchain);
+	impl->panels.erase(it);
+}
+
+void CXRSession::SetPanelPlacement(const std::string& id, bool headLocked, const float pos[3], const float rot[4], float widthMetres)
+{
+	const auto it = impl->panels.find(id);
+	if (it == impl->panels.end())
+		return;
+
+	Impl::Panel& panel = it->second;
+	panel.headLocked = headLocked;
+	std::copy(pos, pos + 3, panel.pos);
+	std::copy(rot, rot + 4, panel.rot);
+	panel.widthMetres = widthMetres;
+}
 
 #else // no OpenXR in this build
 
@@ -430,6 +572,12 @@ bool CXRSession::Start(int) { return false; }
 void CXRSession::Stop() {}
 bool CXRSession::IsCreated() const { return false; }
 bool CXRSession::IsLost() const { return false; }
+bool CXRSession::IsFrameActive() const { return false; }
+bool CXRSession::EnsurePanel(const std::string&, int, int) { return false; }
+uint32_t CXRSession::AcquirePanelImage(const std::string&) { return 0; }
+void CXRSession::ReleasePanelImage(const std::string&) {}
+void CXRSession::RemovePanel(const std::string&) {}
+void CXRSession::SetPanelPlacement(const std::string&, bool, const float[3], const float[4], float) {}
 bool CXRSession::BeginFrame() { return false; }
 void CXRSession::EndFrame() {}
 int CXRSession::GetEyeWidth() const { return 0; }

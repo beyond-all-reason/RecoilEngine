@@ -145,6 +145,7 @@ set(sources_engine_Rendering
 		"${CMAKE_CURRENT_SOURCE_DIR}/Units/UnitDrawer.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/ModelsDataUploader.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/RenderViews.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/XR/XRPanels.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/XR/XRSession.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/UniformConstants.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/VerticalSync.cpp"

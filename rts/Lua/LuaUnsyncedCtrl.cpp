@@ -54,6 +54,7 @@
 #include "Rendering/Env/IGroundDecalDrawer.h"
 #include "Rendering/Env/Particles/Classes/NanoProjectile.h"
 #include "Rendering/GL/myGL.h"
+#include "Rendering/XR/XRPanels.h"
 #include "Rendering/CommandDrawer.h"
 #include "Rendering/IconHandler.h"
 #include "Rendering/Models/IModelParser.h"
@@ -281,6 +282,8 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(SetWMIcon);
 	REGISTER_LUA_CFUNC(SetWMCaption);
+	REGISTER_LUA_CFUNC(XRSetPanel);
+	REGISTER_LUA_CFUNC(XRRemovePanel);
 
 	REGISTER_LUA_CFUNC(SetUnitDefIcon);
 	REGISTER_LUA_CFUNC(SetUnitDefImage);
@@ -5551,6 +5554,109 @@ int LuaUnsyncedCtrl::SetWMIcon(lua_State* L)
 int LuaUnsyncedCtrl::SetWMCaption(lua_State* L)
 {
 	globalRendering->SetWindowTitle(luaL_checksstring(L, 1));
+	return 0;
+}
+
+
+/*** Parameters of a VR panel, see `Spring.XRSetPanel`.
+ *
+ * @class XRPanelParams
+ * @x_helper
+ * @field mode "head"|"world"? (Default: `"head"`) floating in front of the face, or anchored in the game world
+ * @field x number? head: metres to the right of the view axis; world: map x in elmos
+ * @field y number? head: metres above the view axis; world: map height in elmos
+ * @field z number? head: distance in front of the eyes in metres (Default: `1.5`); world: map z in elmos
+ * @field width number? head: width in metres (Default: `1.5`); world: width in elmos (Default: `400`). The height follows the texture's aspect ratio.
+ * @field billboard boolean? world only (Default: `true`) turn to face the viewer
+ * @field yaw number? world only, when not a billboard: the direction the panel faces, in degrees around the vertical axis (0 faces +z of the map)
+ * @field visible boolean? (Default: `true`)
+ */
+
+/*** Show a texture as a flat panel in the VR headset (OpenXR, `XREnable`), either
+ * floating in front of the face or anchored in the game world.
+ *
+ * The texture is a 2D texture created with `gl.CreateTexture` (with `fbo = true`) that
+ * the widget keeps drawing into with `gl.RenderToTexture`; its alpha channel is used,
+ * so clear it to transparent. Call again to move or change the panel, each call
+ * sets all of its parameters. The texture is looked up once per call: call
+ * `Spring.XRRemovePanel` before deleting it, and set the panel again if it is recreated.
+ *
+ * @function Spring.XRSetPanel
+ * @param id string name of the panel (per id one panel)
+ * @param texture string name returned by `gl.CreateTexture`
+ * @param params XRPanelParams?
+ * @return boolean ok false when the texture is unknown or not a 2D texture
+ */
+int LuaUnsyncedCtrl::XRSetPanel(lua_State* L)
+{
+	const std::string id = luaL_checkstring(L, 1);
+	const std::string texName = luaL_checkstring(L, 2);
+	const bool hasParams = lua_istable(L, 3);
+
+	const LuaTextures::Texture* tex = CLuaHandle::GetActiveTextures(L).GetInfo(texName);
+	if (tex == nullptr || tex->target != GL_TEXTURE_2D || tex->xsize <= 0 || tex->ysize <= 0) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	const auto getNumber = [&](const char* key, float def) {
+		if (!hasParams)
+			return def;
+		lua_getfield(L, 3, key);
+		const float value = lua_isnumber(L, -1) ? lua_tonumber(L, -1) : def;
+		lua_pop(L, 1);
+		return value;
+	};
+	const auto getBool = [&](const char* key, bool def) {
+		if (!hasParams)
+			return def;
+		lua_getfield(L, 3, key);
+		const bool value = lua_isnil(L, -1) ? def : lua_toboolean(L, -1);
+		lua_pop(L, 1);
+		return value;
+	};
+
+	bool headLocked = true;
+	if (hasParams) {
+		lua_getfield(L, 3, "mode");
+		if (lua_isstring(L, -1))
+			headLocked = (std::string(lua_tostring(L, -1)) != "world");
+		lua_pop(L, 1);
+	}
+
+	CXRPanels::Panel panel;
+	panel.texture = tex->id;
+	panel.sizeX = tex->xsize;
+	panel.sizeY = tex->ysize;
+	panel.headLocked = headLocked;
+	panel.visible = getBool("visible", true);
+	panel.billboard = getBool("billboard", true);
+	panel.yaw = getNumber("yaw", 0.0f);
+
+	if (headLocked) {
+		panel.pos = float3(getNumber("x", 0.0f), getNumber("y", 0.0f), getNumber("z", 1.5f));
+		panel.width = getNumber("width", 1.5f);
+	} else {
+		panel.pos = float3(getNumber("x", 0.0f), getNumber("y", 0.0f), getNumber("z", 0.0f));
+		panel.width = getNumber("width", 400.0f);
+	}
+	panel.width = std::max(panel.width, 0.001f);
+
+	CXRPanels::GetInstance().Set(id, panel);
+	lua_pushboolean(L, true);
+	return 1;
+}
+
+
+/*** Remove a panel set with `Spring.XRSetPanel`.
+ *
+ * @function Spring.XRRemovePanel
+ * @param id string
+ * @return nil
+ */
+int LuaUnsyncedCtrl::XRRemovePanel(lua_State* L)
+{
+	CXRPanels::GetInstance().Remove(luaL_checkstring(L, 1));
 	return 0;
 }
 

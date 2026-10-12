@@ -21,6 +21,8 @@
 #include "Game/TraceRay.h"
 #include "Game/Camera/CameraController.h"
 #include "Game/UI/GuiHandler.h"
+#include "Rendering/RenderViews.h"
+#include "Rendering/XR/XRPanels.h"
 #include "Game/UI/InfoConsole.h"
 #include "Game/UI/KeyCodes.h"
 #include "Game/UI/ScanCodes.h"
@@ -239,6 +241,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(GetFPS);
 	REGISTER_LUA_CFUNC(GetGameSpeed);
+	REGISTER_LUA_CFUNC(XRGetHeadPose);
 	REGISTER_LUA_CFUNC(GetGameState);
 
 	REGISTER_LUA_CFUNC(GetActiveCommand);
@@ -3270,7 +3273,7 @@ int LuaUnsyncedRead::TraceScreenRay(lua_State* L)
 	const float badRange = rawRange - 300.0f;
 
 	const float3 camPos = camera->GetPos();
-	const float3 pxlDir = camera->CalcPixelDir(wx, wy);
+	const float3 pxlDir = CRenderViews::CalcCursorDir(camera, wx, wy);
 
 	// trace for player's allyteam
 	const float traceDist = TraceRay::GuiTraceRay(camPos, pxlDir, rawRange, nullptr, unit, feature, true, onlyCoords, ignoreWater);
@@ -3328,7 +3331,7 @@ int LuaUnsyncedRead::GetPixelDir(lua_State* L)
 {
 	const int x = luaL_checkint(L, 1);
 	const int y = luaL_checkint(L, 2);
-	const float3 dir = camera->CalcPixelDir(x, y);
+	const float3 dir = CRenderViews::CalcCursorDir(camera, x, y);
 	lua_pushnumber(L, dir.x);
 	lua_pushnumber(L, dir.y);
 	lua_pushnumber(L, dir.z);
@@ -3665,6 +3668,32 @@ int LuaUnsyncedRead::GetGameSpeed(lua_State* L)
 	lua_pushnumber(L, gs->speedFactor);
 	lua_pushboolean(L, gs->paused);
 	return 3;
+}
+
+/*** Where the VR headset is in the game world, for placing panels (`Spring.XRSetPanel`).
+ *
+ * @function Spring.XRGetHeadPose
+ * @return number? x position in map coordinates (nil without a headset)
+ * @return number? y
+ * @return number? z
+ * @return number? dx direction the headset looks in (unit vector)
+ * @return number? dy
+ * @return number? dz
+ */
+int LuaUnsyncedRead::XRGetHeadPose(lua_State* L)
+{
+	float3 pos;
+	float3 dir;
+	if (!CXRPanels::GetInstance().GetHeadPose(pos, dir))
+		return 0;
+
+	lua_pushnumber(L, pos.x);
+	lua_pushnumber(L, pos.y);
+	lua_pushnumber(L, pos.z);
+	lua_pushnumber(L, dir.x);
+	lua_pushnumber(L, dir.y);
+	lua_pushnumber(L, dir.z);
+	return 6;
 }
 
 /***

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/RenderViews.h"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Env/ISky.h"
 #include "Rendering/Env/SunLighting.h"
@@ -273,7 +274,7 @@ void UniformConstants::UpdateParamsImpl(UniformParamsBuffer* updateBuffer)
 		const float badRange = rawRange - 300.0f;
 
 		const float3 camPos = camPlayer->GetPos();
-		const float3 pxlDir = camPlayer->CalcPixelDir(wx, wy);
+		const float3 pxlDir = CRenderViews::CalcCursorDir(camPlayer, wx, wy);
 
 		// trace for player's allyteam
 		const float traceDist = TraceRay::GuiTraceRay(camPos, pxlDir, rawRange, nullptr, unit, feature, true, false, true);

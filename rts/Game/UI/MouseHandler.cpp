@@ -22,6 +22,7 @@
 #include "Lua/LuaInputReceiver.h"
 #include "Map/Ground.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/RenderViews.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/RenderBuffers.h"
@@ -705,7 +706,7 @@ int2 CMouseHandler::GetViewMouseCenter() const
 	};
 }
 
-float3 CMouseHandler::GetCursorCameraDir(int x, int y) const { return (hideCursor? camera->GetDir() : camera->CalcPixelDir(x, y)); }
+float3 CMouseHandler::GetCursorCameraDir(int x, int y) const { return (hideCursor? camera->GetDir() : CRenderViews::CalcCursorDir(camera, x, y)); }
 float3 CMouseHandler::GetWorldMapPos() const
 {
 	const float3 cameraPos = camera->GetPos();

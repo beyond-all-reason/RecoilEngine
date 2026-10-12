@@ -122,12 +122,34 @@ public:
 	// then, since widgets assume the window is the render target
 	static bool InSecondaryView() { return inSecondaryView; }
 
+	// The direction of the ray under window pixel (x, y), for picking. With a
+	// headset, the window is a virtual screen floating in front of the face: its
+	// centre is where the head looks, and its height spans the XRPointerFov, so
+	// that the mouse moves a pointer through what is seen in the headset.
+	// Otherwise it is the camera's own pixel direction.
+	static float3 CalcCursorDir(const CCamera* cam, int x, int y);
+
+	// ends the headset frame begun in Update, after everything was drawn: the
+	// UI panels (see CXRPanels) are copied to the headset first
+	void EndXRFrame();
+
 private:
 	bool EnsureTarget(RenderView& view);
 	bool EnsureInset(RenderView& view);
 
 private:
 	inline static bool inSecondaryView = false;
+
+	// the pointer: the headset's axes in the world, and where the pointer ray
+	// meets the ground (updated per frame in Update)
+	inline static bool pointerActive = false;
+	inline static float3 pointerForward = FwdVector;
+	inline static float3 pointerUp = UpVector;
+	inline static float3 pointerRight = RgtVector;
+	inline static float pointerTanHalf = 0.5f;
+
+	bool reticleValid = false;
+	float3 reticlePos;
 
 	std::vector<RenderView> views;
 };

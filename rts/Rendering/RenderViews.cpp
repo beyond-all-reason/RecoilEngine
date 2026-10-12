@@ -10,6 +10,9 @@
 #include "Rendering/UniformConstants.h"
 #include "Rendering/WorldDrawer.h"
 #include "Rendering/Textures/Bitmap.h"
+#include "Game/UI/MouseHandler.h"
+#include "Map/Ground.h"
+#include "Rendering/XR/XRPanels.h"
 #include "Rendering/XR/XRSession.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/EventHandler.h"
@@ -61,6 +64,14 @@ CONFIG(int, XRResolutionScale)
 	.minimumValue(10)
 	.maximumValue(200)
 	.description("Per-eye render size in percent of the size the headset runtime recommends (read when the session starts).");
+CONFIG(bool, XRPointer)
+	.defaultValue(true)
+	.description("Headset: the mouse moves a pointer through the view of the headset (see XRPointerFov) instead of over the flat camera view, and a reticle shows where it hits the ground.");
+CONFIG(int, XRPointerFov)
+	.defaultValue(60)
+	.minimumValue(10)
+	.maximumValue(150)
+	.description("Headset: the vertical angle in degrees that the window's height covers for the mouse pointer.");
 CONFIG(bool, SecondaryViewDump)
 	.defaultValue(false)
 	.description("Saves the next rendered image of the secondary view to screenshots/mrt_view<N>.png, then resets itself to 0.");
@@ -137,6 +148,54 @@ namespace {
 		return base.GetRight() * v.x + base.GetUp() * v.y - base.GetForward() * v.z;
 	}
 
+	// a ring on the ground around the pointer, of a constant size as seen from the eye,
+	// drawn over everything with the (already loaded) matrices of the current view
+	void DrawReticle(const float3& pos, const float3& eyePos)
+	{
+		const float radius = std::max(4.0f, pos.distance(eyePos) * 0.012f);
+
+		GLint prevProgram = 0;
+		glGetIntegerv(GL_CURRENT_PROGRAM, &prevProgram);
+		glUseProgram(0);
+
+		glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_LINE_BIT | GL_CURRENT_BIT | GL_DEPTH_BUFFER_BIT);
+		glActiveTexture(GL_TEXTURE0);
+		glDisable(GL_TEXTURE_2D);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_CULL_FACE);
+		glDisable(GL_ALPHA_TEST);
+		glDisable(GL_FOG);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		const auto ring = [&](float r, float width, float cr, float cg, float cb) {
+			glLineWidth(width);
+			glColor4f(cr, cg, cb, 1.0f);
+			glBegin(GL_LINE_LOOP);
+			for (int i = 0; i < 48; ++i) {
+				const float a = float(i) * (math::TWOPI / 48.0f);
+				glVertex3f(pos.x + std::cos(a) * r, pos.y + 2.0f, pos.z + std::sin(a) * r);
+			}
+			glEnd();
+		};
+
+		ring(radius, 6.0f, 0.0f, 0.0f, 0.0f);
+		ring(radius, 3.0f, 1.0f, 1.0f, 1.0f);
+
+		// a mark in the middle, so that the exact point can be told
+		glLineWidth(3.0f);
+		glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+		glBegin(GL_LINES);
+			glVertex3f(pos.x - radius * 0.35f, pos.y + 2.0f, pos.z);
+			glVertex3f(pos.x + radius * 0.35f, pos.y + 2.0f, pos.z);
+			glVertex3f(pos.x, pos.y + 2.0f, pos.z - radius * 0.35f);
+			glVertex3f(pos.x, pos.y + 2.0f, pos.z + radius * 0.35f);
+		glEnd();
+
+		glPopAttrib();
+		glUseProgram(prevProgram);
+	}
+
 	void UploadPlayerCameraMatrices()
 	{
 		UniformConstants::GetInstance().UpdateMatrices();
@@ -145,9 +204,25 @@ namespace {
 }
 
 
+float3 CRenderViews::CalcCursorDir(const CCamera* cam, int x, int y)
+{
+	if (!pointerActive)
+		return cam->CalcPixelDir(x, y);
+
+	const int vsx = std::max(1, globalRendering->viewSizeX);
+	const int vsy = std::max(1, globalRendering->viewSizeY);
+
+	const float dx = float(x - globalRendering->viewPosX - (vsx >> 1)) / vsy * (pointerTanHalf * 2.0f);
+	const float dy = float(y - (vsy >> 1)) / vsy * (pointerTanHalf * 2.0f);
+
+	return (pointerForward - pointerUp * dy + pointerRight * dx).Normalize();
+}
+
+
 void CRenderViews::Kill()
 {
 	views.clear();
+	CXRPanels::GetInstance().Kill();
 }
 
 
@@ -229,6 +304,9 @@ void CRenderViews::Update()
 	RECOIL_DETAILED_TRACY_ZONE;
 	CXRSession& xr = CXRSession::GetInstance();
 	const bool xrWanted = configHandler->GetBool("XREnable");
+
+	pointerActive = false;
+	reticleValid = false;
 
 	if (!FBO::IsSupported() || !(xrWanted || configHandler->GetBool("SecondaryView"))) {
 		if (xr.IsCreated())
@@ -355,6 +433,30 @@ void CRenderViews::Update()
 		frusta.push_back(cam.GetFrustum());
 	}
 
+	if (xrWanted) {
+		CXRPanels& panels = CXRPanels::GetInstance();
+		panels.SetOrigin(player->GetPos(), player->GetRight(), player->GetUp(), player->GetForward(), float(configHandler->GetInt("XRWorldScale")));
+
+		float3 headPos;
+		if (xrFrame && configHandler->GetBool("XRPointer") && panels.GetHeadBasis(headPos, pointerForward, pointerUp, pointerRight)) {
+			const float fovDeg = float(configHandler->GetInt("XRPointerFov"));
+			pointerTanHalf = std::tan(0.5f * fovDeg * math::DEG_TO_RAD);
+			pointerActive = true;
+
+			// where the pointer meets the ground, for the reticle; like the picking, from the camera
+			if (mouse != nullptr && mouse->lastx >= 0 && mouse->lasty >= 0) {
+				const float3 dir = CalcCursorDir(player, mouse->lastx, mouse->lasty);
+				const float range = player->GetFarPlaneDist() * 1.4f;
+				const float dist = CGround::LineGroundCol(player->GetPos(), dir, range, false);
+
+				if (dist > 0.0f) {
+					reticlePos = player->GetPos() + dir * dist;
+					reticleValid = true;
+				}
+			}
+		}
+	}
+
 	// the camera updates loaded the views' matrices into the GL matrix stacks
 	CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER)->LoadMatrices();
 
@@ -367,13 +469,6 @@ void CRenderViews::DrawSecondaryViews(const CWorldDrawer& worldDrawer)
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (views.empty())
 		return;
-
-	// the headset frame begun in Update must always be ended, even when
-	// something below bails out
-	struct XRFrameEnd {
-		bool wanted;
-		~XRFrameEnd() { if (wanted) CXRSession::GetInstance().EndFrame(); }
-	} xrFrameEnd{views[0].xrDriven};
 
 	for (RenderView& view: views) {
 		if (!EnsureInset(view))
@@ -436,6 +531,11 @@ void CRenderViews::DrawSecondaryViews(const CWorldDrawer& worldDrawer)
 			CEventHandler::SetDrawCallinsSuppressed(false);
 			inSecondaryView = false;
 
+			if (view.xrDriven && reticleValid) {
+				slot->LoadMatrices();
+				DrawReticle(reticlePos, slot->GetPos());
+			}
+
 			if (configHandler->GetBool("SecondaryViewDump")) {
 				configHandler->Set("SecondaryViewDump", false);
 				DumpBoundTarget(view, &view - views.data());
@@ -461,9 +561,18 @@ void CRenderViews::DrawSecondaryViews(const CWorldDrawer& worldDrawer)
 		// same-size rects, so this is valid into a multisampled window framebuffer
 		const bool shown = FBO::Blit(view.inset->GetId(), FBO::GetDefaultTarget(), {0, 0, view.insetSizeX, view.insetSizeY}, {x0, y0, x1, y1}, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-		// TEMP-MRT-DEBUG
-		static int dbgFrames = 0;
-		if (dbgFrames++ < 3)
-			LOG("[MRT] view %dx%d blit=%d/%d err=0x%x", view.sizeX, view.sizeY, scaled, shown, glGetError());
+		(void) scaled;
+		(void) shown;
+	}
+}
+
+
+void CRenderViews::EndXRFrame()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	CXRSession& xr = CXRSession::GetInstance();
+	if (xr.IsCreated()) {
+		CXRPanels::GetInstance().Submit();
+		xr.EndFrame();
 	}
 }
