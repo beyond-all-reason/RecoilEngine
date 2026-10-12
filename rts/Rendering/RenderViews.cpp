@@ -59,6 +59,11 @@ CONFIG(int, XRWorldScale)
 	.defaultValue(200)
 	.minimumValue(1)
 	.description("Elmos per metre of headset movement; also the eye separation (an IPD of 0.063m gives 0.063 * this).");
+CONFIG(int, XRCursorSize)
+	.defaultValue(100)
+	.minimumValue(10)
+	.maximumValue(1000)
+	.description("Headset: size of the pointer's cursor image in percent (100 = 32 pixel cursor spans about 1.5 degrees of view).");
 CONFIG(int, XRResolutionScale)
 	.defaultValue(100)
 	.minimumValue(10)
@@ -548,7 +553,17 @@ void CRenderViews::DrawSecondaryViews(const CWorldDrawer& worldDrawer)
 
 			if (view.xrDriven && reticleValid) {
 				slot->LoadMatrices();
-				DrawReticle(reticlePos, slot->GetPos());
+				const CMouseCursor* cursor = (mouse != nullptr) ? mouse->GetActiveCursor() : nullptr;
+
+				if (cursor != nullptr) {
+					// the desktop's cursor image for the current command, turned to face the eye;
+					// at the default size 32 pixels span about 1.5 degrees of view
+					const float angle = configHandler->GetInt("XRCursorSize") * 0.01f * 0.0008f;
+					const float pixelSize = reticlePos.distance(slot->GetPos()) * angle * std::abs(mouse->GetCurrentCursorScale());
+					cursor->DrawInWorld(reticlePos, slot->GetRight(), slot->GetUp(), pixelSize);
+				} else {
+					DrawReticle(reticlePos, slot->GetPos());
+				}
 			}
 
 			if (configHandler->GetBool("SecondaryViewDump")) {
