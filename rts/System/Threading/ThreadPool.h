@@ -116,7 +116,7 @@ namespace ThreadPool {
 	void AddExtJob(std::future<void>&& f);
 	void ClearExtJobs();
 
-	void PushTaskGroup(ITaskGroup* taskGroup);
+	void PushTaskGroup(ITaskGroup* taskGroup, bool notify = true);
 	void PushTaskGroup(std::shared_ptr<ITaskGroup>&& taskGroup);
 	void WaitForFinished(std::shared_ptr<ITaskGroup>&& taskGroup);
 
@@ -794,9 +794,13 @@ static inline void for_mt(int start, int end, int step, F&& f)
 		// store the group in all worker queues s.t. each executes a slice
 		for (size_t i = 1; i < ThreadPool::GetNumThreads(); ++i) {
 			taskGroup->wantedThread.store(i);
-			ThreadPool::PushTaskGroup(taskGroup);
+			ThreadPool::PushTaskGroup(taskGroup.get(), false);
 		}
 		#endif
+
+		// wake whoever sleeps, once; a push only notifies when all workers sleep,
+		// which misses those that went to sleep while others were still busy
+		ThreadPool::NotifyWorkerThreads(true, false);
 
 		// make calling thread also run ExecuteLoop
 		ThreadPool::WaitForFinished(taskGroup);

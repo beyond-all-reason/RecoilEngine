@@ -53,9 +53,16 @@ void win_signal::wait()
 
 void win_signal::wait_for(spring_time t)
 {
+	const DWORD timeout_milliseconds = t.toMilliSecsi();
+
+	// a zero timeout only polls the event; notify_all can't reach this thread, so it is no sleeper
+	if (timeout_milliseconds == 0) {
+		WaitForSingleObject(event, 0);
+		return;
+	}
+
 	++sleepers;
 
-	const DWORD timeout_milliseconds = t.toMilliSecsi();
 	DWORD dwWaitResult;
 	do {
 		dwWaitResult = WaitForSingleObject(event, timeout_milliseconds);
