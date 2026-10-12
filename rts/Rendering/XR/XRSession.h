@@ -68,17 +68,21 @@ public:
 	// a frame was begun and the eyes are to be rendered
 	bool IsFrameActive() const;
 
-	// Flat panels (2D UI) drawn over the eyes by the compositor, one swapchain
-	// each, identified by name. The image is premultiplied RGBA; recreated when
-	// the size changes. Used between BeginFrame and EndFrame, like the eyes: the
-	// panels that had an image released this frame are submitted in EndFrame.
-	bool EnsurePanel(const std::string& id, int width, int height);
-	uint32_t AcquirePanelImage(const std::string& id);
-	void ReleasePanelImage(const std::string& id);
+	// Flat panels (2D UI) drawn over the eyes by the compositor, identified by name.
+	// They all share one swapchain image (an atlas of premultiplied RGBA), each one is
+	// a rectangle of it. Used between BeginFrame and EndFrame, like the eyes: acquire
+	// the atlas image once, draw the panels into their rectangles, release it; the
+	// panels set (SetPanel) since BeginFrame are submitted in EndFrame.
+	uint32_t AcquirePanelAtlas();
+	void ReleasePanelAtlas();
+	int GetPanelAtlasWidth() const;
+	int GetPanelAtlasHeight() const;
+	// The rectangle of the atlas (x, y from the lower left, as in OpenGL) that holds the
+	// panel, and its pose in metres: relative to the head (headLocked) or in the "local"
+	// space of the eyes; the panel faces +z of its own frame. The height follows the
+	// aspect of the rectangle.
+	void SetPanel(const std::string& id, int x, int y, int width, int height, bool headLocked, const float pos[3], const float rot[4], float widthMetres);
 	void RemovePanel(const std::string& id);
-	// Pose in metres: relative to the head (headLocked) or in the "local" space
-	// of the eyes; the panel faces +z of its own frame. The height follows the image aspect.
-	void SetPanelPlacement(const std::string& id, bool headLocked, const float pos[3], const float rot[4], float widthMetres);
 
 private:
 	CXRSession();

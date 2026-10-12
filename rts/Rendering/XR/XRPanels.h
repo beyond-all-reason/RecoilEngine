@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <string>
@@ -62,6 +63,12 @@ public:
 	bool GetHeadPose(float3& pos, float3& dir) const;
 	// the same with the axes of the headset (looking along forward) as well
 	bool GetHeadBasis(float3& pos, float3& forward, float3& up, float3& right) const;
+
+	// Where the pointer (see CRenderViews::CalcCursorDir) meets a head locked panel:
+	// u to the right and v up, both 0..1 over the panel. x, y are window pixels, with
+	// y from the top. False if it does not hit the panel.
+	bool HitTest(const std::string& id, int x, int y, float& u, float& v) const;
+	bool IsPointerOverPanel(int x, int y) const;
 
 	// at the end of the draw, before the headset frame ends
 	void Submit();

@@ -219,6 +219,20 @@ float3 CRenderViews::CalcCursorDir(const CCamera* cam, int x, int y)
 }
 
 
+bool CRenderViews::CalcCursorHeadOffset(int x, int y, float& offsetX, float& offsetY)
+{
+	if (!pointerActive)
+		return false;
+
+	const int vsx = std::max(1, globalRendering->viewSizeX);
+	const int vsy = std::max(1, globalRendering->viewSizeY);
+
+	offsetX =  float(x - globalRendering->viewPosX - (vsx >> 1)) / vsy * (pointerTanHalf * 2.0f);
+	offsetY = -float(y - (vsy >> 1)) / vsy * (pointerTanHalf * 2.0f);
+	return true;
+}
+
+
 void CRenderViews::Kill()
 {
 	views.clear();
@@ -449,7 +463,8 @@ void CRenderViews::Update()
 				const float range = player->GetFarPlaneDist() * 1.4f;
 				const float dist = CGround::LineGroundCol(player->GetPos(), dir, range, false);
 
-				if (dist > 0.0f) {
+				// no ground marker while pointing at a panel
+				if (dist > 0.0f && !CXRPanels::GetInstance().IsPointerOverPanel(mouse->lastx, mouse->lasty)) {
 					reticlePos = player->GetPos() + dir * dist;
 					reticleValid = true;
 				}

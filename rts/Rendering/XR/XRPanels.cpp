@@ -2,8 +2,14 @@
 
 #include "XRPanels.h"
 
+#include <algorithm>
 #include <cmath>
+#include <vector>
 
+#include "Rendering/RenderViews.h"
+#include "Rendering/Textures/Bitmap.h"
+#include "System/Config/ConfigHandler.h"
+#include "System/FileSystem/DataDirLocater.h"
 #include "Rendering/XR/XRSession.h"
 #include "System/Log/ILog.h"
 #include "System/Misc/TracyDefs.h"
@@ -57,6 +63,10 @@ namespace {
 
 void CXRPanels::Set(const std::string& id, const Panel& panel)
 {
+	const auto it = panels.find(id);
+	if (it == panels.end() || it->second.texture != panel.texture)
+		LOG("[XRPanels] panel '%s': texture %u (%dx%d), %s at %.2f %.2f %.2f, width %.2f", id.c_str(), panel.texture, panel.sizeX, panel.sizeY, panel.headLocked ? "head" : "world", panel.pos.x, panel.pos.y, panel.pos.z, panel.width);
+
 	panels[id] = panel;
 }
 
@@ -115,6 +125,42 @@ bool CXRPanels::GetHeadBasis(float3& pos, float3& forward, float3& up, float3& r
 	return true;
 }
 
+bool CXRPanels::HitTest(const std::string& id, int x, int y, float& u, float& v) const
+{
+	const auto it = panels.find(id);
+	if (it == panels.end())
+		return false;
+
+	const Panel& panel = it->second;
+	if (!panel.headLocked || !panel.visible || panel.sizeX <= 0 || panel.sizeY <= 0 || panel.pos.z <= 0.0f)
+		return false;
+
+	float offsetX = 0.0f;
+	float offsetY = 0.0f;
+	if (!CRenderViews::CalcCursorHeadOffset(x, y, offsetX, offsetY))
+		return false;
+
+	// the ray passes the panel's plane at distance pos.z
+	const float hitX = offsetX * panel.pos.z;
+	const float hitY = offsetY * panel.pos.z;
+	const float height = panel.width * float(panel.sizeY) / float(panel.sizeX);
+
+	u = (hitX - panel.pos.x) / panel.width + 0.5f;
+	v = (hitY - panel.pos.y) / height + 0.5f;
+	return (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f);
+}
+
+bool CXRPanels::IsPointerOverPanel(int x, int y) const
+{
+	float u, v;
+	for (const auto& [id, panel]: panels) {
+		if (HitTest(id, x, y, u, v))
+			return true;
+	}
+	return false;
+}
+
+
 void CXRPanels::LocatePanel(const Panel& panel, bool& headLocked, float pos[3], float rot[4], float& widthMetres) const
 {
 	headLocked = panel.headLocked;
@@ -172,6 +218,20 @@ void CXRPanels::LocatePanel(const Panel& panel, bool& headLocked, float pos[3], 
 	QuatFromAxes(xAxis, yAxis, normal, rot);
 }
 
+CONFIG(int, XRPanelDump).defaultValue(0).description("Set to 1 to save the images of the VR panels to the data directory, once");
+
+// saves the colour attachment of the bound framebuffer
+static void DumpBoundFramebuffer(const std::string& name, int width, int height)
+{
+	CBitmap bmp;
+	bmp.Alloc(width, height, 4);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, bmp.GetRawMem());
+
+	const std::string path = dataDirLocater.GetWriteDirPath() + name;
+	bmp.Save(path, false, true);
+}
+
 void CXRPanels::Submit()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -179,39 +239,94 @@ void CXRPanels::Submit()
 	if (panels.empty() || !xr.IsCreated() || !xr.IsFrameActive())
 		return;
 
+	const bool dumpWanted = (configHandler->GetInt("XRPanelDump") != 0);
+	if (dumpWanted)
+		configHandler->Set("XRPanelDump", 0);
+
+	// the panels go side by side in rows on the shared image
+	constexpr int PADDING = 2;
+	const int atlasWidth = xr.GetPanelAtlasWidth();
+	const int atlasHeight = xr.GetPanelAtlasHeight();
+
+	struct Placed {
+		const std::string* id;
+		const Panel* panel;
+		int x;
+		int y;
+	};
+	std::vector<Placed> placed;
+
+	int cursorX = 0;
+	int cursorY = 0;
+	int rowHeight = 0;
+
 	for (const auto& [id, panel]: panels) {
 		// the texture may have been freed by its widget
 		if (!panel.visible || panel.texture == 0 || !glIsTexture(panel.texture))
 			continue;
-		if (!xr.EnsurePanel(id, panel.sizeX, panel.sizeY))
+		if (panel.sizeX > atlasWidth || panel.sizeY > atlasHeight)
 			continue;
+
+		if (cursorX + panel.sizeX > atlasWidth) {
+			cursorX = 0;
+			cursorY += rowHeight + PADDING;
+			rowHeight = 0;
+		}
+		if (cursorY + panel.sizeY > atlasHeight)
+			continue;
+
+		placed.push_back({&id, &panel, cursorX, cursorY});
+		cursorX += panel.sizeX + PADDING;
+		rowHeight = std::max(rowHeight, panel.sizeY);
+	}
+
+	if (placed.empty())
+		return;
+
+	const GLuint image = xr.AcquirePanelAtlas();
+	if (image == 0)
+		return;
+
+	if (srcFbo == nullptr)
+		srcFbo = std::make_unique<FBO>();
+	if (dstFbo == nullptr)
+		dstFbo = std::make_unique<FBO>();
+
+	dstFbo->Bind();
+	dstFbo->AttachTexture(image, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0_EXT);
+	FBO::Unbind();
+
+	for (const Placed& p: placed) {
+		const Panel& panel = *p.panel;
 
 		bool headLocked = true;
 		float pos[3];
 		float rot[4];
 		float widthMetres = 1.0f;
 		LocatePanel(panel, headLocked, pos, rot, widthMetres);
-		xr.SetPanelPlacement(id, headLocked, pos, rot, widthMetres);
-
-		const GLuint image = xr.AcquirePanelImage(id);
-		if (image == 0)
-			continue;
-
-		if (srcFbo == nullptr)
-			srcFbo = std::make_unique<FBO>();
-		if (dstFbo == nullptr)
-			dstFbo = std::make_unique<FBO>();
+		xr.SetPanel(*p.id, p.x, p.y, panel.sizeX, panel.sizeY, headLocked, pos, rot, widthMetres);
 
 		srcFbo->Bind();
 		srcFbo->AttachTexture(panel.texture, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0_EXT);
-		dstFbo->Bind();
-		dstFbo->AttachTexture(image, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0_EXT);
 		FBO::Unbind();
 
-		FBO::Blit(srcFbo->GetId(), dstFbo->GetId(), {0, 0, panel.sizeX, panel.sizeY}, {0, 0, panel.sizeX, panel.sizeY}, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		FBO::Blit(srcFbo->GetId(), dstFbo->GetId(), {0, 0, panel.sizeX, panel.sizeY}, {p.x, p.y, p.x + panel.sizeX, p.y + panel.sizeY}, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-		// the compositor reads the image once released
-		glFlush();
-		xr.ReleasePanelImage(id);
+		if (dumpWanted) {
+			// what the widget drew, and what arrived in the headset image
+			srcFbo->Bind();
+			DumpBoundFramebuffer("xrpanel_" + *p.id + "_widget.png", panel.sizeX, panel.sizeY);
+			dstFbo->Bind();
+			CBitmap bmp;
+			bmp.Alloc(panel.sizeX, panel.sizeY, 4);
+			glPixelStorei(GL_PACK_ALIGNMENT, 1);
+			glReadPixels(p.x, p.y, panel.sizeX, panel.sizeY, GL_RGBA, GL_UNSIGNED_BYTE, bmp.GetRawMem());
+			bmp.Save(dataDirLocater.GetWriteDirPath() + "xrpanel_" + *p.id + "_headset.png", false, true);
+			FBO::Unbind();
+		}
 	}
+
+	// the compositor reads the image once released
+	glFinish();
+	xr.ReleasePanelAtlas();
 }

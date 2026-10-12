@@ -129,6 +129,11 @@ public:
 	// Otherwise it is the camera's own pixel direction.
 	static float3 CalcCursorDir(const CCamera* cam, int x, int y);
 
+	// The same pointer ray in the headset's own space, for hitting head locked
+	// panels: where it passes a plane one unit in front of the eyes (x right, y up).
+	// False when the pointer is not following the headset.
+	static bool CalcCursorHeadOffset(int x, int y, float& offsetX, float& offsetY);
+
 	// ends the headset frame begun in Update, after everything was drawn: the
 	// UI panels (see CXRPanels) are copied to the headset first
 	void EndXRFrame();

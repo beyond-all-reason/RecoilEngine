@@ -4610,10 +4610,10 @@ int LuaOpenGL::RenderToTexture(lua_State* L)
 	if ((tex == nullptr) || (tex->fbo == 0))
 		return 0;
 
+	// restore whatever was bound, not just in the shadow pass: this can be nested
+	// (a widget drawing into a texture calls one that renders into another)
 	GLint currentFBO = 0;
-	if (drawMode == DRAW_WORLD_SHADOW) {
-		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
-	}
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, tex->fbo);
 

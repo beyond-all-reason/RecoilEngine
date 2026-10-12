@@ -16,6 +16,7 @@
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/RenderViews.h"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Shaders/ShaderHandler.h"
@@ -563,6 +564,27 @@ void CBumpWater::UpdateWater(const CGame* game)
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
+
+	if (CRenderViews::InSecondaryView()) {
+		// the reflection and refraction textures are made from the window camera and are
+		// sampled by window pixel; an eye has another pose, projection and viewport, so
+		// they would be wrong and flicker. Show the sky color instead.
+		const auto& sky = ISky::GetSky();
+		glClearColor(sky->fogColor.x, sky->fogColor.y, sky->fogColor.z, 0.0f);
+		if (reflection > 0) {
+			reflectFBO.Bind();
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		}
+		if (refraction > 1) {
+			refractFBO.Bind();
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		}
+		if (reflection || refraction) {
+			FBO::Unbind();
+			globalRendering->LoadViewport();
+		}
+		return;
+	}
 
 	glPushAttrib(GL_FOG_BIT);
 	if (refraction > 1) DrawRefraction(game);

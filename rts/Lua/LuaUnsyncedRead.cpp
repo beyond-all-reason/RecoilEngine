@@ -243,6 +243,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetGameSpeed);
 	REGISTER_LUA_CFUNC(XRGetHeadPose);
 	REGISTER_LUA_CFUNC(XRInSecondaryView);
+	REGISTER_LUA_CFUNC(XRPanelHit);
 	REGISTER_LUA_CFUNC(GetGameState);
 
 	REGISTER_LUA_CFUNC(GetActiveCommand);
@@ -3669,6 +3670,37 @@ int LuaUnsyncedRead::GetGameSpeed(lua_State* L)
 	lua_pushnumber(L, gs->speedFactor);
 	lua_pushboolean(L, gs->paused);
 	return 3;
+}
+
+/*** Where the pointer hits a head locked VR panel (see `Spring.XRSetPanel`).
+ *
+ * The pointer is the mouse, mapped through the headset view (see the `XRPointer` config).
+ *
+ * @function Spring.XRPanelHit
+ * @param id string
+ * @param x number? mouse position as in `Spring.GetMouseState` (Default: the mouse)
+ * @param y number?
+ * @return number? u 0..1 from the left of the panel (nil if the pointer is not on the panel)
+ * @return number? v 0..1 from the bottom of the panel
+ */
+int LuaUnsyncedRead::XRPanelHit(lua_State* L)
+{
+	const std::string id = luaL_checkstring(L, 1);
+
+	int x = mouse->lastx;
+	int y = mouse->lasty;
+	if (lua_isnumber(L, 2) && lua_isnumber(L, 3)) {
+		x = lua_tointeger(L, 2) + globalRendering->viewPosX;
+		y = globalRendering->viewSizeY - 1 - lua_tointeger(L, 3);
+	}
+
+	float u, v;
+	if (!CXRPanels::GetInstance().HitTest(id, x, y, u, v))
+		return 0;
+
+	lua_pushnumber(L, u);
+	lua_pushnumber(L, v);
+	return 2;
 }
 
 /*** True while an extra view (e.g. a VR eye) is being drawn instead of the window.

@@ -53,7 +53,7 @@ struct CXRSession::Impl {
 
 	bool Start(int resolutionScalePercent);
 	bool CreateSwapchain(Eye& eye, int width, int height);
-	bool EnsurePanel(const std::string& id, int width, int height);
+	bool EnsurePanelAtlas();
 	void DestroyPanels();
 	void Stop();
 	bool PollEvents();
@@ -69,17 +69,23 @@ struct CXRSession::Impl {
 	XrSpace viewSpace = XR_NULL_HANDLE;
 	int64_t swapchainFormat = XR_GL_RGBA8;
 
-	// flat quads showing 2D UI, by name
+	// flat quads showing 2D UI, by name, all rectangles of one swapchain image
+	static constexpr int PANEL_ATLAS_WIDTH = 4096;
+	static constexpr int PANEL_ATLAS_HEIGHT = 2048;
+	Eye panelAtlas;
 	struct Panel {
-		Eye eye;
+		int x = 0;
+		int y = 0;
 		int width = 0;
 		int height = 0;
+		bool submitted = false;
 		bool headLocked = true;
 		float pos[3] = {0.0f, 0.0f, -1.5f};
 		float rot[4] = {0.0f, 0.0f, 0.0f, 1.0f};
 		float widthMetres = 1.5f;
 	};
 	std::map<std::string, Panel> panels;
+	std::map<std::string, std::string> reportedLayers;
 
 	XrSessionState state = XR_SESSION_STATE_UNKNOWN;
 
@@ -313,10 +319,10 @@ bool CXRSession::Impl::BeginFrame()
 		eye.imageAcquired = false;
 		eye.submitted = false;
 	}
-	for (auto& [id, panel]: panels) {
-		panel.eye.imageAcquired = false;
-		panel.eye.submitted = false;
-	}
+	panelAtlas.imageAcquired = false;
+	panelAtlas.submitted = false;
+	for (auto& [id, panel]: panels)
+		panel.submitted = false;
 
 	if (!frameState.shouldRender)
 		return false;
@@ -365,8 +371,7 @@ void CXRSession::Impl::EndFrame()
 
 	// the swapchain images may still be held if rendering was cut short
 	std::vector<Eye*> held = {&eyes[0], &eyes[1]};
-	for (auto& [id, panel]: panels)
-		held.push_back(&panel.eye);
+	held.push_back(&panelAtlas);
 
 	for (Eye* eye: held) {
 		if (eye->imageAcquired) {
@@ -398,15 +403,15 @@ void CXRSession::Impl::EndFrame()
 	std::vector<XrCompositionLayerQuad> quads;
 	quads.reserve(panels.size());
 	for (const auto& [id, panel]: panels) {
-		if (!panel.eye.submitted || panel.eye.swapchain == XR_NULL_HANDLE)
+		if (!panel.submitted || !panelAtlas.submitted || panelAtlas.swapchain == XR_NULL_HANDLE)
 			continue;
 
 		XrCompositionLayerQuad quad{XR_TYPE_COMPOSITION_LAYER_QUAD};
 		quad.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
 		quad.space = panel.headLocked ? viewSpace : space;
 		quad.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
-		quad.subImage.swapchain = panel.eye.swapchain;
-		quad.subImage.imageRect.offset = {0, 0};
+		quad.subImage.swapchain = panelAtlas.swapchain;
+		quad.subImage.imageRect.offset = {panel.x, panel.y};
 		quad.subImage.imageRect.extent = {panel.width, panel.height};
 		quad.subImage.imageArrayIndex = 0;
 		quad.pose.position = {panel.pos[0], panel.pos[1], panel.pos[2]};
@@ -414,6 +419,14 @@ void CXRSession::Impl::EndFrame()
 		quad.size.width = panel.widthMetres;
 		quad.size.height = panel.widthMetres * float(panel.height) / float(panel.width);
 		quads.push_back(quad);
+
+		// the placement of every layer, logged when it changes
+		char placement[160];
+		snprintf(placement, sizeof(placement), "%llx %s %.2f %.2f %.2f w %.2f %dx%d at %d %d", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(panelAtlas.swapchain)), panel.headLocked ? "head" : "world", panel.pos[0], panel.pos[1], panel.pos[2], panel.widthMetres, panel.width, panel.height, panel.x, panel.y);
+		if (reportedLayers[id] != placement) {
+			reportedLayers[id] = placement;
+			LOG("[XRSession] layer '%s': swapchain %s", id.c_str(), placement);
+		}
 	}
 
 	std::vector<const XrCompositionLayerBaseHeader*> layers;
@@ -431,38 +444,30 @@ void CXRSession::Impl::EndFrame()
 		lost = true;
 }
 
-bool CXRSession::Impl::EnsurePanel(const std::string& id, int width, int height)
+bool CXRSession::Impl::EnsurePanelAtlas()
 {
-	if (session == XR_NULL_HANDLE || width <= 0 || height <= 0)
+	if (session == XR_NULL_HANDLE)
 		return false;
-
-	Panel& panel = panels[id];
-	if (panel.eye.swapchain != XR_NULL_HANDLE && panel.width == width && panel.height == height)
+	if (panelAtlas.swapchain != XR_NULL_HANDLE)
 		return true;
 
-	if (panel.eye.swapchain != XR_NULL_HANDLE)
-		xrDestroySwapchain(panel.eye.swapchain);
-	panel.eye = Eye{};
-	panel.width = 0;
-	panel.height = 0;
-
-	if (!CreateSwapchain(panel.eye, width, height)) {
-		if (panel.eye.swapchain != XR_NULL_HANDLE)
-			xrDestroySwapchain(panel.eye.swapchain);
-		panels.erase(id);
+	if (!CreateSwapchain(panelAtlas, PANEL_ATLAS_WIDTH, PANEL_ATLAS_HEIGHT)) {
+		LOG_L(L_ERROR, "[XRSession] could not create the panel swapchain (%dx%d)", PANEL_ATLAS_WIDTH, PANEL_ATLAS_HEIGHT);
+		if (panelAtlas.swapchain != XR_NULL_HANDLE)
+			xrDestroySwapchain(panelAtlas.swapchain);
+		panelAtlas = Eye{};
 		return false;
 	}
-	panel.width = width;
-	panel.height = height;
+
+	LOG("[XRSession] panel swapchain: %dx%d", PANEL_ATLAS_WIDTH, PANEL_ATLAS_HEIGHT);
 	return true;
 }
 
 void CXRSession::Impl::DestroyPanels()
 {
-	for (auto& [id, panel]: panels) {
-		if (panel.eye.swapchain != XR_NULL_HANDLE)
-			xrDestroySwapchain(panel.eye.swapchain);
-	}
+	if (panelAtlas.swapchain != XR_NULL_HANDLE)
+		xrDestroySwapchain(panelAtlas.swapchain);
+	panelAtlas = Eye{};
 	panels.clear();
 }
 
@@ -517,38 +522,32 @@ const XREye& CXRSession::GetEye(int eye) const { return impl->eyePoses[eye]; }
 uint32_t CXRSession::AcquireEyeImage(int eye) { return impl->AcquireImage(impl->eyes[eye]); }
 void CXRSession::ReleaseEyeImage(int eye) { impl->ReleaseImage(impl->eyes[eye]); }
 bool CXRSession::IsFrameActive() const { return impl->frameBegun && impl->shouldRender; }
-bool CXRSession::EnsurePanel(const std::string& id, int width, int height) { return impl->EnsurePanel(id, width, height); }
-
-uint32_t CXRSession::AcquirePanelImage(const std::string& id)
+uint32_t CXRSession::AcquirePanelAtlas()
 {
-	const auto it = impl->panels.find(id);
-	return (it == impl->panels.end()) ? 0 : impl->AcquireImage(it->second.eye);
+	return impl->EnsurePanelAtlas() ? impl->AcquireImage(impl->panelAtlas) : 0;
 }
 
-void CXRSession::ReleasePanelImage(const std::string& id)
+void CXRSession::ReleasePanelAtlas()
 {
-	const auto it = impl->panels.find(id);
-	if (it != impl->panels.end())
-		impl->ReleaseImage(it->second.eye);
+	impl->ReleaseImage(impl->panelAtlas);
 }
+
+int CXRSession::GetPanelAtlasWidth() const { return Impl::PANEL_ATLAS_WIDTH; }
+int CXRSession::GetPanelAtlasHeight() const { return Impl::PANEL_ATLAS_HEIGHT; }
 
 void CXRSession::RemovePanel(const std::string& id)
 {
-	const auto it = impl->panels.find(id);
-	if (it == impl->panels.end())
-		return;
-	if (it->second.eye.swapchain != XR_NULL_HANDLE)
-		xrDestroySwapchain(it->second.eye.swapchain);
-	impl->panels.erase(it);
+	impl->panels.erase(id);
 }
 
-void CXRSession::SetPanelPlacement(const std::string& id, bool headLocked, const float pos[3], const float rot[4], float widthMetres)
+void CXRSession::SetPanel(const std::string& id, int x, int y, int width, int height, bool headLocked, const float pos[3], const float rot[4], float widthMetres)
 {
-	const auto it = impl->panels.find(id);
-	if (it == impl->panels.end())
-		return;
-
-	Impl::Panel& panel = it->second;
+	Impl::Panel& panel = impl->panels[id];
+	panel.x = x;
+	panel.y = y;
+	panel.width = width;
+	panel.height = height;
+	panel.submitted = true;
 	panel.headLocked = headLocked;
 	std::copy(pos, pos + 3, panel.pos);
 	std::copy(rot, rot + 4, panel.rot);
@@ -573,11 +572,12 @@ void CXRSession::Stop() {}
 bool CXRSession::IsCreated() const { return false; }
 bool CXRSession::IsLost() const { return false; }
 bool CXRSession::IsFrameActive() const { return false; }
-bool CXRSession::EnsurePanel(const std::string&, int, int) { return false; }
-uint32_t CXRSession::AcquirePanelImage(const std::string&) { return 0; }
-void CXRSession::ReleasePanelImage(const std::string&) {}
+uint32_t CXRSession::AcquirePanelAtlas() { return 0; }
+void CXRSession::ReleasePanelAtlas() {}
+int CXRSession::GetPanelAtlasWidth() const { return 0; }
+int CXRSession::GetPanelAtlasHeight() const { return 0; }
 void CXRSession::RemovePanel(const std::string&) {}
-void CXRSession::SetPanelPlacement(const std::string&, bool, const float[3], const float[4], float) {}
+void CXRSession::SetPanel(const std::string&, int, int, int, int, bool, const float[3], const float[4], float) {}
 bool CXRSession::BeginFrame() { return false; }
 void CXRSession::EndFrame() {}
 int CXRSession::GetEyeWidth() const { return 0; }
