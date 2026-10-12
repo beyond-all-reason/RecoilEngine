@@ -13,7 +13,7 @@ add_dependencies(Game generateVersionFiles)
 target_include_directories(Game PRIVATE "${CMAKE_BINARY_DIR}/src-generated/engine")
 target_link_libraries(Game PRIVATE
 	 Tracy::TracyClient
-	 SDL2::SDL2
+	 SDL3::SDL3
 	 RmlUi::RmlUi
 	 ${sound-impl}
 	 prd::jsoncpp
@@ -22,13 +22,13 @@ target_link_libraries(Game PRIVATE
 )
 
 ### Assemble libraries
-find_package(SDL2 MODULE REQUIRED)
+find_package(SDL3 REQUIRED CONFIG)
 
 
 
 
 
-set(engineLibraries SDL2::SDL2)
+set(engineLibraries SDL3::SDL3)
 
 set(OpenGL_GL_PREFERENCE LEGACY)
 find_package_static(OpenGL 3.0 REQUIRED)
