@@ -330,6 +330,7 @@ public:
 	bool supportClipSpaceControl;
 	bool supportSeamlessCubeMaps;
 	bool supportFragDepthLayout;
+	bool supportGeometryShaders;
 
 	/**
 	 * @brief whether glPolygonMode(*, GL_LINE) actually rasterizes outlines

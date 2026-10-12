@@ -196,6 +196,7 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(supportSeamlessCubeMaps),
 	CR_IGNORED(supportFragDepthLayout),
 	CR_IGNORED(supportPolygonModeLine),
+	CR_IGNORED(supportGeometryShaders),
 	CR_IGNORED(haveGL4),
 	CR_IGNORED(glslMaxVaryings),
 	CR_IGNORED(glslMaxAttributes),
@@ -327,6 +328,7 @@ CGlobalRendering::CGlobalRendering()
 	, supportSeamlessCubeMaps(false)
 	, supportFragDepthLayout(false)
 	, supportPolygonModeLine(true)
+	, supportGeometryShaders(true)
 	, haveGL4(false)
 
 	, glslMaxVaryings(0)
@@ -967,6 +969,9 @@ void CGlobalRendering::SetGLSupportFlags()
 	//supportFragDepthLayout = ((globalRenderingInfo.glContextVersion.x * 10 + globalRenderingInfo.glContextVersion.y) >= 42);
 	supportFragDepthLayout = GLAD_GL_ARB_conservative_depth; //stick to the theory that reported = exist
 
+	// KosmicKrisp has no geometryShader feature, Zink still exposes the stage
+	supportGeometryShaders = (glRenderer.find("kosmickrisp") == std::string::npos);
+
 	//stick to the theory that reported = exist
 	//supportMSAAFrameBuffer &= ((globalRenderingInfo.glContextVersion.x * 10 + globalRenderingInfo.glContextVersion.y) >= 32);
 
@@ -1101,6 +1106,7 @@ void CGlobalRendering::LogVersionInfo(const char* sdlVersionStr, const char* glV
 	LOG("\tseamless cube-map support : %i (%i)", supportSeamlessCubeMaps, IsExtensionSupported("GL_ARB_seamless_cube_map"));
 	LOG("\tfrag-depth layout support : %i (%i)", supportFragDepthLayout, IsExtensionSupported("GL_ARB_conservative_depth"));
 	LOG("\twireframe polygon mode    : %i (-)" , supportPolygonModeLine);
+	LOG("\tgeometry shader support   : %i (-)" , supportGeometryShaders);
 	LOG("\tpersistent maps support   : %i (%i)", supportPersistentMapping, IsExtensionSupported("GL_ARB_buffer_storage"));
 	LOG("\texplicit attribs location : %i (%i)", supportExplicitAttribLoc, IsExtensionSupported("GL_ARB_explicit_attrib_location"));
 	LOG("\tmulti draw indirect       : %i (-)" , IsExtensionSupported("GL_ARB_multi_draw_indirect"));
