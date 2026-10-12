@@ -120,10 +120,10 @@ void CRadarTexture::Update()
 	const auto& myJammer = losHandler->jammer.losMaps[jammerAllyTeam].GetLosMap();
 
 	auto binding1 = uploadTexRadar.ScopedBind(1);
-	uploadTexRadar.UploadImage(myRadar.data());
+	UploadThroughPBO(uploadTexRadar, uploadPBORadar, myRadar.data(), myRadar.size() * sizeof(myRadar[0]));
 
 	auto binding0 = uploadTexJammer.ScopedBind(0);
-	uploadTexJammer.UploadImage(myJammer.data());
+	UploadThroughPBO(uploadTexJammer, uploadPBOJammer, myJammer.data(), myJammer.size() * sizeof(myJammer[0]));
 
 	// do post-processing on the gpu (los-checking & scaling)
 	using namespace GL::State;

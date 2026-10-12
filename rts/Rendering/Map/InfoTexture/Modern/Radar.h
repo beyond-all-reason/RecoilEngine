@@ -25,6 +25,8 @@ public:
 private:
 	GL::Texture2D uploadTexRadar;
 	GL::Texture2D uploadTexJammer;
+	PBO uploadPBORadar;
+	PBO uploadPBOJammer;
 };
 
 #endif // _RADAR_TEXTURE_H
