@@ -32,6 +32,13 @@ struct RenderView {
 	GLuint depthTex = 0;
 	std::unique_ptr<FBO> target;
 
+	// views that are skipped this frame (e.g. the headset asks for no rendering)
+	bool active = true;
+	// the colour image comes from an OpenXR swapchain each frame, the
+	// own colorTex is then only a placeholder keeping the target complete
+	bool xrDriven = false;
+	GLuint externalColorTex = 0;
+
 	// downscaled copy of the target for showing it in the window: blitting
 	// with scaling into the (possibly multisampled) window framebuffer is
 	// not allowed
@@ -50,6 +57,9 @@ struct RenderView {
 			viewCam = o.viewCam;
 			sizeX = o.sizeX;
 			sizeY = o.sizeY;
+			active = o.active;
+			xrDriven = o.xrDriven;
+			externalColorTex = o.externalColorTex;
 			colorTex = std::exchange(o.colorTex, 0);
 			depthTex = std::exchange(o.depthTex, 0);
 			target = std::move(o.target);

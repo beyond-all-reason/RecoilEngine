@@ -10,6 +10,7 @@
 #include "Rendering/UniformConstants.h"
 #include "Rendering/WorldDrawer.h"
 #include "Rendering/Textures/Bitmap.h"
+#include "Rendering/XR/XRSession.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/EventHandler.h"
 #include "System/Log/ILog.h"
@@ -48,6 +49,18 @@ CONFIG(bool, SecondaryViewStereo)
 CONFIG(int, SecondaryViewEyeSeparation)
 	.defaultValue(16)
 	.description("Distance in elmos between the two eyes in stereo mode.");
+CONFIG(bool, XREnable)
+	.defaultValue(false)
+	.description("Render the world to an OpenXR headset (both eyes, runtime frame pacing); the eye views are also shown as insets. Turn the window's VSync off, the headset paces the frames.");
+CONFIG(int, XRWorldScale)
+	.defaultValue(200)
+	.minimumValue(1)
+	.description("Elmos per metre of headset movement; also the eye separation (an IPD of 0.063m gives 0.063 * this).");
+CONFIG(int, XRResolutionScale)
+	.defaultValue(100)
+	.minimumValue(10)
+	.maximumValue(200)
+	.description("Per-eye render size in percent of the size the headset runtime recommends (read when the session starts).");
 CONFIG(bool, SecondaryViewDump)
 	.defaultValue(false)
 	.description("Saves the next rendered image of the secondary view to screenshots/mrt_view<N>.png, then resets itself to 0.");
@@ -107,6 +120,21 @@ namespace {
 		CBitmap bmp(pixels.data(), view.sizeX, view.sizeY);
 		bmp.ReverseYAxis();
 		bmp.Save("screenshots/mrt_view" + std::to_string(viewIdx) + ".png", true, true);
+	}
+
+	// v rotated by the unit quaternion q (x y z w)
+	float3 RotateByQuat(const float q[4], const float3& v)
+	{
+		const float3 qv(q[0], q[1], q[2]);
+		const float3 t = qv.cross(v) * 2.0f;
+		return v + t * q[3] + qv.cross(t);
+	}
+
+	// maps a vector from headset space (+x right, +y up, -z forward) onto the
+	// axes of the given camera
+	float3 XRVectorToWorld(const CCamera& base, const float3& v)
+	{
+		return base.GetRight() * v.x + base.GetUp() * v.y - base.GetForward() * v.z;
 	}
 
 	void UploadPlayerCameraMatrices()
@@ -199,7 +227,12 @@ bool CRenderViews::EnsureInset(RenderView& view)
 void CRenderViews::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!FBO::IsSupported() || !configHandler->GetBool("SecondaryView")) {
+	CXRSession& xr = CXRSession::GetInstance();
+	const bool xrWanted = configHandler->GetBool("XREnable");
+
+	if (!FBO::IsSupported() || !(xrWanted || configHandler->GetBool("SecondaryView"))) {
+		if (xr.IsCreated())
+			xr.Stop();
 		if (!views.empty())
 			Kill();
 
@@ -207,20 +240,49 @@ void CRenderViews::Update()
 		return;
 	}
 
+	// the headset: the session is started on demand and dropped again when
+	// it is lost or the user turns the option off
+	bool xrFrame = false;
+	if (xrWanted) {
+		if (!xr.IsCreated() && !xr.Start(configHandler->GetInt("XRResolutionScale"))) {
+			configHandler->Set("XREnable", false);
+			return;
+		}
+		if (xr.IsLost()) {
+			LOG("[RenderViews::%s] the OpenXR session ended, disabling XREnable", __func__);
+			xr.Stop();
+			configHandler->Set("XREnable", false);
+			return;
+		}
+		// blocks until the runtime wants the next frame
+		xrFrame = xr.BeginFrame();
+	} else if (xr.IsCreated()) {
+		xr.Stop();
+		Kill();
+	}
+
 	const CCamera* player = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
 
-	const int scale = std::clamp(configHandler->GetInt("SecondaryViewScale"), 10, 200);
-	// an explicit size (a headset's recommended render size) wins over the scale
-	const int fixedX = configHandler->GetInt("SecondaryViewWidth");
-	const int fixedY = configHandler->GetInt("SecondaryViewHeight");
-	const bool useFixed = (fixedX > 0 && fixedY > 0);
-	const int sizeX = useFixed ? std::clamp(fixedX, 16, 8192) : std::max(16, globalRendering->viewSizeX * scale / 100);
-	const int sizeY = useFixed ? std::clamp(fixedY, 16, 8192) : std::max(16, globalRendering->viewSizeY * scale / 100);
+	int sizeX = 0;
+	int sizeY = 0;
+
+	if (xrWanted) {
+		sizeX = xr.GetEyeWidth();
+		sizeY = xr.GetEyeHeight();
+	} else {
+		const int scale = std::clamp(configHandler->GetInt("SecondaryViewScale"), 10, 200);
+		// an explicit size (a headset's recommended render size) wins over the scale
+		const int fixedX = configHandler->GetInt("SecondaryViewWidth");
+		const int fixedY = configHandler->GetInt("SecondaryViewHeight");
+		const bool useFixed = (fixedX > 0 && fixedY > 0);
+		sizeX = useFixed ? std::clamp(fixedX, 16, 8192) : std::max(16, globalRendering->viewSizeX * scale / 100);
+		sizeY = useFixed ? std::clamp(fixedY, 16, 8192) : std::max(16, globalRendering->viewSizeY * scale / 100);
+	}
 
 	// stereo: a left and a right eye looking where the player camera looks,
 	// each offset sideways by half the eye separation and with its frustum
 	// shifted inward; otherwise one free-standing view
-	const bool stereo = configHandler->GetBool("SecondaryViewStereo");
+	const bool stereo = xrWanted || configHandler->GetBool("SecondaryViewStereo");
 	views.resize(stereo ? 2 : 1);
 
 	const float aspect = float(sizeX) / float(sizeY);
@@ -232,11 +294,18 @@ void CRenderViews::Update()
 	for (size_t i = 0; i < views.size(); ++i) {
 		RenderView& view = views[i];
 
+		view.xrDriven = xrWanted;
+		view.active = !xrWanted || xrFrame;
+		view.externalColorTex = 0;
+
 		if (view.sizeX != sizeX || view.sizeY != sizeY) {
 			view.FreeTarget();
 			view.sizeX = sizeX;
 			view.sizeY = sizeY;
 		}
+
+		if (!view.active)
+			continue;
 
 		// the view's camera: the player camera turned by a yaw offset and moved
 		// sideways, with its own (shifted, hence asymmetric) frustum
@@ -244,24 +313,38 @@ void CRenderViews::Update()
 		cam = *player;
 		cam.SetCamType(CCamera::CAMTYPE_VISCUL);
 
-		float3 rot = player->GetRot();
-		float sideOffset = float(configHandler->GetInt("SecondaryViewOffset"));
-		float lensShift = shift;
+		if (xrWanted) {
+			// the headset's pose is relative to its starting position, which is
+			// put at the player camera, turned the way the player camera looks
+			const XREye& eye = xr.GetEye(int(i));
+			const float worldScale = float(configHandler->GetInt("XRWorldScale"));
 
-		if (stereo) {
-			const float eyeSign = (i == 0) ? -1.0f : 1.0f;
-			sideOffset = eyeSign * 0.5f * float(configHandler->GetInt("SecondaryViewEyeSeparation"));
-			lensShift = -eyeSign * shift;
+			const float3 headPos = XRVectorToWorld(*player, float3(eye.pos[0], eye.pos[1], eye.pos[2]));
+			const float3 eyeFwd = XRVectorToWorld(*player, RotateByQuat(eye.rot, float3(0.0f, 0.0f, -1.0f)));
+			const float3 eyeUp = XRVectorToWorld(*player, RotateByQuat(eye.rot, float3(0.0f, 1.0f, 0.0f)));
+
+			cam.SetExternalPose(player->GetPos() + headPos * worldScale, eyeFwd, eyeUp);
+			cam.SetFrustumTangents(eye.tanLeft, eye.tanRight, eye.tanBottom, eye.tanTop);
 		} else {
-			rot.y += configHandler->GetInt("SecondaryViewYaw") * math::DEG_TO_RAD;
+			float3 rot = player->GetRot();
+			float sideOffset = float(configHandler->GetInt("SecondaryViewOffset"));
+			float lensShift = shift;
+
+			if (stereo) {
+				const float eyeSign = (i == 0) ? -1.0f : 1.0f;
+				sideOffset = eyeSign * 0.5f * float(configHandler->GetInt("SecondaryViewEyeSeparation"));
+				lensShift = -eyeSign * shift;
+			} else {
+				rot.y += configHandler->GetInt("SecondaryViewYaw") * math::DEG_TO_RAD;
+			}
+
+			const float3 fwd = CCamera::GetFwdFromRot(rot);
+			const float3 rgt = CCamera::GetRgtFromRot(rot);
+			const float3 upv = rgt.cross(fwd);
+
+			cam.SetExternalPose(player->GetPos() + rgt * sideOffset, fwd, upv);
+			cam.SetFrustumTangents(-tanV * aspect + lensShift, tanV * aspect + lensShift, -tanV, tanV);
 		}
-
-		const float3 fwd = CCamera::GetFwdFromRot(rot);
-		const float3 rgt = CCamera::GetRgtFromRot(rot);
-		const float3 upv = rgt.cross(fwd);
-
-		cam.SetExternalPose(player->GetPos() + rgt * sideOffset, fwd, upv);
-		cam.SetFrustumTangents(-tanV * aspect + lensShift, tanV * aspect + lensShift, -tanV, tanV);
 
 		{
 			ViewSizeScope sizeScope(sizeX, sizeY);
@@ -285,6 +368,13 @@ void CRenderViews::DrawSecondaryViews(const CWorldDrawer& worldDrawer)
 	if (views.empty())
 		return;
 
+	// the headset frame begun in Update must always be ended, even when
+	// something below bails out
+	struct XRFrameEnd {
+		bool wanted;
+		~XRFrameEnd() { if (wanted) CXRSession::GetInstance().EndFrame(); }
+	} xrFrameEnd{views[0].xrDriven};
+
 	for (RenderView& view: views) {
 		if (!EnsureInset(view))
 			return;
@@ -302,13 +392,28 @@ void CRenderViews::DrawSecondaryViews(const CWorldDrawer& worldDrawer)
 	int nextX = globalRendering->viewPosX + globalRendering->viewSizeX - rowWidth;
 
 	for (RenderView& view: views) {
-		if (!EnsureTarget(view))
-			return;
-
 		const int x0 = nextX;
 		const int x1 = x0 + view.insetSizeX;
 		const int y0 = y1 - view.insetSizeY;
 		nextX = x1;
+
+		if (!view.active)
+			continue;
+
+		if (!EnsureTarget(view))
+			return;
+
+		const int viewIdx = int(&view - views.data());
+
+		if (view.xrDriven) {
+			view.externalColorTex = CXRSession::GetInstance().AcquireEyeImage(viewIdx);
+			if (view.externalColorTex == 0)
+				continue;
+
+			view.target->Bind();
+			view.target->AttachTexture(view.externalColorTex, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0_EXT);
+			FBO::Unbind();
+		}
 
 		{
 			ViewSizeScope sizeScope(view.sizeX, view.sizeY);
@@ -338,6 +443,12 @@ void CRenderViews::DrawSecondaryViews(const CWorldDrawer& worldDrawer)
 
 			FBO::SetDefaultTarget(prevTarget);
 			FBO::Unbind();
+		}
+
+		if (view.xrDriven) {
+			// the compositor reads the image once released
+			glFlush();
+			CXRSession::GetInstance().ReleaseEyeImage(viewIdx);
 		}
 
 		// back to the primary camera for the remaining passes of this frame
