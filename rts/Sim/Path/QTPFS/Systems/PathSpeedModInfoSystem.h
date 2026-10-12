@@ -9,6 +9,7 @@ class PathSpeedModInfoSystem {
 public:
     static void Init();
     static void Update();
+    static void StartNextScan();
     static void Shutdown();
 };
 
