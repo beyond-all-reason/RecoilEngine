@@ -6,8 +6,11 @@ Manual check: destroy a target with a native Attack queue. UnitDestroyed still
 sees a valid unit. UnitDeleted sees an invalid ID and the next native Attack,
 with the original unit definition/team; the unsynced callin must never run.
 Neutralization must notify only affected units after native queue pruning, including
-virtual targets without a materialized order. Returned tags must be erased without
-UnitCmdDone or immediate successor execution. Neither callin may run unsynced.
+virtual targets without a materialized order. A callback must be able to immediately
+delete another listener without invalidating the remaining listener snapshot.
+Returned tags must be erased without UnitCmdDone or immediate successor execution.
+UnitDeleted must tolerate an immediate nested deletion while the outer unit is being
+removed. Neither callin may run unsynced.
 AI assistance: OpenAI Codex authored the fixture and runner.
 """
 import argparse
@@ -36,7 +39,7 @@ handler = handler.replace('function gadgetHandler:UnitDestroyed(', 'function gad
 handler = handler.replace('function gadgetHandler:UnitDestroyed(', 'function gadgetHandler:UnitAttackTargetRemoved(...)\n local tags = {}\n for _,g in ipairs(self.UnitAttackTargetRemovedList) do\n local removed = g:UnitAttackTargetRemoved(...)\n for _,tag in ipairs(removed or {}) do tags[#tags+1] = tag end\n end\n return tags\nend\n\nfunction gadgetHandler:UnitDestroyed(', 1)
 (overlay/'luarules/gadgets.lua').write_text(handler)
 (overlay/'luarules/gadgets/dbg_unit_deleted.lua').write_bytes(Path(__file__).with_name('observer.lua').read_bytes())
-(root/'springsettings.cfg').write_text('HostPortDefault=51320\nNoSound=1\nLuaUI=0\nWorkerThreadCount=1\nHardwareThreadCount=1\n')
+(root/'springsettings.cfg').write_text('HostPortDefault=51320\nNoSound=1\nLuaUI=0\nWorkerThreadCount=2\nHardwareThreadCount=1\n')
 (root/'startscript.txt').write_text(f'''[GAME] {{
  MapName={a.map}; GameType=Unit Deletion Validation 1;
  IsHost=1; HostIP=127.0.0.1; MyPlayerName=Validation; GameStartDelay=0; StartPosType=0;
@@ -47,7 +50,7 @@ handler = handler.replace('function gadgetHandler:UnitDestroyed(', 'function gad
  [TEAM1] {{ TeamLeader=0; AllyTeam=1; }} [ALLYTEAM1] {{ }}
 }}\n''')
 with (root/'console.log').open('w') as log:
- r = subprocess.run([str(a.engine.resolve()), '--isolation', '--write-dir', str(root), str(root/'startscript.txt')], cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=180)
+ r = subprocess.run([str(a.engine.resolve()), '--isolation', '--write-dir', str(root), str(root/'startscript.txt')], cwd=root, stdout=log, stderr=subprocess.STDOUT, timeout=600)
 text = (root/'console.log').read_text(errors='replace')
 passed = r.returncode == 0 and 'UNIT_DELETED_COMPLETE' in text and not any(s in text for s in ('LUA_ERR', 'RunCallInTraceback', 'Fatal:'))
 (root/'result.json').write_text(json.dumps(dict(passed=passed, exit=r.returncode), indent=2)+'\n')

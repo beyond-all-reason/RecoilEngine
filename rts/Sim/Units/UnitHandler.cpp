@@ -278,8 +278,13 @@ void CUnitHandler::DeleteUnits()
 {
 	ZoneScopedC(tracy::Color::Goldenrod);
 	while (!unitsToBeRemoved.empty()) {
-		DeleteUnit(unitsToBeRemoved.back());
+		// DeleteUnit may run synced Lua (UnitDeleted) which is allowed to
+		// trigger another immediate deletion, so do not leave this entry
+		// in the queue while the callin is active
+		CUnit* delUnit = unitsToBeRemoved.back();
+
 		unitsToBeRemoved.pop_back();
+		DeleteUnit(delUnit);
 	}
 }
 
