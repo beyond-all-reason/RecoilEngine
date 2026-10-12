@@ -15,6 +15,7 @@
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/glxHandler.h"
+#include "Rendering/GL/MacEGLBridge.h"
 #include "Rendering/UniformConstants.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/Models/ModelsMemStorage.h"
@@ -447,6 +448,12 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 	         sdlFlags |= GetFullScreenFlag(borderless_) * fullScreen_;
 	         sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
 
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	// the GL context lives offscreen (Mesa EGL), the window is only presented to
+	if (MacEGLBridge::Wanted())
+		sdlFlags &= ~SDL_WINDOW_OPENGL;
+#endif
+
 	for (size_t i = 0; i < (aaLvls.size()) && (newWindow == nullptr); i++) {
 		if (i > 0 && aaLvls[i] == aaLvls[i - 1])
 			break;
@@ -488,6 +495,14 @@ SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 		handleerror(nullptr, "illegal OpenGL context-version specified, aborting", "ERROR", MBF_OK | MBF_EXCL);
 		return nullptr;
 	}
+
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if (MacEGLBridge::Wanted()) {
+		if ((newContext = MacEGLBridge::CreateContext(sdlWindow, minCtx.x, minCtx.y, forceCoreContext, false)) == nullptr)
+			handleerror(nullptr, "[GR] could not create Mesa EGL/Zink GL context (set RECOIL_MAC_NATIVE_GL=1 to use Apple's GL)", "ERROR", MBF_OK | MBF_EXCL);
+		return newContext;
+	}
+#endif
 
 	if ((newContext = SDL_GL_CreateContext(sdlWindow)) != nullptr)
 		return newContext;
@@ -605,6 +620,11 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 	if ((glContext = CreateGLContext(minCtx)) == nullptr)
 		return false;
 
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if (MacEGLBridge::Active())
+		gladLoadGLLoader(&MacEGLBridge::GetProcAddress);
+	else
+#endif
 	gladLoadGL();
 	GLX::Load(sdlWindow);
 
@@ -628,6 +648,12 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 
 
 void CGlobalRendering::MakeCurrentContext(bool clear) const {
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if (MacEGLBridge::Active()) {
+		MacEGLBridge::MakeCurrent(clear);
+		return;
+	}
+#endif
 	SDL_GL_MakeCurrent(sdlWindow, clear ? nullptr : glContext);
 }
 
@@ -638,6 +664,13 @@ void CGlobalRendering::DestroyWindowAndContext() {
 
 	WindowManagerHelper::SetIconSurface(sdlWindow, nullptr);
 	SetWindowInputGrabbing(false);
+
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if (MacEGLBridge::Active()) {
+		MacEGLBridge::DestroyContext();
+		glContext = nullptr;
+	}
+#endif
 
 	SDL_GL_MakeCurrent(sdlWindow, nullptr);
 	SDL_DestroyWindow(sdlWindow);
@@ -718,6 +751,11 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 			}
 		#endif
 		
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+		if (MacEGLBridge::Active())
+			MacEGLBridge::SwapWindow(sdlWindow);
+		else
+#endif
 		SDL_GL_SwapWindow(sdlWindow);
 
 		#ifdef _WIN32
