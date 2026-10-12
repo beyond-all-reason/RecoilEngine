@@ -38,6 +38,7 @@ CR_BIND_DERIVED_POOL(CFeature, CSolidObject, , featureMemPool.allocMem, featureM
 CR_REG_METADATA(CFeature, (
 	CR_MEMBER(isRepairingBeforeResurrect),
 	CR_MEMBER(inUpdateQue),
+	CR_MEMBER(prevTransformStale),
 	CR_MEMBER(deleteMe),
 	CR_MEMBER(alphaFade),
 
@@ -521,8 +522,11 @@ void CFeature::UpdateTransform(const float3& p, bool synced)
 {
 	transMatrix[synced] = std::move(ComposeMatrix(p));
 
-	if (synced)
-		CondUpdatePrevTransform();
+	if (!synced)
+		return;
+
+	CondUpdatePrevTransform();
+	featureHandler.SetFeaturePrevTransformStale(this);
 }
 
 void CFeature::UpdateTransformAndPhysState()
