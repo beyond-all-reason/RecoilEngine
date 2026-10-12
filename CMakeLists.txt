@@ -645,6 +645,8 @@ if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
 	endif()
 endif()
 
+set(VERSION_OVERRIDE "" CACHE STRING "Report this engine version instead of the one derived from git, e.g. to match the upstream release a patched build is based on")
+
 # Declare template files as inputs (for proper dependency tracking)
 set(VERSION_TEMPLATE_FILES
 	"${CMAKE_SOURCE_DIR}/rts/System/VersionGenerated.h.template"
@@ -662,6 +664,7 @@ add_custom_command(
 		"-DCMAKE_MODULES_SPRING=${CMAKE_MODULES_SPRING}"
 		"-DGENERATE_DIR=${VERSION_GENERATE_DIR}"
 		"-DVERSION_ADDITIONAL=${VERSION_ADDITIONAL}"
+		"-DVERSION_OVERRIDE=${VERSION_OVERRIDE}"
 		-P "${CMAKE_MODULES_SPRING}/ConfigureVersion.cmake"
 		"${VERSION_GENERATE_DIR}"
 	DEPENDS ${VERSION_TEMPLATE_FILES} ${VERSION_GIT_DEPS}
