@@ -242,6 +242,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetFPS);
 	REGISTER_LUA_CFUNC(GetGameSpeed);
 	REGISTER_LUA_CFUNC(XRGetHeadPose);
+	REGISTER_LUA_CFUNC(XRInSecondaryView);
 	REGISTER_LUA_CFUNC(GetGameState);
 
 	REGISTER_LUA_CFUNC(GetActiveCommand);
@@ -3668,6 +3669,21 @@ int LuaUnsyncedRead::GetGameSpeed(lua_State* L)
 	lua_pushnumber(L, gs->speedFactor);
 	lua_pushboolean(L, gs->paused);
 	return 3;
+}
+
+/*** True while an extra view (e.g. a VR eye) is being drawn instead of the window.
+ *
+ * Only the Lua handlers that asked for it with `Spring.XRSetDrawInViews` get their
+ * world draw callins (`DrawWorld`, `DrawWorldPreUnit`, `DrawWorldPreParticles`)
+ * called then, and should pick which of their widgets/gadgets draw with this.
+ *
+ * @function Spring.XRInSecondaryView
+ * @return boolean
+ */
+int LuaUnsyncedRead::XRInSecondaryView(lua_State* L)
+{
+	lua_pushboolean(L, CRenderViews::InSecondaryView());
+	return 1;
 }
 
 /*** Where the VR headset is in the game world, for placing panels (`Spring.XRSetPanel`).

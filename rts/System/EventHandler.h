@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef EVENT_HANDLER_H
-#define EVENT_HANDLER_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -288,6 +287,11 @@ class CEventHandler
 		// Beyond All Reason draws its units from Lua.
 		static void SetDrawCallinsSuppressed(bool b) { drawCallinsSuppressed = b; }
 
+		// A handler that opted in (Spring.XRSetDrawInViews) still gets the world
+		// callins (World, WorldPreUnit, WorldPreParticles) while suppressed, and is
+		// itself responsible for restricting them to what is safe in an extra view.
+		void SetDrawInSecondaryViews(const CEventClient* ec, bool b);
+
 		inline static bool drawCallinsSuppressed = false;
 
 		// see the DRAW_CALLIN macro for implementations
@@ -378,6 +382,12 @@ class CEventHandler
 
 	private:
 		CEventClient* mouseOwner;
+
+		// the handlers that get the world callins in extra views, see SetDrawInSecondaryViews
+		std::vector<const CEventClient*> secondaryViewDrawers;
+
+		bool DrawsInSecondaryViews(const CEventClient* ec) const;
+		void DrawInSecondaryViews(EventClientList& list, void (*enable)(), void (*reset)(), void (*disable)(), void (CEventClient::*draw)());
 
 	private:
 		EventMap eventMap;
@@ -811,5 +821,3 @@ inline void CEventHandler::RenderProjectileDestroyed(const CProjectile* proj)
 #undef UNIT_CALLIN_NO_PARAM
 #undef UNIT_CALLIN_INT_PARAMS
 #undef UNIT_CALLIN_LOS_PARAM
-
-#endif /* EVENT_HANDLER_H */

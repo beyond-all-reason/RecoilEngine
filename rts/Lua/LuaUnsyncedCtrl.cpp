@@ -284,6 +284,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetWMCaption);
 	REGISTER_LUA_CFUNC(XRSetPanel);
 	REGISTER_LUA_CFUNC(XRRemovePanel);
+	REGISTER_LUA_CFUNC(XRSetDrawInViews);
 
 	REGISTER_LUA_CFUNC(SetUnitDefIcon);
 	REGISTER_LUA_CFUNC(SetUnitDefImage);
@@ -5657,6 +5658,25 @@ int LuaUnsyncedCtrl::XRSetPanel(lua_State* L)
 int LuaUnsyncedCtrl::XRRemovePanel(lua_State* L)
 {
 	CXRPanels::GetInstance().Remove(luaL_checkstring(L, 1));
+	return 0;
+}
+
+
+/*** Let this Lua handler's world draw callins run in the extra views (VR eyes).
+ *
+ * By default the callins `DrawWorld`, `DrawWorldPreUnit` and `DrawWorldPreParticles`
+ * are not called while an extra view is drawn, since widgets assume the window is the
+ * render target. A handler (the widget or gadget handler) that opts in is called in
+ * those views as well, and has to restrict that to the widgets/gadgets that are safe
+ * there, see `Spring.XRInSecondaryView`.
+ *
+ * @function Spring.XRSetDrawInViews
+ * @param enable boolean
+ * @return nil
+ */
+int LuaUnsyncedCtrl::XRSetDrawInViews(lua_State* L)
+{
+	eventHandler.SetDrawInSecondaryViews(CLuaHandle::GetHandle(L), lua_toboolean(L, 1) != 0);
 	return 0;
 }
 
