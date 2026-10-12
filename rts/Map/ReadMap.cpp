@@ -901,20 +901,11 @@ void CReadMap::BecomeSpectator()
 	HeightMapUpdateLOSCheck({0, 0, mapDims.mapx, mapDims.mapy});
 }
 
-namespace {
-	template<typename T>
-	void CopySyncedToUnsyncedImpl(const std::vector<T>& src, std::vector<T>& dst) {
-		std::copy(src.begin(), src.end(), dst.begin());
-	};
-}
-
 void CReadMap::CopySyncedToUnsynced()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	CopySyncedToUnsyncedImpl(*heightMapSyncedPtr, *heightMapUnsyncedPtr);
-	CopySyncedToUnsyncedImpl(faceNormalsSynced, faceNormalsUnsynced);
-	CopySyncedToUnsyncedImpl(centerNormalsSynced, centerNormalsUnsynced);
-	eventHandler.UnsyncedHeightMapUpdate(SRectangle{ 0, 0, mapDims.mapx, mapDims.mapy });
+	// the next UpdateDraw copies heights and normals, also refreshes the heightmap texture and sends the event
+	unsyncedHeightMapUpdates.push_back(SRectangle{ 0, 0, mapDims.mapx, mapDims.mapy });
 }
 
 bool CReadMap::HasVisibleWater()  const { return (!mapRendering->voidWater && !IsAboveWater()); }
