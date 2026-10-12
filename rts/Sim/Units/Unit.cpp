@@ -1,5 +1,8 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <utility>
+#include <vector>
+
 #include "System/RangesCompat.h"
 #include "UnitDef.h"
 #include "Unit.h"
@@ -1704,17 +1707,42 @@ void CUnit::SetNeutral(bool b) {
 
 	// stop any units targeting us manually or automatically
 	// TestTarget tests for neutrality only if !isUserTarget
+	//
+	// finish all native queue cleanup before entering Lua, so a callin
+	// can not invalidate the remaining listener snapshot entries
+	std::vector<std::pair<int, entt::entity>> affectedUnits;
+	affectedUnits.reserve(unitIDs[0]);
+
 	for (int i = 0, n = unitIDs[0]; i < n; i++) {
 		CUnit* unit = unitHandler.GetUnit(unitIDs[1 + i]);
-		CCommandAI* cai = unit->commandAI;
+
+		if (unit == nullptr)
+			continue;
 
 		if (unit->curTarget.type != Target_Unit || unit->curTarget.unit != this)
 			continue;
 
 		unit->DropCurrentAttackTarget();
-		cai->StopAttackingTargetIf([&](const CUnit* t) { return (t == this); });
-		const auto removedTags = eventHandler.UnitAttackTargetRemoved(unit->id, unit->unitDef->id, unit->team, id);
-		cai->RemoveCommandsByTag(removedTags);
+		unit->commandAI->StopAttackingTargetIf([&](const CUnit* t) { return (t == this); });
+		affectedUnits.emplace_back(unit->id, unit->entityReference);
+	}
+
+	for (const auto& [unitID, unitEntity]: affectedUnits) {
+		CUnit* unit = unitHandler.GetUnit(unitID);
+
+		// a callin may have deleted (or even recycled the ID of) this unit
+		if (unit == nullptr || unit->entityReference != unitEntity)
+			continue;
+
+		const auto removedTags = eventHandler.UnitAttackTargetRemoved(unitID, unit->unitDef->id, unit->team, id);
+
+		// re-check after the callin, which may likewise have deleted this unit
+		unit = unitHandler.GetUnit(unitID);
+
+		if (unit == nullptr || unit->entityReference != unitEntity)
+			continue;
+
+		unit->commandAI->RemoveCommandsByTag(removedTags);
 	}
 }
 
