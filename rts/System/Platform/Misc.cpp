@@ -29,6 +29,9 @@
 	#include <climits> // for PATH_MAX
 
 	#include <mach-o/dyld.h>
+	#include <IOKit/IOKitLib.h>
+	#include <IOKit/IOBSD.h>
+	#include <IOKit/network/IOEthernetController.h>
 
 #elif defined( __FreeBSD__)
 	#include <sys/sysctl.h>
@@ -766,8 +769,26 @@ namespace Platform
 	#elif defined(__APPLE__)
 
 	std::array<uint8_t, 6> GetRawMacAddr() {
-		// TODO: http://lists.freebsd.org/pipermail/freebsd-hackers/2004-June/007415.html
-		return {{0, 0, 0, 0, 0, 0}};
+		std::array<uint8_t, 6> macAddr = {{0, 0, 0, 0, 0, 0}};
+
+		// getifaddrs() reports the per-network private Wi-Fi address, so ask IOKit for the hardware one
+		const io_service_t service = IOServiceGetMatchingService(kIOMainPortDefault, IOBSDNameMatching(kIOMainPortDefault, 0, "en0"));
+
+		if (service == IO_OBJECT_NULL)
+			return macAddr;
+
+		const auto flags = kIORegistryIterateRecursively | kIORegistryIterateParents;
+		const CFTypeRef data = IORegistryEntrySearchCFProperty(service, kIOServicePlane, CFSTR(kIOMACAddress), kCFAllocatorDefault, flags);
+
+		if (data != nullptr) {
+			if (CFGetTypeID(data) == CFDataGetTypeID() && CFDataGetLength(static_cast<CFDataRef>(data)) == macAddr.size())
+				CFDataGetBytes(static_cast<CFDataRef>(data), CFRangeMake(0, macAddr.size()), macAddr.data());
+
+			CFRelease(data);
+		}
+
+		IOObjectRelease(service);
+		return macAddr;
 	}
 
 	#else
