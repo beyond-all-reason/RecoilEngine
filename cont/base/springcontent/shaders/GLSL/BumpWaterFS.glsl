@@ -275,7 +275,7 @@ void main()
 
     vec3  eVec = normalize(eyeVec);
     float eyeNormalCos = dot(-eVec, normal);
-    float angle = (1.0 - abs(eyeNormalCos));
+    float angle = max(1.0 - abs(eyeNormalCos), 0.0); // can be about -1e-7, and pow() of a negative base is undefined
 
   // SHADOW
     vec3 shadowOcc = GetShadowOcclusion(worldPos + vec3(normal.x, 0.0, normal.z) * 10.0);

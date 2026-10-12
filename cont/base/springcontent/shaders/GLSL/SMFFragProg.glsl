@@ -150,7 +150,7 @@ vec2 GetParallaxUVOffset(vec2 uv, vec3 dir) {
 	vec3 GetFragmentNormal(vec2 uv) {
 		vec3 normal;
 		normal.xz = texture2D(normalsTex, uv).ra;
-		normal.y  = sqrt(1.0 - dot(normal.xz, normal.xz));
+		normal.y  = sqrt(max(1.0 - dot(normal.xz, normal.xz), 0.0));
 		return normal;
 	}
 #endif // SMF_ADV_SHADING

@@ -137,7 +137,7 @@ vec3 BlackBody(float t)
 vec3 GetFragmentNormal(vec2 wxz) {
 	vec3 normal;
 	normal.xz = textureLod(groundNormalTex, wxz * mapDims.zw, 0.0).ra;
-	normal.y  = sqrt(1.0 - dot(normal.xz, normal.xz));
+	normal.y  = sqrt(max(1.0 - dot(normal.xz, normal.xz), 0.0));
 	return normal;
 }
 
@@ -473,7 +473,9 @@ void main() {
 	vec3 rotWorldPos = transpose(vRotMat) * (worldPos - midPoint.xyz);
 	//fragColor.xyz=vec3(1);
 	vec3 ellipseAxes = vec3(vTranformedPos[1].w, vHeight, vTranformedPos[2].w);
-	fragColor.a *= mix(1.0, EllipsoidRedunction(rotWorldPos, ellipseAxes), float(vDecalType == DECAL_EXPLOSION));
+	// only explosion decals have a height; mix() with weight 0 still gives NaN when vHeight is 0
+	if (vDecalType == DECAL_EXPLOSION)
+		fragColor.a *= EllipsoidRedunction(rotWorldPos, ellipseAxes);
 	// artistic adjustments
 
 	fragColor  *= mix(1.0, pow(max(dot(vRotMat[1], N), 0.0), vDotElimExp), float(vDotElimExp > 0.0));
