@@ -564,8 +564,8 @@ void CSMFReadMap::UpdateHeightMapTexture(const SRectangle& update)
 void CSMFReadMap::UpdateHeightBoundsUnsynced(const SRectangle& update)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const uint32_t minPatchX = std::max(update.x1 / bigSquareSize, (0             ));
-	const uint32_t minPatchZ = std::max(update.z1 / bigSquareSize, (0             ));
+	const uint32_t minPatchX = std::max((update.x1 - 1) / bigSquareSize, (0             ));
+	const uint32_t minPatchZ = std::max((update.z1 - 1) / bigSquareSize, (0             ));
 	const uint32_t maxPatchX = std::min(update.x2 / bigSquareSize, (numBigTexX - 1));
 	const uint32_t maxPatchZ = std::min(update.z2 / bigSquareSize, (numBigTexY - 1));
 
