@@ -430,12 +430,24 @@ static inline int poscall_nohook (lua_State *L, StkId firstResult) {
 
 
 /*
+** Recoil: the call fast paths below skip the forced stack and CallInfo
+** reallocations of HARDSTACKTESTS (condhardstacktests in luaD_checkstack
+** and inc_ci), so builds with HARDSTACKTESTS use luaD_precall for all calls.
+*/
+#ifdef HARDSTACKTESTS
+#define VM_FASTCALLS	0
+#else
+#define VM_FASTCALLS	1
+#endif
+
+
+/*
 ** Recoil: true when luaD_precall would call a C function at L->top
 ** without growing the CallInfo array or the stack and without a call
 ** hook; its C branch is then exactly precall_C below.
 */
 RECOIL_FORCE_INLINE bool canprecallC (lua_State *L) {
-  return !(L->hookmask & LUA_MASKCALL) && L->ci != L->end_ci &&
+  return VM_FASTCALLS && !(L->hookmask & LUA_MASKCALL) && L->ci != L->end_ci &&
          (char *)L->stack_last - (char *)L->top > LUA_MINSTACK*(int)sizeof(TValue);
 }
 
@@ -849,7 +861,7 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         ** everything else (vararg functions, __call, hooks, growth) goes
         ** through luaD_precall.
         */
-        if (ttisfunction(ra) && !(L->hookmask & LUA_MASKCALL) &&
+        if (VM_FASTCALLS && ttisfunction(ra) && !(L->hookmask & LUA_MASKCALL) &&
             L->ci != L->end_ci) {
           Closure *ncl = clvalue(ra);
           if (!ncl->c.isC) {  /* Lua function */
