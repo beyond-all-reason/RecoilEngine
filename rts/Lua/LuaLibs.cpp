@@ -41,6 +41,11 @@ namespace LuaLibs {
 		LUA_OPEN_LIB(L, luaopen_io);
 		LUA_OPEN_LIB(L, luaopen_os);
 		LUA_OPEN_LIB(L, luaopen_debug);
+		RemoveMethods(L, "debug",
+			{ "getregistry"
+			, "getmetatable"
+			, "setmetatable"
+		});
 
 		lua_set_fopen (L, LuaIO::fopen);
 		lua_set_system(L, LuaIO::system);
