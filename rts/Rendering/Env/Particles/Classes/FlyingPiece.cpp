@@ -45,7 +45,7 @@ FlyingPiece::FlyingPiece(
 
 	splitterParts.reserve(shatterPieceData.size());
 	for (const auto& cp: shatterPieceData) {
-		if (guRNG.NextFloat() > _pieceParams.x)
+		if (guRNG.NextFloat() > _pieceParams.y)
 			continue;
 
 		const float3 flyDir = (cp.dir + (guRNG.NextVector() * 0.3f)).ANormalize();
@@ -197,7 +197,7 @@ void FlyingPiece::CheckDrawStateChange(const FlyingPiece* prev) const
 		return;
 	}
 
-	const auto prevModelType = piece->GetParentModel()->type;
+	const auto prevModelType = prev->piece->GetParentModel()->type;
 
 	if (team != prev->team)
 		CUnitDrawer::SetTeamColor(team);
