@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_GL_H
-#define LUA_GL_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -155,12 +154,8 @@ class LuaOpenGL {
 		static std::unordered_map<GLenum, std::string> fixedStateEnumToString;
 		static std::string fixedStateEnumToStringUnk;
 
-		struct OcclusionQuery {
-			unsigned int index; // into LuaOpenGL::occlusionQueries
-			unsigned int id;
-		};
-
-		static std::vector<OcclusionQuery*> occlusionQueries;
+		static std::unordered_map<const void*, unsigned int> occlusionQueries;
+		inline static unsigned int runningQueryId = 0;
 
 	private:
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);
@@ -374,5 +369,3 @@ inline void LuaOpenGL::CheckMatrixState(lua_State* L, const char* fn, int error)
 		return;
 	GetLuaContextData(L)->glMatrixTracker.HandleMatrixStateError(error, fn);
 }
-
-#endif /* LUA_UNITDEFS_H */
