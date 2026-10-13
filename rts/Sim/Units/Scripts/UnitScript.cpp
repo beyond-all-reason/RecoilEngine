@@ -249,7 +249,10 @@ void CUnitScript::TickAllAnims(int deltaTime)
 			lmp->UpdatePieceSpaceTransform();
 		}
 		if likely(lmp->rank >= lastDirtyRank) {
-			lmp->UpdateModelSpaceTransform(pTra);
+			// the same composition as LocalModelPiece::UpdateChildTransformRec
+			// (the root copies its piece space transform), so both give
+			// bit-identical results; the parent was updated before its children
+			lmp->UpdateModelSpaceTransform(lmp->parent);
 			lmp->SetWasUpdated(true);
 		}
 
