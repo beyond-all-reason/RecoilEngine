@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_HANDLE_SYNCED
-#define LUA_HANDLE_SYNCED
+#pragma once
 
 #include <string>
 
@@ -142,9 +141,6 @@ class CSyncedLuaHandle : public CLuaHandle
 
 		spring::unordered_map<std::string, std::string> textCommands; // name, help
 
-	private:
-		int origNextRef;
-
 	private: // call-outs
 		static int SyncedRandom(lua_State* L);
 		static int SyncedRandomSeed(lua_State* L);
@@ -282,6 +278,3 @@ class CSplitLuaHandle
 		friend class CGameStateCollector;
 		static LuaRulesParams::Params gameParams;
 };
-
-
-#endif /* LUA_HANDLE_SYNCED */

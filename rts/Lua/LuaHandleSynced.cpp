@@ -411,7 +411,6 @@ bool CUnsyncedLuaHandle::DrawMaterial(const LuaMaterial* material)
 CSyncedLuaHandle::CSyncedLuaHandle(CSplitLuaHandle* _base, const std::string& _name, int _order)
 	: CLuaHandle(_name, _order, false, true)
 	, base(*_base)
-	, origNextRef(-1)
 {
 }
 
@@ -439,9 +438,6 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	LuaLibs::OpenSynced(L, true);
 	EnactDevMode();
 
-	lua_getglobal(L, "next");
-	origNextRef = luaL_ref(L, LUA_REGISTRYINDEX);
-
 	// delete/replace some dangerous functions
 	lua_pushnil(L); lua_setglobal(L, "dofile");
 	lua_pushnil(L); lua_setglobal(L, "loadfile");
@@ -458,7 +454,9 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 
 	lua_pushvalue(L, LUA_GLOBALSINDEX);
 	LuaPushNamedCFunc(L, "loadstring", CLuaHandle::LoadStringData);
-	LuaPushNamedCFunc(L, "pairs", SyncedPairs);
+	lua_pushcfunction(L, SyncedNext);
+	lua_pushcclosure(L, SyncedPairs, 1);
+	lua_setfield(L, -2, "pairs");
 	LuaPushNamedCFunc(L, "next",  SyncedNext);
 	lua_pop(L, 1);
 
@@ -1969,22 +1967,11 @@ int CSyncedLuaHandle::SyncedNext(lua_State* L)
 		LUA_TTHREAD //FIXME LUA_TTHREAD is normally _not_ synced safe but LUS handler needs it atm (and uses it in a safe way)
 	};
 
-	const CSyncedLuaHandle* slh = GetSyncedHandle(L);
-	assert(slh->origNextRef > 0);
-	const int oldTop = lua_gettop(L);
-
-	lua_rawgeti(L, LUA_REGISTRYINDEX, slh->origNextRef);
-	lua_pushvalue(L, 1);
-
-	if (oldTop >= 2) {
-		lua_pushvalue(L, 2);
-	} else {
+	luaL_checktype(L, 1, LUA_TTABLE);
+	lua_settop(L, 2);
+	const int retCount = lua_next(L, 1) ? 2 : 1;
+	if (retCount == 1)
 		lua_pushnil(L);
-	}
-
-	lua_call(L, 2, LUA_MULTRET);
-	const int retCount = lua_gettop(L) - oldTop;
-	assert(retCount == 1 || retCount == 2);
 
 	if (retCount >= 2) {
 		const int keyType = lua_type(L, -2);
@@ -2010,7 +1997,7 @@ int CSyncedLuaHandle::SyncedPairs(lua_State* L)
 	RECOIL_DETAILED_TRACY_ZONE;
 	/* copied from lbaselib.cpp */
 	luaL_checktype(L, 1, LUA_TTABLE);
-	lua_pushcfunction(L, SyncedNext);  /* return generator, */
+	lua_pushvalue(L, lua_upvalueindex(1));  /* return generator, */
 	lua_pushvalue(L, 1);  /* state, */
 	lua_pushnil(L);  /* and initial value */
 	return 3;
