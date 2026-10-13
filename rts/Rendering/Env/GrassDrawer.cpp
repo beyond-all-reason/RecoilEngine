@@ -1056,9 +1056,15 @@ unsigned char CGrassDrawer::GetGrass(const float3& pos)
 void CGrassDrawer::UnsyncedHeightMapUpdate(const SRectangle& rect)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	for (int z = rect.z1; z <= rect.z2; ++z) {
-		for (int x = rect.x1; x <= rect.x2; ++x) {
-			ResetPos(float3(x, 0.f, z));
+	// Convert heightmap squares to grass blocks, clamping the outer map corner.
+	const int x1 = std::min(rect.x1 / blockMapSize, blocksX - 1);
+	const int z1 = std::min(rect.z1 / blockMapSize, blocksY - 1);
+	const int x2 = std::min(rect.x2 / blockMapSize, blocksX - 1);
+	const int z2 = std::min(rect.z2 / blockMapSize, blocksY - 1);
+
+	for (int z = z1; z <= z2; ++z) {
+		for (int x = x1; x <= x2; ++x) {
+			ResetPos(x, z);
 		}
 	}
 }

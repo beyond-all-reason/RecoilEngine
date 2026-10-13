@@ -526,6 +526,7 @@ void CBumpWater::FreeResources()
 	DeleteTexture(normalTexture);
 	DeleteTexture(normalTexture2);
 	DeleteTexture(coastTexture);
+	DeleteTexture(coastUpdateTexture);
 	DeleteTexture(waveRandTexture);
 	for (auto& caustTexture : caustTextures) {
 		DeleteTexture(caustTexture);
@@ -611,6 +612,11 @@ void CBumpWater::UnsyncedHeightMapUpdate(const SRectangle& rect)
 void CBumpWater::UploadCoastline(const bool forceFull)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// UpdateCoastmap has not used the last atlas yet; its rectangles are
+	// still in coastmapAtlasRects, so wait for it.
+	if (coastUpdateTexture != 0)
+		return;
+
 	// optimize update area (merge overlapping areas etc.)
 	heightmapUpdates.Process(forceFull);
 
@@ -799,6 +805,7 @@ void CBumpWater::UpdateCoastmap(const bool initialize)
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);
 	glDeleteTextures(1, &coastUpdateTexture);
+	coastUpdateTexture = 0;
 	coastmapAtlasRects.clear();
 
 	globalRendering->LoadViewport();
