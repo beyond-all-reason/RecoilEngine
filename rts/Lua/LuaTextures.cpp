@@ -67,6 +67,10 @@ std::string LuaTextures::Create(const Texture& tex)
 		case GL_TEXTURE_2D: {
 			glTexImage2D(tex.target, 0, tex.format, tex.xsize, tex.ysize           , tex.border, dataFormat, dataType, nullptr);
 		} break;
+		case GL_TEXTURE_CUBE_MAP: {
+			for (GLenum face = GL_TEXTURE_CUBE_MAP_POSITIVE_X; face <= GL_TEXTURE_CUBE_MAP_NEGATIVE_Z; ++face)
+				glTexImage2D(face, 0, tex.format, tex.xsize, tex.ysize, tex.border, dataFormat, dataType, nullptr);
+		} break;
 		case GL_TEXTURE_2D_ARRAY: [[fallthrough]];
 		case GL_TEXTURE_3D: {
 			glTexImage3D(tex.target, 0, tex.format, tex.xsize, tex.ysize, tex.zsize, tex.border, dataFormat, dataType, nullptr);
@@ -243,6 +247,9 @@ void LuaTextures::FreeAll()
 
 void LuaTextures::ApplyParams(const Texture& tex) const
 {
+	if (tex.target == GL_TEXTURE_2D_MULTISAMPLE)
+		return;
+
 	glTexParameteri(tex.target, GL_TEXTURE_WRAP_S, tex.wrap_s);
 	glTexParameteri(tex.target, GL_TEXTURE_WRAP_T, tex.wrap_t);
 	glTexParameteri(tex.target, GL_TEXTURE_WRAP_R, tex.wrap_r);
@@ -257,8 +264,7 @@ void LuaTextures::ApplyParams(const Texture& tex) const
 		glTexParameteri(tex.target, GL_TEXTURE_COMPARE_FUNC, GL_LEQUAL); //sensible default
 	}
 
-	if (tex.lodBias != 0.0f)
-		glTexParameterf(tex.target, GL_TEXTURE_LOD_BIAS, tex.lodBias);
+	glTexParameterf(tex.target, GL_TEXTURE_LOD_BIAS, tex.lodBias);
 
 	if (tex.aniso != 0.0f && GLAD_GL_EXT_texture_filter_anisotropic)
 		glTexParameterf(tex.target, GL_TEXTURE_MAX_ANISOTROPY_EXT, std::clamp(tex.aniso, 1.0f, globalRendering->maxTexAnisoLvl));

@@ -390,7 +390,7 @@ bool LuaFBOs::ApplyAttachment(
 	if (!lua_istable(L, index))
 		return AttachObject(__func__, L, index, fbo, attachID);
 
-	const int table = (index < 0) ? index : (lua_gettop(L) + index + 1);
+	const int table = (index > 0) ? index : (lua_gettop(L) + index + 1);
 
 	GLenum target = 0;
 	GLint  level  = 0;
@@ -522,6 +522,11 @@ int LuaFBOs::CreateFBO(lua_State* L)
 					ApplyDrawBuffers(L, -1);
 				}
 			}
+			lua_rawgeti(L, LUA_REGISTRYINDEX, fboPtr->luaRef);
+			lua_pushvalue(L, -3); // key
+			lua_pushvalue(L, -3); // value
+			lua_rawset(L, -3);
+			lua_pop(L, 1);
 		}
 	}
 
@@ -791,15 +796,18 @@ int LuaFBOs::BlitFBO(lua_State* L)
 	const GLbitfield mask = (GLbitfield)luaL_optint(L, 11, GL_COLOR_BUFFER_BIT);
 	const GLenum filter = (GLenum)luaL_optint(L, 12, GL_NEAREST);
 
-	GLint currentFBO;
-	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
+	GLint currentReadFBO;
+	GLint currentDrawFBO;
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING_EXT, &currentReadFBO);
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING_EXT, &currentDrawFBO);
 
 	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, (fboSrc == nullptr)? 0: fboSrc->id);
 	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, (fboDst == nullptr)? 0: fboDst->id);
 
 	glBlitFramebufferEXT(x0Src, y0Src, x1Src, y1Src,  x0Dst, y0Dst, x1Dst, y1Dst,  mask, filter);
 
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, currentFBO);
+	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, currentReadFBO);
+	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, currentDrawFBO);
 	return 0;
 }
 
@@ -869,7 +877,7 @@ int LuaFBOs::ClearAttachmentFBO(lua_State* L)
 	GLenum attachment = 0;
 	GLenum drawBuffer = 0;
 
-	if (lua_isstring(L, nextArg)) {
+	if (lua_israwstring(L, nextArg)) {
 		const char* attachmentStr = luaL_checkstring(L, nextArg++);
 		switch (hashString(attachmentStr)) {
 			case hashString("color0"): { bufferType = GL_COLOR;   attachment = GL_COLOR_ATTACHMENT0;  drawBuffer = 0; } break;
@@ -932,6 +940,9 @@ int LuaFBOs::ClearAttachmentFBO(lua_State* L)
 
 	GLint componentType = 0;
 	glGetFramebufferAttachmentParameteriv(target, attachment, GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE, &componentType);
+
+	if (bufferType == GL_STENCIL)
+		componentType = GL_INT; // stencil clears require glClearBufferiv
 
 	switch (componentType)
 	{
