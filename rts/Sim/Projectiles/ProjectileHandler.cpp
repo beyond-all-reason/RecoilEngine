@@ -218,10 +218,7 @@ void CProjectileHandler::UpdateProjectilesImpl()
 		// append reallocates while other workers read pc[i]. Update a copy of the pointers instead;
 		// new projectiles are first updated in the next frame, as before.
 		static std::vector<CProjectile*> updateList;
-		updateList.clear();
-		updateList.reserve(pc.size());
-		for (size_t i = 0; i < pc.size(); ++i)
-			updateList.push_back(pc[i]);
+		updateList = pc.GetData();
 
 		for_mt_chunk(0, updateList.size(), [](int i) {
 			CProjectile* p = updateList[i];
