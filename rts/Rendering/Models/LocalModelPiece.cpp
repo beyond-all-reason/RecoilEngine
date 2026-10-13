@@ -78,11 +78,34 @@ LocalModelPiece::~LocalModelPiece()
 	spring::SafeDelete(colvol);
 }
 
+void LocalModelPiece::SetDirty(bool state)
+{
+	dirty = state;
+
+	if (state) {
+		assert(localModel);
+		localModel->SetPieceTransformsDirty();
+	}
+}
+
 void LocalModelPiece::AddChild(LocalModelPiece* c)
 {
 	c->parent = this;
 	children.push_back(c);
-	c->rank = rank + 1;
+	c->SetRank(rank + 1);
+}
+
+void LocalModelPiece::SetRank(uint32_t r)
+{
+	// TickAllAnims needs rank == depth for every piece; after
+	// Spring.SetUnitPieceParent the children of c move with it
+	if (rank == r)
+		return;
+
+	rank = r;
+
+	for (auto* c : children)
+		c->SetRank(r + 1);
 }
 
 void LocalModelPiece::RemoveChild(LocalModelPiece* c)
@@ -139,7 +162,30 @@ void LocalModelPiece::ResetWasUpdated() const
 
 bool LocalModelPiece::SetPieceSpaceMatrix(const CMatrix44f& mat)
 {
-	return blockScriptAnims = mat.IsRotOrRotTranMatrix();
+	const bool block = mat.IsRotOrRotTranMatrix();
+
+	// freeze the current script pose now, so that it does not depend on
+	// whether (unsynced) code read the transforms since the last change
+	if (block && !blockScriptAnims)
+		pieceSpaceTra = CalcPieceSpaceTransformOrig(pos, rot, scale);
+
+	// a released piece composes its pose from the script values again
+	if (block != blockScriptAnims)
+		SetDirty(true);
+
+	return blockScriptAnims = block;
+}
+
+const Transform& LocalModelPiece::GetModelSpaceTransform() const
+{
+	localModel->UpdatePieceTransforms();
+	return modelSpaceTra;
+}
+
+const CMatrix44f& LocalModelPiece::GetModelSpaceMatrix() const
+{
+	localModel->UpdatePieceTransforms();
+	return modelSpaceMat;
 }
 
 void LocalModelPiece::SetScriptVisible(bool b)
@@ -192,13 +238,14 @@ void LocalModelPiece::UpdateChildTransformRec(bool updateChildTransform) const
 
 	if (dirty) {
 		dirty = false;
-		wasUpdated[0] = true;  //update for current frame
 		updateChildTransform = true;
 
 		pieceSpaceTra = CalcPieceSpaceTransform(pos, rot, scale);
 	}
 
 	if (updateChildTransform) {
+		wasUpdated[0] = true;  //update for current frame
+
 		if (parent != nullptr)
 			modelSpaceTra = parent->modelSpaceTra * pieceSpaceTra;
 		else
@@ -305,8 +352,8 @@ bool LocalModelPiece::GetEmitDirPos(float3& emitPos, float3& emitDir) const
 		return false;
 
 	// note: actually OBJECT_TO_WORLD but transform is the same
-	emitPos = modelSpaceTra *        original->GetEmitPos()        * WORLD_TO_OBJECT_SPACE;
-	emitDir = modelSpaceTra * float4(original->GetEmitDir(), 0.0f) * WORLD_TO_OBJECT_SPACE;
+	emitPos = GetModelSpaceTransform() *        original->GetEmitPos()        * WORLD_TO_OBJECT_SPACE;
+	emitDir = GetModelSpaceTransform() * float4(original->GetEmitDir(), 0.0f) * WORLD_TO_OBJECT_SPACE;
 	return true;
 }
 

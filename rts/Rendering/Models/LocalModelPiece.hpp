@@ -31,6 +31,7 @@ struct LocalModelPiece
 
 	void AddChild(LocalModelPiece* c);
 	void RemoveChild(LocalModelPiece* c);
+	void SetRank(uint32_t r);
 	void SetLocalModel(LocalModel* lm) { localModel = lm; }
 
 	void SetLModelPieceIndex(uint32_t idx) { lmodelPieceIndex = idx; }
@@ -58,7 +59,7 @@ struct LocalModelPiece
 
 	bool GetEmitDirPos(float3& emitPos, float3& emitDir) const;
 
-	void SetDirty(bool state) { dirty = state; }
+	void SetDirty(bool state);
 	bool GetDirty() const { return dirty; }
 	void SetFloat3(const float3& src, float3& dst); // anim-script only
 	void SetFloat(const float& src, float& dst); // anim-script only
@@ -82,8 +83,10 @@ struct LocalModelPiece
 
 	const float3& GetDirection() const { return dir; }
 
-	const Transform& GetModelSpaceTransform() const { return modelSpaceTra; }
-	const CMatrix44f& GetModelSpaceMatrix() const { return modelSpaceMat; }
+	// raw: for CUnitScript::TickAllAnims only, may be stale for dirty pieces
+	const Transform& GetModelSpaceTransformRaw() const { return modelSpaceTra; }
+	const Transform&  GetModelSpaceTransform() const;
+	const CMatrix44f& GetModelSpaceMatrix()    const;
 
 	const CollisionVolume* GetCollisionVolume() const { return colvol; }
 	      CollisionVolume* GetCollisionVolume()       { return colvol; }

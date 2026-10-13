@@ -12,7 +12,8 @@ CR_REG_METADATA(LocalModel, (
 
 	CR_MEMBER(boundingVolume),
 	CR_IGNORED(luaMaterialData),
-	CR_MEMBER(needsBoundariesRecalc)
+	CR_MEMBER(needsBoundariesRecalc),
+	CR_MEMBER(pieceTransformsDirty)
 ))
 
 /** ****************************************************************************************************
