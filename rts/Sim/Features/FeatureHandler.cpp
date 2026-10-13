@@ -104,10 +104,11 @@ void CFeatureHandler::LoadFeaturesFromMap()
 }
 
 
-CFeature* CFeatureHandler::LoadFeature(const FeatureLoadParams& params) {
+CFeature* CFeatureHandler::LoadFeature(const FeatureLoadParams& params)
+{
 	RECOIL_DETAILED_TRACY_ZONE;
 	// need to check this BEFORE creating the instance
-	if (!CanAddFeature(params.featureID))
+	if (idPool.IsEmpty() || !CanAddFeature(params.featureID))
 		return nullptr;
 
 	CFeature* feature = featureMemPool.alloc<CFeature>();
@@ -206,10 +207,17 @@ void CFeatureHandler::Update()
 		deletedFeatureIDs.erase(iter, deletedFeatureIDs.end());
 	}
 	{
-		const auto& pred = [this](CFeature* feature) { return (this->UpdateFeature(feature)); };
-		const auto& iter = std::remove_if(updateFeatures.begin(), updateFeatures.end(), pred);
-
-		updateFeatures.erase(iter, updateFeatures.end());
+		const size_t count = updateFeatures.size();
+		size_t kept = 0;
+		for (size_t i = 0; i < count; ++i) {
+			if (UpdateFeature(updateFeatures[i])) {
+				updateFeatures[i] = nullptr;
+				continue;
+			}
+			std::swap(updateFeatures[kept++], updateFeatures[i]);
+		}
+		// Preserve features appended by callbacks for the next frame.
+		updateFeatures.erase(updateFeatures.begin() + kept, updateFeatures.begin() + count);
 	}
 }
 

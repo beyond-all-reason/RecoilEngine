@@ -1887,6 +1887,7 @@ void CMobileCAI::UnloadUnits_Drop(Command& c)
 	std::vector<float3> dropSpots;
 
 	const bool canUnload = FindEmptyDropSpots(startingDropPos, startingDropPos + approachVector * std::max(16.0f, c.GetParam(3)), dropSpots);
+	const auto commandOptions = c.GetOpts();
 
 	StopMoveAndFinishCommand();
 
@@ -1895,14 +1896,12 @@ void CMobileCAI::UnloadUnits_Drop(Command& c)
 		auto di = dropSpots.rbegin();
 
 		for (; ti != transportees.end() && di != dropSpots.rend(); ++ti, ++di) {
-			commandQue.push_front(Command(CMD_UNLOAD_UNIT, c.GetOpts() | INTERNAL_ORDER, *di));
+			commandQue.push_front(Command(CMD_UNLOAD_UNIT, commandOptions | INTERNAL_ORDER, *di));
 		}
 
 		SlowUpdate();
 		return;
 	}
-
-	StopMoveAndFinishCommand();
 }
 
 
@@ -1915,7 +1914,7 @@ void CMobileCAI::UnloadUnits_LandFlood(Command& c)
 	const float radius = c.GetParam(3);
 	const float dist = std::max(64.0f, owner->unitDef->loadingRadius - radius);
 
-	if (pos.SqDistance2D(owner->pos) > dist) {
+	if (pos.SqDistance2D(owner->pos) > Square(dist)) {
 		SetGoal(pos, owner->pos, dist);
 		return;
 	}
