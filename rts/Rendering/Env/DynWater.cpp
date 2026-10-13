@@ -224,7 +224,7 @@ void CDynWater::InitResources(bool loadShader)
 	boatShape = bm.CreateTexture();
 
 	CBitmap bm2;
-	if (!bm.Load("bitmaps/hovershape.bmp"))
+	if (!bm2.Load("bitmaps/hovershape.bmp"))
 		throw content_error("Could not load hovershape from file bitmaps/hovershape.bmp");
 
 	for (int a = 0; a < (bm2.xsize * bm2.ysize); ++a) {

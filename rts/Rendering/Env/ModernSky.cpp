@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "ModernSky.h"
 
 #include "Rendering/GlobalRendering.h"
@@ -81,7 +83,7 @@ void CModernSky::Draw()
 
 	skyShader->SetUniform("sunColor", sunColor.x, sunColor.y, sunColor.z, sunDir.w); // sunDir.w -- intensity
 
-	skyShader->SetUniform("cloudInfo", cloudColor.x, cloudColor.y, cloudColor.z, mapInfo->atmosphere.cloudDensity);
+	skyShader->SetUniform("cloudInfo", cloudColor.x, cloudColor.y, cloudColor.z, cloudDensity);
 
 	skyShader->SetUniform("skyColor", skyColor.x, skyColor.y, skyColor.z);
 
