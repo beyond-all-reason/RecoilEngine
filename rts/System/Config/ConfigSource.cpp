@@ -102,6 +102,8 @@ void FileConfigSource::ReadModifyWrite(std::function<void ()> modify) {
 		Read(file);
 		modify();
 		Write(file);
+		if (fflush(file) != 0)
+			LOG_L(L_ERROR, "ConfigSource: Error: Could not flush config file.");
 	}
 	else {
 		modify();
@@ -138,6 +140,7 @@ void FileConfigSource::Read(FILE* file)
 	std::ostringstream commentBuffer;
 	char line[500];
 	rewind(file);
+	data.clear();
 	comments.clear();
 	while (fgets(line, sizeof(line), file)) {
 		char* line_stripped = Strip(line, strchr(line, '\0') - 1);
