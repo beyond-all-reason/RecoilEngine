@@ -1809,6 +1809,9 @@ bool CUnit::IsIdle() const
 bool CUnit::AttackUnit(CUnit* targetUnit, bool isUserTarget, bool wantManualFire, bool fpsMode)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (DeathDependencesNotified() || (targetUnit != nullptr && targetUnit->DeathDependencesNotified()))
+		return false;
+
 	// don't self-target
 	if (targetUnit == this)
 		return false;
