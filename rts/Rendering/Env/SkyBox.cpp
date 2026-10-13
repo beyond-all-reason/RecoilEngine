@@ -7,6 +7,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/FBO.h"
+#include "Rendering/GL/TexBind.h"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Textures/Bitmap.h"
@@ -96,6 +97,7 @@ void CSkyBox::Init(uint32_t textureID, uint32_t xsize, uint32_t ysize, bool conv
 
 		valid = true;
 		{
+			auto sourceBinding = GL::TexBind(0, GL_TEXTURE_2D, textureID);
 			glPushAttrib(GL_ENABLE_BIT | GL_VIEWPORT_BIT);
 
 			glViewport(0, 0, ysize, ysize);

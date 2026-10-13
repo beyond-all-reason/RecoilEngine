@@ -71,6 +71,7 @@ void CShadowHandler::Init()
 	//shadowProMode = SHADOWPROMODE_CAM_CENTER;
 	shadowColorMode = configHandler->GetInt("ShadowColorMode");
 	shadowGenBits = SHADOWGEN_BIT_NONE;
+	sunProjDir = ZeroVector;
 
 	shadowsLoaded = false;
 	inShadowPass = false;

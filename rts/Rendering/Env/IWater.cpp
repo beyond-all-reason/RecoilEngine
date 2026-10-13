@@ -76,7 +76,7 @@ void IWater::SetWater(int rendererMode)
 		}
 		else {
 			// cycle
-			for (int i = NUM_WATER_RENDERERS - 1; i >= 0; --i) {
+			for (int i = 0; i < NUM_WATER_RENDERERS; ++i) {
 				selectedRendererID = static_cast<WATER_RENDERER>((static_cast<int>(water->GetID()) + 1 + i) % NUM_WATER_RENDERERS);
 				if (allowedModes[selectedRendererID])
 					break;
@@ -131,8 +131,10 @@ void IWater::SetWater(int rendererMode)
 	if (water)
 		configHandler->Set("Water", static_cast<int>(water->GetID()));
 
-	if (water == nullptr)
+	if (water == nullptr) {
 		water = std::make_unique<CBasicWater>();
+		water->InitResources();
+	}
 }
 
 
