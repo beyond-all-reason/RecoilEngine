@@ -74,7 +74,7 @@ class CEventHandler
 		void UnitConstructionDecayed(const CUnit* unit, float timeSinceLastBuild, float iterationPeriod, float part);
 		void UnitFromFactory(const CUnit* unit, const CUnit* factory, bool userOrders);
 		void UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID);
-		void UnitDeleted(int unitID, int unitDefID, int unitTeam);
+		void UnitPreDelete(int unitID, int unitDefID, int unitTeam);
 		std::vector<int> UnitAttackTargetRemoved(int unitID, int unitDefID, int unitTeam, int targetID);
 		void UnitTaken(const CUnit* unit, int oldTeam, int newTeam);
 		void UnitGiven(const CUnit* unit, int oldTeam, int newTeam);

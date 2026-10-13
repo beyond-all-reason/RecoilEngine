@@ -1433,9 +1433,9 @@ function gadgetHandler:UnitDestroyed(
 end
 
 
-function gadgetHandler:UnitDeleted(unitID, unitDefID, unitTeam)
-  for _,g in r_ipairs(self.UnitDeletedList) do
-    g:UnitDeleted(unitID, unitDefID, unitTeam)
+function gadgetHandler:UnitPreDelete(unitID, unitDefID, unitTeam)
+  for _,g in r_ipairs(self.UnitPreDeleteList) do
+    g:UnitPreDelete(unitID, unitDefID, unitTeam)
   end
 end
 

@@ -1248,18 +1248,18 @@ void CLuaHandle::UnitDestroyed(const CUnit* unit, const CUnit* attacker, int wea
 }
 
 
-/*** Called after a unit has been deleted and its native death dependences processed.
+/*** Called before a unit is deleted, after its native death dependences are processed.
  * Unlike UnitDestroyed, this runs after the death script completes and before the
- * next unit movement update. The ID is no longer valid. Only synced handles with
- * full read access receive this callin; it is suitable for removing virtual queued
- * targets at the same simulation phase as native queued commands.
+ * next unit movement update. The unit is still readable, but cannot receive new
+ * orders or death dependences. Only synced handles with full read access receive
+ * this callin. Use it to remove virtual queued targets before final invalidation.
  *
- * @function Callins:UnitDeleted
+ * @function Callins:UnitPreDelete
  * @param unitID UnitID
  * @param unitDefID UnitDefID
  * @param unitTeam TeamID
  */
-void CLuaHandle::UnitDeleted(int unitID, int unitDefID, int unitTeam)
+void CLuaHandle::UnitPreDelete(int unitID, int unitDefID, int unitTeam)
 {
 	LUA_CALL_IN_CHECK(L);
 	luaL_checkstack(L, 5, __func__);

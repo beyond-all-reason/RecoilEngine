@@ -632,9 +632,27 @@ static inline bool AdjustGroundAttackCommand(const Command& c, bool fromSynced, 
 
 
 
+static bool CommandTouchesFinalizingUnit(const CUnit* owner, const Command& command)
+{
+	if (owner->DeathDependencesNotified())
+		return true;
+
+	int targetParameter;
+	if (command.IsObjectCommand(targetParameter)) {
+		const CUnit* target = unitHandler.GetUnit(command.GetParam(targetParameter));
+		if (target != nullptr && target->DeathDependencesNotified())
+			return true;
+	}
+	return false;
+}
+
+
 bool CCommandAI::AllowedCommand(const Command& c, bool fromSynced)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (CommandTouchesFinalizingUnit(owner, c))
+		return false;
+
 	const int cmdID = c.GetID();
 
 	// TODO check if the command is in the map first, for more commands
@@ -821,6 +839,9 @@ void CCommandAI::GiveCommand(const Command& c, bool fromSynced)
 void CCommandAI::GiveCommand(const Command& c, int playerNum, bool fromSynced, bool fromLua)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (CommandTouchesFinalizingUnit(owner, c))
+		return;
+
 	if (!eventHandler.AllowCommand(owner, c, playerNum, fromSynced, fromLua))
 		return;
 
@@ -1620,6 +1641,9 @@ int CCommandAI::GetDefaultCmd(const CUnit* pointed, const CFeature* feature)
 
 void CCommandAI::AddDeathDependence(CObject* o, DependenceType dep) {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (DeathDependencesNotified() || o->DeathDependencesNotified())
+		return;
+
 	if (dep == DEPENDENCE_COMMANDQUE) {
 		if (commandDeathDependences.insert(o).second) // prevent multiple dependencies for the same object
 			CObject::AddDeathDependence(o, dep);
