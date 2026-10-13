@@ -19,9 +19,9 @@ CR_REG_METADATA(CCobEngine, (
 	CR_MEMBER(tickRemovedThreads),
 	CR_MEMBER(runningThreadIDs),
 	CR_MEMBER(sleepingThreadIDs),
-	// always null/empty when saving
-	CR_IGNORED(waitingThreadIDs),
+	CR_MEMBER(waitingThreadIDs),
 
+	// always null when saving
 	CR_IGNORED(curThread),
 	CR_IGNORED(deferredCallins),
 
