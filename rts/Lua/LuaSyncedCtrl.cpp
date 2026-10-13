@@ -3756,8 +3756,19 @@ int LuaSyncedCtrl::SetUnitPieceParent(lua_State* L)
 		return 0;
 	}
 
+	// the piece tree must stay a tree
+	for (const LocalModelPiece* p = parentPiece; p != nullptr; p = p->parent) {
+		if (p == childPiece) {
+			luaL_error(L, "Can't make a piece a child of itself or of its own descendant");
+			return 0;
+		}
+	}
+
 	childPiece->parent->RemoveChild(childPiece);
 	parentPiece->AddChild(childPiece);
+	// the model space transforms of the moved piece and its children change
+	childPiece->SetDirty(true);
+	unit->localModel.SetBoundariesNeedsRecalc();
 	return 0;
 }
 
