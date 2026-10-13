@@ -527,10 +527,14 @@ static void vm_call (lua_State *L, StkId func, int nResults) {
 ** handler ends with its own fetch + dispatch, instead of jumping back to
 ** a single switch. Fetch, hook check and `ra' computation are the same
 ** code as the loop head of the switch version (vmfetch). Lua 5.4 does
-** the same (ljumptab.h). The table has one entry per opcode: the parser
-** makes only valid opcodes, and luaG_checkcode rejects others in binary
-** chunks (which only privileged loads accept). Define
-** LUA_USE_SWITCH_DISPATCH to get the plain switch.
+** the same (ljumptab.h). Define LUA_USE_SWITCH_DISPATCH to get the plain
+** switch.
+** The table covers all 64 values of the 6-bit opcode field. Values above
+** OP_VARARG are not valid opcodes, but the Lua 5.1 bytecode verifier
+** (luaG_checkcode, for binary chunks from privileged loads) does not
+** reject all of them: it does not check an instruction skipped by
+** OP_LOADBOOL with C > 1, or the extra word of OP_SETLIST with C = 0.
+** Like an unmatched switch value, they do nothing (L_unknown).
 */
 #define vmfetch() { \
     i = *pc++; \
@@ -548,7 +552,6 @@ static void vm_call (lua_State *L, StkId func, int nResults) {
     lua_assert(base == L->base && L->base == L->ci->base); \
     lua_assert(base <= L->top && L->top <= L->stack + L->stacksize); \
     lua_assert(L->top == L->ci->top || luaG_checkopenop(i)); \
-    lua_assert(GET_OPCODE(i) < NUM_OPCODES); \
   }
 
 #if defined(__GNUC__) && !defined(LUA_USE_SWITCH_DISPATCH)
@@ -592,8 +595,8 @@ void luaV_execute (lua_State *L, int nexeccalls) {
   base = L->base;
   k = cl->p->k;
 #if LUAV_COMPUTED_GOTO
-  /* ORDER OP */
-  static const void *const disptab[] = {
+  /* ORDER OP; L_unknown for the values above OP_VARARG (see above) */
+  static const void *const disptab[1 << SIZE_OP] = {
     &&L_OP_MOVE, &&L_OP_LOADK, &&L_OP_LOADBOOL, &&L_OP_LOADNIL,
     &&L_OP_GETUPVAL, &&L_OP_GETGLOBAL, &&L_OP_GETTABLE, &&L_OP_SETGLOBAL,
     &&L_OP_SETUPVAL, &&L_OP_SETTABLE, &&L_OP_NEWTABLE, &&L_OP_SELF,
@@ -603,9 +606,14 @@ void luaV_execute (lua_State *L, int nexeccalls) {
     &&L_OP_LT, &&L_OP_LE, &&L_OP_TEST, &&L_OP_TESTSET,
     &&L_OP_CALL, &&L_OP_TAILCALL, &&L_OP_RETURN, &&L_OP_FORLOOP,
     &&L_OP_FORPREP, &&L_OP_TFORLOOP, &&L_OP_SETLIST, &&L_OP_CLOSE,
-    &&L_OP_CLOSURE, &&L_OP_VARARG
+    &&L_OP_CLOSURE, &&L_OP_VARARG,
+    &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown,
+    &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown,
+    &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown,
+    &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown, &&L_unknown,
+    &&L_unknown, &&L_unknown
   };
-  static_assert(sizeof(disptab) / sizeof(disptab[0]) == NUM_OPCODES, "one disptab entry per opcode");
+  static_assert(NUM_OPCODES == 38 && SIZE_OP == 6, "update disptab");
 #endif
   /* main loop of interpreter */
   for (;;) {
@@ -1117,6 +1125,9 @@ void luaV_execute (lua_State *L, int nexeccalls) {
         }
         vmbreak;
       }
+#if LUAV_COMPUTED_GOTO
+      L_unknown: vmbreak;  /* not a valid opcode: skip it, as the switch does */
+#endif
     }
   }
 }
