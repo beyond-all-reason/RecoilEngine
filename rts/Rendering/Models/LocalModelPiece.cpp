@@ -162,7 +162,18 @@ void LocalModelPiece::ResetWasUpdated() const
 
 bool LocalModelPiece::SetPieceSpaceMatrix(const CMatrix44f& mat)
 {
-	return blockScriptAnims = mat.IsRotOrRotTranMatrix();
+	const bool block = mat.IsRotOrRotTranMatrix();
+
+	// freeze the current script pose now, so that it does not depend on
+	// whether (unsynced) code read the transforms since the last change
+	if (block && !blockScriptAnims)
+		pieceSpaceTra = CalcPieceSpaceTransformOrig(pos, rot, scale);
+
+	// a released piece composes its pose from the script values again
+	if (block != blockScriptAnims)
+		SetDirty(true);
+
+	return blockScriptAnims = block;
 }
 
 const Transform& LocalModelPiece::GetModelSpaceTransform() const
