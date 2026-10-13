@@ -77,7 +77,8 @@ struct LocalModel
 	// or by UpdatePieceTransforms; lets readers outside of TickAllAnims (e.g.
 	// after MoveNow/TurnNow on a non-animating unit) see up-to-date transforms
 	void SetPieceTransformsDirty(bool b = true) const { pieceTransformsDirty = b; }
-	void UpdatePieceTransforms() const {
+	void UpdatePieceTransforms() const
+	{
 		if (!pieceTransformsDirty)
 			return;
 
