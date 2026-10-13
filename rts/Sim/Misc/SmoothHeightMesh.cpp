@@ -471,13 +471,15 @@ void SmoothHeightMesh::MapChanged(int x1, int y1, int x2, int y2) {
 
 	const bool queueWasEmpty = mapChangeTrack.damageQueue[mapChangeTrack.activeBuffer].empty();
 	const int res = resolution*SAMPLES_PER_QUAD;
+	// a height change affects the maxima within smoothRadius, and the blur reaches blurSize samples further
+	const int updateRadius = smoothRadius + std::max(1, (smoothRadius / resolution) / 2) * resolution;
 	const int w = mapChangeTrack.width;
 	const int h = mapChangeTrack.height;
 	
-	const int2 min  { std::max((x1 - smoothRadius) / res, 0)
-					, std::max((y1 - smoothRadius) / res, 0)};
-	const int2 max  { std::min((x2 + smoothRadius - 1) / res, (w-1))
-					, std::min((y2 + smoothRadius - 1) / res, (h-1))};
+	const int2 min  { std::max((x1 - updateRadius) / res, 0)
+					, std::max((y1 - updateRadius) / res, 0)};
+	const int2 max  { std::min((x2 + updateRadius) / res, (w-1))
+					, std::min((y2 + updateRadius) / res, (h-1))};
 
 	for (int y = min.y; y <= max.y; ++y) {
 		int i = min.x + y*w;
