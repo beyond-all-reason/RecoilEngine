@@ -456,7 +456,7 @@ static int GetSolidObjectLastHitPiece(lua_State* L, const CSolidObject* o)
 	const LocalModelPiece* lmp = o->hitModelPieces[true];
 	const S3DModelPiece* omp = lmp->original;
 
-	if (lua_isboolean(L, 1) && lua_toboolean(L, 1)) {
+	if (lua_isboolean(L, 2) && lua_toboolean(L, 2)) {
 		lua_pushnumber(L, lmp->GetLModelPieceIndex() + 1);
 	} else {
 		lua_pushsstring(L, omp->name);
@@ -2518,7 +2518,7 @@ static bool PushVisibleUnits(
 	unsigned int* unitCount,
 	unsigned int* defCount
 ) {
-	bool createdTable = false;
+	bool createdTable = (*unitCount > 1);
 
 	for (const CUnit* unit: defUnits) {
 		if (!LuaUtils::IsUnitVisible(L, unit))
@@ -2595,6 +2595,7 @@ int LuaSyncedRead::GetTeamUnitsSorted(lua_State* L)
 			lua_pushnumber(L, i + 1);
 			lua_createtable(L, unitsByDef.size(), 0);
 			defCount++;
+			unitCount = 1;
 
 			for (const CUnit* unit: unitsByDef) {
 				lua_pushnumber(L, unit->id);
@@ -2616,6 +2617,7 @@ int LuaSyncedRead::GetTeamUnitsSorted(lua_State* L)
 			if (ud->decoyDef != nullptr)
 				continue;
 
+			unitCount = 1;
 			bool createdTable = PushVisibleUnits(L, unitHandler.GetUnitsByTeamAndDef(teamID, unitDefID), unitDefID, &unitCount, &defCount);
 
 			// for all decoy-defs of unitDefID, add decoy units under the same ID
@@ -2785,7 +2787,10 @@ int LuaSyncedRead::GetTeamUnitsByDefs(lua_State* L)
 	bool isCalledFromSynced = CLuaHandle::GetHandleSynced(L);
 
 	for (const int unitDefID: gtuObjectIDs) {
-		for (const CUnit* unit: unitHandler.GetUnitsByTeam(teamID)) {
+		const auto& candidates = (allied && !isCalledFromSynced)
+			? unitHandler.GetUnitsByTeamAndDef(teamID, unitDefID)
+			: unitHandler.GetUnitsByTeam(teamID);
+		for (const CUnit* unit: candidates) {
 			if (!allied && !LuaUtils::IsUnitTyped(L, unit))
 				continue;
 
@@ -5903,6 +5908,9 @@ int LuaSyncedRead::GetUnitLastAttacker(lua_State* L)
  *
  * @function Spring.GetUnitLastAttackedPiece
  * @param unitID UnitID
+ * @param returnIndex boolean? (Default: `false`) Return a 1-based piece index instead of its name.
+ * @return string|integer|nil piece Last hit piece name or index, or `nil` if unavailable.
+ * @return integer? frame Frame of the last piece hit.
  */
 int LuaSyncedRead::GetUnitLastAttackedPiece(lua_State* L)
 {
@@ -6227,7 +6235,7 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 		LuaPushNamedNumber(L, "altitudeRate", hAMT->altitudeRate);
 
 		LuaPushNamedNumber(L, "brakeDistance", -1.0f); // DEPRECATED
-		LuaPushNamedBool  (L, "dontLand", hAMT->GetAllowLanding());
+		LuaPushNamedBool  (L, "dontLand", !hAMT->GetAllowLanding());
 		LuaPushNamedNumber(L, "maxDrift", hAMT->maxDrift);
 
 		return 1;
@@ -6265,7 +6273,7 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 		LuaPushNamedNumber(L, "myGravity", sAMT->myGravity);
 
 		LuaPushNamedNumber(L, "maxBank",    sAMT->maxBank);
-		LuaPushNamedNumber(L, "maxPitch",   sAMT->maxBank);
+		LuaPushNamedNumber(L, "maxPitch",   sAMT->maxPitch);
 		LuaPushNamedNumber(L, "turnRadius", sAMT->turnRadius);
 
 		LuaPushNamedNumber(L, "maxAcc",      sAMT->accRate);
@@ -6598,10 +6606,9 @@ static void PackFactoryCounts(lua_State* L,
 		if (noCmds && (cmdID >= 0))
 			continue;
 
-		if (entry == 0) {
+		if (currentCount == 0) {
 			currentCmd = cmdID;
 			currentCount = 1;
-			entry = 1;
 		}
 		else if (cmdID == currentCmd) {
 			currentCount++;
@@ -6620,7 +6627,7 @@ static void PackFactoryCounts(lua_State* L,
 			currentCount = 1;
 		}
 	}
-	if (currentCount > 0) {
+	if (currentCount > 0 && entry < count) {
 		entry++;
 		lua_createtable(L, 0, 1); {
 			lua_pushnumber(L, currentCount);
@@ -7261,8 +7268,9 @@ int LuaSyncedRead::GetFeatureResurrect(lua_State* L)
  *
  * @function Spring.GetFeatureLastAttackedPiece
  * @param featureID FeatureID
- * @return string|""|nil pieceName Last hit piece name
- * @return integer? frame frame it was last hit on, `nil` when featureID is not valid
+ * @param returnIndex boolean? (Default: `false`) Return a 1-based piece index instead of its name.
+ * @return string|integer|nil piece Last hit piece name or index, or `nil` if unavailable.
+ * @return integer? frame Frame of the last piece hit.
  */
 int LuaSyncedRead::GetFeatureLastAttackedPiece(lua_State* L)
 {

@@ -2358,14 +2358,16 @@ namespace {
 		changedIds.reserve(renderObjects.size());
 
 		std::vector<uint8_t> changedDrawFlags;
-		changedDrawFlags.reserve(renderObjects.size());
+		if (sendMask)
+			changedDrawFlags.reserve(renderObjects.size());
 
 		for (const auto renderObject : renderObjects)
 		{
 			if (renderObject->previousDrawFlag == renderObject->drawFlag)
 				continue;
 			changedIds.push_back(renderObject->id);
-			changedDrawFlags.push_back(renderObject->drawFlag);
+			if (sendMask)
+				changedDrawFlags.push_back(renderObject->drawFlag);
 		}
 
 		lua_createtable(L, changedIds.size(), 0);
