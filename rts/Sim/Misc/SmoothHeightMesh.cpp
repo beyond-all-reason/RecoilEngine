@@ -496,22 +496,6 @@ void SmoothHeightMesh::MapChanged(int x1, int y1, int x2, int y2) {
 }
 
 
-inline static void CopyMeshPart
-		( int mapx
-		, int2 min
-		, int2 max
-		, const std::vector<float>& src
-		, std::vector<float>& dest
-		) {
-			RECOIL_DETAILED_TRACY_ZONE;
-	for (int y = min.y; y <= max.y; ++y) {
-		const int startIdx = min.x + y*mapx;
-		const int endIdx = max.x + y*mapx + 1;
-		std::copy(src.begin() + startIdx, src.begin() + endIdx, dest.begin() + startIdx);
-	}
-}
-
-
 inline static bool UpdateSmoothMeshRequired(SmoothHeightMesh::MapChangeTrack& mapChangeTrack) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const bool flushBuffer = !mapChangeTrack.activeBuffer;
@@ -643,7 +627,6 @@ void SmoothHeightMesh::UpdateSmoothMesh() {
 		}
 		else {
 			BlurVertical(map, damageMin, damageMax, blurSize, resolution, tempMesh, mesh);
-			CopyMeshPart(map.x, damageMin, damageMax, mesh, tempMesh);
 		}
 	}
 }
@@ -678,8 +661,7 @@ void SmoothHeightMesh::MakeSmoothMesh() {
 	// <mesh> now contains the final smoothed heightmap, save it in origMesh
 	std::copy(mesh.begin(), mesh.end(), origMesh.begin());
 
-	// tempMesh should be kept inline with mesh to avoid bluring artefacts in dynamic updates
-	std::copy(mesh.begin(), mesh.end(), tempMesh.begin());
+	// keep the horizontal blur in tempMesh: partial updates read it as the vertical blur input
 }
 
 
