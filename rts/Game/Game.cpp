@@ -1210,11 +1210,11 @@ bool CGame::Update()
 			for (char *ptr = &error.msgBuf[0], *tmp = nullptr; (tmp = strstr(ptr, "\n")) != nullptr; ptr = tmp + 1) {
 				*tmp = 0;
 
-				LOG_L(L_FATAL, "%s", error.msgBuf);
-				CLIENT_NETLOG(gu->myPlayerNum, LOG_LEVEL_FATAL, error.msgBuf);
+				LOG_L(L_FATAL, "%s", ptr);
+				CLIENT_NETLOG(gu->myPlayerNum, LOG_LEVEL_FATAL, ptr);
 
 				// force a restart if synced Lua died, simply reloading might not work
-				gu->globalQuit = gu->globalQuit || (strstr(error.msgBuf, "[OOM] synced=1") != nullptr);
+				gu->globalQuit = gu->globalQuit || (strstr(ptr, "[OOM] synced=1") != nullptr);
 			}
 		}
 	}

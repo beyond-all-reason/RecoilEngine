@@ -162,8 +162,10 @@ void CGame::UpdateNumQueuedSimFrames()
 {
 	// on any *incoming* ping-response, just process NETMSG_{PING, GAME_FRAME_PROGRESS}
 	// (even if host, self-ping processing time is useful to know for testing purposes)
-	if (clientNet->GetNumWaitingPingPackets() > 0)
-		GetNumQueuedSimFrameMessages(-1u);
+	const bool scannedQueue = (clientNet->GetNumWaitingPingPackets() > 0);
+	uint32_t numQueuedFrames = 0;
+	if (scannedQueue)
+		numQueuedFrames = GetNumQueuedSimFrameMessages(-1u);
 
 	// if host, we have no buffer
 	if (gameServer != nullptr)
@@ -183,7 +185,8 @@ void CGame::UpdateNumQueuedSimFrames()
 	// NOTE:
 	//   unnecessary to scan entire queue *unless* joining a running game
 	//   only reason in that case is to handle NETMSG_GAME_FRAME_PROGRESS
-	const uint32_t numQueuedFrames = GetNumQueuedSimFrameMessages(-1u);
+	if (!scannedQueue)
+		numQueuedFrames = GetNumQueuedSimFrameMessages(-1u);
 
 	if (globalConfig.useNetMessageSmoothingBuffer) {
 		if (numQueuedFrames < lastNumQueuedSimFrames) {
