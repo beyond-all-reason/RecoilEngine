@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "FeatureDrawerData.h"
 
 #include "System/Config/ConfigHandler.h"
@@ -148,6 +150,8 @@ void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 				if (!f->alphaFade) {
 					f->SetDrawFlag(DrawFlags::SO_OPAQUE_FLAG);
 					f->drawAlpha = 1.0f;
+					if (f->IsInWater())
+						f->AddDrawFlag(DrawFlags::SO_REFRAC_FLAG);
 					continue;
 				}
 
