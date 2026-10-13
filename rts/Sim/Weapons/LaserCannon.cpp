@@ -29,7 +29,7 @@ void CLaserCannon::UpdateProjectileSpeed(const float val)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	projectileSpeed = std::max(0.001f, val); // sanitize
-	range = std::max(1.0f, std::floor(val / projectileSpeed)) * projectileSpeed;
+	UpdateRange(range);
 }
 void CLaserCannon::UpdateRange(const float val)
 {
