@@ -501,7 +501,7 @@ bool CStrafeAirMoveType::Update()
 							const SyncedFloat3& rightdir = owner->rightdir;
 							const SyncedFloat3& frontdir = owner->frontdir;
 
-							const float altitude = CGround::GetHeightAboveWater(owner->pos.x, owner->pos.z) - lastPos.y;
+							const float altitude = owner->pos.y - CGround::GetHeightAboveWater(owner->pos.x, owner->pos.z);
 
 							if ((maneuverState = SelectLoopBackManeuver(frontdir, rightdir, lastSpd, turnRadius, altitude)) == MANEUVER_IMMELMAN_INV)
 								maneuverSubState = 0;
