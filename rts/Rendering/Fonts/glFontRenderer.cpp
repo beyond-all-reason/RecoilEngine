@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "glFontRenderer.h"
 
 #include "glFont.h"
@@ -211,6 +213,9 @@ void CglShaderFontRenderer::HandleTextureUpdate(CFontTexture& fnt, bool onlyUplo
 	if (!onlyUpload)
 		fnt.UpdateGlyphAtlasTexture();
 
+	if (!fnt.GlyphAtlasTextureNeedsUpload())
+		return;
+
 	GLint dl = 0;
 	glGetIntegerv(GL_LIST_INDEX, &dl);
 	if (dl == 0) {
@@ -294,7 +299,7 @@ void CglNoShaderFontRenderer::AddQuadTrianglesImpl(bool primary, VA_TYPE_TC&& tl
 	auto& v = verts[primary];
 	auto& i = indcs[primary];
 
-	const uint16_t baseIndex = static_cast<uint16_t>(v.size());
+	const uint32_t baseIndex = static_cast<uint32_t>(v.size());
 
 	v.emplace_back(std::move(tl)); //0
 	v.emplace_back(std::move(tr)); //1
@@ -336,7 +341,7 @@ void CglNoShaderFontRenderer::DrawTraingleElements()
 		glVertexPointer(3, GL_FLOAT, stride, &verts[idx].data()->pos);
 		glTexCoordPointer(2, GL_FLOAT, stride, &verts[idx].data()->s);
 		glColorPointer(4, GL_UNSIGNED_BYTE, stride, &verts[idx].data()->c.r);
-		glDrawRangeElements(GL_TRIANGLES, 0, verts[idx].size() - 1, indcs[idx].size(), GL_UNSIGNED_SHORT, indcs[idx].data());
+		glDrawRangeElements(GL_TRIANGLES, 0, verts[idx].size() - 1, indcs[idx].size(), GL_UNSIGNED_INT, indcs[idx].data());
 	};
 
 	for (auto& v : verts)
@@ -350,6 +355,9 @@ void CglNoShaderFontRenderer::HandleTextureUpdate(CFontTexture& fnt, bool onlyUp
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!onlyUpload)
 		fnt.UpdateGlyphAtlasTexture();
+
+	if (!fnt.GlyphAtlasTextureNeedsUpload())
+		return;
 
 	GLint dl = 0;
 	glGetIntegerv(GL_LIST_INDEX, &dl);
@@ -366,7 +374,7 @@ void CglNoShaderFontRenderer::HandleTextureUpdate(CFontTexture& fnt, bool onlyUp
 void CglNoShaderFontRenderer::PushGLState(const CglFont& fnt)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT);
+	glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_COLOR_BUFFER_BIT);
 	glDisable(GL_LIGHTING);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_ALPHA_TEST);

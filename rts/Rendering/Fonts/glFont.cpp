@@ -732,6 +732,7 @@ void CglFont::RenderStringImpl(float x, float y, float scaleX, float scaleY, con
 
 	char32_t curGlyphIdx = 0;
 	char32_t prvGlyphIdx = 0;
+	const GlyphInfo* prvGlyphPtr = nullptr;
 
 	int currentPos = 0;
 	int skippedLines = 0;
@@ -745,15 +746,12 @@ void CglFont::RenderStringImpl(float x, float y, float scaleX, float scaleY, con
 
 		const GlyphInfo* curGlyphPtr = &GetGlyph(curGlyphIdx);
 		assert(curGlyphPtr != &CFontTexture::dummyGlyph);
-		const GlyphInfo* prvGlyphPtr = nullptr;
 
 		if (skippedLines > 0) {
 			x = startx;
 			y -= (skippedLines * lineHeight_);
 		}
 		else if (prvGlyphIdx != 0) {
-			prvGlyphPtr = &GetGlyph(prvGlyphIdx);
-			assert(prvGlyphPtr != &CFontTexture::dummyGlyph);
 			x += (scaleX * GetKerning(*prvGlyphPtr, *curGlyphPtr));
 		}
 

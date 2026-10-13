@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #pragma once
 
 #include <memory>
@@ -83,7 +85,7 @@ private:
 	void AddQuadTrianglesImpl(bool primary, VA_TYPE_TC&& tl, VA_TYPE_TC&& tr, VA_TYPE_TC&& br, VA_TYPE_TC&& bl);
 
 	std::array<std::vector<VA_TYPE_TC>, 2> verts; // OL, PM
-	std::array<std::vector<uint16_t  >, 2> indcs; // OL, PM
+	std::array<std::vector<uint32_t  >, 2> indcs; // OL, PM
 
 	uint32_t textureSpaceMatrix = 0u;
 };
