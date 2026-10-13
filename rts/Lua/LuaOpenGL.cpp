@@ -598,6 +598,8 @@ const GLbitfield AttribBits =
 	GL_LINE_BIT         |
 	GL_POINT_BIT        |
 	GL_POLYGON_BIT      |
+	GL_SCISSOR_BIT      |
+	GL_STENCIL_BUFFER_BIT |
 	GL_VIEWPORT_BIT;
 
 
@@ -4610,10 +4612,10 @@ int LuaOpenGL::RenderToTexture(lua_State* L)
 	if ((tex == nullptr) || (tex->fbo == 0))
 		return 0;
 
-	GLint currentFBO = 0;
-	if (drawMode == DRAW_WORLD_SHADOW) {
-		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
-	}
+	GLint currentReadFBO = 0;
+	GLint currentDrawFBO = 0;
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING_EXT, &currentReadFBO);
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING_EXT, &currentDrawFBO);
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, tex->fbo);
 
@@ -4628,7 +4630,8 @@ int LuaOpenGL::RenderToTexture(lua_State* L)
 	glMatrixMode(GL_MODELVIEW);  glPopMatrix();
 	glPopAttrib();
 
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, currentFBO);
+	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, currentReadFBO);
+	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, currentDrawFBO);
 
 	if (error != 0) {
 		LOG_L(L_ERROR, "gl.RenderToTexture: error(%i) = %s",
