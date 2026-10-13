@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _SOUND_H_
-#define _SOUND_H_
+#pragma once
 
 #include <atomic>
 #include <string>
@@ -138,5 +137,3 @@ private:
 	std::atomic<bool> soundThreadQuit = {false};
 	std::atomic<bool> canLoadDefs = {false};
 };
-
-#endif // _SOUND_H_
