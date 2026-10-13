@@ -176,6 +176,15 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG")
 
 ################################################################################
+### ObjectFinalization
+	set(test_name ObjectFinalization)
+	set(test_src
+		"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testObjectFinalization.cpp"
+		"${ENGINE_SOURCE_DIR}/System/Object.cpp"
+		${test_Common_sources}
+	)
+	add_spring_test(${test_name} "${test_src}" "" "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
+
 ### Float3
 	set(test_name Float3)
 	set(test_src

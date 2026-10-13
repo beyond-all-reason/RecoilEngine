@@ -410,14 +410,15 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 //  Parsing helpers
 //
 
-static inline CUnit* ParseRawUnit(lua_State* L, const char* caller, int index)
+static inline CUnit* ParseRawUnit(lua_State* L, const char* caller, int index, bool allowFinalizing = false)
 {
-	return (unitHandler.GetUnit(luaL_checkint(L, index)));
+	CUnit* unit = unitHandler.GetUnit(luaL_checkint(L, index));
+	return (unit != nullptr && (allowFinalizing || !unit->DeathDependencesNotified())) ? unit : nullptr;
 }
 
-static inline CUnit* ParseUnit(lua_State* L, const char* caller, int index)
+static inline CUnit* ParseUnit(lua_State* L, const char* caller, int index, bool allowFinalizing = false)
 {
-	CUnit* unit = ParseRawUnit(L, caller, index);
+	CUnit* unit = ParseRawUnit(L, caller, index, allowFinalizing);
 
 	if (unit == nullptr)
 		return nullptr;
@@ -3642,7 +3643,11 @@ int LuaSyncedCtrl::SetUnitTarget(lua_State* L)
 		return 1;
 	}
 	else if (args >= 2) {
-		CUnit* target = ParseRawUnit(L, __func__, 2);
+		CUnit* target = unitHandler.GetUnit(luaL_checkint(L, 2));
+		if (target != nullptr && target->DeathDependencesNotified()) {
+			lua_pushboolean(L, false);
+			return 1;
+		}
 
 		if (target == unit) {
 			luaL_error(L, "[%s()]: unit tried to attack itself", __func__);
@@ -5962,14 +5967,14 @@ int LuaSyncedCtrl::UnitFinishCommand(lua_State* L)
  */
 int LuaSyncedCtrl::GiveOrderToUnit(lua_State* L)
 {
-	CUnit* unit = ParseUnit(L, __func__, 1);
+	CUnit* unit = ParseUnit(L, __func__, 1, true);
 
 	if (unit == nullptr)
 		luaL_error(L, "[%s] invalid unitID", __func__);
 
 	Command cmd = LuaUtils::ParseCommand(L, __func__, 2);
 
-	if (!CanControlUnit(L, unit)) {
+	if (unit->DeathDependencesNotified() || !CanControlUnit(L, unit)) {
 		lua_pushboolean(L, false);
 		return 1;
 	}
@@ -6082,10 +6087,10 @@ int LuaSyncedCtrl::GiveOrderToUnitArray(lua_State* L)
  */
 int LuaSyncedCtrl::GiveOrderArrayToUnit(lua_State* L)
 {
-	CUnit* const unit = ParseUnit(L, __func__, 1);
+	CUnit* const unit = ParseUnit(L, __func__, 1, true);
 	if (unit == nullptr)
 		luaL_error(L, "[%s] invalid unitID", __func__);
-	if (!CanControlUnit(L, unit)) {
+	if (unit->DeathDependencesNotified() || !CanControlUnit(L, unit)) {
 		lua_pushboolean(L, false);
 		return 1;
 	}

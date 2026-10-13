@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef OBJECT_H
-#define OBJECT_H
+#pragma once
 
 #include <atomic>
 #include <functional>
@@ -19,6 +18,8 @@ public:
 
 	CObject();
 	virtual ~CObject();
+	void NotifyDeathDependences();
+	bool DeathDependencesNotified() const { return deathDependencesNotified; }
 
 	/// Request to not inform this when obj dies
 	virtual void DeleteDeathDependence(CObject* obj, DependenceType dep);
@@ -80,6 +81,7 @@ public:
 	typedef std::function<bool(const CObject*, int*)> TObjFilterPred;
 
 	bool detached;
+	bool deathDependencesNotified = false;
 
 protected:
 	const TSyncSafeSet& GetListeners(const DependenceType dep) {
@@ -132,6 +134,4 @@ protected:
 	TDependenceMap listeners;
 	TDependenceMap listening;
 };
-
-#endif /* OBJECT_H */
 
