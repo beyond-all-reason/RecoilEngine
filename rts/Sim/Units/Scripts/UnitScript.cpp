@@ -289,11 +289,15 @@ bool CUnitScript::TickAnimFinished()
 	ZoneScoped;
 
 	// Tell listeners to unblock, and remove finished animations from the unit/script.
-	for (const auto& ai : doneAnims)
-		AnimFinished(ai.animType, ai.piece, ai.axis);
+	for (auto& ai : doneAnims) {
+		if (!ai.hasWaiting)
+			continue;
 
-	// don't clear doneAnims for the purpose of capturing them in DumpState
-	//doneAnims.clear();
+		ai.hasWaiting = false;
+		AnimFinished(ai.animType, ai.piece, ai.axis);
+	}
+
+	// Keep consumed completion records for DumpState.
 
 	return HaveAnimations();
 }
@@ -1127,7 +1131,7 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 
 	case UNIT_TEAM: {
 		const CUnit* u = unitHandler.GetUnit(p1);
-		return (u != nullptr)? unit->team : 0;
+		return (u != nullptr)? u->team : 0;
 	} break;
 	case UNIT_ALLIED: {
 		const CUnit* u = unitHandler.GetUnit(p1);
