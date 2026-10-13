@@ -340,10 +340,12 @@ void CProjectileHandler::Update()
 		for (int modelType = 0; modelType < MODELTYPE_CNT; ++modelType) {
 			auto& fpc = flyingPieces[modelType];
 
+			const auto oldSize = fpc.size();
 			UPDATE_REF_CONTAINER(fpc);
 
-			if (resortFlyingPieces[modelType]) {
+			if (resortFlyingPieces[modelType] || fpc.size() != oldSize) {
 				std::stable_sort(fpc.begin(), fpc.end());
+				resortFlyingPieces[modelType] = false;
 			}
 		}
 	}
