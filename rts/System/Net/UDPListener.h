@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _UDP_LISTENER_H
-#define _UDP_LISTENER_H
+#pragma once
 
 #include "System/Misc/NonCopyable.h"
 #include <memory>
@@ -98,5 +97,3 @@ private:
 };
 
 }
-
-#endif // _UDP_LISTENER_H
