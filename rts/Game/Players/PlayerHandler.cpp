@@ -66,6 +66,7 @@ int CPlayerHandler::Player(const std::string& name) const
 void CPlayerHandler::PlayerLeft(int id, unsigned char reason)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	Player(id)->StopControllingUnit();
 	Player(id)->active = false;
 	Player(id)->ping = 0;
 }
