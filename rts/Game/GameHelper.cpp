@@ -657,7 +657,6 @@ namespace {
 size_t CGameHelper::GenerateWeaponTargets(const CWeapon* weapon, const CUnit* avoidUnit, std::vector<std::pair<float, CUnit*>>& targets)
 {
 	const CUnit*  weaponOwner = weapon->owner;
-	const CUnit* lastAttacker = ((weaponOwner->lastAttackFrame + 200) <= gs->frameNum) ? weaponOwner->lastAttacker : nullptr;
 
 	const      WeaponDef* weaponDef = weapon->weaponDef;
 	const DynDamageArray* weaponDmg = weapon->damages;
@@ -681,8 +680,8 @@ size_t CGameHelper::GenerateWeaponTargets(const CWeapon* weapon, const CUnit* av
 	// const float scanRadius = weapon->GetRange2D(rangeBoost, (minMapHeight - aimPosHeight) * heightMod);
 	const float scanRadius = baseRange + rangeBoost + (aimPosHeight - minMapHeight) * heightMod;
 
-	// [0] := default, [1,2,3,4,5,6] := target is {avoidee, in bad category, crashing, last attacker, paralyzed, outside unboosted range}
-	constexpr float tgtPriorityMults[] = {1.0f, 10.0f, 100.0f, 1000.0f, 0.5f, 4.0f, 100000.0f};
+	// [0] := default, [1,2,3,4,5] := target is {avoidee, in bad category, crashing, paralyzed, outside unboosted range}
+	constexpr float tgtPriorityMults[] = {1.0f, 10.0f, 100.0f, 1000.0f, 4.0f, 100000.0f};
 
 	const bool paralyzer = (weaponDmg->paralyzeDamageTime != 0);
 
@@ -751,13 +750,13 @@ size_t CGameHelper::GenerateWeaponTargets(const CWeapon* weapon, const CUnit* av
 
 				targetPriority *= angleMul;
 				targetPriority *= rangeMul;
-				targetPriority *= tgtPriorityMults[(dist2D > baseRange) * 6];
+				targetPriority *= tgtPriorityMults[(dist2D > baseRange) * 5];
 
 				if (targetLOSState & LOS_INLOS) {
 					targetPriority *= (secDamage + targetUnit->health);
 
 					if (paralyzer && targetUnit->paralyzeDamage > (modInfo.paralyzeOnMaxHealth? targetUnit->maxHealth: targetUnit->health))
-						targetPriority *= tgtPriorityMults[5];
+						targetPriority *= tgtPriorityMults[4];
 
 					if (weapon->hasTargetWeight)
 						targetPriority *= weapon->TargetWeight(targetUnit);
@@ -770,7 +769,6 @@ size_t CGameHelper::GenerateWeaponTargets(const CWeapon* weapon, const CUnit* av
 					targetPriority /= (damageMul * targetUnit->power);
 					targetPriority *= tgtPriorityMults[((targetUnit->category & weapon->badTargetCategory) != 0) * 2];
 					targetPriority *= tgtPriorityMults[(targetUnit->IsCrashing()) * 3];
-					targetPriority *= tgtPriorityMults[(targetUnit == lastAttacker) * 4];
 				}
 
 				const bool allowTarget = eventHandler.AllowWeaponTarget(weaponOwner->id, targetUnit->id, weapon->weaponNum, weaponDef->id, &targetPriority);
