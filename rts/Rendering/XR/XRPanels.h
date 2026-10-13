@@ -78,6 +78,7 @@ private:
 	// drift towards the middle while the pointer (where the player looks) is near them
 	struct PanelState {
 		float focus = 0.0f; // 0..1, smoothed
+		float lean = 0.0f; // 0..1, how far the head is turned towards the panel
 		float alpha = 1.0f;
 	};
 

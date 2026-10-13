@@ -98,6 +98,11 @@ namespace {
 
 	// the largest drift towards the middle, as a fraction of the panel's position
 	constexpr float MAX_DRIFT = 0.2f;
+	// the drift when the head is turned towards the panel, from about 6 degrees (0 rad)
+	// of yaw, fully at about 29 degrees
+	constexpr float MAX_LEAN_DRIFT = 0.65f;
+	constexpr float LEAN_YAW_MIN = 0.1f;
+	constexpr float LEAN_YAW_MAX = 0.5f;
 }
 
 void CXRPanels::UpdateStates()
@@ -115,6 +120,14 @@ void CXRPanels::UpdateStates()
 	float pointerY = 0.0f;
 	if (mouse != nullptr && mouse->lastx >= 0 && mouse->lasty >= 0)
 		CRenderViews::CalcCursorHeadOffset(mouse->lastx, mouse->lasty, pointerX, pointerY);
+
+	// the head's yaw in the headset's space, positive to the right
+	float yaw = 0.0f;
+	{
+		const XREye& eye = CXRSession::GetInstance().GetEye(0);
+		const float3 forward = RotateByQuat(eye.rot, float3(0.0f, 0.0f, -1.0f));
+		yaw = std::atan2(forward.x, -forward.z);
+	}
 
 	// a quick response coming into view, slower going out
 	const float rateIn = 1.0f - std::exp(-dt * 12.0f);
@@ -137,8 +150,12 @@ void CXRPanels::UpdateStates()
 
 		state.focus += (target - state.focus) * (target > state.focus ? rateIn : rateOut);
 
+		// turning the head towards a panel brings it towards the middle
+		const float leanTarget = SmoothStep(LEAN_YAW_MIN, LEAN_YAW_MAX, panel.pos.x >= 0.0f ? yaw : -yaw);
+		state.lean += (leanTarget - state.lean) * (leanTarget > state.lean ? rateIn : rateOut);
+
 		const float side = Sideness(panel);
-		state.alpha = fade ? (1.0f - side * (1.0f - std::lerp(minAlpha, 1.0f, state.focus))) : 1.0f;
+		state.alpha = fade ? (1.0f - side * (1.0f - std::lerp(minAlpha, 1.0f, std::max(state.focus, state.lean)))) : 1.0f;
 	}
 }
 
@@ -148,7 +165,8 @@ float3 CXRPanels::GetEffectivePos(const std::string& id, const Panel& panel) con
 	if (it == states.end() || !panel.headLocked)
 		return panel.pos;
 
-	const float drift = MAX_DRIFT * it->second.focus * Sideness(panel);
+	const float side = Sideness(panel);
+	const float drift = 1.0f - (1.0f - MAX_DRIFT * it->second.focus * side) * (1.0f - MAX_LEAN_DRIFT * it->second.lean * side);
 	return float3(panel.pos.x * (1.0f - drift), panel.pos.y * (1.0f - drift), panel.pos.z);
 }
 
