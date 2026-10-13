@@ -2728,7 +2728,7 @@ const std::uint32_t QTPFS::PathSearch::GenerateVirtualNodeNumber(const QTPFS::No
 	uint32_t xoff = startNode->xmin();
 	uint32_t zoff = startNode->zmin();
 
-	int depth = 0;
+	int depth = startNode->GetDepth();
 	while (nodeSize > nodeMaxSize) {
 		// build the rest of the virtual node number
 		bool isRight = x >= xoff + (nodeSize >> 1);
