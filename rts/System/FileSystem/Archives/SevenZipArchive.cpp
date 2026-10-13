@@ -167,7 +167,7 @@ CSevenZipArchive::CSevenZipArchive(const std::string& name)
 
 	parallelAccessNum = !CheckForSolid() ? ThreadPool::GetNumThreads() : 1; // allow parallel access, but only for non-solid archives
 	sem = std::make_unique<decltype(sem)::element_type>(parallelAccessNum);
-	const auto maxBitMask = (1u << parallelAccessNum) - 1;
+	const auto maxBitMask = uint32_t((uint64_t{1} << parallelAccessNum) - 1);
 	afi.SetMaxBitsMask(maxBitMask);
 }
 
@@ -176,7 +176,7 @@ CSevenZipArchive::~CSevenZipArchive()
 {
 	std::scoped_lock lck(archiveLock); //not needed?
 
-	for (size_t i = 0; i < ThreadPool::GetNumThreads(); ++i) {
+	for (size_t i = 0; i < perThreadData.size(); ++i) {
 		if (!perThreadData[i])
 			continue;
 
@@ -286,6 +286,7 @@ void CSevenZipArchive::OpenArchive(int tnum)
 		isOpen[tnum] = true;
 	}
 	else {
+		File_Close(&archiveStream.file);
 		LOG_L(L_ERROR, "[%s] error opening \"%s\": %s", __func__, archiveFile.c_str(), GetErrorStr(res));
 	}
 }
