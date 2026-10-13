@@ -90,6 +90,13 @@ public:
 	float lastRudderPos[2] = {0.0f, 0.0f};
 	float lastElevatorPos[2] = {0.0f, 0.0f};
 	float lastAileronPos[2] = {0.0f, 0.0f};
+
+	/// seconds of flight path along which the altitude hold looks for high ground (0: a single point ahead, the stock behaviour)
+	float terrainLookahead = 0.0f;
+	/// share of altitudeRate at which that reference comes down again
+	float terrainLookaheadDescent = 0.5f;
+	/// that ground height; rises at once, comes down gradually
+	float lookaheadGroundHeight = 0.0f;
 };
 
 #endif // _AIR_MOVE_TYPE_H_
