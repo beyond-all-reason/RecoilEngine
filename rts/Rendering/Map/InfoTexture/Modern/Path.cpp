@@ -199,6 +199,7 @@ void CPathTexture::Update()
 	// just clear
 	if (ud == nullptr && md == nullptr) {
 		isCleared = true;
+		lastSelectedPathType = 0;
 		updateProcess = 0;
 		fbo.Bind();
 		glViewport(0, 0, texSize.x, texSize.y);

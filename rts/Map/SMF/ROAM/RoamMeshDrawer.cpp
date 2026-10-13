@@ -203,7 +203,7 @@ void CRoamMeshDrawer::Update()
 	if ((!forceNextTesselation[shadowPass]) &&
 		(cam->GetPos().distance(lastCamPos[shadowPass]) < CAMERA_CHANGE_TRESHOLD) &&
 		(cam->GetDir().distance(lastCamDir[shadowPass]) < CAMERA_CHANGE_TRESHOLD * 0.001f) &&
-		(heightMapChanged == false) &&
+		(heightMapChanged[shadowPass] == false) &&
 		!gldUpdated) {
 		return;
 	}
@@ -446,7 +446,7 @@ void CRoamMeshDrawer::Update()
 	lastCamPos[shadowPass] = cam->GetPos();
 	lastCamDir[shadowPass] = cam->GetDir();
 	forceNextTesselation[shadowPass] = false;
-	heightMapChanged = false;
+	heightMapChanged[shadowPass] = false;
 }
 
 
@@ -619,6 +619,6 @@ void CRoamMeshDrawer::UnsyncedHeightMapUpdate(const SRectangle& rect)
 			}
 		}
 	}
-	heightMapChanged = true;
+	heightMapChanged.fill(true);
 }
 

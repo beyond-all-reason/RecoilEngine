@@ -101,10 +101,8 @@ void CAirLosTexture::Update()
 	}
 
 	const auto& myAirLos = losHandler->airLos.losMaps[gu->myAllyTeam].GetLosMap();
-	{
-		auto binding = uploadTex.ScopedBind();
-		uploadTex.UploadImage(myAirLos.data());
-	}
+	auto binding = uploadTex.ScopedBind();
+	uploadTex.UploadImage(myAirLos.data());
 
 	// do post-processing on the gpu (los-checking & scaling)
 	using namespace GL::State;
@@ -114,6 +112,6 @@ void CAirLosTexture::Update()
 	RunFullScreenPass();
 
 	// generate mipmaps
-	auto binding = texture.ScopedBind();
+	texture.ScopedBind(binding);
 	texture.ProduceMipmaps();
 }

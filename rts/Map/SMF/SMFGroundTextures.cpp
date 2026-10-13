@@ -467,7 +467,7 @@ bool CSMFGroundTextures::GetSquareLuaTexture(int texSquareX, int texSquareY, int
 	if (lodMax < 0 || lodMax > 3)
 		return false;
 
-	if (lodMax > lodMin)
+	if (lodMax < lodMin)
 		std::swap(lodMin, lodMax);
 
 	static constexpr GLenum ttarget = GL_TEXTURE_2D;
@@ -490,7 +490,7 @@ bool CSMFGroundTextures::GetSquareLuaTexture(int texSquareX, int texSquareY, int
 		ExtractSquareTiles(texSquareX, texSquareY, lod, reinterpret_cast<GLint*>(pbo.MapBuffer(0, pbo.GetSize(), access | pbo.mapUnsyncedBit)));
 		pbo.UnmapBuffer();
 
-		glCompressedTexImage2D(ttarget, 0, tileTexFormat, texSizeX, texSizeY, 0, numSqBytes, pbo.GetPtr());
+		glCompressedTexImage2D(ttarget, lod - lodMin, tileTexFormat, mipSqSize, mipSqSize, 0, numSqBytes, pbo.GetPtr());
 
 		pbo.Invalidate();
 		pbo.Unbind();
@@ -598,6 +598,7 @@ void CSMFGroundTextures::LoadSquareTexturePersistent(int x, int y)
 
 	//skip pbo, makes little sense here
 
+	glDeleteTextures(1, square->GetTextureIDPtr());
 	glGenTextures(1, square->GetTextureIDPtr());
 	glBindTexture(ttarget, square->GetTextureID());
 
