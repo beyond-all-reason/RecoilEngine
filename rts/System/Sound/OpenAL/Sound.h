@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _SOUND_H_
-#define _SOUND_H_
+#pragma once
 
 #include <atomic>
 #include <string>
@@ -80,7 +79,7 @@ private:
 private:
 	void Cleanup();
 	void OpenOpenALDevice(const std::string& deviceName);
-	bool OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec);
+	bool OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec, const SDL_AudioSpec* requiredSpec = nullptr);
 	void OpenLoopbackDevice(const std::string& deviceName);
 
 	void InitThread(int cfgMaxSounds);
@@ -126,6 +125,8 @@ private:
 
 	int pitchAdjustMode = 0;
 	int frameSize = -1;
+	// format of the OpenAL loopback device; a reopened SDL device must deliver exactly this
+	SDL_AudioSpec loopbackSpec = {};
 
 	bool mute = false;
 
@@ -136,5 +137,3 @@ private:
 	std::atomic<bool> soundThreadQuit = {false};
 	std::atomic<bool> canLoadDefs = {false};
 };
-
-#endif // _SOUND_H_
