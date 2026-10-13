@@ -847,7 +847,8 @@ void CUnitDrawerGLSL::DrawUnitIconScreen(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, s
 	const float x1 = (pos.x + offset) / globalRendering->viewSizeX;
 	const float y1 = (pos.y - offset) / globalRendering->viewSizeY;
 
-	if (x1 < 0 && x0 > 1 && y0 < 0 && y1 > 1)
+	// offset can be negative (negative icon size), so test the sorted bounds
+	if (std::max(x0, x1) < 0.0f || std::min(x0, x1) > 1.0f || std::max(y0, y1) < 0.0f || std::min(y0, y1) > 1.0f)
 		return; // don't try to draw when totally outside the screen
 
 	const auto& tc = iconData.GetTexCoords();
