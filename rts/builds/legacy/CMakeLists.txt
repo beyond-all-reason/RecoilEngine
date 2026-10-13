@@ -73,9 +73,11 @@ list(APPEND engineLibraries RmlUi::Debugger)
 list(APPEND engineLibraries lunasvg)
 list(APPEND engineLibraries glad)
 
-# VR output through OpenXR (see rts/Rendering/XR)
-add_definitions(-DUSE_OPENXR)
-list(APPEND engineLibraries OpenXR::openxr_loader)
+# VR output through OpenXR (see rts/Rendering/XR), implemented for Windows only
+if (WIN32)
+	add_definitions(-DUSE_OPENXR)
+	list(APPEND engineLibraries OpenXR::openxr_loader)
+endif()
 
 ### Assemble external include dirs
 list(APPEND engineIncludes ${ENGINE_SRC_ROOT_DIR}/lib/asio/include)

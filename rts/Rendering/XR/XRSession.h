@@ -31,8 +31,6 @@ struct XREye {
  *
  * Usage per frame: BeginFrame(), then per eye AcquireEyeImage() / render /
  * ReleaseEyeImage(), then EndFrame().
- *
- * See coding-agents/MULTI_RENDER_TARGETS.md for the multi-view groundwork.
  */
 class CXRSession {
 public:

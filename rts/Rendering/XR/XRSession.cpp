@@ -85,7 +85,6 @@ struct CXRSession::Impl {
 		float widthMetres = 1.5f;
 	};
 	std::map<std::string, Panel> panels;
-	std::map<std::string, std::string> reportedLayers;
 
 	XrSessionState state = XR_SESSION_STATE_UNKNOWN;
 
@@ -420,13 +419,6 @@ void CXRSession::Impl::EndFrame()
 		quad.size.height = panel.widthMetres * float(panel.height) / float(panel.width);
 		quads.push_back(quad);
 
-		// the placement of every layer, logged when it changes
-		char placement[160];
-		snprintf(placement, sizeof(placement), "%llx %s %.2f %.2f %.2f w %.2f %dx%d at %d %d", static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(panelAtlas.swapchain)), panel.headLocked ? "head" : "world", panel.pos[0], panel.pos[1], panel.pos[2], panel.widthMetres, panel.width, panel.height, panel.x, panel.y);
-		if (reportedLayers[id] != placement) {
-			reportedLayers[id] = placement;
-			LOG("[XRSession] layer '%s': swapchain %s", id.c_str(), placement);
-		}
 	}
 
 	std::vector<const XrCompositionLayerBaseHeader*> layers;
@@ -510,7 +502,15 @@ CXRSession& CXRSession::GetInstance()
 	return instance;
 }
 
-bool CXRSession::Start(int resolutionScalePercent) { return impl->Start(resolutionScalePercent); }
+bool CXRSession::Start(int resolutionScalePercent)
+{
+	if (impl->Start(resolutionScalePercent))
+		return true;
+
+	// do not leave a half made instance behind
+	impl->Stop();
+	return false;
+}
 void CXRSession::Stop() { impl->Stop(); }
 bool CXRSession::IsCreated() const { return impl->session != XR_NULL_HANDLE; }
 bool CXRSession::IsLost() const { return impl->lost; }

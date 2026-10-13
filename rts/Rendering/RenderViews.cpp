@@ -10,7 +10,6 @@
 #include "Rendering/UniformConstants.h"
 #include "Rendering/WorldDrawer.h"
 #include "Rendering/Units/UnitDrawer.h"
-#include "Rendering/Textures/Bitmap.h"
 #include "Game/UI/MouseHandler.h"
 #include "Map/Ground.h"
 #include "Rendering/XR/XRPanels.h"
@@ -24,7 +23,7 @@
 
 CONFIG(bool, SecondaryView)
 	.defaultValue(false)
-	.description("Render a second camera into an offscreen target, shown as an inset. Prototype for multi-window rendering.");
+	.description("Render a second camera into an offscreen target, shown as an inset. Mainly for testing the headset views without a headset.");
 CONFIG(int, SecondaryViewYaw)
 	.defaultValue(40)
 	.description("Yaw offset in degrees of the secondary view's camera relative to the player camera.");
@@ -78,9 +77,6 @@ CONFIG(int, XRPointerFov)
 	.minimumValue(10)
 	.maximumValue(150)
 	.description("Headset: the vertical angle in degrees that the window's height covers for the mouse pointer.");
-CONFIG(bool, SecondaryViewDump)
-	.defaultValue(false)
-	.description("Saves the next rendered image of the secondary view to screenshots/mrt_view<N>.png, then resets itself to 0.");
 
 
 namespace {
@@ -124,20 +120,6 @@ namespace {
 		int viewPosX, viewPosY, viewSizeX, viewSizeY;
 		float pixelX, pixelY, aspectRatio;
 	};
-
-	// debugging aid: saves the (currently bound) view target, so that what the view
-	// rendered can be told apart from how it was shown in the window
-	void DumpBoundTarget(const RenderView& view, size_t viewIdx)
-	{
-		std::vector<uint8_t> pixels(size_t(view.sizeX) * view.sizeY * 4);
-
-		glPixelStorei(GL_PACK_ALIGNMENT, 1);
-		glReadPixels(0, 0, view.sizeX, view.sizeY, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-
-		CBitmap bmp(pixels.data(), view.sizeX, view.sizeY);
-		bmp.ReverseYAxis();
-		bmp.Save("screenshots/mrt_view" + std::to_string(viewIdx) + ".png", true, true);
-	}
 
 	// v rotated by the unit quaternion q (x y z w)
 	float3 RotateByQuat(const float q[4], const float3& v)
@@ -281,6 +263,7 @@ bool CRenderViews::EnsureTarget(RenderView& view)
 	if (!complete) {
 		LOG_L(L_ERROR, "[RenderViews::%s] incomplete %dx%d target, disabling secondary view", __func__, view.sizeX, view.sizeY);
 		configHandler->Set("SecondaryView", false);
+		configHandler->Set("XREnable", false);
 		view.FreeTarget();
 	}
 	return complete;
@@ -309,6 +292,7 @@ bool CRenderViews::EnsureInset(RenderView& view)
 	if (!complete) {
 		LOG_L(L_ERROR, "[RenderViews::%s] incomplete %dx%d inset, disabling secondary view", __func__, wantedX, wantedY);
 		configHandler->Set("SecondaryView", false);
+		configHandler->Set("XREnable", false);
 		view.inset = nullptr;
 		return false;
 	}
@@ -586,11 +570,6 @@ void CRenderViews::DrawSecondaryViews(const CWorldDrawer& worldDrawer)
 				}
 			}
 
-			if (configHandler->GetBool("SecondaryViewDump")) {
-				configHandler->Set("SecondaryViewDump", false);
-				DumpBoundTarget(view, &view - views.data());
-			}
-
 			FBO::SetDefaultTarget(prevTarget);
 			FBO::Unbind();
 		}
@@ -607,12 +586,9 @@ void CRenderViews::DrawSecondaryViews(const CWorldDrawer& worldDrawer)
 		UploadPlayerCameraMatrices();
 		slot->LoadViewport();
 
-		const bool scaled = FBO::Blit(view.target->GetId(), view.inset->GetId(), {0, 0, view.sizeX, view.sizeY}, {0, 0, view.insetSizeX, view.insetSizeY}, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		FBO::Blit(view.target->GetId(), view.inset->GetId(), {0, 0, view.sizeX, view.sizeY}, {0, 0, view.insetSizeX, view.insetSizeY}, GL_COLOR_BUFFER_BIT, GL_LINEAR);
 		// same-size rects, so this is valid into a multisampled window framebuffer
-		const bool shown = FBO::Blit(view.inset->GetId(), FBO::GetDefaultTarget(), {0, 0, view.insetSizeX, view.insetSizeY}, {x0, y0, x1, y1}, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-		(void) scaled;
-		(void) shown;
+		FBO::Blit(view.inset->GetId(), FBO::GetDefaultTarget(), {0, 0, view.insetSizeX, view.insetSizeY}, {x0, y0, x1, y1}, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	}
 }
 

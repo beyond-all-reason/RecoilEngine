@@ -10,13 +10,13 @@
 #include "Game/UI/MouseHandler.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/RenderViews.h"
-#include "Rendering/Textures/Bitmap.h"
 #include "System/Config/ConfigHandler.h"
-#include "System/FileSystem/DataDirLocater.h"
 #include "Rendering/XR/XRSession.h"
-#include "System/Log/ILog.h"
 #include "System/Misc/TracyDefs.h"
 #include "System/SpringMath.h"
+
+CONFIG(int, XRPanelFade).defaultValue(1).description("Headset panels away from the middle of the view fade out, and fade in and move towards the middle when the pointer comes near or the head turns towards them.");
+CONFIG(int, XRPanelFadeMin).defaultValue(10).minimumValue(0).maximumValue(100).description("The opacity in percent of a faded out headset panel.");
 
 namespace {
 	// v rotated by the unit quaternion q (x y z w)
@@ -66,10 +66,6 @@ namespace {
 
 void CXRPanels::Set(const std::string& id, const Panel& panel)
 {
-	const auto it = panels.find(id);
-	if (it == panels.end() || it->second.texture != panel.texture)
-		LOG("[XRPanels] panel '%s': texture %u (%dx%d), %s at %.2f %.2f %.2f, width %.2f", id.c_str(), panel.texture, panel.sizeX, panel.sizeY, panel.headLocked ? "head" : "world", panel.pos.x, panel.pos.y, panel.pos.z, panel.width);
-
 	panels[id] = panel;
 }
 
@@ -79,9 +75,6 @@ void CXRPanels::Remove(const std::string& id)
 	if (panels.erase(id) > 0)
 		CXRSession::GetInstance().RemovePanel(id);
 }
-
-CONFIG(int, XRPanelFade).defaultValue(1).description("Headset panels away from the middle of the view fade out, and fade in and move towards the middle when the pointer comes near.");
-CONFIG(int, XRPanelFadeMin).defaultValue(10).minimumValue(0).maximumValue(100).description("The opacity in percent of a faded out headset panel.");
 
 namespace {
 	float SmoothStep(float edge0, float edge1, float x)
@@ -98,8 +91,8 @@ namespace {
 
 	// the largest drift towards the middle, as a fraction of the panel's position
 	constexpr float MAX_DRIFT = 0.2f;
-	// the drift when the head is turned towards the panel, from about 6 degrees (0 rad)
-	// of yaw, fully at about 29 degrees
+	// the drift when the head is turned towards the panel, from about 6 degrees of yaw,
+	// fully at about 29 degrees
 	constexpr float MAX_LEAN_DRIFT = 0.65f;
 	constexpr float LEAN_YAW_MIN = 0.1f;
 	constexpr float LEAN_YAW_MAX = 0.5f;
@@ -314,20 +307,6 @@ void CXRPanels::LocatePanel(const std::string& id, const Panel& panel, bool& hea
 	QuatFromAxes(xAxis, yAxis, normal, rot);
 }
 
-CONFIG(int, XRPanelDump).defaultValue(0).description("Set to 1 to save the images of the VR panels to the data directory, once");
-
-// saves the colour attachment of the bound framebuffer
-static void DumpBoundFramebuffer(const std::string& name, int width, int height)
-{
-	CBitmap bmp;
-	bmp.Alloc(width, height, 4);
-	glPixelStorei(GL_PACK_ALIGNMENT, 1);
-	glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, bmp.GetRawMem());
-
-	const std::string path = dataDirLocater.GetWriteDirPath() + name;
-	bmp.Save(path, false, true);
-}
-
 void CXRPanels::Submit()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -336,10 +315,6 @@ void CXRPanels::Submit()
 		return;
 
 	UpdateStates();
-
-	const bool dumpWanted = (configHandler->GetInt("XRPanelDump") != 0);
-	if (dumpWanted)
-		configHandler->Set("XRPanelDump", 0);
 
 	// the panels go side by side in rows on the shared image
 	constexpr int PADDING = 2;
@@ -458,18 +433,6 @@ void CXRPanels::Submit()
 			glUseProgram(program);
 		}
 
-		if (dumpWanted) {
-			// what the widget drew, and what arrived in the headset image
-			srcFbo->Bind();
-			DumpBoundFramebuffer("xrpanel_" + *p.id + "_widget.png", panel.sizeX, panel.sizeY);
-			dstFbo->Bind();
-			CBitmap bmp;
-			bmp.Alloc(panel.sizeX, panel.sizeY, 4);
-			glPixelStorei(GL_PACK_ALIGNMENT, 1);
-			glReadPixels(p.x, p.y, panel.sizeX, panel.sizeY, GL_RGBA, GL_UNSIGNED_BYTE, bmp.GetRawMem());
-			bmp.Save(dataDirLocater.GetWriteDirPath() + "xrpanel_" + *p.id + "_headset.png", false, true);
-			FBO::Unbind();
-		}
 	}
 
 	// the compositor reads the image once released

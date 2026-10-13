@@ -88,7 +88,8 @@ struct RenderView {
  * Extra camera views of the 3D world, each rendered into an offscreen target
  * of its own and composited over the window afterwards.
  *
- * Prototype: the views are drawn one after the other by temporarily
+
+ * The views are drawn one after the other by temporarily
  * pointing the player camera slot at the view's camera (and overriding the
  * view size in globalRendering). Everything that reads those (shader
  * matrices, culling, draw flags) then follows along, and it is put back
@@ -97,8 +98,6 @@ struct RenderView {
  * Visibility is computed once per frame for the player camera; the frusta
  * of the extra views are added to it (CCamera::SetExtraCullFrusta) so the
  * result is valid for all of them.
- *
- * See coding-agents/MULTI_RENDER_TARGETS.md (DSN-01, TGT-01, CAM-01, OBJ-01).
  */
 class CRenderViews {
 public:

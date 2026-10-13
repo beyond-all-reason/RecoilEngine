@@ -1085,25 +1085,25 @@ void CEventHandler::DrawWorldPreParticles(bool drawAboveWater, bool drawBelowWat
 void CEventHandler::DrawOpaqueUnitsLua(bool deferredPass, bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
-	ITERATE_EVENTCLIENTLIST(DrawOpaqueUnitsLua,deferredPass, drawReflection, drawRefraction);
+	ITERATE_EVENTCLIENTLIST(DrawOpaqueUnitsLua, deferredPass, drawReflection, drawRefraction);
 }
 
 void CEventHandler::DrawOpaqueFeaturesLua(bool deferredPass, bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
-	ITERATE_EVENTCLIENTLIST(DrawOpaqueFeaturesLua,deferredPass, drawReflection, drawRefraction);
+	ITERATE_EVENTCLIENTLIST(DrawOpaqueFeaturesLua, deferredPass, drawReflection, drawRefraction);
 }
 
 void CEventHandler::DrawAlphaUnitsLua(bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
-	ITERATE_EVENTCLIENTLIST(DrawAlphaUnitsLua,drawReflection, drawRefraction);
+	ITERATE_EVENTCLIENTLIST(DrawAlphaUnitsLua, drawReflection, drawRefraction);
 }
 
 void CEventHandler::DrawAlphaFeaturesLua(bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
-	ITERATE_EVENTCLIENTLIST(DrawAlphaFeaturesLua,drawReflection, drawRefraction);
+	ITERATE_EVENTCLIENTLIST(DrawAlphaFeaturesLua, drawReflection, drawRefraction);
 }
 
 void CEventHandler::DrawShadowUnitsLua()
