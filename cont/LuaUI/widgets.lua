@@ -133,6 +133,7 @@ local flexCallIns = {
   'UnitCmdDone',
   'UnitDamaged',
   'UnitStunned',
+  'UnitFlightRegimeChanged',
   'UnitEnteredRadar',
   'UnitEnteredLos',
   'UnitLeftRadar',
@@ -1955,6 +1956,13 @@ end
 function widgetHandler:UnitStunned(unitID, unitDefID, unitTeam, stunned)
   for _,w in ipairs(self.UnitStunnedList) do
     w:UnitStunned(unitID, unitDefID, unitTeam, stunned)
+  end
+  return
+end
+
+function widgetHandler:UnitFlightRegimeChanged(unitID, unitDefID, unitTeam, regime)
+  for _,w in ipairs(self.UnitFlightRegimeChangedList) do
+    w:UnitFlightRegimeChanged(unitID, unitDefID, unitTeam, regime)
   end
   return
 end
