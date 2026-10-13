@@ -22,6 +22,7 @@
 #include "Lua/LuaInputReceiver.h"
 #include "Map/Ground.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/RenderViews.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/RenderBuffers.h"
@@ -684,15 +685,31 @@ void CMouseHandler::DrawSelectionBox() const
 		{tpLeft , cmdColors.mouseBox},
 	});
 
+	// a headset view has many more pixels per degree: a hairline would vanish there
+	const bool inHeadsetView = CRenderViews::InSecondaryView();
+
 	auto state = GL::SubState(
 		DepthTest(GL_FALSE),
 		Blending(GL_TRUE),
 		BlendFunc((GLenum)cmdColors.MouseBoxBlendSrc(), (GLenum)cmdColors.MouseBoxBlendDst()),
-		LineWidth(cmdColors.MouseBoxLineWidth()));
+		LineWidth(inHeadsetView ? std::max(cmdColors.MouseBoxLineWidth(), 4.0f) : cmdColors.MouseBoxLineWidth()));
 
 	sh.Enable();
 
 	rb.DrawArrays(GL_LINE_LOOP);
+
+	if (inHeadsetView) {
+		// and a faint fill, to see the area
+		const SColor fill(cmdColors.mouseBox[0], cmdColors.mouseBox[1], cmdColors.mouseBox[2], 0.16f);
+
+		rb.AddVertices({
+			{btLeft , fill}, {btRight, fill}, {tpRight, fill},
+			{btLeft , fill}, {tpRight, fill}, {tpLeft , fill},
+		});
+
+		GL::State::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		rb.DrawArrays(GL_TRIANGLES);
+	}
 
 	sh.Disable();
 }
@@ -705,7 +722,7 @@ int2 CMouseHandler::GetViewMouseCenter() const
 	};
 }
 
-float3 CMouseHandler::GetCursorCameraDir(int x, int y) const { return (hideCursor? camera->GetDir() : camera->CalcPixelDir(x, y)); }
+float3 CMouseHandler::GetCursorCameraDir(int x, int y) const { return (hideCursor? camera->GetDir() : CRenderViews::CalcCursorDir(camera, x, y)); }
 float3 CMouseHandler::GetWorldMapPos() const
 {
 	const float3 cameraPos = camera->GetPos();

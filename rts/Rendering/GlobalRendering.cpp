@@ -15,6 +15,7 @@
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/glxHandler.h"
+#include "Rendering/RenderViews.h"
 #include "Rendering/UniformConstants.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/Models/ModelsMemStorage.h"
@@ -388,6 +389,7 @@ CGlobalRendering::~CGlobalRendering()
 
 void CGlobalRendering::PreKill()
 {
+	CRenderViews::GetInstance().Kill();
 	UniformConstants::GetInstance().Kill(); //unsafe to kill in ~CGlobalRendering()
 	RenderBuffer::KillStatic();
 	GL::shapes.Kill();

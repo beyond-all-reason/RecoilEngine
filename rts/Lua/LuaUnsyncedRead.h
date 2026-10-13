@@ -147,6 +147,9 @@ class LuaUnsyncedRead {
 
 		static int GetFPS(lua_State* L);
 		static int GetGameSpeed(lua_State* L);
+		static int XRGetHeadPose(lua_State* L);
+		static int XRInSecondaryView(lua_State* L);
+		static int XRPanelHit(lua_State* L);
 		static int GetGameState(lua_State* L);
 
 		static int GetMouseButtonsPressed(lua_State* L);

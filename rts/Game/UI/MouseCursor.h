@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef MOUSECURSOR_H
-#define MOUSECURSOR_H
+#pragma once
 
 #include <string>
 #include <vector>
@@ -28,6 +27,9 @@ public:
 
 	void Update();
 	void Draw(int x, int y, float scale) const;   // software cursor draw
+	// draws the cursor image as a quad in the world, with its hotspot at pos; the matrices
+	// of the current view must be loaded. pixelSize is the world size of one image pixel
+	void DrawInWorld(const float3& pos, const float3& right, const float3& up, float pixelSize) const;
 	void BindTexture() const;                     // software mouse cursor
 	void UpdateHwCursor() const;                  // hardware mouse cursor animation
 	void BindHwCursor() const;                    // hardware mouse cursor
@@ -107,4 +109,3 @@ private:
 };
 
 
-#endif /* MOUSECURSOR_H */

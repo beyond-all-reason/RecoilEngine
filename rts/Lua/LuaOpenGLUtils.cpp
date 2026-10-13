@@ -11,6 +11,7 @@
 #include "Map/BaseGroundDrawer.h"
 #include "Map/ReadMap.h"
 #include "Rendering/Fonts/glFont.h"
+#include "Rendering/DepthBufferCopy.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/IconHandler.h"
 #include "Rendering/ShadowHandler.h"
@@ -96,6 +97,8 @@ LuaMatTexture::Type LuaOpenGLUtils::GetLuaMatTextureType(const std::string& name
 		case hashString("$map_gb_et"): { return LuaMatTexture::LUATEX_MAP_GBUFFER_EMIT; } break;
 		case hashString("$map_gb_mt"): { return LuaMatTexture::LUATEX_MAP_GBUFFER_MISC; } break;
 		case hashString("$map_gb_zt"): { return LuaMatTexture::LUATEX_MAP_GBUFFER_ZVAL; } break;
+
+		case hashString("$terrain_depth_copy"): { return LuaMatTexture::LUATEX_TERRAIN_DEPTH_COPY; } break;
 
 		case hashString("$map_gbuffer_normtex"): { return LuaMatTexture::LUATEX_MAP_GBUFFER_NORM; } break;
 		case hashString("$map_gbuffer_difftex"): { return LuaMatTexture::LUATEX_MAP_GBUFFER_DIFF; } break;
@@ -614,6 +617,9 @@ GLuint LuaMatTexture::GetTextureID() const
 		case LUATEX_MAP_GBUFFER_MISC: { texID = gdGeomBuff->GetBufferTexture(GL::GeometryBuffer::ATTACHMENT_MISCTEX); } break;
 		case LUATEX_MAP_GBUFFER_ZVAL: { texID = gdGeomBuff->GetBufferTexture(GL::GeometryBuffer::ATTACHMENT_ZVALTEX); } break;
 
+		// the terrain depth of the view being drawn, as sampled with view relative coordinates
+		case LUATEX_TERRAIN_DEPTH_COPY: { texID = (depthBufferCopy != nullptr && depthBufferCopy->IsValid(false))? depthBufferCopy->GetDepthBufferTexture(false): 0; } break;
+
 		case LUATEX_MODEL_GBUFFER_NORM: { texID = udGeomBuff->GetBufferTexture(GL::GeometryBuffer::ATTACHMENT_NORMTEX); } break;
 		case LUATEX_MODEL_GBUFFER_DIFF: { texID = udGeomBuff->GetBufferTexture(GL::GeometryBuffer::ATTACHMENT_DIFFTEX); } break;
 		case LUATEX_MODEL_GBUFFER_SPEC: { texID = udGeomBuff->GetBufferTexture(GL::GeometryBuffer::ATTACHMENT_SPECTEX); } break;
@@ -701,6 +707,7 @@ GLuint LuaMatTexture::GetTextureTarget() const
 		case LUATEX_SHADOWMAP:   [[fallthrough]];
 		case LUATEX_SHADOWCOLOR: [[fallthrough]];
 		case LUATEX_HEIGHTMAP:	 [[fallthrough]];
+		case LUATEX_TERRAIN_DEPTH_COPY: [[fallthrough]];
 
 
 		case LUATEX_SMF_GRASS:   [[fallthrough]];
@@ -1094,6 +1101,7 @@ void LuaMatTexture::Print(const string& indent) const
 		STRING_CASE(typeName, LUATEX_MAP_GBUFFER_EMIT);
 		STRING_CASE(typeName, LUATEX_MAP_GBUFFER_MISC);
 		STRING_CASE(typeName, LUATEX_MAP_GBUFFER_ZVAL);
+		STRING_CASE(typeName, LUATEX_TERRAIN_DEPTH_COPY);
 
 		STRING_CASE(typeName, LUATEX_MODEL_GBUFFER_NORM);
 		STRING_CASE(typeName, LUATEX_MODEL_GBUFFER_DIFF);

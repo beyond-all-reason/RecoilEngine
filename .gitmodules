@@ -55,3 +55,6 @@
 [submodule "rts/lib/monocypher"]
 	path = rts/lib/monocypher
 	url = https://github.com/LoupVaillant/Monocypher.git
+[submodule "rts/lib/OpenXR-SDK"]
+	path = rts/lib/OpenXR-SDK
+	url = https://github.com/KhronosGroup/OpenXR-SDK.git

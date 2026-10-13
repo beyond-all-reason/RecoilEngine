@@ -3,6 +3,7 @@
 #pragma once
 
 #include <array>
+#include <vector>
 
 #include "System/AABB.hpp"
 #include "System/float3.h"
@@ -158,6 +159,30 @@ public:
 	const FrustumLine* GetPosFrustumLines() const { return &frustumLines[FRUSTUM_SIDE_POS][0]; }
 	const FrustumLine* GetNegFrustumLines() const { return &frustumLines[FRUSTUM_SIDE_NEG][0]; }
 
+	/**
+	 * Explicit pose: position and orientation are taken as given (roll
+	 * included) instead of being derived from `rot` on every Update().
+	 * @param upHint need not be perpendicular to fwd
+	 */
+	void SetExternalPose(const float3& p, const float3& fwd, const float3& upHint);
+
+	/**
+	 * Explicit, possibly asymmetric, perspective frustum given as tangents
+	 * at unit distance (left < 0 < right, bottom < 0 < top), the form
+	 * headset runtimes report per eye. Overrides fov and window aspect.
+	 */
+	void SetFrustumTangents(float left, float right, float bottom, float top);
+
+	void ClearExternalState() { externalPose = false; useTangents = false; }
+	bool HasExternalState() const { return externalPose || useTangents; }
+
+	/**
+	 * Frusta of the other views that are drawn through the player camera
+	 * slot. The player camera also counts anything inside them as visible,
+	 * so that visibility computed once per frame holds for every view.
+	 */
+	static void SetExtraCullFrusta(std::vector<Frustum>&& frusta) { extraCullFrusta = std::move(frusta); }
+
 	void SetClipCtrlMatrix(const CMatrix44f& mat) { clipControlMatrix = mat; }
 	void SetProjMatrix(const CMatrix44f& mat) { projectionMatrix = mat; }
 	void SetViewMatrix(const CMatrix44f& mat) {
@@ -308,6 +333,13 @@ private:
 	uint32_t projType = -1u;
 
 	uint8_t inViewPlanesMask;
+
+	// see SetExternalPose / SetFrustumTangents
+	bool externalPose = false;
+	bool useTangents = false;
+	float4 tangents; // left, right, bottom, top
+
+	inline static std::vector<Frustum> extraCullFrusta;
 
 	bool movState[10]; // fwd, back, left, right, up, down, fast, slow, tilt, reset
 	bool rotState[4]; // unused

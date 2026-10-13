@@ -49,6 +49,7 @@
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/TeamHighlight.h"
 #include "Rendering/Units/UnitDrawer.h"
+#include "Rendering/RenderViews.h"
 #include "Rendering/UniformConstants.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Textures/NamedTextures.h"
@@ -1429,6 +1430,7 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 
 	camera->Update();
 	shadowHandler.Update();
+	CRenderViews::GetInstance().Update();
 	{
 		worldDrawer.Update(newSimFrame);
 		transformsUploader.Update();
@@ -1524,6 +1526,7 @@ bool CGame::Draw() {
 		camera->LoadViewport();
 
 		worldDrawer.Draw();
+		CRenderViews::GetInstance().DrawSecondaryViews(worldDrawer);
 		worldDrawer.ResetMVPMatrices();
 	}
 
@@ -1546,6 +1549,8 @@ bool CGame::Draw() {
 
 		eventHandler.DrawScreenPost();
 	}
+
+	CRenderViews::GetInstance().EndXRFrame();
 
 	glEnable(GL_DEPTH_TEST);
 	glLoadIdentity();

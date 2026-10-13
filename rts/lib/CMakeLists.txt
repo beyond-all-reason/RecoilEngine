@@ -220,3 +220,14 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU" AND TARGET rmlui_core)
 	# Fixed in GCC 14 -- retest dropping this once CI is off GCC 13.
 	target_compile_options(rmlui_core PRIVATE -Wno-array-bounds)
 endif()
+
+# OpenXR loader (static, pre-generated sources, so no python needed); only
+# linked into the interactive engine build, hence EXCLUDE_FROM_ALL.
+# The headset output is only implemented for Windows (see rts/Rendering/XR)
+if (WIN32)
+	set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
+	set(BUILD_API_LAYERS OFF CACHE BOOL "" FORCE)
+	set(BUILD_CONFORMANCE_TESTS OFF CACHE BOOL "" FORCE)
+	set(DYNAMIC_LOADER OFF CACHE BOOL "" FORCE)
+	ADD_SUBDIRECTORY(OpenXR-SDK EXCLUDE_FROM_ALL)
+endif()
