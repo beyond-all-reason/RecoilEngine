@@ -3,9 +3,12 @@
 #include "XRPanels.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <vector>
 
+#include "Game/UI/MouseHandler.h"
+#include "Rendering/GlobalRendering.h"
 #include "Rendering/RenderViews.h"
 #include "Rendering/Textures/Bitmap.h"
 #include "System/Config/ConfigHandler.h"
@@ -72,8 +75,81 @@ void CXRPanels::Set(const std::string& id, const Panel& panel)
 
 void CXRPanels::Remove(const std::string& id)
 {
+	states.erase(id);
 	if (panels.erase(id) > 0)
 		CXRSession::GetInstance().RemovePanel(id);
+}
+
+CONFIG(int, XRPanelFade).defaultValue(1).description("Headset panels away from the middle of the view fade out, and fade in and move towards the middle when the pointer comes near.");
+CONFIG(int, XRPanelFadeMin).defaultValue(10).minimumValue(0).maximumValue(100).description("The opacity in percent of a faded out headset panel.");
+
+namespace {
+	float SmoothStep(float edge0, float edge1, float x)
+	{
+		const float t = std::clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+		return t * t * (3.0f - 2.0f * t);
+	}
+
+	// how far the panel is from the middle of the view, 0 (in the middle) to 1 (at the side)
+	float Sideness(const CXRPanels::Panel& panel)
+	{
+		return SmoothStep(0.12f, 0.35f, std::hypot(panel.pos.x, panel.pos.y) / std::max(panel.pos.z, 0.1f));
+	}
+
+	// the largest drift towards the middle, as a fraction of the panel's position
+	constexpr float MAX_DRIFT = 0.2f;
+}
+
+void CXRPanels::UpdateStates()
+{
+	static auto lastTime = std::chrono::steady_clock::now();
+	const auto now = std::chrono::steady_clock::now();
+	const float dt = std::min(0.1f, std::chrono::duration<float>(now - lastTime).count());
+	lastTime = now;
+
+	const bool fade = (configHandler->GetInt("XRPanelFade") != 0);
+	const float minAlpha = configHandler->GetInt("XRPanelFadeMin") * 0.01f;
+
+	// where the pointer points, as the offsets in the view (per metre of distance)
+	float pointerX = 0.0f;
+	float pointerY = 0.0f;
+	if (mouse != nullptr && mouse->lastx >= 0 && mouse->lasty >= 0)
+		CRenderViews::CalcCursorHeadOffset(mouse->lastx, mouse->lasty, pointerX, pointerY);
+
+	// a quick response coming into view, slower going out
+	const float rateIn = 1.0f - std::exp(-dt * 12.0f);
+	const float rateOut = 1.0f - std::exp(-dt * 4.0f);
+
+	for (const auto& [id, panel]: panels) {
+		if (!panel.headLocked || panel.pos.z <= 0.0f)
+			continue;
+
+		PanelState& state = states[id];
+
+		float target = 1.0f;
+		if (fade) {
+			const float halfWidth = 0.5f * panel.width / panel.pos.z;
+			const float halfHeight = 0.5f * panel.width * float(panel.sizeY) / float(std::max(panel.sizeX, 1)) / panel.pos.z;
+			const float dx = std::max(0.0f, std::fabs(pointerX - panel.pos.x / panel.pos.z) - halfWidth);
+			const float dy = std::max(0.0f, std::fabs(pointerY - panel.pos.y / panel.pos.z) - halfHeight);
+			target = 1.0f - SmoothStep(0.08f, 0.4f, std::hypot(dx, dy));
+		}
+
+		state.focus += (target - state.focus) * (target > state.focus ? rateIn : rateOut);
+
+		const float side = Sideness(panel);
+		state.alpha = fade ? (1.0f - side * (1.0f - std::lerp(minAlpha, 1.0f, state.focus))) : 1.0f;
+	}
+}
+
+float3 CXRPanels::GetEffectivePos(const std::string& id, const Panel& panel) const
+{
+	const auto it = states.find(id);
+	if (it == states.end() || !panel.headLocked)
+		return panel.pos;
+
+	const float drift = MAX_DRIFT * it->second.focus * Sideness(panel);
+	return float3(panel.pos.x * (1.0f - drift), panel.pos.y * (1.0f - drift), panel.pos.z);
 }
 
 void CXRPanels::Kill()
@@ -141,12 +217,13 @@ bool CXRPanels::HitTest(const std::string& id, int x, int y, float& u, float& v)
 		return false;
 
 	// the ray passes the panel's plane at distance pos.z
-	const float hitX = offsetX * panel.pos.z;
-	const float hitY = offsetY * panel.pos.z;
+	const float3 pos = GetEffectivePos(id, panel);
+	const float hitX = offsetX * pos.z;
+	const float hitY = offsetY * pos.z;
 	const float height = panel.width * float(panel.sizeY) / float(panel.sizeX);
 
-	u = (hitX - panel.pos.x) / panel.width + 0.5f;
-	v = (hitY - panel.pos.y) / height + 0.5f;
+	u = (hitX - pos.x) / panel.width + 0.5f;
+	v = (hitY - pos.y) / height + 0.5f;
 	return (u >= 0.0f && u <= 1.0f && v >= 0.0f && v <= 1.0f);
 }
 
@@ -161,14 +238,15 @@ bool CXRPanels::IsPointerOverPanel(int x, int y) const
 }
 
 
-void CXRPanels::LocatePanel(const Panel& panel, bool& headLocked, float pos[3], float rot[4], float& widthMetres) const
+void CXRPanels::LocatePanel(const std::string& id, const Panel& panel, bool& headLocked, float pos[3], float rot[4], float& widthMetres) const
 {
 	headLocked = panel.headLocked;
 
 	if (panel.headLocked) {
-		pos[0] = panel.pos.x;
-		pos[1] = panel.pos.y;
-		pos[2] = -panel.pos.z;
+		const float3 effective = GetEffectivePos(id, panel);
+		pos[0] = effective.x;
+		pos[1] = effective.y;
+		pos[2] = -effective.z;
 		rot[0] = rot[1] = rot[2] = 0.0f;
 		rot[3] = 1.0f;
 		widthMetres = panel.width;
@@ -239,6 +317,8 @@ void CXRPanels::Submit()
 	if (panels.empty() || !xr.IsCreated() || !xr.IsFrameActive())
 		return;
 
+	UpdateStates();
+
 	const bool dumpWanted = (configHandler->GetInt("XRPanelDump") != 0);
 	if (dumpWanted)
 		configHandler->Set("XRPanelDump", 0);
@@ -303,14 +383,62 @@ void CXRPanels::Submit()
 		float pos[3];
 		float rot[4];
 		float widthMetres = 1.0f;
-		LocatePanel(panel, headLocked, pos, rot, widthMetres);
+		LocatePanel(*p.id, panel, headLocked, pos, rot, widthMetres);
 		xr.SetPanel(*p.id, p.x, p.y, panel.sizeX, panel.sizeY, headLocked, pos, rot, widthMetres);
 
 		srcFbo->Bind();
 		srcFbo->AttachTexture(panel.texture, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0_EXT);
 		FBO::Unbind();
 
-		FBO::Blit(srcFbo->GetId(), dstFbo->GetId(), {0, 0, panel.sizeX, panel.sizeY}, {p.x, p.y, p.x + panel.sizeX, p.y + panel.sizeY}, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		const auto stateIt = states.find(*p.id);
+		const float alpha = (stateIt != states.end()) ? stateIt->second.alpha : 1.0f;
+
+		if (alpha >= 0.999f) {
+			FBO::Blit(srcFbo->GetId(), dstFbo->GetId(), {0, 0, panel.sizeX, panel.sizeY}, {p.x, p.y, p.x + panel.sizeX, p.y + panel.sizeY}, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		} else {
+			// the images are premultiplied: scaling all four channels fades them
+			GLint program = 0;
+			glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+			glUseProgram(0);
+
+			glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_VIEWPORT_BIT | GL_TEXTURE_BIT | GL_CURRENT_BIT);
+			glMatrixMode(GL_PROJECTION);
+			glPushMatrix();
+			glLoadIdentity();
+			glOrtho(0.0, atlasWidth, 0.0, atlasHeight, -1.0, 1.0);
+			glMatrixMode(GL_MODELVIEW);
+			glPushMatrix();
+			glLoadIdentity();
+
+			dstFbo->Bind();
+			glViewport(0, 0, atlasWidth, atlasHeight);
+			glDisable(GL_SCISSOR_TEST);
+			glDisable(GL_DEPTH_TEST);
+			glDisable(GL_BLEND);
+			glDisable(GL_CULL_FACE);
+			glActiveTexture(GL_TEXTURE0);
+			glEnable(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, panel.texture);
+			glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+			glColor4f(alpha, alpha, alpha, alpha);
+
+			glBegin(GL_QUADS);
+				glTexCoord2f(0.0f, 0.0f); glVertex2f(float(p.x), float(p.y));
+				glTexCoord2f(1.0f, 0.0f); glVertex2f(float(p.x + panel.sizeX), float(p.y));
+				glTexCoord2f(1.0f, 1.0f); glVertex2f(float(p.x + panel.sizeX), float(p.y + panel.sizeY));
+				glTexCoord2f(0.0f, 1.0f); glVertex2f(float(p.x), float(p.y + panel.sizeY));
+			glEnd();
+
+			glBindTexture(GL_TEXTURE_2D, 0);
+			FBO::Unbind();
+
+			glMatrixMode(GL_PROJECTION);
+			glPopMatrix();
+			glMatrixMode(GL_MODELVIEW);
+			glPopMatrix();
+			glPopAttrib();
+			glUseProgram(program);
+		}
 
 		if (dumpWanted) {
 			// what the widget drew, and what arrived in the headset image

@@ -74,10 +74,21 @@ public:
 	void Submit();
 
 private:
-	void LocatePanel(const Panel& panel, bool& headLocked, float pos[3], float rot[4], float& widthMetres) const;
+	// Head locked panels away from the middle of the view fade out, and fade in and
+	// drift towards the middle while the pointer (where the player looks) is near them
+	struct PanelState {
+		float focus = 0.0f; // 0..1, smoothed
+		float alpha = 1.0f;
+	};
+
+	void LocatePanel(const std::string& id, const Panel& panel, bool& headLocked, float pos[3], float rot[4], float& widthMetres) const;
+	void UpdateStates();
+	// where the panel is now, drifted towards the middle by its focus
+	float3 GetEffectivePos(const std::string& id, const Panel& panel) const;
 
 private:
 	std::map<std::string, Panel> panels;
+	std::map<std::string, PanelState> states;
 
 	std::unique_ptr<FBO> srcFbo;
 	std::unique_ptr<FBO> dstFbo;
