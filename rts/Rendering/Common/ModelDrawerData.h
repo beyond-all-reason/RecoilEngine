@@ -1,8 +1,10 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 #pragma once
 
 #include <vector>
 #include <array>
 #include <functional>
+#include <cstring>
 
 #include <unordered_map>
 
@@ -203,7 +205,8 @@ inline void CModelDrawerDataBase<T>::UpdateObjectTrasform(const T* o)
 template<typename T>
 inline void CModelDrawerDataBase<T>::UpdateObjectUniforms(const T* o)
 {
-	auto& uni = modelUniformsStorage.GetObjUniformsArray(o);
+	const auto& oldUni = static_cast<const ModelUniformsStorage&>(modelUniformsStorage).GetObjUniformsArray(o);
+	auto uni = oldUni;
 	uni.drawFlag = o->drawFlag;
 
 	if (gu->spectatingFullView || o->IsInLosForAllyTeam(gu->myAllyTeam)) {
@@ -215,6 +218,9 @@ inline void CModelDrawerDataBase<T>::UpdateObjectUniforms(const T* o)
 		uni.maxHealth = o->maxHealth;
 		uni.health = o->health;
 	}
+
+	if (std::memcmp(&uni, &oldUni, sizeof(uni)) != 0)
+		modelUniformsStorage.GetObjUniformsArray(o) = uni;
 }
 
 template<typename T>
