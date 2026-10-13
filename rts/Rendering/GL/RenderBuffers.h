@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #pragma once
 
 #include "RenderBuffers.inl"
@@ -811,6 +813,8 @@ inline void TypedRenderBuffer<T>::UploadVBO()
 		LOG_L(L_DEBUG, "[TypedRenderBuffer<%s>::%s] Increase the number of elements here!", vboTypeName, __func__);
 		vbo->Resize(static_cast<uint32_t>(verts.capacity()));
 		vertCount0 = verts.capacity();
+		vboUploadIndex = 0;
+		elemsCount = verts.size();
 	}
 
 	//update on the GPU
@@ -837,6 +841,8 @@ inline void TypedRenderBuffer<T>::UploadEBO()
 		LOG_L(L_DEBUG, "[TypedRenderBuffer<%s>::%s] Increase the number of elements here!", vboTypeName, __func__);
 		ebo->Resize(static_cast<uint32_t>(indcs.capacity()));
 		elemCount0 = indcs.capacity();
+		eboUploadIndex = 0;
+		elemsCount = indcs.size();
 	}
 
 	//update on the GPU

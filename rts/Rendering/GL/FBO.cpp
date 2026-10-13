@@ -355,13 +355,6 @@ bool FBO::Blit(int32_t fromID, int32_t toID, const std::array<int, 4>& srcRect, 
 	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, fromID);
 	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT,   toID);
 
-	int samples; int sampleBuffers;
-	glGetFramebufferParameteriv(GL_READ_FRAMEBUFFER_EXT, GL_SAMPLES, &samples);
-	glGetFramebufferParameteriv(GL_READ_FRAMEBUFFER_EXT, GL_SAMPLE_BUFFERS, &sampleBuffers);
-
-	glGetFramebufferParameteriv(GL_DRAW_FRAMEBUFFER_EXT, GL_SAMPLES, &samples);
-	glGetFramebufferParameteriv(GL_DRAW_FRAMEBUFFER_EXT, GL_SAMPLE_BUFFERS, &sampleBuffers);
-
 	glBlitFramebufferEXT(srcRect[0], srcRect[1], srcRect[2], srcRect[3], dstRect[0], dstRect[1], dstRect[2], dstRect[3], mask, filter);
 
 	// required call

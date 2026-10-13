@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #pragma once
 
 #include "myGL.h"
@@ -339,8 +341,10 @@ public:
 	}
 
 	void Kill(bool deleteBuffer) override {
-		for (auto& fence : fences)
+		for (auto& fence : fences) {
+			std::erase(this->lockList, &fence);
 			this->WaitBuffer(fence);
+		}
 		glFinish(); //just in case
 
 		this->DeleteBuffer(); //delete regardless because of immutability
@@ -427,8 +431,10 @@ public:
 	}
 
 	void Kill(bool deleteBuffer) override {
-		for (auto& fence : fences)
+		for (auto& fence : fences) {
+			std::erase(this->lockList, &fence);
 			this->WaitBuffer(fence);
+		}
 		glFinish(); //just in case
 
 		this->Bind();
@@ -514,8 +520,10 @@ public:
 			IStreamBufferConcept::QueueLockBuffer(fence);
 	}
 	void Kill(bool deleteBuffer) override {
-		for (auto& fence : fences)
+		for (auto& fence : fences) {
+			std::erase(this->lockList, &fence);
 			this->WaitBuffer(fence);
+		}
 
 		this->Unbind();
 		glFinish();
