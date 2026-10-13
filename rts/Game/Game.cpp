@@ -2145,6 +2145,11 @@ bool CGame::IsSimLagging(float maxLatency) const
 void CGame::Save(std::string&& fileName, std::string&& saveArgs)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (!gs->cheatEnabled && (gameServer == nullptr || playerHandler.ActivePlayers() > 1)) {
+		LOG_L(L_WARNING, "Saving multiplayer games requires cheats");
+		return;
+	}
+
 	globalSaveFileData.name = std::move(fileName);
 	globalSaveFileData.args = std::move(saveArgs);
 }
