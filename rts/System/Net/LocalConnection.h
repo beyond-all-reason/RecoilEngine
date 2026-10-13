@@ -47,7 +47,6 @@ public:
 
 	unsigned int GetPacketQueueSize() const override;
 
-	std::string Statistics() const override;
 	std::string GetFullAddress() const override { return "Localhost"; }
 
 	// END overriding CConnection

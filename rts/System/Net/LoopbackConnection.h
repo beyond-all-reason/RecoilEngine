@@ -30,7 +30,6 @@ public:
 	void Close(bool flush) override {}
 	void SetLossFactor(int factor) override {}
 
-	std::string Statistics() const override { return "Statistics for loopback connection: N/A"; }
 	std::string GetFullAddress() const override { return "Loopback"; }
 
 private:
