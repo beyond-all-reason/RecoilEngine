@@ -35,6 +35,7 @@
 #include "System/Platform/WindowManagerHelper.h"
 #ifdef __APPLE__
 #include "System/Platform/Mac/AutoFill.h"
+#include "System/Platform/Mac/Keyboard.h"
 #endif
 #include "System/Platform/errorhandler.h"
 #include "System/ScopedResource.h"
@@ -625,6 +626,10 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 
 	if ((sdlWindow = CreateSDLWindow(title)) == nullptr)
 		return false;
+
+#ifdef __APPLE__
+	MacKeyboard::Init();
+#endif
 
 	if (configHandler->GetInt("MinimizeOnFocusLoss") == 0)
 		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
