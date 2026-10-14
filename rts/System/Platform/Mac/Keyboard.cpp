@@ -38,9 +38,21 @@ static constexpr std::array<SDL_Scancode, 51> characterKeys = {
 	SDL_SCANCODE_TAB, SDL_SCANCODE_SPACE, SDL_SCANCODE_GRAVE,
 };
 
+// keys macOS takes for itself or Mac keyboards lack, reachable with Cmd instead
+struct Alias {
+	SDL_Scancode from;
+	SDL_Scancode to;
+};
+
+static constexpr std::array<Alias, 2> aliases = {{
+	{SDL_SCANCODE_F11,    SDL_SCANCODE_F11  }, // Show Desktop
+	{SDL_SCANCODE_PERIOD, SDL_SCANCODE_PAUSE}, // Cmd+Esc never arrives
+}};
+
 static bool commandAsCtrl = false;
 
 static std::vector<SDL_Scancode> heldKeys;
+static std::vector<Alias> heldAliases;
 
 using SendEventFunc = void (*)(id, SEL, id);
 static SendEventFunc sdlSendEvent = nullptr;
@@ -200,6 +212,7 @@ void TranslateEvent(SDL_Event& event)
 {
 	if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
 		heldKeys.clear();
+		heldAliases.clear();
 		return;
 	}
 
@@ -207,6 +220,31 @@ void TranslateEvent(SDL_Event& event)
 		return;
 
 	SDL_Keysym& keysym = event.key.keysym;
+	const auto heldIt = std::find_if(heldAliases.begin(), heldAliases.end(), [&](const Alias& a) { return (a.from == keysym.scancode); });
+
+	if (heldIt != heldAliases.end()) {
+		keysym.scancode = heldIt->to;
+		keysym.sym = SDL_GetKeyFromScancode(heldIt->to);
+		keysym.mod = KMOD_NONE;
+
+		if (event.type == SDL_KEYUP)
+			heldAliases.erase(heldIt);
+
+		return;
+	}
+
+	if (event.type == SDL_KEYDOWN && (keysym.mod & (KMOD_GUI | KMOD_CTRL | KMOD_SHIFT | KMOD_ALT)) == (keysym.mod & KMOD_GUI) && (keysym.mod & KMOD_GUI) != 0) {
+		const auto aliasIt = std::find_if(aliases.begin(), aliases.end(), [&](const Alias& a) { return (a.from == keysym.scancode); });
+
+		if (aliasIt != aliases.end()) {
+			heldAliases.push_back(*aliasIt);
+			keysym.scancode = aliasIt->to;
+			keysym.sym = SDL_GetKeyFromScancode(aliasIt->to);
+			keysym.mod = KMOD_NONE;
+			return;
+		}
+	}
+
 	keysym.mod = TranslateMods(SDL_Keymod(keysym.mod));
 
 	if (!commandAsCtrl)
@@ -221,6 +259,10 @@ void TranslateEvent(SDL_Event& event)
 
 SDL_Keymod TranslateMods(SDL_Keymod mods)
 {
+	// an alias stands in for a key pressed on its own
+	if (!heldAliases.empty())
+		return SDL_Keymod(mods & ~(KMOD_GUI | KMOD_CTRL));
+
 	if (!commandAsCtrl)
 		return mods;
 
