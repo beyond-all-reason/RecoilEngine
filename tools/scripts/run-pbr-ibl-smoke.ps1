@@ -4,6 +4,9 @@ param(
     [string] $GameDirectory,
     [string] $BARDataDirectory,
     [string] $StartScript,
+    [string] $GameArchiveName = 'Beyond All Reason $VERSION',
+    [ValidateSet('legacy-clone', 'hdr-modern', 'compare')]
+    [string] $EnvironmentCapture = 'hdr-modern',
     [switch] $PrepareOnly
 )
 
@@ -37,6 +40,8 @@ $gamesDirectory = Join-Path $BuildDirectory 'games'
 $gameMount = Join-Path $gamesDirectory 'Beyond-All-Reason-Private-pbr-rendering-V3.sdd'
 $mapMount = Join-Path $BuildDirectory 'maps'
 $writeDirectory = Join-Path $BuildDirectory 'pbr-user'
+$runtimeStartScript = Join-Path $writeDirectory '_script-pbr-v3.txt'
+$runtimeConfig = Join-Path $writeDirectory 'springsettings.cfg'
 $runtimeLibraries = @(
     'libcurl.dll',
     'OpenAL32.dll',
@@ -73,17 +78,68 @@ function Ensure-Junction {
     New-Item -ItemType Junction -Path $Path -Target $Target | Out-Null
 }
 
+function Set-SpringSetting {
+    param(
+        [Parameter(Mandatory)] [string] $ConfigText,
+        [Parameter(Mandatory)] [string] $Name,
+        [Parameter(Mandatory)] [string] $Value
+    )
+
+    $settingRegex = [regex]::new('(?im)^\s*' + [regex]::Escape($Name) + '\s*=.*$')
+    $matches = $settingRegex.Matches($ConfigText)
+    if ($matches.Count -gt 1) {
+        throw "Expected at most one $Name entry in the isolated runtime configuration: $runtimeConfig"
+    }
+
+    $setting = "$Name = $Value"
+    if ($matches.Count -eq 1) {
+        return $settingRegex.Replace($ConfigText, $setting, 1)
+    }
+
+    if ($ConfigText.Length -gt 0 -and -not $ConfigText.EndsWith("`n")) {
+        $ConfigText += [Environment]::NewLine
+    }
+    return $ConfigText + $setting + [Environment]::NewLine
+}
+
 New-Item -ItemType Directory -Force -Path $gamesDirectory | Out-Null
 New-Item -ItemType Directory -Force -Path $writeDirectory | Out-Null
 Ensure-Junction -Path $gameMount -Target $GameDirectory
 Ensure-Junction -Path $mapMount -Target $installedMaps
+
+$sourceScriptText = [System.IO.File]::ReadAllText($StartScript)
+$gameTypeRegex = [regex]::new('(?im)^(\s*gametype\s*=\s*)[^;]+;')
+if ($gameTypeRegex.Matches($sourceScriptText).Count -ne 1) {
+    throw "Expected exactly one gametype entry in the startscript: $StartScript"
+}
+$runtimeScriptText = $gameTypeRegex.Replace(
+    $sourceScriptText,
+    [System.Text.RegularExpressions.MatchEvaluator] {
+        param($match)
+        return $match.Groups[1].Value + $GameArchiveName + ';'
+    },
+    1
+)
+[System.IO.File]::WriteAllText($runtimeStartScript, $runtimeScriptText, [System.Text.UTF8Encoding]::new($false))
+
+$runtimeConfigText = if (Test-Path -LiteralPath $runtimeConfig) {
+    [System.IO.File]::ReadAllText($runtimeConfig)
+} else {
+    ''
+}
+$runtimeConfigText = Set-SpringSetting -ConfigText $runtimeConfigText -Name 'Fullscreen' -Value '0'
+$runtimeConfigText = Set-SpringSetting -ConfigText $runtimeConfigText -Name 'PBREnvironmentCapture' -Value $EnvironmentCapture
+[System.IO.File]::WriteAllText($runtimeConfig, $runtimeConfigText, [System.Text.UTF8Encoding]::new($false))
 
 Write-Host "Launching isolated PBR IBL smoke test"
 Write-Host "  Engine:      $engine"
 Write-Host "  Game:        $GameDirectory"
 Write-Host "  Maps:        $installedMaps"
 Write-Host "  Writable:    $writeDirectory"
-Write-Host "  Startscript: $StartScript"
+Write-Host "  Source script:  $StartScript"
+Write-Host "  Runtime script: $runtimeStartScript"
+Write-Host "  Game archive:   $GameArchiveName"
+Write-Host "  PBR capture:    $EnvironmentCapture"
 
 if ($PrepareOnly) {
     Write-Host 'Runtime prepared; launch skipped because -PrepareOnly was supplied.'
@@ -95,7 +151,7 @@ $engineArguments = @(
     '--isolation-dir', $BuildDirectory,
     '--write-dir', $writeDirectory,
     '-window',
-    $StartScript
+    $runtimeStartScript
 )
 
 & $engine @engineArguments
