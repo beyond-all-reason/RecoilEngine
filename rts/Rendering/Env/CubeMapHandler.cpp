@@ -22,6 +22,9 @@
 
 #include "System/Misc/TracyDefs.h"
 
+#include <algorithm>
+#include <string>
+
 CONFIG(int, CubeTexSizeSpecular).defaultValue(128).minimumValue(1).description("The square resolution of each face of the specular cubemap.");
 CONFIG(int, CubeTexSizeReflection).defaultValue(128).minimumValue(1).description("The square resolution of each face of the environment reflection cubemap.");
 CONFIG(bool, CubeTexGenerateMipMaps).defaultValue(false).description("Generate mipmaps for the reflection and specular cubemap textures, useful for efficient subsampling and blurring.");
@@ -42,17 +45,33 @@ out vec2 texCoord;
 
 void main()
 {
+	// Full-screen triangle with clip-space corners (-1,-1), (3,-1), (-1,3).
+	// The visible [-1,1] square corresponds to position in [0,1], so the face
+	// coordinate is position itself (scaling it by 0.5 would map every face to
+	// one magnified quadrant of the intended directions).
 	vec2 position = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
-	texCoord = position * 0.5;
+	texCoord = position;
 	gl_Position = vec4(position * 2.0 - 1.0, 0.0, 1.0);
 }
 )";
 
+	// One program implements the three post-capture passes, selected by
+	// filterType (see PBRFilterType):
+	//   0  decode: display-referred legacy capture -> scene-linear radiance
+	//      (sRGB EOTF applied exactly once, input clamped to its [0,1] domain)
+	//   1  diffuse irradiance E(n) = integral(L(l) * max(n.l, 0) dl); stored
+	//      as irradiance, NOT divided by pi (a Lambert consumer multiplies by
+	//      albedo / pi)
+	//   2  GGX prefilter with the split-sum N = V = R assumption; destination
+	//      mip m of M stores perceptual roughness m / (M - 1)
+	// Both integrals importance-sample their lobe and read the source mip
+	// whose texel solid angle matches each sample's solid angle, so that a
+	// fixed sample count does not alias the full-resolution source.
 	constexpr const char* pbrFilterFragmentShader = R"(
 #version 150 compatibility
 
 const float PI = 3.14159265358979323846;
-const uint DIFFUSE_SAMPLE_COUNT = 128u;
+const uint DIFFUSE_SAMPLE_COUNT = 256u;
 const uint SPECULAR_SAMPLE_COUNT = 256u;
 
 uniform samplerCube sourceEnvironment;
@@ -108,6 +127,25 @@ vec3 ImportanceSampleGGX(vec2 xi, float alpha, vec3 normal)
 	return normalize(TangentBasis(normal) * halfVector);
 }
 
+// Source mip whose texel solid angle matches the sample's solid angle
+// 1 / (N * pdf). No extra +1 bias, and never coarser than an 8x8 face: low-pdf
+// (grazing or wide-lobe) samples would otherwise read whole-face averages that
+// mix in radiance from outside the lobe, which measured as a 3-5% darkening
+// against the CPU reference in the in-game self-test.
+float SourceLod(float pdf, uint sampleCount)
+{
+	float texelSolidAngle = 4.0 * PI / (6.0 * sourceResolution * sourceResolution);
+	float sampleSolidAngle = 1.0 / (float(sampleCount) * max(pdf, 1e-6));
+	float maxLod = max(0.0, log2(sourceResolution) - 3.0);
+	return clamp(0.5 * log2(sampleSolidAngle / texelSolidAngle), 0.0, maxLod);
+}
+
+vec3 SrgbToLinear(vec3 encoded)
+{
+	vec3 c = clamp(encoded, 0.0, 1.0);
+	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c));
+}
+
 vec3 FilterDiffuse(vec3 normal)
 {
 	vec3 sum = vec3(0.0);
@@ -116,8 +154,11 @@ vec3 FilterDiffuse(vec3 normal)
 		vec2 xi = Hammersley(i, DIFFUSE_SAMPLE_COUNT);
 		float phi = 2.0 * PI * xi.x;
 		float radius = sqrt(xi.y);
-		vec3 localDirection = vec3(radius * cos(phi), radius * sin(phi), sqrt(1.0 - xi.y));
-		sum += textureLod(sourceEnvironment, normalize(basis * localDirection), 0.0).rgb;
+		float cosTheta = sqrt(1.0 - xi.y);
+		vec3 localDirection = vec3(radius * cos(phi), radius * sin(phi), cosTheta);
+		// cosine-weighted pdf = cos(theta) / pi
+		float lod = SourceLod(cosTheta / PI, DIFFUSE_SAMPLE_COUNT);
+		sum += textureLod(sourceEnvironment, normalize(basis * localDirection), lod).rgb;
 	}
 	return PI * sum / float(DIFFUSE_SAMPLE_COUNT);
 }
@@ -131,7 +172,6 @@ vec3 FilterSpecular(vec3 normal)
 	vec3 sum = vec3(0.0);
 	float weight = 0.0;
 	float alpha = max(roughness * roughness, 0.001);
-	float texelSolidAngle = 4.0 * PI / (6.0 * sourceResolution * sourceResolution);
 
 	for (uint i = 0u; i < SPECULAR_SAMPLE_COUNT; ++i) {
 		vec3 halfVector = ImportanceSampleGGX(Hammersley(i, SPECULAR_SAMPLE_COUNT), alpha, normal);
@@ -144,10 +184,8 @@ vec3 FilterSpecular(vec3 normal)
 		float hDotV = max(dot(halfVector, viewDirection), 0.0);
 		float denominator = nDotH * nDotH * (alpha * alpha - 1.0) + 1.0;
 		float distribution = (alpha * alpha) / max(PI * denominator * denominator, 1e-6);
-		float pdf = max(distribution * nDotH / max(4.0 * hDotV, 1e-6), 1e-6);
-		float sampleSolidAngle = 1.0 / (float(SPECULAR_SAMPLE_COUNT) * pdf);
-		float sourceMip = max(0.0, 0.5 * log2(sampleSolidAngle / texelSolidAngle));
-		sum += textureLod(sourceEnvironment, lightDirection, sourceMip).rgb * nDotL;
+		float pdf = distribution * nDotH / max(4.0 * hDotV, 1e-6);
+		sum += textureLod(sourceEnvironment, lightDirection, SourceLod(pdf, SPECULAR_SAMPLE_COUNT)).rgb * nDotL;
 		weight += nDotL;
 	}
 
@@ -157,10 +195,36 @@ vec3 FilterSpecular(vec3 normal)
 void main()
 {
 	vec3 direction = FaceDirection(faceIndex, texCoord);
-	vec3 color = filterType == 1 ? FilterDiffuse(direction) : FilterSpecular(direction);
+	vec3 color;
+	if (filterType == 0)
+		color = SrgbToLinear(textureLod(sourceEnvironment, direction, 0.0).rgb);
+	else if (filterType == 1)
+		color = FilterDiffuse(direction);
+	else
+		color = FilterSpecular(direction);
 	fragColor = vec4(max(color, vec3(0.0)), 1.0);
 }
 )";
+
+	enum PBRFilterType {
+		PBR_FILTER_DECODE = 0,
+		PBR_FILTER_DIFFUSE = 1,
+		PBR_FILTER_SPECULAR = 2,
+	};
+
+	// Accepted values of the persisted PBREnvironment* selectors. Anything else
+	// is reported as requested-but-unavailable and replaced by the documented
+	// safe value; the persisted request itself is never rewritten.
+	bool IsKnownCaptureMode(const std::string& v) { return v == "legacy-clone" || v == "hdr-modern" || v == "compare"; }
+	bool IsKnownAnchor(const std::string& v) { return v == "map-center" || v == "camera"; }
+	bool IsKnownContent(const std::string& v) { return v == "sky-only" || v == "sky-terrain" || v == "legacy-scene"; }
+
+	void AppendFallback(std::string& text, const std::string& reason)
+	{
+		if (!text.empty())
+			text += "; ";
+		text += reason;
+	}
 
 	unsigned int MipCount(unsigned int size)
 	{
@@ -257,11 +321,9 @@ bool CubeMapHandler::Init() {
 		reflectionCubeFBO.CreateRenderBuffer(GL_DEPTH_ATTACHMENT_EXT, GL_DEPTH_COMPONENT, reflTexSize, reflTexSize);
 		reflectionCubeFBO.Unbind();
 
-		pbrCaptureMode = configHandler->GetString("PBREnvironmentCapture");
-		pbrEnabled = (pbrCaptureMode == "hdr-modern" || pbrCaptureMode == "compare");
-		if (pbrEnabled && !InitPBREnvironment()) {
-			LOG_L(L_WARNING, "[CubeMapHandler] PBR environment initialization failed: %s", pbrFailure.c_str());
-		}
+		// resolves the persisted PBREnvironment* controls and, when enabled,
+		// builds the GPU programs and schedules the first capture epoch
+		UpdatePBRConfiguration();
 		return true;
 	}
 
@@ -413,13 +475,15 @@ void CubeMapHandler::CreateReflectionFace(unsigned int glFace, bool skyOnly)
 
 PBREnvironmentInfo CubeMapHandler::GetPBREnvironmentInfo() const
 {
+	const PBREnvironmentSet& set = PublishedOrRequestedSet();
+
 	PBREnvironmentInfo info;
 	info.requestedRevision = pbrRequestedRevision;
 	info.activeRevision = pbrActiveRevision;
-	info.environmentSize = pbrEnvironmentSize;
-	info.irradianceSize = pbrIrradianceSize;
-	info.specularSize = pbrSpecularSize;
-	info.specularMipCount = pbrSpecularMipCount;
+	info.environmentSize = set.environmentSize;
+	info.irradianceSize = set.irradianceSize;
+	info.specularSize = set.specularSize;
+	info.specularMipCount = set.specularMipCount;
 	info.enabled = pbrEnabled;
 	info.ready = pbrReady;
 	info.pending = pbrPending;
@@ -427,8 +491,43 @@ PBREnvironmentInfo CubeMapHandler::GetPBREnvironmentInfo() const
 	info.anchor = pbrAnchor;
 	info.content = pbrContent;
 	info.filter = pbrFilter;
+	info.requestedCaptureMode = pbrRequestedCaptureMode;
+	info.requestedAnchor = pbrRequestedAnchor;
+	info.requestedContent = pbrRequestedContent;
+	info.requestedFilter = pbrRequestedFilter;
+	// The capture draws BAR's legacy, display-referred sky/terrain shaders;
+	// FilterPBREnvironment decodes them with the sRGB EOTF exactly once.
+	info.transfer = "srgb-decoded-legacy";
+	info.fallback = pbrFallback;
 	info.failure = pbrFailure;
+	info.captureGpuMilliseconds = pbrCaptureGpuMilliseconds;
+	info.filterGpuMilliseconds = pbrFilterGpuMilliseconds;
 	return info;
+}
+
+void CubeMapHandler::CollectPBRTimers()
+{
+	if (!pbrTimersPending)
+		return;
+
+	for (const unsigned int query: pbrTimerQueries) {
+		GLint available = 0;
+		glGetQueryObjectiv(query, GL_QUERY_RESULT_AVAILABLE, &available);
+		if (!available)
+			return;
+	}
+
+	std::array<GLuint64, PBR_TIMER_QUERY_COUNT> stamps = {};
+	for (unsigned int i = 0; i < PBR_TIMER_QUERY_COUNT; ++i)
+		glGetQueryObjectui64v(pbrTimerQueries[i], GL_QUERY_RESULT, &stamps[i]);
+
+	GLuint64 captureNanoseconds = 0;
+	for (unsigned int face = 0; face < 6; ++face)
+		captureNanoseconds += stamps[face * 2 + 1] - stamps[face * 2];
+
+	pbrCaptureGpuMilliseconds = static_cast<float>(captureNanoseconds) * 1e-6f;
+	pbrFilterGpuMilliseconds = static_cast<float>(stamps[13] - stamps[12]) * 1e-6f;
+	pbrTimersPending = false;
 }
 
 bool CubeMapHandler::AllocatePBRCube(unsigned int& textureID, unsigned int size, unsigned int mipCount)
@@ -459,38 +558,20 @@ bool CubeMapHandler::AllocatePBRCube(unsigned int& textureID, unsigned int size,
 	return false;
 }
 
+void CubeMapHandler::FreePBRSet(PBREnvironmentSet& set)
+{
+	for (unsigned int* textureID: {&set.environmentTexID, &set.irradianceTexID, &set.specularTexID}) {
+		if (*textureID != 0)
+			glDeleteTextures(1, textureID);
+	}
+	set = PBREnvironmentSet();
+}
+
+// Creates the size-independent GPU objects (FBOs and the filter program).
+// Texture sets are sized per epoch by EnsurePBRCaptureResources().
 bool CubeMapHandler::InitPBREnvironment()
 {
 	FreePBREnvironment();
-
-	pbrEnvironmentSize = configHandler->GetInt("PBREnvironmentSize");
-	pbrIrradianceSize = configHandler->GetInt("PBRIrradianceSize");
-	pbrSpecularSize = configHandler->GetInt("PBRSpecularSize");
-	pbrSpecularMipCount = MipCount(pbrSpecularSize);
-	pbrAnchor = configHandler->GetString("PBREnvironmentCaptureAnchor");
-	pbrContent = configHandler->GetString("PBREnvironmentCaptureContent");
-	pbrFilter = configHandler->GetString("PBREnvironmentFilter");
-	pbrRefreshRevision = configHandler->GetInt("PBREnvironmentRevision");
-
-	if (pbrAnchor != "camera")
-		pbrAnchor = "map-center";
-	if (pbrContent != "sky-terrain" && pbrContent != "legacy-scene")
-		pbrContent = "sky-only";
-	if (pbrFilter != "raster") {
-		LOG_L(L_WARNING, "[CubeMapHandler] PBREnvironmentFilter=%s is not implemented; using the explicit raster fallback", pbrFilter.c_str());
-		pbrFilter = "raster";
-	}
-
-	const unsigned int environmentMipCount = MipCount(pbrEnvironmentSize);
-	for (unsigned int index = 0; index < 2; ++index) {
-		if (!AllocatePBRCube(pbrEnvironmentTexIDs[index], pbrEnvironmentSize, environmentMipCount) ||
-			!AllocatePBRCube(pbrIrradianceTexIDs[index], pbrIrradianceSize, 1) ||
-			!AllocatePBRCube(pbrSpecularTexIDs[index], pbrSpecularSize, pbrSpecularMipCount)) {
-			pbrFailure = "RGBA16F cubemap allocation failed";
-			FreePBREnvironment();
-			return false;
-		}
-	}
 
 	pbrCaptureFBO.Init(false);
 	pbrFilterFBO.Init(false);
@@ -499,10 +580,6 @@ bool CubeMapHandler::InitPBREnvironment()
 		FreePBREnvironment();
 		return false;
 	}
-
-	pbrCaptureFBO.Bind();
-	pbrCaptureFBO.CreateRenderBuffer(GL_DEPTH_ATTACHMENT_EXT, GL_DEPTH_COMPONENT, pbrEnvironmentSize, pbrEnvironmentSize);
-	FBO::Unbind();
 
 	pbrFilterShader = new Shader::GLSLProgramObject("[PBR-EnvironmentFilter]");
 	pbrFilterShader->AttachShaderObject(new Shader::GLSLShaderObject(GL_VERTEX_SHADER, pbrFilterVertexShader));
@@ -523,37 +600,37 @@ bool CubeMapHandler::InitPBREnvironment()
 		return false;
 	}
 
-	if (GLAD_GL_ARB_seamless_cube_map || GLAD_GL_VERSION_3_2)
-		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+	// timestamp queries are optional diagnostics; their absence never blocks
+	// the environment
+	pbrTimersSupported = (GLAD_GL_ARB_timer_query || GLAD_GL_VERSION_3_3);
+	if (pbrTimersSupported)
+		glGenQueries(PBR_TIMER_QUERY_COUNT, pbrTimerQueries.data());
+	pbrTimersPending = false;
 
+	// Seamless cube-map filtering is enabled globally by CGlobalRendering
+	// when supported; the filter relies on it at face edges.
 	pbrActiveIndex = 0;
 	pbrCaptureIndex = 1;
 	pbrCaptureFace = 0;
-	pbrRequestedRevision = 1;
-	pbrActiveRevision = 0;
 	pbrReady = false;
-	pbrPending = true;
+	pbrPending = false;
 	pbrFailure.clear();
 	return true;
 }
 
 void CubeMapHandler::FreePBREnvironment()
 {
-	for (unsigned int& textureID: pbrEnvironmentTexIDs) {
-		if (textureID != 0)
-			glDeleteTextures(1, &textureID);
-		textureID = 0;
-	}
-	for (unsigned int& textureID: pbrIrradianceTexIDs) {
-		if (textureID != 0)
-			glDeleteTextures(1, &textureID);
-		textureID = 0;
-	}
-	for (unsigned int& textureID: pbrSpecularTexIDs) {
-		if (textureID != 0)
-			glDeleteTextures(1, &textureID);
-		textureID = 0;
-	}
+	FreePBRSet(pbrSets[0]);
+	FreePBRSet(pbrSets[1]);
+	if (pbrStagingTexID != 0)
+		glDeleteTextures(1, &pbrStagingTexID);
+	pbrStagingTexID = 0;
+	pbrStagingSize = 0;
+
+	if (pbrTimerQueries[0] != 0)
+		glDeleteQueries(PBR_TIMER_QUERY_COUNT, pbrTimerQueries.data());
+	pbrTimerQueries = {};
+	pbrTimersPending = false;
 
 	pbrCaptureFBO.Kill();
 	pbrFilterFBO.Kill();
@@ -561,19 +638,142 @@ void CubeMapHandler::FreePBREnvironment()
 	pbrFilterShader = nullptr;
 	pbrReady = false;
 	pbrPending = false;
+	pbrCaptureFace = 0;
+}
+
+// (Re)allocates the capture set and the staging cube when the requested sizes
+// differ from what they hold. Only the capture set is touched: the published
+// set stays bound and valid until the new epoch is swapped in, which makes a
+// live resize transactional.
+bool CubeMapHandler::EnsurePBRCaptureResources()
+{
+	PBREnvironmentSet& set = pbrSets[pbrCaptureIndex];
+	const PBREnvironmentSet& wanted = pbrRequestedSet;
+
+	const bool setMatches =
+		set.environmentTexID != 0 &&
+		set.environmentSize == wanted.environmentSize &&
+		set.irradianceSize == wanted.irradianceSize &&
+		set.specularSize == wanted.specularSize;
+
+	if (!setMatches) {
+		FreePBRSet(set);
+		const bool allocated =
+			AllocatePBRCube(set.environmentTexID, wanted.environmentSize, MipCount(wanted.environmentSize)) &&
+			AllocatePBRCube(set.irradianceTexID, wanted.irradianceSize, 1) &&
+			AllocatePBRCube(set.specularTexID, wanted.specularSize, wanted.specularMipCount);
+		if (!allocated) {
+			FreePBRSet(set);
+			pbrFailure = "RGBA16F cubemap allocation failed";
+			return false;
+		}
+		set.environmentSize = wanted.environmentSize;
+		set.irradianceSize = wanted.irradianceSize;
+		set.specularSize = wanted.specularSize;
+		set.specularMipCount = wanted.specularMipCount;
+	}
+
+	if (pbrStagingTexID == 0 || pbrStagingSize != wanted.environmentSize) {
+		if (pbrStagingTexID != 0)
+			glDeleteTextures(1, &pbrStagingTexID);
+		pbrStagingTexID = 0;
+		pbrStagingSize = 0;
+		if (!AllocatePBRCube(pbrStagingTexID, wanted.environmentSize, 1)) {
+			pbrFailure = "RGBA16F capture staging allocation failed";
+			return false;
+		}
+		pbrStagingSize = wanted.environmentSize;
+
+		// the capture depth buffer must match the staging face resolution
+		pbrCaptureFBO.Bind();
+		pbrCaptureFBO.Detach(GL_DEPTH_ATTACHMENT_EXT);
+		pbrCaptureFBO.CreateRenderBuffer(GL_DEPTH_ATTACHMENT_EXT, GL_DEPTH_COMPONENT, pbrStagingSize, pbrStagingSize);
+		FBO::Unbind();
+	}
+
+	return true;
+}
+
+void CubeMapHandler::RequestPBREpoch()
+{
+	// Revisions are never reset (not on disable/re-enable, not on resize):
+	// a waiting consumer compares requested and active revisions, so a reset
+	// would let an older epoch look current.
+	++pbrRequestedRevision;
+	pbrCaptureFace = 0;
+	pbrPending = true;
+	pbrFailure.clear();
 }
 
 void CubeMapHandler::UpdatePBRConfiguration()
 {
-	const std::string captureMode = configHandler->GetString("PBREnvironmentCapture");
-	const bool shouldEnable = (captureMode == "hdr-modern" || captureMode == "compare");
-	const unsigned int environmentSize = configHandler->GetInt("PBREnvironmentSize");
-	const unsigned int irradianceSize = configHandler->GetInt("PBRIrradianceSize");
-	const unsigned int specularSize = configHandler->GetInt("PBRSpecularSize");
-	const int newRefreshRevision = configHandler->GetInt("PBREnvironmentRevision");
+	pbrRequestedCaptureMode = configHandler->GetString("PBREnvironmentCapture");
+	pbrRequestedAnchor = configHandler->GetString("PBREnvironmentCaptureAnchor");
+	pbrRequestedContent = configHandler->GetString("PBREnvironmentCaptureContent");
+	pbrRequestedFilter = configHandler->GetString("PBREnvironmentFilter");
+	const int refreshRevision = configHandler->GetInt("PBREnvironmentRevision");
+
+	// Resolve every request to an implemented value. The persisted request is
+	// left untouched; `fallback` records each substitution for Lua and the log.
+	std::string fallback;
+	std::string captureMode = pbrRequestedCaptureMode;
+	std::string anchor = pbrRequestedAnchor;
+	std::string content = pbrRequestedContent;
+	std::string filter = pbrRequestedFilter;
+
+	if (!IsKnownCaptureMode(captureMode)) {
+		AppendFallback(fallback, "PBREnvironmentCapture=" + captureMode + " is unknown; legacy-clone is active");
+		captureMode = "legacy-clone";
+	}
+	if (!IsKnownAnchor(anchor)) {
+		AppendFallback(fallback, "PBREnvironmentCaptureAnchor=" + anchor + " is unknown; map-center is active");
+		anchor = "map-center";
+	}
+	if (content == "compare") {
+		AppendFallback(fallback, "PBREnvironmentCaptureContent=compare is not implemented; sky-only is active");
+		content = "sky-only";
+	} else if (!IsKnownContent(content)) {
+		AppendFallback(fallback, "PBREnvironmentCaptureContent=" + content + " is unknown; sky-only is active");
+		content = "sky-only";
+	}
+	if (filter == "compute") {
+		AppendFallback(fallback, "PBREnvironmentFilter=compute is not implemented; raster is active");
+		filter = "raster";
+	} else if (filter != "raster") {
+		AppendFallback(fallback, "PBREnvironmentFilter=" + filter + " is unknown; raster is active");
+		filter = "raster";
+	}
+
+	// the CONFIG ranges document these limits; clamp here as well so that a
+	// hand-edited value can never request an invalid allocation
+	PBREnvironmentSet requestedSet;
+	requestedSet.environmentSize = std::clamp(configHandler->GetInt("PBREnvironmentSize"), 16, 2048);
+	requestedSet.irradianceSize = std::clamp(configHandler->GetInt("PBRIrradianceSize"), 4, 256);
+	requestedSet.specularSize = std::clamp(configHandler->GetInt("PBRSpecularSize"), 16, 1024);
+	requestedSet.specularMipCount = MipCount(requestedSet.specularSize);
+
+	if (fallback != pbrFallback) {
+		if (!fallback.empty())
+			LOG_L(L_WARNING, "[CubeMapHandler] PBR environment fallback: %s", fallback.c_str());
+		pbrFallback = fallback;
+	}
+
+	const bool sizesChanged =
+		requestedSet.environmentSize != pbrRequestedSet.environmentSize ||
+		requestedSet.irradianceSize != pbrRequestedSet.irradianceSize ||
+		requestedSet.specularSize != pbrRequestedSet.specularSize;
+	const bool controlsChanged =
+		anchor != pbrAnchor || content != pbrContent || filter != pbrFilter ||
+		refreshRevision != pbrRefreshRevision || sizesChanged;
 
 	pbrCaptureMode = captureMode;
-	if (!shouldEnable) {
+	pbrAnchor = anchor;
+	pbrContent = content;
+	pbrFilter = filter;
+	pbrRequestedSet = requestedSet;
+	pbrRefreshRevision = refreshRevision;
+
+	if (captureMode != "hdr-modern" && captureMode != "compare") {
 		if (pbrEnabled)
 			FreePBREnvironment();
 		pbrEnabled = false;
@@ -582,62 +782,64 @@ void CubeMapHandler::UpdatePBRConfiguration()
 
 	const bool wasEnabled = pbrEnabled;
 	pbrEnabled = true;
-	const bool sizeChanged = (environmentSize != pbrEnvironmentSize || irradianceSize != pbrIrradianceSize || specularSize != pbrSpecularSize);
-	if (pbrFilterShader == nullptr || sizeChanged) {
-		// A persistent capability or shader failure must not allocate and compile
-		// again every frame. A mode re-enable, size change, or explicit revision
-		// bump is the retry contract exposed to the viewer and config.
-		if (!pbrFailure.empty() && wasEnabled && !sizeChanged && newRefreshRevision == pbrRefreshRevision)
-			return;
+	if (wasEnabled && !controlsChanged)
+		return;
 
-		if (!InitPBREnvironment())
-			LOG_L(L_WARNING, "[CubeMapHandler] PBR environment reinitialization failed: %s", pbrFailure.c_str());
+	// A persistent program/FBO failure is retried only after the user changes
+	// a control (including a PBREnvironmentRevision bump), never every frame.
+	if (pbrFilterShader == nullptr && !InitPBREnvironment()) {
+		LOG_L(L_WARNING, "[CubeMapHandler] PBR environment initialization failed: %s", pbrFailure.c_str());
 		return;
 	}
 
-	std::string anchor = configHandler->GetString("PBREnvironmentCaptureAnchor");
-	std::string content = configHandler->GetString("PBREnvironmentCaptureContent");
-	std::string filter = configHandler->GetString("PBREnvironmentFilter");
-	if (anchor != "camera") anchor = "map-center";
-	if (content != "sky-terrain" && content != "legacy-scene") content = "sky-only";
-	if (filter != "raster") filter = "raster";
-
-	if (anchor == pbrAnchor && content == pbrContent && filter == pbrFilter && newRefreshRevision == pbrRefreshRevision)
-		return;
-
-	pbrAnchor = anchor;
-	pbrContent = content;
-	pbrFilter = filter;
-	pbrRefreshRevision = newRefreshRevision;
-	++pbrRequestedRevision;
-	pbrCaptureFace = 0;
-	pbrPending = true;
-	pbrFailure.clear();
+	RequestPBREpoch();
 }
 
 void CubeMapHandler::UpdatePBREnvironment()
 {
+	CollectPBRTimers();
+
 	if (!pbrPending || pbrFilterShader == nullptr)
 		return;
 
+	if (pbrCaptureFace == 0) {
+		// results of an unread earlier epoch are abandoned, never mixed
+		pbrTimersPending = false;
+		if (!EnsurePBRCaptureResources()) {
+			pbrPending = false;
+			LOG_L(L_WARNING, "[CubeMapHandler] PBR environment epoch %u rejected: %s", pbrRequestedRevision, pbrFailure.c_str());
+			return;
+		}
+	}
+
+	const bool timed = pbrTimersSupported && pbrTimerQueries[0] != 0;
+	if (timed)
+		glQueryCounter(pbrTimerQueries[pbrCaptureFace * 2], GL_TIMESTAMP);
 	pbrCaptureFBO.Bind();
 	CreatePBRReflectionFace(GL_TEXTURE_CUBE_MAP_POSITIVE_X + pbrCaptureFace);
+	if (timed)
+		glQueryCounter(pbrTimerQueries[pbrCaptureFace * 2 + 1], GL_TIMESTAMP);
 	if (!pbrFailure.empty())
 		return;
 
-	++pbrCaptureFace;
-	if (pbrCaptureFace < 6)
+	if (++pbrCaptureFace < 6)
 		return;
 
-	glBindTexture(GL_TEXTURE_CUBE_MAP, pbrEnvironmentTexIDs[pbrCaptureIndex]);
-	glGenerateMipmapEXT(GL_TEXTURE_CUBE_MAP);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+	if (timed)
+		glQueryCounter(pbrTimerQueries[12], GL_TIMESTAMP);
+	const bool filtered = FilterPBREnvironment();
+	if (timed) {
+		glQueryCounter(pbrTimerQueries[13], GL_TIMESTAMP);
+		pbrTimersPending = filtered;
+	}
 
-	if (!FilterPBREnvironment()) {
+	if (!filtered) {
 		pbrPending = false;
+		LOG_L(L_WARNING, "[CubeMapHandler] PBR environment epoch %u rejected: %s", pbrRequestedRevision, pbrFailure.c_str());
 		return;
 	}
 
+	// atomic publication: all three resources of the epoch switch together
 	pbrActiveIndex = pbrCaptureIndex;
 	pbrCaptureIndex = 1 - pbrActiveIndex;
 	pbrActiveRevision = pbrRequestedRevision;
@@ -648,16 +850,18 @@ void CubeMapHandler::UpdatePBREnvironment()
 
 void CubeMapHandler::CreatePBRReflectionFace(unsigned int glFace)
 {
-	pbrCaptureFBO.AttachTexture(pbrEnvironmentTexIDs[pbrCaptureIndex], glFace);
+	pbrCaptureFBO.AttachTexture(pbrStagingTexID, glFace);
 	if (!pbrCaptureFBO.CheckStatus("PBR-ENVIRONMENT-CAPTURE")) {
 		pbrFailure = "PBR environment capture FBO is incomplete";
 		pbrPending = false;
 		return;
 	}
 
-	glPushAttrib(GL_FOG_BIT | GL_DEPTH_BUFFER_BIT | GL_VIEWPORT_BIT);
+	glPushAttrib(GL_FOG_BIT | GL_DEPTH_BUFFER_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT | GL_SCISSOR_BIT);
+	// an inherited scissor rectangle would leave stale texels in the face
+	glDisable(GL_SCISSOR_TEST);
 	const auto& sky = ISky::GetSky();
-	glViewport(0, 0, pbrEnvironmentSize, pbrEnvironmentSize);
+	glViewport(0, 0, pbrStagingSize, pbrStagingSize);
 	glClearColor(sky->fogColor.x, sky->fogColor.y, sky->fogColor.z, 1.0f);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
@@ -686,7 +890,7 @@ void CubeMapHandler::CreatePBRReflectionFace(unsigned int glFace)
 		environmentCamera->SetPos(float3(mapCenterX, mapCenterY, mapCenterZ));
 	}
 
-	environmentCamera->UpdateLoadViewport(0, 0, pbrEnvironmentSize, pbrEnvironmentSize);
+	environmentCamera->UpdateLoadViewport(0, 0, pbrStagingSize, pbrStagingSize);
 	environmentCamera->UpdateViewRange();
 	environmentCamera->UpdateMatrices(globalRendering->viewSizeX, globalRendering->viewSizeY, environmentCamera->GetAspectRatio());
 	environmentCamera->UpdateFrustum();
@@ -695,6 +899,10 @@ void CubeMapHandler::CreatePBRReflectionFace(unsigned int glFace)
 	game->SetDrawMode(CGame::gameReflectionDraw);
 	if (!globalRendering->drawDebugCubeMap) {
 		sky->Draw();
+		// NOTE: the ROAM ground mesh reuses the player camera's tessellation
+		// for every non-shadow pass, so patches the player camera never
+		// tessellated draw nothing here; sky-terrain content is therefore
+		// incomplete and depends on the player camera (see status docs).
 		if (!skyOnly)
 			readMap->GetGroundDrawer()->Draw(DrawPass::TerrainReflection);
 	} else {
@@ -705,26 +913,80 @@ void CubeMapHandler::CreatePBRReflectionFace(unsigned int glFace)
 	glPopAttrib();
 }
 
+// Reports (once per distinct combination) GL state inherited from earlier
+// passes that could drop or clip the full-screen filter triangles. The filter
+// overrides all of it; the log makes a leaking pass visible.
+static void ReportInheritedFilterState()
+{
+	static std::string lastReport;
+	std::string report;
+
+	const auto Check = [&](GLenum cap, const char* name) {
+		if (glIsEnabled(cap))
+			report += std::string(" ") + name;
+	};
+	Check(GL_SCISSOR_TEST, "scissor");
+	Check(GL_CULL_FACE, "cull-face");
+	Check(GL_STENCIL_TEST, "stencil");
+	Check(GL_ALPHA_TEST, "alpha-test");
+	Check(GL_BLEND, "blend");
+	Check(GL_DEPTH_TEST, "depth-test");
+	Check(GL_RASTERIZER_DISCARD, "rasterizer-discard");
+	for (int i = 0; i < 6; ++i) {
+		if (glIsEnabled(GL_CLIP_DISTANCE0 + i))
+			report += " clip-distance" + std::to_string(i);
+	}
+
+	GLint frontFace = GL_CCW;
+	glGetIntegerv(GL_FRONT_FACE, &frontFace);
+	if (frontFace != GL_CCW)
+		report += " front-face=cw";
+
+	GLboolean colorMask[4] = {GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE};
+	glGetBooleanv(GL_COLOR_WRITEMASK, colorMask);
+	if (!colorMask[0] || !colorMask[1] || !colorMask[2] || !colorMask[3])
+		report += " color-mask";
+
+	if (report != lastReport && !report.empty())
+		LOG_L(L_WARNING, "[CubeMapHandler] PBR filter overrides inherited GL state:%s", report.c_str());
+	lastReport = report;
+}
+
 bool CubeMapHandler::FilterPBREnvironment()
 {
+	PBREnvironmentSet& set = pbrSets[pbrCaptureIndex];
+
 	pbrFilterFBO.Bind();
-	glPushAttrib(GL_ENABLE_BIT | GL_VIEWPORT_BIT | GL_COLOR_BUFFER_BIT);
+	ReportInheritedFilterState();
+
+	glPushAttrib(GL_ENABLE_BIT | GL_VIEWPORT_BIT | GL_COLOR_BUFFER_BIT | GL_SCISSOR_BIT | GL_POLYGON_BIT | GL_STENCIL_BUFFER_BIT);
+	const GLboolean rasterizerDiscard = glIsEnabled(GL_RASTERIZER_DISCARD);
+	glDisable(GL_RASTERIZER_DISCARD);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_BLEND);
+	glDisable(GL_SCISSOR_TEST);
+	glDisable(GL_STENCIL_TEST);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_ALPHA_TEST);
+	for (int i = 0; i < 6; ++i)
+		glDisable(GL_CLIP_DISTANCE0 + i);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 	glDrawBuffer(GL_COLOR_ATTACHMENT0);
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, pbrEnvironmentTexIDs[pbrCaptureIndex]);
 
 	pbrFilterShader->Enable();
-	pbrFilterShader->SetUniform("sourceResolution", static_cast<float>(pbrEnvironmentSize));
 	pbrFilterVAO.Bind();
 
-	auto renderFaceMip = [&](unsigned int destination, unsigned int face, unsigned int mip, unsigned int size, int filterType, float roughness) {
+	auto renderFaceMip = [&](unsigned int source, unsigned int sourceSize, unsigned int destination, unsigned int face, unsigned int mip, unsigned int size, int filterType, float roughness) {
 		pbrFilterFBO.AttachTexture(destination, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, GL_COLOR_ATTACHMENT0, mip);
 		if (!pbrFilterFBO.CheckStatus("PBR-ENVIRONMENT-FILTER"))
 			return false;
 		glViewport(0, 0, size, size);
+		// bound immediately before every draw so that no intervening call
+		// can leave a different cube map on unit 0
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, source);
+		pbrFilterShader->SetUniform("sourceResolution", static_cast<float>(sourceSize));
 		pbrFilterShader->SetUniform("faceIndex", static_cast<int>(face));
 		pbrFilterShader->SetUniform("filterType", filterType);
 		pbrFilterShader->SetUniform("roughness", roughness);
@@ -733,19 +995,36 @@ bool CubeMapHandler::FilterPBREnvironment()
 	};
 
 	bool valid = true;
-	for (unsigned int face = 0; face < 6 && valid; ++face)
-		valid &= renderFaceMip(pbrIrradianceTexIDs[pbrCaptureIndex], face, 0, pbrIrradianceSize, 1, 1.0f);
 
-	for (unsigned int mip = 0; mip < pbrSpecularMipCount && valid; ++mip) {
-		const unsigned int mipSize = std::max(1u, pbrSpecularSize >> mip);
-		const float roughness = (pbrSpecularMipCount > 1) ? static_cast<float>(mip) / static_cast<float>(pbrSpecularMipCount - 1) : 0.0f;
-		for (unsigned int face = 0; face < 6 && valid; ++face)
-			valid &= renderFaceMip(pbrSpecularTexIDs[pbrCaptureIndex], face, mip, mipSize, 2, roughness);
+	// 1. display-referred staging capture -> scene-linear environment mip 0
+	for (unsigned int face = 0; face < 6 && valid; ++face)
+		valid &= renderFaceMip(pbrStagingTexID, pbrStagingSize, set.environmentTexID, face, 0, set.environmentSize, PBR_FILTER_DECODE, 0.0f);
+
+	// 2. box mips of the linear source: an integration aid for the filters
+	//    below (solid-angle source-LOD selection), never published as GGX
+	if (valid) {
+		pbrFilterFBO.Detach(GL_COLOR_ATTACHMENT0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, set.environmentTexID);
+		glGenerateMipmapEXT(GL_TEXTURE_CUBE_MAP);
 	}
 
+	// 3. diffuse irradiance, 4. GGX prefiltered radiance per roughness mip
+	for (unsigned int face = 0; face < 6 && valid; ++face)
+		valid &= renderFaceMip(set.environmentTexID, set.environmentSize, set.irradianceTexID, face, 0, set.irradianceSize, PBR_FILTER_DIFFUSE, 1.0f);
+
+	for (unsigned int mip = 0; mip < set.specularMipCount && valid; ++mip) {
+		const unsigned int mipSize = std::max(1u, set.specularSize >> mip);
+		const float roughness = (set.specularMipCount > 1) ? static_cast<float>(mip) / static_cast<float>(set.specularMipCount - 1) : 0.0f;
+		for (unsigned int face = 0; face < 6 && valid; ++face)
+			valid &= renderFaceMip(set.environmentTexID, set.environmentSize, set.specularTexID, face, mip, mipSize, PBR_FILTER_SPECULAR, roughness);
+	}
+
+	pbrFilterFBO.Detach(GL_COLOR_ATTACHMENT0);
 	pbrFilterVAO.Unbind();
 	pbrFilterShader->Disable();
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+	if (rasterizerDiscard)
+		glEnable(GL_RASTERIZER_DISCARD);
 	glPopAttrib();
 	FBO::Unbind();
 	globalRendering->LoadViewport();

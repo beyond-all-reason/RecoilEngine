@@ -2843,6 +2843,12 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
  * Returns the state of the atomically published PBR environment resources.
  * A consumer must require `ready == true`, `pending == false`, and matching
  * requested/active revisions before using a capture as validation evidence.
+ * Revisions only ever increase. `captureMode`, `anchor`, `content` and
+ * `filter` are the values in effect; the `requested*` fields echo the
+ * persisted settings and `fallback` explains every substitution. `transfer`
+ * names how the captured legacy content was converted to scene-linear.
+ * `captureGpuMilliseconds` (all six faces) and `filterGpuMilliseconds` are
+ * GPU timestamp measurements of the last completed epoch, or -1 if unknown.
  *
  * @function Spring.GetPBREnvironmentInfo
  * @return table environmentInfo
@@ -2850,7 +2856,7 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
 int LuaUnsyncedRead::GetPBREnvironmentInfo(lua_State* L)
 {
 	const PBREnvironmentInfo info = cubeMapHandler.GetPBREnvironmentInfo();
-	lua_createtable(L, 0, 14);
+	lua_createtable(L, 0, 23);
 	LuaPushNamedNumber(L, "requestedRevision", info.requestedRevision);
 	LuaPushNamedNumber(L, "activeRevision", info.activeRevision);
 	LuaPushNamedNumber(L, "environmentSize", info.environmentSize);
@@ -2864,7 +2870,15 @@ int LuaUnsyncedRead::GetPBREnvironmentInfo(lua_State* L)
 	LuaPushNamedString(L, "anchor", info.anchor);
 	LuaPushNamedString(L, "content", info.content);
 	LuaPushNamedString(L, "filter", info.filter);
+	LuaPushNamedString(L, "requestedCaptureMode", info.requestedCaptureMode);
+	LuaPushNamedString(L, "requestedAnchor", info.requestedAnchor);
+	LuaPushNamedString(L, "requestedContent", info.requestedContent);
+	LuaPushNamedString(L, "requestedFilter", info.requestedFilter);
+	LuaPushNamedString(L, "transfer", info.transfer);
+	LuaPushNamedString(L, "fallback", info.fallback);
 	LuaPushNamedString(L, "failure", info.failure);
+	LuaPushNamedNumber(L, "captureGpuMilliseconds", info.captureGpuMilliseconds);
+	LuaPushNamedNumber(L, "filterGpuMilliseconds", info.filterGpuMilliseconds);
 	return 1;
 }
 
