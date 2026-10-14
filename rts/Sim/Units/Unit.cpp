@@ -700,6 +700,9 @@ unsigned int CUnit::UpdateState()
 		return eventBits;
 	}
 
+	// Not while being built or currently stunned.
+	commandAI->Update();
+
 	restTime += 1;
 	return eventBits;
 }
