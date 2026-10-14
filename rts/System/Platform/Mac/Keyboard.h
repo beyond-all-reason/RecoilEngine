@@ -12,6 +12,7 @@ namespace MacKeyboard {
 	void Init();
 
 	void TranslateEvent(SDL_Event& event);
+	SDL_Keymod TranslateMods(SDL_Keymod mods);
 
 	// keys held down that SDL's own keyboard state does not know about
 	const std::vector<SDL_Scancode>& GetHeldKeys();
