@@ -12,6 +12,10 @@
 
 #include "KeyInput.h"
 
+#ifdef __APPLE__
+#include "System/Platform/Mac/Keyboard.h"
+#endif
+
 /**
 * @brief keys
 *
@@ -136,6 +140,13 @@ namespace KeyInput {
 
 		std::sort(keyVec.begin(), keyVec.end(), keyCmp);
 		std::sort(scanVec.begin(), scanVec.end(), keyCmp);
+
+#ifdef __APPLE__
+		for (const SDL_Scancode scanCode: MacKeyboard::GetHeldKeys()) {
+			ForcePressed(keyVec, SDL_GetKeyFromScancode(scanCode));
+			ForcePressed(scanVec, scanCode);
+		}
+#endif
 
 		SetKeyModState(KMOD_GUI, IsKeyPressed(fakeMetaKey));
 		SetKeyPressed(SDLK_LALT  , GetKeyModState(KMOD_ALT  ));
