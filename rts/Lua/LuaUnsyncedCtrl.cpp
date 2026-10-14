@@ -2761,7 +2761,7 @@ int LuaUnsyncedCtrl::ExtractModArchiveFile(lua_State* L)
 
 
 	std::vector<uint8_t> buffer;
-	nowide::fstream fstr(path.c_str(), std::ios::out | std::ios::binary);
+	nowide::ofstream fstr(path.c_str(), std::ios::out | std::ios::binary);
 
 	if (!vfsFile.IsBuffered()) {
 		buffer.resize(vfsFile.FileSize(), 0);

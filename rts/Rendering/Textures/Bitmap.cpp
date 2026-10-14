@@ -1507,7 +1507,7 @@ namespace {
 			if (err = ilGetError(); err != IL_NO_ERROR)
 				return false;
 
-			nowide::fstream fstr(p, std::ios::out | std::ios::binary);
+			nowide::ofstream fstr(p, std::ios::out | std::ios::binary);
 			if (!fstr.is_open())
 				return false;
 
