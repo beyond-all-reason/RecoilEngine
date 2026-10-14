@@ -316,6 +316,7 @@ void CWorldDrawer::Draw() const
 	camera->Update();
 
 	DrawOpaqueObjects();
+	eventHandler.DrawWorldPreAlpha();
 	DrawAlphaObjects();
 	{
 		SCOPED_TIMER("Draw::World::DrawWorld");
@@ -372,6 +373,9 @@ void CWorldDrawer::DrawOpaqueObjects() const
 		unitDrawer->Draw(false);
 		featureDrawer->Draw(false);
 	}
+
+	eventHandler.DrawWorldPreProjectiles();
+
 	{
 		SCOPED_TIMER("Draw::World::Models::Projectiles");
 		SCOPED_GL_DEBUGGROUP("Draw::World::Models::Projectiles");
