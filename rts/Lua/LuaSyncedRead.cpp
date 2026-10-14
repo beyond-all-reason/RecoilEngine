@@ -191,6 +191,8 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitsInBox);
 	REGISTER_LUA_CFUNC(GetUnitsInPlanes);
 	REGISTER_LUA_CFUNC(GetUnitsInSphere);
+	REGISTER_LUA_CFUNC(GetUnitsInExplosion);
+	REGISTER_LUA_CFUNC(GetUnitClosestPointFromExplosion);
 	REGISTER_LUA_CFUNC(GetUnitsInCylinder);
 
 	REGISTER_LUA_CFUNC(GetUnitArrayCentroid);
@@ -3149,6 +3151,172 @@ int LuaSyncedRead::GetUnitsInSphere(lua_State* L)
 	GetFilteredUnits(L, allegiance, units, sphereCheck);
 
 	return 1;
+}
+
+
+/**
+ * @brief Helper to compute the closest surface point on a unit's collision volume
+ * from a given world-space position.
+ *
+ * Handles both piece-tree and single-volume collision models.
+ *
+ * @param unit The unit to test against
+ * @param pos The world-space point to find the closest surface point from
+ * @return The closest surface point on the unit's collision volume
+ */
+static float3 GetClosestSurfacePoint(const CUnit* unit, const float3& pos) {
+	if (unit->collisionVolume.DefaultToPieceTree()) {
+		float bestDistSq = 1e30f;
+		float3 closestPt;
+
+		for (unsigned int n = 0; n < unit->localModel.pieces.size(); n++) {
+			const LocalModelPiece* lmp = unit->localModel.GetPiece(n);
+			const CollisionVolume* lmpVol = lmp->GetCollisionVolume();
+
+			if (!lmp->GetScriptVisible() || lmpVol->IgnoreHits())
+				continue;
+
+			const float3 pt = lmpVol->GetClosestSurfacePoint(unit, lmp, pos);
+			const float dSq = (pt - pos).SqLength();
+
+			if (dSq < bestDistSq) {
+				bestDistSq = dSq;
+				closestPt = pt;
+			}
+		}
+
+		return closestPt;
+	}
+
+	return unit->collisionVolume.GetClosestSurfacePoint(unit, nullptr, pos);
+}
+
+
+/**
+ * @brief Like GetFilteredUnits, but the inRegion lambda also outputs a
+ * closest point via an out-parameter. The Lua table is keyed by unitID,
+ * with each value being {x, y, z} of the closest point.
+ *
+ * @param inRegion A lambda: (const CUnit*, const float3& pos, float3& closestPt) -> bool
+ */
+template<typename InRegion>
+static void GetFilteredUnitsWithPoint(lua_State *L, int allegiance, const std::vector<CUnit*>& units, InRegion inRegion) {
+	const int readTeam = CLuaHandle::GetHandleReadTeam(L);
+	const int readAllyTeam = CLuaHandle::GetHandleReadAllyTeam(L);
+	const bool fullRead = CLuaHandle::GetHandleFullRead(L);
+
+	auto runLoop = [&](auto disqualifier) {
+		for (const CUnit* unit : units) {
+			if (disqualifier(unit))
+				continue;
+
+			float3 pos = unit->midPos + unit->GetLuaErrorVector(readAllyTeam, fullRead);
+			float3 closestPt;
+			if (!inRegion(unit, pos, closestPt))
+				continue;
+
+			lua_createtable(L, 3, 0);
+			lua_pushnumber(L, closestPt.x); lua_rawseti(L, -2, 1);
+			lua_pushnumber(L, closestPt.y); lua_rawseti(L, -2, 2);
+			lua_pushnumber(L, closestPt.z); lua_rawseti(L, -2, 3);
+			lua_rawseti(L, -2, unit->id);
+		}
+	};
+
+	switch (allegiance) {
+		case LuaUtils::AllUnits:
+			runLoop([L](const CUnit* u) { return !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::MyUnits:
+			runLoop([L, readTeam](const CUnit* u) { return u->team != readTeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::AllyUnits:
+			runLoop([L, readAllyTeam](const CUnit* u) { return u->allyteam != readAllyTeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		case LuaUtils::EnemyUnits:
+			runLoop([L, readAllyTeam](const CUnit* u) { return u->allyteam == readAllyTeam || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+		default:
+			runLoop([L, allegiance](const CUnit* u) { return u->team != allegiance || !LuaUtils::IsUnitVisible(L, u); });
+			break;
+	}
+}
+
+
+/***
+ *
+ * @function Spring.GetUnitsInExplosion
+ * @param x number
+ * @param y number
+ * @param z number
+ * @param radius number
+ * @param allegiance number? (Default: `-1`) teamID when > 0, when < 0 one of AllUnits = -1, MyUnits = -2, AllyUnits = -3, EnemyUnits = -4
+ * @return table<number, number[]> unitIDToClosestPoint a table keyed by unitID, each value is {x, y, z} world-space closest surface point on the unit's collision volume
+ */
+int LuaSyncedRead::GetUnitsInExplosion(lua_State* L)
+{
+	const float x = luaL_checkfloat(L, 1);
+	const float y = luaL_checkfloat(L, 2);
+	const float z = luaL_checkfloat(L, 3);
+	const float radius = luaL_checkfloat(L, 4);
+	const float radSqr = (radius * radius);
+
+	const float3 pos(x, y, z);
+	float3 mins(x - radius, 0.0f, z - radius);
+	float3 maxs(x + radius, 0.0f, z + radius);
+
+	const int allegiance = LuaUtils::ParseAllegiance(L, __func__, 5);
+
+	const auto explosionCheck = [&](const CUnit* unit, const float3& /* errorPos */, float3& closestPt) {
+		closestPt = GetClosestSurfacePoint(unit, pos);
+		return (closestPt - pos).SqLength() <= radSqr;
+	};
+
+	const bool fullRead = CLuaHandle::GetHandleFullRead(L);
+	if (!fullRead)
+		ApplyPlanarTeamError(L, allegiance, mins, maxs);
+
+	QuadFieldQuery qfQuery;
+	quadField.GetUnitsExact(qfQuery, mins, maxs);
+	const auto& units = (*qfQuery.units);
+
+	lua_createtable(L, 0, units.size());
+
+	GetFilteredUnitsWithPoint(L, allegiance, units, explosionCheck);
+
+	return 1;
+}
+
+
+/***
+ *
+ * @function Spring.GetUnitClosestPointFromExplosion
+ * @param unitID integer
+ * @param x number explosion center X
+ * @param y number explosion center Y
+ * @param z number explosion center Z
+ * @return number? closestX
+ * @return number? closestY
+ * @return number? closestZ
+ */
+int LuaSyncedRead::GetUnitClosestPointFromExplosion(lua_State* L)
+{
+	const CUnit* unit = ParseUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	const float x = luaL_checkfloat(L, 2);
+	const float y = luaL_checkfloat(L, 3);
+	const float z = luaL_checkfloat(L, 4);
+	const float3 pos(x, y, z);
+
+	const float3 closestPt = GetClosestSurfacePoint(unit, pos);
+
+	lua_pushnumber(L, closestPt.x);
+	lua_pushnumber(L, closestPt.y);
+	lua_pushnumber(L, closestPt.z);
+	return 3;
 }
 
 
