@@ -64,6 +64,9 @@ LuaMatTexture::Type LuaOpenGLUtils::GetLuaMatTextureType(const std::string& name
 		case hashString(    "$reflection"): { return LuaMatTexture::LUATEX_MAP_REFLECTION; } break;
 		case hashString("$map_reflection"): { return LuaMatTexture::LUATEX_MAP_REFLECTION; } break;
 		case hashString("$sky_reflection"): { return LuaMatTexture::LUATEX_SKY_REFLECTION; } break;
+		case hashString( "$pbr_environment"): { return LuaMatTexture::LUATEX_PBR_ENVIRONMENT; } break;
+		case hashString(  "$pbr_irradiance"): { return LuaMatTexture::LUATEX_PBR_IRRADIANCE ; } break;
+		case hashString(    "$pbr_specular"): { return LuaMatTexture::LUATEX_PBR_SPECULAR   ; } break;
 
 		// specials
 		case hashString("$shadow"      ): { return LuaMatTexture::LUATEX_SHADOWMAP;   } break;
@@ -551,6 +554,15 @@ GLuint LuaMatTexture::GetTextureID() const
 		case LUATEX_SPECULAR: {
 			texID = cubeMapHandler.GetSpecularTextureID();
 		} break;
+		case LUATEX_PBR_ENVIRONMENT: {
+			texID = cubeMapHandler.GetPBREnvironmentTextureID();
+		} break;
+		case LUATEX_PBR_IRRADIANCE: {
+			texID = cubeMapHandler.GetPBRIrradianceTextureID();
+		} break;
+		case LUATEX_PBR_SPECULAR: {
+			texID = cubeMapHandler.GetPBRSpecularTextureID();
+		} break;
 
 
 		case LUATEX_SHADOWMAP: {
@@ -687,7 +699,10 @@ GLuint LuaMatTexture::GetTextureTarget() const
 
 		case LUATEX_MAP_REFLECTION: [[fallthrough]];
 		case LUATEX_SKY_REFLECTION: [[fallthrough]];
-		case LUATEX_SPECULAR: {
+		case LUATEX_SPECULAR: [[fallthrough]];
+		case LUATEX_PBR_ENVIRONMENT: [[fallthrough]];
+		case LUATEX_PBR_IRRADIANCE: [[fallthrough]];
+		case LUATEX_PBR_SPECULAR: {
 			texType = GL_TEXTURE_CUBE_MAP_ARB;
 		} break;
 
@@ -907,6 +922,15 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 		case LUATEX_SPECULAR: {
 			return ReturnHelper(cubeMapHandler.GetSpecularTextureSize());
 		} break;
+		case LUATEX_PBR_ENVIRONMENT: {
+			return ReturnHelper(cubeMapHandler.GetPBREnvironmentTextureSize());
+		} break;
+		case LUATEX_PBR_IRRADIANCE: {
+			return ReturnHelper(cubeMapHandler.GetPBRIrradianceTextureSize());
+		} break;
+		case LUATEX_PBR_SPECULAR: {
+			return ReturnHelper(cubeMapHandler.GetPBRSpecularTextureSize());
+		} break;
 
 
 		case LUATEX_SHADOWMAP: {
@@ -1064,6 +1088,9 @@ void LuaMatTexture::Print(const string& indent) const
 		STRING_CASE(typeName, LUATEX_MAP_REFLECTION);
 		STRING_CASE(typeName, LUATEX_SKY_REFLECTION);
 		STRING_CASE(typeName, LUATEX_SPECULAR);
+		STRING_CASE(typeName, LUATEX_PBR_ENVIRONMENT);
+		STRING_CASE(typeName, LUATEX_PBR_IRRADIANCE);
+		STRING_CASE(typeName, LUATEX_PBR_SPECULAR);
 
 		STRING_CASE(typeName, LUATEX_SHADOWMAP);
 		STRING_CASE(typeName, LUATEX_SHADOWCOLOR);
