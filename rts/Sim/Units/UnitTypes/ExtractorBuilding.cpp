@@ -16,7 +16,7 @@
 #include "System/Misc/TracyDefs.h"
 
 
-CR_BIND_DERIVED(CExtractorBuilding, CBuilding, )
+CR_BIND_DERIVED(CExtractorBuilding, CUnit, )
 CR_REG_METADATA(CExtractorBuilding, (
 	CR_MEMBER(extractionRange),
 	CR_MEMBER(extractionDepth),
@@ -43,7 +43,7 @@ CExtractorBuilding::~CExtractorBuilding()
 void CExtractorBuilding::PreInit(const UnitLoadParams& params)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	CBuilding::PreInit(params);
+	CUnit::PreInit(params);
 
 	extractionRange = unitDef->extractRange;
 	extractionDepth = unitDef->extractsMetal;
@@ -193,7 +193,7 @@ void CExtractorBuilding::Activate()
 	if (activated)
 		return;
 
-	CBuilding::Activate();
+	CUnit::Activate();
 
 	/* Finds the amount of metal to extract and sets the rotationspeed when the extractor is built. */
 	SetExtractionRangeAndDepth(extractionRange, extractionDepth);
@@ -206,7 +206,7 @@ void CExtractorBuilding::Deactivate()
 	if (!activated)
 		return;
 
-	CBuilding::Deactivate();
+	CUnit::Deactivate();
 
 	ResetExtraction();
 }

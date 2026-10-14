@@ -32,7 +32,7 @@
 #include "Rendering/Env/NanoParticles/NanoParticleSystem.h"
 #include "System/Misc/TracyDefs.h"
 
-CR_BIND_DERIVED(CFactory, CBuilding, )
+CR_BIND_DERIVED(CFactory, CUnit, )
 CR_REG_METADATA(CFactory, (
 	CR_MEMBER(buildSpeed),
 
@@ -55,7 +55,7 @@ CR_REG_METADATA(CFactory, (
 //////////////////////////////////////////////////////////////////////
 
 CFactory::CFactory()
-	: CBuilding()
+	: CUnit()
 	, buildSpeed(100.0f)
 	, boOffset(0.0f) //can't set here
 	, boRadius(0.0f) //can't set here
@@ -85,7 +85,7 @@ void CFactory::PreInit(const UnitLoadParams& params)
 	unitDef = params.unitDef;
 	buildSpeed = unitDef->buildSpeed / GAME_SPEED;
 
-	CBuilding::PreInit(params);
+	CUnit::PreInit(params);
 
 	//radius is defined after CUnit::PreInit()
 	boOffset = radius * 0.5f;
@@ -167,7 +167,7 @@ void CFactory::Update()
 		script->Deactivate();
 	}
 
-	CBuilding::Update();
+	CUnit::Update();
 }
 
 
@@ -520,7 +520,7 @@ void CFactory::AssignBuildeeOrders(CUnit* unit) {
 bool CFactory::ChangeTeam(int newTeam, ChangeType type)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!CBuilding::ChangeTeam(newTeam, type))
+	if (!CUnit::ChangeTeam(newTeam, type))
 		return false;
 
 	if (curBuild)
