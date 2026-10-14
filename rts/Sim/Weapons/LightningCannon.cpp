@@ -30,7 +30,10 @@ CLightningCannon::CLightningCannon(CUnit* owner, const WeaponDef* def): CWeapon(
 
 bool CLightningCannon::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
 {
-	float3 aimDir = (tgtPos - aimFromPos);
+	float3 aimDir = (rangeFromBase == 1) ? tgtPos - float3(owner->pos.x, aimFromPos.y, owner->pos.z) :
+					(rangeFromBase == 2) ? tgtPos - owner->aimPos :
+										   tgtPos - aimFromPos; // default case
+
 	const float targetDist = aimDir.LengthNormalize();
 
 	if (const auto shapedRange = GetShapedWeaponRange(aimDir, range); targetDist > shapedRange)
@@ -54,7 +57,29 @@ void CLightningCannon::FireImpl(const bool scriptCall)
 	CPlasmaRepulser* hitShield = nullptr;
 	CollisionQuery hitColQuery;
 
-	const auto shapedRange = GetShapedWeaponRange(curDir, range);
+	float maxLength = range;
+	if (rangeFromBase == 1) {
+		// need to keep the laser from shooting past range as defined by rangeFromBase
+		// and also need to stretch it if the muzzle is behind the rangefrom point
+		// figure out the length of a ray that starts at weaponMuzzlePos, 
+		// and terminates on a sphere centered on the rangefrom point with radius range * rangeMod
+		const float3 weaponMuzzlePosOffset = weaponMuzzlePos - float3(owner->pos.x, aimFromPos.y, owner->pos.z);
+		const float b = weaponMuzzlePosOffset.dot(curDir);
+		const float c = weaponMuzzlePosOffset.dot(weaponMuzzlePosOffset) - maxLength * maxLength;
+		if ( (b * b - c) > 0) {
+			maxLength = (-b + math::sqrt(b * b - c));
+		}
+	}
+	else if (rangeFromBase == 2) {
+		const float3 weaponMuzzlePosOffset = weaponMuzzlePos - owner->aimPos;
+		const float b = weaponMuzzlePosOffset.dot(curDir);
+		const float c = weaponMuzzlePosOffset.dot(weaponMuzzlePosOffset) - maxLength * maxLength;
+		if ( (b * b - c) > 0) {
+			maxLength = (-b + math::sqrt(b * b - c));
+		}
+	}
+
+	const auto shapedRange = GetShapedWeaponRange(curDir, maxLength);
 
 	float boltLength = TraceRay::TraceRay(curPos, curDir, shapedRange, collisionFlags, owner, hitUnit, hitFeature, &hitColQuery);
 
