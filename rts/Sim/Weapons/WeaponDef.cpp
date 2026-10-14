@@ -529,6 +529,16 @@ WeaponDef::WeaponDef(const LuaTable& wdTable, const std::string& name_, int id_)
 				// CStarburstProjectile
 				projectileType = WEAPON_STARBURST_PROJECTILE;
 				defInterceptType = 4;
+
+				/* Starburst always needs a non-zero turnrate to shift from
+				 * the vertical ascent phase and reorient towards its actual
+				 * target. Disabling tracking is for backwards compat, since
+				 * historically a zero turnrate was handled via a hardcoded
+				 * exception (which is where the 1.8 below comes from). */
+				if (turnrate == 0.0f) {
+					turnrate = 1.8f * INV_GAME_SPEED;
+					tracks = false;
+				}
 			} break;
 			case hashString("AircraftBomb"): {
 				// WeaponLoader will create BombDropper with dropTorpedoes = false
