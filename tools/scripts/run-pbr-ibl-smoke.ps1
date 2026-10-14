@@ -37,10 +37,20 @@ $gamesDirectory = Join-Path $BuildDirectory 'games'
 $gameMount = Join-Path $gamesDirectory 'Beyond-All-Reason-Private-pbr-rendering-V3.sdd'
 $mapMount = Join-Path $BuildDirectory 'maps'
 $writeDirectory = Join-Path $BuildDirectory 'pbr-user'
+$runtimeLibraries = @(
+    'libcurl.dll',
+    'OpenAL32.dll',
+    'zlib1.dll',
+    'SDL2.dll',
+    'libfontconfig-1.dll',
+    'libfreetype-6.dll',
+    'libIL.dll',
+    'libvorbisfile-3.dll'
+) | ForEach-Object { Join-Path $BuildDirectory $_ }
 
-foreach ($requiredPath in @($engine, $baseDirectory, $installedMaps)) {
+foreach ($requiredPath in @($engine, $baseDirectory, $installedMaps) + $runtimeLibraries) {
     if (-not (Test-Path -LiteralPath $requiredPath)) {
-        throw "Required PBR smoke-test path does not exist: $requiredPath"
+        throw "Required PBR smoke-test path does not exist: $requiredPath. Run the VS Code task 'PBR: debug-ready' or tools/scripts/install-pbr-runtime.ps1 first."
     }
 }
 
