@@ -18,6 +18,7 @@
  * @x_helper
  * @field NegativeGetUnitCurrentCommand boolean Whether Spring.GetUnitCurrentCommand allows negative indices to look from the end
  * @field hasExitOnlyYardmaps boolean Whether yardmaps accept 'e' (exit only) and 'u' (unbuildable, walkable)
+ * @field isFactoryTag boolean Whether unit defs accept the isFactory tag
  * @field rmlUiApiVersion integer Version of Recoil's rmlUI API
  * @field noAutoShowMetal boolean Whether the engine switches to the metal view when selecting a "build metal extractor" command (yes if false)
  * @field maxPiecesPerModel integer How many pieces supported for 3d models?
@@ -73,9 +74,10 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 	 *
 	 * will be compatible even on engines that don't yet know about the entry at all. */
 	lua_pushliteral(L, "FeatureSupport");
-	lua_createtable(L, 0, 16);
+	lua_createtable(L, 0, 17);
 		LuaPushNamedBool(L, "NegativeGetUnitCurrentCommand", true);
 		LuaPushNamedBool(L, "hasExitOnlyYardmaps", true);
+		LuaPushNamedBool(L, "isFactoryTag", true);
 		LuaPushNamedNumber(L, "rmlUiApiVersion", 1);
 		LuaPushNamedBool(L, "noAutoShowMetal", false);
 		LuaPushNamedNumber(L, "maxPiecesPerModel", MAX_PIECES_PER_MODEL);
