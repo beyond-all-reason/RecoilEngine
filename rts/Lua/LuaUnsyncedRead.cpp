@@ -40,6 +40,7 @@
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/Env/IWater.h"
+#include "Rendering/Env/CubeMapHandler.h"
 #include "Rendering/Env/IGroundDecalDrawer.h"
 #include "Rendering/Env/Particles/Classes/NanoProjectile.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
@@ -208,6 +209,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(HaveShadows);
 	REGISTER_LUA_CFUNC(HaveAdvShading);
 	REGISTER_LUA_CFUNC(GetWaterMode);
+	REGISTER_LUA_CFUNC(GetPBREnvironmentInfo);
 	REGISTER_LUA_CFUNC(GetMapDrawMode);
 	REGISTER_LUA_CFUNC(GetMapSquareTexture);
 
@@ -2834,6 +2836,36 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
 	lua_pushnumber(L, water->GetID());
 	lua_pushstring(L, IWater::GetWaterName(water->GetID()));
 	return 2;
+}
+
+
+/***
+ * Returns the state of the atomically published PBR environment resources.
+ * A consumer must require `ready == true`, `pending == false`, and matching
+ * requested/active revisions before using a capture as validation evidence.
+ *
+ * @function Spring.GetPBREnvironmentInfo
+ * @return table environmentInfo
+ */
+int LuaUnsyncedRead::GetPBREnvironmentInfo(lua_State* L)
+{
+	const PBREnvironmentInfo info = cubeMapHandler.GetPBREnvironmentInfo();
+	lua_createtable(L, 0, 14);
+	LuaPushNamedNumber(L, "requestedRevision", info.requestedRevision);
+	LuaPushNamedNumber(L, "activeRevision", info.activeRevision);
+	LuaPushNamedNumber(L, "environmentSize", info.environmentSize);
+	LuaPushNamedNumber(L, "irradianceSize", info.irradianceSize);
+	LuaPushNamedNumber(L, "specularSize", info.specularSize);
+	LuaPushNamedNumber(L, "specularMipCount", info.specularMipCount);
+	LuaPushNamedBool(L, "enabled", info.enabled);
+	LuaPushNamedBool(L, "ready", info.ready);
+	LuaPushNamedBool(L, "pending", info.pending);
+	LuaPushNamedString(L, "captureMode", info.captureMode);
+	LuaPushNamedString(L, "anchor", info.anchor);
+	LuaPushNamedString(L, "content", info.content);
+	LuaPushNamedString(L, "filter", info.filter);
+	LuaPushNamedString(L, "failure", info.failure);
+	return 1;
 }
 
 
