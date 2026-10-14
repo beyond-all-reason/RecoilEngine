@@ -124,6 +124,9 @@ namespace KeyInput {
 		const uint8_t* kbState = SDL_GetKeyboardState(&numKeys);
 
 		keyMods = SDL_GetModState();
+#ifdef __APPLE__
+		keyMods = MacKeyboard::TranslateMods(keyMods);
+#endif
 
 		keyVec.clear();
 		keyVec.reserve(numKeys);
