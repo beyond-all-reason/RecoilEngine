@@ -27,6 +27,7 @@
 #include "Sim/Units/Scripts/LuaUnitScript.h"
 
 
+class CFactory;
 class CPlayer;
 class CCommandAI;
 class CGroup;
@@ -281,6 +282,7 @@ public:
 
 	CUnit* soloBuilder = nullptr;
 	CUnit* lastAttacker = nullptr;
+	CFactory* producingFactory = nullptr;
 	// transport that the unit is currently in
 	CUnit* transporter = nullptr;
 

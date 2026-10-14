@@ -72,6 +72,7 @@ void CFactory::KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int 
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (curBuild != nullptr) {
+		curBuild->producingFactory = nullptr;
 		curBuild->KillUnit(nullptr, false, true, -CSolidObject::DAMAGE_FACTORY_KILLED);
 		curBuild = nullptr;
 	}
@@ -195,6 +196,7 @@ void CFactory::StartBuild(const UnitDef* buildeeDef) {
 		buildee->AddDeathDependence(this, DEPENDENCE_BUILDER);
 	}
 
+	buildee->producingFactory = this;
 	AddDeathDependence(buildee, DEPENDENCE_BUILD);
 	script->StartBuilding();
 
@@ -320,6 +322,7 @@ void CFactory::StopBuild()
 			AddResources({curBuild->cost.metal * curBuild->buildProgress, 0.0f}, false);
 			curBuild->KillUnit(nullptr, false, true, -CSolidObject::DAMAGE_FACTORY_CANCEL);
 		}
+		curBuild->producingFactory = nullptr;
 		DeleteDeathDependence(curBuild, DEPENDENCE_BUILD);
 	}
 
