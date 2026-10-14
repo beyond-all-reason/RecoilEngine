@@ -385,6 +385,7 @@ CStrafeAirMoveType::CStrafeAirMoveType(CUnit* owner): AAirMoveType(owner)
 	isFighter = owner->unitDef->IsFighterAirUnit();
 	loopbackAttack = owner->unitDef->canLoopbackAttack && isFighter;
 
+	wingDrag = owner->unitDef->wingDrag;
 	wingAngle = owner->unitDef->wingAngle;
 	crashDrag = 1.0f - owner->unitDef->crashDrag;
 
