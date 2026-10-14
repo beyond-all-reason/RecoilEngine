@@ -167,6 +167,8 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetTeamDamageStats);
 	REGISTER_LUA_CFUNC(GetTeamRulesParam);
 	REGISTER_LUA_CFUNC(GetTeamRulesParams);
+	REGISTER_LUA_CFUNC(GetAllyTeamRulesParam);
+	REGISTER_LUA_CFUNC(GetAllyTeamRulesParams);
 	REGISTER_LUA_CFUNC(GetTeamStatsHistory);
 	REGISTER_LUA_CFUNC(GetTeamLuaAI);
 	REGISTER_LUA_CFUNC(GetTeamMaxUnits);
@@ -1195,6 +1197,65 @@ int LuaSyncedRead::GetTeamRulesParam(lua_State* L)
 	}
 
 	return GetRulesParam(L, __func__, 2, team->modParams, losMask);
+}
+
+
+/***
+ *
+ * @function Spring.GetAllyTeamRulesParams
+ *
+ * @param allyTeamID integer
+ *
+ * @return RulesParams rulesParams map with rules names as key and values as values
+ */
+int LuaSyncedRead::GetAllyTeamRulesParams(lua_State* L)
+{
+	const int allyTeamID = luaL_checkint(L, 1);
+	if (!teamHandler.IsValidAllyTeam(allyTeamID) || game == nullptr)
+		return 0;
+
+	const AllyTeam& allyTeam = teamHandler.GetAllyTeam(allyTeamID);
+
+	int losMask = LuaRulesParams::RULESPARAMLOS_PUBLIC;
+
+	if (LuaUtils::IsAlliedAllyTeam(L, allyTeamID) || game->IsGameOver()) {
+		losMask |= LuaRulesParams::RULESPARAMLOS_PRIVATE_MASK;
+	}
+	else if (teamHandler.AlliedAllyTeams(allyTeamID, CLuaHandle::GetHandleReadAllyTeam(L))) {
+		losMask |= LuaRulesParams::RULESPARAMLOS_ALLIED_MASK;
+	}
+
+	return PushRulesParams(L, __func__, allyTeam.modParams, losMask);
+}
+
+
+/***
+ *
+ * @function Spring.GetAllyTeamRulesParam
+ *
+ * @param allyTeamID integer
+ * @param ruleRef number|string the rule index or name
+ *
+ * @return number|string|nil value
+ */
+int LuaSyncedRead::GetAllyTeamRulesParam(lua_State* L)
+{
+	const int allyTeamID = luaL_checkint(L, 1);
+	if (!teamHandler.IsValidAllyTeam(allyTeamID) || game == nullptr)
+		return 0;
+
+	const AllyTeam& allyTeam = teamHandler.GetAllyTeam(allyTeamID);
+
+	int losMask = LuaRulesParams::RULESPARAMLOS_PUBLIC;
+
+	if (LuaUtils::IsAlliedAllyTeam(L, allyTeamID) || game->IsGameOver()) {
+		losMask |= LuaRulesParams::RULESPARAMLOS_PRIVATE_MASK;
+	}
+	else if (teamHandler.AlliedAllyTeams(allyTeamID, CLuaHandle::GetHandleReadAllyTeam(L))) {
+		losMask |= LuaRulesParams::RULESPARAMLOS_ALLIED_MASK;
+	}
+
+	return GetRulesParam(L, __func__, 2, allyTeam.modParams, losMask);
 }
 
 

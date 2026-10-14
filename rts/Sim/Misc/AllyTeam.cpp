@@ -16,7 +16,8 @@ CR_REG_METADATA(AllyTeam, (
 	CR_MEMBER(startRectLeft),
 	CR_MEMBER(startRectRight),
 	CR_MEMBER(allies),
-	CR_MEMBER(customValues)
+	CR_MEMBER(customValues),
+	CR_MEMBER(modParams)
 ))
 
 
