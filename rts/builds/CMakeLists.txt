@@ -65,9 +65,28 @@ macro    (create_engine_build_and_install_target targetName)
 		add_dependencies(spring spring-${targetName}) # This also works for custom targets
 		add_dependencies(install-spring install-spring-${targetName}) # This also works for custom targets
 		set_target_properties(engine-${targetName} PROPERTIES OUTPUT_NAME "spring")
+		set(recoilLinkSrc "spring")
+		set(recoilLinkDst "recoil")
 	else()
 		set_target_properties(engine-${targetName} PROPERTIES OUTPUT_NAME "spring-${targetName}")
+		set(recoilLinkSrc "spring-${targetName}")
+		set(recoilLinkDst "recoil-${targetName}")
 	endif ()
+
+	# Create recoil symlinks (or copies on Windows) pointing to spring binaries at install time
+	if (WIN32)
+		install(CODE "
+			execute_process(COMMAND \"${CMAKE_COMMAND}\" -E copy
+				\"\${CMAKE_INSTALL_PREFIX}/${BINDIR}/${recoilLinkSrc}${CMAKE_EXECUTABLE_SUFFIX}\"
+				\"\${CMAKE_INSTALL_PREFIX}/${BINDIR}/${recoilLinkDst}${CMAKE_EXECUTABLE_SUFFIX}\")
+		")
+	else()
+		install(CODE "
+			execute_process(COMMAND \"${CMAKE_COMMAND}\" -E create_symlink
+				\"${recoilLinkSrc}${CMAKE_EXECUTABLE_SUFFIX}\"
+				\"\${CMAKE_INSTALL_PREFIX}/${BINDIR}/${recoilLinkDst}${CMAKE_EXECUTABLE_SUFFIX}\")
+		")
+	endif()
 endmacro (create_engine_build_and_install_target targetName)
 
 
