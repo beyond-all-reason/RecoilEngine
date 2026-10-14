@@ -16,6 +16,25 @@
 
 #include "LuaUtils.h"
 
+namespace {
+	// restart only matters for connected primitives, but some drivers (e.g. KosmicKrisp)
+	// have to unroll every indexed list draw while it is enabled
+	bool UsesPrimitiveRestart(GLenum mode)
+	{
+		switch (mode) {
+			case GL_LINE_STRIP:
+			case GL_LINE_LOOP:
+			case GL_LINE_STRIP_ADJACENCY:
+			case GL_TRIANGLE_STRIP:
+			case GL_TRIANGLE_FAN:
+			case GL_TRIANGLE_STRIP_ADJACENCY:
+				return true;
+			default:
+				return false;
+		}
+	}
+}
+
 /***
  * Vertex Array Object
  * 
@@ -428,9 +447,12 @@ void LuaVAOImpl::DrawElements(GLenum mode, sol::optional<int> indCountOpt, sol::
 	const auto indElemOffsetInBytes = result.baseIndex * indxLuaVBO->elemSizeInBytes;
 
 	const auto indexType = indxLuaVBO->bufferAttribDefsVec[0].second.type;
+	const bool primitiveRestart = UsesPrimitiveRestart(mode);
 
-	glEnable(GL_PRIMITIVE_RESTART);
-	glPrimitiveRestartIndex(indxLuaVBO->primitiveRestartIndex);
+	if (primitiveRestart) {
+		glEnable(GL_PRIMITIVE_RESTART);
+		glPrimitiveRestartIndex(indxLuaVBO->primitiveRestartIndex);
+	}
 
 	vao->Bind();
 
@@ -454,7 +476,8 @@ void LuaVAOImpl::DrawElements(GLenum mode, sol::optional<int> indCountOpt, sol::
 
 	vao->Unbind();
 
-	glDisable(GL_PRIMITIVE_RESTART);
+	if (primitiveRestart)
+		glDisable(GL_PRIMITIVE_RESTART);
 }
 
 void LuaVAOImpl::ClearSubmission()
@@ -536,12 +559,7 @@ void LuaVAOImpl::RemoveFromSubmission(int idx)
  */
 void LuaVAOImpl::Submit()
 {
-	glEnable(GL_PRIMITIVE_RESTART);
-	glPrimitiveRestartIndex(indxLuaVBO->primitiveRestartIndex);
-
 	vao->Bind();
 	glMultiDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, submitCmds.data(), submitCmds.size(), sizeof(SDrawElementsIndirectCommand));
 	vao->Unbind();
-
-	glDisable(GL_PRIMITIVE_RESTART);
 }
