@@ -145,6 +145,7 @@ set(sources_engine_System_Platform_Mac
 		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/Mac/MessageBox.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/Mac/CrashHandler.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/Mac/WindowManagerHelper.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/Mac/AutoFill.cpp"
 	)
 set(sources_engine_System_Platform_Windows
 		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/Win/CrashHandler.cpp"
