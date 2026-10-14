@@ -377,8 +377,8 @@ CGlobalRendering::~CGlobalRendering()
 	configHandler->RemoveObserver(this);
 	verticalSync->WrapRemoveObserver();
 
-	// protect against aborted startup
-	if (glContext) {
+	// protect against aborted startup (also when glDeleteQueries was not loaded)
+	if (glContext && glDeleteQueries != nullptr) {
 		glDeleteQueries(glTimerQueries.size(), glTimerQueries.data());
 	}
 
