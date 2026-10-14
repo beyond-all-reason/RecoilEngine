@@ -2625,7 +2625,7 @@ bool CUnit::AttachUnit(CUnit* unit, int piece, bool force)
 	if (dynamic_cast<CBuilding*>(unit) != nullptr)
 		unitLoader->RestoreGround(unit);
 
-	if (dynamic_cast<CHoverAirMoveType*>(moveType) != nullptr)
+	if (dynamic_cast<CHoverAirMoveType*>(unit->moveType) != nullptr)
 		unit->moveType->UseHeading(false);
 
 	TransportedUnit tu;
@@ -2666,7 +2666,7 @@ bool CUnit::DetachUnitCore(CUnit* unit)
 		unit->SetTransporter(nullptr);
 		unit->unloadingTransportId = id;
 
-		if (dynamic_cast<CHoverAirMoveType*>(moveType) != nullptr)
+		if (dynamic_cast<CHoverAirMoveType*>(unit->moveType) != nullptr)
 			unit->moveType->UseHeading(true);
 
 		// de-stun detaching units in case we are not a fire-platform
