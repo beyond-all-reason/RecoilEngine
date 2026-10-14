@@ -281,7 +281,14 @@ void CExplosionGeneratorHandler::ReloadGenerators(const std::string& tag) {
 	}
 }
 
+// tag is bare name without CEG_PREFIX_STRING
+bool CExplosionGeneratorHandler::IsCustomGeneratorDefined(const char* tag) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	const LuaTable* root = GetExplosionTableRoot();
+	const LuaTable& expTable = (root != nullptr) ? root->SubTable(tag) : LuaTable();
 
+	return expTable.IsValid();
+}
 
 unsigned int CExplosionGeneratorHandler::LoadGeneratorID(const char* tag, const char* pre)
 {
