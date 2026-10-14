@@ -13,7 +13,7 @@
 #include "System/Log/ILog.h"
 
 
-void DumpHistory(nowide::fstream& file, int frameNum, bool serverRequest)
+void DumpHistory(nowide::ofstream& file, int frameNum, bool serverRequest)
 {
 #ifdef SYNC_HISTORY
 	if (!gs->cheatEnabled && !serverRequest)

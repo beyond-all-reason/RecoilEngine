@@ -5,6 +5,6 @@
 
 #include <nowide/fstream.hpp>
 
-extern void DumpHistory(nowide::fstream& file, int frameNum, bool serverRequest);
+extern void DumpHistory(nowide::ofstream& file, int frameNum, bool serverRequest);
 
 #endif /* DUMPHISTORY_H */
