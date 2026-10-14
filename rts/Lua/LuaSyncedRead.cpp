@@ -3201,11 +3201,10 @@ int LuaSyncedRead::GetUnitsInPlanes(lua_State* L)
 
 	// parse the planes
 	vector<Plane> planes;
-	const int table = lua_gettop(L);
-	for (lua_pushnil(L); lua_next(L, table) != 0; lua_pop(L, 1)) {
-		if (lua_istable(L, -1)) {
+	for (lua_pushnil(L); lua_next(L, 1) != 0; lua_pop(L, 1)) {
+		if (lua_istable(L, LUA_TABLE_VALUE_INDEX)) {
 			float values[4];
-			const int v = LuaUtils::ParseFloatArray(L, -1, values, 4);
+			const int v = LuaUtils::ParseFloatArray(L, LUA_TABLE_VALUE_INDEX, values, 4);
 			if (v == 4) {
 				Plane plane = { values[0], values[1], values[2], values[3] };
 				planes.push_back(plane);
