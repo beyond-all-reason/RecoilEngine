@@ -6,6 +6,8 @@ aliases = ['/changelogs/changelog-2026-07']
 This is the changelog since version 2025.06 until **version 2025.07.04**, which was released on 2026-08-04.
 
 ## Caveats
+- unit colors are now unsynced. This means you can color units locally (for things such as teal heroes like in starcraft), see "Custom teamcolor palette" below, but as a side effect the color is no longer part of the save/load system.
+There is a replacement Lua gadget that brings back the previous behaviour at https://github.com/beyond-all-reason/RecoilEngine/blob/master/cont/examples/Gadgets/unit_fix_saveload_teamcolors.lua .
 - removed Java bindings for Skirmish AI.
 - Lua environment sandboxing changes, each has a caveat. See below.
 - builders now perform an extra block check immediately when a build command reaches the front of the queue, in addition to the existing periodic check. This can result in an event spam e.g. if a builder is on repeat between multiple queued buildings and they're all blocked.
