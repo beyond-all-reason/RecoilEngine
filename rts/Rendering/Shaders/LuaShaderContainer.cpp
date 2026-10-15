@@ -201,7 +201,7 @@ bool LoadFromLua(Shader::IProgramObject* program, const std::string& filename)
 	ParseShaderTable(&root, "fragment", fragSrcs);
 	ParseShaderTable(&root, "compute",  compSrcs);
 
-	if (vertSrcs.str().empty() && fragSrcs.str().empty() && geomSrcs.str().empty())
+	if (vertSrcs.str().empty() && fragSrcs.str().empty() && geomSrcs.str().empty() && compSrcs.str().empty())
 		return false;
 
 	CreateShaderObject(program, shdrDefs.str(), vertSrcs.str(), GL_VERTEX_SHADER);
