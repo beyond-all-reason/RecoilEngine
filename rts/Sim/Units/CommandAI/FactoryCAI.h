@@ -33,7 +33,12 @@ public:
 	void FactoryFinishBuild(const Command& command);
 	void ExecuteStop(Command& c);
 
+private:
 	CCommandQueue newUnitCommands;
+
+public:
+	      CCommandQueue& GetNewUnitQueue()       { return newUnitCommands; }
+	const CCommandQueue& GetNewUnitQueue() const { return newUnitCommands; }
 
 	spring::unordered_map<int, int> buildOptions;
 

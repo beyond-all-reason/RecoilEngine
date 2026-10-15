@@ -521,9 +521,9 @@ bool CCommandAI::HandleBuildOptionRemoval(int cmdId)
 
 	if (auto* bcai = dynamic_cast<CBuilderCAI*>(this); bcai != nullptr) {
 		// clear the removed unitDef from the construction queue
-		for (size_t i = 0; i < bcai->commandQue.size(); /*NOOP*/) {
-			if (const auto& q = bcai->commandQue[i]; q.GetID() == cmdId)
-				bcai->commandQue.erase(commandQue.begin() + i);
+		for (size_t i = 0; i < bcai->GetOwnQueue().size(); /*NOOP*/) {
+			if (const auto& q = bcai->GetOwnQueue()[i]; q.GetID() == cmdId)
+				bcai->GetOwnQueue().erase(GetOwnQueue().begin() + i);
 			else
 				++i;
 		}
@@ -531,9 +531,9 @@ bool CCommandAI::HandleBuildOptionRemoval(int cmdId)
 	}
 	else if (auto* fcai = dynamic_cast<CFactoryCAI*>(this); fcai != nullptr) {
 		// clear the removed unitDef from the construction queue
-		for (size_t i = 0; i < fcai->commandQue.size(); /*NOOP*/) {
-			if (const auto& q = fcai->commandQue[i]; q.GetID() == cmdId)
-				fcai->commandQue.erase(commandQue.begin() + i);
+		for (size_t i = 0; i < fcai->GetOwnQueue().size(); /*NOOP*/) {
+			if (const auto& q = fcai->GetOwnQueue()[i]; q.GetID() == cmdId)
+				fcai->GetOwnQueue().erase(GetOwnQueue().begin() + i);
 			else
 				++i;
 		}
@@ -964,17 +964,17 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 	switch (c.GetID()) {
 		case CMD_SELFD: {
 			if (owner->unitDef->canSelfD) {
-				if (!(c.GetOpts() & SHIFT_KEY) || commandQue.empty()) {
+				if (!(c.GetOpts() & SHIFT_KEY) || GetOwnQueue().empty()) {
 					if (owner->selfDCountdown != 0) {
 						owner->selfDCountdown = 0;
 					} else {
 						owner->selfDCountdown = owner->unitDef->selfDCountdown*2+1;
 					}
 				}
-				else if (commandQue.back().GetID() == CMD_SELFD) {
-					commandQue.pop_back();
+				else if (GetOwnQueue().back().GetID() == CMD_SELFD) {
+					GetOwnQueue().pop_back();
 				} else {
-					commandQue.push_back(c);
+					GetOwnQueue().push_back(c);
 				}
 			}
 			return;
@@ -996,8 +996,8 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 	// flush the queue for immediate commands
 	// NOTE: CMD_STOP can be a queued order (!)
 	if (!(c.GetOpts() & SHIFT_KEY)) {
-		waitCommandsAI.ClearUnitQueue(owner, commandQue);
-		ClearTargetLock((commandQue.empty())? Command(CMD_STOP): commandQue.front());
+		waitCommandsAI.ClearUnitQueue(owner, GetOwnQueue());
+		ClearTargetLock((GetOwnQueue().empty())? Command(CMD_STOP): GetOwnQueue().front());
 		ClearCommandDependencies();
 		SetOrderTarget(nullptr);
 		targetDied = false;
@@ -1005,8 +1005,8 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 		// if c is an attack command, the actual order-target
 		// gets set via ExecuteAttack (called from SlowUpdate
 		// at the end of this function)
-		commandQue.clear();
-		assert(commandQue.empty());
+		GetOwnQueue().clear();
+		assert(GetOwnQueue().empty());
 
 		inCommand = CMD_STOP;
 	}
@@ -1014,13 +1014,13 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 	AddCommandDependency(c);
 
 	if (c.GetID() == CMD_PATROL) {
-		CCommandQueue::iterator ci = commandQue.begin();
-		for (; ci != commandQue.end() && ci->GetID() != CMD_PATROL; ++ci) {
+		CCommandQueue::iterator ci = GetOwnQueue().begin();
+		for (; ci != GetOwnQueue().end() && ci->GetID() != CMD_PATROL; ++ci) {
 			// just increment
 		}
-		if (ci == commandQue.end()) {
-			if (commandQue.empty()) {
-				commandQue.push_back(Command(CMD_PATROL, c.GetOpts(), owner->pos));
+		if (ci == GetOwnQueue().end()) {
+			if (GetOwnQueue().empty()) {
+				GetOwnQueue().push_back(Command(CMD_PATROL, c.GetOpts(), owner->pos));
 			} else {
 				do {
 					--ci;
@@ -1028,23 +1028,23 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 					if (ci->GetNumParams() >= 3) {
 						Command c2(CMD_PATROL, c.GetOpts());
 						c2.CopyParams(*ci);
-						commandQue.push_back(c2);
+						GetOwnQueue().push_back(c2);
 						break;
-					} else if (ci == commandQue.begin()) {
-						commandQue.push_back(Command(CMD_PATROL, c.GetOpts(), owner->pos));
+					} else if (ci == GetOwnQueue().begin()) {
+						GetOwnQueue().push_back(Command(CMD_PATROL, c.GetOpts(), owner->pos));
 						break;
 					}
 				}
-				while (ci != commandQue.begin());
+				while (ci != GetOwnQueue().begin());
 			}
 		}
 	}
 
 	// cancel duplicated commands
 	bool first;
-	if (CancelCommands(c, commandQue, first) > 0) {
+	if (CancelCommands(c, GetOwnQueue(), first) > 0) {
 		if (first) {
-			commandQue.push_front(Command(CMD_STOP));
+			GetOwnQueue().push_front(Command(CMD_STOP));
 			SlowUpdate();
 		}
 		return;
@@ -1057,14 +1057,14 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 	if (c.GetID() == CMD_ATTACK) {
 		// avoid weaponless units moving to 0 distance when given attack order
 		if (owner->weapons.empty() && (!owner->unitDef->canKamikaze)) {
-			commandQue.push_back(Command(CMD_STOP));
+			GetOwnQueue().push_back(Command(CMD_STOP));
 			return;
 		}
 	}
 
-	commandQue.push_back(c);
+	GetOwnQueue().push_back(c);
 
-	if (commandQue.size() == 1 && !owner->beingBuilt && !owner->IsStunned()) {
+	if (GetOwnQueue().size() == 1 && !owner->beingBuilt && !owner->IsStunned()) {
 		SlowUpdate();
 	}
 }
@@ -1073,22 +1073,22 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 void CCommandAI::GiveWaitCommand(const Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (commandQue.empty()) {
-		commandQue.push_back(c);
+	if (GetOwnQueue().empty()) {
+		GetOwnQueue().push_back(c);
 		return;
 	}
 	else if (c.GetOpts() & SHIFT_KEY) {
-		if (commandQue.back().GetID() == CMD_WAIT) {
-			waitCommandsAI.RemoveWaitCommand(owner, commandQue.back());
-			commandQue.pop_back();
+		if (GetOwnQueue().back().GetID() == CMD_WAIT) {
+			waitCommandsAI.RemoveWaitCommand(owner, GetOwnQueue().back());
+			GetOwnQueue().pop_back();
 		} else {
-			commandQue.push_back(c);
+			GetOwnQueue().push_back(c);
 			return;
 		}
 	}
-	else if (commandQue.front().GetID() == CMD_WAIT) {
-		waitCommandsAI.RemoveWaitCommand(owner, commandQue.front());
-		commandQue.pop_front();
+	else if (GetOwnQueue().front().GetID() == CMD_WAIT) {
+		waitCommandsAI.RemoveWaitCommand(owner, GetOwnQueue().front());
+		GetOwnQueue().pop_front();
 		return;
 	}
 	else {
@@ -1099,11 +1099,11 @@ void CCommandAI::GiveWaitCommand(const Command& c)
 		inCommand = CMD_STOP;
 		targetDied = false;
 
-		commandQue.push_front(c);
+		GetOwnQueue().push_front(c);
 		return;
 	}
 
-	if (commandQue.empty()) {
+	if (GetOwnQueue().empty()) {
 		if (owner->GetGroup() == nullptr)
 			eoh->UnitIdle(*owner);
 
@@ -1130,7 +1130,7 @@ void CCommandAI::ExecuteInsert(const Command& c, bool fromSynced)
 	if (!AllowedCommand(newCmd, fromSynced))
 		return;
 
-	CCommandQueue* queue = &commandQue;
+	CCommandQueue* queue = &GetOwnQueue();
 
 	bool facBuildQueue = false;
 	CFactoryCAI* facCAI = dynamic_cast<CFactoryCAI*>(this);
@@ -1145,7 +1145,7 @@ void CCommandAI::ExecuteInsert(const Command& c, bool fromSynced)
 			facBuildQueue = true;
 		} else {
 			// use the new commands
-			queue = &facCAI->newUnitCommands;
+			queue = &facCAI->GetNewUnitQueue();
 		}
 	}
 
@@ -1219,7 +1219,7 @@ void CCommandAI::ExecuteInsert(const Command& c, bool fromSynced)
 void CCommandAI::ExecuteRemove(const Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	CCommandQueue* queue = &commandQue;
+	CCommandQueue* queue = &GetOwnQueue();
 	CFactoryCAI* facCAI = dynamic_cast<CFactoryCAI*>(this);
 
 	// if false, remove commands by tag
@@ -1237,7 +1237,7 @@ void CCommandAI::ExecuteRemove(const Command& c)
 			facBuildQueue = true;
 		} else {
 			// use the command-queue for new units
-			queue = &facCAI->newUnitCommands;
+			queue = &facCAI->GetNewUnitQueue();
 		}
 	}
 
@@ -1308,7 +1308,7 @@ void CCommandAI::ExecuteRemove(const Command& c)
 bool CCommandAI::WillCancelQueued(const Command& c) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	return (GetCancelQueued(c, commandQue) != commandQue.end());
+	return (GetCancelQueued(c, GetOwnQueue()) != GetOwnQueue().end());
 }
 
 
@@ -1408,7 +1408,7 @@ int CCommandAI::CancelCommands(const Command& c, CCommandQueue& q, bool& first)
 std::vector<Command> CCommandAI::GetOverlapQueued(const Command& c) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	return GetOverlapQueued(c, commandQue);
+	return GetOverlapQueued(c, GetOwnQueue());
 }
 
 
@@ -1558,11 +1558,11 @@ void CCommandAI::SlowUpdate()
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (gs->paused) // Commands issued may invoke SlowUpdate when paused
 		return;
-	if (commandQue.empty()) {
+	if (GetOwnQueue().empty()) {
 		return;
 	}
 
-	Command& c = commandQue.front();
+	Command& c = GetOwnQueue().front();
 
 	switch (c.GetID()) {
 		case CMD_WAIT: {
@@ -1650,7 +1650,7 @@ void CCommandAI::DependentDied(CObject* o)
 
 	if (commandDeathDependences.erase(o) && o != owner) {
 		CFactoryCAI* facCAI = dynamic_cast<CFactoryCAI*>(this);
-		CCommandQueue& dq = facCAI ? facCAI->newUnitCommands : commandQue;
+		CCommandQueue& dq = facCAI ? facCAI->GetNewUnitQueue() : GetOwnQueue();
 		int lastTag;
 		int curTag = -1;
 		do {
@@ -1672,17 +1672,17 @@ void CCommandAI::DependentDied(CObject* o)
 void CCommandAI::FinishCommand()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	assert(!commandQue.empty());
+	assert(!GetOwnQueue().empty());
 
-	const Command cmd = commandQue.front(); // copy is needed here
+	const Command cmd = GetOwnQueue().front(); // copy is needed here
 
 	const bool dontRepeat = (cmd.IsInternalOrder());
 	const bool pushCommand = (cmd.GetID() != CMD_STOP && cmd.GetID() != CMD_PATROL);
 
 	if (repeatOrders && !dontRepeat && pushCommand)
-		commandQue.push_back(cmd);
+		GetOwnQueue().push_back(cmd);
 
-	commandQue.pop_front();
+	GetOwnQueue().pop_front();
 
 	inCommand = CMD_STOP;
 	targetDied = false;
@@ -1692,7 +1692,7 @@ void CCommandAI::FinishCommand()
 	eventHandler.UnitCmdDone(owner, cmd);
 	ClearTargetLock(cmd);
 
-	if (commandQue.empty()) {
+	if (GetOwnQueue().empty()) {
 		if (owner->GetGroup() == nullptr)
 			eoh->UnitIdle(*owner);
 
@@ -1755,10 +1755,10 @@ void CCommandAI::UpdateStockpileIcon()
 void CCommandAI::WeaponFired(CWeapon* weapon, const bool searchForNewTarget, bool raiseEvent)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (inCommand != CMD_ATTACK || commandQue.empty())
+	if (inCommand != CMD_ATTACK || GetOwnQueue().empty())
 		return;
 
-	const Command& c = commandQue.front();
+	const Command& c = GetOwnQueue().front();
 
 	const bool haveGroundAttackCmd = (c.GetID() == CMD_ATTACK && c.GetNumParams() >= 3);
 	const bool haveAreaAttackCmd = (c.GetID() == CMD_AREA_ATTACK);
@@ -1792,7 +1792,7 @@ void CCommandAI::WeaponFired(CWeapon* weapon, const bool searchForNewTarget, boo
 	}
 
 	// if this fails, we need to take a copy at top instead of a reference
-	assert(&c == &commandQue.front());
+	assert(&c == &GetOwnQueue().front());
 
 	if (raiseEvent)
 		eoh->WeaponFired(*owner, *(weapon->weaponDef));
@@ -1806,8 +1806,8 @@ void CCommandAI::WeaponFired(CWeapon* weapon, const bool searchForNewTarget, boo
 void CCommandAI::PushOrUpdateReturnFight(const float3& cmdPos1, const float3& cmdPos2)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	assert(!commandQue.empty());
-	Command& c = commandQue.front();
+	assert(!GetOwnQueue().empty());
+	Command& c = GetOwnQueue().front();
 	assert(c.GetID() == CMD_FIGHT && c.GetNumParams() >= 3);
 
 	const float3 pos = ClosestPointOnLine(cmdPos1, cmdPos2, owner->pos);
@@ -1817,28 +1817,28 @@ void CCommandAI::PushOrUpdateReturnFight(const float3& cmdPos1, const float3& cm
 		// make the new fight command inherit <c>'s options
 		Command c2(CMD_FIGHT, c.GetOpts(), pos);
 		c2.PushPos(c.GetPos(0));
-		commandQue.push_front(c2);
+		GetOwnQueue().push_front(c2);
 	}
 }
 
 
 bool CCommandAI::HasCommand(int cmdID) const {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (commandQue.empty())
+	if (GetOwnQueue().empty())
 		return false;
 	if (cmdID < 0)
-		return ((commandQue.front()).IsBuildCommand());
+		return ((GetOwnQueue().front()).IsBuildCommand());
 
-	return ((commandQue.front()).GetID() == cmdID);
+	return ((GetOwnQueue().front()).GetID() == cmdID);
 }
 
 bool CCommandAI::HasMoreMoveCommands(bool skipFirstCmd) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const auto pred = [](const Command& c) { return (c.IsMoveCommand()); };
-	const auto iter = std::find_if(commandQue.begin() + int(skipFirstCmd && !commandQue.empty()), commandQue.end(), pred);
+	const auto iter = std::find_if(GetOwnQueue().begin() + int(skipFirstCmd && !GetOwnQueue().empty()), GetOwnQueue().end(), pred);
 
-	return (iter != commandQue.end());
+	return (iter != GetOwnQueue().end());
 }
 
 
@@ -1870,9 +1870,9 @@ void CCommandAI::StopAttackingTargetIf(const std::function<bool(const CUnit*)>& 
 	const auto hasTarget = [&](const Command& c) { return (c.GetNumParams() == 1 && (c.GetID() == CMD_FIGHT || c.GetID() == CMD_ATTACK)); };
 	const auto removeCmd = [&](const Command& c) { return (hasTarget(c) && pred(unitHandler.GetUnit(c.GetParam(0)))); };
 
-	const bool frontRemoved = (!commandQue.empty() && removeCmd(commandQue.front()));
+	const bool frontRemoved = (!GetOwnQueue().empty() && removeCmd(GetOwnQueue().front()));
 
-	commandQue.erase(std::remove_if(commandQue.begin(), commandQue.end(), removeCmd), commandQue.end());
+	GetOwnQueue().erase(std::remove_if(GetOwnQueue().begin(), GetOwnQueue().end(), removeCmd), GetOwnQueue().end());
 
 	// the order being executed was erased without FinishCommand; clear its
 	// execution state so the next queued order starts fresh instead of being

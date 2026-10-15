@@ -446,10 +446,10 @@ bool CBuilder::UpdateResurrect(const Command& fCommand)
 			CBuilder* resurrecter = static_cast<CBuilder*>(unitHandler.GetUnit(resurrecterID));
 			CCommandAI* resurrecterCAI = resurrecter->commandAI;
 
-			if (resurrecterCAI->commandQue.empty())
+			if (resurrecterCAI->GetOwnQueue().empty())
 				continue;
 
-			Command& c = resurrecterCAI->commandQue.front();
+			Command& c = resurrecterCAI->GetOwnQueue().front();
 
 			if (c.GetID() != CMD_RESURRECT || (c.GetNumParams() != 1 && c.GetNumParams() != 5))
 				continue;
@@ -543,7 +543,7 @@ void CBuilder::Update()
 	RECOIL_DETAILED_TRACY_ZONE;
 	const CBuilderCAI* cai = static_cast<CBuilderCAI*>(commandAI);
 
-	const CCommandQueue& cQueue = cai->commandQue;
+	const CCommandQueue& cQueue = cai->GetOwnQueue();
 	const Command& fCommand = (!cQueue.empty())? cQueue.front(): Command(CMD_STOP);
 
 	bool updated = false;

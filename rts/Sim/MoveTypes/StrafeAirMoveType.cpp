@@ -465,7 +465,7 @@ bool CStrafeAirMoveType::Update()
 	switch (aircraftState) {
 		case AIRCRAFT_FLYING: {
 
-			const CCommandQueue& cmdQue = owner->commandAI->commandQue;
+			const CCommandQueue& cmdQue = owner->commandAI->GetOwnQueue();
 
 			const bool isAttacking = (!cmdQue.empty() && (cmdQue.front()).GetID() == CMD_ATTACK);
 			const bool keepAttacking = ((owner->curTarget.type == Target_Unit && !owner->curTarget.unit->isDead) || owner->curTarget.type == Target_Pos);
