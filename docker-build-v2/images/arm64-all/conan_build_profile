@@ -1,0 +1,15 @@
+[settings]
+arch=armv8
+build_type=RelWithDebInfo
+compiler=gcc
+compiler.cppstd=gnu23
+compiler.libcxx=libstdc++11
+compiler.version=13
+os=Linux
+
+[conf]
+tools.cmake.cmaketoolchain:user_toolchain+=/build/toolchain.cmake
+user.cmake.cmake_layout:build_folder=/build/conan-out
+
+[platform_tool_requires]
+cmake/{{ os.getenv("CMAKE_VERSION") }}

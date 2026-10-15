@@ -59,6 +59,7 @@ target_link_libraries(GameHeadless PRIVATE
 	streflop
 	nowide::nowide
 	fmt::fmt
+	${ZLIB_LIBRARIES}
 )
 ### Build the executable
 add_executable(engine-headless ${engineSources} ${ENGINE_ICON})

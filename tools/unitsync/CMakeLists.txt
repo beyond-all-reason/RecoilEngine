@@ -25,7 +25,7 @@ if (WIN32)
 	list(APPEND unitsync_libs ${WINMM_LIBRARY})
 endif (WIN32)
 
-find_package(SDL2 MODULE REQUIRED)
+find_package(SDL2 REQUIRED)
 list(APPEND unitsync_libs SDL2::SDL2)
 
 if    (MINGW)
