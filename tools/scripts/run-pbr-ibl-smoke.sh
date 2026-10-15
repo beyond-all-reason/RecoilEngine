@@ -53,7 +53,7 @@ Usage: run-pbr-ibl-smoke.sh [options]
   --maps-directory PATH    folder with installed maps (default: sibling
                            BARS-Install/data/maps, then an existing runtime/maps)
   --write-directory PATH   isolated writable data directory
-                           (default: <runtime-directory>/pbr-user)
+                           (default: <repository>/test-results/pbr-ibl)
   --start-script PATH      start script (default: tools/scripts/pbr-ibl-startscript.txt)
   --config-template PATH   optional initial springsettings.cfg template
   --game-link-name NAME    stable .sdd mount name under runtime/games
@@ -159,7 +159,9 @@ fi
 	die "--game-link-name must be one .sdd directory name, not a path: $game_link_name"
 
 if [[ -z "$write_directory" ]]; then
-	write_directory="${runtime_directory}/pbr-user"
+	# Keep settings, logs, screenshots and reports outside the disposable build
+	# tree so a clean configure/rebuild cannot erase test evidence.
+	write_directory="${recoil_root}/test-results/pbr-ibl"
 else
 	write_directory="$(cygpath -u "$write_directory")"
 	[[ "$write_directory" == /* ]] || write_directory="$(pwd -P)/${write_directory}"
