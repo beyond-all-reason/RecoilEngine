@@ -15,6 +15,7 @@ game_archive_name='Beyond All Reason $VERSION'
 environment_capture='hdr-modern'
 prepare_only=0
 self_test=0
+input_probe=0
 
 usage() {
 	cat <<'EOF'
@@ -28,6 +29,10 @@ Usage: run-pbr-ibl-smoke.sh [options]
   --environment-capture legacy-clone|hdr-modern|compare
   --self-test      run BAR's opt-in "PBR IBL Self-Test" widget, then quit;
                    the report is written to <write-dir>/pbr-ibl-selftest/report.txt
+  --input-probe    launch, then drive the PBR IBL viewer with real Windows mouse and
+                   keyboard input (moves your cursor for about a minute) and
+                   check that the focused panel keeps input away from the game;
+                   report: <write-dir>/pbr-ibl-input-probe/report.txt
   --prepare-only
 EOF
 }
@@ -61,6 +66,7 @@ while (($# > 0)); do
 		--game-archive-name) game_archive_name="$2"; shift 2 ;;
 		--environment-capture) environment_capture="$2"; shift 2 ;;
 		--self-test) self_test=1; shift ;;
+		--input-probe) input_probe=1; shift ;;
 		--prepare-only) prepare_only=1; shift ;;
 		-h|--help) usage; exit 0 ;;
 		*) printf 'Unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -228,6 +234,19 @@ set_spring_setting "$runtime_config" 'PBREnvironmentCapture' "$environment_captu
 # leaves the self-test armed for a later manual session.
 set_spring_setting "$runtime_config" 'PBRIBLSelfTest' "$self_test"
 set_spring_setting "$runtime_config" 'PBRIBLSelfTestQuit' "$self_test"
+if ((input_probe)); then
+	# the probe reads the viewer's /pbribllayout output while the game runs
+	set_spring_setting "$runtime_config" 'LogFlush' '1'
+fi
+
+# BAR only uses a widget's "enabled" default when its saved widget order has
+# no entry; a saved order of 0 (widget switched off in F11 at some point)
+# would silently prevent the self-test from loading. Force it on in the
+# isolated runtime's widget order when the self-test is requested.
+widget_order_file="${write_directory}/LuaUI/Config/BYAR.lua"
+if ((self_test)) && [[ -f "$widget_order_file" ]]; then
+	sed -i 's/\["PBR IBL Self-Test"\] = 0,/["PBR IBL Self-Test"] = 1,/' "$widget_order_file"
+fi
 
 printf 'PBR IBL smoke test\n'
 printf '  Engine:         %s\n' "$engine"
@@ -238,15 +257,32 @@ printf '  Runtime script: %s\n' "$runtime_start_script"
 printf '  Game archive:   %s\n' "$game_archive_name"
 printf '  PBR capture:    %s\n' "$environment_capture"
 printf '  Self-test:      %s\n' "$self_test"
+printf '  Input probe:    %s\n' "$input_probe"
 
 if ((prepare_only)); then
 	printf 'Runtime prepared; launch skipped because --prepare-only was supplied.\n'
 	exit 0
 fi
 
-"$engine" \
-	--isolation \
-	--isolation-dir "$(cygpath -m "$build_directory")" \
-	--write-dir "$(cygpath -m "$write_directory")" \
-	-window \
+engine_arguments=(
+	--isolation
+	--isolation-dir "$(cygpath -m "$build_directory")"
+	--write-dir "$(cygpath -m "$write_directory")"
+	-window
 	"$(cygpath -m "$runtime_start_script")"
+)
+
+if ((input_probe)); then
+	# The game runs in the background while the PowerShell probe drives it with
+	# real OS input; the probe quits the game when it is done.
+	"$engine" "${engine_arguments[@]}" &
+	engine_pid=$!
+	probe_status=0
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "${script_dir}/pbr-viewer-input-probe.ps1")" \
+		-WriteDirectory "$(cygpath -w "$write_directory")" || probe_status=$?
+	wait "$engine_pid" || true
+	printf 'Input probe report: %s\n' "${write_directory}/pbr-ibl-input-probe/report.txt"
+	exit "$probe_status"
+fi
+
+"$engine" "${engine_arguments[@]}"
