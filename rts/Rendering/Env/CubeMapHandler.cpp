@@ -25,19 +25,42 @@
 #include <algorithm>
 #include <string>
 
+// Build-time pruning switches for the three post-capture IBL filters. Define
+// any switch to 0 (for example in compiler flags) to omit that implementation.
+// All are 1 by default so existing builds retain the runtime A/B selectors.
+// Keep at least one enabled; this does NOT disable legacy $reflection capture.
+#ifndef PBR_ENABLE_ENGINE_RASTER_FILTER
+#define PBR_ENABLE_ENGINE_RASTER_FILTER 1
+#endif
+#ifndef PBR_ENABLE_BAR_RASTER_FILTER
+#define PBR_ENABLE_BAR_RASTER_FILTER 1
+#endif
+#ifndef PBR_ENABLE_BAR_COMPUTE_FILTER
+#define PBR_ENABLE_BAR_COMPUTE_FILTER 1
+#endif
+#if (PBR_ENABLE_ENGINE_RASTER_FILTER != 0 && PBR_ENABLE_ENGINE_RASTER_FILTER != 1) || \
+	(PBR_ENABLE_BAR_RASTER_FILTER != 0 && PBR_ENABLE_BAR_RASTER_FILTER != 1) || \
+	(PBR_ENABLE_BAR_COMPUTE_FILTER != 0 && PBR_ENABLE_BAR_COMPUTE_FILTER != 1)
+#error PBR filter switches must be 0 or 1
+#endif
+#if !PBR_ENABLE_ENGINE_RASTER_FILTER && !PBR_ENABLE_BAR_RASTER_FILTER && !PBR_ENABLE_BAR_COMPUTE_FILTER
+#error Enable at least one PBR environment filter
+#endif
+
 CONFIG(int, CubeTexSizeSpecular).defaultValue(128).minimumValue(1).description("The square resolution of each face of the specular cubemap.");
 CONFIG(int, CubeTexSizeReflection).defaultValue(128).minimumValue(1).description("The square resolution of each face of the environment reflection cubemap.");
 CONFIG(bool, CubeTexGenerateMipMaps).defaultValue(false).description("Generate mipmaps for the reflection and specular cubemap textures, useful for efficient subsampling and blurring.");
 CONFIG(std::string, PBREnvironmentCapture).defaultValue("legacy-clone").description("PBR environment capture mode: legacy-clone, hdr-modern, or compare.");
 CONFIG(std::string, PBREnvironmentCaptureAnchor).defaultValue("map-center").description("PBR environment capture anchor: map-center or camera.");
 CONFIG(std::string, PBREnvironmentCaptureContent).defaultValue("sky-only").description("PBR environment capture content: sky-only, sky-terrain, or legacy-scene.");
-CONFIG(std::string, PBREnvironmentFilter).defaultValue("raster").description("PBR environment filtering backend: raster (engine oracle), bar-raster (BAR fragment shader), or compute (BAR compute shader).");
+CONFIG(std::string, PBREnvironmentFilter).defaultValue("raster").description("PBR environment filter request: raster, bar-raster, or compute; unavailable build/GPU choices report a fallback.");
 CONFIG(int, PBREnvironmentSize).defaultValue(256).minimumValue(16).maximumValue(2048).description("PBR scene-linear HDR environment cubemap face size.");
 CONFIG(int, PBRIrradianceSize).defaultValue(32).minimumValue(4).maximumValue(256).description("PBR diffuse irradiance cubemap face size.");
 CONFIG(int, PBRSpecularSize).defaultValue(128).minimumValue(16).maximumValue(1024).description("PBR GGX-prefiltered specular cubemap base face size.");
 CONFIG(int, PBREnvironmentRevision).defaultValue(0).minimumValue(0).description("Increment to request a new atomic PBR environment capture/filter epoch.");
 
 namespace {
+#if PBR_ENABLE_ENGINE_RASTER_FILTER
 	constexpr const char* pbrFilterVertexShader = R"(
 #version 150 compatibility
 
@@ -205,19 +228,27 @@ void main()
 	fragColor = vec4(max(color, vec3(0.0)), 1.0);
 }
 )";
+#endif
 
 	// The engine owns capture, pass scheduling and atomic texture publication.
 	// BAR may own only the filter program through the existing VFS Lua-shader
 	// loader; this fixed path cannot redirect the engine to arbitrary files.
+#if PBR_ENABLE_ENGINE_RASTER_FILTER || PBR_ENABLE_BAR_RASTER_FILTER
 	Shader::IProgramObject* CreatePBRFilterProgram(bool barOwned)
 	{
 		Shader::IProgramObject* program = new Shader::GLSLProgramObject(barOwned ? "[PBR-BAR-EnvironmentFilter]" : "[PBR-EnvironmentFilter]");
 		if (barOwned) {
+#if PBR_ENABLE_BAR_RASTER_FILTER
 			if (!program->LoadFromLua("shaders/GLSL/pbrEnvironmentFilter.lua")) {
 				delete program;
 				return nullptr;
 			}
+#else
+			delete program;
+			return nullptr;
+#endif
 		} else {
+#if PBR_ENABLE_ENGINE_RASTER_FILTER
 			program->AttachShaderObject(new Shader::GLSLShaderObject(GL_VERTEX_SHADER, pbrFilterVertexShader));
 			program->AttachShaderObject(new Shader::GLSLShaderObject(GL_FRAGMENT_SHADER, pbrFilterFragmentShader));
 			program->Link();
@@ -225,6 +256,10 @@ void main()
 				delete program;
 				return nullptr;
 			}
+#else
+			delete program;
+			return nullptr;
+#endif
 		}
 
 		// These uniforms are the engine/BAR ABI. Reject a shader that compiles
@@ -245,7 +280,9 @@ void main()
 		}
 		return program;
 	}
+#endif
 
+#if PBR_ENABLE_BAR_COMPUTE_FILTER
 	Shader::IProgramObject* CreatePBRComputeProgram()
 	{
 		if (!GLAD_GL_VERSION_4_3)
@@ -272,6 +309,52 @@ void main()
 			return nullptr;
 		}
 		return program;
+	}
+#endif
+
+	// This factory is the sole filter-program ownership boundary. BAR owns the
+	// external GLSL files; Recoil validates their ABI and publishes only a
+	// complete result. Disabled backends are absent from this binary.
+	Shader::IProgramObject* CreatePBRProgram(const std::string& filter)
+	{
+#if PBR_ENABLE_ENGINE_RASTER_FILTER
+		if (filter == "raster") return CreatePBRFilterProgram(false);
+#endif
+#if PBR_ENABLE_BAR_RASTER_FILTER
+		if (filter == "bar-raster") return CreatePBRFilterProgram(true);
+#endif
+#if PBR_ENABLE_BAR_COMPUTE_FILTER
+		if (filter == "compute") return CreatePBRComputeProgram();
+#endif
+		return nullptr;
+	}
+
+	// Runtime fallback is deterministic even in a one-backend build. Compute
+	// alone cannot run below GL 4.3; the caller reports that case as unavailable
+	// instead of pretending that an omitted raster backend exists.
+	const char* AvailablePBRFilter()
+	{
+#if PBR_ENABLE_ENGINE_RASTER_FILTER
+		return "raster";
+#elif PBR_ENABLE_BAR_RASTER_FILTER
+		return "bar-raster";
+#else
+		return GLAD_GL_VERSION_4_3 ? "compute" : nullptr;
+#endif
+	}
+
+	bool SupportsPBRFilter(const std::string& filter)
+	{
+#if PBR_ENABLE_ENGINE_RASTER_FILTER
+		if (filter == "raster") return true;
+#endif
+#if PBR_ENABLE_BAR_RASTER_FILTER
+		if (filter == "bar-raster") return true;
+#endif
+#if PBR_ENABLE_BAR_COMPUTE_FILTER
+		if (filter == "compute") return GLAD_GL_VERSION_4_3;
+#endif
+		return false;
 	}
 
 	enum PBRFilterType {
@@ -346,6 +429,9 @@ bool CubeMapHandler::Init() {
 
 	{
 		glGenTextures(1, &envReflectionTexID);
+		// Legacy $reflection/$map_reflection is explicitly 8-bit UNORM.
+		// Changing this allocation alone would not make the captured legacy
+		// sky/terrain shaders HDR or change existing consumers' expectations.
 		glBindTexture(GL_TEXTURE_CUBE_MAP, envReflectionTexID);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, generateMipMaps? GL_LINEAR_MIPMAP_LINEAR: GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER,                                           GL_LINEAR); // magnification doesn't use mips
@@ -364,6 +450,7 @@ bool CubeMapHandler::Init() {
 		glGenerateMipmapEXT(GL_TEXTURE_CUBE_MAP);
 
 	if (mapSkyReflections) {
+		// Optional $sky_reflection for SSMF uses the same legacy RGBA8 layout.
 		glGenTextures(1, &skyReflectionTexID);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, skyReflectionTexID);
 		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -563,6 +650,21 @@ PBREnvironmentInfo CubeMapHandler::GetPBREnvironmentInfo() const
 	info.requestedAnchor = pbrRequestedAnchor;
 	info.requestedContent = pbrRequestedContent;
 	info.requestedFilter = pbrRequestedFilter;
+#if PBR_ENABLE_ENGINE_RASTER_FILTER
+	info.compiledFilters += "raster,";
+	info.availableFilters += "raster,";
+#endif
+#if PBR_ENABLE_BAR_RASTER_FILTER
+	info.compiledFilters += "bar-raster,";
+	info.availableFilters += "bar-raster,";
+#endif
+#if PBR_ENABLE_BAR_COMPUTE_FILTER
+	info.compiledFilters += "compute,";
+	if (GLAD_GL_VERSION_4_3)
+		info.availableFilters += "compute,";
+#endif
+	if (!info.compiledFilters.empty()) info.compiledFilters.pop_back();
+	if (!info.availableFilters.empty()) info.availableFilters.pop_back();
 	// The capture draws BAR's legacy, display-referred sky/terrain shaders;
 	// FilterPBREnvironment decodes them with the sRGB EOTF exactly once.
 	info.transfer = "srgb-decoded-legacy";
@@ -600,6 +702,8 @@ void CubeMapHandler::CollectPBRTimers()
 
 bool CubeMapHandler::AllocatePBRCube(unsigned int& textureID, unsigned int size, unsigned int mipCount)
 {
+	// Dedicated PBR cubes (including the display-referred staging target) are
+	// float RGBA16F; they are not aliases for the legacy RGBA8 cube names.
 	glGenTextures(1, &textureID);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, mipCount > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
@@ -642,20 +746,30 @@ bool CubeMapHandler::InitPBREnvironment()
 	FreePBREnvironment();
 
 	pbrCaptureFBO.Init(false);
+#if PBR_ENABLE_ENGINE_RASTER_FILTER || PBR_ENABLE_BAR_RASTER_FILTER
 	pbrFilterFBO.Init(false);
-	if (!pbrCaptureFBO.IsValid() || !pbrFilterFBO.IsValid()) {
+#endif
+	if (!pbrCaptureFBO.IsValid()
+#if PBR_ENABLE_ENGINE_RASTER_FILTER || PBR_ENABLE_BAR_RASTER_FILTER
+		|| !pbrFilterFBO.IsValid()
+#endif
+	) {
 		pbrFailure = "PBR capture or filter FBO creation failed";
 		FreePBREnvironment();
 		return false;
 	}
 
-	pbrFilterShader = CreatePBRFilterProgram(false);
+	// Start with the first compiled, GPU-supported backend. With all switches
+	// enabled this is the independent engine raster oracle. In a pruned build
+	// it is the sole (or first remaining) backend, never an omitted program.
+	const char* initialFilter = AvailablePBRFilter();
+	pbrFilterShader = initialFilter != nullptr ? CreatePBRProgram(initialFilter) : nullptr;
 	if (pbrFilterShader == nullptr) {
-		pbrFailure = "PBR raster filter shader compilation or validation failed";
+		pbrFailure = "PBR initial filter shader unavailable or invalid";
 		FreePBREnvironment();
 		return false;
 	}
-	pbrFilter = "raster";
+	pbrFilter = initialFilter;
 
 	// timestamp queries are optional diagnostics; their absence never blocks
 	// the environment
@@ -794,12 +908,15 @@ void CubeMapHandler::UpdatePBRConfiguration()
 		AppendFallback(fallback, "PBREnvironmentCaptureContent=" + content + " is unknown; sky-only is active");
 		content = "sky-only";
 	}
-	if (filter == "compute" && !GLAD_GL_VERSION_4_3) {
-		AppendFallback(fallback, "PBREnvironmentFilter=compute requires OpenGL 4.3; raster is active");
-		filter = "raster";
-	} else if (filter != "raster" && filter != "bar-raster" && filter != "compute") {
-		AppendFallback(fallback, "PBREnvironmentFilter=" + filter + " is unknown; raster is active");
-		filter = "raster";
+	const char* availableFilter = AvailablePBRFilter();
+	if (availableFilter == nullptr) {
+		AppendFallback(fallback, "no compiled PBR filter is supported by this GPU; PBR capture is disabled");
+		filter = "unavailable";
+	} else if (!SupportsPBRFilter(filter)) {
+		const std::string reason = (filter == "compute" && !GLAD_GL_VERSION_4_3)
+			? " requires OpenGL 4.3" : " is unknown or omitted from this build";
+		AppendFallback(fallback, "PBREnvironmentFilter=" + filter + reason + "; " + availableFilter + " is active");
+		filter = availableFilter;
 	}
 
 	// the CONFIG ranges document these limits; clamp here as well so that a
@@ -826,7 +943,7 @@ void CubeMapHandler::UpdatePBRConfiguration()
 	pbrRequestedSet = requestedSet;
 	pbrRefreshRevision = refreshRevision;
 
-	if (captureMode != "hdr-modern" && captureMode != "compare") {
+	if ((captureMode != "hdr-modern" && captureMode != "compare") || availableFilter == nullptr) {
 		if (pbrEnabled)
 			FreePBREnvironment();
 		pbrEnabled = false;
@@ -844,6 +961,13 @@ void CubeMapHandler::UpdatePBRConfiguration()
 		LOG_L(L_WARNING, "[CubeMapHandler] PBR environment initialization failed: %s", pbrFailure.c_str());
 		return;
 	}
+	if (shaderWasMissing) {
+		// Init already loaded the first available program. Only compile another
+		// one below if the requested backend differs from that initial choice.
+		pbrFilterAttemptedRequest = pbrRequestedFilter;
+		pbrFilterAttemptedRevision = refreshRevision;
+		pbrFilterLoadError.clear();
+	}
 
 	// A new program is compiled before the old one is retired. A missing or
 	// invalid BAR shader cannot discard published textures or poison the
@@ -859,7 +983,7 @@ void CubeMapHandler::UpdatePBRConfiguration()
 	}
 	const bool needProgram = filter != pbrFilter || ((filter == "bar-raster" || filter == "compute") && newFilterRequest);
 	if (needProgram && (newFilterRequest || pbrFilterLoadError.empty())) {
-		Shader::IProgramObject* replacement = (filter == "compute") ? CreatePBRComputeProgram() : CreatePBRFilterProgram(filter == "bar-raster");
+		Shader::IProgramObject* replacement = CreatePBRProgram(filter);
 		pbrFilterAttemptedRequest = pbrRequestedFilter;
 		pbrFilterAttemptedRevision = refreshRevision;
 		if (replacement != nullptr) {
@@ -874,7 +998,7 @@ void CubeMapHandler::UpdatePBRConfiguration()
 	}
 	if (!pbrFilterLoadError.empty() && filter != pbrFilter)
 		AppendFallback(fallback, pbrFilterLoadError);
-	else if (!pbrFilterLoadError.empty() && filter == "bar-raster")
+	else if (!pbrFilterLoadError.empty() && (filter == "bar-raster" || filter == "compute"))
 		AppendFallback(fallback, pbrFilterLoadError);
 	if (fallback != pbrFallback) {
 		if (!fallback.empty())
@@ -1048,8 +1172,12 @@ static void ReportInheritedFilterState()
 
 bool CubeMapHandler::FilterPBREnvironment()
 {
+#if PBR_ENABLE_BAR_COMPUTE_FILTER
 	if (pbrFilter == "compute")
 		return FilterPBREnvironmentCompute();
+#endif
+
+#if PBR_ENABLE_ENGINE_RASTER_FILTER || PBR_ENABLE_BAR_RASTER_FILTER
 
 	PBREnvironmentSet& set = pbrSets[pbrCaptureIndex];
 
@@ -1129,14 +1257,27 @@ bool CubeMapHandler::FilterPBREnvironment()
 	if (!valid)
 		pbrFailure = "PBR environment raster filter FBO is incomplete";
 	return valid;
+#else
+	return false; // Compute-only build: there is no raster pass to dispatch.
+#endif
 }
 
+#if PBR_ENABLE_BAR_COMPUTE_FILTER
 bool CubeMapHandler::FilterPBREnvironmentCompute()
 {
 	PBREnvironmentSet& set = pbrSets[pbrCaptureIndex];
 	// The capture FBO is no longer needed; image stores target the inactive set.
 	FBO::Unbind();
 	while (glGetError() != GL_NO_ERROR) {}
+	// BAR owns the shader's local_size declaration. Query the linked program
+	// instead of fixing 8x8x1 in Recoil, so BAR can tune group dimensions while
+	// the engine still bounds dispatch and owns publication.
+	GLint groupSize[3] = {};
+	glGetProgramiv(pbrFilterShader->GetObjID(), GL_COMPUTE_WORK_GROUP_SIZE, groupSize);
+	if (groupSize[0] <= 0 || groupSize[1] <= 0 || groupSize[2] <= 0 || glGetError() != GL_NO_ERROR) {
+		pbrFailure = "PBR compute shader has no valid work-group size";
+		return false;
+	}
 	pbrFilterShader->Enable();
 	glActiveTexture(GL_TEXTURE0);
 
@@ -1147,7 +1288,9 @@ bool CubeMapHandler::FilterPBREnvironmentCompute()
 		pbrFilterShader->SetUniform("sourceResolution", static_cast<float>(sourceSize));
 		pbrFilterShader->SetUniform("filterType", filterType);
 		pbrFilterShader->SetUniform("roughness", roughness);
-		glDispatchCompute((size + 7) / 8, (size + 7) / 8, 6);
+		glDispatchCompute((size + groupSize[0] - 1) / groupSize[0],
+		                  (size + groupSize[1] - 1) / groupSize[1],
+		                  (6 + groupSize[2] - 1) / groupSize[2]);
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		return glGetError() == GL_NO_ERROR;
 	};
@@ -1178,6 +1321,7 @@ bool CubeMapHandler::FilterPBREnvironmentCompute()
 		pbrFailure = "PBR environment compute filtering failed";
 	return valid;
 }
+#endif
 
 
 void CubeMapHandler::UpdateSpecularTexture()
@@ -1244,6 +1388,8 @@ void CubeMapHandler::CreateSpecularFace(
 		CreateSpecularFacePart(texType, size, cdir, xdif, ydif, y, &specTexFaceBuf[y * size * 4]);
 	}
 
+	// Legacy $specular is generated into unsigned-byte CPU rows and uploaded
+	// as RGBA8 with no mip chain. It is not the GGX-filtered $pbr_specular cube.
 	//! note: no mipmaps, cubemap linear filtering is broken
 	glTexImage2D(texType, 0, GL_RGBA8, size, size, 0, GL_RGBA, GL_UNSIGNED_BYTE, &specTexFaceBuf[0]);
 }
