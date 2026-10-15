@@ -923,6 +923,7 @@ CBitmap TBitmapAction<T, ch>::CreateRescaled(int newx, int newy)
 	}
 
 	using ThisType = decltype(this);
+	using AccumChanType = std::conditional_t<std::is_same_v<T, float>, float, uint64_t>;
 	const AccumChanType N = GetMaxNormValue();
 
 	dst.Alloc(newx, newy, bmp->channels, bmp->dataType);
