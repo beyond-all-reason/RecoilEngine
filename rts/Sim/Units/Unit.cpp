@@ -700,6 +700,8 @@ unsigned int CUnit::UpdateState()
 		return eventBits;
 	}
 
+	commandAI->CheckForAndAttemptNewCommand();
+
 	restTime += 1;
 	return eventBits;
 }
