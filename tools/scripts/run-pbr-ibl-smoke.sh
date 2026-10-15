@@ -205,10 +205,10 @@ if [[ ! -f "$config" ]]; then
 	# first run: start from the developer's BAR settings when available
 	if [[ -f "$config_template" ]]; then cp -- "$config_template" "$config"; else : > "$config"; fi
 fi
-# A copied developer config can retain absolute search paths from another
-# checkout. Isolation and the runtime junctions above provide all data roots
-# needed by this harness, so discard that machine-specific override.
-sed -i '/^[[:space:]]*SpringData[[:space:]]*=/Id' "$config"
+# A copied developer or runtime config can retain absolute search paths from
+# another checkout. Override them with the selected runtime on every launch;
+# this also follows an explicitly supplied external runtime after a rebuild.
+set_setting SpringData "$(cygpath -m "$runtime_directory")"
 # The capture mode is a persistent player choice (the viewer's Capture
 # dropdown); only seed it on first run, but the self-test needs it on.
 if ((self_test)) || ! grep -qi '^[[:space:]]*PBREnvironmentCapture[[:space:]]*=' "$config"; then
