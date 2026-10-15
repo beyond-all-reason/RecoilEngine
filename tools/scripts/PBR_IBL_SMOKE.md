@@ -52,3 +52,5 @@ When no BAR path is supplied, the launcher first checks the expected experimenta
 `--prepare-only` validates the paths, creates the managed game/maps junctions, and writes isolated settings without starting the engine. The stable managed game mount is named `Beyond-All-Reason-Private-pbr-test.sdd`, so renaming the source checkout does not change the runtime archive path.
 
 The launcher never edits the BAR checkout, installed maps, or a normal BAR user directory. Runtime settings and reports stay under the selected write directory.
+
+When `--write-directory` is omitted, the default is `test-results/pbr-ibl` at the Recoil repository root. This intentionally lives outside `build/`, so deleting and recreating the build tree does not remove settings, logs, reports, screenshots, or numeric dumps. The repository ignores `test-results/`; copy or archive any evidence that must be retained beyond the checkout itself.
