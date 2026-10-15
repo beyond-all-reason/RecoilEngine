@@ -234,10 +234,8 @@ void CBasicMapDamage::RecalcArea(int x1, int x2, int y1, int y2)
 	x1 = std::max(x1, 0); x2 = std::clamp(x2, x1, mapDims.mapx);
 	y1 = std::max(y1, 0); y2 = std::clamp(y2, y1, mapDims.mapy);
 
-	// do not bother with zero-area updates
+	// bounds are inclusive: a single point, row or column can change heightmap vertices
 	const SRectangle updRect(x1, y1, x2, y2);
-	if (updRect.GetArea() <= 0)
-		return;
 
 	readMap->UpdateHeightMapSynced(updRect);
 	featureHandler.TerrainChanged(x1, y1, x2, y2);
