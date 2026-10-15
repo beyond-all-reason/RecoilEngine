@@ -23,6 +23,7 @@
 # window can be stale, so screenshots are taken by the engine (F12).
 param(
 	[Parameter(Mandatory = $true)][string]$WriteDirectory,
+	[int]$TargetProcessId = 0,
 	[int]$LoadTimeoutSeconds = 300
 )
 $ErrorActionPreference = "Stop"
@@ -77,10 +78,14 @@ function Check($ok, $name, $detail) {
 # --- wait for the game ---------------------------------------------------
 $proc = $null
 for ($i = 0; $i -lt ($LoadTimeoutSeconds * 2) -and -not $proc; $i++) {
-	$proc = Get-Process spring -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+	if ($TargetProcessId -gt 0) {
+		$proc = Get-Process -Id $TargetProcessId -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 }
+	} else {
+		$proc = Get-Process spring -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
+	}
 	if (-not $proc) { Start-Sleep -Milliseconds 500 }
 }
-if (-not $proc) { throw "no spring.exe window appeared" }
+if (-not $proc) { throw "no target engine window appeared" }
 for ($i = 0; $i -lt $LoadTimeoutSeconds; $i++) {
 	if ((Test-Path $Infolog) -and (Select-String -Path $Infolog -Pattern "finished loading and is now ingame" -Quiet)) { break }
 	Start-Sleep -Seconds 1
