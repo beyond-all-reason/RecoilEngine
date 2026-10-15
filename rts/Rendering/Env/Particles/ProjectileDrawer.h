@@ -34,6 +34,8 @@ public:
 	void Init();
 	void Kill();
 
+	void ConfigNotify(const std::string& key, const std::string& value);
+
 	void UpdateDrawFlags();
 
 	void DrawOpaque(bool drawReflection, bool drawRefraction = false);
@@ -156,6 +158,11 @@ private:
 
 	int perlinTexObjects = 0;
 	bool drawPerlinTex = false;
+
+	// config values read every frame, kept current by ConfigNotify
+	float reflMinRadius = 0.0f; // alpha particles smaller than this skip the water reflection pass
+	bool reuseWaterPasses = true;
+	bool threadedFill = true;
 
 	FBO perlinFB;
 
