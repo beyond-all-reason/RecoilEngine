@@ -458,7 +458,7 @@ void CMiniMap::ConfigCommand(const std::string& line)
 			const bool wantMaximized = (words.size() >= 2) ? !!atoi(words[1].c_str()) : !isMaximized;
 
 			if (isMaximized != wantMaximized)
-				ToggleMaximized(hashStringLower(words[0].c_str()) != hashString("maxspect"));
+				ToggleMaximized(hashStringLower(words[0].c_str()) == hashString("maxspect"));
 		} break;
 
 		case hashString("mouseevents"): {
