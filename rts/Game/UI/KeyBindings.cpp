@@ -326,9 +326,19 @@ void CKeyBindings::Kill()
 void FilterByKeychain(const ActionList & in, const CKeyChain & kc, ActionList & out)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	for (const Action& action: in)
-		if (kc.fit(action.keyChain))
+	const auto first = out.size();
+	// Each input is ordered by bindingIndex. Keep the earliest matching chain
+	// per action, without deduplicating against an earlier modifier tier.
+	for (const Action& action: in) {
+		if (!kc.fit(action.keyChain))
+			continue;
+
+		const auto it = std::find_if(out.begin() + first, out.end(), [&action](const Action& a) {
+			return action.line == a.line;
+		});
+		if (it == out.end())
 			out.push_back(action);
+	}
 }
 
 
@@ -342,12 +352,8 @@ void MergeActionListsByTrigger(const ActionList& actionListA, const ActionList& 
 	// If the user bound same action to both keys and scancodes we want to not
 	// include action duplicates keeping the action with lower bindingIndex.
 	//
-	// A duplicate is an action for which theres a correspondent and only one
-	// identical action present, but bound to a different key.
-	// This is guaranteed by the logic in ::Bind, which also implies it will
-	// invariably be the opposite of the action keytype (scancode<->keycode)
-	// Duplicates will not exist in a single list but would exist if both lists
-	// were merged without care.
+	// FilterByKeychain removes duplicate actions within each trigger list.
+	// The remaining duplicates can only be between keycodes and scancodes.
 	//
 	// For each list we have a list of ordered actions that is partitioned in two sections:
 	// [k, k, ..., Any+k, Any+k,...]
@@ -629,7 +635,7 @@ void CKeyBindings::AddActionToKeyMap(KeyMap& bindings, Action& action)
 		assert(it->first == ks);
 
 		auto it = std::find_if(al.begin(), al.end(), [&action](Action a) {
-			return action.line == a.line;
+			return action.line == a.line && action.keyChain == a.keyChain;
 		});
 
 		// check if the command is already bound to the given keyset
