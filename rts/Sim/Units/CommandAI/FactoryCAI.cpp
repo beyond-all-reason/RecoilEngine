@@ -269,7 +269,7 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 			Command nc(c);
 			nc.SetOpts(nc.GetOpts() | INTERNAL_ORDER);
 			for (int a = 0; a < numItems; ++a) {
-				if (repeatOrders) {
+				if (GetOwnQueue().GetRepeat()) {
 					if (GetOwnQueue().empty()) {
 						GetOwnQueue().push_front(nc);
 					} else {
@@ -341,7 +341,7 @@ void CFactoryCAI::DecreaseQueueCount(const Command& buildCommand, int& numQueued
 	// NOTE: the queue should not be empty at this point!
 	const Command frontCommand = GetOwnQueue().empty()? Command(CMD_STOP): GetOwnQueue().front();
 
-	if (!repeatOrders || buildCommand.IsInternalOrder())
+	if (!GetOwnQueue().GetRepeat() || buildCommand.IsInternalOrder())
 		numQueued--;
 
 	UpdateIconName(buildCommand.GetID(), numQueued);

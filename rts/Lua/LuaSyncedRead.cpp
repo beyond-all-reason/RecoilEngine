@@ -3729,7 +3729,7 @@ int LuaSyncedRead::GetUnitStates(lua_State* L)
 		}
 
 		if (binState) {
-			lua_pushboolean(L, unit->commandAI->repeatOrders);
+			lua_pushboolean(L, unit->commandAI->GetOwnQueue().GetRepeat());
 			lua_pushboolean(L, unit->wantCloak);
 			lua_pushboolean(L, unit->activated);
 			lua_pushboolean(L, unit->useHighTrajectory);
@@ -3766,7 +3766,7 @@ int LuaSyncedRead::GetUnitStates(lua_State* L)
 		}
 
 		if (binState) {
-			LuaPushNamedBool(L, "repeat",     unit->commandAI->repeatOrders);
+			LuaPushNamedBool(L, "repeat",     unit->commandAI->GetOwnQueue().GetRepeat());
 			LuaPushNamedBool(L, "cloak",      unit->wantCloak);
 			LuaPushNamedBool(L, "active",     unit->activated);
 			LuaPushNamedBool(L, "trajectory", unit->useHighTrajectory);

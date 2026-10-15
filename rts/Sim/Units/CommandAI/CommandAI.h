@@ -133,7 +133,6 @@ public:
 	CUnit* orderTarget;
 
 	bool targetDied;
-	bool repeatOrders;
 	int lastSelectedCommandPage;
 	int inCommand;
 protected:
