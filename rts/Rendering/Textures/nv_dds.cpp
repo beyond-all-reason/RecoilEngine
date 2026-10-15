@@ -166,6 +166,7 @@
 // spring related
 #include "Rendering/GL/myGL.h"
 #include "nv_dds.h"
+#include "lib/squish/squish.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/Platform/byteorder.h"
 #include "System/Log/ILog.h"
@@ -819,6 +820,13 @@ bool CDDSImage::is_compressed() const
 		   (m_format == GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM));
 }
 
+bool CDDSImage::is_s3tc() const
+{
+	return ((m_format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) ||
+		   (m_format == GL_COMPRESSED_RGBA_S3TC_DXT3_EXT) ||
+		   (m_format == GL_COMPRESSED_RGBA_S3TC_DXT5_EXT));
+}
+
 #ifndef HEADLESS
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -943,6 +951,36 @@ bool CDDSImage::upload_texture2D(unsigned int imageIndex, int target) const
         if (alignment != -1)
             glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
     }
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// uploads the base level of a compressed 2D texture as RGBA8
+bool CDDSImage::upload_texture2D_decompressed(unsigned int imageIndex, int target) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+    assert(m_valid);
+    assert(imageIndex < m_images.size());
+    assert(is_s3tc());
+
+    const CTexture &image = m_images[imageIndex];
+
+    int flags = squish::kDxt1;
+    switch (m_format) {
+        case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT: flags = squish::kDxt3; break;
+        case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT: flags = squish::kDxt5; break;
+        default: break;
+    }
+
+    std::vector<squish::u8> rgba(image.get_width() * image.get_height() * 4);
+    squish::DecompressImage(rgba.data(), image.get_width(), image.get_height(), static_cast<const unsigned char*>(image), flags);
+
+    GLint alignment = 0;
+    glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    glTexImage2D(target, 0, GL_RGBA8, image.get_width(), image.get_height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+    glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
 
     return true;
 }
