@@ -628,8 +628,8 @@ void ILosType::UpdateHeightMapSynced(SRectangle rect)
 		const int hh = rect.GetHeight() * (SQUARE_SIZE / 2);
 
 		int2 circleDistance;
-		circleDistance.x = std::abs(pos.x - rect.x1 * SQUARE_SIZE) - hw;
-		circleDistance.y = std::abs(pos.y - rect.y1 * SQUARE_SIZE) - hh;
+		circleDistance.x = std::abs(pos.x - (rect.x1 * SQUARE_SIZE + hw)) - hw;
+		circleDistance.y = std::abs(pos.y - (rect.y1 * SQUARE_SIZE + hh)) - hh;
 
 		if (circleDistance.x > radius) { return false; }
 		if (circleDistance.y > radius) { return false; }
