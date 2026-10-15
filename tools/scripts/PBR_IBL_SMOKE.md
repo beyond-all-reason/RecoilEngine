@@ -53,4 +53,8 @@ When no BAR path is supplied, the launcher first checks the expected experimenta
 
 The launcher never edits the BAR checkout, installed maps, or a normal BAR user directory. Runtime settings and reports stay under the selected write directory.
 
+The ordinary `--self-test` injects UI events directly into the viewer. It does not send Windows keyboard/mouse events, move your cursor, or take keyboard ownership from another widget. You may use your desktop while it runs; avoid changing the test game's camera or settings, which can still affect image-based checks. The separate opt-in `--input-probe` deliberately sends real Windows input and should be run only while you are not using the computer.
+
+The isolated launcher defaults to `--cursor-mode software` (`HardwareCursor = 0`) so OBS Game Capture can include the in-game cursor. Use `--cursor-mode hardware` to force the OS cursor, or `--cursor-mode keep` to retain the isolated config's setting; `PBR_CURSOR_MODE` is the equivalent environment override. This changes only the isolated write directory's settings, not your normal BAR installation. For a manual launch, set `HardwareCursor = 0` in that launch's `springsettings.cfg` and enable cursor capture in OBS. Hardware cursor overlays may not be present in the captured game framebuffer.
+
 When `--write-directory` is omitted, the default is `test-results/pbr-ibl` at the Recoil repository root. This intentionally lives outside `build/`, so deleting and recreating the build tree does not remove settings, logs, reports, screenshots, or numeric dumps. The repository ignores `test-results/`; copy or archive any evidence that must be retained beyond the checkout itself.

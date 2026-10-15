@@ -41,6 +41,7 @@ game_link_name="${PBR_GAME_LINK_NAME:-Beyond-All-Reason-Private-pbr-test.sdd}"
 prepare_only=0
 self_test=0
 input_probe=0
+cursor_mode="${PBR_CURSOR_MODE:-software}"
 
 usage() {
 	cat <<'EOF'
@@ -63,12 +64,15 @@ Usage: run-pbr-ibl-smoke.sh [options]
   --input-probe            drive the PBR IBL viewer with real Windows mouse/keyboard
                            input (moves your cursor for about a minute);
                            report: <write-dir>/pbr-ibl-input-probe/report.txt
+  --cursor-mode MODE       software (default, visible in OBS game capture),
+                           hardware, or keep (retain isolated config setting)
   --prepare-only           create links and settings, do not launch
 
 Environment equivalents:
   PBR_ENGINE, PBR_RUNTIME_DIRECTORY (or legacy PBR_BUILD_DIRECTORY),
   PBR_GAME_DIRECTORY, PBR_MAPS_DIRECTORY, PBR_WRITE_DIRECTORY,
-  PBR_START_SCRIPT, PBR_CONFIG_TEMPLATE, PBR_GAME_LINK_NAME.
+  PBR_START_SCRIPT, PBR_CONFIG_TEMPLATE, PBR_GAME_LINK_NAME,
+  PBR_CURSOR_MODE.
 EOF
 }
 
@@ -117,11 +121,17 @@ while (($# > 0)); do
 		--game-link-name) (($# >= 2)) || die "Missing value for $1"; game_link_name="$2"; shift 2 ;;
 		--self-test) self_test=1; shift ;;
 		--input-probe) input_probe=1; shift ;;
+		--cursor-mode) (($# >= 2)) || die "Missing value for $1"; cursor_mode="$2"; shift 2 ;;
 		--prepare-only) prepare_only=1; shift ;;
 		-h|--help) usage; exit 0 ;;
 		*) usage >&2; die "Unknown argument: $1" ;;
 	esac
 done
+
+case "$cursor_mode" in
+	software|hardware|keep) ;;
+	*) die "--cursor-mode must be software, hardware, or keep (got: $cursor_mode)" ;;
+esac
 
 if [[ -n "$engine_input" ]]; then
 	engine="$(absolute_file "$engine_input")"
@@ -209,6 +219,13 @@ fi
 # another checkout. Override them with the selected runtime on every launch;
 # this also follows an explicitly supplied external runtime after a rebuild.
 set_setting SpringData "$(cygpath -m "$runtime_directory")"
+# OBS Game Capture sees the software cursor drawn into the game framebuffer.
+# The hardware cursor is an OS overlay and can disappear from that capture.
+# Only this isolated config is changed; a user can opt back in explicitly.
+case "$cursor_mode" in
+	software) set_setting HardwareCursor 0 ;;
+	hardware) set_setting HardwareCursor 1 ;;
+esac
 # The capture mode is a persistent player choice (the viewer's Capture
 # dropdown); only seed it on first run, but the self-test needs it on.
 if ((self_test)) || ! grep -qi '^[[:space:]]*PBREnvironmentCapture[[:space:]]*=' "$config"; then
@@ -227,8 +244,8 @@ if ((self_test)) && [[ -f "$widget_order" ]]; then
 	sed -i 's/\["PBR IBL Self-Test"\] = 0,/["PBR IBL Self-Test"] = 1,/' "$widget_order"
 fi
 
-printf 'Engine:  %s\nGame:    %s\nMaps:    %s\nScript:  %s\nWrite:   %s\n' \
-	"$engine" "$game_directory" "$maps_directory" "$start_script" "$write_directory"
+printf 'Engine:  %s\nGame:    %s\nMaps:    %s\nScript:  %s\nWrite:   %s\nCursor:  %s\n' \
+	"$engine" "$game_directory" "$maps_directory" "$start_script" "$write_directory" "$cursor_mode"
 ((prepare_only)) && { printf 'Prepared; not launching (--prepare-only).\n'; exit 0; }
 
 engine_arguments=(
