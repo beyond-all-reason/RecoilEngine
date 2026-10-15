@@ -108,6 +108,7 @@ private:
 	void UpdatePBREnvironment();
 	void CreatePBRReflectionFace(unsigned int glFace);
 	bool FilterPBREnvironment();
+	bool FilterPBREnvironmentCompute();
 	bool AllocatePBRCube(unsigned int& textureID, unsigned int size, unsigned int mipCount);
 	void UpdatePBRConfiguration();
 	void RequestPBREpoch();

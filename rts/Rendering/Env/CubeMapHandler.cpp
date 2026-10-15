@@ -31,7 +31,7 @@ CONFIG(bool, CubeTexGenerateMipMaps).defaultValue(false).description("Generate m
 CONFIG(std::string, PBREnvironmentCapture).defaultValue("legacy-clone").description("PBR environment capture mode: legacy-clone, hdr-modern, or compare.");
 CONFIG(std::string, PBREnvironmentCaptureAnchor).defaultValue("map-center").description("PBR environment capture anchor: map-center or camera.");
 CONFIG(std::string, PBREnvironmentCaptureContent).defaultValue("sky-only").description("PBR environment capture content: sky-only, sky-terrain, or legacy-scene.");
-CONFIG(std::string, PBREnvironmentFilter).defaultValue("raster").description("PBR environment filtering backend: raster (engine shader) or bar-raster (BAR Lua shader); compute falls back explicitly.");
+CONFIG(std::string, PBREnvironmentFilter).defaultValue("raster").description("PBR environment filtering backend: raster (engine oracle), bar-raster (BAR fragment shader), or compute (BAR compute shader).");
 CONFIG(int, PBREnvironmentSize).defaultValue(256).minimumValue(16).maximumValue(2048).description("PBR scene-linear HDR environment cubemap face size.");
 CONFIG(int, PBRIrradianceSize).defaultValue(32).minimumValue(4).maximumValue(256).description("PBR diffuse irradiance cubemap face size.");
 CONFIG(int, PBRSpecularSize).defaultValue(128).minimumValue(16).maximumValue(1024).description("PBR GGX-prefiltered specular cubemap base face size.");
@@ -232,6 +232,34 @@ void main()
 		for (const char* name: {"sourceEnvironment", "faceIndex", "filterType", "roughness", "sourceResolution"}) {
 			if (glGetUniformLocation(program->GetObjID(), name) < 0) {
 				LOG_L(L_ERROR, "[CubeMapHandler] PBR filter shader is missing required uniform %s", name);
+				delete program;
+				return nullptr;
+			}
+		}
+		program->Enable();
+		program->SetUniform("sourceEnvironment", 0);
+		program->Disable();
+		if (!program->Validate()) {
+			delete program;
+			return nullptr;
+		}
+		return program;
+	}
+
+	Shader::IProgramObject* CreatePBRComputeProgram()
+	{
+		if (!GLAD_GL_VERSION_4_3)
+			return nullptr;
+
+		Shader::IProgramObject* program = new Shader::GLSLProgramObject("[PBR-BAR-EnvironmentCompute]");
+		if (!program->LoadFromLua("shaders/GLSL/pbrEnvironmentCompute.lua")) {
+			delete program;
+			return nullptr;
+		}
+
+		for (const char* name: {"sourceEnvironment", "filterType", "roughness", "sourceResolution"}) {
+			if (glGetUniformLocation(program->GetObjID(), name) < 0) {
+				LOG_L(L_ERROR, "[CubeMapHandler] PBR compute shader is missing required uniform %s", name);
 				delete program;
 				return nullptr;
 			}
@@ -766,10 +794,10 @@ void CubeMapHandler::UpdatePBRConfiguration()
 		AppendFallback(fallback, "PBREnvironmentCaptureContent=" + content + " is unknown; sky-only is active");
 		content = "sky-only";
 	}
-	if (filter == "compute") {
-		AppendFallback(fallback, "PBREnvironmentFilter=compute is not implemented; raster is active");
+	if (filter == "compute" && !GLAD_GL_VERSION_4_3) {
+		AppendFallback(fallback, "PBREnvironmentFilter=compute requires OpenGL 4.3; raster is active");
 		filter = "raster";
-	} else if (filter != "raster" && filter != "bar-raster") {
+	} else if (filter != "raster" && filter != "bar-raster" && filter != "compute") {
 		AppendFallback(fallback, "PBREnvironmentFilter=" + filter + " is unknown; raster is active");
 		filter = "raster";
 	}
@@ -829,9 +857,9 @@ void CubeMapHandler::UpdatePBRConfiguration()
 		pbrFilterAttemptedRevision = refreshRevision;
 		pbrFilterLoadError.clear();
 	}
-	const bool needProgram = filter != pbrFilter || (filter == "bar-raster" && newFilterRequest);
+	const bool needProgram = filter != pbrFilter || ((filter == "bar-raster" || filter == "compute") && newFilterRequest);
 	if (needProgram && (newFilterRequest || pbrFilterLoadError.empty())) {
-		Shader::IProgramObject* replacement = CreatePBRFilterProgram(filter == "bar-raster");
+		Shader::IProgramObject* replacement = (filter == "compute") ? CreatePBRComputeProgram() : CreatePBRFilterProgram(filter == "bar-raster");
 		pbrFilterAttemptedRequest = pbrRequestedFilter;
 		pbrFilterAttemptedRevision = refreshRevision;
 		if (replacement != nullptr) {
@@ -1020,6 +1048,9 @@ static void ReportInheritedFilterState()
 
 bool CubeMapHandler::FilterPBREnvironment()
 {
+	if (pbrFilter == "compute")
+		return FilterPBREnvironmentCompute();
+
 	PBREnvironmentSet& set = pbrSets[pbrCaptureIndex];
 
 	pbrFilterFBO.Bind();
@@ -1097,6 +1128,54 @@ bool CubeMapHandler::FilterPBREnvironment()
 
 	if (!valid)
 		pbrFailure = "PBR environment raster filter FBO is incomplete";
+	return valid;
+}
+
+bool CubeMapHandler::FilterPBREnvironmentCompute()
+{
+	PBREnvironmentSet& set = pbrSets[pbrCaptureIndex];
+	// The capture FBO is no longer needed; image stores target the inactive set.
+	FBO::Unbind();
+	while (glGetError() != GL_NO_ERROR) {}
+	pbrFilterShader->Enable();
+	glActiveTexture(GL_TEXTURE0);
+
+	auto dispatch = [&](unsigned int source, unsigned int sourceSize, unsigned int destination,
+	                    unsigned int mip, unsigned int size, int filterType, float roughness) {
+		glBindTexture(GL_TEXTURE_CUBE_MAP, source);
+		glBindImageTexture(1, destination, mip, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		pbrFilterShader->SetUniform("sourceResolution", static_cast<float>(sourceSize));
+		pbrFilterShader->SetUniform("filterType", filterType);
+		pbrFilterShader->SetUniform("roughness", roughness);
+		glDispatchCompute((size + 7) / 8, (size + 7) / 8, 6);
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		return glGetError() == GL_NO_ERROR;
+	};
+
+	bool valid = dispatch(pbrStagingTexID, pbrStagingSize, set.environmentTexID,
+	                      0, set.environmentSize, PBR_FILTER_DECODE, 0.0f);
+	if (valid) {
+		glBindTexture(GL_TEXTURE_CUBE_MAP, set.environmentTexID);
+		glGenerateMipmapEXT(GL_TEXTURE_CUBE_MAP);
+		glMemoryBarrier(GL_ALL_BARRIER_BITS);
+		valid = (glGetError() == GL_NO_ERROR);
+	}
+	if (valid)
+		valid = dispatch(set.environmentTexID, set.environmentSize, set.irradianceTexID,
+		                 0, set.irradianceSize, PBR_FILTER_DIFFUSE, 1.0f);
+	for (unsigned int mip = 0; mip < set.specularMipCount && valid; ++mip) {
+		const unsigned int mipSize = std::max(1u, set.specularSize >> mip);
+		const float roughness = (set.specularMipCount > 1) ? static_cast<float>(mip) / static_cast<float>(set.specularMipCount - 1) : 0.0f;
+		valid = dispatch(set.environmentTexID, set.environmentSize, set.specularTexID,
+		                 mip, mipSize, PBR_FILTER_SPECULAR, roughness);
+	}
+
+	glBindImageTexture(1, 0, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+	pbrFilterShader->Disable();
+	globalRendering->LoadViewport();
+	if (!valid)
+		pbrFailure = "PBR environment compute filtering failed";
 	return valid;
 }
 
