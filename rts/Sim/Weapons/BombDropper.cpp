@@ -97,14 +97,14 @@ bool CBombDropper::TestRange(const float3& tgtPos, const SWeaponTarget& trg) con
 	if (aimFromPos.y < tgtPos.y)
 		return false;
 
-	const float fallTime = GetPredictedImpactTime(tgtPos);
+	const float impactTime = GetShotDelay() + GetPredictedImpactTime(tgtPos);
 	const float dropDist = std::max(1, salvoSize - 1) * salvoDelay * owner->speed.Length2D() * 0.5f;
 
 	// torpedoes especially should not be dropped if the
 	// target position is already behind owner's position
 	const float torpDist = torpMoveRange * (owner->frontdir.dot(tgtPos - aimFromPos) > 0.0f);
 
-	return (tgtPos.SqDistance2D(aimFromPos + owner->speed * fallTime) < Square(dropDist + torpDist));
+	return (tgtPos.SqDistance2D(aimFromPos + owner->speed * impactTime) < Square(dropDist + torpDist));
 }
 
 

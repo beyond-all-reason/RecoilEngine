@@ -117,9 +117,10 @@ protected:
 	static bool TargetInWater(const float3& tgtPos, const SWeaponTarget&);
 
 	void UpdateWeaponPieces(const bool updateAimFrom = true);
+	int GetShotDelay() const; //< frames before firing excluding reload
 	float3 GetLeadVec(const CUnit* unit) const;
-	float GetAccuratePredictedImpactTime(const CUnit* unit) const;
-	float GetSafeInterceptTime(const CUnit* unit, float predictMult) const;
+	float GetAccuratePredictedImpactTime(const CUnit* unit, const float3& unitPos) const;
+	float GetSafeInterceptTime(const CUnit* unit, const float3& unitPos, float predictMult) const;
 
 	float GetShapedWeaponRange(const float3& dir, float maxLength) const;
 private:
