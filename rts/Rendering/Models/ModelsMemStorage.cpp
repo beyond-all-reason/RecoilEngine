@@ -123,6 +123,10 @@ size_t TransformsMemStorage::Allocate(size_t numElems)
 	auto res = storage.Allocate(numElems);
 	updateList.Resize(storage.GetSize());
 
+	// Resize flags only what it adds; the block may reuse a freed gap
+	if (res != INVALID_INDEX)
+		updateList.SetUpdate(res, numElems);
+
 	return res;
 }
 
