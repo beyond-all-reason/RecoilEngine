@@ -31,7 +31,7 @@ CONFIG(bool, CubeTexGenerateMipMaps).defaultValue(false).description("Generate m
 CONFIG(std::string, PBREnvironmentCapture).defaultValue("legacy-clone").description("PBR environment capture mode: legacy-clone, hdr-modern, or compare.");
 CONFIG(std::string, PBREnvironmentCaptureAnchor).defaultValue("map-center").description("PBR environment capture anchor: map-center or camera.");
 CONFIG(std::string, PBREnvironmentCaptureContent).defaultValue("sky-only").description("PBR environment capture content: sky-only, sky-terrain, or legacy-scene.");
-CONFIG(std::string, PBREnvironmentFilter).defaultValue("raster").description("PBR environment filtering backend. Raster is currently implemented; compute falls back explicitly.");
+CONFIG(std::string, PBREnvironmentFilter).defaultValue("raster").description("PBR environment filtering backend: raster (engine shader) or bar-raster (BAR Lua shader); compute falls back explicitly.");
 CONFIG(int, PBREnvironmentSize).defaultValue(256).minimumValue(16).maximumValue(2048).description("PBR scene-linear HDR environment cubemap face size.");
 CONFIG(int, PBRIrradianceSize).defaultValue(32).minimumValue(4).maximumValue(256).description("PBR diffuse irradiance cubemap face size.");
 CONFIG(int, PBRSpecularSize).defaultValue(128).minimumValue(16).maximumValue(1024).description("PBR GGX-prefiltered specular cubemap base face size.");
@@ -205,6 +205,46 @@ void main()
 	fragColor = vec4(max(color, vec3(0.0)), 1.0);
 }
 )";
+
+	// The engine owns capture, pass scheduling and atomic texture publication.
+	// BAR may own only the filter program through the existing VFS Lua-shader
+	// loader; this fixed path cannot redirect the engine to arbitrary files.
+	Shader::IProgramObject* CreatePBRFilterProgram(bool barOwned)
+	{
+		Shader::IProgramObject* program = new Shader::GLSLProgramObject(barOwned ? "[PBR-BAR-EnvironmentFilter]" : "[PBR-EnvironmentFilter]");
+		if (barOwned) {
+			if (!program->LoadFromLua("shaders/GLSL/pbrEnvironmentFilter.lua")) {
+				delete program;
+				return nullptr;
+			}
+		} else {
+			program->AttachShaderObject(new Shader::GLSLShaderObject(GL_VERTEX_SHADER, pbrFilterVertexShader));
+			program->AttachShaderObject(new Shader::GLSLShaderObject(GL_FRAGMENT_SHADER, pbrFilterFragmentShader));
+			program->Link();
+			if (!program->IsValid()) {
+				delete program;
+				return nullptr;
+			}
+		}
+
+		// These uniforms are the engine/BAR ABI. Reject a shader that compiles
+		// but cannot run all three passes, before it can replace a valid one.
+		for (const char* name: {"sourceEnvironment", "faceIndex", "filterType", "roughness", "sourceResolution"}) {
+			if (glGetUniformLocation(program->GetObjID(), name) < 0) {
+				LOG_L(L_ERROR, "[CubeMapHandler] PBR filter shader is missing required uniform %s", name);
+				delete program;
+				return nullptr;
+			}
+		}
+		program->Enable();
+		program->SetUniform("sourceEnvironment", 0);
+		program->Disable();
+		if (!program->Validate()) {
+			delete program;
+			return nullptr;
+		}
+		return program;
+	}
 
 	enum PBRFilterType {
 		PBR_FILTER_DECODE = 0,
@@ -490,7 +530,7 @@ PBREnvironmentInfo CubeMapHandler::GetPBREnvironmentInfo() const
 	info.captureMode = pbrCaptureMode;
 	info.anchor = pbrAnchor;
 	info.content = pbrContent;
-	info.filter = pbrFilter;
+	info.filter = pbrReady ? pbrPublishedFilter : pbrFilter;
 	info.requestedCaptureMode = pbrRequestedCaptureMode;
 	info.requestedAnchor = pbrRequestedAnchor;
 	info.requestedContent = pbrRequestedContent;
@@ -581,24 +621,13 @@ bool CubeMapHandler::InitPBREnvironment()
 		return false;
 	}
 
-	pbrFilterShader = new Shader::GLSLProgramObject("[PBR-EnvironmentFilter]");
-	pbrFilterShader->AttachShaderObject(new Shader::GLSLShaderObject(GL_VERTEX_SHADER, pbrFilterVertexShader));
-	pbrFilterShader->AttachShaderObject(new Shader::GLSLShaderObject(GL_FRAGMENT_SHADER, pbrFilterFragmentShader));
-	pbrFilterShader->Link();
-	if (!pbrFilterShader->IsValid()) {
+	pbrFilterShader = CreatePBRFilterProgram(false);
+	if (pbrFilterShader == nullptr) {
 		pbrFailure = "PBR raster filter shader compilation or validation failed";
 		FreePBREnvironment();
 		return false;
 	}
-
-	pbrFilterShader->Enable();
-	pbrFilterShader->SetUniform("sourceEnvironment", 0);
-	pbrFilterShader->Disable();
-	if (!pbrFilterShader->Validate()) {
-		pbrFailure = "PBR raster filter shader validation failed";
-		FreePBREnvironment();
-		return false;
-	}
+	pbrFilter = "raster";
 
 	// timestamp queries are optional diagnostics; their absence never blocks
 	// the environment
@@ -710,6 +739,7 @@ void CubeMapHandler::UpdatePBRConfiguration()
 	pbrRequestedCaptureMode = configHandler->GetString("PBREnvironmentCapture");
 	pbrRequestedAnchor = configHandler->GetString("PBREnvironmentCaptureAnchor");
 	pbrRequestedContent = configHandler->GetString("PBREnvironmentCaptureContent");
+	const std::string previousRequestedFilter = pbrRequestedFilter;
 	pbrRequestedFilter = configHandler->GetString("PBREnvironmentFilter");
 	const int refreshRevision = configHandler->GetInt("PBREnvironmentRevision");
 
@@ -739,7 +769,7 @@ void CubeMapHandler::UpdatePBRConfiguration()
 	if (filter == "compute") {
 		AppendFallback(fallback, "PBREnvironmentFilter=compute is not implemented; raster is active");
 		filter = "raster";
-	} else if (filter != "raster") {
+	} else if (filter != "raster" && filter != "bar-raster") {
 		AppendFallback(fallback, "PBREnvironmentFilter=" + filter + " is unknown; raster is active");
 		filter = "raster";
 	}
@@ -752,24 +782,19 @@ void CubeMapHandler::UpdatePBRConfiguration()
 	requestedSet.specularSize = std::clamp(configHandler->GetInt("PBRSpecularSize"), 16, 1024);
 	requestedSet.specularMipCount = MipCount(requestedSet.specularSize);
 
-	if (fallback != pbrFallback) {
-		if (!fallback.empty())
-			LOG_L(L_WARNING, "[CubeMapHandler] PBR environment fallback: %s", fallback.c_str());
-		pbrFallback = fallback;
-	}
-
 	const bool sizesChanged =
 		requestedSet.environmentSize != pbrRequestedSet.environmentSize ||
 		requestedSet.irradianceSize != pbrRequestedSet.irradianceSize ||
 		requestedSet.specularSize != pbrRequestedSet.specularSize;
-	const bool controlsChanged =
-		anchor != pbrAnchor || content != pbrContent || filter != pbrFilter ||
+	const bool wasEnabled = pbrEnabled;
+	const bool shaderWasMissing = (pbrFilterShader == nullptr);
+	const std::string previousFilter = pbrFilter;
+	const bool otherControlsChanged =
+		anchor != pbrAnchor || content != pbrContent ||
 		refreshRevision != pbrRefreshRevision || sizesChanged;
-
 	pbrCaptureMode = captureMode;
 	pbrAnchor = anchor;
 	pbrContent = content;
-	pbrFilter = filter;
 	pbrRequestedSet = requestedSet;
 	pbrRefreshRevision = refreshRevision;
 
@@ -777,21 +802,61 @@ void CubeMapHandler::UpdatePBRConfiguration()
 		if (pbrEnabled)
 			FreePBREnvironment();
 		pbrEnabled = false;
+		pbrFilter = filter;
+		pbrFallback = fallback;
 		return;
 	}
 
-	const bool wasEnabled = pbrEnabled;
 	pbrEnabled = true;
-	if (wasEnabled && !controlsChanged)
-		return;
-
 	// A persistent program/FBO failure is retried only after the user changes
 	// a control (including a PBREnvironmentRevision bump), never every frame.
-	if (pbrFilterShader == nullptr && !InitPBREnvironment()) {
+	if (shaderWasMissing && wasEnabled && !otherControlsChanged && pbrRequestedFilter == previousRequestedFilter)
+		return;
+	if (shaderWasMissing && !InitPBREnvironment()) {
 		LOG_L(L_WARNING, "[CubeMapHandler] PBR environment initialization failed: %s", pbrFailure.c_str());
 		return;
 	}
 
+	// A new program is compiled before the old one is retired. A missing or
+	// invalid BAR shader cannot discard published textures or poison the
+	// engine-owned raster backend. A revision bump retries/reloads BAR edits.
+	const bool newFilterRequest =
+		shaderWasMissing ||
+		pbrFilterAttemptedRequest != pbrRequestedFilter ||
+		pbrFilterAttemptedRevision != refreshRevision;
+	if (filter == "raster" && pbrFilter == "raster" && newFilterRequest) {
+		pbrFilterAttemptedRequest = pbrRequestedFilter;
+		pbrFilterAttemptedRevision = refreshRevision;
+		pbrFilterLoadError.clear();
+	}
+	const bool needProgram = filter != pbrFilter || (filter == "bar-raster" && newFilterRequest);
+	if (needProgram && (newFilterRequest || pbrFilterLoadError.empty())) {
+		Shader::IProgramObject* replacement = CreatePBRFilterProgram(filter == "bar-raster");
+		pbrFilterAttemptedRequest = pbrRequestedFilter;
+		pbrFilterAttemptedRevision = refreshRevision;
+		if (replacement != nullptr) {
+			delete pbrFilterShader;
+			pbrFilterShader = replacement;
+			pbrFilter = filter;
+			pbrFilterLoadError.clear();
+		} else {
+			pbrFilterLoadError = "PBREnvironmentFilter=" + pbrRequestedFilter +
+				" could not load or validate its shader; " + pbrFilter + " remains active";
+		}
+	}
+	if (!pbrFilterLoadError.empty() && filter != pbrFilter)
+		AppendFallback(fallback, pbrFilterLoadError);
+	else if (!pbrFilterLoadError.empty() && filter == "bar-raster")
+		AppendFallback(fallback, pbrFilterLoadError);
+	if (fallback != pbrFallback) {
+		if (!fallback.empty())
+			LOG_L(L_WARNING, "[CubeMapHandler] PBR environment fallback: %s", fallback.c_str());
+		pbrFallback = fallback;
+	}
+
+	const bool controlsChanged = otherControlsChanged || previousFilter != pbrFilter;
+	if (wasEnabled && !shaderWasMissing && !controlsChanged)
+		return;
 	RequestPBREpoch();
 }
 
@@ -843,6 +908,7 @@ void CubeMapHandler::UpdatePBREnvironment()
 	pbrActiveIndex = pbrCaptureIndex;
 	pbrCaptureIndex = 1 - pbrActiveIndex;
 	pbrActiveRevision = pbrRequestedRevision;
+	pbrPublishedFilter = pbrFilter;
 	pbrCaptureFace = 0;
 	pbrReady = true;
 	pbrPending = false;

@@ -147,12 +147,17 @@ private:
 	std::string pbrAnchor = "map-center";
 	std::string pbrContent = "sky-only";
 	std::string pbrFilter = "raster";
+	std::string pbrPublishedFilter = "raster";
 	std::string pbrRequestedCaptureMode;
 	std::string pbrRequestedAnchor;
 	std::string pbrRequestedContent;
 	std::string pbrRequestedFilter;
 	std::string pbrFallback;
 	std::string pbrFailure;
+	// A failed BAR shader is retried only when its request/revision changes.
+	std::string pbrFilterAttemptedRequest;
+	int pbrFilterAttemptedRevision = -1;
+	std::string pbrFilterLoadError;
 
 	// GL_TIMESTAMP queries: [2k, 2k+1] bracket capture face k, [12, 13] the
 	// filter pass. Results are read without stalling once all are available.
