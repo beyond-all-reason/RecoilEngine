@@ -42,6 +42,10 @@ struct PBREnvironmentInfo {
 	std::string requestedAnchor;
 	std::string requestedContent;
 	std::string requestedFilter;
+	// Comma-separated build/GPU capability lists. Lua uses availableFilters to
+	// grey out pruned or unsupported backends without losing the saved request.
+	std::string compiledFilters;
+	std::string availableFilters;
 	std::string transfer;
 	std::string fallback;
 	std::string failure;
