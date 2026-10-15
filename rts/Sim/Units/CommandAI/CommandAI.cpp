@@ -1122,6 +1122,7 @@ void CCommandAI::ExecuteInsert(const Command& c, bool fromSynced)
 
 	// make the command
 	Command newCmd((int)c.GetParam(1), (unsigned char)c.GetParam(2));
+	newCmd.SetTimeOut(c.GetTimeOut());
 	for (unsigned int p = 3; p < c.GetNumParams(); p++) {
 		newCmd.PushParam(c.GetParam(p));
 	}

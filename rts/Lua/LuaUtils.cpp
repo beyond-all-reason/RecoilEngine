@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <cctype>
+#include <climits> // INT_MAX
 
 #include "LuaUtils.h"
 #include "LuaConfig.h"
@@ -1094,8 +1095,26 @@ static bool ParseCommandTimeOut(
 	if (!lua_isnumber(L, idx))
 		return false;
 
-	cmd.SetTimeOut(lua_tonumber(L, idx));
+	cmd.SetTimeOut(LuaUtils::ParseTimeOut(L, idx));
 	return true;
+}
+
+/*
+ * lua_Number is a float here, so `INT_MAX` is not representable.
+ * It rounds up to 2^31, and converting that to int is out of range.
+ * Leave every in-range value alone. Otherwise, cast to the default.
+ */
+int LuaUtils::ParseTimeOut(lua_State* L, int index)
+{
+	const double timeOut = luaL_checknumber(L, index);
+
+	if (timeOut < 0)
+		return 0;
+
+	if (timeOut < INT_MAX)
+		return static_cast<int>(timeOut);
+
+	return INT_MAX; // default timeout
 }
 
 /***
@@ -1111,7 +1130,7 @@ static bool ParseCommandTimeOut(
  * @param cmdID CMD|integer The command ID.
  * @param params CreateCommandParams? Parameters for the given command.
  * @param options CreateCommandOptions?
- * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units.
+ * @param timeout integer? Absolute frame number. The command will be discarded after this frame. Only respected by mobile units. `CMD_INSERT` passes its timeout to its inserted command.
  */
 Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
 {
@@ -1159,7 +1178,7 @@ Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
  * @field [1] CMD|integer Command ID.
  * @field [2] CreateCommandParams? Parameters for the given command.
  * @field [3] CreateCommandOptions? Command options.
- * @field [4] integer? Timeout.
+ * @field [4] integer? Timeout as an absolute frame number. `math.huge` means no timeout.
  */
 
 Command LuaUtils::ParseCommandTable(lua_State* L, const char* caller, int tableIdx)

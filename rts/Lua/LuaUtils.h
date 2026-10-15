@@ -136,6 +136,7 @@ class LuaUtils {
 		static Command ParseCommand(lua_State* L, const char* caller, int idIndex);
 		static Command ParseCommandTable(lua_State* L, const char* caller, int table);
 		static void ParseCommandArray(lua_State* L, const char* caller, int table, vector<Command>& commands);
+		static int ParseTimeOut(lua_State* L, int index);
 		static int ParseFacing(lua_State* L, const char* caller, int index);
 
 		static void PushCurrentFuncEnv(lua_State* L, const char* caller);
