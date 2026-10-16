@@ -40,6 +40,17 @@ void LuaImmediateBatch::ReadGLValue(BatchAttrib attrib, unsigned unit, float* ou
 void LuaImmediateBatch::Issue(const BatchLayout& l)
 {
 	if (l.draw) {
+		// client pointers are read as offsets into a bound buffer, and would
+		// overwrite the attribute setup of a bound VAO
+		GLint prevVAO = 0;
+		GLint prevArrayBuffer = 0;
+		glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prevVAO);
+		glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prevArrayBuffer);
+		if (prevVAO != 0)
+			glBindVertexArray(0);
+		if (prevArrayBuffer != 0)
+			glBindBuffer(GL_ARRAY_BUFFER, 0);
+
 		glEnableClientState(GL_VERTEX_ARRAY);
 		glVertexPointer(BatchLayout::POSITION_SIZE, GL_FLOAT, 0, l.position);
 
@@ -99,6 +110,11 @@ void LuaImmediateBatch::Issue(const BatchLayout& l)
 		if (l.color != nullptr)
 			glDisableClientState(GL_COLOR_ARRAY);
 		glDisableClientState(GL_VERTEX_ARRAY);
+
+		if (prevArrayBuffer != 0)
+			glBindBuffer(GL_ARRAY_BUFFER, prevArrayBuffer);
+		if (prevVAO != 0)
+			glBindVertexArray(prevVAO);
 	}
 
 	// current values are undefined after drawing from an array, and a block
