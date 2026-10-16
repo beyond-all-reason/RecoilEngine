@@ -43,14 +43,14 @@
 # Build everything first, tolerating the two Linux-only test targets that
 # cannot compile here:
 #
-#   ninja -C build-macos-legacy -k 0
+#   ninja -C build-macos -k 0
 #
 # Mesa is 26.3.0-rc1, unpatched, built with installer/Mac/make-mesa.sh, see
 # coding-agents/MACOS_BUILD.md. 26.2.5 leaks during load and must not be packaged.
 set -euo pipefail
 
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
-BUILD=${BUILD_DIR:-$REPO/build-macos-legacy}
+BUILD=${BUILD_DIR:-$REPO/build-macos}
 PLATFORM=arm64-macos
 VERSION=$(cd "$REPO" && git describe --abbrev=7)
 OUT=${1:-$REPO/dist/recoil_${VERSION}_${PLATFORM}}
