@@ -1,0 +1,94 @@
+// BAR's 650-unit benchmark on Starwatcher 1.0, driven by the debugcommands
+// modoption. Results print in the log after "Benchmark Results".
+//
+// Needs the game "Beyond All Reason pr-8942-30929-09be885" (the gametype below)
+// and the map Starwatcher 1.0 in the data dir. Change gametype to the installed
+// BAR version if it differs.
+//
+// BAR's "Mission Info" widget pauses the game until Esc is pressed, which stalls
+// the benchmark. Disable it in LuaUI/Config/BYAR.lua by setting its order to 0.
+[Game]
+{
+	[allyTeam0]
+	{
+		startrectright = 0.17;
+		startrectbottom = 1;
+		startrectleft = 0;
+		numallies = 0;
+		startrecttop = 0;
+	}
+
+	[allyTeam1]
+	{
+		startrectright = 1;
+		startrectbottom = 1;
+		startrectleft = 0.82999998;
+		numallies = 0;
+		startrecttop = 0;
+	}
+
+	[team0]
+	{
+		Side = Armada;
+		Handicap = 0;
+		RgbColor = 0.99609375 0.546875 0;
+		AllyTeam = 0;
+		TeamLeader = 0;
+		StartPosX = 800;
+		StartPosZ = 100;
+	}
+
+	[team1]
+	{
+		Side = Cortex;
+		Handicap = 0;
+		RgbColor = 0.99609375 0.546875 0;
+		AllyTeam = 1;
+		TeamLeader = 0;
+		StartPosX = 100;
+		StartPosZ = 800;
+	}
+
+	[ai0]
+	{
+		Host = 0;
+		IsFromDemo = 0;
+		Name = InactiveAI(1);
+		ShortName = NullAI;
+		Team = 1;
+		Version = 0.1;
+	}
+
+	[player0]
+	{
+		IsFromDemo = 0;
+		Name = tomjn;
+		Team = 0;
+		rank = 0;
+	}
+
+	[modoptions]
+	{
+		scenariooptions = eyJzY2VuYXJpb2lkIjoiYmVuY2htYXJrX2xpZ2h0c2lkZSIsImRpc2FibGVmYWN0aW9ucGlja2VyIjp0cnVlLCJiZW5jaG1hcmtjb21tYW5kIjoibHVhcnVsZXMgYmVuY2htYXJrIGNvcmFrIGFybXB3IDY1MCAxMCAyMDQwIiwiYmVuY2htYXJrZnJhbWVzIjoyMDAwfQ==;
+		debugcommands = 1:cheat|15:luarules benchmark corak armpw 650 10 2040|25:deselect|2015:screenshot|2016:luarules benchmark;
+	}
+
+	NumRestrictions=0;
+
+	[RESTRICT]
+	{
+	}
+
+	hostip = 127.0.0.1;
+	hostport = 0;
+	numplayers = 1;
+	startpostype = 3;
+	mapname = Starwatcher 1.0;
+	ishost = 1;
+	numusers = 2;
+	gametype = Beyond All Reason pr-8942-30929-09be885;
+	GameStartDelay = 5;
+	myplayername = tomjn;
+	nohelperais = 0;
+	FixedRNGSeed = 123123;
+}
