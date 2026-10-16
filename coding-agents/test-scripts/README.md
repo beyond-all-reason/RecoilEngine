@@ -2,15 +2,16 @@
 
 Start scripts the engine accepts directly, so a renderer change can be checked against a real game without a lobby. Kept here rather than in a scratch directory so the setup is not lost between sessions.
 
-Run one with:
+Run one with the capped runner, after checking `memory_pressure`:
 
 ```bash
-cmake --build build-macos-legacy -j 10 --target engine-legacy
-cd build-macos-legacy
-./run-macos.sh --isolation-dir ~/dev/spring-testdata --window ../coding-agents/test-scripts/<script>.txt
+cmake --build build-macos -j 10 --target engine-legacy
+SCRIPT=coding-agents/test-scripts/<script>.tdf coding-agents/test-scripts/run-capped.sh 120 /tmp/run.log
 ```
 
-`--isolation-dir` is not optional. Without it the engine picks up `~/.spring`, whose `base/springcontent.sdz` is from January 2025 and is missing shaders this engine asks for, and the terrain draws black. That is a stale content problem wearing a renderer costume.
+`run-capped.sh` runs `./spring` in `build-macos` with `--isolation-dir ~/dev/spring-testdata --window`. It kills the engine above `MAX_RSS_KB` of phys_footprint (default 11010048, 10.5 GiB) and after the time limit. It checks footprint every 0.5 s and writes a full rss, top and footprint line to `<logfile>.mem` about every 4 s.
+
+`--isolation-dir` is not optional, and `run-capped.sh` passes it for you. Without it the engine picks up `~/.spring`, whose `base/springcontent.sdz` is from January 2025 and is missing shaders this engine asks for, and the terrain draws black. That is a stale content problem wearing a renderer costume.
 
 ## The scripts
 
@@ -20,22 +21,17 @@ cd build-macos-legacy
 | `empty-mod-valles.tdf` | Empty Mod | the same, on the SplinterFaction script's map, so a run differs in content only. Measures what the map alone costs. |
 | `splinterfaction-fixed-start.tdf` | SplinterFaction 0.1.78 | a real game with a real LuaUI. Sets `side` so the faction is the same every run. |
 | `metal-factions-valles.tdf` | Metal Factions v2.58 | a second real game on the same map, with an unrelated LuaUI. Sets `side=aven` so the faction is the same every run. |
+| `bar-benchmark.tdf` | Beyond All Reason pr-8942-30929-09be885 | BAR's 650-unit benchmark on Starwatcher 1.0. Needs that game and map in the data dir. The result prints in the log after "Benchmark Results". Disable BAR's "Mission Info" widget first, see the header of the file. |
 
 `run-capped.sh` takes `SCRIPT=<path>` to pick one. **Name new ones `.tdf`, not `.txt`.** The format needs semicolons on every line and the humanize hook rejects those in a `.txt`, so a `.txt` script has to be derived with a shell redirect and cannot carry a comment explaining itself.
 
 ## Which engine and which Mesa a run actually uses
 
-**`run-capped.sh` defaults to `run-macos-premtl4.sh`, not `run-macos.sh`.** So a run uses `spring-premtl4`, a copy of `spring` relinked against `~/dev/mesa-install-premtl4`, and not the `spring` you just built against `~/dev/mesa-install`. Your code changes do reach it, because the launcher refreshes the copy whenever `spring` is newer, but the Mesa underneath is a different build.
+The engine loads Mesa itself, so `run-capped.sh` runs `./spring` directly. It looks for Mesa in `<exe dir>/mesa` first, so `build-macos/mesa` is a symlink to a Mesa install prefix and repointing it picks the Mesa build for the next run. See `coding-agents/MACOS_BUILD.md` for the lookup order and the environment variables the engine sets.
 
-That distinction is easy to miss and has already produced one wrong conclusion: a packaged engine was built against `mesa-install` on the reasoning that "this is what the launcher uses", which was true of a launcher nothing runs. It also means memory figures in the plan are pre-Metal4 numbers and say nothing about rc3.
+Use Mesa 26.3.0-rc1 (`~/dev/mesa-install-26.3.0-rc1`, unpatched). Do not use 26.2.5, which leaks during load and reached a 9.7 GiB footprint 15 s into SplinterFaction.
 
-| prefix | gallium | what it is |
-|---|---|---|
-| `~/dev/mesa-install-premtl4` | `26.2.0-devel` | pinned before "kk: Move to Metal4 command encoding", the one every measurement uses |
-| `~/dev/mesa-install` | `26.2.0-rc3` | carries the Metal4 change, which never returns render pass memory |
-| `~/dev/mesa-install-staging` | | scratch, not used by any launcher |
-
-`LAUNCHER=` overrides it, which is also how a packaged engine gets tested: point it at the `spring` launcher inside the archive.
+`LAUNCHER=` overrides `./spring`, which is also how a packaged engine gets tested: point it at the `spring` launcher inside the archive.
 
 ## Rules that cost time to learn
 
