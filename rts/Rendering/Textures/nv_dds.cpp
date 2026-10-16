@@ -976,11 +976,8 @@ bool CDDSImage::upload_texture2D_decompressed(unsigned int imageIndex, int targe
     std::vector<squish::u8> rgba(image.get_width() * image.get_height() * 4);
     squish::DecompressImage(rgba.data(), image.get_width(), image.get_height(), static_cast<const unsigned char*>(image), flags);
 
-    GLint alignment = 0;
-    glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    // RGBA8 rows are always 4-byte aligned
     glTexImage2D(target, 0, GL_RGBA8, image.get_width(), image.get_height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
-    glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
 
     return true;
 }
