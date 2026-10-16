@@ -32,9 +32,12 @@ endmacro (CHECK_AND_ADD_FLAGS)
 
 if    (NOT DEFINED VISIBILITY_HIDDEN)
 	set(VISIBILITY_HIDDEN "")
-	if    (NOT WIN32 AND NOT APPLE)
+	# Also on macOS: dyld merges weak definitions (vtables, inline functions)
+	# of the same name across images, so without it a Skirmish AI ends up
+	# using the engine's copies of libraries both bundle, such as JsonCpp.
+	if    (NOT WIN32)
 		check_and_add_flags(VISIBILITY_HIDDEN -fvisibility=hidden)
-	endif (NOT WIN32 AND NOT APPLE)
+	endif (NOT WIN32)
 endif (NOT DEFINED VISIBILITY_HIDDEN)
 
 
