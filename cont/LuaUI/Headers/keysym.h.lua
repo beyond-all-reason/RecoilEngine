@@ -355,6 +355,13 @@ local function warnKeysym(key, value)
   Spring.Log("", LOG.DEPRECATED, msg)
 end
 
+-- a game can include this header into a bare environment table (no setmetatable,
+-- no Spring); hand out the plain values there, as before the deprecation shim
+if not setmetatable then
+  KEYSYMS = KEYSYM_VALUES
+  return
+end
+
 -- proxy: warns on access/iteration, returns the original values (no drift), and
 -- keeps pairs() working via __pairs (backported into this Lua from 5.2)
 KEYSYMS = setmetatable({}, {
