@@ -329,6 +329,7 @@ decltype(glad_glPopMatrix) glad_glPopMatrix = nullptr;
 decltype(glad_glPopName) glad_glPopName = nullptr;
 decltype(glad_glPrimitiveRestartIndex) glad_glPrimitiveRestartIndex = nullptr;
 decltype(glad_glProgramParameteri) glad_glProgramParameteri = nullptr;
+decltype(glad_glProvokingVertex) glad_glProvokingVertex = nullptr;
 decltype(glad_glPushAttrib) glad_glPushAttrib = nullptr;
 decltype(glad_glPushMatrix) glad_glPushMatrix = nullptr;
 decltype(glad_glPushName) glad_glPushName = nullptr;
@@ -770,6 +771,7 @@ int gladLoadGL(void) {
     glad_glPopName = MakeStubImpl(glad_glPopName);
     glad_glPrimitiveRestartIndex = MakeStubImpl(glad_glPrimitiveRestartIndex);
     glad_glProgramParameteri = MakeStubImpl(glad_glProgramParameteri);
+    glad_glProvokingVertex = MakeStubImpl(glad_glProvokingVertex);
     glad_glPushAttrib = MakeStubImpl(glad_glPushAttrib);
     glad_glPushMatrix = MakeStubImpl(glad_glPushMatrix);
     glad_glPushName = MakeStubImpl(glad_glPushName);
