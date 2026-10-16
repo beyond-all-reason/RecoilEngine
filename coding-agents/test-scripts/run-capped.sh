@@ -85,11 +85,15 @@ while kill -0 "$PID" 2>/dev/null; do
 
 		# RSS ignores IOAccelerator entirely, and top's MEM counts reserved GPU
 		# address space, so log all three beside the footprint the cap uses.
+		# in the background, because top -l 1 blocks for about a second, long
+		# enough for a leak to overshoot the ceiling by a gigabyte
 		if [ $((ELAPSED - LAST_LOG)) -ge "$LOG_SECONDS" ]; then
 			LAST_LOG=$ELAPSED
-			RSS_KB=$(ps -o rss= -p "$PID" 2>/dev/null | tr -d ' ')
-			TOPMEM=$(top -l 1 -pid "$PID" -stats mem 2>/dev/null | tail -1 | tr -d ' ')
-			echo "$ELAPSED rss=$((${RSS_KB:-0} / 1024))M top=${TOPMEM:-?} foot=$((FOOT_KB / 1024))M" >> "$LOGFILE.mem"
+			(
+				RSS_KB=$(ps -o rss= -p "$PID" 2>/dev/null | tr -d ' ')
+				TOPMEM=$(top -l 1 -pid "$PID" -stats mem 2>/dev/null | tail -1 | tr -d ' ')
+				echo "$ELAPSED rss=$((${RSS_KB:-0} / 1024))M top=${TOPMEM:-?} foot=$((FOOT_KB / 1024))M" >> "$LOGFILE.mem"
+			) &
 		fi
 	fi
 
