@@ -46,13 +46,15 @@ void CRowAtlasAlloc::EstimateNeededSize()
 			break;
 
 		// Resize texture
-		if ((atlasSize.x << 1) <= maxsize.x) {
-			spaceFree += atlasSize.x * atlasSize.y;
-			atlasSize.x = std::min(maxsize.x, atlasSize.x << 1);
+		if (atlasSize.x < maxsize.x) {
+			const auto newWidth = std::min(maxsize.x, atlasSize.x << 1);
+			spaceFree += (newWidth - atlasSize.x) * atlasSize.y;
+			atlasSize.x = newWidth;
 		}
-		if ((atlasSize.y << 1) <= maxsize.y) {
-			spaceFree += atlasSize.x * atlasSize.y;
-			atlasSize.y = std::min(maxsize.y, atlasSize.y << 1);
+		if (atlasSize.y < maxsize.y) {
+			const auto newHeight = std::min(maxsize.y, atlasSize.y << 1);
+			spaceFree += atlasSize.x * (newHeight - atlasSize.y);
+			atlasSize.y = newHeight;
 		}
 	}
 }
@@ -63,7 +65,7 @@ CRowAtlasAlloc::Row* CRowAtlasAlloc::AddRow(int glyphWidth, int glyphHeight)
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int wantedRowHeight = glyphHeight;
 
-	while (atlasSize.y < (nextRowPos + wantedRowHeight)) {
+	while (atlasSize.x < glyphWidth || atlasSize.y < (nextRowPos + wantedRowHeight)) {
 		if (atlasSize.x >= maxsize.x && atlasSize.y >= maxsize.y) {
 			//throw texture_size_exception();
 			return nullptr;
