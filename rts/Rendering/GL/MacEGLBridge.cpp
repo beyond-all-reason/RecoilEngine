@@ -5,13 +5,9 @@
 #ifdef MAC_EGL_BRIDGE_AVAILABLE
 
 #include <dlfcn.h>
-#include <mach-o/dyld.h>
-#include <climits>
-#include <unistd.h>
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
-#include <cstdio>
 #include <cstdint>
 #include <string>
 #include <mutex>
@@ -19,11 +15,9 @@
 #include <SDL.h>
 
 #include "Rendering/GL/myGL.h"
+#include "System/FileSystem/FileSystem.h"
 #include "System/Log/ILog.h"
-
-#ifndef MAC_MESA_PREFIX
-	#define MAC_MESA_PREFIX "/opt/homebrew/opt/mesa"
-#endif
+#include "System/Platform/Misc.h"
 
 // minimal EGL declarations; libEGL is dlopen()ed so there is no build-time dependency on Mesa
 namespace {
@@ -45,9 +39,7 @@ namespace {
 	constexpr EGLint EGL_CONTEXT_MAJOR_VERSION = 0x3098, EGL_CONTEXT_MINOR_VERSION = 0x30FB;
 	constexpr EGLint EGL_CONTEXT_OPENGL_PROFILE_MASK = 0x30FD;
 	constexpr EGLint EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT = 0x1, EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT = 0x2;
-	constexpr EGLint EGL_CONTEXT_OPENGL_DEBUG = 0x31B0;
 	constexpr EGLenum EGL_PLATFORM_SURFACELESS_MESA = 0x31DD;
-	constexpr EGLint EGL_TRUE_ = 1;
 
 	struct EGLFuncs {
 		void* lib = nullptr;
@@ -82,30 +74,14 @@ namespace {
 	GLsync fences[NUM_PBOS] = {};
 	int pboSizes[NUM_PBOS][2] = {};
 	unsigned int frameIdx = 0;
-	int vsyncInterval = 0;
 
 	std::mutex surfMutex;
-
-	void SetEnvDefault(const char* k, const char* v) {
-		if (getenv(k) == nullptr)
-			setenv(k, v, 0);
-	}
 
 	// a Mesa tree shipped next to the engine binary takes precedence over the system one
 	const std::string& MesaPrefix() {
 		static const std::string prefix = []() -> std::string {
-			char exe[PATH_MAX];
-			char real[PATH_MAX];
-			uint32_t size = sizeof(exe);
-
-			if (_NSGetExecutablePath(exe, &size) == 0 && realpath(exe, real) != nullptr) {
-				std::string dir = real;
-				dir = dir.substr(0, dir.rfind('/')) + "/mesa";
-
-				if (access((dir + "/lib/libEGL.1.dylib").c_str(), R_OK) == 0)
-					return dir;
-			}
-			return MAC_MESA_PREFIX;
+			const std::string bundled = Platform::GetProcessExecutablePath() + "mesa";
+			return FileSystem::FileExists(bundled + "/lib/libEGL.1.dylib") ? bundled : MAC_MESA_PREFIX;
 		}();
 		return prefix;
 	}
@@ -114,12 +90,7 @@ namespace {
 		if (egl.lib != nullptr)
 			return true;
 
-		const std::string paths[] = {MesaPrefix() + "/lib/libEGL.1.dylib", "libEGL.1.dylib", "libEGL.dylib"};
-		for (const auto& p: paths) {
-			if ((egl.lib = dlopen(p.c_str(), RTLD_NOW | RTLD_LOCAL)) != nullptr)
-				break;
-		}
-		if (egl.lib == nullptr) {
+		if ((egl.lib = dlopen((MesaPrefix() + "/lib/libEGL.1.dylib").c_str(), RTLD_NOW | RTLD_LOCAL)) == nullptr) {
 			LOG_L(L_ERROR, "[MacEGLBridge] could not load Mesa libEGL (%s)", dlerror());
 			return false;
 		}
@@ -144,17 +115,17 @@ namespace {
 	}
 
 	void SetupEnvironment() {
-		// MoltenVK lacks robustness2.nullDescriptor which Zink requires
-		SetEnvDefault("GALLIUM_DRIVER", "zink");
+		setenv("GALLIUM_DRIVER", "zink", 0);
 
+		// Zink needs robustness2.nullDescriptor, which MoltenVK lacks, so the loader gets KosmicKrisp
 		if (getenv("VK_ICD_FILENAMES") == nullptr && getenv("VK_DRIVER_FILES") == nullptr) {
 			const std::string icd = MesaPrefix() + "/share/vulkan/icd.d/kosmickrisp_mesa_icd.aarch64.json";
 			setenv("VK_DRIVER_FILES", icd.c_str(), 0);
 		}
 
 		// Zink reports GL 2.1 on KosmicKrisp due to missing geometry shaders
-		SetEnvDefault("MESA_GL_VERSION_OVERRIDE", "4.6COMPAT");
-		SetEnvDefault("MESA_GLSL_VERSION_OVERRIDE", "460");
+		setenv("MESA_GL_VERSION_OVERRIDE", "4.6COMPAT", 0);
+		setenv("MESA_GLSL_VERSION_OVERRIDE", "460", 0);
 	}
 
 	bool CreateSurface(int sx, int sy) {
@@ -202,15 +173,10 @@ namespace {
 }
 
 
-bool MacEGLBridge::Wanted() {
-	const char* e = getenv("RECOIL_MAC_NATIVE_GL");
-	return (e == nullptr || e[0] == '0');
-}
-
 bool MacEGLBridge::Active() { return (context != nullptr); }
 
 
-void* MacEGLBridge::CreateContext(SDL_Window* window, int major, int minor, bool core, bool debug)
+void* MacEGLBridge::CreateContext(SDL_Window* window, int major, int minor, bool core)
 {
 	SetupEnvironment();
 
@@ -244,27 +210,16 @@ void* MacEGLBridge::CreateContext(SDL_Window* window, int major, int minor, bool
 		return nullptr;
 	}
 
-	const int versions[][2] = {{major, minor}, {4, 6}, {4, 5}, {4, 3}, {4, 1}, {3, 3}, {3, 0}};
-	for (const auto& v: versions) {
-		for (const bool c: {core, !core}) {
-			const EGLint ctxAttrs[] = {
-				EGL_CONTEXT_MAJOR_VERSION, v[0],
-				EGL_CONTEXT_MINOR_VERSION, v[1],
-				EGL_CONTEXT_OPENGL_PROFILE_MASK, c ? EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT : EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
-				EGL_CONTEXT_OPENGL_DEBUG, debug ? EGL_TRUE_ : 0,
-				EGL_NONE
-			};
-			if ((context = egl.CreateContext(display, config, nullptr, ctxAttrs)) != nullptr) {
-				LOG("[MacEGLBridge] created GL %d.%d %s context", v[0], v[1], c ? "core" : "compatibility");
-				break;
-			}
-			LOG_L(L_WARNING, "[MacEGLBridge] GL %d.%d %s context failed: 0x%x", v[0], v[1], c ? "core" : "compatibility", egl.GetError());
-		}
-		if (context != nullptr)
-			break;
-	}
-	if (context == nullptr)
+	const EGLint ctxAttrs[] = {
+		EGL_CONTEXT_MAJOR_VERSION, major,
+		EGL_CONTEXT_MINOR_VERSION, minor,
+		EGL_CONTEXT_OPENGL_PROFILE_MASK, core ? EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT : EGL_CONTEXT_OPENGL_COMPATIBILITY_PROFILE_BIT,
+		EGL_NONE
+	};
+	if ((context = egl.CreateContext(display, config, nullptr, ctxAttrs)) == nullptr) {
+		LOG_L(L_ERROR, "[MacEGLBridge] GL %d.%d %s context failed: 0x%x", major, minor, core ? "core" : "compatibility", egl.GetError());
 		return nullptr;
+	}
 
 	int wx = 0, wy = 0;
 	SDL_GetWindowSize(window, &wx, &wy);
@@ -335,7 +290,6 @@ void* MacEGLBridge::GetProcAddress(const char* name)
 
 void MacEGLBridge::SetSwapInterval(int interval)
 {
-	vsyncInterval = interval;
 	if (renderer != nullptr)
 		SDL_RenderSetVSync(renderer, interval != 0);
 }
@@ -410,30 +364,6 @@ void MacEGLBridge::SwapWindow(SDL_Window* window)
 				SDL_UnlockTexture(texture);
 			}
 
-			// debug: RECOIL_MAC_EGL_DUMP=<file.ppm>[,frame] dumps one presented frame
-			static const char* dumpEnv = getenv("RECOIL_MAC_EGL_DUMP");
-			static unsigned int dumpFrame = 0;
-			if (dumpEnv != nullptr && dumpFrame == 0) {
-				const char* comma = strchr(dumpEnv, ',');
-				dumpFrame = (comma != nullptr) ? std::max(atoi(comma + 1), 2) : 300;
-			}
-			if (dumpEnv != nullptr && frameIdx == dumpFrame) {
-				const std::string fn(dumpEnv, strchr(dumpEnv, ',') ? strchr(dumpEnv, ',') - dumpEnv : strlen(dumpEnv));
-				if (FILE* f = fopen(fn.c_str(), "wb"); f != nullptr) {
-					fprintf(f, "P6\n%d %d\n255\n", px, py);
-					const uint8_t* rgba = static_cast<const uint8_t*>(data);
-					for (int y = py - 1; y >= 0; --y) {
-						for (int x = 0; x < px; ++x) {
-							const uint8_t* p = rgba + (y * px + x) * 4;
-							const uint8_t rgb[3] = {p[0], p[1], p[2]};
-							fwrite(rgb, 1, 3, f);
-						}
-					}
-					fclose(f);
-					LOG("[MacEGLBridge] dumped frame %u to %s", frameIdx, fn.c_str());
-				}
-			}
-
 			glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
 		}
 	}
@@ -445,7 +375,6 @@ void MacEGLBridge::SwapWindow(SDL_Window* window)
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, prevReadFBO);
 
 	if (texture != nullptr) {
-		SDL_RenderClear(renderer);
 		SDL_RenderCopyEx(renderer, texture, nullptr, nullptr, 0.0, nullptr, SDL_FLIP_VERTICAL);
 		SDL_RenderPresent(renderer);
 	}
