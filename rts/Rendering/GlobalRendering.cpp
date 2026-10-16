@@ -200,6 +200,7 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(supportFragDepthLayout),
 	CR_IGNORED(supportPolygonModeLine),
 	CR_IGNORED(supportGeometryShaders),
+	CR_IGNORED(preferFirstProvokingVertex),
 	CR_IGNORED(haveGL4),
 	CR_IGNORED(glslMaxVaryings),
 	CR_IGNORED(glslMaxAttributes),
@@ -332,6 +333,7 @@ CGlobalRendering::CGlobalRendering()
 	, supportFragDepthLayout(false)
 	, supportPolygonModeLine(true)
 	, supportGeometryShaders(true)
+	, preferFirstProvokingVertex(false)
 	, haveGL4(false)
 
 	, glslMaxVaryings(0)
@@ -999,6 +1001,9 @@ void CGlobalRendering::SetGLSupportFlags()
 
 	// KosmicKrisp has no geometryShader feature, Zink still exposes the stage
 	supportGeometryShaders = (glRenderer.find("kosmickrisp") == std::string::npos);
+	// Metal flat-shades from the first vertex, and KosmicKrisp emulates the GL default by
+	// unrolling every draw with flat varyings, which costs frame rate and leaks GPU memory
+	preferFirstProvokingVertex = !supportGeometryShaders;
 
 	//stick to the theory that reported = exist
 	//supportMSAAFrameBuffer &= ((globalRenderingInfo.glContextVersion.x * 10 + globalRenderingInfo.glContextVersion.y) >= 32);
@@ -1826,6 +1831,9 @@ void CGlobalRendering::InitGLState()
 
 	if (supportSeamlessCubeMaps)
 		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+	if (preferFirstProvokingVertex)
+		glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
 
 	// MSAA rasterization
 	msaaLevel *= CheckGLMultiSampling();
