@@ -95,7 +95,9 @@ It runs `./spring` in `build-macos` with `--isolation-dir ~/dev/spring-testdata 
 coding-agents/test-scripts/package-macos.sh
 ```
 
-Produces `dist/recoil_<version>_arm64-macos/`, laid out like a Recoil release and carrying every non-system dylib including Mesa, so it runs on a machine with no Homebrew. The Mesa prefix defaults to `~/dev/mesa-install-26.3.0-rc1` and `MESA_PREFIX=` overrides it. The script still writes a `spring` launcher that sets the Mesa variables and calls `spring-bin`. It has not been re-checked since the bridge started loading Mesa itself.
+Produces `dist/recoil_<version>_arm64-macos/`, laid out like a Recoil release and carrying every non-system dylib including Mesa, so it runs on a machine with no Homebrew. The Mesa prefix defaults to `~/dev/mesa-install-26.3.0-rc1` and `MESA_PREFIX=` overrides it. Mesa goes in the archive's `mesa/` directory, which is where the bridge looks, so `spring` is the engine binary itself with no launcher.
+
+For a build that should join games of a release, configure with `-DVERSION_OVERRIDE=<release>` on a branch made from that release tag. The engine then reports the release version, and the archive is named after it. The 2026.09.01 package built this way completed the BAR benchmark at a 10 GiB peak footprint.
 
 ## What works
 
