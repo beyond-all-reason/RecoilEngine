@@ -196,6 +196,19 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DBUILDING_AI")
 
 ################################################################################
+### LuaImmediateBatch
+	set(test_name LuaImmediateBatch)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testLuaImmediateBatch.cpp"
+			"${ENGINE_SOURCE_DIR}/Lua/LuaImmediateBatch.cpp"
+			${test_Common_sources}
+		)
+
+	set(test_libs "")
+
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
+
+################################################################################
 ### Matrix44f
 	set(test_name Matrix44f)
 	set(test_src
