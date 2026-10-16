@@ -782,6 +782,11 @@ void CGlobalRendering::CheckGLExtensions()
 	if (underExternalDebug)
 		return;
 
+	// All checked ARB extensions are part of the core specification since OpenGL 3.0,
+	// and a core profile context does not advertise them by name.
+	if (globalRenderingInfo.glVersionNum >= 30)
+		return;
+
 	char extMsg[ 128] = {0};
 	char errMsg[2048] = {0};
 	char* ptr = &extMsg[0];
