@@ -331,6 +331,7 @@ public:
 	bool supportSeamlessCubeMaps;
 	bool supportFragDepthLayout;
 	bool supportGeometryShaders;
+	bool preferFirstProvokingVertex;
 
 	/**
 	 * @brief whether glPolygonMode(*, GL_LINE) actually rasterizes outlines
