@@ -1,6 +1,6 @@
 # Building and running Recoil on macOS
 
-Apple Silicon only, macOS 15 or newer. Expect an afternoon the first time, most of it compiling Mesa.
+Apple Silicon only, macOS 15 or newer. Most of the first build is compiling Mesa.
 
 macOS has no OpenGL 4.6. Apple froze its driver at 4.1 core, and the engine needs 4.6 compatibility. So the graphical engine runs on Mesa's Zink, which translates OpenGL to Vulkan, on top of KosmicKrisp, which is Mesa's Vulkan driver for Metal.
 
@@ -29,7 +29,7 @@ The script finds its patches in `installer/Mac/mesa-patches` next to it. Put a c
 MESA_VERSION=26.3.0-rc1 installer/Mac/make-mesa.sh ~/dev/mesa-work/work-26.3.0-rc1 ~/dev/mesa-install-26.3.0-rc1
 ```
 
-That produced a 34 MB prefix. Its header says it pins 26.2 because 26.3 unrolls flat-varying draws. The engine now handles that in commit 34210bcf3c (first-vertex provoking on KosmicKrisp), so 26.3 is the right choice.
+That produced a 34 MB prefix. Its header says it pins 26.2 because 26.3 unrolls flat-varying draws. The engine now avoids that path by switching to first-vertex provoking on KosmicKrisp (`preferFirstProvokingVertex` in `rts/Rendering/GlobalRendering.cpp`), so 26.3 is the right choice.
 
 Homebrew's `llvm` and `bison` are keg-only. The script puts them on `PATH` itself. Apple's bison is 2.3 and cannot parse Mesa's grammars.
 
@@ -73,7 +73,7 @@ Export any of them first to override.
 
 ## 5. Running it
 
-Use `--isolation-dir`. Without it the engine picks up whatever is in `~/.spring`, and a `base/springcontent.sdz` older than this engine is missing shaders it asks for, which draws the terrain black. That is a stale content problem wearing a renderer costume.
+Use `--isolation-dir`. Without it the engine picks up whatever is in `~/.spring`, and a `base/springcontent.sdz` older than this engine is missing shaders it asks for, which draws the terrain black. It looks like a renderer bug but is stale content.
 
 Check `memory_pressure` first. Then use the capped runner, which kills the engine above a memory ceiling and after a time limit:
 
