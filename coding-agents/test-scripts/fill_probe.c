@@ -9,7 +9,7 @@
 // Draws K full screen quads into a pbuffer of the given size, syncs, and reports
 // the rate. Compare the result against the engine's 90 Mpixel/s.
 //
-//   PREFIX=$HOME/dev/mesa-install-premtl4
+//   PREFIX=$HOME/dev/mesa-install-26.3.0-rc1
 //   gcc -O1 -I$PREFIX/include -o /tmp/fill_probe fill_probe.c -L$PREFIX/lib -lEGL
 //   DYLD_LIBRARY_PATH=/opt/homebrew/lib EGL_PLATFORM=surfaceless \
 //     MESA_LOADER_DRIVER_OVERRIDE=zink GALLIUM_DRIVER=zink \
