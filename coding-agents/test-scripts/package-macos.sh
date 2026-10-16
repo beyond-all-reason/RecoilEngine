@@ -16,27 +16,25 @@
 #     Homebrew. CI deletes lib/ after installing because it is GNUInstallDirs
 #     leftovers from vendored subprojects. Here it is deleted and then recreated
 #     for the bundled copies, so the order matters.
-#   - spring is a launcher and spring-bin is the binary. A lobby runs the file
-#     called spring, and Mesa picks its driver entirely through
-#     MESA_LOADER_DRIVER_OVERRIDE, GALLIUM_DRIVER and VK_DRIVER_FILES, none of
-#     which can be baked into a Mach-O, so a bare binary gets no GL context and
-#     no useful error.
+#   - mesa/ holds Mesa's EGL, gallium and KosmicKrisp, plus the Vulkan ICD file.
+#     MacEGLBridge loads Mesa from <exe dir>/mesa and sets the driver
+#     environment itself, so spring is the binary and needs no launcher.
 #
 # Bundled dylibs are reached three different ways, because @executable_path
 # means whichever process loaded the file, and that is not always the engine:
 #
-#   root executables    @executable_path/lib            spring-bin, headless,
+#   root executables    @executable_path/lib            spring, headless,
 #                                                       dedicated, pr-downloader
 #   libunitsync.dylib   @loader_path/lib                a lobby dlopens it, so
 #                                                       @executable_path would be
 #                                                       the lobby's own directory
 #   AI/*/*/*/*.dylib    @loader_path/../../../../lib    the engine dlopens these
 #                                                       from four levels down
+#   mesa/lib/*.dylib    @loader_path/../../lib          MacEGLBridge dlopens
+#                                                       libEGL by path
 #
-# Two things dylibbundler cannot find on its own, because they are dlopened
-# rather than linked: the gallium driver, reached through LIBGL_DRIVERS_PATH,
-# and the kosmickrisp ICD, reached through VK_DRIVER_FILES. Both are passed to
-# it explicitly below.
+# Mesa is dlopened rather than linked, so dylibbundler cannot find it on its
+# own. Its dylibs are passed to it explicitly below, then moved into mesa/.
 #
 #   package-macos.sh [outdir]
 #
@@ -52,7 +50,9 @@ set -euo pipefail
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 BUILD=${BUILD_DIR:-$REPO/build-macos}
 PLATFORM=arm64-macos
-VERSION=$(cd "$REPO" && git describe --abbrev=7)
+# a build configured with VERSION_OVERRIDE reports that version, so name the archive after it
+VERSION=$(sed -n 's/^VERSION_OVERRIDE:STRING=//p' "$BUILD/CMakeCache.txt" 2>/dev/null)
+VERSION=${VERSION:-$(cd "$REPO" && git describe --abbrev=7)}
 OUT=${1:-$REPO/dist/recoil_${VERSION}_${PLATFORM}}
 MESA=${MESA_PREFIX:-$HOME/dev/mesa-install-26.3.0-rc1}
 VKLIB=${VK_LOADER_LIB:-/opt/homebrew/opt/vulkan-loader/lib}
@@ -74,18 +74,6 @@ cmake --install "$BUILD" --prefix "$OUT" > "$(dirname "$OUT")/.install.log" 2>&1
 rm -rf "$OUT/include" "$OUT/lib" "$OUT/share"
 mkdir -p "$OUT/lib"
 
-mv "$OUT/spring" "$OUT/spring-bin"
-
-# The build links whichever Mesa prefix it was compiled against. Left alone,
-# dylibbundler follows that and may pull a different gallium into the archive
-# than the one chosen with MESA_PREFIX. Point it at the bundled copy before
-# anything else runs.
-OLD_EGL=$(otool -L "$OUT/spring-bin" | awk '/libEGL\.1\.dylib/ {print $1; exit}')
-if [ -n "$OLD_EGL" ]; then
-	echo "==> repointing libEGL from $OLD_EGL"
-	install_name_tool -change "$OLD_EGL" "@executable_path/lib/libEGL.1.dylib" "$OUT/spring-bin"
-fi
-
 # -L so the versioned target is copied rather than a symlink into Homebrew
 cp -L "$MESA"/lib/libEGL.1.dylib "$OUT/lib/"
 cp -L "$MESA"/lib/libgallium-*.dylib "$OUT/lib/"
@@ -102,18 +90,6 @@ if [ -f "$SDL3" ]; then
 else
 	echo "!! no libSDL3 at $SDL3, the engine will abort on start"
 fi
-
-# The ICD sits beside the driver so its library_path can stay relative, which
-# keeps the archive relocatable.
-cat > "$OUT/lib/kosmickrisp_icd.json" <<'JSON'
-{
-    "file_format_version": "1.0.0",
-    "ICD": {
-        "library_path": "./libvulkan_kosmickrisp.dylib",
-        "api_version": "1.3.0"
-    }
-}
-JSON
 
 # dylibbundler rewrites what a file depends on, not what a file calls itself.
 # The ones copied in by hand still carry their build location as an install
@@ -132,7 +108,7 @@ AI_LIBS=$(cd "$OUT" && find AI -name '*.dylib' 2>/dev/null | sed "s|^|$OUT/|")
 echo "==> bundling dependencies"
 # shellcheck disable=SC2046,SC2086
 dylibbundler --overwrite-files --bundle-deps \
-	--fix-file "$OUT/spring-bin" \
+	--fix-file "$OUT/spring" \
 	--fix-file "$OUT/spring-headless" \
 	--fix-file "$OUT/spring-dedicated" \
 	--fix-file "$OUT/pr-downloader" \
@@ -180,7 +156,7 @@ strip_rpaths() {
 			|| break
 	done
 }
-for f in "$OUT/spring-bin" "$OUT/spring-headless" "$OUT/spring-dedicated" "$OUT/pr-downloader"; do
+for f in "$OUT/spring" "$OUT/spring-headless" "$OUT/spring-dedicated" "$OUT/pr-downloader"; do
 	strip_rpaths "$f"
 	install_name_tool -add_rpath "@executable_path/lib" "$f"
 	codesign --force -s - "$f" 2>/dev/null || true
@@ -198,41 +174,35 @@ for f in $AI_LIBS; do
 	codesign --force -s - "$f" 2>/dev/null || true
 done
 
-cat > "$OUT/spring" <<'SH'
-#!/bin/sh
-# The engine. This is a launcher, and the binary sits beside it as spring-bin.
-#
-# It has to be this way round because a lobby runs the file called "spring".
-# Mesa picks its driver entirely through the environment, and none of
-# MESA_LOADER_DRIVER_OVERRIDE, GALLIUM_DRIVER or VK_DRIVER_FILES can be baked
-# into a Mach-O, so a bare binary gets no GL context and no useful error.
-#
-# spring-headless and spring-dedicated need none of this and are run directly.
-#
-# Everything resolves relative to this file, so the archive runs from wherever
-# it was extracted.
-DIR=$(cd "$(dirname "$0")" && pwd)
-
-export EGL_PLATFORM=surfaceless
-export MESA_LOADER_DRIVER_OVERRIDE=zink
-export GALLIUM_DRIVER=zink
-export LIBGL_DRIVERS_PATH="$DIR/lib"
-export VK_DRIVER_FILES="$DIR/lib/kosmickrisp_icd.json"
-export DYLD_LIBRARY_PATH="$DIR/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-
-# Zink reports GL 2.1 without these and every context request at 3.0 or above
-# fails with EGL_BAD_MATCH.
-export MESA_GL_VERSION_OVERRIDE=4.6
-export MESA_GLSL_VERSION_OVERRIDE=460
-
-exec "$DIR/spring-bin" "$@"
-SH
-chmod +x "$OUT/spring"
+# Where MacEGLBridge looks: <exe dir>/mesa/lib/libEGL.1.dylib, and the ICD at
+# the path a Mesa install prefix puts it. Mesa's own dylibs reach each other as
+# siblings, everything else they need stays in lib/.
+echo "==> moving Mesa into mesa/"
+mkdir -p "$OUT/mesa/lib" "$OUT/mesa/share/vulkan/icd.d"
+mv "$OUT/lib/libEGL.1.dylib" "$OUT/lib"/libgallium-*.dylib "$OUT/lib/libvulkan_kosmickrisp.dylib" "$OUT/mesa/lib/"
+for f in "$OUT/mesa/lib"/*.dylib; do
+	install_name_tool -id "@loader_path/$(basename "$f")" "$f"
+	otool -L "$f" | awk '/@loader_path\//{print $1}' | while read -r dep; do
+		[ -e "$OUT/mesa/lib/$(basename "$dep")" ] && continue
+		install_name_tool -change "$dep" "@loader_path/../../lib/$(basename "$dep")" "$f"
+	done
+	codesign --force -s - "$f" 2>/dev/null || true
+done
+# library_path is relative to this file, which keeps the archive relocatable
+cat > "$OUT/mesa/share/vulkan/icd.d/kosmickrisp_mesa_icd.aarch64.json" <<'JSON'
+{
+    "file_format_version": "1.0.0",
+    "ICD": {
+        "library_path": "../../../lib/libvulkan_kosmickrisp.dylib",
+        "api_version": "1.3.0"
+    }
+}
+JSON
 
 echo "==> checking nothing still points outside the archive"
-BINARIES="$OUT/spring-bin $OUT/spring-headless $OUT/spring-dedicated $OUT/pr-downloader $OUT/libunitsync.dylib $AI_LIBS"
+BINARIES="$OUT/spring $OUT/spring-headless $OUT/spring-dedicated $OUT/pr-downloader $OUT/libunitsync.dylib $AI_LIBS"
 # shellcheck disable=SC2086
-LEAKS=$( (otool -L $BINARIES "$OUT/lib"/*.dylib || true) \
+LEAKS=$( (otool -L $BINARIES "$OUT/lib"/*.dylib "$OUT/mesa/lib"/*.dylib || true) \
 	| grep -v ":$" | grep -E "/opt/homebrew|/Users/" || true)
 if [ -n "$LEAKS" ]; then
 	echo "!! these still reference paths outside the archive:"
