@@ -45,10 +45,8 @@
 #
 #   ninja -C build-macos-legacy -k 0
 #
-# Mesa is pinned to 56588ef0665, the commit before "kk: Move to Metal4 command
-# encoding" (c08dba83025). Everything after that never returns the memory a
-# render pass allocates, see https://gitlab.freedesktop.org/mesa/mesa/-/work_items/15998. No
-# released Mesa works, so this is built from source and the pin is deliberate.
+# Mesa is 26.3.0-rc1, unpatched, built with installer/Mac/make-mesa.sh, see
+# coding-agents/MACOS_BUILD.md. 26.2.5 leaks during load and must not be packaged.
 set -euo pipefail
 
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -56,7 +54,7 @@ BUILD=${BUILD_DIR:-$REPO/build-macos-legacy}
 PLATFORM=arm64-macos
 VERSION=$(cd "$REPO" && git describe --abbrev=7)
 OUT=${1:-$REPO/dist/recoil_${VERSION}_${PLATFORM}}
-MESA=${MESA_PREFIX:-$HOME/dev/mesa-install-premtl4}
+MESA=${MESA_PREFIX:-$HOME/dev/mesa-install-26.3.0-rc1}
 VKLIB=${VK_LOADER_LIB:-/opt/homebrew/opt/vulkan-loader/lib}
 
 command -v dylibbundler > /dev/null || { echo "need dylibbundler (brew install dylibbundler)"; exit 1; }
@@ -78,10 +76,10 @@ mkdir -p "$OUT/lib"
 
 mv "$OUT/spring" "$OUT/spring-bin"
 
-# The build links whichever Mesa prefix it was compiled against, which is the
-# post-Metal4 one. Left alone, dylibbundler follows that and pulls the leaking
-# gallium into the archive, silently undoing the whole reason for the pin.
-# Point it at the bundled copy before anything else runs.
+# The build links whichever Mesa prefix it was compiled against. Left alone,
+# dylibbundler follows that and may pull a different gallium into the archive
+# than the one chosen with MESA_PREFIX. Point it at the bundled copy before
+# anything else runs.
 OLD_EGL=$(otool -L "$OUT/spring-bin" | awk '/libEGL\.1\.dylib/ {print $1; exit}')
 if [ -n "$OLD_EGL" ]; then
 	echo "==> repointing libEGL from $OLD_EGL"

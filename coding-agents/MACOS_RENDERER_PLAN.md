@@ -792,8 +792,7 @@ Pre-Metal4 also gives the memory back, and scales sublinearly rather than at a f
 **The setup.**
 
 - `~/dev/mesa-install-premtl4` is the prefix, built from `~/dev/mesa` branch `premtl4` at `56588ef0665` using the recipe in section 2 with the prefix changed.
-- `build-macos-legacy/run-macos-premtl4.sh` is the launcher. Pass it to the harness as `LAUNCHER=./run-macos-premtl4.sh coding-agents/test-scripts/run-capped.sh ...`.
-- It relinks `spring-premtl4` automatically whenever `spring` is newer, so the stale-copy trap that `spring-staging` has cannot happen here.
+- `build-macos-legacy/run-macos-premtl4.sh` was the launcher. It and `run-capped.sh`'s use of it are gone. The engine now loads Mesa itself, see `MACOS_BUILD.md`.
 - `~/dev/mesa` branch `macos-diagnostics` at `337c87ae087` carries the instrumentation, on top of the post-Metal4 tree it was written against. That is where the counters live now, not in the working tree.
 
 **Pre-Metal4 is not a clean win, 2026-08-03. Three things are worse than the first run suggested.**

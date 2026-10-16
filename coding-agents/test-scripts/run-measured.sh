@@ -29,10 +29,10 @@ shift 2
 HERE=$(dirname "$0")
 POLL_SECONDS=2
 
-if pgrep -f 'spring-premtl4|\./spring' > /dev/null; then
+if pgrep -f '\./spring' > /dev/null; then
 	echo "REFUSING: an engine is already running. A second one aborts in"
 	echo "UDPListener::TryBindSocket and the failure looks like a code fault."
-	pgrep -fl 'spring-premtl4|\./spring'
+	pgrep -fl '\./spring'
 	exit 1
 fi
 
