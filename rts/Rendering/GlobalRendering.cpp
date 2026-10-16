@@ -1526,12 +1526,14 @@ bool CGlobalRendering::IsExtensionSupported(const char* ext) const
 // only called on startup; change the config based on command-line args
 void CGlobalRendering::SetFullScreen(bool cliWindowed, bool cliFullScreen)
 {
-	const bool cfgFullScreen = configHandler->GetBool("Fullscreen");
+	// --window beats --fullscreen, either beats the config. Set as an overlay,
+	// so the flag applies to this run without being saved into later ones.
+	if (cliWindowed)
+		configHandler->Set("Fullscreen", 0, true);
+	else if (cliFullScreen)
+		configHandler->Set("Fullscreen", 1, true);
 
-	// --window beats --fullscreen, either beats the config
-	fullScreen = (cfgFullScreen || cliFullScreen) && !cliWindowed;
-
-	configHandler->Set("Fullscreen", fullScreen);
+	fullScreen = configHandler->GetBool("Fullscreen");
 }
 
 void CGlobalRendering::SetDualScreenParams()
