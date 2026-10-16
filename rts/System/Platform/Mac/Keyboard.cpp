@@ -69,6 +69,13 @@ static id GetApp()
 	return Send(reinterpret_cast<id>(objc_getClass("NSApplication")), "sharedApplication");
 }
 
+static void ApplyAlias(SDL_Keysym& keysym, SDL_Scancode to)
+{
+	keysym.scancode = to;
+	keysym.sym = SDL_GetKeyFromScancode(to);
+	keysym.mod = KMOD_NONE;
+}
+
 
 // HIToolbox comes with AppKit, the engine does not link it
 static bool IsISOKeyboard()
@@ -189,6 +196,22 @@ static void ClearKeyEquivalents(id menu)
 }
 
 
+// With text input active, AppKit's AutoFill heuristics start a Safari helper
+// process for the window. It never exits, so after quitting the engine stays
+// listed as running in the background, and every start adds another helper.
+// Registered defaults only apply in this process and lose to the user's own.
+void DisableAutoFill()
+{
+	const void* keys[] = {CFSTR("NSAutoFillHeuristicsEnabled")};
+	const void* vals[] = {kCFBooleanFalse};
+	CFDictionaryRef dict = CFDictionaryCreate(nullptr, keys, vals, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+
+	id defaults = Send(reinterpret_cast<id>(objc_getClass("NSUserDefaults")), "standardUserDefaults");
+	Send<void>(defaults, "registerDefaults:", dict);
+
+	CFRelease(dict);
+}
+
 void Init()
 {
 	id app = GetApp();
@@ -223,9 +246,7 @@ void TranslateEvent(SDL_Event& event)
 	const auto heldIt = std::find_if(heldAliases.begin(), heldAliases.end(), [&](const Alias& a) { return (a.from == keysym.scancode); });
 
 	if (heldIt != heldAliases.end()) {
-		keysym.scancode = heldIt->to;
-		keysym.sym = SDL_GetKeyFromScancode(heldIt->to);
-		keysym.mod = KMOD_NONE;
+		ApplyAlias(keysym, heldIt->to);
 
 		if (event.type == SDL_KEYUP)
 			heldAliases.erase(heldIt);
@@ -233,14 +254,14 @@ void TranslateEvent(SDL_Event& event)
 		return;
 	}
 
-	if (event.type == SDL_KEYDOWN && (keysym.mod & (KMOD_GUI | KMOD_CTRL | KMOD_SHIFT | KMOD_ALT)) == (keysym.mod & KMOD_GUI) && (keysym.mod & KMOD_GUI) != 0) {
+	const bool onlyCommand = ((keysym.mod & KMOD_GUI) != 0 && (keysym.mod & (KMOD_CTRL | KMOD_SHIFT | KMOD_ALT)) == 0);
+
+	if (event.type == SDL_KEYDOWN && onlyCommand) {
 		const auto aliasIt = std::find_if(aliases.begin(), aliases.end(), [&](const Alias& a) { return (a.from == keysym.scancode); });
 
 		if (aliasIt != aliases.end()) {
 			heldAliases.push_back(*aliasIt);
-			keysym.scancode = aliasIt->to;
-			keysym.sym = SDL_GetKeyFromScancode(aliasIt->to);
-			keysym.mod = KMOD_NONE;
+			ApplyAlias(keysym, aliasIt->to);
 			return;
 		}
 	}

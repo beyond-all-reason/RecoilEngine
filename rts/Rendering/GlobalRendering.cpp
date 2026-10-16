@@ -34,7 +34,6 @@
 #include "System/Platform/SharedLib.h"
 #include "System/Platform/WindowManagerHelper.h"
 #ifdef __APPLE__
-#include "System/Platform/Mac/AutoFill.h"
 #include "System/Platform/Mac/Keyboard.h"
 #endif
 #include "System/Platform/errorhandler.h"
@@ -571,7 +570,7 @@ SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 bool CGlobalRendering::CreateWindowAndContext(const char* title)
 {
 #ifdef __APPLE__
-	AutoFill::Disable();
+	MacKeyboard::DisableAutoFill();
 #endif
 
 	if (SDL_Init(SDL_INIT_VIDEO) == -1) {
