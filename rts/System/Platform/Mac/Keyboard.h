@@ -9,6 +9,9 @@
 #include <SDL_keyboard.h>
 
 namespace MacKeyboard {
+	// before SDL_Init
+	void DisableAutoFill();
+	// after the window exists
 	void Init();
 
 	void TranslateEvent(SDL_Event& event);
