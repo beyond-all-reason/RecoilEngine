@@ -3,7 +3,6 @@
 #pragma once
 
 // Renders through Mesa EGL + Zink into a pbuffer and presents it via SDL_Renderer.
-// Disable at runtime with RECOIL_MAC_NATIVE_GL=1.
 
 #if defined(__APPLE__) && defined(MAC_EGL_ZINK) && !defined(HEADLESS)
 	#define MAC_EGL_BRIDGE_AVAILABLE 1
@@ -13,12 +12,10 @@
 struct SDL_Window;
 
 namespace MacEGLBridge {
-	// true if the bridge is compiled in and not disabled via env
-	bool Wanted();
 	// true after a context was successfully created
 	bool Active();
 
-	void* CreateContext(SDL_Window* window, int major, int minor, bool core, bool debug);
+	void* CreateContext(SDL_Window* window, int major, int minor, bool core);
 	void MakeCurrent(bool clear);
 	void DestroyContext();
 	void* GetProcAddress(const char* name);
