@@ -89,9 +89,7 @@ CMouseHandler::CMouseHandler()
 
 	UpdateCursorCameraDir();
 
-#ifndef __APPLE__
 	hardwareCursor = configHandler->GetBool("HardwareCursor");
-#endif
 
 	crossSize      = configHandler->GetFloat("CrossSize");
 	crossAlpha     = configHandler->GetFloat("CrossAlpha");

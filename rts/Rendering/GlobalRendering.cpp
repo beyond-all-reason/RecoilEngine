@@ -15,6 +15,7 @@
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/glxHandler.h"
+#include "Rendering/GL/MacEGLBridge.h"
 #include "Rendering/UniformConstants.h"
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/Models/ModelsMemStorage.h"
@@ -32,6 +33,9 @@
 #include "System/Platform/Threading.h"
 #include "System/Platform/SharedLib.h"
 #include "System/Platform/WindowManagerHelper.h"
+#ifdef __APPLE__
+#include "System/Platform/Mac/Keyboard.h"
+#endif
 #include "System/Platform/errorhandler.h"
 #include "System/ScopedResource.h"
 #include "System/QueueToMain.h"
@@ -194,6 +198,9 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_IGNORED(supportClipSpaceControl),
 	CR_IGNORED(supportSeamlessCubeMaps),
 	CR_IGNORED(supportFragDepthLayout),
+	CR_IGNORED(supportPolygonModeLine),
+	CR_IGNORED(supportGeometryShaders),
+	CR_IGNORED(preferFirstProvokingVertex),
 	CR_IGNORED(haveGL4),
 	CR_IGNORED(glslMaxVaryings),
 	CR_IGNORED(glslMaxAttributes),
@@ -324,6 +331,9 @@ CGlobalRendering::CGlobalRendering()
 	, supportClipSpaceControl(false)
 	, supportSeamlessCubeMaps(false)
 	, supportFragDepthLayout(false)
+	, supportPolygonModeLine(true)
+	, supportGeometryShaders(true)
+	, preferFirstProvokingVertex(false)
 	, haveGL4(false)
 
 	, glslMaxVaryings(0)
@@ -395,6 +405,37 @@ void CGlobalRendering::PreKill()
 }
 
 
+// macOS has no exclusive fullscreen worth asking for. It is a display mode
+// change, which takes the desktop out of its 2x scale, so the pointer covers
+// twice the distance for the same hand movement and every other window on the
+// screen is laid out again. Nothing on the Metal present path needs the mode,
+// and the non-exclusive kind already draws at the full backing resolution.
+static uint32_t GetFullScreenFlag(bool borderless)
+{
+#ifdef __APPLE__
+	return SDL_WINDOW_FULLSCREEN_DESKTOP;
+#else
+	return borderless ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN;
+#endif
+}
+
+// Borderless windowed mode asks for a window covering a whole display, but
+// macOS keeps windows below the menu bar. Only desktop fullscreen covers it.
+static bool IsBorderlessFullScreen(bool borderless, int x, int y, int w, int h)
+{
+#ifdef __APPLE__
+	if (!borderless)
+		return false;
+
+	for (int i = 0, n = SDL_GetNumVideoDisplays(); i < n; i++) {
+		SDL_Rect r;
+		if (SDL_GetDisplayBounds(i, &r) == 0 && x <= r.x && y <= r.y && x + w >= r.x + r.w && y + h >= r.y + r.h)
+			return true;
+	}
+#endif
+	return false;
+}
+
 SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 {
 	SDL_Window* newWindow = nullptr;
@@ -426,8 +467,13 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 	//   and 0 for windowed mode.
 
 	uint32_t sdlFlags  = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-	         sdlFlags |= (borderless_ ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen_;
+	         sdlFlags |= GetFullScreenFlag(borderless_) * (fullScreen_ || IsBorderlessFullScreen(borderless_, winPosX_, winPosY_, newRes.x, newRes.y));
 	         sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
+
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	// the GL context lives offscreen (Mesa EGL), the window is only presented to
+	sdlFlags &= ~SDL_WINDOW_OPENGL;
+#endif
 
 	for (size_t i = 0; i < (aaLvls.size()) && (newWindow == nullptr); i++) {
 		if (i > 0 && aaLvls[i] == aaLvls[i - 1])
@@ -470,6 +516,12 @@ SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 		handleerror(nullptr, "illegal OpenGL context-version specified, aborting", "ERROR", MBF_OK | MBF_EXCL);
 		return nullptr;
 	}
+
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if ((newContext = MacEGLBridge::CreateContext(sdlWindow, minCtx.x, minCtx.y, forceCoreContext)) == nullptr)
+		handleerror(nullptr, "[GR] could not create Mesa EGL/Zink GL context", "ERROR", MBF_OK | MBF_EXCL);
+	return newContext;
+#endif
 
 	if ((newContext = SDL_GL_CreateContext(sdlWindow)) != nullptr)
 		return newContext;
@@ -517,6 +569,10 @@ SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 
 bool CGlobalRendering::CreateWindowAndContext(const char* title)
 {
+#ifdef __APPLE__
+	MacKeyboard::DisableAutoFill();
+#endif
+
 	if (SDL_Init(SDL_INIT_VIDEO) == -1) {
 		LOG_L(L_FATAL, "[GR::%s] error \"%s\" initializing SDL", __func__, SDL_GetError());
 		return false;
@@ -570,6 +626,10 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 	if ((sdlWindow = CreateSDLWindow(title)) == nullptr)
 		return false;
 
+#ifdef __APPLE__
+	MacKeyboard::Init();
+#endif
+
 	if (configHandler->GetInt("MinimizeOnFocusLoss") == 0)
 		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
 
@@ -587,6 +647,11 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 	if ((glContext = CreateGLContext(minCtx)) == nullptr)
 		return false;
 
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if (MacEGLBridge::Active())
+		gladLoadGLLoader(&MacEGLBridge::GetProcAddress);
+	else
+#endif
 	gladLoadGL();
 	GLX::Load(sdlWindow);
 
@@ -610,6 +675,12 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 
 
 void CGlobalRendering::MakeCurrentContext(bool clear) const {
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if (MacEGLBridge::Active()) {
+		MacEGLBridge::MakeCurrent(clear);
+		return;
+	}
+#endif
 	SDL_GL_MakeCurrent(sdlWindow, clear ? nullptr : glContext);
 }
 
@@ -620,6 +691,13 @@ void CGlobalRendering::DestroyWindowAndContext() {
 
 	WindowManagerHelper::SetIconSurface(sdlWindow, nullptr);
 	SetWindowInputGrabbing(false);
+
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if (MacEGLBridge::Active()) {
+		MacEGLBridge::DestroyContext();
+		glContext = nullptr;
+	}
+#endif
 
 	SDL_GL_MakeCurrent(sdlWindow, nullptr);
 	SDL_DestroyWindow(sdlWindow);
@@ -700,6 +778,11 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 			}
 		#endif
 		
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+		if (MacEGLBridge::Active())
+			MacEGLBridge::SwapWindow(sdlWindow);
+		else
+#endif
 		SDL_GL_SwapWindow(sdlWindow);
 
 		#ifdef _WIN32
@@ -780,6 +863,11 @@ void CGlobalRendering::CheckGLExtensions()
 	#endif
 
 	if (underExternalDebug)
+		return;
+
+	// All checked ARB extensions are part of the core specification since OpenGL 3.0,
+	// and a core profile context does not advertise them by name.
+	if (globalRenderingInfo.glVersionNum >= 30)
 		return;
 
 	char extMsg[ 128] = {0};
@@ -908,6 +996,12 @@ void CGlobalRendering::SetGLSupportFlags()
 	//supportFragDepthLayout = ((globalRenderingInfo.glContextVersion.x * 10 + globalRenderingInfo.glContextVersion.y) >= 42);
 	supportFragDepthLayout = GLAD_GL_ARB_conservative_depth; //stick to the theory that reported = exist
 
+	// KosmicKrisp has no geometryShader feature, Zink still exposes the stage
+	supportGeometryShaders = (glRenderer.find("kosmickrisp") == std::string::npos);
+	// Metal flat-shades from the first vertex, and KosmicKrisp emulates the GL default by
+	// unrolling every draw with flat varyings, which costs frame rate and leaks GPU memory
+	preferFirstProvokingVertex = !supportGeometryShaders;
+
 	//stick to the theory that reported = exist
 	//supportMSAAFrameBuffer &= ((globalRenderingInfo.glContextVersion.x * 10 + globalRenderingInfo.glContextVersion.y) >= 32);
 
@@ -931,6 +1025,8 @@ void CGlobalRendering::SetGLSupportFlags()
 	if (globalRendering->amdHacks) {
 		supportDepthBufferBitDepth = 24;
 	}
+
+	supportPolygonModeLine = ProbePolygonModeLine();
 }
 
 void CGlobalRendering::QueryGLMaxVals()
@@ -1039,6 +1135,8 @@ void CGlobalRendering::LogVersionInfo(const char* sdlVersionStr, const char* glV
 	LOG("\tclip-space control support: %i (%i)", supportClipSpaceControl, IsExtensionSupported("GL_ARB_clip_control"));
 	LOG("\tseamless cube-map support : %i (%i)", supportSeamlessCubeMaps, IsExtensionSupported("GL_ARB_seamless_cube_map"));
 	LOG("\tfrag-depth layout support : %i (%i)", supportFragDepthLayout, IsExtensionSupported("GL_ARB_conservative_depth"));
+	LOG("\twireframe polygon mode    : %i (-)" , supportPolygonModeLine);
+	LOG("\tgeometry shader support   : %i (-)" , supportGeometryShaders);
 	LOG("\tpersistent maps support   : %i (%i)", supportPersistentMapping, IsExtensionSupported("GL_ARB_buffer_storage"));
 	LOG("\texplicit attribs location : %i (%i)", supportExplicitAttribLoc, IsExtensionSupported("GL_ARB_explicit_attrib_location"));
 	LOG("\tmulti draw indirect       : %i (-)" , IsExtensionSupported("GL_ARB_multi_draw_indirect"));
@@ -1162,7 +1260,9 @@ void CGlobalRendering::LogDisplayMode(SDL_Window* window) const
 	};
 
 	const int fs = fullScreen;
-	const int bl = borderless;
+	// the second half of the fullscreen names is exclusive against not, which is
+	// the flag asked for rather than the borderless config
+	const int bl = fullScreen ? (GetFullScreenFlag(borderless) == SDL_WINDOW_FULLSCREEN_DESKTOP) : borderless;
 
 	LOG("[GR::%s] display-mode set to %ix%ix%ibpp@%iHz (%s)", __func__, viewSizeX, viewSizeY, SDL_BITSPERPIXEL(dmode.format), dmode.refresh_rate, names[fs * 2 + bl]);
 }
@@ -1245,7 +1345,9 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 	SDL_SetWindowPosition(window, winPosX, winPosY);
 	SDL_SetWindowSize(window, newRes.x, newRes.y);
 
-	if (SDL_SetWindowFullscreen(window, (borderless ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen) != 0)
+	const bool sdlFullScreen = fullScreen || IsBorderlessFullScreen(borderless, winPosX, winPosY, newRes.x, newRes.y);
+
+	if (SDL_SetWindowFullscreen(window, GetFullScreenFlag(borderless) * sdlFullScreen) != 0)
 		LOG("[GR::%s][4][SDL_SetWindowFullscreen] err=\"%s\"", __func__, SDL_GetError());
 
 	SDL_SetWindowBordered(window, borderless ? SDL_FALSE : SDL_TRUE);
@@ -1412,12 +1514,14 @@ bool CGlobalRendering::IsExtensionSupported(const char* ext) const
 // only called on startup; change the config based on command-line args
 void CGlobalRendering::SetFullScreen(bool cliWindowed, bool cliFullScreen)
 {
-	const bool cfgFullScreen = configHandler->GetBool("Fullscreen");
+	// --window beats --fullscreen, either beats the config. Set as an overlay,
+	// so the flag applies to this run without being saved into later ones.
+	if (cliWindowed)
+		configHandler->Set("Fullscreen", 0, true);
+	else if (cliFullScreen)
+		configHandler->Set("Fullscreen", 1, true);
 
-	fullScreen = (cfgFullScreen && !cliWindowed  );
-	fullScreen = (cfgFullScreen ||  cliFullScreen);
-
-	configHandler->Set("Fullscreen", fullScreen);
+	fullScreen = configHandler->GetBool("Fullscreen");
 }
 
 void CGlobalRendering::SetDualScreenParams()
@@ -1717,6 +1821,9 @@ void CGlobalRendering::InitGLState()
 	if (supportSeamlessCubeMaps)
 		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
+	if (preferFirstProvokingVertex)
+		glProvokingVertex(GL_FIRST_VERTEX_CONVENTION);
+
 	// MSAA rasterization
 	msaaLevel *= CheckGLMultiSampling();
 	ToggleMultisampling();
@@ -1791,6 +1898,95 @@ void main()
 	return testShader.IsValid();
 #else
 	return false;
+#endif
+}
+
+bool CGlobalRendering::ProbePolygonModeLine() const
+{
+#ifndef HEADLESS
+	// there is no query for this, so rasterize a triangle in GL_LINE mode and
+	// look at the result: only its edges should be lit, a mostly lit probe means
+	// the driver quietly filled it instead
+	constexpr static const char* vsSrc = R"(
+#version 150
+
+void main()
+{
+	const vec2 verts[3] = vec2[3](vec2(-0.9, -0.9), vec2(0.9, -0.9), vec2(0.0, 0.9));
+	gl_Position = vec4(verts[gl_VertexID], 0.0, 1.0);
+}
+)";
+
+	constexpr static const char* fsSrc = R"(
+#version 150
+
+out vec4 fragColor;
+void main()
+{
+	fragColor = vec4(1.0);
+}
+)";
+
+	if (!FBO::IsSupported() || !VAO::IsSupported())
+		return true;
+
+	auto probeShader = Shader::GLSLProgramObject("[GL-PolygonModeProbe]");
+	probeShader.AttachShaderObject(new Shader::GLSLShaderObject(GL_VERTEX_SHADER  , vsSrc));
+	probeShader.AttachShaderObject(new Shader::GLSLShaderObject(GL_FRAGMENT_SHADER, fsSrc));
+
+	probeShader.SetLogReporting(false);
+	probeShader.Link();
+
+	if (!probeShader.IsValid())
+		return true;
+
+	constexpr int probeSize = 32;
+
+	FBO fbo;
+	fbo.Bind();
+	fbo.CreateRenderBuffer(GL_COLOR_ATTACHMENT0_EXT, GL_RGBA8, probeSize, probeSize);
+
+	bool filled = false;
+
+	if (fbo.GetStatus() == GL_FRAMEBUFFER_COMPLETE_EXT) {
+		VAO vao;
+		vao.Bind();
+
+		// the viewport, enables and clear colour go back the way they were found
+		glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+		glViewport(0, 0, probeSize, probeSize);
+		glDisable(GL_DEPTH_TEST);
+		glDisable(GL_BLEND);
+		glDisable(GL_CULL_FACE);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+		probeShader.Enable();
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+		probeShader.Disable();
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+		std::array<uint8_t, probeSize * probeSize * 4> pixels;
+		glReadPixels(0, 0, probeSize, probeSize, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+		glPopAttrib();
+		vao.Unbind();
+
+		size_t litPixels = 0;
+		for (size_t i = 0; i < pixels.size(); i += 4)
+			litPixels += (pixels[i] > 0);
+
+		// the triangle covers about 40% of the probe filled and about 10% as edges
+		filled = (litPixels * 4 > probeSize * probeSize);
+	}
+
+	fbo.Unbind();
+
+	return !filled;
+#else
+	return true;
 #endif
 }
 

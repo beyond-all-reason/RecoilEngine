@@ -1755,12 +1755,17 @@ uint32_t CBitmap::CreateTexture(const GL::TextureCreationParams& tcp) const
 }
 
 
+static bool NeedsGeneratedMipmaps(int32_t numEmbeddedLevels, uint32_t minFilter)
+{
+	return (numEmbeddedLevels == 0 && minFilter != GL_LINEAR && minFilter != GL_NEAREST);
+}
+
 static void HandleDDSMipmap(GLenum target, int32_t numEmbeddedLevels, uint32_t minFilter)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minFilter);
 
-	if (numEmbeddedLevels == 0 && minFilter != GL_LINEAR && minFilter != GL_NEAREST)
+	if (NeedsGeneratedMipmaps(numEmbeddedLevels, minFilter))
 		glGenerateMipmap(target);
 }
 
@@ -1780,11 +1785,18 @@ uint32_t CBitmap::CreateDDSTexture(const GL::TextureCreationParams& tcp) const
 			texID = 0;
 			break;
 
-		case nv_dds::TextureFlat:    // 1D, 2D, and rectangle textures
+		case nv_dds::TextureFlat: {  // 1D, 2D, and rectangle textures
 			glEnable(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, texID);
 
-			if (!ddsimage.upload_texture2D(0, GL_TEXTURE_2D)) {
+			// drivers that cannot generate mipmaps of compressed formats on the GPU (Mesa)
+			// read the texture back for it, which stalls until the GPU has caught up
+			const bool decompress = ddsimage.is_s3tc() && NeedsGeneratedMipmaps(ddsimage.get_num_mipmaps(), tcp.GetMinFilter(ddsimage.get_num_mipmaps()));
+			const bool uploaded = decompress
+				? ddsimage.upload_texture2D_decompressed(0, GL_TEXTURE_2D)
+				: ddsimage.upload_texture2D(0, GL_TEXTURE_2D);
+
+			if (!uploaded) {
 				glDeleteTextures(1, &texID);
 				texID = 0;
 				break;
@@ -1796,7 +1808,7 @@ uint32_t CBitmap::CreateDDSTexture(const GL::TextureCreationParams& tcp) const
 				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, tcp.aniso);
 
 			HandleDDSMipmap(GL_TEXTURE_2D, ddsimage.get_num_mipmaps(), tcp.GetMinFilter(ddsimage.get_num_mipmaps()));
-			break;
+		} break;
 
 		case nv_dds::Texture3D:
 			glEnable(GL_TEXTURE_3D);
