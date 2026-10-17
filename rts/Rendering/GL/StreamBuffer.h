@@ -45,7 +45,7 @@ public:
 	static void PutBufferLocks();
 
 	IStreamBufferConcept(IStreamBufferConcept::StreamBufferCreationParams p, std::string_view bufferTypeName);
-	virtual ~IStreamBufferConcept() {}
+	virtual ~IStreamBufferConcept();
 
 	uint32_t GetAlignedByteSize(uint32_t byteSizeRaw);
 
@@ -54,6 +54,9 @@ public:
 
 	void BindBufferRange(GLuint index, uint32_t bindTarget = 0) const;
 	void UnbindBufferRange(GLuint index, uint32_t bindTarget = 0) const;
+	// Indexed bindings can keep reading a slot after SwapBuffer advances the
+	// write cursor. Call each draw frame that reuses the unchanged binding.
+	void MarkBoundBufferUsed() const;
 
 	uint32_t GetID() const { return id; }
 	uint32_t GetTarget() const { return target; }
@@ -61,11 +64,21 @@ public:
 
 	virtual IStreamBufferConcept::Types GetBufferImplementation() const = 0;
 protected:
+	struct BufferFence {
+		GLsync sync = nullptr;
+		bool queued = false;
+	};
+
 	void CreateBuffer(uint32_t byteBufferSize, uint32_t newUsage);
 	void CreateBufferStorage(uint32_t byteBufferSize, uint32_t flags);
 	void DeleteBuffer();
-	void QueueLockBuffer(GLsync& syncObj) const;
-	void WaitBuffer(GLsync& syncObj) const;
+	void InitBufferFences(uint32_t count);
+	void ClearBufferFences();
+	void QueueLockBuffer(BufferFence& fence) const;
+	void WaitBuffer(BufferFence& fence) const;
+private:
+	static void PutBufferLock(BufferFence& fence);
+	static void CancelBufferLock(BufferFence& fence);
 protected:
 	const std::string name;
 	uint32_t target;
@@ -76,9 +89,12 @@ protected:
 	uint32_t mapElemOffet;
 	uint32_t mapElemCount;
 	bool optimizeForStreaming;
+	mutable uint32_t boundIdx = INVALID_BUFFER_IDX;
+	mutable std::vector<BufferFence> fences;
 protected:
 	inline static bool reportType = false;
-	inline static std::vector<GLsync*> lockList = {};
+	inline static std::vector<BufferFence*> lockList = {};
+	static constexpr uint32_t INVALID_BUFFER_IDX = UINT32_MAX;
 public:
 	static constexpr uint32_t DEFAULT_NUM_BUFFERS = 3;
 };
@@ -349,15 +365,16 @@ public:
 		this->CreateBufferStorage(numBuffers * this->byteSize,
 			GL_MAP_WRITE_BIT | GL_CLIENT_STORAGE_BIT);
 
-		fences.resize(numBuffers);
-		for (auto& fence : fences)
-			this->QueueLockBuffer(fence);
+		this->InitBufferFences(numBuffers);
 	}
 
 	void Kill(bool deleteBuffer) override {
-		for (auto& fence : fences)
+		if (this->id == 0)
+			return;
+		for (auto& fence : this->fences)
 			this->WaitBuffer(fence);
 		glFinish(); //just in case
+		this->ClearBufferFences();
 
 		this->DeleteBuffer(); //delete regardless because of immutability
 	}
@@ -366,7 +383,7 @@ public:
 	T* Map(const T* clientPtr, uint32_t elemOffset, uint32_t elemCount) override {
 		IStreamBuffer<T>::Map(clientPtr, elemOffset, elemCount);
 
-		this->WaitBuffer(fences[this->allocIdx]);
+		this->WaitBuffer(this->fences[this->allocIdx]);
 
 		this->Bind();
 		T* ptr = reinterpret_cast<T*>(glMapBufferRange(
@@ -398,13 +415,12 @@ public:
 	}
 
 	void SwapBuffer() override {
-		this->QueueLockBuffer(fences[this->allocIdx]);
+		this->QueueLockBuffer(this->fences[this->allocIdx]);
 		this->allocIdx = (this->allocIdx + 1) % numBuffers;
 	};
 private:
 	uint32_t numBuffers;
 	const bool coherent;
-	std::vector<GLsync> fences;
 };
 
 template<typename T>
@@ -434,22 +450,24 @@ public:
 			numBuffers * this->byteSize,
 			GL_MAP_WRITE_BIT | GL_MAP_UNSYNCHRONIZED_BIT | GL_MAP_PERSISTENT_BIT | mix(GL_MAP_FLUSH_EXPLICIT_BIT, GL_MAP_COHERENT_BIT, coherent)
 		));
-		assert(ptrBase);
 		this->Unbind();
 
-		fences.resize(numBuffers);
-		for (auto& fence : fences)
-			this->QueueLockBuffer(fence);
+		this->InitBufferFences(numBuffers);
 	}
 
 	void Kill(bool deleteBuffer) override {
-		for (auto& fence : fences)
+		if (this->id == 0)
+			return;
+		for (auto& fence : this->fences)
 			this->WaitBuffer(fence);
 		glFinish(); //just in case
+		this->ClearBufferFences();
 
-		this->Bind();
-		glUnmapBuffer(this->target);
-		this->Unbind();
+		if (ptrBase != nullptr) {
+			this->Bind();
+			glUnmapBuffer(this->target);
+			this->Unbind();
+		}
 
 		this->DeleteBuffer(); //delete regardless because of immutability
 		ptrBase = nullptr;
@@ -464,7 +482,7 @@ public:
 		IStreamBuffer<T>::Map(clientPtr, elemOffset, elemCount);
 		assert(ptrBase);
 
-		this->WaitBuffer(fences[this->allocIdx]);
+		this->WaitBuffer(this->fences[this->allocIdx]);
 
 		// slots are byteSize apart, which can include alignment padding
 		T* ptr = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(ptrBase) + this->allocIdx * this->byteSize) + this->mapElemOffet;
@@ -490,14 +508,13 @@ public:
 	}
 
 	void SwapBuffer() override {
-		this->QueueLockBuffer(fences[this->allocIdx]);
+		this->QueueLockBuffer(this->fences[this->allocIdx]);
 		this->allocIdx = (this->allocIdx + 1) % numBuffers;
 	};
 private:
 	uint32_t numBuffers;
 	T* ptrBase;
 	const bool coherent;
-	std::vector<GLsync> fences;
 };
 
 template<typename T>
@@ -526,16 +543,17 @@ public:
 
 		this->Bind();
 
-		fences.resize(numBuffers);
-		for (auto& fence : fences)
-			IStreamBufferConcept::QueueLockBuffer(fence);
+		this->InitBufferFences(numBuffers);
 	}
 	void Kill(bool deleteBuffer) override {
-		for (auto& fence : fences)
+		if (this->id == 0)
+			return;
+		for (auto& fence : this->fences)
 			this->WaitBuffer(fence);
 
 		this->Unbind();
 		glFinish();
+		this->ClearBufferFences();
 
 		this->DeleteBuffer();
 		recoil::aligned_free(ptrBase);
@@ -547,7 +565,7 @@ public:
 		IStreamBuffer<T>::Map(clientPtr, elemOffset, elemCount);
 		assert(ptrBase);
 
-		this->WaitBuffer(fences[this->allocIdx]);
+		this->WaitBuffer(this->fences[this->allocIdx]);
 
 		// slots are byteSize apart, which can include alignment padding
 		T* ptr = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(ptrBase) + this->allocIdx * this->byteSize) + this->mapElemOffet;
@@ -561,13 +579,12 @@ public:
 	}
 
 	void SwapBuffer() override {
-		this->QueueLockBuffer(fences[this->allocIdx]);
+		this->QueueLockBuffer(this->fences[this->allocIdx]);
 		this->allocIdx = (this->allocIdx + 1) % numBuffers;
 	};
 private:
 	uint32_t numBuffers;
 	T* ptrBase;
-	std::vector<GLsync> fences;
 
 	static constexpr uint32_t ALIGN_PINNED_MEMORY_SIZE = 4096;
 };
