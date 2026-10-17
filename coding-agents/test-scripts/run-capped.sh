@@ -42,9 +42,14 @@ MAX_RSS_KB=${MAX_RSS_KB:-11010048}   # 10.5 GiB of phys_footprint
 POLL_SECONDS=0.5
 LOG_SECONDS=4
 
+# FULLSCREEN=1 runs in fullscreen instead of a window, which some rendering
+# faults need: the view then sits below the menu bar strip of the screen
+WINDOW_FLAG=--window
+[ "${FULLSCREEN:-0}" = 1 ] && WINDOW_FLAG=--fullscreen
+
 cd "$BUILD" || exit 1
 
-"$LAUNCHER" --isolation-dir ~/dev/spring-testdata --window "$SCRIPT" "$@" \
+"$LAUNCHER" --isolation-dir ~/dev/spring-testdata "$WINDOW_FLAG" "$SCRIPT" "$@" \
 	> "$LOGFILE" 2>&1 &
 PID=$!
 
