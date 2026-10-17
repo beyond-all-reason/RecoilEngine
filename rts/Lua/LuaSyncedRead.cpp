@@ -2595,6 +2595,7 @@ int LuaSyncedRead::GetTeamUnitsSorted(lua_State* L)
 			lua_pushnumber(L, i + 1);
 			lua_createtable(L, unitsByDef.size(), 0);
 			defCount++;
+			unitCount = 1;
 
 			for (const CUnit* unit: unitsByDef) {
 				lua_pushnumber(L, unit->id);
@@ -2616,6 +2617,7 @@ int LuaSyncedRead::GetTeamUnitsSorted(lua_State* L)
 			if (ud->decoyDef != nullptr)
 				continue;
 
+			unitCount = 1;
 			bool createdTable = PushVisibleUnits(L, unitHandler.GetUnitsByTeamAndDef(teamID, unitDefID), unitDefID, &unitCount, &defCount);
 
 			// for all decoy-defs of unitDefID, add decoy units under the same ID
