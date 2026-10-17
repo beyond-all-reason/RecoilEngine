@@ -294,7 +294,7 @@ void CglNoShaderFontRenderer::AddQuadTrianglesImpl(bool primary, VA_TYPE_TC&& tl
 	auto& v = verts[primary];
 	auto& i = indcs[primary];
 
-	const uint16_t baseIndex = static_cast<uint16_t>(v.size());
+	const uint32_t baseIndex = static_cast<uint32_t>(v.size());
 
 	v.emplace_back(std::move(tl)); //0
 	v.emplace_back(std::move(tr)); //1
@@ -336,7 +336,7 @@ void CglNoShaderFontRenderer::DrawTraingleElements()
 		glVertexPointer(3, GL_FLOAT, stride, &verts[idx].data()->pos);
 		glTexCoordPointer(2, GL_FLOAT, stride, &verts[idx].data()->s);
 		glColorPointer(4, GL_UNSIGNED_BYTE, stride, &verts[idx].data()->c.r);
-		glDrawRangeElements(GL_TRIANGLES, 0, verts[idx].size() - 1, indcs[idx].size(), GL_UNSIGNED_SHORT, indcs[idx].data());
+		glDrawRangeElements(GL_TRIANGLES, 0, verts[idx].size() - 1, indcs[idx].size(), GL_UNSIGNED_INT, indcs[idx].data());
 	};
 
 	for (auto& v : verts)
