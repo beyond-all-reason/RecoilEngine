@@ -262,7 +262,7 @@ void CFactory::FinishBuild(CUnit* buildee) {
 		return;
 
 	// assign buildee to same group as us
-	if (GetGroup() != nullptr && buildee->GetGroup() != nullptr)
+	if (GetGroup() != nullptr && buildee->GetGroup() == nullptr)
 		buildee->SetGroup(GetGroup(), true);
 
 	const CCommandAI* bcai = buildee->commandAI;

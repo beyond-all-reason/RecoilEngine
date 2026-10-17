@@ -32,6 +32,7 @@
  * @field nanoParticleUpdateCallin boolean Whether LuaUI receives batched `NanoParticleUpdate` lifecycle events
  * @field nanoParticlesGL4 boolean Whether the engine has the standalone shader-based nano particle effect (the `NanoParticles*` springsettings)
  * @field modelVertexColor boolean Whether glTF `COLOR_0` is loaded into the models VBO (`color`, attribute 15; opaque white when absent)
+ * @field liveConfigChanges boolean Whether `DoubleClickTime`, `MinSimDrawBalance`, `MinDrawFPS`, `UseNetMessageSmoothingBuffer`, the `Link*` bandwidths and `snd_device` (with `UseSDLAudio`) apply without a restart
  */
 
 /***
@@ -91,6 +92,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "nanoParticleUpdateCallin", true);
 		LuaPushNamedBool(L, "nanoParticlesGL4", true);
 		LuaPushNamedBool(L, "modelVertexColor", true);
+		LuaPushNamedBool(L, "liveConfigChanges", true);
 	lua_rawset(L, -3);
 
 	lua_pushliteral(L, "textColorCodes");
