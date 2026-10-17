@@ -176,7 +176,7 @@ CSevenZipArchive::~CSevenZipArchive()
 {
 	std::scoped_lock lck(archiveLock); //not needed?
 
-	for (size_t i = 0; i < ThreadPool::GetNumThreads(); ++i) {
+	for (size_t i = 0; i < perThreadData.size(); ++i) {
 		if (!perThreadData[i])
 			continue;
 
