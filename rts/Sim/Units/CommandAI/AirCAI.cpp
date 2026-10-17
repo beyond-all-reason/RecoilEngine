@@ -503,7 +503,7 @@ void CAirCAI::ExecuteGuard(Command& c)
 	const bool pushAttackCommand =
 		(owner->maxRange > 0.0f) &&
 		owner->unitDef->canAttack &&
-		((guardee->lastAttackFrame + 40) < gs->frameNum) &&
+		((guardee->lastAttackFrame + 40) > gs->frameNum) &&
 		IsValidTarget(guardee->lastAttacker, nullptr);
 
 	if (pushAttackCommand) {
