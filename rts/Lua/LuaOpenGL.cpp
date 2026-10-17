@@ -4801,9 +4801,7 @@ int LuaOpenGL::RenderToTexture(lua_State* L)
 		return 0;
 
 	GLint currentFBO = 0;
-	if (drawMode == DRAW_WORLD_SHADOW) {
-		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
-	}
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
 
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, tex->fbo);
 
