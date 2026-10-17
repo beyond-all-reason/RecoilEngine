@@ -286,6 +286,7 @@ void CSevenZipArchive::OpenArchive(int tnum)
 		isOpen[tnum] = true;
 	}
 	else {
+		File_Close(&archiveStream.file);
 		LOG_L(L_ERROR, "[%s] error opening \"%s\": %s", __func__, archiveFile.c_str(), GetErrorStr(res));
 	}
 }
