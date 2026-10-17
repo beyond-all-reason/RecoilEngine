@@ -6227,7 +6227,7 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 		LuaPushNamedNumber(L, "altitudeRate", hAMT->altitudeRate);
 
 		LuaPushNamedNumber(L, "brakeDistance", -1.0f); // DEPRECATED
-		LuaPushNamedBool  (L, "dontLand", hAMT->GetAllowLanding());
+		LuaPushNamedBool  (L, "dontLand", !hAMT->GetAllowLanding());
 		LuaPushNamedNumber(L, "maxDrift", hAMT->maxDrift);
 
 		return 1;
