@@ -32,6 +32,7 @@
 #include "System/Color.h"
 #include "System/EventHandler.h"
 #include "System/Log/ILog.h"
+#include "System/StringHash.h"
 #include "System/StringUtil.h"
 #include "Net/Protocol/NetProtocol.h"
 #include "System/Net/PackPacket.h"
@@ -63,7 +64,27 @@ void CSelectedUnitsHandler::Init(unsigned numPlayers)
 	autoAddBuiltUnitsToFactoryGroup = configHandler->GetBool("AutoAddBuiltUnitsToFactoryGroup");
 	autoAddBuiltUnitsToSelectedGroup = configHandler->GetBool("AutoAddBuiltUnitsToSelectedGroup");
 
+	configHandler->NotifyOnChange(this, {"BuildIconsFirst", "AutoAddBuiltUnitsToFactoryGroup", "AutoAddBuiltUnitsToSelectedGroup"});
+
 	netSelected.resize(numPlayers);
+}
+
+void CSelectedUnitsHandler::Kill()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	configHandler->RemoveObserver(this);
+}
+
+void CSelectedUnitsHandler::ConfigNotify(const std::string& key, const std::string& value)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// per key, so a build-icons-first toggle survives a change of the other two
+	switch (hashString(key.c_str())) {
+		case hashString("BuildIconsFirst"                 ): { buildIconsFirst = configHandler->GetBool(key); possibleCommandsChanged = true; } break;
+		case hashString("AutoAddBuiltUnitsToFactoryGroup" ): { autoAddBuiltUnitsToFactoryGroup = configHandler->GetBool(key); } break;
+		case hashString("AutoAddBuiltUnitsToSelectedGroup"): { autoAddBuiltUnitsToSelectedGroup = configHandler->GetBool(key); } break;
+		default: {} break;
+	}
 }
 
 

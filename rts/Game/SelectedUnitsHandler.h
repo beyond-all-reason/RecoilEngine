@@ -21,6 +21,8 @@ class CSelectedUnitsHandler : public CObject
 {
 public:
 	void Init(unsigned numPlayers);
+	void Kill();
+	void ConfigNotify(const std::string& key, const std::string& value);
 	void SelectGroup(int num);
 	void SetGroup(CGroup* group, bool fromFactory= false, bool autoSelect = false);
 	void AINetOrder(int unitID, int aiTeamID, int playerID, const Command& c);
