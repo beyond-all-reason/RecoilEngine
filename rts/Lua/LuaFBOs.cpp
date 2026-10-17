@@ -933,6 +933,9 @@ int LuaFBOs::ClearAttachmentFBO(lua_State* L)
 	GLint componentType = 0;
 	glGetFramebufferAttachmentParameteriv(target, attachment, GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE, &componentType);
 
+	if (bufferType == GL_STENCIL)
+		componentType = GL_INT; // stencil clears require glClearBufferiv
+
 	switch (componentType)
 	{
 		case GL_INT:
