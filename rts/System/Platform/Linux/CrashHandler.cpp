@@ -17,6 +17,7 @@
 #include <execinfo.h>
 #include <SDL_events.h>
 #include <sys/resource.h> // getrlimits
+#include <unistd.h> // write, _exit
 #define UNW_LOCAL_ONLY
 #include <libunwind.h>
 #include <dlfcn.h>
@@ -696,6 +697,48 @@ static sigaction_t& GetSigAction(sigact_handler_t sigact_handler)
 }
 
 
+#if defined(__APPLE__)
+/**
+ * libunwind steps from _sigtramp to the return address in lr instead of the
+ * faulting pc, so the function that faulted is missing from the trace. Insert
+ * it after the _sigtramp frame, taken from the pc saved in the signal context.
+ * If that function had already saved lr in its own frame, libunwind lists its
+ * caller twice; drop the second copy.
+ */
+static void InsertFaultingFrame(const ucontext_t* uc, StackTrace& stacktrace)
+{
+#if defined(__aarch64__)
+	void* pc = reinterpret_cast<void*>(__darwin_arm_thread_state64_get_pc(uc->uc_mcontext->__ss));
+#else
+	void* pc = reinterpret_cast<void*>(uc->uc_mcontext->__ss.__rip);
+#endif
+
+	for (size_t i = 0; i < stacktrace.size(); i++) {
+		if (stacktrace[i].symbol.find("_sigtramp") == std::string::npos)
+			continue;
+
+		StackFrame frame;
+		frame.ip = pc;
+
+		if (char** lines = backtrace_symbols(&pc, 1); lines != nullptr) {
+			frame.symbol = lines[0];
+			free(lines);
+		}
+
+		stacktrace.insert(stacktrace.begin() + i + 1, std::move(frame));
+
+		if (i + 3 < stacktrace.size() && stacktrace[i + 2].ip == stacktrace[i + 3].ip)
+			stacktrace.erase(stacktrace.begin() + i + 3);
+
+		for (size_t j = 0; j < stacktrace.size(); j++) {
+			stacktrace[j].level = j;
+		}
+		return;
+	}
+}
+#endif
+
+
 namespace CrashHandler
 {
 	/**
@@ -922,6 +965,10 @@ namespace CrashHandler
 			return;
 		}
 
+		#if defined(__APPLE__)
+		InsertFaultingFrame(ucontext, stacktrace);
+		#endif
+
 		TranslateStackTrace(stacktrace, LOG_LEVEL_ERROR);
 
 		LOG_L(L_DEBUG, "[%s][4]", __func__);
@@ -933,6 +980,39 @@ namespace CrashHandler
 
 	void PrepareStacktrace(const int logLevel) {}
 	void CleanupStacktrace(const int logLevel) { LOG_CLEANUP(); }
+
+
+#if defined(__APPLE__)
+	static void HandleSignalDuringCleanup(int signal, siginfo_t* siginfo, void* pctx)
+	{
+		static constexpr char msg[] = "[CrashHandler] fatal signal while cleaning up after a crash, exiting\n";
+		(void) !write(STDERR_FILENO, msg, sizeof(msg) - 1);
+		_exit(spring::EXIT_CODE_CRASHED);
+	}
+
+	/**
+	 * A crash can leave the heap corrupted, so the cleanup that follows it
+	 * (SpringApp::Kill down to the SDL and Cocoa shutdown) may fault again.
+	 * Exit with the crash code then, the stacktrace is already in the log, instead
+	 * of leaving a second crash whose report hides the first one.
+	 */
+	static void InstallCleanupSignalHandler(int signal)
+	{
+		const sigaction_t& sa = GetSigAction(&HandleSignalDuringCleanup);
+
+		sigaction(SIGSEGV, &sa, nullptr);
+		sigaction(SIGILL,  &sa, nullptr);
+		sigaction(SIGFPE,  &sa, nullptr);
+		sigaction(SIGABRT, &sa, nullptr);
+		sigaction(SIGBUS,  &sa, nullptr);
+
+		// the signal being handled stays blocked until HandleSignal returns
+		sigset_t mask;
+		sigemptyset(&mask);
+		sigaddset(&mask, signal);
+		pthread_sigmask(SIG_UNBLOCK, &mask, nullptr);
+	}
+#endif
 
 
 	void HandleSignal(int signal, siginfo_t* siginfo, void* pctx)
@@ -1007,6 +1087,12 @@ namespace CrashHandler
 
 			// fatal signal, try to clean up
 			Remove();
+			#if defined(__APPLE__)
+			// only the main thread cleans up; other threads return and fault
+			// again with the default handler, which reports the original crash
+			if (Threading::IsMainThread())
+				InstallCleanupSignalHandler(signal);
+			#endif
 			// exit if we cought a critical signal; don't handle any further signals when exiting
 			ErrorMessageBox(buf, "Spring crashed", MBF_OK | MBF_CRASH);
 		} else {
