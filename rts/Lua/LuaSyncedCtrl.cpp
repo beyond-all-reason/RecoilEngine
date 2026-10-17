@@ -3809,6 +3809,9 @@ int LuaSyncedCtrl::SetUnitPieceParent(lua_State* L)
 	childPiece->parent->RemoveChild(childPiece);
 	childPiece->SetParent(parentPiece);
 	parentPiece->AddChild(childPiece);
+	// the model space transforms of the moved piece and its children change
+	childPiece->SetDirty();
+	unit->localModel.SetBoundariesNeedsRecalc();
 	return 0;
 }
 
