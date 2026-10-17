@@ -466,7 +466,8 @@ public:
 
 		this->WaitBuffer(fences[this->allocIdx]);
 
-		T* ptr = ptrBase + this->allocIdx * this->numElements + this->mapElemOffet;
+		// slots are byteSize apart, which can include alignment padding
+		T* ptr = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(ptrBase) + this->allocIdx * this->byteSize) + this->mapElemOffet;
 
 		return ptr;
 	}
@@ -548,7 +549,8 @@ public:
 
 		this->WaitBuffer(fences[this->allocIdx]);
 
-		T* ptr = ptrBase + this->allocIdx * this->numElements + this->mapElemOffet;
+		// slots are byteSize apart, which can include alignment padding
+		T* ptr = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(ptrBase) + this->allocIdx * this->byteSize) + this->mapElemOffet;
 		return ptr;
 	}
 
