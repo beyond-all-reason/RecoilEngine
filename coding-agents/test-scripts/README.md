@@ -61,8 +61,6 @@ Three scripts, in the order you use them.
 ./install-probe.sh --remove             # leave the game unmodified
 ```
 
-`SPRING_FPS_LOG=<seconds>` makes the engine log its present rate, which is how an unattended run reports a frame rate at all.
-
 Two flags change what a run measures, and both rewrite a constant in the installed copy and then read it back, because three results in one session were mislabelled by patches that silently did not apply.
 
 `--luaui-off <seconds>` issues `luaui disable` that long after the freeze, which removes every widget and the probe with it. The scene stays frozen, because pause is engine state. The intervals either side of the switch are the two sides, so one run holds both.
@@ -70,10 +68,6 @@ Two flags change what a run measures, and both rewrite a constant in the install
 `--shots <seconds>[,...]` installs a LuaRules gadget that calls the engine's screenshot action at those times. It is a gadget rather than a widget so it survives `luaui disable`, which is the frame that most needs proving. Files land in `<data dir>/screenshots/` and the log says which shot was taken and what the unit count was.
 
 `--move` sends the starting unit to the middle of the map and puts the camera on it instead of pausing. **Frame rates in this mode are void**, because a live scene varies by a factor of two where a frozen one reads to 2.5%. Use it for hunting artefacts, where it shows what a frozen scene cannot: the move line, the waypoint marker, and line of sight sweeping over new ground. It also removes the faction from the framing, since a locked camera otherwise frames whatever position that faction's commander started at. Tracking is engine state, so it survives `luaui disable` and the unit keeps walking after every widget is gone.
-
-`--loops <n>` installs the artefact amplifier, which draws that many identical `LINE_LOOP` batches a frame so batch merging goes from about 8% of frames to all of them. Score it with `minimap_score.py <log> --amp`.
-
-`--alt` alternates the amplifier's colour by batch index, which measures a different defect with the same grid. Identical batches are what makes merging visible and exactly what hides a batch inheriting the previous one's attributes, since an inherited attribute is then the same attribute. With `--alt` a batch that takes the previous batch's colour draws a whole circle wrong, about 40 pixels against a threshold of 10. Score it with `--alt`. It varies colour only, so it cannot see an inherited texture coordinate or normal, which need a bound texture or lighting to show.
 
 Run a different game with `GAME=<path to a .sdd> ./install-probe.sh ...` and `SCRIPT=<path to a .tdf>`.
 
@@ -85,21 +79,4 @@ Change the window without touching the shared config by passing `-config <file>`
 
 **Only trust deltas measured in one run.** Absolute frame rates move about 10% between runs even frozen and focused. Mouse position is one uncontrolled variable, since hovering changes what the UI draws.
 
-## Standalone probes
-
-These need no engine run, so use them first where they can answer the question.
-
-| probe | what it settles |
-|---|---|
-| `fill_probe.c` | the driver's fill rate, and the cost of a render pass break. A break is a full attachment store and reload at memory bandwidth, 0.266ms at 3024x1832 |
-| `kk_mipmap_leak.c` | the KosmicKrisp memory leak, attached to the upstream issue |
-
 GL timer queries do not work here, so do not reach for them. Zink on KosmicKrisp does not advertise `GL_ARB_timer_query` and `glQueryCounter` silently returns zeros.
-
-Build and run them against the same Mesa the engine uses. Each carries its own command in a comment at the top. `DYLD_LIBRARY_PATH=/opt/homebrew/lib` is needed or Zink cannot find `libvulkan.1.dylib`.
-
-## Capturing what happened
-
-`SPRING_PHASE_DUMP=1 SPRING_PHASE_DUMP_DIR=<dir>` writes a quarter-size PPM between draw phases, so a stray polygon can be attributed to the phase that drew it. Convert with `python3 ~/dev/macos-probes/ppm2png.py <file.ppm>`.
-
-Note the phase dumps stop at `6-screenpost`, the last point in `CGame::Draw`. Anything that appears on screen but not in that dump is being drawn somewhere else. The engine's own screenshot action captures the finished frame and is the control for exactly that case.

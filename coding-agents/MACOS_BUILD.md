@@ -4,7 +4,7 @@ Apple Silicon only, macOS 15 or newer. Most of the first build is compiling Mesa
 
 macOS has no OpenGL 4.6. Apple froze its driver at 4.1 core, and the engine needs 4.6 compatibility. So the graphical engine runs on Mesa's Zink, which translates OpenGL to Vulkan, on top of KosmicKrisp, which is Mesa's Vulkan driver for Metal.
 
-Leon Seemann's `MacEGLBridge` (`rts/Rendering/GL/MacEGLBridge.cpp`) is the present path. It creates the GL context through Mesa EGL, reads each finished frame back through two pixel buffers and presents it through SDL's Metal renderer. `MACOS_RENDERER_PLAN.md` and `MACOS_INTEGRATION_PLAN.md` are the history of how the port got here. `MetalPresent.mm`, the earlier present path, no longer exists.
+Leon Seemann's `MacEGLBridge` (`rts/Rendering/GL/MacEGLBridge.cpp`) is the present path. It creates the GL context through Mesa EGL, reads each finished frame back through two pixel buffers and presents it through SDL's Metal renderer.
 
 The headless, dedicated and unitsync builds need none of that. If you only want a server or content tools, do step 1 and step 3 and stop.
 
@@ -120,4 +120,4 @@ Lua lines now get the wide-line emulation too, so `gl.LineWidth(2)` draws about 
 
 ## Known rough edges
 
-`MACOS_RENDERER_PLAN.md` has the full list. `glPolygonMode(GL_LINE)` does nothing on this driver, so wireframe stages are skipped.
+`glPolygonMode(GL_LINE)` does nothing on this driver, so wireframe stages are skipped.

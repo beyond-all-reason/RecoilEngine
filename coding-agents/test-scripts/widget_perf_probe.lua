@@ -41,8 +41,9 @@ local TOP_N      = 16   -- timers reported, by share of wall clock
 -- cycles either side of it are the two sides of the comparison.
 --
 -- The freeze survives, because "pause" is engine state rather than widget state,
--- and nothing is left to move the camera. Frame rates keep coming from the engine
--- through SPRING_FPS_LOG, which does not go through Lua at all.
+-- and nothing is left to move the camera. Nothing reports a frame rate after the
+-- disable either: this probe is gone, and the engine-side SPRING_FPS_LOG that
+-- used to cover it was dropped in the October rebuild.
 local DISABLE_AFTER = 0
 
 -- 1 to send the starting unit to the middle of the map and have the camera
