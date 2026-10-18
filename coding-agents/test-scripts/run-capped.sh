@@ -8,7 +8,7 @@
 #
 #   run-capped.sh <seconds> <logfile> [extra spring args...]
 #
-# Environment passed through, so SPRING_PHASE_DUMP etc still work.
+# Environment is passed through to the engine.
 set -u
 
 LIMIT_SECONDS=${1:?seconds}

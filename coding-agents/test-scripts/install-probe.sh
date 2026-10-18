@@ -8,9 +8,6 @@
 #                                        fires at those times after it loads
 #   install-probe.sh --move              send the unit to the middle of the map and
 #                                        track it, rather than freezing the scene
-#   install-probe.sh --loops 2000        also install the artefact amplifier
-#   install-probe.sh --loops 2000 --alt  the same, alternating the batch colour so
-#                                        an inherited attribute is visible
 #   install-probe.sh --remove            take them all out again
 #
 # GAME=<path to a .sdd> targets a game other than SplinterFaction. It has to be an
@@ -53,11 +50,9 @@ DEST=$WIDGET_DIR/test_perf_probe.lua
 SRC=$(dirname "$0")/widget_perf_probe.lua
 SHOT_DEST=${GADGET_DIR:-$GAME/LuaRules/Gadgets}/test_shot_probe.lua
 SHOT_SRC=$(dirname "$0")/gadget_shot_probe.lua
-AMP_DEST=$WIDGET_DIR/test_loop_amp.lua
-AMP_SRC=$(dirname "$0")/widget_loop_amp.lua
 
 if [ "${1:-}" = "--remove" ]; then
-	for F in "$DEST" "$SHOT_DEST" "$AMP_DEST"; do
+	for F in "$DEST" "$SHOT_DEST"; do
 		if [ -e "$F" ]; then
 			rm "$F"
 			echo "removed $F"
@@ -71,8 +66,6 @@ fi
 LUAUI_OFF=0
 SHOTS=""
 MOVE=0
-LOOPS=0
-ALT=0
 
 while [ $# -gt 0 ]; do
 	case $1 in
@@ -92,17 +85,6 @@ while [ $# -gt 0 ]; do
 			;;
 		--move)
 			MOVE=1
-			shift
-			;;
-		--loops)
-			LOOPS=${2:?--loops needs a count}
-			case $LOOPS in
-				''|*[!0-9]*) echo "--loops takes a whole number, got \"$LOOPS\""; exit 1 ;;
-			esac
-			shift 2
-			;;
-		--alt)
-			ALT=1
 			shift
 			;;
 		*)
@@ -162,37 +144,4 @@ if [ -n "$SHOTS" ]; then
 elif [ -e "$SHOT_DEST" ]; then
 	rm "$SHOT_DEST"
 	echo "removed $SHOT_DEST, no --shots given"
-fi
-
-if [ "$LOOPS" != 0 ]; then
-	cp "$AMP_SRC" "$AMP_DEST"
-	sed -i '' "s/^local LOOP_COUNT = 0\$/local LOOP_COUNT = $LOOPS/" "$AMP_DEST"
-
-	GOT=$(grep -c "^local LOOP_COUNT = $LOOPS\$" "$AMP_DEST" || true)
-
-	if [ "$GOT" != 1 ]; then
-		echo "install-probe: LOOP_COUNT is not $LOOPS in $AMP_DEST, found:"
-		grep -n "^local LOOP_COUNT" "$AMP_DEST" || echo "  no LOOP_COUNT line at all"
-		exit 1
-	fi
-
-	if [ "$ALT" != 0 ]; then
-		sed -i '' "s/^local ALT_COLOURS = 0\$/local ALT_COLOURS = 1/" "$AMP_DEST"
-	fi
-
-	GOT=$(grep -c "^local ALT_COLOURS = $ALT\$" "$AMP_DEST" || true)
-
-	if [ "$GOT" != 1 ]; then
-		echo "install-probe: ALT_COLOURS is not $ALT in $AMP_DEST, found:"
-		grep -n "^local ALT_COLOURS" "$AMP_DEST" || echo "  no ALT_COLOURS line at all"
-		exit 1
-	fi
-
-	echo "installed $AMP_DEST with LOOP_COUNT = $LOOPS and ALT_COLOURS = $ALT"
-elif [ "$ALT" != 0 ]; then
-	echo "--alt needs --loops, there is no amplifier to alternate"
-	exit 1
-elif [ -e "$AMP_DEST" ]; then
-	rm "$AMP_DEST"
-	echo "removed $AMP_DEST, no --loops given"
 fi
