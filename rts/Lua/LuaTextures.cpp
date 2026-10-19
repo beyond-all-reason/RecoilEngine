@@ -72,7 +72,16 @@ std::string LuaTextures::Create(const Texture& tex)
 			glTexImage3D(tex.target, 0, tex.format, tex.xsize, tex.ysize, tex.zsize, tex.border, dataFormat, dataType, nullptr);
 		} break;
 		case GL_TEXTURE_CUBE_MAP: {
-			// all six faces need storage; gl.GenerateMipmap allocates the mip chain
+			// IsValidLuaTextureTarget accepts GL_TEXTURE_CUBE_MAP, but upstream had no
+			// case here: the texture reached the assert below (debug) or came back
+			// with no storage at all (release), so nothing could render into it or
+			// sample it. A cube texture's level 0 is six separate 2D images, one per
+			// face target, allocated in the OpenGL face order +X, -X, +Y, -Y, +Z, -Z
+			// (the face enums are consecutive). Only level 0 is allocated here;
+			// gl.GenerateMipmap allocates the rest of the mip chain, as the PBR
+			// provider does for its mipmapped cubes. GL requires square faces:
+			// xsize != ysize fails with GL_INVALID_VALUE, which the glGetError check
+			// below reports, and gl.CreateTexture then returns nil.
 			for (GLenum face = GL_TEXTURE_CUBE_MAP_POSITIVE_X; face <= GL_TEXTURE_CUBE_MAP_NEGATIVE_Z; ++face)
 				glTexImage2D(face, 0, tex.format, tex.xsize, tex.ysize, tex.border, dataFormat, dataType, nullptr);
 		} break;
@@ -191,6 +200,9 @@ bool LuaTextures::Free(const std::string& name)
 
 	if (it != textureMap.end()) {
 		const Texture& tex = textureVec[it->second];
+		// gl.DeleteTexture of a published texture unpublishes it first: GL may
+		// hand the deleted name to the next new texture, which a stale slot
+		// would then expose under the old "$pub:" name.
 		Unpublish(tex.id);
 		glDeleteTextures(1, &tex.id);
 
@@ -233,6 +245,9 @@ void LuaTextures::FreeAll()
 {
 	for (const auto& item: textureMap) {
 		const Texture& tex = textureVec[item.second];
+		// the handle is shutting down (~LuaTextures, also on a /luarules or
+		// /luaui reload, which destroys and recreates the handle): its published
+		// names become unowned and sample as id 0 until a handle publishes again
 		Unpublish(tex.id);
 		glDeleteTextures(1, &tex.id);
 
@@ -248,9 +263,22 @@ void LuaTextures::FreeAll()
 }
 
 
+// The published-texture registry (see LuaTextures::Published in the header).
+//
+// File statics rather than members: every Lua handle has its own LuaTextures,
+// but a published name must be visible to all of them and to engine code that
+// has no Lua handle, so the registry belongs to none of them. They live for
+// the whole process; slots are only ever cleared, never erased.
+//
+// A vector plus a name-to-index map, the layout CNamedTextures uses: the map
+// is consulted once, when a "$pub:<name>" string is parsed, and every later
+// bind or gl.TextureInfo is a bounds-checked vector access by the kept index.
+// The vector may reallocate when a new name appears, which is why consumers
+// keep an index and never a Published pointer across calls.
 static std::vector<LuaTextures::Published> publishedSlots;
 static spring::unsynced_map<std::string, size_t> publishedIndices;
 
+// See the header. Never fails; an unknown name gets a new empty slot.
 size_t LuaTextures::GetPublishedIndex(const std::string& name)
 {
 	const auto it = publishedIndices.find(name);
@@ -266,34 +294,51 @@ size_t LuaTextures::GetPublishedIndex(const std::string& name)
 	return index;
 }
 
+// See the header. The returned pointer is valid only until the next new name
+// is looked up (the vector may grow), so callers use it immediately.
 const LuaTextures::Published* LuaTextures::GetPublished(size_t index)
 {
 	return (index < publishedSlots.size()) ? &publishedSlots[index] : nullptr;
 }
 
+// See the header; gl.PublishTexture is the only caller.
 bool LuaTextures::Publish(const std::string& name, const std::string& texName, std::string& error) const
 {
+	// Ownership rule: a name belongs to the handle that published it until that
+	// handle unpublishes it or frees the texture. Without it a LuaUI widget
+	// could replace the LuaRules provider's "pbr_environment" and every
+	// consumer would silently sample the widget's texture.
 	Published& slot = publishedSlots[GetPublishedIndex(name)];
 	if (slot.owner != nullptr && slot.owner != this) {
 		error = "\"" + name + "\" is published by another Lua handle";
 		return false;
 	}
 
+	// gl.PublishTexture(name, nil): clear the slot but keep its name, so the
+	// index held by consumers stays valid and now resolves to id 0
 	if (texName.empty()) {
 		slot = {name};
 		return true;
 	}
 
+	// only this handle's own textures can be published, so the owner is always
+	// the LuaTextures that will unpublish the slot when the texture is freed
 	const Texture* tex = GetInfo(texName);
 	if (tex == nullptr) {
 		error = "\"" + texName + "\" is not a texture of this Lua handle";
 		return false;
 	}
 
+	// A copy of the texture's GL name, target and size, not a reference to the
+	// Texture: consumers in other handles cannot reach this handle's textureVec,
+	// and Free/FreeAll clear the copy before the GL name dies.
 	slot = {name, this, tex->id, tex->target, tex->xsize, tex->ysize};
 	return true;
 }
 
+// See the header. A linear scan: there are only a handful of published names
+// (the PBR provider uses four), and it runs only when a texture is deleted.
+// Several names may point at the same texture; all of them are cleared.
 void LuaTextures::Unpublish(GLuint id)
 {
 	for (Published& slot: publishedSlots) {
