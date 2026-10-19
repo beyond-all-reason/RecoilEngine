@@ -42,6 +42,9 @@ prepare_only=0
 self_test=0
 input_probe=0
 cursor_mode="${PBR_CURSOR_MODE:-software}"
+window_mode="${PBR_WINDOW_MODE:-background}"
+window_size="${PBR_WINDOW_SIZE:-1280x720}"
+window_position="${PBR_WINDOW_POSITION:-40,40}"
 
 usage() {
 	cat <<'EOF'
@@ -66,13 +69,23 @@ Usage: run-pbr-ibl-smoke.sh [options]
                            report: <write-dir>/pbr-ibl-input-probe/report.txt
   --cursor-mode MODE       software (default, visible in OBS game capture),
                            hardware, or keep (retain isolated config setting)
+  --window-mode MODE       background (default): a plain window of --window-size at
+                           --window-position that does not take keyboard focus when
+                           it opens and is kept at the bottom of the window stack
+                           (pbr-window-to-back.ps1), so runs need no physical mouse
+                           or keyboard and never cover your windows; foreground: the same
+                           window, activated normally; keep: the config's own
+                           window/fullscreen settings. Never minimize a running
+                           test: Recoil then draws only twice a minute.
+  --window-size WxH        windowed size (default 1280x720)
+  --window-position X,Y    window position in desktop pixels (default 40,40)
   --prepare-only           create links and settings, do not launch
 
 Environment equivalents:
   PBR_ENGINE, PBR_RUNTIME_DIRECTORY (or legacy PBR_BUILD_DIRECTORY),
   PBR_GAME_DIRECTORY, PBR_MAPS_DIRECTORY, PBR_WRITE_DIRECTORY,
   PBR_START_SCRIPT, PBR_CONFIG_TEMPLATE, PBR_GAME_LINK_NAME,
-  PBR_CURSOR_MODE.
+  PBR_CURSOR_MODE, PBR_WINDOW_MODE, PBR_WINDOW_SIZE, PBR_WINDOW_POSITION.
 EOF
 }
 
@@ -122,6 +135,9 @@ while (($# > 0)); do
 		--self-test) self_test=1; shift ;;
 		--input-probe) input_probe=1; shift ;;
 		--cursor-mode) (($# >= 2)) || die "Missing value for $1"; cursor_mode="$2"; shift 2 ;;
+		--window-mode) (($# >= 2)) || die "Missing value for $1"; window_mode="$2"; shift 2 ;;
+		--window-size) (($# >= 2)) || die "Missing value for $1"; window_size="$2"; shift 2 ;;
+		--window-position) (($# >= 2)) || die "Missing value for $1"; window_position="$2"; shift 2 ;;
 		--prepare-only) prepare_only=1; shift ;;
 		-h|--help) usage; exit 0 ;;
 		*) usage >&2; die "Unknown argument: $1" ;;
@@ -132,6 +148,18 @@ case "$cursor_mode" in
 	software|hardware|keep) ;;
 	*) die "--cursor-mode must be software, hardware, or keep (got: $cursor_mode)" ;;
 esac
+case "$window_mode" in
+	background|foreground|keep) ;;
+	*) die "--window-mode must be background, foreground, or keep (got: $window_mode)" ;;
+esac
+[[ "$window_size" =~ ^([0-9]+)x([0-9]+)$ ]] || die "--window-size must be WxH (got: $window_size)"
+window_width="${BASH_REMATCH[1]}"; window_height="${BASH_REMATCH[2]}"
+[[ "$window_position" =~ ^(-?[0-9]+),(-?[0-9]+)$ ]] || die "--window-position must be X,Y (got: $window_position)"
+window_x="${BASH_REMATCH[1]}"; window_y="${BASH_REMATCH[2]}"
+# The real-input probe moves the user's cursor and types into the focused game
+# window, so it cannot run in the background; it must be requested explicitly.
+((input_probe)) && [[ "$window_mode" == "background" ]] &&
+	die "--input-probe drives real mouse and keyboard input and needs --window-mode foreground."
 
 if [[ -n "$engine_input" ]]; then
 	engine="$(absolute_file "$engine_input")"
@@ -226,6 +254,29 @@ case "$cursor_mode" in
 	software) set_setting HardwareCursor 0 ;;
 	hardware) set_setting HardwareCursor 1 ;;
 esac
+# A new write directory has no archive cache, so the engine hashes the whole
+# BAR checkout first (about 9 s here) without answering window messages;
+# Windows then ghosts the "hung" window and gives it the keyboard focus. Seed
+# the cache from the newest earlier run next to this write directory. After BAR
+# files change the engine still re-hashes once, and that start-up can take focus.
+if ! compgen -G "${write_directory}/cache/ArchiveCache*.lua" >/dev/null; then
+	newest_cache="$(ls -t "$(dirname -- "$write_directory")"/*/cache/ArchiveCache*.lua 2>/dev/null | head -n 1 || true)"
+	if [[ -n "$newest_cache" ]]; then
+		mkdir -p "${write_directory}/cache"
+		cp -- "$newest_cache" "${write_directory}/cache/"
+	fi
+fi
+# Window placement for unattended runs (see --window-mode). Fullscreen and
+# borderless windows cover the desktop, so tests always use a plain window.
+if [[ "$window_mode" != "keep" ]]; then
+	set_setting Fullscreen 0
+	set_setting WindowBorderless 0
+	set_setting XResolutionWindowed "$window_width"
+	set_setting YResolutionWindowed "$window_height"
+	set_setting WindowPosX "$window_x"
+	set_setting WindowPosY "$window_y"
+	set_setting MinimizeOnFocusLoss 0
+fi
 # The capture mode is a persistent player choice (the viewer's Capture
 # dropdown); only seed it on first run, but the self-test needs it on.
 if ((self_test)) || ! grep -qi '^[[:space:]]*PBREnvironmentCapture[[:space:]]*=' "$config"; then
@@ -244,9 +295,14 @@ if ((self_test)) && [[ -f "$widget_order" ]]; then
 	sed -i 's/\["PBR IBL Self-Test"\] = 0,/["PBR IBL Self-Test"] = 1,/' "$widget_order"
 fi
 
-printf 'Engine:  %s\nGame:    %s\nMaps:    %s\nScript:  %s\nWrite:   %s\nCursor:  %s\n' \
-	"$engine" "$game_directory" "$maps_directory" "$start_script" "$write_directory" "$cursor_mode"
+printf 'Engine:  %s\nGame:    %s\nMaps:    %s\nScript:  %s\nWrite:   %s\nCursor:  %s\nWindow:  %s %s at %s\n' \
+	"$engine" "$game_directory" "$maps_directory" "$start_script" "$write_directory" "$cursor_mode" \
+	"$window_mode" "$window_size" "$window_position"
 ((prepare_only)) && { printf 'Prepared; not launching (--prepare-only).\n'; exit 0; }
+
+# SDL reads hints from the environment: show the window without activating it,
+# so it never takes keyboard focus (it still opens on top; see below).
+[[ "$window_mode" == "background" ]] && export SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN=1
 
 engine_arguments=(
 	--isolation
@@ -265,6 +321,22 @@ if ((input_probe)); then
 	wait "$engine_pid" || true
 	printf 'Input probe report: %s\n' "${write_directory}/pbr-ibl-input-probe/report.txt"
 	exit "$probe_status"
+fi
+
+if [[ "$window_mode" == "background" ]]; then
+	# A window shown without activation still lands on top of the z-order, and
+	# clicking the already-active window behind it does not raise that window.
+	# pbr-window-to-back.ps1 keeps the game window at the bottom, unactivated.
+	"$engine" "${engine_arguments[@]}" &
+	engine_pid=$!
+	windows_pid="$engine_pid"
+	[[ -r "/proc/${engine_pid}/winpid" ]] && windows_pid="$(cat "/proc/${engine_pid}/winpid")"
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$(cygpath -w "${script_dir}/pbr-window-to-back.ps1")" 		-ProcessId "$windows_pid" -LogFile "$(cygpath -w "${write_directory}/window-to-back.log")" &
+	helper_pid=$!
+	engine_status=0
+	wait "$engine_pid" || engine_status=$?
+	kill "$helper_pid" 2>/dev/null || true
+	exit "$engine_status"
 fi
 
 exec "$engine" "${engine_arguments[@]}"
