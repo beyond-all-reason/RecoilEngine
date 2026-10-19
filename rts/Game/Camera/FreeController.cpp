@@ -440,11 +440,11 @@ bool CFreeController::SetState(const StateMap& sm)
 	SetStateBool (sm, "invertAlt",   invertAlt);
 	SetStateBool (sm, "gndLock",     gndLock);
 
-	SetStateFloat(sm, "rx", rot.x);
-	SetStateFloat(sm, "ry", rot.y);
+	if (SetStateFloat(sm, "rx", rot.x))
+		rot.x = math::HALFPI - rot.x;
+	if (SetStateFloat(sm, "ry", rot.y))
+		rot.y = math::PI - rot.y;
 	SetStateFloat(sm, "rz", rot.z);
-	rot.x = math::HALFPI - rot.x;
-	rot.y = math::PI - rot.y;
 
 	SetStateFloat(sm, "vx", prevVel.x);
 	SetStateFloat(sm, "vy", prevVel.y);
