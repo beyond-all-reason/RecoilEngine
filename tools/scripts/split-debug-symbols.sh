@@ -123,14 +123,15 @@ while (($# > 0)); do
 	esac
 done
 
-# Resolve the executable. --engine wins and defines the folder and name; the
-# runtime directory is still resolved first, so it must exist even then.
-runtime_directory="$(absolute_directory "$runtime_directory")"
+# Resolve the executable. --engine wins and defines the folder and name, so the
+# default runtime directory (build/window) is resolved only without it and need
+# not exist when --engine is given.
 if [[ -n "$engine_input" ]]; then
 	binary="$(absolute_file "$engine_input")"
 	runtime_directory="$(dirname -- "$binary")"
 	binary_name="$(basename -- "$binary")"
 else
+	runtime_directory="$(absolute_directory "$runtime_directory")"
 	binary="${runtime_directory}/${binary_name}"
 	[[ -f "$binary" ]] || die "Engine does not exist: $binary"
 fi
@@ -141,14 +142,16 @@ fi
 # looks valid.
 debug_file="${runtime_directory}/${binary_name%.exe}.dbg"
 temporary_debug_file="${debug_file}.tmp"
-objcopy="$(find_tool "${PBR_OBJCOPY:-}" objcopy 'C:/mingw64/bin/objcopy.exe')"
-objdump="$(find_tool "${PBR_OBJDUMP:-}" objdump 'C:/mingw64/bin/objdump.exe')"
-strip="$(find_tool "${PBR_STRIP:-}" strip 'C:/mingw64/bin/strip.exe')"
+# the MinGW toolchain this project builds with, used when a tool is not on PATH
+mingw_bin='C:/mingw64/bin'
+objcopy="$(find_tool "${PBR_OBJCOPY:-}" objcopy "${mingw_bin}/objcopy.exe")"
+objdump="$(find_tool "${PBR_OBJDUMP:-}" objdump "${mingw_bin}/objdump.exe")"
+strip="$(find_tool "${PBR_STRIP:-}" strip "${mingw_bin}/strip.exe")"
 
 # Inspect the executable's section table (objdump -h): .gnu_debuglink means it
 # was already split; .debug_info/.debug_line/.debug_abbrev mean DWARF is still
 # embedded. These two flags choose between verify, split or error below.
-binary_sections="$($objdump -h "$binary")"
+binary_sections="$("$objdump" -h "$binary")"
 has_debug_link=0
 has_embedded_debug=0
 grep -q '\.gnu_debuglink' <<<"$binary_sections" && has_debug_link=1
@@ -179,6 +182,23 @@ if ((has_debug_link)) && [[ -f "$debug_file" ]]; then
 	exit 0
 fi
 
+# Stripped but not linked: an earlier run stopped between the rename of the
+# .dbg file and objcopy --add-gnu-debuglink. The symbols are complete in the
+# .dbg file, so only the link step is repeated (in the runtime directory, so
+# the link holds the bare file name), then the result is verified.
+if ! ((has_embedded_debug)) && ! ((has_debug_link)) && [[ -f "$debug_file" ]] &&
+	"$objdump" -h "$debug_file" | grep -Eq '\.debug_(info|line|abbrev)'; then
+	printf 'The runtime is stripped but not linked to %s; adding the debug link.\n' "$debug_file"
+	(
+		cd -- "$runtime_directory"
+		"$objcopy" "--add-gnu-debuglink=$(basename -- "$debug_file")" "$binary_name"
+	)
+	binary_sections="$("$objdump" -h "$binary")"
+	grep -q '\.gnu_debuglink' <<<"$binary_sections" && has_debug_link=1
+	verify_symbols
+	exit 0
+fi
+
 ((has_embedded_debug)) || die "The executable has neither embedded DWARF sections nor a usable external debug link: $binary"
 
 # The split, in the order the GNU binutils documentation gives:
@@ -204,7 +224,7 @@ mv -f -- "$temporary_debug_file" "$debug_file"
 trap - EXIT
 
 # Re-read the section table so verify_symbols sees the new debug link.
-binary_sections="$($objdump -h "$binary")"
+binary_sections="$("$objdump" -h "$binary")"
 has_debug_link=0
 grep -q '\.gnu_debuglink' <<<"$binary_sections" && has_debug_link=1
 verify_symbols
