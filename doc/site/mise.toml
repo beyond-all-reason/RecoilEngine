@@ -18,6 +18,8 @@
 
 [vars]
 	lua_doc_gen_dest = "$RECOIL_LUA_LIBRARY_DIR/generated"
+	lua_handles_dir = "rts/Lua/handles"
+	lua_handles_temp_dir = "{{vars.site_dir}}/temp/handles"
 	site_dir = 'doc/site'
 	site_temp_dir = "{{vars.site_dir}}/temp"
 	lua_doc_paths = 'rts/{Lua,Rml/SolLua,Sim/Units/Scripts}/**/*.cpp'
@@ -99,7 +101,8 @@
 	tools.lua-language-server = "{{env.LUA_LANGUAGE_SERVER_VERSION}}"
 	dir = "../../"
 	run = [
-		"lua-language-server --check \"${RECOIL_LUA_LIBRARY_DIR}\""
+		"lua-language-server --check \"${RECOIL_LUA_LIBRARY_DIR}\"",
+		"lua-language-server --check \"{{vars.lua_handles_dir}}\""
 	]
 
 	[tasks.lua_library]
@@ -107,7 +110,10 @@
 	tools."npm:lua-doc-extractor" = { version = "{{env.LUA_DOC_EXTRACTOR_VERSION}}", allow_low_downloads = true }
 	dir = "../../"
 	run = [
-		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_doc_gen_dest}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\""
+		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_doc_gen_dest}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\"",
+		# The same docs routed by their @env into one file per handle, each behind its class header.
+		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_handles_temp_dir}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\" --env synced=synced.lua --env unsynced=unsynced.lua --env synced,unsynced=shared.lua",
+		"mkdir -p {{vars.lua_handles_dir}}/generated && for h in shared synced unsynced; do cat {{vars.lua_handles_dir}}/$h.header {{vars.lua_handles_temp_dir}}/$h.lua > {{vars.lua_handles_dir}}/generated/$h.lua; done"
 	]
 
 	[tasks.latest_release_data]
