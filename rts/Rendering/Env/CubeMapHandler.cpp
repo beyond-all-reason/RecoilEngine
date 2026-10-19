@@ -21,9 +21,13 @@
 #include "Sim/Misc/GlobalConstants.h"
 
 #include "System/Misc/TracyDefs.h"
+#include "System/Misc/SpringTime.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <string>
+#include <vector>
 
 // Build-time pruning switches for the three post-capture IBL filters. Define
 // any switch to 0 (for example in compiler flags) to omit that implementation.
@@ -55,6 +59,7 @@ CONFIG(bool, CubeTexGenerateMipMaps).defaultValue(false).description("Generate m
 // and this pipeline stays idle. "engine": this C++ pipeline below. Both read the same
 // PBREnvironment* keys; exactly one of them runs.
 CONFIG(std::string, PBRIBLProvider).defaultValue("bar").description("PBR environment provider: bar (BAR LuaRules provider) or engine (Recoil CubeMapHandler pipeline).");
+CONFIG(std::string, PBRDFGSource).defaultValue("bar-generated").description("PBR split-sum DFG table source: bar-generated (BAR GLSL), engine-generated (this engine, $pbr_dfg) or file (BAR's validated data file). BAR validates and publishes the active one.");
 CONFIG(std::string, PBREnvironmentCapture).defaultValue("legacy-clone").description("PBR environment capture mode: legacy-clone, hdr-modern, or compare.");
 CONFIG(std::string, PBREnvironmentCaptureAnchor).defaultValue("map-center").description("PBR environment capture anchor: map-center or camera.");
 CONFIG(std::string, PBREnvironmentCaptureContent).defaultValue("sky-only").description("PBR environment capture content: sky-only, sky-terrain, or legacy-scene.");
@@ -494,6 +499,10 @@ bool CubeMapHandler::Init() {
 void CubeMapHandler::Free() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	FreePBREnvironment();
+	if (pbrDFGTexID != 0) {
+		glDeleteTextures(1, &pbrDFGTexID);
+		pbrDFGTexID = 0;
+	}
 
 	if (specularTexID != 0) {
 		glDeleteTextures(1, &specularTexID);
@@ -881,8 +890,88 @@ void CubeMapHandler::RequestPBREpoch()
 	pbrFailure.clear();
 }
 
+// Builds the split-sum DFG table on the CPU in double precision, the C++ variant of
+// PBRDFGSource. Convention BAR_PBR_V1_GLTF_GGX_SMITHCORR_SCHLICK_LAMBERT_FMIX_DFG_BIAS_E,
+// identical to BAR's GLSL generator and modelmaterials_gl4/validation/generate_pbr_dfg.py:
+// texel centres x = NdotV, y = perceptual roughness r (row 0 first), alpha = r^2; GGX
+// importance sampling with Hammersley points (i / N, radical inverse of i); height-
+// correlated Smith visibility; Schlick Fc = (1 - VdotH)^5; R = A (scale on F0), G = B (bias).
+void CubeMapHandler::GeneratePBRDFG()
+{
+	const spring_time start = spring_gettime();
+	constexpr unsigned int size = PBR_DFG_SIZE;
+	constexpr unsigned int samples = PBR_DFG_SAMPLES;
+	std::vector<float> texels(size * size * 2);
+
+	const auto radicalInverse = [](uint32_t bits) {
+		bits = (bits << 16u) | (bits >> 16u);
+		bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+		bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+		bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+		bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+		return static_cast<double>(bits) * 2.3283064365386963e-10;
+	};
+
+	for (unsigned int j = 0; j < size; ++j) {
+		const double roughness = (j + 0.5) / size;
+		const double alpha = roughness * roughness;
+		const double a2 = alpha * alpha;
+		for (unsigned int i = 0; i < size; ++i) {
+			const double nDotV = (i + 0.5) / size;
+			const double vx = std::sqrt(1.0 - nDotV * nDotV), vz = nDotV;
+			double a = 0.0, b = 0.0;
+			for (unsigned int s = 0; s < samples; ++s) {
+				const double phi = 2.0 * 3.14159265358979323846 * (static_cast<double>(s) / samples);
+				const double xiY = radicalInverse(s);
+				const double cosH = std::sqrt((1.0 - xiY) / (1.0 + (a2 - 1.0) * xiY));
+				const double sinH = std::sqrt(1.0 - cosH * cosH);
+				const double hx = sinH * std::cos(phi), hz = cosH;
+				const double vDotH = vx * hx + vz * hz;
+				const double nDotL = 2.0 * vDotH * hz - vz;
+				if (nDotL <= 0.0)
+					continue;
+				// literals are single precision in this build (-fsingle-precision-constant), hence the casts
+				const double vh = std::min(std::max(vDotH, static_cast<double>(0)), static_cast<double>(1));
+				const double ggxV = nDotL * std::sqrt(nDotV * nDotV * (1.0 - a2) + a2);
+				const double ggxL = nDotV * std::sqrt(nDotL * nDotL * (1.0 - a2) + a2);
+				const double gv = (0.5 / (ggxV + ggxL)) * 4.0 * vh * nDotL / hz;
+				const double fc = std::pow(1.0 - vh, 5.0);
+				a += (1.0 - fc) * gv;
+				b += fc * gv;
+			}
+			texels[(j * size + i) * 2 + 0] = static_cast<float>(a / samples);
+			texels[(j * size + i) * 2 + 1] = static_cast<float>(b / samples);
+		}
+	}
+
+	glGenTextures(1, &pbrDFGTexID);
+	glBindTexture(GL_TEXTURE_2D, pbrDFGTexID);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, size, size, 0, GL_RG, GL_FLOAT, texels.data());
+	glBindTexture(GL_TEXTURE_2D, 0);
+	LOG("[CubeMapHandler] engine-generated PBR DFG table %ux%u, %u samples, built on the CPU in %.1f ms",
+		size, size, samples, (spring_gettime() - start).toMilliSecsf());
+}
+
+// PBRDFGSource is independent of PBRIBLProvider: the engine builds its table only
+// while engine-generated is requested and releases it otherwise.
+void CubeMapHandler::UpdatePBRDFG()
+{
+	const bool wanted = (configHandler->GetString("PBRDFGSource") == "engine-generated");
+	if (wanted && pbrDFGTexID == 0) {
+		GeneratePBRDFG();
+	} else if (!wanted && pbrDFGTexID != 0) {
+		glDeleteTextures(1, &pbrDFGTexID);
+		pbrDFGTexID = 0;
+	}
+}
+
 void CubeMapHandler::UpdatePBRConfiguration()
 {
+	UpdatePBRDFG();
 	pbrRequestedCaptureMode = configHandler->GetString("PBREnvironmentCapture");
 	pbrRequestedAnchor = configHandler->GetString("PBREnvironmentCaptureAnchor");
 	pbrRequestedContent = configHandler->GetString("PBREnvironmentCaptureContent");

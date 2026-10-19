@@ -46,6 +46,7 @@ class LuaMatTexture {
 			LUATEX_PBR_ENVIRONMENT,
 			LUATEX_PBR_IRRADIANCE,
 			LUATEX_PBR_SPECULAR,
+			LUATEX_PBR_DFG, // "$pbr_dfg", PBRDFGSource=engine-generated
 			LUATEX_PUBLISHED, // "$pub:<name>", see LuaTextures::Published
 
 
