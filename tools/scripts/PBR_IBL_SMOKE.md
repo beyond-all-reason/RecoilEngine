@@ -71,7 +71,7 @@ The helper discovers `objcopy`, `objdump`, and `strip` from `PATH`, falls back t
 tools/scripts/run-pbr-ibl-smoke.sh --window-mode foreground
 ```
 
-The game opens in front, activated, and stops on the pregame start-position screen. Open the viewer with `/luaui enablewidget PBR IBL and Cubemap Viewer` in chat. Quit the game normally; the launcher returns with the engine's exit status. Without `--window-mode foreground` the window opens behind your windows (section 5); click it in the taskbar to bring it forward.
+The game opens in front, activated, and stops on the pregame start-position screen. Open the viewer with `/luaui enablewidget PBR IBL and Cubemap Viewer` in chat. Quit the game normally; the launcher returns with the engine's exit status. Without `--window-mode foreground` the window opens behind your windows (section 5), and the z-order helper sends it back to the bottom every second even if you bring it forward from the taskbar, so use `foreground` whenever you want to watch or play.
 
 ### 3.2 Run the automated self-test
 
@@ -316,6 +316,7 @@ A passing report ends with `SUMMARY pass=8 fail=0`.
 | `Refusing to replace <path>` | `<runtime>/games/<name>` or `<runtime>/maps` exists and is not a junction to the requested target. Remove that junction with `rmdir` in cmd (check first that it is a junction), or choose another `--game-link-name`. |
 | The game window took the keyboard focus at start | The archive cache was rebuilt (first run, or BAR files changed); later runs stay in the background. |
 | The game window stays in front | The z-order helper is not running: check `window-to-back.log` for a `keeping window` line. |
+| The game window keeps disappearing behind other windows | That is background mode working as intended; launch with `--window-mode foreground` to watch. |
 | `--self-test` does nothing | The isolated widget order had the self-test switched off in a format the launcher did not recognise; check `LuaUI/Config/BYAR.lua` and `infolog.txt` for `[PBR IBL SelfTest]`. |
 | Self-test stalls | The window was minimized; restore it. |
 | Input probe: `no target engine window appeared` | The engine failed to open a window, or the probe was given a process id it cannot find; check `infolog.txt`. |
