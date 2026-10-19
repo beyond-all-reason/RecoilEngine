@@ -178,8 +178,6 @@ std::string LuaOpenGL::fixedStateEnumToStringUnk;
 
 static float3 screenViewTrans;
 
-std::vector<LuaOpenGL::OcclusionQuery> LuaOpenGL::occlusionQueries;
-uintptr_t LuaOpenGL::nextQueryHandle = 0;
 
 
 
@@ -278,11 +276,6 @@ void LuaOpenGL::Free()
 {
 	glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
 
-	for (const OcclusionQuery& q: occlusionQueries) {
-		glDeleteQueries(1, &q.id);
-	}
-
-	occlusionQueries.clear();
 
 	glDeleteFramebuffersEXT(1, &environmentFaceFBO);
 	glDeleteRenderbuffersEXT(1, &environmentFaceDepth);
@@ -476,6 +469,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SaveImage);
 
 	if (GLAD_GL_ARB_occlusion_query) {
+		CreateQueryMetatable(L);
 		REGISTER_LUA_CFUNC(CreateQuery);
 		REGISTER_LUA_CFUNC(DeleteQuery);
 		REGISTER_LUA_CFUNC(RunQuery);
@@ -6883,14 +6877,20 @@ int LuaOpenGL::SaveImage(lua_State* L)
 
 /******************************************************************************/
 
-int LuaOpenGL::FindQuery(const void* handle)
+void LuaOpenGL::CreateQueryMetatable(lua_State* L)
 {
-	const uintptr_t value = reinterpret_cast<uintptr_t>(handle);
-	for (size_t i = 0; i < occlusionQueries.size(); ++i) {
-		if (occlusionQueries[i].handle == value)
-			return static_cast<int>(i);
-	}
-	return -1;
+	luaL_newmetatable(L, "Query");
+	LuaPushNamedCFunc(L, "__gc", QueryGC);
+	lua_pop(L, 1);
+}
+
+int LuaOpenGL::QueryGC(lua_State* L)
+{
+	auto* query = static_cast<LuaQuery*>(luaL_checkudata(L, 1, "Query"));
+	if (query->id != 0)
+		glDeleteQueries(1, &query->id);
+	query->id = 0;
+	return 0;
 }
 
 /***
@@ -6923,16 +6923,17 @@ int LuaOpenGL::CreateQuery(lua_State* L)
 	if (id == 0)
 		return 0;
 
-	// Stored by value; Lua only receives the handle number, so the garbage
-	// collector cannot free anything the list still refers to.
-	const OcclusionQuery query = {++nextQueryHandle, id, target};
-	occlusionQueries.push_back(query);
-
-	lua_pushlightuserdata(L, reinterpret_cast<void*>(query.handle));
+	// Lua owns the query (allocated from this handle's Lua memory); __gc frees it.
+	auto* query = static_cast<LuaQuery*>(lua_newuserdata(L, sizeof(LuaQuery)));
+	*query = {id, target};
+	luaL_getmetatable(L, "Query");
+	lua_setmetatable(L, -2);
 	return 1;
 }
 
 /***
+ * Deletes the GL query now instead of at garbage collection.
+ *
  * @function gl.DeleteQuery
  * @param query any
  */
@@ -6941,19 +6942,7 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
 	if (lua_isnil(L, 1))
 		return 0;
 
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.DeleteQuery(q) expects a userdata query");
-
-	const int index = FindQuery(lua_touserdata(L, 1));
-
-	if (index < 0)
-		return 0; // unknown or already deleted
-
-	glDeleteQueries(1, &occlusionQueries[index].id);
-
-	occlusionQueries[index] = occlusionQueries.back();
-	occlusionQueries.pop_back();
-	return 0;
+	return QueryGC(L);
 }
 
 /***
@@ -6967,17 +6956,14 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	if (running)
 		luaL_error(L, "gl.RunQuery(q,f) can not be called recursively");
 
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.RunQuery(q,f) expects a userdata query");
+	const auto* query = static_cast<const LuaQuery*>(luaL_checkudata(L, 1, "Query"));
 
-	const int index = FindQuery(lua_touserdata(L, 1));
+	if (query->id == 0)
+		return 0; // deleted
 
-	if (index < 0)
-		return 0;
-
-	// copies: the callback may create or delete queries, which moves list entries
-	const GLuint id = occlusionQueries[index].id;
-	const GLenum target = occlusionQueries[index].target;
+	// copies, so the callback may delete this query safely
+	const GLuint id = query->id;
+	const GLenum target = query->target;
 
 	if (!lua_isfunction(L, 2))
 		luaL_error(L, "gl.RunQuery(q,f) expects a function");
@@ -7010,16 +6996,13 @@ int LuaOpenGL::RunQuery(lua_State* L)
  */
 int LuaOpenGL::GetQuery(lua_State* L)
 {
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.GetQuery(q) expects a userdata query");
+	const auto* query = static_cast<const LuaQuery*>(luaL_checkudata(L, 1, "Query"));
 
-	const int index = FindQuery(lua_touserdata(L, 1));
+	if (query->id == 0)
+		return 0; // deleted
 
-	if (index < 0)
-		return 0;
-
-	const GLuint id = occlusionQueries[index].id;
-	const GLenum target = occlusionQueries[index].target;
+	const GLuint id = query->id;
+	const GLenum target = query->target;
 
 	if (!luaL_optboolean(L, 2, true)) {
 		GLuint available = GL_FALSE;

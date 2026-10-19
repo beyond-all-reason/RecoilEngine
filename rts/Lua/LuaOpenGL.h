@@ -155,21 +155,17 @@ class LuaOpenGL {
 		static std::unordered_map<GLenum, std::string> fixedStateEnumToString;
 		static std::string fixedStateEnumToStringUnk;
 
-		// gl.CreateQuery objects, stored by value in one contiguous list. Lua holds a
-		// light userdata whose value is `handle`; handles are never reused, so a
-		// deleted or stale handle simply is not found.
-		struct OcclusionQuery {
-			uintptr_t handle;
+		// A gl.CreateQuery object: a full Lua userdata with the "Query" metatable,
+		// the same ownership as LuaFBOs/LuaRBOs. Lua owns it; its __gc deletes the
+		// GL query unless gl.DeleteQuery already did (id is then 0).
+		struct LuaQuery {
 			GLuint id;
 			GLenum target; // GL_SAMPLES_PASSED, or GL_TIME_ELAPSED for gl.CreateQuery("time")
 		};
 
-		static std::vector<OcclusionQuery> occlusionQueries;
-		static uintptr_t nextQueryHandle;
-		// index of the query with this Lua handle in occlusionQueries, or -1
-		static int FindQuery(const void* handle);
-
 	private:
+		static void CreateQueryMetatable(lua_State* L);
+		static int QueryGC(lua_State* L);
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);
 		static void CondWarnDeprecatedGL(lua_State* L, const char* caller);
 		static void NotImplementedError(lua_State* L, const char* caller);
