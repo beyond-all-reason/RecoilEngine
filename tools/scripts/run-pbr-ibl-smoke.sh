@@ -506,22 +506,32 @@ engine_arguments=(
 	"$(cygpath -m "$start_script")"
 )
 
+# Prints the Windows process id of a process started from this shell.
+# $! is the MSYS (Git Bash) process id: Git Bash gives every process, even a
+# native Windows one, its own id, and the Windows id that Get-Process and the
+# Win32 window calls need is published in /proc/<pid>/winpid. If that file is
+# missing (another shell), the id is printed unchanged.
+# Example: windows_pid="$(windows_process_id "$!")"
+windows_process_id() {
+	local id="$1"
+	[[ -r "/proc/${id}/winpid" ]] && id="$(cat "/proc/${id}/winpid")"
+	printf '%s\n' "$id"
+}
+
 # Real-input probe: the engine runs in the background while the probe drives it
 # through Windows input, then this script waits for the engine (the probe ends
 # the game with /quitforce) and returns the probe's status, not the engine's.
 # -ExecutionPolicy Bypass lets the unsigned repository script run without
 # changing the machine's policy; -NoProfile keeps the user's profile out.
-# The probe receives $! directly. In Git Bash that is the MSYS process id, which
-# can differ from the Windows process id Get-Process needs (the background
-# branch below converts it through /proc/<pid>/winpid). The probe then waits for
-# a window of that id and stops with "no target engine window appeared" if none
-# shows up within its -LoadTimeoutSeconds.
+# The probe gets the Windows process id (windows_process_id): it waits for a
+# window of that id and stops with "no target engine window appeared" if none
+# shows up within its -LoadTimeoutSeconds. `wait` still takes the MSYS id.
 if ((input_probe)); then
 	"$engine" "${engine_arguments[@]}" &
 	engine_pid=$!
 	probe_status=0
 	powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(cygpath -w "${script_dir}/pbr-viewer-input-probe.ps1")" \
-		-WriteDirectory "$(cygpath -w "$write_directory")" -TargetProcessId "$engine_pid" || probe_status=$?
+		-WriteDirectory "$(cygpath -w "$write_directory")" -TargetProcessId "$(windows_process_id "$engine_pid")" || probe_status=$?
 	wait "$engine_pid" || true
 	printf 'Input probe report: %s\n' "${write_directory}/pbr-ibl-input-probe/report.txt"
 	exit "$probe_status"
@@ -530,18 +540,14 @@ fi
 if [[ "$window_mode" == "background" ]]; then
 	# A window shown without activation still lands on top of the z-order, and
 	# clicking the already-active window behind it does not raise that window.
-	# pbr-window-to-back.ps1 keeps the game window at the bottom, unactivated.
-	# $! is the MSYS (Git Bash) process id. Git Bash gives every process, even a
-	# native Windows one, its own id; the Windows id that Get-Process and the
-	# Win32 window calls need is published in /proc/<pid>/winpid. If that file
-	# is missing (another shell), the MSYS id is passed unchanged.
+	# pbr-window-to-back.ps1 keeps the game window at the bottom, unactivated;
+	# it needs the Windows process id (windows_process_id above).
 	# -WindowStyle Hidden keeps the helper's console window from appearing.
 	# When the engine exits, the helper is stopped; it would also stop by
 	# itself within a second because the process is gone.
 	"$engine" "${engine_arguments[@]}" &
 	engine_pid=$!
-	windows_pid="$engine_pid"
-	[[ -r "/proc/${engine_pid}/winpid" ]] && windows_pid="$(cat "/proc/${engine_pid}/winpid")"
+	windows_pid="$(windows_process_id "$engine_pid")"
 	powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$(cygpath -w "${script_dir}/pbr-window-to-back.ps1")" 		-ProcessId "$windows_pid" -LogFile "$(cygpath -w "${write_directory}/window-to-back.log")" &
 	helper_pid=$!
 	engine_status=0
