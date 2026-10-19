@@ -257,10 +257,13 @@ size_t LuaTextures::GetPublishedIndex(const std::string& name)
 	if (it != publishedIndices.end())
 		return it->second;
 
-	publishedSlots.emplace_back();
-	publishedSlots.back().name = name;
-	publishedIndices.emplace(name, publishedSlots.size() - 1);
-	return publishedSlots.size() - 1;
+	// A slot is created on the first lookup, by the publisher or by a consumer that
+	// parses "$pub:<name>" before anything is published. The index stays valid for
+	// the rest of the session, so consumers keep it instead of the name.
+	const size_t index = publishedSlots.size();
+	publishedSlots.emplace_back().name = name;
+	publishedIndices.emplace(name, index);
+	return index;
 }
 
 const LuaTextures::Published* LuaTextures::GetPublished(size_t index)
