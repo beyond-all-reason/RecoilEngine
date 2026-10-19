@@ -92,6 +92,7 @@ public:
 	int tx1,tx2,tz1,tz2;
 	float3 terraformCenter;
 	float terraformRadius;
+	float lastNanoPieceOrientationUpdate;
 
 private:
 	NanoPieceCache nanoPieceCache;
