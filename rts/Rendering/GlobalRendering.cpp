@@ -32,6 +32,9 @@
 #include "System/Platform/Threading.h"
 #include "System/Platform/SharedLib.h"
 #include "System/Platform/WindowManagerHelper.h"
+#ifdef __APPLE__
+#include "System/Platform/Mac/Keyboard.h"
+#endif
 #include "System/Platform/errorhandler.h"
 #include "System/ScopedResource.h"
 #include "System/QueueToMain.h"
@@ -517,6 +520,10 @@ SDL_GLContext CGlobalRendering::CreateGLContext(const int2& minCtx)
 
 bool CGlobalRendering::CreateWindowAndContext(const char* title)
 {
+#ifdef __APPLE__
+	MacKeyboard::DisableAutoFill();
+#endif
+
 	if (SDL_Init(SDL_INIT_VIDEO) == -1) {
 		LOG_L(L_FATAL, "[GR::%s] error \"%s\" initializing SDL", __func__, SDL_GetError());
 		return false;
@@ -569,6 +576,10 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 
 	if ((sdlWindow = CreateSDLWindow(title)) == nullptr)
 		return false;
+
+#ifdef __APPLE__
+	MacKeyboard::Init();
+#endif
 
 	if (configHandler->GetInt("MinimizeOnFocusLoss") == 0)
 		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
