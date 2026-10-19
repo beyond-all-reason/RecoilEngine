@@ -161,6 +161,8 @@ class LuaOpenGL {
 		};
 
 		static std::vector<OcclusionQuery*> occlusionQueries;
+		// index of a live query handle in occlusionQueries, or -1; never dereferences it
+		static int FindQuery(const void* handle);
 
 	private:
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);

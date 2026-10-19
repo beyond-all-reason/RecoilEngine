@@ -279,6 +279,7 @@ void LuaOpenGL::Free()
 
 	for (const OcclusionQuery* q: occlusionQueries) {
 		glDeleteQueries(1, &q->id);
+		delete q;
 	}
 
 	occlusionQueries.clear();
@@ -6882,6 +6883,15 @@ int LuaOpenGL::SaveImage(lua_State* L)
 
 /******************************************************************************/
 
+int LuaOpenGL::FindQuery(const void* handle)
+{
+	for (size_t i = 0; i < occlusionQueries.size(); ++i) {
+		if (occlusionQueries[i] == handle)
+			return static_cast<int>(i);
+	}
+	return -1;
+}
+
 /***
  * @function gl.CreateQuery
  * @return any query
@@ -6894,12 +6904,10 @@ int LuaOpenGL::CreateQuery(lua_State* L)
 	if (id == 0)
 		return 0;
 
-	OcclusionQuery* qry = static_cast<OcclusionQuery*>(lua_newuserdata(L, sizeof(OcclusionQuery)));
-
-	if (qry == nullptr)
-		return 0;
-
-	*qry = {static_cast<unsigned int>(occlusionQueries.size()), id};
+	// Heap-owned until gl.DeleteQuery or LuaOpenGL::Free. (A lua_newuserdata block
+	// was left unreferenced while only a light userdata was returned, so the
+	// garbage collector could free it while occlusionQueries still pointed at it.)
+	OcclusionQuery* qry = new OcclusionQuery{static_cast<unsigned int>(occlusionQueries.size()), id};
 	occlusionQueries.push_back(qry);
 
 	lua_pushlightuserdata(L, reinterpret_cast<void*>(qry));
@@ -6918,18 +6926,18 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
 	if (!lua_islightuserdata(L, 1))
 		luaL_error(L, "gl.DeleteQuery(q) expects a userdata query");
 
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
+	const int index = FindQuery(lua_touserdata(L, 1));
 
-	if (qry == nullptr)
-		return 0;
-	if (qry->index >= occlusionQueries.size())
-		return 0;
+	if (index < 0)
+		return 0; // unknown or already deleted
 
+	OcclusionQuery* qry = occlusionQueries[index];
 	glDeleteQueries(1, &qry->id);
 
-	occlusionQueries[qry->index] = occlusionQueries.back();
-	occlusionQueries[qry->index]->index = qry->index;
+	occlusionQueries[index] = occlusionQueries.back();
+	occlusionQueries[index]->index = index;
 	occlusionQueries.pop_back();
+	delete qry;
 	return 0;
 }
 
@@ -6947,12 +6955,12 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	if (!lua_islightuserdata(L, 1))
 		luaL_error(L, "gl.RunQuery(q,f) expects a userdata query");
 
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
+	const int index = FindQuery(lua_touserdata(L, 1));
 
-	if (qry == nullptr)
+	if (index < 0)
 		return 0;
-	if (qry->index >= occlusionQueries.size())
-		return 0;
+
+	const OcclusionQuery* qry = occlusionQueries[index];
 
 	if (!lua_isfunction(L, 2))
 		luaL_error(L, "gl.RunQuery(q,f) expects a function");
@@ -6983,12 +6991,12 @@ int LuaOpenGL::GetQuery(lua_State* L)
 	if (!lua_islightuserdata(L, 1))
 		luaL_error(L, "gl.GetQuery(q) expects a userdata query");
 
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
+	const int index = FindQuery(lua_touserdata(L, 1));
 
-	if (qry == nullptr)
+	if (index < 0)
 		return 0;
-	if (qry->index >= occlusionQueries.size())
-		return 0;
+
+	const OcclusionQuery* qry = occlusionQueries[index];
 
 	GLuint count;
 	glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT, &count);
