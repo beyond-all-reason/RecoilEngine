@@ -395,6 +395,37 @@ void CGlobalRendering::PreKill()
 }
 
 
+// macOS has no exclusive fullscreen worth asking for. It is a display mode
+// change, which takes the desktop out of its 2x scale, so the pointer covers
+// twice the distance for the same hand movement and every other window on the
+// screen is laid out again. Nothing on the Metal present path needs the mode,
+// and the non-exclusive kind already draws at the full backing resolution.
+static uint32_t GetFullScreenFlag(bool borderless)
+{
+#ifdef __APPLE__
+	return SDL_WINDOW_FULLSCREEN_DESKTOP;
+#else
+	return borderless ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN;
+#endif
+}
+
+// Borderless windowed mode asks for a window covering a whole display, but
+// macOS keeps windows below the menu bar. Only desktop fullscreen covers it.
+static bool IsBorderlessFullScreen(bool borderless, int x, int y, int w, int h)
+{
+#ifdef __APPLE__
+	if (!borderless)
+		return false;
+
+	for (int i = 0, n = SDL_GetNumVideoDisplays(); i < n; i++) {
+		SDL_Rect r;
+		if (SDL_GetDisplayBounds(i, &r) == 0 && x <= r.x && y <= r.y && x + w >= r.x + r.w && y + h >= r.y + r.h)
+			return true;
+	}
+#endif
+	return false;
+}
+
 SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 {
 	SDL_Window* newWindow = nullptr;
@@ -426,7 +457,7 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 	//   and 0 for windowed mode.
 
 	uint32_t sdlFlags  = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
-	         sdlFlags |= (borderless_ ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen_;
+	         sdlFlags |= GetFullScreenFlag(borderless_) * (fullScreen_ || IsBorderlessFullScreen(borderless_, winPosX_, winPosY_, newRes.x, newRes.y));
 	         sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
 
 	for (size_t i = 0; i < (aaLvls.size()) && (newWindow == nullptr); i++) {
@@ -1162,7 +1193,9 @@ void CGlobalRendering::LogDisplayMode(SDL_Window* window) const
 	};
 
 	const int fs = fullScreen;
-	const int bl = borderless;
+	// the second half of the fullscreen names is exclusive against not, which is
+	// the flag asked for rather than the borderless config
+	const int bl = fullScreen ? (GetFullScreenFlag(borderless) == SDL_WINDOW_FULLSCREEN_DESKTOP) : borderless;
 
 	LOG("[GR::%s] display-mode set to %ix%ix%ibpp@%iHz (%s)", __func__, viewSizeX, viewSizeY, SDL_BITSPERPIXEL(dmode.format), dmode.refresh_rate, names[fs * 2 + bl]);
 }
@@ -1245,7 +1278,9 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 	SDL_SetWindowPosition(window, winPosX, winPosY);
 	SDL_SetWindowSize(window, newRes.x, newRes.y);
 
-	if (SDL_SetWindowFullscreen(window, (borderless ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen) != 0)
+	const bool sdlFullScreen = fullScreen || IsBorderlessFullScreen(borderless, winPosX, winPosY, newRes.x, newRes.y);
+
+	if (SDL_SetWindowFullscreen(window, GetFullScreenFlag(borderless) * sdlFullScreen) != 0)
 		LOG("[GR::%s][4][SDL_SetWindowFullscreen] err=\"%s\"", __func__, SDL_GetError());
 
 	SDL_SetWindowBordered(window, borderless ? SDL_FALSE : SDL_TRUE);
