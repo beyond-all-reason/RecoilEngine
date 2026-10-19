@@ -176,7 +176,7 @@ The worktrees' local `.vscode/tasks.json` files (not tracked) call the launcher:
 | `--maps-directory PATH` | `PBR_MAPS_DIRECTORY` | sibling `BARS-Install/data/maps`, then `<runtime>/maps` | installed maps |
 | `--write-directory PATH` | `PBR_WRITE_DIRECTORY` | `test-results/pbr-ibl` in this repository | settings, logs, caches, screenshots, reports |
 | `--start-script PATH` | `PBR_START_SCRIPT` | `tools/scripts/pbr-ibl-startscript.txt` | game to start |
-| `--config-template PATH` | `PBR_CONFIG_TEMPLATE` | `.vscode/springsettings-debug.cfg` if present | first-run `springsettings.cfg` |
+| `--config-template PATH` | `PBR_CONFIG_TEMPLATE` | `.vscode/springsettings-debug.cfg` if present | first-run `springsettings.cfg`; a named file that does not exist stops the launcher |
 | `--game-link-name NAME` | `PBR_GAME_LINK_NAME` | `Beyond-All-Reason-Private-pbr-test.sdd` | junction name under `<runtime>/games` (one `.sdd` name, not a path) |
 | `--cursor-mode MODE` | `PBR_CURSOR_MODE` | `software` | `software`, `hardware` or `keep` (section 7) |
 | `--window-mode MODE` | `PBR_WINDOW_MODE` | `background` | `background`, `foreground` or `keep` (section 5) |
