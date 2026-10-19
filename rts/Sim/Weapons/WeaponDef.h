@@ -197,6 +197,8 @@ public:
 	 * (radius*tag value, [-1;1]) instead of its centre.
 	 */
 	float targetBorder;
+	int controlAreaMode;
+	float controlAreaRangeMult;
 	/**
 	 * If greater than 0, the range will be checked in a cylinder
 	 * (height=range*cylinderTargeting) instead of a sphere.

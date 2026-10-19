@@ -16,6 +16,7 @@
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Projectiles/ProjectileMemPool.h"
 #include "Sim/Units/Unit.h"
+#include "Sim/Weapons/Weapon.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
 #include "System/Matrix44f.h"
 #include "System/SpringMath.h"
@@ -140,94 +141,107 @@ void CMissileProjectile::Update()
 
 	if (--ttl > 0) {
 		if (!luaMoveCtrl) {
-			speed.w += (weaponDef->weaponacceleration * (speed.w < maxSpeed));
-
-			// FIXME: should go before the targeting update?
-			// const float3 orgTargPos = targetPos;
-			// const float3 targetDir = (targetPos - pos).SafeNormalize();
-			const float3& targetVel = UpdateTargeting();
-
-			UpdateWobble();
-			UpdateDance();
-
-			const float3 orgTargPos = targetPos;
-			const float3 targetDir = (targetPos - pos).SafeNormalize();
-			const float targetDist = pos.distance(targetPos) + 0.1f;
-
-			if (extraHeightTime > 0) {
-				extraHeight -= extraHeightDecay;
-				--extraHeightTime;
-
-				targetPos.y += extraHeight;
-
-				if (dir.y <= 0.0f) {
-					// missile has reached apex, smoothly transition
-					// to targetDir (can still overshoot when target
-					// is too close or height difference too large)
-					const float horDiff = (targetPos - pos).Length2D() + 0.01f;
-					const float verDiff = (targetPos.y - pos.y) + 0.01f;
-					const float dirDiff = math::fabs(targetDir.y - dir.y);
-					const float ratio = math::fabs(verDiff / horDiff);
-
-					// tilt missile up if
-					// 1. missile is pointing below target
-					// 2. AND missile height is below target
-					// This compensates for high wobble zero turnrate missiles aiming at high elevations
-					// Prevents these missiles from quickly turing directly downwards if wobble 
-					// causes them to undershoot their elevated target 
-					if (((targetDir.y - dir.y) > 0.0f) && ((targetPos.y - extraHeight - pos.y) > 0.0f)) {
-						dir.y += (dirDiff * ratio);
-					}
-					else {
-						dir.y -= (dirDiff * ratio);
-					}
-
+			if (!TestControlArea()) // out of control area bounds; handle as expired ttl
+			{
+				if (weaponDef->selfExplode) {
+					Collision();
 				} else {
-					// missile is still ascending
-					
-					// tilt missile up if
-					// 1. missile is pointing below target
-					// 2. AND missile height is below target
-					// This compensates for high wobble zero turnrate missiles aiming at high elevations
-					// Lets these missiles continue ascending to an elevated target
-					// even if wobble causes them to temporarily undershoot their elevated target 
-					if ( ((targetDir.y - dir.y) > 0.0f) && ((targetPos.y - extraHeight - pos.y) > 0.0f) ) {
-						dir.y += (extraHeightDecay / targetDist);
-					}
-					else {
-						dir.y -= (extraHeightDecay / targetDist);
+					// only when TTL <= 0 do we (missiles)
+					// get influenced by gravity and drag
+					if (!luaMoveCtrl)
+						SetVelocityAndSpeed((speed * 0.98f) + (UpVector * mygravity));
+				}
+			} else {
+
+				speed.w += (weaponDef->weaponacceleration * (speed.w < maxSpeed));
+
+				// FIXME: should go before the targeting update?
+				// const float3 orgTargPos = targetPos;
+				// const float3 targetDir = (targetPos - pos).SafeNormalize();
+				const float3& targetVel = UpdateTargeting();
+
+				UpdateWobble();
+				UpdateDance();
+
+				const float3 orgTargPos = targetPos;
+				const float3 targetDir = (targetPos - pos).SafeNormalize();
+				const float targetDist = pos.distance(targetPos) + 0.1f;
+
+				if (extraHeightTime > 0) {
+					extraHeight -= extraHeightDecay;
+					--extraHeightTime;
+
+					targetPos.y += extraHeight;
+
+					if (dir.y <= 0.0f) {
+						// missile has reached apex, smoothly transition
+						// to targetDir (can still overshoot when target
+						// is too close or height difference too large)
+						const float horDiff = (targetPos - pos).Length2D() + 0.01f;
+						const float verDiff = (targetPos.y - pos.y) + 0.01f;
+						const float dirDiff = math::fabs(targetDir.y - dir.y);
+						const float ratio = math::fabs(verDiff / horDiff);
+
+						// tilt missile up if
+						// 1. missile is pointing below target
+						// 2. AND missile height is below target
+						// This compensates for high wobble zero turnrate missiles aiming at high elevations
+						// Prevents these missiles from quickly turing directly downwards if wobble 
+						// causes them to undershoot their elevated target 
+						if (((targetDir.y - dir.y) > 0.0f) && ((targetPos.y - extraHeight - pos.y) > 0.0f)) {
+							dir.y += (dirDiff * ratio);
+						}
+						else {
+							dir.y -= (dirDiff * ratio);
+						}
+
+					} else {
+						// missile is still ascending
+						
+						// tilt missile up if
+						// 1. missile is pointing below target
+						// 2. AND missile height is below target
+						// This compensates for high wobble zero turnrate missiles aiming at high elevations
+						// Lets these missiles continue ascending to an elevated target
+						// even if wobble causes them to temporarily undershoot their elevated target 
+						if ( ((targetDir.y - dir.y) > 0.0f) && ((targetPos.y - extraHeight - pos.y) > 0.0f) ) {
+							dir.y += (extraHeightDecay / targetDist);
+						}
+						else {
+							dir.y -= (extraHeightDecay / targetDist);
+						}
 					}
 				}
+
+				const float3 targetLeadVec = targetVel * (targetDist / maxSpeed) * 0.7f;
+				const float3 targetLeadDir = (targetPos + targetLeadVec - pos).Normalize();
+
+				float3 targetDirDif = targetLeadDir - dir;
+
+				if (targetDirDif.SqLength() < Square(weaponDef->turnrate)) {
+					dir = targetLeadDir;
+				} else {
+					targetDirDif = (targetDirDif - (dir * (targetDirDif.dot(dir)))).SafeNormalize();
+					dir = (dir + (targetDirDif * weaponDef->turnrate)).SafeNormalize();
+				}
+
+				targetPos = orgTargPos;
+
+				// dir and speed.w have changed, keep speed-vector in sync
+				SetDirectionAndSpeed(dir, speed.w);
 			}
 
-			const float3 targetLeadVec = targetVel * (targetDist / maxSpeed) * 0.7f;
-			const float3 targetLeadDir = (targetPos + targetLeadVec - pos).Normalize();
-
-			float3 targetDirDif = targetLeadDir - dir;
-
-			if (targetDirDif.SqLength() < Square(weaponDef->turnrate)) {
-				dir = targetLeadDir;
-			} else {
-				targetDirDif = (targetDirDif - (dir * (targetDirDif.dot(dir)))).SafeNormalize();
-				dir = (dir + (targetDirDif * weaponDef->turnrate)).SafeNormalize();
-			}
-
-			targetPos = orgTargPos;
-
-			// dir and speed.w have changed, keep speed-vector in sync
-			SetDirectionAndSpeed(dir, speed.w);
+			explGenHandler.GenExplosion(
+				cegID,
+				pos,
+				dir,
+				ttl,
+				damages->damageAreaOfEffect,
+				0.0f,
+				owner(),
+				ExplosionHitObject()
+			);
 		}
-
-		explGenHandler.GenExplosion(
-			cegID,
-			pos,
-			dir,
-			ttl,
-			damages->damageAreaOfEffect,
-			0.0f,
-			owner(),
-			ExplosionHitObject()
-		);
 	} else {
 		if (weaponDef->selfExplode) {
 			Collision();
