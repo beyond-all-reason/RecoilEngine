@@ -71,6 +71,11 @@ std::string LuaTextures::Create(const Texture& tex)
 		case GL_TEXTURE_3D: {
 			glTexImage3D(tex.target, 0, tex.format, tex.xsize, tex.ysize, tex.zsize, tex.border, dataFormat, dataType, nullptr);
 		} break;
+		case GL_TEXTURE_CUBE_MAP: {
+			// all six faces need storage; gl.GenerateMipmap allocates the mip chain
+			for (GLenum face = GL_TEXTURE_CUBE_MAP_POSITIVE_X; face <= GL_TEXTURE_CUBE_MAP_NEGATIVE_Z; ++face)
+				glTexImage2D(face, 0, tex.format, tex.xsize, tex.ysize, tex.border, dataFormat, dataType, nullptr);
+		} break;
 
 		case GL_TEXTURE_2D_MULTISAMPLE: {
 			assert(tex.samples > 1);
