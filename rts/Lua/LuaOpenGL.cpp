@@ -6893,11 +6893,29 @@ int LuaOpenGL::FindQuery(const void* handle)
 }
 
 /***
+ * Creates a query object for gl.RunQuery.
+ *
+ * "samples" (the default) counts the samples that pass the depth test.
+ * "time" measures the GPU execution time of the commands issued inside
+ * gl.RunQuery (GL_TIME_ELAPSED), in nanoseconds; it returns nil when the GPU
+ * lacks timer queries (OpenGL 3.3 or ARB_timer_query).
+ *
  * @function gl.CreateQuery
- * @return any query
+ * @param kind ("samples"|"time")? (Default: `"samples"`)
+ * @return any? query
  */
 int LuaOpenGL::CreateQuery(lua_State* L)
 {
+	const std::string kind = luaL_optstring(L, 1, "samples");
+	GLenum target = GL_SAMPLES_PASSED;
+	if (kind == "time") {
+		if (!GLAD_GL_VERSION_3_3 && !GLAD_GL_ARB_timer_query)
+			return 0;
+		target = GL_TIME_ELAPSED;
+	} else if (kind != "samples") {
+		luaL_error(L, "gl.CreateQuery(kind): kind must be \"samples\" or \"time\"");
+	}
+
 	GLuint id;
 	glGenQueries(1, &id);
 
@@ -6907,7 +6925,7 @@ int LuaOpenGL::CreateQuery(lua_State* L)
 	// Heap-owned until gl.DeleteQuery or LuaOpenGL::Free. (A lua_newuserdata block
 	// was left unreferenced while only a light userdata was returned, so the
 	// garbage collector could free it while occlusionQueries still pointed at it.)
-	OcclusionQuery* qry = new OcclusionQuery{static_cast<unsigned int>(occlusionQueries.size()), id};
+	OcclusionQuery* qry = new OcclusionQuery{static_cast<unsigned int>(occlusionQueries.size()), id, target};
 	occlusionQueries.push_back(qry);
 
 	lua_pushlightuserdata(L, reinterpret_cast<void*>(qry));
@@ -6968,9 +6986,9 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	const int args = lua_gettop(L); // number of arguments
 
 	running = true;
-	glBeginQuery(GL_SAMPLES_PASSED, qry->id);
+	glBeginQuery(qry->target, qry->id);
 	const int error = lua_pcall(L, (args - 2), 0, 0);
-	glEndQuery(GL_SAMPLES_PASSED);
+	glEndQuery(qry->target);
 	running = false;
 
 	if (error != 0) {
@@ -6982,9 +7000,14 @@ int LuaOpenGL::RunQuery(lua_State* L)
 }
 
 /***
+ * Result of the last gl.RunQuery: a sample count, or GPU nanoseconds for a
+ * "time" query. With wait = false it does not stall: it returns nil while the
+ * GPU has not finished the measured commands yet.
+ *
  * @function gl.GetQuery
  * @param query any
- * @return integer count
+ * @param wait boolean? (Default: `true`)
+ * @return number? result
  */
 int LuaOpenGL::GetQuery(lua_State* L)
 {
@@ -6997,6 +7020,22 @@ int LuaOpenGL::GetQuery(lua_State* L)
 		return 0;
 
 	const OcclusionQuery* qry = occlusionQueries[index];
+
+	if (!luaL_optboolean(L, 2, true)) {
+		GLuint available = GL_FALSE;
+		glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT_AVAILABLE, &available);
+		if (available == GL_FALSE) {
+			lua_pushnil(L);
+			return 1;
+		}
+	}
+
+	if (qry->target == GL_TIME_ELAPSED) {
+		GLuint64 nanoseconds = 0;
+		glGetQueryObjectui64v(qry->id, GL_QUERY_RESULT, &nanoseconds);
+		lua_pushnumber(L, static_cast<double>(nanoseconds));
+		return 1;
+	}
 
 	GLuint count;
 	glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT, &count);

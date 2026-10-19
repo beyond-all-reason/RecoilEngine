@@ -158,6 +158,7 @@ class LuaOpenGL {
 		struct OcclusionQuery {
 			unsigned int index; // into LuaOpenGL::occlusionQueries
 			unsigned int id;
+			unsigned int target = 0x8914; // GL_SAMPLES_PASSED, or GL_TIME_ELAPSED for gl.CreateQuery("time")
 		};
 
 		static std::vector<OcclusionQuery*> occlusionQueries;
