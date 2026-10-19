@@ -50,6 +50,11 @@
 CONFIG(int, CubeTexSizeSpecular).defaultValue(128).minimumValue(1).description("The square resolution of each face of the specular cubemap.");
 CONFIG(int, CubeTexSizeReflection).defaultValue(128).minimumValue(1).description("The square resolution of each face of the environment reflection cubemap.");
 CONFIG(bool, CubeTexGenerateMipMaps).defaultValue(false).description("Generate mipmaps for the reflection and specular cubemap textures, useful for efficient subsampling and blurring.");
+// Which implementation owns the PBR environment. "bar" (default): BAR's LuaRules provider
+// (gfx_pbr_ibl_provider.lua) builds it with gl.RenderEnvironmentFace and gl.PublishTexture,
+// and this pipeline stays idle. "engine": this C++ pipeline below. Both read the same
+// PBREnvironment* keys; exactly one of them runs.
+CONFIG(std::string, PBRIBLProvider).defaultValue("bar").description("PBR environment provider: bar (BAR LuaRules provider) or engine (Recoil CubeMapHandler pipeline).");
 CONFIG(std::string, PBREnvironmentCapture).defaultValue("legacy-clone").description("PBR environment capture mode: legacy-clone, hdr-modern, or compare.");
 CONFIG(std::string, PBREnvironmentCaptureAnchor).defaultValue("map-center").description("PBR environment capture anchor: map-center or camera.");
 CONFIG(std::string, PBREnvironmentCaptureContent).defaultValue("sky-only").description("PBR environment capture content: sky-only, sky-terrain, or legacy-scene.");
@@ -943,7 +948,10 @@ void CubeMapHandler::UpdatePBRConfiguration()
 	pbrRequestedSet = requestedSet;
 	pbrRefreshRevision = refreshRevision;
 
-	if ((captureMode != "hdr-modern" && captureMode != "compare") || availableFilter == nullptr) {
+	// Another provider owns the environment: stay idle and release the engine's PBR resources.
+	const bool engineProvider = (configHandler->GetString("PBRIBLProvider") == "engine");
+
+	if (!engineProvider || (captureMode != "hdr-modern" && captureMode != "compare") || availableFilter == nullptr) {
 		if (pbrEnabled)
 			FreePBREnvironment();
 		pbrEnabled = false;
