@@ -30,12 +30,17 @@ public:
 	using TrajectoryFunc = std::function<void(float xzDist, float rise, std::vector<float3>& path)>;
 
 	void Build(float range, const TrajectoryFunc& getTrajectory);
+	bool Covers(float xzDist, float rise) const;
 
 	/**
 	 * @brief fill the interior samples [1, NUM_SAMPLES - 1] of a shot's path,
 	 * as horizontal distance and height relative to its start
 	 */
 	void Sample(float xzDist, float rise, float* dist, float* height) const;
+	/**
+	 * @brief Resample a traced path to the same evenly spaced points Build produces.
+	 */
+	static void TraceToSample(const std::vector<float3>& path, float xzDist, float rise, float* dist, float* height);
 
 private:
 	static constexpr std::array<float, 4> DIST_FRACS = {0.25f, 0.5f, 0.75f, 1.0f};

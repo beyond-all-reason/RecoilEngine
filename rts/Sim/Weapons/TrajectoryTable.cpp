@@ -4,6 +4,26 @@
 #include <algorithm>
 #include "System/SpringMath.h"
 
+// heights above the straight line from the origin to the target, as fractions of the xzDist value
+static void GetChordHeights(const std::vector<float3>& path, float xzDist, float rise, float* heights)
+{
+	constexpr uint32_t numSamples = TrajectoryTable::NUM_SAMPLES;
+	size_t j = 1;
+
+	for (uint32_t i = 1; i < numSamples; i++) {
+		const float x = xzDist * i / numSamples;
+
+		while (j < (path.size() - 1) && path[j].x < x)
+			j++;
+
+		const float3& p0 = path[j - 1];
+		const float3& p1 = path[j];
+		const float t = (p1.x > p0.x)? std::clamp((x - p0.x) / (p1.x - p0.x), 0.0f, 1.0f): 1.0f;
+
+		heights[i - 1] = (mix(p0.y, p1.y, t) - rise * i / numSamples) / xzDist;
+	}
+}
+
 void TrajectoryTable::Build(float range_, const TrajectoryFunc& getTrajectory)
 {
 	range = range_;
@@ -23,23 +43,29 @@ void TrajectoryTable::Build(float range_, const TrajectoryFunc& getTrajectory)
 			getTrajectory(xzDist, rise, path);
 			path.emplace_back(xzDist, rise, 0.0f);
 
-			// heights above the straight line to the target, interpolated along the path
-			size_t j = 1;
-
-			for (uint32_t i = 1; i < NUM_SAMPLES; i++) {
-				const float x = xzDist * i / NUM_SAMPLES;
-
-				while (j < (path.size() - 1) && path[j].x < x)
-					j++;
-
-				const float3& p0 = path[j - 1];
-				const float3& p1 = path[j];
-				const float t = (p1.x > p0.x)? std::clamp((x - p0.x) / (p1.x - p0.x), 0.0f, 1.0f): 1.0f;
-
-				heights.push_back((mix(p0.y, p1.y, t) - rise * i / NUM_SAMPLES) / xzDist);
-			}
+			heights.resize(heights.size() + NUM_HEIGHTS);
+			GetChordHeights(path, xzDist, rise, &heights[heights.size() - NUM_HEIGHTS]);
 		}
 	}
+}
+
+void TrajectoryTable::TraceToSample(const std::vector<float3>& path, float xzDist, float rise, float* dist, float* height)
+{
+	std::array<float, NUM_HEIGHTS> chordHeights;
+	GetChordHeights(path, xzDist, rise, chordHeights.data());
+
+	for (uint32_t i = 1; i < NUM_SAMPLES; i++) {
+		dist[i] = xzDist * i / NUM_SAMPLES;
+		height[i] = rise * i / NUM_SAMPLES + xzDist * chordHeights[i - 1];
+	}
+}
+
+bool TrajectoryTable::Covers(float xzDist, float rise) const
+{
+	const float distFrac = xzDist / range;
+	const float slope = rise / xzDist;
+
+	return (distFrac >= DIST_FRACS.front() && distFrac <= DIST_FRACS.back() && slope >= SLOPES.front() && slope <= SLOPES.back());
 }
 
 void TrajectoryTable::Sample(float xzDist, float rise, float* dist, float* height) const

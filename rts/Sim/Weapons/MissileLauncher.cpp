@@ -138,15 +138,24 @@ bool CMissileLauncher::HaveFreeLineOfFire(const float3& srcPos, const float3& tg
 	if (xzTargetDist == 0.0f)
 		return true;
 
-	// look up the path in the precomputed shots for the weapon
 	constexpr uint32_t numSteps = TrajectoryTable::NUM_SAMPLES;
+	const float rise = tgtPos.y - srcPos.y;
 
 	std::array<float, numSteps + 1> mdist = {}; //distance radially the missile has travelled
 	std::array<float, numSteps + 1> mheight = {}; //distance vertically the missile has travelled
 	mdist[numSteps] = xzTargetDist;
-	mheight[numSteps] = (tgtPos.y - srcPos.y);
+	mheight[numSteps] = rise;
 
-	weaponDef->trajectoryTable->Sample(xzTargetDist, tgtPos.y - srcPos.y, mdist.data(), mheight.data());
+	if (weaponDef->trajectoryTable->Covers(xzTargetDist, rise)) {
+		weaponDef->trajectoryTable->Sample(xzTargetDist, rise, mdist.data(), mheight.data());
+	} else {
+		std::vector<float3> path(1);
+
+		GetStaticTrajectory(*weaponDef, xzTargetDist, rise, path);
+		path.emplace_back(xzTargetDist, rise, 0.0f);
+
+		TrajectoryTable::TraceToSample(path, xzTargetDist, rise, mdist.data(), mheight.data());
+	}
 
 	// debug draw
 	if (globalRendering->drawDebugTraceRay) {
