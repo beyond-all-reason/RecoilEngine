@@ -36,11 +36,7 @@
 
 
 
-//////////////////////////////////////////////////////////////////////
-// Platform dependent classes
-//////////////////////////////////////////////////////////////////////
-
-#if defined(HEADLESS)
+// Shared fallback when no hardware cursor implementation is available.
 class HardwareCursorNull: public IHardwareCursor {
 public:
 	void PushImage(int xsize, int ysize, const void* mem) override {}
@@ -58,7 +54,11 @@ public:
 };
 
 
-#elif defined(_WIN32)
+//////////////////////////////////////////////////////////////////////
+// Platform dependent classes
+//////////////////////////////////////////////////////////////////////
+
+#if defined(_WIN32) && !defined(HEADLESS)
 
 
 class HardwareCursorWindows: public IHardwareCursor {
@@ -142,7 +142,7 @@ private:
 };
 
 
-#else
+#elif !defined(HEADLESS)
 
 
 #ifndef __APPLE__
@@ -209,7 +209,7 @@ private:
 
 IHardwareCursor* IHardwareCursor::Alloc(void* mem) {
 #if defined(HEADLESS)
-	static_assert(sizeof(HardwareCursorNull   ) <= CMouseCursor::HWC_MEM_SIZE, "");
+	static_assert(sizeof(HardwareCursorNull) <= CMouseCursor::HWC_MEM_SIZE, "");
 	return (new (mem) HardwareCursorNull());
 #elif defined (_WIN32)
 	static_assert(sizeof(HardwareCursorWindows) <= CMouseCursor::HWC_MEM_SIZE, "");
