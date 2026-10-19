@@ -87,9 +87,7 @@ CMissileProjectile::CMissileProjectile(const ProjectileParams& params): CWeaponP
 			assert(maxSpeed > 0.0f);
 			assert((std::max(dist, maxSpeed) / maxSpeed) >= 1.0f);
 
-			extraHeight = (dist * weaponDef->trajectoryHeight);
-			extraHeightTime = int(std::max(dist, maxSpeed) / maxSpeed);
-			extraHeightDecay = extraHeight / extraHeightTime;
+			InitExtraHeight(weaponDef, dist, maxSpeed, extraHeight, extraHeightTime, extraHeightDecay);
 		}
 	}
 
@@ -150,55 +148,7 @@ void CMissileProjectile::Update()
 			UpdateWobble();
 			UpdateDance();
 
-			const float3 orgTargPos = targetPos;
-			const float3 targetDir = (targetPos - pos).SafeNormalize();
-			const float targetDist = pos.distance(targetPos) + 0.1f;
-
-			if (extraHeightTime > 0) {
-				extraHeight -= extraHeightDecay;
-				--extraHeightTime;
-
-				targetPos.y += extraHeight;
-
-				if (dir.y <= 0.0f) {
-					// missile has reached apex, smoothly transition
-					// to targetDir without overshooting it
-					const float horDiff = (targetPos - pos).Length2D() + 0.01f;
-					const float verDiff = (targetPos.y - pos.y) + 0.01f;
-					const float ratio = math::fabs(verDiff / horDiff);
-
-					dir.y = mix(dir.y, targetDir.y, std::min(ratio, 1.0f));
-				} else {
-					// missile is still ascending
-					
-					// tilt missile up if
-					// 1. missile is pointing below target
-					// 2. AND missile height is below target
-					// This compensates for high wobble zero turnrate missiles aiming at high elevations
-					// Lets these missiles continue ascending to an elevated target
-					// even if wobble causes them to temporarily undershoot their elevated target 
-					if ( ((targetDir.y - dir.y) > 0.0f) && ((targetPos.y - extraHeight - pos.y) > 0.0f) ) {
-						dir.y += (extraHeightDecay / targetDist);
-					}
-					else {
-						dir.y -= (extraHeightDecay / targetDist);
-					}
-				}
-			}
-
-			const float3 targetLeadVec = targetVel * (targetDist / maxSpeed) * 0.7f;
-			const float3 targetLeadDir = (targetPos + targetLeadVec - pos).Normalize();
-
-			float3 targetDirDif = targetLeadDir - dir;
-
-			if (targetDirDif.SqLength() < Square(weaponDef->turnrate)) {
-				dir = targetLeadDir;
-			} else {
-				targetDirDif = (targetDirDif - (dir * (targetDirDif.dot(dir)))).SafeNormalize();
-				dir = (dir + (targetDirDif * weaponDef->turnrate)).SafeNormalize();
-			}
-
-			targetPos = orgTargPos;
+			dir = StepSteering(weaponDef, pos, dir, targetPos, targetVel, maxSpeed, extraHeight, extraHeightTime, extraHeightDecay);
 
 			// dir and speed.w have changed, keep speed-vector in sync
 			SetDirectionAndSpeed(dir, speed.w);
@@ -260,6 +210,76 @@ void CMissileProjectile::Update()
 
 	UpdateInterception();
 	UpdateGroundBounce();
+}
+
+void CMissileProjectile::InitExtraHeight(const WeaponDef* wd, float dist, float maxSpeed, float& extraHeight, int& extraHeightTime, float& extraHeightDecay)
+{
+	extraHeight = (dist * wd->trajectoryHeight);
+	extraHeightTime = int(std::max(dist, maxSpeed) / maxSpeed);
+	extraHeightDecay = extraHeight / extraHeightTime;
+}
+
+float3 CMissileProjectile::StepSteering(
+	const WeaponDef* wd,
+	const float3& pos,
+	float3 dir,
+	const float3& targetPos,
+	const float3& targetVel,
+	float maxSpeed,
+	float& extraHeight,
+	int& extraHeightTime,
+	float extraHeightDecay
+) {
+	RECOIL_DETAILED_TRACY_ZONE;
+	float3 aimPos = targetPos;
+	const float3 targetDir = (targetPos - pos).SafeNormalize();
+	const float targetDist = pos.distance(targetPos) + 0.1f;
+
+	if (extraHeightTime > 0) {
+		extraHeight -= extraHeightDecay;
+		--extraHeightTime;
+
+		aimPos.y += extraHeight;
+
+		if (dir.y <= 0.0f) {
+			// missile has reached apex, smoothly transition
+			// to targetDir without overshooting it
+			const float horDiff = (aimPos - pos).Length2D() + 0.01f;
+			const float verDiff = (aimPos.y - pos.y) + 0.01f;
+			const float ratio = math::fabs(verDiff / horDiff);
+
+			dir.y = mix(dir.y, targetDir.y, std::min(ratio, 1.0f));
+		} else {
+			// missile is still ascending
+			
+			// tilt missile up if
+			// 1. missile is pointing below target
+			// 2. AND missile height is below target
+			// This compensates for high wobble zero turnrate missiles aiming at high elevations
+			// Lets these missiles continue ascending to an elevated target
+			// even if wobble causes them to temporarily undershoot their elevated target 
+			if ( ((targetDir.y - dir.y) > 0.0f) && ((aimPos.y - extraHeight - pos.y) > 0.0f) ) {
+				dir.y += (extraHeightDecay / targetDist);
+			}
+			else {
+				dir.y -= (extraHeightDecay / targetDist);
+			}
+		}
+	}
+
+	const float3 targetLeadVec = targetVel * (targetDist / maxSpeed) * 0.7f;
+	const float3 targetLeadDir = (aimPos + targetLeadVec - pos).Normalize();
+
+	float3 targetDirDif = targetLeadDir - dir;
+
+	if (targetDirDif.SqLength() < Square(wd->turnrate)) {
+		dir = targetLeadDir;
+	} else {
+		targetDirDif = (targetDirDif - (dir * (targetDirDif.dot(dir)))).SafeNormalize();
+		dir = (dir + (targetDirDif * wd->turnrate)).SafeNormalize();
+	}
+
+	return dir;
 }
 
 float3 CMissileProjectile::UpdateTargeting() {

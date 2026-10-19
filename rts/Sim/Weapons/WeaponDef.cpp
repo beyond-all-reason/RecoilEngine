@@ -11,6 +11,7 @@
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectileTypes.h"
 #include "Sim/Units/Scripts/CobInstance.h" // TAANG2RAD
+#include "Sim/Weapons/MissileLauncher.h"
 #include "System/SpringMath.h"
 #include "System/Log/ILog.h"
 #include "System/StringHash.h"
@@ -571,6 +572,9 @@ WeaponDef::WeaponDef(const LuaTable& wdTable, const std::string& name_, int id_)
 	noAutoTarget = (manualfire || interceptor || isShield);
 	onlyForward = !turret && (projectileType != WEAPON_STARBURST_PROJECTILE);
 	submissile &= (projectileType == WEAPON_TORPEDO_PROJECTILE);
+
+	if (projectileType == WEAPON_MISSILE_PROJECTILE)
+		trajectoryTable = CMissileLauncher::BuildTrajectoryTable(*this);
 }
 
 
