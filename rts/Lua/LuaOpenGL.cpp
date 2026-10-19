@@ -176,8 +176,6 @@ std::string LuaOpenGL::fixedStateEnumToStringUnk;
 
 static float3 screenViewTrans;
 
-std::vector<LuaOpenGL::OcclusionQuery*> LuaOpenGL::occlusionQueries;
-
 
 
 
@@ -269,12 +267,6 @@ void LuaOpenGL::Init()
 void LuaOpenGL::Free()
 {
 	glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
-
-	for (const OcclusionQuery* q: occlusionQueries) {
-		glDeleteQueries(1, &q->id);
-	}
-
-	occlusionQueries.clear();
 }
 
 /******************************************************************************/
@@ -459,6 +451,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SaveImage);
 
 	if (GLAD_GL_ARB_occlusion_query) {
+		CreateQueryMetatable(L);
 		REGISTER_LUA_CFUNC(CreateQuery);
 		REGISTER_LUA_CFUNC(DeleteQuery);
 		REGISTER_LUA_CFUNC(RunQuery);
@@ -6729,6 +6722,34 @@ int LuaOpenGL::SaveImage(lua_State* L)
 
 /******************************************************************************/
 
+void LuaOpenGL::CreateQueryMetatable(lua_State* L)
+{
+	luaL_newmetatable(L, "OcclusionQuery");
+	LuaPushNamedCFunc(L, "__gc", QueryGC);
+	lua_pop(L, 1);
+}
+
+int LuaOpenGL::QueryGC(lua_State* L)
+{
+	auto* qry = static_cast<OcclusionQuery*>(luaL_checkudata(L, 1, "OcclusionQuery"));
+
+	if (qry->id != 0)
+		glDeleteQueries(1, &qry->id);
+
+	qry->id = 0;
+	return 0;
+}
+
+LuaOpenGL::OcclusionQuery* LuaOpenGL::GetOcclusionQuery(lua_State* L, int index, const char* errorMsg)
+{
+	auto* qry = static_cast<OcclusionQuery*>(LuaUtils::GetUserData(L, index, "OcclusionQuery"));
+
+	if (qry == nullptr)
+		luaL_error(L, "%s", errorMsg);
+
+	return qry;
+}
+
 /***
  * @function gl.CreateQuery
  * @return any query
@@ -6741,15 +6762,12 @@ int LuaOpenGL::CreateQuery(lua_State* L)
 	if (id == 0)
 		return 0;
 
-	OcclusionQuery* qry = static_cast<OcclusionQuery*>(lua_newuserdata(L, sizeof(OcclusionQuery)));
+	// a full userdata keeps the query alive while Lua references it; __gc frees it
+	auto* qry = static_cast<OcclusionQuery*>(lua_newuserdata(L, sizeof(OcclusionQuery)));
+	qry->id = id;
 
-	if (qry == nullptr)
-		return 0;
-
-	*qry = {static_cast<unsigned int>(occlusionQueries.size()), id};
-	occlusionQueries.push_back(qry);
-
-	lua_pushlightuserdata(L, reinterpret_cast<void*>(qry));
+	luaL_getmetatable(L, "OcclusionQuery");
+	lua_setmetatable(L, -2);
 	return 1;
 }
 
@@ -6762,22 +6780,10 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
 	if (lua_isnil(L, 1))
 		return 0;
 
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.DeleteQuery(q) expects a userdata query");
+	GetOcclusionQuery(L, 1, "gl.DeleteQuery(q) expects a userdata query");
 
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
-
-	if (qry == nullptr)
-		return 0;
-	if (qry->index >= occlusionQueries.size())
-		return 0;
-
-	glDeleteQueries(1, &qry->id);
-
-	occlusionQueries[qry->index] = occlusionQueries.back();
-	occlusionQueries[qry->index]->index = qry->index;
-	occlusionQueries.pop_back();
-	return 0;
+	// deletes now instead of at garbage collection; a second call does nothing
+	return QueryGC(L);
 }
 
 /***
@@ -6791,15 +6797,10 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	if (running)
 		luaL_error(L, "gl.RunQuery(q,f) can not be called recursively");
 
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.RunQuery(q,f) expects a userdata query");
+	const OcclusionQuery* qry = GetOcclusionQuery(L, 1, "gl.RunQuery(q,f) expects a userdata query");
 
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
-
-	if (qry == nullptr)
-		return 0;
-	if (qry->index >= occlusionQueries.size())
-		return 0;
+	if (qry->id == 0)
+		return 0; // deleted
 
 	if (!lua_isfunction(L, 2))
 		luaL_error(L, "gl.RunQuery(q,f) expects a function");
@@ -6827,15 +6828,10 @@ int LuaOpenGL::RunQuery(lua_State* L)
  */
 int LuaOpenGL::GetQuery(lua_State* L)
 {
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.GetQuery(q) expects a userdata query");
+	const OcclusionQuery* qry = GetOcclusionQuery(L, 1, "gl.GetQuery(q) expects a userdata query");
 
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
-
-	if (qry == nullptr)
-		return 0;
-	if (qry->index >= occlusionQueries.size())
-		return 0;
+	if (qry->id == 0)
+		return 0; // deleted
 
 	GLuint count;
 	glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT, &count);

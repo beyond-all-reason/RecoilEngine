@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_GL_H
-#define LUA_GL_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -155,14 +154,18 @@ class LuaOpenGL {
 		static std::unordered_map<GLenum, std::string> fixedStateEnumToString;
 		static std::string fixedStateEnumToStringUnk;
 
+		// gl.CreateQuery object: a full userdata with the "OcclusionQuery"
+		// metatable, owned by Lua like FBOs and RBOs. Its __gc deletes the GL
+		// query unless gl.DeleteQuery already did (id is 0 then).
 		struct OcclusionQuery {
-			unsigned int index; // into LuaOpenGL::occlusionQueries
 			unsigned int id;
 		};
 
-		static std::vector<OcclusionQuery*> occlusionQueries;
-
 	private:
+		static void CreateQueryMetatable(lua_State* L);
+		static int QueryGC(lua_State* L);
+		static OcclusionQuery* GetOcclusionQuery(lua_State* L, int index, const char* errorMsg);
+
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);
 		static void CondWarnDeprecatedGL(lua_State* L, const char* caller);
 		static void NotImplementedError(lua_State* L, const char* caller);
@@ -374,5 +377,3 @@ inline void LuaOpenGL::CheckMatrixState(lua_State* L, const char* fn, int error)
 		return;
 	GetLuaContextData(L)->glMatrixTracker.HandleMatrixStateError(error, fn);
 }
-
-#endif /* LUA_UNITDEFS_H */
