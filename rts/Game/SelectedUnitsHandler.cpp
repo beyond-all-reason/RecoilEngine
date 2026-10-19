@@ -32,7 +32,6 @@
 #include "System/Color.h"
 #include "System/EventHandler.h"
 #include "System/Log/ILog.h"
-#include "System/StringHash.h"
 #include "System/StringUtil.h"
 #include "Net/Protocol/NetProtocol.h"
 #include "System/Net/PackPacket.h"
@@ -49,8 +48,8 @@
 
 
 CONFIG(bool, BuildIconsFirst).defaultValue(false);
-CONFIG(bool, AutoAddBuiltUnitsToFactoryGroup).defaultValue(false).description("Controls whether or not units built by factories will inherit that factory's unit group.");
-CONFIG(bool, AutoAddBuiltUnitsToSelectedGroup).defaultValue(false);
+CONFIG(bool, AutoAddBuiltUnitsToFactoryGroup).deprecated(true);
+CONFIG(bool, AutoAddBuiltUnitsToSelectedGroup).deprecated(true);
 
 CSelectedUnitsHandler selectedUnitsHandler;
 
@@ -61,10 +60,8 @@ void CSelectedUnitsHandler::Init(unsigned numPlayers)
 	RECOIL_DETAILED_TRACY_ZONE;
 	soundMultiselID = sound->GetDefSoundId("MultiSelect");
 	buildIconsFirst = configHandler->GetBool("BuildIconsFirst");
-	autoAddBuiltUnitsToFactoryGroup = configHandler->GetBool("AutoAddBuiltUnitsToFactoryGroup");
-	autoAddBuiltUnitsToSelectedGroup = configHandler->GetBool("AutoAddBuiltUnitsToSelectedGroup");
 
-	configHandler->NotifyOnChange(this, {"BuildIconsFirst", "AutoAddBuiltUnitsToFactoryGroup", "AutoAddBuiltUnitsToSelectedGroup"});
+	configHandler->NotifyOnChange(this, {"BuildIconsFirst"});
 
 	netSelected.resize(numPlayers);
 }
@@ -78,13 +75,8 @@ void CSelectedUnitsHandler::Kill()
 void CSelectedUnitsHandler::ConfigNotify(const std::string& key, const std::string& value)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// per key, so a build-icons-first toggle survives a change of the other two
-	switch (hashString(key.c_str())) {
-		case hashString("BuildIconsFirst"                 ): { buildIconsFirst = configHandler->GetBool(key); possibleCommandsChanged = true; } break;
-		case hashString("AutoAddBuiltUnitsToFactoryGroup" ): { autoAddBuiltUnitsToFactoryGroup = configHandler->GetBool(key); } break;
-		case hashString("AutoAddBuiltUnitsToSelectedGroup"): { autoAddBuiltUnitsToSelectedGroup = configHandler->GetBool(key); } break;
-		default: {} break;
-	}
+	buildIconsFirst = configHandler->GetBool("BuildIconsFirst");
+	possibleCommandsChanged = true;
 }
 
 
@@ -248,7 +240,7 @@ void CSelectedUnitsHandler::GiveCommand(const Command& c, bool fromUser)
 
 				// change group, but do not call SUH::AddUnit while iterating
 				// (the unit's id is already present in selectedUnits anyway)
-				u->SetGroup(const_cast<CGroup*>(group), false, false);
+				u->SetGroup(const_cast<CGroup*>(group), false);
 			}
 
 			SelectGroup(group->id);
@@ -480,7 +472,7 @@ void CSelectedUnitsHandler::ClearSelected()
 }
 
 
-void CSelectedUnitsHandler::SetGroup(CGroup* group, bool fromFactory, bool autoSelect)
+void CSelectedUnitsHandler::SetGroup(CGroup* group, bool autoSelect)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	for (const int unitID: selectedUnits) {
@@ -489,7 +481,7 @@ void CSelectedUnitsHandler::SetGroup(CGroup* group, bool fromFactory, bool autoS
 		if (u == nullptr)
 			continue;
 
-		u->SetGroup(group, fromFactory, autoSelect);
+		u->SetGroup(group, autoSelect);
 	}
 }
 
@@ -643,9 +635,8 @@ void CSelectedUnitsHandler::Draw()
 	if (color1.a > 0) {
 		const auto* unitSet = &selectedUnits;
 
-		// note: units in this set are not necessarily all selected themselves, eg.
-		// if autoAddBuiltUnitsToSelectedGroup is true, so we check IsUnitSelected
-		// for each
+		// note: units in this set are not necessarily all selected themselves,
+		// so we check IsUnitSelected for each
 		if (selectedGroup != -1) {
 			const CGroupHandler* gh = &uiGroupHandlers[gu->myTeam];
 			const CGroup* g = gh->GetGroup(selectedGroup);

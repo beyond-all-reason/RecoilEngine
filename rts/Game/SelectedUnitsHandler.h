@@ -24,7 +24,7 @@ public:
 	void Kill();
 	void ConfigNotify(const std::string& key, const std::string& value);
 	void SelectGroup(int num);
-	void SetGroup(CGroup* group, bool fromFactory= false, bool autoSelect = false);
+	void SetGroup(CGroup* group, bool autoSelect = false);
 	void AINetOrder(int unitID, int aiTeamID, int playerID, const Command& c);
 	int GetDefaultCmd(const CUnit* unit, const CFeature* feature);
 
@@ -62,8 +62,6 @@ public:
 	bool CommandsChanged() const { return possibleCommandsChanged; }
 	bool IsUnitSelected(const CUnit* unit) const;
 	bool IsUnitSelected(const int unitID) const;
-	bool AutoAddBuiltUnitsToFactoryGroup() const { return autoAddBuiltUnitsToFactoryGroup; }
-	bool AutoAddBuiltUnitsToSelectedGroup() const { return autoAddBuiltUnitsToSelectedGroup; }
 	bool IsGroupSelected(int groupID) const { return (selectedGroup == groupID); }
 	int GetSelectedGroup() const { return selectedGroup; }
 
@@ -78,8 +76,6 @@ private:
 	int selectedGroup = -1;
 	int soundMultiselID = 0;
 
-	bool autoAddBuiltUnitsToFactoryGroup = false;
-	bool autoAddBuiltUnitsToSelectedGroup = false;
 	bool buildIconsFirst = false;
 
 	bool ubHandledByEngine = true;
