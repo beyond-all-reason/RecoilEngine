@@ -7311,7 +7311,7 @@ int LuaOpenGL::GetQuery(lua_State* L)
 		return 1;
 	}
 
-	GLuint count;
+	GLuint count = 0; // stays 0 for a query that never ran (GL_INVALID_OPERATION, nothing written)
 	glGetQueryObjectuiv(id, GL_QUERY_RESULT, &count);
 
 	lua_pushnumber(L, count);
