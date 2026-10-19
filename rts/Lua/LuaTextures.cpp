@@ -195,6 +195,7 @@ bool LuaTextures::Free(const std::string& name)
 
 	if (it != textureMap.end()) {
 		const Texture& tex = textureVec[it->second];
+		Unpublish(tex.id);
 		glDeleteTextures(1, &tex.id);
 
 		if (FBO::IsSupported()) {
@@ -236,6 +237,7 @@ void LuaTextures::FreeAll()
 {
 	for (const auto& item: textureMap) {
 		const Texture& tex = textureVec[item.second];
+		Unpublish(tex.id);
 		glDeleteTextures(1, &tex.id);
 
 		if (FBO::IsSupported()) {
@@ -247,6 +249,61 @@ void LuaTextures::FreeAll()
 	textureMap.clear();
 	textureVec.clear();
 	freeIndices.clear();
+}
+
+
+static std::vector<LuaTextures::Published> publishedSlots;
+static spring::unsynced_map<std::string, size_t> publishedIndices;
+
+size_t LuaTextures::GetPublishedIndex(const std::string& name)
+{
+	const auto it = publishedIndices.find(name);
+	if (it != publishedIndices.end())
+		return it->second;
+
+	// A slot is created on the first lookup, by the publisher or by a consumer that
+	// parses "$pub:<name>" before anything is published. The index stays valid for
+	// the rest of the session, so consumers keep it instead of the name.
+	const size_t index = publishedSlots.size();
+	publishedSlots.emplace_back().name = name;
+	publishedIndices.emplace(name, index);
+	return index;
+}
+
+const LuaTextures::Published* LuaTextures::GetPublished(size_t index)
+{
+	return (index < publishedSlots.size()) ? &publishedSlots[index] : nullptr;
+}
+
+bool LuaTextures::Publish(const std::string& name, const std::string& texName, std::string& error) const
+{
+	Published& slot = publishedSlots[GetPublishedIndex(name)];
+	if (slot.owner != nullptr && slot.owner != this) {
+		error = "\"" + name + "\" is published by another Lua handle";
+		return false;
+	}
+
+	if (texName.empty()) {
+		slot = {name};
+		return true;
+	}
+
+	const Texture* tex = GetInfo(texName);
+	if (tex == nullptr) {
+		error = "\"" + texName + "\" is not a texture of this Lua handle";
+		return false;
+	}
+
+	slot = {name, this, tex->id, tex->target, tex->xsize, tex->ysize};
+	return true;
+}
+
+void LuaTextures::Unpublish(GLuint id)
+{
+	for (Published& slot: publishedSlots) {
+		if (slot.id == id)
+			slot = {slot.name};
+	}
 }
 
 

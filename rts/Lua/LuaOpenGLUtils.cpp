@@ -433,6 +433,13 @@ bool LuaOpenGLUtils::ParseTextureImage(lua_State* L, LuaMatTexture& texUnit, con
 		} break;
 
 		case '$': {
+			if (image.compare(0, 5, "$pub:") == 0) {
+				// a texture published with gl.PublishTexture; id 0 while unpublished
+				texUnit.type = LuaMatTexture::LUATEX_PUBLISHED;
+				texUnit.data = reinterpret_cast<const void*>(LuaTextures::GetPublishedIndex(image.substr(5)));
+				break;
+			}
+
 			switch ((texUnit.type = GetLuaMatTextureType(image))) {
 				case LuaMatTexture::LUATEX_NONE: {
 					// name not found in table, check for special case overrides
@@ -562,6 +569,10 @@ GLuint LuaMatTexture::GetTextureID() const
 		} break;
 		case LUATEX_PBR_SPECULAR: {
 			texID = cubeMapHandler.GetPBRSpecularTextureID();
+		} break;
+		case LUATEX_PUBLISHED: {
+			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
+			texID = (pub != nullptr) ? pub->id : 0;
 		} break;
 
 
@@ -704,6 +715,10 @@ GLuint LuaMatTexture::GetTextureTarget() const
 		case LUATEX_PBR_IRRADIANCE: [[fallthrough]];
 		case LUATEX_PBR_SPECULAR: {
 			texType = GL_TEXTURE_CUBE_MAP_ARB;
+		} break;
+		case LUATEX_PUBLISHED: {
+			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
+			texType = (pub != nullptr && pub->id != 0) ? pub->target : GL_TEXTURE_2D;
 		} break;
 
 		case LUATEX_NONE:		  [[fallthrough]];
@@ -931,6 +946,10 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 		case LUATEX_PBR_SPECULAR: {
 			return ReturnHelper(cubeMapHandler.GetPBRSpecularTextureSize());
 		} break;
+		case LUATEX_PUBLISHED: {
+			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
+			return (pub != nullptr && pub->id != 0) ? ReturnHelper(pub->xsize, pub->ysize) : ReturnHelper(0);
+		} break;
 
 
 		case LUATEX_SHADOWMAP: {
@@ -1091,6 +1110,7 @@ void LuaMatTexture::Print(const string& indent) const
 		STRING_CASE(typeName, LUATEX_PBR_ENVIRONMENT);
 		STRING_CASE(typeName, LUATEX_PBR_IRRADIANCE);
 		STRING_CASE(typeName, LUATEX_PBR_SPECULAR);
+		STRING_CASE(typeName, LUATEX_PUBLISHED);
 
 		STRING_CASE(typeName, LUATEX_SHADOWMAP);
 		STRING_CASE(typeName, LUATEX_SHADOWCOLOR);

@@ -72,7 +72,25 @@ public:
 
 	const Texture* GetInfo(const std::string& name) const { return (GetInfo(GetIdx(name))); }
 	      Texture* GetInfo(const std::string& name)       { return (GetInfo(GetIdx(name))); }
+
+	// Textures published with gl.PublishTexture, sampled by any Lua handle as
+	// "$pub:<name>". Slots are never removed, so a consumer may keep an index;
+	// an unpublished or deleted texture leaves id 0.
+	struct Published {
+		std::string name;
+		const LuaTextures* owner = nullptr;
+		GLuint id = 0;
+		GLenum target = GL_TEXTURE_2D;
+		GLsizei xsize = 0;
+		GLsizei ysize = 0;
+	};
+	// publishes texName (or unpublishes when empty); only the owner may change a name
+	bool Publish(const std::string& name, const std::string& texName, std::string& error) const;
+	static size_t GetPublishedIndex(const std::string& name);
+	static const Published* GetPublished(size_t index);
 private:
+	static void Unpublish(GLuint id);
+
 	int lastCode;
 
 	// maps names to textureVec indices
