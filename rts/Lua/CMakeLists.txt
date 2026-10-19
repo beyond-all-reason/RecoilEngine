@@ -22,6 +22,8 @@ set(sources_engine_Lua
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaIO.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaInputReceiver.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaLibs.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/LuaImmediateBatch.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/LuaImmediateBatchGL.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaInterCall.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaIntro.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/LuaMaterial.cpp"
