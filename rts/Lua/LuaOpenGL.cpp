@@ -376,6 +376,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 		REGISTER_LUA_CFUNC(GenerateMipmap);
 	if (FBO::IsSupported()) {
 		REGISTER_LUA_CFUNC(RenderEnvironmentFace);
+		REGISTER_LUA_CFUNC(PublishTexture);
 	}
 
 	REGISTER_LUA_CFUNC(ActiveTexture);
@@ -4813,6 +4814,33 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 		return 1;
 
 	lua_pushstring(L, error);
+	return 2;
+}
+
+
+/***
+ * Publishes a Lua texture of this handle so every Lua handle (and engine
+ * code) can sample it as `"$pub:<name>"`, or unpublishes the name when
+ * `texName` is nil. Only the publishing handle can change a name. Deleting the
+ * texture, or the handle shutting down, unpublishes it. Consumers see names
+ * changed within one call-in together.
+ *
+ * @function gl.PublishTexture
+ * @param name string
+ * @param texName string? Lua texture name, nil to unpublish
+ * @return boolean success
+ * @return string? error
+ */
+int LuaOpenGL::PublishTexture(lua_State* L)
+{
+	std::string error;
+	const bool published = CLuaHandle::GetActiveTextures(L).Publish(luaL_checksstring(L, 1), luaL_optsstring(L, 2, ""), error);
+
+	lua_pushboolean(L, published);
+	if (published)
+		return 1;
+
+	lua_pushsstring(L, error);
 	return 2;
 }
 

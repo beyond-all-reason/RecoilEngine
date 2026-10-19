@@ -236,6 +236,7 @@ class LuaOpenGL {
 		static int RenderToTexture(lua_State* L);
 		static int GenerateMipmap(lua_State* L);
 		static int RenderEnvironmentFace(lua_State* L);
+		static int PublishTexture(lua_State* L);
 		static int ActiveTexture(lua_State* L);
 		static int TexEnv(lua_State* L);
 		static int TexGen(lua_State* L);
