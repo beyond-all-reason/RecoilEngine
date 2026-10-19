@@ -1,3 +1,5 @@
+/*** @env unsynced */
+
 #include "LuaVAO.h"
 
 #include "lib/sol2/sol.hpp"

@@ -1,5 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+/*** @env synced, unsynced */
+
 
 #include "LuaMetalMap.h"
 
@@ -64,6 +66,7 @@ int LuaMetalMap::GetMetalAmount(lua_State* L)
 /***
  * Sets the amount of metal on a single square.
  * @function Spring.SetMetalAmount
+ * @env synced
  * @param x integer X coordinate in worldspace / `Game.metalMapSquareSize`.
  * @param z integer Z coordinate in worldspace / `Game.metalMapSquareSize`.
  * @param metalAmount number must be between 0 and 255*maxMetal (with maxMetal from the .smd or mapinfo.lua).

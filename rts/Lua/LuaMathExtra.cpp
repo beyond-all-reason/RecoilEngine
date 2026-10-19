@@ -1,5 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+/*** @env synced, unsynced */
+
 #include "lib/streflop/streflop_cond.h"
 #include "System/SpringMath.h"
 #include "LuaMathExtra.h"
