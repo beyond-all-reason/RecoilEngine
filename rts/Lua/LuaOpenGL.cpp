@@ -178,7 +178,8 @@ std::string LuaOpenGL::fixedStateEnumToStringUnk;
 
 static float3 screenViewTrans;
 
-std::vector<LuaOpenGL::OcclusionQuery*> LuaOpenGL::occlusionQueries;
+std::vector<LuaOpenGL::OcclusionQuery> LuaOpenGL::occlusionQueries;
+uintptr_t LuaOpenGL::nextQueryHandle = 0;
 
 
 
@@ -277,9 +278,8 @@ void LuaOpenGL::Free()
 {
 	glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
 
-	for (const OcclusionQuery* q: occlusionQueries) {
-		glDeleteQueries(1, &q->id);
-		delete q;
+	for (const OcclusionQuery& q: occlusionQueries) {
+		glDeleteQueries(1, &q.id);
 	}
 
 	occlusionQueries.clear();
@@ -6885,8 +6885,9 @@ int LuaOpenGL::SaveImage(lua_State* L)
 
 int LuaOpenGL::FindQuery(const void* handle)
 {
+	const uintptr_t value = reinterpret_cast<uintptr_t>(handle);
 	for (size_t i = 0; i < occlusionQueries.size(); ++i) {
-		if (occlusionQueries[i] == handle)
+		if (occlusionQueries[i].handle == value)
 			return static_cast<int>(i);
 	}
 	return -1;
@@ -6922,13 +6923,12 @@ int LuaOpenGL::CreateQuery(lua_State* L)
 	if (id == 0)
 		return 0;
 
-	// Heap-owned until gl.DeleteQuery or LuaOpenGL::Free. (A lua_newuserdata block
-	// was left unreferenced while only a light userdata was returned, so the
-	// garbage collector could free it while occlusionQueries still pointed at it.)
-	OcclusionQuery* qry = new OcclusionQuery{static_cast<unsigned int>(occlusionQueries.size()), id, target};
-	occlusionQueries.push_back(qry);
+	// Stored by value; Lua only receives the handle number, so the garbage
+	// collector cannot free anything the list still refers to.
+	const OcclusionQuery query = {++nextQueryHandle, id, target};
+	occlusionQueries.push_back(query);
 
-	lua_pushlightuserdata(L, reinterpret_cast<void*>(qry));
+	lua_pushlightuserdata(L, reinterpret_cast<void*>(query.handle));
 	return 1;
 }
 
@@ -6949,13 +6949,10 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
 	if (index < 0)
 		return 0; // unknown or already deleted
 
-	OcclusionQuery* qry = occlusionQueries[index];
-	glDeleteQueries(1, &qry->id);
+	glDeleteQueries(1, &occlusionQueries[index].id);
 
 	occlusionQueries[index] = occlusionQueries.back();
-	occlusionQueries[index]->index = index;
 	occlusionQueries.pop_back();
-	delete qry;
 	return 0;
 }
 
@@ -6978,7 +6975,9 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	if (index < 0)
 		return 0;
 
-	const OcclusionQuery* qry = occlusionQueries[index];
+	// copies: the callback may create or delete queries, which moves list entries
+	const GLuint id = occlusionQueries[index].id;
+	const GLenum target = occlusionQueries[index].target;
 
 	if (!lua_isfunction(L, 2))
 		luaL_error(L, "gl.RunQuery(q,f) expects a function");
@@ -6986,9 +6985,9 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	const int args = lua_gettop(L); // number of arguments
 
 	running = true;
-	glBeginQuery(qry->target, qry->id);
+	glBeginQuery(target, id);
 	const int error = lua_pcall(L, (args - 2), 0, 0);
-	glEndQuery(qry->target);
+	glEndQuery(target);
 	running = false;
 
 	if (error != 0) {
@@ -7019,26 +7018,27 @@ int LuaOpenGL::GetQuery(lua_State* L)
 	if (index < 0)
 		return 0;
 
-	const OcclusionQuery* qry = occlusionQueries[index];
+	const GLuint id = occlusionQueries[index].id;
+	const GLenum target = occlusionQueries[index].target;
 
 	if (!luaL_optboolean(L, 2, true)) {
 		GLuint available = GL_FALSE;
-		glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT_AVAILABLE, &available);
+		glGetQueryObjectuiv(id, GL_QUERY_RESULT_AVAILABLE, &available);
 		if (available == GL_FALSE) {
 			lua_pushnil(L);
 			return 1;
 		}
 	}
 
-	if (qry->target == GL_TIME_ELAPSED) {
+	if (target == GL_TIME_ELAPSED) {
 		GLuint64 nanoseconds = 0;
-		glGetQueryObjectui64v(qry->id, GL_QUERY_RESULT, &nanoseconds);
+		glGetQueryObjectui64v(id, GL_QUERY_RESULT, &nanoseconds);
 		lua_pushnumber(L, static_cast<double>(nanoseconds));
 		return 1;
 	}
 
 	GLuint count;
-	glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT, &count);
+	glGetQueryObjectuiv(id, GL_QUERY_RESULT, &count);
 
 	lua_pushnumber(L, count);
 	return 1;

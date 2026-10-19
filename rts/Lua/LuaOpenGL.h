@@ -155,14 +155,18 @@ class LuaOpenGL {
 		static std::unordered_map<GLenum, std::string> fixedStateEnumToString;
 		static std::string fixedStateEnumToStringUnk;
 
+		// gl.CreateQuery objects, stored by value in one contiguous list. Lua holds a
+		// light userdata whose value is `handle`; handles are never reused, so a
+		// deleted or stale handle simply is not found.
 		struct OcclusionQuery {
-			unsigned int index; // into LuaOpenGL::occlusionQueries
-			unsigned int id;
-			unsigned int target = 0x8914; // GL_SAMPLES_PASSED, or GL_TIME_ELAPSED for gl.CreateQuery("time")
+			uintptr_t handle;
+			GLuint id;
+			GLenum target; // GL_SAMPLES_PASSED, or GL_TIME_ELAPSED for gl.CreateQuery("time")
 		};
 
-		static std::vector<OcclusionQuery*> occlusionQueries;
-		// index of a live query handle in occlusionQueries, or -1; never dereferences it
+		static std::vector<OcclusionQuery> occlusionQueries;
+		static uintptr_t nextQueryHandle;
+		// index of the query with this Lua handle in occlusionQueries, or -1
 		static int FindQuery(const void* handle);
 
 	private:
