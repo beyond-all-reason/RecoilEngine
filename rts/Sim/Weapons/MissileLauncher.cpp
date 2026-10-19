@@ -62,8 +62,10 @@ void CMissileLauncher::FireImpl(const bool scriptCall)
 	params.pos = weaponMuzzlePos;
 	params.end = currentTargetPos;
 	params.speed = startSpeed;
-	params.ttl = (ttl == 0) ? math::ceil(std::max(targetDist, range) / projectileSpeed + 25 * weaponDef->selfExplode) : ttl;
 	params.gravity = -weaponDef->myGravity;
+	// arcing trajectories are longer than the straight-line distance
+	const float pathScale = 1.0f + 0.25f * std::max(0.0f, weaponDef->trajectoryHeight);
+	params.ttl = (ttl == 0) ? math::ceil(std::max(targetDist, range) * pathScale / projectileSpeed + 25 * weaponDef->selfExplode) : ttl;
 
 	WeaponProjectileFactory::LoadProjectile(params);
 }
