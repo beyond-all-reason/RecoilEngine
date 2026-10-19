@@ -7304,7 +7304,9 @@ int LuaOpenGL::GetQuery(lua_State* L)
 
 	if (target == GL_TIME_ELAPSED) {
 		// 64-bit: a 32-bit result would overflow after about 4.3 seconds of GPU
-		// time. A double holds integers exactly up to 2^53 ns (about 104 days).
+		// time. Recoil's lua_Number is float (luaconf.h), so the value reaches Lua
+		// rounded to 24 significant bits: exact below 2^24 ns (about 16.8 ms),
+		// otherwise within about 1e-7 relative, ample for timing.
 		GLuint64 nanoseconds = 0;
 		glGetQueryObjectui64v(id, GL_QUERY_RESULT, &nanoseconds);
 		lua_pushnumber(L, static_cast<double>(nanoseconds));
