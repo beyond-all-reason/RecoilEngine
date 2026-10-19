@@ -1116,9 +1116,11 @@ bool CKeyBindings::FileSave(FILE* out) const
 	keyCodes.SaveUserKeySymbols(out);
 	scanCodes.SaveUserKeySymbols(out);
 
-	// save the fake meta key (if it has been defined)
+	// save the fake meta key, including the disabled state
 	if (fakeMetaKey >= 0)
 		fprintf(out, "fakemeta  %s\n\n", keyCodes.GetName(fakeMetaKey).c_str());
+	else
+		fprintf(out, "fakemeta  none\n\n");
 
 	for (const Action& action: GetActionList()) {
 		std::string comment;
