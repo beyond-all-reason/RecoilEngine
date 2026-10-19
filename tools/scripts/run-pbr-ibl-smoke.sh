@@ -57,7 +57,8 @@
 #     --start-script PATH / PBR_START_SCRIPT      default pbr-ibl-startscript.txt
 #     --config-template PATH / PBR_CONFIG_TEMPLATE first-run springsettings.cfg;
 #                                                 default .vscode/springsettings-
-#                                                 debug.cfg when it exists
+#                                                 debug.cfg when it exists; a
+#                                                 named file must exist
 #     --game-link-name NAME / PBR_GAME_LINK_NAME  junction name under games/
 #     --cursor-mode software|hardware|keep / PBR_CURSOR_MODE
 #     --window-mode background|foreground|keep / PBR_WINDOW_MODE
@@ -133,6 +134,10 @@ maps_directory="${PBR_MAPS_DIRECTORY:-}"
 start_script="${PBR_START_SCRIPT:-${script_dir}/pbr-ibl-startscript.txt}"
 write_directory="${PBR_WRITE_DIRECTORY:-}"
 config_template="${PBR_CONFIG_TEMPLATE:-${recoil_root}/.vscode/springsettings-debug.cfg}"
+# 1 when the caller named a template (PBR_CONFIG_TEMPLATE or --config-template):
+# a missing one is then an error, while the default local file is optional
+config_template_explicit=0
+[[ -n "${PBR_CONFIG_TEMPLATE:-}" ]] && config_template_explicit=1
 game_link_name="${PBR_GAME_LINK_NAME:-Beyond-All-Reason-Private-pbr-test.sdd}"
 prepare_only=0
 self_test=0
@@ -157,7 +162,8 @@ Usage: run-pbr-ibl-smoke.sh [options]
   --write-directory PATH   isolated writable data directory
                            (default: <repository>/test-results/pbr-ibl)
   --start-script PATH      start script (default: tools/scripts/pbr-ibl-startscript.txt)
-  --config-template PATH   optional initial springsettings.cfg template
+  --config-template PATH   initial springsettings.cfg template (must exist;
+                           default: .vscode/springsettings-debug.cfg if present)
   --game-link-name NAME    stable .sdd mount name under runtime/games
                            (default: Beyond-All-Reason-Private-pbr-test.sdd)
   --self-test              run BAR's "PBR IBL Self-Test" widget, then quit;
@@ -247,7 +253,7 @@ while (($# > 0)); do
 		--maps-directory) (($# >= 2)) || die "Missing value for $1"; maps_directory="$2"; shift 2 ;;
 		--write-directory) (($# >= 2)) || die "Missing value for $1"; write_directory="$2"; shift 2 ;;
 		--start-script) (($# >= 2)) || die "Missing value for $1"; start_script="$2"; shift 2 ;;
-		--config-template) (($# >= 2)) || die "Missing value for $1"; config_template="$2"; shift 2 ;;
+		--config-template) (($# >= 2)) || die "Missing value for $1"; config_template="$2"; config_template_explicit=1; shift 2 ;;
 		--game-link-name) (($# >= 2)) || die "Missing value for $1"; game_link_name="$2"; shift 2 ;;
 		--self-test) self_test=1; shift ;;
 		--input-probe) input_probe=1; shift ;;
@@ -315,8 +321,10 @@ maps_directory="$(absolute_directory "$maps_directory")"
 start_script="$(absolute_file "$start_script")"
 
 if [[ -n "$config_template" && ! -f "$(cygpath -u "$config_template")" ]]; then
-	# The default points at optional ignored local VS Code settings. An explicit
-	# portable run does not require that file and starts from an empty config.
+	# The default points at optional ignored local VS Code settings; a portable
+	# run without that file starts from an empty config. A template the caller
+	# named must exist: a typo would otherwise silently drop their settings.
+	((config_template_explicit)) && die "Config template does not exist: $config_template"
 	config_template=""
 elif [[ -n "$config_template" ]]; then
 	config_template="$(absolute_file "$config_template")"
@@ -350,9 +358,10 @@ config="${write_directory}/springsettings.cfg"
 	die "Engine runtime files are not installed in $runtime_directory. For a build tree run: cmake -P $(cygpath -m "$runtime_directory")/cont/cmake_install.cmake"
 # Windows refuses PE images above 2 GiB ("Exec format error"): a Debug build
 # keeps its DWARF inside spring.exe until the symbol split has run.
-# 2147483647 is 2^31 - 1 bytes, the largest size the Windows loader accepts;
-# checking here turns a cryptic exec failure into an actionable message.
-(($(stat -c %s "$engine") <= 2147483647)) ||
+# 2^31 - 1 bytes is the largest image the Windows loader accepts; checking
+# here turns a cryptic exec failure into an actionable message.
+windows_max_image_bytes=2147483647
+(($(stat -c %s "$engine") <= windows_max_image_bytes)) ||
 	die "The engine exceeds Windows' 2 GiB executable limit. Run tools/scripts/split-debug-symbols.sh --engine $(cygpath -m "$engine")."
 
 # Directory junction (no admin rights needed); an existing path is only
@@ -548,7 +557,8 @@ if [[ "$window_mode" == "background" ]]; then
 	"$engine" "${engine_arguments[@]}" &
 	engine_pid=$!
 	windows_pid="$(windows_process_id "$engine_pid")"
-	powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$(cygpath -w "${script_dir}/pbr-window-to-back.ps1")" 		-ProcessId "$windows_pid" -LogFile "$(cygpath -w "${write_directory}/window-to-back.log")" &
+	powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$(cygpath -w "${script_dir}/pbr-window-to-back.ps1")" \
+		-ProcessId "$windows_pid" -LogFile "$(cygpath -w "${write_directory}/window-to-back.log")" &
 	helper_pid=$!
 	engine_status=0
 	wait "$engine_pid" || engine_status=$?
