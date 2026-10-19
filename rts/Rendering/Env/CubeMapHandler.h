@@ -81,6 +81,10 @@ public:
 	unsigned int GetPBRIrradianceTextureSize() const { return PublishedOrRequestedSet().irradianceSize; }
 	unsigned int GetPBRSpecularTextureSize() const { return PublishedOrRequestedSet().specularSize; }
 	PBREnvironmentInfo GetPBREnvironmentInfo() const;
+	// Split-sum DFG table built by the engine while PBRDFGSource=engine-generated
+	// (0 otherwise); RG16F, x = NdotV, y = perceptual roughness. See GeneratePBRDFG.
+	unsigned int GetPBRDFGTextureID() const { return pbrDFGTexID; }
+	unsigned int GetPBRDFGTextureSize() const { return pbrDFGTexID != 0 ? PBR_DFG_SIZE : 0; }
 
 private:
 	/**
@@ -117,6 +121,8 @@ private:
 	void UpdatePBRConfiguration();
 	void RequestPBREpoch();
 	void CollectPBRTimers();
+	void UpdatePBRDFG();
+	void GeneratePBRDFG();
 
 	unsigned int envReflectionTexID; // sky and map
 	unsigned int skyReflectionTexID; // sky only
@@ -163,6 +169,13 @@ private:
 	std::string pbrFilterAttemptedRequest;
 	int pbrFilterAttemptedRevision = -1;
 	std::string pbrFilterLoadError;
+
+	// Engine-generated DFG table (one of the three PBRDFGSource variants). Size and
+	// sample count must match BAR's generator and modelmaterials_gl4/validation/
+	// pbr_dfg_v1.lua, or BAR's validation rejects the table.
+	static constexpr unsigned int PBR_DFG_SIZE = 128;
+	static constexpr unsigned int PBR_DFG_SAMPLES = 1024;
+	unsigned int pbrDFGTexID = 0;
 
 	// GL_TIMESTAMP queries: [2k, 2k+1] bracket capture face k, [12, 13] the
 	// filter pass. Results are read without stalling once all are available.
