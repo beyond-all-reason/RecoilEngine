@@ -196,6 +196,14 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-UUNIT_TEST")
 
 ################################################################################
+### SensorRegions
+	set(test_name SensorRegions)
+	set(test_src "${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/Misc/testSensorRegions.cpp" ${test_Common_sources})
+	set(test_libs "")
+	set(test_flags "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
+
+################################################################################
 ### Float3
 	set(test_name Float3)
 	set(test_src
