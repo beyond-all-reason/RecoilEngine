@@ -9,7 +9,6 @@
 # VISIBILITY_INLINES_HIDDEN    -fvisibility-inlines-hidden
 # SSE_FLAGS                    -msse -mfpmath=sse
 # IEEE_FP_FLAG                 -fvisibility-inlines-hidden
-# LTO_FLAGS                    -flto -fwhopr
 #
 # Note: gcc for windows supports these flags, but gives lots of errors when
 #       compiling, so use them only for linux builds.
@@ -86,12 +85,6 @@ EndIf (NOT DEFINED FP_CONTRACT_FLAG)
 If    (NOT DEFINED CXX17_FLAGS)
 	CHECK_AND_ADD_FLAGS(CXX17_FLAGS "-std=c++17")
 EndIf (NOT DEFINED CXX17_FLAGS)
-
-
-If    (NOT MSVC AND NOT DEFINED LTO_FLAGS)
-	Set(LTO_FLAGS "")
-	CHECK_AND_ADD_FLAGS(LTO_FLAGS -flto)
-EndIf (NOT MSVC AND NOT DEFINED LTO_FLAGS)
 
 
 

@@ -202,7 +202,7 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 	if (outputFloats.has_value())
 		onlyHash = !outputFloats.value();
 
-	static nowide::fstream file;
+	static nowide::ofstream file;
 	static int gMinFrameNum = -1;
 	static int gMaxFrameNum = -1;
 	static int gFramePeriod =  1;
@@ -828,7 +828,7 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 
 void DumpRNG(int newMinFrameNum, int newMaxFrameNum)
 {
-	static nowide::fstream file;
+	static nowide::ofstream file;
 	static int gMinFrameNum = -1;
 	static int gMaxFrameNum = -1;
 
