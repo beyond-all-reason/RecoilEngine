@@ -154,8 +154,8 @@ class LuaOpenGL {
 		static std::unordered_map<GLenum, std::string> fixedStateEnumToString;
 		static std::string fixedStateEnumToStringUnk;
 
-		static std::unordered_map<const void*, unsigned int> occlusionQueries;
-		inline static unsigned int runningQueryId = 0;
+		static std::unordered_map<const void*, GLuint> occlusionQueries;
+		inline static GLuint runningQueryId = 0;
 
 	private:
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);
