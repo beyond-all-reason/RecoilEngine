@@ -22,7 +22,9 @@ function Update()
 		reported = true
 		assert(Spring.SetMapDamageRegions == nil, "crater regions must be synced-only")
 		local r = Spring.GetMyPlayerID() == 0 and { 0, 0, 2048, 4096 } or { 2560, 0, 5120, 4096 }
-		assert(Spring.SetWorldDrawBounds(unpack(r)))
+		if Spring.SetWorldDrawBounds then
+			assert(Spring.SetWorldDrawBounds(unpack(r)))
+		end
 		Spring.Echo("[CRATER_LOCAL_VIEW] " .. table.concat(r, ","))
 		if Spring.GetModOptions().fixture_save_load == "1" then
 			if Spring.GetConfigInt("RegionFixtureReloaded", 0) == 1 then

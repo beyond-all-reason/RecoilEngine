@@ -24,12 +24,18 @@ Spring.SetCameraBounds()
 Spring.SetMiniMapView()
 ```
 
-`Spring.SetWorldDrawBounds` filters native world objects/effects, shadows, icons and command
-queues by position, and clips SMF terrain fragments. It also covers both native
-nano particle shader paths. Camera and minimap rectangles remain independent.
-Large billboards/models are included by their draw position, rather than cut into
-pieces at the rectangle edge. Lua models, custom shaders, decals and arbitrary
-widget geometry still require game-side filtering.
+`Spring.SetWorldDrawBounds` sets both the terrain and native object/effect bounds. It filters shadows, world icons and command queues by position, clips SMF terrain fragments and covers both native nano particle shader paths. Camera and minimap rectangles remain independent. Large billboards/models are included by their draw position, rather than cut into pieces at the rectangle edge. Lua models, custom shaders, decals and arbitrary widget geometry still require game-side filtering.
+
+Games can give objects more room while keeping a fixed terrain edge. Check `Engine.FeatureSupport.objectDrawBounds`, then override only the object/effect rectangle after setting the world bounds:
+
+```lua
+Spring.SetWorldDrawBounds(0, 0, 4096, 4096)
+Spring.SetObjectDrawBounds(-256, -256, 4352, 4352)
+```
+
+`Spring.SetObjectDrawBounds` changes the native object/effect filter without changing terrain, camera or minimap bounds. This includes unit/feature models, shadows, world icons, selection/command drawing, projectiles, particles, ground flashes and native nano particles. Unlike the other view setters, finite, ordered object coordinates may extend beyond the physical map, so aircraft, overshooting projectiles and displaced units can remain visible there. Invalid input preserves the previous state. A finite margin still has an outer drawing cutoff; games choose its size and must account for neighboring worlds and cubicle barriers.
+
+No arguments or nil clears only the object filter, leaving the terrain edge in place. Calling `Spring.SetWorldDrawBounds` again resets both terrain and object bounds together, preserving its original behavior. The minimap remains independently cropped; this setter does not add edge indicators or alter minimap input. All drawing bounds are local presentation state, cleared during camera initialization and teardown; games reapply them when their UI initializes after loading a save.
 
 `Spring.SetCameraBounds` constrains controller focus and interpolated camera focus, and uses
 the region's size/centre for normal overhead zoom limits, reset and overview.

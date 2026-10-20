@@ -2,6 +2,7 @@
 #include <catch_amalgamated.hpp>
 #include <limits>
 #include "Game/ViewRectangle.h"
+#include "Game/WorldDrawBounds.h"
 
 TEST_CASE("ViewRectangle validates map coordinates")
 {
@@ -46,4 +47,27 @@ TEST_CASE("ViewRectangle clamp supports narrow but valid regions")
 	REQUIRE(rectangle.ValidForMap(1024, 1024));
 	CHECK(rectangle.Contains(0, 0));
 	CHECK(rectangle.Contains(1024, 1024));
+}
+
+TEST_CASE("Object draw bounds can extend past terrain and physical map edges")
+{
+	const ViewRectangle terrain{0, 0, 1024, 1024};
+	const ViewRectangle objects{-128, -128, 1152, 1152};
+	REQUIRE(objects.Valid());
+	CHECK_FALSE(objects.ValidForMap(1024, 1024));
+	worldDrawBounds::Set(terrain);
+	CHECK_FALSE(worldDrawBounds::Contains({-64, 0, 512}));
+	worldDrawBounds::objectRectangle = objects;
+	CHECK(worldDrawBounds::Contains({-64, 0, 512}));
+	CHECK(worldDrawBounds::Contains({1088, 0, 512}));
+	CHECK_FALSE(worldDrawBounds::Contains({-129, 0, 512}));
+	CHECK_FALSE(worldDrawBounds::terrainRectangle.Contains(-64, 512));
+	worldDrawBounds::objectRectangle = {};
+	CHECK(worldDrawBounds::Contains({-4096, 0, 512}));
+	CHECK(worldDrawBounds::terrainRectangle.IsSet());
+	worldDrawBounds::Set(terrain);
+	CHECK_FALSE(worldDrawBounds::Contains({-64, 0, 512}));
+	worldDrawBounds::Clear();
+	CHECK_FALSE(worldDrawBounds::terrainRectangle.IsSet());
+	CHECK_FALSE(worldDrawBounds::objectRectangle.IsSet());
 }

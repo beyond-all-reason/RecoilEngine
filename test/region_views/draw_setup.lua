@@ -6,6 +6,7 @@ if not gadgetHandler:IsSyncedCode() then
 	return
 end
 local projectiles = {}
+local homeUnit, homeProjectile
 function gadget:Initialize()
 	for _, region in ipairs({ { "home", 1300 }, { "frontier", 3200 } }) do
 		local name, z = region[1], region[2]
@@ -20,6 +21,9 @@ function gadget:Initialize()
 			ttl = 10000,
 		}))
 		projectiles[projectile] = { 2600, 230, z }
+		if name == "home" then
+			homeUnit, homeProjectile = unit, projectile
+		end
 		Spring.SetGameRulesParam(name .. "_unit", unit, { public = true })
 		Spring.SetGameRulesParam(name .. "_feature", feature, { public = true })
 		Spring.SetGameRulesParam(name .. "_projectile", projectile, { public = true })
@@ -31,5 +35,13 @@ function gadget:GameFrame(frame)
 	for id, pos in pairs(projectiles) do
 		Spring.SetProjectilePosition(id, pos[1], pos[2], pos[3])
 		Spring.SetProjectileVelocity(id, 0, 0, 0)
+	end
+end
+
+function gadget:RecvLuaMsg(message)
+	if message == "draw_bounds_offmap" then
+		Spring.MoveCtrl.Enable(homeUnit)
+		Spring.MoveCtrl.SetPosition(homeUnit, -128, 220, 1300)
+		projectiles[homeProjectile] = { -128, 230, 1600 }
 	end
 end

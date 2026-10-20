@@ -43,6 +43,7 @@ class LuaUnsyncedCtrl {
 		static int SetCameraBounds(lua_State* L);
 		static int SetMiniMapView(lua_State* L);
 		static int SetWorldDrawBounds(lua_State* L);
+		static int SetObjectDrawBounds(lua_State* L);
 		static int RunDollyCamera(lua_State* L);
 		static int PauseDollyCamera(lua_State* L);
 		static int ResumeDollyCamera(lua_State* L);

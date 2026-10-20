@@ -19,7 +19,7 @@ already exist. Each run records its configuration, log, exit code and result.
 Use `--case nano --nano geometry` and `--case nano --nano instanced` for real
 construction emission, native lifecycle event assertions and pixels before,
 during, after switching and after clearing the world crop. The draw case separately
-exercises legacy CEGs.
+exercises legacy CEGs. It also overrides object bounds independently of terrain, checks invalid input and both clearing behaviors, and places a native unit/projectile beyond the physical map edge. Their draw flags and pixels must return with padded object bounds while the terrain crop stays fixed. Both unit drawers run the same case.
 
 The camera case covers all seven ordinary controllers, out-of-range camera
 states/targets, zoom limits and reset keys, disabled optional map-clamp settings,
@@ -78,3 +78,5 @@ python3 test/region_views/run.py --case crater --save-load --output /tmp/craters
 Crater save/load creates another explosion in the loaded process, testing restored
 boundaries rather than only a saved heightmap. As with sensors, this minimal native
 roundtrip does not establish complete downstream-game persistence.
+
+The engine also has a generic CREG serialization unit test in `test/engine/System/LoadSave/testCregLoadSave.cpp`. That checks the serializer itself; the two `--save-load` fixtures above exercise the region configuration through real `.ssf` saves and separate native processes. No desktop game or downstream game installation is needed. The loaded sensor fixture creates a new emitter; the loaded crater fixture creates a new explosion and checks terrain/building effects on both sides of the boundary. These focused tests do not establish complete save/load correctness for BAR or Zero-K.

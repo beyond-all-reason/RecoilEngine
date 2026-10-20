@@ -713,7 +713,7 @@ void Renderer::Draw(bool drawAboveWater, bool drawBelowWater, bool drawReflectio
 
 	shader->Enable();
 	shader->SetUniform("animationFrame", frame + globalRendering->timeOffset);
-	const auto& bounds = worldDrawBounds::rectangle;
+	const auto& bounds = worldDrawBounds::objectRectangle;
 	shader->SetUniform("worldDrawBoundsEnabled", int(bounds.IsSet()));
 	shader->SetUniform("worldDrawBounds", bounds.x0, bounds.z0, bounds.x1, bounds.z1);
 	shader->SetUniform("cameraPos",   camPos.x,   camPos.y,   camPos.z);

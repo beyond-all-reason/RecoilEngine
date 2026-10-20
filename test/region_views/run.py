@@ -205,6 +205,8 @@ HostIP=localhost;HostPort=0;StartPosType=0;GameStartDelay=0;RecordDemo=0;
             "NanoParticlesUpdateLuaUI=1\nNanoParticlesUpdateLuaUISampleRate=1\nNanoParticlesRate=1\nTeamNanoSpray=0\n"
         )
         env = os.environ.copy()
+        env.pop("DISPLAY", None)
+        env.pop("WAYLAND_DISPLAY", None)
         env["SDL_VIDEODRIVER"] = "offscreen"
         if options.render_fps > 0:
             limiter = data / "limit-swap.so"
