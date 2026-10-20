@@ -10,6 +10,7 @@ class CRotOverheadController : public CCameraController
 {
 public:
 	CRotOverheadController();
+	~CRotOverheadController();
 
 	const std::string GetName() const { return "rot"; }
 
@@ -31,6 +32,11 @@ public:
 	float3 GetDir() const {	return CCamera::GetFwdFromRot(rot); }
 
 	void Update();
+
+	void ConfigNotify(const std::string& key, const std::string& value);
+
+private:
+	void ReadConfig(const std::string& key);
 
 private:
 	float3 rot;

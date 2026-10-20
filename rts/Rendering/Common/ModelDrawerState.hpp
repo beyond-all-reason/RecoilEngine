@@ -60,7 +60,9 @@ public:
 	}
 public:
 	IModelDrawerState();
-	virtual ~IModelDrawerState() {}
+	virtual ~IModelDrawerState();
+
+	void ConfigNotify(const std::string& key, const std::string& value);
 
 	virtual bool CanEnable() const = 0;
 	virtual bool CanDrawDeferred() const { return false; }

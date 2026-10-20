@@ -261,10 +261,6 @@ void CFactory::FinishBuild(CUnit* buildee) {
 	if (unitDef->fullHealthFactory && buildee->health < buildee->maxHealth)
 		return;
 
-	// assign buildee to same group as us
-	if (GetGroup() != nullptr && buildee->GetGroup() != nullptr)
-		buildee->SetGroup(GetGroup(), true);
-
 	const CCommandAI* bcai = buildee->commandAI;
 	// if not idle, the buildee already has user orders
 	const bool buildeeIdle = (bcai->commandQue.empty());

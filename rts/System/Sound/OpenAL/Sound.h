@@ -81,6 +81,7 @@ private:
 	void Cleanup();
 	void OpenOpenALDevice(const std::string& deviceName);
 	bool OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec);
+	void ReopenSdlDevice();
 	void OpenLoopbackDevice(const std::string& deviceName);
 
 	void InitThread(int cfgMaxSounds);
@@ -100,6 +101,8 @@ private:
 	ALCcontext* curContext = nullptr;
 	int sdlDeviceID = -1;
 	bool hasAlcSoftLoopBack = false;
+	// OpenAL renders into the loopback device and SDL plays it
+	bool sdlOutput = false;
 
 	std::string selectedDeviceName = "";
 
