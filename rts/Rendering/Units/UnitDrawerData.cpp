@@ -1,3 +1,5 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "UnitDrawerData.h"
 
 #include "System/MemPoolTypes.h"
@@ -9,6 +11,7 @@
 #include "Game/GameSetup.h"
 #include "Game/GlobalUnsynced.h"
 #include "Game/Camera.h"
+#include "Game/WorldDrawBounds.h"
 #include "Game/CameraHandler.h"
 #include "Game/UI/MiniMap.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
@@ -426,6 +429,9 @@ void CUnitDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 		u->ResetDrawFlag();
 		u->SetIsIcon(isIcon);
 	}
+
+	if (!worldDrawBounds::Contains(u->drawPos))
+		return;
 
 	for (uint32_t camType = CCamera::CAMTYPE_PLAYER; camType < CCamera::CAMTYPE_ENVMAP; ++camType) {
 		if (camType == CCamera::CAMTYPE_UWREFL && !IWater::GetWater()->CanDrawReflectionPass())

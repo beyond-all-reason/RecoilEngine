@@ -926,7 +926,7 @@ void CSelectedUnitsHandler::PossibleCommandChange(CUnit* sender)
 // CALLINFO:
 // CGame::Draw --> DrawCommands
 // CMiniMap::DrawForReal --> DrawCommands
-void CSelectedUnitsHandler::DrawCommands()
+void CSelectedUnitsHandler::DrawCommands(bool onMiniMap)
 {
 	glDisable(GL_TEXTURE_2D);
 	glDisable(GL_DEPTH_TEST);
@@ -947,11 +947,11 @@ void CSelectedUnitsHandler::DrawCommands()
 		const auto& groupUnits = groupHandler.GetGroup(selectedGroup)->units;
 
 		for (const int unitID: groupUnits) {
-			commandDrawer->Draw((unitHandler.GetUnit(unitID))->commandAI);
+			commandDrawer->Draw((unitHandler.GetUnit(unitID))->commandAI, -1, onMiniMap);
 		}
 	} else {
 		for (const int unitID: selectedUnits) {
-			commandDrawer->Draw((unitHandler.GetUnit(unitID))->commandAI);
+			commandDrawer->Draw((unitHandler.GetUnit(unitID))->commandAI, -1, onMiniMap);
 		}
 	}
 

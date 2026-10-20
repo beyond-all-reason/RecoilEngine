@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "SimpleParticleSystem.h"
+#include "Game/WorldDrawBounds.h"
 
 #include "Game/Camera.h"
 #include "Game/GlobalUnsynced.h"
@@ -108,6 +109,8 @@ void CSimpleParticleSystem::Draw()
 
 	const auto DoParticleDraw = [this](const float3& xdir, const float3& ydir, const float3& zdir, const Particle* p) {
 		const float3 pDrawPos = p->pos + p->speed * globalRendering->timeOffset;
+		if (!worldDrawBounds::Contains(pDrawPos))
+			return;
 		const float size = p->size;
 
 		unsigned char color[4];

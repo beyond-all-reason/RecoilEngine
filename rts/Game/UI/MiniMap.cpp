@@ -231,15 +231,15 @@ void CMiniMap::ParseGeometry(const string& geostr)
 	}
 
 	if ((curDim.x <= 0) && (curDim.y <= 0)) {
-		const float hw = math::sqrt(mapDims.mapx * 1.0f / mapDims.mapy);
+		const float hw = math::sqrt(GetViewRectangle().Width() / GetViewRectangle().Height());
 		curDim.x = (-curDim.x * hw);
 		curDim.y = (-curDim.y / hw);
 	}
 	else if (curDim.x <= 0) {
-		curDim.x = curDim.y * (mapDims.mapx * 1.0f / mapDims.mapy);
+		curDim.x = curDim.y * (GetViewRectangle().Width() / GetViewRectangle().Height());
 	}
 	else if (curDim.y <= 0) {
-		curDim.y = curDim.x * (mapDims.mapy * 1.0f / mapDims.mapx);
+		curDim.y = curDim.x * (GetViewRectangle().Height() / GetViewRectangle().Width());
 	}
 
 	// convert to GL coords (MM origin in bottom-left corner)
@@ -276,6 +276,10 @@ void CMiniMap::SetRotation(RotationOptions state) // 0 1 2 3: 0 90 180 270
 
 	const float oldRotation = static_cast<int>(rotation) * math::HALFPI;
 	rotation = state;
+	if (HasViewRectangle()) {
+		UpdateGeometry();
+		viewNeedsUpdate = true;
+	}
 	eventHandler.MiniMapRotationChanged(static_cast<int>(rotation) * math::HALFPI, oldRotation);
 }
 
@@ -294,7 +298,9 @@ void CMiniMap::SetAspectRatioGeometry(const float& viewSizeX, const float& viewS
 		const float& viewPosX, const float& viewPosY, const MINIMAP_POSITION position)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const float  mapRatio = (float)mapDims.mapx / (float)mapDims.mapy;
+	const auto view = GetViewRectangle();
+	const bool sideways = HasViewRectangle() && (rotation == ROTATION_90 || rotation == ROTATION_270);
+	const float mapRatio = sideways ? view.Height() / view.Width() : view.Width() / view.Height();
 	const float viewRatio = viewSizeX / float(viewSizeY);;
 
 	if (mapRatio > viewRatio) {
@@ -515,20 +521,24 @@ void CMiniMap::UpdateGeometry()
 		curPos.x = std::clamp(curPos.x, 0, globalRendering->viewSizeX - curDim.x);
 	}
 
+	const auto view = GetViewRectangle();
 	{
 		// Draw{WorldStuff} transform
 		viewMats[0].LoadIdentity();
 		viewMats[0].Translate(UpVector);
-		viewMats[0].Scale({ +1.0f / (mapDims.mapx * SQUARE_SIZE), -1.0f / (mapDims.mapy * SQUARE_SIZE), 1.0f });
+		viewMats[0].Scale({ +1.0f / GetViewRectangle().Width(), -1.0f / GetViewRectangle().Height(), 1.0f });
 		viewMats[0].RotateX(90.0f * math::DEG_TO_RAD); // rotate to match real 'world' coordinates
 		viewMats[0].Scale(XZVector + UpVector * 0.0001f); // (invertibly) flatten; LuaOpenGL::DrawScreen uses persp-proj so z-values influence x&y
+
+		viewMats[0].Translate({-view.x0, 0.0f, -view.z0});
 
 		viewMats[1].LoadIdentity();
 		viewMats[1].Translate(UpVector);
 		// heightmap (squares) to minimap
-		viewMats[1].Scale({ 1.0f / mapDims.mapx, -1.0f / mapDims.mapy, 1.0f });
+		viewMats[1].Scale({ SQUARE_SIZE / view.Width(), -SQUARE_SIZE / view.Height(), 1.0f });
+		viewMats[1].Translate({-view.x0 / SQUARE_SIZE, -view.z0 / SQUARE_SIZE, 0.0f});
 		// worldmap (elmos) to minimap
-		// viewMats[1].Scale({1.0f / (mapDims.mapx * SQUARE_SIZE), -1.0f / (mapDims.mapy * SQUARE_SIZE), 1.0f});
+		// viewMats[1].Scale({1.0f / GetViewRectangle().Width(), -1.0f / GetViewRectangle().Height(), 1.0f});
 
 		viewMats[2].LoadIdentity();
 		viewMats[2].Scale({ 1.0f / curDim.x, 1.0f / curDim.y, 1.0f });
@@ -541,8 +551,8 @@ void CMiniMap::UpdateGeometry()
 	// setup the unit scaling
 	const float w = float(curDim.x);
 	const float h = float(curDim.y);
-	const float mapx = float(mapDims.mapx * SQUARE_SIZE);
-	const float mapy = float(mapDims.mapy * SQUARE_SIZE);
+	const float mapx = view.Width();
+	const float mapy = view.Height();
 	const float ref  = unitBaseSize / math::pow((200.0f * 200.0f), unitExponent);
 	const float dpr  = ref * math::pow((w * h), unitExponent);
 
@@ -793,12 +803,12 @@ void CMiniMap::MouseMove(int x, int y, int dx, int dy, int button)
 			{
 				case ROTATION_0:
 				case ROTATION_180:
-					curDim.x = (curDim.y * mapDims.mapx) / mapDims.mapy;
+					curDim.x = curDim.y * GetViewRectangle().Width() / GetViewRectangle().Height();
 					break;
 
 				case ROTATION_90:
 				case ROTATION_270:
-					curDim.x = (curDim.y * mapDims.mapy) / mapDims.mapx;
+					curDim.x = curDim.y * GetViewRectangle().Height() / GetViewRectangle().Width();
 					break;
 			}
 
@@ -865,6 +875,9 @@ CUnit* CMiniMap::GetSelectUnit(const float3& pos) const
 
 	if (unit == nullptr)
 		return unit;
+	const auto drawPos = gu->spectatingFullView ? unit->GetObjDrawMidPos() : unit->GetObjDrawErrorPos(gu->myAllyTeam);
+	if (!IsInView(drawPos.x, drawPos.z))
+		return nullptr;
 
 	if ((unit->losStatus[gu->myAllyTeam] & (LOS_INLOS | LOS_INRADAR)) || gu->spectatingFullView)
 		return unit;
@@ -876,8 +889,9 @@ CUnit* CMiniMap::GetSelectUnit(const float3& pos) const
 float3 CMiniMap::GetMapPosition(int x, int y) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const float mapX = float3::maxxpos + 1.0f;
-	const float mapZ = float3::maxzpos + 1.0f;
+	const auto view = GetViewRectangle();
+	const float mapX = view.Width();
+	const float mapZ = view.Height();
 
 	// mouse coordinate-origin is top-left of screen while
 	// the minimap origin is in its bottom-left corner, so
@@ -913,7 +927,7 @@ float3 CMiniMap::GetMapPosition(int x, int y) const
 		break;
 	}
 
-	return {mapX * sx, readMap->GetCurrMaxHeight(), mapZ * sz};
+	return {view.x0 + mapX * sx, readMap->GetCurrMaxHeight(), view.z0 + mapZ * sz};
 }
 
 
@@ -1049,8 +1063,8 @@ void CMiniMap::AddNotification(float3 pos, float3 color, float alpha)
 void CMiniMap::DrawCircle(TypedRenderBuffer<VA_TYPE_C>& rb, const float3& pos, SColor color, float radius) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const float xPixels = radius * float(curDim.x) / float(mapDims.mapx * SQUARE_SIZE);
-	const float yPixels = radius * float(curDim.y) / float(mapDims.mapy * SQUARE_SIZE);
+	const float xPixels = radius * float(curDim.x) / GetViewRectangle().Width();
+	const float yPixels = radius * float(curDim.y) / GetViewRectangle().Height();
 	const auto lod = static_cast<int>(0.25 * math::log2(1.0f + (xPixels * yPixels)));
 	const int divs = 1 << (std::clamp(lod, 0, 6 - 1) + 3);
 
@@ -1098,7 +1112,7 @@ void CMiniMap::Update()
 
 	static spring_time nextDrawScreen = spring_gettime();
 
-	if (spring_gettime() <= nextDrawScreen)
+	if (!viewNeedsUpdate && spring_gettime() <= nextDrawScreen)
 		return;
 
 	/* Below the renderToTexture check above,
@@ -1125,6 +1139,7 @@ void CMiniMap::Update()
 
 	fbo.Bind();
 	UpdateTextureCache();
+	viewNeedsUpdate = false;
 
 	/* Would need a larger refactor for this to become SetGeometry since the entire file
 	 * continuously changes dim and pos from curDim and curPos regularly from many functions */
@@ -1345,10 +1360,8 @@ void CMiniMap::DrawForReal(bool useNormalizedCoors, bool updateTex, bool luaCall
 
 	glActiveTexture(GL_TEXTURE0);
 
-	if (!updateTex) {
-		RenderCachedTexture(useNormalizedCoors);
+	if (!updateTex && RenderCachedTexture(useNormalizedCoors))
 		return;
-	}
 
 	glPushAttrib(GL_DEPTH_BUFFER_BIT);
 	glEnable(GL_BLEND);
@@ -1375,8 +1388,10 @@ void CMiniMap::DrawForReal(bool useNormalizedCoors, bool updateTex, bool luaCall
 
 	DrawBackground();
 
-	// allow Lua scripts to overdraw the background image
+	// Keep clipping independent of the script's GL safe-mode setting.
+	if (HasViewRectangle()) glPushAttrib(GL_SCISSOR_BIT);
 	eventHandler.DrawInMiniMapBackground();
+	if (HasViewRectangle()) glPopAttrib();
 
 	DrawUnitIcons();
 	DrawWorldStuff();
@@ -1389,7 +1404,9 @@ void CMiniMap::DrawForReal(bool useNormalizedCoors, bool updateTex, bool luaCall
 
 	// allow Lua scripts to draw into the minimap
 	SetClipPlanes(true);
+	if (HasViewRectangle()) glPushAttrib(GL_SCISSOR_BIT);
 	eventHandler.DrawInMiniMap();
+	if (HasViewRectangle()) glPopAttrib();
 
 	if (!updateTex) {
 		glPushMatrix();
@@ -1428,23 +1445,26 @@ void CMiniMap::DrawCameraFrustumAndMouseSelection()
 	{
 		case ROTATION_0:
 			glTranslatef(0.0f, +1.0f, 0.0f);
-			glScalef(+1.0f / (mapDims.mapx * SQUARE_SIZE), -1.0f / (mapDims.mapy * SQUARE_SIZE), +1.0f);
+			glScalef(+1.0f / GetViewRectangle().Width(), -1.0f / GetViewRectangle().Height(), +1.0f);
 			break;
 		case ROTATION_90:
-			glScalef(-1.0f / (mapDims.mapy * SQUARE_SIZE), +1.0f / (mapDims.mapx * SQUARE_SIZE), +1.0f);
+			glScalef(-1.0f / GetViewRectangle().Height(), +1.0f / GetViewRectangle().Width(), +1.0f);
 			glRotatef(90.0f, 0.0f, 0.0f, 1.0f);
 			break;
 		case ROTATION_180:
 			glTranslatef(+1.0f, 0.0f, 0.0f);
-			glScalef(+1.0f / (mapDims.mapx * SQUARE_SIZE), +1.0f / (mapDims.mapy * SQUARE_SIZE), +1.0f);
+			glScalef(+1.0f / GetViewRectangle().Width(), +1.0f / GetViewRectangle().Height(), +1.0f);
 			glRotatef(180.0f, 0.0f, 1.0f, 0.0f);
 			break;
 		case ROTATION_270:
 			glTranslatef(+1.0f, +1.0f, 0.0f);
-			glScalef(-1.0f / (mapDims.mapy * SQUARE_SIZE), +1.0f / (mapDims.mapx * SQUARE_SIZE), +1.0f);
+			glScalef(-1.0f / GetViewRectangle().Height(), +1.0f / GetViewRectangle().Width(), +1.0f);
 			glRotatef(-90.0f, 0.0f, 0.0f, 1.0f);
 			break;
 	}
+
+	const auto view = GetViewRectangle();
+	glTranslatef(-view.x0, -view.z0, 0.0f);
 
 	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_2D0>();
 	rb.AssertSubmission();
@@ -1725,7 +1745,7 @@ void CMiniMap::DrawNotes()
 		return;
 	}
 
-	const float baseSize = mapDims.mapx * SQUARE_SIZE;
+	const float baseSize = GetViewRectangle().Width();
 	static auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_C>();
 	rb.AssertSubmission();
 	auto& shader = rb.GetShader();
@@ -1738,6 +1758,10 @@ void CMiniMap::DrawNotes()
 			continue;
 		}
 
+		if (!IsInView(ni->pos.x, ni->pos.z)) {
+			++ni;
+			continue;
+		}
 		SColor color(ni->color[0], ni->color[1], ni->color[2], ni->color[3]);
 		for (int a = 0; a < 3; ++a) {
 			const float modage = age + a * 0.1f;
@@ -1835,48 +1859,29 @@ void CMiniMap::DrawBackground() const
 	auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_2DT>();
 	rb.AssertSubmission();
 
-	switch (rotation){
-		case ROTATION_0:
-			rb.AddQuadTriangles(
-				{ 0.0f, 0.0f, 0.0f, 1.0f }, // tl
-				{ 1.0f, 0.0f, 1.0f, 1.0f }, // tr
-				{ 1.0f, 1.0f, 1.0f, 0.0f }, // br
-				{ 0.0f, 1.0f, 0.0f, 0.0f }  // bl
-			);
-			break;
-		case ROTATION_90:
-			rb.AddQuadTriangles(
-				{ 1.0f, 0.0f, 0.0f, 1.0f }, // tl
-				{ 1.0f, 1.0f, 1.0f, 1.0f }, // tr
-				{ 0.0f, 1.0f, 1.0f, 0.0f }, // br
-				{ 0.0f, 0.0f, 0.0f, 0.0f }  // bl
-			);
-			break;
-		case ROTATION_180:
-			rb.AddQuadTriangles(
-				{ 1.0f, 1.0f, 0.0f, 1.0f }, // tl
-				{ 0.0f, 1.0f, 1.0f, 1.0f }, // tr
-				{ 0.0f, 0.0f, 1.0f, 0.0f }, // br
-				{ 1.0f, 0.0f, 0.0f, 0.0f }  // bl
-			);
-			break;
-		case ROTATION_270:
-			rb.AddQuadTriangles(
-				{ 0.0f, 1.0f, 0.0f, 1.0f }, // tl
-				{ 0.0f, 0.0f, 1.0f, 1.0f }, // tr
-				{ 1.0f, 0.0f, 1.0f, 0.0f }, // br
-				{ 1.0f, 1.0f, 0.0f, 0.0f }  // bl
-			);
-			break;		
-	}
+	const auto view = GetViewRectangle();
+	const float u0 = view.x0 / (mapDims.mapx * SQUARE_SIZE);
+	const float v0 = view.z0 / (mapDims.mapy * SQUARE_SIZE);
+	const float u1 = view.x1 / (mapDims.mapx * SQUARE_SIZE);
+	const float v1 = view.z1 / (mapDims.mapy * SQUARE_SIZE);
+	const auto tl = WorldToMiniMap(view.x0, view.z1);
+	const auto tr = WorldToMiniMap(view.x1, view.z1);
+	const auto br = WorldToMiniMap(view.x1, view.z0);
+	const auto bl = WorldToMiniMap(view.x0, view.z0);
+	rb.AddQuadTriangles(
+		{tl.x, tl.y, u0, v1}, {tr.x, tr.y, u1, v1},
+		{br.x, br.y, u1, v0}, {bl.x, bl.y, u0, v0}
+	);
 
 	//glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
-	glLoadIdentity();
+	if (renderToTexture)
+		glLoadIdentity();
 
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
-	glLoadMatrixf(projMats[0]);
+	if (renderToTexture)
+		glLoadMatrixf(projMats[0]);
 
 	// draw the map
 	auto state = GL::SubState(
@@ -1910,9 +1915,15 @@ void CMiniMap::DrawUnitIcons() const
 	// switch to top-down map/world coords (z is twisted with y compared to the real map/world coords)
 	glPushMatrix();
 	glTranslatef(0.0f, +1.0f, 0.0f);
-	glScalef(+1.0f / (mapDims.mapx * SQUARE_SIZE), -1.0f / (mapDims.mapy * SQUARE_SIZE), 1.0f);
+	glScalef(+1.0f / GetViewRectangle().Width(), -1.0f / GetViewRectangle().Height(), 1.0f);
 
 	MiniMapIconDrawParams params;
+	const auto view = GetViewRectangle();
+	params.viewRectangle = view;
+	params.cullMinX = view.x0;
+	params.cullMinZ = view.z0;
+	params.cullMaxX = view.x1;
+	params.cullMaxZ = view.z1;
 	params.iconSizeX = unitSizeX;
 	params.iconSizeY = unitSizeY;
 	params.rotation = rotation;
@@ -1944,6 +1955,8 @@ void CMiniMap::DrawUnitRanges() const
 
 	for (const int unitID: selUnits) {
 		const CUnit* unit = unitHandler.GetUnit(unitID);
+		if (!IsInView(unit->pos.x, unit->pos.z))
+			continue;
 
 		// LOS Ranges
 		if (unit->radarRadius && !unit->beingBuilt && unit->activated) {
@@ -1978,6 +1991,11 @@ void CMiniMap::DrawUnitRanges() const
 void CMiniMap::DrawWorldStuff() const
 {
 	ZoneScoped;
+	glPushAttrib(GL_SCISSOR_BIT);
+	if (HasViewRectangle()) {
+		glEnable(GL_SCISSOR_TEST);
+		glScissor(curPos.x, curPos.y, curDim.x, curDim.y);
+	}
 	glPushMatrix();
 
 	// normalize coords
@@ -1987,23 +2005,26 @@ void CMiniMap::DrawWorldStuff() const
 	{
 		case ROTATION_0:
 			glTranslatef(0.0f, 0.0f, -1.0f);
-			glScalef(+1.0f / (mapDims.mapx * SQUARE_SIZE), 0.0f, +1.0f / (mapDims.mapy * SQUARE_SIZE));
+			glScalef(+1.0f / GetViewRectangle().Width(), 0.0f, +1.0f / GetViewRectangle().Height());
 			break;
 		case ROTATION_90:
-			glScalef(+1.0f / (mapDims.mapy * SQUARE_SIZE), 0.0f, +1.0f / (mapDims.mapx * SQUARE_SIZE));
+			glScalef(+1.0f / GetViewRectangle().Height(), 0.0f, +1.0f / GetViewRectangle().Width());
 			glRotatef(90.0f, 0.0f, 1.0f, 0.0f);
 			break;
 		case ROTATION_180:
 			glTranslatef(+1.0f, 0.0f, 0.0f);
-			glScalef(+1.0f / (mapDims.mapx * SQUARE_SIZE), 0.0f, +1.0f / (mapDims.mapy * SQUARE_SIZE));
+			glScalef(+1.0f / GetViewRectangle().Width(), 0.0f, +1.0f / GetViewRectangle().Height());
 			glRotatef(180.0f, 0.0f, 1.0f, 0.0f);
 			break;
 		case ROTATION_270:
 			glTranslatef(+1.0f, 0.0f, -1.0f);
-			glScalef(+1.0f / (mapDims.mapy * SQUARE_SIZE), 0.0f, +1.0f / (mapDims.mapx * SQUARE_SIZE));
+			glScalef(+1.0f / GetViewRectangle().Height(), 0.0f, +1.0f / GetViewRectangle().Width());
 			glRotatef(-90.0f, 0.0f, 1.0f, 0.0f);
 			break;
 	}
+
+	const auto view = GetViewRectangle();
+	glTranslatef(-view.x0, 0.0f, -view.z0);
 
 	// draw the projectiles
 	if (drawProjectiles) {
@@ -2017,13 +2038,13 @@ void CMiniMap::DrawWorldStuff() const
 
 	{
 		// draw the queued commands
-		commandDrawer->DrawLuaQueuedUnitSetCommands();
+		commandDrawer->DrawLuaQueuedUnitSetCommands(true);
 
 		// NOTE: this needlessly adds to the CursorIcons list, but at least
 		//       they are not drawn  (because the input receivers are drawn
 		//       after the command queues)
 		if ((drawCommands > 0) && guihandler->GetQueueKeystate()) {
-			selectedUnitsHandler.DrawCommands();
+			selectedUnitsHandler.DrawCommands(true);
 		}
 	}
 
@@ -2039,6 +2060,7 @@ void CMiniMap::DrawWorldStuff() const
 	DrawUnitRanges();
 
 	glPopMatrix();
+	glPopAttrib();
 }
 
 
@@ -2087,3 +2109,31 @@ void CMiniMap::SetClipPlanes(const bool lua) const
 
 /******************************************************************************/
 
+
+
+ViewRectangle CMiniMap::GetViewRectangle() const
+{
+	if (HasViewRectangle())
+		return viewRectangle;
+	return {0.0f, 0.0f, float(mapDims.mapx * SQUARE_SIZE), float(mapDims.mapy * SQUARE_SIZE)};
+}
+
+float2 CMiniMap::WorldToMiniMap(float x, float z) const
+{
+	const auto view = GetViewRectangle();
+	const float u = (x - view.x0) / view.Width();
+	const float v = (z - view.z0) / view.Height();
+	switch (rotation) {
+		case ROTATION_90: return {v, u};
+		case ROTATION_180: return {1.0f - u, v};
+		case ROTATION_270: return {1.0f - v, 1.0f - u};
+		default: return {u, 1.0f - v};
+	}
+}
+
+void CMiniMap::SetViewRectangle(const ViewRectangle& rectangle)
+{
+	viewRectangle = rectangle;
+	UpdateGeometry();
+	viewNeedsUpdate = true;
+}

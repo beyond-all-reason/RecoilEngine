@@ -180,8 +180,9 @@ void COverheadController::MouseWheelMove(float move, const float3& newDir)
 				}
 
 				height = maxHeight;
-				pos.x  = mapDims.mapx * SQUARE_SIZE * 0.5f;
-				pos.z  = mapDims.mapy * SQUARE_SIZE * 0.55f; // somewhat longer toward bottom
+				const auto bounds = GetViewBounds();
+				pos.x = bounds.CenterX();
+				pos.z = HasViewBounds() ? bounds.CenterZ() : bounds.Height() * 0.55f; // somewhat longer toward bottom
 			} else {
 				height *= (1.0f + (altZoomDist / height));
 			}
@@ -202,10 +203,12 @@ void COverheadController::MouseWheelMove(float move, const float3& newDir)
 void COverheadController::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	pos.x = std::clamp(pos.x, 0.01f, mapDims.mapx * SQUARE_SIZE - 0.01f);
-	pos.z = std::clamp(pos.z, 0.01f, mapDims.mapy * SQUARE_SIZE - 0.01f);
+	const auto bounds = GetViewBounds();
+	pos.x = bounds.ClampX(pos.x);
+	pos.z = bounds.ClampZ(pos.z);
 	pos.y = CGround::GetHeightAboveWater(pos.x, pos.z, false);
 
+	maxHeight = std::max(minHeight, 9.5f / SQUARE_SIZE * std::max(bounds.Width(), bounds.Height()) * configHandler->GetFloat("OverheadMaxHeightFactor"));
 	height = std::clamp(height, minHeight, maxHeight);
 	angle = std::clamp(angle, 0.01f, math::HALFPI);
 

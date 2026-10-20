@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef SELECTED_UNITS_H
-#define SELECTED_UNITS_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -52,7 +51,7 @@ public:
 	bool BuildIconsFirst() const { return buildIconsFirst; }
 
 	void PossibleCommandChange(CUnit* sender);
-	void DrawCommands();
+	void DrawCommands(bool onMiniMap = false);
 	std::string GetTooltip();
 	void SetCommandPage(int page);
 	void SendCommand(const Command& c);
@@ -92,6 +91,3 @@ private:
 };
 
 extern CSelectedUnitsHandler selectedUnitsHandler;
-
-#endif /* SELECTED_UNITS_H */
-

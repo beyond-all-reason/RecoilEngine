@@ -2,6 +2,58 @@
 title: Map-region views, sensors and craters
 ---
 
+Games can present several regions of a single map as separate worlds. Three
+unsynced Lua setters control independent parts of the local view:
+
+```lua
+Spring.SetWorldDrawBounds(0, 0, 4096, 4096)
+Spring.SetCameraBounds(0, 0, 4096, 4096)
+Spring.SetMiniMapView(0, 0, 4096, 4096)
+```
+
+Check `Engine.FeatureSupport.mapRegionViews` before enabling a game mode that
+requires these commands.
+
+Coordinates are `x0 z0 x1 z1` in world elmos. All values must be finite, ordered,
+and within the physical map. Invalid coordinates return false and leave the previous rectangle
+unchanged. Each setter accepts no arguments or nil to restore normal whole-map behavior:
+
+```lua
+Spring.SetWorldDrawBounds()
+Spring.SetCameraBounds()
+Spring.SetMiniMapView()
+```
+
+`Spring.SetWorldDrawBounds` filters native world objects/effects, shadows, icons and command
+queues by position, and clips SMF terrain fragments. It also covers both native
+nano particle shader paths. Camera and minimap rectangles remain independent.
+Large billboards/models are included by their draw position, rather than cut into
+pieces at the rectangle edge. Lua models, custom shaders, decals and arbitrary
+widget geometry still require game-side filtering.
+
+`Spring.SetCameraBounds` constrains controller focus and interpolated camera focus, and uses
+the region's size/centre for normal overhead zoom limits, reset and overview.
+The camera can still look beyond the edge; pair it with terrain/render clipping
+or the game's chosen background effect. Clear camera bounds at widget shutdown.
+
+`Spring.SetMiniMapView` crops the background, maps world passes and icons to that rectangle,
+and maps input/rays back into its coordinates. Rotation, direct drawing and the
+cached minimap path are supported. Native range/command overlays use the minimap
+rectangle independently of `Spring.SetWorldDrawBounds`. Lua minimap drawing remains in the
+engine's documented callback coordinate spaces; games drawing full-map pixel
+charts must transform their own charts for the crop. The engine retains clipping
+when Lua resets drawing state. `gl.DrawMiniMapIcons` is independent of the built-in
+minimap crop and continues to use its caller-supplied rectangle.
+
+All three setters are local presentation state. They do not partition simulation,
+LOS, pathfinding, collision, damage, projectiles, teams or map physics. A game must
+implement portals, order routing and interaction isolation itself. Rendering
+bounds do not provide a security or information-hiding boundary for Lua clients.
+These are intentionally not console commands. Like other unsynced Lua controls,
+they are not a protection against modified widgets or clients; rely on synced
+rules and LOS for information hiding.
+With no bounds set, existing games retain their normal whole-map behavior.
+
 ## Synced sensor regions
 
 Sensor coverage can be partitioned independently of presentation. Check
@@ -70,3 +122,5 @@ own game rules. Combining terrain/build masks with those rules, native sensor
 bounds and crater bounds permits compact separating strips without relying on
 strip width to absorb every explosion. No particular game or packing layout is
 encoded in the engine.
+
+See `test/region_views/README.md` for graphical regressions and manual checks.
