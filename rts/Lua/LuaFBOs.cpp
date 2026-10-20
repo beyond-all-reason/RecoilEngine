@@ -930,11 +930,13 @@ int LuaFBOs::ClearAttachmentFBO(lua_State* L)
 	if (objectId == 0)
 		return ReportErrorAndReturn(fmt::format("invalid attachment object id ({})", objectId).c_str());
 
-	GLint componentType = 0;
-	glGetFramebufferAttachmentParameteriv(target, attachment, GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE, &componentType);
-
-	if (bufferType == GL_STENCIL)
+	GLint componentType;
+	if (bufferType == GL_STENCIL) {
 		componentType = GL_INT; // stencil clears require glClearBufferiv
+	} else {
+		componentType = 0;
+		glGetFramebufferAttachmentParameteriv(target, attachment, GL_FRAMEBUFFER_ATTACHMENT_COMPONENT_TYPE, &componentType);
+	}
 
 	switch (componentType)
 	{
