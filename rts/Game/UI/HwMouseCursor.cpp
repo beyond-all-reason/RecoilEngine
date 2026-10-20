@@ -237,7 +237,9 @@ IHardwareCursor* IHardwareCursor::Alloc(void* mem) {
 	}
 #endif
 
-	return nullptr;
+	// Offscreen SDL drivers have no window-system cursor; software drawing still works.
+	static_assert(sizeof(HardwareCursorNull) <= CMouseCursor::HWC_MEM_SIZE, "");
+	return (new (mem) HardwareCursorNull());
 }
 
 void IHardwareCursor::Free(IHardwareCursor* hwc) {
