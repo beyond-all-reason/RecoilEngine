@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _MAP_DAMAGE_H_
-#define _MAP_DAMAGE_H_
+#pragma once
 
 #include "System/float3.h"
 
@@ -23,10 +22,9 @@ public:
 	virtual void Update() = 0;
 
 	virtual bool Disabled() const = 0;
+	virtual bool HasPendingExplosions() const { return false; }
 
 	float mapHardness = 0.0f;
 };
 
 extern IMapDamage* mapDamage;
-
-#endif // _MAP_DAMAGE_H_

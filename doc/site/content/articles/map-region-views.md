@@ -45,3 +45,28 @@ This API belongs to synced Lua control and is unavailable to LuaUI. It changes
 sensor coverage, not movement, terrain deformation, weapons or damage. A game
 still needs synced rules for its other region boundaries. The three view setters
 above remain local, independent presentation controls.
+
+## Synced crater regions
+
+Check `Engine.FeatureSupport.mapDamageRegions` and configure
+`Spring.SetMapDamageRegions({{x0,z0,x1,z1}, ...})` from synced initialization.
+The rectangles use the same half-open convention, but only require alignment to
+terrain squares (8 elmos). No arguments, nil or an empty table restores whole-map
+deformation. Invalid geometry returns false without changing state; malformed
+argument types raise a Lua error. Calls after the first simulation frame begins or after any native crater is
+queued are rejected. Configure before initialization code creates explosions. This API is unavailable to LuaUI and has no console command.
+
+A native explosion deforms only height samples within its impact region. Impacts
+outside every region produce no crater. The clipped rectangle is stored with the
+queued explosion, so its delayed updates cannot modify the separating strip or a
+neighbor. Buildings are moved with their flattened ground only when the entire
+footprint lies within that region; foreign/straddling footprints are left alone.
+The configuration is serialized as synced game state and reset between matches.
+No configuration preserves existing whole-map behavior.
+
+These bounds govern native explosion deformation only. Lua heightmap editing,
+movement, projectile motion, object damage and script-created effects need their
+own game rules. Combining terrain/build masks with those rules, native sensor
+bounds and crater bounds permits compact separating strips without relying on
+strip width to absorb every explosion. No particular game or packing layout is
+encoded in the engine.

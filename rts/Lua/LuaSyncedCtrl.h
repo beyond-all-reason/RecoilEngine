@@ -43,6 +43,7 @@ class LuaSyncedCtrl
 		static int GameOver(lua_State* L);
 		static int SetGlobalLos(lua_State* L);
 		static int SetSensorRegions(lua_State* L);
+	static int SetMapDamageRegions(lua_State* L);
 		static int SetCheatingEnabled(lua_State* L);
 		static int SetGodMode(lua_State* L);
 

@@ -157,6 +157,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GameOver);
 	REGISTER_LUA_CFUNC(SetGlobalLos);
 	REGISTER_LUA_CFUNC(SetSensorRegions);
+	REGISTER_LUA_CFUNC(SetMapDamageRegions);
 	REGISTER_LUA_CFUNC(SetCheatingEnabled);
 	REGISTER_LUA_CFUNC(SetGodMode);
 
@@ -1088,6 +1089,27 @@ int LuaSyncedCtrl::SetSensorRegions(lua_State* L)
 {
 	std::vector<SRectangle> regions;
 	const bool accepted = ParseRegionPartitions(L, regions) && losHandler->SetSensorRegions(std::move(regions));
+	lua_pushboolean(L, accepted);
+	return 1;
+}
+
+/*** Restrict native explosion craters to the region containing the explosion.
+ * Configure during initialization, before any native crater is queued or simulation begins.
+ * Rectangles are disjoint, half-open world coordinates aligned to terrain squares.
+ * Empty/nil restores whole-map deformation. Invalid/late calls preserve state.
+ * This does not restrict Lua heightmap edits, damage, projectiles or movement.
+ *
+ * @function Spring.SetMapDamageRegions
+ * @param regions {[1]:number,[2]:number,[3]:number,[4]:number}[]? Rectangles x0,z0,x1,z1
+ * @return boolean accepted
+ */
+int LuaSyncedCtrl::SetMapDamageRegions(lua_State* L)
+{
+	std::vector<SRectangle> regions;
+	const bool accepted = ParseRegionPartitions(L, regions) && gs->PreSimFrame() && !mapDamage->HasPendingExplosions()
+		&& ValidRegionPartitions(regions, mapDims.mapx * SQUARE_SIZE, mapDims.mapy * SQUARE_SIZE, SQUARE_SIZE);
+	if (accepted)
+		gs->mapDamageRegions = std::move(regions);
 	lua_pushboolean(L, accepted);
 	return 1;
 }
