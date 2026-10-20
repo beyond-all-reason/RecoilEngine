@@ -3,9 +3,9 @@
 Query handles are now opaque full userdata rather than lightuserdata pointers to
 unrooted memory. Unreachable handles release their GL resource through `__gc`;
 explicit deletion remains optional and idempotent. Running or reading a deleted
-handle remains a no-op or returns nil. Deleting or reading the currently active
-query raises an error. Callers should retain the returned handle, not depend on
-its former pointer representation.
+handle remains a no-op or returns nil. Reading the currently active query raises
+an error; deleting it is allowed. Callers should retain the returned handle, not
+depend on its former pointer representation.
 
 Run with a graphical engine, BAR checkout and development assets:
 
@@ -22,7 +22,7 @@ dereference freed query memory or reproduce a native crash.
 
 The fixed run covers retained handles across GC, collectible handles, independent
 deletion, invalid inputs, callback arguments/errors, nested queries, active-query
-deletion/read rejection, callback-induced map growth and LuaUI shutdown. When
+deletion and read rejection, callback-induced map growth and LuaUI shutdown. When
 unsafe debug metatable access is available, it also checks finalizers, unrelated
 userdata forged as queries and shutdown cleanup after finalizer removal. Those
 optional checks are skipped when the independent debug hardening fix is present.

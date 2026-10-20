@@ -6743,8 +6743,6 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
 	const auto queryIt = occlusionQueries.find(query);
 	if (queryIt == occlusionQueries.end())
 		return 0;
-	if (queryIt->second == runningQueryId)
-		return luaL_error(L, "gl.DeleteQuery(q) cannot delete an active query");
 
 	glDeleteQueries(1, &queryIt->second);
 	occlusionQueries.erase(queryIt);
@@ -6757,7 +6755,7 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
  */
 int LuaOpenGL::RunQuery(lua_State* L)
 {
-	if (runningQueryId != 0)
+	if (runningQuery != nullptr)
 		luaL_error(L, "gl.RunQuery(q,f) can not be called recursively");
 
 	const void* query = luaL_checkudata(L, 1, "OcclusionQuery");
@@ -6770,11 +6768,11 @@ int LuaOpenGL::RunQuery(lua_State* L)
 
 	const int args = lua_gettop(L); // number of arguments
 
-	runningQueryId = queryIt->second;
-	glBeginQuery(GL_SAMPLES_PASSED, runningQueryId);
+	runningQuery = query;
+	glBeginQuery(GL_SAMPLES_PASSED, queryIt->second);
 	const int error = lua_pcall(L, (args - 2), 0, 0);
 	glEndQuery(GL_SAMPLES_PASSED);
-	runningQueryId = 0;
+	runningQuery = nullptr;
 
 	if (error != 0) {
 		LOG_L(L_ERROR, "gl.RunQuery: error(%i) = %s", error, lua_tostring(L, -1));
@@ -6795,7 +6793,7 @@ int LuaOpenGL::GetQuery(lua_State* L)
 	const auto queryIt = occlusionQueries.find(query);
 	if (queryIt == occlusionQueries.end())
 		return 0;
-	if (queryIt->second == runningQueryId)
+	if (query == runningQuery)
 		return luaL_error(L, "gl.GetQuery(q) cannot read an active query");
 
 	GLuint count;
