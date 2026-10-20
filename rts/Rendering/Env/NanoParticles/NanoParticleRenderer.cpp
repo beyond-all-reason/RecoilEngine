@@ -11,6 +11,7 @@
 #include "NanoParticleSystem.h"
 
 #include "Game/Camera.h"
+#include "Game/WorldDrawBounds.h"
 #include "Game/GlobalUnsynced.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/RenderBuffers.h"
@@ -712,6 +713,9 @@ void Renderer::Draw(bool drawAboveWater, bool drawBelowWater, bool drawReflectio
 
 	shader->Enable();
 	shader->SetUniform("animationFrame", frame + globalRendering->timeOffset);
+	const auto& bounds = worldDrawBounds::rectangle;
+	shader->SetUniform("worldDrawBoundsEnabled", int(bounds.IsSet()));
+	shader->SetUniform("worldDrawBounds", bounds.x0, bounds.z0, bounds.x1, bounds.z1);
 	shader->SetUniform("cameraPos",   camPos.x,   camPos.y,   camPos.z);
 	shader->SetUniform("cameraRight", camRight.x, camRight.y, camRight.z);
 	shader->SetUniform("cameraUp",    camUp.x,    camUp.y,    camUp.z);

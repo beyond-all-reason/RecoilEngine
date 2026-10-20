@@ -2,7 +2,23 @@
 title: Map regions
 ---
 
-Games can restrict native sensors and craters to regions of a single map.
+A game can divide one map into rectangular regions. It can crop each player's view and configure synced boundaries for sensors and craters. Movement, orders, damage, and gameplay rules belong to the game.
+
+## Local view
+
+Check `Engine.FeatureSupport.mapRegionViews`. The unsynced setters take `x0, z0, x1, z1` in world elmos.
+
+```lua
+Spring.SetCameraBounds(0, 0, 4096, 4096)
+Spring.SetMiniMapView(0, 0, 4096, 4096)
+Spring.SetWorldDrawBounds(0, 0, 4096, 4096)
+```
+
+- `SetCameraBounds` limits camera focus and adjusts overhead zoom and overview to the region.
+- `SetMiniMapView` crops the minimap and remaps its input. Widgets that draw in whole-map coordinates must account for the crop.
+- `SetWorldDrawBounds` clips terrain and filters native objects and effects. Games handle their own Lua overlays.
+
+Invalid rectangles return `false` and preserve the previous bounds. Call a setter without arguments to clear its bounds. Reapply local bounds when the UI starts after loading a save.
 
 ## Synced boundaries
 

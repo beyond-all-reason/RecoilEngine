@@ -4,6 +4,7 @@
 #include "SMFGroundDrawer.h"
 #include "SMFReadMap.h"
 #include "Game/Camera.h"
+#include "Game/WorldDrawBounds.h"
 #include "Map/MapInfo.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/ShadowHandler.h"
@@ -287,6 +288,9 @@ void SMFRenderStateGLSL::Enable(const CSMFGroundDrawer* smfGroundDrawer, const D
 	currShader->SetFlag("HAVE_INFOTEX", infoTextureHandler->IsEnabled());
 
 	currShader->Enable();
+	const auto& bounds = worldDrawBounds::rectangle;
+	currShader->SetUniform("worldDrawBoundsEnabled", int(bounds.IsSet()));
+	currShader->SetUniform("worldDrawBounds", bounds.x0, bounds.z0, bounds.x1, bounds.z1);
 	currShader->SetUniform("mapHeights", readMap->GetCurrMinHeight(), readMap->GetCurrMaxHeight());
 	currShader->SetUniform("infoTexIntensityMul", float(infoTextureHandler->InMetalMode()) + 1.0f);
 
