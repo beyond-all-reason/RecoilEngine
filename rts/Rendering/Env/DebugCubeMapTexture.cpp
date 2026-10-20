@@ -12,8 +12,6 @@ DebugCubeMapTexture::DebugCubeMapTexture()
 	, vao()
 {
 #ifndef HEADLESS
-	glGenTextures(1, &texId);
-
 	static constexpr const char* texture = "bitmaps/testsky.dds";
 
 	CBitmap btex;
@@ -36,6 +34,8 @@ DebugCubeMapTexture::DebugCubeMapTexture()
 
 		dims = { FALLBACK_DIM, FALLBACK_DIM };
 
+		// the file path gets its texture from CBitmap::CreateTexture below
+		glGenTextures(1, &texId);
 		glEnable(GL_TEXTURE_CUBE_MAP);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, texId);
 		for (GLenum glFace = GL_TEXTURE_CUBE_MAP_POSITIVE_X; glFace <= GL_TEXTURE_CUBE_MAP_NEGATIVE_Z; ++glFace) {
