@@ -35,3 +35,5 @@ Each emitter covers only its region. Emitters in a gap provide no coverage. Off-
 Check `Engine.FeatureSupport.mapDamageRegions` and call `Spring.SetMapDamageRegions(rectangles)` before any crater is queued. Align the rectangles to terrain squares (8 elmos).
 
 Native craters deform terrain strictly inside the impact region, leaving shared edge corners alone. They move buildings only when the corners affected by the building footprint are inside that region. Lua heightmap edits use their usual rules.
+
+See `test/region_views/README.md` for regression fixtures.
