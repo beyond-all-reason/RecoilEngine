@@ -412,12 +412,13 @@ void CLosTableHelper::Debug(const LosTable& losRays, const std::vector<int2>& po
 void CLosMap::AddCircle(SLosInstance* instance, int amount)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	const SRectangle& bounds = instance->bounds;
 	MidpointCircleAlgoPerLine(instance->radius, [&](int width, int y) {
-		const unsigned y_ = instance->basePos.y + y;
+		const int y_ = instance->basePos.y + y;
 
-		if (y_ < size.y) {
-			const unsigned sx = std::clamp(instance->basePos.x - width,     0, size.x);
-			const unsigned ex = std::clamp(instance->basePos.x + width + 1, 0, size.x);
+		if (y_ >= bounds.z1 && y_ < bounds.z2) {
+			const unsigned sx = std::clamp(instance->basePos.x - width,     bounds.x1, bounds.x2);
+			const unsigned ex = std::clamp(instance->basePos.x + width + 1, bounds.x1, bounds.x2);
 
 			for (unsigned x_ = sx; x_ < ex; ++x_) {
 				losmap[(y_ * size.x) + x_] += amount;
@@ -474,7 +475,8 @@ void CLosMap::PrepareRaycast(SLosInstance* instance) const
 	if (!instance->squares.empty())
 		return;
 
-	LosAdd(instance);
+	if (instance->bounds.GetArea() > 0)
+		LosAdd(instance);
 
 	if (!instance->squares.empty())
 		return;
@@ -582,6 +584,23 @@ void CLosMap::AddSquaresToInstance(SLosInstance* li, const std::vector<char>& lo
 		if (rle.length > 0)
 			losSquares.push_back(rle);
 	}
+
+	// Clip whole row spans rather than testing every raycast pixel. Preserve the
+	// ordinary whole-map path, and cache exactly the spans later removed again.
+	if (li->bounds == SRectangle(0, 0, size.x, size.y))
+		return;
+
+	size_t count = 0;
+	for (const SLosInstance::RLE rle: losSquares) {
+		const int2 start = IdxToCoord(rle.start, size.x);
+		if (start.y < li->bounds.z1 || start.y >= li->bounds.z2)
+			continue;
+		const int x1 = std::max(start.x, li->bounds.x1);
+		const int x2 = std::min(start.x + int(rle.length), li->bounds.x2);
+		if (x1 < x2)
+			losSquares[count++] = {start.y * size.x + x1, unsigned(x2 - x1)};
+	}
+	losSquares.resize(count);
 }
 
 

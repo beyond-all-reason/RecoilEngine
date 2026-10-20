@@ -39,6 +39,7 @@
 #include "Sim/Misc/DamageArray.h"
 #include "Sim/Misc/DamageArrayHandler.h"
 #include "Sim/Misc/LosHandler.h"
+#include "Sim/Misc/RegionPartitions.h"
 #include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/SmoothHeightMesh.h"
 #include "Sim/Misc/Team.h"
@@ -155,6 +156,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(AssignPlayerToTeam);
 	REGISTER_LUA_CFUNC(GameOver);
 	REGISTER_LUA_CFUNC(SetGlobalLos);
+	REGISTER_LUA_CFUNC(SetSensorRegions);
 	REGISTER_LUA_CFUNC(SetCheatingEnabled);
 	REGISTER_LUA_CFUNC(SetGodMode);
 
@@ -1041,6 +1043,60 @@ int LuaSyncedCtrl::SetGlobalLos(lua_State* L)
 
 	losHandler->SetGlobalLOS(allyTeam, luaL_checkboolean(L, 2));
 	return 0;
+}
+
+static bool ParseRegionPartitions(lua_State* L, std::vector<SRectangle>& regions)
+{
+	if (lua_gettop(L) > 1)
+		return luaL_error(L, "Region partitions expect one optional array of rectangles");
+	if (!lua_isnoneornil(L, 1)) {
+		luaL_checktype(L, 1, LUA_TTABLE);
+		const int count = lua_objlen(L, 1);
+		regions.reserve(count);
+		for (int i = 1; i <= count; ++i) {
+			lua_rawgeti(L, 1, i);
+			luaL_checktype(L, -1, LUA_TTABLE);
+			if (lua_objlen(L, -1) != 4)
+				return luaL_error(L, "Region partitions expect four coordinates per rectangle");
+			std::array<int, 4> coordinates;
+			for (int j = 0; j < 4; ++j) {
+				lua_rawgeti(L, -1, j + 1);
+				const double value = luaL_checknumber_noassert(L, -1);
+				lua_pop(L, 1);
+				if (!std::isfinite(value) || value < 0 || value > std::max(mapDims.mapx, mapDims.mapy) * SQUARE_SIZE || value != std::floor(value)) {
+					return false;
+				}
+				coordinates[j] = value;
+			}
+			regions.emplace_back(coordinates[0], coordinates[1], coordinates[2], coordinates[3]);
+			lua_pop(L, 1);
+		}
+	}
+	return true;
+}
+
+/*** Configure disjoint sensor regions before the first simulation sensor update.
+ * All seven sensor types are restricted to the emitter's region. Emitters beyond
+ * the map edge use the region at the nearest map position. Rectangles are
+ * half-open world coordinates whose edges align to the coarsest sensor cell.
+ * Empty/nil clears the configuration.
+ * Changes are accepted only up to frame 0 and before any sensor instance exists.
+ * Reapplying the current configuration is a no-op that returns true at any time.
+ * Later changes, invalid geometry and non-integer or out-of-range coordinates
+ * return false and keep the current configuration. Malformed arguments (extra
+ * arguments, non-table entries, rectangles without four numbers) raise an error.
+ * This is synced game state, independent of local camera and draw bounds.
+ *
+ * @function Spring.SetSensorRegions
+ * @param regions {[1]:number,[2]:number,[3]:number,[4]:number}[]? Rectangles x0,z0,x1,z1
+ * @return boolean accepted
+ */
+int LuaSyncedCtrl::SetSensorRegions(lua_State* L)
+{
+	std::vector<SRectangle> regions;
+	const bool accepted = ParseRegionPartitions(L, regions) && losHandler->SetSensorRegions(std::move(regions));
+	lua_pushboolean(L, accepted);
+	return 1;
 }
 
 /*** Changes whether activating cheats is allowed.

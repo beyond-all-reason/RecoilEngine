@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LOS_HANDLER_H
-#define LOS_HANDLER_H
+#pragma once
 
 #include <vector>
 #include <deque>
@@ -49,7 +48,7 @@ struct SLosInstance
 		, isQueuedForUpdate(false)
 		, isQueuedForTerraform(false)
 	{}
-	void Init(int radius, int allyteam, int2 basePos, float baseHeight, int hashNum);
+	void Init(int radius, int allyteam, int2 basePos, float baseHeight, int hashNum, const SRectangle& bounds);
 
 public:
 	// hash properties
@@ -58,6 +57,7 @@ public:
 	int radius;
 	int2 basePos;
 	float baseHeight;
+	SRectangle bounds; // immutable coverage clip, in this sensor type's cells
 
 	// working data
 	int refCount;
@@ -284,6 +284,14 @@ public:
 
 	void FlipGlobalLOS(const int allyTeamId) { SetGlobalLOS(allyTeamId, !globalLOS[allyTeamId]); }
 	void SetGlobalLOS(const int allyTeamId, const bool newState);
+
+	bool SetSensorRegions(std::vector<SRectangle> regions);
+	bool HasSensorRegions() const { return !sensorRegions.empty(); }
+	// Region of an emitter or target; positions beyond the map edge use the
+	// region at the nearest map position. Only meaningful with regions set.
+	const SRectangle* FindSensorRegion(const float3& position) const;
+	// Coverage clip in cells of mipDiv elmos; empty for the separating strip.
+	SRectangle GetSensorBounds(const float3& position, int mipDiv) const;
 	bool GetGlobalLOS(const int allyTeamId) const { return globalLOS[allyTeamId]; }
 
 public:
@@ -320,6 +328,7 @@ private:
 	*/
 
 	std::array<bool, MAX_TEAMS> globalLOS;
+	std::vector<SRectangle> sensorRegions;
 private:
 	static constexpr float defBaseRadarErrorSize = 96.0f;
 	static constexpr float defBaseRadarErrorMult =  2.0f;
@@ -328,10 +337,8 @@ private:
 	float baseRadarErrorMult = 0.0f;
 
 	std::vector<float> radarErrorSizes;
-	std::array<ILosType*, 7> losTypes;
+	std::array<ILosType*, 7> losTypes = {};
 };
 
 
 extern CLosHandler* losHandler;
-
-#endif /* LOS_HANDLER_H */
