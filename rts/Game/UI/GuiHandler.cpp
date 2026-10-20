@@ -14,6 +14,7 @@
 #include "Game/GlobalUnsynced.h"
 #include "Game/SelectedUnitsHandler.h"
 #include "Game/TraceRay.h"
+#include "Game/WorldDrawBounds.h"
 #include "Lua/LuaConfig.h"
 #include "Lua/LuaTextures.h"
 #include "Lua/LuaGaia.h"
@@ -2496,7 +2497,7 @@ static bool WouldCancelAnyQueued(const BuildInfo& buildInfo)
 
 using CancelledBuildCommandTags = spring::unordered_map<int, spring::unordered_set<unsigned int>>;
 
-static void DrawQueuedBuildSquares(const CancelledBuildCommandTags& cancelledCommandTags)
+static void DrawQueuedBuildSquares(const CancelledBuildCommandTags& cancelledCommandTags, bool onMiniMap)
 {
 	if (cmdColors.buildBox[3] <= 0.0f || selectedUnitsHandler.selectedUnits.empty())
 		return;
@@ -2530,6 +2531,11 @@ static void DrawQueuedBuildSquares(const CancelledBuildCommandTags& cancelledCom
 		} else {
 			continue;
 		}
+
+		// Like CommandDrawer::Draw, hide the queues of builders outside the local view.
+		const float3& drawPos = builder->drawPos;
+		if (onMiniMap ? !minimap->IsInView(drawPos.x, drawPos.z) : !worldDrawBounds::Contains(drawPos))
+			continue;
 
 		const auto cancelledIt = cancelledCommandTags.find(builderID);
 		const auto& cancelled = (cancelledIt != cancelledCommandTags.end()) ? cancelledIt->second : noCancelledCommands;
@@ -4006,7 +4012,7 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 		}
 	}
 
-	DrawQueuedBuildSquares(cancelledBuildCommandTags);
+	DrawQueuedBuildSquares(cancelledBuildCommandTags, onMiniMap);
 
 	glLineWidth(1.0f);
 

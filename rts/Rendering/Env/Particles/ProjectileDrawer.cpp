@@ -7,6 +7,7 @@
 #include <bit>
 
 #include "Game/Camera.h"
+#include "Game/WorldDrawBounds.h"
 #include "Game/CameraHandler.h"
 #include "Game/GlobalUnsynced.h"
 #include "Game/LoadScreen.h"
@@ -509,6 +510,9 @@ void CProjectileDrawer::UpdateDrawFlags()
 
 		p->SetDrawFlag(DrawFlags::SO_DRICON_FLAG); //reuse as a minimap draw indication
 
+		if (!worldDrawBounds::Contains(p->drawPos))
+			return;
+
 		const float drawRadius = p->GetDrawRadius();
 
 		if (camPlayer->InView(p->drawPos, drawRadius)) {
@@ -717,6 +721,9 @@ bool CProjectileDrawer::ShouldDrawProjectile(const CProjectile* p, uint8_t thisP
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(p);
 
+	if (thisPassMask != DrawFlags::SO_DRICON_FLAG && !worldDrawBounds::Contains(p->drawPos))
+		return false;
+
 	if (p->drawFlag == 0)
 		return false;
 
@@ -794,7 +801,7 @@ void CProjectileDrawer::DrawFlyingPieces(int modelType) const
 		if (!inAirLos)
 			continue;
 
-		if (!camera->InView(fp.GetPos(), fp.GetRadius()))
+		if (!worldDrawBounds::Contains(fp.GetPos()) || !camera->InView(fp.GetPos(), fp.GetRadius()))
 			continue;
 
 		fp.Draw(last);
@@ -1219,7 +1226,7 @@ void CProjectileDrawer::DrawGroundFlashes()
 		if (!inLos)
 			continue;
 
-		if (!camera->InView(gf->pos, gf->size))
+		if (!worldDrawBounds::Contains(gf->pos) || !camera->InView(gf->pos, gf->size))
 			continue;
 
 		bool depthTestWanted = needSoften ? false : gf->depthTest;

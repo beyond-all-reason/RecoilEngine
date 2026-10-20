@@ -4,7 +4,9 @@
 #include "LineDrawer.h"
 #include "Game/GameHelper.h"
 #include "Game/UI/CommandColors.h"
+#include "Game/UI/MiniMap.h"
 #include "Game/WaitCommandsAI.h"
+#include "Game/WorldDrawBounds.h"
 #include "Map/Ground.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/myGL.h"
@@ -42,7 +44,11 @@ CommandDrawer* CommandDrawer::GetInstance() {
 
 
 
-void CommandDrawer::Draw(const CCommandAI* cai, int queueDrawDepth) const {
+void CommandDrawer::Draw(const CCommandAI* cai, int queueDrawDepth, bool onMiniMap) const {
+	const auto& pos = cai->owner->drawPos;
+	if (onMiniMap ? !minimap->IsInView(pos.x, pos.z) : !worldDrawBounds::Contains(pos))
+		return;
+
 	// note: {Air,Builder}CAI inherit from MobileCAI, so test that last
 	if ((dynamic_cast<const     CAirCAI*>(cai)) != nullptr) {     DrawAirCAICommands(static_cast<const     CAirCAI*>(cai), queueDrawDepth); return; }
 	if ((dynamic_cast<const CBuilderCAI*>(cai)) != nullptr) { DrawBuilderCAICommands(static_cast<const CBuilderCAI*>(cai), queueDrawDepth); return; }
@@ -59,7 +65,7 @@ void CommandDrawer::AddLuaQueuedUnit(const CUnit* unit, int queueDrawDepth) {
 	luaQueuedUnitSet.insert({ unit->id, queueDrawDepth });
 }
 
-void CommandDrawer::DrawLuaQueuedUnitSetCommands() const
+void CommandDrawer::DrawLuaQueuedUnitSetCommands(bool onMiniMap) const
 {
 	if (luaQueuedUnitSet.empty())
 		return;
@@ -85,7 +91,7 @@ void CommandDrawer::DrawLuaQueuedUnitSetCommands() const
 		if (unit == nullptr || unit->commandAI == nullptr)
 			continue;
 
-		Draw(unit->commandAI, qDrawDepth);
+		Draw(unit->commandAI, qDrawDepth, onMiniMap);
 	}
 
 	glLineWidth(1.0f);

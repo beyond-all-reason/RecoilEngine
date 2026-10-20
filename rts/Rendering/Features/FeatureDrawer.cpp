@@ -3,6 +3,7 @@
 #include "FeatureDrawer.h"
 
 #include "Game/Camera.h"
+#include "Game/WorldDrawBounds.h"
 #include "Game/CameraHandler.h"
 #include "Game/GlobalUnsynced.h"
 #include "Map/Ground.h"
@@ -55,6 +56,9 @@ bool CFeatureDrawer::ShouldDrawOpaqueFeature(CFeature* f, uint8_t thisPassMask)
 	assert(f);
 	assert(f->model);
 
+	if (!worldDrawBounds::Contains(f->drawPos))
+		return false;
+
 	if (f->drawFlag == 0)
 		return false;
 
@@ -85,6 +89,9 @@ bool CFeatureDrawer::ShouldDrawAlphaFeature(CFeature* f, uint8_t thisPassMask)
 	assert(f);
 	assert(f->model);
 
+	if (!worldDrawBounds::Contains(f->drawPos))
+		return false;
+
 	if (f->drawFlag == 0)
 		return false;
 
@@ -114,6 +121,9 @@ bool CFeatureDrawer::ShouldDrawFeatureShadow(CFeature* f)
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(f);
 	assert(f->model);
+
+	if (!worldDrawBounds::Contains(f->drawPos))
+		return false;
 
 	static constexpr uint8_t thisPassMask = DrawFlags::SO_SHOPAQ_FLAG;
 
