@@ -84,6 +84,7 @@ public:
 
 	void Init(int2 mapDims, int quadSize);
 	void Kill();
+	void PostLoad();
 
 	void GetQuads(QuadFieldQuery& qfq, float3 pos, float radius);
 	void GetQuadsRectangle(QuadFieldQuery& qfq, const float3& mins, const float3& maxs);
@@ -144,6 +145,13 @@ public:
 		const unsigned int collisionStateBits = 0xFFFFFFFF
 	);
 
+
+	/**
+	 * Returns false only if no unit of an allyteam that is not allied to
+	 * @c allyTeam is in any of the quads GetQuads(pos, radius) returns;
+	 * checks coarse per-allyteam counts, so may also return true otherwise
+	 */
+	bool MayHaveEnemyUnits(float3 pos, float radius, int allyTeam) const;
 
 	bool InsertUnitIf(CUnit* unit, const float3& wpos);
 	bool RemoveUnitIf(CUnit* unit, const float3& wpos);
@@ -231,8 +239,21 @@ private:
 	int2 WorldPosToQuadField(const float3 p) const;
 	int WorldPosToQuadFieldIdx(const float3 p) const;
 
+	int CellUnitsIndex(int quadIdx, int allyTeam) const;
+	void AddTeamUnit(int quadIdx, CUnit* unit);
+	void EraseTeamUnit(int quadIdx, CUnit* unit);
+	void CountTeamUnits();
+
 private:
+	// side length (in quads) of the cells in allyTeamCellUnits
+	static constexpr int CELL_QUADS = 4;
+
 	std::vector<Quad> baseQuads;
+
+	// number of Quad::teamUnits entries per (cell, allyteam), for MayHaveEnemyUnits
+	std::vector<int> allyTeamCellUnits;
+	int numCellsX = 0;
+	int numAllyTeams = 0;
 
 	// preallocated vectors for Get*Exact functions
 	std::array< QueryVectorCache<CUnit*>, ThreadPool::MAX_THREADS >  tempUnits;

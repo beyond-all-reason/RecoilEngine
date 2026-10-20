@@ -28,6 +28,8 @@
 
 #include "Game/GlobalUnsynced.h"
 
+#include "Rendering/Env/NanoParticles/NanoParticleEmitter.h"
+#include "Rendering/Env/NanoParticles/NanoParticleSystem.h"
 #include "System/Misc/TracyDefs.h"
 
 CR_BIND_DERIVED(CFactory, CBuilding, )
@@ -258,10 +260,6 @@ void CFactory::FinishBuild(CUnit* buildee) {
 		return;
 	if (unitDef->fullHealthFactory && buildee->health < buildee->maxHealth)
 		return;
-
-	// assign buildee to same group as us
-	if (GetGroup() != nullptr && buildee->GetGroup() != nullptr)
-		buildee->SetGroup(GetGroup(), true);
 
 	const CCommandAI* bcai = buildee->commandAI;
 	// if not idle, the buildee already has user orders
@@ -531,6 +529,11 @@ bool CFactory::ChangeTeam(int newTeam, ChangeType type)
 void CFactory::CreateNanoParticle(bool highPriority)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (NanoParticles::system.Enabled()) {
+		NanoParticles::emitter.EmitFactorySpray(this, highPriority);
+		return;
+	}
+
 	const int modelNanoPiece = nanoPieceCache.GetNanoPiece(script);
 
 	if (!localModel.Initialized() || !localModel.HasPiece(modelNanoPiece))

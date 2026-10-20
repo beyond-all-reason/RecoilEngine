@@ -32,7 +32,6 @@ void SyncUpdatedPathsSystem::Init()
 
 void SyncUpdatedPathsSystem::Update()
 {
-	RECOIL_DETAILED_TRACY_ZONE;
     SCOPED_TIMER("ECS::SyncUpdatedPathsSystem::Update");
 
     auto* pm = dynamic_cast<PathManager*>(pathManager);

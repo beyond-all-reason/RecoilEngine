@@ -156,9 +156,10 @@ CUnitDrawerData::CUnitDrawerData(bool& mtModelDrawer_)
 	iconFadeVanish = configHandler->GetFloat("UnitIconFadeVanish");
 	useScreenIcons = configHandler->GetBool("UnitIconsAsUI");
 	iconHideWithUI = configHandler->GetBool("UnitIconsHideWithUI");
+	sortUnitIconsByDepth = configHandler->GetBool("UnitIconsSortedByDepth");
 	ghostIconDimming = configHandler->GetFloat("UnitGhostIconsDimming");
 
-	configHandler->NotifyOnChange(this, {"UnitGhostIconsDimming"});
+	configHandler->NotifyOnChange(this, {"UnitGhostIconsDimming", "UnitIconsSortedByDepth"});
 
 	unitDefImages.clear();
 	unitDefImages.resize(unitDefHandler->NumUnitDefs() + 1);
@@ -207,6 +208,7 @@ CUnitDrawerData::~CUnitDrawerData()
 void CUnitDrawerData::ConfigNotify(const std::string& key, const std::string& value)
 {
 	ghostIconDimming = configHandler->GetFloat("UnitGhostIconsDimming");
+	sortUnitIconsByDepth = configHandler->GetBool("UnitIconsSortedByDepth");
 }
 
 void CUnitDrawerData::Update()
@@ -295,34 +297,34 @@ void CUnitDrawerData::UpdateUnitIconsByUnitDef(const UnitDef* ud)
 	}
 }
 
+size_t CUnitDrawerData::GetUnitIconIndex(const CUnit* unit, int allyTeam, bool fullView) const
+{
+	const unsigned short losStatus = unit->losStatus[allyTeam];
+	constexpr unsigned short prevMask = (LOS_PREVLOS | LOS_CONTRADAR);
+
+	// use the unit's custom icon if the viewer can currently see it,
+	// or has seen it before and did not lose contact since
+	const bool isInLOS    = (losStatus & LOS_INLOS  ) == LOS_INLOS;
+	const bool isInPrvLos = (losStatus & LOS_PREVLOS) == LOS_PREVLOS;
+	const bool isInRadar  = (losStatus & LOS_INRADAR) == LOS_INRADAR;
+	const bool seenUnit   = (losStatus & prevMask   ) == prevMask;
+	const bool isGhostBuilding = gameSetup->ghostedBuildings && unit->leavesGhost && isInPrvLos;
+
+	const bool unitVisible = isInLOS || (isInRadar && seenUnit) || isGhostBuilding;
+
+	if (unitVisible || fullView)
+		return (unit->customIconIndex != icon::INVALID_ICON_INDEX) ? unit->customIconIndex : icon::iconHandler.GetIconIdxOrDefault(unit->definedIconName);
+
+	if ((losStatus & LOS_INRADAR) != 0)
+		return icon::iconHandler.GetDefaultIconIdx();
+
+	return icon::INVALID_ICON_INDEX;
+}
+
 void CUnitDrawerData::UpdateCurrentUnitIcon(const CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
-	constexpr unsigned short prevMask = (LOS_PREVLOS | LOS_CONTRADAR);
-
-	// use the unit's custom icon if we can currently see it,
-	// or have seen it before and did not lose contact since
-	bool isInLOS    = (losStatus & LOS_INLOS  ) == LOS_INLOS;
-	bool isInPrvLos = (losStatus & LOS_PREVLOS) == LOS_PREVLOS;
-	bool isInRadar  = (losStatus & LOS_INRADAR) == LOS_INRADAR;
-	bool seenUnit   = (losStatus & prevMask   ) == prevMask;
-	bool isGhostBuilding = gameSetup->ghostedBuildings && unit->leavesGhost && isInPrvLos;
-
-	bool unitVisible = isInLOS || (isInRadar && seenUnit) || isGhostBuilding;
-
-	const bool typedIcon = (unitVisible || gu->spectatingFullView);
-
-	if (typedIcon) {
-		unit->currentIconIndex =
-			(unit->customIconIndex != icon::INVALID_ICON_INDEX) ? unit->customIconIndex : icon::iconHandler.GetIconIdxOrDefault(unit->definedIconName);
-	}
-	else if ((losStatus & LOS_INRADAR) != 0) {
-		unit->currentIconIndex = icon::iconHandler.GetDefaultIconIdx();
-	}
-	else {
-		unit->currentIconIndex = icon::INVALID_ICON_INDEX;
-	}
+	unit->currentIconIndex = GetUnitIconIndex(unit, gu->myAllyTeam, gu->spectatingFullView);
 }
 
 void CUnitDrawerData::UpdateUnitIconState(CUnit* unit)

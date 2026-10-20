@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include "System/RangesCompat.h"
 #include "UnitDef.h"
 #include "Unit.h"
 #include "UnitHandler.h"
@@ -53,6 +54,9 @@
 #include "Sim/MoveTypes/MoveType.h"
 #include "Sim/MoveTypes/MoveTypeFactory.h"
 #include "Sim/MoveTypes/ScriptMoveType.h"
+#include "Rendering/Env/NanoParticles/NanoParticleConfig.h"
+#include "Rendering/Env/NanoParticles/NanoParticleEmitter.h"
+#include "Rendering/Env/NanoParticles/NanoParticleSystem.h"
 #include "Sim/Projectiles/FlareProjectile.h"
 #include "Sim/Projectiles/ProjectileMemPool.h"
 #include "Sim/Projectiles/WeaponProjectiles/MissileProjectile.h"
@@ -666,14 +670,23 @@ void CUnit::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	ASSERT_SYNCED(pos);
+}
 
-	UpdatePhysicalState(0.1f);
+unsigned int CUnit::UpdateState()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const unsigned int prevState = physicalState;
+
+	// no events here, CUnitHandler::UpdateUnits sends them in unit order
+	CSolidObject::UpdatePhysicalState(0.1f);
 	UpdatePosErrorParams(true, false);
 
+	const unsigned int eventBits = (prevState ^ physicalState) & (PSTATE_BIT_INAIR | PSTATE_BIT_INWATER | PSTATE_BIT_UNDERWATER);
+
 	if (beingBuilt)
-		return;
+		return eventBits;
 	if (isDead)
-		return;
+		return eventBits;
 
 	recentDamage *= 0.9f;
 	flankingBonusMobility += flankingBonusMobilityAdd;
@@ -684,15 +697,16 @@ void CUnit::Update()
 			++(w->reloadStatus);
 		}
 
-		return;
+		return eventBits;
 	}
 
 	restTime += 1;
+	return eventBits;
 }
 
 void CUnit::UpdateWeaponVectors()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (!CanUpdateWeapons())
 		return;
@@ -705,7 +719,7 @@ void CUnit::UpdateWeaponVectors()
 
 void CUnit::UpdateWeapons()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (!CanUpdateWeapons())
 			return;
@@ -965,7 +979,7 @@ static auto SplitResourcePackIntoPositiveNegative (const SResourcePack &pack)
 {
 	SResourcePack positive {0.0f}, negative {0.0f};
 
-	for (auto [resourceID, value] : std::views::enumerate (pack)) {
+	for (auto [resourceID, value] : spring::views::enumerate (pack)) {
 		if (value < 0.0f)
 			negative[resourceID] = -value;
 		else
@@ -1840,11 +1854,18 @@ void CUnit::DependentDied(CObject* o)
 void CUnit::UpdatePhysicalState(float eps)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const bool inAir      = IsInAir();
-	const bool inWater    = IsInWater();
-	const bool underWater = IsUnderWater();
+	const unsigned int prevState = physicalState;
 
 	CSolidObject::UpdatePhysicalState(eps);
+	SendPhysicalStateEvents(prevState);
+}
+
+void CUnit::SendPhysicalStateEvents(unsigned int prevState)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const bool inAir      = ((prevState & PSTATE_BIT_INAIR     ) != 0);
+	const bool inWater    = ((prevState & PSTATE_BIT_INWATER   ) != 0);
+	const bool underWater = ((prevState & PSTATE_BIT_UNDERWATER) != 0);
 
 	if (IsInAir() != inAir) {
 		if (IsInAir()) {
@@ -1922,13 +1943,9 @@ void CUnit::CalculateTerrainType()
 }
 
 
-bool CUnit::SetGroup(CGroup* newGroup, bool fromFactory, bool autoSelect)
+bool CUnit::SetGroup(CGroup* newGroup, bool autoSelect)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// factory is not necessarily selected
-	if (fromFactory && !selectedUnitsHandler.AutoAddBuiltUnitsToFactoryGroup())
-		return false;
-
 	CGroup* group = GetGroup();
 
 	if (group != nullptr)
@@ -1949,8 +1966,7 @@ bool CUnit::SetGroup(CGroup* newGroup, bool fromFactory, bool autoSelect)
 		return true;
 
 	// add unit to the set of selected units iff its new group is already selected
-	// and (user wants the unit to be auto-selected or the unit is not newly built)
-	if (selectedUnitsHandler.IsGroupSelected(newGroup->id) && (selectedUnitsHandler.AutoAddBuiltUnitsToSelectedGroup() || !fromFactory))
+	if (selectedUnitsHandler.IsGroupSelected(newGroup->id))
 		selectedUnitsHandler.AddUnit(this);
 
 	return true;
@@ -2093,9 +2109,17 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 			return false;
 		}
 
+		const bool trackReclaimBurst = NanoParticles::GetConfig().reclaimBurst && NanoParticles::system.Enabled();
+
+		if (trackReclaimBurst)
+			NanoParticles::emitter.RecordReclaimContributor(this, builder);
+
 		// turn reclaimee into nanoframe (even living units)
 		if (modInfo.reclaimUnitMethod == 0)
 			TurnIntoNanoframe();
+
+		// captured before buildProgress is overwritten below
+		const float reclaimBurstMetal = trackReclaimBurst ? cost.metal * buildProgress : 0.0f;
 
 		// reduce health & resources
 		health = postHealth;
@@ -2103,6 +2127,9 @@ bool CUnit::AddBuildPower(CUnit* builder, float amount)
 
 		// reclaim finished?
 		if (killMe || buildProgress <= 0.0f || health <= 0.0f) {
+			if (trackReclaimBurst)
+				NanoParticles::emitter.EmitReclaimBurst(this, builder, reclaimBurstMetal);
+
 			health = 0.0f;
 			buildProgress = 0.0f;
 			KillUnit(builder, false, true, -CSolidObject::DAMAGE_RECLAIMED);
@@ -2134,92 +2161,6 @@ bool CUnit::AllowedReclaim(CUnit* builder) const
 	return true;
 }
 
-
-bool CUnit::UseMetal(float metal)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (metal < 0.0f) {
-		AddMetal(-metal);
-		return true;
-	}
-
-	CTeam* myTeam = teamHandler.Team(team);
-	myTeam->resPull.metal += metal;
-
-	if (myTeam->UseMetal(metal)) {
-		resourcesUseI.metal += metal;
-		return true;
-	}
-
-	return false;
-}
-
-void CUnit::AddMetal(float metal, bool useIncomeMultiplier)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (metal < 0.0f) {
-		UseMetal(-metal);
-		return;
-	}
-
-	resourcesMakeI.metal += metal;
-	teamHandler.Team(team)->AddMetal(metal, useIncomeMultiplier);
-}
-
-
-bool CUnit::UseEnergy(float energy)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (energy < 0.0f) {
-		AddEnergy(-energy);
-		return true;
-	}
-
-	CTeam* myTeam = teamHandler.Team(team);
-	myTeam->resPull.energy += energy;
-
-	if (myTeam->UseEnergy(energy)) {
-		resourcesUseI.energy += energy;
-		return true;
-	}
-
-	return false;
-}
-
-void CUnit::AddEnergy(float energy, bool useIncomeMultiplier)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (energy < 0.0f) {
-		UseEnergy(-energy);
-		return;
-	}
-	resourcesMakeI.energy += energy;
-	teamHandler.Team(team)->AddEnergy(energy, useIncomeMultiplier);
-}
-
-
-bool CUnit::AddHarvestedMetal(float metal)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	if (harvestStorage.metal <= 0.0f) {
-		AddMetal(metal, false);
-		return true;
-	}
-
-	if (harvested.metal >= harvestStorage.metal) {
-		eventHandler.UnitHarvestStorageFull(this);
-		return false;
-	}
-
-	//FIXME what do with exceeding metal?
-	harvested.metal = std::min(harvested.metal + metal, harvestStorage.metal);
-	if (harvested.metal >= harvestStorage.metal) {
-		eventHandler.UnitHarvestStorageFull(this);
-	}
-	return true;
-}
-
-
 void CUnit::SetStorage(const SResourcePack& newStorage)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -2239,11 +2180,6 @@ bool CUnit::HaveResources(const SResourcePack& pack) const
 bool CUnit::UseResources(const SResourcePack& pack)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	//FIXME
-	/*if (energy < 0.0f) {
-		AddEnergy(-energy);
-		return true;
-	}*/
 
 	CTeam* myTeam = teamHandler.Team(team);
 	myTeam->resPull += pack;
@@ -2259,11 +2195,6 @@ bool CUnit::UseResources(const SResourcePack& pack)
 void CUnit::AddResources(const SResourcePack& pack, bool useIncomeMultiplier)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	//FIXME
-	/*if (energy < 0.0f) {
-		UseEnergy(-energy);
-		return true;
-	}*/
 	resourcesMakeI += pack;
 	teamHandler.Team(team)->AddResources(pack, useIncomeMultiplier);
 }

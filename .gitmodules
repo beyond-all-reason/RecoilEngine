@@ -52,3 +52,6 @@
 [submodule "rts/lib/streflop"]
 	path = rts/lib/streflop
 	url = https://github.com/RecoilEngine/streflop.git
+[submodule "rts/lib/monocypher"]
+	path = rts/lib/monocypher
+	url = https://github.com/LoupVaillant/Monocypher.git

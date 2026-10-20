@@ -37,6 +37,7 @@ struct FeatureDef;
 class LuaMaterial;
 struct WeaponDef;
 struct SResourcePack;
+namespace NanoParticles { struct Event; }
 
 #ifndef zipFile
 	// might be defined through zip.h already
@@ -285,8 +286,10 @@ class CEventClient
 		virtual void Save(zipFile archive);
 
 		virtual void Update();
+		virtual void NanoParticleUpdate(const std::vector<NanoParticles::Event>& events) {}
 		virtual void UnsyncedHeightMapUpdate(const SRectangle& rect);
 
+		virtual void KeyBindingsChanged();
 		virtual bool KeyMapChanged();
 		virtual bool KeyPress(int keyCode, int scanCode, bool isRepeat);
 		virtual bool KeyRelease(int keyCode, int scanCode);
@@ -315,6 +318,7 @@ class CEventClient
 		virtual void MiniMapStateChanged(const bool isMinimized, const bool isMaximized, const bool isSlaved);
 		virtual void MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim);
 		virtual bool CommandNotify(const Command& cmd);
+		virtual bool AllowQuit();
 
 		virtual bool AddConsoleLine(const std::string& msg, const std::string& section, int level);
 

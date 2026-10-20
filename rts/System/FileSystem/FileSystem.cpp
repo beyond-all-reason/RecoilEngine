@@ -14,8 +14,6 @@
 #include <filesystem>
 #include <variant>
 
-#include <unistd.h>
-
 #include <fmt/printf.h>
 #include <fmt/format.h>
 
@@ -47,6 +45,7 @@
 		#undef CreateDirectory
 	#endif
 #else
+	#include <unistd.h>
 	#include <sys/types.h>
 	#include <dirent.h>
 #endif // _WIN32
@@ -912,7 +911,7 @@ std::string FileSystem::GetExtensionLowerCase(const std::string& pathStr)
 }
 
 std::string FileSystem::GetNormalizedPath(const std::string& path) {
-	return Impl::StoreUTF8AsString(std::filesystem::path(ForwardSlashes(path)).lexically_normal().generic_u8string());
+	return Impl::StoreUTF8AsString(Recoil::filesystem::u8path(ForwardSlashes(path)).lexically_normal().generic_u8string());
 }
 
 bool FileSystem::CheckFile(const std::string& file)

@@ -56,6 +56,8 @@ class CKeyBindings : public CommandReceiver
 		int GetFakeMetaKey() const { return fakeMetaKey; }
 		int GetKeyChainTimeout() const { return keyChainTimeout; }
 
+		void Clear();
+
 	protected:
 		void BuildHotkeyMap();
 		// rebuilds the reverse map once, and only if a binding actually changed
@@ -79,6 +81,7 @@ class CKeyBindings : public CommandReceiver
 		bool AddKeySymbol(const std::string& keysym, const std::string& code);
 
 		static bool RemoveCommandFromList(ActionList& al, const std::string& command);
+		static bool RemoveCommandFromList(ActionList& al, const CKeyChain& kc, const std::string& command);
 
 		bool FileSave(FILE* file) const;
 

@@ -281,7 +281,7 @@ void CWeapon::UpdateWeaponErrorVector()
 
 void CWeapon::UpdateWeaponVectors()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	relAimFromPos = owner->script->GetPiecePos(aimFromPiece);
 	owner->script->GetEmitDirPos(muzzlePiece, relWeaponMuzzlePos, weaponDir);
@@ -317,7 +317,11 @@ float CWeapon::GetPredictedImpactTime(const float3& p) const
 
 void CWeapon::Update()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	// nothing to aim at, fire or stockpile
+	if (!HaveTarget() && !owner->HaveTarget() && salvoLeft == 0 && !weaponDef->stockpile)
+		return;
 
 	// Fast auto targeting needs to trigger an immediate retarget once the target is dead.
 	bool fastAutoRetargetRequired = fastAutoRetargeting && HaveTarget()
@@ -338,6 +342,9 @@ void CWeapon::Update()
 	if (!HaveTarget() && owner->curTarget.type != Target_None)
 		Attack(owner->curTarget);
 
+	if (salvoLeft == 0 && HaveDeniedInterceptTarget())
+		UpdateInterceptTarget();
+
 	currentTargetPos = GetLeadTargetPos(currentTarget);
 
 	if (!UpdateStockpile())
@@ -351,7 +358,7 @@ void CWeapon::Update()
 
 void CWeapon::UpdateAim()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!HaveTarget())
 		return;
 
@@ -463,7 +470,7 @@ bool CWeapon::CanFire(bool ignoreAngleGood, bool ignoreTargetType, bool ignoreRe
 
 void CWeapon::UpdateFire()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!CanFire(false, false, false))
 		return;
 
@@ -514,7 +521,7 @@ void CWeapon::UpdateFire()
 
 bool CWeapon::UpdateStockpile()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!weaponDef->stockpile)
 		return true;
 
@@ -540,7 +547,7 @@ bool CWeapon::UpdateStockpile()
 
 void CWeapon::UpdateSalvo()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!salvoLeft || nextSalvo > gs->frameNum)
 		return;
 
@@ -610,7 +617,7 @@ void CWeapon::UpdateSalvo()
 
 bool CWeapon::Attack(const SWeaponTarget& newTarget)
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (newTarget == currentTarget)
 		return true;
 
@@ -660,6 +667,12 @@ void CWeapon::DropCurrentTarget()
 		DeleteDeathDependence(currentTarget.unit, DEPENDENCE_TARGETUNIT);
 
 	currentTarget = SWeaponTarget();
+}
+
+
+bool CWeapon::HaveDeniedInterceptTarget() const
+{
+	return (currentTarget.type == Target_Intercept && weaponDef->interceptSolo && currentTarget.intercept->IsBeingIntercepted());
 }
 
 
@@ -819,6 +832,12 @@ void CWeapon::HoldIfTargetInvalid()
 		return;
 
 	if (!TryTarget(currentTarget)) {
+		// BombDroppers must retain ground targets until their active salvo ends.
+		// Dropping one after the aircraft passes the target prevents the CAI from
+		// associating the completed salvo with its current attack command.
+		if (noAutoTarget && HavePosTarget() && salvoLeft > 0)
+			return;
+
 		DropCurrentTarget();
 		return;
 	}
@@ -1112,6 +1131,10 @@ bool CWeapon::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
 bool CWeapon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// Match the pre-fire muzzle check before considering the ground-hit AoE exception.
+	if ((avoidFlags & Collision::NOGROUND) == 0 && srcPos.y < CGround::GetHeightReal(srcPos))
+		return false;
+
 	float3 tgtDir = tgtPos - srcPos;
 
 	const float length = tgtDir.LengthNormalize();
@@ -1132,7 +1155,9 @@ bool CWeapon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, con
 		const float tgtDst = tgtPos.SqDistance(srcPos + tgtDir * gndDst);
 
 		// true iff ground does not block the ray of length <length> from <srcPos> along <tgtDir>
-		if ((gndDst > 0.0f) && (tgtDst > Square(damages->damageAreaOfEffect)))
+		// A surface source pointing into terrain can hit at distance 0, so keep >= 0
+		// and retain the AoE exception.
+		if ((gndDst >= 0.0f) && (tgtDst > Square(damages->damageAreaOfEffect)))
 			return false;
 
 		unit = nullptr;
@@ -1276,6 +1301,21 @@ void CWeapon::UpdateInterceptTarget()
 	CWeaponProjectile* newTarget = nullptr;
 	float minInterceptTargetDistSq = std::numeric_limits<float>::max();
 
+	if (weaponDef->interceptSolo) {
+		if (HaveDeniedInterceptTarget())
+			DropCurrentTarget();
+
+		spring::VectorEraseIfAll(incomingProjectileIDs, [this](const int projID) {
+			CWeaponProjectile* wp = static_cast<CWeaponProjectile*>(projectileHandler.GetProjectileBySyncedID(projID));
+
+			if (!wp->IsBeingIntercepted())
+				return false;
+
+			DeleteDeathDependence(wp, DEPENDENCE_INTERCEPT);
+			return true;
+		});
+	}
+
 	if (currentTarget.type == Target_Intercept)
 		minInterceptTargetDistSq = aimFromPos.SqDistance(currentTarget.intercept->pos);
 
@@ -1284,10 +1324,6 @@ void CWeapon::UpdateInterceptTarget()
 		CWeaponProjectile* wp = static_cast<CWeaponProjectile*>(p);
 
 		const float curInterceptTargetDistSq = aimFromPos.SqDistance(wp->pos);
-
-		// set by CWeaponProjectile's ctor when the interceptor fires
-		if (weaponDef->interceptSolo && wp->IsBeingIntercepted()) //FIXME add bad target?
-			continue;
 
 		if (curInterceptTargetDistSq >= minInterceptTargetDistSq)
 			continue;

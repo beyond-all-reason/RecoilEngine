@@ -463,7 +463,7 @@ namespace {
 		{
 			EnemyAircraft(const CUnit* exclUnit, int allyTeam) : Enemy_InLos(exclUnit, allyTeam) {}
 			bool Unit(const CUnit* u) {
-				return (u->unitDef->canfly && !u->IsCrashing() && Enemy_InLos::Unit(u));
+				return (u->unitDef->canfly && (modInfo.fireAtCrashing || !u->IsCrashing()) && Enemy_InLos::Unit(u));
 			}
 		};
 
@@ -479,27 +479,6 @@ namespace {
 				return (u->allyteam == gu->myAllyTeam) ||
 					   (u->losStatus[gu->myAllyTeam] & (LOS_INLOS | LOS_INRADAR)) ||
 					   gu->spectatingFullView;
-			}
-		};
-
-		/**
-		 * Delegates filtering to CMobileCAI::IsValidTarget.
-		 *
-		 * This is necessary in CMobileCAI and CAirCAI so they can select the closest
-		 * enemy unit which they consider a valid target.
-		 *
-		 * Without the valid target condition, units don't attack anything if an
-		 * the nearest enemy is an invalid target. (e.g. noChaseCategory)
-		 */
-		struct Enemy_InLos_ValidTarget : public Enemy_InLos
-		{
-			const CMobileCAI* const cai;
-
-			Enemy_InLos_ValidTarget(int at, const CMobileCAI* cai) :
-				Enemy_InLos(nullptr, at), cai(cai) {}
-
-			bool Unit(const CUnit* u) {
-				return Enemy_InLos::Unit(u) && cai->IsValidTarget(u, nullptr);
 			}
 		};
 
@@ -543,6 +522,27 @@ namespace {
 			}
 
 			CUnit* GetClosestUnit() const { return closeUnit; }
+		};
+
+		/**
+		 * Return the closest unit which CMobileCAI::IsValidTarget accepts, so
+		 * that CMobileCAI and CAirCAI skip invalid targets (e.g. noChaseCategory).
+		 * The distance is tested first since IsValidTarget is the expensive part.
+		 */
+		struct ClosestValidTarget : public ClosestUnit
+		{
+			const CMobileCAI* const cai;
+
+			ClosestValidTarget(const float3& pos, float searchRadius, const CMobileCAI* cai) :
+				ClosestUnit(pos, searchRadius), cai(cai) {}
+
+			void AddUnit(CUnit* u) {
+				const float sqDist = (pos - u->midPos).SqLength2D();
+				if (sqDist <= closeSqDist && cai->IsValidTarget(u, nullptr)) {
+					closeSqDist = sqDist;
+					closeUnit = u;
+				}
+			}
 		};
 
 		/**
@@ -686,11 +686,16 @@ size_t CGameHelper::GenerateWeaponTargets(const CWeapon* weapon, const CUnit* av
 
 	const bool paralyzer = (weaponDmg->paralyzeDamageTime != 0);
 
+	targets.clear();
+
+	// cheap exit for the common case of no enemies anywhere near
+	if (!quadField.MayHaveEnemyUnits(ownerPos, scanRadius, weaponOwner->allyteam))
+		return 0;
+
 	// copy on purpose since the below calls lua
 	QuadFieldQuery qfQuery;
 	quadField.GetQuads(qfQuery, ownerPos, scanRadius);
 
-	targets.clear();
 	targets.reserve(32);
 
 	const int tempNum = gs->GetTempNum();
@@ -806,8 +811,11 @@ CUnit* CGameHelper::GetClosestEnemyUnit(const CUnit* excludeUnit, const float3& 
 CUnit* CGameHelper::GetClosestValidTarget(const float3& pos, float searchRadius, int searchAllyteam, const CMobileCAI* cai)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	Query::ClosestUnit q(pos, searchRadius);
-	QueryUnits(Filter::Enemy_InLos_ValidTarget(searchAllyteam, cai), q);
+	if (!quadField.MayHaveEnemyUnits(pos, searchRadius, searchAllyteam))
+		return nullptr;
+
+	Query::ClosestValidTarget q(pos, searchRadius, cai);
+	QueryUnits(Filter::Enemy_InLos(nullptr, searchAllyteam), q);
 	return q.GetClosestUnit();
 }
 

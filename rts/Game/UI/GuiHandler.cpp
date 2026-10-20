@@ -81,6 +81,8 @@ CGuiHandler::CGuiHandler()
 	miniMapMarker = configHandler->GetBool("MiniMapMarker");
 	invertQueueKey = configHandler->GetBool("InvertQueueKey");
 
+	configHandler->NotifyOnChange(this, {"MiniMapMarker"});
+
 
 	autoShowMetal = mapInfo->gui.autoShowMetal;
 	useStencil = false;
@@ -92,6 +94,16 @@ CGuiHandler::CGuiHandler()
 	}
 
 	failedSound = sound->GetDefSoundId("FailedCommand");
+}
+
+CGuiHandler::~CGuiHandler()
+{
+	configHandler->RemoveObserver(this);
+}
+
+void CGuiHandler::ConfigNotify(const std::string& key, const std::string& value)
+{
+	miniMapMarker = configHandler->GetBool("MiniMapMarker");
 }
 
 

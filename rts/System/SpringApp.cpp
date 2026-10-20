@@ -254,6 +254,7 @@ bool SpringApp::Init()
 
 	// populate params
 	globalConfig.Init();
+	globalConfig.InitConfigNotify();
 
 	// Install Watchdog (must happen after time epoch is set)
 	Watchdog::Install();
@@ -1058,6 +1059,8 @@ void SpringApp::Kill(bool fromRun)
 	CBitmap::KillPool();
 	CLuaSocketRestrictions::KillStatic();
 
+	globalConfig.RemoveConfigNotify();
+
 	// also gets rid of configHandler
 	FileSystemInitializer::Cleanup();
 	DataDirLocater::FreeInstance();
@@ -1071,6 +1074,26 @@ void SpringApp::Kill(bool fromRun)
 	killedCount -= 1;
 }
 
+
+// close button, Alt+F4, SDL_QUIT; quitforce and Spring.Quit set globalQuit directly and skip this
+static void RequestQuit()
+{
+	if (gu->globalQuit)
+		return;
+
+	// don't call into Lua while loading, events are pumped from the load thread and handles are still registering
+	if (game != nullptr && !game->IsDoneLoading()) {
+		gu->globalQuit = true;
+		return;
+	}
+
+	if (!eventHandler.AllowQuit()) {
+		LOG("[SpringApp::%s] quit vetoed by Lua (AllowQuit), use /quitforce to override", __func__);
+		return;
+	}
+
+	gu->globalQuit = true;
+}
 
 bool SpringApp::MainEventHandler(const SDL_Event& event)
 {
@@ -1227,20 +1250,20 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 				} break;
 
 				case SDL_WINDOWEVENT_CLOSE: {
-					gu->globalQuit = true;
+					RequestQuit();
 				} break;
 			};
 		} break;
 		case SDL_AUDIODEVICEREMOVED: {
 			LOG("[SpringApp::%s][SDL_AUDIODEVICEREMOVED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.iscapture));
-			sound->DeviceChanged(event.adevice.which);
+			sound->DeviceChanged(event.adevice.which, false);
 		} break;
 		case SDL_AUDIODEVICEADDED: {
 			LOG("[SpringApp::%s][SDL_AUDIODEVICEADDED][1] type=%u, which=%u, iscapture=%u", __func__, event.adevice.type, event.adevice.which, static_cast<uint32_t>(event.adevice.iscapture));
-			sound->DeviceChanged(event.adevice.which);
+			sound->DeviceChanged(event.adevice.which, true);
 		} break;
 		case SDL_QUIT: {
-			gu->globalQuit = true;
+			RequestQuit();
 		} break;
 		case SDL_TEXTEDITING: {
 			if (activeController != nullptr)

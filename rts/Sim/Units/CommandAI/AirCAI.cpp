@@ -402,7 +402,7 @@ void CAirCAI::ExecuteAttack(Command& c)
 			return;
 		}
 		if (orderTarget != nullptr) {
-			if (orderTarget->unitDef->canfly && orderTarget->IsCrashing()) {
+			if (SkipCrashingTarget(orderTarget)) {
 				owner->DropCurrentAttackTarget();
 				StopMoveAndFinishCommand();
 				return;
@@ -428,6 +428,10 @@ void CAirCAI::ExecuteAttack(Command& c)
 				return;
 			}
 			if (targetUnit->GetTransporter() != nullptr && !modInfo.targetableTransportedUnits) {
+				StopMoveAndFinishCommand();
+				return;
+			}
+			if (SkipCrashingTarget(targetUnit)) {
 				StopMoveAndFinishCommand();
 				return;
 			}
@@ -539,7 +543,7 @@ int CAirCAI::GetDefaultCmd(const CUnit* pointed, const CFeature* feature)
 bool CAirCAI::IsValidTarget(const CUnit* enemy, CWeapon* weapon) const {
 	if (!CMobileCAI::IsValidTarget(enemy, weapon))
 		return false;
-	if (enemy->IsCrashing())
+	if (SkipCrashingTarget(enemy))
 		return false;
 	return (GetStrafeAirMoveType(owner)->isFighter || !enemy->unitDef->canfly);
 }

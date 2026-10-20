@@ -77,3 +77,10 @@ struct Transform {
 
 	void AssertNaNs() const;
 };
+
+inline float3 Transform::operator*(const float3& v) const
+{
+	// Scale, Rotate, Translate
+	// the same order as CMatrix44f's vTra = T * R * S * v;
+	return r.Rotate(v * s) + t;
+}

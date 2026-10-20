@@ -61,6 +61,7 @@ void CEventClient::DrawLoadScreen() {}
 void CEventClient::LoadProgress(const std::string& msg, const bool replace_lastline) {}
 
 // from LuaUI
+void CEventClient::KeyBindingsChanged() {}
 bool CEventClient::KeyMapChanged() { return false; }
 bool CEventClient::KeyPress(int keyCode, int scanCode, bool isRepeat) { return false; }
 bool CEventClient::KeyRelease(int keyCode, int scanCode) { return false; }
@@ -87,6 +88,7 @@ void CEventClient::MiniMapRotationChanged(const float newRot, const float oldRot
 void CEventClient::MiniMapStateChanged(const bool isMinimized, const bool isMaximized, const bool isSlaved) {}
 void CEventClient::MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim) {}
 bool CEventClient::CommandNotify(const Command& cmd) { return false; }
+bool CEventClient::AllowQuit() { return true; }
 
 bool CEventClient::AddConsoleLine(const std::string& msg, const std::string& section, int level) { return false; }
 
