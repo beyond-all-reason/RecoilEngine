@@ -21,7 +21,6 @@
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Textures/Bitmap.h"
-#include "Rendering/Textures/TextureAtlas.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/FastMath.h"
 #include "System/SpringMath.h"
@@ -62,6 +61,17 @@ LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_BUMP_WATER)
 	#undef LOG_SECTION_CURRENT
 #endif
 #define LOG_SECTION_CURRENT LOG_SECTION_BUMP_WATER
+
+// coastmap updates: heightmap changes mark cells of COAST_CELL_SIZE^2 texels, and every
+// COAST_UPDATE_INTERVAL sim frames the marked cells are recomputed on the GPU, padded by
+// COAST_PADDING texels (how far the blur passes spread a change), at most COAST_MAX_PIXELS
+// padded texels and COAST_MAX_RUN cells per side of one area per update
+static constexpr int COAST_CELL_SIZE = 8;
+static constexpr int COAST_PADDING = 15;
+static constexpr int COAST_MAX_RUN = 32;
+static constexpr int COAST_MAX_PIXELS = 512 * 512;
+static constexpr int COAST_SCRATCH_SIZE = 1024;
+static constexpr int COAST_UPDATE_INTERVAL = 10;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// HELPER FUNCTIONS
@@ -188,7 +198,7 @@ CBumpWater::CBumpWater()
 	, normalTexture(0)
 	, normalTexture2(0)
 	, coastTexture(0)
-	, coastUpdateTexture(0)
+	, coastScratchTexture(0)
 {
 	eventHandler.AddClient(this);
 }
@@ -283,6 +293,7 @@ void CBumpWater::InitResources(bool loadShader)
 			blurShader->Enable();
 			blurShader->SetUniform("tex0", 0);
 			blurShader->SetUniform("tex1", 1);
+			blurShader->SetUniform("heightTex", 2);
 			blurShader->SetUniform("args", 0, 0);
 			blurShader->Disable();
 			blurShader->Validate();
@@ -300,16 +311,36 @@ void CBumpWater::InitResources(bool loadShader)
 		coastFBO.reloadOnAltTab = true;
 		coastFBO.Bind();
 		coastFBO.AttachTexture(coastTexture, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0_EXT);
+		glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
 
 		if ((shoreWaves = coastFBO.CheckStatus("BUMPWATER(Coastmap)"))) {
 			// initialize texture
 			glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 			glClear(GL_COLOR_BUFFER_BIT);
 
-			// fill with current heightmap/coastmap
-			UnsyncedHeightMapUpdate(SRectangle(0, 0, mapDims.mapx, mapDims.mapy));
-			UploadCoastline(true);
-			UpdateCoastmap(true);
+			coastCellsX = (mapDims.mapx + COAST_CELL_SIZE - 1) / COAST_CELL_SIZE;
+			coastCellsY = (mapDims.mapy + COAST_CELL_SIZE - 1) / COAST_CELL_SIZE;
+			coastDirtyCells.assign(coastCellsX * coastCellsY, 0);
+
+			// fill with the current heightmap in one pass over the whole map; the map's
+			// heightmap texture is not uploaded yet while loading, so use a copy here
+			const float* heightMap = (!gs->PreSimFrame()) ? readMap->GetCornerHeightMapUnsynced() : readMap->GetCornerHeightMapSynced();
+
+			GLuint heightTex = 0;
+			glGenTextures(1, &heightTex);
+			glBindTexture(GL_TEXTURE_2D, heightTex);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, mapDims.mapxp1, mapDims.mapyp1, 0, GL_RED, GL_FLOAT, heightMap);
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			CreateCoastScratch(mapDims.mapx, mapDims.mapy);
+			coastRects.assign(1, CoastRect{ 0, 0, mapDims.mapx, mapDims.mapy, 0, 0 });
+			UpdateCoastmap(heightTex);
+			glDeleteTextures(1, &heightTex);
+
+			// later updates cover at most COAST_MAX_PIXELS texels
+			CreateCoastScratch(std::min(mapDims.mapx, COAST_SCRATCH_SIZE), std::min(mapDims.mapy, COAST_SCRATCH_SIZE));
 
 			eventHandler.InsertEvent(this, "UnsyncedHeightMapUpdate");
 		}
@@ -526,6 +557,7 @@ void CBumpWater::FreeResources()
 	DeleteTexture(normalTexture);
 	DeleteTexture(normalTexture2);
 	DeleteTexture(coastTexture);
+	DeleteTexture(coastScratchTexture);
 	DeleteTexture(waveRandTexture);
 	for (auto& caustTexture : caustTextures) {
 		DeleteTexture(caustTexture);
@@ -548,12 +580,12 @@ void CBumpWater::Update()
 	if (dynWaves)
 		UpdateDynWaves();
 
-	if (shoreWaves) {
-		if ((gs->frameNum % 10) == 0 && !heightmapUpdates.empty())
-			UploadCoastline();
+	// on the first call at or after every COAST_UPDATE_INTERVAL'th frame (more than one sim frame can pass between two calls)
+	if (shoreWaves && numCoastDirtyCells > 0 && gs->frameNum >= nextCoastUpdateFrame) {
+		nextCoastUpdateFrame = (gs->frameNum / COAST_UPDATE_INTERVAL + 1) * COAST_UPDATE_INTERVAL;
 
-		if ((gs->frameNum % 10) == 5 && !coastmapAtlasRects.empty())
-			UpdateCoastmap();
+		if (CollectCoastRects())
+			UpdateCoastmap(readMap->GetHeightMapTexture());
 	}
 }
 
@@ -579,130 +611,154 @@ void CBumpWater::UpdateWater(const CGame* game)
 ///  SHOREWAVES/COASTMAP
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-CBumpWater::CoastAtlasRect::CoastAtlasRect(const SRectangle& rect)
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	ix1 = std::max(rect.x1 - 15,            0);
-	iy1 = std::max(rect.y1 - 15,            0);
-	ix2 = std::min(rect.x2 + 15, mapDims.mapx);
-	iy2 = std::min(rect.y2 + 15, mapDims.mapy);
-
-	xsize = ix2 - ix1;
-	ysize = iy2 - iy1;
-
-	x1 = (ix1 + 0.5f) / (float)mapDims.mapx;
-	x2 = (ix2 + 0.5f) / (float)mapDims.mapx;
-	y1 = (iy1 + 0.5f) / (float)mapDims.mapy;
-	y2 = (iy2 + 0.5f) / (float)mapDims.mapy;
-	tx1 = tx2 = ty1 = ty2 = 0.0f;
-	isCoastline = true;
-}
-
 void CBumpWater::UnsyncedHeightMapUpdate(const SRectangle& rect)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!shoreWaves || !readMap->HasVisibleWater())
+	if (!shoreWaves || !readMap->HasVisibleWater() || coastDirtyCells.empty())
 		return;
 
-	heightmapUpdates.push_back(rect);
+	// corner rectangle (inclusive); coastmap texel (x, z) holds the height of corner (x, z)
+	const int cx1 = std::clamp(rect.x1, 0, mapDims.mapx - 1) / COAST_CELL_SIZE;
+	const int cx2 = std::clamp(rect.x2, 0, mapDims.mapx - 1) / COAST_CELL_SIZE;
+	const int cy1 = std::clamp(rect.z1, 0, mapDims.mapy - 1) / COAST_CELL_SIZE;
+	const int cy2 = std::clamp(rect.z2, 0, mapDims.mapy - 1) / COAST_CELL_SIZE;
+
+	for (int cy = cy1; cy <= cy2; ++cy) {
+		for (int cx = cx1; cx <= cx2; ++cx) {
+			uint8_t& cell = coastDirtyCells[cy * coastCellsX + cx];
+			numCoastDirtyCells += (cell == 0);
+			cell = 1;
+		}
+	}
 }
 
 
-void CBumpWater::UploadCoastline(const bool forceFull)
+void CBumpWater::CreateCoastScratch(int sizeX, int sizeY)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// optimize update area (merge overlapping areas etc.)
-	heightmapUpdates.Process(forceFull);
+	if (coastScratchTexture != 0 && sizeX == coastScratchSizeX && sizeY == coastScratchSizeY)
+		return;
 
-	// limit the to be updated areas
-	unsigned int currentPixels = 0;
-	unsigned int numCoastRects = 0;
+	if (coastScratchTexture == 0)
+		glGenTextures(1, &coastScratchTexture);
 
-	// select the to be updated areas
-	while (!heightmapUpdates.empty()) {
-		const SRectangle& cuRect1 = heightmapUpdates.front();
+	glBindTexture(GL_TEXTURE_2D, coastScratchTexture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, sizeX, sizeY, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
-		if ((currentPixels + cuRect1.GetArea() <= 512 * 512) || forceFull) {
-			currentPixels += cuRect1.GetArea();
-			coastmapAtlasRects.emplace_back(cuRect1);
-			heightmapUpdates.pop_front();
-			continue;
-		}
+	coastScratchSizeX = sizeX;
+	coastScratchSizeY = sizeY;
 
-		break;
-	}
+	coastScratchFBO.reloadOnAltTab = true;
+	coastScratchFBO.Bind();
+	coastScratchFBO.AttachTexture(coastScratchTexture, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0_EXT);
+	glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
+	coastScratchFBO.CheckStatus("BUMPWATER(CoastScratch)");
+	coastScratchFBO.Unbind();
+}
 
 
-	// create a texture atlas for the to-be-updated areas
-	CTextureAtlas atlas;
+bool CBumpWater::CollectCoastRects()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	coastRects.clear();
 
-	const float* heightMap = (!gs->PreSimFrame()) ? readMap->GetCornerHeightMapUnsynced() : readMap->GetCornerHeightMapSynced();
+	const auto IsDirty = [this](int cx, int cy) { return (coastDirtyCells[cy * coastCellsX + cx] != 0); };
 
-	for (size_t i = 0; i < coastmapAtlasRects.size(); i++) {
-		CoastAtlasRect& caRect = coastmapAtlasRects[i];
+	// areas are shelf-packed into the scratch texture
+	int shelfX = 0;
+	int shelfY = 0;
+	int shelfH = 0;
+	int numPixels = 0;
 
-		unsigned int a = 0;
-		unsigned char* texpixels = (unsigned char*) atlas.AddGetTex(IntToString(i), caRect.xsize, caRect.ysize);
+	// the scan continues where the previous update stopped, so a busy region cannot starve the rest
+	for (int n = 0; n < coastCellsY && numCoastDirtyCells > 0; ++n) {
+		const int cy = (coastScanRow + n) % coastCellsY;
 
-		for (int y = 0; y < caRect.ysize; ++y) {
-			const int yindex  = (y + caRect.iy1) * mapDims.mapxp1 + caRect.ix1;
-			const int yindex2 = y * caRect.xsize;
+		for (int cx = 0; cx < coastCellsX; ++cx) {
+			if (!IsDirty(cx, cy))
+				continue;
 
-			for (int x = 0; x < caRect.xsize; ++x) {
-				const int index  = yindex + x;
-				const int index2 = (yindex2 + x) << 2;
-				const float& height = heightMap[index];
+			// a run of dirty cells, extended downwards while every cell below it is dirty too
+			int cx2 = cx + 1;
+			int cy2 = cy + 1;
 
-				texpixels[index2    ] = (height > 10.0f)? 255 : 0; // isground
-				texpixels[index2 + 1] = (height >  0.0f)? 255 : 0; // coastdist
-				texpixels[index2 + 2] = (height <  0.0f)? CReadMap::EncodeHeight(height) : 255; // waterdepth
-				texpixels[index2 + 3] = 0;
-				a += (height > 0.0f);
+			while (cx2 < coastCellsX && (cx2 - cx) < COAST_MAX_RUN && IsDirty(cx2, cy))
+				cx2++;
+
+			while (cy2 < coastCellsY && (cy2 - cy) < COAST_MAX_RUN) {
+				bool rowDirty = true;
+
+				for (int x = cx; x < cx2 && rowDirty; ++x) {
+					rowDirty = IsDirty(x, cy2);
+				}
+				if (!rowDirty)
+					break;
+
+				cy2++;
 			}
+
+			CoastRect r;
+			r.x1 = std::max(cx  * COAST_CELL_SIZE - COAST_PADDING, 0);
+			r.y1 = std::max(cy  * COAST_CELL_SIZE - COAST_PADDING, 0);
+			r.x2 = std::min(cx2 * COAST_CELL_SIZE + COAST_PADDING, mapDims.mapx);
+			r.y2 = std::min(cy2 * COAST_CELL_SIZE + COAST_PADDING, mapDims.mapy);
+
+			const int w = r.x2 - r.x1;
+			const int h = r.y2 - r.y1;
+
+			if (shelfX + w > coastScratchSizeX) {
+				shelfX = 0;
+				shelfY += shelfH;
+				shelfH = 0;
+			}
+
+			// out of budget or scratch space, the rest waits for the next update
+			if (!coastRects.empty() && ((numPixels + w * h) > COAST_MAX_PIXELS || (shelfY + h) > coastScratchSizeY)) {
+				coastScanRow = cy;
+				return true;
+			}
+
+			r.sx = shelfX;
+			r.sy = shelfY;
+			shelfX += w;
+			shelfH = std::max(shelfH, h);
+			numPixels += w * h;
+
+			for (int y = cy; y < cy2; ++y) {
+				std::fill_n(coastDirtyCells.begin() + (y * coastCellsX + cx), cx2 - cx, uint8_t(0));
+			}
+
+			numCoastDirtyCells -= (cx2 - cx) * (cy2 - cy);
+			coastRects.push_back(r);
+
+			cx = cx2 - 1;
 		}
-
-		numCoastRects += (caRect.isCoastline = (a != 0 && a != (caRect.ysize * caRect.xsize)));
 	}
 
-	// create the texture atlas only if any coastal regions exist
-	if (numCoastRects == 0 || !atlas.Finalize()) {
-		coastmapAtlasRects.clear();
-		return;
-	}
-
-	// must happen after atlas.Finalize()
-	atlas.DisOwnTexture();
-
-	coastUpdateTexture = atlas.GetTexID();
-	atlasX = (atlas.GetSize()).x;
-	atlasY = (atlas.GetSize()).y;
-
-	// save the area positions in the texture atlas
-	for (size_t i = 0; i < coastmapAtlasRects.size(); i++) {
-		CoastAtlasRect& r = coastmapAtlasRects[i];
-		const auto& tex = atlas.GetTexture(IntToString(i));
-		r.tx1 = tex.xstart;
-		r.tx2 = tex.xend;
-		r.ty1 = tex.ystart;
-		r.ty2 = tex.yend;
-	}
+	return !coastRects.empty();
 }
 
 
-void CBumpWater::UpdateCoastmap(const bool initialize)
+void CBumpWater::UpdateCoastmap(GLuint heightTex)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	coastFBO.Bind();
+	SCOPED_GL_DEBUGGROUP("Update::Water::Coastmap");
+
 	glPushAttrib(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_ENABLE_BIT);
 
 	glDisable(GL_BLEND);
 	glDepthMask(GL_FALSE);
 	glDisable(GL_DEPTH_TEST);
 
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, heightTex);
 	glActiveTexture(GL_TEXTURE1);
-	glBindTexture(GL_TEXTURE_2D, coastUpdateTexture);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glBindTexture(GL_TEXTURE_2D, coastScratchTexture);
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, coastTexture);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -716,93 +772,86 @@ void CBumpWater::UpdateCoastmap(const bool initialize)
 	glLoadIdentity();
 	glOrtho(0, 1, 0, 1, -1, 1);
 
-	glViewport(0, 0, mapDims.mapx, mapDims.mapy);
-	glDrawBuffer(GL_COLOR_ATTACHMENT0_EXT);
-	coastFBO.AttachTexture(coastTexture, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0_EXT);
-
-	blurShader->Enable();
-	blurShader->SetUniform("args", 0, 0);
-
-	uint32_t numCoastRects = 0;
+	const float coastScaleX = 1.0f / mapDims.mapx;
+	const float coastScaleY = 1.0f / mapDims.mapy;
+	const float scratchScaleX = 1.0f / coastScratchSizeX;
+	const float scratchScaleY = 1.0f / coastScratchSizeY;
 
 	auto& rbt4 = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_T4>();
 
-	for (const CoastAtlasRect& r : coastmapAtlasRects) {
-		rbt4.AddQuadTriangles(
-			{ {r.x1, r.y1, 0.0f}, { r.tx1, r.ty1, 0.0f, 0.0f } },
-			{ {r.x1, r.y2, 0.0f}, { r.tx1, r.ty2, 0.0f, 1.0f } },
-			{ {r.x2, r.y2, 0.0f}, { r.tx2, r.ty2, 1.0f, 1.0f } },
-			{ {r.x2, r.y1, 0.0f}, { r.tx2, r.ty1, 1.0f, 0.0f } }
-		);
-		numCoastRects += r.isCoastline;
-	}
-	rbt4.DrawElements(GL_TRIANGLES);
+	// draws each area into the coastmap or into its scratch area; the texture coordinates
+	// address the same texels in the other texture, and .pq spans the area from 0 to 1
+	const auto DrawAreas = [&](bool toScratch) {
+		for (const CoastRect& r : coastRects) {
+			const float4 coastCoords = {
+				r.x1 * coastScaleX,
+				r.y1 * coastScaleY,
+				r.x2 * coastScaleX,
+				r.y2 * coastScaleY
+			};
+			const float4 scratchCoords = {
+				r.sx * scratchScaleX,
+				r.sy * scratchScaleY,
+				(r.sx + r.x2 - r.x1) * scratchScaleX,
+				(r.sy + r.y2 - r.y1) * scratchScaleY
+			};
+			const float4& v = toScratch? scratchCoords: coastCoords;
+			const float4& t = toScratch? coastCoords: scratchCoords;
 
-	if (numCoastRects > 0 && atlasX > 0 && atlasY > 0) {
-		for (int i = 0; i < 5; ++i) {
-			coastFBO.AttachTexture(coastUpdateTexture, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0_EXT);
-			glViewport(0, 0, atlasX, atlasY);
-			blurShader->SetUniform("args", 1, i * 2 + 1);
-
-			for (const CoastAtlasRect& r : coastmapAtlasRects) {
-				if (!r.isCoastline)
-					continue;
-
-				rbt4.AddQuadTriangles(
-					{ { r.tx1, r.ty1, 0.0f }, { r.x1, r.y1, 0.0f, 0.0f } },
-					{ { r.tx1, r.ty2, 0.0f }, { r.x1, r.y2, 0.0f, 1.0f } },
-					{ { r.tx2, r.ty2, 0.0f }, { r.x2, r.y2, 1.0f, 1.0f } },
-					{ { r.tx2, r.ty1, 0.0f }, { r.x2, r.y1, 1.0f, 0.0f } }
-				);
-			}
-			rbt4.DrawElements(GL_TRIANGLES);
-
-			coastFBO.AttachTexture(coastTexture, GL_TEXTURE_2D, GL_COLOR_ATTACHMENT0_EXT);
-			glViewport(0, 0, mapDims.mapx, mapDims.mapy);
-			blurShader->SetUniform("args", 0, i * 2 + 2);
-
-			for (const CoastAtlasRect& r : coastmapAtlasRects) {
-				if (!r.isCoastline)
-					continue;
-
-				rbt4.AddQuadTriangles(
-					{ { r.x1, r.y1, 0.0f }, { r.tx1, r.ty1, 0.0f, 0.0f } },
-					{ { r.x1, r.y2, 0.0f }, { r.tx1, r.ty2, 0.0f, 1.0f } },
-					{ { r.x2, r.y2, 0.0f }, { r.tx2, r.ty2, 1.0f, 1.0f } },
-					{ { r.x2, r.y1, 0.0f }, { r.tx2, r.ty1, 1.0f, 0.0f } }
-				);
-			}
-			rbt4.DrawElements(GL_TRIANGLES);
+			rbt4.AddQuadTriangles(
+				{ { v.x, v.y, 0.0f }, { t.x, t.y, 0.0f, 0.0f } },
+				{ { v.x, v.w, 0.0f }, { t.x, t.w, 0.0f, 1.0f } },
+				{ { v.z, v.w, 0.0f }, { t.z, t.w, 1.0f, 1.0f } },
+				{ { v.z, v.y, 0.0f }, { t.z, t.y, 1.0f, 0.0f } }
+			);
 		}
+		rbt4.DrawElements(GL_TRIANGLES);
+	};
+
+	blurShader->Enable();
+
+	// initialize the areas from the heightmap, then blur them back and forth
+	coastFBO.Bind();
+	glViewport(0, 0, mapDims.mapx, mapDims.mapy);
+	blurShader->SetUniform("args", 0, 0);
+	DrawAreas(false);
+
+	for (int i = 0; i < 5; ++i) {
+		coastScratchFBO.Bind();
+		glViewport(0, 0, coastScratchSizeX, coastScratchSizeY);
+		blurShader->SetUniform("args", 1, i * 2 + 1);
+		DrawAreas(true);
+
+		coastFBO.Bind();
+		glViewport(0, 0, mapDims.mapx, mapDims.mapy);
+		blurShader->SetUniform("args", 0, i * 2 + 2);
+		DrawAreas(false);
 	}
+
+	blurShader->Disable();
+	coastFBO.Unbind();
 
 	//glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
 	glMatrixMode(GL_MODELVIEW);
 	glPopMatrix();
 
-	blurShader->Disable();
-	coastFBO.Detach(GL_COLOR_ATTACHMENT0_EXT);
 	glPopAttrib();
 
-	// NB: not needed during init, but no reason to leave bound after ::Update
-	coastFBO.Unbind();
-
-	// generate mipmaps
-	//glActiveTexture(GL_TEXTURE0);
-	//glBindTexture(GL_TEXTURE_2D, coastTexture);
+	// generate mipmaps (coastTexture is still bound to unit 0)
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
 	glGenerateMipmapEXT(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
 
-	// delete UpdateAtlas
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, 0);
 	glActiveTexture(GL_TEXTURE1);
 	glBindTexture(GL_TEXTURE_2D, 0);
-	glDeleteTextures(1, &coastUpdateTexture);
-	coastmapAtlasRects.clear();
-
-	globalRendering->LoadViewport();
 	glActiveTexture(GL_TEXTURE0);
+
+	coastRects.clear();
+	globalRendering->LoadViewport();
 }
 
 
