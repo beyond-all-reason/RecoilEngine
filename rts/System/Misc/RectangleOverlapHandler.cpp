@@ -134,12 +134,13 @@ void CRectangleOverlapHandler::StageSplitTooLarge()
 {
 	// split too-large rects
 	for (size_t i = frontIdx; i < rectangles.size(); i++) {
-		SRectangle& rect1 = rectangles[i];
-
-		int width  = rect1.GetWidth();
-		int height = rect1.GetHeight();
+		int width  = rectangles[i].GetWidth();
+		int height = rectangles[i].GetHeight();
 
 		while ((width * height) > maxAreaPerRect) {
+			// This shouldn't be moved outside the loop
+			// as the vector can realloc after push_back
+			SRectangle& rect1 = rectangles[i];
 			SRectangle rect2 = rect1;
 
 			if (width > maxAreaPerRect) {
@@ -150,10 +151,10 @@ void CRectangleOverlapHandler::StageSplitTooLarge()
 				rect2.z1 = (rect2.z1 + rect2.z2) / 2;
 			}
 
-			rectangles.push_back(rect2);
-
 			width  = rect1.GetWidth();
 			height = rect1.GetHeight();
+
+			rectangles.push_back(rect2);
 		}
 	}
 }
