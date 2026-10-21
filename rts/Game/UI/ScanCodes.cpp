@@ -222,10 +222,10 @@ void CScanCodes::Reset()
 	AddPair("sc_help", SDL_SCANCODE_HELP);
 	AddPair("sc_printscreen", SDL_SCANCODE_PRINTSCREEN);
 	AddPair("sc_print", SDL_SCANCODE_PRINTSCREEN);
-	//AddPair("sc_sysreq", SDL_SCANCODE_SYSREQ);
-	//AddPair("sc_menu", SDL_SCANCODE_MENU);
-	//AddPair("sc_power", SDL_SCANCODE_POWER);     // Power Macintosh power key
-	//AddPair("sc_undo", SDL_SCANCODE_UNDO);       // Atari keyboard has Undo
+	AddPair("sc_sysreq", SDL_SCANCODE_SYSREQ);
+	AddPair("sc_menu", SDL_SCANCODE_MENU);
+	AddPair("sc_power", SDL_SCANCODE_POWER);     // Power Macintosh power key
+	AddPair("sc_undo", SDL_SCANCODE_UNDO);       // Atari keyboard has Undo
 
 	std::sort(nameToCode.begin(), nameToCode.end(), namePred);
 	std::sort(codeToName.begin(), codeToName.end(), codePred);
