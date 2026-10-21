@@ -189,7 +189,7 @@ private:
 
 	// Engine-generated DFG table (one of the three PBRDFGSource variants). Size and
 	// sample count must match BAR's generator and modelmaterials_gl4/validation/
-	// pbr_dfg_v1.lua, or BAR's validation rejects the table.
+	// pbr_dfg.lua, or BAR's validation rejects the table.
 	static constexpr unsigned int PBR_DFG_SIZE = 128;
 	static constexpr unsigned int PBR_DFG_SAMPLES = 1024;
 	unsigned int pbrDFGTexID = 0;
