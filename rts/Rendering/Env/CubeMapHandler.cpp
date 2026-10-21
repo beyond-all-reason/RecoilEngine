@@ -26,6 +26,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <string>
 #include <vector>
 
@@ -397,6 +398,29 @@ void main()
 		}
 		return count;
 	}
+
+	// glGetError returns one recorded error per call. The bound ends a drain on a
+	// driver that keeps reporting errors (for example after context loss).
+	constexpr unsigned int PBR_MAX_DRAINED_GL_ERRORS = 32;
+
+	// Clears errors left by earlier passes, so that the next glGetError reports
+	// only the PBR step's own, and logs what it cleared in one line.
+	void DrainEarlierGLErrors(const char* step)
+	{
+		std::string codes;
+		unsigned int count = 0;
+		for (GLenum error; count < PBR_MAX_DRAINED_GL_ERRORS && (error = glGetError()) != GL_NO_ERROR; ++count) {
+			char code[16];
+			std::snprintf(code, sizeof(code), "%s0x%x", codes.empty() ? "" : ", ", static_cast<unsigned int>(error));
+			codes += code;
+		}
+
+		if (count == 0)
+			return;
+
+		LOG_L(L_WARNING, "[CubeMapHandler] %s: cleared %u%s GL error(s) left by earlier passes: %s",
+			step, count, (count == PBR_MAX_DRAINED_GL_ERRORS ? " (limit reached)" : ""), codes.c_str());
+	}
 }
 
 CubeMapHandler cubeMapHandler;
@@ -500,6 +524,10 @@ bool CubeMapHandler::Init() {
 void CubeMapHandler::Free() {
 	RECOIL_DETAILED_TRACY_ZONE;
 	FreePBREnvironment();
+	// the next Init (a new game in this process) must initialize again; left
+	// enabled, UpdatePBRConfiguration would take the missing program for a
+	// persistent failure and stay idle until a control changed
+	pbrEnabled = false;
 	if (pbrDFGTexID != 0) {
 		glDeleteTextures(1, &pbrDFGTexID);
 		pbrDFGTexID = 0;
@@ -525,10 +553,6 @@ void CubeMapHandler::Free() {
 
 void CubeMapHandler::UpdateReflectionTexture()
 {
-	// the next Init (a new game in this process) must initialize again; left
-	// enabled, UpdatePBRConfiguration would take the missing program for a
-	// persistent failure and stay idle until a control changed
-	pbrEnabled = false;
 	RECOIL_DETAILED_TRACY_ZONE;
 	UpdatePBRConfiguration();
 
@@ -723,6 +747,7 @@ bool CubeMapHandler::AllocatePBRCube(unsigned int& textureID, unsigned int size,
 {
 	// Dedicated PBR cubes (including the display-referred staging target) are
 	// float RGBA16F; they are not aliases for the legacy RGBA8 cube names.
+	DrainEarlierGLErrors("AllocatePBRCube");
 	glGenTextures(1, &textureID);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, mipCount > 1 ? GL_LINEAR_MIPMAP_LINEAR : GL_LINEAR);
@@ -1370,7 +1395,7 @@ bool CubeMapHandler::FilterPBREnvironmentCompute()
 	PBREnvironmentSet& set = pbrSets[pbrCaptureIndex];
 	// The capture FBO is no longer needed; image stores target the inactive set.
 	FBO::Unbind();
-	while (glGetError() != GL_NO_ERROR) {}
+	DrainEarlierGLErrors("FilterPBREnvironmentCompute");
 	// BAR owns the shader's local_size declaration. Query the linked program
 	// instead of fixing 8x8x1 in Recoil, so BAR can tune group dimensions while
 	// the engine still bounds dispatch and owns publication.
