@@ -210,7 +210,7 @@ namespace {
 		},
 	)
 
-	DECLARE_FILTER_EX(Category, 1, unit->category == cat,
+	DECLARE_FILTER_EX(Category, 1, (unit->category & cat) != 0,
 		unsigned int cat;
 		void SetParam(int index, const std::string& value) override {
 			cat = CCategoryHandler::Instance()->GetCategory(value);
