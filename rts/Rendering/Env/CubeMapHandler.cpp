@@ -63,7 +63,8 @@ CONFIG(std::string, PBRDFGSource).defaultValue("bar-generated").description("PBR
 CONFIG(std::string, PBREnvironmentCapture).defaultValue("legacy-clone").description("PBR environment capture mode: legacy-clone, hdr-modern, or compare.");
 CONFIG(std::string, PBREnvironmentCaptureAnchor).defaultValue("map-center").description("PBR environment capture anchor: map-center or camera.");
 CONFIG(std::string, PBREnvironmentCaptureContent).defaultValue("sky-only").description("PBR environment capture content: sky-only, sky-terrain, or legacy-scene.");
-CONFIG(std::string, PBREnvironmentFilter).defaultValue("raster").description("PBR environment filter request: raster, bar-raster, or compute; unavailable build/GPU choices report a fallback.");
+// Lua reads this declared default too, so it must match BAR's provider ("compute").
+CONFIG(std::string, PBREnvironmentFilter).defaultValue("compute").description("PBR environment filter request: compute (default, needs OpenGL 4.3), raster, or bar-raster; unavailable build/GPU choices report a fallback.");
 CONFIG(int, PBREnvironmentSize).defaultValue(256).minimumValue(16).maximumValue(2048).description("PBR scene-linear HDR environment cubemap face size.");
 CONFIG(int, PBRIrradianceSize).defaultValue(32).minimumValue(4).maximumValue(256).description("PBR diffuse irradiance cubemap face size.");
 CONFIG(int, PBRSpecularSize).defaultValue(128).minimumValue(16).maximumValue(1024).description("PBR GGX-prefiltered specular cubemap base face size.");
