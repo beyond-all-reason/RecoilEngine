@@ -524,6 +524,10 @@ void CubeMapHandler::Free() {
 
 void CubeMapHandler::UpdateReflectionTexture()
 {
+	// the next Init (a new game in this process) must initialize again; left
+	// enabled, UpdatePBRConfiguration would take the missing program for a
+	// persistent failure and stay idle until a control changed
+	pbrEnabled = false;
 	RECOIL_DETAILED_TRACY_ZONE;
 	UpdatePBRConfiguration();
 
