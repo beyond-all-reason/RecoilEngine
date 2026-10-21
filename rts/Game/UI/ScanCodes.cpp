@@ -206,9 +206,9 @@ void CScanCodes::Reset()
 	}
 
 	// Key state modifier keys
-	//AddPair("sc_numlock", SDL_SCANCODE_NUMLOCKCLEAR);
-	//AddPair("sc_capslock", SDL_SCANCODE_CAPSLOCK);
-	//AddPair("sc_scrollock", SDL_SCANCODE_SCROLLLOCK);
+	AddPair("sc_numlock",   SDL_SCANCODE_NUMLOCKCLEAR);
+	AddPair("sc_capslock",  SDL_SCANCODE_CAPSLOCK);
+	AddPair("sc_scrollock", SDL_SCANCODE_SCROLLLOCK);
 	AddPair("sc_shift", SDL_SCANCODE_LSHIFT);
 	AddPair("sc_ctrl",  SDL_SCANCODE_LCTRL);
 	AddPair("sc_alt",   SDL_SCANCODE_LALT);
