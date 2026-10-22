@@ -20,6 +20,7 @@
 #include "System/UnorderedSet.hpp"
 
 static constexpr float4 DEFAULT_COLVOL_COLOR = float4(0.45f, 0.00f, 0.45f, 0.35f); // purple (light)
+static constexpr float4 DEFAULT_OBJVOL_COLOR = float4(0.20f, 0.55f, 1.00f, 0.40f); // light blue
 static constexpr float4 DEFAULT_SELVOL_COLOR = float4(0.00f, 0.45f, 0.00f, 0.20f); // dark green
 static constexpr float4 DEFAULT_TARGET_COLOR = float4(1.00f, 0.80f, 0.00f, 0.40f); // yellowish
 static constexpr float4 DEFAULT_MUZZLE_COLOR = float4(1.00f, 0.00f, 0.00f, 0.40f); // red
@@ -161,6 +162,7 @@ static inline void DrawFeatureColVol(const CFeature* f)
 	DrawCollisionVolume(&f->selectionVolume, fm, DEFAULT_SELVOL_COLOR);
 
 	if (v->DefaultToPieceTree()) {
+		DrawCollisionVolume(v, fm, DEFAULT_OBJVOL_COLOR);
 		DrawObjectDebugPieces(f, DEFAULT_COLVOL_COLOR);
 	} else {
 		if (!v->IgnoreHits()) {
@@ -241,6 +243,7 @@ static inline void DrawUnitColVol(const CUnit* u)
 		DrawCollisionVolume(&u->selectionVolume, um, DEFAULT_SELVOL_COLOR);
 
 		if (v->DefaultToPieceTree()) {
+			DrawCollisionVolume(v, um, DEFAULT_OBJVOL_COLOR);
 			DrawObjectDebugPieces(u, DEFAULT_COLVOL_COLOR);
 		} else {
 			if (!v->IgnoreHits()) {
