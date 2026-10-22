@@ -46,10 +46,11 @@ add_subdirectory(cursors)
 
 install(FILES "RecoilEngine_4K.png" DESTINATION "${DATADIR}/base")
 
-# Debug builds only: the labelled cube used by /DebugCubeMap (DebugCubeMapTexture
-# loads bitmaps/testsky.dds). As a loose file next to the engine it is found by
-# the raw-file lookup without changing springcontent.sdz, so the base archives
-# and their checksums stay the same in every build type.
-install(FILES "springcontent/bitmaps/testsky.dds" DESTINATION "${DATADIR}/bitmaps" CONFIGURATIONS Debug)
+# The labelled cube used by /DebugCubeMap (DebugCubeMapTexture loads
+# bitmaps/testsky.dds), installed for every build type because the command
+# works in every build. As a loose file next to the engine it is found by the
+# raw-file lookup without changing springcontent.sdz, so the base archives and
+# their checksums stay the same.
+install(FILES "springcontent/bitmaps/testsky.dds" DESTINATION "${DATADIR}/bitmaps")
 
 #install(FILES "fontscache.bmp" DESTINATION "${DATADIR}/base")
