@@ -605,7 +605,10 @@ static bool ParseKeyChain(std::string keystr, CKeyChain* kc, const size_t pos = 
 	if ((nextpos != std::string::npos) && ParseKeyChain(keystr, kc, nextpos))
 		return true;
 
-	keystr.replace(cpos, 1, IntToString(keyCodes.GetCode(","), "%#x"));
+	// The comma must use the same code type as the key token.
+	const bool isScanCode = (cpos >= 3 && StringToLower(keystr.substr(cpos - 3, 3)) == "sc_");
+	const int commaCode = isScanCode ? scanCodes.GetCode("sc_comma") : keyCodes.GetCode(",");
+	keystr.replace(cpos, 1, IntToString(commaCode, "%#x"));
 	return ParseKeyChain(keystr, kc, cpos);
 }
 
