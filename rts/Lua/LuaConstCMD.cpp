@@ -72,8 +72,6 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 #define PUSH_CMD(cmd) LuaInsertDualMapPair(L, #cmd, CMD_ ## cmd);
 
 	/***
-	 * @field CMD.STOP 0
-	 *
 	 * Stop the current action and clear the unit's command queue.
 	 *
 	 * For factories, this will cancel the new unit orders queue.
@@ -82,14 +80,14 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * Accepts no parameters.
 	 *
 	 * It won't do anything if used with `CMD.INSERT`, or the `shift` option.
+	 *
+	 * @field CMD.STOP 0
 	 */
 	PUSH_CMD(STOP);
 	/*** @field CMD.INSERT 1 */
 	PUSH_CMD(INSERT);
 
 	/***
-	 * @field CMD.REMOVE 2
-	 *
 	 * Remove all commands from a unit's queue matching specific cmdIDs or tags.
 	 *
 	 * ## Modes of operation
@@ -139,31 +137,31 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * Spring.GiveOrderToUnit(unitID, CMD.REMOVE, {-unitDefId1, -unitDefId2}, CMD.OPT_ALT + CMD.OPT_CTRL)
 	 * ```
 	 *
+	 * @field CMD.REMOVE 2
+	 *
 	 * @see Spring.GiveOrderToUnit
 	 */
 	PUSH_CMD(REMOVE);
 
 	/***
-	 * @field CMD.WAIT 5
-	 *
 	 * Makes the unit suspend processing its command queue until wait is removed.
 	 *
 	 * Accepts no parameters.
+	 *
+	 * @field CMD.WAIT 5
 	 */
 	PUSH_CMD(WAIT);
 
 	/***
-	 * @field CMD.TIMEWAIT 6
-	 *
 	 * Makes the unit suspend processing its command queue for a given duration.
 	 *
 	 * - `params` {duration} Time to wait in seconds.
+	 *
+	 * @field CMD.TIMEWAIT 6
 	 */
 	PUSH_CMD(TIMEWAIT);
 
 	/***
-	 * @field CMD.DEATHWAIT 7
-	 *
 	 * Makes the unit suspend processing its commmand queue until the death of a
 	 * given unit or units in an area.
 	 *
@@ -176,12 +174,12 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * ### Wait for death of units in an area
 	 *
 	 * - `params` {x1, y1, z1, x2, y2, z2}: Wait for death of units in square {x1, z1, x2, z2}.
+	 *
+	 * @field CMD.DEATHWAIT 7
 	 */
 	PUSH_CMD(DEATHWAIT);
 
 	/***
-	 * @field CMD.SQUADWAIT 8
-	 *
 	 * Makes selected units, or units coming out of a factory wait until squadSize peers
 	 * are found to go with them.
 	 *
@@ -200,12 +198,12 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * will gather together.
 	 *
 	 * - `params` {squadSize} Squad size.
+	 *
+	 * @field CMD.SQUADWAIT 8
 	 */
 	PUSH_CMD(SQUADWAIT);
 
 	/***
-	 * @field CMD.GATHERWAIT 9
-	 *
 	 * Makes the unit wait for all other selected units to reach the command.
 	 *
 	 * Useful to make units wait until all other units have reached a waypoint.
@@ -213,6 +211,8 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * Will only be given to movable (`unitDef.canMove == true`) non-factory units.
 	 *
 	 * Accepts no parameters.
+	 *
+	 * @field CMD.GATHERWAIT 9
 	 */
 	PUSH_CMD(GATHERWAIT);
 	/*** @field CMD.MOVE 10 */
@@ -223,8 +223,6 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	PUSH_CMD(FIGHT);
 
 	/***
-	 * @field CMD.ATTACK 20
-	 *
 	 * Attack command. Gives an order to attack some target(s).
 	 *
 	 * The command has different modes of operation, depending on the number
@@ -283,6 +281,8 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * ```lua
 	 * Spring.GiveOrderToUnit(unitID, CMD.ATTACK, {1000,100,1000})
 	 * ```
+	 *
+	 * @field CMD.ATTACK 20
 	 */
 	 // Fields can't @see
 	 // @see Spring.GiveOrderToUnit

@@ -44,9 +44,9 @@ Comment blocks must start with `/***`, and by convention each line starts with `
 
 ```cpp
 /***
- * @function Spring.GetFeaturesInScreenRectangle
- *
  * Get features inside a rectangle area on the map
+ *
+ * @function Spring.GetFeaturesInScreenRectangle
  *
  * @param left number
  * @param top number
@@ -63,6 +63,8 @@ int LuaUnsyncedRead::GetFeaturesInScreenRectangle(lua_State* L)
 These comments are mostly copied directly into the Lua library, but some code generation is required. For these [custom tags](https://github.com/rhys-vdw/lua-doc-extractor?tab=readme-ov-file#custom-tags) must be used.
 
 Markdown is supported in all text.
+
+A description goes above the tags it describes, or on the tag's own line. Text on the lines below a tag is not part of that tag's description.
 
 ### Authored library files
 
@@ -127,19 +129,18 @@ An array type is expressed as `type[]`.
 
 ### Function
 
-- Must start with `@function TableName.FunctionName`.
-- Can have any amount of description. This should be added after the first
+- Must have a `@function TableName.FunctionName` tag.
+- Can have any amount of description. This goes before the tags.
 - Specify parameters with `@param parameterName type Description...`
 - Specify return type with `@return type name Description...`
 - For multiple returns use one per line.
+- `@param` and `@return` descriptions are a single line, on the tag's line. Longer explanations, lists of accepted values and examples go in the function description.
 
 > [!WARNING]
 > `@return` must specify the type _before_ the name, whereas `@param` takes the name before the type.
 
 ````cpp
 /***
- * @function Math.Add
- *
  * Add two integers together.
  *
  * This function will add two numbers together and return the result.
@@ -148,9 +149,11 @@ An array type is expressed as `type[]`.
  * local totalHeight = Math.Add(legLength, upperBodyHeight)
  * ```
  *
+ * @function Math.Add
+ *
  * @param a integer The first number.
  * @param b integer The second number.
- * @returns integer result The sum of `a` and `b`.
+ * @return integer result The sum of `a` and `b`.
  */
 ````
 
@@ -171,14 +174,14 @@ int LuaUnsyncedRead::GetLocalPlayerID(lua_State* L)
 
 Structured data is expressed as a class. This represents a table with expected key/value pairs.
 
-- Must start with `@class ClassName`. This name becomes a type that can be used in annotations.
-- Fields are specified by `@field fieldName type Description...`.
+- Must have a `@class ClassName` tag. This name becomes a type that can be used in annotations. The class description goes above it.
+- Fields are specified by `@field fieldName type Description...`. A longer field description can go on the lines above the field.
 
 ```cpp
 /***
- * @class Color
- *
  * Describes an RGB color value.
+ *
+ * @class Color
  *
  * @field red number The red value.
  * @field green number The green value.

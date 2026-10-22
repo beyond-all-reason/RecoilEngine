@@ -1115,12 +1115,11 @@ int LuaSyncedCtrl::KillTeam(lua_State* L)
 
 /*** Declare game over.
  * 
+ * Pass multiple winners to declare a draw. Pass no arguments if undecided (e.g.
+ * when dropped from the host).
+ *
  * @function Spring.GameOver
- * @param winningAllyTeamIDs AllyTeamID[] A list of winning ally team IDs.
- *
- * Pass multiple winners to declare a draw.
- * Pass no arguments if undecided (e.g. when dropped from the host).
- *
+ * @param winningAllyTeamIDs AllyTeamID[] List of winning ally team IDs.
  * @return integer teams Number of accepted (valid) ally teams.
  */
 int LuaSyncedCtrl::GameOver(lua_State* L)
@@ -1230,8 +1229,7 @@ int LuaSyncedCtrl::AddTeamResource(lua_State* L)
  * @param teamID TeamID
  * @param type ResourceName Resource type.
  * @param amount number Amount of resource to use.
- * @return boolean hadEnough
- * True if enough of the resource type was available and was consumed, otherwise false.
+ * @return boolean hadEnough True if enough of the resource type was available and was consumed, otherwise false.
  */
 /***
  * Consumes metal and/or energy resources of the specified team.
@@ -1240,8 +1238,7 @@ int LuaSyncedCtrl::AddTeamResource(lua_State* L)
  * @function Spring.UseTeamResource
  * @param teamID TeamID
  * @param amount ResourceUsage
- * @return boolean hadEnough
- * True if enough of the resource type(s) were available and was consumed, otherwise false.
+ * @return boolean hadEnough True if enough of the resource type(s) were available and was consumed, otherwise false.
  */
 int LuaSyncedCtrl::UseTeamResource(lua_State* L)
 {
@@ -2350,9 +2347,7 @@ int LuaSyncedCtrl::SetUnitTooltip(lua_State* L)
  * then reverting into nanoframes via the "build" tag will fail to render properly.
  *
  * @param unitID UnitID
- * @param health number|SetUnitHealthAmounts If a number, sets the units health
- * to that value. Pass a table to update health, capture progress, paralyze
- * damage, and build progress.
+ * @param health number|SetUnitHealthAmounts If a number, sets the units health to that value. Pass a table to update health, capture progress, paralyze damage, and build progress.
  * @return nil
  * 
  * @see SetUnitHealthAmounts
@@ -2468,16 +2463,14 @@ int LuaSyncedCtrl::SetUnitStockpile(lua_State* L)
  * @field reaimTime integer?
  * @field accuracy number?
  * @field sprayAngle number?
- * @field range number?
- * If you change the range of a weapon with dynamic damage make sure you use `SetUnitWeaponDamages` to change dynDamageRange as well.
+ * @field range number? If you change the range of a weapon with dynamic damage make sure you use `SetUnitWeaponDamages` to change dynDamageRange as well.
  * @field projectileSpeed number?
  * @field burst integer?
  * @field burstRate number?
  * @field projectiles integer?
  * @field salvoLeft integer?
  * @field nextSalvo integer?
- * @field aimReady number?
- * Set to `true` if a non-zero value is passed, `false` is zero is passed.
+ * @field aimReady number? Set to `true` if a non-zero value is passed, `false` is zero is passed.
  * @field forceAim integer?
  * @field avoidFlags integer?
  * @field collisionFlags integer?
@@ -2647,8 +2640,7 @@ int LuaSyncedCtrl::SetUnitWeaponState(lua_State* L)
  * @field dynDamageExp number
  * @field dynDamageMin number
  * @field dynDamageRange number
- * @field dynDamageInverted number
- * Set to `true` if a non-zero value is passed, `false` is zero is passed.
+ * @field dynDamageInverted number Set to `true` if a non-zero value is passed, `false` is zero is passed.
  * @field craterAreaOfEffect number
  * @field damageAreaOfEffect number
  * @field edgeEffectiveness number
@@ -2938,8 +2930,7 @@ static unsigned char ParseLosBits(lua_State* L, int index, unsigned char bits)
  *
  * @param unitID UnitID
  * @param allyTeam AllyTeamID
- * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` bits or a
- * table. True bits disable engine updates to visibility.
+ * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` bits or a table. True bits disable engine updates to visibility.
  */
 int LuaSyncedCtrl::SetUnitLosMask(lua_State* L)
 {
@@ -2985,8 +2976,7 @@ int LuaSyncedCtrl::SetUnitLosMask(lua_State* L)
  * @function Spring.SetUnitLosState
  * @param unitID UnitID
  * @param allyTeam AllyTeamID
- * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` bits or a
- * table
+ * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` bits or a table.
  */
 int LuaSyncedCtrl::SetUnitLosState(lua_State* L)
 {
@@ -3832,19 +3822,7 @@ int LuaSyncedCtrl::SetUnitPieceMatrix(lua_State* L)
 
 
 /***
- * @function Spring.SetUnitCollisionVolumeData
- * @param unitID UnitID
- * @param scaleX number
- * @param scaleY number
- * @param scaleZ number
- * @param offsetX number
- * @param offsetY number
- * @param offsetZ number
- * @param vType integer
- * @param tType integer
- * @param Axis integer
- * @return nil
- *
+ * ```cpp
  *  enum COLVOL_TYPES {
  *      COLVOL_TYPE_DISABLED = -1,
  *      COLVOL_TYPE_ELLIPSOID = 0,
@@ -3864,6 +3842,20 @@ int LuaSyncedCtrl::SetUnitPieceMatrix(lua_State* L)
  *      COLVOL_AXIS_Z   = 2,
  *      COLVOL_NUM_AXES = 3    // number of collision volume axes
  *    };
+ * ```
+ *
+ * @function Spring.SetUnitCollisionVolumeData
+ * @param unitID UnitID
+ * @param scaleX number
+ * @param scaleY number
+ * @param scaleZ number
+ * @param offsetX number
+ * @param offsetY number
+ * @param offsetZ number
+ * @param vType integer
+ * @param tType integer
+ * @param Axis integer
+ * @return nil
  */
 int LuaSyncedCtrl::SetUnitCollisionVolumeData(lua_State* L)
 {
@@ -6153,15 +6145,17 @@ int LuaSyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 
 
 /***
- * @function Spring.GiveOrderArrayToUnitArray
- * @param unitIDs UnitID[] Array of unit IDs.
- * @param commands CreateCommand[]
- * @param pairwise boolean? (Default: `false`) When `false`, assign all commands to each unit.
+ * When `pairwise` is `false`, assign all commands to each unit.
  *
  * When `true`, assign commands according to index between units and cmds arrays.
  *
  * If `len(unitArray) < len(cmdArray)` only the first `len(unitArray)` commands
  * will be assigned, and vice-versa.
+ *
+ * @function Spring.GiveOrderArrayToUnitArray
+ * @param unitIDs UnitID[] Array of unit IDs.
+ * @param commands CreateCommand[]
+ * @param pairwise boolean? (Default: `false`) When `true`, assign commands to units by index.
  *
  * @return integer unitsOrdered The number of units ordered.
  */
@@ -7191,13 +7185,13 @@ int LuaSyncedCtrl::SetTerrainTypeData(lua_State* L)
 
 
 /***
+ * See also buildingMask unitdef tag.
+ *
  * @function Spring.SetSquareBuildingMask
  * @param x integer
  * @param z integer
  * @param mask integer
  * @return nil
- *
- * See also buildingMask unitdef tag.
  */
 int LuaSyncedCtrl::SetSquareBuildingMask(lua_State* L)
 {

@@ -525,12 +525,7 @@ bool LuaVBOImpl::DefineElementArray(const sol::optional<sol::object> attribDefAr
  *
  * @function VBO:Define
  * @param size integer The maximum number of elements this VBO can have.
- * @param attribs integer|VBOAttributeDef[]
- *
- * When integer, the maximum number of elements this VBO can have.
- *
- * Otherwise, an array of arrays specifying the layout.
- *
+ * @param attribs integer|VBOAttributeDef[] When integer, the maximum number of elements this VBO can have. Otherwise, an array of arrays specifying the layout.
  * @return nil
  * @see GL.OpenGL_Data_Types
  * @see VBO:Upload
@@ -602,17 +597,16 @@ std::tuple<uint32_t, uint32_t, uint32_t> LuaVBOImpl::GetBufferSize()
 /***
  * Uploads data into the VBO.
  *
- * @function VBO:Upload
- * @param vboData number[] Array of values to upload into the VBO.
- * @param attributeIndex integer? (Default: `-1`)
- * 
- * If supplied with non-default value then the data from `vboData` will only be
- * used to upload the data to this particular attribute.
- * 
+ * If `attributeIndex` is supplied with non-default value then the data from
+ * `vboData` will only be used to upload the data to this particular attribute.
+ *
  * The whole `vboData` is expected to contain only attributeIndex data.
- * 
+ *
  * Otherwise all attributes get updated sequentially across attributes and elements.
  *
+ * @function VBO:Upload
+ * @param vboData number[] Array of values to upload into the VBO.
+ * @param attributeIndex integer? (Default: `-1`) The attribute to upload to, or all attributes.
  * @param elemOffset integer? (Default: `0`) The index in destination VBO (on GPU) at which storing begins.
  * @param luaStartIndex integer? (Default: `1`) The index of `vboData` at which copying begins.
  * @param luaFinishIndex integer? (Default: `#vboData`) The index of `vboData` at which copying ends.
@@ -666,13 +660,10 @@ size_t LuaVBOImpl::Upload(const sol::stack_table& luaTblData, sol::optional<int>
 /***
  *
  * @function VBO:Download
- * @param attributeIndex integer? (Default: `-1`) when supplied with non-default value: only data
- * from specified attribute will be downloaded - otherwise all attributes are
- * downloaded
+ * @param attributeIndex integer? (Default: `-1`) When supplied with non-default value: only data from specified attribute will be downloaded - otherwise all attributes are downloaded.
  * @param elementOffset integer? (Default: `0`) download data starting from this element
  * @param elementCount integer? number of elements to download
- * @param forceGPURead boolean? (Default: `false`) force downloading the data from GPU buffer as opposed
- * to using shadow RAM buffer
+ * @param forceGPURead boolean? (Default: `false`) Force downloading the data from GPU buffer as opposed to using shadow RAM buffer.
  * @return number[] vboData
  */
 sol::as_table_t<std::vector<lua_Number>> LuaVBOImpl::Download(sol::optional<int> attribIdxOpt, sol::optional<int> elemOffsetOpt, sol::optional<int> elemCountOpt, sol::optional<bool> forceGPUReadOpt)
@@ -1435,8 +1426,7 @@ int LuaVBOImpl::BindBufferRangeImpl(GLuint bindingIndex,  const sol::optional<in
  * https://registry.khronos.org/OpenGL-Refpages/gl4/html/glBindBufferRange.xhtml
  * except offset and size are specified in number of elements / element indices.
  *
- * @param index integer should be in the range between
- * `5 < index < GL_MAX_UNIFORM_BUFFER_BINDINGS` value (usually 31)
+ * @param index integer Should be in the range between `5 < index < GL_MAX_UNIFORM_BUFFER_BINDINGS` value (usually 31).
  * @param elementOffset integer?
  * @param elementCount integer?
  * @param target GL? glEnum
