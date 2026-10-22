@@ -602,6 +602,23 @@ endif()
 	endif()
 
 ################################################################################
+### PBRBrdfGolden
+# The PBR BRDF golden table of decision D011: a verbatim copy of BAR's
+# modelmaterials_gl4/validation/pbr_brdf_golden.lua and its SHA-512 live next
+# to the test, which checks the hash and evaluates the convention on the CPU.
+	set(test_name PBRBrdfGolden)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/PBR/testPBRBrdfGolden.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Sync/SHA512.cpp"
+			${test_Common_sources}
+		)
+	set(test_libs
+			""
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+	target_compile_definitions(test_${test_name} PRIVATE PBR_GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/PBR")
+
+################################################################################
 
 
 add_subdirectory(headercheck)

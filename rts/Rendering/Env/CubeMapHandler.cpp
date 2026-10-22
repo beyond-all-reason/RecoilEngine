@@ -975,7 +975,7 @@ void CubeMapHandler::RequestPBREpoch()
 }
 
 // Builds the split-sum DFG table on the CPU in double precision, the C++ variant of
-// PBRDFGSource. Convention BAR_PBR_V1_GLTF_GGX_SMITHCORR_SCHLICK_LAMBERT_FMIX_DFG_BIAS_E,
+// PBRDFGSource. Convention BAR_PBR_V1_GLTF_GGX_SMITHCORR_SCHLICK_LAMBERT_FMIX_DFG_SCALE_BIAS,
 // identical to BAR's GLSL generator and modelmaterials_gl4/validation/generate_pbr_dfg.py:
 // texel centres x = NdotV, y = perceptual roughness r (row 0 first), alpha = r^2; GGX
 // importance sampling with Hammersley points (i / N, radical inverse of i); height-
