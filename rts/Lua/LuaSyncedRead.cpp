@@ -4849,13 +4849,20 @@ int LuaSyncedRead::GetUnitHarvestStorage(lua_State* L)
 }
 
 /***
+ * Get the build range of an allied builder unit.
  *
  * @function Spring.GetUnitBuildParams
  * @param unitID UnitID
- * @param paramName "buildRange"|"buildDistance"|"buildRange3D" The build param to get
- * @return number|boolean|nil value number for `"buildRange"` or `"buildDistance"`,
- * boolean for `"buildRange3D"`, otherwise `nil` for unrecognized paramName or not
- * allied builder unit.
+ * @param paramName "buildRange"|"buildDistance"
+ * @return number? buildDistance The builder's build range, or `nil` if `unitID` is not an allied builder unit.
+ */
+/***
+ * Get whether an allied builder unit's range tests are 3D.
+ *
+ * @function Spring.GetUnitBuildParams
+ * @param unitID UnitID
+ * @param paramName "buildRange3D"
+ * @return boolean? buildRange3D `true` if range tests use spheres, `false` if they use infinite cylinders, or `nil` if `unitID` is not an allied builder unit.
  */
 int LuaSyncedRead::GetUnitBuildParams(lua_State* L)
 {
@@ -4995,8 +5002,7 @@ int LuaSyncedRead::GetUnitTransporter(lua_State* L)
  *
  * @function Spring.GetUnitIsTransporting
  * @param unitID UnitID
- * @return UnitID[]? transporteeArray
- * An array of unitIDs being transported by this unit, or `nil` if not a transport.
+ * @return UnitID[]? transporteeArray An array of unitIDs being transported by this unit, or `nil` if not a transport.
  */
 int LuaSyncedRead::GetUnitIsTransporting(lua_State* L)
 {
@@ -5938,10 +5944,7 @@ int LuaSyncedRead::GetUnitCollisionVolumeData(lua_State* L)
  * @return integer? volumeType
  * @return integer? testType
  * @return integer? primaryAxis
- * @return boolean? disabled
- *
- * Returns no values when `unitID` is invalid or not in line of sight, or when
- * `pieceIndex` is invalid.
+ * @return boolean? disabled Returns no values when `unitID` is invalid or not in line of sight, or when `pieceIndex` is invalid.
  */
 int LuaSyncedRead::GetUnitPieceCollisionVolumeData(lua_State* L)
 {
@@ -7467,14 +7470,15 @@ int LuaSyncedRead::GetPieceProjectileParams(lua_State* L)
 
 
 /***
+ * `targetTypeInt` is one of:
+ * - `string.byte('g')` ground
+ * - `string.byte('u')` unit
+ * - `string.byte('f')` feature
+ * - `string.byte('p')` projectile
  *
  * @function Spring.GetProjectileTarget
  * @param projectileID ProjectileID
- * @return integer? targetTypeInt where
- * string.byte('g') := GROUND
- * string.byte('u') := UNIT
- * string.byte('f') := FEATURE
- * string.byte('p') := PROJECTILE
+ * @return integer? targetTypeInt The type of target.
  * @return UnitID|FeatureID|ProjectileID|float3 target targetID or targetPos when targetTypeInt == string.byte('g')
  */
 int LuaSyncedRead::GetProjectileTarget(lua_State* L)
@@ -7694,25 +7698,26 @@ int LuaSyncedRead::GetPieceProjectileName(lua_State* L)
 
 
 /***
+ * `tag` is one of:
+ * - `"paralyzeDamageTime"`
+ * - `"impulseFactor"`
+ * - `"impulseBoost"`
+ * - `"craterMult"`
+ * - `"craterBoost"`
+ * - `"dynDamageExp"`
+ * - `"dynDamageMin"`
+ * - `"dynDamageRange"`
+ * - `"dynDamageInverted"`
+ * - `"craterAreaOfEffect"`
+ * - `"damageAreaOfEffect"`
+ * - `"edgeEffectiveness"`
+ * - `"explosionSpeed"`
+ *
+ * It can also be an armor type index, to get the damage against it.
  *
  * @function Spring.GetProjectileDamages
  * @param projectileID ProjectileID
- * @param tag string one of:
- *     "paralyzeDamageTime"
- *     "impulseFactor"
- *     "impulseBoost"
- *     "craterMult"
- *     "craterBoost"
- *     "dynDamageExp"
- *     "dynDamageMin"
- *     "dynDamageRange"
- *     "dynDamageInverted"
- *     "craterAreaOfEffect"
- *     "damageAreaOfEffect"
- *     "edgeEffectiveness"
- *     "explosionSpeed"
- *     - or -
- *     an armor type index to get the damage against it.
+ * @param tag string The damage property, or an armor type index.
  * @return number?
  */
 int LuaSyncedRead::GetProjectileDamages(lua_State* L)

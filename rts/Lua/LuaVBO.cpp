@@ -130,23 +130,19 @@ LuaVBOs::~LuaVBOs()
  * if myVBO == nil then Spring.Echo("Failed to get VBO") end
  * ```
  *
- * @function gl.GetVBO
- * 
- * @param bufferType GL? (Default: `GL.ARRAY_BUFFER`) The buffer type to use.
- *
- * Accepts the following:
+ * `bufferType` accepts the following:
  * - `GL.ARRAY_BUFFER` for vertex data.
  * - `GL.ELEMENT_ARRAY_BUFFER` for vertex indices.
  * - `GL.UNIFORM_BUFFER`
  * - `GL.SHADER_STORAGE_BUFFER`
+ *
+ * @function gl.GetVBO
+ *
+ * @param bufferType GL? (Default: `GL.ARRAY_BUFFER`) The buffer type to use.
  * 
- * @param freqUpdated boolean? (Default: `true`)
+ * @param freqUpdated boolean? (Default: `true`) `true` to update frequently, `false` to update only once.
  * 
- * `true` to updated frequently, `false` to update only once.
- * 
- * @return VBO? VBO
- * 
- * The VBO ref on success, or nil if not supported or an error occurred.
+ * @return VBO? VBO The VBO ref on success, or `nil` if not supported or an error occurred.
  * 
  * @see GL.OpenGL_Buffer_Types
  */

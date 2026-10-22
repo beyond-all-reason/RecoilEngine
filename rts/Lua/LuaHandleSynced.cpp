@@ -165,8 +165,9 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 }
 
 /***
- * @class UnsyncedCallins
  * Functions called by the Engine (Unsynced).
+ *
+ * @class UnsyncedCallins
  */
 
 /**********************
@@ -550,8 +551,9 @@ void CSyncedLuaHandle::EnactDevMode() const
 //
 
 /***
- * @class SyncedCallins
  * Functions called by the Engine (Synced).
+ *
+ * @class SyncedCallins
  */
 
 bool CSyncedLuaHandle::SyncedActionFallback(const std::string& msg, int playerID)
@@ -1275,19 +1277,19 @@ bool CSyncedLuaHandle::AllowDirectUnitControl(int playerID, const CUnit* unit)
 
 /*** Called when a construction unit wants to "use his nano beams".
  *
- * @function SyncedCallins:AllowBuilderHoldFire
- *
- * @param unitID UnitID
- * @param unitDefID UnitDefID
- * @param action -1|CMD
- * 
- * One of the following:
+ * `action` is one of the following:
  * 	- `-1` build,
  * 	- `CMD.REPAIR` repair,
  * 	- `CMD.RECLAIM` reclaim,
  * 	- `CMD.RESTORE` restore,
  * 	- `CMD.RESURRECT` resurrect, or
  * 	- `CMD.CAPTURE` capture.
+ *
+ * @function SyncedCallins:AllowBuilderHoldFire
+ *
+ * @param unitID UnitID
+ * @param unitDefID UnitDefID
+ * @param action -1|CMD The action the builder wants to perform.
  * 
  * @return boolean actionAllowed
  */
@@ -2020,11 +2022,13 @@ int CSyncedLuaHandle::SyncedPairs(lua_State* L)
 /***
  * Invoke `UnsyncedCallins:RecvFromSynced` callin with the given arguments.
  * 
- * @function SyncedCallins.SendToUnsynced
- *
- * @param ... nil|boolean|number|string|table Arguments. Typically the first argument is the name of a function to call.
+ * Typically the first argument is the name of a function to call.
  *
  * Argument tables will be recursively copied and stripped of unsupported types and metatables.
+ *
+ * @function SyncedCallins.SendToUnsynced
+ *
+ * @param ... nil|boolean|number|string|table Arguments.
  *
  * @see UnsyncedCallins:RecvFromSynced
  */

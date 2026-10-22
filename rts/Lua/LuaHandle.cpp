@@ -85,8 +85,6 @@ bool CLuaHandle::devMode = false;
 const int* CLuaHandle::currentCobArgs = nullptr;
 
 /***
- * @class Callins
- * 
  * Functions called by the Engine.
  *
  * To use these callins in a widget, prepend `widget:` and, for a gadget,
@@ -108,7 +106,9 @@ const int* CLuaHandle::currentCobArgs = nullptr;
  * **Attention:** Some callins will only work on the unsynced portion of the gadget.
  * Due to the type-unsafe nature of lua parsing, those callins not firing up
  * might be hard to trace.
- * 
+ *
+ * @class Callins
+ *
  * @see Gadget
  * @see Widget
  * @see Menu
