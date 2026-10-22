@@ -140,6 +140,7 @@ private:
 	uint32_t elemSizeInBytes;
 	uint32_t bufferSizeInBytes;
 
+	uint32_t definitionRevision = 0; // bumped on Define/ModelsVBO/Delete, LuaVAOImpl rebuilds on change
 	VBO* vbo = nullptr;
 	bool vboOwner;
 

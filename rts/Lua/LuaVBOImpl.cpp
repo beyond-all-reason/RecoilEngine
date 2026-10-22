@@ -115,6 +115,8 @@ inline void LuaVBOImpl::InstanceBufferCheckAndFormatCheck(int attrID, const char
  */
 void LuaVBOImpl::Delete()
 {
+	++definitionRevision;
+
 	//safe to call multiple times
 	if (vboOwner)
 		spring::SafeDelete(vbo);
@@ -545,6 +547,7 @@ void LuaVBOImpl::Define(const int elementsCount, const sol::optional<sol::object
 		LuaUtils::SolLuaError("[LuaVBOImpl::%s] Elements count cannot be <= 0", __func__);
 	}
 
+	++definitionRevision;
 	this->elementsCount = elementsCount;
 
 	const auto defineBufferFunc = [this](const sol::object& attribDefArg) {
@@ -937,6 +940,7 @@ size_t LuaVBOImpl::ModelsVBOImpl()
 
 	CopyAttrMapToVec();
 
+	++definitionRevision;
 	vboOwner = false;
 
 	return bufferSizeInBytes;
