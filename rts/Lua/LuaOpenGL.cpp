@@ -6473,6 +6473,9 @@ int LuaOpenGL::Finish(lua_State* L)
 
 /******************************************************************************/
 
+// Number of values per pixel that glReadPixels writes for format f.
+// ReadPixels walks its result with this size, so every format it can read
+// must be listed; an unlisted one returns -1 and is read as 4 values.
 static int PixelFormatSize(GLenum f)
 {
 	switch (f) {
@@ -6486,7 +6489,8 @@ static int PixelFormatSize(GLenum f)
 		case GL_LUMINANCE: {
 			return 1;
 		}
-		case GL_LUMINANCE_ALPHA: {
+		case GL_LUMINANCE_ALPHA:
+		case GL_RG: {
 			return 2;
 		}
 		case GL_RGB:
