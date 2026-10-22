@@ -175,6 +175,10 @@ private:
 	std::string pbrAnchor = "map-center";
 	std::string pbrContent = "sky-only";
 	std::string pbrFilter = "raster";
+	// anchor, content and filter of the published set, reported while a newer
+	// epoch is pending so the status describes one set (with the sizes)
+	std::string pbrPublishedAnchor = "map-center";
+	std::string pbrPublishedContent = "sky-only";
 	std::string pbrPublishedFilter = "raster";
 	std::string pbrRequestedCaptureMode;
 	std::string pbrRequestedAnchor;
@@ -189,14 +193,19 @@ private:
 
 	// Engine-generated DFG table (one of the three PBRDFGSource variants). Size and
 	// sample count must match BAR's generator and modelmaterials_gl4/validation/
-	// pbr_dfg_v1.lua, or BAR's validation rejects the table.
+	// pbr_dfg.lua, or BAR's validation rejects the table.
 	static constexpr unsigned int PBR_DFG_SIZE = 128;
 	static constexpr unsigned int PBR_DFG_SAMPLES = 1024;
 	unsigned int pbrDFGTexID = 0;
 
-	// GL_TIMESTAMP queries: [2k, 2k+1] bracket capture face k, [12, 13] the
-	// filter pass. Results are read without stalling once all are available.
-	static constexpr unsigned int PBR_TIMER_QUERY_COUNT = 14;
+	// Faces of a cube map, in OpenGL order +X, -X, +Y, -Y, +Z, -Z.
+	static constexpr unsigned int PBR_FACE_COUNT = 6;
+	// GL_TIMESTAMP queries: [2k, 2k+1] bracket capture face k, then one pair
+	// brackets the filter pass. Results are read without stalling once all are
+	// available.
+	static constexpr unsigned int PBR_FILTER_TIMER_BEGIN = 2 * PBR_FACE_COUNT;
+	static constexpr unsigned int PBR_FILTER_TIMER_END = PBR_FILTER_TIMER_BEGIN + 1;
+	static constexpr unsigned int PBR_TIMER_QUERY_COUNT = PBR_FILTER_TIMER_END + 1;
 	std::array<unsigned int, PBR_TIMER_QUERY_COUNT> pbrTimerQueries = {};
 	bool pbrTimersSupported = false;
 	bool pbrTimersPending = false;

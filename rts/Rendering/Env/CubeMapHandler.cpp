@@ -68,13 +68,36 @@ CONFIG(std::string, PBREnvironmentCaptureAnchor).defaultValue("map-center").desc
 CONFIG(std::string, PBREnvironmentCaptureContent).defaultValue("sky-only").description("PBR environment capture content: sky-only, sky-terrain, or legacy-scene.");
 // Lua reads this declared default too, so it must match BAR's provider ("compute").
 CONFIG(std::string, PBREnvironmentFilter).defaultValue("compute").description("PBR environment filter request: compute (default, needs OpenGL 4.3), raster, or bar-raster; unavailable build/GPU choices report a fallback.");
-CONFIG(int, PBREnvironmentSize).defaultValue(256).minimumValue(16).maximumValue(2048).description("PBR scene-linear HDR environment cubemap face size.");
-CONFIG(int, PBRIrradianceSize).defaultValue(32).minimumValue(4).maximumValue(256).description("PBR diffuse irradiance cubemap face size.");
-CONFIG(int, PBRSpecularSize).defaultValue(128).minimumValue(16).maximumValue(1024).description("PBR GGX-prefiltered specular cubemap base face size.");
+// Face-size limits of the three PBR cubes, shared by the CONFIG ranges below
+// and the clamp in UpdatePBRConfiguration; BAR's provider uses the same values
+// (CUBE_SIZES in gfx_pbr_ibl_provider.lua). The lower limits keep a usable mip
+// chain and 4x4 irradiance texels; the upper limits bound the VRAM of two sets.
+constexpr int PBR_ENVIRONMENT_SIZE_MIN = 16, PBR_ENVIRONMENT_SIZE_MAX = 2048;
+constexpr int PBR_IRRADIANCE_SIZE_MIN = 4, PBR_IRRADIANCE_SIZE_MAX = 256;
+constexpr int PBR_SPECULAR_SIZE_MIN = 16, PBR_SPECULAR_SIZE_MAX = 1024;
+CONFIG(int, PBREnvironmentSize).defaultValue(256).minimumValue(PBR_ENVIRONMENT_SIZE_MIN).maximumValue(PBR_ENVIRONMENT_SIZE_MAX).description("PBR scene-linear HDR environment cubemap face size.");
+CONFIG(int, PBRIrradianceSize).defaultValue(32).minimumValue(PBR_IRRADIANCE_SIZE_MIN).maximumValue(PBR_IRRADIANCE_SIZE_MAX).description("PBR diffuse irradiance cubemap face size.");
+CONFIG(int, PBRSpecularSize).defaultValue(128).minimumValue(PBR_SPECULAR_SIZE_MIN).maximumValue(PBR_SPECULAR_SIZE_MAX).description("PBR GGX-prefiltered specular cubemap base face size.");
 CONFIG(int, PBREnvironmentRevision).defaultValue(0).minimumValue(0).description("Increment to request a new atomic PBR environment capture/filter epoch.");
 
 namespace {
+	// Height of the map-centre capture point above the ground (or above water
+	// level 0) in elmos; BAR's provider (CAPTURE_HEIGHT_ELMOS) and its self-test
+	// use the same value, so both providers capture from the same point.
+	constexpr float PBR_CAPTURE_HEIGHT_ELMOS = 128.0f;
+	// Texture unit the filter programs sample their source cube from, and the
+	// image unit the compute program writes its destination level to (the
+	// shared program ABI: sourceEnvironment = unit 0, outputEnvironment =
+	// binding 1).
+	constexpr GLenum PBR_SOURCE_TEXTURE_UNIT = GL_TEXTURE0;
+	constexpr GLuint PBR_DESTINATION_IMAGE_UNIT = 1;
+	// Clip distances the raster filter reports and disables: the first six,
+	// the legacy GL_MAX_CLIP_PLANES minimum that every driver offers and that
+	// the engine's clipped passes stay within.
+	constexpr int PBR_CHECKED_CLIP_DISTANCES = 6;
+
 #if PBR_ENABLE_ENGINE_RASTER_FILTER
+	// variant: PBREnvironmentFilter=raster (the engine's own embedded filter)
 	constexpr const char* pbrFilterVertexShader = R"(
 #version 150 compatibility
 
@@ -110,6 +133,19 @@ void main()
 const float PI = 3.14159265358979323846;
 const uint DIFFUSE_SAMPLE_COUNT = 256u;
 const uint SPECULAR_SAMPLE_COUNT = 256u;
+// TangentBasis: above this |normal.y| the world up axis is too close to the
+// normal for a stable cross product, so the x axis is used instead
+const float TANGENT_UP_LIMIT = 0.999;
+// guards against a division by a zero pdf or lobe weight
+const float PDF_EPSILON = 1e-6;
+const float WEIGHT_EPSILON = 1e-5;
+// SourceLod: never read a mip coarser than an 8x8 face (log2(8) levels above
+// the 1x1 mip)
+const float COARSEST_LOD_OFFSET = 3.0;
+// FilterSpecular: at or below this roughness mip 0 is a mirror copy; GGX alpha
+// is kept above MIN_ALPHA so the distribution stays finite
+const float MIRROR_ROUGHNESS = 0.0001;
+const float MIN_ALPHA = 0.001;
 
 uniform samplerCube sourceEnvironment;
 uniform int faceIndex;
@@ -148,7 +184,7 @@ vec3 FaceDirection(int face, vec2 uv)
 
 mat3 TangentBasis(vec3 normal)
 {
-	vec3 up = abs(normal.y) < 0.999 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+	vec3 up = abs(normal.y) < TANGENT_UP_LIMIT ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
 	vec3 tangent = normalize(cross(up, normal));
 	vec3 bitangent = cross(normal, tangent);
 	return mat3(tangent, bitangent, normal);
@@ -172,8 +208,8 @@ vec3 ImportanceSampleGGX(vec2 xi, float alpha, vec3 normal)
 float SourceLod(float pdf, uint sampleCount)
 {
 	float texelSolidAngle = 4.0 * PI / (6.0 * sourceResolution * sourceResolution);
-	float sampleSolidAngle = 1.0 / (float(sampleCount) * max(pdf, 1e-6));
-	float maxLod = max(0.0, log2(sourceResolution) - 3.0);
+	float sampleSolidAngle = 1.0 / (float(sampleCount) * max(pdf, PDF_EPSILON));
+	float maxLod = max(0.0, log2(sourceResolution) - COARSEST_LOD_OFFSET);
 	return clamp(0.5 * log2(sampleSolidAngle / texelSolidAngle), 0.0, maxLod);
 }
 
@@ -202,13 +238,13 @@ vec3 FilterDiffuse(vec3 normal)
 
 vec3 FilterSpecular(vec3 normal)
 {
-	if (roughness <= 0.0001)
+	if (roughness <= MIRROR_ROUGHNESS)
 		return textureLod(sourceEnvironment, normal, 0.0).rgb;
 
 	vec3 viewDirection = normal;
 	vec3 sum = vec3(0.0);
 	float weight = 0.0;
-	float alpha = max(roughness * roughness, 0.001);
+	float alpha = max(roughness * roughness, MIN_ALPHA);
 
 	for (uint i = 0u; i < SPECULAR_SAMPLE_COUNT; ++i) {
 		vec3 halfVector = ImportanceSampleGGX(Hammersley(i, SPECULAR_SAMPLE_COUNT), alpha, normal);
@@ -220,13 +256,13 @@ vec3 FilterSpecular(vec3 normal)
 		float nDotH = max(dot(normal, halfVector), 0.0);
 		float hDotV = max(dot(halfVector, viewDirection), 0.0);
 		float denominator = nDotH * nDotH * (alpha * alpha - 1.0) + 1.0;
-		float distribution = (alpha * alpha) / max(PI * denominator * denominator, 1e-6);
-		float pdf = distribution * nDotH / max(4.0 * hDotV, 1e-6);
+		float distribution = (alpha * alpha) / max(PI * denominator * denominator, PDF_EPSILON);
+		float pdf = distribution * nDotH / max(4.0 * hDotV, PDF_EPSILON);
 		sum += textureLod(sourceEnvironment, lightDirection, SourceLod(pdf, SPECULAR_SAMPLE_COUNT)).rgb * nDotL;
 		weight += nDotL;
 	}
 
-	return sum / max(weight, 1e-5);
+	return sum / max(weight, WEIGHT_EPSILON);
 }
 
 void main()
@@ -687,9 +723,13 @@ PBREnvironmentInfo CubeMapHandler::GetPBREnvironmentInfo() const
 	info.enabled = pbrEnabled;
 	info.ready = pbrReady;
 	info.pending = pbrPending;
+	// One set at a time: with a published set, anchor, content and filter
+	// describe it, like the sizes above; the request being built is in the
+	// requested* fields. Before the first publication everything describes the
+	// request. captureMode is the switch itself, not a property of a set.
 	info.captureMode = pbrCaptureMode;
-	info.anchor = pbrAnchor;
-	info.content = pbrContent;
+	info.anchor = pbrReady ? pbrPublishedAnchor : pbrAnchor;
+	info.content = pbrReady ? pbrPublishedContent : pbrContent;
 	info.filter = pbrReady ? pbrPublishedFilter : pbrFilter;
 	info.requestedCaptureMode = pbrRequestedCaptureMode;
 	info.requestedAnchor = pbrRequestedAnchor;
@@ -737,11 +777,12 @@ void CubeMapHandler::CollectPBRTimers()
 		glGetQueryObjectui64v(pbrTimerQueries[i], GL_QUERY_RESULT, &stamps[i]);
 
 	GLuint64 captureNanoseconds = 0;
-	for (unsigned int face = 0; face < 6; ++face)
+	for (unsigned int face = 0; face < PBR_FACE_COUNT; ++face)
 		captureNanoseconds += stamps[face * 2 + 1] - stamps[face * 2];
 
+	// GL timestamps are nanoseconds; 1e-6 converts to milliseconds
 	pbrCaptureGpuMilliseconds = static_cast<float>(captureNanoseconds) * 1e-6f;
-	pbrFilterGpuMilliseconds = static_cast<float>(stamps[13] - stamps[12]) * 1e-6f;
+	pbrFilterGpuMilliseconds = static_cast<float>(stamps[PBR_FILTER_TIMER_END] - stamps[PBR_FILTER_TIMER_BEGIN]) * 1e-6f;
 	pbrTimersPending = false;
 }
 
@@ -761,7 +802,7 @@ bool CubeMapHandler::AllocatePBRCube(unsigned int& textureID, unsigned int size,
 
 	for (unsigned int mip = 0; mip < mipCount; ++mip) {
 		const unsigned int mipSize = std::max(1u, size >> mip);
-		for (unsigned int face = 0; face < 6; ++face) {
+		for (unsigned int face = 0; face < PBR_FACE_COUNT; ++face) {
 			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, mip, GL_RGBA16F, mipSize, mipSize, 0, GL_RGBA, GL_FLOAT, nullptr);
 		}
 	}
@@ -851,6 +892,11 @@ void CubeMapHandler::FreePBREnvironment()
 
 	pbrCaptureFBO.Kill();
 	pbrFilterFBO.Kill();
+	// The empty vertex array of the raster filter (its bufferless triangle):
+	// deleted here while the GL context exists; left to its destructor it would
+	// run at process exit, after the context is gone. VAO::Bind generates a new
+	// one on the next filter pass.
+	pbrFilterVAO.Delete();
 	delete pbrFilterShader;
 	pbrFilterShader = nullptr;
 	pbrReady = false;
@@ -1048,9 +1094,9 @@ void CubeMapHandler::UpdatePBRConfiguration()
 	// the CONFIG ranges document these limits; clamp here as well so that a
 	// hand-edited value can never request an invalid allocation
 	PBREnvironmentSet requestedSet;
-	requestedSet.environmentSize = std::clamp(configHandler->GetInt("PBREnvironmentSize"), 16, 2048);
-	requestedSet.irradianceSize = std::clamp(configHandler->GetInt("PBRIrradianceSize"), 4, 256);
-	requestedSet.specularSize = std::clamp(configHandler->GetInt("PBRSpecularSize"), 16, 1024);
+	requestedSet.environmentSize = std::clamp(configHandler->GetInt("PBREnvironmentSize"), PBR_ENVIRONMENT_SIZE_MIN, PBR_ENVIRONMENT_SIZE_MAX);
+	requestedSet.irradianceSize = std::clamp(configHandler->GetInt("PBRIrradianceSize"), PBR_IRRADIANCE_SIZE_MIN, PBR_IRRADIANCE_SIZE_MAX);
+	requestedSet.specularSize = std::clamp(configHandler->GetInt("PBRSpecularSize"), PBR_SPECULAR_SIZE_MIN, PBR_SPECULAR_SIZE_MAX);
 	requestedSet.specularMipCount = MipCount(requestedSet.specularSize);
 
 	const bool sizesChanged =
@@ -1168,14 +1214,14 @@ void CubeMapHandler::UpdatePBREnvironment()
 	if (!pbrFailure.empty())
 		return;
 
-	if (++pbrCaptureFace < 6)
+	if (++pbrCaptureFace < PBR_FACE_COUNT)
 		return;
 
 	if (timed)
-		glQueryCounter(pbrTimerQueries[12], GL_TIMESTAMP);
+		glQueryCounter(pbrTimerQueries[PBR_FILTER_TIMER_BEGIN], GL_TIMESTAMP);
 	const bool filtered = FilterPBREnvironment();
 	if (timed) {
-		glQueryCounter(pbrTimerQueries[13], GL_TIMESTAMP);
+		glQueryCounter(pbrTimerQueries[PBR_FILTER_TIMER_END], GL_TIMESTAMP);
 		pbrTimersPending = filtered;
 	}
 
@@ -1189,6 +1235,8 @@ void CubeMapHandler::UpdatePBREnvironment()
 	pbrActiveIndex = pbrCaptureIndex;
 	pbrCaptureIndex = 1 - pbrActiveIndex;
 	pbrActiveRevision = pbrRequestedRevision;
+	pbrPublishedAnchor = pbrAnchor;
+	pbrPublishedContent = pbrContent;
 	pbrPublishedFilter = pbrFilter;
 	pbrCaptureFace = 0;
 	pbrReady = true;
@@ -1210,6 +1258,11 @@ void CubeMapHandler::CreatePBRReflectionFace(unsigned int glFace)
 	const auto& sky = ISky::GetSky();
 	glViewport(0, 0, pbrStagingSize, pbrStagingSize);
 	glClearColor(sky->fogColor.x, sky->fogColor.y, sky->fogColor.z, 1.0f);
+	// glClear honours the depth write mask: with depth writes left off by an
+	// earlier pass the depth buffer would keep the previous face, and terrain
+	// would test against it. Enable writes for the clear (the GL_DEPTH_BUFFER_BIT
+	// push restores the caller's mask); gl.RenderEnvironmentFace does the same.
+	glDepthMask(GL_TRUE);
 	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 
 	const bool skyOnly = (pbrContent == "sky-only");
@@ -1233,7 +1286,7 @@ void CubeMapHandler::CreatePBRReflectionFace(unsigned int glFace)
 	} else {
 		const float mapCenterX = mapDims.mapx * SQUARE_SIZE * 0.5f;
 		const float mapCenterZ = mapDims.mapy * SQUARE_SIZE * 0.5f;
-		const float mapCenterY = std::max(0.0f, CGround::GetHeightReal(mapCenterX, mapCenterZ, false)) + 128.0f;
+		const float mapCenterY = std::max(0.0f, CGround::GetHeightReal(mapCenterX, mapCenterZ, false)) + PBR_CAPTURE_HEIGHT_ELMOS;
 		environmentCamera->SetPos(float3(mapCenterX, mapCenterY, mapCenterZ));
 	}
 
@@ -1279,7 +1332,7 @@ static void ReportInheritedFilterState()
 	Check(GL_BLEND, "blend");
 	Check(GL_DEPTH_TEST, "depth-test");
 	Check(GL_RASTERIZER_DISCARD, "rasterizer-discard");
-	for (int i = 0; i < 6; ++i) {
+	for (int i = 0; i < PBR_CHECKED_CLIP_DISTANCES; ++i) {
 		if (glIsEnabled(GL_CLIP_DISTANCE0 + i))
 			report += " clip-distance" + std::to_string(i);
 	}
@@ -1322,7 +1375,7 @@ bool CubeMapHandler::FilterPBREnvironment()
 	glDisable(GL_STENCIL_TEST);
 	glDisable(GL_CULL_FACE);
 	glDisable(GL_ALPHA_TEST);
-	for (int i = 0; i < 6; ++i)
+	for (int i = 0; i < PBR_CHECKED_CLIP_DISTANCES; ++i)
 		glDisable(GL_CLIP_DISTANCE0 + i);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
@@ -1331,28 +1384,37 @@ bool CubeMapHandler::FilterPBREnvironment()
 	pbrFilterShader->Enable();
 	pbrFilterVAO.Bind();
 
-	auto renderFaceMip = [&](unsigned int source, unsigned int sourceSize, unsigned int destination, unsigned int face, unsigned int mip, unsigned int size, int filterType, float roughness) {
-		pbrFilterFBO.AttachTexture(destination, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, GL_COLOR_ATTACHMENT0, mip);
-		if (!pbrFilterFBO.CheckStatus("PBR-ENVIRONMENT-FILTER"))
-			return false;
+	// One pass into one destination level: the six faces of that level, each
+	// attached as a single 2D face (the embedded program has no geometry stage
+	// to route a draw to a layer). The framebuffer's completeness depends only
+	// on the attachment's format and size, which are the same for every face
+	// of one level, so it is checked once, after the first face is attached
+	// (it used to be checked before every draw: 60 checks per epoch at the
+	// default sizes, walkthrough finding 3). The viewport and the pass uniforms
+	// are also set once per level; only faceIndex changes per draw.
+	auto renderLevel = [&](unsigned int source, unsigned int sourceSize, unsigned int destination, unsigned int mip, unsigned int size, int filterType, float roughness) {
 		glViewport(0, 0, size, size);
-		// bound immediately before every draw so that no intervening call
-		// can leave a different cube map on unit 0
-		glActiveTexture(GL_TEXTURE0);
+		// bound before the level's draws so that no intervening call can leave
+		// a different cube map on unit 0
+		glActiveTexture(PBR_SOURCE_TEXTURE_UNIT);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, source);
 		pbrFilterShader->SetUniform("sourceResolution", static_cast<float>(sourceSize));
-		pbrFilterShader->SetUniform("faceIndex", static_cast<int>(face));
 		pbrFilterShader->SetUniform("filterType", filterType);
 		pbrFilterShader->SetUniform("roughness", roughness);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		for (unsigned int face = 0; face < PBR_FACE_COUNT; ++face) {
+			pbrFilterFBO.AttachTexture(destination, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, GL_COLOR_ATTACHMENT0, mip);
+			if (face == 0 && !pbrFilterFBO.CheckStatus("PBR-ENVIRONMENT-FILTER"))
+				return false;
+			pbrFilterShader->SetUniform("faceIndex", static_cast<int>(face));
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+		}
 		return true;
 	};
 
 	bool valid = true;
 
 	// 1. display-referred staging capture -> scene-linear environment mip 0
-	for (unsigned int face = 0; face < 6 && valid; ++face)
-		valid &= renderFaceMip(pbrStagingTexID, pbrStagingSize, set.environmentTexID, face, 0, set.environmentSize, PBR_FILTER_DECODE, 0.0f);
+	valid &= renderLevel(pbrStagingTexID, pbrStagingSize, set.environmentTexID, 0, set.environmentSize, PBR_FILTER_DECODE, 0.0f);
 
 	// 2. box mips of the linear source: an integration aid for the filters
 	//    below (solid-angle source-LOD selection), never published as GGX
@@ -1363,14 +1425,12 @@ bool CubeMapHandler::FilterPBREnvironment()
 	}
 
 	// 3. diffuse irradiance, 4. GGX prefiltered radiance per roughness mip
-	for (unsigned int face = 0; face < 6 && valid; ++face)
-		valid &= renderFaceMip(set.environmentTexID, set.environmentSize, set.irradianceTexID, face, 0, set.irradianceSize, PBR_FILTER_DIFFUSE, 1.0f);
+	valid = valid && renderLevel(set.environmentTexID, set.environmentSize, set.irradianceTexID, 0, set.irradianceSize, PBR_FILTER_DIFFUSE, 1.0f);
 
 	for (unsigned int mip = 0; mip < set.specularMipCount && valid; ++mip) {
 		const unsigned int mipSize = std::max(1u, set.specularSize >> mip);
 		const float roughness = (set.specularMipCount > 1) ? static_cast<float>(mip) / static_cast<float>(set.specularMipCount - 1) : 0.0f;
-		for (unsigned int face = 0; face < 6 && valid; ++face)
-			valid &= renderFaceMip(set.environmentTexID, set.environmentSize, set.specularTexID, face, mip, mipSize, PBR_FILTER_SPECULAR, roughness);
+		valid = renderLevel(set.environmentTexID, set.environmentSize, set.specularTexID, mip, mipSize, PBR_FILTER_SPECULAR, roughness);
 	}
 
 	pbrFilterFBO.Detach(GL_COLOR_ATTACHMENT0);
@@ -1408,18 +1468,18 @@ bool CubeMapHandler::FilterPBREnvironmentCompute()
 		return false;
 	}
 	pbrFilterShader->Enable();
-	glActiveTexture(GL_TEXTURE0);
+	glActiveTexture(PBR_SOURCE_TEXTURE_UNIT);
 
 	auto dispatch = [&](unsigned int source, unsigned int sourceSize, unsigned int destination,
 	                    unsigned int mip, unsigned int size, int filterType, float roughness) {
 		glBindTexture(GL_TEXTURE_CUBE_MAP, source);
-		glBindImageTexture(1, destination, mip, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+		glBindImageTexture(PBR_DESTINATION_IMAGE_UNIT, destination, mip, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 		pbrFilterShader->SetUniform("sourceResolution", static_cast<float>(sourceSize));
 		pbrFilterShader->SetUniform("filterType", filterType);
 		pbrFilterShader->SetUniform("roughness", roughness);
 		glDispatchCompute((size + groupSize[0] - 1) / groupSize[0],
 		                  (size + groupSize[1] - 1) / groupSize[1],
-		                  (6 + groupSize[2] - 1) / groupSize[2]);
+		                  (PBR_FACE_COUNT + groupSize[2] - 1) / groupSize[2]);
 		glMemoryBarrier(GL_ALL_BARRIER_BITS);
 		return glGetError() == GL_NO_ERROR;
 	};
@@ -1442,7 +1502,7 @@ bool CubeMapHandler::FilterPBREnvironmentCompute()
 		                 mip, mipSize, PBR_FILTER_SPECULAR, roughness);
 	}
 
-	glBindImageTexture(1, 0, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
+	glBindImageTexture(PBR_DESTINATION_IMAGE_UNIT, 0, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 	pbrFilterShader->Disable();
 	globalRendering->LoadViewport();
