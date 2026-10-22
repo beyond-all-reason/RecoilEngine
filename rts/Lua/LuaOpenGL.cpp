@@ -55,6 +55,7 @@
 #include "Rendering/UnitDefImage.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
 #include "Rendering/Units/UnitDrawer.h"
+#include "Rendering/Env/CubeMapHandler.h"
 #include "Rendering/Env/DebugCubeMapTexture.h"
 #include "Rendering/Env/ISky.h"
 #include "Rendering/Env/SunLighting.h"
@@ -4736,8 +4737,9 @@ int LuaOpenGL::GenerateMipmap(lua_State* L)
  * `$reflection` cube is RGBA8 and follows the player camera, so it cannot feed
  * a stable PBR environment. This function draws one face per call into a cube
  * the Lua handle owns; filtering (irradiance, specular prefilter) stays in Lua.
- * It follows CubeMapHandler::CreateReflectionFace step by step but does not
- * touch CubeMapHandler or the legacy cubes.
+ * It follows CubeMapHandler::CreateReflectionFace step by step and uses its
+ * face table (CubeMapHandler::faceDirs) but changes neither CubeMapHandler
+ * nor the legacy cubes.
  *
  * Why only DrawGenesis: it switches the active camera and the game draw mode
  * and renders into its own framebuffer. DrawGenesis runs at the start of the
@@ -4827,11 +4829,15 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 		// The depth attachment must match the color attachment's size or the
 		// FBO is incomplete. Faces are square, so xsize is the size; the
 		// renderbuffer is (re)allocated only when it changes and stays attached.
+		// A sized depth format, the one Lua texture FBOs get (LuaTextures), so
+		// the precision does not depend on the driver's choice for the unsized
+		// GL_DEPTH_COMPONENT.
 		if (environmentFaceDepthSize != tex->xsize) {
 			if (environmentFaceDepth == 0)
 				glGenRenderbuffersEXT(1, &environmentFaceDepth);
 			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, environmentFaceDepth);
-			glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, GL_DEPTH_COMPONENT, tex->xsize, tex->xsize);
+			const GLenum depthFormat = static_cast<GLenum>(CGlobalRendering::DepthBitsToFormat(globalRendering->supportDepthBufferBitDepth));
+			glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, depthFormat, tex->xsize, tex->xsize);
 			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
 			glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, environmentFaceDepth);
 			environmentFaceDepthSize = tex->xsize;
@@ -4846,26 +4852,24 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 	}
 
 	if (error == nullptr) {
-		// the axes of CubeMapHandler::CreateReflectionFace (right and up negated below)
-		// Per face: forward, right, up, in OpenGL face order. A copy, because
-		// CubeMapHandler keeps its table private; the two must stay identical
-		// or the Lua cube's faces would not match the legacy cubes'.
-		static const float3 faceDirs[6][3] = {
-			{ RgtVector,  FwdVector,   UpVector},
-			{-RgtVector, -FwdVector,   UpVector},
-			{  UpVector, -RgtVector, -FwdVector},
-			{ -UpVector, -RgtVector,  FwdVector},
-			{ FwdVector, -RgtVector,   UpVector},
-			{-FwdVector,  RgtVector,   UpVector},
-		};
+		// Per face: forward, right, up, in OpenGL face order; the table of
+		// CubeMapHandler::CreateReflectionFace itself (right and up negated
+		// below, as there), so the Lua cube's faces match the legacy cubes'.
+		const auto& faceDirs = CubeMapHandler::faceDirs;
 
 		// Save everything the capture changes, so the Lua caller continues with
 		// its own state: fog and clear color, depth test/mask, viewport, enables,
-		// scissor, color mask and the matrix mode, plus both fixed-function
-		// matrices (the camera's LoadMatrices overwrites them). The engine's
-		// CreateReflectionFace saves only fog and depth because it runs inside
-		// the engine's own pass; a Lua caller's state is unknown.
-		glPushAttrib(GL_FOG_BIT | GL_DEPTH_BUFFER_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT | GL_SCISSOR_BIT | GL_COLOR_BUFFER_BIT | GL_TRANSFORM_BIT);
+		// scissor, color mask, the matrix mode and the polygon state (the sky and
+		// terrain passes set the cull face mode, which GL_ENABLE_BIT does not
+		// cover), plus both fixed-function matrices (the camera's LoadMatrices
+		// overwrites them) and the bound program (the sky and terrain shaders
+		// leave program 0 bound; glPushAttrib does not save programs). The
+		// engine's CreateReflectionFace saves only fog and depth because it runs
+		// inside the engine's own pass; a Lua caller's state is unknown. BAR's
+		// IBL self-test checks all of it from a widget's DrawGenesis.
+		glPushAttrib(GL_FOG_BIT | GL_DEPTH_BUFFER_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT | GL_SCISSOR_BIT | GL_COLOR_BUFFER_BIT | GL_TRANSFORM_BIT | GL_POLYGON_BIT);
+		GLint previousProgram = 0;
+		glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
 		glMatrixMode(GL_PROJECTION);
 		glPushMatrix();
 		glMatrixMode(GL_MODELVIEW);
@@ -4933,6 +4937,7 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 
 		// pops in the reverse order of the pushes above; glPopAttrib last, so
 		// the matrix mode it restores is the caller's
+		glUseProgram(static_cast<GLuint>(previousProgram));
 		glMatrixMode(GL_PROJECTION);
 		glPopMatrix();
 		glMatrixMode(GL_MODELVIEW);
