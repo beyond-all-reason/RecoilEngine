@@ -4791,6 +4791,7 @@ int LuaOpenGL::GenerateMipmap(lua_State* L)
  * @return boolean success
  * @return string? error
  */
+// variant: PBRIBLProvider=bar (the capture primitive of BAR's provider)
 int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 {
 	// raises a Lua error outside any draw call-in, like every gl.* draw call
@@ -5061,6 +5062,7 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
  * @return boolean success
  * @return string? error when another handle owns the name, or texName is not a texture of this handle
  */
+// variant: PBRIBLProvider=bar (BAR's provider publishes its cubes and DFG table)
 int LuaOpenGL::PublishTexture(lua_State* L)
 {
 	// nil and "" both mean "unpublish"; all rules live in LuaTextures::Publish.
@@ -7183,6 +7185,7 @@ int LuaOpenGL::CreateQuery(lua_State* L)
 	GLenum target = GL_SAMPLES_PASSED;
 
 	if (kind == "time") {
+		// variant: PBREnvironmentGpuTiming=2 (BAR's provider times its passes with it)
 		// GL_TIME_ELAPSED is core in OpenGL 3.3, or the ARB_timer_query extension
 		if (!GLAD_GL_VERSION_3_3 && !GLAD_GL_ARB_timer_query)
 			return 0;

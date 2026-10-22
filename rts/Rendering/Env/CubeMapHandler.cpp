@@ -289,6 +289,7 @@ void main()
 		Shader::IProgramObject* program = new Shader::GLSLProgramObject(barOwned ? "[PBR-BAR-EnvironmentFilter]" : "[PBR-EnvironmentFilter]");
 		if (barOwned) {
 #if PBR_ENABLE_BAR_RASTER_FILTER
+			// variant: PBREnvironmentFilter=bar-raster (BAR's single-face file)
 			if (!program->LoadFromLua("shaders/GLSL/pbrEnvironmentFilter.lua")) {
 				delete program;
 				return nullptr;
@@ -299,6 +300,7 @@ void main()
 #endif
 		} else {
 #if PBR_ENABLE_ENGINE_RASTER_FILTER
+			// variant: PBREnvironmentFilter=raster (the embedded engine filter)
 			program->AttachShaderObject(new Shader::GLSLShaderObject(GL_VERTEX_SHADER, pbrFilterVertexShader));
 			program->AttachShaderObject(new Shader::GLSLShaderObject(GL_FRAGMENT_SHADER, pbrFilterFragmentShader));
 			program->Link();
@@ -333,6 +335,7 @@ void main()
 #endif
 
 #if PBR_ENABLE_BAR_COMPUTE_FILTER
+	// variant: PBREnvironmentFilter=compute (BAR's compute file, dispatched here)
 	Shader::IProgramObject* CreatePBRComputeProgram()
 	{
 		if (!GLAD_GL_VERSION_4_3)
@@ -709,6 +712,9 @@ void CubeMapHandler::CreateReflectionFace(unsigned int glFace, bool skyOnly)
 	glPopAttrib();
 }
 
+// variant: PBRIBLProvider=engine (everything from here to the end of
+// FilterPBREnvironmentCompute; the legacy reflection and specular cubes below
+// and above it serve every provider)
 PBREnvironmentInfo CubeMapHandler::GetPBREnvironmentInfo() const
 {
 	const PBREnvironmentSet& set = PublishedOrRequestedSet();
@@ -974,6 +980,7 @@ void CubeMapHandler::RequestPBREpoch()
 // texel centres x = NdotV, y = perceptual roughness r (row 0 first), alpha = r^2; GGX
 // importance sampling with Hammersley points (i / N, radical inverse of i); height-
 // correlated Smith visibility; Schlick Fc = (1 - VdotH)^5; R = A (scale on F0), G = B (bias).
+// variant: PBRDFGSource=engine-generated
 void CubeMapHandler::GeneratePBRDFG()
 {
 	const spring_time start = spring_gettime();
@@ -1352,6 +1359,8 @@ static void ReportInheritedFilterState()
 	lastReport = report;
 }
 
+// variant: PBREnvironmentFilter=raster and =bar-raster (compute is dispatched to
+// FilterPBREnvironmentCompute at the top)
 bool CubeMapHandler::FilterPBREnvironment()
 {
 #if PBR_ENABLE_BAR_COMPUTE_FILTER
@@ -1452,6 +1461,7 @@ bool CubeMapHandler::FilterPBREnvironment()
 }
 
 #if PBR_ENABLE_BAR_COMPUTE_FILTER
+// variant: PBRIBLProvider=engine, PBREnvironmentFilter=compute
 bool CubeMapHandler::FilterPBREnvironmentCompute()
 {
 	PBREnvironmentSet& set = pbrSets[pbrCaptureIndex];
