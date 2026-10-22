@@ -2095,7 +2095,7 @@ int LuaOpenGL::DrawListAtUnit(lua_State* L)
  * @function gl.DrawFuncAtUnit
  * @param unitID UnitID
  * @param useMidPos boolean? (Default: `true`)
- * @param fun(...) func Function to call.
+ * @param func fun(...) Function to call.
  * @param ... any Arguments passed to function.
  */
 int LuaOpenGL::DrawFuncAtUnit(lua_State* L)
@@ -2452,7 +2452,7 @@ int LuaOpenGL::Shape(lua_State* L)
 /***
  * @function gl.BeginEnd
  * @param primMode GL
- * @param fun(...) func Function to call.
+ * @param func fun(...) Function to call.
  * @param ... any Arguments passed to function.
  */
 int LuaOpenGL::BeginEnd(lua_State* L)
@@ -4589,7 +4589,7 @@ int LuaOpenGL::CopyImageSubData(lua_State* L)
 /***
  * @function gl.RenderToTexture
  * @param texName string
- * @param fun(...) function
+ * @param func fun(...)
  * @param ... any Arguments to the function.
  */
 int LuaOpenGL::RenderToTexture(lua_State* L)
