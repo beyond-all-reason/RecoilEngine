@@ -1228,11 +1228,23 @@ static inline void SafeStr(FILE* out, const char* prefix, const std::string& str
 	if (str.empty())
 		return;
 
-	if ((str.find_first_of("\\\"") != std::string::npos) || (str.find_first_of('\n') != std::string::npos )) {
-		fprintf(out, "%s[[%s]],\n", prefix, str.c_str());
-	} else {
-		fprintf(out, "%s\"%s\",\n", prefix, str.c_str());
+	std::string escaped;
+	escaped.reserve(str.size());
+	for (const unsigned char c: str) {
+		if (c == '\\' || c == '"') {
+			escaped += '\\';
+			escaped += c;
+		} else if (c < 32 || c == 127) {
+			// Three digits keep a following digit out of the Lua escape.
+			escaped += '\\';
+			escaped += '0' + c / 100;
+			escaped += '0' + (c / 10) % 10;
+			escaped += '0' + c % 10;
+		} else {
+			escaped += c;
+		}
 	}
+	fprintf(out, "%s\"%s\",\n", prefix, escaped.c_str());
 }
 
 void FilterDep(std::vector<std::string>& deps, const std::string& exclude)
