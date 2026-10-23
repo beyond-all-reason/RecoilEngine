@@ -181,6 +181,16 @@ std::vector<LuaOpenGL::OcclusionQuery*> LuaOpenGL::occlusionQueries;
 
 
 
+static bool UsingUnsupportedLinePolygonMode()
+{
+	if (globalRendering->supportPolygonModeLine)
+		return false;
+
+	GLint modes[2];
+	glGetIntegerv(GL_POLYGON_MODE, modes);
+	return (modes[0] == GL_LINE);
+}
+
 static inline CUnit* ParseUnit(lua_State* L, const char* caller, int index)
 {
 	if (!lua_isnumber(L, index)) {
@@ -2466,7 +2476,11 @@ int LuaOpenGL::BeginEnd(lua_State* L)
 	if ((args < 2) || !lua_isfunction(L, 2)) {
 		luaL_error(L, "Incorrect arguments to gl.BeginEnd(type, func, ...)");
 	}
-	const GLuint primMode = (GLuint)luaL_checkint(L, 1);
+	GLuint primMode = (GLuint)luaL_checkint(L, 1);
+
+	// exact for the common single-quad/polygon outline case
+	if ((primMode == GL_QUADS || primMode == GL_POLYGON) && UsingUnsupportedLinePolygonMode())
+		primMode = GL_LINE_LOOP;
 
 	if (primMode == GL_POINTS) {
 		WorkaroundATIPointSizeBug();
@@ -2906,6 +2920,17 @@ int LuaOpenGL::Rect(lua_State* L)
 	const float y1 = luaL_checkfloat(L, 2);
 	const float x2 = luaL_checkfloat(L, 3);
 	const float y2 = luaL_checkfloat(L, 4);
+
+	if (UsingUnsupportedLinePolygonMode()) {
+		glBegin(GL_LINE_LOOP);
+		glVertex2f(x1, y1);
+		glVertex2f(x2, y1);
+		glVertex2f(x2, y2);
+		glVertex2f(x1, y2);
+		glEnd();
+		return 0;
+	}
+
 	glRectf(x1, y1, x2, y2);
 	return 0;
 }
