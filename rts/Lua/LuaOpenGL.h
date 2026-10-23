@@ -155,14 +155,29 @@ class LuaOpenGL {
 		static std::unordered_map<GLenum, std::string> fixedStateEnumToString;
 		static std::string fixedStateEnumToStringUnk;
 
-		struct OcclusionQuery {
-			unsigned int index; // into LuaOpenGL::occlusionQueries
-			unsigned int id;
+		// A gl.CreateQuery object: a full Lua userdata with the "Query" metatable,
+		// the same ownership as LuaFBOs/LuaRBOs. Lua owns it; its __gc deletes the
+		// GL query unless gl.DeleteQuery already did (id is then 0).
+		//
+		// Replaces upstream's OcclusionQuery list. Upstream built the struct in a
+		// lua_newuserdata block but returned only a light userdata pointing at it,
+		// so nothing referenced the block and the garbage collector could free it
+		// while the static list still pointed there (use after free on the next
+		// Run/Get/DeleteQuery). The block's memory comes from the handle's Lua
+		// allocator, it is freed with the Lua state, and no engine-side list is
+		// needed. Plain data (no destructor), as lua_newuserdata requires.
+		struct LuaQuery {
+			// GL query name; 0 once deleted (gl.DeleteQuery or __gc)
+			GLuint id;
+			GLenum target; // GL_SAMPLES_PASSED, or GL_TIME_ELAPSED for gl.CreateQuery("time")
 		};
 
-		static std::vector<OcclusionQuery*> occlusionQueries;
-
 	private:
+		// registers the "Query" metatable (only __gc) in this Lua state's registry;
+		// called once per handle from PushEntries, before gl.CreateQuery exists
+		static void CreateQueryMetatable(lua_State* L);
+		// Query.__gc and the body of gl.DeleteQuery: deletes the GL query once
+		static int QueryGC(lua_State* L);
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);
 		static void CondWarnDeprecatedGL(lua_State* L, const char* caller);
 		static void NotImplementedError(lua_State* L, const char* caller);
@@ -235,6 +250,11 @@ class LuaOpenGL {
 		static int CopyImageSubData(lua_State* L);
 		static int RenderToTexture(lua_State* L);
 		static int GenerateMipmap(lua_State* L);
+		// draws the engine sky (optionally terrain) into one face of a Lua cube;
+		// DrawGenesis only; uses the file-static capture FBO in LuaOpenGL.cpp
+		static int RenderEnvironmentFace(lua_State* L);
+		// gives a Lua texture of this handle a global "$pub:<name>" (LuaTextures::Publish)
+		static int PublishTexture(lua_State* L);
 		static int ActiveTexture(lua_State* L);
 		static int TexEnv(lua_State* L);
 		static int TexGen(lua_State* L);
