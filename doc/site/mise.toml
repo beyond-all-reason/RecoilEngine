@@ -6,7 +6,8 @@
 	HUGO_VERSION = "0.147.9"
 	# Exact version: mise hides releases younger than `minimum_release_age` from a range like "4"
 	LUA_DOC_EXTRACTOR_VERSION = "4.1.1" # lua_library lua_check
-	EMMYLUA_DOC_CLI_VERSION = "0.8.2" # lua_pages lua_library lua_check
+	# 0.25 exports every `@see` (`tag_content`); 0.8 kept only the last
+	EMMYLUA_DOC_CLI_VERSION = "0.25.1" # lua_pages lua_library lua_check
 	LUA_LANGUAGE_SERVER_VERSION = "3.15.0" # lua_check
 	JQ_VERSION = "1.8.0" # binary_pages
 	SEVENZIP_VERSION = "24.09" # binary_pages
@@ -53,7 +54,7 @@
 	tools."cargo:emmylua_doc_cli" = "{{env.EMMYLUA_DOC_CLI_VERSION}}"
 	depends = ["lua_library"]
 	dir = "../../"
-	run = "emmylua_doc_cli -f json -i $RECOIL_LUA_LIBRARY_DIR -o {{vars.site_dir}}/data"
+	run = "emmylua_doc_cli -f json -o {{vars.site_dir}}/data $RECOIL_LUA_LIBRARY_DIR"
 
 	[tasks.binary_pages]
 	depends = ["latest_release_data"]

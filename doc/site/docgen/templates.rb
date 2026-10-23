@@ -28,9 +28,9 @@ class Member < OpenStruct
 
     Deprecated<%= ": #{deprecation_reason}" if deprecation_reason %>
     <% end %>
-    <% if see %>
+    <% unless see.empty? %>
 
-    See <%= see %>
+    See <%= see.join(", ") %>
     <% end %>
 
     <dl><%= generate_fields() %></dl>
@@ -43,9 +43,9 @@ class Member < OpenStruct
 
     Deprecated<%= ": #{deprecation_reason}" if deprecation_reason %>
     <% end %>
-    <% if see %>
+    <% unless see.empty? %>
 
-    See <%= see %>
+    See <%= see.join(", ") %>
     <% end %>
 
     ```lua
@@ -84,9 +84,9 @@ class Member < OpenStruct
 
     Deprecated<%= ": #{deprecation_reason}" if deprecation_reason %>
     <% end %>
-    <% if see %>
+    <% unless see.empty? %>
 
-    See <%= see %>
+    See <%= see.join(", ") %>
     <% end %>
 
     <% if not children.empty? %>
@@ -115,9 +115,9 @@ class Member < OpenStruct
 
     Deprecated<%= ": #{deprecation_reason}" if deprecation_reason %>
     <% end %>
-    <% if see %>
+    <% unless see.empty? %>
 
-    See <%= see %>
+    See <%= see.join(", ") %>
     <% end %>
 
     <% if not children.empty? %>
@@ -141,9 +141,9 @@ class Member < OpenStruct
 
     Deprecated<%= ": #{deprecation_reason}" if deprecation_reason %>
     <% end %>
-    <% if see %>
+    <% unless see.empty? %>
 
-    See <%= see %>
+    See <%= see.join(", ") %>
     <% end %>
 
     <% if not children.empty? %>
@@ -172,9 +172,9 @@ class Member < OpenStruct
 
     Deprecated<%= ": #{deprecation_reason}" if deprecation_reason %>
     <% end %>
-    <% if see %>
+    <% unless see.empty? %>
 
-    See <%= see %>
+    See <%= see.join(", ") %>
     <% end %>
   EOF
 
