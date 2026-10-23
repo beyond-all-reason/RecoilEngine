@@ -11,7 +11,7 @@ on:
 env:
   RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
   LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
-  LUA_DOC_EXTRACTOR_VERSION: "3"
+  LUA_DOC_EXTRACTOR_VERSION: "4.1.0"
 jobs:
   generate-library:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
@@ -37,7 +37,7 @@ jobs:
           working_directory: ./recoil/doc/site
           mise_toml: |
             [tools]
-            "npm:lua-doc-extractor" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
+            "github:rhys-vdw/lua-doc-extractor-rs" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
 
       - name: Generate Lua library
         working-directory: ./recoil/doc/site
