@@ -19,7 +19,6 @@ on:
       - doc/site/luals-check.json
 env:
   RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
-  LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
   LUA_DOC_EXTRACTOR_VERSION: "4.1.1"
   LUA_LANGUAGE_SERVER_VERSION: "3.15.0"
 jobs:
@@ -36,6 +35,9 @@ jobs:
             rts/Sim/Units/Scripts
             doc/site/mise.toml
             doc/site/luals-check.json
+
+      - name: Link the docs to this commit
+        run: echo "LUA_DOC_EXTRACTOR_SOURCE_REF=https://github.com/$GITHUB_REPOSITORY/blob/${GITHUB_SHA::10}" >> "$GITHUB_ENV"
 
       - uses: jdx/mise-action@v2
         with:

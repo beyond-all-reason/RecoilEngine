@@ -11,7 +11,8 @@
 	JQ_VERSION = "1.8.0" # binary_pages
 	SEVENZIP_VERSION = "24.09" # binary_pages
 	RUBY_VERSION = "3.3" # lua_pages
-	LUA_DOC_EXTRACTOR_SOURCE_REF = "https://github.com/beyond-all-reason/RecoilEngine/blob/master"
+	# CI sets the commit being built; local runs link to master
+	LUA_DOC_EXTRACTOR_SOURCE_REF = "{{ get_env(name='LUA_DOC_EXTRACTOR_SOURCE_REF', default='https://github.com/beyond-all-reason/RecoilEngine/blob/master') }}"
 	RECOIL_LUA_LIBRARY_DIR = "rts/Lua/library"
 
 [vars]

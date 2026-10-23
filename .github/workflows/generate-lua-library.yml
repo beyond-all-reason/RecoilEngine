@@ -10,7 +10,6 @@ on:
       - doc/site/mise.toml
 env:
   RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
-  LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
   LUA_DOC_EXTRACTOR_VERSION: "4.1.1"
 jobs:
   generate-library:
@@ -31,6 +30,9 @@ jobs:
             rts/Rml/SolLua
             doc/site/mise.toml
           path: recoil
+
+      - name: Link the docs to this commit
+        run: echo "LUA_DOC_EXTRACTOR_SOURCE_REF=https://github.com/$GITHUB_REPOSITORY/blob/${GITHUB_SHA::10}" >> "$GITHUB_ENV"
 
       - uses: jdx/mise-action@v2
         with:

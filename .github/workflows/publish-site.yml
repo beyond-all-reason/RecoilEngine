@@ -10,7 +10,6 @@ permissions:
   id-token: write
 env:
   RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
-  LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
   HUGO_VERSION: "0.147.9"
   LUA_DOC_EXTRACTOR_VERSION: "4.1.1"
   EMMYLUA_DOC_CLI_VERSION: "0.8.2"
@@ -55,6 +54,8 @@ jobs:
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
+      - name: Link the docs to this commit
+        run: echo "LUA_DOC_EXTRACTOR_SOURCE_REF=https://github.com/$GITHUB_REPOSITORY/blob/${GITHUB_SHA::10}" >> "$GITHUB_ENV"
       - name: Setup Mise
         uses: jdx/mise-action@v2
         with:
