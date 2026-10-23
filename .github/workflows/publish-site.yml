@@ -12,7 +12,7 @@ env:
   RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
   LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
   HUGO_VERSION: "0.147.9"
-  LUA_DOC_EXTRACTOR_VERSION: "4.1.0"
+  LUA_DOC_EXTRACTOR_VERSION: "4.1.1"
   EMMYLUA_DOC_CLI_VERSION: "0.8.2"
   JQ_VERSION: "1.8.0"
   SEVENZIP_VERSION: "24.09"
