@@ -20,7 +20,7 @@
 #include "System/UnorderedSet.hpp"
 
 static constexpr float4 DEFAULT_COLVOL_COLOR = float4(0.45f, 0.00f, 0.45f, 0.35f); // purple (light)
-static constexpr float4 DEFAULT_OBJVOL_COLOR = float4(0.20f, 0.55f, 1.00f, 0.40f); // light blue
+static constexpr float4 DEFAULT_OBJVOL_COLOR = float4(0.75f, 0.50f, 0.75f, 0.40f);
 static constexpr float4 DEFAULT_SELVOL_COLOR = float4(0.00f, 0.45f, 0.00f, 0.20f); // dark green
 static constexpr float4 DEFAULT_TARGET_COLOR = float4(1.00f, 0.80f, 0.00f, 0.40f); // yellowish
 static constexpr float4 DEFAULT_MUZZLE_COLOR = float4(1.00f, 0.00f, 0.00f, 0.40f); // red
