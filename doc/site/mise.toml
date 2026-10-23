@@ -101,15 +101,17 @@
 
 	[tasks.lua_check]
 	description = "Sanity check lua library with lua language server"
-	depends = ["lua_library"]
 	tools.lua-language-server = "{{env.LUA_LANGUAGE_SERVER_VERSION}}"
 	tools."github:rhys-vdw/lua-doc-extractor-rs" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
 	dir = "../../"
+	# Runs `lua_library` itself rather than through `depends`: the library is written even when the
+	# extractor reports errors, so LuaLS still checks it and one run reports both.
 	# luals-check.json disables `luadoc-miss-see-name`: LuaLS wants a name before the `@see [file#L1](url)` source links.
 	# `remap` then reports LuaLS's problems at the C++ lines they came from (annotations in Actions),
-	# and the task fails if LuaLS found any.
+	# and the task fails if the extractor or LuaLS found any.
 	run = '''
 		status=0
+		mise -C "{{config_root}}" run lua_library || status=$?
 		lua-language-server --check "${RECOIL_LUA_LIBRARY_DIR}" --configpath "$PWD/{{vars.site_dir}}/luals-check.json" --check_out_path {{vars.lua_check_results}} || status=$?
 		lua-doc-extractor remap --sourcemap {{vars.lua_doc_sourcemap}} --dest {{vars.lua_doc_gen_dest}} --format {{vars.lua_doc_format}} {{vars.lua_check_results}}
 		exit $status
