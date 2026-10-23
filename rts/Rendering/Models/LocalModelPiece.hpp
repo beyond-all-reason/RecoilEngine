@@ -29,9 +29,8 @@ struct LocalModelPiece
 	LocalModelPiece(const S3DModelPiece* piece);
 	~LocalModelPiece();
 
-	void AddChild(LocalModelPiece* c) { children.push_back(c); }
-	void RemoveChild(LocalModelPiece* c) { children.erase(std::find(children.begin(), children.end(), c)); }
-	void SetParent(LocalModelPiece* p) { parent = p; }
+	void AddChild(LocalModelPiece* c);
+	void RemoveChild(LocalModelPiece* c);
 	void SetLocalModel(LocalModel* lm) { localModel = lm; }
 
 	void SetLModelPieceIndex(uint32_t idx) { lmodelPieceIndex = idx; }
@@ -59,8 +58,7 @@ struct LocalModelPiece
 
 	bool GetEmitDirPos(float3& emitPos, float3& emitDir) const;
 
-	void SetDirtyRaw(bool state) { dirty = state; }
-	void SetDirty();
+	void SetDirty(bool state) { dirty = state; }
 	bool GetDirty() const { return dirty; }
 	void SetFloat3(const float3& src, float3& dst); // anim-script only
 	void SetFloat(const float& src, float& dst); // anim-script only
@@ -72,7 +70,7 @@ struct LocalModelPiece
 	void SetPositionNoInterpolation(bool noInterpolate) { noInterpolation[1] = noInterpolate; }
 	void SetScalingNoInterpolation (bool noInterpolate) { noInterpolation[2] = noInterpolate; }
 
-	void SetWasUpdatedRaw(bool state = true) { wasUpdated[0] = state; }
+	void SetWasUpdated(bool state = true) { wasUpdated[0] = state; }
 	auto GetWasUpdated() const { return wasUpdated[0] || wasUpdated[1]; }
 	void ResetWasUpdated() const; /*fake*/
 
@@ -84,9 +82,8 @@ struct LocalModelPiece
 
 	const float3& GetDirection() const { return dir; }
 
-	const Transform& GetModelSpaceTransformRaw() const { return modelSpaceTra; }
-	const Transform&  GetModelSpaceTransform() const;
-	const CMatrix44f& GetModelSpaceMatrix()    const;
+	const Transform& GetModelSpaceTransform() const { return modelSpaceTra; }
+	const CMatrix44f& GetModelSpaceMatrix() const { return modelSpaceMat; }
 
 	const CollisionVolume* GetCollisionVolume() const { return colvol; }
 	      CollisionVolume* GetCollisionVolume()       { return colvol; }
@@ -119,9 +116,10 @@ private:
 	mutable std::array<bool, 2> wasUpdated; // currFrame, prevFrame
 	bool scriptSetVisible; // TODO: add (visibility) maxradius!
 public:
-	bool blockScriptAnims; // if true, Set{Position,Rotation} are ignored for this piece
+	uint32_t rank;   // copy from 3DModelPiece
 	int32_t lmodelPieceIndex; // index of this piece into LocalModel::pieces
 	int32_t scriptPieceIndex; // index of this piece into UnitScript::pieces
+	bool blockScriptAnims; // if true, Set{Position,Rotation} are ignored for this piece
 
 	std::vector<LocalModelPiece*> children;
 	LocalModelPiece* parent;
