@@ -51,13 +51,6 @@ static const float COMMAND_CANCEL_DIST = 17.0f;
 void CCommandAI::InitCommandDescriptionCache() { commandDescriptionCache.Init(); }
 void CCommandAI::KillCommandDescriptionCache() { commandDescriptionCache.Kill(); }
 
-CR_BIND(CCommandQueue, )
-CR_REG_METADATA(CCommandQueue, (
-	CR_MEMBER(queue),
-	CR_MEMBER(queueType),
-	CR_MEMBER(tagCounter)
-))
-
 CR_BIND_DERIVED(CCommandAI, CObject, )
 CR_REG_METADATA(CCommandAI, (
 	CR_MEMBER(stockpileWeapon),
@@ -474,8 +467,9 @@ void CCommandAI::UpdateNonQueueingCommands()
 
 void CCommandAI::ClearCommandDependencies() {
 	RECOIL_DETAILED_TRACY_ZONE;
-	while (!commandDeathDependences.empty()) {
-		DeleteDeathDependence(*commandDeathDependences.begin(), DEPENDENCE_COMMANDQUE);
+	SharedObjectSet::Batch mutations;
+	while (!commandDeathDependences.Empty()) {
+		DeleteDeathDependence(commandDeathDependences.First(), DEPENDENCE_COMMANDQUE);
 	}
 }
 
@@ -1315,6 +1309,9 @@ bool CCommandAI::WillCancelQueued(const Command& c) const
 CCommandQueue::const_iterator CCommandAI::GetCancelQueued(const Command& c, const CCommandQueue& q) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (c.GetID() == CMD_ATTACK && c.GetNumParams() == 1)
+		return q.FindLastAttackTarget(c.GetParam(0));
+
 	CCommandQueue::const_iterator ci = q.end();
 
 	while (ci != q.begin()) {
@@ -1415,6 +1412,11 @@ std::vector<Command> CCommandAI::GetOverlapQueued(const Command& c) const
 std::vector<Command> CCommandAI::GetOverlapQueued(const Command& c, const CCommandQueue& q) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// ATTACK overlap can only match this exact target. A FIGHT-only hit
+	// merely falls through to the existing scan, which preserves filtering.
+	if (c.GetID() == CMD_ATTACK && c.GetNumParams() == 1 && q.FindLastAttackTarget(c.GetParam(0)) == q.end())
+		return {};
+
 	CCommandQueue::const_iterator ci = q.end();
 	std::vector<Command> v;
 	BuildInfo cbi(c);
@@ -1621,7 +1623,7 @@ int CCommandAI::GetDefaultCmd(const CUnit* pointed, const CFeature* feature)
 void CCommandAI::AddDeathDependence(CObject* o, DependenceType dep) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (dep == DEPENDENCE_COMMANDQUE) {
-		if (commandDeathDependences.insert(o).second) // prevent multiple dependencies for the same object
+		if (commandDeathDependences.Insert(o)) // prevent multiple dependencies for the same object
 			CObject::AddDeathDependence(o, dep);
 		return;
 	}
@@ -1632,7 +1634,7 @@ void CCommandAI::AddDeathDependence(CObject* o, DependenceType dep) {
 void CCommandAI::DeleteDeathDependence(CObject* o, DependenceType dep) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (dep == DEPENDENCE_COMMANDQUE) {
-		if (commandDeathDependences.erase(o))
+		if (commandDeathDependences.Erase(o))
 			CObject::DeleteDeathDependence(o, dep);
 		return;
 	}
@@ -1648,7 +1650,7 @@ void CCommandAI::DependentDied(CObject* o)
 		orderTarget = nullptr;
 	}
 
-	if (commandDeathDependences.erase(o) && o != owner) {
+	if (commandDeathDependences.Erase(o) && o != owner) {
 		CFactoryCAI* facCAI = dynamic_cast<CFactoryCAI*>(this);
 		CCommandQueue& dq = facCAI ? facCAI->newUnitCommands : commandQue;
 		int lastTag;
@@ -1656,7 +1658,7 @@ void CCommandAI::DependentDied(CObject* o)
 		do {
 			lastTag = curTag;
 			for (CCommandQueue::iterator qit = dq.begin(); qit != dq.end(); ++qit) {
-				Command &c = *qit;
+				const Command c = *qit;
 				int cpos;
 				if (c.IsObjectCommand(cpos) && (c.GetParam(cpos) == CSolidObject::GetDeletingRefID())) {
 					ExecuteRemove(Command(CMD_REMOVE, 0, curTag = c.GetTag()));
@@ -1680,7 +1682,7 @@ void CCommandAI::FinishCommand()
 	const bool pushCommand = (cmd.GetID() != CMD_STOP && cmd.GetID() != CMD_PATROL);
 
 	if (repeatOrders && !dontRepeat && pushCommand)
-		commandQue.push_back(cmd);
+		commandQue.RepeatFront();
 
 	commandQue.pop_front();
 
@@ -1872,7 +1874,7 @@ void CCommandAI::StopAttackingTargetIf(const std::function<bool(const CUnit*)>& 
 
 	const bool frontRemoved = (!commandQue.empty() && removeCmd(commandQue.front()));
 
-	commandQue.erase(std::remove_if(commandQue.begin(), commandQue.end(), removeCmd), commandQue.end());
+	commandQue.RemoveIf(removeCmd);
 
 	// the order being executed was erased without FinishCommand; clear its
 	// execution state so the next queued order starts fresh instead of being

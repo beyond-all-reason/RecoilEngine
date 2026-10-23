@@ -1648,7 +1648,7 @@ void CUnit::ChangeTeamReset()
 			std::vector<Command> clearCommands;
 			clearCommands.reserve(facAI->commandQue.size());
 
-			for (auto& cmd: facAI->commandQue) {
+			for (const auto& cmd: facAI->commandQue) {
 				clearCommands.emplace_back(cmd.GetID(), RIGHT_MOUSE_KEY);
 			}
 			for (auto& cmd: clearCommands) {
