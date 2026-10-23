@@ -1901,8 +1901,6 @@ void CMobileCAI::UnloadUnits_Drop(Command& c)
 		SlowUpdate();
 		return;
 	}
-
-	StopMoveAndFinishCommand();
 }
 
 
