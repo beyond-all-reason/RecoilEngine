@@ -1006,7 +1006,7 @@ void CBuilderCAI::ExecuteReclaim(Command& c)
 			if (obj) {
 				const float3& pos = c.GetPos(1);
 				const float radius = c.GetParam(4);
-				const float curdist = pos.SqDistance2D(obj->pos);
+				const float curdist = f3SqDist(owner->pos, obj->pos);
 
 				const bool recUnits = !!(c.GetOpts() & META_KEY);
 				const bool recEnemyOnly = (c.GetOpts() & META_KEY) && (c.GetOpts() & CONTROL_KEY);
