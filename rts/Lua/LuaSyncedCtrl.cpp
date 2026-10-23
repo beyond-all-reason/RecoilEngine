@@ -7018,7 +7018,7 @@ int LuaSyncedCtrl::AddSmoothMesh(lua_State* L)
 	return 1;
 }
 
-/***Can only be called in `Spring.SetSmoothMeshFunc`.
+/*** Can only be called in `Spring.SetSmoothMeshFunc`.
  *
  * @function Spring.SetSmoothMesh
  * @param x number

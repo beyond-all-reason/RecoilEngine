@@ -2249,7 +2249,7 @@ void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
 
 /******************************************************************************/
 
-/***
+/*
  * Helper to get Explosion visibility.
  */
 
