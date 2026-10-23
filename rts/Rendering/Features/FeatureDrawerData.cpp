@@ -1,8 +1,11 @@
+/* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+
 #include "FeatureDrawerData.h"
 
 #include "System/Config/ConfigHandler.h"
 #include "System/StringHash.h"
 #include "Game/Camera.h"
+#include "Game/WorldDrawBounds.h"
 #include "Game/CameraHandler.h"
 #include "Game/GlobalUnsynced.h"
 #include "Sim/Features/Feature.h"
@@ -117,6 +120,9 @@ void CFeatureDrawerData::UpdateObjectDrawFlags(CSolidObject* o) const
 
 	CFeature* f = static_cast<CFeature*>(o);
 	f->ResetDrawFlag();
+
+	if (!worldDrawBounds::Contains(f->drawPos))
+		return;
 
 	for (uint32_t camType = CCamera::CAMTYPE_PLAYER; camType < CCamera::CAMTYPE_ENVMAP; ++camType) {
 		if (camType == CCamera::CAMTYPE_UWREFL && !IWater::GetWater()->CanDrawReflectionPass())

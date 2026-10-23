@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _OV_CONTROLLER_H
-#define _OV_CONTROLLER_H
+#pragma once
 
 #include "CameraController.h"
 
@@ -19,6 +18,7 @@ public:
 	void MouseWheelMove(float move) override {}
 	void MouseWheelMove(float move, const float3& newDir) override { }
 
+	void Update() override;
 	float3 GetRot() const override;
 
 	void SetPos(const float3& newPos) override {}
@@ -35,9 +35,8 @@ public:
 	void ConfigUpdate();
 
 private:
+	bool boundedView = false;
 	bool minimizeMinimap;
 	bool dynamicRotation;
 	float camRotY;
 };
-
-#endif // _OV_CONTROLLER_H

@@ -3,6 +3,7 @@
 
 #include "CameraController.h"
 #include "Game/Camera.h"
+#include "Game/CameraHandler.h"
 #include "Map/Ground.h"
 #include "Map/ReadMap.h"
 #include "Sim/Misc/GlobalConstants.h"
@@ -118,4 +119,25 @@ float CCameraController::DistanceToGround(float3 from, float3 dir, float fallbac
 	}
 
 	return newGroundDist;
+}
+
+ViewRectangle CCameraController::GetViewBounds()
+{
+	if (HasViewBounds())
+		return camHandler->GetCameraBounds();
+	return {0.0f, 0.0f, float(mapDims.mapx * SQUARE_SIZE), float(mapDims.mapy * SQUARE_SIZE)};
+}
+
+bool CCameraController::HasViewBounds()
+{
+	return camHandler != nullptr && camHandler->GetCameraBounds().IsSet();
+}
+
+void CCameraController::ClampToViewBounds()
+{
+	if (!HasViewBounds())
+		return;
+	const auto bounds = GetViewBounds();
+	pos.x = bounds.ClampX(pos.x);
+	pos.z = bounds.ClampZ(pos.z);
 }

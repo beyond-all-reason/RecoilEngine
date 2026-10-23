@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _CAMERA_HANDLER_H
-#define _CAMERA_HANDLER_H
+#pragma once
 
 #include <array>
 #include <vector>
@@ -11,6 +10,7 @@
 #include "Game/Camera/DollyController.h"
 #include "System/UnorderedMap.hpp"
 #include "Console.h"
+#include "Game/ViewRectangle.h"
 
 class CCamera;
 class CPlayer;
@@ -105,6 +105,8 @@ public:
 	void ToggleOverviewCamera();
 
 	void PushAction(const Action&) override;
+	void SetCameraBounds(const ViewRectangle& rectangle);
+	const ViewRectangle& GetCameraBounds() const { return cameraBounds; }
 
 	void SaveView(const std::string& name);
 	bool LoadView(const std::string& name);
@@ -142,6 +144,7 @@ private:
 	bool LoadViewData(const ViewData& vd);
 
 private:
+	ViewRectangle cameraBounds;
 	float3 lastCamRot;
 	float3 lastCamPos;
 
@@ -162,6 +165,3 @@ private:
 };
 
 extern CCameraHandler* camHandler;
-
-#endif // _CAMERA_HANDLER_H
-

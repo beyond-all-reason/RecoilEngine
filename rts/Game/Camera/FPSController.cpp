@@ -81,14 +81,16 @@ void CFPSController::MouseWheelMove(float move, const float3& newDir)
 void CFPSController::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	ClampToViewBounds();
 	if (gu->fpsMode || !clampPos)
 		return;
 
 	const float margin = 0.01f;
-	const float xMin = margin;
-	const float zMin = margin;
-	const float xMax = (float)(mapDims.mapx * SQUARE_SIZE) - margin;
-	const float zMax = (float)(mapDims.mapy * SQUARE_SIZE) - margin;
+	const auto bounds = GetViewBounds();
+	const float xMin = bounds.x0 + std::min(margin, bounds.Width() * 0.25f);
+	const float zMin = bounds.z0 + std::min(margin, bounds.Height() * 0.25f);
+	const float xMax = bounds.x1 - std::min(margin, bounds.Width() * 0.25f);
+	const float zMax = bounds.z1 - std::min(margin, bounds.Height() * 0.25f);
 
 	pos.x = std::clamp(pos.x, xMin, xMax);
 	pos.z = std::clamp(pos.z, zMin, zMax);

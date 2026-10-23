@@ -37,6 +37,7 @@ CR_BIND(CGlobalSynced, )
 
 CR_REG_METADATA(CGlobalSynced, (
 	CR_MEMBER(frameNum),
+	CR_MEMBER(mapDamageRegions),
 	CR_MEMBER(tempNum),
 	CR_MEMBER(mtTempNum),
 	CR_MEMBER(godMode),
@@ -60,6 +61,7 @@ void CGlobalSynced::Kill()
 
 void CGlobalSynced::ResetState() {
 	frameNum = -1; // first real frame is 0
+	mapDamageRegions.clear();
 	tempNum  =  1;
 	godMode  =  0;
 

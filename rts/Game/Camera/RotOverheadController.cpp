@@ -115,7 +115,9 @@ void CRotOverheadController::MouseWheelMove(float move)
 void CRotOverheadController::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (clampToMap) {
+	if (HasViewBounds()) {
+		ClampToViewBounds();
+	} else if (clampToMap) {
 		pos.x = std::clamp(pos.x, 0.01f, mapDims.mapx * SQUARE_SIZE - 0.01f);
 		pos.z = std::clamp(pos.z, 0.01f, mapDims.mapy * SQUARE_SIZE - 0.01f);
 	}

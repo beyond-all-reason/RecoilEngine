@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "Game/Camera.h"
+#include "Game/WorldDrawBounds.h"
 #include "Game/CameraHandler.h"
 #include "Game/Game.h"
 #include "Game/GameHelper.h"
@@ -193,6 +194,9 @@ bool CUnitDrawer::ShouldDrawOpaqueUnit(CUnit* u, uint8_t thisPassMask)
 	assert(u);
 	assert(u->model);
 
+	if (!worldDrawBounds::Contains(u->drawPos))
+		return false;
+
 	if (u->drawFlag == 0)
 		return false;
 
@@ -226,6 +230,9 @@ bool CUnitDrawer::ShouldDrawAlphaUnit(CUnit* u, uint8_t thisPassMask)
 	assert(u);
 	assert(u->model);
 
+	if (!worldDrawBounds::Contains(u->drawPos))
+		return false;
+
 	if (u->drawFlag == 0)
 		return false;
 
@@ -258,6 +265,9 @@ bool CUnitDrawer::ShouldDrawUnitShadow(CUnit* u)
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(u);
 	assert(u->model);
+
+	if (!worldDrawBounds::Contains(u->drawPos))
+		return false;
 
 	static constexpr uint8_t thisPassMask = DrawFlags::SO_SHOPAQ_FLAG;
 
@@ -453,29 +463,31 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, 
 {
 	const float iconSizeX = (iconScale * params.iconSizeX);
 	const float iconSizeY = (iconScale * params.iconSizeY);
-	float posX = pos.x;
-	float posY = pos.z;
+	const auto view = params.viewRectangle.IsSet() ? params.viewRectangle :
+		ViewRectangle{0.0f, 0.0f, float(mapDims.mapx * SQUARE_SIZE), float(mapDims.mapy * SQUARE_SIZE)};
+	float posX = pos.x - view.x0;
+	float posY = pos.z - view.z0;
 
 	switch (params.rotation) {
 		case CMiniMap::ROTATION_90:
-			posX = mapDims.mapx * SQUARE_SIZE - posX;
+			posX = view.Width() - posX;
 
 			// Normalize the coordinates to the minimap
-			posX = posX / mapDims.mapx * mapDims.mapy;
-			posY = posY / mapDims.mapy * mapDims.mapx;
+			posX = posX / view.Width() * view.Height();
+			posY = posY / view.Height() * view.Width();
 
 			std::swap(posX, posY);
 			break;
 		case CMiniMap::ROTATION_180:
-			posX = mapDims.mapx * SQUARE_SIZE - posX;
-			posY = mapDims.mapy * SQUARE_SIZE - posY;
+			posX = view.Width() - posX;
+			posY = view.Height() - posY;
 			break;
 		case CMiniMap::ROTATION_270:
-			posY = mapDims.mapy * SQUARE_SIZE - posY;
+			posY = view.Height() - posY;
 
 			// Normalize the coordinates to the minimap
-			posX = posX / mapDims.mapx * mapDims.mapy;
-			posY = posY / mapDims.mapy * mapDims.mapx;
+			posX = posX / view.Width() * view.Height();
+			posY = posY / view.Height() * view.Width();
 
 			std::swap(posX, posY);
 			break;
@@ -757,6 +769,9 @@ void CUnitDrawerGLSL::DrawUnitIcons() const
 		if (!unit->drawIcon)
 			continue;
 
+		if (!worldDrawBounds::Contains(unit->drawPos))
+			continue;
+
 		// drawMidPos is auto-calculated now; can wobble on its own as pieces move
 		float3 pos = (!gu->spectatingFullView) ?
 			unit->GetObjDrawErrorPos(gu->myAllyTeam) :
@@ -902,6 +917,9 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 		if (!unit->drawIcon)
 			continue;
 
+		if (!worldDrawBounds::Contains(unit->drawPos))
+			continue;
+
 		// needed?
 		const bool canSee = gu->spectatingFullView || (unit->losStatus[gu->myAllyTeam] && (LOS_INLOS | LOS_CONTRADAR | LOS_PREVLOS) == (LOS_INLOS | LOS_CONTRADAR | LOS_PREVLOS));
 		if (!canSee)
@@ -947,6 +965,8 @@ void CUnitDrawerGLSL::DrawUnitIconsScreen() const
 
 	if (!isFullView && ghostIconDimming > 0.0f) {
 		for (auto* ghost : modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam)) {
+			if (!worldDrawBounds::Contains(ghost->midPos))
+				continue;
 			float3 pos = camera->CalcViewPortCoordinates(ghost->midPos);
 			if (pos.z > 1.0f || pos.z < 0.0f)
 				continue;
@@ -1090,7 +1110,7 @@ void CUnitDrawerGLSL::DrawOpaqueObjectsAux(int modelType) const
 
 	// NOTE: not type-sorted
 	for (const auto& unit : tmpOpaqueUnits) {
-		if (!camera->InView(unit.pos, 100.0f))
+		if (!worldDrawBounds::Contains(unit.pos) || !camera->InView(unit.pos, 100.0f))
 			continue;
 
 		DrawOpaqueAIUnit(unit);
@@ -1104,7 +1124,7 @@ void CUnitDrawerGLSL::DrawAlphaObjectsAux(int modelType) const
 
 	// NOTE: not type-sorted
 	for (const auto& unit : tmpAlphaUnits) {
-		if (!camera->InView(unit.pos, 100.0f))
+		if (!worldDrawBounds::Contains(unit.pos) || !camera->InView(unit.pos, 100.0f))
 			continue;
 
 		DrawAlphaAIUnit(unit);
@@ -1123,7 +1143,7 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 	// buildings that died while ghosted
 	for (const GhostSolidObject* dgb : deadGhostedBuildings) {
 		const S3DModel* model = dgb->GetModel();
-		if (!camera->InView(dgb->pos, model->GetDrawRadius()))
+		if (!worldDrawBounds::Contains(dgb->pos) || !camera->InView(dgb->pos, model->GetDrawRadius()))
 			continue;
 
 		glPushMatrix();
@@ -1140,6 +1160,8 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 	// buildings that left LOS but are still alive
 	for (const auto& lgb : liveGhostedBuildings) {
 		const CUnit* unit = lgb.unit;
+		if (!worldDrawBounds::Contains(unit->drawPos))
+			continue;
 
 		// check for decoy models
 		const UnitDef* decoyDef = unit->unitDef->decoyDef;
@@ -1798,7 +1820,7 @@ void CUnitDrawerGLSL::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon>&
 		const auto* model = unitDef->LoadModel();
 		assert(model);
 
-		if (!camera->InView(buildIcon.pos, model->GetDrawRadius()))
+		if (!worldDrawBounds::Contains(buildIcon.pos) || !camera->InView(buildIcon.pos, model->GetDrawRadius()))
 			continue;
 
 		glPushMatrix();
@@ -1844,7 +1866,7 @@ void CUnitDrawerGL4::DrawBuildIcons(const std::vector<CCursorIcons::BuildIcon>& 
 		const auto* model = unitDef->LoadModel();
 		assert(model);
 
-		if (!camera->InView(buildIcon.pos, model->GetDrawRadius()))
+		if (!worldDrawBounds::Contains(buildIcon.pos) || !camera->InView(buildIcon.pos, model->GetDrawRadius()))
 			continue;
 
 		CMatrix44f staticWorldMat;
@@ -2055,7 +2077,7 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 		bool any = false;
 		for (const auto* dgb : deadGhostBuildings) {
 			const S3DModel* model = dgb->GetModel();
-			if (!camera->InView(dgb->pos, model->GetDrawRadius()))
+			if (!worldDrawBounds::Contains(dgb->pos) || !camera->InView(dgb->pos, model->GetDrawRadius()))
 				continue;
 			if (!dgb->worldTransformAlloc.Valid())
 				continue;
@@ -2084,6 +2106,8 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 
 		for (const auto& lgb : liveGhostedBuildings) {
 			const CUnit* u = lgb.unit;
+			if (!worldDrawBounds::Contains(u->drawPos))
+				continue;
 			if (!camera->InView(u->pos, u->model->GetDrawRadius()))
 				continue;
 
@@ -2135,7 +2159,7 @@ void CUnitDrawerGL4::DrawAlphaObjectsAux(int modelType) const
 
 	// NOTE: not type-sorted
 	for (const auto& unit : tmpAlphaUnits) {
-		if (!camera->InView(unit.pos, 100.0f))
+		if (!worldDrawBounds::Contains(unit.pos) || !camera->InView(unit.pos, 100.0f))
 			continue;
 
 		DrawAlphaAIUnit(unit);
@@ -2182,7 +2206,7 @@ void CUnitDrawerGL4::DrawOpaqueObjectsAux(int modelType) const
 
 	// NOTE: not type-sorted
 	for (const auto& unit : tmpOpaqueUnits) {
-		if (!camera->InView(unit.pos, 100.0f))
+		if (!worldDrawBounds::Contains(unit.pos) || !camera->InView(unit.pos, 100.0f))
 			continue;
 
 		DrawOpaqueAIUnit(unit);

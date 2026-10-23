@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_SYNCED_CTRL_H
-#define LUA_SYNCED_CTRL_H
+#pragma once
 
 struct lua_State;
 class CFeature;
@@ -43,6 +42,8 @@ class LuaSyncedCtrl
 		static int AssignPlayerToTeam(lua_State* L);
 		static int GameOver(lua_State* L);
 		static int SetGlobalLos(lua_State* L);
+		static int SetSensorRegions(lua_State* L);
+	static int SetMapDamageRegions(lua_State* L);
 		static int SetCheatingEnabled(lua_State* L);
 		static int SetGodMode(lua_State* L);
 
@@ -270,6 +271,3 @@ class LuaSyncedCtrl
 
 		static int SetRadarErrorParams(lua_State* L);
 };
-
-
-#endif /* LUA_SYNCED_CTRL_H */

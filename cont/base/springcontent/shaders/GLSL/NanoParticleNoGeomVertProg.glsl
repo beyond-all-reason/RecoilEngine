@@ -25,6 +25,8 @@ in vec4 particleFrames;  // x = createFrame, y = deathFrame, z = baseFrame, w = 
 in vec4 particleColor;
 
 uniform float animationFrame;
+uniform bool worldDrawBoundsEnabled;
+uniform vec4 worldDrawBounds;
 uniform vec3 cameraRight;
 uniform vec3 cameraUp;
 uniform vec4 clipPlane;
@@ -146,7 +148,8 @@ void main()
 
 	float haloSize = size * glowScale;
 
-	if (outsideFrustum(center, haloSize)) {
+	if ((worldDrawBoundsEnabled && (center.x < worldDrawBounds.x || center.z < worldDrawBounds.y ||
+		center.x > worldDrawBounds.z || center.z > worldDrawBounds.w)) || outsideFrustum(center, haloSize)) {
 		discardVertex();
 		return;
 	}

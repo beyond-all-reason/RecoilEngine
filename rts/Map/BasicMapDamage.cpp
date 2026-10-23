@@ -7,6 +7,8 @@
 #include "Rendering/Env/GrassDrawer.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/LosHandler.h"
+#include "Sim/Misc/GlobalSynced.h"
+#include "Sim/Misc/RegionPartitions.h"
 #include "Sim/Misc/QuadField.h"
 #include "Sim/Misc/SmoothHeightMesh.h"
 #include "Sim/Units/Unit.h"
@@ -94,6 +96,10 @@ void CBasicMapDamage::Explosion(const float3& pos, float strength, float radius,
 	if (strength < 10.0f || radius < 8.0f)
 		return;
 
+	const SRectangle* region = FindRegionPartition(gs->mapDamageRegions, pos.x, pos.z);
+	if (!gs->mapDamageRegions.empty() && region == nullptr)
+		return; // Explosions in the separating strip must not deform any region.
+
 	explosionUpdateQueue.emplace_back();
 
 	Explo& e = explosionUpdateQueue.back();
@@ -105,6 +111,18 @@ void CBasicMapDamage::Explosion(const float3& pos, float strength, float radius,
 	e.x2 = std::clamp <int> ((pos.x + radius) / SQUARE_SIZE, 1, mapDims.mapxm1);
 	e.y1 = std::clamp <int> ((pos.z - radius) / SQUARE_SIZE, 1, mapDims.mapym1);
 	e.y2 = std::clamp <int> ((pos.z + radius) / SQUARE_SIZE, 1, mapDims.mapym1);
+	if (region != nullptr) {
+		// Height samples use the same half-open bounds as world positions. Store
+		// the clipped rectangle so delayed updates cannot touch the barrier.
+		e.x1 = std::max(e.x1, region->x1 / SQUARE_SIZE);
+		e.x2 = std::min(e.x2, region->x2 / SQUARE_SIZE - 1);
+		e.y1 = std::max(e.y1, region->z1 / SQUARE_SIZE);
+		e.y2 = std::min(e.y2, region->z2 / SQUARE_SIZE - 1);
+		if (e.x1 > e.x2 || e.y1 > e.y2) {
+			explosionUpdateQueue.pop_back();
+			return;
+		}
+	}
 	e.idx = explSquaresPoolIdx;
 
 	const float* curHeightMap = readMap->GetCornerHeightMapSynced();
@@ -174,7 +192,7 @@ void CBasicMapDamage::Explosion(const float3& pos, float strength, float radius,
 		}
 	}
 
-	maxHeightDiff = (minMax.y - minMax.x) * e.ttl;
+	maxHeightDiff = (minMax.x <= minMax.y) ? (minMax.y - minMax.x) * e.ttl : 0.0f;
 
 	QuadFieldQuery qfQuery;
 	quadField.GetUnitsExact(qfQuery, pos, radius);
@@ -185,6 +203,14 @@ void CBasicMapDamage::Explosion(const float3& pos, float strength, float radius,
 		if (!unit->blockHeightChanges)
 			continue;
 		if (!unit->IsBlocking())
+			continue;
+
+		// Buildings move with their whole flattened footprint. Do not let a
+		// foreign or straddling footprint deform terrain outside this region.
+		if (region != nullptr && (unit->mapPos.x * SQUARE_SIZE < region->x1
+			|| unit->mapPos.y * SQUARE_SIZE < region->z1
+			|| (unit->mapPos.x + unit->xsize) * SQUARE_SIZE > region->x2
+			|| (unit->mapPos.y + unit->zsize) * SQUARE_SIZE > region->z2))
 			continue;
 
 		float totalDif = 0.0f;

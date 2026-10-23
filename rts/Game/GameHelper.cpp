@@ -438,11 +438,17 @@ namespace {
 		struct Enemy : public Base
 		{
 		public:
-			Enemy(const CUnit* exclUnit, int allyTeam) : Base(allyTeam), excludeUnit(exclUnit) {}
+			Enemy(const CUnit* exclUnit, int allyTeam, const SRectangle* bounds = nullptr) : Base(allyTeam), excludeUnit(exclUnit), regionBounds(bounds) {}
 			bool Team(int allyTeam) { return !teamHandler.Ally(searchAllyteam, allyTeam); }
-			bool Unit(const CUnit* unit) { return (unit != excludeUnit && !unit->IsNeutral()); }
+			bool Unit(const CUnit* unit) {
+				return unit != excludeUnit && !unit->IsNeutral() &&
+					(regionBounds == nullptr ||
+						(unit->pos.x >= regionBounds->x1 && unit->pos.x < regionBounds->x2 &&
+						 unit->pos.z >= regionBounds->z1 && unit->pos.z < regionBounds->z2));
+			}
 		protected:
 			const CUnit* excludeUnit;
+			const SRectangle* regionBounds;
 		};
 
 		/**
@@ -829,16 +835,20 @@ CUnit* CGameHelper::GetClosestEnemyUnitNoLosTest(
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	CUnit* closestUnit = nullptr;
+	// Proximity decloaking is detection too. Filter before finding the nearest
+	// enemy, so a foreign candidate cannot conceal a valid local candidate.
+	const SRectangle bounds = losHandler->GetSensorBounds(searchPos, 1);
+	const SRectangle* regionBounds = losHandler->HasSensorRegions() ? &bounds : nullptr;
 
 	if (sphereDistTest) {
 		// includes target radius
 		Query::ClosestUnit_InLos q(searchPos, searchRadius, checkSightDist);
-		QueryUnits(Filter::Enemy(excludeUnit, searchAllyteam), q);
+		QueryUnits(Filter::Enemy(excludeUnit, searchAllyteam, regionBounds), q);
 		closestUnit = q.GetClosestUnit();
 	} else {
 		// excludes target radius
 		Query::ClosestUnit_InLos_Cylinder q(searchPos, searchRadius, checkSightDist);
-		QueryUnits(Filter::Enemy(excludeUnit, searchAllyteam), q);
+		QueryUnits(Filter::Enemy(excludeUnit, searchAllyteam, regionBounds), q);
 		closestUnit = q.GetClosestUnit();
 	}
 
