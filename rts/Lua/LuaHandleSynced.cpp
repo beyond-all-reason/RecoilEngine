@@ -1278,12 +1278,12 @@ bool CSyncedLuaHandle::AllowDirectUnitControl(int playerID, const CUnit* unit)
 /*** Called when a construction unit wants to "use his nano beams".
  *
  * `action` is one of the following:
- * 	- `-1` build,
- * 	- `CMD.REPAIR` repair,
- * 	- `CMD.RECLAIM` reclaim,
- * 	- `CMD.RESTORE` restore,
- * 	- `CMD.RESURRECT` resurrect, or
- * 	- `CMD.CAPTURE` capture.
+ * - `-1` build,
+ * - `CMD.REPAIR` repair,
+ * - `CMD.RECLAIM` reclaim,
+ * - `CMD.RESTORE` restore,
+ * - `CMD.RESURRECT` resurrect, or
+ * - `CMD.CAPTURE` capture.
  *
  * @function SyncedCallins:AllowBuilderHoldFire
  *
