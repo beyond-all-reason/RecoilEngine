@@ -146,6 +146,7 @@ add_library(engineSim STATIC
 		"${CMAKE_CURRENT_SOURCE_DIR}/Weapons/LightningCannon.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Weapons/MeleeWeapon.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Weapons/MissileLauncher.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/Weapons/TrajectoryTable.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Weapons/NoWeapon.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Weapons/PlasmaRepulser.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Weapons/Rifle.cpp"

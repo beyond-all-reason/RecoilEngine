@@ -11,6 +11,7 @@
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectileTypes.h"
 #include "Sim/Units/Scripts/CobInstance.h" // TAANG2RAD
+#include "Sim/Weapons/MissileLauncher.h"
 #include "System/SpringMath.h"
 #include "System/Log/ILog.h"
 #include "System/StringHash.h"
@@ -112,7 +113,7 @@ WEAPONTAG(bool, fixedLauncher).defaultValue(false).description("Missile/Torpedo/
 WEAPONTAG(float, maxAngle).externalName("tolerance").defaultValue(3000.0f).scaleValue(TAANG2RAD).description("For `turret = false` only. Firing cone width, in the 16-bit legacy angular unit.");
 WEAPONDUMMYTAG(float, maxFireAngle).externalName("firetolerance").defaultValue(3640.0f).scaleValue(TAANG2RAD).description("Angle above which reaim (script `AimWeapon`) is forced outside the usual time-based reaim. In the legacy 16-bit angular units."); // default value is 20degree
 WEAPONTAG(int, highTrajectory).defaultValue(2).description("0: low trajectory, 1: high trajectory, 2: the unit will have a state toggle for the player to pick");
-WEAPONTAG(float, trajectoryHeight).defaultValue(0.0f).description("Missile/Torpedo only. Causes the missile to fly in an arc. The value is the fraction of target distance as extra arc height (e.g. at 1.0 the arc is as tall as it is long).");
+WEAPONTAG(float, trajectoryHeight).defaultValue(0.0f).description("Missile/Torpedo only. Causes the missile to follow an arc. The value is the fraction of aim height to target distance. The aim converges onto the actual target on the approach, so e.g. at 1.0 the arc peaks at only about 0.3x the distance. Torpedoes only use this for the launch direction.");
 WEAPONTAG(bool, tracks).defaultValue(false).description("Missile/Torpedo/Starburst only. Does the projectile track its target (i.e. homing)? Requires a positive `turnRate`.");
 WEAPONTAG(float, wobble).defaultValue(0.0f).scaleValue(TAANG2RAD * INV_GAME_SPEED).description("Missile only. Missiles will turn towards random directions (new direction rolled every 16 sim frames). In legacy angular units per second.");
 WEAPONTAG(float, dance).defaultValue(0.0f).scaleValue(1.0f / GAME_SPEED).description("Missile only. Missiles will randomly shift up to this many elmos, perpendicular to their movement direction. Movement period is hardcoded to 8 sim frames");
@@ -571,6 +572,9 @@ WeaponDef::WeaponDef(const LuaTable& wdTable, const std::string& name_, int id_)
 	noAutoTarget = (manualfire || interceptor || isShield);
 	onlyForward = !turret && (projectileType != WEAPON_STARBURST_PROJECTILE);
 	submissile &= (projectileType == WEAPON_TORPEDO_PROJECTILE);
+
+	if (projectileType == WEAPON_MISSILE_PROJECTILE)
+		trajectoryTable = CMissileLauncher::BuildTrajectoryTable(*this);
 }
 
 
