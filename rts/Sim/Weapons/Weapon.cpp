@@ -552,7 +552,7 @@ void CWeapon::UpdateSalvo()
 		return;
 
 	salvoLeft--;
-	nextSalvo = gs->frameNum + salvoDelay;
+	nextSalvo = gs->frameNum + (salvoSize > 1 ? salvoDelay : 0);
 
 	if (burstControlWhenOutOfArc) {
 		bool haveTarget = HaveTarget();
