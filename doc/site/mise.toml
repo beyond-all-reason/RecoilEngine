@@ -18,6 +18,10 @@
 	lua_doc_gen_dest = "$RECOIL_LUA_LIBRARY_DIR/generated"
 	site_dir = 'doc/site'
 	site_temp_dir = "{{vars.site_dir}}/temp"
+	# Diagnostics as GitHub annotations in Actions, which show on a PR's diff; plain text elsewhere
+	lua_doc_format = "{% if get_env(name='GITHUB_ACTIONS', default='') %}github{% else %}text{% endif %}"
+	# Maps each generated Lua line to its C++ line, for `lua-doc-extractor remap`
+	lua_doc_sourcemap = "{{vars.site_temp_dir}}/lua-sourcemap.json"
 	lua_doc_paths = 'rts/{Lua,Rml/SolLua,Sim/Units/Scripts}/**/*.cpp'
 	lua_pages_dir = "{{vars.site_dir}}/content/docs/lua-api"
 	emmylua_cli_template = "{{vars.site_dir}}/emmylua-doc-cli-template"
@@ -107,7 +111,8 @@
 	tools."github:rhys-vdw/lua-doc-extractor-rs" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
 	dir = "../../"
 	run = [
-		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_doc_gen_dest}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\""
+		# Also writes the source map for `lua_check`, and in Actions prints warnings as PR annotations
+		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_doc_gen_dest}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\" --sourcemap {{vars.lua_doc_sourcemap}} --format {{vars.lua_doc_format}}"
 	]
 
 	[tasks.latest_release_data]
