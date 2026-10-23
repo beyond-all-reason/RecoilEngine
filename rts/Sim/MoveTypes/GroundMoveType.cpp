@@ -87,9 +87,9 @@ LOG_REGISTER_SECTION_GLOBAL(LOG_SECTION_GMT)
 
 #define UNIT_EVENTS_RESERVE			8
 
-#define UNIT_CMD_QUE_SIZE(u) (u->commandAI->commandQue.size())
+#define UNIT_CMD_QUE_SIZE(u) (u->commandAI->GetOwnQueue().size())
 // Not using IsMoveCommand on purpose, as the following is changing the effective goalRadius
-#define UNIT_HAS_MOVE_CMD(u) (u->commandAI->commandQue.empty() || u->commandAI->commandQue[0].GetID() == CMD_MOVE || u->commandAI->commandQue[0].GetID() == CMD_FIGHT)
+#define UNIT_HAS_MOVE_CMD(u) (u->commandAI->GetOwnQueue().empty() || u->commandAI->GetOwnQueue()[0].GetID() == CMD_MOVE || u->commandAI->GetOwnQueue()[0].GetID() == CMD_FIGHT)
 
 #define WAYPOINT_RADIUS (1.25f * SQUARE_SIZE)
 

@@ -182,6 +182,8 @@ class LuaSyncedRead {
 		static int GetFactoryCounts(lua_State* L);
 		static int GetFactoryCommandCount(lua_State* L);
 		static int GetFactoryCommands(lua_State* L);
+		static int GetUnitQueues(lua_State* L);
+		static int GetUnitQueueCommands(lua_State* L);
 
 		static int GetFactoryBuggerOff(lua_State* L);
 

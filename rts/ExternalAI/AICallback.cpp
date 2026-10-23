@@ -385,7 +385,7 @@ const CCommandQueue* CAICallback::GetCurrentUnitCommands(int unitId)
 	const CUnit* unit = GetMyTeamUnit(unitId);
 
 	if (unit != nullptr)
-		return &unit->commandAI->commandQue;
+		return &unit->commandAI->GetOwnQueue();
 
 	return nullptr;
 }
