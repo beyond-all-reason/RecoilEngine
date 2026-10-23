@@ -10,7 +10,7 @@ on:
       - doc/site/mise.toml
 env:
   RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
-  LUA_DOC_EXTRACTOR_VERSION: "4.1.1"
+  LUA_DOC_EXTRACTOR_VERSION: "4.2.0"
 jobs:
   generate-library:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
