@@ -22,6 +22,8 @@
 	lua_doc_format = "{% if get_env(name='GITHUB_ACTIONS', default='') %}github{% else %}text{% endif %}"
 	# Maps each generated Lua line to its C++ line, for `lua-doc-extractor remap`
 	lua_doc_sourcemap = "{{vars.site_temp_dir}}/lua-sourcemap.json"
+	# LuaLS's problems as JSON, for `remap`
+	lua_check_results = "{{vars.site_temp_dir}}/lua-check.json"
 	lua_doc_paths = 'rts/{Lua,Rml/SolLua,Sim/Units/Scripts}/**/*.cpp'
 	lua_pages_dir = "{{vars.site_dir}}/content/docs/lua-api"
 	emmylua_cli_template = "{{vars.site_dir}}/emmylua-doc-cli-template"
@@ -99,11 +101,17 @@
 	description = "Sanity check lua library with lua language server"
 	depends = ["lua_library"]
 	tools.lua-language-server = "{{env.LUA_LANGUAGE_SERVER_VERSION}}"
+	tools."github:rhys-vdw/lua-doc-extractor-rs" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
 	dir = "../../"
-	run = [
-		# luals-check.json disables `luadoc-miss-see-name`: LuaLS wants a name before the `@see [file#L1](url)` source links
-		"lua-language-server --check \"${RECOIL_LUA_LIBRARY_DIR}\" --configpath \"$PWD/{{vars.site_dir}}/luals-check.json\""
-	]
+	# luals-check.json disables `luadoc-miss-see-name`: LuaLS wants a name before the `@see [file#L1](url)` source links.
+	# `remap` then reports LuaLS's problems at the C++ lines they came from (annotations in Actions),
+	# and the task fails if LuaLS found any.
+	run = '''
+		status=0
+		lua-language-server --check "${RECOIL_LUA_LIBRARY_DIR}" --configpath "$PWD/{{vars.site_dir}}/luals-check.json" --check_out_path {{vars.lua_check_results}} || status=$?
+		lua-doc-extractor remap --sourcemap {{vars.lua_doc_sourcemap}} --dest {{vars.lua_doc_gen_dest}} --format {{vars.lua_doc_format}} {{vars.lua_check_results}}
+		exit $status
+	'''
 
 	[tasks.lua_library]
 	description = "Generate Lua Docs"
