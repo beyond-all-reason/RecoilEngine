@@ -1415,7 +1415,7 @@ static bool ParseTableFloat(lua_State* L,
 static bool ParseFloat3(lua_State* L, int index, float3& value)
 {
 	if (lua_istable(L, index)) {
-		const int table = (index > 0) ? index : lua_gettop(L) + index + 1;
+		const int table = LuaUtils::PosAbsLuaIndex(L, index);
 		if (ParseTableFloat(L, table, 1, value.x) &&
 		    ParseTableFloat(L, table, 2, value.y) &&
 		    ParseTableFloat(L, table, 3, value.z)) {
@@ -1433,7 +1433,7 @@ static bool ParseFloat3(lua_State* L, int index, float3& value)
 static bool ParseFloat4(lua_State* L, int index, float4& value)
 {
 	if (lua_istable(L, index)) {
-		const int table = (index > 0) ? index : lua_gettop(L) + index + 1;
+		const int table = LuaUtils::PosAbsLuaIndex(L, index);
 		if (ParseTableFloat(L, table, 1, value.x) &&
 		    ParseTableFloat(L, table, 2, value.y) &&
 		    ParseTableFloat(L, table, 3, value.z) &&
