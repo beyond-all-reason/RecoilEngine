@@ -11,6 +11,7 @@ end
 
 class Member
   @@refs = Set.new
+  @@source_matcher = Regexp.new('\A\[[^\]]*\]\((https?://\S+/blob/\S+)\)\z')
 
   def self.refs; @@refs; end
 
@@ -215,8 +216,12 @@ class Member
 
   def extract_custom_tags()
     see, other = (self.tag_content || []).partition {|t| t["tag_name"] == "see" }
+    see = see.map {|t| t["content"] }
 
-    self.see = see.map {|t| t["content"] }
+    # lua-doc-extractor's link to the C++ is shown as "view source", not under "See"
+    sources, see = see.partition {|s| s.match?(@@source_matcher) }
+    self.source = sources.first&.match(@@source_matcher)&.[](1)
+    self.see = see
     self.custom = other.to_h {|t| [t["tag_name"], t["content"].empty? ? true : t["content"]] }
     self.section = custom["section"]
   end

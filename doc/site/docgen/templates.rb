@@ -9,18 +9,25 @@ H_TEMPLATE = ERB.new <<~'EOF'
   <%= name %>
   <span id="<%= ref %>" class="hx-absolute -hx-mt-20"></span>
   <a href="#<%= ref %>" class="subheading-anchor" aria-label="Permalink for this section"></a>
+  <%= source_link(source) %>
   </h<%= dom_level %>>
 EOF
 
-def h(dom_level, name, ref)
+def h(dom_level, name, ref, source = nil)
   dom_level = dom_level + 2
 
   H_TEMPLATE.result(binding)
 end
 
+def source_link(source)
+  return "" unless source
+
+  %Q(<a href="#{source}" class="source-link" target="_blank" rel="noopener">view source {{< icon "arrow-up-right" >}}</a>)
+end
+
 class Member < OpenStruct
   @@enum_template = ERB.new <<~'EOF'
-    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref) %>
+    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref, source) %>
 
     <%= md description %>
 
@@ -37,7 +44,7 @@ class Member < OpenStruct
   EOF
 
   @@function_template = ERB.new <<~'EOF'
-    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref) %>
+    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref, source) %>
     <%= md description %>
     <% if deprecated %>
 
@@ -77,7 +84,7 @@ class Member < OpenStruct
   EOF
 
   @@table_template = ERB.new <<~'EOF'
-    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref) %>
+    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref, source) %>
 
     <%= md description %>
     <% if deprecated %>
@@ -103,7 +110,7 @@ class Member < OpenStruct
   EOF
 
   @@class_template = ERB.new <<~'EOF'
-    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref) %>
+    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref, source) %>
 
     <% if not bases.empty? %>
     Inherits <% bases.each do |base| %><code><%= base %></code> <% end %>
@@ -134,7 +141,7 @@ class Member < OpenStruct
   EOF
 
   @@global_template = ERB.new <<~'EOF'
-    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref) %>
+    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref, source) %>
 
     <%= md description %>
     <% if deprecated %>
@@ -160,12 +167,12 @@ class Member < OpenStruct
   EOF
 
   @@alias_template = ERB.new <<~'EOF'
-    <dt><a href="#<%= ref %>"><%= full_name %></a><span id="<%= ref %>" class="hx-absolute -hx-mt-20"></span></dt>
+    <dt><a href="#<%= ref %>"><%= full_name %></a><span id="<%= ref %>" class="hx-absolute -hx-mt-20"></span><%= source_link(source) %></dt>
     <dd><code><%= literal || typeref %></code></dd>
   EOF
 
   @@dunno_template = ERB.new <<~'EOF'
-    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref) %>
+    <%= h(dom_level, full_name + ' <em class="hx-text-sm">(' + type.to_s + (" overload #{overload_index}" if overload_index).to_s + ')</em>', ref, source) %>
 
     <%= md description %>
     <% if deprecated %>
@@ -201,7 +208,7 @@ class Member < OpenStruct
   EOF
 
   @@field_template = ERB.new <<~'EOF'
-    <dt><code><%= literal || typeref %></code> <a href="#<%= ref %>"><%= name %></a><span id="<%= ref %>" class="hx-absolute -hx-mt-20"></span></dt>
+    <dt><code><%= literal || typeref %></code> <a href="#<%= ref %>"><%= name %></a><span id="<%= ref %>" class="hx-absolute -hx-mt-20"></span><%= source_link(source) %></dt>
     <dd><%= md(description) %></dd>
   EOF
 
