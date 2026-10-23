@@ -5,7 +5,7 @@
 [env]
 	HUGO_VERSION = "0.147.9"
 	# Exact version: mise hides releases younger than `minimum_release_age` from a range like "4"
-	LUA_DOC_EXTRACTOR_VERSION = "4.2.0" # lua_library lua_check
+	LUA_DOC_EXTRACTOR_VERSION = "4.2.1" # lua_library lua_check
 	# 0.25 exports every `@see` (`tag_content`); 0.8 kept only the last
 	EMMYLUA_DOC_CLI_VERSION = "0.25.1" # lua_pages lua_library lua_check
 	LUA_LANGUAGE_SERVER_VERSION = "3.15.0" # lua_check

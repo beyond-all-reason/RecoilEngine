@@ -19,7 +19,7 @@ on:
       - doc/site/luals-check.json
 env:
   RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
-  LUA_DOC_EXTRACTOR_VERSION: "4.2.0"
+  LUA_DOC_EXTRACTOR_VERSION: "4.2.1"
   LUA_LANGUAGE_SERVER_VERSION: "3.15.0"
 jobs:
   check-library:
