@@ -35,7 +35,6 @@ jobs:
       - name: Checkout Source Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           sparse-checkout: |
             doc/site
             rts/Lua
@@ -50,8 +49,6 @@ jobs:
           key: hugo-${{ github.run_id }}
           restore-keys:
             hugo-
-      - name: Configure Git
-        run: git config core.quotepath false
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
