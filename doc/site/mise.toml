@@ -121,8 +121,9 @@
 	tools."github:rhys-vdw/lua-doc-extractor-rs" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
 	dir = "../../"
 	run = [
-		# Also writes the source map for `lua_check`, and in Actions prints warnings as PR annotations
-		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_doc_gen_dest}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\" --sourcemap {{vars.lua_doc_sourcemap}} --format {{vars.lua_doc_format}}"
+		# Also writes the source map for `lua_check`, and in Actions prints warnings as PR annotations.
+		# `--error` fails the task on extractor errors (the library is still written).
+		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_doc_gen_dest}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\" --sourcemap {{vars.lua_doc_sourcemap}} --format {{vars.lua_doc_format}} --error"
 	]
 
 	[tasks.latest_release_data]
