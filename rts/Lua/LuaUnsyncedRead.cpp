@@ -4577,7 +4577,7 @@ int LuaUnsyncedRead::GetGroupUnitsCount(lua_State* L)
  * @field teamID TeamID
  * @field allyTeamID AllyTeamID
  * @field spectator boolean
- * @field cpuUsage number in order to find the progress, use: cpuUsage&0x1 if it's PC or BO, cpuUsage& 0xFE to get path res, (cpuUsage>>8)*1000 for the progress
+ * @field cpuUsage number CPU usage. To find the progress, use: cpuUsage&0x1 if it's PC or BO, cpuUsage& 0xFE to get path res, (cpuUsage>>8)*1000 for the progress
  * @field pingTime number if -1, the player is pathfinding
  */
 
