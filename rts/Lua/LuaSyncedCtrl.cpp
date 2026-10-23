@@ -4254,9 +4254,9 @@ int LuaSyncedCtrl::SetUnitHeadingAndUpDir(lua_State* L)
  * @see Spring.SetUnitMoveCtrl for disabling/enabling this control
  * @function Spring.SetUnitVelocity
  * @param unitID UnitID
- * @param velX number in elmos/frame
- * @param velY number in elmos/frame
- * @param velZ number in elmos/frame
+ * @param velX number Velocity x component in elmos/frame.
+ * @param velY number Velocity y component in elmos/frame.
+ * @param velZ number Velocity z component in elmos/frame.
  */
 int LuaSyncedCtrl::SetUnitVelocity(lua_State* L)
 {
@@ -5173,9 +5173,9 @@ int LuaSyncedCtrl::SetFeatureHeadingAndUpDir(lua_State* L)
  * @see Spring.SetFeatureMoveCtrl for disabling/enabling this control
  * @function Spring.SetFeatureVelocity
  * @param featureID FeatureID
- * @param velX number in elmos/frame
- * @param velY number in elmos/frame
- * @param velZ number in elmos/frame
+ * @param velX number Velocity x component in elmos/frame.
+ * @param velY number Velocity y component in elmos/frame.
+ * @param velZ number Velocity z component in elmos/frame.
  */
 int LuaSyncedCtrl::SetFeatureVelocity(lua_State* L)
 {
@@ -5386,7 +5386,7 @@ int LuaSyncedCtrl::SetFeaturePieceMatrix(lua_State* L)
  * feature will be destroyed.
  *
  * @param featureID FeatureID
- * @param fireTime number in seconds
+ * @param fireTime number Fire timer duration in seconds.
  */
 int LuaSyncedCtrl::SetFeatureFireTime(lua_State* L)
 {
@@ -5421,7 +5421,7 @@ int LuaSyncedCtrl::SetFeatureFireTime(lua_State* L)
  * The smoke timer affects both the duration and size of the smoke particles.
  *
  * @param featureID FeatureID
- * @param smokeTime number in seconds
+ * @param smokeTime number Smoke timer duration in seconds.
  */
 int LuaSyncedCtrl::SetFeatureSmokeTime(lua_State* L)
 {
@@ -5598,9 +5598,9 @@ int LuaSyncedCtrl::SetProjectilePosition(lua_State* L)
  * @see Spring.SetProjectileMoveControl
  * @function Spring.SetProjectileVelocity
  * @param projectileID ProjectileID
- * @param velX number in elmos/frame
- * @param velY number in elmos/frame
- * @param velZ number in elmos/frame
+ * @param velX number Velocity x component in elmos/frame.
+ * @param velY number Velocity y component in elmos/frame.
+ * @param velZ number Velocity z component in elmos/frame.
  */
 int LuaSyncedCtrl::SetProjectileVelocity(lua_State* L)
 {
@@ -7018,7 +7018,7 @@ int LuaSyncedCtrl::AddSmoothMesh(lua_State* L)
 	return 1;
 }
 
-/***Can only be called in `Spring.SetSmoothMeshFunc`.
+/*** Can only be called in `Spring.SetSmoothMeshFunc`.
  *
  * @function Spring.SetSmoothMesh
  * @param x number

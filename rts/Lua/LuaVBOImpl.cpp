@@ -34,13 +34,13 @@
 #include "LuaUtils.h"
 
 
-/******************************************************************************
+/***
  * Vertex Buffer Object
  * @class VBO
  *
  * @see LuaVBO.GetVBO
  * @see rts/Lua/LuaVBOImpl.cpp
-******************************************************************************/
+ */
 
 
 LuaVBOImpl::LuaVBOImpl(const sol::optional<GLenum> defTargetOpt, const sol::optional<bool> freqUpdatedOpt)
