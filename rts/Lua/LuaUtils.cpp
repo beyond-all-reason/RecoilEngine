@@ -1128,14 +1128,19 @@ Command LuaUtils::ParseCommand(lua_State* L, const char* caller, int idIndex)
 		if (lua_isnumber(L, paramTableIdx)) {
 			cmd.PushParam(lua_tofloat(L, paramTableIdx));
 		} else if (lua_istable(L, paramTableIdx)) {
-			for (lua_pushnil(L); lua_next(L, paramTableIdx) != 0; lua_pop(L, 1)) {
-				if (!lua_israwnumber(L, -2))
-					continue; // avoid 'n'
+			for (int i = 1; ; i++) {
+				lua_rawgeti(L, paramTableIdx, i);
+
+				if (lua_isnil(L, -1)) {
+					lua_pop(L, 1);
+					break;
+				}
 
 				if (!lua_isnumber(L, -1))
-					luaL_error(L, "%s(): expected <number idx=%d, number value> in params-table", caller, lua_tonumber(L, -2));
+					luaL_error(L, "%s(): expected <number idx=%d, number value> in params-table", caller, i);
 
 				cmd.PushParam(lua_tofloat(L, -1));
+				lua_pop(L, 1);
 			}
 		} else if (!lua_isnoneornil(L, paramTableIdx)) {
 			luaL_error(L, "%s(): bad param (expected table, number or nil)", caller);
@@ -1182,14 +1187,19 @@ Command LuaUtils::ParseCommandTable(lua_State* L, const char* caller, int tableI
 		} else if (lua_istable(L, -1)) {
 			const int paramTableIdx = lua_gettop(L);
 
-			for (lua_pushnil(L); lua_next(L, paramTableIdx) != 0; lua_pop(L, 1)) {
-				if (!lua_israwnumber(L, -2))
-					continue; // avoid 'n'
+			for (int i = 1; ; i++) {
+				lua_rawgeti(L, paramTableIdx, i);
+
+				if (lua_isnil(L, -1)) {
+					lua_pop(L, 1);
+					break;
+				}
 
 				if (!lua_isnumber(L, -1))
 					luaL_error(L, "%s(): bad param table entry", caller);
 
 				cmd.PushParam(lua_tofloat(L, -1));
+				lua_pop(L, 1);
 			}
 		} else if (!lua_isnil(L, -1)) {
 			luaL_error(L, "%s(): bad param (expected table, number or nil)", caller);
@@ -1225,11 +1235,18 @@ void LuaUtils::ParseCommandArray(
 	if (!lua_istable(L, tableIdx))
 		luaL_error(L, "%s(): error parsing command array", caller);
 
-	for (lua_pushnil(L); lua_next(L, tableIdx) != 0; lua_pop(L, 1)) {
-		if (!lua_istable(L, -1))
-			continue;
+	for (int i = 1; ; i++) {
+		lua_rawgeti(L, tableIdx, i);
 
-		commands.emplace_back(ParseCommandTable(L, caller, lua_gettop(L)));
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			break;
+		}
+
+		if (lua_istable(L, -1))
+			commands.emplace_back(ParseCommandTable(L, caller, lua_gettop(L)));
+
+		lua_pop(L, 1);
 	}
 }
 
