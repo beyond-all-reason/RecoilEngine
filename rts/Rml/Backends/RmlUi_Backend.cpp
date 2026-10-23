@@ -467,7 +467,7 @@ bool RmlGui::ProcessMousePress(int x, int y, int button)
 			if (el) {
 				el->Blur();
 			}
-		} else if (state->debug_host_context && state->debug_host_context != context) {
+		} else if (state->debug_host_context != context) {
 			state->clicked_context = context;
 		}
 	}
