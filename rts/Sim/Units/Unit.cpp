@@ -379,6 +379,8 @@ void CUnit::PostInit(const CUnit* builder)
 		}
 
 		commandAI->GiveCommand(Command(CMD_FIRE_STATE, 0, fireState));
+	} else if (unitDef->fireState > FIRESTATE_NONE) {
+		fireState = unitDef->fireState;
 	}
 
 	UpdateRenderParams();
