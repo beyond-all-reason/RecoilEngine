@@ -1499,7 +1499,7 @@ void CCommandAI::ExecuteAttack(Command& c)
 			FinishCommand();
 			return;
 		}
-		if (SkipCrashingTarget(orderTarget)) {
+		if (SkipTarget(orderTarget)) {
 			owner->DropCurrentAttackTarget();
 			FinishCommand();
 			return;
@@ -1524,7 +1524,7 @@ void CCommandAI::ExecuteAttack(Command& c)
 				FinishCommand();
 				return;
 			}
-			if (SkipCrashingTarget(targetUnit)) {
+			if (SkipTarget(targetUnit)) {
 				FinishCommand();
 				return;
 			}
@@ -1843,9 +1843,9 @@ bool CCommandAI::HasMoreMoveCommands(bool skipFirstCmd) const
 
 
 bool CCommandAI::CanChangeFireState() const { return (owner->unitDef->CanChangeFireState()); }
-bool CCommandAI::SkipCrashingTarget(const CUnit* target) const
+bool CCommandAI::SkipTarget(const CUnit* target) const
 {
-	return (target != nullptr && !modInfo.fireAtCrashing && target->IsCrashing());
+	return (target != nullptr && !target->CanBeFiredAt());
 }
 
 bool CCommandAI::SkipParalyzeTarget(const CUnit* target) const
