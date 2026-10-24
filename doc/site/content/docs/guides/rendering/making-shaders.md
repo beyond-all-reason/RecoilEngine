@@ -52,7 +52,7 @@ void main() {
 Creating a basic shader in Lua is simple.
 
 ```lua
-local ubo_defs = gl.GetEngineUniformBuffer()
+local ubo_defs = gl.GetEngineUniformBufferDef(0) .. "\n" .. gl.GetEngineUniformBufferDef(1)
 shader = gl.CreateShader({
     fragment = VFS.LoadFile("path/to/shader.frag.glsl"):gsub("//##UBO##", ubo_defs), -- again we will address this later
     vertex = VFS.LoadFile("path/to/shader.vert.glsl"):gsub("//##UBO##", ubo_defs),
@@ -72,7 +72,7 @@ There are some uniforms in these shaders. Some data is provided by the engine in
 All shaders have access to a Uniform Buffer Object containing information about the game world. The shape is as follows:
 
 ```glsl
-layout(std140, binding = 0) uniform UniformMatrixBuffer {
+layout(std140, binding = 0) uniform UniformMatricesBuffer {
 	mat4 screenView;
 	mat4 screenProj;
 	mat4 screenViewProj;
@@ -139,11 +139,11 @@ layout(std140, binding = 1) uniform UniformParamsBuffer {
 	uint mouseUnused;
 	vec4 mouseWorldPos; //x,y,z; w=0 -- offmap. Ignores water, doesn't ignore units/features under the mouse cursor
 
-	vec4 teamColor[255]; //all team colors
+	vec4 teamColor[2048]; // [0..254] = team, [255] = reserved, [256..2047] = custom
 };
 ```
 
-To include this in your shader, it's better to append this to the beginning of your shader on the lua side with [`gl.GetEngineUniformBuffer()`]({{% ref "docs/lua-api/gl/#glgetengineuniformbufferdef" %}}), like `fragment = VFS.LoadFile("path/to/shader.frag.glsl"):gsub("//##UBO##", gl.GetEngineUniformBuffer())`. We use the gsub here to put UBO in the middle of the code, rather than just prepend engine UBO in front of the shader, to make sure it's after the `#version` stuff glsl expects to be at the beginning. If you plan to use them in your shader, make sure to add `//##UBO##` as a comment up near the beginning. This way, if something changes, you won't have to update all of your scripts (but we will still have to update this article).
+To include this in your shader, it's better to append this to the beginning of your shader on the lua side with [`gl.GetEngineUniformBufferDef(index)`]({{% ref "docs/lua-api/gl/#glgetengineuniformbufferdef" %}}), which returns one block at a time (0 is `UniformMatricesBuffer`, 1 is `UniformParamsBuffer`), like `fragment = VFS.LoadFile("path/to/shader.frag.glsl"):gsub("//##UBO##", gl.GetEngineUniformBufferDef(0) .. "\n" .. gl.GetEngineUniformBufferDef(1))`. We use the gsub here to put UBO in the middle of the code, rather than just prepend engine UBO in front of the shader, to make sure it's after the `#version` stuff glsl expects to be at the beginning. If you plan to use them in your shader, make sure to add `//##UBO##` as a comment up near the beginning. This way, if something changes, you won't have to update all of your scripts (but we will still have to update this article).
 
 ### Custom Uniforms
 
