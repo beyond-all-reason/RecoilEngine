@@ -746,6 +746,12 @@ void creg_TValue::Serialize(creg::ISerializer* s)
 
 void creg_Node::Serialize(creg::ISerializer* s)
 {
+	// The GC skips removeentry() for tables with weak keys and values, so an
+	// empty node there can keep a collectable key whose object is already
+	// freed. Mark such a key dead, as removeentry() does in other tables.
+	if (s->IsWriting() && i_val.tt == LUA_TNIL && i_key.tvk.tt >= LUA_TSTRING)
+		i_key.tvk.tt = LUA_TDEADKEY;
+
 	SerializeInstance(s, &i_key.tvk);
 	SerializePtr(s, &i_key.nk.next);
 }
