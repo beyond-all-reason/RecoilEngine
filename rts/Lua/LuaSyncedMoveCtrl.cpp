@@ -757,7 +757,7 @@ static int SetMoveTypeData(lua_State* L, AMoveType* moveType, const char* caller
 					if (lua_israwstring(L, -2) && SetMoveTypeValue(L, moveType, -2, -1)) {
 						numAssignedValues++;
 					} else {
-						LOG_L(L_WARNING, "[%s] incompatible movetype key for %s", __func__, caller);
+						LOG_L(L_WARNING, "[%s] incompatible movetype key or value for %s", __func__, caller);
 					}
 				}
 			}
@@ -768,7 +768,7 @@ static int SetMoveTypeData(lua_State* L, AMoveType* moveType, const char* caller
 			if (lua_isstring(L, 2) && SetMoveTypeValue(L, moveType, 2, 3)) {
 				numAssignedValues++;
 			} else {
-				LOG_L(L_WARNING, "[%s] incompatible movetype key for %s", __func__, caller);
+				LOG_L(L_WARNING, "[%s] incompatible movetype key or value for %s", __func__, caller);
 			}
 		} break;
 	}
