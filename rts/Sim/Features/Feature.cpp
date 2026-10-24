@@ -258,6 +258,17 @@ void CFeature::Initialize(const FeatureLoadParams& params)
 }
 
 
+// limit a reclaim step to what the feature has left, for negative
+// resources (a cost to reclaim it) as well as for positive ones
+static SResourcePack CapToResourcesLeft(SResourcePack step, const SResourcePack& left)
+{
+	for (int i = 0; i < SResourcePack::MAX_RESOURCES; ++i) {
+		step[i] = (left[i] < 0.0f) ? std::clamp(step[i], left[i], 0.0f) : std::clamp(step[i], 0.0f, left[i]);
+	}
+
+	return step;
+}
+
 bool CFeature::AddBuildPower(CUnit* builder, float amount)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -336,7 +347,7 @@ bool CFeature::AddBuildPower(CUnit* builder, float amount)
 	// stop the last bit giving too much resource
 	const float reclaimLeftTemp = std::max(0.0f, reclaimLeft - step);
 	const float fractionReclaimed = oldReclaimLeft - reclaimLeftTemp;
-	const auto resourceFraction = (defResources * fractionReclaimed).cap_at(resources);
+	const auto resourceFraction = CapToResourcesLeft(defResources * fractionReclaimed, resources);
 	const auto resourceCost = resourceFraction.metal * modInfo.reclaimFeatureCostFactor;
 
 	SResourceOrder order;
@@ -367,8 +378,7 @@ bool CFeature::AddBuildPower(CUnit* builder, float amount)
 		const int numChunks = oldChunk - newChunk;
 
 		if (numChunks != 0) {
-			order.add = defResources * (numChunks * chunkSize);
-			order.add.cap_at(resources);
+			order.add = CapToResourcesLeft(defResources * (numChunks * chunkSize), resources);
 		}
 	}
 
