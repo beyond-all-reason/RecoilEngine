@@ -260,6 +260,8 @@ void CommandDrawer::DrawBuilderCAICommands(const CBuilderCAI* cai, int queueDraw
 				if (!bi.Parse(*ci))
 					continue;
 
+				bi.pos = CGameHelper::Pos2BuildPos(bi, false);
+
 				cursorIcons.AddBuildIcon(cmdID, bi.pos, owner->team, bi.buildFacing);
 				lineDrawer.DrawLine(bi.pos, cmdColors.build);
 
@@ -479,6 +481,8 @@ void CommandDrawer::DrawFactoryCAICommands(const CFactoryCAI* cai, int queueDraw
 
 			if (!bi.Parse(*ci))
 				continue;
+
+			bi.pos = CGameHelper::Pos2BuildPos(bi, false);
 
 			cursorIcons.AddBuildIcon(cmdID, bi.pos, owner->team, bi.buildFacing);
 			lineDrawer.DrawLine(bi.pos, cmdColors.build);
