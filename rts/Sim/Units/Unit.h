@@ -157,6 +157,9 @@ public:
 
 	bool FloatOnWater() const;
 
+	// Checks only dead/crashing state against fireAtKilled and fireAtCrashing.
+	bool CanBeFiredAt() const;
+
 	bool IsNeutral() const { return neutral; }
 	bool IsCloaked() const { return isCloaked; }
 	bool IsStunned() const { return stunned; }
