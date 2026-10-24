@@ -402,7 +402,7 @@ void CAirCAI::ExecuteAttack(Command& c)
 			return;
 		}
 		if (orderTarget != nullptr) {
-			if (SkipCrashingTarget(orderTarget)) {
+			if (SkipTarget(orderTarget)) {
 				owner->DropCurrentAttackTarget();
 				StopMoveAndFinishCommand();
 				return;
@@ -431,7 +431,7 @@ void CAirCAI::ExecuteAttack(Command& c)
 				StopMoveAndFinishCommand();
 				return;
 			}
-			if (SkipCrashingTarget(targetUnit)) {
+			if (SkipTarget(targetUnit)) {
 				StopMoveAndFinishCommand();
 				return;
 			}
@@ -543,7 +543,7 @@ int CAirCAI::GetDefaultCmd(const CUnit* pointed, const CFeature* feature)
 bool CAirCAI::IsValidTarget(const CUnit* enemy, CWeapon* weapon) const {
 	if (!CMobileCAI::IsValidTarget(enemy, weapon))
 		return false;
-	if (SkipCrashingTarget(enemy))
+	if (SkipTarget(enemy))
 		return false;
 	return (GetStrafeAirMoveType(owner)->isFighter || !enemy->unitDef->canfly);
 }
