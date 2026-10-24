@@ -644,7 +644,19 @@ void CommandDrawer::DrawDefaultCommand(const Command& c, const CUnit* owner) con
 	}
 
 	// allow a second param (ignored here) for custom commands
-	const CUnit* unit = GetTrackableUnit(owner, unitHandler.GetUnit(c.GetParam(0)));
+	const unsigned int id = std::max(0.0f, c.GetParam(0));
+
+	// ids from MaxUnits on are features, as for CMD_RECLAIM
+	if (id >= unitHandler.MaxUnits()) {
+		const CFeature* feature = featureHandler.GetFeature(id - unitHandler.MaxUnits());
+
+		if (feature != nullptr)
+			lineDrawer.DrawLineAndIcon(dd->cmdIconID, feature->GetObjDrawMidPos(), dd->color);
+
+		return;
+	}
+
+	const CUnit* unit = GetTrackableUnit(owner, unitHandler.GetUnit(id));
 
 	if (unit == nullptr)
 		return;
