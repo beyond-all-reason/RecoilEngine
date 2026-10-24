@@ -415,6 +415,12 @@ if(NOT MSVC)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-literal-operator")
 	endif()
 
+	if (CMAKE_COMPILER_IS_GNUCXX)
+		## note: parameter passing for argument of type 'std::pair<...>' when C++17 is enabled changed to match C++14 in GCC 10.1
+		## only matters when linking with code built by GCC older than 10.1, and it floods the build log
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-psabi")
+	endif()
+
 	### CompileTime Warnings
 	set(COMMON_WARNINGS "${COMMON_WARNINGS} -Wformat -Wformat-security")
 
