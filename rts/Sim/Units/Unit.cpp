@@ -381,6 +381,11 @@ void CUnit::PostInit(const CUnit* builder)
 		commandAI->GiveCommand(Command(CMD_FIRE_STATE, 0, fireState));
 	} else if (unitDef->fireState > FIRESTATE_NONE) {
 		fireState = unitDef->fireState;
+
+		/* In theory giving the unit a command (like above) could be nice
+		 * for consistency, but that would introduce a special case since
+		 * this command doesn't otherwise do anything, and Lua knows what
+		 * the firestate of this unit is anyway via the unit def. */
 	}
 
 	UpdateRenderParams();
