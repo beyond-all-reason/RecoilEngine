@@ -2249,7 +2249,7 @@ void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
 
 /******************************************************************************/
 
-/***
+/*
  * Helper to get Explosion visibility.
  */
 
@@ -3756,14 +3756,14 @@ void CLuaHandle::MiniMapStateChanged(const bool isMinimized,
 /*** Called when the MiniMap Geometry changes
  * 
  * @function Callins:MiniMapGeometryChanged
- * @param newPosX integer in pixels
- * @param newPosY integer in pixels
- * @param newDimX integer in pixels
- * @param newDimY integer in pixels
- * @param oldPosX integer in pixels
- * @param oldPosY integer in pixels
- * @param oldDimX integer in pixels
- * @param oldDimY integer in pixels
+ * @param newPosX integer New x position in pixels.
+ * @param newPosY integer New y position in pixels.
+ * @param newDimX integer New width in pixels.
+ * @param newDimY integer New height in pixels.
+ * @param oldPosX integer Old x position in pixels.
+ * @param oldPosY integer Old y position in pixels.
+ * @param oldDimX integer Old width in pixels.
+ * @param oldDimY integer Old height in pixels.
  */
 void CLuaHandle::MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim)
 {

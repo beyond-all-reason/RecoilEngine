@@ -92,9 +92,9 @@ bool LuaConstGame::PushEntries(lua_State* L)
 		LuaPushNamedNumber(L, "mapX"    , mapDims.mapx / 64);
 		/*** @field Game.mapY integer Map size along the z axis, in map units (512 elmos). */
 		LuaPushNamedNumber(L, "mapY"    , mapDims.mapy / 64);
-		/*** @field Game.mapSizeX integer in worldspace/opengl coords. Divide by Game.squareSize to get engine's "mapDims" coordinates */
+		/*** @field Game.mapSizeX integer Map size along the x axis in worldspace/opengl coords. Divide by Game.squareSize to get engine's "mapDims" coordinates */
 		LuaPushNamedNumber(L, "mapSizeX", mapDims.mapx * SQUARE_SIZE);
-		/*** @field Game.mapSizeZ integer in worldspace/opengl coords. Divide by Game.squareSize to get engine's "mapDims" coordinates */
+		/*** @field Game.mapSizeZ integer Map size along the z axis in worldspace/opengl coords. Divide by Game.squareSize to get engine's "mapDims" coordinates */
 		LuaPushNamedNumber(L, "mapSizeZ", mapDims.mapy * SQUARE_SIZE);
 	}
 

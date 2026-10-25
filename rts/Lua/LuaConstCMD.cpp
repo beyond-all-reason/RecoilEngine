@@ -283,10 +283,9 @@ bool LuaConstCMD::PushEntries(lua_State* L)
 	 * ```
 	 *
 	 * @field CMD.ATTACK 20
+	 * @see Spring.GiveOrderToUnit
+	 * @see Callins:UnitCmdDone
 	 */
-	 // Fields can't @see
-	 // @see Spring.GiveOrderToUnit
-	 // @see Callins:UnitCmdDone
 	PUSH_CMD(ATTACK);
 	/*** @field CMD.AREA_ATTACK 21 */
 	PUSH_CMD(AREA_ATTACK);

@@ -1,0 +1,4 @@
+{
+	"$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+	"diagnostics.disable": ["luadoc-miss-see-name"]
+}
