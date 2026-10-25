@@ -869,7 +869,7 @@ int LuaFBOs::ClearAttachmentFBO(lua_State* L)
 	GLenum attachment = 0;
 	GLenum drawBuffer = 0;
 
-	if (lua_isstring(L, nextArg)) {
+	if (lua_israwstring(L, nextArg)) {
 		const char* attachmentStr = luaL_checkstring(L, nextArg++);
 		switch (hashString(attachmentStr)) {
 			case hashString("color0"): { bufferType = GL_COLOR;   attachment = GL_COLOR_ATTACHMENT0;  drawBuffer = 0; } break;
