@@ -6,6 +6,7 @@
 #include <cstdarg> // va_start
 
 #include "CameraHandler.h"
+#include "Game/WorldDrawBounds.h"
 
 #include "Action.h"
 #include "Camera.h"
@@ -18,6 +19,7 @@
 #include "Camera/OverviewController.h"
 #include "Camera/SpringController.h"
 #include "Players/Player.h"
+#include "Map/ReadMap.h"
 #include "System/MathConstants.h"
 #include "UI/UnitTracker.h"
 #include "Rendering/GlobalRendering.h"
@@ -146,6 +148,8 @@ CCameraHandler::~CCameraHandler() {
 void CCameraHandler::Init()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	cameraBounds = {}; // a new game starts with the normal whole-map view
+	worldDrawBounds::Clear();
 	{
 		InitControllers();
 
@@ -196,6 +200,8 @@ void CCameraHandler::Kill()
 	RECOIL_DETAILED_TRACY_ZONE;
 	configHandler->RemoveObserver(this);
 	KillControllers();
+	cameraBounds = {};
+	worldDrawBounds::Clear();
 }
 
 
@@ -286,6 +292,7 @@ void CCameraHandler::UpdateController(CPlayer* player, bool fpsMode)
 		UpdateController(camCon, true, true, fusEdgeMove || winEdgeMove);
 
 	camCon.Update();
+	camCon.ClampToViewBounds();
 
 	UpdateTransition();
 
@@ -395,6 +402,7 @@ static constexpr decltype(&CameraTransitionExpDecay) cameraTransitionFunction[] 
 void CCameraHandler::CameraTransition(float nsecs)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	camControllers[currCamCtrlNum]->ClampToViewBounds();
 	cameraTransitionFunction[currCamTransitionNum](camControllers[currCamCtrlNum], camTransState, nsecs);
 	// LOG_L(L_INFO, "CamPos: %s, Dir: %s",
 	// camControllers[currCamCtrlNum]->GetPos().str().c_str(), camControllers[currCamCtrlNum]->GetDir().str().c_str());
@@ -560,7 +568,25 @@ static constexpr decltype(&UpdateTransitionExpDecay) cameraUpdateTransitionFunct
 void CCameraHandler::UpdateTransition()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	camControllers[currCamCtrlNum]->ClampToViewBounds();
 	cameraUpdateTransitionFunction[currCamTransitionNum](camControllers[currCamCtrlNum], camTransState);
+	if (!cameraBounds.IsSet())
+		return;
+	// Constrain the interpolated view as well as the controller's stored focus.
+	// Overhead styles place the eye behind the focus, so clamp the ground ray,
+	// rather than incorrectly forcing the eye's x/z into the rectangle.
+	float3 focus = camera->GetPos();
+	if (currCamCtrlNum == CAMERA_MODE_OVERHEAD || currCamCtrlNum == CAMERA_MODE_SPRING || currCamCtrlNum == CAMERA_MODE_OVERVIEW) {
+		const float distance = CCameraController::DistanceToGround(focus, camera->GetDir(), GetCurrentController().GetFocusPos().y);
+		if (distance > 0.0f)
+			focus += camera->GetDir() * distance;
+	}
+	const float3 correction = {cameraBounds.ClampX(focus.x) - focus.x, 0.0f, cameraBounds.ClampZ(focus.z) - focus.z};
+	if (correction.SqLength() > 0.0f) {
+		camera->SetPos(camera->GetPos() + correction);
+		camera->Update();
+	}
+
 }
 
 void CCameraHandler::SetCameraMode(unsigned int newMode)
@@ -588,6 +614,7 @@ void CCameraHandler::SetCameraMode(unsigned int newMode)
 
 	newCamCtrl->SwitchTo(oldCamCtrl);
 	newCamCtrl->Update();
+	newCamCtrl->ClampToViewBounds();
 	CameraTransition(1.0f);
 }
 
@@ -742,6 +769,7 @@ bool CCameraHandler::SetState(const CCameraController::StateMap& sm)
 
 	const bool result = camControllers[currCamCtrlNum]->SetState(sm);
 	camControllers[currCamCtrlNum]->Update();
+	camControllers[currCamCtrlNum]->ClampToViewBounds();
 	return result;
 }
 
@@ -839,6 +867,24 @@ bool CCameraHandler::LoadViewData(const ViewData& vd)
 		}
 	}
 
-	return camControllers[currCamCtrlNum]->SetState(vd);
+	const bool result = camControllers[currCamCtrlNum]->SetState(vd);
+	if (cameraBounds.IsSet()) {
+		camControllers[currCamCtrlNum]->Update();
+		camControllers[currCamCtrlNum]->ClampToViewBounds();
+	}
+	return result;
 }
 
+
+
+void CCameraHandler::SetCameraBounds(const ViewRectangle& rectangle)
+{
+	cameraBounds = rectangle;
+	for (auto* controller: camControllers)
+		controller->ClampToViewBounds();
+	GetCurrentController().Update();
+	// A region switch must not tween through the gap or retain spring velocity.
+	CameraTransition(0.0f);
+	camTransState.posVelocity = ZeroVector;
+	UpdateTransition();
+}

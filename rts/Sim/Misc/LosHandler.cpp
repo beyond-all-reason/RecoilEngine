@@ -7,6 +7,7 @@
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/ModInfo.h"
+#include "Sim/Misc/RegionPartitions.h"
 #include "Map/ReadMap.h"
 #include "System/Log/ILog.h"
 #include "System/SpringHash.h"
@@ -33,6 +34,7 @@ CR_REG_METADATA(CLosHandler,(
 	CR_IGNORED(synced_),
 
 	CR_MEMBER(globalLOS),
+	CR_MEMBER(sensorRegions),
 	CR_IGNORED(los),
 	CR_IGNORED(airLos),
 	CR_IGNORED(radar),
@@ -52,12 +54,13 @@ CR_REG_METADATA(CLosHandler,(
 // SLosInstance
 //////////////////////////////////////////////////////////////////////
 
-inline void SLosInstance::Init(int radius, int allyteam, int2 basePos, float baseHeight, int hashNum)
+inline void SLosInstance::Init(int radius, int allyteam, int2 basePos, float baseHeight, int hashNum, const SRectangle& bounds)
 {
 	this->allyteam = allyteam;
 	this->radius = radius;
 	this->basePos = basePos;
 	this->baseHeight = baseHeight;
+	this->bounds = bounds;
 	this->refCount = 0;
 	this->hashNum = hashNum;
 	this->status = NONE;
@@ -256,7 +259,7 @@ inline void ILosType::UpdateUnit(CUnit* unit, bool ignore)
 	// New - create a new one
 	cacheFails += (algoType == LOS_ALGO_RAYCAST);
 	SLosInstance* li = CreateInstance();
-	li->Init(radius, allyteam, baseLos, height, hash);
+	li->Init(radius, allyteam, baseLos, height, hash, losHandler->GetSensorBounds(losPos, mipDiv));
 	li->refCount++;
 	unit->los[type] = li;
 	instanceHashes[hash].push_back(li);
@@ -712,6 +715,7 @@ void CLosHandler::Init()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	globalLOS.fill(false);
+	sensorRegions.clear();
 
 	baseRadarErrorSize = defBaseRadarErrorSize;
 	baseRadarErrorMult = defBaseRadarErrorMult;
@@ -771,6 +775,36 @@ void CLosHandler::Kill()
 	losTypes.fill(nullptr);
 }
 
+
+bool CLosHandler::SetSensorRegions(std::vector<SRectangle> regions)
+{
+	// Reconfiguring existing instances would invalidate cached RLEs and delayed
+	// removals. Authored partitions are fixed before the first sensor update.
+	if (gs->frameNum > 0)
+		return false;
+
+	int alignment = SQUARE_SIZE;
+	for (const ILosType* type: losTypes) {
+		if (type == nullptr || !type->instances.empty())
+			return false;
+		alignment = std::max(alignment, type->mipDiv);
+	}
+	if (!ValidRegionPartitions(regions, mapDims.mapx * SQUARE_SIZE, mapDims.mapy * SQUARE_SIZE, alignment))
+		return false;
+
+	sensorRegions = std::move(regions);
+	return true;
+}
+
+SRectangle CLosHandler::GetSensorBounds(const float3& position, int mipDiv) const
+{
+	if (sensorRegions.empty())
+		return SRectangle(0, 0, std::max(1, mapDims.mapx * SQUARE_SIZE / mipDiv), std::max(1, mapDims.mapy * SQUARE_SIZE / mipDiv));
+
+	if (const SRectangle* region = FindRegionPartition(sensorRegions, position.x, position.z))
+		return *region / mipDiv;
+	return {}; // Emitters in the separating strip supply no sensor coverage.
+}
 
 void CLosHandler::SetGlobalLOS(const int allyTeamId, const bool newState)
 {

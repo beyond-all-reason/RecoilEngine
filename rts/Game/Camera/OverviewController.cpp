@@ -98,6 +98,7 @@ void COverviewController::SwitchTo(const CCameraController* oldCam, const bool s
 
 	bool cameraSideways = CameraPointingSideways(oldCam->GetRot().y);
 	pos.y = GetCamHeightToFitMapInView(pos.x, pos.z, fov/2.0, cameraSideways);
+	Update();
 }
 
 void COverviewController::GetState(StateMap& sm) const
@@ -125,4 +126,25 @@ void COverviewController::ConfigNotify(const std::string & key, const std::strin
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	ConfigUpdate();
+}
+
+
+void COverviewController::Update()
+{
+	if (!HasViewBounds() && !boundedView)
+		return;
+	boundedView = HasViewBounds();
+	const auto bounds = GetViewBounds();
+	pos.x = bounds.CenterX();
+	pos.z = bounds.CenterZ();
+	if (!boundedView) {
+		pos.y = GetCamHeightToFitMapInView(pos.x, pos.z, fov / 2.0f, CameraPointingSideways(GetRot().y));
+		return;
+	}
+	const bool sideways = CameraPointingSideways(GetRot().y);
+	const float halfWidth = bounds.Width() * 0.5f;
+	const float halfHeight = bounds.Height() * 0.5f;
+	const float extent = sideways ? std::max(halfHeight / globalRendering->aspectRatio, halfWidth) :
+		std::max(halfWidth / globalRendering->aspectRatio, halfHeight);
+	pos.y = CGround::GetHeightAboveWater(pos.x, pos.z, false) + extent * 1.037f / math::tan(fov * 0.5f * math::DEG_TO_RAD);
 }

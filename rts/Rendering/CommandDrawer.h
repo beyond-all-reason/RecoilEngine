@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef COMMAND_DRAWER_H
-#define COMMAND_DRAWER_H
+#pragma once
 
 #include "System/UnorderedSet.hpp"
 
@@ -20,8 +19,8 @@ public:
 	// clear the set after WorldDrawer and MiniMap have both used it
 	void Update() { luaQueuedUnitSet.clear(); }
 
-	void Draw(const CCommandAI*, int queueDrawDepth = -1) const;
-	void DrawLuaQueuedUnitSetCommands() const;
+	void Draw(const CCommandAI*, int queueDrawDepth = -1, bool onMiniMap = false) const;
+	void DrawLuaQueuedUnitSetCommands(bool onMiniMap = false) const;
 	void DrawQuedBuildingSquares(const CBuilderCAI*) const;
 
 	void AddLuaQueuedUnit(const CUnit* unit, int queueDrawDepth = 0);
@@ -42,5 +41,3 @@ private:
 };
 
 #define commandDrawer (CommandDrawer::GetInstance())
-
-#endif

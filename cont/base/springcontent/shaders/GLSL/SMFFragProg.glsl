@@ -35,6 +35,8 @@ in vec2 diffuseTexCoords;
 
 
 uniform sampler2D diffuseTex;
+uniform bool worldDrawBoundsEnabled;
+uniform vec4 worldDrawBounds;
 uniform sampler2D normalsTex;
 uniform sampler2D detailTex;
 #ifndef SMF_ADV_SHADING
@@ -262,6 +264,11 @@ vec4 GetSplatDetailTextureNormal(vec2 uv, out vec2 splatDetailStrength) {
 #line 10257
 
 void main() {
+	if (worldDrawBoundsEnabled && (
+		vertexWorldPos.x < worldDrawBounds.x || vertexWorldPos.z < worldDrawBounds.y ||
+		vertexWorldPos.x > worldDrawBounds.z || vertexWorldPos.z > worldDrawBounds.w
+	)) discard;
+
 	vec2 diffTexCoords = diffuseTexCoords;
 	vec2 specTexCoords = vertexWorldPos.xz * specularTexGen;
 	vec2 infoTexCoords = vertexWorldPos.xz * infoTexGen;

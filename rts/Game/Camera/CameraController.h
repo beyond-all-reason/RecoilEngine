@@ -1,13 +1,13 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _CAMERA_CONTROLLER_H
-#define _CAMERA_CONTROLLER_H
+#pragma once
 
 #include <algorithm>
 #include <array>
 #include <string>
 
 #include "System/float3.h"
+#include "Game/ViewRectangle.h"
 
 
 class CCameraController
@@ -99,15 +99,19 @@ public:
 	virtual void MouseWheelMove(float move) = 0;
 	virtual void MouseWheelMove(float move, const float3& dir) = 0;
 
-	virtual void Update() {}
+	virtual void Update() { ClampToViewBounds(); }
+	static ViewRectangle GetViewBounds();
+	static bool HasViewBounds();
+	void ClampToViewBounds();
 
 	float GetFOV() const { return fov; } //< In degrees!
 
 	virtual float3 GetPos() const { return pos; }
+	float3 GetFocusPos() const { return pos; }
 	virtual float3 GetDir() const { return dir; }
 	virtual float3 GetRot() const;
 
-	virtual void SetPos(const float3& newPos) { pos = newPos; }
+	virtual void SetPos(const float3& newPos) { pos = newPos; ClampToViewBounds(); }
 	virtual void SetRot(const float3& newRot);
 	virtual void SetDir(const float3& newDir) { dir = newDir; }
 	virtual bool DisableTrackingByKey() { return true; }
@@ -161,6 +165,3 @@ protected:
 
 	float pixelSize;
 };
-
-
-#endif // _CAMERA_CONTROLLER_H

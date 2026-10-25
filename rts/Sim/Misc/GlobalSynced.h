@@ -1,8 +1,10 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _GLOBAL_SYNCED_H
-#define _GLOBAL_SYNCED_H
+#pragma once
 
+#include <vector>
+
+#include "System/Rectangle.h"
 #include "System/creg/creg_cond.h"
 #include "System/GlobalRNG.h"
 #include "System/Threading/ThreadPool.h"
@@ -65,6 +67,9 @@ public:
 	* Stores the current frame number
 	*/
 	int frameNum = -1;
+
+	// Initialization-only half-open world rectangles for native crater deformation.
+	std::vector<SRectangle> mapDamageRegions;
 
 	/**
 	* @brief god mode
@@ -135,6 +140,3 @@ public:
 
 extern CGlobalSynced* gs;
 extern CGlobalSyncedRNG gsRNG;
-
-#endif // _GLOBAL_SYNCED_H
-
