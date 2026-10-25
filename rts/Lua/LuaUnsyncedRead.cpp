@@ -1445,8 +1445,7 @@ int LuaUnsyncedRead::GetUnitNoSelect(lua_State* L)
  *
  * @function Spring.UnitIconGetDraw
  * @param unitID UnitID
- * @return boolean? drawIcon
- * `true` if icon is being drawn, `nil` when unitID is invalid, otherwise `false`.
+ * @return boolean? drawIcon `true` if icon is being drawn, `nil` when unitID is invalid, otherwise `false`.
  */
 int LuaUnsyncedRead::UnitIconGetDraw(lua_State* L) {
 	CUnit* unit = ParseUnit(L, __func__, 1);
@@ -4578,7 +4577,7 @@ int LuaUnsyncedRead::GetGroupUnitsCount(lua_State* L)
  * @field teamID TeamID
  * @field allyTeamID AllyTeamID
  * @field spectator boolean
- * @field cpuUsage number in order to find the progress, use: cpuUsage&0x1 if it's PC or BO, cpuUsage& 0xFE to get path res, (cpuUsage>>8)*1000 for the progress
+ * @field cpuUsage number CPU usage. To find the progress, use: cpuUsage&0x1 if it's PC or BO, cpuUsage& 0xFE to get path res, (cpuUsage>>8)*1000 for the progress
  * @field pingTime number if -1, the player is pathfinding
  */
 
@@ -5214,8 +5213,7 @@ int LuaUnsyncedRead::GetGroundDecalCreationFrame(lua_State* L)
 /***
  * @function Spring.GetGroundDecalOwner
  * @param decalID DecalID
- * @return integer? value If owner is a unit, then this is `unitID`, if owner is
- * a feature it is `featureID + MAX_UNITS`. If there is no owner, then `nil`.
+ * @return integer? value If owner is a unit, then this is `unitID`, if owner is a feature it is `featureID + MAX_UNITS`. If there is no owner, then `nil`.
  */
 int LuaUnsyncedRead::GetGroundDecalOwner(lua_State* L)
 {

@@ -3,6 +3,8 @@
 #ifndef _BASE_GROUND_DRAWER_H
 #define _BASE_GROUND_DRAWER_H
 
+#include <string>
+
 #include "MapDrawPassTypes.h"
 
 
@@ -27,8 +29,10 @@ class CBaseGroundDrawer
 {
 public:
 	CBaseGroundDrawer();
-	virtual ~CBaseGroundDrawer() {}
+	virtual ~CBaseGroundDrawer();
 	CBaseGroundDrawer(const CBaseGroundDrawer&) = delete; // no-copy
+
+	void ConfigNotify(const std::string& key, const std::string& value);
 
 	virtual void Draw(const DrawPass::e& drawPass) = 0;
 	virtual void DrawShadowPass() {}

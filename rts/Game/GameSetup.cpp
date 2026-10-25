@@ -460,16 +460,21 @@ void CGameSetup::LoadAllyTeams(const TdfParser& file)
 
 	{
 		const size_t numAllyTeams = allyStartingData.size();
-		for (size_t a = 0; a < numAllyTeams; ++a) {
+		for (int scriptIndex = 0; scriptIndex < MAX_TEAMS; ++scriptIndex) {
+			const auto remap = allyteamRemap.find(scriptIndex);
+			if (remap == allyteamRemap.end())
+				continue;
+
+			const int a = remap->second;
 			allyStartingData[a].allies.resize(numAllyTeams, false);
 			allyStartingData[a].allies[a] = true; // each team is allied with itself
 
-			const std::string section = "GAME\\ALLYTEAM" + IntToString(a) + "\\";
+			const std::string section = "GAME\\ALLYTEAM" + IntToString(scriptIndex) + "\\";
 
 			const size_t numAllies = atoi(file.SGetValueDef("0", section + "NumAllies").c_str());
 
 			for (size_t b = 0; b < numAllies; ++b) {
-				const std::string key = "GAME\\ALLYTEAM" + IntToString(a) + "\\Ally" + IntToString(b);
+				const std::string key = section + "Ally" + IntToString(b);
 				const std::string val = file.SGetValueDef("0", key);
 
 				const int other = atoi(val.c_str());

@@ -367,7 +367,9 @@ CGlobalRendering::CGlobalRendering()
 		"YResolutionWindowed",
 		"WindowPosX",
 		"WindowPosY",
-		"MinSampleShadingRate"
+		"MinSampleShadingRate",
+		"MinimizeOnFocusLoss",
+		"TeamNanoSpray"
 	});
 	SetDualScreenParams();
 }
@@ -1259,6 +1261,16 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 void CGlobalRendering::ConfigNotify(const std::string& key, const std::string& value)
 {
 	LOG("[GR::%s][1] key=%s val=%s", __func__, key.c_str(), value.c_str());
+
+	// neither needs the window updated; SDL reads the hint on each focus loss
+	if (key == "MinimizeOnFocusLoss") {
+		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, (configHandler->GetInt(key) == 0) ? "0" : "1");
+		return;
+	}
+	if (key == "TeamNanoSpray") {
+		teamNanospray = configHandler->GetBool(key);
+		return;
+	}
 
 	if (key == "MinSampleShadingRate") {
 		auto newMSSR = configHandler->GetFloat("MinSampleShadingRate");

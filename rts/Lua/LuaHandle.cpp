@@ -85,8 +85,6 @@ bool CLuaHandle::devMode = false;
 const int* CLuaHandle::currentCobArgs = nullptr;
 
 /***
- * @class Callins
- * 
  * Functions called by the Engine.
  *
  * To use these callins in a widget, prepend `widget:` and, for a gadget,
@@ -108,7 +106,9 @@ const int* CLuaHandle::currentCobArgs = nullptr;
  * **Attention:** Some callins will only work on the unsynced portion of the gadget.
  * Due to the type-unsafe nature of lua parsing, those callins not firing up
  * might be hard to trace.
- * 
+ *
+ * @class Callins
+ *
  * @see Gadget
  * @see Widget
  * @see Menu
@@ -2249,7 +2249,7 @@ void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
 
 /******************************************************************************/
 
-/***
+/*
  * Helper to get Explosion visibility.
  */
 
@@ -3756,14 +3756,14 @@ void CLuaHandle::MiniMapStateChanged(const bool isMinimized,
 /*** Called when the MiniMap Geometry changes
  * 
  * @function Callins:MiniMapGeometryChanged
- * @param newPosX integer in pixels
- * @param newPosY integer in pixels
- * @param newDimX integer in pixels
- * @param newDimY integer in pixels
- * @param oldPosX integer in pixels
- * @param oldPosY integer in pixels
- * @param oldDimX integer in pixels
- * @param oldDimY integer in pixels
+ * @param newPosX integer New x position in pixels.
+ * @param newPosY integer New y position in pixels.
+ * @param newDimX integer New width in pixels.
+ * @param newDimY integer New height in pixels.
+ * @param oldPosX integer Old x position in pixels.
+ * @param oldPosY integer Old y position in pixels.
+ * @param oldDimX integer Old width in pixels.
+ * @param oldDimY integer Old height in pixels.
  */
 void CLuaHandle::MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim)
 {
@@ -4534,7 +4534,7 @@ int CLuaHandle::CallOutIsEngineMinVersion(lua_State* L)
 /***
  * @function Script.DelayByFrames
  * @param frameDelay integer
- * @param fun(...) func
+ * @param func fun(...)
  */
 int CLuaHandle::CallOutDelayByFrames(lua_State* L)
 {

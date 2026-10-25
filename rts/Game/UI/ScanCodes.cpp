@@ -206,9 +206,9 @@ void CScanCodes::Reset()
 	}
 
 	// Key state modifier keys
-	//AddPair("sc_numlock", SDL_SCANCODE_NUMLOCKCLEAR);
-	//AddPair("sc_capslock", SDL_SCANCODE_CAPSLOCK);
-	//AddPair("sc_scrollock", SDL_SCANCODE_SCROLLLOCK);
+	AddPair("sc_numlock",   SDL_SCANCODE_NUMLOCKCLEAR);
+	AddPair("sc_capslock",  SDL_SCANCODE_CAPSLOCK);
+	AddPair("sc_scrollock", SDL_SCANCODE_SCROLLLOCK);
 	AddPair("sc_shift", SDL_SCANCODE_LSHIFT);
 	AddPair("sc_ctrl",  SDL_SCANCODE_LCTRL);
 	AddPair("sc_alt",   SDL_SCANCODE_LALT);
@@ -222,10 +222,10 @@ void CScanCodes::Reset()
 	AddPair("sc_help", SDL_SCANCODE_HELP);
 	AddPair("sc_printscreen", SDL_SCANCODE_PRINTSCREEN);
 	AddPair("sc_print", SDL_SCANCODE_PRINTSCREEN);
-	//AddPair("sc_sysreq", SDL_SCANCODE_SYSREQ);
-	//AddPair("sc_menu", SDL_SCANCODE_MENU);
-	//AddPair("sc_power", SDL_SCANCODE_POWER);     // Power Macintosh power key
-	//AddPair("sc_undo", SDL_SCANCODE_UNDO);       // Atari keyboard has Undo
+	AddPair("sc_sysreq", SDL_SCANCODE_SYSREQ);
+	AddPair("sc_menu", SDL_SCANCODE_MENU);
+	AddPair("sc_power", SDL_SCANCODE_POWER);     // Power Macintosh power key
+	AddPair("sc_undo", SDL_SCANCODE_UNDO);       // Atari keyboard has Undo
 
 	std::sort(nameToCode.begin(), nameToCode.end(), namePred);
 	std::sort(codeToName.begin(), codeToName.end(), codePred);

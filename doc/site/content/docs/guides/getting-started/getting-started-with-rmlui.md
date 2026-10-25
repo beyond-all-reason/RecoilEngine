@@ -233,7 +233,7 @@ There are data bindings to allow you to loop through arrays (data-for) have cond
 
 ### The Lua
 
-> [!NOTE] For information on setting up your editor to provide intellisense behaviour see the [Lua Language Server guide]({{% ref "lua-language-server" %}}).
+> [!NOTE] For information on setting up your editor to provide intellisense behaviour see the [Working with Lua guide]({{% ref "working-with-lua" %}}).
 
 To load your document into the shared context we created earlier and to define and add the data model you will need to have a lua script something like the one below.
 

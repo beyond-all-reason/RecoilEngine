@@ -1450,12 +1450,7 @@ int LuaOpenGL::EndText(lua_State* L)
 }
 
 /***
- * @function gl.Text
- * @param text string
- * @param x number
- * @param y number
- * @param size number?
- * @param options string? concatenated string of option characters.
+ * `options` is a concatenated string of option characters:
  *
  *   - horizontal alignment:
  *     - 'c' = center
@@ -1473,6 +1468,13 @@ int LuaOpenGL::EndText(lua_State* L)
  *     - 's' = shadow
  *   - other:
  *     - 'n' = don't round vertex coords to nearest integer (font may get blurry)
+ *
+ * @function gl.Text
+ * @param text string
+ * @param x number
+ * @param y number
+ * @param size number?
+ * @param options string? Concatenated string of option characters.
  * @return nil
  */
 int LuaOpenGL::Text(lua_State* L)
@@ -2095,7 +2097,7 @@ int LuaOpenGL::DrawListAtUnit(lua_State* L)
  * @function gl.DrawFuncAtUnit
  * @param unitID UnitID
  * @param useMidPos boolean? (Default: `true`)
- * @param fun(...) func Function to call.
+ * @param func fun(...) Function to call.
  * @param ... any Arguments passed to function.
  */
 int LuaOpenGL::DrawFuncAtUnit(lua_State* L)
@@ -2452,7 +2454,7 @@ int LuaOpenGL::Shape(lua_State* L)
 /***
  * @function gl.BeginEnd
  * @param primMode GL
- * @param fun(...) func Function to call.
+ * @param func fun(...) Function to call.
  * @param ... any Arguments passed to function.
  */
 int LuaOpenGL::BeginEnd(lua_State* L)
@@ -3362,13 +3364,13 @@ int LuaOpenGL::DepthMask(lua_State* L)
  */
 /***
  * Enable depth test and specify the depth comparison function.
- * @function gl.DepthTest 
- * 
- * @param depthFunction GL
- * 
- * Symbolic constants `GL.NEVER`, `GL.LESS`, `GL.EQUAL`, `GL.LEQUAL`,
- * `GL.GREATER`, `GL.NOTEQUAL`, `GL.GEQUAL`, and `GL.ALWAYS` are accepted.
- * The initial value is `GL.LESS`.
+ *
+ * `depthFunction` accepts `GL.NEVER`, `GL.LESS`, `GL.EQUAL`, `GL.LEQUAL`,
+ * `GL.GREATER`, `GL.NOTEQUAL`, `GL.GEQUAL`, and `GL.ALWAYS`.
+ *
+ * @function gl.DepthTest
+ *
+ * @param depthFunction GL The depth comparison function.
  */
 int LuaOpenGL::DepthTest(lua_State* L)
 {
@@ -3420,12 +3422,11 @@ int LuaOpenGL::DepthClamp(lua_State* L)
  */
 /***
  * Enable culling and set culling mode.
+ *
+ * `mode` accepts `GL.FRONT`, `GL.BACK`, and `GL.FRONT_AND_BACK`.
+ *
  * @function gl.Culling
- * @param mode GL
- * 
- * Specifies whether front- or back-facing facets are candidates for culling.
- * Symbolic constants `GL.FRONT`, `GL.BACK`, and `GL.FRONT_AND_BACK` are accepted. The
- * initial value is `GL.BACK`.
+ * @param mode GL Whether front- or back-facing facets are candidates for culling.
  */
 
 int LuaOpenGL::Culling(lua_State* L)
@@ -3461,16 +3462,15 @@ int LuaOpenGL::Culling(lua_State* L)
  */
 /***
  * Specify a logical pixel operation for rendering.
- * 
- * @function gl.LogicOp
- * 
- * @param opCode GL
- * 
- * Specifies a symbolic constant that selects a logical operation. The following
- * symbols are accepted: `GL.CLEAR`, `GL.SET`, `GL.COPY`, `GL.COPY_INVERTED`,
+ *
+ * `opCode` accepts `GL.CLEAR`, `GL.SET`, `GL.COPY`, `GL.COPY_INVERTED`,
  * `GL.NOOP`, `GL.INVERT`, `GL.AND`, `GL.NAND`, `GL.OR`, `GL.NOR`, `GL.XOR`,
  * `GL.EQUIV`, `GL.AND_REVERSE`, `GL.AND_INVERTED`, `GL.OR_REVERSE`, and
- * `GL.OR_INVERTED`.  The initial value is `GL.COPY`.
+ * `GL.OR_INVERTED`.
+ *
+ * @function gl.LogicOp
+ *
+ * @param opCode GL The logical operation.
  */
 int LuaOpenGL::LogicOp(lua_State* L)
 {
@@ -3660,17 +3660,16 @@ int LuaOpenGL::BlendFuncSeparate(lua_State* L)
  */
 /***
  * Specify the alpha test function.
- * 
+ *
+ * `func` accepts `GL.NEVER`, `GL.LESS`, `GL.EQUAL`, `GL.LEQUAL`, `GL.GREATER`,
+ * `GL.NOTEQUAL`, `GL.GEQUAL`, and `GL.ALWAYS`.
+ *
+ * `ref` is clamped to the range `[0, 1]`, where `0` represents the lowest
+ * possible alpha value and `1` the highest possible value.
+ *
  * @function gl.AlphaTest
- * @param func GL
- * Specifies the alpha comparison function. Symbolic constants `GL.NEVER`,
- * `GL.LESS`, `GL.EQUAL`, `GL.LEQUAL`, `GL.GREATER`, `GL.NOTEQUAL`, `GL.GEQUAL`,
- * and `GL.ALWAYS` are accepted. The initial value is `GL.ALWAYS`.
- * @param ref number
- * Specifies the reference value that incoming alpha values are compared to.
- * This value is clamped to the range `[0, 1]`, where `0` represents the lowest
- * possible alpha value and `1` the highest possible value. The initial reference
- * value is `0`.
+ * @param func GL The alpha comparison function.
+ * @param ref number The reference value that incoming alpha values are compared to.
  */
 int LuaOpenGL::AlphaTest(lua_State* L)
 {
@@ -3718,20 +3717,18 @@ int LuaOpenGL::AlphaToCoverage(lua_State* L)
 
 /***
  * Select polygon rasterization mode.
- * 
+ *
+ * `face` must be `GL.FRONT` for front-facing polygons, `GL.BACK` for
+ * back-facing polygons, or `GL.FRONT_AND_BACK` for front- and back-facing
+ * polygons.
+ *
+ * `mode` accepts `GL.POINT`, `GL.LINE`, and `GL.FILL`.
+ *
  * @function gl.PolygonMode
- * 
- * @param face GL
- * 
- * Specifies the polygons that mode applies to. Must be `GL.FRONT` for
- * front-facing polygons, `GL.BACK` for back-facing polygons, or `GL.FRONT_AND_BACK`
- * for front- and back-facing polygons.
- * 
- * @param mode GL
- * 
- * Specifies how polygons will be rasterized. Accepted values are `GL.POINT`,
- * `GL.LINE`, and `GL.FILL`. The initial value is `GL.FILL` for both front- and
- * back-facing polygons.
+ *
+ * @param face GL The polygons that mode applies to.
+ *
+ * @param mode GL How the polygons will be rasterized.
  */
 int LuaOpenGL::PolygonMode(lua_State* L)
 {
@@ -3749,15 +3746,9 @@ int LuaOpenGL::PolygonMode(lua_State* L)
  */
 /***
  * @function gl.PolygonOffset
- * @param factor number
- * 
- * Specifies a scale factor that is used to create a variable depth offset for
- * each polygon. The initial value is `0`.
- * 
- * @param units number
- * 
- * Is multiplied by an implementation-specific value to create a constant depth
- * offset. The initial value is `0`.
+ * @param factor number Scale factor for a variable depth offset for each polygon.
+ *
+ * @param units number Multiplied by an implementation-specific value to create a constant depth offset.
  */
 int LuaOpenGL::PolygonOffset(lua_State* L)
 {
@@ -3809,8 +3800,9 @@ int LuaOpenGL::StencilTest(lua_State* L)
 
 /***
  * Control the front and back writing of individual bits in the stencil planes.
+ *
  * @function gl.StencilMask
- * @param mask integer Specifies a bit mask to enable and disable writing of individual bits in the stencil planes. Initially, the mask is all `1`'s.
+ * @param mask integer Bit mask to enable and disable writing of individual bits in the stencil planes.
  */
 int LuaOpenGL::StencilMask(lua_State* L)
 {
@@ -3823,10 +3815,17 @@ int LuaOpenGL::StencilMask(lua_State* L)
 
 /***
  * Set front and back function and reference value for stencil testing.
+ *
+ * `func` accepts `GL.NEVER`, `GL.LESS`, `GL.EQUAL`, `GL.LEQUAL`, `GL.GREATER`,
+ * `GL.NOTEQUAL`, `GL.GEQUAL`, and `GL.ALWAYS`.
+ *
+ * `ref` is clamped to the range `[0, 2^n - 1]`, where `n` is the number of
+ * bitplanes in the stencil buffer.
+ *
  * @function gl.StencilFunc
- * @param func GL Specifies the test function. Eight symbolic constants are valid: `GL.NEVER`, `GL.LESS`, `GL.EQUAL`, `GL.LEQUAL`, `GL.GREATER`, `GL.NOTEQUAL`, `GL.GEQUAL`, and `GL.ALWAYS`. The initial value is `GL.ALWAYS`.
- * @param ref integer Specifies the reference value for the stencil test. `ref` is clamped to the range `[0, 2^n - 1]`, where `n` is the number of bitplanes in the stencil buffer. The initial value is `0`.
- * @param mask integer Specifies a mask that is ANDed with both the reference value and the stored stencil value when the test is done. The initial value is all `1`'s.
+ * @param func GL The test function.
+ * @param ref integer The reference value for the stencil test.
+ * @param mask integer ANDed with both the reference value and the stored stencil value when the test is done.
  */
 int LuaOpenGL::StencilFunc(lua_State* L)
 {
@@ -3841,10 +3840,17 @@ int LuaOpenGL::StencilFunc(lua_State* L)
 
 /***
  * Set front and back stencil test actions.
+ *
+ * `fail`, `zfail` and `zpass` accept `GL.KEEP`, `GL.ZERO`, `GL.REPLACE`,
+ * `GL.INCR`, `GL.INCR_WRAP`, `GL.DECR`, `GL.DECR_WRAP`, and `GL.INVERT`.
+ *
+ * `zpass` also applies when the stencil test passes and either there is no
+ * depth buffer or depth testing is not enabled.
+ *
  * @function gl.StencilOp
- * @param fail GL Specifies the action to take when the stencil test fails. Eight symbolic constants are valid: `GL.KEEP`, `GL.ZERO`, `GL.REPLACE`, `GL.INCR`, `GL.INCR_WRAP`, `GL.DECR`, `GL.DECR_WRAP`, and `GL.INVERT`. The initial value is `GL.KEEP`.
- * @param zfail GL Specifies the stencil action when the stencil test passes, but the depth test fails. The initial value is `GL.KEEP`.
- * @param zpass GL Specifies the stencil action when both the stencil test and the depth test pass, or when the stencil test passes and either there is no depth buffer or depth testing is not enabled. The initial value is `GL.KEEP`.
+ * @param fail GL The action to take when the stencil test fails.
+ * @param zfail GL The action when the stencil test passes, but the depth test fails.
+ * @param zpass GL The action when both the stencil test and the depth test pass.
  */
 int LuaOpenGL::StencilOp(lua_State* L)
 {
@@ -3859,9 +3865,12 @@ int LuaOpenGL::StencilOp(lua_State* L)
 
 /***
  * Control the front and back writing of individual bits in the stencil planes.
+ *
+ * `face` accepts `GL.FRONT`, `GL.BACK`, and `GL.FRONT_AND_BACK`.
+ *
  * @function gl.StencilMaskSeparate
- * @param face GL Specifies whether the front and/or back stencil writemask is updated. Three symbolic constants are accepted: `GL.FRONT`, `GL.BACK`, and `GL.FRONT_AND_BACK`. The initial value is `GL.FRONT_AND_BACK`.
- * @param mask integer Specifies a bit mask to enable and disable writing of individual bits in the stencil planes. Initially, the mask is all `1`'s.
+ * @param face GL Whether the front and/or back stencil writemask is updated.
+ * @param mask integer Bit mask to enable and disable writing of individual bits in the stencil planes.
  */
 int LuaOpenGL::StencilMaskSeparate(lua_State* L)
 {
@@ -3875,11 +3884,20 @@ int LuaOpenGL::StencilMaskSeparate(lua_State* L)
 
 /***
  * Set front and/or back function and reference value for stencil testing.
+ *
+ * `face` accepts `GL.FRONT`, `GL.BACK`, and `GL.FRONT_AND_BACK`.
+ *
+ * `func` accepts `GL.NEVER`, `GL.LESS`, `GL.EQUAL`, `GL.LEQUAL`, `GL.GREATER`,
+ * `GL.NOTEQUAL`, `GL.GEQUAL`, and `GL.ALWAYS`.
+ *
+ * `ref` is clamped to the range `[0, 2^n - 1]`, where `n` is the number of
+ * bitplanes in the stencil buffer.
+ *
  * @function gl.StencilFuncSeparate
- * @param face GL Specifies whether front and/or back stencil state is updated. Three symbolic constants are accepted: `GL.FRONT`, `GL.BACK`, and `GL.FRONT_AND_BACK`. The initial value is `GL.FRONT_AND_BACK`.
- * @param func GL Specifies the test function. Eight symbolic constants are valid: `GL.NEVER`, `GL.LESS`, `GL.EQUAL`, `GL.LEQUAL`, `GL.GREATER`, `GL.NOTEQUAL`, `GL.GEQUAL`, and `GL.ALWAYS`. The initial value is `GL.ALWAYS`.
- * @param ref integer Specifies the reference value for the stencil test. `ref` is clamped to the range `[0, 2^n - 1]`, where `n` is the number of bitplanes in the stencil buffer. The initial value is `0`.
- * @param mask integer Specifies a mask that is ANDed with both the reference value and the stored stencil value when the test is done. The initial value is all `1`'s.
+ * @param face GL Whether front and/or back stencil state is updated.
+ * @param func GL The test function.
+ * @param ref integer The reference value for the stencil test.
+ * @param mask integer ANDed with both the reference value and the stored stencil value when the test is done.
  */
 int LuaOpenGL::StencilFuncSeparate(lua_State* L)
 {
@@ -3895,11 +3913,20 @@ int LuaOpenGL::StencilFuncSeparate(lua_State* L)
 
 /***
  * Set front and/or back stencil test actions.
+ *
+ * `face` accepts `GL.FRONT`, `GL.BACK`, and `GL.FRONT_AND_BACK`.
+ *
+ * `fail`, `zfail` and `zpass` accept `GL.KEEP`, `GL.ZERO`, `GL.REPLACE`,
+ * `GL.INCR`, `GL.INCR_WRAP`, `GL.DECR`, `GL.DECR_WRAP`, and `GL.INVERT`.
+ *
+ * `zpass` also applies when the stencil test passes and either there is no
+ * depth buffer or depth testing is not enabled.
+ *
  * @function gl.StencilOpSeparate
- * @param face GL Specifies whether front and/or back stencil state is updated. Three symbolic constants are accepted: `GL.FRONT`, `GL.BACK`, and `GL.FRONT_AND_BACK`. The initial value is `GL.FRONT_AND_BACK`.
- * @param fail GL Specifies the action to take when the stencil test fails. Eight symbolic constants are valid: `GL.KEEP`, `GL.ZERO`, `GL.REPLACE`, `GL.INCR`, `GL.INCR_WRAP`, `GL.DECR`, `GL.DECR_WRAP`, and `GL.INVERT`. The initial value is `GL.KEEP`.
- * @param zfail GL Specifies the stencil action when the stencil test passes, but the depth test fails. The initial value is `GL.KEEP`.
- * @param zpass GL Specifies the stencil action when both the stencil test and the depth test pass, or when the stencil test passes and either there is no depth buffer or depth testing is not enabled. The initial value is `GL.KEEP`.
+ * @param face GL Whether front and/or back stencil state is updated.
+ * @param fail GL The action to take when the stencil test fails.
+ * @param zfail GL The action when the stencil test passes, but the depth test fails.
+ * @param zpass GL The action when both the stencil test and the depth test pass.
  */
 int LuaOpenGL::StencilOpSeparate(lua_State* L)
 {
@@ -4589,7 +4616,7 @@ int LuaOpenGL::CopyImageSubData(lua_State* L)
 /***
  * @function gl.RenderToTexture
  * @param texName string
- * @param fun(...) function
+ * @param func fun(...)
  * @param ... any Arguments to the function.
  */
 int LuaOpenGL::RenderToTexture(lua_State* L)

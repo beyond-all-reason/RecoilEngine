@@ -165,8 +165,9 @@ bool CUnsyncedLuaHandle::Init(std::string code, const std::string& file)
 }
 
 /***
- * @class UnsyncedCallins
  * Functions called by the Engine (Unsynced).
+ *
+ * @class UnsyncedCallins
  */
 
 /**********************
@@ -550,8 +551,9 @@ void CSyncedLuaHandle::EnactDevMode() const
 //
 
 /***
- * @class SyncedCallins
  * Functions called by the Engine (Synced).
+ *
+ * @class SyncedCallins
  */
 
 bool CSyncedLuaHandle::SyncedActionFallback(const std::string& msg, int playerID)
@@ -1275,19 +1277,19 @@ bool CSyncedLuaHandle::AllowDirectUnitControl(int playerID, const CUnit* unit)
 
 /*** Called when a construction unit wants to "use his nano beams".
  *
+ * `action` is one of the following:
+ * - `-1` build,
+ * - `CMD.REPAIR` repair,
+ * - `CMD.RECLAIM` reclaim,
+ * - `CMD.RESTORE` restore,
+ * - `CMD.RESURRECT` resurrect, or
+ * - `CMD.CAPTURE` capture.
+ *
  * @function SyncedCallins:AllowBuilderHoldFire
  *
  * @param unitID UnitID
  * @param unitDefID UnitDefID
- * @param action -1|CMD
- * 
- * One of the following:
- * 	- `-1` build,
- * 	- `CMD.REPAIR` repair,
- * 	- `CMD.RECLAIM` reclaim,
- * 	- `CMD.RESTORE` restore,
- * 	- `CMD.RESURRECT` resurrect, or
- * 	- `CMD.CAPTURE` capture.
+ * @param action -1|CMD The action the builder wants to perform.
  * 
  * @return boolean actionAllowed
  */
@@ -1457,17 +1459,17 @@ bool CSyncedLuaHandle::TerraformComplete(const CUnit* unit, const CUnit* build)
 
 
 /***
- * Damage Controllers
+ * The weapon that caused damage, or a negative ID for damage that didn't come from a weapon.
  *
- * For the following callins, in addition to being a regular weapon, weaponDefID may be one of the following:
- *
- *     -1 - debris collision, also default of Spring.AddUnitDamage
- *     -2 - ground collision
- *     -3 - object collision
- *     -4 - fire damage
- *     -5 - water damage
- *     -6 - kill damage
- *     -7 - crush damage
+ * @alias DamageWeaponDefID
+ * | WeaponDefID
+ * | -1 # Debris collision, also the default of `Spring.AddUnitDamage`
+ * | -2 # Ground collision
+ * | -3 # Object collision
+ * | -4 # Fire damage
+ * | -5 # Water damage
+ * | -6 # Kill damage
+ * | -7 # Crush damage
  */
 
 /*** Called before damage is applied to the unit, allows fine control over how much damage and impulse is applied.
@@ -1485,7 +1487,7 @@ bool CSyncedLuaHandle::TerraformComplete(const CUnit* unit, const CUnit* build)
  * @param unitTeam TeamID
  * @param damage number
  * @param paralyzer boolean
- * @param weaponDefID WeaponDefID? Synced Only
+ * @param weaponDefID DamageWeaponDefID? Synced Only
  * @param projectileID ProjectileID? Synced Only
  * @param attackerID UnitID? Synced Only
  * @param attackerDefID UnitDefID? Synced Only
@@ -1577,7 +1579,7 @@ bool CSyncedLuaHandle::UnitPreDamaged(
  * @param featureDefID FeatureDefID
  * @param featureTeam TeamID
  * @param damage number
- * @param weaponDefID WeaponDefID
+ * @param weaponDefID DamageWeaponDefID
  * @param projectileID ProjectileID
  * @param attackerID UnitID
  * @param attackerDefID UnitDefID
@@ -2020,11 +2022,13 @@ int CSyncedLuaHandle::SyncedPairs(lua_State* L)
 /***
  * Invoke `UnsyncedCallins:RecvFromSynced` callin with the given arguments.
  * 
- * @function SyncedCallins.SendToUnsynced
- *
- * @param ... nil|boolean|number|string|table Arguments. Typically the first argument is the name of a function to call.
+ * Typically the first argument is the name of a function to call.
  *
  * Argument tables will be recursively copied and stripped of unsupported types and metatables.
+ *
+ * @function SyncedCallins.SendToUnsynced
+ *
+ * @param ... nil|boolean|number|string|table Arguments.
  *
  * @see UnsyncedCallins:RecvFromSynced
  */
