@@ -28,6 +28,8 @@
 	# LuaLS's problems as JSON, for `remap`
 	lua_check_results = "{{vars.site_temp_dir}}/lua-check.json"
 	lua_handles_temp_dir = "{{vars.site_temp_dir}}/handles"
+	# The handles beside the library's hand-written files, for `lua_check`
+	lua_handles_check_dir = "{{vars.site_temp_dir}}/handles-check"
 	lua_doc_paths = 'rts/{Lua,Rml/SolLua,Sim/Units/Scripts}/**/*.cpp'
 	lua_pages_dir = "{{vars.site_dir}}/content/docs/lua-api"
 	emmylua_cli_template = "{{vars.site_dir}}/emmylua-doc-cli-template"
@@ -111,11 +113,16 @@
 	# luals-check.json disables `luadoc-miss-see-name`: LuaLS wants a name before the `@see [file#L1](url)` source links.
 	# `remap` then reports LuaLS's problems at the C++ lines they came from (annotations in Actions),
 	# and the task fails if the extractor or LuaLS found any.
+	# The handles are checked as a game lists them: with the library's hand-written files (Types.lua,
+	# Script.lua, ...) in place of its `generated` and `Spring.lua`.
 	run = '''
 		status=0
 		mise -C "{{config_root}}" run lua_library || status=$?
 		lua-language-server --check "${RECOIL_LUA_LIBRARY_DIR}" --configpath "$PWD/{{vars.site_dir}}/luals-check.json" --check_out_path {{vars.lua_check_results}} || status=$?
-		lua-language-server --check "{{vars.lua_handles_dir}}" --configpath "$PWD/{{vars.site_dir}}/luals-check.json" || status=$?
+		rm -rf {{vars.lua_handles_check_dir}} && mkdir -p {{vars.lua_handles_check_dir}}
+		cp -r {{vars.lua_handles_dir}} {{vars.lua_handles_check_dir}}/handles
+		find "${RECOIL_LUA_LIBRARY_DIR}" -maxdepth 1 -name '*.lua' ! -name Spring.lua -exec cp {} {{vars.lua_handles_check_dir}}/ \;
+		lua-language-server --check "{{vars.lua_handles_check_dir}}" --configpath "$PWD/{{vars.site_dir}}/luals-check.json" || status=$?
 		lua-doc-extractor remap --sourcemap {{vars.lua_doc_sourcemap}} --dest {{vars.lua_doc_gen_dest}} --format {{vars.lua_doc_format}} {{vars.lua_check_results}}
 		exit $status
 	'''
