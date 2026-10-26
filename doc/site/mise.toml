@@ -19,7 +19,6 @@
 [vars]
 	lua_doc_gen_dest = "$RECOIL_LUA_LIBRARY_DIR/generated"
 	lua_handles_dir = "rts/Lua/handles"
-	lua_handles_temp_dir = "{{vars.site_dir}}/temp/handles"
 	site_dir = 'doc/site'
 	site_temp_dir = "{{vars.site_dir}}/temp"
 	# Diagnostics as GitHub annotations in Actions, which show on a PR's diff; plain text elsewhere
@@ -28,6 +27,7 @@
 	lua_doc_sourcemap = "{{vars.site_temp_dir}}/lua-sourcemap.json"
 	# LuaLS's problems as JSON, for `remap`
 	lua_check_results = "{{vars.site_temp_dir}}/lua-check.json"
+	lua_handles_temp_dir = "{{vars.site_temp_dir}}/handles"
 	lua_doc_paths = 'rts/{Lua,Rml/SolLua,Sim/Units/Scripts}/**/*.cpp'
 	lua_pages_dir = "{{vars.site_dir}}/content/docs/lua-api"
 	emmylua_cli_template = "{{vars.site_dir}}/emmylua-doc-cli-template"
