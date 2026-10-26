@@ -151,8 +151,8 @@ Often times, you want to pass in your own uniform data. To do that, we have to d
 
 ```lua
 shader = gl.CreateShader({
-    fragment = VFS.LoadFile("path/to/shader.frag.glsl"),
-    vertex = VFS.LoadFile("path/to/shader.vert.glsl"),
+    fragment = VFS.LoadFile("path/to/shader.frag.glsl"):gsub("//##UBO##", ubo_defs),
+    vertex = VFS.LoadFile("path/to/shader.vert.glsl"):gsub("//##UBO##", ubo_defs),
     uniformInt = {
         inputTexture = 0, -- we'll get to this
     }
