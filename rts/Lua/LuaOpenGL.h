@@ -159,6 +159,7 @@ class LuaOpenGL {
 		// query unless gl.DeleteQuery already did (id is 0 then).
 		struct OcclusionQuery {
 			unsigned int id;
+			unsigned int target; // GL_SAMPLES_PASSED, or GL_TIME_ELAPSED for gl.CreateQuery("time")
 		};
 
 	private:

@@ -6755,11 +6755,52 @@ LuaOpenGL::OcclusionQuery* LuaOpenGL::GetOcclusionQuery(lua_State* L, int index,
 }
 
 /***
+ * Creates a query object for gl.RunQuery.
+ *
+ * "samples" (the default) counts the samples that pass the depth test.
+ * "time" measures the GPU execution time of the commands issued inside
+ * gl.RunQuery (GL_TIME_ELAPSED), in nanoseconds; it returns nil when the GPU
+ * lacks timer queries (OpenGL 3.3 or ARB_timer_query).
+ *
+ * An unknown kind raises a Lua error. Engines without the kind argument
+ * ignore it and make a "samples" query, so a script can detect time-query
+ * support by checking that `pcall(gl.CreateQuery, "unknown-kind")` fails.
+ *
+ * Example usage (GPU time of a pass, read later without stalling):
+ *
+ * ```lua
+ * local query = gl.CreateQuery("time")
+ * if query then
+ *   gl.RunQuery(query, DrawMyPass)
+ * end
+ * -- a few frames later
+ * local nanoseconds = query and gl.GetQuery(query, false)
+ * if nanoseconds then
+ *   Spring.Echo(string.format("pass took %.3f ms", nanoseconds * 1e-6))
+ * end
+ * ```
+ *
  * @function gl.CreateQuery
- * @return any query
+ * @param kind ("samples"|"time")? (Default: `"samples"`)
+ * @return any? query nil when the GPU lacks timer queries ("time") or no query name could be generated
  */
 int LuaOpenGL::CreateQuery(lua_State* L)
 {
+	const std::string kind = luaL_optstring(L, 1, "samples");
+	GLenum target = GL_SAMPLES_PASSED;
+
+	if (kind == "time") {
+		// GL_TIME_ELAPSED is core in OpenGL 3.3, or the ARB_timer_query extension
+		if (!GLAD_GL_VERSION_3_3 && !GLAD_GL_ARB_timer_query)
+			return 0;
+
+		target = GL_TIME_ELAPSED;
+	} else if (kind != "samples") {
+		// an error, not a silent "samples" query, so a misspelt kind cannot
+		// return sample counts that look like times (luaL_error does not return)
+		luaL_error(L, "gl.CreateQuery(kind): kind must be \"samples\" or \"time\"");
+	}
+
 	GLuint id;
 	glGenQueries(1, &id);
 
@@ -6769,6 +6810,7 @@ int LuaOpenGL::CreateQuery(lua_State* L)
 	// a full userdata keeps the query alive while Lua references it; __gc frees it
 	auto* qry = static_cast<OcclusionQuery*>(lua_newuserdata(L, sizeof(OcclusionQuery)));
 	qry->id = id;
+	qry->target = target;
 
 	luaL_getmetatable(L, "OcclusionQuery");
 	lua_setmetatable(L, -2);
@@ -6812,9 +6854,9 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	const int args = lua_gettop(L); // number of arguments
 
 	running = true;
-	glBeginQuery(GL_SAMPLES_PASSED, qry->id);
+	glBeginQuery(qry->target, qry->id);
 	const int error = lua_pcall(L, (args - 2), 0, 0);
-	glEndQuery(GL_SAMPLES_PASSED);
+	glEndQuery(qry->target);
 	running = false;
 
 	if (error != 0) {
@@ -6826,9 +6868,19 @@ int LuaOpenGL::RunQuery(lua_State* L)
 }
 
 /***
+ * Result of the last gl.RunQuery: a sample count, or GPU nanoseconds for a
+ * "time" query.
+ *
+ * With wait = true (the default) the call blocks until the GPU has finished
+ * the measured commands, which stalls the frame when the query ran in the
+ * same frame. With wait = false it never blocks: it returns nil while the
+ * result is not available yet (and for a query that never ran), so a caller
+ * can poll once per frame (see the gl.CreateQuery example).
+ *
  * @function gl.GetQuery
  * @param query any
- * @return integer count
+ * @param wait boolean? (Default: `true`)
+ * @return number? result
  */
 int LuaOpenGL::GetQuery(lua_State* L)
 {
@@ -6836,6 +6888,29 @@ int LuaOpenGL::GetQuery(lua_State* L)
 
 	if (qry->id == 0)
 		return 0; // deleted
+
+	if (!luaL_optboolean(L, 2, true)) {
+		// GL_QUERY_RESULT_AVAILABLE never blocks; GL_QUERY_RESULT below would
+		GLuint available = GL_FALSE;
+		glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT_AVAILABLE, &available);
+
+		if (available == GL_FALSE) {
+			lua_pushnil(L);
+			return 1;
+		}
+	}
+
+	if (qry->target == GL_TIME_ELAPSED) {
+		// 64-bit: a 32-bit result would overflow after about 4.3 seconds of GPU
+		// time. lua_Number is float here, so the value reaches Lua rounded to 24
+		// significant bits: exact below 2^24 ns (about 16.8 ms), otherwise within
+		// about 1e-7 relative, ample for timing.
+		GLuint64 nanoseconds = 0;
+		glGetQueryObjectui64v(qry->id, GL_QUERY_RESULT, &nanoseconds);
+
+		lua_pushnumber(L, static_cast<double>(nanoseconds));
+		return 1;
+	}
 
 	GLuint count = 0; // stays 0 for a query that never ran (GL_INVALID_OPERATION, nothing written)
 	glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT, &count);
