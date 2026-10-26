@@ -979,9 +979,11 @@ bool QTPFS::PathManager::InitializeSearch(QTPFS::entity searchEntity) {
 		}
 
 		// We don't want to work on the live path in the background tasks because it can be changed and that would
-		// potentially cause a desync.
+		// potentially cause a desync. Externally requested (immediate) synced searches have no search copy: they
+		// work on the live path, see ExecuteSearch.
 		IPath* searchPath = GetSearchPath(pathEntity);
-		(*searchPath) = (*path);
+		if (searchPath != nullptr)
+			(*searchPath) = (*path);
 
 		search->initialized = true;
 	} else // If the underlying path is missing for some reason, then this search is invalid.
