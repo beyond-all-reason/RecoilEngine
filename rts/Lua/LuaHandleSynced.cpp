@@ -493,6 +493,11 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	lua_pop(L, 1);
 
 	// add the custom file loader
+	/***
+	 * Sends its arguments to the unsynced half, which receives them in `RecvFromSynced`.
+	 * @global SendToUnsynced function
+	 * @env synced
+	 */
 	LuaPushNamedCFunc(L, "SendToUnsynced", SendToUnsynced);
 	LuaPushNamedCFunc(L, "CallAsTeam",     CSplitLuaHandle::CallAsTeam);
 	LuaPushNamedNumber(L, "COBSCALE",      COBSCALE);
