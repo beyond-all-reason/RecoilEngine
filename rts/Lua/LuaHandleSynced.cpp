@@ -2600,8 +2600,15 @@ int CSplitLuaHandle::CallAsTeam(lua_State* L)
 
 			const int teamID = lua_toint(L, -1);
 
-			if ((teamID < CEventClient::MinSpecialTeam) || (teamID >= teamHandler.ActiveTeams()))
+			if ((teamID < CEventClient::MinSpecialTeam) || (teamID >= teamHandler.ActiveTeams())) {
+				CLuaHandle::SetHandleFullCtrl(L, prevFullCtrl);
+				CLuaHandle::SetHandleFullRead(L, prevFullRead);
+				CLuaHandle::SetHandleCtrlTeam(L, prevCtrlTeam);
+				CLuaHandle::SetHandleReadTeam(L, prevReadTeam);
+				CLuaHandle::SetHandleReadAllyTeam(L, prevReadAllyTeam);
+				CLuaHandle::SetHandleSelectTeam(L, prevSelectTeam);
 				luaL_error(L, "[%s] bad teamID %d", __func__, teamID);
+			}
 
 			switch (hashString(lua_tostring(L, -2))) {
 				case hashString("ctrl"): {
