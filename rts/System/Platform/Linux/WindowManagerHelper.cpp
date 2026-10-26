@@ -103,4 +103,59 @@ void SetWindowResizable(SDL_Window* window, bool resizable)
 	// Probably not needed
 }
 
+void LowerWindow(SDL_Window* window)
+{
+#ifndef HEADLESS
+	SDL_SysWMinfo info;
+	SDL_VERSION(&info.version);
+	if (!SDL_GetWindowWMInfo(window, &info) || info.subsystem != SDL_SYSWM_X11)
+		return;
+
+	Display* display = info.info.x11.display;
+	const Window x11window = info.info.x11.window;
+
+	// mutter ignores XLowerWindow from the application itself but honours the EWMH
+	// request, sent as a pager (source 2), the client EWMH defines it for.
+	// XLowerWindow stays for window managers without EWMH
+	constexpr long SOURCE_PAGER = 2;
+	XEvent ev = {};
+	ev.xclient.type = ClientMessage;
+	ev.xclient.window = x11window;
+	ev.xclient.message_type = XInternAtom(display, "_NET_RESTACK_WINDOW", false);
+	ev.xclient.format = 32;
+	ev.xclient.data.l[0] = SOURCE_PAGER;
+	ev.xclient.data.l[1] = None;
+	ev.xclient.data.l[2] = Below;
+	XSendEvent(display, DefaultRootWindow(display), false, SubstructureRedirectMask | SubstructureNotifyMask, &ev);
+
+	XLowerWindow(display, x11window);
+	XFlush(display);
+#endif
+}
+
+void SetNoInitialFocus(SDL_Window* window)
+{
+#ifndef HEADLESS
+	SDL_SysWMinfo info;
+	SDL_VERSION(&info.version);
+	if (!SDL_GetWindowWMInfo(window, &info) || info.subsystem != SDL_SYSWM_X11)
+		return;
+
+	Display* display = info.info.x11.display;
+	const Window x11window = info.info.x11.window;
+
+	// EWMH: a _NET_WM_USER_TIME of 0 on a newly mapped window asks the window manager
+	// not to focus it; Xlib takes 32-bit property data as an array of long
+	const long userTime = 0;
+	const Atom userTimeAtom = XInternAtom(display, "_NET_WM_USER_TIME", false);
+	XChangeProperty(display, x11window, userTimeAtom, XA_CARDINAL, 32, PropModeReplace, (const unsigned char*)&userTime, 1);
+	XFlush(display);
+#endif
+}
+
+void DisableWindowGhosting()
+{
+	// no ghost windows on X11
+}
+
 }; // namespace WindowManagerHelper

@@ -5436,6 +5436,8 @@ int LuaUnsyncedCtrl::SetWindowGeometry(lua_State* L)
 
 /***
  *
+ * Does nothing and returns false when the config key `BackgroundWindow` is set.
+ *
  * @function Spring.SetWindowMinimized
  * @return boolean minimized
  */

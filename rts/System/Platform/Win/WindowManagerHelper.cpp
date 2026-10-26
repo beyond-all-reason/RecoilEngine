@@ -68,4 +68,32 @@ void SetWindowResizable(SDL_Window* window, bool resizable)
 #endif
 }
 
+
+void LowerWindow(SDL_Window* window)
+{
+#ifndef HEADLESS
+	SDL_SysWMinfo info;
+	SDL_VERSION(&info.version);
+	if (!SDL_GetWindowWMInfo(window, &info))
+		return;
+
+	SetWindowPos(info.info.win.window, HWND_BOTTOM, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+#endif
+}
+
+
+void SetNoInitialFocus(SDL_Window* window)
+{
+	// SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN already keeps the focus away on Windows
+}
+
+
+void DisableWindowGhosting()
+{
+#ifndef HEADLESS
+	// affects the whole process, for the rest of its lifetime
+	DisableProcessWindowsGhosting();
+#endif
+}
+
 }; // namespace WindowManagerHelper
