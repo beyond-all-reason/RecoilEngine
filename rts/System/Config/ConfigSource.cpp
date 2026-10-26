@@ -101,7 +101,8 @@ void FileConfigSource::ReadModifyWrite(std::function<void ()> modify) {
 		ScopedFileLock scoped_lock(fileno(file), true);
 		Read(file);
 		modify();
-		Write(file);
+		if (!ferror(file))
+			Write(file);
 	}
 	else {
 		modify();
@@ -135,11 +136,11 @@ char* FileConfigSource::Strip(char* begin, char* end) {
  */
 void FileConfigSource::Read(FILE* file)
 {
+	StringMap newData;
+	StringMap newComments;
 	std::ostringstream commentBuffer;
 	char line[500];
 	rewind(file);
-	data.clear();
-	comments.clear();
 	while (fgets(line, sizeof(line), file)) {
 		char* line_stripped = Strip(line, strchr(line, '\0') - 1);
 		if (*line_stripped == '\0' || *line_stripped == '#') {
@@ -153,9 +154,9 @@ void FileConfigSource::Read(FILE* file)
 				// a "key=value" line
 				char* key = Strip(line_stripped, eq - 1);
 				char* value = Strip(eq + 1, strchr(eq + 1, '\0') - 1);
-				data[key] = value;
+				newData[key] = value;
 				if (commentBuffer.tellp() > 0) {
-					comments[key] = commentBuffer.str();
+					newComments[key] = commentBuffer.str();
 					// reset the ostringstream
 					commentBuffer.clear();
 					commentBuffer.str("");
@@ -168,11 +169,19 @@ void FileConfigSource::Read(FILE* file)
 		}
 	}
 
+	if (ferror(file)) {
+		LOG_L(L_ERROR, "FileConfigSource: Error: Could not read config file \"%s\"", filename.c_str());
+		return;
+	}
+
 	if (commentBuffer.tellp() > 0) {
 		// Must be sorted after all valid config variable names.
 		const std::string AT_THE_END = "\x7f";
-		comments[AT_THE_END] = commentBuffer.str();
+		newComments[AT_THE_END] = commentBuffer.str();
 	}
+
+	data.swap(newData);
+	comments.swap(newComments);
 }
 
 /**
