@@ -41,6 +41,24 @@ VOID_COMPONENT(ProcessPath);
 ALIAS_COMPONENT(PathSearchRef, QTPFS::entity);
 ALIAS_COMPONENT(PathRequeueSearch, bool);
 
+// This section is used to handle external pathing requests
+
+struct ExternalPathRequest {
+	const CSolidObject* object;
+
+	float3 startPos;
+	float3 endPos;
+	float radius;
+	unsigned int pathType; // looks up movedef
+	bool synced;
+	bool externalRequest;
+	bool allowRawSearch;
+};
+
+ALIAS_COMPONENT(ExternalPathEntityId, QTPFS::entity);
+ALIAS_COMPONENT(InternalPathEntityId, QTPFS::entity);
+
+
 }
 
 #endif
