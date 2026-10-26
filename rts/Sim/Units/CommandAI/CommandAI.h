@@ -47,6 +47,7 @@ public:
 	void WeaponFired(CWeapon* weapon, const bool searchForNewTarget, bool raiseEvent = true);
 
 	virtual bool CanWeaponAutoTarget(const CWeapon* weapon) const { return true; }
+	virtual bool HasAutoAttackCommand() const { return false; }
 	virtual int GetDefaultCmd(const CUnit* pointed, const CFeature* feature);
 	virtual void SlowUpdate();
 	virtual void GiveCommandReal(const Command& c, bool fromSynced = true);

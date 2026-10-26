@@ -42,6 +42,7 @@ struct UnitDefWeapon {
 
 	float3 mainDir = FwdVector;
 
+	bool independentAutoTargeting = false; ///< choose weapon targets independently of temporary auto-ATTACK movement targets
 	bool fastAutoRetargeting = false; ///< retarget immediately when dead/crashing state forbids firing under fireAtKilled/fireAtCrashing
 	bool fastQueryPointUpdate = false;	///< check in with unitscript to get most current query piece before every friendly fire check, don't wait for slow update
 	unsigned int accurateLeading = 0;	///< Accurately lead moving targets. The number controls how many calculation iterations are done. 0 = undershoot approaching or retreating targets (default), 1 = sufficient for exact solution for non-parabolic shots and improves parabolic shots, 2+ = extra iterations for parabolic shots

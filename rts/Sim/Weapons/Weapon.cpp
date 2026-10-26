@@ -112,6 +112,7 @@ CR_REG_METADATA(CWeapon, (
 	CR_MEMBER(incomingProjectileIDs),
 
 	CR_MEMBER(weaponAimAdjustPriority),
+	CR_MEMBER(independentAutoTargeting),
 	CR_MEMBER(fastAutoRetargeting),
 	CR_MEMBER(fastQueryPointUpdate),
 	CR_MEMBER(accurateLeading),
@@ -195,6 +196,7 @@ CWeapon::CWeapon(CUnit* owner, const WeaponDef* def):
 	muzzleFlareSize(1),
 
 	weaponAimAdjustPriority(1.f),
+	independentAutoTargeting(false),
 	fastAutoRetargeting(false),
 	fastQueryPointUpdate(false),
 	accurateLeading(0),
@@ -337,14 +339,14 @@ void CWeapon::Update()
 			? (ownerTarget.unit != nullptr && ownerTarget.unit->CanBeFiredAt())
 			: (ownerTarget.type != Target_None);
 
-		if (!ownerTargetIsValid)
+		if (!ownerTargetIsValid || !CanUseUnitTarget())
 			AutoTarget();
 	}
 
 	// SlowUpdate() only generates targets when we are in range
 	// esp. for bombs this is often too late (SlowUpdate gets only called twice per second)
 	// so check unit's target this check every frame (unit target has highest priority even in SlowUpdate!)
-	if (!HaveTarget() && owner->curTarget.type != Target_None)
+	if (!HaveTarget() && owner->curTarget.type != Target_None && CanUseUnitTarget())
 		Attack(owner->curTarget);
 
 	if (salvoLeft == 0 && HaveDeniedInterceptTarget())
@@ -681,6 +683,19 @@ bool CWeapon::HaveDeniedInterceptTarget() const
 }
 
 
+bool CWeapon::CanUseUnitTarget() const
+{
+	// Temporary attack orders still steer the unit. Eligible weapons choose
+	// their own targets instead of repeatedly inheriting that movement target.
+	if (!independentAutoTargeting || weaponDef->noAutoTarget || noAutoTarget)
+		return true;
+	if (slavedTo != nullptr || weaponDef->interceptor || owner->fireState < FIRESTATE_FIREATWILL)
+		return true;
+	if (owner->curTarget.isUserTarget || owner->curTarget.isManualFire)
+		return true;
+	return !owner->commandAI->HasAutoAttackCommand();
+}
+
 bool CWeapon::AllowWeaponAutoTarget() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -816,7 +831,7 @@ void CWeapon::SlowUpdate()
 		// keep track of the closest projectile heading our way (if any)
 		UpdateInterceptTarget();
 	} else
-	if (owner->curTarget.type != Target_None) {
+	if (owner->curTarget.type != Target_None && CanUseUnitTarget()) {
 		// If unit got an attack target, clone the job (independent of AutoTarget!)
 		// Also do this unconditionally (owner's target always has priority over weapon one!)
 		Attack(owner->curTarget);
