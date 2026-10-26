@@ -23,4 +23,16 @@ void SetWindowResizable(SDL_Window* window, bool resizable)
 	//FIXME implement?
 }
 
+
+void LowerWindow(SDL_Window* window)
+{
+	//FIXME implement?
+}
+
+
+void DisableWindowGhosting()
+{
+	// no ghost windows on macOS
+}
+
 }; // namespace WindowManagerHelper
