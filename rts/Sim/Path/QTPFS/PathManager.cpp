@@ -226,7 +226,7 @@ QTPFS::PathManager::~PathManager() {
 		bool isUnsyncedPath = externalRegistry.all_of<UnsyncedIPath>(entity);
 		bool isExternallyManagedSyncedPath = externalRegistry.all_of<ExternallyManagedSyncedIPath>(entity);
 		bool isInternalPathEntityId = externalRegistry.all_of<InternalPathEntityId>(entity);
-		bool isExternalPathRequest = externalRegistry.all_of<ExternalPathRequest>(entity);
+		bool isExternalPathRequest = externalRegistry.all_of<PendingPathRequestDetails>(entity);
 
 		bool isUnsyncedSearch = externalRegistry.all_of<UnsyncedPathSearch>(entity);
 		bool isExternallyManagedSearch = externalRegistry.all_of<ExternallyManagedPathSearch>(entity);
@@ -244,7 +244,7 @@ QTPFS::PathManager::~PathManager() {
 			DestroyPathEntity(externalRegistry, entity);
 		}
 		if (isExternalPathRequest) {
-			LOG("%s: ExternalPathRequest %x still active!", __func__, entt::to_integral(entity));
+			LOG("%s: PendingPathRequestDetails %x still active!", __func__, entt::to_integral(entity));
 			DestroyPathEntity(externalRegistry, entity);
 		}
 		if (isUnsyncedSearch) {
@@ -1452,7 +1452,7 @@ unsigned int QTPFS::PathManager::QueueSearch(
 		if (&reg == &externalRegistry){
 			// This unit path request has come in while the background path processing may still be underway. We need
 			// to raise an external request so that it can be safely transferred to the internal registry later.
-			reg.emplace<ExternalPathRequest>
+			reg.emplace<PendingPathRequestDetails>
 				( pathEntity
 				, object, sourcePoint, targetPoint, radius
 				, moveDef->pathType
@@ -1623,10 +1623,10 @@ void QTPFS::PathManager::DeletePath(unsigned int pathID, bool force) {
 
 	QTPFS::entity pathEntity = QTPFS::entity(pathID);
 
-	// Check if it is a ExternalPathRequest in the external registry, if so then this  is pending request that still
+	// Check if it is a PendingPathRequestDetails in the external registry, if so then this  is pending request that still
 	// has not been scheduled and can be straight up removed. We need this check because there isn't a referencable
 	// IPath type object needed further down.
-	if (externalRegistry.valid(pathEntity) && externalRegistry.all_of<ExternalPathRequest>(pathEntity)) {
+	if (externalRegistry.valid(pathEntity) && externalRegistry.all_of<PendingPathRequestDetails>(pathEntity)) {
 		// The presence of a link to the internal regsitry means the request has been scheduled.
 		assert(!externalRegistry.any_of<InternalPathEntityId>(pathEntity));
 
@@ -1883,10 +1883,10 @@ float3 QTPFS::PathManager::NextWayPoint(
 		return float3(sourcePoint.x + targetDirec.x, -1.0f, sourcePoint.z + targetDirec.z);
 	};
 
-	// Check if it is a ExternalPathRequest in the external registry. If so then call and return a temporary waypoint
+	// Check if it is a PendingPathRequestDetails in the external registry. If so then call and return a temporary waypoint
 	// because this is pending request that still needs to be scheduled.
-	if (externalRegistry.valid(pathEntity) && externalRegistry.all_of<ExternalPathRequest>(pathEntity)) {
-		const auto& request = externalRegistry.get<ExternalPathRequest>(pathEntity);
+	if (externalRegistry.valid(pathEntity) && externalRegistry.all_of<PendingPathRequestDetails>(pathEntity)) {
+		const auto& request = externalRegistry.get<PendingPathRequestDetails>(pathEntity);
 		return makeTempWaypoint(sourcePoint, request.endPos);
 	}
 

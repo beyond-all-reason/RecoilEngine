@@ -35,12 +35,12 @@ void RequestPathInternalSystem::Update()
 
     // walk the available path requests in the external registry and create internal path entities for them.
 
-    auto view = externalRegistry.view<ExternalPathRequest>();
+    auto view = externalRegistry.view<PendingPathRequestDetails>();
     for (auto externalPathEntity : view) {
         assert(externalRegistry.valid(externalPathEntity));
-        assert(externalRegistry.all_of<ExternalPathRequest>(externalPathEntity));
+        assert(externalRegistry.all_of<PendingPathRequestDetails>(externalPathEntity));
 
-        ExternalPathRequest* request = &view.get<ExternalPathRequest>(externalPathEntity);
+        PendingPathRequestDetails* request = &view.get<PendingPathRequestDetails>(externalPathEntity);
 
         // LOG("%s: delete search %x", __func__, entt::to_integral(pathSearchEntity));
         if (externalRegistry.valid(externalPathEntity)) {
@@ -60,7 +60,7 @@ void RequestPathInternalSystem::Update()
     }
 
     // clear all path requests from the external registry, since they have been processed and converted into internal path entities.
-    externalRegistry.clear<ExternalPathRequest>();
+    externalRegistry.clear<PendingPathRequestDetails>();
 }
 
 void RequestPathInternalSystem::Shutdown() {

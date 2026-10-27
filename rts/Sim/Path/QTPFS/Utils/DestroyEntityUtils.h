@@ -9,7 +9,7 @@ namespace QTPFS {
 
     // Destroy an entity. It should be a path and is checked when asserts are enabled.
     inline void DestroyPathEntity(entt::basic_registry<QTPFS::entity> &reg, QTPFS::entity pathEntity) {
-        assert((reg.any_of<IPath, UnsyncedIPath, ExternallyManagedSyncedIPath, InternalPathEntityId, ExternalPathRequest>(pathEntity)));
+        assert((reg.any_of<IPath, UnsyncedIPath, ExternallyManagedSyncedIPath, InternalPathEntityId, PendingPathRequestDetails>(pathEntity)));
         assert((!reg.any_of<PathSearch, UnsyncedPathSearch, ExternallyManagedPathSearch>(pathEntity)));
         reg.destroy(pathEntity);
     }
@@ -17,7 +17,7 @@ namespace QTPFS {
      // Destroy an entity. It should be a path search and is checked when asserts are enabled.
     inline void DestroyPathSearchEntity(entt::basic_registry<QTPFS::entity> &reg, QTPFS::entity pathSearchEntity) {
         assert((reg.any_of<PathSearch, UnsyncedPathSearch, ExternallyManagedPathSearch>(pathSearchEntity)));
-        assert((!reg.any_of<IPath, UnsyncedIPath, ExternallyManagedSyncedIPath, InternalPathEntityId, ExternalPathRequest>(pathSearchEntity)));
+        assert((!reg.any_of<IPath, UnsyncedIPath, ExternallyManagedSyncedIPath, InternalPathEntityId, PendingPathRequestDetails>(pathSearchEntity)));
         reg.destroy(pathSearchEntity);
     }
 
