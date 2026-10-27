@@ -1530,7 +1530,7 @@ void CLuaHandle::UnitHarvestStorageFull(const CUnit* unit)
 	UnitCallIn(cmdStr, unit);
 }
 
-/*** Called when a unit starts it's self destruct command.
+/*** Called when a unit's self-destruct countdown starts.
  *
  * @function Callins:UnitSelfDestructStarted
  * @param unitID integer
@@ -1538,13 +1538,13 @@ void CLuaHandle::UnitHarvestStorageFull(const CUnit* unit)
  * @param unitTeam integer
  * @param remainingSeconds number
  */
-void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) 
+void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds)
 {
 	static const LuaHashString cmdStr(__func__);
 	UnitSelfDestructCallin(cmdStr, unit, remainingSeconds);
 }
 
-/*** Called when a unit cancels it's self destruct command.
+/*** Called when a unit's self-destruct countdown is cancelled.
  *
  * @function Callins:UnitSelfDestructCancelled
  * @param unitID integer
@@ -1552,7 +1552,7 @@ void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit, float remainingSecon
  * @param unitTeam integer
  * @param remainingSeconds number
  */
-void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds) 
+void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds)
 {
 	static const LuaHashString cmdStr(__func__);
 	UnitSelfDestructCallin(cmdStr, unit, remainingSeconds);

@@ -76,6 +76,8 @@
 
 #include "System/Misc/TracyDefs.h"
 
+#include <limits>
+
 GlobalUnitParams globalUnitParams;
 
 // See end of source for member bindings
@@ -679,12 +681,45 @@ void CUnit::Update()
 	ASSERT_SYNCED(pos);
 
 	if unlikely(selfDTargetFrame > 0 && !isDead) {
-		const int currentFrameNum = gs->frameNum;
-		if (currentFrameNum >= selfDTargetFrame) {
+		// a stunned unit's countdown waits
+		if (IsStunned()) {
+			++selfDTargetFrame;
+		} else if (gs->frameNum >= selfDTargetFrame) {
+			// avoid unfinished buildings making an explosion
 			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
-			return; // Skip rest of update if killed
 		}
 	}
+}
+
+void CUnit::StartSelfD(float seconds)
+{
+	// clamped so neither the cast nor the target frame can overflow
+	const int maxFrames = std::numeric_limits<int>::max() - gs->frameNum;
+	const float wantedFrames = math::ceil(std::max(0.0f, seconds) * GAME_SPEED);
+	const int frames = (wantedFrames < static_cast<float>(maxFrames)) ? std::min(static_cast<int>(wantedFrames), maxFrames) : maxFrames;
+
+	// 0 means inactive, which only frame 0 could produce
+	selfDTargetFrame = std::max(1, gs->frameNum + frames);
+	eventHandler.UnitSelfDestructStarted(this, frames * INV_GAME_SPEED);
+}
+
+void CUnit::CancelSelfD()
+{
+	if (selfDTargetFrame <= 0)
+		return;
+
+	const float secondsLeft = GetSelfDSecondsLeft();
+
+	selfDTargetFrame = 0;
+	eventHandler.UnitSelfDestructCancelled(this, secondsLeft);
+}
+
+float CUnit::GetSelfDSecondsLeft() const
+{
+	if (selfDTargetFrame <= 0)
+		return 0.0f;
+
+	return std::max(0, selfDTargetFrame - gs->frameNum) * INV_GAME_SPEED;
 }
 
 unsigned int CUnit::UpdateState()

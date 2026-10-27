@@ -234,6 +234,10 @@ public:
 	void KilledScriptFinished(int wreckLevel) { deathScriptFinished = true; delayedWreckLevel = wreckLevel; }
 	void ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
 	virtual void KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
+
+	void StartSelfD(float seconds);
+	void CancelSelfD();
+	float GetSelfDSecondsLeft() const;
 	virtual void IncomingMissile(CMissileProjectile* missile);
 	CFeature* CreateWreck(int wreckLevel, int smokeTime);
 
