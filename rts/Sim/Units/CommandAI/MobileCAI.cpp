@@ -1880,6 +1880,7 @@ void CMobileCAI::UnloadUnits_Drop(Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const auto& transportees = owner->transportedUnits;
+	const auto cmdOpts = c.GetOpts(); // FinishCommand removes c from the queue
 
 	const float3 startingDropPos = c.GetPos(0);
 	const float3 approachVector = (startingDropPos - owner->pos).Normalize();
@@ -1895,7 +1896,7 @@ void CMobileCAI::UnloadUnits_Drop(Command& c)
 		auto di = dropSpots.rbegin();
 
 		for (; ti != transportees.end() && di != dropSpots.rend(); ++ti, ++di) {
-			commandQue.push_front(Command(CMD_UNLOAD_UNIT, c.GetOpts() | INTERNAL_ORDER, *di));
+			commandQue.push_front(Command(CMD_UNLOAD_UNIT, cmdOpts | INTERNAL_ORDER, *di));
 		}
 
 		SlowUpdate();
