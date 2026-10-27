@@ -62,14 +62,14 @@ void CScanCodes::Reset()
 	AddPair("sc_clear",     SDL_SCANCODE_CLEAR);
 	AddPair("sc_return",    SDL_SCANCODE_RETURN);
 	AddPair("sc_pause",     SDL_SCANCODE_PAUSE);
-	AddPair("sc_esc",       SDL_SCANCODE_ESCAPE);
+	AddAlias("sc_esc",      SDL_SCANCODE_ESCAPE);
 	AddPair("sc_escape",    SDL_SCANCODE_ESCAPE);
 	AddPair("sc_space",     SDL_SCANCODE_SPACE, true);
 	AddPair("sc_delete",    SDL_SCANCODE_DELETE);
-	AddPair("sc_-",         SDL_SCANCODE_MINUS);
+	AddAlias("sc_-",        SDL_SCANCODE_MINUS);
 	AddPair("sc_minus",     SDL_SCANCODE_MINUS);
 	AddPair("sc_=",         SDL_SCANCODE_EQUALS);
-	AddPair("sc_equals",    SDL_SCANCODE_EQUALS);
+	AddAlias("sc_equals",   SDL_SCANCODE_EQUALS);
 
 	AddPair("sc_a",    SDL_SCANCODE_A);
 	AddPair("sc_b",    SDL_SCANCODE_B);
@@ -111,23 +111,23 @@ void CScanCodes::Reset()
 	AddPair("sc_comma", SDL_SCANCODE_COMMA, true);
 	AddAlias("sc_,", SDL_SCANCODE_COMMA);
 
-	AddPair("sc_'", SDL_SCANCODE_APOSTROPHE, true);
+	AddAlias("sc_'", SDL_SCANCODE_APOSTROPHE);
 	AddPair("sc_apostrophe", SDL_SCANCODE_APOSTROPHE, true);
 
-	AddPair("sc_.", SDL_SCANCODE_PERIOD, true);
+	AddAlias("sc_.", SDL_SCANCODE_PERIOD);
 	AddPair("sc_period", SDL_SCANCODE_PERIOD, true);
 
 	AddPair("sc_;", SDL_SCANCODE_SEMICOLON, true);
-	AddPair("sc_semicolon", SDL_SCANCODE_SEMICOLON, true);
+	AddAlias("sc_semicolon", SDL_SCANCODE_SEMICOLON);
 
-	AddPair("sc_[", SDL_SCANCODE_LEFTBRACKET, true);
+	AddAlias("sc_[", SDL_SCANCODE_LEFTBRACKET);
 	AddPair("sc_leftbracket", SDL_SCANCODE_LEFTBRACKET, true);
 
-	AddPair("sc_]", SDL_SCANCODE_RIGHTBRACKET, true);
+	AddAlias("sc_]", SDL_SCANCODE_RIGHTBRACKET);
 	AddPair("sc_rightbracket", SDL_SCANCODE_RIGHTBRACKET, true);
 
 	AddPair("sc_/", SDL_SCANCODE_SLASH, true);
-	AddPair("sc_slash", SDL_SCANCODE_SLASH, true);
+	AddAlias("sc_slash", SDL_SCANCODE_SLASH);
 
 	// (Located in the top left corner (on both ANSI and ISO keyboards).
 	//
@@ -140,7 +140,7 @@ void CScanCodes::Reset()
 	// a French Windows layout, COMMERCIAL AT and NUMBER SIGN in a French Mac
 	// layout on ISO keyboards, and LESS-THAN SIGN and GREATER-THAN SIGN in a
 	// Swiss German, German, or French Mac layout on ANSI keyboards.)
-	AddPair("sc_`", SDL_SCANCODE_GRAVE, true);
+	AddAlias("sc_`", SDL_SCANCODE_GRAVE);
 	AddPair("sc_backquote", SDL_SCANCODE_GRAVE, true);
 
 	// (Located at the lower left of the return key on ISO keyboards and at the
@@ -152,7 +152,7 @@ void CScanCodes::Reset()
 	// German layout, NUMBER SIGN and APOSTROPHE in a German layout, GRAVE ACCENT
 	// and POUND SIGN in a French Mac layout, and ASTERISK and MICRO SIGN in a
 	// French Windows layout.)
-	AddPair("sc_\\", SDL_SCANCODE_BACKSLASH, true);
+	AddAlias("sc_\\", SDL_SCANCODE_BACKSLASH);
 	AddPair("sc_backslash", SDL_SCANCODE_BACKSLASH, true);
 
 	// This is the additional key that ISO keyboards have over ANSI ones, located
@@ -222,7 +222,7 @@ void CScanCodes::Reset()
 	// Miscellaneous function keys
 	AddPair("sc_help", SDL_SCANCODE_HELP);
 	AddPair("sc_printscreen", SDL_SCANCODE_PRINTSCREEN);
-	AddPair("sc_print", SDL_SCANCODE_PRINTSCREEN);
+	AddAlias("sc_print", SDL_SCANCODE_PRINTSCREEN);
 	AddPair("sc_sysreq", SDL_SCANCODE_SYSREQ);
 	AddPair("sc_menu", SDL_SCANCODE_MENU);
 	AddPair("sc_power", SDL_SCANCODE_POWER);     // Power Macintosh power key
