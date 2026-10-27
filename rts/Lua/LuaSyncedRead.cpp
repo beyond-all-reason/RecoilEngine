@@ -34,6 +34,7 @@
 #include "Sim/Features/Feature.h"
 #include "Sim/Features/FeatureDef.h"
 #include "Sim/Features/FeatureHandler.h"
+#include "Sim/Misc/CategoryHandler.h"
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "Sim/Misc/LosHandler.h"
@@ -214,6 +215,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitTeam);
 	REGISTER_LUA_CFUNC(GetUnitAllyTeam);
 	REGISTER_LUA_CFUNC(GetUnitNeutral);
+	REGISTER_LUA_CFUNC(GetUnitCategories);
 	REGISTER_LUA_CFUNC(GetUnitHealth);
 	REGISTER_LUA_CFUNC(GetUnitIsDead);
 	REGISTER_LUA_CFUNC(GetUnitIsStunned);
@@ -4149,6 +4151,35 @@ int LuaSyncedRead::GetUnitNeutral(lua_State* L)
 		return 0;
 
 	lua_pushboolean(L, unit->IsNeutral());
+	return 1;
+}
+
+
+/*** Returns the categories of an allied unit.
+ *
+ * @function Spring.GetUnitCategories
+ *
+ * The categories of the unit's definition, as changed by `Spring.SetUnitCategories`.
+ *
+ * @param unitID UnitID
+ * @return table<string, true>? categories
+ */
+int LuaSyncedRead::GetUnitCategories(lua_State* L)
+{
+	const CUnit* unit = ParseAllyUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
+
+	const std::vector<std::string> names = CCategoryHandler::Instance()->GetCategoryNames(unit->category);
+
+	lua_createtable(L, 0, names.size());
+
+	for (const std::string& name: names) {
+		lua_pushsstring(L, name);
+		lua_pushboolean(L, true);
+		lua_rawset(L, -3);
+	}
+
 	return 1;
 }
 

@@ -126,6 +126,7 @@ class LuaSyncedCtrl
 		static int SetUnitLandGoal(lua_State* L);
 		static int ClearUnitGoal(lua_State* L);
 		static int SetUnitNeutral(lua_State* L);
+		static int SetUnitCategories(lua_State* L);
 		static int SetUnitTarget(lua_State* L);
 		static int SetUnitMidAndAimPos(lua_State* L);
 		static int SetUnitRadiusAndHeight(lua_State* L);
