@@ -5182,7 +5182,8 @@ int LuaSyncedRead::GetUnitMaxRange(lua_State* L)
  *   "targetMoveError" (extra inaccuracy against moving targets, after XP bonus)
  *   "avoidFlags" (bitmask for targeting avoidance),
  *   "ttl" (number of seconds a projectile should live)
- *   "collisionFlags" (bitmask for collisions).
+ *   "collisionFlags" (bitmask for collisions),
+ *   "onlyForward" (boolean: weapon requires chassis rotation to aim).
  *
  * The state "salvoError" is an exception and returns a table: {x, y, z},
  * which represents the inaccuracy error of the ongoing burst.
@@ -5237,6 +5238,10 @@ int LuaSyncedRead::GetUnitWeaponState(lua_State* L)
 		} break;
 		case hashString("sprayAngle"): {
 			lua_pushnumber(L, weapon->SprayAngleExperience());
+		} break;
+
+		case hashString("onlyForward"): {
+			lua_pushboolean(L, weapon->WantOwnerRotation());
 		} break;
 
 		case hashString("range"): {
@@ -5509,7 +5514,7 @@ int LuaSyncedRead::GetUnitWeaponTryTarget(lua_State* L)
 			return 0;
 	}
 
-	lua_pushboolean(L, weapon->TryTarget(SWeaponTarget(enemy, pos, true)));
+	lua_pushboolean(L, weapon->TryTarget(SWeaponTarget(enemy, pos, true)) == TargetCheckResult::Clear);
 	return 1;
 }
 
@@ -5715,7 +5720,7 @@ int LuaSyncedRead::GetUnitWeaponHaveFreeLineOfFire(lua_State* L)
 		} break;
 	}
 
-	lua_pushboolean(L, weapon->HaveFreeLineOfFire(srcPos, tgtPos, SWeaponTarget(enemy, tgtPos, true)));
+	lua_pushboolean(L, weapon->HaveFreeLineOfFire(srcPos, tgtPos, SWeaponTarget(enemy, tgtPos, true)) == TargetCheckResult::Clear);
 	return 1;
 }
 
@@ -6114,6 +6119,10 @@ int LuaSyncedRead::GetUnitBlocking(lua_State* L)
 
 /***
  *
+ * Includes strafeLeft for mobile command AIs: the native controller's seeded
+ * strafe side. A Lua controller can read it once when taking ownership, then
+ * manage its own direction without consuming simulation RNG. Native state does
+ * not follow subsequent Lua direction changes.
  * @function Spring.GetUnitMoveTypeData
  * @param unitID UnitID
  */
@@ -6126,6 +6135,11 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 	AMoveType* amt = unit->moveType;
 
 	lua_createtable(L, 0, 26);
+	// Seed for a Lua-owned strafe controller. Native and Lua controllers must
+	// not alternate updates while assuming they share subsequent direction state.
+	if (const auto* cai = dynamic_cast<const CMobileCAI*>(unit->commandAI))
+		LuaPushNamedBool(L, "strafeLeft", cai->GetStrafeLeft());
+
 	LuaPushNamedNumber(L, "maxSpeed", amt->GetMaxSpeed() * GAME_SPEED);
 	LuaPushNamedNumber(L, "maxWantedSpeed", amt->GetMaxWantedSpeed() * GAME_SPEED);
 	LuaPushNamedNumber(L, "goalx", amt->goalPos.x);

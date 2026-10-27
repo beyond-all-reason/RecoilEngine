@@ -2,6 +2,11 @@
 
 
 #include "MobileCAI.h"
+
+#include <string>
+#include <cmath>
+
+#include "LuaInclude.h"
 #include "ExternalAI/EngineOutHandler.h"
 #include "Game/GameHelper.h"
 #include "Game/GlobalUnsynced.h"
@@ -590,14 +595,14 @@ bool CMobileCAI::IsValidTarget(const CUnit* enemy, CWeapon* weapon) const {
 	// test if given weapon belonging to owner can target
 	// the enemy unit; indicates an auto-targeting context
 	if (weapon != nullptr)
-		return (weapon->TestTarget(enemy->pos, {enemy}) && (owner->moveState != MOVESTATE_HOLDPOS || weapon->TryTargetRotate(enemy, false, false)));
+		return (weapon->TestTarget(enemy->pos, {enemy}) && (owner->moveState != MOVESTATE_HOLDPOS || weapon->TryTargetRotate(enemy, false, false) == TargetCheckResult::Clear));
 
 	// test if any of owner's weapons can target the enemy unit
 	if (owner->weapons.empty())
 		return false;
 
 	for (CWeapon* w: owner->weapons) {
-		if (w->TestTarget(enemy->pos, SWeaponTarget(enemy)) && (owner->moveState != MOVESTATE_HOLDPOS || w->TryTargetRotate(enemy, false, false)))
+		if (w->TestTarget(enemy->pos, SWeaponTarget(enemy)) && (owner->moveState != MOVESTATE_HOLDPOS || w->TryTargetRotate(enemy, false, false) == TargetCheckResult::Clear))
 			return true;
 	}
 
@@ -702,9 +707,175 @@ void CMobileCAI::ExecuteStop(Command& c)
 
 
 
+// Movement operations are only valid during this unit's movement call-in.
+// A copied command survives command-queue edits made by a gadget.
+namespace {
+	struct AttackMovementScope {
+		CMobileCAI* cai;
+		Command command;
+		CUnit* target;
+		bool targetDead;
+	};
+	thread_local AttackMovementScope* attackMovementScope = nullptr;
+
+	int ParseAttackAvoidFlags(lua_State* L, int index)
+	{
+		if (lua_isnoneornil(L, index))
+			return -1;
+		const auto flags = luaL_checknumber(L, index);
+		if (!std::isfinite(flags) || flags < 0 || flags > 1023 || flags != int(flags))
+			luaL_error(L, "invalid avoidance flags");
+		return int(flags);
+	}
+}
+
+bool CMobileCAI::CallAttackMovement(Command& c)
+{
+	if (owner->isDead || !eventHandler.HasAttackCommandMovement())
+		return false;
+	AttackMovementScope scope{this, c, orderTarget, orderTarget != nullptr && orderTarget->isDead};
+	auto* previous = attackMovementScope;
+	attackMovementScope = &scope;
+	const bool handled = eventHandler.AttackCommandMovement(owner, scope.command);
+	attackMovementScope = previous;
+	// Do not touch the original command reference after Lua replaced its queue.
+	return handled || owner->isDead || orderTarget != scope.target || commandQue.empty() ||
+		commandQue.front().GetTag() != scope.command.GetTag() ||
+		commandQue.front().GetID() != scope.command.GetID();
+}
+
+const Command& CMobileCAI::CheckAttackMovementContext(lua_State* L) const
+{
+	if (attackMovementScope == nullptr || attackMovementScope->cai != this)
+		luaL_error(L, "Attack movement APIs are only valid inside this unit's AttackCommandMovement");
+	const Command& c = attackMovementScope->command;
+	if (!IsAttackMovementContextValid())
+		luaL_error(L, "attack command changed during AttackCommandMovement");
+
+	return c;
+}
+
+bool CMobileCAI::IsAttackMovementContextValid() const
+{
+	return attackMovementScope != nullptr && attackMovementScope->cai == this &&
+		!owner->isDead && orderTarget == attackMovementScope->target && !commandQue.empty() &&
+		// Native AI can enter with a dead target (e.g. fireAtKilled). Only a
+		// death during this callback invalidates an otherwise identical target.
+		(orderTarget == nullptr || orderTarget->isDead == attackMovementScope->targetDead) &&
+		commandQue.front().GetTag() == attackMovementScope->command.GetTag() &&
+		commandQue.front().GetID() == attackMovementScope->command.GetID();
+}
+
+int CMobileCAI::TestAttackWeapon(lua_State* L)
+{
+	const Command& command = CheckAttackMovementContext(L);
+	const int index = luaL_checkint(L, 2) - 1;
+	if (index < 0 || index >= owner->weapons.size())
+		return luaL_error(L, "invalid weapon index");
+	CWeapon* weapon = owner->weapons[index];
+	SWeaponTarget target = orderTarget != nullptr
+		? SWeaponTarget(orderTarget, !command.IsInternalOrder())
+		: SWeaponTarget(command.GetPos(0), !command.IsInternalOrder());
+	target.isManualFire = orderTarget != nullptr && command.GetID() == CMD_MANUALFIRE;
+
+	std::string orientation = orderTarget != nullptr ? "rotate" : "heading";
+	int avoidFlags = -1;
+	bool useMuzzle = false;
+	bool candidate = false;
+	float3 position = owner->pos;
+	const float3 targetPos = orderTarget != nullptr ? float3(orderTarget->midPos) : command.GetPos(0);
+	const float3 origin = orderTarget != nullptr ? float3(owner->midPos) : owner->pos;
+	short heading = GetHeadingFromVector(targetPos.x - origin.x, targetPos.z - origin.z);
+	if (!lua_isnoneornil(L, 3)) {
+		luaL_checktype(L, 3, LUA_TTABLE);
+		lua_getfield(L, 3, "orientation");
+		orientation = luaL_optstring(L, -1, orientation.c_str());
+		lua_pop(L, 1);
+		lua_getfield(L, 3, "avoidFlags");
+		avoidFlags = ParseAttackAvoidFlags(L, -1);
+		lua_pop(L, 1);
+		lua_getfield(L, 3, "useMuzzle");
+		if (!lua_isnil(L, -1))
+			luaL_checktype(L, -1, LUA_TBOOLEAN);
+		useMuzzle = luaL_optboolean(L, -1, false);
+		lua_pop(L, 1);
+		lua_getfield(L, 3, "position");
+		if (!lua_isnil(L, -1)) {
+			luaL_checktype(L, -1, LUA_TTABLE);
+			for (int i = 0; i < 3; ++i) {
+				lua_rawgeti(L, -1, i + 1);
+				position[i] = luaL_checkfloat(L, -1);
+				lua_pop(L, 1);
+			}
+			if (!position.IsInBounds() || !std::isfinite(position.y))
+				return luaL_error(L, "invalid candidate position");
+			candidate = true;
+		}
+		lua_pop(L, 1);
+		lua_getfield(L, 3, "heading");
+		if (candidate && lua_isnil(L, -1))
+			return luaL_error(L, "candidate position requires an explicit heading");
+		if (!lua_isnil(L, -1)) {
+			const auto value = luaL_checknumber(L, -1);
+			if (!std::isfinite(value) || value < -32768 || value > 32767 || value != int(value))
+				return luaL_error(L, "invalid candidate heading");
+			heading = short(value);
+			candidate = true;
+		}
+		lua_pop(L, 1);
+	}
+	if (orientation != "rotate" && orientation != "heading")
+		return luaL_error(L, "orientation must be rotate or heading");
+	if ((candidate || useMuzzle) && orientation != "heading")
+		return luaL_error(L, "candidate and muzzle queries require heading orientation");
+
+	TargetCheckResult result = TargetCheckResult::NotChecked;
+	if (candidate || useMuzzle) {
+		result = weapon->TryTargetAt(position, heading, target, avoidFlags, useMuzzle);
+	} else if (orientation == "heading") {
+		result = weapon->TryTargetHeading(heading, target, avoidFlags);
+	} else if (orderTarget != nullptr) {
+		result = weapon->TryTargetRotate(orderTarget, target.isUserTarget, target.isManualFire, avoidFlags);
+	}
+	lua_pushboolean(L, result == TargetCheckResult::Clear);
+	lua_pushstring(L, TargetCheckResultName(result));
+	if (result.objectType == TargetCheckResult::ObjectType::None) {
+		lua_pushnil(L);
+		lua_pushnil(L);
+	} else {
+		lua_pushstring(L, result.objectType == TargetCheckResult::ObjectType::Unit ? "unit" : "feature");
+		lua_pushnumber(L, result.objectID);
+	}
+	return 4;
+}
+
+int CMobileCAI::GetAttackTargetPosition(lua_State* L)
+{
+	const Command& command = CheckAttackMovementContext(L);
+	const float3 position = orderTarget != nullptr
+		? orderTarget->GetErrorPos(owner->allyteam, false) : command.GetPos(0);
+	lua_pushnumber(L, position.x);
+	lua_pushnumber(L, position.y);
+	lua_pushnumber(L, position.z);
+	return 3;
+}
+
+int CMobileCAI::FinishAttackCommand(lua_State* L)
+{
+	CheckAttackMovementContext(L);
+	FinishCommand();
+	return 0;
+}
+
 void CMobileCAI::ExecuteObjectAttack(Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (!(c.GetOpts() & ALT_KEY) && SkipParalyzeTarget(orderTarget)) {
+		StopMoveAndFinishCommand();
+		return;
+	}
+	if (CallAttackMovement(c))
+		return;
 	bool tryTargetRotate  = false;
 	bool tryOwnerRotation = false; // if a weapon doesn't swivel to aim we've got to know about it to rotate the owner instead
 
@@ -723,12 +894,6 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 	const float targetMidPosDist2D = targetMidPosVec.Length2D();
 	// const float targetMidPosMaxDist = owner->maxRange - (Square(orderTarget->speed.w) / owner->unitDef->maxAcc);
 
-	if (!owner->weapons.empty()) {
-		if (!(c.GetOpts() & ALT_KEY) && SkipParalyzeTarget(orderTarget)) {
-			StopMoveAndFinishCommand();
-			return;
-		}
-	}
 
 	// tell weapons about the ordered target-unit
 	SWeaponTarget orderTgtInfo(orderTarget);
@@ -743,7 +908,7 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 		if (c.GetID() == CMD_MANUALFIRE && !w->weaponDef->manualfire)
 			continue;
 
-		tryTargetRotate = w->TryTargetRotate(orderTgtInfo.unit, orderTgtInfo.isUserTarget, orderTgtInfo.isManualFire);
+		tryTargetRotate = w->TryTargetRotate(orderTgtInfo.unit, orderTgtInfo.isUserTarget, orderTgtInfo.isManualFire) == TargetCheckResult::Clear;
 
 		edgeFactor = math::fabs(w->weaponDef->targetBorder);
 
@@ -764,7 +929,7 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 		const bool targetBehind = (targetMidPosVec.dot(orderTarget->speed) < 0.0f);
 
 		// TryTargetHeading has no side effects, so it is only run when its result is used
-		if (canChaseTarget && targetBehind && !owner->unitDef->IsHoveringAirUnit() && rotateWeapon->TryTargetHeading(targetHeading, orderTgtInfo)) {
+		if (canChaseTarget && targetBehind && !owner->unitDef->IsHoveringAirUnit() && rotateWeapon->TryTargetHeading(targetHeading, orderTgtInfo) == TargetCheckResult::Clear) {
 			SetGoal(owner->pos + (orderTarget->speed * 80), owner->pos, SQUARE_SIZE, orderTarget->speed.w * 1.1f);
 		} else {
 			StopMove();
@@ -838,6 +1003,8 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 void CMobileCAI::ExecuteGroundAttack(Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (CallAttackMovement(c))
+		return;
 	const float3 attackPos = c.GetPos(0);
 	const float3 attackVec = attackPos - owner->pos;
 	const short  attackHeading = GetHeadingFromVector(attackVec.x, attackVec.z);
@@ -861,7 +1028,7 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 		//   we call TryTargetHeading which is less restrictive than TryTarget
 		//   (eg. the former succeeds even if the unit has not already aligned
 		//   itself with <attackVec>)
-		if (!w->TryTargetHeading(attackHeading, attackTgtInfo))
+		if (w->TryTargetHeading(attackHeading, attackTgtInfo) != TargetCheckResult::Clear)
 			continue;
 
 		if (owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, false)) {
