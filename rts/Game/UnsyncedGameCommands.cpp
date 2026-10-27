@@ -2110,6 +2110,11 @@ public:
 	) {}
 
 	bool Execute(const UnsyncedAction& action) const final {
+		if (!gameSetup->hostDemo && !gs->cheatEnabled) {
+			LOG_L(L_WARNING, "Chat command /setspeed cannot be executed (cheats required outside replays)!");
+			return false;
+		}
+
 		if ((action.GetArgs()).empty())
 			return false;
 
