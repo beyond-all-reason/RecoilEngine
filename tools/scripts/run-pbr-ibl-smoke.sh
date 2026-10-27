@@ -30,8 +30,9 @@
 #     cursor mode, plain-window placement, refreshed SpringData path);
 #   * an archive cache copied from an earlier run, so start-up does not hang;
 #   * the committed start script tools/scripts/pbr-ibl-startscript.txt;
-#   * in background window mode, SDL's no-activation hint and the z-order
-#     helper pbr-window-to-back.ps1; with --input-probe, the real-input probe
+#   * in background window mode, the engine's --background-window switch, or for
+#     an engine without it SDL's no-activation hint and the z-order helper
+#     pbr-window-to-back.ps1; with --input-probe, the real-input probe
 #     pbr-viewer-input-probe.ps1.
 #
 # The equivalent manual launch, once prepared, is:
@@ -175,8 +176,9 @@ Usage: run-pbr-ibl-smoke.sh [options]
                            hardware, or keep (retain isolated config setting)
   --window-mode MODE       background (default): a plain window of --window-size at
                            --window-position that does not take keyboard focus when
-                           it opens and is kept at the bottom of the window stack
-                           (pbr-window-to-back.ps1), so runs need no physical mouse
+                           it opens and stays behind your windows (the engine's
+                           --background-window; older engines: pbr-window-to-back.ps1),
+                           so runs need no physical mouse
                            or keyboard and never cover your windows; foreground: the same
                            window, activated normally; keep: the config's own
                            window/fullscreen settings. Never minimize a running
@@ -487,14 +489,34 @@ printf 'Engine:  %s\nGame:    %s\nMaps:    %s\nScript:  %s\nWrite:   %s\nCursor:
 	"$window_mode" "$window_size" "$window_position"
 ((prepare_only)) && { printf 'Prepared; not launching (--prepare-only).\n'; exit 0; }
 
-# SDL reads hints from the environment: show the window without activating it,
-# so it never takes keyboard focus (it still opens on top; see below).
-# SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN makes SDL show the window with
-# SW_SHOWNOACTIVATE instead of activating it. SDL hints can be set by the
-# program (SDL_SetHint) or, as here, by an environment variable of the same
-# name, so no engine change is needed. Exported only for the engine started
+# Background mode, two ways:
+#   engine  the engine's own --background-window switch (Recoil branch
+#           1767-feat-background-window): the window is created hidden, lowered behind
+#           every other window, shown without activation, never minimized, and
+#           Windows' "Not Responding" ghost window (which takes the focus) is off.
+#           One switch, no helper process; the window stays behind until clicked.
+#   legacy  for an engine without that switch (for example a released engine via
+#           --engine): SDL's no-activation hint from the environment plus the
+#           z-order helper pbr-window-to-back.ps1 (see the background branch below).
+# An engine that does not know a switch stops with "unknown command line flag",
+# so the switch is passed only when its name is in the executable (grep -a reads
+# the binary as text; a Debug spring.exe of ~1 GB takes a second or two).
+background_method=""
+if [[ "$window_mode" == "background" ]]; then
+	if LC_ALL=C grep -qaF -- 'background-window' "$engine"; then
+		background_method=engine
+	else
+		background_method=legacy
+	fi
+	printf 'Background: %s\n' "$background_method"
+fi
+
+# Legacy background mode: SDL reads hints from the environment; show the window
+# without activating it, so it never takes keyboard focus (it still opens on
+# top; see below). SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN makes SDL show the window
+# with SW_SHOWNA instead of activating it. Exported only for the engine started
 # below; the user's shell is not affected.
-[[ "$window_mode" == "background" ]] && export SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN=1
+[[ "$background_method" == "legacy" ]] && export SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN=1
 
 # Recoil command line:
 #   --isolation             use only --isolation-dir for data; ignore the user's
@@ -503,6 +525,8 @@ printf 'Engine:  %s\nGame:    %s\nMaps:    %s\nScript:  %s\nWrite:   %s\nCursor:
 #   --write-dir PATH        where settings, infolog.txt, caches, screenshots and
 #                           the widgets' reports are written
 #   -window                 start windowed (the settings above place the window)
+#   --background-window     engine background mode (see "Background mode" above);
+#                           for this run only, nothing is written to the config
 #   <start script>          last argument: the game to start (copied by the
 #                           engine to <write-dir>/_script.txt)
 # Paths go to the engine in C:/x form (cygpath -m): spring.exe is a Windows
@@ -512,8 +536,9 @@ engine_arguments=(
 	--isolation-dir "$(cygpath -m "$runtime_directory")"
 	--write-dir "$(cygpath -m "$write_directory")"
 	-window
-	"$(cygpath -m "$start_script")"
 )
+[[ "$background_method" == "engine" ]] && engine_arguments+=(--background-window)
+engine_arguments+=("$(cygpath -m "$start_script")")
 
 # Prints the Windows process id of a process started from this shell.
 # $! is the MSYS (Git Bash) process id: Git Bash gives every process, even a
@@ -546,7 +571,7 @@ if ((input_probe)); then
 	exit "$probe_status"
 fi
 
-if [[ "$window_mode" == "background" ]]; then
+if [[ "$background_method" == "legacy" ]]; then
 	# A window shown without activation still lands on top of the z-order, and
 	# clicking the already-active window behind it does not raise that window.
 	# pbr-window-to-back.ps1 keeps the game window at the bottom, unactivated;
@@ -566,6 +591,6 @@ if [[ "$window_mode" == "background" ]]; then
 	exit "$engine_status"
 fi
 
-# Foreground and keep modes need no helper: exec replaces this shell with the
+# Engine background, foreground and keep modes need no helper: exec replaces this shell with the
 # engine, so the engine's exit status and Ctrl+C reach the caller directly.
 exec "$engine" "${engine_arguments[@]}"

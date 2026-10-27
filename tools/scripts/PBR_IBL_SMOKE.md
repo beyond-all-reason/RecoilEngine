@@ -8,7 +8,7 @@ This guide covers all four tools in this folder that belong to it:
 |---|---|---|---|
 | `run-pbr-ibl-smoke.sh` | bash, entry point | prepares the isolated runtime and launches the game, the self-test or the input probe | you, VS Code tasks |
 | `pbr-ibl-startscript.txt` | start script | the game to start: Onyx Cauldron 2.2.2, one player, one SimpleAI | the launcher (last engine argument) |
-| `pbr-window-to-back.ps1` | PowerShell helper | keeps an unattended game window at the bottom of the window stack | the launcher, background window mode |
+| `pbr-window-to-back.ps1` | PowerShell helper | keeps an unattended game window at the bottom of the window stack | the launcher, background window mode with an engine that lacks `--background-window` |
 | `pbr-viewer-input-probe.ps1` | PowerShell helper | drives the viewer with real Windows mouse and keyboard input and checks the result | the launcher, `--input-probe` |
 | `split-debug-symbols.sh` | bash | moves a Debug build's DWARF symbols into `spring.dbg` so Windows can run `spring.exe` | you, after a Debug build |
 
@@ -36,6 +36,7 @@ Script:  /c/.../RecoilEngine-pbr-rendering-experimental-V1/tools/scripts/pbr-ibl
 Write:   /c/.../RecoilEngine-pbr-rendering-experimental-V1/test-results/pbr-ibl
 Cursor:  software
 Window:  background 1280x720 at 40,40
+Background: engine
 ```
 
 The last report line summarises the run, for example `SUMMARY pass=145 fail=0 known=1 gap=3 info=71`.
@@ -191,13 +192,17 @@ Run `tools/scripts/run-pbr-ibl-smoke.sh --help` for the same list. The launcher 
 
 ## 5. Window behaviour
 
-Test runs are unattended by default (`--window-mode background`, `PBR_WINDOW_MODE`): the launcher writes `Fullscreen = 0`, `WindowBorderless = 0`, `MinimizeOnFocusLoss = 0` and a plain 1280x720 window at 40,40 (`--window-size WxH`, `--window-position X,Y`) into the isolated settings, and exports SDL's `SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN=1`. SDL reads its hints from environment variables of the same name, so no engine change is needed.
+Test runs are unattended by default (`--window-mode background`, `PBR_WINDOW_MODE`): the launcher writes `Fullscreen = 0`, `WindowBorderless = 0`, `MinimizeOnFocusLoss = 0` and a plain 1280x720 window at 40,40 (`--window-size WxH`, `--window-position X,Y`) into the isolated settings.
 
-The game window therefore opens without taking keyboard focus. A window shown without activation still lands at the top of the window stack (the "z-order"), and clicking the already-active window behind it does not raise that window. The hidden helper `pbr-window-to-back.ps1` therefore moves the game window to the bottom of the stack every second, without activating it (`SetWindowPos(HWND_BOTTOM)` with `SWP_NOACTIVATE`), so it never covers your windows. It logs to `<write-dir>/window-to-back.log`. The self-test needs no physical mouse or keyboard, and a covered window keeps rendering.
+It then starts the engine with `--background-window` when the engine has that switch (Recoil branch `1767-feat-background-window`; the launcher looks for its name in `spring.exe` and prints `Background: engine`). The engine creates the window hidden, moves it behind every other window, shows it without activation, never minimizes it, and turns off Windows' "Not Responding" ghost window, which would otherwise take the focus when start-up stalls. The switch applies to that run only; nothing is written to `springsettings.cfg`. The window stays behind your windows until you click it; from then on it behaves like any window.
 
-Do not minimize a running test: Recoil draws only about twice a minute while minimized, so the self-test would stall.
+An engine without the switch (for example a released engine given with `--engine`) gets the older method (`Background: legacy`): the launcher exports SDL's `SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN=1` (SDL reads hints from environment variables of the same name), so the window opens without taking keyboard focus. Such a window still lands at the top of the window stack (the "z-order"), and clicking the already-active window behind it does not raise that window, so the hidden helper `pbr-window-to-back.ps1` moves the game window to the bottom of the stack every second, without activating it (`SetWindowPos(HWND_BOTTOM)` with `SWP_NOACTIVATE`). It logs to `<write-dir>/window-to-back.log`.
 
-A new write directory is seeded with the newest archive cache of an earlier run beside it. Without that cache the engine hashes the BAR checkout for about 9 s without answering window messages, Windows treats the window as hung, and the ghosted window ("Not Responding") takes the focus; after BAR files change this re-hash still happens once.
+Either way the self-test needs no physical mouse or keyboard, and a covered window keeps rendering.
+
+Do not minimize a running test: Recoil draws only about twice a minute while minimized, so the self-test would stall. With the engine switch, the engine itself refuses to minimize (`Spring.SetWindowMinimized` returns false); a minimize by hand from the taskbar still works.
+
+A new write directory is seeded with the newest archive cache of an earlier run beside it. Without that cache start-up hashes the BAR checkout once (about 9 s on this machine). In the legacy method the ghosted window could then take the focus; the engine switch turns ghosting off.
 
 `--window-mode foreground` opens the same plain window activated, and `--window-mode keep` leaves the config's own window and fullscreen settings untouched. `--input-probe` refuses background mode because it moves your cursor and types into the game.
 
@@ -314,9 +319,9 @@ A passing report ends with `SUMMARY pass=8 fail=0`.
 | `No sibling BAR checkout contains the PBR IBL widgets` or `Multiple sibling BAR PBR checkouts were found` | Pass `--game-directory`. |
 | `No maps directory was found` | Pass `--maps-directory` with a folder holding Onyx Cauldron 2.2.2. |
 | `Refusing to replace <path>` | `<runtime>/games/<name>` or `<runtime>/maps` exists and is not a junction to the requested target. Remove that junction with `rmdir` in cmd (check first that it is a junction), or choose another `--game-link-name`. |
-| The game window took the keyboard focus at start | The archive cache was rebuilt (first run, or BAR files changed); later runs stay in the background. |
-| The game window stays in front | The z-order helper is not running: check `window-to-back.log` for a `keeping window` line. |
-| The game window keeps disappearing behind other windows | That is background mode working as intended; launch with `--window-mode foreground` to watch. |
+| The game window took the keyboard focus at start | With `Background: engine`: check `infolog.txt` for `background window: shown without activation`; without that line the engine ignored the switch. With `Background: legacy`: the archive cache was rebuilt (first run, or BAR files changed); later runs stay in the background. |
+| The game window stays in front | With `Background: legacy`, the z-order helper is not running: check `window-to-back.log` for a `keeping window` line. With `Background: engine`, the window was clicked or raised from the taskbar; that is allowed. |
+| The game window keeps disappearing behind other windows | That is the legacy helper working as intended; launch with `--window-mode foreground` to watch. |
 | `--self-test` does nothing | The isolated widget order had the self-test switched off in a format the launcher did not recognise; check `LuaUI/Config/BYAR.lua` and `infolog.txt` for `[PBR IBL SelfTest]`. |
 | Self-test stalls | The window was minimized; restore it. |
 | Input probe: `no target engine window appeared` | The engine failed to open a window, or the probe was given a process id it cannot find; check `infolog.txt`. |

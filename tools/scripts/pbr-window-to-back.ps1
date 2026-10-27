@@ -16,7 +16,9 @@
 #   active window changes nothing, so the game would stay in front.
 #
 # USAGES
-#   Started by run-pbr-ibl-smoke.sh in background window mode (the default), hidden
+#   Started by run-pbr-ibl-smoke.sh in background window mode (the default) only for
+#   an engine without the --background-window switch ("Background: legacy"; an
+#   engine with it lowers its own window once and needs no helper), hidden
 #   (-WindowStyle Hidden), with the game's Windows process id and
 #   -LogFile <write-dir>/window-to-back.log. It is never an entry point by itself.
 #   By hand (PowerShell or Git Bash), with the Windows id shown in Task Manager:
