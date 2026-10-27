@@ -26,7 +26,6 @@ function gadget:GetInfo()
 		name      = "Start Position",
 		desc      = "Choose start positions in game, like the engine selecter",
 		license   = "GNU GPL, v2 or later",
-		-- synced: GameStart before the gadgets that spawn start units
 		-- unsynced: map clicks after the other gadgets, like the engine selecter
 		layer     = gadgetHandler:IsSyncedCode() and -1000 or 1000,
 		enabled   = true
@@ -44,36 +43,11 @@ local PLAYER_RDYSTATE_FORCED = 2
 
 if (gadgetHandler:IsSyncedCode()) then
 
--- CTeam::SetDefaultStartPos
-local function GetDefaultStartPos(teamID, numTeams)
-	local allyTeamID = select(6, Spring.GetTeamInfo(teamID, false))
-	local xmin, zmin, xmax, zmax = Spring.GetAllyTeamStartBox(allyTeamID)
-	local offset = (teamID - numTeams) * 4 * Game.squareSize
-	return offset + (xmin + xmax) * 0.5, offset + (zmin + zmax) * 0.5
-end
-
 function gadget:AllowStartPosition(playerID, teamID, readyState)
 	if (readyState == PLAYER_RDYSTATE_FORCED) then
 		SendToUnsynced("StartPositionForced", playerID, teamID)
 	end
 	return true
-end
-
-function gadget:GameStart()
-	local gaiaTeamID = Spring.GetGaiaTeamID()
-	local teams = Spring.GetTeamList()
-	for i = 1, #teams do
-		local teamID = teams[i]
-		local x, y, z, valid = Spring.GetTeamStartPosition(teamID)
-		if (teamID ~= gaiaTeamID) and (not valid) then
-			local dx, dz = GetDefaultStartPos(teamID, #teams)
-			-- while the engine still sets the default itself, a team
-			-- only gets here when that default is outside the map
-			if (math.abs(x - dx) > 0.5) or (math.abs(z - dz) > 0.5) then
-				Spring.SetTeamStartPosition(teamID, dx, y, dz)
-			end
-		end
-	end
 end
 
 --------------------------------------------------------------------------------
