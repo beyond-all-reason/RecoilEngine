@@ -9,7 +9,10 @@
 #include "IWater.h"
 
 #include "System/EventClient.h"
-#include "System/Misc/RectangleOverlapHandler.h"
+#include "System/Rectangle.h"
+
+#include <cstdint>
+#include <vector>
 
 
 namespace Shader {
@@ -43,26 +46,27 @@ public:
 	bool CanDrawRefractionPass() const override { return true; }
 private:
 	//! coastmap (needed for shorewaves)
-	struct CoastAtlasRect {
-		explicit CoastAtlasRect(const SRectangle& rect);
-		bool isCoastline; ///< if false, then the whole rect is either above water or below water (no coastline -> no need to calc/render distfield)
-		int ix1, iy1;
-		int ix2, iy2;
-		int xsize, ysize;
-		float x1, y1;
-		float x2, y2;
-		float tx1, ty1;
-		float tx2, ty2;
+	struct CoastRect {
+		int x1, y1; ///< update area in coastmap texels (one per heightmap corner), padded by the blur reach
+		int x2, y2; ///< exclusive
+		int sx, sy; ///< position of the area in the scratch texture
 	};
 
-	std::vector<CoastAtlasRect> coastmapAtlasRects;
-	CRectangleOverlapHandler heightmapUpdates;
+	std::vector<CoastRect> coastRects;
+	std::vector<uint8_t> coastDirtyCells; ///< heightmap changes not yet in the coastmap, one flag per cell of COAST_CELL_SIZE^2 texels
 
-	void UploadCoastline(const bool forceFull = false);
-	void UpdateCoastmap(const bool initialize = false);
+	int coastCellsX = 0;
+	int coastCellsY = 0;
+	int numCoastDirtyCells = 0;
+	int coastScanRow = 0;
+	int nextCoastUpdateFrame = 0;
+	int coastScratchSizeX = 0;
+	int coastScratchSizeY = 0;
+
+	void CreateCoastScratch(int sizeX, int sizeY);
+	bool CollectCoastRects();
+	void UpdateCoastmap(GLuint heightTex);
 	void UpdateDynWaves(const bool initialize = false);
-
-	int atlasX,atlasY;
 
 	void UnsyncedHeightMapUpdate(const SRectangle& rect) override;
 
@@ -90,6 +94,7 @@ private:
 	FBO reflectFBO;
 	FBO refractFBO;
 	FBO coastFBO;
+	FBO coastScratchFBO;
 	FBO dynWavesFBO;
 
 	TypedRenderBuffer<VA_TYPE_0> rb;
@@ -102,7 +107,7 @@ private:
 	GLuint normalTexture;  ///< final used
 	GLuint normalTexture2; ///< updates normalTexture with dynamic waves turned on
 	GLuint coastTexture;
-	GLuint coastUpdateTexture;
+	GLuint coastScratchTexture; ///< ping-pong target of the coastmap blur passes
 	std::vector<GLuint> caustTextures;
 
 	Shader::IProgramObject* waterShader;
