@@ -109,6 +109,7 @@ void CScanCodes::Reset()
 	AddPair("sc_9",    SDL_SCANCODE_9);
 
 	AddPair("sc_comma", SDL_SCANCODE_COMMA, true);
+	AddAlias("sc_,", SDL_SCANCODE_COMMA);
 
 	AddPair("sc_'", SDL_SCANCODE_APOSTROPHE, true);
 	AddPair("sc_apostrophe", SDL_SCANCODE_APOSTROPHE, true);
