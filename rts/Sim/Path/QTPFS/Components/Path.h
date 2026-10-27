@@ -51,7 +51,7 @@ struct PendingPathRequestDetails {
 	float radius;
 	unsigned int pathType; // looks up movedef
 	bool synced;
-	bool externalRequest;
+	bool externalRequest; // true if the request came form Lua or AI
 	bool allowRawSearch;
 };
 
