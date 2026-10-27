@@ -143,9 +143,6 @@ void PathSpeedModInfoSystem::Init()
     auto pm = dynamic_cast<QTPFS::PathManager*>(IPathManager::GetInstance(QTPFS_TYPE));
 
     InitLayers();
-
-    systemUtils.OnUpdate().connect<&PathSpeedModInfoSystem::Update>();
-
     ScanWholeMap();
 
     comp.startRefreshOnFrame = NEXT_FRAME_NEVER;
@@ -180,7 +177,6 @@ void PathSpeedModInfoSystem::Update()
 
 void PathSpeedModInfoSystem::Shutdown() {
     RECOIL_DETAILED_TRACY_ZONE;
-    systemUtils.OnUpdate().disconnect<&PathSpeedModInfoSystem::Update>();
 
     auto view = registry.view<NodeLayerSpeedInfoSweep>();
     for ( QTPFS::entity entity : view ) { registry.destroy(entity); }

@@ -182,9 +182,6 @@ All source files must begin with the GPL license header:
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 ```
 
-### Include Guards
-Use `#pragma once` for new headers, migrate ifdef guards to `#pragma once` whenever you edit a header file.
-
 ### Naming Conventions
 
 **Classes and Structs:**

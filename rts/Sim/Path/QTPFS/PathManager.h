@@ -20,6 +20,14 @@ class CSolidObject;
 namespace QTPFS {
 	struct QTNode;
 	class PathManager: public IPathManager {
+		friend class RequestPathInternalSystem;
+
+		struct ResolvedPath {
+			entt::basic_registry<QTPFS::entity>* reg;   // &registry or &externalRegistry
+			QTPFS::entity entity;                        // path entity within reg
+			IPath* path;                                 // live path, or nullptr
+		};
+
 	public:
 		// must not be larger than the smallest evenly divisible size of maps.
 		static constexpr unsigned int DAMAGE_MAP_BLOCK_SIZE = 16;
@@ -55,7 +63,7 @@ namespace QTPFS {
 		void Update() override;
 		void UpdatePath(const CSolidObject* owner, unsigned int pathID) override;
 		void DeletePath(unsigned int pathID, bool force = false) override;
-		void DeletePathEntity(QTPFS::entity pathEntity);
+		void DeletePathEntity(entt::basic_registry<QTPFS::entity> &reg, QTPFS::entity pathEntity);
 
 		unsigned int RequestPath(
 			CSolidObject* object,
@@ -126,8 +134,10 @@ namespace QTPFS {
 		void InitRootSize(const SRectangle& r);
 		void UpdateNodeLayer(unsigned int layerNum, const SRectangle& r, int currentThread);
 
-		bool InitializeSearch(QTPFS::entity searchEntity);
-		void RemovePathSearch(QTPFS::entity pathEntity);
+		bool InitializeSearch(entt::basic_registry<QTPFS::entity> &reg, QTPFS::entity searchEntity);
+		void RemovePathSearch(entt::basic_registry<QTPFS::entity> &reg, QTPFS::entity pathEntity);
+
+		ResolvedPath ResolvePath(QTPFS::entity externalId) const;
 
 		void ReadyQueuedSearches();
 		void ProcessPathSearch(int i, bool shouldBeRaw);
@@ -135,6 +145,7 @@ namespace QTPFS {
 		void QueueDeadPathSearches();
 
 		unsigned int QueueSearch(
+			entt::basic_registry<QTPFS::entity> &reg,
 			const CSolidObject* object,
 			const MoveDef* moveDef,
 			const float3& sourcePoint,
@@ -154,14 +165,16 @@ namespace QTPFS {
 		);
 
 	private:
-		bool ExecuteSearch(
-			PathSearch* search,
-			NodeLayer& nodeLayer,
-			unsigned int pathType,
-			bool immediateSearch
-		);
+        bool ExecuteSearch(
+            entt::basic_registry<QTPFS::entity> &reg,
+            PathSearch *search,
+            NodeLayer &nodeLayer,
+            unsigned int pathType,
+            bool immediateSearch);
 
-		unsigned int ExecuteImmediateSearch(unsigned int pathId);
+        bool CanPathSearchContinue(QTPFS::PathSearch *search, QTPFS::IPath *path, QTPFS::entity &partialChainHeadEntity, QTPFS::entity pathEntity, QTPFS::entity &chainHeadEntity, bool &forceFullPath);
+
+        unsigned int ExecuteImmediateSearch(unsigned int pathId);
 
 		bool IsFinalized() const { return isFinalized; }
 
@@ -201,12 +214,14 @@ namespace QTPFS {
 
 		std::uint32_t pfsCheckSum;
 
+		QTPFS::entity extReserveEntity = entt::null;
 		QTPFS::entity systemEntity = entt::null;
 
 		bool isFinalized = false;
 
 		static constexpr size_t INITIAL_PATH_RESERVE = 256;
-	};
+        void AddToPathShares(QTPFS::IPath *path, QTPFS::PathSearch *search, QTPFS::entity &pathEntity);
+    };
 }
 
 #endif

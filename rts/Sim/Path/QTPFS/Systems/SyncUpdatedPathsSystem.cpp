@@ -27,7 +27,6 @@ void SyncUpdatedPathsSystem::Init()
 {
     RECOIL_DETAILED_TRACY_ZONE;
     auto& comp = systemGlobals.CreateSystemComponent<SyncUpdatedPathsComponent>();
-    systemUtils.OnUpdate().connect<&SyncUpdatedPathsSystem::Update>();
 }
 
 void SyncUpdatedPathsSystem::Update()
@@ -56,13 +55,12 @@ void SyncUpdatedPathsSystem::Update()
 
 		// LOG("%s: delete search %x", __func__, entt::to_integral(pathSearchEntity));
 		if (registry.valid(pathSearchEntity))
-			DestroyPathSearchEntity(pathSearchEntity);
+			DestroyPathSearchEntity(registry, pathSearchEntity);
 	}
 }
 
 void SyncUpdatedPathsSystem::Shutdown() {
     RECOIL_DETAILED_TRACY_ZONE;
-    systemUtils.OnUpdate().disconnect<&SyncUpdatedPathsSystem::Update>();
 
 	// drain the task group if it still exists, to ensure all tasks have completed before we shutdown.
 	auto& comp = systemGlobals.GetSystemComponent<SyncUpdatedPathsComponent>();
