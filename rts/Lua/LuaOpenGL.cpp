@@ -4848,7 +4848,9 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 		// full-size image. A layered attachment (all six faces) is not needed,
 		// because the sky shaders write no gl_Layer.
 		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, tex->id, 0);
-		if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
+		// core glCheckFramebufferStatus, as FBO.cpp uses: the headless build's GL stubs
+		// (rts/lib/headlessStubs/gladstub.cpp) have no EXT form, so spring-headless would not link
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
 			error = "gl.RenderEnvironmentFace: capture framebuffer is incomplete";
 	}
 
