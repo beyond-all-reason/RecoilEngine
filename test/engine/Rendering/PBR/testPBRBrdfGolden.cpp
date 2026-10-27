@@ -56,7 +56,9 @@ namespace {
 	// Hammersley samples of the DFG integral; the table's samples are taken
 	// with the same count (pbr_dfg.lua, CubeMapHandler::PBR_DFG_SAMPLES)
 	constexpr unsigned int DFG_SAMPLES = 1024;
-	constexpr double PI_D = 3.14159265358979323846;
+	// the engine builds with gcc's -fsingle-precision-constant, which turns an
+	// unsuffixed literal into a float; the L suffix keeps pi at double precision
+	constexpr double PI_D = static_cast<double>(3.14159265358979323846L);
 	constexpr float PI_F = 3.14159265358979323846f;
 
 	std::string ReadFile(const std::string& path)
@@ -198,7 +200,7 @@ namespace {
 
 	double Relative(double measured, double expected)
 	{
-		return std::abs(measured - expected) / std::max(std::abs(expected), 1e-6);
+		return std::abs(measured - expected) / std::max<double>(std::abs(expected), 1e-6);
 	}
 
 	// Van der Corput radical inverse of a 32-bit index (bit reversal), as in
@@ -231,7 +233,7 @@ namespace {
 			const double nDotL = 2.0 * vDotH * h[2] - v[2];
 			if (nDotL <= 0.0)
 				continue;
-			const double vh = std::min(std::max(vDotH, 0.0), 1.0);
+			const double vh = std::min<double>(std::max<double>(vDotH, 0.0), 1.0);
 			const double ggxV = nDotL * std::sqrt(nDotV * nDotV * (1.0 - a2) + a2);
 			const double ggxL = nDotV * std::sqrt(nDotL * nDotL * (1.0 - a2) + a2);
 			const double gv = (0.5 / (ggxV + ggxL)) * 4.0 * vh * nDotL / h[2];
