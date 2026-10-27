@@ -643,8 +643,14 @@ void CommandDrawer::DrawDefaultCommand(const Command& c, const CUnit* owner) con
 		}
 	}
 
-	// allow a second param (ignored here) for custom commands
-	const unsigned int id = std::max(0.0f, c.GetParam(0));
+	// allow a second param (ignored here) for custom commands; unlike for
+	// CMD_RECLAIM it can be any number, and a negative one is not an object
+	const int signedID = c.GetParam(0);
+
+	if (signedID < 0)
+		return;
+
+	const unsigned int id = signedID;
 
 	// ids from MaxUnits on are features, as for CMD_RECLAIM
 	if (id >= unitHandler.MaxUnits()) {
