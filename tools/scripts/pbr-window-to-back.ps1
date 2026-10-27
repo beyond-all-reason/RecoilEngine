@@ -20,7 +20,8 @@
 #   an engine without the --background-window switch ("Background: legacy"; an
 #   engine with it lowers its own window once and needs no helper), hidden
 #   (-WindowStyle Hidden), with the game's Windows process id and
-#   -LogFile <write-dir>/window-to-back.log. It is never an entry point by itself.
+#   -LogFile <write-dir>/window-to-back.log. run-pbr-nsight.sh starts it the same way,
+#   also only for such an engine. It is never an entry point by itself.
 #   By hand (PowerShell or Git Bash), with the Windows id shown in Task Manager:
 #     powershell -NoProfile -ExecutionPolicy Bypass -File pbr-window-to-back.ps1 -ProcessId <pid>
 #   Options:

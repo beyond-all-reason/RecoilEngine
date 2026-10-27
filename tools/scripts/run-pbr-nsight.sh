@@ -28,13 +28,15 @@
 #      game and shows which self-test step the capture landed in;
 #   2. for the Frame Debugger and C++ capture: the project file
 #      <write>/recoil-nocounters.ngfx-proj (pbr-nsight-files.py write-project);
-#   3. ngfx.exe with --activity, the engine command line of the smoke launcher,
-#      --env SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN=1, --output-dir <write>/nsight
+#   3. ngfx.exe with --activity, the engine command line of the smoke launcher
+#      (with --background-window when the engine has that switch; otherwise
+#      --env SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN=1), --output-dir <write>/nsight
 #      and every option this script does not know (the trigger options);
 #      output in <write>/nsight/ngfx-stdout.log;
 #   4. the game's process id from the log line "Launched process: spring.exe
 #      (pid: N)" (never by process name: another session may run its own
-#      spring.exe), then pbr-window-to-back.ps1 -ProcessId N;
+#      spring.exe), then, only for an engine without --background-window,
+#      pbr-window-to-back.ps1 -ProcessId N;
 #   5. after ngfx ends: stop the helper and strip process_environment from every
 #      new <write>/nsight/CppCaptures/*/metadata.json (pbr-nsight-files.py).
 #   --elevated runs steps 3-5 in an elevated Git Bash (one UAC prompt), which
@@ -270,14 +272,30 @@ fi
 # Step 3. ngfx arguments:
 #   --args      the engine command line of run-pbr-ibl-smoke.sh as ONE string,
 #               with Windows paths in quotes (ngfx splits it for spring.exe)
-#   --env       SDL shows the window without activating it (no focus taken)
+#   --env       (older engines only) SDL shows the window without activating it
 #   --verbose   the "Launched process: ... (pid: N)" line step 4 reads
 # MSYS_NO_PATHCONV keeps Git Bash from rewriting anything that looks like a path.
-engine_arguments="--isolation --isolation-dir \"$(cygpath -w "$runtime_directory")\" --write-dir \"$(cygpath -w "$write_directory")\" -window \"$(cygpath -w "${script_dir}/pbr-ibl-startscript.txt")\""
+# Background method, as in run-pbr-ibl-smoke.sh: an engine with the switch
+# --background-window (Recoil 1767-feat-background-window) keeps its own window
+# unfocused, behind other windows and never minimized ("engine"); an engine that
+# lacks it would stop on the unknown switch, so it gets the environment hint and
+# the z-order helper instead ("legacy"). The switch name is found in spring.exe.
+if LC_ALL=C grep -qaF -- 'background-window' "${runtime_directory}/spring.exe"; then
+	background_method=engine
+	background_switch=" --background-window"
+	ngfx_environment=()
+else
+	background_method=legacy
+	background_switch=""
+	ngfx_environment=(--env "SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN=1;")
+fi
+printf 'Background: %s
+' "$background_method"
+engine_arguments="--isolation --isolation-dir \"$(cygpath -w "$runtime_directory")\" --write-dir \"$(cygpath -w "$write_directory")\" -window${background_switch} \"$(cygpath -w "${script_dir}/pbr-ibl-startscript.txt")\""
 ngfx_arguments=(--activity "$activity")
 [[ -n "$project" ]] && ngfx_arguments+=(--project "$(cygpath -w "$project")")
 ngfx_arguments+=(--exe "$(cygpath -w "${runtime_directory}/spring.exe")" --dir "$(cygpath -w "$runtime_directory")"
-	--args "$engine_arguments" --env "SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN=1;"
+	--args "$engine_arguments" "${ngfx_environment[@]}"
 	--output-dir "$(cygpath -w "$nsight_directory")" --verbose "${ngfx_options[@]}")
 
 # captures that exist before this run are not touched by step 5
@@ -304,9 +322,12 @@ for ((second = 0; second < pid_wait_seconds; second++)); do
 	sleep 1
 done
 helper_pid=""
-if [[ -n "$windows_pid" ]]; then
-	# same call as run-pbr-ibl-smoke.sh's background mode; the helper stops by
-	# itself when the process is gone
+if [[ -n "$windows_pid" && "$background_method" == "engine" ]]; then
+	printf 'Game:    spring.exe pid %s (the engine keeps its window in the background)
+' "$windows_pid"
+elif [[ -n "$windows_pid" ]]; then
+	# same call as run-pbr-ibl-smoke.sh's legacy background mode; the helper
+	# stops by itself when the process is gone
 	powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "$(cygpath -w "${script_dir}/pbr-window-to-back.ps1")" \
 		-ProcessId "$windows_pid" -LogFile "$(cygpath -w "${write_directory}/window-to-back.log")" &
 	helper_pid=$!
