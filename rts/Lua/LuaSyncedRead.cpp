@@ -6268,7 +6268,7 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 		LuaPushNamedNumber(L, "myGravity", sAMT->myGravity);
 
 		LuaPushNamedNumber(L, "maxBank",    sAMT->maxBank);
-		LuaPushNamedNumber(L, "maxPitch",   sAMT->maxBank);
+		LuaPushNamedNumber(L, "maxPitch",   sAMT->maxPitch);
 		LuaPushNamedNumber(L, "turnRadius", sAMT->turnRadius);
 
 		LuaPushNamedNumber(L, "maxAcc",      sAMT->accRate);
