@@ -450,6 +450,36 @@ bool CSyncedLuaHandle::Init(std::string code, const std::string& file)
 	lua_pushnil(L); lua_setglobal(L, "loadfile");
 	lua_pushnil(L); lua_setglobal(L, "loadlib");
 	lua_pushnil(L); lua_setglobal(L, "require");
+	/***
+	 * Lua's `rawequal`. The synced handle removes it; the unsynced handle keeps it.
+	 * @global rawequal function
+	 * @env unsynced
+	 */
+	/***
+	 * Lua's `rawget`. The synced handle removes it; the unsynced handle keeps it.
+	 * @global rawget function
+	 * @env unsynced
+	 */
+	/***
+	 * Lua's `rawset`. The synced handle removes it; the unsynced handle keeps it.
+	 * @global rawset function
+	 * @env unsynced
+	 */
+	/***
+	 * Lua's `newproxy`. The synced handle removes it; the unsynced handle keeps it.
+	 * @global newproxy function
+	 * @env unsynced
+	 */
+	/***
+	 * Lua's `gcinfo`. The synced handle removes it; the unsynced handle keeps it.
+	 * @global gcinfo function
+	 * @env unsynced
+	 */
+	/***
+	 * Lua's `collectgarbage`. The synced handle removes it; the unsynced handle keeps it.
+	 * @global collectgarbage function
+	 * @env unsynced
+	 */
 	lua_pushnil(L); lua_setglobal(L, "rawequal"); //FIXME not unsafe anymore since split?
 	lua_pushnil(L); lua_setglobal(L, "rawget"); //FIXME not unsafe anymore since split?
 	lua_pushnil(L); lua_setglobal(L, "rawset"); //FIXME not unsafe anymore since split?
