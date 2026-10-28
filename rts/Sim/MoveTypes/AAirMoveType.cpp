@@ -115,8 +115,6 @@ AAirMoveType::AAirMoveType(CUnit* unit): AMoveType(unit)
 	canSubmerge = ud->canSubmerge;
 	floatOnWater = ud->floatOnWater;
 
-	UseHeading(false);
-
 	if (ud->GetCrashExpGenCount() > 0) {
 		crashExpGenID = guRNG.NextInt(ud->GetCrashExpGenCount());
 		crashExpGenID = ud->GetCrashExpGenID(crashExpGenID);
@@ -152,14 +150,6 @@ void AAirMoveType::DependentDied(CObject* o) {
 
 bool AAirMoveType::Update() {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// NOTE: useHeading is never true by default for aircraft (AAirMoveType
-	// forces it to false, while only CUnit::{Attach,Detach}Unit manipulate
-	// it specifically for HoverAirMoveType's)
-	if (UseHeading()) {
-		SetState(AIRCRAFT_TAKEOFF);
-		UseHeading(false);
-	}
-
 	// prevent UnitMoved event spam
 	return false;
 }

@@ -62,9 +62,6 @@ public:
 	virtual bool IsPushResistant() const { return false; }
 	virtual bool IsPushResitanceBlockActive() const { return false; }
 
-	bool UseHeading(      ) const { return (useHeading    ); }
-	bool UseHeading(bool b)       { return (useHeading = b); }
-
 	bool UseWantedSpeed(bool groupOrder) const { return useWantedSpeed[groupOrder]; }
 
 	float GetMaxSpeed() const { return maxSpeed; }
@@ -113,7 +110,6 @@ protected:
 	float maneuverLeash;                    // maximum distance before target stops being chased
 	float waterline;
 
-	bool useHeading = true;
 	bool useWantedSpeed[2] = {true, true};  // if false, SelUnitsAI will not (re)set wanted-speed for {[0] := individual, [1] := formation} orders
 };
 
