@@ -562,6 +562,31 @@ void CEventHandler::GameFramePost(int gameFrame)
 	ITERATE_EVENTCLIENTLIST(GameFramePost, gameFrame);
 }
 
+void CEventHandler::UnitPreDelete(int unitID, int unitDefID, int unitTeam)
+{
+	for (size_t index = 0; index < listUnitPreDelete.size(); ) {
+		CEventClient* client = listUnitPreDelete[index];
+		if (client->GetSynced() && client->GetFullRead())
+			client->UnitPreDelete(unitID, unitDefID, unitTeam);
+		index += (index < listUnitPreDelete.size() && client == listUnitPreDelete[index]);
+	}
+}
+
+std::vector<int> CEventHandler::UnitAttackTargetRemoved(int unitID, int unitDefID, int unitTeam, int targetID)
+{
+	// Exposes native command-target state; restrict it to full-read synced clients.
+	std::vector<int> removedTags;
+	for (size_t i = 0; i < listUnitAttackTargetRemoved.size(); ) {
+		CEventClient* ec = listUnitAttackTargetRemoved[i];
+		if (ec->GetSynced() && ec->GetFullRead()) {
+			const auto tags = ec->UnitAttackTargetRemoved(unitID, unitDefID, unitTeam, targetID);
+			removedTags.insert(removedTags.end(), tags.begin(), tags.end());
+		}
+		i += (i < listUnitAttackTargetRemoved.size() && ec == listUnitAttackTargetRemoved[i]);
+	}
+	return removedTags;
+}
+
 void CEventHandler::GameProgress(int gameFrame)
 {
 	ZoneScoped;

@@ -635,9 +635,27 @@ static inline bool AdjustGroundAttackCommand(const Command& c, bool fromSynced, 
 
 
 
+static bool CommandTouchesFinalizingUnit(const CUnit* owner, const Command& command)
+{
+	if (owner->DeathDependencesNotified())
+		return true;
+
+	int targetParameter;
+	if (command.IsObjectCommand(targetParameter)) {
+		const CUnit* target = unitHandler.GetUnit(command.GetParam(targetParameter));
+		if (target != nullptr && target->DeathDependencesNotified())
+			return true;
+	}
+	return false;
+}
+
+
 bool CCommandAI::AllowedCommand(const Command& c, bool fromSynced)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (CommandTouchesFinalizingUnit(owner, c))
+		return false;
+
 	const int cmdID = c.GetID();
 
 	// TODO check if the command is in the map first, for more commands
@@ -824,6 +842,9 @@ void CCommandAI::GiveCommand(const Command& c, bool fromSynced)
 void CCommandAI::GiveCommand(const Command& c, int playerNum, bool fromSynced, bool fromLua)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (CommandTouchesFinalizingUnit(owner, c))
+		return;
+
 	if (!eventHandler.AllowCommand(owner, c, playerNum, fromSynced, fromLua))
 		return;
 
@@ -1623,6 +1644,9 @@ int CCommandAI::GetDefaultCmd(const CUnit* pointed, const CFeature* feature)
 
 void CCommandAI::AddDeathDependence(CObject* o, DependenceType dep) {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (DeathDependencesNotified() || o->DeathDependencesNotified())
+		return;
+
 	if (dep == DEPENDENCE_COMMANDQUE) {
 		if (commandDeathDependences.insert(o).second) // prevent multiple dependencies for the same object
 			CObject::AddDeathDependence(o, dep);
@@ -1880,6 +1904,18 @@ void CCommandAI::StopAttackingTargetIf(const std::function<bool(const CUnit*)>& 
 	const auto hasTarget = [&](const Command& c) { return (c.GetNumParams() == 1 && (c.GetID() == CMD_FIGHT || c.GetID() == CMD_ATTACK)); };
 	const auto removeCmd = [&](const Command& c) { return (hasTarget(c) && pred(unitHandler.GetUnit(c.GetParam(0)))); };
 
+	EraseCommandsIf(removeCmd);
+}
+
+void CCommandAI::RemoveCommandsByTag(const std::vector<int>& tags)
+{
+	if (tags.empty())
+		return;
+	EraseCommandsIf([&](const Command& c) { return std::find(tags.begin(), tags.end(), c.GetTag()) != tags.end(); });
+}
+
+void CCommandAI::EraseCommandsIf(const std::function<bool(const Command&)>& removeCmd)
+{
 	const bool frontRemoved = (!commandQue.empty() && removeCmd(commandQue.front()));
 
 	commandQue.erase(std::remove_if(commandQue.begin(), commandQue.end(), removeCmd), commandQue.end());
