@@ -252,14 +252,14 @@ void CFactoryCAI::GiveCommandReal(const Command& c, bool fromSynced)
 		if (c.GetOpts() & ALT_KEY) {
 			for (unsigned int cmdNum = 0; cmdNum < commandQue.size() && numToErase; ++cmdNum) {
 				if (commandQue[cmdNum].GetID() == cmdID) {
-					commandQue[cmdNum] = Command(CMD_STOP);
+					commandQue.Edit(cmdNum) = Command(CMD_STOP);
 					numToErase--;
 				}
 			}
 		} else {
 			for (int cmdNum = commandQue.size() - 1; cmdNum != -1 && numToErase; --cmdNum) {
 				if (commandQue[cmdNum].GetID() == cmdID) {
-					commandQue[cmdNum] = Command(CMD_STOP);
+					commandQue.Edit(cmdNum) = Command(CMD_STOP);
 					numToErase--;
 				}
 			}
@@ -314,7 +314,7 @@ void CFactoryCAI::InsertBuildCommand(CCommandQueue::iterator& it,
 bool CFactoryCAI::RemoveBuildCommand(CCommandQueue::iterator& it)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	Command& cmd = *it;
+	Command& cmd = commandQue.Edit(it - commandQue.begin());
 	const auto boi = buildOptions.find(cmd.GetID());
 	if (boi != buildOptions.end()) {
 		boi->second--;

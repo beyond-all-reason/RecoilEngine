@@ -41,6 +41,7 @@ make_global_var(sources_engine_System_common
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/RectangleOverlapHandler.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Misc/SpringTime.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Object.cpp"
+		"${CMAKE_CURRENT_SOURCE_DIR}/SharedObjectSet.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/GameLoadThread.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Option.cpp"
 		"${CMAKE_CURRENT_SOURCE_DIR}/Platform/Clipboard.cpp"
