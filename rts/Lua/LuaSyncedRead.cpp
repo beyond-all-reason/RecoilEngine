@@ -282,6 +282,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(GetUnitBlocking);
 	REGISTER_LUA_CFUNC(GetUnitMoveTypeData);
+	REGISTER_LUA_CFUNC(GetUnitMaxWantedSpeed);
 
 	REGISTER_LUA_CFUNC(GetUnitCommandCount);
 	REGISTER_LUA_CFUNC(GetUnitCommands);
@@ -6291,6 +6292,22 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 	}
 
 	LuaPushNamedString(L, "name", "unknown");
+	return 1;
+}
+
+/***
+ *
+ * @function Spring.GetUnitMaxWantedSpeed
+ * @param unitID UnitID
+ * @return number? maxWantedSpeed Same as `maxWantedSpeed` in `Spring.GetUnitMoveTypeData`.
+ */
+int LuaSyncedRead::GetUnitMaxWantedSpeed(lua_State* L)
+{
+	const CUnit* unit = ParseAllyUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
+
+	lua_pushnumber(L, unit->moveType->GetMaxWantedSpeed() * GAME_SPEED);
 	return 1;
 }
 
