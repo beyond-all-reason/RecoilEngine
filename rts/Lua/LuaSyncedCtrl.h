@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_SYNCED_CTRL_H
-#define LUA_SYNCED_CTRL_H
+#pragma once
 
 struct lua_State;
 class CFeature;
@@ -126,6 +125,8 @@ class LuaSyncedCtrl
 		static int SetUnitLandGoal(lua_State* L);
 		static int ClearUnitGoal(lua_State* L);
 		static int SetUnitNeutral(lua_State* L);
+		static int ClearCommandsTargeting(lua_State* L);
+		static int ClearTargetingFromUnit(lua_State* L);
 		static int SetUnitTarget(lua_State* L);
 		static int SetUnitMidAndAimPos(lua_State* L);
 		static int SetUnitRadiusAndHeight(lua_State* L);
@@ -270,6 +271,3 @@ class LuaSyncedCtrl
 
 		static int SetRadarErrorParams(lua_State* L);
 };
-
-
-#endif /* LUA_SYNCED_CTRL_H */
