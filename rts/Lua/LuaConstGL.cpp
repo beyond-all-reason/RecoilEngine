@@ -793,20 +793,9 @@ bool LuaConstGL::PushEntries(lua_State* L)
 
 
 /******************************************************************************
- * Not included, but useful texture Formats
- * @section textureformats
-******************************************************************************/
-
-/// @field GL_RGBA16F_ARB 0x881A
-
-/// @field GL_RGBA32F_ARB 0x8814
-
-/******************************************************************************
  * Not included, but useful FBO Targets
  * @section fbotargets
 ******************************************************************************/
-
-/// @field GL_FRAMEBUFFER_EXT 0x8D40
 
 /// @field GL_READ_FRAMEBUFFER_EXT 0x8CA8
 
