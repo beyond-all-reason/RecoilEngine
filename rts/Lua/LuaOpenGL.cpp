@@ -6588,7 +6588,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w 1
  * @param h 1
- * @param format GLPixelFormat4? (Default: `GL.RGBA`, i.e. `6408`)
+ * @param format GLPixelFormat4? (Default: `GL.RGBA`)
  * @return number red
  * @return number green
  * @return number blue
@@ -6605,7 +6605,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w 1
  * @param h integer
- * @param format GLPixelFormat4? (Default: `GL.RGBA`, i.e. `6408`)
+ * @param format GLPixelFormat4? (Default: `GL.RGBA`)
  * @return [number,number,number,number][] colors Color values indexed by row.
  * @overload fun(x: integer, y: integer, w: 1, h: integer, format: GLPixelFormat3): [number,number,number][]
  * @overload fun(x: integer, y: integer, w: 1, h: integer, format: GLPixelFormat2): [number,number][]
@@ -6619,7 +6619,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w integer
  * @param h 1
- * @param format GLPixelFormat4? (Default: `GL.RGBA`, i.e. `6408`)
+ * @param format GLPixelFormat4? (Default: `GL.RGBA`)
  * @return [number,number,number,number][] colors Color values indexed by column.
  * @overload fun(x: integer, y: integer, w: integer, h: 1, format: GLPixelFormat3): [number,number,number][]
  * @overload fun(x: integer, y: integer, w: integer, h: 1, format: GLPixelFormat2): [number,number][]
@@ -6632,7 +6632,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w integer
  * @param h integer
- * @param format GLPixelFormat4? (Default: `GL.RGBA`, i.e. `6408`)
+ * @param format GLPixelFormat4? (Default: `GL.RGBA`)
  * @return [number,number,number,number][][] colors Array of rows of color values, bottom row first: `colors[y][x]`.
  * @overload fun(x: integer, y: integer, w: integer, h: integer, format: GLPixelFormat3): [number,number,number][][]
  * @overload fun(x: integer, y: integer, w: integer, h: integer, format: GLPixelFormat2): [number,number][][]
