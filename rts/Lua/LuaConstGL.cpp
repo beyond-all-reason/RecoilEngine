@@ -765,9 +765,9 @@ bool LuaConstGL::PushEntries(lua_State* L)
 	PUSH_GL(BLUE);
 	/*** @field GL.ALPHA integer */
 	PUSH_GL(ALPHA);
+
 	/*** @field GL.RG integer */
 	PUSH_GL(RG);
-
 	/*** @field GL.RGB integer */
 	PUSH_GL(RGB);
 	/*** @field GL.RGBA integer */

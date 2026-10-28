@@ -6543,14 +6543,14 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * actually have the matching attachment.
  *
  * @alias GLPixelFormat1
- * | 6400 # `GL.COLOR_INDEX` (`0x1900`)
- * | 6401 # `GL.STENCIL_INDEX` (`0x1901`)
- * | 6402 # `GL.DEPTH_COMPONENT` (`0x1902`)
- * | 6403 # `GL.RED` (`0x1903`)
- * | 6404 # `GL.GREEN` (`0x1904`)
- * | 6405 # `GL.BLUE` (`0x1905`)
- * | 6406 # `GL.ALPHA` (`0x1906`)
- * | 6409 # `GL.LUMINANCE` (`0x1909`)
+ * | 6400 # `GL.COLOR_INDEX`
+ * | 6401 # `GL.STENCIL_INDEX`
+ * | 6402 # `GL.DEPTH_COMPONENT`
+ * | 6403 # `GL.RED`
+ * | 6404 # `GL.GREEN`
+ * | 6405 # `GL.BLUE`
+ * | 6406 # `GL.ALPHA`
+ * | 6409 # `GL.LUMINANCE`
  */
 /***
  * Pixel format with two color components.
@@ -6560,22 +6560,22 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * config unset.
  *
  * @alias GLPixelFormat2
- * | 6410 # `GL.LUMINANCE_ALPHA` (`0x190A`)
- * | 33319 # `GL.RG` (`0x8227`)
+ * | 6410 # `GL.LUMINANCE_ALPHA`
+ * | 33319 # `GL.RG`
  */
 /***
  * Pixel format with three color components.
  *
  * @alias GLPixelFormat3
- * | 6407 # `GL.RGB` (`0x1907`)
- * | 32992 # `GL.BGR` (`0x80E0`)
+ * | 6407 # `GL.RGB`
+ * | 32992 # `GL.BGR`
  */
 /***
  * Pixel format with four color components.
  *
  * @alias GLPixelFormat4
- * | 6408 # `GL.RGBA` (`0x1908`)
- * | 32993 # `GL.BGRA` (`0x80E1`)
+ * | 6408 # `GL.RGBA`
+ * | 32993 # `GL.BGRA`
  */
 /***
  * Get single pixel.
