@@ -146,6 +146,8 @@ bool LuaConstGame::PushEntries(lua_State* L)
 		LuaPushNamedNumber(L, "constructionDecayTime" , modInfo.constructionDecayTime);
 		/*** @field Game.constructionDecaySpeed number How fast constructions without builders decay. */
 		LuaPushNamedNumber(L, "constructionDecaySpeed", modInfo.constructionDecaySpeed);
+		/*** @field Game.useYardmapsForQueuedBuildOverlap boolean Whether queued build overlap uses yardmap cells instead of full footprints. */
+		LuaPushNamedBool  (L, "useYardmapsForQueuedBuildOverlap", modInfo.useYardmapsForQueuedBuildOverlap);
 
 		/*** @field Game.multiReclaim integer `0` = 1 reclaimer per feature max, otherwise unlimited. */
 		LuaPushNamedNumber(L, "multiReclaim"                  , modInfo.multiReclaim);
@@ -413,4 +415,3 @@ bool LuaConstGame::PushEntries(lua_State* L)
 
 	return true;
 }
-
