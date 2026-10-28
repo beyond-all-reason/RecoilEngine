@@ -6530,100 +6530,52 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
 
 
 /***
- * Pixel format with a single color component.
- *
- * Pass the matching `GL` table constant, e.g. `GL.RED`.
- *
- * `GL.COLOR_INDEX`, `GL.ALPHA` and `GL.LUMINANCE` were removed in the core
- * profile, and are only accepted while running in the compatibility profile,
- * i.e. with the `ForceCoreContext` config unset. `GL.COLOR_INDEX` additionally
- * requires a color-index color buffer, which Recoil never creates.
- *
- * `GL.STENCIL_INDEX` and `GL.DEPTH_COMPONENT` require the read buffer to
- * actually have the matching attachment.
- *
- * @alias GLPixelFormat1
- * | 6400 # `GL.COLOR_INDEX`
- * | 6401 # `GL.STENCIL_INDEX`
- * | 6402 # `GL.DEPTH_COMPONENT`
- * | 6403 # `GL.RED`
- * | 6404 # `GL.GREEN`
- * | 6405 # `GL.BLUE`
- * | 6406 # `GL.ALPHA`
- * | 6409 # `GL.LUMINANCE`
- */
-/***
- * Pixel format with two color components.
- *
- * `GL.LUMINANCE_ALPHA` was removed in the core profile, and is only accepted
- * while running in the compatibility profile, i.e. with the `ForceCoreContext`
- * config unset.
- *
- * @alias GLPixelFormat2
- * | 6410 # `GL.LUMINANCE_ALPHA`
- * | 33319 # `GL.RG`
- */
-/***
- * Pixel format with three color components.
- *
- * @alias GLPixelFormat3
- * | 6407 # `GL.RGB`
- * | 32992 # `GL.BGR`
- */
-/***
- * Pixel format with four color components.
- *
- * @alias GLPixelFormat4
- * | 6408 # `GL.RGBA`
- * | 32993 # `GL.BGRA`
- */
-/***
  * Get single pixel.
  *
- * One value is returned per component of `format`, in the order the format
- * names them, so `GL.BGRA` returns blue, green, red and alpha.
+ * `format` is one of the `GL` pixel format constants. One value is returned
+ * per component of the format, in the order the format names them, so
+ * `GL.BGRA` returns blue, green, red and alpha:
+ *
+ * - one component: `GL.RED`, `GL.GREEN`, `GL.BLUE`, `GL.ALPHA`, `GL.LUMINANCE`,
+ *   `GL.COLOR_INDEX`, `GL.STENCIL_INDEX`, `GL.DEPTH_COMPONENT`
+ * - two components: `GL.RG`, `GL.LUMINANCE_ALPHA`
+ * - three components: `GL.RGB`, `GL.BGR`
+ * - four components: `GL.RGBA`, `GL.BGRA`
+ *
+ * `GL.COLOR_INDEX`, `GL.ALPHA`, `GL.LUMINANCE` and `GL.LUMINANCE_ALPHA` were
+ * removed in the core profile, and are only accepted while running in the
+ * compatibility profile, i.e. with the `ForceCoreContext` config unset.
+ * `GL.COLOR_INDEX` additionally requires a color-index color buffer, which
+ * Recoil never creates. `GL.STENCIL_INDEX` and `GL.DEPTH_COMPONENT` require
+ * the read buffer to actually have the matching attachment.
  *
  * @function gl.ReadPixels
  * @param x integer
  * @param y integer
  * @param w 1
  * @param h 1
- * @param format GLPixelFormat4? (Default: `GL.RGBA`)
- * @return number red
- * @return number green
- * @return number blue
- * @return number alpha
- * @overload fun(x: integer, y: integer, w: 1, h: 1, format: GLPixelFormat3): number, number, number
- * @overload fun(x: integer, y: integer, w: 1, h: 1, format: GLPixelFormat2): number, number
- * @overload fun(x: integer, y: integer, w: 1, h: 1, format: GLPixelFormat1): number
+ * @param format integer? (Default: `GL.RGBA`)
+ * @return number ... Color value (color size based on format).
  */
 /***
  * Get column of pixels.
- *
  * @function gl.ReadPixels
  * @param x integer
  * @param y integer
  * @param w 1
  * @param h integer
- * @param format GLPixelFormat4? (Default: `GL.RGBA`)
- * @return [number,number,number,number][] colors Color values indexed by row.
- * @overload fun(x: integer, y: integer, w: 1, h: integer, format: GLPixelFormat3): [number,number,number][]
- * @overload fun(x: integer, y: integer, w: 1, h: integer, format: GLPixelFormat2): [number,number][]
- * @overload fun(x: integer, y: integer, w: 1, h: integer, format: GLPixelFormat1): number[]
+ * @param format integer? (Default: `GL.RGBA`)
+ * @return (number|number[])[] colors Column of color values (color size based on format), indexed by row.
  */
 /***
  * Get row of pixels.
- *
  * @function gl.ReadPixels
  * @param x integer
  * @param y integer
  * @param w integer
  * @param h 1
- * @param format GLPixelFormat4? (Default: `GL.RGBA`)
- * @return [number,number,number,number][] colors Color values indexed by column.
- * @overload fun(x: integer, y: integer, w: integer, h: 1, format: GLPixelFormat3): [number,number,number][]
- * @overload fun(x: integer, y: integer, w: integer, h: 1, format: GLPixelFormat2): [number,number][]
- * @overload fun(x: integer, y: integer, w: integer, h: 1, format: GLPixelFormat1): number[]
+ * @param format integer? (Default: `GL.RGBA`)
+ * @return (number|number[])[] colors Row of color values (color size based on format), indexed by column.
  */
 /***
  * Get rows of pixels.
@@ -6632,11 +6584,8 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w integer
  * @param h integer
- * @param format GLPixelFormat4? (Default: `GL.RGBA`)
- * @return [number,number,number,number][][] colors Array of rows of color values, bottom row first: `colors[y][x]`.
- * @overload fun(x: integer, y: integer, w: integer, h: integer, format: GLPixelFormat3): [number,number,number][][]
- * @overload fun(x: integer, y: integer, w: integer, h: integer, format: GLPixelFormat2): [number,number][][]
- * @overload fun(x: integer, y: integer, w: integer, h: integer, format: GLPixelFormat1): number[][]
+ * @param format integer? (Default: `GL.RGBA`)
+ * @return (number|number[])[][] colors Array of rows of color values (color size based on format), bottom row first: `colors[y][x]`.
  */
 int LuaOpenGL::ReadPixels(lua_State* L)
 {
