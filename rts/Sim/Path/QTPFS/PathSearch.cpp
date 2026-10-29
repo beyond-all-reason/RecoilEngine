@@ -167,11 +167,10 @@ void QTPFS::PathSearch::InitializeThread(SearchThreadData* threadData, IPath* pa
 	constexpr auto isRemainingPathLongEnoughForRetrigger = [](const QTPFS::IPath *pathToRepair) {
 		const uint32_t firstCleanPointId = pathToRepair->GetFirstNodeIdOfCleanPath();
 		const uint32_t pointCount = pathToRepair->GetGoodNodeCount() + 1;
-		const float3& prevPoint = pathToRepair->GetPoint(firstCleanPointId);
-		uint32_t pathLength = 0;
+		float pathLength = 0.0f;
 		for (auto i = firstCleanPointId + 1; i < pointCount; ++i) {
 			const float3& nextPoint = pathToRepair->GetPoint(i);
-			pathLength += nextPoint.distance2D(prevPoint);
+			pathLength += nextPoint.distance2D(pathToRepair->GetPoint(i - 1));
 			if (pathLength >= modInfo.qtRefreshPathMinDist)
 				return true;
 		}
