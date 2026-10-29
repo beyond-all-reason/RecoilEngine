@@ -201,7 +201,6 @@ bool LoadFromLua(Shader::IProgramObject* program, const std::string& filename)
 	ParseShaderTable(&root, "fragment", fragSrcs);
 	ParseShaderTable(&root, "compute",  compSrcs);
 
-	// a program needs at least one stage; a compute shader is a complete program on its own
 	if (vertSrcs.str().empty() && fragSrcs.str().empty() && geomSrcs.str().empty() && compSrcs.str().empty())
 		return false;
 
