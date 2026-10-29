@@ -3,6 +3,7 @@
 #include "SevenZipArchive.h"
 
 #include <algorithm>
+#include <limits>
 #include <cassert>
 #include <cstring>
 #include <optional>
@@ -166,6 +167,7 @@ CSevenZipArchive::CSevenZipArchive(const std::string& name)
 	considerSolid = (db.db.NumFolders == 1) || (fileEntries.size() > db.db.NumFolders && db.db.NumFolders < ThreadPool::GetNumThreads());
 
 	parallelAccessNum = !CheckForSolid() ? ThreadPool::GetNumThreads() : 1; // allow parallel access, but only for non-solid archives
+	parallelAccessNum = std::min<uint32_t>(parallelAccessNum, std::numeric_limits<decltype(afi)::ValueType>::digits - 1); // so that 1u << parallelAccessNum below stays defined
 	sem = std::make_unique<decltype(sem)::element_type>(parallelAccessNum);
 	const auto maxBitMask = (1u << parallelAccessNum) - 1;
 	afi.SetMaxBitsMask(maxBitMask);
