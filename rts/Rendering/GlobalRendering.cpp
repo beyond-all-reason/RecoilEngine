@@ -590,6 +590,12 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 		return false;
 
 	gladLoadGL();
+	// Some drivers (Intel, Parallels) report GL_EXT_framebuffer_blit but do not export glBlitFramebufferEXT.
+	// Use the core GL 3.0 glBlitFramebuffer, which has the same signature, or report the extension as missing.
+	if (glBlitFramebufferEXT == nullptr) {
+		glad_glBlitFramebufferEXT = glad_glBlitFramebuffer;
+		GLAD_GL_EXT_framebuffer_blit &= (glBlitFramebufferEXT != nullptr);
+	}
 	GLX::Load(sdlWindow);
 
 	if (!CheckGLContextVersion(minCtx)) {
