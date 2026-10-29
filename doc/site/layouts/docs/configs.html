@@ -25,7 +25,7 @@
 							</td>
 							<td>
 								{{ $info.description }}
-								<a href="{{ $repo }}blob/master/{{ replaceRE `^(.*?/)?rts/` "rts/" $info.declarationFile }}#L{{ $info.declarationLine }}">(source)</a>
+								<a href="{{ $repo }}blob/master/{{ $info.declarationFile }}#L{{ $info.declarationLine }}">(source)</a>
 							</td>
 							<td>
 								<dl class="hx-text-xs">
