@@ -2,6 +2,7 @@
 
 #include "System/RangesCompat.h"
 #include "LuaHandleSynced.h"
+#include "Sim/Units/CommandAI/MobileCAI.h"
 
 #include "LuaInclude.h"
 
@@ -1729,6 +1730,60 @@ bool CSyncedLuaHandle::ShieldPreDamaged(
 	const bool ret = luaL_optboolean(L, -1, false);
 	lua_pop(L, 1);
 	return ret;
+}
+
+
+/*** Lets synced Lua handle one mobile unit attack-movement update.
+ * Called before native object/ground movement decisions, independently of the
+ * 90% range threshold. Command initialization and weapon firing remain native.
+ * Return literal true to handle this update; false/nil or an error uses native
+ * behavior, unless the callback invalidated the command, owner or order target.
+ * Only one of targetID and x/y/z is populated. This is not a shot-fired event.
+ * Movement API effects are not rolled back when returning false or on errors.
+ * Dispatch stops at the first handler returning true, or at invalidation,
+ * including across LuaRules and LuaGaia. Later handlers do not run that update.
+ * @function SyncedCallins:AttackCommandMovement
+ * @param unitID integer
+ * @param cmdTag integer
+ * @param cmdID integer
+ * @param cmdOptions integer Command option bitmask
+ * @param targetID integer? Object target
+ * @param x number? Ground target x
+ * @param y number? Ground target y
+ * @param z number? Ground target z
+ * @param temporary boolean Attack generated as a temporary command-AI suborder
+ * @return boolean handled
+ * @see Spring.TestUnitAttackWeapon
+ * @see Spring.GetUnitAttackTargetPosition
+ * @see Spring.SetUnitFacingTarget
+ * @see Spring.FinishUnitAttackCommand
+ */
+bool CSyncedLuaHandle::AttackCommandMovement(const CUnit* unit, const Command& cmd)
+{
+	LUA_CALL_IN_CHECK(L, false);
+	luaL_checkstack(L, 12, __func__);
+	const LuaUtils::ScopedDebugTraceBack dbgTrace(L);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return false;
+	lua_pushnumber(L, unit->id);
+	lua_pushnumber(L, cmd.GetTag());
+	lua_pushnumber(L, cmd.GetID());
+	lua_pushnumber(L, cmd.GetOpts());
+	if (cmd.GetNumParams() == 1) {
+		lua_pushnumber(L, cmd.GetParam(0));
+		lua_pushnil(L); lua_pushnil(L); lua_pushnil(L);
+	} else {
+		lua_pushnil(L);
+		const float3 pos = cmd.GetPos(0);
+		lua_pushnumber(L, pos.x); lua_pushnumber(L, pos.y); lua_pushnumber(L, pos.z);
+	}
+	lua_pushboolean(L, static_cast<const CMobileCAI*>(unit->commandAI)->tempOrder);
+	if (!RunCallInTraceback(L, cmdStr, 9, 1, dbgTrace.GetErrFuncIdx(), false))
+		return false;
+	const bool handled = lua_isboolean(L, -1) && lua_toboolean(L, -1);
+	lua_pop(L, 1);
+	return handled;
 }
 
 

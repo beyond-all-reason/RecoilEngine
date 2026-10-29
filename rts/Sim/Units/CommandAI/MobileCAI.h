@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef MOBILE_CAI_H
-#define MOBILE_CAI_H
+#pragma once
 
 #include "CommandAI.h"
 #include "Sim/Misc/GlobalConstants.h" // for SQUARE_SIZE
@@ -13,6 +12,7 @@ class CUnit;
 class CFeature;
 class CWeapon;
 struct Command;
+struct lua_State;
 
 class CMobileCAI : public CCommandAI
 {
@@ -44,6 +44,13 @@ public:
 	void StopSlowGuard();
 	void StartSlowGuard(float speed);
 	void ExecuteAttack(Command& c) override;
+	const Command& CheckAttackMovementContext(lua_State* L) const;
+	int TestAttackWeapon(lua_State* L);
+	int GetAttackTargetPosition(lua_State* L);
+	int FinishAttackCommand(lua_State* L);
+	bool GetStrafeLeft() const { return moveDir; }
+	bool IsAttackMovementContextValid() const;
+	bool CallAttackMovement(Command& c);
 	void ExecuteStop(Command& c) override;
 
 	virtual void Execute();
@@ -131,5 +138,3 @@ private:
 	bool MobileAutoGenerateTarget();
 	bool GenerateAttackCmd();
 };
-
-#endif /* MOBILE_CAI_H */

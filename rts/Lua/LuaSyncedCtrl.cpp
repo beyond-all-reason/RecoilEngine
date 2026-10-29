@@ -68,6 +68,7 @@
 #include "Sim/Units/UnitTypes/Factory.h"
 #include "Sim/Units/CommandAI/Command.h"
 #include "Sim/Units/CommandAI/CommandAI.h"
+#include "Sim/Units/CommandAI/MobileCAI.h"
 #include "Sim/Units/CommandAI/FactoryCAI.h"
 #include "Sim/Units/UnitTypes/ExtractorBuilding.h"
 #include "Sim/Weapons/PlasmaRepulser.h"
@@ -224,6 +225,10 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitPhysicalStateBit);
 	REGISTER_LUA_CFUNC(SetUnitTravel);
 	REGISTER_LUA_CFUNC(SetUnitFuel);
+	REGISTER_LUA_CFUNC(TestUnitAttackWeapon);
+	REGISTER_LUA_CFUNC(GetUnitAttackTargetPosition);
+	REGISTER_LUA_CFUNC(SetUnitFacingTarget);
+	REGISTER_LUA_CFUNC(FinishUnitAttackCommand);
 	REGISTER_LUA_CFUNC(SetUnitMoveGoal);
 	REGISTER_LUA_CFUNC(SetUnitLandGoal);
 	REGISTER_LUA_CFUNC(ClearUnitGoal);
@@ -3988,7 +3993,93 @@ int LuaSyncedCtrl::SetUnitPosErrorParams(lua_State* L)
 }
 
 
+/*** Options for one attack weapon geometry query.
+ * @class AttackWeaponQuery
+ * @field orientation ("rotate"|"heading")? Defaults to rotate for unit targets, heading for ground targets
+ * @field avoidFlags integer? Query-only replacement for the weapon's avoidance flags
+ * @field position number[]? Candidate unit base position {x,y,z}; requires explicit heading
+ * @field heading integer? Signed chassis heading (-32768 through 32767)
+ * @field useMuzzle boolean? Use current muzzle geometry instead of the pre-aim source
+ */
+
+/*** Test one firing geometry for the active attack command.
+ * No movement, script aiming, reload or firing checks are performed.
+ * Query-only avoidance flags do not change the weapon's stored flags.
+ * The first blocker is in native scan order, not necessarily the nearest.
+ * Candidate queries translate the current piece pose; they do not predict
+ * animation, terrain alignment, water transitions or path reachability.
+ * @function Spring.TestUnitAttackWeapon
+ * @param unitID integer Same unit as the active AttackCommandMovement callback
+ * @param weaponNum integer 1-based weapon index
+ * @param options AttackWeaponQuery? Candidate and muzzle queries require heading orientation
+ * @return boolean? clear Geometric eligibility only, not a guarantee of firing
+ * @return string reason First failed check; clear, notChecked, invalidTarget, range, terrain, friendly, neutral, feature, blocked
+ * @return string? blockerType "unit" or "feature"
+ * @return integer? blockerID
+ */
+int LuaSyncedCtrl::TestUnitAttackWeapon(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+	auto* cai = unit != nullptr ? dynamic_cast<CMobileCAI*>(unit->commandAI) : nullptr;
+	return cai != nullptr ? cai->TestAttackWeapon(L) : 0;
+}
+
+/*** Get the active attack target position as perceived by the attacking allyteam.
+ * Object targets use the midpoint with sensor error; ground targets use the
+ * command position. Valid only in this unit's AttackCommandMovement callback.
+ * @function Spring.GetUnitAttackTargetPosition
+ * @param unitID integer
+ * @return number? x
+ * @return number y
+ * @return number z
+ */
+int LuaSyncedCtrl::GetUnitAttackTargetPosition(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+	auto* cai = unit != nullptr ? dynamic_cast<CMobileCAI*>(unit->commandAI) : nullptr;
+	return cai != nullptr ? cai->GetAttackTargetPosition(L) : 0;
+}
+
+/*** Ask the movement controller to face a position while attacking.
+ * Does not stop movement or assign a weapon target.
+ * @function Spring.SetUnitFacingTarget
+ * @param unitID integer
+ * @param x number
+ * @param y number
+ * @param z number
+ * @param radius number Pointing distance used by the movement controller
+ */
+int LuaSyncedCtrl::SetUnitFacingTarget(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
+	const float3 position(luaL_checkfloat(L, 2), luaL_checkfloat(L, 3), luaL_checkfloat(L, 4));
+	const float radius = luaL_checkfloat(L, 5);
+	if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z) ||
+	    !std::isfinite(radius) || radius < 0)
+		return luaL_error(L, "invalid facing position or radius");
+	unit->moveType->KeepPointingTo(position, radius, true);
+	return 0;
+}
+
+/*** Finish the active attack command without discarding its queued successors.
+ * Valid only in this unit's AttackCommandMovement callback. Does not stop
+ * movement; use ClearUnitGoal separately when the policy requires a stop.
+ * @function Spring.FinishUnitAttackCommand
+ * @param unitID integer
+ */
+int LuaSyncedCtrl::FinishUnitAttackCommand(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+	auto* cai = unit != nullptr ? dynamic_cast<CMobileCAI*>(unit->commandAI) : nullptr;
+	return cai != nullptr ? cai->FinishAttackCommand(L) : 0;
+}
+
 /*** Used by default commands to get in build-, attackrange etc.
+ * Normal (non-raw) goals for the current AttackCommandMovement unit use its
+ * command AI, retaining a matching active goal. Other calls keep their existing
+ * independent movement behavior.
  *
  * @function Spring.SetUnitMoveGoal
  * @param unitID UnitID
@@ -4014,7 +4105,15 @@ int LuaSyncedCtrl::SetUnitMoveGoal(lua_State* L)
 	const float radius = luaL_optfloat(L, 5, 0.0f);
 	const float speed  = luaL_optfloat(L, 6, unit->moveType->GetMaxSpeed());
 
-	if (luaL_optboolean(L, 7, false)) {
+	const bool raw = luaL_optboolean(L, 7, false);
+	// Within the movement callback, normal goals belong to the active attack.
+	// Use the same command-AI path as native movement, including goal reuse.
+	if (auto* cai = dynamic_cast<CMobileCAI*>(unit->commandAI); !raw && cai != nullptr && cai->IsAttackMovementContextValid()) {
+		cai->SetGoal(pos, unit->pos, radius, speed);
+		return 0;
+	}
+
+	if (raw) {
 		unit->moveType->StartMovingRaw(pos, radius);
 	} else {
 		unit->moveType->StartMoving(pos, radius, speed);
