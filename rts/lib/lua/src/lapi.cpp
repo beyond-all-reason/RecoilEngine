@@ -157,6 +157,13 @@ LUA_API lua_State *lua_newthread (lua_State *L) {
 */
 
 
+LUA_API int lua_absindex (lua_State *L, int idx) {
+  return (idx > 0 || idx <= LUA_REGISTRYINDEX)
+         ? idx
+         : cast_int(L->top - L->base) + idx + 1;
+}
+
+
 LUA_API int lua_gettop (lua_State *L) {
   return cast_int(L->top - L->base);
 }

@@ -96,7 +96,7 @@ static bool CopyPushData(lua_State* dst, lua_State* src, int index, int depth, s
 
 static bool CopyPushTable(lua_State* dst, lua_State* src, int index, int depth, spring::unsynced_map<const void*, int>& alreadyCopied)
 {
-	const int table = LuaUtils::PosAbsLuaIndex(src, index);
+	const int table = lua_absindex(src, index);
 
 	// check cache
 	const void* p = lua_topointer(src, table);
@@ -251,7 +251,7 @@ static bool BackupTable(LuaUtils::DataDump& d, lua_State* src, int index, int de
 	if (depth++ > maxDepth)
 		return false;
 
-	const int tableIdx = LuaUtils::PosAbsLuaIndex(src, index);
+	const int tableIdx = lua_absindex(src, index);
 	for (lua_pushnil(src); lua_next(src, tableIdx) != 0; lua_pop(src, 1)) {
 		LuaUtils::DataDump dk, dv;
 		BackupData(dk, src, -2, depth);
@@ -545,7 +545,7 @@ int LuaUtils::ParseIntArray(lua_State* L, int index, int* array, int size)
 	if (!lua_istable(L, index))
 		return -1;
 
-	for (int i = 0, absIdx = LuaUtils::PosAbsLuaIndex(L, index); i < size; i++) {
+	for (int i = 0, absIdx = lua_absindex(L, index); i < size; i++) {
 		lua_rawgeti(L, absIdx, (i + 1));
 
 		if (lua_isnumber(L, -1)) {
@@ -565,7 +565,7 @@ int LuaUtils::ParseFloatArray(lua_State* L, int index, float* array, int size)
 	if (!lua_istable(L, index))
 		return -1;
 
-	for (int i = 0, absIdx = LuaUtils::PosAbsLuaIndex(L, index); i < size; i++) {
+	for (int i = 0, absIdx = lua_absindex(L, index); i < size; i++) {
 		lua_rawgeti(L, absIdx, (i + 1));
 
 		if (lua_isnumber(L, -1)) {
@@ -585,7 +585,7 @@ int LuaUtils::ParseStringArray(lua_State* L, int index, string* array, int size)
 	if (!lua_istable(L, index))
 		return -1;
 
-	for (int i = 0, absIdx = LuaUtils::PosAbsLuaIndex(L, index); i < size; i++) {
+	for (int i = 0, absIdx = lua_absindex(L, index); i < size; i++) {
 		lua_rawgeti(L, absIdx, (i + 1));
 
 		if (lua_isstring(L, -1)) {
@@ -607,7 +607,7 @@ int LuaUtils::ParseIntVector(lua_State* L, int index, vector<int>& vec)
 
 	vec.clear();
 
-	for (int i = 0, absIdx = LuaUtils::PosAbsLuaIndex(L, index); ; i++) {
+	for (int i = 0, absIdx = lua_absindex(L, index); ; i++) {
 		lua_rawgeti(L, absIdx, (i + 1));
 
 		if (lua_isnumber(L, -1)) {
@@ -628,7 +628,7 @@ int LuaUtils::ParseFloatVector(lua_State* L, int index, vector<float>& vec)
 
 	vec.clear();
 
-	for (int i = 0, absIdx = LuaUtils::PosAbsLuaIndex(L, index); ; i++) {
+	for (int i = 0, absIdx = lua_absindex(L, index); ; i++) {
 		lua_rawgeti(L, absIdx, (i + 1));
 
 		if (lua_isnumber(L, -1)) {
@@ -649,7 +649,7 @@ int LuaUtils::ParseStringVector(lua_State* L, int index, vector<string>& vec)
 
 	vec.clear();
 
-	for (int i = 0, absIdx = LuaUtils::PosAbsLuaIndex(L, index); ; i++) {
+	for (int i = 0, absIdx = lua_absindex(L, index); ; i++) {
 		lua_rawgeti(L, absIdx, (i + 1));
 
 		if (lua_isstring(L, -1)) {
@@ -670,7 +670,7 @@ int LuaUtils::ParseFloat4Vector(lua_State* L, int index, vector<float4>& vec)
 
 	vec.clear();
 
-	for (int i = 0, absIdx = LuaUtils::PosAbsLuaIndex(L, index); ; i += 4) {
+	for (int i = 0, absIdx = lua_absindex(L, index); ; i += 4) {
 		lua_rawgeti(L, absIdx, (i + 4));
 		lua_rawgeti(L, absIdx, (i + 3));
 		lua_rawgeti(L, absIdx, (i + 2));
@@ -1686,7 +1686,7 @@ void LuaUtils::LuaStackDumper::ParseTable(lua_State* L, int i, int parseDepth)
 	}
 
 	// Ensure i is an absolute index as we'll be pushing/popping things after it.
-	i = LuaUtils::PosAbsLuaIndex(L, i);
+	i = lua_absindex(L, i);
 
 	if (isSeq(L, i)) {
 		PrintSeq(L, i, parseDepth);  // This case includes all empty tables.
@@ -1715,7 +1715,7 @@ void LuaUtils::LuaStackDumper::ParseLuaItem(lua_State* L, int i, bool asKey, int
 		std::string fnName;
 
 		// Ensure i is an absolute index as we'll be pushing/popping things after it.
-		i = LuaUtils::PosAbsLuaIndex(L, i);
+		i = lua_absindex(L, i);
 
 		// Check to see if the function has a global name.
 			// stack = [..]

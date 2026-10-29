@@ -325,7 +325,7 @@ static void ParseShader(lua_State* L, int index, LuaMatShader& shader)
 
 static void ParseTexture(lua_State* L, int index, LuaMatTexture& texUnit) {
 	RECOIL_DETAILED_TRACY_ZONE;
-	index = LuaUtils::PosAbsLuaIndex(L, index);
+	index = lua_absindex(L, index);
 
 	if (lua_isstring(L, index)) {
 		LuaOpenGLUtils::ParseTextureImage(L, texUnit, lua_tostring(L, index));
@@ -336,7 +336,6 @@ static void ParseTexture(lua_State* L, int index, LuaMatTexture& texUnit) {
 	if (!lua_istable(L, index))
 		return;
 
-	// index is absolute since the top of this function
 	const int table = index;
 
 	for (lua_pushnil(L); lua_next(L, table) != 0; lua_pop(L, 1)) {

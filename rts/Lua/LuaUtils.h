@@ -141,17 +141,6 @@ class LuaUtils {
 
 		static void* GetUserData(lua_State* L, int index, const string& type);
 
-		// Turns an index relative to the stack top (negative) into an absolute
-		// one, which stays valid while values are pushed and popped; a positive
-		// index is already absolute. Not for pseudo-indices such as
-		// LUA_REGISTRYINDEX. (Lua 5.2 and later call this lua_absindex.)
-		static inline int PosAbsLuaIndex(lua_State* L, int index) {
-			if (index > 0)
-				return index;
-
-			return (lua_gettop(L) + index + 1);
-		}
-
 		static int IsEngineMinVersion(lua_State* L);
 
 		// from LuaFeatureDefs.cpp / LuaUnitDefs.cpp / LuaWeaponDefs.cpp

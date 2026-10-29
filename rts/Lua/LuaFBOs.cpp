@@ -391,7 +391,7 @@ bool LuaFBOs::ApplyAttachment(
 		return AttachObject(__func__, L, index, fbo, attachID);
 
 	// meta_newindex passes 3, CreateFBO passes -1; the lua_rawgeti calls below push
-	const int table = LuaUtils::PosAbsLuaIndex(L, index);
+	const int table = lua_absindex(L, index);
 
 	GLenum target = 0;
 	GLint  level  = 0;
