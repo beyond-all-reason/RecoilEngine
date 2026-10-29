@@ -476,7 +476,7 @@ void UpdateTransitionLerpSmoothed(const CCameraController* currCam, CCameraHandl
 	float decay = camTransState.halflife / 1000.0f;
 	expDecay(currentPos, targetPos, decay, dt);
 	expDecay(currentRot, targetRot, decay, dt);
-	expDecay(currentFov, targetFov, decay, dt);
+	currentFov = expDecay(currentFov, targetFov, decay, dt);
 	camera->SetPos(currentPos);
 	camera->SetRot(currentRot);
 	camera->SetVFOV(currentFov);
