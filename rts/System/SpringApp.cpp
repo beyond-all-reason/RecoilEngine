@@ -27,6 +27,7 @@
 #include "System/SpringApp.h"
 #ifndef HEADLESS
 #include "aGui/Gui.h"
+#include "System/Platform/MessageBox.h"
 #endif
 #include "ExternalAI/AILibraryManager.h"
 #include "Game/CameraHandler.h"
@@ -207,7 +208,16 @@ SpringApp::SpringApp(int argc, char** argv)
 	Recoil::InitConsole();
 
 	// also initializes configHandler and logOutput
-	ParseCmdLine(argc, argv);
+	try {
+		ParseCmdLine(argc, argv);
+	} catch (const content_error& e) {
+		// e.g. no writable data-directory; too early for ErrorMessageBox, whose ::Kill expects an initialized app
+		LOG_L(L_FATAL, "%s", e.what());
+		#ifndef HEADLESS
+		Platform::MsgBox(e.what(), "Spring: caught content_error: ", MBF_OK | MBF_EXCL);
+		#endif
+		exit(spring::EXIT_CODE_FAILURE);
+	}
 
 	spring_clock::PushTickRate(configHandler->GetBool("UseHighResTimer"));
 	// set the Spring "epoch" to be whatever value the first
