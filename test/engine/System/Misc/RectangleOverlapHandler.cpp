@@ -96,13 +96,54 @@ static inline bool TestOverlapping(std::vector<int>& testMap, CRectangleOverlapH
 
 TEST_CASE("RectangleOverlapHandler")
 {
-	srand( time(NULL) );
+	{
+		srand( time(NULL) );
 
-	std::vector<int> testMap(size * size, 0);
-	CRectangleOverlapHandler ro;
+		std::vector<int> testMap(size * size, 0);
+		CRectangleOverlapHandler ro;
 
-	INFO("Optimized rectangles don't cover the same area!");
-	CHECK(TestArea(testMap, ro));
-	INFO("Optimized rectangles still overlap!");
-	CHECK(TestOverlapping(testMap, ro));
+		INFO("Optimized rectangles don't cover the same area!");
+		CHECK(TestArea(testMap, ro));
+		INFO("Optimized rectangles still overlap!");
+		CHECK(TestOverlapping(testMap, ro));
+	}
+	{
+		// Issue #3548
+		CRectangleOverlapHandler ro;
+
+		// CRectangleOverlapHandler reserves 512 entries worth of memory so we want to see
+		// what happens if we have to table-expand in the middle of Process
+		// Need to make sure these don't overlap so they don't get pruned or merged
+		for ( int i = 0; i < 511; ++i )
+			ro.push_back(SRectangle(10000 + i * 100,
+				10000 + i * 100,
+				10000 + ( i + 1 ) * 100,
+				10000 + ( i + 1 ) * 100));
+		ro.Process(true);
+		CHECK(ro.size() == 511);
+		ro.push_back(SRectangle(0, 0, 2000, 2000));	// add a large rect
+		CHECK(ro.size() == 512);
+		ro.Process(false);
+		CHECK(ro.size() == 511 + 16); // Our large rect gets chopped into 16 small ones
+
+		// In the current algorithm, one side is compared against the area
+		// So unintuitively it will make small strips on the z axis
+
+		auto rects = std::vector(ro.begin(), ro.end());
+		std::sort(rects.begin(), rects.end(), [](const auto &lhs, const auto &rhs) {
+			return lhs.z1 < rhs.z1;
+		});	// We don't care about the order, lets just sort by z1
+		rects.resize(16);	// Only care about the 16 split ones
+
+		int w = 0;
+		for (const auto &r : rects)
+		{
+			CHECK(0 == r.x1);
+			CHECK(2000 == r.x2);
+			CHECK(w == r.z1);
+			CHECK(w + 125 == r.z2);
+
+			w += 125;
+		}
+	}
 }
