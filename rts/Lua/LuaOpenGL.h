@@ -164,6 +164,8 @@ class LuaOpenGL {
 
 	private:
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);
+		// as CheckDrawingEnabled, returns false inside a buffered gl.BeginEnd block where only vertex data calls are allowed
+		static bool CheckDrawingAllowed(lua_State* L, const char* caller);
 		static void CondWarnDeprecatedGL(lua_State* L, const char* caller);
 		static void NotImplementedError(lua_State* L, const char* caller);
 
