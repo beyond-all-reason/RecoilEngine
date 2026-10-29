@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_GL_H
-#define LUA_GL_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -384,5 +383,3 @@ inline void LuaOpenGL::CheckMatrixState(lua_State* L, const char* fn, int error)
 		return;
 	GetLuaContextData(L)->glMatrixTracker.HandleMatrixStateError(error, fn);
 }
-
-#endif /* LUA_UNITDEFS_H */
