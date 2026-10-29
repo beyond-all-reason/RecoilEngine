@@ -72,11 +72,6 @@ std::string LuaTextures::Create(const Texture& tex)
 			glTexImage3D(tex.target, 0, tex.format, tex.xsize, tex.ysize, tex.zsize, tex.border, dataFormat, dataType, nullptr);
 		} break;
 		case GL_TEXTURE_CUBE_MAP: {
-			// A cube texture's level 0 is six separate 2D images, one per face target,
-			// allocated in the OpenGL face order +X, -X, +Y, -Y, +Z, -Z (the face
-			// enums are consecutive). Only level 0 is allocated here; gl.GenerateMipmap
-			// allocates the rest of the chain. GL requires square faces: xsize != ysize
-			// fails with GL_INVALID_VALUE, which the glGetError check below reports.
 			for (GLenum face = GL_TEXTURE_CUBE_MAP_POSITIVE_X; face <= GL_TEXTURE_CUBE_MAP_NEGATIVE_Z; ++face)
 				glTexImage2D(face, 0, tex.format, tex.xsize, tex.ysize, tex.border, dataFormat, dataType, nullptr);
 		} break;
