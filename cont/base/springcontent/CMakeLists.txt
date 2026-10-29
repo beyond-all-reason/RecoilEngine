@@ -108,6 +108,7 @@ list(APPEND FILES
 	LuaGadgets/Gadgets/share_control.lua
 	LuaGadgets/Gadgets/unit_script.lua
 	LuaGadgets/Gadgets/game_spawn.lua
+	LuaGadgets/Gadgets/game_start_position.lua
 	LuaGadgets/system.lua
 	LuaGadgets/actions.lua
 	LuaGadgets/README.txt
