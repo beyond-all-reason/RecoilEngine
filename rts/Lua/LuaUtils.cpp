@@ -801,7 +801,7 @@ int LuaUtils::PushModelTable(lua_State* L, const SolidObjectDef* def) {
 	 * access it in the slower way without realizing it */
 	const S3DModel* model = def->LoadModel();
 
-	lua_createtable(L, 0, 10);
+	lua_createtable(L, 0, 11);
 
 	if (model != nullptr) {
 		// unit, or non-tree feature
@@ -827,6 +827,14 @@ int LuaUtils::PushModelTable(lua_State* L, const SolidObjectDef* def) {
 		LuaPushNamedNumber(L, "midy", 0.0f);
 		LuaPushNamedNumber(L, "midz", 0.0f);
 	}
+
+	// whether the importer found authored per-vertex colour (glTF COLOR_0) on all, some or none
+	// of the model's primitives; models without vertex colour (S3O, ...) and missing models say "none"
+	static constexpr const char* VERTEX_COLOR_NAMES[] = { "none", "partial", "all" };
+	static_assert(S3DModel::VERTEX_COLOR_NONE == 0);
+	static_assert(S3DModel::VERTEX_COLOR_PARTIAL == 1);
+	static_assert(S3DModel::VERTEX_COLOR_ALL == 2);
+	LuaPushNamedString(L, "vertexColor", VERTEX_COLOR_NAMES[(model != nullptr) ? model->GetVertexColorReport() : S3DModel::VERTEX_COLOR_NONE]);
 
 	LuaPushString(L, "textures");
 	lua_createtable(L, 0, model != nullptr ? 2 : 0);
