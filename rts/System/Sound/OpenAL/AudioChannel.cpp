@@ -48,9 +48,9 @@ void AudioChannel::Enable(bool newState)
 
 void AudioChannel::SoundSourceFinished(CSoundSource* sndSource)
 {
-	// FIXME broken queue
-	// we don't want to play from the queue if we're about to shut down or
-	// if we're called from StreamPlay() -> SoundSource::Stop() context
+	curSources.erase(sndSource);
+
+	// FIXME: do not advance the queue when shutting down.
 	if (curStreamSrc == sndSource) {
 		if (!streamQueue.empty()) {
 			StreamPlay(streamQueue.front(), false);
@@ -59,8 +59,6 @@ void AudioChannel::SoundSourceFinished(CSoundSource* sndSource)
 			curStreamSrc = nullptr;
 		}
 	}
-
-	curSources.erase(sndSource);
 }
 
 
@@ -192,9 +190,11 @@ void AudioChannel::StreamPlay(const std::string& filepath, float volume, bool en
 	if (curStreamSrc == nullptr)
 		return;
 
-	// insert first, PlayStream may invoke Stop immediately thus setting curStreamSrc to NULL
-	curSources.insert(curStreamSrc);
-	curStreamSrc->PlayStream(this, filepath, volume);
+	CSoundSource* src = curStreamSrc;
+	curStreamSrc = nullptr; // replacing a stream must not advance the queue
+	src->PlayStream(this, filepath, volume);
+	curStreamSrc = src;
+	curSources.insert(src);
 }
 
 void AudioChannel::StreamPause()
