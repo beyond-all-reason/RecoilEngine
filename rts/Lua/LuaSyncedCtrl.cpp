@@ -35,6 +35,7 @@
 #include "Sim/Features/FeatureDefHandler.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Misc/BuildingMaskMap.h"
+#include "Sim/Misc/CategoryHandler.h"
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/DamageArray.h"
 #include "Sim/Misc/DamageArrayHandler.h"
@@ -228,6 +229,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitLandGoal);
 	REGISTER_LUA_CFUNC(ClearUnitGoal);
 	REGISTER_LUA_CFUNC(SetUnitNeutral);
+	REGISTER_LUA_CFUNC(SetUnitCategories);
 	REGISTER_LUA_CFUNC(SetUnitTarget);
 	REGISTER_LUA_CFUNC(SetUnitMidAndAimPos);
 	REGISTER_LUA_CFUNC(SetUnitRadiusAndHeight);
@@ -3572,6 +3574,43 @@ int LuaSyncedCtrl::SetUnitNeutral(lua_State* L)
 		return 0;
 
 	unit->SetNeutral(luaL_checkboolean(L, 2));
+	return 0;
+}
+
+
+/*** Adds or removes categories of a unit.
+ *
+ * @function Spring.SetUnitCategories
+ *
+ * Categories are the names used by the `category` tag of unit definitions,
+ * which `onlyTargetCategory`, `badTargetCategory` and `noChaseCategory` match.
+ * A unit starts with the categories of its definition.
+ *
+ * @param unitID UnitID
+ * @param categories table<string, boolean> `true` adds the category, `false` removes it; categories not in the table are unchanged.
+ */
+int LuaSyncedCtrl::SetUnitCategories(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	luaL_checktype(L, 2, LUA_TTABLE);
+
+	for (lua_pushnil(L); lua_next(L, 2) != 0; lua_pop(L, 1)) {
+		if (!lua_israwstring(L, LUA_TABLE_KEY_INDEX) || !lua_isboolean(L, LUA_TABLE_VALUE_INDEX))
+			continue;
+
+		const unsigned int bit = CCategoryHandler::Instance()->GetCategory(lua_tostring(L, LUA_TABLE_KEY_INDEX));
+
+		if (lua_toboolean(L, LUA_TABLE_VALUE_INDEX)) {
+			unit->category |= bit;
+		} else {
+			unit->category &= ~bit;
+		}
+	}
+
 	return 0;
 }
 
