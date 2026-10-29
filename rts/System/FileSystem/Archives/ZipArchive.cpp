@@ -3,6 +3,7 @@
 #include "ZipArchive.h"
 
 #include <algorithm>
+#include <limits>
 #include <stdexcept>
 #include <cassert>
 
@@ -72,8 +73,9 @@ CZipArchive::CZipArchive(const std::string& archiveName)
 	zipPerThread[0] = zip;
 
 	parallelAccessNum = ThreadPool::GetNumThreads(); // will open NumThreads parallel archives, this way GetFile() is no longer needs to be mutex locked
+	parallelAccessNum = std::min<uint32_t>(parallelAccessNum, std::numeric_limits<decltype(afi)::ValueType>::digits - 1); // so that 1u << parallelAccessNum below stays defined
 	sem = std::make_unique<decltype(sem)::element_type>(parallelAccessNum);
-	const auto maxBitMask = uint32_t((uint64_t{1} << parallelAccessNum) - 1);
+	const auto maxBitMask = (1u << parallelAccessNum) - 1;
 	afi.SetMaxBitsMask(maxBitMask);
 }
 
