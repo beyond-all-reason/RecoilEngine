@@ -155,15 +155,20 @@ class LuaOpenGL {
 		static std::unordered_map<GLenum, std::string> fixedStateEnumToString;
 		static std::string fixedStateEnumToStringUnk;
 
+		// gl.CreateQuery object: a full userdata with the "OcclusionQuery" metatable,
+		// owned by Lua like FBOs and RBOs. Its __gc deletes the GL query unless
+		// gl.DeleteQuery already did (id is 0 then).
 		struct OcclusionQuery {
-			unsigned int index; // into LuaOpenGL::occlusionQueries
 			unsigned int id;
 			unsigned int target; // GL_SAMPLES_PASSED, GL_TIME_ELAPSED, GL_TIMESTAMP, ...
 		};
 
-		static std::vector<OcclusionQuery*> occlusionQueries;
+		// the query inside gl.RunQuery, nullptr outside; RunQuery cannot nest
+		inline static const OcclusionQuery* runningQuery = nullptr;
 
-		static OcclusionQuery* ParseQuery(lua_State* L, const char* caller);
+		static void CreateQueryMetatable(lua_State* L);
+		static int QueryGC(lua_State* L);
+		static OcclusionQuery* ParseQuery(lua_State* L, int index, const char* caller);
 
 	private:
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);

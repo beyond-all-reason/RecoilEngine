@@ -179,8 +179,6 @@ std::string LuaOpenGL::fixedStateEnumToStringUnk;
 
 static float3 screenViewTrans;
 
-std::vector<LuaOpenGL::OcclusionQuery*> LuaOpenGL::occlusionQueries;
-
 // gl.PushDebugGroup / gl.PopDebugGroup also open and close a Tracy GPU zone of
 // the group's name, so Lua draw passes annotated for graphics debuggers get
 // their GPU time in Tracy captures too. One scope per open group. Raw pointers
@@ -315,12 +313,8 @@ void LuaOpenGL::Free()
 {
 	glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
 
-	for (const OcclusionQuery* q: occlusionQueries) {
-		glDeleteQueries(1, &q->id);
-		delete q;
-	}
-
-	occlusionQueries.clear();
+	// queries need nothing here: closing the Lua state collects them, and their __gc
+	// deletes the GL queries
 
 	ClearLuaDebugGroupGpuZones();
 }
@@ -507,6 +501,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SaveImage);
 
 	if (GLAD_GL_ARB_occlusion_query) {
+		CreateQueryMetatable(L);
 		REGISTER_LUA_CFUNC(CreateQuery);
 		REGISTER_LUA_CFUNC(DeleteQuery);
 		REGISTER_LUA_CFUNC(RunQuery);
@@ -6781,18 +6776,36 @@ int LuaOpenGL::SaveImage(lua_State* L)
 
 /******************************************************************************/
 
-LuaOpenGL::OcclusionQuery* LuaOpenGL::ParseQuery(lua_State* L, const char* caller)
+void LuaOpenGL::CreateQueryMetatable(lua_State* L)
 {
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "%s expects a userdata query", caller);
+	luaL_newmetatable(L, "OcclusionQuery");
+	LuaPushNamedCFunc(L, "__gc", QueryGC);
+	// getmetatable() from Lua returns this string, so scripts cannot reach __gc
+	LuaPushNamedString(L, "__metatable", "protected metatable");
+	lua_pop(L, 1);
+}
 
-	OcclusionQuery* qry = static_cast<OcclusionQuery*>(lua_touserdata(L, 1));
+// __gc, and gl.DeleteQuery: deletes the GL query once; a deleted query keeps id 0
+int LuaOpenGL::QueryGC(lua_State* L)
+{
+	auto* qry = static_cast<OcclusionQuery*>(luaL_checkudata(L, 1, "OcclusionQuery"));
+
+	// the query inside gl.RunQuery is deleted by RunQuery after glEndQuery
+	if (qry->id != 0 && qry != runningQuery)
+		glDeleteQueries(1, &qry->id);
+
+	qry->id = 0;
+	return 0;
+}
+
+// the query at index, or a Lua error for anything else (nil, a number, an FBO, ...);
+// a deleted query is returned with id 0, never as freed memory
+LuaOpenGL::OcclusionQuery* LuaOpenGL::ParseQuery(lua_State* L, int index, const char* caller)
+{
+	auto* qry = static_cast<OcclusionQuery*>(LuaUtils::GetUserData(L, index, "OcclusionQuery"));
 
 	if (qry == nullptr)
-		return nullptr;
-	// a deleted query's handle must not be dereferenced any further than this check
-	if (qry->index >= occlusionQueries.size() || occlusionQueries[qry->index] != qry)
-		return nullptr;
+		luaL_error(L, "%s expects a query from gl.CreateQuery", caller);
 
 	return qry;
 }
@@ -6834,14 +6847,13 @@ int LuaOpenGL::CreateQuery(lua_State* L)
 	if (id == 0)
 		return 0;
 
-	// Engine-owned: the handle given to Lua is a light userdata, which Lua does not
-	// collect (a full userdata here would be freed by the GC as soon as it is not
-	// referenced, leaving this vector with dangling pointers). Freed by gl.DeleteQuery
-	// or Free().
-	OcclusionQuery* qry = new OcclusionQuery{static_cast<unsigned int>(occlusionQueries.size()), id, target};
-	occlusionQueries.push_back(qry);
+	// Lua-owned: the full userdata stays alive while Lua references it, and its __gc
+	// deletes the GL query once nothing does (or gl.DeleteQuery did it earlier)
+	auto* qry = static_cast<OcclusionQuery*>(lua_newuserdata(L, sizeof(OcclusionQuery)));
+	*qry = {id, target};
 
-	lua_pushlightuserdata(L, reinterpret_cast<void*>(qry));
+	luaL_getmetatable(L, "OcclusionQuery");
+	lua_setmetatable(L, -2);
 	return 1;
 }
 
@@ -6854,18 +6866,10 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
 	if (lua_isnil(L, 1))
 		return 0;
 
-	const OcclusionQuery* qry = ParseQuery(L, "gl.DeleteQuery(q)");
+	ParseQuery(L, 1, "gl.DeleteQuery(q)");
 
-	if (qry == nullptr)
-		return 0;
-
-	glDeleteQueries(1, &qry->id);
-
-	occlusionQueries[qry->index] = occlusionQueries.back();
-	occlusionQueries[qry->index]->index = qry->index;
-	occlusionQueries.pop_back();
-	delete qry;
-	return 0;
+	// deletes now instead of at garbage collection; a second call does nothing
+	return QueryGC(L);
 }
 
 /***
@@ -6884,15 +6888,13 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
  */
 int LuaOpenGL::RunQuery(lua_State* L)
 {
-	static bool running = false;
-
-	if (running)
+	if (runningQuery != nullptr)
 		luaL_error(L, "gl.RunQuery(q,f) can not be called recursively");
 
-	const OcclusionQuery* qry = ParseQuery(L, "gl.RunQuery(q,f)");
+	const OcclusionQuery* qry = ParseQuery(L, 1, "gl.RunQuery(q,f)");
 
-	if (qry == nullptr)
-		return 0;
+	if (qry->id == 0)
+		return 0; // deleted
 
 	if (qry->target == GL_TIMESTAMP)
 		luaL_error(L, "gl.RunQuery(q,f): GL.TIMESTAMP queries are recorded with gl.QueryCounter(q)");
@@ -6902,11 +6904,19 @@ int LuaOpenGL::RunQuery(lua_State* L)
 
 	const int args = lua_gettop(L); // number of arguments
 
-	running = true;
-	glBeginQuery(qry->target, qry->id);
+	// func may delete this query; QueryGC then only zeroes its id, and the GL query
+	// is deleted here once it is no longer active. The userdata itself cannot be
+	// collected meanwhile: it is argument 1 on this call's stack.
+	const GLuint id = qry->id;
+
+	runningQuery = qry;
+	glBeginQuery(qry->target, id);
 	const int error = lua_pcall(L, (args - 2), 0, 0);
 	glEndQuery(qry->target);
-	running = false;
+	runningQuery = nullptr;
+
+	if (qry->id == 0)
+		glDeleteQueries(1, &id);
 
 	if (error != 0) {
 		LOG_L(L_ERROR, "gl.RunQuery: error(%i) = %s", error, lua_tostring(L, -1));
@@ -6928,10 +6938,10 @@ int LuaOpenGL::RunQuery(lua_State* L)
  */
 int LuaOpenGL::QueryCounter(lua_State* L)
 {
-	const OcclusionQuery* qry = ParseQuery(L, "gl.QueryCounter(q)");
+	const OcclusionQuery* qry = ParseQuery(L, 1, "gl.QueryCounter(q)");
 
-	if (qry == nullptr)
-		return 0;
+	if (qry->id == 0)
+		return 0; // deleted
 
 	if (qry->target != GL_TIMESTAMP)
 		luaL_error(L, "gl.QueryCounter(q) expects a GL.TIMESTAMP query");
@@ -6958,10 +6968,12 @@ int LuaOpenGL::QueryCounter(lua_State* L)
  */
 int LuaOpenGL::GetQuery(lua_State* L)
 {
-	const OcclusionQuery* qry = ParseQuery(L, "gl.GetQuery(q)");
+	const OcclusionQuery* qry = ParseQuery(L, 1, "gl.GetQuery(q)");
 
-	if (qry == nullptr)
-		return 0;
+	if (qry->id == 0)
+		return 0; // deleted
+	if (qry == runningQuery)
+		luaL_error(L, "gl.GetQuery(q) cannot read the query gl.RunQuery is measuring");
 
 	const bool blocking = luaL_optboolean(L, 2, true);
 
@@ -7005,18 +7017,11 @@ int LuaOpenGL::GetQuery(lua_State* L)
  */
 int LuaOpenGL::GetQueryDelta(lua_State* L)
 {
-	if (!lua_islightuserdata(L, 1) || !lua_islightuserdata(L, 2))
-		luaL_error(L, "gl.GetQueryDelta(q0, q1) expects two userdata queries");
+	const OcclusionQuery* q0 = ParseQuery(L, 1, "gl.GetQueryDelta(q0, q1)");
+	const OcclusionQuery* q1 = ParseQuery(L, 2, "gl.GetQueryDelta(q0, q1)");
 
-	const OcclusionQuery* q0 = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
-	const OcclusionQuery* q1 = static_cast<const OcclusionQuery*>(lua_touserdata(L, 2));
-
-	if (q0 == nullptr || q1 == nullptr)
-		return 0;
-	if (q0->index >= occlusionQueries.size() || occlusionQueries[q0->index] != q0)
-		return 0;
-	if (q1->index >= occlusionQueries.size() || occlusionQueries[q1->index] != q1)
-		return 0;
+	if (q0->id == 0 || q1->id == 0)
+		return 0; // deleted
 
 	const bool blocking = luaL_optboolean(L, 3, true);
 
