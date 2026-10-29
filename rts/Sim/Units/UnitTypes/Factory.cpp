@@ -187,6 +187,15 @@ void CFactory::StartBuild(const UnitDef* buildeeDef) {
 	if (groundBlockingObjectMap.GroundBlocked(buildPos, this))
 		return;
 
+	// QueueBuild checked the limit when the order was accepted, but other
+	// factories can reach it while this one opens; the next QueueBuild then
+	// skips the order like any order at the limit (removed, or moved to the
+	// back of the queue with repeat on)
+	if (unitHandler.NumUnitsByTeamAndDef(team, buildeeDef->id) >= buildeeDef->maxThisUnit) {
+		curBuildDef = nullptr;
+		return;
+	}
+
 	UnitLoadParams buildeeParams = {buildeeDef, this, buildPos, ZeroVector, -1, team, buildFacing, true, false};
 	CUnit* buildee = unitLoader->LoadUnit(buildeeParams);
 
