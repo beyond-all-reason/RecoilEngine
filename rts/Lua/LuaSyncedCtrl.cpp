@@ -3599,12 +3599,12 @@ int LuaSyncedCtrl::SetUnitCategories(lua_State* L)
 	luaL_checktype(L, 2, LUA_TTABLE);
 
 	for (lua_pushnil(L); lua_next(L, 2) != 0; lua_pop(L, 1)) {
-		if (!lua_israwstring(L, -2) || !lua_isboolean(L, -1))
+		if (!lua_israwstring(L, LUA_TABLE_KEY_INDEX) || !lua_isboolean(L, LUA_TABLE_VALUE_INDEX))
 			continue;
 
-		const unsigned int bit = CCategoryHandler::Instance()->GetCategory(lua_tostring(L, -2));
+		const unsigned int bit = CCategoryHandler::Instance()->GetCategory(lua_tostring(L, LUA_TABLE_KEY_INDEX));
 
-		if (lua_toboolean(L, -1)) {
+		if (lua_toboolean(L, LUA_TABLE_VALUE_INDEX)) {
 			unit->category |= bit;
 		} else {
 			unit->category &= ~bit;
