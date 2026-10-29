@@ -831,7 +831,9 @@ int LuaUtils::PushModelTable(lua_State* L, const SolidObjectDef* def) {
 	// whether the importer found authored per-vertex colour (glTF COLOR_0) on all, some or none
 	// of the model's primitives; models without vertex colour (S3O, ...) and missing models say "none"
 	static constexpr const char* VERTEX_COLOR_NAMES[] = { "none", "partial", "all" };
-	static_assert(S3DModel::VERTEX_COLOR_NONE == 0 && S3DModel::VERTEX_COLOR_PARTIAL == 1 && S3DModel::VERTEX_COLOR_ALL == 2);
+	static_assert(S3DModel::VERTEX_COLOR_NONE == 0);
+	static_assert(S3DModel::VERTEX_COLOR_PARTIAL == 1);
+	static_assert(S3DModel::VERTEX_COLOR_ALL == 2);
 	LuaPushNamedString(L, "vertexColor", VERTEX_COLOR_NAMES[(model != nullptr) ? model->GetVertexColorReport() : S3DModel::VERTEX_COLOR_NONE]);
 
 	LuaPushString(L, "textures");
