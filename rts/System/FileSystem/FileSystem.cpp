@@ -273,6 +273,9 @@ bool FileSystem::IsPathOnSpinningDisk(const std::string& path)
 	}
 	CloseHandle(volHandle);
 	return result.IncursSeekPenalty;
+#elif defined(__APPLE__)
+	// Macs have shipped with SSDs for years, and the /sys lookup below does not exist here
+	return false;
 #else
 	struct stat info;
 
