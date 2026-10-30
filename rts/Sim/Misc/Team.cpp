@@ -371,6 +371,8 @@ void CTeam::AddUnit(CUnit* unit, AddType type)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	numUnits++;
+	if (unit->skipUnitStats)
+		return;
 
 	switch (type) {
 		case AddBuilt: {
@@ -390,6 +392,8 @@ void CTeam::RemoveUnit(CUnit* unit, RemoveType type)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	numUnits--;
+	if (unit->skipUnitStats)
+		return;
 
 	switch (type) {
 		case RemoveDied: {

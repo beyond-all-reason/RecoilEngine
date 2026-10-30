@@ -251,6 +251,8 @@ public:
 
 	bool nativeExcessSharing;
 	bool allowTake;
+	/// Allow LuaUI orders before the first simulation frame (opt-in).
+	bool allowPreGameCommands;
 	bool allowEnginePlayerlist;
 
 	// how often to report wind speed/direction to wind gens

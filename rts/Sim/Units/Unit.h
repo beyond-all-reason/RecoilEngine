@@ -516,6 +516,8 @@ public:
 	bool neutral = false;
 	// if unit is currently incompletely constructed (implies buildProgress < 1)
 	bool beingBuilt = true;
+	/// Exclude temporary units from team unit-count statistics.
+	bool skipUnitStats = false;
 	// if the updir is straight up or align to the ground vector
 	bool upright = true;
 	// whether the ground below this unit has been terraformed
@@ -543,6 +545,7 @@ public:
 	mutable size_t customIconIndex = size_t(-1); // icon::INVALID_ICON_INDEX;
 
 	bool drawIcon = true;
+	bool drawCommandStart = true;
 private:
 	// if we are stunned by a weapon or for other reason, access via IsStunned/SetStunned(bool)
 	bool stunned = false;
