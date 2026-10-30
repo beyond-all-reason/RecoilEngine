@@ -2,6 +2,7 @@
 #
 # Macros and functions defined in this file:
 # * create_engine_build_and_install_target
+# * recoil_add_variant_library
 #
 
 include_directories(${CMAKE_BINARY_DIR}/src-generated/engine)
@@ -78,6 +79,28 @@ macro    (add_engine_build build)
 		add_subdirectory(${build})
 	endif  ()
 endmacro (add_engine_build)
+
+# Engine build variants
+#
+# Builds compile the same sources with different directory-level defines (HEADLESS, ...),
+# so a library is described once as an INTERFACE library (sources, includes, build-agnostic
+# deps) and each build creates its variant with this function. Interface sources are compiled
+# by the linking target with its defines. Don't link the INTERFACE library directly:
+# every target that links it compiles all its sources.
+# example:
+# 	recoil_add_variant_library(GameHeadless GameCommon)
+function(recoil_add_variant_library targetName commonTarget)
+	if (NOT TARGET ${commonTarget})
+		message(FATAL_ERROR "recoil_add_variant_library: ${commonTarget} target does not exist")
+	endif()
+	get_target_property(commonType ${commonTarget} TYPE)
+	if (NOT commonType STREQUAL "INTERFACE_LIBRARY")
+		message(FATAL_ERROR "recoil_add_variant_library: ${commonTarget} must be an INTERFACE library, got ${commonType}")
+	endif()
+
+	add_library(${targetName} STATIC)
+	target_link_libraries(${targetName} PRIVATE ${commonTarget})
+endfunction()
 
 # add default dummy target which is used later on
 add_custom_target(spring WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
