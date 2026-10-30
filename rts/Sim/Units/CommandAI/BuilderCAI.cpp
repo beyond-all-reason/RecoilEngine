@@ -21,7 +21,6 @@
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Units/UnitTypes/Builder.h"
-#include "Sim/Units/UnitTypes/Building.h"
 #include "Sim/Units/UnitTypes/Factory.h"
 #include "Sim/Units/CommandAI/BuilderCaches.h"
 #include "System/SpringMath.h"
