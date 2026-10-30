@@ -1863,6 +1863,7 @@ int LuaSyncedCtrl::GetCOBScriptID(lua_State* L)
  * @param flattenGround boolean? (Default: `true`) The unit flattens ground, if it normally does so.
  * @param unitID UnitID? Request a specific unitID.
  * @param builderID UnitID?
+ * @param skipUnitStats boolean? (Default: `false`) Exclude this unit from produced, killed, died, given and captured unit counts. Does not suppress lifecycle callins, resource or damage statistics.
  * @return UnitID? unitID The ID of the created unit, or `nil` if the unit could not be created.
  */
 int LuaSyncedCtrl::CreateUnit(lua_State* L)
@@ -1933,6 +1934,7 @@ int LuaSyncedCtrl::CreateUnit(lua_State* L)
 	params.facing  = facing;
 	params.beingBuilt = beingBuilt;
 	params.flattenGround = flattenGround;
+	params.skipUnitStats = luaL_optboolean(L, 11, false);
 
 	CUnit* unit = unitLoader->LoadUnit(params);
 	inCreateUnit--;

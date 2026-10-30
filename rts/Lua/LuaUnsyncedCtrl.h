@@ -102,6 +102,7 @@ class LuaUnsyncedCtrl {
 		static int SetSkyBoxTexture(lua_State* L);
 
 		static int SetUnitNoDraw(lua_State* L);
+		static int SetUnitCommandDrawStart(lua_State* L);
 		static int SetUnitEngineDrawMask(lua_State* L);
 		static int SetUnitAlwaysUpdateMatrix(lua_State* L);
 		static int SetUnitNoMinimap(lua_State* L);

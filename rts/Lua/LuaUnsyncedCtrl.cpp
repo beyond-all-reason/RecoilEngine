@@ -66,6 +66,7 @@
 #include "Sim/Features/FeatureDefHandler.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "Sim/Misc/TeamHandler.h"
+#include "Sim/Misc/ModInfo.h"
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/CustomColorPalette.h"
 #include "Sim/Projectiles/Projectile.h"
@@ -211,6 +212,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetSkyBoxTexture);
 
 	REGISTER_LUA_CFUNC(SetUnitNoDraw);
+	REGISTER_LUA_CFUNC(SetUnitCommandDrawStart);
 	REGISTER_LUA_CFUNC(SetUnitEngineDrawMask);
 	REGISTER_LUA_CFUNC(SetUnitAlwaysUpdateMatrix);
 	REGISTER_LUA_CFUNC(SetUnitNoMinimap);
@@ -2189,6 +2191,22 @@ int LuaUnsyncedCtrl::SetUnitNoDraw(lua_State* L)
 
 
 /***
+ * Control the line from a unit to its first queued command. Command icons and
+ * the lines between queued commands are unaffected.
+ * @function Spring.SetUnitCommandDrawStart
+ * @param unitID UnitID
+ * @param drawStart boolean
+ */
+int LuaUnsyncedCtrl::SetUnitCommandDrawStart(lua_State* L)
+{
+	CUnit* unit = ParseCtrlUnit(L, __func__, 1);
+	if (unit != nullptr)
+		unit->drawCommandStart = luaL_checkboolean(L, 2);
+	return 0;
+}
+
+
+/***
  *
  * @function Spring.SetUnitEngineDrawMask
  * @param unitID UnitID
@@ -3533,7 +3551,7 @@ static void ParseUnitArray(lua_State* L, const char* caller,
 
 static bool CanGiveOrders(const lua_State* L)
 {
-	if (gs->PreSimFrame())
+	if (gs->PreSimFrame() && !modInfo.allowPreGameCommands)
 		return false;
 
 	if (gs->noHelperAIs)

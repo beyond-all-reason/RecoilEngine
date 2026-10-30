@@ -197,6 +197,8 @@ bool LuaConstGame::PushEntries(lua_State* L)
 
 		/*** @field Game.allowEnginePlayerlist boolean */
 		LuaPushNamedBool  (L, "allowEnginePlayerlist", modInfo.allowEnginePlayerlist);
+		/*** @field Game.allowPreGameCommands boolean Allow LuaUI orders before simulation starts. */
+		LuaPushNamedBool(L, "allowPreGameCommands", modInfo.allowPreGameCommands);
 		/*** @field Game.nativeExcessSharing boolean whether the engine handles excess resources overflow */
 		LuaPushNamedBool  (L, "nativeExcessSharing", modInfo.nativeExcessSharing);
 	}

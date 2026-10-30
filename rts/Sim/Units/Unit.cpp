@@ -204,6 +204,7 @@ void CUnit::PreInit(const UnitLoadParams& params)
 	featureDefID = -1;
 
 	unitDef = params.unitDef;
+	skipUnitStats = params.skipUnitStats;
 
 	{
 		const FeatureDef* wreckFeatureDef = featureDefHandler->GetFeatureDef(unitDef->wreckName);
@@ -1406,7 +1407,8 @@ void CUnit::DoDamage(
 	CTeam* attackerTeam = teamHandler.Team(attacker->team);
 	TeamStatistics& attackerStats = attackerTeam->GetCurrentStats();
 
-	attackerStats.unitsKilled += (1 - isCollision);
+	if (!skipUnitStats && !attacker->skipUnitStats)
+		attackerStats.unitsKilled += (1 - isCollision);
 }
 
 
@@ -2848,6 +2850,7 @@ CR_REG_METADATA(CUnit, (
 
 	CR_MEMBER(neutral),
 	CR_MEMBER(beingBuilt),
+	CR_MEMBER(skipUnitStats),
 	CR_MEMBER(upright),
 
 	CR_MEMBER(lastAttackFrame),
@@ -2994,6 +2997,7 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER_UN(currentIconIndex),
 	CR_MEMBER(customIconIndex),
 	CR_MEMBER_UN(drawIcon),
+	CR_MEMBER_UN(drawCommandStart),
 
 	CR_MEMBER(transportedUnits),
 	CR_MEMBER(incomingMissiles),

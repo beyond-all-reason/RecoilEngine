@@ -28,6 +28,7 @@ struct UnitLoadParams {
 
 	bool beingBuilt;
 	bool flattenGround;
+	bool skipUnitStats = false;
 };
 
 class CUnitLoader

@@ -148,6 +148,7 @@ void CModInfo::ResetState()
 
 		nativeExcessSharing = true;
 		allowTake = true;
+		allowPreGameCommands = false;
 
 		allowEnginePlayerlist = true;
 
@@ -213,6 +214,7 @@ void CModInfo::Init(const std::string& modFileName)
 
 		nativeExcessSharing = system.GetBool("nativeExcessSharing", nativeExcessSharing);
 		allowTake = system.GetBool("allowTake", allowTake);
+		allowPreGameCommands = system.GetBool("allowPreGameCommands", allowPreGameCommands);
 		allowEnginePlayerlist = system.GetBool("allowEnginePlayerlist", allowEnginePlayerlist);
 
 		useStartPositionSelecter = system.GetBool("useStartPositionSelecter", useStartPositionSelecter);

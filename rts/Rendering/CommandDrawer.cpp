@@ -100,7 +100,7 @@ void CommandDrawer::DrawCommands(const CCommandAI* cai, int queueDrawDepth) cons
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
 
-	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start);
+	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start, owner->drawCommandStart);
 
 	if (owner->selfDCountdown != 0)
 		lineDrawer.DrawIconAtLastPos(CMD_SELFD);
@@ -157,7 +157,7 @@ void CommandDrawer::DrawAirCAICommands(const CAirCAI* cai, int queueDrawDepth) c
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
 
-	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start);
+	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start, owner->drawCommandStart);
 
 	if (owner->selfDCountdown != 0)
 		lineDrawer.DrawIconAtLastPos(CMD_SELFD);
@@ -242,7 +242,7 @@ void CommandDrawer::DrawBuilderCAICommands(const CBuilderCAI* cai, int queueDraw
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
 
-	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start);
+	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start, owner->drawCommandStart);
 
 	if (owner->selfDCountdown != 0)
 		lineDrawer.DrawIconAtLastPos(CMD_SELFD);
@@ -411,7 +411,7 @@ void CommandDrawer::DrawFactoryCAICommands(const CFactoryCAI* cai, int queueDraw
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = newUnitCommands.size();
 
-	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start);
+	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start, owner->drawCommandStart);
 
 	if (owner->selfDCountdown != 0)
 		lineDrawer.DrawIconAtLastPos(CMD_SELFD);
@@ -505,7 +505,7 @@ void CommandDrawer::DrawMobileCAICommands(const CMobileCAI* cai, int queueDrawDe
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
 
-	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start);
+	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start, owner->drawCommandStart);
 
 	if (owner->selfDCountdown != 0)
 		lineDrawer.DrawIconAtLastPos(CMD_SELFD);
