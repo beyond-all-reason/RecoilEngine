@@ -690,15 +690,18 @@ void CGame::ClientReadNet()
 					int32_t cmdID;
 					int32_t cmdTimeOut;
 					uint8_t cmdOptions;
+					uint8_t cmdQueue;
 					uint32_t numParams;
 
 					pckt >> cmdID;
 					pckt >> cmdTimeOut;
 					pckt >> cmdOptions;
+					pckt >> cmdQueue;
 					pckt >> numParams;
 
 					Command c(cmdID, cmdOptions);
 					c.SetTimeOut(cmdTimeOut);
+					c.SetQueue(cmdQueue);
 
 					for (uint32_t a = 0; a < numParams; ++a) {
 						float param; pckt >> param;
@@ -775,15 +778,18 @@ void CGame::ClientReadNet()
 					int32_t cmdID;
 					int32_t cmdTimeOut;
 					uint8_t cmdOptions;
+					uint8_t cmdQueue;
 					uint32_t numParams;
 
 					pckt >> cmdID;
 					pckt >> cmdTimeOut;
 					pckt >> cmdOptions;
+					pckt >> cmdQueue;
 					pckt >> numParams;
 
 					Command c(cmdID, cmdOptions);
 					c.SetTimeOut(cmdTimeOut);
+					c.SetQueue(cmdQueue);
 
 					if (packetCode == NETMSG_AICOMMAND_TRACKED) {
 						pckt >> cmdID;
@@ -816,6 +822,7 @@ void CGame::ClientReadNet()
 					uint32_t sameCmdID;
 					uint8_t sameCmdOpt;
 					uint16_t sameCmdParamSize;
+					uint8_t sameCmdQueue;
 
 					int16_t unitCount;
 					int16_t commandCount;
@@ -830,6 +837,7 @@ void CGame::ClientReadNet()
 					pckt >> sameCmdID;
 					pckt >> sameCmdOpt;
 					pckt >> sameCmdParamSize;
+					pckt >> sameCmdQueue;
 
 					std::vector<int32_t> unitIDs;
 					std::vector<Command> commands;
@@ -860,7 +868,12 @@ void CGame::ClientReadNet()
 						if ((paramCount = sameCmdParamSize) == 0xFFFF)
 							pckt >> paramCount;
 
+						uint8_t cmdQueue;
+						if ((cmdQueue = sameCmdQueue) == 0xFF)
+							pckt >> cmdQueue;
+
 						Command cmd(cmdID, cmdOpt);
+						cmd.SetQueue(cmdQueue);
 
 						for (uint16_t p = 0; p < paramCount; p++) {
 							float param;

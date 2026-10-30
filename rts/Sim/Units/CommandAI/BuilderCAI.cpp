@@ -260,12 +260,12 @@ void CBuilderCAI::PostLoad()
 		if (cd->id < 0)
 			buildOptions.insert(cd->id);
 	}
-	if (commandQue.empty())
+	if (GetOwnQueue().empty())
 		return;
 
 	ownerBuilder = static_cast<CBuilder*>(owner);
 
-	const Command& c = commandQue.front();
+	const Command& c = GetOwnQueue().front();
 
 	if (buildOptions.find(c.GetID()) != buildOptions.end()) {
 		build.Parse(c);
@@ -533,7 +533,7 @@ void CBuilderCAI::SlowUpdate()
 	if (gs->paused) // Commands issued may invoke SlowUpdate when paused
 		return;
 
-	if (commandQue.empty()) {
+	if (GetOwnQueue().empty()) {
 		CMobileCAI::SlowUpdate();
 		return;
 	}
@@ -541,7 +541,7 @@ void CBuilderCAI::SlowUpdate()
 	if (owner->beingBuilt || owner->IsStunned())
 		return;
 
-	Command& c = commandQue.front();
+	Command& c = GetOwnQueue().front();
 
 	if (OutOfImmobileRange(c)) {
 		FinishCommand();
@@ -579,7 +579,7 @@ void CBuilderCAI::ReclaimFeature(CFeature* f)
 		// in the first place (in this case).
 		StopMoveAndFinishCommand();
 	} else {
-		commandQue.push_front(Command(CMD_RECLAIM, 0, f->id + unitHandler.MaxUnits()));
+		GetOwnQueue().push_front(Command(CMD_RECLAIM, 0, f->id + unitHandler.MaxUnits()));
 		// this assumes that the reclaim command can never return directly
 		// without having reclaimed the target
 		SlowUpdate();
@@ -952,7 +952,7 @@ void CBuilderCAI::ExecuteGuard(Command& c)
 
 			Command nc(CMD_REPAIR, c.GetOpts(), b->curBuild->id);
 
-			commandQue.push_front(nc);
+			GetOwnQueue().push_front(nc);
 			inCommand = CMD_STOP;
 			SlowUpdate();
 			return;
@@ -969,7 +969,7 @@ void CBuilderCAI::ExecuteGuard(Command& c)
 		if (pushRepairCommand) {
 			StopSlowGuard();
 
-			commandQue.push_front(Command(CMD_REPAIR, c.GetOpts(), fac->curBuild->id));
+			GetOwnQueue().push_front(Command(CMD_REPAIR, c.GetOpts(), fac->curBuild->id));
 			inCommand = CMD_STOP;
 			// SlowUpdate();
 			return;
@@ -994,7 +994,7 @@ void CBuilderCAI::ExecuteGuard(Command& c)
 		if (pushRepairCommand) {
 			StopSlowGuard();
 
-			commandQue.push_front(Command(CMD_REPAIR, c.GetOpts(), guardee->id));
+			GetOwnQueue().push_front(Command(CMD_REPAIR, c.GetOpts(), guardee->id));
 			inCommand = CMD_STOP;
 			return;
 		}
@@ -1089,7 +1089,7 @@ void CBuilderCAI::ExecuteReclaim(Command& c)
 					(ownerBuilder->curReclaim == unit && unit->IsMoving() && !IsInBuildRange(unit));
 				const bool busyAlliedBuilder =
 					unit->unitDef->builder &&
-					!unit->commandAI->commandQue.empty() &&
+					!unit->commandAI->GetOwnQueue().empty() &&
 					teamHandler.Ally(owner->allyteam, unit->allyteam);
 
 				if (outOfReclaimRange || busyAlliedBuilder) {
@@ -1239,9 +1239,9 @@ void CBuilderCAI::ExecutePatrol(Command& c)
 
 	Command temp(CMD_FIGHT, c.GetOpts() | INTERNAL_ORDER, c.GetPos(0));
 
-	commandQue.push_back(c);
-	commandQue.pop_front();
-	commandQue.push_front(temp);
+	GetOwnQueue().push_back(c);
+	GetOwnQueue().pop_front();
+	GetOwnQueue().push_front(temp);
 	Command tmpC(CMD_PATROL);
 	eoh->CommandFinished(*owner, tmpC);
 	SlowUpdate();
@@ -1463,7 +1463,7 @@ int CBuilderCAI::FindReclaimTarget(const float3& pos, float radius, unsigned cha
 				continue;
 
 			// do not reclaim friendly builders that are busy
-			if (u->unitDef->builder && teamHandler.Ally(owner->allyteam, u->allyteam) && !u->commandAI->commandQue.empty())
+			if (u->unitDef->builder && teamHandler.Ally(owner->allyteam, u->allyteam) && !u->commandAI->GetOwnQueue().empty())
 				continue;
 
 			const float dist = f3SqDist(u->pos, owner->pos);
@@ -1551,7 +1551,7 @@ bool CBuilderCAI::FindReclaimTargetAndReclaim(const float3& pos, float radius, u
 
 	Command c(CMD_RECLAIM, cmdopt | INTERNAL_ORDER, rid, pos);
 	c.PushParam(radius);
-	commandQue.push_front(c);
+	GetOwnQueue().push_front(c);
 	return true;
 }
 
@@ -1596,7 +1596,7 @@ bool CBuilderCAI::FindResurrectableFeatureAndResurrect(
 	if (best != nullptr) {
 		Command c(CMD_RESURRECT, options | INTERNAL_ORDER, unitHandler.MaxUnits() + best->id, pos);
 		c.PushParam(radius);
-		commandQue.push_front(c);
+		GetOwnQueue().push_front(c);
 		return true;
 	}
 
@@ -1651,7 +1651,7 @@ bool CBuilderCAI::FindCaptureTargetAndCapture(
 	}
 
 	if (best != nullptr) {
-		commandQue.push_front(Command(CMD_CAPTURE, options | INTERNAL_ORDER, best->id));
+		GetOwnQueue().push_front(Command(CMD_CAPTURE, options | INTERNAL_ORDER, best->id));
 		return true;
 	}
 
@@ -1763,10 +1763,10 @@ bool CBuilderCAI::FindRepairTargetAndRepair(
 
 		Command c(CMD_REPAIR, options | INTERNAL_ORDER, bestUnit->id, pos);
 		c.PushParam(radius);
-		commandQue.push_front(c);
+		GetOwnQueue().push_front(c);
 	} else {
 		PushOrUpdateReturnFight(); // attackEnemy must be true
-		commandQue.push_front(Command(CMD_ATTACK, options | INTERNAL_ORDER, bestUnit->id));
+		GetOwnQueue().push_front(Command(CMD_ATTACK, options | INTERNAL_ORDER, bestUnit->id));
 	}
 
 	return true;
