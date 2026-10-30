@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_GL_H
-#define LUA_GL_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -155,12 +154,20 @@ class LuaOpenGL {
 		static std::unordered_map<GLenum, std::string> fixedStateEnumToString;
 		static std::string fixedStateEnumToStringUnk;
 
+		// gl.CreateQuery object: a full userdata with the "OcclusionQuery" metatable,
+		// owned by Lua like FBOs and RBOs. Its __gc deletes the GL query unless
+		// gl.DeleteQuery already did (id is 0 then).
 		struct OcclusionQuery {
-			unsigned int index; // into LuaOpenGL::occlusionQueries
 			unsigned int id;
+			unsigned int target; // GL_SAMPLES_PASSED, GL_TIME_ELAPSED, GL_TIMESTAMP, ...
 		};
 
-		static std::vector<OcclusionQuery*> occlusionQueries;
+		// the query inside gl.RunQuery, nullptr outside; RunQuery cannot nest
+		inline static const OcclusionQuery* runningQuery = nullptr;
+
+		static void CreateQueryMetatable(lua_State* L);
+		static int QueryGC(lua_State* L);
+		static OcclusionQuery* ParseQuery(lua_State* L, int index, const char* caller);
 
 	private:
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);
@@ -341,7 +348,9 @@ class LuaOpenGL {
 		static int CreateQuery(lua_State* L);
 		static int DeleteQuery(lua_State* L);
 		static int RunQuery(lua_State* L);
+		static int QueryCounter(lua_State* L);
 		static int GetQuery(lua_State* L);
+		static int GetQueryDelta(lua_State* L);
 
 		static int GetGlobalTexNames(lua_State* L);
 		static int GetGlobalTexCoords(lua_State* L);
@@ -374,5 +383,3 @@ inline void LuaOpenGL::CheckMatrixState(lua_State* L, const char* fn, int error)
 		return;
 	GetLuaContextData(L)->glMatrixTracker.HandleMatrixStateError(error, fn);
 }
-
-#endif /* LUA_UNITDEFS_H */
