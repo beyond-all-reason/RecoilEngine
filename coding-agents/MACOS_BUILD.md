@@ -19,14 +19,14 @@ The engine builds with Homebrew GCC, not Apple Clang, to keep floating point beh
 
 ## 2. Mesa
 
-Use Mesa 26.3.0-rc1, unpatched, until 26.3 ships in Homebrew. Do not use 26.2.5: it leaks during load and reached a 9.7 GiB footprint 15 s into SplinterFaction.
+Use Mesa 26.3.0-rc1 with the patch in `coding-agents/mesa-patches`, until 26.3 ships in Homebrew with the fix. The patch stops single frames showing blocks flipped vertically with red and blue swapped, Mesa issue 16734. Do not use 26.2.5: it leaks during load and reached a 9.7 GiB footprint 15 s into SplinterFaction.
 
 Build it with Leon's `make-mesa.sh`, which is `installer/Mac/make-mesa.sh` on the `macos-port-2026.07.04` branch of `github.com/leonseemann/RecoilEngine`. If you have a `leon` remote, `git show leon/macos-port-2026.07.04:installer/Mac/make-mesa.sh` prints it. The script builds the EGL and Zink half and the KosmicKrisp half as two Meson builds into one prefix. Its prerequisites are the Homebrew packages above, `python3`, `cmake` and `curl`. It downloads the Mesa tarball and builds `mesa-libclc` itself.
 
-The script finds its patches in `installer/Mac/mesa-patches` next to it. Put a copy of the script in a directory with an empty `installer/Mac/mesa-patches` and run it from there:
+The script finds its patches in `installer/Mac/mesa-patches` next to it. Put a copy of the script in a directory, copy `coding-agents/mesa-patches/*.patch` into its `installer/Mac/mesa-patches`, and run it from there:
 
 ```bash
-MESA_VERSION=26.3.0-rc1 installer/Mac/make-mesa.sh ~/dev/mesa-work/work-26.3.0-rc1 ~/dev/mesa-install-26.3.0-rc1
+MESA_VERSION=26.3.0-rc1 installer/Mac/make-mesa.sh ~/dev/mesa-work/work-26.3.0-rc1-tcfix ~/dev/mesa-install-26.3.0-rc1-tcfix
 ```
 
 That produced a 34 MB prefix. Its header says it pins 26.2 because 26.3 unrolls flat-varying draws. The engine now avoids that path by switching to first-vertex provoking on KosmicKrisp (`preferFirstProvokingVertex` in `rts/Rendering/GlobalRendering.cpp`), so 26.3 is the right choice.
@@ -57,7 +57,7 @@ The engine loads Mesa itself, so no launcher or environment variables are needed
 Make `build-macos/mesa` a symlink to a Mesa install prefix and that is the Mesa the engine runs:
 
 ```bash
-ln -sfn ~/dev/mesa-install-26.3.0-rc1 build-macos/mesa
+ln -sfn ~/dev/mesa-install-26.3.0-rc1-tcfix build-macos/mesa
 ```
 
 To switch Mesa builds, repoint the symlink. No relink is needed.

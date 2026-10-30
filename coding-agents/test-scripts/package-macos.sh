@@ -43,7 +43,7 @@
 #
 #   ninja -C build-macos -k 0
 #
-# Mesa is 26.3.0-rc1, unpatched, built with installer/Mac/make-mesa.sh, see
+# Mesa is 26.3.0-rc1 with coding-agents/mesa-patches, built with installer/Mac/make-mesa.sh, see
 # coding-agents/MACOS_BUILD.md. 26.2.5 leaks during load and must not be packaged.
 set -euo pipefail
 
@@ -54,7 +54,7 @@ PLATFORM=arm64-macos
 VERSION=$(sed -n 's/^VERSION_OVERRIDE:STRING=//p' "$BUILD/CMakeCache.txt" 2>/dev/null)
 VERSION=${VERSION:-$(cd "$REPO" && git describe --abbrev=7)}
 OUT=${1:-$REPO/dist/recoil_${VERSION}_${PLATFORM}}
-MESA=${MESA_PREFIX:-$HOME/dev/mesa-install-26.3.0-rc1}
+MESA=${MESA_PREFIX:-$HOME/dev/mesa-install-26.3.0-rc1-tcfix}
 VKLIB=${VK_LOADER_LIB:-/opt/homebrew/opt/vulkan-loader/lib}
 
 command -v dylibbundler > /dev/null || { echo "need dylibbundler (brew install dylibbundler)"; exit 1; }

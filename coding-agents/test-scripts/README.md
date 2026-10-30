@@ -29,7 +29,7 @@ SCRIPT=coding-agents/test-scripts/<script>.tdf coding-agents/test-scripts/run-ca
 
 The engine loads Mesa itself, so `run-capped.sh` runs `./spring` directly. It looks for Mesa in `<exe dir>/mesa` first, so `build-macos/mesa` is a symlink to a Mesa install prefix and repointing it picks the Mesa build for the next run. See `coding-agents/MACOS_BUILD.md` for the lookup order and the environment variables the engine sets.
 
-Use Mesa 26.3.0-rc1 (`~/dev/mesa-install-26.3.0-rc1`, unpatched). Do not use 26.2.5, which leaks during load and reached a 9.7 GiB footprint 15 s into SplinterFaction.
+Use Mesa 26.3.0-rc1 with the patch in `coding-agents/mesa-patches` (`~/dev/mesa-install-26.3.0-rc1-tcfix`). Do not use 26.2.5, which leaks during load and reached a 9.7 GiB footprint 15 s into SplinterFaction.
 
 `LAUNCHER=` overrides `./spring`, which is also how a packaged engine gets tested: point it at the `spring` launcher inside the archive.
 
