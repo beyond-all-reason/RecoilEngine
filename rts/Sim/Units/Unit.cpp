@@ -1691,6 +1691,13 @@ void CUnit::ChangeTeamReset()
 	}
 }
 
+bool CUnit::CanBeFiredAt() const
+{
+	return (!isDead || modInfo.fireAtKilled)
+		&& (!IsCrashing() || modInfo.fireAtCrashing);
+}
+
+
 void CUnit::SetNeutral(bool b) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// only intervene for units *becoming* neutral
