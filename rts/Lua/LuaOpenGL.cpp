@@ -1112,7 +1112,9 @@ inline void LuaOpenGL::CheckDrawingEnabled(lua_State* L, const char* caller)
 	}
 }
 
-inline void LuaOpenGL::CondWarnDeprecatedGL(lua_State* L, const char* caller)
+// Logs `message` once per `what`, or once per `what` and Lua call site when `DeprecatedGLWarnLevel` is 2 or higher,
+// in which case the call site is appended to the message. Nothing is logged while the level is 0.
+void LuaOpenGL::WarnDeprecatedOnce(lua_State* L, const std::string& what, const std::string& message)
 {
 	if (deprecatedGLWarnLevel <= 0)
 		return;
@@ -1125,22 +1127,42 @@ inline void LuaOpenGL::CondWarnDeprecatedGL(lua_State* L, const char* caller)
 		if (lua_getstack(L, level, &info)) {
 			lua_getinfo(L, "nSl", &info);
 
-			luaCaller = fmt::format("[{}]:{} Caller: {}", info.short_src, info.currentline, (info.name ? info.name : "<unknown>"));
+			luaCaller = fmt::format(" in [{}]:{} Caller: {}", info.short_src, info.currentline, (info.name ? info.name : "<unknown>"));
 		}
 	}
 
-	const std::string key = fmt::format("{}{}", caller, luaCaller.c_str());
-
-	if (deprecatedGLWarned.find(key) != deprecatedGLWarned.end())
+	if (!deprecatedGLWarned.emplace(what + luaCaller).second)
 		return;
 
-	deprecatedGLWarned.emplace(key);
-	if (deprecatedGLWarnLevel == 1) {
-		LOG("gl.%s: Attempt to call a deprecated OpenGL function from Lua OpenGL", caller);
+	LOG("%s%s", message.c_str(), luaCaller.c_str());
+}
+
+inline void LuaOpenGL::CondWarnDeprecatedGL(lua_State* L, const char* caller)
+{
+	// before the message is built: deprecated calls can happen every frame
+	if (deprecatedGLWarnLevel <= 0)
+		return;
+
+	WarnDeprecatedOnce(L, caller, fmt::format("gl.{}: Attempt to call a deprecated OpenGL function from Lua OpenGL", caller));
+}
+
+// Until the pixel format names were added to `GL`, `GL.RGBA` and `GL.ALPHA` were nil in Lua, so a texture created
+// with `format = GL.RGBA` or `format = GL.ALPHA` got the default `GL_RGBA8`. With the names defined, `GL_ALPHA` would
+// make an alpha-only texture and `GL_RGBA` would leave the internal format to the driver. Map both to `GL_RGBA8`
+// so existing games keep the old result, and warn to use `GL.RGBA8` when `DeprecatedGLWarnLevel` is set.
+GLint LuaOpenGL::ResolveLegacyTexFormat(lua_State* L, GLint format)
+{
+	const char* name = nullptr;
+
+	switch (format) {
+	case GL_ALPHA: { name = "GL.ALPHA"; } break;
+	case GL_RGBA: { name = "GL.RGBA"; } break;
+	default: { return format; } break;
 	}
-	else {
-		LOG("gl.%s: Attempt to call a deprecated OpenGL function from Lua OpenGL in %s", caller, luaCaller.c_str());
-	}
+
+	WarnDeprecatedOnce(L, name, fmt::format("gl.CreateTexture: format = {} is deprecated and treated as GL.RGBA8, use GL.RGBA8", name));
+
+	return GL_RGBA8;
 }
 
 inline void LuaOpenGL::NotImplementedError(lua_State* L, const char* caller)
@@ -4326,6 +4348,8 @@ int LuaOpenGL::CreateTexture(lua_State* L)
 		}
 	}
 
+	tex.format = ResolveLegacyTexFormat(L, tex.format);
+
 	LuaTextures& textures = CLuaHandle::GetActiveTextures(L);
 	const string& texName = textures.Create(tex);
 
@@ -6480,6 +6504,9 @@ int LuaOpenGL::Finish(lua_State* L)
 
 /******************************************************************************/
 
+// Number of values per pixel that glReadPixels writes for format f.
+// ReadPixels walks its result with this size, so every format it can read
+// must be listed; an unlisted one returns -1 and is read as 4 values.
 static int PixelFormatSize(GLenum f)
 {
 	switch (f) {
@@ -6493,7 +6520,8 @@ static int PixelFormatSize(GLenum f)
 		case GL_LUMINANCE: {
 			return 1;
 		}
-		case GL_LUMINANCE_ALPHA: {
+		case GL_LUMINANCE_ALPHA:
+		case GL_RG: {
 			return 2;
 		}
 		case GL_RGB:
@@ -6527,12 +6555,30 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
 
 /***
  * Get single pixel.
+ *
+ * `format` is one of the `GL` pixel format constants. One value is returned
+ * per component of the format, in the order the format names them, so
+ * `GL.BGRA` returns blue, green, red and alpha:
+ *
+ * - one component: `GL.RED`, `GL.GREEN`, `GL.BLUE`, `GL.ALPHA`, `GL.LUMINANCE`,
+ *   `GL.COLOR_INDEX`, `GL.STENCIL_INDEX`, `GL.DEPTH_COMPONENT`
+ * - two components: `GL.RG`, `GL.LUMINANCE_ALPHA`
+ * - three components: `GL.RGB`, `GL.BGR`
+ * - four components: `GL.RGBA`, `GL.BGRA`
+ *
+ * `GL.COLOR_INDEX`, `GL.ALPHA`, `GL.LUMINANCE` and `GL.LUMINANCE_ALPHA` were
+ * removed in the core profile, and are only accepted while running in the
+ * compatibility profile, i.e. with the `ForceCoreContext` config unset.
+ * `GL.COLOR_INDEX` additionally requires a color-index color buffer, which
+ * Recoil never creates. `GL.STENCIL_INDEX` and `GL.DEPTH_COMPONENT` require
+ * the read buffer to actually have the matching attachment.
+ *
  * @function gl.ReadPixels
  * @param x integer
  * @param y integer
  * @param w 1
  * @param h 1
- * @param format GL? (Default: `GL.RGBA`)
+ * @param format integer? (Default: `GL.RGBA`)
  * @return number ... Color value (color size based on format).
  */
 /***
@@ -6542,8 +6588,8 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w 1
  * @param h integer
- * @param format GL? (Default: `GL.RGBA`)
- * @return number[][] colors Column of color values (color size based on format).
+ * @param format integer? (Default: `GL.RGBA`)
+ * @return (number|number[])[] colors Column of color values (color size based on format), indexed by row.
  */
 /***
  * Get row of pixels.
@@ -6552,8 +6598,8 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w integer
  * @param h 1
- * @param format GL? (Default: `GL.RGBA`)
- * @return number[][] colors Row of color values (color size based on format).
+ * @param format integer? (Default: `GL.RGBA`)
+ * @return (number|number[])[] colors Row of color values (color size based on format), indexed by column.
  */
 /***
  * Get rows of pixels.
@@ -6562,8 +6608,8 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w integer
  * @param h integer
- * @param format GL? (Default: `GL.RGBA`)
- * @return number[][][] colors Array of rows of color values (color size based on format), bottom row first: `colors[y][x]`.
+ * @param format integer? (Default: `GL.RGBA`)
+ * @return (number|number[])[][] colors Array of rows of color values (color size based on format), bottom row first: `colors[y][x]`.
  */
 int LuaOpenGL::ReadPixels(lua_State* L)
 {
