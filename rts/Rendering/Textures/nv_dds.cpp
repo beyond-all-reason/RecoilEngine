@@ -1295,37 +1295,19 @@ void CDDSImage::flip_dxt5_alpha(DXT5AlphaBlock *block) const
     bits >>= 3;
     gBits[3][3] = (unsigned char)(bits & mask);
 
-    memset(block->row, 0, sizeof(unsigned char) * 6);
+    // The packed rows are unaligned 24-bit groups. A fourth byte at row[3]
+    // belongs to the next block (or lies beyond the final BC4/BC5 block).
+    bits = (gBits[3][0] << 0)  | (gBits[3][1] << 3)
+         | (gBits[3][2] << 6)  | (gBits[3][3] << 9)
+         | (gBits[2][0] << 12) | (gBits[2][1] << 15)
+         | (gBits[2][2] << 18) | (gBits[2][3] << 21);
+    memcpy(&block->row[0], &bits, sizeof(unsigned char) * 3);
 
-    unsigned int *pBits = ((unsigned int*) &(block->row[0]));
-
-    *pBits = *pBits | (gBits[3][0] << 0);
-    *pBits = *pBits | (gBits[3][1] << 3);
-    *pBits = *pBits | (gBits[3][2] << 6);
-    *pBits = *pBits | (gBits[3][3] << 9);
-
-    *pBits = *pBits | (gBits[2][0] << 12);
-    *pBits = *pBits | (gBits[2][1] << 15);
-    *pBits = *pBits | (gBits[2][2] << 18);
-    *pBits = *pBits | (gBits[2][3] << 21);
-
-    pBits = ((unsigned int*) &(block->row[3]));
-
-#ifdef MACOS
-    *pBits &= 0x000000ff;
-#else
-    *pBits &= 0xff000000;
-#endif
-
-    *pBits = *pBits | (gBits[1][0] << 0);
-    *pBits = *pBits | (gBits[1][1] << 3);
-    *pBits = *pBits | (gBits[1][2] << 6);
-    *pBits = *pBits | (gBits[1][3] << 9);
-
-    *pBits = *pBits | (gBits[0][0] << 12);
-    *pBits = *pBits | (gBits[0][1] << 15);
-    *pBits = *pBits | (gBits[0][2] << 18);
-    *pBits = *pBits | (gBits[0][3] << 21);
+    bits = (gBits[1][0] << 0)  | (gBits[1][1] << 3)
+         | (gBits[1][2] << 6)  | (gBits[1][3] << 9)
+         | (gBits[0][0] << 12) | (gBits[0][1] << 15)
+         | (gBits[0][2] << 18) | (gBits[0][3] << 21);
+    memcpy(&block->row[3], &bits, sizeof(unsigned char) * 3);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
