@@ -61,7 +61,6 @@ void DebugCubeMapTexture::CreateTexture(bool wantFile)
 
 		dims = { FALLBACK_DIM, FALLBACK_DIM };
 
-		// the file branch gets its texture from CBitmap::CreateTexture, so a name is reserved only here
 		glGenTextures(1, &texId);
 		glEnable(GL_TEXTURE_CUBE_MAP);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, texId);
