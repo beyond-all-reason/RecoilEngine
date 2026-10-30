@@ -74,6 +74,10 @@ cmake --install "$BUILD" --prefix "$OUT" > "$(dirname "$OUT")/.install.log" 2>&1
 rm -rf "$OUT/include" "$OUT/lib" "$OUT/share"
 mkdir -p "$OUT/lib"
 
+# Finder litters the source tree and install(DIRECTORY) copies it. The archive
+# skips dotfiles at its root, so one left here fails the files.md5.gz check.
+find "$OUT" -name .DS_Store -delete
+
 # -L so the versioned target is copied rather than a symlink into Homebrew
 cp -L "$MESA"/lib/libEGL.1.dylib "$OUT/lib/"
 cp -L "$MESA"/lib/libgallium-*.dylib "$OUT/lib/"
