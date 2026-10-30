@@ -6958,11 +6958,12 @@ int LuaOpenGL::QueryCounter(lua_State* L)
  * it `nil` is returned while the result is still pending, so queries from the previous
  * frame can be read without a GPU sync.
  *
+ * Note that a `GL.TIMESTAMP` value is a 64-bit nanosecond counter that Lua's single
+ * precision numbers cannot hold exactly; use `gl.GetQueryDelta` to measure between two.
+ *
  * @function gl.GetQuery
  * @param query any
  * @param blocking boolean? (Default: `true`) Wait for the result.
- * Note that a `GL.TIMESTAMP` value is a 64-bit nanosecond counter that Lua's single
- * precision numbers cannot hold exactly; use `gl.GetQueryDelta` to measure between two.
  *
  * @return number? result Sample count, primitive count, or nanoseconds for timer queries; `nil` if not yet available and `blocking` is false.
  */
