@@ -40,6 +40,7 @@
 
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
+#include "Game/Game.h"
 #include "Game/UI/CommandColors.h"
 #include "Game/UI/MiniMap.h"
 #include "Map/BaseGroundDrawer.h"
@@ -54,6 +55,8 @@
 #include "Rendering/UnitDefImage.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
 #include "Rendering/Units/UnitDrawer.h"
+#include "Rendering/Env/CubeMapHandler.h"
+#include "Rendering/Env/DebugCubeMapTexture.h"
 #include "Rendering/Env/ISky.h"
 #include "Rendering/Env/SunLighting.h"
 #include "Rendering/Env/WaterRendering.h"
@@ -176,8 +179,6 @@ std::string LuaOpenGL::fixedStateEnumToStringUnk;
 
 static float3 screenViewTrans;
 
-std::vector<LuaOpenGL::OcclusionQuery*> LuaOpenGL::occlusionQueries;
-
 
 
 
@@ -266,15 +267,34 @@ void LuaOpenGL::Init()
 		deprecatedGLWarned.reserve(4096); // deprecated calls are logged along with caller information
 }
 
+// gl.RenderEnvironmentFace target: color is attached per call, depth matches the face
+//
+// One framebuffer object (FBO) shared by every Lua handle, created on the first
+// call and kept for the process; LuaOpenGL::Free deletes it. File statics, not
+// per-handle state, because the capture is stateless between calls: the color
+// attachment is the caller's cube face, attached at the start of each call and
+// detached at the end, so no handle's texture stays referenced.
+// The depth attachment is a renderbuffer (storage that can be rendered into but
+// never sampled), which is all the terrain pass's depth test needs; a depth
+// texture would cost the same and serve no reader. It is reallocated only when
+// the face size changes (environmentFaceDepthSize), so a steady capture of one
+// cube size allocates nothing per frame.
+static GLuint environmentFaceFBO = 0;
+static GLuint environmentFaceDepth = 0;
+static GLsizei environmentFaceDepthSize = 0;
+
 void LuaOpenGL::Free()
 {
 	glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
 
-	for (const OcclusionQuery* q: occlusionQueries) {
-		glDeleteQueries(1, &q->id);
-	}
-
-	occlusionQueries.clear();
+	// The gl.RenderEnvironmentFace capture target. Free runs from
+	// CGame::KillLua after the Lua handles are gone, and in SpringApp::Reload
+	// before Init; zeroing the names makes the next capture recreate both.
+	// glDelete* ignores the name 0, so this is safe when no capture ever ran.
+	glDeleteFramebuffersEXT(1, &environmentFaceFBO);
+	glDeleteRenderbuffersEXT(1, &environmentFaceDepth);
+	environmentFaceFBO = environmentFaceDepth = 0;
+	environmentFaceDepthSize = 0;
 }
 
 /******************************************************************************/
@@ -362,6 +382,14 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	}
 	if (IS_GL_FUNCTION_AVAILABLE(glGenerateMipmapEXT))
 		REGISTER_LUA_CFUNC(GenerateMipmap);
+	// RenderEnvironmentFace renders through its own FBO, so it exists only with
+	// FBO support. PublishTexture needs none, but it is registered with it: its
+	// only user (BAR's PBR provider) needs both and tests `gl.X ~= nil` for the
+	// pair, so a Lua script can detect the feature with either name.
+	if (FBO::IsSupported()) {
+		REGISTER_LUA_CFUNC(RenderEnvironmentFace);
+		REGISTER_LUA_CFUNC(PublishTexture);
+	}
 
 	REGISTER_LUA_CFUNC(ActiveTexture);
 	REGISTER_LUA_CFUNC(TexEnv);
@@ -459,6 +487,8 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SaveImage);
 
 	if (GLAD_GL_ARB_occlusion_query) {
+		// before CreateQuery can run: it looks the metatable up by name
+		CreateQueryMetatable(L);
 		REGISTER_LUA_CFUNC(CreateQuery);
 		REGISTER_LUA_CFUNC(DeleteQuery);
 		REGISTER_LUA_CFUNC(RunQuery);
@@ -4692,6 +4722,366 @@ int LuaOpenGL::GenerateMipmap(lua_State* L)
 }
 
 
+
+/***
+ * Renders the engine sky (and optionally the terrain reflection pass) seen
+ * from a world position into one face of a Lua cube texture, with the same
+ * steps as the engine's reflection-cube capture. With /DebugCubeMap active the
+ * debug faces are drawn instead. The values are the sky/terrain shaders'
+ * display-referred output. Only allowed in DrawGenesis; the caller's
+ * framebuffer, matrices and GL state are restored.
+ *
+ * Why it exists: Lua cannot draw the engine sky (SkyBox, ModernSky and the
+ * other ISky types) or the terrain reflection pass from an arbitrary camera,
+ * and the map's skybox texture is not readable from Lua. The legacy
+ * `$reflection` cube is RGBA8 and follows the player camera, so it cannot feed
+ * a stable PBR environment. This function draws one face per call into a cube
+ * the Lua handle owns; filtering (irradiance, specular prefilter) stays in Lua.
+ * It follows CubeMapHandler::CreateReflectionFace step by step and uses its
+ * face table (CubeMapHandler::faceDirs) but changes neither CubeMapHandler
+ * nor the legacy cubes.
+ *
+ * Why only DrawGenesis: it switches the active camera and the game draw mode
+ * and renders into its own framebuffer. DrawGenesis runs at the start of the
+ * frame (CGame::Draw), before the engine draws the world, so no engine pass is
+ * half-way through with its own camera, draw mode or framebuffer bound. In
+ * the world call-ins that state is live and would be corrupted.
+ *
+ * Output: the face is overwritten (cleared to the sky fog color first). Only
+ * mip level 0 is written; call gl.GenerateMipmap or filter in Lua afterwards.
+ * The texture's xsize is used as the face size (cube faces are square).
+ * Terrain (`skyOnly = false`) uses the player camera's ROAM tessellation, so
+ * terrain the player camera has not tessellated is missing.
+ *
+ * Failure: returns `false, message` and draws nothing when called from a draw
+ * call-in other than DrawGenesis, when face is outside 0..5, when texName is
+ * not a cube texture of the calling handle, or when the capture framebuffer
+ * is incomplete (for example a format that cannot be rendered to). Outside
+ * every draw call-in, and for arguments of the wrong type, it raises a Lua
+ * error like other gl.* drawing functions. The caller's framebuffer binding
+ * is restored in every case.
+ *
+ * Example usage (an unsynced gadget capturing one face per frame):
+ *
+ * ```lua
+ * local cube = gl.CreateTexture(256, 256, {
+ *   target = GL.TEXTURE_CUBE_MAP, format = GL.RGBA16F,
+ *   min_filter = GL.LINEAR, mag_filter = GL.LINEAR,
+ *   wrap_s = GL.CLAMP_TO_EDGE, wrap_t = GL.CLAMP_TO_EDGE, wrap_r = GL.CLAMP_TO_EDGE,
+ * })
+ * local face = 0
+ * function gadget:DrawGenesis()
+ *   if face < 6 then
+ *     local x, z = Game.mapSizeX / 2, Game.mapSizeZ / 2
+ *     local y = math.max(0, Spring.GetGroundHeight(x, z)) + 128
+ *     local ok, err = gl.RenderEnvironmentFace(cube, face, x, y, z, true)
+ *     if not ok then Spring.Echo(err) end
+ *     face = face + 1
+ *   end
+ * end
+ * ```
+ *
+ * @function gl.RenderEnvironmentFace
+ * @param texName string Lua cube texture (gl.CreateTexture with target GL_TEXTURE_CUBE_MAP)
+ * @param face integer 0..5 in OpenGL order (+X, -X, +Y, -Y, +Z, -Z)
+ * @param x number world position of the capture (elmos)
+ * @param y number
+ * @param z number
+ * @param skyOnly boolean? false also draws the terrain reflection pass (default true)
+ * @return boolean success
+ * @return string? error
+ */
+// variant: PBRIBLProvider=bar (the capture primitive of BAR's provider)
+int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
+{
+	// raises a Lua error outside any draw call-in, like every gl.* draw call
+	CheckDrawingEnabled(L, __func__);
+
+	const int face = luaL_checkint(L, 2);
+	const float3 position(luaL_checkfloat(L, 3), luaL_checkfloat(L, 4), luaL_checkfloat(L, 5));
+	// sky-only is the default: it is independent of the player camera (see the
+	// ROAM note below), which a stable environment needs
+	const bool skyOnly = luaL_optboolean(L, 6, true);
+	// the calling handle's own textures only, the same lookup as "!N" names
+	const LuaTextures::Texture* tex = CLuaHandle::GetActiveTextures(L).GetInfo(luaL_checksstring(L, 1));
+
+	// Usage errors are returned rather than raised, so a provider can report
+	// them as a status instead of losing its whole call-in to a Lua error.
+	const char* error = nullptr;
+	// drawMode is LuaOpenGL's record of the running draw call-in
+	if (drawMode != DRAW_GENESIS)
+		error = "gl.RenderEnvironmentFace is only allowed in DrawGenesis";
+	else if (face < 0 || face > 5)
+		error = "gl.RenderEnvironmentFace: face must be 0..5";
+	else if (tex == nullptr || tex->target != GL_TEXTURE_CUBE_MAP)
+		error = "gl.RenderEnvironmentFace: not a Lua cube texture of this handle";
+
+	// whatever the caller had bound (normally the default framebuffer in
+	// DrawGenesis, but a Lua FBO bound with gl.ActiveFBO is possible) is put back
+	// at the end, on success and on failure
+	GLint previousFBO = 0;
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &previousFBO);
+
+	if (error == nullptr) {
+		// created lazily: most games never call this, so they never pay for it
+		if (environmentFaceFBO == 0)
+			glGenFramebuffersEXT(1, &environmentFaceFBO);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, environmentFaceFBO);
+		// The depth attachment must match the color attachment's size or the
+		// FBO is incomplete. Faces are square, so xsize is the size; the
+		// renderbuffer is (re)allocated only when it changes and stays attached.
+		// A sized depth format, the one Lua texture FBOs get (LuaTextures), so
+		// the precision does not depend on the driver's choice for the unsized
+		// GL_DEPTH_COMPONENT.
+		if (environmentFaceDepthSize != tex->xsize) {
+			if (environmentFaceDepth == 0)
+				glGenRenderbuffersEXT(1, &environmentFaceDepth);
+			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, environmentFaceDepth);
+			const GLenum depthFormat = static_cast<GLenum>(CGlobalRendering::DepthBitsToFormat(globalRendering->supportDepthBufferBitDepth));
+			glRenderbufferStorageEXT(GL_RENDERBUFFER_EXT, depthFormat, tex->xsize, tex->xsize);
+			glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
+			glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, environmentFaceDepth);
+			environmentFaceDepthSize = tex->xsize;
+		}
+		// One face of the cube as a 2D color attachment: the face target
+		// (POSITIVE_X + face, consecutive enums) selects the face, level 0 the
+		// full-size image. A layered attachment (all six faces) is not needed,
+		// because the sky shaders write no gl_Layer.
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + face, tex->id, 0);
+		// core glCheckFramebufferStatus, as FBO.cpp uses: the headless build's GL stubs
+		// (rts/lib/headlessStubs/gladstub.cpp) have no EXT form, so spring-headless would not link
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT)
+			error = "gl.RenderEnvironmentFace: capture framebuffer is incomplete";
+	}
+
+	if (error == nullptr) {
+		// Per face: forward, right, up, in OpenGL face order; the table of
+		// CubeMapHandler::CreateReflectionFace itself (right and up negated
+		// below, as there), so the Lua cube's faces match the legacy cubes'.
+		const auto& faceDirs = CubeMapHandler::faceDirs;
+
+		// Save everything the capture changes, so the Lua caller continues with
+		// its own state: fog and clear color, depth test/mask, viewport, enables,
+		// scissor, color mask, the matrix mode and the polygon state (the sky and
+		// terrain passes set the cull face mode, which GL_ENABLE_BIT does not
+		// cover), plus both fixed-function matrices (the camera's LoadMatrices
+		// overwrites them) and the bound program (the sky and terrain shaders
+		// leave program 0 bound; glPushAttrib does not save programs). The
+		// engine's CreateReflectionFace saves only fog and depth because it runs
+		// inside the engine's own pass; a Lua caller's state is unknown. BAR's
+		// IBL self-test checks all of it from a widget's DrawGenesis.
+		glPushAttrib(GL_FOG_BIT | GL_DEPTH_BUFFER_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT | GL_SCISSOR_BIT | GL_COLOR_BUFFER_BIT | GL_TRANSFORM_BIT | GL_POLYGON_BIT);
+		GLint previousProgram = 0;
+		glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+
+		const auto& sky = ISky::GetSky();
+		// a scissor left by the caller would clip the clear and the face
+		glDisable(GL_SCISSOR_TEST);
+		// cleared to the fog color, as the engine's capture does, so texels
+		// the sky leaves uncovered match the horizon
+		glClearColor(sky->fogColor.x, sky->fogColor.y, sky->fogColor.z, 1.0f);
+		// Lua call-ins run with depth writes off; the depth buffer must be cleared
+		// (glClear honors the write masks, so depth and color writes are enabled
+		// for it; with depth writes off the terrain would test against stale depth)
+		glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+		glDepthMask(GL_TRUE);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+		// the sky alone needs no depth test; terrain does (same as the engine)
+		glDepthMask(skyOnly ? GL_FALSE : GL_TRUE);
+		if (skyOnly)
+			glDisable(GL_DEPTH_TEST);
+		else
+			glEnable(GL_DEPTH_TEST);
+
+		// The ENVMAP camera is the engine's camera slot for cube captures, shared
+		// with CubeMapHandler; both set every field they use before drawing, so
+		// sharing it is safe. The player camera is untouched and made active again.
+		CCamera* prvCam = CCameraHandler::GetSetActiveCamera(CCamera::CAMTYPE_ENVMAP);
+		CCamera* curCam = CCameraHandler::GetActiveCamera();
+		// reflections are drawn from an inverted perspective (right becomes
+		// left and up becomes down), as in CreateReflectionFace
+		curCam->forward = faceDirs[face][0];
+		curCam->right   = faceDirs[face][1] * -1.0f;
+		curCam->up      = faceDirs[face][2] * -1.0f;
+		// 90 degrees vertical and (with aspect 1) horizontal: the six faces then
+		// tile the full sphere of directions exactly
+		curCam->SetVFOV(90.0f);
+		curCam->SetAspectRatio(1.0f);
+		// the caller's position, where the engine uses the player camera's
+		curCam->SetPos(position);
+		curCam->UpdateLoadViewport(0, 0, tex->xsize, tex->xsize);
+		curCam->UpdateViewRange();
+		curCam->UpdateMatrices(globalRendering->viewSizeX, globalRendering->viewSizeY, curCam->GetAspectRatio());
+		curCam->UpdateFrustum();
+		curCam->LoadMatrices();
+
+		// drawers check this mode: ModernSky picks its reflection shader, the
+		// SMF ground textures skip their per-frame bookkeeping, as in the
+		// engine's capture; restored to gameNormalDraw right after drawing
+		game->SetDrawMode(CGame::gameReflectionDraw);
+		if (!globalRendering->drawDebugCubeMap) {
+			sky->Draw();
+			// ROAM reuses the player camera's tessellation here, so terrain the
+			// player camera has not tessellated is missing
+			if (!skyOnly)
+				readMap->GetGroundDrawer()->Draw(DrawPass::TerrainReflection);
+		} else {
+			// /DebugCubeMap: the engine's debug face images, the same ones the
+			// legacy cubes get, to check face order and orientation
+			debugCubeMapTexture.Draw(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face);
+		}
+		// DrawGenesis runs in gameNormalDraw (CGame::Draw sets it just before)
+		game->SetDrawMode(CGame::gameNormalDraw);
+		CCameraHandler::SetActiveCamera(prvCam->GetCamType());
+
+		// pops in the reverse order of the pushes above; glPopAttrib last, so
+		// the matrix mode it restores is the caller's
+		glUseProgram(static_cast<GLuint>(previousProgram));
+		glMatrixMode(GL_PROJECTION);
+		glPopMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glPopMatrix();
+		glPopAttrib();
+	}
+
+	if (environmentFaceFBO != 0 && tex != nullptr) {
+		// leave no attachment behind that could outlive the caller's texture
+		// (the shared FBO would otherwise keep a reference to a texture that
+		// gl.DeleteTexture later frees, and the next call by another handle
+		// would start from that stale attachment). Texture 0 detaches; the
+		// target argument is then ignored. Runs on the failure paths too.
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, environmentFaceFBO);
+		glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D, 0, 0);
+	}
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, previousFBO);
+
+	// true, or false plus the message (the Lua convention of `ok, err`)
+	lua_pushboolean(L, error == nullptr);
+	if (error == nullptr)
+		return 1;
+
+	lua_pushstring(L, error);
+	return 2;
+}
+
+
+/***
+ * Publishes a Lua texture of this handle so every Lua handle (and engine
+ * code) can sample it as `"$pub:<name>"`, or unpublishes the name when
+ * `texName` is nil. Only the publishing handle can change a name. Deleting the
+ * texture, or the handle shutting down, unpublishes it. Consumers see names
+ * changed within one call-in together.
+ *
+ * Why it exists: a Lua texture name such as `"!12"` (returned by
+ * gl.CreateTexture) resolves only inside the Lua handle that created it, so a
+ * texture built in LuaRules cannot be sampled by a LuaUI widget, and engine
+ * code has no way to name it at all. Publishing gives the texture a global
+ * name. The texture itself stays owned by the publishing handle; nothing is
+ * copied.
+ *
+ * Use case 1, a LuaRules provider and LuaUI consumers. BAR's PBR provider
+ * (an unsynced LuaRules gadget, beside the unit shaders) builds the
+ * environment cubes and publishes them; the LuaUI IBL viewer and self-test
+ * sample them:
+ *
+ * ```lua
+ * -- LuaRules (unsynced): publish all three together, in one call-in
+ * gl.PublishTexture("pbr_environment", set.environment)
+ * gl.PublishTexture("pbr_irradiance", set.irradiance)
+ * gl.PublishTexture("pbr_specular", set.specular)
+ *
+ * -- LuaUI widget: bind like any named texture
+ * function widget:DrawScreen()
+ *   local info = gl.TextureInfo("$pub:pbr_environment")
+ *   if info and info.id ~= 0 then -- id is 0 while nothing is published
+ *     gl.Texture(0, "$pub:pbr_environment")
+ *     -- draw with a samplerCube shader ...
+ *     gl.Texture(0, false)
+ *   end
+ * end
+ * ```
+ *
+ * Use case 2, any LuaUI widget that needs the image-based lighting cubes (for
+ * example a widget shader lighting its own geometry): it binds
+ * `"$pub:pbr_irradiance"` and `"$pub:pbr_specular"` the same way, to the
+ * texture units its shader's samplerCube uniforms use. It needs no code from
+ * the provider and keeps working when the provider republishes new cubes:
+ * the name is resolved again on every bind.
+ *
+ * Use case 3, names that the engine binds. Every place that accepts a texture
+ * name string accepts `"$pub:<name>"`: material texture tables such as the
+ * `texunits` of Spring.UnitRendering.SetMaterial, and the `textures` table of
+ * engine shaders loaded from Lua files. The engine binds those itself at draw
+ * time, so the material always samples the currently published texture:
+ *
+ * ```lua
+ * Spring.UnitRendering.SetMaterial(unitID, 1, "opaque", {
+ *   shader = shaderID,
+ *   texunits = {
+ *     [0] = "%" .. unitDefID .. ":0",
+ *     [6] = "$pub:pbr_irradiance",
+ *     [7] = "$pub:pbr_specular",
+ *   },
+ * })
+ * ```
+ *
+ * Unpublishing: pass nil (or omit texName). The name stays known and samples
+ * as no texture (id 0) until a handle publishes it again:
+ *
+ * ```lua
+ * gl.PublishTexture("pbr_environment", nil)
+ * ```
+ *
+ * Inside one Lua handle no publication is needed: the handle can bind its own
+ * `"!N"` name directly (`gl.Texture(0, texture)`), and other code in the same
+ * handle can be given that name (BAR's LuaRules consumers use
+ * GG.PBREnvironment.GetTextures()). Publish only what another handle or the
+ * engine must sample.
+ *
+ * Ownership: only the handle that published a name can republish or
+ * unpublish it; another handle gets `false, message` and the name is
+ * unchanged. Once the owner unpublishes (or frees the texture) any handle may
+ * take the name. Only textures of the calling handle can be published.
+ *
+ * Lifetime: a name's slot is created the first time it is looked up, by the
+ * publisher or by a consumer parsing `"$pub:<name>"` before anything is
+ * published, and is never removed, so a parsed name (in a material, say)
+ * stays valid for the rest of the process. gl.DeleteTexture of a published
+ * texture, and the publishing handle shutting down or reloading, unpublish it
+ * automatically, so a name never points at a deleted texture.
+ *
+ * Atomicity: all Lua call-ins and draws run on the one render thread, so
+ * names changed in one call-in are seen together by every consumer; publish a
+ * whole set (environment, irradiance, specular) in one call-in.
+ *
+ * @function gl.PublishTexture
+ * @param name string the published name, sampled as `"$pub:" .. name`
+ * @param texName string? Lua texture name of this handle, nil to unpublish
+ * @return boolean success
+ * @return string? error when another handle owns the name, or texName is not a texture of this handle
+ */
+// variant: PBRIBLProvider=bar (BAR's provider publishes its cubes and DFG table)
+int LuaOpenGL::PublishTexture(lua_State* L)
+{
+	// nil and "" both mean "unpublish"; all rules live in LuaTextures::Publish.
+	// No CheckDrawingEnabled: publishing issues no GL call, so it is allowed
+	// in any unsynced call-in (the gl table does not exist in synced code).
+	std::string error;
+	const bool published = CLuaHandle::GetActiveTextures(L).Publish(luaL_checksstring(L, 1), luaL_optsstring(L, 2, ""), error);
+
+	lua_pushboolean(L, published);
+	if (published)
+		return 1;
+
+	lua_pushsstring(L, error);
+	return 2;
+}
+
+
 /***
  * @function gl.ActiveTexture
  * @param texNum integer
@@ -6480,6 +6870,9 @@ int LuaOpenGL::Finish(lua_State* L)
 
 /******************************************************************************/
 
+// Number of values per pixel that glReadPixels writes for format f.
+// ReadPixels walks its result with this size, so every format it can read
+// must be listed; an unlisted one returns -1 and is read as 4 values.
 static int PixelFormatSize(GLenum f)
 {
 	switch (f) {
@@ -6493,7 +6886,8 @@ static int PixelFormatSize(GLenum f)
 		case GL_LUMINANCE: {
 			return 1;
 		}
-		case GL_LUMINANCE_ALPHA: {
+		case GL_LUMINANCE_ALPHA:
+		case GL_RG: {
 			return 2;
 		}
 		case GL_RGB:
@@ -6729,27 +7123,95 @@ int LuaOpenGL::SaveImage(lua_State* L)
 
 /******************************************************************************/
 
+void LuaOpenGL::CreateQueryMetatable(lua_State* L)
+{
+	luaL_newmetatable(L, "OcclusionQuery");
+	LuaPushNamedCFunc(L, "__gc", QueryGC);
+	lua_pop(L, 1);
+}
+
+int LuaOpenGL::QueryGC(lua_State* L)
+{
+	auto* qry = static_cast<OcclusionQuery*>(luaL_checkudata(L, 1, "OcclusionQuery"));
+
+	if (qry->id != 0)
+		glDeleteQueries(1, &qry->id);
+
+	qry->id = 0;
+	return 0;
+}
+
+LuaOpenGL::OcclusionQuery* LuaOpenGL::GetOcclusionQuery(lua_State* L, int index, const char* errorMsg)
+{
+	auto* qry = static_cast<OcclusionQuery*>(LuaUtils::GetUserData(L, index, "OcclusionQuery"));
+
+	if (qry == nullptr)
+		luaL_error(L, "%s", errorMsg);
+
+	return qry;
+}
+
 /***
+ * Creates a query object for gl.RunQuery.
+ *
+ * "samples" (the default) counts the samples that pass the depth test.
+ * "time" measures the GPU execution time of the commands issued inside
+ * gl.RunQuery (GL_TIME_ELAPSED), in nanoseconds; it returns nil when the GPU
+ * lacks timer queries (OpenGL 3.3 or ARB_timer_query).
+ *
+ * An unknown kind raises a Lua error. Engines without the kind argument
+ * ignore it and make a "samples" query, so a script can detect time-query
+ * support by checking that `pcall(gl.CreateQuery, "unknown-kind")` fails.
+ *
+ * Example usage (GPU time of a pass, read later without stalling):
+ *
+ * ```lua
+ * local query = gl.CreateQuery("time")
+ * if query then
+ *   gl.RunQuery(query, DrawMyPass)
+ * end
+ * -- a few frames later
+ * local nanoseconds = query and gl.GetQuery(query, false)
+ * if nanoseconds then
+ *   Spring.Echo(string.format("pass took %.3f ms", nanoseconds * 1e-6))
+ * end
+ * ```
+ *
  * @function gl.CreateQuery
- * @return any query
+ * @param kind ("samples"|"time")? (Default: `"samples"`)
+ * @return any? query nil when the GPU lacks timer queries ("time") or no query name could be generated
  */
 int LuaOpenGL::CreateQuery(lua_State* L)
 {
+	const std::string kind = luaL_optstring(L, 1, "samples");
+	GLenum target = GL_SAMPLES_PASSED;
+
+	if (kind == "time") {
+		// variant: PBREnvironmentGpuTiming=2 (BAR's provider times its passes with it)
+		// GL_TIME_ELAPSED is core in OpenGL 3.3, or the ARB_timer_query extension
+		if (!GLAD_GL_VERSION_3_3 && !GLAD_GL_ARB_timer_query)
+			return 0;
+
+		target = GL_TIME_ELAPSED;
+	} else if (kind != "samples") {
+		// an error, not a silent "samples" query, so a misspelt kind cannot
+		// return sample counts that look like times (luaL_error does not return)
+		luaL_error(L, "gl.CreateQuery(kind): kind must be \"samples\" or \"time\"");
+	}
+
 	GLuint id;
 	glGenQueries(1, &id);
 
 	if (id == 0)
 		return 0;
 
-	OcclusionQuery* qry = static_cast<OcclusionQuery*>(lua_newuserdata(L, sizeof(OcclusionQuery)));
+	// a full userdata keeps the query alive while Lua references it; __gc frees it
+	auto* qry = static_cast<OcclusionQuery*>(lua_newuserdata(L, sizeof(OcclusionQuery)));
+	qry->id = id;
+	qry->target = target;
 
-	if (qry == nullptr)
-		return 0;
-
-	*qry = {static_cast<unsigned int>(occlusionQueries.size()), id};
-	occlusionQueries.push_back(qry);
-
-	lua_pushlightuserdata(L, reinterpret_cast<void*>(qry));
+	luaL_getmetatable(L, "OcclusionQuery");
+	lua_setmetatable(L, -2);
 	return 1;
 }
 
@@ -6762,22 +7224,10 @@ int LuaOpenGL::DeleteQuery(lua_State* L)
 	if (lua_isnil(L, 1))
 		return 0;
 
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.DeleteQuery(q) expects a userdata query");
+	GetOcclusionQuery(L, 1, "gl.DeleteQuery(q) expects a userdata query");
 
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
-
-	if (qry == nullptr)
-		return 0;
-	if (qry->index >= occlusionQueries.size())
-		return 0;
-
-	glDeleteQueries(1, &qry->id);
-
-	occlusionQueries[qry->index] = occlusionQueries.back();
-	occlusionQueries[qry->index]->index = qry->index;
-	occlusionQueries.pop_back();
-	return 0;
+	// deletes now instead of at garbage collection; a second call does nothing
+	return QueryGC(L);
 }
 
 /***
@@ -6791,15 +7241,10 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	if (running)
 		luaL_error(L, "gl.RunQuery(q,f) can not be called recursively");
 
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.RunQuery(q,f) expects a userdata query");
+	const OcclusionQuery* qry = GetOcclusionQuery(L, 1, "gl.RunQuery(q,f) expects a userdata query");
 
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
-
-	if (qry == nullptr)
-		return 0;
-	if (qry->index >= occlusionQueries.size())
-		return 0;
+	if (qry->id == 0)
+		return 0; // deleted
 
 	if (!lua_isfunction(L, 2))
 		luaL_error(L, "gl.RunQuery(q,f) expects a function");
@@ -6807,9 +7252,9 @@ int LuaOpenGL::RunQuery(lua_State* L)
 	const int args = lua_gettop(L); // number of arguments
 
 	running = true;
-	glBeginQuery(GL_SAMPLES_PASSED, qry->id);
+	glBeginQuery(qry->target, qry->id);
 	const int error = lua_pcall(L, (args - 2), 0, 0);
-	glEndQuery(GL_SAMPLES_PASSED);
+	glEndQuery(qry->target);
 	running = false;
 
 	if (error != 0) {
@@ -6821,23 +7266,51 @@ int LuaOpenGL::RunQuery(lua_State* L)
 }
 
 /***
+ * Result of the last gl.RunQuery: a sample count, or GPU nanoseconds for a
+ * "time" query.
+ *
+ * With wait = true (the default) the call blocks until the GPU has finished
+ * the measured commands, which stalls the frame when the query ran in the
+ * same frame. With wait = false it never blocks: it returns nil while the
+ * result is not available yet (and for a query that never ran), so a caller
+ * can poll once per frame (see the gl.CreateQuery example).
+ *
  * @function gl.GetQuery
  * @param query any
- * @return integer count
+ * @param wait boolean? (Default: `true`)
+ * @return number? result
  */
 int LuaOpenGL::GetQuery(lua_State* L)
 {
-	if (!lua_islightuserdata(L, 1))
-		luaL_error(L, "gl.GetQuery(q) expects a userdata query");
+	const OcclusionQuery* qry = GetOcclusionQuery(L, 1, "gl.GetQuery(q) expects a userdata query");
 
-	const OcclusionQuery* qry = static_cast<const OcclusionQuery*>(lua_touserdata(L, 1));
+	if (qry->id == 0)
+		return 0; // deleted
 
-	if (qry == nullptr)
-		return 0;
-	if (qry->index >= occlusionQueries.size())
-		return 0;
+	if (!luaL_optboolean(L, 2, true)) {
+		// GL_QUERY_RESULT_AVAILABLE never blocks; GL_QUERY_RESULT below would
+		GLuint available = GL_FALSE;
+		glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT_AVAILABLE, &available);
 
-	GLuint count;
+		if (available == GL_FALSE) {
+			lua_pushnil(L);
+			return 1;
+		}
+	}
+
+	if (qry->target == GL_TIME_ELAPSED) {
+		// 64-bit: a 32-bit result would overflow after about 4.3 seconds of GPU
+		// time. lua_Number is float here, so the value reaches Lua rounded to 24
+		// significant bits: exact below 2^24 ns (about 16.8 ms), otherwise within
+		// about 1e-7 relative, ample for timing.
+		GLuint64 nanoseconds = 0;
+		glGetQueryObjectui64v(qry->id, GL_QUERY_RESULT, &nanoseconds);
+
+		lua_pushnumber(L, static_cast<double>(nanoseconds));
+		return 1;
+	}
+
+	GLuint count = 0; // stays 0 for a query that never ran (GL_INVALID_OPERATION, nothing written)
 	glGetQueryObjectuiv(qry->id, GL_QUERY_RESULT, &count);
 
 	lua_pushnumber(L, count);

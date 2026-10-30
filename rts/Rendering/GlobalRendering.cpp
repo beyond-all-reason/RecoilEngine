@@ -69,6 +69,7 @@ CONFIG(bool, DualScreenMiniMapOnLeft).defaultValue(false).description("When set,
 CONFIG(bool, TeamNanoSpray).defaultValue(true).headlessValue(false);
 
 CONFIG(int, MinimizeOnFocusLoss).defaultValue(0).minimumValue(0).maximumValue(1).description("When set to 1 minimize Window if it loses key focus when in fullscreen mode.");
+CONFIG(bool, BackgroundWindow).defaultValue(false).description("Run in the background, for unattended tests, CI, replays and capture: the window opens without taking the keyboard focus and behind other windows, never minimizes itself (MinimizeOnFocusLoss and Lua minimize requests are ignored), and Fullscreen is forced off. On Windows a hung window is not replaced by a \"Not Responding\" ghost that would take the focus. Read at start-up; also set by --background-window.");
 
 CONFIG(bool, Fullscreen).defaultValue(true).headlessValue(false).description("Sets whether the game will run in fullscreen, as opposed to a window. For Windowed Fullscreen of Borderless Window, set this to 0, WindowBorderless to 1, and WindowPosX and WindowPosY to 0.");
 CONFIG(bool, WindowBorderless).defaultValue(false).description("When set and Fullscreen is 0, will put the game in Borderless Window mode, also known as Windowed Fullscreen. When using this, it is generally best to also set WindowPosX and WindowPosY to 0");
@@ -429,6 +430,8 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 
 	uint32_t sdlFlags  = (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	         sdlFlags |= (borderless_ ? SDL_WINDOW_FULLSCREEN_DESKTOP : SDL_WINDOW_FULLSCREEN) * fullScreen_;
+	         // a background window is shown later, once it is behind the other windows
+	         sdlFlags |= (SDL_WINDOW_HIDDEN * configHandler->GetBool("BackgroundWindow"));
 	         sdlFlags |= (SDL_WINDOW_BORDERLESS * borderless_);
 
 	for (size_t i = 0; i < (aaLvls.size()) && (newWindow == nullptr); i++) {
@@ -569,10 +572,31 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 			++msaaLevel;
 	}
 
+	// a background window is created hidden and shown without activation (SW_SHOWNA
+	// on Windows), so it never takes the keyboard focus; the hint is read on show
+	const bool backgroundWindow = configHandler->GetBool("BackgroundWindow");
+
+	if (backgroundWindow) {
+		SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, "1");
+		WindowManagerHelper::DisableWindowGhosting();
+	}
+
 	if ((sdlWindow = CreateSDLWindow(title)) == nullptr)
 		return false;
 
-	if (configHandler->GetInt("MinimizeOnFocusLoss") == 0)
+	// shown without activation, a window still opens on top of the others, so it is
+	// lowered first (Windows keeps that place on show); X11 may raise it on mapping,
+	// hence the second call. It then stays behind until the user clicks it.
+	if (backgroundWindow) {
+		WindowManagerHelper::LowerWindow(sdlWindow);
+		SDL_ShowWindow(sdlWindow);
+		WindowManagerHelper::LowerWindow(sdlWindow);
+		// measured in CreateSDLWindow while hidden, where the DWM frame is not known yet
+		UpdateWindowBorders(sdlWindow);
+		LOG("[GR::%s] background window: shown without activation, lowered, never minimized", __func__);
+	}
+
+	if (backgroundWindow || configHandler->GetInt("MinimizeOnFocusLoss") == 0)
 		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
 
 	SetWindowAttributes(sdlWindow);
@@ -1252,7 +1276,8 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 
 	SDL_SetWindowBordered(window, borderless ? SDL_FALSE : SDL_TRUE);
 
-	if (newRes == maxRes)
+	// maximizing activates the window, which a background window must not be
+	if (newRes == maxRes && !configHandler->GetBool("BackgroundWindow"))
 		SDL_MaximizeWindow(window);
 
 	WindowManagerHelper::SetWindowResizable(window, !borderless && !fullScreen);
@@ -1264,7 +1289,8 @@ void CGlobalRendering::ConfigNotify(const std::string& key, const std::string& v
 
 	// neither needs the window updated; SDL reads the hint on each focus loss
 	if (key == "MinimizeOnFocusLoss") {
-		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, (configHandler->GetInt(key) == 0) ? "0" : "1");
+		const bool minimize = (configHandler->GetInt(key) != 0) && !configHandler->GetBool("BackgroundWindow");
+		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, minimize ? "1" : "0");
 		return;
 	}
 	if (key == "TeamNanoSpray") {
@@ -1428,6 +1454,14 @@ void CGlobalRendering::SetFullScreen(bool cliWindowed, bool cliFullScreen)
 
 	fullScreen = (cfgFullScreen && !cliWindowed  );
 	fullScreen = (cfgFullScreen ||  cliFullScreen);
+
+	// a fullscreen window cannot stay behind other windows; the overlay keeps the
+	// saved setting unchanged
+	if (configHandler->GetBool("BackgroundWindow")) {
+		fullScreen = false;
+		configHandler->Set("Fullscreen", fullScreen, true);
+		return;
+	}
 
 	configHandler->Set("Fullscreen", fullScreen);
 }
@@ -1846,6 +1880,12 @@ bool CGlobalRendering::SetWindowMinMaximized(bool maximize) const
 	};
 	if ((SDL_GetWindowFlags(sdlWindow) & mmFlags[maximize]) != 0)
 		return false; //already in desired state
+
+	// a minimized window draws only a few frames a minute, which stalls unattended runs
+	if (!maximize && configHandler->GetBool("BackgroundWindow")) {
+		LOG_L(L_WARNING, "[GR::%s] not minimizing: BackgroundWindow is set", __func__);
+		return false;
+	}
 
 	if (maximize)
 		SDL_MaximizeWindow(sdlWindow);

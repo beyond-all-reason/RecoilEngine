@@ -220,6 +220,10 @@ CSkyBox::CSkyBox(const std::string& texture)
 CSkyBox::~CSkyBox()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// ~MapTexture deletes the raw texture id
+	if (!ownsTexture)
+		skyTex.SetRawTexID(0);
+
 #ifndef HEADLESS
 	if (shader)
 		shaderHandler->ReleaseProgramObject("[SkyBox]", "SkyBox");

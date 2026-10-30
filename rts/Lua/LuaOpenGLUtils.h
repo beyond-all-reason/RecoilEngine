@@ -43,6 +43,22 @@ class LuaMatTexture {
 			LUATEX_MAP_REFLECTION,
 			LUATEX_SKY_REFLECTION,
 			LUATEX_SPECULAR,
+			// PBR additions. Inserted mid-enum: the values after them shift, but
+			// no code uses absolute values (the SMF/SSMF offsets below are taken
+			// relative to LUATEX_SMF_GRASS), so only the names matter.
+			// The engine pipeline's cubes, "$pbr_environment", "$pbr_irradiance",
+			// "$pbr_specular" (CubeMapHandler, PBRIBLProvider=engine); texture
+			// id 0 while that pipeline is off or has no complete set.
+			LUATEX_PBR_ENVIRONMENT,
+			LUATEX_PBR_IRRADIANCE,
+			LUATEX_PBR_SPECULAR,
+			// the split-sum DFG lookup table the engine builds on the CPU, a 2D
+			// texture; the only way to name an engine-created texture for Lua
+			// (CNamedTextures loads files and has no registration call)
+			LUATEX_PBR_DFG, // "$pbr_dfg", PBRDFGSource=engine-generated
+			// a Lua texture published with gl.PublishTexture; data holds the
+			// LuaTextures published-slot index, resolved on every bind
+			LUATEX_PUBLISHED, // "$pub:<name>", see LuaTextures::Published
 
 
 			LUATEX_SHADOWMAP,

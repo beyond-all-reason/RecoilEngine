@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_GL_H
-#define LUA_GL_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -155,14 +154,19 @@ class LuaOpenGL {
 		static std::unordered_map<GLenum, std::string> fixedStateEnumToString;
 		static std::string fixedStateEnumToStringUnk;
 
+		// gl.CreateQuery object: a full userdata with the "OcclusionQuery"
+		// metatable, owned by Lua like FBOs and RBOs. Its __gc deletes the GL
+		// query unless gl.DeleteQuery already did (id is 0 then).
 		struct OcclusionQuery {
-			unsigned int index; // into LuaOpenGL::occlusionQueries
 			unsigned int id;
+			unsigned int target; // GL_SAMPLES_PASSED, or GL_TIME_ELAPSED for gl.CreateQuery("time")
 		};
 
-		static std::vector<OcclusionQuery*> occlusionQueries;
-
 	private:
+		static void CreateQueryMetatable(lua_State* L);
+		static int QueryGC(lua_State* L);
+		static OcclusionQuery* GetOcclusionQuery(lua_State* L, int index, const char* errorMsg);
+
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);
 		static void CondWarnDeprecatedGL(lua_State* L, const char* caller);
 		static void NotImplementedError(lua_State* L, const char* caller);
@@ -235,6 +239,11 @@ class LuaOpenGL {
 		static int CopyImageSubData(lua_State* L);
 		static int RenderToTexture(lua_State* L);
 		static int GenerateMipmap(lua_State* L);
+		// draws the engine sky (optionally terrain) into one face of a Lua cube;
+		// DrawGenesis only; uses the file-static capture FBO in LuaOpenGL.cpp
+		static int RenderEnvironmentFace(lua_State* L);
+		// gives a Lua texture of this handle a global "$pub:<name>" (LuaTextures::Publish)
+		static int PublishTexture(lua_State* L);
 		static int ActiveTexture(lua_State* L);
 		static int TexEnv(lua_State* L);
 		static int TexGen(lua_State* L);
@@ -374,5 +383,3 @@ inline void LuaOpenGL::CheckMatrixState(lua_State* L, const char* fn, int error)
 		return;
 	GetLuaContextData(L)->glMatrixTracker.HandleMatrixStateError(error, fn);
 }
-
-#endif /* LUA_UNITDEFS_H */
