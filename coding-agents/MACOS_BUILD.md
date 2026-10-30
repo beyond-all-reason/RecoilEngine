@@ -52,7 +52,7 @@ Never reuse a CMake cache across a Homebrew upgrade. Cellar paths are absolute a
 The engine loads Mesa itself, so no launcher or environment variables are needed. `MacEGLBridge` looks for Mesa in this order:
 
 1. `<exe dir>/mesa`, if it contains `lib/libEGL.1.dylib`.
-2. The `MAC_MESA_PREFIX` CMake cache value compiled into the binary. It defaults to `/opt/homebrew/opt/mesa`. Pass `-DMAC_MESA_PREFIX=<prefix>` at configure time to change it. The current `build-macos` cache points at `~/dev/mesa-install-26.2.5`, which leaks, so rely on the symlink.
+2. The `MAC_MESA_PREFIX` CMake cache value compiled into the binary. It defaults to `/opt/homebrew/opt/mesa`. Pass `-DMAC_MESA_PREFIX=<prefix>` at configure time to change it. The current `build-macos` cache points at `~/dev/mesa-install-26.3.0-rc1`, which lacks the patch, so rely on the symlink.
 
 Make `build-macos/mesa` a symlink to a Mesa install prefix and that is the Mesa the engine runs:
 
@@ -95,7 +95,7 @@ It runs `./spring` in `build-macos` with `--isolation-dir ~/dev/spring-testdata 
 coding-agents/test-scripts/package-macos.sh
 ```
 
-Produces `dist/recoil_<version>_arm64-macos/`, laid out like a Recoil release and carrying every non-system dylib including Mesa, so it runs on a machine with no Homebrew. The Mesa prefix defaults to `~/dev/mesa-install-26.3.0-rc1` and `MESA_PREFIX=` overrides it. Mesa goes in the archive's `mesa/` directory, which is where the bridge looks, so `spring` is the engine binary itself with no launcher.
+Produces `dist/recoil_<version>_arm64-macos/`, laid out like a Recoil release and carrying every non-system dylib including Mesa, so it runs on a machine with no Homebrew. The Mesa prefix defaults to `~/dev/mesa-install-26.3.0-rc1-tcfix` and `MESA_PREFIX=` overrides it. Mesa goes in the archive's `mesa/` directory, which is where the bridge looks, so `spring` is the engine binary itself with no launcher.
 
 For a build that should join games of a release, configure with `-DVERSION_OVERRIDE=<release>` on a branch made from that release tag. The engine then reports the release version, and the archive is named after it. The 2026.09.01 package built this way completed the BAR benchmark at a 10 GiB peak footprint.
 
