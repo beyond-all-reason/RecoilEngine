@@ -409,8 +409,7 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
 	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
 	if (WIN32)
-		# Windows loads a DLL only from the exe's folder or PATH; unitsync.dll is built in another folder than
-		# test_UnitSync.exe, so without this the test stops on a "unitsync.dll was not found" box until ctest times out
+		# unitsync.dll is built outside test_UnitSync.exe's folder; ctest would otherwise hang on the DLL-not-found box
 		set_tests_properties(test${test_name} PROPERTIES
 			ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:unitsync>")
 	endif ()
