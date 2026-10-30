@@ -507,7 +507,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 		REGISTER_LUA_CFUNC(RunQuery);
 		REGISTER_LUA_CFUNC(GetQuery);
 	}
-	if (GLAD_GL_ARB_timer_query) {
+	if (GLTimerQueriesSupported()) {
 		REGISTER_LUA_CFUNC(QueryCounter);
 		REGISTER_LUA_CFUNC(GetQueryDelta);
 	}
@@ -6813,7 +6813,7 @@ LuaOpenGL::OcclusionQuery* LuaOpenGL::ParseQuery(lua_State* L, int index, const 
 /***
  * Creates a GL query object.
  *
- * Timer targets (`GL.TIME_ELAPSED`, `GL.TIMESTAMP`) need `ARB_timer_query`; without it
+ * Timer targets (`GL.TIME_ELAPSED`, `GL.TIMESTAMP`) need OpenGL 3.3 or `ARB_timer_query`; without it
  * `nil` is returned. A `GL.TIMESTAMP` query is written with `gl.QueryCounter`, the other
  * targets are measured over a function with `gl.RunQuery`.
  *
@@ -6833,7 +6833,7 @@ int LuaOpenGL::CreateQuery(lua_State* L)
 			break;
 		case GL_TIME_ELAPSED:
 		case GL_TIMESTAMP: {
-			if (!GLAD_GL_ARB_timer_query)
+			if (!GLTimerQueriesSupported())
 				return 0;
 		} break;
 		default: {
@@ -6931,7 +6931,7 @@ int LuaOpenGL::RunQuery(lua_State* L)
  * reaches this point of the command stream. The difference between two timestamps is
  * the GPU time spent between them; unlike `GL.TIME_ELAPSED` ranges these nest freely.
  *
- * May be unavailable and `nil` if the platform doesn't support `ARB_timer_query`.
+ * May be unavailable and `nil` if the platform supports neither OpenGL 3.3 nor `ARB_timer_query`.
  *
  * @function gl.QueryCounter
  * @param query any A query created with `gl.CreateQuery(GL.TIMESTAMP)`.
@@ -6987,7 +6987,7 @@ int LuaOpenGL::GetQuery(lua_State* L)
 		}
 	}
 
-	if (GLAD_GL_ARB_timer_query) {
+	if (GLTimerQueriesSupported()) {
 		// 64 bits, timestamps and long elapsed times would overflow a GLuint
 		GLuint64 result = 0;
 		glGetQueryObjectui64v(qry->id, GL_QUERY_RESULT, &result);
@@ -7007,7 +7007,7 @@ int LuaOpenGL::GetQuery(lua_State* L)
  * The subtraction happens on the 64-bit values, so the result stays exact where the raw
  * timestamps would not survive the trip into Lua's single precision numbers.
  *
- * May be unavailable and `nil` if the platform doesn't support `ARB_timer_query`.
+ * May be unavailable and `nil` if the platform supports neither OpenGL 3.3 nor `ARB_timer_query`.
  *
  * @function gl.GetQueryDelta
  * @param startQuery any

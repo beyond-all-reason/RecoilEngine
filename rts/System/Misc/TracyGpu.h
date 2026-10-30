@@ -13,7 +13,7 @@
 
 namespace TracyGpu {
 	// true once CGlobalRendering created the Tracy GPU context (needs
-	// ARB_timer_query); zones created before that or without it are inactive
+	// OpenGL 3.3 or ARB_timer_query); zones created before that or without it are inactive
 	extern bool ready;
 }
 

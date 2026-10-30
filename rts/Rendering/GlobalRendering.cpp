@@ -732,12 +732,12 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 bool TracyGpu::ready = false;
 
 // Tracy GPU zones (System/Misc/TracyGpu.h) time GL work with GL_TIMESTAMP queries,
-// which need ARB_timer_query. One context per GL context, created once; zones
+// which need OpenGL 3.3 or ARB_timer_query. One context per GL context, created once; zones
 // issued before this stay inactive (TracyGpu::ready).
 void CGlobalRendering::CreateTracyGpuContext() const
 {
 #ifdef TRACY_ENABLE
-	if (TracyGpu::ready || !GLAD_GL_ARB_timer_query)
+	if (TracyGpu::ready || !GLTimerQueriesSupported())
 		return;
 
 	TracyGpuContext;
@@ -759,7 +759,7 @@ void CGlobalRendering::CollectTracyGpuZones() const
 
 void CGlobalRendering::SetGLTimeStamp(uint32_t queryIdx) const
 {
-	if (!GLAD_GL_ARB_timer_query)
+	if (!GLTimerQueriesSupported())
 		return;
 
 	glQueryCounter(glTimerQueries[(NUM_OPENGL_TIMER_QUERIES * (drawFrame & 1)) + queryIdx], GL_TIMESTAMP);
@@ -767,7 +767,7 @@ void CGlobalRendering::SetGLTimeStamp(uint32_t queryIdx) const
 
 uint64_t CGlobalRendering::CalcGLDeltaTime(uint32_t queryIdx0, uint32_t queryIdx1) const
 {
-	if (!GLAD_GL_ARB_timer_query)
+	if (!GLTimerQueriesSupported())
 		return 0;
 
 	const uint32_t queryBase = NUM_OPENGL_TIMER_QUERIES * (1 - (drawFrame & 1));

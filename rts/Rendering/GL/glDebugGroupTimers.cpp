@@ -91,8 +91,8 @@ bool GL::DebugGroupTimers::Enabled()
 {
 	if (logInterval < 0) {
 		logInterval = configHandler->GetInt("GLDebugGroupTimers");
-		if (logInterval > 0 && !GLAD_GL_ARB_timer_query) {
-			LOG_L(L_WARNING, "[GLDebugGroupTimers] GL_ARB_timer_query is not supported, timers disabled");
+		if (logInterval > 0 && !GLTimerQueriesSupported()) {
+			LOG_L(L_WARNING, "[GLDebugGroupTimers] timer queries are not supported (no OpenGL 3.3 or GL_ARB_timer_query), timers disabled");
 			logInterval = 0;
 		}
 	}
