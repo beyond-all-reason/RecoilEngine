@@ -42,7 +42,7 @@ namespace RmlGui {
 
 class ElementSVG : public Rml::Element {
 public:
-	RMLUI_RTTI_DefineWithParent(ElementSVG, Element)
+	RMLUI_RTTI_DeclareWithParent(ElementSVG, Element)
 
 	ElementSVG(const Rml::String& tag);
 	virtual ~ElementSVG();

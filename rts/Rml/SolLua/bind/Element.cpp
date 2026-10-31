@@ -156,9 +156,10 @@ namespace Rml::SolLua
 			if (iter.AtEnd())
 				return std::make_tuple(sol::object(sol::lua_nil), sol::object(sol::lua_nil));
 
+			const auto pair = *iter;
 			auto result = std::make_tuple(
-				sol::object(s, sol::in_place, iter.GetName()),
-				sol::object(s, sol::in_place, iter.GetProperty().ToString())
+				sol::object(s, sol::in_place, pair.first),
+				sol::object(s, sol::in_place, pair.second.ToString())
 			);
 			++iter;
 
@@ -200,7 +201,7 @@ namespace Rml::SolLua
 
 			auto Pairs()
 			{
-				auto iter = m_element->IterateLocalProperties();
+				auto iter = m_element->IterateLocalProperties(nullptr);
 				return std::make_tuple(
 					&nextPair,
 					sol::user<Rml::PropertiesIteratorView>(std::move(iter)),
