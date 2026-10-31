@@ -791,15 +791,18 @@ int LuaFBOs::BlitFBO(lua_State* L)
 	const GLbitfield mask = (GLbitfield)luaL_optint(L, 11, GL_COLOR_BUFFER_BIT);
 	const GLenum filter = (GLenum)luaL_optint(L, 12, GL_NEAREST);
 
-	GLint currentFBO;
-	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
+	GLint currentReadFBO;
+	GLint currentDrawFBO;
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING_EXT, &currentReadFBO);
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING_EXT, &currentDrawFBO);
 
 	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, (fboSrc == nullptr)? 0: fboSrc->id);
 	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, (fboDst == nullptr)? 0: fboDst->id);
 
 	glBlitFramebufferEXT(x0Src, y0Src, x1Src, y1Src,  x0Dst, y0Dst, x1Dst, y1Dst,  mask, filter);
 
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, currentFBO);
+	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, currentReadFBO);
+	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, currentDrawFBO);
 	return 0;
 }
 
