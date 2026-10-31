@@ -522,6 +522,11 @@ int LuaFBOs::CreateFBO(lua_State* L)
 					ApplyDrawBuffers(L, -1);
 				}
 			}
+			lua_rawgeti(L, LUA_REGISTRYINDEX, fboPtr->luaRef);
+			lua_pushvalue(L, -3); // key
+			lua_pushvalue(L, -3); // value
+			lua_rawset(L, -3);
+			lua_pop(L, 1);
 		}
 	}
 
