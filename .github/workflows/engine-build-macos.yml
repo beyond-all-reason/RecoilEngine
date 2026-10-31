@@ -1,0 +1,155 @@
+# Builds the arm64-macos engine (engine + Mesa EGL/Zink/KosmicKrisp in an
+# Engine.app, recoil_<version>_arm64-macos.7z) on GitHub's macOS runners with
+# Homebrew GCC. It is the macOS counterpart of engine-build.yml, which builds
+# the Linux and Windows engines in docker, and takes the same inputs and
+# artifact naming so that release-build.yml can collect all of them.
+#
+# Without the Developer ID secrets the engine is ad-hoc signed. With them,
+# builds outside pull requests are signed and notarized.
+#   MACOS_CERT_P12         base64 of the exported "Developer ID Application" .p12
+#   MACOS_CERT_PASSWORD    password of that .p12
+#   APPLE_ID               Apple ID used for notarization
+#   APPLE_TEAM_ID          team id of the Developer ID certificate
+#   APPLE_APP_PASSWORD     app-specific password of that Apple ID
+
+name: Build Engine macOS
+on:
+  workflow_dispatch:
+    inputs:
+      cmake-options:
+        description: 'Custom CMake options for build'
+        type: string
+  workflow_call:
+    inputs:
+      cmake-options:
+        description: 'Custom CMake options for build'
+        type: string
+      package-suffix:
+        description: 'Custom suffix for the package name'
+        type: string
+  pull_request:
+    paths-ignore:
+      - 'doc/**'
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - 'doc/**'
+jobs:
+  build-engine:
+    if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
+    name: Build arm64-macos engine
+    runs-on: macos-26
+    env:
+      CAN_SIGN: ${{ github.event_name != 'pull_request' && secrets.MACOS_CERT_P12 != '' }}
+      CAN_NOTARIZE: ${{ github.event_name != 'pull_request' && secrets.APPLE_APP_PASSWORD != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install dependencies
+        id: deps
+        run: |
+          brew update
+          # no jsoncpp: Homebrew builds it against libc++, so the engine uses its bundled copy;
+          # spirv-tools and zstd are what the Mesa libraries link against
+          brew install cmake ninja pkg-config gcc ccache sevenzip devil fontconfig freetype libvorbis minizip openal-soft sdl2-compat sdl3 vulkan-loader \
+            spirv-tools zstd
+          brew uninstall --ignore-dependencies jsoncpp 2>/dev/null || true
+          # ccache needs fmt's library, but its headers would shadow the engine's own fmt
+          brew unlink fmt
+          echo "spirv-tools=$(brew list --versions spirv-tools | cut -d' ' -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore compiler cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.ccache
+          key: ccache-macos-${{ github.sha }}
+          restore-keys: ccache-macos-
+
+      - name: Build engine
+        env:
+          CCACHE_MAXSIZE: 2G
+          CCACHE_COMPRESS: 'true'
+        run: |
+          export CCACHE_DIR="$HOME/.ccache"
+          # GCC like the Linux and Windows builds, for the same floating point behaviour
+          GCC_BIN="$(ls "$(brew --prefix gcc)"/bin/gcc-[0-9]* | sort -V | tail -n1)"
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_C_COMPILER="$GCC_BIN" \
+            -DCMAKE_CXX_COMPILER="${GCC_BIN/gcc-/g++-}" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DOPENAL_INCLUDE_DIR="$(brew --prefix openal-soft)/include/AL" \
+            -DOPENAL_LIBRARY="$(brew --prefix openal-soft)/lib/libopenal.dylib" \
+            -DAI_TYPES=NATIVE \
+            -DBUILD_spring-dedicated=OFF \
+            -DBUILD_spring-headless=OFF \
+            ${{ inputs.cmake-options || '' }}
+          cmake --build build --target spring unitsync pr-downloader_cli basecontent C-AIInterface NullAI BARb
+          ccache --show-stats
+
+      - name: Save compiler cache
+        if: ${{ !cancelled() && github.event_name != 'pull_request' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.ccache
+          key: ccache-macos-${{ github.sha }}
+
+      - name: Restore Mesa
+        id: mesa
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/mesa-prefix
+          key: mesa-${{ hashFiles('installer/Mac/make-mesa.sh') }}-spirv-tools-${{ steps.deps.outputs.spirv-tools }}
+
+      - name: Build Mesa (EGL + Zink + KosmicKrisp)
+        if: steps.mesa.outputs.cache-hit != 'true'
+        run: |
+          brew install meson bison molten-vk llvm spirv-llvm-translator glslang
+          installer/Mac/make-mesa.sh "$RUNNER_TEMP/mesa" "$RUNNER_TEMP/mesa-prefix"
+
+      - name: Import signing certificate
+        if: env.CAN_SIGN == 'true'
+        env:
+          MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$MACOS_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+          IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN" | grep -o '"Developer ID Application:[^"]*"' | head -n1 | tr -d '"')"
+          echo "SIGN_IDENTITY=$IDENTITY" >> "$GITHUB_ENV"
+
+      - name: Bundle engine
+        env:
+          PACKAGE_SUFFIX: ${{ inputs.package-suffix }}
+        run: MESA_PREFIX="$RUNNER_TEMP/mesa-prefix" installer/Mac/make-engine-archive.sh build dist
+
+      - name: Notarize
+        if: env.CAN_NOTARIZE == 'true' && env.SIGN_IDENTITY != ''
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          # the same signed files as in the 7z archive, which notarytool does not take
+          xcrun notarytool submit dist/engine-notarize.zip --wait \
+            --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD"
+
+      - name: Save
+        uses: actions/upload-artifact@v4
+        with:
+          name: engine-artifacts-arm64-macos-${{ inputs.package-suffix }}
+          path: dist/recoil_*.7z
+          compression-level: 0  # already compressed
