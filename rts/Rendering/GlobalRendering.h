@@ -57,6 +57,9 @@ public:
 	void SetGLTimeStamp(uint32_t queryIdx) const;
 	uint64_t CalcGLDeltaTime(uint32_t queryIdx0, uint32_t queryIdx1) const;
 
+	void CreateTracyGpuContext() const;
+	void CollectTracyGpuZones() const;
+
 	void MakeCurrentContext(bool clear) const;
 
 	void CheckGLExtensions();
