@@ -265,7 +265,7 @@ public:
 	mutable UnitDefImage* buildPic;
 	mutable std::string iconName;
 
-	int selfDCountdown;
+	float selfDCountdown; // seconds
 
 	bool builder;
 	bool activateWhenBuilt;

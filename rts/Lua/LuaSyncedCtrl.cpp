@@ -207,6 +207,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitSonarStealth);
 	REGISTER_LUA_CFUNC(SetUnitSeismicSignature);
 	REGISTER_LUA_CFUNC(SetUnitLeavesGhost);
+	REGISTER_LUA_CFUNC(SetUnitSelfDTime);
 	REGISTER_LUA_CFUNC(SetUnitAlwaysVisible);
 	REGISTER_LUA_CFUNC(SetUnitUseAirLos);
 	REGISTER_LUA_CFUNC(SetUnitMetalExtraction);
@@ -3118,6 +3119,34 @@ int LuaSyncedCtrl::SetUnitLeavesGhost(lua_State* L)
 		return 0;
 
 	unit->SetLeavesGhost(luaL_checkboolean(L, 2), luaL_optboolean(L, 3, false));
+	return 0;
+}
+
+/*** Start, restart or cancel a unit's self-destruct countdown, whether or not its unit def has `canSelfD`.
+ *
+ * @function Spring.SetUnitSelfDTime
+ * @param unitID UnitID
+ * @param seconds number? Seconds until the unit self-destructs, `nil` cancels the countdown.
+ * @return nil
+ */
+int LuaSyncedCtrl::SetUnitSelfDTime(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+
+	if (unit == nullptr)
+		return 0;
+
+	if (lua_isnoneornil(L, 2)) {
+		unit->CancelSelfD();
+		return 0;
+	}
+
+	const float seconds = luaL_checkfloat(L, 2);
+
+	if (seconds < 0.0f)
+		luaL_error(L, "[%s] seconds must not be negative", __func__);
+
+	unit->StartSelfD(seconds);
 	return 0;
 }
 

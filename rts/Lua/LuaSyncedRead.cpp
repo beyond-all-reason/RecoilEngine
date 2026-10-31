@@ -3886,7 +3886,7 @@ int LuaSyncedRead::GetUnitLeavesGhost(lua_State* L)
  *
  * @function Spring.GetUnitSelfDTime
  * @param unitID UnitID
- * @return integer? selfDTime
+ * @return number? selfDTime Seconds until the unit self-destructs, `0` if it is not counting down.
  */
 int LuaSyncedRead::GetUnitSelfDTime(lua_State* L)
 {
@@ -3894,7 +3894,7 @@ int LuaSyncedRead::GetUnitSelfDTime(lua_State* L)
 	if (unit == nullptr)
 		return 0;
 
-	lua_pushnumber(L, unit->selfDCountdown);
+	lua_pushnumber(L, unit->GetSelfDSecondsLeft());
 	return 1;
 }
 
