@@ -41,7 +41,7 @@ find_package_static(DevIL REQUIRED)
 include_directories(BEFORE lib)
 include_directories(BEFORE lib/lua/include)
 include_directories(${CMAKE_SOURCE_DIR}/include/AL)
-include_directories(${SPRING_MINIZIP_INCLUDE_DIR})
+include_directories(SYSTEM ${SPRING_MINIZIP_INCLUDE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/lib/cereal/include)
 
@@ -106,7 +106,7 @@ if    (USE_MIMALLOC)
 endif (USE_MIMALLOC)
 
 
-if(UNIX AND NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
+if(UNIX AND NOT APPLE AND NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
 	find_package_static(Libunwind 1.4.0 REQUIRED)
 	prefer_static_libs()
 	find_library(LZMA_LIBRARY lzma)

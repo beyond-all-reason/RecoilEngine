@@ -166,6 +166,7 @@
 // spring related
 #include "Rendering/GL/myGL.h"
 #include "nv_dds.h"
+#include "lib/squish/squish.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/Platform/byteorder.h"
 #include "System/Log/ILog.h"
@@ -819,6 +820,13 @@ bool CDDSImage::is_compressed() const
 		   (m_format == GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM));
 }
 
+bool CDDSImage::is_s3tc() const
+{
+	return ((m_format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) ||
+		   (m_format == GL_COMPRESSED_RGBA_S3TC_DXT3_EXT) ||
+		   (m_format == GL_COMPRESSED_RGBA_S3TC_DXT5_EXT));
+}
+
 #ifndef HEADLESS
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -943,6 +951,33 @@ bool CDDSImage::upload_texture2D(unsigned int imageIndex, int target) const
         if (alignment != -1)
             glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
     }
+
+    return true;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// uploads the base level of a compressed 2D texture as RGBA8
+bool CDDSImage::upload_texture2D_decompressed(unsigned int imageIndex, int target) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+    assert(m_valid);
+    assert(imageIndex < m_images.size());
+    assert(is_s3tc());
+
+    const CTexture &image = m_images[imageIndex];
+
+    int flags = squish::kDxt1;
+    switch (m_format) {
+        case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT: flags = squish::kDxt3; break;
+        case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT: flags = squish::kDxt5; break;
+        default: break;
+    }
+
+    std::vector<squish::u8> rgba(image.get_width() * image.get_height() * 4);
+    squish::DecompressImage(rgba.data(), image.get_width(), image.get_height(), static_cast<const unsigned char*>(image), flags);
+
+    // RGBA8 rows are always 4-byte aligned
+    glTexImage2D(target, 0, GL_RGBA8, image.get_width(), image.get_height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
 
     return true;
 }
@@ -1260,37 +1295,19 @@ void CDDSImage::flip_dxt5_alpha(DXT5AlphaBlock *block) const
     bits >>= 3;
     gBits[3][3] = (unsigned char)(bits & mask);
 
-    memset(block->row, 0, sizeof(unsigned char) * 6);
+    // The packed rows are unaligned 24-bit groups. A fourth byte at row[3]
+    // belongs to the next block (or lies beyond the final BC4/BC5 block).
+    bits = (gBits[3][0] << 0)  | (gBits[3][1] << 3)
+         | (gBits[3][2] << 6)  | (gBits[3][3] << 9)
+         | (gBits[2][0] << 12) | (gBits[2][1] << 15)
+         | (gBits[2][2] << 18) | (gBits[2][3] << 21);
+    memcpy(&block->row[0], &bits, sizeof(unsigned char) * 3);
 
-    unsigned int *pBits = ((unsigned int*) &(block->row[0]));
-
-    *pBits = *pBits | (gBits[3][0] << 0);
-    *pBits = *pBits | (gBits[3][1] << 3);
-    *pBits = *pBits | (gBits[3][2] << 6);
-    *pBits = *pBits | (gBits[3][3] << 9);
-
-    *pBits = *pBits | (gBits[2][0] << 12);
-    *pBits = *pBits | (gBits[2][1] << 15);
-    *pBits = *pBits | (gBits[2][2] << 18);
-    *pBits = *pBits | (gBits[2][3] << 21);
-
-    pBits = ((unsigned int*) &(block->row[3]));
-
-#ifdef MACOS
-    *pBits &= 0x000000ff;
-#else
-    *pBits &= 0xff000000;
-#endif
-
-    *pBits = *pBits | (gBits[1][0] << 0);
-    *pBits = *pBits | (gBits[1][1] << 3);
-    *pBits = *pBits | (gBits[1][2] << 6);
-    *pBits = *pBits | (gBits[1][3] << 9);
-
-    *pBits = *pBits | (gBits[0][0] << 12);
-    *pBits = *pBits | (gBits[0][1] << 15);
-    *pBits = *pBits | (gBits[0][2] << 18);
-    *pBits = *pBits | (gBits[0][3] << 21);
+    bits = (gBits[1][0] << 0)  | (gBits[1][1] << 3)
+         | (gBits[1][2] << 6)  | (gBits[1][3] << 9)
+         | (gBits[0][0] << 12) | (gBits[0][1] << 15)
+         | (gBits[0][2] << 18) | (gBits[0][3] << 21);
+    memcpy(&block->row[3], &bits, sizeof(unsigned char) * 3);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

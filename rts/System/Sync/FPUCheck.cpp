@@ -80,7 +80,7 @@ MaskRsvd:    0    0    0  1  1  1  1  1|   0    0   1  1  1  1  1  1 = 0x1F3F
 
 	Source: Intel Architecture Software Development Manual, Volume 1, Basic Architecture
 
-TODO: NEON VERSION
+For NEON, verify the rounding and flush-to-zero bits controlled by streflop.
 */
 
 void good_fpu_control_registers(const char* text)
@@ -118,6 +118,24 @@ void good_fpu_control_registers(const char* text)
 		LOG_L(L_WARNING, "[%s] Sync warning: (env.x87_mode) FPUCW 0x%04X instead of 0x%04X or 0x%04X (\"%s\")", __func__, x87_flag, x87_a, x87_b, text);
 
 		// Set single precision floating point math.
+		streflop::streflop_init<streflop::Simple>();
+		#if defined(__SUPPORT_SNAN__)
+		streflop::feraiseexcept(streflop::FPU_Exceptions(streflop::FE_INVALID | streflop::FE_DIVBYZERO | streflop::FE_OVERFLOW));
+		#endif
+	}
+
+	#elif defined(STREFLOP_NEON)
+	// Match the control bits streflop_init<Simple>() sets on AArch64. Other
+	// FPCR fields are preserved by upstream streflop and are outside this check.
+	constexpr uint64_t fpcrMask = uint64_t(streflop::FE_ROUND_MASK) | uint64_t(streflop::FE_FLUSH_TO_ZERO);
+	#if defined(STREFLOP_NO_DENORMALS)
+	constexpr uint64_t expectedFpcr = uint64_t(streflop::FE_TONEAREST) | uint64_t(streflop::FE_FLUSH_TO_ZERO);
+	#else
+	constexpr uint64_t expectedFpcr = streflop::FE_TONEAREST;
+	#endif
+	const uint64_t fpcrFlag = fenv.fpcr & fpcrMask;
+	if (fpcrFlag != expectedFpcr) {
+		LOG_L(L_WARNING, "[%s] Sync warning: FPCR controlled bits 0x%08llX instead of 0x%08llX (\"%s\")", __func__, (unsigned long long)fpcrFlag, (unsigned long long)expectedFpcr, text);
 		streflop::streflop_init<streflop::Simple>();
 		#if defined(__SUPPORT_SNAN__)
 		streflop::feraiseexcept(streflop::FPU_Exceptions(streflop::FE_INVALID | streflop::FE_DIVBYZERO | streflop::FE_OVERFLOW));
@@ -170,7 +188,7 @@ void good_fpu_init()
 	if (sseFlag == 0)
 		throw unsupported_error("CPU is missing SSE 1.0 instruction support");
 	#elif (defined(STREFLOP_NEON))
-	LOG("\tStreflop NEON mode, FPCR verification active");
+	LOG("\tStreflop NEON mode, FPCR rounding/flush-to-zero verification active");
 	{
 		streflop::fpenv_t fenv;
 		streflop::fegetenv(&fenv);

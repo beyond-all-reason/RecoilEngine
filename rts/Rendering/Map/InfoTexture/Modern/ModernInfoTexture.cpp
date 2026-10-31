@@ -22,6 +22,16 @@ bool CModernInfoTexture::CreateFBO(const char* fboName)
 	return status;
 }
 
+void CModernInfoTexture::UploadThroughPBO(const GL::Texture2D& tex, PBO& pbo, const void* data, size_t size) const
+{
+	// a re-specified unpack buffer lets the driver upload asynchronously instead of
+	// waiting for the GPU to release the texture, which was used by the previous frame
+	pbo.Bind();
+	pbo.New(size, GL_STREAM_DRAW, data);
+	tex.UploadImage(nullptr);
+	pbo.Unbind();
+}
+
 void CModernInfoTexture::RunFullScreenPass()
 {
 	fbo.Bind();

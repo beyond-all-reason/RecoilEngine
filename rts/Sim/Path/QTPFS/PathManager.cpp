@@ -202,8 +202,11 @@ QTPFS::PathManager::~PathManager() {
 	RequestPathInternalSystem::Shutdown();
 	RequeuePathsSystem::Shutdown();
 	PathSpeedModInfoSystem::Shutdown();
-	RemoveDeadPathsSystem::Shutdown();
-	SyncUpdatedPathsSystem::Shutdown();
+	// A load failure can destroy this manager before Load creates these systems
+	if (systemGlobals.IsSystemActive<RemoveDeadPathsComponent>())
+		RemoveDeadPathsSystem::Shutdown();
+	if (systemGlobals.IsSystemActive<SyncUpdatedPathsComponent>())
+		SyncUpdatedPathsSystem::Shutdown();
 
 	// print out and clear anything still left in the registry
 	// due to delayed path deletion there may be some entities still around.
