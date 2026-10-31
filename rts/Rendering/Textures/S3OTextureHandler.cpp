@@ -138,6 +138,20 @@ unsigned int CS3OTextureHandler::LoadAndCacheTexture(
 	if (textureIt != textureCache.end() && textureIt->second.texID > 0)
 		return textureIt->second.texID;
 
+#ifdef HEADLESS
+	// nothing is drawn, so do not decode the file, only report if it is missing
+	if (textureIt == textureCache.end()) {
+		const bool found = CFileHandler::FileExists(textureName, SPRING_VFS_RAW_FIRST) || CFileHandler::FileExists("unittextures/" + textureName, SPRING_VFS_RAW_FIRST);
+
+		if (texNum == 0 && !found)
+			LOG_L(L_WARNING, "[%s] could not load primary texture \"%s\" from model \"%s\"", __func__, textureName.c_str(), model->name.c_str());
+
+		textureCache[textureName] = {0, 1, 1, invertAxis, invertAlpha};
+	}
+
+	return 0;
+#endif
+
 	const auto bitmapIt = bitmapCache.find(textureName);
 
 	if (bitmapIt != bitmapCache.end()) {
