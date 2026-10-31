@@ -390,7 +390,8 @@ bool LuaFBOs::ApplyAttachment(
 	if (!lua_istable(L, index))
 		return AttachObject(__func__, L, index, fbo, attachID);
 
-	const int table = (index < 0) ? index : (lua_gettop(L) + index + 1);
+	// meta_newindex passes 3, CreateFBO passes -1; the lua_rawgeti calls below push
+	const int table = lua_absindex(L, index);
 
 	GLenum target = 0;
 	GLint  level  = 0;
