@@ -556,6 +556,25 @@ endif()
 	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/lua/include)
 
 ################################################################################
+### LuaAbsIndex
+	set(test_name LuaAbsIndex)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testLuaAbsIndex.cpp"
+			"${ENGINE_SOURCE_DIR}/Lua/LuaMemPool.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+	set(test_libs
+			lua
+			headlessStubs
+			smmalloc
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/lua/include)
+
+################################################################################
 ### MemPoolTypes
 	set(test_name MemPoolTypes)
 	set(test_src
