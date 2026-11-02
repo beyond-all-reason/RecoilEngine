@@ -704,16 +704,16 @@ void CUnit::CancelSelfD()
 	if (selfDTargetFrame <= 0)
 		return;
 
-	const float secondsLeft = GetSelfDSecondsLeft();
+	const float secondsLeft = *GetSelfDSecondsLeft();
 
 	selfDTargetFrame = 0;
 	eventHandler.UnitSelfDestructCancelled(this, secondsLeft);
 }
 
-float CUnit::GetSelfDSecondsLeft() const
+std::optional<float> CUnit::GetSelfDSecondsLeft() const
 {
 	if (selfDTargetFrame <= 0)
-		return 0.0f;
+		return std::nullopt;
 
 	return std::max(0, selfDTargetFrame - gs->frameNum) * INV_GAME_SPEED;
 }

@@ -3,6 +3,7 @@
 #ifndef UNIT_H
 #define UNIT_H
 
+#include <optional>
 #include <vector>
 
 #include "Sim/Objects/SolidObject.h"
@@ -237,7 +238,7 @@ public:
 
 	void StartSelfD(float seconds);
 	void CancelSelfD();
-	float GetSelfDSecondsLeft() const;
+	std::optional<float> GetSelfDSecondsLeft() const;
 	virtual void IncomingMissile(CMissileProjectile* missile);
 	CFeature* CreateWreck(int wreckLevel, int smokeTime);
 
