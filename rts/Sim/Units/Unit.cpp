@@ -76,8 +76,6 @@
 
 #include "System/Misc/TracyDefs.h"
 
-#include <limits>
-
 GlobalUnitParams globalUnitParams;
 
 // See end of source for member bindings
@@ -693,10 +691,8 @@ void CUnit::Update()
 
 void CUnit::StartSelfD(float seconds)
 {
-	// clamped so neither the cast nor the target frame can overflow
-	const int maxFrames = std::numeric_limits<int>::max() - gs->frameNum;
-	const float wantedFrames = math::ceil(std::max(0.0f, seconds) * GAME_SPEED);
-	const int frames = (wantedFrames < static_cast<float>(maxFrames)) ? std::min(static_cast<int>(wantedFrames), maxFrames) : maxFrames;
+	assert(seconds >= 0.0f);
+	const int frames = static_cast<int>(math::ceil(seconds * GAME_SPEED));
 
 	// 0 means inactive, which only frame 0 could produce
 	selfDTargetFrame = std::max(1, gs->frameNum + frames);

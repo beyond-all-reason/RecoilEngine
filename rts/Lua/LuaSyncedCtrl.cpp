@@ -3143,7 +3143,7 @@ int LuaSyncedCtrl::SetUnitSelfDTime(lua_State* L)
 
 	const float seconds = luaL_checkfloat(L, 2);
 
-	if (seconds < 0.0f)
+	if (!(seconds >= 0.0f))
 		luaL_error(L, "[%s] seconds must not be negative", __func__);
 
 	unit->StartSelfD(seconds);
