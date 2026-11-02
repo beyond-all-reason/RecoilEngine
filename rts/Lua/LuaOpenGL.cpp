@@ -6578,7 +6578,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w 1
  * @param h 1
- * @param format integer? (Default: `GL.RGBA`)
+ * @param format GL? (Default: `GL.RGBA`)
  * @return number ... Color value (color size based on format).
  */
 /***
@@ -6588,7 +6588,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w 1
  * @param h integer
- * @param format integer? (Default: `GL.RGBA`)
+ * @param format GL? (Default: `GL.RGBA`)
  * @return (number|number[])[] colors Column of color values (color size based on format), indexed by row.
  */
 /***
@@ -6598,7 +6598,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w integer
  * @param h 1
- * @param format integer? (Default: `GL.RGBA`)
+ * @param format GL? (Default: `GL.RGBA`)
  * @return (number|number[])[] colors Row of color values (color size based on format), indexed by column.
  */
 /***
@@ -6608,7 +6608,7 @@ static void PushPixelData(lua_State* L, int fSize, const float*& data)
  * @param y integer
  * @param w integer
  * @param h integer
- * @param format integer? (Default: `GL.RGBA`)
+ * @param format GL? (Default: `GL.RGBA`)
  * @return (number|number[])[][] colors Array of rows of color values (color size based on format), bottom row first: `colors[y][x]`.
  */
 int LuaOpenGL::ReadPixels(lua_State* L)
