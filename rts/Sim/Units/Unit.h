@@ -238,6 +238,7 @@ public:
 
 	void StartSelfD(float seconds);
 	void CancelSelfD();
+	void FinishSelfD();
 	std::optional<float> GetSelfDSecondsLeft() const;
 	virtual void IncomingMissile(CMissileProjectile* missile);
 	CFeature* CreateWreck(int wreckLevel, int smokeTime);

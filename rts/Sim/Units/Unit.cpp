@@ -683,10 +683,15 @@ void CUnit::Update()
 		if (IsStunned()) {
 			++selfDTargetFrame;
 		} else if (gs->frameNum >= selfDTargetFrame) {
-			// avoid unfinished buildings making an explosion
-			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
+			FinishSelfD();
 		}
 	}
+}
+
+void CUnit::FinishSelfD()
+{
+	// avoid unfinished buildings making an explosion
+	KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
 }
 
 void CUnit::StartSelfD(float seconds)

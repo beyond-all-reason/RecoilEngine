@@ -3126,7 +3126,7 @@ int LuaSyncedCtrl::SetUnitLeavesGhost(lua_State* L)
  *
  * @function Spring.SetUnitSelfDTime
  * @param unitID UnitID
- * @param seconds number? Seconds until the unit self-destructs, `nil` cancels the countdown.
+ * @param seconds number? Seconds until the unit self-destructs, `nil` cancels the countdown. `0` self-destructs it during this call unless it is stunned.
  * @return nil
  */
 int LuaSyncedCtrl::SetUnitSelfDTime(lua_State* L)
@@ -3147,6 +3147,18 @@ int LuaSyncedCtrl::SetUnitSelfDTime(lua_State* L)
 		luaL_error(L, "[%s] seconds must not be negative", __func__);
 
 	unit->StartSelfD(seconds);
+
+	if (seconds > 0.0f || unit->IsStunned())
+		return 0;
+
+	if (inDestroyUnit >= MAX_CMD_RECURSION_DEPTH)
+		luaL_error(L, "[%s] recursion is not permitted, max depth: %d", __func__, MAX_CMD_RECURSION_DEPTH);
+
+	inDestroyUnit++;
+	ASSERT_SYNCED(unit->id);
+	unit->FinishSelfD();
+	inDestroyUnit--;
+
 	return 0;
 }
 
