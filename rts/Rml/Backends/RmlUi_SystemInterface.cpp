@@ -36,6 +36,10 @@
 #include <System/Log/ILog.h>
 #include <System/Misc/SpringTime.h>
 
+#ifdef __APPLE__
+#include <System/Platform/Mac/Keyboard.h>
+#endif
+
 RmlSystemInterface::RmlSystemInterface()
 {
 }
@@ -363,6 +367,9 @@ int RmlSDLRecoil::ConvertMouseButton(int button)
 int RmlSDLRecoil::GetKeyModifierState()
 {
 	SDL_Keymod sdl_mods = SDL_GetModState();
+#ifdef __APPLE__
+	sdl_mods = MacKeyboard::TranslateMods(sdl_mods);
+#endif
 
 	int retval = 0;
 

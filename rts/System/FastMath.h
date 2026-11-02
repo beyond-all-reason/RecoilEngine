@@ -8,6 +8,14 @@
 
 // Tell streflop_cond.h not to define math::sqrt(float) - we'll provide a faster one
 #define MATH_SQRT_OVERRIDE 1
+// streflop_cond.h includes this header back, and on macOS its std::hypot
+// fallback uses math::sqrtf before our definition below is reached (a circular
+// include). Provide an early declaration so that fallback resolves; the real
+// (faster) definition still follows further down.
+#ifdef __APPLE__
+#include <cmath>
+namespace math { inline float sqrtf(float x) { return std::sqrt(x); } }
+#endif
 #include "lib/streflop/streflop_cond.h"
 #include "System/MainDefines.h"
 #include "System/MathConstants.h"

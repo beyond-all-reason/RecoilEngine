@@ -176,3 +176,6 @@ build-*
 .kilo
 
 /.i-understand-git-submodules.txt
+
+# macOS Finder metadata, written into any directory it browses
+.DS_Store

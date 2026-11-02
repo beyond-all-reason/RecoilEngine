@@ -3,6 +3,7 @@
 #include <string>
 
 #include "VerticalSync.h"
+#include "Rendering/GL/MacEGLBridge.h"
 #include "GL/myGL.h"
 #include "System/SpringMath.h"
 #include "System/Config/ConfigHandler.h"
@@ -70,6 +71,14 @@ void CVerticalSync::SetInterval(int i)
 
 	#if defined HEADLESS
 	return;
+	#endif
+
+	#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if (MacEGLBridge::Active()) {
+		MacEGLBridge::SetSwapInterval(interval);
+		LOG("[VSync::%s] interval=%d (Mesa EGL bridge)", __func__, interval);
+		return;
+	}
 	#endif
 
 	// adaptive (delay swap iff frame-rate > vblank-rate)

@@ -1,0 +1,37 @@
+Subject: [PATCH] gallium/tc: do not carry an ended renderpass into the next batch
+
+If the call that ends a renderpass is the last one to fit in a batch, the
+batch flush copies the ended info into the next batch and clears end_call.
+The next draw makes the recording thread advance to a new info because the
+info is marked ended. The driver thread only advances after executing
+end_call, so it stays one info behind for the rest of that batch.
+
+Each renderpass in that batch then sees the info of the one before it. In
+Recoil, an MSAA RmlUi layer loses its resolve and the following pass to the
+window-system framebuffer inherits it. The single-sampled BGRA framebuffer is
+then resolved into the texture that pass is sampling, which shows blocks of
+the image flipped with red and blue swapped.
+
+Only copy the info when the ending call has not been recorded yet.
+---
+ src/gallium/auxiliary/util/u_threaded_context.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/gallium/auxiliary/util/u_threaded_context.c b/src/gallium/auxiliary/util/u_threaded_context.c
+--- a/src/gallium/auxiliary/util/u_threaded_context.c
++++ b/src/gallium/auxiliary/util/u_threaded_context.c
+@@ -280,6 +280,13 @@ tc_batch_increment_renderpass_info(struct threaded_context *tc, unsigned batch_idx, bool full_copy)
+    batch->renderpass_info_idx++;
+    tc_batch_renderpass_infos_resize(tc, batch);
+    tc_info = batch->renderpass_infos.data;
+
++   /* the call that ended the renderpass is in the batch being flushed: nothing in the next batch
++    * continues that renderpass, and the driver only advances past an ended info at its end_call
++    */
++   if (full_copy && tc->renderpass_info_recording &&
++       tc_batch_rp_info(tc->renderpass_info_recording)->end_call)
++      full_copy = false;
++
+    if (full_copy) {
+       /* this should only be called when changing batches */
+       assert(batch->renderpass_info_idx == 0);
