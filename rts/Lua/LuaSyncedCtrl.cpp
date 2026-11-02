@@ -3124,6 +3124,8 @@ int LuaSyncedCtrl::SetUnitLeavesGhost(lua_State* L)
 
 /*** Start, restart or cancel a unit's self-destruct countdown, whether or not its unit def has `canSelfD`.
  *
+ * Restarting a running countdown sends `UnitSelfDestructStarted` again.
+ *
  * @function Spring.SetUnitSelfDTime
  * @param unitID UnitID
  * @param seconds number? Seconds until the unit self-destructs, `nil` cancels the countdown. `0` self-destructs it during this call unless it is stunned.
