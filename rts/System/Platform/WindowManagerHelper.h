@@ -37,6 +37,19 @@ namespace WindowManagerHelper {
 	 * @brief returns the window-state of the given window in SDL_GetWindowFlags() format
 	 */
 	void SetWindowResizable(SDL_Window* window, bool resizable);
+
+	/**
+	 * @brief moves the window behind all other windows without activating it
+	 * (BackgroundWindow); a window shown without activation still opens on top
+	 */
+	void LowerWindow(SDL_Window* window);
+
+	/**
+	 * @brief stops the OS from replacing a hung window by a "Not Responding" ghost
+	 * window (BackgroundWindow); on Windows the ghost is activated like a normal
+	 * window and takes the keyboard focus. Only Windows has ghosting.
+	 */
+	void DisableWindowGhosting();
 };
 
 #endif // WINDOW_MANAGER_HELPER_H

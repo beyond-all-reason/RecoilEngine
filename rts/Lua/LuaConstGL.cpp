@@ -507,6 +507,12 @@ bool LuaConstGL::PushEntries(lua_State* L)
 	/*** @field GL.TEXTURE_2D_MULTISAMPLE integer */
 	PUSH_GL(TEXTURE_2D_MULTISAMPLE);
 
+	//Pixel formats (the format argument of gl.ReadPixels)
+	/*** @field GL.RED integer */
+	PUSH_GL(RED);
+	/*** @field GL.RG integer */
+	PUSH_GL(RG);
+
 	//Image formats
 	/*** @field GL.RGBA32F integer */
 	PUSH_GL(RGBA32F);

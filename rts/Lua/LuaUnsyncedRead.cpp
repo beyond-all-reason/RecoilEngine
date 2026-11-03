@@ -40,6 +40,7 @@
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/Env/IWater.h"
+#include "Rendering/Env/CubeMapHandler.h"
 #include "Rendering/Env/IGroundDecalDrawer.h"
 #include "Rendering/Env/Particles/Classes/NanoProjectile.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
@@ -208,6 +209,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(HaveShadows);
 	REGISTER_LUA_CFUNC(HaveAdvShading);
 	REGISTER_LUA_CFUNC(GetWaterMode);
+	REGISTER_LUA_CFUNC(GetPBREnvironmentInfo);
 	REGISTER_LUA_CFUNC(GetMapDrawMode);
 	REGISTER_LUA_CFUNC(GetMapSquareTexture);
 
@@ -2833,6 +2835,54 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
 	lua_pushnumber(L, water->GetID());
 	lua_pushstring(L, IWater::GetWaterName(water->GetID()));
 	return 2;
+}
+
+
+/***
+ * Returns the state of the atomically published PBR environment resources.
+ * A consumer must require `ready == true`, `pending == false`, and matching
+ * requested/active revisions before using a capture as validation evidence.
+ * Revisions only ever increase. `captureMode`, `anchor`, `content` and
+ * `filter` are the values in effect; the `requested*` fields echo the
+ * persisted settings and `fallback` explains every substitution. The comma-
+ * separated `compiledFilters` and `availableFilters` list build and build/GPU
+ * choices, respectively, so a pruned build can grey out unavailable filters.
+ * `transfer` names how captured legacy content was converted to scene-linear.
+ * `captureGpuMilliseconds` (all six faces) and `filterGpuMilliseconds` are
+ * GPU timestamp measurements of the last completed epoch, or -1 if unknown.
+ *
+ * @function Spring.GetPBREnvironmentInfo
+ * @return table environmentInfo
+ */
+int LuaUnsyncedRead::GetPBREnvironmentInfo(lua_State* L)
+{
+	const PBREnvironmentInfo info = cubeMapHandler.GetPBREnvironmentInfo();
+	lua_createtable(L, 0, 25);
+	LuaPushNamedNumber(L, "requestedRevision", info.requestedRevision);
+	LuaPushNamedNumber(L, "activeRevision", info.activeRevision);
+	LuaPushNamedNumber(L, "environmentSize", info.environmentSize);
+	LuaPushNamedNumber(L, "irradianceSize", info.irradianceSize);
+	LuaPushNamedNumber(L, "specularSize", info.specularSize);
+	LuaPushNamedNumber(L, "specularMipCount", info.specularMipCount);
+	LuaPushNamedBool(L, "enabled", info.enabled);
+	LuaPushNamedBool(L, "ready", info.ready);
+	LuaPushNamedBool(L, "pending", info.pending);
+	LuaPushNamedString(L, "captureMode", info.captureMode);
+	LuaPushNamedString(L, "anchor", info.anchor);
+	LuaPushNamedString(L, "content", info.content);
+	LuaPushNamedString(L, "filter", info.filter);
+	LuaPushNamedString(L, "requestedCaptureMode", info.requestedCaptureMode);
+	LuaPushNamedString(L, "requestedAnchor", info.requestedAnchor);
+	LuaPushNamedString(L, "requestedContent", info.requestedContent);
+	LuaPushNamedString(L, "requestedFilter", info.requestedFilter);
+	LuaPushNamedString(L, "compiledFilters", info.compiledFilters);
+	LuaPushNamedString(L, "availableFilters", info.availableFilters);
+	LuaPushNamedString(L, "transfer", info.transfer);
+	LuaPushNamedString(L, "fallback", info.fallback);
+	LuaPushNamedString(L, "failure", info.failure);
+	LuaPushNamedNumber(L, "captureGpuMilliseconds", info.captureGpuMilliseconds);
+	LuaPushNamedNumber(L, "filterGpuMilliseconds", info.filterGpuMilliseconds);
+	return 1;
 }
 
 

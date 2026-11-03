@@ -1,0 +1,61 @@
+[game]
+{
+	gametype=Beyond All Reason $VERSION;
+	mapname=Onyx Cauldron 2.2.2;
+	ishost=1;
+	hostip=127.0.0.1;
+	hostport=0;
+	myplayername=Player;
+	startpostype=2;
+	gamestartdelay=5;
+	numplayers=1;
+	numusers=2;
+	nohelperais=0;
+	[player0]
+	{
+		name=Player;
+		team=0;
+		rank=0;
+		isfromdemo=0;
+	}
+	[ai0]
+	{
+		name=SimpleAI(1);
+		shortname=SimpleAI;
+		team=1;
+		host=0;
+		isfromdemo=0;
+	}
+	[team0]
+	{
+		teamleader=0;
+		allyteam=0;
+		side=Armada;
+		rgbcolor=0.1 0.4 1;
+		handicap=0;
+	}
+	[team1]
+	{
+		teamleader=0;
+		allyteam=1;
+		side=Random;
+		rgbcolor=1 0.55 0;
+		handicap=0;
+	}
+	[allyteam0]
+	{
+		numallies=0;
+		startrectleft=0.125;
+		startrectright=0.275;
+		startrecttop=0.125;
+		startrectbottom=0.275;
+	}
+	[allyteam1]
+	{
+		numallies=0;
+		startrectleft=0.725;
+		startrectright=0.875;
+		startrecttop=0.725;
+		startrectbottom=0.875;
+	}
+}

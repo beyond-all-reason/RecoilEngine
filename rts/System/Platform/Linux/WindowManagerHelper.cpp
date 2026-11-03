@@ -103,4 +103,22 @@ void SetWindowResizable(SDL_Window* window, bool resizable)
 	// Probably not needed
 }
 
+void LowerWindow(SDL_Window* window)
+{
+#ifndef HEADLESS
+	SDL_SysWMinfo info;
+	SDL_VERSION(&info.version);
+	if (!SDL_GetWindowWMInfo(window, &info) || info.subsystem != SDL_SYSWM_X11)
+		return;
+
+	XLowerWindow(info.info.x11.display, info.info.x11.window);
+	XFlush(info.info.x11.display);
+#endif
+}
+
+void DisableWindowGhosting()
+{
+	// no ghost windows on X11
+}
+
 }; // namespace WindowManagerHelper

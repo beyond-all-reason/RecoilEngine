@@ -130,6 +130,7 @@ DEFINE_bool_EX  (gen_fontconfig,     "gen-fontconfig",     false, "Generate font
 DEFINE_bool     (fullscreen,                               false, "Run in fullscreen mode");
 DEFINE_bool     (window,                                   false, "Run in windowed mode");
 DEFINE_bool     (hidden,                                   false, "Start in background (minimised, no taskbar entry)");
+DEFINE_bool_EX  (background_window,  "background-window",  false, "Run in the background for unattended tests: open the window without focus and behind other windows, never minimize it, no fullscreen (sets BackgroundWindow=1 for this run only)");
 DEFINE_bool     (nocolor,                                  false, "Disables colorized stdout");
 DEFINE_string   (server,                                   "",    "Set listening IP for server");
 DEFINE_bool     (textureatlas,                             false, "Dump each finalized textureatlas in textureatlasN.tga");
@@ -588,6 +589,10 @@ void SpringApp::ParseCmdLine(int argc, char* argv[])
 	// logOutput's init depends on configHandler
 	FileSystemInitializer::PreInitializeConfigHandler(FLAGS_config, FLAGS_name, FLAGS_safemode);
 	FileSystemInitializer::InitializeLogOutput();
+
+	// overlay: applies to this run only and is not written to the config file
+	if (FLAGS_background_window)
+		configHandler->Set("BackgroundWindow", true, true);
 }
 
 

@@ -145,6 +145,10 @@ bool GL::GeometryBuffer::Create(const int2 size) {
 
 			bufferAttachments[n] = GL_DEPTH_ATTACHMENT_EXT;
 		} else {
+			// Legacy G-buffer color slots are byte-sized (RGBA8 for MSAA).
+			// A full-world HDR scene or PBR material buffer needs separately
+			// specified float attachments; changing this one allocation is not
+			// a compatible upgrade of the existing packed channel contract.
 			if (texTarget == GL_TEXTURE_2D)
 				glTexImage2D(texTarget, 0, GL_RGBA, size.x, size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 			else
