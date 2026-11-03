@@ -7,7 +7,6 @@
 #include "UnitDefHandler.h"
 #include "UnitMemPool.h"
 #include "UnitTypes/Builder.h"
-#include "UnitTypes/ExtractorBuilding.h"
 #include "UnitTypes/Factory.h"
 
 #include "CommandAI/BuilderCAI.h"
@@ -72,21 +71,9 @@ CUnit* CUnitHandler::NewUnit(const UnitDef* ud)
 	if (ud->IsFactoryUnit())
 		return (unitMemPool.alloc<CFactory>());
 
-	// all other types of non-structure "builders", including hubs and
-	// nano-towers (the latter should not have any build-options at all,
-	// whereas the former should be unable to build any mobile units)
 	if (ud->IsMobileBuilderUnit() || ud->IsStaticBuilderUnit())
 		return (unitMemPool.alloc<CBuilder>());
 
-	// static non-builder structures
-	if (ud->IsBuildingUnit()) {
-		if (ud->IsExtractorUnit())
-			return (unitMemPool.alloc<CExtractorBuilding>());
-
-		return (unitMemPool.alloc<CBuilding>());
-	}
-
-	// regular mobile unit
 	return (unitMemPool.alloc<CUnit>());
 }
 
