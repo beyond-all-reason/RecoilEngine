@@ -2519,10 +2519,9 @@ static bool PushVisibleUnits(
 	const std::vector<CUnit*>& defUnits,
 	int unitDefID,
 	unsigned int* unitCount,
-	unsigned int* defCount
+	unsigned int* defCount,
+	bool createdTable = false
 ) {
-	bool createdTable = false;
-
 	for (const CUnit* unit: defUnits) {
 		if (!LuaUtils::IsUnitVisible(L, unit))
 			continue;
@@ -2598,6 +2597,7 @@ int LuaSyncedRead::GetTeamUnitsSorted(lua_State* L)
 			lua_pushnumber(L, i + 1);
 			lua_createtable(L, unitsByDef.size(), 0);
 			defCount++;
+			unitCount = 1;
 
 			for (const CUnit* unit: unitsByDef) {
 				lua_pushnumber(L, unit->id);
@@ -2619,6 +2619,7 @@ int LuaSyncedRead::GetTeamUnitsSorted(lua_State* L)
 			if (ud->decoyDef != nullptr)
 				continue;
 
+			unitCount = 1;
 			bool createdTable = PushVisibleUnits(L, unitHandler.GetUnitsByTeamAndDef(teamID, unitDefID), unitDefID, &unitCount, &defCount);
 
 			// for all decoy-defs of unitDefID, add decoy units under the same ID
@@ -2627,7 +2628,7 @@ int LuaSyncedRead::GetTeamUnitsSorted(lua_State* L)
 
 			if (decoyMapIt != decoyMap.end()) {
 				for (int decoyDefID: decoyMapIt->second) {
-					createdTable |= PushVisibleUnits(L, unitHandler.GetUnitsByTeamAndDef(teamID, decoyDefID), unitDefID, &unitCount, &defCount);
+					createdTable = PushVisibleUnits(L, unitHandler.GetUnitsByTeamAndDef(teamID, decoyDefID), unitDefID, &unitCount, &defCount, createdTable);
 				}
 			}
 
