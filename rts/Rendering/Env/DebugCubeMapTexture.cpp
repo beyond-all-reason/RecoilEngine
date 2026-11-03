@@ -9,16 +9,41 @@
 
 DebugCubeMapTexture::DebugCubeMapTexture()
 	: texId(0)
+	, usesFile(false) // plain colours until /DebugCubeMap file asks for the labelled testsky.dds
 	, vao()
 {
 #ifndef HEADLESS
-	glGenTextures(1, &texId);
+	CreateTexture(usesFile);
+
+	shader = shaderHandler->CreateProgramObject("[DebugCubeMap]", "DebugCubeMap");
+	shader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/CubeMapVS.glsl", "", GL_VERTEX_SHADER));
+	shader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/CubeMapFS.glsl", "", GL_FRAGMENT_SHADER));
+	shader->Link();
+	shader->Enable();
+	shader->SetUniform("uvFlip", 1.0f, -1.0f, 1.0f);
+	shader->SetUniform("skybox", 0);
+	shader->Disable();
+	shader->Validate();
+#endif
+}
+
+void DebugCubeMapTexture::CreateTexture(bool wantFile)
+{
+#ifndef HEADLESS
+	// the old texture is replaced; a sky box borrowing it must be rebuilt afterwards (ISky::SetSky)
+	if (texId != 0) {
+		glDeleteTextures(1, &texId);
+		texId = 0;
+	}
 
 	static constexpr const char* texture = "bitmaps/testsky.dds";
 
 	CBitmap btex;
-	if (!btex.Load(texture) || btex.textype != GL_TEXTURE_CUBE_MAP) {
-		LOG_L(L_WARNING, "[DebugCubeMapTexture] could not load debug skybox texture from file %s, using fallback colors", texture);
+	usesFile = wantFile && btex.Load(texture) && btex.textype == GL_TEXTURE_CUBE_MAP;
+
+	if (!usesFile) {
+		if (wantFile)
+			LOG_L(L_WARNING, "[DebugCubeMapTexture] could not load debug skybox texture from file %s, using fallback colors", texture);
 
 		// match testsky.dds colors
 		static constexpr const SColor debugFaceColors[] = {
@@ -36,6 +61,7 @@ DebugCubeMapTexture::DebugCubeMapTexture()
 
 		dims = { FALLBACK_DIM, FALLBACK_DIM };
 
+		glGenTextures(1, &texId);
 		glEnable(GL_TEXTURE_CUBE_MAP);
 		glBindTexture(GL_TEXTURE_CUBE_MAP, texId);
 		for (GLenum glFace = GL_TEXTURE_CUBE_MAP_POSITIVE_X; glFace <= GL_TEXTURE_CUBE_MAP_NEGATIVE_Z; ++glFace) {
@@ -57,17 +83,13 @@ DebugCubeMapTexture::DebugCubeMapTexture()
 	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 	glDisable(GL_TEXTURE_CUBE_MAP);
-
-	shader = shaderHandler->CreateProgramObject("[DebugCubeMap]", "DebugCubeMap");
-	shader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/CubeMapVS.glsl", "", GL_VERTEX_SHADER));
-	shader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/CubeMapFS.glsl", "", GL_FRAGMENT_SHADER));
-	shader->Link();
-	shader->Enable();
-	shader->SetUniform("uvFlip", 1.0f, -1.0f, 1.0f);
-	shader->SetUniform("skybox", 0);
-	shader->Disable();
-	shader->Validate();
 #endif
+}
+
+bool DebugCubeMapTexture::SetUseFile(bool useFile)
+{
+	CreateTexture(useFile);
+	return usesFile;
 }
 
 DebugCubeMapTexture::~DebugCubeMapTexture()
