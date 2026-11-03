@@ -50,6 +50,9 @@ static inline void glColorf4(const float4& v)     { glColor4f(v.r, v.g, v.b, v.a
 static inline void glTranslatef3(const float3& v) { glTranslatef(v.r, v.g, v.b); }
 static inline void glColorf4(const float3& v, const float alpha) { glColor4f(v.r, v.g, v.b, alpha); }
 
+// timer queries are core since OpenGL 3.3, older contexts need ARB_timer_query
+static inline bool GLTimerQueriesSupported() { return GLAD_GL_VERSION_3_3 || GLAD_GL_ARB_timer_query; }
+
 typedef   void   (*   glOrthoFuncPtr) (GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdouble near, GLdouble far);
 typedef   void   (*gluOrtho2DFuncPtr) (GLdouble left, GLdouble right, GLdouble bottom, GLdouble top);
 typedef   void   (* glFrustumFuncPtr) (GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdouble near, GLdouble far);
