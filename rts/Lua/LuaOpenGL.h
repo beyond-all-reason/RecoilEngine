@@ -165,6 +165,8 @@ class LuaOpenGL {
 	private:
 		static void CheckDrawingEnabled(lua_State* L, const char* caller);
 		static void CondWarnDeprecatedGL(lua_State* L, const char* caller);
+		static void WarnDeprecatedOnce(lua_State* L, const std::string& what, const std::string& message);
+		static GLint ResolveLegacyTexFormat(lua_State* L, GLint format);
 		static void NotImplementedError(lua_State* L, const char* caller);
 
 	private:
