@@ -59,11 +59,7 @@ on:
       - 'doc/**'
 jobs:
   build-engine:
-    # The Tracy variant only runs for pull requests and master pushes; releases
-    # already build every target with Tracy through release-build.yml.
-    if: >-
-      (github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch') &&
-      (!matrix.system.variant || ((github.event_name == 'pull_request' || github.event_name == 'push') && !inputs.image-artifacts))
+    if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
     strategy:
       matrix:
         system:
@@ -76,15 +72,11 @@ jobs:
           - target: amd64-windows
             runs-on-arch: amd64
             bazel-remote-sha256: 6a6b64666c2238ec6b49b7b29f5e41e4149de09417a0028897c9bffe40376876
-          # Compiles the Tracy-enabled code (TRACY_ENABLE) that ordinary builds
-          # leave out, so a break there shows up in the pull request and not
-          # only in the release. Windows is the one that links the headless
-          # engine against stubs.
-          - target: amd64-windows
-            variant: -tracy
-            cmake-options: -DTRACY_ENABLE=ON
-            runs-on-arch: amd64
-            bazel-remote-sha256: 6a6b64666c2238ec6b49b7b29f5e41e4149de09417a0028897c9bffe40376876
+        # Compiles the Tracy-enabled code (TRACY_ENABLE) that ordinary builds leave out, so a break there shows up
+        # in the pull request and not only in the release. Windows is where the headless link failure was seen.
+        # Pull requests and master pushes only: release-build.yml already builds every target with Tracy, and
+        # its collected artifacts must not gain an extra package.
+        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && !inputs.image-artifacts && '[{"system":{"target":"amd64-windows","variant":"-tracy","cmake-options":"-DTRACY_ENABLE=ON","runs-on-arch":"amd64","bazel-remote-sha256":"6a6b64666c2238ec6b49b7b29f5e41e4149de09417a0028897c9bffe40376876"}}]' || '[]') }}
     name: Build ${{ matrix.system.target }}${{ matrix.system.variant }} engine
     runs-on:
       # Run on 8 core, 16GiB ubuntu 24.04 machine.
