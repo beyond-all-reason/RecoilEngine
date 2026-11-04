@@ -143,6 +143,9 @@ class LuaUnsyncedCtrl {
 
 		static int SetWMIcon(lua_State* L);
 		static int SetWMCaption(lua_State* L);
+		static int XRSetPanel(lua_State* L);
+		static int XRRemovePanel(lua_State* L);
+		static int XRSetDrawInViews(lua_State* L);
 
 		static int SetUnitDefIcon(lua_State* L);
 		static int SetUnitDefImage(lua_State* L);

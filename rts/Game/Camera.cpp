@@ -130,10 +130,26 @@ void CCamera::CopyStateReflect(const CCamera* cam)
 	assert(cam->GetCamType() != CAMTYPE_UWREFL);
 	assert(     GetCamType() == CAMTYPE_UWREFL);
 
-	SetDir(cam->GetDir() * float3(1.0f, -1.0f, 1.0f));
-	SetPos(cam->GetPos() * float3(1.0f, -1.0f, 1.0f));
-	SetRotZ(-cam->GetRot().z);
-	SetVFOV(cam->GetVFOV());
+	if (cam->externalPose) {
+		// an extra view (headset eye): its pose is explicit, and its frustum may be asymmetric.
+		// The mirrored camera sees upside down, as the one made from the angles below does
+		// (its basis is the mirrored one with the up vector negated, which keeps it a rotation),
+		// so the frustum is turned over as well
+		const float3 mirror(1.0f, -1.0f, 1.0f);
+		SetExternalPose(cam->GetPos() * mirror, cam->GetDir() * mirror, -(cam->GetUp() * mirror));
+		if (cam->useTangents) {
+			SetFrustumTangents(cam->tangents.x, cam->tangents.y, -cam->tangents.w, -cam->tangents.z);
+		} else {
+			useTangents = false;
+			SetVFOV(cam->GetVFOV());
+		}
+	} else {
+		ClearExternalState();
+		SetDir(cam->GetDir() * float3(1.0f, -1.0f, 1.0f));
+		SetPos(cam->GetPos() * float3(1.0f, -1.0f, 1.0f));
+		SetRotZ(-cam->GetRot().z);
+		SetVFOV(cam->GetVFOV());
+	}
 
 	Update(false, true, false);
 }
@@ -142,12 +158,12 @@ void CCamera::Update(const UpdateParams& p)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	lppScale = (2.0f * tanHalfFov) * globalRendering->pixelY;
-	aspectRatio = globalRendering->aspectRatio;
+	aspectRatio = useTangents ? ((tangents.y - tangents.x) / (tangents.w - tangents.z)) : globalRendering->aspectRatio;
 
 	// should be set before UpdateMatrices
 	if (p.updateViewRange)
 		UpdateViewRange();
-	if (p.updateDirs)
+	if (p.updateDirs && !externalPose)
 		UpdateDirsFromRot(rot);
 	if (p.updateMats)
 		UpdateMatrices(globalRendering->viewSizeX, globalRendering->viewSizeY, aspectRatio);
@@ -164,28 +180,32 @@ void CCamera::Update(const UpdateParams& p)
 void CCamera::UpdateFrustum()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// scale-factors for {x,y}-axes
-	float2 nAxisScales;
-	float2 fAxisScales;
+	// frustum extents {left, right, bottom, top} at the near and far plane
+	float4 nExtents;
+	float4 fExtents;
 
 	assert(projType <= PROJTYPE_ORTHO);
 	if (projType == PROJTYPE_PERSP) {
-		const float2 tanHalfFOVs = {math::tan(GetHFOV() * 0.5f * math::DEG_TO_RAD), tanHalfFov}; // horz, vert
-		nAxisScales = {frustum.scales.z * tanHalfFOVs.x, frustum.scales.z * tanHalfFOVs.y}; // x, y
-		fAxisScales = {frustum.scales.w * tanHalfFOVs.x, frustum.scales.w * tanHalfFOVs.y}; // x, y
+		float4 tans = tangents; // left, right, bottom, top
+		if (!useTangents) {
+			const float2 tanHalfFOVs = {math::tan(GetHFOV() * 0.5f * math::DEG_TO_RAD), tanHalfFov}; // horz, vert
+			tans = float4(-tanHalfFOVs.x, tanHalfFOVs.x, -tanHalfFOVs.y, tanHalfFOVs.y);
+		}
+		nExtents = float4(tans.x * frustum.scales.z, tans.y * frustum.scales.z, tans.z * frustum.scales.z, tans.w * frustum.scales.z);
+		fExtents = float4(tans.x * frustum.scales.w, tans.y * frustum.scales.w, tans.z * frustum.scales.w, tans.w * frustum.scales.w);
 	} else { //PROJTYPE_ORTHO
-		nAxisScales = {frustum.scales.x, frustum.scales.y};
-		fAxisScales = {frustum.scales.x, frustum.scales.y};
+		nExtents = float4(-frustum.scales.x, frustum.scales.x, -frustum.scales.y, frustum.scales.y);
+		fExtents = nExtents;
 	}
 
-	frustum.verts[FRUSTUM_POINT_NBL] = pos + (forward * frustum.scales.z) + (right * -nAxisScales.x) + (up * -nAxisScales.y); // nbl
-	frustum.verts[FRUSTUM_POINT_NBR] = pos + (forward * frustum.scales.z) + (right *  nAxisScales.x) + (up * -nAxisScales.y); // nbr
-	frustum.verts[FRUSTUM_POINT_NTR] = pos + (forward * frustum.scales.z) + (right *  nAxisScales.x) + (up *  nAxisScales.y); // ntr
-	frustum.verts[FRUSTUM_POINT_NTL] = pos + (forward * frustum.scales.z) + (right * -nAxisScales.x) + (up *  nAxisScales.y); // ntl
-	frustum.verts[FRUSTUM_POINT_FBL] = pos + (forward * frustum.scales.w) + (right * -fAxisScales.x) + (up * -fAxisScales.y); // fbl
-	frustum.verts[FRUSTUM_POINT_FBR] = pos + (forward * frustum.scales.w) + (right *  fAxisScales.x) + (up * -fAxisScales.y); // fbr
-	frustum.verts[FRUSTUM_POINT_FTR] = pos + (forward * frustum.scales.w) + (right *  fAxisScales.x) + (up *  fAxisScales.y); // ftr
-	frustum.verts[FRUSTUM_POINT_FTL] = pos + (forward * frustum.scales.w) + (right * -fAxisScales.x) + (up *  fAxisScales.y); // ftl
+	frustum.verts[FRUSTUM_POINT_NBL] = pos + (forward * frustum.scales.z) + (right * nExtents.x) + (up * nExtents.z); // nbl
+	frustum.verts[FRUSTUM_POINT_NBR] = pos + (forward * frustum.scales.z) + (right * nExtents.y) + (up * nExtents.z); // nbr
+	frustum.verts[FRUSTUM_POINT_NTR] = pos + (forward * frustum.scales.z) + (right * nExtents.y) + (up * nExtents.w); // ntr
+	frustum.verts[FRUSTUM_POINT_NTL] = pos + (forward * frustum.scales.z) + (right * nExtents.x) + (up * nExtents.w); // ntl
+	frustum.verts[FRUSTUM_POINT_FBL] = pos + (forward * frustum.scales.w) + (right * fExtents.x) + (up * fExtents.z); // fbl
+	frustum.verts[FRUSTUM_POINT_FBR] = pos + (forward * frustum.scales.w) + (right * fExtents.y) + (up * fExtents.z); // fbr
+	frustum.verts[FRUSTUM_POINT_FTR] = pos + (forward * frustum.scales.w) + (right * fExtents.y) + (up * fExtents.w); // ftr
+	frustum.verts[FRUSTUM_POINT_FTL] = pos + (forward * frustum.scales.w) + (right * fExtents.x) + (up * fExtents.w); // ftl
 
 	const auto SetFrustumPlane = [this](uint32_t i, uint32_t v1i, uint32_t v2i, uint32_t v3i) {
 		const auto& v1 = frustum.verts[v1i];
@@ -356,13 +376,67 @@ void CCamera::UpdateViewRange()
 bool CCamera::InView(const float3& point, float radius) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	return frustum.IntersectSphere(point, radius, inViewPlanesMask);
+	if (frustum.IntersectSphere(point, radius, inViewPlanesMask))
+		return true;
+
+	if (camType != CAMTYPE_PLAYER)
+		return false;
+
+	for (const Frustum& f: extraCullFrusta) {
+		if (f.IntersectSphere(point, radius, inViewPlanesMask))
+			return true;
+	}
+	return false;
 }
 
 bool CCamera::InView(const AABB& aabb) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	return InView(aabb.CalcCenter(), aabb.CalcRadius()) && frustum.IntersectAABB(aabb, inViewPlanesMask);
+	const float3 center = aabb.CalcCenter();
+	const float radius = aabb.CalcRadius();
+
+	if (frustum.IntersectSphere(center, radius, inViewPlanesMask) && frustum.IntersectAABB(aabb, inViewPlanesMask))
+		return true;
+
+	if (camType != CAMTYPE_PLAYER)
+		return false;
+
+	for (const Frustum& f: extraCullFrusta) {
+		if (f.IntersectSphere(center, radius, inViewPlanesMask) && f.IntersectAABB(aabb, inViewPlanesMask))
+			return true;
+	}
+	return false;
+}
+
+
+void CCamera::SetExternalPose(const float3& p, const float3& fwd, const float3& upHint)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	float3 f = fwd;
+	f.Normalize();
+	float3 r = f.cross(upHint);
+	r.Normalize();
+	float3 u = r.cross(f);
+	u.Normalize();
+
+	pos = p;
+	forward = f;
+	right = r;
+	up = u;
+	rot = GetRotFromDir(f);
+	externalPose = true;
+}
+
+void CCamera::SetFrustumTangents(float left, float right, float bottom, float top)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	tangents = float4(left, right, bottom, top);
+	useTangents = true;
+
+	// keep the symmetric-fov state used by lppScale and CalcPixelDir roughly right
+	tanHalfFov = (top - bottom) * 0.5f;
+	halfFov = math::atan(tanHalfFov);
+	fov = halfFov * 2.0f * math::RAD_TO_DEG;
 }
 
 #if 0
@@ -596,10 +670,17 @@ float3 CCamera::CalcViewPortCoordinates(const float3& objPos) const
 
 
 inline void CCamera::gluPerspectiveSpring(float aspect, float zn, float zf) {
-	const float t = zn * tanHalfFov;
-	const float b = -t;
-	const float l = b * aspect;
-	const float r = t * aspect;
+	float t = zn * tanHalfFov;
+	float b = -t;
+	float l = b * aspect;
+	float r = t * aspect;
+
+	if (useTangents) {
+		l = zn * tangents.x;
+		r = zn * tangents.y;
+		b = zn * tangents.z;
+		t = zn * tangents.w;
+	}
 
 	projectionMatrix = clipControlMatrix * CMatrix44f::PerspProj(l, r,  b, t,  zn, zf);
 }

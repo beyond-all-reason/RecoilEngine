@@ -85,7 +85,13 @@ void DepthBufferCopy::MakeDepthBufferCopy() const
 
 	if (consumersCount[false] > 0) {
 		const auto srcFboID = depthFBOs[true] ? depthFBOs[true]->GetId() : -1;
-		FBO::Blit(srcFboID, depthFBOs[false]->GetId(), srcScreenRect, dstScreenRect, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+		auto dstRect = dstScreenRect;
+		// the shaders sample the copy with view relative coordinates (0..1)
+		if (srcFboID < 0 && textureSizeX[false] > 0) {
+			dstRect[2] = textureSizeX[false];
+			dstRect[3] = textureSizeY[false];
+		}
+		FBO::Blit(srcFboID, depthFBOs[false]->GetId(), srcScreenRect, dstRect, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 	}
 }
 
@@ -132,6 +138,9 @@ void DepthBufferCopy::CreateTextureAndFBO(bool ms)
 	glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
 	glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, 0);
 	glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+
+	textureSizeX[ms] = globalRendering->viewSizeX;
+	textureSizeY[ms] = globalRendering->viewSizeY;
 
 	GLint depthFormat = static_cast<GLint>(CGlobalRendering::DepthBitsToFormat(globalRendering->supportDepthBufferBitDepth));
 	if (target == GL_TEXTURE_2D)

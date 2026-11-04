@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef FBO_H
-#define FBO_H
+#pragma once
 
 #include <vector>
 #include <array>
@@ -138,8 +137,22 @@ public:
 
 	/**
 	 * @brief Unbind
+	 *
+	 * Rebinds the default render target, which is the window's
+	 * framebuffer (0) unless a view has redirected it through
+	 * SetDefaultTarget.
 	 */
 	static void Unbind();
+
+	/**
+	 * @brief SetDefaultTarget
+	 *
+	 * Redirects what Unbind() falls back to, so passes that "restore the
+	 * screen" keep rendering into the current view's target.
+	 * @return the previous default target
+	 */
+	static GLuint SetDefaultTarget(GLuint id) { const GLuint prev = defaultTarget; defaultTarget = id; return prev; }
+	static GLuint GetDefaultTarget() { return defaultTarget; }
 
 	static bool Blit(
 		int32_t fromID,
@@ -200,6 +213,7 @@ private:
 	static std::vector<FBO*> activeFBOs;
 	static spring::unordered_map<GLuint, TexData> fboTexData;
 
+	static GLuint defaultTarget;
 	static GLint maxAttachments;
 	static GLsizei maxSamples;
 
@@ -218,4 +232,3 @@ private:
 	static GLenum GetTextureTargetByID(const GLuint id, const unsigned int i = 0);
 };
 
-#endif /* FBO_H */

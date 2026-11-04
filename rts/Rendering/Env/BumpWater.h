@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef BUMP_WATER_H
-#define BUMP_WATER_H
+#pragma once
 
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/myGL.h"
@@ -108,6 +107,4 @@ private:
 	Shader::IProgramObject* waterShader;
 	Shader::IProgramObject* blurShader;
 };
-
-#endif // BUMP_WATER_H
 

@@ -2,6 +2,8 @@
 
 #include "System/EventHandler.h"
 
+#include <algorithm>
+
 #include "Game/GameHelper.h"
 #include "Lua/LuaCallInCheck.h"
 #include "Lua/LuaOpenGL.h"  // FIXME -- should be moved
@@ -677,12 +679,62 @@ void CEventHandler::ViewResize()
 }
 
 
-#define DRAW_CALLIN(name)                                                   \
+bool CEventHandler::DrawsInSecondaryViews(const CEventClient* ec) const
+{
+	return (std::find(secondaryViewDrawers.begin(), secondaryViewDrawers.end(), ec) != secondaryViewDrawers.end());
+}
+
+void CEventHandler::SetDrawInSecondaryViews(const CEventClient* ec, bool b)
+{
+	const auto it = std::find(secondaryViewDrawers.begin(), secondaryViewDrawers.end(), ec);
+
+	if (b && it == secondaryViewDrawers.end())
+		secondaryViewDrawers.push_back(ec);
+	if (!b && it != secondaryViewDrawers.end())
+		secondaryViewDrawers.erase(it);
+}
+
+void CEventHandler::DrawInSecondaryViews(EventClientList& list, void (*enable)(), void (*reset)(), void (*disable)(), void (CEventClient::*draw)())
+{
+	bool first = true;
+
+	for (size_t i = 0; i < list.size(); ) {
+		CEventClient* ec = list[i];
+
+		if (DrawsInSecondaryViews(ec)) {
+			if (first)
+				enable();
+			else
+				reset();
+
+			first = false;
+			(ec->*draw)();
+		}
+
+		i += (i < list.size() && ec == list[i]);
+	}
+
+	if (!first)
+		disable();
+}
+
+
+#define DRAW_CALLIN(name, xrOk)                                             \
 	void CEventHandler:: Draw ## name ()                                    \
 	{                                                                       \
 		ZoneScoped;                                                         \
 		if (listDraw ## name.empty())                                       \
 			return;                                                         \
+                                                                            \
+		if (drawCallinsSuppressed) {                                        \
+			if (xrOk)                                                       \
+				DrawInSecondaryViews(listDraw ## name,                      \
+					&LuaOpenGL::EnableDraw ## name,                         \
+					&LuaOpenGL::ResetDraw ## name,                          \
+					&LuaOpenGL::DisableDraw ## name,                        \
+					&CEventClient:: Draw ## name);                          \
+			return;                                                         \
+		}                                                                   \
                                                                             \
 		LuaOpenGL::EnableDraw ## name ();                                   \
 		listDraw ## name [0]->Draw ## name ();                              \
@@ -700,27 +752,27 @@ void CEventHandler::ViewResize()
   }
 
 
-DRAW_CALLIN(Genesis)
-DRAW_CALLIN(World)
-DRAW_CALLIN(WorldPreUnit)
-DRAW_CALLIN(PreDecals)
-DRAW_CALLIN(WaterPost)
-DRAW_CALLIN(WorldShadow)
-DRAW_CALLIN(ShadowPassTransparent)
-DRAW_CALLIN(WorldReflection)
-DRAW_CALLIN(WorldRefraction)
-DRAW_CALLIN(GroundPreForward)
-DRAW_CALLIN(GroundPostForward)
-DRAW_CALLIN(GroundPreDeferred)
-DRAW_CALLIN(GroundDeferred)
-DRAW_CALLIN(GroundPostDeferred)
-DRAW_CALLIN(UnitsPostDeferred)
-DRAW_CALLIN(FeaturesPostDeferred)
-DRAW_CALLIN(ScreenEffects)
-DRAW_CALLIN(ScreenPost)
-DRAW_CALLIN(Screen)
-DRAW_CALLIN(InMiniMap)
-DRAW_CALLIN(InMiniMapBackground)
+DRAW_CALLIN(Genesis, 0)
+DRAW_CALLIN(World, 1)
+DRAW_CALLIN(WorldPreUnit, 1)
+DRAW_CALLIN(PreDecals, 0)
+DRAW_CALLIN(WaterPost, 0)
+DRAW_CALLIN(WorldShadow, 0)
+DRAW_CALLIN(ShadowPassTransparent, 0)
+DRAW_CALLIN(WorldReflection, 0)
+DRAW_CALLIN(WorldRefraction, 0)
+DRAW_CALLIN(GroundPreForward, 0)
+DRAW_CALLIN(GroundPostForward, 0)
+DRAW_CALLIN(GroundPreDeferred, 0)
+DRAW_CALLIN(GroundDeferred, 0)
+DRAW_CALLIN(GroundPostDeferred, 0)
+DRAW_CALLIN(UnitsPostDeferred, 0)
+DRAW_CALLIN(FeaturesPostDeferred, 0)
+DRAW_CALLIN(ScreenEffects, 0)
+DRAW_CALLIN(ScreenPost, 0)
+DRAW_CALLIN(Screen, 0)
+DRAW_CALLIN(InMiniMap, 0)
+DRAW_CALLIN(InMiniMapBackground, 0)
 
 
 #define DRAW_ENTITY_CALLIN(name, args, args2)                                 \
@@ -1016,6 +1068,17 @@ void CEventHandler::MetalMapChanged(const int x, const int z)
 void CEventHandler::DrawWorldPreParticles(bool drawAboveWater, bool drawBelowWater, bool drawReflection, bool drawRefraction)
 {
 	ZoneScoped;
+	if (drawCallinsSuppressed) {
+		for (size_t i = 0; i < listDrawWorldPreParticles.size(); ) {
+			CEventClient* ec = listDrawWorldPreParticles[i];
+
+			if (DrawsInSecondaryViews(ec))
+				ec->DrawWorldPreParticles(drawAboveWater, drawBelowWater, drawReflection, drawRefraction);
+
+			i += (i < listDrawWorldPreParticles.size() && ec == listDrawWorldPreParticles[i]);
+		}
+		return;
+	}
 	ITERATE_EVENTCLIENTLIST(DrawWorldPreParticles, drawAboveWater, drawBelowWater, drawReflection, drawRefraction);
 }
 
