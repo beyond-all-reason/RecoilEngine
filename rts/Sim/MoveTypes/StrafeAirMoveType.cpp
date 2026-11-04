@@ -930,7 +930,9 @@ void CStrafeAirMoveType::UpdateTakeOff()
 	// normally aircraft start taking off from the ground below wantedHeight,
 	// but state can also change to LANDING via StopMoving and then again to
 	// TAKEOFF (via StartMoving) while still in mid-air
-	if (currentHeight > wantedHeight || spd.SqLength2D() >= Square(maxWantedSpeed * 0.8f))
+	// (StopMoving zeroes maxWantedSpeed, which must not count as having reached it:
+	// the aircraft would start flying, and bounce, while still on the ground)
+	if (currentHeight > wantedHeight || (maxWantedSpeed > 0.0f && spd.SqLength2D() >= Square(maxWantedSpeed * 0.8f)))
 		SetState(AIRCRAFT_FLYING);
 
 	owner->SetVelocityAndSpeed(spd * invDrag);
@@ -1349,6 +1351,17 @@ void CStrafeAirMoveType::StopMoving(bool callScript, bool hardStop, bool)
 	SetGoal(owner->pos);
 	ClearLandingPos();
 	SetWantedMaxSpeed(0.0f);
+
+	// a move order can finish while we are still taking off (the goal was close by);
+	// without this nothing ever tells an unarmed aircraft to land again
+	if (aircraftState == AAirMoveType::AIRCRAFT_TAKEOFF && autoLand && !dontLand) {
+		// still standing on the ground: call the takeoff off (landing needs speed to work with).
+		// On the ground is where the collision sphere touches it, as the contact code has it
+		const float groundHeight = amtGetGroundHeightFuncs[canSubmerge](owner->pos.x, owner->pos.z);
+
+		SetState((groundHeight > (owner->midPos.y - owner->radius))? AIRCRAFT_LANDED: AIRCRAFT_LANDING);
+		return;
+	}
 
 	if (aircraftState != AAirMoveType::AIRCRAFT_FLYING && aircraftState != AAirMoveType::AIRCRAFT_LANDING)
 		return;
