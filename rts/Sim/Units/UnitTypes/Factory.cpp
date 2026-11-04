@@ -154,8 +154,12 @@ void CFactory::Update()
 	}
 
 	if (curBuild != nullptr) {
-		UpdateBuild(curBuild);
-		FinishBuild(curBuild);
+		CUnit* buildee = curBuild;
+		UpdateBuild(buildee);
+
+		// Build callbacks can kill either unit or cancel the current build.
+		if (!isDead && curBuild == buildee && !buildee->isDead)
+			FinishBuild(buildee);
 	}
 
 	const bool wantClose = (!IsStunned() && yardOpen && (gs->frameNum >= (lastBuildUpdateFrame + GAME_SPEED * (UNIT_SLOWUPDATE_RATE >> 1))));
@@ -249,6 +253,11 @@ void CFactory::UpdateBuild(CUnit* buildee) {
 	}
 
 	if (!buildee->AddBuildPower(this, buildSpeed))
+		return;
+
+	// AddBuildPower invokes Lua (including UnitFinished). Do not emit for a
+	// build that was destroyed or cancelled while that callback was running.
+	if (isDead || curBuild != buildee || buildee->isDead)
 		return;
 
 	CreateNanoParticle();
