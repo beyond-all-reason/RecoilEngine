@@ -188,6 +188,7 @@ private:
 
 	void UpdateUnitIconState(CUnit* unit);
 	void UpdateUnitIconStateScreen(CUnit* unit);
+	static void SetUnitIsIcon(CUnit* unit, bool isIcon);
 	static void UpdateDrawPos(CUnit* unit);
 
 	/// Returns true if the given unit should be drawn as icon in the current frame.

@@ -92,19 +92,43 @@ namespace Impl {
 		// get the data
 		const auto* clientPtr = memStorage.GetData().data();
 
+		// regions closer than this are uploaded together: each upload has a fixed
+		// cost (GL calls) larger than copying a few elements that did not change
+		static constexpr size_t MAX_MERGE_GAP = 32;
+
+		size_t uploadBeg = 0;
+		size_t uploadEnd = 0;
+
+		const auto Upload = [&]() {
+			if (uploadEnd == uploadBeg)
+				return;
+
+			auto* mappedPtr = ssbo->Map(clientPtr, uploadBeg, uploadEnd - uploadBeg);
+
+			if (!ssbo->HasClientPtr())
+				std::copy(clientPtr + uploadBeg, clientPtr + uploadEnd, mappedPtr);
+
+			ssbo->Unmap();
+		};
+
 		// iterate over contiguous regions of values that need update on the GPU
 		for (auto itPair = ul.GetNext(); itPair.has_value(); itPair = ul.GetNext(itPair)) {
 			auto [idxOffset, idxSize] = ul.GetOffsetAndSize(itPair.value());
 
-			auto* mappedPtr = ssbo->Map(clientPtr, idxOffset, idxSize);
-
-			if (!ssbo->HasClientPtr())
-				std::copy(clientPtr + idxOffset, clientPtr + idxOffset + idxSize, mappedPtr);
-
 			ul.DecrementUpdate(itPair.value());
 
-			ssbo->Unmap();
+			if (uploadEnd > uploadBeg && idxOffset - uploadEnd <= MAX_MERGE_GAP) {
+				uploadEnd = idxOffset + idxSize;
+				continue;
+			}
+
+			Upload();
+
+			uploadBeg = idxOffset;
+			uploadEnd = idxOffset + idxSize;
 		}
+
+		Upload();
 
 		ssbo->BindBufferRange(uploader.GetBindingIdx());
 		ssbo->SwapBuffer();
