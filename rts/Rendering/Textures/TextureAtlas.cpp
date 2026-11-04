@@ -319,9 +319,7 @@ void CTextureAtlas::ReloadTextures()
 
 	for (auto idx : nonFileEntries) {
 		const auto& memTex = memTextures[idx];
-		for (const auto& texName : memTex.names) {
-			atlasAllocator->AddEntry(texName, int2(memTex.xsize, memTex.ysize));
-		}
+		atlasAllocator->AddEntry(memTex.names.front(), int2(memTex.xsize, memTex.ysize));
 	}
 
 	Finalize();
