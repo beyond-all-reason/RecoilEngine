@@ -418,6 +418,14 @@ namespace {
 			return 0;
 		}
 
+		// the driver may compile and link them anyway, but nothing gets drawn
+		if (type == GL_GEOMETRY_SHADER && !globalRendering->supportGeometryShaders) {
+			LuaShaders& shaders = CLuaHandle::GetActiveShaders(L);
+			shaders.errorLog = "Geometry shaders are not supported by the GPU driver";
+			success = false;
+			return 0;
+		}
+
 		GLuint obj = glCreateShader(type);
 		if (obj == 0) {
 			LuaShaders& shaders = CLuaHandle::GetActiveShaders(L);
