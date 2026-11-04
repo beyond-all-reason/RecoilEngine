@@ -597,7 +597,7 @@ void CGuiHandler::LayoutIcons(bool useSelectionPage)
 	SCommandDescription cmdDesc;
 	{
 		defCmd =
-			(mouse->buttons[SDL_BUTTON_RIGHT].pressed &&
+			(mouse->IsActionButtonPressed("mousesecondary") &&
 			(defaultCmdMemory >= 0) && (inCommand < 0) &&
 			((activeReceiver == this) || (minimap->ProxyMode())));
 
@@ -1139,7 +1139,7 @@ void CGuiHandler::SetCursorIcon() const
 	else if (!useMinimap || minimap->FullProxy()) {
 		int defcmd;
 
-		if (mouse->buttons[SDL_BUTTON_RIGHT].pressed && ((activeReceiver == this) || (minimap->ProxyMode()))) {
+		if (mouse->IsActionButtonPressed("mousesecondary") && ((activeReceiver == this) || (minimap->ProxyMode()))) {
 			defcmd = defaultCmdMemory;
 		} else {
 			defcmd = GetDefaultCommand(mouse->lastx, mouse->lasty);
@@ -1220,7 +1220,8 @@ bool CGuiHandler::MousePress(int x, int y, int button)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	{
-		if (button != SDL_BUTTON_LEFT && button != SDL_BUTTON_RIGHT && button != -SDL_BUTTON_RIGHT && button != -SDL_BUTTON_LEFT)
+		const int roleButton = (button < 0) ? -button : button;
+		if (!mouse->IsButtonBoundToAction(roleButton, "mouseprimary") && !mouse->IsButtonBoundToAction(roleButton, "mousesecondary"))
 			return false;
 
 		if (button < 0) {
@@ -1236,7 +1237,7 @@ bool CGuiHandler::MousePress(int x, int y, int button)
 					curIconCommand = icons[iconPos].commandsID;
 				}
 			}
-			if (button == SDL_BUTTON_RIGHT)
+			if (mouse->IsButtonBoundToAction(button, "mousesecondary"))
 				SetActiveCommandIndex(defaultCmdMemory = -1);
 			return true;
 		}
@@ -1245,8 +1246,8 @@ bool CGuiHandler::MousePress(int x, int y, int button)
 		}
 
 		if (inCommand >= 0) {
-			if (invertQueueKey && (button == SDL_BUTTON_RIGHT) &&
-				!mouse->buttons[SDL_BUTTON_LEFT].pressed) { // for rocker gestures
+			if (invertQueueKey && mouse->IsButtonBoundToAction(button, "mousesecondary") &&
+				!mouse->IsActionButtonPressed("mouseprimary")) { // for rocker gestures
 					SetActiveCommandIndex(-1);
 					needShift = false;
 					return false;
@@ -1255,7 +1256,7 @@ bool CGuiHandler::MousePress(int x, int y, int button)
 			return true;
 		}
 	}
-	if (button == SDL_BUTTON_RIGHT) {
+	if (mouse->IsButtonBoundToAction(button, "mousesecondary")) {
 		activeMousePress = true;
 		defaultCmdMemory = GetDefaultCommand(x, y);
 		return true;
@@ -1268,7 +1269,8 @@ bool CGuiHandler::MousePress(int x, int y, int button)
 void CGuiHandler::MouseRelease(int x, int y, int button, const float3& cameraPos, const float3& mouseDir)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (button != SDL_BUTTON_LEFT && button != SDL_BUTTON_RIGHT && button != -SDL_BUTTON_RIGHT && button != -SDL_BUTTON_LEFT)
+	const int roleButton = (button < 0) ? -button : button;
+	if (!mouse->IsButtonBoundToAction(roleButton, "mouseprimary") && !mouse->IsButtonBoundToAction(roleButton, "mousesecondary"))
 		return;
 
 	int lastIconCmd = curIconCommand;
@@ -1300,14 +1302,14 @@ void CGuiHandler::MouseRelease(int x, int y, int button, const float3& cameraPos
 		}
 	}
 
-	if ((button == SDL_BUTTON_RIGHT) && (iconCmd == -1)) {
-		// right click -> set the default cmd
+	if (mouse->IsButtonBoundToAction(button, "mousesecondary") && (iconCmd == -1)) {
+		// command-role button -> set the default cmd
 		SetActiveCommandIndex(defaultCmdMemory);
 		defaultCmdMemory = -1;
 	}
 
 	if (size_t(iconCmd) < commands.size()) {
-		SetActiveCommand(iconCmd, button == SDL_BUTTON_RIGHT);
+		SetActiveCommand(iconCmd, mouse->IsButtonBoundToAction(button, "mousesecondary"));
 		return;
 	}
 
@@ -1431,26 +1433,30 @@ bool CGuiHandler::SetActiveCommand(int cmdIndex, int button,
                                    bool alt, bool ctrl, bool meta, bool shift)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// use the button value instead of rightMouseButton
-	const bool effectiveRMB = (button == SDL_BUTTON_LEFT) ? false : true;
+	// derive the command flag from the button's role, not the passed rightMouseButton
+	const bool effectiveSecondary = !mouse->IsButtonBoundToAction(button, "mouseprimary");
+
+	// spoof state on whichever buttons carry the select/command roles
+	const int selectButton  = mouse->GetActionButton("mouseprimary");
+	const int commandButton = mouse->GetActionButton("mousesecondary");
 
 	// setup the mouse and key states
-	const bool  prevLMB   = mouse->buttons[SDL_BUTTON_LEFT].pressed;
-	const bool  prevRMB   = mouse->buttons[SDL_BUTTON_RIGHT].pressed;
+	const bool  prevPrimary   = (selectButton  > 0) && mouse->buttons[selectButton ].pressed;
+	const bool  prevSecondary = (commandButton > 0) && mouse->buttons[commandButton].pressed;
 	const std::uint8_t prevAlt   = KeyInput::GetKeyModState(KMOD_ALT);
 	const std::uint8_t prevCtrl  = KeyInput::GetKeyModState(KMOD_CTRL);
 	const std::uint8_t prevMeta  = KeyInput::GetKeyModState(KMOD_GUI);
 	const std::uint8_t prevShift = KeyInput::GetKeyModState(KMOD_SHIFT);
 
-	mouse->buttons[SDL_BUTTON_LEFT].pressed  = leftMouseButton;
-	mouse->buttons[SDL_BUTTON_RIGHT].pressed = rightMouseButton;
+	if (selectButton  > 0) mouse->buttons[selectButton ].pressed = leftMouseButton;
+	if (commandButton > 0) mouse->buttons[commandButton].pressed = rightMouseButton;
 
 	KeyInput::SetKeyModState(KMOD_ALT,   alt);
 	KeyInput::SetKeyModState(KMOD_CTRL,  ctrl);
 	KeyInput::SetKeyModState(KMOD_GUI,   meta);
 	KeyInput::SetKeyModState(KMOD_SHIFT, shift);
 
-	const bool retval = SetActiveCommand(cmdIndex, effectiveRMB);
+	const bool retval = SetActiveCommand(cmdIndex, effectiveSecondary);
 
 	// revert the mouse and key states
 	KeyInput::SetKeyModState(KMOD_SHIFT, prevShift);
@@ -1458,8 +1464,8 @@ bool CGuiHandler::SetActiveCommand(int cmdIndex, int button,
 	KeyInput::SetKeyModState(KMOD_CTRL,  prevCtrl);
 	KeyInput::SetKeyModState(KMOD_ALT,   prevAlt);
 
-	mouse->buttons[SDL_BUTTON_RIGHT].pressed = prevRMB;
-	mouse->buttons[SDL_BUTTON_LEFT].pressed  = prevLMB;
+	if (commandButton > 0) mouse->buttons[commandButton].pressed = prevSecondary;
+	if (selectButton  > 0) mouse->buttons[selectButton ].pressed = prevPrimary;
 
 	return retval;
 }
@@ -1657,8 +1663,8 @@ unsigned char CGuiHandler::CreateOptions(bool rightMouseButton)
 		// allow mouse button 'rocker' movements to force
 		// immediate mode (when queuing is the default mode)
 		if (!invertQueueKey ||
-		    (!mouse->buttons[SDL_BUTTON_LEFT].pressed &&
-		     !mouse->buttons[SDL_BUTTON_RIGHT].pressed)) {
+		    (!mouse->IsActionButtonPressed("mouseprimary") &&
+		     !mouse->IsActionButtonPressed("mousesecondary"))) {
 			options |= SHIFT_KEY;
 		}
 	}
@@ -1671,7 +1677,7 @@ unsigned char CGuiHandler::CreateOptions(bool rightMouseButton)
 unsigned char CGuiHandler::CreateOptions(int button)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	return CreateOptions(button != SDL_BUTTON_LEFT);
+	return CreateOptions(!mouse->IsButtonBoundToAction(button, "mouseprimary"));
 }
 
 
@@ -2088,7 +2094,7 @@ bool CGuiHandler::KeyReleased(int keyCode, int scanCode)
 
 void CGuiHandler::FinishCommand(int button)
 {
-	if ((button == SDL_BUTTON_LEFT) && (KeyInput::GetKeyModState(KMOD_SHIFT) || invertQueueKey)) {
+	if (mouse->IsButtonBoundToAction(button, "mouseprimary") && (KeyInput::GetKeyModState(KMOD_SHIFT) || invertQueueKey)) {
 		needShift = true;
 	} else {
 		SetActiveCommandIndex(-1);
@@ -2194,17 +2200,19 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 	if (buttonHint >= SDL_BUTTON_LEFT) {
 		button = buttonHint;
 	} else if (inCommand != -1) {
-		button = SDL_BUTTON_LEFT;
-	} else if (mouse->buttons[SDL_BUTTON_RIGHT].pressed) {
-		button = SDL_BUTTON_RIGHT;
+		button = mouse->GetActionButton("mouseprimary");
+		if (button < 0)
+			button = SDL_BUTTON_LEFT;
+	} else if (mouse->IsActionButtonPressed("mousesecondary")) {
+		button = mouse->GetPressedActionButton("mousesecondary");
 	} else {
 		return Command(CMD_STOP);
 	}
 
-	if (button == SDL_BUTTON_RIGHT && preview) {
-		// right click -> default cmd
+	if (mouse->IsButtonBoundToAction(button, "mousesecondary") && preview) {
+		// command-role button -> default cmd
 		// (in preview we might not have default cmd memory set)
-		if (mouse->buttons[SDL_BUTTON_RIGHT].pressed) {
+		if (mouse->IsActionButtonPressed("mousesecondary")) {
 			tempInCommand = defaultCmdMemory;
 		} else {
 			tempInCommand = GetDefaultCommand(mouseX, mouseY, cameraPos, mouseDir);
@@ -2225,8 +2233,8 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 
 		case CMDTYPE_ICON: {
 			Command c(commands[tempInCommand].id, CreateOptions(button));
-			if (button == SDL_BUTTON_LEFT && !preview)
-				LOG_L(L_WARNING, "CMDTYPE_ICON left button press in incommand test? This should not happen.");
+			if (mouse->IsButtonBoundToAction(button, "mouseprimary") && !preview)
+				LOG_L(L_WARNING, "CMDTYPE_ICON primary-role button press in incommand test? This should not happen.");
 
 			return CheckCommand(c);
 		}
@@ -2253,9 +2261,9 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 
 			const BuildInfo bi(unitdef, cameraPos + mouseDir * dist, buildFacing);
 
-			if (GetQueueKeystate() && (button == SDL_BUTTON_LEFT)) {
-				const float3 camTracePos = mouse->buttons[SDL_BUTTON_LEFT].camPos;
-				const float3 camTraceDir = mouse->buttons[SDL_BUTTON_LEFT].dir;
+			if (GetQueueKeystate() && mouse->IsButtonBoundToAction(button, "mouseprimary")) {
+				const float3 camTracePos = mouse->buttons[button].camPos;
+				const float3 camTraceDir = mouse->buttons[button].dir;
 
 				const float traceDist = camera->GetFarPlaneDist() * 1.4f;
 				const float isectDist = CGround::LineGroundWaterCol(camTracePos, camTraceDir, traceDist, unitdef->floatOnWater, false);
@@ -3095,7 +3103,7 @@ void CGuiHandler::DrawHilightQuad(const IconInfo& icon)
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (icon.commandsID == inCommand) {
 		glColor4f(0.3f, 0.0f, 0.0f, 1.0f);
-	} else if (mouse->buttons[SDL_BUTTON_LEFT].pressed) {
+	} else if (mouse->IsActionButtonPressed("mouseprimary")) {
 		glColor4f(0.2f, 0.0f, 0.0f, 1.0f);
 	} else {
 		glColor4f(0.0f, 0.0f, 0.2f, 1.0f);
@@ -3239,8 +3247,8 @@ void CGuiHandler::DrawButtons() // Only called by Draw
 		if (highlight) {
 			if (icon.commandsID == inCommand) {
 				glColor4f(1.0f, 1.0f, 0.0f, 0.75f);
-			} else if (mouse->buttons[SDL_BUTTON_LEFT].pressed ||
-			           mouse->buttons[SDL_BUTTON_RIGHT].pressed) {
+			} else if (mouse->IsActionButtonPressed("mouseprimary") ||
+			           mouse->IsActionButtonPressed("mousesecondary")) {
 				glColor4f(1.0f, 0.0f, 0.0f, 0.50f);
 			} else {
 				glColor4f(1.0f, 1.0f, 1.0f, 0.50f);
@@ -3637,15 +3645,19 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 
 	if (activeMousePress) {
 		int cmdIndex = -1;
-		int button = SDL_BUTTON_LEFT;
+		int button = mouse->GetPressedActionButton("mouseprimary");
+		if (button < 0)
+			button = mouse->GetActionButton("mouseprimary");
+		if (button < 0)
+			button = SDL_BUTTON_LEFT;
 
 		if (size_t(inCommand) < commands.size()) {
 			cmdIndex = inCommand;
 		} else {
-			if (mouse->buttons[SDL_BUTTON_RIGHT].pressed &&
+			if (mouse->IsActionButtonPressed("mousesecondary") &&
 			    ((activeReceiver == this) || (minimap->ProxyMode()))) {
 				cmdIndex = defaultCmdMemory;
-				button = SDL_BUTTON_RIGHT;
+				button = mouse->GetPressedActionButton("mousesecondary");
 			}
 		}
 
@@ -3880,8 +3892,9 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 				// get the build information
 				const float3 cPos = tracePos + traceDir * rayTraceDist;
 
-				const CMouseHandler::ButtonPressEvt& bp = mouse->buttons[SDL_BUTTON_LEFT];
-				if (GetQueueKeystate() && bp.pressed) {
+				const int selBtn = mouse->GetPressedActionButton("mouseprimary");
+				const CMouseHandler::ButtonPressEvt& bp = mouse->buttons[(selBtn > 0) ? selBtn : SDL_BUTTON_LEFT];
+				if (GetQueueKeystate() && (selBtn > 0) && bp.pressed) {
 					const float bpDist = CGround::LineGroundWaterCol(bp.camPos, bp.dir, maxTraceDist, buildeeDef->floatOnWater, false);
 					const float3 bPos = bp.camPos + bp.dir * bpDist;
 					const BuildInfo cInfo = BuildInfo(buildeeDef, cPos, buildFacing);
@@ -4079,7 +4092,7 @@ void CGuiHandler::DrawCentroidCursor()
 	} else {
 		size_t defcmd = 0;
 
-		if (mouse->buttons[SDL_BUTTON_RIGHT].pressed && ((activeReceiver == this) || (minimap->ProxyMode()))) {
+		if (mouse->IsActionButtonPressed("mousesecondary") && ((activeReceiver == this) || (minimap->ProxyMode()))) {
 			defcmd = defaultCmdMemory;
 		} else {
 			defcmd = GetDefaultCommand(mouse->lastx, mouse->lasty);
