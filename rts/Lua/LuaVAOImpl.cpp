@@ -1,3 +1,5 @@
+/*** @env unsynced */
+
 #include "LuaVAOImpl.h"
 
 #include <algorithm>

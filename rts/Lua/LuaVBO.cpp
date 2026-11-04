@@ -1,3 +1,5 @@
+/*** @env unsynced */
+
 #include "LuaVBO.h"
 
 #include <unordered_map>

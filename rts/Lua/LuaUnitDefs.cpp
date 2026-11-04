@@ -1,5 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+/*** @env synced, unsynced */
+
 #include <string>
 #include <vector>
 #include <cctype>
@@ -53,6 +55,10 @@ static int CategorySetFromString(lua_State* L, const void* data);
 /******************************************************************************/
 /******************************************************************************/
 
+/***
+ * Unit definitions by id, each a table of the def's fields.
+ * @global UnitDefs table<UnitDefID, table>
+ */
 bool LuaUnitDefs::PushEntries(lua_State* L)
 {
 	InitParamMap();

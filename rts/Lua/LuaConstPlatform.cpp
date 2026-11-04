@@ -1,5 +1,7 @@
 /* This file is part of the Spring System (GPL v2 or later), see LICENSE.html */
 
+/*** @env unsynced */
+
 #include "LuaConstPlatform.h"
 #include "LuaUtils.h"
 #include "Game/GameVersion.h"
