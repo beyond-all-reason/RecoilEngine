@@ -1,14 +1,18 @@
-FROM docker.io/ubuntu:24.04
+# Arch Linux rolling-release image pinned to a fixed snapshot for reproducibility.
+# mingw-w64-gcc on Arch tracks GCC 15 and uses POSIX thread model by default.
+# Update the tag when a newer snapshot is desired.
+FROM docker.io/archlinux:base-20260301.0.494762
 ENV ENGINE_PLATFORM=amd64-windows
 
-RUN apt-get update \
- && apt-get upgrade --yes \
- && apt-get install --no-install-recommends --yes \
-    g++-mingw-w64-x86-64-posix git ninja-build ccache pipx p7zip-full binutils zstd \
- && rm -rf /var/lib/apt/lists/*
+# Point pacman to a frozen ALA snapshot date for reproducible package installs.
+# The date should match the base image snapshot date.
+RUN echo 'Server=https://archive.archlinux.org/repos/2026/03/01/$repo/os/$arch' \
+    > /etc/pacman.d/mirrorlist
 
-# Using `pipx --global` would be better but it's available only since pipx 1.5
-RUN PIPX_HOME=/opt/pipx PIPX_BIN_DIR=/usr/local/bin pipx install cmake==3.27.*
+RUN pacman -Syu --noconfirm \
+ && pacman -S --noconfirm --needed \
+    mingw-w64-gcc git ninja ccache p7zip binutils zstd cmake \
+ && pacman -Scc --noconfirm
 
 WORKDIR /build
 RUN mkdir src cache out artifacts && chmod a+rwx cache out artifacts
