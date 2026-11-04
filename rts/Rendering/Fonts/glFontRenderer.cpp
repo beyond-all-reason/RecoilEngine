@@ -366,7 +366,7 @@ void CglNoShaderFontRenderer::HandleTextureUpdate(CFontTexture& fnt, bool onlyUp
 void CglNoShaderFontRenderer::PushGLState(const CglFont& fnt)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT);
+	glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_COLOR_BUFFER_BIT);
 	glDisable(GL_LIGHTING);
 	glDisable(GL_DEPTH_TEST);
 	glDisable(GL_ALPHA_TEST);
