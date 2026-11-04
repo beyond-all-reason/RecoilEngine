@@ -61,6 +61,8 @@ jobs:
   build-engine:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
     strategy:
+      # One failing target (the Tracy build, say) must not cancel the others.
+      fail-fast: false
       matrix:
         system:
           - target: amd64-linux
