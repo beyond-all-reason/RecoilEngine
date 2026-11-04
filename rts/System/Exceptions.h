@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef EXCEPTIONS_H
-#define EXCEPTIONS_H
+#pragma once
 
 #include <stdexcept>
 
@@ -62,5 +61,12 @@ public:
 	network_error(const std::string& msg) : std::runtime_error(msg) {};
 };
 
-
-#endif
+/**
+ * port_in_use_error
+ *   thrown when udp socket can't be bound because the port is in use
+ */
+class port_in_use_error : public network_error
+{
+public:
+	port_in_use_error(const std::string& msg) : network_error(msg) {};
+};
