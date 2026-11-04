@@ -10,6 +10,7 @@
 #else
 	#include <unistd.h>
 #endif
+#include <cerrno>
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
@@ -100,9 +101,13 @@ void FileConfigSource::ReadModifyWrite(std::function<void ()> modify) {
 	if (file) {
 		ScopedFileLock scoped_lock(fileno(file), true);
 		Read(file);
+		// before modify() can change errno
+		const int readErrno = errno;
 		modify();
 		if (!ferror(file))
 			Write(file);
+		else
+			LOG_L(L_ERROR, "FileConfigSource: Error: Could not read config file \"%s\" (%s), not writing it", filename.c_str(), strerror(readErrno));
 	}
 	else {
 		modify();
@@ -136,11 +141,10 @@ char* FileConfigSource::Strip(char* begin, char* end) {
  */
 void FileConfigSource::Read(FILE* file)
 {
-	StringMap newData;
-	StringMap newComments;
 	std::ostringstream commentBuffer;
 	char line[500];
 	rewind(file);
+	comments.clear();
 	while (fgets(line, sizeof(line), file)) {
 		char* line_stripped = Strip(line, strchr(line, '\0') - 1);
 		if (*line_stripped == '\0' || *line_stripped == '#') {
@@ -154,9 +158,9 @@ void FileConfigSource::Read(FILE* file)
 				// a "key=value" line
 				char* key = Strip(line_stripped, eq - 1);
 				char* value = Strip(eq + 1, strchr(eq + 1, '\0') - 1);
-				newData[key] = value;
+				data[key] = value;
 				if (commentBuffer.tellp() > 0) {
-					newComments[key] = commentBuffer.str();
+					comments[key] = commentBuffer.str();
 					// reset the ostringstream
 					commentBuffer.clear();
 					commentBuffer.str("");
@@ -169,19 +173,11 @@ void FileConfigSource::Read(FILE* file)
 		}
 	}
 
-	if (ferror(file)) {
-		LOG_L(L_ERROR, "FileConfigSource: Error: Could not read config file \"%s\"", filename.c_str());
-		return;
-	}
-
 	if (commentBuffer.tellp() > 0) {
 		// Must be sorted after all valid config variable names.
 		const std::string AT_THE_END = "\x7f";
-		newComments[AT_THE_END] = commentBuffer.str();
+		comments[AT_THE_END] = commentBuffer.str();
 	}
-
-	data.swap(newData);
-	comments.swap(newComments);
 }
 
 /**
