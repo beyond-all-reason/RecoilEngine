@@ -1223,16 +1223,33 @@ bool CArchiveScanner::ReadCacheData(const std::string& filename, bool loadOldVer
 	return true;
 }
 
+static std::string EscapeLuaString(const std::string& str)
+{
+	std::string escaped;
+	escaped.reserve(str.size());
+	for (const unsigned char c: str) {
+		if (c == '\\' || c == '"') {
+			escaped += '\\';
+			escaped += c;
+		} else if (c < 32 || c == 127) {
+			// Three digits keep a following digit out of the Lua escape.
+			escaped += '\\';
+			escaped += '0' + c / 100;
+			escaped += '0' + (c / 10) % 10;
+			escaped += '0' + c % 10;
+		} else {
+			escaped += c;
+		}
+	}
+	return escaped;
+}
+
 static inline void SafeStr(FILE* out, const char* prefix, const std::string& str)
 {
 	if (str.empty())
 		return;
 
-	if ((str.find_first_of("\\\"") != std::string::npos) || (str.find_first_of('\n') != std::string::npos )) {
-		fprintf(out, "%s[[%s]],\n", prefix, str.c_str());
-	} else {
-		fprintf(out, "%s\"%s\",\n", prefix, str.c_str());
-	}
+	fprintf(out, "%s\"%s\",\n", prefix, EscapeLuaString(str).c_str());
 }
 
 void FilterDep(std::vector<std::string>& deps, const std::string& exclude)
@@ -1398,10 +1415,11 @@ void CArchiveScanner::WriteCacheData(const std::string& filename)
 			fprintf(out, "\t\t\tarchivedata = {\n");
 
 			for (const auto& ii: archData.GetInfo()) {
+				const std::string prefix = "\t\t\t\t[\"" + EscapeLuaString(ii.first) + "\"] = ";
 				if (ii.second.valueType == INFO_VALUE_TYPE_STRING) {
-					SafeStr(out, std::string("\t\t\t\t" + ii.first + " = ").c_str(), ii.second.valueTypeString);
+					SafeStr(out, prefix.c_str(), ii.second.valueTypeString);
 				} else {
-					fprintf(out, "\t\t\t\t%s = %s,\n", ii.first.c_str(), ii.second.GetValueAsString(false).c_str());
+					fprintf(out, "%s%s,\n", prefix.c_str(), ii.second.GetValueAsString(false).c_str());
 				}
 			}
 
