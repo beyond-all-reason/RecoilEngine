@@ -522,6 +522,10 @@ int LuaFBOs::CreateFBO(lua_State* L)
 				else if (key == "drawbuffers") {
 					ApplyDrawBuffers(L, -1);
 				}
+				else if (key == "readbuffer") {
+					if (lua_isnumber(L, -1))
+						glReadBuffer((GLenum)lua_toint(L, -1));
+				}
 			}
 			lua_rawgeti(L, LUA_REGISTRYINDEX, fboPtr->luaRef);
 			lua_pushvalue(L, -3); // key
