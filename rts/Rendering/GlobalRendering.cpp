@@ -43,6 +43,11 @@
 #include <SDL_syswm.h>
 #include <SDL_rect.h>
 
+// SDL before 2.0.18 (the Linux builds use Ubuntu 18.04's 2.0.8) has no name for this hint and ignores it
+#ifndef SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN
+#define SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN "SDL_WINDOW_NO_ACTIVATION_WHEN_SHOWN"
+#endif
+
 #include "System/Misc/TracyDefs.h"
 #include "System/Misc/TracyGpu.h"
 
