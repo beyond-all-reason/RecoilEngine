@@ -107,6 +107,21 @@ private:
 
 	Shader::IProgramObject* waterShader;
 	Shader::IProgramObject* blurShader;
+
+	// BumpWaterSkipInvisible: while no water pixel passed the depth test last frame, skip the screen
+	// copies, the reflection and refraction passes and the surface draw, and only draw a depth-only
+	// probe of the surface mesh (no color or depth writes) under an occlusion query to notice when
+	// water comes back into view. Results are read without waiting, so the state can lag a frame or two;
+	// a camera jump forces the full path for that frame.
+	void DrawVisibilityProbe();
+	void ReadVisibilityQuery();
+	bool skipInvisible = false;
+	bool waterVisible = true;
+	GLenum visQueryTarget = 0;
+	GLuint visQueries[2] = { 0, 0 };
+	bool visQueryIssued[2] = { false, false };
+	int visQueryIdx = 0;
+	float3 lastCamPos;
 };
 
 #endif // BUMP_WATER_H
