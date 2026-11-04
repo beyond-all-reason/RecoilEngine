@@ -970,9 +970,10 @@ void CProjectileDrawer::DrawAlpha(bool drawAboveWater, bool drawBelowWater, bool
 		const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
 		const auto& sky = ISky::GetSky();
 
-		fxShader->Enable();
+		// flags must be set before Enable(), which recompiles for them; after it they apply one pass late
 		fxShader->SetFlag("SMOOTH_PARTICLES", needSoften);
 		fxShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
+		fxShader->Enable();
 		fxShader->SetUniform("clipPlane", clipPlane[0], clipPlane[1], clipPlane[2], clipPlane[3]);
 		fxShader->SetUniform("alphaCtrl", 0.0f, 1.0f, 0.0f, 0.0f);
 		fxShader->SetUniform("softenThreshold", CProjectileDrawer::softenThreshold[0]);
@@ -1093,8 +1094,8 @@ void CProjectileDrawer::DrawShadowTransparent()
 	// 6) Render transparents in arbitrary order
 	textureAtlas->BindTexture();
 
-	fxShadowShader->Enable();
 	fxShadowShader->SetFlag("USE_TEXTURE_ARRAY", (textureAtlas->GetNumPages() > 1));
+	fxShadowShader->Enable();
 	fxShadowShader->SetUniform("shadowColorMode", shadowHandler.shadowColorMode > 0 ? 1.0f : 0.0f);
 
 	rb.DrawElements(GL_TRIANGLES);
@@ -1206,8 +1207,9 @@ void CProjectileDrawer::DrawGroundFlashes()
 	const auto camPlayer = CCameraHandler::GetCamera(CCamera::CAMTYPE_PLAYER);
 	const auto& sky = ISky::GetSky();
 
-	fxShader->Enable();
+	fxShader->SetFlag("SMOOTH_PARTICLES", needSoften);
 	fxShader->SetFlag("USE_TEXTURE_ARRAY", (groundFXAtlas->GetNumPages() > 1));
+	fxShader->Enable();
 	fxShader->SetUniform("alphaCtrl", 0.01f, 1.0f, 0.0f, 0.0f);
 	fxShader->SetUniform("softenThreshold", -CProjectileDrawer::softenThreshold[1]);
 	fxShader->SetUniform("camPos", camPlayer->pos.x, camPlayer->pos.y, camPlayer->pos.z);
