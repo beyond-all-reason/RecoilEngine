@@ -57,7 +57,8 @@ CR_BIND(CCommandQueue, )
 CR_REG_METADATA(CCommandQueue, (
 	CR_MEMBER(queue),
 	CR_MEMBER(queueType),
-	CR_MEMBER(tagCounter)
+	CR_MEMBER(tagCounter),
+	CR_MEMBER(repeat)
 ))
 
 CR_BIND_DERIVED(CCommandAI, CObject, )
@@ -76,7 +77,6 @@ CR_REG_METADATA(CCommandAI, (
 
 	CR_MEMBER(orderTarget),
 	CR_MEMBER(targetDied),
-	CR_MEMBER(repeatOrders),
 	CR_MEMBER(lastSelectedCommandPage),
 	CR_MEMBER(inCommand),
 	CR_MEMBER(commandDeathDependences),
@@ -95,7 +95,6 @@ CCommandAI::CCommandAI():
 	orderTarget(0),
 	targetDied(false),
 	inCommand(CMD_STOP),
-	repeatOrders(false),
 	lastSelectedCommandPage(0),
 	targetLostTimer(TARGET_LOST_TIMER)
 {}
@@ -110,7 +109,6 @@ CCommandAI::CCommandAI(CUnit* owner):
 	orderTarget(0),
 	targetDied(false),
 	inCommand(CMD_STOP),
-	repeatOrders(false),
 	lastSelectedCommandPage(0),
 	targetLostTimer(TARGET_LOST_TIMER)
 {
@@ -876,15 +874,12 @@ bool CCommandAI::ExecuteStateCommand(const Command& c)
 			return true;
 		}
 		case CMD_REPEAT: {
-			if (c.GetParam(0) == 1) {
-				repeatOrders = true;
-			} else if (c.GetParam(0) == 0) {
-				repeatOrders = false;
-			} else {
-				// cause some code parts need it to be either 0 or 1,
-				// we can not accept any other values as valid
+			// cause some code parts need it to be either 0 or 1,
+			// we can not accept any other values as valid
+			if (c.GetParam(0) != 0 && c.GetParam(0) != 1)
 				return false;
-			}
+
+			GetOwnQueue().SetRepeat(c.GetParam(0) == 1);
 
 			SetCommandDescParam0(c);
 			selectedUnitsHandler.PossibleCommandChange(owner);
@@ -1230,7 +1225,7 @@ void CCommandAI::ExecuteRemove(const Command& c)
 	// if false, remove commands by tag
 	const bool removeByID = (c.GetOpts() & ALT_KEY);
 	// disable repeating during the removals
-	const bool prevRepeat = repeatOrders;
+	const bool prevRepeat = GetOwnQueue().GetRepeat();
 
 	// erase commands by a list of command types
 	bool active = false;
@@ -1249,7 +1244,7 @@ void CCommandAI::ExecuteRemove(const Command& c)
 	if ((c.GetNumParams() <= 0) || (queue->size() <= 0))
 		return;
 
-	repeatOrders = false;
+	GetOwnQueue().SetRepeat(false);
 
 	for (unsigned int p = 0; p < c.GetNumParams(); p++) {
 		const int removeValue = c.GetParam(p); // tag or id
@@ -1306,7 +1301,7 @@ void CCommandAI::ExecuteRemove(const Command& c)
 		} while (ci != queue->end());
 	}
 
-	repeatOrders = prevRepeat;
+	GetOwnQueue().SetRepeat(prevRepeat);
 }
 
 
@@ -1671,7 +1666,7 @@ void CCommandAI::FinishCommand()
 	const bool dontRepeat = (cmd.IsInternalOrder());
 	const bool pushCommand = (cmd.GetID() != CMD_STOP && cmd.GetID() != CMD_PATROL);
 
-	if (repeatOrders && !dontRepeat && pushCommand)
+	if (GetOwnQueue().GetRepeat() && !dontRepeat && pushCommand)
 		GetOwnQueue().push_back(cmd);
 
 	GetOwnQueue().pop_front();
