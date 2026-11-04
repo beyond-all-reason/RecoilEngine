@@ -38,7 +38,8 @@ using System;
 using System.Text;
 using System.Runtime.InteropServices;
 
-public static class WindowFocusProbe {
+public static class WindowFocusProbe
+{
 	[DllImport("user32.dll")]
 	public static extern IntPtr GetForegroundWindow();
 
@@ -66,20 +67,24 @@ public static class WindowFocusProbe {
 	// the maximum window class name length
 	public const int CLASS_NAME_MAX = 256;
 
-	public static string ClassOf(IntPtr h) {
+	public static string ClassOf(IntPtr h)
+	{
 		var name = new StringBuilder(CLASS_NAME_MAX);
 		GetClassName(h, name, CLASS_NAME_MAX);
 		return name.ToString();
 	}
 
 	// true when window a comes before window b walking the z-order from the top
-	public static bool IsAbove(IntPtr a, IntPtr b) {
-		for (IntPtr h = GetTopWindow(IntPtr.Zero); h != IntPtr.Zero; h = GetWindow(h, GW_HWNDNEXT)) {
+	public static bool IsAbove(IntPtr a, IntPtr b)
+	{
+		for (IntPtr h = GetTopWindow(IntPtr.Zero); h != IntPtr.Zero; h = GetWindow(h, GW_HWNDNEXT))
+		{
 			if (h == a)
 				return true;
 			if (h == b)
 				return false;
 		}
+
 		return false;
 	}
 }
@@ -98,7 +103,9 @@ $ShellOwners = @(
 )
 
 $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-if (-not $process) {
+
+if (-not $process)
+{
 	Write-Output "VERDICT background: NO-PROCESS"
 	exit 2
 }
@@ -114,14 +121,18 @@ $counts = [ordered]@{
 	shell_foreground  = 0
 	no_foreground     = 0
 }
+
 $rows = New-Object System.Collections.Generic.List[string]
 $rows.Add("time,fg_hwnd,fg_owner,fg_class,engine_hwnd,engine_fg,hung,minimized,above_fg")
 $exited = $false
 $end = (Get-Date).AddSeconds($Seconds)
 
-while ((Get-Date) -lt $end) {
+while ((Get-Date) -lt $end)
+{
 	$engine = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
-	if (-not $engine) {
+
+	if (-not $engine)
+	{
 		$exited = $true
 		break
 	}
@@ -133,13 +144,18 @@ while ((Get-Date) -lt $end) {
 	$fgOwner = (Get-Process -Id $fgPid -ErrorAction SilentlyContinue).ProcessName
 	$isShell = $ShellOwners -contains $fgOwner
 
-	if ($fg -eq [IntPtr]::Zero) {
+	if ($fg -eq [IntPtr]::Zero)
+	{
 		$counts.no_foreground++
 	}
-	if ($isShell) {
+
+	if ($isShell)
+	{
 		$counts.shell_foreground++
 	}
-	if ($fgClass -eq "Ghost") {
+
+	if ($fgClass -eq "Ghost")
+	{
 		$counts.ghost_foreground++
 	}
 
@@ -148,22 +164,33 @@ while ((Get-Date) -lt $end) {
 	$isHung = 0
 	$isMin = 0
 	$isAbove = 0
-	if ($window -ne [IntPtr]::Zero) {
+
+	if ($window -ne [IntPtr]::Zero)
+	{
 		$counts.window_seen++
-		if ($fg -eq $window) {
+
+		if ($fg -eq $window)
+		{
 			$isFg = 1
 			$counts.engine_foreground++
 		}
-		if ([WindowFocusProbe]::IsHungAppWindow($window)) {
+
+		if ([WindowFocusProbe]::IsHungAppWindow($window))
+		{
 			$isHung = 1
 			$counts.hung++
 		}
-		if ([WindowFocusProbe]::IsIconic($window)) {
+
+		if ([WindowFocusProbe]::IsIconic($window))
+		{
 			$isMin = 1
 			$counts.minimized++
 		}
+
 		$canCompare = ($isFg -eq 0) -and (-not $isShell) -and ($fg -ne [IntPtr]::Zero)
-		if ($canCompare -and [WindowFocusProbe]::IsAbove($window, $fg)) {
+
+		if ($canCompare -and [WindowFocusProbe]::IsAbove($window, $fg))
+		{
 			$isAbove = 1
 			$counts.above_foreground++
 		}
@@ -175,13 +202,15 @@ while ((Get-Date) -lt $end) {
 	Start-Sleep -Milliseconds $IntervalMs
 }
 
-if ($Csv) {
+if ($Csv)
+{
 	$rows | Out-File -Encoding utf8 $Csv
 }
 
 Write-Output (($counts.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join " ")
 
-if ($exited) {
+if ($exited)
+{
 	Write-Output "VERDICT background: EXITED"
 	exit 1
 }
@@ -191,8 +220,12 @@ $pass = ($counts.window_seen -gt 0) -and
 	($counts.ghost_foreground -eq 0) -and
 	($counts.minimized -eq 0) -and
 	($counts.above_foreground -eq 0)
-if ($pass) {
+
+if ($pass)
+{
 	Write-Output "VERDICT background: PASS"
-} else {
+}
+else
+{
 	Write-Output "VERDICT background: FAIL"
 }

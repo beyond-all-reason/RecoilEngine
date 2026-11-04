@@ -43,61 +43,86 @@ $BaseConfig = @(
 )
 
 # Returns the extra springsettings.cfg lines and command-line arguments of one case.
-function Get-CaseSetup([string]$Case) {
-	switch ($Case) {
-		"off" {
+function Get-CaseSetup([string]$Case)
+{
+	switch ($Case)
+	{
+		"off"
+		{
 			return @{ Config = @("Fullscreen = 0"); Arguments = @() }
 		}
-		"switch" {
+
+		"switch"
+		{
 			return @{ Config = @("Fullscreen = 0"); Arguments = @("--background-window") }
 		}
-		"fullscreen" {
+
+		"fullscreen"
+		{
 			return @{ Config = @("Fullscreen = 1"); Arguments = @("--background-window") }
 		}
-		"config" {
+
+		"config"
+		{
 			return @{ Config = @("Fullscreen = 0", "BackgroundWindow = 1"); Arguments = @() }
 		}
 	}
+
 	return $null
 }
 
 # The fullscreen case also needs only windowed display modes in the infolog, and the engine
 # must not have saved Fullscreen = 0 (the switch must not change the user's setting).
-function Test-StayedWindowed([string]$Infolog, [string]$ConfigFile) {
+function Test-StayedWindowed([string]$Infolog, [string]$ConfigFile)
+{
 	$modes = @(
 		Select-String -Path $Infolog -Pattern "display-mode set to .*\((\w+)::" |
 			ForEach-Object { $_.Matches.Groups[1].Value }
 	)
-	if ($modes.Count -eq 0) {
+
+	if ($modes.Count -eq 0)
+	{
 		return $false
 	}
-	if ($modes -contains "fullscreen") {
+
+	if ($modes -contains "fullscreen")
+	{
 		return $false
 	}
+
 	$savedOff = Select-String -Quiet -Path $ConfigFile -Pattern "^\s*Fullscreen\s*=\s*0"
 	return -not $savedOff
 }
 
-if (-not (Test-Path -PathType Leaf $Engine)) {
+if (-not (Test-Path -PathType Leaf $Engine))
+{
 	Write-Output "engine not found: $Engine"
 	exit 2
 }
+
 $Engine = (Resolve-Path $Engine).Path
 $engineDir = Split-Path -Parent $Engine
 $probe = Join-Path $PSScriptRoot "window-focus-probe.ps1"
 
 $results = @()
-foreach ($case in ($Cases -split ",")) {
+
+foreach ($case in ($Cases -split ","))
+{
 	$setup = Get-CaseSetup $case
-	if (-not $setup) {
+
+	if (-not $setup)
+	{
 		Write-Output "unknown case $case"
 		exit 2
 	}
 
 	$writeDir = Join-Path $OutDir $case
-	if (Test-Path $writeDir) {
+
+	if (Test-Path $writeDir)
+	{
 		Remove-Item -Recurse -Force $writeDir
 	}
+
 	New-Item -ItemType Directory -Force $writeDir | Out-Null
 	$configFile = Join-Path $writeDir "springsettings.cfg"
 	($BaseConfig + $setup.Config) | Out-File -Encoding ascii $configFile
@@ -109,14 +134,19 @@ foreach ($case in ($Cases -split ",")) {
 		"--write-dir", "`"$writeDir`""
 	) + $setup.Arguments
 	$process = Start-Process -FilePath $Engine -ArgumentList $engineArgs -PassThru
-	try {
+
+	try
+	{
 		$probeOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $probe `
 			-ProcessId $process.Id `
 			-Seconds $Seconds `
 			-Csv (Join-Path $writeDir "probe.csv")
-	} finally {
+	}
+	finally
+	{
 		Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
 	}
+
 	$probeOut | ForEach-Object { Write-Output "   $_" }
 
 	$verdict = ($probeOut | Select-String "VERDICT background: (\S+)").Matches.Groups[1].Value
@@ -124,16 +154,23 @@ foreach ($case in ($Cases -split ",")) {
 	$hasLine = (Test-Path $infolog) -and (Select-String -Quiet -SimpleMatch $LogLine $infolog)
 
 	$windowed = "-"
-	if ($case -eq "fullscreen") {
+
+	if ($case -eq "fullscreen")
+	{
 		$windowed = Test-StayedWindowed $infolog $configFile
 	}
 
-	if ($case -eq "off") {
+	if ($case -eq "off")
+	{
 		# the control: shows what the probe sees without the feature, never fails
 		$result = "-"
-	} elseif ($verdict -eq "PASS" -and $hasLine -and $windowed -ne $false) {
+	}
+	elseif ($verdict -eq "PASS" -and $hasLine -and $windowed -ne $false)
+	{
 		$result = "PASS"
-	} else {
+	}
+	else
+	{
 		$result = "FAIL"
 	}
 
@@ -148,7 +185,10 @@ foreach ($case in ($Cases -split ",")) {
 
 $results | Format-Table -AutoSize | Out-String | Write-Output
 Write-Output "write directories, infologs and probe CSVs: $OutDir"
-if ($results | Where-Object { $_.Result -eq "FAIL" }) {
+
+if ($results | Where-Object { $_.Result -eq "FAIL" })
+{
 	exit 1
 }
+
 exit 0
