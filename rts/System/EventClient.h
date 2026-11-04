@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef EVENT_CLIENT_H
-#define EVENT_CLIENT_H
+#pragma once
 
 #include <algorithm>
 #include <map>
@@ -151,6 +150,7 @@ class CEventClient
 			int projectileID,
 			bool paralyzer) {}
 		virtual void UnitStunned(const CUnit* unit, bool stunned) {}
+		virtual void UnitFlightRegimeChanged(const CUnit* unit, bool agile) {}
 		virtual void UnitExperience(const CUnit* unit, float oldExperience) {}
 		virtual void UnitHarvestStorageFull(const CUnit* unit) {}
 
@@ -393,6 +393,3 @@ class CEventClient
 		virtual void MetalMapChanged(const int x, const int z) {}
 		/// @}
 };
-
-
-#endif /* EVENT_CLIENT_H */
