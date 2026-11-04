@@ -40,8 +40,9 @@ Set it before the engine starts: the window is created according to it.
 | does not take the focus when the window opens | the window is created hidden and shown without activation (`SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN`); on X11 `_NET_WM_USER_TIME` is also set to 0 before it is shown, the EWMH way to ask the window manager not to focus it |
 | opens behind the other windows | it is lowered before and after it is shown, and whenever the engine changes the window's size, position or border (`SetWindowPos(HWND_BOTTOM)` on Windows; on X11 the EWMH `_NET_RESTACK_WINDOW` request, which mutter needs, and `XLowerWindow`) |
 | is not replaced by a ghost window | Windows ghosting is turned off for the process (`DisableProcessWindowsGhosting`) |
-| never minimizes itself | `MinimizeOnFocusLoss` is ignored, and `Spring.SetWindowMinimized` does nothing and returns `false` |
+| never minimizes or maximizes itself | `MinimizeOnFocusLoss` is ignored, and `Spring.SetWindowMinimized` and `Spring.SetWindowMaximized` do nothing and return `false` (maximizing activates the window) |
 | never goes fullscreen | `Fullscreen` is ignored, also when a game asks for fullscreen later (`Spring.SetWindowGeometry`); the saved value is kept. The window is not maximized when its size equals the desktop's, because maximizing activates it |
+| does not move the user's pointer | while the window has no focus, `Spring.WarpMouse` and the engine's own mouse warps leave the system pointer where it is; the engine still uses the new position, so `Spring.GetMouseState` reports it. Input grabbing (`grabinput`) already applies only while the window has the focus |
 
 The window stays behind your windows until you click it; from then on it behaves like any window.
 The infolog says `background window: shown without activation, lowered, never minimized`.

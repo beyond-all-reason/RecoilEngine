@@ -3174,7 +3174,12 @@ int LuaUnsyncedCtrl::SetCustomCommandDrawData(lua_State* L)
 ******************************************************************************/
 
 
-/*** @function Spring.WarpMouse
+/***
+ *
+ * Does not move the system pointer while the window has no focus and the config key
+ * `BackgroundWindow` is set; the engine still uses the new position.
+ *
+ * @function Spring.WarpMouse
  * @param x integer
  * @param y integer
  * @return nil
@@ -5448,6 +5453,8 @@ int LuaUnsyncedCtrl::SetWindowMinimized(lua_State* L)
 }
 
 /***
+ *
+ * Does nothing and returns false when the config key `BackgroundWindow` is set.
  *
  * @function Spring.SetWindowMaximized
  * @return boolean maximized

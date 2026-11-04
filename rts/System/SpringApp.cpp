@@ -590,7 +590,7 @@ void SpringApp::ParseCmdLine(int argc, char* argv[])
 	FileSystemInitializer::PreInitializeConfigHandler(FLAGS_config, FLAGS_name, FLAGS_safemode);
 	FileSystemInitializer::InitializeLogOutput();
 
-	// overlay: applies to this run only and is not written to the config file
+	// in memory only (useOverlay): this run only, springsettings.cfg is not changed
 	if (FLAGS_background_window)
 		configHandler->Set("BackgroundWindow", true, true);
 }

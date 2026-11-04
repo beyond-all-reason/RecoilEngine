@@ -72,7 +72,7 @@ CONFIG(bool, DualScreenMiniMapOnLeft).defaultValue(false).description("When set,
 CONFIG(bool, TeamNanoSpray).defaultValue(true).headlessValue(false);
 
 CONFIG(int, MinimizeOnFocusLoss).defaultValue(0).minimumValue(0).maximumValue(1).description("When set to 1 minimize Window if it loses key focus when in fullscreen mode.");
-CONFIG(bool, BackgroundWindow).defaultValue(false).description("Run in the background, for unattended tests, CI, replays and capture: the window opens without taking the keyboard focus and behind other windows, never minimizes itself (MinimizeOnFocusLoss and Lua minimize requests are ignored), and Fullscreen is forced off. On Windows a hung window is not replaced by a \"Not Responding\" ghost that would take the focus. Also set for one run by --background-window.");
+CONFIG(bool, BackgroundWindow).defaultValue(false).description("Run in the background, for unattended tests, CI, replays and capture: the window opens without taking the keyboard focus and behind other windows, never minimizes or maximizes itself (MinimizeOnFocusLoss and Lua minimize and maximize requests are ignored), Fullscreen is forced off, and mouse warps do not move the system pointer while the window has no focus. On Windows a hung window is not replaced by a \"Not Responding\" ghost that would take the focus. Also set for one run by --background-window.");
 
 CONFIG(bool, Fullscreen).defaultValue(true).headlessValue(false).description("Sets whether the game will run in fullscreen, as opposed to a window. For Windowed Fullscreen of Borderless Window, set this to 0, WindowBorderless to 1, and WindowPosX and WindowPosY to 0.");
 CONFIG(bool, WindowBorderless).defaultValue(false).description("When set and Fullscreen is 0, will put the game in Borderless Window mode, also known as Windowed Fullscreen. When using this, it is generally best to also set WindowPosX and WindowPosY to 0");
@@ -1924,8 +1924,9 @@ bool CGlobalRendering::SetWindowMinMaximized(bool maximize) const
 	if ((SDL_GetWindowFlags(sdlWindow) & mmFlags[maximize]) != 0)
 		return false; //already in desired state
 
-	if (!maximize && configHandler->GetBool("BackgroundWindow")) {
-		LOG_L(L_WARNING, "[GR::%s] not minimizing: BackgroundWindow is set", __func__);
+	// minimizing stalls rendering, maximizing activates the window
+	if (configHandler->GetBool("BackgroundWindow")) {
+		LOG_L(L_WARNING, "[GR::%s] not %s: BackgroundWindow is set", __func__, maximize ? "maximizing" : "minimizing");
 		return false;
 	}
 
