@@ -117,7 +117,12 @@ public:
 	std::vector<const SCommandDescription*> possibleCommands;
 	spring::unordered_set<int> nonQueingCommands;
 
+private:
 	CCommandQueue commandQue;
+
+public:
+	      CCommandQueue& GetOwnQueue()       { return commandQue; }
+	const CCommandQueue& GetOwnQueue() const { return commandQue; }
 
 	int lastUserCommand;
 	int selfDCountdown;

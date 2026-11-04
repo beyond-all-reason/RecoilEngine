@@ -127,9 +127,9 @@ namespace {
 	DECLARE_FILTER(Transport, unit->unitDef->IsTransportUnit())
 	DECLARE_FILTER(Aircraft, unit->unitDef->IsAirUnit())
 	DECLARE_FILTER(Weapons, !unit->weapons.empty())
-	DECLARE_FILTER(Idle, unit->commandAI->commandQue.empty())
-	DECLARE_FILTER(Waiting, !unit->commandAI->commandQue.empty() && (unit->commandAI->commandQue.front().GetID() == CMD_WAIT))
-	DECLARE_FILTER(Guarding, !unit->commandAI->commandQue.empty() && (unit->commandAI->commandQue.front().GetID() == CMD_GUARD))
+	DECLARE_FILTER(Idle, unit->commandAI->GetOwnQueue().empty())
+	DECLARE_FILTER(Waiting, !unit->commandAI->GetOwnQueue().empty() && (unit->commandAI->GetOwnQueue().front().GetID() == CMD_WAIT))
+	DECLARE_FILTER(Guarding, !unit->commandAI->GetOwnQueue().empty() && (unit->commandAI->GetOwnQueue().front().GetID() == CMD_GUARD))
 
 	/* Patrol works by prepending fight commands, which can in turn prepend attack commands.
 	 * This can push the parent patrol command quite deep into the queue:
@@ -141,7 +141,7 @@ namespace {
 	struct Patrolling_Filter : public Filter {
 		Patrolling_Filter() : Filter("Patrolling", 0) { }
 		bool ShouldIncludeUnit(const CUnit* unit) const override {
-			const auto& queue = unit->commandAI->commandQue;
+			const auto& queue = unit->commandAI->GetOwnQueue();
 			const auto searchDepth = std::min <size_t> (queue.size(), 4);
 			for (size_t i = 0; i < searchDepth; ++i)
 				if (queue[i].GetID() == CMD_PATROL)
