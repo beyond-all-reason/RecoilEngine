@@ -250,6 +250,7 @@ decltype(glad_glGetError) glad_glGetError = nullptr;
 decltype(glad_glGetFloatv) glad_glGetFloatv = nullptr;
 decltype(glad_glGetFramebufferAttachmentParameteriv) glad_glGetFramebufferAttachmentParameteriv = nullptr;
 decltype(glad_glGetFramebufferParameteriv) glad_glGetFramebufferParameteriv = nullptr;
+decltype(glad_glGetInteger64v) glad_glGetInteger64v = nullptr;
 decltype(glad_glGetIntegeri_v) glad_glGetIntegeri_v = nullptr;
 decltype(glad_glGetIntegerv) glad_glGetIntegerv = nullptr;
 decltype(glad_glGetProgramInfoLog) glad_glGetProgramInfoLog = nullptr;
@@ -691,6 +692,7 @@ int gladLoadGL(void) {
     glad_glGetFloatv = impl_glGetFloatv;
     glad_glGetFramebufferAttachmentParameteriv = MakeStubImpl(glad_glGetFramebufferAttachmentParameteriv);
     glad_glGetFramebufferParameteriv = MakeStubImpl(glad_glGetFramebufferParameteriv);
+    glad_glGetInteger64v = MakeStubImpl(glad_glGetInteger64v);
     glad_glGetIntegeri_v = MakeStubImpl(glad_glGetIntegeri_v);
     glad_glGetIntegerv = MakeStubImpl(glad_glGetIntegerv);
     glad_glGetProgramInfoLog = MakeStubImpl(glad_glGetProgramInfoLog);
