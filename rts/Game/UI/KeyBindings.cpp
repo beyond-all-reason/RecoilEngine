@@ -296,9 +296,11 @@ void CKeyBindings::Init()
 	RegisterAction("unbindkeyset");
 	RegisterAction("fakemeta");
 	RegisterAction("keydebug");
+	RegisterAction("keydefaults");
 	RegisterAction("keyload");
 	RegisterAction("keyreload");
 	RegisterAction("keysave");
+	RegisterAction("keysym");
 	RegisterAction("keysyms");
 	RegisterAction("keycodes");
 	RegisterAction("keyprint");
