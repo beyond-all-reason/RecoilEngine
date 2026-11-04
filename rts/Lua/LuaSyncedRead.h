@@ -110,6 +110,7 @@ class LuaSyncedRead {
 		static int GetUnitTeam(lua_State* L);
 		static int GetUnitAllyTeam(lua_State* L);
 		static int GetUnitNeutral(lua_State* L);
+		static int GetUnitCategories(lua_State* L);
 		static int GetUnitHealth(lua_State* L);
 		static int GetUnitIsDead(lua_State* L);
 		static int GetUnitIsStunned(lua_State* L);
