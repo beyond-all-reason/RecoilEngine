@@ -48,7 +48,7 @@ The window stays behind your windows until you click it; from then on it behaves
 The infolog says `background window: shown without activation, lowered, never minimized`.
 
 Tested on Windows 11 and on Linux X11 with the openbox, xfwm4 (Xfce), KWin (KDE) and mutter (GNOME) window managers; other X11 window managers should behave the same where they follow EWMH.
-Not covered: macOS (neither the lowering nor the X11 focus request exists there), Wayland sessions where SDL uses its own Wayland driver instead of X11, a crash or assertion message box (it still takes the focus), and minimizing the window by hand.
+Not covered: macOS (neither the lowering nor the X11 focus request exists there), focus and stacking in Wayland sessions where SDL uses its own Wayland driver instead of X11 (the switch starts and runs there, but the compositor decides), a crash or assertion message box (it still takes the focus), and minimizing the window by hand.
 
 ## Testing
 
