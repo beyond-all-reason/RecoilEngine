@@ -76,7 +76,19 @@ jobs:
         # in the pull request and not only in the release. Windows is where the headless link failure was seen.
         # Pull requests and master pushes only: release-build.yml already builds every target with Tracy, and
         # its collected artifacts must not gain an extra package.
-        include: ${{ fromJSON((github.event_name == 'pull_request' || github.event_name == 'push') && !inputs.image-artifacts && '[{"system":{"target":"amd64-windows","variant":"-tracy","cmake-options":"-DTRACY_ENABLE=ON","runs-on-arch":"amd64","bazel-remote-sha256":"6a6b64666c2238ec6b49b7b29f5e41e4149de09417a0028897c9bffe40376876"}}]' || '[]') }}
+        # The folded scalar below joins its lines with single spaces into one expression.
+        include: >-
+          ${{ fromJSON(
+          (github.event_name == 'pull_request' || github.event_name == 'push')
+          && !inputs.image-artifacts
+          && '[{"system": {
+          "target": "amd64-windows",
+          "variant": "-tracy",
+          "cmake-options": "-DTRACY_ENABLE=ON",
+          "runs-on-arch": "amd64",
+          "bazel-remote-sha256": "6a6b64666c2238ec6b49b7b29f5e41e4149de09417a0028897c9bffe40376876"
+          }}]'
+          || '[]') }}
     name: Build ${{ matrix.system.target }}${{ matrix.system.variant }} engine
     runs-on:
       # Run on 8 core, 16GiB ubuntu 24.04 machine.
