@@ -210,6 +210,8 @@ UnitDef::UnitDef()
 	, maxElevator(0.0f)
 	, maxRudder(0.0f)
 	, crashDrag(0.0f)
+	, terrainLookahead(0.0f)
+	, terrainLookaheadDescent(0.5f)
 	, loadingRadius(0.0f)
 	, unloadSpread(0.0f)
 	, transportCapacity(0)
@@ -564,6 +566,14 @@ UnitDef::UnitDef(const LuaTable& udTable, const std::string& unitName, int id)
 	maxAileron  = udTable.GetFloat("maxAileron",  0.015f); // turn speed around roll axis
 	maxElevator = udTable.GetFloat("maxElevator", 0.01f);  // turn speed around pitch axis
 	maxRudder   = udTable.GetFloat("maxRudder",   0.004f); // turn speed around yaw axis
+
+	terrainLookahead = udTable.GetFloat("terrainLookahead", 0.0f);
+	if (terrainLookahead < 0.0f)
+		throw content_error(unitName + ".terrainLookahead < 0");
+
+	terrainLookaheadDescent = udTable.GetFloat("terrainLookaheadDescent", 0.5f);
+	if (terrainLookaheadDescent <= 0.0f || terrainLookaheadDescent > 1.0f)
+		throw content_error(unitName + ".terrainLookaheadDescent must be (0; 1]");
 
 	maxThisUnit = udTable.GetInt("maxThisUnit", udTable.GetInt("unitRestricted", MAX_UNITS));
 	maxThisUnit = std::min(maxThisUnit, gameSetup->GetRestrictedUnitLimit(name, MAX_UNITS));
