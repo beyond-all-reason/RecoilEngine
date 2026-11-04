@@ -198,6 +198,21 @@ namespace math {
 	template<typename T>
 	inline float isqrt(T x) { return fastmath::isqrt2_nosse(static_cast<float>(x)); }
 	using fastmath::floor;
+
+	// isqrt for four floats, with the operations of fastmath::isqrt2_nosse per lane
+	inline __m128 i128_isqrt(__m128 x) {
+		const __m128 xh = _mm_mul_ps(_mm_set1_ps(0.5f), x);
+
+		x = _mm_castsi128_ps(_mm_sub_epi32(_mm_set1_epi32(0x5f375a86), _mm_srai_epi32(_mm_castps_si128(x), 1)));
+		x = _mm_mul_ps(x, _mm_sub_ps(_mm_set1_ps(1.5f), _mm_mul_ps(xh, _mm_mul_ps(x, x))));
+		x = _mm_mul_ps(x, _mm_sub_ps(_mm_set1_ps(1.5f), _mm_mul_ps(xh, _mm_mul_ps(x, x))));
+		return x;
+	}
+
+	// mask ? a : b per lane, for masks from the _mm_cmp*_ps functions
+	inline __m128 i128_select(__m128 mask, __m128 a, __m128 b) {
+		return _mm_or_ps(_mm_and_ps(mask, a), _mm_andnot_ps(mask, b));
+	}
 }
 
 #endif

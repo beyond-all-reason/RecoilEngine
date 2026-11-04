@@ -198,6 +198,8 @@ public:
 	/// if you modify the heightmap through these, call UpdateHeightMapSynced
 	float SetHeight(const int idx, const float h, const int add = 0);
 	float AddHeight(const int idx, const float a);
+	/// AddHeight for a row of vertices
+	void AddHeights(const int idx, const float* values, const int count);
 
 	/// These will not modify the current heightmap, only the original
 	float SetOriginalHeight(const int idx, const float h, const int add = 0);
