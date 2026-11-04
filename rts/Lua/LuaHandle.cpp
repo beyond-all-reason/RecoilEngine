@@ -1885,11 +1885,14 @@ bool CLuaHandle::UnitUnitCollision(const CUnit* collider, const CUnit* collidee)
 	lua_pushnumber(L, collider->id);
 	lua_pushnumber(L, collidee->id);
 
-	RunCallInTraceback(L, cmdStr, 2, 1, traceBack.GetErrFuncIdx(), false);
-
-	// if nothing is returned, this is the correct behaviour now.
-	if (lua_isnone(L, -1))
+	if (!RunCallInTraceback(L, cmdStr, 2, 1, traceBack.GetErrFuncIdx(), false))
 		return false;
+
+	// A missing return value is padded with nil by lua_pcall.
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
+		return false;
+	}
 
 	if (returnValueDeprecationWarningIssued < gs->frameNum) {
 		LOG_L(L_ERROR, "[%s] return value is deprecated and ignored.", __func__);
@@ -1939,11 +1942,14 @@ bool CLuaHandle::UnitFeatureCollision(const CUnit* collider, const CFeature* col
 	lua_pushnumber(L, collider->id);
 	lua_pushnumber(L, collidee->id);
 
-	RunCallInTraceback(L, cmdStr, 2, 1, traceBack.GetErrFuncIdx(), false);
-
-	// if nothing is returned, this is the correct behaviour now.
-	if (lua_isnone(L, -1))
+	if (!RunCallInTraceback(L, cmdStr, 2, 1, traceBack.GetErrFuncIdx(), false))
 		return false;
+
+	// A missing return value is padded with nil by lua_pcall.
+	if (lua_isnil(L, -1)) {
+		lua_pop(L, 1);
+		return false;
+	}
 
 	if (returnValueDeprecationWarningIssued < gs->frameNum) {
 		LOG_L(L_ERROR, "[%s] return value is deprecated and ignored.", __func__);
