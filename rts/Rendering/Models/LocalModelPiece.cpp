@@ -134,7 +134,16 @@ void LocalModelPiece::ResetWasUpdated() const
 
 bool LocalModelPiece::SetPieceSpaceMatrix(const CMatrix44f& mat)
 {
-	return blockScriptAnims = mat.IsRotOrRotTranMatrix();
+	const bool block = mat.IsRotOrRotTranMatrix();
+
+	if (block)
+		pieceSpaceTra = Transform::FromMatrix(mat);
+
+	// a released piece composes its pose from the script values again
+	if (block != blockScriptAnims)
+		SetDirty();
+
+	return blockScriptAnims = block;
 }
 
 const Transform& LocalModelPiece::GetModelSpaceTransform() const
