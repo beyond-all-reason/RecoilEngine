@@ -30,9 +30,7 @@ public:
 	const uint8_t& GetMapState(int x, int z) const {
 		const int cx = std::clamp(x, 0, mapDims.mapxm1);
 		const int cz = std::clamp(z, 0, mapDims.mapym1);
-		const int tileId   = (cz / TILE_SIZE) * tileStride + (cx / TILE_SIZE);
-		const int squareId = (cz & (TILE_SIZE - 1)) * TILE_SIZE  + (cx & (TILE_SIZE - 1));
-		return stateMap[tileId].squares[squareId];
+		return MapStateAt(cx, cz);
 	}
 	uint8_t& GetMapState(int x, int z) {
 		return const_cast<uint8_t&>(std::as_const(*this).GetMapState(x, z));
@@ -41,8 +39,37 @@ public:
 	bool AreAllFlagsSet(int x, int z, uint8_t flags) const { return (GetMapState(x, z) & flags) == flags; }
 	bool AreAnyFlagsSet(int x, int z, uint8_t flags) const { return (GetMapState(x, z) & flags) != 0; }
 
-	void SetFlags  (int x, int z, uint8_t flags) { GetMapState(x, z) |=  flags; }
-	void ClearFlags(int x, int z, uint8_t flags) { GetMapState(x, z) &= ~flags; }
+	void SetFlags(int x, int z, uint8_t flags) {
+		const int cx = std::clamp(x, 0, mapDims.mapxm1);
+		const int cz = std::clamp(z, 0, mapDims.mapym1);
+		uint8_t& st = MapStateAt(cx, cz);
+		if ((flags & EXIT_ONLY) && !(st & EXIT_ONLY))
+			++exitOnlyBlocks[ExitOnlyBlockIdx(cx, cz)];
+		st |= flags;
+	}
+	void ClearFlags(int x, int z, uint8_t flags) {
+		const int cx = std::clamp(x, 0, mapDims.mapxm1);
+		const int cz = std::clamp(z, 0, mapDims.mapym1);
+		uint8_t& st = MapStateAt(cx, cz);
+		if ((flags & EXIT_ONLY) && (st & EXIT_ONLY)) {
+			assert(exitOnlyBlocks[ExitOnlyBlockIdx(cx, cz)] > 0);
+			--exitOnlyBlocks[ExitOnlyBlockIdx(cx, cz)];
+		}
+		st &= ~flags;
+	}
+
+	bool RangeMayHaveExitOnly(int xmin, int xmax, int zmin, int zmax) const {
+		const int bx0 = std::clamp(xmin, 0, mapDims.mapxm1) >> EXIT_ONLY_BLOCK_SHIFT;
+		const int bx1 = std::clamp(xmax, 0, mapDims.mapxm1) >> EXIT_ONLY_BLOCK_SHIFT;
+		const int bz0 = std::clamp(zmin, 0, mapDims.mapym1) >> EXIT_ONLY_BLOCK_SHIFT;
+		const int bz1 = std::clamp(zmax, 0, mapDims.mapym1) >> EXIT_ONLY_BLOCK_SHIFT;
+		for (int bz = bz0; bz <= bz1; ++bz) {
+			const int row = bz * exitOnlyBlockStride;
+			for (int bx = bx0; bx <= bx1; ++bx)
+				if (exitOnlyBlocks[row + bx] != 0) return true;
+		}
+		return false;
+	}
 
 	void ClearTile(int tileId);
 
@@ -51,6 +78,17 @@ public:
 	void PostLoad();
 
 private:
+	// takes already-clamped coordinates
+	const uint8_t& MapStateAt(int cx, int cz) const {
+		assert(cx >= 0 && cx <= mapDims.mapxm1 && cz >= 0 && cz <= mapDims.mapym1);
+		const int tileId   = (cz / TILE_SIZE) * tileStride + (cx / TILE_SIZE);
+		const int squareId = (cz & (TILE_SIZE - 1)) * TILE_SIZE  + (cx & (TILE_SIZE - 1));
+		return stateMap[tileId].squares[squareId];
+	}
+	uint8_t& MapStateAt(int cx, int cz) {
+		return const_cast<uint8_t&>(std::as_const(*this).MapStateAt(cx, cz));
+	}
+
 	// Each tile is exactly 64 bytes — one cache line.
 	// Tiles are stored in row-major order: tileId = (z/8)*tileStride + (x/8).
 	// Within a tile, squares are in row-major order: squareId = (z%8)*8 + (x%8).
@@ -68,6 +106,17 @@ private:
 	              "Tile must be trivially default constructible for resize() zero-init to hold");
 
 	int tileStride = 0; // tiles per map row, set by Init / PostLoad
+
+	// Per-block counters of EXIT_ONLY squares, one per 16x16 squares: a whole
+	// 8x8 status tile falls inside one block.
+	static constexpr int EXIT_ONLY_BLOCK_SHIFT = 4;
+	int ExitOnlyBlockIdx(int cx, int cz) const {
+		return (cz >> EXIT_ONLY_BLOCK_SHIFT) * exitOnlyBlockStride + (cx >> EXIT_ONLY_BLOCK_SHIFT);
+	}
+	void RebuildExitOnlyBlocks();
+
+	int exitOnlyBlockStride = 0;
+	std::vector<uint16_t> exitOnlyBlocks;
 
 	typedef std::vector<Tile> TileMapType;
 	TileMapType stateMap;
