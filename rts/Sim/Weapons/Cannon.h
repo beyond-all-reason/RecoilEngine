@@ -47,6 +47,6 @@ private:
 
 	const float3& GetAimFromPos(bool useMuzzle = false) const override { return weaponMuzzlePos; }
 
-	TargetCheckResult HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const override final;
+	TargetCheckResult HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg, int avoidFlagsOverride = -1) const override final;
 	void FireImpl(const bool scriptCall) override final;
 };

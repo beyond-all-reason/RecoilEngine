@@ -18,7 +18,7 @@ private:
 	bool TestTarget(const float3& pos, const SWeaponTarget& trg) const override final;
 	bool TestRange(const float3& tgtPos, const SWeaponTarget& trg) const override final;
 	// TODO: requires sampling parabola from aimFromPos down to dropPos
-	TargetCheckResult HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const override final { return TargetCheckResult::Clear; }
+	TargetCheckResult HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg, int avoidFlagsOverride = -1) const override final { return TargetCheckResult::Clear; }
 	void FireImpl(const bool scriptCall) override final;
 
 private:

@@ -64,14 +64,14 @@ public:
 	/// test if the enemy/mapspot is in range/angle
 	virtual bool TestRange(const float3& tgtPos, const SWeaponTarget& trg) const;
 	/// test if something is blocking our LineOfFire
-	virtual TargetCheckResult HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const;
+	virtual TargetCheckResult HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg, int avoidFlagsOverride = -1) const;
 
 	virtual bool CanFire(bool ignoreAngleGood, bool ignoreTargetType, bool ignoreRequestedDir) const;
 
-	TargetCheckResult TryTarget(const SWeaponTarget& trg) const;
-	TargetCheckResult TryTargetRotate(const CUnit* unit, bool userTarget, bool manualFire);
-	TargetCheckResult TryTargetRotate(float3 tgtPos, bool userTarget, bool manualFire);
-	TargetCheckResult TryTargetHeading(short heading, const SWeaponTarget& trg);
+	TargetCheckResult TryTarget(const SWeaponTarget& trg, int avoidFlagsOverride = -1) const;
+	TargetCheckResult TryTargetRotate(const CUnit* unit, bool userTarget, bool manualFire, int avoidFlagsOverride = -1);
+	TargetCheckResult TryTargetRotate(float3 tgtPos, bool userTarget, bool manualFire, int avoidFlagsOverride = -1);
+	TargetCheckResult TryTargetHeading(short heading, const SWeaponTarget& trg, int avoidFlagsOverride = -1);
 
 	bool WantOwnerRotation() const { return onlyForward; }
 public:
@@ -140,7 +140,7 @@ private:
 	bool CallAimingScript(bool waitForAim);
 	void HoldIfTargetInvalid();
 
-	TargetCheckResult TryTarget(const float3& tgtPos, const SWeaponTarget& trg, bool preFire = false) const;
+	TargetCheckResult TryTarget(const float3& tgtPos, const SWeaponTarget& trg, bool preFire = false, int avoidFlagsOverride = -1) const;
 
 public:
 	CUnit* owner;

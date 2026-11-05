@@ -2,6 +2,8 @@
 
 #include "LuaSyncedRead.h"
 
+#include <cmath>
+
 #include "LuaInclude.h"
 
 #include "LuaConfig.h"
@@ -5474,43 +5476,70 @@ int LuaSyncedRead::GetUnitWeaponVectors(lua_State* L)
  * @param posZ number
  * @return boolean canTarget
  */
+/*** Synced options-table extension: pass {avoidFlags=mask} after the target
+ * arguments to replace avoidance flags for this query only. Returns the native
+ * boolean, first failure reason and visible blocker type/ID. Without options,
+ * legacy argument handling and the single boolean return are unchanged.
+ */
 int LuaSyncedRead::GetUnitWeaponTryTarget(lua_State* L)
 {
 	const CUnit* unit = ParseAllyUnit(L, __func__, 1);
-
 	if (unit == nullptr)
 		return 0;
-
 	const size_t weaponNum = luaL_checkint(L, 2) - LUA_WEAPON_BASE_INDEX;
-
 	if (weaponNum >= unit->weapons.size())
 		return 0;
 
-	const CWeapon* weapon = unit->weapons[weaponNum];
+	CWeapon* weapon = unit->weapons[weaponNum];
 	const CUnit* enemy = nullptr;
-
 	float3 pos;
+	const int args = lua_gettop(L);
+	const int optionsIndex = (args == 4 || args == 6) && lua_istable(L, args) ? args : 0;
+	if (optionsIndex != 0 && !CLuaHandle::GetHandleSynced(L))
+		return luaL_error(L, "extended weapon target queries require synced Lua");
 
-	//we cannot test calling TryTarget/TestTarget/HaveFreeLineOfFire directly
-	// by passing a position thatis not approximately the wanted checked position, because
-	//the checks for target using passed position for checking both free line of fire and range
-	//which would result in wrong test unless target was by chance near coords <0,0,0>
-	//while position alone works because NULL target omits target class validity checks
-
-	if (lua_gettop(L) >= 5) {
+	if ((optionsIndex != 0 ? args - 1 : args) >= 5) {
 		pos.x = luaL_optnumber(L, 3, 0.0f);
 		pos.y = luaL_optnumber(L, 4, 0.0f);
 		pos.z = luaL_optnumber(L, 5, 0.0f);
-
 	} else {
-		enemy = ParseUnit(L, __func__, 3);
-
-		if (enemy == nullptr)
+		if ((enemy = ParseUnit(L, __func__, 3)) == nullptr)
 			return 0;
 	}
 
-	lua_pushboolean(L, weapon->TryTarget(SWeaponTarget(enemy, pos, true)) == TargetCheckResult::Clear);
-	return 1;
+	if (optionsIndex == 0) {
+		// Preserve existing argument handling and the single boolean return.
+		lua_pushboolean(L, weapon->TryTarget(SWeaponTarget(enemy, pos, true)) == TargetCheckResult::Clear);
+		return 1;
+	}
+	if (enemy == nullptr && (!std::isfinite(pos.x) || !std::isfinite(pos.y) || !std::isfinite(pos.z)))
+		return luaL_error(L, "invalid target position");
+
+	SWeaponTarget target = enemy != nullptr ? SWeaponTarget(enemy, true) : SWeaponTarget(pos, true);
+	int avoidFlags = -1;
+	lua_getfield(L, optionsIndex, "avoidFlags");
+	if (!lua_isnil(L, -1)) {
+		const auto value = luaL_checknumber(L, -1);
+		if (!std::isfinite(value) || value < 0 || value > 1023 || value != int(value))
+			return luaL_error(L, "invalid avoidance flags");
+		avoidFlags = int(value);
+	}
+	lua_pop(L, 1);
+
+	const TargetCheckResult result = weapon->TryTarget(target, avoidFlags);
+	lua_pushboolean(L, result == TargetCheckResult::Clear);
+	lua_pushstring(L, TargetCheckResultName(result));
+	const bool visible =
+		(result.objectType == TargetCheckResult::ObjectType::Unit && LuaUtils::IsUnitVisible(L, unitHandler.GetUnit(result.objectID))) ||
+		(result.objectType == TargetCheckResult::ObjectType::Feature && LuaUtils::IsFeatureVisible(L, featureHandler.GetFeature(result.objectID)));
+	if (visible) {
+		lua_pushstring(L, result.objectType == TargetCheckResult::ObjectType::Unit ? "unit" : "feature");
+		lua_pushnumber(L, result.objectID);
+	} else {
+		lua_pushnil(L);
+		lua_pushnil(L);
+	}
+	return 4;
 }
 
 

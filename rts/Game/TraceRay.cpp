@@ -26,6 +26,14 @@
 
 #include "System/Misc/TracyDefs.h"
 
+bool Collision::SkipFriendly(const CUnit* unit, int traceFlags)
+{
+	// Capability, not current velocity: stopped/stunned mobile units still
+	// belong to the mobile category.
+	return (traceFlags & (NOMOBILEFRIENDLIES | NOSTATICFRIENDLIES)) != 0 &&
+		(traceFlags & (unit->unitDef->IsImmobileUnit() ? NOSTATICFRIENDLIES : NOMOBILEFRIENDLIES)) != 0;
+}
+
 //////////////////////////////////////////////////////////////////////
 // Local/Helper functions
 //////////////////////////////////////////////////////////////////////
@@ -191,10 +199,10 @@ inline static bool TestTrajectoryConeHelper(
 namespace TraceRay {
 
 // called by {CRifle, CBeamLaser, CLightningCannon}::Fire(), CWeapon::HaveFreeLineOfFire(), and Skirmish AIs
-float TraceRay(const float3& p, const float3& d, float l, int f, const CUnit* o, CUnit*& hu, CFeature*& hf, CollisionQuery* cq)
+float TraceRay(const float3& p, const float3& d, float l, int f, const CUnit* o, CUnit*& hu, CFeature*& hf, CollisionQuery* cq, int queryFlags)
 {
 	assert(o != nullptr);
-	return (TraceRay(p, d, l, f, o->allyteam, o, hu, hf, cq));
+	return (TraceRay(p, d, l, f, o->allyteam, o, hu, hf, cq, queryFlags));
 }
 
 float TraceRay(
@@ -206,7 +214,8 @@ float TraceRay(
 	const CUnit* owner,
 	CUnit*& hitUnit,
 	CFeature*& hitFeature,
-	CollisionQuery* hitColQuery
+	CollisionQuery* hitColQuery,
+	int queryFlags
 ) {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// NOTE:
@@ -281,6 +290,8 @@ float TraceRay(
 						continue;
 
 					bool doHitTest = false;
+					if (u->allyteam == allyTeam && Collision::SkipFriendly(u, queryFlags))
+						continue;
 
 					doHitTest |= (scanForAllies   && u->allyteam == owner->allyteam);
 					doHitTest |= (scanForEnemies  && u->allyteam != owner->allyteam);
@@ -554,6 +565,8 @@ TargetCheckResult TestCone(
 			for (const CUnit* u: quad.teamUnits[allyteam]) {
 				if (u == owner)
 					continue;
+				if (u->allyteam == allyteam && Collision::SkipFriendly(u, traceFlags))
+					continue;
 				if (!u->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
 
@@ -568,6 +581,8 @@ TargetCheckResult TestCone(
 				if (!u->IsNeutral())
 					continue;
 				if (u == owner)
+					continue;
+				if (u->allyteam == allyteam && Collision::SkipFriendly(u, traceFlags))
 					continue;
 				if (!u->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
@@ -626,6 +641,8 @@ TargetCheckResult TestTrajectoryCone(
 			for (const CUnit* u: quad.teamUnits[allyteam]) {
 				if (u == owner)
 					continue;
+				if (u->allyteam == allyteam && Collision::SkipFriendly(u, traceFlags))
+					continue;
 				if (!u->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
 
@@ -642,6 +659,8 @@ TargetCheckResult TestTrajectoryCone(
 				if (!u->IsNeutral())
 					continue;
 				if (u == owner)
+					continue;
+				if (u->allyteam == allyteam && Collision::SkipFriendly(u, traceFlags))
 					continue;
 				if (!u->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;

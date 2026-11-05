@@ -68,12 +68,13 @@ void CMissileLauncher::FireImpl(const bool scriptCall)
 	WeaponProjectileFactory::LoadProjectile(params);
 }
 
-TargetCheckResult CMissileLauncher::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
+TargetCheckResult CMissileLauncher::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg, int avoidFlagsOverride) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	const int traceFlags = (avoidFlagsOverride < 0) ? (avoidFlags & 255) : avoidFlagsOverride;
 	// high-trajectory missiles use curved path rather than linear ground intersection
 	if (weaponDef->trajectoryHeight <= 0.0f)
-		return (CWeapon::HaveFreeLineOfFire(srcPos, tgtPos, trg));
+		return (CWeapon::HaveFreeLineOfFire(srcPos, tgtPos, trg, avoidFlagsOverride));
 
 	float3 targetVec = (tgtPos - srcPos) * XZVector;
 	float3 launchDir = (tgtPos - srcPos).SafeNormalize();
@@ -132,7 +133,7 @@ TargetCheckResult CMissileLauncher::HaveFreeLineOfFire(const float3& srcPos, con
 
 	// For close targets, impact within 8 frames, just use a TestTrajectoryCone check
 	if (hstep < 1.0f)
-		return (CWeapon::HaveFreeLineOfFire(srcPos, tgtPos, trg));
+		return (CWeapon::HaveFreeLineOfFire(srcPos, tgtPos, trg, avoidFlagsOverride));
 
 	float drdt = 0.0f;
 	float dydt = 0.0f;
@@ -178,7 +179,7 @@ TargetCheckResult CMissileLauncher::HaveFreeLineOfFire(const float3& srcPos, con
 	float delta2 = 0.0f;
 	float ratio = 0.0f;
 	float hitheight = 0.0f;
-	if ((avoidFlags & Collision::NOGROUND) == 0) {
+	if ((traceFlags & Collision::NOGROUND) == 0) {
 		// do not check last bit of trajectory, sized by damageAreaOfEffect
 		// to avoid false positive values at very end of trajectory
 		// this mimics CGround::TrajectoryGroundCol called by parabolic cannon shots 
@@ -211,9 +212,9 @@ TargetCheckResult CMissileLauncher::HaveFreeLineOfFire(const float3& srcPos, con
 
 	CollisionQuery cq;
 
-	const bool scanForAllies = ((avoidFlags & Collision::NOFRIENDLIES) == 0);
-	const bool scanForNeutrals = ((avoidFlags & Collision::NONEUTRALS) == 0);
-	const bool scanForFeatures = ((avoidFlags & Collision::NOFEATURES) == 0);
+	const bool scanForAllies = ((traceFlags & Collision::NOFRIENDLIES) == 0);
+	const bool scanForNeutrals = ((traceFlags & Collision::NONEUTRALS) == 0);
+	const bool scanForFeatures = ((traceFlags & Collision::NOFEATURES) == 0);
 	for (const int quadIdx : *qfQuery.quads) {
 		const CQuadField::Quad& quad = quadField.GetQuad(quadIdx);
 
@@ -221,6 +222,8 @@ TargetCheckResult CMissileLauncher::HaveFreeLineOfFire(const float3& srcPos, con
 		if (scanForAllies) {
 			for (const CUnit* u : quad.teamUnits[owner->allyteam]) {
 				if (u == owner)
+					continue;
+				if (u->allyteam == owner->allyteam && Collision::SkipFriendly(u, traceFlags))
 					continue;
 				if (!u->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
@@ -264,6 +267,8 @@ TargetCheckResult CMissileLauncher::HaveFreeLineOfFire(const float3& srcPos, con
 				if (!u->IsNeutral())
 					continue;
 				if (u == owner)
+					continue;
+				if (u->allyteam == owner->allyteam && Collision::SkipFriendly(u, traceFlags))
 					continue;
 				if (!u->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
