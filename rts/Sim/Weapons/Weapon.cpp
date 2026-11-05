@@ -479,7 +479,7 @@ void CWeapon::UpdateFire()
 		UpdateWeaponVectors();
 	} 
 
-	if (!TryTarget(currentTargetPos, currentTarget, true))
+	if (TryTarget(currentTargetPos, currentTarget, true) != TargetCheckResult::Clear)
 		return;
 
 	// pre-check if we got enough resources (so CobBlockShot gets only called when really possible to shoot)
@@ -631,7 +631,7 @@ bool CWeapon::Attack(const SWeaponTarget& newTarget)
 		case Target_Unit:
 		case Target_Pos:
 		case Target_Intercept: {
-			if (!TryTarget(newTarget))
+			if (TryTarget(newTarget) != TargetCheckResult::Clear)
 				return false;
 
 			SetAttackTarget(newTarget);
@@ -703,7 +703,7 @@ bool CWeapon::AllowWeaponAutoTarget() const
 		return true;
 
 	if (HaveUnitTarget()) {
-		if (!TryTarget(SWeaponTarget(currentTarget.unit, currentTarget.isUserTarget))) {
+		if (TryTarget(SWeaponTarget(currentTarget.unit, currentTarget.isUserTarget)) != TargetCheckResult::Clear) {
 			// if we have a user-target (ie. a user attack order)
 			// then only allow generating opportunity targets iff
 			// it is not possible to hit the user's chosen unit
@@ -762,7 +762,7 @@ bool CWeapon::AutoTarget()
 
 		// set isAutoTarget s.t. TestRange result is ignored
 		// (which enables pre-aiming at targets out of range)
-		if (!TryTarget(SWeaponTarget(unit, false, autoTargetRangeBoost > 0.0f)))
+		if (TryTarget(SWeaponTarget(unit, false, autoTargetRangeBoost > 0.0f)) != TargetCheckResult::Clear)
 			continue;
 
 		if (unit->IsNeutral() && (owner->fireState < FIRESTATE_FIREATNEUTRAL))
@@ -831,7 +831,7 @@ void CWeapon::HoldIfTargetInvalid()
 	if (!HaveTarget())
 		return;
 
-	if (!TryTarget(currentTarget)) {
+	if (TryTarget(currentTarget) != TargetCheckResult::Clear) {
 		// BombDroppers must retain ground targets until their active salvo ends.
 		// Dropping one after the aircraft passes the target prevents the CAI from
 		// associating the completed salvo with its current attack command.
@@ -970,22 +970,22 @@ float3 CWeapon::GetTargetBorderPos(
 }
 
 
-bool CWeapon::TryTarget(const float3& tgtPos, const SWeaponTarget& trg, bool preFire) const
+TargetCheckResult CWeapon::TryTarget(const float3& tgtPos, const SWeaponTarget& trg, bool preFire) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(GetLeadTargetPos(trg).SqDistance(tgtPos) < Square(250.0f));
 
 	if (!TestTarget(tgtPos, trg))
-		return false;
+		return TargetCheckResult::InvalidTarget;
 
 	// auto-targeted units are allowed to be out of range
 	// (UpdateFire will still block firing at such units)
 	if (!trg.isAutoTarget && !TestRange(tgtPos, trg))
-		return false;
+		return TargetCheckResult::Range;
 
 	// no LOF if aim-position is below ground (not in HFLOF, is overridden)
 	if (preFire && (weaponMuzzlePos.y < CGround::GetHeightReal(weaponMuzzlePos.x, weaponMuzzlePos.z)))
-		return false;
+		return TargetCheckResult::Terrain;
 
 	// TODO: add a forcedUserTarget (forced-fire mode enabled with CTRL e.g.) and skip the tests below
 	return (HaveFreeLineOfFire(GetAimFromPos(preFire), tgtPos, trg));
@@ -1128,12 +1128,13 @@ bool CWeapon::TestRange(const float3& tgtPos, const SWeaponTarget& trg) const
 }
 
 
-bool CWeapon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
+TargetCheckResult CWeapon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// Match the pre-fire muzzle check before considering the ground-hit AoE exception.
 	if ((avoidFlags & Collision::NOGROUND) == 0 && srcPos.y < CGround::GetHeightReal(srcPos))
-		return false;
+		return TargetCheckResult::Terrain;
+
 
 	float3 tgtDir = tgtPos - srcPos;
 
@@ -1141,7 +1142,7 @@ bool CWeapon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, con
 	const float spread = AccuracyExperience() + SprayAngleExperience();
 
 	if (length == 0.0f)
-		return true;
+		return TargetCheckResult::Clear;
 
 	CUnit* unit = nullptr;
 	CFeature* feature = nullptr;
@@ -1158,7 +1159,7 @@ bool CWeapon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, con
 		// A surface source pointing into terrain can hit at distance 0, so keep >= 0
 		// and retain the AoE exception.
 		if ((gndDst >= 0.0f) && (tgtDst > Square(damages->damageAreaOfEffect)))
-			return false;
+			return TargetCheckResult::Terrain;
 
 		unit = nullptr;
 		feature = nullptr;
@@ -1169,20 +1170,32 @@ bool CWeapon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, con
 	// this reduces to a ray intersection, which is also more accurate
 	// must nerf TraceRay since it scans for enemies and ground if the
 	// flags are omitted, unlike TestCone which is restricted to A/N/F
-	if (spread < 0.001f)
-		return (TraceRay::TraceRay(srcPos, tgtDir, length, avoidFlags | Collision::NOENEMIES | Collision::NOGROUND, owner, unit, feature) >= length);
+	if (spread < 0.001f) {
+		if (TraceRay::TraceRay(srcPos, tgtDir, length, avoidFlags | Collision::NOENEMIES | Collision::NOGROUND, owner, unit, feature) >= length)
+			return TargetCheckResult::Clear;
+		if (feature != nullptr)
+			return {TargetCheckResult::Feature, TargetCheckResult::ObjectType::Feature, feature->id};
+		if (unit != nullptr) {
+			if (unit->allyteam == owner->allyteam && (avoidFlags & Collision::NOFRIENDLIES) == 0)
+				return {TargetCheckResult::Friendly, TargetCheckResult::ObjectType::Unit, unit->id};
+			if (unit->IsNeutral() && (avoidFlags & Collision::NONEUTRALS) == 0)
+				return {TargetCheckResult::Neutral, TargetCheckResult::ObjectType::Unit, unit->id};
+			return {TargetCheckResult::Blocked, TargetCheckResult::ObjectType::Unit, unit->id};
+		}
+		return TargetCheckResult::Blocked;
+	}
 
-	return (!TraceRay::TestCone(srcPos, tgtDir, length, spread, owner->allyteam, avoidFlags, owner));
+	return (TraceRay::TestCone(srcPos, tgtDir, length, spread, owner->allyteam, avoidFlags, owner));
 }
 
 
-bool CWeapon::TryTarget(const SWeaponTarget& trg) const {
+TargetCheckResult CWeapon::TryTarget(const SWeaponTarget& trg) const {
 	RECOIL_DETAILED_TRACY_ZONE;
-	return TryTarget(GetLeadTargetPos(trg), trg);
+	return TryTarget(GetLeadTargetPos(trg), trg, false);
 }
 
 
-bool CWeapon::TryTargetRotate(const CUnit* unit, bool userTarget, bool manualFire)
+TargetCheckResult CWeapon::TryTargetRotate(const CUnit* unit, bool userTarget, bool manualFire)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 tempTargetPos = GetUnitLeadTargetPos(unit);
@@ -1207,7 +1220,7 @@ bool CWeapon::TryTargetRotate(const CUnit* unit, bool userTarget, bool manualFir
 }
 
 
-bool CWeapon::TryTargetRotate(float3 pos, bool userTarget, bool manualFire)
+TargetCheckResult CWeapon::TryTargetRotate(float3 pos, bool userTarget, bool manualFire)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	AdjustTargetPosToWater(pos, true);
@@ -1220,7 +1233,7 @@ bool CWeapon::TryTargetRotate(float3 pos, bool userTarget, bool manualFire)
 }
 
 
-bool CWeapon::TryTargetHeading(short heading, const SWeaponTarget& trg)
+TargetCheckResult CWeapon::TryTargetHeading(short heading, const SWeaponTarget& trg)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	const float3 tempfrontdir(owner->frontdir);
@@ -1233,7 +1246,7 @@ bool CWeapon::TryTargetHeading(short heading, const SWeaponTarget& trg)
 	auto wvs = SaveWeaponVectors();
 	UpdateWeaponVectors();
 
-	const bool val = TryTarget(trg);
+	const TargetCheckResult val = TryTarget(trg);
 
 	owner->frontdir = tempfrontdir;
 	owner->rightdir = temprightdir;

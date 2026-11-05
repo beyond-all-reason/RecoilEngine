@@ -590,14 +590,14 @@ bool CMobileCAI::IsValidTarget(const CUnit* enemy, CWeapon* weapon) const {
 	// test if given weapon belonging to owner can target
 	// the enemy unit; indicates an auto-targeting context
 	if (weapon != nullptr)
-		return (weapon->TestTarget(enemy->pos, {enemy}) && (owner->moveState != MOVESTATE_HOLDPOS || weapon->TryTargetRotate(enemy, false, false)));
+		return (weapon->TestTarget(enemy->pos, {enemy}) && (owner->moveState != MOVESTATE_HOLDPOS || weapon->TryTargetRotate(enemy, false, false) == TargetCheckResult::Clear));
 
 	// test if any of owner's weapons can target the enemy unit
 	if (owner->weapons.empty())
 		return false;
 
 	for (CWeapon* w: owner->weapons) {
-		if (w->TestTarget(enemy->pos, SWeaponTarget(enemy)) && (owner->moveState != MOVESTATE_HOLDPOS || w->TryTargetRotate(enemy, false, false)))
+		if (w->TestTarget(enemy->pos, SWeaponTarget(enemy)) && (owner->moveState != MOVESTATE_HOLDPOS || w->TryTargetRotate(enemy, false, false) == TargetCheckResult::Clear))
 			return true;
 	}
 
@@ -743,7 +743,7 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 		if (c.GetID() == CMD_MANUALFIRE && !w->weaponDef->manualfire)
 			continue;
 
-		tryTargetRotate = w->TryTargetRotate(orderTgtInfo.unit, orderTgtInfo.isUserTarget, orderTgtInfo.isManualFire);
+		tryTargetRotate = w->TryTargetRotate(orderTgtInfo.unit, orderTgtInfo.isUserTarget, orderTgtInfo.isManualFire) == TargetCheckResult::Clear;
 
 		edgeFactor = math::fabs(w->weaponDef->targetBorder);
 
@@ -764,7 +764,7 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 		const bool targetBehind = (targetMidPosVec.dot(orderTarget->speed) < 0.0f);
 
 		// TryTargetHeading has no side effects, so it is only run when its result is used
-		if (canChaseTarget && targetBehind && !owner->unitDef->IsHoveringAirUnit() && rotateWeapon->TryTargetHeading(targetHeading, orderTgtInfo)) {
+		if (canChaseTarget && targetBehind && !owner->unitDef->IsHoveringAirUnit() && rotateWeapon->TryTargetHeading(targetHeading, orderTgtInfo) == TargetCheckResult::Clear) {
 			SetGoal(owner->pos + (orderTarget->speed * 80), owner->pos, SQUARE_SIZE, orderTarget->speed.w * 1.1f);
 		} else {
 			StopMove();
@@ -861,7 +861,7 @@ void CMobileCAI::ExecuteGroundAttack(Command& c)
 		//   we call TryTargetHeading which is less restrictive than TryTarget
 		//   (eg. the former succeeds even if the unit has not already aligned
 		//   itself with <attackVec>)
-		if (!w->TryTargetHeading(attackHeading, attackTgtInfo))
+		if (w->TryTargetHeading(attackHeading, attackTgtInfo) != TargetCheckResult::Clear)
 			continue;
 
 		if (owner->AttackGround(attackTgtInfo.groundPos, attackTgtInfo.isUserTarget, false)) {

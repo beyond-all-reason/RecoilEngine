@@ -57,27 +57,28 @@ void CCannon::UpdateRange(const float val)
 }
 
 
-bool CCannon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
+TargetCheckResult CCannon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, const SWeaponTarget& trg) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// Use real terrain height: the trajectory scan's approximate height can be above a clear source.
 	if ((avoidFlags & Collision::NOGROUND) == 0 && srcPos.y < CGround::GetHeightReal(srcPos))
-		return false;
+		return TargetCheckResult::Terrain;
+
 
 	// assume we can still fire at partially submerged targets
 	if (!weaponDef->waterweapon && TargetUnderWater(tgtPos, trg))
-		return false;
+		return TargetCheckResult::InvalidTarget;
 
 	if (projectileSpeed == 0.0f)
-		return true;
+		return TargetCheckResult::Clear;
 
 	float3 launchDir = CalcWantedDir(tgtPos - srcPos);
 	float3 targetVec = (tgtPos - srcPos) * XZVector;
 
 	if (launchDir.SqLength() == 0.0f)
-		return false;
+		return TargetCheckResult::Range;
 	if (targetVec.SqLength2D() == 0.0f)
-		return true;
+		return TargetCheckResult::Clear;
 
 	const float xzTargetDist = targetVec.LengthNormalize();
 
@@ -102,10 +103,10 @@ bool CCannon::HaveFreeLineOfFire(const float3& srcPos, const float3& tgtPos, con
 	// can report an above-ground source as blocked. Keep > 0; the GetHeightReal check
 	// above rejects sources that are actually underground.
 	if (groundDist > 0.0f)
-		return false;
+		return TargetCheckResult::Terrain;
 
 	// TODO: add a forcedUserTarget mode (enabled with meta key e.g.) and skip this test accordingly
-	return (!TraceRay::TestTrajectoryCone(srcPos, targetVec, xzTargetDist, linCoeff, qdrCoeff, angleSpread, owner->allyteam, avoidFlags, owner));
+	return (TraceRay::TestTrajectoryCone(srcPos, targetVec, xzTargetDist, linCoeff, qdrCoeff, angleSpread, owner->allyteam, avoidFlags, owner));
 }
 
 void CCannon::FireImpl(const bool scriptCall)

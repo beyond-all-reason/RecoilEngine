@@ -526,7 +526,7 @@ float GuiTraceRay(
 }
 
 
-bool TestCone(
+TargetCheckResult TestCone(
 	const float3& from,
 	const float3& dir,
 	float length,
@@ -539,8 +539,9 @@ bool TestCone(
 	QuadFieldQuery qfQuery;
 	quadField.GetQuadsOnRay(qfQuery, from, dir, length);
 
-	if (qfQuery.quads->empty())
-		return true;
+	if (qfQuery.quads->empty()) {
+		return TargetCheckResult::Blocked;
+	}
 
 	const bool scanForAllies   = ((traceFlags & Collision::NOFRIENDLIES) == 0);
 	const bool scanForNeutrals = ((traceFlags & Collision::NONEUTRALS  ) == 0);
@@ -556,8 +557,9 @@ bool TestCone(
 				if (!u->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
 
-				if (TestConeHelper(from, dir, length, spread, u))
-					return true;
+				if (TestConeHelper(from, dir, length, spread, u)) {
+					return {TargetCheckResult::Friendly, TargetCheckResult::ObjectType::Unit, u->id};
+				}
 			}
 		}
 
@@ -570,8 +572,9 @@ bool TestCone(
 				if (!u->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
 
-				if (TestConeHelper(from, dir, length, spread, u))
-					return true;
+				if (TestConeHelper(from, dir, length, spread, u)) {
+					return {TargetCheckResult::Neutral, TargetCheckResult::ObjectType::Unit, u->id};
+				}
 			}
 		}
 
@@ -580,18 +583,19 @@ bool TestCone(
 				if (!f->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
 
-				if (TestConeHelper(from, dir, length, spread, f))
-					return true;
+				if (TestConeHelper(from, dir, length, spread, f)) {
+					return {TargetCheckResult::Feature, TargetCheckResult::ObjectType::Feature, f->id};
+				}
 			}
 		}
 	}
 
-	return false;
+	return TargetCheckResult::Clear;
 }
 
 
 
-bool TestTrajectoryCone(
+TargetCheckResult TestTrajectoryCone(
 	const float3& from,
 	const float3& dir,
 	float length,
@@ -606,8 +610,9 @@ bool TestTrajectoryCone(
 	QuadFieldQuery qfQuery;
 	quadField.GetQuadsOnRay(qfQuery, from, dir, length);
 
-	if (qfQuery.quads->empty())
-		return true;
+	if (qfQuery.quads->empty()) {
+		return TargetCheckResult::Blocked;
+	}
 
 	const bool scanForAllies   = ((traceFlags & Collision::NOFRIENDLIES) == 0);
 	const bool scanForNeutrals = ((traceFlags & Collision::NONEUTRALS  ) == 0);
@@ -624,8 +629,9 @@ bool TestTrajectoryCone(
 				if (!u->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
 
-				if (TestTrajectoryConeHelper(from, dir, length, linear, quadratic, spread, 0.0f, u))
-					return true;
+				if (TestTrajectoryConeHelper(from, dir, length, linear, quadratic, spread, 0.0f, u)) {
+					return {TargetCheckResult::Friendly, TargetCheckResult::ObjectType::Unit, u->id};
+				}
 
 			}
 		}
@@ -640,8 +646,9 @@ bool TestTrajectoryCone(
 				if (!u->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
 
-				if (TestTrajectoryConeHelper(from, dir, length, linear, quadratic, spread, 0.0f, u))
-					return true;
+				if (TestTrajectoryConeHelper(from, dir, length, linear, quadratic, spread, 0.0f, u)) {
+					return {TargetCheckResult::Neutral, TargetCheckResult::ObjectType::Unit, u->id};
+				}
 			}
 		}
 
@@ -651,13 +658,14 @@ bool TestTrajectoryCone(
 				if (!f->HasCollidableStateBit(CSolidObject::CSTATE_BIT_QUADMAPRAYS))
 					continue;
 
-				if (TestTrajectoryConeHelper(from, dir, length, linear, quadratic, spread, 0.0f, f))
-					return true;
+				if (TestTrajectoryConeHelper(from, dir, length, linear, quadratic, spread, 0.0f, f)) {
+					return {TargetCheckResult::Feature, TargetCheckResult::ObjectType::Feature, f->id};
+				}
 			}
 		}
 	}
 
-	return false;
+	return TargetCheckResult::Clear;
 }
 
 
