@@ -193,6 +193,16 @@ void CFactory::StartBuild(const UnitDef* buildeeDef) {
 
 	UnitLoadParams buildeeParams = {buildeeDef, this, buildPos, ZeroVector, -1, team, buildFacing, true, false};
 	CUnit* buildee = unitLoader->LoadUnit(buildeeParams);
+	if (buildee == nullptr)
+		return;
+
+	// UnitCreated can kill the factory or change its build order before the
+	// new unit has been assigned to curBuild. Do not leave an orphan nanoframe.
+	if (isDead || curBuildDef != buildeeDef || buildee->isDead) {
+		if (!buildee->isDead)
+			buildee->KillUnit(nullptr, false, true, -CSolidObject::DAMAGE_FACTORY_CANCEL);
+		return;
+	}
 
 	if (!unitDef->canBeAssisted) {
 		buildee->soloBuilder = this;
