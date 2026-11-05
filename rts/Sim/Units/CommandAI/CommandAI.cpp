@@ -68,7 +68,6 @@ CR_REG_METADATA(CCommandAI, (
 	CR_MEMBER(nonQueingCommands),
 	CR_MEMBER(commandQue),
 	CR_MEMBER(lastUserCommand),
-	CR_MEMBER(selfDCountdown),
 	CR_MEMBER(lastFinishCommand),
 	CR_MEMBER(finishCommandBudget),
 
@@ -88,7 +87,6 @@ CR_REG_METADATA(CCommandAI, (
 CCommandAI::CCommandAI():
 	stockpileWeapon(0),
 	lastUserCommand(-1000),
-	selfDCountdown(0),
 	lastFinishCommand(0),
 	finishCommandBudget(0),
 	owner(NULL),
@@ -103,7 +101,6 @@ CCommandAI::CCommandAI():
 CCommandAI::CCommandAI(CUnit* owner):
 	stockpileWeapon(0),
 	lastUserCommand(-1000),
-	selfDCountdown(0),
 	lastFinishCommand(0),
 	finishCommandBudget(0),
 	owner(owner),
@@ -970,11 +967,10 @@ void CCommandAI::GiveAllowedCommand(const Command& c, bool fromSynced)
 		case CMD_SELFD: {
 			if (owner->unitDef->canSelfD) {
 				if (!(c.GetOpts() & SHIFT_KEY) || commandQue.empty()) {
-					if (owner->selfDCountdown != 0) {
-						owner->selfDCountdown = 0;
-					} else {
-						owner->selfDCountdown = owner->unitDef->selfDCountdown*2+1;
-					}
+					if (owner->selfDTargetFrame > 0)
+						owner->CancelSelfD();
+					else
+						owner->StartSelfD(owner->unitDef->selfDCountdown);
 				}
 				else if (commandQue.back().GetID() == CMD_SELFD) {
 					commandQue.pop_back();
@@ -1561,11 +1557,10 @@ void CCommandAI::SlowUpdate()
 			return;
 		}
 		case CMD_SELFD: {
-			if ((owner->selfDCountdown != 0) || !owner->unitDef->canSelfD) {
-				owner->selfDCountdown = 0;
-			} else {
-				owner->selfDCountdown = (owner->unitDef->selfDCountdown * 2) + 1;
-			}
+			if (owner->selfDTargetFrame > 0)
+				owner->CancelSelfD();
+			else if (owner->unitDef->canSelfD)
+				owner->StartSelfD(owner->unitDef->selfDCountdown);
 			FinishCommand();
 			return;
 		}

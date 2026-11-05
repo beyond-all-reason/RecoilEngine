@@ -81,6 +81,8 @@ CALLIN_LIST = {
 	"UnitLeftUnderwater",
 	"UnitCommand",
 	"UnitHarvestStorageFull",
+	"UnitSelfDestructStarted",
+	"UnitSelfDestructCancelled",
 
 	-- weapon callins
 	"StockpileChanged",
