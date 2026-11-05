@@ -225,6 +225,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetUnitPhysicalStateBit);
 	REGISTER_LUA_CFUNC(SetUnitTravel);
 	REGISTER_LUA_CFUNC(SetUnitFuel);
+	REGISTER_LUA_CFUNC(SetUnitFacingTarget);
 	REGISTER_LUA_CFUNC(SetUnitMoveGoal);
 	REGISTER_LUA_CFUNC(SetUnitLandGoal);
 	REGISTER_LUA_CFUNC(ClearUnitGoal);
@@ -3988,6 +3989,30 @@ int LuaSyncedCtrl::SetUnitPosErrorParams(lua_State* L)
 	return 0;
 }
 
+
+/*** Ask the movement controller to face a position while attacking.
+ * Uses native turning for ground units and attack-flight behavior for gunships.
+ * Does not assign a weapon target.
+ * @function Spring.SetUnitFacingTarget
+ * @param unitID integer
+ * @param x number
+ * @param y number
+ * @param z number
+ * @param radius number Pointing distance used by the movement controller
+ */
+int LuaSyncedCtrl::SetUnitFacingTarget(lua_State* L)
+{
+	CUnit* unit = ParseUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
+	const float3 position(luaL_checkfloat(L, 2), luaL_checkfloat(L, 3), luaL_checkfloat(L, 4));
+	const float radius = luaL_checkfloat(L, 5);
+	if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z) ||
+	    !std::isfinite(radius) || radius < 0)
+		return luaL_error(L, "invalid facing position or radius");
+	unit->moveType->KeepPointingTo(position, radius, true);
+	return 0;
+}
 
 /*** Used by default commands to get in build-, attackrange etc.
  * Normal (non-raw) goals for the current AttackCommandMovement unit use its

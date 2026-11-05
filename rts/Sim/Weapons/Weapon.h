@@ -72,6 +72,8 @@ public:
 	TargetCheckResult TryTargetRotate(const CUnit* unit, bool userTarget, bool manualFire, int avoidFlagsOverride = -1);
 	TargetCheckResult TryTargetRotate(float3 tgtPos, bool userTarget, bool manualFire, int avoidFlagsOverride = -1);
 	TargetCheckResult TryTargetHeading(short heading, const SWeaponTarget& trg, int avoidFlagsOverride = -1);
+	// Hypothetical translation/yaw of the current pose; no pathing or aiming.
+	TargetCheckResult TryTargetAt(const float3& pos, short heading, const SWeaponTarget& trg, int avoidFlagsOverride, bool useMuzzle);
 
 	bool WantOwnerRotation() const { return onlyForward; }
 public:

@@ -43,6 +43,7 @@ public:
 	void StopSlowGuard();
 	void StartSlowGuard(float speed);
 	void ExecuteAttack(Command& c) override;
+	bool GetStrafeLeft() const { return moveDir; }
 	bool IsAttackMovementContextValid() const;
 	bool CallAttackMovement(Command& c);
 	void ExecuteStop(Command& c) override;

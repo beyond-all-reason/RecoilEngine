@@ -703,7 +703,7 @@ void CMobileCAI::ExecuteStop(Command& c)
 
 
 
-// Movement operations are only valid during this unit's movement call-in.
+// Track the active call-in for invalidation checks and command-owned goals.
 // A copied command survives command-queue edits made by a gadget.
 namespace {
 	struct AttackMovementScope {

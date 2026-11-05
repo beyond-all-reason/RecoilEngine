@@ -22,18 +22,47 @@ if not gadgetHandler:IsSyncedCode() then
 	end
 	return
 end
-local cases = { "handled", "false", "nil", "replace", "targetDeath", "ownerDeath" }
+local cases = {
+	"handled",
+	"false",
+	"nil",
+	"replace",
+	"targetDeath",
+	"ownerDeath",
+	"finishSuccessor",
+	"groundCoordinates",
+	"sensorCoordinates",
+}
 local shooter, target, active, calls, finished
 local function cleanup(id)
 	if id and Spring.ValidUnitID(id) then
 		Spring.DestroyUnit(id, false, true)
 	end
 end
-function gadget:AttackCommandMovement(id)
+function gadget:AttackCommandMovement(id, _, _, _, targetID, x, y, z)
 	if id ~= shooter then
 		return false
 	end
 	calls = calls + 1
+	assert(type(x) == "number" and type(y) == "number" and type(z) == "number", "missing target coordinates")
+	if active == "groundCoordinates" then
+		local _, _, _, cx, cy, cz = Spring.GetUnitCurrentCommand(id)
+		assert(targetID == nil and x == cx and y == cy and z == cz, "ground command coordinates changed")
+		return true
+	end
+	if active == "sensorCoordinates" then
+		assert(targetID == target)
+		local _, _, _, mx, my, mz = Spring.GetUnitPosition(target, true)
+		-- Forced radar-only visibility and error size 1 make the expected
+		-- midpoint offset exact. Interpolation is frozen below.
+		assert(x == mx + 64 and y == my + 16 and z == mz - 32, "sensor error not passed to callback")
+		return true
+	end
+	if active == "finishSuccessor" then
+		Spring.UnitFinishCommand(id)
+		assert(Spring.GetUnitCurrentCommand(id) == CMD.MOVE, "queued MOVE lost")
+		return false
+	end
 	if active == "handled" then
 		return true
 	end
@@ -79,10 +108,28 @@ function gadget:GameFrame(frame)
 		Spring.GiveOrderToUnit(shooter, CMD.FIRE_STATE, { 0 }, {})
 		Spring.GiveOrderToUnit(target, CMD.FIRE_STATE, { 0 }, {})
 		Spring.SetUnitWeaponState(shooter, 1, "reloadState", 1000000)
+		if active == "finishSuccessor" then
+			Spring.SetUnitHealth(shooter, { paralyze = 100000 })
+		end
 		Spring.SetGameRulesParam("attack_dispatch_gaia", 0)
 		Spring.SetGameRulesParam("attack_dispatch_later", 0)
 	elseif phase == 30 then
-		Spring.GiveOrderToUnit(shooter, CMD.ATTACK, { target }, {})
+		if active == "sensorCoordinates" then
+			Spring.SetUnitLosMask(target, 0, 15)
+			Spring.SetUnitLosState(target, 0, 2) -- radar only
+			Spring.SetRadarErrorParams(0, 1)
+			Spring.SetUnitPosErrorParams(target, 64, 16, -32, 0, 0, 0, 1000000, 0, true)
+		end
+		Spring.GiveOrderToUnit(
+			shooter,
+			CMD.ATTACK,
+			active == "groundCoordinates" and { 2048, 200, 2248 } or { target },
+			{}
+		)
+		if active == "finishSuccessor" then
+			Spring.GiveOrderToUnit(shooter, CMD.MOVE, { 2048, 200, 3000 }, { "shift" })
+			Spring.SetUnitHealth(shooter, { paralyze = 0 })
+		end
 	elseif phase == 119 then
 		local gaia = Spring.GetGameRulesParam("attack_dispatch_gaia") or 0
 		local later = Spring.GetGameRulesParam("attack_dispatch_later") or 0

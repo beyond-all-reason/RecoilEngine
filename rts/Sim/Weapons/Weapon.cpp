@@ -1259,6 +1259,34 @@ TargetCheckResult CWeapon::TryTargetHeading(short heading, const SWeaponTarget& 
 }
 
 
+TargetCheckResult CWeapon::TryTargetAt(const float3& pos, short heading, const SWeaponTarget& trg, int avoidFlagsOverride, bool useMuzzle)
+{
+	// As in TryTargetHeading, only the temporary weapon coordinate system is
+	// changed. No Move/SetPosition, quadfield update, script call-in or RNG use.
+	// Keep the current up direction, velocity and underwater state: this tests a
+	// translated current pose, not the unit's future simulation state.
+	const float3 savedPos = owner->pos;
+	const float3 savedFront = owner->frontdir;
+	const float3 savedRight = owner->rightdir;
+	const short savedHeading = owner->heading;
+	const auto savedVectors = SaveWeaponVectors();
+
+	owner->pos = pos;
+	owner->heading = heading;
+	owner->frontdir = GetVectorFromHeading(heading);
+	owner->rightdir = owner->frontdir.cross(owner->updir);
+	UpdateWeaponVectors();
+	const auto result = TryTarget(GetLeadTargetPos(trg), trg, useMuzzle, avoidFlagsOverride);
+
+	LoadWeaponVectors(savedVectors);
+	owner->pos = savedPos;
+	owner->frontdir = savedFront;
+	owner->rightdir = savedRight;
+	owner->heading = savedHeading;
+	return result;
+}
+
+
 void CWeapon::Init()
 {
 	RECOIL_DETAILED_TRACY_ZONE;

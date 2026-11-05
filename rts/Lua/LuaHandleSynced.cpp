@@ -1738,7 +1738,8 @@ bool CSyncedLuaHandle::ShieldPreDamaged(
  * 90% range threshold. Command initialization and weapon firing remain native.
  * Return literal true to handle this update; false/nil or an error uses native
  * behavior, unless the callback invalidated the command, owner or order target.
- * Only one of targetID and x/y/z is populated. This is not a shot-fired event.
+ * Coordinates are always populated; object targets include the attacking
+ * allyteam's sensor error. This is not a shot-fired event.
  * Movement API effects are not rolled back when returning false or on errors.
  * Dispatch stops at the first handler returning true, or at invalidation,
  * including across LuaRules and LuaGaia. Later handlers do not run that update.
@@ -1748,11 +1749,14 @@ bool CSyncedLuaHandle::ShieldPreDamaged(
  * @param cmdID integer
  * @param cmdOptions integer Command option bitmask
  * @param targetID integer? Object target
- * @param x number? Ground target x
- * @param y number? Ground target y
- * @param z number? Ground target z
+ * @param x number Perceived object midpoint or ground target x
+ * @param y number Perceived object midpoint or ground target y
+ * @param z number Perceived object midpoint or ground target z
  * @param temporary boolean Attack generated as a temporary command-AI suborder
  * @return boolean handled
+ * @see Spring.GetUnitWeaponTryTarget
+ * @see Spring.SetUnitFacingTarget
+ * @see Spring.UnitFinishCommand
  */
 bool CSyncedLuaHandle::AttackCommandMovement(const CUnit* unit, const Command& cmd)
 {
@@ -1766,14 +1770,13 @@ bool CSyncedLuaHandle::AttackCommandMovement(const CUnit* unit, const Command& c
 	lua_pushnumber(L, cmd.GetTag());
 	lua_pushnumber(L, cmd.GetID());
 	lua_pushnumber(L, cmd.GetOpts());
-	if (cmd.GetNumParams() == 1) {
-		lua_pushnumber(L, cmd.GetParam(0));
-		lua_pushnil(L); lua_pushnil(L); lua_pushnil(L);
-	} else {
+	const CUnit* target = unit->commandAI->orderTarget;
+	if (target != nullptr)
+		lua_pushnumber(L, target->id);
+	else
 		lua_pushnil(L);
-		const float3 pos = cmd.GetPos(0);
-		lua_pushnumber(L, pos.x); lua_pushnumber(L, pos.y); lua_pushnumber(L, pos.z);
-	}
+	const float3 pos = target != nullptr ? target->GetErrorPos(unit->allyteam, false) : cmd.GetPos(0);
+	lua_pushnumber(L, pos.x); lua_pushnumber(L, pos.y); lua_pushnumber(L, pos.z);
 	lua_pushboolean(L, static_cast<const CMobileCAI*>(unit->commandAI)->tempOrder);
 	if (!RunCallInTraceback(L, cmdStr, 9, 1, dbgTrace.GetErrFuncIdx(), false))
 		return false;
