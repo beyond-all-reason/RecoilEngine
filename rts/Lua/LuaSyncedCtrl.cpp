@@ -68,6 +68,7 @@
 #include "Sim/Units/UnitTypes/Factory.h"
 #include "Sim/Units/CommandAI/Command.h"
 #include "Sim/Units/CommandAI/CommandAI.h"
+#include "Sim/Units/CommandAI/MobileCAI.h"
 #include "Sim/Units/CommandAI/FactoryCAI.h"
 #include "Sim/Units/UnitTypes/ExtractorBuilding.h"
 #include "Sim/Weapons/PlasmaRepulser.h"
@@ -3989,6 +3990,9 @@ int LuaSyncedCtrl::SetUnitPosErrorParams(lua_State* L)
 
 
 /*** Used by default commands to get in build-, attackrange etc.
+ * Normal (non-raw) goals for the current AttackCommandMovement unit use its
+ * command AI, retaining a matching active goal. Other calls keep their existing
+ * independent movement behavior.
  *
  * @function Spring.SetUnitMoveGoal
  * @param unitID UnitID
@@ -4014,7 +4018,15 @@ int LuaSyncedCtrl::SetUnitMoveGoal(lua_State* L)
 	const float radius = luaL_optfloat(L, 5, 0.0f);
 	const float speed  = luaL_optfloat(L, 6, unit->moveType->GetMaxSpeed());
 
-	if (luaL_optboolean(L, 7, false)) {
+	const bool raw = luaL_optboolean(L, 7, false);
+	// Within the movement callback, normal goals belong to the active attack.
+	// Use the same command-AI path as native movement, including goal reuse.
+	if (auto* cai = dynamic_cast<CMobileCAI*>(unit->commandAI); !raw && cai != nullptr && cai->IsAttackMovementContextValid()) {
+		cai->SetGoal(pos, unit->pos, radius, speed);
+		return 0;
+	}
+
+	if (raw) {
 		unit->moveType->StartMovingRaw(pos, radius);
 	} else {
 		unit->moveType->StartMoving(pos, radius, speed);

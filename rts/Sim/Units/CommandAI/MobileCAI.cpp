@@ -2,6 +2,7 @@
 
 
 #include "MobileCAI.h"
+
 #include "ExternalAI/EngineOutHandler.h"
 #include "Game/GameHelper.h"
 #include "Game/GlobalUnsynced.h"
@@ -702,9 +703,54 @@ void CMobileCAI::ExecuteStop(Command& c)
 
 
 
+// Movement operations are only valid during this unit's movement call-in.
+// A copied command survives command-queue edits made by a gadget.
+namespace {
+	struct AttackMovementScope {
+		CMobileCAI* cai;
+		Command command;
+		CUnit* target;
+		bool targetDead;
+	};
+	thread_local AttackMovementScope* attackMovementScope = nullptr;
+
+}
+
+bool CMobileCAI::CallAttackMovement(Command& c)
+{
+	if (owner->isDead || !eventHandler.HasAttackCommandMovement())
+		return false;
+	AttackMovementScope scope{this, c, orderTarget, orderTarget != nullptr && orderTarget->isDead};
+	auto* previous = attackMovementScope;
+	attackMovementScope = &scope;
+	const bool handled = eventHandler.AttackCommandMovement(owner, scope.command);
+	attackMovementScope = previous;
+	// Do not touch the original command reference after Lua replaced its queue.
+	return handled || owner->isDead || orderTarget != scope.target || commandQue.empty() ||
+		commandQue.front().GetTag() != scope.command.GetTag() ||
+		commandQue.front().GetID() != scope.command.GetID();
+}
+
+bool CMobileCAI::IsAttackMovementContextValid() const
+{
+	return attackMovementScope != nullptr && attackMovementScope->cai == this &&
+		!owner->isDead && orderTarget == attackMovementScope->target && !commandQue.empty() &&
+		// Native AI can enter with a dead target (e.g. fireAtKilled). Only a
+		// death during this callback invalidates an otherwise identical target.
+		(orderTarget == nullptr || orderTarget->isDead == attackMovementScope->targetDead) &&
+		commandQue.front().GetTag() == attackMovementScope->command.GetTag() &&
+		commandQue.front().GetID() == attackMovementScope->command.GetID();
+}
+
 void CMobileCAI::ExecuteObjectAttack(Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (!(c.GetOpts() & ALT_KEY) && SkipParalyzeTarget(orderTarget)) {
+		StopMoveAndFinishCommand();
+		return;
+	}
+	if (CallAttackMovement(c))
+		return;
 	bool tryTargetRotate  = false;
 	bool tryOwnerRotation = false; // if a weapon doesn't swivel to aim we've got to know about it to rotate the owner instead
 
@@ -723,12 +769,6 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 	const float targetMidPosDist2D = targetMidPosVec.Length2D();
 	// const float targetMidPosMaxDist = owner->maxRange - (Square(orderTarget->speed.w) / owner->unitDef->maxAcc);
 
-	if (!owner->weapons.empty()) {
-		if (!(c.GetOpts() & ALT_KEY) && SkipParalyzeTarget(orderTarget)) {
-			StopMoveAndFinishCommand();
-			return;
-		}
-	}
 
 	// tell weapons about the ordered target-unit
 	SWeaponTarget orderTgtInfo(orderTarget);
@@ -838,6 +878,8 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 void CMobileCAI::ExecuteGroundAttack(Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (CallAttackMovement(c))
+		return;
 	const float3 attackPos = c.GetPos(0);
 	const float3 attackVec = attackPos - owner->pos;
 	const short  attackHeading = GetHeadingFromVector(attackVec.x, attackVec.z);
