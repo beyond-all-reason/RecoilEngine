@@ -408,6 +408,11 @@ endif()
 	set(test_flags "-DUNITSYNC")
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
 	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	if (WIN32)
+		# unitsync.dll is built outside test_UnitSync.exe's folder; ctest would otherwise hang on the DLL-not-found box
+		set_tests_properties(test${test_name} PROPERTIES
+			ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:unitsync>")
+	endif ()
 	add_dependencies(test_${test_name} springcontent.sdz)
 
 ################################################################################
