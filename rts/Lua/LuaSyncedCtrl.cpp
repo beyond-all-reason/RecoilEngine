@@ -110,7 +110,7 @@ namespace Impl {
 			return 0;
 
 		if (lmp->SetPieceSpaceMatrix(mat))
-			lmp->SetDirty();
+			lmp->SetDirty(true);
 
 		lua_pushboolean(L, lmp->blockScriptAnims);
 		return 1;
@@ -3797,7 +3797,6 @@ int LuaSyncedCtrl::SetUnitPieceParent(lua_State* L)
 	}
 
 	childPiece->parent->RemoveChild(childPiece);
-	childPiece->SetParent(parentPiece);
 	parentPiece->AddChild(childPiece);
 	return 0;
 }
