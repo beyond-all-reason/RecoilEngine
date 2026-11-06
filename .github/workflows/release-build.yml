@@ -48,9 +48,13 @@ jobs:
       package-suffix: '-tracy'
       split-debug-info: false
     secrets: inherit
+  build-engine-macos:
+    needs: get-tag
+    uses: ./.github/workflows/engine-build-macos.yml
+    secrets: inherit
   create-release:
     runs-on: ubuntu-latest
-    needs: [build-engine, build-engine-tracy, get-tag]
+    needs: [build-engine, build-engine-tracy, build-engine-macos, get-tag]
     steps:
       - name: Download All Artifacts
         uses: actions/download-artifact@v4
