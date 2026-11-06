@@ -2,6 +2,9 @@
 
 #include "LuaSyncedRead.h"
 
+#include <cmath>
+#include <string>
+
 #include "LuaInclude.h"
 
 #include "LuaConfig.h"
@@ -5459,61 +5462,167 @@ int LuaSyncedRead::GetUnitWeaponVectors(lua_State* L)
 }
 
 
-/***
- *
+/*** Options for an extended weapon targeting query (synced Lua only).
+ * Without options, GetUnitWeaponTryTarget retains its single boolean result.
+ * With options it also returns the first failed check and visible blocker identity.
+ * No script aiming, reload or firing-readiness checks are performed.
+ * @class WeaponTargetQuery
+ * @field orientation ("current"|"rotate"|"heading")? Defaults to current; rotate aligns the weapon, heading aligns the chassis toward the target
+ * @field avoidFlags integer? Query-only replacement for avoidance flags
+ * @field position number[]? Candidate unit base position {x,y,z}; requires explicit heading
+ * @field heading integer? Signed chassis heading (-32768 through 32767)
+ * @field useMuzzle boolean? Use muzzle instead of pre-aim geometry; requires heading orientation
+ * @field userTarget boolean? Defaults to true; false tests an internal order
+ * @field manualFire boolean? Defaults to false
+ */
+/*** Test a unit target, optionally with different firing geometry.
+ * Candidate queries translate the current pose without predicting animation,
+ * terrain alignment, water transitions or path reachability. Queries restore
+ * the unit and weapon geometry and do not modify stored avoidance flags.
  * @function Spring.GetUnitWeaponTryTarget
  * @param unitID UnitID
  * @param weaponNum integer
  * @param targetID UnitID
- * @return boolean canTarget
+ * @param options WeaponTargetQuery? Synced Lua only
+ * @return boolean? canTarget
+ * @return string? reason With options: clear, invalidTarget, range, terrain, friendly, neutral, feature, blocked
+ * @return string? blockerType With options: unit or feature, when visible to the caller
+ * @return integer? blockerID First blocker in native scan order, not necessarily nearest
  */
-/***
- *
+/*** Test a ground target, optionally with different firing geometry.
  * @function Spring.GetUnitWeaponTryTarget
  * @param unitID UnitID
  * @param weaponNum integer
  * @param posX number
  * @param posY number
  * @param posZ number
- * @return boolean canTarget
+ * @param options WeaponTargetQuery? Synced Lua only
+ * @return boolean? canTarget
+ * @return string? reason With options: first failed check
+ * @return string? blockerType With options: unit or feature, when visible to the caller
+ * @return integer? blockerID
  */
 int LuaSyncedRead::GetUnitWeaponTryTarget(lua_State* L)
 {
 	const CUnit* unit = ParseAllyUnit(L, __func__, 1);
-
 	if (unit == nullptr)
 		return 0;
-
 	const size_t weaponNum = luaL_checkint(L, 2) - LUA_WEAPON_BASE_INDEX;
-
 	if (weaponNum >= unit->weapons.size())
 		return 0;
 
-	const CWeapon* weapon = unit->weapons[weaponNum];
+	CWeapon* weapon = unit->weapons[weaponNum];
 	const CUnit* enemy = nullptr;
-
 	float3 pos;
+	const int args = lua_gettop(L);
+	const int optionsIndex = (args == 4 || args == 6) && lua_istable(L, args) ? args : 0;
+	if (optionsIndex != 0 && !CLuaHandle::GetHandleSynced(L))
+		return luaL_error(L, "extended weapon target queries require synced Lua");
 
-	//we cannot test calling TryTarget/TestTarget/HaveFreeLineOfFire directly
-	// by passing a position thatis not approximately the wanted checked position, because
-	//the checks for target using passed position for checking both free line of fire and range
-	//which would result in wrong test unless target was by chance near coords <0,0,0>
-	//while position alone works because NULL target omits target class validity checks
-
-	if (lua_gettop(L) >= 5) {
+	if ((optionsIndex != 0 ? args - 1 : args) >= 5) {
 		pos.x = luaL_optnumber(L, 3, 0.0f);
 		pos.y = luaL_optnumber(L, 4, 0.0f);
 		pos.z = luaL_optnumber(L, 5, 0.0f);
-
 	} else {
-		enemy = ParseUnit(L, __func__, 3);
-
-		if (enemy == nullptr)
+		if ((enemy = ParseUnit(L, __func__, 3)) == nullptr)
 			return 0;
 	}
 
-	lua_pushboolean(L, weapon->TryTarget(SWeaponTarget(enemy, pos, true)));
-	return 1;
+	if (optionsIndex == 0) {
+		// Preserve existing argument handling and the single boolean return.
+		lua_pushboolean(L, weapon->TryTarget(SWeaponTarget(enemy, pos, true)) == TargetCheckResult::Clear);
+		return 1;
+	}
+	if (enemy == nullptr && (!std::isfinite(pos.x) || !std::isfinite(pos.y) || !std::isfinite(pos.z)))
+		return luaL_error(L, "invalid target position");
+
+	SWeaponTarget target = enemy != nullptr ? SWeaponTarget(enemy, true) : SWeaponTarget(pos, true);
+	const auto ReadBool = [L, optionsIndex](const char* key, bool fallback) {
+		lua_getfield(L, optionsIndex, key);
+		if (!lua_isnil(L, -1))
+			luaL_checktype(L, -1, LUA_TBOOLEAN);
+		const bool value = luaL_optboolean(L, -1, fallback);
+		lua_pop(L, 1);
+		return value;
+	};
+	target.isUserTarget = ReadBool("userTarget", true);
+	target.isManualFire = ReadBool("manualFire", false);
+	const bool useMuzzle = ReadBool("useMuzzle", false);
+	lua_getfield(L, optionsIndex, "orientation");
+	const std::string orientation = luaL_optstring(L, -1, "current");
+	lua_pop(L, 1);
+	if (orientation != "current" && orientation != "rotate" && orientation != "heading")
+		return luaL_error(L, "orientation must be current, rotate or heading");
+
+	int avoidFlags = -1;
+	lua_getfield(L, optionsIndex, "avoidFlags");
+	if (!lua_isnil(L, -1)) {
+		const auto value = luaL_checknumber(L, -1);
+		if (!std::isfinite(value) || value < 0 || value > 1023 || value != int(value))
+			return luaL_error(L, "invalid avoidance flags");
+		avoidFlags = int(value);
+	}
+	lua_pop(L, 1);
+
+	bool candidate = false;
+	float3 position = unit->pos;
+	const float3 targetPos = enemy != nullptr ? float3(enemy->midPos) : pos;
+	const float3 origin = enemy != nullptr ? float3(unit->midPos) : unit->pos;
+	short heading = ::GetHeadingFromVector(targetPos.x - origin.x, targetPos.z - origin.z);
+	lua_getfield(L, optionsIndex, "position");
+	if (!lua_isnil(L, -1)) {
+		luaL_checktype(L, -1, LUA_TTABLE);
+		for (int i = 0; i < 3; ++i) {
+			lua_rawgeti(L, -1, i + 1);
+			position[i] = luaL_checkfloat(L, -1);
+			lua_pop(L, 1);
+		}
+		if (!position.IsInBounds() || !std::isfinite(position.y))
+			return luaL_error(L, "invalid candidate position");
+		candidate = true;
+	}
+	lua_pop(L, 1);
+	lua_getfield(L, optionsIndex, "heading");
+	if (candidate && lua_isnil(L, -1))
+		return luaL_error(L, "candidate position requires an explicit heading");
+	if (!lua_isnil(L, -1)) {
+		const auto value = luaL_checknumber(L, -1);
+		if (!std::isfinite(value) || value < -32768 || value > 32767 || value != int(value))
+			return luaL_error(L, "invalid candidate heading");
+		heading = short(value);
+		candidate = true;
+	}
+	lua_pop(L, 1);
+	if (candidate && orientation != "heading")
+		return luaL_error(L, "candidate queries require heading orientation");
+	if (useMuzzle && orientation != "heading")
+		return luaL_error(L, "muzzle queries require heading orientation");
+
+	TargetCheckResult result = TargetCheckResult::NotChecked;
+	if (orientation == "current") {
+		result = weapon->TryTarget(target, avoidFlags);
+	} else if (candidate || useMuzzle) {
+		result = weapon->TryTargetAt(position, heading, target, avoidFlags, useMuzzle);
+	} else if (orientation == "heading") {
+		result = weapon->TryTargetHeading(heading, target, avoidFlags);
+	} else {
+		result = enemy != nullptr
+			? weapon->TryTargetRotate(enemy, target.isUserTarget, target.isManualFire, avoidFlags)
+			: weapon->TryTargetRotate(pos, target.isUserTarget, target.isManualFire, avoidFlags);
+	}
+	lua_pushboolean(L, result == TargetCheckResult::Clear);
+	lua_pushstring(L, TargetCheckResultName(result));
+	const bool visible =
+		(result.objectType == TargetCheckResult::ObjectType::Unit && LuaUtils::IsUnitVisible(L, unitHandler.GetUnit(result.objectID))) ||
+		(result.objectType == TargetCheckResult::ObjectType::Feature && LuaUtils::IsFeatureVisible(L, featureHandler.GetFeature(result.objectID)));
+	if (visible) {
+		lua_pushstring(L, result.objectType == TargetCheckResult::ObjectType::Unit ? "unit" : "feature");
+		lua_pushnumber(L, result.objectID);
+	} else {
+		lua_pushnil(L);
+		lua_pushnil(L);
+	}
+	return 4;
 }
 
 
@@ -5718,7 +5827,7 @@ int LuaSyncedRead::GetUnitWeaponHaveFreeLineOfFire(lua_State* L)
 		} break;
 	}
 
-	lua_pushboolean(L, weapon->HaveFreeLineOfFire(srcPos, tgtPos, SWeaponTarget(enemy, tgtPos, true)));
+	lua_pushboolean(L, weapon->HaveFreeLineOfFire(srcPos, tgtPos, SWeaponTarget(enemy, tgtPos, true)) == TargetCheckResult::Clear);
 	return 1;
 }
 
@@ -6117,6 +6226,10 @@ int LuaSyncedRead::GetUnitBlocking(lua_State* L)
 
 /***
  *
+ * Includes strafeLeft for mobile command AIs: the native controller's seeded
+ * strafe side. A Lua controller can read it once when taking ownership, then
+ * manage its own direction without consuming simulation RNG. Native state does
+ * not follow subsequent Lua direction changes.
  * @function Spring.GetUnitMoveTypeData
  * @param unitID UnitID
  */
@@ -6129,6 +6242,11 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 	AMoveType* amt = unit->moveType;
 
 	lua_createtable(L, 0, 26);
+	// Seed for a Lua-owned strafe controller. Native and Lua controllers must
+	// not alternate updates while assuming they share subsequent direction state.
+	if (const auto* cai = dynamic_cast<const CMobileCAI*>(unit->commandAI))
+		LuaPushNamedBool(L, "strafeLeft", cai->GetStrafeLeft());
+
 	LuaPushNamedNumber(L, "maxSpeed", amt->GetMaxSpeed() * GAME_SPEED);
 	LuaPushNamedNumber(L, "maxWantedSpeed", amt->GetMaxWantedSpeed() * GAME_SPEED);
 	LuaPushNamedNumber(L, "goalx", amt->goalPos.x);
