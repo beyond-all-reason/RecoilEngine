@@ -188,6 +188,7 @@ namespace QTPFS {
 		std::vector<SearchThreadData> searchThreadData;
 		std::vector<UpdateThreadData> updateThreadData;
 		std::vector<unsigned char> nodeLayerUpdatePriorityOrder;
+		std::vector<int> nodeLayersToUpdate;
 
 		PathTraceMap pathTraces;
 		SharedPathMap sharedPaths;
