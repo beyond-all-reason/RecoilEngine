@@ -185,6 +185,10 @@ void CHoverAirMoveType::SetState(AircraftState newState)
 
 	aircraftState = newState;
 
+	// only a landing or landed aircraft keeps its footprint on the ground
+	if (aircraftState != AIRCRAFT_LANDING && aircraftState != AIRCRAFT_LANDED)
+		owner->UnBlock();
+
 	switch (aircraftState) {
 		case AIRCRAFT_CRASHING:
 			owner->SetPhysicalStateBit(CSolidObject::PSTATE_BIT_CRASHING);
@@ -209,7 +213,6 @@ void CHoverAirMoveType::SetState(AircraftState newState)
 			break;
 		case AIRCRAFT_TAKEOFF:
 			owner->Activate();
-			owner->UnBlock();
 			owner->SetPhysicalStateBit(CSolidObject::PSTATE_BIT_FLYING);
 			break;
 		case AIRCRAFT_HOVERING: {
