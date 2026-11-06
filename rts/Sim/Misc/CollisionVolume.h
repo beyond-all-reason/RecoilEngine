@@ -136,7 +136,7 @@ public:
 	bool DefaultToPieceTree() const { return defaultToPieceTree; }
 	bool UsePolygonPieceVolumes() const { return usePolygonPieceVolumes; }
 
-	bool HasCustomType() const { return (volumeType < COLVOL_TYPE_SPHERE); }
+	bool HasCustomType() const { return (volumeType != COLVOL_TYPE_SPHERE); }
 	bool HasCustomProp(float r) const { return (axisOffsets.SqLength() >= 1.0f || math::fabs(volumeBoundingRadius - r) >= 1.0f); }
 
 	float3 GetWorldSpacePos(const CSolidObject* o, const float3& extOffsets = ZeroVector) const;
