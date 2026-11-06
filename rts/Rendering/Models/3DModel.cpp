@@ -33,6 +33,9 @@ S3DModel& S3DModel::operator= (S3DModel&& m) noexcept {
 	indxStart = m.indxStart;
 	indxCount = m.indxCount;
 
+	numPrimitives = m.numPrimitives;
+	numVertexColorPrimitives = m.numVertexColorPrimitives;
+
 	pieceObjects.swap(m.pieceObjects);
 
 	for (auto po : pieceObjects)

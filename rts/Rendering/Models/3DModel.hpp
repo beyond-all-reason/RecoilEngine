@@ -65,6 +65,28 @@ struct S3DModel
 	void DrawStatic() const;
 	void SetPieceMatrices();
 
+	/**
+	 * Authored per-vertex colour (glTF COLOR_0) is imported per mesh primitive. A primitive without
+	 * it still gets the importer's opaque white default, which a shader cannot tell apart from authored
+	 * white, so the importer tells each model how many of its primitives had real data and Lua
+	 * reads the aggregate as model.vertexColor. Formats without vertex colour (S3O, 3DO, ...) never
+	 * call AddPrimitive and therefore report VERTEX_COLOR_NONE.
+	 */
+	enum VertexColorReport {
+		VERTEX_COLOR_NONE,    // no primitive (or no geometry at all) had COLOR_0
+		VERTEX_COLOR_PARTIAL, // some primitives had COLOR_0, others fell back to white
+		VERTEX_COLOR_ALL      // every primitive had COLOR_0
+	};
+	void AddPrimitive(bool hasAuthoredVertexColor) {
+		numPrimitives++;
+		numVertexColorPrimitives += (hasAuthoredVertexColor ? 1 : 0);
+	}
+	VertexColorReport GetVertexColorReport() const {
+		if (numVertexColorPrimitives == 0)
+			return VERTEX_COLOR_NONE;
+		return (numVertexColorPrimitives == numPrimitives) ? VERTEX_COLOR_ALL : VERTEX_COLOR_PARTIAL;
+	}
+
 	void FlattenPieceTree(S3DModelPiece* root);
 
 	void UpdatePiecesMinMaxExtents();
@@ -94,6 +116,10 @@ public:
 
 	uint32_t indxStart; //global VBO offset, size data
 	uint32_t indxCount;
+
+	// counters behind GetVertexColorReport(); only the glTF importer writes them
+	uint32_t numPrimitives = 0;
+	uint32_t numVertexColorPrimitives = 0;
 
 	ModelType type;
 
