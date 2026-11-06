@@ -61,6 +61,7 @@ public:
 
 	virtual bool IsValidTarget(const CUnit* enemy, CWeapon* weapon) const;
 	virtual bool CanWeaponAutoTarget(const CWeapon* weapon) const override;
+	bool HasAutoAttackCommand() const override;
 
 	void SetTransportee(CUnit* unit);
 	bool FindEmptySpot(const CUnit* unloadee, const float3& center, float radius, float spread, float3& found, bool fromSynced = true);
