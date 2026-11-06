@@ -101,8 +101,13 @@ void SolidObjectDef::ParseCollisionVolume(const LuaTable& odTable)
 	// "polygon" is a per-piece shape: the object-level volume has no piece
 	// behind it, so it stays a plain sphere and merely defers to the piece
 	// tree (same as usePieceCollisionVolumes) while every piece is switched
-	// to COLVOL_TYPE_POLYGON once its LocalModel exists
-	usePolygonPieceVolumes = (!cvTypeRaw.empty() && (cvTypeRaw.front() == 'p' || cvTypeRaw.front() == 'P'));
+	// to COLVOL_TYPE_POLYGON once its LocalModel exists.
+	//
+	// The choice is kept as a flag on the volume, next to defaultToPieceTree,
+	// rather than as the volume's type: a polygon def has no use for scales and
+	// normally sets none, so the volume counts as a default one and InitDefault
+	// would turn the type back into a sphere on every instance.
+	const bool usePolygonPieceVolumes = (!cvTypeRaw.empty() && (cvTypeRaw.front() == 'p' || cvTypeRaw.front() == 'P'));
 
 	const std::string cvType = usePolygonPieceVolumes ? std::string("") : cvTypeRaw;
 
@@ -125,6 +130,7 @@ void SolidObjectDef::ParseCollisionVolume(const LuaTable& odTable)
 	// if this unit wants per-piece volumes, make
 	// its main collision volume deferent and let
 	// it ignore hits
+	collisionVolume.SetUsePolygonPieceVolumes(usePolygonPieceVolumes);
 	collisionVolume.SetDefaultToPieceTree(odTable.GetBool("usePieceCollisionVolumes", false) || usePolygonPieceVolumes);
 	collisionVolume.SetDefaultToFootPrint(odTable.GetBool("useFootPrintCollisionVolume", false));
 	collisionVolume.SetIgnoreHits(collisionVolume.DefaultToPieceTree());

@@ -109,7 +109,9 @@ void CSolidObject::ApplyPolygonPieceVolumes()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 
-	if (!GetDef()->usePolygonPieceVolumes)
+	// read from the def's volume rather than this object's: CUnit::PreInit
+	// calls this before it copies unitDef->collisionVolume into the instance
+	if (!GetDef()->collisionVolume.UsePolygonPieceVolumes())
 		return;
 
 	for (LocalModelPiece& lmp: localModel.pieces) {

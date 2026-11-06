@@ -108,6 +108,7 @@ public:
 	void SetIgnoreHits(bool b) { ignoreHits = b; }
 	void SetUseContHitTest(bool b) { useContHitTest = b; }
 	void SetDefaultToPieceTree(bool b) { defaultToPieceTree = b; }
+	void SetUsePolygonPieceVolumes(bool b) { usePolygonPieceVolumes = b; }
 	void SetDefaultToFootPrint(bool b) { defaultToFootPrint = b; }
 
 	int GetPrimaryAxis() const { return volumeAxes[0]; }
@@ -133,6 +134,7 @@ public:
 	bool DefaultToSphere() const { return (fullAxisScales.equals(OnesVector, ZeroVector)); }
 	bool DefaultToFootPrint() const { return defaultToFootPrint; }
 	bool DefaultToPieceTree() const { return defaultToPieceTree; }
+	bool UsePolygonPieceVolumes() const { return usePolygonPieceVolumes; }
 
 	bool HasCustomType() const { return (volumeType < COLVOL_TYPE_SPHERE); }
 	bool HasCustomProp(float r) const { return (axisOffsets.SqLength() >= 1.0f || math::fabs(volumeBoundingRadius - r) >= 1.0f); }
@@ -171,6 +173,7 @@ private:
 	bool useContHitTest = true;                    /// if true, CollisionHandler does continuous instead of discrete hit-testing
 	bool defaultToFootPrint = false;               /// if true, volume becomes a box with dimensions equal to a SolidObject's {x,z}size
 	bool defaultToPieceTree = false;               /// if true, volume is owned by a unit but defaults to piece-volume tree for hit-testing
+	bool usePolygonPieceVolumes = false;           /// if true, piece volumes are COLVOL_TYPE_POLYGON (set by collisionVolumeType = "polygon")
 };
 
 #endif

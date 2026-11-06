@@ -133,7 +133,7 @@ waste most of every cache line it touches.
 rts/Sim/Misc/CollisionVolume.{h,cpp}
 rts/Sim/Misc/CollisionHandler.{h,cpp}
 rts/Sim/Objects/SolidObject.{h,cpp}
-rts/Sim/Objects/SolidObjectDef.{h,cpp}
+rts/Sim/Objects/SolidObjectDef.cpp
 rts/Sim/Units/Unit.cpp
 rts/Sim/Features/Feature.cpp
 rts/Rendering/DebugColVolDrawer.cpp
@@ -310,7 +310,7 @@ local sx,sy,sz, ox,oy,oz, vType, testType, pAxis, ignoreHits =
 rts/Sim/Misc/CollisionVolume.{h,cpp}
 rts/Sim/Misc/CollisionHandler.{h,cpp}
 rts/Sim/Objects/SolidObject.{h,cpp}
-rts/Sim/Objects/SolidObjectDef.{h,cpp}
+rts/Sim/Objects/SolidObjectDef.cpp
 rts/Sim/Units/Unit.cpp
 rts/Sim/Features/Feature.cpp
 rts/Rendering/DebugColVolDrawer.cpp
