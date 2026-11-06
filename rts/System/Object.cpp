@@ -6,6 +6,10 @@
 #include "System/creg/STL_Map.h"
 #include "System/Log/ILog.h"
 #include "System/Platform/CrashHandler.h"
+#include <optional>
+
+CR_BIND(ObjectDependencySet, )
+CR_REG_METADATA(ObjectDependencySet, (CR_MEMBER(objects), CR_MEMBER(shared)))
 
 CR_BIND(CObject, )
 
@@ -53,6 +57,9 @@ CObject::~CObject()
 {
 	assert(!detached);
 	detached = true;
+	std::optional<SharedObjectSet::Batch> commandMutations;
+	if (listenersDepTbl.find(DEPENDENCE_COMMANDQUE) != listenersDepTbl.end() || listeningDepTbl.find(DEPENDENCE_COMMANDQUE) != listeningDepTbl.end())
+		commandMutations.emplace();
 
 	// NB: listenersDepTbl must be iterated sequentially
 	// due to the presence of obj->DependentDied(this);
@@ -68,8 +75,16 @@ CObject::~CObject()
 		++cnt;
 
 		assert(it->second < listeners.size());
+		if (dt == DEPENDENCE_COMMANDQUE) {
+			listeners[it->second].shared.Visit([&](CObject* obj) {
+				obj->DependentDied(this);
+				const auto jt = obj->listeningDepTbl.find(DEPENDENCE_COMMANDQUE);
+				if (jt != obj->listeningDepTbl.end()) obj->listening[jt->second].shared.Erase(this);
+			});
+			continue;
+		}
 
-		for (CObject* obj: listeners[it->second]) {
+		for (CObject* obj: listeners[it->second].objects) {
 			obj->DependentDied(this);
 
 			const auto jt = obj->listeningDepTbl.find(it->first);
@@ -77,21 +92,28 @@ CObject::~CObject()
 			if (jt == obj->listeningDepTbl.end())
 				continue;
 
-			VectorEraseSorted(obj->listening[ jt->second ], this);
+			VectorEraseSorted(obj->listening[ jt->second ].objects, this);
 		}
 	}
 
 	for (const auto& p: listeningDepTbl) {
 		assert(p.first >= DEPENDENCE_ATTACKER && p.first < DEPENDENCE_COUNT);
 		assert(p.second < listening.size());
+		if (p.first == DEPENDENCE_COMMANDQUE) {
+			listening[p.second].shared.Visit([&](CObject* obj) {
+				const auto jt = obj->listenersDepTbl.find(DEPENDENCE_COMMANDQUE);
+				if (jt != obj->listenersDepTbl.end()) obj->listeners[jt->second].shared.Erase(this);
+			});
+			continue;
+		}
 
-		for (CObject* obj: listening[p.second]) {
+		for (CObject* obj: listening[p.second].objects) {
 			const auto jt = obj->listenersDepTbl.find(p.first);
 
 			if (jt == obj->listenersDepTbl.end())
 				continue;
 
-			VectorEraseSorted(obj->listeners[ jt->second ], this);
+			VectorEraseSorted(obj->listeners[ jt->second ].objects, this);
 		}
 	}
 }
@@ -109,6 +131,13 @@ void CObject::AddDeathDependence(CObject* obj, DependenceType dep)
 	// check this explicitly
 	if (detached || obj->detached)
 		return;
+	if (dep == DEPENDENCE_COMMANDQUE) {
+		GetListening(dep);
+		obj->GetListeners(dep);
+		listening[listeningDepTbl[dep]].shared.Insert(obj);
+		obj->listeners[obj->listenersDepTbl[dep]].shared.Insert(this);
+		return;
+	}
 
 	VectorInsertSorted(const_cast<TSyncSafeSet&>(     GetListening(dep)),  obj);
 	VectorInsertSorted(const_cast<TSyncSafeSet&>(obj->GetListeners(dep)), this);
@@ -121,11 +150,18 @@ void CObject::DeleteDeathDependence(CObject* obj, DependenceType dep)
 
 	if (detached || obj->detached)
 		return;
+	if (dep == DEPENDENCE_COMMANDQUE) {
+		const auto it = listeningDepTbl.find(dep);
+		const auto jt = obj->listenersDepTbl.find(dep);
+		if (it != listeningDepTbl.end()) listening[it->second].shared.Erase(obj);
+		if (jt != obj->listenersDepTbl.end()) obj->listeners[jt->second].shared.Erase(this);
+		return;
+	}
 
 	const auto it =      listeningDepTbl.find(dep);
 	const auto jt = obj->listenersDepTbl.find(dep);
 
-	if (it !=      listeningDepTbl.end()) VectorEraseSorted(     listening[ it->second ],  obj);
-	if (jt != obj->listenersDepTbl.end()) VectorEraseSorted(obj->listeners[ jt->second ], this);
+	if (it !=      listeningDepTbl.end()) VectorEraseSorted(     listening[ it->second ].objects,  obj);
+	if (jt != obj->listenersDepTbl.end()) VectorEraseSorted(obj->listeners[ jt->second ].objects, this);
 }
 

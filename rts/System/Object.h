@@ -11,6 +11,15 @@
 #include "ObjectDependenceTypes.h"
 #include "System/creg/creg_cond.h"
 #include "System/UnorderedMap.hpp"
+#include "System/SharedObjectSet.h"
+
+// Dependency storage is allocated only when a dependence-type slot is used.
+// Keep shared roots out of CObject itself: large object pools preallocate it.
+struct ObjectDependencySet {
+	CR_DECLARE_STRUCT(ObjectDependencySet)
+	std::vector<CObject*> objects;
+	SharedObjectSet shared;
+};
 
 class CObject
 {
@@ -76,7 +85,7 @@ private:
 
 public:
 	typedef std::vector<CObject*> TSyncSafeSet;
-	typedef std::vector<TSyncSafeSet> TDependenceMap;
+	typedef std::vector<ObjectDependencySet> TDependenceMap;
 	typedef std::function<bool(const CObject*, int*)> TObjFilterPred;
 
 	bool detached;
@@ -88,10 +97,10 @@ protected:
 		if (it == listenersDepTbl.end()) {
 			listeners.emplace_back();
 			listenersDepTbl[dep] = listeners.size() - 1;
-			return (listeners.back());
+			return (listeners.back().objects);
 		}
 
-		return (listeners[it->second]);
+		return (listeners[it->second].objects);
 	}
 	const TSyncSafeSet& GetListening(const DependenceType dep) {
 		const auto it = listeningDepTbl.find(dep);
@@ -99,10 +108,10 @@ protected:
 		if (it == listeningDepTbl.end()) {
 			listening.emplace_back();
 			listeningDepTbl[dep] = listening.size() - 1;
-			return (listening.back());
+			return (listening.back().objects);
 		}
 
-		return (listening[it->second]);
+		return (listening[it->second].objects);
 	}
 
 	const TDependenceMap& GetAllListeners() const { return listeners; }
@@ -115,10 +124,12 @@ protected:
 	) {
 		objectIDs[0] = 0;
 
-		for (const auto& objs: depObjects) {
-			for (const CObject* obj: objs) {
-				objectIDs[0] += ((objectIDs[0] < (N - 1)) && filterPred(obj, &objectIDs[objectIDs[0] + 1]));
-			}
+		auto visit = [&](const CObject* obj) {
+			objectIDs[0] += ((objectIDs[0] < (N - 1)) && filterPred(obj, &objectIDs[objectIDs[0] + 1]));
+		};
+		for (const auto& slot: depObjects) {
+			slot.shared.Visit(visit);
+			for (const CObject* obj: slot.objects) visit(obj);
 		}
 	}
 
