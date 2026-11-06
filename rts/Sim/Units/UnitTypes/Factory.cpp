@@ -198,9 +198,19 @@ void CFactory::StartBuild(const UnitDef* buildeeDef) {
 
 	// UnitCreated can kill the factory or change its build order before the
 	// new unit has been assigned to curBuild. Do not leave an orphan nanoframe.
-	if (isDead || curBuildDef != buildeeDef || buildee->isDead) {
-		if (!buildee->isDead)
-			buildee->KillUnit(nullptr, false, true, -CSolidObject::DAMAGE_FACTORY_CANCEL);
+	if (buildee->isDead)
+		return;
+
+	if (isDead) {
+		/* Technically Lua can first cancel and then kill,
+		 * in which case the reason won't be correct, but
+		 * that is an edge case. Perhaps ideally Lua would
+		 * be the one responsible for removing buildees on
+		 * factory death in the first place. */
+		buildee->KillUnit(nullptr, false, true, -CSolidObject::DAMAGE_FACTORY_KILLED);
+		return;
+	} else if (curBuildDef != buildeeDef) {
+		buildee->KillUnit(nullptr, false, true, -CSolidObject::DAMAGE_FACTORY_CANCEL);
 		return;
 	}
 
