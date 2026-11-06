@@ -832,6 +832,8 @@ static int SetSolidObjectPieceCollisionVolumeData(lua_State* L, CSolidObject* ob
 	const unsigned int pAxis = luaL_optint(L, 11, vol->GetPrimaryAxis());
 
 	// piece volumes are not allowed to use discrete hit-testing
+	// COLVOL_TYPE_POLYGON needs no extra wiring: it traces the triangles of
+	// the very piece this volume belongs to, resolved at test time
 	vol->InitShape(scales, offset, vType, CollisionVolume::COLVOL_HITTEST_CONT, pAxis);
 	vol->SetIgnoreHits(!luaL_checkboolean(L, 3));
 	return 0;

@@ -12,6 +12,7 @@ constexpr float3 WORLD_TO_OBJECT_SPACE = {-1.0f, 1.0f, 1.0f};
 constexpr float COLLISION_VOLUME_EPS = 0.0000000001f;
 
 struct LocalModelPiece;
+struct S3DModelPiece;
 class CMatrix44f;
 class CSolidObject;
 class CUnit;
@@ -27,6 +28,7 @@ public:
 		COLVOL_TYPE_CYLINDER  =  1,
 		COLVOL_TYPE_BOX       =  2,
 		COLVOL_TYPE_SPHERE    =  3,
+		COLVOL_TYPE_POLYGON   =  4,
 	};
 	enum {
 		COLVOL_AXIS_X = 0,
@@ -88,6 +90,18 @@ public:
 	void SetBoundingRadius();
 	void SetOffsets(const float3& offsets) { axisOffsets = offsets; }
 
+	/// COLVOL_TYPE_POLYGON traces the owning piece's real triangles. The
+	/// geometry is NOT cached here: every caller that can reach a polygon
+	/// volume already holds the LocalModelPiece it belongs to, so the
+	/// piece is passed in at test time instead. That keeps this struct
+	/// free of raw geometry pointers, which would otherwise dangle across
+	/// savegame loads, model swaps and volume copies.
+	/// Vertices live in piece-local space (see ModelUtils.cpp, "transform
+	/// model space mesh vertices into bone/piece space") -- exactly the
+	/// space Intersect() works in once axisOffsets are forced to zero for
+	/// this type, so the volume follows the piece's own orientation
+	/// through GetModelSpaceMatrix() with no transform of its own.
+
 	int GetVolumeType() const { return volumeType; }
 	void SetVolumeType(int type) { volumeType = type; }
 
@@ -130,9 +144,10 @@ public:
 
 private:
 	float GetPointSurfaceDistance(const CSolidObject* obj, const LocalModelPiece* lmp, const CMatrix44f& mat, const float3& pos) const;
-	float GetPointSurfaceDistance(const CMatrix44f& mv, const float3& p) const;
+	float GetPointSurfaceDistance(const CMatrix44f& mv, const float3& p, const LocalModelPiece* lmp) const;
 
 	float GetCylinderDistance(const float3& pv, size_t axisA = 0, size_t axisB = 1, size_t axisC = 2) const;
+	float GetPolygonDistance(const float3& pv, const LocalModelPiece* lmp) const;
 	float GetEllipsoidDistance(const float3& pv) const;
 
 private:

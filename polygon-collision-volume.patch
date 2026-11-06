@@ -1,0 +1,1011 @@
+diff --git a/POLYGON_COLVOL.md b/POLYGON_COLVOL.md
+new file mode 100644
+index 0000000000..29651d8f38
+--- /dev/null
++++ b/POLYGON_COLVOL.md
+@@ -0,0 +1,324 @@
++# Polygon collision volumes
++
++A fork of [RecoilEngine](https://github.com/beyond-all-reason/RecoilEngine)
++adding a per-piece collision volume type that traces a piece's real
++triangles instead of fitting an axis-aligned box around them.
++
++*Русская версия — ниже. / Russian version below.*
++
++---
++
++## English
++
++### The problem
++
++Recoil builds each piece's default collision volume as an axis-aligned
++bounding box over that piece's vertices — see `ModelUtils.cpp`,
++`S3OParser.cpp` and `3DOParser.cpp`, all of which do:
++
++```cpp
++piece->SetCollisionVolume(CollisionVolume('b', 'z',
++    piece->maxs - piece->mins,
++    (piece->maxs + piece->mins) * 0.5f));
++```
++
++For a piece that sits at an angle — sloped armour, angled plating, a
++rotated module — that box is considerably larger than the piece itself
++and protrudes into empty space. Shots register against nothing.
++
++Collision volumes have no rotation parameter, so the box cannot be
++tilted to match. The only workaround available today is rotating the
++piece itself from a script, which also rotates the visible mesh and is
++impractical when many differently-angled parts are involved.
++
++### The approach
++
++Rather than adding a second source of orientation, this fork adds a
++volume type whose shape *is* the geometry: `COLVOL_TYPE_POLYGON`.
++
++Orientation comes from the piece, through the same
++`LocalModelPiece::GetModelSpaceMatrix()` path every other volume type
++uses. The piece's vertices already live in piece-local space
++(`ModelUtils.cpp`: *"transform model space mesh vertices into bone/piece
++space"*), which is exactly the space `CCollisionHandler::Intersect()`
++works in, so no extra transform is introduced anywhere.
++
++### Usage
++
++In the UnitDef:
++
++```lua
++collisionVolumeType = "polygon",
++```
++
++That is all. Every piece of the unit switches to polygon volumes and
++piece-tree hit testing is enabled automatically — `usePieceCollisionVolumes`
++is implied and does not need to be written.
++
++For **mixed** setups, leave `collisionVolumeType` out, set
++
++```lua
++usePieceCollisionVolumes = true,
++```
++
++and assign volumes per piece from the unit script or a gadget:
++
++```lua
++-- volume types: 0 ellipsoid, 1 cylinder, 2 box, 3 sphere, 4 polygon
++Spring.SetUnitPieceCollisionVolumeData(unitID, piece("hull"), true,
++    0,0,0, 0,0,0, 4, 0)       -- polygon: scales and offsets unused
++
++Spring.SetUnitPieceCollisionVolumeData(unitID, piece("turret"), true,
++    30,20,30, 0,10,0, 2, 0)   -- box: scales and offsets do apply
++```
++
++Excluding a piece from hit detection works as with any volume type — via
++the third argument:
++
++```lua
++Spring.SetUnitPieceCollisionVolumeData(unitID, piece("flare"), false,
++    0,0,0, 0,0,0, 4, 0)
++```
++
++Reading a volume back (10 return values, type is numeric):
++
++```lua
++local sx,sy,sz, ox,oy,oz, vType, testType, pAxis, ignoreHits =
++    Spring.GetUnitPieceCollisionVolumeData(unitID, pieceIndex)
++```
++
++`/debugcolvol` draws polygon volumes as a wireframe of the same triangles
++the collision test traces, through the same matrix — so if the outline
++does not sit on the mesh, neither do the hits.
++
++### Design notes
++
++- **Scales and offsets are ignored** for this type. Offsets are forced to
++  zero in `InitShape()` so a stray value cannot shift the volume away
++  from the mesh it is supposed to follow.
++- **No cached geometry pointer.** The piece is passed to the intersection
++  routine at test time rather than stored on the volume, so there is
++  nothing to dangle across savegame loads, model swaps or volume copies.
++- **The object-level volume cannot be polygon** — it has no piece behind
++  it. It stays a sphere and defers to the piece tree, the same way
++  `usePieceCollisionVolumes` already works.
++- **Broad-phase.** The axis-scale box reject is meaningless for this type,
++  so a bounding sphere derived from the piece's own `mins`/`maxs` is used
++  instead; rays nowhere near a piece never reach the per-triangle loop.
++- **Discrete (point-in-volume) testing is not implemented.** It is also
++  unreachable: `DetectHit()` branches to `IntersectPieceTree()` when
++  `DefaultToPieceTree()` is set, before the continuous/discrete choice is
++  made, and that branch overrides `forceTrace`, which itself overrides
++  `testType`.
++
++### Cost
++
++Cost scales with triangle count per piece: a box is closed-form maths, a
++polygon is a loop. Low-poly collision shells are recommended. The
++bounding-sphere reject keeps rays that miss entirely out of the loop, but
++a detailed mesh will still cost more than a primitive.
++
++### Changed files
++
++```
++rts/Sim/Misc/CollisionVolume.{h,cpp}
++rts/Sim/Misc/CollisionHandler.{h,cpp}
++rts/Sim/Objects/SolidObject.{h,cpp}
++rts/Sim/Objects/SolidObjectDef.{h,cpp}
++rts/Sim/Units/Unit.cpp
++rts/Sim/Features/Feature.cpp
++rts/Rendering/DebugColVolDrawer.cpp
++rts/Lua/LuaSyncedCtrl.cpp
++rts/Lua/LuaSyncedRead.cpp
++rts/Lua/LuaUtils.cpp
++```
++
++### Building
++
++Same as upstream:
++
++```bash
++bash docker-build-v2/build.sh windows
++```
++
++Output lands in `build-amd64-windows/install/`.
++
++### Status
++
++Based on upstream commit `e9d199329538cd9078a621c5e0f9ada416e1229f` (2026-09-18).
++
++Tested on Windows. Verified in game: units spawn, polygon outlines follow
++the real geometry on angled pieces, hits register per piece, and mixed
++volume types coexist on one unit. Not benchmarked under heavy unit counts;
++no automated tests added.
++
++### AI disclosure
++
++Parts of this work were written with AI assistance (Claude). Per the
++upstream [AI policy](AI_POLICY.md), this is disclosed here and in any
++discussion or pull request derived from it.
++
++### License
++
++GPL v2 or later, inherited from the upstream engine. See `LICENSE`.
++
++---
++---
++
++## Русский
++
++### Проблема
++
++Recoil задаёт каждому piece'у объём по умолчанию как axis-aligned коробку
++по габаритам его вершин — одинаково в `ModelUtils.cpp`, `S3OParser.cpp` и
++`3DOParser.cpp`:
++
++```cpp
++piece->SetCollisionVolume(CollisionVolume('b', 'z',
++    piece->maxs - piece->mins,
++    (piece->maxs + piece->mins) * 0.5f));
++```
++
++Если деталь стоит под углом — скошенная броня, наклонная плита,
++повёрнутый модуль — такая коробка заметно больше самой детали и торчит в
++пустоту. Выстрелы засчитываются там, где ничего нет.
++
++Параметра поворота у коллизионных объёмов нет, так что подогнать коробку
++под наклон нельзя. Единственный доступный обходной путь сегодня —
++поворачивать сам piece из скрипта, но это разворачивает и видимый меш и
++плохо масштабируется, когда деталей с разными углами много.
++
++### Решение
++
++Вместо второго источника ориентации добавлен тип объёма, форма которого
++**и есть** геометрия: `COLVOL_TYPE_POLYGON`.
++
++Ориентация приходит от самого piece'а, через тот же
++`LocalModelPiece::GetModelSpaceMatrix()`, которым пользуются все
++остальные типы. Вершины piece'а уже лежат в его локальном пространстве
++(`ModelUtils.cpp`: *«transform model space mesh vertices into bone/piece
++space»*) — ровно в том, в котором работает
++`CCollisionHandler::Intersect()`, поэтому никаких дополнительных
++преобразований не вводится.
++
++### Использование
++
++В UnitDef:
++
++```lua
++collisionVolumeType = "polygon",
++```
++
++Этого достаточно: движок переводит все piece'ы юнита на полигональные
++объёмы и сам включает проверку по дереву piece'ов —
++`usePieceCollisionVolumes` подразумевается и дописывать его не нужно.
++
++Для **смешанных** конфигураций `collisionVolumeType` не указывают вообще,
++а пишут
++
++```lua
++usePieceCollisionVolumes = true,
++```
++
++и назначают объёмы поштучно из скрипта юнита или гейджа:
++
++```lua
++-- типы объёмов: 0 эллипсоид, 1 цилиндр, 2 коробка, 3 сфера, 4 полигон
++Spring.SetUnitPieceCollisionVolumeData(unitID, piece("hull"), true,
++    0,0,0, 0,0,0, 4, 0)       -- полигон: размеры и смещение не используются
++
++Spring.SetUnitPieceCollisionVolumeData(unitID, piece("turret"), true,
++    30,20,30, 0,10,0, 2, 0)   -- коробка: размеры и смещение работают
++```
++
++Исключение piece'а из хит-теста делается как и для любого другого типа —
++третьим аргументом:
++
++```lua
++Spring.SetUnitPieceCollisionVolumeData(unitID, piece("flare"), false,
++    0,0,0, 0,0,0, 4, 0)
++```
++
++Чтение объёма обратно (10 возвращаемых значений, тип — число):
++
++```lua
++local sx,sy,sz, ox,oy,oz, vType, testType, pAxis, ignoreHits =
++    Spring.GetUnitPieceCollisionVolumeData(unitID, pieceIndex)
++```
++
++`/debugcolvol` рисует полигональный объём по тем же треугольникам и той же
++матрице, которыми пользуется сам тест столкновений: если контур не лежит
++на меше, то и попадания считаются не там.
++
++### Замечания по устройству
++
++- **Размеры и смещение игнорируются.** Смещение принудительно обнуляется
++  в `InitShape()`, чтобы случайно переданное значение не увело объём в
++  сторону от геометрии, которую он должен повторять.
++- **Указатель на геометрию не кэшируется.** Piece передаётся в тест
++  столкновений в момент вызова, а не хранится в объёме — поэтому нечему
++  повиснуть после загрузки сейва, смены модели или копирования объёма.
++- **Объём уровня юнита полигональным быть не может** — за ним нет
++  piece'а. Он остаётся сферой и делегирует в дерево piece'ов, ровно как
++  штатный `usePieceCollisionVolumes`.
++- **Ранний отсев.** Проверка по коробке из осевых размеров для этого типа
++  бессмысленна, поэтому используется сфера, выведенная из собственных
++  `mins`/`maxs` piece'а: лучи, проходящие далеко, до перебора
++  треугольников не доходят.
++- **Дискретный тест «точка внутри» не реализован.** Он же и недостижим:
++  `DetectHit()` уходит в `IntersectPieceTree()` при включённом
++  `DefaultToPieceTree()` — раньше, чем выбирается непрерывный или
++  дискретный режим, и эта ветка перекрывает `forceTrace`, который сам
++  перекрывает `testType`.
++
++### Цена
++
++Стоимость растёт с числом треугольников на piece: коробка считается
++формулой, полигон — циклом. Рекомендуются низкополигональные
++коллизионные «скорлупы». Отсев по сфере убирает из цикла лучи, проходящие
++мимо, но детальный меш всё равно обойдётся дороже примитива.
++
++### Изменённые файлы
++
++```
++rts/Sim/Misc/CollisionVolume.{h,cpp}
++rts/Sim/Misc/CollisionHandler.{h,cpp}
++rts/Sim/Objects/SolidObject.{h,cpp}
++rts/Sim/Objects/SolidObjectDef.{h,cpp}
++rts/Sim/Units/Unit.cpp
++rts/Sim/Features/Feature.cpp
++rts/Rendering/DebugColVolDrawer.cpp
++rts/Lua/LuaSyncedCtrl.cpp
++rts/Lua/LuaSyncedRead.cpp
++rts/Lua/LuaUtils.cpp
++```
++
++### Сборка
++
++Как в апстриме:
++
++```bash
++bash docker-build-v2/build.sh windows
++```
++
++Результат — в `build-amd64-windows/install/`.
++
++### Состояние
++
++Основано на коммите апстрима `e9d199329538cd9078a621c5e0f9ada416e1229f` (2026-09-18).
++
++Проверено на Windows. В игре подтверждено: юниты спавнятся, контуры
++полигональных объёмов повторяют реальную геометрию на наклонных деталях,
++попадания засчитываются по конкретному piece'у, разные типы объёмов
++уживаются на одном юните. Под нагрузкой из десятков юнитов не измерялось,
++автоматических тестов не добавлено.
++
++### Раскрытие использования ИИ
++
++Часть работы выполнена с помощью ИИ (Claude). Согласно
++[политике апстрима](AI_POLICY.md) это раскрывается здесь и в любом
++обсуждении или pull request, производном от этой работы.
++
++### Лицензия
++
++GPL v2 или более поздняя, унаследована от апстрима. См. `LICENSE`.
+diff --git a/rts/Lua/LuaSyncedCtrl.cpp b/rts/Lua/LuaSyncedCtrl.cpp
+index bcb1ba1360..b307decee6 100644
+--- a/rts/Lua/LuaSyncedCtrl.cpp
++++ b/rts/Lua/LuaSyncedCtrl.cpp
+@@ -832,6 +832,8 @@ static int SetSolidObjectPieceCollisionVolumeData(lua_State* L, CSolidObject* ob
+ 	const unsigned int pAxis = luaL_optint(L, 11, vol->GetPrimaryAxis());
+ 
+ 	// piece volumes are not allowed to use discrete hit-testing
++	// COLVOL_TYPE_POLYGON needs no extra wiring: it traces the triangles of
++	// the very piece this volume belongs to, resolved at test time
+ 	vol->InitShape(scales, offset, vType, CollisionVolume::COLVOL_HITTEST_CONT, pAxis);
+ 	vol->SetIgnoreHits(!luaL_checkboolean(L, 3));
+ 	return 0;
+diff --git a/rts/Lua/LuaSyncedRead.cpp b/rts/Lua/LuaSyncedRead.cpp
+index 4c71083fb1..0af6da057e 100644
+--- a/rts/Lua/LuaSyncedRead.cpp
++++ b/rts/Lua/LuaSyncedRead.cpp
+@@ -7274,7 +7274,7 @@ int LuaSyncedRead::GetFeatureLastAttackedPiece(lua_State* L)
+  * @class CollisionVolumeData
+  * @x_helper
+  *
+- * @field type "ellipsoid"|"cylinder"|"box"|"sphere" type
++ * @field type "ellipsoid"|"cylinder"|"box"|"sphere"|"polygon" type
+  * @field scaleX number
+  * @field scaleY number
+  * @field scaleZ number
+diff --git a/rts/Lua/LuaUtils.cpp b/rts/Lua/LuaUtils.cpp
+index caebc42cc7..6d2a0d396f 100644
+--- a/rts/Lua/LuaUtils.cpp
++++ b/rts/Lua/LuaUtils.cpp
+@@ -861,6 +861,9 @@ int LuaUtils::PushColVolTable(lua_State* L, const CollisionVolume* vol) {
+ 		case CollisionVolume::COLVOL_TYPE_SPHERE:
+ 			LuaPushNamedString(L, "type", "sphere");
+ 			break;
++		case CollisionVolume::COLVOL_TYPE_POLYGON:
++			LuaPushNamedString(L, "type", "polygon");
++			break;
+ 	}
+ 
+ 	LuaPushNamedNumber(L, "scaleX", vol->GetScales().x);
+diff --git a/rts/Rendering/DebugColVolDrawer.cpp b/rts/Rendering/DebugColVolDrawer.cpp
+index ff8762d973..0362a147d6 100644
+--- a/rts/Rendering/DebugColVolDrawer.cpp
++++ b/rts/Rendering/DebugColVolDrawer.cpp
+@@ -10,6 +10,9 @@
+ #include "Rendering/GL/glExtra.h"
+ #include "Rendering/GL/myGL.h"
+ #include "Rendering/GL/SubState.h"
++#include "Rendering/GL/RenderBuffers.h"
++#include "Rendering/Models/3DModelPiece.hpp"
++#include "Rendering/Models/LocalModelPiece.hpp"
+ #include "Sim/Features/Feature.h"
+ #include "Sim/Misc/CollisionVolume.h"
+ #include "Sim/Misc/QuadField.h"
+@@ -30,7 +33,7 @@ static constexpr float4 DEFAULT_SHIELD_COLOR = float4(0.00f, 0.00f, 0.60f, 0.35f
+ static constexpr float4 DEFAULT_CUSTCV_COLOR = float4(0.50f, 0.50f, 0.50f, 0.35f); // grey
+ static constexpr float4 DEFAULT_BUGOFF_COLOR = float4(0.00f, 1.00f, 1.00f, 0.35f); // cyan
+ 
+-static inline void DrawCollisionVolume(const CollisionVolume* vol, const CMatrix44f& mSrc, const float4& color)
++static inline void DrawCollisionVolume(const CollisionVolume* vol, const CMatrix44f& mSrc, const float4& color, const LocalModelPiece* lmp = nullptr)
+ {
+ 	CMatrix44f m = mSrc;
+ 	switch (vol->GetVolumeType()) {
+@@ -74,6 +77,44 @@ static inline void DrawCollisionVolume(const CollisionVolume* vol, const CMatrix
+ 			m.Scale(vol->GetScale(0), vol->GetScale(1), vol->GetScale(2));
+ 			GL::shapes.DrawWireBox(m, color);
+ 		} break;
++		case CollisionVolume::COLVOL_TYPE_POLYGON: {
++			// wireframe of the exact triangles IntersectPolygon() traces,
++			// through the exact same matrix -- if the outline does not sit
++			// on the mesh in-game, the collision does not either
++			const S3DModelPiece* piece = (lmp != nullptr) ? lmp->original : nullptr;
++
++			if (piece == nullptr || !piece->HasGeometryData())
++				break;
++
++			const auto& verts = piece->GetVerticesVec();
++			const auto& indcs = piece->GetIndicesVec();
++
++			const SColor sc = {color.x, color.y, color.z, color.w};
++
++			auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_C>();
++			auto& sh = rb.GetShader();
++
++			for (size_t i = 0; i + 2 < indcs.size(); i += 3) {
++				const uint32_t ia = indcs[i + 0];
++				const uint32_t ib = indcs[i + 1];
++				const uint32_t ic = indcs[i + 2];
++
++				if (ia >= verts.size() || ib >= verts.size() || ic >= verts.size())
++					continue;
++
++				const float3 a = m * verts[ia].pos;
++				const float3 b = m * verts[ib].pos;
++				const float3 c = m * verts[ic].pos;
++
++				rb.AddVertex({a, sc}); rb.AddVertex({b, sc});
++				rb.AddVertex({b, sc}); rb.AddVertex({c, sc});
++				rb.AddVertex({c, sc}); rb.AddVertex({a, sc});
++			}
++
++			sh.Enable();
++			rb.Submit(GL_LINES);
++			sh.Disable();
++		} break;
+ 	}
+ }
+ 
+@@ -97,7 +138,7 @@ static void DrawObjectDebugPieces(const CSolidObject* o, const float4& defColor)
+ 
+ 		const CMatrix44f mp = mo * lmp->GetModelSpaceMatrix();
+ 		// factors in the volume offsets
+-		DrawCollisionVolume(lmpVol, mp, curColor);
++		DrawCollisionVolume(lmpVol, mp, curColor, lmp);
+ 	}
+ }
+ 
+diff --git a/rts/Sim/Features/Feature.cpp b/rts/Sim/Features/Feature.cpp
+index b458e7abd6..8a4c5637cf 100644
+--- a/rts/Sim/Features/Feature.cpp
++++ b/rts/Sim/Features/Feature.cpp
+@@ -213,6 +213,7 @@ void CFeature::Initialize(const FeatureLoadParams& params)
+ 				// (this is still never animated but allows for
+ 				// custom piece display-lists, etc)
+ 				localModel.SetModel(model);
++				ApplyPolygonPieceVolumes();
+ 			} else {
+ 				LOG_L(L_ERROR, "[%s] couldn't load model for %s", __FUNCTION__, def->name.c_str());
+ 			}
+diff --git a/rts/Sim/Misc/CollisionHandler.cpp b/rts/Sim/Misc/CollisionHandler.cpp
+index 15c7a0a1e5..e334907932 100644
+--- a/rts/Sim/Misc/CollisionHandler.cpp
++++ b/rts/Sim/Misc/CollisionHandler.cpp
+@@ -2,6 +2,8 @@
+ 
+ #include "CollisionHandler.h"
+ #include "CollisionVolume.h"
++#include "Rendering/Models/3DModelPiece.hpp"
++#include "Rendering/Models/LocalModelPiece.hpp"
+ #include "Map/ReadMap.h" // mapDims
+ #include "Sim/Misc/GroundBlockingObjectMap.h"
+ #include "Sim/Misc/GlobalConstants.h"
+@@ -243,7 +245,7 @@ bool CCollisionHandler::IntersectPieceTreeHelper(
+ 
+ 		CollisionQuery cq;
+ 
+-		if ((ret = CCollisionHandler::Intersect(lmpVol, volMat, p0, p1, &cq))) {
++		if ((ret = CCollisionHandler::Intersect(lmpVol, volMat, p0, p1, &cq, lmp))) {
+ 			cq.SetHitPiece(lmp); cqs->push_back(cq);
+ 		}
+ 
+@@ -282,7 +284,7 @@ bool CCollisionHandler::IntersectPiecesHelper(
+ 		volMat.Translate(lmpVol->GetOffsets());
+ 
+ 		CollisionQuery cqn;
+-		if (!CCollisionHandler::Intersect(lmpVol, volMat, p0, p1, &cqn))
++		if (!CCollisionHandler::Intersect(lmpVol, volMat, p0, p1, &cqn, lmp))
+ 			continue;
+ 
+ 		// skip if neither an ingress nor an egress hit
+@@ -353,7 +355,7 @@ inline bool CCollisionHandler::Intersect(
+ 	return (CCollisionHandler::Intersect(v, mr, p0, p1, cq));
+ }
+ 
+-bool CCollisionHandler::Intersect(const CollisionVolume* v, const CMatrix44f& m, const float3& p0, const float3& p1, CollisionQuery* q)
++bool CCollisionHandler::Intersect(const CollisionVolume* v, const CMatrix44f& m, const float3& p0, const float3& p1, CollisionQuery* q, const LocalModelPiece* lmp)
+ {
+ 	RECOIL_DETAILED_TRACY_ZONE;
+ 	numContTests += 1;
+@@ -363,21 +365,47 @@ bool CCollisionHandler::Intersect(const CollisionVolume* v, const CMatrix44f& m,
+ 	const float3 pi1 = mInv.Mul(p1);
+ 	bool intersect = false;
+ 
+-	// minimum and maximum (x, y, z) coordinates of transformed ray
+-	const float3 rmin = float3::min(pi0, pi1);
+-	const float3 rmax = float3::max(pi0, pi1);
+-	// minimum and maximum (x, y, z) coordinates of (bounding box around) volume
+-	const float3 vmin = -v->GetHScales();
+-	const float3 vmax =  v->GetHScales();
++	if (v->GetVolumeType() != CollisionVolume::COLVOL_TYPE_POLYGON) {
++		// minimum and maximum (x, y, z) coordinates of transformed ray
++		const float3 rmin = float3::min(pi0, pi1);
++		const float3 rmax = float3::max(pi0, pi1);
++		// minimum and maximum (x, y, z) coordinates of (bounding box around) volume
++		const float3 vmin = -v->GetHScales();
++		const float3 vmax =  v->GetHScales();
++
++		// check if ray segment misses (bounding box around) volume
++		// (if so, then no further intersection tests are necessary)
++		if (rmax.x < vmin.x || rmin.x > vmax.x)
++			return false;
++		if (rmax.y < vmin.y || rmin.y > vmax.y)
++			return false;
++		if (rmax.z < vmin.z || rmin.z > vmax.z)
++			return false;
++	} else {
++		// POLYGON ignores the axis scales (its shape IS the geometry), so
++		// the box test above would be meaningless. Reject against a sphere
++		// derived from the piece's own extents instead, so rays nowhere
++		// near it never reach the per-triangle loop.
++		const S3DModelPiece* piece = (lmp != nullptr) ? lmp->original : nullptr;
+ 
+-	// check if ray segment misses (bounding box around) volume
+-	// (if so, then no further intersection tests are necessary)
+-	if (rmax.x < vmin.x || rmin.x > vmax.x)
+-		return false;
+-	if (rmax.y < vmin.y || rmin.y > vmax.y)
+-		return false;
+-	if (rmax.z < vmin.z || rmin.z > vmax.z)
+-		return false;
++		if (piece == nullptr)
++			return false;
++
++		// radius of the piece AABB about the piece origin, O(1) from data
++		// the piece already carries -- nothing cached, nothing to go stale
++		const float3 e = float3::max(float3::fabs(piece->mins), float3::fabs(piece->maxs));
++		const float radiusSq = e.SqLength();
++
++		const float3 seg = pi1 - pi0;
++		const float segLenSq = seg.SqLength();
++
++		float t = 0.0f;
++		if (segLenSq > COLLISION_VOLUME_EPS)
++			t = std::clamp(-pi0.dot(seg) / segLenSq, 0.0f, 1.0f);
++
++		if ((pi0 + seg * t).SqLength() > radiusSq)
++			return false;
++	}
+ 
+ 	switch (v->GetVolumeType()) {
+ 		case CollisionVolume::COLVOL_TYPE_ELLIPSOID:
+@@ -388,6 +416,9 @@ bool CCollisionHandler::Intersect(const CollisionVolume* v, const CMatrix44f& m,
+ 		case CollisionVolume::COLVOL_TYPE_CYLINDER: {
+ 			intersect = CCollisionHandler::IntersectCylinder(v, pi0, pi1, q);
+ 		} break;
++		case CollisionVolume::COLVOL_TYPE_POLYGON: {
++			intersect = CCollisionHandler::IntersectPolygon(v, lmp, pi0, pi1, q);
++		} break;
+ 		case CollisionVolume::COLVOL_TYPE_BOX: {
+ 			// also covers footprints, but without taking the blocking-map into account
+ 			// TODO: this would require stepping ray across non-blocking yardmap squares?
+@@ -801,3 +832,108 @@ bool CCollisionHandler::IntersectBox(const CollisionVolume* v, const float3& pi0
+ 	return (b0 == CQ_POINT_ON_RAY || b1 == CQ_POINT_ON_RAY);
+ }
+ 
++
++// Möller-Trumbore ray/triangle test; <t> is the distance along <dir>
++static bool RayTriangleIntersect(
++	const float3& org, const float3& dir,
++	const float3& v0, const float3& v1, const float3& v2,
++	float& t
++) {
++	const float3 e1 = v1 - v0;
++	const float3 e2 = v2 - v0;
++	const float3 pv = dir.cross(e2);
++	const float det = e1.dot(pv);
++
++	// degenerate triangle, or ray parallel to its plane
++	if (math::fabs(det) <= COLLISION_VOLUME_EPS)
++		return false;
++
++	const float invDet = 1.0f / det;
++	const float3 tv = org - v0;
++
++	const float u = tv.dot(pv) * invDet;
++	if (u < 0.0f || u > 1.0f)
++		return false;
++
++	const float3 qv = tv.cross(e1);
++	const float w = dir.dot(qv) * invDet;
++	if (w < 0.0f || (u + w) > 1.0f)
++		return false;
++
++	t = e2.dot(qv) * invDet;
++	return true;
++}
++
++/*
++ * COLVOL_TYPE_POLYGON: trace the piece's real triangles.
++ *
++ * pi0/pi1 arrive in piece-local space (IntersectPiecesHelper builds the
++ * matrix as m * lmp->GetModelSpaceMatrix(), and InitShape() forces this
++ * type's offsets to zero so the extra Translate() is a no-op). The piece
++ * vertices live in that very same space -- ModelUtils.cpp converts them
++ * there explicitly ("transform model space mesh vertices into bone/piece
++ * space"). So no further transform is needed, and the volume inherits the
++ * piece's own orientation for free instead of carrying a second one.
++ */
++bool CCollisionHandler::IntersectPolygon(const CollisionVolume* v, const LocalModelPiece* lmp, const float3& pi0, const float3& pi1, CollisionQuery* q)
++{
++	RECOIL_DETAILED_TRACY_ZONE;
++
++	const S3DModelPiece* piece = (lmp != nullptr) ? lmp->original : nullptr;
++
++	if (piece == nullptr || !piece->HasGeometryData())
++		return false;
++
++	const float3 seg = pi1 - pi0;
++	const float segLen = seg.Length();
++
++	if (segLen <= COLLISION_VOLUME_EPS)
++		return false;
++
++	const float3 dir = seg / segLen;
++
++	const auto& verts = piece->GetVerticesVec();
++	const auto& indcs = piece->GetIndicesVec();
++
++	// nearest (ingress) and farthest (egress) surface crossing along the
++	// segment; a closed shell yields both, an open one only the first
++	float nearT =  std::numeric_limits<float>::max();
++	float farT  = -std::numeric_limits<float>::max();
++
++	for (size_t i = 0; i + 2 < indcs.size(); i += 3) {
++		const uint32_t ia = indcs[i + 0];
++		const uint32_t ib = indcs[i + 1];
++		const uint32_t ic = indcs[i + 2];
++
++		if (ia >= verts.size() || ib >= verts.size() || ic >= verts.size())
++			continue;
++
++		float t = 0.0f;
++
++		if (!RayTriangleIntersect(pi0, dir, verts[ia].pos, verts[ib].pos, verts[ic].pos, t))
++			continue;
++		if (t < 0.0f || t > segLen)
++			continue;
++
++		nearT = std::min(nearT, t);
++		farT  = std::max(farT , t);
++	}
++
++	if (nearT > farT)
++		return false;
++
++	if (q != nullptr) {
++		q->b0 = CQ_POINT_ON_RAY;
++		q->t0 = nearT;
++		q->p0 = pi0 + dir * nearT;
++
++		// only report an egress point if it is a distinct second crossing
++		const bool hasEgress = ((farT - nearT) > COLLISION_VOLUME_EPS);
++
++		q->b1 = hasEgress ? CQ_POINT_ON_RAY : CQ_POINT_NO_INT;
++		q->t1 = hasEgress ? farT : nearT;
++		q->p1 = hasEgress ? (pi0 + dir * farT) : q->p0;
++	}
++
++	return true;
++}
+diff --git a/rts/Sim/Misc/CollisionHandler.h b/rts/Sim/Misc/CollisionHandler.h
+index 67c7258d0a..7c1d5906c7 100644
+--- a/rts/Sim/Misc/CollisionHandler.h
++++ b/rts/Sim/Misc/CollisionHandler.h
+@@ -158,7 +158,7 @@ class CCollisionHandler {
+ 		 * @param p0 start of ray (in world-coordinates)
+ 		 * @param p1 end of ray (in world-coordinates)
+ 		 */
+-		static bool Intersect(const CollisionVolume* v, const CMatrix44f& m, const float3& p0, const float3& p1, CollisionQuery* cq);
++		static bool Intersect(const CollisionVolume* v, const CMatrix44f& m, const float3& p0, const float3& p1, CollisionQuery* cq, const LocalModelPiece* lmp = nullptr);
+ 		static bool IntersectPieceTree(const CSolidObject* o, const CMatrix44f& m, const float3& p0, const float3& p1, CollisionQuery* cq);
+ 		static bool IntersectPiecesHelper(const CSolidObject* o, const CMatrix44f& m, const float3& p0, const float3& p1, CollisionQuery* cqp);
+ 
+@@ -166,6 +166,7 @@ class CCollisionHandler {
+ 		static bool IntersectEllipsoid(const CollisionVolume* v, const float3& pi0, const float3& pi1, CollisionQuery* cq);
+ 		static bool IntersectCylinder(const CollisionVolume* v, const float3& pi0, const float3& pi1, CollisionQuery* cq);
+ 		static bool IntersectBox(const CollisionVolume* v, const float3& pi0, const float3& pi1, CollisionQuery* cq);
++		static bool IntersectPolygon(const CollisionVolume* v, const LocalModelPiece* lmp, const float3& pi0, const float3& pi1, CollisionQuery* cq);
+ 
+ 	private:
+ 		static unsigned int numDiscTests; // number of discrete hit-tests executed
+diff --git a/rts/Sim/Misc/CollisionVolume.cpp b/rts/Sim/Misc/CollisionVolume.cpp
+index 73c0cf423e..69a277b399 100644
+--- a/rts/Sim/Misc/CollisionVolume.cpp
++++ b/rts/Sim/Misc/CollisionVolume.cpp
+@@ -1,6 +1,8 @@
+ /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
+ 
+ #include "CollisionVolume.h"
++#include "Rendering/Models/3DModelPiece.hpp"
++#include "Rendering/Models/LocalModelPiece.hpp"
+ #include "Sim/Units/Unit.h"
+ #include "Sim/Features/Feature.h"
+ #include "System/Matrix44f.h"
+@@ -116,9 +118,17 @@ void CollisionVolume::InitShape(
+ 
+ 	// assign these here, since we can be
+ 	// called from outside the constructor
+-	volumeType    = std::max(vType, 0) % (COLVOL_TYPE_SPHERE + 1);
++	volumeType    = std::max(vType, 0) % (COLVOL_TYPE_POLYGON + 1);
+ 	volumeAxes[0] = std::max(pAxis, 0) % (COLVOL_AXIS_Z + 1);
+ 
++	// POLYGON takes its shape AND its placement straight from the piece
++	// geometry, so any caller-supplied offset would double-shift it away
++	// from the mesh it is supposed to trace. Zero it so that the matrix
++	// built in IntersectPiecesHelper (which translates by GetOffsets())
++	// leaves the ray exactly in vertex space.
++	if (volumeType == COLVOL_TYPE_POLYGON)
++		axisOffsets = ZeroVector;
++
+ 	///< [0] is primary axis, [1] and [2] are secondary (all COLVOL_AXIS_*)
+ 	switch (volumeAxes[0]) {
+ 		case COLVOL_AXIS_X: {
+@@ -173,6 +183,10 @@ void CollisionVolume::SetBoundingRadius() {
+ 			volumeBoundingRadius = std::max(halfAxisScales.x, std::max(halfAxisScales.y, halfAxisScales.z));
+ 			volumeBoundingRadiusSq = volumeBoundingRadius * volumeBoundingRadius;
+ 		} break;
++		case COLVOL_TYPE_POLYGON: {
++			// not used: the broad-phase radius for this type is derived
++			// from the piece's own mins/maxs at test time (see Intersect)
++		} break;
+ 	}
+ }
+ 
+@@ -271,12 +285,12 @@ float CollisionVolume::GetPointSurfaceDistance(
+ 	vm.Translate(GetOffsets());
+ 	vm.InvertAffineInPlace();
+ 
+-	return (GetPointSurfaceDistance(vm, pos));
++	return (GetPointSurfaceDistance(vm, pos, lmp));
+ }
+ 
+ 
+ 
+-float CollisionVolume::GetPointSurfaceDistance(const CMatrix44f& mv, const float3& p) const {
++float CollisionVolume::GetPointSurfaceDistance(const CMatrix44f& mv, const float3& p, const LocalModelPiece* lmp) const {
+ 	RECOIL_DETAILED_TRACY_ZONE;
+ 	// transform <p> from world- to volume-space
+ 	float3 pv = mv.Mul(p);
+@@ -323,6 +337,13 @@ float CollisionVolume::GetPointSurfaceDistance(const CMatrix44f& mv, const float
+ 			d = GetEllipsoidDistance(pv);
+ 		} break;
+ 
++		case COLVOL_TYPE_POLYGON: {
++			// distance to the closest point on the closest triangle; the
++			// same triangles IntersectPolygon() traces, in the same space,
++			// so the two never disagree about where the volume is
++			d = GetPolygonDistance(pv, lmp);
++		} break;
++
+ 		default: {
+ 			assert(false);
+ 		} break;
+@@ -333,6 +354,77 @@ float CollisionVolume::GetPointSurfaceDistance(const CMatrix44f& mv, const float
+ 
+ 
+ 
++// closest point on a triangle to p (standard barycentric region test)
++static float3 ClosestPointOnTriangle(const float3& p, const float3& a, const float3& b, const float3& c)
++{
++	const float3 ab = b - a;
++	const float3 ac = c - a;
++	const float3 ap = p - a;
++
++	const float d1 = ab.dot(ap);
++	const float d2 = ac.dot(ap);
++	if (d1 <= 0.0f && d2 <= 0.0f) return a;
++
++	const float3 bp = p - b;
++	const float d3 = ab.dot(bp);
++	const float d4 = ac.dot(bp);
++	if (d3 >= 0.0f && d4 <= d3) return b;
++
++	const float vc = d1 * d4 - d3 * d2;
++	if (vc <= 0.0f && d1 >= 0.0f && d3 <= 0.0f)
++		return a + ab * (d1 / (d1 - d3));
++
++	const float3 cp = p - c;
++	const float d5 = ab.dot(cp);
++	const float d6 = ac.dot(cp);
++	if (d6 >= 0.0f && d5 <= d6) return c;
++
++	const float vb = d5 * d2 - d1 * d6;
++	if (vb <= 0.0f && d2 >= 0.0f && d6 <= 0.0f)
++		return a + ac * (d2 / (d2 - d6));
++
++	const float va = d3 * d6 - d5 * d4;
++	if (va <= 0.0f && (d4 - d3) >= 0.0f && (d5 - d6) >= 0.0f)
++		return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)));
++
++	const float denom = 1.0f / (va + vb + vc);
++	return a + ab * (vb * denom) + ac * (vc * denom);
++}
++
++float CollisionVolume::GetPolygonDistance(const float3& pv, const LocalModelPiece* lmp) const
++{
++	RECOIL_DETAILED_TRACY_ZONE;
++
++	// same triangles IntersectPolygon() traces, reached the same way, so
++	// the two can never disagree about where the volume actually is
++	const S3DModelPiece* piece = (lmp != nullptr) ? lmp->original : nullptr;
++
++	if (piece == nullptr || !piece->HasGeometryData())
++		return 0.0f;
++
++	const auto& verts = piece->GetVerticesVec();
++	const auto& indcs = piece->GetIndicesVec();
++
++	float minDistSq = std::numeric_limits<float>::max();
++
++	for (size_t i = 0; i + 2 < indcs.size(); i += 3) {
++		const uint32_t ia = indcs[i + 0];
++		const uint32_t ib = indcs[i + 1];
++		const uint32_t ic = indcs[i + 2];
++
++		if (ia >= verts.size() || ib >= verts.size() || ic >= verts.size())
++			continue;
++
++		const float3 q = ClosestPointOnTriangle(pv, verts[ia].pos, verts[ib].pos, verts[ic].pos);
++		minDistSq = std::min(minDistSq, (q - pv).SqLength());
++	}
++
++	if (minDistSq == std::numeric_limits<float>::max())
++		return 0.0f;
++
++	return math::sqrt(minDistSq);
++}
++
+ float CollisionVolume::GetCylinderDistance(const float3& pv, size_t axisA, size_t axisB, size_t axisC) const
+ {
+ 	RECOIL_DETAILED_TRACY_ZONE;
+diff --git a/rts/Sim/Misc/CollisionVolume.h b/rts/Sim/Misc/CollisionVolume.h
+index cf8d75dd72..a3bb9e67a2 100644
+--- a/rts/Sim/Misc/CollisionVolume.h
++++ b/rts/Sim/Misc/CollisionVolume.h
+@@ -12,6 +12,7 @@ constexpr float3 WORLD_TO_OBJECT_SPACE = {-1.0f, 1.0f, 1.0f};
+ constexpr float COLLISION_VOLUME_EPS = 0.0000000001f;
+ 
+ struct LocalModelPiece;
++struct S3DModelPiece;
+ class CMatrix44f;
+ class CSolidObject;
+ class CUnit;
+@@ -27,6 +28,7 @@ public:
+ 		COLVOL_TYPE_CYLINDER  =  1,
+ 		COLVOL_TYPE_BOX       =  2,
+ 		COLVOL_TYPE_SPHERE    =  3,
++		COLVOL_TYPE_POLYGON   =  4,
+ 	};
+ 	enum {
+ 		COLVOL_AXIS_X = 0,
+@@ -88,6 +90,18 @@ public:
+ 	void SetBoundingRadius();
+ 	void SetOffsets(const float3& offsets) { axisOffsets = offsets; }
+ 
++	/// COLVOL_TYPE_POLYGON traces the owning piece's real triangles. The
++	/// geometry is NOT cached here: every caller that can reach a polygon
++	/// volume already holds the LocalModelPiece it belongs to, so the
++	/// piece is passed in at test time instead. That keeps this struct
++	/// free of raw geometry pointers, which would otherwise dangle across
++	/// savegame loads, model swaps and volume copies.
++	/// Vertices live in piece-local space (see ModelUtils.cpp, "transform
++	/// model space mesh vertices into bone/piece space") -- exactly the
++	/// space Intersect() works in once axisOffsets are forced to zero for
++	/// this type, so the volume follows the piece's own orientation
++	/// through GetModelSpaceMatrix() with no transform of its own.
++
+ 	int GetVolumeType() const { return volumeType; }
+ 	void SetVolumeType(int type) { volumeType = type; }
+ 
+@@ -130,9 +144,10 @@ public:
+ 
+ private:
+ 	float GetPointSurfaceDistance(const CSolidObject* obj, const LocalModelPiece* lmp, const CMatrix44f& mat, const float3& pos) const;
+-	float GetPointSurfaceDistance(const CMatrix44f& mv, const float3& p) const;
++	float GetPointSurfaceDistance(const CMatrix44f& mv, const float3& p, const LocalModelPiece* lmp) const;
+ 
+ 	float GetCylinderDistance(const float3& pv, size_t axisA = 0, size_t axisB = 1, size_t axisC = 2) const;
++	float GetPolygonDistance(const float3& pv, const LocalModelPiece* lmp) const;
+ 	float GetEllipsoidDistance(const float3& pv) const;
+ 
+ private:
+diff --git a/rts/Sim/Objects/SolidObject.cpp b/rts/Sim/Objects/SolidObject.cpp
+index 750de80c06..cffb414276 100644
+--- a/rts/Sim/Objects/SolidObject.cpp
++++ b/rts/Sim/Objects/SolidObject.cpp
+@@ -98,6 +98,31 @@ void CSolidObject::PostLoad()
+ 		return;
+ 
+ 	localModel.SetModel(model, false);
++	ApplyPolygonPieceVolumes();
++}
++
++void CSolidObject::ApplyPolygonPieceVolumes()
++{
++	RECOIL_DETAILED_TRACY_ZONE;
++
++	if (!GetDef()->usePolygonPieceVolumes)
++		return;
++
++	for (LocalModelPiece& lmp: localModel.pieces) {
++		CollisionVolume* cv = lmp.GetCollisionVolume();
++
++		if (cv == nullptr)
++			continue;
++
++		// scales/offsets are unused by this type: the shape and its
++		// placement both come from the piece geometry itself
++		cv->InitShape(
++			ZeroVector, ZeroVector,
++			CollisionVolume::COLVOL_TYPE_POLYGON,
++			CollisionVolume::COLVOL_HITTEST_CONT,
++			CollisionVolume::COLVOL_AXIS_Z
++		);
++	}
+ }
+ 
+ 
+diff --git a/rts/Sim/Objects/SolidObject.h b/rts/Sim/Objects/SolidObject.h
+index 00df6531de..9bad4001f8 100644
+--- a/rts/Sim/Objects/SolidObject.h
++++ b/rts/Sim/Objects/SolidObject.h
+@@ -129,6 +129,11 @@ public:
+ 
+ 	void PostLoad();
+ 
++	/// switches every piece of this object's LocalModel to
++	/// COLVOL_TYPE_POLYGON when the def asked for it; call right after
++	/// localModel.SetModel(), the piece volumes do not exist before that
++	void ApplyPolygonPieceVolumes();
++
+ 	virtual bool AddBuildPower(CUnit* builder, float amount) { return false; }
+ 	virtual void DoDamage(const DamageArray& damages, const float3& impulse, CUnit* attacker, int weaponDefID, int projectileID) {}
+ 
+diff --git a/rts/Sim/Objects/SolidObjectDef.cpp b/rts/Sim/Objects/SolidObjectDef.cpp
+index 416847892d..2b57c675bc 100644
+--- a/rts/Sim/Objects/SolidObjectDef.cpp
++++ b/rts/Sim/Objects/SolidObjectDef.cpp
+@@ -96,7 +96,15 @@ void SolidObjectDef::ParseCollisionVolume(const LuaTable& odTable)
+ {
+ 	RECOIL_DETAILED_TRACY_ZONE;
+ 	const LuaTable& cvTable = odTable.SubTable("collisionVolume");
+-	const std::string& cvType = odTable.GetString("collisionVolumeType", "");
++	const std::string& cvTypeRaw = odTable.GetString("collisionVolumeType", "");
++
++	// "polygon" is a per-piece shape: the object-level volume has no piece
++	// behind it, so it stays a plain sphere and merely defers to the piece
++	// tree (same as usePieceCollisionVolumes) while every piece is switched
++	// to COLVOL_TYPE_POLYGON once its LocalModel exists
++	usePolygonPieceVolumes = (!cvTypeRaw.empty() && (cvTypeRaw.front() == 'p' || cvTypeRaw.front() == 'P'));
++
++	const std::string cvType = usePolygonPieceVolumes ? std::string("") : cvTypeRaw;
+ 
+ 	if (cvTable.IsValid()) {
+ 		collisionVolume = CollisionVolume(
+@@ -117,7 +125,7 @@ void SolidObjectDef::ParseCollisionVolume(const LuaTable& odTable)
+ 	// if this unit wants per-piece volumes, make
+ 	// its main collision volume deferent and let
+ 	// it ignore hits
+-	collisionVolume.SetDefaultToPieceTree(odTable.GetBool("usePieceCollisionVolumes", false));
++	collisionVolume.SetDefaultToPieceTree(odTable.GetBool("usePieceCollisionVolumes", false) || usePolygonPieceVolumes);
+ 	collisionVolume.SetDefaultToFootPrint(odTable.GetBool("useFootPrintCollisionVolume", false));
+ 	collisionVolume.SetIgnoreHits(collisionVolume.DefaultToPieceTree());
+ }
+diff --git a/rts/Sim/Objects/SolidObjectDef.h b/rts/Sim/Objects/SolidObjectDef.h
+index 6a19327ebb..5f5113d8c0 100644
+--- a/rts/Sim/Objects/SolidObjectDef.h
++++ b/rts/Sim/Objects/SolidObjectDef.h
+@@ -69,6 +69,10 @@ public:
+ 	bool upright;
+ 	bool reclaimable;
+ 
++	///< set by collisionVolumeType = "polygon": every piece of this
++	///< object traces its own real triangles instead of a fitted box
++	bool usePolygonPieceVolumes = false;
++
+ 	// must be mutable because models are lazy-loaded even for defs
+ 	mutable S3DModel* model;
+ 
+diff --git a/rts/Sim/Units/Unit.cpp b/rts/Sim/Units/Unit.cpp
+index cc5bce8d41..26979ad249 100644
+--- a/rts/Sim/Units/Unit.cpp
++++ b/rts/Sim/Units/Unit.cpp
+@@ -234,6 +234,7 @@ void CUnit::PreInit(const UnitLoadParams& params)
+ 
+ 
+ 	localModel.SetModel(model = unitDef->LoadModel());
++	ApplyPolygonPieceVolumes();
+ 
+ 	collisionVolume = unitDef->collisionVolume;
+ 	selectionVolume = unitDef->selectionVolume;

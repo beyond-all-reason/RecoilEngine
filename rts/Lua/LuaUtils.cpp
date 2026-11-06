@@ -852,6 +852,9 @@ int LuaUtils::PushColVolTable(lua_State* L, const CollisionVolume* vol) {
 		case CollisionVolume::COLVOL_TYPE_SPHERE:
 			LuaPushNamedString(L, "type", "sphere");
 			break;
+		case CollisionVolume::COLVOL_TYPE_POLYGON:
+			LuaPushNamedString(L, "type", "polygon");
+			break;
 	}
 
 	LuaPushNamedNumber(L, "scaleX", vol->GetScales().x);

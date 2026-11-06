@@ -69,6 +69,10 @@ public:
 	bool upright;
 	bool reclaimable;
 
+	///< set by collisionVolumeType = "polygon": every piece of this
+	///< object traces its own real triangles instead of a fitted box
+	bool usePolygonPieceVolumes = false;
+
 	// must be mutable because models are lazy-loaded even for defs
 	mutable S3DModel* model;
 
