@@ -1127,7 +1127,7 @@ int CUnitScript::GetUnitVal(int val, int p1, int p2, int p3, int p4)
 
 	case UNIT_TEAM: {
 		const CUnit* u = unitHandler.GetUnit(p1);
-		return (u != nullptr)? unit->team : 0;
+		return (u != nullptr)? u->team : 0;
 	} break;
 	case UNIT_ALLIED: {
 		const CUnit* u = unitHandler.GetUnit(p1);

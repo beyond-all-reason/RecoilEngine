@@ -280,36 +280,29 @@ static int LoadFileWithModes(const std::string& fileName, std::string& data, con
 
 /***
  * Loads and runs lua code from a file in the VFS.
- * 
- * @function VFS.Include
- * 
+ *
  * The path is relative to the main Spring directory, e.g.
- * 
+ *
  * ```lua
  * VFS.Include('LuaUI/includes/filename.lua', nil, vfsmode)
  * ```
- * 
- * @param filename string
- * 
- * Path to file, lowercase only. Use linux style path separators, e.g.
- * `"foo/bar.txt"`.
- * 
- * @param environment table? (Default: the current function environment)
- * 
+ *
  * The environment arg sets the global environment (see generic lua refs). In
  * almost all cases, this should be left `nil` to preserve the current env.
- *  
+ *
  * If the provided, any non-local variables and functions defined in
  * `filename.lua` are then accessable via env. Vise-versa, any variables
  * defined in env prior to passing to `VFS.Include` are available to code in the
  * included file. Code running in `filename.lua` will see the contents of env in
  * place of the normal global environment.
- * 
- * @param mode string?
- * 
- * VFS modes are single char strings and can be concatenated;
- * doing specifies an order of preference for the mode (i.e. location) from
- * which to include files.
+ *
+ * @function VFS.Include
+ *
+ * @param filename string Path to file, lowercase only. Use linux style path separators, e.g. `"foo/bar.txt"`.
+ *
+ * @param environment table? (Default: the current function environment) The global environment for the included file.
+ *
+ * @param mode string? VFS modes are single char strings and can be concatenated; doing specifies an order of preference for the mode (i.e. location) from which to include files.
  * 
  * @return any module The return value of the included file.
  */
@@ -404,16 +397,9 @@ int LuaVFS::UnsyncInclude(lua_State* L)
  * Returns file contents as a string. Unlike `VFS.Include` the file will not be
  * executed. This lets you pre-process the code. Use `loadstring` afterwards.
  *
- * @param filename string
- * 
- * Path to file, lowercase only. Use linux style path separators, e.g.
- * `"foo/bar.txt"`.
+ * @param filename string Path to file, lowercase only. Use linux style path separators, e.g. `"foo/bar.txt"`.
  *
- * @param mode string?
- * 
- * VFS modes are single char strings and can be concatenated;
- * doing specifies an order of preference for the mode (i.e. location) from
- * which to include files.
+ * @param mode string? VFS modes are single char strings and can be concatenated; doing specifies an order of preference for the mode (i.e. location) from which to include files.
  * 
  * @return string? data The contents of the file.
  */
@@ -460,16 +446,9 @@ int LuaVFS::UnsyncLoadFile(lua_State* L)
  * end
  * ```
  * 
- * @param filename string
- * 
- * Path to file, lowercase only. Use linux style path separators, e.g.
- * `"foo/bar.txt"`.
+ * @param filename string Path to file, lowercase only. Use linux style path separators, e.g. `"foo/bar.txt"`.
  *
- * @param mode string?
- * 
- * VFS modes are single char strings and can be concatenated;
- * doing specifies an order of preference for the mode (i.e. location) from
- * which to include files.
+ * @param mode string? VFS modes are single char strings and can be concatenated; doing specifies an order of preference for the mode (i.e. location) from which to include files.
  * 
  * @return boolean exists `true` if the file exists, otherwise `false`.
  */
@@ -504,18 +483,11 @@ int LuaVFS::UnsyncFileExists(lua_State* L) { return FileExists(L, false); }
  * local luaFiles = VFS.DirList('units/', '*.lua', nil, true)
  * ```
  * 
- * @param directory string
- * 
- * Path to directory, lowercase only. Use linux style path separators, e.g.
- * `"foo/bar/"`.
+ * @param directory string Path to directory, lowercase only. Use linux style path separators, e.g. `"foo/bar/"`.
  *
  * @param pattern string? (Default: `"*"`)
  * 
- * @param mode string?
- * 
- * VFS modes are single char strings and can be concatenated;
- * doing specifies an order of preference for the mode (i.e. location) from
- * which to include files.
+ * @param mode string? VFS modes are single char strings and can be concatenated; doing specifies an order of preference for the mode (i.e. location) from which to include files.
  * 
  * @param recursive boolean? (Default: `false`)
  * 
@@ -566,18 +538,11 @@ int LuaVFS::UnsyncDirList(lua_State* L)
  * end
  * ```
  * 
- * @param directory string
- * 
- * Path to directory, lowercase only. Use linux style path separators, e.g.
- * `"foo/bar/"`.
+ * @param directory string Path to directory, lowercase only. Use linux style path separators, e.g. `"foo/bar/"`.
  *
  * @param pattern string? (Default: `"*"`)
  * 
- * @param mode string?
- * 
- * VFS modes are single char strings and can be concatenated;
- * doing specifies an order of preference for the mode (i.e. location) from
- * which to include files.
+ * @param mode string? VFS modes are single char strings and can be concatenated; doing specifies an order of preference for the mode (i.e. location) from which to include files.
  * 
  * @param recursive boolean? (Default: `false`)
  * 
@@ -613,16 +578,9 @@ int LuaVFS::UnsyncSubDirs(lua_State* L)
 /***
  * @function VFS.GetFileAbsolutePath
  *
- * @param filename string
- * 
- * Path to file, lowercase only. Use linux style path separators, e.g.
- * `"foo/bar.txt"`.
+ * @param filename string Path to file, lowercase only. Use linux style path separators, e.g. `"foo/bar.txt"`.
  *
- * @param mode string?
- * 
- * VFS modes are single char strings and can be concatenated;
- * doing specifies an order of preference for the mode (i.e. location) from
- * which to include files.
+ * @param mode string? VFS modes are single char strings and can be concatenated; doing specifies an order of preference for the mode (i.e. location) from which to include files.
  * 
  * @return string? absolutePath
  */
@@ -652,16 +610,9 @@ int LuaVFS::GetFileAbsolutePath(lua_State* L)
 /***
  * @function VFS.GetArchiveContainingFile
  *
- * @param filename string
- * 
- * Path to file, lowercase only. Use linux style path separators, e.g.
- * `"foo/bar.txt"`.
+ * @param filename string Path to file, lowercase only. Use linux style path separators, e.g. `"foo/bar.txt"`.
  *
- * @param mode string?
- * 
- * VFS modes are single char strings and can be concatenated;
- * doing specifies an order of preference for the mode (i.e. location) from
- * which to include files.
+ * @param mode string? VFS modes are single char strings and can be concatenated; doing specifies an order of preference for the mode (i.e. location) from which to include files.
  * 
  * @return string? archiveName
  */
@@ -695,7 +646,7 @@ int LuaVFS::GetArchiveContainingFile(lua_State* L)
  * 
  * @function VFS.UseArchive
  * @param archiveName string
- * @param fun(...) func
+ * @param func fun(...)
  * @return any ... Results of the given function
  */
 int LuaVFS::UseArchive(lua_State* L)
@@ -821,11 +772,9 @@ int LuaVFS::UnmapArchive(lua_State* L)
  * Compresses the specified folder.
  * @function VFS.CompressFolder
  * @param folderPath string
- * @param archiveType string? (Default: `"zip"`)The compression type (can
- * currently be only `"zip"`).
+ * @param archiveType string? (Default: `"zip"`) The compression type (can currently be only `"zip"`).
  * @param compressedFilePath string? (Default: `folderPath .. ".sdz"`)
- * @param includeFolder boolean? (Default: `false`) Whether the archive should
- * have the specified folder as root.
+ * @param includeFolder boolean? (Default: `false`) Whether the archive should have the specified folder as root.
  * @param mode string?
  */
 int LuaVFS::CompressFolder(lua_State* L)

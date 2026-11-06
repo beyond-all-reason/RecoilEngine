@@ -72,7 +72,7 @@ private:
 	bool CanAddFeature(int id) const {
 		// do we want to be assigned a random ID and are any left in pool?
 		if (id < 0)
-			return true;
+			return !idPool.IsEmpty();
 		// is this ID not already in use *and* has it been recycled by pool?
 		if (id < features.size())
 			return (features[id] == nullptr && idPool.HasID(id));

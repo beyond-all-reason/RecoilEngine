@@ -31,8 +31,7 @@ bool IArchive::GetFile(const std::string& name, std::vector<std::uint8_t>& buffe
 	if (!IsFileId(fid))
 		return false;
 
-	GetFile(fid, buffer);
-	return true;
+	return GetFile(fid, buffer);
 }
 
 bool IArchive::CalcHash(uint32_t fid, sha512::raw_digest& hash, std::vector<std::uint8_t>& fb)

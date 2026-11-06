@@ -96,7 +96,7 @@ bool CGroupHandler::GroupCommand(int num)
 			}
 
 			// change group, but do not call SUH::AddUnit while iterating
-			u->SetGroup(group, false, false);
+			u->SetGroup(group, false);
 		}
 	}
 	// stable equivalent of "selectadd" command
@@ -163,7 +163,7 @@ bool CGroupHandler::GroupCommand(int num, const std::string& cmd, const std::vec
 				}
 
 				// change group, but do not call SUH::AddUnit while iterating
-				u->SetGroup(group, false, false);
+				u->SetGroup(group, false);
 			}
 
 			// if adding to group, do not proceed to select/focus logic

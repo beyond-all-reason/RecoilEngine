@@ -12,6 +12,8 @@
 #include "Rendering/GL/StreamBuffer.h"
 #include "Rendering/GL/RenderBuffers.h"
 #include "Rendering/GL/myGL.h"
+#include "Rendering/GL/glDebugGroupTimers.h"
+#include "Rendering/GL/glVRAMTracker.h"
 #include "Rendering/GL/FBO.h"
 #include "Rendering/GL/glExtra.h"
 #include "Rendering/GL/glxHandler.h"
@@ -42,6 +44,7 @@
 #include <SDL_rect.h>
 
 #include "System/Misc/TracyDefs.h"
+#include "System/Misc/TracyGpu.h"
 
 CONFIG(bool, DebugGL).defaultValue(false).description("Enables GL debug-context and output. (see GL_ARB_debug_output)");
 CONFIG(bool, DebugGLStacktraces).defaultValue(false).description("Create a stacktrace when an OpenGL error occurs");
@@ -367,7 +370,9 @@ CGlobalRendering::CGlobalRendering()
 		"YResolutionWindowed",
 		"WindowPosX",
 		"WindowPosY",
-		"MinSampleShadingRate"
+		"MinSampleShadingRate",
+		"MinimizeOnFocusLoss",
+		"TeamNanoSpray"
 	});
 	SetDualScreenParams();
 }
@@ -594,6 +599,7 @@ bool CGlobalRendering::CreateWindowAndContext(const char* title)
 		glad_glBlitFramebufferEXT = glad_glBlitFramebuffer;
 		GLAD_GL_EXT_framebuffer_blit &= (glBlitFramebufferEXT != nullptr);
 	}
+	GL::VRAMTracker::Init(); // before anything allocates
 	GLX::Load(sdlWindow);
 
 	if (!CheckGLContextVersion(minCtx)) {
@@ -627,6 +633,8 @@ void CGlobalRendering::DestroyWindowAndContext() {
 	WindowManagerHelper::SetIconSurface(sdlWindow, nullptr);
 	SetWindowInputGrabbing(false);
 
+	GL::DebugGroupTimers::Kill(); // frees its GL queries, needs the context still current
+	GL::VRAMTracker::Kill();
 	SDL_GL_MakeCurrent(sdlWindow, nullptr);
 	SDL_DestroyWindow(sdlWindow);
 
@@ -668,6 +676,7 @@ void CGlobalRendering::PostInit() {
 	UniformConstants::GetInstance().Init();
 	ModelUniformData::Init();
 	glGenQueries(glTimerQueries.size(), glTimerQueries.data());
+	CreateTracyGpuContext();
 	RenderBuffer::InitStatic();
 	GL::shapes.Init();
 
@@ -717,15 +726,46 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 		#endif
 
 		FrameMark;
+		CollectTracyGpuZones();
+		GL::DebugGroupTimers::EndFrame();
+		GL::VRAMTracker::Update();
 	}
 	// exclude debug from SCOPED_TIMER("Misc::SwapBuffers");
 	eventHandler.DbgTimingInfo(TIMING_SWAP, pre, spring_now());
 	globalRendering->lastSwapBuffersEnd = spring_now();
 }
 
+bool TracyGpu::ready = false;
+
+// Tracy GPU zones (System/Misc/TracyGpu.h) time GL work with GL_TIMESTAMP queries,
+// which need OpenGL 3.3 or ARB_timer_query. One context per GL context, created once; zones
+// issued before this stay inactive (TracyGpu::ready).
+void CGlobalRendering::CreateTracyGpuContext() const
+{
+#ifdef TRACY_ENABLE
+	if (TracyGpu::ready || !GLTimerQueriesSupported())
+		return;
+
+	TracyGpuContext;
+	TracyGpuContextName("OpenGL", 6);
+	TracyGpu::ready = true;
+#endif
+}
+
+// reads back the finished GPU zone timestamps; once per frame, after the swap
+void CGlobalRendering::CollectTracyGpuZones() const
+{
+#ifdef TRACY_ENABLE
+	if (!TracyGpu::ready)
+		return;
+
+	TracyGpuCollect;
+#endif
+}
+
 void CGlobalRendering::SetGLTimeStamp(uint32_t queryIdx) const
 {
-	if (!GLAD_GL_ARB_timer_query)
+	if (!GLTimerQueriesSupported())
 		return;
 
 	glQueryCounter(glTimerQueries[(NUM_OPENGL_TIMER_QUERIES * (drawFrame & 1)) + queryIdx], GL_TIMESTAMP);
@@ -733,7 +773,7 @@ void CGlobalRendering::SetGLTimeStamp(uint32_t queryIdx) const
 
 uint64_t CGlobalRendering::CalcGLDeltaTime(uint32_t queryIdx0, uint32_t queryIdx1) const
 {
-	if (!GLAD_GL_ARB_timer_query)
+	if (!GLTimerQueriesSupported())
 		return 0;
 
 	const uint32_t queryBase = NUM_OPENGL_TIMER_QUERIES * (1 - (drawFrame & 1));
@@ -1265,6 +1305,16 @@ void CGlobalRendering::SetWindowAttributes(SDL_Window* window)
 void CGlobalRendering::ConfigNotify(const std::string& key, const std::string& value)
 {
 	LOG("[GR::%s][1] key=%s val=%s", __func__, key.c_str(), value.c_str());
+
+	// neither needs the window updated; SDL reads the hint on each focus loss
+	if (key == "MinimizeOnFocusLoss") {
+		SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, (configHandler->GetInt(key) == 0) ? "0" : "1");
+		return;
+	}
+	if (key == "TeamNanoSpray") {
+		teamNanospray = configHandler->GetBool(key);
+		return;
+	}
 
 	if (key == "MinSampleShadingRate") {
 		auto newMSSR = configHandler->GetFloat("MinSampleShadingRate");

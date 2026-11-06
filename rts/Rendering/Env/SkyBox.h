@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef SKY_BOX_H
-#define SKY_BOX_H
+#pragma once
 
 #include <string>
 
@@ -16,7 +15,8 @@ namespace Shader {
 class CSkyBox : public ISky
 {
 public:
-	explicit CSkyBox(uint32_t textureID, uint32_t xsize, uint32_t ysize) { Init(textureID, xsize, ysize, false); }
+	// borrows textureID (the debug cube map, a Lua texture): its owner deletes it
+	explicit CSkyBox(uint32_t textureID, uint32_t xsize, uint32_t ysize): ownsTexture(false) { Init(textureID, xsize, ysize, false); }
 	explicit CSkyBox(const std::string& texture);
 	~CSkyBox() override;
 	void Init(uint32_t textureID, uint32_t xsize, uint32_t ysize, bool convertToCM);
@@ -41,6 +41,5 @@ private:
 	Shader::IProgramObject* shader;
 	MapTexture skyTex;
 	bool valid = false;
+	bool ownsTexture = true; // false: skyTex holds a borrowed id that must not be deleted
 };
-
-#endif // SKY_BOX_H

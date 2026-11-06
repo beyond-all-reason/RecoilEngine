@@ -302,7 +302,7 @@ Two games are particularly suited for newcomers:
 4. Edit Lua files and retest
 
 Changes to Lua code take effect on the next game start. For workflow tips,
-see the [Lua Language Server guide](lua-language-server.md) for setting up IDE
+see the [Working with Lua guide](working-with-lua.md) for setting up IDE
 autocompletion.
 
 ## Next Steps

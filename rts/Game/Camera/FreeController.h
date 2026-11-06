@@ -8,6 +8,7 @@
 class CFreeController : public CCameraController {
 public:
 	CFreeController();
+	~CFreeController();
 
 	const std::string GetName() const { return "free"; }
 
@@ -33,6 +34,11 @@ public:
 
 	void GetState(StateMap& sm) const;
 	bool SetState(const StateMap& sm);
+
+	void ConfigNotify(const std::string& key, const std::string& value);
+
+private:
+	void ReadConfig(const std::string& key);
 
 private:
 	float3 vel;      // velocity

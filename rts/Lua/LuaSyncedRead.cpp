@@ -56,6 +56,7 @@
 #include "Sim/Projectiles/WeaponProjectiles/WeaponProjectile.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
 #include "Sim/Units/BuildInfo.h"
+#include "Sim/Units/QueuedBuildOverlap.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/UnitHandler.h"
@@ -282,6 +283,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(GetUnitBlocking);
 	REGISTER_LUA_CFUNC(GetUnitMoveTypeData);
+	REGISTER_LUA_CFUNC(GetUnitMaxWantedSpeed);
 
 	REGISTER_LUA_CFUNC(GetUnitCommandCount);
 	REGISTER_LUA_CFUNC(GetUnitCommands);
@@ -365,6 +367,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(TestMoveOrder);
 	REGISTER_LUA_CFUNC(TestBuildOrder);
+	REGISTER_LUA_CFUNC(TestBuildOrderOverlap);
 	REGISTER_LUA_CFUNC(Pos2BuildPos);
 	REGISTER_LUA_CFUNC(ClosestBuildPos);
 
@@ -4849,13 +4852,20 @@ int LuaSyncedRead::GetUnitHarvestStorage(lua_State* L)
 }
 
 /***
+ * Get the build range of an allied builder unit.
  *
  * @function Spring.GetUnitBuildParams
  * @param unitID UnitID
- * @param paramName "buildRange"|"buildDistance"|"buildRange3D" The build param to get
- * @return number|boolean|nil value number for `"buildRange"` or `"buildDistance"`,
- * boolean for `"buildRange3D"`, otherwise `nil` for unrecognized paramName or not
- * allied builder unit.
+ * @param paramName "buildRange"|"buildDistance"
+ * @return number? buildDistance The builder's build range, or `nil` if `unitID` is not an allied builder unit.
+ */
+/***
+ * Get whether an allied builder unit's range tests are 3D.
+ *
+ * @function Spring.GetUnitBuildParams
+ * @param unitID UnitID
+ * @param paramName "buildRange3D"
+ * @return boolean? buildRange3D `true` if range tests use spheres, `false` if they use infinite cylinders, or `nil` if `unitID` is not an allied builder unit.
  */
 int LuaSyncedRead::GetUnitBuildParams(lua_State* L)
 {
@@ -4995,8 +5005,7 @@ int LuaSyncedRead::GetUnitTransporter(lua_State* L)
  *
  * @function Spring.GetUnitIsTransporting
  * @param unitID UnitID
- * @return UnitID[]? transporteeArray
- * An array of unitIDs being transported by this unit, or `nil` if not a transport.
+ * @return UnitID[]? transporteeArray An array of unitIDs being transported by this unit, or `nil` if not a transport.
  */
 int LuaSyncedRead::GetUnitIsTransporting(lua_State* L)
 {
@@ -5938,10 +5947,7 @@ int LuaSyncedRead::GetUnitCollisionVolumeData(lua_State* L)
  * @return integer? volumeType
  * @return integer? testType
  * @return integer? primaryAxis
- * @return boolean? disabled
- *
- * Returns no values when `unitID` is invalid or not in line of sight, or when
- * `pieceIndex` is invalid.
+ * @return boolean? disabled Returns no values when `unitID` is invalid or not in line of sight, or when `pieceIndex` is invalid.
  */
 int LuaSyncedRead::GetUnitPieceCollisionVolumeData(lua_State* L)
 {
@@ -6291,6 +6297,22 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State* L)
 	}
 
 	LuaPushNamedString(L, "name", "unknown");
+	return 1;
+}
+
+/***
+ *
+ * @function Spring.GetUnitMaxWantedSpeed
+ * @param unitID UnitID
+ * @return number? maxWantedSpeed Same as `maxWantedSpeed` in `Spring.GetUnitMoveTypeData`.
+ */
+int LuaSyncedRead::GetUnitMaxWantedSpeed(lua_State* L)
+{
+	const CUnit* unit = ParseAllyUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
+
+	lua_pushnumber(L, unit->moveType->GetMaxWantedSpeed() * GAME_SPEED);
 	return 1;
 }
 
@@ -7467,14 +7489,15 @@ int LuaSyncedRead::GetPieceProjectileParams(lua_State* L)
 
 
 /***
+ * `targetTypeInt` is one of:
+ * - `string.byte('g')` ground
+ * - `string.byte('u')` unit
+ * - `string.byte('f')` feature
+ * - `string.byte('p')` projectile
  *
  * @function Spring.GetProjectileTarget
  * @param projectileID ProjectileID
- * @return integer? targetTypeInt where
- * string.byte('g') := GROUND
- * string.byte('u') := UNIT
- * string.byte('f') := FEATURE
- * string.byte('p') := PROJECTILE
+ * @return integer? targetTypeInt The type of target.
  * @return UnitID|FeatureID|ProjectileID|float3 target targetID or targetPos when targetTypeInt == string.byte('g')
  */
 int LuaSyncedRead::GetProjectileTarget(lua_State* L)
@@ -7694,25 +7717,26 @@ int LuaSyncedRead::GetPieceProjectileName(lua_State* L)
 
 
 /***
+ * `tag` is one of:
+ * - `"paralyzeDamageTime"`
+ * - `"impulseFactor"`
+ * - `"impulseBoost"`
+ * - `"craterMult"`
+ * - `"craterBoost"`
+ * - `"dynDamageExp"`
+ * - `"dynDamageMin"`
+ * - `"dynDamageRange"`
+ * - `"dynDamageInverted"`
+ * - `"craterAreaOfEffect"`
+ * - `"damageAreaOfEffect"`
+ * - `"edgeEffectiveness"`
+ * - `"explosionSpeed"`
+ *
+ * It can also be an armor type index, to get the damage against it.
  *
  * @function Spring.GetProjectileDamages
  * @param projectileID ProjectileID
- * @param tag string one of:
- *     "paralyzeDamageTime"
- *     "impulseFactor"
- *     "impulseBoost"
- *     "craterMult"
- *     "craterBoost"
- *     "dynDamageExp"
- *     "dynDamageMin"
- *     "dynDamageRange"
- *     "dynDamageInverted"
- *     "craterAreaOfEffect"
- *     "damageAreaOfEffect"
- *     "edgeEffectiveness"
- *     "explosionSpeed"
- *     - or -
- *     an armor type index to get the damage against it.
+ * @param tag string The damage property, or an armor type index.
  * @return number?
  */
 int LuaSyncedRead::GetProjectileDamages(lua_State* L)
@@ -8199,6 +8223,68 @@ int LuaSyncedRead::TestBuildOrder(lua_State* L)
 	return 2;
 }
 
+
+/***
+ * @class BuildOrderSpec
+ * @x_helper
+ * @field [1] integer unitDefID
+ * @field [2] number x
+ * @field [3] number y
+ * @field [4] number z
+ * @field [5] Facing facing
+ */
+
+static BuildInfo ParseBuildOrderSpec(lua_State* L, int tableIndex)
+{
+	luaL_checktype(L, tableIndex, LUA_TTABLE);
+
+	BuildInfo buildInfo;
+
+	lua_rawgeti(L, tableIndex, 1);
+	buildInfo.def = unitDefHandler->GetUnitDefByID(luaL_checkint(L, -1));
+	lua_pop(L, 1);
+
+	float pos[3];
+	for (int i = 0; i < 3; ++i) {
+		lua_rawgeti(L, tableIndex, i + 2);
+		pos[i] = luaL_checkfloat(L, -1);
+		lua_pop(L, 1);
+	}
+	buildInfo.pos = {pos[0], pos[1], pos[2]};
+
+	lua_rawgeti(L, tableIndex, 5);
+	buildInfo.buildFacing = LuaUtils::ParseFacing(L, __func__, -1);
+	lua_pop(L, 1);
+
+	return buildInfo;
+}
+
+/***
+ * @function Spring.TestBuildOrderOverlap
+ * @param queuedBuild BuildOrderSpec
+ * @param proposedBuild BuildOrderSpec
+ * @return boolean overlaps Whether the builds conflict under the queued-build overlap rules.
+ * @return boolean cancels Whether the proposed build would cancel the earlier queued build.
+ */
+int LuaSyncedRead::TestBuildOrderOverlap(lua_State* L)
+{
+	BuildInfo queuedBuild = ParseBuildOrderSpec(L, 1);
+	BuildInfo proposedBuild = ParseBuildOrderSpec(L, 2);
+
+	if (queuedBuild.def == nullptr || proposedBuild.def == nullptr) {
+		lua_pushboolean(L, false);
+		return 1;
+	}
+
+	const bool synced = CLuaHandle::GetHandleSynced(L);
+	queuedBuild.pos = CGameHelper::Pos2BuildPos(queuedBuild, synced);
+	proposedBuild.pos = CGameHelper::Pos2BuildPos(proposedBuild, synced);
+
+	const auto result = CGameHelper::TestQueuedBuildOverlap(queuedBuild, proposedBuild);
+	lua_pushboolean(L, result != QueuedBuildOverlap::Result::NONE);
+	lua_pushboolean(L, result == QueuedBuildOverlap::Result::CANCEL);
+	return 2;
+}
 
 /*** Snaps a position to the building grid
  *

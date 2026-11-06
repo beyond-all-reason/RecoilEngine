@@ -251,7 +251,6 @@ static const DefaultBinding defaultBindings[] = {
 	{ "Ctrl+b",    "select AllMap+_Builder_Idle+_ClearSelection_SelectOne+"                            },
 	{ "Ctrl+c",    "select AllMap+_ManualFireUnit+_ClearSelection_SelectOne+"                          },
 	{ "Ctrl+r",    "select AllMap+_Radar+_ClearSelection_SelectAll+"                                   },
-	{ "Ctrl+v",    "select AllMap+_Not_Builder_Not_Commander_InPrevSel_Not_InHotkeyGroup+_SelectAll+"  },
 	{ "Ctrl+w",    "select AllMap+_Not_Aircraft_Weapons+_ClearSelection_SelectAll+"                    },
 	{ "Ctrl+x",    "select AllMap+_InPrevSel_Not_InHotkeyGroup+_SelectAll+"                            },
 	{ "Ctrl+z",    "select AllMap+_InPrevSel+_ClearSelection_SelectAll+"                               }
@@ -560,6 +559,8 @@ void CKeyBindings::Clear()
 
 /******************************************************************************/
 
+static constexpr char escapedComma = '\x01';
+
 static bool ParseSingleChain(const std::string& keystr, CKeyChain* kc)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -573,6 +574,7 @@ static bool ParseSingleChain(const std::string& keystr, CKeyChain* kc)
 		char kcstr[256];
 		ss.getline(kcstr, 256, ',');
 		std::string kstr(kcstr);
+		std::replace(kstr.begin(), kstr.end(), escapedComma, ',');
 
 		if (!ks.Parse(kstr, false))
 			return false;
@@ -588,9 +590,9 @@ static bool ParseKeyChain(std::string keystr, CKeyChain* kc, const size_t pos = 
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// recursive function to allow "," as separator-char & as shortcut
-	// -> when parsing fails, this functions replaces one by one all "," by their hexcode
-	//    and tries then to reparse it
-	// -> i.e. ",,," will at the end parsed as "0x2c,0x2c"
+	// -> when parsing fails, this functions escapes one by one all "," so they are
+	//    kept as part of their key token and tries then to reparse it
+	// -> i.e. ",,," will at the end parsed as the chain "," then ","
 
 	const size_t cpos = keystr.rfind(',', pos);
 
@@ -606,7 +608,7 @@ static bool ParseKeyChain(std::string keystr, CKeyChain* kc, const size_t pos = 
 	if ((nextpos != std::string::npos) && ParseKeyChain(keystr, kc, nextpos))
 		return true;
 
-	keystr.replace(cpos, 1, IntToString(keyCodes.GetCode(","), "%#x"));
+	keystr[cpos] = escapedComma;
 	return ParseKeyChain(keystr, kc, cpos);
 }
 

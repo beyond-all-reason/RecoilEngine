@@ -118,8 +118,8 @@ protected:
 
 	void UpdateWeaponPieces(const bool updateAimFrom = true);
 	float3 GetLeadVec(const CUnit* unit) const;
-	float GetAccuratePredictedImpactTime(const CUnit* unit) const;
-	float GetSafeInterceptTime(const CUnit* unit, float predictMult) const;
+	float GetAccuratePredictedImpactTime(const float3& targetPos, const float3& targetSpeed) const;
+	float GetSafeInterceptTime(const float3& targetPos, const float3& targetSpeed) const;
 
 	float GetShapedWeaponRange(const float3& dir, float maxLength) const;
 private:

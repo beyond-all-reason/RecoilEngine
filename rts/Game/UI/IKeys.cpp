@@ -111,3 +111,9 @@ void IKeys::AddPair(const std::string& name, const int code, const bool printabl
 
 	printableCodes.push_back(code);
 }
+
+void IKeys::AddAlias(const std::string& name, const int code)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	nameToCode.emplace_back(name, code);
+}

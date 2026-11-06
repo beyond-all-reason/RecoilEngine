@@ -379,6 +379,13 @@ void CUnit::PostInit(const CUnit* builder)
 		}
 
 		commandAI->GiveCommand(Command(CMD_FIRE_STATE, 0, fireState));
+	} else if (unitDef->fireState > FIRESTATE_NONE) {
+		fireState = unitDef->fireState;
+
+		/* In theory giving the unit a command (like above) could be nice
+		 * for consistency, but that would introduce a special case since
+		 * this command doesn't otherwise do anything, and Lua knows what
+		 * the firestate of this unit is anyway via the unit def. */
 	}
 
 	UpdateRenderParams();
@@ -1943,13 +1950,9 @@ void CUnit::CalculateTerrainType()
 }
 
 
-bool CUnit::SetGroup(CGroup* newGroup, bool fromFactory, bool autoSelect)
+bool CUnit::SetGroup(CGroup* newGroup, bool autoSelect)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// factory is not necessarily selected
-	if (fromFactory && !selectedUnitsHandler.AutoAddBuiltUnitsToFactoryGroup())
-		return false;
-
 	CGroup* group = GetGroup();
 
 	if (group != nullptr)
@@ -1970,8 +1973,7 @@ bool CUnit::SetGroup(CGroup* newGroup, bool fromFactory, bool autoSelect)
 		return true;
 
 	// add unit to the set of selected units iff its new group is already selected
-	// and (user wants the unit to be auto-selected or the unit is not newly built)
-	if (selectedUnitsHandler.IsGroupSelected(newGroup->id) && (selectedUnitsHandler.AutoAddBuiltUnitsToSelectedGroup() || !fromFactory))
+	if (selectedUnitsHandler.IsGroupSelected(newGroup->id))
 		selectedUnitsHandler.AddUnit(this);
 
 	return true;

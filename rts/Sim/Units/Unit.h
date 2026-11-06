@@ -249,7 +249,7 @@ protected:
 	float GetFlankingDamageBonus(const float3& attackDir);
 
 public: // unsynced methods
-	bool SetGroup(CGroup* newGroup, bool fromFactory = false, bool autoSelect = true);
+	bool SetGroup(CGroup* newGroup, bool autoSelect = true);
 
 	const CGroup* GetGroup() const;
 	      CGroup* GetGroup();

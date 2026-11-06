@@ -408,6 +408,11 @@ endif()
 	set(test_flags "-DUNITSYNC")
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
 	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	if (WIN32)
+		# unitsync.dll is built outside test_UnitSync.exe's folder; ctest would otherwise hang on the DLL-not-found box
+		set_tests_properties(test${test_name} PROPERTIES
+			ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:$<TARGET_FILE_DIR:unitsync>")
+	endif ()
 	add_dependencies(test_${test_name} springcontent.sdz)
 
 ################################################################################
@@ -458,6 +463,18 @@ endif()
 
 	set(test_flags "-DNOT_USING_CREG -DBUILDING_AI")
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
+
+################################################################################
+### QueuedBuildOverlap
+	set(test_name QueuedBuildOverlap)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/Misc/testQueuedBuildOverlap.cpp"
+			"${ENGINE_SOURCE_DIR}/Sim/Units/QueuedBuildOverlap.cpp"
+			${test_Common_sources}
+		)
+
+	set(test_libs "")
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DNOT_USING_STREFLOP -DBUILDING_AI")
 
 ################################################################################
 ### Ellipsoid
@@ -543,6 +560,25 @@ endif()
 			"${ENGINE_SOURCE_DIR}/System/creg/VarTypes.cpp"
 			"${ENGINE_SOURCE_DIR}/System/creg/SerializeLuaState.cpp"
 			"${ENGINE_SOURCE_DIR}/System/creg/creg.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+	set(test_libs
+			lua
+			headlessStubs
+			smmalloc
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/)
+	target_include_directories(test_${test_name} PRIVATE ${ENGINE_SOURCE_DIR}/lib/lua/include)
+
+################################################################################
+### LuaAbsIndex
+	set(test_name LuaAbsIndex)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testLuaAbsIndex.cpp"
+			"${ENGINE_SOURCE_DIR}/Lua/LuaMemPool.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
 			${sources_engine_System_Threading}
 			${test_Common_sources}
 		)

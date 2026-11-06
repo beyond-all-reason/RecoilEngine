@@ -300,6 +300,7 @@ void main()
     // Sample the screencopy for refraction at the distorted UV coordinate:
     vec3 refrColor = texture2D(refraction, refrUV).rgb;
 
+  #ifdef opt_depth
     // Look up the depth of the distorted UV coordinate
     float  texZ = ConvertDepthToEyeZ(texture2D(depthmap, refrUV).r);
     float fragZ = ConvertDepthToEyeZ(gl_FragCoord.z);
@@ -312,6 +313,7 @@ void main()
 
     // Replace the distorted screencopy with the original if the fragment is above the water. 
     refrColor = mix(refrColor, origRefrColor, mixback);
+  #endif
 
     gl_FragColor.rgb = mix(refrColor, waterSurface, 0.1 + surfaceMix * 0.100);
 #else

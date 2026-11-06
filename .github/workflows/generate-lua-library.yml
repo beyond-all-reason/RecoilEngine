@@ -7,11 +7,11 @@ on:
     paths:
       - rts/Lua/**
       - rts/Rml/SolLua/**/*.cpp
+      - rts/Sim/Units/Scripts/**/*.cpp
       - doc/site/mise.toml
 env:
   RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
-  LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
-  LUA_DOC_EXTRACTOR_VERSION: "3"
+  LUA_DOC_EXTRACTOR_VERSION: "4.2.1"
 jobs:
   generate-library:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
@@ -29,15 +29,19 @@ jobs:
           sparse-checkout: |
             rts/Lua
             rts/Rml/SolLua
+            rts/Sim/Units/Scripts
             doc/site/mise.toml
           path: recoil
+
+      - name: Link the docs to this commit
+        run: echo "LUA_DOC_EXTRACTOR_SOURCE_REF=https://github.com/$GITHUB_REPOSITORY/blob/${GITHUB_SHA::10}" >> "$GITHUB_ENV"
 
       - uses: jdx/mise-action@v2
         with:
           working_directory: ./recoil/doc/site
           mise_toml: |
             [tools]
-            "npm:lua-doc-extractor" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
+            "github:rhys-vdw/lua-doc-extractor-rs" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
 
       - name: Generate Lua library
         working-directory: ./recoil/doc/site

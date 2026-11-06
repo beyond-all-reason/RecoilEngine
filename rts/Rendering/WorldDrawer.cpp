@@ -359,11 +359,15 @@ void CWorldDrawer::DrawOpaqueObjects() const
 
 	// not an opaque rendering, but makes sense to run after the terrain was rendered
 	{
+		SCOPED_GL_DEBUGGROUP("Draw::World::Sky");
 		const auto& sky = ISky::GetSky();
 		sky->Draw();
 	}
 
-	selectedUnitsHandler.Draw();
+	{
+		SCOPED_GL_DEBUGGROUP("Draw::World::SelectedUnits");
+		selectedUnitsHandler.Draw();
+	}
 	eventHandler.DrawWorldPreUnit();
 
 	{

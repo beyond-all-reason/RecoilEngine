@@ -1,25 +1,31 @@
-[settings.npm]
-	package_manager = "npm"
-
 [tools]
 	# We only install tools required for each task on each task, unless all tasks use a tool here
 	# For CI when we need to install and cache all tools, see mise.ci.toml
 
 [env]
 	HUGO_VERSION = "0.147.9"
-	LUA_DOC_EXTRACTOR_VERSION = "3" # lua_library lua_check
-	EMMYLUA_DOC_CLI_VERSION = "0.8.2" # lua_pages lua_library lua_check
+	# Exact version: mise hides releases younger than `minimum_release_age` from a range like "4"
+	LUA_DOC_EXTRACTOR_VERSION = "4.2.1" # lua_library lua_check
+	# 0.25 exports every `@see` (`tag_content`); 0.8 kept only the last
+	EMMYLUA_DOC_CLI_VERSION = "0.25.1" # lua_pages lua_library lua_check
 	LUA_LANGUAGE_SERVER_VERSION = "3.15.0" # lua_check
 	JQ_VERSION = "1.8.0" # binary_pages
 	SEVENZIP_VERSION = "24.09" # binary_pages
 	RUBY_VERSION = "3.3" # lua_pages
-	LUA_DOC_EXTRACTOR_SOURCE_REF = "https://github.com/beyond-all-reason/RecoilEngine/blob/master"
+	# CI sets the commit being built; local runs link to master
+	LUA_DOC_EXTRACTOR_SOURCE_REF = "{{ get_env(name='LUA_DOC_EXTRACTOR_SOURCE_REF', default='https://github.com/beyond-all-reason/RecoilEngine/blob/master') }}"
 	RECOIL_LUA_LIBRARY_DIR = "rts/Lua/library"
 
 [vars]
 	lua_doc_gen_dest = "$RECOIL_LUA_LIBRARY_DIR/generated"
 	site_dir = 'doc/site'
 	site_temp_dir = "{{vars.site_dir}}/temp"
+	# Diagnostics as GitHub annotations in Actions, which show on a PR's diff; plain text elsewhere
+	lua_doc_format = "{% if get_env(name='GITHUB_ACTIONS', default='') %}github{% else %}text{% endif %}"
+	# Maps each generated Lua line to its C++ line, for `lua-doc-extractor remap`
+	lua_doc_sourcemap = "{{vars.site_temp_dir}}/lua-sourcemap.json"
+	# LuaLS's problems as JSON, for `remap`
+	lua_check_results = "{{vars.site_temp_dir}}/lua-check.json"
 	lua_doc_paths = 'rts/{Lua,Rml/SolLua,Sim/Units/Scripts}/**/*.cpp'
 	lua_pages_dir = "{{vars.site_dir}}/content/docs/lua-api"
 	emmylua_cli_template = "{{vars.site_dir}}/emmylua-doc-cli-template"
@@ -48,7 +54,7 @@
 	tools."cargo:emmylua_doc_cli" = "{{env.EMMYLUA_DOC_CLI_VERSION}}"
 	depends = ["lua_library"]
 	dir = "../../"
-	run = "emmylua_doc_cli -f json -i $RECOIL_LUA_LIBRARY_DIR -o {{vars.site_dir}}/data"
+	run = "emmylua_doc_cli -f json -o {{vars.site_dir}}/data $RECOIL_LUA_LIBRARY_DIR"
 
 	[tasks.binary_pages]
 	depends = ["latest_release_data"]
@@ -95,28 +101,41 @@
 
 	[tasks.lua_check]
 	description = "Sanity check lua library with lua language server"
-	depends = ["lua_library"]
 	tools.lua-language-server = "{{env.LUA_LANGUAGE_SERVER_VERSION}}"
+	tools."github:rhys-vdw/lua-doc-extractor-rs" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
 	dir = "../../"
-	run = [
-		"lua-language-server --check \"${RECOIL_LUA_LIBRARY_DIR}\""
-	]
+	# Runs `lua_library` itself rather than through `depends`: the library is written even when the
+	# extractor reports errors, so LuaLS still checks it and one run reports both.
+	# luals-check.json disables `luadoc-miss-see-name`: LuaLS wants a name before the `@see [file#L1](url)` source links.
+	# `remap` then reports LuaLS's problems at the C++ lines they came from (annotations in Actions),
+	# and the task fails if the extractor or LuaLS found any.
+	run = '''
+		status=0
+		mise -C "{{config_root}}" run lua_library || status=$?
+		lua-language-server --check "${RECOIL_LUA_LIBRARY_DIR}" --configpath "$PWD/{{vars.site_dir}}/luals-check.json" --check_out_path {{vars.lua_check_results}} || status=$?
+		lua-doc-extractor remap --sourcemap {{vars.lua_doc_sourcemap}} --dest {{vars.lua_doc_gen_dest}} --format {{vars.lua_doc_format}} {{vars.lua_check_results}}
+		exit $status
+	'''
 
 	[tasks.lua_library]
 	description = "Generate Lua Docs"
-	tools."npm:lua-doc-extractor" = { version = "{{env.LUA_DOC_EXTRACTOR_VERSION}}", allow_low_downloads = true }
+	# Prebuilt binary from the GitHub release
+	tools."github:rhys-vdw/lua-doc-extractor-rs" = "{{env.LUA_DOC_EXTRACTOR_VERSION}}"
 	dir = "../../"
 	run = [
-		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_doc_gen_dest}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\""
+		# Also writes the source map for `lua_check`, and in Actions prints warnings as PR annotations.
+		# `--error` fails the task on extractor errors (the library is still written).
+		"lua-doc-extractor --src \"{{vars.lua_doc_paths}}\" --dest {{vars.lua_doc_gen_dest}} --repo \"${LUA_DOC_EXTRACTOR_SOURCE_REF}\" --sourcemap {{vars.lua_doc_sourcemap}} --format {{vars.lua_doc_format}} --error"
 	]
 
 	[tasks.latest_release_data]
 	description = "Get latest release data"
 	tools."aqua:jqlang/jq" = "{{env.JQ_VERSION}}"
+	# Authenticated when HUGO_GH_TOKEN is set (CI): unauthenticated requests share a rate limit per IP
 	run = [
 		"rm -f temp/latest_release.json",
 		"mkdir -p temp",
-		"curl -s https://api.github.com/repos/beyond-all-reason/RecoilEngine/releases/latest > temp/latest_release.json",
+		"curl -s ${HUGO_GH_TOKEN:+-H \"Authorization: Bearer $HUGO_GH_TOKEN\"} https://api.github.com/repos/beyond-all-reason/RecoilEngine/releases/latest > temp/latest_release.json",
 		"mv temp/latest_release.json {{vars.latest_release_data}}",
 		"jq '.' {{vars.latest_release_data}}"
 	]

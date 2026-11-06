@@ -16,6 +16,8 @@ CBaseGroundDrawer::CBaseGroundDrawer()
 	LODScaleTerrainReflection = configHandler->GetFloat("GroundLODScaleTerrainReflection");
 	advShading = configHandler->GetBool("AdvMapShading");
 
+	configHandler->NotifyOnChange(this, {"GroundLODScaleReflection", "GroundLODScaleRefraction", "GroundLODScaleTerrainReflection"});
+
 	drawForward = true;
 	drawDeferred = false;
 	drawMapEdges = false;
@@ -43,5 +45,17 @@ CBaseGroundDrawer::CBaseGroundDrawer()
 	radarColor2[2] = (int)(losColorScale * 0.0f);
 	
 	groundTextures = nullptr;
+}
+
+CBaseGroundDrawer::~CBaseGroundDrawer()
+{
+	configHandler->RemoveObserver(this);
+}
+
+void CBaseGroundDrawer::ConfigNotify(const std::string& key, const std::string& value)
+{
+	LODScaleReflection = configHandler->GetFloat("GroundLODScaleReflection");
+	LODScaleRefraction = configHandler->GetFloat("GroundLODScaleRefraction");
+	LODScaleTerrainReflection = configHandler->GetFloat("GroundLODScaleTerrainReflection");
 }
 

@@ -48,8 +48,8 @@
 
 
 CONFIG(bool, BuildIconsFirst).defaultValue(false);
-CONFIG(bool, AutoAddBuiltUnitsToFactoryGroup).defaultValue(false).description("Controls whether or not units built by factories will inherit that factory's unit group.");
-CONFIG(bool, AutoAddBuiltUnitsToSelectedGroup).defaultValue(false);
+CONFIG(bool, AutoAddBuiltUnitsToFactoryGroup).deprecated(true);
+CONFIG(bool, AutoAddBuiltUnitsToSelectedGroup).deprecated(true);
 
 CSelectedUnitsHandler selectedUnitsHandler;
 
@@ -60,10 +60,23 @@ void CSelectedUnitsHandler::Init(unsigned numPlayers)
 	RECOIL_DETAILED_TRACY_ZONE;
 	soundMultiselID = sound->GetDefSoundId("MultiSelect");
 	buildIconsFirst = configHandler->GetBool("BuildIconsFirst");
-	autoAddBuiltUnitsToFactoryGroup = configHandler->GetBool("AutoAddBuiltUnitsToFactoryGroup");
-	autoAddBuiltUnitsToSelectedGroup = configHandler->GetBool("AutoAddBuiltUnitsToSelectedGroup");
+
+	configHandler->NotifyOnChange(this, {"BuildIconsFirst"});
 
 	netSelected.resize(numPlayers);
+}
+
+void CSelectedUnitsHandler::Kill()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	configHandler->RemoveObserver(this);
+}
+
+void CSelectedUnitsHandler::ConfigNotify(const std::string& key, const std::string& value)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	buildIconsFirst = configHandler->GetBool("BuildIconsFirst");
+	possibleCommandsChanged = true;
 }
 
 
@@ -227,7 +240,7 @@ void CSelectedUnitsHandler::GiveCommand(const Command& c, bool fromUser)
 
 				// change group, but do not call SUH::AddUnit while iterating
 				// (the unit's id is already present in selectedUnits anyway)
-				u->SetGroup(const_cast<CGroup*>(group), false, false);
+				u->SetGroup(const_cast<CGroup*>(group), false);
 			}
 
 			SelectGroup(group->id);
@@ -459,7 +472,7 @@ void CSelectedUnitsHandler::ClearSelected()
 }
 
 
-void CSelectedUnitsHandler::SetGroup(CGroup* group, bool fromFactory, bool autoSelect)
+void CSelectedUnitsHandler::SetGroup(CGroup* group, bool autoSelect)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	for (const int unitID: selectedUnits) {
@@ -468,7 +481,7 @@ void CSelectedUnitsHandler::SetGroup(CGroup* group, bool fromFactory, bool autoS
 		if (u == nullptr)
 			continue;
 
-		u->SetGroup(group, fromFactory, autoSelect);
+		u->SetGroup(group, autoSelect);
 	}
 }
 
@@ -622,9 +635,8 @@ void CSelectedUnitsHandler::Draw()
 	if (color1.a > 0) {
 		const auto* unitSet = &selectedUnits;
 
-		// note: units in this set are not necessarily all selected themselves, eg.
-		// if autoAddBuiltUnitsToSelectedGroup is true, so we check IsUnitSelected
-		// for each
+		// note: units in this set are not necessarily all selected themselves,
+		// so we check IsUnitSelected for each
 		if (selectedGroup != -1) {
 			const CGroupHandler* gh = &uiGroupHandlers[gu->myTeam];
 			const CGroup* g = gh->GetGroup(selectedGroup);
@@ -680,40 +692,6 @@ void CSelectedUnitsHandler::Draw()
 		//glMatrixMode(GL_MODELVIEW);      glPopMatrix();
 
 		shader.Disable();
-	}
-
-	// highlight queued build sites if we are about to build something
-	// (or old-style, whenever the shift key is being held down)
-	if (cmdColors.buildBox[3] > 0.0f) {
-		if (!selectedUnits.empty() &&
-				((cmdColors.BuildBoxesOnShift() && KeyInput::GetKeyModState(KMOD_SHIFT)) ||
-				 ((guihandler->inCommand >= 0) &&
-					(guihandler->inCommand < int(guihandler->commands.size())) &&
-					(guihandler->commands[guihandler->inCommand].id < 0)))) {
-
-			bool myColor = true;
-			glColor4fv(cmdColors.buildBox);
-
-			for (const auto& [bid, builderCAI] : unitHandler.GetBuilderCAIs()) {
-				const CUnit* builder = builderCAI->owner;
-
-				if (builder->team == gu->myTeam) {
-					if (!myColor) {
-						glColor4fv(cmdColors.buildBox);
-						myColor = true;
-					}
-					commandDrawer->DrawQuedBuildingSquares(builderCAI);
-				}
-
-				else if (teamHandler.AlliedTeams(builder->team, gu->myTeam)) {
-					if (myColor) {
-						glColor4fv(cmdColors.allyBuildBox);
-						myColor = false;
-					}
-					commandDrawer->DrawQuedBuildingSquares(builderCAI);
-				}
-			}
-		}
 	}
 
 	glLineWidth(1.0f);
@@ -1155,4 +1133,3 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 
 	clientNet->Send(std::shared_ptr<netcode::RawPacket>(packet));
 }
-

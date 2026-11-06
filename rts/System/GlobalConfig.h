@@ -3,10 +3,20 @@
 #ifndef _GLOBAL_CONFIG_H
 #define _GLOBAL_CONFIG_H
 
+#include <string>
+
 
 class GlobalConfig {
 public:
 	void Init();
+
+	// keeps the values consumers read live (network, catch-up, ...) in step with the config
+	void InitConfigNotify();
+	void RemoveConfigNotify();
+	void ConfigNotify(const std::string& key, const std::string& value);
+
+private:
+	void ReadLinkLimits();
 
 public:
 	/**
