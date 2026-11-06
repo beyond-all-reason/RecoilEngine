@@ -189,7 +189,15 @@ bool CCollisionHandler::Collision(const CollisionVolume* v, const CMatrix44f& m,
 				} break;
 			}
 		} break;
-		case CollisionVolume::COLVOL_TYPE_BOX: {
+		// POLYGON: this signature carries no piece, so test the same box of the
+		// volume's own scales that the continuous path falls back to
+		// (CCollisionHandler::Intersect); falling off the end of the switch
+		// reported a miss for every point. default: likewise for any type this
+		// switch does not know. GetVolumeType() returns int, so no -Wswitch
+		// coverage is lost.
+		case CollisionVolume::COLVOL_TYPE_POLYGON:
+		case CollisionVolume::COLVOL_TYPE_BOX:
+		default: {
 			const bool b1 = (math::fabs(pi.x) < v->GetHScales().x);
 			const bool b2 = (math::fabs(pi.y) < v->GetHScales().y);
 			const bool b3 = (math::fabs(pi.z) < v->GetHScales().z);

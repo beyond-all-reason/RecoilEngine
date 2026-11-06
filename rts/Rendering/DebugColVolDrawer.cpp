@@ -83,7 +83,16 @@ static inline void DrawCollisionVolume(const CollisionVolume* vol, const CMatrix
 			// on the mesh in-game, the collision does not either
 			const S3DModelPiece* piece = (lmp != nullptr) ? lmp->original : nullptr;
 
-			if (piece == nullptr || !piece->HasGeometryData())
+			if (piece == nullptr) {
+				// no piece behind the volume: it is tested as a box of its own
+				// scales (CCollisionHandler::Intersect), so draw that box
+				m.Translate(vol->GetOffset(0), vol->GetOffset(1), vol->GetOffset(2));
+				m.Scale(vol->GetScale(0), vol->GetScale(1), vol->GetScale(2));
+				GL::shapes.DrawWireBox(m, color);
+				break;
+			}
+
+			if (!piece->HasGeometryData())
 				break;
 
 			const auto& verts = piece->GetVerticesVec();

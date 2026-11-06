@@ -186,8 +186,15 @@ void CollisionVolume::SetBoundingRadius() {
 			volumeBoundingRadiusSq = volumeBoundingRadius * volumeBoundingRadius;
 		} break;
 		case COLVOL_TYPE_POLYGON: {
-			// not used: the broad-phase radius for this type is derived
-			// from the piece's own mins/maxs at test time (see Intersect)
+			// The continuous test bounds a piece's triangles with the piece's
+			// own mins/maxs and never reads this. QuadField's broad phase, the
+			// discrete test's early-out and CWeapon::GetTargetBorderPos do, and
+			// left unset it kept whatever the volume held before (1.0f when
+			// fresh). An object-level polygon volume has no piece and is tested
+			// as a box of these scales (CCollisionHandler::Intersect), so bound
+			// that box.
+			volumeBoundingRadiusSq = halfAxisScalesSqr.x + halfAxisScalesSqr.y + halfAxisScalesSqr.z;
+			volumeBoundingRadius = math::sqrt(volumeBoundingRadiusSq);
 		} break;
 	}
 }
