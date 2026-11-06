@@ -24,6 +24,14 @@
 #include "System/SpringMath.h"
 #include "System/Log/ILog.h"
 
+// Hide only origins far beyond the map; aircraft can normally fly past its edges.
+static void StartCommandPath(const CUnit* owner)
+{
+	constexpr float MAX_ORIGIN_DISTANCE = 16384.0f;
+	const bool drawStart = owner->pos.SqDistance2D(owner->pos.cClampInMap()) <= Square(MAX_ORIGIN_DISTANCE);
+	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start, drawStart);
+}
+
 static const CUnit* GetTrackableUnit(const CUnit* caiOwner, const CUnit* cmdUnit)
 {
 	if (cmdUnit == nullptr)
@@ -100,7 +108,7 @@ void CommandDrawer::DrawCommands(const CCommandAI* cai, int queueDrawDepth) cons
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
 
-	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start);
+	StartCommandPath(owner);
 
 	if (owner->selfDCountdown != 0)
 		lineDrawer.DrawIconAtLastPos(CMD_SELFD);
@@ -157,7 +165,7 @@ void CommandDrawer::DrawAirCAICommands(const CAirCAI* cai, int queueDrawDepth) c
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
 
-	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start);
+	StartCommandPath(owner);
 
 	if (owner->selfDCountdown != 0)
 		lineDrawer.DrawIconAtLastPos(CMD_SELFD);
@@ -242,7 +250,7 @@ void CommandDrawer::DrawBuilderCAICommands(const CBuilderCAI* cai, int queueDraw
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
 
-	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start);
+	StartCommandPath(owner);
 
 	if (owner->selfDCountdown != 0)
 		lineDrawer.DrawIconAtLastPos(CMD_SELFD);
@@ -411,7 +419,7 @@ void CommandDrawer::DrawFactoryCAICommands(const CFactoryCAI* cai, int queueDraw
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = newUnitCommands.size();
 
-	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start);
+	StartCommandPath(owner);
 
 	if (owner->selfDCountdown != 0)
 		lineDrawer.DrawIconAtLastPos(CMD_SELFD);
@@ -505,7 +513,7 @@ void CommandDrawer::DrawMobileCAICommands(const CMobileCAI* cai, int queueDrawDe
 	if (queueDrawDepth <= 0)
 		queueDrawDepth = commandQue.size();
 
-	lineDrawer.StartPath(owner->GetObjDrawMidPos(), cmdColors.start);
+	StartCommandPath(owner);
 
 	if (owner->selfDCountdown != 0)
 		lineDrawer.DrawIconAtLastPos(CMD_SELFD);
