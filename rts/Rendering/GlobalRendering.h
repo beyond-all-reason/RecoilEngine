@@ -120,6 +120,7 @@ public:
 	void ToggleMultisampling() const;
 
 	bool CheckShaderGL4() const;
+	bool ProbePolygonModeLine() const;
 public:
 	//helper function
 	static int DepthBitsToFormat(int bits);
@@ -332,6 +333,15 @@ public:
 	bool supportClipSpaceControl;
 	bool supportSeamlessCubeMaps;
 	bool supportFragDepthLayout;
+
+	/**
+	 * @brief whether glPolygonMode(*, GL_LINE) actually rasterizes outlines
+	 *
+	 * No GL query reports this. Drivers layered over an API without a wireframe
+	 * fill mode (Zink on Metal) silently rasterize filled polygons instead, so
+	 * it is measured by ProbePolygonModeLine().
+	 */
+	bool supportPolygonModeLine;
 
 	/**
 	 * Shader capabilities
