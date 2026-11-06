@@ -332,6 +332,7 @@ public:
 	bool supportClipSpaceControl;
 	bool supportSeamlessCubeMaps;
 	bool supportFragDepthLayout;
+	bool preferFirstProvokingVertex;
 
 	/**
 	 * Shader capabilities
