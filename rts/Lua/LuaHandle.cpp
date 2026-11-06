@@ -223,6 +223,15 @@ void CLuaHandle::KillLua(bool inFreeHandler)
 	// false and FreeHandler runs next
 	LUA_ERASE_CONTEXT(&D, LUAHANDLE_CONTEXTS[D.synced]);
 	LUA_CLOSE(&L);
+
+	if (D.synced) {
+		for (auto it = gs->customCommands.begin(); it != gs->customCommands.end(); ) {
+			if (it->second.luaHandleName == GetName())
+				it = gs->customCommands.erase(it);
+			else
+				++it;
+		}
+	}
 }
 
 

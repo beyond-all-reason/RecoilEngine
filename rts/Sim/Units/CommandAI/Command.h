@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef COMMAND_H
-#define COMMAND_H
+#pragma once
 
 #include <string>
 #include <climits> // INT_MAX
@@ -9,6 +8,8 @@
 
 #include "System/creg/creg_cond.h"
 #include "System/float3.h"
+
+static constexpr int MIN_CUSTOM_CMD_ID = 1001;
 
 // ID's lower than 0 are reserved for build options (cmd -x = unitdefs[x])
 static constexpr int CMD_STOP                =   0;
@@ -452,6 +453,3 @@ private:
 	/// inline command parameters, used if numParams <= MAX_COMMAND_PARAMS
 	float params[MAX_COMMAND_PARAMS];
 };
-
-#endif // COMMAND_H
-
