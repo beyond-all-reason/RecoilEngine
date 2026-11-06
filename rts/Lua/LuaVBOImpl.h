@@ -155,7 +155,6 @@ private:
 private:
 	static constexpr uint32_t VA_NUMBER_OF_ATTRIBUTES = 16u;
 	static constexpr uint32_t UBO_SAFE_SIZE_BYTES = 0x4000u; //16 KB
-	// BAR's gui_buildsquare_gl4.lua defines 262144 instances of 72 bytes (18 MiB)
 	static constexpr uint32_t BUFFER_SANE_LIMIT_BYTES = 0x2000000u; //32 MiB
 	static constexpr GLenum DEFAULT_VERT_ATTR_TYPE = GL_FLOAT;
 	static constexpr GLenum DEFAULT_BUFF_ATTR_TYPE = GL_FLOAT_VEC4;
