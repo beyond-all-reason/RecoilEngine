@@ -471,7 +471,7 @@ float GuiTraceRay(
 				const bool unitHitInsideFactory = ((hitFactory && ingressDist <  minEgressDist) || (!hitFactory && ingressDist < minIngressDist));
 
 				// give units in a factory higher priority than the factory itself
-				if (hitUnit == nullptr || (factoryUnderCursor && factoryHitBeforeUnit) || (!factoryUnderCursor && unitHitInsideFactory)) {
+				if ((hitUnit == nullptr && hitFeature == nullptr) || (factoryUnderCursor && factoryHitBeforeUnit) || (!factoryUnderCursor && unitHitInsideFactory)) {
 					hitFactory = factoryUnderCursor;
 					minIngressDist = ingressDist;
 					minEgressDist = egressDist;
@@ -504,7 +504,7 @@ float GuiTraceRay(
 
 				// we want the closest feature (intersection point) on the ray
 				// give features in a factory (?) higher priority than the factory itself
-				if (hitUnit == nullptr || factoryHitBeforeUnit || unitHitInsideFactory) {
+				if ((hitUnit == nullptr && hitFeature == nullptr) || factoryHitBeforeUnit || unitHitInsideFactory) {
 					hitFactory = false;
 					minIngressDist = hitDist;
 
