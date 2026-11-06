@@ -1103,6 +1103,7 @@ void CCommandAI::GiveWaitCommand(const Command& c)
 
 		inCommand = CMD_STOP;
 		targetDied = false;
+		SetOrderTarget(nullptr);
 
 		commandQue.push_front(c);
 		return;
