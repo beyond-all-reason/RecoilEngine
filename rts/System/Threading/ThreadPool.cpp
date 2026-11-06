@@ -330,7 +330,7 @@ void WaitForFinished(std::shared_ptr<ITaskGroup>&& taskGroup)
 //   otherwise task might get deleted while its pointer is still
 //   in the queue
 void PushTaskGroup(std::shared_ptr<ITaskGroup>&& taskGroup) { PushTaskGroup(taskGroup.get()); }
-void PushTaskGroup(ITaskGroup* taskGroup)
+void PushTaskGroup(ITaskGroup* taskGroup, bool notify)
 {
 	auto& queue = (taskGroup->IsHighPriority())
 			? taskQueues[ taskGroup->IsAsyncTask() ][ taskGroup->WantedThread() ]
@@ -353,7 +353,7 @@ void PushTaskGroup(ITaskGroup* taskGroup)
 
 	#if 1
 	// AsyncTask's do not care about wakeup-latency as much
-	if (taskGroup->IsAsyncTask())
+	if (taskGroup->IsAsyncTask() || !notify)
 		return;
 
 	NotifyWorkerThreads(false, false);
