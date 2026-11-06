@@ -323,16 +323,21 @@ void CWeapon::Update()
 	if (!HaveTarget() && !owner->HaveTarget() && salvoLeft == 0 && !weaponDef->stockpile)
 		return;
 
-	// Fast auto targeting needs to trigger an immediate retarget once the target is dead.
-	bool fastAutoRetargetRequired = fastAutoRetargeting && HaveTarget()
-									&& currentTarget.unit != nullptr && currentTarget.unit->isDead;
+	// Fast auto targeting needs to trigger an immediate retarget once the target cannot be fired at.
+	const bool fastAutoRetargetRequired = fastAutoRetargeting && HaveUnitTarget()
+		&& !currentTarget.unit->CanBeFiredAt();
+
 	if (fastAutoRetargetRequired) {
-		// switch to unit's target if it has one - see next bit below
-		bool ownerTargetIsValid = (owner->curTarget.type == Target_Unit && currentTarget.unit != nullptr && !currentTarget.unit->isDead)
-								|| (owner->curTarget.type != Target_Unit && owner->curTarget.type != Target_None);
-		if (ownerTargetIsValid)
-			DropCurrentTarget();
-		else
+		// Dropping the target prevents repeated searches when no replacement is available.
+		DropCurrentTarget();
+
+		// switch to unit's target if it has a usable one - see next bit below
+		const SWeaponTarget& ownerTarget = owner->curTarget;
+		const bool ownerTargetIsValid = (ownerTarget.type == Target_Unit)
+			? (ownerTarget.unit != nullptr && ownerTarget.unit->CanBeFiredAt())
+			: (ownerTarget.type != Target_None);
+
+		if (!ownerTargetIsValid)
 			AutoTarget();
 	}
 
@@ -1051,9 +1056,7 @@ bool CWeapon::TestTarget(const float3& tgtPos, const SWeaponTarget& trg) const
 				return false;
 			if ((trg.unit->category & onlyTargetCategory) == 0)
 				return false;
-			if (trg.unit->isDead && !modInfo.fireAtKilled)
-				return false;
-			if (trg.unit->IsCrashing() && !modInfo.fireAtCrashing)
+			if (!trg.unit->CanBeFiredAt())
 				return false;
 			if ((trg.unit->losStatus[owner->allyteam] & (LOS_INLOS | LOS_INRADAR)) == 0)
 				return false;
