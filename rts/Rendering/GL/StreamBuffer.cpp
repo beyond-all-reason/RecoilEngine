@@ -2,7 +2,9 @@
 
 #include "VBO.h"
 
-#include "System/ContainerUtil.h"
+#include <algorithm>
+#include <cstdlib>
+
 #include "System/Log/ILog.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GlobalRenderingInfo.h"
@@ -23,15 +25,30 @@ void IStreamBufferConcept::PutBufferLocks()
 	if (lockList.empty())
 		return;
 
-	spring::VectorSortUnique(lockList);
-
-	for (auto& so : lockList) {
-		if (glIsSync(*so))
-			glDeleteSync(*so);
-
-		*so = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-	}
+	for (auto* fence : lockList)
+		PutBufferLock(*fence);
 	lockList.clear();
+}
+
+void IStreamBufferConcept::PutBufferLock(BufferFence& fence)
+{
+	const GLsync sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+	if (sync == nullptr) {
+		LOG_L(L_FATAL, "[IStreamBuffer::PutBufferLock] Failed to fence GPU buffer use");
+		std::abort();
+	}
+	if (fence.sync != nullptr)
+		glDeleteSync(fence.sync);
+	fence.sync = sync;
+	fence.queued = false;
+}
+
+void IStreamBufferConcept::CancelBufferLock(BufferFence& fence)
+{
+	if (!fence.queued)
+		return;
+	std::erase(lockList, &fence);
+	fence.queued = false;
 }
 
 IStreamBufferConcept::IStreamBufferConcept(StreamBufferCreationParams p, std::string_view bufferTypeName)
@@ -49,28 +66,71 @@ IStreamBufferConcept::IStreamBufferConcept(StreamBufferCreationParams p, std::st
 		LOG_L(L_INFO, "[StreamBuffer::%s] Created StreamBuffer name %s type %s", __func__, name.c_str(), bufferTypeName.data());
 }
 
-void IStreamBufferConcept::QueueLockBuffer(GLsync& syncObj) const
+IStreamBufferConcept::~IStreamBufferConcept()
 {
-	RECOIL_DETAILED_TRACY_ZONE;
-	lockList.emplace_back(&syncObj);
+	// Derived Kill has already waited for the GPU. No reservation may outlive
+	// its host storage, even when initialization failed or no frame was swapped.
+	ClearBufferFences();
 }
 
-void IStreamBufferConcept::WaitBuffer(GLsync& syncObj) const
+void IStreamBufferConcept::InitBufferFences(uint32_t count)
+{
+	assert(fences.empty());
+	assert(count > 0);
+	fences.resize(count);
+	allocIdx = 0;
+	boundIdx = INVALID_BUFFER_IDX;
+	// Fresh storage has no GPU reader; fences are queued only when used.
+}
+
+void IStreamBufferConcept::ClearBufferFences()
+{
+	for (auto& fence : fences) {
+		CancelBufferLock(fence);
+		assert(fence.sync == nullptr);
+	}
+	fences.clear();
+	allocIdx = 0;
+	boundIdx = INVALID_BUFFER_IDX;
+}
+
+void IStreamBufferConcept::QueueLockBuffer(BufferFence& fence) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (!glIsSync(syncObj))
+	if (fence.queued)
+		return;
+	lockList.emplace_back(&fence);
+	fence.queued = true;
+}
+
+void IStreamBufferConcept::WaitBuffer(BufferFence& fence) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (fence.queued) {
+		// A slot can wrap or be destroyed before the frame-end fence pass.
+		// Cover its latest issued reads before granting the CPU write access.
+		CancelBufferLock(fence);
+		PutBufferLock(fence);
+	}
+	if (fence.sync == nullptr)
 		return;
 
 	uint32_t gWaitCount = 0;
 	while (true) {
-		GLenum waitReturn = glClientWaitSync(syncObj, GL_SYNC_FLUSH_COMMANDS_BIT, 1);
+		GLenum waitReturn = glClientWaitSync(fence.sync, GL_SYNC_FLUSH_COMMANDS_BIT, 1);
 		if (waitReturn == GL_ALREADY_SIGNALED || waitReturn == GL_CONDITION_SATISFIED)
 			break;
 
+		if (waitReturn != GL_TIMEOUT_EXPIRED) {
+			// Completion is unknown. Never delete this fence and let Map reuse
+			// GPU-owned storage, and do not throw through buffer destructors.
+			LOG_L(L_FATAL, "[IStreamBuffer::WaitBuffer] Fence wait failed (0x%x) for buffer %u (%s)", waitReturn, id, name.c_str());
+			std::abort();
+		}
 		gWaitCount++;
 	}
-	glDeleteSync(syncObj);
-	syncObj = {};
+	glDeleteSync(fence.sync);
+	fence.sync = nullptr;
 
 	if (gWaitCount > 0)
 		LOG_L(L_DEBUG, "[IStreamBuffer::WaitBuffer] Detected non-zero (%u) wait spins on stream buffer (%u, %s). Consider increasing numBuffers", gWaitCount, id, name.c_str());
@@ -132,10 +192,19 @@ void IStreamBufferConcept::BindBufferRange(GLuint index, uint32_t bindTarget) co
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	glBindBufferRange(bindTarget > 0 ? bindTarget : this->target, index, id, allocIdx * this->byteSize, this->byteSize);
+	boundIdx = allocIdx;
+	MarkBoundBufferUsed();
 }
 
 void IStreamBufferConcept::UnbindBufferRange(GLuint index, uint32_t bindTarget) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	glBindBufferRange(bindTarget > 0 ? bindTarget : this->target, index, 0u, allocIdx * this->byteSize, this->byteSize);
+	boundIdx = INVALID_BUFFER_IDX;
+}
+
+void IStreamBufferConcept::MarkBoundBufferUsed() const
+{
+	if (boundIdx < fences.size())
+		QueueLockBuffer(fences[boundIdx]);
 }
