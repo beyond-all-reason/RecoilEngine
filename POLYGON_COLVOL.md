@@ -101,18 +101,29 @@ does not sit on the mesh, neither do the hits.
   nothing to dangle across savegame loads, model swaps or volume copies.
 - **The object-level volume cannot be polygon** — it has no piece behind
   it. It stays a sphere and defers to the piece tree, the same way
-  `usePieceCollisionVolumes` already works.
+  `usePieceCollisionVolumes` already works. The choice is kept as a flag
+  on that volume, next to `defaultToPieceTree`, rather than as its type:
+  a polygon def normally sets no scales, so the volume counts as a
+  default one and `InitDefault()` would turn the type back into a sphere
+  on every instance.
+- **A polygon type set on the object-level volume from Lua** has no piece
+  to trace either. Every test that reads it treats it as a box of the
+  volume's own scales: the ray test, the discrete point test, the
+  bounding radius used by the broad phase and by
+  `CWeapon::GetTargetBorderPos`, and `/debugcolvol`.
 - **Broad-phase.** The axis-scale box reject is meaningless for this type,
   so a slab test against the piece's own `mins`/`maxs` is used instead;
   rays nowhere near a piece never reach the per-triangle loop. A bounding
   sphere would be cheaper per test but fits elongated pieces poorly — a
   gun barrel's sphere has a radius of half its length and is mostly empty,
   so shots passing alongside it would still pay for a full triangle scan.
-- **Discrete (point-in-volume) testing is not implemented.** It is also
-  unreachable: `DetectHit()` branches to `IntersectPieceTree()` when
-  `DefaultToPieceTree()` is set, before the continuous/discrete choice is
-  made, and that branch overrides `forceTrace`, which itself overrides
-  `testType`.
+- **Discrete (point-in-volume) testing of a piece's polygon volume is not
+  implemented.** It is also unreachable: `DetectHit()` branches to
+  `IntersectPieceTree()` when `DefaultToPieceTree()` is set, before the
+  continuous/discrete choice is made, and that branch overrides
+  `forceTrace`, which itself overrides `testType`. The only polygon volume
+  the discrete test can see is the piece-less one above, and for it the
+  test checks the box.
 
 ### Cost
 
@@ -142,6 +153,8 @@ rts/Rendering/Models/IModelParser.cpp
 rts/Lua/LuaSyncedCtrl.cpp
 rts/Lua/LuaSyncedRead.cpp
 rts/Lua/LuaUtils.cpp
+test/CMakeLists.txt
+test/engine/Sim/Misc/testCollisionVolume.cpp
 ```
 
 ### Building
@@ -154,19 +167,55 @@ bash docker-build-v2/build.sh windows
 
 Output lands in `build-amd64-windows/install/`.
 
+To put the whole change on a clean upstream checkout instead of using
+this fork, apply `polygon-collision-volume.patch` from the repository
+root. It holds every file above as one patch against upstream:
+
+```bash
+git apply polygon-collision-volume.patch
+```
+
+The unit test is optional; `--exclude='test/*'` leaves it out.
+
 ### Status
 
 Based on upstream commit `e9d199329538cd9078a621c5e0f9ada416e1229f` (2026-09-18).
+The standalone patch also applies to upstream master as of `c9d0299`
+(2026-11-06).
 
 Tested on Windows. Verified in game: units spawn, polygon outlines follow
 the real geometry on angled pieces, hits register per piece, and mixed
-volume types coexist on one unit. Not benchmarked under heavy unit counts;
-no automated tests added.
+volume types coexist on one unit. Not benchmarked under heavy unit counts.
 
 **v2** adds two performance changes that leave behaviour untouched: the
 positions-only tracing array described under *Cost*, and the slab-test
 broad-phase described under *Design notes*. Both were verified to produce
 identical outlines and identical hit results.
+
+**v2.5** fixes four defects found in review. A polygon volume with no
+piece behind it now tests as a box of its own scales instead of missing
+every shot. Rays running exactly along an edge shared by two triangles
+are no longer rejected by both: on a rotated test cube 9.2% of such rays
+were lost, and the tolerance that closes the gap was tuned on that cube.
+The surface distance from a point inside a closed mesh is now zero, as
+for the other types, so an explosion inside a hull is no longer cancelled
+by the `expDist > expRadius` early-out; open shells keep the distance to
+the nearest triangle. Piece volumes changed by scripts during a match are
+no longer reset when a savegame is loaded.
+
+**v2.6** makes the box fallback for a piece-less polygon volume hold
+everywhere the volume is read, not only in the ray test. That covers the
+bounding radius, which was left unset: QuadField dropped such objects
+before any hit test, losing explosion damage and projectile hits, and the
+probe ray in `CWeapon::GetTargetBorderPos` came out too short. It also
+covers the discrete point test and `/debugcolvol`. The polygon choice
+moves from `SolidObjectDef` to a flag on `CollisionVolume` (review
+feedback; no behaviour change), `HasCustomType()` counts polygon as a
+custom type, and the unit test `test_CollisionVolume` is added. Built on
+Linux with gcc 13: the headless engine and the unit tests, where
+`test_CollisionVolume` passes. The standalone patch also compiles against
+master `c9d0299`, and `test_CollisionVolume` passes there too. Not yet
+checked in game.
 
 ### AI disclosure
 
@@ -276,7 +325,16 @@ local sx,sy,sz, ox,oy,oz, vType, testType, pAxis, ignoreHits =
   повиснуть после загрузки сейва, смены модели или копирования объёма.
 - **Объём уровня юнита полигональным быть не может** — за ним нет
   piece'а. Он остаётся сферой и делегирует в дерево piece'ов, ровно как
-  штатный `usePieceCollisionVolumes`.
+  штатный `usePieceCollisionVolumes`. Выбор хранится флагом на этом
+  объёме, рядом с `defaultToPieceTree`, а не его типом: полигональный
+  деф обычно не задаёт размеров, такой объём считается объёмом по
+  умолчанию, и `InitDefault()` у каждого экземпляра превратил бы тип
+  обратно в сферу.
+- **Полигональный тип, поставленный объёму уровня юнита из Lua**, тоже
+  не имеет piece'а для трассировки. Все проверки, которые его читают,
+  считают его коробкой по собственным размерам объёма: тест луча,
+  дискретный тест точки, ограничивающий радиус для раннего отсева и для
+  `CWeapon::GetTargetBorderPos`, и `/debugcolvol`.
 - **Ранний отсев.** Проверка по коробке из осевых размеров для этого типа
   бессмысленна, поэтому используется слэб-тест по собственным
   `mins`/`maxs` piece'а: лучи, проходящие далеко, до перебора
@@ -284,11 +342,14 @@ local sx,sy,sz, ox,oy,oz, vType, testType, pAxis, ignoreHits =
   плохо облегает вытянутые детали — у ствола пушки её радиус равен
   половине длины и внутри в основном пустота, так что выстрелы,
   пролетающие вдоль него, всё равно оплачивали бы полный перебор.
-- **Дискретный тест «точка внутри» не реализован.** Он же и недостижим:
-  `DetectHit()` уходит в `IntersectPieceTree()` при включённом
-  `DefaultToPieceTree()` — раньше, чем выбирается непрерывный или
-  дискретный режим, и эта ветка перекрывает `forceTrace`, который сам
-  перекрывает `testType`.
+- **Дискретный тест «точка внутри» для полигонального объёма piece'а не
+  реализован.** Он же и недостижим: `DetectHit()` уходит в
+  `IntersectPieceTree()` при включённом `DefaultToPieceTree()` — раньше,
+  чем выбирается непрерывный или дискретный режим, и эта ветка
+  перекрывает `forceTrace`, который сам перекрывает `testType`.
+  Единственный полигональный объём, который дискретный тест может
+  увидеть, — описанный выше объём без piece'а, и для него проверяется
+  коробка.
 
 ### Цена
 
@@ -319,6 +380,8 @@ rts/Rendering/Models/IModelParser.cpp
 rts/Lua/LuaSyncedCtrl.cpp
 rts/Lua/LuaSyncedRead.cpp
 rts/Lua/LuaUtils.cpp
+test/CMakeLists.txt
+test/engine/Sim/Misc/testCollisionVolume.cpp
 ```
 
 ### Сборка
@@ -331,20 +394,57 @@ bash docker-build-v2/build.sh windows
 
 Результат — в `build-amd64-windows/install/`.
 
+Чтобы наложить всё изменение на чистый апстрим, а не брать этот форк,
+есть `polygon-collision-volume.patch` в корне репозитория: все
+перечисленные выше файлы одним патчем относительно апстрима.
+
+```bash
+git apply polygon-collision-volume.patch
+```
+
+Юнит-тест необязателен; `--exclude='test/*'` его пропускает.
+
 ### Состояние
 
 Основано на коммите апстрима `e9d199329538cd9078a621c5e0f9ada416e1229f` (2026-09-18).
+Отдельный патч накладывается и на master апстрима по состоянию на
+`c9d0299` (2026-11-06).
 
 Проверено на Windows. В игре подтверждено: юниты спавнятся, контуры
 полигональных объёмов повторяют реальную геометрию на наклонных деталях,
 попадания засчитываются по конкретному piece'у, разные типы объёмов
-уживаются на одном юните. Под нагрузкой из десятков юнитов не измерялось,
-автоматических тестов не добавлено.
+уживаются на одном юните. Под нагрузкой из десятков юнитов не измерялось.
 
 **v2** добавляет две правки производительности, не меняющие поведение:
 массив только с позициями для трассировки (см. «Цена») и слэб-тест в
 раннем отсеве (см. «Замечания по устройству»). Обе проверены: контуры и
 результаты попаданий остались идентичными.
+
+**v2.5** исправляет четыре дефекта, найденных при разборе кода.
+Полигональный объём без piece'а за ним теперь проверяется как коробка по
+собственным размерам, а не пропускает каждый выстрел. Луч, идущий точно
+по ребру, общему для двух треугольников, больше не отвергается обоими:
+на повёрнутом тестовом кубе терялось 9,2% таких лучей, и допуск,
+закрывающий щель, подобран на нём же. Расстояние до поверхности от точки
+внутри замкнутого меша теперь равно нулю, как у остальных типов, поэтому
+взрыв внутри корпуса больше не отменяется ранним выходом
+`expDist > expRadius`; у открытой «скорлупы» остаётся расстояние до
+ближайшего треугольника. Объёмы piece'ов, изменённые скриптами за матч,
+больше не откатываются при загрузке сейва.
+
+**v2.6** распространяет замену на коробку для полигонального объёма без
+piece'а на все места, где объём читается, а не только на тест луча.
+Сюда входит ограничивающий радиус, который оставался незаданным:
+QuadField выкидывал такие объекты до всякого хит-теста — терялись урон
+от взрывов и попадания снарядов, — а пробный луч в
+`CWeapon::GetTargetBorderPos` выходил слишком коротким. Сюда же входят
+дискретный тест точки и `/debugcolvol`. Выбор полигона перенесён из
+`SolidObjectDef` во флаг `CollisionVolume` (замечание ревьюера; поведение
+не меняется), `HasCustomType()` считает полигон нестандартным типом,
+добавлен юнит-тест `test_CollisionVolume`. Собрано на Linux (gcc 13):
+headless-движок и юнит-тесты, `test_CollisionVolume` проходит. Отдельный
+патч собирается и на master `c9d0299`, `test_CollisionVolume` проходит и
+там. В игре ещё не проверялось.
 
 ### Раскрытие использования ИИ
 
