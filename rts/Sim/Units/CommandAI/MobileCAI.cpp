@@ -2040,8 +2040,10 @@ void CMobileCAI::UnloadDrop(Command& c)
 		SetGoal(pos, owner->pos);
 
 	CHoverAirMoveType* am = dynamic_cast<CHoverAirMoveType*>(owner->moveType);
-	CUnit* transportee = owner->transportedUnits[0].unit;
 
+	const auto& transportees = owner->transportedUnits;
+	CUnit* transportee = GetTransporteeFromUnloadOrder(c, transportees);
+	
 	if (am != nullptr) {
 		pos.y = CGround::GetHeightAboveWater(pos.x, pos.z);
 		am->maxDrift = 1.0f;
