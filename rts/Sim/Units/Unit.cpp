@@ -2627,9 +2627,6 @@ bool CUnit::AttachUnit(CUnit* unit, int piece, bool force)
 	if (dynamic_cast<CBuilding*>(unit) != nullptr)
 		unitLoader->RestoreGround(unit);
 
-	if (dynamic_cast<CHoverAirMoveType*>(moveType) != nullptr)
-		unit->moveType->UseHeading(false);
-
 	TransportedUnit tu;
 		tu.unit = unit;
 		tu.piece = piece;
@@ -2668,8 +2665,9 @@ bool CUnit::DetachUnitCore(CUnit* unit)
 		unit->SetTransporter(nullptr);
 		unit->unloadingTransportId = id;
 
-		if (dynamic_cast<CHoverAirMoveType*>(moveType) != nullptr)
-			unit->moveType->UseHeading(true);
+		// an aircraft docked in any flight state is released and takes off
+		if (CHoverAirMoveType* amt = dynamic_cast<CHoverAirMoveType*>(unit->moveType))
+			amt->SetState(AAirMoveType::AIRCRAFT_TAKEOFF);
 
 		// de-stun detaching units in case we are not a fire-platform
 		unit->SetStunned(unit->paralyzeDamage > (modInfo.paralyzeOnMaxHealth? unit->maxHealth: unit->health));
