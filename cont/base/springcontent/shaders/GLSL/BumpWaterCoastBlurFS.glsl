@@ -6,6 +6,7 @@
  * @brief Input is a 0/1 bitmap and 1 indicates land.
  *        Now this shader blurs this map, so you get something like
  *        a distance to land map (->coastmap).
+ *        The first pass (radius 0) creates the input from the heightmap.
  * @author jK
  *
  * Copyright (C) 2008,2009.  Licensed under the terms of the
@@ -15,11 +16,12 @@
 in vec4 vTexCoord;
 
 uniform sampler2D tex0; //! final (fullsize) texture
-uniform sampler2D tex1; //! atlas with to be updated rects
+uniform sampler2D tex1; //! scratch texture with the to be updated rects
+uniform sampler2D heightTex; //! corner heightmap, read by the first pass
 uniform ivec2     args;
 
 #define res 15.0
-#define renderToAtlas (args.x > 0.5)
+#define renderToScratch (args.x > 0.5)
 #define radius args.y
 
 out vec4 fragColor;
@@ -30,12 +32,12 @@ vec2 texelScissor = vec2(dFdx(vTexCoord.p), dFdy(vTexCoord.q)); // heightmap pos
 vec2 texel0 = vec2(dFdx(vTexCoord.s), dFdy(vTexCoord.t)); // 0..1
 
 vec4 tex2D(vec2 offset) {
-	if (renderToAtlas) {
+	if (renderToScratch) {
 		return texture2D(tex0, vTexCoord.st + offset * texel0);
 	} else {
 		vec2 scissor = vTexCoord.pq + (offset * texelScissor);
-		bool outOfAtlasBound = any(greaterThan(scissor,vec2(1.0))) || any(lessThan(scissor,vec2(0.0)));
-		if (outOfAtlasBound) {
+		bool outOfRectBound = any(greaterThan(scissor,vec2(1.0))) || any(lessThan(scissor,vec2(0.0)));
+		if (outOfRectBound) {
 			return texture2D(tex1, vTexCoord.st);
 		} else {
 			return texture2D(tex1, vTexCoord.st + offset * texel0);
@@ -96,8 +98,15 @@ void LoopIter(inout float maxDist, inout vec3 minDist, float i) {
 
 void main() {
 	if (radius < 0.5) {
-		//! initialize
-		fragColor = texture2D(tex1, vTexCoord.st);
+		//! initialize: r = is ground, g = is above water (blurred into the coast distance below),
+		//! b = water depth in the encoding of CReadMap::EncodeHeight; one texel per heightmap corner
+		float height = texelFetch(heightTex, ivec2(gl_FragCoord.xy), 0).r;
+		fragColor = vec4(
+			float(height > 10.0),
+			float(height >  0.0),
+			(height < 0.0)? (float(max(0, 255 + int(10.0 * height))) / 255.0): 1.0,
+			0.0
+		);
 		return;
 	}
 
@@ -132,6 +141,19 @@ void main() {
 		return;
 	}
 
+	vec4 center;
+	if (renderToScratch) {
+		center = texture2D(tex0, vTexCoord.st);
+	} else {
+		center = texture2D(tex1, vTexCoord.st);
+	}
+
+	//! the search below can only raise g, texels already at 1.0 (land) keep their value
+	if (center.g >= 1.0) {
+		fragColor = center;
+		return;
+	}
+
 	float maxValue = 0.0;
 	vec3 minDist = vec3(1e9);
 
@@ -154,11 +176,6 @@ void main() {
 
 	float fDist = 1.0 - (min(res, sqrt(minDist.z)) / res);
 
-	if (renderToAtlas) {
-		fragColor = texture2D(tex0, vTexCoord.st);
-	} else {
-		fragColor = texture2D(tex1, vTexCoord.st);
-	}
-
+	fragColor = center;
 	fragColor.g = max(fragColor.g, fDist * fDist * fDist);
 }
