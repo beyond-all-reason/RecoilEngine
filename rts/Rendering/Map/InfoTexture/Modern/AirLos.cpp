@@ -103,7 +103,7 @@ void CAirLosTexture::Update()
 	const auto& myAirLos = losHandler->airLos.losMaps[gu->myAllyTeam].GetLosMap();
 	{
 		auto binding = uploadTex.ScopedBind();
-		uploadTex.UploadImage(myAirLos.data());
+		UploadThroughPBO(uploadTex, uploadPBO, myAirLos.data(), myAirLos.size() * sizeof(myAirLos[0]));
 	}
 
 	// do post-processing on the gpu (los-checking & scaling)
