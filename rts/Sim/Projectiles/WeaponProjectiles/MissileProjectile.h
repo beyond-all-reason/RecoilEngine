@@ -33,6 +33,21 @@ public:
 
 	void SetIgnoreError(bool b) { ignoreError = b; }
 
+	static void InitExtraHeight(const WeaponDef* wd, float dist, float maxSpeed, float& extraHeight, int& extraHeightTime, float& extraHeightDecay);
+
+	/// one frame of steering towards targetPos; returns the new direction
+	static float3 StepSteering(
+		const WeaponDef* wd,
+		const float3& pos,
+		float3 dir,
+		const float3& targetPos,
+		const float3& targetVel,
+		float maxSpeed,
+		float& extraHeight,
+		int& extraHeightTime,
+		float extraHeightDecay
+	);
+
 private:
 	float3 UpdateTargeting();
 	void UpdateWobble();
