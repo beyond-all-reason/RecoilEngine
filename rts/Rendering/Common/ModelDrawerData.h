@@ -179,7 +179,7 @@ inline void CModelDrawerDataBase<T>::UpdateObjectTrasform(const T* o)
 	for (int i = 0; i < o->localModel.pieces.size(); ++i) {
 		const LocalModelPiece& lmp = o->localModel.pieces[i];
 
-		const auto& lmpTransform = lmp.GetModelSpaceTransform(); //forces dirty / wasUpdated recalculation if no other method called it yet
+		const auto& lmpTransform = lmp.GetModelSpaceTransform();
 
 		if likely(!lmp.GetWasUpdated())
 			continue;
