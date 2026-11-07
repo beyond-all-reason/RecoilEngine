@@ -367,8 +367,9 @@ static void cleartable (GCObject *l) {
       if (!ttisnil(gval(n)) &&  /* non-empty entry? */
           (iscleared(key2tval(n), 1) || iscleared(gval(n), 0))) {
         setnilvalue(gval(n));  /* remove value ... */
-        removeentry(n);  /* remove entry from table */
       }
+      if (ttisnil(gval(n)))
+        removeentry(n);  /* remove key, including already-empty entries */
     }
     l = h->gclist;
   }
