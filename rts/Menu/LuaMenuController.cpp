@@ -2,6 +2,8 @@
 
 #include "LuaMenuController.h"
 
+#include <Rml/Backends/RmlUi_Backend.h>
+
 #include "Game/GlobalUnsynced.h"
 #include "Game/UI/InfoConsole.h"
 #include "Game/UI/MouseHandler.h"
@@ -101,6 +103,7 @@ bool CLuaMenuController::Update()
 	mouse->Update();
 	mouse->UpdateCursors();
 	eventHandler.Update();
+	RmlGui::Update();
 	// calls IsAbove
 	mouse->GetCurrentTooltip();
 
@@ -122,6 +125,7 @@ bool CLuaMenuController::Draw()
 
 		eventHandler.DrawGenesis();
 		eventHandler.DrawScreen();
+		RmlGui::RenderFrame();
 		mouse->DrawCursor();
 		eventHandler.DrawScreenPost();
 
