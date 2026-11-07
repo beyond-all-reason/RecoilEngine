@@ -25,11 +25,17 @@ using namespace asio;
 
 UDPListener::UDPListener(int port, const std::string& ip): acceptNewConnections(false)
 {
-	// resets socket on any exception
-	const std::string err = TryBindSocket(port, socket, ip);
+	bool portInUse = false;
 
-	if (!err.empty())
+	// resets socket on any exception
+	const std::string err = TryBindSocket(port, socket, ip, &portInUse);
+
+	if (!err.empty()) {
+		if (portInUse)
+			throw port_in_use_error(err);
+
 		throw network_error(err);
+	}
 
 	socket->non_blocking(true);
 	SetAcceptingConnections(true);
@@ -44,7 +50,7 @@ UDPListener::~UDPListener() {
 }
 
 
-std::string UDPListener::TryBindSocket(int port, std::shared_ptr<asio::ip::udp::socket>& sock, const std::string& ip)
+std::string UDPListener::TryBindSocket(int port, std::shared_ptr<asio::ip::udp::socket>& sock, const std::string& ip, bool* portInUse)
 {
 	std::string errorMsg;
 
@@ -85,7 +91,14 @@ std::string UDPListener::TryBindSocket(int port, std::shared_ptr<asio::ip::udp::
 				throw std::runtime_error("[UDPListener] failed to open IPv4 socket: " + err.message());
 		}
 
-		sock->bind(endpoint);
+		sock->bind(endpoint, err);
+
+		if (err) {
+			if (portInUse != nullptr)
+				*portInUse = (err == asio::error::address_in_use);
+
+			throw asio::system_error(err, "bind");
+		}
 
 		LOG(
 			"[UDPListener::%s] binding UDP socket to IPv%d-address %s (%s) on port %i",
