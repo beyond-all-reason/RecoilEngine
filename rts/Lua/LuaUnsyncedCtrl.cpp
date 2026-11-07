@@ -5608,15 +5608,11 @@ int LuaUnsyncedCtrl::SetClipboard(lua_State* L)
  */
 int LuaUnsyncedCtrl::Yield(lua_State* L)
 {
-	if (CLoadLock::GetThreadSafety() == false) {
+	if (!CLoadLock::YieldToDraw()) {
 		lua_pushboolean(L, false); //hint Lua might stop calling Yield
 		return 1;
 	}
 
-	auto& mtx = CLoadLock::GetMutex();
-	mtx.unlock();
-	std::this_thread::yield();
-	mtx.lock();
 	Watchdog::ClearTimer(WDT_LOAD);
 
 	lua_pushboolean(L, true); //hint Lua should keep calling Yield

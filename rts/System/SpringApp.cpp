@@ -899,12 +899,17 @@ bool SpringApp::Update()
 	// sic; Update can set the controller to null
 	retc = (        activeController == nullptr || activeController->Update());
 
-	auto lock = CLoadLock::GetUniqueLock();
-	swap = (retc && activeController != nullptr && activeController->Draw());
+	{
+		// LoadingMT: tells the loading thread a frame is waiting, so it can let the frame through
+		const CLoadLock::ScopedDraw scopedDraw;
+		auto lock = CLoadLock::GetUniqueLock();
+		swap = (retc && activeController != nullptr && activeController->Draw());
+
+		// always swap by default, not doing so can upset some drivers
+		globalRendering->SwapBuffers(swap, false);
+	}
 	#endif
 
-	// always swap by default, not doing so can upset some drivers
-	globalRendering->SwapBuffers(swap, false);
 	return retc;
 }
 

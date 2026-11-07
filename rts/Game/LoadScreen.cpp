@@ -289,17 +289,10 @@ bool CLoadScreen::Update()
 	if (!mtLoading)
 		spring::UnfreezeSpring(WDT_LOAD);
 
-	return true;
-}
-
-
-bool CLoadScreen::Draw()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	// limit FPS via sleep to not lock a singlethreaded CPU from loading the game
+	// limit FPS via sleep to not lock a singlethreaded CPU from loading the game;
+	// done here rather than in Draw so the sleep does not hold CLoadLock
 	if (mtLoading) {
-		const spring_time now = spring_gettime();
-		const unsigned diffTime = spring_tomsecs(now - lastDrawTime);
+		const unsigned diffTime = spring_tomsecs(spring_gettime() - lastDrawTime);
 
 		constexpr unsigned wantedFPS = 50;
 		constexpr unsigned minFrameTime = 1000 / wantedFPS;
@@ -307,9 +300,16 @@ bool CLoadScreen::Draw()
 		if (diffTime < minFrameTime)
 			spring_sleep(spring_msecs(minFrameTime - diffTime));
 
-		lastDrawTime = now;
+		lastDrawTime = spring_gettime();
 	}
 
+	return true;
+}
+
+
+bool CLoadScreen::Draw()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
 	globalRendering->drawFrame = std::max(1U, globalRendering->drawFrame + 1);
 	// let LuaMenu keep the lobby connection alive
 	if (luaMenu != nullptr)
@@ -335,7 +335,12 @@ bool CLoadScreen::Draw()
 void CLoadScreen::SetLoadMessage(const std::string& text, bool replaceLast)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	spring::UnfreezeSpring(WDT_LOAD);
+	// LoadingMT: the main thread pumps window events itself; pumping them here as
+	// well would hand key, mouse and resize events to LuaIntro from the loading thread
+	if (mtLoading)
+		Watchdog::ClearTimer(WDT_LOAD);
+	else
+		spring::UnfreezeSpring(WDT_LOAD);
 
 	std::lock_guard<spring::recursive_mutex> lck(mutex);
 
