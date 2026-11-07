@@ -77,13 +77,6 @@ namespace Shader {
 		NullShaderObject(unsigned int shType, const std::string& shSrcFile) : IShaderObject(shType, shSrcFile) {}
 	};
 
-	struct ARBShaderObject: public Shader::IShaderObject {
-	public:
-		ARBShaderObject(unsigned int, const std::string&, const std::string& shSrcDefs = "");
-		void Compile();
-		void Release();
-	};
-
 	struct GLSLShaderObject: public Shader::IShaderObject {
 	public:
 		GLSLShaderObject(unsigned int, const std::string&, const std::string& shSrcDefs = "");
@@ -217,7 +210,6 @@ namespace Shader {
 
 
 		/// old interface
-		virtual void SetUniformTarget(int) {} //< only needed for ARB, for GLSL uniforms of vertex & frag shader are accessed in the same space
 		virtual void SetUniformLocation(const std::string&) {}
 
 		virtual void SetUniform1i(int idx, int   v0) = 0;
@@ -369,53 +361,6 @@ namespace Shader {
 		void SetUniform2fv(int idx, GLsizei count, const float* v) override {}
 		void SetUniform3fv(int idx, GLsizei count, const float* v) override {}
 		void SetUniform4fv(int idx, GLsizei count, const float* v) override {}
-	};
-
-
-	struct ARBProgramObject: public Shader::IProgramObject {
-	public:
-		ARBProgramObject(const std::string& poName);
-
-		void Enable() override;
-		void Disable() override;
-		void Link() override;
-		void Release() override { IProgramObject::Release(); }
-		void Reload(bool reloadFromDisk, bool validate) override;
-		bool Validate() override { return true; }
-
-		int GetUniformLoc(const char* name) override { return -1; } // FIXME
-		int GetUniformType(const int idx) override { return -1; }
-		void SetUniformTarget(int target) override;
-		int GetUnitformTarget();
-
-		void SetUniform1i(int idx, int   v0) override;
-		void SetUniform2i(int idx, int   v0, int   v1) override;
-		void SetUniform3i(int idx, int   v0, int   v1, int   v2) override;
-		void SetUniform4i(int idx, int   v0, int   v1, int   v2, int   v3) override;
-		void SetUniform1f(int idx, float v0) override;
-		void SetUniform2f(int idx, float v0, float v1) override;
-		void SetUniform3f(int idx, float v0, float v1, float v2) override;
-		void SetUniform4f(int idx, float v0, float v1, float v2, float v3) override;
-
-		void SetUniform2iv(int idx, const int*   v) override;
-		void SetUniform3iv(int idx, const int*   v) override;
-		void SetUniform4iv(int idx, const int*   v) override;
-		void SetUniform2fv(int idx, const float* v) override;
-		void SetUniform3fv(int idx, const float* v) override;
-		void SetUniform4fv(int idx, const float* v) override;
-
-		/// variants with count param
-		void SetUniform1iv(int idx, GLsizei count, const int*   v) override { SetUniform1i(idx, v[0]); }
-		void SetUniform2iv(int idx, GLsizei count, const int*   v) override { SetUniform2iv(idx, v); }
-		void SetUniform3iv(int idx, GLsizei count, const int*   v) override { SetUniform3iv(idx, v); }
-		void SetUniform4iv(int idx, GLsizei count, const int*   v) override { SetUniform4iv(idx, v); }
-		void SetUniform1fv(int idx, GLsizei count, const float* v) override { SetUniform1f(idx, v[0]); }
-		void SetUniform2fv(int idx, GLsizei count, const float* v) override { SetUniform2fv(idx, v); }
-		void SetUniform3fv(int idx, GLsizei count, const float* v) override { SetUniform3fv(idx, v); }
-		void SetUniform4fv(int idx, GLsizei count, const float* v) override { SetUniform4fv(idx, v); }
-
-	private:
-		int uniformTarget;
 	};
 
 

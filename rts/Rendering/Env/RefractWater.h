@@ -17,9 +17,6 @@ public:
 	void Draw() override;
 	WATER_RENDERER GetID() const override { return WATER_RENDERER_REFL_REFR; }
 protected:
-	void SetupWaterDepthTex();
-
-	unsigned int target = 0;
 	/// the screen is copied into this texture and used for water rendering
 	GLuint subSurfaceTex = 0;
 };
