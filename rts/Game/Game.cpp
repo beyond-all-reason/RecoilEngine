@@ -47,6 +47,7 @@
 #include "Rendering/IconHandler.h"
 #include "Rendering/ModelsDataUploader.h"
 #include "Rendering/ShadowHandler.h"
+#include "Rendering/Screenshot.h"
 #include "Rendering/TeamHighlight.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/UniformConstants.h"
@@ -1461,6 +1462,8 @@ bool CGame::Draw() {
 
 	SetDrawMode(gameNormalDraw);
 
+	ScreenshotReadbackBegin();
+
 	// Bind per-drawFrame UBO
 	UniformConstants::GetInstance().Bind();
 
@@ -1556,6 +1559,9 @@ bool CGame::Draw() {
 		// does nothing unless StartCapturing has also been called via /createvideo (Windows-only)
 		videoCapturing->RenderFrame();
 	}
+
+	// Read back the finished frame before SwapBuffers; offloads compression to a background thread.
+	ScreenshotReadbackEnd();
 
 	SetDrawMode(gameNotDrawing);
 	CTeamHighlight::Disable();
