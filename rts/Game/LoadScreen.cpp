@@ -17,6 +17,7 @@
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Textures/NamedTextures.h"
+#include "Rendering/VerticalSync.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Path/IPathManager.h"
 #include "System/Config/ConfigHandler.h"
@@ -121,6 +122,11 @@ bool CLoadScreen::Init()
 	CglFont::sync.SetThreadSafety(mtLoading);
 	CLoadLock::SetThreadSafety(mtLoading);
 	if (mtLoading) {
+		// the load screen swaps while holding CLoadLock, so a vblank wait there would also
+		// hold up the loading thread; frames are paced in Update instead. Set before the
+		// loading thread exists, while this thread still has the context.
+		verticalSync->Suspend();
+
 		try {
 			// create the game-loading thread; rebinds primary context to hidden window
 			gameLoadThread = CGameLoadThread(std::bind(&CGame::Load, game, mapFileName));
@@ -132,6 +138,7 @@ bool CLoadScreen::Init()
 			mtLoading = false;
 			CglFont::sync.SetThreadSafety(false);
 			CLoadLock::SetThreadSafety(false);
+			verticalSync->Resume();
 		}
 	}
 
@@ -157,8 +164,11 @@ bool CLoadScreen::Init()
 void CLoadScreen::Kill()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (mtLoading && !gameLoadThread.joinable())
+	if (mtLoading && !gameLoadThread.joinable()) {
+		// the loading thread was never started, this thread still has the context
+		verticalSync->Resume();
 		return;
+	}
 
 	if (luaIntro != nullptr)
 		luaIntro->Shutdown();
@@ -174,6 +184,9 @@ void CLoadScreen::Kill()
 	// set last time and forever
 	globalRendering->MakeCurrentContext(false);
 	globalRendering->ToggleMultisampling();
+	// also applies a VSync change made during the load (e.g. by LuaIntro), which could
+	// not reach the context then
+	verticalSync->Resume();
 }
 
 
