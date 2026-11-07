@@ -132,6 +132,8 @@ public:
 	float GetLineHeight() const { return lineHeight; }
 	float GetDescender() const { return fontDescender; }
 	int GetTexture() const { return glyphAtlasTextureID; }
+	/// made while the load screen draws in its own GL context (LoadingMT=2): its VAOs live there
+	bool IsIntroOwned() const { return introOwned; }
 
 	const std::string& GetFamily() const { return fontFamily; }
 	const std::string& GetStyle() const { return fontStyle; }
@@ -164,6 +166,8 @@ protected:
 	static inline bool needsClearGlyphs = false;
 
 	std::array<float, 128 * 128> kerningPrecached = {}; // contains ASCII kerning
+
+	bool introOwned = false;
 
 	int outlineSize;
 	float outlineWeight;

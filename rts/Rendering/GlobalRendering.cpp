@@ -620,6 +620,105 @@ void CGlobalRendering::MakeCurrentContext(bool clear) const {
 }
 
 
+bool CGlobalRendering::CreateIntroContext()
+{
+	assert(Threading::IsMainThread());
+	assert(introContext == nullptr);
+
+	#if !defined(HEADLESS)
+	// the loading thread's own drawable: with both contexts on the main window, the load screen's
+	// swaps starve the loader's driver calls. Same GL attributes, so the same pixel format.
+	loadWindow = SDL_CreateWindow("load", 0, 0, 1, 1, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
+
+	if (loadWindow == nullptr) {
+		LOG_L(L_WARNING, "[GR::%s] could not create the loading thread's window (\"%s\")", __func__, SDL_GetError());
+		return false;
+	}
+
+	// the game's context only goes on a window with a matching pixel format; find out now,
+	// while there is still a way back
+	if (SDL_GL_MakeCurrent(loadWindow, glContext) != 0) {
+		LOG_L(L_WARNING, "[GR::%s] the game's GL context does not take the loading thread's window (\"%s\")", __func__, SDL_GetError());
+		SDL_DestroyWindow(loadWindow);
+		loadWindow = nullptr;
+		MakeCurrentContext(false);
+		return false;
+	}
+
+	// shares with the context current on this thread, which must be glContext; the
+	// other attributes (version, profile, pixel format) are still those glContext got
+	MakeCurrentContext(false);
+	SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 1);
+	introContext = SDL_GL_CreateContext(sdlWindow);
+	SDL_GL_SetAttribute(SDL_GL_SHARE_WITH_CURRENT_CONTEXT, 0);
+
+	if (introContext == nullptr) {
+		LOG_L(L_WARNING, "[GR::%s] could not create the load screen GL context (\"%s\")", __func__, SDL_GetError());
+		SDL_DestroyWindow(loadWindow);
+		loadWindow = nullptr;
+		MakeCurrentContext(false);
+		return false;
+	}
+
+	// SDL_GL_CreateContext made it current; mirror the state the game's context starts with
+	glShadeModel(GL_SMOOTH);
+	glClearDepth(1.0f);
+	glDepthRange(0.0f, 1.0f);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+
+	if (supportClipSpaceControl)
+		glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+	if (supportSeamlessCubeMaps)
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+	// see LuaOpenGL::Init
+	glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+
+	ToggleMultisampling();
+	SetMinSampleShadingRate();
+	ToggleGLDebugOutput(0, 0, 0);
+	LoadViewport();
+
+	LOG("[GR::%s] load screen draws in its own GL context", __func__);
+	return true;
+	#else
+	return false;
+	#endif
+}
+
+void CGlobalRendering::DestroyIntroContext()
+{
+	assert(Threading::IsMainThread());
+
+	if (introContext == nullptr)
+		return;
+
+	#if !defined(HEADLESS)
+	// whatever the load screen uploaded must be complete before the game's context uses it
+	glFinish();
+	SDL_GL_MakeCurrent(sdlWindow, nullptr);
+	SDL_GL_DeleteContext(introContext);
+	// the loading thread is done with it (joined)
+	SDL_DestroyWindow(loadWindow);
+	#endif
+
+	introContext = nullptr;
+	loadWindow = nullptr;
+}
+
+bool CGlobalRendering::MakeLoadThreadContext(bool clear) const
+{
+	assert(loadWindow != nullptr);
+	return (SDL_GL_MakeCurrent(loadWindow, clear ? nullptr : glContext) == 0);
+}
+
+bool CGlobalRendering::OnIntroContext() const
+{
+	return (introContext != nullptr && Threading::IsMainThread());
+}
+
+
 void CGlobalRendering::DestroyWindowAndContext() {
 	if (!sdlWindow)
 		return;

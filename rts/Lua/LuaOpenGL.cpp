@@ -30,6 +30,7 @@
 #include "LuaFBOs.h"
 #include "LuaFonts.h"
 #include "LuaHandle.h"
+#include "LuaIntro.h"
 #include "LuaHashString.h"
 #include "LuaIO.h"
 #include "LuaOpenGLUtils.h"
@@ -1484,6 +1485,18 @@ int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 ******************************************************************************/
 
 
+// LoadingMT=2: the load screen draws in its own GL context, where the global font's
+// VAOs do not exist; LuaIntro has its own copy of it there
+static CglFont* GetTextFont()
+{
+	// nullptr when LuaIntro's copy could not be made: callers draw nothing
+	if (luaIntro != nullptr && globalRendering->OnIntroContext())
+		return luaIntro->GetDefaultFont();
+
+	return font.get();
+}
+
+
 /*** Begin a block of text commands.
  *
  * @function gl.BeginText
@@ -1503,7 +1516,8 @@ int LuaOpenGL::BeginText(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
 	auto userDefinedBlending = luaL_optboolean(L, 2, false);
-	font->Begin(userDefinedBlending);
+	if (CglFont* f = GetTextFont(); f != nullptr)
+		f->Begin(userDefinedBlending);
 	return 0;
 }
 
@@ -1514,7 +1528,8 @@ int LuaOpenGL::BeginText(lua_State* L)
 int LuaOpenGL::EndText(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
-	font->End();
+	if (CglFont* f = GetTextFont(); f != nullptr)
+		f->End();
 	return 0;
 }
 
@@ -1549,6 +1564,10 @@ int LuaOpenGL::EndText(lua_State* L)
 int LuaOpenGL::Text(lua_State* L)
 {
 	CheckDrawingEnabled(L, __func__);
+
+	CglFont* textFont = GetTextFont();
+	if (textFont == nullptr)
+		return 0;
 
 	const int args = lua_gettop(L); // number of arguments
 
@@ -1588,14 +1607,14 @@ int LuaOpenGL::Text(lua_State* L)
 
 	if (outline) {
 		if (lightOut) {
-			font->SetOutlineColor(0.95f, 0.95f, 0.95f, 0.8f);
+			textFont->SetOutlineColor(0.95f, 0.95f, 0.95f, 0.8f);
 		} else {
-			font->SetOutlineColor(0.15f, 0.15f, 0.15f, 0.8f);
+			textFont->SetOutlineColor(0.15f, 0.15f, 0.15f, 0.8f);
 		}
 	}
 
-	font->SetTextColor(SColor(color.data()));
-	font->glPrint(x, y, size, options, text);
+	textFont->SetTextColor(SColor(color.data()));
+	textFont->glPrint(x, y, size, options, text);
 
 	return 0;
 }
@@ -1610,7 +1629,9 @@ int LuaOpenGL::GetTextWidth(lua_State* L)
 {
 
 	const string text = luaL_checksstring(L, 1);
-	const float width = font->GetTextWidth(text);
+	// metrics only, no GL: the global font will do when LuaIntro has no copy
+	CglFont* textFont = GetTextFont();
+	const float width = ((textFont != nullptr)? textFont: font.get())->GetTextWidth(text);
 	lua_pushnumber(L, width);
 	return 1;
 }
@@ -1629,7 +1650,8 @@ int LuaOpenGL::GetTextHeight(lua_State* L)
 	float descender;
 	int lines;
 
-	const float height = font->GetTextHeight(text,&descender,&lines);
+	CglFont* textFont = GetTextFont();
+	const float height = ((textFont != nullptr)? textFont: font.get())->GetTextHeight(text,&descender,&lines);
 	lua_pushnumber(L, height);
 	lua_pushnumber(L, descender);
 	lua_pushnumber(L, lines);
