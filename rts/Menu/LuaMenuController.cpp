@@ -140,18 +140,27 @@ bool CLuaMenuController::Draw()
 
 int CLuaMenuController::KeyReleased(int keyCode, int scanCode)
 {
+	if (RmlGui::ProcessKeyReleased(keyCode, scanCode))
+		return 0;
+
 	luaInputReceiver->KeyReleased(keyCode, scanCode);
 	return 0;
 }
 
 int CLuaMenuController::KeyPressed(int keyCode, int scanCode, bool isRepeat)
 {
+	if (RmlGui::ProcessKeyPressed(keyCode, scanCode, isRepeat))
+		return 0;
+
 	luaInputReceiver->KeyPressed(keyCode, scanCode, isRepeat);
 	return 0;
 }
 
 int CLuaMenuController::TextInput(const std::string& utf8Text)
 {
+	if (RmlGui::ProcessTextInput(utf8Text))
+		return 0;
+
 	eventHandler.TextInput(utf8Text);
 	return 0;
 }
