@@ -198,6 +198,7 @@ public:
 	float targetOffset = 1.0f;
 	float volatilityScore = 1.0f;
 	spring_time nextFrameTargetProcessTime;
+	int32_t catchupTarget = 0;
 
 	#if 0
 	int skipStartFrame = 0;
