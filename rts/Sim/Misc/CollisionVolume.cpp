@@ -431,3 +431,297 @@ float CollisionVolume::GetEllipsoidDistance(const float3& pv) const
 	return currDist;
 }
 
+
+
+float3 CollisionVolume::GetClosestSurfacePoint(const CUnit* u, const LocalModelPiece* lmp, const float3& pos) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	return (GetClosestSurfacePoint(u, lmp, u->GetTransformMatrix(true), pos));
+}
+
+float3 CollisionVolume::GetClosestSurfacePoint(const CFeature* f, const LocalModelPiece* lmp, const float3& pos) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	return (GetClosestSurfacePoint(f, lmp, f->GetTransformMatrixRef(true), pos));
+}
+
+float3 CollisionVolume::GetClosestSurfacePoint(
+	const CSolidObject* obj,
+	const LocalModelPiece* lmp,
+	const CMatrix44f& mat,
+	const float3& pos
+) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	CMatrix44f vm = mat;
+
+	if (lmp != nullptr && (obj->collisionVolume).DefaultToPieceTree()) {
+		// NOTE: if we get here, <this> is the piece-volume
+		assert(this == lmp->GetCollisionVolume());
+
+		// transform into piece-space relative to pos
+		vm <<= lmp->GetModelSpaceMatrix();
+	}
+	else {
+		// SObj::GetTransformMatrix does not include this
+		// (its translation component is pos, not midPos)
+		vm.Translate(obj->relMidPos);
+	}
+
+	vm.Translate(GetOffsets());
+
+	// vm is the volume-to-world matrix; create the inverse for world-to-volume
+	const CMatrix44f mv = vm.InvertAffine();
+
+	return (GetClosestSurfacePoint(mv, vm, pos));
+}
+
+float3 CollisionVolume::GetClosestSurfacePoint(const CMatrix44f& mv, const CMatrix44f& vm, const float3& p) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	// transform <p> from world- to volume-space
+	const float3 pv = mv.Mul(p);
+
+	float3 closestVS;
+
+	switch (volumeType) {
+	case COLVOL_TYPE_BOX: {
+		// if point is inside, push it to box surface first (same as existing distance code)
+		float3 pvClamped;
+		pvClamped.x = ((int(pv.x >= 0.0f) * 2) - 1) * std::max(math::fabs(pv.x), halfAxisScales.x);
+		pvClamped.y = ((int(pv.y >= 0.0f) * 2) - 1) * std::max(math::fabs(pv.y), halfAxisScales.y);
+		pvClamped.z = ((int(pv.z >= 0.0f) * 2) - 1) * std::max(math::fabs(pv.z), halfAxisScales.z);
+
+		closestVS.x = std::clamp(pvClamped.x, -halfAxisScales.x, halfAxisScales.x);
+		closestVS.y = std::clamp(pvClamped.y, -halfAxisScales.y, halfAxisScales.y);
+		closestVS.z = std::clamp(pvClamped.z, -halfAxisScales.z, halfAxisScales.z);
+
+		if (pv.distance(closestVS) < COLLISION_VOLUME_EPS)
+			return p;
+	} break;
+
+	case COLVOL_TYPE_SPHERE: {
+		const float l = pv.Length();
+
+		if (l <= volumeBoundingRadius)
+			return p;
+
+		closestVS = (pv / l) * volumeBoundingRadius;
+	} break;
+
+	case COLVOL_TYPE_CYLINDER: {
+		assert(halfAxisScales[volumeAxes[1]] == halfAxisScales[volumeAxes[2]]);
+
+		// check if point is inside the cylinder (distance == 0)
+		const float pSq = (pv[volumeAxes[1]] * pv[volumeAxes[1]]) + (pv[volumeAxes[2]] * pv[volumeAxes[2]]);
+		const float rSq = (halfAxisScalesSqr[volumeAxes[1]] + halfAxisScalesSqr[volumeAxes[2]]) * 0.5f;
+		const bool insideCaps = (pv[volumeAxes[0]] >= -halfAxisScales[volumeAxes[0]] && pv[volumeAxes[0]] <= halfAxisScales[volumeAxes[0]]);
+		const bool insideTube = (pSq <= rSq);
+
+		if (insideCaps && insideTube)
+			return p;
+
+		switch (volumeAxes[0]) {
+		case COLVOL_AXIS_X: { closestVS = GetCylinderClosestPoint(pv, 0, 1, 2); } break;
+		case COLVOL_AXIS_Y: { closestVS = GetCylinderClosestPoint(pv, 1, 0, 2); } break;
+		case COLVOL_AXIS_Z: { closestVS = GetCylinderClosestPoint(pv, 2, 0, 1); } break;
+		}
+	} break;
+
+	case COLVOL_TYPE_ELLIPSOID: {
+		// check if inside the ellipsoid
+		const float3 xyz2abc2 = (pv * pv) / halfAxisScalesSqr;
+		if (xyz2abc2.dot(OnesVector) <= 1.0f)
+			return p;
+
+		closestVS = GetEllipsoidClosestPoint(pv);
+	} break;
+
+	default: {
+		assert(false);
+		return p;
+	} break;
+	}
+
+	// transform closest point from volume-space back to world-space
+	return vm.Mul(closestVS);
+}
+
+
+float3 CollisionVolume::GetCylinderClosestPoint(const float3& pv, size_t axisA, size_t axisB, size_t axisC) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const float pSq = (pv[axisB] * pv[axisB]) + (pv[axisC] * pv[axisC]);
+	const float rSq = (halfAxisScalesSqr[axisB] + halfAxisScalesSqr[axisC]) * 0.5f;
+	const float r = math::sqrt(rSq);
+	const float pRadial = math::sqrt(pSq);
+
+	float3 pt;
+
+	// clamp along primary axis to nearest end-cap
+	pt[axisA] = std::clamp(pv[axisA], -halfAxisScales[axisA], halfAxisScales[axisA]);
+
+	if (pv[axisA] >= -halfAxisScales[axisA] && pv[axisA] <= halfAxisScales[axisA]) {
+		// case 1: between end-caps, outside tube - project onto tube surface
+		if (pRadial <= r) {
+			// point inside cylinder
+			return pv;
+		}
+		else {
+			const float scale = r / pRadial;
+			pt[axisB] = pv[axisB] * scale;
+			pt[axisC] = pv[axisC] * scale;
+		}
+	}
+	else {
+		if (pSq <= rSq) {
+			// case 2: outside end-cap bounds but inside tube radius - closest is on end-cap
+			pt[axisB] = pv[axisB];
+			pt[axisC] = pv[axisC];
+		}
+		else {
+			// case 3: outside both - closest is on the rim edge
+			const float scale = r / pRadial;
+			pt[axisB] = pv[axisB] * scale;
+			pt[axisC] = pv[axisC] * scale;
+		}
+	}
+
+	return pt;
+}
+
+
+float3 CollisionVolume::GetEllipsoidClosestPoint(const float3& pv) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const float3& abc1 = halfAxisScales;    // {a, b, c}
+	const float3& abc2 = halfAxisScalesSqr; // {a2, b2, c2}
+
+	assert(abc1.x > 0.0f && abc1.y > 0.0f && abc1.z > 0.0f);
+	assert(abc2.x > 0.0f && abc2.y > 0.0f && abc2.z > 0.0f);
+
+	const float3 xyz1 = float3::fabs(pv);     // {x, y, z}
+	const float3 xyz1abc1 = (xyz1)*abc1; // {xa, yb, zc}
+	const float3 xyz2abc2 = (xyz1 * xyz1) / abc2; // {x2_a2, y2_b2, z2_c2}
+
+	// Newton's method (same iteration as GetEllipsoidDistance)
+	float theta = math::atan2(abc1.x * xyz1.y, abc1.y * xyz1.x);
+	float phi = math::atan2(xyz1.z, abc1.z * math::sqrt(xyz2abc2.x + xyz2abc2.y));
+
+	float currDist = 0.0f;
+	float lastDist = 0.0f;
+
+	float sint = 0.0f, cost = 0.0f, sinp = 0.0f, cosp = 0.0f;
+
+	for (int i = 0; i < MAX_ITERATIONS; i++) {
+		sint = math::sin(theta);
+		cost = math::cos(theta);
+		sinp = math::sin(phi);
+		cosp = math::cos(phi);
+
+		{
+			const float3 angs = { cosp * cost, cosp * sint, sinp };
+			const float3 fxyz = (abc1 * angs) - xyz1;
+
+			lastDist = currDist;
+			currDist = fxyz.Length();
+
+			if (math::fabsf(currDist - lastDist) < THRESHOLD * currDist)
+				break;
+		}
+
+		const float sin2t = sint * sint;
+		const float xacost_ybsint = xyz1abc1.x * cost + xyz1abc1.y * sint;
+		const float xasint_ybcost = xyz1abc1.x * sint - xyz1abc1.y * cost;
+		const float a2b2costsint = (abc2.x - abc2.y) * cost * sint;
+		const float a2cos2t_b2sin2t_c2 = abc2.x * cost * cost + abc2.y * sin2t - abc2.z;
+
+		const float d1 = a2b2costsint * cosp - xasint_ybcost;
+		const float d2 = a2cos2t_b2sin2t_c2 * sinp * cosp - sinp * xacost_ybsint + xyz1abc1.z * cosp;
+
+		// Derivative matrix
+		const float a11 = (abc2.x - abc2.y) * (1 - 2 * sin2t) * cosp - xacost_ybsint;
+		const float a12 = -a2b2costsint * sinp;
+		const float a21 = 2 * a12 * cosp + sinp * xasint_ybcost;
+		const float a22 = a2cos2t_b2sin2t_c2 * (1 - 2 * sinp * sinp) - cosp * xacost_ybsint - xyz1abc1.z;
+
+		const float invDet = 1.0f / (a11 * a22 - a21 * a12);
+
+		theta += (a12 * d2 - a22 * d1) * invDet;
+		theta = std::clamp(theta, 0.0f, math::HALFPI);
+		phi += (a21 * d1 - a11 * d2) * invDet;
+		phi = std::clamp(phi, 0.0f, math::HALFPI);
+	}
+
+	// extract closest surface point in the positive octant, then restore original signs
+	float3 closest;
+	closest.x = abc1.x * cosp * cost;
+	closest.y = abc1.y * cosp * sint;
+	closest.z = abc1.z * sinp;
+
+	closest.x *= ((int(pv.x >= 0.0f) * 2) - 1);
+	closest.y *= ((int(pv.y >= 0.0f) * 2) - 1);
+	closest.z *= ((int(pv.z >= 0.0f) * 2) - 1);
+
+	return closest;
+}
+
+
+float3 CollisionVolume::GetClosestSurfacePointFromLineSegment(const CUnit* u, const LocalModelPiece* lmp, const float3& p1, const float3& p2) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	return (GetClosestSurfacePointFromLineSegment(u, lmp, u->GetTransformMatrix(true), p1, p2));
+}
+
+float3 CollisionVolume::GetClosestSurfacePointFromLineSegment(const CFeature* f, const LocalModelPiece* lmp, const float3& p1, const float3& p2) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	return (GetClosestSurfacePointFromLineSegment(f, lmp, f->GetTransformMatrixRef(true), p1, p2));
+}
+
+float3 CollisionVolume::GetClosestSurfacePointFromLineSegment(
+	const CSolidObject* obj,
+	const LocalModelPiece* lmp,
+	const CMatrix44f& mat,
+	const float3& p1,
+	const float3& p2
+) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	CMatrix44f vm = mat;
+
+	if (lmp != nullptr && (obj->collisionVolume).DefaultToPieceTree()) {
+		assert(this == lmp->GetCollisionVolume());
+		vm <<= lmp->GetModelSpaceMatrix();
+	}
+	else {
+		vm.Translate(obj->relMidPos);
+	}
+
+	vm.Translate(GetOffsets());
+
+	const CMatrix44f mv = vm.InvertAffine();
+
+	return (GetClosestSurfacePointFromLineSegment(mv, vm, p1, p2));
+}
+
+float3 CollisionVolume::GetClosestSurfacePointFromLineSegment(const CMatrix44f& mv, const CMatrix44f& vm, const float3& p1, const float3& p2) const {
+	RECOIL_DETAILED_TRACY_ZONE;
+	// The distance from a point on a line segment to a convex body surface
+	// is a convex function of the line parameter t in [0,1].
+	// Ternary search finds the minimum of a convex function reliably.
+	const float3 dir = p2 - p1;
+
+	float lo = 0.0f;
+	float hi = 1.0f;
+
+	for (int i = 0; i < 32; i++) {
+		const float m1 = lo + (hi - lo) / 3.0f;
+		const float m2 = hi - (hi - lo) / 3.0f;
+
+		const float d1 = GetPointSurfaceDistance(mv, p1 + dir * m1);
+		const float d2 = GetPointSurfaceDistance(mv, p1 + dir * m2);
+
+		if (d1 < d2)
+			hi = m2;
+		else
+			lo = m1;
+	}
+
+	const float tBest = (lo + hi) * 0.5f;
+	return (GetClosestSurfacePoint(mv, vm, p1 + dir * tBest));
+}
+
