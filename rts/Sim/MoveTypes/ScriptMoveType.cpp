@@ -10,7 +10,7 @@
 #include "Sim/Misc/Wind.h"
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/Units/UnitDef.h"
-#include "Sim/Units/UnitTypes/Building.h"
+#include "Sim/Units/Unit.h"
 #include "System/EventHandler.h"
 #include "System/Matrix44f.h"
 #include "System/SpringMath.h"
