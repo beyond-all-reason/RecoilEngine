@@ -46,13 +46,15 @@ void CRowAtlasAlloc::EstimateNeededSize()
 			break;
 
 		// Resize texture
-		if ((atlasSize.x << 1) <= maxsize.x) {
-			spaceFree += atlasSize.x * atlasSize.y;
-			atlasSize.x = std::min(maxsize.x, atlasSize.x << 1);
+		if (atlasSize.x < maxsize.x) {
+			const auto newWidth = std::min(maxsize.x, atlasSize.x << 1);
+			spaceFree += (newWidth - atlasSize.x) * atlasSize.y;
+			atlasSize.x = newWidth;
 		}
-		if ((atlasSize.y << 1) <= maxsize.y) {
-			spaceFree += atlasSize.x * atlasSize.y;
-			atlasSize.y = std::min(maxsize.y, atlasSize.y << 1);
+		if (atlasSize.y < maxsize.y) {
+			const auto newHeight = std::min(maxsize.y, atlasSize.y << 1);
+			spaceFree += atlasSize.x * (newHeight - atlasSize.y);
+			atlasSize.y = newHeight;
 		}
 	}
 }
@@ -63,7 +65,7 @@ CRowAtlasAlloc::Row* CRowAtlasAlloc::AddRow(int glyphWidth, int glyphHeight)
 	RECOIL_DETAILED_TRACY_ZONE;
 	const int wantedRowHeight = glyphHeight;
 
-	while (atlasSize.y < (nextRowPos + wantedRowHeight)) {
+	while (atlasSize.x < glyphWidth || atlasSize.y < (nextRowPos + wantedRowHeight)) {
 		if (atlasSize.x >= maxsize.x && atlasSize.y >= maxsize.y) {
 			//throw texture_size_exception();
 			return nullptr;
@@ -86,11 +88,9 @@ bool CRowAtlasAlloc::Allocate()
 	RECOIL_DETAILED_TRACY_ZONE;
 	bool success = true;
 
-	// revert the used height clamping at the bottom of this function
-	// else for the case when Allocate() is called multiple times, the
-	// width would grow faster than height
-	// also AddRow() only works with PowerOfTwo values.
-	atlasSize.y = std::bit_ceil <uint32_t>(atlasSize.y);
+	// Restore growth space trimmed at the end of the previous allocation,
+	// without exceeding the height limit when it is not a power of two.
+	atlasSize.y = std::min(maxsize.y, std::bit_ceil<uint32_t>(atlasSize.y));
 
 	// it gives much better results when we resize the available space before starting allocation
 	// esp. allocation is more horizontal and so we can clip more free space at bottom
