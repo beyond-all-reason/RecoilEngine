@@ -122,6 +122,21 @@ namespace spring {
         return t2;
     }
 
+	// Stores src into dst only when their bytes differ. Per-frame passes mostly recompute
+	// unchanged values, and an unconditional store moves the cache line to the storing core
+	// (a different one each frame in MT passes). Compared bytewise because operator== of
+	// float3 and float4 has a tolerance.
+	template<typename T> inline bool StoreIfChanged(T& dst, const T& src)
+	{
+		static_assert(std::is_trivially_copyable_v<T>, "Requires TriviallyCopyable type");
+
+		if (std::memcmp(&dst, &src, sizeof(T)) == 0)
+			return false;
+
+		dst = src;
+		return true;
+	}
+
 
 };
 

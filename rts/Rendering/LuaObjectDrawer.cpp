@@ -282,9 +282,11 @@ void LuaObjectDrawer::Update(bool init)
 	if ((drawDeferredEnabled = geomBuffer->Valid())) {
 		drawDeferredEnabled &= (geomBuffer->Update(init));
 
-		notifyEventFlags[LUAOBJ_UNIT   ] = !unitDrawer->DrawForward() || configHandler->GetBool("AllowDrawModelPostDeferredEvents");
+		const bool postDeferredEvents = configHandler->GetBool("AllowDrawModelPostDeferredEvents");
+
+		notifyEventFlags[LUAOBJ_UNIT   ] = !unitDrawer->DrawForward() || postDeferredEvents;
 		bufferClearFlags[LUAOBJ_UNIT   ] =  unitDrawer->DrawDeferred();
-		notifyEventFlags[LUAOBJ_FEATURE] = !featureDrawer->DrawForward() || configHandler->GetBool("AllowDrawModelPostDeferredEvents");
+		notifyEventFlags[LUAOBJ_FEATURE] = !featureDrawer->DrawForward() || postDeferredEvents;
 		bufferClearFlags[LUAOBJ_FEATURE] =  featureDrawer->DrawDeferred();
 
 		// if both object types are going to be drawn deferred, only
