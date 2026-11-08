@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include <algorithm>
+#include <cmath>
 
 #include "QuadField.h"
 #include "Map/ReadMap.h"
@@ -9,6 +10,7 @@
 #include "Sim/Misc/GlobalConstants.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "System/ContainerUtil.h"
+#include "System/Log/ILog.h"
 #include "System/Threading/ThreadPool.h"
 
 #ifndef UNIT_TEST
@@ -29,11 +31,17 @@ CR_REG_METADATA(CQuadField, (
 	CR_MEMBER(quadSizeZ),
 	CR_MEMBER(invQuadSize),
 
+	CR_IGNORED(allyTeamCellUnits),
+	CR_IGNORED(numCellsX),
+	CR_IGNORED(numAllyTeams),
+
 	CR_IGNORED(tempUnits),
 	CR_IGNORED(tempFeatures),
 	CR_IGNORED(tempProjectiles),
 	CR_IGNORED(tempSolids),
-	CR_IGNORED(tempQuads)
+	CR_IGNORED(tempQuads),
+
+	CR_POSTLOAD(PostLoad)
 ))
 
 CR_BIND(CQuadField::Quad, )
@@ -92,6 +100,8 @@ void CQuadField::Init(int2 mapDims, int quadSize)
 	for (Quad& quad: baseQuads) {
 		quad.Resize(teamHandler.ActiveAllyTeams());
 	}
+
+	CountTeamUnits();
 #endif
 }
 
@@ -103,6 +113,8 @@ void CQuadField::Kill()
 	for (Quad& quad: baseQuads) {
 		quad.Clear();
 	}
+
+	std::fill(allyTeamCellUnits.begin(), allyTeamCellUnits.end(), 0);
 
 	for (auto cache : tempUnits)
 		cache.ReleaseAll();
@@ -201,6 +213,16 @@ void CQuadField::GetQuadsOnRay(QuadFieldQuery& qfq, const float3& start, const f
 	dir.AssertNaNs();
 	start.AssertNaNs();
 
+	// callers may pass invalid lengths (see https://github.com/beyond-all-reason/RecoilEngine/issues/3018),
+	// which violates the preconditions of std::clamp(t0, 0.0f, length) below and aborts on
+	// hardened builds (_GLIBCXX_ASSERTIONS). Clamp to 0 instead, which routes execution
+	// into the "special case" below and turns this into a zero-length ray query.
+	if (!std::isfinite(length) || length < 0.0f) {
+		LOG_L(L_ERROR, "[CQuadField::%s] invalid ray length %f (start=(%g,%g,%g) dir=(%g,%g,%g)), clamping to 0"
+			, __func__, length, start.x, start.y, start.z, dir.x, dir.y, dir.z);
+		length = 0.0f;
+	}
+
 	auto& queryQuads = *(qfq.quads = tempQuads[qfq.threadOwner].ReserveVector());
 
 	const float3 to = start + (dir * length);
@@ -288,6 +310,13 @@ void CQuadField::GetQuadsOnWideRay(QuadFieldQuery& qfq, const float3& start, con
 	RECOIL_DETAILED_TRACY_ZONE;
 	dir.AssertNaNs();
 	start.AssertNaNs();
+
+	// same rationale as GetQuadsOnRay above (see https://github.com/beyond-all-reason/RecoilEngine/issues/3018)
+	if (!std::isfinite(length) || length < 0.0f) {
+		LOG_L(L_ERROR, "[CQuadField::%s] invalid ray length %f (start=(%g,%g,%g) dir=(%g,%g,%g)), clamping to 0"
+			, __func__, length, start.x, start.y, start.z, dir.x, dir.y, dir.z);
+		length = 0.0f;
+	}
 
 	const float3 baseTo = start + (dir * length);
 
@@ -392,7 +421,7 @@ bool CQuadField::InsertUnitIf(CUnit* unit, const float3& wpos)
 		return false;
 
 	spring::VectorInsertUnique(baseQuads[wposQuadIdx].units, unit, false);
-	spring::VectorInsertUnique(baseQuads[wposQuadIdx].teamUnits[unit->allyteam], unit, false);
+	AddTeamUnit(wposQuadIdx, unit);
 	return true;
 }
 
@@ -423,7 +452,7 @@ bool CQuadField::RemoveUnitIf(CUnit* unit, const float3& wpos)
 		return false;
 
 	spring::VectorErase(baseQuads[wposQuadIdx].units, unit);
-	spring::VectorErase(baseQuads[wposQuadIdx].teamUnits[unit->allyteam], unit);
+	EraseTeamUnit(wposQuadIdx, unit);
 	return true;
 }
 #endif
@@ -431,6 +460,68 @@ bool CQuadField::RemoveUnitIf(CUnit* unit, const float3& wpos)
 
 
 #ifndef UNIT_TEST
+int CQuadField::CellUnitsIndex(int quadIdx, int allyTeam) const
+{
+	const int cellX = (quadIdx % numQuadsX) / CELL_QUADS;
+	const int cellZ = (quadIdx / numQuadsX) / CELL_QUADS;
+
+	return (cellZ * numCellsX + cellX) * numAllyTeams + allyTeam;
+}
+
+void CQuadField::AddTeamUnit(int quadIdx, CUnit* unit)
+{
+	spring::VectorInsertUnique(baseQuads[quadIdx].teamUnits[unit->allyteam], unit, false);
+	allyTeamCellUnits[CellUnitsIndex(quadIdx, unit->allyteam)] += 1;
+}
+
+void CQuadField::EraseTeamUnit(int quadIdx, CUnit* unit)
+{
+	if (spring::VectorErase(baseQuads[quadIdx].teamUnits[unit->allyteam], unit))
+		allyTeamCellUnits[CellUnitsIndex(quadIdx, unit->allyteam)] -= 1;
+}
+
+void CQuadField::CountTeamUnits()
+{
+	numCellsX = (numQuadsX + CELL_QUADS - 1) / CELL_QUADS;
+	numAllyTeams = teamHandler.ActiveAllyTeams();
+	allyTeamCellUnits.assign(numCellsX * ((numQuadsZ + CELL_QUADS - 1) / CELL_QUADS) * numAllyTeams, 0);
+
+	// from Quad::units, which unlike Quad::teamUnits is saved
+	for (size_t qi = 0; qi < baseQuads.size(); ++qi) {
+		for (const CUnit* unit: baseQuads[qi].units) {
+			allyTeamCellUnits[CellUnitsIndex(qi, unit->allyteam)] += 1;
+		}
+	}
+}
+
+void CQuadField::PostLoad()
+{
+	CountTeamUnits();
+}
+
+bool CQuadField::MayHaveEnemyUnits(float3 pos, float radius, int allyTeam) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// same quad range as GetQuads
+	pos.ClampInBounds();
+
+	const int2 min = WorldPosToQuadField(pos - radius);
+	const int2 max = WorldPosToQuadField(pos + radius);
+
+	for (int z = min.y / CELL_QUADS; z <= max.y / CELL_QUADS; ++z) {
+		for (int x = min.x / CELL_QUADS; x <= max.x / CELL_QUADS; ++x) {
+			const int* cellUnits = &allyTeamCellUnits[(z * numCellsX + x) * numAllyTeams];
+
+			for (int t = 0; t < numAllyTeams; ++t) {
+				if (cellUnits[t] > 0 && !teamHandler.Ally(allyTeam, t))
+					return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 void CQuadField::MovedUnit(CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -445,15 +536,16 @@ void CQuadField::MovedUnit(CUnit* unit)
 
 	for (const int qi: unit->quads) {
 		spring::VectorErase(baseQuads[qi].units, unit);
-		spring::VectorErase(baseQuads[qi].teamUnits[unit->allyteam], unit);
+		EraseTeamUnit(qi, unit);
 	}
 
 	for (const int qi: *qfQuery.quads) {
 		spring::VectorInsertUnique(baseQuads[qi].units, unit, false);
-		spring::VectorInsertUnique(baseQuads[qi].teamUnits[unit->allyteam], unit, false);
+		AddTeamUnit(qi, unit);
 	}
 
-	unit->quads = std::move(*qfQuery.quads);
+	// copy, moving would take the pooled vector's buffer and make the next query reallocate it
+	unit->quads = *qfQuery.quads;
 }
 
 void CQuadField::RemoveUnit(CUnit* unit)
@@ -461,7 +553,7 @@ void CQuadField::RemoveUnit(CUnit* unit)
 	RECOIL_DETAILED_TRACY_ZONE;
 	for (const int qi: unit->quads) {
 		spring::VectorErase(baseQuads[qi].units, unit);
-		spring::VectorErase(baseQuads[qi].teamUnits[unit->allyteam], unit);
+		EraseTeamUnit(qi, unit);
 	}
 
 	unit->quads.clear();
@@ -500,7 +592,7 @@ void CQuadField::MovedRepulser(CPlasmaRepulser* repulser)
 		spring::VectorInsertUnique(baseQuads[qi].repulsers, repulser, false);
 	}
 
-	repulser->SetQuads(std::move(*qfQuery.quads));
+	repulser->SetQuads(*qfQuery.quads);
 }
 
 void CQuadField::RemoveRepulser(CPlasmaRepulser* repulser)
@@ -583,7 +675,7 @@ void CQuadField::AddProjectile(CProjectile* p)
 			spring::VectorInsertUnique(baseQuads[qi].projectiles, p, false);
 		}
 
-		p->quads = std::move(*qfQuery.quads);
+		p->quads = *qfQuery.quads;
 	} else {
 		int newQuad = WorldPosToQuadFieldIdx(p->pos);
 		spring::VectorInsertUnique(baseQuads[newQuad].projectiles, p, false);

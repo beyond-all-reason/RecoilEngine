@@ -10,8 +10,8 @@ def a(name)
 end
 
 class Member
-  @@other_matcher = Regexp.compile('\@\*(\w+)\*( (.*))?')
   @@refs = Set.new
+  @@source_matcher = Regexp.new('\A\[[^\]]*\]\((https?://\S+/blob/\S+)\)\z')
 
   def self.refs; @@refs; end
 
@@ -105,7 +105,8 @@ class Member
   end
 
   def process_refs()
-    self.see = a(see) if @@refs.include?(see)
+    # A known name links within the page; anything else (e.g. a source link) stays markdown
+    self.see = see.map { |s| @@refs.include?(s) ? a(s) : s }
 
     self.description = Member.replace_refs(self.description)
 
@@ -214,26 +215,14 @@ class Member
   end
 
   def extract_custom_tags()
-    other = self.other
+    see, other = (self.tag_content || []).partition {|t| t["tag_name"] == "see" }
+    see = see.map {|t| t["content"] }
 
-    if !other
-      self.custom = {}
-      self.section = nil
-
-      return
-    end
-
-    custom = other.split("\n\n").reduce({}) do |acc, el|
-      name, _, value = el.match(@@other_matcher).captures
-
-      if name
-        acc[name] = value || true
-      end
-
-      acc
-    end
-
-    self.custom = custom
+    # lua-doc-extractor's link to the C++ is shown as "view source", not under "See"
+    sources, see = see.partition {|s| s.match?(@@source_matcher) }
+    self.source = sources.first&.match(@@source_matcher)&.[](1)
+    self.see = see
+    self.custom = other.to_h {|t| [t["tag_name"], t["content"].empty? ? true : t["content"]] }
     self.section = custom["section"]
   end
 end

@@ -109,7 +109,7 @@ CMiniMap::CMiniMap()
 
 	ConfigUpdate();
 
-	configHandler->NotifyOnChange(this, {"DualScreenMiniMapAspectRatio", "MiniMapCanFlip", "MiniMapDrawProjectiles", "MiniMapDrawPings", "MiniMapCursorScale", "MiniMapIcons", "MiniMapDrawCommands", "MiniMapButtonSize"});
+	configHandler->NotifyOnChange(this, {"DualScreenMiniMapAspectRatio", "MiniMapCanFlip", "MiniMapDrawProjectiles", "MiniMapDrawPings", "MiniMapCursorScale", "MiniMapIcons", "MiniMapDrawCommands", "MiniMapButtonSize", "MiniMapRefreshRate"});
 
 	UpdateGeometry();
 
@@ -204,6 +204,12 @@ void CMiniMap::ConfigUpdate()
 void CMiniMap::ConfigNotify(const std::string& key, const std::string& value)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	// alone, ConfigUpdate would also undo what /minimap icons, drawcommands etc. set
+	if (key == "MiniMapRefreshRate") {
+		minimapRefreshRate = configHandler->GetInt(key);
+		return;
+	}
+
 	ConfigUpdate();
 
 	if (key == "DualScreenMiniMapAspectRatio")

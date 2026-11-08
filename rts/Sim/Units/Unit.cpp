@@ -380,6 +380,13 @@ void CUnit::PostInit(const CUnit* builder)
 		}
 
 		commandAI->GiveCommand(Command(CMD_FIRE_STATE, 0, fireState));
+	} else if (unitDef->fireState > FIRESTATE_NONE) {
+		fireState = unitDef->fireState;
+
+		/* In theory giving the unit a command (like above) could be nice
+		 * for consistency, but that would introduce a special case since
+		 * this command doesn't otherwise do anything, and Lua knows what
+		 * the firestate of this unit is anyway via the unit def. */
 	}
 
 	UpdateRenderParams();
@@ -671,14 +678,23 @@ void CUnit::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	ASSERT_SYNCED(pos);
+}
 
-	UpdatePhysicalState(0.1f);
+unsigned int CUnit::UpdateState()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const unsigned int prevState = physicalState;
+
+	// no events here, CUnitHandler::UpdateUnits sends them in unit order
+	CSolidObject::UpdatePhysicalState(0.1f);
 	UpdatePosErrorParams(true, false);
 
+	const unsigned int eventBits = (prevState ^ physicalState) & (PSTATE_BIT_INAIR | PSTATE_BIT_INWATER | PSTATE_BIT_UNDERWATER);
+
 	if (beingBuilt)
-		return;
+		return eventBits;
 	if (isDead)
-		return;
+		return eventBits;
 
 	recentDamage *= 0.9f;
 	flankingBonusMobility += flankingBonusMobilityAdd;
@@ -689,15 +705,16 @@ void CUnit::Update()
 			++(w->reloadStatus);
 		}
 
-		return;
+		return eventBits;
 	}
 
 	restTime += 1;
+	return eventBits;
 }
 
 void CUnit::UpdateWeaponVectors()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (!CanUpdateWeapons())
 		return;
@@ -710,7 +727,7 @@ void CUnit::UpdateWeaponVectors()
 
 void CUnit::UpdateWeapons()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (!CanUpdateWeapons())
 			return;
@@ -1845,11 +1862,18 @@ void CUnit::DependentDied(CObject* o)
 void CUnit::UpdatePhysicalState(float eps)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const bool inAir      = IsInAir();
-	const bool inWater    = IsInWater();
-	const bool underWater = IsUnderWater();
+	const unsigned int prevState = physicalState;
 
 	CSolidObject::UpdatePhysicalState(eps);
+	SendPhysicalStateEvents(prevState);
+}
+
+void CUnit::SendPhysicalStateEvents(unsigned int prevState)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const bool inAir      = ((prevState & PSTATE_BIT_INAIR     ) != 0);
+	const bool inWater    = ((prevState & PSTATE_BIT_INWATER   ) != 0);
+	const bool underWater = ((prevState & PSTATE_BIT_UNDERWATER) != 0);
 
 	if (IsInAir() != inAir) {
 		if (IsInAir()) {
@@ -1927,13 +1951,9 @@ void CUnit::CalculateTerrainType()
 }
 
 
-bool CUnit::SetGroup(CGroup* newGroup, bool fromFactory, bool autoSelect)
+bool CUnit::SetGroup(CGroup* newGroup, bool autoSelect)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// factory is not necessarily selected
-	if (fromFactory && !selectedUnitsHandler.AutoAddBuiltUnitsToFactoryGroup())
-		return false;
-
 	CGroup* group = GetGroup();
 
 	if (group != nullptr)
@@ -1954,8 +1974,7 @@ bool CUnit::SetGroup(CGroup* newGroup, bool fromFactory, bool autoSelect)
 		return true;
 
 	// add unit to the set of selected units iff its new group is already selected
-	// and (user wants the unit to be auto-selected or the unit is not newly built)
-	if (selectedUnitsHandler.IsGroupSelected(newGroup->id) && (selectedUnitsHandler.AutoAddBuiltUnitsToSelectedGroup() || !fromFactory))
+	if (selectedUnitsHandler.IsGroupSelected(newGroup->id))
 		selectedUnitsHandler.AddUnit(this);
 
 	return true;

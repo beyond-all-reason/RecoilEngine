@@ -175,6 +175,7 @@ class LuaSyncedRead {
 
 		static int GetUnitBlocking(lua_State* L);
 		static int GetUnitMoveTypeData(lua_State* L);
+		static int GetUnitMaxWantedSpeed(lua_State* L);
 
 		static int GetUnitCommandCount(lua_State* L);
 		static int GetUnitCommands(lua_State* L);
@@ -263,6 +264,7 @@ class LuaSyncedRead {
 
 		static int TestMoveOrder(lua_State* L);
 		static int TestBuildOrder(lua_State* L);
+		static int TestBuildOrderOverlap(lua_State* L);
 		static int Pos2BuildPos(lua_State* L);
 		static int ClosestBuildPos(lua_State* L);
 

@@ -52,8 +52,7 @@ CSpringController::CSpringController()
 	, zoomBack(false)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	enabled = configHandler->GetBool("CamSpringEnabled");
-	configHandler->NotifyOnChange(this, {"CamSpringScrollSpeed", "CamSpringFOV", "CamSpringMinZoomDistance", "CamSpringZoomInToMousePos", "CamSpringZoomOutFromMousePos", "CamSpringFastScaleMousewheelMove", "CamSpringFastScaleMouseMove", "CamSpringEdgeRotate", "CamSpringLockCardinalDirections", "CamSpringTrackMapHeightMode", "CamSpringSmoothMeshBlendMinDist", "CamSpringSmoothMeshBlendMaxDist"});
+	configHandler->NotifyOnChange(this, {"CamSpringEnabled", "CamSpringScrollSpeed", "CamSpringFOV", "CamSpringMinZoomDistance", "CamSpringZoomInToMousePos", "CamSpringZoomOutFromMousePos", "CamSpringFastScaleMousewheelMove", "CamSpringFastScaleMouseMove", "CamSpringEdgeRotate", "CamSpringLockCardinalDirections", "CamSpringTrackMapHeightMode", "CamSpringSmoothMeshBlendMinDist", "CamSpringSmoothMeshBlendMaxDist"});
 	ConfigUpdate();
 }
 
@@ -67,6 +66,7 @@ CSpringController::~CSpringController()
 void CSpringController::ConfigUpdate()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	enabled = configHandler->GetBool("CamSpringEnabled");
 	scrollSpeed = configHandler->GetFloat("CamSpringScrollSpeed") * 0.1f;
 	fov = configHandler->GetFloat("CamSpringFOV");
 	minDist = std::max(configHandler->GetFloat("CamSpringMinZoomDistance"), 0.1f);

@@ -6,7 +6,10 @@
 #include "System/Exceptions.h"
 #include "System/SafeUtil.h"
 #include "System/Log/ILog.h"
+#include "Sim/Features/Feature.h"
+#include "Sim/Features/FeatureHandler.h"
 #include "Sim/Units/Unit.h"
+#include "Sim/Units/UnitHandler.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -43,6 +46,9 @@ void IGroundDecalDrawer::SetDrawDecals(bool v)
 	if (groundDecals && v == GetDrawDecals())
 		return;
 
+	// switched in a running game: the new handler starts empty
+	const bool runtimeSwitch = (groundDecals != nullptr);
+
 	FreeInstance();
 
 	hasDecals = v;
@@ -54,6 +60,19 @@ void IGroundDecalDrawer::SetDrawDecals(bool v)
 	else {
 		groundDecals = new NullGroundDecalDrawer();
 		LOG_L(L_INFO, "Loaded DecalsDrawer: %s", "null");
+	}
+
+	if (runtimeSwitch) {
+		// give what already stands its plate, as RenderUnitCreated / RenderFeatureCreated would have;
+		// explosion scars, tracks and Lua decals of the old handler are gone
+		for (const CUnit* unit: unitHandler.GetActiveUnits()) {
+			if (unit->GetTransporter() == nullptr)
+				groundDecals->AddSolidObject(unit);
+		}
+		for (const int featureID: featureHandler.GetActiveFeatureIDs()) {
+			if (const CFeature* feature = featureHandler.GetFeature(featureID); feature != nullptr)
+				groundDecals->AddSolidObject(feature);
+		}
 	}
 
 	configHandler->Set("GroundDecals", hasDecals);

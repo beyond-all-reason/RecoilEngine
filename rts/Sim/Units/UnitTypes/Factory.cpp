@@ -154,8 +154,12 @@ void CFactory::Update()
 	}
 
 	if (curBuild != nullptr) {
-		UpdateBuild(curBuild);
-		FinishBuild(curBuild);
+		CUnit* buildee = curBuild;
+		UpdateBuild(buildee);
+
+		// Build callbacks can kill either unit or cancel the current build.
+		if (!isDead && curBuild == buildee && !buildee->isDead)
+			FinishBuild(buildee);
 	}
 
 	const bool wantClose = (!IsStunned() && yardOpen && (gs->frameNum >= (lastBuildUpdateFrame + GAME_SPEED * (UNIT_SLOWUPDATE_RATE >> 1))));
@@ -189,6 +193,26 @@ void CFactory::StartBuild(const UnitDef* buildeeDef) {
 
 	UnitLoadParams buildeeParams = {buildeeDef, this, buildPos, ZeroVector, -1, team, buildFacing, true, false};
 	CUnit* buildee = unitLoader->LoadUnit(buildeeParams);
+	if (buildee == nullptr)
+		return;
+
+	// UnitCreated can kill the factory or change its build order before the
+	// new unit has been assigned to curBuild. Do not leave an orphan nanoframe.
+	if (buildee->isDead)
+		return;
+
+	if (isDead) {
+		/* Technically Lua can first cancel and then kill,
+		 * in which case the reason won't be correct, but
+		 * that is an edge case. Perhaps ideally Lua would
+		 * be the one responsible for removing buildees on
+		 * factory death in the first place. */
+		buildee->KillUnit(nullptr, false, true, -CSolidObject::DAMAGE_FACTORY_KILLED);
+		return;
+	} else if (curBuildDef != buildeeDef) {
+		buildee->KillUnit(nullptr, false, true, -CSolidObject::DAMAGE_FACTORY_CANCEL);
+		return;
+	}
 
 	if (!unitDef->canBeAssisted) {
 		buildee->soloBuilder = this;
@@ -251,6 +275,11 @@ void CFactory::UpdateBuild(CUnit* buildee) {
 	if (!buildee->AddBuildPower(this, buildSpeed))
 		return;
 
+	// AddBuildPower invokes Lua (including UnitFinished). Do not emit for a
+	// build that was destroyed or cancelled while that callback was running.
+	if (isDead || curBuild != buildee || buildee->isDead)
+		return;
+
 	CreateNanoParticle();
 }
 
@@ -260,10 +289,6 @@ void CFactory::FinishBuild(CUnit* buildee) {
 		return;
 	if (unitDef->fullHealthFactory && buildee->health < buildee->maxHealth)
 		return;
-
-	// assign buildee to same group as us
-	if (GetGroup() != nullptr && buildee->GetGroup() != nullptr)
-		buildee->SetGroup(GetGroup(), true);
 
 	const CCommandAI* bcai = buildee->commandAI;
 	// if not idle, the buildee already has user orders

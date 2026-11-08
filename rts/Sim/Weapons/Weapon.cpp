@@ -281,7 +281,7 @@ void CWeapon::UpdateWeaponErrorVector()
 
 void CWeapon::UpdateWeaponVectors()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	relAimFromPos = owner->script->GetPiecePos(aimFromPiece);
 	owner->script->GetEmitDirPos(muzzlePiece, relWeaponMuzzlePos, weaponDir);
@@ -317,7 +317,11 @@ float CWeapon::GetPredictedImpactTime(const float3& p) const
 
 void CWeapon::Update()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
+
+	// nothing to aim at, fire or stockpile
+	if (!HaveTarget() && !owner->HaveTarget() && salvoLeft == 0 && !weaponDef->stockpile)
+		return;
 
 	// Fast auto targeting needs to trigger an immediate retarget once the target is dead.
 	bool fastAutoRetargetRequired = fastAutoRetargeting && HaveTarget()
@@ -338,6 +342,9 @@ void CWeapon::Update()
 	if (!HaveTarget() && owner->curTarget.type != Target_None)
 		Attack(owner->curTarget);
 
+	if (salvoLeft == 0 && HaveDeniedInterceptTarget())
+		UpdateInterceptTarget();
+
 	currentTargetPos = GetLeadTargetPos(currentTarget);
 
 	if (!UpdateStockpile())
@@ -351,7 +358,7 @@ void CWeapon::Update()
 
 void CWeapon::UpdateAim()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!HaveTarget())
 		return;
 
@@ -463,7 +470,7 @@ bool CWeapon::CanFire(bool ignoreAngleGood, bool ignoreTargetType, bool ignoreRe
 
 void CWeapon::UpdateFire()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!CanFire(false, false, false))
 		return;
 
@@ -514,7 +521,7 @@ void CWeapon::UpdateFire()
 
 bool CWeapon::UpdateStockpile()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!weaponDef->stockpile)
 		return true;
 
@@ -540,7 +547,7 @@ bool CWeapon::UpdateStockpile()
 
 void CWeapon::UpdateSalvo()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (!salvoLeft || nextSalvo > gs->frameNum)
 		return;
 
@@ -610,7 +617,7 @@ void CWeapon::UpdateSalvo()
 
 bool CWeapon::Attack(const SWeaponTarget& newTarget)
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 	if (newTarget == currentTarget)
 		return true;
 
@@ -660,6 +667,12 @@ void CWeapon::DropCurrentTarget()
 		DeleteDeathDependence(currentTarget.unit, DEPENDENCE_TARGETUNIT);
 
 	currentTarget = SWeaponTarget();
+}
+
+
+bool CWeapon::HaveDeniedInterceptTarget() const
+{
+	return (currentTarget.type == Target_Intercept && weaponDef->interceptSolo && currentTarget.intercept->IsBeingIntercepted());
 }
 
 
@@ -1288,6 +1301,21 @@ void CWeapon::UpdateInterceptTarget()
 	CWeaponProjectile* newTarget = nullptr;
 	float minInterceptTargetDistSq = std::numeric_limits<float>::max();
 
+	if (weaponDef->interceptSolo) {
+		if (HaveDeniedInterceptTarget())
+			DropCurrentTarget();
+
+		spring::VectorEraseIfAll(incomingProjectileIDs, [this](const int projID) {
+			CWeaponProjectile* wp = static_cast<CWeaponProjectile*>(projectileHandler.GetProjectileBySyncedID(projID));
+
+			if (!wp->IsBeingIntercepted())
+				return false;
+
+			DeleteDeathDependence(wp, DEPENDENCE_INTERCEPT);
+			return true;
+		});
+	}
+
 	if (currentTarget.type == Target_Intercept)
 		minInterceptTargetDistSq = aimFromPos.SqDistance(currentTarget.intercept->pos);
 
@@ -1296,10 +1324,6 @@ void CWeapon::UpdateInterceptTarget()
 		CWeaponProjectile* wp = static_cast<CWeaponProjectile*>(p);
 
 		const float curInterceptTargetDistSq = aimFromPos.SqDistance(wp->pos);
-
-		// set by CWeaponProjectile's ctor when the interceptor fires
-		if (weaponDef->interceptSolo && wp->IsBeingIntercepted()) //FIXME add bad target?
-			continue;
 
 		if (curInterceptTargetDistSq >= minInterceptTargetDistSq)
 			continue;
@@ -1453,12 +1477,11 @@ float3 CWeapon::GetUnitLeadTargetPos(const CUnit* unit) const
 	return aimPos;
 }
 
-float CWeapon::GetSafeInterceptTime(const CUnit* unit, float predictMult) const
+float CWeapon::GetSafeInterceptTime(const float3& targetPos, const float3& targetSpeed) const
 {
-	float3 unitSpeed = unit->speed * predictMult;
-	float3 dist = unit->pos - weaponMuzzlePos;
-	float aa = unitSpeed.dot(unitSpeed) - (weaponDef->projectilespeed) * (weaponDef->projectilespeed);
-	float bb = 2 * (dist.dot(unitSpeed));
+	float3 dist = targetPos - weaponMuzzlePos;
+	float aa = targetSpeed.dot(targetSpeed) - (weaponDef->projectilespeed) * (weaponDef->projectilespeed);
+	float bb = 2 * (dist.dot(targetSpeed));
 	float cc = dist.dot(dist);
 	float temp1 = 4 * aa * cc;
 	float temp2 = (bb * bb);
@@ -1522,11 +1545,10 @@ float CWeapon::GetSafeInterceptTime(const CUnit* unit, float predictMult) const
 
 }
 
-float CWeapon::GetAccuratePredictedImpactTime(const CUnit* unit) const
+float CWeapon::GetAccuratePredictedImpactTime(const float3& targetPos, const float3& targetSpeed) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	float predictTime = GetPredictedImpactTime(unit->pos);
-	const float predictMult = mix(predictSpeedMod, 1.0f, weaponDef->predictBoost);
+	float predictTime = GetPredictedImpactTime(targetPos);
 	const float gravity = mix(mapInfo->map.gravity, -weaponDef->myGravity, weaponDef->myGravity != 0.0f);
 
 	if (gravity < 0) {
@@ -1591,7 +1613,7 @@ float CWeapon::GetAccuratePredictedImpactTime(const CUnit* unit) const
 			highTrajectorySwitch = 1.0f;
 		}
 
-		float3 dist = unit->pos + unit->speed * predictMult * predictTime - weaponMuzzlePos;
+		float3 dist = targetPos + targetSpeed * predictTime - weaponMuzzlePos;
 		const float gg = (gravity) * (gravity);
 		const float ps2 = (weaponDef->projectilespeed) * (weaponDef->projectilespeed);
 		float t1 = 1.0f;
@@ -1636,13 +1658,13 @@ float CWeapon::GetAccuratePredictedImpactTime(const CUnit* unit) const
 			deltatime = t1 - predictTime;
 			predictTime = t1;
 			// use new time estimate to get new estimate target location
-			dist = unit->pos + unit->speed * predictMult * predictTime - weaponMuzzlePos;
+			dist = targetPos + targetSpeed * predictTime - weaponMuzzlePos;
 		}
 	} else {
 		// weapon has no gravity (either zero map gravity, or myGravity set to zero)
 		// non-parabolic projectiles can be directly calculated
 		// just need to solve the quadratic equation, in a numerically safe way
-		const float interceptTime = GetSafeInterceptTime(unit, predictMult);
+		const float interceptTime = GetSafeInterceptTime(targetPos, targetSpeed);
 		if (interceptTime > 0) {
 			predictTime = interceptTime;
 		}
@@ -1656,7 +1678,7 @@ float3 CWeapon::GetLeadVec(const CUnit* unit) const
 {
 	const float predictMult = mix(predictSpeedMod, 1.0f, weaponDef->predictBoost);
 	const float predictTime = (accurateLeading > 0)
-		? GetAccuratePredictedImpactTime(unit)
+		? GetAccuratePredictedImpactTime(unit->pos, unit->speed * predictMult)
 		: GetPredictedImpactTime(unit->pos)
 	;
 	float3 lead = unit->speed * predictTime * predictMult;

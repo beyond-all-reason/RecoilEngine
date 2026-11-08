@@ -1117,12 +1117,11 @@ int LuaSyncedCtrl::KillTeam(lua_State* L)
 
 /*** Declare game over.
  * 
+ * Pass multiple winners to declare a draw. Pass no arguments if undecided (e.g.
+ * when dropped from the host).
+ *
  * @function Spring.GameOver
- * @param winningAllyTeamIDs AllyTeamID[] A list of winning ally team IDs.
- *
- * Pass multiple winners to declare a draw.
- * Pass no arguments if undecided (e.g. when dropped from the host).
- *
+ * @param winningAllyTeamIDs AllyTeamID[] List of winning ally team IDs.
  * @return integer teams Number of accepted (valid) ally teams.
  */
 int LuaSyncedCtrl::GameOver(lua_State* L)
@@ -1232,8 +1231,7 @@ int LuaSyncedCtrl::AddTeamResource(lua_State* L)
  * @param teamID TeamID
  * @param type ResourceName Resource type.
  * @param amount number Amount of resource to use.
- * @return boolean hadEnough
- * True if enough of the resource type was available and was consumed, otherwise false.
+ * @return boolean hadEnough True if enough of the resource type was available and was consumed, otherwise false.
  */
 /***
  * Consumes metal and/or energy resources of the specified team.
@@ -1242,8 +1240,7 @@ int LuaSyncedCtrl::AddTeamResource(lua_State* L)
  * @function Spring.UseTeamResource
  * @param teamID TeamID
  * @param amount ResourceUsage
- * @return boolean hadEnough
- * True if enough of the resource type(s) were available and was consumed, otherwise false.
+ * @return boolean hadEnough True if enough of the resource type(s) were available and was consumed, otherwise false.
  */
 int LuaSyncedCtrl::UseTeamResource(lua_State* L)
 {
@@ -2352,9 +2349,7 @@ int LuaSyncedCtrl::SetUnitTooltip(lua_State* L)
  * then reverting into nanoframes via the "build" tag will fail to render properly.
  *
  * @param unitID UnitID
- * @param health number|SetUnitHealthAmounts If a number, sets the units health
- * to that value. Pass a table to update health, capture progress, paralyze
- * damage, and build progress.
+ * @param health number|SetUnitHealthAmounts If a number, sets the units health to that value. Pass a table to update health, capture progress, paralyze damage, and build progress.
  * @return nil
  * 
  * @see SetUnitHealthAmounts
@@ -2470,16 +2465,14 @@ int LuaSyncedCtrl::SetUnitStockpile(lua_State* L)
  * @field reaimTime integer?
  * @field accuracy number?
  * @field sprayAngle number?
- * @field range number?
- * If you change the range of a weapon with dynamic damage make sure you use `SetUnitWeaponDamages` to change dynDamageRange as well.
+ * @field range number? If you change the range of a weapon with dynamic damage make sure you use `SetUnitWeaponDamages` to change dynDamageRange as well.
  * @field projectileSpeed number?
  * @field burst integer?
  * @field burstRate number?
  * @field projectiles integer?
  * @field salvoLeft integer?
  * @field nextSalvo integer?
- * @field aimReady number?
- * Set to `true` if a non-zero value is passed, `false` is zero is passed.
+ * @field aimReady number? Set to `true` if a non-zero value is passed, `false` is zero is passed.
  * @field forceAim integer?
  * @field avoidFlags integer?
  * @field collisionFlags integer?
@@ -2527,7 +2520,7 @@ static bool SetSingleUnitWeaponState(lua_State* L, CWeapon* weapon, int index)
 			weapon->salvoDelay = (int) (lua_tofloat(L, index + 1) * GAME_SPEED);
 		} break;
 		case hashString("windup"): {
-			weapon->salvoWindup = (int) (lua_tofloat(L, index + 1) * GAME_SPEED);
+			weapon->salvoWindup = std::max(0, (int) (lua_tofloat(L, index + 1) * GAME_SPEED));
 		} break;
 
 		case hashString("projectiles"): {
@@ -2649,8 +2642,7 @@ int LuaSyncedCtrl::SetUnitWeaponState(lua_State* L)
  * @field dynDamageExp number
  * @field dynDamageMin number
  * @field dynDamageRange number
- * @field dynDamageInverted number
- * Set to `true` if a non-zero value is passed, `false` is zero is passed.
+ * @field dynDamageInverted number Set to `true` if a non-zero value is passed, `false` is zero is passed.
  * @field craterAreaOfEffect number
  * @field damageAreaOfEffect number
  * @field edgeEffectiveness number
@@ -2940,8 +2932,7 @@ static unsigned char ParseLosBits(lua_State* L, int index, unsigned char bits)
  *
  * @param unitID UnitID
  * @param allyTeam AllyTeamID
- * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` bits or a
- * table. True bits disable engine updates to visibility.
+ * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` bits or a table. True bits disable engine updates to visibility.
  */
 int LuaSyncedCtrl::SetUnitLosMask(lua_State* L)
 {
@@ -2987,8 +2978,7 @@ int LuaSyncedCtrl::SetUnitLosMask(lua_State* L)
  * @function Spring.SetUnitLosState
  * @param unitID UnitID
  * @param allyTeam AllyTeamID
- * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` bits or a
- * table
+ * @param losTypes LosTable|LosMask|integer A bitmask of `LosMask` bits or a table.
  */
 int LuaSyncedCtrl::SetUnitLosState(lua_State* L)
 {
@@ -3834,19 +3824,7 @@ int LuaSyncedCtrl::SetUnitPieceMatrix(lua_State* L)
 
 
 /***
- * @function Spring.SetUnitCollisionVolumeData
- * @param unitID UnitID
- * @param scaleX number
- * @param scaleY number
- * @param scaleZ number
- * @param offsetX number
- * @param offsetY number
- * @param offsetZ number
- * @param vType integer
- * @param tType integer
- * @param Axis integer
- * @return nil
- *
+ * ```cpp
  *  enum COLVOL_TYPES {
  *      COLVOL_TYPE_DISABLED = -1,
  *      COLVOL_TYPE_ELLIPSOID = 0,
@@ -3866,6 +3844,20 @@ int LuaSyncedCtrl::SetUnitPieceMatrix(lua_State* L)
  *      COLVOL_AXIS_Z   = 2,
  *      COLVOL_NUM_AXES = 3    // number of collision volume axes
  *    };
+ * ```
+ *
+ * @function Spring.SetUnitCollisionVolumeData
+ * @param unitID UnitID
+ * @param scaleX number
+ * @param scaleY number
+ * @param scaleZ number
+ * @param offsetX number
+ * @param offsetY number
+ * @param offsetZ number
+ * @param vType integer
+ * @param tType integer
+ * @param Axis integer
+ * @return nil
  */
 int LuaSyncedCtrl::SetUnitCollisionVolumeData(lua_State* L)
 {
@@ -4264,9 +4256,9 @@ int LuaSyncedCtrl::SetUnitHeadingAndUpDir(lua_State* L)
  * @see Spring.SetUnitMoveCtrl for disabling/enabling this control
  * @function Spring.SetUnitVelocity
  * @param unitID UnitID
- * @param velX number in elmos/frame
- * @param velY number in elmos/frame
- * @param velZ number in elmos/frame
+ * @param velX number Velocity x component in elmos/frame.
+ * @param velY number Velocity y component in elmos/frame.
+ * @param velZ number Velocity z component in elmos/frame.
  */
 int LuaSyncedCtrl::SetUnitVelocity(lua_State* L)
 {
@@ -5183,9 +5175,9 @@ int LuaSyncedCtrl::SetFeatureHeadingAndUpDir(lua_State* L)
  * @see Spring.SetFeatureMoveCtrl for disabling/enabling this control
  * @function Spring.SetFeatureVelocity
  * @param featureID FeatureID
- * @param velX number in elmos/frame
- * @param velY number in elmos/frame
- * @param velZ number in elmos/frame
+ * @param velX number Velocity x component in elmos/frame.
+ * @param velY number Velocity y component in elmos/frame.
+ * @param velZ number Velocity z component in elmos/frame.
  */
 int LuaSyncedCtrl::SetFeatureVelocity(lua_State* L)
 {
@@ -5396,7 +5388,7 @@ int LuaSyncedCtrl::SetFeaturePieceMatrix(lua_State* L)
  * feature will be destroyed.
  *
  * @param featureID FeatureID
- * @param fireTime number in seconds
+ * @param fireTime number Fire timer duration in seconds.
  */
 int LuaSyncedCtrl::SetFeatureFireTime(lua_State* L)
 {
@@ -5431,7 +5423,7 @@ int LuaSyncedCtrl::SetFeatureFireTime(lua_State* L)
  * The smoke timer affects both the duration and size of the smoke particles.
  *
  * @param featureID FeatureID
- * @param smokeTime number in seconds
+ * @param smokeTime number Smoke timer duration in seconds.
  */
 int LuaSyncedCtrl::SetFeatureSmokeTime(lua_State* L)
 {
@@ -5608,9 +5600,9 @@ int LuaSyncedCtrl::SetProjectilePosition(lua_State* L)
  * @see Spring.SetProjectileMoveControl
  * @function Spring.SetProjectileVelocity
  * @param projectileID ProjectileID
- * @param velX number in elmos/frame
- * @param velY number in elmos/frame
- * @param velZ number in elmos/frame
+ * @param velX number Velocity x component in elmos/frame.
+ * @param velY number Velocity y component in elmos/frame.
+ * @param velZ number Velocity z component in elmos/frame.
  */
 int LuaSyncedCtrl::SetProjectileVelocity(lua_State* L)
 {
@@ -6155,15 +6147,17 @@ int LuaSyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 
 
 /***
- * @function Spring.GiveOrderArrayToUnitArray
- * @param unitIDs UnitID[] Array of unit IDs.
- * @param commands CreateCommand[]
- * @param pairwise boolean? (Default: `false`) When `false`, assign all commands to each unit.
+ * When `pairwise` is `false`, assign all commands to each unit.
  *
  * When `true`, assign commands according to index between units and cmds arrays.
  *
  * If `len(unitArray) < len(cmdArray)` only the first `len(unitArray)` commands
  * will be assigned, and vice-versa.
+ *
+ * @function Spring.GiveOrderArrayToUnitArray
+ * @param unitIDs UnitID[] Array of unit IDs.
+ * @param commands CreateCommand[]
+ * @param pairwise boolean? (Default: `false`) When `true`, assign commands to units by index.
  *
  * @return integer unitsOrdered The number of units ordered.
  */
@@ -7026,7 +7020,7 @@ int LuaSyncedCtrl::AddSmoothMesh(lua_State* L)
 	return 1;
 }
 
-/***Can only be called in `Spring.SetSmoothMeshFunc`.
+/*** Can only be called in `Spring.SetSmoothMeshFunc`.
  *
  * @function Spring.SetSmoothMesh
  * @param x number
@@ -7193,13 +7187,13 @@ int LuaSyncedCtrl::SetTerrainTypeData(lua_State* L)
 
 
 /***
+ * See also buildingMask unitdef tag.
+ *
  * @function Spring.SetSquareBuildingMask
  * @param x integer
  * @param z integer
  * @param mask integer
  * @return nil
- *
- * See also buildingMask unitdef tag.
  */
 int LuaSyncedCtrl::SetSquareBuildingMask(lua_State* L)
 {
@@ -7291,7 +7285,7 @@ int LuaSyncedCtrl::ForceUnitCollisionUpdate(lua_State* L)
 	if (!unit->moveType)
 		return 0;
 
-	unit->moveType->UpdateCollisionMap(true);
+	unit->moveType->UpdateCollisionMap();
 	return 0;
 }
 

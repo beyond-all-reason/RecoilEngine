@@ -79,3 +79,16 @@ make_global_var(sources_engine_Game
 		"${CMAKE_CURRENT_SOURCE_DIR}/WordCompletion.cpp"
 	)
 
+# Build-variant-agnostic Game library, see recoil_add_variant_library in rts/builds/CMakeLists.txt.
+add_library(GameCommon INTERFACE)
+target_sources(GameCommon INTERFACE ${sources_engine_Game})
+target_include_directories(GameCommon INTERFACE "${CMAKE_BINARY_DIR}/src-generated/engine")
+target_link_libraries(GameCommon INTERFACE
+	Tracy::TracyClient
+	RmlUi::Core
+	prd::jsoncpp
+	streflop
+	fmt::fmt
+	nowide::nowide
+)
+add_dependencies(GameCommon generateVersionFiles)

@@ -10,6 +10,7 @@
 #else
 	#include <unistd.h>
 #endif
+#include <cerrno>
 #include <cstdint>
 #include <cstring>
 #include <stdexcept>
@@ -100,8 +101,13 @@ void FileConfigSource::ReadModifyWrite(std::function<void ()> modify) {
 	if (file) {
 		ScopedFileLock scoped_lock(fileno(file), true);
 		Read(file);
+		// before modify() can change errno
+		const int readErrno = errno;
 		modify();
-		Write(file);
+		if (!ferror(file))
+			Write(file);
+		else
+			LOG_L(L_ERROR, "FileConfigSource: Error: Could not read config file \"%s\" (%s), not writing it", filename.c_str(), strerror(readErrno));
 	}
 	else {
 		modify();

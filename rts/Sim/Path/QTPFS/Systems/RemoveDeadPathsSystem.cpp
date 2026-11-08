@@ -11,6 +11,7 @@
 #include "Sim/MoveTypes/MoveDefHandler.h"
 #include "Sim/MoveTypes/MoveMath/MoveMath.h"
 #include "Sim/Path/IPathManager.h"
+#include "Sim/Path/QTPFS/Components/Path.h"
 #include "Sim/Path/QTPFS/Components/RemoveDeadPaths.h"
 #include "Sim/Path/QTPFS/NodeLayer.h"
 #include "Sim/Path/QTPFS/PathManager.h"
@@ -35,8 +36,6 @@ void RemoveDeadPathsSystem::Init()
 
     auto& comp = systemGlobals.CreateSystemComponent<RemoveDeadPathsComponent>();
     comp.deleteAll = false;
-
-    systemUtils.OnUpdate().connect<&RemoveDeadPathsSystem::Update>();
 }
 
 void RemoveDeadPathsSystem::Update()
@@ -52,7 +51,7 @@ void RemoveDeadPathsSystem::Update()
     for (auto pathEntity : view) {
         auto deleteOnFrame = view.get<PathDelayedDelete>(pathEntity).value;
         if (comp.deleteAll || gs->frameNum > deleteOnFrame) {
-            pm->DeletePathEntity(pathEntity);
+            pm->DeletePathEntity(registry, pathEntity);
         }
     }
 }
@@ -64,6 +63,4 @@ void RemoveDeadPathsSystem::Shutdown() {
     comp.deleteAll = true;
 
     Update();
-
-    systemUtils.OnUpdate().disconnect<&RemoveDeadPathsSystem::Update>();
 }

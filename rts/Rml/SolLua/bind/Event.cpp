@@ -114,12 +114,12 @@ namespace Rml::SolLua
 		namespace_table.new_usertype<Rml::Event>("Event", sol::no_constructor,
 			// M
 			/***
-			 * function RmlUi.Event:StopPropogation
+			 * @function RmlUi.Event:StopPropagation
 			 */
 			"StopPropagation", &Rml::Event::StopPropagation,
 			//--
 			/***
-			 * function RmlUi.Event:StopImmediatePropogation
+			 * @function RmlUi.Event:StopImmediatePropagation
 			 */
 			"StopImmediatePropagation", &Rml::Event::StopImmediatePropagation,
 

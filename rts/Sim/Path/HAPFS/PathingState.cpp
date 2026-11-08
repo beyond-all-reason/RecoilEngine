@@ -719,7 +719,12 @@ void PathingState::UpdateVertexPathCosts(int blocksToUpdate)
 		std::atomic<std::int64_t> updateCostBlockNum = consumedBlocks.size();
 		const size_t threadsUsed = std::min(consumedBlocks.size(), (size_t)ThreadPool::GetNumThreads());
 
-		auto updateVertexPathCosts = [this, &updateCostBlockNum](int threadNum){
+		// the loop index is not the thread number: for_mt hands indices out through an
+		// atomic counter, so index i can run on any worker. The nested max-res search
+		// keys its per-thread blocking scratch on the real thread number, so use the
+		// same here or two threads end up sharing one slot.
+		auto updateVertexPathCosts = [this, &updateCostBlockNum](int){
+				const int threadNum = ThreadPool::GetThreadNum();
 				std::int64_t n;
 				while ((n = --updateCostBlockNum) >= 0){
 					//LOG("TK PathingState::Update: PROC moveDef = %d %p (%p)", n, &consumedBlocks[n], consumedBlocks[n].moveDef);

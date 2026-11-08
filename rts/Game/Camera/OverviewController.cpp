@@ -96,7 +96,7 @@ void COverviewController::SwitchTo(const CCameraController* oldCam, const bool s
 
 	camRotY = oldCam->GetRot().y;
 
-	bool cameraSideways = CameraPointingSideways(oldCam->GetRot().y);
+	bool cameraSideways = CameraPointingSideways(GetRot().y);
 	pos.y = GetCamHeightToFitMapInView(pos.x, pos.z, fov/2.0, cameraSideways);
 }
 

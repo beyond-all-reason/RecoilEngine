@@ -32,7 +32,9 @@ GameData::GameData(std::shared_ptr<const RawPacket> pckt)
 	RECOIL_DETAILED_TRACY_ZONE;
 	assert(pckt->data[0] == NETMSG_GAMEDATA);
 
-	UnpackPacket packet(pckt, 3);
+	const uint32_t headerSize = sizeof(uint8_t) + sizeof(uint16_t);
+
+	UnpackPacket packet(pckt, headerSize);
 
 	std::uint16_t compressedSize;
 
@@ -53,18 +55,30 @@ GameData::GameData(std::shared_ptr<const RawPacket> pckt)
 	packet >> randomSeed;
 }
 
-const netcode::RawPacket* GameData::Pack() const
+size_t GameData::GetPackedSize() const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (compressed.empty())
 		compressed = zlib::deflate(reinterpret_cast<const std::uint8_t*>(setupText.data()), setupText.size());
 
 	assert(!compressed.empty());
-	assert(compressed.size() <= std::numeric_limits<std::uint16_t>::max());
 
-	const std::uint16_t size = 3 + sizeof(mapChecksum) + sizeof(modChecksum) + compressed.size() + 2 + sizeof(uint32_t);
-	PackPacket* buffer = new PackPacket(size, NETMSG_GAMEDATA);
-	*buffer << size;
+	const uint32_t payloadSize = sizeof(uint16_t) + compressed.size() + sizeof(mapChecksum) + sizeof(modChecksum) + sizeof(randomSeed);
+	const uint32_t headerSize = sizeof(uint8_t) + sizeof(uint16_t);
+
+	return headerSize + payloadSize;
+}
+
+const netcode::RawPacket* GameData::Pack() const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const size_t packetSize = GetPackedSize();
+
+	if (packetSize > MAX_PACKED_SIZE)
+		return nullptr;
+
+	PackPacket* buffer = new PackPacket(packetSize, NETMSG_GAMEDATA);
+	*buffer << static_cast<uint16_t>(packetSize);
 	*buffer << std::uint16_t(compressed.size());
 	*buffer << compressed;
 

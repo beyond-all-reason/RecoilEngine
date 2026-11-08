@@ -78,6 +78,9 @@ public:
 
 	virtual void Update();
 	virtual void SlowUpdate();
+	// per-frame state that only depends on the unit itself, safe to run in parallel;
+	// returns the physical state bits whose events still have to be sent
+	unsigned int UpdateState();
 
 	const SolidObjectDef* GetDef() const override { return ((const SolidObjectDef*) unitDef); }
 
@@ -138,6 +141,7 @@ public:
 	void CalculateTerrainType();
 	void UpdateTerrainType();
 	void UpdatePhysicalState(float eps) override;
+	void SendPhysicalStateEvents(unsigned int prevState);
 
 	float3 GetErrorVector(int allyteam) const;
 	float3 GetErrorPos(int allyteam, bool aiming = false) const { return (aiming? aimPos: midPos) + GetErrorVector(allyteam); }
@@ -245,7 +249,7 @@ protected:
 	float GetFlankingDamageBonus(const float3& attackDir);
 
 public: // unsynced methods
-	bool SetGroup(CGroup* newGroup, bool fromFactory = false, bool autoSelect = true);
+	bool SetGroup(CGroup* newGroup, bool autoSelect = true);
 
 	const CGroup* GetGroup() const;
 	      CGroup* GetGroup();

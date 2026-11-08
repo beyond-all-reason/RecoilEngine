@@ -11,6 +11,7 @@
 #include "System/Log/ILog.h"
 #include "System/Input/KeyInput.h"
 #include "System/SpringMath.h"
+#include "System/StringHash.h"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -29,6 +30,21 @@ CONFIG(float, CamFreeTiltSpeed).defaultValue(150.0f);
 CONFIG(float, CamFreeAutoTilt).defaultValue(150.0f).description("When free camera is locked, AutoTilt will point the camera in the direction of the ground's slope");
 CONFIG(float, CamFreeVelTime).defaultValue(1.5f);
 CONFIG(float, CamFreeAngVelTime).defaultValue(1.0f);
+
+static const std::vector<std::string> FREE_CONFIG_KEYS = {
+	"CamFreeEnabled",
+	"CamFreeInvertAlt",
+	"CamFreeGoForward",
+	"CamFreeFOV",
+	"CamFreeScrollSpeed",
+	"CamFreeGravity",
+	"CamFreeSlide",
+	"CamFreeGroundOffset",
+	"CamFreeTiltSpeed",
+	"CamFreeAutoTilt",
+	"CamFreeVelTime",
+	"CamFreeAngVelTime",
+};
 
 /******************************************************************************/
 /******************************************************************************/
@@ -50,22 +66,43 @@ CFreeController::CFreeController()
 	camera->SetDir(dir);
 	rot = camera->GetRot();
 
-	enabled     = configHandler->GetBool("CamFreeEnabled");
-	invertAlt   = configHandler->GetBool("CamFreeInvertAlt");
-	goForward   = configHandler->GetBool("CamFreeGoForward");
-	fov         = configHandler->GetFloat("CamFreeFOV");
-	scrollSpeed = configHandler->GetFloat("CamFreeScrollSpeed");
-	gravity     = configHandler->GetFloat("CamFreeGravity");
-	slide       = configHandler->GetFloat("CamFreeSlide");
-	gndOffset   = configHandler->GetFloat("CamFreeGroundOffset");
-	tiltSpeed   = configHandler->GetFloat("CamFreeTiltSpeed");
-	tiltSpeed   = tiltSpeed * math::DEG_TO_RAD;
-	autoTilt    = configHandler->GetFloat("CamFreeAutoTilt");
-	autoTilt    = autoTilt * math::DEG_TO_RAD;
-	velTime     = configHandler->GetFloat("CamFreeVelTime");
-	velTime     = max(0.1f, velTime);
-	avelTime    = configHandler->GetFloat("CamFreeAngVelTime");
-	avelTime    = max(0.1f, avelTime);
+	for (const std::string& key: FREE_CONFIG_KEYS)
+		ReadConfig(key);
+
+	configHandler->NotifyOnChange(this, FREE_CONFIG_KEYS);
+}
+
+CFreeController::~CFreeController()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	configHandler->RemoveObserver(this);
+}
+
+void CFreeController::ConfigNotify(const std::string& key, const std::string& value)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// only the changed key, values set through SetCameraState stay when another one changes
+	ReadConfig(key);
+}
+
+void CFreeController::ReadConfig(const std::string& key)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	switch (hashString(key.c_str())) {
+		case hashString("CamFreeEnabled"     ): { enabled     = configHandler->GetBool(key); } break;
+		case hashString("CamFreeInvertAlt"   ): { invertAlt   = configHandler->GetBool(key); } break;
+		case hashString("CamFreeGoForward"   ): { goForward   = configHandler->GetBool(key); } break;
+		case hashString("CamFreeFOV"         ): { fov         = configHandler->GetFloat(key); } break;
+		case hashString("CamFreeScrollSpeed" ): { scrollSpeed = configHandler->GetFloat(key); } break;
+		case hashString("CamFreeGravity"     ): { gravity     = configHandler->GetFloat(key); } break;
+		case hashString("CamFreeSlide"       ): { slide       = configHandler->GetFloat(key); } break;
+		case hashString("CamFreeGroundOffset"): { gndOffset   = configHandler->GetFloat(key); } break;
+		case hashString("CamFreeTiltSpeed"   ): { tiltSpeed   = configHandler->GetFloat(key) * math::DEG_TO_RAD; } break;
+		case hashString("CamFreeAutoTilt"    ): { autoTilt    = configHandler->GetFloat(key) * math::DEG_TO_RAD; } break;
+		case hashString("CamFreeVelTime"     ): { velTime     = max(0.1f, configHandler->GetFloat(key)); } break;
+		case hashString("CamFreeAngVelTime"  ): { avelTime    = max(0.1f, configHandler->GetFloat(key)); } break;
+		default: {} break;
+	}
 }
 
 

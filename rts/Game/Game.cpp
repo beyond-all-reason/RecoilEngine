@@ -1025,6 +1025,7 @@ void CGame::KillInterface()
 	LOG("[Game::%s][1]", __func__);
 	ProfileDrawer::SetEnabled(false);
 	camHandler->Kill();
+	selectedUnitsHandler.Kill();
 	spring::SafeDelete(guihandler);
 	spring::SafeDelete(minimap);
 	spring::SafeDelete(resourceBar);

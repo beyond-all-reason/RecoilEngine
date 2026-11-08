@@ -46,7 +46,7 @@ public:
 
 	const std::vector<int>& GetQuads() const { return quads; }
 
-	void SetQuads(std::vector<int>&& q) { quads = std::move(q); }
+	void SetQuads(std::vector<int> q) { quads = std::move(q); }
 	void ClearQuads() { quads.clear(); }
 
 	static void SerializeShieldSegmentCollectionPool(creg::ISerializer* s);

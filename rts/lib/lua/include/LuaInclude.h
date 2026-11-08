@@ -135,15 +135,6 @@ static inline void lua_pop(lua_State* L, const int args)
 }
 
 
-static inline int luaS_absIndex(lua_State* L, const int i)
-{
-	if (i <= 0 && i > LUA_REGISTRYINDEX)
-		return lua_gettop(L) + (i) + 1;
-
-	return i;
-}
-
-
 template<typename T>
 static inline T luaL_SpringOpt(lua_State* L, int idx, const T def, T(*lua_optFoo)(lua_State*, int, const T), T(*lua_toFoo)(lua_State*, int), int typeFoo, const char* caller)
 {
@@ -155,7 +146,7 @@ static inline T luaL_SpringOpt(lua_State* L, int idx, const T def, T(*lua_optFoo
 		return ret;
 
 	if (!lua_isnoneornil(L, idx))
-		LOG_L(L_WARNING, "[%s] wrong type for return argument %d in \"%s::%s\" (%s expected, got %s)", __func__, luaS_absIndex(L, idx), spring_lua_get_handle_name(L), caller, lua_typename(L, typeFoo), luaL_typename(L, idx));
+		LOG_L(L_WARNING, "[%s] wrong type for return argument %d in \"%s::%s\" (%s expected, got %s)", __func__, lua_absindex(L, idx), spring_lua_get_handle_name(L), caller, lua_typename(L, typeFoo), luaL_typename(L, idx));
 
 	return def;
 }
@@ -171,7 +162,7 @@ static inline std::string luaL_SpringOptString(lua_State* L, int idx, const std:
 		return ret;
 
 	if (!lua_isnoneornil(L, idx))
-		LOG_L(L_WARNING, "[%s(def=%s)] wrong type for return argument %d in \"%s::%s\" (%s expected, got %s)", __func__, def.c_str(), luaS_absIndex(L, idx), spring_lua_get_handle_name(L), caller, lua_typename(L, typeFoo), luaL_typename(L, idx));
+		LOG_L(L_WARNING, "[%s(def=%s)] wrong type for return argument %d in \"%s::%s\" (%s expected, got %s)", __func__, def.c_str(), lua_absindex(L, idx), spring_lua_get_handle_name(L), caller, lua_typename(L, typeFoo), luaL_typename(L, idx));
 
 	return def;
 }
@@ -187,7 +178,7 @@ static inline const char* luaL_SpringOptCString(lua_State* L, int idx, const cha
 		return ret;
 
 	if (!lua_isnoneornil(L, idx))
-		LOG_L(L_WARNING, "[%s(def=%s)] wrong type for return argument %d in \"%s::%s\" (%s expected, got %s)", __func__, def, luaS_absIndex(L, idx), spring_lua_get_handle_name(L), caller, lua_typename(L, typeFoo), luaL_typename(L, idx));
+		LOG_L(L_WARNING, "[%s(def=%s)] wrong type for return argument %d in \"%s::%s\" (%s expected, got %s)", __func__, def, lua_absindex(L, idx), spring_lua_get_handle_name(L), caller, lua_typename(L, typeFoo), luaL_typename(L, idx));
 
 	if (len != nullptr)
 		*len = strlen(def);

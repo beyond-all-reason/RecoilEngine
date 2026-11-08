@@ -5,6 +5,7 @@
 #ifndef UNITSYNC
 #include "System/Config/ConfigHandler.h"
 #include "System/Net/UDPConnection.h"
+#include "System/StringHash.h"
 #include "Rendering/TeamHighlight.h"
 
 CONFIG(int, NetworkLossFactor)
@@ -83,18 +84,7 @@ void GlobalConfig::Init()
 	reconnectTimeout = configHandler->GetInt("ReconnectTimeout");
 	mtu = configHandler->GetInt("MaximumTransmissionUnit");
 
-	linkOutgoingBandwidth = configHandler->GetInt("LinkOutgoingBandwidth");
-	linkIncomingSustainedBandwidth = configHandler->GetInt("LinkIncomingSustainedBandwidth");
-	linkIncomingPeakBandwidth = configHandler->GetInt("LinkIncomingPeakBandwidth");
-	linkIncomingMaxPacketRate = configHandler->GetInt("LinkIncomingMaxPacketRate");
-	linkIncomingMaxWaitingPackets = configHandler->GetInt("LinkIncomingMaxWaitingPackets");
-
-	if (linkIncomingSustainedBandwidth > 0 && linkIncomingPeakBandwidth < linkIncomingSustainedBandwidth)
-		linkIncomingPeakBandwidth = linkIncomingSustainedBandwidth;
-	if (linkIncomingPeakBandwidth > 0 && linkIncomingSustainedBandwidth <= 0)
-		linkIncomingSustainedBandwidth = linkIncomingPeakBandwidth;
-	if (linkIncomingMaxPacketRate > 0 && linkIncomingSustainedBandwidth <= 0)
-		linkIncomingSustainedBandwidth = linkIncomingPeakBandwidth = 1024 * 1024;
+	ReadLinkLimits();
 
 	useNetMessageSmoothingBuffer = configHandler->GetBool("UseNetMessageSmoothingBuffer");
 	luaWritableConfigFile = configHandler->GetBool("LuaWritableConfigFile");
@@ -108,6 +98,73 @@ void GlobalConfig::Init()
 	teamHighlight = configHandler->GetInt("TeamHighlight");
 
 	selectThroughGround = configHandler->GetFloat("SelectThroughGround");
+}
+
+void GlobalConfig::ReadLinkLimits()
+{
+	linkOutgoingBandwidth = configHandler->GetInt("LinkOutgoingBandwidth");
+	linkIncomingSustainedBandwidth = configHandler->GetInt("LinkIncomingSustainedBandwidth");
+	linkIncomingPeakBandwidth = configHandler->GetInt("LinkIncomingPeakBandwidth");
+	linkIncomingMaxPacketRate = configHandler->GetInt("LinkIncomingMaxPacketRate");
+	linkIncomingMaxWaitingPackets = configHandler->GetInt("LinkIncomingMaxWaitingPackets");
+
+	if (linkIncomingSustainedBandwidth > 0 && linkIncomingPeakBandwidth < linkIncomingSustainedBandwidth)
+		linkIncomingPeakBandwidth = linkIncomingSustainedBandwidth;
+	if (linkIncomingPeakBandwidth > 0 && linkIncomingSustainedBandwidth <= 0)
+		linkIncomingSustainedBandwidth = linkIncomingPeakBandwidth;
+	if (linkIncomingMaxPacketRate > 0 && linkIncomingSustainedBandwidth <= 0)
+		linkIncomingSustainedBandwidth = linkIncomingPeakBandwidth = 1024 * 1024;
+}
+
+void GlobalConfig::InitConfigNotify()
+{
+	// not observed: MTU and the archive/Lua-write flags only matter when what uses them is created
+	configHandler->NotifyOnChange(this, {
+		"NetworkLossFactor",
+		"InitialNetworkTimeout",
+		"NetworkTimeout",
+		"ReconnectTimeout",
+		"LinkOutgoingBandwidth",
+		"LinkIncomingSustainedBandwidth",
+		"LinkIncomingPeakBandwidth",
+		"LinkIncomingMaxPacketRate",
+		"LinkIncomingMaxWaitingPackets",
+		"UseNetMessageSmoothingBuffer",
+		"DumpGameStateOnDesync",
+		"MinSimDrawBalance",
+		"MinDrawFPS",
+		"TeamHighlight",
+		"SelectThroughGround",
+	});
+}
+
+void GlobalConfig::RemoveConfigNotify()
+{
+	configHandler->RemoveObserver(this);
+}
+
+void GlobalConfig::ConfigNotify(const std::string& key, const std::string& value)
+{
+	// per key, so a change does not undo what a command set for another one (/NetMsgSmoothing, /TeamHighlight)
+	switch (hashString(key.c_str())) {
+		// connections read the loss factor when they are made, the server takes it from the connect message
+		case hashString("NetworkLossFactor"             ): { networkLossFactor = configHandler->GetInt(key); } break;
+		case hashString("InitialNetworkTimeout"         ): { initialNetworkTimeout = configHandler->GetInt(key); } break;
+		case hashString("NetworkTimeout"                ): { networkTimeout = configHandler->GetInt(key); } break;
+		case hashString("ReconnectTimeout"              ): { reconnectTimeout = configHandler->GetInt(key); } break;
+		case hashString("LinkOutgoingBandwidth"         ):
+		case hashString("LinkIncomingSustainedBandwidth"):
+		case hashString("LinkIncomingPeakBandwidth"     ):
+		case hashString("LinkIncomingMaxPacketRate"     ):
+		case hashString("LinkIncomingMaxWaitingPackets" ): { ReadLinkLimits(); } break;
+		case hashString("UseNetMessageSmoothingBuffer"  ): { useNetMessageSmoothingBuffer = configHandler->GetBool(key); } break;
+		case hashString("DumpGameStateOnDesync"         ): { dumpGameStateOnDesync = configHandler->GetBool(key); } break;
+		case hashString("MinSimDrawBalance"             ): { minSimDrawBalance = configHandler->GetFloat(key); } break;
+		case hashString("MinDrawFPS"                    ): { minDrawFPS = configHandler->GetInt(key); } break;
+		case hashString("TeamHighlight"                 ): { teamHighlight = configHandler->GetInt(key); } break;
+		case hashString("SelectThroughGround"           ): { selectThroughGround = configHandler->GetFloat(key); } break;
+		default: {} break;
+	}
 }
 #endif
 
