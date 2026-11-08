@@ -1581,6 +1581,10 @@ bool CUnit::ChangeTeam(int newteam, ChangeType type)
 		teamHandler.Team(newteam)->resStorage += storage;
 	}
 
+	if (!beingBuilt && activated && unitDef->targfac) {
+		losHandler->IncreaseAllyTeamRadarErrorSize(allyteam);
+		losHandler->DecreaseAllyTeamRadarErrorSize(teamHandler.AllyTeam(newteam));
+	}
 
 	team = newteam;
 	if (paletteIndex == static_cast<uint16_t>(oldteam))
