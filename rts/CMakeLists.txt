@@ -106,7 +106,7 @@ if    (USE_MIMALLOC)
 endif (USE_MIMALLOC)
 
 
-if(UNIX AND NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
+if(UNIX AND NOT APPLE AND NOT (CMAKE_SYSTEM_NAME MATCHES "OpenBSD"))
 	find_package_static(Libunwind 1.4.0 REQUIRED)
 	prefer_static_libs()
 	find_library(LZMA_LIBRARY lzma)
