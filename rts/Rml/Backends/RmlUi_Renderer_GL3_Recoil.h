@@ -203,6 +203,8 @@ private:
 		int scissor[4];
 
 		int active_texture;
+		int draw_framebuffer;
+		int read_framebuffer;
 
 		int stencil_clear_value;
 		float color_clear_value[4];
