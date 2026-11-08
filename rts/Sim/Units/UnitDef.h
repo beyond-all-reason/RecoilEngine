@@ -69,7 +69,7 @@ public:
 	bool IsBuilderUnit()       const { return (builder && buildSpeed > 0.0f && buildDistance > 0.0f); }
 	bool IsMobileBuilderUnit() const { return (IsBuilderUnit() && !IsImmobileUnit()); }
 	bool IsStaticBuilderUnit() const { return (IsBuilderUnit() &&  IsImmobileUnit()); }
-	bool IsFactoryUnit()       const { return (IsBuilderUnit() &&  IsBuildingUnit()); }
+	bool IsFactoryUnit()       const { return isFactory; }
 	bool IsExtractorUnit()     const { return (extractsMetal > 0.0f && extractRange > 0.0f); }
 	bool IsGroundUnit()        const { return (pathType != -1U && !canfly); }
 	bool IsAirUnit()           const { return (pathType == -1U &&  canfly); }
@@ -100,7 +100,7 @@ public:
 	}
 
 	const UnitDefWeapon& GetWeapon(unsigned int idx) const { return weapons[idx]; }
-	const YardMapStatus* GetYardMapPtr() const { return (yardmap.data()); }
+	const YardMapStatus* GetYardMapPtr() const { return (yardmap.empty()) ? nullptr : yardmap.data(); }
 
 
 	void AddModelExpGenID(unsigned int egID) { modelExplGenIDs[1 + modelExplGenIDs[0]] = egID; modelExplGenIDs[0] += (egID != -1u); }
@@ -268,6 +268,7 @@ public:
 	int selfDCountdown;
 
 	bool builder;
+	bool isFactory;
 	bool activateWhenBuilt;
 	bool onoffable;
 	bool fullHealthFactory;
