@@ -40,6 +40,8 @@ CLuaMenuController::CLuaMenuController(const std::string& menuName)
 CLuaMenuController::~CLuaMenuController()
 {
 	CLuaMenu::FreeHandler();
+	// the menu may have been the one to initialize RmlUi (no game ever ran)
+	RmlGui::Shutdown();
 }
 
 

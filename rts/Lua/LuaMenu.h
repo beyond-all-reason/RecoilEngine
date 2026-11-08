@@ -45,6 +45,9 @@ public:
 
 	bool PersistOnReload() const override { return true; }
 
+	// true if RmlUi is bound to this Lua state (see CLuaHandle::InitializeRmlUi)
+	bool UsesRmlUi() const { return rmlui; }
+
 	// Don't call GamePreload since it may be called concurrent
 	// with other callins during loading.
 	void GamePreload() override {}

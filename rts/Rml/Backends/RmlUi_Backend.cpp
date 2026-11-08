@@ -137,6 +137,14 @@ void AddPendingDelete(Rml::ElementPtr element)
 
 bool RmlGui::Initialize()
 {
+	if (RmlInitialized()) {
+		// e.g. LuaMenu initialized RmlUi and a game is now starting. Replacing `state` while
+		// the library is initialized would leave it holding plugin pointers into the
+		// destroyed state, so keep the running instance.
+		LOG_L(L_INFO, "[RmlGui::%s] RmlUi is already initialized, reusing it", __func__);
+		return true;
+	}
+
 	LOG_L(L_INFO, "[RmlUi::%s] Beginning RmlUi Initialization", __func__);
 	state = Rml::MakeUnique<BackendState>();
 
