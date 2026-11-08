@@ -257,6 +257,23 @@ void DataDirLocater::FindWriteableDataDir()
 	}
 
 	LOG("[DataDirLocater::%s] using writeable data-directory \"%s\"", __func__, (writeDir != nullptr)? writeDir->path.c_str(): "<NULL>");
+
+	if (writeDir != nullptr)
+		return;
+
+	// bail out, everything after this (chdir, config file, cache, logs) needs the write-dir
+	const std::string errstr =
+			"Not a single writable data directory found!\n\n"
+			"Configure a writable data directory using either:\n"
+			"- the SPRING_DATADIR environment variable,\n"
+		#ifdef _WIN32
+			"- a SpringData=C:/path/to/data declaration in spring's config file ./springsettings.cfg\n"
+			"- by giving your user-account write access to the installation directory";
+		#else
+			"- a SpringData=/path/to/data declaration in ~/.springrc or\n"
+			"- the configuration file /etc/spring/datadir";
+		#endif
+	throw content_error(errstr);
 }
 
 
@@ -454,22 +471,6 @@ void DataDirLocater::Check()
 
 	// Filter usable DataDirs
 	FilterUsableDataDirs();
-
-	if (writeDir == nullptr) {
-		// bail out
-		const std::string errstr =
-				"Not a single writable data directory found!\n\n"
-				"Configure a writable data directory using either:\n"
-				"- the SPRING_DATADIR environment variable,\n"
-			#ifdef _WIN32
-				"- a SpringData=C:/path/to/data declaration in spring's config file ./springsettings.cfg\n"
-				"- by giving your user-account write access to the installation directory";
-			#else
-				"- a SpringData=/path/to/data declaration in ~/.springrc or\n"
-				"- the configuration file /etc/spring/datadir";
-			#endif
-		throw content_error(errstr);
-	}
 
 	if (Platform::FreeDiskSpace(writeDir->path) <= 1024)
 		throw content_error("not enough free space on drive containing writeable data-directory " + writeDir->path);
