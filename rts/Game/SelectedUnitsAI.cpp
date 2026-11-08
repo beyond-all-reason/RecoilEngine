@@ -773,7 +773,7 @@ void CSelectedUnitsHandlerAI::SelectRectangleUnits(
 float3 CSelectedUnitsHandlerAI::LastQueuePosition(const CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const CCommandQueue& queue = unit->commandAI->commandQue;
+	const CCommandQueue& queue = unit->commandAI->GetOwnQueue();
 
 	for (auto it = queue.rbegin(); it != queue.rend(); ++it) {
 		const Command& cmd = *it;
