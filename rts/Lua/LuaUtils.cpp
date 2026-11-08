@@ -952,6 +952,9 @@ void LuaUtils::PushCommandOptionsTable(lua_State* L, const Command& cmd, bool su
 	LuaPushNamedBool(L, "meta",     !!(cmd.GetOpts() & META_KEY       ));
 	LuaPushNamedBool(L, "internal", !!(cmd.GetOpts() & INTERNAL_ORDER ));
 
+	if (cmd.GetQueue() != 0)
+		LuaPushNamedNumber(L, "queue", cmd.GetQueue());
+
 	if (subtable)
 		lua_rawset(L, -3);
 }
@@ -1018,6 +1021,11 @@ static bool ParseCommandOptions(
 			// "key" = value (table format of CommandNotify)
 			// ignore the "coded" key; not a boolean value
 			if (lua_israwstring(L, -2)) {
+				if (lua_isnumber(L, -1) && hashString(lua_tostring(L, -2)) == hashString("queue")) {
+					cmd.SetQueue(std::clamp(lua_toint(L, -1), 0, 255));
+					continue;
+				}
+
 				if (!lua_isboolean(L, -1))
 					continue;
 

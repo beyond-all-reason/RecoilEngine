@@ -496,7 +496,7 @@ void DumpState(int newMinFrameNum, int newMaxFrameNum, int newFramePeriod, std::
 
 		#ifdef DUMP_UNIT_COMMANDAI_DATA
 		const CCommandAI* cai = u->commandAI;
-		const CCommandQueue& cq = cai->commandQue;
+		const CCommandQueue& cq = cai->GetOwnQueue();
 
 		file << "\t\t\tcommandAI:\n";
 		file << "\t\t\t\torderTarget->id: " << ((cai->orderTarget != nullptr)? cai->orderTarget->id: -1) << "\n";
