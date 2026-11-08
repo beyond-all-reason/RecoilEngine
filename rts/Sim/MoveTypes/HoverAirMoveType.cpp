@@ -715,7 +715,7 @@ void CHoverAirMoveType::UpdateBanking(bool noBanking)
 	if (!noBanking && bankingAllowed)
 		wantedBank = rightDir2D.dot(deltaSpeed) / accRate * 0.5f;
 	if (Square(wantedBank) > bankLimit)
-		wantedBank = math::sqrt(bankLimit);
+		wantedBank = std::copysign(math::sqrt(bankLimit), wantedBank);
 
 	// Adjust our banking to the desired value
 	if (currentBank > wantedBank) {
