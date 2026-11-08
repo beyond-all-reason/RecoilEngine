@@ -44,6 +44,10 @@ private:
 
 	std::array<uint32_t, 2> consumersCount = {};
 	std::array<uint32_t, 2> depthTextures = {};
+	// the size the textures were made with (the window), the copy is stretched
+	// to it when the view being drawn has a different size (secondary views)
+	std::array<int, 2> textureSizeX = {};
+	std::array<int, 2> textureSizeY = {};
 	std::array<std::unique_ptr<FBO>, 2> depthFBOs = {};
 };
 

@@ -21,6 +21,7 @@ CONFIG(bool, AtiSwapRBFix).defaultValue(false);
 std::vector<FBO*> FBO::activeFBOs;
 spring::unordered_map<GLuint, FBO::TexData> FBO::fboTexData;
 
+GLuint FBO::defaultTarget = 0;
 GLint FBO::maxAttachments = 0;
 GLsizei FBO::maxSamples = -1;
 
@@ -332,7 +333,7 @@ void FBO::Unbind()
 	//   do stuff
 	// FBO::Unbind(); <- not redundant!
 	//   continue with screen FBO
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, defaultTarget);
 }
 
 bool FBO::Blit(int32_t fromID, int32_t toID, const std::array<int, 4>& srcRect, const std::array<int, 4>& dstRect, uint32_t mask, uint32_t filter)

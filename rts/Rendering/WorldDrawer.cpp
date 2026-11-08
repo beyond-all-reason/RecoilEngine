@@ -50,6 +50,7 @@
 #include "System/TimeProfiler.h"
 #include "System/SafeUtil.h"
 #include "System/Log/ILog.h"
+#include "Rendering/GL/FBO.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/LoadLock.h"
 
@@ -214,17 +215,7 @@ void CWorldDrawer::Update(bool newSimFrame)
 	LuaObjectDrawer::Update(numUpdates == 0);
 	readMap->UpdateDraw(numUpdates == 0);
 
-	if (globalRendering->drawGround) {
-		ZoneScopedN("GroundDrawer::Update");
-		(readMap->GetGroundDrawer())->Update();
-	}
-	// XXX: done in CGame, needs to get updated even when !doDrawWorld
-	// (it updates unitdrawpos which is used for maximized minimap too)
-	// unitDrawer->Update();
-	// lineDrawer.UpdateLineStipple();
-	CUnitDrawer::UpdateStatic();
-	CFeatureDrawer::UpdateStatic();
-	projectileDrawer->UpdateDrawFlags();
+	UpdateViewDependent();
 
 	if (newSimFrame) {
 		projectileDrawer->UpdateTextures();
@@ -244,6 +235,22 @@ void CWorldDrawer::Update(bool newSimFrame)
 	numUpdates += 1;
 }
 
+
+
+void CWorldDrawer::UpdateViewDependent() const
+{
+	if (globalRendering->drawGround) {
+		ZoneScopedN("GroundDrawer::Update");
+		(readMap->GetGroundDrawer())->Update();
+	}
+	// XXX: done in CGame, needs to get updated even when !doDrawWorld
+	// (it updates unitdrawpos which is used for maximized minimap too)
+	// unitDrawer->Update();
+	// lineDrawer.UpdateLineStipple();
+	CUnitDrawer::UpdateStatic();
+	CFeatureDrawer::UpdateStatic();
+	projectileDrawer->UpdateDrawFlags();
+}
 
 
 void CWorldDrawer::GenerateIBLTextures() const

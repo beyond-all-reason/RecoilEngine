@@ -81,6 +81,14 @@ public:
 		return nullptr;
 	}
 
+	/// the cursor the desktop would draw now (null if there is none, or the mouse is locked)
+	const CMouseCursor* GetActiveCursor() const {
+		if (locked || activeCursorIdx < 0 || size_t(activeCursorIdx) >= loadedCursors.size())
+			return nullptr;
+
+		return loadedCursors[activeCursorIdx].IsValid() ? &loadedCursors[activeCursorIdx] : nullptr;
+	}
+
 	float3 GetCursorCameraDir(int x, int y) const;
 	float3 GetWorldMapPos() const;
 

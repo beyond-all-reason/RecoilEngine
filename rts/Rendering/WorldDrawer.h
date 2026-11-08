@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _WORLD_DRAWER_H
-#define _WORLD_DRAWER_H
+#pragma once
 
 class CWorldDrawer
 {
@@ -12,6 +11,11 @@ public:
 
 	void Update(bool newSimFrame);
 	void Draw() const;
+
+	// the part of Update that depends on the active player camera
+	// (visibility, draw flags, terrain LOD); re-run it for a view
+	// that uses a different camera
+	void UpdateViewDependent() const;
 
 	void GenerateIBLTextures() const;
 	void ResetMVPMatrices() const;
@@ -25,5 +29,3 @@ private:
 private:
 	unsigned int numUpdates = 0;
 };
-
-#endif // _WORLD_DRAWER_H

@@ -367,6 +367,49 @@ void CMouseCursor::Draw(int x, int y, float scale) const
 	glDisable(GL_BLEND);
 }
 
+void CMouseCursor::DrawInWorld(const float3& pos, const float3& right, const float3& up, float pixelSize) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (frames.empty())
+		return;
+
+	const ImageData& image = images[frames[currentFrame].imageIdx];
+
+	const float xs = image.xAlignedSize * pixelSize;
+	const float ys = image.yAlignedSize * pixelSize;
+	const float xo = xofs * pixelSize;
+	const float yo = (image.yAlignedSize - yofs) * pixelSize; // hotspot height above the bottom edge
+
+	GLint prevProgram = 0;
+	glGetIntegerv(GL_CURRENT_PROGRAM, &prevProgram);
+	glUseProgram(0);
+
+	glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT | GL_DEPTH_BUFFER_BIT | GL_TEXTURE_BIT);
+	glActiveTexture(GL_TEXTURE0);
+	glEnable(GL_TEXTURE_2D);
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
+	glDisable(GL_FOG);
+	glDisable(GL_ALPHA_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glBindTexture(GL_TEXTURE_2D, image.texture);
+	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+	// same corner layout as the window space cursor: texture coordinates equal the corner
+	glBegin(GL_QUADS);
+	for (const float2 c: {float2(0.0f, 0.0f), float2(1.0f, 0.0f), float2(1.0f, 1.0f), float2(0.0f, 1.0f)}) {
+		const float3 v = pos + right * (c.x * xs - xo) + up * (c.y * ys - yo);
+		glTexCoord2f(c.x, c.y);
+		glVertex3f(v.x, v.y, v.z);
+	}
+	glEnd();
+
+	glPopAttrib();
+	glUseProgram(prevProgram);
+}
+
+
 void CMouseCursor::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
