@@ -94,7 +94,7 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	LuaPushNamedNumber(L, "numDisplays", globalRendering->numDisplays);
 
 	/*** @field Platform.glSupportNonPowerOfTwoTex boolean */
-	LuaPushNamedBool(L, "glSupportNonPowerOfTwoTex", true);
+	LuaPushNamedBool(L, "glSupportNonPowerOfTwoTex", !SpringVersion::IsHeadless());
 	/*** @field Platform.glSupportTextureQueryLOD boolean */
 	LuaPushNamedBool(L, "glSupportTextureQueryLOD" , globalRendering->supportTextureQueryLOD);
 	/*** @field Platform.glSupportMSAAFrameBuffer boolean */
@@ -108,7 +108,7 @@ bool LuaConstPlatform::PushEntries(lua_State* L)
 	LuaPushNamedBool(L, "glHaveIntel", globalRendering->haveIntel);
 
 	/*** @field Platform.glHaveGLSL boolean */
-	LuaPushNamedBool(L, "glHaveGLSL", true);
+	LuaPushNamedBool(L, "glHaveGLSL", !SpringVersion::IsHeadless());
 	/*** @field Platform.glHaveGL4 boolean */
 	LuaPushNamedBool(L, "glHaveGL4", globalRendering->haveGL4);
 
