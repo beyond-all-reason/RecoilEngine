@@ -432,6 +432,57 @@ bool CWeaponProjectile::CanBeInterceptedBy(const WeaponDef* wd) const
 }
 
 
+namespace {
+	// mirrors the range part of CWeapon::TestRange (sphere or cylinder), minus the aim-angle constraint
+	bool IsWithinControlArea(const float3& srcPos, const float3& tgtPos, float controlRange, const WeaponDef& wd)
+	{
+		const float heightDiff = (tgtPos.y - srcPos.y) * wd.heightmod;
+		float range2D = 0.0f;
+
+		if (wd.cylinderTargeting < 0.01f) {
+			range2D = math::sqrt(std::max(Square(controlRange) - Square(heightDiff), 0.0f));
+		} else if ((wd.cylinderTargeting * controlRange) > math::fabsf(heightDiff)) {
+			range2D = controlRange;
+		}
+
+		return (srcPos.SqDistance2D(tgtPos) <= Square(range2D));
+	}
+}
+
+bool CWeaponProjectile::TestStaticControlArea() const
+{
+	// myrange is the owner weapon's range at launch time (weaponDef->range if there was none)
+	return IsWithinControlArea(startPos, pos, myrange * weaponDef->controlAreaRangeMult, *weaponDef);
+}
+
+bool CWeaponProjectile::TestDynamicControlArea() const
+{
+	CUnit* own = owner();
+	if (own == nullptr || weaponNum >= own->weapons.size())
+		return false;
+
+	const CWeapon* weapon = own->weapons[weaponNum];
+	if (weapon == nullptr)
+		return false;
+
+	return IsWithinControlArea(weapon->GetAimFromPos(), pos, weapon->range * weaponDef->controlAreaRangeMult, *weaponDef);
+}
+
+bool CWeaponProjectile::TestControlArea() const
+{
+	switch (weaponDef->controlAreaMode) {
+		case 0: // no control area
+			return true;
+		case 1: // static control area
+			return TestStaticControlArea();
+		case 2: // dynamic control area
+			return TestDynamicControlArea();
+		default:
+			return true;
+	}
+}
+
+
 void CWeaponProjectile::DependentDied(CObject* o)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
