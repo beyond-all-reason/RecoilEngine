@@ -2265,6 +2265,17 @@ void CGameServer::StartGame(bool forced)
 		// the client told us to start a demo
 		// no need to send startPos and startplaying since its in the demo
 		Message(DemoStart);
+
+		// Replay-verification knob (scripts/replay-check.sh): play the demo back
+		// faster than real time. Simulation frames and their sync checksums are
+		// identical at any speed; this only changes how fast the server feeds
+		// the recorded stream. Opt-in by environment, demos only.
+		if (const char* ds = getenv("SPRING_DEMO_SPEED"); ds != nullptr) {
+			const float s = std::max(0.1f, static_cast<float>(atof(ds)));
+			maxUserSpeed = std::max(maxUserSpeed, s);
+			UserSpeedChange(s, SERVER_PLAYER);
+			Message(spring::format("[GameServer] SPRING_DEMO_SPEED: demo playback speed %.1fx", s));
+		}
 		return;
 	}
 
