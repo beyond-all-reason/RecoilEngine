@@ -135,7 +135,7 @@ bool AAirMoveType::UseSmoothMesh() const {
 	const CCommandQueue& cq = cai->commandQue;
 	const Command& fc = (cq.empty())? Command(CMD_STOP): cq.front();
 
-	const bool closeGoalPos = (goalPos.SqDistance2D(owner->pos) < Square(landRadiusSq * 2.0f));
+	const bool closeGoalPos = (goalPos.SqDistance2D(owner->pos) < landRadiusSq * 4.0f);
 	const bool transportCmd = ((fc.GetID() == CMD_LOAD_UNITS) || (fc.GetID() == CMD_UNLOAD_UNIT));
 	const bool forceDisable = ((transportCmd && closeGoalPos) || (aircraftState != AIRCRAFT_FLYING && aircraftState != AIRCRAFT_HOVERING));
 
