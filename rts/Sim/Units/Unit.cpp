@@ -348,8 +348,19 @@ void CUnit::PostInit(const CUnit* builder)
 	UpdatePhysicalState(0.1f);
 	UpdatePosErrorParams(true, true);
 
-	if (FloatOnWater() && IsInWater())
-		Move(UpVector * (std::max(CGround::GetHeightReal(pos.x, pos.z), -moveType->GetWaterline()) - pos.y), true);
+	if (FloatOnWater() && IsInWater()) {
+		const float groundHeight = CGround::GetHeightReal(pos.x, pos.z);
+		const float floatHeight = -moveType->GetWaterline();
+
+		Move(UpVector * (std::max(groundHeight, floatHeight) - pos.y), true);
+
+		// PreInit set the direction before the physical state was known, so
+		// it took the slope of the seabed; a floating unit is level instead
+		if (!upright && groundHeight < floatHeight) {
+			UpdateDirVectors(UpVector);
+			UpdateMidAndAimPos();
+		}
+	}
 
 	if (unitDef->canmove || unitDef->builder) {
 		if (unitDef->moveState <= MOVESTATE_NONE) {
