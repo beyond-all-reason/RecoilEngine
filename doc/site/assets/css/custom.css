@@ -54,6 +54,10 @@
 	padding-left: 2rem;
 }
 
+td[id] {
+	scroll-margin-top: 5rem;
+}
+
 .content.lua-api {
 	h2, h3, h4 {
 		margin-top: 1rem !important;
