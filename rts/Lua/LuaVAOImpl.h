@@ -91,9 +91,15 @@ private:
 	std::shared_ptr<LuaVBOImpl> instLuaVBO;
 	std::shared_ptr<LuaVBOImpl> indxLuaVBO;
 
-	uint32_t oldVertVBOId = 0;
-	uint32_t oldInstVBOId = 0;
-	uint32_t oldIndxVBOId = 0;
+	struct BufferState {
+		uint32_t id = 0;
+		uint32_t definitionRevision = 0;
+		size_t size = 0;
+		bool operator==(const BufferState&) const = default;
+	};
+	BufferState oldVertState;
+	BufferState oldInstState;
+	BufferState oldIndxState;
 
 	uint32_t baseInstance;
 	std::vector<SDrawElementsIndirectCommand> submitCmds;
