@@ -411,7 +411,10 @@ void CSound::ReopenSdlDevice()
 	if (configHandler->IsSet("snd_device"))
 		configDeviceName = configHandler->GetString("snd_device");
 	SDL_AudioSpec obtainedSpec;
-	if (OpenSdlDevice(configDeviceName, obtainedSpec) == false)
+	// The loopback device keeps rendering in its original format, and RenderSDLSamples writes
+	// len / frameSize of its frames into SDL's buffer. Require that format so that SDL converts
+	// to the new hardware; a smaller format here made OpenAL write past the end of the buffer.
+	if (OpenSdlDevice(configDeviceName, obtainedSpec, &loopbackSpec) == false)
 	{
 		LOG("[Sound::%s] Reopening device failed", __func__);
 		// Continue using our loopback device.
@@ -419,10 +422,7 @@ void CSound::ReopenSdlDevice()
 	}
 
 	// The OpenAL loopback device remains unchanged.
-	// In fact, obtainedSpec.channels, obtainedSpec.format, and obtainedSpec.freq may have been modified by SDL2.
-	// This means the loopback device continues to run with the old values.
-	// As a result, RenderSDLSamples() may need to resample the audio.
-	// The new frameSize is already taken into account inside RenderSDLSamples().
+	// The SDL device was reopened with the loopback device's format (SDL converts if needed).
 	//
 	// ToDo: Once OpenAL-Soft is updated, we can make use of alcReopenDeviceSOFT, etc.
 
@@ -523,7 +523,7 @@ static const char* TypeName(ALCenum type)
 
 #endif
 
-bool CSound::OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec)
+bool CSound::OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtainedSpec, const SDL_AudioSpec* requiredSpec)
 {
 	if (SDL_InitSubSystem(SDL_INIT_AUDIO) != 0) {
 		LOG("[Sound::%s] failed to initialize SDL audio, error:  \"%s\"", __func__, SDL_GetError());
@@ -548,6 +548,13 @@ bool CSound::OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtaine
 	desiredSpec.samples = 4096;
 	desiredSpec.callback = RenderSDLSamples;
 	desiredSpec.userdata = this;
+
+	int allowedChanges = SDL_AUDIO_ALLOW_ANY_CHANGE & ~SDL_AUDIO_ALLOW_CHANNELS_CHANGE;
+	if (requiredSpec != nullptr) {
+		desiredSpec.format = requiredSpec->format;
+		desiredSpec.freq = requiredSpec->freq;
+		allowedChanges = 0;
+	}
 	
 	/* SDL bug: can return devices with >2 channels (3D surround), even if we ask for just 2.
 	 * This causes the 2 "primary" channels to be moved in the 3D space compared to their "normal" state
@@ -558,7 +565,7 @@ bool CSound::OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtaine
 	 * for it, apparently noticeably worse than just stereo according to players, despite being in a more relevant genre. */
 	selectedDeviceName = "";
 	for (int channelsDesired : {2, 1}) {
-		desiredSpec.channels = channelsDesired;
+		desiredSpec.channels = (requiredSpec != nullptr)? requiredSpec->channels: channelsDesired;
 
 		sdlDeviceID = 0;
 
@@ -566,13 +573,13 @@ bool CSound::OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtaine
 			const std::string sdlDeviceName = ToSdlDeviceName(deviceName);
 
 			LOG("[Sound::%s] opening configured device \"%s\"", __func__, sdlDeviceName.c_str());
-			sdlDeviceID = SDL_OpenAudioDevice(sdlDeviceName.c_str(), 0, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_ANY_CHANGE & ~SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
+			sdlDeviceID = SDL_OpenAudioDevice(sdlDeviceName.c_str(), 0, &desiredSpec, &obtainedSpec, allowedChanges);
 			selectedDeviceName = sdlDeviceName;
 		}
 
 		if (sdlDeviceID == 0) {
 			LOG("[Sound::%s] opening default device", __func__);
-			sdlDeviceID = SDL_OpenAudioDevice(nullptr, 0, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_ANY_CHANGE & ~SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
+			sdlDeviceID = SDL_OpenAudioDevice(nullptr, 0, &desiredSpec, &obtainedSpec, allowedChanges);
 			selectedDeviceName = "default";
 		}
 
@@ -692,6 +699,7 @@ void CSound::OpenLoopbackDevice(const std::string& deviceName)
 	}
 
 	sdlOutput = true;
+	loopbackSpec = obtainedSpec;
 
 	LOG("[Sound::%s] device=%p(%s) context=%p  numChannels=%d frameSize=%d", __func__, curDevice, selectedDeviceName.c_str(), curContext, obtainedSpec.channels, frameSize);
 #endif
