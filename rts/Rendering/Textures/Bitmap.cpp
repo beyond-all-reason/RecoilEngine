@@ -1755,9 +1755,17 @@ uint32_t CBitmap::CreateTexture(const GL::TextureCreationParams& tcp) const
 }
 
 
-static void HandleDDSMipmap(GLenum target, int32_t numEmbeddedLevels, uint32_t minFilter)
+static void HandleDDSMipmap(GLenum target, int32_t numEmbeddedLevels, const GL::TextureCreationParams& tcp)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	int32_t numLevels = tcp.reqNumLevels;
+	if (numEmbeddedLevels > 0)
+		numLevels = (numLevels > 0) ? std::min(numLevels, numEmbeddedLevels + 1) : numEmbeddedLevels + 1;
+
+	const auto minFilter = tcp.GetMinFilter(numLevels);
+	glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
+	glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, (numLevels > 0) ? numLevels - 1 : 1000);
+	glTexParameteri(target, GL_TEXTURE_MAG_FILTER, tcp.GetMagFilter());
 	glTexParameteri(target, GL_TEXTURE_MIN_FILTER, minFilter);
 
 	if (numEmbeddedLevels == 0 && minFilter != GL_LINEAR && minFilter != GL_NEAREST)
@@ -1795,7 +1803,7 @@ uint32_t CBitmap::CreateDDSTexture(const GL::TextureCreationParams& tcp) const
 			if (tcp.aniso > 0.0f)
 				glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, tcp.aniso);
 
-			HandleDDSMipmap(GL_TEXTURE_2D, ddsimage.get_num_mipmaps(), tcp.GetMinFilter(ddsimage.get_num_mipmaps()));
+			HandleDDSMipmap(GL_TEXTURE_2D, ddsimage.get_num_mipmaps(), tcp);
 			break;
 
 		case nv_dds::Texture3D:
@@ -1811,7 +1819,7 @@ uint32_t CBitmap::CreateDDSTexture(const GL::TextureCreationParams& tcp) const
 			if (tcp.lodBias != 0.0f)
 				glTexParameterf(GL_TEXTURE_3D, GL_TEXTURE_LOD_BIAS, tcp.lodBias);
 
-			HandleDDSMipmap(GL_TEXTURE_3D, ddsimage.get_num_mipmaps(), tcp.GetMinFilter(ddsimage.get_num_mipmaps()));
+			HandleDDSMipmap(GL_TEXTURE_3D, ddsimage.get_num_mipmaps(), tcp);
 			break;
 
 		case nv_dds::TextureCubemap:
@@ -1829,7 +1837,7 @@ uint32_t CBitmap::CreateDDSTexture(const GL::TextureCreationParams& tcp) const
 			if (tcp.aniso > 0.0f)
 				glTexParameterf(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAX_ANISOTROPY_EXT, tcp.aniso);
 
-			HandleDDSMipmap(GL_TEXTURE_CUBE_MAP, ddsimage.get_num_mipmaps(), tcp.GetMinFilter(ddsimage.get_num_mipmaps()));
+			HandleDDSMipmap(GL_TEXTURE_CUBE_MAP, ddsimage.get_num_mipmaps(), tcp);
 			break;
 
 		default:
