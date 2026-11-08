@@ -250,6 +250,7 @@ bool LuaSyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetUnitBuildFacing);
 	REGISTER_LUA_CFUNC(GetUnitIsBuilding);
 	REGISTER_LUA_CFUNC(GetUnitWorkerTask);
+	REGISTER_LUA_CFUNC(GetUnitFactoryBuilding);
 	REGISTER_LUA_CFUNC(GetUnitEffectiveBuildRange);
 	REGISTER_LUA_CFUNC(GetUnitCurrentBuildPower);
 	REGISTER_LUA_CFUNC(GetUnitHarvestStorage);
@@ -4734,6 +4735,26 @@ int LuaSyncedRead::GetUnitWorkerTask(lua_State* L)
 		return GetFactoryWorkerTask(L, factory);
 
 	return 0;
+}
+
+/*** Returns the factory producing given unit.
+ *
+ * @function Spring.GetUnitFactoryBuilding
+ *
+ * @param unitID integer
+ * @return integer factoryID of the factory currently building the unit, or nil if not being built by a factory
+ */
+int LuaSyncedRead::GetUnitFactoryBuilding(lua_State* L)
+{
+	const auto unit = ParseInLosUnit(L, __func__, 1);
+	if (unit == nullptr)
+		return 0;
+
+	if (unit->producingFactory == nullptr)
+		return 0;
+
+	lua_pushnumber(L, unit->producingFactory->id);
+	return 1;
 }
 
 /***
