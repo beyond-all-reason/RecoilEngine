@@ -2570,6 +2570,50 @@ void CLuaHandle::Update()
 }
 
 
+/*** Called each draw frame before the camera moves. A number returned replaces that value for this frame,
+ * nil keeps it. Each handle sees the values the one before it returned.
+ *
+ * @function Callins:UpdateTimeOffset
+ * @param timeOffset number the fraction of a sim frame units are drawn ahead of the last one, see `Spring.GetFrameTimeOffset`
+ * @param drawSimRatio number sim frames per draw frame, averaged (about 0.5 at 60 fps and 30 sim frames a second)
+ * @param presentedUpdateSeconds number see `Spring.GetPresentedUpdateSeconds`
+ * @return number? timeOffset clamped to [-0.5, 1.5] (half a sim frame back, for a draw shown late, to one and a half ahead)
+ * @return number? presentedUpdateSeconds clamped to [0, the larger of 4 display periods (0.25 s with no known period) and the engine's value]
+ */
+void CLuaHandle::UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 5, __func__);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	lua_pushnumber(L, timeOffset);
+	lua_pushnumber(L, drawSimRatio);
+	lua_pushnumber(L, presentedUpdateSecs);
+
+	if (!RunCallIn(L, cmdStr, 3, 2))
+		return;
+
+	// not lua_tofloat: its NaN check raises a Lua error outside the call
+	const auto ReadReturn = [&](int idx, float& value) {
+		if (!lua_isnumber(L, idx))
+			return;
+
+		const lua_Number n = lua_tonumber(L, idx);
+
+		if (std::isfinite(n))
+			value = static_cast<float>(n);
+	};
+
+	ReadReturn(-2, timeOffset);
+	ReadReturn(-1, presentedUpdateSecs);
+
+	lua_pop(L, 2);
+}
+
+
 /*** Called whenever the window is resized.
  *
  * @function Callins:ViewResize

@@ -103,6 +103,7 @@ widgetHandler = {
 -- they are setup in UpdateCallIns()
 local flexCallIns = {
   'GamePreload',
+  'UpdateTimeOffset',
   'GameStart',
   'GameOver',
   'GamePaused',
@@ -184,6 +185,7 @@ local callInLists = {
   'GameStart',
   'Shutdown',
   'Update',
+  'UpdateTimeOffset',
   'TextCommand',
   'ActiveCommandChanged',
   'CameraRotationChanged',
@@ -1107,6 +1109,22 @@ function widgetHandler:Update(dt)
     w:Update(dt)
   end
   return
+end
+
+
+-- each widget sees the values the one before it returned; nil keeps a value
+function widgetHandler:UpdateTimeOffset(timeOffset, drawSimRatio, presentedUpdateSeconds)
+  local newTimeOffset, newPresented
+  for _,w in ipairs(self.UpdateTimeOffsetList) do
+    local t, p = w:UpdateTimeOffset(timeOffset, drawSimRatio, presentedUpdateSeconds)
+    if (type(t) == 'number') then
+      timeOffset, newTimeOffset = t, t
+    end
+    if (type(p) == 'number') then
+      presentedUpdateSeconds, newPresented = p, p
+    end
+  end
+  return newTimeOffset, newPresented
 end
 
 

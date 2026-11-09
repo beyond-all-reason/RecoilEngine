@@ -286,6 +286,7 @@ class CEventClient
 		virtual void Save(zipFile archive);
 
 		virtual void Update();
+		virtual void UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs);
 		virtual void NanoParticleUpdate(const std::vector<NanoParticles::Event>& events) {}
 		virtual void UnsyncedHeightMapUpdate(const SRectangle& rect);
 

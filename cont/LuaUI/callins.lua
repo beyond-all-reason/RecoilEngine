@@ -22,6 +22,7 @@ CallInsList = {
 	"MiniMapStateChanged",
 	"MiniMapGeometryChanged",
 	"CommandNotify",
+	"UpdateTimeOffset",
 
 	"KeyBindingsChanged",
 	"KeyMapChanged",

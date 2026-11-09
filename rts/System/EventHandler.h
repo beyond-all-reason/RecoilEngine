@@ -225,6 +225,7 @@ class CEventHandler
 
 		void UnsyncedHeightMapUpdate(const SRectangle& rect);
 		void Update();
+		void UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs);
 		void NanoParticleUpdate(const std::vector<NanoParticles::Event>& events);
 
 		void KeyBindingsChanged();

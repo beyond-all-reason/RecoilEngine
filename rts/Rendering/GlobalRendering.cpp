@@ -131,6 +131,7 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_MEMBER(lastFrameTime),
 	CR_MEMBER(lastFrameStart),
 	CR_MEMBER(lastSwapBuffersEnd),
+	CR_MEMBER(lastSwapBuffersDuration),
 	CR_IGNORED(presentedFrameTime),
 	CR_IGNORED(presentedTime),
 	CR_IGNORED(presentedFrameLag),
@@ -245,6 +246,7 @@ CGlobalRendering::CGlobalRendering()
 	, lastFrameTime(0.0f)
 	, lastFrameStart(spring_notime)
 	, lastSwapBuffersEnd(spring_notime)
+	, lastSwapBuffersDuration(spring_notime)
 	, presentedFrameTime(0.0f)
 	, presentedTime(0.0)
 	, presentedFrameLag(0.0f)
@@ -696,6 +698,7 @@ void CGlobalRendering::PostInit() {
 void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 {
 	spring_time pre;
+	spring_time swapEnd;
 	{
 		SCOPED_TIMER("Misc::SwapBuffers");
 		SCOPED_GL_DEBUGGROUP("Misc::SwapBuffers");
@@ -735,6 +738,8 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 			}
 		#endif
 
+		swapEnd = spring_now();
+
 		FrameMark;
 		CollectTracyGpuZones();
 		GL::DebugGroupTimers::EndFrame();
@@ -743,6 +748,7 @@ void CGlobalRendering::SwapBuffers(bool allowSwapBuffers, bool clearErrors)
 	// exclude debug from SCOPED_TIMER("Misc::SwapBuffers");
 	eventHandler.DbgTimingInfo(TIMING_SWAP, pre, spring_now());
 	globalRendering->lastSwapBuffersEnd = spring_now();
+	globalRendering->lastSwapBuffersDuration = swapEnd - pre;
 }
 
 bool TracyGpu::ready = false;
@@ -1263,6 +1269,13 @@ void CGlobalRendering::UpdatePresentedFrameTime(float frameTimeMs)
 
 	presentedFrameTime = presentedMs;
 	presentedTime += presentedMs;
+}
+
+// the UpdateTimeOffset call-in's value for this frame
+void CGlobalRendering::OverridePresentedFrameTime(float frameTimeMs)
+{
+	presentedTime += (frameTimeMs - presentedFrameTime);
+	presentedFrameTime = frameTimeMs;
 }
 
 // vsync on but the mean frame time well under a period: frames outpace the refresh (fast sync).

@@ -55,6 +55,7 @@ public:
 	void SwapBuffers(bool allowSwapBuffers, bool clearErrors);
 	void UpdateDisplayPeriod();
 	void UpdatePresentedFrameTime(float frameTimeMs);
+	void OverridePresentedFrameTime(float frameTimeMs);
 
 	void SetGLTimeStamp(uint32_t queryIdx) const;
 	uint64_t CalcGLDeltaTime(uint32_t queryIdx0, uint32_t queryIdx1) const;
@@ -145,6 +146,9 @@ public:
 	spring_time lastFrameStart;
 
 	spring_time lastSwapBuffersEnd;
+
+	/// from before the swap to its return; short with vsync when the driver queues frames
+	spring_time lastSwapBuffersDuration;
 
 	/// how long this draw frame advances by on screen (MILLIseconds), see UpdatePresentedFrameTime
 	float presentedFrameTime;

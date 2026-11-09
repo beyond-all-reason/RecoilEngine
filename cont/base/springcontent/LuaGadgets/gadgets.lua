@@ -1835,6 +1835,22 @@ function gadgetHandler:Update()
 end
 
 
+-- each gadget sees the values the one before it returned; nil keeps a value
+function gadgetHandler:UpdateTimeOffset(timeOffset, drawSimRatio, presentedUpdateSeconds)
+  local newTimeOffset, newPresented
+  for _,g in r_ipairs(self.UpdateTimeOffsetList) do
+    local t, p = g:UpdateTimeOffset(timeOffset, drawSimRatio, presentedUpdateSeconds)
+    if (type(t) == 'number') then
+      timeOffset, newTimeOffset = t, t
+    end
+    if (type(p) == 'number') then
+      presentedUpdateSeconds, newPresented = p, p
+    end
+  end
+  return newTimeOffset, newPresented
+end
+
+
 function gadgetHandler:DefaultCommand(type, id, cmd)
   for _,g in r_ipairs(self.DefaultCommandList) do
     local id = g:DefaultCommand(type, id, cmd)
