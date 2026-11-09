@@ -112,6 +112,8 @@ void CFeature::PostLoad()
 void CFeature::ChangeTeam(int newTeam)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	const int oldTeam = team;
+
 	if (newTeam < 0) {
 		// remap all negative teams to Gaia
 		// if the Gaia team is not enabled, these would become
@@ -122,6 +124,9 @@ void CFeature::ChangeTeam(int newTeam)
 		team = newTeam;
 		allyteam = teamHandler.AllyTeam(newTeam);
 	}
+
+	if (paletteIndex == static_cast<uint16_t>(oldTeam))
+		paletteIndex = static_cast<uint16_t>(team);
 }
 
 
