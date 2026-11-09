@@ -41,6 +41,8 @@
 #include <sol2/sol.hpp>
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 
 namespace Rml::SolLua
@@ -59,6 +61,13 @@ namespace Rml::SolLua
 		void RemoveLuaItems();
 		void AddContextTracking(Context* context);
 		void AddDocumentTracking(ElementDocument* document);
+
+		/// RmlUi context names are global, but each Lua state (LuaMenu, LuaUI) must be able to use
+		/// the same name (e.g. "shared") for its own context without touching another state's.
+		/// Maps a name used by this plugin's Lua state to the name the context has inside RmlUi:
+		/// the same name, unless another context already has it, then "<name>#<n>".
+		/// With create == false, returns an empty string for a name this state has not created.
+		Rml::String InternalContextName(const Rml::String& luaName, bool create);
 
 		lua_State* GetLuaState() const { return m_lua_state.lua_state(); }
 		sol::state_view GetStateView() const { return m_lua_state; }
@@ -106,6 +115,8 @@ namespace Rml::SolLua
 
 		std::vector<Context*> luaContexts;
 		std::vector<ElementDocument*> luaDocuments;
+		std::unordered_map<Rml::String, Rml::String> contextNames; // lua name -> name inside RmlUi
+		int serial; // tells this plugin's contexts apart from other plugins' ones of the same name
 	};
 
 } // end namespace Rml::SolLua

@@ -47,15 +47,16 @@ namespace Rml::SolLua
 	// Only ever touched from the main thread.
 	static std::vector<SolLuaPlugin*> plugins;
 	static SolLuaPlugin* activePlugin = nullptr;
+	static int nextSerial = 1;
 
 	SolLuaPlugin::SolLuaPlugin(sol::state_view lua_state)
-		: m_lua_state{lua_state}
+		: m_lua_state{lua_state}, serial{nextSerial++}
 	{
 		plugins.push_back(this);
 	}
 
 	SolLuaPlugin::SolLuaPlugin(sol::state_view lua_state, const Rml::String& lua_environment_identifier)
-		: m_lua_state{lua_state}, m_lua_env_identifier{lua_environment_identifier}
+		: m_lua_state{lua_state}, m_lua_env_identifier{lua_environment_identifier}, serial{nextSerial++}
 	{
 		plugins.push_back(this);
 	}
@@ -124,6 +125,24 @@ namespace Rml::SolLua
 
 	void SolLuaPlugin::OnContextDestroy(Context* context) {
 		luaContexts.erase(std::remove(luaContexts.begin(), luaContexts.end(), context), luaContexts.end());
+		std::erase_if(contextNames, [&](const auto& entry) { return entry.second == context->GetName(); });
+	}
+
+	Rml::String SolLuaPlugin::InternalContextName(const Rml::String& luaName, bool create)
+	{
+		if (const auto it = contextNames.find(luaName); it != contextNames.end()) {
+			return it->second;
+		}
+		if (!create) {
+			return {};
+		}
+		Rml::String internalName = luaName;
+		if (Rml::GetContext(internalName) != nullptr) {
+			// taken by another Lua state
+			internalName = luaName + "#" + std::to_string(serial);
+		}
+		contextNames[luaName] = internalName;
+		return internalName;
 	}
 
 	void SolLuaPlugin::AddDocumentTracking(ElementDocument* document) {
