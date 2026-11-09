@@ -50,8 +50,11 @@ namespace Rml::SolLua
 			self.AddEventListener(event, e, in_capture_phase);
 		}
 
-		void setInnerRMLSafe(Rml::Element& self, const Rml::String& rml)
+		void setInnerRMLSafe(Rml::Element& self, const Rml::String& rml, sol::this_state s)
 		{
+			// inline event listeners in the markup are created for the calling Lua state
+			SolLuaPlugin::ScopedActive active(s.L);
+
 			// Manually remove all DOM children and defer their deletion
 			// This prevents use-after-free when Lua holds references to children
 			while (self.GetNumChildren())
@@ -423,7 +426,11 @@ namespace Rml::SolLua
 			 * @param name string
 			 * @param value string
 			 */
-			"SetAttribute", static_cast<void(Rml::Element::*)(const Rml::String&, const Rml::String&)>(&Rml::Element::SetAttribute),
+			"SetAttribute", [](Rml::Element& self, const Rml::String& name, const Rml::String& value, sol::this_state s) {
+				// "onclick" and friends create an inline event listener for the calling Lua state
+				SolLuaPlugin::ScopedActive active(s.L);
+				self.SetAttribute(name, value);
+			},
 			/***
 			 * Sets (if value is true) or clears (if value is false) the class name on the element.
 			 * @function RmlUi.Element:SetClass

@@ -68,7 +68,9 @@ public:
 
 	// New hooks for Recoil engine
 	const Rml::String& GetMouseCursor();
-	void SetTranslationTable(TranslationTable* tt);
+	// one table per Lua state using RmlUi, looked up in the order they were added
+	void AddTranslationTable(TranslationTable* tt);
+	void RemoveTranslationTable(TranslationTable* tt);
 
 	std::vector<std::string> GetDocumentPathRequests(const Rml::String& document_path);
 	void ClearDocumentPathRequests(const Rml::String& document_path);
@@ -91,7 +93,7 @@ public:
 	std::unordered_map<std::string, std::string> mouseCursorAliases;
 
 private:
-	TranslationTable* translationTable = nullptr;
+	std::vector<TranslationTable*> translationTables;
 	std::unordered_map<std::string, std::vector<std::string>> documentPathRequests;
 	Rml::String mouseCursor;
 };

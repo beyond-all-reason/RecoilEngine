@@ -42,9 +42,11 @@ namespace RmlGui
 {
 	bool Initialize();
 	bool InitializeLua(lua_State* lua_state);
-	bool RemoveLua();
+	bool RemoveLua(lua_State* lua_state);
 
 	void Shutdown();
+	// shuts down unless a Lua state (e.g. LuaMenu) is still using RmlUi
+	void ShutdownIfUnused();
 	void Reload();
 
 	Rml::SystemInterface* GetSystemInterface();

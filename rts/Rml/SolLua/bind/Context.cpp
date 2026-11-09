@@ -398,6 +398,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 		 * @return RmlUi.Document
 		 */
 		"CreateDocument", [slp](Rml::Context& self) {
+			SolLuaPlugin::ScopedActive active(slp);
 			auto doc = self.CreateDocument();
 			slp->AddDocumentTracking(doc);
 			return doc;
@@ -409,6 +410,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 		 * @return RmlUi.Document
 		 */
 		"LoadDocument", [slp](Rml::Context& self, const Rml::String& document, const sol::object& widget) {
+			SolLuaPlugin::ScopedActive active(slp);
 			auto doc = self.LoadDocument(document);
 			if (doc == nullptr) {
 				return (SolLuaDocument*)nullptr;

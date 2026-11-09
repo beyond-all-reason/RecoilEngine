@@ -54,10 +54,41 @@ namespace Rml::SolLua
 	public:
 		SolLuaPlugin(sol::state_view lua_state);
 		SolLuaPlugin(sol::state_view lua_state, const Rml::String& lua_environment_identifier);
+		~SolLuaPlugin() override;
 
 		void RemoveLuaItems();
 		void AddContextTracking(Context* context);
 		void AddDocumentTracking(ElementDocument* document);
+
+		lua_State* GetLuaState() const { return m_lua_state.lua_state(); }
+		sol::state_view GetStateView() const { return m_lua_state; }
+		const Rml::String& GetEnvironmentIdentifier() const { return m_lua_env_identifier; }
+
+		/// The plugin that belongs to the given Lua state, or nullptr.
+		static SolLuaPlugin* ForState(lua_State* L);
+
+		/// The plugin whose Lua state is currently calling into RmlUi (see ScopedActive), or nullptr.
+		static SolLuaPlugin* Active();
+
+		/// Picks the plugin for something being instanced by RmlUi (a document, an inline event
+		/// listener): the active one, else the one that owns the hint element's document, else the
+		/// most recently registered one.
+		static SolLuaPlugin* Resolve(Rml::Element* hint);
+
+		/// Marks a plugin as the one whose Lua state is calling into RmlUi for the lifetime of
+		/// the object. RmlUi's factories are global, so they cannot tell which Lua state asked
+		/// for a document or listener to be created unless the caller says so.
+		class ScopedActive
+		{
+		public:
+			explicit ScopedActive(SolLuaPlugin* plugin);
+			explicit ScopedActive(lua_State* L);
+			~ScopedActive();
+			ScopedActive(const ScopedActive&) = delete;
+			ScopedActive& operator=(const ScopedActive&) = delete;
+		private:
+			SolLuaPlugin* previous;
+		};
 
 		TranslationTable translationTable;
 		RmlSystemInterface* systemInterface;
@@ -69,9 +100,6 @@ namespace Rml::SolLua
 
 		void OnContextDestroy(Context* context) override;
 		void OnDocumentUnload(ElementDocument* document) override;
-
-		std::unique_ptr<SolLuaDocumentElementInstancer> document_element_instancer;
-		std::unique_ptr<SolLuaEventListenerInstancer> event_listener_instancer;
 
 		sol::state_view m_lua_state;
 		Rml::String m_lua_env_identifier;

@@ -33,6 +33,7 @@
 
 #include "SolLuaDocument.h"
 #include "SolLuaEventListener.h"
+#include "SolLuaPlugin.h"
 
 
 namespace Rml::SolLua
@@ -40,7 +41,10 @@ namespace Rml::SolLua
 
 	ElementPtr SolLuaDocumentElementInstancer::InstanceElement(Element* parent, const String& tag, const XMLAttributes& attributes)
 	{
-		return ElementPtr(new SolLuaDocument(m_state, tag, m_lua_env_identifier));
+		auto* plugin = SolLuaPlugin::Resolve(parent);
+		if (plugin == nullptr)
+			return ElementPtr(new ::Rml::ElementDocument(tag));
+		return ElementPtr(new SolLuaDocument(plugin->GetStateView(), tag, plugin->GetEnvironmentIdentifier()));
 	}
 
 	void SolLuaDocumentElementInstancer::ReleaseElement(Element* element)
@@ -51,7 +55,11 @@ namespace Rml::SolLua
 
 	EventListener* SolLuaEventListenerInstancer::InstanceEventListener(const String& value, Element* element)
 	{
-		return new SolLuaEventListener(m_state, value, element);
+		auto* plugin = SolLuaPlugin::Resolve(element);
+		if (plugin == nullptr)
+			return nullptr;
+		auto state = plugin->GetStateView();
+		return new SolLuaEventListener(state, value, element);
 	}
 
 } // end namespace Rml::SolLua
