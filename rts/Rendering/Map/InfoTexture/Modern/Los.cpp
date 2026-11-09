@@ -106,7 +106,7 @@ void CLosTexture::Update()
 	assert(myLos.size() == texSize.x * texSize.y);
 
 	auto binding = uploadTex.ScopedBind();
-	uploadTex.UploadImage(myLos.data());
+	UploadThroughPBO(uploadTex, uploadPBO, myLos.data(), myLos.size() * sizeof(myLos[0]));
 
 	// do post-processing on the gpu (los-checking & scaling)
 	{
