@@ -1238,6 +1238,7 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 		// update game timings
 		globalRendering->lastFrameStart = currentTime;
 		globalRendering->lastFrameTime = deltaDrawFrameTime.toMilliSecsf();
+		globalRendering->UpdatePresentedFrameTime(globalRendering->lastFrameTime);
 
 		gu->avgFrameTime = mix(gu->avgFrameTime, deltaDrawFrameTime.toMilliSecsf(), 0.05f);
 		gu->gameTime += modGameDeltaTimeSecs;

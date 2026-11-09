@@ -1,5 +1,8 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <algorithm>
+#include <cmath>
+#include <numeric>
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -128,6 +131,15 @@ CR_REG_METADATA(CGlobalRendering, (
 	CR_MEMBER(lastFrameTime),
 	CR_MEMBER(lastFrameStart),
 	CR_MEMBER(lastSwapBuffersEnd),
+	CR_IGNORED(presentedFrameTime),
+	CR_IGNORED(presentedTime),
+	CR_IGNORED(presentedFrameLag),
+	CR_IGNORED(displayPeriod),
+	CR_IGNORED(recentFrameTimes),
+	CR_IGNORED(recentFrameTimeIdx),
+	CR_IGNORED(recentFrameTimeCnt),
+	CR_IGNORED(recentFrameTimeSum),
+	CR_IGNORED(fastSyncDetected),
 	CR_MEMBER(weightedSpeedFactor),
 	CR_MEMBER(drawFrame),
 	CR_MEMBER(FPS),
@@ -233,6 +245,10 @@ CGlobalRendering::CGlobalRendering()
 	, lastFrameTime(0.0f)
 	, lastFrameStart(spring_notime)
 	, lastSwapBuffersEnd(spring_notime)
+	, presentedFrameTime(0.0f)
+	, presentedTime(0.0)
+	, presentedFrameLag(0.0f)
+	, displayPeriod(0.0f)
 	, weightedSpeedFactor(0.0f)
 	, drawFrame(1)
 	, FPS(1.0f)
@@ -1188,6 +1204,111 @@ void CGlobalRendering::LogVersionInfo(const char* sdlVersionStr, const char* glV
 	LOG("\tCompressed texture formats: %s", ss.str().c_str());
 }
 
+// the current mode of the window's display: SDL3 keeps this call (by display id), not SDL_GetWindowDisplayMode
+void CGlobalRendering::UpdateDisplayPeriod()
+{
+	static bool loggedFailure = false;
+
+	SDL_DisplayMode dmode;
+
+	displayPeriod = 0.0f;
+
+	if (sdlWindow == nullptr)
+		return;
+
+	if (SDL_GetCurrentDisplayMode(GetCurrentDisplayIndex(), &dmode) != 0 || dmode.refresh_rate <= 0) {
+		if (!loggedFailure)
+			LOG_L(L_WARNING, "[GR::%s] display refresh rate unknown (%s), the presented frame time is the raw frame time", __func__, SDL_GetError());
+
+		loggedFailure = true;
+		return;
+	}
+
+	displayPeriod = 1000.0f / dmode.refresh_rate;
+}
+
+// With vsync on a frame is shown for whole display periods however unevenly draws start, so the
+// frame time is snapped to periods and the remainder paid back over LAG_PAYBACK_SECONDS.
+// Vsync off, fast sync, an unknown refresh rate or a slow frame: the raw frame time.
+void CGlobalRendering::UpdatePresentedFrameTime(float frameTimeMs)
+{
+	// spreads a dropped frame's extra period over many frames, follows a frame rate change within a second
+	constexpr float LAG_PAYBACK_SECONDS = 0.5f;
+
+	float presentedMs = frameTimeMs;
+
+	const bool vsyncPeriodKnown = (verticalSync->IsEnabled() && displayPeriod > 0.0f);
+
+	if (vsyncPeriodKnown) {
+		UpdateFastSyncDetection(frameTimeMs);
+	} else {
+		recentFrameTimes = {};
+		recentFrameTimeSum = 0.0f;
+		recentFrameTimeCnt = 0;
+		fastSyncDetected = false;
+	}
+
+	if (vsyncPeriodKnown && !fastSyncDetected && frameTimeMs > 0.0f) {
+		// a slow frame takes the raw frame time, the lag is still paid back
+		const bool snap = (frameTimeMs < MAX_SNAP_PERIODS * displayPeriod);
+		const float targetMs = snap ? std::max(1.0f, std::round(frameTimeMs / displayPeriod)) * displayPeriod : frameTimeMs;
+		const float lag = presentedFrameLag + frameTimeMs - targetMs;
+		const float payback = lag * std::min(1.0f, targetMs / (LAG_PAYBACK_SECONDS * 1000.0f));
+
+		presentedFrameLag = lag - payback;
+		presentedMs = targetMs + payback;
+	} else {
+		presentedFrameLag = 0.0f;
+	}
+
+	presentedFrameTime = presentedMs;
+	presentedTime += presentedMs;
+}
+
+// vsync on but the mean frame time well under a period: frames outpace the refresh (fast sync).
+// The mean, not the median: frames queued after a sim frame bunch up but still drain at the refresh rate.
+void CGlobalRendering::UpdateFastSyncDetection(float frameTimeMs)
+{
+	// a vsync'd frame lasts a period or more: 0.75 leaves room for timer noise, the gap to 0.9 stops flapping
+	constexpr float ENTER_BELOW_PERIODS = 0.75f;
+	constexpr float LEAVE_ABOVE_PERIODS = 0.9f;
+
+	static bool loggedEnter = false;
+	static bool loggedLeave = false;
+
+	recentFrameTimeSum += (frameTimeMs - recentFrameTimes[recentFrameTimeIdx]);
+	recentFrameTimes[recentFrameTimeIdx] = frameTimeMs;
+	recentFrameTimeIdx = (recentFrameTimeIdx + 1) % FAST_SYNC_WINDOW;
+	recentFrameTimeCnt = std::min(recentFrameTimeCnt + 1, FAST_SYNC_WINDOW);
+
+	// resum once per window so float rounding cannot accumulate
+	if (recentFrameTimeIdx == 0)
+		recentFrameTimeSum = std::accumulate(recentFrameTimes.begin(), recentFrameTimes.end(), 0.0f);
+
+	if (recentFrameTimeCnt < FAST_SYNC_WINDOW)
+		return;
+
+	const float meanPeriods = recentFrameTimeSum / (FAST_SYNC_WINDOW * displayPeriod);
+	const bool detected = fastSyncDetected ? (meanPeriods < LEAVE_ABOVE_PERIODS) : (meanPeriods < ENTER_BELOW_PERIODS);
+
+	if (detected == fastSyncDetected)
+		return;
+
+	fastSyncDetected = detected;
+	presentedFrameLag = 0.0f;
+
+	// once each way: a frame rate near the thresholds would spam the log
+	bool& logged = detected ? loggedEnter : loggedLeave;
+
+	if (logged)
+		return;
+
+	logged = true;
+	LOG("[GR::%s] frames %s the display refresh (mean %.2f ms, period %.2f ms), the presented frame time is %s", __func__,
+		detected ? "outpace" : "are held to", meanPeriods * displayPeriod, displayPeriod,
+		detected ? "the raw frame time" : "snapped to whole periods");
+}
+
 void CGlobalRendering::LogDisplayMode(SDL_Window* window) const
 {
 	// print final mode (call after SetupViewportGeometry, which updates viewSizeX/Y)
@@ -1781,6 +1902,7 @@ void CGlobalRendering::InitGLState()
 	// this does not accomplish much
 	// SwapBuffers(true, true);
 	LogDisplayMode(sdlWindow);
+	UpdateDisplayPeriod();
 }
 
 void CGlobalRendering::ToggleMultisampling() const
