@@ -161,6 +161,10 @@ void luaV_settable (lua_State *L, const TValue *t, TValue *key, StkId val) {
     const TValue *tm;
     if (ttistable(t)) {  /* `t' is a table? */
       Table *h = hvalue(t);
+      if (ttisnil(val) && fasttm(L, h->metatable, TM_NEWINDEX) == NULL) {
+        luaH_setnil(L, h, key);
+        return;
+      }
       TValue *oldval = luaH_set(L, h, key); /* do a primitive set */
       if (!ttisnil(oldval) ||  /* result is no nil? */
           (tm = fasttm(L, h->metatable, TM_NEWINDEX)) == NULL) { /* or no TM? */

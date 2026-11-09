@@ -506,6 +506,21 @@ TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
 }
 
 
+/*
+** Assigns nil to `key` without an insertion when they key is absent, so
+** absent keys cannot move nodes or rehash the hash set during iteration.
+*/
+void luaH_setnil (lua_State *L, Table *t, const TValue *key) {
+  const TValue *p = luaH_get(t, key);
+  t->flags = 0;
+  if (p != luaO_nilobject)
+    setnilvalue(lua_cast(TValue *, p));
+  else if (ttisnil(key)) luaG_runerror(L, "table index is nil");
+  else if (ttisnumber(key) && luai_numisnan(nvalue(key)))
+    luaG_runerror(L, "table index is NaN");
+}
+
+
 TValue *luaH_setnum (lua_State *L, Table *t, int key) {
   const TValue *p = luaH_getnum(t, key);
   if (p != luaO_nilobject)
