@@ -771,17 +771,14 @@
 ** CHANGE them if your system supports long long or does not support long.
 */
 
-#if defined(LUA_USELONGLONG)
-
+//SPRING long is 32-bit on Windows and 64-bit elsewhere
+//SPRING#if defined(LUA_USELONGLONG)
 #define LUA_INTFRMLEN		"ll"
 #define LUA_INTFRM_T		long long
-
-#else
-
-#define LUA_INTFRMLEN		"l"
-#define LUA_INTFRM_T		long
-
-#endif
+//SPRING#else
+//SPRING#define LUA_INTFRMLEN		"l"
+//SPRING#define LUA_INTFRM_T		long
+//SPRING#endif
 
 
 
