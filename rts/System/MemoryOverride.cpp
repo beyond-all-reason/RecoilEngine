@@ -78,6 +78,19 @@ void* aligned_alloc(size_t alignment, size_t size)
 #endif
 }
 
+void* aligned_zalloc(size_t alignment, size_t size)
+{
+#ifdef USE_MIMALLOC
+	// skips the memset when the memory is fresh from the OS (already zero), so untouched pages stay unused
+	return mi_zalloc_aligned(size, alignment);
+#else
+	void* ptr = recoil::aligned_alloc(alignment, size);
+	if (ptr != nullptr)
+		std::memset(ptr, 0, size);
+	return ptr;
+#endif
+}
+
 void* aligned_realloc(void* ptr, size_t oldsize, size_t newsize, size_t alignment)
 {
 	alignment = std::max<size_t>(alignment, 1);
