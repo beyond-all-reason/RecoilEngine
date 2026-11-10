@@ -50,6 +50,8 @@ jobs:
     secrets: inherit
   create-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     needs: [build-engine, build-engine-tracy, get-tag]
     steps:
       - name: Download All Artifacts
