@@ -424,9 +424,12 @@ void CCregLoadSaveHandler::LoadAIData()
 	// cleanup
 	iss.str("");
 
-	gs->paused = false;
+	// keep the pause set in CGameServer::PostLoad
+	gs->paused = true;
+	game->paused = true;
+
 	if (gameServer != nullptr) {
-		gameServer->isPaused = false;
+		gameServer->isPaused = true;
 		gameServer->syncErrorFrame = 0;
 	}
 
