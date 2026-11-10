@@ -55,6 +55,7 @@ class CEventHandler
 
 		void GamePreload();
 		void GameStart();
+		void GameLoaded();
 		void GameOver(const std::vector<unsigned char>& winningAllyTeams);
 		void GamePaused(int playerID, bool paused);
 		void GameFrame(int gameFrame);

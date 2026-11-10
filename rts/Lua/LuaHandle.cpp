@@ -767,6 +767,28 @@ void CLuaHandle::GameStart()
 }
 
 
+/*** Called once a game loaded from a `.ssf` save is ready, paused at the saved frame.
+ *
+ * Takes the place of `GameStart`; not called for Lua (`.slsf`) saves, see `Load`.
+ *
+ * @function Callins:GameLoaded
+ */
+void CLuaHandle::GameLoaded()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 3, __func__);
+
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	RunCallInTraceback(L, cmdStr, 0, 0, traceBack.GetErrFuncIdx(), false);
+}
+
+
 /*** Called when the game ends
  *
  * @function Callins:GameOver

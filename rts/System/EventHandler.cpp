@@ -538,6 +538,12 @@ void CEventHandler::GameStart()
 	ITERATE_EVENTCLIENTLIST_NA(GameStart);
 }
 
+void CEventHandler::GameLoaded()
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST_NA(GameLoaded);
+}
+
 void CEventHandler::GameOver(const std::vector<unsigned char>& winningAllyTeams)
 {
 	ZoneScoped;

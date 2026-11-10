@@ -104,6 +104,7 @@ widgetHandler = {
 local flexCallIns = {
   'GamePreload',
   'GameStart',
+  'GameLoaded',
   'GameOver',
   'GamePaused',
   'GameFrame',
@@ -182,6 +183,7 @@ end
 local callInLists = {
   'GamePreload',
   'GameStart',
+  'GameLoaded',
   'Shutdown',
   'Update',
   'TextCommand',
@@ -1698,6 +1700,13 @@ end
 function widgetHandler:GameStart()
   for _,w in ipairs(self.GameStartList) do
     w:GameStart()
+  end
+  return
+end
+
+function widgetHandler:GameLoaded()
+  for _,w in ipairs(self.GameLoadedList) do
+    w:GameLoaded()
   end
   return
 end

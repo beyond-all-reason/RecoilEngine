@@ -39,6 +39,8 @@
 #include "Sim/Units/Scripts/UnitScriptEngine.h"
 #include "Sim/Units/Scripts/NullUnitScript.h"
 #include "Sim/Weapons/PlasmaRepulser.h"
+#include "System/EventHandler.h"
+#include "System/LoadLock.h"
 #include "System/SafeUtil.h"
 #include "System/Platform/errorhandler.h"
 #include "System/FileSystem/DataDirsAccess.h"
@@ -431,6 +433,11 @@ void CCregLoadSaveHandler::LoadAIData()
 	if (gameServer != nullptr) {
 		gameServer->isPaused = true;
 		gameServer->syncErrorFrame = 0;
+	}
+
+	{
+		auto lock = CLoadLock::GetUniqueLock();
+		eventHandler.GameLoaded();
 	}
 
 	LEAVE_SYNCED_CODE();

@@ -866,6 +866,12 @@ function gadgetHandler:GameStart()
   end
 end
 
+function gadgetHandler:GameLoaded()
+  for _,g in r_ipairs(self.GameLoadedList) do
+    g:GameLoaded()
+  end
+end
+
 function gadgetHandler:GameOver(winningAllyTeams)
   for _,g in r_ipairs(self.GameOverList) do
     g:GameOver(winningAllyTeams)

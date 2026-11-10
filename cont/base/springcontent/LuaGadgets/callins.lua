@@ -28,6 +28,7 @@ CALLIN_LIST = {
 	"GameSetup",
 	"GamePreload",
 	"GameStart",
+	"GameLoaded",
 	"GameOver",
 	"GameFrame",
 	"GameFramePost", -- Called after all other Sim operations are completed
