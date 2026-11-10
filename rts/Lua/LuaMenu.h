@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_MENU_H
-#define LUA_MENU_H
+#pragma once
 
 #include "LuaHandle.h"
 
@@ -45,8 +44,10 @@ public:
 
 	bool PersistOnReload() const override { return true; }
 
-	// true if RmlUi is bound to this Lua state (see CLuaHandle::InitializeRmlUi)
-	bool UsesRmlUi() const { return rmlui; }
+	// true if this menu's Lua state has RmlUi bindings (see CLuaHandle::InitializeRmlUi). That is
+	// the case for every menu that loaded while RmlUi was available, whether or not it creates
+	// any contexts: tearing RmlUi down would leave the bindings dangling.
+	bool HasRmlUiBinding() const { return rmlui; }
 
 	// Don't call GamePreload since it may be called concurrent
 	// with other callins during loading.
@@ -72,4 +73,3 @@ protected:
 extern CLuaMenu* luaMenu;
 
 
-#endif /* LUA_MENU_H */

@@ -94,7 +94,9 @@ namespace Rml::SolLua
 			}
 		}
 
-		return plugins.empty() ? nullptr : plugins.back();
+		// with a single Lua state there is no ambiguity. With several, guessing would bind the
+		// object to a state that may not be the one asking (and may be removed before it).
+		return plugins.size() == 1 ? plugins.front() : nullptr;
 	}
 
 	SolLuaPlugin::ScopedActive::ScopedActive(SolLuaPlugin* plugin)
@@ -143,6 +145,21 @@ namespace Rml::SolLua
 		}
 		contextNames[luaName] = internalName;
 		return internalName;
+	}
+
+	Rml::String SolLuaPlugin::LuaContextName(const Rml::String& internalName) const
+	{
+		for (const auto& [luaName, internal] : contextNames) {
+			if (internal == internalName) {
+				return luaName;
+			}
+		}
+		return internalName;
+	}
+
+	bool SolLuaPlugin::OwnsContext(const Context* context) const
+	{
+		return std::find(luaContexts.begin(), luaContexts.end(), context) != luaContexts.end();
 	}
 
 	void SolLuaPlugin::AddDocumentTracking(ElementDocument* document) {

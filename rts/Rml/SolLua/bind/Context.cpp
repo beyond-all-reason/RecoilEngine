@@ -593,7 +593,7 @@ void bind_context(sol::table& namespace_table, SolLuaPlugin* slp)
 		/*** @field RmlUi.Context.hover_element RmlUi.Element */
 		"hover_element", sol::readonly_property(&Rml::Context::GetHoverElement),
 		/*** @field RmlUi.Context.name string */
-		"name", sol::readonly_property(&Rml::Context::GetName),
+		"name", sol::readonly_property([slp](Rml::Context& self) { return slp->LuaContextName(self.GetName()); }),
 		/*** @field RmlUi.Context.root_element RmlUi.Element */
 		"root_element", sol::readonly_property(&Rml::Context::GetRootElement));
 	// clang-format on

@@ -101,6 +101,9 @@ public:
 	std::unordered_set<Rml::Context*> contexts_to_remove;
 
 	Rml::Context* debug_host_context = nullptr;
+	// the debugger's documents belong to the Lua state that created it, and it shows one context
+	Rml::SolLua::SolLuaPlugin* debug_owner = nullptr;
+	Rml::Context* debug_target = nullptr;
 	Rml::Context* clicked_context = nullptr;
 
 	InputHandler::HandlerTokenT inputCon;
@@ -219,10 +222,14 @@ bool RmlGui::RemoveLua(lua_State* lua_state)
 	}
 	auto* plugin = it->plugin;
 
-	// the debugger's context may show documents of the state being removed
-	if (state->debug_host_context) {
+	// the debugger goes with the state it was created by, or whose context it is showing
+	const bool debugAffected = state->debug_owner == plugin || state->debug_owner == nullptr ||
+		(state->debug_target != nullptr && plugin->OwnsContext(state->debug_target));
+	if (state->debug_host_context && debugAffected) {
 		MarkContextForRemoval(state->debug_host_context);
 		state->debug_host_context = nullptr;
+		state->debug_owner = nullptr;
+		state->debug_target = nullptr;
 		Update();
 		Rml::Debugger::Shutdown();
 	}
@@ -291,11 +298,13 @@ void RmlGui::SetDebugContext(Rml::Context* context)
 
 	if (state->debug_host_context == nullptr) {
 		state->debug_host_context = Rml::CreateContext(RML_DEBUG_HOST_CONTEXT_NAME, {0, 0});
+		state->debug_owner = Rml::SolLua::SolLuaPlugin::Active();
 
 		// TODO?: Make own Debugger UI that better suits our needs
 		Rml::Debugger::Initialise(state->debug_host_context);
 	}
 
+	state->debug_target = context;
 	Rml::Debugger::SetContext(context);
 	Rml::Debugger::SetVisible(context != nullptr);
 }

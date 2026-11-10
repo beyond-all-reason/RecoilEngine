@@ -2,13 +2,12 @@
 
 #include "LuaMenuController.h"
 
-#include <Rml/Backends/RmlUi_Backend.h>
-
 #include "Game/GlobalUnsynced.h"
 #include "Game/UI/InfoConsole.h"
 #include "Game/UI/MouseHandler.h"
 #include "Lua/LuaInputReceiver.h"
 #include "Lua/LuaMenu.h"
+#include "Rml/Backends/RmlUi_Backend.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/EventHandler.h"
 #include "System/FileSystem/VFSHandler.h"

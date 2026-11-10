@@ -28,8 +28,7 @@
  *
  */
 
-#ifndef RMLUI_BACKENDS_BACKEND_H
-#define RMLUI_BACKENDS_BACKEND_H
+#pragma once
 
 #include "Rml/Rml_MathTypes_Conversions.h"
 #include <RmlUi/Core.h>
@@ -84,5 +83,3 @@ namespace RmlGui
 	void PresentFrame();
 
 }  // namespace RmlGui
-
-#endif

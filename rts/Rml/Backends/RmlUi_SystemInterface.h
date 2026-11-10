@@ -28,8 +28,7 @@
  *
  */
 
-#ifndef RMLUI_SYSTEMINTERFACE_H
-#define RMLUI_SYSTEMINTERFACE_H
+#pragma once
 
 
 #include <RmlUi/Core/Input.h>
@@ -123,4 +122,3 @@ namespace RmlSDLRecoil
 	int GetKeyModifierState();
 
 }  // namespace RmlSDLRecoil
-#endif  // RMLUI_SYSTEMINTERFACE_H

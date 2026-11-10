@@ -69,6 +69,12 @@ namespace Rml::SolLua
 		/// With create == false, returns an empty string for a name this state has not created.
 		Rml::String InternalContextName(const Rml::String& luaName, bool create);
 
+		/// The name this state uses for a context whose name inside RmlUi is internalName.
+		Rml::String LuaContextName(const Rml::String& internalName) const;
+		/// True if the context was created by this plugin's Lua state.
+		bool OwnsContext(const Context* context) const;
+		const std::vector<Context*>& GetContexts() const { return luaContexts; }
+
 		lua_State* GetLuaState() const { return m_lua_state.lua_state(); }
 		sol::state_view GetStateView() const { return m_lua_state; }
 		const Rml::String& GetEnvironmentIdentifier() const { return m_lua_env_identifier; }
@@ -81,7 +87,7 @@ namespace Rml::SolLua
 
 		/// Picks the plugin for something being instanced by RmlUi (a document, an inline event
 		/// listener): the active one, else the one that owns the hint element's document, else the
-		/// most recently registered one.
+		/// only registered one. nullptr if it cannot be told.
 		static SolLuaPlugin* Resolve(Rml::Element* hint);
 
 		/// Marks a plugin as the one whose Lua state is calling into RmlUi for the lifetime of

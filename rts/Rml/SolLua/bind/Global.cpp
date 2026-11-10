@@ -288,13 +288,19 @@
 			  * @param context string | RmlUi.Context
 			  */
 			 "SetDebugContext", sol::overload(
-				 &functions::setDebugContext,
-				 [slp](const Rml::String& name) { functions::setDebugContextByName(slp->InternalContextName(name, false)); }
+				 [slp](Rml::Context* context) {
+					 SolLuaPlugin::ScopedActive active(slp);
+					 functions::setDebugContext(context);
+				 },
+				 [slp](const Rml::String& name) {
+					 SolLuaPlugin::ScopedActive active(slp);
+					 functions::setDebugContextByName(slp->InternalContextName(name, false));
+				 }
 			 ),
 
 			 // G
 			 /*** @field RmlUi.contexts RmlUi.Context[] */
-			 "contexts", sol::readonly_property(&getIndexedTable<Rml::Context, &functions::getContext, &functions::getMaxContexts>),
+			 "contexts", sol::readonly_property([slp]() { return sol::as_table(std::vector<Rml::Context*>(slp->GetContexts())); }),
 			 //--
 			 /*** @field RmlUi.version string RmlUi version */
 			 "version", sol::readonly_property(&Rml::GetVersion)

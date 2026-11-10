@@ -449,7 +449,11 @@ namespace Rml::SolLua
 			 * @function RmlUi.Element:Clone
 			 * @return RmlUi.ElementPtr
 			 */
-			"Clone", &Rml::Element::Clone,
+			"Clone", [](Rml::Element& self, sol::this_state s) {
+				// inline event listeners on the clone are created for the calling Lua state
+				SolLuaPlugin::ScopedActive active(s.L);
+				return self.Clone();
+			},
 			/***
 			 * @function RmlUi.Element:Closest
 			 * @return RmlUi.Element?
