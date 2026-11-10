@@ -61,3 +61,10 @@ Lua-5.1.4 source code modifications:
       the engine reads it (asserts are disabled for Lua-internal math calls)
   12.
       modify ldo.cpp: don't allow luaU_undump inside f_parser. (no bytecode)
+  13.
+      ported the Lua 5.4.3 table assignment rules:
+	  - inserting a nil value never builds a hash node nor inserts a nil key
+	  - __newindex searches for the key before being called
+	  
+	  Added ltable.cpp::luaH_setnil, which now is used by:
+      lvm.cpp::luaV_settable, lapi.cpp::lua_rawset and lua_rawseti
