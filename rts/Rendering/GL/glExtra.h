@@ -26,6 +26,9 @@ extern void glBallisticCircle(const CWeapon* weapon     , const SColor& color, u
 extern void glBallisticCircle(const WeaponDef* weaponDef, const SColor& color, uint32_t resolution, const float3& center, const float3& params);
 extern void glBallisticCircleLua(const CWeapon* weapon, const SColor& color, uint32_t resolution, const float3& center, const float3& params);
 extern void glBallisticCircleLua(const WeaponDef* weaponDef, const SColor& color, uint32_t resolution, const float3& center, const float3& params);
+// adds one circle as line pairs to the VA_TYPE_0 render buffer; glBallisticCircleLinesDraw draws all added circles at once
+extern void glBallisticCircleLinesAdd(const CWeapon* weapon, uint32_t resolution, const float3& center, const float3& params);
+extern void glBallisticCircleLinesDraw(const SColor& color);
 
 using DrawVolumeFunc = void (*)(const void* data);
 extern void glDrawVolume(DrawVolumeFunc drawFunc, const void* data);

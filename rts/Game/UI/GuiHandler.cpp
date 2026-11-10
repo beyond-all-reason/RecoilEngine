@@ -3976,6 +3976,11 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 		const bool   drawWeaponArcs = (!onMiniMap && gs->cheatEnabled && globalRendering->drawDebug);
 
 		if (playerAttackCmd || defaultAttackCmd) {
+			const SColor rangeColor = { cmdColors.rangeAttack };
+			const bool drawRanges = (rangeColor.a != 0);
+
+			RenderBuffer::GetTypedRenderBuffer<VA_TYPE_0>().AssertSubmission();
+
 			for (const int unitID: selectedUnitsHandler.selectedUnits) {
 				const CUnit* unit = unitHandler.GetUnit(unitID);
 
@@ -3994,14 +3999,19 @@ void CGuiHandler::DrawMapStuff(bool onMiniMap)
 				if (!gu->spectatingFullView && !unit->IsInLosForAllyTeam(gu->myAllyTeam))
 					continue;
 
-				glDisable(GL_DEPTH_TEST);
-				glBallisticCircle(unit->weapons[0], { cmdColors.rangeAttack }, 40, unit->pos, { unit->maxRange, 0.0f, mapInfo->map.gravity });
-				glEnable(GL_DEPTH_TEST);
+				if (drawRanges)
+					glBallisticCircleLinesAdd(unit->weapons[0], 40, unit->pos, { unit->maxRange, 0.0f, mapInfo->map.gravity });
 
 				if (!drawWeaponArcs)
 					continue;
 
 				DrawWeaponArc(unit);
+			}
+
+			if (drawRanges) {
+				glDisable(GL_DEPTH_TEST);
+				glBallisticCircleLinesDraw(rangeColor);
+				glEnable(GL_DEPTH_TEST);
 			}
 		}
 	}
