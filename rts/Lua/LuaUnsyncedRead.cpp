@@ -87,6 +87,7 @@
 
 #include <cctype>
 #include <algorithm>
+#include <cstring>
 
 #include <SDL_keyboard.h>
 #include <SDL_clipboard.h>
@@ -730,45 +731,59 @@ int LuaUnsyncedRead::GetVidMemUsage(lua_State* L)
 }
 
 
+static void PushTimerTable(lua_State* L)
+{
+	static char timerTableKey;
+	lua_pushlightuserdata(L, &timerTableKey);
+	lua_rawget(L, LUA_REGISTRYINDEX);
+	if (lua_istable(L, -1))
+		return;
+
+	lua_pop(L, 1);
+	lua_newtable(L);
+	lua_newtable(L);
+	LuaPushNamedString(L, "__mode", "k");
+	lua_setmetatable(L, -2);
+	lua_pushlightuserdata(L, &timerTableKey);
+	lua_pushvalue(L, -2);
+	lua_rawset(L, LUA_REGISTRYINDEX);
+}
+
 static void PushTimer(lua_State* L, const spring_time& time, bool microseconds)
 {
-	// use time since Spring's epoch in MILLIseconds because that
-	// is more likely to fit in a 32-bit pointer (on any platforms
-	// where sizeof(void*) == 4) than time since ::chrono's epoch
-	// (which can be arbitrarily large) and can be represented by
-	// single-precision floats better
-	//
-	// 4e9millis == 4e6s == 46.3 days until overflow
-	ptrdiff_t p = 0;
+	const std::uint64_t timestamp = microseconds ? time.toMicroSecs<std::uint64_t>() : time.toMilliSecs<std::uint64_t>();
 
-	if (microseconds) {
-		const std::uint64_t micros = time.toMicroSecs<std::uint64_t>();
+	PushTimerTable(L);
+	lua_newuserdata(L, 0);
+	if (luaL_newmetatable(L, "SpringTimer"))
+		LuaPushNamedString(L, "__metatable", "protected metatable");
+	lua_setmetatable(L, -2);
+	lua_pushvalue(L, -1);
+	lua_pushlstring(L, reinterpret_cast<const char*>(&timestamp), sizeof(timestamp));
+	lua_rawset(L, -4);
+	lua_remove(L, -2);
+}
 
-		if (sizeof(void*) == 8) {
-			p = spring::SafeCast<std::uint64_t>(micros);
-		}
-		else {
-			p = spring::SafeCast<std::uint32_t>(micros);
-		}
-	}
-	else {
-		const std::uint64_t millis = time.toMilliSecs<std::uint64_t>();
+static std::uint64_t ReadTimer(lua_State* L, int index)
+{
+	luaL_checkudata(L, index, "SpringTimer");
+	PushTimerTable(L);
+	lua_pushvalue(L, index);
+	lua_rawget(L, -2);
+	if (lua_type(L, -1) != LUA_TSTRING || lua_objlen(L, -1) != sizeof(std::uint64_t))
+		luaL_argerror(L, index, "expected a timer returned by Spring");
 
-		if (sizeof(void*) == 8) {
-			p = spring::SafeCast<std::uint64_t>(millis);
-		}
-		else {
-			p = spring::SafeCast<std::uint32_t>(millis);
-		}
-	}
-
-	lua_pushlightuserdata(L, reinterpret_cast<void*>(p));
+	const char* data = lua_tostring(L, -1);
+	std::uint64_t timestamp;
+	std::memcpy(&timestamp, data, sizeof(timestamp));
+	lua_pop(L, 2);
+	return timestamp;
 }
 
 /*** Get a timer with millisecond resolution
  *
  * @function Spring.GetTimer
- * @return integer
+ * @return userdata timer Opaque millisecond timer handle.
  */
 int LuaUnsyncedRead::GetTimer(lua_State* L)
 {
@@ -780,7 +795,7 @@ int LuaUnsyncedRead::GetTimer(lua_State* L)
 /*** Get a timer with microsecond resolution
  *
  * @function Spring.GetTimerMicros
- * @return integer
+ * @return userdata timer Opaque microsecond timer handle.
  */
 int LuaUnsyncedRead::GetTimerMicros(lua_State* L)
 {
@@ -796,7 +811,7 @@ int LuaUnsyncedRead::GetTimerMicros(lua_State* L)
  * This should give better results for camera interpolations
  *
  * @param lastFrameTime boolean? (Default: `false`) whether to use last frame time instead of last frame start
- * @return integer
+ * @return userdata timer Opaque millisecond timer handle.
  */
 int LuaUnsyncedRead::GetFrameTimer(lua_State* L)
 {
@@ -812,51 +827,23 @@ int LuaUnsyncedRead::GetFrameTimer(lua_State* L)
 /***
  *
  * @function Spring.DiffTimers
- * @param endTimer integer
- * @param startTimer integer
+ * @param endTimer userdata Timer handle returned by Spring.
+ * @param startTimer userdata Timer handle returned by Spring, no later than endTimer.
  * @param returnMs boolean? (Default: `false`) whether to return `timeAmount` in milliseconds as opposed to seconds
  * @param fromMicroSecs boolean? (Default: `false`) whether timers are in microseconds instead of milliseconds
  * @return number timeAmount
  */
 int LuaUnsyncedRead::DiffTimers(lua_State* L)
 {
-	if (!lua_islightuserdata(L, 1) || !lua_islightuserdata(L, 2)) {
-		luaL_error(L, "Incorrect arguments to DiffTimers()");
-	}
+	const bool microseconds = luaL_optboolean(L, 4, false);
+	const bool returnMs = luaL_optboolean(L, 3, false);
+	const std::uint64_t endTimer = ReadTimer(L, 1);
+	const std::uint64_t startTimer = ReadTimer(L, 2);
+	if (endTimer < startTimer)
+		return luaL_error(L, "DiffTimers() endTimer must not precede startTimer");
 
-	const void* p1 = lua_touserdata(L, 1);
-	const void* p2 = lua_touserdata(L, 2);
-
-	const std::uint64_t t1 = (sizeof(void*) == 8) ?
-		*reinterpret_cast<std::uint64_t*>(&p1) :
-		*reinterpret_cast<std::uint32_t*>(&p1);
-	const std::uint64_t t2 = (sizeof(void*) == 8) ?
-		*reinterpret_cast<std::uint64_t*>(&p2) :
-		*reinterpret_cast<std::uint32_t*>(&p2);
-
-	// t1 is supposed to be the most recent time-point
-	assert(t1 >= t2);
-
-	if (luaL_optboolean(L, 4, false)) {
-		const spring_time dt = spring_time::fromMicroSecs(t1 - t2);
-
-		if (luaL_optboolean(L, 3, false)) {
-			lua_pushnumber(L, dt.toMilliSecsf());
-		}
-		else {
-			lua_pushnumber(L, dt.toSecsf());
-		}
-	}
-	else {
-		const spring_time dt = spring_time::fromMilliSecs(t1 - t2);
-
-		if (luaL_optboolean(L, 3, false)) {
-			lua_pushnumber(L, dt.toMilliSecsf());
-		}
-		else {
-			lua_pushnumber(L, dt.toSecsf());
-		}
-	}
+	const double scale = microseconds ? (returnMs ? 1e-3 : 1e-6) : (returnMs ? 1.0 : 1e-3);
+	lua_pushnumber(L, static_cast<lua_Number>(endTimer - startTimer) * scale);
 	return 1;
 }
 
