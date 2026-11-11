@@ -767,9 +767,9 @@ void CLuaHandle::GameStart()
 }
 
 
-/*** Called once a game loaded from a `.ssf` save is ready, paused at the saved frame.
+/*** Called once when a game finishes loading from a native save (`.ssf`), paused at the saved frame.
  *
- * Takes the place of `GameStart`; not called for Lua (`.slsf`) saves, see `Load`.
+ * Takes the place of `GameStart`. Not called for old style Lua saves, which use `GameStart` plus `Load`.
  *
  * @function Callins:GameLoaded
  */

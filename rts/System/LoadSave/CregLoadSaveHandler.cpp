@@ -426,6 +426,17 @@ void CCregLoadSaveHandler::LoadAIData()
 	// cleanup
 	iss.str("");
 
+	LEAVE_SYNCED_CODE();
+#else //USING_CREG
+	LOG_L(L_ERROR, "Load failed: creg is disabled");
+#endif //USING_CREG
+}
+
+void CCregLoadSaveHandler::PostLoad()
+{
+#ifdef USING_CREG
+	ENTER_SYNCED_CODE();
+
 	// keep the pause set in CGameServer::PostLoad
 	gs->paused = true;
 	game->paused = true;
@@ -441,7 +452,5 @@ void CCregLoadSaveHandler::LoadAIData()
 	}
 
 	LEAVE_SYNCED_CODE();
-#else //USING_CREG
-	LOG_L(L_ERROR, "Load failed: creg is disabled");
 #endif //USING_CREG
 }
