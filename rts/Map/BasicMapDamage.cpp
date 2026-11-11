@@ -14,6 +14,7 @@
 #include "Sim/Path/IPathManager.h"
 #include "Sim/Features/FeatureHandler.h"
 #include "System/TimeProfiler.h"
+#include "System/UnorderedSet.hpp"
 
 #include "System/Misc/TracyDefs.h"
 
@@ -222,7 +223,20 @@ void CBasicMapDamage::Explosion(const float3& pos, float strength, float radius,
 			eb.tz1 = unit->mapPos.y;
 			eb.tz2 = unit->mapPos.y + unit->zsize;
 		}
+
+		// The foundation is a rectangle of heightmap vertices, not the movement
+		// yardmap. Open factory exits must not receive a crater displacement in
+		// addition to the uniform foundation displacement below.
+		for (int z = std::max(e.y1, unit->mapPos.y); z <= std::min(e.y2, unit->mapPos.y + unit->zsize); ++z) {
+			for (int x = std::max(e.x1, unit->mapPos.x); x <= std::min(e.x2, unit->mapPos.x + unit->xsize); ++x) {
+				const unsigned int idx = e.idx + (z - e.y1) * (e.x2 - e.x1 + 1) + (x - e.x1);
+				explosionSquaresPool[idx % explosionSquaresPool.size()] = 0.0f;
+			}
+		}
 	}
+
+	// Give shared edge vertices a stable owner without coupling building heights.
+	std::sort(e.buildings.begin(), e.buildings.end(), [](const ExploBuilding& a, const ExploBuilding& b) { return a.id < b.id; });
 }
 
 void CBasicMapDamage::RecalcArea(int x1, int x2, int y1, int y2)
@@ -273,16 +287,19 @@ void CBasicMapDamage::Update()
 		}
 
 
+		spring::unordered_set<int> movedVertices;
 		for (const ExploBuilding& b: e.buildings) {
 			CUnit* unit = unitHandler.GetUnit(b.id);
 
-			if (unit == nullptr)
+			if (unit == nullptr || b.dif == 0.0f)
 				continue;
 
 			// only change ground level if building is still here
-			for (int z = b.tz1; z < b.tz2; z++) {
-				for (int x = b.tx1; x < b.tx2; x++) {
-					readMap->AddHeight(z * mapDims.mapxp1 + x, b.dif);
+			for (int z = b.tz1; z <= b.tz2; z++) {
+				for (int x = b.tx1; x <= b.tx2; x++) {
+					const int vertex = z * mapDims.mapxp1 + x;
+					if (movedVertices.insert(vertex).second)
+						readMap->AddHeight(vertex, b.dif);
 				}
 			}
 
@@ -292,7 +309,13 @@ void CBasicMapDamage::Update()
 		if (e.ttl != 0)
 			continue;
 
-		RecalcArea(e.x1 - 1, e.x2 + 1, e.y1 - 1, e.y2 + 1);
+		// A foundation touched by the explosion can extend beyond the crater.
+		int x1 = e.x1, x2 = e.x2, z1 = e.y1, z2 = e.y2;
+		for (const ExploBuilding& b: e.buildings) {
+			x1 = std::min(x1, b.tx1); x2 = std::max(x2, b.tx2);
+			z1 = std::min(z1, b.tz1); z2 = std::max(z2, b.tz2);
+		}
+		RecalcArea(x1 - 1, x2 + 1, z1 - 1, z2 + 1);
 	}
 
 
