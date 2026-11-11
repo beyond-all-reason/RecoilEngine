@@ -1296,11 +1296,21 @@ int CLuaUnitScript::GetUnitValue(lua_State* L, CUnitScript* script, int arg)
 
 /*** Get a COB/script value for a unit (synced gadget API).
  *
- * @function UnitScriptTable.GetUnitCOBValue
+ * @function Spring.GetUnitCOBValue
  * @param unitID UnitID
  * @param val integer COB value ID (use COB constants)
- * @param ... number optional extra args for certain COB values
+ * @param ... number|integer[] optional extra args for certain COB values; a table `{x, z}` is packed into one value
  * @return integer value
+ */
+/*** Get a COB/script value for a unit (synced gadget API).
+ *
+ * @function Spring.GetUnitCOBValue
+ * @param unitID UnitID
+ * @param splitData boolean When `true`, return the packed result as two values `x, z`.
+ * @param val integer COB value ID (use COB constants)
+ * @param ... number|integer[] optional extra args for certain COB values; a table `{x, z}` is packed into one value
+ * @return integer valueOrX
+ * @return integer? z
  */
 int CLuaUnitScript::GetUnitCOBValue(lua_State* L)
 {
@@ -1318,7 +1328,17 @@ int CLuaUnitScript::GetUnitCOBValue(lua_State* L)
  *
  * @function UnitScriptTable.GetUnitValue
  * @param val integer COB value ID (use COB constants)
+ * @param ... number|integer[] optional extra args for certain COB values; a table `{x, z}` is packed into one value
  * @return integer value
+ */
+/*** Get a COB/script value. Must be called from within a UnitScript callin.
+ *
+ * @function UnitScriptTable.GetUnitValue
+ * @param splitData boolean When `true`, return the packed result as two values `x, z`.
+ * @param val integer COB value ID (use COB constants)
+ * @param ... number|integer[] optional extra args for certain COB values; a table `{x, z}` is packed into one value
+ * @return integer valueOrX
+ * @return integer? z
  */
 int CLuaUnitScript::GetUnitValue(lua_State* L)
 {
@@ -1353,10 +1373,19 @@ int CLuaUnitScript::SetUnitValue(lua_State* L, CUnitScript* script, int arg)
 
 /*** Set a COB/script value for a unit (synced gadget API).
  *
- * @function UnitScriptTable.SetUnitCOBValue
+ * @function Spring.SetUnitCOBValue
  * @param unitID UnitID
  * @param val integer COB value ID (use COB constants)
  * @param param integer|boolean value to set
+ * @return nil
+ */
+/*** Set a COB/script value for a unit (synced gadget API).
+ *
+ * @function Spring.SetUnitCOBValue
+ * @param unitID UnitID
+ * @param val integer COB value ID (use COB constants)
+ * @param x integer packed with `z` into one value
+ * @param z integer
  * @return nil
  */
 int CLuaUnitScript::SetUnitCOBValue(lua_State* L)
@@ -1376,6 +1405,14 @@ int CLuaUnitScript::SetUnitCOBValue(lua_State* L)
  * @function UnitScriptTable.SetUnitValue
  * @param val integer COB value ID (use COB constants)
  * @param param integer|boolean value to set
+ * @return nil
+ */
+/*** Set a COB/script value. Must be called from within a UnitScript callin.
+ *
+ * @function UnitScriptTable.SetUnitValue
+ * @param val integer COB value ID (use COB constants)
+ * @param x integer packed with `z` into one value
+ * @param z integer
  * @return nil
  */
 int CLuaUnitScript::SetUnitValue(lua_State* L)
@@ -1527,8 +1564,8 @@ int CLuaUnitScript::ShowFlare(lua_State* L)
  * @function UnitScriptTable.Spin
  * @param piece integer 1-indexed piece number
  * @param axis integer axis (1=x, 2=y, 3=z)
- * @param speed number angular speed in radians/frame
- * @param accel number? angular acceleration (Default: `0`, instant)
+ * @param speed number angular speed in radians per second
+ * @param accel number? added to the speed each frame until it reaches `speed` (Default: `0`, instant)
  * @return nil
  */
 int CLuaUnitScript::Spin(lua_State* L)
@@ -1553,7 +1590,7 @@ int CLuaUnitScript::Spin(lua_State* L)
  * @function UnitScriptTable.StopSpin
  * @param piece integer 1-indexed piece number
  * @param axis integer axis (1=x, 2=y, 3=z)
- * @param decel number? angular deceleration (Default: `0`, instant)
+ * @param decel number? taken from the speed each frame until it reaches zero (Default: `0`, instant)
  * @return nil
  */
 int CLuaUnitScript::StopSpin(lua_State* L)
@@ -1814,12 +1851,14 @@ int CLuaUnitScript::WaitForAnimation(lua_State* L, const char* caller, AnimType 
 }
 
 
-/*** Check whether the calling thread needs to wait for a turn to finish.
+/*** Returns `true` when the piece is turning on this axis, like `IsInTurn`. When it returns `true`,
+ * the engine also calls the `TurnFinished` callin of the unit script when the turn ends.
+ * It does not wait; the calling thread decides whether to wait for that callin.
  *
  * @function UnitScriptTable.WaitForTurn
  * @param piece integer 1-indexed piece number
  * @param axis integer axis (1=x, 2=y, 3=z)
- * @return boolean needsWait
+ * @return boolean isInAnimation
  */
 int CLuaUnitScript::WaitForTurn(lua_State* L)
 {
@@ -1828,12 +1867,14 @@ int CLuaUnitScript::WaitForTurn(lua_State* L)
 }
 
 
-/*** Check whether the calling thread needs to wait for a move to finish.
+/*** Returns `true` when the piece is moving on this axis, like `IsInMove`. When it returns `true`,
+ * the engine also calls the `MoveFinished` callin of the unit script when the move ends.
+ * It does not wait; the calling thread decides whether to wait for that callin.
  *
  * @function UnitScriptTable.WaitForMove
  * @param piece integer 1-indexed piece number
  * @param axis integer axis (1=x, 2=y, 3=z)
- * @return boolean needsWait
+ * @return boolean isInAnimation
  */
 int CLuaUnitScript::WaitForMove(lua_State* L)
 {
@@ -1841,11 +1882,13 @@ int CLuaUnitScript::WaitForMove(lua_State* L)
 	return WaitForAnimation(L, __func__, AMove);
 }
 
-/*** Check whether the calling thread needs to wait for a scale to finish.
+/*** Returns `true` when the piece is scaling, like `IsInScale`. When it returns `true`,
+ * the engine also calls the `ScaleFinished` callin of the unit script when the scale ends.
+ * It does not wait; the calling thread decides whether to wait for that callin.
  *
  * @function UnitScriptTable.WaitForScale
  * @param piece integer 1-indexed piece number
- * @return boolean needsWait
+ * @return boolean isInAnimation
  */
 int CLuaUnitScript::WaitForScale(lua_State* L)
 {
@@ -1944,11 +1987,11 @@ int CLuaUnitScript::GetPieceScale(lua_State* L)
 }
 
 
-/*** Get the world-space emit position and direction of a piece.
+/*** Get the emit position and direction of a piece, in unit space (not world space).
  *
  * @function UnitScriptTable.GetPiecePosDir
  * @param piece integer 1-indexed piece number
- * @return number posX
+ * @return number? posX
  * @return number posY
  * @return number posZ
  * @return number dirX
