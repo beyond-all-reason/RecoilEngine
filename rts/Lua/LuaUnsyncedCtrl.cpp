@@ -803,16 +803,37 @@ int LuaUnsyncedCtrl::LoadSoundDef(lua_State* L)
  * | 3 # User interface
  */
 
-/*** @function Spring.PlaySoundFile
+/*** Plays a sound without a position.
+ *
+ * @function Spring.PlaySoundFile
  * @param soundfile string
- * @param volume number? (Default: 1.0) optional; all following arguments are optional
- * @param posx number? world position X (use with `posy` and `posz`, or omit all three)
- * @param posy number?
- * @param posz number?
- * @param speedx number? velocity X (use with `speedy` and `speedz` after position, or omit all three)
- * @param speedy number?
- * @param speedz number?
- * @param channel SoundChannel? (Default: `0|"general"`) optional; parsed from the last argument index after position and speed triples
+ * @param volume number? (Default: 1.0)
+ * @param channel SoundChannel? (Default: `0|"general"`)
+ * @return boolean playSound
+ */
+/*** Plays a sound at a world position.
+ *
+ * @function Spring.PlaySoundFile
+ * @param soundfile string
+ * @param volume number? (Default: 1.0)
+ * @param posx number
+ * @param posy number
+ * @param posz number
+ * @param channel SoundChannel? (Default: `0|"general"`)
+ * @return boolean playSound
+ */
+/*** Plays a sound at a world position, with a velocity.
+ *
+ * @function Spring.PlaySoundFile
+ * @param soundfile string
+ * @param volume number? (Default: 1.0)
+ * @param posx number
+ * @param posy number
+ * @param posz number
+ * @param speedx number
+ * @param speedy number
+ * @param speedz number
+ * @param channel SoundChannel? (Default: `0|"general"`)
  * @return boolean playSound
  */
 int LuaUnsyncedCtrl::PlaySoundFile(lua_State* L)
@@ -4630,7 +4651,6 @@ int LuaUnsyncedCtrl::SetVideoCapturingTimeOffset(lua_State* L)
  * @field texture string? file
  * @field foamTexture string? file
  * @field normalTexture string? file
- * @field damage number?
  * @field repeatX number?
  * @field repeatY number?
  * @field surfaceAlpha number?
@@ -5519,7 +5539,7 @@ int LuaUnsyncedCtrl::Start(lua_State* L)
  * Note: *.ico images are not supported.
  *
  * @param iconFileName string
- * @param autoFree boolean?
+ * @param forceResolution boolean? (Default: `false`) When `true`, also accept an icon that is not 32x32 pixels.
  * @return nil
  */
 int LuaUnsyncedCtrl::SetWMIcon(lua_State* L)

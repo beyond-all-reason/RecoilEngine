@@ -5174,7 +5174,7 @@ int LuaSyncedRead::GetUnitMaxRange(lua_State* L)
  *
  * Available states to poll:
  *   "reloadFrame" (frame on which the weapon will be ready to fire),
- *   "reloadSpeed" (reload time in seconds),
+ *   "reloadTime" (reload time in seconds),
  *   "range" (in elmos),
  *   "autoTargetRangeBoost" (predictive aiming range buffer, in elmos),
  *   "projectileSpeed" (in elmos/frame),
@@ -5182,6 +5182,7 @@ int LuaSyncedRead::GetUnitMaxRange(lua_State* L)
  *   "reaimTime" (frames between AimWeapon calls),
  *   "burst" (shots in a burst),
  *   "burstRate" (delay between shots in a burst, in seconds),
+ *   "windup" (delay before the first shot, in seconds),
  *   "projectiles" (projectiles per shot),
  *   "salvoLeft" (shots remaining in ongoing burst),
  *   "nextSalvo" (simframe of the next shot in an ongoing burst),
@@ -5197,8 +5198,22 @@ int LuaSyncedRead::GetUnitMaxRange(lua_State* L)
  *
  * @param unitID UnitID
  * @param weaponNum integer
- * @param stateName string?
- * @return number stateValue
+ * @param stateName string
+ * @return (number|number[])? stateValue `nil` for an unknown state name.
+ */
+/*** Check the state of a unit's weapon
+ *
+ * @function Spring.GetUnitWeaponState
+ *
+ * Without `stateName`, returns five values.
+ *
+ * @param unitID UnitID
+ * @param weaponNum integer
+ * @return boolean? angleGood
+ * @return boolean loaded `true` when the reload frame has passed.
+ * @return integer reloadFrame
+ * @return integer salvoLeft
+ * @return integer numStockpiled
  */
 int LuaSyncedRead::GetUnitWeaponState(lua_State* L)
 {
@@ -5470,7 +5485,7 @@ int LuaSyncedRead::GetUnitWeaponVectors(lua_State* L)
  * @param unitID UnitID
  * @param weaponNum integer
  * @param targetID UnitID
- * @return boolean canTarget
+ * @return boolean? canTarget
  */
 /***
  *
@@ -5480,7 +5495,7 @@ int LuaSyncedRead::GetUnitWeaponVectors(lua_State* L)
  * @param posX number
  * @param posY number
  * @param posZ number
- * @return boolean canTarget
+ * @return boolean? canTarget
  */
 int LuaSyncedRead::GetUnitWeaponTryTarget(lua_State* L)
 {
@@ -5528,7 +5543,7 @@ int LuaSyncedRead::GetUnitWeaponTryTarget(lua_State* L)
  * @param unitID UnitID
  * @param weaponID integer weapon number (1-based Lua index)
  * @param targetUnitID UnitID enemy unit to test (when fewer than five arguments)
- * @return boolean validTarget
+ * @return boolean? validTarget
  */
 /***
  *
@@ -5538,7 +5553,7 @@ int LuaSyncedRead::GetUnitWeaponTryTarget(lua_State* L)
  * @param targetX number world X to test (with `targetY`, `targetZ`; used when at least five arguments are passed)
  * @param targetY number
  * @param targetZ number
- * @return boolean validTarget
+ * @return boolean? validTarget
  */
 int LuaSyncedRead::GetUnitWeaponTestTarget(lua_State* L)
 {
@@ -5579,7 +5594,7 @@ int LuaSyncedRead::GetUnitWeaponTestTarget(lua_State* L)
  * @param unitID UnitID
  * @param weaponNum integer
  * @param targetID UnitID
- * @return boolean inRange
+ * @return boolean? inRange
  */
 /***
  *
@@ -5589,7 +5604,7 @@ int LuaSyncedRead::GetUnitWeaponTestTarget(lua_State* L)
  * @param posX number
  * @param posY number
  * @param posZ number
- * @return boolean inRange
+ * @return boolean? inRange
  */
 int LuaSyncedRead::GetUnitWeaponTestRange(lua_State* L)
 {
@@ -5630,7 +5645,7 @@ int LuaSyncedRead::GetUnitWeaponTestRange(lua_State* L)
  * @param unitID UnitID
  * @param weaponNum integer
  * @param targetID UnitID
- * @return boolean haveFreeLineOfFire
+ * @return boolean? haveFreeLineOfFire
  */
 /***
  *
@@ -5640,7 +5655,7 @@ int LuaSyncedRead::GetUnitWeaponTestRange(lua_State* L)
  * @param srcPosX number
  * @param srcPosY number
  * @param srcPosZ number
- * @return boolean haveFreeLineOfFire
+ * @return boolean? haveFreeLineOfFire
  */
 /***
  *
@@ -5651,7 +5666,7 @@ int LuaSyncedRead::GetUnitWeaponTestRange(lua_State* L)
  * @param srcPosY number
  * @param srcPosZ number
  * @param targetID UnitID
- * @return boolean haveFreeLineOfFire
+ * @return boolean? haveFreeLineOfFire
  */
 /***
  *
@@ -5664,7 +5679,7 @@ int LuaSyncedRead::GetUnitWeaponTestRange(lua_State* L)
  * @param tgtPosX number
  * @param tgtPosY number
  * @param tgtPosZ number
- * @return boolean haveFreeLineOfFire
+ * @return boolean? haveFreeLineOfFire
  */
 int LuaSyncedRead::GetUnitWeaponHaveFreeLineOfFire(lua_State* L)
 {
@@ -5735,7 +5750,7 @@ int LuaSyncedRead::GetUnitWeaponHaveFreeLineOfFire(lua_State* L)
  * @param ignoreAngleGood boolean?
  * @param ignoreTargetType boolean?
  * @param ignoreRequestedDir boolean?
- * @return boolean canFire
+ * @return boolean? canFire
  */
 int LuaSyncedRead::GetUnitWeaponCanFire(lua_State* L)
 {
@@ -6008,7 +6023,7 @@ int LuaSyncedRead::GetUnitSeparation(lua_State* L)
  * @param unitID UnitID
  * @param featureID FeatureID
  * @param flat boolean? (Default: `false`) if true, XZ (2D) distance; otherwise 3D distance
- * @return number distance
+ * @return number? distance
  */
 int LuaSyncedRead::GetUnitFeatureSeparation(lua_State* L)
 {
@@ -7988,7 +8003,7 @@ static void ParseMapCoords(lua_State* L, const char* caller,
  * @param z number world z coordinate (or zMin when using 4-arg form)
  * @param x2 number? world xMax (4-arg rectangle form)
  * @param z2 number? world zMax (4-arg rectangle form)
- * @return string? objectType `"feature"` or `"unit"`
+ * @return ("feature"|"unit"|false)? objectType `"feature"` or `"unit"`, `false` when nothing visible blocks the area, `nil` when the caller cannot read any ally team.
  * @return ObjectID? objectID the feature or unit ID
  */
 int LuaSyncedRead::GetGroundBlocked(lua_State* L)
