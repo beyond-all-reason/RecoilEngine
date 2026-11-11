@@ -1,0 +1,6 @@
+---@meta
+
+---The engine in the unsynced handle: what both offer and what it alone registers.
+---@class Recoil.Unsynced : Recoil.Shared
+local Spring = {}
+

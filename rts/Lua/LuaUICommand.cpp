@@ -1,5 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+/*** @env synced, unsynced */
+
 
 #include "LuaUICommand.h"
 
@@ -29,6 +31,21 @@ bool LuaUICommand::PushEntries(lua_State* L)
 /******************************************************************************/
 /******************************************************************************/
 
+/***
+ * @class UICommand
+ * @x_helper
+ * @field command string
+ * @field description string
+ * @field synced boolean
+ * @field cheat boolean Whether cheats must be enabled to run it.
+ */
+
+/***
+ * The console commands the engine registers, synced and unsynced: what `/luaui reload` and the like run.
+ *
+ * @function Spring.GetUICommands
+ * @return UICommand[]
+ */
 int LuaUICommand::GetUICommands(lua_State* L)
 {
 	const auto& syncedExecutors = syncedGameCommands->GetSortedActionExecutors();
