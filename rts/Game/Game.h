@@ -171,6 +171,8 @@ public:
 	spring_time skipLastDrawTime;
 
 	float updateDeltaSeconds = 0.0f;
+	/// updateDeltaSeconds as shown on screen, see CPresentedFrameClock
+	float presentedUpdateDeltaSeconds = 0.0f;
 	/// Time in seconds, stops at game end
 	float totalGameTime = 0.0f;
 

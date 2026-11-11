@@ -67,8 +67,10 @@ activePage = 0
 forceLayout = true
 
 
-function Update(dt)
-  dt = dt or Spring.GetLastUpdateSeconds()
+function Update(dt, presentedDt)
+  if (dt == nil) then
+    dt, presentedDt = Spring.GetLastUpdateSeconds()
+  end
 
   local currentPage = Spring.GetActivePage()
   if (forceLayout or (currentPage ~= activePage)) then
@@ -79,7 +81,7 @@ function Update(dt)
 
   fontHandler.Update(dt)
 
-  widgetHandler:Update(dt)
+  widgetHandler:Update(dt, presentedDt)
 
   return
 end

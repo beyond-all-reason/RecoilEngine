@@ -122,7 +122,6 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetFrameTimeOffset);
 	REGISTER_LUA_CFUNC(GetGameSecondsInterpolated);
 	REGISTER_LUA_CFUNC(GetLastUpdateSeconds);
-	REGISTER_LUA_CFUNC(GetPresentedUpdateSeconds);
 	REGISTER_LUA_CFUNC(GetVideoCapturingMode);
 	REGISTER_LUA_CFUNC(GetPrevFrameSyncChecksum);
 
@@ -861,7 +860,7 @@ int LuaUnsyncedRead::GetDisplayTiming(lua_State* L)
 {
 	lua_pushnumber(L, globalRendering->displayPeriod * 0.001f);
 	lua_pushnumber(L, verticalSync->GetEffectiveInterval());
-	lua_pushboolean(L, globalRendering->fastSyncDetected);
+	lua_pushboolean(L, globalRendering->presentedClock.IsFastSync());
 	return 3;
 }
 
@@ -1280,26 +1279,13 @@ int LuaUnsyncedRead::GetGameSecondsInterpolated(lua_State* L)
  * @function Spring.GetLastUpdateSeconds
  *
  * @return number? lastUpdateSeconds
+ * @return number? presentedUpdateSeconds the same time as shown on screen, see `Callins:Update`
  */
 int LuaUnsyncedRead::GetLastUpdateSeconds(lua_State* L)
 {
 	lua_pushnumber(L, game->updateDeltaSeconds);
-	return 1;
-}
-
-/*** Get the seconds this draw frame advances by on screen
- *
- * The camera moves by it under `CamFrameTimeCorrection` 2. With vsync on, whole display periods;
- * vsync off, under fast sync or for frames of 4 periods or more, the raw frame time.
- * The `UpdateTimeOffset` call-in can replace it.
- *
- * @function Spring.GetPresentedUpdateSeconds
- * @return number seconds
- */
-int LuaUnsyncedRead::GetPresentedUpdateSeconds(lua_State* L)
-{
-	lua_pushnumber(L, globalRendering->presentedFrameTime * 0.001f);
-	return 1;
+	lua_pushnumber(L, game->presentedUpdateDeltaSeconds);
+	return 2;
 }
 
 

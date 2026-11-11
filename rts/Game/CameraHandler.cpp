@@ -259,7 +259,7 @@ void CCameraHandler::ConfigNotify(const std::string& key, const std::string& val
 		camTransState.halflife = configHandler->GetFloat("CamSpringHalflife");
 
 		camTransState.lastTime = spring_gettime().toMilliSecsf();
-		camTransState.lastPresentedTime = globalRendering->presentedTime;
+		camTransState.lastPresentedTime = globalRendering->presentedClock.GetTime();
 	}
 }
 
@@ -356,7 +356,7 @@ void CameraTransitionExpDecay(const CCameraController* currCam, CCameraHandler::
 		camTransState.timeStart = globalRendering->lastSwapBuffersEnd.toMilliSecsf() + 1000.0f / std::fmax(globalRendering->FPS, 1.0f);
 	}
 	if (camera->useInterpolate == 2) {
-		camTransState.timeStart = float(globalRendering->presentedTime);
+		camTransState.timeStart = float(globalRendering->presentedClock.GetTime());
 	}
 	camTransState.timeEnd   = camTransState.timeStart + nsecs * 1000.0f;
 
@@ -424,7 +424,7 @@ void UpdateTransitionExpDecay(const CCameraController* currCam, CCameraHandler::
 		transTime = globalRendering->lastSwapBuffersEnd.toMilliSecsf() + 1000.0f / drawFPS;
 	}
 	if (camera->useInterpolate == 2)
-		transTime = float(globalRendering->presentedTime);
+		transTime = float(globalRendering->presentedClock.GetTime());
 
 	float timeRatio = (camTransState.timeEnd - camTransState.timeStart != 0.0f) ?
 		std::fmax(0.0f, (camTransState.timeEnd - transTime) / (camTransState.timeEnd - camTransState.timeStart)) :
@@ -471,10 +471,10 @@ static float TransitionDeltaTime(CCameraHandler::CamTransitionState& camTransSta
 {
 	const float currTime = spring_gettime().toMilliSecsf();
 	const float dt = currTime - camTransState.lastTime;
-	const float presentedDt = float(globalRendering->presentedTime - camTransState.lastPresentedTime);
+	const float presentedDt = float(globalRendering->presentedClock.GetTime() - camTransState.lastPresentedTime);
 
 	camTransState.lastTime = currTime;
-	camTransState.lastPresentedTime = globalRendering->presentedTime;
+	camTransState.lastPresentedTime = globalRendering->presentedClock.GetTime();
 
 	if (camera->useInterpolate == 2)
 		return presentedDt;

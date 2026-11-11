@@ -2621,20 +2621,25 @@ void CLuaHandle::UnsyncedHeightMapUpdate(const SRectangle& rect)
  *
  * @function Callins:Update
  * @param dt number the time since the last update.
+ * @param presentedDt number `dt` as shown on screen: with vsync on, whole display periods, the difference paid back
+ * over half a second. Equals `dt` with vsync off, an unknown refresh rate, fast sync, frame times steadily between
+ * whole periods, and while skipping. The camera moves by it under `CamFrameTimeCorrection` 2.
  */
 void CLuaHandle::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	LUA_CALL_IN_CHECK(L);
-	luaL_checkstack(L, 2, __func__);
+	luaL_checkstack(L, 3, __func__);
 	static const LuaHashString cmdStr(__func__);
 	if (!cmdStr.GetGlobalFunc(L))
 		return;
 
-	if (game) // null in LuaMenu
+	if (game) { // null in LuaMenu
 		lua_pushnumber(L, game->updateDeltaSeconds);
+		lua_pushnumber(L, game->presentedUpdateDeltaSeconds);
+	}
 
-	RunCallIn(L, cmdStr, game ? 1 : 0, 0);
+	RunCallIn(L, cmdStr, game ? 2 : 0, 0);
 }
 
 
@@ -2644,9 +2649,9 @@ void CLuaHandle::Update()
  * @function Callins:UpdateTimeOffset
  * @param timeOffset number the fraction of a sim frame units are drawn ahead of the last one, see `Spring.GetFrameTimeOffset`
  * @param drawSimRatio number sim frames per draw frame, averaged (about 0.5 at 60 fps and 30 sim frames a second)
- * @param presentedUpdateSeconds number see `Spring.GetPresentedUpdateSeconds`
+ * @param presentedUpdateSeconds number the presented frame time the engine computed, see `Callins:Update`
  * @return number? timeOffset clamped to [-0.5, 1.5] (half a sim frame back, for a draw shown late, to one and a half ahead)
- * @return number? presentedUpdateSeconds clamped to [0, the larger of 4 display periods (0.25 s with no known period) and the engine's value]
+ * @return number? presentedUpdateSeconds the `presentedDt` of `Update` and `Spring.GetLastUpdateSeconds`, clamped to [0, the larger of 4 display periods (0.25 s with no known period) and the engine's value]
  */
 void CLuaHandle::UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs)
 {

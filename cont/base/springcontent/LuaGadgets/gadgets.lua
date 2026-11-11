@@ -1846,9 +1846,9 @@ end
 --  Draw call-ins
 --
 
-function gadgetHandler:Update()
+function gadgetHandler:Update(dt, presentedDt)
   for _,g in r_ipairs(self.UpdateList) do
-    g:Update()
+    g:Update(dt, presentedDt)
   end
 end
 
