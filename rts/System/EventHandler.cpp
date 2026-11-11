@@ -538,6 +538,12 @@ void CEventHandler::GameStart()
 	ITERATE_EVENTCLIENTLIST_NA(GameStart);
 }
 
+void CEventHandler::GameLoaded()
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST_NA(GameLoaded);
+}
+
 void CEventHandler::GameOver(const std::vector<unsigned char>& winningAllyTeams)
 {
 	ZoneScoped;
@@ -654,6 +660,13 @@ void CEventHandler::Update()
 {
 	ZoneScoped;
 	ITERATE_EVENTCLIENTLIST_NA(Update);
+}
+
+// chained: each client sees the values the previous one left
+void CEventHandler::UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs)
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST(UpdateTimeOffset, timeOffset, drawSimRatio, presentedUpdateSecs);
 }
 
 void CEventHandler::NanoParticleUpdate(const std::vector<NanoParticles::Event>& events)

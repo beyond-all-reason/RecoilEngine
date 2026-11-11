@@ -643,7 +643,7 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_STRING("wreckName", ud.wreckName);
 	ADD_STRING("buildpicname", ud.buildPicName);
 	ADD_BOOL("canSelfD", ud.canSelfD);
-	ADD_INT("selfDCountdown", ud.selfDCountdown);
+	ADD_FLOAT("selfDCountdown", ud.selfDCountdown);
 	ADD_FLOAT("losHeight", ud.losHeight);
 	// radarHeight was missing, enumerating it here alongside other sensors for completeness
 	ADD_FLOAT("losRadius", ud.losRadius);
@@ -667,7 +667,7 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_STRING("corpse", ud.wreckName);
 	ADD_STRING("buildPic", ud.buildPicName);
 	ADD_BOOL("canSelfDestruct", ud.canSelfD);
-	ADD_INT("selfDestructCountdown", ud.selfDCountdown);
+	ADD_FLOAT("selfDestructCountdown", ud.selfDCountdown);
 	ADD_FLOAT("sightEmitHeight", ud.losHeight);
 	ADD_FLOAT("radarEmitHeight", ud.radarHeight);
 	ADD_FLOAT("sightDistance", ud.losRadius);

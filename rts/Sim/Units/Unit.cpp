@@ -678,6 +678,50 @@ void CUnit::Update()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	ASSERT_SYNCED(pos);
+
+	if unlikely(selfDTargetFrame > 0 && !isDead) {
+		// a stunned unit's countdown waits
+		if (IsStunned()) {
+			++selfDTargetFrame;
+		} else if (gs->frameNum >= selfDTargetFrame) {
+			FinishSelfD();
+		}
+	}
+}
+
+void CUnit::FinishSelfD()
+{
+	// avoid unfinished buildings making an explosion
+	KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
+}
+
+void CUnit::StartSelfD(float seconds)
+{
+	assert(seconds >= 0.0f);
+	const int frames = static_cast<int>(math::ceil(seconds * GAME_SPEED));
+
+	// 0 means inactive, which only frame 0 could produce
+	selfDTargetFrame = std::max(1, gs->frameNum + frames);
+	eventHandler.UnitSelfDestructStarted(this, frames * INV_GAME_SPEED);
+}
+
+void CUnit::CancelSelfD()
+{
+	if (selfDTargetFrame <= 0)
+		return;
+
+	const float secondsLeft = *GetSelfDSecondsLeft();
+
+	selfDTargetFrame = 0;
+	eventHandler.UnitSelfDestructCancelled(this, secondsLeft);
+}
+
+std::optional<float> CUnit::GetSelfDSecondsLeft() const
+{
+	if (selfDTargetFrame <= 0)
+		return std::nullopt;
+
+	return std::max(0, selfDTargetFrame - gs->frameNum) * INV_GAME_SPEED;
 }
 
 unsigned int CUnit::UpdateState()
@@ -1037,17 +1081,6 @@ void CUnit::SlowUpdate()
 
 		SlowUpdateCloak(true);
 		return;
-	}
-
-	if (selfDCountdown > 0) {
-		if ((selfDCountdown -= 1) == 0) {
-			// avoid unfinished buildings making an explosion
-			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
-			return;
-		}
-
-		if ((selfDCountdown & 1) && (team == gu->myTeam) && !gu->spectating)
-			LOG("%s: self-destruct in %is", unitDef->humanName.c_str(), (selfDCountdown >> 1) + 1);
 	}
 
 	if (beingBuilt) {
@@ -2989,7 +3022,7 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(lastTerrainType),
 	CR_MEMBER(curTerrainType),
 
-	CR_MEMBER(selfDCountdown),
+	CR_MEMBER(selfDTargetFrame),
 
 	CR_MEMBER(definedIconName),
 	CR_MEMBER_UN(currentIconIndex),
