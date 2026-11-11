@@ -521,6 +521,9 @@ void CGame::Load(const std::string& mapFileName)
 		}
 	}
 
+	if (!forcedQuit && IsSavedGame())
+		saveFileHandler->PostLoad();
+
 	Watchdog::DeregisterThread(WDT_LOAD);
 	AddTimedJobs();
 
