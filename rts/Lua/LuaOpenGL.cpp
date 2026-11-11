@@ -3057,7 +3057,7 @@ int LuaOpenGL::TexRect(lua_State* L)
 
 /***
  * @function gl.DispatchCompute
- * @param numGroupX integer?
+ * @param numGroupX integer
  * @param numGroupY integer
  * @param numGroupZ integer
  * @param barriers integer? (Default: `0`)
@@ -4846,7 +4846,7 @@ int LuaOpenGL::TexEnv(lua_State* L)
  * @param texNum integer
  * @param target GL
  * @param pname GL
- * @param value number?
+ * @param value number
  */
 /***
  * @function gl.MultiTexEnv
@@ -4917,7 +4917,7 @@ static void SetTexGenState(GLenum target, bool state)
  * @function gl.TexGen
  * @param target GL
  * @param pname GL
- * @param value number?
+ * @param value number
  */
 /***
  * @function gl.TexGen
@@ -4977,7 +4977,7 @@ int LuaOpenGL::TexGen(lua_State* L)
  * @param texNum integer
  * @param target GL
  * @param pname GL
- * @param value number?
+ * @param value number
  */
 /***
  * @function gl.MultiTexGen
