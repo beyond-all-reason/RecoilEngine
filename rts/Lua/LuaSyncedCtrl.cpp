@@ -3626,7 +3626,6 @@ int LuaSyncedCtrl::SetUnitNeutral(lua_State* L)
  * @param enemyUnitID UnitID? when nil drops the units current target.
  * @param dgun boolean? (Default: `false`)
  * @param userTarget boolean? (Default: `false`)
- * @param dontForceTarget boolean?
  * @param weaponNum integer? (Default: `-1`)
  * @return boolean success
  */
@@ -3639,7 +3638,6 @@ int LuaSyncedCtrl::SetUnitNeutral(lua_State* L)
  * @param z number?
  * @param dgun boolean? (Default: `false`)
  * @param userTarget boolean? (Default: `false`)
- * @param dontForceTarget boolean?
  * @param weaponNum integer? (Default: `-1`)
  * @return boolean success
  */
