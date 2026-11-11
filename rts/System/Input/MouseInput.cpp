@@ -24,6 +24,7 @@
 
 #include "Game/UI/MouseHandler.h"
 #include "Rendering/GlobalRendering.h"
+#include "System/Config/ConfigHandler.h"
 #include "System/MainDefines.h"
 #include "System/SafeUtil.h"
 
@@ -211,6 +212,11 @@ bool IMouseInput::SetPos(int2 pos)
 
 bool IMouseInput::WarpPos(int2 pos)
 {
+	// a background window without the focus must not move the user's pointer;
+	// the engine still keeps the position (SetPos), so Spring.GetMouseState reports it
+	if (configHandler->GetBool("BackgroundWindow") && (SDL_GetWindowFlags(globalRendering->GetWindow()) & SDL_WINDOW_INPUT_FOCUS) == 0)
+		return false;
+
 	#if __unix__
 		/* Needed for SDL2+Wayland where warping isn't allowed otherwise, works fine with X11.
 		 * One would think there should be a corresponding `SDL_ShowCursor(SDL_ENABLE);` below,
