@@ -158,7 +158,7 @@ class CCollisionHandler {
 		 * @param p0 start of ray (in world-coordinates)
 		 * @param p1 end of ray (in world-coordinates)
 		 */
-		static bool Intersect(const CollisionVolume* v, const CMatrix44f& m, const float3& p0, const float3& p1, CollisionQuery* cq);
+		static bool Intersect(const CollisionVolume* v, const CMatrix44f& m, const float3& p0, const float3& p1, CollisionQuery* cq, const LocalModelPiece* lmp = nullptr);
 		static bool IntersectPieceTree(const CSolidObject* o, const CMatrix44f& m, const float3& p0, const float3& p1, CollisionQuery* cq);
 		static bool IntersectPiecesHelper(const CSolidObject* o, const CMatrix44f& m, const float3& p0, const float3& p1, CollisionQuery* cqp);
 
@@ -166,6 +166,7 @@ class CCollisionHandler {
 		static bool IntersectEllipsoid(const CollisionVolume* v, const float3& pi0, const float3& pi1, CollisionQuery* cq);
 		static bool IntersectCylinder(const CollisionVolume* v, const float3& pi0, const float3& pi1, CollisionQuery* cq);
 		static bool IntersectBox(const CollisionVolume* v, const float3& pi0, const float3& pi1, CollisionQuery* cq);
+		static bool IntersectPolygon(const CollisionVolume* v, const LocalModelPiece* lmp, const float3& pi0, const float3& pi1, CollisionQuery* cq);
 
 	private:
 		static unsigned int numDiscTests; // number of discrete hit-tests executed
