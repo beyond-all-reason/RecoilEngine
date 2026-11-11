@@ -1612,7 +1612,7 @@ void SetRulesParam(lua_State* L, const char* caller, int offset,
 /***
  * @function Spring.SetGameRulesParam
  * @param paramName string
- * @param paramValue (number|string|boolean)? numeric paramValues in quotes will be converted to number.
+ * @param paramValue (number|string|boolean)? A string is stored as a string, also when it holds a number. `nil` removes the parameter.
  * @param losAccess losAccess?
  * @return nil
  */
@@ -1627,7 +1627,7 @@ int LuaSyncedCtrl::SetGameRulesParam(lua_State* L)
  * @function Spring.SetTeamRulesParam
  * @param teamID TeamID
  * @param paramName string
- * @param paramValue (number|string|boolean)? numeric paramValues in quotes will be converted to number.
+ * @param paramValue (number|string|boolean)? A string is stored as a string, also when it holds a number. `nil` removes the parameter.
  * @param losAccess losAccess?
  * @return nil
  */
@@ -1645,7 +1645,7 @@ int LuaSyncedCtrl::SetTeamRulesParam(lua_State* L)
  * @function Spring.SetPlayerRulesParam
  * @param playerID PlayerID
  * @param paramName string
- * @param paramValue (number|string|boolean)? numeric paramValues in quotes will be converted to number.
+ * @param paramValue (number|string|boolean)? A string is stored as a string, also when it holds a number. `nil` removes the parameter.
  * @param losAccess losAccess?
  * @return nil
  */
@@ -1669,7 +1669,7 @@ int LuaSyncedCtrl::SetPlayerRulesParam(lua_State* L)
  * @function Spring.SetUnitRulesParam
  * @param unitID UnitID
  * @param paramName string
- * @param paramValue (number|string|boolean)? numeric paramValues in quotes will be converted to number.
+ * @param paramValue (number|string|boolean)? A string is stored as a string, also when it holds a number. `nil` removes the parameter.
  * @param losAccess losAccess?
  * @return nil
  */
@@ -1689,7 +1689,7 @@ int LuaSyncedCtrl::SetUnitRulesParam(lua_State* L)
  * @function Spring.SetFeatureRulesParam
  * @param featureID FeatureID
  * @param paramName string
- * @param paramValue (number|string|boolean)? numeric paramValues in quotes will be converted to number.
+ * @param paramValue (number|string|boolean)? A string is stored as a string, also when it holds a number. `nil` removes the parameter.
  * @param losAccess losAccess?
  * @return nil
  */
@@ -3220,7 +3220,10 @@ int LuaSyncedCtrl::SetUnitMetalExtraction(lua_State* L)
  *
  * @function Spring.SetUnitHarvestStorage
  * @param unitID UnitID
- * @param metal number?
+ * @param metal number? Harvested metal.
+ * @param metalStorage number? Metal harvest storage.
+ * @param energy number? Harvested energy.
+ * @param energyStorage number? Energy harvest storage.
  * @return nil
  */
 int LuaSyncedCtrl::SetUnitHarvestStorage(lua_State* L)
@@ -4098,7 +4101,7 @@ int LuaSyncedCtrl::SetUnitLandGoal(lua_State* L)
 /***
  * @function Spring.ClearUnitGoal
  * @param unitID UnitID
- * @param maneuver boolean?
+ * @param cancelRawMove boolean? (Default: `true`) Also stop raw (direct, unpathed) movement.
  * @return nil
  */
 int LuaSyncedCtrl::ClearUnitGoal(lua_State* L)
@@ -7470,7 +7473,7 @@ int LuaSyncedCtrl::SetUnitLoadingTransport(lua_State* L)
  * @field startAlpha number?
  * @field endAlpha number?
  * @field model string?
- * @field cegTag string?
+ * @field cegtag string?
  */
 
 /***
