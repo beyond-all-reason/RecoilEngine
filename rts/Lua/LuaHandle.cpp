@@ -2621,9 +2621,7 @@ void CLuaHandle::UnsyncedHeightMapUpdate(const SRectangle& rect)
  *
  * @function Callins:Update
  * @param dt number the time since the last update.
- * @param presentedDt number `dt` as shown on screen: with vsync on, whole display periods, the difference paid back
- * over half a second. Equals `dt` with vsync off, an unknown refresh rate, fast sync, frame times steadily between
- * whole periods, and while skipping. The camera moves by it under `CamFrameTimeCorrection` 2.
+ * @param presentedDt number smoothed `dt`
  */
 void CLuaHandle::Update()
 {

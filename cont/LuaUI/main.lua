@@ -79,7 +79,7 @@ function Update(dt, presentedDt)
   end
   activePage = currentPage
 
-  fontHandler.Update(dt)
+  fontHandler.Update(dt, presentedDt)
 
   widgetHandler:Update(dt, presentedDt)
 

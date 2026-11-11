@@ -1279,7 +1279,7 @@ int LuaUnsyncedRead::GetGameSecondsInterpolated(lua_State* L)
  * @function Spring.GetLastUpdateSeconds
  *
  * @return number? lastUpdateSeconds
- * @return number? presentedUpdateSeconds the same time as shown on screen, see `Callins:Update`
+ * @return number? presentedUpdateSeconds smoothed `lastUpdateSeconds`
  */
 int LuaUnsyncedRead::GetLastUpdateSeconds(lua_State* L)
 {
