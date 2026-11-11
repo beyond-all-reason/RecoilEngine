@@ -55,6 +55,8 @@ public:
 		float3 rotVelocity;
 		float fovVelocity;
 		float lastTime;
+		// presentedTime at the last transition update
+		double lastPresentedTime = 0.0;
 
 		// configurable parameters
 		float timeFactor = 0.0f;

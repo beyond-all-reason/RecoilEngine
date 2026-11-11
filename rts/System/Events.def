@@ -104,6 +104,7 @@
 	SETUP_EVENT(UnsyncedHeightMapUpdate, MANAGED_BIT | UNSYNCED_BIT)
 
 	SETUP_EVENT(Update,         MANAGED_BIT | UNSYNCED_BIT)
+	SETUP_EVENT(UpdateTimeOffset, MANAGED_BIT | UNSYNCED_BIT | CONTROL_BIT) // may replace this frame's timeOffset and presented frame time
 	SETUP_EVENT(NanoParticleUpdate, MANAGED_BIT | UNSYNCED_BIT)
 
 	SETUP_EVENT(KeyBindingsChanged,  MANAGED_BIT | UNSYNCED_BIT)

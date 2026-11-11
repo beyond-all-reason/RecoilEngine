@@ -662,6 +662,13 @@ void CEventHandler::Update()
 	ITERATE_EVENTCLIENTLIST_NA(Update);
 }
 
+// chained: each client sees the values the previous one left
+void CEventHandler::UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs)
+{
+	ZoneScoped;
+	ITERATE_EVENTCLIENTLIST(UpdateTimeOffset, timeOffset, drawSimRatio, presentedUpdateSecs);
+}
+
 void CEventHandler::NanoParticleUpdate(const std::vector<NanoParticles::Event>& events)
 {
 	ZoneScopedN("NanoParticles::LuaUpdate");

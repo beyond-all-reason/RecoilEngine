@@ -136,6 +136,7 @@ CALLIN_LIST = {
 
 	-- unsynced callins
 	"Update",
+	"UpdateTimeOffset",
 	"UnsyncedHeightMapUpdate", -- FIXME: not implemented by base GH
 
 	"DrawGenesis",
