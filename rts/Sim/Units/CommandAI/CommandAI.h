@@ -120,7 +120,6 @@ public:
 	CCommandQueue commandQue;
 
 	int lastUserCommand;
-	int selfDCountdown;
 	int lastFinishCommand;
 	// how many more FinishCommand calls may re-enter SlowUpdate this frame
 	int finishCommandBudget;

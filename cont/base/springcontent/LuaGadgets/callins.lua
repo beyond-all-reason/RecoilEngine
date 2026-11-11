@@ -28,6 +28,7 @@ CALLIN_LIST = {
 	"GameSetup",
 	"GamePreload",
 	"GameStart",
+	"GameLoaded",
 	"GameOver",
 	"GameFrame",
 	"GameFramePost", -- Called after all other Sim operations are completed
@@ -81,6 +82,8 @@ CALLIN_LIST = {
 	"UnitLeftUnderwater",
 	"UnitCommand",
 	"UnitHarvestStorageFull",
+	"UnitSelfDestructStarted",
+	"UnitSelfDestructCancelled",
 
 	-- weapon callins
 	"StockpileChanged",
@@ -133,6 +136,7 @@ CALLIN_LIST = {
 
 	-- unsynced callins
 	"Update",
+	"UpdateTimeOffset",
 	"UnsyncedHeightMapUpdate", -- FIXME: not implemented by base GH
 
 	"DrawGenesis",

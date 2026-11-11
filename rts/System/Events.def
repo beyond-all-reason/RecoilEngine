@@ -27,6 +27,7 @@
 
 	SETUP_EVENT(GamePreload,   MANAGED_BIT)
 	SETUP_EVENT(GameStart,     MANAGED_BIT)
+	SETUP_EVENT(GameLoaded,    MANAGED_BIT)
 	SETUP_EVENT(GameOver,      MANAGED_BIT)
 	SETUP_EVENT(GamePaused,    MANAGED_BIT)
 	SETUP_EVENT(GameFrame,     MANAGED_BIT)
@@ -82,6 +83,9 @@
 	SETUP_EVENT(UnitMoveFailed,       MANAGED_BIT)
 	SETUP_EVENT(UnitArrivedAtGoal,    MANAGED_BIT)
 
+	SETUP_EVENT(UnitSelfDestructStarted,     MANAGED_BIT)
+	SETUP_EVENT(UnitSelfDestructCancelled,   MANAGED_BIT)
+
 	SETUP_EVENT(FeatureCreated,   MANAGED_BIT)
 	SETUP_EVENT(FeatureDestroyed, MANAGED_BIT)
 	SETUP_EVENT(FeatureDamaged,   MANAGED_BIT)
@@ -100,6 +104,7 @@
 	SETUP_EVENT(UnsyncedHeightMapUpdate, MANAGED_BIT | UNSYNCED_BIT)
 
 	SETUP_EVENT(Update,         MANAGED_BIT | UNSYNCED_BIT)
+	SETUP_EVENT(UpdateTimeOffset, MANAGED_BIT | UNSYNCED_BIT | CONTROL_BIT) // may replace this frame's timeOffset and presented frame time
 	SETUP_EVENT(NanoParticleUpdate, MANAGED_BIT | UNSYNCED_BIT)
 
 	SETUP_EVENT(KeyBindingsChanged,  MANAGED_BIT | UNSYNCED_BIT)

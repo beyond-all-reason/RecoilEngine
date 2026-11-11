@@ -22,8 +22,8 @@ local mapinfo = {
 	notDeformable   = false,
 	gravity         = 130,
 	tidalStrength   = 0,
-	maxMetal        = 0.02,
-	extractorRadius = 500.0,
+	maxMetal        = ${MAX_METAL},
+	extractorRadius = ${EXTRACTOR_RADIUS},
 	voidWater       = false,
 	autoShowMetal   = true,
 

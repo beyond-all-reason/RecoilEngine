@@ -61,6 +61,7 @@ namespace Impl {
 
 	template<typename PrimContainer>
 	void ReadGeometryData(
+		S3DModel& model,
 		const fastgltf::Asset& asset,
 		const PrimContainer& primitives,
 		std::vector<SVertexData>& verts,
@@ -78,6 +79,9 @@ namespace Impl {
 				bool seenNormal = false;
 				bool seenTangents = false;
 				bool seenTex2 = false;
+				// true only when COLOR_0 carried data (VEC3/VEC4 with a buffer view); the white
+				// default written for a missing attribute must not count as authored colour
+				bool seenColor = false;
 
 				std::vector<std::array<std::pair<uint16_t, float>, 8>> vertexWeights;
 
@@ -137,10 +141,12 @@ namespace Impl {
 							fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(asset, accessor, [&](const auto& val, std::size_t idx) {
 								verts[prevVertSize + idx].color = { ToByte(val.x()), ToByte(val.y()), ToByte(val.z()), 255 };
 							});
+							seenColor = true;
 						} else if (accessor.type == fastgltf::AccessorType::Vec4) {
 							fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(asset, accessor, [&](const auto& val, std::size_t idx) {
 								verts[prevVertSize + idx].color = { ToByte(val.x()), ToByte(val.y()), ToByte(val.z()), ToByte(val.w()) };
 							});
+							seenColor = true;
 						}
 					} break;
 					case hashString("JOINTS_0"): {
@@ -185,6 +191,8 @@ namespace Impl {
 						break;
 					}
 				}
+
+			model.AddPrimitive(seenColor);
 
 			for (auto& vertexWeight : vertexWeights) {
 				for (auto& w : vertexWeight) {
@@ -520,7 +528,7 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 		const auto& mesh = asset.meshes[*node.meshIndex];
 		auto& skinnedMesh = allSkinnedMeshes.emplace_back();
 
-		Impl::ReadGeometryData(asset, mesh.primitives, skinnedMesh.verts, skinnedMesh.indcs, ni, sourceConvention, &skin);
+		Impl::ReadGeometryData(model, asset, mesh.primitives, skinnedMesh.verts, skinnedMesh.indcs, ni, sourceConvention, &skin);
 		Impl::TransformSkinsToModelSpace(skinnedMesh.verts, ni, modelTransforms);
 		Impl::ReplaceNodeIndexWithPieceIndex(skinnedMesh.verts, nodeIdxToPieceIdx);
 	}
@@ -663,7 +671,7 @@ GLTFPiece* CGLTFParser::LoadPiece(
 	auto& verts = piece->GetVerticesVec();
 	auto& indcs = piece->GetIndicesVec();
 	const auto& mesh = asset.meshes[*node.meshIndex];
-	Impl::ReadGeometryData(asset, mesh.primitives, verts, indcs, nodeIndex, sourceConvention, nullptr);
+	Impl::ReadGeometryData(*model, asset, mesh.primitives, verts, indcs, nodeIndex, sourceConvention, nullptr);
 
 	return piece;
 }
