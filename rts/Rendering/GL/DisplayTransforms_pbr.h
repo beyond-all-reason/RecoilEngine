@@ -240,11 +240,13 @@ inline RGB Unreal(RGB c) {
 }
 
 // BAR's CUS unit curve `CustomTM` (modelmaterials_gl4/templates/cus_gl4.frag.glsl)
-// with BAR's default tonemapA-E. CUS runs with modelGamma 1, so the curve
+// with the constants that shader actually uses: its `pbrParams` array is a
+// GLSL constant (4.85, 0.85, 3.5, 0.85, 1.0), not the tonemapA-E config values
+// (whose defaults are 4.75 and 0.75). CUS runs with modelGamma 1, so the curve
 // works on display-encoded values; the pass re-encodes the decoded scene value
 // first and applies no encode after it, which reproduces a CUS unit pixel.
-static constexpr float BAR_CUSTOM_A = 4.75f;
-static constexpr float BAR_CUSTOM_B = 0.75f;
+static constexpr float BAR_CUSTOM_A = 4.85f;
+static constexpr float BAR_CUSTOM_B = 0.85f;
 static constexpr float BAR_CUSTOM_C = 3.5f;
 static constexpr float BAR_CUSTOM_D = 0.85f;
 static constexpr float BAR_CUSTOM_E = 1.0f;
