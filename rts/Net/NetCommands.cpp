@@ -185,7 +185,7 @@ void CGame::UpdateNumQueuedSimFrames()
 	//   only reason in that case is to handle NETMSG_GAME_FRAME_PROGRESS
 	const uint32_t numQueuedFrames = GetNumQueuedSimFrameMessages(-1u);
 
-	if (globalConfig.useNetMessageSmoothingBuffer) {
+	if (globalConfig.useNetMessageSmoothingBuffer == 1) {
 		if (numQueuedFrames < lastNumQueuedSimFrames) {
 			// conservative policy: take minimum of current and previous queue size
 			// we *NEVER* want the queue to run completely dry (by not keeping a few
@@ -261,8 +261,10 @@ void CGame::ClientReadNet()
 	// first look ahead so we can adapt consumeSpeedMult to network fluctuations
 	// (smooths simframes across each full second, and balances the time spent in
 	// sim & drawing)
-	UpdateNumQueuedSimFrames();
-	UpdateNetMessageProcessingTimeLeft();
+	if (globalConfig.useNetMessageSmoothingBuffer != 2) {
+		UpdateNumQueuedSimFrames();
+		UpdateNetMessageProcessingTimeLeft();
+	}
 
 	const spring_time msgProcEndTime = spring_gettime() + spring_msecs(GetNetMessageProcessingTimeLimit());
 
@@ -270,8 +272,9 @@ void CGame::ClientReadNet()
 	const bool haveClientDemo = (clientNet->GetDemoRecorder() != nullptr);
 
 	// now really process the messages
-	while (true) {
-		if (msgProcTimeLeft <= 0.0f)
+	while (globalConfig.useNetMessageSmoothingBuffer != 2 || spring_gettime() >= nextFrameTargetProcessTime) {
+
+		if (globalConfig.useNetMessageSmoothingBuffer != 2 && msgProcTimeLeft <= 0.0f)
 			break;
 		if (spring_gettime() > msgProcEndTime)
 			break;
@@ -391,6 +394,12 @@ void CGame::ClientReadNet()
 				}
 
 				gs->paused = !!inbuf[2];
+				
+				if (globalConfig.useNetMessageSmoothingBuffer == 2 && !gs->paused) {
+					expectedFrameTime = spring_gettime();
+					nextFrameTargetProcessTime = expectedFrameTime + spring_msecs(targetOffset);
+				}
+
 
 				LOG("%s %s the game", playerHandler.Player(playerNum)->name.c_str(), (gs->paused ? "paused" : "unpaused"));
 
@@ -612,7 +621,59 @@ void CGame::ClientReadNet()
 				TracyPlot(tracingSpeedFactor, gs->speedFactor);
 				TracyPlot(tracingWantedSpeedFactor, gs->wantedSpeedFactor);
 				
-				msgProcTimeLeft -= 1000.0f;
+				if (globalConfig.useNetMessageSmoothingBuffer == 2) {
+					const float msPerFrame = (1000.0f / (GAME_SPEED * gs->speedFactor));
+					if (gs->frameNum < (catchupTarget - targetOffset / msPerFrame)) {
+						// if we're too far behind the server, set up to process next frame immediately and forget offsets.
+						nextFrameTargetProcessTime = spring_now();
+						expectedFrameTime = spring_now() - spring_msecs(msPerFrame);
+						targetOffset = 1.0f;
+						volatilityScore = 1.0f;
+						lastFrameOffset = 1.0f;
+					} else {
+						if (expectedFrameTime <= spring_time(0))
+							expectedFrameTime = packet->receiveTime;
+
+						const float currentFrameOffset = (packet->receiveTime - expectedFrameTime).toMilliSecsf();
+						targetOffset = fmax(currentFrameOffset, (targetOffset - lastFrameOffset) * volatilityScore + lastFrameOffset);
+
+						/*
+						latencyDegree is a magic number that describes how close to the target latency we're at.
+						via volatilityScore, we will generate a multiplier (~ -1 - 1.001) that we'll apply to our 
+						
+						At its root, we have `(targetOffset - currentFrameOffset) / targetOffset`, which describes how close currentFrameOffset is to targetOffset.
+						This will at its minimum (0) if currentFrameOffset >= targetOffset (see above, where we clamp targetOffset to currentFrameOffset).
+						It will be greater (usually 0-1) otherwise. (It is rare, but possible with very low latencies, that currentFrameOffset will be negative.)
+
+						This root proportion is used to inform and adjust our buffer duration according to the filters described below.
+
+						Filter 1 - pow(x, 4): This greatly collapses the range towards 0 - more aggressively the lower it is.
+						                      Thus having less spare time is weighted much heavier than having more spare time.
+						Filter 2 - fmin(2, x): This caps the range from 0-2, to limit the benefit of 
+						Filter 3 - 1.0f - x: This inverts the distribution: before 0 corresponded to a later time and 1 was an earlier time:
+						                     Now 1 corresponds to a later time and 0 to an earlier time (and -1 to the minimum time).
+						Filter 4. - * 1.001: This shifts the distribution, such that a value of 1 after filter 4 corresponds to a value of 0.177 before filter 1.
+											 This allows the multiplier to signal an increase in targetOffset, not just a decrease, to maintain a desired buffer.
+						                     Ultimately, this creates a time buffer of about 117.7% the highest offset we've seen recently. 
+						                     E.g. if currentFrameOffset fluctuates between 5 - 50ms, we'll settle with a targetOffset of about 58.9ms.
+						*/
+						const float latencyDegree = (1.0f - fmin(2, pow((targetOffset - currentFrameOffset) / targetOffset, 4))) * 1.001;
+						/*
+						volatility score is used as a multiplier against the current expectedFrameTime.
+						This is very aggressively smoothed and should result in very gradual changes to targetOffset.
+						High latencyDegree will hoist volatilityScore to ensure that we need a very long period of low latencyDegree
+						before we will see more rapid changes in targetOffset.
+						*/
+						volatilityScore = fmax(latencyDegree, latencyDegree * 0.0001 + volatilityScore * 0.9999);
+
+						expectedFrameTime = expectedFrameTime + spring_msecs(msPerFrame);
+						nextFrameTargetProcessTime = expectedFrameTime + spring_msecs(targetOffset);
+
+						lastFrameOffset = currentFrameOffset;
+					}
+				} else {
+					msgProcTimeLeft -= 1000.0f;
+				}
 				lastSimFrameNetPacketTime = spring_gettime();
 
 				SimFrame();
@@ -1575,8 +1636,11 @@ void CGame::ClientReadNet()
 			// if we received this packet here we are the local host player
 			// (for which GetNumQueuedSimFrameMessages is not called where
 			// it would normally be processed), so discard it
-			case NETMSG_PING:
+			case NETMSG_PING: {
+
+			} break;
 			case NETMSG_GAME_FRAME_PROGRESS: {
+				catchupTarget = *reinterpret_cast<int32_t*>(packet->data + 1);
 			} break;
 
 			case NETMSG_GAMESTATE_DUMP: {
