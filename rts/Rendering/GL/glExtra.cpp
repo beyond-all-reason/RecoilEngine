@@ -167,6 +167,33 @@ void glBallisticCircle(const CWeapon* weapon, const WeaponDef* weaponDef, const 
 	sh.Disable();
 }
 
+void glBallisticCircleLinesAdd(const CWeapon* weapon, uint32_t resolution, const float3& center, const float3& params)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_0>();
+	const auto vertices = glBallisticCircleImpl(weapon, weapon->weaponDef, resolution, center, params);
+
+	// GL_LINES pairs give the same segments as one GL_LINE_LOOP per circle
+	for (size_t i = 0; i < vertices.size(); ++i) {
+		rb.AddVertex(VA_TYPE_0{ vertices[i] });
+		rb.AddVertex(VA_TYPE_0{ vertices[(i + 1) % vertices.size()] });
+	}
+}
+
+void glBallisticCircleLinesDraw(const SColor& color)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	auto& rb = RenderBuffer::GetTypedRenderBuffer<VA_TYPE_0>();
+	const float4 fColor = color;
+
+	auto& sh = rb.GetShader();
+	sh.Enable();
+	sh.SetUniform("ucolor", fColor.x, fColor.y, fColor.z, fColor.w);
+	rb.DrawArrays(GL_LINES);
+	sh.SetUniform("ucolor", 1.0f, 1.0f, 1.0f, 1.0f);
+	sh.Disable();
+}
+
 void glBallisticCircleLua(const CWeapon* weapon, const WeaponDef* weaponDef, const SColor& color, uint32_t resolution, const float3& center, const float3& params)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
