@@ -157,7 +157,7 @@ vec3 Unreal(vec3 x) {
 // BAR's CUS CustomTM with BAR's default tonemapA-E; it works on display-encoded
 // values (CUS runs with modelGamma 1), so no encode follows it.
 vec3 BarCustom(vec3 encoded) {
-	const float A = 4.75, B = 0.75, C = 3.5, D = 0.85, E = 1.0;
+	const float A = 4.85, B = 0.85, C = 3.5, D = 0.85, E = 1.0; // CUS's own constants (DisplayTransforms_pbr.h)
 	return (encoded * (A * encoded + B)) / (encoded * (C * encoded + D) + E);
 }
 

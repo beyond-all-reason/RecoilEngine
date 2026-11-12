@@ -131,7 +131,7 @@ def unreal(c):
 
 
 def bar_custom(encoded):
-    A, B, C, D, E = 4.75, 0.75, 3.5, 0.85, 1.0
+    A, B, C, D, E = 4.85, 0.85, 3.5, 0.85, 1.0  # the constants cus_gl4.frag.glsl uses
     return tuple((x * (A * x + B)) / (x * (C * x + D) + E) for x in encoded)
 
 
