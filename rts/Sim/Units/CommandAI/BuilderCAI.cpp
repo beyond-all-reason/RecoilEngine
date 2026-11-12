@@ -578,10 +578,13 @@ void CBuilderCAI::ReclaimFeature(CFeature* f)
 		// FIXME user shouldn't be able to queue buildings on top of features
 		// in the first place (in this case).
 		StopMoveAndFinishCommand();
+	} else if (CBuilderCaches::IsFeatureBeingResurrected(f->id, owner)) {
+		// Keep the build queued without repeatedly creating and finishing reclaim orders.
+		ownerBuilder->StopBuild();
+		StopMove();
 	} else {
-		commandQue.push_front(Command(CMD_RECLAIM, 0, f->id + unitHandler.MaxUnits()));
-		// this assumes that the reclaim command can never return directly
-		// without having reclaimed the target
+		// Respect allied resurrection and do not repeat this build-site subcommand.
+		commandQue.push_front(Command(CMD_RECLAIM, INTERNAL_ORDER, f->id + unitHandler.MaxUnits()));
 		SlowUpdate();
 	}
 }
