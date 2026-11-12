@@ -131,6 +131,7 @@ private:
 	};
 
 	void Init();
+	void CreatePrograms();
 	void ReadSettings();
 	bool Allocate(const Desc& desc, Resources& res, std::string& error) const;
 	static void Free(Resources& res);
@@ -143,6 +144,7 @@ private:
 
 private:
 	bool initialized = false;
+	bool programsCreated = false;
 	bool worldPhase = false;
 	std::atomic<bool> settingsDirty = {true};
 
