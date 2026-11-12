@@ -162,6 +162,7 @@ bool CLuaIntro::LoadUnsyncedCtrlFunctions(lua_State* L)
 
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, LoadSoundDef);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, PlaySoundFile);
+	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, StopSoundFile);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, PlaySoundStream);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, StopSoundStream);
 	REGISTER_SCOPED_LUA_CFUNC(LuaUnsyncedCtrl, PauseSoundStream);

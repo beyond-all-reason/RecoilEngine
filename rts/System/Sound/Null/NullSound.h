@@ -25,6 +25,7 @@ public:
 
 	SoundItem* GetSoundItem(size_t id) override { return nullptr; }
 	CSoundSource* GetNextBestSource(bool lock = true) override { return nullptr; }
+	bool StopSoundItem(const std::string& name, const IAudioChannel* channel) override { return false; }
 
 	void UpdateListener(const float3& campos, const float3& camdir, const float3& camup) override {}
 	void NewFrame() override {}

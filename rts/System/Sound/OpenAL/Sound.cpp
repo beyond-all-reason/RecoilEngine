@@ -196,6 +196,17 @@ size_t CSound::GetDefSoundId(const std::string& name)
 	return (GetSoundId(name));
 }
 
+size_t CSound::FindLoadedSoundId(const std::string& name) const
+{
+	auto soundMapIt = soundMap.find(name);
+
+	// items made from sounds.lua are stored under their lower-case name
+	if (soundMapIt == soundMap.end())
+		soundMapIt = soundMap.find(StringToLower(name));
+
+	return (soundMapIt != soundMap.end()) ? soundMapIt->second : 0;
+}
+
 size_t CSound::GetSoundId(const std::string& name)
 {
 	std::lock_guard<spring::recursive_mutex> lck(soundMutex);
@@ -206,9 +217,9 @@ size_t CSound::GetSoundId(const std::string& name)
 	if (soundSources.empty())
 		return (preloadSet.erase(name), 0);
 
-	const auto soundMapIt = soundMap.find(name);
-	if (soundMapIt != soundMap.end())
-		return (preloadSet.erase(name), soundMapIt->second);
+	const size_t loadedId = FindLoadedSoundId(name);
+	if (loadedId != 0)
+		return (preloadSet.erase(name), loadedId);
 
 	const auto itemDefIt = soundItemDefsMap.find(StringToLower(name));
 
@@ -270,6 +281,23 @@ CSoundSource* CSound::GetNextBestSource(bool lock)
 	}
 
 	return bestSrc;
+}
+
+bool CSound::StopSoundItem(const std::string& name, const IAudioChannel* channel)
+{
+	std::lock_guard<spring::recursive_mutex> lck(soundMutex);
+
+	const size_t itemID = FindLoadedSoundId(name);
+	if (itemID == 0)
+		return false;
+
+	bool stopped = false;
+
+	for (CSoundSource& src: soundSources) {
+		stopped |= src.StopItem(itemID, channel);
+	}
+
+	return stopped;
 }
 
 void CSound::PitchAdjust(const float newPitch)
