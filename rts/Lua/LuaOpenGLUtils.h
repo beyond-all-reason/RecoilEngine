@@ -43,6 +43,12 @@ class LuaMatTexture {
 			LUATEX_MAP_REFLECTION,
 			LUATEX_SKY_REFLECTION,
 			LUATEX_SPECULAR,
+			// Inserted mid-enum: the values after them shift, but no code uses
+			// absolute values (the SMF/SSMF offsets below are taken relative to
+			// LUATEX_SMF_GRASS), so only the names matter.
+			// a Lua texture published with gl.PublishTexture; data holds the
+			// LuaTextures published-slot index, resolved on every bind
+			LUATEX_PUBLISHED, // "$pub:<name>", see LuaTextures::Published
 
 
 			LUATEX_SHADOWMAP,

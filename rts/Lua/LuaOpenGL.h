@@ -244,6 +244,8 @@ class LuaOpenGL {
 		static int CopyImageSubData(lua_State* L);
 		static int RenderToTexture(lua_State* L);
 		static int GenerateMipmap(lua_State* L);
+		// gives a Lua texture of this handle a global "$pub:<name>" (LuaTextures::Publish)
+		static int PublishTexture(lua_State* L);
 		static int ActiveTexture(lua_State* L);
 		static int TexEnv(lua_State* L);
 		static int TexGen(lua_State* L);
