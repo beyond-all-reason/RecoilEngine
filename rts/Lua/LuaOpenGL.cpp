@@ -4869,8 +4869,14 @@ int LuaOpenGL::GenerateMipmap(lua_State* L)
  * @param y number
  * @param z number
  * @param skyOnly boolean? false also draws the terrain reflection pass (default true)
+ * @param sunFree boolean? true leaves the sun's glow out of the sky, for an
+ *   environment used as image-based lighting, where the sun is already the
+ *   direct light (default false: the sky as the player sees it). Only skies
+ *   that draw the sun themselves can do it (ModernSky); see the third result.
  * @return boolean success
  * @return string? error
+ * @return boolean? sunRemoved with sunFree on success: whether the sun was left out
+ *   (false for a painted skybox, whose sun is part of its texture)
  */
 int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 {
@@ -4882,6 +4888,8 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 	// sky-only is the default: it is independent of the player camera (see the
 	// ROAM note below), which a stable environment needs
 	const bool skyOnly = luaL_optboolean(L, 6, true);
+	const bool sunFree = luaL_optboolean(L, 7, false);
+	bool sunRemoved = false;
 	// the calling handle's own textures only, the same lookup as "!N" names
 	const LuaTextures::Texture* tex = CLuaHandle::GetActiveTextures(L).GetInfo(luaL_checksstring(L, 1));
 
@@ -5004,7 +5012,10 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 		// engine's capture; restored to gameNormalDraw right after drawing
 		game->SetDrawMode(CGame::gameReflectionDraw);
 		if (!globalRendering->drawDebugCubeMap) {
+			sunRemoved = sunFree && sky->SupportsSunFreeDraw();
+			sky->drawWithoutSunLobe = sunRemoved;
 			sky->Draw();
+			sky->drawWithoutSunLobe = false;
 			// ROAM reuses the player camera's tessellation here, so terrain the
 			// player camera has not tessellated is missing
 			if (!skyOnly)
@@ -5039,10 +5050,16 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 	}
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, previousFBO);
 
-	// true, or false plus the message (the Lua convention of `ok, err`)
+	// true, or false plus the message (the Lua convention of `ok, err`); with
+	// sunFree a third result says whether the sun was left out
 	lua_pushboolean(L, error == nullptr);
-	if (error == nullptr)
-		return 1;
+	if (error == nullptr) {
+		if (!sunFree)
+			return 1;
+		lua_pushnil(L);
+		lua_pushboolean(L, sunRemoved);
+		return 3;
+	}
 
 	lua_pushstring(L, error);
 	return 2;

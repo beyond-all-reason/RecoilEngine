@@ -80,6 +80,7 @@ void CModernSky::Draw()
 	skyShader->SetUniform("sunDir", sunDir.x, sunDir.y, sunDir.z);
 
 	skyShader->SetUniform("sunColor", sunColor.x, sunColor.y, sunColor.z, sunDir.w); // sunDir.w -- intensity
+	skyShader->SetUniform("sunLobe", drawWithoutSunLobe ? 0.0f : 1.0f);
 
 	skyShader->SetUniform("cloudInfo", cloudColor.x, cloudColor.y, cloudColor.z, mapInfo->atmosphere.cloudDensity);
 
