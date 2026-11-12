@@ -116,7 +116,7 @@ namespace QTPFS {
 		float GetNodeRatio() const { return (numLeafNodes / std::max(1.0f, float(xsize * zsize))); }
 
 		const INode* GetNode(unsigned int x, unsigned int z) const {
-			ZoneScoped;
+			RECOIL_DETAILED_TRACY_ZONE;
 			int iz = (z / rootNodeSize) * xRootNodes;
 			int ix = (x / rootNodeSize);
 			int i = iz + ix;

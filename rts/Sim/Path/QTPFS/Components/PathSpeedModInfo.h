@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "Sim/MoveTypes/MoveDefHandler.h"
+#include "Sim/Path/QTPFS/Components/SyncUpdatedPaths.h"
 #include "System/float3.h"
 #include "System/Rectangle.h"
 
@@ -39,6 +40,10 @@ struct PathSpeedModInfoSystemComponent {
 	int refreshTimeInFrames = 0;
 	int startRefreshOnFrame = 0;
 	int refeshDelayInFrames = 0;
+
+	// scan of the chunk of frame scanFrame, running in the background
+	BackgroundTaskPtr scanTask;
+	int scanFrame = -1;
 
 	enum STATES {
 		STATE_INIT,

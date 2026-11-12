@@ -449,16 +449,21 @@ CMoveMath::BlockType CMoveMath::RangeIsBlockedHashedMt(int xmin, int xmax, int z
 
 void CMoveMath::FloodFillRangeIsBlocked(const MoveDef& moveDef, const CSolidObject* collider, const SRectangle& areaToSample, std::vector<std::uint8_t>& results, int thread)
 {
+	const MoveTypes::CheckCollisionQuery colliderInfo = (collider != nullptr)
+			? MoveTypes::CheckCollisionQuery(collider)
+			: MoveTypes::CheckCollisionQuery(&moveDef, {float(areaToSample.x1*SQUARE_SIZE), 0.f, float(areaToSample.z1*SQUARE_SIZE)});
+
+	FloodFillRangeIsBlocked(colliderInfo, areaToSample, results, thread);
+}
+
+void CMoveMath::FloodFillRangeIsBlocked(const MoveTypes::CheckCollisionQuery& colliderInfo, const SRectangle& areaToSample, std::vector<std::uint8_t>& results, int thread)
+{
 	RECOIL_DETAILED_TRACY_ZONE;
 	spring::unordered_map<CSolidObject*, CMoveMath::BlockType>& blockMap = blockMaps[thread];
 	blockMap.clear();
 
 	results.clear();
 	results.reserve(areaToSample.GetArea());
-
-	MoveTypes::CheckCollisionQuery colliderInfo = (collider != nullptr)
-			? MoveTypes::CheckCollisionQuery(collider)
-			: MoveTypes::CheckCollisionQuery(&moveDef, {float(areaToSample.x1*SQUARE_SIZE), 0.f, float(areaToSample.z1*SQUARE_SIZE)});
 
 	for (int z = areaToSample.z1; z < areaToSample.z2; ++z) {
 		const int zOffset = z * mapDims.mapx;
