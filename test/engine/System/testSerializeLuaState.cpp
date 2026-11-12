@@ -2,8 +2,12 @@
 
 #include "System/creg/Serializer.h"
 #include "System/creg/SerializeLuaState.h"
+#include "lib/lua/src/ltable.h"
 
 #include <catch_amalgamated.hpp>
+
+#include <cstdlib>
+#include <cstring>
 
 
 static int handlepanic(lua_State* L)
@@ -18,7 +22,7 @@ static void* l_alloc (void* ud, void* ptr, size_t osize, size_t nsize) {
 	(void)osize;
 	if (nsize == 0) {
 		free(ptr);
-		return NULL;
+		return nullptr;
 	} else {
 		return realloc(ptr, nsize);
 	}
@@ -66,13 +70,37 @@ TEST_CASE("SerializeLuaState")
 	int idx = luaL_ref(flh.L, LUA_REGISTRYINDEX);
 	const char* code = "local co = coroutine.create(function ()\n local function f()\n coroutine.yield()\n end\n f()\n end);\ncoroutine.resume(co);\n";
 
-	int err = luaL_loadbuffer(flh.L, code, strlen(code), "yield");
-	if (err)
-	{
-		printf("%s\n", lua_tostring(flh.L, -1));
+	REQUIRE(luaL_loadbuffer(flh.L, code, strlen(code), "yield") == 0);
+	REQUIRE(lua_pcall(flh.L, 0, 0, 0) == 0);
+
+	const Node* emptyKey = nullptr;
+	SECTION("Collected keys in empty weak-table slots") {
+		const char* weakKeys = R"(
+			weak = setmetatable({}, {__mode = "kv"})
+			emptyWeak = setmetatable({}, {__mode = "kv"})
+			retained = {answer = 42}
+			weak[retained] = retained
+			local co = coroutine.create(function() end)
+			weak[co] = true
+			weak[co] = nil
+			co = nil
+		)";
+		REQUIRE(luaL_loadstring(flh.L, weakKeys) == 0);
+		REQUIRE(lua_pcall(flh.L, 0, 0, 0) == 0);
+		lua_getglobal(flh.L, "weak");
+		const Table* table = static_cast<const Table*>(lua_topointer(flh.L, -1));
+		for (int i = 0; i < sizenode(table); ++i) {
+			const Node* node = &table->node[i];
+			if (node->i_val.tt == LUA_TNIL && node->i_key.nk.tt == LUA_TTHREAD)
+				emptyKey = node;
+		}
+		REQUIRE(emptyKey != nullptr);
 		lua_pop(flh.L, 1);
+		lua_gc(flh.L, LUA_GCCOLLECT, 0);
+		REQUIRE(emptyKey->i_key.nk.tt == LUA_TDEADKEY);
 	}
-	lua_pcall(flh.L, 0, 0, 0);
+
+	SECTION("Ordinary coroutine state") {}
 
 	std::stringstream ss(std::ios::in | std::ios::out | std::ios::binary);
 	{
@@ -80,6 +108,9 @@ TEST_CASE("SerializeLuaState")
 		creg::COutputStreamSerializer oser;
 		oser.SavePackage(&ss, &root, root.GetClass());
 	}
+
+	if (emptyKey != nullptr)
+		CHECK(emptyKey->i_key.nk.tt == LUA_TDEADKEY);
 
 	{
 		creg::CInputStreamSerializer iser;
@@ -96,5 +127,18 @@ TEST_CASE("SerializeLuaState")
 	lua_State* L_GC = lua_tothread(flh.L, -1);
 	CHECK(L_GC == flh.L_GC);
 
+	if (emptyKey != nullptr) {
+		lua_getglobal(flh.L, "weak");
+		REQUIRE(lua_istable(flh.L, -1));
+		lua_getglobal(flh.L, "retained");
+		lua_gettable(flh.L, -2);
+		REQUIRE(lua_istable(flh.L, -1));
+		lua_getfield(flh.L, -1, "answer");
+		CHECK(lua_tointeger(flh.L, -1) == 42);
+		lua_getglobal(flh.L, "emptyWeak");
+		REQUIRE(lua_istable(flh.L, -1));
+		lua_pushnil(flh.L);
+		CHECK(lua_next(flh.L, -2) == 0);
+	}
 	lua_close(flh.L);
 }
