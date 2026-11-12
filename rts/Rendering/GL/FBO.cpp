@@ -15,6 +15,7 @@
 
 #include "System/Misc/TracyDefs.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/GL/SceneTarget.h"
 
 CONFIG(bool, AtiSwapRBFix).defaultValue(false);
 
@@ -251,7 +252,7 @@ void FBO::Init(bool noop)
 
 	// we need to bind it once, else it isn't valid
 	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, fboId);
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, sceneTarget.GetDefaultFBO());
 
 	activeFBOs.push_back(this);
 
@@ -280,7 +281,7 @@ void FBO::Kill()
 		rboIDs.clear();
 	}
 	{
-		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+		glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, sceneTarget.GetDefaultFBO());
 		glDeleteFramebuffersEXT(1, &fboId);
 
 		fboId = 0;
@@ -332,7 +333,8 @@ void FBO::Unbind()
 	//   do stuff
 	// FBO::Unbind(); <- not redundant!
 	//   continue with screen FBO
-	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
+	// During the world phase "the screen" is the PBR scene target when it is active.
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, sceneTarget.GetDefaultFBO());
 }
 
 bool FBO::Blit(int32_t fromID, int32_t toID, const std::array<int, 4>& srcRect, const std::array<int, 4>& dstRect, uint32_t mask, uint32_t filter)

@@ -6,6 +6,7 @@
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/GL/myGL.h"
 #include "RefractWater.h"
+#include "Rendering/GL/SceneTarget.h"
 #include "Map/MapInfo.h"
 #include "Map/ReadMap.h"
 
@@ -62,7 +63,10 @@ void CRefractWater::Draw()
 	glActiveTextureARB(GL_TEXTURE2_ARB);
 	glBindTexture(target, subSurfaceTex);
 	glEnable(target);
-	glCopyTexSubImage2D(target, 0, 0, 0, globalRendering->viewPosX, globalRendering->viewPosY, globalRendering->viewSizeX, globalRendering->viewSizeY);
+	{
+		ScopedSceneReadResolve sceneRead; // a multisampled PBR scene target is copied from its resolve
+		glCopyTexSubImage2D(target, 0, 0, 0, globalRendering->viewPosX, globalRendering->viewPosY, globalRendering->viewSizeX, globalRendering->viewSizeY);
+	}
 
 	SetupWaterDepthTex();
 

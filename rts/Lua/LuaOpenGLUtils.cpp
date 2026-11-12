@@ -18,6 +18,7 @@
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/GL/GeometryBuffer.h"
 #include "Rendering/Env/CubeMapHandler.h"
+#include "Rendering/GL/SceneTarget.h"
 #include "Rendering/Env/Decals/GroundDecalHandler.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
 #include "Rendering/Map/InfoTexture/InfoTexture.h"
@@ -64,6 +65,9 @@ LuaMatTexture::Type LuaOpenGLUtils::GetLuaMatTextureType(const std::string& name
 		case hashString(    "$reflection"): { return LuaMatTexture::LUATEX_MAP_REFLECTION; } break;
 		case hashString("$map_reflection"): { return LuaMatTexture::LUATEX_MAP_REFLECTION; } break;
 		case hashString("$sky_reflection"): { return LuaMatTexture::LUATEX_SKY_REFLECTION; } break;
+		// the PBR HDR scene target (PBRSceneTarget=hdr), single-sample views
+		case hashString(     "$scene_color"): { return LuaMatTexture::LUATEX_SCENE_COLOR    ; } break;
+		case hashString(     "$scene_depth"): { return LuaMatTexture::LUATEX_SCENE_DEPTH    ; } break;
 
 		// specials
 		case hashString("$shadow"      ): { return LuaMatTexture::LUATEX_SHADOWMAP;   } break;
@@ -564,6 +568,12 @@ GLuint LuaMatTexture::GetTextureID() const
 			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
 			texID = (pub != nullptr) ? pub->id : 0;
 		} break;
+		case LUATEX_SCENE_COLOR: {
+			texID = sceneTarget.GetColorTexture();
+		} break;
+		case LUATEX_SCENE_DEPTH: {
+			texID = sceneTarget.GetDepthTexture();
+		} break;
 
 
 		case LUATEX_SHADOWMAP: {
@@ -706,6 +716,10 @@ GLuint LuaMatTexture::GetTextureTarget() const
 		case LUATEX_PUBLISHED: {
 			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
 			texType = (pub != nullptr && pub->id != 0) ? pub->target : GL_TEXTURE_2D;
+		} break;
+		case LUATEX_SCENE_COLOR: [[fallthrough]];
+		case LUATEX_SCENE_DEPTH: {
+			texType = GL_TEXTURE_2D;
 		} break;
 
 		case LUATEX_NONE:		  [[fallthrough]];
@@ -928,6 +942,11 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
 			return (pub != nullptr && pub->id != 0) ? ReturnHelper(pub->xsize, pub->ysize) : ReturnHelper(0);
 		} break;
+		case LUATEX_SCENE_COLOR: [[fallthrough]];
+		case LUATEX_SCENE_DEPTH: {
+			const auto size = sceneTarget.GetSize();
+			return std::make_tuple(size[0], size[1], 0);
+		} break;
 
 
 		case LUATEX_SHADOWMAP: {
@@ -1086,6 +1105,8 @@ void LuaMatTexture::Print(const string& indent) const
 		STRING_CASE(typeName, LUATEX_SKY_REFLECTION);
 		STRING_CASE(typeName, LUATEX_SPECULAR);
 		STRING_CASE(typeName, LUATEX_PUBLISHED);
+		STRING_CASE(typeName, LUATEX_SCENE_COLOR);
+		STRING_CASE(typeName, LUATEX_SCENE_DEPTH);
 
 		STRING_CASE(typeName, LUATEX_SHADOWMAP);
 		STRING_CASE(typeName, LUATEX_SHADOWCOLOR);

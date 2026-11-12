@@ -44,6 +44,13 @@ class LuaMatTexture {
 			LUATEX_SKY_REFLECTION,
 			LUATEX_SPECULAR,
 			LUATEX_PUBLISHED, // "$pub:<name>"; data is the LuaTextures published-slot index
+			// Inserted mid-enum: the values after them shift, but no code uses
+			// absolute values (the SMF/SSMF offsets below are taken relative to
+			// LUATEX_SMF_GRASS), so only the names matter.
+			// the PBR HDR scene target (PBRSceneTarget=hdr), single-sample views;
+			// a multisampled scene is resolved when read during the world phase
+			LUATEX_SCENE_COLOR, // "$scene_color", RGBA16F
+			LUATEX_SCENE_DEPTH, // "$scene_depth", depth-stencil
 
 
 			LUATEX_SHADOWMAP,
