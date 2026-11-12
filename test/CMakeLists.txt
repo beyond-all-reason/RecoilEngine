@@ -638,6 +638,20 @@ endif()
 	endif()
 
 ################################################################################
+### PBRDisplayTransforms
+# The curves of the PBR display pass (rts/Rendering/GL/DisplayTransforms_pbr.h)
+# against float64 goldens from generate_display_transform_golden.py.
+	set(test_name PBRDisplayTransforms)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/PBR/testPBRDisplayTransforms.cpp"
+			${test_Common_sources}
+		)
+	set(test_libs
+			""
+		)
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+
+################################################################################
 
 
 add_subdirectory(headercheck)

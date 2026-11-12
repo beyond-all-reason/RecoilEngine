@@ -33,6 +33,7 @@
 #include "ExternalAI/EngineOutHandler.h"
 #include "ExternalAI/SkirmishAIHandler.h"
 #include "Rendering/WorldDrawer.h"
+#include "Rendering/GL/SceneTarget.h"
 #include "Rendering/Env/IWater.h"
 #include "Rendering/Env/WaterRendering.h"
 #include "Rendering/Env/MapRendering.h"
@@ -1014,6 +1015,7 @@ void CGame::KillRendering()
 	icon::iconHandler.Kill();
 	spring::SafeDelete(geometricObjects);
 	worldDrawer.Kill();
+	sceneTarget.Kill();
 
 	modelUniformsStorage.Kill();
 	//transformsMemStorage.Kill(); //Add?
@@ -1558,9 +1560,13 @@ bool CGame::Draw() {
 			FBO::Unbind();
 		camera->LoadViewport();
 
+		// PBRSceneTarget=hdr: the world draws into the HDR scene target
+		sceneTarget.BeginFrame();
 		worldDrawer.Draw();
 		worldDrawer.ResetMVPMatrices();
 	}
+
+	sceneTarget.Present(CSceneTarget::Boundary::AfterWorld);
 
 	{
 		SCOPED_TIMER("Draw::Screen");
@@ -1569,6 +1575,7 @@ bool CGame::Draw() {
 			unitDrawer->DrawUnitIconsScreen();
 
 		eventHandler.DrawScreenEffects();
+		sceneTarget.Present(CSceneTarget::Boundary::AfterScreenEffects);
 
 		hudDrawer->Draw((gu->GetMyPlayer())->fpsController.GetControllee());
 		debugDrawerAI->Draw();

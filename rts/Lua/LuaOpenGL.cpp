@@ -85,6 +85,7 @@
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Weapons/WeaponDefHandler.h"
+#include "Rendering/GL/SceneTarget.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Matrix44f.h"
@@ -4586,6 +4587,7 @@ int LuaOpenGL::CopyToTexture(lua_State* L)
 	const auto target = (GLenum)luaL_optnumber(L, 8, tex->target);
 	const auto level  = (GLenum)luaL_optnumber(L, 9, 0);
 
+	ScopedSceneReadResolve resolve;
 	glCopyTexSubImage2D(target, level, xoff, yoff, x, y, w, h);
 
 	if (tex->target != GL_TEXTURE_2D) {glDisable(tex->target);}
@@ -4744,7 +4746,8 @@ int LuaOpenGL::RenderToTexture(lua_State* L)
 	if ((tex == nullptr) || (tex->fbo == 0))
 		return 0;
 
-	GLint currentFBO = 0;
+	// restores "the window": the PBR scene target during the world phase
+	GLint currentFBO = sceneTarget.GetDefaultFBO();
 	if (drawMode == DRAW_WORLD_SHADOW) {
 		glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &currentFBO);
 	}
@@ -7070,6 +7073,7 @@ int LuaOpenGL::ReadPixels(lua_State* L)
 
 	CBitmap bmp;
 	bmp.Alloc(w, h, fSize * sizeof(float));
+	ScopedSceneReadResolve resolve;
 	glReadPixels(x, y, w, h, format, GL_FLOAT, reinterpret_cast<float*>(bmp.GetRawMem()));
 
 	const float* data = reinterpret_cast<const float*>(bmp.GetRawMem());
@@ -7195,7 +7199,10 @@ int LuaOpenGL::SaveImage(lua_State* L)
 	CBitmap bitmap;
 	bitmap.Alloc(width, height);
 
-	glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, bitmap.GetRawMem());
+	{
+		ScopedSceneReadResolve resolve;
+		glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, bitmap.GetRawMem());
+	}
 
 	if (yflip)
 		bitmap.ReverseYAxis();
