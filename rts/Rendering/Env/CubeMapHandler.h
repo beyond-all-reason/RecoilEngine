@@ -21,6 +21,23 @@ public:
 	unsigned int GetReflectionTextureSize() const { return reflTexSize; }
 	unsigned int GetSpecularTextureSize() const { return specTexSize; }
 
+	/**
+	 * Camera axes of the six cube faces, in OpenGL face order (POSITIVE_X,
+	 * NEGATIVE_X, POSITIVE_Y, NEGATIVE_Y, POSITIVE_Z, NEGATIVE_Z): forward,
+	 * right and up per face. The reflection captures here negate right and up
+	 * (reflections are drawn mirrored). Public and static so that
+	 * gl.RenderEnvironmentFace (LuaOpenGL.cpp) uses this one table: a Lua
+	 * cube's faces then line up with the legacy cubes' by construction.
+	 */
+	static constexpr float3 faceDirs[6][3] = {
+		{ RgtVector,  FwdVector,   UpVector}, // fwd = +x, right = +z, up = +y
+		{-RgtVector, -FwdVector,   UpVector}, // fwd = -x
+		{  UpVector, -RgtVector, -FwdVector}, // fwd = +y
+		{ -UpVector, -RgtVector,  FwdVector}, // fwd = -y
+		{ FwdVector, -RgtVector,   UpVector}, // fwd = +z
+		{-FwdVector,  RgtVector,   UpVector}, // fwd = -z
+	};
+
 private:
 	void CreateReflectionFace(unsigned int, bool);
 	void CreateSpecularFacePart(unsigned int, unsigned int, const float3&, const float3&, const float3&, unsigned int, unsigned char*);
@@ -44,24 +61,6 @@ private:
 	std::vector<unsigned char> specTexFaceBuf;
 
 	FBO reflectionCubeFBO;
-
-	/*
-	GL_TEXTURE_CUBE_MAP_POSITIVE_X
-	GL_TEXTURE_CUBE_MAP_NEGATIVE_X
-	GL_TEXTURE_CUBE_MAP_POSITIVE_Y
-	GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
-	GL_TEXTURE_CUBE_MAP_POSITIVE_Z
-	GL_TEXTURE_CUBE_MAP_NEGATIVE_Z
-	*/
-
-	const float3 faceDirs[6][3] = {
-		{ RgtVector,  FwdVector,   UpVector}, // fwd = +x, right = +z, up = +y
-		{-RgtVector, -FwdVector,   UpVector}, // fwd = -x
-		{  UpVector, -RgtVector, -FwdVector}, // fwd = +y
-		{ -UpVector, -RgtVector,  FwdVector}, // fwd = -y
-		{ FwdVector, -RgtVector,   UpVector}, // fwd = +z
-		{-FwdVector,  RgtVector,   UpVector}, // fwd = -z
-	};
 };
 
 extern CubeMapHandler cubeMapHandler;
