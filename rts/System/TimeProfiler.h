@@ -26,7 +26,7 @@
 #define SCOPED_SPECIAL_TIMER(      name)  static TimerNameRegistrar __stnr(name); ScopedTimer __scopedTimer(hashString(name), false, true);
 #define SCOPED_SPECIAL_TIMER_NOREG(name)                                          ScopedTimer __scopedTimer(hashString(name), false, true);
 
-#define SCOPED_MT_TIMER(name)  ScopedMtTimer __scopedTimer(hashString(name));
+#define SCOPED_MT_TIMER(name)  static TimerNameRegistrar __mttnr(name); ScopedMtTimer __scopedTimer(hashString(name));
 
 #define SCOPED_ONCE_TIMER(name) ZoneScopedNC(name, tracy::Color::Purple); ScopedOnceTimer __timer(name);
 
