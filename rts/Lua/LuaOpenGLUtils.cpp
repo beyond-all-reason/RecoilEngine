@@ -430,6 +430,22 @@ bool LuaOpenGLUtils::ParseTextureImage(lua_State* L, LuaMatTexture& texUnit, con
 		} break;
 
 		case '$': {
+			// Checked before the fixed "$..." names: "$pub:<name>" is a prefix plus
+			// a free name, which the hashed switch below cannot match. 5 is the
+			// length of "$pub:" (the compare and the substr skip exactly it).
+			if (image.compare(0, 5, "$pub:") == 0) {
+				// a texture published with gl.PublishTexture; id 0 while unpublished
+				// Always succeeds, even before anything is published: a material or
+				// a widget may parse the name before the provider publishes, and
+				// then samples the texture from the first bind after publication.
+				// Only the slot index is stored (GetPublishedIndex creates the slot
+				// if needed); it needs no Lua state, so it also works for engine
+				// shaders parsed with L == nullptr (IProgramObject::AddTextureBinding).
+				texUnit.type = LuaMatTexture::LUATEX_PUBLISHED;
+				texUnit.data = reinterpret_cast<const void*>(LuaTextures::GetPublishedIndex(image.substr(5)));
+				break;
+			}
+
 			switch ((texUnit.type = GetLuaMatTextureType(image))) {
 				case LuaMatTexture::LUATEX_NONE: {
 					// name not found in table, check for special case overrides
@@ -550,6 +566,15 @@ GLuint LuaMatTexture::GetTextureID() const
 		} break;
 		case LUATEX_SPECULAR: {
 			texID = cubeMapHandler.GetSpecularTextureID();
+		} break;
+		// Resolved on every bind, not at parse time: a republished name takes
+		// effect on the next draw, and an unpublished one yields id 0, never a
+		// deleted GL name. With id 0 Bind() binds nothing, so the unit keeps
+		// whatever it had; consumers check gl.TextureInfo(name).id first. data
+		// holds the slot index the way LUATEX_NAMED holds its CNamedTextures index.
+		case LUATEX_PUBLISHED: {
+			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
+			texID = (pub != nullptr) ? pub->id : 0;
 		} break;
 
 
@@ -689,6 +714,12 @@ GLuint LuaMatTexture::GetTextureTarget() const
 		case LUATEX_SKY_REFLECTION: [[fallthrough]];
 		case LUATEX_SPECULAR: {
 			texType = GL_TEXTURE_CUBE_MAP_ARB;
+		} break;
+		// the target copied at publication (a cube for the PBR names); while
+		// unpublished GL_TEXTURE_2D, the default of every other "no texture" case
+		case LUATEX_PUBLISHED: {
+			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
+			texType = (pub != nullptr && pub->id != 0) ? pub->target : GL_TEXTURE_2D;
 		} break;
 
 		case LUATEX_NONE:		  [[fallthrough]];
@@ -907,6 +938,14 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 		case LUATEX_SPECULAR: {
 			return ReturnHelper(cubeMapHandler.GetSpecularTextureSize());
 		} break;
+		// the size copied at publication, so gl.TextureInfo("$pub:<name>") works
+		// from any handle without access to the owner's textures; 0x0 while
+		// unpublished (zsize is not copied, so a published 3D or array texture
+		// reports zsize 0; the PBR names are cubes)
+		case LUATEX_PUBLISHED: {
+			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
+			return (pub != nullptr && pub->id != 0) ? ReturnHelper(pub->xsize, pub->ysize) : ReturnHelper(0);
+		} break;
 
 
 		case LUATEX_SHADOWMAP: {
@@ -1064,6 +1103,7 @@ void LuaMatTexture::Print(const string& indent) const
 		STRING_CASE(typeName, LUATEX_MAP_REFLECTION);
 		STRING_CASE(typeName, LUATEX_SKY_REFLECTION);
 		STRING_CASE(typeName, LUATEX_SPECULAR);
+		STRING_CASE(typeName, LUATEX_PUBLISHED);
 
 		STRING_CASE(typeName, LUATEX_SHADOWMAP);
 		STRING_CASE(typeName, LUATEX_SHADOWCOLOR);

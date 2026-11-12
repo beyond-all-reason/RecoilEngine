@@ -433,9 +433,13 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	if (IS_GL_FUNCTION_AVAILABLE(glGenerateMipmapEXT))
 		REGISTER_LUA_CFUNC(GenerateMipmap);
 	// RenderEnvironmentFace renders through its own FBO, so it exists only with
-	// FBO support.
-	if (FBO::IsSupported())
+	// FBO support. PublishTexture needs none, but it is registered with it: its
+	// only user (BAR's PBR provider) needs both and tests `gl.X ~= nil` for the
+	// pair, so a Lua script can detect the feature with either name.
+	if (FBO::IsSupported()) {
 		REGISTER_LUA_CFUNC(RenderEnvironmentFace);
+		REGISTER_LUA_CFUNC(PublishTexture);
+	}
 
 	REGISTER_LUA_CFUNC(ActiveTexture);
 	REGISTER_LUA_CFUNC(TexEnv);
@@ -5037,6 +5041,118 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 		return 1;
 
 	lua_pushstring(L, error);
+	return 2;
+}
+
+
+/***
+ * Publishes a Lua texture of this handle so every Lua handle (and engine
+ * code) can sample it as `"$pub:<name>"`, or unpublishes the name when
+ * `texName` is nil. Only the publishing handle can change a name. Deleting the
+ * texture, or the handle shutting down, unpublishes it. Consumers see names
+ * changed within one call-in together.
+ *
+ * Why it exists: a Lua texture name such as `"!12"` (returned by
+ * gl.CreateTexture) resolves only inside the Lua handle that created it, so a
+ * texture built in LuaRules cannot be sampled by a LuaUI widget, and engine
+ * code has no way to name it at all. Publishing gives the texture a global
+ * name. The texture itself stays owned by the publishing handle; nothing is
+ * copied.
+ *
+ * Use case 1, a LuaRules provider and LuaUI consumers. BAR's PBR provider
+ * (an unsynced LuaRules gadget, beside the unit shaders) builds the
+ * environment cubes and publishes them; the LuaUI IBL viewer and self-test
+ * sample them:
+ *
+ * ```lua
+ * -- LuaRules (unsynced): publish all three together, in one call-in
+ * gl.PublishTexture("pbr_environment", set.environment)
+ * gl.PublishTexture("pbr_irradiance", set.irradiance)
+ * gl.PublishTexture("pbr_specular", set.specular)
+ *
+ * -- LuaUI widget: bind like any named texture
+ * function widget:DrawScreen()
+ *   local info = gl.TextureInfo("$pub:pbr_environment")
+ *   if info and info.id ~= 0 then -- id is 0 while nothing is published
+ *     gl.Texture(0, "$pub:pbr_environment")
+ *     -- draw with a samplerCube shader ...
+ *     gl.Texture(0, false)
+ *   end
+ * end
+ * ```
+ *
+ * Use case 2, any LuaUI widget that needs the image-based lighting cubes (for
+ * example a widget shader lighting its own geometry): it binds
+ * `"$pub:pbr_irradiance"` and `"$pub:pbr_specular"` the same way, to the
+ * texture units its shader's samplerCube uniforms use. It needs no code from
+ * the provider and keeps working when the provider republishes new cubes:
+ * the name is resolved again on every bind.
+ *
+ * Use case 3, names that the engine binds. Every place that accepts a texture
+ * name string accepts `"$pub:<name>"`: material texture tables such as the
+ * `texunits` of Spring.UnitRendering.SetMaterial, and the `textures` table of
+ * engine shaders loaded from Lua files. The engine binds those itself at draw
+ * time, so the material always samples the currently published texture:
+ *
+ * ```lua
+ * Spring.UnitRendering.SetMaterial(unitID, 1, "opaque", {
+ *   shader = shaderID,
+ *   texunits = {
+ *     [0] = "%" .. unitDefID .. ":0",
+ *     [6] = "$pub:pbr_irradiance",
+ *     [7] = "$pub:pbr_specular",
+ *   },
+ * })
+ * ```
+ *
+ * Unpublishing: pass nil (or omit texName). The name stays known and samples
+ * as no texture (id 0) until a handle publishes it again:
+ *
+ * ```lua
+ * gl.PublishTexture("pbr_environment", nil)
+ * ```
+ *
+ * Inside one Lua handle no publication is needed: the handle can bind its own
+ * `"!N"` name directly (`gl.Texture(0, texture)`), and other code in the same
+ * handle can be given that name (BAR's LuaRules consumers use
+ * GG.PBREnvironment.GetTextures()). Publish only what another handle or the
+ * engine must sample.
+ *
+ * Ownership: only the handle that published a name can republish or
+ * unpublish it; another handle gets `false, message` and the name is
+ * unchanged. Once the owner unpublishes (or frees the texture) any handle may
+ * take the name. Only textures of the calling handle can be published.
+ *
+ * Lifetime: a name's slot is created the first time it is looked up, by the
+ * publisher or by a consumer parsing `"$pub:<name>"` before anything is
+ * published, and is never removed, so a parsed name (in a material, say)
+ * stays valid for the rest of the process. gl.DeleteTexture of a published
+ * texture, and the publishing handle shutting down or reloading, unpublish it
+ * automatically, so a name never points at a deleted texture.
+ *
+ * Atomicity: all Lua call-ins and draws run on the one render thread, so
+ * names changed in one call-in are seen together by every consumer; publish a
+ * whole set (environment, irradiance, specular) in one call-in.
+ *
+ * @function gl.PublishTexture
+ * @param name string the published name, sampled as `"$pub:" .. name`
+ * @param texName string? Lua texture name of this handle, nil to unpublish
+ * @return boolean success
+ * @return string? error when another handle owns the name, or texName is not a texture of this handle
+ */
+int LuaOpenGL::PublishTexture(lua_State* L)
+{
+	// nil and "" both mean "unpublish"; all rules live in LuaTextures::Publish.
+	// No CheckDrawingEnabled: publishing issues no GL call, so it is allowed
+	// in any unsynced call-in (the gl table does not exist in synced code).
+	std::string error;
+	const bool published = CLuaHandle::GetActiveTextures(L).Publish(luaL_checksstring(L, 1), luaL_optsstring(L, 2, ""), error);
+
+	lua_pushboolean(L, published);
+	if (published)
+		return 1;
+
+	lua_pushsstring(L, error);
 	return 2;
 }
 
