@@ -189,8 +189,6 @@ QTPFS::PathManager::PathManager() {
 	// Force the EnTT component storage to be created to avoid race conditions with the background worker threads.
 	registry.storage<PathDelayedDelete>();
 
-	CTimeProfiler::RegisterTimer("Sim::Path::Requests");
-
 	assert(entt::to_entity(extReserveEntity) == 0);
 	assert(entt::to_entity(systemEntity) == 0);
 }
