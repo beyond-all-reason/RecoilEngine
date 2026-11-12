@@ -141,6 +141,15 @@ void CSceneTarget::Init()
 	initialized = true;
 	configHandler->NotifyOnChange(this, CONFIG_KEYS);
 	settingsDirty = true;
+}
+
+// The display and depth-copy programs are built the first time a frame wants the
+// scene target (or the transform test runs), not at game start: a game that never
+// sets PBRSceneTarget=hdr compiles nothing and logs nothing (R7, other games).
+void CSceneTarget::CreatePrograms()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	programsCreated = true;
 
 	displayShader = shaderHandler->CreateProgramObject(SHADER_POOL, "PBRDisplay");
 	displayShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/PBRDisplayVS.glsl", "", GL_VERTEX_SHADER));
@@ -190,9 +199,11 @@ void CSceneTarget::Kill()
 	Free(res);
 	sceneFBO = 0;
 	worldPhase = false;
-	shaderHandler->ReleaseProgramObjects(SHADER_POOL);
+	if (programsCreated)
+		shaderHandler->ReleaseProgramObjects(SHADER_POOL);
 	displayShader = nullptr;
 	depthCopyShader = nullptr;
+	programsCreated = false;
 	emptyVAO.Delete();
 	initialized = false;
 }
@@ -387,6 +398,8 @@ void CSceneTarget::BeginFrame()
 		goDirect(blockedReason);
 		return;
 	}
+	if (!programsCreated)
+		CreatePrograms();
 	if (forceFailure) {
 		blockedReason = "forced allocation failure (PBRSceneTargetForceFailure), using direct";
 		info.allocationFailures++;
@@ -669,6 +682,8 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 #ifndef HEADLESS
 	if (!initialized)
 		Init();
+	if (!programsCreated)
+		CreatePrograms();
 	if (!displayShader->IsValid()) {
 		result.failure = "display pass shader failed to link";
 		return result;

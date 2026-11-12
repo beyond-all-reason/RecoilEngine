@@ -2957,6 +2957,9 @@ int LuaUnsyncedRead::GetSceneTargetInfo(lua_State* L)
  * transfers and is compared with the engine's CPU reference of the same curves.
  * `pass` needs every value within two half-float steps, finite, and the gray
  * row monotonic. Changes no setting; restores the GL state it touches.
+ * A test tool: the first call builds the display pass programs (otherwise built
+ * only when PBRSceneTarget=hdr is first wanted), so a game that never calls it
+ * and never asks for hdr compiles none of them.
  *
  * @function Spring.TestDisplayTransforms
  * @return table result fields ran, pass, samples, maxError, worstTransform, failure
