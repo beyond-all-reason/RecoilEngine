@@ -61,6 +61,8 @@ jobs:
   build-engine:
     if: github.repository == 'beyond-all-reason/RecoilEngine' || github.event_name == 'workflow_dispatch'
     strategy:
+      # One failing target (the Tracy build, say) must not cancel the others.
+      fail-fast: false
       matrix:
         system:
           - target: amd64-linux
@@ -72,7 +74,24 @@ jobs:
           - target: amd64-windows
             runs-on-arch: amd64
             bazel-remote-sha256: 6a6b64666c2238ec6b49b7b29f5e41e4149de09417a0028897c9bffe40376876
-    name: Build ${{ matrix.system.target }} engine
+        # Compiles the Tracy-enabled code (TRACY_ENABLE) that ordinary builds leave out, so a break there shows up
+        # in the pull request and not only in the release. Windows is where the headless link failure was seen.
+        # Pull requests and master pushes only: release-build.yml already builds every target with Tracy, and
+        # its collected artifacts must not gain an extra package.
+        # The folded scalar below joins its lines with single spaces into one expression.
+        include: >-
+          ${{ fromJSON(
+          (github.event_name == 'pull_request' || github.event_name == 'push')
+          && !inputs.image-artifacts
+          && '[{"system": {
+          "target": "amd64-windows",
+          "variant": "-tracy",
+          "cmake-options": "-DTRACY_ENABLE=ON",
+          "runs-on-arch": "amd64",
+          "bazel-remote-sha256": "6a6b64666c2238ec6b49b7b29f5e41e4149de09417a0028897c9bffe40376876"
+          }}]'
+          || '[]') }}
+    name: Build ${{ matrix.system.target }}${{ matrix.system.variant }} engine
     runs-on:
       # Run on 8 core, 16GiB ubuntu 24.04 machine.
       - nscloud-ubuntu-24.04-${{ matrix.system.runs-on-arch }}-8x16-with-cache
@@ -108,8 +127,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: bazel-remote-data-overlay.tar
-          key: pr-bazel-remote-data-${{ matrix.system.target }}-${{ github.run_id }}
-          restore-keys: pr-bazel-remote-data-${{ matrix.system.target }}-
+          key: pr-bazel-remote-data-${{ matrix.system.target }}${{ matrix.system.variant }}-${{ github.run_id }}
+          restore-keys: pr-bazel-remote-data-${{ matrix.system.target }}${{ matrix.system.variant }}-
       - name: Mount bazel remote overlay
         id: mount-overlay
         if: github.event_name == 'pull_request'
@@ -202,10 +221,10 @@ jobs:
             bash <<EOF
           set -e
           cd /build/src/docker-build-v2/scripts
-          ./configure.sh ${{ inputs.cmake-options || '' }}
+          ./configure.sh ${{ inputs.cmake-options || '' }} ${{ matrix.system.cmake-options }}
           ./compile.sh
           ${{ ((github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.split-debug-info == false) && 'echo "Not splitting debug info."' || './split-debug-info.sh' }}
-          ./package.sh ${{ inputs.package-suffix }}
+          ./package.sh ${{ inputs.package-suffix }}${{ matrix.system.variant }}
 
           EOF
       - name: Save
@@ -213,7 +232,7 @@ jobs:
         uses: actions/upload-artifact@v4
         id: save-artifact
         with:
-          name: engine-artifacts-${{ matrix.system.target }}-${{ inputs.package-suffix }}
+          name: engine-artifacts-${{ matrix.system.target }}${{ matrix.system.variant }}-${{ inputs.package-suffix }}
           path: ./artifacts
           compression-level: 0  # already compressed
       - name: Unmount bazel remote overlay
