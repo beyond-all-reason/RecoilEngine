@@ -154,6 +154,7 @@ private:
 	bool forceFailure = false;
 	Boundary boundary = Boundary::AfterWorld;
 	GLenum wantDepthFormat = 0;
+	GLenum wantColorFormat = GL_RGBA16F;
 	PBRDisplay::Transform transform = PBRDisplay::Transform::KhronosNeutral;
 	PBRDisplay::SceneTransfer transfer = PBRDisplay::SceneTransfer::SRGBExtended;
 	float exposureEV = 0.0f;

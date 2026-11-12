@@ -19,7 +19,7 @@
 CONFIG(std::string, PBRSceneTarget).defaultValue("direct").description("PBR M1 master switch: direct (draw the world into the window, today's rendering) or hdr (draw it into the RGBA16F scene target and present it through the one display pass). A failed allocation falls back to direct in the same frame.");
 CONFIG(std::string, PBRSceneTransfer).defaultValue("srgb-extended").description("How the scene target stores the legacy world: srgb-extended (legacy shaders unchanged, decoded once by the display pass). linear is reserved and falls back to srgb-extended.");
 CONFIG(std::string, PBRSceneDepthFormat).defaultValue("d24s8").description("Scene depth and stencil: d24s8 (copied into the window by a blit) or d32fs8 (depth copied by a shader, stencil not copied).");
-CONFIG(std::string, PBRHDRColorFormat).defaultValue("rgba16f").description("Scene colour format. Only rgba16f is built; r11g11b10f and compare are reserved and fall back to rgba16f.");
+CONFIG(std::string, PBRHDRColorFormat).defaultValue("rgba16f").description("Scene colour format: rgba16f (default) or r11g11b10f (half the memory and bandwidth; no alpha, no negative values, about 6 bits of mantissa). compare is reserved and falls back to rgba16f.");
 CONFIG(std::string, PBRDisplayTransform).defaultValue("khronos-neutral").description("The one display transform: khronos-neutral, agx, aces, aces-hill, hable, uchimura, reinhard, reinhard-jodie, filmic-hejl, unreal, bar-custom, legacy (today's image unchanged) or linear-debug.");
 CONFIG(std::string, PBRExposureMode).defaultValue("manual").description("Exposure mode. Only manual is built; auto and compare are reserved and fall back to manual.");
 CONFIG(float, PBRExposureEV).defaultValue(0.0f).description("Manual exposure in EV stops applied by the display pass (linear multiplier 2^EV; 0 = 1.0).");
@@ -61,6 +61,11 @@ namespace {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, nullptr);
 		return tex;
+	}
+
+	// client format of the (empty) colour upload: three channels for R11F_G11F_B10F, four otherwise
+	GLenum ColorClientFormat(GLenum internalFormat) {
+		return (internalFormat == GL_R11F_G11F_B10F)? GL_RGB: GL_RGBA;
 	}
 
 	GLuint MakeRenderbuffer(GLenum internalFormat, int samples, int w, int h) {
@@ -240,7 +245,8 @@ void CSceneTarget::ReadSettings()
 		note("PBRSceneDepthFormat=" + info.requestedDepthFormat + " is unknown, using d24s8");
 
 	const std::string colorName = configHandler->GetString("PBRHDRColorFormat");
-	if (colorName != "rgba16f")
+	wantColorFormat = (colorName == "r11g11b10f")? GL_R11F_G11F_B10F: GL_RGBA16F;
+	if (colorName != "rgba16f" && colorName != "r11g11b10f")
 		note("PBRHDRColorFormat=" + colorName + " is not built, using rgba16f");
 
 	const std::string transformName = configHandler->GetString("PBRDisplayTransform");
@@ -271,7 +277,7 @@ void CSceneTarget::ReadSettings()
 	if (ditherName != "off" && ditherName != "unreal")
 		note("PBRDisplayDither=" + ditherName + " is unknown, using unreal");
 
-	info.colorFormat = "rgba16f";
+	info.colorFormat = (wantColorFormat == GL_R11F_G11F_B10F)? "r11g11b10f": "rgba16f";
 	info.transfer = "srgb-extended";
 	info.displayTransform = std::string(PBRDisplay::TransformName(transform));
 	info.exposureMode = "manual";
@@ -294,7 +300,7 @@ bool CSceneTarget::Allocate(const Desc& d, Resources& out, std::string& error) c
 	glBindFramebuffer(GL_FRAMEBUFFER, out.sceneFBO);
 
 	if (d.samples == 0) {
-		out.colorTex = MakeTexture(d.colorFormat, GL_RGBA, GL_HALF_FLOAT, d.width, d.height);
+		out.colorTex = MakeTexture(d.colorFormat, ColorClientFormat(d.colorFormat), GL_HALF_FLOAT, d.width, d.height);
 		out.depthTex = MakeTexture(d.depthFormat, GL_DEPTH_STENCIL, DepthFormatType(d.depthFormat), d.width, d.height);
 		out.maskTex = MakeTexture(PBR_MASK_FORMAT, GL_RED, GL_UNSIGNED_BYTE, d.width, d.height);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, out.colorTex, 0);
@@ -319,7 +325,7 @@ bool CSceneTarget::Allocate(const Desc& d, Resources& out, std::string& error) c
 	if (status == GL_FRAMEBUFFER_COMPLETE && d.samples > 0) {
 		glGenFramebuffers(1, &out.resolveFBO);
 		glBindFramebuffer(GL_FRAMEBUFFER, out.resolveFBO);
-		out.resolveColorTex = MakeTexture(d.colorFormat, GL_RGBA, GL_HALF_FLOAT, d.width, d.height);
+		out.resolveColorTex = MakeTexture(d.colorFormat, ColorClientFormat(d.colorFormat), GL_HALF_FLOAT, d.width, d.height);
 		out.resolveDepthTex = MakeTexture(d.depthFormat, GL_DEPTH_STENCIL, DepthFormatType(d.depthFormat), d.width, d.height);
 		out.resolveMaskTex = MakeTexture(PBR_MASK_FORMAT, GL_RED, GL_UNSIGNED_BYTE, d.width, d.height);
 		glBindTexture(GL_TEXTURE_2D, 0);
@@ -416,7 +422,7 @@ void CSceneTarget::BeginFrame()
 	GLint windowSamples = 0;
 	glGetIntegerv(GL_SAMPLES, &windowSamples);
 
-	const Desc want = {globalRendering->winSizeX, globalRendering->winSizeY, windowSamples, GL_RGBA16F, wantDepthFormat};
+	const Desc want = {globalRendering->winSizeX, globalRendering->winSizeY, windowSamples, wantColorFormat, wantDepthFormat};
 
 	if (!(res.desc == want) || res.sceneFBO == 0) {
 		Resources fresh;
