@@ -7,6 +7,9 @@
 // Uniform values match the C++ enums PBRDisplay::Transform and SceneTransfer.
 
 uniform sampler2D sceneColor;
+// 1 where a PBR model was drawn last (SceneTarget.h); everything else holds display-referred colour already
+uniform sampler2D sceneMask;
+uniform int useSceneMask; // 0 only in the transform test, whose ramp is all PBR light
 uniform int displayTransform;
 uniform int sceneTransfer;
 uniform float exposureLinear;
@@ -23,6 +26,11 @@ void main() {
 	vec4 stored = texelFetch(sceneColor, ivec2(gl_FragCoord.xy), 0);
 
 	if (displayTransform == TM_LEGACY) {
+		fragColor = stored;
+		return;
+	}
+	// legacy models, terrain, water and sky: today's direct value, untouched (no curve, exposure or grain)
+	if (useSceneMask == 1 && texelFetch(sceneMask, ivec2(gl_FragCoord.xy), 0).r < 0.5) {
 		fragColor = stored;
 		return;
 	}

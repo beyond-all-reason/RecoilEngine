@@ -36,6 +36,9 @@ namespace {
 	constexpr float DITHER_8BIT = 1.0f / 255.0f;     // one step of an 8-bit window
 	constexpr unsigned DITHER_SEED_PERIOD = 1024u;  // keeps the float seed exact
 	constexpr const char* DEPTH_D32FS8 = "d32fs8";
+	// the PBR mask (see SceneTarget.h): one 8-bit channel is enough for 0 / 1 and blended edges
+	constexpr GLenum PBR_MASK_FORMAT = GL_R8;
+	constexpr GLenum PBR_MASK_ATTACHMENT = GL_COLOR_ATTACHMENT1;
 
 	const std::vector<std::string> CONFIG_KEYS = {
 		"PBRSceneTarget", "PBRSceneTransfer", "PBRSceneDepthFormat", "PBRHDRColorFormat",
@@ -134,6 +137,7 @@ void CSceneTarget::Init()
 	if (displayShader->IsValid()) {
 		displayShader->Enable();
 		displayShader->SetUniform("sceneColor", 0);
+		displayShader->SetUniform("sceneMask", 1);
 		displayShader->Disable();
 	} else {
 		LOG_L(L_ERROR, "[SceneTarget] display pass shader failed; PBRSceneTarget=hdr will fall back to direct:\n%s", displayShader->GetLog().c_str());
@@ -255,16 +259,23 @@ bool CSceneTarget::Allocate(const Desc& d, Resources& out, std::string& error) c
 	if (d.samples == 0) {
 		out.colorTex = MakeTexture(d.colorFormat, GL_RGBA, GL_HALF_FLOAT, d.width, d.height);
 		out.depthTex = MakeTexture(d.depthFormat, GL_DEPTH_STENCIL, DepthFormatType(d.depthFormat), d.width, d.height);
+		out.maskTex = MakeTexture(PBR_MASK_FORMAT, GL_RED, GL_UNSIGNED_BYTE, d.width, d.height);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, out.colorTex, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, PBR_MASK_ATTACHMENT, GL_TEXTURE_2D, out.maskTex, 0);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, out.depthTex, 0);
 	} else {
 		out.colorRBO = MakeRenderbuffer(d.colorFormat, d.samples, d.width, d.height);
 		out.depthRBO = MakeRenderbuffer(d.depthFormat, d.samples, d.width, d.height);
+		out.maskRBO = MakeRenderbuffer(PBR_MASK_FORMAT, d.samples, d.width, d.height);
 		glBindRenderbuffer(GL_RENDERBUFFER, 0);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, out.colorRBO);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, PBR_MASK_ATTACHMENT, GL_RENDERBUFFER, out.maskRBO);
 		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, out.depthRBO);
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
+	// everything that binds the scene as "the window" writes the colour only
+	glDrawBuffer(GL_COLOR_ATTACHMENT0);
+	glReadBuffer(GL_COLOR_ATTACHMENT0);
 
 	GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 
@@ -273,9 +284,13 @@ bool CSceneTarget::Allocate(const Desc& d, Resources& out, std::string& error) c
 		glBindFramebuffer(GL_FRAMEBUFFER, out.resolveFBO);
 		out.resolveColorTex = MakeTexture(d.colorFormat, GL_RGBA, GL_HALF_FLOAT, d.width, d.height);
 		out.resolveDepthTex = MakeTexture(d.depthFormat, GL_DEPTH_STENCIL, DepthFormatType(d.depthFormat), d.width, d.height);
+		out.resolveMaskTex = MakeTexture(PBR_MASK_FORMAT, GL_RED, GL_UNSIGNED_BYTE, d.width, d.height);
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, out.resolveColorTex, 0);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, PBR_MASK_ATTACHMENT, GL_TEXTURE_2D, out.resolveMaskTex, 0);
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, out.resolveDepthTex, 0);
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+		glReadBuffer(GL_COLOR_ATTACHMENT0);
 		status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
 	}
 
@@ -301,11 +316,11 @@ void CSceneTarget::Free(Resources& r)
 		if (*fbo != 0)
 			glDeleteFramebuffers(1, fbo);
 	}
-	for (GLuint* tex: {&r.colorTex, &r.depthTex, &r.resolveColorTex, &r.resolveDepthTex}) {
+	for (GLuint* tex: {&r.colorTex, &r.depthTex, &r.resolveColorTex, &r.resolveDepthTex, &r.maskTex, &r.resolveMaskTex}) {
 		if (*tex != 0)
 			glDeleteTextures(1, tex);
 	}
-	for (GLuint* rbo: {&r.colorRBO, &r.depthRBO}) {
+	for (GLuint* rbo: {&r.colorRBO, &r.depthRBO, &r.maskRBO}) {
 		if (*rbo != 0)
 			glDeleteRenderbuffers(1, rbo);
 	}
@@ -402,8 +417,44 @@ void CSceneTarget::BeginFrame()
 	info.depthFormat = DepthFormatName(res.desc.depthFormat);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+	ClearPBRMask();
 	worldPhase = true;
 #endif
+}
+
+void CSceneTarget::ClearPBRMask()
+{
+	// glClearBuffer obeys the scissor test and the colour write mask of that draw buffer
+	const GLboolean scissor = glIsEnabled(GL_SCISSOR_TEST);
+	glDisable(GL_SCISSOR_TEST);
+	const GLenum both[] = {GL_COLOR_ATTACHMENT0, PBR_MASK_ATTACHMENT};
+	glDrawBuffers(2, both);
+	glColorMaski(1, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	const GLfloat zero[] = {0.0f, 0.0f, 0.0f, 0.0f};
+	glClearBufferfv(GL_COLOR, 1, zero);
+	glDrawBuffer(GL_COLOR_ATTACHMENT0);
+	maskWrites = false;
+	if (scissor)
+		glEnable(GL_SCISSOR_TEST);
+}
+
+bool CSceneTarget::SetPBRMaskWrites(bool on)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!worldPhase)
+		return false;
+	GLint drawFBO = 0;
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &drawFBO);
+	if (GLuint(drawFBO) != sceneFBO)
+		return false;
+	if (on) {
+		const GLenum both[] = {GL_COLOR_ATTACHMENT0, PBR_MASK_ATTACHMENT};
+		glDrawBuffers(2, both);
+	} else {
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
+	}
+	maskWrites = on;
+	return on;
 }
 
 void CSceneTarget::ResolveScene(GLbitfield mask)
@@ -425,6 +476,23 @@ void CSceneTarget::ResolveScene(GLbitfield mask)
 	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, prevDraw);
 	if (scissor)
 		glEnable(GL_SCISSOR_TEST);
+}
+
+void CSceneTarget::ResolvePBRMask()
+{
+	if (samples == 0 || res.resolveFBO == 0)
+		return;
+
+	// a blit copies the read buffer into the draw buffers: point both at the mask, then back at the colour
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, res.sceneFBO);
+	glBindFramebuffer(GL_DRAW_FRAMEBUFFER, res.resolveFBO);
+	glReadBuffer(PBR_MASK_ATTACHMENT);
+	glDrawBuffer(PBR_MASK_ATTACHMENT);
+	glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+	glReadBuffer(GL_COLOR_ATTACHMENT0);
+	glDrawBuffer(GL_COLOR_ATTACHMENT0);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, res.resolveFBO);
+	glReadBuffer(GL_COLOR_ATTACHMENT0);
 }
 
 GLuint CSceneTarget::GetColorTexture()
@@ -471,7 +539,14 @@ void CSceneTarget::Present(Boundary at)
 
 	{
 		ScopedPassState state;
+		if (maskWrites) {
+			// a draw that never switched the mask off: the scene is "the window" for everyone else again
+			glBindFramebuffer(GL_FRAMEBUFFER, sceneFBO);
+			glDrawBuffer(GL_COLOR_ATTACHMENT0);
+			maskWrites = false;
+		}
 		ResolveScene(GL_COLOR_BUFFER_BIT);
+		ResolvePBRMask();
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0, 0, width, height);
 		DrawDisplayPass();
@@ -489,10 +564,19 @@ void CSceneTarget::DrawDisplayPass()
 	displayShader->SetUniform("exposureLinear", PBRDisplay::ExposureLinear(exposureEV));
 	displayShader->SetUniform("ditherAmount", dither? DITHER_8BIT: 0.0f);
 	displayShader->SetUniform("ditherSeed", float(ditherFrame++ % DITHER_SEED_PERIOD));
+	displayShader->SetUniform("useSceneMask", 1);
 
+	GLint prevUnit1 = 0;
+	glActiveTexture(GL_TEXTURE1);
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &prevUnit1);
+	glBindTexture(GL_TEXTURE_2D, (samples > 0)? res.resolveMaskTex: res.maskTex);
+	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, (samples > 0)? res.resolveColorTex: res.colorTex);
 	glBindVertexArray(emptyVAO.GetId());
 	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, prevUnit1);
+	glActiveTexture(GL_TEXTURE0);
 	displayShader->Disable();
 }
 
@@ -613,6 +697,7 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 		displayShader->Enable();
 		displayShader->SetUniform("exposureLinear", 1.0f);
 		displayShader->SetUniform("ditherAmount", 0.0f); // the CPU reference has no grain
+		displayShader->SetUniform("useSceneMask", 0); // every ramp texel is PBR light
 
 		using namespace PBRDisplay;
 		for (int transferIdx = 0; transferIdx <= int(SceneTransfer::Linear); ++transferIdx) {

@@ -441,6 +441,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 		REGISTER_LUA_CFUNC(RenderEnvironmentFace);
 		REGISTER_LUA_CFUNC(PublishTexture);
 	}
+	REGISTER_LUA_CFUNC(SceneTargetPBRMask);
 
 	REGISTER_LUA_CFUNC(ActiveTexture);
 	REGISTER_LUA_CFUNC(TexEnv);
@@ -5157,6 +5158,28 @@ int LuaOpenGL::PublishTexture(lua_State* L)
 
 	lua_pushsstring(L, error);
 	return 2;
+}
+
+
+/***
+ * Marks what the following draws put into the HDR scene target as PBR or not.
+ *
+ * With `PBRSceneTarget=hdr` the display pass curves only pixels whose mask is
+ * 1; all others keep the display-referred colour they were drawn with, as under
+ * `direct`. While the mask is on, every fragment shader drawing must write its
+ * output location 1 (`1.0` in red for PBR, `0.0` for display-referred colour);
+ * turn it off again before anything else draws. Does nothing, and returns
+ * false, outside the HDR world phase or while another framebuffer is bound.
+ *
+ * @function gl.SceneTargetPBRMask
+ * @param enable boolean
+ * @return boolean writing whether the mask is now written
+ */
+int LuaOpenGL::SceneTargetPBRMask(lua_State* L)
+{
+	CheckDrawingEnabled(L, __func__);
+	lua_pushboolean(L, sceneTarget.SetPBRMaskWrites(luaL_checkboolean(L, 1)));
+	return 1;
 }
 
 

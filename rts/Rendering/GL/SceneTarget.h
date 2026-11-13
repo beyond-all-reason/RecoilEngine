@@ -10,6 +10,11 @@
 // encodes it once into the window and copies depth and stencil there, so the
 // screen phase draws display-referred as before. With PBRSceneTarget=direct
 // (the default) nothing here binds anything and the frame is today's.
+//
+// Only PBR pixels are curved: a second colour attachment holds a mask (1 where
+// a PBR model was drawn last), written only between SetPBRMaskWrites(true) and
+// (false); everything else (legacy models, terrain, water, sky) leaves it at 0
+// and its stored, already display-referred value reaches the window unchanged.
 
 #include <array>
 #include <atomic>
@@ -86,6 +91,12 @@ public:
 	// single-sample resolve framebuffer to read from instead; else `readFBO`.
 	GLuint ResolvedReadFBO(GLuint readFBO);
 
+	// Turns the PBR mask attachment on or off as a draw buffer (gl.SceneTargetPBRMask).
+	// While on, every fragment shader drawing must write output location 1: 1 for
+	// PBR, 0 for display-referred colour. Only acts while the scene target is the
+	// bound draw framebuffer; returns whether the mask is now being written.
+	bool SetPBRMaskWrites(bool on);
+
 	SceneTargetInfo GetInfo() const { return info; }
 
 	// Renders a 0..64 brightness ramp through every curve on the GPU and compares
@@ -114,6 +125,9 @@ private:
 		GLuint resolveFBO = 0;    // MSAA only: single-sample copies for reading
 		GLuint resolveColorTex = 0;
 		GLuint resolveDepthTex = 0;
+		GLuint maskTex = 0;        // single-sample PBR mask (no MSAA)
+		GLuint maskRBO = 0;        // multisampled PBR mask
+		GLuint resolveMaskTex = 0; // MSAA only
 		Desc desc;
 	};
 
@@ -123,6 +137,8 @@ private:
 	static void Free(Resources& res);
 	void Adopt(Resources& res);
 	void ResolveScene(GLbitfield mask);
+	void ResolvePBRMask();
+	void ClearPBRMask();
 	void DrawDisplayPass();
 	void CopyDepthToWindow();
 
@@ -148,6 +164,7 @@ private:
 	int height = 0;
 	int samples = 0;
 	bool resolvedThisFrame = false;
+	bool maskWrites = false;
 	bool depthBlitChecked = false;
 	bool depthBlitWorks = true;
 
