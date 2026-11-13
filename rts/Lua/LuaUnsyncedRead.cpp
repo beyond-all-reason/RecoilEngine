@@ -2937,6 +2937,7 @@ int LuaUnsyncedRead::GetSceneTargetInfo(lua_State* L)
 	LuaPushNamedString(L, "displayTransform", info.displayTransform);
 	LuaPushNamedString(L, "exposureMode", info.exposureMode);
 	LuaPushNamedString(L, "boundary", info.boundary);
+	LuaPushNamedString(L, "dither", info.dither);
 	LuaPushNamedString(L, "depthCopy", info.depthCopy);
 	LuaPushNamedBool(L, "stencilCopied", info.stencilCopied);
 	LuaPushNamedNumber(L, "width", info.width);

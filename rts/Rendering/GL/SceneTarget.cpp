@@ -23,6 +23,7 @@ CONFIG(std::string, PBRDisplayTransform).defaultValue("khronos-neutral").descrip
 CONFIG(std::string, PBRExposureMode).defaultValue("manual").description("Exposure mode. Only manual is built; auto and compare are reserved and fall back to manual.");
 CONFIG(float, PBRExposureEV).defaultValue(0.0f).description("Manual exposure in EV stops applied by the display pass (linear multiplier 2^EV; 0 = 1.0).");
 CONFIG(std::string, PBRDisplayBoundary).defaultValue("after-world").description("Where the display pass runs: after-world (screen icons and screen effects draw display-referred into the window) or after-screen-effects (they draw into the scene and are tone-mapped).");
+CONFIG(std::string, PBRDisplayDither).defaultValue("unreal").description("Grain added to the display pass's 8-bit output to hide banding: unreal (Unreal's triangular grain of 1/255, the default) or off.");
 CONFIG(bool, PBRSceneTargetForceFailure).defaultValue(false).description("Test only: make the scene-target allocation fail so the fallback to direct can be checked.");
 
 CSceneTarget sceneTarget;
@@ -31,12 +32,14 @@ namespace {
 	constexpr const char* SHADER_POOL = "[SceneTarget]";
 
 	constexpr const char* DEPTH_D24S8 = "d24s8";
+	constexpr float DITHER_8BIT = 1.0f / 255.0f;     // one step of an 8-bit window
+	constexpr unsigned DITHER_SEED_PERIOD = 1024u;  // keeps the float seed exact
 	constexpr const char* DEPTH_D32FS8 = "d32fs8";
 
 	const std::vector<std::string> CONFIG_KEYS = {
 		"PBRSceneTarget", "PBRSceneTransfer", "PBRSceneDepthFormat", "PBRHDRColorFormat",
 		"PBRDisplayTransform", "PBRExposureMode", "PBRExposureEV", "PBRDisplayBoundary",
-		"PBRSceneTargetForceFailure",
+		"PBRSceneTargetForceFailure", "PBRDisplayDither",
 	};
 
 	const char* DepthFormatName(GLenum f) { return (f == GL_DEPTH32F_STENCIL8)? DEPTH_D32FS8: DEPTH_D24S8; }
@@ -221,6 +224,11 @@ void CSceneTarget::ReadSettings()
 
 	forceFailure = configHandler->GetBool("PBRSceneTargetForceFailure");
 
+	const std::string ditherName = configHandler->GetString("PBRDisplayDither");
+	dither = (ditherName != "off");
+	if (ditherName != "off" && ditherName != "unreal")
+		note("PBRDisplayDither=" + ditherName + " is unknown, using unreal");
+
 	info.colorFormat = "rgba16f";
 	info.transfer = "srgb-extended";
 	info.displayTransform = std::string(PBRDisplay::TransformName(transform));
@@ -228,6 +236,7 @@ void CSceneTarget::ReadSettings()
 	info.exposureEV = exposureEV;
 	info.exposureLinear = PBRDisplay::ExposureLinear(exposureEV);
 	info.boundary = (boundary == Boundary::AfterScreenEffects)? "after-screen-effects": "after-world";
+	info.dither = dither? "unreal": "off";
 }
 
 bool CSceneTarget::Allocate(const Desc& d, Resources& out, std::string& error) const
@@ -476,6 +485,8 @@ void CSceneTarget::DrawDisplayPass()
 	displayShader->SetUniform("displayTransform", int(transform));
 	displayShader->SetUniform("sceneTransfer", int(transfer));
 	displayShader->SetUniform("exposureLinear", PBRDisplay::ExposureLinear(exposureEV));
+	displayShader->SetUniform("ditherAmount", dither? DITHER_8BIT: 0.0f);
+	displayShader->SetUniform("ditherSeed", float(ditherFrame++ % DITHER_SEED_PERIOD));
 
 	glBindTexture(GL_TEXTURE_2D, (samples > 0)? res.resolveColorTex: res.colorTex);
 	glBindVertexArray(emptyVAO.GetId());
@@ -599,6 +610,7 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 		glBindVertexArray(emptyVAO.GetId());
 		displayShader->Enable();
 		displayShader->SetUniform("exposureLinear", 1.0f);
+		displayShader->SetUniform("ditherAmount", 0.0f); // the CPU reference has no grain
 
 		using namespace PBRDisplay;
 		for (int transferIdx = 0; transferIdx <= int(SceneTransfer::Linear); ++transferIdx) {

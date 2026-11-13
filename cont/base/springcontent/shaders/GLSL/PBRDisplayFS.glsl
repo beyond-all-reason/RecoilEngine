@@ -10,6 +10,8 @@ uniform sampler2D sceneColor;
 uniform int displayTransform;
 uniform int sceneTransfer;
 uniform float exposureLinear;
+uniform float ditherAmount; // PBRDisplayDither: 1/255 (unreal) or 0 (off)
+uniform float ditherSeed;   // changes every frame
 
 out vec4 fragColor;
 
@@ -28,7 +30,7 @@ void main() {
 	vec3 lin = (sceneTransfer == TRANSFER_SRGB_EXTENDED) ? SRGBDecode(stored.rgb) : stored.rgb;
 	lin *= exposureLinear;
 
-	vec3 outColor = PBRApplyDisplayTransform(lin, displayTransform);
+	vec3 outColor = PBRDitherDisplay(PBRApplyDisplayTransform(lin, displayTransform), gl_FragCoord.xy, ditherSeed, ditherAmount);
 
 	// alpha passes through so window captures keep today's alpha
 	fragColor = vec4(outColor, stored.a);

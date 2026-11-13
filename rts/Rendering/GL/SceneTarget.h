@@ -32,6 +32,7 @@ struct SceneTargetInfo {
 	std::string displayTransform;  // active PBRDisplayTransform
 	std::string exposureMode;
 	std::string boundary;          // PBRDisplayBoundary
+	std::string dither;            // PBRDisplayDither: "unreal" or "off"
 	std::string depthCopy;         // "blit", "shader" or "none"
 	bool stencilCopied = false;
 	int width = 0;
@@ -137,6 +138,8 @@ private:
 	PBRDisplay::Transform transform = PBRDisplay::Transform::KhronosNeutral;
 	PBRDisplay::SceneTransfer transfer = PBRDisplay::SceneTransfer::SRGBExtended;
 	float exposureEV = 0.0f;
+	bool dither = true;
+	unsigned ditherFrame = 0;
 
 	Resources res;
 	GLuint sceneFBO = 0;
