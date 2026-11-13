@@ -245,6 +245,16 @@ vec3 BarCustom(vec3 encoded) {
 	return (encoded * (A * encoded + B)) / (encoded * (C * encoded + D) + E);
 }
 
+// Unreal's backbuffer dither (UE 5.5 PostProcessTonemap.usf: GrainFromUV, triangular grain, OutColor += grain *
+// BackbufferQuantizationDithering, 1/255 for an 8-bit target): hides banding in dark gradients. `seed` moves the grain
+// every frame; amount 0 switches it off.
+vec3 PBRDitherDisplay(vec3 encoded, vec2 pixel, float seed, float amount) {
+	float uniformGrain = fract(sin(pixel.x + seed + (pixel.y + seed) * 543.31) * 493013.0);
+	float n = uniformGrain * 2.0 - 1.0;
+	float triangular = sign(n) - sign(n) * sqrt(clamp(1.0 - abs(n), 0.0, 1.0));
+	return encoded + triangular * amount;
+}
+
 // One curve for an exposed scene-linear value; returns the encoded display value. legacy has no curve of its own:
 // the display pass passes the stored value through before calling this, and a material shader that owns the curve
 // treats it as khronos-neutral (today's look of the PBR units).
