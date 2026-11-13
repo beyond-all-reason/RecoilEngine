@@ -10,6 +10,7 @@
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "System/Config/ConfigHandler.h"
+#include "System/FileSystem/FileHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Misc/TracyDefs.h"
 #include "System/StringUtil.h"
@@ -111,7 +112,21 @@ void CSceneTarget::Init()
 
 	displayShader = shaderHandler->CreateProgramObject(SHADER_POOL, "PBRDisplay");
 	displayShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/PBRDisplayVS.glsl", "", GL_VERTEX_SHADER));
-	displayShader->AttachShaderObject(shaderHandler->CreateShaderObject("GLSL/PBRDisplayFS.glsl", "", GL_FRAGMENT_SHADER));
+	// the shader loader has no #include: the curves shared with BAR's PBR unit shader are prepended here; a source
+	// string containing "void main()" is taken as the source itself (IShaderObject::GetShaderSource)
+	const auto readShader = [](const char* path) {
+		CFileHandler file(path);
+		std::string text;
+		if (file.FileExists()) {
+			text.resize(file.FileSize());
+			file.Read(text.data(), file.FileSize());
+		} else {
+			LOG_L(L_ERROR, "[SceneTarget] file not found \"%s\"", path);
+		}
+		return text;
+	};
+	const std::string displaySource = readShader("shaders/GLSL/PBRDisplayCurves.glsl") + "\n" + readShader("shaders/GLSL/PBRDisplayFS.glsl");
+	displayShader->AttachShaderObject(shaderHandler->CreateShaderObject(displaySource, "", GL_FRAGMENT_SHADER));
 	displayShader->Link();
 	if (displayShader->IsValid()) {
 		displayShader->Enable();

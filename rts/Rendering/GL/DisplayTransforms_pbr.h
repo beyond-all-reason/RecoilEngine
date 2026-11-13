@@ -4,7 +4,7 @@
 #define DISPLAY_TRANSFORMS_PBR_H
 
 // CPU reference of the PBR display pass (planning decision D013: pure math in a
-// header-only file without GL). The GLSL in shaders/GLSL/PBRDisplayFS.glsl
+// header-only file without GL). The GLSL in shaders/GLSL/PBRDisplayCurves.glsl
 // implements the same functions; test/engine/Rendering/PBR/testPBRDisplayTransforms.cpp
 // holds the golden values and Spring.TestDisplayTransforms() compares the GPU
 // pass against ApplyDisplayPass() below. Change both files together.
@@ -33,7 +33,7 @@ enum class Transform : int32_t {
 	Reinhard       = 6,
 	ReinhardJodie  = 7,
 	FilmicHejl     = 8, // published form includes the display encode
-	Unreal         = 9, // published form includes the display encode
+	Unreal         = 9, // UE 5.5 Filmic; the result includes the display encode
 	BarCustom      = 10,
 	Legacy         = 11,
 	LinearDebug    = 12,
@@ -234,9 +234,100 @@ inline RGB FilmicHejl(RGB c) {
 	});
 }
 
-// Unreal Engine 3 filmic approximation with gamma 2.2 baked in.
-inline RGB Unreal(RGB c) {
-	return PerChannel(c, [](float x) { x = std::max(x, 0.0f); return x / (x + 0.155f) * 1.019f; });
+// Unreal Engine 5.5 Filmic display transform, default post-process settings (PostProcessTonemap.usf,
+// PostProcessCombineLUTs.usf, TonemapCommon.ush FilmToneMap, ACES.ush): AP1 working space, gamut expansion 1.0,
+// blue correction 0.6, film slope 0.88 / toe 0.55 / shoulder 0.26 / black clip 0 / white clip 0.04, back to sRGB
+// primaries and the exact sRGB encode (the encode is part of the result). Same math as UnrealFilmic in
+// shaders/GLSL/PBRDisplayCurves.glsl; the combined matrices are products of the ACES.ush matrices.
+struct Mat3 { float m[3][3]; };
+inline RGB Mul(const Mat3& a, RGB v) {
+	return {a.m[0][0] * v.r + a.m[0][1] * v.g + a.m[0][2] * v.b,
+	        a.m[1][0] * v.r + a.m[1][1] * v.g + a.m[1][2] * v.b,
+	        a.m[2][0] * v.r + a.m[2][1] * v.g + a.m[2][2] * v.b};
+}
+inline RGB Lerp(RGB a, RGB b, float t) { return {a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t}; }
+inline RGB Scale(RGB a, float k) { return {a.r * k, a.g * k, a.b * k}; }
+
+static constexpr Mat3 UE_SRGB_2_AP1 = {{{0.6130974024f, 0.3395231461f, 0.04737945145f}, {0.07019372251f, 0.9163538791f, 0.01345239859f}, {0.02061559286f, 0.1095697729f, 0.8698146341f}}};
+static constexpr Mat3 UE_AP1_2_SRGB = {{{1.705050993f, -0.6217921205f, -0.08325887216f}, {-0.1302564175f, 1.140804736f, -0.01054831904f}, {-0.02400335679f, -0.1289689761f, 1.152972333f}}};
+static constexpr Mat3 UE_AP1_2_AP0 = {{{0.6954522413f, 0.1406786965f, 0.1638690622f}, {0.04479456338f, 0.8596711184f, 0.0955343182f}, {-0.005525882568f, 0.004025210277f, 1.001500672f}}};
+static constexpr Mat3 UE_AP0_2_AP1_FILM = {{{1.451439316f, -0.2365107469f, -0.2149285693f}, {-0.0765537734f, 1.1762297f, -0.0996759264f}, {0.0083161484f, -0.0060324498f, 0.9977163014f}}};
+static constexpr Mat3 UE_EXPAND = {{{1.370412372f, -0.3292921877f, -0.0636831194f}, {-0.08343349166f, 1.097092748f, -0.01086137953f}, {-0.02579332091f, -0.09862579884f, 1.203694953f}}};
+static constexpr Mat3 UE_BLUE = {{{0.9386393778f, 1.023595929e-10f, 0.06136062213f}, {8.360085378e-11f, 0.8307941329f, 0.1692058671f}, {2.131872912e-12f, -5.633071266e-12f, 1.0f}}};
+static constexpr Mat3 UE_BLUE_INV = {{{1.065374875f, 1.446785097e-06f, -0.06537100528f}, {-3.455255821e-07f, 1.203663524f, -0.2036677199f}, {1.98654478e-08f, 2.120795747e-08f, 0.9999996001f}}};
+static constexpr RGB UE_AP1_RGB2Y = {0.2722287168f, 0.6740817658f, 0.0536895174f};
+static constexpr float UE_FILM_SLOPE = 0.88f, UE_FILM_TOE = 0.55f, UE_FILM_SHOULDER = 0.26f;
+static constexpr float UE_FILM_BLACK_CLIP = 0.0f, UE_FILM_WHITE_CLIP = 0.04f;
+static constexpr float UE_BLUE_CORRECTION = 0.6f, UE_EXPAND_GAMUT = 1.0f;
+static constexpr float UE_LUT_INPUT_MAX = 43.7052f;
+
+inline float UeDot(RGB a, RGB b) { return a.r * b.r + a.g * b.g + a.b * b.b; }
+
+inline RGB UeFilmToneMap(RGB ap1) {
+	RGB ap0 = Mul(UE_AP1_2_AP0, ap1);
+	const float mn = std::min({ap0.r, ap0.g, ap0.b}), mx = std::max({ap0.r, ap0.g, ap0.b});
+	const float sat = (std::max(mx, 1e-10f) - std::max(mn, 1e-10f)) / std::max(mx, 1e-2f);
+	const float sx = (sat - 0.4f) / 0.2f;
+	const float st = std::max(1.0f - std::abs(0.5f * sx), 0.0f);
+	const float shaper = 0.5f * (1.0f + ((sx > 0.0f) - (sx < 0.0f)) * (1.0f - st * st));
+	const float chroma = std::sqrt(std::max(ap0.b * (ap0.b - ap0.g) + ap0.g * (ap0.g - ap0.r) + ap0.r * (ap0.r - ap0.b), 0.0f));
+	const float yc = (ap0.r + ap0.g + ap0.b + 1.75f * chroma) / 3.0f;
+	const float gain = 0.05f * shaper, mid = 0.08f;
+	const float glow = (yc <= 2.0f / 3.0f * mid)? gain: ((yc >= 2.0f * mid)? 0.0f: gain * (mid / yc - 0.5f));
+	ap0 = Scale(ap0, 1.0f + glow);
+	float hue = (ap0.r == ap0.g && ap0.g == ap0.b)? 0.0f:
+		std::atan2(std::sqrt(3.0f) * (ap0.g - ap0.b), 2.0f * ap0.r - ap0.g - ap0.b) * (180.0f / 3.14159265358979f);
+	if (hue < 0.0f) hue += 360.0f;
+	hue = std::clamp(hue, 0.0f, 360.0f);
+	if (hue > 180.0f) hue -= 360.0f;
+	const float hx = std::clamp(1.0f - std::abs(2.0f * hue / 135.0f), 0.0f, 1.0f);
+	float hueWeight = hx * hx * (3.0f - 2.0f * hx);
+	hueWeight *= hueWeight;
+	ap0.r += hueWeight * sat * (0.03f - ap0.r) * (1.0f - 0.82f);
+	RGB w = Mul(UE_AP0_2_AP1_FILM, ap0);
+	w = {std::max(w.r, 0.0f), std::max(w.g, 0.0f), std::max(w.b, 0.0f)};
+	const float wy = UeDot(w, UE_AP1_RGB2Y);
+	w = Lerp({wy, wy, wy}, w, 0.96f);
+	const float toeScale = 1.0f + UE_FILM_BLACK_CLIP - UE_FILM_TOE;
+	const float shoulderScale = 1.0f + UE_FILM_WHITE_CLIP - UE_FILM_SHOULDER;
+	const float bt = (0.18f + UE_FILM_BLACK_CLIP) / toeScale - 1.0f;
+	const float toeMatch = std::log10(0.18f) - 0.5f * std::log((1.0f + bt) / (1.0f - bt)) * (toeScale / UE_FILM_SLOPE);
+	const float straightMatch = (1.0f - UE_FILM_TOE) / UE_FILM_SLOPE - toeMatch;
+	const float shoulderMatch = UE_FILM_SHOULDER / UE_FILM_SLOPE - straightMatch;
+	const auto channel = [&](float x) {
+		const float logc = std::log10(std::max(x, 1e-30f));
+		const float straightC = UE_FILM_SLOPE * (logc + straightMatch);
+		float toeC = -UE_FILM_BLACK_CLIP + (2.0f * toeScale) / (1.0f + std::exp((-2.0f * UE_FILM_SLOPE / toeScale) * (logc - toeMatch)));
+		float shoulderC = (1.0f + UE_FILM_WHITE_CLIP) - (2.0f * shoulderScale) / (1.0f + std::exp((2.0f * UE_FILM_SLOPE / shoulderScale) * (logc - shoulderMatch)));
+		toeC = (logc < toeMatch)? toeC: straightC;
+		shoulderC = (logc > shoulderMatch)? shoulderC: straightC;
+		float t = std::clamp((logc - toeMatch) / (shoulderMatch - toeMatch), 0.0f, 1.0f);
+		if (shoulderMatch < toeMatch)
+			t = 1.0f - t; // true for the default settings (toe 0.55, shoulder 0.26)
+		t = (3.0f - 2.0f * t) * t * t;
+		return toeC + (shoulderC - toeC) * t;
+	};
+	RGB tone = {channel(w.r), channel(w.g), channel(w.b)};
+	const float ty = UeDot(tone, UE_AP1_RGB2Y);
+	tone = Lerp({ty, ty, ty}, tone, 0.93f);
+	return {std::max(tone.r, 0.0f), std::max(tone.g, 0.0f), std::max(tone.b, 0.0f)};
+}
+
+inline RGB UnrealFilmic(RGB lin) {
+	lin = PerChannel(lin, [](float x) { return std::clamp(x, 0.0f, UE_LUT_INPUT_MAX); });
+	RGB c = Mul(UE_SRGB_2_AP1, lin);
+	const float luma = UeDot(c, UE_AP1_RGB2Y);
+	if (luma > 0.0f) {
+		const RGB d = {c.r / luma - 1.0f, c.g / luma - 1.0f, c.b / luma - 1.0f};
+		const float expand = (1.0f - std::exp2(-4.0f * UeDot(d, d))) * (1.0f - std::exp2(-4.0f * UE_EXPAND_GAMUT * luma * luma));
+		c = Lerp(c, Mul(UE_EXPAND, c), expand);
+	}
+	c = Lerp(c, Mul(UE_BLUE, c), UE_BLUE_CORRECTION);
+	c = UeFilmToneMap(c);
+	c = Lerp(c, Mul(UE_BLUE_INV, c), UE_BLUE_CORRECTION);
+	RGB film = Mul(UE_AP1_2_SRGB, c);
+	film = {std::max(film.r, 0.0f), std::max(film.g, 0.0f), std::max(film.b, 0.0f)};
+	return PerChannel(SRGBEncode(film), Clamp01);
 }
 
 // BAR's CUS unit curve `CustomTM` (modelmaterials_gl4/templates/cus_gl4.frag.glsl)
@@ -276,7 +367,7 @@ inline RGB ApplyDisplayPass(Transform t, SceneTransfer transfer, float exposureL
 		case Transform::Reinhard      : return SRGBEncode(Reinhard(lin));
 		case Transform::ReinhardJodie : return SRGBEncode(ReinhardJodie(lin));
 		case Transform::FilmicHejl    : return FilmicHejl(lin);
-		case Transform::Unreal        : return Unreal(lin);
+		case Transform::Unreal        : return UnrealFilmic(lin);
 		case Transform::BarCustom     : return BarCustom(SRGBEncode(lin));
 		case Transform::LinearDebug   : return SRGBEncode(PerChannel(lin, Clamp01));
 		default                       : return stored;
