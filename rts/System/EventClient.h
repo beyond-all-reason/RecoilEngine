@@ -117,6 +117,7 @@ class CEventClient
 
 		virtual void GamePreload() {}
 		virtual void GameStart() {}
+		virtual void GameLoaded() {}
 		virtual void GameOver(const std::vector<unsigned char>& winningAllyTeams) {}
 		virtual void GamePaused(int playerID, bool paused) {}
 		virtual void GameFrame(int gameFrame) {}
@@ -139,6 +140,9 @@ class CEventClient
 		virtual void UnitDestroyed(const CUnit* unit, const CUnit* attacker, int weaponDefID) {}
 		virtual void UnitTaken(const CUnit* unit, int oldTeam, int newTeam) {}
 		virtual void UnitGiven(const CUnit* unit, int oldTeam, int newTeam) {}
+
+		virtual void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) {}
+		virtual void UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds) {}
 
 		virtual void UnitIdle(const CUnit* unit) {}
 		virtual void UnitCommand(const CUnit* unit, const Command& command, int playerNum, bool fromSynced, bool fromLua) {}
@@ -286,6 +290,7 @@ class CEventClient
 		virtual void Save(zipFile archive);
 
 		virtual void Update();
+		virtual void UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs);
 		virtual void NanoParticleUpdate(const std::vector<NanoParticles::Event>& events) {}
 		virtual void UnsyncedHeightMapUpdate(const SRectangle& rect);
 

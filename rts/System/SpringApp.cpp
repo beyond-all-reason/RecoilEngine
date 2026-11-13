@@ -1281,6 +1281,7 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 					// try to reinit GL context; LoadingMT=2: the loading thread has it, CLoadScreen::Kill does this
 					if (!globalRendering->HaveIntroContext())
 						globalRendering->MakeCurrentContext(false);
+					globalRendering->UpdateDisplayPeriod();
 				} break;
 
 				case SDL_WINDOWEVENT_CLOSE: {

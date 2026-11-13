@@ -81,6 +81,7 @@ void CVerticalSync::Suspend()
 
 	#if !defined HEADLESS
 	SDL_GL_SetSwapInterval(0);
+	effectiveInterval = 0;
 	LOG("[VSync::%s] interval=%d suspended", __func__, interval);
 	#endif
 }
@@ -94,7 +95,7 @@ void CVerticalSync::Resume()
 	ApplyInterval();
 }
 
-void CVerticalSync::ApplyInterval() const
+void CVerticalSync::ApplyInterval()
 {
 	#if defined HEADLESS
 	return;
@@ -103,15 +104,18 @@ void CVerticalSync::ApplyInterval() const
 	// adaptive (delay swap iff frame-rate > vblank-rate)
 	if (interval < 0 && SDL_GL_SetSwapInterval(interval) == 0) {
 		LOG("[VSync::SetInterval] interval=%d (adaptive)", interval);
+		effectiveInterval = interval;
 		return;
 	}
 	// standard (<interval> vblanks per swap)
 	if (interval > 0 && SDL_GL_SetSwapInterval(interval) == 0) {
 		LOG("[VSync::SetInterval] interval=%d (standard)", interval);
+		effectiveInterval = interval;
 		return;
 	}
 
 	// disabled (never wait for vblank)
 	SDL_GL_SetSwapInterval(0);
 	LOG("[VSync::SetInterval] interval=%d (disabled)", interval);
+	effectiveInterval = 0;
 }

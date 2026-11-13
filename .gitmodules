@@ -55,3 +55,6 @@
 [submodule "rts/lib/monocypher"]
 	path = rts/lib/monocypher
 	url = https://github.com/LoupVaillant/Monocypher.git
+[submodule "AI/Skirmish/CampaignAI"]
+	path = AI/Skirmish/CampaignAI
+	url = https://github.com/beyond-all-reason/campaign-ai.git

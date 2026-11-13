@@ -18,16 +18,21 @@ public:
 	void Resume();
 	void ConfigNotify(const std::string& key, const std::string& value);
 	int  GetInterval() const { return interval; }
+	/// the interval SDL accepted: 0 if refused or headless, negative for adaptive
+	int  GetEffectiveInterval() const { return effectiveInterval; }
+	/// true for standard and adaptive vsync
+	bool IsEnabled() const { return effectiveInterval != 0; }
 
 	static CVerticalSync* GetInstance();
 
 private:
 	/// apply the configured interval to the context current on this thread
-	void ApplyInterval() const;
+	void ApplyInterval();
 
 	// must start at a value that can not occur in config; see SetInterval
 	int interval = -1000;
 	bool suspended = false;
+	int effectiveInterval = 0;
 };
 
 #define verticalSync (CVerticalSync::GetInstance())

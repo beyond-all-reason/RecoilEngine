@@ -138,7 +138,7 @@ void CFreeController::Update()
 	const float3 prevPos = pos;
 
 	// setup the time fractions (seconds)
-	const float ft = globalRendering->lastFrameTime * 0.001f;
+	const float ft = camera->GetFrameTime() * 0.001f;
 	const float nt = (ft / velTime); // next time factor
 	const float pt = (1.0f - nt);    // prev time factor
 	const float ant = (ft / avelTime); // next time factor
