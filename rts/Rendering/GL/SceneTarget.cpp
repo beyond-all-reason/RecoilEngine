@@ -71,7 +71,9 @@ namespace {
 		return rbo;
 	}
 
-	// Saves and restores everything the display pass and the transform test touch.
+	// Saves and restores everything the display pass, the depth copy and the transform test change, one state at a
+	// time: no glPushAttrib, which a core profile lacks and whose stack depth is shared with every other caller.
+	// Add a state here before a pass inside the scope changes it.
 	class ScopedPassState {
 	public:
 		ScopedPassState() {
@@ -82,20 +84,35 @@ namespace {
 			glGetIntegerv(GL_TEXTURE_BINDING_2D, &texture2D);
 			glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
 			glGetIntegerv(GL_CURRENT_PROGRAM, &program);
-			glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_VIEWPORT_BIT | GL_SCISSOR_BIT | GL_POLYGON_BIT);
+			for (size_t i = 0; i < CAPABILITIES.size(); ++i)
+				enabled[i] = glIsEnabled(CAPABILITIES[i]);
+			glGetBooleanv(GL_COLOR_WRITEMASK, colorMask);
+			glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMask);
+			glGetIntegerv(GL_DEPTH_FUNC, &depthFunc);
+			glGetIntegerv(GL_STENCIL_WRITEMASK, &stencilMask);
+			glGetIntegerv(GL_STENCIL_BACK_WRITEMASK, &stencilBackMask);
+			glGetIntegerv(GL_STENCIL_CLEAR_VALUE, &stencilClear);
+			glGetIntegerv(GL_VIEWPORT, viewport);
+			glGetIntegerv(GL_POLYGON_MODE, polygonMode); // front and back (compatibility profile)
 
-			glDisable(GL_DEPTH_TEST);
-			glDisable(GL_STENCIL_TEST);
-			glDisable(GL_BLEND);
-			glDisable(GL_SCISSOR_TEST);
-			glDisable(GL_CULL_FACE);
-			glDisable(GL_ALPHA_TEST);
-			glDisable(GL_FRAMEBUFFER_SRGB); // the pass encodes itself
+			for (const GLenum cap: CAPABILITIES)
+				glDisable(cap); // GL_FRAMEBUFFER_SRGB too: the pass encodes itself
 			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 		}
 		~ScopedPassState() {
-			glPopAttrib();
+			for (size_t i = 0; i < CAPABILITIES.size(); ++i)
+				(enabled[i] ? glEnable : glDisable)(CAPABILITIES[i]);
+			glColorMask(colorMask[0], colorMask[1], colorMask[2], colorMask[3]);
+			glDepthMask(depthMask);
+			glDepthFunc(depthFunc);
+			glStencilMaskSeparate(GL_FRONT, stencilMask);
+			glStencilMaskSeparate(GL_BACK, stencilBackMask);
+			glClearStencil(stencilClear);
+			glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+			glPolygonMode(GL_FRONT, polygonMode[0]);
+			glPolygonMode(GL_BACK, polygonMode[1]);
+
 			glUseProgram(program);
 			glBindVertexArray(vao);
 			glBindTexture(GL_TEXTURE_2D, texture2D);
@@ -104,6 +121,15 @@ namespace {
 			glBindFramebuffer(GL_DRAW_FRAMEBUFFER, drawFBO);
 		}
 	private:
+		static constexpr std::array<GLenum, 7> CAPABILITIES = {
+			GL_DEPTH_TEST, GL_STENCIL_TEST, GL_BLEND, GL_SCISSOR_TEST, GL_CULL_FACE, GL_ALPHA_TEST, GL_FRAMEBUFFER_SRGB
+		};
+		std::array<GLboolean, CAPABILITIES.size()> enabled = {};
+		GLboolean colorMask[4] = {GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE};
+		GLboolean depthMask = GL_TRUE;
+		GLint depthFunc = GL_LESS, stencilMask = ~0, stencilBackMask = ~0, stencilClear = 0;
+		GLint viewport[4] = {0, 0, 0, 0};
+		GLint polygonMode[2] = {GL_FILL, GL_FILL};
 		GLint drawFBO = 0, readFBO = 0, activeTexture = 0, texture2D = 0, vao = 0, program = 0;
 	};
 }
