@@ -39,6 +39,7 @@ public:
 
 	SoundItem* GetSoundItem(size_t id) override;
 	CSoundSource* GetNextBestSource(bool lock = true) override;
+	bool StopSoundItem(const std::string& name, const IAudioChannel* channel) override;
 
 	void NewFrame() override;
 	void UpdateListener(const float3& campos, const float3& camdir, const float3& camup) override {
@@ -93,6 +94,8 @@ private:
 	int GetMaxMonoSources(ALCdevice* device, int cfgMaxSounds);
 	void GenSources(int alMaxSounds);
 
+	size_t FindLoadedSoundId(const std::string& name) const;
+	const SoundItemNameMap* FindSoundItemDef(const std::string& name) const;
 	size_t MakeItemFromDef(const SoundItemNameMap& itemDef);
 	size_t LoadSoundBuffer(const std::string& filename);
 
