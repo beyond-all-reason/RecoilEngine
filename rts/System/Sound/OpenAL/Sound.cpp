@@ -173,7 +173,7 @@ bool CSound::HasSoundItem(const std::string& name) const
 	if (soundMap.find(name) != soundMap.end())
 		return true;
 
-	return (soundItemDefsMap.find(StringToLower(name)) != soundItemDefsMap.end());
+	return (FindSoundItemDef(name) != nullptr);
 }
 
 bool CSound::PreloadSoundItem(const std::string& name)
@@ -200,11 +200,22 @@ size_t CSound::FindLoadedSoundId(const std::string& name) const
 {
 	auto soundMapIt = soundMap.find(name);
 
-	// items made from sounds.lua are stored under their lower-case name
+	// the name as written first; sounds.lua lower-cases its keys unless the game turns that off
 	if (soundMapIt == soundMap.end())
 		soundMapIt = soundMap.find(StringToLower(name));
 
 	return (soundMapIt != soundMap.end()) ? soundMapIt->second : 0;
+}
+
+const CSound::SoundItemNameMap* CSound::FindSoundItemDef(const std::string& name) const
+{
+	auto itemDefIt = soundItemDefsMap.find(name);
+
+	// same order as FindLoadedSoundId
+	if (itemDefIt == soundItemDefsMap.end())
+		itemDefIt = soundItemDefsMap.find(StringToLower(name));
+
+	return (itemDefIt != soundItemDefsMap.end()) ? &itemDefIt->second : nullptr;
 }
 
 size_t CSound::GetSoundId(const std::string& name)
@@ -221,10 +232,10 @@ size_t CSound::GetSoundId(const std::string& name)
 	if (loadedId != 0)
 		return (preloadSet.erase(name), loadedId);
 
-	const auto itemDefIt = soundItemDefsMap.find(StringToLower(name));
+	const SoundItemNameMap* itemDef = FindSoundItemDef(name);
 
-	if (itemDefIt != soundItemDefsMap.end())
-		return (preloadSet.erase(name), MakeItemFromDef(itemDefIt->second));
+	if (itemDef != nullptr)
+		return (preloadSet.erase(name), MakeItemFromDef(*itemDef));
 
 	// name does not match any sounds.lua item, interpret as raw file reference
 	if (LoadSoundBuffer(name) > 0) {

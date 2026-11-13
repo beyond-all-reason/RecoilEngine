@@ -95,6 +95,7 @@ private:
 	void GenSources(int alMaxSounds);
 
 	size_t FindLoadedSoundId(const std::string& name) const;
+	const SoundItemNameMap* FindSoundItemDef(const std::string& name) const;
 	size_t MakeItemFromDef(const SoundItemNameMap& itemDef);
 	size_t LoadSoundBuffer(const std::string& filename);
 
