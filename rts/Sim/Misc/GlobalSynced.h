@@ -1,12 +1,23 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _GLOBAL_SYNCED_H
-#define _GLOBAL_SYNCED_H
+#pragma once
+
+#include <string>
 
 #include "System/creg/creg_cond.h"
 #include "System/GlobalRNG.h"
+#include "System/UnorderedMap.hpp"
 #include "System/Threading/ThreadPool.h"
 
+
+struct CustomCommandProperties
+{
+	CR_DECLARE_STRUCT(CustomCommandProperties)
+
+	bool movement = false;
+	bool attack = false;
+	std::string luaHandleName; // either "LuaRules" or "LuaGaia"
+};
 
 class CGameSetup;
 class CTeam;
@@ -130,11 +141,11 @@ public:
 	* Whether or not LuaGaia is enabled
 	*/
 	bool useLuaGaia = true;
+
+	// Properties shared by all units for the lifetime of the registering Lua handle.
+	spring::unordered_map<int, CustomCommandProperties> customCommands;
 };
 
 
 extern CGlobalSynced* gs;
 extern CGlobalSyncedRNG gsRNG;
-
-#endif // _GLOBAL_SYNCED_H
-
