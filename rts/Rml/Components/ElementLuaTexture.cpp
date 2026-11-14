@@ -48,6 +48,8 @@
 
 namespace RmlGui
 {
+RMLUI_RTTI_Define(ElementLuaTexture)
+
 ElementLuaTexture::ElementLuaTexture(const Rml::String& tag) :
 	Element(tag),
 	dimensions(-1, -1), rect_source(RectSource::None), luaTexture()
