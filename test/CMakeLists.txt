@@ -94,6 +94,34 @@ macro (add_spring_test target sources libraries flags)
 	#install(TARGETS test_${target} DESTINATION ${BINDIR})
 endmacro()
 
+set(test_name ObjectDependencies)
+set(test_src
+	"${CMAKE_CURRENT_SOURCE_DIR}/engine/System/testObjectDependencies.cpp"
+	"${ENGINE_SOURCE_DIR}/System/Object.cpp"
+	"${ENGINE_SOURCE_DIR}/System/SharedObjectSet.cpp"
+	"${ENGINE_SOURCE_DIR}/System/creg/Serializer.cpp"
+	"${ENGINE_SOURCE_DIR}/System/creg/VarTypes.cpp"
+	"${ENGINE_SOURCE_DIR}/System/creg/creg.cpp"
+	${test_Common_sources}
+)
+set(test_libs "")
+set(test_flags "-DNOT_USING_STREFLOP")
+add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
+
+set(test_name CommandQueue)
+set(test_src
+	"${CMAKE_CURRENT_SOURCE_DIR}/engine/Sim/Misc/testCommandQueue.cpp"
+	"${ENGINE_SOURCE_DIR}/Sim/Units/CommandAI/Command.cpp"
+	"${ENGINE_SOURCE_DIR}/Sim/Units/CommandAI/CommandQueue.cpp"
+	"${ENGINE_SOURCE_DIR}/System/Object.cpp"
+	"${ENGINE_SOURCE_DIR}/System/SharedObjectSet.cpp"
+	"${ENGINE_SOURCE_DIR}/System/creg/Serializer.cpp"
+	"${ENGINE_SOURCE_DIR}/System/creg/VarTypes.cpp"
+	"${ENGINE_SOURCE_DIR}/System/creg/creg.cpp"
+	${test_Common_sources}
+)
+add_spring_test(${test_name} "${test_src}" "" "-DNOT_USING_STREFLOP")
+
 ################################################################################
 ### UDPListener
 # disabled for travis: https://springrts.com/mantis/view.php?id=5014

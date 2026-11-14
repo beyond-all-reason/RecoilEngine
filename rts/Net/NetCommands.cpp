@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include "Sim/Units/CommandAI/SharedAttackBatch.h"
 #include <cinttypes>
 
 #include "Game/Game.h"
@@ -879,6 +880,7 @@ void CGame::ClientReadNet()
 							selectedUnitsHandler.AINetOrder(unitIDs[x], aiInstID, playerID, commands[x]);
 						}
 					} else {
+						SharedAttackBatch batch(commands);
 						for (int16_t c = 0; c < commandCount; c++) {
 							for (int16_t u = 0; u < unitCount; u++) {
 								selectedUnitsHandler.AINetOrder(unitIDs[u], aiInstID, playerID, commands[c]);
