@@ -101,6 +101,9 @@ public:
 	std::unordered_set<Rml::Context*> contexts_to_remove;
 
 	Rml::Context* debug_host_context = nullptr;
+	// the debugger's documents belong to the Lua state that created it, and it shows one context
+	Rml::SolLua::SolLuaPlugin* debug_owner = nullptr;
+	Rml::Context* debug_target = nullptr;
 	Rml::Context* clicked_context = nullptr;
 
 	InputHandler::HandlerTokenT inputCon;
@@ -110,8 +113,12 @@ public:
 	int winX = 0;
 	int winY = 0;
 
-	lua_State* ls = nullptr;
-	Rml::SolLua::SolLuaPlugin* luaPlugin = nullptr;
+	// One entry per Lua state using RmlUi (LuaMenu and LuaUI can be alive at the same time).
+	struct LuaBinding {
+		lua_State* ls;
+		Rml::SolLua::SolLuaPlugin* plugin;
+	};
+	std::vector<LuaBinding> luaBindings;
 
 	RmlGui::SVG::DynamicSVGPlugin* svgPlugin;
 	Rml::UniquePtr<Rml::ElementInstancerGeneric<RmlGui::ElementLuaTexture>> element_lua_texture_instancer;
@@ -137,6 +144,14 @@ void AddPendingDelete(Rml::ElementPtr element)
 
 bool RmlGui::Initialize()
 {
+	if (RmlInitialized()) {
+		// e.g. LuaMenu initialized RmlUi and a game is now starting. Replacing `state` while
+		// the library is initialized would leave it holding plugin pointers into the
+		// destroyed state, so keep the running instance.
+		LOG_L(L_INFO, "[RmlGui::%s] RmlUi is already initialized, reusing it", __func__);
+		return true;
+	}
+
 	LOG_L(L_INFO, "[RmlUi::%s] Beginning RmlUi Initialization", __func__);
 	state = Rml::MakeUnique<BackendState>();
 
@@ -176,46 +191,58 @@ bool RmlGui::Initialize()
 
 bool RmlGui::InitializeLua(lua_State* lua_state)
 {
-	if (!RmlInitialized()) {
-		RmlGui::Initialize();
-	} else if (state->ls != nullptr) {
+	if (!RmlInitialized() && !RmlGui::Initialize()) {
 		return false;
+	}
+
+	for (const auto& binding : state->luaBindings) {
+		if (binding.ls == lua_state)
+			return false;
 	}
 
 	LOG_L(L_INFO, "[RmlGui::%s] Initializing RmlUi Lua Bindings", __func__);
 
 	sol::state_view lua(lua_state);
-	state->ls = lua_state;
-	state->luaPlugin = Rml::SolLua::Initialise(&lua, "rmlDocumentId");
-	state->luaPlugin->systemInterface = &state->system_interface;
-	state->system_interface.SetTranslationTable(&state->luaPlugin->translationTable);
+	auto* plugin = Rml::SolLua::Initialise(&lua, "rmlDocumentId");
+	plugin->systemInterface = &state->system_interface;
+	state->system_interface.AddTranslationTable(&plugin->translationTable);
+	state->luaBindings.push_back({lua_state, plugin});
 	return true;
 }
 
-bool RmlGui::RemoveLua()
+bool RmlGui::RemoveLua(lua_State* lua_state)
 {
-	if (!RmlInitialized() || state->ls == nullptr) {
+	if (!RmlInitialized()) {
 		return false;
 	}
 
-	// debugger must be shut down before the reference to
-	// Lua Plugin DocumentElementInstancer becomes a dangling pointer
-	if (state->debug_host_context) {
+	const auto it = std::ranges::find(state->luaBindings, lua_state, &BackendState::LuaBinding::ls);
+	if (it == state->luaBindings.end()) {
+		return false;
+	}
+	auto* plugin = it->plugin;
+
+	// the debugger goes with the state it was created by, or whose context it is showing
+	const bool debugAffected = state->debug_owner == plugin || state->debug_owner == nullptr ||
+		(state->debug_target != nullptr && plugin->OwnsContext(state->debug_target));
+	if (state->debug_host_context && debugAffected) {
 		MarkContextForRemoval(state->debug_host_context);
 		state->debug_host_context = nullptr;
+		state->debug_owner = nullptr;
+		state->debug_target = nullptr;
 		Update();
 		Rml::Debugger::Shutdown();
 	}
 
-	state->luaPlugin->RemoveLuaItems();
+	plugin->RemoveLuaItems();
 
 	// Update to allow clean up of removed items.
 	Update();
 
-	Rml::UnregisterPlugin(state->luaPlugin);
-	state->system_interface.SetTranslationTable(nullptr);
-	state->luaPlugin = nullptr;
-	state->ls = nullptr;
+	state->system_interface.RemoveTranslationTable(&plugin->translationTable);
+	// deletes the plugin
+	Rml::UnregisterPlugin(plugin);
+	state->luaBindings.erase(it);
 
 	return true;
 }
@@ -231,7 +258,9 @@ void RmlGui::Shutdown()
 	}
 
 	// note: during SpringApp shutdown, RmlGui::RemoveLua() was already called when LuaUI was shutdown
-	RemoveLua();
+	while (!state->luaBindings.empty()) {
+		RemoveLua(state->luaBindings.back().ls);
+	}
 	Rml::UnregisterPlugin(state->svgPlugin);
 	Rml::UnregisterPlugin(state.get());
 
@@ -240,6 +269,15 @@ void RmlGui::Shutdown()
 
 	// interfaces within can now be destroyed
 	state.reset();
+}
+
+void RmlGui::ShutdownIfUnused()
+{
+	// e.g. LuaUI is reloading while LuaMenu, which is not, keeps using RmlUi
+	if (!RmlInitialized() || !state->luaBindings.empty()) {
+		return;
+	}
+	Shutdown();
 }
 
 void RmlGui::Reload()
@@ -260,11 +298,13 @@ void RmlGui::SetDebugContext(Rml::Context* context)
 
 	if (state->debug_host_context == nullptr) {
 		state->debug_host_context = Rml::CreateContext(RML_DEBUG_HOST_CONTEXT_NAME, {0, 0});
+		state->debug_owner = Rml::SolLua::SolLuaPlugin::Active();
 
 		// TODO?: Make own Debugger UI that better suits our needs
 		Rml::Debugger::Initialise(state->debug_host_context);
 	}
 
+	state->debug_target = context;
 	Rml::Debugger::SetContext(context);
 	Rml::Debugger::SetVisible(context != nullptr);
 }
@@ -600,10 +640,14 @@ bool RmlGui::ProcessEvent(const SDL_Event& event)
 
 lua_State* RmlGui::GetLuaState()
 {
-    if (!RmlInitialized())
-    {
-        return nullptr;
-    }
+	if (!RmlInitialized() || state->luaBindings.empty()) {
+		return nullptr;
+	}
 
-    return state->ls;
+	// prefer the state that is calling into RmlUi right now
+	if (const auto* active = Rml::SolLua::SolLuaPlugin::Active()) {
+		return active->GetLuaState();
+	}
+
+	return state->luaBindings.back().ls;
 }

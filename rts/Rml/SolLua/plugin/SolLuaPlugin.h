@@ -41,6 +41,8 @@
 #include <sol2/sol.hpp>
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 
 
 namespace Rml::SolLua
@@ -54,10 +56,54 @@ namespace Rml::SolLua
 	public:
 		SolLuaPlugin(sol::state_view lua_state);
 		SolLuaPlugin(sol::state_view lua_state, const Rml::String& lua_environment_identifier);
+		~SolLuaPlugin() override;
 
 		void RemoveLuaItems();
 		void AddContextTracking(Context* context);
 		void AddDocumentTracking(ElementDocument* document);
+
+		/// RmlUi context names are global, but each Lua state (LuaMenu, LuaUI) must be able to use
+		/// the same name (e.g. "shared") for its own context without touching another state's.
+		/// Maps a name used by this plugin's Lua state to the name the context has inside RmlUi:
+		/// the same name, unless another context already has it, then "<name>#<n>".
+		/// With create == false, returns an empty string for a name this state has not created.
+		Rml::String InternalContextName(const Rml::String& luaName, bool create);
+
+		/// The name this state uses for a context whose name inside RmlUi is internalName.
+		Rml::String LuaContextName(const Rml::String& internalName) const;
+		/// True if the context was created by this plugin's Lua state.
+		bool OwnsContext(const Context* context) const;
+		const std::vector<Context*>& GetContexts() const { return luaContexts; }
+
+		lua_State* GetLuaState() const { return m_lua_state.lua_state(); }
+		sol::state_view GetStateView() const { return m_lua_state; }
+		const Rml::String& GetEnvironmentIdentifier() const { return m_lua_env_identifier; }
+
+		/// The plugin that belongs to the given Lua state, or nullptr.
+		static SolLuaPlugin* ForState(lua_State* L);
+
+		/// The plugin whose Lua state is currently calling into RmlUi (see ScopedActive), or nullptr.
+		static SolLuaPlugin* Active();
+
+		/// Picks the plugin for something being instanced by RmlUi (a document, an inline event
+		/// listener): the active one, else the one that owns the hint element's document, else the
+		/// only registered one. nullptr if it cannot be told.
+		static SolLuaPlugin* Resolve(Rml::Element* hint);
+
+		/// Marks a plugin as the one whose Lua state is calling into RmlUi for the lifetime of
+		/// the object. RmlUi's factories are global, so they cannot tell which Lua state asked
+		/// for a document or listener to be created unless the caller says so.
+		class ScopedActive
+		{
+		public:
+			explicit ScopedActive(SolLuaPlugin* plugin);
+			explicit ScopedActive(lua_State* L);
+			~ScopedActive();
+			ScopedActive(const ScopedActive&) = delete;
+			ScopedActive& operator=(const ScopedActive&) = delete;
+		private:
+			SolLuaPlugin* previous;
+		};
 
 		TranslationTable translationTable;
 		RmlSystemInterface* systemInterface;
@@ -70,14 +116,13 @@ namespace Rml::SolLua
 		void OnContextDestroy(Context* context) override;
 		void OnDocumentUnload(ElementDocument* document) override;
 
-		std::unique_ptr<SolLuaDocumentElementInstancer> document_element_instancer;
-		std::unique_ptr<SolLuaEventListenerInstancer> event_listener_instancer;
-
 		sol::state_view m_lua_state;
 		Rml::String m_lua_env_identifier;
 
 		std::vector<Context*> luaContexts;
 		std::vector<ElementDocument*> luaDocuments;
+		std::unordered_map<Rml::String, Rml::String> contextNames; // lua name -> name inside RmlUi
+		int serial; // tells this plugin's contexts apart from other plugins' ones of the same name
 	};
 
 } // end namespace Rml::SolLua

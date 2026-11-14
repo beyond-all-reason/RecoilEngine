@@ -291,7 +291,11 @@ CGame::~CGame()
 	ENTER_SYNCED_CODE();
 	LOG("[Game::%s][1]", __func__);
 
-	RmlGui::Shutdown();
+	// LuaMenu persists across games. If its Lua state has RmlUi bindings it keeps RmlUi for the
+	// whole process: shutting it down here would leave the menu's Lua state with dangling
+	// plugins, contexts and documents. It is released with the menu (~CLuaMenuController).
+	if (luaMenu == nullptr || !luaMenu->HasRmlUiBinding())
+		RmlGui::Shutdown();
 	helper->Kill();
 	KillLua(true);
 	KillMisc();

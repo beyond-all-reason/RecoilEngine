@@ -213,7 +213,7 @@ void CLuaHandle::KillLua(bool inFreeHandler)
 		Shutdown();
 
 	if(rmlui) {
-		RmlGui::RemoveLua();
+		RmlGui::RemoveLua(L);
 	}
 
 	// 3. delete the lua_State
