@@ -3533,9 +3533,6 @@ static void ParseUnitArray(lua_State* L, const char* caller,
 
 static bool CanGiveOrders(const lua_State* L)
 {
-	if (gs->PreSimFrame())
-		return false;
-
 	if (gs->noHelperAIs)
 		return false;
 
