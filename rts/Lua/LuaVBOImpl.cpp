@@ -574,7 +574,7 @@ void LuaVBOImpl::Define(const int elementsCount, const sol::optional<sol::object
 	}
 
 	CopyAttrMapToVec();
-	AllocGLBuffer(elemSizeInBytes * elementsCount);
+	AllocGLBuffer(static_cast<size_t>(elemSizeInBytes) * elementsCount);
 }
 
 /***
@@ -1526,12 +1526,12 @@ uint32_t LuaVBOImpl::GetID() const
 
 void LuaVBOImpl::AllocGLBuffer(size_t byteSize)
 {
-	if (defTarget == GL_UNIFORM_BUFFER && bufferSizeInBytes > UBO_SAFE_SIZE_BYTES) {
-		LuaUtils::SolLuaError("[LuaVBOImpl::%s] Exceeded [%u] safe UBO buffer size limit of [%u] bytes", __func__, bufferSizeInBytes, LuaVBOImpl::UBO_SAFE_SIZE_BYTES);
+	if (defTarget == GL_UNIFORM_BUFFER && byteSize > UBO_SAFE_SIZE_BYTES) {
+		LuaUtils::SolLuaError("[LuaVBOImpl::%s] Exceeded [%zu] safe UBO buffer size limit of [%u] bytes", __func__, byteSize, LuaVBOImpl::UBO_SAFE_SIZE_BYTES);
 	}
 
-	if (bufferSizeInBytes > BUFFER_SANE_LIMIT_BYTES) {
-		LuaUtils::SolLuaError("[LuaVBOImpl::%s] Exceeded [%u] sane buffer size limit of [%u] bytes", __func__, bufferSizeInBytes, LuaVBOImpl::BUFFER_SANE_LIMIT_BYTES);
+	if (byteSize > BUFFER_SANE_LIMIT_BYTES) {
+		LuaUtils::SolLuaError("[LuaVBOImpl::%s] Exceeded [%zu] sane buffer size limit of [%u] bytes", __func__, byteSize, LuaVBOImpl::BUFFER_SANE_LIMIT_BYTES);
 	}
 
 	bufferSizeInBytes = static_cast<uint32_t>(byteSize); //be strict here and don't account for possible increase of size on GPU due to alignment requirements
