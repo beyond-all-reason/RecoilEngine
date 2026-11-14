@@ -521,6 +521,21 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "${test_flags}")
 
 ################################################################################
+### PresentedFrameClock
+	set(test_name PresentedFrameClock)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/testPresentedFrameClock.cpp"
+			"${ENGINE_SOURCE_DIR}/Rendering/PresentedFrameClock.cpp"
+			${test_Catch_main}
+		)
+
+	set(test_libs
+			""
+		)
+
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "")
+
+################################################################################
 ### ClampRad
 	set(test_name ClampRad)
 	set(test_src

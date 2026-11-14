@@ -714,7 +714,7 @@ float CCamera::GetFrameTime() const
 {
 	switch (useInterpolate) {
 		case 1: return 1000.0f / std::fmax(globalRendering->FPS, 1.0f);
-		case 2: return globalRendering->presentedFrameTime;
+		case 2: return globalRendering->presentedClock.GetFrameTime();
 		default: return globalRendering->lastFrameTime;
 	}
 }

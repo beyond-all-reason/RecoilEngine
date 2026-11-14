@@ -7,6 +7,7 @@
 #include <memory>
 #include <array>
 
+#include "Rendering/PresentedFrameClock.h"
 #include "System/Matrix44f.h"
 #include "System/creg/creg_cond.h"
 #include "System/Misc/SpringTime.h"
@@ -55,7 +56,6 @@ public:
 	void SwapBuffers(bool allowSwapBuffers, bool clearErrors);
 	void UpdateDisplayPeriod();
 	void UpdatePresentedFrameTime(float frameTimeMs);
-	void OverridePresentedFrameTime(float frameTimeMs);
 
 	void SetGLTimeStamp(uint32_t queryIdx) const;
 	uint64_t CalcGLDeltaTime(uint32_t queryIdx0, uint32_t queryIdx1) const;
@@ -150,31 +150,11 @@ public:
 	/// from before the swap to its return; short with vsync when the driver queues frames
 	spring_time lastSwapBuffersDuration;
 
-	/// how long this draw frame advances by on screen (MILLIseconds), see UpdatePresentedFrameTime
-	float presentedFrameTime;
-
-	/// the sum of presentedFrameTime (MILLIseconds); trails wall time by presentedFrameLag
-	double presentedTime;
-
-	/// MILLIseconds of wall time not yet paid into presentedTime
-	float presentedFrameLag;
+	/// the presented frame time and its running sum, see CPresentedFrameClock
+	CPresentedFrameClock presentedClock;
 
 	/// refresh period of the window's display (MILLIseconds), 0 when unknown
 	float displayPeriod;
-
-	/// at this many periods or more, rounding a frame to whole periods adds more unevenness than it removes
-	static constexpr float MAX_SNAP_PERIODS = 4.0f;
-
-	static constexpr int FAST_SYNC_WINDOW = 30;
-
-	/// raw frame times (MILLIseconds) for UpdateFastSyncDetection
-	std::array<float, FAST_SYNC_WINDOW> recentFrameTimes = {};
-	float recentFrameTimeSum = 0.0f;
-	int recentFrameTimeIdx = 0;
-	int recentFrameTimeCnt = 0;
-
-	/// vsync on but frames outpace the refresh; presentedFrameTime is then the raw frame time
-	bool fastSyncDetected = false;
 
 	/// 0.001f * gu->simFPS, used for rendering
 	float weightedSpeedFactor;
@@ -447,7 +427,6 @@ public:
 	static constexpr uint32_t FRAME_END_TIME_QUERY_IDX = NUM_OPENGL_TIMER_QUERIES - 1;
 private:
 	void SetMinSampleShadingRate();
-	void UpdateFastSyncDetection(float frameTimeMs);
 	bool SetWindowMinMaximized(bool maximize) const;
 private:
 	spring::unordered_set<std::string> glExtensions;
