@@ -183,6 +183,7 @@ using namespace nv_dds;
 CDDSImage::CDDSImage()
   : m_format(0),
     m_components(0),
+    m_dataType(GL_UNSIGNED_BYTE),
     m_type(TextureNone),
     m_valid(false)
 {
@@ -441,9 +442,27 @@ bool CDDSImage::load(string filename, bool flipImage)
 				m_format = GL_COMPRESSED_RG_RGTC2;
 				m_components = 2;
 				break;
+			case D3DFMT_R16F:
+				set_float16_format(GL_RED, GL_R16F, 1);
+				break;
+			case D3DFMT_G16R16F:
+				set_float16_format(GL_RG, GL_RG16F, 2);
+				break;
+			case D3DFMT_A16B16G16R16F:
+				set_float16_format(GL_RGBA, GL_RGBA16F, 4);
+				break;
 			case FOURCC_DX10:
 				switch (ddsh10.dxgiFormat)
 				{
+					case DXGI_FORMAT_R16_FLOAT:
+						set_float16_format(GL_RED, GL_R16F, 1);
+						break;
+					case DXGI_FORMAT_R16G16_FLOAT:
+						set_float16_format(GL_RG, GL_RG16F, 2);
+						break;
+					case DXGI_FORMAT_R16G16B16A16_FLOAT:
+						set_float16_format(GL_RGBA, GL_RGBA16F, 4);
+						break;
 					case DXGI_FORMAT_BC1_UNORM:
 						m_format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
 						m_components = 3;
@@ -657,6 +676,10 @@ bool CDDSImage::save(std::string filename, bool flipImage) const
     assert(m_valid);
     assert(m_type != TextureNone);
 
+    // writing float formats is not supported
+    if (is_float())
+        return false;
+
     if (is_compressed() &&
         m_format != GL_COMPRESSED_RGBA_S3TC_DXT1_EXT &&
         m_format != GL_COMPRESSED_RGBA_S3TC_DXT3_EXT &&
@@ -801,10 +824,30 @@ void CDDSImage::clear()
 	RECOIL_DETAILED_TRACY_ZONE;
     m_components = 0;
     m_format = 0;
+    m_internalFormat = 0;
+    m_dataType = GL_UNSIGNED_BYTE;
+    m_bytesPerComponent = 1;
     m_type = TextureNone;
     m_valid = false;
 
     m_images.clear();
+}
+
+bool CDDSImage::is_float() const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	return (m_dataType == GL_HALF_FLOAT);
+}
+
+// selects an uncompressed 16-bit float layout: tightly packed, no padding, component order as in memory
+void CDDSImage::set_float16_format(unsigned int format, unsigned int internalFormat, unsigned int components)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	m_format = format;
+	m_internalFormat = internalFormat;
+	m_dataType = GL_HALF_FLOAT;
+	m_components = components;
+	m_bytesPerComponent = sizeof(uint16_t);
 }
 
 bool CDDSImage::is_compressed() const
@@ -856,16 +899,16 @@ bool CDDSImage::upload_texture1D() const
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         }
 
-        glTexImage1D(GL_TEXTURE_1D, 0, m_components, baseImage.get_width(), 0,
-            m_format, GL_UNSIGNED_BYTE, baseImage);
+        glTexImage1D(GL_TEXTURE_1D, 0, get_internal_format(), baseImage.get_width(), 0,
+            m_format, m_dataType, baseImage);
 
         // load all mipmaps
         for (unsigned int i = 0; i < baseImage.get_num_mipmaps(); i++)
         {
             const CSurface &mipmap = baseImage.get_mipmap(i);
 
-            glTexImage1D(GL_TEXTURE_1D, i+1, m_components,
-                mipmap.get_width(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
+            glTexImage1D(GL_TEXTURE_1D, i+1, get_internal_format(),
+                mipmap.get_width(), 0, m_format, m_dataType, mipmap);
         }
 
         if (alignment != -1)
@@ -927,8 +970,8 @@ bool CDDSImage::upload_texture2D(unsigned int imageIndex, int target) const
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         }
 
-        glTexImage2D(target, 0, m_components, image.get_width(),
-            image.get_height(), 0, m_format, GL_UNSIGNED_BYTE,
+        glTexImage2D(target, 0, get_internal_format(), image.get_width(),
+            image.get_height(), 0, m_format, m_dataType,
             image);
 
         // load all mipmaps
@@ -936,8 +979,8 @@ bool CDDSImage::upload_texture2D(unsigned int imageIndex, int target) const
         {
             const CSurface &mipmap = image.get_mipmap(i);
 
-            glTexImage2D(target, i+1, m_components, mipmap.get_width(),
-                mipmap.get_height(), 0, m_format, GL_UNSIGNED_BYTE, mipmap);
+            glTexImage2D(target, i+1, get_internal_format(), mipmap.get_width(),
+                mipmap.get_height(), 0, m_format, m_dataType, mipmap);
         }
 
         if (alignment != -1)
@@ -984,18 +1027,18 @@ bool CDDSImage::upload_texture3D() const
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         }
 
-        glTexImage3D(GL_TEXTURE_3D, 0, m_components, baseImage.get_width(),
+        glTexImage3D(GL_TEXTURE_3D, 0, get_internal_format(), baseImage.get_width(),
             baseImage.get_height(), baseImage.get_depth(), 0, m_format,
-            GL_UNSIGNED_BYTE, baseImage);
+            m_dataType, baseImage);
 
         // load all mipmap volumes
         for (unsigned int i = 0; i < baseImage.get_num_mipmaps(); i++)
         {
             const CSurface &mipmap = baseImage.get_mipmap(i);
 
-            glTexImage3D(GL_TEXTURE_3D, i+1, m_components,
+            glTexImage3D(GL_TEXTURE_3D, i+1, get_internal_format(),
                 mipmap.get_width(), mipmap.get_height(), mipmap.get_depth(), 0,
-                m_format, GL_UNSIGNED_BYTE,  mipmap);
+                m_format, m_dataType,  mipmap);
         }
 
         if (alignment != -1)
@@ -1066,7 +1109,7 @@ inline unsigned int CDDSImage::size_dxtc(unsigned int width, unsigned int height
 inline unsigned int CDDSImage::size_rgb(unsigned int width, unsigned int height) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-    return width*height*m_components;
+    return width*height*m_components*m_bytesPerComponent;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

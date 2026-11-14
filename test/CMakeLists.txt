@@ -176,6 +176,26 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG")
 
 ################################################################################
+### DDSFloat
+	set(test_name DDSFloat)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Rendering/testDDSFloat.cpp"
+			"${ENGINE_SOURCE_DIR}/Rendering/Textures/nv_dds.cpp"
+			${test_Common_sources}
+		)
+
+	# headlessStubs: no-op OpenGL entry points for the glad symbols myGL.h refers to
+	set(test_libs
+			headlessStubs
+			nowide::nowide
+		)
+
+	# HEADLESS: nv_dds.cpp then skips its glTexImage upload code, which needs a GL context.
+	# -UUNIT_TEST: nv_dds.cpp includes myGL.h, which refuses to compile under UNIT_TEST (it guards its glOrtho wrappers);
+	# nothing here calls them.
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DHEADLESS -UUNIT_TEST")
+
+################################################################################
 ### Float3
 	set(test_name Float3)
 	set(test_src
