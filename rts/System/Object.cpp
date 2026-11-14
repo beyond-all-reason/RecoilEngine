@@ -13,6 +13,7 @@ CR_REG_METADATA(CObject, (
 	CR_MEMBER(sync_id),
 
 	CR_MEMBER(detached),
+	CR_MEMBER(deathDependencesNotified),
 
 	CR_MEMBER(listening),
 	CR_MEMBER(listeners),
@@ -53,6 +54,26 @@ CObject::~CObject()
 {
 	assert(!detached);
 	detached = true;
+	NotifyDeathDependences();
+
+	for (const auto& dependence: listeningDepTbl) {
+		assert(dependence.first >= DEPENDENCE_ATTACKER && dependence.first < DEPENDENCE_COUNT);
+		assert(dependence.second < listening.size());
+		for (CObject* object: listening[dependence.second]) {
+			const auto entry = object->listenersDepTbl.find(dependence.first);
+			if (entry != object->listenersDepTbl.end())
+				VectorEraseSorted(object->listeners[entry->second], this);
+		}
+	}
+}
+
+
+void CObject::NotifyDeathDependences()
+{
+	if (deathDependencesNotified)
+		return;
+
+	deathDependencesNotified = true;
 
 	// NB: listenersDepTbl must be iterated sequentially
 	// due to the presence of obj->DependentDied(this);
@@ -81,19 +102,8 @@ CObject::~CObject()
 		}
 	}
 
-	for (const auto& p: listeningDepTbl) {
-		assert(p.first >= DEPENDENCE_ATTACKER && p.first < DEPENDENCE_COUNT);
-		assert(p.second < listening.size());
-
-		for (CObject* obj: listening[p.second]) {
-			const auto jt = obj->listenersDepTbl.find(p.first);
-
-			if (jt == obj->listenersDepTbl.end())
-				continue;
-
-			VectorEraseSorted(obj->listeners[ jt->second ], this);
-		}
-	}
+	listeners.clear();
+	listenersDepTbl.clear();
 }
 
 
@@ -104,6 +114,9 @@ CObject::~CObject()
 //   to waste memory
 void CObject::AddDeathDependence(CObject* obj, DependenceType dep)
 {
+	if (deathDependencesNotified || obj->deathDependencesNotified)
+		return;
+
 	assert(!detached && !obj->detached);
 
 	// check this explicitly
@@ -119,7 +132,7 @@ void CObject::DeleteDeathDependence(CObject* obj, DependenceType dep)
 {
 	assert(!detached);
 
-	if (detached || obj->detached)
+	if (detached || obj->detached || obj->deathDependencesNotified)
 		return;
 
 	const auto it =      listeningDepTbl.find(dep);

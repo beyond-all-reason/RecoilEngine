@@ -618,6 +618,9 @@ void CWeapon::UpdateSalvo()
 bool CWeapon::Attack(const SWeaponTarget& newTarget)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (owner->DeathDependencesNotified() || (newTarget.type == Target_Unit && newTarget.unit->DeathDependencesNotified()))
+		return false;
+
 	if (newTarget == currentTarget)
 		return true;
 
@@ -646,6 +649,9 @@ bool CWeapon::Attack(const SWeaponTarget& newTarget)
 void CWeapon::SetAttackTarget(const SWeaponTarget& newTarget)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (owner->DeathDependencesNotified() || (newTarget.type == Target_Unit && newTarget.unit->DeathDependencesNotified()))
+		return;
+
 	if (newTarget == currentTarget)
 		return;
 
@@ -1048,6 +1054,8 @@ bool CWeapon::TestTarget(const float3& tgtPos, const SWeaponTarget& trg) const
 		} break;
 		case Target_Unit: {
 			if (trg.unit == owner || trg.unit == nullptr)
+				return false;
+			if (trg.unit->DeathDependencesNotified())
 				return false;
 			if ((trg.unit->category & onlyTargetCategory) == 0)
 				return false;
