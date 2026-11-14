@@ -41,6 +41,7 @@
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/Env/IWater.h"
+#include "Rendering/GL/SceneTarget.h"
 #include "Rendering/Env/IGroundDecalDrawer.h"
 #include "Rendering/Env/Particles/Classes/NanoProjectile.h"
 #include "Rendering/Map/InfoTexture/IInfoTextureHandler.h"
@@ -210,6 +211,8 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(HaveShadows);
 	REGISTER_LUA_CFUNC(HaveAdvShading);
 	REGISTER_LUA_CFUNC(GetWaterMode);
+	REGISTER_LUA_CFUNC(GetSceneTargetInfo);
+	REGISTER_LUA_CFUNC(TestDisplayTransforms);
 	REGISTER_LUA_CFUNC(GetMapDrawMode);
 	REGISTER_LUA_CFUNC(GetMapSquareTexture);
 
@@ -2905,6 +2908,73 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
 	lua_pushnumber(L, water->GetID());
 	lua_pushstring(L, IWater::GetWaterName(water->GetID()));
 	return 2;
+}
+
+
+/***
+ * Returns the state of the PBR HDR scene target and its display pass
+ * (PBRSceneTarget and the keys next to it). `requested` echoes the saved
+ * PBRSceneTarget, `active` is "direct" or "hdr" this frame, and `fallback`
+ * explains every substitution (an allocation failure, a reserved value).
+ * `revision` increases on every successful (re)allocation (resize, depth
+ * format). `depthCopy` is how depth reached the window after the display pass:
+ * "blit", "shader" (stencil then not copied) or "none".
+ *
+ * @function Spring.GetSceneTargetInfo
+ * @return table sceneTargetInfo
+ */
+int LuaUnsyncedRead::GetSceneTargetInfo(lua_State* L)
+{
+	const SceneTargetInfo info = sceneTarget.GetInfo();
+	lua_createtable(L, 0, 20);
+	LuaPushNamedString(L, "requested", info.requested);
+	LuaPushNamedString(L, "active", info.active);
+	LuaPushNamedString(L, "fallback", info.fallback);
+	LuaPushNamedString(L, "colorFormat", info.colorFormat);
+	LuaPushNamedString(L, "depthFormat", info.depthFormat);
+	LuaPushNamedString(L, "requestedDepthFormat", info.requestedDepthFormat);
+	LuaPushNamedString(L, "transfer", info.transfer);
+	LuaPushNamedString(L, "displayTransform", info.displayTransform);
+	LuaPushNamedString(L, "exposureMode", info.exposureMode);
+	LuaPushNamedString(L, "boundary", info.boundary);
+	LuaPushNamedString(L, "dither", info.dither);
+	LuaPushNamedString(L, "depthCopy", info.depthCopy);
+	LuaPushNamedBool(L, "stencilCopied", info.stencilCopied);
+	LuaPushNamedNumber(L, "width", info.width);
+	LuaPushNamedNumber(L, "height", info.height);
+	LuaPushNamedNumber(L, "samples", info.samples);
+	LuaPushNamedNumber(L, "revision", info.revision);
+	LuaPushNamedNumber(L, "allocationFailures", info.allocationFailures);
+	LuaPushNamedNumber(L, "exposureEV", info.exposureEV);
+	LuaPushNamedNumber(L, "exposureLinear", info.exposureLinear);
+	return 1;
+}
+
+
+/***
+ * Runs the display pass's GPU check: a brightness ramp from 0 to 64 (gray and
+ * coloured rows) goes through every PBRDisplayTransform curve with both scene
+ * transfers and is compared with the engine's CPU reference of the same curves.
+ * `pass` needs every value within two half-float steps, finite, and the gray
+ * row monotonic. Changes no setting; restores the GL state it touches.
+ * A test tool: the first call builds the display pass programs (otherwise built
+ * only when PBRSceneTarget=hdr is first wanted), so a game that never calls it
+ * and never asks for hdr compiles none of them.
+ *
+ * @function Spring.TestDisplayTransforms
+ * @return table result fields ran, pass, samples, maxError, worstTransform, failure
+ */
+int LuaUnsyncedRead::TestDisplayTransforms(lua_State* L)
+{
+	const DisplayTransformTestResult r = sceneTarget.TestDisplayTransforms();
+	lua_createtable(L, 0, 6);
+	LuaPushNamedBool(L, "ran", r.ran);
+	LuaPushNamedBool(L, "pass", r.pass);
+	LuaPushNamedNumber(L, "samples", r.samples);
+	LuaPushNamedNumber(L, "maxError", r.maxError);
+	LuaPushNamedString(L, "worstTransform", r.worstTransform);
+	LuaPushNamedString(L, "failure", r.failure);
+	return 1;
 }
 
 

@@ -5,6 +5,7 @@
  */
 
 #include "BumpWater.h"
+#include "Rendering/GL/SceneTarget.h"
 
 #include "ISky.h"
 #include "SunLighting.h"
@@ -899,6 +900,9 @@ void CBumpWater::Draw()
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (!waterRendering->forceRendering && !readMap->HasVisibleWater())
 		return;
+
+	// a multisampled PBR scene target is copied from its resolve
+	ScopedSceneReadResolve sceneRead;
 
 	if (refraction == 1) {
 		// _SCREENCOPY_ REFRACT TEXTURE
