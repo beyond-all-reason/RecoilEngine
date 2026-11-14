@@ -229,6 +229,10 @@ bool CBuilder::UpdateTerraform(const Command&)
 			SmoothBorders();
 
 			if (curBuildee->terraformLeft <= 0.0f) {
+				// The final height changes must reach the terrain even if no SlowUpdate
+				// ran during terraforming. StopBuild also skips this once the flag is cleared.
+				constexpr int tsr = TERRA_SMOOTHING_RADIUS;
+				mapDamage->RecalcArea(tx1 - tsr, tx2 + tsr, tz1 - tsr, tz2 + tsr);
 				terraforming = false;
 				curBuildee->groundLevelled = true;
 
@@ -261,7 +265,7 @@ bool CBuilder::UpdateTerraform(const Command&)
 		SmoothBorders();
 
 		if (myTerraformLeft <= 0.0f) {
-			terraforming = false;
+			// StopBuild flushes the final terrain changes before clearing terraforming.
 			StopBuild();
 		}
 	} break;
