@@ -342,11 +342,15 @@ bool LuaConstGame::PushEntries(lua_State* L)
 		 * @table Game.collisionFlags
 		 */
 		lua_pushliteral(L, "collisionFlags");
-		lua_createtable(L, 0, 9);
+		lua_createtable(L, 0, 11);
 			/*** @field Game.collisionFlags.noEnemies integer */
 			LuaPushNamedNumber(L, "noEnemies"   , Collision::NOENEMIES   );
 			/*** @field Game.collisionFlags.noFriendlies integer */
 			LuaPushNamedNumber(L, "noFriendlies", Collision::NOFRIENDLIES);
+			/*** @field Game.collisionFlags.noMobileFriendlies integer Ignore friendly units capable of movement. */
+			LuaPushNamedNumber(L, "noMobileFriendlies", Collision::NOMOBILEFRIENDLIES);
+			/*** @field Game.collisionFlags.noStaticFriendlies integer Ignore immobile friendly units. */
+			LuaPushNamedNumber(L, "noStaticFriendlies", Collision::NOSTATICFRIENDLIES);
 			/*** @field Game.collisionFlags.noFeatures integer */
 			LuaPushNamedNumber(L, "noFeatures"  , Collision::NOFEATURES  );
 			/*** @field Game.collisionFlags.noNeutrals integer */
