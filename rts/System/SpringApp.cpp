@@ -884,6 +884,13 @@ bool SpringApp::Update()
 	bool retc = true;
 	bool swap = true;
 
+	// LoadingMT=2: the load screen draws and swaps in its own context from its Update. Config
+	// observers, window updates and the game's buffer swap need the game's context, so they wait.
+	if (globalRendering->HaveIntroContext()) {
+		globalRendering->UpdateTimer();
+		return (activeController == nullptr || activeController->Update());
+	}
+
 	configHandler->Update();
 	globalRendering->UpdateWindow();
 	globalRendering->UpdateTimer();
@@ -899,12 +906,21 @@ bool SpringApp::Update()
 	// sic; Update can set the controller to null
 	retc = (        activeController == nullptr || activeController->Update());
 
-	auto lock = CLoadLock::GetUniqueLock();
-	swap = (retc && activeController != nullptr && activeController->Draw());
+	// the controller just started a LoadingMT=2 load, see above
+	if (globalRendering->HaveIntroContext())
+		return retc;
+
+	{
+		// LoadingMT: tells the loading thread a frame is waiting, so it can let the frame through
+		const CLoadLock::ScopedDraw scopedDraw;
+		auto lock = CLoadLock::GetUniqueLock();
+		swap = (retc && activeController != nullptr && activeController->Draw());
+
+		// always swap by default, not doing so can upset some drivers
+		globalRendering->SwapBuffers(swap, false);
+	}
 	#endif
 
-	// always swap by default, not doing so can upset some drivers
-	globalRendering->SwapBuffers(swap, false);
 	return retc;
 }
 
@@ -1099,6 +1115,10 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 {
 	switch (event.type) {
 		case SDL_WINDOWEVENT: {
+			// LoadingMT=2 has a hidden window of its own for the loading thread
+			if (event.window.windowID != SDL_GetWindowID(globalRendering->GetWindow()))
+				break;
+
 			switch (event.window.event) {
 				case SDL_WINDOWEVENT_MOVED: {
 					LOG("[SpringApp::%s][SDL_WINDOWEVENT_MOVED][1] di=%d, ssx=%d, ssy=%d, wsx=%d, wsy=%d, wpx=%d, wpy=%d"
@@ -1113,7 +1133,8 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 
 					SaveWindowPosAndSize();
 
-					if (globalRendering->numDisplays > 1 && globalRendering->dualScreenMode) {
+					// LoadingMT=2: needs the game's context, which the loading thread has
+					if (globalRendering->numDisplays > 1 && globalRendering->dualScreenMode && !globalRendering->HaveIntroContext()) {
 						{
 							SCOPED_ONCE_TIMER("GlobalRendering::UpdateGL");
 
@@ -1139,6 +1160,16 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 					LOG("[SpringApp::%s][SDL_WINDOWEVENT_SIZE_CHANGED][1] fullScreen=%d", __func__, globalRendering->fullScreen);
 
 					Watchdog::ClearTimer(WDT_MAIN, true);
+
+					// LoadingMT=2: only the load screen's context is here; the load screen
+					// sends this event again once the game's context is back (CLoadScreen::Kill)
+					if (globalRendering->HaveIntroContext()) {
+						SaveWindowPosAndSize();
+						globalRendering->UpdateGLGeometry();
+						globalRendering->LoadViewport();
+						activeController->ResizeEvent();
+						break;
+					}
 
 					{
 						SCOPED_ONCE_TIMER("GlobalRendering::UpdateGL");
@@ -1172,7 +1203,8 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 						sound->Iconified(false);
 					}
 
-					if (globalRendering->fullScreen) {
+					// LoadingMT=2: the FBOs are in the loading thread's context
+					if (globalRendering->fullScreen && !globalRendering->HaveIntroContext()) {
 						SCOPED_ONCE_TIMER("FBO::GLContextReinit");
 						FBO::GLContextReinit();
 					}
@@ -1192,7 +1224,8 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 						sound->Iconified(true);
 					}
 
-					if (globalRendering->fullScreen) {
+					// LoadingMT=2: the FBOs are in the loading thread's context
+					if (globalRendering->fullScreen && !globalRendering->HaveIntroContext()) {
 						SCOPED_ONCE_TIMER("FBO::GLContextLost");
 						FBO::GLContextLost();
 					}
@@ -1245,8 +1278,9 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 				// replace with normal SDL_WINDOWEVENT_DISPLAY_CHANGED when our Linux SDL2 is updated
 				case RECOIL_SDL_WINDOWEVENT_DISPLAY_CHANGED: {
 					LOG("[SpringApp::%s][SDL_WINDOWEVENT_DISPLAY_CHANGED] to display %d\n", __func__, event.window.data1);
-					// try to reinit GL context
-					globalRendering->MakeCurrentContext(false);
+					// try to reinit GL context; LoadingMT=2: the loading thread has it, CLoadScreen::Kill does this
+					if (!globalRendering->HaveIntroContext())
+						globalRendering->MakeCurrentContext(false);
 					globalRendering->UpdateDisplayPeriod();
 				} break;
 

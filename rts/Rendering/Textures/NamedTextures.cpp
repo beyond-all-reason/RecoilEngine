@@ -2,6 +2,7 @@
 
 // must be included before streflop! else we get streflop/cmath resolve conflicts in its hash implementation files
 #include <bit>
+#include <deque>
 #include <vector>
 #include "NamedTextures.h"
 
@@ -21,13 +22,62 @@ namespace CNamedTextures {
 	// maps names to texInfoVec indices
 	static spring::unordered_map<std::string, size_t> texInfoMap;
 
-	static std::vector<CNamedTextures::TexInfo> texInfoVec;
+	// a deque: entries stay where they are when another is added, so a TexInfo* handed out
+	// stays valid while another thread loads a texture (LoadingMT)
+	static std::deque<CNamedTextures::TexInfo> texInfoVec;
 	static std::vector<size_t> freeIndices;
 	static std::vector<std::string> waitingTextures;
 
 	static spring::recursive_mutex mutex;
 
+	// LoadingMT=2: uploads by one GL context that the other may not see complete yet
+	static spring::unordered_map<GLuint, GLsync> uploadFences;
+
 	/******************************************************************************/
+
+	static void DropUploadFence(GLuint texID)
+	{
+		// caller has the lock
+		const auto it = uploadFences.find(texID);
+
+		if (it == uploadFences.end())
+			return;
+
+		glDeleteSync(it->second);
+		uploadFences.erase(it);
+	}
+
+	// LoadingMT=2: before using a texture that may have been uploaded in the other context
+	static void WaitForUpload(GLuint texID)
+	{
+		// caller has the lock
+		if (uploadFences.empty())
+			return;
+
+		// the load is over and the game's context, which made the rest, is the only one left
+		if (!globalRendering->HaveIntroContext()) {
+			for (const auto& [id, fence]: uploadFences)
+				glDeleteSync(fence);
+
+			uploadFences.clear();
+			return;
+		}
+
+		const auto it = uploadFences.find(texID);
+
+		if (it == uploadFences.end())
+			return;
+
+		GLint status = GL_UNSIGNALED;
+		glGetSynciv(it->second, GL_SYNC_STATUS, 1, nullptr, &status);
+
+		if (status == GL_SIGNALED) {
+			DropUploadFence(texID);
+			return;
+		}
+
+		glWaitSync(it->second, 0, GL_TIMEOUT_IGNORED);
+	}
 
 	void Init()
 	{
@@ -35,7 +85,6 @@ namespace CNamedTextures {
 		texInfoMap.clear();
 		texInfoMap.reserve(128);
 		texInfoVec.clear();
-		texInfoVec.reserve(128);
 
 		freeIndices.clear();
 
@@ -54,6 +103,7 @@ namespace CNamedTextures {
 			const GLuint texID = texInfoVec[texIdx].id;
 
 			if (shutdown || !texInfoVec[texIdx].persist) {
+				DropUploadFence(texID);
 				glDeleteTextures(1, &texID);
 				// always recycle non-persistent textures
 				freeIndices.push_back(texIdx);
@@ -140,6 +190,7 @@ namespace CNamedTextures {
 			const size_t texIdx = it->second;
 			const GLuint texID = texInfoVec[texIdx].id;
 
+			DropUploadFence(texID);
 			glDeleteTextures(1, &texID);
 
 			freeIndices.push_back(texIdx);
@@ -155,6 +206,8 @@ namespace CNamedTextures {
 	static bool Load(const std::string& texName, unsigned int texID, bool genInsert)
 	{
 	RECOIL_DETAILED_TRACY_ZONE;
+		const unsigned int reqTexID = texID;
+
 		// strip off the qualifiers
 		std::string filename = texName;
 		bool border  = false;
@@ -289,8 +342,25 @@ namespace CNamedTextures {
 			}	
 		#endif
 
-		if (genInsert)
+		if (genInsert) {
+			const std::lock_guard<spring::recursive_mutex> lck(mutex);
+			const auto it = texInfoMap.find(texName);
+
+			// LoadingMT: another thread loaded the same texture meanwhile, keep that one
+			if (it != texInfoMap.end() && texInfoVec[it->second].id != reqTexID) {
+				glDeleteTextures(1, &texID);
+				return true;
+			}
+
+			// LoadingMT=2: the other context may use it as soon as it is in the map
+			if (globalRendering->HaveIntroContext()) {
+				DropUploadFence(texID);
+				uploadFences[texID] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+				glFlush();
+			}
+
 			GenInsertTex(texName, texInfo, false, false, true, false);
+		}
 
 		return true;
 	}
@@ -310,14 +380,19 @@ namespace CNamedTextures {
 		if (texName.empty())
 			return false;
 
-		// cached
-		const auto it = texInfoMap.find(texName);
+		// cached; the lookup is locked, the load below is not, so a thread loading a big
+		// texture does not hold up another one binding (LoadingMT)
+		{
+			const std::lock_guard<spring::recursive_mutex> lck(mutex);
+			const auto it = texInfoMap.find(texName);
 
-		if (it != texInfoMap.end()) {
-			const size_t texIdx = it->second;
-			const GLuint texID = texInfoVec[texIdx].id;
-			glBindTexture(GL_TEXTURE_2D, texID);
-			return (texID != 0);
+			if (it != texInfoMap.end()) {
+				const size_t texIdx = it->second;
+				const GLuint texID = texInfoVec[texIdx].id;
+				WaitForUpload(texID);
+				glBindTexture(GL_TEXTURE_2D, texID);
+				return (texID != 0);
+			}
 		}
 
 		// load texture
@@ -369,6 +444,7 @@ namespace CNamedTextures {
 	size_t GetInfoIndex(const std::string& texName)
 	{
 	RECOIL_DETAILED_TRACY_ZONE;
+		const std::lock_guard<spring::recursive_mutex> lck(mutex);
 		const auto it = texInfoMap.find(texName);
 
 		if (it != texInfoMap.end())
@@ -377,7 +453,12 @@ namespace CNamedTextures {
 		return (size_t(-1));
 	}
 
-	const TexInfo* GetInfo(size_t texIdx) { return &texInfoVec[texIdx]; }
+	const TexInfo* GetInfo(size_t texIdx)
+	{
+		const std::lock_guard<spring::recursive_mutex> lck(mutex);
+		WaitForUpload(texInfoVec[texIdx].id);
+		return &texInfoVec[texIdx];
+	}
 	const TexInfo* GetInfo(const std::string& texName, bool forceLoad, bool persist, bool secondaryGLContext)
 	{
 	RECOIL_DETAILED_TRACY_ZONE;
@@ -387,7 +468,9 @@ namespace CNamedTextures {
 		const size_t texIdx = GetInfoIndex(texName);
 
 		if (texIdx != size_t(-1)) {
+			const std::lock_guard<spring::recursive_mutex> lck(mutex);
 			texInfoVec[texIdx].persist |= persist;
+			WaitForUpload(texInfoVec[texIdx].id);
 			return &texInfoVec[texIdx];
 		}
 
@@ -402,6 +485,8 @@ namespace CNamedTextures {
 				GenLoadTex(texName);
 			}
 
+			const std::lock_guard<spring::recursive_mutex> lck(mutex);
+			WaitForUpload(texInfoVec[ texInfoMap[texName] ].id);
 			return &texInfoVec[ texInfoMap[texName] ];
 		}
 

@@ -67,6 +67,8 @@ private:
 	spring::unsynced_map<void*, std::vector<std::string>> observersToConfigs;
 	spring::mutex observerMutex;
 	StringMap changedValues;
+	// the sources; LoadingMT reads and writes them from the loading and the main thread
+	mutable spring::recursive_mutex dataMutex;
 	bool writingEnabled;
 };
 
@@ -202,6 +204,8 @@ void ConfigHandlerImpl::RemoveDeprecated()
 
 StringMap ConfigHandlerImpl::GetDataWithoutDefaults() const
 {
+	std::lock_guard<spring::recursive_mutex> lck(dataMutex);
+
 	StringMap cleanConfig;
 	StringMap defaults = sources.back()->GetData();
 
@@ -229,6 +233,8 @@ StringMap ConfigHandlerImpl::GetDataWithoutDefaults() const
 
 void ConfigHandlerImpl::Delete(const std::string& key)
 {
+	std::lock_guard<spring::recursive_mutex> lck(dataMutex);
+
 	for (ReadOnlyConfigSource* s: sources) {
 		// The alternative to the dynamic cast is to merge ReadWriteConfigSource
 		// with ReadOnlyConfigSource, but then DefaultConfigSource would have to
@@ -244,6 +250,8 @@ void ConfigHandlerImpl::Delete(const std::string& key)
 
 bool ConfigHandlerImpl::IsSet(const std::string& key) const
 {
+	std::lock_guard<spring::recursive_mutex> lck(dataMutex);
+
 	for (const ReadOnlyConfigSource* s: sources) {
 		if (s->IsSet(key)) return true;
 	}
@@ -274,6 +282,8 @@ bool ConfigHandlerImpl::IsDeprecated(const std::string& key) const
 std::string ConfigHandlerImpl::GetString(const std::string& key) const
 {
 	const ConfigVariableMetaData* meta = ConfigVariable::GetMetaData(key);
+
+	std::lock_guard<spring::recursive_mutex> lck(dataMutex);
 
 	for (const ReadOnlyConfigSource* s: sources) {
 		if (s->IsSet(key)) {
@@ -307,6 +317,9 @@ std::string ConfigHandlerImpl::GetString(const std::string& key) const
  */
 void ConfigHandlerImpl::SetString(const std::string& key, const std::string& value, bool useOverlay, bool notify)
 {
+	// released before observerMutex: Update holds that while observers read the config
+	std::unique_lock<spring::recursive_mutex> dataLck(dataMutex);
+
 	// if we set something to be persisted,
 	// we do want to override the overlay value
 	if (!useOverlay)
@@ -346,6 +359,7 @@ void ConfigHandlerImpl::SetString(const std::string& key, const std::string& val
 		}
 	}
 
+	dataLck.unlock();
 	std::lock_guard<spring::mutex> lck(observerMutex);
 
 	if (notify)
@@ -375,6 +389,8 @@ std::string ConfigHandlerImpl::GetConfigFile() const {
 }
 
 const StringMap ConfigHandlerImpl::GetData() const {
+	std::lock_guard<spring::recursive_mutex> lck(dataMutex);
+
 	StringMap data;
 	for (const ReadOnlyConfigSource* s: sources) {
 		const StringMap& sourceData = s->GetData();

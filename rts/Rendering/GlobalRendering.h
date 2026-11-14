@@ -65,6 +65,16 @@ public:
 
 	void MakeCurrentContext(bool clear) const;
 
+	/// LoadingMT=2: the main thread draws the load screen in this context, shared with the game's.
+	/// VAOs, FBOs and queries are not shared, so only what the load screen creates can be drawn in it.
+	bool CreateIntroContext();
+	void DestroyIntroContext();
+	/// loading thread: the game's context on a hidden window of its own, so neither context waits on the other's drawable
+	bool MakeLoadThreadContext(bool clear) const;
+	bool HaveIntroContext() const { return (introContext != nullptr); }
+	/// whether the calling thread draws in the intro context (GL objects made here die with it)
+	bool OnIntroContext() const;
+
 	void CheckGLExtensions();
 	void SetGLSupportFlags();
 	void QueryVersionInfo(char (&sdlVersionStr)[64], char (&glVidMemStr)[64]);
@@ -418,6 +428,8 @@ public:
 public:
 	SDL_Window* sdlWindow;
 	SDL_GLContext glContext;
+	SDL_GLContext introContext = nullptr;
+	SDL_Window* loadWindow = nullptr;
 public:
 	/**
 	* @brief maximum texture unit number

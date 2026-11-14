@@ -364,6 +364,7 @@ class CLuaHandle : public CEventClient
 		bool rmlui = false;
 		bool userMode = false;
 		bool killMe = false; // set for handles that fail to RunCallIn
+		bool eventsDetached = false; // takes no events from eventHandler (LuaIntro, LoadingMT=2)
 
 		int callinErrors = 0;
 

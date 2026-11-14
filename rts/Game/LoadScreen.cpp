@@ -17,6 +17,9 @@
 #include "Rendering/Fonts/glFont.h"
 #include "Rendering/GlobalRendering.h"
 #include "Rendering/Textures/NamedTextures.h"
+#include "Rendering/VerticalSync.h"
+#include "Rendering/GL/RenderBuffers.h"
+#include "Rendering/GL/StreamBuffer.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Path/IPathManager.h"
 #include "System/Config/ConfigHandler.h"
@@ -44,7 +47,12 @@
 #include "System/Misc/TracyDefs.h"
 
 CONFIG(int, LoadingMT)
-	.description("Experimental option to load the game in separate thread. Expect visual glitches, crashes and deadlocks")
+	.description(
+		"Experimental option to load the game in separate thread. Expect visual glitches, crashes and deadlocks."
+		" 1: the load screen and the loading thread take turns with one GL context."
+		" 2: the load screen draws in its own GL context, independently of the loading thread;"
+		" LuaIntro gets no events from the load (e.g. GamePreload) and LuaMenu is not updated until it is done."
+	)
 	.defaultValue(0)
 	.safemodeValue(0);
 
@@ -98,10 +106,12 @@ bool CLoadScreen::Init()
 
 #ifdef HEADLESS
 	mtLoading = false;
+	splitContext = false;
 #else
 	const int mtCfg = configHandler->GetInt("LoadingMT");
 	// user override
 	mtLoading = (mtCfg > 0);
+	splitContext = (mtCfg >= 2);
 #endif
 
 
@@ -118,8 +128,43 @@ bool CLoadScreen::Init()
 		throw;
 	}
 
+	if (splitContext && !globalRendering->CreateIntroContext()) {
+		LOG_L(L_WARNING, "[LoadScreen::%s] LoadingMT=2 falls back to 1", __func__);
+		splitContext = false;
+	}
+
 	CglFont::sync.SetThreadSafety(mtLoading);
-	CLoadLock::SetThreadSafety(mtLoading);
+	// LoadingMT=2: the loading thread keeps the game's context for the whole load and
+	// nothing else takes it, so CLoadLock has nothing to hand over
+	CLoadLock::SetThreadSafety(mtLoading && !splitContext);
+
+	// a swap that waits for vblank holds up the loading thread: in LoadingMT=1 the swap holds
+	// CLoadLock, in LoadingMT=2 the driver stalls the other context (60% longer loads with
+	// NVIDIA). Frames are paced in Update instead. Set while this thread has a context.
+	if (mtLoading)
+		verticalSync->Suspend();
+
+	if (splitContext) {
+		// one frame per display refresh
+		constexpr int FALLBACK_REFRESH_RATE = 60;
+
+		SDL_DisplayMode mode;
+		const int displayIndex = SDL_GetWindowDisplayIndex(globalRendering->GetWindow());
+		const bool haveMode = (displayIndex >= 0 && SDL_GetCurrentDisplayMode(displayIndex, &mode) == 0 && mode.refresh_rate > 0);
+		const int refreshRate = haveMode ? mode.refresh_rate : FALLBACK_REFRESH_RATE;
+		introFramePeriod = spring_time::fromMicroSecs(1000000 / refreshRate);
+		nextFrameTime = spring_gettime();
+
+		// before the loading thread exists: LuaIntro takes itself out of eventHandler,
+		// which the loading thread broadcasts through
+		CLuaIntro::LoadFreeHandler();
+
+		gameLoadThread = CGameLoadThread(std::bind(&CLoadScreen::LoadInGameContext, this));
+
+		while (!Watchdog::HasThread(WDT_LOAD));
+		return true;
+	}
+
 	if (mtLoading) {
 		try {
 			// create the game-loading thread; rebinds primary context to hidden window
@@ -132,6 +177,7 @@ bool CLoadScreen::Init()
 			mtLoading = false;
 			CglFont::sync.SetThreadSafety(false);
 			CLoadLock::SetThreadSafety(false);
+			verticalSync->Resume();
 		}
 	}
 
@@ -157,23 +203,66 @@ bool CLoadScreen::Init()
 void CLoadScreen::Kill()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (mtLoading && !gameLoadThread.joinable())
+	if (mtLoading && !gameLoadThread.joinable() && !splitContext) {
+		// the loading thread was never started, this thread still has the context
+		verticalSync->Resume();
 		return;
+	}
 
+	// before LuaIntro is freed: on a quit during the load, the loading thread may still be
+	// registering Lua handles and eventHandler clients, which freeing LuaIntro also touches
+	gameLoadThread.join();
+
+	// LoadingMT=2: still in the load screen's own context, so what LuaIntro made there
+	// (VAOs, FBOs, its fonts) is released in it
 	if (luaIntro != nullptr)
 		luaIntro->Shutdown();
 
 	CLuaIntro::FreeHandler();
 
-	// at this point, gameLoadThread running CGame::Load
-	// has finished and deregistered itself from WatchDog
-	gameLoadThread.join();
+	// LoadingMT=2: done with it; the loading thread released the game's context as it exited
+	globalRendering->DestroyIntroContext();
 
 	CFontTexture::sync.SetThreadSafety(false);
 	CLoadLock::SetThreadSafety(false);
 	// set last time and forever
 	globalRendering->MakeCurrentContext(false);
 	globalRendering->ToggleMultisampling();
+	// also applies a VSync change made during the load (e.g. by LuaIntro), which could
+	// not reach the context then
+	verticalSync->Resume();
+
+	// LoadingMT=2: a resize during the load only reached the load screen; now that the
+	// game's context is back, let the regular handler do the rest
+	if (resizedDuringLoad) {
+		SDL_Event event = {};
+		event.type = SDL_WINDOWEVENT;
+		event.window.event = SDL_WINDOWEVENT_SIZE_CHANGED;
+		event.window.windowID = SDL_GetWindowID(globalRendering->GetWindow());
+		SDL_GetWindowSize(globalRendering->GetWindow(), &event.window.data1, &event.window.data2);
+		SDL_PushEvent(&event);
+	}
+}
+
+
+void CLoadScreen::LoadInGameContext()
+{
+	// LoadingMT=2: the game's context stays with this thread for the whole load
+	if (!globalRendering->MakeLoadThreadContext(false))
+		LOG_L(L_ERROR, "[LoadScreen::%s] the loading thread could not take the game's GL context (\"%s\")", __func__, SDL_GetError());
+
+	globalRendering->ToggleMultisampling();
+
+	// released on every way out (CGame::Load can throw), so the main thread can take it back
+	struct ContextRelease {
+		~ContextRelease() {
+			// fences for the stream buffers the load set up, in the context that uses them
+			IStreamBufferConcept::PutBufferLocks();
+			globalRendering->MakeLoadThreadContext(true);
+		}
+	} contextRelease;
+
+	game->Load(mapFileName);
 }
 
 
@@ -238,6 +327,9 @@ void CLoadScreen::DeleteInstance()
 void CLoadScreen::ResizeEvent()
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	if (splitContext)
+		resizedDuringLoad = true;
+
 	if (luaIntro != nullptr)
 		luaIntro->ViewResize();
 }
@@ -289,17 +381,24 @@ bool CLoadScreen::Update()
 	if (!mtLoading)
 		spring::UnfreezeSpring(WDT_LOAD);
 
-	return true;
-}
-
-
-bool CLoadScreen::Draw()
-{
-	RECOIL_DETAILED_TRACY_ZONE;
-	// limit FPS via sleep to not lock a singlethreaded CPU from loading the game
-	if (mtLoading) {
+	// LoadingMT=2: one frame per display refresh, see DrawIntroFrame
+	if (splitContext) {
 		const spring_time now = spring_gettime();
-		const unsigned diffTime = spring_tomsecs(now - lastDrawTime);
+
+		if (nextFrameTime > now)
+			spring_sleep(nextFrameTime - now);
+
+		// a late frame moves the schedule instead of bunching the next ones up
+		nextFrameTime = std::max(nextFrameTime, now) + introFramePeriod;
+
+		DrawIntroFrame();
+		return true;
+	}
+
+	// limit FPS via sleep to not lock a singlethreaded CPU from loading the game;
+	// done here rather than in Draw so the sleep does not hold CLoadLock
+	if (mtLoading) {
+		const unsigned diffTime = spring_tomsecs(spring_gettime() - lastDrawTime);
 
 		constexpr unsigned wantedFPS = 50;
 		constexpr unsigned minFrameTime = 1000 / wantedFPS;
@@ -307,12 +406,35 @@ bool CLoadScreen::Draw()
 		if (diffTime < minFrameTime)
 			spring_sleep(spring_msecs(minFrameTime - diffTime));
 
-		lastDrawTime = now;
+		lastDrawTime = spring_gettime();
 	}
 
+	return true;
+}
+
+
+void CLoadScreen::DrawIntroFrame()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// SpringApp leaves drawing and swapping to the load screen in LoadingMT=2
+	Draw();
+
+	// only what the load screen made itself (whose buffers queue no fences); the game's
+	// render buffers belong to the loading thread's context and wait for the game's first
+	// frame, and its stream buffer fences are put by the loading thread (LoadInGameContext)
+	RenderBuffer::SwapIntroRenderBuffers();
+
+	SDL_GL_SwapWindow(globalRendering->GetWindow());
+}
+
+
+bool CLoadScreen::Draw()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
 	globalRendering->drawFrame = std::max(1U, globalRendering->drawFrame + 1);
-	// let LuaMenu keep the lobby connection alive
-	if (luaMenu != nullptr)
+	// let LuaMenu keep the lobby connection alive; not with LoadingMT=2, where the loading
+	// thread can run LuaMenu's state (eventHandler) and its GL objects are in the game's context
+	if (luaMenu != nullptr && !splitContext)
 		luaMenu->Update();
 
 	if (luaIntro != nullptr) {
@@ -335,7 +457,12 @@ bool CLoadScreen::Draw()
 void CLoadScreen::SetLoadMessage(const std::string& text, bool replaceLast)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	spring::UnfreezeSpring(WDT_LOAD);
+	// LoadingMT: the main thread pumps window events itself; pumping them here as
+	// well would hand key, mouse and resize events to LuaIntro from the loading thread
+	if (mtLoading)
+		Watchdog::ClearTimer(WDT_LOAD);
+	else
+		spring::UnfreezeSpring(WDT_LOAD);
 
 	std::lock_guard<spring::recursive_mutex> lck(mutex);
 
