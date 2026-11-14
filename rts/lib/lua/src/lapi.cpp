@@ -695,8 +695,12 @@ LUA_API void lua_rawset (lua_State *L, int idx) {
   api_checknelems(L, 2);
   t = index2adr(L, idx);
   api_check(L, ttistable(t));
-  setobj2t(L, luaH_set(L, hvalue(t), L->top-2), L->top-1);
-  luaC_barriert(L, hvalue(t), L->top-1);
+  if (ttisnil(L->top-1))
+    luaH_setnil(L, hvalue(t), L->top-2);
+  else {
+    setobj2t(L, luaH_set(L, hvalue(t), L->top-2), L->top-1);
+    luaC_barriert(L, hvalue(t), L->top-1);
+  }
   L->top -= 2;
   lua_unlock(L);
 }
@@ -708,8 +712,15 @@ LUA_API void lua_rawseti (lua_State *L, int idx, int n) {
   api_checknelems(L, 1);
   o = index2adr(L, idx);
   api_check(L, ttistable(o));
-  setobj2t(L, luaH_setnum(L, hvalue(o), n), L->top-1);
-  luaC_barriert(L, hvalue(o), L->top-1);
+  if (ttisnil(L->top-1)) {
+    TValue k;
+    setnvalue(&k, cast_num(n));
+    luaH_setnil(L, hvalue(o), &k);
+  }
+  else {
+    setobj2t(L, luaH_setnum(L, hvalue(o), n), L->top-1);
+    luaC_barriert(L, hvalue(o), L->top-1);
+  }
   L->top--;
   lua_unlock(L);
 }
