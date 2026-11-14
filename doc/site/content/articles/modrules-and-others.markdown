@@ -21,6 +21,7 @@ This article will briefly describe all of them in a way that hopefully prevents 
 * everything is a single constant global value. No per-unit rules, no changing at runtime, no rules outside the limited set exposed by the engine.
 * read from `./gamedata/modrules.lua`, hence the name. Internal engine C++ code stores them in the `CModInfo` class.
 * can depend on modoptions.
+* see https://github.com/beyond-all-reason/RecoilEngine/tree/master/cont/examples/gamedata/modrules.lua for the list of available values and their defaults.
 
 ### Mod options
 * per-match game setup.
