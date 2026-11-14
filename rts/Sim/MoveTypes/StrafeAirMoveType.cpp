@@ -92,6 +92,12 @@ static const unsigned int FLOAT_MEMBER_HASHES[] = {
 #undef MEMBER_CHARPTR_HASH
 #undef MEMBER_LITERAL_HASH
 
+// landing approach: the share of its previous travel direction an aircraft still has after one
+// second of swinging its velocity onto its heading, and the time its sink rate takes to build up
+// to altitudeRate. Given per second so that the approach does not depend on GAME_SPEED
+static constexpr float LANDING_TRAVEL_DIR_KEPT_PER_SECOND = 0.0076f;
+static constexpr float LANDING_SINK_RATE_BUILDUP_SECONDS = 1.0f / 3.0f;
+
 extern AAirMoveType::GetGroundHeightFunc amtGetGroundHeightFuncs[6];
 extern AAirMoveType::EmitCrashTrailFunc amtEmitCrashTrailFuncs[2];
 
@@ -1002,11 +1008,18 @@ void CStrafeAirMoveType::UpdateLanding()
 		//A Mangled UpdateAirPhysics
 		float4& spd = owner->speed;
 
+		// what we came in with, the approach below must not replace it in a single frame
+		const float3 prevFlatDir = (spd * XZVector).SafeNormalize();
+		const float prevSinkRate = spd.y;
+
 		float frontSpeed = spd.dot2D(frontdir);
 
 		if (frontSpeed > 0.0f) {
-			//Slow down before vertical landing
-			owner->SetVelocity(frontdir * (spd.Length2D() * invDrag - decRate));
+			//Slow down before vertical landing, swinging the velocity onto our heading
+			const float travelDirKept = math::pow(LANDING_TRAVEL_DIR_KEPT_PER_SECOND, INV_GAME_SPEED);
+			const float3 flatDir = (prevFlatDir * travelDirKept + (frontdir * XZVector).SafeNormalize() * (1.0f - travelDirKept)).SafeNormalize();
+
+			owner->SetVelocity(flatDir * (spd.Length2D() * invDrag - decRate));
 
 			//Calculate again for next check
 			frontSpeed = spd.dot2D(frontdir);
@@ -1030,6 +1043,13 @@ void CStrafeAirMoveType::UpdateLanding()
 			if (deltaAltitude < 0.0f)
 				owner->SetVelocity(spd + UpVector * std::max(-altitudeRate, deltaAltitude));
 		}
+
+		// ease into the descent (it used to start at the full altitudeRate from one frame
+		// to the next); easing out of it is left alone, the ground does not wait
+		const float maxSinkRate = prevSinkRate - altitudeRate * (INV_GAME_SPEED / LANDING_SINK_RATE_BUILDUP_SECONDS);
+
+		if (spd.y < maxSinkRate)
+			owner->SetVelocity(spd + UpVector * (maxSinkRate - spd.y));
 
 		owner->SetSpeed(spd);
 
