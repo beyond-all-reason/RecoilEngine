@@ -59,6 +59,12 @@ function DrawScreen()
 				Spring.SetWorldDrawBounds(0, 2800, 5120, 4096)
 			elseif phase == 3 then
 				assert(pixels(3200) > 4 and pixels(1300) == 0, "native nanos did not follow second region")
+				assert(Spring.SetObjectDrawBounds(-256, -256, 5376, 4352))
+			elseif phase == 4 then
+				assert(pixels(1300) > 4 and pixels(3200) > 4, "object override did not restore native nanos")
+				assert(Spring.SetObjectDrawBounds(0, 0, 5120, 2500))
+			elseif phase == 5 then
+				assert(pixels(1300) > 4 and pixels(3200) == 0, "native nanos followed terrain instead of object bounds")
 				Spring.SetWorldDrawBounds()
 			else
 				assert(pixels(1300) > 4 and pixels(3200) > 4, "clearing did not restore native nanos")

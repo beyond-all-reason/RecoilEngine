@@ -18,7 +18,13 @@ Spring.SetWorldDrawBounds(0, 0, 4096, 4096)
 - `SetMiniMapView` crops the minimap and remaps its input. Widgets that draw in whole-map coordinates must account for the crop.
 - `SetWorldDrawBounds` clips terrain and filters native objects and effects. Games handle their own Lua overlays.
 
-Invalid rectangles return `false` and preserve the previous bounds. Call a setter without arguments to clear its bounds. Reapply local bounds when the UI starts after loading a save.
+With `Engine.FeatureSupport.objectDrawBounds`, call `Spring.SetObjectDrawBounds` after `SetWorldDrawBounds` to give aircraft, projectiles, and displaced units room beyond the terrain edge. The object rectangle can extend past the physical map. Choose a margin that leaves neighboring regions separate.
+
+```lua
+Spring.SetObjectDrawBounds(-1024, -1024, 5120, 5120)
+```
+
+Invalid rectangles return `false` and preserve the previous bounds. Call a setter without arguments to clear its bounds. `SetWorldDrawBounds` sets or clears both terrain and object bounds, while `SetObjectDrawBounds` affects only objects. Reapply local bounds when the UI starts after loading a save.
 
 ## Synced boundaries
 

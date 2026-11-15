@@ -9,6 +9,7 @@ local samples = {}
 local units = {}
 local features = {}
 local shotPositions = {}
+local offmapHidden = {}
 local function worldFlags(flag)
 	return flag % 128
 end -- exclude minimap/icon bit
@@ -20,18 +21,7 @@ local function pixels(x, y, z)
 	local w, h = Spring.GetViewGeometry()
 	assert(
 		depth > 0 and depth < 1 and px > 20 and px < w - 20 and py > 20 and py < h - 20,
-		"test object outside tilted view: "
-			.. x
-			.. ","
-			.. y
-			.. ","
-			.. z
-			.. " -> "
-			.. px
-			.. ","
-			.. py
-			.. ","
-			.. depth
+		"test object outside tilted view: " .. x .. "," .. y .. "," .. z .. " -> " .. px .. "," .. py .. "," .. depth
 	)
 	local image = gl.ReadPixels(math.floor(px) - 16, math.floor(py) - 16, 33, 33)
 	local result = {}
@@ -71,10 +61,7 @@ local function flags(region, visible)
 	end
 end
 local function simulation()
-	assert(
-		#Spring.GetAllUnits() == 2 and #Spring.GetAllFeatures() == 2,
-		"draw bounds changed object lifetimes"
-	)
+	assert(#Spring.GetAllUnits() == 2 and #Spring.GetAllFeatures() == 2, "draw bounds changed object lifetimes")
 	for id, pos in pairs(shotPositions) do
 		local x, y, z = Spring.GetProjectilePosition(id)
 		assert(x, "test projectile unavailable: " .. id)
@@ -108,6 +95,7 @@ function DrawScreen()
 				samples[region .. "_particle"] = { 2300, 230, z }
 				samples[region .. "_projectile"] = { 2600, 260, z }
 				samples[region .. "_flash"] = { 2900, 98, z }
+				samples[region .. "_terrain"] = { 3400, 96, z }
 			end
 			phase = 1
 			frames = 0
@@ -152,31 +140,98 @@ function DrawScreen()
 			simulation()
 			switched = capture()
 			for name, values in pairs(hidden) do
-				assert(
-					difference(values, switched[name]) > 0.0005,
-					"region switch did not change pixels: " .. name
-				)
+				assert(difference(values, switched[name]) > 0.0005, "region switch did not change pixels: " .. name)
 			end
-			assert(Spring.SetWorldDrawBounds())
+			assert(Engine.FeatureSupport.objectDrawBounds)
+			assert(Spring.SetObjectDrawBounds(-256, -256, 5376, 4352))
 			phase = 5
 			frames = 0
-		else
+		elseif phase == 5 then
+			flags("home", true)
+			flags("frontier", true)
+			simulation()
+			local expanded = capture()
+			for name, values in pairs(expanded) do
+				if name == "frontier_terrain" then
+					assert(difference(values, switched[name]) < 0.005, "object override exposed terrain")
+				elseif name:find("frontier_") then
+					assert(difference(values, switched[name]) > 0.0005, "object override did not restore " .. name)
+				end
+			end
+			assert(not Spring.SetObjectDrawBounds(0, 0, 0, 1000))
+			assert(not Spring.SetObjectDrawBounds(0, 0, math.huge, 1000))
+			assert(not Spring.SetObjectDrawBounds(0, 0 / 0, 1000, 1000))
+			assert(not pcall(Spring.SetObjectDrawBounds, 0, 0, 1000))
+			phase = 6
+			frames = 0
+		elseif phase == 6 then
+			flags("home", true)
+			flags("frontier", true)
+			assert(Spring.SetObjectDrawBounds())
+			phase = 7
+			frames = 0
+		elseif phase == 7 then
+			flags("home", true)
+			flags("frontier", true)
+			local clearedObjects = capture()
+			assert(
+				difference(clearedObjects.frontier_terrain, switched.frontier_terrain) < 0.005,
+				"clearing object bounds cleared terrain bounds"
+			)
+			assert(Spring.SetWorldDrawBounds(0, 0, 5120, 2500))
+			phase = 8
+			frames = 0
+		elseif phase == 8 then
+			flags("home", true)
+			flags("frontier", false)
+			assert(Spring.SetWorldDrawBounds())
+			phase = 9
+			frames = 0
+		elseif phase == 9 then
 			flags("home", true)
 			flags("frontier", true)
 			simulation()
 			local cleared = capture()
 			for name, values in pairs(cleared) do
 				if name:find("frontier_") then
-					assert(
-						difference(values, switched[name]) > 0.0005,
-						"clear did not restore render: " .. name
-					)
-					assert(
-						difference(values, hidden[name]) < 0.005,
-						"clear changed restored render: " .. name
-					)
+					assert(difference(values, switched[name]) > 0.0005, "clear did not restore render: " .. name)
+					assert(difference(values, hidden[name]) < 0.005, "clear changed restored render: " .. name)
 				end
 			end
+			-- Exercise a unit and a real projectile beyond the physical map edge.
+			Spring.SendLuaRulesMsg("draw_bounds_offmap")
+			for id, pos in pairs(shotPositions) do
+				if pos[3] == 1300 then
+					shotPositions[id] = { -128, 230, 1600 }
+				end
+			end
+			Spring.SetCameraState(
+				{ mode = 1, px = 100, py = 96, pz = 1500, height = 1600, angle = 0.35, flipped = 0 },
+				0
+			)
+			assert(Spring.SetWorldDrawBounds(0, 0, 5120, 4096))
+			phase = 10
+			frames = 0
+		elseif phase == 10 then
+			local x, _, _, mx, my, mz = Spring.GetUnitPosition(units.home, true)
+			assert(x < 0, "fixture unit was clamped back onto the map")
+			assert(worldFlags(Spring.GetUnitDrawFlag(units.home)) == 0)
+			offmapHidden.unit = pixels(mx, my, mz)
+			offmapHidden.projectile = pixels(-128, 260, 1600)
+			assert(Spring.SetObjectDrawBounds(-256, -256, 5376, 4352))
+			phase = 11
+			frames = 0
+		else
+			local _, _, _, x, y, z = Spring.GetUnitPosition(units.home, true)
+			assert(worldFlags(Spring.GetUnitDrawFlag(units.home)) ~= 0, "offmap unit missing")
+			assert(difference(pixels(x, y, z), offmapHidden.unit) > 0.0005, "offmap model pixels missing")
+			assert(
+				difference(pixels(-128, 260, 1600), offmapHidden.projectile) > 0.0005,
+				"offmap projectile pixels missing"
+			)
+			simulation()
+			local w, h = Spring.GetViewGeometry()
+			gl.SaveImage(0, 0, w, h, "draw-offmap.png")
 			Spring.Echo("DRAW_BOUNDS_PASS")
 			done = true
 			Spring.SendCommands("quitforce")

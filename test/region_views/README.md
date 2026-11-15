@@ -11,7 +11,7 @@ python3 test/region_views/run.py --case crater --headless --clients 2 --output /
 ```
 
 - **camera** checks camera limits, minimap crop and input across region switches.
-- **draw** checks terrain and object clipping. Use drawer 0 for GLSL or 1 for GL4.
+- **draw** checks terrain and object clipping, including objects beyond the map edge. Use drawer 0 for GLSL or 1 for GL4.
 - **nano** checks particles emitted during construction. The `--nano` options are `legacy`, `geometry` and `instanced`.
 - **sensor** checks coverage for all seven native sensors, including movement and jamming.
 - **crater** checks terrain deformation and building movement at region edges.

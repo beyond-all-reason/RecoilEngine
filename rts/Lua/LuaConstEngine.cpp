@@ -33,6 +33,7 @@
  * @field nanoParticlesGL4 boolean Whether the engine has the standalone shader-based nano particle effect (the `NanoParticles*` springsettings)
  * @field mapDamageRegions boolean Supports Spring.SetMapDamageRegions
  * @field sensorRegions boolean Supports Spring.SetSensorRegions
+ * @field objectDrawBounds boolean Supports Spring.SetObjectDrawBounds
  * @field mapRegionViews boolean Supports local camera, minimap and world bounds
  * @field modelVertexColor boolean Whether glTF `COLOR_0` is loaded into the models VBO (`color`, attribute 15; opaque white when absent)
  * @field liveConfigChanges integer Version of the set of springsettings that apply without a restart, bumped when more are added (1: those listed in the 2026.09 changelog)
@@ -97,6 +98,7 @@ bool LuaConstEngine::PushEntries(lua_State* L)
 		LuaPushNamedBool(L, "nanoParticlesGL4", true);
 		LuaPushNamedBool(L, "modelVertexColor", true);
 		LuaPushNamedBool(L, "mapRegionViews", true);
+		LuaPushNamedBool(L, "objectDrawBounds", true);
 		LuaPushNamedBool(L, "sensorRegions", true);
 		LuaPushNamedBool(L, "mapDamageRegions", true);
 		LuaPushNamedNumber(L, "liveConfigChanges", 1);

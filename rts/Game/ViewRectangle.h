@@ -27,8 +27,10 @@ struct ViewRectangle
 		return std::clamp(z, z0 + margin, z1 - margin);
 	}
 
+	bool Valid() const {
+		return std::isfinite(x0) && std::isfinite(z0) && std::isfinite(x1) && std::isfinite(z1) && IsSet();
+	}
 	bool ValidForMap(float mapWidth, float mapHeight) const {
-		return std::isfinite(x0) && std::isfinite(z0) && std::isfinite(x1) && std::isfinite(z1) &&
-			IsSet() && x0 >= 0.0f && z0 >= 0.0f && x1 <= mapWidth && z1 <= mapHeight;
+		return Valid() && x0 >= 0.0f && z0 >= 0.0f && x1 <= mapWidth && z1 <= mapHeight;
 	}
 };
