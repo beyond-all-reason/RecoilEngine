@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef _BASIC_MAP_DAMAGE_H
-#define _BASIC_MAP_DAMAGE_H
+#pragma once
 
 #include "MapDamage.h"
 
@@ -19,6 +18,7 @@ public:
 	void Update() override;
 
 	bool Disabled() const override { return false; }
+	bool HasPendingExplosions() const override { return !explosionUpdateQueue.empty(); }
 
 private:
 	void SetExplosionSquare(float v) {
@@ -72,5 +72,3 @@ private:
 	float invHardness[/*CMapInfo::NUM_TERRAIN_TYPES*/ 256];
 	float weightTable[9];
 };
-
-#endif /* _BASIC_MAP_DAMAGE_H */
