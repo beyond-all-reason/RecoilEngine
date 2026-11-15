@@ -210,6 +210,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetMapShadingTexture);
 	REGISTER_LUA_CFUNC(SetSkyBoxTexture);
 
+	REGISTER_LUA_CFUNC(SetGhostHighlight);
 	REGISTER_LUA_CFUNC(SetUnitNoDraw);
 	REGISTER_LUA_CFUNC(SetUnitEngineDrawMask);
 	REGISTER_LUA_CFUNC(SetUnitAlwaysUpdateMatrix);
@@ -2167,6 +2168,28 @@ int LuaUnsyncedCtrl::SetSkyBoxTexture(lua_State* L)
  * Unit custom rendering
  * @section unitcustomrendering
 ******************************************************************************/
+
+
+/***
+ * Highlight the local player's remembered ghost at the aimpoint returned by TraceScreenRay.
+ * Refresh each Update; the highlight expires after a rendered frame without a refresh.
+ * Call without arguments to clear. Does not reveal a hidden unit or change targeting.
+ * @function Spring.SetGhostHighlight
+ * @param x number? Last observed aimpoint X
+ * @param y number? Last observed aimpoint Y
+ * @param z number? Last observed aimpoint Z
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SetGhostHighlight(lua_State* L)
+{
+	if (lua_isnoneornil(L, 1)) {
+		CUnitDrawer::SetGhostHighlight(nullptr);
+		return 0;
+	}
+	const float3 aimPos(luaL_checknumber(L, 1), luaL_checknumber(L, 2), luaL_checknumber(L, 3));
+	CUnitDrawer::SetGhostHighlight(&aimPos);
+	return 0;
+}
 
 
 /***

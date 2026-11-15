@@ -591,7 +591,7 @@ static inline bool AdjustGroundAttackCommand(const Command& c, bool fromSynced, 
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (c.GetNumParams() < 3)
 		return false;
-	if (aiOrder)
+	if (aiOrder || (c.GetOpts() & KEEP_TARGET_HEIGHT) != 0)
 		return false;
 
 	const float3 cPos = c.GetPos(0);

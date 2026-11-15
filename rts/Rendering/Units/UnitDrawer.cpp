@@ -80,6 +80,8 @@ CONFIG(bool, AdvUnitShading).deprecated(true);
 
 /***********************************************************************/
 
+static constexpr float4 ghostHighlightColor = {1.0f, 0.85f, 0.45f, 0.55f};
+
 //don't inherit and leave only static Unit specific helpers
 class CUnitDrawerHelper
 {
@@ -1131,7 +1133,13 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 		glRotatef(dgb->facing * 90.0f, 0, 1, 0);
 
 		CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType);
-		SetTeamColor(dgb->team, IModelDrawerState::alphaValues.y);
+		const bool highlighted = modelDrawerData->IsGhostHighlighted(dgb->targets[gu->myAllyTeam]);
+		const float alpha = highlighted ? ghostHighlightColor.w : IModelDrawerState::alphaValues.y;
+		if (highlighted)
+			glColor4fv(ghostHighlightColor);
+		else
+			glColor4f(0.6f, 0.6f, 0.6f, alpha);
+		SetTeamColor(dgb->team, alpha);
 
 		model->DrawStatic();
 		glPopMatrix();
@@ -1151,8 +1159,12 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 
 		const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
 
+		const bool highlighted = (losStatus & LOS_INLOS) == 0 && modelDrawerData->IsGhostHighlighted(lgb.target);
 		// ghosted enemy units
-		if (losStatus & LOS_CONTRADAR) {
+		if (highlighted) {
+			glColor4fv(ghostHighlightColor);
+		}
+		else if (losStatus & LOS_CONTRADAR) {
 			glColor4f(0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z);
 		}
 		else {
@@ -1170,7 +1182,7 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 		CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType);
 
 		// color with the team the unit was last seen under, not the live unit's current team
-		const float ghostAlpha = (losStatus & LOS_CONTRADAR) ? IModelDrawerState::alphaValues.z : IModelDrawerState::alphaValues.y;
+		const float ghostAlpha = highlighted ? ghostHighlightColor.w : (losStatus & LOS_CONTRADAR) ? IModelDrawerState::alphaValues.z : IModelDrawerState::alphaValues.y;
 		SetTeamColor(lgb.team, ghostAlpha);
 		model->DrawStatic();
 		glPopMatrix();
@@ -2046,6 +2058,9 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 			instances.clear();
 	};
 
+	static std::map<int, std::vector<GhostInstance>> byTexHighlighted;
+	clearBuckets(byTexHighlighted);
+
 	// deadGhostedBuildings (single color state)
 	{
 		const auto& deadGhostBuildings = modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam, modelType);
@@ -2060,7 +2075,8 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 			if (!dgb->worldTransformAlloc.Valid())
 				continue;
 
-			byTex[model->textureType].push_back({ model, static_cast<uint32_t>(dgb->worldTransformAlloc.GetOffset()), dgb->paletteIndex });
+			(modelDrawerData->IsGhostHighlighted(dgb->targets[gu->myAllyTeam]) ? byTexHighlighted : byTex)[model->textureType]
+				.push_back({ model, static_cast<uint32_t>(dgb->worldTransformAlloc.GetOffset()), dgb->paletteIndex });
 			any = true;
 		}
 
@@ -2101,6 +2117,10 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 
 			const unsigned short losStatus = u->losStatus[gu->myAllyTeam];
 			const bool contradar = (losStatus & LOS_CONTRADAR);
+			if ((losStatus & LOS_INLOS) == 0 && modelDrawerData->IsGhostHighlighted(lgb.target)) {
+				byTexHighlighted[model->textureType].push_back({ model, static_cast<uint32_t>(xfOffset), lgb.paletteIndex });
+				continue;
+			}
 			// bucket with the palette the unit was last seen under, not the live unit's current one
 			(contradar ? byTexContradar : byTexNormal)[model->textureType]
 				.push_back({ model, static_cast<uint32_t>(xfOffset), lgb.paletteIndex });
@@ -2118,6 +2138,10 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 			flushGhosts(byTexContradar);
 		}
 	}
+
+	modelDrawerState->SetColorMultiplier(ghostHighlightColor.x, ghostHighlightColor.y, ghostHighlightColor.z, ghostHighlightColor.w);
+	modelDrawerState->SetTeamColor(0, ghostHighlightColor.w);
+	flushGhosts(byTexHighlighted);
 
 	modelDrawerState->SetColorMultiplier(IModelDrawerState::alphaValues.x);
 	modelDrawerState->SetMatrixMode(oldMM); //reset is needed because other modelType's might be rendered afterwards

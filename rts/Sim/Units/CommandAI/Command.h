@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef COMMAND_H
-#define COMMAND_H
+#pragma once
 
 #include <string>
 #include <climits> // INT_MAX
@@ -86,6 +85,7 @@ static constexpr float CMD_WAITCODE_GATHERWAIT = 4.0f;
 //   be QUEUED_ORDER), ALT_KEY in most contexts means
 //   OVERRIDE_QUEUED_ORDER, etc.
 //
+static constexpr uint8_t KEEP_TARGET_HEIGHT = (1 << 0); // preserve explicit position targets above terrain
 static constexpr uint8_t META_KEY        = (1 << 2); //   4
 static constexpr uint8_t INTERNAL_ORDER  = (1 << 3); //   8
 static constexpr uint8_t RIGHT_MOUSE_KEY = (1 << 4); //  16
@@ -452,6 +452,3 @@ private:
 	/// inline command parameters, used if numParams <= MAX_COMMAND_PARAMS
 	float params[MAX_COMMAND_PARAMS];
 };
-
-#endif // COMMAND_H
-

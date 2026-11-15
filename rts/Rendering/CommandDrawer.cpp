@@ -24,6 +24,14 @@
 #include "System/SpringMath.h"
 #include "System/Log/ILog.h"
 
+static float3 GetAttackDrawPosition(const Command& command)
+{
+	float3 pos = command.GetPos(0);
+	if ((command.GetOpts() & KEEP_TARGET_HEIGHT) == 0)
+		pos.y = CGround::GetHeightReal(pos.x, pos.z, false) + 3.0f;
+	return pos;
+}
+
 static const CUnit* GetTrackableUnit(const CUnit* caiOwner, const CUnit* cmdUnit)
 {
 	if (cmdUnit == nullptr)
@@ -123,11 +131,7 @@ void CommandDrawer::DrawCommands(const CCommandAI* cai, int queueDrawDepth) cons
 				} else {
 					assert(ci->GetNumParams() >= 3);
 
-					const float x = ci->GetParam(0);
-					const float z = ci->GetParam(2);
-					const float y = CGround::GetHeightReal(x, z, false) + 3.0f;
-
-					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
+					lineDrawer.DrawLineAndIcon(cmdID, GetAttackDrawPosition(*ci), cmdColors.attack);
 				}
 			} break;
 
@@ -189,11 +193,7 @@ void CommandDrawer::DrawAirCAICommands(const CAirCAI* cai, int queueDrawDepth) c
 				} else {
 					assert(ci->GetNumParams() >= 3);
 
-					const float x = ci->GetParam(0);
-					const float z = ci->GetParam(2);
-					const float y = CGround::GetHeightReal(x, z, false) + 3.0f;
-
-					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
+					lineDrawer.DrawLineAndIcon(cmdID, GetAttackDrawPosition(*ci), cmdColors.attack);
 				}
 			} break;
 
@@ -314,11 +314,7 @@ void CommandDrawer::DrawBuilderCAICommands(const CBuilderCAI* cai, int queueDraw
 				} else {
 					assert(ci->GetNumParams() >= 3);
 
-					const float x = ci->GetParam(0);
-					const float z = ci->GetParam(2);
-					const float y = CGround::GetHeightReal(x, z, false) + 3.0f;
-
-					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
+					lineDrawer.DrawLineAndIcon(cmdID, GetAttackDrawPosition(*ci), cmdColors.attack);
 				}
 			} break;
 
@@ -446,11 +442,7 @@ void CommandDrawer::DrawFactoryCAICommands(const CFactoryCAI* cai, int queueDraw
 				} else {
 					assert(ci->GetNumParams() >= 3);
 
-					const float x = ci->GetParam(0);
-					const float z = ci->GetParam(2);
-					const float y = CGround::GetHeightReal(x, z, false) + 3.0f;
-
-					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
+					lineDrawer.DrawLineAndIcon(cmdID, GetAttackDrawPosition(*ci), cmdColors.attack);
 				}
 			} break;
 
@@ -537,11 +529,7 @@ void CommandDrawer::DrawMobileCAICommands(const CMobileCAI* cai, int queueDrawDe
 				}
 
 				if (ci->GetNumParams() >= 3) {
-					const float x = ci->GetParam(0);
-					const float z = ci->GetParam(2);
-					const float y = CGround::GetHeightReal(x, z, false) + 3.0f;
-
-					lineDrawer.DrawLineAndIcon(cmdID, float3(x, y, z), cmdColors.attack);
+					lineDrawer.DrawLineAndIcon(cmdID, GetAttackDrawPosition(*ci), cmdColors.attack);
 				}
 			} break;
 

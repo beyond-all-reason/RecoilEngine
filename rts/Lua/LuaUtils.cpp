@@ -943,6 +943,7 @@ void LuaUtils::PushCommandParamsTable(lua_State* L, const Command& cmd, bool sub
  * @field shift boolean Shift key pressed.
  * @field right boolean Right mouse key pressed.
  * @field meta boolean Meta key (space) pressed.
+ * @field keepheight boolean Preserve explicit position target height.
  * @field internal boolean
  */
 
@@ -951,8 +952,9 @@ void LuaUtils::PushCommandOptionsTable(lua_State* L, const Command& cmd, bool su
 	if (subtable)
 		LuaPushString(L, "options");
 
-	lua_createtable(L, 0, 7);
+	lua_createtable(L, 0, 8);
 	LuaPushNamedNumber(L, "coded", cmd.GetOpts());
+	LuaPushNamedBool(L, "keepheight", !!(cmd.GetOpts() & KEEP_TARGET_HEIGHT));
 	LuaPushNamedBool(L, "alt",      !!(cmd.GetOpts() & ALT_KEY        ));
 	LuaPushNamedBool(L, "ctrl",     !!(cmd.GetOpts() & CONTROL_KEY    ));
 	LuaPushNamedBool(L, "shift",    !!(cmd.GetOpts() & SHIFT_KEY      ));
@@ -981,6 +983,7 @@ int LuaUtils::PushUnitAndCommand(lua_State* L, const CUnit* unit, const Command&
 
 /***
  * @alias CommandOptionBit
+ * | 1 # Preserve explicit position target height.
  * | 4 # Meta (windows/mac/mod4) key.
  * | 8 # Internal order.
  * | 16 # Right mouse key.
@@ -991,6 +994,7 @@ int LuaUtils::PushUnitAndCommand(lua_State* L, const CUnit* unit, const Command&
 
 /***
  * @alias CommandOptionName
+ * | "keepheight" # Preserve explicit position target height.
  * | "right" # Right mouse key.
  * | "alt" # Alt key.
  * | "ctrl" # Control key.
@@ -1032,6 +1036,9 @@ static bool ParseCommandOptions(
 				const bool value = lua_toboolean(L, -1);
 
 				switch (hashString(lua_tostring(L, -2))) {
+					case hashString("keepheight"): {
+						cmd.SetOpts(cmd.GetOpts() | (KEEP_TARGET_HEIGHT * value));
+					} break;
 					case hashString("right"): {
 						cmd.SetOpts(cmd.GetOpts() | (RIGHT_MOUSE_KEY * value));
 					} break;
@@ -1058,6 +1065,9 @@ static bool ParseCommandOptions(
 					continue;
 
 				switch (hashString(lua_tostring(L, -1))) {
+					case hashString("keepheight"): {
+						cmd.SetOpts(cmd.GetOpts() | KEEP_TARGET_HEIGHT);
+					} break;
 					case hashString("right"): {
 						cmd.SetOpts(cmd.GetOpts() | RIGHT_MOUSE_KEY);
 					} break;
