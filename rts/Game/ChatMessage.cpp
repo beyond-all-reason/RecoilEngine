@@ -8,6 +8,8 @@
 
 #include "System/Misc/TracyDefs.h"
 
+#include <algorithm>
+
 ChatMessage::ChatMessage(int from, int dest, const std::string& chat)
 	: fromPlayer(from)
 	, destination(dest)
@@ -36,6 +38,9 @@ ChatMessage::ChatMessage(std::shared_ptr<const netcode::RawPacket> data)
 	packet >> from;
 	packet >> dest;
 	packet >> msg;
+
+	// a chat message is one line; a line break would show as a line without the sender's name
+	std::replace_if(msg.begin(), msg.end(), [](unsigned char c) { return (c < 0x20); }, ' ');
 
 	fromPlayer = from;
 	destination = dest;
