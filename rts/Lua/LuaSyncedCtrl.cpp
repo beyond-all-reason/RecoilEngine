@@ -157,6 +157,7 @@ bool LuaSyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GameOver);
 	REGISTER_LUA_CFUNC(SetGlobalLos);
 	REGISTER_LUA_CFUNC(SetSensorRegions);
+	REGISTER_LUA_CFUNC(SetMapDamageRegions);
 	REGISTER_LUA_CFUNC(SetCheatingEnabled);
 	REGISTER_LUA_CFUNC(SetGodMode);
 
@@ -1085,6 +1086,24 @@ int LuaSyncedCtrl::SetSensorRegions(lua_State* L)
 {
 	std::vector<SRectangle> regions;
 	const bool accepted = ParseRegionPartitions(L, regions) && losHandler->SetSensorRegions(std::move(regions));
+	lua_pushboolean(L, accepted);
+	return 1;
+}
+
+/*** Restrict native crater deformation to the explosion's region.
+ *
+ * @function Spring.SetMapDamageRegions
+ * @param regions {[1]:number,[2]:number,[3]:number,[4]:number}[]? Rectangles in x0, z0, x1, z1 order. Nil clears.
+ * @return boolean accepted False for invalid rectangles or changes after simulation starts or a crater is queued.
+ */
+int LuaSyncedCtrl::SetMapDamageRegions(lua_State* L)
+{
+	std::vector<SRectangle> regions;
+	const bool accepted = ParseRegionPartitions(L, regions) && (regions == gs->mapDamageRegions
+		|| (gs->PreSimFrame() && !mapDamage->HasPendingExplosions()
+			&& ValidRegionPartitions(regions, mapDims.mapx * SQUARE_SIZE, mapDims.mapy * SQUARE_SIZE, SQUARE_SIZE)));
+	if (accepted && regions != gs->mapDamageRegions)
+		gs->mapDamageRegions = std::move(regions);
 	lua_pushboolean(L, accepted);
 	return 1;
 }
