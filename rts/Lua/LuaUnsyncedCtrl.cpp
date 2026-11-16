@@ -5368,10 +5368,10 @@ int LuaUnsyncedCtrl::SetGroundDecalUserData(lua_State* L)
 int LuaUnsyncedCtrl::SDLSetTextInputRect(lua_State* L)
 {
 	SDL_Rect textWindow;
-	textWindow.x = luaL_checkint(L, 1);
-	textWindow.y = luaL_checkint(L, 2);
-	textWindow.w = luaL_checkint(L, 3);
-	textWindow.h = luaL_checkint(L, 4);
+	textWindow.x = globalRendering->ToWindowCoord(luaL_checkint(L, 1));
+	textWindow.y = globalRendering->ToWindowCoord(luaL_checkint(L, 2));
+	textWindow.w = globalRendering->ToWindowCoord(luaL_checkint(L, 3));
+	textWindow.h = globalRendering->ToWindowCoord(luaL_checkint(L, 4));
 	SDL_SetTextInputRect(&textWindow);
 	return 0;
 }
@@ -5419,10 +5419,10 @@ int LuaUnsyncedCtrl::SDLStopTextInput(lua_State* L)
 int LuaUnsyncedCtrl::SetWindowGeometry(lua_State* L)
 {
 	const int displayIndex = luaL_checkint(L, 1) - 1;
-	const int winRelPosX = luaL_checkint(L, 2);
-	const int winRelPosY = luaL_checkint(L, 3);
-	const int winSizeX = luaL_checkint(L, 4);
-	const int winSizeY = luaL_checkint(L, 5);
+	const int winRelPosX = globalRendering->ToWindowCoord(luaL_checkint(L, 2));
+	const int winRelPosY = globalRendering->ToWindowCoord(luaL_checkint(L, 3));
+	const int winSizeX = globalRendering->ToWindowCoord(luaL_checkint(L, 4));
+	const int winSizeY = globalRendering->ToWindowCoord(luaL_checkint(L, 5));
 	const bool fullScreen = luaL_checkboolean(L, 6);
 	const bool borderless = luaL_checkboolean(L, 7);
 

@@ -6,6 +6,7 @@
 
 #include <dlfcn.h>
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <cstdint>
@@ -15,9 +16,12 @@
 #include <SDL.h>
 
 #include "Rendering/GL/myGL.h"
+#include "System/Config/ConfigHandler.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/Log/ILog.h"
 #include "System/Platform/Misc.h"
+
+CONFIG(float, MacRenderScale).defaultValue(1.0f).minimumValue(1.0f).maximumValue(2.0f).description("macOS only. Pixels rendered per window point: 1, 1.5 or 2. A Retina display shows 2, so higher values are sharper and cost frame rate. Capped at the display's own pixel density.");
 
 // minimal EGL declarations; libEGL is dlopen()ed so there is no build-time dependency on Mesa
 namespace {
@@ -63,6 +67,7 @@ namespace {
 	EGLSurface surface = nullptr;
 	int surfSizeX = 0;
 	int surfSizeY = 0;
+	float renderScale = 1.0f;
 
 	SDL_Renderer* renderer = nullptr;
 	SDL_Texture* texture = nullptr;
@@ -169,6 +174,19 @@ namespace {
 			LOG("[MacEGLBridge] presenting through SDL renderer \"%s\"", info.name);
 
 		return true;
+	}
+
+	float WantedRenderScale(SDL_Window* window) {
+		int wx = 0, wy = 0;
+		int ox = 0, oy = 0;
+		SDL_GetWindowSize(window, &wx, &wy);
+
+		if (renderer == nullptr || wx <= 0 || SDL_GetRendererOutputSize(renderer, &ox, &oy) != 0)
+			return 1.0f;
+
+		// 2 on a Retina display, 1 on most external ones
+		const float density = std::max(ox / static_cast<float>(wx), 1.0f);
+		return std::clamp(configHandler->GetFloat("MacRenderScale"), 1.0f, density);
 	}
 }
 
@@ -341,15 +359,18 @@ void* MacEGLBridge::CreateContext(SDL_Window* window, int major, int minor, bool
 		return nullptr;
 	}
 
+	if (!CreatePresenter(window))
+		return nullptr;
+
+	renderScale = WantedRenderScale(window);
+	LOG("[MacEGLBridge] render scale %.2f", renderScale);
+
 	int wx = 0, wy = 0;
 	SDL_GetWindowSize(window, &wx, &wy);
-	if (!CreateSurface(wx, wy) || !egl.MakeCurrent(display, surface, surface, context)) {
+	if (!CreateSurface(ToPixels(wx), ToPixels(wy)) || !egl.MakeCurrent(display, surface, surface, context)) {
 		LOG_L(L_ERROR, "[MacEGLBridge] eglMakeCurrent failed: 0x%x", egl.GetError());
 		return nullptr;
 	}
-
-	if (!CreatePresenter(window))
-		return nullptr;
 
 	return context;
 }
@@ -407,6 +428,10 @@ void* MacEGLBridge::GetProcAddress(const char* name)
 
 	return WideLines::GetProcAddress(name, egl.GetProcAddress(name));
 }
+
+float MacEGLBridge::GetRenderScale() { return renderScale; }
+
+int MacEGLBridge::ToPixels(int points) { return static_cast<int>(std::lround(points * renderScale)); }
 
 void MacEGLBridge::SetSwapInterval(int interval)
 {
@@ -501,9 +526,25 @@ void MacEGLBridge::SwapWindow(SDL_Window* window)
 
 	frameIdx++;
 
-	// track window size changes; the pbuffer is the engine's default framebuffer
+	// a new MacRenderScale, or a move to a display with a different density, changes the engine's
+	// window size in pixels, so send the resize event the engine already handles
+	if (const float wanted = WantedRenderScale(window); wanted != renderScale) {
+		LOG("[MacEGLBridge] render scale %.2f -> %.2f", renderScale, wanted);
+		renderScale = wanted;
+
+		SDL_Event event = {};
+		event.type = SDL_WINDOWEVENT;
+		event.window.event = SDL_WINDOWEVENT_SIZE_CHANGED;
+		event.window.windowID = SDL_GetWindowID(window);
+		SDL_GetWindowSize(window, &event.window.data1, &event.window.data2);
+		SDL_PushEvent(&event);
+	}
+
+	// track window size changes, the pbuffer is the engine's default framebuffer
 	int wx = 0, wy = 0;
 	SDL_GetWindowSize(window, &wx, &wy);
+	wx = ToPixels(wx);
+	wy = ToPixels(wy);
 	if ((wx != surfSizeX || wy != surfSizeY) && wx > 0 && wy > 0) {
 		std::lock_guard<std::mutex> lck(surfMutex);
 		LOG("[MacEGLBridge] resizing pbuffer %dx%d -> %dx%d", surfSizeX, surfSizeY, wx, wy);

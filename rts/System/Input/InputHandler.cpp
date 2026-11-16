@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "InputHandler.h"
+#include "Rendering/GlobalRendering.h"
 #include "System/TimeProfiler.h"
 
 #ifdef __APPLE__
@@ -33,6 +34,7 @@ void InputHandler::PushEvents()
 #ifdef __APPLE__
 		MacKeyboard::TranslateEvent(event);
 #endif
+		globalRendering->EventToPixels(event);
 		PushEvent(event);
 	}
 }
