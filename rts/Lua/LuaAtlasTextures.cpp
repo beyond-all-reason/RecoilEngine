@@ -18,7 +18,7 @@ void LuaAtlasTextures::Clear()
 std::string LuaAtlasTextures::Create(const int xsize, const int ysize, const int allocatorType)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	std::string idStr = prefix + std::to_string(textureAtlasVec.size());
+	std::string idStr = prefix + std::to_string(nextCode++);
 
 	textureAtlasVec.emplace_back(CTextureAtlas(allocatorType, xsize, ysize, idStr));
 	textureAtlasMap[idStr] = textureAtlasVec.size() - 1;
