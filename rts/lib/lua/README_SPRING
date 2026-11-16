@@ -66,5 +66,7 @@ Lua-5.1.4 source code modifications:
 	  - inserting a nil value never builds a hash node nor inserts a nil key
 	  - __newindex searches for the key before being called
 	  
-	  Added ltable.cpp::luaH_setnil, which now is used by:
-      lvm.cpp::luaV_settable, lapi.cpp::lua_rawset and lua_rawseti
+	  Added ltable.cpp::luaH_setnil, used in lapi.cpp::lua_rawset, lua_rawseti.
+
+	  lvm.cpp::luaV_settable instead checks the key before checking __newindex,
+	  and inserts only non-nil values.
