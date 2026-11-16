@@ -1681,7 +1681,7 @@ bool CBuilderCAI::FindRepairTargetAndRepair(
 
 	for (const CUnit* unit: *qfQuery.units) {
 		if (teamHandler.Ally(owner->allyteam, unit->allyteam)) {
-			if (!haveEnemy && (unit->health < unit->maxHealth)) {
+			if (!haveEnemy && (unit->beingBuilt || unit->health < unit->maxHealth)) {
 				// don't help allies build unless set on roam
 				if (unit->beingBuilt && owner->team != unit->team && (owner->moveState != MOVESTATE_ROAM))
 					continue;
