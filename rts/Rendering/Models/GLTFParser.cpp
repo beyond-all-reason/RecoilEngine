@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <unordered_set>
 #include <unordered_map>
+#include <mutex>
+#include <string_view>
 
 #include "GLTFParser.h"
 #include "3DModel.hpp"
@@ -59,10 +61,31 @@ namespace Impl {
 		return gltfmodel::ToEngineSpace(sourceTransform, sourceConvention);
 	}
 
+	// Primitives without a TANGENT attribute get tangents generated from the UVs (ModelUtils::CalculateTangents),
+	// which differ from the tangents the normal map was baked with. Say so once per model, so a model that
+	// was exported without tangents can be found and fixed by its author.
+	void WarnMissingTangents(const S3DModel& model, std::string_view meshName, size_t primitiveIdx)
+	{
+		static std::mutex warnedMutex;
+		static spring::unordered_set<std::string> warnedModels;
+
+		{
+			std::lock_guard<std::mutex> lock(warnedMutex);
+			if (!warnedModels.insert(model.name).second)
+				return;
+		}
+
+		LOG_SL(LOG_SECTION_MODEL, L_WARNING,
+			"GLTF model '%s': mesh '%.*s' primitive %zu has no TANGENT attribute, generating tangents from the UVs"
+			" (other primitives of this model without tangents are not reported)",
+			model.name.c_str(), static_cast<int>(meshName.size()), meshName.data(), primitiveIdx);
+	}
+
 	template<typename PrimContainer>
 	void ReadGeometryData(
 		S3DModel& model,
 		const fastgltf::Asset& asset,
+		std::string_view meshName,
 		const PrimContainer& primitives,
 		std::vector<SVertexData>& verts,
 		std::vector<uint32_t>& indcs,
@@ -231,8 +254,10 @@ namespace Impl {
 			if (!seenNormal)
 				ModelUtils::CalculateNormals(verts, indcs);
 
-			if (!seenTangents)
+			if (!seenTangents) {
+				WarnMissingTangents(model, meshName, static_cast<size_t>(&prim - primitives.data()));
 				ModelUtils::CalculateTangents(verts, indcs);
+			}
 
 		}
 
@@ -528,7 +553,7 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 		const auto& mesh = asset.meshes[*node.meshIndex];
 		auto& skinnedMesh = allSkinnedMeshes.emplace_back();
 
-		Impl::ReadGeometryData(model, asset, mesh.primitives, skinnedMesh.verts, skinnedMesh.indcs, ni, sourceConvention, &skin);
+		Impl::ReadGeometryData(model, asset, mesh.name, mesh.primitives, skinnedMesh.verts, skinnedMesh.indcs, ni, sourceConvention, &skin);
 		Impl::TransformSkinsToModelSpace(skinnedMesh.verts, ni, modelTransforms);
 		Impl::ReplaceNodeIndexWithPieceIndex(skinnedMesh.verts, nodeIdxToPieceIdx);
 	}
@@ -671,7 +696,7 @@ GLTFPiece* CGLTFParser::LoadPiece(
 	auto& verts = piece->GetVerticesVec();
 	auto& indcs = piece->GetIndicesVec();
 	const auto& mesh = asset.meshes[*node.meshIndex];
-	Impl::ReadGeometryData(*model, asset, mesh.primitives, verts, indcs, nodeIndex, sourceConvention, nullptr);
+	Impl::ReadGeometryData(*model, asset, mesh.name, mesh.primitives, verts, indcs, nodeIndex, sourceConvention, nullptr);
 
 	return piece;
 }
