@@ -64,12 +64,15 @@ FileConfigSource::FileConfigSource(const string& filename)
 		Read(file);
 		fclose(file);
 	}
+	else if (errno != ENOENT) {
+		LOG_L(L_ERROR, "FileConfigSource: Error: Could not read config file \"%s\" (%s)", filename.c_str(), strerror(errno));
+	}
 	else if ((file = nowide::fopen(filename.c_str(), "a"))) {
 		// TODO: write some initial contents into the config file?
 		fclose(file);
 	}
 	else {
-		LOG_L(L_ERROR, "FileConfigSource: Error: Could not write to config file \"%s\"", filename.c_str());
+		LOG_L(L_ERROR, "FileConfigSource: Error: Could not create config file \"%s\" (%s)", filename.c_str(), strerror(errno));
 	}
 }
 
@@ -110,6 +113,7 @@ void FileConfigSource::ReadModifyWrite(std::function<void ()> modify) {
 			LOG_L(L_ERROR, "FileConfigSource: Error: Could not read config file \"%s\" (%s), not writing it", filename.c_str(), strerror(readErrno));
 	}
 	else {
+		LOG_L(L_ERROR, "FileConfigSource: Error: Could not write config file \"%s\" (%s)", filename.c_str(), strerror(errno));
 		modify();
 	}
 
