@@ -1031,20 +1031,20 @@ void CSelectedUnitsHandler::SendSelect()
 
 
 // despite the NETMSG_AICOMMANDS packet-id, this only services LuaUnsyncedCtrl
-void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs, const std::vector<Command>& commands, bool pairwise)
+bool CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs, const std::vector<Command>& commands, bool pairwise)
 {
 	// do not waste bandwidth (units can be selected
 	// by any spectator, but not given orders without
 	// god-mode)
 	// note: clients verify this every NETMSG_SELECT
 	if (gu->spectating && gs->godMode == 0)
-		return;
+		return false;
 
 	const unsigned unitIDCount  = unitIDs.size();
 	const unsigned commandCount = commands.size();
 
 	if ((unitIDCount == 0) || (commandCount == 0))
-		return;
+		return false;
 
 	uint32_t totalParams = 0;
 
@@ -1092,7 +1092,7 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 
 	if (totalPacketLen > 8192) {
 		LOG_L(L_WARNING, "[%s] discarded oversized (len=%i) NETMSG_AICOMMANDS packet", __func__, totalPacketLen);
-		return; // do not send oversized packets
+		return false; // do not send oversized packets
 	}
 
 	netcode::PackPacket* packet = new netcode::PackPacket(totalPacketLen);
@@ -1132,4 +1132,5 @@ void CSelectedUnitsHandler::SendCommandsToUnits(const std::vector<int>& unitIDs,
 	}
 
 	clientNet->Send(std::shared_ptr<netcode::RawPacket>(packet));
+	return true;
 }

@@ -3635,9 +3635,7 @@ int LuaUnsyncedCtrl::GiveOrderToUnitMap(lua_State* L)
 		return 1;
 	}
 
-	selectedUnitsHandler.SendCommandsToUnits(unitIDs, {LuaUtils::ParseCommand(L, __func__, 2)});
-
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, selectedUnitsHandler.SendCommandsToUnits(unitIDs, {LuaUtils::ParseCommand(L, __func__, 2)}));
 	return 1;
 }
 
@@ -3669,9 +3667,7 @@ int LuaUnsyncedCtrl::GiveOrderToUnitArray(lua_State* L)
 		return 1;
 	}
 
-	selectedUnitsHandler.SendCommandsToUnits(unitIDs, {LuaUtils::ParseCommand(L, __func__, 2)});
-
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, selectedUnitsHandler.SendCommandsToUnits(unitIDs, {LuaUtils::ParseCommand(L, __func__, 2)}));
 	return 1;
 }
 
@@ -3703,8 +3699,7 @@ int LuaUnsyncedCtrl::GiveOrderArrayToUnit(lua_State* L)
 		return 1;
 	}
 
-	selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands);
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands));
 	return 1;
 }
 
@@ -3736,9 +3731,7 @@ int LuaUnsyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 		return 1;
 	}
 
-	selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands);
-
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands));
 	return 1;
 }
 
@@ -3780,9 +3773,7 @@ int LuaUnsyncedCtrl::GiveOrderArrayToUnitArray(lua_State* L)
 		return 1;
 	}
 
-	selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands, (args >= 3 && lua_toboolean(L, 3)));
-
-	lua_pushboolean(L, true);
+	lua_pushboolean(L, selectedUnitsHandler.SendCommandsToUnits(unitIDs, commands, (args >= 3 && lua_toboolean(L, 3))));
 	return 1;
 }
 
