@@ -669,7 +669,13 @@ void CBuilderCAI::ExecuteBuildCmd(Command& c)
 
 	if (building) {
 		// keep moving until 3D distance to buildPos is LEQ our buildDistance
-		MoveInBuildRange(build.pos, objRadius);
+		if (MoveInBuildRange(build.pos, objRadius)) {
+			const CUnit* buildee = ownerBuilder->curBuild;
+
+			// finished buildee moved away from the build site, stop repairing it
+			if (buildee != nullptr && !buildee->beingBuilt && !IsInBuildRange(buildee))
+				ownerBuilder->StopBuild();
+		}
 
 		if (ownerBuilder->curBuild == nullptr && !ownerBuilder->terraforming) {
 			building = false;
