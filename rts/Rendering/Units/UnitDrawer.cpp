@@ -85,6 +85,9 @@ CONFIG(bool, AdvUnitShading).deprecated(true);
 // Keep the Lua ABI identical in GL4 and GLSL. Ordinary GL4 ghosts remain batched.
 static bool DrawLuaGhost(const GhostTarget& target, const float4& color, bool radar, bool highlighted)
 {
+#ifdef HEADLESS
+	return false;
+#else
 	if (!eventHandler.HasDrawGhost() || target.unitID < 0 || target.modelName.empty())
 		return false;
 	GhostDrawInfo info;
@@ -125,6 +128,7 @@ static bool DrawLuaGhost(const GhostTarget& target, const float4& color, bool ra
 	glUseProgram(program);
 	glPopAttrib();
 	return handled;
+#endif
 }
 
 //don't inherit and leave only static Unit specific helpers
