@@ -40,7 +40,13 @@ void GameControllerTextInput::ViewResize() {
 	textEditingWindow.w = inputTextSizeX * globalRendering->viewSizeX;
 	textEditingWindow.h = inputTextSizeY * globalRendering->viewSizeY;
 
-	SDL_SetTextInputRect(&textEditingWindow);
+	SDL_Rect windowCoords = {
+		globalRendering->ToWindowCoord(textEditingWindow.x),
+		globalRendering->ToWindowCoord(textEditingWindow.y),
+		globalRendering->ToWindowCoord(textEditingWindow.w),
+		globalRendering->ToWindowCoord(textEditingWindow.h),
+	};
+	SDL_SetTextInputRect(&windowCoords);
 }
 
 void GameControllerTextInput::Draw() {

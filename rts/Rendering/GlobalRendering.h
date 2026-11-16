@@ -17,6 +17,7 @@ class SharedLib;
 struct SDL_version;
 struct SDL_Rect;
 struct SDL_Window;
+union SDL_Event;
 typedef void* SDL_GLContext;
 
 /**
@@ -107,6 +108,13 @@ public:
 	int GetCurrentDisplayIndex() const;
 	void GetDisplayBounds(SDL_Rect& r, const int* di = nullptr) const;
 	void GetUsableDisplayBounds(SDL_Rect& r, const int* di = nullptr) const;
+
+	/// window pixels per SDL window coordinate, above 1 only on macOS with MacRenderScale
+	float GetPixelScale() const;
+	int ToPixels(int windowCoord) const;
+	int ToWindowCoord(int pixels) const;
+	/// converts the window coordinates SDL puts in mouse and resize events to pixels
+	void EventToPixels(SDL_Event& event) const;
 
 	bool IsExtensionSupported(const char* ext) const;
 

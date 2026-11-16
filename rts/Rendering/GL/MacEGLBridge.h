@@ -20,8 +20,12 @@ namespace MacEGLBridge {
 	void DestroyContext();
 	void* GetProcAddress(const char* name);
 
-	// reads back the pbuffer and presents it; resizes the pbuffer to track the window
+	// reads back the pbuffer and presents it, then resizes the pbuffer to track the window and MacRenderScale
 	void SwapWindow(SDL_Window* window);
+
+	// pbuffer pixels per SDL window point: MacRenderScale, capped at the display's own pixel density
+	float GetRenderScale();
+	int ToPixels(int points);
 	void SetSwapInterval(int interval);
 }
 #endif

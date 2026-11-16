@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "InputHandler.h"
+#include "Rendering/GlobalRendering.h"
 #include "System/TimeProfiler.h"
 
 InputHandler input;
@@ -26,6 +27,7 @@ void InputHandler::PushEvents()
 	while (SDL_PollEvent(&event)) {
 		// SDL_PollEvent may modify FPU flags
 		streflop::streflop_init<streflop::Simple>();
+		globalRendering->EventToPixels(event);
 		PushEvent(event);
 	}
 }

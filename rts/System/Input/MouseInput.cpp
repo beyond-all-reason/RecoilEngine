@@ -218,7 +218,7 @@ bool IMouseInput::WarpPos(int2 pos)
 		SDL_ShowCursor(SDL_DISABLE);
 	#endif
 
-	SDL_WarpMouseInWindow(globalRendering->GetWindow(), pos.x, pos.y);
+	SDL_WarpMouseInWindow(globalRendering->GetWindow(), globalRendering->ToWindowCoord(pos.x), globalRendering->ToWindowCoord(pos.y));
 
 	// SDL_WarpMouse generates SDL_MOUSEMOTION events
 	// in `middle click scrolling` those SDL generated ones would point into

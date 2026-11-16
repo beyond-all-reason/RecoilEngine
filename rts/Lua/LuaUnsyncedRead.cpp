@@ -941,10 +941,10 @@ int LuaUnsyncedRead::GetWindowGeometry(lua_State* L)
 	lua_pushnumber(L, globalRendering->winPosX);
 	lua_pushnumber(L, winPosY_bl);
 
-	lua_pushnumber(L, globalRendering->winBorder[0]);
-	lua_pushnumber(L, globalRendering->winBorder[1]);
-	lua_pushnumber(L, globalRendering->winBorder[2]);
-	lua_pushnumber(L, globalRendering->winBorder[3]);
+	lua_pushnumber(L, globalRendering->ToPixels(globalRendering->winBorder[0]));
+	lua_pushnumber(L, globalRendering->ToPixels(globalRendering->winBorder[1]));
+	lua_pushnumber(L, globalRendering->ToPixels(globalRendering->winBorder[2]));
+	lua_pushnumber(L, globalRendering->ToPixels(globalRendering->winBorder[3]));
 	return 4 + 4;
 }
 
@@ -1006,10 +1006,10 @@ int LuaUnsyncedRead::GetScreenGeometry(lua_State* L)
 	else {
 		SDL_Rect r{};
 		globalRendering->GetDisplayBounds(r, displayIndexPtr);
-		lua_pushnumber(L, r.w);
-		lua_pushnumber(L, r.h);
-		lua_pushnumber(L, r.x);
-		lua_pushnumber(L, r.y);
+		lua_pushnumber(L, globalRendering->ToPixels(r.w));
+		lua_pushnumber(L, globalRendering->ToPixels(r.h));
+		lua_pushnumber(L, globalRendering->ToPixels(r.x));
+		lua_pushnumber(L, globalRendering->ToPixels(r.y));
 	}
 
 	if (!queryUsable)
@@ -1018,10 +1018,10 @@ int LuaUnsyncedRead::GetScreenGeometry(lua_State* L)
 	{
 		SDL_Rect r{};
 		globalRendering->GetUsableDisplayBounds(r, displayIndexPtr);
-		lua_pushnumber(L, r.w);
-		lua_pushnumber(L, r.h);
-		lua_pushnumber(L, r.x);
-		lua_pushnumber(L, r.y);
+		lua_pushnumber(L, globalRendering->ToPixels(r.w));
+		lua_pushnumber(L, globalRendering->ToPixels(r.h));
+		lua_pushnumber(L, globalRendering->ToPixels(r.x));
+		lua_pushnumber(L, globalRendering->ToPixels(r.y));
 
 		return 4 + 4;
 	}

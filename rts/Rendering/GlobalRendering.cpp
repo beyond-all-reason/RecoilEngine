@@ -1,5 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
+#include <cmath>
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -433,6 +434,8 @@ SDL_Window* CGlobalRendering::CreateSDLWindow(const char* title) const
 #ifdef MAC_EGL_BRIDGE_AVAILABLE
 	// the GL context lives offscreen (Mesa EGL), the window is only presented to
 	sdlFlags &= ~SDL_WINDOW_OPENGL;
+	// lets the presenter fill a Retina display pixel for pixel, MacRenderScale decides how much of that is rendered
+	sdlFlags |= SDL_WINDOW_ALLOW_HIGHDPI;
 #endif
 
 	for (size_t i = 0; i < (aaLvls.size()) && (newWindow == nullptr); i++) {
@@ -1438,6 +1441,57 @@ void CGlobalRendering::GetUsableDisplayBounds(SDL_Rect& r, const int* di) const
 	SDL_GetDisplayUsableBounds(displayIndex, &r);
 }
 
+float CGlobalRendering::GetPixelScale() const
+{
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if (MacEGLBridge::Active())
+		return MacEGLBridge::GetRenderScale();
+#endif
+	return 1.0f;
+}
+
+int CGlobalRendering::ToPixels(int windowCoord) const
+{
+#ifdef MAC_EGL_BRIDGE_AVAILABLE
+	if (MacEGLBridge::Active())
+		return MacEGLBridge::ToPixels(windowCoord);
+#endif
+	return windowCoord;
+}
+
+int CGlobalRendering::ToWindowCoord(int pixels) const
+{
+	return static_cast<int>(std::lround(pixels / GetPixelScale()));
+}
+
+void CGlobalRendering::EventToPixels(SDL_Event& event) const
+{
+	if (GetPixelScale() == 1.0f)
+		return;
+
+	switch (event.type) {
+		case SDL_MOUSEMOTION: {
+			event.motion.x = ToPixels(event.motion.x);
+			event.motion.y = ToPixels(event.motion.y);
+			event.motion.xrel = ToPixels(event.motion.xrel);
+			event.motion.yrel = ToPixels(event.motion.yrel);
+		} break;
+		case SDL_MOUSEBUTTONDOWN:
+		case SDL_MOUSEBUTTONUP: {
+			event.button.x = ToPixels(event.button.x);
+			event.button.y = ToPixels(event.button.y);
+		} break;
+		case SDL_WINDOWEVENT: {
+			if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED || event.window.event == SDL_WINDOWEVENT_RESIZED) {
+				event.window.data1 = ToPixels(event.window.data1);
+				event.window.data2 = ToPixels(event.window.data2);
+			}
+		} break;
+		default:
+			break;
+	}
+}
+
 bool CGlobalRendering::IsExtensionSupported(const char* ext) const
 {
 	return glExtensions.contains(ext);
@@ -1502,6 +1556,7 @@ void CGlobalRendering::UpdateViewPortGeometry()
 	{
 		SDL_Rect screen, interRect;
 		GetDisplayBounds(screen, &i);
+		screen = { ToPixels(screen.x), ToPixels(screen.y), ToPixels(screen.w), ToPixels(screen.h) };
 		LOG("[GR::%s] Raw Screen %i: pos %dx%d | size %dx%d", __func__, i, screen.x, screen.y, screen.w, screen.h);
 		// we only care about screenRects that overlap window
 		if (!SDL_IntersectRect(&screen, &winRect, &interRect)) {
@@ -1594,10 +1649,10 @@ void CGlobalRendering::ReadWindowPosAndSize()
 	GetDisplayBounds(screenSize);
 
 	// no other good place to set these
-	screenSizeX = screenSize.w;
-	screenSizeY = screenSize.h;
-	screenPosX  = screenSize.x;
-	screenPosY  = screenSize.y;
+	screenSizeX = ToPixels(screenSize.w);
+	screenSizeY = ToPixels(screenSize.h);
+	screenPosX  = ToPixels(screenSize.x);
+	screenPosY  = ToPixels(screenSize.y);
 
 	//probably redundant
 	if (!borderless)
@@ -1605,6 +1660,11 @@ void CGlobalRendering::ReadWindowPosAndSize()
 
 	SDL_GetWindowSize(sdlWindow, &winSizeX, &winSizeY);
 	SDL_GetWindowPosition(sdlWindow, &winPosX, &winPosY);
+
+	winSizeX = ToPixels(winSizeX);
+	winSizeY = ToPixels(winSizeY);
+	winPosX = ToPixels(winPosX);
+	winPosY = ToPixels(winPosY);
 
 	//enforce >=0 https://github.com/beyond-all-reason/spring/issues/23
 	//winPosX = std::max(winPosX, 0);
@@ -1632,10 +1692,10 @@ void CGlobalRendering::SaveWindowPosAndSize()
 		return;
 
 	// do not notify about changes to block update loop
-	configHandler->Set("WindowPosX", winPosX, false, false);
-	configHandler->Set("WindowPosY", winPosY, false, false);
-	configHandler->Set("XResolutionWindowed", winSizeX, false, false);
-	configHandler->Set("YResolutionWindowed", winSizeY, false, false);
+	configHandler->Set("WindowPosX", ToWindowCoord(winPosX), false, false);
+	configHandler->Set("WindowPosY", ToWindowCoord(winPosY), false, false);
+	configHandler->Set("XResolutionWindowed", ToWindowCoord(winSizeX), false, false);
+	configHandler->Set("YResolutionWindowed", ToWindowCoord(winSizeY), false, false);
 }
 
 
