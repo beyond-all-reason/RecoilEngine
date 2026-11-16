@@ -190,10 +190,10 @@ endif()
 			nowide::nowide
 		)
 
-	# HEADLESS: nv_dds.cpp then skips its glTexImage upload code, which needs a GL context.
+	# Compile the upload code too; tests replace the GL entry points with capture stubs.
 	# -UUNIT_TEST: nv_dds.cpp includes myGL.h, which refuses to compile under UNIT_TEST (it guards its glOrtho wrappers);
 	# nothing here calls them.
-	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DHEADLESS -UUNIT_TEST")
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-UUNIT_TEST")
 
 ################################################################################
 ### Float3

@@ -893,7 +893,7 @@ bool CDDSImage::upload_texture1D() const
     else
     {
         GLint alignment = -1;
-        if (!is_dword_aligned())
+        if (is_float() || !is_dword_aligned())
         {
             glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -964,7 +964,8 @@ bool CDDSImage::upload_texture2D(unsigned int imageIndex, int target) const
     else
     {
         GLint alignment = -1;
-        if (!is_dword_aligned())
+        // Half-float mip rows can be unaligned even when the base row is aligned.
+        if (is_float() || !is_dword_aligned())
         {
             glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -1021,7 +1022,8 @@ bool CDDSImage::upload_texture3D() const
     else
     {
         GLint alignment = -1;
-        if (!is_dword_aligned())
+        // Half-float mip rows can be unaligned even when the base row is aligned.
+        if (is_float() || !is_dword_aligned())
         {
             glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
