@@ -299,6 +299,21 @@ void CLuaHandle::CheckStack()
 }
 
 
+bool CLuaHandle::HasXCall(const std::string& funcName) const
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	if (!IsValid())
+		return false;
+
+	lua_pushsstring(L, funcName);
+	lua_rawget(L, LUA_GLOBALSINDEX);
+	const bool found = lua_isfunction(L, -1);
+	lua_pop(L, 1);
+
+	return found;
+}
+
+
 int CLuaHandle::XCall(lua_State* srcState, const char* funcName)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
