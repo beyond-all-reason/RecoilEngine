@@ -1,7 +1,12 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include <cmath>
-#include <xmmintrin.h>
+
+// the float exception control register is SSE's; other architectures run the checks without trapping
+#if defined(__SSE__) || defined(_M_X64)
+	#include <xmmintrin.h>
+	#define CAMERA_PROJECTION_TEST_HAS_SSE 1
+#endif
 
 #include "Game/CameraProjection.h"
 #include "System/float3.h"
@@ -17,12 +22,16 @@ namespace {
 struct ScopedFloatTraps {
 	ScopedFloatTraps()
 	{
+	#ifdef CAMERA_PROJECTION_TEST_HAS_SSE
 		oldCsr = _mm_getcsr();
 		_mm_setcsr((oldCsr & ~_MM_EXCEPT_MASK) & ~(_MM_MASK_DIV_ZERO | _MM_MASK_INVALID | _MM_MASK_OVERFLOW));
+	#endif
 	}
 	~ScopedFloatTraps()
 	{
+	#ifdef CAMERA_PROJECTION_TEST_HAS_SSE
 		_mm_setcsr(oldCsr);
+	#endif
 	}
 	unsigned int oldCsr = 0;
 };
