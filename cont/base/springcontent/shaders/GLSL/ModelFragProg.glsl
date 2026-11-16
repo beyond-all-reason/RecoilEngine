@@ -24,6 +24,8 @@
 // texture alpha-masking is done in both passes
 uniform vec4 teamColor;
 uniform vec4 nanoColor;
+// x: hover brightness, y: animation phase. Neutral outside ghost draws.
+uniform vec2 ghostHighlight = vec2(0.0);
 // Ghost tint is explicit: the GLSL model shaders do not consume gl_Color.
 uniform vec3 ghostColor = vec3(1.0);
 
@@ -132,6 +134,10 @@ void main(void)
 	gl_FragColor.rgb = mix(gl_Fog.color.rgb, gl_FragColor.rgb, fogFactor); // fog
 	gl_FragColor.rgb = mix(gl_FragColor.rgb, nanoColor.rgb, nanoColor.a); // wireframe or polygon color
 	gl_FragColor.rgb *= ghostColor;
+	if (ghostHighlight.x > 0.0) {
+		float shimmer = fract(vertexWorldPos.y * (1.0 / 30.0) + ghostHighlight.y);
+		gl_FragColor.rgb += ghostColor * shimmer * ghostHighlight.x;
+	}
 	gl_FragColor.a   = alpha;
 #endif
 }

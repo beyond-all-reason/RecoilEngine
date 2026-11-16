@@ -21,7 +21,7 @@ function Update()
 		else
 			Spring.SetGhostHighlight()
 		end
-		for _, shot in ipairs({ {125, "live"}, {140, "live_highlight"}, {165, "radar"}, {168, "radar_highlight"}, {205, "dead"}, {220, "dead_highlight"}, {235, "reset"} }) do
+		for _, shot in ipairs({ {125, "live"}, {140, "live_highlight"}, {142, "live_shimmer"}, {165, "radar"}, {168, "radar_highlight"}, {205, "dead"}, {220, "dead_highlight"}, {222, "dead_shimmer"}, {235, "reset"} }) do
 			if frame >= shot[1] and not seen[shot[2] .. "_shot"] then
 				seen[shot[2] .. "_shot"] = true
 				Spring.Echo("GHOST_TEST screenshot " .. shot[2])

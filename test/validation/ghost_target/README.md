@@ -30,7 +30,7 @@ clicks keep their prior behavior. Minimap targeting and automatic target persist
 outside this patch.
 
 Radar coverage checks that the icon remains a unit target while the remembered model
-resolves to that same unit target outside the icon, with its frozen aimpoint supplied only for highlighting. Seven screenshots in the output
+resolves to that same unit target outside the icon, with its frozen aimpoint supplied only for highlighting. Nine screenshots in the output
 `screenshots/` directory show live, radar and dead ghosts before and during the
 highlight, followed by the reset appearance. Highlighting uses the stored aimpoint, never a hidden unit ID.
 
@@ -53,3 +53,12 @@ folder and enabled manually; shutdown restores the engine defaults.
 
 Scenario phases use six simulation frames per logical frame at speed 1, leaving
 time for synchronous screenshot capture and ray sweeps between radar transitions.
+
+The `live_highlight`/`live_shimmer` and `dead_highlight`/`dead_shimmer`
+screenshot pairs capture different animation phases. Check that the bright bands
+move vertically on the remembered model, including after hidden destruction.
+Radar hover must shimmer too, while normal ghosts and nearby visible units must
+not inherit it. The effect changes RGB brightness only; Lua's alpha is retained.
+The height/time formula matches BAR's CUS hover effect (30 world units per band,
+2/40 cycles per interpolated simulation frame), with the configured ghost highlight
+RGB supplying its color. Run with `--colors` and with `--colors --glsl`.
