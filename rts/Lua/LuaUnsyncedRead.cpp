@@ -3280,10 +3280,9 @@ int LuaUnsyncedRead::WorldToScreenCoords(lua_State* L)
  * @param ignoreWater boolean? (Default: `false`)
  * @param heightOffset number? (Default: `0`)
  * @param includeGhosts boolean? (Default: `false`) World view only; return "ghost" and its last observed aim-position triple. A remembered model with radar contact returns "unit", its targetable ID, and that frozen aim-position triple instead. Ignored with onlyCoords or the legacy argument layout.
- * @return string? description of traced position
- * @return UnitID|FeatureID|string|xyz|nil unitID or feature, position triple when onlyCoords=true
- * @return FeatureID|string|xyz|nil featureID, ground, or the last observed aimpoint when a remembered model resolves to a radar unit.
- * @return xyz? coords
+ * @return ("unit"|"feature"|"ground"|"sky"|"ghost")? description Type of the traced object or position.
+ * @return UnitID|FeatureID|xyz|nil result Unit or feature ID, world coordinates, or the frozen ghost aimpoint.
+ * @return xyz? ghostAimPos Last observed aimpoint when a remembered model resolves to a radar unit.
  */
 int LuaUnsyncedRead::TraceScreenRay(lua_State* L)
 {
