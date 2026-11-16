@@ -2387,7 +2387,8 @@ Command CGuiHandler::GetCommand(int mouseX, int mouseY, int buttonHint, bool pre
 					c.PushParam(unit->id);
 				} else {
 					// clicked in map; only attack ground if command explicitly set
-					if (explicitCommand < 0 || !ZeroRadiusAllowed(c))
+					// (an area-only command has no other use for a click)
+					if ((explicitCommand < 0 && commands[tempInCommand].type != CMDTYPE_ICON_AREA) || !ZeroRadiusAllowed(c))
 						return defaultRet;
 
 					c.PushPos(cameraPos + (mouseDir * dist2));
