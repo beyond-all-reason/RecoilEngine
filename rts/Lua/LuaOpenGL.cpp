@@ -1406,8 +1406,9 @@ int LuaOpenGL::DrawMiniMap(lua_State* L)
  *
  * The rectangle is mapped onto the unit square under the current transform:
  * (left,top) -> (0,0), (right,bottom) -> (1,1). Callers position, scale, rotate or
- * flip the result via their own matrices, e.g. inside gl.RenderToTexture. Blending,
- * scissor and viewport state are left to the caller.
+ * flip the result via their own matrices, e.g. inside gl.RenderToTexture; when rotating,
+ * also pass the angle as `rotation` so the icons stay upright. Blending, scissor and
+ * viewport state are left to the caller.
  *
  * @function gl.DrawMiniMapIcons
  * @param left number map-space rectangle edges in elmos; left < right and top < bottom (top = smaller z) are required, mirror via your own transform instead
@@ -1418,6 +1419,7 @@ int LuaOpenGL::DrawMiniMap(lua_State* L)
  * @param allyTeam integer? (Default: your allyTeam) perspective to render; other allyteams require a full-read handle
  * @param fullView boolean? (Default: true when spectating in full view with a full-read handle) draw every unit at its true position; true requires a full-read handle, false is always allowed
  * @param highlightSelected boolean? (Default: true) draw the local player's selected units white. Other players' selections are unknown to the engine — when rendering another perspective, pass false and overlay that viewer's selection yourself
+ * @param rotation number? (Default: 0) counter-clockwise screen rotation in radians that you apply to the result, with the rectangle drawn minimap-style before it ((left,top) at the top-left). Each icon is turned back by it to stay upright and icons stack by the rotated screen vertical; positions are left to your transform. For a minimap replacement pass Spring.GetMiniMapRotation()
  */
 int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 {
@@ -1448,6 +1450,7 @@ int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 	params.iconSizeX = iconSize;
 	params.iconSizeY = iconSize;
 	params.rotation = CMiniMap::ROTATION_0;
+	params.outputRotation = luaL_optfloat(L, 9, 0.0f);
 	params.viewAllyTeam = allyTeam;
 	params.fullView = fullView;
 	params.useIcons = true;

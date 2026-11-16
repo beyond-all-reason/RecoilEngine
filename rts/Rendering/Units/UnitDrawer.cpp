@@ -394,6 +394,12 @@ namespace {
 		}
 	}
 
+	// the same screen vertical when the caller rotates the result itself by an angle
+	// (MiniMapIconDrawParams::outputRotation); quarter turns give the cases above
+	inline float MiniMapIconSortDepth(const float3& pos, float rotSin, float rotCos) {
+		return pos.z * rotCos - pos.x * rotSin;
+	}
+
 	void SortIconRecs(std::vector<uint64_t>& recs) {
 		// measured crossover: LSD radix beats std::sort ~3x at 20k records but loses
 		// below a few thousand, where its per-pass histogram overhead dominates
@@ -449,7 +455,7 @@ namespace {
 	}
 }
 
-void CUnitDrawerGLSL::DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, size_t iconIdx, const float iconScale, const float3& pos, const SColor& color, const MiniMapIconDrawParams& params) const
+void CUnitDrawerGLSL::DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, size_t iconIdx, const float iconScale, const float3& pos, const SColor& color, const MiniMapIconDrawParams& params, float quadSin, float quadCos) const
 {
 	const float iconSizeX = (iconScale * params.iconSizeX);
 	const float iconSizeY = (iconScale * params.iconSizeY);
@@ -483,20 +489,22 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, 
 			break;
 	}
 
-	float x0 = posX - iconSizeX;
-	float x1 = posX + iconSizeX;
-	float y0 = posY - iconSizeY;
-	float y1 = posY + iconSizeY;
+	// half-axes of the quad, turned back by the caller's output rotation (quadSin = 0 and
+	// quadCos = 1 without one, leaving the quad axis-aligned)
+	const float ux = iconSizeX * quadCos;
+	const float uy = iconSizeX * quadSin;
+	const float vx = -iconSizeY * quadSin;
+	const float vy = iconSizeY * quadCos;
 
 	const auto& iconData = icon::iconHandler.GetIconData(iconIdx);
 	const auto& tc = iconData.GetTexCoords();
 	const float atlasIdx = static_cast<float>(tc.pageNum);
 
 	rb.AddQuadTriangles(
-		{ x0, y0, tc.x1, tc.y1, atlasIdx, color },
-		{ x1, y0, tc.x2, tc.y1, atlasIdx, color },
-		{ x1, y1, tc.x2, tc.y2, atlasIdx, color },
-		{ x0, y1, tc.x1, tc.y2, atlasIdx, color }
+		{ posX - ux - vx, posY - uy - vy, tc.x1, tc.y1, atlasIdx, color },
+		{ posX + ux - vx, posY + uy - vy, tc.x2, tc.y1, atlasIdx, color },
+		{ posX + ux + vx, posY + uy + vy, tc.x2, tc.y2, atlasIdx, color },
+		{ posX - ux + vx, posY - uy + vy, tc.x1, tc.y2, atlasIdx, color }
 	);
 }
 
@@ -519,6 +527,19 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons(const MiniMapIconDrawParams& params) 
 	const bool sortDepth = modelDrawerData->sortUnitIconsByDepth;
 	const bool sortIcons = sortDepth || icon::iconHandler.HasDrawOrders();
 	const auto mmRotation = params.rotation;
+
+	// a caller rotating the result itself gets icons turned back by that angle; near-zero
+	// terms are snapped so quarter turns stack exactly like the rotated minimap
+	const bool outputRotated = (params.outputRotation != 0.0f);
+	const auto snapZero = [](float v) { return (math::fabs(v) < 1e-6f) ? 0.0f : v; };
+	const float quadSin = outputRotated ? snapZero(math::sin(params.outputRotation)) : 0.0f;
+	const float quadCos = outputRotated ? snapZero(math::cos(params.outputRotation)) : 1.0f;
+	const auto iconSortDepth = [&](const float3& pos) {
+		if (!sortDepth)
+			return 0.0f;
+
+		return outputRotated ? MiniMapIconSortDepth(pos, quadSin, quadCos) : MiniMapIconSortDepth(pos, mmRotation);
+	};
 
 	struct IconDrawEntry {
 		size_t iconIdx;
@@ -594,10 +615,10 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons(const MiniMapIconDrawParams& params) 
 		const float iconScale = CUnitDrawerHelper::GetUnitIconScale(unit);
 
 		if (!sortIcons) {
-			DrawUnitMiniMapIcon(rb, iconIndex, iconScale, pos, currentColor, params);
+			DrawUnitMiniMapIcon(rb, iconIndex, iconScale, pos, currentColor, params, quadSin, quadCos);
 		} else {
 			entries.push_back({ iconIndex, iconScale, pos, currentColor });
-			sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(iconIndex).GetDrawOrder(), sortDepth ? MiniMapIconSortDepth(pos, mmRotation) : 0.0f, entries.size() - 1));
+			sortRecs.push_back(MakeIconSortRec(icon::iconHandler.GetIconData(iconIndex).GetDrawOrder(), iconSortDepth(pos), entries.size() - 1));
 		}
 	}
 
@@ -627,10 +648,10 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons(const MiniMapIconDrawParams& params) 
 			currentColor.b *= ghostIconDimming;
 
 			if (!sortIcons) {
-				DrawUnitMiniMapIcon(rb, iconIndex, iconScale, pos, currentColor, params);
+				DrawUnitMiniMapIcon(rb, iconIndex, iconScale, pos, currentColor, params, quadSin, quadCos);
 			} else {
 				entries.push_back({ iconIndex, iconScale, pos, currentColor });
-				sortRecs.push_back(MakeIconSortRec(iconData.GetDrawOrder(), sortDepth ? MiniMapIconSortDepth(pos, mmRotation) : 0.0f, entries.size() - 1));
+				sortRecs.push_back(MakeIconSortRec(iconData.GetDrawOrder(), iconSortDepth(pos), entries.size() - 1));
 			}
 		}
 	}
@@ -646,7 +667,7 @@ void CUnitDrawerGLSL::DrawUnitMiniMapIcons(const MiniMapIconDrawParams& params) 
 
 		for (const uint64_t rec : sortRecs) {
 			const auto& e = entries[uint32_t(rec) & ICON_SORT_IDX_MASK];
-			DrawUnitMiniMapIcon(rb, e.iconIdx, e.iconScale, e.pos, e.color, params);
+			DrawUnitMiniMapIcon(rb, e.iconIdx, e.iconScale, e.pos, e.color, params, quadSin, quadCos);
 		}
 	}
 
