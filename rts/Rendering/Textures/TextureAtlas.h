@@ -119,7 +119,7 @@ public:
 	int2 GetSize() const;
 	std::string GetName() const { return name; }
 
-	uint32_t GetTexID() const { return atlasTex->GetId(); }
+	uint32_t GetTexID() const { return atlasTex ? atlasTex->GetId() : 0; }
 	uint32_t GetTexTarget() const;
 	uint32_t GetNumPages() const;
 
