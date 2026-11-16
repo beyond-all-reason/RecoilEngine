@@ -31,6 +31,7 @@
 #include "Sim/Units/CommandAI/MobileCAI.h"
 #include "Sim/Units/UnitTypes/Factory.h"
 #include "Sim/Units/BuildInfo.h"
+#include "Sim/Units/QueuedBuildOverlap.h"
 #include "Sim/Units/UnitDef.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitHandler.h"
@@ -482,27 +483,6 @@ namespace {
 			}
 		};
 
-		/**
-		 * Delegates filtering to CMobileCAI::IsValidTarget.
-		 *
-		 * This is necessary in CMobileCAI and CAirCAI so they can select the closest
-		 * enemy unit which they consider a valid target.
-		 *
-		 * Without the valid target condition, units don't attack anything if an
-		 * the nearest enemy is an invalid target. (e.g. noChaseCategory)
-		 */
-		struct Enemy_InLos_ValidTarget : public Enemy_InLos
-		{
-			const CMobileCAI* const cai;
-
-			Enemy_InLos_ValidTarget(int at, const CMobileCAI* cai) :
-				Enemy_InLos(nullptr, at), cai(cai) {}
-
-			bool Unit(const CUnit* u) {
-				return Enemy_InLos::Unit(u) && cai->IsValidTarget(u, nullptr);
-			}
-		};
-
 	} // end of namespace Filter
 
 
@@ -543,6 +523,27 @@ namespace {
 			}
 
 			CUnit* GetClosestUnit() const { return closeUnit; }
+		};
+
+		/**
+		 * Return the closest unit which CMobileCAI::IsValidTarget accepts, so
+		 * that CMobileCAI and CAirCAI skip invalid targets (e.g. noChaseCategory).
+		 * The distance is tested first since IsValidTarget is the expensive part.
+		 */
+		struct ClosestValidTarget : public ClosestUnit
+		{
+			const CMobileCAI* const cai;
+
+			ClosestValidTarget(const float3& pos, float searchRadius, const CMobileCAI* cai) :
+				ClosestUnit(pos, searchRadius), cai(cai) {}
+
+			void AddUnit(CUnit* u) {
+				const float sqDist = (pos - u->midPos).SqLength2D();
+				if (sqDist <= closeSqDist && cai->IsValidTarget(u, nullptr)) {
+					closeSqDist = sqDist;
+					closeUnit = u;
+				}
+			}
 		};
 
 		/**
@@ -686,11 +687,16 @@ size_t CGameHelper::GenerateWeaponTargets(const CWeapon* weapon, const CUnit* av
 
 	const bool paralyzer = (weaponDmg->paralyzeDamageTime != 0);
 
+	targets.clear();
+
+	// cheap exit for the common case of no enemies anywhere near
+	if (!quadField.MayHaveEnemyUnits(ownerPos, scanRadius, weaponOwner->allyteam))
+		return 0;
+
 	// copy on purpose since the below calls lua
 	QuadFieldQuery qfQuery;
 	quadField.GetQuads(qfQuery, ownerPos, scanRadius);
 
-	targets.clear();
 	targets.reserve(32);
 
 	const int tempNum = gs->GetTempNum();
@@ -806,8 +812,11 @@ CUnit* CGameHelper::GetClosestEnemyUnit(const CUnit* excludeUnit, const float3& 
 CUnit* CGameHelper::GetClosestValidTarget(const float3& pos, float searchRadius, int searchAllyteam, const CMobileCAI* cai)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	Query::ClosestUnit q(pos, searchRadius);
-	QueryUnits(Filter::Enemy_InLos_ValidTarget(searchAllyteam, cai), q);
+	if (!quadField.MayHaveEnemyUnits(pos, searchRadius, searchAllyteam))
+		return nullptr;
+
+	Query::ClosestValidTarget q(pos, searchRadius, cai);
+	QueryUnits(Filter::Enemy_InLos(nullptr, searchAllyteam), q);
 	return q.GetClosestUnit();
 }
 
@@ -1019,35 +1028,13 @@ float4 CGameHelper::BuildPosToRect(const float3& midPoint, int facing, int xsize
 int CGameHelper::GetYardMapIndex(int buildFacing, const int2& yardPos, const int2& xrange, const int2& zrange)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	int yardX = yardPos.x - xrange.x;
-	int yardZ = yardPos.y - zrange.x;
-	int yardXR = xrange.y - xrange.x;
-	int yardZR = zrange.y - zrange.x;
+	return QueuedBuildOverlap::GetYardMapIndex(buildFacing, yardPos, xrange, zrange);
+}
 
-	switch (buildFacing) {
-		default: {
-			// FACING_SOUTH don't need to do any remapping
-		} break;
-
-		case FacingMap::FACING_NORTH: {
-			yardX = yardXR - yardX - 1; //mirror yardX
-			yardZ = yardZR - yardZ - 1; //mirror yardZ
-		} break;
-
-		case FacingMap::FACING_EAST: {
-			yardZ = yardZR - yardZ - 1; //mirror yardZ
-			std::swap(yardX , yardZ );  //swap yard{X,Z}
-			std::swap(yardXR, yardZR);  //swap yard{XR,ZR}
-		} break;
-
-		case FacingMap::FACING_WEST: {
-			yardX = yardXR - yardX - 1; //mirror yardX
-			std::swap(yardX , yardZ );  //swap yard{X,Z}
-			std::swap(yardXR, yardZR);  //swap yard{XR,ZR}
-		} break;
-	}
-
-	return yardX + yardXR * yardZ;
+QueuedBuildOverlap::Result CGameHelper::TestQueuedBuildOverlap(const BuildInfo& queuedBuild, const BuildInfo& buildInfo)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	return QueuedBuildOverlap::Test(queuedBuild, buildInfo, modInfo.useYardmapsForQueuedBuildOverlap);
 }
 
 
@@ -1284,11 +1271,10 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 	const int z1 = int(testPos.z / SQUARE_SIZE) - (zsize >> 1), z2 = z1 + zsize;
 	const int2 xrange = int2(x1, x2);
 	const int2 zrange = int2(z1, z2);
+	const int numCells = (x2 - x1) * (z2 - z1);
 
-	if (statuses != nullptr) {
-		const int numCells = (x2 - x1) * (z2 - z1);
+	if (statuses != nullptr)
 		statuses->assign(numCells, 0);
-	}
 
 	const MoveDef* moveDef = (buildInfo.def->pathType != -1U) ? moveDefHandler.GetMoveDefByPathType(buildInfo.def->pathType) : nullptr;
 
@@ -1350,9 +1336,23 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 
 	if (commands != nullptr) {
 		assert(!synced);
+		std::vector<uint8_t> queuedBuildBlockedCells(numCells, false);
+		size_t queuedBuildOpenCellCount = numCells;
+		for (const Command& command: *commands) {
+			const BuildInfo queuedBuild(command);
+			if (QueuedBuildOverlap::AddBlockedCells(
+				queuedBuild,
+				buildInfo,
+				modInfo.useYardmapsForQueuedBuildOverlap,
+				queuedBuildBlockedCells,
+				queuedBuildOpenCellCount
+			))
+				break;
+		}
 
 		for (int z = z1; z < z2; z++) {
 			for (int x = x1; x < x2; x++) {
+				const int idx = (z - z1) * (x2 - x1) + (x - x1);
 				sqrPos.x = x * SQUARE_SIZE;
 				sqrPos.z = z * SQUARE_SIZE;
 
@@ -1361,27 +1361,11 @@ CGameHelper::BuildSquareStatus CGameHelper::TestUnitBuildSquare(
 				if (sqrPos.IsInBounds())
 					sqrStatus = TestBuildSquare(sqrPos, xrange, zrange, buildInfo, moveDef, feature, gu->myAllyTeam, synced);
 
-				if (sqrStatus != BUILDSQUARE_BLOCKED) {
-					for (const Command& c : *commands) {
-						const BuildInfo bc(c);
+				if (sqrStatus != BUILDSQUARE_BLOCKED && queuedBuildBlockedCells[idx])
+					sqrStatus = BUILDSQUARE_BLOCKED;
 
-						const int cmdSizeX = bc.GetXSize() * SQUARE_SIZE;
-						const int cmdSizeZ = bc.GetZSize() * SQUARE_SIZE;
-
-						const int cmdDistX = std::max(bc.pos.x - sqrPos.x - SQUARE_SIZE, sqrPos.x - bc.pos.x) * 2;
-						const int cmdDistZ = std::max(bc.pos.z - sqrPos.z - SQUARE_SIZE, sqrPos.z - bc.pos.z) * 2;
-
-						if (cmdDistX < cmdSizeX && cmdDistZ < cmdSizeZ) {
-							sqrStatus = BUILDSQUARE_BLOCKED;
-							break;
-						}
-					}
-				}
-
-				if (statuses != nullptr) {
-					const int idx = (z - z1) * (x2 - x1) + (x - x1);
+				if (statuses != nullptr)
 					(*statuses)[idx] = sqrStatus;
-				}
 
 				testStatus = std::min(testStatus, sqrStatus);
 			}

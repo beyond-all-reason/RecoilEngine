@@ -75,15 +75,18 @@ void CVerticalSync::SetInterval(int i)
 	// adaptive (delay swap iff frame-rate > vblank-rate)
 	if (interval < 0 && SDL_GL_SetSwapInterval(interval) == 0) {
 		LOG("[VSync::%s] interval=%d (adaptive)", __func__, interval);
+		effectiveInterval = interval;
 		return;
 	}
 	// standard (<interval> vblanks per swap)
 	if (interval > 0 && SDL_GL_SetSwapInterval(interval) == 0) {
 		LOG("[VSync::%s] interval=%d (standard)", __func__, interval);
+		effectiveInterval = interval;
 		return;
 	}
 
 	// disabled (never wait for vblank)
 	SDL_GL_SetSwapInterval(0);
 	LOG("[VSync::%s] interval=%d (disabled)", __func__, interval);
+	effectiveInterval = 0;
 }

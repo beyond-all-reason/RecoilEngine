@@ -3,6 +3,8 @@
 #ifndef _BASE_GROUND_DRAWER_H
 #define _BASE_GROUND_DRAWER_H
 
+#include <string>
+
 #include "MapDrawPassTypes.h"
 
 
@@ -18,14 +20,19 @@ struct LuaMapShaderData {
 	// [0] := standard program from gl.CreateShader
 	// [1] := deferred program from gl.CreateShader
 	unsigned int shaderIDs[2];
+
+	// if true, [1] also writes the lit forward color (see AllowCombinedMapRendering)
+	bool combinedShader = false;
 };
 
 class CBaseGroundDrawer
 {
 public:
 	CBaseGroundDrawer();
-	virtual ~CBaseGroundDrawer() {}
+	virtual ~CBaseGroundDrawer();
 	CBaseGroundDrawer(const CBaseGroundDrawer&) = delete; // no-copy
+
+	void ConfigNotify(const std::string& key, const std::string& value);
 
 	virtual void Draw(const DrawPass::e& drawPass) = 0;
 	virtual void DrawShadowPass() {}

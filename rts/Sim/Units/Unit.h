@@ -3,6 +3,7 @@
 #ifndef UNIT_H
 #define UNIT_H
 
+#include <optional>
 #include <vector>
 
 #include "Sim/Objects/SolidObject.h"
@@ -78,6 +79,9 @@ public:
 
 	virtual void Update();
 	virtual void SlowUpdate();
+	// per-frame state that only depends on the unit itself, safe to run in parallel;
+	// returns the physical state bits whose events still have to be sent
+	unsigned int UpdateState();
 
 	const SolidObjectDef* GetDef() const override { return ((const SolidObjectDef*) unitDef); }
 
@@ -138,6 +142,7 @@ public:
 	void CalculateTerrainType();
 	void UpdateTerrainType();
 	void UpdatePhysicalState(float eps) override;
+	void SendPhysicalStateEvents(unsigned int prevState);
 
 	float3 GetErrorVector(int allyteam) const;
 	float3 GetErrorPos(int allyteam, bool aiming = false) const { return (aiming? aimPos: midPos) + GetErrorVector(allyteam); }
@@ -230,6 +235,11 @@ public:
 	void KilledScriptFinished(int wreckLevel) { deathScriptFinished = true; delayedWreckLevel = wreckLevel; }
 	void ForcedKillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
 	virtual void KillUnit(CUnit* attacker, bool selfDestruct, bool reclaimed, int weaponDefID = 0);
+
+	void StartSelfD(float seconds);
+	void CancelSelfD();
+	void FinishSelfD();
+	std::optional<float> GetSelfDSecondsLeft() const;
 	virtual void IncomingMissile(CMissileProjectile* missile);
 	CFeature* CreateWreck(int wreckLevel, int smokeTime);
 
@@ -245,7 +255,7 @@ protected:
 	float GetFlankingDamageBonus(const float3& attackDir);
 
 public: // unsynced methods
-	bool SetGroup(CGroup* newGroup, bool fromFactory = false, bool autoSelect = true);
+	bool SetGroup(CGroup* newGroup, bool autoSelect = true);
 
 	const CGroup* GetGroup() const;
 	      CGroup* GetGroup();
@@ -476,7 +486,8 @@ public:
 	// Used for calling setSFXoccupy which TA scripts want
 	int curTerrainType = 0;
 
-	int selfDCountdown = 0;
+	// Frame number when self-destruct occurs, 0 means inactive
+	int selfDTargetFrame = 0;
 
 	// the damage value passed to CEGs spawned by this unit's script
 	int cegDamage = 0;

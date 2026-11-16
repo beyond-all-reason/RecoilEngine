@@ -27,6 +27,9 @@ struct SCommandDescription;
 class CGuiHandler : public CInputReceiver {
 public:
 	CGuiHandler();
+	~CGuiHandler();
+
+	void ConfigNotify(const std::string& key, const std::string& value);
 
 	void Update();
 

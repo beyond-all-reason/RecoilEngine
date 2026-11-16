@@ -10,7 +10,7 @@
 class CBuilder;
 class CFactory;
 class CUnit;
-struct float3;
+class float3;
 
 namespace NanoParticles {
 

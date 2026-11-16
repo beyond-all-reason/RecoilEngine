@@ -254,6 +254,7 @@ bool SpringApp::Init()
 
 	// populate params
 	globalConfig.Init();
+	globalConfig.InitConfigNotify();
 
 	// Install Watchdog (must happen after time epoch is set)
 	Watchdog::Install();
@@ -1058,6 +1059,8 @@ void SpringApp::Kill(bool fromRun)
 	CBitmap::KillPool();
 	CLuaSocketRestrictions::KillStatic();
 
+	globalConfig.RemoveConfigNotify();
+
 	// also gets rid of configHandler
 	FileSystemInitializer::Cleanup();
 	DataDirLocater::FreeInstance();
@@ -1244,6 +1247,7 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 					LOG("[SpringApp::%s][SDL_WINDOWEVENT_DISPLAY_CHANGED] to display %d\n", __func__, event.window.data1);
 					// try to reinit GL context
 					globalRendering->MakeCurrentContext(false);
+					globalRendering->UpdateDisplayPeriod();
 				} break;
 
 				case SDL_WINDOWEVENT_CLOSE: {

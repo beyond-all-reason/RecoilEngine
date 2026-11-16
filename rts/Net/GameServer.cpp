@@ -181,6 +181,11 @@ void CGameServer::Initialize()
 	// modify and save GameSetup text (remove passwords)
 	StripGameSetupText(const_cast<GameData*>(myGameData.get()));
 
+	myGameDataPacket.reset(myGameData->Pack());
+
+	if (myGameDataPacket == nullptr)
+		Message(spring::format(GameDataTooLarge, unsigned(myGameData->GetPackedSize()), unsigned(GameData::MAX_PACKED_SIZE)));
+
 	// load demo (if there is one)
 	if (myGameSetup->hostDemo) {
 		Message(spring::format(PlayingDemo, myGameSetup->demoName.c_str()));
@@ -248,12 +253,10 @@ void CGameServer::Initialize()
 		std::sort(commandBlacklist.begin(), commandBlacklist.end());
 	}
 
-	if (configHandler->GetBool("ServerRecordDemos")) {
+	if (configHandler->GetBool("ServerRecordDemos") && myGameDataPacket != nullptr) {
 		demoRecorder.reset(new CDemoRecorder(myGameSetup->mapName, myGameSetup->modName, true));
 		demoRecorder->WriteSetupText(myGameData->GetSetupText());
-		const netcode::RawPacket* ret = myGameData->Pack();
-		demoRecorder->SaveToDemo(ret->data, ret->length, GetDemoTime());
-		delete ret;
+		demoRecorder->SaveToDemo(myGameDataPacket->data, myGameDataPacket->length, GetDemoTime());
 	}
 
 	loopSleepTime = configHandler->GetInt("ServerSleepTime");
@@ -293,6 +296,13 @@ void CGameServer::PostLoad(int newServerFrameNum)
 	for (GameParticipant& p: players) {
 		p.lastFrameResponse = newServerFrameNum;
 	}
+
+	// a loaded save starts paused; any later and frames past the saved one are sent
+	isPaused = true;
+
+	// a regular pause message, so every client and its GamePaused callin agree
+	if (HasLocalClient())
+		Broadcast(CBaseNetProtocol::Get().SendPause(localClientNumber, true));
 }
 
 
@@ -2960,7 +2970,12 @@ unsigned CGameServer::BindConnection(
 	bool killExistingLink = false;
 	// bool reconnectAllowed = canReconnect;
 
-	if (clientVersion != refClientVersion.second) {
+	if (myGameDataPacket == nullptr) {
+		errMsg = spring::format(GameDataTooLarge, unsigned(myGameData->GetPackedSize()), unsigned(GameData::MAX_PACKED_SIZE));
+
+	if (!reconnect)
+		clientLink->Unmute();
+	} else if (clientVersion != refClientVersion.second) {
 		errMsg = "client version '" + clientVersion + "' mismatch, reference is '" + refClientVersion.second + "' set by '" + refClientVersion.first + "'";
 	} else {
 		struct ConnectionFlags {
@@ -3082,7 +3097,7 @@ unsigned CGameServer::BindConnection(
 	}
 
 	newPlayer.Connected(clientLink, isLocal);
-	newPlayer.SendData(std::shared_ptr<const RawPacket>(myGameData->Pack()));
+	newPlayer.SendData(myGameDataPacket);
 	newPlayer.SendData(CBaseNetProtocol::Get().SendSetPlayerNum((unsigned char)newPlayerNumber));
 
 	// after gamedata and playerNum, the player can start loading

@@ -97,6 +97,7 @@ list(APPEND FILES
 	bitmaps/icons/frame.png
 	bitmaps/icons/frame_slate_hilite_128x96.png
 	bitmaps/minimapbuttons.png
+	bitmaps/testsky.dds
 	LuaGadgets/callins.lua
 	LuaGadgets/Gadgets/share_levels.lua
 	LuaGadgets/Gadgets/cmd_nocost.lua

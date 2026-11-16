@@ -39,6 +39,8 @@ const char lua_ident[] =
 
 
 
+#define ispseudo(i)		((i) <= LUA_REGISTRYINDEX)
+
 #define api_checknelems(L, n)	api_check(L, (n) <= (L->top - L->base))
 
 #define api_checkvalidindex(L, i)	api_check(L, (i) != luaO_nilobject)
@@ -54,7 +56,7 @@ static TValue *index2adr (lua_State *L, int idx) {
     if (o >= L->top) return lua_cast(TValue *, luaO_nilobject);
     else return o;
   }
-  else if (idx > LUA_REGISTRYINDEX) {
+  else if (!ispseudo(idx)) {
     api_check(L, idx != 0 && -idx <= L->top - L->base);
     return L->top + idx;
   }
@@ -155,6 +157,13 @@ LUA_API lua_State *lua_newthread (lua_State *L) {
 /*
 ** basic stack manipulation
 */
+
+
+LUA_API int lua_absindex (lua_State *L, int idx) {
+  return (idx > 0 || ispseudo(idx))
+         ? idx
+         : cast_int(L->top - L->base) + idx + 1;
+}
 
 
 LUA_API int lua_gettop (lua_State *L) {

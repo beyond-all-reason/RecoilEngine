@@ -132,8 +132,7 @@ void CBeamLaser::UpdatePosAndMuzzlePos()
 
 		sweepFireState.SetSweepTempDir(newWeaponDir);
 	} else {
-		UpdateWeaponVectors();
-
+		// weapon vectors are current, see CUnit::UpdateWeaponVectors
 		if (weaponDef->sweepFire) {
 			// needed for first call to GetFireDir() when new sweep starts after inactivity
 			sweepFireState.SetSweepTempDir((weaponMuzzlePos - aimFromPos).SafeNormalize());
@@ -334,7 +333,8 @@ void CBeamLaser::FireInternal(float3 curDir)
 
 	uint32_t lastProjID = -1;
 	for (int tries = 0; tries < 5 && tryAgain; ++tries) {
-		float beamLength = TraceRay::TraceRay(curPos, curDir, maxLength - curLength, collisionFlags, owner, hitUnit, hitFeature, &hitColQuery);
+		// TraceRay returns -1 for a zero direction: a point-blank shot, the target border pos is our muzzle
+		float beamLength = std::max(TraceRay::TraceRay(curPos, curDir, maxLength - curLength, collisionFlags, owner, hitUnit, hitFeature, &hitColQuery), 0.0f);
 
 		if (hitUnit != nullptr && teamHandler.AlliedTeams(hitUnit->team, owner->team)) {
 			if (sweepFireState.IsSweepFiring() && !sweepFireState.DamageAllies()) {

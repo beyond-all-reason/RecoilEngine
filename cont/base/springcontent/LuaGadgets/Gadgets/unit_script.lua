@@ -123,6 +123,7 @@ local sp_SetUnitShieldState = Spring.SetUnitShieldState
 local sp_CallAsUnit  = Spring.UnitScript.CallAsUnit
 local sp_WaitForMove = Spring.UnitScript.WaitForMove
 local sp_WaitForTurn = Spring.UnitScript.WaitForTurn
+local sp_WaitForScale = Spring.UnitScript.WaitForScale
 local sp_SetPieceVisibility = Spring.UnitScript.SetPieceVisibility
 local sp_SetDeathScriptFinished = Spring.UnitScript.SetDeathScriptFinished
 

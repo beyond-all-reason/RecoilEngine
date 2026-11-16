@@ -34,6 +34,10 @@ struct entt::internal::entt_traits<QTPFS::entity> {
 };
 
 namespace QTPFS {
+    // Used to map external requests
+    extern entt::basic_registry<QTPFS::entity> externalRegistry;
+
+    // Internal to QTPFS
     extern entt::basic_registry<QTPFS::entity> registry;
     extern SystemGlobals::SystemGlobal<decltype(registry)> systemGlobals;
     extern SystemUtils::SystemUtils systemUtils;

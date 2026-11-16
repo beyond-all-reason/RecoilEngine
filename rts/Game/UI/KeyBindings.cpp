@@ -251,7 +251,6 @@ static const DefaultBinding defaultBindings[] = {
 	{ "Ctrl+b",    "select AllMap+_Builder_Idle+_ClearSelection_SelectOne+"                            },
 	{ "Ctrl+c",    "select AllMap+_ManualFireUnit+_ClearSelection_SelectOne+"                          },
 	{ "Ctrl+r",    "select AllMap+_Radar+_ClearSelection_SelectAll+"                                   },
-	{ "Ctrl+v",    "select AllMap+_Not_Builder_Not_Commander_InPrevSel_Not_InHotkeyGroup+_SelectAll+"  },
 	{ "Ctrl+w",    "select AllMap+_Not_Aircraft_Weapons+_ClearSelection_SelectAll+"                    },
 	{ "Ctrl+x",    "select AllMap+_InPrevSel_Not_InHotkeyGroup+_SelectAll+"                            },
 	{ "Ctrl+z",    "select AllMap+_InPrevSel+_ClearSelection_SelectAll+"                               }
@@ -546,8 +545,21 @@ const CKeyBindings::HotkeyList& CKeyBindings::GetHotkeys(const std::string& acti
 	return it->second;
 }
 
+void CKeyBindings::Clear()
+{
+	codeBindings.clear();
+	scanBindings.clear();
+	keyCodes.Reset();
+	scanCodes.Reset();
+	bindingsCount = 0;
+	buildHotkeyMap = true;
+
+}
+
 
 /******************************************************************************/
+
+static constexpr char escapedComma = '\x01';
 
 static bool ParseSingleChain(const std::string& keystr, CKeyChain* kc)
 {
@@ -562,6 +574,7 @@ static bool ParseSingleChain(const std::string& keystr, CKeyChain* kc)
 		char kcstr[256];
 		ss.getline(kcstr, 256, ',');
 		std::string kstr(kcstr);
+		std::replace(kstr.begin(), kstr.end(), escapedComma, ',');
 
 		if (!ks.Parse(kstr, false))
 			return false;
@@ -577,9 +590,9 @@ static bool ParseKeyChain(std::string keystr, CKeyChain* kc, const size_t pos = 
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// recursive function to allow "," as separator-char & as shortcut
-	// -> when parsing fails, this functions replaces one by one all "," by their hexcode
-	//    and tries then to reparse it
-	// -> i.e. ",,," will at the end parsed as "0x2c,0x2c"
+	// -> when parsing fails, this functions escapes one by one all "," so they are
+	//    kept as part of their key token and tries then to reparse it
+	// -> i.e. ",,," will at the end parsed as the chain "," then ","
 
 	const size_t cpos = keystr.rfind(',', pos);
 
@@ -595,7 +608,7 @@ static bool ParseKeyChain(std::string keystr, CKeyChain* kc, const size_t pos = 
 	if ((nextpos != std::string::npos) && ParseKeyChain(keystr, kc, nextpos))
 		return true;
 
-	keystr.replace(cpos, 1, IntToString(keyCodes.GetCode(","), "%#x"));
+	keystr[cpos] = escapedComma;
 	return ParseKeyChain(keystr, kc, cpos);
 }
 
@@ -962,13 +975,15 @@ bool CKeyBindings::ExecuteCommandInternal(const std::string& line)
 		if (!UnBindKeyset(words[1])) { return false; }
 	}
 	else if (command == "unbindall") {
-		codeBindings.clear();
-		scanBindings.clear();
-		keyCodes.Reset();
-		scanCodes.Reset();
-		bindingsCount = 0;
-		buildHotkeyMap = true;
-		Bind("enter", "chat"); // bare minimum
+		Clear();
+
+		Bind("enter", "chat"); // opens chat window
+		Bind("enter", "edit_return"); // confirms the input in chat window
+		Bind("escape", "edit_escape");
+		Bind("backspace", "edit_backspace");
+		Bind("delete", "edit_delete");
+		Bind("left", "edit_prev_char");
+		Bind("right", "edit_next_char");
 
 		if (debugEnabled)
 			LOG("[CKeyBindings::%s] line=%s", __func__, line.c_str());

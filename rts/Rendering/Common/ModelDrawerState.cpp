@@ -460,6 +460,17 @@ IModelDrawerState::IModelDrawerState()
 	modelShaders.fill(nullptr);
 
 	//dup with every instance, but ok
+	ConfigNotify("UnitTransparency", "");
+	configHandler->NotifyOnChange(this, {"UnitTransparency"});
+}
+
+IModelDrawerState::~IModelDrawerState()
+{
+	configHandler->RemoveObserver(this);
+}
+
+void IModelDrawerState::ConfigNotify(const std::string& key, const std::string& value)
+{
 	alphaValues.x = std::max(0.11f, std::min(1.0f, 1.0f - configHandler->GetFloat("UnitTransparency")));
 	alphaValues.y = std::min(1.0f, alphaValues.x + 0.1f);
 	alphaValues.z = std::min(1.0f, alphaValues.x + 0.2f);

@@ -273,6 +273,9 @@ bool FileSystem::IsPathOnSpinningDisk(const std::string& path)
 	}
 	CloseHandle(volHandle);
 	return result.IncursSeekPenalty;
+#elif defined(__APPLE__)
+	// Macs have shipped with SSDs for years, and the /sys lookup below does not exist here
+	return false;
 #else
 	struct stat info;
 
@@ -911,7 +914,7 @@ std::string FileSystem::GetExtensionLowerCase(const std::string& pathStr)
 }
 
 std::string FileSystem::GetNormalizedPath(const std::string& path) {
-	return Impl::StoreUTF8AsString(std::filesystem::path(ForwardSlashes(path)).lexically_normal().generic_u8string());
+	return Impl::StoreUTF8AsString(Recoil::filesystem::u8path(ForwardSlashes(path)).lexically_normal().generic_u8string());
 }
 
 bool FileSystem::CheckFile(const std::string& file)

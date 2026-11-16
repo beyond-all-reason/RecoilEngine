@@ -706,8 +706,9 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	bool tryTargetRotate  = false;
-	bool tryTargetHeading = false;
 	bool tryOwnerRotation = false; // if a weapon doesn't swivel to aim we've got to know about it to rotate the owner instead
+
+	CWeapon* rotateWeapon = nullptr;
 
 	float edgeFactor = 0.0f; // percent offset to target center
 
@@ -742,13 +743,14 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 		if (c.GetID() == CMD_MANUALFIRE && !w->weaponDef->manualfire)
 			continue;
 
-		tryTargetRotate  = w->TryTargetRotate(orderTgtInfo.unit, orderTgtInfo.isUserTarget, orderTgtInfo.isManualFire);
-		tryTargetHeading = w->TryTargetHeading(targetHeading, orderTgtInfo);
+		tryTargetRotate = w->TryTargetRotate(orderTgtInfo.unit, orderTgtInfo.isUserTarget, orderTgtInfo.isManualFire);
 
 		edgeFactor = math::fabs(w->weaponDef->targetBorder);
 
-		if (tryTargetRotate)
+		if (tryTargetRotate) {
+			rotateWeapon = w;
 			break;
+		}
 
 		tryOwnerRotation |= w->WantOwnerRotation();
 	}
@@ -761,7 +763,8 @@ void CMobileCAI::ExecuteObjectAttack(Command& c)
 		const bool canChaseTarget = (!owner->unitDef->stopToAttack) && (owner->moveState != MOVESTATE_HOLDPOS);
 		const bool targetBehind = (targetMidPosVec.dot(orderTarget->speed) < 0.0f);
 
-		if (canChaseTarget && tryTargetHeading && targetBehind && !owner->unitDef->IsHoveringAirUnit()) {
+		// TryTargetHeading has no side effects, so it is only run when its result is used
+		if (canChaseTarget && targetBehind && !owner->unitDef->IsHoveringAirUnit() && rotateWeapon->TryTargetHeading(targetHeading, orderTgtInfo)) {
 			SetGoal(owner->pos + (orderTarget->speed * 80), owner->pos, SQUARE_SIZE, orderTarget->speed.w * 1.1f);
 		} else {
 			StopMove();

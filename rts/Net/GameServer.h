@@ -204,6 +204,9 @@ private:
 	std::shared_ptr<const    GameData> myGameData;
 	std::shared_ptr<const  CGameSetup> myGameSetup;
 
+	// nullptr if myGameData does not fit into one packet
+	std::shared_ptr<const netcode::RawPacket> myGameDataPacket;
+
 
 	std::vector< std::pair<bool, GameSkirmishAI> > skirmishAIs;
 	std::vector<uint8_t> freeSkirmishAIs;

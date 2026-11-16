@@ -78,6 +78,7 @@
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/VerticalSync.h"
 #include "Rendering/Env/IGroundDecalDrawer.h"
+#include "Rendering/Env/DebugCubeMapTexture.h"
 #include "Rendering/Env/ISky.h"
 #include "Rendering/Env/IWater.h"
 #include "Rendering/Env/GrassDrawer.h"
@@ -1587,11 +1588,24 @@ public:
 
 class DebugCubeMapActionExecutor : public IUnsyncedActionExecutor {
 public:
-	DebugCubeMapActionExecutor() : IUnsyncedActionExecutor("DebugCubeMap", "Use debug cubemap texture instead of the sky") {
+	DebugCubeMapActionExecutor() : IUnsyncedActionExecutor("DebugCubeMap", "Use debug cubemap texture instead of the sky; \"file\" or \"colors\" picks the labelled testsky.dds or six plain colours and turns it on") {
 	}
 
 	bool Execute(const UnsyncedAction& action) const final {
-		globalRendering->drawDebugCubeMap = !globalRendering->drawDebugCubeMap;
+		const std::string arg = StringToLower(action.GetArgs());
+
+		if (arg.empty()) {
+			globalRendering->drawDebugCubeMap = !globalRendering->drawDebugCubeMap;
+		} else if (arg == "file" || arg == "colors") {
+			const bool useFile = debugCubeMapTexture.SetUseFile(arg == "file");
+			LOG("[DebugCubeMap] using %s", useFile ? "bitmaps/testsky.dds" : "plain colors");
+			globalRendering->drawDebugCubeMap = true;
+		} else {
+			LOG_L(L_WARNING, "[DebugCubeMap] unknown argument \"%s\", use \"file\" or \"colors\"", arg.c_str());
+			return false;
+		}
+
+		// the sky box borrows the texture id, so it is rebuilt after a source change as well
 		ISky::SetSky();
 		return true;
 	}

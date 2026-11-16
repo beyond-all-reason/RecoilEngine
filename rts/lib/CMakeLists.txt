@@ -45,6 +45,18 @@ endif()
 ADD_SUBDIRECTORY(lua)
 ADD_SUBDIRECTORY(luasocket)
 ADD_SUBDIRECTORY(minizip)
+
+# Monocypher is a submodule that ships no CMakeLists.txt of its own, so build it here.
+add_library(monocypher STATIC
+	monocypher/src/monocypher.c
+	monocypher/src/optional/monocypher-ed25519.c
+)
+target_include_directories(monocypher PUBLIC
+	"${CMAKE_CURRENT_SOURCE_DIR}/monocypher/src"
+	"${CMAKE_CURRENT_SOURCE_DIR}/monocypher/src/optional"
+)
+set_target_properties(monocypher PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 ADD_SUBDIRECTORY(nowide)
 ADD_SUBDIRECTORY(headlessStubs)
 if (ENABLE_STREFLOP)

@@ -31,6 +31,7 @@ class LuaUnsyncedRead {
 		static int GetFrameTimeOffset(lua_State* L);
 		static int GetGameSecondsInterpolated(lua_State* L);
 		static int GetLastUpdateSeconds(lua_State* L);
+		static int GetPresentedUpdateSeconds(lua_State* L);
 		static int GetVideoCapturingMode(lua_State* L);
 		static int GetPrevFrameSyncChecksum(lua_State* L);
 
@@ -137,6 +138,9 @@ class LuaUnsyncedRead {
 		static int GetTimer(lua_State* L);
 		static int GetTimerMicros(lua_State* L);
 		static int GetFrameTimer(lua_State* L);
+		static int GetLastSwapBuffersEnd(lua_State* L);
+		static int GetLastSwapBuffersDuration(lua_State* L);
+		static int GetDisplayTiming(lua_State* L);
 		static int DiffTimers(lua_State* L);
 
 		static int GetDrawSeconds(lua_State* L);

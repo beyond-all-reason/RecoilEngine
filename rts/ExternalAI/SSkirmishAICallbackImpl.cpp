@@ -2687,7 +2687,7 @@ EXPORT(bool) skirmishAiCallback_UnitDef_isAbleToSelfD(int skirmishAIId, int unit
 }
 
 EXPORT(int) skirmishAiCallback_UnitDef_getSelfDCountdown(int skirmishAIId, int unitDefId) {
-	return getUnitDefById(skirmishAIId, unitDefId)->selfDCountdown;
+	return static_cast<int>(getUnitDefById(skirmishAIId, unitDefId)->selfDCountdown);
 }
 
 EXPORT(bool) skirmishAiCallback_UnitDef_isAbleToSubmerge(int skirmishAIId, int unitDefId) {

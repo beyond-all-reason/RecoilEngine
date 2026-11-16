@@ -21,6 +21,7 @@
 #include "System/MathConstants.h"
 #include "UI/UnitTracker.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/VerticalSync.h"
 #include "System/SpringMath.h"
 #include "System/SafeUtil.h"
 #include "System/StringHash.h"
@@ -174,7 +175,7 @@ void CCameraHandler::Init()
 		SortRegisteredActions();
 	}
 
-	configHandler->NotifyOnChange(this, {"CamModeName", "WindowedEdgeMove", "FullscreenEdgeMove", "CamTimeFactor", "CamTimeExponent", "CamTransitionMode", "CamSpringHalflife"});
+	configHandler->NotifyOnChange(this, {"CamModeName", "WindowedEdgeMove", "FullscreenEdgeMove", "CamTimeFactor", "CamTimeExponent", "CamTransitionMode", "CamSpringHalflife", "UseDistToGroundForIcons"});
 
 	{
 		camTransState.startFOV  = 90.0f;
@@ -241,6 +242,12 @@ void CCameraHandler::ConfigNotify(const std::string& key, const std::string& val
 	RECOIL_DETAILED_TRACY_ZONE;
 	if (key == "CamModeName") {
 		SetCameraMode(configHandler->GetString("CamModeName"));
+	} else if (key == "UseDistToGroundForIcons") {
+		// every controller reads it in its constructor
+		for (CCameraController* cc: camControllers) {
+			if (cc != nullptr)
+				cc->SetUseDistToGroundForIcons(configHandler->GetFloat(key));
+		}
 	} else {
 		currCamTransitionNum = configHandler->GetInt("CamTransitionMode");
 
@@ -252,6 +259,7 @@ void CCameraHandler::ConfigNotify(const std::string& key, const std::string& val
 		camTransState.halflife = configHandler->GetFloat("CamSpringHalflife");
 
 		camTransState.lastTime = spring_gettime().toMilliSecsf();
+		camTransState.lastPresentedTime = globalRendering->presentedTime;
 	}
 }
 
@@ -327,7 +335,7 @@ void CCameraHandler::UpdateController(CCameraController& camCon, bool keyMove, b
 		float mouseWheelDist = 0.0f;
 		mouseWheelDist +=  float(camera->GetMovState()[CCamera::MOVE_STATE_UP]);
 		mouseWheelDist += -float(camera->GetMovState()[CCamera::MOVE_STATE_DWN]);
-		mouseWheelDist *= 0.2f * globalRendering->lastFrameTime;
+		mouseWheelDist *= 0.2f * camera->GetFrameTime();
 
 		if (mouseWheelDist == 0.0f)
 			return;
@@ -344,8 +352,11 @@ void CameraTransitionExpDecay(const CCameraController* currCam, CCameraHandler::
 	if (camera->useInterpolate == 0) { // old
 		camTransState.timeStart = globalRendering->lastFrameStart.toMilliSecsf();
 	}
-	if (camera->useInterpolate > 0) {
+	if (camera->useInterpolate == 1) {
 		camTransState.timeStart = globalRendering->lastSwapBuffersEnd.toMilliSecsf() + 1000.0f / std::fmax(globalRendering->FPS, 1.0f);
+	}
+	if (camera->useInterpolate == 2) {
+		camTransState.timeStart = float(globalRendering->presentedTime);
 	}
 	camTransState.timeEnd   = camTransState.timeStart + nsecs * 1000.0f;
 
@@ -401,16 +412,19 @@ void UpdateTransitionExpDecay(const CCameraController* currCam, CCameraHandler::
 	camTransState.tweenRot = currCam->GetRot();
 	camTransState.tweenFOV = currCam->GetFOV();
 
-	int vsync = configHandler->GetInt("VSync");
+	// adaptive vsync counts as on
+	const bool vsync = verticalSync->IsEnabled();
 	float transTime = globalRendering->lastFrameStart.toMilliSecsf();
 	float lastswaptime = globalRendering->lastSwapBuffersEnd.toMilliSecsf();
 	float drawFPS = std::fmax(globalRendering->FPS, 1.0f); // this is probably much better
 
 
-	if (vsync == 1 && camera->useInterpolate > 0) {
+	if (vsync && camera->useInterpolate == 1) {
 		transTime = lastswaptime;
 		transTime = globalRendering->lastSwapBuffersEnd.toMilliSecsf() + 1000.0f / drawFPS;
 	}
+	if (camera->useInterpolate == 2)
+		transTime = float(globalRendering->presentedTime);
 
 	float timeRatio = (camTransState.timeEnd - camTransState.timeStart != 0.0f) ?
 		std::fmax(0.0f, (camTransState.timeEnd - transTime) / (camTransState.timeEnd - camTransState.timeStart)) :
@@ -419,10 +433,10 @@ void UpdateTransitionExpDecay(const CCameraController* currCam, CCameraHandler::
 	float tweenFact = 1.0f - math::pow(timeRatio, camTransState.timeExponent);
 
 
-	if (vsync == 1 && camera->useInterpolate == 1) {
+	if (vsync && camera->useInterpolate == 1) {
 		tweenFact = 1.0f - timeRatio;
 	}
-	if (vsync == 0 && camera->useInterpolate == 1){
+	if (!vsync && camera->useInterpolate == 1){
 		tweenFact = 0.08f * (camTransState.timeEnd - camTransState.timeStart) / drawFPS ;// should be 0.25 at 120ms deltat and 60hz
 	}
 	/*
@@ -452,6 +466,22 @@ void UpdateTransitionExpDecay(const CCameraController* currCam, CCameraHandler::
 	camera->Update();
 }
 
+// a second update in the same draw frame (UnitTracker::SetCam) advances by 0
+static float TransitionDeltaTime(CCameraHandler::CamTransitionState& camTransState)
+{
+	const float currTime = spring_gettime().toMilliSecsf();
+	const float dt = currTime - camTransState.lastTime;
+	const float presentedDt = float(globalRendering->presentedTime - camTransState.lastPresentedTime);
+
+	camTransState.lastTime = currTime;
+	camTransState.lastPresentedTime = globalRendering->presentedTime;
+
+	if (camera->useInterpolate == 2)
+		return presentedDt;
+
+	return dt;
+}
+
 void UpdateTransitionLerpSmoothed(const CCameraController* currCam, CCameraHandler::CamTransitionState& camTransState)
 {
 	float3 currentPos = camera->GetPos();
@@ -463,14 +493,12 @@ void UpdateTransitionLerpSmoothed(const CCameraController* currCam, CCameraHandl
 	float targetFov = currCam->GetFOV();
 	float3 goalRot{};
 
-	float currTime = spring_gettime().toMilliSecsf();
-	float dt = currTime - camTransState.lastTime;
-	camTransState.lastTime = currTime;
+	const float dt = TransitionDeltaTime(camTransState);
 
 	float decay = camTransState.halflife / 1000.0f;
-	expDecay(currentPos, targetPos, decay, dt);
-	expDecay(currentRot, targetRot, decay, dt);
-	expDecay(currentFov, targetFov, decay, dt);
+	currentPos = expDecay(currentPos, targetPos, decay, dt);
+	currentRot = expDecay(currentRot, targetRot, decay, dt);
+	currentFov = expDecay(currentFov, targetFov, decay, dt);
 	camera->SetPos(currentPos);
 	camera->SetRot(currentRot);
 	camera->SetVFOV(currentFov);
@@ -487,9 +515,7 @@ void UpdateTransitionTimedSpringDampened(const CCameraController* currCam, CCame
 	float3 targetRot = currCam->GetRot();
 	float targetFov = currCam->GetFOV();
 
-	float currTime = spring_gettime().toMilliSecsf();
-	float dt = currTime - camTransState.lastTime;
-	camTransState.lastTime = currTime;
+	const float dt = TransitionDeltaTime(camTransState);
 	camTransState.timeEnd -= dt;
 	camTransState.timeEnd = std::max(camTransState.timeEnd, 0.0f);
 	camTransState.timeStart -= dt;
@@ -523,9 +549,7 @@ void UpdateTransitionSpringDampened(const CCameraController* currCam, CCameraHan
 	float3 targetRot = currCam->GetRot();
 	float targetFov = currCam->GetFOV();
 
-	float currTime = spring_gettime().toMilliSecsf();
-	float dt = currTime - camTransState.lastTime;
-	camTransState.lastTime = currTime;
+	const float dt = TransitionDeltaTime(camTransState);
 
 	if((currentPos.equals(targetPos)	&& currentRot.equals(targetRot)	&& currentFov == targetFov) || dt <= 0) {
 		return;

@@ -379,6 +379,13 @@ void CUnit::PostInit(const CUnit* builder)
 		}
 
 		commandAI->GiveCommand(Command(CMD_FIRE_STATE, 0, fireState));
+	} else if (unitDef->fireState > FIRESTATE_NONE) {
+		fireState = unitDef->fireState;
+
+		/* In theory giving the unit a command (like above) could be nice
+		 * for consistency, but that would introduce a special case since
+		 * this command doesn't otherwise do anything, and Lua knows what
+		 * the firestate of this unit is anyway via the unit def. */
 	}
 
 	UpdateRenderParams();
@@ -671,13 +678,66 @@ void CUnit::Update()
 	RECOIL_DETAILED_TRACY_ZONE;
 	ASSERT_SYNCED(pos);
 
-	UpdatePhysicalState(0.1f);
+	if unlikely(selfDTargetFrame > 0 && !isDead) {
+		// a stunned unit's countdown waits
+		if (IsStunned()) {
+			++selfDTargetFrame;
+		} else if (gs->frameNum >= selfDTargetFrame) {
+			FinishSelfD();
+		}
+	}
+}
+
+void CUnit::FinishSelfD()
+{
+	// avoid unfinished buildings making an explosion
+	KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
+}
+
+void CUnit::StartSelfD(float seconds)
+{
+	assert(seconds >= 0.0f);
+	const int frames = static_cast<int>(math::ceil(seconds * GAME_SPEED));
+
+	// 0 means inactive, which only frame 0 could produce
+	selfDTargetFrame = std::max(1, gs->frameNum + frames);
+	eventHandler.UnitSelfDestructStarted(this, frames * INV_GAME_SPEED);
+}
+
+void CUnit::CancelSelfD()
+{
+	if (selfDTargetFrame <= 0)
+		return;
+
+	const float secondsLeft = *GetSelfDSecondsLeft();
+
+	selfDTargetFrame = 0;
+	eventHandler.UnitSelfDestructCancelled(this, secondsLeft);
+}
+
+std::optional<float> CUnit::GetSelfDSecondsLeft() const
+{
+	if (selfDTargetFrame <= 0)
+		return std::nullopt;
+
+	return std::max(0, selfDTargetFrame - gs->frameNum) * INV_GAME_SPEED;
+}
+
+unsigned int CUnit::UpdateState()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const unsigned int prevState = physicalState;
+
+	// no events here, CUnitHandler::UpdateUnits sends them in unit order
+	CSolidObject::UpdatePhysicalState(0.1f);
 	UpdatePosErrorParams(true, false);
 
+	const unsigned int eventBits = (prevState ^ physicalState) & (PSTATE_BIT_INAIR | PSTATE_BIT_INWATER | PSTATE_BIT_UNDERWATER);
+
 	if (beingBuilt)
-		return;
+		return eventBits;
 	if (isDead)
-		return;
+		return eventBits;
 
 	recentDamage *= 0.9f;
 	flankingBonusMobility += flankingBonusMobilityAdd;
@@ -688,15 +748,16 @@ void CUnit::Update()
 			++(w->reloadStatus);
 		}
 
-		return;
+		return eventBits;
 	}
 
 	restTime += 1;
+	return eventBits;
 }
 
 void CUnit::UpdateWeaponVectors()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (!CanUpdateWeapons())
 		return;
@@ -709,7 +770,7 @@ void CUnit::UpdateWeaponVectors()
 
 void CUnit::UpdateWeapons()
 {
-	ZoneScoped;
+	RECOIL_DETAILED_TRACY_ZONE;
 
 	if (!CanUpdateWeapons())
 			return;
@@ -1019,17 +1080,6 @@ void CUnit::SlowUpdate()
 
 		SlowUpdateCloak(true);
 		return;
-	}
-
-	if (selfDCountdown > 0) {
-		if ((selfDCountdown -= 1) == 0) {
-			// avoid unfinished buildings making an explosion
-			KillUnit(nullptr, !beingBuilt, beingBuilt, -CSolidObject::DAMAGE_SELFD_EXPIRED);
-			return;
-		}
-
-		if ((selfDCountdown & 1) && (team == gu->myTeam) && !gu->spectating)
-			LOG("%s: self-destruct in %is", unitDef->humanName.c_str(), (selfDCountdown >> 1) + 1);
 	}
 
 	if (beingBuilt) {
@@ -1844,11 +1894,18 @@ void CUnit::DependentDied(CObject* o)
 void CUnit::UpdatePhysicalState(float eps)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	const bool inAir      = IsInAir();
-	const bool inWater    = IsInWater();
-	const bool underWater = IsUnderWater();
+	const unsigned int prevState = physicalState;
 
 	CSolidObject::UpdatePhysicalState(eps);
+	SendPhysicalStateEvents(prevState);
+}
+
+void CUnit::SendPhysicalStateEvents(unsigned int prevState)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	const bool inAir      = ((prevState & PSTATE_BIT_INAIR     ) != 0);
+	const bool inWater    = ((prevState & PSTATE_BIT_INWATER   ) != 0);
+	const bool underWater = ((prevState & PSTATE_BIT_UNDERWATER) != 0);
 
 	if (IsInAir() != inAir) {
 		if (IsInAir()) {
@@ -1926,13 +1983,9 @@ void CUnit::CalculateTerrainType()
 }
 
 
-bool CUnit::SetGroup(CGroup* newGroup, bool fromFactory, bool autoSelect)
+bool CUnit::SetGroup(CGroup* newGroup, bool autoSelect)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	// factory is not necessarily selected
-	if (fromFactory && !selectedUnitsHandler.AutoAddBuiltUnitsToFactoryGroup())
-		return false;
-
 	CGroup* group = GetGroup();
 
 	if (group != nullptr)
@@ -1953,8 +2006,7 @@ bool CUnit::SetGroup(CGroup* newGroup, bool fromFactory, bool autoSelect)
 		return true;
 
 	// add unit to the set of selected units iff its new group is already selected
-	// and (user wants the unit to be auto-selected or the unit is not newly built)
-	if (selectedUnitsHandler.IsGroupSelected(newGroup->id) && (selectedUnitsHandler.AutoAddBuiltUnitsToSelectedGroup() || !fromFactory))
+	if (selectedUnitsHandler.IsGroupSelected(newGroup->id))
 		selectedUnitsHandler.AddUnit(this);
 
 	return true;
@@ -2969,7 +3021,7 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(lastTerrainType),
 	CR_MEMBER(curTerrainType),
 
-	CR_MEMBER(selfDCountdown),
+	CR_MEMBER(selfDTargetFrame),
 
 	CR_MEMBER(definedIconName),
 	CR_MEMBER_UN(currentIconIndex),
