@@ -25,6 +25,10 @@ namespace GL {
 struct GhostTarget {
 	CR_DECLARE_STRUCT(GhostTarget)
 	float3 aimPos;
+	CMatrix44f modelTransform;
+	float4 teamColor;
+	std::string modelName;
+	int unitID = -1;
 	CMatrix44f selectionTransform;
 	CollisionVolume selectionVolume;
 	bool selectable = false;

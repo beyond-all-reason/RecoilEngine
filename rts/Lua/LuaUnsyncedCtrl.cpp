@@ -2210,7 +2210,7 @@ int LuaUnsyncedCtrl::SetGhostColor(lua_State* L)
 
 /***
  * Highlight the local player's remembered ghost at the aimpoint returned by TraceScreenRay.
- * Adds a moving height-based shimmer using the highlight RGB color; alpha is unchanged.
+ * Selects the highlight color state; DrawGhost can provide game-defined shader effects.
  * Refresh each Update; the highlight expires after a rendered frame without a refresh.
  * Call without arguments to clear. Does not reveal a hidden unit or change targeting.
  * @function Spring.SetGhostHighlight

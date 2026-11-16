@@ -30,10 +30,11 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", action="store_true")
     parser.add_argument("--colors", action="store_true", help="exercise Lua RGBA overrides and reset")
+    parser.add_argument("--lua-render", action="store_true", help="exercise BAR DrawGhost and its shared shimmer shader")
     parser.add_argument("--glsl", action="store_true", help="force the legacy GLSL model renderer")
     args = parser.parse_args()
-    if args.colors and args.baseline:
-        parser.error("--colors requires the candidate engine")
+    if (args.colors or args.lua_render) and args.baseline:
+        parser.error("--colors and --lua-render require the candidate engine")
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     exe, bar, assets, out = (p.resolve() for p in (args.engine, args.bar, args.assets, args.output))
     out.mkdir(parents=True, exist_ok=True)
@@ -62,7 +63,7 @@ def main():
         config.write_text(
             "LuaUI = 1\nSound = 0\nWorkerThreadCount = 4\nPathingThreadCount = 1\n"
             "GhostedBuildings = 1\nUnitIconsAsUI = 1\nFullscreen = 0\nXResolutionWindowed = 1280\nYResolutionWindowed = 720\nVSync = 0\n"
-            f"GhostTestColors = {int(args.colors)}\nForceDisableGL4 = {int(args.glsl)}\n"
+            f"GhostTestLuaRender = {int(args.lua_render)}\nGhostTestColors = {int(args.colors)}\nForceDisableGL4 = {int(args.glsl)}\n"
             f"GhostTestCandidate = {int(candidate)}\nAutohostIP = 127.0.0.1\nAutohostPort = {sock.getsockname()[1]}\n"
         )
         command = [str(exe), "--isolation", f"--isolation-dir={data}", f"--write-dir={data}", f"--config={config}", "--only-local", str(out / "input.txt")]
@@ -95,6 +96,9 @@ def main():
             if args.colors:
                 assert "GHOST_TEST PASS ghost color API validation" in content
                 assert "GHOST_TEST PASS ghost colors reset" in content
+            if args.lua_render:
+                for marker in ("live", "radar", "dead", "fallback"):
+                    assert f"GHOST_TEST PASS Lua ghost renderer {marker}" in content, marker
             expected = 280 if candidate else 200
             for event in ("attack_y", "settarget_y"):
                 assert f"GHOST_TEST {event} {expected}" in content, event

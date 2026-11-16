@@ -53,6 +53,10 @@ static Transform MakeGhostWorldTransform(const float3& pos, int facing)
 CR_BIND(GhostTarget, )
 CR_REG_METADATA(GhostTarget, (
 	CR_MEMBER(aimPos),
+	CR_MEMBER(modelTransform),
+	CR_MEMBER(teamColor),
+	CR_MEMBER(modelName),
+	CR_MEMBER(unitID),
 	CR_MEMBER(selectionTransform),
 	CR_MEMBER(selectionVolume),
 	CR_MEMBER(selectable)
@@ -760,6 +764,11 @@ void CUnitDrawerData::UnitLeftLos(const CUnit* unit, int allyTeam)
 		if (!alreadyGhosted) {
 			GhostTarget target;
 			target.aimPos = u->aimPos;
+			target.unitID = u->id;
+			target.modelName = GetUnitModel(u)->name;
+			target.modelTransform.Translate(u->pos);
+			target.modelTransform.RotateY(-u->buildFacing * math::HALFPI);
+			target.teamColor = CModelDrawerHelper::GetTeamColor(u->team, 1.0f);
 			target.selectionTransform = u->GetTransformMatrix(false);
 			target.selectionTransform.Translate(u->relMidPos);
 			target.selectionTransform.Translate(u->selectionVolume.GetOffsets());

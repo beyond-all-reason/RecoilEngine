@@ -62,8 +62,6 @@ uniform int shadingMode = 0; //NORMAL_SHADING
 uniform vec4 alphaCtrl = vec4(0.0, 0.0, 0.0, 1.0); //always pass
 uniform vec4 colorMult = vec4(1.0);
 uniform vec4 nanoColor = vec4(0.0);
-// x: hover brightness, y: animation phase. Neutral outside ghost draws.
-uniform vec2 ghostHighlight = vec2(0.0);
 
 bool AlphaDiscard(float a) {
 	float alphaTestGT = float(a > alphaCtrl.x) * alphaCtrl.y;
@@ -146,9 +144,5 @@ void main(void)
 		fragColor.rgb = mix(fragColor.rgb ,  nanoColor.rgb, nanoColor.a * int(shadingMode == 0));
 		fragColor.a   = alpha;
 		fragColor *= colorMult;
-		if (ghostHighlight.x > 0.0) {
-			float shimmer = fract(worldPos.y * (1.0 / 30.0) + ghostHighlight.y);
-			fragColor.rgb += colorMult.rgb * shimmer * ghostHighlight.x;
-		}
 	#endif
 }

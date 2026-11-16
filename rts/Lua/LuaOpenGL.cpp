@@ -23,6 +23,7 @@
 #include <fmt/format.h>
 
 #include "LuaOpenGL.h"
+#include "Rendering/Units/GhostDrawInfo.h"
 
 #include "LuaInclude.h"
 #include "LuaContextData.h"
@@ -443,6 +444,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 
 	REGISTER_LUA_CFUNC(Unit);
 	REGISTER_LUA_CFUNC(UnitRaw);
+	REGISTER_LUA_CFUNC(GhostRaw);
 	REGISTER_LUA_CFUNC(UnitTextures);
 	REGISTER_LUA_CFUNC(UnitShape);
 	REGISTER_LUA_CFUNC(UnitShapeTextures);
@@ -1767,6 +1769,39 @@ static void GLObjectShapeTextures(lua_State* L, const SolidObjectDef* def)
 	}
 }
 
+
+namespace {
+	const GhostDrawInfo* ghostDrawContext = nullptr;
+	lua_State* ghostDrawLua = nullptr;
+}
+
+void LuaOpenGL::SetGhostDrawContext(lua_State* L, const GhostDrawInfo* info)
+{
+	ghostDrawContext = info;
+	ghostDrawLua = info != nullptr ? L : nullptr;
+}
+
+/*** Draw the current observer's stored ghost with the active Lua shader.
+ * Only valid inside DrawGhost, including after unobserved destruction. No unit lookup.
+ * Uses compatibility attributes gl_Vertex, gl_Normal, gl_MultiTexCoord0 in both renderers.
+ * Model-view includes the stored world transform and static piece bind-pose transforms.
+ * Model textures are bound to units 0 (diffuse/team mask) and 1 (shading/alpha mask).
+ * The shader must apply the masks, lighting, tint and alpha itself. No engine shader is bound.
+ * @function gl.GhostRaw
+ */
+int LuaOpenGL::GhostRaw(lua_State* L)
+{
+	if (ghostDrawLua != L || ghostDrawContext == nullptr || !IsDrawingEnabled(L))
+		return luaL_error(L, "gl.GhostRaw is only valid inside DrawGhost");
+	const auto& info = *ghostDrawContext;
+	CModelDrawerHelper::BindModelTypeTexture(info.model->type, info.model->textureType);
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glMultMatrixf(info.transform);
+	info.model->DrawStatic();
+	glPopMatrix();
+	return 0;
+}
 
 int LuaOpenGL::UnitCommon(lua_State* L, bool applyTransform, bool callDrawUnit)
 {

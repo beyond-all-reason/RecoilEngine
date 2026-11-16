@@ -12,6 +12,40 @@ local function check(ok, message)
 	Spring.Echo("GHOST_TEST " .. (ok and "PASS " or "FAIL ") .. message)
 	failed = failed or not ok
 end
+local ghostRenderer
+local luaRender = Spring.GetConfigInt("GhostTestLuaRender", 0) == 1
+if luaRender then
+	ghostRenderer = {}
+	local handler = { RemoveWidget = function() error("BAR ghost shader unavailable") end }
+	VFS.Include("luaui/Widgets/gfx_ghost_hover.lua", setmetatable({ widget = ghostRenderer, widgetHandler = handler }, { __index = _G }))
+	ghostRenderer:Initialize()
+	check(not pcall(gl.GhostRaw), "GhostRaw rejects calls outside DrawGhost")
+end
+
+function DrawGhost(info)
+	if not luaRender then return false end
+	local frame = math.floor(Spring.GetGameFrame() / 6)
+	local phase = frame >= 200 and "dead" or frame >= 160 and "radar" or "live"
+	if info.state == "ghostHighlight" or info.state == "radarGhostHighlight" then
+		if not seen["render_" .. phase] then
+			seen["render_" .. phase] = true
+			check(info.unitID == Spring.GetGameRulesParam("ghost_test_target"), "Lua ghost historical unit ID " .. phase)
+			check(info.aimPos[1] == 2060 and info.aimPos[2] == 280 and info.aimPos[3] == 2056, "Lua ghost frozen aimpoint " .. phase)
+			check(#info.transform == 16 and #info.color == 4 and #info.teamColor == 4, "Lua ghost render fields " .. phase)
+			check(info.transform[13] == 2048 and info.transform[15] == 2048, "Lua ghost stored transform " .. phase)
+			check(ghostRenderer:DrawGhost(info) == true, "Lua ghost renderer " .. phase)
+			return true
+		end
+		return ghostRenderer:DrawGhost(info)
+	end
+	local handled = ghostRenderer:DrawGhost(info)
+	if not seen.render_fallback then
+		seen.render_fallback = true
+		check(handled == false, "Lua ghost renderer fallback")
+	end
+	return handled
+end
+
 function Update()
 	local frame = math.floor(Spring.GetGameFrame() / 6)
 	if colorTest then colorTest:Update() end

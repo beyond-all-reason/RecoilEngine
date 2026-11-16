@@ -309,6 +309,8 @@ class CEventHandler
 		void DrawInMiniMap();
 		void DrawInMiniMapBackground();
 
+		bool DrawGhost(const GhostDrawInfo& info);
+		bool HasDrawGhost() const { return !listDrawGhost.empty(); }
 		bool DrawUnit(const CUnit* unit);
 		bool DrawFeature(const CFeature* feature);
 		bool DrawShield(const CUnit* unit, const CWeapon* weapon);

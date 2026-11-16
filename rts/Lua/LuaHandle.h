@@ -262,6 +262,7 @@ class CLuaHandle : public CEventClient
 
 		void SunChanged() override;
 
+		bool DrawGhost(const GhostDrawInfo& info) override;
 		void DrawGenesis() override;
 		void DrawWorld() override;
 		void DrawWorldPreUnit() override;

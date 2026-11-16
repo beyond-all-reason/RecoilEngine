@@ -61,4 +61,19 @@ Radar hover must shimmer too, while normal ghosts and nearby visible units must
 not inherit it. The effect changes RGB brightness only; Lua's alpha is retained.
 The height/time formula matches BAR's CUS hover effect (30 world units per band,
 2/40 cycles per interpolated simulation frame), with the configured ghost highlight
-RGB supplying its color. Run with `--colors` and with `--colors --glsl`.
+RGB supplying its color. The effect now belongs to BAR's shared shader include,
+not to the engine shaders. Run with `--colors --lua-render` and with
+`--colors --lua-render --glsl` to load BAR's actual Ghost Hover widget in the fixture.
+Without `--lua-render`, highlighted ghosts retain the static engine tint.
+
+The Lua-render fixture checks callback-scoped access, historical unit ID and frozen
+XYZ after hidden aimpoint changes and destruction, transform/color fields, and the
+normal-ghost fallback. Visually compare the live, radar and dead highlight frames
+in both renderers; the adjacent ordinary models must keep their original shading.
+
+Full-game manual procedure: enable Ghost Hover, issue Attack/Set Target and hover
+over the three recorded contact cases (LoS, radar only, ghost only). Check that the
+visible-unit CUS shader and ghost shader animate the same vertical band pattern.
+Disable Ghost Hover: the engine must still draw normal and highlighted ghosts with
+the configured static colors. Re-enable/reload LuaUI and repeat, including after
+an unobserved destruction. Check reflection/refraction views when available.

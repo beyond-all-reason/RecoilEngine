@@ -1,6 +1,7 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "LuaHandle.h"
+#include "Rendering/Units/GhostDrawInfo.h"
 #include "lua_privileges.h"
 
 #include "LuaGaia.h"
@@ -2896,6 +2897,54 @@ void CLuaHandle::RunDrawCallIn(const LuaHashString& hs)
 	RunCallIn(L, hs, 0, 0);
 
 	LuaOpenGL::SetDrawingEnabled(L, false);
+}
+
+/*** Replace the rendering of an observer's stored ghost. Return true only when drawn.
+ * @function Callins:DrawGhost
+ * @param info table Snapshot fields: unitID (historical, may be reused), transform (16 column-major numbers),
+ * aimPos (XYZ), teamColor (RGBA), color (RGBA), state (ghost/ghostHighlight/radarGhost/radarGhostHighlight), drawPass.
+ * No field reports whether a hidden unit is still alive. Called for the local viewing allyteam only.
+ * @return boolean suppressEngineDraw
+ */
+bool CLuaHandle::DrawGhost(const GhostDrawInfo& info)
+{
+	if (GetSynced() || !CanReadAllyTeam(info.allyTeam))
+		return false;
+	LUA_CALL_IN_CHECK(L, false);
+	luaL_checkstack(L, 24, __func__);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return false;
+	lua_createtable(L, 0, 7);
+	lua_pushnumber(L, info.unitID);
+	lua_setfield(L, -2, "unitID");
+	lua_pushnumber(L, info.drawPass);
+	lua_setfield(L, -2, "drawPass");
+	lua_pushstring(L, info.state);
+	lua_setfield(L, -2, "state");
+	const auto array = [&](const char* key, const float* values, int count) {
+		lua_createtable(L, count, 0);
+		for (int i = 0; i < count; ++i) {
+			lua_pushnumber(L, values[i]);
+			lua_rawseti(L, -2, i + 1);
+		}
+		lua_setfield(L, -2, key);
+	};
+	array("transform", info.transform, 16);
+	array("aimPos", &info.aimPos.x, 3);
+	array("teamColor", &info.teamColor.x, 4);
+	array("color", &info.color.x, 4);
+	const bool oldDrawState = LuaOpenGL::IsDrawingEnabled(L);
+	LuaOpenGL::SetDrawingEnabled(L, true);
+	LuaOpenGL::SetGhostDrawContext(L, &info);
+	const bool success = RunCallIn(L, cmdStr, 1, 1);
+	LuaOpenGL::SetGhostDrawContext(L, nullptr);
+	LuaOpenGL::SetDrawingEnabled(L, oldDrawState);
+	if (!success)
+		return false;
+	const bool handled = lua_isboolean(L, -1) && lua_toboolean(L, -1);
+	lua_pop(L, 1);
+	return handled;
 }
 
 #define DRAW_CALLIN(name)                     \
