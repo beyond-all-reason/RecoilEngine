@@ -1689,10 +1689,12 @@ void CCommandAI::FinishCommand()
 	// avoid infinite loops: allow as many re-entries per frame as there were
 	// orders queued when the first one finished, so a run of orders that end
 	// as soon as they start (dead or crashing targets) is worked through in
-	// one update, while repeat orders re-pushing themselves still terminate
+	// one update, while repeat orders re-pushing themselves still terminate.
+	// Also cap recursion: a large queue must not exhaust the native stack.
 	if (lastFinishCommand != gs->frameNum) {
 		lastFinishCommand = gs->frameNum;
-		finishCommandBudget = static_cast<int>(commandQue.size());
+		constexpr size_t MAX_FINISH_COMMAND_REENTRIES = 64;
+		finishCommandBudget = static_cast<int>(std::min(commandQue.size(), MAX_FINISH_COMMAND_REENTRIES));
 	} else if (finishCommandBudget <= 0) {
 		return;
 	} else {
