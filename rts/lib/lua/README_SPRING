@@ -64,8 +64,8 @@ Lua-5.1.4 source code modifications:
   13.
       ported the Lua 5.4.3 table assignment rules:
 	  - inserting a nil value never builds a hash node nor inserts a nil key
-	  - __newindex searches for the key before being called
-	  
+	  - inserting searches for the key before calling __newindex
+ 
 	  Added ltable.cpp::luaH_setnil, used in lapi.cpp::lua_rawset, lua_rawseti.
 
 	  lvm.cpp::luaV_settable instead checks the key before checking __newindex,
