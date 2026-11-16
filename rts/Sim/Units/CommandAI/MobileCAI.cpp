@@ -454,6 +454,15 @@ void CMobileCAI::ExecuteLoadOnto(Command& c) {
 		return;
 	}
 
+	// transport no longer has the order to load <owner>, e.g. after a Stop
+	const auto pred = [&](const Command& tc) { return (tc.GetID() == CMD_LOAD_UNITS && tc.GetNumParams() == 1 && int(tc.GetParam(0)) == owner->id); };
+	const auto& transportQue = transport->commandAI->commandQue;
+
+	if (std::find_if(transportQue.begin(), transportQue.end(), pred) == transportQue.end()) {
+		StopMoveAndFinishCommand();
+		return;
+	}
+
 	// owner not loaded yet, stand still or move closer
 	if ((owner->pos - transport->pos).SqLength2D() < cancelDistance) {
 		StopMove();
