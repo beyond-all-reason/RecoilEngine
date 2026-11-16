@@ -919,7 +919,8 @@ void CBuilderCAI::ExecuteGuard(Command& c)
 		if (pushRepairCommand) {
 			StopSlowGuard();
 
-			Command nc(CMD_REPAIR, c.GetOpts(), b->curBuild->id);
+			// Guard-generated repairs must not be copied into a repeating queue.
+			Command nc(CMD_REPAIR, c.GetOpts() | INTERNAL_ORDER, b->curBuild->id);
 
 			commandQue.push_front(nc);
 			inCommand = CMD_STOP;
@@ -938,7 +939,7 @@ void CBuilderCAI::ExecuteGuard(Command& c)
 		if (pushRepairCommand) {
 			StopSlowGuard();
 
-			commandQue.push_front(Command(CMD_REPAIR, c.GetOpts(), fac->curBuild->id));
+			commandQue.push_front(Command(CMD_REPAIR, c.GetOpts() | INTERNAL_ORDER, fac->curBuild->id));
 			inCommand = CMD_STOP;
 			// SlowUpdate();
 			return;
