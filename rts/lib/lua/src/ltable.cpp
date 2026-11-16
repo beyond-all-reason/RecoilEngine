@@ -397,7 +397,7 @@ static Node *getfreepos (Table *t) {
 ** put new key in its main position; otherwise (colliding node is in its main 
 ** position), new key goes to an empty position. 
 */
-static TValue *newkey (lua_State *L, Table *t, const TValue *key) {
+TValue *luaH_newkey (lua_State *L, Table *t, const TValue *key) {
   Node *mp = mainposition(t, key);
   if (!ttisnil(gval(mp)) || mp == dummynode) {
     Node *othern;
@@ -501,7 +501,7 @@ TValue *luaH_set (lua_State *L, Table *t, const TValue *key) {
     if (ttisnil(key)) luaG_runerror(L, "table index is nil");
     else if (ttisnumber(key) && luai_numisnan(nvalue(key)))
       luaG_runerror(L, "table index is NaN");
-    return newkey(L, t, key);
+    return luaH_newkey(L, t, key);
   }
 }
 
@@ -528,7 +528,7 @@ TValue *luaH_setnum (lua_State *L, Table *t, int key) {
   else {
     TValue k;
     setnvalue(&k, cast_num(key));
-    return newkey(L, t, &k);
+    return luaH_newkey(L, t, &k);
   }
 }
 
@@ -540,7 +540,7 @@ TValue *luaH_setstr (lua_State *L, Table *t, TString *key) {
   else {
     TValue k;
     setsvalue(L, &k, key);
-    return newkey(L, t, &k);
+    return luaH_newkey(L, t, &k);
   }
 }
 

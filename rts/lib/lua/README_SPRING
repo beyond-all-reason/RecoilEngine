@@ -69,4 +69,7 @@ Lua-5.1.4 source code modifications:
 	  Added ltable.cpp::luaH_setnil, used in lapi.cpp::lua_rawset, lua_rawseti.
 
 	  lvm.cpp::luaV_settable instead checks the key before checking __newindex,
-	  and inserts only non-nil values.
+	  and inserts only non-nil values (rather than using luaH_setnil).
+
+	  Exported ltable.cpp::newkey as luaH_newkey, as in Lua 5.2, so that
+	  lvm.cpp::luaV_settable inserts without searching for the key again.
