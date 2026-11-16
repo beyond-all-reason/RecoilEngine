@@ -4,6 +4,7 @@
 
 #include "Camera.h"
 #include "CameraHandler.h"
+#include "CameraProjection.h"
 #include "UI/MouseHandler.h"
 #include "Map/Ground.h"
 #include "Map/ReadMap.h"
@@ -583,14 +584,7 @@ float3 CCamera::CalcViewPortCoordinates(const float3& objPos) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// same as gluProject()
-	const float4 projPos = viewProjectionMatrix * float4(objPos, 1.0f);
-	const float3 clipPos = float3(projPos) / projPos.w;
-
-	float3 vpPos;
-	vpPos.x = viewport[2] * (clipPos.x + 1.0f) * 0.5f;
-	vpPos.y = viewport[3] * (clipPos.y + 1.0f) * 0.5f;
-	vpPos.z =               (clipPos.z + 1.0f) * 0.5f;
-	return vpPos;
+	return CameraProjection::ClipToViewport(viewProjectionMatrix * float4(objPos, 1.0f), viewport);
 }
 
 

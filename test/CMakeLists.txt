@@ -196,6 +196,26 @@ endif()
 	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DBUILDING_AI")
 
 ################################################################################
+### CameraProjection
+	set(test_name CameraProjection)
+	set(test_src
+			"${CMAKE_CURRENT_SOURCE_DIR}/engine/Game/testCameraProjection.cpp"
+			"${ENGINE_SOURCE_DIR}/System/float3.cpp"
+			"${ENGINE_SOURCE_DIR}/System/float4.cpp"
+			"${ENGINE_SOURCE_DIR}/System/Misc/SpringTime.cpp"
+			"${ENGINE_SOURCE_DIR}/System/TimeProfiler.cpp"
+			${sources_engine_System_Threading}
+			${test_Common_sources}
+		)
+
+	set(test_libs
+			streflop
+			${WINMM_LIBRARY}
+		)
+
+	add_spring_test(${test_name} "${test_src}" "${test_libs}" "-DNOT_USING_CREG -DBUILDING_AI")
+
+################################################################################
 ### Matrix44f
 	set(test_name Matrix44f)
 	set(test_src
