@@ -10,10 +10,9 @@ permissions:
   id-token: write
 env:
   RECOIL_LUA_LIBRARY_DIR: "rts/Lua/library"
-  LUA_DOC_EXTRACTOR_SOURCE_REF: "https://github.com/${{ github.repository }}/blob/${{ github.sha }}"
   HUGO_VERSION: "0.147.9"
-  LUA_DOC_EXTRACTOR_VERSION: "3"
-  EMMYLUA_DOC_CLI_VERSION: "0.8.2"
+  LUA_DOC_EXTRACTOR_VERSION: "4.2.1"
+  EMMYLUA_DOC_CLI_VERSION: "0.25.1"
   JQ_VERSION: "1.8.0"
   SEVENZIP_VERSION: "24.09"
   RUBY_VERSION: "3.3"
@@ -36,11 +35,11 @@ jobs:
       - name: Checkout Source Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
           sparse-checkout: |
             doc/site
             rts/Lua
             rts/Rml/SolLua
+            rts/Sim/Units/Scripts
       - name: Cache Restore
         id: cache-restore
         uses: actions/cache/restore@v4
@@ -50,11 +49,11 @@ jobs:
           key: hugo-${{ github.run_id }}
           restore-keys:
             hugo-
-      - name: Configure Git
-        run: git config core.quotepath false
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
+      - name: Link the docs to this commit
+        run: echo "LUA_DOC_EXTRACTOR_SOURCE_REF=https://github.com/$GITHUB_REPOSITORY/blob/${GITHUB_SHA::10}" >> "$GITHUB_ENV"
       - name: Setup Mise
         uses: jdx/mise-action@v2
         with:

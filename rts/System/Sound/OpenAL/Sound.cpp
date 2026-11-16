@@ -19,6 +19,7 @@
 #include <climits>
 #include <cinttypes>
 #include <functional>
+#include <string_view>
 
 #include "System/Sound/ISoundChannels.h"
 #include "System/Sound/SoundLog.h"
@@ -47,10 +48,21 @@
 
 spring::recursive_mutex soundMutex;
 
+// snd_device used to be filled from OpenAL's device list, whose names put this before the system's
+static std::string ToSdlDeviceName(const std::string& deviceName)
+{
+	constexpr std::string_view openALPrefix = "OpenAL Soft on ";
+
+	if (deviceName.starts_with(openALPrefix))
+		return deviceName.substr(openALPrefix.size());
+
+	return deviceName;
+}
+
 
 CSound::CSound()
 {
-	configHandler->NotifyOnChange(this, {"snd_volmaster", "snd_eaxpreset", "snd_filter", "UseEFX", "snd_volgeneral", "snd_volunitreply", "snd_volbattle", "snd_volui", "snd_volmusic", "PitchAdjust"});
+	configHandler->NotifyOnChange(this, {"snd_volmaster", "snd_eaxpreset", "snd_filter", "UseEFX", "snd_volgeneral", "snd_volunitreply", "snd_volbattle", "snd_volui", "snd_volmusic", "PitchAdjust", "snd_device"});
 }
 
 CSound::~CSound()
@@ -135,6 +147,7 @@ void CSound::Cleanup() {
 
 		sdlDeviceID = -1;
 	}
+	sdlOutput = false;
 #endif
 
 	if (curContext != nullptr) {
@@ -328,6 +341,18 @@ void CSound::ConfigNotify(const std::string& key, const std::string& value)
 			pitchAdjustMode = tempPitchAdjustMode;
 		} break;
 
+		case hashString("snd_device"): {
+			if (!sdlOutput) {
+				LOG("[Sound::%s] snd_device takes effect after a restart when OpenAL plays without SDL (UseSDLAudio=0)", __func__);
+				break;
+			}
+			// unset means the default device, which is how a failed open ends up too
+			const std::string deviceName = configHandler->IsSet("snd_device") ? configHandler->GetString("snd_device") : "";
+
+			if (ToSdlDeviceName(deviceName) != selectedDeviceName && !(deviceName.empty() && selectedDeviceName == "default"))
+				ReopenSdlDevice();
+		} break;
+
 		default: {
 		} break;
 	}
@@ -365,6 +390,12 @@ void CSound::DeviceChanged(uint32_t sdlDeviceIndex, bool added)
 	
 	// This behavior can be reproduced on several test systems, for example when switching the Windows default device from monitor audio over HDMI to a sound card (HDMI->analog)
 
+	ReopenSdlDevice();
+}
+
+void CSound::ReopenSdlDevice()
+{
+	// also how a snd_device change is applied while SDL plays our output
 	std::lock_guard<spring::recursive_mutex> lck(soundMutex);
 
 	LOG("[Sound::%s] Pausing audio", __func__);
@@ -532,9 +563,11 @@ bool CSound::OpenSdlDevice(const std::string& deviceName, SDL_AudioSpec& obtaine
 		sdlDeviceID = 0;
 
 		if (!deviceName.empty()) {
-			LOG("[Sound::%s] opening configured device \"%s\"", __func__, deviceName.c_str());
-			sdlDeviceID = SDL_OpenAudioDevice(deviceName.c_str(), 0, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_ANY_CHANGE & ~SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
-			selectedDeviceName = deviceName;
+			const std::string sdlDeviceName = ToSdlDeviceName(deviceName);
+
+			LOG("[Sound::%s] opening configured device \"%s\"", __func__, sdlDeviceName.c_str());
+			sdlDeviceID = SDL_OpenAudioDevice(sdlDeviceName.c_str(), 0, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_ANY_CHANGE & ~SDL_AUDIO_ALLOW_CHANNELS_CHANGE);
+			selectedDeviceName = sdlDeviceName;
 		}
 
 		if (sdlDeviceID == 0) {
@@ -657,6 +690,8 @@ void CSound::OpenLoopbackDevice(const std::string& deviceName)
 		Cleanup();
 		return;
 	}
+
+	sdlOutput = true;
 
 	LOG("[Sound::%s] device=%p(%s) context=%p  numChannels=%d frameSize=%d", __func__, curDevice, selectedDeviceName.c_str(), curContext, obtainedSpec.channels, frameSize);
 #endif
@@ -1097,7 +1132,18 @@ void CSound::GenSources(int alMaxSounds)
 
 std::vector<std::string> CSound::GetSoundDevices()
 {
+	std::lock_guard<spring::recursive_mutex> lck(soundMutex);
 	std::vector<std::string> devices;
+
+	// SDL opens snd_device when it plays our output, so offer the names it knows
+	if (sdlOutput) {
+		for (int i = 0, n = SDL_GetNumAudioDevices(0); i < n; ++i) {
+			if (const char* deviceName = SDL_GetAudioDeviceName(i, 0); deviceName != nullptr)
+				devices.emplace_back(deviceName);
+		}
+		return devices;
+	}
+
 	const bool hasAllEnumExt = alcIsExtensionPresent(nullptr, "ALC_ENUMERATE_ALL_EXT");
 	const bool hasDefEnumExt = alcIsExtensionPresent(nullptr, "ALC_ENUMERATION_EXT");
 

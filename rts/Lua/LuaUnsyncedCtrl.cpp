@@ -673,13 +673,18 @@ int LuaUnsyncedCtrl::SendMessage(lua_State* L)
 }
 
 
-/*** @function Spring.SendMessageToSpectators
- * @param message string ``"`<PLAYER#>`"`` where `#` is a player ID.
+/***
+ * Send a message to spectators.
+ *
+ * If `message` contains ``"`<PLAYER#>`"`` (where `#` is a player ID) it will be
+ * replaced with the player's name. e.g.
  * 
- * This will be replaced with the player's name. e.g.
  * ```lua
- * Spring.SendMessage("`<PLAYER1>` did something") -- "ProRusher did something"
+ * Spring.SendMessageToSpectators("`<PLAYER1>` did something") -- "ProRusher did something"
  * ```
+ *
+ * @function Spring.SendMessageToSpectators
+ * @param message string Message to send.
  * 
  * @return nil
  */
@@ -1275,23 +1280,21 @@ int LuaUnsyncedCtrl::SetCameraOffset(lua_State* L)
 
 /*** Set camera state.
  *
+ * `transitionTimeFactor` defaults to "CamTimeFactor" springsetting unless set
+ * previously.
+ *
+ * `transitionTimeExponent` defaults to "CamTimeExponent" springsetting unless
+ * set previously.
+ *
  * @function Spring.SetCameraState
  *
  * @param cameraState CameraState The fields must be consistent with the name/mode and current/new camera mode.
  * 
  * @param transitionTime number? (Default: `0`) in nanoseconds
  *
- * @param transitionTimeFactor number?
- * Multiplicative factor applied to this and all subsequent transition times for
- * this camera mode.
+ * @param transitionTimeFactor number? Multiplicative factor applied to this and all subsequent transition times for this camera mode.
  *
- * Defaults to "CamTimeFactor" springsetting unless set previously.
- *
- * @param transitionTimeExponent number?
- * Tween factor applied to this and all subsequent transitions for this camera
- * mode.
- *
- * Defaults to "CamTimeExponent" springsetting unless set previously.
+ * @param transitionTimeExponent number? Tween factor applied to this and all subsequent transitions for this camera mode.
  *
  * @return boolean set `true` when applied without errors, otherwise `false`.
  */
@@ -1640,16 +1643,12 @@ int LuaUnsyncedCtrl::SelectUnitMap(lua_State* L)
  * @field specularColor { red: number, green: number, blue: number }
  * @field intensityWeight { ambientWeight: number, diffuseWeight: number, specularWeight: number }
  *
- * @field ambientDecayRate { ambientRedDecay: number, ambientGreenDecay: number, ambientBlueDecay: number }
- * Per-frame decay of `ambientColor` (spread over TTL frames)
+ * @field ambientDecayRate { ambientRedDecay: number, ambientGreenDecay: number, ambientBlueDecay: number } Per-frame decay of `ambientColor` (spread over TTL frames).
  *
- * @field diffuseDecayRate { diffuseRedDecay: number, diffuseGreenDecay: number, diffuseBlueDecay: number }
- * Per-frame decay of `diffuseColor` (spread over TTL frames)
+ * @field diffuseDecayRate { diffuseRedDecay: number, diffuseGreenDecay: number, diffuseBlueDecay: number } Per-frame decay of `diffuseColor` (spread over TTL frames).
  *
- * @field specularDecayRate { specularRedDecay: number, specularGreenDecay: number, specularBlueDecay: number }
- * Per-frame decay of `specularColor` (spread over TTL frames)
- * @field decayFunctionType { ambientDecayType: number, diffuseDecayType: number, specularDecayType: number }
- * If value is `0.0` then the `*DecayRate` values will be interpreted as linear, otherwise exponential.
+ * @field specularDecayRate { specularRedDecay: number, specularGreenDecay: number, specularBlueDecay: number } Per-frame decay of `specularColor` (spread over TTL frames).
+ * @field decayFunctionType { ambientDecayType: number, diffuseDecayType: number, specularDecayType: number } If value is `0.0` then the `*DecayRate` values will be interpreted as linear, otherwise exponential.
  *
  * @field radius number
  * @field fov number
@@ -3075,12 +3074,15 @@ int LuaUnsyncedCtrl::SetFeaturePaletteIndex(lua_State* L)
 
 /*** Changes/creates the cursor of a single CursorCmd.
  *
+ * `iconFileName` is not the full filename, instead it is like this:
+ *
+ *     Wanted filename: Anims/cursorattack_0.bmp
+ *     => iconFileName: cursorattack
+ *
  * @function Spring.AssignMouseCursor
  *
  * @param cmdName string
- * @param iconFileName string not the full filename, instead it is like this:
- *     Wanted filename: Anims/cursorattack_0.bmp
- *     => iconFileName: cursorattack
+ * @param iconFileName string The cursor name, without path, frame number or extension.
  * @param overwrite boolean? (Default: `true`)
  * @param hotSpotTopLeft boolean? (Default: `false`)
  * @return boolean? assigned
@@ -3742,15 +3744,17 @@ int LuaUnsyncedCtrl::GiveOrderArrayToUnitMap(lua_State* L)
 
 
 /***
- * @function Spring.GiveOrderArrayToUnitArray
- * @param unitIDs UnitID[] Array of unit IDs.
- * @param commands CreateCommand[]
- * @param pairwise boolean? (Default: `false`) When `false`, assign all commands to each unit.
+ * When `pairwise` is `false`, assign all commands to each unit.
  *
  * When `true`, assign commands according to index between units and cmds arrays.
  *
  * If `len(unitArray) < len(cmdArray)` only the first `len(unitArray)` commands
  * will be assigned, and vice-versa.
+ *
+ * @function Spring.GiveOrderArrayToUnitArray
+ * @param unitIDs UnitID[] Array of unit IDs.
+ * @param commands CreateCommand[]
+ * @param pairwise boolean? (Default: `false`) When `true`, assign commands to units by index.
  *
  * @return boolean ordersGiven `true` if any orders were sent, otherwise `false`.
  */
@@ -4228,11 +4232,9 @@ int LuaUnsyncedCtrl::SetSunDirection(lua_State* L)
 }
 
 /***
+ * The parameter table for sun lighting.
+ *
  * @class SunLightingParams
- *
- * The parameter table for sun lighting
- * @see Spring.SetSunLighting
- *
  * @field specularExponent number?
  * @field groundShadowDensity number?
  * @field modelShadowDensity number?
@@ -4245,6 +4247,8 @@ int LuaUnsyncedCtrl::SetSunDirection(lua_State* L)
  * @field modelDiffuseColor rgba?
  * @field unitSpecularColor rgba?
  * @field modelSpecularColor rgba?
+ *
+ * @see Spring.SetSunLighting
  */
 
 /***
@@ -5537,14 +5541,14 @@ int LuaUnsyncedCtrl::SetWMIcon(lua_State* L)
 
 /*** Set the window title for the process
  *
- * @function Spring.SetWMCaption
- *
- * @param title string (Default: `"Spring <version>"`)
- * @param titleShort string? (Default: `"Spring <version>"`) displayed in the OS task-bar .
- *
  * > [!NOTE]
  * > shortTitle is only ever possibly used under X11 (Linux & OS X), but not
  * > with QT (KDE) and never under Windows.
+ *
+ * @function Spring.SetWMCaption
+ *
+ * @param title string (Default: `"Spring <version>"`)
+ * @param titleShort string? (Default: `"Spring <version>"`) Displayed in the OS task-bar.
  *
  * @return nil
  */

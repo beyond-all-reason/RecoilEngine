@@ -21,9 +21,7 @@
 								<code>{{ if strings.Contains $info.type "string" }}string{{ else }}{{ $info.type }}{{ end }}</code>
 								<a href="#{{ $name }}">{{ $name }}</a>
 							</td>
-							<td>
-								{{ $info.description }}
-							</td>
+							<td style="white-space: pre-line">{{ $info.description }}</td>
 							<td>
 								<dl class="hx-text-xs">
 									{{ if $info.fallbackName }}

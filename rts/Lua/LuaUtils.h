@@ -1,7 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef LUA_UTILS_H
-#define LUA_UTILS_H
+#pragma once
 
 #include <cstdint>
 #include <string>
@@ -619,5 +618,3 @@ const inline FeatureDef* LuaUtils::SolIdToObject(int id, const char* func)
 
 	return obj;
 }
-
-#endif // LUA_UTILS_H

@@ -204,6 +204,8 @@ public:
 	float GetAspectRatio() const { return aspectRatio; }
 
 	float3 GetMoveVectorFromState(bool fromKeyState) const;
+	/// milliseconds the camera moves by this frame, per CamFrameTimeCorrection
+	float GetFrameTime() const;
 
 	void SetMovState(int idx, bool b) { movState[idx] = b; }
 	void SetRotState(int idx, bool b) { rotState[idx] = b; }

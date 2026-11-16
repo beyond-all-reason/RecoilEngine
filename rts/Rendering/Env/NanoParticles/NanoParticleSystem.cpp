@@ -761,7 +761,6 @@ bool System::UpdateHoming(Particle& particle, const float3& currentPos, int fram
 void System::Update()
 {
 	ZoneScopedN("NanoParticles::Update");
-	RECOIL_DETAILED_TRACY_ZONE;
 
 	const Config& cfg = GetConfig();
 	const int frame = gs->frameNum;

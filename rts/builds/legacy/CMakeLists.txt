@@ -7,18 +7,10 @@
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
 
-add_library(Game STATIC)
-target_sources(Game PRIVATE ${sources_engine_Game})
-add_dependencies(Game generateVersionFiles)
-target_include_directories(Game PRIVATE "${CMAKE_BINARY_DIR}/src-generated/engine")
+recoil_add_variant_library(Game GameCommon)
 target_link_libraries(Game PRIVATE
-	 Tracy::TracyClient
 	 SDL2::SDL2
-	 RmlUi::RmlUi
 	 ${sound-impl}
-	 prd::jsoncpp
-	 streflop
-	 fmt::fmt
 )
 
 ### Assemble libraries

@@ -396,7 +396,8 @@ bool CLuaUI::LayoutButtons(
 		return false;
 	}
 
-	// get the results
+	// Results follow any arguments already on the stack during a nested Lua call.
+	// Layout updates can be requested from LuaUI itself (e.g. LoadCtrlPanelConfig).
 	const int args = lua_gettop(L) - top;
 
 	if (lua_israwstring(L, -1) &&
@@ -410,64 +411,64 @@ bool CLuaUI::LayoutButtons(
 		return false;
 	}
 
-	if (!lua_isstring(L, 1)) {
+	if (!lua_isstring(L, top + 1)) {
 		LOG_L(L_WARNING, "LayoutButtons() bad menuName value");
 		lua_settop(L, top);
 		return false;
 	}
-	menuName = string(lua_tostring(L, 1), lua_strlen(L, 1));
+	menuName = string(lua_tostring(L, top + 1), lua_strlen(L, top + 1));
 
-	if (!lua_isnumber(L, 2) || !lua_isnumber(L, 3)) {
+	if (!lua_isnumber(L, top + 2) || !lua_isnumber(L, top + 3)) {
 		LOG_L(L_WARNING, "LayoutButtons() bad xButtons or yButtons values");
 		lua_settop(L, top);
 		return false;
 	}
-	xButtons = lua_toint(L, 2);
-	yButtons = lua_toint(L, 3);
+	xButtons = lua_toint(L, top + 2);
+	yButtons = lua_toint(L, top + 3);
 
-	if (!GetLuaIntList(L, 4, removeCmds)) {
+	if (!GetLuaIntList(L, top + 4, removeCmds)) {
 		LOG_L(L_WARNING, "LayoutButtons() bad removeCommands table");
 		lua_settop(L, top);
 		return false;
 	}
 
-	if (!GetLuaCmdDescList(L, 5, customCmds)) {
+	if (!GetLuaCmdDescList(L, top + 5, customCmds)) {
 		LOG_L(L_WARNING, "LayoutButtons() bad customCommands table");
 		lua_settop(L, top);
 		return false;
 	}
 
-	if (!GetLuaIntList(L, 6, onlyTextureCmds)) {
+	if (!GetLuaIntList(L, top + 6, onlyTextureCmds)) {
 		LOG_L(L_WARNING, "LayoutButtons() bad onlyTexture table");
 		lua_settop(L, top);
 		return false;
 	}
 
-	if (!GetLuaReStringList(L, 7, reTextureCmds)) {
+	if (!GetLuaReStringList(L, top + 7, reTextureCmds)) {
 		LOG_L(L_WARNING, "LayoutButtons() bad reTexture table");
 		lua_settop(L, top);
 		return false;
 	}
 
-	if (!GetLuaReStringList(L, 8, reNamedCmds)) {
+	if (!GetLuaReStringList(L, top + 8, reNamedCmds)) {
 		LOG_L(L_WARNING, "LayoutButtons() bad reNamed table");
 		lua_settop(L, top);
 		return false;
 	}
 
-	if (!GetLuaReStringList(L, 9, reTooltipCmds)) {
+	if (!GetLuaReStringList(L, top + 9, reTooltipCmds)) {
 		LOG_L(L_WARNING, "LayoutButtons() bad reTooltip table");
 		lua_settop(L, top);
 		return false;
 	}
 
-	if (!GetLuaReParamsList(L, 10, reParamsCmds)) {
+	if (!GetLuaReParamsList(L, top + 10, reParamsCmds)) {
 		LOG_L(L_WARNING, "LayoutButtons() bad reParams table");
 		lua_settop(L, top);
 		return false;
 	}
 
-	if (!GetLuaIntMap(L, 11, buttonList)) {
+	if (!GetLuaIntMap(L, top + 11, buttonList)) {
 		LOG_L(L_WARNING, "LayoutButtons() bad buttonList table");
 		lua_settop(L, top);
 		return false;

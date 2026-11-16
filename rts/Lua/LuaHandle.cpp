@@ -85,8 +85,6 @@ bool CLuaHandle::devMode = false;
 const int* CLuaHandle::currentCobArgs = nullptr;
 
 /***
- * @class Callins
- * 
  * Functions called by the Engine.
  *
  * To use these callins in a widget, prepend `widget:` and, for a gadget,
@@ -108,7 +106,9 @@ const int* CLuaHandle::currentCobArgs = nullptr;
  * **Attention:** Some callins will only work on the unsynced portion of the gadget.
  * Due to the type-unsafe nature of lua parsing, those callins not firing up
  * might be hard to trace.
- * 
+ *
+ * @class Callins
+ *
  * @see Gadget
  * @see Widget
  * @see Menu
@@ -767,6 +767,28 @@ void CLuaHandle::GameStart()
 }
 
 
+/*** Called once when a game finishes loading from a native save (`.ssf`), paused at the saved frame.
+ *
+ * Takes the place of `GameStart`. Not called for old style Lua saves, which use `GameStart` plus `Load`.
+ *
+ * @function Callins:GameLoaded
+ */
+void CLuaHandle::GameLoaded()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 3, __func__);
+
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	RunCallInTraceback(L, cmdStr, 0, 0, traceBack.GetErrFuncIdx(), false);
+}
+
+
 /*** Called when the game ends
  *
  * @function Callins:GameOver
@@ -1075,6 +1097,24 @@ inline void CLuaHandle::UnitCallIn(const LuaHashString& hs, const CUnit* unit)
 
 	// call the routine
 	RunCallInTraceback(L, hs, 3, 0, traceBack.GetErrFuncIdx(), false);
+}
+
+inline void CLuaHandle::UnitSelfDestructCallin(const LuaHashString& hs, const CUnit* unit, float remainingSeconds)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 6, __func__);
+	const LuaUtils::ScopedDebugTraceBack traceBack(L);
+
+	if (!hs.GetGlobalFunc(L))
+		return;
+
+	lua_pushnumber(L, unit->id);
+	lua_pushnumber(L, unit->unitDef->id);
+	lua_pushnumber(L, unit->team);
+	lua_pushnumber(L, remainingSeconds);
+
+	RunCallInTraceback(L, hs, 4, 0, traceBack.GetErrFuncIdx(), false);
 }
 
 
@@ -1510,6 +1550,34 @@ void CLuaHandle::UnitHarvestStorageFull(const CUnit* unit)
 {
 	static const LuaHashString cmdStr(__func__);
 	UnitCallIn(cmdStr, unit);
+}
+
+/*** Called when a unit's self-destruct countdown starts.
+ *
+ * @function Callins:UnitSelfDestructStarted
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param unitTeam integer
+ * @param remainingSeconds number
+ */
+void CLuaHandle::UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds)
+{
+	static const LuaHashString cmdStr(__func__);
+	UnitSelfDestructCallin(cmdStr, unit, remainingSeconds);
+}
+
+/*** Called when a unit's self-destruct countdown is cancelled.
+ *
+ * @function Callins:UnitSelfDestructCancelled
+ * @param unitID integer
+ * @param unitDefID integer
+ * @param unitTeam integer
+ * @param remainingSeconds number
+ */
+void CLuaHandle::UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds)
+{
+	static const LuaHashString cmdStr(__func__);
+	UnitSelfDestructCallin(cmdStr, unit, remainingSeconds);
 }
 
 
@@ -2249,7 +2317,7 @@ void CLuaHandle::ProjectileDestroyed(const CProjectile* p)
 
 /******************************************************************************/
 
-/***
+/*
  * Helper to get Explosion visibility.
  */
 
@@ -2567,6 +2635,50 @@ void CLuaHandle::Update()
 		lua_pushnumber(L, game->updateDeltaSeconds);
 
 	RunCallIn(L, cmdStr, game ? 1 : 0, 0);
+}
+
+
+/*** Called each draw frame before the camera moves. A number returned replaces that value for this frame,
+ * nil keeps it. Each handle sees the values the one before it returned.
+ *
+ * @function Callins:UpdateTimeOffset
+ * @param timeOffset number the fraction of a sim frame units are drawn ahead of the last one, see `Spring.GetFrameTimeOffset`
+ * @param drawSimRatio number sim frames per draw frame, averaged (about 0.5 at 60 fps and 30 sim frames a second)
+ * @param presentedUpdateSeconds number see `Spring.GetPresentedUpdateSeconds`
+ * @return number? timeOffset clamped to [-0.5, 1.5] (half a sim frame back, for a draw shown late, to one and a half ahead)
+ * @return number? presentedUpdateSeconds clamped to [0, the larger of 4 display periods (0.25 s with no known period) and the engine's value]
+ */
+void CLuaHandle::UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	LUA_CALL_IN_CHECK(L);
+	luaL_checkstack(L, 5, __func__);
+	static const LuaHashString cmdStr(__func__);
+	if (!cmdStr.GetGlobalFunc(L))
+		return;
+
+	lua_pushnumber(L, timeOffset);
+	lua_pushnumber(L, drawSimRatio);
+	lua_pushnumber(L, presentedUpdateSecs);
+
+	if (!RunCallIn(L, cmdStr, 3, 2))
+		return;
+
+	// not lua_tofloat: its NaN check raises a Lua error outside the call
+	const auto ReadReturn = [&](int idx, float& value) {
+		if (!lua_isnumber(L, idx))
+			return;
+
+		const lua_Number n = lua_tonumber(L, idx);
+
+		if (std::isfinite(n))
+			value = static_cast<float>(n);
+	};
+
+	ReadReturn(-2, timeOffset);
+	ReadReturn(-1, presentedUpdateSecs);
+
+	lua_pop(L, 2);
 }
 
 
@@ -3756,14 +3868,14 @@ void CLuaHandle::MiniMapStateChanged(const bool isMinimized,
 /*** Called when the MiniMap Geometry changes
  * 
  * @function Callins:MiniMapGeometryChanged
- * @param newPosX integer in pixels
- * @param newPosY integer in pixels
- * @param newDimX integer in pixels
- * @param newDimY integer in pixels
- * @param oldPosX integer in pixels
- * @param oldPosY integer in pixels
- * @param oldDimX integer in pixels
- * @param oldDimY integer in pixels
+ * @param newPosX integer New x position in pixels.
+ * @param newPosY integer New y position in pixels.
+ * @param newDimX integer New width in pixels.
+ * @param newDimY integer New height in pixels.
+ * @param oldPosX integer Old x position in pixels.
+ * @param oldPosY integer Old y position in pixels.
+ * @param oldDimX integer Old width in pixels.
+ * @param oldDimY integer Old height in pixels.
  */
 void CLuaHandle::MiniMapGeometryChanged(const int2 newPos, const int2 newDim, const int2 oldPos, const int2 oldDim)
 {
@@ -4534,7 +4646,7 @@ int CLuaHandle::CallOutIsEngineMinVersion(lua_State* L)
 /***
  * @function Script.DelayByFrames
  * @param frameDelay integer
- * @param fun(...) func
+ * @param func fun(...)
  */
 int CLuaHandle::CallOutDelayByFrames(lua_State* L)
 {

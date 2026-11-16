@@ -103,6 +103,7 @@ everywhere the engine uses it, including `Game.gravity`. Unset (nil) keeps the m
  * Barbarian AI shipped with the engine updated to v1.6.29, contains a fix for island maps.
  * added the unsynced `AllowQuit` callin; returning false keeps the game running when the window close button or Alt+F4 is used (`Spring.Quit` and `/quitforce` still quit unconditionally)
  * glTF models now load the `COLOR_0` vertex attribute. Model shaders can read it as `layout (location = 15) in vec4 color`, and Lua as the `color` attribute of `VBO:ModelsVBO()`. Models without it (including all S3O, 3DO and assimp models) read opaque white. `Engine.FeatureSupport.modelVertexColor` is `true` on engines that have it.
+ * CCommandAI::FinishCommand will allow a number of retries to execute a new command upto the size of the command buffer instead of only one extra try. This helps units clear out a series of obselete commands, which they would otherwise only clear out at rate of 2 every slwo update, which could stop them reacting in game for a noticeable amount of time.
 
 ### Fixes
  * fixed that attempting loading a save would overflow MacOS' default stack size.
@@ -147,6 +148,8 @@ on the surface is no longer treated as underground.
  * fixed mouse position to go back to the centre of the screen after a middle-mouse camera pan.
  * fixed attack queues stalling or skipping the next target when the current target is made neutral.
  * fixed attack orders to now skip crashing aircraft when the `fireAtDead.fireAtCrashing` modrule is disabled. Fighters also respect this modrule when selecting targets automatically.
+ * fixed a crash when synced Lua calls Spring.RequestPath with QTPFS.
+ * fixed intermittent memory errors/crashes during pathing caused by a race between background path-finding threads and newly created path requests. Requests originating outside the pathing system (units, Lua, AI) are now staged in a separate registry and transferred to the internal registry at a sync-safe point, so that the background threads no longer observe entities being created.
 
 ### Internals relevant for engine devs
  * enforce power-of-2 memory alignment for analyzing the engine with Address Sanitizer.

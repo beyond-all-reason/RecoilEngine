@@ -36,6 +36,7 @@
 #include "Menu/LuaMenuController.h"
 #include "Net/GameServer.h"
 #include "Rendering/GlobalRendering.h"
+#include "Rendering/VerticalSync.h"
 #include "Rendering/GlobalRenderingInfo.h"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/Units/UnitDrawer.h"
@@ -122,6 +123,7 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetFrameTimeOffset);
 	REGISTER_LUA_CFUNC(GetGameSecondsInterpolated);
 	REGISTER_LUA_CFUNC(GetLastUpdateSeconds);
+	REGISTER_LUA_CFUNC(GetPresentedUpdateSeconds);
 	REGISTER_LUA_CFUNC(GetVideoCapturingMode);
 	REGISTER_LUA_CFUNC(GetPrevFrameSyncChecksum);
 
@@ -230,6 +232,9 @@ bool LuaUnsyncedRead::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(GetTimer);
 	REGISTER_LUA_CFUNC(GetTimerMicros);
 	REGISTER_LUA_CFUNC(GetFrameTimer);
+	REGISTER_LUA_CFUNC(GetLastSwapBuffersEnd);
+	REGISTER_LUA_CFUNC(GetLastSwapBuffersDuration);
+	REGISTER_LUA_CFUNC(GetDisplayTiming);
 	REGISTER_LUA_CFUNC(DiffTimers);
 
 	REGISTER_LUA_CFUNC(GetDrawSeconds);
@@ -811,16 +816,68 @@ int LuaUnsyncedRead::GetTimerMicros(lua_State* L)
  * This should give better results for camera interpolations
  *
  * @param lastFrameTime boolean? (Default: `false`) whether to use last frame time instead of last frame start
- * @return userdata timer Opaque millisecond timer handle.
+ * @param micros boolean? (Default: `false`) a microsecond timer, as `Spring.GetTimerMicros`
+ * @return userdata timer Opaque timer handle.
  */
 int LuaUnsyncedRead::GetFrameTimer(lua_State* L)
 {
+	const bool micros = luaL_optboolean(L, 2, false);
+
 	if (luaL_optboolean(L, 1, false)) {
-		PushTimer(L, game->lastFrameTime, false);
+		PushTimer(L, game->lastFrameTime, micros);
 	} else {
-		PushTimer(L, globalRendering->lastFrameStart, false);
+		PushTimer(L, globalRendering->lastFrameStart, micros);
 	}
 	return 1;
+}
+
+
+/*** Get a timer for when the last buffer swap finished
+ *
+ * @function Spring.GetLastSwapBuffersEnd
+ *
+ * For tracking vsync, and calculating frame and camera time offsets.
+ *
+ * @param micros boolean? (Default: `false`) a microsecond timer, as `Spring.GetTimerMicros`
+ * @return userdata timer Opaque timer handle.
+ */
+int LuaUnsyncedRead::GetLastSwapBuffersEnd(lua_State* L)
+{
+	PushTimer(L, globalRendering->lastSwapBuffersEnd, luaL_optboolean(L, 1, false));
+	return 1;
+}
+
+
+/*** Get how long the last buffer swap took
+ *
+ * @function Spring.GetLastSwapBuffersDuration
+ *
+ * With vsync on, a swap that returns at once while the frame rate holds the refresh rate hints at
+ * triple buffering (the driver queues the frame instead of waiting for the display).
+ *
+ * @return number seconds
+ */
+int LuaUnsyncedRead::GetLastSwapBuffersDuration(lua_State* L)
+{
+	lua_pushnumber(L, globalRendering->lastSwapBuffersDuration.toSecsf());
+	return 1;
+}
+
+
+/*** Get what the presented frame time is computed from
+ *
+ * @function Spring.GetDisplayTiming
+ *
+ * @return number displayPeriod seconds between refreshes of the display the window is on, 0 when unknown
+ * @return integer swapInterval the swap interval in effect: 0 off, N standard, -N adaptive (the `VSync` config value is only the one asked for)
+ * @return boolean fastSync vsync is on but frames outpace the display refresh, so the presented frame time is the raw frame time
+ */
+int LuaUnsyncedRead::GetDisplayTiming(lua_State* L)
+{
+	lua_pushnumber(L, globalRendering->displayPeriod * 0.001f);
+	lua_pushnumber(L, verticalSync->GetEffectiveInterval());
+	lua_pushboolean(L, globalRendering->fastSyncDetected);
+	return 3;
 }
 
 
@@ -1217,6 +1274,21 @@ int LuaUnsyncedRead::GetLastUpdateSeconds(lua_State* L)
 	return 1;
 }
 
+/*** Get the seconds this draw frame advances by on screen
+ *
+ * The camera moves by it under `CamFrameTimeCorrection` 2. With vsync on, whole display periods;
+ * vsync off, under fast sync or for frames of 4 periods or more, the raw frame time.
+ * The `UpdateTimeOffset` call-in can replace it.
+ *
+ * @function Spring.GetPresentedUpdateSeconds
+ * @return number seconds
+ */
+int LuaUnsyncedRead::GetPresentedUpdateSeconds(lua_State* L)
+{
+	lua_pushnumber(L, globalRendering->presentedFrameTime * 0.001f);
+	return 1;
+}
+
 
 /***
  *
@@ -1432,8 +1504,7 @@ int LuaUnsyncedRead::GetUnitNoSelect(lua_State* L)
  *
  * @function Spring.UnitIconGetDraw
  * @param unitID UnitID
- * @return boolean? drawIcon
- * `true` if icon is being drawn, `nil` when unitID is invalid, otherwise `false`.
+ * @return boolean? drawIcon `true` if icon is being drawn, `nil` when unitID is invalid, otherwise `false`.
  */
 int LuaUnsyncedRead::UnitIconGetDraw(lua_State* L) {
 	CUnit* unit = ParseUnit(L, __func__, 1);
@@ -4565,7 +4636,7 @@ int LuaUnsyncedRead::GetGroupUnitsCount(lua_State* L)
  * @field teamID TeamID
  * @field allyTeamID AllyTeamID
  * @field spectator boolean
- * @field cpuUsage number in order to find the progress, use: cpuUsage&0x1 if it's PC or BO, cpuUsage& 0xFE to get path res, (cpuUsage>>8)*1000 for the progress
+ * @field cpuUsage number CPU usage. To find the progress, use: cpuUsage&0x1 if it's PC or BO, cpuUsage& 0xFE to get path res, (cpuUsage>>8)*1000 for the progress
  * @field pingTime number if -1, the player is pathfinding
  */
 
@@ -5201,8 +5272,7 @@ int LuaUnsyncedRead::GetGroundDecalCreationFrame(lua_State* L)
 /***
  * @function Spring.GetGroundDecalOwner
  * @param decalID DecalID
- * @return integer? value If owner is a unit, then this is `unitID`, if owner is
- * a feature it is `featureID + MAX_UNITS`. If there is no owner, then `nil`.
+ * @return integer? value If owner is a unit, then this is `unitID`, if owner is a feature it is `featureID + MAX_UNITS`. If there is no owner, then `nil`.
  */
 int LuaUnsyncedRead::GetGroundDecalOwner(lua_State* L)
 {

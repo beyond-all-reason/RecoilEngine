@@ -39,6 +39,8 @@
 #include "Sim/Units/Scripts/UnitScriptEngine.h"
 #include "Sim/Units/Scripts/NullUnitScript.h"
 #include "Sim/Weapons/PlasmaRepulser.h"
+#include "System/EventHandler.h"
+#include "System/LoadLock.h"
 #include "System/SafeUtil.h"
 #include "System/Platform/errorhandler.h"
 #include "System/FileSystem/DataDirsAccess.h"
@@ -424,14 +426,31 @@ void CCregLoadSaveHandler::LoadAIData()
 	// cleanup
 	iss.str("");
 
-	gs->paused = false;
-	if (gameServer != nullptr) {
-		gameServer->isPaused = false;
-		gameServer->syncErrorFrame = 0;
-	}
-
 	LEAVE_SYNCED_CODE();
 #else //USING_CREG
 	LOG_L(L_ERROR, "Load failed: creg is disabled");
+#endif //USING_CREG
+}
+
+void CCregLoadSaveHandler::PostLoad()
+{
+#ifdef USING_CREG
+	ENTER_SYNCED_CODE();
+
+	// keep the pause set in CGameServer::PostLoad
+	gs->paused = true;
+	game->paused = true;
+
+	if (gameServer != nullptr) {
+		gameServer->isPaused = true;
+		gameServer->syncErrorFrame = 0;
+	}
+
+	{
+		auto lock = CLoadLock::GetUniqueLock();
+		eventHandler.GameLoaded();
+	}
+
+	LEAVE_SYNCED_CODE();
 #endif //USING_CREG
 }

@@ -30,6 +30,7 @@ public:
 
 protected:
 	void AddPair(const std::string& name, const int code, const bool printable = false);
+	void AddAlias(const std::string& name, const int code);
 
 protected:
 	typedef std::pair<std::string, int> NameCodePair;

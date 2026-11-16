@@ -296,6 +296,13 @@ void CGameServer::PostLoad(int newServerFrameNum)
 	for (GameParticipant& p: players) {
 		p.lastFrameResponse = newServerFrameNum;
 	}
+
+	// a loaded save starts paused; any later and frames past the saved one are sent
+	isPaused = true;
+
+	// a regular pause message, so every client and its GamePaused callin agree
+	if (HasLocalClient())
+		Broadcast(CBaseNetProtocol::Get().SendPause(localClientNumber, true));
 }
 
 

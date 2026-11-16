@@ -344,7 +344,7 @@ WeaponDef::WeaponDef(const LuaTable& wdTable, const std::string& name_, int id_)
 	shieldArmorType = damageArrayHandler.GetTypeFromName(shieldArmorTypeName);
 	flighttime = int(wdTable.GetFloat("flighttime", 0.0f) * GAME_SPEED);
 	maxFireAngle = math::cos(wdTable.GetFloat("firetolerance", 3640.0f) * TAANG2RAD);
-	salvoWindup = int(wdTable.GetFloat("windup", 0.0f) * GAME_SPEED);
+	salvoWindup = std::max(0, int(wdTable.GetFloat("windup", 0.0f) * GAME_SPEED));
 
 	collisionFlags = 0;
 	collisionFlags |= (Collision::NOENEMIES    * (!wdTable.GetBool("collideEnemy",      true)));

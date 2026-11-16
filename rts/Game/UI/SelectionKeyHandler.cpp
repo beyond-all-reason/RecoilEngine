@@ -266,7 +266,10 @@ namespace {
 					const char* cstr = value.c_str();
 					char* endNumPos = nullptr;
 					wantedValueNum = strtof(cstr, &endNumPos);
-					if (endNumPos == cstr) wantedValueStr = value;
+					if (endNumPos == cstr)
+						wantedValueStr = value;
+					else
+						wantedValueStr.clear();
 				} break;
 			}
 		}

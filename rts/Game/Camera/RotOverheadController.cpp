@@ -9,6 +9,7 @@
 #include "System/SpringMath.h"
 #include "System/Config/ConfigHandler.h"
 #include "System/Log/ILog.h"
+#include "System/StringHash.h"
 
 #include "Game/CameraHandler.h"
 
@@ -21,14 +22,48 @@ CONFIG(float, RotOverheadFOV).defaultValue(45.0f);
 CONFIG(bool, RotOverheadClampMap).defaultValue(true).headlessValue(true);
 
 
+static const std::vector<std::string> ROT_OVERHEAD_CONFIG_KEYS = {
+	"RotOverheadMouseScale",
+	"RotOverheadScrollSpeed",
+	"RotOverheadEnabled",
+	"RotOverheadFOV",
+	"RotOverheadClampMap",
+};
+
+
 CRotOverheadController::CRotOverheadController(): oldHeight(500.0f), rot(2.677f, 0.0f, 0.0f)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	mouseScale  = configHandler->GetFloat("RotOverheadMouseScale");
-	scrollSpeed = configHandler->GetInt("RotOverheadScrollSpeed") * 0.1f;
-	enabled     = configHandler->GetBool("RotOverheadEnabled");
-	fov         = configHandler->GetFloat("RotOverheadFOV");
-	clampToMap = configHandler->GetBool("RotOverheadClampMap");
+	for (const std::string& key: ROT_OVERHEAD_CONFIG_KEYS)
+		ReadConfig(key);
+
+	configHandler->NotifyOnChange(this, ROT_OVERHEAD_CONFIG_KEYS);
+}
+
+CRotOverheadController::~CRotOverheadController()
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	configHandler->RemoveObserver(this);
+}
+
+void CRotOverheadController::ConfigNotify(const std::string& key, const std::string& value)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	// only the changed key, a fov set through SetCameraState stays when the scroll speed changes
+	ReadConfig(key);
+}
+
+void CRotOverheadController::ReadConfig(const std::string& key)
+{
+	RECOIL_DETAILED_TRACY_ZONE;
+	switch (hashString(key.c_str())) {
+		case hashString("RotOverheadMouseScale" ): { mouseScale  = configHandler->GetFloat(key); } break;
+		case hashString("RotOverheadScrollSpeed"): { scrollSpeed = configHandler->GetInt(key) * 0.1f; } break;
+		case hashString("RotOverheadEnabled"    ): { enabled     = configHandler->GetBool(key); } break;
+		case hashString("RotOverheadFOV"        ): { fov         = configHandler->GetFloat(key); } break;
+		case hashString("RotOverheadClampMap"   ): { clampToMap  = configHandler->GetBool(key); } break;
+		default: {} break;
+	}
 }
 
 
