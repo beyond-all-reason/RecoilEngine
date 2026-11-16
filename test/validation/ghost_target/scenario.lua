@@ -10,6 +10,9 @@ local function report(name, value)
 	Spring.Echo("GHOST_TEST " .. name .. " " .. tostring(value))
 end
 function gadget:GameFrame(frame)
+	-- Leave enough wall time for screenshot capture and screen-ray sweeps.
+	if frame % 6 ~= 0 then return end
+	frame = frame / 6
 	if frame == 1 then
 		for _, id in ipairs(Spring.GetAllUnits()) do
 			Spring.DestroyUnit(id, false, true)

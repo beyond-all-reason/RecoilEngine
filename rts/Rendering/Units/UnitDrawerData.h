@@ -1,9 +1,12 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 #pragma once
 
+#include <array>
+#include <optional>
 #include <ranges>
 
 #include "System/float3.h"
+#include "System/float4.h"
 #include "System/Matrix44f.h"
 #include "Sim/Misc/CollisionVolume.h"
 #include "Rendering/Common/ModelDrawerData.h"
@@ -89,6 +92,9 @@ public:
 	bool UpdateUnitGhosts(const CUnit* unit, const bool addNewGhost);
 	void UnitLeavesGhostChanged(const CUnit* unit, const bool leaveDeadGhost);
 	void ReviewPrevLos(const CUnit* unit);
+	enum class GhostColorState { Normal, Highlight, Radar, RadarHighlight, Count };
+	void SetGhostColor(GhostColorState state, const float4* color);
+	float4 GetGhostColor(bool radar, bool highlighted) const;
 	void SetGhostHighlight(const float3* aimPos);
 	bool IsGhostHighlighted(const GhostTarget& target) const;
 	bool TraceGhost(const float3& start, const float3& dir, float length, float3& aimPos, int& unitID, const CUnit* excludeUnit) const;
@@ -230,6 +236,7 @@ public:
 	void ConfigNotify(const std::string& key, const std::string& value);
 private:
 	SavedData savedData;
+	std::array<std::optional<float4>, static_cast<size_t>(GhostColorState::Count)> ghostColorOverrides;
 	float3 ghostHighlightPos;
 	int ghostHighlightFrame = -1;
 	int ghostHighlightAllyTeam = -1;

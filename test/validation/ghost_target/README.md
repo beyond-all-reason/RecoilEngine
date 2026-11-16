@@ -30,6 +30,26 @@ clicks keep their prior behavior. Minimap targeting and automatic target persist
 outside this patch.
 
 Radar coverage checks that the icon remains a unit target while the remembered model
-resolves to that same unit target outside the icon, with its frozen aimpoint supplied only for highlighting. Four screenshots in the output
-`screenshots/` directory show live/dead ghosts before and during the translucent amber
-highlight. Highlighting uses the stored aimpoint, never a hidden unit ID.
+resolves to that same unit target outside the icon, with its frozen aimpoint supplied only for highlighting. Seven screenshots in the output
+`screenshots/` directory show live, radar and dead ghosts before and during the
+highlight, followed by the reset appearance. Highlighting uses the stored aimpoint, never a hidden unit ID.
+
+## Ghost RGBA colors
+
+Add `--colors` to run the `ghost_colors.lua` test widget. It checks all four
+state names, component boundaries, invalid input, and reset calls. The screenshots
+use green normal ghosts, red highlighted ghosts, blue radar ghosts and magenta
+highlighted radar ghosts, with explicit alpha values. At logical frame 230 it resets all
+states; the final screenshot must match the default ghost appearance. Run again
+without `--colors` for comparison, and with `--glsl` to exercise the GLSL path.
+
+Manual procedure: reveal an enemy building, lose LOS, then compare its model with
+and without continuous radar contact and hover. Check all four colors in both
+renderers. Change `UnitTransparency`: default normal/radar opacity must respond,
+while explicit Lua alpha must remain unchanged. Reset each state with
+`Spring.SetGhostColor(state)` and verify the default appearance returns.
+The widget can also be installed temporarily in a development game's LuaUI Widgets
+folder and enabled manually; shutdown restores the engine defaults.
+
+Scenario phases use six simulation frames per logical frame at speed 1, leaving
+time for synchronous screenshot capture and ray sweeps between radar transitions.

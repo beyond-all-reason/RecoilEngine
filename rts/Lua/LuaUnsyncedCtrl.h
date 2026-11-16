@@ -100,6 +100,7 @@ class LuaUnsyncedCtrl {
 		static int SetMapShadingTexture(lua_State* L);
 		static int SetSkyBoxTexture(lua_State* L);
 
+		static int SetGhostColor(lua_State* L);
 		static int SetGhostHighlight(lua_State* L);
 		static int SetUnitNoDraw(lua_State* L);
 		static int SetUnitEngineDrawMask(lua_State* L);

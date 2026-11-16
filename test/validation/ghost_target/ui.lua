@@ -1,5 +1,11 @@
 -- This file is part of the Spring engine (GPL v2 or later), see LICENSE.html.
 local candidate = Spring.GetConfigInt("GhostTestCandidate", 0) == 1
+local colorTest
+if Spring.GetConfigInt("GhostTestColors", 0) == 1 then
+	colorTest = {}
+	VFS.Include("ghost_colors.lua", setmetatable({ widget = colorTest }, { __index = _G }))
+	colorTest:Initialize()
+end
 local seen = {}
 local failed = false
 local function check(ok, message)
@@ -7,14 +13,15 @@ local function check(ok, message)
 	failed = failed or not ok
 end
 function Update()
-	local frame = Spring.GetGameFrame()
+	local frame = math.floor(Spring.GetGameFrame() / 6)
+	if colorTest then colorTest:Update() end
 	if candidate and Spring.SetGhostHighlight then
-		if (frame >= 130 and frame < 150) or (frame >= 210 and frame < 230) then
+		if (frame >= 130 and frame < 150) or (frame >= 167 and frame < 170) or (frame >= 210 and frame < 230) then
 			Spring.SetGhostHighlight(2060, 280, 2056)
 		else
 			Spring.SetGhostHighlight()
 		end
-		for _, shot in ipairs({ {125, "live"}, {140, "live_highlight"}, {205, "dead"}, {220, "dead_highlight"} }) do
+		for _, shot in ipairs({ {125, "live"}, {140, "live_highlight"}, {165, "radar"}, {168, "radar_highlight"}, {205, "dead"}, {220, "dead_highlight"}, {235, "reset"} }) do
 			if frame >= shot[1] and not seen[shot[2] .. "_shot"] then
 				seen[shot[2] .. "_shot"] = true
 				Spring.Echo("GHOST_TEST screenshot " .. shot[2])

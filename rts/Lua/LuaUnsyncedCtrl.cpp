@@ -210,6 +210,7 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetMapShadingTexture);
 	REGISTER_LUA_CFUNC(SetSkyBoxTexture);
 
+	REGISTER_LUA_CFUNC(SetGhostColor);
 	REGISTER_LUA_CFUNC(SetGhostHighlight);
 	REGISTER_LUA_CFUNC(SetUnitNoDraw);
 	REGISTER_LUA_CFUNC(SetUnitEngineDrawMask);
@@ -2168,6 +2169,43 @@ int LuaUnsyncedCtrl::SetSkyBoxTexture(lua_State* L)
  * Unit custom rendering
  * @section unitcustomrendering
 ******************************************************************************/
+
+
+/***
+ * Override the RGBA modulation of remembered building models for this client.
+ * Both GLSL and GL4 use these colors. Radar states refer to LOS_CONTRADAR.
+ * Call with only the state (or nil for r) to restore its engine default.
+ * Defaults: ghost = (0.6, 0.6, 0.6, alphaValues.y), radarGhost =
+ * (0.9, 0.9, 0.9, alphaValues.z); both highlights = (1, 0.85, 0.45, 0.55).
+ * Default non-highlight alpha follows UnitTransparency; explicit alpha overrides it.
+ * Overrides last until reset or the game ends. Widgets should reset their overrides on shutdown.
+ * @function Spring.SetGhostColor
+ * @param state "ghost"|"ghostHighlight"|"radarGhost"|"radarGhostHighlight"
+ * @param r number? Red, in [0, 1]. Omit to reset this state.
+ * @param g number? Green, in [0, 1]. Required when r is supplied.
+ * @param b number? Blue, in [0, 1]. Required when r is supplied.
+ * @param a number? Alpha, in [0, 1]. Required when r is supplied.
+ * @return nil
+ */
+int LuaUnsyncedCtrl::SetGhostColor(lua_State* L)
+{
+	static const char* const states[] = {"ghost", "ghostHighlight", "radarGhost", "radarGhostHighlight", nullptr};
+	const auto state = static_cast<CUnitDrawerData::GhostColorState>(luaL_checkoption(L, 1, nullptr, states));
+	if (lua_isnoneornil(L, 2)) {
+		CUnitDrawer::SetGhostColor(state, nullptr);
+		return 0;
+	}
+
+	float components[4];
+	for (int i = 0; i < 4; ++i) {
+		const lua_Number value = luaL_checknumber(L, i + 2);
+		luaL_argcheck(L, value >= 0.0 && value <= 1.0, i + 2, "expected a finite color component in [0, 1]");
+		components[i] = value;
+	}
+	const float4 color(components);
+	CUnitDrawer::SetGhostColor(state, &color);
+	return 0;
+}
 
 
 /***

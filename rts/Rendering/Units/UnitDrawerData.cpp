@@ -14,6 +14,7 @@
 #include "Game/CameraHandler.h"
 #include "Game/UI/MiniMap.h"
 #include "Rendering/Common/ModelDrawerHelpers.h"
+#include "Rendering/Common/ModelDrawerState.hpp"
 #include "Rendering/Units/UnitDrawer.h"
 #include "Rendering/Models/IModelParser.h"
 #include "Rendering/LuaObjectDrawer.h"
@@ -880,6 +881,35 @@ bool CUnitDrawerData::TraceGhost(const float3& start, const float3& dir, float l
 			trace(dead->targets[gu->myAllyTeam], -1);
 	}
 	return hit;
+}
+
+void CUnitDrawerData::SetGhostColor(GhostColorState state, const float4* color)
+{
+	auto& overrideColor = ghostColorOverrides[static_cast<size_t>(state)];
+	if (color != nullptr)
+		overrideColor = *color;
+	else
+		overrideColor.reset();
+}
+
+float4 CUnitDrawerData::GetGhostColor(bool radar, bool highlighted) const
+{
+	const auto state = radar
+		? (highlighted ? GhostColorState::RadarHighlight : GhostColorState::Radar)
+		: (highlighted ? GhostColorState::Highlight : GhostColorState::Normal);
+	const auto& overrideColor = ghostColorOverrides[static_cast<size_t>(state)];
+	if (overrideColor.has_value())
+		return *overrideColor;
+
+	// Keep normal ghost opacity responsive to the UnitTransparency setting.
+	const float4 ghostColor = {0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y};
+	const float4 radarGhostColor = {0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z};
+	static constexpr float4 GhostHighlightColor = {1.0f, 0.85f, 0.45f, 0.55f};
+	static constexpr float4 RadarGhostHighlightColor = {1.0f, 0.85f, 0.45f, 0.55f};
+
+	if (highlighted)
+		return radar ? RadarGhostHighlightColor : GhostHighlightColor;
+	return radar ? radarGhostColor : ghostColor;
 }
 
 void CUnitDrawerData::SetGhostHighlight(const float3* aimPos)

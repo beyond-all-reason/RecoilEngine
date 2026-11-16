@@ -80,8 +80,6 @@ CONFIG(bool, AdvUnitShading).deprecated(true);
 
 /***********************************************************************/
 
-static constexpr float4 ghostHighlightColor = {1.0f, 0.85f, 0.45f, 0.55f};
-
 //don't inherit and leave only static Unit specific helpers
 class CUnitDrawerHelper
 {
@@ -1117,10 +1115,9 @@ void CUnitDrawerGLSL::DrawAlphaObjectsAux(int modelType) const
 void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
+	auto* shader = modelDrawerState->ActiveShader();
 	const auto& deadGhostedBuildings = modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam, modelType);
 	const auto& liveGhostedBuildings = modelDrawerData->GetLiveGhostBuildings(gu->myAllyTeam, modelType);
-
-	glColor4f(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
 
 	// buildings that died while ghosted
 	for (const GhostSolidObject* dgb : deadGhostedBuildings) {
@@ -1134,12 +1131,9 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 
 		CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType);
 		const bool highlighted = modelDrawerData->IsGhostHighlighted(dgb->targets[gu->myAllyTeam]);
-		const float alpha = highlighted ? ghostHighlightColor.w : IModelDrawerState::alphaValues.y;
-		if (highlighted)
-			glColor4fv(ghostHighlightColor);
-		else
-			glColor4f(0.6f, 0.6f, 0.6f, alpha);
-		SetTeamColor(dgb->team, alpha);
+		const float4 color = modelDrawerData->GetGhostColor(false, highlighted);
+		shader->SetUniform("ghostColor", color.x, color.y, color.z);
+		SetTeamColor(dgb->team, color.w);
 
 		model->DrawStatic();
 		glPopMatrix();
@@ -1160,16 +1154,8 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 		const unsigned short losStatus = unit->losStatus[gu->myAllyTeam];
 
 		const bool highlighted = (losStatus & LOS_INLOS) == 0 && modelDrawerData->IsGhostHighlighted(lgb.target);
-		// ghosted enemy units
-		if (highlighted) {
-			glColor4fv(ghostHighlightColor);
-		}
-		else if (losStatus & LOS_CONTRADAR) {
-			glColor4f(0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z);
-		}
-		else {
-			glColor4f(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
-		}
+		const float4 color = modelDrawerData->GetGhostColor((losStatus & LOS_CONTRADAR) != 0, highlighted);
+		shader->SetUniform("ghostColor", color.x, color.y, color.z);
 
 		glPushMatrix();
 		glTranslatef3(unit->drawPos);
@@ -1182,13 +1168,13 @@ void CUnitDrawerGLSL::DrawGhostedBuildings(int modelType) const
 		CModelDrawerHelper::BindModelTypeTexture(modelType, model->textureType);
 
 		// color with the team the unit was last seen under, not the live unit's current team
-		const float ghostAlpha = highlighted ? ghostHighlightColor.w : (losStatus & LOS_CONTRADAR) ? IModelDrawerState::alphaValues.z : IModelDrawerState::alphaValues.y;
-		SetTeamColor(lgb.team, ghostAlpha);
+		SetTeamColor(lgb.team, color.w);
 		model->DrawStatic();
 		glPopMatrix();
 
 		glColor4f(1.0f, 1.0f, 1.0f, IModelDrawerState::alphaValues.x);
 	}
+	shader->SetUniform("ghostColor", 1.0f, 1.0f, 1.0f);
 }
 
 void CUnitDrawerGLSL::DrawOpaqueUnit(CUnit* unit, uint8_t thisPassMask) const
@@ -2042,7 +2028,9 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 	// bind the texture once per group, accumulate, then one Submit (=one multidraw) per texture type.
 	// buckets are reused across frames (see clearBuckets) so a screen full of ghosts does not realloc
 	// its per-texture vectors every frame; empty buckets (a texture no longer on screen) are skipped.
-	const auto flushGhosts = [&](const std::map<int, std::vector<GhostInstance>>& byTex) {
+	const auto flushGhosts = [&](const std::map<int, std::vector<GhostInstance>>& byTex, const float4& color) {
+		modelDrawerState->SetColorMultiplier(color.x, color.y, color.z, color.w);
+		modelDrawerState->SetTeamColor(0, color.w); // teamID is per-instance
 		for (const auto& [texType, instances] : byTex) {
 			if (instances.empty())
 				continue;
@@ -2060,8 +2048,10 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 
 	static std::map<int, std::vector<GhostInstance>> byTexHighlighted;
 	clearBuckets(byTexHighlighted);
+	static std::map<int, std::vector<GhostInstance>> byTexRadarHighlighted;
+	clearBuckets(byTexRadarHighlighted);
 
-	// deadGhostedBuildings (single color state)
+	// deadGhostedBuildings (normal or highlighted)
 	{
 		const auto& deadGhostBuildings = modelDrawerData->GetDeadGhostBuildings(gu->myAllyTeam, modelType);
 
@@ -2081,13 +2071,11 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 		}
 
 		if (any) {
-			modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
-			modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.y); //teamID is per-instance
-			flushGhosts(byTex);
+			flushGhosts(byTex, modelDrawerData->GetGhostColor(false, false));
 		}
 	}
 
-	// liveGhostedBuildings (two color states: normal and CONTRADAR)
+	// liveGhostedBuildings (normal or CONTRADAR, each with its own highlight)
 	{
 		const auto& liveGhostedBuildings = modelDrawerData->GetLiveGhostBuildings(gu->myAllyTeam, modelType);
 
@@ -2118,7 +2106,8 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 			const unsigned short losStatus = u->losStatus[gu->myAllyTeam];
 			const bool contradar = (losStatus & LOS_CONTRADAR);
 			if ((losStatus & LOS_INLOS) == 0 && modelDrawerData->IsGhostHighlighted(lgb.target)) {
-				byTexHighlighted[model->textureType].push_back({ model, static_cast<uint32_t>(xfOffset), lgb.paletteIndex });
+				(contradar ? byTexRadarHighlighted : byTexHighlighted)[model->textureType]
+					.push_back({ model, static_cast<uint32_t>(xfOffset), lgb.paletteIndex });
 				continue;
 			}
 			// bucket with the palette the unit was last seen under, not the live unit's current one
@@ -2128,20 +2117,15 @@ void CUnitDrawerGL4::DrawGhostedBuildings(int modelType) const
 		}
 
 		if (anyNormal) {
-			modelDrawerState->SetColorMultiplier(0.6f, 0.6f, 0.6f, IModelDrawerState::alphaValues.y);
-			modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.y);
-			flushGhosts(byTexNormal);
+			flushGhosts(byTexNormal, modelDrawerData->GetGhostColor(false, false));
 		}
 		if (anyContradar) {
-			modelDrawerState->SetColorMultiplier(0.9f, 0.9f, 0.9f, IModelDrawerState::alphaValues.z);
-			modelDrawerState->SetTeamColor(0, IModelDrawerState::alphaValues.z);
-			flushGhosts(byTexContradar);
+			flushGhosts(byTexContradar, modelDrawerData->GetGhostColor(true, false));
 		}
 	}
 
-	modelDrawerState->SetColorMultiplier(ghostHighlightColor.x, ghostHighlightColor.y, ghostHighlightColor.z, ghostHighlightColor.w);
-	modelDrawerState->SetTeamColor(0, ghostHighlightColor.w);
-	flushGhosts(byTexHighlighted);
+	flushGhosts(byTexHighlighted, modelDrawerData->GetGhostColor(false, true));
+	flushGhosts(byTexRadarHighlighted, modelDrawerData->GetGhostColor(true, true));
 
 	modelDrawerState->SetColorMultiplier(IModelDrawerState::alphaValues.x);
 	modelDrawerState->SetMatrixMode(oldMM); //reset is needed because other modelType's might be rendered afterwards

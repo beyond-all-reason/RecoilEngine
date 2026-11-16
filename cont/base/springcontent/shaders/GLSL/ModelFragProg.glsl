@@ -1,3 +1,5 @@
+#version 120
+
 #define textureS3o1 diffuseTex
 #define textureS3o2 shadingTex
 	uniform sampler2D textureS3o1;
@@ -22,6 +24,8 @@
 // texture alpha-masking is done in both passes
 uniform vec4 teamColor;
 uniform vec4 nanoColor;
+// Ghost tint is explicit: the GLSL model shaders do not consume gl_Color.
+uniform vec3 ghostColor = vec3(1.0);
 
 varying vec4 vertexWorldPos;
 varying vec3 cameraDir;
@@ -117,6 +121,7 @@ void main(void)
 	gl_FragData[GBUFFER_NORMTEX_IDX] = vec4((normal + vec3(1.0, 1.0, 1.0)) * 0.5, 1.0);
 	gl_FragData[GBUFFER_DIFFTEX_IDX] = vec4(mix(                         diffuse.rgb, teamColor.rgb,   diffuse.a), alpha);
 	gl_FragData[GBUFFER_DIFFTEX_IDX] = vec4(mix(gl_FragData[GBUFFER_DIFFTEX_IDX].rgb, nanoColor.rgb, nanoColor.a), alpha);
+	gl_FragData[GBUFFER_DIFFTEX_IDX].rgb *= ghostColor;
 	// do not premultiply reflection, leave it to the deferred lighting pass
 	// gl_FragData[GBUFFER_DIFFTEX_IDX] = vec4(mix(diffuse.rgb, teamColor.rgb, diffuse.a) * reflection, alpha);
 	// allows standard-lighting reconstruction by lazy LuaMaterials using us
@@ -126,6 +131,7 @@ void main(void)
 #else
 	gl_FragColor.rgb = mix(gl_Fog.color.rgb, gl_FragColor.rgb, fogFactor); // fog
 	gl_FragColor.rgb = mix(gl_FragColor.rgb, nanoColor.rgb, nanoColor.a); // wireframe or polygon color
+	gl_FragColor.rgb *= ghostColor;
 	gl_FragColor.a   = alpha;
 #endif
 }

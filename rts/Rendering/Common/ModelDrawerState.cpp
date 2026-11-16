@@ -146,6 +146,7 @@ CModelDrawerStateGLSL::CModelDrawerStateGLSL()
 		modelShaders[n]->SetUniform3v("cameraPos", &camera->GetPos()[0]);
 		modelShaders[n]->SetUniform("teamColor", 0.0f, 0.0f, 0.0f, 0.0f);
 		modelShaders[n]->SetUniform("nanoColor", 0.0f, 0.0f, 0.0f, 0.0f);
+		modelShaders[n]->SetUniform("ghostColor", 1.0f, 1.0f, 1.0f);
 		modelShaders[n]->SetUniform3v("sunAmbient", &sunLighting->modelAmbientColor[0]);
 		modelShaders[n]->SetUniform3v("sunDiffuse", &sunLighting->modelDiffuseColor[0]);
 		modelShaders[n]->SetUniform3v("sunSpecular", &sunLighting->modelSpecularColor[0]);

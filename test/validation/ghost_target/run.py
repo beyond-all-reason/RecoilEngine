@@ -29,7 +29,11 @@ def main():
     parser.add_argument("--assets", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--baseline", action="store_true")
+    parser.add_argument("--colors", action="store_true", help="exercise Lua RGBA overrides and reset")
+    parser.add_argument("--glsl", action="store_true", help="force the legacy GLSL model renderer")
     args = parser.parse_args()
+    if args.colors and args.baseline:
+        parser.error("--colors requires the candidate engine")
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     exe, bar, assets, out = (p.resolve() for p in (args.engine, args.bar, args.assets, args.output))
     out.mkdir(parents=True, exist_ok=True)
@@ -50,6 +54,7 @@ def main():
         )
         shutil.copyfile(fixture / "scenario.lua", overlay / "luarules/gadgets/test_ghost_target.lua")
         shutil.copyfile(fixture / "ui.lua", overlay / "luaui.lua")
+        shutil.copyfile(fixture / "ghost_colors.lua", overlay / "ghost_colors.lua")
         (out / "input.txt").write_text(START_SCRIPT)
         sock.bind(("127.0.0.1", 0))
         sock.settimeout(0.2)
@@ -57,6 +62,7 @@ def main():
         config.write_text(
             "LuaUI = 1\nSound = 0\nWorkerThreadCount = 4\nPathingThreadCount = 1\n"
             "GhostedBuildings = 1\nUnitIconsAsUI = 1\nFullscreen = 0\nXResolutionWindowed = 1280\nYResolutionWindowed = 720\nVSync = 0\n"
+            f"GhostTestColors = {int(args.colors)}\nForceDisableGL4 = {int(args.glsl)}\n"
             f"GhostTestCandidate = {int(candidate)}\nAutohostIP = 127.0.0.1\nAutohostPort = {sock.getsockname()[1]}\n"
         )
         command = [str(exe), "--isolation", f"--isolation-dir={data}", f"--write-dir={data}", f"--config={config}", "--only-local", str(out / "input.txt")]
@@ -71,7 +77,7 @@ def main():
                     except socket.timeout:
                         pass
                     elapsed = time.monotonic() - started
-                    for delay, message in ((5, "/forcestart"), (7, "/setmaxspeed 3"), (8, "/setminspeed 3")):
+                    for delay, message in ((5, "/forcestart"), (7, "/setmaxspeed 1"), (8, "/setminspeed 1")):
                         if peer and elapsed > delay and message not in sent:
                             sock.sendto(message.encode(), peer)
                             sent.add(message)
@@ -85,6 +91,10 @@ def main():
             assert "GHOST_TEST DONE" in content, "missing completion marker; see engine.log"
             assert "GHOST_TEST FAIL" not in content, "fixture failed; see engine.log"
             assert "LUA_ERRRUN" not in content, "Lua error; see engine.log"
+            assert "[Shader] Error:" not in content, "shader error; see engine.log"
+            if args.colors:
+                assert "GHOST_TEST PASS ghost color API validation" in content
+                assert "GHOST_TEST PASS ghost colors reset" in content
             expected = 280 if candidate else 200
             for event in ("attack_y", "settarget_y"):
                 assert f"GHOST_TEST {event} {expected}" in content, event
