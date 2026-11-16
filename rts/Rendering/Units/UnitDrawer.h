@@ -26,6 +26,10 @@ struct MiniMapIconDrawParams {
 	float iconSizeX = 1.0f;                  // base icon half-size in elmos, scaled per icon
 	float iconSizeY = 1.0f;
 	int rotation = 0;                        // CMiniMap::RotationOptions
+	// counter-clockwise screen rotation (radians) the caller applies to the drawn result
+	// itself (gl.DrawMiniMapIcons; positions stay unrotated): each icon is turned back by
+	// it to stay upright, and icons stack by the rotated screen vertical
+	float outputRotation = 0.0f;
 	int viewAllyTeam = 0;                    // perspective the icons are selected/positioned for
 	bool fullView = false;                   // godmode: true positions, everything visible
 	bool useIcons = true;                    // false = draw every unit as the default radar dot
@@ -214,7 +218,7 @@ protected:
 	void PopIndividualOpaqueState(const S3DModel* model, int teamID, bool deferredPass) const;
 	void PopIndividualAlphaState(const S3DModel* model, int teamID, bool deferredPass) const;
 
-	void DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, size_t iconIdx, const float iconScale, const float3& pos, const SColor& color, const MiniMapIconDrawParams& params) const;
+	void DrawUnitMiniMapIcon(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, size_t iconIdx, const float iconScale, const float3& pos, const SColor& color, const MiniMapIconDrawParams& params, float quadSin, float quadCos) const;
 	float DrawUnitIcon(TypedRenderBuffer<VA_TYPE_TC3>& rb, size_t iconIdx, const float iconRadius, const float unitRadius, float3 pos, const SColor& color) const;
 	void DrawUnitIconScreen(TypedRenderBuffer<VA_TYPE_2DTC3>& rb, size_t iconIdx, const float3& pos, SColor& color, float unitRadius, bool isIcon) const;
 };
