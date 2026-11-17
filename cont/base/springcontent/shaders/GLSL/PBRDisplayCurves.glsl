@@ -137,71 +137,71 @@ vec3 FilmicHejl(vec3 x) {
 	return (x * (6.2 * x + 0.5)) / (x * (6.2 * x + 1.7) + 0.06);
 }
 
-// Filmic tone mapper inspired by Unreal's, with its default post-process settings. Analytic chain, not a LUT;
-// the 6500 K white balance is left out (identity within 0.1 %). The matrices are products of the ACES AP0/AP1 matrices.
-const mat3 UE_SRGB_2_AP1 = mat3(0.6130974024, 0.07019372251, 0.02061559286, 0.3395231461, 0.9163538791, 0.1095697729, 0.04737945145, 0.01345239859, 0.8698146341);
-const mat3 UE_AP1_2_SRGB = mat3(1.705050993, -0.1302564175, -0.02400335679, -0.6217921205, 1.140804736, -0.1289689761, -0.08325887216, -0.01054831904, 1.152972333);
-const mat3 UE_AP1_2_AP0 = mat3(0.6954522413, 0.04479456338, -0.005525882568, 0.1406786965, 0.8596711184, 0.004025210277, 0.1638690622, 0.0955343182, 1.001500672);
-const mat3 UE_AP0_2_AP1_FILM = mat3(1.451439316, -0.0765537734, 0.0083161484, -0.2365107469, 1.1762297, -0.0060324498, -0.2149285693, -0.0996759264, 0.9977163014);
-const mat3 UE_EXPAND = mat3(1.370412372, -0.08343349166, -0.02579332091, -0.3292921877, 1.097092748, -0.09862579884, -0.0636831194, -0.01086137953, 1.203694953);
-const mat3 UE_BLUE = mat3(0.9386393778, 8.360085378e-11, 2.131872912e-12, 1.023595929e-10, 0.8307941329, -5.633071266e-12, 0.06136062213, 0.1692058671, 1);
-const mat3 UE_BLUE_INV = mat3(1.065374875, -3.455255821e-07, 1.98654478e-08, 1.446785097e-06, 1.203663524, 2.120795747e-08, -0.06537100528, -0.2036677199, 0.9999996001);
-const vec3 UE_AP1_RGB2Y = vec3(0.2722287168, 0.6740817658, 0.0536895174);
-const float UE_FILM_SLOPE = 0.88;
-const float UE_FILM_TOE = 0.55;
-const float UE_FILM_SHOULDER = 0.26;
-const float UE_FILM_BLACK_CLIP = 0.0;
-const float UE_FILM_WHITE_CLIP = 0.04;
-const float UE_BLUE_CORRECTION = 0.6;
-const float UE_EXPAND_GAMUT = 1.0;
-const float UE_LUT_INPUT_MAX = 43.7052;
+// Filmic tone mapper inspired by Unreal's filmic tone mapper.
+// Matrices: products of the ACES AP0/AP1 primaries; Aces* helpers: the ACES RRT (github.com/ampas/aces-dev).
+const mat3 SRGB_TO_AP1 = mat3(0.6130974024, 0.07019372251, 0.02061559286, 0.3395231461, 0.9163538791, 0.1095697729, 0.04737945145, 0.01345239859, 0.8698146341);
+const mat3 AP1_TO_SRGB = mat3(1.705050993, -0.1302564175, -0.02400335679, -0.6217921205, 1.140804736, -0.1289689761, -0.08325887216, -0.01054831904, 1.152972333);
+const mat3 AP1_TO_AP0 = mat3(0.6954522413, 0.04479456338, -0.005525882568, 0.1406786965, 0.8596711184, 0.004025210277, 0.1638690622, 0.0955343182, 1.001500672);
+const mat3 AP0_TO_AP1_FILMIC = mat3(1.451439316, -0.0765537734, 0.0083161484, -0.2365107469, 1.1762297, -0.0060324498, -0.2149285693, -0.0996759264, 0.9977163014);
+const mat3 GAMUT_EXPAND = mat3(1.370412372, -0.08343349166, -0.02579332091, -0.3292921877, 1.097092748, -0.09862579884, -0.0636831194, -0.01086137953, 1.203694953);
+const mat3 BLUE_CORRECTION = mat3(0.9386393778, 8.360085378e-11, 2.131872912e-12, 1.023595929e-10, 0.8307941329, -5.633071266e-12, 0.06136062213, 0.1692058671, 1);
+const mat3 BLUE_CORRECTION_INV = mat3(1.065374875, -3.455255821e-07, 1.98654478e-08, 1.446785097e-06, 1.203663524, 2.120795747e-08, -0.06537100528, -0.2036677199, 0.9999996001);
+const vec3 AP1_LUMA = vec3(0.2722287168, 0.6740817658, 0.0536895174);
+const float FILMIC_SLOPE = 0.88;
+const float FILMIC_TOE = 0.55;
+const float FILMIC_SHOULDER = 0.26;
+const float FILMIC_BLACK_CLIP = 0.0;
+const float FILMIC_WHITE_CLIP = 0.04;
+const float BLUE_CORRECTION_AMOUNT = 0.6;
+const float GAMUT_EXPAND_AMOUNT = 1.0;
+const float FILMIC_INPUT_MAX = 43.7052;
 
-float UeSaturation(vec3 c) {
+float AcesSaturation(vec3 c) {
 	float mn = min(min(c.r, c.g), c.b);
 	float mx = max(max(c.r, c.g), c.b);
 	return (max(mx, 1e-10) - max(mn, 1e-10)) / max(mx, 1e-2);
 }
-float UeYC(vec3 c) {
+float AcesYC(vec3 c) {
 	float chroma = sqrt(max(c.b * (c.b - c.g) + c.g * (c.g - c.r) + c.r * (c.r - c.b), 0.0));
 	return (c.r + c.g + c.b + 1.75 * chroma) / 3.0;
 }
-float UeSigmoidShaper(float x) {
+float AcesSigmoidShaper(float x) {
 	float t = max(1.0 - abs(0.5 * x), 0.0);
 	return 0.5 * (1.0 + sign(x) * (1.0 - t * t));
 }
-float UeGlowFwd(float yc, float gain, float mid) {
+float AcesGlowFwd(float yc, float gain, float mid) {
 	return (yc <= 2.0 / 3.0 * mid) ? gain : ((yc >= 2.0 * mid) ? 0.0 : gain * (mid / yc - 0.5));
 }
-float UeHue(vec3 c) {
+float AcesHue(vec3 c) {
 	float h = (c.r == c.g && c.g == c.b) ? 0.0 : degrees(atan(sqrt(3.0) * (c.g - c.b), 2.0 * c.r - c.g - c.b));
 	if (h < 0.0)
 		h += 360.0;
 	return clamp(h, 0.0, 360.0);
 }
 
-vec3 UeFilmToneMap(vec3 ap1) {
-	vec3 ap0 = UE_AP1_2_AP0 * ap1;
-	float sat = UeSaturation(ap0);
-	float s = UeSigmoidShaper((sat - 0.4) / 0.2);
-	ap0 *= 1.0 + UeGlowFwd(UeYC(ap0), 0.05 * s, 0.08);
-	float hue = UeHue(ap0);
+vec3 FilmicToneCurve(vec3 ap1) {
+	vec3 ap0 = AP1_TO_AP0 * ap1;
+	float sat = AcesSaturation(ap0);
+	float s = AcesSigmoidShaper((sat - 0.4) / 0.2);
+	ap0 *= 1.0 + AcesGlowFwd(AcesYC(ap0), 0.05 * s, 0.08);
+	float hue = AcesHue(ap0);
 	if (hue > 180.0)
 		hue -= 360.0;
 	float hueWeight = smoothstep(0.0, 1.0, 1.0 - abs(2.0 * hue / 135.0));
 	hueWeight *= hueWeight;
 	ap0.r += hueWeight * sat * (0.03 - ap0.r) * (1.0 - 0.82);
-	vec3 w = max(vec3(0.0), UE_AP0_2_AP1_FILM * ap0);
-	w = mix(vec3(dot(w, UE_AP1_RGB2Y)), w, 0.96);
-	float toeScale = 1.0 + UE_FILM_BLACK_CLIP - UE_FILM_TOE;
-	float shoulderScale = 1.0 + UE_FILM_WHITE_CLIP - UE_FILM_SHOULDER;
-	float bt = (0.18 + UE_FILM_BLACK_CLIP) / toeScale - 1.0;
-	float toeMatch = log(0.18) / log(10.0) - 0.5 * log((1.0 + bt) / (1.0 - bt)) * (toeScale / UE_FILM_SLOPE);
-	float straightMatch = (1.0 - UE_FILM_TOE) / UE_FILM_SLOPE - toeMatch;
-	float shoulderMatch = UE_FILM_SHOULDER / UE_FILM_SLOPE - straightMatch;
+	vec3 w = max(vec3(0.0), AP0_TO_AP1_FILMIC * ap0);
+	w = mix(vec3(dot(w, AP1_LUMA)), w, 0.96);
+	float toeScale = 1.0 + FILMIC_BLACK_CLIP - FILMIC_TOE;
+	float shoulderScale = 1.0 + FILMIC_WHITE_CLIP - FILMIC_SHOULDER;
+	float bt = (0.18 + FILMIC_BLACK_CLIP) / toeScale - 1.0;
+	float toeMatch = log(0.18) / log(10.0) - 0.5 * log((1.0 + bt) / (1.0 - bt)) * (toeScale / FILMIC_SLOPE);
+	float straightMatch = (1.0 - FILMIC_TOE) / FILMIC_SLOPE - toeMatch;
+	float shoulderMatch = FILMIC_SHOULDER / FILMIC_SLOPE - straightMatch;
 	vec3 logc = log(max(w, vec3(1e-30))) / log(10.0);
-	vec3 straightC = UE_FILM_SLOPE * (logc + straightMatch);
-	vec3 toeC = -UE_FILM_BLACK_CLIP + (2.0 * toeScale) / (1.0 + exp((-2.0 * UE_FILM_SLOPE / toeScale) * (logc - toeMatch)));
-	vec3 shoulderC = (1.0 + UE_FILM_WHITE_CLIP) - (2.0 * shoulderScale) / (1.0 + exp((2.0 * UE_FILM_SLOPE / shoulderScale) * (logc - shoulderMatch)));
+	vec3 straightC = FILMIC_SLOPE * (logc + straightMatch);
+	vec3 toeC = -FILMIC_BLACK_CLIP + (2.0 * toeScale) / (1.0 + exp((-2.0 * FILMIC_SLOPE / toeScale) * (logc - toeMatch)));
+	vec3 shoulderC = (1.0 + FILMIC_WHITE_CLIP) - (2.0 * shoulderScale) / (1.0 + exp((2.0 * FILMIC_SLOPE / shoulderScale) * (logc - shoulderMatch)));
 	toeC = mix(straightC, toeC, lessThan(logc, vec3(toeMatch)));
 	shoulderC = mix(straightC, shoulderC, greaterThan(logc, vec3(shoulderMatch)));
 	vec3 t = clamp((logc - toeMatch) / (shoulderMatch - toeMatch), 0.0, 1.0);
@@ -209,24 +209,24 @@ vec3 UeFilmToneMap(vec3 ap1) {
 		t = 1.0 - t; // true for the default toe and shoulder
 	t = (3.0 - 2.0 * t) * t * t;
 	vec3 tone = mix(toeC, shoulderC, t);
-	tone = mix(vec3(dot(tone, UE_AP1_RGB2Y)), tone, 0.93);
+	tone = mix(vec3(dot(tone, AP1_LUMA)), tone, 0.93);
 	return max(vec3(0.0), tone);
 }
 
 // exposed scene-linear sRGB -> encoded display value
 vec3 UnrealFilmic(vec3 lin) {
-	lin = clamp(lin, vec3(0.0), vec3(UE_LUT_INPUT_MAX));
-	vec3 c = UE_SRGB_2_AP1 * lin;
-	float luma = dot(c, UE_AP1_RGB2Y);
+	lin = clamp(lin, vec3(0.0), vec3(FILMIC_INPUT_MAX));
+	vec3 c = SRGB_TO_AP1 * lin;
+	float luma = dot(c, AP1_LUMA);
 	if (luma > 0.0) {
 		vec3 d = c / luma - 1.0;
-		float expand = (1.0 - exp2(-4.0 * dot(d, d))) * (1.0 - exp2(-4.0 * UE_EXPAND_GAMUT * luma * luma));
-		c = mix(c, UE_EXPAND * c, expand);
+		float expand = (1.0 - exp2(-4.0 * dot(d, d))) * (1.0 - exp2(-4.0 * GAMUT_EXPAND_AMOUNT * luma * luma));
+		c = mix(c, GAMUT_EXPAND * c, expand);
 	}
-	c = mix(c, UE_BLUE * c, UE_BLUE_CORRECTION);
-	c = UeFilmToneMap(c);
-	c = mix(c, UE_BLUE_INV * c, UE_BLUE_CORRECTION);
-	return clamp(SRGBEncode(max(vec3(0.0), UE_AP1_2_SRGB * c)), 0.0, 1.0);
+	c = mix(c, BLUE_CORRECTION * c, BLUE_CORRECTION_AMOUNT);
+	c = FilmicToneCurve(c);
+	c = mix(c, BLUE_CORRECTION_INV * c, BLUE_CORRECTION_AMOUNT);
+	return clamp(SRGBEncode(max(vec3(0.0), AP1_TO_SRGB * c)), 0.0, 1.0);
 }
 
 // BAR's CUS CustomTM; it works on display-encoded values, so no encode follows it.
@@ -235,7 +235,7 @@ vec3 BarCustom(vec3 encoded) {
 	return (encoded * (A * encoded + B)) / (encoded * (C * encoded + D) + E);
 }
 
-// Triangular grain as in Unreal's backbuffer dither; `seed` moves it every frame, amount 0 switches it off.
+// Triangular grain of +-1 step (the "unreal" option); `seed` moves it every frame, amount 0 switches it off.
 vec3 PBRDitherDisplay(vec3 encoded, vec2 pixel, float seed, float amount) {
 	float uniformGrain = fract(sin(pixel.x + seed + (pixel.y + seed) * 543.31) * 493013.0);
 	float n = uniformGrain * 2.0 - 1.0;

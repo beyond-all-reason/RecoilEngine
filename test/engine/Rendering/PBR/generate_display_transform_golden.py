@@ -122,15 +122,15 @@ def filmic_hejl(c):
     return tuple(out)
 
 
-# Filmic tone mapper inspired by Unreal's (default post-process settings).
-UE_SRGB_2_AP1 = [[0.6130974024, 0.3395231461, 0.04737945145], [0.07019372251, 0.9163538791, 0.01345239859], [0.02061559286, 0.1095697729, 0.8698146341]]
-UE_AP1_2_SRGB = [[1.705050993, -0.6217921205, -0.08325887216], [-0.1302564175, 1.140804736, -0.01054831904], [-0.02400335679, -0.1289689761, 1.152972333]]
-UE_AP1_2_AP0 = [[0.6954522413, 0.1406786965, 0.1638690622], [0.04479456338, 0.8596711184, 0.0955343182], [-0.005525882568, 0.004025210277, 1.001500672]]
-UE_AP0_2_AP1_FILM = [[1.451439316, -0.2365107469, -0.2149285693], [-0.0765537734, 1.1762297, -0.0996759264], [0.0083161484, -0.0060324498, 0.9977163014]]
-UE_EXPAND = [[1.370412372, -0.3292921877, -0.0636831194], [-0.08343349166, 1.097092748, -0.01086137953], [-0.02579332091, -0.09862579884, 1.203694953]]
-UE_BLUE = [[0.9386393778, 1.023595929e-10, 0.06136062213], [8.360085378e-11, 0.8307941329, 0.1692058671], [2.131872912e-12, -5.633071266e-12, 1.0]]
-UE_BLUE_INV = [[1.065374875, 1.446785097e-06, -0.06537100528], [-3.455255821e-07, 1.203663524, -0.2036677199], [1.98654478e-08, 2.120795747e-08, 0.9999996001]]
-UE_AP1_RGB2Y = (0.2722287168, 0.6740817658, 0.0536895174)
+# Filmic tone mapper inspired by Unreal's filmic tone mapper; matrices from the ACES AP0/AP1 primaries.
+SRGB_TO_AP1 = [[0.6130974024, 0.3395231461, 0.04737945145], [0.07019372251, 0.9163538791, 0.01345239859], [0.02061559286, 0.1095697729, 0.8698146341]]
+AP1_TO_SRGB = [[1.705050993, -0.6217921205, -0.08325887216], [-0.1302564175, 1.140804736, -0.01054831904], [-0.02400335679, -0.1289689761, 1.152972333]]
+AP1_TO_AP0 = [[0.6954522413, 0.1406786965, 0.1638690622], [0.04479456338, 0.8596711184, 0.0955343182], [-0.005525882568, 0.004025210277, 1.001500672]]
+AP0_TO_AP1_FILMIC = [[1.451439316, -0.2365107469, -0.2149285693], [-0.0765537734, 1.1762297, -0.0996759264], [0.0083161484, -0.0060324498, 0.9977163014]]
+GAMUT_EXPAND = [[1.370412372, -0.3292921877, -0.0636831194], [-0.08343349166, 1.097092748, -0.01086137953], [-0.02579332091, -0.09862579884, 1.203694953]]
+BLUE_CORRECTION = [[0.9386393778, 1.023595929e-10, 0.06136062213], [8.360085378e-11, 0.8307941329, 0.1692058671], [2.131872912e-12, -5.633071266e-12, 1.0]]
+BLUE_CORRECTION_INV = [[1.065374875, 1.446785097e-06, -0.06537100528], [-3.455255821e-07, 1.203663524, -0.2036677199], [1.98654478e-08, 2.120795747e-08, 0.9999996001]]
+AP1_LUMA = (0.2722287168, 0.6740817658, 0.0536895174)
 
 
 def _lerp(a, b, t):
@@ -141,8 +141,8 @@ def _dot(a, b):
     return sum(x * y for x, y in zip(a, b))
 
 
-def _ue_film_tone_map(ap1):
-    ap0 = mat(UE_AP1_2_AP0, ap1)
+def _filmic_tone_curve(ap1):
+    ap0 = mat(AP1_TO_AP0, ap1)
     mn, mx = min(ap0), max(ap0)
     sat = (max(mx, 1e-10) - max(mn, 1e-10)) / max(mx, 1e-2)
     sx = (sat - 0.4) / 0.2
@@ -165,8 +165,8 @@ def _ue_film_tone_map(ap1):
     hx = min(max(1 - abs(2 * hue / 135), 0.0), 1.0)
     weight = (hx * hx * (3 - 2 * hx)) ** 2
     ap0 = (ap0[0] + weight * sat * (0.03 - ap0[0]) * (1 - 0.82), ap0[1], ap0[2])
-    w = tuple(max(0.0, x) for x in mat(UE_AP0_2_AP1_FILM, ap0))
-    w = _lerp((_dot(w, UE_AP1_RGB2Y),) * 3, w, 0.96)
+    w = tuple(max(0.0, x) for x in mat(AP0_TO_AP1_FILMIC, ap0))
+    w = _lerp((_dot(w, AP1_LUMA),) * 3, w, 0.96)
     slope, toe, shoulder, black, white = 0.88, 0.55, 0.26, 0.0, 0.04
     toe_scale, shoulder_scale = 1 + black - toe, 1 + white - shoulder
     bt = (0.18 + black) / toe_scale - 1
@@ -186,22 +186,22 @@ def _ue_film_tone_map(ap1):
             t = 1 - t
         t = (3 - 2 * t) * t * t
         tone.append(toe_c + (sh_c - toe_c) * t)
-    tone = _lerp((_dot(tone, UE_AP1_RGB2Y),) * 3, tuple(tone), 0.93)
+    tone = _lerp((_dot(tone, AP1_LUMA),) * 3, tuple(tone), 0.93)
     return tuple(max(0.0, x) for x in tone)
 
 
 def unreal(c):
     lin = tuple(min(max(x, 0.0), 43.7052) for x in c)
-    a = mat(UE_SRGB_2_AP1, lin)
-    luma = _dot(a, UE_AP1_RGB2Y)
+    a = mat(SRGB_TO_AP1, lin)
+    luma = _dot(a, AP1_LUMA)
     if luma > 0:
         d = tuple(x / luma - 1 for x in a)
         expand = (1 - 2 ** (-4 * _dot(d, d))) * (1 - 2 ** (-4 * 1.0 * luma * luma))
-        a = _lerp(a, mat(UE_EXPAND, a), expand)
-    a = _lerp(a, mat(UE_BLUE, a), 0.6)
-    a = _ue_film_tone_map(a)
-    a = _lerp(a, mat(UE_BLUE_INV, a), 0.6)
-    film = tuple(max(0.0, x) for x in mat(UE_AP1_2_SRGB, a))
+        a = _lerp(a, mat(GAMUT_EXPAND, a), expand)
+    a = _lerp(a, mat(BLUE_CORRECTION, a), 0.6)
+    a = _filmic_tone_curve(a)
+    a = _lerp(a, mat(BLUE_CORRECTION_INV, a), 0.6)
+    film = tuple(max(0.0, x) for x in mat(AP1_TO_SRGB, a))
     return tuple(min(max(srgb_encode(x), 0.0), 1.0) for x in film)
 
 
