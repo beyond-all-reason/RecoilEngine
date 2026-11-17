@@ -21,14 +21,7 @@ public:
 	unsigned int GetReflectionTextureSize() const { return reflTexSize; }
 	unsigned int GetSpecularTextureSize() const { return specTexSize; }
 
-	/**
-	 * Camera axes of the six cube faces, in OpenGL face order (POSITIVE_X,
-	 * NEGATIVE_X, POSITIVE_Y, NEGATIVE_Y, POSITIVE_Z, NEGATIVE_Z): forward,
-	 * right and up per face. The reflection captures here negate right and up
-	 * (reflections are drawn mirrored). Public and static so that
-	 * gl.RenderEnvironmentFace (LuaOpenGL.cpp) uses this one table: a Lua
-	 * cube's faces then line up with the legacy cubes' by construction.
-	 */
+	// forward, right, up per face in GL order; shared with gl.RenderEnvironmentFace
 	static constexpr float3 faceDirs[6][3] = {
 		{ RgtVector,  FwdVector,   UpVector}, // fwd = +x, right = +z, up = +y
 		{-RgtVector, -FwdVector,   UpVector}, // fwd = -x

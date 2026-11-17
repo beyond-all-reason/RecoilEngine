@@ -25,8 +25,7 @@ public:
 	virtual void SetLuaTexture(const MapTextureData& td) {}
 
 	virtual bool IsValid() const = 0;
-	// true when Draw() honours drawWithoutSunLobe (the procedural sky draws its
-	// sun as a lobe it can leave out; a painted skybox has the sun in its texels)
+	// a painted skybox has the sun in its texels and cannot leave it out
 	virtual bool SupportsSunFreeDraw() const { return false; }
 
 	virtual std::string GetName() const = 0;
@@ -69,9 +68,7 @@ public:
 	float fogEnd;
 	float cloudDensity;
 
-	// Set only around one Draw() by gl.RenderEnvironmentFace(..., sunFree = true):
-	// an environment for image-based lighting must not contain the sun, which
-	// the renderer already adds as the direct light.
+	// set around one Draw() by gl.RenderEnvironmentFace(..., sunFree = true)
 	bool drawWithoutSunLobe = false;
 protected:
 	float4 skyAxisAngle;

@@ -10,7 +10,7 @@ uniform vec3 fogColor;
 uniform vec4 planeColor; // .w signals if enabled
 uniform vec3 sunDir;
 uniform vec4 sunColor;
-// 1 draws the sun's glow; 0 leaves it out (environment captures for lighting)
+// 0 leaves the sun's glow out (lighting captures)
 uniform float sunLobe;
 
 const float cirrus1  = 0.9;

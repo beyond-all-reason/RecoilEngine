@@ -244,8 +244,6 @@ class LuaOpenGL {
 		static int CopyImageSubData(lua_State* L);
 		static int RenderToTexture(lua_State* L);
 		static int GenerateMipmap(lua_State* L);
-		// draws the engine sky (optionally terrain) into one face of a Lua cube;
-		// DrawGenesis only; uses the file-static capture FBO in LuaOpenGL.cpp
 		static int RenderEnvironmentFace(lua_State* L);
 		static int ActiveTexture(lua_State* L);
 		static int TexEnv(lua_State* L);
