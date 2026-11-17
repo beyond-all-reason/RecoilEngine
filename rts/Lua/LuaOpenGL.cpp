@@ -420,6 +420,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 		REGISTER_LUA_CFUNC(GenerateMipmap);
 	if (FBO::IsSupported())
 		REGISTER_LUA_CFUNC(RenderEnvironmentFace);
+	REGISTER_LUA_CFUNC(PublishTexture);
 
 	REGISTER_LUA_CFUNC(ActiveTexture);
 	REGISTER_LUA_CFUNC(TexEnv);
@@ -1422,8 +1423,9 @@ int LuaOpenGL::DrawMiniMap(lua_State* L)
  *
  * The rectangle is mapped onto the unit square under the current transform:
  * (left,top) -> (0,0), (right,bottom) -> (1,1). Callers position, scale, rotate or
- * flip the result via their own matrices, e.g. inside gl.RenderToTexture. Blending,
- * scissor and viewport state are left to the caller.
+ * flip the result via their own matrices, e.g. inside gl.RenderToTexture; when rotating,
+ * also pass the angle as `rotation` so the icons stay upright. Blending, scissor and
+ * viewport state are left to the caller.
  *
  * @function gl.DrawMiniMapIcons
  * @param left number map-space rectangle edges in elmos; left < right and top < bottom (top = smaller z) are required, mirror via your own transform instead
@@ -1434,6 +1436,7 @@ int LuaOpenGL::DrawMiniMap(lua_State* L)
  * @param allyTeam integer? (Default: your allyTeam) perspective to render; other allyteams require a full-read handle
  * @param fullView boolean? (Default: true when spectating in full view with a full-read handle) draw every unit at its true position; true requires a full-read handle, false is always allowed
  * @param highlightSelected boolean? (Default: true) draw the local player's selected units white. Other players' selections are unknown to the engine — when rendering another perspective, pass false and overlay that viewer's selection yourself
+ * @param rotation number? (Default: 0) counter-clockwise screen rotation in radians that you apply to the result, with the rectangle drawn minimap-style before it ((left,top) at the top-left). Each icon is turned back by it to stay upright and icons stack by the rotated screen vertical; positions are left to your transform. For a minimap replacement pass Spring.GetMiniMapRotation()
  */
 int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 {
@@ -1464,6 +1467,7 @@ int LuaOpenGL::DrawMiniMapIcons(lua_State* L)
 	params.iconSizeX = iconSize;
 	params.iconSizeY = iconSize;
 	params.rotation = CMiniMap::ROTATION_0;
+	params.outputRotation = luaL_optfloat(L, 9, 0.0f);
 	params.viewAllyTeam = allyTeam;
 	params.fullView = fullView;
 	params.useIcons = true;
@@ -4920,6 +4924,44 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 	}
 
 	lua_pushstring(L, error);
+	return 2;
+}
+
+
+/***
+ * Publishes a Lua texture of this handle as `"$pub:<name>"`, so other Lua
+ * handles and engine-bound materials can sample it, or unpublishes the name
+ * when `texName` is nil.
+ *
+ * Only the publishing handle can change a name until it unpublishes it.
+ * Deleting the texture, or the handle shutting down, unpublishes it.
+ * The name is resolved on every bind, and samples as no texture (id 0) while
+ * nothing is published under it.
+ *
+ * ```lua
+ * -- LuaRules (unsynced)
+ * gl.PublishTexture("pbr_irradiance", irradianceCube)
+ * -- LuaUI, or a material's texunits
+ * gl.Texture(0, "$pub:pbr_irradiance")
+ * ```
+ *
+ * @function gl.PublishTexture
+ * @param name string the published name, sampled as `"$pub:" .. name`
+ * @param texName string? Lua texture name of this handle, nil to unpublish
+ * @return boolean success
+ * @return string? error when another handle owns the name, or texName is not a texture of this handle
+ */
+int LuaOpenGL::PublishTexture(lua_State* L)
+{
+	// no CheckDrawingEnabled: publishing makes no GL call
+	std::string error;
+	const bool published = CLuaHandle::GetActiveTextures(L).Publish(luaL_checksstring(L, 1), luaL_optsstring(L, 2, ""), error);
+
+	lua_pushboolean(L, published);
+	if (published)
+		return 1;
+
+	lua_pushsstring(L, error);
 	return 2;
 }
 

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <unordered_set>
 #include <unordered_map>
+#include <string_view>
 
 #include "GLTFParser.h"
 #include "3DModel.hpp"
@@ -63,6 +64,8 @@ namespace Impl {
 	void ReadGeometryData(
 		S3DModel& model,
 		const fastgltf::Asset& asset,
+		std::string_view meshName,
+		bool& warnedMissingTangents,
 		const PrimContainer& primitives,
 		std::vector<SVertexData>& verts,
 		std::vector<uint32_t>& indcs,
@@ -231,8 +234,18 @@ namespace Impl {
 			if (!seenNormal)
 				ModelUtils::CalculateNormals(verts, indcs);
 
-			if (!seenTangents)
+			if (!seenTangents) {
+				// the generated tangents differ from the ones the normal map was baked with
+				if (!warnedMissingTangents) {
+					warnedMissingTangents = true;
+					LOG_SL(LOG_SECTION_MODEL, L_WARNING,
+						"GLTF model '%s': mesh '%.*s' primitive %zu has no TANGENT attribute, generating tangents from the UVs"
+						" (other primitives of this model without tangents are not reported)",
+						model.name.c_str(), static_cast<int>(meshName.size()), meshName.data(),
+						static_cast<size_t>(&prim - primitives.data()));
+				}
 				ModelUtils::CalculateTangents(verts, indcs);
+			}
 
 		}
 
@@ -497,8 +510,9 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 	);
 
 	const auto defaultSceneIdx = asset.defaultScene.value_or(0);
+	bool warnedMissingTangents = false;
 
-	auto* rootPiece = AllocRootEmptyPiece(&model, asset, defaultSceneIdx, sourceConvention);
+	auto* rootPiece = AllocRootEmptyPiece(&model, asset, defaultSceneIdx, sourceConvention, warnedMissingTangents);
 	model.FlattenPieceTree(rootPiece);
 
 	spring::unordered_map<size_t, size_t> nodeIdxToPieceIdx;
@@ -528,7 +542,7 @@ void CGLTFParser::Load(S3DModel& model, const std::string& modelFilePath)
 		const auto& mesh = asset.meshes[*node.meshIndex];
 		auto& skinnedMesh = allSkinnedMeshes.emplace_back();
 
-		Impl::ReadGeometryData(model, asset, mesh.primitives, skinnedMesh.verts, skinnedMesh.indcs, ni, sourceConvention, &skin);
+		Impl::ReadGeometryData(model, asset, mesh.name, warnedMissingTangents, mesh.primitives, skinnedMesh.verts, skinnedMesh.indcs, ni, sourceConvention, &skin);
 		Impl::TransformSkinsToModelSpace(skinnedMesh.verts, ni, modelTransforms);
 		Impl::ReplaceNodeIndexWithPieceIndex(skinnedMesh.verts, nodeIdxToPieceIdx);
 	}
@@ -595,7 +609,8 @@ GLTFPiece* CGLTFParser::AllocRootEmptyPiece(
 	S3DModel* model,
 	const fastgltf::Asset& asset,
 	size_t sceneIndex,
-	gltfmodel::SourceConvention sourceConvention
+	gltfmodel::SourceConvention sourceConvention,
+	bool& warnedMissingTangents
 )
 {
 	const auto& scene = asset.scenes[sceneIndex];
@@ -615,7 +630,7 @@ GLTFPiece* CGLTFParser::AllocRootEmptyPiece(
 	piece->children.reserve(scene.nodeIndices.size());
 
 	for (const auto childNodeIndex : scene.nodeIndices) {
-		auto* childPiece = LoadPiece(model, piece, asset, childNodeIndex, sourceConvention);
+		auto* childPiece = LoadPiece(model, piece, asset, childNodeIndex, sourceConvention, warnedMissingTangents);
 		if (childPiece)
 			piece->children.push_back(childPiece);
 	}
@@ -629,7 +644,8 @@ GLTFPiece* CGLTFParser::LoadPiece(
 	GLTFPiece* parentPiece,
 	const fastgltf::Asset& asset,
 	size_t nodeIndex,
-	gltfmodel::SourceConvention sourceConvention
+	gltfmodel::SourceConvention sourceConvention,
+	bool& warnedMissingTangents
 )
 {
 	const auto& node = asset.nodes[nodeIndex];
@@ -660,7 +676,7 @@ GLTFPiece* CGLTFParser::LoadPiece(
 	piece->scale = pieceTransform.s;
 
 	for (const auto childNodeIndex : node.children) {
-		auto* childPiece = LoadPiece(model, piece, asset, childNodeIndex, sourceConvention);
+		auto* childPiece = LoadPiece(model, piece, asset, childNodeIndex, sourceConvention, warnedMissingTangents);
 		if (childPiece)
 			piece->children.push_back(childPiece);
 	}
@@ -671,7 +687,7 @@ GLTFPiece* CGLTFParser::LoadPiece(
 	auto& verts = piece->GetVerticesVec();
 	auto& indcs = piece->GetIndicesVec();
 	const auto& mesh = asset.meshes[*node.meshIndex];
-	Impl::ReadGeometryData(*model, asset, mesh.primitives, verts, indcs, nodeIndex, sourceConvention, nullptr);
+	Impl::ReadGeometryData(*model, asset, mesh.name, warnedMissingTangents, mesh.primitives, verts, indcs, nodeIndex, sourceConvention, nullptr);
 
 	return piece;
 }

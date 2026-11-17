@@ -21,6 +21,7 @@ public:
 	~LuaAtlasTextures() { Clear(); }
 	LuaAtlasTextures() {
 		textureAtlasMap.reserve(32);
+		nextCode = 0;
 	}
 
 	void Clear();
@@ -34,6 +35,8 @@ private:
 	using TextureAtlasMap = spring::unsynced_map<std::string, std::size_t>;
 	using TextureAtlasVec = std::vector<CTextureAtlas>;
 private:
+	int nextCode;
+
 	TextureAtlasMap textureAtlasMap;
 	TextureAtlasVec textureAtlasVec;
 };
