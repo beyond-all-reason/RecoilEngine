@@ -36,14 +36,16 @@ private:
 		S3DModel* model,
 		const fastgltf::Asset& asset,
 		size_t sceneIndex,
-		gltfmodel::SourceConvention sourceConvention
+		gltfmodel::SourceConvention sourceConvention,
+		bool& warnedMissingTangents
 	);
 	GLTFPiece* LoadPiece(
 		S3DModel* model,
 		GLTFPiece* parentPiece,
 		const fastgltf::Asset& asset,
 		size_t nodeIndex,
-		gltfmodel::SourceConvention sourceConvention
+		gltfmodel::SourceConvention sourceConvention,
+		bool& warnedMissingTangents
 	);
 
 	std::vector<GLTFPiece> piecePool;
