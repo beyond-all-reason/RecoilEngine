@@ -4785,9 +4785,8 @@ int LuaOpenGL::GenerateMipmap(lua_State* L)
  * world position into one face of a Lua cube texture, the way the engine fills
  * its reflection cube. Only mip level 0 is written. Allowed only in DrawGenesis.
  *
- * Afterwards the caller's framebuffer and viewport are bound again, and the
- * matrices and GL state are the DrawGenesis defaults (see gl.ResetMatrices and
- * gl.ResetState). Terrain reuses the player camera's ROAM tessellation, so
+ * The caller's framebuffer, GL state and bound program are restored; the
+ * matrices are reset to the DrawGenesis identity. Terrain reuses the player camera's ROAM tessellation, so
  * terrain the player camera has not tessellated is missing.
  *
  * @function gl.RenderEnvironmentFace
@@ -4851,8 +4850,11 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 		const auto& sky = ISky::GetSky();
 		const float3* fd = CubeMapHandler::faceDirs[face];
 
-		GLint previousViewport[4];
-		glGetIntegerv(GL_VIEWPORT, previousViewport);
+		// the sky and terrain passes change blend, depth, cull and polygon state and
+		// leave program 0 bound; the Lua caller's state is unknown
+		glPushAttrib(GL_FOG_BIT | GL_DEPTH_BUFFER_BIT | GL_VIEWPORT_BIT | GL_ENABLE_BIT | GL_SCISSOR_BIT | GL_COLOR_BUFFER_BIT | GL_POLYGON_BIT);
+		GLint previousProgram = 0;
+		glGetIntegerv(GL_CURRENT_PROGRAM, &previousProgram);
 
 		glDisable(GL_SCISSOR_TEST);
 		glClearColor(sky->fogColor.x, sky->fogColor.y, sky->fogColor.z, 1.0f);
@@ -4896,9 +4898,9 @@ int LuaOpenGL::RenderEnvironmentFace(lua_State* L)
 		game->SetDrawMode(CGame::gameNormalDraw);
 		CCameraHandler::SetActiveCamera(prvCam->GetCamType());
 
-		glViewport(previousViewport[0], previousViewport[1], previousViewport[2], previousViewport[3]);
+		glUseProgram(static_cast<GLuint>(previousProgram));
+		glPopAttrib();
 		ResetGenesisMatrices();
-		ResetGLState();
 	}
 
 	if (environmentFaceFBO != 0 && tex != nullptr) {
