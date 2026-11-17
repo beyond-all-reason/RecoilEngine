@@ -10,6 +10,7 @@
 #include "Rendering/Shaders/Shader.h"
 #include "Rendering/Shaders/ShaderHandler.h"
 #include "System/Config/ConfigHandler.h"
+#include "System/EventHandler.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/Log/ILog.h"
 #include "System/Misc/TracyDefs.h"
@@ -555,6 +556,13 @@ GLuint CSceneTarget::GetDepthTexture()
 	return res.resolveDepthTex;
 }
 
+GLuint CSceneTarget::GetPBRMaskTexture() const
+{
+	if (res.sceneFBO == 0)
+		return 0;
+	return (samples > 0)? res.resolveMaskTex: res.maskTex;
+}
+
 GLuint CSceneTarget::ResolvedReadFBO(GLuint readFBO)
 {
 	if (samples == 0 || readFBO == 0 || readFBO != res.sceneFBO)
@@ -585,7 +593,17 @@ void CSceneTarget::Present(Boundary at)
 		ResolvePBRMask();
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		glViewport(0, 0, width, height);
-		DrawDisplayPass();
+
+		bool gameDrew = false;
+		{
+			// undoes the call-in's state changes (Lua's screen state enables blending)
+			ScopedPassState luaState;
+			gameDrew = eventHandler.DrawSceneDisplay();
+		}
+		if (!gameDrew)
+			DrawDisplayPass();
+		info.displayPass = gameDrew? "game": "engine";
+
 		CopyDepthToWindow();
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -733,7 +751,7 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 
 		using namespace PBRDisplay;
 		for (int transferIdx = 0; transferIdx <= int(SceneTransfer::Linear); ++transferIdx) {
-			for (int t = 0; t < int(Transform::Count); ++t) {
+			for (int t = 0; t < int(PBRDisplay::Transform::Count); ++t) {
 				displayShader->SetUniform("displayTransform", t);
 				displayShader->SetUniform("sceneTransfer", transferIdx);
 				glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -742,7 +760,7 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 				float prev[3] = {-1.0f, -1.0f, -1.0f};
 				for (int i = 0; i < RAMP_TEXELS; ++i) {
 					const RGB in = {ramp[i * 4 + 0], ramp[i * 4 + 1], ramp[i * 4 + 2]};
-					const RGB ref = ApplyDisplayPass(Transform(t), SceneTransfer(transferIdx), 1.0f, in);
+					const RGB ref = ApplyDisplayPass(PBRDisplay::Transform(t), SceneTransfer(transferIdx), 1.0f, in);
 					const float gpu[3] = {out[i * 4 + 0], out[i * 4 + 1], out[i * 4 + 2]};
 					const float cpu[3] = {ref.r, ref.g, ref.b};
 
@@ -756,7 +774,7 @@ DisplayTransformTestResult CSceneTarget::TestDisplayTransforms()
 
 						if (err > result.maxError) {
 							result.maxError = err;
-							result.worstTransform = std::string(TransformName(Transform(t))) + ((transferIdx == 0)? " srgb-extended": " linear");
+							result.worstTransform = std::string(TransformName(PBRDisplay::Transform(t))) + ((transferIdx == 0)? " srgb-extended": " linear");
 						}
 						if (!finite || err > TOLERANCE || !monotonic)
 							result.pass = false;

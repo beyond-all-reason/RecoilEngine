@@ -67,6 +67,7 @@ LuaMatTexture::Type LuaOpenGLUtils::GetLuaMatTextureType(const std::string& name
 		case hashString("$sky_reflection"): { return LuaMatTexture::LUATEX_SKY_REFLECTION; } break;
 		case hashString(     "$scene_color"): { return LuaMatTexture::LUATEX_SCENE_COLOR    ; } break;
 		case hashString(     "$scene_depth"): { return LuaMatTexture::LUATEX_SCENE_DEPTH    ; } break;
+		case hashString( "$scene_pbr_mask"): { return LuaMatTexture::LUATEX_SCENE_PBR_MASK ; } break;
 
 		// specials
 		case hashString("$shadow"      ): { return LuaMatTexture::LUATEX_SHADOWMAP;   } break;
@@ -573,6 +574,9 @@ GLuint LuaMatTexture::GetTextureID() const
 		case LUATEX_SCENE_DEPTH: {
 			texID = sceneTarget.GetDepthTexture();
 		} break;
+		case LUATEX_SCENE_PBR_MASK: {
+			texID = sceneTarget.GetPBRMaskTexture();
+		} break;
 
 
 		case LUATEX_SHADOWMAP: {
@@ -717,7 +721,8 @@ GLuint LuaMatTexture::GetTextureTarget() const
 			texType = (pub != nullptr && pub->id != 0) ? pub->target : GL_TEXTURE_2D;
 		} break;
 		case LUATEX_SCENE_COLOR: [[fallthrough]];
-		case LUATEX_SCENE_DEPTH: {
+		case LUATEX_SCENE_DEPTH: [[fallthrough]];
+		case LUATEX_SCENE_PBR_MASK: {
 			texType = GL_TEXTURE_2D;
 		} break;
 
@@ -942,7 +947,8 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 			return (pub != nullptr && pub->id != 0) ? ReturnHelper(pub->xsize, pub->ysize) : ReturnHelper(0);
 		} break;
 		case LUATEX_SCENE_COLOR: [[fallthrough]];
-		case LUATEX_SCENE_DEPTH: {
+		case LUATEX_SCENE_DEPTH: [[fallthrough]];
+		case LUATEX_SCENE_PBR_MASK: {
 			const auto size = sceneTarget.GetSize();
 			return std::make_tuple(size[0], size[1], 0);
 		} break;
@@ -1106,6 +1112,7 @@ void LuaMatTexture::Print(const string& indent) const
 		STRING_CASE(typeName, LUATEX_PUBLISHED);
 		STRING_CASE(typeName, LUATEX_SCENE_COLOR);
 		STRING_CASE(typeName, LUATEX_SCENE_DEPTH);
+		STRING_CASE(typeName, LUATEX_SCENE_PBR_MASK);
 
 		STRING_CASE(typeName, LUATEX_SHADOWMAP);
 		STRING_CASE(typeName, LUATEX_SHADOWCOLOR);

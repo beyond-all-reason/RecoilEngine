@@ -2914,8 +2914,9 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
 /***
  * State of the PBR HDR scene target and its display pass.
  * `active` is "direct" or "hdr" this frame, `fallback` explains any substitution,
- * `revision` increases on every successful (re)allocation, and `depthCopy` is
- * "blit", "shader" (stencil not copied) or "none".
+ * `revision` increases on every successful (re)allocation, `depthCopy` is
+ * "blit", "shader" (stencil not copied) or "none", and `displayPass` is "engine", or "game"
+ * when a `DrawSceneDisplay` call-in drew the last display pass.
  *
  * @function Spring.GetSceneTargetInfo
  * @return table sceneTargetInfo
@@ -2923,7 +2924,7 @@ int LuaUnsyncedRead::GetWaterMode(lua_State* L)
 int LuaUnsyncedRead::GetSceneTargetInfo(lua_State* L)
 {
 	const SceneTargetInfo info = sceneTarget.GetInfo();
-	lua_createtable(L, 0, 20);
+	lua_createtable(L, 0, 21);
 	LuaPushNamedString(L, "requested", info.requested);
 	LuaPushNamedString(L, "active", info.active);
 	LuaPushNamedString(L, "fallback", info.fallback);
@@ -2935,6 +2936,7 @@ int LuaUnsyncedRead::GetSceneTargetInfo(lua_State* L)
 	LuaPushNamedString(L, "exposureMode", info.exposureMode);
 	LuaPushNamedString(L, "boundary", info.boundary);
 	LuaPushNamedString(L, "dither", info.dither);
+	LuaPushNamedString(L, "displayPass", info.displayPass);
 	LuaPushNamedString(L, "depthCopy", info.depthCopy);
 	LuaPushNamedBool(L, "stencilCopied", info.stencilCopied);
 	LuaPushNamedNumber(L, "width", info.width);

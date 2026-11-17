@@ -2065,6 +2065,16 @@ function gadgetHandler:DrawScreenEffects(vsx, vsy)
   end
 end
 
+-- the first gadget that drew the display pass wins
+function gadgetHandler:DrawSceneDisplay(winSizeX, winSizeY)
+  for _,g in r_ipairs(self.DrawSceneDisplayList) do
+    if g:DrawSceneDisplay(winSizeX, winSizeY) then
+      return true
+    end
+  end
+  return false
+end
+
 function gadgetHandler:DrawScreenPost(vsx, vsy)
   for _,g in r_ipairs(self.DrawScreenPostList) do
     g:DrawScreenPost(vsx, vsy)

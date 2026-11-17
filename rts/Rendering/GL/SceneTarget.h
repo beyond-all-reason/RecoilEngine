@@ -30,6 +30,7 @@ struct SceneTargetInfo {
 	std::string exposureMode;
 	std::string boundary;          // PBRDisplayBoundary
 	std::string dither;            // PBRDisplayDither: "triangular" or "off"
+	std::string displayPass;       // who drew the last display pass: "engine" or "game" (call-in DrawSceneDisplay)
 	std::string depthCopy;         // "blit", "shader" or "none"
 	bool stencilCopied = false;
 	int width = 0;
@@ -71,6 +72,8 @@ public:
 	// Single-sample views for $scene_color / $scene_depth; a multisampled scene is resolved first.
 	GLuint GetColorTexture();
 	GLuint GetDepthTexture();
+	// $scene_pbr_mask; with MSAA the copy resolved by the display pass, so only valid from Present on
+	GLuint GetPBRMaskTexture() const;
 	std::array<int, 2> GetSize() const { return {width, height}; }
 
 	// For screen copies: if `readFBO` is the multisampled scene, resolves it and returns the resolve FBO instead.

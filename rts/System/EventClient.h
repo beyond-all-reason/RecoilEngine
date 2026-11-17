@@ -375,6 +375,7 @@ class CEventClient
 		virtual bool DrawShield(const CUnit* unit, const CWeapon* weapon) { return false; }
 		virtual bool DrawProjectile(const CProjectile* projectile) { return false; }
 		virtual bool DrawMaterial(const LuaMaterial* material) { return false; }
+		virtual bool DrawSceneDisplay() { return false; }
 
 		virtual void DrawOpaqueUnitsLua(bool deferredPass, bool drawReflection, bool drawRefraction) {}
 		virtual void DrawOpaqueFeaturesLua(bool deferredPass, bool drawReflection, bool drawRefraction) {}
