@@ -23,7 +23,7 @@ CONFIG(std::string, PBRDisplayTransform).defaultValue("khronos-neutral").descrip
 CONFIG(std::string, PBRExposureMode).defaultValue("manual").description("Only manual is built; auto and compare are reserved and fall back to manual.");
 CONFIG(float, PBRExposureEV).defaultValue(0.0f).description("Manual exposure in EV stops (linear multiplier 2^EV).");
 CONFIG(std::string, PBRDisplayBoundary).defaultValue("after-world").description("after-world (screen effects draw into the window) or after-screen-effects (they draw into the scene and are tone-mapped).");
-CONFIG(std::string, PBRDisplayDither).defaultValue("unreal").description("unreal (triangular 1/255 grain hiding banding, as in Unreal's backbuffer dither) or off.");
+CONFIG(std::string, PBRDisplayDither).defaultValue("unreal").description("unreal (triangular grain of 1/255 hiding banding in the 8-bit output) or off.");
 CONFIG(bool, PBRSceneTargetForceFailure).defaultValue(false).description("Test only: make the allocation fail to exercise the fallback to direct.");
 
 CSceneTarget sceneTarget;
