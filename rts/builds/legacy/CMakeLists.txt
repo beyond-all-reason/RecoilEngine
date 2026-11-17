@@ -63,6 +63,10 @@ if (APPLE)
 		# MacEGLBridge reads the display's native mode to cap MacRenderScale
 		find_library(COREGRAPHICS_LIBRARY CoreGraphics)
 		list(APPEND engineLibraries ${COREGRAPHICS_LIBRARY})
+		# and reads frames back into IOSurfaces that SDL draws without a copy
+		find_library(IOSURFACE_LIBRARY IOSurface)
+		find_library(COREVIDEO_LIBRARY CoreVideo)
+		list(APPEND engineLibraries ${IOSURFACE_LIBRARY} ${COREVIDEO_LIBRARY})
 		list(APPEND engineLibraries "-Wl,-rpath,@executable_path/mesa/lib" "-Wl,-rpath,${MAC_VULKAN_LIBDIR}" "-Wl,-rpath,${MAC_MESA_PREFIX}/lib")
 	endif ()
 endif (APPLE)
