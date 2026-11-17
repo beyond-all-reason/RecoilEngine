@@ -521,6 +521,9 @@ void CGame::Load(const std::string& mapFileName)
 		}
 	}
 
+	if (!forcedQuit && IsSavedGame())
+		saveFileHandler->PostLoad();
+
 	Watchdog::DeregisterThread(WDT_LOAD);
 	AddTimedJobs();
 
@@ -1238,6 +1241,7 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 		// update game timings
 		globalRendering->lastFrameStart = currentTime;
 		globalRendering->lastFrameTime = deltaDrawFrameTime.toMilliSecsf();
+		globalRendering->UpdatePresentedFrameTime(globalRendering->lastFrameTime);
 
 		gu->avgFrameTime = mix(gu->avgFrameTime, deltaDrawFrameTime.toMilliSecsf(), 0.05f);
 		gu->gameTime += modGameDeltaTimeSecs;
@@ -1358,6 +1362,36 @@ bool CGame::UpdateUnsynced(const spring_time currentTime)
 
 		lastSimFrameTime = currentTime;
 		lastFrameTime = currentTime;
+	}
+
+	{
+		// the game may replace this frame's time offset and presented frame time
+		constexpr float MIN_TIME_OFFSET = -0.5f;
+		constexpr float MAX_TIME_OFFSET = 1.5f;
+		// ceiling for a replaced presented time while the display period is unknown
+		constexpr float MAX_PRESENTED_SECS_NO_PERIOD = 0.25f;
+
+		const float engineTimeOffset = globalRendering->timeOffset;
+		const float enginePresentedSecs = globalRendering->presentedFrameTime * 0.001f;
+
+		float timeOffset = engineTimeOffset;
+		float presentedSecs = enginePresentedSecs;
+
+		eventHandler.UpdateTimeOffset(timeOffset, gu->simFPS * gu->avgFrameTime * 0.001f, presentedSecs);
+
+		// clamp only a replaced value: the engine's own can exceed these on a slow frame
+		if (timeOffset != engineTimeOffset)
+			globalRendering->timeOffset = std::clamp(timeOffset, MIN_TIME_OFFSET, MAX_TIME_OFFSET);
+
+		if (presentedSecs != enginePresentedSecs) {
+			const float period = globalRendering->displayPeriod;
+			const float maxSecs = std::max((period > 0.0f) ? (period * CGlobalRendering::MAX_SNAP_PERIODS * 0.001f) : MAX_PRESENTED_SECS_NO_PERIOD, enginePresentedSecs);
+
+			globalRendering->OverridePresentedFrameTime(std::clamp(presentedSecs, 0.0f, maxSecs) * 1000.0f);
+		}
+
+		TracyPlot("PresentedFrameTime", globalRendering->presentedFrameTime);
+		TracyPlot("PresentedFrameLag", globalRendering->presentedFrameLag);
 	}
 
 	if ((currentTime - frameStartTime).toMilliSecsf() >= 1000.0f) {

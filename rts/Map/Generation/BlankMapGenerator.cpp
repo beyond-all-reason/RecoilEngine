@@ -15,6 +15,7 @@
 
 #include "lib/squish/squish.h"
 
+#include <cmath>
 #include <string>
 #include <array>
 #include <vector>
@@ -273,6 +274,12 @@ void CBlankMapGenerator::GenerateMapInfo(CVirtualFile* fileMapInfo)
 		return str.empty() ? "nil" : EscapeLuaString(str);
 	};
 
+	const auto NumberOrNil = [] (const std::string &str) {
+		bool failed;
+		const float value = StringToFloat(str, &failed);
+		return (failed || !std::isfinite(value)) ? std::string("nil") : fmt::format("{}", value);
+	};
+
 	//Replace tags in mapinfo.lua
 	luaInfo = StringReplace(luaInfo, "${NAME}", setup->mapName);
 	luaInfo = StringReplace(luaInfo, "${DESCRIPTION}", mapDescription);
@@ -287,6 +294,8 @@ void CBlankMapGenerator::GenerateMapInfo(CVirtualFile* fileMapInfo)
 	luaInfo = StringReplace(luaInfo, "${SPLAT_DETAIL_NORMAL_TEX_3}", StringOrNil(GetBlankMapOpt("splatdetailnormaltex3")));
 	luaInfo = StringReplace(luaInfo, "${SPLAT_DETAIL_NORMAL_TEX_4}", StringOrNil(GetBlankMapOpt("splatdetailnormaltex4")));
 	luaInfo = StringReplace(luaInfo, "${SPLAT_DETAIL_NORMAL_DIFFUSE_ALPHA}", splatDetailNormalDiffuseAlpha ? "true" : "false");
+	luaInfo = StringReplace(luaInfo, "${MAX_METAL}", NumberOrNil(GetBlankMapOpt("maxmetal")));
+	luaInfo = StringReplace(luaInfo, "${EXTRACTOR_RADIUS}", NumberOrNil(GetBlankMapOpt("extractorradius")));
 
 	//Copy to filebuffer
 	fileMapInfo->buffer.assign(luaInfo.begin(), luaInfo.end());

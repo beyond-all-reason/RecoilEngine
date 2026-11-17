@@ -103,7 +103,9 @@ widgetHandler = {
 -- they are setup in UpdateCallIns()
 local flexCallIns = {
   'GamePreload',
+  'UpdateTimeOffset',
   'GameStart',
+  'GameLoaded',
   'GameOver',
   'GamePaused',
   'GameFrame',
@@ -150,6 +152,8 @@ local flexCallIns = {
   'UnitDecloaked',
   'UnitMoveFailed',
   'UnitHarvestStorageFull',
+  "UnitSelfDestructStarted",
+  "UnitSelfDestructCancelled",
   'RecvLuaMsg',
   'StockpileChanged',
   'DrawGenesis',
@@ -182,8 +186,10 @@ end
 local callInLists = {
   'GamePreload',
   'GameStart',
+  'GameLoaded',
   'Shutdown',
   'Update',
+  'UpdateTimeOffset',
   'TextCommand',
   'ActiveCommandChanged',
   'CameraRotationChanged',
@@ -1110,6 +1116,22 @@ function widgetHandler:Update(dt)
 end
 
 
+-- each widget sees the values the one before it returned; nil keeps a value
+function widgetHandler:UpdateTimeOffset(timeOffset, drawSimRatio, presentedUpdateSeconds)
+  local newTimeOffset, newPresented
+  for _,w in ipairs(self.UpdateTimeOffsetList) do
+    local t, p = w:UpdateTimeOffset(timeOffset, drawSimRatio, presentedUpdateSeconds)
+    if (type(t) == 'number') then
+      timeOffset, newTimeOffset = t, t
+    end
+    if (type(p) == 'number') then
+      presentedUpdateSeconds, newPresented = p, p
+    end
+  end
+  return newTimeOffset, newPresented
+end
+
+
 function widgetHandler:ConfigureLayout(command)
   if (command == 'tweakgui') then
     self.tweakKeys = {}
@@ -1702,6 +1724,13 @@ function widgetHandler:GameStart()
   return
 end
 
+function widgetHandler:GameLoaded()
+  for _,w in ipairs(self.GameLoadedList) do
+    w:GameLoaded()
+  end
+  return
+end
+
 function widgetHandler:GameOver()
   for _,w in ipairs(self.GameOverList) do
     w:GameOver()
@@ -2094,6 +2123,18 @@ function widgetHandler:UnitHarvestStorageFull(unitID, unitDefID, unitTeam)
     w:UnitHarvestStorageFull(unitID, unitDefID, unitTeam)
   end
   return
+end
+
+function widgetHandler:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
+  for _,w in ipairs(self.UnitSelfDestructStartedList) do
+    w:UnitSelfDestructStarted(unitID, unitDefID, unitTeam, remainingSeconds)
+  end
+end
+
+function widgetHandler:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
+  for _,w in ipairs(self.UnitSelfDestructCancelledList) do
+    w:UnitSelfDestructCancelled(unitID, unitDefID, unitTeam, remainingSeconds)
+  end
 end
 
 

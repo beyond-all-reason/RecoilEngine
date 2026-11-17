@@ -4,6 +4,7 @@
 
 #include "Camera.h"
 #include "CameraHandler.h"
+#include "CameraProjection.h"
 #include "UI/MouseHandler.h"
 #include "Map/Ground.h"
 #include "Map/ReadMap.h"
@@ -35,7 +36,8 @@ CONFIG(float, CameraMoveSlowMult)
 CONFIG(int, CamFrameTimeCorrection)
     .defaultValue(0)
 	.minimumValue(0)
-	.description("Sets wether the camera interpolation factor should be the inverse of fps or last draw frame time (0 = lastdrawframetime, 1 = fpsinv)");
+	.maximumValue(2)
+	.description("Which frame time the camera moves and transitions by: 0 = the last draw frame time, 1 = 1 / FPS, 2 = the presented frame time (with vsync on, snapped to whole display periods, so a scrolling or tweening camera steps evenly on screen; without vsync as 0).");
 
 
 CCamera::CCamera(uint32_t cameraType, uint32_t projectionType)
@@ -582,14 +584,7 @@ float3 CCamera::CalcViewPortCoordinates(const float3& objPos) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
 	// same as gluProject()
-	const float4 projPos = viewProjectionMatrix * float4(objPos, 1.0f);
-	const float3 clipPos = float3(projPos) / projPos.w;
-
-	float3 vpPos;
-	vpPos.x = viewport[2] * (clipPos.x + 1.0f) * 0.5f;
-	vpPos.y = viewport[3] * (clipPos.y + 1.0f) * 0.5f;
-	vpPos.z =               (clipPos.z + 1.0f) * 0.5f;
-	return vpPos;
+	return CameraProjection::ClipToViewport(viewProjectionMatrix * float4(objPos, 1.0f), viewport);
 }
 
 
@@ -709,14 +704,20 @@ void CCamera::ClipFrustumLines(const float zmin, const float zmax, bool neg)
 }
 
 
+float CCamera::GetFrameTime() const
+{
+	switch (useInterpolate) {
+		case 1: return 1000.0f / std::fmax(globalRendering->FPS, 1.0f);
+		case 2: return globalRendering->presentedFrameTime;
+		default: return globalRendering->lastFrameTime;
+	}
+}
+
 float3 CCamera::GetMoveVectorFromState(bool fromKeyState) const
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	float camDeltaTime = globalRendering->lastFrameTime;
+	const float camDeltaTime = GetFrameTime();
 
-	if (useInterpolate > 0)
-		camDeltaTime = 1000.0f / std::fmax(globalRendering->FPS, 1.0f);
-	
 	float camMoveSpeed = 1.0f;
 
 	camMoveSpeed *= movState[MOVE_STATE_SLW] ? moveSlowMult : 1.0f;

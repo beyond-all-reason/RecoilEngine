@@ -113,6 +113,7 @@ class CLuaHandle : public CEventClient
 
 		void GamePreload() override;
 		void GameStart() override;
+		void GameLoaded() override;
 		void GameOver(const std::vector<unsigned char>& winningAllyTeams) override;
 		void GamePaused(int playerID, bool paused) override;
 		void GameFrame(int frameNum) override;
@@ -175,6 +176,9 @@ class CLuaHandle : public CEventClient
 		void UnitMoveFailed(const CUnit* unit) override;
 		void UnitArrivedAtGoal(const CUnit* unit) override;
 
+		void UnitSelfDestructStarted(const CUnit* unit, float remainingSeconds) override;
+		void UnitSelfDestructCancelled(const CUnit* unit, float remainingSeconds) override;
+
 		void RenderUnitDestroyed(const CUnit* unit) override;
 
 		void FeatureCreated(const CFeature* feature) override;
@@ -200,6 +204,7 @@ class CLuaHandle : public CEventClient
 
 		void UnsyncedHeightMapUpdate(const SRectangle& rect) override;
 		void Update() override;
+		void UpdateTimeOffset(float& timeOffset, float drawSimRatio, float& presentedUpdateSecs) override;
 		void NanoParticleUpdate(const std::vector<NanoParticles::Event>& events) override;
 
 		void KeyBindingsChanged() override;
@@ -347,6 +352,7 @@ class CLuaHandle : public CEventClient
 
 		void LosCallIn(const LuaHashString& hs, const CUnit* unit, int allyTeam);
 		void UnitCallIn(const LuaHashString& hs, const CUnit* unit);
+		void UnitSelfDestructCallin(const LuaHashString& hs, const CUnit* unit, float remainingSeconds);
 
 		void RunDrawCallIn(const LuaHashString& hs);
 
