@@ -430,6 +430,15 @@ bool LuaOpenGLUtils::ParseTextureImage(lua_State* L, LuaMatTexture& texUnit, con
 		} break;
 
 		case '$': {
+			// a prefix plus a free name, which the hashed switch below cannot match;
+			// succeeds before anything is published, the slot is resolved per bind
+			constexpr std::string_view publishedPrefix = "$pub:";
+			if (image.starts_with(publishedPrefix)) {
+				texUnit.type = LuaMatTexture::LUATEX_PUBLISHED;
+				texUnit.data = reinterpret_cast<const void*>(LuaTextures::GetPublishedIndex(image.substr(publishedPrefix.size())));
+				break;
+			}
+
 			switch ((texUnit.type = GetLuaMatTextureType(image))) {
 				case LuaMatTexture::LUATEX_NONE: {
 					// name not found in table, check for special case overrides
@@ -550,6 +559,10 @@ GLuint LuaMatTexture::GetTextureID() const
 		} break;
 		case LUATEX_SPECULAR: {
 			texID = cubeMapHandler.GetSpecularTextureID();
+		} break;
+		case LUATEX_PUBLISHED: {
+			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
+			texID = (pub != nullptr) ? pub->id : 0;
 		} break;
 
 
@@ -689,6 +702,10 @@ GLuint LuaMatTexture::GetTextureTarget() const
 		case LUATEX_SKY_REFLECTION: [[fallthrough]];
 		case LUATEX_SPECULAR: {
 			texType = GL_TEXTURE_CUBE_MAP_ARB;
+		} break;
+		case LUATEX_PUBLISHED: {
+			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
+			texType = (pub != nullptr && pub->id != 0) ? pub->target : GL_TEXTURE_2D;
 		} break;
 
 		case LUATEX_NONE:		  [[fallthrough]];
@@ -907,6 +924,10 @@ std::tuple<int, int, int> LuaMatTexture::GetSize() const
 		case LUATEX_SPECULAR: {
 			return ReturnHelper(cubeMapHandler.GetSpecularTextureSize());
 		} break;
+		case LUATEX_PUBLISHED: {
+			const LuaTextures::Published* pub = LuaTextures::GetPublished(*reinterpret_cast<const size_t*>(&data));
+			return (pub != nullptr && pub->id != 0) ? ReturnHelper(pub->xsize, pub->ysize) : ReturnHelper(0);
+		} break;
 
 
 		case LUATEX_SHADOWMAP: {
@@ -1064,6 +1085,7 @@ void LuaMatTexture::Print(const string& indent) const
 		STRING_CASE(typeName, LUATEX_MAP_REFLECTION);
 		STRING_CASE(typeName, LUATEX_SKY_REFLECTION);
 		STRING_CASE(typeName, LUATEX_SPECULAR);
+		STRING_CASE(typeName, LUATEX_PUBLISHED);
 
 		STRING_CASE(typeName, LUATEX_SHADOWMAP);
 		STRING_CASE(typeName, LUATEX_SHADOWCOLOR);

@@ -43,6 +43,7 @@ class LuaMatTexture {
 			LUATEX_MAP_REFLECTION,
 			LUATEX_SKY_REFLECTION,
 			LUATEX_SPECULAR,
+			LUATEX_PUBLISHED, // "$pub:<name>"; data is the LuaTextures published-slot index
 
 
 			LUATEX_SHADOWMAP,

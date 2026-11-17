@@ -404,6 +404,7 @@ bool LuaOpenGL::PushEntries(lua_State* L)
 	}
 	if (IS_GL_FUNCTION_AVAILABLE(glGenerateMipmapEXT))
 		REGISTER_LUA_CFUNC(GenerateMipmap);
+	REGISTER_LUA_CFUNC(PublishTexture);
 
 	REGISTER_LUA_CFUNC(ActiveTexture);
 	REGISTER_LUA_CFUNC(TexEnv);
@@ -4763,6 +4764,44 @@ int LuaOpenGL::GenerateMipmap(lua_State* L)
 	glGenerateMipmapEXT(tex->target);
 
 	return 0;
+}
+
+
+/***
+ * Publishes a Lua texture of this handle as `"$pub:<name>"`, so other Lua
+ * handles and engine-bound materials can sample it, or unpublishes the name
+ * when `texName` is nil.
+ *
+ * Only the publishing handle can change a name until it unpublishes it.
+ * Deleting the texture, or the handle shutting down, unpublishes it.
+ * The name is resolved on every bind, and samples as no texture (id 0) while
+ * nothing is published under it.
+ *
+ * ```lua
+ * -- LuaRules (unsynced)
+ * gl.PublishTexture("pbr_irradiance", irradianceCube)
+ * -- LuaUI, or a material's texunits
+ * gl.Texture(0, "$pub:pbr_irradiance")
+ * ```
+ *
+ * @function gl.PublishTexture
+ * @param name string the published name, sampled as `"$pub:" .. name`
+ * @param texName string? Lua texture name of this handle, nil to unpublish
+ * @return boolean success
+ * @return string? error when another handle owns the name, or texName is not a texture of this handle
+ */
+int LuaOpenGL::PublishTexture(lua_State* L)
+{
+	// no CheckDrawingEnabled: publishing makes no GL call
+	std::string error;
+	const bool published = CLuaHandle::GetActiveTextures(L).Publish(luaL_checksstring(L, 1), luaL_optsstring(L, 2, ""), error);
+
+	lua_pushboolean(L, published);
+	if (published)
+		return 1;
+
+	lua_pushsstring(L, error);
+	return 2;
 }
 
 
