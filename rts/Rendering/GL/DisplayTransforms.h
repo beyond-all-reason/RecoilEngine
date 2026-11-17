@@ -26,7 +26,7 @@ enum class Transform : int32_t {
 	Reinhard       = 6,
 	ReinhardJodie  = 7,
 	FilmicHejl     = 8, // published form includes the display encode
-	Filmic         = 9, // option "unreal", inspired by Unreal's filmic tone mapper; the result includes the display encode
+	Filmic         = 9, // option "filmic-toe-shoulder", inspired by Unreal's filmic tone mapper; the result includes the display encode
 	BarCustom      = 10,
 	Legacy         = 11,
 	LinearDebug    = 12,
@@ -40,7 +40,7 @@ enum class SceneTransfer : int32_t {
 
 static constexpr std::array<std::string_view, size_t(Transform::Count)> TRANSFORM_NAMES = {
 	"khronos-neutral", "agx", "aces", "aces-hill", "hable", "uchimura", "reinhard",
-	"reinhard-jodie", "filmic-hejl", "unreal", "bar-custom", "legacy", "linear-debug",
+	"reinhard-jodie", "filmic-hejl", "filmic-toe-shoulder", "bar-custom", "legacy", "linear-debug",
 };
 
 inline bool ParseTransform(std::string_view name, Transform& out) {

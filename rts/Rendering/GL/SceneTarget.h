@@ -29,7 +29,7 @@ struct SceneTargetInfo {
 	std::string displayTransform;  // active PBRDisplayTransform
 	std::string exposureMode;
 	std::string boundary;          // PBRDisplayBoundary
-	std::string dither;            // PBRDisplayDither: "unreal" or "off"
+	std::string dither;            // PBRDisplayDither: "triangular" or "off"
 	std::string depthCopy;         // "blit", "shader" or "none"
 	bool stencilCopied = false;
 	int width = 0;

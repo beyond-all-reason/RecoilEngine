@@ -235,7 +235,7 @@ vec3 BarCustom(vec3 encoded) {
 	return (encoded * (A * encoded + B)) / (encoded * (C * encoded + D) + E);
 }
 
-// Triangular grain of +-1 step (the "unreal" option); `seed` moves it every frame, amount 0 switches it off.
+// Triangular grain of +-1 step (the "triangular" option); `seed` moves it every frame, amount 0 switches it off.
 vec3 PBRDitherDisplay(vec3 encoded, vec2 pixel, float seed, float amount) {
 	float uniformGrain = fract(sin(pixel.x + seed + (pixel.y + seed) * 543.31) * 493013.0);
 	float n = uniformGrain * 2.0 - 1.0;

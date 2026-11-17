@@ -19,11 +19,11 @@ CONFIG(std::string, PBRSceneTarget).defaultValue("direct").description("direct (
 CONFIG(std::string, PBRSceneTransfer).defaultValue("srgb-extended").description("How the scene target stores non-PBR colour: srgb-extended. linear is reserved and falls back to srgb-extended.");
 CONFIG(std::string, PBRSceneDepthFormat).defaultValue("d24s8").description("d24s8 (copied into the window by a blit) or d32fs8 (depth copied by a shader, stencil not copied).");
 CONFIG(std::string, PBRHDRColorFormat).defaultValue("rgba16f").description("rgba16f or r11g11b10f (half the memory; no alpha, no negative values, about 6 bits of mantissa). compare is reserved and falls back to rgba16f.");
-CONFIG(std::string, PBRDisplayTransform).defaultValue("khronos-neutral").description("khronos-neutral, agx, aces, aces-hill, hable, uchimura, reinhard, reinhard-jodie, filmic-hejl, unreal (inspired by Unreal's filmic tone mapper), bar-custom, legacy (no curve) or linear-debug.");
+CONFIG(std::string, PBRDisplayTransform).defaultValue("khronos-neutral").description("khronos-neutral, agx, aces, aces-hill, hable, uchimura, reinhard, reinhard-jodie, filmic-hejl, filmic-toe-shoulder (inspired by Unreal's filmic tone mapper), bar-custom, legacy (no curve) or linear-debug.");
 CONFIG(std::string, PBRExposureMode).defaultValue("manual").description("Only manual is built; auto and compare are reserved and fall back to manual.");
 CONFIG(float, PBRExposureEV).defaultValue(0.0f).description("Manual exposure in EV stops (linear multiplier 2^EV).");
 CONFIG(std::string, PBRDisplayBoundary).defaultValue("after-world").description("after-world (screen effects draw into the window) or after-screen-effects (they draw into the scene and are tone-mapped).");
-CONFIG(std::string, PBRDisplayDither).defaultValue("unreal").description("unreal (triangular grain of 1/255 hiding banding in the 8-bit output) or off.");
+CONFIG(std::string, PBRDisplayDither).defaultValue("triangular").description("triangular (grain of 1/255 hiding banding in the 8-bit output) or off.");
 CONFIG(bool, PBRSceneTargetForceFailure).defaultValue(false).description("Test only: make the allocation fail to exercise the fallback to direct.");
 
 CSceneTarget sceneTarget;
@@ -267,8 +267,8 @@ void CSceneTarget::ReadSettings()
 
 	const std::string ditherName = configHandler->GetString("PBRDisplayDither");
 	dither = (ditherName != "off");
-	if (ditherName != "off" && ditherName != "unreal")
-		note("PBRDisplayDither=" + ditherName + " is unknown, using unreal");
+	if (ditherName != "off" && ditherName != "triangular")
+		note("PBRDisplayDither=" + ditherName + " is unknown, using triangular");
 
 	info.colorFormat = (wantColorFormat == GL_R11F_G11F_B10F)? "r11g11b10f": "rgba16f";
 	info.transfer = "srgb-extended";
@@ -277,7 +277,7 @@ void CSceneTarget::ReadSettings()
 	info.exposureEV = exposureEV;
 	info.exposureLinear = PBRDisplay::ExposureLinear(exposureEV);
 	info.boundary = (boundary == Boundary::AfterScreenEffects)? "after-screen-effects": "after-world";
-	info.dither = dither? "unreal": "off";
+	info.dither = dither? "triangular": "off";
 }
 
 bool CSceneTarget::Allocate(const Desc& d, Resources& out, std::string& error) const

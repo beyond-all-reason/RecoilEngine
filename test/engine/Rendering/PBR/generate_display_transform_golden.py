@@ -190,7 +190,7 @@ def _filmic_tone_curve(ap1):
     return tuple(max(0.0, x) for x in tone)
 
 
-def unreal(c):
+def filmic_toe_shoulder(c):
     lin = tuple(min(max(x, 0.0), 43.7052) for x in c)
     a = mat(SRGB_TO_AP1, lin)
     luma = _dot(a, AP1_LUMA)
@@ -224,7 +224,7 @@ TRANSFORMS = [
     ("reinhard", lambda c: enc(reinhard(c))),
     ("reinhard-jodie", lambda c: enc(reinhard_jodie(c))),
     ("filmic-hejl", filmic_hejl),
-    ("unreal", unreal),
+    ("filmic-toe-shoulder", filmic_toe_shoulder),
     ("bar-custom", lambda c: bar_custom(enc(c))),
     ("linear-debug", lambda c: enc(tuple(min(max(v, 0.0), 1.0) for v in c))),
 ]
