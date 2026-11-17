@@ -14,6 +14,8 @@
 #include <mutex>
 
 #include <SDL.h>
+#include <CoreFoundation/CoreFoundation.h>
+#include <IOKit/graphics/IOGraphicsTypes.h>
 
 #include "Rendering/GL/myGL.h"
 #include "System/Config/ConfigHandler.h"
@@ -22,6 +24,19 @@
 #include "System/Platform/Misc.h"
 
 CONFIG(float, MacRenderScale).defaultValue(1.0f).minimumValue(1.0f).maximumValue(2.0f).description("macOS only. Pixels rendered per window point: 1, 1.5 or 2. A Retina display shows 2, so higher values are sharper and cost frame rate. Capped at the display's own pixel density.");
+
+// the few CoreGraphics display calls the bridge needs, gcc cannot parse the CoreGraphics headers
+extern "C" {
+	typedef struct CGDisplayMode* CGDisplayModeRef;
+	struct MacCGPoint { double x, y; };
+	struct MacCGRect { double x, y, w, h; };
+
+	int32_t CGGetDisplaysWithPoint(MacCGPoint point, uint32_t maxDisplays, uint32_t* displays, uint32_t* matchingDisplayCount);
+	MacCGRect CGDisplayBounds(uint32_t display);
+	CFArrayRef CGDisplayCopyAllDisplayModes(uint32_t display, CFDictionaryRef options);
+	size_t CGDisplayModeGetPixelWidth(CGDisplayModeRef mode);
+	uint32_t CGDisplayModeGetIOFlags(CGDisplayModeRef mode);
+}
 
 // minimal EGL declarations; libEGL is dlopen()ed so there is no build-time dependency on Mesa
 namespace {
@@ -176,6 +191,52 @@ namespace {
 		return true;
 	}
 
+	size_t NativePixelWidth(uint32_t cgDisplay) {
+		size_t width = 0;
+		const CFArrayRef modes = CGDisplayCopyAllDisplayModes(cgDisplay, nullptr);
+
+		if (modes == nullptr)
+			return 0;
+
+		for (CFIndex i = 0; i < CFArrayGetCount(modes); ++i) {
+			const auto mode = static_cast<CGDisplayModeRef>(const_cast<void*>(CFArrayGetValueAtIndex(modes, i)));
+
+			if (CGDisplayModeGetIOFlags(mode) & kDisplayModeNativeFlag)
+				width = std::max(width, CGDisplayModeGetPixelWidth(mode));
+		}
+
+		CFRelease(modes);
+		return width;
+	}
+
+	// panel pixels per point on the window's display. In a scaled mode, e.g. a 4K panel set to look like
+	// 2560x1440, macOS gives windows a 2x backing and shrinks it to fit, so 1.5 is all the panel can show.
+	// Returns 0 when the panel's native mode is unknown.
+	float PanelDensity(SDL_Window* window) {
+		static uint32_t cachedDisplay = 0;
+		static size_t cachedWidth = 0;
+
+		SDL_Rect bounds;
+		if (SDL_GetDisplayBounds(SDL_GetWindowDisplayIndex(window), &bounds) != 0)
+			return 0.0f;
+
+		uint32_t cgDisplay = 0;
+		uint32_t count = 0;
+		const MacCGPoint centre = {bounds.x + bounds.w * 0.5, bounds.y + bounds.h * 0.5};
+
+		if (CGGetDisplaysWithPoint(centre, 1, &cgDisplay, &count) != 0 || count == 0)
+			return 0.0f;
+
+		// listing display modes is slow, and a panel's native mode does not change
+		if (cgDisplay != cachedDisplay) {
+			cachedDisplay = cgDisplay;
+			cachedWidth = NativePixelWidth(cgDisplay);
+		}
+
+		const MacCGRect cgBounds = CGDisplayBounds(cgDisplay);
+		return (cgBounds.w > 0.0) ? static_cast<float>(cachedWidth / cgBounds.w) : 0.0f;
+	}
+
 	float WantedRenderScale(SDL_Window* window) {
 		int wx = 0, wy = 0;
 		int ox = 0, oy = 0;
@@ -184,9 +245,13 @@ namespace {
 		if (renderer == nullptr || wx <= 0 || SDL_GetRendererOutputSize(renderer, &ox, &oy) != 0)
 			return 1.0f;
 
-		// 2 on a Retina display, 1 on most external ones
-		const float density = std::max(ox / static_cast<float>(wx), 1.0f);
-		return std::clamp(configHandler->GetFloat("MacRenderScale"), 1.0f, density);
+		// the backing macOS gives the window, 2 on a Retina display and 1 on most external ones
+		float density = ox / static_cast<float>(wx);
+
+		if (const float panel = PanelDensity(window); panel > 0.0f)
+			density = std::min(density, panel);
+
+		return std::clamp(configHandler->GetFloat("MacRenderScale"), 1.0f, std::max(density, 1.0f));
 	}
 }
 
