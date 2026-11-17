@@ -12,7 +12,7 @@
 #include <cstdint>
 #include <string>
 
-#include "Rendering/GL/DisplayTransforms_pbr.h"
+#include "Rendering/GL/DisplayTransforms.h"
 #include "Rendering/GL/myGL.h"
 #include "Rendering/GL/VAO.h"
 

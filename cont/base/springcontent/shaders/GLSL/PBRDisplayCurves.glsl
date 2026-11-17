@@ -1,6 +1,6 @@
 // Display curves shared by the display pass (prepended to PBRDisplayFS.glsl) and BAR's PBR unit shader.
 // No version directive, so it can be inserted into another shader. The TM_ values are PBRDisplay::Transform;
-// the CPU reference is rts/Rendering/GL/DisplayTransforms_pbr.h, change both together.
+// the CPU reference is rts/Rendering/GL/DisplayTransforms.h, change both together.
 
 const int TM_KHRONOS_NEUTRAL = 0;
 const int TM_AGX             = 1;

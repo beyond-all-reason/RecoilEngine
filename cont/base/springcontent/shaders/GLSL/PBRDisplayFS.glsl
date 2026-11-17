@@ -1,7 +1,7 @@
 #version 330
 
 // The one display pass: decode, exposure, one curve, one sRGB encode.
-// Uniform values match PBRDisplay::Transform and SceneTransfer (DisplayTransforms_pbr.h).
+// Uniform values match PBRDisplay::Transform and SceneTransfer (DisplayTransforms.h).
 
 uniform sampler2D sceneColor;
 // 1 where a PBR model was drawn; everything else is already display-referred

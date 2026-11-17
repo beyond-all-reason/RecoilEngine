@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Independent float64 implementation of the display curves, written from the published sources, not from
-DisplayTransforms_pbr.h. Prints the table that testPBRDisplayTransforms.cpp embeds.
+DisplayTransforms.h. Prints the table that testPBRDisplayTransforms.cpp embeds.
 
 Usage (from the Recoil checkout):
     python -I test/engine/Rendering/PBR/generate_display_transform_golden.py

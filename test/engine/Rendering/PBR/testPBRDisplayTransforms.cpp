@@ -1,12 +1,12 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-// CPU test of the display curves in DisplayTransforms_pbr.h against float64 reference values from
+// CPU test of the display curves in DisplayTransforms.h against float64 reference values from
 // generate_display_transform_golden.py. The GPU side is checked in game by Spring.TestDisplayTransforms().
 
 #include <cmath>
 #include <string_view>
 
-#include "Rendering/GL/DisplayTransforms_pbr.h"
+#include "Rendering/GL/DisplayTransforms.h"
 
 #include <catch_amalgamated.hpp>
 
