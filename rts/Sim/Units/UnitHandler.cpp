@@ -235,7 +235,7 @@ bool CUnitHandler::AddUnit(CUnit* unit)
 bool CUnitHandler::GarbageCollectUnit(unsigned int id)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (inUpdateCall || units[id] == nullptr || units[id]->DeathDependencesNotified())
+	if (inUpdateCall || units[id] == nullptr || units[id]->IsPreDeleting())
 		return false;
 
 	assert(unitsToBeRemoved.empty());
@@ -262,7 +262,7 @@ void CUnitHandler::QueueDeleteUnits()
 bool CUnitHandler::QueueDeleteUnit(CUnit* unit)
 {
 	RECOIL_DETAILED_TRACY_ZONE;
-	if (unit->DeathDependencesNotified() || !unit->deathScriptFinished)
+	if (unit->IsPreDeleting() || !unit->deathScriptFinished)
 		return false;
 
 	// there are many ways to fiddle with "deathScriptFinished", so a unit may
@@ -297,9 +297,9 @@ void CUnitHandler::DeleteUnit(CUnit* delUnit)
 	eventHandler.RenderUnitDestroyed(delUnit);
 
 	const int previousDeletingRefID = CSolidObject::GetDeletingRefID();
-	CSolidObject::SetDeletingRefID(delUnit->id);
-	delUnit->NotifyDeathDependences();
-	CSolidObject::SetDeletingRefID(previousDeletingRefID);
+	// Lua may prune virtual references while the complete unit is still readable.
+	// Do not notify native dependants here: they must run after native teardown.
+	delUnit->SetPreDeleting(true);
 	eventHandler.UnitPreDelete(delUnit->id, delUnit->unitDef->id, delUnit->team);
 
 	const auto it = std::find(activeUnits.begin(), activeUnits.end(), delUnit);
@@ -309,7 +309,6 @@ void CUnitHandler::DeleteUnit(CUnit* delUnit)
 		return;
 	}
 
-	const int delUnitID = delUnit->id;
 	const int delUnitTeam = delUnit->team;
 	const int delUnitType = delUnit->unitDef->id;
 
@@ -326,6 +325,8 @@ void CUnitHandler::DeleteUnit(CUnit* delUnit)
 	idPool.FreeID(delUnit->id, true);
 
 	units[delUnit->id] = nullptr;
+	// The ID is now inaccessible. Native destruction keeps its original semantics.
+	delUnit->SetPreDeleting(false);
 
 	entt::entity delUnitEntity = delUnit->entityReference;
 
