@@ -2,7 +2,6 @@
 
 #include <cmath>
 
-// the float exception control register is SSE's; other architectures run the checks without trapping
 #if defined(__SSE__) || defined(_M_X64)
 	#include <xmmintrin.h>
 	#define CAMERA_PROJECTION_TEST_HAS_SSE 1
@@ -15,31 +14,27 @@
 #include <catch_amalgamated.hpp>
 
 namespace {
+	// Debug engine builds unmask these exceptions, so a division by zero stops the process instead of giving an infinity.
+	struct ScopedFloatTraps {
+		ScopedFloatTraps()
+		{
+		#ifdef CAMERA_PROJECTION_TEST_HAS_SSE
+			oldCsr = _mm_getcsr();
+			_mm_setcsr((oldCsr & ~_MM_EXCEPT_MASK) & ~(_MM_MASK_DIV_ZERO | _MM_MASK_INVALID | _MM_MASK_OVERFLOW));
+		#endif
+		}
+		~ScopedFloatTraps()
+		{
+		#ifdef CAMERA_PROJECTION_TEST_HAS_SSE
+			_mm_setcsr(oldCsr);
+		#endif
+		}
+		unsigned int oldCsr = 0;
+	};
 
-// Debug builds of the engine run with float exceptions enabled; do the same here (unmask divide-by-zero and
-// invalid in the SSE control register, which scalar float maths uses on x86-64), so that a division by zero
-// stops the test the way it stops the engine, instead of quietly producing an infinity.
-struct ScopedFloatTraps {
-	ScopedFloatTraps()
-	{
-	#ifdef CAMERA_PROJECTION_TEST_HAS_SSE
-		oldCsr = _mm_getcsr();
-		_mm_setcsr((oldCsr & ~_MM_EXCEPT_MASK) & ~(_MM_MASK_DIV_ZERO | _MM_MASK_INVALID | _MM_MASK_OVERFLOW));
-	#endif
-	}
-	~ScopedFloatTraps()
-	{
-	#ifdef CAMERA_PROJECTION_TEST_HAS_SSE
-		_mm_setcsr(oldCsr);
-	#endif
-	}
-	unsigned int oldCsr = 0;
-};
+	constexpr int VIEWPORT[4] = {0, 0, 1920, 1080};
 
-constexpr int VIEWPORT[4] = {0, 0, 1920, 1080};
-
-bool OffScreenDepth(const float3& vp) { return vp.z < 0.0f || vp.z > 1.0f; }
-
+	bool OffScreenDepth(const float3& vp) { return vp.z < 0.0f || vp.z > 1.0f; }
 }
 
 
@@ -49,7 +44,6 @@ TEST_CASE("ClipToViewport")
 
 	SECTION("a point in front of the camera is projected as before")
 	{
-		// centre of the screen, between the near and far planes
 		const float3 vp = CameraProjection::ClipToViewport(float4(0.0f, 0.0f, 50.0f, 100.0f), VIEWPORT);
 		CHECK(vp.x == Catch::Approx(960.0f));
 		CHECK(vp.y == Catch::Approx(540.0f));
@@ -58,7 +52,6 @@ TEST_CASE("ClipToViewport")
 
 	SECTION("a point in the camera plane (w == 0) gives a finite, off-screen result")
 	{
-		// a unit exactly in the camera plane, as seen by the unit icon code; z is the (negative) near-plane term
 		for (const float w: {0.0f, -0.0f}) {
 			const float3 vp = CameraProjection::ClipToViewport(float4(300.0f, -200.0f, -2.0f, w), VIEWPORT);
 			CHECK(std::isfinite(vp.x));
@@ -68,7 +61,7 @@ TEST_CASE("ClipToViewport")
 		}
 	}
 
-	SECTION("a point in the camera plane with all-zero clip coordinates stays finite")
+	SECTION("all-zero clip coordinates stay finite")
 	{
 		const float3 vp = CameraProjection::ClipToViewport(float4(0.0f, 0.0f, 0.0f, 0.0f), VIEWPORT);
 		CHECK(std::isfinite(vp.x));
