@@ -13,9 +13,12 @@
 #include <string>
 #include <mutex>
 
+#include <mach-o/dyld.h>
+
 #include <SDL.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/graphics/IOGraphicsTypes.h>
+#include <IOSurface/IOSurfaceRef.h>
 
 #include "Rendering/GL/myGL.h"
 #include "System/Config/ConfigHandler.h"
@@ -36,6 +39,11 @@ extern "C" {
 	CFArrayRef CGDisplayCopyAllDisplayModes(uint32_t display, CFDictionaryRef options);
 	size_t CGDisplayModeGetPixelWidth(CGDisplayModeRef mode);
 	uint32_t CGDisplayModeGetIOFlags(CGDisplayModeRef mode);
+
+	// CoreVideo, whose headers gcc cannot parse either
+	typedef struct __CVBuffer* CVPixelBufferRef;
+	int32_t CVPixelBufferCreateWithIOSurface(CFAllocatorRef allocator, IOSurfaceRef surface, CFDictionaryRef attributes, CVPixelBufferRef* pixelBufferOut);
+	void CVPixelBufferRelease(CVPixelBufferRef pixelBuffer);
 }
 
 // minimal EGL declarations; libEGL is dlopen()ed so there is no build-time dependency on Mesa
@@ -89,11 +97,35 @@ namespace {
 	int texSizeX = 0;
 	int texSizeY = 0;
 
-	constexpr unsigned int NUM_PBOS = 2;
-	GLuint pbos[NUM_PBOS] = {};
-	GLsync fences[NUM_PBOS] = {};
-	int pboSizes[NUM_PBOS][2] = {};
+	// One frame read back from the pbuffer. A pinned slot reads straight into an IOSurface
+	// that SDL draws from, a copy slot reads into a PBO that is copied into the streaming texture.
+	struct Slot {
+		GLuint buffer = 0;
+		GLsync fence = nullptr;
+		int sizeX = 0;
+		int sizeY = 0;
+		int rowPixels = 0;
+		IOSurfaceRef ioSurface = nullptr;
+		CVPixelBufferRef pixelBuffer = nullptr;
+		SDL_Texture* texture = nullptr;
+	};
+
+	// three, so a slot is written again only after Metal has had two frames to finish drawing it
+	constexpr unsigned int NUM_SLOTS = 3;
+	Slot slots[NUM_SLOTS];
 	unsigned int frameIdx = 0;
+
+	enum class Readback { Unknown, Pinned, Copy };
+	Readback readback = Readback::Unknown;
+
+	// SDL3 calls for wrapping an IOSurface as a texture, from the SDL3 that sdl2-compat already loaded
+	struct SDL3Funcs {
+		uint32_t (*CreateProperties)() = nullptr;
+		bool (*SetPointerProperty)(uint32_t, const char*, void*) = nullptr;
+		bool (*SetNumberProperty)(uint32_t, const char*, int64_t) = nullptr;
+		void (*DestroyProperties)(uint32_t) = nullptr;
+		SDL_Texture* (*CreateTextureWithProperties)(SDL_Renderer*, uint32_t) = nullptr;
+	} sdl3;
 
 	std::mutex surfMutex;
 
@@ -189,6 +221,177 @@ namespace {
 			LOG("[MacEGLBridge] presenting through SDL renderer \"%s\"", info.name);
 
 		return true;
+	}
+
+	bool LoadSDL3() {
+		void* lib = nullptr;
+
+		// dlopen by the loaded image's own path, a second copy of SDL3 would not know the renderer
+		for (uint32_t i = 0; i < _dyld_image_count() && lib == nullptr; ++i) {
+			const char* name = _dyld_get_image_name(i);
+			if (strstr(name, "libSDL3") != nullptr)
+				lib = dlopen(name, RTLD_NOLOAD | RTLD_LAZY);
+		}
+
+		if (lib == nullptr)
+			return false;
+
+		sdl3.CreateProperties = reinterpret_cast<decltype(sdl3.CreateProperties)>(dlsym(lib, "SDL_CreateProperties"));
+		sdl3.SetPointerProperty = reinterpret_cast<decltype(sdl3.SetPointerProperty)>(dlsym(lib, "SDL_SetPointerProperty"));
+		sdl3.SetNumberProperty = reinterpret_cast<decltype(sdl3.SetNumberProperty)>(dlsym(lib, "SDL_SetNumberProperty"));
+		sdl3.DestroyProperties = reinterpret_cast<decltype(sdl3.DestroyProperties)>(dlsym(lib, "SDL_DestroyProperties"));
+		sdl3.CreateTextureWithProperties = reinterpret_cast<decltype(sdl3.CreateTextureWithProperties)>(dlsym(lib, "SDL_CreateTextureWithProperties"));
+
+		return sdl3.CreateProperties != nullptr && sdl3.SetPointerProperty != nullptr && sdl3.SetNumberProperty != nullptr &&
+			sdl3.DestroyProperties != nullptr && sdl3.CreateTextureWithProperties != nullptr;
+	}
+
+	void DestroySlot(Slot& s) {
+		// the GPU may still be writing into a pinned slot's pages
+		if (s.fence != nullptr) {
+			glClientWaitSync(s.fence, 0, GL_TIMEOUT_IGNORED);
+			glDeleteSync(s.fence);
+		}
+		if (s.buffer != 0)
+			glDeleteBuffers(1, &s.buffer);
+		if (s.texture != nullptr)
+			SDL_DestroyTexture(s.texture);
+		if (s.pixelBuffer != nullptr)
+			CVPixelBufferRelease(s.pixelBuffer);
+		if (s.ioSurface != nullptr) {
+			IOSurfaceUnlock(s.ioSurface, 0, nullptr);
+			CFRelease(s.ioSurface);
+		}
+
+		s = Slot{};
+	}
+
+	void DestroySlots() {
+		for (Slot& s: slots)
+			DestroySlot(s);
+	}
+
+	IOSurfaceRef CreateIOSurface(int sx, int sy, size_t rowBytes) {
+		constexpr int32_t pixelFormatRGBA = 0x52474241; // the four-char code 'RGBA'
+		const int32_t values[] = {sx, sy, 4, static_cast<int32_t>(rowBytes), pixelFormatRGBA};
+		const CFStringRef keys[] = {kIOSurfaceWidth, kIOSurfaceHeight, kIOSurfaceBytesPerElement, kIOSurfaceBytesPerRow, kIOSurfacePixelFormat};
+		CFTypeRef numbers[std::size(values)];
+
+		for (size_t i = 0; i < std::size(values); ++i)
+			numbers[i] = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &values[i]);
+
+		const CFDictionaryRef props = CFDictionaryCreate(kCFAllocatorDefault, reinterpret_cast<const void**>(const_cast<CFStringRef*>(keys)), numbers, std::size(keys), &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+		const IOSurfaceRef ioSurface = IOSurfaceCreate(props);
+
+		CFRelease(props);
+		for (CFTypeRef n: numbers)
+			CFRelease(n);
+
+		return ioSurface;
+	}
+
+	// The IOSurface's pages back both a GL pack buffer (GL_AMD_pinned_memory) and the SDL texture,
+	// so the readback is the only copy of the frame.
+	bool CreatePinnedSlot(Slot& s, int sx, int sy) {
+		const size_t rowBytes = IOSurfaceAlignProperty(kIOSurfaceBytesPerRow, sx * 4);
+
+		if ((s.ioSurface = CreateIOSurface(sx, sy, rowBytes)) == nullptr) {
+			LOG_L(L_ERROR, "[MacEGLBridge] IOSurfaceCreate(%dx%d) failed", sx, sy);
+			return false;
+		}
+
+		// the pinned GL buffer needs the pages at a fixed address for as long as it exists
+		IOSurfaceLock(s.ioSurface, 0, nullptr);
+
+		while (glGetError() != GL_NO_ERROR) {}
+
+		glGenBuffers(1, &s.buffer);
+		glBindBuffer(GL_EXTERNAL_VIRTUAL_MEMORY_BUFFER_AMD, s.buffer);
+		glBufferData(GL_EXTERNAL_VIRTUAL_MEMORY_BUFFER_AMD, IOSurfaceGetAllocSize(s.ioSurface), IOSurfaceGetBaseAddress(s.ioSurface), GL_STREAM_READ);
+		glBindBuffer(GL_EXTERNAL_VIRTUAL_MEMORY_BUFFER_AMD, 0);
+
+		if (const GLenum err = glGetError(); err != GL_NO_ERROR) {
+			LOG_L(L_ERROR, "[MacEGLBridge] pinning the IOSurface as a GL buffer failed: 0x%x", err);
+			return false;
+		}
+
+		if (CVPixelBufferCreateWithIOSurface(kCFAllocatorDefault, s.ioSurface, nullptr, &s.pixelBuffer) != 0) {
+			LOG_L(L_ERROR, "[MacEGLBridge] CVPixelBufferCreateWithIOSurface failed");
+			return false;
+		}
+
+		const uint32_t props = sdl3.CreateProperties();
+		sdl3.SetPointerProperty(props, "SDL.texture.create.metal.pixelbuffer", s.pixelBuffer);
+		sdl3.SetNumberProperty(props, "SDL.texture.create.format", SDL_PIXELFORMAT_ABGR8888);
+		sdl3.SetNumberProperty(props, "SDL.texture.create.width", sx);
+		sdl3.SetNumberProperty(props, "SDL.texture.create.height", sy);
+		s.texture = sdl3.CreateTextureWithProperties(renderer, props);
+		sdl3.DestroyProperties(props);
+
+		if (s.texture == nullptr) {
+			LOG_L(L_ERROR, "[MacEGLBridge] SDL texture over the IOSurface failed: %s", SDL_GetError());
+			return false;
+		}
+
+		// what SDL_CreateTexture would have set
+		SDL_SetTextureBlendMode(s.texture, SDL_BLENDMODE_NONE);
+		SDL_SetTextureScaleMode(s.texture, SDL_ScaleModeLinear);
+
+		s.sizeX = sx;
+		s.sizeY = sy;
+		s.rowPixels = static_cast<int>(rowBytes / 4);
+		return true;
+	}
+
+	void CreateCopySlot(Slot& s, int sx, int sy) {
+		glGenBuffers(1, &s.buffer);
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, s.buffer);
+		glBufferData(GL_PIXEL_PACK_BUFFER, sx * sy * 4, nullptr, GL_STREAM_READ);
+
+		s.sizeX = sx;
+		s.sizeY = sy;
+		s.rowPixels = sx;
+	}
+
+	// copies a copy slot's pixels into the streaming texture, which SDL then uploads to Metal
+	void CopyToTexture(const Slot& s) {
+		glBindBuffer(GL_PIXEL_PACK_BUFFER, s.buffer);
+		const void* data = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, s.sizeX * s.sizeY * 4, GL_MAP_READ_BIT);
+
+		if (data == nullptr)
+			return;
+
+		if (texture == nullptr || texSizeX != s.sizeX || texSizeY != s.sizeY) {
+			if (texture != nullptr)
+				SDL_DestroyTexture(texture);
+			texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, s.sizeX, s.sizeY);
+			texSizeX = s.sizeX;
+			texSizeY = s.sizeY;
+		}
+
+		void* pixels = nullptr;
+		int pitch = 0;
+		if (texture != nullptr && SDL_LockTexture(texture, nullptr, &pixels, &pitch) == 0) {
+			if (pitch == s.sizeX * 4) {
+				memcpy(pixels, data, s.sizeX * s.sizeY * 4);
+			} else {
+				for (int y = 0; y < s.sizeY; ++y)
+					memcpy(static_cast<uint8_t*>(pixels) + y * pitch, static_cast<const uint8_t*>(data) + y * s.sizeX * 4, s.sizeX * 4);
+			}
+			SDL_UnlockTexture(texture);
+		}
+
+		glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+	}
+
+	void ChooseReadback() {
+		if (GLAD_GL_AMD_pinned_memory && LoadSDL3()) {
+			readback = Readback::Pinned;
+			LOG("[MacEGLBridge] reading frames back into IOSurfaces that SDL draws directly");
+		} else {
+			readback = Readback::Copy;
+			LOG("[MacEGLBridge] reading frames back through a copy (GL_AMD_pinned_memory=%d)", GLAD_GL_AMD_pinned_memory);
+		}
 	}
 
 	size_t NativePixelWidth(uint32_t cgDisplay) {
@@ -457,6 +660,9 @@ void MacEGLBridge::DestroyContext()
 	if (context == nullptr)
 		return;
 
+	egl.MakeCurrent(display, surface, surface, context);
+	DestroySlots();
+
 	if (texture != nullptr)
 		SDL_DestroyTexture(texture);
 	if (renderer != nullptr)
@@ -465,16 +671,6 @@ void MacEGLBridge::DestroyContext()
 	texture = nullptr;
 	renderer = nullptr;
 	texSizeX = texSizeY = 0;
-
-	egl.MakeCurrent(display, surface, surface, context);
-	for (unsigned int i = 0; i < NUM_PBOS; i++) {
-		if (fences[i] != nullptr)
-			glDeleteSync(fences[i]);
-		fences[i] = nullptr;
-	}
-	if (pbos[0] != 0)
-		glDeleteBuffers(NUM_PBOS, pbos);
-	std::fill(std::begin(pbos), std::end(pbos), 0);
 
 	egl.MakeCurrent(display, nullptr, nullptr, nullptr);
 	egl.DestroySurface(display, surface);
@@ -519,62 +715,48 @@ void MacEGLBridge::SwapWindow(SDL_Window* window)
 	glGetIntegerv(GL_READ_BUFFER, &prevReadBuf);
 	glReadBuffer(GL_BACK);
 	glPixelStorei(GL_PACK_ALIGNMENT, 4);
-	glPixelStorei(GL_PACK_ROW_LENGTH, 0);
 
-	if (pbos[0] == 0)
-		glGenBuffers(NUM_PBOS, pbos);
+	if (readback == Readback::Unknown)
+		ChooseReadback();
 
-	// asynchronous readback: queue this frame into one PBO and present the oldest one; the flush
-	// submits the frame right away so mapping never has to wait for the frame currently in flight
-	const unsigned int cur = frameIdx % NUM_PBOS;
-	const unsigned int prv = (frameIdx + 1) % NUM_PBOS;
+	// Asynchronous readback: queue this frame into one slot and present the previous frame's.
+	// The flush submits the frame right away, so presenting never waits for the frame in flight.
+	const unsigned int cur = frameIdx % NUM_SLOTS;
+	const unsigned int prv = (frameIdx + NUM_SLOTS - 1) % NUM_SLOTS;
 
-	glBindBuffer(GL_PIXEL_PACK_BUFFER, pbos[cur]);
-	if (pboSizes[cur][0] != surfSizeX || pboSizes[cur][1] != surfSizeY) {
-		glBufferData(GL_PIXEL_PACK_BUFFER, surfSizeX * surfSizeY * 4, nullptr, GL_STREAM_READ);
-		pboSizes[cur][0] = surfSizeX;
-		pboSizes[cur][1] = surfSizeY;
+	if (Slot& s = slots[cur]; s.sizeX != surfSizeX || s.sizeY != surfSizeY) {
+		DestroySlot(s);
+
+		if (readback == Readback::Pinned && !CreatePinnedSlot(s, surfSizeX, surfSizeY)) {
+			LOG_L(L_WARNING, "[MacEGLBridge] falling back to reading frames back through a copy");
+			readback = Readback::Copy;
+			DestroySlots();
+		}
+		if (readback == Readback::Copy)
+			CreateCopySlot(s, surfSizeX, surfSizeY);
 	}
+
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, slots[cur].buffer);
+	glPixelStorei(GL_PACK_ROW_LENGTH, slots[cur].rowPixels);
 	glReadPixels(0, 0, surfSizeX, surfSizeY, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
-	if (fences[cur] != nullptr)
-		glDeleteSync(fences[cur]);
-	fences[cur] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+	if (slots[cur].fence != nullptr)
+		glDeleteSync(slots[cur].fence);
+	slots[cur].fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 	glFlush();
 
-	const int px = pboSizes[prv][0];
-	const int py = pboSizes[prv][1];
+	SDL_Texture* frame = (readback == Readback::Copy) ? texture : nullptr;
 
-	if (fences[prv] != nullptr && px > 0 && py > 0) {
-		glClientWaitSync(fences[prv], 0, GL_TIMEOUT_IGNORED);
-		glDeleteSync(fences[prv]);
-		fences[prv] = nullptr;
+	if (Slot& p = slots[prv]; p.fence != nullptr) {
+		glClientWaitSync(p.fence, 0, GL_TIMEOUT_IGNORED);
+		glDeleteSync(p.fence);
+		p.fence = nullptr;
 
-		glBindBuffer(GL_PIXEL_PACK_BUFFER, pbos[prv]);
-		const void* data = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, px * py * 4, GL_MAP_READ_BIT);
-
-		if (data != nullptr) {
-			if (texture == nullptr || texSizeX != px || texSizeY != py) {
-				if (texture != nullptr)
-					SDL_DestroyTexture(texture);
-				texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, px, py);
-				texSizeX = px;
-				texSizeY = py;
-			}
-
-			void* pixels = nullptr;
-			int pitch = 0;
-			if (texture != nullptr && SDL_LockTexture(texture, nullptr, &pixels, &pitch) == 0) {
-				if (pitch == px * 4) {
-					memcpy(pixels, data, px * py * 4);
-				} else {
-					for (int y = 0; y < py; ++y)
-						memcpy(static_cast<uint8_t*>(pixels) + y * pitch, static_cast<const uint8_t*>(data) + y * px * 4, px * 4);
-				}
-				SDL_UnlockTexture(texture);
-			}
-
-			glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+		if (readback == Readback::Pinned) {
+			frame = p.texture;
+		} else {
+			CopyToTexture(p);
+			frame = texture;
 		}
 	}
 
@@ -584,8 +766,8 @@ void MacEGLBridge::SwapWindow(SDL_Window* window)
 	glPixelStorei(GL_PACK_ROW_LENGTH, prevRowLen);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, prevReadFBO);
 
-	if (texture != nullptr) {
-		SDL_RenderCopyEx(renderer, texture, nullptr, nullptr, 0.0, nullptr, SDL_FLIP_VERTICAL);
+	if (frame != nullptr) {
+		SDL_RenderCopyEx(renderer, frame, nullptr, nullptr, 0.0, nullptr, SDL_FLIP_VERTICAL);
 		SDL_RenderPresent(renderer);
 	}
 
